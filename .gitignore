@@ -66,3 +66,7 @@ export_presets.local.cfg
 
 # Image-generation tool state (empty lock file, recreated on each run)
 generated_images/.tbh-generated-images.lock
+
+# Raw image-generation dumps at the repo root of generated_images/;
+# curated results belong in named subfolders (prototypes/, screenshots/)
+/generated_images/call_*
