@@ -34,6 +34,36 @@ Enter coordinates or pick any location on a world map to generate an accurate 36
 
 Initial development targets **macOS** for easier development and testing, followed by **iOS** and **Android**.
 
+## Development
+
+Stack: Godot 4.7.2 (standard, non-.NET build) + GDScript, Blender offline
+for assets, GDAL for dev-time geo data prep. No Flutter, no self-hosted
+server, free with no paywall. Architecture:
+[`.agents/plans/2026-10-27-planet-render-360-architecture.md`](.agents/plans/2026-10-27-planet-render-360-architecture.md),
+data-source gate: [`docs/data-source-register.md`](docs/data-source-register.md).
+
+Run: open the project in Godot 4.7.2, or from the repo root:
+
+```sh
+godot --path .            # run the app
+godot --headless --script tests/smoke_test.gd   # contract checks
+godot --headless --script tests/osm_test.gd     # OSM parser (offline fixture)
+godot --headless --script tests/tiles_test.gd   # tile math + pool drain
+godot --headless --script tests/search_test.gd  # place-search parser
+godot --headless --script tests/weather_test.gd # weather parser
+godot --headless --script tests/dem_test.gd     # live DEM decode (network once)
+godot --headless --script tests/flow_test.gd    # picker -> loading -> 360 flow
+godot --headless --script tests/responsive_test.gd # breakpoints + layout switching
+godot --headless --script tests/zoom_search_test.gd # map/360 zoom, search predictions, time of day
+godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
+```
+
+Current MVP: map picker (tap/search/coordinates) → staged loading pipeline
+→ procedural 360° terrain view with drag-look, landmark, buildings,
+vegetation, and time-of-day control → on-device history/cache. Real DEM and
+map data swap in behind the same `LocationData` contract once the
+data-source register is settled.
+
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
