@@ -21,9 +21,11 @@ func _ready() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	_margin.add_child(col)
-	_title = UiTheme.label("History", 34, UiTheme.INK, true)
+	_title = UiTheme.label("◷  History", 34, UiTheme.INK, true)
 	col.add_child(_title)
-	col.add_child(UiTheme.label("Saved places", 17, UiTheme.MUTED))
+	var subtitle := UiTheme.label("Places you've rendered — tap one to step back inside. Saved on this device, works offline.", 15, UiTheme.MUTED)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(subtitle)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -67,10 +69,29 @@ func refresh() -> void:
 	for child in _list.get_children():
 		child.queue_free()
 	if _store == null or _store.entries.is_empty():
+		var empty_card := PanelContainer.new()
+		empty_card.custom_minimum_size = Vector2(0, 220)
+		empty_card.add_theme_stylebox_override("panel",
+			UiTheme.style(UiTheme.CARD, 18, Color.TRANSPARENT, true))
+		var empty_col := VBoxContainer.new()
+		empty_col.alignment = BoxContainer.ALIGNMENT_CENTER
+		empty_col.add_theme_constant_override("separation", 8)
+		empty_card.add_child(empty_col)
+		var empty_icon := UiTheme.label("◭", 40, UiTheme.AMBER, true)
+		empty_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_col.add_child(empty_icon)
+		var empty_title := UiTheme.label("No places yet", 20, UiTheme.INK, true)
+		empty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_col.add_child(empty_title)
 		var empty := UiTheme.label(
-			"No places yet. Render a location and it will appear here.", 16, UiTheme.MUTED)
+			"Pick a spot on the map, render it in 360°, and it will wait for you here.", 15, UiTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_list.add_child(empty)
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_col.add_child(empty)
+		var explore := UiTheme.primary_button("◭  Explore the map")
+		explore.pressed.connect(func() -> void: back_requested.emit())
+		empty_col.add_child(explore)
+		_list.add_child(empty_card)
 		return
 	_list.columns = Responsive.history_columns(_current_layout)
 	for entry in _store.entries:
@@ -87,7 +108,10 @@ func refresh() -> void:
 		var thumb := PanelContainer.new()
 		thumb.custom_minimum_size = Vector2(76, 76)
 		thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		thumb.add_theme_stylebox_override("panel", UiTheme.style(Color(0.72, 0.78, 0.72), 12))
+		# Varied sage tints per place so the list scans as places, not rows.
+		var tints := [Color(0.62, 0.72, 0.62), Color(0.58, 0.68, 0.72), Color(0.72, 0.68, 0.55), Color(0.66, 0.62, 0.72)]
+		var tint: Color = tints[abs(str(entry.get("name", "")).hash()) % tints.size()]
+		thumb.add_theme_stylebox_override("panel", UiTheme.style(tint, 12))
 		var thumb_label := UiTheme.label("◭", 26, Color.WHITE)
 		thumb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		thumb_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -103,6 +127,7 @@ func refresh() -> void:
 		texts.add_child(UiTheme.label("⬇ Cached · works offline", 14, UiTheme.TEAL))
 		texts.add_child(UiTheme.label("%.4f°, %.4f°" % [lat, lon], 13, UiTheme.MUTED))
 		var open_btn := UiTheme.primary_button("Open 360° View")
+		open_btn.clip_text = true
 		open_btn.custom_minimum_size = Vector2(0, 48)
 		open_btn.pressed.connect(func() -> void: place_selected.emit(lat, lon))
 		texts.add_child(open_btn)

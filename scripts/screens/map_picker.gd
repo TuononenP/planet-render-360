@@ -27,6 +27,9 @@ var _map_wrap: Control
 var _card: PanelContainer
 var _history_btn: Button
 var _tip: Label
+var _quick_box: VBoxContainer
+var _ready_label: Label
+var _coords_label: Label
 var _layout_btn: OptionButton
 var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
@@ -42,19 +45,26 @@ func _ready() -> void:
 	add_child(_margin)
 
 	_stack = VBoxContainer.new()
-	_stack.add_theme_constant_override("separation", 12)
+	_stack.add_theme_constant_override("separation", 10)
 	_margin.add_child(_stack)
 	_split = HBoxContainer.new()
 	_split.add_theme_constant_override("separation", 16)
 	_split.visible = false
 	_margin.add_child(_split)
 
-	# Header: title + layout option (Auto follows the window size).
+	# Header: name + one-line promise, layout option stays quiet.
 	_header = HBoxContainer.new()
 	_header.add_theme_constant_override("separation", 10)
-	var title := UiTheme.label("Planet Render 360", 26, UiTheme.INK, true)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_header.add_child(title)
+	_header.alignment = BoxContainer.ALIGNMENT_CENTER
+	var title_box := VBoxContainer.new()
+	title_box.add_theme_constant_override("separation", 2)
+	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := UiTheme.label("◭  Planet Render 360", 27, UiTheme.INK, true)
+	title_box.add_child(title)
+	var tagline := UiTheme.label("Stand anywhere on Earth — see it in 360°", 14, UiTheme.MUTED)
+	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_box.add_child(tagline)
+	_header.add_child(title_box)
 	_layout_btn = OptionButton.new()
 	_layout_btn.add_item("Auto layout", 0)
 	_layout_btn.add_item("Compact", 1)
@@ -70,7 +80,7 @@ func _ready() -> void:
 
 	_search_box = VBoxContainer.new()
 	_search_box.add_theme_constant_override("separation", 6)
-	_search = UiTheme.field("Search place or coordinates")
+	_search = UiTheme.field("Search a place — try “Banff”")
 	_search.text_submitted.connect(func(t: String) -> void:
 		_hide_suggestions()
 		_on_search(t))
@@ -89,6 +99,26 @@ func _ready() -> void:
 	_suggest_timer.wait_time = 0.45
 	_suggest_timer.timeout.connect(_request_remote_suggestions)
 	add_child(_suggest_timer)
+
+	# Quick picks: one tap to a wow place, no typing needed first run.
+	_quick_box = VBoxContainer.new()
+	_quick_box.add_theme_constant_override("separation", 6)
+	_quick_box.add_child(UiTheme.section_label("Try a place — one tap"))
+	var quick_row := HBoxContainer.new()
+	quick_row.add_theme_constant_override("separation", 8)
+	_quick_box.add_child(quick_row)
+	for quick in [
+			["Paris", "Paris, France", 48.8566, 2.3522],
+			["Alps", "Interlaken, Switzerland", 46.6863, 7.8632],
+			["Banff", "Banff, Canada", 51.1789, -115.5708],
+			["Big Sur", "Big Sur, United States", 36.2704, -121.8081],
+			["Tokyo", "Tokyo, Japan", 35.6762, 139.6503]]:
+		var chip := UiTheme.chip_button(str(quick[0]))
+		var qname := str(quick[1])
+		var qlat := float(quick[2])
+		var qlon := float(quick[3])
+		chip.pressed.connect(func() -> void: _select_suggestion(qname, qlat, qlon))
+		quick_row.add_child(chip)
 
 	# Map fills whatever space the layout gives it (no fixed height, so
 	# no dead band below the card on tall or desktop windows).
@@ -114,16 +144,33 @@ func _ready() -> void:
 	var zoom_in := UiTheme.icon_button("+")
 	zoom_in.pressed.connect(func() -> void: _canvas.zoom_in())
 	zoom_row.add_child(zoom_in)
+	# Hint pill floats on the map: guidance where the hand already is,
+	# at no layout height cost on compact screens.
+	var hint_pill := UiTheme.pill("Tap the map to drop the pin", 13)
+	hint_pill.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hint_pill.offset_left = 12
+	hint_pill.offset_top = -52
+	hint_pill.offset_right = 236
+	hint_pill.offset_bottom = -12
+	hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_wrap.add_child(hint_pill)
+	_tip = hint_pill.get_meta("label") as Label
 
 	_card = PanelContainer.new()
 	_card.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.CARD, 16, Color.TRANSPARENT, true))
 	var card_col := VBoxContainer.new()
 	card_col.add_theme_constant_override("separation", 10)
 	_card.add_child(card_col)
+	card_col.add_child(UiTheme.section_label("Selected place"))
 	_name_label = UiTheme.label("Paris, France", 22, UiTheme.INK, true)
+	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	card_col.add_child(_name_label)
 	_coord_label = UiTheme.label("", 15, UiTheme.MUTED)
 	card_col.add_child(_coord_label)
+	_ready_label = UiTheme.label("● Ready — tap Render and step inside", 14, UiTheme.TEAL, true)
+	card_col.add_child(_ready_label)
+	_coords_label = UiTheme.section_label("Coordinates — or just tap the map")
+	card_col.add_child(_coords_label)
 	var fields := HBoxContainer.new()
 	fields.add_theme_constant_override("separation", 10)
 	card_col.add_child(fields)
@@ -137,15 +184,12 @@ func _ready() -> void:
 	_lon_field.text_changed.connect(func(_t: String) -> void: _sync_from_fields())
 	fields.add_child(_lat_field)
 	fields.add_child(_lon_field)
-	var render_btn := UiTheme.primary_button("Render 360° View")
+	var render_btn := UiTheme.primary_button("◭  Render this place in 360°")
 	render_btn.pressed.connect(func() -> void: render_requested.emit(_lat, _lon))
 	card_col.add_child(render_btn)
 
-	_history_btn = UiTheme.ghost_button("History & Saved Places")
+	_history_btn = UiTheme.ghost_button("◷  History & saved places")
 	_history_btn.pressed.connect(func() -> void: history_requested.emit())
-
-	_tip = UiTheme.label("Drag to pan, scroll or pinch to zoom, tap to place the pin. Or search above — predictions appear as you type.", 14, UiTheme.MUTED)
-	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	_sidebar = PanelContainer.new()
 	_sidebar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -186,6 +230,14 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 	if _stack == null:
 		return  # not ready yet; _ready applies the initial layout
 	_current_layout = layout
+	# Compact is height-tight: the map hint already says "tap the map",
+	# so the coordinates caption gives its height back to the map.
+	if _coords_label != null:
+		_coords_label.visible = layout != Responsive.Layout.COMPACT
+	# The layout override is a wide-screen convenience; on compact its
+	# minimum width alone would push the whole column past the screen.
+	if _layout_btn != null:
+		_layout_btn.visible = layout != Responsive.Layout.COMPACT
 	var pad := Responsive.page_padding(layout)
 	_margin.add_theme_constant_override("margin_left", pad)
 	_margin.add_theme_constant_override("margin_right", pad)
@@ -199,19 +251,18 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 		_sidebar.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
 		_move(_header, _side_col)
 		_move(_search_box, _side_col)
+		_move(_quick_box, _side_col)
 		_move(_card, _side_col)
 		_move(_history_btn, _side_col)
-		_move(_tip, _side_col)
 	else:
 		_split.visible = false
 		_stack.visible = true
 		_move(_header, _stack)
 		_move(_search_box, _stack)
+		_move(_quick_box, _stack)
 		_move(_map_wrap, _stack)
 		_move(_card, _stack)
 		_move(_history_btn, _stack)
-		if _tip.get_parent() != null:
-			_tip.get_parent().remove_child(_tip)
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()
@@ -220,6 +271,10 @@ func _on_picked(lat: float, lon: float) -> void:
 	_lon = lon
 	_lat_field.text = "%.4f" % lat
 	_lon_field.text = "%.4f" % lon
+	# Keep the map centred on the choice: search and quick picks arrive
+	# without a map tap, so without this the pin stayed on the old place.
+	if _canvas != null:
+		_canvas.set_lat_lon(lat, lon)
 	_refresh_labels()
 
 func _sync_from_fields() -> void:
