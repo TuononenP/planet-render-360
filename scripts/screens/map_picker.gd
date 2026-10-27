@@ -226,6 +226,10 @@ func _move(node: Control, parent: Container) -> void:
 		node.get_parent().remove_child(node)
 	parent.add_child(node)
 
+func _move_all(nodes: Array, parent: Container) -> void:
+	for node in nodes:
+		_move(node, parent)
+
 func _apply_layout(layout: Responsive.Layout) -> void:
 	if _stack == null:
 		return  # not ready yet; _ready applies the initial layout
@@ -246,23 +250,13 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 	if Responsive.is_split(layout):
 		_stack.visible = false
 		_split.visible = true
-		_move(_map_wrap, _split)
-		_move(_sidebar, _split)
+		_move_all([_map_wrap, _sidebar], _split)
 		_sidebar.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
-		_move(_header, _side_col)
-		_move(_search_box, _side_col)
-		_move(_quick_box, _side_col)
-		_move(_card, _side_col)
-		_move(_history_btn, _side_col)
+		_move_all([_header, _search_box, _quick_box, _card, _history_btn], _side_col)
 	else:
 		_split.visible = false
 		_stack.visible = true
-		_move(_header, _stack)
-		_move(_search_box, _stack)
-		_move(_quick_box, _stack)
-		_move(_map_wrap, _stack)
-		_move(_card, _stack)
-		_move(_history_btn, _stack)
+		_move_all([_header, _search_box, _quick_box, _map_wrap, _card, _history_btn], _stack)
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()
