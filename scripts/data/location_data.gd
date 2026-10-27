@@ -9,6 +9,16 @@ var place_name: String = "Unknown place"
 var latitude: float = 0.0
 var longitude: float = 0.0
 
+## RenderSettings.Preset value (0 Fast, 1 Balanced, 2 High) chosen for
+## this render; TerrainBuilder reads its budgets from it.
+var quality_preset: int = 1
+
+## Real-world relief across the detailed grid, in metres (0 = unknown).
+## The pipeline's adaptive vertical scale maps every place to ~30
+## world units, so world relief cannot tell a plain from the Alps;
+## TerrainBuilder uses this to pick pavement vs meadow ground.
+var relief_metres: float = 0.0
+
 ## TerrainData equivalent, kept as typed fields for the MVP.
 var grid_size: int = 48
 var heights: PackedFloat32Array = PackedFloat32Array()
@@ -24,7 +34,30 @@ var far_heights: PackedFloat32Array = PackedFloat32Array()
 var far_grid_size: int = 64
 var far_extent: float = 9000.0  # world units spanned by the far tile
 var far_centre_frac: Vector2 = Vector2(0.5, 0.5)  # viewpoint inside far tile
-var landmark_type: String = "none"  # none | eiffel | tower
+## Satellite mosaic draped on the detailed terrain (SatelliteFetcher).
+## Null means "no imagery": vertex colours dress the terrain instead.
+var satellite_texture: Texture2D
+## Global-pixel coordinates (at satellite_zoom) of the mosaic's
+## top-left corner; TerrainBuilder turns world XZ into UVs from it.
+var satellite_origin_px: Vector2 = Vector2.ZERO
+var satellite_zoom: int = 16
+var landmark_type: String = "none"  # see landmarks() for the types
+## True site of the landmark (landmarks() entry), so TerrainBuilder
+## can place the model at its real bearing from the viewpoint instead
+## of a fixed offset. has_landmark_site distinguishes "no site" from
+## a legitimate site near 0,0.
+var has_landmark_site: bool = false
+var landmark_lat: float = 0.0
+var landmark_lon: float = 0.0
+
+enum Season { SPRING, SUMMER, AUTUMN, WINTER }
+const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
+## Season chosen in the 360 view; TerrainBuilder bakes its ground and
+## leaf colours from it (snow line, autumn canopy, spring grass).
+var season: int = Season.SUMMER
+
+static func clamp_season(value: int) -> int:
+	return clampi(value, Season.SPRING, Season.WINTER)
 var seed_value: int = 0
 var attribution: String = ""
 ## Real OSM features in world XZ space; empty means procedural dressing.

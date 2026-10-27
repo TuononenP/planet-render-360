@@ -29,6 +29,11 @@ var _sky_mat: ProceduralSkyMaterial
 var _cloud_cover := 0.0
 var _weather_foggy := false
 var _touches: Dictionary = {}
+var _quality_preset: int = RenderSettings.Preset.BALANCED
+var _data: LocationData
+var _generated: Node3D
+var _season_btn: OptionButton
+var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
 
@@ -70,6 +75,7 @@ func _ready() -> void:
 	add_child(_governor)
 	_governor.viewport = _viewport
 	_governor.sun = _sun
+	_governor.set_preset(_quality_preset)
 	_governor.quality_changed.connect(func(step_name: String, fps: float) -> void:
 		if _quality_label != null:
 			_quality_label.text = "%s · %d fps" % [step_name, int(round(fps))])
@@ -171,6 +177,20 @@ func _ready() -> void:
 	_now_btn = _dark_btn("Use current time", Vector2(0, 46))
 	_now_btn.pressed.connect(use_live_time)
 	bottom.add_child(_now_btn)
+	var season_row := HBoxContainer.new()
+	season_row.add_theme_constant_override("separation", 8)
+	bottom.add_child(season_row)
+	season_row.add_child(UiTheme.label("❋ Season", 14, Color.WHITE, true))
+	_season_btn = OptionButton.new()
+	for i in LocationData.SEASON_NAMES.size():
+		_season_btn.add_item(LocationData.SEASON_NAMES[i], i)
+	_season_btn.select(LocationData.Season.SUMMER)
+	_season_btn.custom_minimum_size = Vector2(0, 44)
+	_season_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_season_btn.add_theme_font_size_override("font_size", 14)
+	UiTheme.apply_option(_season_btn)
+	_season_btn.item_selected.connect(_on_season_selected)
+	season_row.add_child(_season_btn)
 	_quality_label = _center_label("High · 60 fps", 12, Color(1, 1, 1, 0.85))
 	bottom.add_child(_quality_label)
 	_attribution_label = _center_label("", 11, Color(1, 1, 1, 0.8))
@@ -231,7 +251,10 @@ func _build_3d() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 0.85
-	env.ambient_light_sky_contribution = 0.6
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.06
+	env.adjustment_saturation = 1.12
+	env.ambient_light_sky_contribution = 0.45
 	env.fog_enabled = true
 	env.fog_density = 0.00035
 	env.fog_sky_affect = 0.3
@@ -245,15 +268,90 @@ func _build_3d() -> void:
 	_rig.add_child(cam)
 	_rig.position = Vector3(0, 14, 0)
 	_world_root.add_child(_rig)
+	_build_precip()
+
+## Caps the FPS governor at the user's preset; terrain accuracy for a
+## place is fixed when it was generated, so this only moves the live
+## render scale / shadow ceiling.
+func set_quality_preset(preset_value: int) -> void:
+	_quality_preset = RenderSettings.clamp_preset(preset_value)
+	if _governor != null:
+		_governor.set_preset(_quality_preset)
+
+## Replace the generated world in place. The old world is tracked by
+## reference: same-named siblings get auto-renamed by the engine, so
+## the previous name-based cleanup leaked a world per place visited.
+func _rebuild_world() -> void:
+	if _data == null or _world_root == null:
+		return
+	if _generated != null and is_instance_valid(_generated):
+		_world_root.remove_child(_generated)
+		_generated.queue_free()
+	_generated = TerrainBuilder.build_world(_data)
+	_world_root.add_child(_generated)
+
+func _on_season_selected(index: int) -> void:
+	if _data == null:
+		return
+	_data.season = LocationData.clamp_season(index)
+	if _season_btn != null:
+		_season_btn.select(_data.season)
+	_data.display_heights = PackedFloat32Array()  # colours bake per season
+	_rebuild_world()
+
+## Rain/snow dressing from the live weather code: one particle system
+## around the camera, off unless the place is actually precipitating.
+func _build_precip() -> void:
+	_precip = GPUParticles3D.new()
+	_precip.amount = 900
+	_precip.lifetime = 1.6
+	_precip.emitting = false
+	_precip.visible = false
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	mat.emission_box_extents = Vector3(28, 16, 28)
+	mat.direction = Vector3(0, -1, 0)
+	mat.spread = 6.0
+	mat.gravity = Vector3(0, -22, 0)
+	mat.initial_velocity_min = 4.0
+	mat.initial_velocity_max = 7.0
+	_precip.process_material = mat
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.05, 0.5)
+	var qm := StandardMaterial3D.new()
+	qm.albedo_color = Color(0.75, 0.85, 0.95, 0.55)
+	qm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	qm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	quad.material = qm
+	_precip.draw_pass_1 = quad
+	_rig.add_child(_precip)
+	_precip.position = Vector3(0, 10, 0)
+
+func _apply_precip(code: int) -> void:
+	if _precip == null:
+		return
+	var snowing := code in [71, 73, 75, 77, 85, 86]
+	var raining := code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]
+	_precip.visible = snowing or raining
+	_precip.emitting = snowing or raining
+	if snowing:
+		var mat := _precip.process_material as ParticleProcessMaterial
+		mat.gravity = Vector3(0, -3.5, 0)
+		(_precip.draw_pass_1 as QuadMesh).size = Vector2(0.14, 0.14)
+	elif raining:
+		var mat2 := _precip.process_material as ParticleProcessMaterial
+		mat2.gravity = Vector3(0, -22, 0)
+		(_precip.draw_pass_1 as QuadMesh).size = Vector2(0.05, 0.5)
 
 func show_location(data: LocationData) -> void:
+	set_quality_preset(data.quality_preset)
+	_data = data
+	if _season_btn != null:
+		_season_btn.select(data.season)
 	_place_pill.text = "📍 %s" % data.place_name
 	if _attribution_label != null:
 		_attribution_label.text = data.attribution
-	for child in _world_root.get_children():
-		if child.name == "GeneratedWorld":
-			child.queue_free()
-	_world_root.add_child(TerrainBuilder.build_world(data))
+	_rebuild_world()
 	_rig.position.y = data.height_at(data.grid_size / 2, data.grid_size / 2) + 7.5
 	_rig.set_look(0.6, -0.07)
 	if data.landmark_type != "none":
@@ -267,6 +365,7 @@ func _on_weather(temp_c: float, label: String, cloud_cover: float, code: int) ->
 		_weather_label.text = "%.0f°C · %s" % [temp_c, label]
 	_cloud_cover = cloud_cover
 	_weather_foggy = code in [45, 48, 51, 53, 55, 61, 63, 65, 71, 73, 75]
+	_apply_precip(code)
 	_apply_time(_time_hour)
 
 # --- Time of day: 24 hourly slots, or live current time ---
@@ -314,7 +413,7 @@ func _apply_time(hour_f: float) -> void:
 	if arc > -0.08:
 		var day_t := clampf((hour_f - 6.0) / 12.0, 0.0, 1.0)
 		_sun.rotation_degrees = Vector3(-maxf(arc, 0.02) * 62.0, lerpf(-95.0, 95.0, day_t), 0)
-		_sun.light_energy = (0.22 + 0.80 * maxf(arc, 0.0)) * cloud
+		_sun.light_energy = (0.18 + 0.62 * maxf(arc, 0.0)) * cloud
 		_sun.light_color = Color(1, 0.62, 0.38).lerp(
 			Color(1, 0.97, 0.92), clampf(arc * 1.7, 0.0, 1.0))
 	else:
@@ -325,8 +424,8 @@ func _apply_time(hour_f: float) -> void:
 	if _sky_mat != null:
 		_sky_mat.sky_top_color = _keyframed(hour_f, [
 			[0.0, Color(0.04, 0.07, 0.15)], [5.0, Color(0.07, 0.10, 0.20)],
-			[7.5, Color(0.40, 0.58, 0.82)], [12.0, Color(0.46, 0.65, 0.86)],
-			[17.0, Color(0.44, 0.60, 0.80)], [19.0, Color(0.35, 0.38, 0.55)],
+			[7.5, Color(0.40, 0.58, 0.82)], [12.0, Color(0.34, 0.55, 0.84)],
+			[17.0, Color(0.38, 0.55, 0.80)], [19.0, Color(0.35, 0.38, 0.55)],
 			[21.0, Color(0.06, 0.08, 0.17)], [24.0, Color(0.04, 0.07, 0.15)]])
 		_sky_mat.sky_horizon_color = _keyframed(hour_f, [
 			[0.0, Color(0.10, 0.12, 0.20)], [5.0, Color(0.16, 0.16, 0.22)],

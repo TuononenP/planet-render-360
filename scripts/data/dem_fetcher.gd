@@ -102,7 +102,10 @@ func _emit_from_image(img: Image) -> void:
 				heights[z * grid + x] = (c.r8 * 256.0 + c.g8 + c.b8 / 256.0) - 32768.0
 	else:
 		var centre := Vector2(frac_x * size, frac_y * size)
-		var step_px := 3  # ~110 m per sample at zoom 12; window covers the tile centre area
+		# Fixed 144 px window (~110 m/sample at the old 48 grid): the
+		# quality preset's grid resamples the same ground extent, so a
+		# finer grid is genuinely more accurate, not just wider.
+		var step_px := 144.0 / float(maxi(grid, 1))
 		for z in grid:
 			for x in grid:
 				var px := clampi(int(centre.x + (x - grid / 2.0) * step_px), 0, size - 1)

@@ -35,6 +35,12 @@ var _osm_buildings: Array = []
 var _osm_roads: Array = []
 var _osm_land: Array = []
 var _osm_done := false
+var _sat: SatelliteFetcher
+var _sat_texture: Texture2D
+var _sat_origin := Vector2.ZERO
+var _sat_zoom := 16
+var _sat_done := false
+var used_satellite := false
 
 func _ready() -> void:
 	_fetcher = DemFetcher.new()
@@ -63,13 +69,27 @@ func _ready() -> void:
 	_osm.failed.connect(func(reason: String) -> void:
 		push_warning("OSM fetch failed, using procedural dressing: %s" % reason)
 		_osm_done = true)
+	_sat = SatelliteFetcher.new()
+	add_child(_sat)
+	_sat.succeeded.connect(func(tex: Texture2D, origin: Vector2, zoom: int) -> void:
+		_sat_texture = tex
+		_sat_origin = origin
+		_sat_zoom = zoom
+		_sat_done = true)
+	_sat.failed.connect(func(reason: String) -> void:
+		push_warning("Satellite fetch failed, using colour dressing: %s" % reason)
+		_sat_done = true)
 
 func cancel() -> void:
 	_cancelled = true
 
-func run(lat: float, lon: float, place_name_override: String = "") -> void:
+func run(lat: float, lon: float, place_name_override: String = "",
+		quality_preset: int = RenderSettings.Preset.BALANCED) -> void:
 	_cancelled = false
 	var data := LocationData.new()
+	# The preset sizes the DEM grids before any fetch, so Fast really
+	# downloads/builds less and High really samples finer terrain.
+	RenderSettings.apply_preset(data, quality_preset)
 	data.latitude = lat
 	data.longitude = lon
 	data.place_name = place_name_override if place_name_override != "" \
@@ -83,6 +103,15 @@ func run(lat: float, lon: float, place_name_override: String = "") -> void:
 	_osm_roads = []
 	_osm_land = []
 	_osm.fetch(lat, lon)
+	# Satellite drape overlaps the stages too; Fast skips it (the
+	# vertex-colour dressing is its whole point: less data, less time).
+	used_satellite = false
+	_sat_done = false
+	_sat_texture = null
+	if quality_preset > RenderSettings.Preset.FAST:
+		_sat.fetch(lat, lon, 16)
+	else:
+		_sat_done = true
 	# Far backdrop fetch overlaps everything else; converted in stage 0
 	# once the detailed centre/scale are known.
 	_far_done = false
@@ -101,6 +130,10 @@ func run(lat: float, lon: float, place_name_override: String = "") -> void:
 			return
 		if i == 0:
 			await _fetch_dem(data)
+			if _cancelled:
+				cancelled.emit()
+				return
+			await _await_satellite(data)
 			if _cancelled:
 				cancelled.emit()
 				return
@@ -134,6 +167,7 @@ func _fetch_dem(data: LocationData) -> void:
 			mx = maxf(mx, h)
 		# Adaptive vertical scale: total relief maps to ~30 world units,
 		# so flat Paris and alpine Interlaken both stay readable.
+		data.relief_metres = mx - mn
 		var vscale := clampf(30.0 / maxf(mx - mn, 1.0), 0.02, 0.35)
 		_dem_centre_m = centre_m
 		_dem_vscale = vscale
@@ -183,6 +217,20 @@ func _build_far_procedural(data: LocationData) -> void:
 				+ n.get_noise_2d(float(x) * 0.55, float(z) * 0.55) * amp * grow \
 				+ amp * 0.55 * grow
 
+func _await_satellite(data: LocationData) -> void:
+	var waited := 0.0
+	while not _sat_done and waited < 20.0 and not _cancelled:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	if _sat_texture != null:
+		used_satellite = true
+		data.satellite_texture = _sat_texture
+		data.satellite_origin_px = _sat_origin
+		data.satellite_zoom = _sat_zoom
+		var sat_attr := "Imagery: Esri, Maxar, Earthstar Geographics"
+		data.attribution = sat_attr if data.attribution.is_empty() \
+			else data.attribution + " · " + sat_attr
+
 func _await_osm(data: LocationData) -> void:
 	var waited := 0.0
 	while not _osm_done and waited < 32.0 and not _cancelled:
@@ -208,6 +256,7 @@ func _build_dem(data: LocationData) -> void:
 	# Paris basin is gentle; alpine-like relief elsewhere. Amplitude is a
 	# placeholder until real DEM tiles land behind this same contract.
 	var amplitude := 6.0 if data.place_name.begins_with("Paris") else 26.0
+	data.relief_metres = 60.0 if data.place_name.begins_with("Paris") else 800.0
 	for z in size:
 		for x in size:
 			var nx := (float(x) / size - 0.5) * 8.0
