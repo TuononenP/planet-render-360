@@ -64,6 +64,20 @@ func _ready() -> void:
 	_top.offset_top = 16
 	_top.offset_right = -16
 	add_child(_top)
+	var back_pill := Button.new()
+	back_pill.text = "← Map"
+	back_pill.custom_minimum_size = Vector2(92, 48)
+	back_pill.add_theme_font_size_override("font_size", 16)
+	back_pill.add_theme_color_override("font_color", UiTheme.TEAL_DARK)
+	back_pill.add_theme_color_override("font_hover_color", UiTheme.TEAL_DARK)
+	back_pill.add_theme_stylebox_override("normal",
+		UiTheme.style(Color(1, 1, 1, 0.94), 22, Color.TRANSPARENT, true))
+	back_pill.add_theme_stylebox_override("hover",
+		UiTheme.style(Color.WHITE, 22, Color.TRANSPARENT, true))
+	back_pill.add_theme_stylebox_override("pressed",
+		UiTheme.style(UiTheme.TEAL_SOFT, 22, Color.TRANSPARENT, true))
+	back_pill.pressed.connect(func() -> void: back_requested.emit())
+	_top.add_child(back_pill)
 	var pill := PanelContainer.new()
 	pill.add_theme_stylebox_override("panel",
 		UiTheme.style(Color(1, 1, 1, 0.92), 22, Color.TRANSPARENT, true))
@@ -97,7 +111,7 @@ func _ready() -> void:
 	_sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_sheet.size_flags_vertical = Control.SIZE_SHRINK_END
 	_sheet.add_theme_stylebox_override("panel",
-		UiTheme.style(Color(0.07, 0.09, 0.08, 0.78), 20, Color.TRANSPARENT, true))
+		UiTheme.style(UiTheme.DARK_PANEL, 20, Color.TRANSPARENT, true))
 	_bottom_root.add_child(_sheet)
 	var right_spacer := Control.new()
 	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -106,7 +120,7 @@ func _ready() -> void:
 	var bottom := VBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 8)
 	_sheet.add_child(bottom)
-	var hint := UiTheme.label("Drag to look around · scroll or pinch to zoom", 15, Color.WHITE)
+	var hint := UiTheme.label("Drag to look around · Pinch or scroll to zoom", 15, Color.WHITE, true)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bottom.add_child(hint)
 	_weather_label = UiTheme.label("", 14, Color(1, 1, 1, 0.92))
@@ -115,7 +129,7 @@ func _ready() -> void:
 	var sun_row := HBoxContainer.new()
 	sun_row.add_theme_constant_override("separation", 8)
 	bottom.add_child(sun_row)
-	sun_row.add_child(UiTheme.label("☀", 16, Color.WHITE))
+	sun_row.add_child(UiTheme.label("☀ Time", 14, Color.WHITE, true))
 	var prev_btn := Button.new()
 	prev_btn.text = "‹"
 	prev_btn.custom_minimum_size = Vector2(40, 44)
@@ -167,16 +181,8 @@ func _ready() -> void:
 	_attribution_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bottom.add_child(_attribution_label)
-	var back := Button.new()
-	back.text = "← Back to map"
-	back.custom_minimum_size = Vector2(0, 50)
-	back.add_theme_font_size_override("font_size", 16)
-	back.add_theme_color_override("font_color", Color.WHITE)
-	back.add_theme_stylebox_override("normal", UiTheme.style(Color(1, 1, 1, 0.14), 12, Color(1, 1, 1, 0.35)))
-	back.add_theme_stylebox_override("hover", UiTheme.style(Color(1, 1, 1, 0.22), 12, Color(1, 1, 1, 0.35)))
-	back.add_theme_stylebox_override("pressed", UiTheme.style(Color(1, 1, 1, 0.22), 12, Color(1, 1, 1, 0.35)))
-	back.pressed.connect(func() -> void: back_requested.emit())
-	bottom.add_child(back)
+	# Back lives in the top bar now (see _ready): one tap, always visible,
+	# and the bottom sheet stays short enough to leave the view open.
 
 	var clock := Timer.new()
 	clock.wait_time = 15.0
