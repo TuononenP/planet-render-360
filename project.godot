@@ -21,8 +21,16 @@ config/icon="res://icon.svg"
 window/size/viewport_width=390
 window/size/viewport_height=844
 window/size/resizable=true
-; Desktop-only first-open size (ignored on phones). Opens in the wide
-; responsive layout on macOS instead of a tall, mostly-empty window.
+; Always start full screen (DisplayServer.WINDOW_MODE_FULLSCREEN).
+; This is the single place that owns the startup window mode: it is
+; applied when the window is created, in the editor run and in
+; exports alike. Full screen makes the window match the actual
+; screen, and canvas_items/expand stretch below plus the Responsive
+; breakpoints relayout every screen to fit it. Mobile is inherently
+; full screen, so this mainly fixes macOS/desktop.
+window/size/mode=3
+; Windowed size restored if the user leaves full screen (ignored on
+; phones). Wide enough for the expanded responsive layout.
 window/size/window_width_override=1180
 window/size/window_height_override=820
 window/handheld/orientation="portrait"
