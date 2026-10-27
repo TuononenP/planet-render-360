@@ -8,11 +8,13 @@ extends RefCounted
 
 const WORLD_SIZE := 220.0
 const METRES_TO_WORLD := 0.25
+## Fallback cap when data carries no preset; RenderSettings owns the
+## per-preset building/tree budgets actually used below.
 const MAX_REAL_BUILDINGS := 340
 const LANDMARK_POS := Vector2(18, -14)
 
 static var _facade_mats: Array = []
-static var _leaf_mats: Array = []
+static var _leaf_mats_by_season: Dictionary = {}
 static var _unit_box: BoxMesh
 
 static func _range_of(values: PackedFloat32Array) -> Vector2:
@@ -32,7 +34,9 @@ static func _polys(data: LocationData, classes: Array) -> Array:
 
 static func _colored_mesh(verts: PackedVector3Array, normals: PackedVector3Array,
 		colors: PackedColorArray, indices: PackedInt32Array,
-		roughness: float = 1.0, cull_disabled: bool = false) -> MeshInstance3D:
+		roughness: float = 1.0, cull_disabled: bool = false,
+		uvs: PackedVector2Array = PackedVector2Array(),
+		tex: Texture2D = null) -> MeshInstance3D:
 	if normals.is_empty():
 		for i in verts.size():
 			normals.append(Vector3.UP)
@@ -42,10 +46,16 @@ static func _colored_mesh(verts: PackedVector3Array, normals: PackedVector3Array
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
+	if not uvs.is_empty():
+		arrays[Mesh.ARRAY_TEX_UV] = uvs
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
+	if tex != null:
+		# Imagery carries the albedo; vertex colour becomes a slope
+		# shade multiplied over it (see _terrain_mesh).
+		mat.albedo_texture = tex
 	mat.roughness = roughness
 	if cull_disabled:
 		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -108,13 +118,13 @@ static func _facades() -> Array:
 		return _facade_mats
 	var img := Image.create(96, 128, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0.96, 0.95, 0.92))
-	for floor_i in 7:
-		for col in 5:
-			var shade := 0.22 + _hash(col * 3.1, floor_i * 7.7) * 0.18
+	for floor_i in 8:
+		for col in 8:
+			var shade := 0.36 + _hash(col * 3.1, floor_i * 7.7) * 0.20
 			var win := Color(shade, shade + 0.04, shade + 0.10)
-			if _hash(col * 9.3, floor_i * 3.9) > 0.82:
-				win = Color(0.85, 0.68, 0.38)  # a few lit windows
-			img.fill_rect(Rect2i(8 + col * 17, 9 + floor_i * 16, 10, 11), win)
+			if _hash(col * 9.3, floor_i * 3.9) > 0.92:
+				win = Color(0.80, 0.62, 0.36)  # a few lit windows
+			img.fill_rect(Rect2i(6 + col * 11, 8 + floor_i * 14, 7, 9), win)
 	img.fill_rect(Rect2i(0, 120, 96, 8), Color(0.55, 0.52, 0.48))  # ground floor
 	var tex := ImageTexture.create_from_image(img)
 	for tint in [Color(0.92, 0.87, 0.74), Color(0.86, 0.78, 0.64), Color(0.89, 0.80, 0.71)]:
@@ -125,12 +135,21 @@ static func _facades() -> Array:
 		_facade_mats.append(m)
 	return _facade_mats
 
-static func _leaves() -> Array:
-	if not _leaf_mats.is_empty():
-		return _leaf_mats
-	for c in [Color(0.30, 0.45, 0.26), Color(0.36, 0.50, 0.28), Color(0.24, 0.38, 0.22)]:
-		_leaf_mats.append(_mat(c, 0.9))
-	return _leaf_mats
+static func _leaves(season: int = LocationData.Season.SUMMER) -> Array:
+	var key := LocationData.clamp_season(season)
+	if _leaf_mats_by_season.has(key):
+		return _leaf_mats_by_season[key]
+	var palettes: Array = [
+		[Color(0.38, 0.55, 0.30), Color(0.45, 0.60, 0.33), Color(0.32, 0.48, 0.27)],  # spring
+		[Color(0.30, 0.45, 0.26), Color(0.36, 0.50, 0.28), Color(0.24, 0.38, 0.22)],  # summer
+		[Color(0.72, 0.42, 0.20), Color(0.65, 0.35, 0.16), Color(0.55, 0.45, 0.20)],  # autumn
+		[Color(0.35, 0.30, 0.24), Color(0.30, 0.36, 0.24), Color(0.38, 0.33, 0.26)],  # winter
+	]
+	var mats: Array = []
+	for c in palettes[key]:
+		mats.append(_mat(c, 0.9))
+	_leaf_mats_by_season[key] = mats
+	return mats
 
 ## The one ground truth for the whole world: raw heights smoothed,
 ## flattened in low-relief cities, and carved under water polygons.
@@ -169,6 +188,18 @@ static func _heights(data: LocationData) -> PackedFloat32Array:
 	data.display_heights = hs
 	return hs
 
+## World XZ -> satellite mosaic UV. World units are metres x 0.25
+## with north as -Z (OsmFetcher.local_xz), so the same linear map
+## that places buildings also addresses the imagery under them.
+static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
+	var east_m := wx / METRES_TO_WORLD
+	var north_m := -wz / METRES_TO_WORLD
+	var lat := data.latitude + north_m / 110540.0
+	var lon := data.longitude + east_m / (111320.0 * cos(deg_to_rad(data.latitude)))
+	var px := TileFetcher.global_pixel(lat, lon, data.satellite_zoom)
+	var mosaic_px := float(SatelliteFetcher.TILE_PX * SatelliteFetcher.SPAN)
+	return (px - data.satellite_origin_px) / mosaic_px
+
 static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 	var size := data.grid_size
 	var step := WORLD_SIZE / float(size - 1)
@@ -182,10 +213,18 @@ static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
-	var grass := Color(0.40, 0.53, 0.31)
-	var dry := Color(0.64, 0.57, 0.40)
-	var rock := Color(0.44, 0.42, 0.40)
-	var urban_ground := Color(0.47, 0.44, 0.40)
+	var uvs := PackedVector2Array()
+	var has_sat := data.satellite_texture != null
+	var grass := Color(0.45, 0.58, 0.36)
+	var dry := Color(0.70, 0.63, 0.45)
+	var rock := Color(0.48, 0.46, 0.43)
+	var urban_ground := Color(0.62, 0.59, 0.53)
+	if data.season == LocationData.Season.AUTUMN:
+		grass = Color(0.55, 0.52, 0.30)
+	elif data.season == LocationData.Season.WINTER:
+		grass = Color(0.60, 0.62, 0.55)
+	elif data.season == LocationData.Season.SPRING:
+		grass = Color(0.48, 0.62, 0.36)
 	for z in size:
 		for x in size:
 			var h := hs[z * size + x]
@@ -208,11 +247,31 @@ static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 			base_color = base_color.lerp(rock, clampf(steep, 0.0, 0.75))
 			if relief > 22.0 and t > 0.84 and steep < 0.35:
 				base_color = base_color.lerp(Color(0.90, 0.91, 0.92), 0.6)  # alpine tops only
-			if urban:
+			elif data.season == LocationData.Season.WINTER \
+					and relief > 8.0 and t > 0.50 and steep < 0.40:
+				base_color = base_color.lerp(Color(0.88, 0.89, 0.90), 0.55)  # winter snow line
+			# Settled ground reads as warm pavement, never bleached:
+			# real OSM cities, and any low-relief place in real metres
+			# (its procedural dressing is a town too). Alpine valleys
+			# keep meadow green even where the floor is flat.
+			if urban or data.relief_metres < 120.0:
 				base_color = urban_ground.lerp(grass, _hash(x * 0.7, z * 0.7) * 0.25)
 			var shade := 0.92 + _hash(x * 1.3, z * 1.7) * 0.14
-			base_color = Color(base_color.r * shade, base_color.g * shade, base_color.b * shade)
-			colors.append(land_color(Vector2(wx, wz), data.land_polygons, base_color))
+			# Ground albedo runs dark: sun + sky ambient would otherwise
+			# wash mid-tones to near-white at noon (PRD: never bleached).
+			base_color = Color(base_color.r * shade * 0.78,
+				base_color.g * shade * 0.78, base_color.b * shade * 0.78)
+			if has_sat:
+				# Imagery is the albedo; vertex colour is only a slope
+				# shade so relief still reads under the photograph.
+				uvs.append(satellite_uv(data, wx, wz))
+				var s := 0.76 + 0.26 * normal.y
+				colors.append(Color(s, s, s))
+			else:
+				var ground_col := land_color(Vector2(wx, wz), data.land_polygons, base_color)
+				if ground_col != base_color:  # polygon colour: same darkening
+					ground_col = Color(ground_col.r * 0.78, ground_col.g * 0.78, ground_col.b * 0.78)
+				colors.append(ground_col)
 	for z in size - 1:
 		for x in size - 1:
 			var a := z * size + x
@@ -220,7 +279,8 @@ static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 			var c := a + size
 			var d := c + 1
 			indices.append_array([a, b, c, b, d, c])
-	return _colored_mesh(verts, normals, colors, indices, 0.97)
+	return _colored_mesh(verts, normals, colors, indices, 0.97, false,
+		uvs, data.satellite_texture)
 
 static func _far_ground(data: LocationData) -> MeshInstance3D:
 	# A broad, fog-tinted apron so the terrain disc never ends in void.
@@ -234,8 +294,10 @@ static func _far_ground(data: LocationData) -> MeshInstance3D:
 		edge_n += 4
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(3200, 3200)
-	var mi := _add(null, plane, _mat(Color(0.45, 0.47, 0.42), 1.0))
-	mi.position.y = edge_sum / maxf(float(edge_n), 1.0) - 0.9
+	var mi := _add(null, plane, _mat(Color(0.47, 0.52, 0.38), 1.0))
+	# Buried well under the far mesh so it only fills pinhole gaps;
+	# at edge height it read as a flat bleached ring past the town.
+	mi.position.y = edge_sum / maxf(float(edge_n), 1.0) - 2.4
 	return mi
 
 static func _far_terrain(data: LocationData) -> MeshInstance3D:
@@ -284,7 +346,8 @@ static func _far_terrain(data: LocationData) -> MeshInstance3D:
 				c = c.lerp(Color(0.90, 0.91, 0.92), 0.6)
 			if h < data.water_level + 1.0:
 				c = Color(0.35, 0.48, 0.52)  # distant lakes read as water
-			colors.append(c)
+			var fshade := 0.92 + _hash(x * 1.3, z * 1.7) * 0.14
+			colors.append(Color(c.r * fshade, c.g * fshade, c.b * fshade))
 	for z in grid - 1:
 		for x in grid - 1:
 			var a := z * grid + x
@@ -356,7 +419,7 @@ static func _building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
 static func _buildings(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 7
-	for i in 90:
+	for i in RenderSettings.procedural_buildings_for(data.quality_preset):
 		var angle := rng.randf_range(0.0, TAU)
 		var dist := rng.randf_range(38.0, 98.0)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
@@ -398,8 +461,9 @@ static func _city_silhouette(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 99
 	var haze := _mat(Color(0.58, 0.59, 0.56), 1.0)
-	for i in 46:
-		var angle := TAU * float(i) / 46.0 + rng.randf_range(-0.05, 0.05)
+	var silhouette_count := RenderSettings.silhouette_count_for(data.quality_preset)
+	for i in silhouette_count:
+		var angle := TAU * float(i) / float(silhouette_count) + rng.randf_range(-0.05, 0.05)
 		var dist := rng.randf_range(125.0, 195.0)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
 		pos.y = _ground_at(data, clampf(pos.x, -108.0, 108.0), clampf(pos.z, -108.0, 108.0)) - 0.5
@@ -419,8 +483,8 @@ static func _roads(root: Node3D, data: LocationData) -> void:
 				continue
 			var seg := _add(root, _box_mesh(), asphalt)
 			var length := a.distance_to(b)
-			seg.scale = Vector3(length, 0.12, 1.7)
-			var y := _ground_at(data, mid.x, mid.y) + 0.16
+			seg.scale = Vector3(length, 0.06, 1.7)
+			var y := _ground_at(data, mid.x, mid.y) + 0.08
 			for wp in water_polys:
 				if point_in_polygon(mid, wp):
 					y = data.water_level + 1.1  # bridge deck over the channel
@@ -502,11 +566,11 @@ static func _pine(root: Node3D, pos: Vector3, rng: RandomNumberGenerator, leaves
 static func _vegetation(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 21
-	var leaves := _leaves()
+	var leaves := _leaves(data.season)
 	var trunk_mat := _mat(Color(0.36, 0.28, 0.20), 0.95)
-	var urban := not data.buildings.is_empty()
+	var urban := not data.buildings.is_empty() or data.relief_metres < 120.0
 	var green_polys := _polys(data, ["forest", "grass"])
-	var count := 170 if urban else 230
+	var count := RenderSettings.vegetation_count_for(data.quality_preset, urban)
 	for i in count:
 		var pos := _random_pos(rng)
 		# Prefer parks and forests: resample a couple of times to land
@@ -531,7 +595,8 @@ static func _vegetation(root: Node3D, data: LocationData) -> void:
 		if urban and _near_building(data, pos):
 			continue
 		pos.y = ground
-		if rng.randf() < 0.55:
+		# Cities get street broadleafs; pines belong to the hills.
+		if rng.randf() < (0.85 if urban else 0.50):
 			_broadleaf(root, pos, rng, leaves, trunk_mat)
 		else:
 			_pine(root, pos, rng, leaves)
