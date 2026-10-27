@@ -1,0 +1,41 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly.
+
+config_version=5
+
+[application]
+
+config/name="Planet Render 360"
+config/description="Render any point on the map as a 3D, 360-degree view."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[display]
+
+; Mobile-first logical size (points, not device pixels). 390x844 is the
+; phone design frame; canvas_items scaling maps it to any device DPI, so
+; 16pt type stays 16pt on a phone, a tablet, and a Retina Mac alike.
+; The old 1170x2532 frame was device pixels at 3x, which shrank every
+; fixed-size control to a third of its intended size on desktop.
+window/size/viewport_width=390
+window/size/viewport_height=844
+window/size/resizable=true
+; Desktop-only first-open size (ignored on phones). Opens in the wide
+; responsive layout on macOS instead of a tall, mostly-empty window.
+window/size/window_width_override=1180
+window/size/window_height_override=820
+window/handheld/orientation="portrait"
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+environment/defaults/default_clear_color=Color(0.925, 0.937, 0.929, 1)
+textures/vram_compression/import_etc2_astc=true
