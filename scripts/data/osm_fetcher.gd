@@ -24,7 +24,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 
 static func build_query(lat: float, lon: float) -> String:
-	return "[out:json][timeout:25];(way[\"building\"](around:%d,%.6f,%.6f);way[\"highway\"](around:%d,%.6f,%.6f);way[\"natural\"](around:%d,%.6f,%.6f);way[\"landuse\"](around:%d,%.6f,%.6f);way[\"leisure\"=\"park\"](around:%d,%.6f,%.6f););out geom 400;" \
+	return "[out:json][timeout:25];(way[\"building\"](around:%d,%.6f,%.6f);way[\"highway\"](around:%d,%.6f,%.6f);way[\"natural\"](around:%d,%.6f,%.6f);way[\"landuse\"](around:%d,%.6f,%.6f);way[\"leisure\"=\"park\"](around:%d,%.6f,%.6f););out geom 900;" \
 		% [RADIUS_M, lat, lon, RADIUS_M, lat, lon, RADIUS_M, lat, lon,
 			RADIUS_M, lat, lon, RADIUS_M, lat, lon]
 
@@ -99,7 +99,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	return {"buildings": buildings, "roads": roads, "land": land}
 
 func fetch(lat: float, lon: float) -> void:
-	var cache_path := "%s/osm2_%d_%d.json" % [CACHE_DIR,
+	var cache_path := "%s/osm3_%d_%d.json" % [CACHE_DIR,
 		int(round(lat * 1000.0)), int(round(lon * 1000.0))]
 	if FileAccess.file_exists(cache_path):
 		var f := FileAccess.open(cache_path, FileAccess.READ)

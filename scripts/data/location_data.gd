@@ -12,7 +12,18 @@ var longitude: float = 0.0
 ## TerrainData equivalent, kept as typed fields for the MVP.
 var grid_size: int = 48
 var heights: PackedFloat32Array = PackedFloat32Array()
+## Mesh-ready heights (smoothed/flattened/water-carved), filled lazily
+## by TerrainBuilder so meshes, buildings, roads, and trees all sample
+## exactly the same ground. Empty means "not computed yet".
+var display_heights: PackedFloat32Array = PackedFloat32Array()
 var water_level: float = 0.0
+## Real low-resolution far terrain (zoom-8 DEM), already converted to
+## world heights with the same centre/scale as the detailed grid, so
+## the two meshes align. Empty means "no far data" (apron only).
+var far_heights: PackedFloat32Array = PackedFloat32Array()
+var far_grid_size: int = 64
+var far_extent: float = 9000.0  # world units spanned by the far tile
+var far_centre_frac: Vector2 = Vector2(0.5, 0.5)  # viewpoint inside far tile
 var landmark_type: String = "none"  # none | eiffel | tower
 var seed_value: int = 0
 var attribution: String = ""
@@ -79,9 +90,9 @@ static func known_place(lat: float, lon: float) -> String:
 
 static func landmark_for(lat: float, lon: float, name: String) -> String:
 	# Eiffel Tower only when the viewpoint is actually near it; central
-	# Paris (Notre Dame) gets its real OSM buildings instead.
+	# Paris (Notre Dame) gets its real OSM buildings instead. No generic
+	# placeholder tower: a fake landmark in every town reads worse than
+	# the real skyline, and the camera now opens facing landmarks.
 	if abs(lat - 48.8584) < 0.01 and abs(lon - 2.2945) < 0.01:
 		return "eiffel"
-	if abs(lat) > 0.01 or abs(lon) > 0.01:
-		return "tower"
 	return "none"
