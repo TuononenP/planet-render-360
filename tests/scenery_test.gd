@@ -103,6 +103,49 @@ func _run() -> void:
 		failures.append("eiffel landmark should have >=10 parts, got %d" % lm.get_child_count())
 	lm.free()
 
+	# Tokyo Tower gets its own multi-part landmark at its real site.
+	if LocationData.landmark_for(35.6586, 139.7454, "Tokyo, Japan") != "tokyo":
+		failures.append("Tokyo Tower site should map to the tokyo landmark")
+	var tokyo := _flat_data()
+	tokyo.landmark_type = "tokyo"
+	var tm := TerrainBuilder._landmark(tokyo)
+	if tm.get_child_count() < 10:
+		failures.append("tokyo landmark should have >=10 parts, got %d" % tm.get_child_count())
+	tm.free()
+
+	# Satellite drape: terrain carries UVs into the mosaic, and the
+	# viewpoint vertex lands at the mosaic centre.
+	var sat := _flat_data()
+	sat.grid_size = 8
+	sat.heights.resize(64)
+	for i in 64:
+		sat.heights[i] = 3.0
+	sat.latitude = 48.8566
+	sat.longitude = 2.3522
+	var sat_img := Image.create(4, 4, false, Image.FORMAT_RGB8)
+	sat.satellite_texture = ImageTexture.create_from_image(sat_img)
+	sat.satellite_zoom = 16
+	sat.satellite_origin_px = TileFetcher.global_pixel(48.8566, 2.3522, 16) - Vector2(384, 384)
+	var smat := TerrainBuilder._terrain_mesh(sat)
+	var sat_uvs: PackedVector2Array = smat.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+	if sat_uvs.size() != 64:
+		failures.append("satellite terrain should carry 64 UVs, got %d" % sat_uvs.size())
+	else:
+		var centre_uv := sat_uvs[4 * 8 + 4]
+		if centre_uv.distance_to(Vector2(0.5, 0.5)) > 0.05:
+			failures.append("viewpoint UV should sit at mosaic centre, got %s" % str(centre_uv))
+	smat.free()
+	if SatelliteFetcher.mosaic_tiles(48.8566, 2.3522, 16).size() != 9:
+		failures.append("satellite mosaic should request 9 tiles")
+
+	# Seasons recolour the canopy: autumn warm, summer green.
+	var autumn_leaf := TerrainBuilder._leaves(LocationData.Season.AUTUMN)[0] as StandardMaterial3D
+	if autumn_leaf.albedo_color.r <= autumn_leaf.albedo_color.g:
+		failures.append("autumn leaves should be warm (r>g), got %s" % str(autumn_leaf.albedo_color))
+	var summer_leaf := TerrainBuilder._leaves(LocationData.Season.SUMMER)[0] as StandardMaterial3D
+	if summer_leaf.albedo_color.g <= summer_leaf.albedo_color.r:
+		failures.append("summer leaves should be green (g>r), got %s" % str(summer_leaf.albedo_color))
+
 	if failures.is_empty():
 		print("SCENERY OK: building scale, terrain normals, water carve, landmark parts")
 		quit(0)

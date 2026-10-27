@@ -443,10 +443,17 @@ static func _real_buildings(root: Node3D, data: LocationData) -> void:
 		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
 			< (float(b["x"]) ** 2 + float(b["z"]) ** 2))
 	var placed := 0
+	var cap := RenderSettings.max_buildings_for(data.quality_preset)
+	# The landmark's own OSM footprint (e.g. the cathedral as one beige
+	# box) must not duplicate the procedural landmark model.
+	var site := landmark_site_xz(data)
 	for b in sorted:
-		if placed >= MAX_REAL_BUILDINGS:
+		if placed >= cap:
 			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
+		if data.landmark_type != "none" \
+				and Vector2(pos.x, pos.z).distance_to(site) < 17.0:
+			continue
 		if absf(pos.x) > 105.0 or absf(pos.z) > 105.0:
 			continue
 		pos.y = _ground_at(data, pos.x, pos.z) - 0.6
@@ -492,36 +499,34 @@ static func _roads(root: Node3D, data: LocationData) -> void:
 			seg.position = Vector3(mid.x, y, mid.y)
 			seg.rotation.y = -atan2(b.y - a.y, b.x - a.x)
 
+## True offset (world XZ) of the landmark's real site from the
+## viewpoint, before clamping. Falls back to the fixed offset when
+## the data carries no site (older tests, hand-built LocationData).
+static func landmark_site_xz(data: LocationData) -> Vector2:
+	if data.has_landmark_site:
+		return OsmFetcher.local_xz(data.landmark_lat, data.landmark_lon,
+			data.latitude, data.longitude)
+	return LANDMARK_POS
+
+## Where the model actually stands: the true bearing from the
+## viewpoint, clamped into the detailed terrain (<=95 units) and
+## pushed out to reading distance when the viewpoint is at (or very
+## near) the site itself, so the camera never starts inside the
+## model or underneath a tower that fills the whole frame.
+static func landmark_world_pos(data: LocationData) -> Vector2:
+	var xz := landmark_site_xz(data)
+	var len := xz.length()
+	if len > 95.0:
+		return xz / len * 95.0
+	if len < 34.0:
+		var dir := xz / len if len > 0.5 else LANDMARK_POS.normalized()
+		return dir * 38.0
+	return xz
+
 static func _landmark(data: LocationData) -> Node3D:
-	var root := Node3D.new()
-	root.position = Vector3(LANDMARK_POS.x,
-		_ground_at(data, LANDMARK_POS.x, LANDMARK_POS.y) - 0.3, LANDMARK_POS.y)
-	var iron := _mat(Color(0.30, 0.23, 0.17), 0.8)
-	if data.landmark_type == "eiffel":
-		# Four legs converging through two platforms to a spire, at
-		# world scale (330 m tower -> ~80 units, base ~90 m -> ±9).
-		var base_corners: Array[Vector3] = [Vector3(-9, 0, -9), Vector3(9, 0, -9),
-			Vector3(-9, 0, 9), Vector3(9, 0, 9)]
-		var mid_corners: Array[Vector3] = []
-		var top_corners: Array[Vector3] = []
-		for c in base_corners:
-			mid_corners.append(Vector3(c.x * 0.46, 15.0, c.z * 0.46))
-			top_corners.append(Vector3(c.x * 0.22, 30.0, c.z * 0.22))
-		for i in 4:
-			_beam(root, base_corners[i], mid_corners[i], 0.85, iron)
-			_beam(root, mid_corners[i], top_corners[i], 0.55, iron)
-		_box_mat(root, Vector3(0, 15.5, 0), Vector3(10.5, 1.2, 10.5), iron)
-		_box_mat(root, Vector3(0, 30.5, 0), Vector3(5.6, 1.1, 5.6), iron)
-		var shaft := _add(root, _cyl(0.7, 2.0, 34.0, 4), iron)
-		shaft.rotation.y = PI / 4.0
-		shaft.position.y = 48.0
-		var spire := _add(root, _cyl(0.10, 0.6, 15.0), iron)
-		spire.position.y = 72.0
-	else:
-		var tower := _add(root, _cyl(1.7, 3.2, 30.0), _mat(Color(0.66, 0.63, 0.58), 0.9))
-		tower.position.y = 15
-		_box_mat(root, Vector3(0, 30.8, 0), Vector3(5.2, 1.4, 5.2),
-			_mat(Color(0.42, 0.45, 0.50), 0.85))
+	var pos := landmark_world_pos(data)
+	var root := LandmarkBuilder.build(data.landmark_type)
+	root.position = Vector3(pos.x, _ground_at(data, pos.x, pos.y) - 0.3, pos.y)
 	return root
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
@@ -589,6 +594,9 @@ static func _vegetation(root: Node3D, data: LocationData) -> void:
 			pos = _random_pos(rng)
 		if absf(pos.x) > 200.0:
 			continue
+		if data.landmark_type != "none" and Vector2(pos.x, pos.z).distance_to(
+				landmark_world_pos(data)) < 12.0:
+			continue  # keep the landmark's clearing free of trees
 		var ground := _ground_at(data, pos.x, pos.z)
 		if ground < data.water_level + 0.4:
 			continue

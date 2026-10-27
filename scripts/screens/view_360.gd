@@ -356,7 +356,8 @@ func show_location(data: LocationData) -> void:
 	_rig.set_look(0.6, -0.07)
 	if data.landmark_type != "none":
 		# Open facing the landmark so it is the first thing seen.
-		_rig.set_look(atan2(-TerrainBuilder.LANDMARK_POS.x, -TerrainBuilder.LANDMARK_POS.y), -0.07)
+		var lp := TerrainBuilder.landmark_world_pos(data)
+		_rig.set_look(atan2(-lp.x, -lp.y), -0.07)
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
 

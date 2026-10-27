@@ -94,7 +94,12 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	data.longitude = lon
 	data.place_name = place_name_override if place_name_override != "" \
 		else LocationData.known_place(lat, lon)
-	data.landmark_type = LocationData.landmark_for(lat, lon, data.place_name)
+	var landmark := LocationData.landmark_entry(lat, lon, data.place_name)
+	data.landmark_type = str(landmark.get("type", "none")) if not landmark.is_empty() else "none"
+	data.has_landmark_site = not landmark.is_empty()
+	if data.has_landmark_site:
+		data.landmark_lat = float(landmark["lat"])
+		data.landmark_lon = float(landmark["lon"])
 	data.seed_value = int(abs(sin(lat * 12.9898 + lon * 78.233) * 43758.5453)) % 100000
 	# Start OSM fetch now so it overlaps the staged timers below.
 	used_osm = false

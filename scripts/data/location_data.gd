@@ -96,6 +96,8 @@ static func known_places() -> Array:
 		{"name": "Rio de Janeiro, Brazil", "lat": -22.9068, "lon": -43.1729},
 		{"name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503},
 		{"name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093},
+		{"name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
+		{"name": "Helsinki, Finland", "lat": 60.1699, "lon": 24.9384},
 	]
 
 static func suggestions_for(query: String) -> Array:
@@ -121,11 +123,61 @@ static func known_place(lat: float, lon: float) -> String:
 			return str(place["name"])
 	return "%.4f°, %.4f°" % [lat, lon]
 
+## Curated landmark registry: the places users actually search for by
+## name. Each entry renders on the fly as a procedural model
+## (LandmarkBuilder) at its true bearing from the viewpoint, clamped
+## into the detailed terrain. radius_m is how far the viewpoint may be
+## from the site and still get the landmark as its skyline icon (a
+## city-centre search for Paris still shows the Eiffel Tower, to the
+## south-west where it really is). Aliases match the searched name,
+## which is the strongest signal: "Turun tuomiokirkko, 1" is the
+## cathedral whatever pin the geocoder returned.
+static func landmarks() -> Array:
+	return [
+		{"type": "turku_cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
+			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
+		{"type": "helsinki_cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
+			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
+		{"type": "eiffel", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
+			"aliases": ["eiffel", "tour eiffel"]},
+		{"type": "tokyo", "lat": 35.6586, "lon": 139.7454, "radius_m": 9500.0,
+			"aliases": ["tokyo tower", "tokyo tawā"]},
+		{"type": "big_ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
+			"aliases": ["big ben", "elizabeth tower"]},
+		{"type": "colosseum", "lat": 41.8902, "lon": 12.4922, "radius_m": 6000.0,
+			"aliases": ["colosseum", "colosseo", "coliseum"]},
+		{"type": "sagrada", "lat": 41.4036, "lon": 2.1744, "radius_m": 5000.0,
+			"aliases": ["sagrada", "sagrada familia", "sagrada família"]},
+		{"type": "pyramid", "lat": 29.9792, "lon": 31.1342, "radius_m": 13000.0,
+			"aliases": ["pyramid", "giza", "khufu", "cheops"]},
+		{"type": "statue_liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
+			"aliases": ["statue of liberty", "lady liberty"]},
+		{"type": "sydney_opera", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
+			"aliases": ["sydney opera", "opera house, sydney"]},
+	]
+
+static func distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+	var east := (lon2 - lon1) * 111320.0 * cos(deg_to_rad(lat1))
+	var north := (lat2 - lat1) * 110540.0
+	return Vector2(east, north).length()
+
+## Registry entry for this viewpoint/search, or {} for none. A name
+## match wins outright; otherwise the nearest site inside its radius.
+static func landmark_entry(lat: float, lon: float, name: String) -> Dictionary:
+	var lowered := name.to_lower()
+	for entry in landmarks():
+		for alias in entry["aliases"]:
+			if lowered.contains(str(alias)):
+				return entry
+	var best: Dictionary = {}
+	var best_dist := INF
+	for entry in landmarks():
+		var d := distance_m(lat, lon, float(entry["lat"]), float(entry["lon"]))
+		if d <= float(entry["radius_m"]) and d < best_dist:
+			best = entry
+			best_dist = d
+	return best
+
 static func landmark_for(lat: float, lon: float, name: String) -> String:
-	# Eiffel Tower only when the viewpoint is actually near it; central
-	# Paris (Notre Dame) gets its real OSM buildings instead. No generic
-	# placeholder tower: a fake landmark in every town reads worse than
-	# the real skyline, and the camera now opens facing landmarks.
-	if abs(lat - 48.8584) < 0.01 and abs(lon - 2.2945) < 0.01:
-		return "eiffel"
-	return "none"
+	var entry := landmark_entry(lat, lon, name)
+	return str(entry.get("type", "none")) if not entry.is_empty() else "none"
