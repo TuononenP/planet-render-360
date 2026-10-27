@@ -28,6 +28,12 @@ func _wait_view(main: Node, timeout_sec: float) -> void:
 		await process_frame
 
 func _run() -> void:
+	# The app starts full screen (display/window/size/mode); this tool
+	# drives window sizes itself, so opt back out to windowed first.
+	# Otherwise the resizes below only resize the viewport inside a
+	# full-screen window instead of sizing the actual window.
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	await process_frame
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await _resize(390, 844)
