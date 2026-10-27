@@ -3,6 +3,9 @@ extends Control
 
 signal render_requested(lat: float, lon: float)
 signal history_requested
+signal settings_requested
+signal exit_requested
+signal palette_changed(index: int)
 
 var _lat := 48.8566
 var _lon := 2.3522
@@ -26,19 +29,34 @@ var _suggest_timer: Timer
 var _map_wrap: Control
 var _card: PanelContainer
 var _history_btn: Button
+var _settings_btn: Button
+var _exit_btn: Button
 var _tip: Label
 var _quick_box: VBoxContainer
 var _ready_label: Label
 var _coords_label: Label
 var _layout_btn: OptionButton
+var _theme_btn: OptionButton
+var _options_row: HBoxContainer
+var _bg: ColorRect
+var _title_label: Label
+var _tagline_label: Label
+var _quick_label: Label
+var _selected_label: Label
+var _render_btn: Button
+var _zoom_out_btn: Button
+var _zoom_in_btn: Button
+var _hint_pill: PanelContainer
+var _quick_chips: Array[Button] = []
+var _selected_quick := -1
 var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = UiTheme.BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	_bg = ColorRect.new()
+	_bg.color = UiTheme.BG
+	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_bg)
 
 	_margin = MarginContainer.new()
 	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -59,24 +77,45 @@ func _ready() -> void:
 	var title_box := VBoxContainer.new()
 	title_box.add_theme_constant_override("separation", 2)
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title := UiTheme.label("◭  Planet Render 360", 27, UiTheme.INK, true)
-	title_box.add_child(title)
-	var tagline := UiTheme.label("Stand anywhere on Earth — see it in 360°", 14, UiTheme.MUTED)
-	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title_box.add_child(tagline)
+	_title_label = UiTheme.label("◭  Planet Render 360", 27, UiTheme.INK, true)
+	title_box.add_child(_title_label)
+	_tagline_label = UiTheme.label("Stand anywhere on Earth — see it in 360°", 14, UiTheme.MUTED)
+	_tagline_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_box.add_child(_tagline_label)
 	_header.add_child(title_box)
+	# The app starts full screen, so it needs its own way out: a clear
+	# Exit in the header, always visible on the home screen.
+	_exit_btn = UiTheme.ghost_button("✕  Exit")
+	_exit_btn.tooltip_text = "Exit the app"
+	_exit_btn.custom_minimum_size = Vector2(96, 48)
+	_exit_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_exit_btn.pressed.connect(func() -> void: exit_requested.emit())
+	_header.add_child(_exit_btn)
+
+	# Layout + UI colour choices on their own row: each OptionButton
+	# keeps its full minimum width instead of squeezing the title.
+	_options_row = HBoxContainer.new()
+	_options_row.add_theme_constant_override("separation", 8)
 	_layout_btn = OptionButton.new()
 	_layout_btn.add_item("Auto layout", 0)
 	_layout_btn.add_item("Compact", 1)
 	_layout_btn.add_item("Wide", 2)
 	_layout_btn.custom_minimum_size = Vector2(118, 44)
+	_layout_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_layout_btn.add_theme_font_size_override("font_size", 14)
-	_layout_btn.add_theme_color_override("font_color", UiTheme.INK)
-	_layout_btn.add_theme_stylebox_override("normal", UiTheme.style(UiTheme.FIELD, 12, UiTheme.LINE))
-	_layout_btn.add_theme_stylebox_override("hover", UiTheme.style(Color.WHITE, 12, UiTheme.LINE))
-	_layout_btn.add_theme_stylebox_override("pressed", UiTheme.style(Color.WHITE, 12, UiTheme.LINE))
+	UiTheme.apply_option(_layout_btn)
 	_layout_btn.item_selected.connect(_on_layout_selected)
-	_header.add_child(_layout_btn)
+	_options_row.add_child(_layout_btn)
+	_theme_btn = OptionButton.new()
+	for i in UiTheme.theme_names.size():
+		_theme_btn.add_item("UI colour: %s" % UiTheme.theme_names[i], i)
+	_theme_btn.select(UiTheme.theme_index)
+	_theme_btn.custom_minimum_size = Vector2(150, 44)
+	_theme_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_theme_btn.add_theme_font_size_override("font_size", 14)
+	UiTheme.apply_option(_theme_btn)
+	_theme_btn.item_selected.connect(_on_theme_selected)
+	_options_row.add_child(_theme_btn)
 
 	_search_box = VBoxContainer.new()
 	_search_box.add_theme_constant_override("separation", 6)
@@ -103,22 +142,31 @@ func _ready() -> void:
 	# Quick picks: one tap to a wow place, no typing needed first run.
 	_quick_box = VBoxContainer.new()
 	_quick_box.add_theme_constant_override("separation", 6)
-	_quick_box.add_child(UiTheme.section_label("Try a place — one tap"))
+	_quick_label = UiTheme.section_label("Try a place — one tap")
+	_quick_box.add_child(_quick_label)
 	var quick_row := HBoxContainer.new()
 	quick_row.add_theme_constant_override("separation", 8)
 	_quick_box.add_child(quick_row)
-	for quick in [
+	var quicks: Array = [
 			["Paris", "Paris, France", 48.8566, 2.3522],
 			["Alps", "Interlaken, Switzerland", 46.6863, 7.8632],
 			["Banff", "Banff, Canada", 51.1789, -115.5708],
 			["Big Sur", "Big Sur, United States", 36.2704, -121.8081],
-			["Tokyo", "Tokyo, Japan", 35.6762, 139.6503]]:
+			["Tokyo", "Tokyo, Japan", 35.6762, 139.6503]]
+	for qi in quicks.size():
+		var quick: Array = quicks[qi]
 		var chip := UiTheme.chip_button(str(quick[0]))
 		var qname := str(quick[1])
 		var qlat := float(quick[2])
 		var qlon := float(quick[3])
-		chip.pressed.connect(func() -> void: _select_suggestion(qname, qlat, qlon))
+		var qindex := qi
+		chip.pressed.connect(func() -> void:
+			_select_suggestion(qname, qlat, qlon)
+			_set_selected_quick(qindex))
+		_quick_chips.append(chip)
 		quick_row.add_child(chip)
+	# Paris is the starting place, so its chip starts out selected.
+	_set_selected_quick(0)
 
 	# Map fills whatever space the layout gives it (no fixed height, so
 	# no dead band below the card on tall or desktop windows).
@@ -138,30 +186,31 @@ func _ready() -> void:
 	zoom_row.offset_bottom = 68
 	zoom_row.add_theme_constant_override("separation", 8)
 	_map_wrap.add_child(zoom_row)
-	var zoom_out := UiTheme.icon_button("−")
-	zoom_out.pressed.connect(func() -> void: _canvas.zoom_out())
-	zoom_row.add_child(zoom_out)
-	var zoom_in := UiTheme.icon_button("+")
-	zoom_in.pressed.connect(func() -> void: _canvas.zoom_in())
-	zoom_row.add_child(zoom_in)
+	_zoom_out_btn = UiTheme.icon_button("−")
+	_zoom_out_btn.pressed.connect(func() -> void: _canvas.zoom_out())
+	zoom_row.add_child(_zoom_out_btn)
+	_zoom_in_btn = UiTheme.icon_button("+")
+	_zoom_in_btn.pressed.connect(func() -> void: _canvas.zoom_in())
+	zoom_row.add_child(_zoom_in_btn)
 	# Hint pill floats on the map: guidance where the hand already is,
 	# at no layout height cost on compact screens.
-	var hint_pill := UiTheme.pill("Tap the map to drop the pin", 13)
-	hint_pill.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	hint_pill.offset_left = 12
-	hint_pill.offset_top = -52
-	hint_pill.offset_right = 236
-	hint_pill.offset_bottom = -12
-	hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_map_wrap.add_child(hint_pill)
-	_tip = hint_pill.get_meta("label") as Label
+	_hint_pill = UiTheme.pill("Tap the map to drop the pin", 13)
+	_hint_pill.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_hint_pill.offset_left = 12
+	_hint_pill.offset_top = -52
+	_hint_pill.offset_right = 236
+	_hint_pill.offset_bottom = -12
+	_hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_wrap.add_child(_hint_pill)
+	_tip = _hint_pill.get_meta("label") as Label
 
 	_card = PanelContainer.new()
 	_card.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.CARD, 16, Color.TRANSPARENT, true))
 	var card_col := VBoxContainer.new()
 	card_col.add_theme_constant_override("separation", 10)
 	_card.add_child(card_col)
-	card_col.add_child(UiTheme.section_label("Selected place"))
+	_selected_label = UiTheme.section_label("Selected place")
+	card_col.add_child(_selected_label)
 	_name_label = UiTheme.label("Paris, France", 22, UiTheme.INK, true)
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	card_col.add_child(_name_label)
@@ -184,12 +233,15 @@ func _ready() -> void:
 	_lon_field.text_changed.connect(func(_t: String) -> void: _sync_from_fields())
 	fields.add_child(_lat_field)
 	fields.add_child(_lon_field)
-	var render_btn := UiTheme.primary_button("◭  Render this place in 360°")
-	render_btn.pressed.connect(func() -> void: render_requested.emit(_lat, _lon))
-	card_col.add_child(render_btn)
+	_render_btn = UiTheme.primary_button("◭  Render this place in 360°")
+	_render_btn.pressed.connect(func() -> void: render_requested.emit(_lat, _lon))
+	card_col.add_child(_render_btn)
 
 	_history_btn = UiTheme.ghost_button("◷  History & saved places")
 	_history_btn.pressed.connect(func() -> void: history_requested.emit())
+
+	_settings_btn = UiTheme.ghost_button("⚙  Settings — Balanced quality")
+	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
 
 	_sidebar = PanelContainer.new()
 	_sidebar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -217,6 +269,82 @@ func _on_layout_selected(index: int) -> void:
 		_:
 			_forced_layout = -1
 	_on_resized()
+
+func _on_theme_selected(index: int) -> void:
+	UiTheme.apply_palette(index)
+	_apply_theme()
+	palette_changed.emit(index)
+
+## Re-skin every picker control after a palette change. Factories read
+## the palette at creation time, so existing controls need this pass.
+func _apply_theme() -> void:
+	if _bg != null:
+		_bg.color = UiTheme.BG
+	if _title_label != null:
+		_title_label.add_theme_color_override("font_color", UiTheme.INK)
+	if _tagline_label != null:
+		_tagline_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	for section in [_quick_label, _selected_label, _coords_label]:
+		if section != null:
+			section.add_theme_color_override("font_color", UiTheme.MUTED)
+	if _name_label != null:
+		_name_label.add_theme_color_override("font_color", UiTheme.INK)
+	if _coord_label != null:
+		_coord_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	if _ready_label != null:
+		_ready_label.add_theme_color_override("font_color", UiTheme.TEAL)
+	if _layout_btn != null:
+		UiTheme.apply_option(_layout_btn)
+	if _theme_btn != null:
+		UiTheme.apply_option(_theme_btn)
+	if _search != null:
+		UiTheme.apply_field(_search)
+	if _lat_field != null:
+		UiTheme.apply_field(_lat_field)
+	if _lon_field != null:
+		UiTheme.apply_field(_lon_field)
+	if _suggest_panel != null:
+		_suggest_panel.add_theme_stylebox_override("panel",
+			UiTheme.style(UiTheme.CARD, 14, Color.TRANSPARENT, true))
+	for child in _suggest_list.get_children():
+		if child is Button:
+			_style_suggestion_row(child as Button)
+	if _card != null:
+		_card.add_theme_stylebox_override("panel",
+			UiTheme.style(UiTheme.CARD, 16, Color.TRANSPARENT, true))
+	if _sidebar != null:
+		_sidebar.add_theme_stylebox_override("panel",
+			UiTheme.style(UiTheme.CARD, 18, Color.TRANSPARENT, true))
+	if _render_btn != null:
+		UiTheme.apply_primary(_render_btn)
+	if _history_btn != null:
+		UiTheme.apply_ghost(_history_btn)
+	if _settings_btn != null:
+		UiTheme.apply_ghost(_settings_btn)
+	if _exit_btn != null:
+		UiTheme.apply_ghost(_exit_btn)
+	if _zoom_out_btn != null:
+		UiTheme.apply_icon(_zoom_out_btn)
+	if _zoom_in_btn != null:
+		UiTheme.apply_icon(_zoom_in_btn)
+	if _tip != null:
+		_tip.add_theme_color_override("font_color", UiTheme.INK)
+	_set_selected_quick(_selected_quick)
+
+## Mark one quick pick as the active place (accent fill, pressed) and
+## clear the rest. -1 clears all: the place no longer comes from a chip.
+func _set_selected_quick(index: int) -> void:
+	_selected_quick = index
+	for i in _quick_chips.size():
+		var chip := _quick_chips[i]
+		chip.set_pressed_no_signal(i == index)
+		UiTheme.apply_chip(chip, i == index)
+
+## Shows the chosen preset on the settings entry point, so the current
+## quality is visible before opening the menu.
+func set_quality_preset(preset_value: int) -> void:
+	if _settings_btn != null:
+		_settings_btn.text = "⚙  Settings — %s quality" % RenderSettings.preset_name(preset_value)
 
 func effective_layout() -> int:
 	return _current_layout
@@ -252,14 +380,15 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 		_split.visible = true
 		_move_all([_map_wrap, _sidebar], _split)
 		_sidebar.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
-		_move_all([_header, _search_box, _quick_box, _card, _history_btn], _side_col)
+		_move_all([_header, _options_row, _search_box, _quick_box, _card, _history_btn, _settings_btn], _side_col)
 	else:
 		_split.visible = false
 		_stack.visible = true
-		_move_all([_header, _search_box, _quick_box, _map_wrap, _card, _history_btn], _stack)
+		_move_all([_header, _options_row, _search_box, _quick_box, _map_wrap, _card, _history_btn, _settings_btn], _stack)
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()
+	_set_selected_quick(-1)
 	selected_name = ""
 	_lat = lat
 	_lon = lon
@@ -273,6 +402,7 @@ func _on_picked(lat: float, lon: float) -> void:
 
 func _sync_from_fields() -> void:
 	if _lat_field.text.is_valid_float() and _lon_field.text.is_valid_float():
+		_set_selected_quick(-1)
 		_lat = clampf(_lat_field.text.to_float(), -90, 90)
 		_lon = clampf(_lon_field.text.to_float(), -180, 180)
 		_canvas.set_lat_lon(_lat, _lon)
@@ -325,6 +455,18 @@ func _on_suggestions_ready(query: String, results: Array) -> void:
 	if not results.is_empty():
 		_show_suggestions(results)
 
+## Suggestion rows share the OptionButton lesson: explicit hover /
+## pressed text colours, or the label goes near-invisible on hover.
+func _style_suggestion_row(row: Button) -> void:
+	row.add_theme_color_override("font_color", UiTheme.INK)
+	row.add_theme_color_override("font_hover_color", UiTheme.INK)
+	row.add_theme_color_override("font_pressed_color", UiTheme.INK)
+	row.add_theme_color_override("font_focus_color", UiTheme.INK)
+	row.add_theme_stylebox_override("normal", UiTheme.style(Color.TRANSPARENT, 10))
+	row.add_theme_stylebox_override("hover", UiTheme.style(UiTheme.TEAL_SOFT, 10))
+	row.add_theme_stylebox_override("pressed", UiTheme.style(UiTheme.TEAL_SOFT, 10))
+	row.add_theme_stylebox_override("focus", UiTheme.style(Color.TRANSPARENT, 10, UiTheme.AMBER))
+
 func _show_suggestions(results: Array) -> void:
 	for child in _suggest_list.get_children():
 		child.queue_free()
@@ -340,10 +482,7 @@ func _show_suggestions(results: Array) -> void:
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.custom_minimum_size = Vector2(0, 48)
 		row.add_theme_font_size_override("font_size", 15)
-		row.add_theme_color_override("font_color", UiTheme.INK)
-		row.add_theme_stylebox_override("normal", UiTheme.style(Color.TRANSPARENT, 10))
-		row.add_theme_stylebox_override("hover", UiTheme.style(UiTheme.FIELD, 10))
-		row.add_theme_stylebox_override("pressed", UiTheme.style(UiTheme.FIELD, 10))
+		_style_suggestion_row(row)
 		row.pressed.connect(func() -> void: _select_suggestion(name, lat, lon))
 		_suggest_list.add_child(row)
 	_suggest_panel.visible = true

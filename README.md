@@ -49,6 +49,9 @@ godot --path .            # run the app
 godot --headless --script tests/smoke_test.gd   # contract checks
 godot --headless --script tests/osm_test.gd     # OSM parser (offline fixture)
 godot --headless --script tests/tiles_test.gd   # tile math + pool drain
+godot --headless --script tests/progressive_map_test.gd # progressive map: preview first, detail centre-out
+godot --headless --script tests/landmark_test.gd # landmark registry, models, placement
+godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile cancellation on far pans
 godot --headless --script tests/search_test.gd  # place-search parser
 godot --headless --script tests/weather_test.gd # weather parser
 godot --headless --script tests/dem_test.gd     # live DEM decode (network once)
@@ -60,10 +63,10 @@ godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/
 ```
 
 Current MVP: map picker (tap/search/coordinates) → staged loading pipeline
-→ procedural 360° terrain view with drag-look, landmark, buildings,
-vegetation, and time-of-day control → on-device history/cache. Real DEM and
-map data swap in behind the same `LocationData` contract once the
-data-source register is settled.
+→ 360° terrain view with real DEM draped in satellite imagery, drag-look,
+landmarks, buildings, vegetation, time-of-day and season controls, and
+live-weather dressing → on-device history/cache. All data sources are
+settled in the data-source register behind the same `LocationData` contract.
 
 ## License
 
