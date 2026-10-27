@@ -5,14 +5,24 @@ extends Control
 ## Navigation: drag (mouse or one finger) pans, mouse wheel / trackpad
 ## magnify / two-finger pinch zooms at the pointer, double-click or
 ## double-tap zooms in, a short tap places the pin, arrow keys pan and
-## +/- zoom when focused. Falls back to a plain background until tiles
-## arrive (offline first run). Attribution is always visible.
+## +/- zoom when focused. Attribution is always visible.
+##
+## Progressive rendering, fast first paint: (1) a flat simple style
+## (plain tile cells) draws instantly with no network, (2) one coarse
+## tile per 4x4 detail block is fetched first and drawn scaled up as a
+## blurry preview, (3) full-detail tiles stream in centre-out and
+## replace the preview tile by tile. Any cached ancestor tile also
+## stands in for a missing detail tile, so pan/zoom never blanks.
 
 signal picked(lat: float, lon: float)
 
 const MIN_ZOOM := 4
 const MAX_ZOOM := 15
 const TAP_MAX_PX := 14.0
+## Zoom levels between the coarse preview and full detail.
+const PREVIEW_DROP := 2
+## How far up the tile pyramid _draw looks for a stand-in texture.
+const MAX_ANCESTOR_DROP := 4
 
 var centre_lat := 48.8566
 var centre_lon := 2.3522
@@ -20,6 +30,8 @@ var zoom_level := 12
 
 var _fetcher: TileFetcher
 var _textures: Dictionary = {}  # "z/x/y" -> Texture2D
+var _requested_tile := Vector2i(1 << 30, 1 << 30)
+var _requested_zoom := -1
 
 var _touches: Dictionary = {}  # touch index -> position
 var _pinch_base := 0.0
@@ -44,6 +56,7 @@ func _ready() -> void:
 	_fetcher.tile_ready.connect(func(z: int, x: int, y: int, tex: Texture2D) -> void:
 		_textures["%d/%d/%d" % [z, x, y]] = tex
 		queue_redraw())
+	resized.connect(func() -> void: refresh_tiles())
 	refresh_tiles()
 
 func set_lat_lon(lat: float, lon: float) -> void:
@@ -81,15 +94,79 @@ func pan_by_pixels(delta: Vector2) -> void:
 	_set_centre_from_pixel(
 		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) - delta)
 	queue_redraw()
+	# Fetch as soon as the drag crosses into a new tile: waiting for
+	# release left a blank background once the drag outran the old grid.
+	var tile_centre := _centre_tile()
+	if tile_centre != _requested_tile or zoom_level != _requested_zoom:
+		refresh_tiles()
+
+func _centre_tile() -> Vector2i:
+	return Vector2i(TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) / 256.0)
+
+## Tiles needed either side of the centre so the grid always covers
+## the whole viewport, whatever its size (the old fixed +/-2 covered
+## only 1280px and left wide/desktop layouts blank at the edges).
+func _tile_half_extents() -> Vector2i:
+	return Vector2i(
+		int(ceil(size.x / 512.0)) + 1,
+		int(ceil(size.y / 512.0)) + 1)
+
+## Order tiles centre-first so the place the user is looking at paints
+## before the edges. Static and pure so tests can pin the order.
+static func centre_out_order(tiles: Array, centre: Vector2i) -> Array:
+	var ordered := tiles.duplicate()
+	ordered.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
+		var da := Vector2(a.y - centre.x, a.z - centre.y)
+		var db := Vector2(b.y - centre.x, b.z - centre.y)
+		if da.length_squared() != db.length_squared():
+			return da.length_squared() < db.length_squared()
+		return a.y < b.y or (a.y == b.y and a.z < b.z))
+	return ordered
+
+## Unique coarse preview tiles (PREVIEW_DROP levels up) covering
+## `wanted`: roughly one request per 16 detail tiles.
+static func preview_tiles_for(wanted: Array, zoom: int) -> Array:
+	var pz := maxi(zoom - PREVIEW_DROP, 0)
+	var seen: Dictionary = {}
+	var preview: Array = []
+	for t in wanted:
+		var p := TileFetcher.parent_tile(t.x, t.y, t.z, zoom - pz)
+		if not seen.has(p):
+			seen[p] = true
+			preview.append(p)
+	return preview
 
 func refresh_tiles() -> void:
 	if _fetcher == null:
 		return
-	var centre_px := TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level)
-	var tile_centre := Vector2i(centre_px / 256.0)
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
-			_fetcher.request_tile(zoom_level, tile_centre.x + dx, tile_centre.y + dy)
+	var tile_centre := _centre_tile()
+	var half := _tile_half_extents()
+	var wanted: Array = []
+	for dy in range(-half.y, half.y + 1):
+		for dx in range(-half.x, half.x + 1):
+			wanted.append(Vector3i(zoom_level, tile_centre.x + dx, tile_centre.y + dy))
+	wanted = centre_out_order(wanted, tile_centre)
+	# Coarse preview first: a handful of low-zoom tiles cover the whole
+	# viewport long before all detail tiles could arrive. Only tiles
+	# whose detail is not already on screen need a preview stand-in.
+	var missing: Array = []
+	for t in wanted:
+		if not _textures.has("%d/%d/%d" % [t.x, t.y, t.z]):
+			missing.append(t)
+	var preview_centre := TileFetcher.parent_tile(
+		zoom_level, tile_centre.x, tile_centre.y, PREVIEW_DROP)
+	var preview := centre_out_order(preview_tiles_for(missing, zoom_level),
+		Vector2i(preview_centre.y, preview_centre.z))
+	var keep := preview.duplicate()
+	keep.append_array(wanted)
+	_fetcher.discard_queued_except(keep)
+	for t in preview:
+		if not _textures.has("%d/%d/%d" % [t.x, t.y, t.z]):
+			_fetcher.request_tile(t.x, t.y, t.z)
+	for t in missing:
+		_fetcher.request_tile(t.x, t.y, t.z)
+	_requested_tile = tile_centre
+	_requested_zoom = zoom_level
 
 func _set_centre_from_pixel(px: Vector2) -> void:
 	var ll := TileFetcher.lat_lon_from_pixel(px, zoom_level)
@@ -238,20 +315,47 @@ func _touch_midpoint() -> Vector2:
 	var pts: Array = _touches.values()
 	return pts[0] if pts.size() == 1 else ((pts[0] as Vector2) + (pts[1] as Vector2)) / 2.0
 
+## Nearest cached ancestor (Vector3i z/x/y) that can stand in for the
+## detail tile (tx, ty), or (-1, -1, -1) when none is loaded yet.
+func _find_ancestor(tx: int, ty: int) -> Vector3i:
+	for drop in range(1, MAX_ANCESTOR_DROP + 1):
+		if zoom_level - drop < 0:
+			break
+		var p := TileFetcher.parent_tile(zoom_level, tx, ty, drop)
+		if _textures.has("%d/%d/%d" % [p.x, p.y, p.z]):
+			return p
+	return Vector3i(-1, -1, -1)
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.92, 0.93, 0.90))
 	var centre_px := TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level)
 	var tile_centre := Vector2i(centre_px / 256.0)
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
+	var half := _tile_half_extents()
+	for dy in range(-half.y, half.y + 1):
+		for dx in range(-half.x, half.x + 1):
 			var tx := tile_centre.x + dx
 			var ty := tile_centre.y + dy
-			var key := "%d/%d/%d" % [zoom_level, tx, ty]
-			if not _textures.has(key):
-				continue
 			var tile_origin := Vector2(tx * 256.0, ty * 256.0)
 			var pos := tile_origin - centre_px + size / 2.0
-			draw_texture_rect(_textures[key], Rect2(pos, Vector2(256, 256)), false)
+			var dest := Rect2(pos, Vector2(256, 256))
+			var key := "%d/%d/%d" % [zoom_level, tx, ty]
+			if _textures.has(key):
+				draw_texture_rect(_textures[key], dest, false)
+				continue
+			var ancestor := _find_ancestor(tx, ty)
+			if ancestor.x >= 0:
+				# Low-detail stand-in: the ancestor's crop for this tile.
+				var akey := "%d/%d/%d" % [ancestor.x, ancestor.y, ancestor.z]
+				draw_texture_rect_region(_textures[akey], dest,
+					TileFetcher.source_rect_for_ancestor(
+						Vector3i(zoom_level, tx, ty), ancestor))
+				continue
+			# Simple style, before any tile arrives: a flat cell with a
+			# hairline grid so the map reads as a map from frame one.
+			var shade := Color(0.87, 0.89, 0.84) if (tx + ty) % 2 == 0 \
+				else Color(0.85, 0.87, 0.82)
+			draw_rect(dest, shade)
+			draw_rect(dest, Color(0.78, 0.80, 0.75), false, 1.0)
 	# Centre pin
 	var p := size / 2.0
 	draw_circle(p + Vector2(0, -14), 11, UiTheme.TEAL)
