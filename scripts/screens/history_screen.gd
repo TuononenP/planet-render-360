@@ -37,6 +37,12 @@ func _ready() -> void:
 	_list.add_theme_constant_override("h_separation", 14)
 	_list.add_theme_constant_override("v_separation", 14)
 	scroll.add_child(_list)
+	var clear_btn := UiTheme.ghost_button("Clear saved places")
+	clear_btn.pressed.connect(func() -> void:
+		if _store != null:
+			_store.clear()
+		refresh())
+	col.add_child(clear_btn)
 	var back := UiTheme.ghost_button("← Back to map")
 	back.pressed.connect(func() -> void: back_requested.emit())
 	col.add_child(back)

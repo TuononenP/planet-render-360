@@ -7,13 +7,17 @@ var _picker: MapPicker
 var _loading: LoadingScreen
 var _view: View360
 var _history: HistoryScreen
+var _settings_screen: SettingsScreen
 var _pipeline: GenerationPipeline
 var _store: CacheStore
+var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
 
 func _ready() -> void:
 	_store = CacheStore.new()
 	_store.load_store()
+	_settings = RenderSettings.new()
+	_settings.load_settings()
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
 	_pipeline.stage_changed.connect(
@@ -30,7 +34,10 @@ func _ready() -> void:
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
+	_picker.settings_requested.connect(func() -> void: _show(_settings_screen))
+	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
+	_picker.set_quality_preset(_settings.preset)
 
 	_loading = LoadingScreen.new()
 	_loading.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -41,6 +48,7 @@ func _ready() -> void:
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.back_requested.connect(func() -> void: _show(_picker))
 	add_child(_view)
+	_view.set_quality_preset(_settings.preset)
 
 	_history = HistoryScreen.new()
 	_history.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -51,10 +59,32 @@ func _ready() -> void:
 		_start_generation(lat, lon))
 	add_child(_history)
 
+	_settings_screen = SettingsScreen.new()
+	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_screen.bind_settings(_settings)
+	_settings_screen.back_requested.connect(func() -> void: _show(_picker))
+	_settings_screen.preset_changed.connect(func(p: int) -> void:
+		_picker.set_quality_preset(p)
+		_view.set_quality_preset(p))
+	add_child(_settings_screen)
+
 	_show(_picker)
 
+## Quit the app. Full screen hides the OS window controls, so the
+## picker Exit button and these keys are the way out on desktop.
+func _request_exit() -> void:
+	get_tree().quit()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE \
+				or (key.keycode == KEY_Q and (key.ctrl_pressed or key.meta_pressed)):
+			_request_exit()
+			get_viewport().set_input_as_handled()
+
 func _show(screen: Control) -> void:
-	for s in [_picker, _loading, _view, _history]:
+	for s in [_picker, _loading, _view, _history, _settings_screen]:
 		s.visible = s == screen
 
 func _start_generation(lat: float, lon: float) -> void:
@@ -64,7 +94,7 @@ func _start_generation(lat: float, lon: float) -> void:
 		display_name = LocationData.known_place(lat, lon)
 	_loading.begin(display_name)
 	_show(_loading)
-	_pipeline.run(lat, lon, _picker.selected_name)
+	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
 
 func _on_generation_finished(data: LocationData) -> void:
 	_store.add_entry(data.place_name, data.latitude, data.longitude)

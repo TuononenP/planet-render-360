@@ -121,6 +121,39 @@ func _run() -> void:
 	view.set_time_of_day(18)
 	if view._sun.rotation_degrees == dawn_rot:
 		failures.append("sun should move between 06:00 and 18:00")
+	# --- World replacement: a second place must not leak the first ---
+	var flat := LocationData.new()
+	flat.grid_size = 8
+	flat.heights.resize(64)
+	for i in 64:
+		flat.heights[i] = 3.0
+	flat.place_name = "Testville"
+	view.show_location(flat)
+	view.show_location(flat)
+	await process_frame
+	var worlds := 0
+	for child in view._world_root.get_children():
+		if str(child.name).begins_with("GeneratedWorld"):
+			worlds += 1
+	if worlds != 1:
+		failures.append("showing a second place should leave exactly 1 generated world, got %d" % worlds)
+	# --- Season control recolours the open place ---
+	if view._season_btn == null or view._season_btn.item_count != 4:
+		failures.append("360 view should offer 4 seasons")
+	else:
+		view._on_season_selected(LocationData.Season.AUTUMN)
+		if flat.season != LocationData.Season.AUTUMN:
+			failures.append("season picker should set the place season")
+	# --- Precipitation dressing follows the weather code ---
+	if view._precip == null:
+		failures.append("360 view should own a precipitation system")
+	else:
+		view._apply_precip(61)  # rain
+		if not view._precip.emitting:
+			failures.append("rain code should start precipitation")
+		view._apply_precip(0)  # clear
+		if view._precip.emitting:
+			failures.append("clear code should stop precipitation")
 	view.use_live_time()
 	if not view._live_time:
 		failures.append("Now should enable live time")

@@ -105,6 +105,56 @@ func _run() -> void:
 				_fail(failures, "quick pick should select Banff, got %f / %s" % [picker._lat, picker.selected_name])
 			if abs(picker._canvas.centre_lat - 51.1789) > 0.01:
 				_fail(failures, "quick pick should centre the map on Banff, got %f" % picker._canvas.centre_lat)
+			# Tokyo quick pick must visibly stay selected (regression:
+			# chips were momentary, so the tap left no active state).
+			(quick_row.get_child(4) as Button).pressed.emit()  # Tokyo
+			await process_frame
+			var tokyo_chip := quick_row.get_child(4) as Button
+			if abs(picker._lat - 35.6762) > 0.01 or picker.selected_name != "Tokyo, Japan":
+				_fail(failures, "quick pick should select Tokyo, got %f / %s" % [picker._lat, picker.selected_name])
+			if not tokyo_chip.button_pressed:
+				_fail(failures, "Tokyo chip should stay pressed after tapping it")
+			var tokyo_bg: Color = (tokyo_chip.get_theme_stylebox("normal") as StyleBoxFlat).bg_color
+			if tokyo_bg != UiTheme.TEAL:
+				_fail(failures, "Tokyo chip should use the selected (accent) style, got %s" % str(tokyo_bg))
+			if (quick_row.get_child(0) as Button).button_pressed:
+				_fail(failures, "only the tapped quick pick should stay pressed")
+			# A manual map pick clears the quick-pick selection.
+			picker._on_picked(48.8566, 2.3522)
+			await process_frame
+			if tokyo_chip.button_pressed:
+				_fail(failures, "manual map pick should clear the Tokyo selection")
+
+	# Hover contrast: dark text must stay dark on the light hover box
+	# (regression: OptionButton had no font_hover_color, so Godot's
+	# default made the layout label nearly invisible on hover).
+	if picker._layout_btn.get_theme_color("font_hover_color") == Color.WHITE:
+		_fail(failures, "layout button hover text should not be white on its white hover box")
+	if picker._layout_btn.get_theme_color("font_hover_color") != UiTheme.INK:
+		_fail(failures, "layout button hover text should stay ink-dark")
+	var popup := picker._layout_btn.get_popup()
+	if popup.get_theme_color("font_hover_color") != Color.WHITE:
+		_fail(failures, "layout popup hover text should be white on the accent hover box")
+	var popup_hover: Color = (popup.get_theme_stylebox("hover") as StyleBoxFlat).bg_color
+	if popup_hover != UiTheme.TEAL:
+		_fail(failures, "layout popup hover box should use the accent colour, got %s" % str(popup_hover))
+
+	# UI colour choices: at least three palettes, and picking one
+	# recolours the picker (background + accent follow the palette).
+	if picker._theme_btn == null or picker._theme_btn.item_count < 3:
+		_fail(failures, "picker should offer at least 3 UI colour choices")
+	else:
+		var teal_before: Color = UiTheme.TEAL
+		picker._on_theme_selected(1)  # Ocean
+		await process_frame
+		if UiTheme.TEAL == teal_before:
+			_fail(failures, "choosing Ocean should change the accent colour")
+		if picker._bg.color != UiTheme.BG:
+			_fail(failures, "choosing a UI colour should recolour the picker background")
+		if (picker._layout_btn.get_popup().get_theme_stylebox("hover") as StyleBoxFlat).bg_color != UiTheme.TEAL:
+			_fail(failures, "popup hover should follow the chosen UI colour")
+		picker._on_theme_selected(0)  # restore default for later checks
+		await process_frame
 	picker.queue_free()
 
 	# History grid follows the window width
