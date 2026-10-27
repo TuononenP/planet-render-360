@@ -14,6 +14,15 @@ func _fail(failures: Array[String], msg: String) -> void:
 func _run() -> void:
 	var failures: Array[String] = []
 
+	# Startup window: full screen at the real screen size, with stretch
+	# that expands the logical viewport to fill it responsively.
+	if int(ProjectSettings.get_setting("display/window/size/mode", 0)) \
+			!= DisplayServer.WINDOW_MODE_FULLSCREEN:
+		_fail(failures, "app should start full screen (display/window/size/mode)")
+	if str(ProjectSettings.get_setting("display/window/stretch/mode", "")) != "canvas_items" \
+			or str(ProjectSettings.get_setting("display/window/stretch/aspect", "")) != "expand":
+		_fail(failures, "stretch should be canvas_items/expand to fill any screen")
+
 	# Breakpoint thresholds
 	if Responsive.layout_for_width(390.0) != Responsive.Layout.COMPACT:
 		_fail(failures, "390pt should be COMPACT")
@@ -161,6 +170,29 @@ func _run() -> void:
 	if not loading._preview.visible:
 		_fail(failures, "loading preview should stay visible at phone height 844")
 	loading.queue_free()
+
+	# Main scene: the whole screen chain relayouts when the window
+	# size changes (as it does entering full screen on screens of
+	# different sizes).
+	var main: Node = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	main.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	main.size = Vector2(1920, 1080)
+	await process_frame
+	await process_frame
+	if main._picker.effective_layout() != Responsive.Layout.EXPANDED:
+		_fail(failures, "main at 1920pt should be EXPANDED, got %d" % main._picker.effective_layout())
+	if main._picker.size != Vector2(1920, 1080):
+		_fail(failures, "picker should fill the window, got %s" % str(main._picker.size))
+	main.size = Vector2(390, 844)
+	await process_frame
+	await process_frame
+	if main._picker.effective_layout() != Responsive.Layout.COMPACT:
+		_fail(failures, "main at 390pt should be COMPACT, got %d" % main._picker.effective_layout())
+	main.queue_free()
+	# queue_free is deferred; let it run before quitting.
+	await process_frame
+	await process_frame
 
 	if failures.is_empty():
 		print("RESPONSIVE OK: breakpoints, stacked/split picker, layout override, history grid, type floors")
