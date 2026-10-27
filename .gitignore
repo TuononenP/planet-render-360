@@ -33,6 +33,24 @@ mono_crash.*.json
 .AppleDouble
 .LSOverride
 
+# Build output (exports live outside the repo; never commit them)
+build/
+*.app/
+DerivedData/
+
+# Signing material — local only, never commit to this public repo
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+*.certSigningRequest
+*.keystore
+*.jks
+keystores/
+provisioning/
+# Local export preset copy with real signing identities, if kept
+export_presets.local.cfg
+
 # Blender
 *.blend1
 *.blend2
