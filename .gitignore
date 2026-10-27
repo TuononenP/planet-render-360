@@ -63,3 +63,6 @@ export_presets.local.cfg
 .idea/
 *.swp
 *~
+
+# Image-generation tool state (empty lock file, recreated on each run)
+generated_images/.tbh-generated-images.lock

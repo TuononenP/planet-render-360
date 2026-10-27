@@ -35,6 +35,9 @@ an unverified source never blocks the app.
   → HTTP 200, `image/png`, 121,106 bytes, S3 metadata names the EU-DEM source.
 - In-engine decode (`tests/dem_test.gd`): Paris tile z12/x2074/y1409 decoded,
   sampled window 25.8–70.1 m — plausible for central Paris.
+- Far backdrop uses the same AWS source at zoom 8 (`DemFetcher.fetch_far`,
+  whole tile sampled 64×64): Paris tile decoded in-engine, 33–193 m across
+  ~100 km, converted with the detailed grid's centre/scale in the pipeline.
 - Attribution source: https://raw.githubusercontent.com/tilezen/joerd/master/docs/attribution.md
 - OSM raster tiles also probed (`tile.openstreetmap.org` → HTTP 200,
   `Access-Control-Allow-Origin: *`), but tile-usage policy for production
