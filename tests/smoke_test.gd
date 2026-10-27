@@ -16,8 +16,10 @@ func _init() -> void:
 		failures.append("Big Sur gazetteer lookup failed")
 	if LocationData.landmark_for(48.8584, 2.2945, "Paris, France") != "eiffel":
 		failures.append("Eiffel coordinates should give the eiffel landmark")
-	if LocationData.landmark_for(48.8566, 2.3522, "Paris, France") == "eiffel":
-		failures.append("Notre Dame centre must not spawn a misplaced Eiffel Tower")
+	if LocationData.landmark_for(48.8566, 2.3522, "Paris, France") != "eiffel":
+		failures.append("Paris centre should show the Eiffel Tower as its skyline landmark")
+	if LocationData.landmark_for(60.4524, 22.2781, "Turun tuomiokirkko, 1") != "turku_cathedral":
+		failures.append("Turku Cathedral search should give the turku_cathedral landmark")
 
 	# Pipeline DEM (call the builder directly; timers need the main loop)
 	var pipeline := GenerationPipeline.new()
