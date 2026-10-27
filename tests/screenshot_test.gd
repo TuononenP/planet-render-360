@@ -64,6 +64,24 @@ func _run() -> void:
 	await _snap("03-view360-phone")
 	await _resize(1280, 800)
 	await _snap("03b-view360-desktop")
+	# Second golden location: alpine terrain at golden hour.
+	main._view.set_time_of_day(17)
+	main._start_generation(46.6863, 7.8632)
+	await _wait_view(main, 60.0)
+	main._view.set_time_of_day(17)
+	main._view._rig.set_look(-1.57, -0.04)  # face the Brienz valley ranges
+	await create_timer(0.5).timeout
+	await _resize(390, 844)
+	await _snap("05-view360-interlaken-phone")
+	await _resize(1280, 800)
+	await _snap("05b-view360-interlaken-desktop")
+	# Landmark viewpoint: the Eiffel Tower at its real coordinates.
+	main._start_generation(48.8584, 2.2945)
+	await _wait_view(main, 60.0)
+	main._view.set_time_of_day(17)
+	await create_timer(0.5).timeout
+	await _resize(1280, 800)
+	await _snap("06-view360-eiffel-desktop")
 	# History at phone and desktop (Paris was just recorded by the flow).
 	await _resize(390, 844)
 	main._history.refresh()
