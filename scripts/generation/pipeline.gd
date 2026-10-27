@@ -24,6 +24,11 @@ var used_real_dem := false
 var _fetcher: DemFetcher
 var _dem_heights: PackedFloat32Array = PackedFloat32Array()
 var _dem_done := false
+var _far_fetcher: DemFetcher
+var _far_heights_m: PackedFloat32Array = PackedFloat32Array()
+var _far_done := false
+var _dem_centre_m := 0.0
+var _dem_vscale := 0.1
 var used_osm := false
 var _osm: OsmFetcher
 var _osm_buildings: Array = []
@@ -40,6 +45,14 @@ func _ready() -> void:
 	_fetcher.failed.connect(func(reason: String) -> void:
 		push_warning("DEM fetch failed, using procedural fallback: %s" % reason)
 		_dem_done = true)
+	_far_fetcher = DemFetcher.new()
+	add_child(_far_fetcher)
+	_far_fetcher.succeeded.connect(func(h: PackedFloat32Array, _g: int) -> void:
+		_far_heights_m = h
+		_far_done = true)
+	_far_fetcher.failed.connect(func(reason: String) -> void:
+		push_warning("Far DEM fetch failed, using procedural backdrop: %s" % reason)
+		_far_done = true)
 	_osm = OsmFetcher.new()
 	add_child(_osm)
 	_osm.succeeded.connect(func(b: Array, r: Array, l: Array) -> void:
@@ -70,6 +83,11 @@ func run(lat: float, lon: float, place_name_override: String = "") -> void:
 	_osm_roads = []
 	_osm_land = []
 	_osm.fetch(lat, lon)
+	# Far backdrop fetch overlaps everything else; converted in stage 0
+	# once the detailed centre/scale are known.
+	_far_done = false
+	_far_heights_m = PackedFloat32Array()
+	_far_fetcher.fetch_far(lat, lon, data.far_grid_size)
 
 	for i in STAGES.size():
 		if _cancelled:
@@ -117,12 +135,53 @@ func _fetch_dem(data: LocationData) -> void:
 		# Adaptive vertical scale: total relief maps to ~30 world units,
 		# so flat Paris and alpine Interlaken both stay readable.
 		var vscale := clampf(30.0 / maxf(mx - mn, 1.0), 0.02, 0.35)
+		_dem_centre_m = centre_m
+		_dem_vscale = vscale
 		data.heights.resize(_dem_heights.size())
 		for idx in _dem_heights.size():
 			data.heights[idx] = (_dem_heights[idx] - centre_m) * vscale + 3.0
 		data.water_level = -3.0
 	else:
 		_build_dem(data)
+	await _apply_far(data)
+
+func _apply_far(data: LocationData) -> void:
+	var waited := 0.0
+	while not _far_done and waited < 12.0 and not _cancelled:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	var grid := data.far_grid_size
+	if used_real_dem and _far_heights_m.size() == grid * grid:
+		data.far_centre_frac = _far_fetcher.far_centre_frac
+		data.far_heights.resize(_far_heights_m.size())
+		for idx in _far_heights_m.size():
+			data.far_heights[idx] = (_far_heights_m[idx] - _dem_centre_m) * _dem_vscale + 3.0
+	else:
+		_build_far_procedural(data)
+
+func _build_far_procedural(data: LocationData) -> void:
+	# Offline backdrop: same noise family as _build_dem, wider and
+	# calmer at the centre so it never fights the detailed terrain.
+	var n := FastNoiseLite.new()
+	n.seed = data.seed_value + 5
+	n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n.frequency = 0.5
+	var grid := data.far_grid_size
+	var centre_h := data.height_at(data.grid_size / 2, data.grid_size / 2)
+	var amp := 10.0
+	if not data.heights.is_empty():
+		var r := TerrainBuilder._range_of(data.heights)
+		amp = clampf((r.y - r.x) * 1.4, 8.0, 60.0)
+	data.far_heights.resize(grid * grid)
+	data.far_centre_frac = Vector2(0.5, 0.5)
+	var cell_world := data.far_extent / float(grid)
+	for z in grid:
+		for x in grid:
+			var dist_world := Vector2(float(x - grid / 2), float(z - grid / 2)).length() * cell_world
+			var grow := clampf((dist_world - 260.0) / 900.0, 0.0, 1.0)
+			data.far_heights[z * grid + x] = centre_h \
+				+ n.get_noise_2d(float(x) * 0.55, float(z) * 0.55) * amp * grow \
+				+ amp * 0.55 * grow
 
 func _await_osm(data: LocationData) -> void:
 	var waited := 0.0

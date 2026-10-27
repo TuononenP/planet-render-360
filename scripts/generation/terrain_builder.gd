@@ -2,12 +2,82 @@ class_name TerrainBuilder
 extends RefCounted
 
 ## Builds renderable 3D from a LocationData height grid.
+## World scale: 1 unit = 4 m (OsmFetcher.WORLD_SCALE 0.25), applied to
+## heights as well as footprints so buildings keep real proportions.
+## Visual target: visual-plan/PRD.md (warm low-poly city/nature panorama).
 
 const WORLD_SIZE := 220.0
+const METRES_TO_WORLD := 0.25
+const MAX_REAL_BUILDINGS := 340
+const LANDMARK_POS := Vector2(18, -14)
+
+static var _facade_mats: Array = []
+static var _leaf_mats: Array = []
+static var _unit_box: BoxMesh
+
+static func _range_of(values: PackedFloat32Array) -> Vector2:
+	var mn := INF
+	var mx := -INF
+	for v in values:
+		mn = minf(mn, v)
+		mx = maxf(mx, v)
+	return Vector2(mn, mx)
+
+static func _polys(data: LocationData, classes: Array) -> Array:
+	var out: Array = []
+	for poly in data.land_polygons:
+		if str(poly.get("class", "")) in classes:
+			out.append(poly["points"])
+	return out
+
+static func _colored_mesh(verts: PackedVector3Array, normals: PackedVector3Array,
+		colors: PackedColorArray, indices: PackedInt32Array,
+		roughness: float = 1.0, cull_disabled: bool = false) -> MeshInstance3D:
+	if normals.is_empty():
+		for i in verts.size():
+			normals.append(Vector3.UP)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = roughness
+	if cull_disabled:
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _add(null, mesh, mat)
+
+static func _cyl(top_r: float, bottom_r: float, height: float, segments: int = 8) -> CylinderMesh:
+	var c := CylinderMesh.new()
+	c.top_radius = top_r
+	c.bottom_radius = bottom_r
+	c.height = height
+	c.radial_segments = segments
+	return c
+
+static func _add(parent: Node, mesh: Mesh, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	if parent != null:
+		parent.add_child(mi)
+	return mi
+
+static func _box_mesh() -> BoxMesh:
+	if _unit_box == null:
+		_unit_box = BoxMesh.new()
+		_unit_box.size = Vector3.ONE
+	return _unit_box
 
 static func build_world(data: LocationData) -> Node3D:
 	var root := Node3D.new()
 	root.name = "GeneratedWorld"
+	root.add_child(_far_ground(data))
+	root.add_child(_far_terrain(data))
 	root.add_child(_terrain_mesh(data))
 	root.add_child(_water(data))
 	if data.buildings.is_empty():
@@ -15,6 +85,7 @@ static func build_world(data: LocationData) -> Node3D:
 	else:
 		_real_buildings(root, data)
 		_roads(root, data)
+		_city_silhouette(root, data)
 	if data.landmark_type != "none":
 		root.add_child(_landmark(data))
 	_vegetation(root, data)
@@ -26,26 +97,121 @@ static func _mat(color: Color, roughness: float = 0.95) -> StandardMaterial3D:
 	m.roughness = roughness
 	return m
 
+static func _hash(x: float, z: float) -> float:
+	return fmod(absf(sin(x * 12.9898 + z * 78.233) * 43758.5453), 1.0)
+
+# --- Shared facade materials: window-grid texture tinted per material,
+# so hundreds of buildings cost a handful of materials, not hundreds.
+
+static func _facades() -> Array:
+	if not _facade_mats.is_empty():
+		return _facade_mats
+	var img := Image.create(96, 128, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.96, 0.95, 0.92))
+	for floor_i in 7:
+		for col in 5:
+			var shade := 0.22 + _hash(col * 3.1, floor_i * 7.7) * 0.18
+			var win := Color(shade, shade + 0.04, shade + 0.10)
+			if _hash(col * 9.3, floor_i * 3.9) > 0.82:
+				win = Color(0.85, 0.68, 0.38)  # a few lit windows
+			img.fill_rect(Rect2i(8 + col * 17, 9 + floor_i * 16, 10, 11), win)
+	img.fill_rect(Rect2i(0, 120, 96, 8), Color(0.55, 0.52, 0.48))  # ground floor
+	var tex := ImageTexture.create_from_image(img)
+	for tint in [Color(0.92, 0.87, 0.74), Color(0.86, 0.78, 0.64), Color(0.89, 0.80, 0.71)]:
+		var m := StandardMaterial3D.new()
+		m.albedo_texture = tex
+		m.albedo_color = tint
+		m.roughness = 0.92
+		_facade_mats.append(m)
+	return _facade_mats
+
+static func _leaves() -> Array:
+	if not _leaf_mats.is_empty():
+		return _leaf_mats
+	for c in [Color(0.30, 0.45, 0.26), Color(0.36, 0.50, 0.28), Color(0.24, 0.38, 0.22)]:
+		_leaf_mats.append(_mat(c, 0.9))
+	return _leaf_mats
+
+## The one ground truth for the whole world: raw heights smoothed,
+## flattened in low-relief cities, and carved under water polygons.
+## Mesh, buildings, roads, trees, and landmarks all sample this.
+static func _heights(data: LocationData) -> PackedFloat32Array:
+	var size := data.grid_size
+	if data.display_heights.size() == size * size:
+		return data.display_heights
+	var raw_range := _range_of(data.heights)
+	var hs := PackedFloat32Array()
+	hs.resize(size * size)
+	for z in size:
+		for x in size:
+			var sum := data.height_at(x, z) * 2.0
+			var n := 2.0
+			for dz in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					if dx == 0 and dz == 0:
+						continue
+					sum += data.height_at(x + dx, z + dz)
+					n += 1.0
+			hs[z * size + x] = sum / n
+	if raw_range.y - raw_range.x < 20.0:
+		# Low-relief places (cities) should read flat, not as dunes.
+		var centre_h := data.height_at(size / 2, size / 2)
+		for i in hs.size():
+			hs[i] = lerpf(hs[i], centre_h, 0.45)
+	var step := WORLD_SIZE / float(size - 1)
+	for pts in _polys(data, ["water"]):
+		for z in size:
+			for x in size:
+				var wx := (x - size / 2.0) * step
+				var wz := (z - size / 2.0) * step
+				if point_in_polygon(Vector2(wx, wz), pts):
+					hs[z * size + x] = minf(hs[z * size + x], data.water_level + 0.35)
+	data.display_heights = hs
+	return hs
+
 static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 	var size := data.grid_size
+	var step := WORLD_SIZE / float(size - 1)
+	var hs := _heights(data)
+	var rng := _range_of(hs)
+	var mn := rng.x
+	var mx := rng.y
+	var relief := mx - mn
+	var urban := not data.buildings.is_empty()
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
-	var step := WORLD_SIZE / float(size - 1)
-	var grass := Color(0.55, 0.62, 0.48)
-	var dry := Color(0.76, 0.70, 0.55)
-	var rock := Color(0.55, 0.52, 0.47)
+	var grass := Color(0.40, 0.53, 0.31)
+	var dry := Color(0.64, 0.57, 0.40)
+	var rock := Color(0.44, 0.42, 0.40)
+	var urban_ground := Color(0.47, 0.44, 0.40)
 	for z in size:
 		for x in size:
-			var h := data.height_at(x, z)
+			var h := hs[z * size + x]
 			var wx := (x - size / 2.0) * step
 			var wz := (z - size / 2.0) * step
 			verts.append(Vector3(wx, h, wz))
-			normals.append(Vector3.UP)
-			var t := clampf((h + 10.0) / 45.0, 0.0, 1.0)
-			var base_color := grass.lerp(dry, t) if t < 0.7 \
-				else dry.lerp(rock, (t - 0.7) / 0.3)
+			var hx0 := hs[z * size + maxi(x - 1, 0)]
+			var hx1 := hs[z * size + mini(x + 1, size - 1)]
+			var hz0 := hs[maxi(z - 1, 0) * size + x]
+			var hz1 := hs[mini(z + 1, size - 1) * size + x]
+			var slope_x := (hx1 - hx0) / (2.0 * step)
+			var slope_z := (hz1 - hz0) / (2.0 * step)
+			var normal := Vector3(-slope_x, 1.0, -slope_z).normalized()
+			normals.append(normal)
+			var t := clampf((h - mn) / maxf(mx - mn, 0.001), 0.0, 1.0)
+			var base_color := grass.lerp(dry, clampf(t * 1.4, 0.0, 1.0))
+			if t > 0.72:
+				base_color = dry.lerp(rock, (t - 0.72) / 0.28)
+			var steep := clampf(1.0 - normal.y, 0.0, 1.0) * 3.2
+			base_color = base_color.lerp(rock, clampf(steep, 0.0, 0.75))
+			if relief > 22.0 and t > 0.84 and steep < 0.35:
+				base_color = base_color.lerp(Color(0.90, 0.91, 0.92), 0.6)  # alpine tops only
+			if urban:
+				base_color = urban_ground.lerp(grass, _hash(x * 0.7, z * 0.7) * 0.25)
+			var shade := 0.92 + _hash(x * 1.3, z * 1.7) * 0.14
+			base_color = Color(base_color.r * shade, base_color.g * shade, base_color.b * shade)
 			colors.append(land_color(Vector2(wx, wz), data.land_polygons, base_color))
 	for z in size - 1:
 		for x in size - 1:
@@ -54,20 +220,80 @@ static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 			var c := a + size
 			var d := c + 1
 			indices.append_array([a, b, c, b, d, c])
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_COLOR] = colors
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.95
-	mi.material_override = mat
+	return _colored_mesh(verts, normals, colors, indices, 0.97)
+
+static func _far_ground(data: LocationData) -> MeshInstance3D:
+	# A broad, fog-tinted apron so the terrain disc never ends in void.
+	var size := data.grid_size
+	var hs := _heights(data)
+	var edge_sum := 0.0
+	var edge_n := 0
+	for i in size:
+		edge_sum += hs[i] + hs[(size - 1) * size + i] \
+			+ hs[i * size] + hs[i * size + size - 1]
+		edge_n += 4
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(3200, 3200)
+	var mi := _add(null, plane, _mat(Color(0.45, 0.47, 0.42), 1.0))
+	mi.position.y = edge_sum / maxf(float(edge_n), 1.0) - 0.9
+	return mi
+
+static func _far_terrain(data: LocationData) -> MeshInstance3D:
+	# Real backdrop terrain from the zoom-8 DEM (LocationData.far_*),
+	# converted with the detailed grid's centre/scale so the meshes
+	# align. Two distance tricks keep the seam invisible: the far mesh
+	# is buried near the viewpoint (the detailed terrain covers it) and
+	# relief is progressively exaggerated with distance, so real Alps
+	# read as Alps at 5 km instead of ripples. Without far data there
+	# is only the flat apron from _far_ground.
+	var grid := data.far_grid_size
+	if data.far_heights.size() != grid * grid:
+		return MeshInstance3D.new()
+	var extent := data.far_extent
+	var step := extent / float(grid - 1)
+	var offset := Vector3((0.5 - data.far_centre_frac.x) * extent, -2.2,
+		(0.5 - data.far_centre_frac.y) * extent)
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var grass := Color(0.42, 0.52, 0.33)
+	var dry := Color(0.62, 0.56, 0.40)
+	var rock := Color(0.46, 0.44, 0.41)
+	for z in grid:
+		for x in grid:
+			var wx := (float(x) - float(grid - 1) / 2.0) * step
+			var wz := (float(z) - float(grid - 1) / 2.0) * step
+			var world := Vector3(wx, 0, wz) + offset
+			var dist := Vector2(world.x, world.z).length()
+			var boost := 1.0 + 1.9 * smoothstep(300.0, 1600.0, dist)
+			var bury := lerpf(16.0, 0.0, smoothstep(160.0, 520.0, dist))
+			var h := 3.0 + (data.far_heights[z * grid + x] - 3.0) * boost - bury
+			verts.append(Vector3(wx, h, wz))
+			var hx0 := data.far_heights[z * grid + maxi(x - 1, 0)]
+			var hx1 := data.far_heights[z * grid + mini(x + 1, grid - 1)]
+			var hz0 := data.far_heights[maxi(z - 1, 0) * grid + x]
+			var hz1 := data.far_heights[mini(z + 1, grid - 1) * grid + x]
+			var normal := Vector3(-(hx1 - hx0) / (2.0 * step), 1.0,
+				-(hz1 - hz0) / (2.0 * step)).normalized()
+			normals.append(normal)
+			var above := h - 3.0
+			var c := grass.lerp(dry, clampf(above / 60.0, 0.0, 1.0))
+			c = c.lerp(rock, clampf((1.0 - normal.y) * 3.0 + above / 160.0, 0.0, 0.8))
+			if above > 95.0 and normal.y > 0.75:
+				c = c.lerp(Color(0.90, 0.91, 0.92), 0.6)
+			if h < data.water_level + 1.0:
+				c = Color(0.35, 0.48, 0.52)  # distant lakes read as water
+			colors.append(c)
+	for z in grid - 1:
+		for x in grid - 1:
+			var a := z * grid + x
+			var b := a + 1
+			var c := a + grid
+			var d := c + 1
+			indices.append_array([a, b, c, b, d, c])
+	var mi := _colored_mesh(verts, normals, colors, indices, 1.0)
+	mi.position = offset
 	return mi
 
 static func point_in_polygon(point: Vector2, polygon: PackedVector2Array) -> bool:
@@ -86,74 +312,103 @@ static func land_color(point: Vector2, land: Array, fallback: Color) -> Color:
 	for poly in land:
 		if point_in_polygon(point, poly["points"]):
 			match str(poly["class"]):
-				"water": return Color(0.42, 0.60, 0.66)
-				"forest": return Color(0.30, 0.44, 0.30)
-				"grass": return Color(0.52, 0.64, 0.42)
-				"field": return Color(0.72, 0.66, 0.46)
-				"urban": return Color(0.66, 0.63, 0.58)
+				"water": return Color(0.30, 0.50, 0.60)
+				"forest": return Color(0.27, 0.41, 0.25)
+				"grass": return Color(0.47, 0.60, 0.37)
+				"field": return Color(0.70, 0.63, 0.43)
+				"urban": return Color(0.64, 0.61, 0.55)
 	return fallback
 
 static func _water(data: LocationData) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(WORLD_SIZE, WORLD_SIZE)
-	mi.mesh = plane
+	var m := _mat(Color(0.16, 0.36, 0.48, 0.94), 0.16)
+	m.metallic = 0.08
+	var mi := _add(null, plane, m)
 	mi.position.y = data.water_level
-	mi.material_override = _mat(Color(0.36, 0.55, 0.62, 0.92), 0.25)
 	return mi
 
-static func _box(root: Node3D, pos: Vector3, scl: Vector3, color: Color) -> void:
-	var mi := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE
-	mi.mesh = box
+static func _box_mat(root: Node3D, pos: Vector3, scl: Vector3, mat: Material) -> void:
+	var mi := _add(root, _box_mesh(), mat)
 	mi.position = pos
 	mi.scale = scl
-	mi.material_override = _mat(color)
-	root.add_child(mi)
+
+static func _box(root: Node3D, pos: Vector3, scl: Vector3, color: Color) -> void:
+	_box_mat(root, pos, scl, _mat(color))
+
+static func _mansard(root: Node3D, cx: float, base_y: float, cz: float,
+		size_x: float, size_z: float, roof_h: float, seed_v: float) -> void:
+	var slate := Color(0.21, 0.24, 0.30).lerp(Color(0.30, 0.33, 0.38), seed_v)
+	var mi := _add(root, _cyl(0.52, 1.0, 1.0, 4), _mat(slate, 0.85))
+	mi.rotation.y = PI / 4.0
+	mi.position = Vector3(cx, base_y + roof_h / 2.0, cz)
+	mi.scale = Vector3(size_x * 0.48, roof_h, size_z * 0.48)
+
+static func _building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
+		height_world: float, seed_v: float) -> void:
+	var facades := _facades()
+	_box_mat(root, pos + Vector3(0, height_world / 2.0, 0),
+		Vector3(size_x, height_world, size_z),
+		facades[int(seed_v * 2.99) % facades.size()])
+	var roof_h := clampf(minf(size_x, size_z) * 0.22, 0.7, 2.0)
+	_mansard(root, pos.x, pos.y + height_world, pos.z, size_x, size_z, roof_h, seed_v)
 
 static func _buildings(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 7
-	var wall := Color(0.84, 0.78, 0.66)
-	var roof := Color(0.38, 0.42, 0.48)
 	for i in 90:
 		var angle := rng.randf_range(0.0, TAU)
 		var dist := rng.randf_range(38.0, 98.0)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
-		var gx := int((pos.x / WORLD_SIZE + 0.5) * data.grid_size)
-		var gz := int((pos.z / WORLD_SIZE + 0.5) * data.grid_size)
-		var ground := data.height_at(gx, gz)
+		var ground := _ground_at(data, pos.x, pos.z)
 		if ground < data.water_level + 0.5:
 			continue
-		var h := rng.randf_range(4.0, 9.0)
-		pos.y = ground
-		_box(root, pos + Vector3(0, h / 2.0, 0),
-			Vector3(rng.randf_range(5, 9), h, rng.randf_range(5, 9)), wall)
-		_box(root, pos + Vector3(0, h + 0.6, 0),
-			Vector3(6.5, 1.2, 6.5), roof)
+		pos.y = ground - 0.25
+		_building(root, pos, rng.randf_range(4.5, 8.0), rng.randf_range(4.5, 8.0),
+			rng.randf_range(3.2, 6.2), rng.randf())
 
 static func _ground_at(data: LocationData, world_x: float, world_z: float) -> float:
-	var gx := int((world_x / WORLD_SIZE + 0.5) * data.grid_size)
-	var gz := int((world_z / WORLD_SIZE + 0.5) * data.grid_size)
-	return data.height_at(gx, gz)
+	var hs := _heights(data)
+	var size := data.grid_size
+	var gx := clampi(int((world_x / WORLD_SIZE + 0.5) * float(size)), 0, size - 1)
+	var gz := clampi(int((world_z / WORLD_SIZE + 0.5) * float(size)), 0, size - 1)
+	return hs[gz * size + gx]
 
 static func _real_buildings(root: Node3D, data: LocationData) -> void:
-	var wall := Color(0.84, 0.78, 0.66)
-	var roof := Color(0.38, 0.42, 0.48)
-	for b in data.buildings:
+	var sorted := data.buildings.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
+			< (float(b["x"]) ** 2 + float(b["z"]) ** 2))
+	var placed := 0
+	for b in sorted:
+		if placed >= MAX_REAL_BUILDINGS:
+			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
 		if absf(pos.x) > 105.0 or absf(pos.z) > 105.0:
 			continue
-		pos.y = _ground_at(data, pos.x, pos.z)
-		var h := float(b["height"]) * 0.6
-		_box(root, pos + Vector3(0, h / 2.0, 0),
-			Vector3(float(b["size_x"]), h, float(b["size_z"])), wall)
-		_box(root, pos + Vector3(0, h + 0.4, 0),
-			Vector3(float(b["size_x"]) + 0.6, 0.9, float(b["size_z"]) + 0.6), roof)
+		pos.y = _ground_at(data, pos.x, pos.z) - 0.6
+		var height_world := clampf(float(b["height"]) * METRES_TO_WORLD, 1.8, 19.0)
+		_building(root, pos, float(b["size_x"]), float(b["size_z"]),
+			height_world, _hash(pos.x, pos.z))
+		placed += 1
+
+static func _city_silhouette(root: Node3D, data: LocationData) -> void:
+	# Hazy low blocks beyond the detailed area, so a city reaches the
+	# horizon instead of stopping at the terrain edge.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = data.seed_value + 99
+	var haze := _mat(Color(0.58, 0.59, 0.56), 1.0)
+	for i in 46:
+		var angle := TAU * float(i) / 46.0 + rng.randf_range(-0.05, 0.05)
+		var dist := rng.randf_range(125.0, 195.0)
+		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+		pos.y = _ground_at(data, clampf(pos.x, -108.0, 108.0), clampf(pos.z, -108.0, 108.0)) - 0.5
+		_box_mat(root, pos + Vector3(0, rng.randf_range(2.0, 4.5), 0),
+			Vector3(rng.randf_range(9, 18), rng.randf_range(4.0, 9.0), rng.randf_range(9, 18)), haze)
 
 static func _roads(root: Node3D, data: LocationData) -> void:
-	var asphalt := Color(0.32, 0.33, 0.34)
+	var asphalt := _mat(Color(0.31, 0.31, 0.32), 0.98)
+	var water_polys := _polys(data, ["water"])
 	for line in data.roads:
 		var pts: PackedVector2Array = line
 		for i in pts.size() - 1:
@@ -162,80 +417,130 @@ static func _roads(root: Node3D, data: LocationData) -> void:
 			var mid := (a + b) / 2.0
 			if absf(mid.x) > 108.0 or absf(mid.y) > 108.0:
 				continue
-			var seg := MeshInstance3D.new()
-			var box := BoxMesh.new()
-			box.size = Vector3.ONE
-			seg.mesh = box
+			var seg := _add(root, _box_mesh(), asphalt)
 			var length := a.distance_to(b)
-			seg.scale = Vector3(length, 0.18, 2.2)
-			seg.position = Vector3(mid.x, _ground_at(data, mid.x, mid.y) + 0.25, mid.y)
+			seg.scale = Vector3(length, 0.12, 1.7)
+			var y := _ground_at(data, mid.x, mid.y) + 0.16
+			for wp in water_polys:
+				if point_in_polygon(mid, wp):
+					y = data.water_level + 1.1  # bridge deck over the channel
+					break
+			seg.position = Vector3(mid.x, y, mid.y)
 			seg.rotation.y = -atan2(b.y - a.y, b.x - a.x)
-			seg.material_override = _mat(asphalt)
-			root.add_child(seg)
 
 static func _landmark(data: LocationData) -> Node3D:
 	var root := Node3D.new()
-	root.position = Vector3(18, data.height_at(30, 24), -14)
-	var iron := Color(0.32, 0.24, 0.18)
+	root.position = Vector3(LANDMARK_POS.x,
+		_ground_at(data, LANDMARK_POS.x, LANDMARK_POS.y) - 0.3, LANDMARK_POS.y)
+	var iron := _mat(Color(0.30, 0.23, 0.17), 0.8)
 	if data.landmark_type == "eiffel":
-		# Tapered square frustums read as the tower silhouette at MVP scale.
-		var sections: Array = [
-			[7.5, 5.2, 11.0, 5.5],   # bottom_r, top_r, height, y
-			[5.0, 3.0, 10.0, 16.0],
-			[2.8, 1.1, 11.0, 26.0],
-		]
-		for s in sections:
-			var mi := MeshInstance3D.new()
-			var cyl := CylinderMesh.new()
-			cyl.radial_segments = 4
-			cyl.bottom_radius = s[0]
-			cyl.top_radius = s[1]
-			cyl.height = s[2]
-			mi.mesh = cyl
-			mi.rotation.y = PI / 4.0
-			mi.position.y = s[3]
-			mi.material_override = _mat(iron)
-			root.add_child(mi)
-		var spire := MeshInstance3D.new()
-		var tip := CylinderMesh.new()
-		tip.top_radius = 0.15
-		tip.bottom_radius = 0.9
-		tip.height = 8.0
-		spire.mesh = tip
-		spire.position.y = 35.0
-		spire.material_override = _mat(iron)
-		root.add_child(spire)
+		# Four legs converging through two platforms to a spire, at
+		# world scale (330 m tower -> ~80 units, base ~90 m -> ±9).
+		var base_corners: Array[Vector3] = [Vector3(-9, 0, -9), Vector3(9, 0, -9),
+			Vector3(-9, 0, 9), Vector3(9, 0, 9)]
+		var mid_corners: Array[Vector3] = []
+		var top_corners: Array[Vector3] = []
+		for c in base_corners:
+			mid_corners.append(Vector3(c.x * 0.46, 15.0, c.z * 0.46))
+			top_corners.append(Vector3(c.x * 0.22, 30.0, c.z * 0.22))
+		for i in 4:
+			_beam(root, base_corners[i], mid_corners[i], 0.85, iron)
+			_beam(root, mid_corners[i], top_corners[i], 0.55, iron)
+		_box_mat(root, Vector3(0, 15.5, 0), Vector3(10.5, 1.2, 10.5), iron)
+		_box_mat(root, Vector3(0, 30.5, 0), Vector3(5.6, 1.1, 5.6), iron)
+		var shaft := _add(root, _cyl(0.7, 2.0, 34.0, 4), iron)
+		shaft.rotation.y = PI / 4.0
+		shaft.position.y = 48.0
+		var spire := _add(root, _cyl(0.10, 0.6, 15.0), iron)
+		spire.position.y = 72.0
 	else:
-		var tower := MeshInstance3D.new()
-		var cyl2 := CylinderMesh.new()
-		cyl2.top_radius = 2.0
-		cyl2.bottom_radius = 3.5
-		cyl2.height = 34
-		tower.mesh = cyl2
-		tower.position.y = 17
-		tower.material_override = _mat(Color(0.62, 0.60, 0.56))
-		root.add_child(tower)
+		var tower := _add(root, _cyl(1.7, 3.2, 30.0), _mat(Color(0.66, 0.63, 0.58), 0.9))
+		tower.position.y = 15
+		_box_mat(root, Vector3(0, 30.8, 0), Vector3(5.2, 1.4, 5.2),
+			_mat(Color(0.42, 0.45, 0.50), 0.85))
 	return root
+
+static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
+	var mi := _add(parent, _cyl(radius * 0.8, radius, 1.0, 6), mat)
+	var dir := to - from
+	var length := dir.length()
+	var y_axis := dir / length
+	var x_axis := Vector3.UP.cross(y_axis).normalized()
+	if x_axis.length() < 0.01:
+		x_axis = Vector3.RIGHT
+	var z_axis := x_axis.cross(y_axis).normalized()
+	x_axis = y_axis.cross(z_axis).normalized()
+	mi.transform = Transform3D(
+		Basis(x_axis * radius, y_axis * length, z_axis * radius),
+		(from + to) / 2.0)
+
+static func _random_pos(rng: RandomNumberGenerator) -> Vector3:
+	var angle := rng.randf_range(0.0, TAU)
+	var dist := rng.randf_range(15.0, 102.0)
+	return Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+
+static func _broadleaf(root: Node3D, pos: Vector3, rng: RandomNumberGenerator,
+		leaves: Array, trunk_mat: Material) -> void:
+	var trunk := _add(root, _cyl(0.10, 0.16, 1.1, 6), trunk_mat)
+	trunk.position = pos + Vector3(0, 0.55, 0)
+	var sphere := SphereMesh.new()
+	sphere.radial_segments = 8
+	sphere.rings = 5
+	sphere.radius = 1.0
+	sphere.height = 1.6
+	var canopy := _add(root, sphere, leaves[rng.randi_range(0, leaves.size() - 1)])
+	var r := rng.randf_range(0.9, 1.5)
+	canopy.scale = Vector3(r, r * 0.82, r)
+	canopy.position = pos + Vector3(0, 1.1 + r * 0.75, 0)
+
+static func _pine(root: Node3D, pos: Vector3, rng: RandomNumberGenerator, leaves: Array) -> void:
+	var h := rng.randf_range(3.2, 5.4)
+	var tree := _add(root, _cyl(0.08, rng.randf_range(0.9, 1.5), h, 8),
+		leaves[rng.randi_range(0, leaves.size() - 1)])
+	tree.position = pos + Vector3(0, h / 2.0, 0)
 
 static func _vegetation(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 21
-	var leaf := _mat(Color(0.30, 0.42, 0.28))
-	for i in 140:
-		var angle := rng.randf_range(0.0, TAU)
-		var dist := rng.randf_range(16.0, 100.0)
-		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
-		var gx := int((pos.x / WORLD_SIZE + 0.5) * data.grid_size)
-		var gz := int((pos.z / WORLD_SIZE + 0.5) * data.grid_size)
-		var ground := data.height_at(gx, gz)
+	var leaves := _leaves()
+	var trunk_mat := _mat(Color(0.36, 0.28, 0.20), 0.95)
+	var urban := not data.buildings.is_empty()
+	var green_polys := _polys(data, ["forest", "grass"])
+	var count := 170 if urban else 230
+	for i in count:
+		var pos := _random_pos(rng)
+		# Prefer parks and forests: resample a couple of times to land
+		# inside green land cover when the place has any.
+		for attempt in 3:
+			var inside_green := false
+			for gp in green_polys:
+				if point_in_polygon(Vector2(pos.x, pos.z), gp):
+					inside_green = true
+					break
+			if inside_green or green_polys.is_empty():
+				break
+			if attempt == 2 and rng.randf() > 0.35:
+				pos = Vector3(9999, 0, 9999)  # skip: cities keep trees in green areas
+				break
+			pos = _random_pos(rng)
+		if absf(pos.x) > 200.0:
+			continue
+		var ground := _ground_at(data, pos.x, pos.z)
 		if ground < data.water_level + 0.4:
 			continue
-		var tree := MeshInstance3D.new()
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.1
-		cone.bottom_radius = rng.randf_range(1.2, 2.0)
-		cone.height = rng.randf_range(4.0, 7.0)
-		tree.mesh = cone
-		tree.position = pos + Vector3(0, ground + cone.height / 2.0, 0)
-		tree.material_override = leaf
-		root.add_child(tree)
+		if urban and _near_building(data, pos):
+			continue
+		pos.y = ground
+		if rng.randf() < 0.55:
+			_broadleaf(root, pos, rng, leaves, trunk_mat)
+		else:
+			_pine(root, pos, rng, leaves)
+
+static func _near_building(data: LocationData, pos: Vector3) -> bool:
+	for b in data.buildings:
+		var dx := pos.x - float(b["x"])
+		var dz := pos.z - float(b["z"])
+		var reach := maxf(float(b["size_x"]), float(b["size_z"])) * 0.5 + 1.6
+		if dx * dx + dz * dz < reach * reach:
+			return true
+	return false
