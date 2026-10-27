@@ -1,19 +1,39 @@
 # planet-render-360
 
-Summary
-Renders any point on the map as 3D modeled 360-view rendering
+> Render any point on the map as a 3D, 360-degree view.
 
-Core idea and use-case
-Give a coordinates or pick any location on a world map, then generate an accurate 360 view of the location. Visuals do not need to be photorealistic but as close as possible to be able to be rendered using Godot in mobile phone. Should procedurally render the view or use similar technique if it is more optimized. Could perhaps use Godot  for this (probably need Blender as well). Would perhaps need some way to  analyze the location to render landmarks correctly. If possible Godot could render landmarks on-the-fly on the phone e.g. Eiffel Tower etc. 
+## Summary
 
-Core requirements
--Should use only freely available  APIs and sources  that do not have too much usage restrictions in terms of API calls.
--Should have correct elevation (use digital elevation model). Elevation should match real location.
--Should use correct terrain type and visuals (fetch e.g. from Polyhaven CC0 resources)
--Optionally render  in current time  and  season of the year, perhaps even in current weather (e.g. raining). This is optional if there are enough time to implement this in time.
--Needs to be cross-platform, ios, android and macos for the first versions. But let's start with MacOS version for easier development and testing. Let's worry about the other platforms later.
-- Should generate the view on-the-fly using network access and free public APIs with attributions were required e.g. OpenFreeMap, digital elevation model, CHELSA to model local climate patterns accurately—especially in complex, mountainous, or remote terrain.
--Should not take too many minutes to load the rendering, but it is allowed to take some time. During loading should look informative and super cool loading loading screen that clearly visualizes what is happening and how far the loading has progressed. 
+Enter coordinates or pick any location on a world map to generate an accurate 360-degree view of that place. Visuals don't need to be photorealistic, but they should be as close to reality as possible while still rendering smoothly in Godot on a mobile phone.
 
-UI and UX
-UI should have appropriate controls and the world map. Could also have a history of recent searched place. Maybe later someway to cache the area for faster view. The main part of the view should consist of the rendered 3D 360 view after it has been loaded and user should be able to use full-screen mode with appropriate control for adjusting the view.
+## Core Idea and Use Case
+
+- Pick a location by entering coordinates or selecting it on a world map.
+- Procedurally generate a 360-degree view of the location, using optimized techniques suitable for mobile.
+- Analyze the location so landmarks (e.g., the Eiffel Tower) are rendered recognizably — ideally generated on the fly on the device.
+- Implementation will likely use **Godot**, possibly with **Blender** for asset preparation.
+
+## Core Requirements
+
+- Use only freely available APIs and data sources without strict rate limits.
+- Use accurate elevation from a digital elevation model (DEM) so terrain matches the real location.
+- Use accurate terrain types and visuals (e.g., [Polyhaven](https://polyhaven.com/) CC0 resources).
+- Generate views on the fly over the network using free public APIs, with attribution where required — e.g., OpenFreeMap, DEM sources, and CHELSA for modeling local climate patterns, especially in complex, mountainous, or remote terrain.
+- Keep loading times reasonable (a few minutes at most). Show an informative, polished loading screen that visualizes what is happening and how far loading has progressed.
+- Optionally render the current time of day, season, and even current weather (e.g., rain) if time allows.
+
+## UI and UX
+
+- Provide intuitive controls alongside a world map for selecting locations.
+- Keep a history of recently viewed places.
+- Support caching areas for faster repeat views (planned).
+- Make the rendered 3D 360-degree view the main focus once loaded.
+- Support full-screen mode with intuitive view controls.
+
+## Platforms
+
+Initial development targets **macOS** for easier development and testing, followed by **iOS** and **Android**.
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
