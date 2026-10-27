@@ -21,5 +21,27 @@ mono_crash.*.json
 
 # Export outputs
 *.exe
+*.apk
+*.aab
+*.ipa
+*.dmg
 # Uncomment if your project does not version PCK files as runtime dependencies.
 # *.pck
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Blender
+*.blend1
+*.blend2
+*.blend3
+*.blend4
+*.blend5
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
