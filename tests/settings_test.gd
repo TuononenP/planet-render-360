@@ -27,19 +27,27 @@ func _flat_data(preset_value: int, building_count: int) -> LocationData:
 func _run() -> void:
 	var failures: Array[String] = []
 
-	# Budgets strictly rise Fast < Balanced < High; clamping is safe.
+	# Budgets strictly rise Fast < Balanced < High < Ultra; clamping is safe.
 	for values in [
-			[RenderSettings.grid_size_for(0), RenderSettings.grid_size_for(1), RenderSettings.grid_size_for(2)],
-			[RenderSettings.max_buildings_for(0), RenderSettings.max_buildings_for(1), RenderSettings.max_buildings_for(2)],
-			[RenderSettings.vegetation_count_for(0, false), RenderSettings.vegetation_count_for(1, false), RenderSettings.vegetation_count_for(2, false)]]:
-		if not (values[0] < values[1] and values[1] < values[2]):
+			[RenderSettings.grid_size_for(0), RenderSettings.grid_size_for(1), RenderSettings.grid_size_for(2), RenderSettings.grid_size_for(3)],
+			[RenderSettings.max_buildings_for(0), RenderSettings.max_buildings_for(1), RenderSettings.max_buildings_for(2), RenderSettings.max_buildings_for(3)],
+			[RenderSettings.vegetation_count_for(0, false), RenderSettings.vegetation_count_for(1, false), RenderSettings.vegetation_count_for(2, false), RenderSettings.vegetation_count_for(3, false)]]:
+		if not (values[0] < values[1] and values[1] < values[2] and values[2] < values[3]):
 			failures.append("budgets should rise with quality, got %s" % str(values))
-	if RenderSettings.clamp_preset(-5) != 0 or RenderSettings.clamp_preset(99) != 2:
+	if RenderSettings.clamp_preset(-5) != 0 or RenderSettings.clamp_preset(99) != 3:
 		failures.append("preset clamping failed")
 	if RenderSettings.shadows_for(0) or not RenderSettings.shadows_for(1):
 		failures.append("only Fast should disable shadows")
 	if not (RenderSettings.render_scale_for(0) < RenderSettings.render_scale_for(2)):
 		failures.append("render scale should rise with quality")
+	if not (RenderSettings.render_scale_for(3) > RenderSettings.render_scale_for(2)):
+		failures.append("Ultra should supersample above High render scale")
+	if not (RenderSettings.shadow_distance_for(3) > RenderSettings.shadow_distance_for(2)):
+		failures.append("Ultra shadows should reach farther than High")
+	if not (RenderSettings.shadow_blur_for(3) < RenderSettings.shadow_blur_for(2)):
+		failures.append("Ultra shadows should be sharper than High")
+	if RenderSettings.preset_name(3) != "Ultra":
+		failures.append("preset 3 should be Ultra")
 
 	# The preset sizes the grids the pipeline fetches/builds.
 	var sized := LocationData.new()
@@ -49,7 +57,13 @@ func _run() -> void:
 	RenderSettings.apply_preset(sized, RenderSettings.Preset.HIGH)
 	if sized.grid_size != 64 or sized.far_grid_size != 64:
 		failures.append("High should size 64x64 grids, got %d" % sized.grid_size)
+	RenderSettings.apply_preset(sized, RenderSettings.Preset.ULTRA)
+	if sized.grid_size != 128 or sized.far_grid_size != 128 or sized.quality_preset != 3:
+		failures.append("Ultra should size 128x128 grids, got %d/%d" % [sized.grid_size, sized.far_grid_size])
 
+	# High is the default preset for fresh installs.
+	if RenderSettings.new().preset != RenderSettings.Preset.HIGH:
+		failures.append("default preset should be High")
 	# Persistence round-trip, then restore the default for the device.
 	var saved := RenderSettings.new()
 	saved.set_preset(RenderSettings.Preset.HIGH)
@@ -57,7 +71,7 @@ func _run() -> void:
 	reloaded.load_settings()
 	if reloaded.preset != RenderSettings.Preset.HIGH:
 		failures.append("preset should persist across instances")
-	saved.set_preset(RenderSettings.Preset.BALANCED)
+	saved.set_preset(RenderSettings.Preset.HIGH)
 
 	# The governor honours the ceiling in both directions.
 	var governor := QualityGovernor.new()
@@ -77,19 +91,29 @@ func _run() -> void:
 	governor.set_preset(RenderSettings.Preset.HIGH)
 	if governor.step != 2 or not sun.shadow_enabled:
 		failures.append("High should restore step 2 with shadows")
+	governor.set_preset(RenderSettings.Preset.ULTRA)
+	if governor.step != 3 or governor.ceiling_step != 3 or not sun.shadow_enabled:
+		failures.append("Ultra should cap the governor at step 3 with shadows")
+	if absf(viewport.scaling_3d_scale - RenderSettings.render_scale_for(3)) > 0.001:
+		failures.append("Ultra render scale not applied, got %f" % viewport.scaling_3d_scale)
 	governor.free()
 	sun.free()
 	viewport.free()
 
 	# Building budget: Fast builds fewer meshes than High from the
-	# same 400-building input.
+	# same 400-building input, and Ultra builds the most.
 	var fast_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.FAST, 400))
 	var high_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.HIGH, 400))
+	var ultra_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.ULTRA, 400))
 	if fast_world.get_child_count() >= high_world.get_child_count():
 		failures.append("Fast should build fewer nodes than High (%d vs %d)" % [
 			fast_world.get_child_count(), high_world.get_child_count()])
+	if high_world.get_child_count() >= ultra_world.get_child_count():
+		failures.append("Ultra should build more nodes than High (%d vs %d)" % [
+			ultra_world.get_child_count(), high_world.get_child_count()])
 	fast_world.free()
 	high_world.free()
+	ultra_world.free()
 
 	# Settings screen: tapping a preset applies, saves, and announces it.
 	var settings := RenderSettings.new()
@@ -101,8 +125,8 @@ func _run() -> void:
 	root.add_child(screen)
 	await process_frame
 	await process_frame
-	if screen._preset_btns.size() != 3:
-		failures.append("settings screen should offer 3 presets")
+	if screen._preset_btns.size() != 4:
+		failures.append("settings screen should offer 4 presets")
 	else:
 		screen._preset_btns[0].pressed.emit()
 		await process_frame
@@ -112,8 +136,21 @@ func _run() -> void:
 			failures.append("only the chosen preset button should stay pressed")
 		if not screen._summary_label.text.contains("32"):
 			failures.append("summary should describe the Fast budget, got: %s" % screen._summary_label.text)
+		screen._preset_btns[3].pressed.emit()
+		await process_frame
+		if settings.preset != RenderSettings.Preset.ULTRA or announced != [0, 3]:
+			failures.append("tapping Ultra should apply and announce it")
+		if not screen._summary_label.text.contains("128"):
+			failures.append("summary should describe the Ultra budget, got: %s" % screen._summary_label.text)
+	# Offline storage management: size is readable, label reports it.
+	if screen._storage_label == null or not screen._storage_label.text.contains("MB"):
+		failures.append("settings should report offline cache size")
+	if OfflineDownloader.cache_size_bytes() < 0:
+		failures.append("cache size should be readable")
+	if OfflineDownloader.JOBS != 4:
+		failures.append("offline download should cover DEM, far DEM, OSM, satellite")
 	screen.queue_free()
-	settings.set_preset(RenderSettings.Preset.BALANCED)
+	settings.set_preset(RenderSettings.Preset.HIGH)
 
 	if failures.is_empty():
 		print("SETTINGS OK: preset budgets, grid sizing, persistence, governor ceiling, settings screen")

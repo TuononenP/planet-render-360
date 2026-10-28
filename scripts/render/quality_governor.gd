@@ -7,14 +7,14 @@ extends Node
 
 signal quality_changed(step_name: String, fps: float)
 
-const STEP_NAMES: Array[String] = ["Low", "Medium", "High"]
+const STEP_NAMES: Array[String] = ["Low", "Medium", "High", "Ultra"]
 ## Render scale per step lives in RenderSettings.render_scale_for, so
 ## the settings screen's summary and the governor cannot drift apart.
 
-var step := 2  # start at the user's ceiling, adapt down if needed
-## Highest step the user's RenderSettings preset allows (0..2). The
+var step := 3  # start at the user's ceiling, adapt down if needed
+## Highest step the user's RenderSettings preset allows (0..3). The
 ## governor still steps down under low FPS, but never back above this.
-var ceiling_step := 2
+var ceiling_step := 3
 var viewport: SubViewport
 var sun: DirectionalLight3D
 
