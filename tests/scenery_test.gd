@@ -138,6 +138,47 @@ func _run() -> void:
 	if SatelliteFetcher.mosaic_tiles(48.8566, 2.3522, 16).size() != 9:
 		failures.append("satellite mosaic should request 9 tiles")
 
+	# Per-building roof extraction: a terracotta mosaic gives a
+	# terracotta roof colour back for a footprint at its centre.
+	var roof_data := _flat_data()
+	roof_data.latitude = 48.8566
+	roof_data.longitude = 2.3522
+	var roof_img := Image.create(768, 768, false, Image.FORMAT_RGB8)
+	roof_img.fill(Color(0.72, 0.30, 0.18))
+	roof_data.satellite_image = roof_img
+	roof_data.satellite_origin_px = TileFetcher.global_pixel(48.8566, 2.3522, 16) - Vector2(384, 384)
+	var sampled := TerrainBuilder.sampled_roof_color(roof_data, 0.0, 0.0, 8.0, 8.0)
+	if absf(sampled.r - 0.72) > 0.05 or absf(sampled.g - 0.30) > 0.05 \
+			or absf(sampled.b - 0.18) > 0.05:
+		failures.append("roof colour should sample the mosaic, got %s" % str(sampled))
+	if TerrainBuilder.sampled_roof_color(_flat_data(), 0.0, 0.0, 8.0, 8.0).a != 0.0:
+		failures.append("no imagery should report alpha 0 (slate fallback)")
+	# Foliage cards: alpha texture has transparent and opaque texels.
+	var card_tex := TerrainBuilder._leaf_card_texture()
+	var card_img := card_tex.get_image()
+	if card_img.get_pixel(0, 0).a != 0.0 or card_img.get_pixel(128, 128).a == 0.0:
+		failures.append("leaf card texture should mix transparent and leaf texels")
+
+	# Any-place landmarks: an OSM candidate renders as its archetype
+	# model in the world, at its true position.
+	var cand := _flat_data()
+	cand.buildings = [{"x": 20.0, "z": -10.0, "size_x": 10.0, "size_z": 8.0,
+		"height": 12.0, "name": "c", "roof_shape": ""}]
+	cand.landmark_candidates = [{"x": 20.0, "z": -10.0, "archetype": "lighthouse",
+		"name": "L", "height": 30.0, "size_x": 8.0, "size_z": 8.0}]
+	var cworld := TerrainBuilder.build_world(cand)
+	var found_light := false
+	for child in cworld.get_children():
+		if str(child.name).begins_with("Landmark_lighthouse"):
+			found_light = true
+	if not found_light:
+		failures.append("landmark candidate should render its archetype in the world")
+	cworld.free()
+	var church := LandmarkBuilder.build_archetype("church", 40.0, Vector2(24, 18))
+	if church.get_child_count() < 4:
+		failures.append("church archetype should be multi-part, got %d" % church.get_child_count())
+	church.free()
+
 	# Seasons recolour the canopy: autumn warm, summer green.
 	var autumn_leaf := TerrainBuilder._leaves(LocationData.Season.AUTUMN)[0] as StandardMaterial3D
 	if autumn_leaf.albedo_color.r <= autumn_leaf.albedo_color.g:
