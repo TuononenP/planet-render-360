@@ -60,6 +60,22 @@ func _run() -> void:
 				% [entry["type"], model.get_child_count()])
 		model.free()
 
+	# --- 2b) Eiffel GLB parts are flattened ownerless: reparented
+	# asset parts must not keep the asset root as owner, or Godot
+	# warns "will make owner 'eiffel' inconsistent" on every part.
+	# The warning itself only shows on stderr; the stderr of this
+	# test run must stay free of it.
+	var eiffel := LandmarkBuilder.build("eiffel")
+	var part_names: Array = eiffel.get_children().map(
+		func(c: Node) -> String: return c.name)
+	if not part_names.has("Brace"):
+		failures.append("eiffel should use the GLB asset parts, got %s" % [part_names])
+	for part in eiffel.get_children():
+		if part.owner != null:
+			failures.append("eiffel part %s should be ownerless, owner is %s"
+				% [part.name, part.owner])
+	eiffel.free()
+
 	# --- 3) Turku Cathedral reads tall: spire parts above y=18 ---
 	var turku := LandmarkBuilder.build("turku_cathedral")
 	var top := 0.0

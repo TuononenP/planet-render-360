@@ -68,11 +68,50 @@ static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat
 	mi.transform = Transform3D(
 		Basis(x_axis * radius, y_axis * length, z_axis * radius), (from + to) / 2.0)
 
+static var _eiffel_scene: PackedScene
+static var _eiffel_tried := false
+
+## Bespoke Blender asset (assets_src/blender/build_eiffel.py, true
+## metres; world scale 0.25) preferred over the procedural archetype,
+## which stays as the fallback when the asset is not imported.
+static func _eiffel_asset(root: Node3D) -> bool:
+	if not _eiffel_tried:
+		_eiffel_tried = true
+		if ResourceLoader.exists("res://assets/eiffel.glb"):
+			_eiffel_scene = load("res://assets/eiffel.glb") as PackedScene
+	if _eiffel_scene == null:
+		return false
+	var inst := _eiffel_scene.instantiate() as Node3D
+	# Flatten the asset's 37 meshes into the landmark root (scaled to
+	# world units) so the model stays multi-part like every other
+	# registry landmark instead of one opaque child node.
+	for child in inst.get_children().duplicate():
+		inst.remove_child(child)
+		# Instantiated parts are owned by the asset root; adding them
+		# to the landmark root with that owner still set warns about
+		# an inconsistent owner (and leaves it dangling once the
+		# asset root is freed below).
+		_clear_owner(child)
+		if child is Node3D:
+			var n3 := child as Node3D
+			n3.position *= 0.25
+			n3.scale *= 0.25
+		root.add_child(child)
+	inst.free()
+	return true
+
+static func _clear_owner(node: Node) -> void:
+	node.set_owner(null)
+	for child in node.get_children():
+		_clear_owner(child)
+
 static func build(type: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
 	match type:
-		"eiffel": _eiffel(root)
+		"eiffel":
+			if not _eiffel_asset(root):
+				_eiffel(root)
 		"tokyo": _tokyo(root)
 		"turku_cathedral": _turku_cathedral(root)
 		"helsinki_cathedral": _helsinki_cathedral(root)
@@ -82,15 +121,144 @@ static func build(type: String) -> Node3D:
 		"pyramid": _pyramid(root)
 		"statue_liberty": _statue_liberty(root)
 		"sydney_opera": _sydney_opera(root)
+		"church", "cathedral", "castle", "lighthouse", "stadium", \
+				"mosque", "temple", "windmill", "tower":
+			_archetype(root, type, 45.0, Vector2(30, 30))
 		_: _generic_tower(root)
 	return root
+
+## On-the-fly archetype for any OSM-tagged feature (OsmFetcher.
+## archetype_for), built at the feature's real height and footprint
+## (metres in, world units out — the builders work in world units).
+static func build_archetype(archetype: String, height_m: float, footprint: Vector2) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Landmark_%s" % archetype
+	_archetype(root, archetype, height_m, footprint)
+	return root
+
+static func _archetype(root: Node3D, archetype: String, height_m: float, footprint: Vector2) -> void:
+	var h := clampf(height_m * 0.25, 5.0, 46.0)
+	var w := clampf(footprint.x, 6.0, 60.0)
+	var d := clampf(footprint.y, 6.0, 60.0)
+	match archetype:
+		"church": _a_church(root, h, w, d, false)
+		"cathedral": _a_church(root, h, w, d, true)
+		"castle": _a_castle(root, h, w, d)
+		"lighthouse": _a_lighthouse(root, h)
+		"stadium": _a_stadium(root, h, w, d)
+		"mosque": _a_mosque(root, h, w, d)
+		"temple": _a_temple(root, h, w, d)
+		"windmill": _a_windmill(root, h)
+		_: _a_tower(root, h, w)
+
+static func _a_church(root: Node3D, h: float, w: float, d: float, twin: bool) -> void:
+	var stone := _mat(Color(0.72, 0.68, 0.60), 0.9)
+	var slate := _mat(Color(0.30, 0.34, 0.40), 0.8)
+	var nave_h := h * 0.42
+	_box(root, Vector3(0, nave_h / 2.0, 0), Vector3(w, nave_h, d), stone)
+	_roof(root, Vector3(0, nave_h, 0), w * 1.04, d * 1.04, h * 0.22, slate)
+	var towers := [-1, 1] if twin else [0]
+	for s in towers:
+		var tx := float(s) * w * 0.30
+		_box(root, Vector3(tx, h * 0.36, -d * 0.38), Vector3(w * 0.26, h * 0.72, w * 0.26), stone)
+		_roof(root, Vector3(tx, h * 0.72, -d * 0.38), w * 0.30, w * 0.30, h * 0.30, slate)
+
+static func _a_castle(root: Node3D, h: float, w: float, d: float) -> void:
+	var stone := _mat(Color(0.62, 0.58, 0.52), 0.95)
+	_box(root, Vector3(0, h * 0.30, 0), Vector3(w, h * 0.60, d), stone)
+	for sx in [-1, 1]:
+		for sz in [-1, 1]:
+			_part(root, _cyl(w * 0.10, w * 0.12, h * 0.85, 10), stone,
+				Vector3(sx * w * 0.44, h * 0.425, sz * d * 0.44))
+			_part(root, _cyl(0.05, w * 0.13, h * 0.22, 10),
+				_mat(Color(0.35, 0.33, 0.36), 0.85),
+				Vector3(sx * w * 0.44, h * 0.85 + h * 0.11, sz * d * 0.44))
+
+static func _a_lighthouse(root: Node3D, h: float) -> void:
+	var white := _mat(Color(0.92, 0.90, 0.86), 0.7)
+	var red := _mat(Color(0.72, 0.22, 0.14), 0.7)
+	var third := h / 3.0
+	_part(root, _cyl(1.6, 2.2, third, 12), red, Vector3(0, third * 0.5, 0))
+	_part(root, _cyl(1.25, 1.6, third, 12), white, Vector3(0, third * 1.5, 0))
+	_part(root, _cyl(0.95, 1.25, third * 0.8, 12), red, Vector3(0, third * 2.4, 0))
+	_part(root, _cyl(1.5, 1.5, 0.5, 12), _mat(Color(0.25, 0.25, 0.28), 0.6),
+		Vector3(0, h * 0.92, 0))
+	var lamp := _mat(Color(1.0, 0.85, 0.45), 0.35)
+	lamp.emission_enabled = true
+	lamp.emission = Color(1.0, 0.75, 0.35)
+	_part(root, _cyl(0.8, 0.8, 1.1, 10), lamp, Vector3(0, h * 0.99, 0))
+
+static func _a_stadium(root: Node3D, h: float, w: float, d: float) -> void:
+	var concrete := _mat(Color(0.78, 0.76, 0.72), 0.9)
+	var bowl := TorusMesh.new()
+	bowl.inner_radius = 0.62
+	bowl.outer_radius = 1.0
+	bowl.rings = 24
+	bowl.ring_segments = 12
+	_part(root, bowl, concrete, Vector3(0, h * 0.55, 0),
+		Vector3(w * 0.55, h * 0.62, d * 0.55))
+	_box(root, Vector3(0, 0.4, 0), Vector3(w * 0.62, 0.5, d * 0.62),
+		_mat(Color(0.35, 0.48, 0.26), 1.0))  # pitch
+
+static func _a_mosque(root: Node3D, h: float, w: float, d: float) -> void:
+	var stone := _mat(Color(0.85, 0.80, 0.70), 0.85)
+	var teal := _mat(Color(0.20, 0.45, 0.45), 0.5)
+	teal.metallic = 0.25
+	_box(root, Vector3(0, h * 0.20, 0), Vector3(w, h * 0.40, d), stone)
+	var dome := SphereMesh.new()
+	dome.radial_segments = 16
+	dome.rings = 8
+	dome.radius = 1.0
+	dome.height = 2.0
+	_part(root, dome, teal, Vector3(0, h * 0.40 + h * 0.16, 0),
+		Vector3(w * 0.34, h * 0.22, w * 0.34))
+	for s in [-1, 1]:
+		_part(root, _cyl(0.35, 0.55, h * 0.85, 8), stone,
+			Vector3(s * w * 0.52, h * 0.425, 0))
+		_part(root, _cyl(0.02, 0.42, h * 0.18, 8), teal,
+			Vector3(s * w * 0.52, h * 0.85 + h * 0.09, 0))
+
+static func _a_temple(root: Node3D, h: float, w: float, d: float) -> void:
+	_a_church(root, h, w, d, false)
+	var gold := _mat(Color(0.80, 0.62, 0.25), 0.45)
+	gold.metallic = 0.5
+	_part(root, _cyl(0.05, 0.5, h * 0.25, 8), gold, Vector3(0, h * 1.02, -d * 0.38))
+
+static func _a_windmill(root: Node3D, h: float) -> void:
+	var wood := _mat(Color(0.55, 0.42, 0.28), 0.9)
+	_part(root, _cyl(1.1, 2.0, h * 0.8, 10), wood, Vector3(0, h * 0.4, 0))
+	_part(root, _cyl(0.15, 1.25, h * 0.25, 10), _mat(Color(0.35, 0.28, 0.20), 0.9),
+		Vector3(0, h * 0.86, 0))
+	var hub := Vector3(0, h * 0.82, -1.6)
+	for i in 4:
+		var blade := _box_at(root, Vector3(0.28, h * 0.52, 0.08),
+			_mat(Color(0.88, 0.85, 0.78), 0.85))
+		blade.position = hub + Vector3(sin(float(i) * PI / 2.0 + 0.4),
+			cos(float(i) * PI / 2.0 + 0.4), 0) * h * 0.26
+		blade.rotation.z = -float(i) * PI / 2.0 - 0.4
+
+static func _box_at(root: Node3D, scl: Vector3, mat: Material) -> MeshInstance3D:
+	var box := BoxMesh.new()
+	box.size = Vector3.ONE
+	var mi := _add(root, box, mat)
+	mi.scale = scl
+	return mi
+
+static func _a_tower(root: Node3D, h: float, w: float) -> void:
+	var steel := _mat(Color(0.55, 0.57, 0.60), 0.55)
+	steel.metallic = 0.45
+	_part(root, _cyl(w * 0.10, w * 0.20, h * 0.88, 10), steel, Vector3(0, h * 0.44, 0))
+	_box(root, Vector3(0, h * 0.93, 0), Vector3(w * 0.42, h * 0.12, w * 0.42),
+		_mat(Color(0.30, 0.33, 0.38), 0.6))
 
 # --- Towers already proven in the skyline ---
 
 static func _eiffel(root: Node3D) -> void:
 	# Four legs converging through two platforms to a spire, at
 	# world scale (330 m tower -> ~80 units, base ~90 m -> ±9).
-	var iron := _mat(Color(0.38, 0.29, 0.20), 0.8)
+	# Iron-brown lattice (PRD §4.1): #4A3A30, metallic 0.6, rough 0.55.
+	var iron := _mat(Color(0.29, 0.23, 0.19), 0.55)
+	iron.metallic = 0.6
 	var base_corners: Array[Vector3] = [Vector3(-9, 0, -9), Vector3(9, 0, -9),
 		Vector3(-9, 0, 9), Vector3(9, 0, 9)]
 	var mid_corners: Array[Vector3] = []
@@ -101,8 +269,31 @@ static func _eiffel(root: Node3D) -> void:
 	for i in 4:
 		_beam(root, base_corners[i], mid_corners[i], 0.85, iron)
 		_beam(root, mid_corners[i], top_corners[i], 0.55, iron)
+	# Lattice cross-bracing on every face, both tiers (PRD §4.1: never
+	# solid cones) plus horizontal rings so the taper reads as truss.
+	for tier in [[base_corners, mid_corners, 15.0], [mid_corners, top_corners, 30.0]]:
+		var lo: Array = tier[0]
+		var hi: Array = tier[1]
+		for i in 4:
+			var j := (i + 1) % 4
+			_beam(root, lo[i], hi[j], 0.20, iron)
+			_beam(root, lo[j], hi[i], 0.20, iron)
+			for f in [0.33, 0.66]:
+				_beam(root, lo[i].lerp(hi[i], f), lo[j].lerp(hi[j], f), 0.16, iron)
+	# Arched openings between legs: segmented arch under platform 1.
+	for i in 4:
+		var j := (i + 1) % 4
+		for s in 5:
+			var t0 := float(s) / 5.0
+			var t1 := float(s + 1) / 5.0
+			var p0: Vector3 = base_corners[i].lerp(base_corners[j], t0)
+			var p1: Vector3 = base_corners[i].lerp(base_corners[j], t1)
+			p0.y = sin(t0 * PI) * 6.5
+			p1.y = sin(t1 * PI) * 6.5
+			_beam(root, p0, p1, 0.28, iron)
 	_box(root, Vector3(0, 15.5, 0), Vector3(10.5, 1.2, 10.5), iron)
 	_box(root, Vector3(0, 30.5, 0), Vector3(5.6, 1.1, 5.6), iron)
+	_box(root, Vector3(0, 64.5, 0), Vector3(2.4, 1.0, 2.4), iron)  # summit
 	var shaft := _part(root, _cyl(0.7, 2.0, 34.0, 8), iron, Vector3(0, 48.0, 0))
 	shaft.rotation.y = PI / 4.0
 	_part(root, _cyl(0.10, 0.6, 15.0), iron, Vector3(0, 72.0, 0))
