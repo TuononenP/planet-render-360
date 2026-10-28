@@ -11,6 +11,7 @@ signal preset_changed(preset: int)
 var _settings: RenderSettings
 var _preset_btns: Array[Button] = []
 var _summary_label: Label
+var _storage_label: Label
 var _margin: MarginContainer
 
 func _ready() -> void:
@@ -58,6 +59,15 @@ func _ready() -> void:
 		14, UiTheme.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(note)
+	col.add_child(UiTheme.section_label("Offline storage"))
+	_storage_label = UiTheme.label("", 14, UiTheme.MUTED)
+	_storage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_storage_label)
+	var clear_cache_btn := UiTheme.ghost_button("Clear downloaded cache")
+	clear_cache_btn.pressed.connect(func() -> void:
+		OfflineDownloader.clear_cache()
+		_refresh_storage())
+	col.add_child(clear_cache_btn)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(spacer)
@@ -91,8 +101,14 @@ func _select(preset_value: int) -> void:
 
 func _refresh() -> void:
 	var current := _settings.preset if _settings != null \
-		else int(RenderSettings.Preset.BALANCED)
+		else int(RenderSettings.Preset.HIGH)
 	for i in _preset_btns.size():
 		_preset_btns[i].set_pressed_no_signal(i == current)
 	if _summary_label != null:
 		_summary_label.text = RenderSettings.summary_for(current)
+	_refresh_storage()
+
+func _refresh_storage() -> void:
+	if _storage_label != null:
+		var mb := float(OfflineDownloader.cache_size_bytes()) / 1048576.0
+		_storage_label.text = "Downloaded places use %.1f MB on this device. Clearing frees the space; saved places stay in History and re-download when opened." % mb

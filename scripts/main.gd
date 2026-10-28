@@ -12,6 +12,8 @@ var _pipeline: GenerationPipeline
 var _store: CacheStore
 var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
+var _downloader: OfflineDownloader
+var _download_at := Vector2.ZERO
 
 func _ready() -> void:
 	_store = CacheStore.new()
@@ -35,6 +37,21 @@ func _ready() -> void:
 		_history.refresh()
 		_show(_history))
 	_picker.settings_requested.connect(func() -> void: _show(_settings_screen))
+	_downloader = OfflineDownloader.new()
+	add_child(_downloader)
+	_downloader.progress.connect(func(done: int, total: int) -> void:
+		_picker.set_download_status("⬇  Downloading… %d/%d" % [done, total]))
+	_downloader.finished.connect(func(ok_count: int, total: int) -> void:
+		if ok_count > 0:
+			_store.add_entry(_picker.selected_name if _picker.selected_name != "" \
+				else LocationData.known_place(_download_at.x, _download_at.y),
+				_download_at.x, _download_at.y)
+		_picker.set_download_status("⬇  Saved for offline (%d/%d)" % [ok_count, total] \
+			if ok_count > 0 else "⬇  Download failed — check connection"))
+	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
+		_download_at = Vector2(lat, lon)
+		_picker.set_download_status("⬇  Downloading… 0/%d" % OfflineDownloader.JOBS)
+		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
 	_picker.set_quality_preset(_settings.preset)
