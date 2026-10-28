@@ -63,9 +63,17 @@ func _run() -> void:
 		_fail(failures, "picker at 390pt should be COMPACT, got %d" % picker.effective_layout())
 	if picker._canvas == null or picker._canvas.size.y < 240.0:
 		_fail(failures, "compact map should fill leftover height, got %s" % str(picker._canvas.size))
-	var history_bottom := picker._history_btn.get_global_rect().end.y
-	if history_bottom < 700.0:
-		_fail(failures, "compact picker leaves dead space: history ends at y=%.0f of 844" % history_bottom)
+	# Night Atlas: the map is full-bleed and the sheet is anchored to
+	# the bottom edge, so no band of dead space sits below it.
+	var sheet_bottom := picker._sheet.get_global_rect().end.y
+	if sheet_bottom < 800.0:
+		_fail(failures, "compact sheet should sit on the bottom edge: ends at y=%.0f of 844" % sheet_bottom)
+	if picker._canvas.size.y < 800.0:
+		_fail(failures, "compact map should be full-bleed, got %s" % str(picker._canvas.size))
+	if not picker._sheet_cols.vertical:
+		_fail(failures, "phone sheet should stack its columns")
+	if picker._history_btn.get_global_rect().end.y > 120.0:
+		_fail(failures, "nav icons should sit in the top bar on a phone")
 	if picker._stack.size.x > 390.0:
 		_fail(failures, "compact picker column should fit 390pt, got %s" % str(picker._stack.size))
 	if not picker._layout_btn.visible:
@@ -98,8 +106,9 @@ func _run() -> void:
 		_fail(failures, "Auto should restore EXPANDED on a wide window")
 	picker._on_layout_selected(2)  # force Wide
 	await process_frame
-	if picker.effective_layout() != Responsive.Layout.MEDIUM or not picker._split.visible:
-		_fail(failures, "Wide override should force split layout on a wide window")
+	if picker.effective_layout() != Responsive.Layout.MEDIUM or picker._split.visible \
+			or picker._sheet_cols.vertical:
+		_fail(failures, "Wide override should force the tablet two-column sheet on a wide window")
 	if not picker._layout_btn.visible:
 		_fail(failures, "layout switcher should stay visible while Wide is forced")
 	picker._layout_btn.item_selected.emit(0)  # back to Auto via the control
@@ -141,16 +150,14 @@ func _run() -> void:
 			if tokyo_chip.button_pressed:
 				_fail(failures, "manual map pick should clear the Tokyo selection")
 
-	# Hover contrast: dark text must stay dark on the light hover box
+	# Hover contrast: text must stay readable on every hover box
 	# (regression: OptionButton had no font_hover_color, so Godot's
 	# default made the layout label nearly invisible on hover).
-	if picker._layout_btn.get_theme_color("font_hover_color") == Color.WHITE:
-		_fail(failures, "layout button hover text should not be white on its white hover box")
 	if picker._layout_btn.get_theme_color("font_hover_color") != UiTheme.INK:
-		_fail(failures, "layout button hover text should stay ink-dark")
+		_fail(failures, "layout button hover text should stay light ink on its dark hover box")
 	var popup := picker._layout_btn.get_popup()
-	if popup.get_theme_color("font_hover_color") != Color.WHITE:
-		_fail(failures, "layout popup hover text should be white on the accent hover box")
+	if popup.get_theme_color("font_hover_color") != UiTheme.ON_ACCENT:
+		_fail(failures, "layout popup hover text should be dark on the accent hover box")
 	var popup_hover: Color = (popup.get_theme_stylebox("hover") as StyleBoxFlat).bg_color
 	if popup_hover != UiTheme.TEAL:
 		_fail(failures, "layout popup hover box should use the accent colour, got %s" % str(popup_hover))

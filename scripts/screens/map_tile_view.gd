@@ -24,11 +24,41 @@ const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
 const MAX_ANCESTOR_DROP := 4
 
+## Night Atlas map: OSM tiles inverted and hue-rotated back so roads
+## and water keep their meaning on a dark ground (the CSS recipe
+## invert + hue-rotate(180deg) + light desaturate + gamma lift). Applied to the
+## tile layer only; the pin and attribution live in a child layer.
+const DARK_SHADER := """
+shader_type canvas_item;
+void fragment() {
+	vec4 c = COLOR;
+	mat3 m = mat3(
+		vec3(-0.574, 0.426, 0.426),
+		vec3(1.430, 0.430, 1.430),
+		vec3(0.144, 0.144, -0.856));
+	vec3 h = m * (vec3(1.0) - c.rgb);
+	float l = dot(h, vec3(0.299, 0.587, 0.114));
+	h = mix(vec3(l), h, 0.7);
+	h = pow(clamp(h, 0.0, 1.0), vec3(0.72)) * 1.15 + 0.03;
+	COLOR = vec4(clamp(h, 0.0, 1.0), c.a);
+}
+"""
+
 var centre_lat := 48.8566
 var centre_lon := 2.3522
 var zoom_level := 12
+## Where the picked place sits, as an offset from the view centre. The
+## picker moves it into the part of the map that is not covered by a
+## sheet or side panel, so the pin is never hidden behind chrome.
+var focus_offset := Vector2.ZERO:
+	set(value):
+		focus_offset = value
+		queue_redraw()
+		if _marker != null:
+			_marker.queue_redraw()
 
 var _fetcher: TileFetcher
+var _marker: Control
 var _textures: Dictionary = {}  # "z/x/y" -> Texture2D
 var _requested_tile := Vector2i(1 << 30, 1 << 30)
 var _requested_zoom := -1
@@ -51,12 +81,24 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
+	var dark := Shader.new()
+	dark.code = DARK_SHADER
+	var dark_mat := ShaderMaterial.new()
+	dark_mat.shader = dark
+	material = dark_mat
+	_marker = Control.new()
+	_marker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_marker.draw.connect(_draw_marker)
+	add_child(_marker)
 	_fetcher = TileFetcher.new()
 	add_child(_fetcher)
 	_fetcher.tile_ready.connect(func(z: int, x: int, y: int, tex: Texture2D) -> void:
 		_textures["%d/%d/%d" % [z, x, y]] = tex
 		queue_redraw())
-	resized.connect(func() -> void: refresh_tiles())
+	resized.connect(func() -> void:
+		refresh_tiles()
+		_marker.queue_redraw())
 	refresh_tiles()
 
 func set_lat_lon(lat: float, lon: float) -> void:
@@ -69,10 +111,10 @@ func pin_lat_lon() -> Vector2:
 	return Vector2(centre_lat, centre_lon)
 
 func zoom_in() -> void:
-	zoom_at(size / 2.0, 1)
+	zoom_at(_focus(), 1)
 
 func zoom_out() -> void:
-	zoom_at(size / 2.0, -1)
+	zoom_at(_focus(), -1)
 
 ## Zoom by whole tile steps, keeping the place under `at` under `at`.
 func zoom_at(at: Vector2, steps: int) -> void:
@@ -80,11 +122,11 @@ func zoom_at(at: Vector2, steps: int) -> void:
 	if new_zoom == zoom_level:
 		return
 	var anchor := TileFetcher.lat_lon_from_pixel(
-		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - size / 2.0),
+		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - _focus()),
 		zoom_level)
 	var anchor_px := TileFetcher.global_pixel(anchor.x, anchor.y, new_zoom)
 	zoom_level = new_zoom
-	_set_centre_from_pixel(anchor_px - (at - size / 2.0))
+	_set_centre_from_pixel(anchor_px - (at - _focus()))
 	refresh_tiles()
 	picked.emit(centre_lat, centre_lon)
 
@@ -175,7 +217,7 @@ func _set_centre_from_pixel(px: Vector2) -> void:
 
 func _pick_at(at: Vector2) -> void:
 	_set_centre_from_pixel(
-		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - size / 2.0))
+		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - _focus()))
 	refresh_tiles()
 	queue_redraw()
 	picked.emit(centre_lat, centre_lon)
@@ -311,7 +353,7 @@ func _touch_distance() -> float:
 
 func _touch_midpoint() -> Vector2:
 	if _touches.is_empty():
-		return size / 2.0
+		return _focus()
 	var pts: Array = _touches.values()
 	return pts[0] if pts.size() == 1 else ((pts[0] as Vector2) + (pts[1] as Vector2)) / 2.0
 
@@ -327,7 +369,7 @@ func _find_ancestor(tx: int, ty: int) -> Vector3i:
 	return Vector3i(-1, -1, -1)
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.92, 0.93, 0.90))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.88, 0.89, 0.86))
 	var centre_px := TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level)
 	var tile_centre := Vector2i(centre_px / 256.0)
 	var half := _tile_half_extents()
@@ -336,7 +378,7 @@ func _draw() -> void:
 			var tx := tile_centre.x + dx
 			var ty := tile_centre.y + dy
 			var tile_origin := Vector2(tx * 256.0, ty * 256.0)
-			var pos := tile_origin - centre_px + size / 2.0
+			var pos := tile_origin - centre_px + _focus()
 			var dest := Rect2(pos, Vector2(256, 256))
 			var key := "%d/%d/%d" % [zoom_level, tx, ty]
 			if _textures.has(key):
@@ -356,17 +398,30 @@ func _draw() -> void:
 				else Color(0.85, 0.87, 0.82)
 			draw_rect(dest, shade)
 			draw_rect(dest, Color(0.78, 0.80, 0.75), false, 1.0)
-	# Centre pin
-	var p := size / 2.0
-	draw_circle(p + Vector2(0, -14), 11, UiTheme.TEAL)
-	draw_circle(p + Vector2(0, -14), 4.5, Color.WHITE)
-	draw_colored_polygon(PackedVector2Array(
+
+func _focus() -> Vector2:
+	return size / 2.0 + focus_offset
+
+## Redraw the pin layer after a palette change.
+func refresh_style() -> void:
+	if _marker != null:
+		_marker.queue_redraw()
+
+## Pin glow and attribution, drawn above the shaded tile layer so they
+## keep their real colours.
+func _draw_marker() -> void:
+	var p := _focus()
+	_marker.draw_circle(p, 28.0, Color(UiTheme.TEAL, 0.10))
+	_marker.draw_circle(p, 17.0, Color(UiTheme.TEAL, 0.22))
+	_marker.draw_circle(p + Vector2(0, -14), 11, UiTheme.TEAL)
+	_marker.draw_circle(p + Vector2(0, -14), 4.5, UiTheme.INK)
+	_marker.draw_colored_polygon(PackedVector2Array(
 		[p + Vector2(-7, -8), p + Vector2(7, -8), p]), UiTheme.TEAL)
 	# Attribution, bottom-right and never hidden (tile usage policy)
 	var font := get_theme_default_font()
 	var text := "© OpenStreetMap contributors"
 	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
-	draw_rect(Rect2(size - text_size - Vector2(12, 20), text_size + Vector2(8, 4)),
-		Color(1, 1, 1, 0.85))
-	draw_string(font, size - text_size - Vector2(8, 6), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.25, 0.27, 0.25))
+	_marker.draw_rect(Rect2(size - text_size - Vector2(12, 20), text_size + Vector2(8, 4)),
+		Color(0.04, 0.08, 0.09, 0.8))
+	_marker.draw_string(font, size - text_size - Vector2(8, 6), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UiTheme.MUTED)

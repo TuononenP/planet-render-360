@@ -30,7 +30,7 @@ func _ready() -> void:
 	add_child(center)
 
 	_card = PanelContainer.new()
-	_card.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.CARD, 20, Color.TRANSPARENT, true))
+	_card.add_theme_stylebox_override("panel", UiTheme.glass_panel(28))
 	center.add_child(_card)
 
 	var col := VBoxContainer.new()
@@ -48,7 +48,7 @@ func _ready() -> void:
 	_preview = PanelContainer.new()
 	_preview.custom_minimum_size = Vector2(0, 210)
 	_preview.add_theme_stylebox_override("panel",
-		UiTheme.style(Color(0.10, 0.20, 0.18), 16))
+		UiTheme.style(Color(0.05, 0.10, 0.11), 20, Color(UiTheme.TEAL, 0.25)))
 	var preview_col := VBoxContainer.new()
 	preview_col.alignment = BoxContainer.ALIGNMENT_CENTER
 	preview_col.add_theme_constant_override("separation", 6)
@@ -72,7 +72,7 @@ func _ready() -> void:
 	_progress.show_percentage = false
 	_progress.custom_minimum_size = Vector2(0, 10)
 	# UiTheme.style carries card padding; a 10pt bar must not inherit it.
-	var bar_bg := UiTheme.style(Color(0.88, 0.89, 0.88), 5)
+	var bar_bg := UiTheme.style(Color(1, 1, 1, 0.12), 5)
 	bar_bg.content_margin_top = 0
 	bar_bg.content_margin_bottom = 0
 	var bar_fill := UiTheme.style(UiTheme.TEAL, 5)
@@ -88,7 +88,7 @@ func _ready() -> void:
 	_stage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_stage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	progress_row.add_child(_stage_label)
-	_percent_label = UiTheme.label("0%", 22, UiTheme.TEAL_DARK, true)
+	_percent_label = UiTheme.label("0%", 28, UiTheme.INK, true)
 	progress_row.add_child(_percent_label)
 	_eta_label = UiTheme.label("Real elevation & map data — usually well under a minute. Yours to keep offline afterwards.", 13, UiTheme.MUTED)
 	_eta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -123,6 +123,7 @@ func _ready() -> void:
 	add_child(pulse)
 
 	_cancel_btn = UiTheme.ghost_button("Cancel")
+	_cancel_btn.custom_minimum_size = Vector2(0, 48)
 	_cancel_btn.pressed.connect(func() -> void: cancel_requested.emit())
 	col.add_child(_cancel_btn)
 
@@ -137,13 +138,24 @@ func _ready() -> void:
 ## Stage rows are display-only: slim vertical padding keeps five of
 ## them plus Cancel inside short windows (the card style's 14pt
 ## top/bottom margins alone added 140pt of dead height).
-static func _row_style(bg: Color) -> StyleBoxFlat:
-	var s := UiTheme.style(bg, 12)
+static func _row_style(bg: Color, edge: Color = Color.TRANSPARENT) -> StyleBoxFlat:
+	var s := UiTheme.style(bg, 14, Color(edge, 0.35) if edge != Color.TRANSPARENT else edge)
 	s.content_margin_left = 12
 	s.content_margin_right = 12
 	s.content_margin_top = 3
 	s.content_margin_bottom = 3
 	return s
+
+## Re-skin after an accent change.
+func refresh_theme() -> void:
+	if _card == null:
+		return
+	_card.add_theme_stylebox_override("panel", UiTheme.glass_panel(28))
+	var bar_fill := UiTheme.style(UiTheme.TEAL, 5)
+	bar_fill.content_margin_top = 0
+	bar_fill.content_margin_bottom = 0
+	_progress.add_theme_stylebox_override("fill", bar_fill)
+	UiTheme.apply_ghost(_cancel_btn)
 
 func _on_resized() -> void:
 	if _card == null:
@@ -229,18 +241,18 @@ func set_stage(index: int, label: String, state: String) -> void:
 			_active_index = -1
 		row["icon"].text = "✓"
 		row["icon"].add_theme_color_override("font_color", UiTheme.TEAL)
-		row["name"].add_theme_color_override("font_color", UiTheme.TEAL_DARK)
+		row["name"].add_theme_color_override("font_color", Color(UiTheme.INK, 0.8))
 		row["state"].text = "Done"
 		row["state"].add_theme_color_override("font_color", UiTheme.TEAL)
 		row["panel"].add_theme_stylebox_override("panel", _row_style(Color.TRANSPARENT))
 	else:
 		_active_index = index
 		row["icon"].text = "◌"
-		row["icon"].add_theme_color_override("font_color", UiTheme.TEAL_DARK)
+		row["icon"].add_theme_color_override("font_color", UiTheme.TEAL)
 		row["name"].add_theme_color_override("font_color", UiTheme.INK)
 		row["state"].text = "Working…"
-		row["state"].add_theme_color_override("font_color", UiTheme.TEAL_DARK)
-		row["panel"].add_theme_stylebox_override("panel", _row_style(UiTheme.TEAL_SOFT))
+		row["state"].add_theme_color_override("font_color", UiTheme.TEAL)
+		row["panel"].add_theme_stylebox_override("panel", _row_style(UiTheme.TEAL_SOFT, UiTheme.TEAL))
 
 func set_progress(fraction: float, label: String) -> void:
 	_progress.value = fraction * 100.0
