@@ -4,6 +4,7 @@ extends Control
 signal render_requested(lat: float, lon: float)
 signal history_requested
 signal settings_requested
+signal download_requested(lat: float, lon: float)
 signal exit_requested
 signal palette_changed(index: int)
 
@@ -30,6 +31,7 @@ var _map_wrap: Control
 var _card: PanelContainer
 var _history_btn: Button
 var _settings_btn: Button
+var _download_btn: Button
 var _exit_btn: Button
 var _tip: Label
 var _quick_box: VBoxContainer
@@ -240,8 +242,11 @@ func _ready() -> void:
 	_history_btn = UiTheme.ghost_button("◷  History & saved places")
 	_history_btn.pressed.connect(func() -> void: history_requested.emit())
 
-	_settings_btn = UiTheme.ghost_button("⚙  Settings — Balanced quality")
+	_settings_btn = UiTheme.ghost_button("⚙  Settings — High quality")
 	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
+
+	_download_btn = UiTheme.ghost_button("⬇  Download for offline")
+	_download_btn.pressed.connect(func() -> void: download_requested.emit(_lat, _lon))
 
 	_sidebar = PanelContainer.new()
 	_sidebar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -321,6 +326,8 @@ func _apply_theme() -> void:
 		UiTheme.apply_ghost(_history_btn)
 	if _settings_btn != null:
 		UiTheme.apply_ghost(_settings_btn)
+	if _download_btn != null:
+		UiTheme.apply_ghost(_download_btn)
 	if _exit_btn != null:
 		UiTheme.apply_ghost(_exit_btn)
 	if _zoom_out_btn != null:
@@ -342,6 +349,12 @@ func _set_selected_quick(index: int) -> void:
 
 ## Shows the chosen preset on the settings entry point, so the current
 ## quality is visible before opening the menu.
+## Offline-download feedback on the button itself (progress, then
+## the outcome), so no extra status line competes for layout height.
+func set_download_status(text: String) -> void:
+	if _download_btn != null:
+		_download_btn.text = text
+
 func set_quality_preset(preset_value: int) -> void:
 	if _settings_btn != null:
 		_settings_btn.text = "⚙  Settings — %s quality" % RenderSettings.preset_name(preset_value)
@@ -366,10 +379,12 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 	# so the coordinates caption gives its height back to the map.
 	if _coords_label != null:
 		_coords_label.visible = layout != Responsive.Layout.COMPACT
-	# The layout override is a wide-screen convenience; on compact its
-	# minimum width alone would push the whole column past the screen.
+	# The layout switcher is the only way back from a forced layout,
+	# so it always stays visible: hiding it on compact stranded users
+	# who forced Compact with no control left to undo it. The options
+	# row (118 + 150pt buttons) fits the 390pt compact frame.
 	if _layout_btn != null:
-		_layout_btn.visible = layout != Responsive.Layout.COMPACT
+		_layout_btn.visible = true
 	var pad := Responsive.page_padding(layout)
 	_margin.add_theme_constant_override("margin_left", pad)
 	_margin.add_theme_constant_override("margin_right", pad)
@@ -380,11 +395,11 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 		_split.visible = true
 		_move_all([_map_wrap, _sidebar], _split)
 		_sidebar.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
-		_move_all([_header, _options_row, _search_box, _quick_box, _card, _history_btn, _settings_btn], _side_col)
+		_move_all([_header, _options_row, _search_box, _quick_box, _card, _history_btn, _settings_btn, _download_btn], _side_col)
 	else:
 		_split.visible = false
 		_stack.visible = true
-		_move_all([_header, _options_row, _search_box, _quick_box, _map_wrap, _card, _history_btn, _settings_btn], _stack)
+		_move_all([_header, _options_row, _search_box, _quick_box, _map_wrap, _card, _history_btn, _settings_btn, _download_btn], _stack)
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()

@@ -16,6 +16,10 @@ const FIXTURE := """
  {"type":"way","tags":{"natural":"water"},
   "geometry":[{"lat":48.8590,"lon":2.3510},{"lat":48.8590,"lon":2.3540},
               {"lat":48.8600,"lon":2.3540},{"lat":48.8590,"lon":2.3510}]},
+ {"type":"way","tags":{"building":"church","building:levels":"3","name":"Old Church"},
+  "geometry":[{"lat":48.8580,"lon":2.3510},{"lat":48.8580,"lon":2.3520},
+              {"lat":48.8576,"lon":2.3520},{"lat":48.8576,"lon":2.3510}]},
+ {"type":"node","tags":{"man_made":"lighthouse","name":"Test Light","height":"28"},"lat":48.8590,"lon":2.3550},
  {"type":"node","tags":{"name":"No geometry"},"lat":48.8566,"lon":2.3522}
 ]}
 """
@@ -25,8 +29,16 @@ func _init() -> void:
 	var result := OsmFetcher.parse_features(FIXTURE, 48.8566, 2.3522)
 	var buildings: Array = result["buildings"]
 	var roads: Array = result["roads"]
-	if buildings.size() != 1:
-		failures.append("expected 1 building, got %d" % buildings.size())
+	# Any-place landmarks: the church way and lighthouse node must be
+	# extracted as archetype candidates at their true positions.
+	var landmarks: Array = result.get("landmarks", [])
+	var archetypes: Array = landmarks.map(func(c: Dictionary) -> String: return str(c["archetype"]))
+	if not archetypes.has("church") or not archetypes.has("lighthouse"):
+		failures.append("expected church+lighthouse candidates, got %s" % [archetypes])
+	if OsmFetcher.archetype_for({"building": "yes"}) != "":
+		failures.append("ordinary buildings must not become landmarks")
+	if buildings.size() != 2:
+		failures.append("expected 2 buildings, got %d" % buildings.size())
 	else:
 		var b: Dictionary = buildings[0]
 		if str(b["name"]) != "Test Hall":
@@ -53,6 +65,30 @@ func _init() -> void:
 	var q := OsmFetcher.build_query(48.8566, 2.3522)
 	if not q.contains("building") or not q.contains("highway"):
 		failures.append("query missing building/highway clauses")
+	if not q.contains("man_made"):
+		failures.append("query missing man_made landmark clauses")
+	# Regression: 7 around clauses need 7 radius/lat/lon triplets. A
+	# short % argument list leaves raw placeholders in the query and
+	# Godot prints "not enough arguments for format string".
+	if q.contains("%"):
+		failures.append("query still has unformatted placeholders: %s" % q)
+	if q.count("420,48.856600,2.352200") != 7:
+		failures.append("expected 7 formatted around clauses, got %s" % q)
+	# Transient Overpass failures (client timeout, 502 from an
+	# overloaded instance) must fall through to another endpoint;
+	# a client error such as 400 must not.
+	if OsmFetcher.ENDPOINTS.size() < 2:
+		failures.append("expected fallback Overpass endpoints")
+	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_TIMEOUT, 0):
+		failures.append("timeout (result=13 code=0) must be retryable")
+	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 502):
+		failures.append("502 must be retryable")
+	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 429):
+		failures.append("429 must be retryable")
+	if OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 400):
+		failures.append("400 must not be retryable")
+	if OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 200):
+		failures.append("200 must not be retryable")
 
 	if failures.is_empty():
 		print("OSM OK: parser, levels->height, road polyline, query")

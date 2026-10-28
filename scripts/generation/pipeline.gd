@@ -34,9 +34,11 @@ var _osm: OsmFetcher
 var _osm_buildings: Array = []
 var _osm_roads: Array = []
 var _osm_land: Array = []
+var _osm_landmarks: Array = []
 var _osm_done := false
 var _sat: SatelliteFetcher
 var _sat_texture: Texture2D
+var _sat_image: Image
 var _sat_origin := Vector2.ZERO
 var _sat_zoom := 16
 var _sat_done := false
@@ -61,18 +63,20 @@ func _ready() -> void:
 		_far_done = true)
 	_osm = OsmFetcher.new()
 	add_child(_osm)
-	_osm.succeeded.connect(func(b: Array, r: Array, l: Array) -> void:
+	_osm.succeeded.connect(func(b: Array, r: Array, l: Array, lm: Array) -> void:
 		_osm_buildings = b
 		_osm_roads = r
 		_osm_land = l
+		_osm_landmarks = lm
 		_osm_done = true)
 	_osm.failed.connect(func(reason: String) -> void:
 		push_warning("OSM fetch failed, using procedural dressing: %s" % reason)
 		_osm_done = true)
 	_sat = SatelliteFetcher.new()
 	add_child(_sat)
-	_sat.succeeded.connect(func(tex: Texture2D, origin: Vector2, zoom: int) -> void:
+	_sat.succeeded.connect(func(tex: Texture2D, img: Image, origin: Vector2, zoom: int) -> void:
 		_sat_texture = tex
+		_sat_image = img
 		_sat_origin = origin
 		_sat_zoom = zoom
 		_sat_done = true)
@@ -84,7 +88,7 @@ func cancel() -> void:
 	_cancelled = true
 
 func run(lat: float, lon: float, place_name_override: String = "",
-		quality_preset: int = RenderSettings.Preset.BALANCED) -> void:
+		quality_preset: int = RenderSettings.Preset.HIGH) -> void:
 	_cancelled = false
 	var data := LocationData.new()
 	# The preset sizes the DEM grids before any fetch, so Fast really
@@ -107,12 +111,14 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_osm_buildings = []
 	_osm_roads = []
 	_osm_land = []
+	_osm_landmarks = []
 	_osm.fetch(lat, lon)
 	# Satellite drape overlaps the stages too; Fast skips it (the
 	# vertex-colour dressing is its whole point: less data, less time).
 	used_satellite = false
 	_sat_done = false
 	_sat_texture = null
+	_sat_image = null
 	if quality_preset > RenderSettings.Preset.FAST:
 		_sat.fetch(lat, lon, 16)
 	else:
@@ -230,6 +236,7 @@ func _await_satellite(data: LocationData) -> void:
 	if _sat_texture != null:
 		used_satellite = true
 		data.satellite_texture = _sat_texture
+		data.satellite_image = _sat_image
 		data.satellite_origin_px = _sat_origin
 		data.satellite_zoom = _sat_zoom
 		var sat_attr := "Imagery: Esri, Maxar, Earthstar Geographics"
@@ -237,8 +244,10 @@ func _await_satellite(data: LocationData) -> void:
 			else data.attribution + " · " + sat_attr
 
 func _await_osm(data: LocationData) -> void:
+	# OsmFetcher retries across Overpass endpoints (3 x 35 s worst
+	# case); this wait must outlast that or a rescued fetch is dropped.
 	var waited := 0.0
-	while not _osm_done and waited < 32.0 and not _cancelled:
+	while not _osm_done and waited < 110.0 and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	if not _osm_buildings.is_empty():
@@ -246,6 +255,11 @@ func _await_osm(data: LocationData) -> void:
 		data.buildings = _osm_buildings
 		data.roads = _osm_roads
 		data.land_polygons = _osm_land
+		var cands := _osm_landmarks.duplicate()
+		cands.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
+				< (float(b["x"]) ** 2 + float(b["z"]) ** 2))
+		data.landmark_candidates = cands.slice(0, 8)
 		var osm_attr := "Map data: © OpenStreetMap contributors"
 		data.attribution = osm_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + osm_attr

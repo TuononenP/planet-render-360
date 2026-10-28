@@ -11,7 +11,7 @@ var longitude: float = 0.0
 
 ## RenderSettings.Preset value (0 Fast, 1 Balanced, 2 High) chosen for
 ## this render; TerrainBuilder reads its budgets from it.
-var quality_preset: int = 1
+var quality_preset: int = 2
 
 ## Real-world relief across the detailed grid, in metres (0 = unknown).
 ## The pipeline's adaptive vertical scale maps every place to ~30
@@ -20,7 +20,7 @@ var quality_preset: int = 1
 var relief_metres: float = 0.0
 
 ## TerrainData equivalent, kept as typed fields for the MVP.
-var grid_size: int = 48
+var grid_size: int = 64
 var heights: PackedFloat32Array = PackedFloat32Array()
 ## Mesh-ready heights (smoothed/flattened/water-carved), filled lazily
 ## by TerrainBuilder so meshes, buildings, roads, and trees all sample
@@ -37,6 +37,8 @@ var far_centre_frac: Vector2 = Vector2(0.5, 0.5)  # viewpoint inside far tile
 ## Satellite mosaic draped on the detailed terrain (SatelliteFetcher).
 ## Null means "no imagery": vertex colours dress the terrain instead.
 var satellite_texture: Texture2D
+## CPU copy of the same mosaic, for per-building roof colour sampling.
+var satellite_image: Image
 ## Global-pixel coordinates (at satellite_zoom) of the mosaic's
 ## top-left corner; TerrainBuilder turns world XZ into UVs from it.
 var satellite_origin_px: Vector2 = Vector2.ZERO
@@ -61,6 +63,11 @@ static func clamp_season(value: int) -> int:
 var seed_value: int = 0
 var attribution: String = ""
 ## Real OSM features in world XZ space; empty means procedural dressing.
+## Any notable OSM feature near the viewpoint (church, lighthouse,
+## castle, stadium...), rendered on the fly as its archetype model
+## at its true position. Dicts: {x, z, archetype, name, height,
+## size_x, size_z} in world units / metres, from OsmFetcher.
+var landmark_candidates: Array = []
 var buildings: Array = []
 var roads: Array = []
 ## Land-cover polygons: {class: water|forest|grass|field|urban, points}

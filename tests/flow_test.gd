@@ -25,11 +25,12 @@ func _run() -> void:
 		quit(1)
 		return
 
-	# DEM is cached after first run; OSM may take up to ~32s cold.
+	# DEM is cached after first run; OSM retries across Overpass
+	# endpoints and may take up to ~110s cold (see pipeline._await_osm).
 	# Real time, not frame counting: headless frames run faster than 60fps.
 	var start_msec := Time.get_ticks_msec()
 	while not main._view.visible \
-			and Time.get_ticks_msec() - start_msec < 60000:
+			and Time.get_ticks_msec() - start_msec < 120000:
 		await process_frame
 
 	if not main._view.visible:

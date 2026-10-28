@@ -68,8 +68,8 @@ func _run() -> void:
 		_fail(failures, "compact picker leaves dead space: history ends at y=%.0f of 844" % history_bottom)
 	if picker._stack.size.x > 390.0:
 		_fail(failures, "compact picker column should fit 390pt, got %s" % str(picker._stack.size))
-	if picker._layout_btn.visible:
-		_fail(failures, "layout override should hide on compact (its min width overflows phones)")
+	if not picker._layout_btn.visible:
+		_fail(failures, "layout switcher should stay visible on compact so the choice is reversible")
 
 	picker.size = Vector2(1280, 800)
 	picker._on_resized()
@@ -86,10 +86,26 @@ func _run() -> void:
 	await process_frame
 	if picker.effective_layout() != Responsive.Layout.COMPACT or picker._split.visible:
 		_fail(failures, "Compact override should force stacked layout on a wide window")
-	picker._on_layout_selected(0)  # back to Auto
+	# Regression: forcing Compact hid the layout switcher itself, so the
+	# choice could not be undone from the UI. The switcher must stay
+	# visible in every forced layout, and switching back through the
+	# actual control must restore the automatic layout.
+	if not picker._layout_btn.visible:
+		_fail(failures, "layout switcher should stay visible while Compact is forced")
+	picker._layout_btn.item_selected.emit(0)  # back to Auto via the control
 	await process_frame
 	if picker.effective_layout() != Responsive.Layout.EXPANDED:
 		_fail(failures, "Auto should restore EXPANDED on a wide window")
+	picker._on_layout_selected(2)  # force Wide
+	await process_frame
+	if picker.effective_layout() != Responsive.Layout.MEDIUM or not picker._split.visible:
+		_fail(failures, "Wide override should force split layout on a wide window")
+	if not picker._layout_btn.visible:
+		_fail(failures, "layout switcher should stay visible while Wide is forced")
+	picker._layout_btn.item_selected.emit(0)  # back to Auto via the control
+	await process_frame
+	if picker.effective_layout() != Responsive.Layout.EXPANDED:
+		_fail(failures, "Auto should restore EXPANDED after Wide")
 
 	# Quick picks: one tap selects the place and centres the map on it
 	if picker._quick_box == null:

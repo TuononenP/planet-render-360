@@ -9,7 +9,7 @@ extends Node
 ## Optional layer: failure emits `failed` and the terrain keeps its
 ## vertex-colour dressing.
 
-signal succeeded(texture: Texture2D, origin_px: Vector2, zoom: int)
+signal succeeded(texture: Texture2D, image: Image, origin_px: Vector2, zoom: int)
 signal failed(reason: String)
 
 const URL_TEMPLATE := "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%d/%d/%d"  # z/y/x
@@ -121,4 +121,4 @@ func _stitch() -> void:
 			mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), dst)
 	mosaic.generate_mipmaps()
 	var origin := Vector2((_centre_tile.x - 1) * TILE_PX, (_centre_tile.y - 1) * TILE_PX)
-	succeeded.emit(ImageTexture.create_from_image(mosaic), origin, _zoom)
+	succeeded.emit(ImageTexture.create_from_image(mosaic), mosaic, origin, _zoom)
