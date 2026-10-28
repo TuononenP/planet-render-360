@@ -16,24 +16,39 @@ var _name_label: Label
 var _lat_field: LineEdit
 var _lon_field: LineEdit
 
-var _margin: MarginContainer
+# Night Atlas layout: the map is full-bleed behind everything and the
+# controls float over it as glass. Compact and medium use a top bar
+# plus a bottom sheet (one column on phones, two on tablets); expanded
+# uses a floating side panel and a top-right nav pill.
+var _overlay: MarginContainer
 var _stack: VBoxContainer
 var _split: HBoxContainer
-var _sidebar: PanelContainer
+var _top_col: VBoxContainer
+var _top_row: HBoxContainer
+var _stack_gap: Control
+var _right_col: VBoxContainer
+var _side: PanelContainer
 var _side_col: VBoxContainer
-var _header: HBoxContainer
+var _sheet: PanelContainer
+var _sheet_cols: BoxContainer
+var _info_col: VBoxContainer
+var _action_col: VBoxContainer
+var _brand: HBoxContainer
+var _brand_pill: PanelContainer
+var _nav: PanelContainer
 var _search: LineEdit
 var _search_box: VBoxContainer
 var _suggest_panel: PanelContainer
 var _suggest_list: VBoxContainer
 var _suggest_timer: Timer
 var _map_wrap: Control
-var _card: PanelContainer
+var _zoom_rail: PanelContainer
 var _history_btn: Button
 var _settings_btn: Button
 var _download_btn: Button
 var _exit_btn: Button
 var _tip: Label
+var _quality_label: Label
 var _quick_box: VBoxContainer
 var _ready_label: Label
 var _coords_label: Label
@@ -48,11 +63,17 @@ var _selected_label: Label
 var _render_btn: Button
 var _zoom_out_btn: Button
 var _zoom_in_btn: Button
-var _hint_pill: PanelContainer
 var _quick_chips: Array[Button] = []
 var _selected_quick := -1
 var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
+var _focus_queued := false
+
+## Container that never eats clicks: the map underneath must stay
+## draggable in every gap between floating controls.
+func _passive(node: Control) -> Control:
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return node
 
 func _ready() -> void:
 	_bg = ColorRect.new()
@@ -60,42 +81,74 @@ func _ready() -> void:
 	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_bg)
 
-	_margin = MarginContainer.new()
-	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_margin)
+	# Map: full-bleed, behind every control.
+	_map_wrap = Control.new()
+	_map_wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_map_wrap)
+	_canvas = MapTileView.new()
+	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_canvas.picked.connect(_on_picked)
+	_map_wrap.add_child(_canvas)
+	_zoom_out_btn = UiTheme.rail_button("−", "Zoom out", 24)
+	_zoom_out_btn.pressed.connect(func() -> void: _canvas.zoom_out())
+	_zoom_in_btn = UiTheme.rail_button("+", "Zoom in", 24)
+	_zoom_in_btn.pressed.connect(func() -> void: _canvas.zoom_in())
+	_zoom_rail = UiTheme.rail([_zoom_in_btn, _zoom_out_btn], true)
+	_zoom_rail.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	_zoom_rail.anchor_top = 0.40
+	_zoom_rail.anchor_bottom = 0.40
+	_zoom_rail.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_zoom_rail.offset_left = -64
+	_zoom_rail.offset_right = -16
+	_map_wrap.add_child(_zoom_rail)
 
+	_overlay = MarginContainer.new()
+	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_passive(_overlay)
+	add_child(_overlay)
 	_stack = VBoxContainer.new()
 	_stack.add_theme_constant_override("separation", 10)
-	_margin.add_child(_stack)
+	_passive(_stack)
+	_overlay.add_child(_stack)
 	_split = HBoxContainer.new()
 	_split.add_theme_constant_override("separation", 16)
 	_split.visible = false
-	_margin.add_child(_split)
+	_passive(_split)
+	_overlay.add_child(_split)
 
-	# Header: name + one-line promise, layout option stays quiet.
-	_header = HBoxContainer.new()
-	_header.add_theme_constant_override("separation", 10)
-	_header.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Brand: shown in the side panel and as a pill on tablets.
+	_brand = HBoxContainer.new()
+	_brand.add_theme_constant_override("separation", 12)
+	var logo := UiTheme.label("◉", 22, UiTheme.TEAL)
+	logo.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_brand.add_child(logo)
 	var title_box := VBoxContainer.new()
 	title_box.add_theme_constant_override("separation", 2)
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_title_label = UiTheme.label("◭  Planet Render 360", 27, UiTheme.INK, true)
+	_title_label = UiTheme.label("Planet Render 360", 22, UiTheme.INK, true)
 	title_box.add_child(_title_label)
-	_tagline_label = UiTheme.label("Stand anywhere on Earth — see it in 360°", 14, UiTheme.MUTED)
+	_tagline_label = UiTheme.label("Stand anywhere on Earth. Look around.", 14, UiTheme.MUTED)
 	_tagline_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_box.add_child(_tagline_label)
-	_header.add_child(title_box)
-	# The app starts full screen, so it needs its own way out: a clear
-	# Exit in the header, always visible on the home screen.
-	_exit_btn = UiTheme.ghost_button("✕  Exit")
-	_exit_btn.tooltip_text = "Exit the app"
-	_exit_btn.custom_minimum_size = Vector2(96, 48)
-	_exit_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_exit_btn.pressed.connect(func() -> void: exit_requested.emit())
-	_header.add_child(_exit_btn)
+	_brand.add_child(title_box)
+	# Glass pill on tablets (floats over the map); bare in the side panel.
+	_brand_pill = PanelContainer.new()
+	_brand_pill.add_child(_brand)
 
-	# Layout + UI colour choices on their own row: each OptionButton
-	# keeps its full minimum width instead of squeezing the title.
+	# Nav: icon-only History / Settings / Exit. The app starts full
+	# screen, so it needs its own way out, always visible on the home
+	# screen.
+	_history_btn = UiTheme.rail_button("◷", "History & saved places")
+	_history_btn.pressed.connect(func() -> void: history_requested.emit())
+	_settings_btn = UiTheme.rail_button("⚙", "Settings")
+	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
+	_exit_btn = UiTheme.rail_button("✕", "Exit the app")
+	_exit_btn.pressed.connect(func() -> void: exit_requested.emit())
+	_nav = UiTheme.rail([_history_btn, _settings_btn, _exit_btn])
+	_nav.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
+	# Layout + accent choices: each OptionButton keeps its full
+	# minimum width instead of squeezing the sheet.
 	_options_row = HBoxContainer.new()
 	_options_row.add_theme_constant_override("separation", 8)
 	_layout_btn = OptionButton.new()
@@ -110,7 +163,7 @@ func _ready() -> void:
 	_options_row.add_child(_layout_btn)
 	_theme_btn = OptionButton.new()
 	for i in UiTheme.theme_names.size():
-		_theme_btn.add_item("UI colour: %s" % UiTheme.theme_names[i], i)
+		_theme_btn.add_item("Accent: %s" % UiTheme.theme_names[i], i)
 	_theme_btn.select(UiTheme.theme_index)
 	_theme_btn.custom_minimum_size = Vector2(150, 44)
 	_theme_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -121,6 +174,7 @@ func _ready() -> void:
 
 	_search_box = VBoxContainer.new()
 	_search_box.add_theme_constant_override("separation", 6)
+	_search_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_search = UiTheme.field("Search a place — try “Banff”")
 	_search.text_submitted.connect(func(t: String) -> void:
 		_hide_suggestions()
@@ -129,8 +183,7 @@ func _ready() -> void:
 	_search_box.add_child(_search)
 	_suggest_panel = PanelContainer.new()
 	_suggest_panel.visible = false
-	_suggest_panel.add_theme_stylebox_override("panel",
-		UiTheme.style(UiTheme.CARD, 14, Color.TRANSPARENT, true))
+	_suggest_panel.add_theme_stylebox_override("panel", _suggest_style())
 	_suggest_list = VBoxContainer.new()
 	_suggest_list.add_theme_constant_override("separation", 2)
 	_suggest_panel.add_child(_suggest_list)
@@ -143,8 +196,8 @@ func _ready() -> void:
 
 	# Quick picks: one tap to a wow place, no typing needed first run.
 	_quick_box = VBoxContainer.new()
-	_quick_box.add_theme_constant_override("separation", 6)
-	_quick_label = UiTheme.section_label("Try a place — one tap")
+	_quick_box.add_theme_constant_override("separation", 8)
+	_quick_label = UiTheme.section_label("Quick picks")
 	_quick_box.add_child(_quick_label)
 	var quick_row := HBoxContainer.new()
 	quick_row.add_theme_constant_override("separation", 8)
@@ -170,61 +223,36 @@ func _ready() -> void:
 	# Paris is the starting place, so its chip starts out selected.
 	_set_selected_quick(0)
 
-	# Map fills whatever space the layout gives it (no fixed height, so
-	# no dead band below the card on tall or desktop windows).
-	_map_wrap = Control.new()
-	_map_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_map_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_map_wrap.custom_minimum_size = Vector2(0, 240)
-	_canvas = MapTileView.new()
-	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_canvas.picked.connect(_on_picked)
-	_map_wrap.add_child(_canvas)
-	var zoom_row := HBoxContainer.new()
-	zoom_row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	zoom_row.offset_left = -124
-	zoom_row.offset_top = 14
-	zoom_row.offset_right = -14
-	zoom_row.offset_bottom = 68
-	zoom_row.add_theme_constant_override("separation", 8)
-	_map_wrap.add_child(zoom_row)
-	_zoom_out_btn = UiTheme.icon_button("−")
-	_zoom_out_btn.pressed.connect(func() -> void: _canvas.zoom_out())
-	zoom_row.add_child(_zoom_out_btn)
-	_zoom_in_btn = UiTheme.icon_button("+")
-	_zoom_in_btn.pressed.connect(func() -> void: _canvas.zoom_in())
-	zoom_row.add_child(_zoom_in_btn)
-	# Hint pill floats on the map: guidance where the hand already is,
-	# at no layout height cost on compact screens.
-	_hint_pill = UiTheme.pill("Tap the map to drop the pin", 13)
-	_hint_pill.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_hint_pill.offset_left = 12
-	_hint_pill.offset_top = -52
-	_hint_pill.offset_right = 236
-	_hint_pill.offset_bottom = -12
-	_hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_map_wrap.add_child(_hint_pill)
-	_tip = _hint_pill.get_meta("label") as Label
-
-	_card = PanelContainer.new()
-	_card.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.CARD, 16, Color.TRANSPARENT, true))
-	var card_col := VBoxContainer.new()
-	card_col.add_theme_constant_override("separation", 10)
-	_card.add_child(card_col)
+	# Selected place: info column (name, coordinates) and action column
+	# (render, offline, options, footer). Side by side on tablets.
+	_sheet_cols = BoxContainer.new()
+	_sheet_cols.add_theme_constant_override("separation", 20)
+	_info_col = VBoxContainer.new()
+	_info_col.add_theme_constant_override("separation", 10)
+	_info_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sheet_cols.add_child(_info_col)
+	_action_col = VBoxContainer.new()
+	_action_col.add_theme_constant_override("separation", 10)
+	_action_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sheet_cols.add_child(_action_col)
+	var head_row := HBoxContainer.new()
+	head_row.add_theme_constant_override("separation", 8)
+	_info_col.add_child(head_row)
 	_selected_label = UiTheme.section_label("Selected place")
-	card_col.add_child(_selected_label)
-	_name_label = UiTheme.label("Paris, France", 22, UiTheme.INK, true)
+	_selected_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_row.add_child(_selected_label)
+	_ready_label = UiTheme.label("● Ready", 13, UiTheme.TEAL, true)
+	head_row.add_child(_ready_label)
+	_name_label = UiTheme.label("Paris, France", 26, UiTheme.INK, true)
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card_col.add_child(_name_label)
+	_info_col.add_child(_name_label)
 	_coord_label = UiTheme.label("", 15, UiTheme.MUTED)
-	card_col.add_child(_coord_label)
-	_ready_label = UiTheme.label("● Ready — tap Render and step inside", 14, UiTheme.TEAL, true)
-	card_col.add_child(_ready_label)
-	_coords_label = UiTheme.section_label("Coordinates — or just tap the map")
-	card_col.add_child(_coords_label)
+	_info_col.add_child(_coord_label)
+	_coords_label = UiTheme.section_label("Coordinates — or tap the map")
+	_info_col.add_child(_coords_label)
 	var fields := HBoxContainer.new()
 	fields.add_theme_constant_override("separation", 10)
-	card_col.add_child(fields)
+	_info_col.add_child(fields)
 	_lat_field = UiTheme.field("Latitude")
 	_lon_field = UiTheme.field("Longitude")
 	_lat_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -235,29 +263,67 @@ func _ready() -> void:
 	_lon_field.text_changed.connect(func(_t: String) -> void: _sync_from_fields())
 	fields.add_child(_lat_field)
 	fields.add_child(_lon_field)
-	_render_btn = UiTheme.primary_button("◭  Render this place in 360°")
+	_render_btn = UiTheme.primary_button("Render in 360°  →")
 	_render_btn.pressed.connect(func() -> void: render_requested.emit(_lat, _lon))
-	card_col.add_child(_render_btn)
-
-	_history_btn = UiTheme.ghost_button("◷  History & saved places")
-	_history_btn.pressed.connect(func() -> void: history_requested.emit())
-
-	_settings_btn = UiTheme.ghost_button("⚙  Settings — High quality")
-	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
-
-	_download_btn = UiTheme.ghost_button("⬇  Download for offline")
+	_action_col.add_child(_render_btn)
+	_download_btn = UiTheme.ghost_button("⬇  Save for offline")
+	_download_btn.custom_minimum_size = Vector2(0, 48)
 	_download_btn.pressed.connect(func() -> void: download_requested.emit(_lat, _lon))
+	_action_col.add_child(_download_btn)
+	_action_col.add_child(_options_row)
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 8)
+	_action_col.add_child(footer)
+	_tip = UiTheme.label("Tap the map to drop the pin · © OpenStreetMap contributors", 12, UiTheme.MUTED)
+	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(_tip)
+	_quality_label = UiTheme.label("High", 12, UiTheme.MUTED)
+	_quality_label.size_flags_vertical = Control.SIZE_SHRINK_END
+	footer.add_child(_quality_label)
 
-	_sidebar = PanelContainer.new()
-	_sidebar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	_sidebar.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.CARD, 18, Color.TRANSPARENT, true))
+	# Bottom sheet (compact / medium) and side panel (expanded).
+	_sheet = PanelContainer.new()
+	_sheet.add_theme_stylebox_override("panel", UiTheme.glass_panel(28))
+	_side = PanelContainer.new()
+	_side.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_side.add_theme_stylebox_override("panel", _side_style())
 	_side_col = VBoxContainer.new()
-	_side_col.add_theme_constant_override("separation", 12)
-	_sidebar.add_child(_side_col)
+	_side_col.add_theme_constant_override("separation", 16)
+	_side.add_child(_side_col)
+	_top_col = VBoxContainer.new()
+	_top_col.add_theme_constant_override("separation", 10)
+	_passive(_top_col)
+	_top_row = HBoxContainer.new()
+	_top_row.add_theme_constant_override("separation", 10)
+	_passive(_top_row)
+	_top_col.add_child(_top_row)
+	_stack_gap = Control.new()
+	_stack_gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_passive(_stack_gap)
+	_right_col = VBoxContainer.new()
+	_right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_passive(_right_col)
 
 	resized.connect(_on_resized)
+	for node in [_sheet, _side, _top_col]:
+		node.resized.connect(_queue_focus_update)
 	_apply_layout(Responsive.layout_for_width(size.x))
 	_refresh_labels()
+
+func _side_style() -> StyleBoxFlat:
+	var st := UiTheme.glass_panel(28)
+	st.content_margin_left = 24
+	st.content_margin_right = 24
+	st.content_margin_top = 24
+	st.content_margin_bottom = 24
+	return st
+
+func _suggest_style() -> StyleBoxFlat:
+	var st := UiTheme.style(Color(0.04, 0.08, 0.09, 0.97), 16, Color(UiTheme.TEAL, 0.35), true)
+	st.content_margin_top = 8
+	st.content_margin_bottom = 8
+	return st
 
 func _on_resized() -> void:
 	if _forced_layout >= 0:
@@ -285,57 +351,33 @@ func _on_theme_selected(index: int) -> void:
 func _apply_theme() -> void:
 	if _bg != null:
 		_bg.color = UiTheme.BG
-	if _title_label != null:
-		_title_label.add_theme_color_override("font_color", UiTheme.INK)
-	if _tagline_label != null:
-		_tagline_label.add_theme_color_override("font_color", UiTheme.MUTED)
-	for section in [_quick_label, _selected_label, _coords_label]:
-		if section != null:
-			section.add_theme_color_override("font_color", UiTheme.MUTED)
-	if _name_label != null:
-		_name_label.add_theme_color_override("font_color", UiTheme.INK)
-	if _coord_label != null:
-		_coord_label.add_theme_color_override("font_color", UiTheme.MUTED)
-	if _ready_label != null:
-		_ready_label.add_theme_color_override("font_color", UiTheme.TEAL)
-	if _layout_btn != null:
-		UiTheme.apply_option(_layout_btn)
-	if _theme_btn != null:
-		UiTheme.apply_option(_theme_btn)
-	if _search != null:
-		UiTheme.apply_field(_search)
-	if _lat_field != null:
-		UiTheme.apply_field(_lat_field)
-	if _lon_field != null:
-		UiTheme.apply_field(_lon_field)
-	if _suggest_panel != null:
-		_suggest_panel.add_theme_stylebox_override("panel",
-			UiTheme.style(UiTheme.CARD, 14, Color.TRANSPARENT, true))
+	_title_label.add_theme_color_override("font_color", UiTheme.INK)
+	_tagline_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	for section in [_quick_label, _selected_label, _coords_label, _tip, _quality_label]:
+		section.add_theme_color_override("font_color", UiTheme.MUTED)
+	_name_label.add_theme_color_override("font_color", UiTheme.INK)
+	_coord_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	_ready_label.add_theme_color_override("font_color", UiTheme.TEAL)
+	UiTheme.apply_option(_layout_btn)
+	UiTheme.apply_option(_theme_btn)
+	UiTheme.apply_field(_search)
+	UiTheme.apply_field(_lat_field)
+	UiTheme.apply_field(_lon_field)
+	_suggest_panel.add_theme_stylebox_override("panel", _suggest_style())
 	for child in _suggest_list.get_children():
 		if child is Button:
 			_style_suggestion_row(child as Button)
-	if _card != null:
-		_card.add_theme_stylebox_override("panel",
-			UiTheme.style(UiTheme.CARD, 16, Color.TRANSPARENT, true))
-	if _sidebar != null:
-		_sidebar.add_theme_stylebox_override("panel",
-			UiTheme.style(UiTheme.CARD, 18, Color.TRANSPARENT, true))
-	if _render_btn != null:
-		UiTheme.apply_primary(_render_btn)
-	if _history_btn != null:
-		UiTheme.apply_ghost(_history_btn)
-	if _settings_btn != null:
-		UiTheme.apply_ghost(_settings_btn)
-	if _download_btn != null:
-		UiTheme.apply_ghost(_download_btn)
-	if _exit_btn != null:
-		UiTheme.apply_ghost(_exit_btn)
-	if _zoom_out_btn != null:
-		UiTheme.apply_icon(_zoom_out_btn)
-	if _zoom_in_btn != null:
-		UiTheme.apply_icon(_zoom_in_btn)
-	if _tip != null:
-		_tip.add_theme_color_override("font_color", UiTheme.INK)
+	_sheet.add_theme_stylebox_override("panel", UiTheme.glass_panel(28))
+	_side.add_theme_stylebox_override("panel", _side_style())
+	UiTheme.apply_primary(_render_btn)
+	UiTheme.apply_ghost(_download_btn)
+	for btn in [_history_btn, _settings_btn, _exit_btn, _zoom_in_btn, _zoom_out_btn]:
+		UiTheme.apply_rail_icon(btn)
+	for rail in [_nav, _zoom_rail]:
+		var st := UiTheme.style(UiTheme.GLASS_FILL, 26, UiTheme.LINE, true)
+		st.set_content_margin_all(4)
+		rail.add_theme_stylebox_override("panel", st)
+	_canvas.refresh_style()
 	_set_selected_quick(_selected_quick)
 
 ## Mark one quick pick as the active place (accent fill, pressed) and
@@ -347,59 +389,116 @@ func _set_selected_quick(index: int) -> void:
 		chip.set_pressed_no_signal(i == index)
 		UiTheme.apply_chip(chip, i == index)
 
-## Shows the chosen preset on the settings entry point, so the current
-## quality is visible before opening the menu.
 ## Offline-download feedback on the button itself (progress, then
 ## the outcome), so no extra status line competes for layout height.
 func set_download_status(text: String) -> void:
 	if _download_btn != null:
 		_download_btn.text = text
 
+## Shows the chosen preset in the sheet footer and on the settings
+## button's tooltip, so the current quality is visible before opening
+## the menu.
 func set_quality_preset(preset_value: int) -> void:
+	if _quality_label != null:
+		_quality_label.text = "Quality · %s" % RenderSettings.preset_name(preset_value)
 	if _settings_btn != null:
-		_settings_btn.text = "⚙  Settings — %s quality" % RenderSettings.preset_name(preset_value)
+		_settings_btn.tooltip_text = "Settings — %s quality" % RenderSettings.preset_name(preset_value)
 
 func effective_layout() -> int:
 	return _current_layout
 
-func _move(node: Control, parent: Container) -> void:
+func _move(node: Control, parent: Node) -> void:
 	if node.get_parent() != null:
 		node.get_parent().remove_child(node)
 	parent.add_child(node)
 
-func _move_all(nodes: Array, parent: Container) -> void:
+func _move_all(nodes: Array, parent: Node) -> void:
 	for node in nodes:
 		_move(node, parent)
 
 func _apply_layout(layout: Responsive.Layout) -> void:
-	if _stack == null:
+	if _stack == null or _side_col == null:
 		return  # not ready yet; _ready applies the initial layout
 	_current_layout = layout
-	# Compact is height-tight: the map hint already says "tap the map",
-	# so the coordinates caption gives its height back to the map.
-	if _coords_label != null:
-		_coords_label.visible = layout != Responsive.Layout.COMPACT
-	# The layout switcher is the only way back from a forced layout,
-	# so it always stays visible: hiding it on compact stranded users
-	# who forced Compact with no control left to undo it. The options
-	# row (118 + 150pt buttons) fits the 390pt compact frame.
-	if _layout_btn != null:
-		_layout_btn.visible = true
+	# Compact is height-tight: the footer already says "tap the map",
+	# so the coordinates caption gives its height back to the map. The
+	# layout switcher is the only way back from a forced layout, so it
+	# always stays visible.
+	var compact := layout == Responsive.Layout.COMPACT
+	var expanded := layout == Responsive.Layout.EXPANDED
+	_coords_label.visible = not compact
+	_quick_label.visible = expanded
+	_layout_btn.visible = true
+	_brand_pill.visible = not compact
+	_tagline_label.visible = expanded
+	_title_label.add_theme_font_size_override("font_size", 22 if expanded else 17)
 	var pad := Responsive.page_padding(layout)
-	_margin.add_theme_constant_override("margin_left", pad)
-	_margin.add_theme_constant_override("margin_right", pad)
-	_margin.add_theme_constant_override("margin_top", pad)
-	_margin.add_theme_constant_override("margin_bottom", pad)
-	if Responsive.is_split(layout):
+	_overlay.add_theme_constant_override("margin_left", pad)
+	_overlay.add_theme_constant_override("margin_right", pad)
+	_overlay.add_theme_constant_override("margin_top", pad)
+	_overlay.add_theme_constant_override("margin_bottom", pad)
+	if expanded:
 		_stack.visible = false
 		_split.visible = true
-		_move_all([_map_wrap, _sidebar], _split)
-		_sidebar.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
-		_move_all([_header, _options_row, _search_box, _quick_box, _card, _history_btn, _settings_btn, _download_btn], _side_col)
+		_move_all([_side, _right_col], _split)
+		_side.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
+		_move_all([_nav], _right_col)
+		_nav.size_flags_horizontal = Control.SIZE_SHRINK_END
+		_brand_pill.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		_move_all([_brand_pill, _search_box, _quick_box, _sheet_cols], _side_col)
+		_sheet_cols.vertical = true
+		_sheet_cols.add_theme_constant_override("separation", 10)
+		_sheet.custom_minimum_size = Vector2.ZERO
 	else:
 		_split.visible = false
 		_stack.visible = true
-		_move_all([_header, _options_row, _search_box, _quick_box, _map_wrap, _card, _history_btn, _settings_btn, _download_btn], _stack)
+		_move_all([_top_col, _stack_gap, _sheet], _stack)
+		if compact:
+			_move_all([_search_box, _nav], _top_row)
+			_move_all([_quick_box], _top_col)
+			_move(_brand_pill, _side_col)  # parked, hidden: phones have no brand row
+		else:
+			var pill_style := UiTheme.style(UiTheme.GLASS_FILL, 28, UiTheme.LINE, true)
+			pill_style.content_margin_top = 8
+			pill_style.content_margin_bottom = 8
+			_brand_pill.add_theme_stylebox_override("panel", pill_style)
+			_move_all([_brand_pill, _search_box, _nav], _top_row)
+			_move_all([_quick_box], _top_col)
+		_nav.size_flags_horizontal = Control.SIZE_SHRINK_END
+		_sheet_cols.vertical = compact
+		_sheet_cols.add_theme_constant_override("separation", 20)
+		_move_all([_sheet_cols], _sheet)
+		# Tablet sheet is a centred two-column card, not full width.
+		var sheet_w := 0 if compact else mini(int(size.x) - pad * 2, 760)
+		_sheet.custom_minimum_size = Vector2(sheet_w, 0)
+		_sheet.size_flags_horizontal = Control.SIZE_FILL if compact else Control.SIZE_SHRINK_CENTER
+	_queue_focus_update()
+
+## Keep the pin in the part of the map that is not covered by the
+## sheet / side panel. Runs after layout has settled.
+func _queue_focus_update() -> void:
+	if _focus_queued:
+		return
+	_focus_queued = true
+	call_deferred("_update_focus")
+
+func _update_focus() -> void:
+	_focus_queued = false
+	if _canvas == null or size.x <= 0.0 or size.y <= 0.0:
+		return
+	var origin := _canvas.get_global_rect().position
+	var centre := _canvas.size / 2.0
+	var want := centre
+	if _current_layout == Responsive.Layout.EXPANDED:
+		if _side.visible and _side.is_inside_tree():
+			var left := _side.get_global_rect().end.x - origin.x
+			want = Vector2((left + _canvas.size.x) / 2.0, centre.y)
+	elif _sheet.is_inside_tree() and _top_col.is_inside_tree():
+		var top := _top_col.get_global_rect().end.y - origin.y
+		var bottom := _sheet.get_global_rect().position.y - origin.y
+		if bottom > top + 80.0:
+			want = Vector2(centre.x, (top + bottom) / 2.0)
+	_canvas.focus_offset = (want - centre).round()
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()
@@ -474,13 +573,13 @@ func _on_suggestions_ready(query: String, results: Array) -> void:
 ## pressed text colours, or the label goes near-invisible on hover.
 func _style_suggestion_row(row: Button) -> void:
 	row.add_theme_color_override("font_color", UiTheme.INK)
-	row.add_theme_color_override("font_hover_color", UiTheme.INK)
-	row.add_theme_color_override("font_pressed_color", UiTheme.INK)
+	row.add_theme_color_override("font_hover_color", UiTheme.ON_ACCENT)
+	row.add_theme_color_override("font_pressed_color", UiTheme.ON_ACCENT)
 	row.add_theme_color_override("font_focus_color", UiTheme.INK)
 	row.add_theme_stylebox_override("normal", UiTheme.style(Color.TRANSPARENT, 10))
-	row.add_theme_stylebox_override("hover", UiTheme.style(UiTheme.TEAL_SOFT, 10))
-	row.add_theme_stylebox_override("pressed", UiTheme.style(UiTheme.TEAL_SOFT, 10))
-	row.add_theme_stylebox_override("focus", UiTheme.style(Color.TRANSPARENT, 10, UiTheme.AMBER))
+	row.add_theme_stylebox_override("hover", UiTheme.style(UiTheme.TEAL, 10))
+	row.add_theme_stylebox_override("pressed", UiTheme.style(UiTheme.TEAL, 10))
+	row.add_theme_stylebox_override("focus", UiTheme.style(Color.TRANSPARENT, 10, UiTheme.TEAL))
 
 func _show_suggestions(results: Array) -> void:
 	for child in _suggest_list.get_children():

@@ -4,10 +4,10 @@ extends RefCounted
 ## Heads-up styling for the 360 view: smoked-glass surfaces with a
 ## glowing cyan-teal accent, so controls float over any terrain (snow,
 ## night sky, satellite imagery) without blocking the scene. The accent
-## is fixed rather than palette-driven: it must read on dark glass.
+## follows the chosen palette (UiTheme.apply_palette) and reads on dark glass.
 
-const ACCENT := Color(0.18, 0.77, 0.71)  # #2EC4B6
-const ACCENT_GLOW := Color(0.18, 0.77, 0.71, 0.35)
+static var ACCENT := Color(0.18, 0.77, 0.71)  # #2EC4B6, follows UiTheme.apply_palette
+static var ACCENT_GLOW := Color(0.18, 0.77, 0.71, 0.35)
 const GLASS := Color(0.04, 0.07, 0.08, 0.58)
 const GLASS_HOVER := Color(0.08, 0.16, 0.17, 0.72)
 const GLASS_PRESSED := Color(0.10, 0.30, 0.29, 0.80)

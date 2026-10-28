@@ -226,6 +226,36 @@ func _build_hud() -> void:
 	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dock.add_child(_attribution_label)
 
+## Rebuild the HUD after an accent change: its styleboxes bake the
+## palette in at creation, so the simplest correct re-skin is a fresh
+## build with the visible state carried over.
+func refresh_theme() -> void:
+	if _top == null:
+		return
+	var place := _place_pill.text
+	var attribution := _attribution_label.text
+	var weather := _weather_label.text
+	var weather_shown := _weather_label.visible
+	var quality := _quality_label.text
+	var compass := _compass.text
+	var season := _season_btn.selected
+	var hint_shown := _hint.visible
+	for node in [_top, _bottom_root, _hint_timer]:
+		remove_child(node)
+		node.queue_free()
+	_build_hud()
+	_place_pill.text = place
+	_attribution_label.text = attribution
+	_weather_label.text = weather
+	_weather_label.visible = weather_shown
+	_quality_label.text = quality
+	_compass.text = compass
+	_season_btn.select(season)
+	_hint.visible = hint_shown
+	_fit_place_pill()
+	_on_resized()
+	_sync_time_ui()
+
 func _dismiss_hint() -> void:
 	if _hint == null or not _hint.visible or _hint.modulate.a < 1.0:
 		return

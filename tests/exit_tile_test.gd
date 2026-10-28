@@ -23,8 +23,9 @@ func _run() -> void:
 	if exit_btn == null:
 		failures.append("picker should have an exit button (_exit_btn)")
 	else:
-		if not exit_btn.text.contains("Exit"):
-			failures.append("exit button should be labelled Exit, got '%s'" % exit_btn.text)
+		# Icon-only in the nav pill: the name lives in the tooltip.
+		if not exit_btn.tooltip_text.contains("Exit"):
+			failures.append("exit button should be named Exit, got tooltip '%s'" % exit_btn.tooltip_text)
 		if not exit_btn.visible or exit_btn.custom_minimum_size.y < 48.0:
 			failures.append("exit button should be visible with a >=48pt touch target")
 		var got_exit := [false]

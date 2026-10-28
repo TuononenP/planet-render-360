@@ -53,6 +53,11 @@ func _ready() -> void:
 		_picker.set_download_status("⬇  Downloading… 0/%d" % OfflineDownloader.JOBS)
 		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
+	_picker.palette_changed.connect(func(_i: int) -> void:
+		_view.refresh_theme()
+		_settings_screen.refresh_theme()
+		_loading.refresh_theme()
+		_history.refresh())
 	add_child(_picker)
 	_picker.set_quality_preset(_settings.preset)
 
