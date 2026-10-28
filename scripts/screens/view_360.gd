@@ -19,7 +19,10 @@ var _weather: WeatherFetcher
 var _weather_label: Label
 var _top: HBoxContainer
 var _sheet: PanelContainer
-var _bottom_root: HBoxContainer
+var _bottom_root: VBoxContainer
+var _hint: PanelContainer
+var _hint_timer: Timer
+var _sun_icon: Label
 var _time_label: Label
 var _now_btn: Button
 var _live_time := true
@@ -29,36 +32,13 @@ var _sky_mat: ProceduralSkyMaterial
 var _cloud_cover := 0.0
 var _weather_foggy := false
 var _touches: Dictionary = {}
-var _quality_preset: int = RenderSettings.Preset.BALANCED
+var _quality_preset: int = RenderSettings.Preset.HIGH
 var _data: LocationData
 var _generated: Node3D
 var _season_btn: OptionButton
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
-
-func _pill(min_size := Vector2.ZERO) -> PanelContainer:
-	var p := PanelContainer.new()
-	p.custom_minimum_size = min_size
-	p.add_theme_stylebox_override("panel",
-		UiTheme.style(Color(1, 1, 1, 0.92), 22, Color.TRANSPARENT, true))
-	return p
-
-func _dark_btn(text: String, min_size: Vector2, font_size := 15, radius := 12) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = min_size
-	b.add_theme_font_size_override("font_size", font_size)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_stylebox_override("normal", UiTheme.style(Color(1, 1, 1, 0.14), radius, Color(1, 1, 1, 0.35)))
-	b.add_theme_stylebox_override("hover", UiTheme.style(Color(1, 1, 1, 0.22), radius, Color(1, 1, 1, 0.35)))
-	b.add_theme_stylebox_override("pressed", UiTheme.style(Color(1, 1, 1, 0.22), radius, Color(1, 1, 1, 0.35)))
-	return b
-
-func _center_label(text: String, size: int, color: Color) -> Label:
-	var l := UiTheme.label(text, size, color)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	return l
 
 func _ready() -> void:
 	_container = SubViewportContainer.new()
@@ -84,120 +64,10 @@ func _ready() -> void:
 	_weather.succeeded.connect(_on_weather)
 	_weather.failed.connect(func(_r: String) -> void:
 		if _weather_label != null:
-			_weather_label.text = "")
+			_weather_label.text = ""
+			_weather_label.visible = false)
 
-	# Top bar: frosted pills matching approved mockup, sized in points.
-	_top = HBoxContainer.new()
-	_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_top.add_theme_constant_override("separation", 10)
-	_top.offset_left = 16
-	_top.offset_top = 16
-	_top.offset_right = -16
-	add_child(_top)
-	var back_pill := Button.new()
-	back_pill.text = "← Map"
-	back_pill.custom_minimum_size = Vector2(92, 48)
-	back_pill.add_theme_font_size_override("font_size", 16)
-	back_pill.add_theme_color_override("font_color", UiTheme.TEAL_DARK)
-	back_pill.add_theme_color_override("font_hover_color", UiTheme.TEAL_DARK)
-	back_pill.add_theme_stylebox_override("normal",
-		UiTheme.style(Color(1, 1, 1, 0.94), 22, Color.TRANSPARENT, true))
-	back_pill.add_theme_stylebox_override("hover",
-		UiTheme.style(Color.WHITE, 22, Color.TRANSPARENT, true))
-	back_pill.add_theme_stylebox_override("pressed",
-		UiTheme.style(UiTheme.TEAL_SOFT, 22, Color.TRANSPARENT, true))
-	back_pill.pressed.connect(func() -> void: back_requested.emit())
-	_top.add_child(back_pill)
-	var pill := _pill()
-	_place_pill = UiTheme.label("📍 Paris, France", 17, UiTheme.INK, true)
-	pill.add_child(_place_pill)
-	_top.add_child(pill)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_top.add_child(spacer)
-	_compass = UiTheme.label("N ↑", 17, UiTheme.TEAL_DARK, true)
-	var compass_pill := _pill(Vector2(72, 48))
-	compass_pill.add_child(_compass)
-	_top.add_child(compass_pill)
-
-	# Bottom sheet: dark frosted panel so white text stays readable over
-	# bright terrain/snow (previously white-on-white at the screen edge).
-	_bottom_root = HBoxContainer.new()
-	_bottom_root.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_bottom_root.offset_left = 16
-	_bottom_root.offset_right = -16
-	_bottom_root.offset_top = -380
-	_bottom_root.offset_bottom = -16
-	add_child(_bottom_root)
-	var left_spacer := Control.new()
-	left_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_bottom_root.add_child(left_spacer)
-	_sheet = PanelContainer.new()
-	_sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_sheet.size_flags_vertical = Control.SIZE_SHRINK_END
-	_sheet.add_theme_stylebox_override("panel",
-		UiTheme.style(UiTheme.DARK_PANEL, 20, Color.TRANSPARENT, true))
-	_bottom_root.add_child(_sheet)
-	var right_spacer := Control.new()
-	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_bottom_root.add_child(right_spacer)
-
-	var bottom := VBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 8)
-	_sheet.add_child(bottom)
-	bottom.add_child(_center_label("Drag to look around · Pinch or scroll to zoom", 15, Color.WHITE))
-	_weather_label = _center_label("", 14, Color(1, 1, 1, 0.92))
-	bottom.add_child(_weather_label)
-	var sun_row := HBoxContainer.new()
-	sun_row.add_theme_constant_override("separation", 8)
-	bottom.add_child(sun_row)
-	sun_row.add_child(UiTheme.label("☀ Time", 14, Color.WHITE, true))
-	var prev_btn := _dark_btn("‹", Vector2(40, 44), 20, 10)
-	prev_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) - 1, 0, 24)))
-	sun_row.add_child(prev_btn)
-	_sun_slider = HSlider.new()
-	_sun_slider.min_value = 0.0
-	_sun_slider.max_value = 23.0
-	_sun_slider.step = 1.0
-	_sun_slider.tick_count = 24
-	_sun_slider.ticks_on_borders = true
-	_sun_slider.value = 12
-	_sun_slider.custom_minimum_size = Vector2(0, 40)
-	_sun_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_sun_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_sun_slider.value_changed.connect(_on_time_slider_changed)
-	sun_row.add_child(_sun_slider)
-	var next_btn := _dark_btn("›", Vector2(40, 44), 20, 10)
-	next_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) + 1, 0, 24)))
-	sun_row.add_child(next_btn)
-	_time_label = UiTheme.label("12:00", 16, Color.WHITE, true)
-	_time_label.custom_minimum_size = Vector2(56, 0)
-	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sun_row.add_child(_time_label)
-	_now_btn = _dark_btn("Use current time", Vector2(0, 46))
-	_now_btn.pressed.connect(use_live_time)
-	bottom.add_child(_now_btn)
-	var season_row := HBoxContainer.new()
-	season_row.add_theme_constant_override("separation", 8)
-	bottom.add_child(season_row)
-	season_row.add_child(UiTheme.label("❋ Season", 14, Color.WHITE, true))
-	_season_btn = OptionButton.new()
-	for i in LocationData.SEASON_NAMES.size():
-		_season_btn.add_item(LocationData.SEASON_NAMES[i], i)
-	_season_btn.select(LocationData.Season.SUMMER)
-	_season_btn.custom_minimum_size = Vector2(0, 44)
-	_season_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_season_btn.add_theme_font_size_override("font_size", 14)
-	UiTheme.apply_option(_season_btn)
-	_season_btn.item_selected.connect(_on_season_selected)
-	season_row.add_child(_season_btn)
-	_quality_label = _center_label("High · 60 fps", 12, Color(1, 1, 1, 0.85))
-	bottom.add_child(_quality_label)
-	_attribution_label = _center_label("", 11, Color(1, 1, 1, 0.8))
-	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	bottom.add_child(_attribution_label)
-	# Back lives in the top bar now (see _ready): one tap, always visible,
-	# and the bottom sheet stays short enough to leave the view open.
+	_build_hud()
 
 	var clock := Timer.new()
 	clock.wait_time = 15.0
@@ -210,6 +80,181 @@ func _ready() -> void:
 
 	resized.connect(_on_resized)
 	_on_resized()
+
+## Heads-up layer (see HudStyle): smoked-glass pills up top, a slim
+## floating dock below and a drag hint that fades once the user looks
+## around, so the scene keeps the screen.
+func _build_hud() -> void:
+	_top = HBoxContainer.new()
+	_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_top.add_theme_constant_override("separation", 10)
+	_top.offset_left = 16
+	_top.offset_top = 16
+	_top.offset_right = -16
+	add_child(_top)
+	var back_btn := HudStyle.button("←  Map", Vector2(96, 52), 16, 26)
+	back_btn.pressed.connect(func() -> void: back_requested.emit())
+	_top.add_child(back_btn)
+	var place := PanelContainer.new()
+	place.custom_minimum_size = Vector2(0, 52)
+	place.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	place.add_theme_stylebox_override("panel", HudStyle.panel(26, 18, 6))
+	_top.add_child(place)
+	var place_col := VBoxContainer.new()
+	place_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	place_col.add_theme_constant_override("separation", 0)
+	place.add_child(place_col)
+	_place_pill = HudStyle.label("◉  Paris, France", 16)
+	_place_pill.clip_text = true
+	_place_pill.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	place_col.add_child(_place_pill)
+	_weather_label = HudStyle.label("", 12, HudStyle.ACCENT)
+	_weather_label.visible = false
+	place_col.add_child(_weather_label)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_top.add_child(spacer)
+	var compass_disc := PanelContainer.new()
+	compass_disc.custom_minimum_size = Vector2(56, 56)
+	compass_disc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var disc_style := HudStyle.glass(28, HudStyle.ACCENT, HudStyle.GLASS, 0, 4)
+	disc_style.set_border_width_all(2)
+	compass_disc.add_theme_stylebox_override("panel", disc_style)
+	_top.add_child(compass_disc)
+	var compass_col := VBoxContainer.new()
+	compass_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	compass_col.add_theme_constant_override("separation", -4)
+	compass_disc.add_child(compass_col)
+	var needle := HudStyle.label("▲", 11, HudStyle.ACCENT)
+	needle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	compass_col.add_child(needle)
+	_compass = HudStyle.label("N", 15)
+	_compass.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	compass_col.add_child(_compass)
+
+	# Bottom: drag hint over a slim floating dock, both centred.
+	_bottom_root = VBoxContainer.new()
+	_bottom_root.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_bottom_root.alignment = BoxContainer.ALIGNMENT_END
+	_bottom_root.add_theme_constant_override("separation", 12)
+	_bottom_root.offset_left = 16
+	_bottom_root.offset_right = -16
+	_bottom_root.offset_top = -380
+	_bottom_root.offset_bottom = -16
+	add_child(_bottom_root)
+	_hint = PanelContainer.new()
+	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint.add_theme_stylebox_override("panel", HudStyle.panel(20, 16, 8))
+	var hint_label := HudStyle.label("✥  Drag to look around · Pinch or scroll to zoom", 13, HudStyle.TEXT)
+	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint.add_child(hint_label)
+	_bottom_root.add_child(_hint)
+	_hint_timer = Timer.new()
+	_hint_timer.one_shot = true
+	_hint_timer.wait_time = 6.0
+	_hint_timer.timeout.connect(_dismiss_hint)
+	add_child(_hint_timer)
+	_sheet = PanelContainer.new()
+	_sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_sheet.add_theme_stylebox_override("panel", HudStyle.panel(28, 18, 14))
+	_bottom_root.add_child(_sheet)
+
+	var dock := VBoxContainer.new()
+	dock.add_theme_constant_override("separation", 12)
+	_sheet.add_child(dock)
+	var sun_row := HBoxContainer.new()
+	sun_row.add_theme_constant_override("separation", 8)
+	dock.add_child(sun_row)
+	_sun_icon = HudStyle.label("☀", 20, HudStyle.ACCENT)
+	_sun_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sun_row.add_child(_sun_icon)
+	var prev_btn := HudStyle.button("‹", Vector2(44, 44), 20, 22)
+	prev_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) - 1, 0, 24)))
+	sun_row.add_child(prev_btn)
+	_sun_slider = HSlider.new()
+	_sun_slider.min_value = 0.0
+	_sun_slider.max_value = 23.0
+	_sun_slider.step = 1.0
+	_sun_slider.tick_count = 24
+	_sun_slider.ticks_on_borders = true
+	_sun_slider.value = 12
+	_sun_slider.focus_mode = Control.FOCUS_NONE
+	_sun_slider.custom_minimum_size = Vector2(0, 44)
+	_sun_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sun_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	HudStyle.apply_slider(_sun_slider)
+	_sun_slider.value_changed.connect(_on_time_slider_changed)
+	sun_row.add_child(_sun_slider)
+	var next_btn := HudStyle.button("›", Vector2(44, 44), 20, 22)
+	next_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) + 1, 0, 24)))
+	sun_row.add_child(next_btn)
+	_time_label = HudStyle.label("12:00", 24)
+	_time_label.custom_minimum_size = Vector2(66, 0)
+	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sun_row.add_child(_time_label)
+
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 10)
+	dock.add_child(mode_row)
+	_season_btn = OptionButton.new()
+	for i in LocationData.SEASON_NAMES.size():
+		_season_btn.add_item("❋  %s" % LocationData.SEASON_NAMES[i], i)
+	_season_btn.select(LocationData.Season.SUMMER)
+	_season_btn.focus_mode = Control.FOCUS_NONE
+	_season_btn.custom_minimum_size = Vector2(0, 44)
+	_season_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_season_btn.add_theme_font_size_override("font_size", 15)
+	HudStyle.apply_option(_season_btn)
+	_season_btn.item_selected.connect(_on_season_selected)
+	mode_row.add_child(_season_btn)
+	_now_btn = HudStyle.button("Now", Vector2(120, 44), 14, 18)
+	_now_btn.pressed.connect(use_live_time)
+	mode_row.add_child(_now_btn)
+
+	var rule := ColorRect.new()
+	rule.color = HudStyle.EDGE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock.add_child(rule)
+	_quality_label = HudStyle.label("High · 60 fps", 12, HudStyle.TEXT_DIM)
+	_quality_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dock.add_child(_quality_label)
+	_attribution_label = HudStyle.label("", 10, HudStyle.TEXT_FAINT)
+	_attribution_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dock.add_child(_attribution_label)
+
+func _dismiss_hint() -> void:
+	if _hint == null or not _hint.visible or _hint.modulate.a < 1.0:
+		return
+	var tw := create_tween()
+	tw.tween_property(_hint, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(_hint.hide)
+
+func _show_hint() -> void:
+	if _hint == null:
+		return
+	_hint.modulate.a = 1.0
+	_hint.show()
+	if _hint_timer.is_inside_tree():
+		_hint_timer.start()
+
+## Long place names ellipsize instead of pushing the compass off
+## screen; short ones keep the pill hugging the text.
+func _fit_place_pill() -> void:
+	if _place_pill == null:
+		return
+	var font := _place_pill.get_theme_font("font")
+	var font_size := _place_pill.get_theme_font_size("font_size")
+	var text_w := font.get_string_size(_place_pill.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var room := size.x - _top.offset_left + _top.offset_right - 96 - 56 - 36 - 30
+	_place_pill.custom_minimum_size.x = clampf(ceilf(text_w) + 2, 40.0, maxf(room, 40.0))
+
+func _on_look_changed() -> void:
+	_compass.text = _rig.compass_text()
+	_dismiss_hint()
 
 func _on_resized() -> void:
 	if _top == null:
@@ -224,41 +269,64 @@ func _on_resized() -> void:
 	_bottom_root.offset_bottom = -pad
 	var sheet_width := int(size.x) - pad * 2
 	if Responsive.is_split(layout):
-		sheet_width = mini(sheet_width, 680)
+		sheet_width = mini(sheet_width, 640)
 	_sheet.custom_minimum_size = Vector2(maxi(sheet_width, 280), 0)
+	_sun_icon.visible = Responsive.is_split(layout)
+	_fit_place_pill()
 
 func _build_3d() -> void:
 	_world_root = Node3D.new()
 	_viewport.add_child(_world_root)
 	_sun = DirectionalLight3D.new()
-	_sun.rotation_degrees = Vector3(-52, -38, 0)
+	# Golden-hour key (PRD §3.3): elevation 8-12°, azimuth from frame-right.
+	_sun.rotation_degrees = Vector3(-10, 65, 0)
+	_sun.light_color = Color(1.0, 0.85, 0.64)  # #FFD9A3
+	_sun.light_energy = 3.0
 	_sun.shadow_enabled = true
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_quality_preset)
+	_sun.shadow_blur = RenderSettings.shadow_blur_for(_quality_preset)
+	_sun.shadow_bias = 0.06
 	_world_root.add_child(_sun)
+	_build_clouds()
 	_env = WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	_sky_mat = ProceduralSkyMaterial.new()
-	_sky_mat.sky_top_color = Color(0.62, 0.76, 0.86)
-	_sky_mat.sky_horizon_color = Color(0.98, 0.88, 0.72)
-	_sky_mat.sky_curve = 0.22
+	# PRD §3.2/§3.3: zenith #7FA8CC -> horizon #F0C48F.
+	_sky_mat.sky_top_color = Color(0.50, 0.66, 0.80)
+	_sky_mat.sky_horizon_color = Color(0.94, 0.77, 0.56)
+	_sky_mat.sky_curve = 0.06
 	_sky_mat.ground_curve = 0.14
-	_sky_mat.sky_energy_multiplier = 0.72
-	_sky_mat.ground_bottom_color = Color(0.55, 0.52, 0.45)
-	_sky_mat.ground_horizon_color = Color(0.92, 0.84, 0.70)
+	_sky_mat.sky_energy_multiplier = 1.0
+	_sky_mat.ground_bottom_color = Color(0.42, 0.38, 0.33)
+	_sky_mat.ground_horizon_color = Color(0.94, 0.82, 0.64)
 	sky.sky_material = _sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_color = Color(0.73, 0.80, 0.85)  # sky ambient #B9CBD8
+	env.ambient_light_energy = 0.38
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.85
+	env.tonemap_exposure = 0.94
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.06
+	env.adjustment_contrast = 1.08
 	env.adjustment_saturation = 1.12
-	env.ambient_light_sky_contribution = 0.45
+	env.ambient_light_sky_contribution = 0.42
+	# Aerial haze (PRD §3.3): far field blends toward #EFD2A4 without
+	# bleaching the mid-ground (kept under the 0.85 luminance cap).
 	env.fog_enabled = true
-	env.fog_density = 0.00035
-	env.fog_sky_affect = 0.3
-	env.fog_light_color = Color(0.94, 0.90, 0.80)
+	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+	env.fog_density = 0.0011
+	env.fog_sky_affect = 0.22
+	env.fog_light_color = Color(0.90, 0.76, 0.55)
+	env.fog_light_energy = 0.75
+	env.fog_sun_scatter = 0.25
+	# Bloom for the sun glint (PRD §3.3, Fidelity 3 look at all tiers).
+	env.glow_enabled = true
+	env.glow_bloom = 0.10
+	env.glow_intensity = 0.4
+	env.glow_strength = 1.0
 	_env.environment = env
 	_world_root.add_child(_env)
 	_rig = CameraRig.new()
@@ -270,11 +338,47 @@ func _build_3d() -> void:
 	_world_root.add_child(_rig)
 	_build_precip()
 
+## Soft stratocumulus band (PRD §3.3): flattened, warm-lit cloud
+## masses high over every yaw — never faceted slabs. They hang on the
+## world root so they survive world rebuilds for every place.
+func _build_clouds() -> void:
+	var holder := Node3D.new()
+	holder.name = "CloudBand"
+	_world_root.add_child(holder)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.99, 0.96, 0.91, 0.42)  # warm-lit #E8C9A0 family
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.roughness = 1.0
+	var sphere := SphereMesh.new()
+	sphere.radial_segments = 16
+	sphere.rings = 8
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1379
+	for i in 16:  # three merged puffs per cloud break the oval outline
+		var ang := TAU * float(i) / 16.0 + rng.randf_range(-0.12, 0.12)
+		var dist := rng.randf_range(1700.0, 2800.0)
+		var centre := Vector3(cos(ang) * dist, rng.randf_range(300.0, 460.0), sin(ang) * dist)
+		for k in 3:
+			var mi := MeshInstance3D.new()
+			mi.mesh = sphere
+			mi.material_override = mat
+			mi.position = centre + Vector3(rng.randf_range(-160.0, 160.0),
+				rng.randf_range(-12.0, 12.0), rng.randf_range(-60.0, 60.0))
+			mi.scale = Vector3(rng.randf_range(200.0, 380.0), rng.randf_range(16.0, 30.0),
+				rng.randf_range(80.0, 150.0))
+			holder.add_child(mi)
+
 ## Caps the FPS governor at the user's preset; terrain accuracy for a
 ## place is fixed when it was generated, so this only moves the live
 ## render scale / shadow ceiling.
 func set_quality_preset(preset_value: int) -> void:
 	_quality_preset = RenderSettings.clamp_preset(preset_value)
+	if _sun != null:
+		_sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_quality_preset)
+		_sun.shadow_blur = RenderSettings.shadow_blur_for(_quality_preset)
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
 
@@ -348,12 +452,17 @@ func show_location(data: LocationData) -> void:
 	_data = data
 	if _season_btn != null:
 		_season_btn.select(data.season)
-	_place_pill.text = "📍 %s" % data.place_name
+	_place_pill.text = "◉  %s" % data.place_name
+	_fit_place_pill()
+	_show_hint()
 	if _attribution_label != null:
 		_attribution_label.text = data.attribution
 	_rebuild_world()
+	# Spawn at golden hour (PRD §3.3): the judged condition for every
+	# place. The time slider still lets the user leave it afterwards.
+	set_time_of_day(17)
 	_rig.position.y = data.height_at(data.grid_size / 2, data.grid_size / 2) + 7.5
-	_rig.set_look(0.6, -0.07)
+	_rig.set_look(0.6, -0.10)
 	if data.landmark_type != "none":
 		# Open facing the landmark so it is the first thing seen.
 		var lp := TerrainBuilder.landmark_world_pos(data)
@@ -364,6 +473,7 @@ func show_location(data: LocationData) -> void:
 func _on_weather(temp_c: float, label: String, cloud_cover: float, code: int) -> void:
 	if _weather_label != null:
 		_weather_label.text = "%.0f°C · %s" % [temp_c, label]
+		_weather_label.visible = true
 	_cloud_cover = cloud_cover
 	_weather_foggy = code in [45, 48, 51, 53, 55, 61, 63, 65, 71, 73, 75]
 	_apply_precip(code)
@@ -401,10 +511,11 @@ func _sync_time_ui() -> void:
 	if _live_time:
 		var now := Time.get_time_dict_from_system()
 		_time_label.text = "%02d:%02d" % [int(now.get("hour", 0)), int(now.get("minute", 0))]
-		_now_btn.text = "● Now — current time (live)"
+		_now_btn.text = "●  Live"
 	else:
 		_time_label.text = "%02d:00" % int(_time_hour)
-		_now_btn.text = "Use current time"
+		_now_btn.text = "↺  Now"
+	HudStyle.apply_live_chip(_now_btn, _live_time)
 
 func _apply_time(hour_f: float) -> void:
 	if _sun == null:
@@ -413,9 +524,12 @@ func _apply_time(hour_f: float) -> void:
 	var arc := sin(PI * (hour_f - 6.0) / 12.0)  # >0 by day, <0 at night
 	if arc > -0.08:
 		var day_t := clampf((hour_f - 6.0) / 12.0, 0.0, 1.0)
-		_sun.rotation_degrees = Vector3(-maxf(arc, 0.02) * 62.0, lerpf(-95.0, 95.0, day_t), 0)
-		_sun.light_energy = (0.18 + 0.62 * maxf(arc, 0.0)) * cloud
-		_sun.light_color = Color(1, 0.62, 0.38).lerp(
+		# Elevation follows the sun arc but floors at the PRD golden
+		# band: at 17:00 the sun sits ~10° up, warm #FFD9A3, energy 3.
+		var elev := clampf(maxf(arc, 0.02) * 48.0, 8.0, 50.0)
+		_sun.rotation_degrees = Vector3(-elev, lerpf(-95.0, 95.0, day_t), 0)
+		_sun.light_energy = (0.75 + 1.35 * clampf(arc * 2.2, 0.0, 1.0)) * cloud
+		_sun.light_color = Color(1.0, 0.85, 0.64).lerp(
 			Color(1, 0.97, 0.92), clampf(arc * 1.7, 0.0, 1.0))
 	else:
 		# Moonlight: fixed cool light so night scenes stay readable.
@@ -426,7 +540,7 @@ func _apply_time(hour_f: float) -> void:
 		_sky_mat.sky_top_color = _keyframed(hour_f, [
 			[0.0, Color(0.04, 0.07, 0.15)], [5.0, Color(0.07, 0.10, 0.20)],
 			[7.5, Color(0.40, 0.58, 0.82)], [12.0, Color(0.34, 0.55, 0.84)],
-			[17.0, Color(0.38, 0.55, 0.80)], [19.0, Color(0.35, 0.38, 0.55)],
+			[17.0, Color(0.50, 0.66, 0.80)], [19.0, Color(0.35, 0.38, 0.55)],
 			[21.0, Color(0.06, 0.08, 0.17)], [24.0, Color(0.04, 0.07, 0.15)]])
 		_sky_mat.sky_horizon_color = _keyframed(hour_f, [
 			[0.0, Color(0.10, 0.12, 0.20)], [5.0, Color(0.16, 0.16, 0.22)],
@@ -438,7 +552,7 @@ func _apply_time(hour_f: float) -> void:
 		_env.environment.fog_enabled = true
 		_env.environment.fog_light_color = _sky_mat.sky_horizon_color \
 			if _sky_mat != null else Color(0.94, 0.90, 0.80)
-		_env.environment.fog_density = 0.016 if _weather_foggy else 0.00035
+		_env.environment.fog_density = 0.016 if _weather_foggy else 0.0011
 
 static func _keyframed(hour_f: float, keys: Array) -> Color:
 	for i in keys.size() - 1:
@@ -491,11 +605,11 @@ func _gui_input(event: InputEvent) -> void:
 				_pinch_base = dist
 		else:
 			_rig.handle_drag(sd.relative)
-			_compass.text = "%s ↑" % _rig.compass_text()
+			_on_look_changed()
 		accept_event()
 	elif event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_rig.handle_drag(event.relative)
-		_compass.text = "%s ↑" % _rig.compass_text()
+		_on_look_changed()
 
 func _touch_distance() -> float:
 	if _touches.size() < 2:

@@ -1,0 +1,19 @@
+- [major] camera height/angle ground eye-level looking slightly up (~0 deg pitch) -> elevated aerial looking slightly down over city
+- [major] Eiffel Tower framing cropped at top, spire off-frame, only ~40% of tower height visible -> 100% base-to-spire visible at ~38% of viewport height
+- [major] Eiffel Tower legs silhouette thick curved single-pipe brown vs 4-leg lattice A-frame -> slender dark lattice tower with 2 platforms and arched base
+- [major] Seine river count 0 visible -> 1 wide blue river diagonally across middle ~35% of viewport width
+- [major] Paris building count ~15 sparse blocks -> ~300+ dense Haussmann blocks filling left, centre and right midground
+- [major] terrain ground dark mottled satellite green-grey covering ~50% foreground -> pale beige low-poly city/terrain with no dark satellite foreground
+- [major] bottom panel opaque dark sheet ~42% viewport width x 35% height with Time/Season/fps/attribution -> no bottom sheet, only 1 translucent Drag pill (~18% width) plus thin curved ruler
+- [major] lighting flat pale-blue daylight sky ~70% blue-white -> warm golden-hour sunset gradient with low sun glare at right horizon
+- [major] horizon/city depth shallow empty haze to flat plain -> layered hills and distant skyline across 100% width behind city
+- [moderate] compass white rounded rectangle ~5% width "N up-arrow" top-right -> circular teal-ring compass ~7% diameter with N and filled teal needle
+- [moderate] location pill opaque white with red pin plus extra "<- Map" pill (2 pills top-left) -> 1 translucent pill with teal pin and teal outline, no Map pill in frame content
+- [moderate] drag hint white text line on dark panel "Drag to look around - Pinch or scroll to zoom" -> centred translucent pill with finger-drag icon and "Drag to look around" only
+- [moderate] bottom-right controls 0 circular buttons (fullscreen, brightness missing) -> 2 circular translucent teal-outline buttons at bottom-right
+- [moderate] bottom azimuth ruler curved teal/white 0 present (straight Time ticks only) -> 1 curved teal-to-white ticked azimuth ruler spanning ~55% bottom width
+- [moderate] clouds 4 thin flat white discs -> ~8 soft layered volumetric sunset clouds across upper sky
+- [moderate] trees ~12 oversized bright-green lollipop spheres in foreground/midground -> 0 prominent lollipops, only small green park patches around tower base
+- [moderate] building form beige boxes with dark-green flat roofs and ivy discs -> beige 4-6 storey blocks with blue-grey mansard roofs in continuous rows
+- [minor] location pin colour red -> teal
+- [minor] outer presentation full-bleed desktop viewport -> landscape phone mockup on dark backdrop (presentation only, content fills phone screen)
