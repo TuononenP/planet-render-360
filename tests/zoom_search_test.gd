@@ -128,7 +128,16 @@ func _run() -> void:
 	for i in 64:
 		flat.heights[i] = 3.0
 	flat.place_name = "Testville"
+	view.use_live_time()  # holds today's date, as on app start
+	flat.latitude = 60.4518  # high latitude: the season's sun differs from today's
+	flat.longitude = 22.2666
 	view.show_location(flat)
+	# T6.2: the spawn slot is the place's golden hour on the season's
+	# date (the view starts in live time, holding today's date).
+	if not view._atmos.date.is_empty():
+		failures.append("spawn hour slot should use the season date, still holds %s" % view._atmos.date)
+	if absf(view._atmos.solar_elevation - AtmosphereRig.GOLDEN_ELEV) > 8.0:
+		failures.append("spawn sun %.1f° should sit near the golden-hour %.1f°" % [view._atmos.solar_elevation, AtmosphereRig.GOLDEN_ELEV])
 	view.show_location(flat)
 	await process_frame
 	var worlds := 0
@@ -157,9 +166,12 @@ func _run() -> void:
 	view.use_live_time()
 	if not view._live_time:
 		failures.append("Now should enable live time")
-	var sys_hour := int(Time.get_time_dict_from_system().get("hour", -1))
+	# T6.2: live time is the place's own clock (UTC + its offset).
+	var place_now := Time.get_datetime_dict_from_unix_time(
+		int(Time.get_unix_time_from_system() + view._atmos.utc_offset_h * 3600.0))
+	var sys_hour := int(place_now.get("hour", -1))
 	if int(floor(view._time_hour)) != sys_hour:
-		failures.append("live time should match system hour %d, got %f" % [sys_hour, view._time_hour])
+		failures.append("live time should match the place's hour %d, got %f" % [sys_hour, view._time_hour])
 	view.queue_free()
 
 	# --- Search suggestions: remote parsing + local predictions ---
