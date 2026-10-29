@@ -120,7 +120,8 @@ static func _material_from(texs: Dictionary, set_name: String, detail: int,
 		tint: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = texs["albedo"] as Texture2D
-	m.albedo_color = tint
+	# `tint` is linear; albedo_color is sRGB-decoded (as pbr_material).
+	m.albedo_color = tint.linear_to_srgb()
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	if set_name == "glass":
 		m.metallic = 0.45

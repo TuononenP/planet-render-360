@@ -343,9 +343,22 @@ static func slate() -> StandardMaterial3D:
 	if _slate_mat != null:
 		return _slate_mat
 	var row: Dictionary = PBR_SETS["slate"]
-	_slate_mat = pbr_material("slate", _calib_tint(row["mean"], PRD_SLATE),
+	_slate_mat = pbr_material("slate", neutral_slate(_calib_tint(row["mean"], PRD_SLATE)),
 		float(ROOF_UV["slate"]))
 	return _slate_mat
+
+## Paris slate and zinc photograph as a neutral, faintly cool grey. The
+## per-channel calibration onto the PRD #46525E base (linear B/R 1.83)
+## rendered a saturated blue under the warm sky, so blue-cast slate tints
+## are pulled this far toward their own grey (PRD base → ≈#4D5358, +3%
+## luminance). Red/green painted metal roofs (b ≤ r) keep their hue.
+const SLATE_GREY_PULL := 0.55
+
+static func neutral_slate(tint: Color) -> Color:
+	if tint.b <= tint.r:
+		return tint
+	var g := (tint.r + tint.g + tint.b) / 3.0
+	return tint.lerp(Color(g, g, g, tint.a), SLATE_GREY_PULL)
 
 static func leaf_texture() -> Texture2D:
 	if _leaf_tex != null:
@@ -473,6 +486,8 @@ static func roof_for_color(c: Color) -> Material:
 	elif c.r + c.g + c.b < 1.05:
 		set_name = "slate"
 	var tint := _sat_roof_tint(set_name, c)
+	if set_name == "slate":
+		tint = neutral_slate(tint)
 	var key := "%s|%s" % [set_name, tint.to_html()]
 	if _roof_mats.has(key):
 		return _roof_mats[key] as Material
