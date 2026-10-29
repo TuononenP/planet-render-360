@@ -28,6 +28,8 @@ var _now_btn: Button
 var _live_time := true
 var _setting_time := false
 var _time_hour := 12.0
+## Still on the spawn's golden hour (no hour picked since opening).
+var _spawn_golden := false
 var _touches: Dictionary = {}
 var _quality_preset: int = RenderSettings.Preset.HIGH
 var _data: LocationData
@@ -390,6 +392,7 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	if _season_btn != null:
 		_season_btn.select(data.season)
 	_atmos.set_season(data.season)
+	_atmos.set_place(data.latitude, data.longitude)
 	_place_pill.text = "◉  %s" % data.place_name
 	_fit_place_pill()
 	_show_hint()
@@ -402,8 +405,9 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_ground = prebuilt[0]
 		_rebuild_world(prebuilt[1])
 	# Spawn at golden hour (PRD §3.3): the judged condition for every
-	# place. The time slider still lets the user leave it afterwards.
-	set_time_of_day(17)
+	# place, now the place's own (T6.2: the hour the true afternoon sun
+	# sits at the reference elevation). The slider still leaves it.
+	ViewConditions.spawn_golden_hour(self)
 	var spawn := spawn_xz(data)
 	_rig.position = Vector3(spawn.x,
 		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
