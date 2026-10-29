@@ -4,9 +4,16 @@ extends Node
 ## "Download for offline": warms every on-device cache for a place
 ## (DEM + far DEM, OSM features, satellite mosaic) without rendering
 ## it, so opening it later works with networking disabled. The
-## fetchers already write user://cache; this just drives them all
-## and reports progress. Map-picker tiles cache themselves as the
-## user pans; they are not bulk-prefetched (tile usage policy).
+## fetchers already write user://cache under v2 keys; this just drives
+## them all and reports progress. The warmed set matches
+## CacheStore.place_cache_keys(lat, lon, preset): satellite zoom/span
+## and the OSM ring follow the preset maps, exactly what the pipeline
+## fetches at that preset (the pipeline's own OSM preset plumbing is
+## T7.4 — until then it fetches the High ring whatever the preset, so
+## a non-High warmup's ring may differ from what the pipeline reads;
+## the detailed phase, the required one, is preset-independent).
+## Map-picker tiles cache themselves as the user pans; they are not
+## bulk-prefetched (tile usage policy).
 
 signal progress(done: int, total: int)
 signal finished(ok_count: int, total: int)
@@ -37,12 +44,18 @@ func download(lat: float, lon: float, quality_preset: int = 2) -> void:
 	add_child(osm)
 	osm.succeeded.connect(func(_b: Array, _r: Array, _l: Array, _lm: Array) -> void: _job(true))
 	osm.failed.connect(func(_r: String) -> void: _job(false))
-	osm.fetch(lat, lon)
+	osm.fetch(lat, lon, quality_preset)
 	var sat := SatelliteFetcher.new()
 	add_child(sat)
 	sat.succeeded.connect(func(_t: Texture2D, _i: Image, _o: Vector2, _z: int) -> void: _job(true))
 	sat.failed.connect(func(_r: String) -> void: _job(false))
-	sat.fetch(lat, lon, 16)
+	if quality_preset > RenderSettings.Preset.FAST:
+		sat.fetch(lat, lon, RenderSettings.satellite_zoom_for(quality_preset),
+			RenderSettings.satellite_span_for(quality_preset, lat))
+	else:
+		# Fast skips satellite (pipeline parity): count the job done.
+		_job(true)
+		sat.queue_free()
 
 func _job(ok: bool) -> void:
 	if ok:
@@ -79,10 +92,11 @@ static func _dir_size(path: String) -> int:
 	return total
 
 ## Delete the whole offline cache (history entries stay; their
-## places simply re-download on next open).
+## places simply re-download on next open). Resets the LRU index too.
 static func clear_cache() -> void:
 	_remove_dir("user://cache")
 	DirAccess.make_dir_recursive_absolute("user://cache")
+	CacheStore.reset_lru()
 
 static func _remove_dir(path: String) -> void:
 	var dir := DirAccess.open(path)
