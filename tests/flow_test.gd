@@ -26,11 +26,15 @@ func _run() -> void:
 		return
 
 	# DEM is cached after first run; OSM retries across Overpass
-	# endpoints and may take up to ~110s cold (see pipeline._await_osm).
+	# endpoints and may take the whole retry budget cold (see
+	# pipeline._await_osm). Allow that plus DEM/satellite waits and
+	# build time, derived from the budget so endpoint changes
+	# cannot silently outgrow this timeout again.
 	# Real time, not frame counting: headless frames run faster than 60fps.
 	var start_msec := Time.get_ticks_msec()
+	var timeout_msec := int((OsmFetcher.retry_budget_seconds() + 60.0) * 1000.0)
 	while not main._view.visible \
-			and Time.get_ticks_msec() - start_msec < 120000:
+			and Time.get_ticks_msec() - start_msec < timeout_msec:
 		await process_frame
 
 	if not main._view.visible:
