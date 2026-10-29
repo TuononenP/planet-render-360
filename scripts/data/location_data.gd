@@ -4,6 +4,15 @@ extends RefCounted
 ## Internal contracts between fetchers, generation, and rendering.
 ## Generation code never parses raw provider payloads; fetchers normalise
 ## into these shapes first (architecture plan: data contracts before visuals).
+##
+## v2 direction (docs/world-model-contract.md, frozen in T0.3 — comments
+## only here, no behaviour change): all XZ/size fields become true metres
+## via WorldScale (T1.2), heights/water/far become metres ASL with identity
+## vertical scale (T1.3), buildings gain full footprint polygons + rich tags
+## and roads gain attributes (T2.3), and every builder samples GroundTruth
+## (T1.4) instead of heights (display_heights removed in T2.3, §7 V8).
+## v1 deprecations are marked with "v2:" notes on the fields below; see
+## the contract §7 schedule.
 
 var place_name: String = "Unknown place"
 var latitude: float = 0.0
@@ -14,26 +23,49 @@ var longitude: float = 0.0
 var quality_preset: int = 2
 
 ## Real-world relief across the detailed grid, in metres (0 = unknown).
-## The pipeline's adaptive vertical scale maps every place to ~30
-## world units, so world relief cannot tell a plain from the Alps;
-## TerrainBuilder uses this to pick pavement vs meadow ground.
+## True source-tile metres in both vertical modes; TerrainBuilder uses
+## this to pick pavement vs meadow ground and snow-line thresholds.
 var relief_metres: float = 0.0
+
+## v2 (T1.3): metres ASL at the viewpoint (DEM centre sample); render-Y
+## datum for the WorldScale origin (contract §1.3/§2.2). Recorded in
+## both vertical modes, even under GenerationPipeline.legacy_squash.
+var centre_elevation_m: float = 0.0
 
 ## TerrainData equivalent, kept as typed fields for the MVP.
 var grid_size: int = 64
+## Absolute metres ASL as decoded, identity vertical scale (T1.3) —
+## no squash, except under GenerationPipeline.legacy_squash (A/B only).
 var heights: PackedFloat32Array = PackedFloat32Array()
-## Mesh-ready heights (smoothed/flattened/water-carved), filled lazily
-## by TerrainBuilder so meshes, buildings, roads, and trees all sample
-## exactly the same ground. Empty means "not computed yet".
-var display_heights: PackedFloat32Array = PackedFloat32Array()
+## Metres ASL since T1.3 (the un-squashed v1 plane, so flood extent is
+## unchanged); per-point GroundTruth.water_at wins from T1.4.
 var water_level: float = 0.0
 ## Real low-resolution far terrain (zoom-8 DEM), already converted to
 ## world heights with the same centre/scale as the detailed grid, so
 ## the two meshes align. Empty means "no far data" (apron only).
+## Metres ASL since T1.3 (identity mapping, same as heights).
 var far_heights: PackedFloat32Array = PackedFloat32Array()
 var far_grid_size: int = 64
+## v2 (T3.3, deprecated): replaced by far_extent_m (metres).
 var far_extent: float = 9000.0  # world units spanned by the far tile
+## v2 (T1.3): metres spanned by the far tile; replaces far_extent (T3.3).
+var far_extent_m: float = 36000.0
 var far_centre_frac: Vector2 = Vector2(0.5, 0.5)  # viewpoint inside far tile
+## v2 (T2.1, closure W1): DemFetcher provenance for the detailed grid —
+## {zoom_near, zoom_mid, zoom_far, span_near, metres_per_px, tile_count,
+## source_zoom}, or {source_zoom: 0, procedural: true} when the procedural
+## fallback built the grid (contract §2.2). Scorecard (F) reads this.
+var dem_source: Dictionary = {}
+## v2 (T3.7): far-field DEM rings for FarTerrainBuilder, finest first
+## (contract §2.2) — {zoom, origin_px: Vector2 (global px at zoom of the
+## window's top-left pixel corner), width, height, heights:
+## PackedFloat32Array (m ASL, row-major Mercator pixels), reach_m}.
+## FarFieldFetcher via pipeline; empty = no rings (z8 far grid only).
+var dem_rings: Array = []
+## v2 (T3.7): far-field imagery drapes, finest first (contract §2.3) —
+## {zoom, origin_px: Vector2, size_px: Vector2i, texture: Texture2D,
+## reach_m}. Empty = colour-ramp fallback on the far rings.
+var far_drapes: Array = []
 ## Satellite mosaic draped on the detailed terrain (SatelliteFetcher).
 ## Null means "no imagery": vertex colours dress the terrain instead.
 var satellite_texture: Texture2D
@@ -42,7 +74,18 @@ var satellite_image: Image
 ## Global-pixel coordinates (at satellite_zoom) of the mosaic's
 ## top-left corner; TerrainBuilder turns world XZ into UVs from it.
 var satellite_origin_px: Vector2 = Vector2.ZERO
+## v2 (T2.2): preset-mapped zoom — 16 Fast/Balanced, 17 High, 18 Ultra —
+## plus satellite_metres_per_px for UV/alignment math (contract §2.3).
 var satellite_zoom: int = 16
+## v2 (T2.2, closure W1): SatelliteFetcher provenance for the drape —
+## {zoom/span requested, tile_count, metres_per_px, source_zoom/source_span
+## actually stitched}; empty when the fetch failed or Fast skipped it
+## (contract §2.3 amendment 2026-10-28). Scorecard (F) reads this.
+var satellite_source: Dictionary = {}
+## v2 (T2.2, closure W1): metres per mosaic pixel at the viewpoint,
+## derived from zoom + latitude (contract §2.3). UV/alignment math uses
+## this, not magic spans. 0.0 means "no imagery this run".
+var satellite_metres_per_px: float = 0.0
 var landmark_type: String = "none"  # see landmarks() for the types
 ## True site of the landmark (landmarks() entry), so TerrainBuilder
 ## can place the model at its real bearing from the viewpoint instead
@@ -67,11 +110,50 @@ var attribution: String = ""
 ## castle, stadium...), rendered on the fly as its archetype model
 ## at its true position. Dicts: {x, z, archetype, name, height,
 ## size_x, size_z} in world units / metres, from OsmFetcher.
+## v2 (T1.2): x/z/size_x/size_z become true metres (contract §2.7).
 var landmark_candidates: Array = []
+## v2 (T2.3 LANDED): full footprint polygon + rich tags per contract
+## §2.4 (height_source, levels, colour/material, roof_*, parts, ...);
+## footprint/x/z/size in current internal units (true metres once T3.1
+## clears the T1.2 equivalence flag). AABB keys stay as the fallback.
 var buildings: Array = []
+## v2 (§2.5): attributed dicts {points, width_m, lanes, surface, bridge,
+## tunnel, layer, class} — carried by the pipeline since closure W2 and
+## consumed by RoadBuilder (tunnels skipped, width_m via WorldScale);
+## v1 bare centrelines are still accepted. OsmFetcher.roads_to_v1 +
+## the frozen 4-arg signal keep the v1 shape available for older
+## consumers/caches.
 var roads: Array = []
 ## Land-cover polygons: {class: water|forest|grass|field|urban, points}
+## v2 (T1.2/T2.4): metre XZ, extended class set
+## (+wetland/sand/rock/glacier/orchard/cemetery/pitch/quarry) and
+## optional holes (contract §2.6). Mapping frozen until T2.4; the new
+## siblings waterways + trees (fields below) landed in T2.3.
 var land_polygons: Array = []
+## v2 (T2.3): waterway lines + coastline ways, contract §2.6 —
+## {points: PackedVector2Array, width_m: float, class: String} in
+## current internal units. Parsed by OsmFetcher; carried by the pipeline
+## since closure W2; meshed T3.4.
+var waterways: Array = []
+## v2 (T2.3): real natural=tree nodes, contract §2.6 —
+## {x: float, z: float} in current internal units. Parsed by OsmFetcher;
+## carried by the pipeline since closure W2; planted T5.1.
+var trees: Array = []
+## v2 (T2.3, closure W1): linear barrier features, contract §2.6
+## (amendment 2026-10-28) — {points: PackedVector2Array, class: String}
+## in current internal units, class = raw `barrier` tag value (fence,
+## wall, hedge, ...). Parsed by OsmFetcher; carried by the pipeline since
+## closure W2; meshed by a Phase-4/5 consumer (no builder claims it).
+var barriers: Array = []
+## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
+## past the detailed extent — {class: residential|commercial|industrial|
+## retail, points: PackedVector2Array, holes: Array} in metre XZ, from
+## FarCityFetcher's one cached ring query. Empty = imagery-only far city.
+var far_landuse: Array = []
+## v2 (T5.4): real tall buildings (height ≥ 50 m or ≥ 15 levels) in the
+## same ring — {footprint: PackedVector2Array, x, z, height} metres. The
+## only source of far modern-tower clusters (La Défense); never invented.
+var far_towers: Array = []
 
 func is_valid() -> bool:
 	return latitude >= -90.0 and latitude <= 90.0 \
