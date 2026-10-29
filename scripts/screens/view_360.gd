@@ -12,7 +12,7 @@ var _attribution_label: Label
 var _compass: Label
 var _sun_slider: HSlider
 var _sun: DirectionalLight3D
-var _env: WorldEnvironment
+var _atmos: AtmosphereRig
 var _governor: QualityGovernor
 var _quality_label: Label
 var _weather: WeatherFetcher
@@ -28,17 +28,33 @@ var _now_btn: Button
 var _live_time := true
 var _setting_time := false
 var _time_hour := 12.0
-var _sky_mat: ProceduralSkyMaterial
-var _cloud_cover := 0.0
-var _weather_foggy := false
 var _touches: Dictionary = {}
 var _quality_preset: int = RenderSettings.Preset.HIGH
 var _data: LocationData
 var _generated: Node3D
+var _ground: GroundTruth
+## Season rebuild in flight on its thread / another season picked
+## meanwhile (coalesced into one follow-up build).
+var _season_building := false
+var _season_dirty := false
+## Live build_location threads, joined before the view is freed.
+var _threads: Array[Thread] = []
 var _season_btn: OptionButton
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
+
+## Eye height above ground in metres (PRD §3.3: 25–35 m, ≈8 m above the
+## mean roofline). v1's 9.5 units were ≈38 m on the 4 m-unit world.
+const EYE_HEIGHT_M := 30.0
+## T5.2 framing: a viewpoint closer than FRAME_MIN_M to its landmark
+## (e.g. picked on the Eiffel itself) spawns FRAME_READ_M back from it
+## (PRD §4.1: the tower is judged from ≈700–900 m), so the camera moves
+## — never the landmark.
+const FRAME_MIN_M := 400.0
+const FRAME_READ_M := 800.0
+## Far plane past the 30 km outer terrain ring's corners.
+const CAMERA_FAR_M := 45000.0
 
 func _ready() -> void:
 	_container = SubViewportContainer.new()
@@ -307,122 +323,91 @@ func _on_resized() -> void:
 func _build_3d() -> void:
 	_world_root = Node3D.new()
 	_viewport.add_child(_world_root)
-	_sun = DirectionalLight3D.new()
-	# Golden-hour key (PRD §3.3): elevation 8-12°, azimuth from frame-right.
-	_sun.rotation_degrees = Vector3(-10, 65, 0)
-	_sun.light_color = Color(1.0, 0.85, 0.64)  # #FFD9A3
-	_sun.light_energy = 3.0
-	_sun.shadow_enabled = true
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	_sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_quality_preset)
-	_sun.shadow_blur = RenderSettings.shadow_blur_for(_quality_preset)
-	_sun.shadow_bias = 0.06
-	_world_root.add_child(_sun)
-	_build_clouds()
-	_env = WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
-	var sky := Sky.new()
-	_sky_mat = ProceduralSkyMaterial.new()
-	# PRD §3.2/§3.3: zenith #7FA8CC -> horizon #F0C48F.
-	_sky_mat.sky_top_color = Color(0.50, 0.66, 0.80)
-	_sky_mat.sky_horizon_color = Color(0.94, 0.77, 0.56)
-	_sky_mat.sky_curve = 0.06
-	_sky_mat.ground_curve = 0.14
-	_sky_mat.sky_energy_multiplier = 1.0
-	_sky_mat.ground_bottom_color = Color(0.42, 0.38, 0.33)
-	_sky_mat.ground_horizon_color = Color(0.94, 0.82, 0.64)
-	sky.sky_material = _sky_mat
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_color = Color(0.73, 0.80, 0.85)  # sky ambient #B9CBD8
-	env.ambient_light_energy = 0.38
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.94
-	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.12
-	env.ambient_light_sky_contribution = 0.42
-	# Aerial haze (PRD §3.3): far field blends toward #EFD2A4 without
-	# bleaching the mid-ground (kept under the 0.85 luminance cap).
-	env.fog_enabled = true
-	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
-	env.fog_density = 0.0011
-	env.fog_sky_affect = 0.22
-	env.fog_light_color = Color(0.90, 0.76, 0.55)
-	env.fog_light_energy = 0.75
-	env.fog_sun_scatter = 0.25
-	# Bloom for the sun glint (PRD §3.3, Fidelity 3 look at all tiers).
-	env.glow_enabled = true
-	env.glow_bloom = 0.10
-	env.glow_intensity = 0.4
-	env.glow_strength = 1.0
-	_env.environment = env
-	_world_root.add_child(_env)
+	# Sun, sky, haze and clouds live in the AtmosphereRig (T6.1); the
+	# view only feeds it time, weather, season and quality.
+	_atmos = AtmosphereRig.new(_quality_preset)
+	_world_root.add_child(_atmos)
+	_sun = _atmos.sun
 	_rig = CameraRig.new()
 	var cam := Camera3D.new()
 	cam.name = "Camera3D"
-	cam.far = 12000.0  # far DEM backdrop spans 9 km of world units
+	cam.far = CAMERA_FAR_M
+	cam.near = 0.25
 	_rig.add_child(cam)
-	_rig.position = Vector3(0, 14, 0)
+	_rig.position = Vector3(0, EYE_HEIGHT_M, 0)
 	_world_root.add_child(_rig)
 	_build_precip()
-
-## Soft stratocumulus band (PRD §3.3): flattened, warm-lit cloud
-## masses high over every yaw — never faceted slabs. They hang on the
-## world root so they survive world rebuilds for every place.
-func _build_clouds() -> void:
-	var holder := Node3D.new()
-	holder.name = "CloudBand"
-	_world_root.add_child(holder)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.99, 0.96, 0.91, 0.42)  # warm-lit #E8C9A0 family
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.roughness = 1.0
-	var sphere := SphereMesh.new()
-	sphere.radial_segments = 16
-	sphere.rings = 8
-	sphere.radius = 1.0
-	sphere.height = 2.0
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1379
-	for i in 16:  # three merged puffs per cloud break the oval outline
-		var ang := TAU * float(i) / 16.0 + rng.randf_range(-0.12, 0.12)
-		var dist := rng.randf_range(1700.0, 2800.0)
-		var centre := Vector3(cos(ang) * dist, rng.randf_range(300.0, 460.0), sin(ang) * dist)
-		for k in 3:
-			var mi := MeshInstance3D.new()
-			mi.mesh = sphere
-			mi.material_override = mat
-			mi.position = centre + Vector3(rng.randf_range(-160.0, 160.0),
-				rng.randf_range(-12.0, 12.0), rng.randf_range(-60.0, 60.0))
-			mi.scale = Vector3(rng.randf_range(200.0, 380.0), rng.randf_range(16.0, 30.0),
-				rng.randf_range(80.0, 150.0))
-			holder.add_child(mi)
 
 ## Caps the FPS governor at the user's preset; terrain accuracy for a
 ## place is fixed when it was generated, so this only moves the live
 ## render scale / shadow ceiling.
 func set_quality_preset(preset_value: int) -> void:
 	_quality_preset = RenderSettings.clamp_preset(preset_value)
-	if _sun != null:
-		_sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_quality_preset)
-		_sun.shadow_blur = RenderSettings.shadow_blur_for(_quality_preset)
+	if _atmos != null:
+		_atmos.set_quality(_quality_preset)
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
+	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
+	if _generated != null and is_instance_valid(_generated):
+		LodRing.apply(_generated, _quality_preset)
 
 ## Replace the generated world in place. The old world is tracked by
 ## reference: same-named siblings get auto-renamed by the engine, so
 ## the previous name-based cleanup leaked a world per place visited.
-func _rebuild_world() -> void:
+func _rebuild_world(prebuilt: Node3D = null) -> void:
 	if _data == null or _world_root == null:
 		return
 	if _generated != null and is_instance_valid(_generated):
 		_world_root.remove_child(_generated)
 		_generated.queue_free()
-	_generated = TerrainBuilder.build_world(_data)
+	if prebuilt != null:
+		_generated = prebuilt
+	else:
+		if _ground == null:
+			_ground = GroundTruth.new(_data)
+		_generated = make_world(_data, _ground)
+	# Range the near/mid rings for the current preset.
+	LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
+
+## Detached world build: touches no scene tree, so it may run off the
+## main thread (see build_location).
+static func make_world(data: LocationData, ground: GroundTruth) -> Node3D:
+	var world := TerrainBuilder.build_world(data, ground)
+	# T7.1: merge building masses per material/cell (preset-independent).
+	LodRing.merge_buildings(world)
+	return world
+
+## Builds [ground, world] for `data` on a worker thread. The build takes
+## seconds on dense cities; run on the main thread it froze the loading
+## screen (macOS beachball), so the caller's screen keeps drawing here.
+## Pass the result to show_location. A known `ground` is reused.
+func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
+	var thread := Thread.new()
+	_threads.append(thread)
+	thread.start(func() -> Array:
+		var g := ground if ground != null else GroundTruth.new(data)
+		return [g, make_world(data, g)])
+	while thread.is_alive():
+		await get_tree().process_frame
+	_threads.erase(thread)
+	return thread.wait_to_finish()
+
+func _notification(what: int) -> void:
+	# A thread outliving its owner aborts the engine on free/quit. The
+	# builders make RenderingServer read-backs (surface_get_arrays,
+	# get_image) that wait on the main thread, so service them while
+	# joining or this deadlocks.
+	if what == NOTIFICATION_PREDELETE:
+		for t in _threads:
+			while t.is_alive():
+				RenderingServer.force_sync()
+				OS.delay_msec(1)
+			if t.is_started():
+				var built: Array = t.wait_to_finish()
+				if built.size() > 1 and built[1] is Node3D:
+					(built[1] as Node3D).free()
+		_threads.clear()
 
 func _on_season_selected(index: int) -> void:
 	if _data == null:
@@ -430,8 +415,26 @@ func _on_season_selected(index: int) -> void:
 	_data.season = LocationData.clamp_season(index)
 	if _season_btn != null:
 		_season_btn.select(_data.season)
-	_data.display_heights = PackedFloat32Array()  # colours bake per season
-	_rebuild_world()
+	_atmos.set_season(_data.season)
+	# Colours bake per season, so the world rebuilds (threaded, the old
+	# world stays up meanwhile); the ground surface is season-free and
+	# reused.
+	if _season_building:
+		_season_dirty = true
+		return
+	_season_building = true
+	while true:
+		_season_dirty = false
+		var data := _data
+		var built := await build_location(data, _ground)
+		if data != _data or _season_dirty:
+			(built[1] as Node3D).free()
+			if data != _data:
+				break  # another place opened meanwhile
+			continue
+		_rebuild_world(built[1])
+		break
+	_season_building = false
 
 ## Rain/snow dressing from the live weather code: one particle system
 ## around the camera, off unless the place is actually precipitating.
@@ -477,37 +480,62 @@ func _apply_precip(code: int) -> void:
 		mat2.gravity = Vector3(0, -22, 0)
 		(_precip.draw_pass_1 as QuadMesh).size = Vector2(0.05, 0.5)
 
-func show_location(data: LocationData) -> void:
+## `prebuilt` is a build_location result; empty builds synchronously.
+func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	set_quality_preset(data.quality_preset)
 	_data = data
 	if _season_btn != null:
 		_season_btn.select(data.season)
+	_atmos.set_season(data.season)
 	_place_pill.text = "◉  %s" % data.place_name
 	_fit_place_pill()
 	_show_hint()
 	if _attribution_label != null:
 		_attribution_label.text = data.attribution
-	_rebuild_world()
+	if prebuilt.is_empty():
+		_ground = GroundTruth.new(data)
+		_rebuild_world()
+	else:
+		_ground = prebuilt[0]
+		_rebuild_world(prebuilt[1])
 	# Spawn at golden hour (PRD §3.3): the judged condition for every
 	# place. The time slider still lets the user leave it afterwards.
 	set_time_of_day(17)
-	_rig.position.y = data.height_at(data.grid_size / 2, data.grid_size / 2) + 7.5
+	var spawn := spawn_xz(data)
+	_rig.position = Vector3(spawn.x,
+		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
 	_rig.set_look(0.6, -0.10)
 	if data.landmark_type != "none":
-		# Open facing the landmark so it is the first thing seen.
-		var lp := TerrainBuilder.landmark_world_pos(data)
-		_rig.set_look(atan2(-lp.x, -lp.y), -0.07)
+		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
+		# not dead ahead, so the river/city sweep fills the right. The
+		# landmark stands at its true site (T5.2); the look aims at it.
+		_rig.set_look(landmark_yaw(data, spawn) - 0.12, -0.08)
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
+
+## Camera ground position (metres): the viewpoint itself, unless the
+## viewpoint sits on its landmark — then FRAME_READ_M back along the v1
+## framing direction (landmark ENE of the camera), inside the extent.
+static func spawn_xz(data: LocationData) -> Vector2:
+	if data.landmark_type == "none":
+		return Vector2.ZERO
+	var lp := TerrainBuilder.landmark_world_pos(data)
+	if lp.length() >= FRAME_MIN_M:
+		return Vector2.ZERO
+	return lp - TerrainBuilder.LANDMARK_POS.normalized() * FRAME_READ_M
+
+## Yaw that faces the landmark's true site from `from` (CameraRig:
+## forward is -Z rotated by yaw; north = -Z).
+static func landmark_yaw(data: LocationData, from: Vector2) -> float:
+	var d := TerrainBuilder.landmark_world_pos(data) - from
+	return atan2(-d.x, -d.y)
 
 func _on_weather(temp_c: float, label: String, cloud_cover: float, code: int) -> void:
 	if _weather_label != null:
 		_weather_label.text = "%.0f°C · %s" % [temp_c, label]
 		_weather_label.visible = true
-	_cloud_cover = cloud_cover
-	_weather_foggy = code in [45, 48, 51, 53, 55, 61, 63, 65, 71, 73, 75]
+	_atmos.set_weather(code, cloud_cover)
 	_apply_precip(code)
-	_apply_time(_time_hour)
 
 # --- Time of day: 24 hourly slots, or live current time ---
 
@@ -548,50 +576,10 @@ func _sync_time_ui() -> void:
 	HudStyle.apply_live_chip(_now_btn, _live_time)
 
 func _apply_time(hour_f: float) -> void:
-	if _sun == null:
+	if _atmos == null:
 		return
-	var cloud := lerpf(1.0, 0.55, clampf(_cloud_cover, 0.0, 100.0) / 100.0)
-	var arc := sin(PI * (hour_f - 6.0) / 12.0)  # >0 by day, <0 at night
-	if arc > -0.08:
-		var day_t := clampf((hour_f - 6.0) / 12.0, 0.0, 1.0)
-		# Elevation follows the sun arc but floors at the PRD golden
-		# band: at 17:00 the sun sits ~10° up, warm #FFD9A3, energy 3.
-		var elev := clampf(maxf(arc, 0.02) * 48.0, 8.0, 50.0)
-		_sun.rotation_degrees = Vector3(-elev, lerpf(-95.0, 95.0, day_t), 0)
-		_sun.light_energy = (0.75 + 1.35 * clampf(arc * 2.2, 0.0, 1.0)) * cloud
-		_sun.light_color = Color(1.0, 0.85, 0.64).lerp(
-			Color(1, 0.97, 0.92), clampf(arc * 1.7, 0.0, 1.0))
-	else:
-		# Moonlight: fixed cool light so night scenes stay readable.
-		_sun.rotation_degrees = Vector3(-38, 35, 0)
-		_sun.light_energy = 0.12 * cloud
-		_sun.light_color = Color(0.62, 0.72, 0.95)
-	if _sky_mat != null:
-		_sky_mat.sky_top_color = _keyframed(hour_f, [
-			[0.0, Color(0.04, 0.07, 0.15)], [5.0, Color(0.07, 0.10, 0.20)],
-			[7.5, Color(0.40, 0.58, 0.82)], [12.0, Color(0.34, 0.55, 0.84)],
-			[17.0, Color(0.50, 0.66, 0.80)], [19.0, Color(0.35, 0.38, 0.55)],
-			[21.0, Color(0.06, 0.08, 0.17)], [24.0, Color(0.04, 0.07, 0.15)]])
-		_sky_mat.sky_horizon_color = _keyframed(hour_f, [
-			[0.0, Color(0.10, 0.12, 0.20)], [5.0, Color(0.16, 0.16, 0.22)],
-			[7.5, Color(0.98, 0.75, 0.52)], [12.0, Color(0.94, 0.90, 0.80)],
-			[17.0, Color(0.95, 0.82, 0.64)], [19.0, Color(0.92, 0.58, 0.42)],
-			[21.0, Color(0.12, 0.12, 0.20)], [24.0, Color(0.10, 0.12, 0.20)]])
-	if _env != null and _env.environment != null:
-		# Aerial haze matched to the horizon; real fog weather thickens it.
-		_env.environment.fog_enabled = true
-		_env.environment.fog_light_color = _sky_mat.sky_horizon_color \
-			if _sky_mat != null else Color(0.94, 0.90, 0.80)
-		_env.environment.fog_density = 0.016 if _weather_foggy else 0.0011
-
-static func _keyframed(hour_f: float, keys: Array) -> Color:
-	for i in keys.size() - 1:
-		var h0 := float(keys[i][0])
-		var h1 := float(keys[i + 1][0])
-		if hour_f >= h0 and hour_f <= h1:
-			var t := 0.0 if h1 == h0 else (hour_f - h0) / (h1 - h0)
-			return (keys[i][1] as Color).lerp(keys[i + 1][1], t)
-	return keys[keys.size() - 1][1]
+	var lat := _data.latitude if _data != null else _atmos.latitude
+	_atmos.set_time(hour_f, lat)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

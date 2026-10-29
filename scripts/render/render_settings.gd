@@ -30,22 +30,64 @@ static func preset_name(value: int) -> String:
 
 # --- Generation budgets (paid once, as loading/render time) ---
 
-static func grid_size_for(value: int) -> int:
-	return [32, 48, 64, 128][clamp_preset(value)]
+## DEM / GroundTruth posts per side over the 2400 m extent (9.4 m, near
+## the z14 DEM's native 6–10 m/px). Preset-INDEPENDENT since T7.0/T7.1:
+## every object sits on GroundTruth, so a per-preset grid moved
+## buildings, trees and landmarks vertically on a preset switch (AC-12).
+## The preset only sets the terrain MESH density (terrain_mesh_posts_for).
+const GROUND_POSTS := 256
 
-static func far_grid_size_for(value: int) -> int:
-	return [32, 48, 64, 128][clamp_preset(value)]
+static func grid_size_for(_value: int) -> int:
+	return GROUND_POSTS
 
+## Terrain mesh vertices per side (a LOD knob over the same GroundTruth):
+## 25 / 18.9 / 12.6 / 9.4 m spacing; v1 64 posts over 2400 m (38 m)
+## flattened every street-scale slope.
+static func terrain_mesh_posts_for(value: int) -> int:
+	return [96, 128, 192, 256][clamp_preset(value)]
+
+## z8 far-tile height grid: preset-independent too (the far rings and
+## far landmark bases sample it); FarTerrainBuilder.RING_SEGS is the
+## per-preset far mesh LOD.
+static func far_grid_size_for(_value: int) -> int:
+	return 128
+
+## Esri World Imagery zoom per preset (contract §2.3, T2.2): 16 Fast/Balanced,
+## 17 High and Ultra. T7.0: the mosaic must cover the 2400 m extent, and
+## z18 over 2.4 km is 25–33 tiles a side (6400+ px, >120 MB) — past any
+## mobile texture budget — so Ultra shares z17 and spends its time on
+## the finer DEM grid instead.
+static func satellite_zoom_for(value: int) -> int:
+	return [16, 16, 17, 17][clamp_preset(value)]
+
+## Largest mosaic side in tiles (15 × 256 = 3840 px ≤ the 4096 px
+## mobile texture limit).
+const SATELLITE_MAX_SPAN := 15
+
+## Satellite mosaic span (tiles per side, odd so the viewpoint tile stays
+## centred) covering the detailed extent plus one tile of slack for the
+## viewpoint's offset inside its tile, at the place's latitude (tiles
+## shrink with cos(lat)). Paris: z16 7, z17 13; Turku z17 hits the cap
+## (≈2.3 km, the edge band fades to the far drape there).
+static func satellite_span_for(value: int, lat: float = 0.0) -> int:
+	var zoom := satellite_zoom_for(value)
+	var tile_m := 156543.03392 * cos(deg_to_rad(lat)) / pow(2.0, float(zoom)) * 256.0
+	var span := int(ceil((WorldScale.DETAILED_EXTENT_M + tile_m) / maxf(tile_m, 1.0)))
+	if span % 2 == 0:
+		span += 1
+	return clampi(span, 3, SATELLITE_MAX_SPAN)
+
+## Real OSM buildings placed, nearest first. T7.0: raised for the 2400 m
+## extent (v1 caps covered ~250 m); past LodRing.MERGE_M they merge per
+## material, so draw cost stays bounded. Past the cap the farthest real
+## buildings become batched impostor masses (T7.3) — never dropped.
 static func max_buildings_for(value: int) -> int:
-	return [120, 240, 340, 700][clamp_preset(value)]
+	return [600, 1200, 2500, 6000][clamp_preset(value)]
 
 static func vegetation_count_for(value: int, urban: bool) -> int:
 	if urban:
 		return [70, 120, 170, 380][clamp_preset(value)]
 	return [90, 170, 230, 500][clamp_preset(value)]
-
-static func silhouette_count_for(value: int) -> int:
-	return [24, 36, 46, 90][clamp_preset(value)]
 
 static func procedural_buildings_for(value: int) -> int:
 	return [40, 65, 90, 200][clamp_preset(value)]
@@ -60,20 +102,27 @@ static func render_scale_for(value: int) -> float:
 static func shadows_for(value: int) -> bool:
 	return clamp_preset(value) > Preset.FAST
 
-## Shadow reach (world units) and softness per preset; only Ultra
-## pays for far, sharp shadows — the rest keep the tuned 600 / 1.8.
+## Shadow reach (metres) and softness per preset; only Ultra pays for
+## far, sharp shadows. T7.0: the v1 600 / 1000 units were 2400 / 4000 m
+## on the 4 m-unit world; the same reach in metres.
 static func shadow_distance_for(value: int) -> float:
-	return [600.0, 600.0, 600.0, 1000.0][clamp_preset(value)]
+	return [2400.0, 2400.0, 2400.0, 4000.0][clamp_preset(value)]
 
 static func shadow_blur_for(value: int) -> float:
 	return [1.8, 1.8, 1.8, 1.0][clamp_preset(value)]
+
+## FBM octaves for the sky shader's cloud deck (AtmosphereRig): the
+## per-pixel sky cost. Coverage and colour are identical at every tier;
+## only fine edge detail changes.
+static func cloud_octaves_for(value: int) -> int:
+	return [3, 4, 5, 5][clamp_preset(value)]
 
 ## Human-readable cost summary for the settings screen, e.g.
 ## "48×48 terrain · up to 240 buildings · shadows on".
 static func summary_for(value: int) -> String:
 	var p := clamp_preset(value)
 	return "%d×%d terrain · up to %d buildings · %d trees · shadows %s · %.0f%% render scale" % [
-		grid_size_for(p), grid_size_for(p), max_buildings_for(p),
+		terrain_mesh_posts_for(p), terrain_mesh_posts_for(p), max_buildings_for(p),
 		vegetation_count_for(p, false), "on" if shadows_for(p) else "off",
 		render_scale_for(p) * 100.0]
 
