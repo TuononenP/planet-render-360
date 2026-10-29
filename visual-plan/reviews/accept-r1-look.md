@@ -1,20 +1,18 @@
-- [major] sky upper 60% pale flat blue approx #B9D6EA -> warm golden-hour peach/cream gradient approx #F7E3C2 to #F2C99A
-- [major] sun and horizon glow 0% visible, no bloom at right horizon -> low sun with warm glow approx #FFDF9E at ~62% width, ~36% height
-- [major] lighting flat even midday, color temperature neutral-cool -> warm directional sunset from right, ~3x stronger warm key and atmospheric haze
-- [major] Eiffel Tower top ~40% cropped out of frame and legs splayed ~20% too wide -> 100% tower visible base-arch to spire, centered ~38% width
-- [major] Eiffel Tower smooth glossy copper-orange approx #B06A32, ~0% lattice detail -> matte dark iron-brown approx #3A2A22 with dense lattice cross-bracing
-- [major] River Seine 100% missing, 0% blue water in frame -> winding blue river approx #4A7FA5 occupying ~35% of midground width
-- [major] terrain dark mottled satellite texture approx #3E4A3A/#6B6F5E, glossy wet specular -> matte low-poly faceted hills sage/beige approx #CFC39E/#A8B08A, roughness high, no gloss
-- [major] city density ~12-15 isolated boxes, ~10% ground coverage -> hundreds of dense Paris blocks, ~70% ground coverage to horizon
-- [major] bottom UI opaque near-black panel approx #12201E covering ~38% width x ~42% height center -> no panel, only translucent pill ~22% width at bottom center
-- [major] clouds 4 thin flat white ellipses ~2% coverage -> large faceted warm clouds approx #F2D7B0 covering ~25% of sky
-- [moderate] building roofs flat dark green/black approx #2E3B33 -> pitched slate blue-grey approx #6B7C8C with dormers/chimneys
-- [moderate] building facades plain beige approx #E8D9B0 with 0 windows -> cream approx #EAD9B5 with dense small dark windows on every facade
-- [moderate] trees oversized lollipop spheres saturated lime approx #6ED43A, ~8% frame each -> small muted olive approx #7A8F5A clusters, ~2% frame each
-- [moderate] background hills washed pale approx #EDE3C8, near-zero facet contrast -> warm beige/sage hills with clear faceted shading steps
-- [moderate] shadows ~0% visible under buildings/trees/tower -> soft long warm shadows cast left from buildings, trees and tower
-- [moderate] compass white opaque rounded-rect approx #FFFFFF with dark-green N text -> circular translucent dark disc, teal approx #2EC4B6 outline/icon
-- [moderate] top-left chrome 2 white opaque pills with red pin approx #E53935 and black text -> 1 translucent dark pill, teal pin approx #2EC4B6, white text, teal border
-- [minor] drag hint white text inside dark panel at ~52% height -> standalone translucent pill with teal border/icon at ~70% height in reference phone view
-- [minor] bottom-right fullscreen/sun circular teal-outline buttons 0% present -> 2 circular translucent buttons approx 4% width each at bottom right
-- [minor] framing full-bleed desktop viewport, no device bezel -> reference is phone mockup on dark charcoal approx #232323 backdrop (platform/framing difference)
+- [major] framing 100% edge-to-edge fullscreen with 0% device surround -> phone landscape mockup centered at ~72% frame width on dark charcoal #23282D surround
+- [major] camera altitude ~5m street-level inside rooftops -> ~120m aerial panorama overlooking city and river bend
+- [major] Eiffel Tower width ~12px spire, ~85% too narrow and ~50% too tall relative to frame -> tower ~90px wide at base, ~38% of viewport height with flared 4-leg base and arch
+- [major] Eiffel Tower material flat dark-brown #4A3520 wire outline with 0% lattice density -> dense bronze-brown #6B4A2F lattice truss with cross-bracing on all 3 tiers
+- [major] Seine river 0% of frame visible -> river ~28% of frame width, diagonal blue #3A7CA5 band with glossy sun reflection crossing mid-frame
+- [major] building scale foreground blocks ~35% frame width each, ~4x too large -> Haussmann blocks ~6-9% frame width each, dense field of 100+ small blocks to horizon
+- [major] sky value pale washed blue-grey #D8DEE2 top -> warm golden gradient #F7D9A8 to #E8B87A with sun glow at horizon right-of-center
+- [major] clouds 4 flat white ovals covering ~6% of sky -> layered faceted golden clouds covering ~45% of sky, lit #FBE3B0 top / shadowed #C9A87A below
+- [major] bottom UI opaque dark panel ~30% of frame height obscuring ground -> single translucent pill ~7% height "Drag to look around" plus 2 small circles at bottom-right
+- [major] terrain/hills 0% rolling relief, flat mottled ground plane -> low-poly beige-olive #CFC0A0 hills framing foreground corners and hazy ridges on both horizons
+- [moderate] building wall color flat pale peach #EAC99A, ~15% too light and too saturated -> muted warm beige #D9C2A0 with varied sunlit #E8D5B0 / shaded #B8A080 facets
+- [moderate] window treatment large glowing cream #FFF3C4 panes, ~3x too large, emissive at 17:00 daylight -> small dark recessed windows ~4px grid, no emissive glow in daylight
+- [moderate] material finish uniformly matte flat-shaded with 0% facet variation -> low-poly faceted matte with per-face value steps of ~8-12% on roofs, hills and clouds
+- [moderate] shadows short soft blobs under eaves, sun elevation appears ~50deg -> long low-sun shadows raking left-to-right, sun elevation ~8deg with warm rim on roof edges
+- [moderate] atmospheric depth 0% haze, distant blocks same contrast as foreground -> aerial haze washing distant city to ~40% contrast and pale blue-gold #E6D3AC at horizon
+- [moderate] top-left UI opaque charcoal #3A4448 pills -> translucent frosted white pill with teal #2EC4B6 pin icon, ~55% opacity over sky
+- [minor] compass dark charcoal disc ~36px with teal triangle -> translucent white disc ~56px with thin teal ring, teal arrow and N label
+- [minor] drag hint black pill with extra "Pinch or scroll to zoom" text above slider -> teal hand icon plus "Drag to look around" only, centred over a thin teal horizon arc with tick marks
