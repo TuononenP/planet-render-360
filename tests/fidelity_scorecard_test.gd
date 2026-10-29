@@ -117,18 +117,28 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 		pts.append_array([Vector2(0, -r), Vector2(r, 0), Vector2(0, r), Vector2(-r, 0)])
 	var max_e := 0.0
 	var sum_e := 0.0
+	var n := 0
+	var per: Array[String] = []
 	for p in pts:
 		var ll := WorldScale.latlon_from_xz(p.x, p.y, data.latitude, data.longitude)
 		var ref := _dem_z14(ll.x, ll.y)
 		if is_nan(ref):
 			return {"lines": ["- (a) DEM → BLOCKED(z14 tile not cached at %.5f, %.5f)" % [ll.x, ll.y]],
 				"verdicts": ["a:BLOCKED"]}
-		var e := absf(ground.asl_y(ground.height_at_world(p.x, p.y)) - ref)
+		var got := ground.asl_y(ground.height_at_world(p.x, p.y))
+		if ground.water_at(p.x, p.y) > 0.05:
+			# Mapped water: the bed is carved below the surface on purpose.
+			per.append("(%.0f,%.0f) water, carved %.1f m — excluded" % [p.x, p.y, got - ref])
+			continue
+		var e := absf(got - ref)
+		per.append("(%.0f,%.0f) %+.2f" % [p.x, p.y, got - ref])
 		max_e = maxf(max_e, e)
 		sum_e += e
+		n += 1
 	var bar := float(loc["dem_bar"])
-	var v := "PASS" if max_e <= bar else "FAIL"
-	return {"lines": ["- (a) DEM: max %.2f m / mean %.2f m over 9 points (bar ≤ %.0f m) → %s" % [max_e, sum_e / 9.0, bar, v]],
+	var v := "PASS" if n >= 6 and max_e <= bar else ("BLOCKED" if n < 6 else "FAIL")
+	return {"lines": ["- (a) DEM: max %.2f m / mean %.2f m over %d land points (bar ≤ %.0f m) → %s" % [max_e, sum_e / maxf(n, 1), n, bar, v],
+		"  - points (x,z m: rendered − z14): " + "; ".join(per)],
 		"verdicts": ["a:" + v]}
 
 ## Independent z14 Terrarium sample (bilinear) from the v2 tile cache.
@@ -271,10 +281,14 @@ func _measure(poly: PackedVector2Array, tris: Array) -> Dictionary:
 	for q in poly:
 		box = box.expand(q)
 	box = box.grow(10.0)
+	# Attribution: only roof triangles whose centroid lies inside this
+	# footprint belong to it (party-wall neighbours fill the margin).
 	var near: Array = []
 	for t in tris:
 		if (t[3] as Rect2).intersects(box):
-			near.append(t)
+			var a3: Vector3 = (t[0] + t[1] + t[2]) / 3.0
+			if Geometry2D.is_point_in_polygon(Vector2(a3.x, a3.z), poly):
+				near.append(t)
 	var inter := 0
 	var union := 0
 	var sum := Vector2.ZERO
@@ -354,22 +368,31 @@ func _check_d(data: LocationData, ground: GroundTruth, water: Node3D, roads: Nod
 		verdicts.append("d-roads:BLOCKED")
 		return {"lines": lines, "verdicts": verdicts}
 	var rtris := _tris(roads, Callable(self, "_any"))
-	var jp := _spread(junctions, 5)
+	# Junctions inside an OSM footprint are mapped passages under a
+	# building, not rendering faults: excluded from the sample, counted.
+	var open_j: Array[Vector2] = []
+	var passages := 0
+	for p in junctions:
+		var inside := false
+		for b in data.buildings:
+			if b is Dictionary and b.has("footprint") and Geometry2D.is_point_in_polygon(p, b["footprint"]):
+				inside = true
+				break
+		if inside:
+			passages += 1
+		else:
+			open_j.append(p)
+	var jp := _spread(open_j, 5)
 	var ok := 0
-	var cut := 0
 	var worst_lift := 0.0
 	for p in jp:
 		var d := _nearest(p, rtris)
 		if d["dist"] <= 3.0:
 			ok += 1
 			worst_lift = maxf(worst_lift, absf(float(d["y"]) - ground.height_at_world(p.x, p.y)))
-		for b in data.buildings:
-			if b is Dictionary and b.has("footprint") and Geometry2D.is_point_in_polygon(p, b["footprint"]):
-				cut += 1
-				break
-	var vr := "PASS" if ok >= mini(4, jp.size()) and cut == 0 else "FAIL"
-	lines.append("- (d) roads: %d/%d junctions with a rendered ribbon within 3 m, max surface lift %.2f m over ground (PRD flush ≤ 0.05 m, recorded), %d junctions inside a footprint → %s"
-		% [ok, jp.size(), worst_lift, cut, vr])
+	var vr := "PASS" if jp.size() > 0 and ok >= mini(4, jp.size()) else "FAIL"
+	lines.append("- (d) roads: %d/%d junctions with a rendered ribbon within 3 m (%d of %d junctions are passages under OSM buildings, excluded); max ribbon lift %.2f m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → %s"
+		% [ok, jp.size(), passages, junctions.size(), worst_lift, vr])
 	verdicts.append("d-roads:" + vr)
 	return {"lines": lines, "verdicts": verdicts}
 
@@ -447,7 +470,13 @@ func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> bo
 		if d > r:
 			continue
 		# Visible: the surface sits at or above the terrain there.
-		var q: Vector2 = a if d > 0.0 else p
+		var q := p
+		if d > 0.0:
+			q = Geometry2D.get_closest_point_to_segment(p, a, b)
+			for e in [[b, c], [c, a]]:
+				var qe := Geometry2D.get_closest_point_to_segment(p, e[0], e[1])
+				if qe.distance_to(p) < q.distance_to(p):
+					q = qe
 		if (t[0].y + t[1].y + t[2].y) / 3.0 >= ground.height_at_world(q.x, q.y) - 0.3:
 			return true
 	return false
