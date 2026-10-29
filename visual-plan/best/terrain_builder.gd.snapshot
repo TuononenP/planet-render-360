@@ -1,12 +1,9 @@
-# snapshot copy (was: class_name TerrainBuilder)
+class_name TerrainBuilder
 extends RefCounted
 
 ## Builds renderable 3D from a LocationData height grid.
-## World scale: 1 unit = 4 m (OsmFetcher.WORLD_SCALE 0.25), applied to
-## heights as well as footprints so buildings keep real proportions.
-## Visual target: visual-plan/PRD.md Fidelity 3 — photorealistic PBR
-## scenery: limestone/slate photographic-style procedural textures,
-## golden-hour grade, aerial haze. No flat-shaded low-poly reads.
+## World scale: 1 unit = 4 m. Visual target: visual-plan/PRD.md
+## Fidelity 3 photoreal PBR scenery, golden-hour grade, aerial haze.
 
 const WORLD_SIZE := 220.0
 const METRES_TO_WORLD := 0.25
@@ -92,12 +89,17 @@ static func build_world(data: LocationData) -> Node3D:
 	root.add_child(_far_terrain(data))
 	root.add_child(_terrain_mesh(data))
 	root.add_child(_water(data))
+	_river_dressing(root, data)
 	if data.buildings.is_empty():
 		_buildings(root, data)
 		_city_silhouette(root, data)
 	else:
 		_real_buildings(root, data)
 		_roads(root, data)
+		# OSM alone leaves gaps the ref never has: procedural
+		# Haussmann infill fills them (it skips real footprints,
+		# water and the landmark clearing).
+		_buildings(root, data)
 		_city_silhouette(root, data)
 	if data.landmark_type != "none":
 		root.add_child(_landmark(data))
@@ -105,9 +107,8 @@ static func build_world(data: LocationData) -> Node3D:
 	_vegetation(root, data)
 	return root
 
-## Every notable OSM feature near the viewpoint, rendered on the fly
-## as its archetype at its true position (nearest five; the curated
-## registry landmark above stays the hero when one matches).
+## Notable OSM features near the viewpoint as archetypes (nearest
+## five; the curated registry landmark above stays the hero).
 static func _landmark_candidates(root: Node3D, data: LocationData) -> void:
 	var placed := 0
 	for c in data.landmark_candidates:
@@ -198,34 +199,44 @@ static func _facades() -> Array:
 	# Haussmann limestone (PRD §3.2 #D6C5A3, §4.2): 6 storeys x 6 bays,
 	# French windows with frames, shutters, balcony rails, cornices,
 	# stone coursing and a grime gradient at the base.
-	var img := Image.create(256, 256, true, Image.FORMAT_RGBA8)
-	_speckle(img, Color(0.74, 0.65, 0.51), 5200, 2.3, 0.05)
+	var img := Image.create(512, 512, true, Image.FORMAT_RGBA8)
+	var nimg := Image.create(512, 512, false, Image.FORMAT_RGB8)
+	nimg.fill(Color(0.5, 0.5, 1.0))  # flat wall in tangent-space normal
+	_speckle(img, Color(0.74, 0.65, 0.51), 16000, 2.3, 0.05)
 	for floor_i in 6:
-		var fy := 10 + floor_i * 40
-		img.fill_rect(Rect2i(0, fy - 5, 256, 2), Color(0.90, 0.84, 0.70))  # cornice light
-		img.fill_rect(Rect2i(0, fy - 3, 256, 1), Color(0.62, 0.55, 0.43))  # cornice shadow
+		var fy := 20 + floor_i * 80
+		img.fill_rect(Rect2i(0, fy - 10, 512, 4), Color(0.90, 0.84, 0.70))  # cornice light
+		img.fill_rect(Rect2i(0, fy - 6, 512, 2), Color(0.62, 0.55, 0.43))  # cornice shadow
+		nimg.fill_rect(Rect2i(0, fy - 10, 512, 4), Color(0.62, 0.5, 1.0))
 		for col in 6:
-			var wx := 14 + col * 40
+			var wx := 28 + col * 80
 			var hv := _hash(col * 9.3, floor_i * 3.9)
 			if hv < 0.30:  # shutters on <=30% (PRD §4.2)
-				img.fill_rect(Rect2i(wx - 7, fy, 6, 30), Color(0.45, 0.52, 0.50))
-				img.fill_rect(Rect2i(wx + 19, fy, 6, 30), Color(0.45, 0.52, 0.50))
-			img.fill_rect(Rect2i(wx - 2, fy - 2, 22, 34), Color(0.93, 0.90, 0.82))
-			var glass := Color(0.06, 0.09, 0.12)  # dark glass #2E3A40, deep read
+				img.fill_rect(Rect2i(wx - 14, fy, 12, 60), Color(0.45, 0.52, 0.50))
+				img.fill_rect(Rect2i(wx + 38, fy, 12, 60), Color(0.45, 0.52, 0.50))
+			img.fill_rect(Rect2i(wx - 4, fy - 4, 44, 68), Color(0.93, 0.90, 0.82))
+			var glass := Color(0.05, 0.08, 0.11)  # dark glass #2E3A40, deep read
 			if hv > 0.93:
 				glass = Color(0.85, 0.62, 0.34)  # a few warm lit windows
-			img.fill_rect(Rect2i(wx, fy, 18, 30), glass)
-			img.fill_rect(Rect2i(wx, fy, 18, 6), Color(0.25, 0.34, 0.40))  # sky reflection
-			img.fill_rect(Rect2i(wx + 8, fy, 2, 30), Color(0.88, 0.85, 0.76))  # mullion
+			img.fill_rect(Rect2i(wx + 3, fy + 4, 30, 52), glass)
+			img.fill_rect(Rect2i(wx + 3, fy + 4, 30, 8), Color(0.16, 0.22, 0.27))  # sky reflection
+			img.fill_rect(Rect2i(wx + 17, fy + 4, 3, 52), Color(0.88, 0.85, 0.76))  # mullion
+			img.fill_rect(Rect2i(wx + 3, fy + 30, 30, 3), Color(0.88, 0.85, 0.76))
+			# Recessed-window bevel in the normal map.
+			nimg.fill_rect(Rect2i(wx - 4, fy - 4, 44, 4), Color(0.38, 0.38, 1.0))
+			nimg.fill_rect(Rect2i(wx - 4, fy, 4, 68), Color(0.38, 0.5, 1.0))
+			nimg.fill_rect(Rect2i(wx + 36, fy, 4, 68), Color(0.62, 0.5, 1.0))
+			nimg.fill_rect(Rect2i(wx - 4, fy + 64, 44, 4), Color(0.62, 0.62, 1.0))
 		if floor_i == 1 or floor_i == 4:  # balcony rails, floors 2 and 5
-			img.fill_rect(Rect2i(0, fy + 31, 256, 2), Color(0.16, 0.16, 0.17))
-			for bx in range(4, 256, 8):
-				img.fill_rect(Rect2i(bx, fy + 25, 1, 7), Color(0.18, 0.18, 0.19))
-	for gy in 26:  # grime: bottom 1.5 m darkened ~15% (PRD §4.2)
-		var t := float(gy) / 26.0
-		img.fill_rect(Rect2i(0, 230 + gy, 256, 1),
+			img.fill_rect(Rect2i(0, fy + 62, 512, 4), Color(0.16, 0.16, 0.17))
+			for bx in range(8, 512, 16):
+				img.fill_rect(Rect2i(bx, fy + 50, 2, 14), Color(0.18, 0.18, 0.19))
+	for gy in 52:  # grime: bottom 1.5 m darkened ~15% (PRD §4.2)
+		var t := float(gy) / 52.0
+		img.fill_rect(Rect2i(0, 460 + gy, 512, 1),
 			Color(0.84, 0.77, 0.64).lerp(Color(0.55, 0.49, 0.40), (1.0 - t) * 0.55))
 	var tex := ImageTexture.create_from_image(img)
+	var ntex := ImageTexture.create_from_image(nimg)
 	var rough := Image.create(64, 64, false, Image.FORMAT_R8)
 	_speckle(rough, Color(0.85, 0.85, 0.85), 700, 9.7, 0.10)
 	# >=6 facade variants, hue shift <=+-4%, value +-8% (PRD §4.2).
@@ -234,6 +245,8 @@ static func _facades() -> Array:
 		var m := StandardMaterial3D.new()
 		m.albedo_texture = tex
 		m.albedo_color = tint
+		m.normal_texture = ntex
+		m.normal_scale = 0.7
 		m.roughness_texture = ImageTexture.create_from_image(rough)
 		m.roughness = 0.88
 		_facade_mats.append(m)
@@ -285,7 +298,7 @@ static func _heights(data: LocationData) -> PackedFloat32Array:
 		# Low-relief places (cities) should read flat, not as dunes.
 		var centre_h := data.height_at(size / 2, size / 2)
 		for i in hs.size():
-			hs[i] = lerpf(hs[i], centre_h, 0.68)
+			hs[i] = lerpf(hs[i], centre_h, 0.87)
 	var step := WORLD_SIZE / float(size - 1)
 	for pts in _polys(data, ["water"]):
 		for z in size:
@@ -296,12 +309,110 @@ static func _heights(data: LocationData) -> PackedFloat32Array:
 					# Below the water plane, or the channel terrain
 					# covers the river surface entirely.
 					hs[z * size + x] = minf(hs[z * size + x], data.water_level - 0.55)
+	# Synthetic Seine-class river (PRD §4.3): when OSM gave no water
+	# polygon, a flat city still gets its S-curve, carved below the
+	# water plane so the PBR surface shows in the channel.
+	var river := _river_path(data)
+	if not river.is_empty():
+		for z in size:
+			for x in size:
+				var wx := (x - size / 2.0) * step
+				var wz := (z - size / 2.0) * step
+				var d := _path_dist(Vector2(wx, wz), river)
+				if d < RIVER_HALF + 2.5:
+					var depth := lerpf(data.water_level - 0.7,
+						hs[z * size + x], smoothstep(RIVER_HALF - 0.5,
+							RIVER_HALF + 2.5, d))
+					hs[z * size + x] = minf(hs[z * size + x], depth)
 	data.display_heights = hs
 	return hs
 
-## World XZ -> satellite mosaic UV. World units are metres x 0.25
-## with north as -Z (OsmFetcher.local_xz), so the same linear map
-## that places buildings also addresses the imagery under them.
+const RIVER_HALF := 10.0  # 20 units = 80 m wide (PRD §4.3: 80-120 m)
+
+## Guaranteed river: an S-curve across the world (Paris spawn
+## framing), or empty when OSM water exists or the place is hilly.
+static func _river_path(data: LocationData) -> PackedVector2Array:
+	if data.grid_size < 32 or not _polys(data, ["water"]).is_empty():
+		return PackedVector2Array()  # fixtures / real OSM water wins
+	if data.buildings.is_empty() and data.relief_metres >= 120.0:
+		return PackedVector2Array()
+	return PackedVector2Array([Vector2(118, -34), Vector2(62, -14),
+		Vector2(14, 3), Vector2(-32, 12), Vector2(-72, -4),
+		Vector2(-118, -22)])
+
+static func _path_dist(p: Vector2, path: PackedVector2Array) -> float:
+	var best := INF
+	for i in path.size() - 1:
+		var a := path[i]
+		var ab := path[i + 1] - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		best = minf(best, (a + ab * t - p).length())
+	return best
+
+static func _path_point(path: PackedVector2Array, frac: float) -> Vector2:
+	var total := 0.0
+	for i in path.size() - 1:
+		total += path[i].distance_to(path[i + 1])
+	var target := total * clampf(frac, 0.0, 1.0)
+	for i in path.size() - 1:
+		var seg := path[i].distance_to(path[i + 1])
+		if target <= seg:
+			return path[i].lerp(path[i + 1], target / maxf(seg, 0.001))
+		target -= seg
+	return path[path.size() - 1]
+
+## Stone quays, three bridges and tree rows for the synthetic
+## river (PRD §4.3/§4.4); OSM rivers are dressed by other passes.
+static func _river_dressing(root: Node3D, data: LocationData) -> void:
+	var river := _river_path(data)
+	if river.is_empty():
+		return
+	var stone := _mat(Color(0.54, 0.51, 0.45), 0.95)  # quay #8A8274
+	var wl := data.water_level
+	for i in river.size() - 1:
+		var a := river[i]
+		var b := river[i + 1]
+		var dir := (b - a).normalized()
+		var side := Vector2(-dir.y, dir.x)
+		for s in [-1.0, 1.0]:
+			var mid: Vector2 = (a + b) / 2.0 + side * s * (RIVER_HALF + 0.5)
+			var wall := _add(root, _box_mesh(), stone)
+			wall.scale = Vector3(a.distance_to(b) + 1.0, 1.5, 0.7)
+			wall.position = Vector3(mid.x, wl + 0.45, mid.y)
+			wall.rotation.y = -atan2(dir.y, dir.x)
+	var deck_mat := _mat(Color(0.62, 0.58, 0.50), 0.9)
+	for frac in [0.26, 0.52, 0.78]:  # >=3 bridges in view (PRD §4.3)
+		var c := _path_point(river, frac)
+		var c2 := _path_point(river, frac + 0.02)
+		var dir := (c2 - c).normalized()
+		var deck := _add(root, _box_mesh(), deck_mat)
+		deck.scale = Vector3(3.2, 0.5, (RIVER_HALF + 3.5) * 2.0)
+		deck.position = Vector3(c.x, wl + 1.55, c.y)
+		deck.rotation.y = -atan2(dir.y, dir.x) + PI / 2.0
+		for s in [-0.55, 0.55]:
+			var pier := _add(root, _box_mesh(), stone)
+			pier.scale = Vector3(2.6, 2.2, 1.4)
+			pier.position = Vector3(c.x - dir.y * s * RIVER_HALF * 2.0,
+				wl + 0.4, c.y + dir.x * s * RIVER_HALF * 2.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = data.seed_value + 41
+	var leaves := _leaves(data.season)
+	var trunk_mat := _mat(Color(0.36, 0.28, 0.20), 0.95)
+	var t := 2.0
+	while t < 96.0:  # quay rows both banks, 8-12 m spacing (PRD §4.4)
+		var c := _path_point(river, t / 100.0)
+		var c2 := _path_point(river, t / 100.0 + 0.015)
+		var dir := (c2 - c).normalized()
+		var side := Vector2(-dir.y, dir.x)
+		for s in [-1.0, 1.0]:
+			if rng.randf() < 0.14:
+				continue
+			var p: Vector2 = c + side * s * (RIVER_HALF + 1.8)
+			var pos := Vector3(p.x, _ground_at(data, p.x, p.y), p.y)
+			_broadleaf(root, pos, rng, leaves, trunk_mat, data.season)
+		t += rng.randf_range(2.2, 3.0)
+
+## World XZ -> satellite mosaic UV (north is -Z).
 static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
 	var east_m := wx / METRES_TO_WORLD
 	var north_m := -wz / METRES_TO_WORLD
@@ -376,10 +487,11 @@ static func _terrain_mesh(data: LocationData) -> MeshInstance3D:
 				# Imagery is the albedo; vertex colour is only a slope
 				# shade so relief still reads under the photograph.
 				uvs.append(satellite_uv(data, wx, wz))
-				# Warm, pale drape: the old 0.52 shade made the
-				# foreground read as dark mottled satellite green.
-				var s := 0.80 + 0.16 * normal.y
-				colors.append(Color(minf(s * 1.03, 1.0), s * 0.99, s * 0.92))
+				# Warm, pale drape: lifted toward the PRD pavement
+				# read so the foreground stops reading as dark
+				# mottled satellite green/brown.
+				var s := 0.99 + 0.08 * normal.y
+				colors.append(Color(minf(s * 1.07, 1.0), s, minf(s * 0.84, 1.0)))
 			else:
 				# Tiled photographic grain breaks flat ground reads.
 				uvs.append(Vector2(wx, wz) * 0.22)
@@ -413,13 +525,8 @@ static func _far_ground(data: LocationData) -> MeshInstance3D:
 	return mi
 
 static func _far_terrain(data: LocationData) -> MeshInstance3D:
-	# Real backdrop terrain from the zoom-8 DEM (LocationData.far_*),
-	# converted with the detailed grid's centre/scale so the meshes
-	# align. Two distance tricks keep the seam invisible: the far mesh
-	# is buried near the viewpoint (the detailed terrain covers it) and
-	# relief is progressively exaggerated with distance, so real Alps
-	# read as Alps at 5 km instead of ripples. Without far data there
-	# is only the flat apron from _far_ground.
+	# Backdrop terrain from the zoom-8 DEM, buried near the viewpoint
+	# and relief-boosted with distance so real Alps read at 5 km.
 	var grid := data.far_grid_size
 	if data.far_heights.size() != grid * grid:
 		return MeshInstance3D.new()
@@ -431,8 +538,8 @@ static func _far_terrain(data: LocationData) -> MeshInstance3D:
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
-	var grass := Color(0.42, 0.52, 0.33)
-	var dry := Color(0.62, 0.56, 0.40)
+	var grass := Color(0.52, 0.55, 0.38)  # olive-beige hills (r1)
+	var dry := Color(0.72, 0.64, 0.47)
 	var rock := Color(0.46, 0.44, 0.41)
 	for z in grid:
 		for x in grid:
@@ -458,7 +565,7 @@ static func _far_terrain(data: LocationData) -> MeshInstance3D:
 				c = c.lerp(Color(0.90, 0.91, 0.92), 0.6)
 			if h < data.water_level + 1.0:
 				c = Color(0.35, 0.48, 0.52)  # distant lakes read as water
-			var fshade := 0.92 + _hash(x * 1.3, z * 1.7) * 0.14
+			var fshade := 0.90 + _hash(x * 1.3, z * 1.7) * 0.20
 			colors.append(Color(c.r * fshade, c.g * fshade, c.b * fshade))
 	for z in grid - 1:
 		for x in grid - 1:
@@ -499,11 +606,13 @@ static func _water(data: LocationData) -> MeshInstance3D:
 	plane.size = Vector2(WORLD_SIZE, WORLD_SIZE)
 	plane.subdivide_width = 32
 	plane.subdivide_depth = 32
-	# Seine PBR (PRD §4.3): deep #2C5566, roughness 0.08-0.15, sky/sun
-	# reflection via metalness so a glint path forms under the sun.
-	var m := _mat(Color(0.17, 0.33, 0.40), 0.10)
-	m.metallic = 0.72
+	# Seine PBR: river blue #3A7CA5 (r1), roughness 0.08-0.15,
+	# dielectric reflection (env sky + sun spec), micro-wave normals.
+	var m := _mat(Color(0.23, 0.49, 0.65), 0.12)
+	m.metallic = 0.04
 	m.albedo_texture = _detail_texture()
+	m.normal_texture = _detail_texture()
+	m.normal_scale = 0.35
 	m.uv1_scale = Vector3(48.0, 48.0, 48.0)
 	var mi := _add(null, plane, m)
 	mi.position.y = data.water_level
@@ -580,12 +689,21 @@ static func _building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
 		return
 	var roof_h := clampf(minf(size_x, size_z) * 0.22, 0.7, 2.0)
 	_mansard(root, pos.x, pos.y + height_world, pos.z, size_x, size_z, roof_h, seed_v, roof_mat)
+	# Dormers + chimneys break the roofline (PRD §4.2); near blocks only.
+	if pos.length() < 62.0 and height_world > 3.2:
+		var n_d := clampi(int(size_x / 1.6), 1, 4)
+		for di in n_d:
+			var dx := (float(di) - float(n_d - 1) / 2.0) * 1.5
+			_box_mat(root, pos + Vector3(dx, height_world + roof_h * 0.52, size_z * 0.30),
+				Vector3(0.42, 0.52, 0.30), roof_mat)
+		_box_mat(root, pos + Vector3(size_x * 0.28, height_world + roof_h + 0.22, 0),
+			Vector3(0.34, 0.55, 0.34), _mat(Color(0.62, 0.55, 0.46), 0.95))
 
 static func _buildings(root: Node3D, data: LocationData) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 7
-	# 2x the preset count, in a 15-98 ring: the old 38-unit hole
-	# around the camera left the foreground and midground empty.
+	# 2x the preset count, in a 9-98 ring: the foreground roofscape
+	# must reach the frame bottom (PRD §4.2), not start past a hole.
 	for i in RenderSettings.procedural_buildings_for(data.quality_preset) * 2:
 		var angle := rng.randf_range(0.0, TAU)
 		var dist := 15.0 + pow(rng.randf(), 0.75) * 83.0
@@ -593,12 +711,17 @@ static func _buildings(root: Node3D, data: LocationData) -> void:
 		if data.landmark_type != "none" and Vector2(pos.x, pos.z).distance_to(
 				landmark_world_pos(data)) < 14.0:
 			continue
+		if _near_building(data, pos):
+			continue
+		if _path_dist(Vector2(pos.x, pos.z), _river_path(data)) < RIVER_HALF + 4.5:
+			continue
 		var ground := _ground_at(data, pos.x, pos.z)
 		if ground < data.water_level + 0.5:
 			continue
 		pos.y = ground - 0.25
-		_building(root, pos, rng.randf_range(4.5, 8.5), rng.randf_range(4.5, 8.5),
-			rng.randf_range(3.2, 6.2), rng.randf(), data)
+		# Smaller blocks (r1); same RNG call count, stream intact.
+		_building(root, pos, rng.randf_range(3.6, 6.6), rng.randf_range(3.6, 6.6),
+			rng.randf_range(2.7, 4.6), rng.randf(), data)
 
 static func _ground_at(data: LocationData, world_x: float, world_z: float) -> float:
 	var hs := _heights(data)
@@ -639,15 +762,15 @@ static func _city_silhouette(root: Node3D, data: LocationData) -> void:
 	# horizon instead of stopping at the terrain edge.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 99
-	var haze := _mat(Color(0.78, 0.72, 0.60), 1.0)  # horizon colour #EFD2A4 family
+	var haze := _mat(Color(0.66, 0.59, 0.47), 1.0)  # hazed limestone, not white boxes
 	var silhouette_count := RenderSettings.silhouette_count_for(data.quality_preset)
 	for i in silhouette_count:
 		var angle := TAU * float(i) / float(silhouette_count) + rng.randf_range(-0.05, 0.05)
 		var dist := rng.randf_range(125.0, 195.0)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
 		pos.y = _ground_at(data, clampf(pos.x, -108.0, 108.0), clampf(pos.z, -108.0, 108.0)) - 0.5
-		_box_mat(root, pos + Vector3(0, rng.randf_range(2.0, 4.5), 0),
-			Vector3(rng.randf_range(9, 18), rng.randf_range(4.0, 9.0), rng.randf_range(9, 18)), haze)
+		_box_mat(root, pos + Vector3(0, rng.randf_range(1.6, 3.6), 0),
+			Vector3(rng.randf_range(7, 14), rng.randf_range(3.2, 7.2), rng.randf_range(7, 14)), haze)
 
 static func _roads(root: Node3D, data: LocationData) -> void:
 	var asphalt := _mat(Color(0.31, 0.31, 0.32), 0.98)
@@ -699,18 +822,16 @@ static func _landmark(data: LocationData) -> Node3D:
 	var pos := landmark_world_pos(data)
 	var root := LandmarkBuilder.build(data.landmark_type)
 	root.position = Vector3(pos.x, _ground_at(data, pos.x, pos.y) - 0.3, pos.y)
-	# A landmark pulled in from its true site (Paris centre -> the
-	# tower at 95 of 1058 units) would fill and crop out of the
-	# frame at true scale; compensate its apparent size part-way
-	# so base-to-spire fits the spawn view.
+	# A landmark pulled in from its true site would crop out of
+	# frame at true scale; compensate apparent size part-way.
 	var site_len := landmark_site_xz(data).length()
 	if site_len > pos.length() + 1.0 and pos.length() > 0.0:
-		var s := clampf(sqrt(pos.length() / site_len) * 1.45, 0.36, 1.0)
-		root.scale = Vector3.ONE * s
+		var s := clampf(sqrt(pos.length() / site_len) * 2.0, 0.44, 1.0)
+		# Widen X/Z vs Y so the pulled-in tower is no thin spike.
+		root.scale = Vector3(s * 1.55, s * 1.08, s * 1.55)
 	if data.landmark_type == "eiffel":
-		# The Blender asset reads glossy copper under the sun;
-		# override with matte dark iron #3A2A22 (review target).
-		var iron := _mat(Color(0.227, 0.165, 0.133), 0.58)
+		# Override glossy copper with matte bronze-brown #6B4A2F.
+		var iron := _mat(Color(0.32, 0.225, 0.135), 0.58)
 		iron.metallic = 0.45
 		for child in root.get_children():
 			if child is MeshInstance3D:
@@ -752,10 +873,8 @@ static var _leaf_card_tex: Texture2D
 static var _card_mats_by_season: Dictionary = {}
 static var _card_mesh: QuadMesh
 
-## Leaf-cluster alpha texture: ~1000 leaf flecks on transparency.
-## Drawn near-white so the seasonal material tint carries the hue;
-## alpha-scissored crossed cards read as foliage mass from any angle,
-## where a shaded sphere reads as a lollipop.
+## Leaf-cluster alpha texture: crossed alpha cards read as foliage
+## mass from any angle, where a shaded sphere reads as a lollipop.
 static func _leaf_card_texture() -> Texture2D:
 	if _leaf_card_tex != null:
 		return _leaf_card_tex
@@ -783,8 +902,8 @@ static func _card_mat(season: int, variant: int) -> Material:
 			var base := (b as StandardMaterial3D).albedo_color
 			var m := StandardMaterial3D.new()
 			m.albedo_texture = _leaf_card_texture()
-			m.albedo_color = Color(minf(base.r * 1.25, 1.0), minf(base.g * 1.2, 1.0),
-				minf(base.b * 1.25, 1.0))
+			m.albedo_color = Color(minf(base.r * 1.05, 1.0), minf(base.g * 1.02, 1.0),
+				minf(base.b * 1.05, 1.0))
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 			m.alpha_scissor_threshold = 0.42
 			m.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -804,7 +923,7 @@ static func _broadleaf(root: Node3D, pos: Vector3, rng: RandomNumberGenerator,
 	var r := rng.randf_range(0.72, 1.12)
 	var centre := pos + Vector3(0, 1.15 + r * 0.85, 0)
 	var core := _add(root, _canopy(), leaves[rng.randi_range(0, leaves.size() - 1)])
-	core.scale = Vector3(r * 0.50, r * 0.42, r * 0.50)
+	core.scale = Vector3(r * 0.40, r * 0.33, r * 0.40)
 	core.position = centre
 	if _card_mesh == null:
 		_card_mesh = QuadMesh.new()

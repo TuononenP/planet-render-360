@@ -186,3 +186,177 @@ Differences from `visual-plan/reviews/accept-r1-shape.md` and `visual-plan/revie
 - [moderate] Drag hint as white text inside the dark panel vs a centred translucent pill with finger-drag icon, "Drag to look around" only — owner: `View360._ready` bottom sheet in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd).
 - [moderate] No curved azimuth ruler vs 1 curved teal-to-white ticked ruler spanning ~55% of the bottom width; no bottom-right circular buttons vs 2 circular translucent teal-outline buttons — owner: `View360` HUD in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd).
 - [minor, not listed as fixable in-app] Reference is a landscape phone mockup on a dark backdrop; the capture is the full-bleed desktop viewport — presentation only, owner: none (reference framing, PRD §2).
+
+## Polish round 2 — render-quality pass (this build)
+
+Capture `03b-view360-desktop.png` vs `view360-paris.jpg`, after the
+terrain_builder.gd rewrite. Fixed: dark mottled satellite foreground
+(lifted warm drape, city flattening 0.84), sparse midground (procedural
+Haussmann infill now also runs with OSM data, 9-15 unit foreground
+ring, dormers/chimneys), 512px facade + painted normal map (window
+grids read at spawn distance), guaranteed Seine S-curve with stone
+quays, 3 bridges and quay tree rows when OSM water is absent (gated to
+real place grids), darker matte Eiffel iron with larger apparent scale,
+landmark spawn framing left-of-centre (~0.44 W) from a higher aerial
+spawn, warmer golden haze. Verified: screenshot_test full run,
+scenery/landmark/smoke/flow tests pass, class size 1000/1000.
+Remaining gaps: the real Seine does not cross this exact spawn yaw
+(tower-west view; the river reads at neighbouring yaws and the
+synthetic river covers OSM-less places), tower lattice still reads
+thin at 95-unit distance (apparent height ~0.31 H vs 0.23 H target),
+sky sun disc/glow still soft, bottom HUD dock still covers the lower
+centre (owner: view_360.gd HUD, flagged in round 1).
+
+Polish round 1 retry (this build): landmark apparent-size compensation
+in `TerrainBuilder._landmark` raised (multiplier 1.7 → 2.0), so the
+Eiffel Tower reads ~38% of frame height at spawn (review target ~42%)
+with the arched legs visible; a procedural-block shrink was tried and
+reverted because it shifted the seeded RNG stream into the scenery
+test's building-scale contract. Screenshot, landmark, scenery and
+smoke tests pass; capture promoted to `visual-plan/best/`.
+
+## Polish round 1
+
+Differences merged from `visual-plan/reviews/accept-r1-shape.md` and
+`visual-plan/reviews/accept-r1-look.md` (capture
+`generated_images/screenshots/03b-view360-desktop.png` vs phone-screen
+content of `visual-plan/refs/view360-paris.jpg`), major and moderate
+only, highest impact first. Owner names the code part that owns each
+item. Fixes this round are applied only in
+`scripts/generation/terrain_builder.gd`; items owned elsewhere are
+listed with their owner and, where possible, mitigated from
+`terrain_builder.gd`.
+
+### Framing, silhouette, missing parts
+
+- [major] Camera at rooftop/street level, horizon ~35% from top, vs
+  high aerial oblique (~120 m) with horizon ~40% and ground plane to
+  the horizon — owner: `View360.show_location` / `CameraRig` and spawn
+  look in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd)
+  (`_rig.position`, `set_look`); not fixable from
+  `terrain_builder.gd` except via landmark/building scale below.
+- [major] Full-bleed desktop frame, no phone bezel, vs landscape phone
+  mockup ~72% × 62% centred on dark charcoal #23282D — presentation
+  only, owner: none in-app (PRD §2: phone hardware and studio backdrop
+  are never rendered in-app).
+- [major] Eiffel Tower thin open spike (~12 px wide, ~85% too narrow,
+  spire ~40% too tall/thin, leg base ~60% too narrow, arch and
+  platforms missing) vs solid tapered lattice ~38% of scene height at
+  ~38% from left, wide pyramidal base ~9% of scene width, 4 splayed
+  arched legs, 2 platforms, cross-bracing — owner:
+  `LandmarkBuilder._eiffel_asset` / `assets/eiffel.glb` (fallback
+  `LandmarkBuilder._eiffel`) in [landmark_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/landmark_builder.gd);
+  co-owner `TerrainBuilder._landmark` (apparent-size scale, iron
+  override) in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed from `terrain_builder.gd` this round: non-uniform landmark
+  scale widens the tower in X/Z relative to Y and warms the iron.
+- [major] Seine river 0% visible vs blue diagonal band ~22–28% of
+  scene area, left-centre to mid-right foreground, with sun reflection
+  — owner: `TerrainBuilder._water`, the water carve in
+  `TerrainBuilder._heights` and `_river_path` / `_river_dressing` in
+  [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd),
+  fed by OSM water polygons (`OsmFetcher` / `GenerationPipeline`).
+  Fixed in part this round: lighter PBR river blue so the carved
+  channel reads where it crosses the spawn view.
+- [major] Foreground buildings ~35–45% of frame height each (~4× too
+  large), blocking the middle ground, vs Haussmann blocks ~6–9% of
+  frame width / ~12–18% of scene height, 100+ dense small blocks to
+  the horizon along the riverbanks — owner:
+  `TerrainBuilder._buildings`, `_real_buildings`, `_building` and
+  `_city_silhouette` in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd),
+  budgets in `RenderSettings`. Fixed this round: smaller procedural
+  footprints/heights (same seeded RNG call count) and finer distant
+  silhouette grain.
+- [major] Distant hills/mountains 0% visible vs low rolling hill
+  silhouettes spanning 100% of the horizon behind the city — owner:
+  `TerrainBuilder._far_terrain` and `_far_ground` in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed this round: warmer olive-beige hill palette, stronger facet
+  steps.
+- [major] Bottom control panel opaque dark block ~44% × 30% occluding
+  the lower-centre scene (plus slider, 17:00 readout, Summer dropdown,
+  Now button, fps/attribution text) vs no large panel, only a slim
+  glass Drag pill ~26% × 7% at bottom-centre — owner: `View360._ready`
+  bottom sheet / HUD in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+
+### Colour and material
+
+- [major] Eiffel material flat dark-brown wire outline, ~0% lattice
+  density, vs dense bronze-brown #6B4A2F lattice truss on all tiers —
+  owner: `assets/eiffel.glb` materials via
+  `LandmarkBuilder._eiffel_asset` in [landmark_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/landmark_builder.gd).
+  Fixed from `terrain_builder.gd`: `TerrainBuilder._landmark` iron
+  override warmed toward bronze-brown, roughness raised.
+- [major] Building palette flat beige #E8C99A with dark blue-grey
+  roofs and oversized glowing windows ~3× too large vs dense
+  small-scale muted beige #D9C2A0 blocks (sunlit #E8D5B0 / shaded
+  #B8A080 facets), muted blue-grey mansard roofs, tiny dark recessed
+  windows in a regular grid — owner: `TerrainBuilder._facades`,
+  `_building`, `_mansard`, `_roof_mat`, `_slate` in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed this round: smaller, darker, more recessed window cells with
+  a thinner sky-reflection band.
+- [moderate] Ground between buildings mottled dark green-grey
+  satellite blur vs defined streets, warm pavement, green park mounds
+  and river embankments — owner: `TerrainBuilder._terrain_mesh`,
+  `_heights`, `_roads` in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed this round: stronger low-relief flattening and a warmer
+  satellite drape lift.
+- [moderate] Trees ~4 oversized bright blobs vs scattered small muted
+  olive tree/park patches integrated between dense blocks — owner:
+  `TerrainBuilder._vegetation`, `_broadleaf`, `_leaves`, `_card_mat`
+  in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed this round: dimmer leaf-card brightness.
+
+### Lighting, shadow, background
+
+- [major] Sky pale blue-grey #DCE8EC, sun and sunset glow missing, vs
+  warm golden sunset at ~63% from left on the horizon, gradient peach
+  #F7D9A8 to soft blue, long low-sun shadows raking left-to-right at
+  ~8° elevation — owner: `View360._build_3d`, `_apply_time` (sun,
+  sky, shadows) in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [major] Clouds 4 flat white ellipses at ~8% opacity vs 6–8 layered
+  low-poly warm cloud masses tinted peach/grey across the upper sky
+  (~45% sky coverage, lit #FBE3B0 / shadowed #C9A87A) — owner:
+  `View360._build_clouds` in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [major] No atmospheric depth (distant blocks at foreground contrast)
+  vs aerial haze washing the distant city to ~40% contrast, pale
+  blue-gold #E6D3AC at the horizon; foreground hills beige-olive
+  #CFC0A0 framing the corners — owner: `View360` fog/sky rig in
+  [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd),
+  co-owner `TerrainBuilder._far_terrain`, `_city_silhouette` haze
+  colours in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed in part this round (terrain-owned haze/hill colours).
+- [moderate] Uniformly matte flat finish, 0% facet variation, vs
+  low-poly faceted matte with ~8–12% per-face value steps on roofs,
+  hills and clouds — owner: `TerrainBuilder._far_terrain` facet shade
+  and roof/facade materials in [terrain_builder.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/generation/terrain_builder.gd).
+  Fixed this round for hills (wider facet shade range).
+
+### Detail
+
+- [moderate] Extra top-left Map pill and dark solid Paris pill
+  #3A4448 with white dot vs single translucent frosted Paris, France
+  pill (~55% opacity) with teal #2EC4B6 pin, no Map button — owner:
+  `View360._ready` top bar in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [moderate] Compass ~4% of frame width, dark filled circle, vs
+  translucent glass circle ~7% of scene width with teal ring, N and
+  teal arrow — owner: `View360._ready` top bar in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [moderate] Drag hint small black pill ~28% wide reading "Drag to
+  look around · Pinch or scroll to zoom" vs larger glass pill ~26%
+  wide reading "Drag to look around" with hand icon only, over the
+  river foreground — owner: `View360._ready` bottom sheet in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [moderate] Bottom-right fullscreen/brightness buttons missing (0)
+  vs 2 glass circular buttons ~6% of scene width each; bottom heading
+  tick arc missing vs thin teal/white graduated arc spanning ~55% of
+  scene width along the bottom edge — owner: `View360` HUD in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.
+- [moderate] Extra time/season controls (slider, 17:00 readout,
+  Summer dropdown, Now button, fps/attribution text; 5+ elements) vs
+  none in the reference overlay — owner: `View360._ready` bottom
+  sheet in [view_360.gd](/Users/petri.tuononen/GithubProjects/planet-render-360/scripts/screens/view_360.gd);
+  not fixable from `terrain_builder.gd`.

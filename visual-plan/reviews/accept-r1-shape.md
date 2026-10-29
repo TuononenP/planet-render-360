@@ -1,19 +1,20 @@
-- [major] camera height/angle ground eye-level looking slightly up (~0 deg pitch) -> elevated aerial looking slightly down over city
-- [major] Eiffel Tower framing cropped at top, spire off-frame, only ~40% of tower height visible -> 100% base-to-spire visible at ~38% of viewport height
-- [major] Eiffel Tower legs silhouette thick curved single-pipe brown vs 4-leg lattice A-frame -> slender dark lattice tower with 2 platforms and arched base
-- [major] Seine river count 0 visible -> 1 wide blue river diagonally across middle ~35% of viewport width
-- [major] Paris building count ~15 sparse blocks -> ~300+ dense Haussmann blocks filling left, centre and right midground
-- [major] terrain ground dark mottled satellite green-grey covering ~50% foreground -> pale beige low-poly city/terrain with no dark satellite foreground
-- [major] bottom panel opaque dark sheet ~42% viewport width x 35% height with Time/Season/fps/attribution -> no bottom sheet, only 1 translucent Drag pill (~18% width) plus thin curved ruler
-- [major] lighting flat pale-blue daylight sky ~70% blue-white -> warm golden-hour sunset gradient with low sun glare at right horizon
-- [major] horizon/city depth shallow empty haze to flat plain -> layered hills and distant skyline across 100% width behind city
-- [moderate] compass white rounded rectangle ~5% width "N up-arrow" top-right -> circular teal-ring compass ~7% diameter with N and filled teal needle
-- [moderate] location pill opaque white with red pin plus extra "<- Map" pill (2 pills top-left) -> 1 translucent pill with teal pin and teal outline, no Map pill in frame content
-- [moderate] drag hint white text line on dark panel "Drag to look around - Pinch or scroll to zoom" -> centred translucent pill with finger-drag icon and "Drag to look around" only
-- [moderate] bottom-right controls 0 circular buttons (fullscreen, brightness missing) -> 2 circular translucent teal-outline buttons at bottom-right
-- [moderate] bottom azimuth ruler curved teal/white 0 present (straight Time ticks only) -> 1 curved teal-to-white ticked azimuth ruler spanning ~55% bottom width
-- [moderate] clouds 4 thin flat white discs -> ~8 soft layered volumetric sunset clouds across upper sky
-- [moderate] trees ~12 oversized bright-green lollipop spheres in foreground/midground -> 0 prominent lollipops, only small green park patches around tower base
-- [moderate] building form beige boxes with dark-green flat roofs and ivy discs -> beige 4-6 storey blocks with blue-grey mansard roofs in continuous rows
-- [minor] location pin colour red -> teal
-- [minor] outer presentation full-bleed desktop viewport -> landscape phone mockup on dark backdrop (presentation only, content fills phone screen)
+- [major] camera altitude at rooftop/street level, horizon at ~35% from top -> high aerial oblique with horizon at ~40% inside scene and ground plane visible to horizon
+- [major] camera framing full-bleed desktop with no phone bezel, scene fills 100% of frame -> landscape phone mockup occupying ~72% width x ~62% height centered on dark charcoal background
+- [major] Eiffel Tower centered at ~42% from left and ~38% of scene height, thin open spike silhouette -> Eiffel Tower at ~38% from left inside phone, ~38% of scene height with solid tapered lattice, 2 platforms and 4 splayed arched legs
+- [major] Eiffel Tower leg base ~60% too narrow and arch/platforms missing, spire ~40% too tall/thin -> wide pyramidal base ~9% of scene width with visible cross-bracing, mid platform and top platform
+- [major] Seine river 0% visible -> blue river diagonal band ~22% of scene area running left-center to mid-right foreground
+- [major] foreground buildings ~35-45% of frame height and blocking middle ground -> foreground Haussmann blocks ~12-18% of scene height along riverbanks with streets and river gap visible
+- [major] distant hills/mountains 0% visible on horizon -> low rolling hills silhouettes spanning 100% of horizon behind city
+- [major] bottom control panel opaque dark block ~44% width x ~30% height occluding lower-center scene -> no large panel; only slim Drag pill ~26% width x ~7% height at bottom-center
+- [moderate] sun and sunset glow missing, sky pale blue-grey #DCE8EC -> warm golden sunset at ~63% from left on horizon, sky gradient peach #F7D9A8 to soft blue
+- [moderate] clouds 4 flat white ellipses at ~8% opacity -> layered low-poly warm clouds ~6-8 masses tinted peach/grey across upper sky
+- [moderate] extra top-left Map pill 1 extra button and Paris pill dark solid #3A4448 with white dot -> single translucent glass Paris, France pill with teal pin icon, no Map button
+- [moderate] compass ~4% of frame width, dark filled circle at top-right corner -> compass ~7% of scene width, translucent glass circle with teal ring, N and teal arrow
+- [moderate] drag hint small black pill ~28% width above panel reading Drag to look around - Pinch or scroll to zoom -> larger glass pill ~26% scene width reading Drag to look around with hand icon only, over river foreground
+- [moderate] bottom-right fullscreen and brightness circular buttons 0 present -> 2 glass circular buttons ~6% scene width each at bottom-right
+- [moderate] bottom heading tick arc missing 0% visible -> thin teal/white graduated arc spanning ~55% of scene width along bottom edge
+- [moderate] extra time/season controls slider, 17:00 readout, Summer dropdown, Now button and fps/attribution text 5+ extra elements -> 0 time/season/fps elements in reference overlay
+- [moderate] building palette flat beige #E8C99A with dark blue-grey roofs and oversized white windows ~3x too large -> dense small-scale beige blocks with muted blue-grey mansard roofs and tiny regular windows, city texture to horizon
+- [minor] tower colour dark brown outline on pale sky -> warm bronze-brown #6B4A2F against golden sky
+- [minor] ground between buildings mottled green-grey blur -> defined streets, green low-poly park mounds and river embankments
+- [minor] tree count ~4 small blobs in foreground -> scattered small green tree/park patches integrated between dense blocks, not isolated foreground blobs
