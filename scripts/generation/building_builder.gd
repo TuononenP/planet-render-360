@@ -88,7 +88,7 @@ static func _building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
 	var m2u := WorldScale.metres_to_units()
 	var distant := data != null and pos.length() / m2u \
 		> MaterialLibrary.full_detail_radius_m(fidelity)
-	var floor_h := float((LEGACY_BOX[region] as Dictionary)["floor_h"])
+	var floor_h := float((BuildingWalls.LEGACY_BOX[region] as Dictionary)["floor_h"])
 	var storeys := int(b.get("levels", 0))
 	if storeys <= 0:
 		storeys = maxi(1, roundi(height_world / m2u / floor_h))
@@ -102,7 +102,7 @@ static func _building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
 	# height; the roof rises above it by roof_h_world (explicit from
 	# real-data callers, v1-auto when negative).
 	var shape := _effective_shape(roof_shape,
-		str((LEGACY_BOX[region] as Dictionary)["default_roof"]), false)
+		str((BuildingWalls.LEGACY_BOX[region] as Dictionary)["default_roof"]), false)
 	var hint := Color(0, 0, 0, 0)
 	if data != null:
 		hint = MaterialLibrary.sampled_roof_color(data, pos.x, pos.z,
@@ -198,12 +198,6 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
-static func _rect_ring(c: Vector2, size: Vector2, yaw: float) -> PackedVector2Array:
-	var ring := PackedVector2Array()
-	for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-		ring.append(c + (corner * size * 0.5).rotated(yaw))
-	return ring
-
 static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
 	var sorted := data.buildings.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -278,19 +272,6 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 
 ## A building whose own footprint/parts failed, re-shaped as its AABB
 ## rectangle (axis-aligned: the keys carry no rotation).
-static func _aabb_footprint(b: Dictionary) -> Dictionary:
-	var out := b.duplicate()
-	out.erase("parts")
-	out["footprint"] = _rect_ring(Vector2(float(b["x"]), float(b["z"])),
-		Vector2(float(b["size_x"]), float(b["size_z"])), 0.0)
-	return out
-
-## True-footprint masses for one §2.4 building: its building:part
-## sub-polygons when present (OSM parts tile the parent outline, each
-## with its own height, so the parent shell is skipped — extruding
-## both would double coplanar walls), else the parent footprint alone.
-## Returns true when at least one mass extruded; false routes to the
-## logged AABB fallback in _real_buildings.
 static func _extrude_masses(root: Node3D, data: LocationData,
 		ground: GroundTruth, b: Dictionary, ctx: Dictionary) -> bool:
 	# One look per building: parts inherit the parent's kind, finish and
@@ -443,353 +424,56 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 
 ## Ring without its OSM closing duplicate (the fetcher keeps every
 ## node), requiring three distinct corners and a non-degenerate area.
-static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
-	var ring := PackedVector2Array(raw)
-	while ring.size() > 1 \
-			and ring[0].distance_to(ring[ring.size() - 1]) < 0.01:
-		ring.remove_at(ring.size() - 1)
-	if ring.size() < 3:
-		return PackedVector2Array()
-	if absf(RingGeometry.signed_area(ring)) < 0.01:
-		return PackedVector2Array()
-	return ring
 
-## Vertical wall quads, one per ring edge. Outward normals come from
-## the winding (exact for simple rings however concave — a centroid
-## test can flip inside deep notches). Triangle order is picked per
-## edge so the Godot front face (clockwise viewed from outside) lands
-## on the outward normal. Wall UVs match BoxMesh (v = 1 at the base),
-## so the facade grime stays at the ground and cornices stay upright.
-static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
-		top: float, mat: Material, v_repeat: float = 1.0) -> void:
-	var ccw := RingGeometry.signed_area(ring) > 0.0
-	# Style facades map UVs in real window bays (and, for tiled patterns,
-	# real storeys) so windows keep their size on any wall; legacy
-	# materials stretch 0..1 over the edge.
-	var uvp := FacadeMaterials.facade_uv(mat)
-	var m2u := WorldScale.metres_to_units()
-	var verts := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	var indices := PackedInt32Array()
-	for i in ring.size():
-		var a := ring[i]
-		var b := ring[(i + 1) % ring.size()]
-		var e := b - a
-		if e.length() < 0.001:
-			continue
-		var n := Vector2(e.y, -e.x).normalized() if ccw \
-			else Vector2(-e.y, e.x).normalized()
-		var n3 := Vector3(n.x, 0.0, n.y)
-		var k := verts.size()
-		verts.append_array([Vector3(a.x, base, a.y), Vector3(b.x, base, b.y),
-			Vector3(b.x, top, b.y), Vector3(a.x, top, a.y)])
-		for j in 4:
-			normals.append(n3)
-		var u1 := 1.0
-		var v0 := 1.0
-		if uvp.x > 0.0:
-			var len_m := e.length() / m2u
-			# An edge under half a bay shows only the blank margin left of
-			# the first window (a pillar must not become a zebra).
-			u1 = 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
-			if uvp.z > 0.0:
-				v0 = v_repeat
-		uvs.append_array([Vector2(0, v0), Vector2(u1, v0),
-			Vector2(u1, 0), Vector2(0, 0)])
-		# Forward order faces (e.y, -e.x): with s < 0 that is the
-		# outward normal already, else the reversed order is emitted.
-		var s := e.x * n.y - e.y * n.x
-		if s > 0.0:
-			indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
-		else:
-			indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
-	if indices.is_empty():
-		return
-	if _batch != null:
-		_batch.add(_batch_key, mat, verts, normals, uvs, indices)
-		return
-	var mesh := ArrayMesh.new()
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	TerrainBuilder._add(root, mesh, mat)
-
-## Flat roof cap over the triangulated ring: the whole roof for flat
-## shapes, the eave-level seal under pitched T4.2 forms (it closes the
-## gaps concave rings leave in apex fans). Triplets flip when the
-## emitted triangle faces down, so the front face points up — the same
-## convention as the terrain mesh.
-static func _roof_cap(root: Node3D, ring: PackedVector2Array,
-		idx: PackedInt32Array, top: float, mat: Material) -> void:
-	# triangulate_polygon normalizes its output winding (a CW input
-	# still yields CCW triplets), so the flip is read off the first
-	# emitted triangle, not the ring: front.y equals its 2D cross.
-	var flip := false
-	if idx.size() >= 3:
-		var p0 := ring[idx[0]]
-		var p1 := ring[idx[1]]
-		var p2 := ring[idx[2]]
-		flip = (p1.x - p0.x) * (p2.y - p0.y) \
-			- (p1.y - p0.y) * (p2.x - p0.x) < 0.0
-	var verts := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	for p in ring:
-		verts.append(Vector3(p.x, top, p.y))
-		normals.append(Vector3.UP)
-		uvs.append(p * 0.05)
-	var indices := PackedInt32Array()
-	for t in idx.size() / 3:
-		var i0 := idx[t * 3]
-		var i1 := idx[t * 3 + 1]
-		var i2 := idx[t * 3 + 2]
-		if flip:
-			indices.append_array([i0, i2, i1])
-		else:
-			indices.append_array([i0, i1, i2])
-	if _batch != null:
-		_batch.add(_batch_key, mat, verts, normals, uvs, indices)
-		return
-	var mesh := ArrayMesh.new()
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	TerrainBuilder._add(root, mesh, mat)
-
-## Floor height / default roof for the legacy box-mesh fallback only
-## (corrupt footprints, AABB-only v1 dicts): box UVs cannot tile, so that
-## path keeps the original Paris-vs-everywhere-else defaults. Every other
-## building takes its numbers from ArchitectureStyle (T4.2 heights and
-## roofs, now by region and kind).
-const LEGACY_BOX = {
-	"haussmann": {"floor_h": 3.1, "default_roof": "mansard"},
-	"urban": {"floor_h": 3.0, "default_roof": "flat"},
-}
-
+# --- Delegators: implementation in BuildingHeights / BuildingWalls. ---
 static func _legacy_region(data: LocationData) -> String:
-	if data != null and ArchitectureStyle.region_for(
-			data.latitude, data.longitude) == "haussmann":
-		return "haussmann"
-	return "urban"
+	return BuildingHeights._legacy_region(data)
 
-## Settlement density by buildings within 400 m of the viewpoint:
-## ≥120 dense, ≥25 mid, else rural (what kind_for and the storey ranges
-## key off when the map does not say).
 static func _density(data: LocationData) -> String:
-	var r := 400.0 * WorldScale.metres_to_units()
-	var n := 0
-	for b in data.buildings:
-		if not (b is Dictionary):
-			continue
-		var bd := b as Dictionary
-		if Vector2(float(bd.get("x", 1e9)), float(bd.get("z", 1e9))).length() <= r:
-			n += 1
-	if n >= 120:
-		return "dense"
-	if n >= 25:
-		return "mid"
-	return "rural"
+	return BuildingHeights._density(data)
 
-## Footprint area in m² (ring area when present, else the AABB keys).
 static func _area_m2(b: Dictionary) -> float:
-	var m2u := WorldScale.metres_to_units()
-	var fp: Variant = b.get("footprint", null)
-	if fp is PackedVector2Array and (fp as PackedVector2Array).size() >= 3:
-		return absf(RingGeometry.signed_area(fp as PackedVector2Array)) / (m2u * m2u)
-	return float(b.get("size_x", 0.0)) * float(b.get("size_z", 0.0)) / (m2u * m2u)
+	return BuildingHeights._area_m2(b)
 
-## One building's ArchitectureStyle look, seeded by its position.
 static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
-	var seed_v := TerrainBuilder._hash(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
-	return ArchitectureStyle.resolve(b, str(ctx["region"]), str(ctx["density"]),
-		seed_v, _area_m2(b))
+	return BuildingHeights._look_for(b, ctx)
 
-## Per-build context: the style region and settlement density, plus the
-## tagged heights (tag/levels resolved, in a 150 m spatial hash keyed by
-## building kind) that feed the neighbour estimate — a house is judged
-## against nearby houses, never against a tagged tower.
 static func _height_context(data: LocationData) -> Dictionary:
-	var region := ArchitectureStyle.region_for(data.latitude, data.longitude)
-	var density := _density(data)
-	var m2u := WorldScale.metres_to_units()
-	var cell := 150.0 * m2u
-	var cells := {}
-	for b in data.buildings:
-		if not (b is Dictionary):
-			continue
-		var bd := b as Dictionary
-		var src := str(bd.get("height_source", ""))
-		if src != "tag_height" and not (src == "levels" and int(bd.get("levels", 0)) > 0):
-			continue
-		var kind := ArchitectureStyle.kind_for(bd, density, _area_m2(bd))
-		var h := float(bd.get("height", 0.0))
-		if src == "levels":
-			h = float(int(bd.get("levels", 0))) \
-				* float(ArchitectureStyle.profile(region, kind)["fh"])
-		if h <= 0.0:
-			continue
-		var p := Vector3(float(bd.get("x", 0.0)), float(bd.get("z", 0.0)), h)
-		var key := Vector3i(int(floor(p.x / cell)), int(floor(p.y / cell)),
-			ArchitectureStyle.KINDS.find(kind))
-		if not cells.has(key):
-			cells[key] = []
-		(cells[key] as Array).append(p)
-	return {"region": region, "density": density,
-		"fidelity": MaterialLibrary.fidelity_for_preset(data.quality_preset),
-		"cells": cells, "cell": cell, "radius_u": 150.0 * m2u}
+	return BuildingHeights._height_context(data)
 
-## T4.2 height priority (contract §2.4): `height` tag → `building:levels`
-## × the kind's regional floor height → same-kind local estimate →
-## the kind's regional default (a seeded storey count, never one global
-## figure). `m` is the mass (part or parent), `b` the parent; parts
-## without own tags inherit parent_res. Dicts without height_source
-## predate v2 (fixtures) and keep their carried height verbatim. Returns
-## {total_m, source}; total includes the roof (OSM `height` semantics),
-## the caller splits wall/roof from the shape.
 static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		parent_res: Dictionary, look: Dictionary) -> Dictionary:
-	var src := str(m.get("height_source", b.get("height_source", "")))
-	var levels := int(m.get("levels", b.get("levels", 0)))
-	# A part echoes its parent's source when it carries no tags of its
-	# own ("levels" with levels 0 included), so it inherits the
-	# resolved parent mass instead of re-inferring at its centroid.
-	if not parent_res.is_empty() \
-			and src != "tag_height" and not (src == "levels" and levels > 0):
-		return {"total_m": float(parent_res["total_m"]),
-			"source": str(parent_res["source"])}
-	if src == "tag_height":
-		return {"total_m": float(m.get("height", b.get("height", 0.0))),
-			"source": "tag_height"}
-	if src == "levels" and levels > 0:
-		return {"total_m": float(levels) * float(look["floor_h"]),
-			"source": "levels"}
-	if src == "":
-		var h := float(m.get("height", b.get("height", 0.0)))
-		if h > 0.0:
-			return {"total_m": h, "source": "tag_height"}
-		if levels > 0:
-			return {"total_m": float(levels) * float(look["floor_h"]),
-				"source": "levels"}
-	return _inferred_total(float(m.get("x", b.get("x", 0.0))),
-		float(m.get("z", b.get("z", 0.0))), ctx, look)
+	return BuildingHeights._resolve_total(m, b, ctx, parent_res, look)
 
-## Step 3 of the priority: the data-derived local estimate. The plan
-## names a satellite/DEM-derived estimate; what is honest today is the
-## same-kind neighbour median (tagged heights within 150 m, ≥3 samples,
-## ±15% seeded so a street is not a row of clones), because the T2.1 DEM
-## is bare-earth (~6 m/px, buildings unresolved) and the Esri mosaic's
-## capture sun geometry is unknown, so shadow extrusion would be
-## guesswork. With 1–2 tagged neighbours the kind's default is clamped
-## within 1.95× of their median (neighbour-guard-safe by construction);
-## with none the kind's regional default applies.
 static func _inferred_total(x: float, z: float, ctx: Dictionary,
 		look: Dictionary) -> Dictionary:
-	var near := _tagged_within(ctx, x, z, str(look["kind"]))
-	var reg := float(look["default_h"])
-	if near.size() >= 3:
-		var jitter := 0.85 + 0.3 * ArchitectureStyle._h(x * 0.37 + z * 0.91, 8)
-		return {"total_m": _median(near) * jitter, "source": "estimate"}
-	if near.size() >= 1:
-		var med := _median(near)
-		return {"total_m": clampf(reg, med / 1.95, med * 1.95),
-			"source": "default"}
-	return {"total_m": reg, "source": "default"}
+	return BuildingHeights._inferred_total(x, z, ctx, look)
 
 static func _tagged_within(ctx: Dictionary, x: float, z: float, kind: String) -> Array:
-	var out: Array = []
-	var cell := float(ctx["cell"])
-	var r := float(ctx["radius_u"])
-	var cx := int(floor(x / cell))
-	var cz := int(floor(z / cell))
-	var k := ArchitectureStyle.KINDS.find(kind)
-	var cells := ctx["cells"] as Dictionary
-	for ix in range(cx - 1, cx + 2):
-		for iz in range(cz - 1, cz + 2):
-			var bucket: Variant = cells.get(Vector3i(ix, iz, k), [])
-			if not (bucket is Array):
-				continue
-			for p in (bucket as Array):
-				var pv: Vector3 = p
-				if Vector2(pv.x - x, pv.y - z).length() <= r:
-					out.append(pv.z)
-	return out
+	return BuildingHeights._tagged_within(ctx, x, z, kind)
 
 static func _median(a: Array) -> float:
-	if a.is_empty():
-		return 0.0
-	a.sort()
-	var n := a.size()
-	if n % 2 == 1:
-		return float(a[n / 2])
-	return (float(a[n / 2 - 1]) + float(a[n / 2])) * 0.5
+	return BuildingHeights._median(a)
 
-## Canonical roof shape from the raw `roof:shape` tag. Pitched-family
-## aliases map to their nearest modelled form (skillion/gambrel read
-## as gabled, cone as pyramidal, round/onion as dome); anything else
-## unknown reads as flat. Untagged ("") takes the regional default —
-## except legacy dicts without height_source, which keep the flat cap
-## their wall heights were pinned against.
 static func _effective_shape(raw: String, default_roof: String, legacy: bool) -> String:
-	match raw.strip_edges().to_lower():
-		"flat":
-			return "flat"
-		"gabled", "gambrel", "skillion", "saltbox", "shed":
-			return "gabled"
-		"hipped":
-			return "hipped"
-		"mansard":
-			return "mansard"
-		"pyramidal", "pyramid", "cone":
-			return "pyramidal"
-		"dome", "round", "onion":
-			return "dome"
-		"":
-			return "flat" if legacy else default_roof
-		_:
-			return "flat"
+	return BuildingHeights._effective_shape(raw, default_roof, legacy)
 
-## Roof rise in metres: the `roof:height` tag when present, else a
-## shape default scaled by the footprint's short span and the style's
-## regional pitch (steep alpine/German roofs, low Nordic/Australian ones;
-## flat reads 0 — the cap is the roof). The caller additionally caps the
-## rise below the total height so the wall keeps ≥0.5 m.
-static func _roof_height_m(shape: String, span_m: float, tag_m: float,
-		pitch: float = 1.0) -> float:
-	if tag_m > 0.0:
-		return tag_m
-	# Clamps scale with the pitch so a steep alpine roof is not flattened
-	# back to the default cap (identical to the old clamps at pitch 1).
-	var lo := minf(pitch, 1.0)
-	var hi := maxf(pitch, 1.0)
-	match shape:
-		"gabled":
-			return clampf(span_m * 0.28 * pitch, 1.2 * lo, 4.5 * hi)
-		"hipped":
-			return clampf(span_m * 0.25 * pitch, 1.2 * lo, 4.0 * hi)
-		"mansard":
-			return clampf(span_m * 0.24 * pitch, 1.5 * lo, 3.2 * hi)
-		"pyramidal":
-			return clampf(span_m * 0.32 * pitch, 1.0 * lo, 5.0 * hi)
-		"dome":
-			return clampf(span_m * 0.30 * pitch, 1.0 * lo, 6.0 * hi)
-	return 0.0
+static func _roof_height_m(shape: String, span_m: float, tag_m: float, pitch: float = 1.0) -> float:
+	return BuildingHeights._roof_height_m(shape, span_m, tag_m, pitch)
 
 static func _ring_span_m(ring: PackedVector2Array) -> float:
-	var bb := RingGeometry.aabb(ring)
-	return minf(bb.size.x, bb.size.y) / WorldScale.metres_to_units()
+	return BuildingHeights._ring_span_m(ring)
 
-## Pitched roof over a cleaned ring, rising rh from the eave level top
-## (RoofGeometry builds the mesh; rings whose centroid falls outside keep
-## the flat seal cap only).
+static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
+	return BuildingWalls._clean_ring(raw)
+
+static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
+		top: float, mat: Material, v_repeat: float = 1.0) -> void:
+	BuildingWalls._walls(root, ring, base, top, mat, v_repeat)
+
+static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array, top: float, mat: Material) -> void:
+	BuildingWalls._roof_cap(root, ring, idx, top, mat)
+
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material) -> void:
 	var mesh := RoofGeometry.form_mesh(ring, top, rh, shape)
@@ -803,3 +487,9 @@ static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> 
 		if Vector2(x - float(c.get("x", 0.0)), z - float(c.get("z", 0.0))).length() < 36.0:
 			return true
 	return false
+
+static func _rect_ring(c: Vector2, size: Vector2, yaw: float) -> PackedVector2Array:
+	return BuildingWalls._rect_ring(c, size, yaw)
+
+static func _aabb_footprint(b: Dictionary) -> Dictionary:
+	return BuildingWalls._aabb_footprint(b)

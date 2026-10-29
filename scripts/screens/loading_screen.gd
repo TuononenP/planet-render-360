@@ -15,6 +15,8 @@ var _cancel_btn: Button
 var _current_layout: int = Responsive.Layout.COMPACT
 var _active_index := -1
 var _pulse_on := false
+var _building := false
+var _build_started_msec := 0
 var _fit_queued := false
 var _fit_pass := 0
 var _preview_min_h := 56  # measured in _ready: icon + label + padding
@@ -212,6 +214,7 @@ func begin(place_name: String) -> void:
 	_title.text = place_name
 	_progress.value = 0
 	_active_index = -1
+	_building = false
 	if _percent_label != null:
 		_percent_label.text = "0%"
 	if _stage_label != null:
@@ -227,6 +230,9 @@ func begin(place_name: String) -> void:
 
 func _on_pulse() -> void:
 	_pulse_on = not _pulse_on
+	if _building and _percent_label != null:
+		_percent_label.text = "%ds" % int(
+			(Time.get_ticks_msec() - _build_started_msec) / 1000)
 	if _active_index < 0 or _active_index >= _rows.size():
 		return
 	var icon: Label = _rows[_active_index]["icon"]
@@ -259,3 +265,14 @@ func set_progress(fraction: float, label: String) -> void:
 	_stage_label.text = label
 	if _percent_label != null:
 		_percent_label.text = "%d%%" % int(round(clampf(fraction, 0.0, 1.0) * 100.0))
+
+## Fetch pipeline is done; the threaded world build has no measurable
+## fraction, so show elapsed seconds instead of a misleading 100%.
+func set_building() -> void:
+	_building = true
+	_build_started_msec = Time.get_ticks_msec()
+	_active_index = -1
+	_progress.value = 100.0
+	_stage_label.text = "Building world…"
+	if _percent_label != null:
+		_percent_label.text = "0s"
