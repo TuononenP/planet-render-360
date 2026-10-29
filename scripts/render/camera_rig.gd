@@ -8,6 +8,16 @@ var pitch: float = -0.08
 var zoom_factor := 1.0  # 1.0 = base FOV, >1 zooms in
 var _dragging := false
 
+## Active WorldScale render origin in metres (contract §1.3, T1.2).
+## The world root carries the −origin offset so metre-scale geometry
+## sits near the float sweet spot; the rig keeps its viewpoint-local
+## position and records the origin so spawn/look math stays in the
+## same frame. Zero (v1 equivalence): no behaviour change.
+var render_origin := Vector3.ZERO
+
+func set_render_origin(metre_origin: Vector3) -> void:
+	render_origin = metre_origin
+
 const BASE_FOV := 70.0
 
 @onready var camera: Camera3D = $Camera3D

@@ -440,6 +440,10 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 	if expanded:
 		_stack.visible = false
 		_split.visible = true
+		# Park the stacked-layout containers in the hidden stack:
+		# left parentless they were orphan nodes, leaked as
+		# CanvasItem RIDs and ObjectDB instances on quit.
+		_move_all([_top_col, _stack_gap, _sheet], _stack)
 		_move_all([_side, _right_col], _split)
 		_side.custom_minimum_size = Vector2(Responsive.sidebar_width(layout), 0)
 		_move_all([_nav], _right_col)
@@ -452,6 +456,11 @@ func _apply_layout(layout: Responsive.Layout) -> void:
 	else:
 		_split.visible = false
 		_stack.visible = true
+		# Park the expanded-only containers in the hidden split: left
+		# parentless they (and the brand pill parked in _side_col on
+		# compact) were orphan nodes, leaked as CanvasItem RIDs and
+		# ObjectDB instances on quit.
+		_move_all([_side, _right_col], _split)
 		_move_all([_top_col, _stack_gap, _sheet], _stack)
 		if compact:
 			_move_all([_search_box, _nav], _top_row)

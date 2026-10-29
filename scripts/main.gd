@@ -14,6 +14,10 @@ var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
 var _downloader: OfflineDownloader
 var _download_at := Vector2.ZERO
+## Bumped per generation and on cancel, so a world still building on
+## its thread is dropped once superseded.
+var _gen_id := 0
+var _building_world := false
 
 func _ready() -> void:
 	_store = CacheStore.new()
@@ -63,7 +67,12 @@ func _ready() -> void:
 
 	_loading = LoadingScreen.new()
 	_loading.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_loading.cancel_requested.connect(func() -> void: _pipeline.cancel())
+	_loading.cancel_requested.connect(func() -> void:
+		_gen_id += 1
+		_pipeline.cancel()
+		# Past the pipeline (world building) nothing emits cancelled.
+		if _building_world:
+			_show(_picker))
 	add_child(_loading)
 
 	_view = View360.new()
@@ -110,6 +119,7 @@ func _show(screen: Control) -> void:
 		s.visible = s == screen
 
 func _start_generation(lat: float, lon: float) -> void:
+	_gen_id += 1
 	_pending = Vector2(lat, lon)
 	var display_name := _picker.selected_name
 	if display_name == "":
@@ -119,6 +129,13 @@ func _start_generation(lat: float, lon: float) -> void:
 	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
 
 func _on_generation_finished(data: LocationData) -> void:
+	var gen := _gen_id
+	_loading.set_progress(1.0, "Building world")
+	_building_world = true
+	var built := await _view.build_location(data)
+	_building_world = false
+	if gen != _gen_id:
+		return
 	_store.add_entry(data.place_name, data.latitude, data.longitude)
-	_view.show_location(data)
+	_view.show_location(data, built)
 	_show(_view)
