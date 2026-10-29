@@ -29,7 +29,7 @@ func _run() -> void:
 
 	# Budgets strictly rise Fast < Balanced < High < Ultra; clamping is safe.
 	for values in [
-			[RenderSettings.grid_size_for(0), RenderSettings.grid_size_for(1), RenderSettings.grid_size_for(2), RenderSettings.grid_size_for(3)],
+			[RenderSettings.terrain_mesh_posts_for(0), RenderSettings.terrain_mesh_posts_for(1), RenderSettings.terrain_mesh_posts_for(2), RenderSettings.terrain_mesh_posts_for(3)],
 			[RenderSettings.max_buildings_for(0), RenderSettings.max_buildings_for(1), RenderSettings.max_buildings_for(2), RenderSettings.max_buildings_for(3)],
 			[RenderSettings.vegetation_count_for(0, false), RenderSettings.vegetation_count_for(1, false), RenderSettings.vegetation_count_for(2, false), RenderSettings.vegetation_count_for(3, false)]]:
 		if not (values[0] < values[1] and values[1] < values[2] and values[2] < values[3]):
@@ -49,17 +49,16 @@ func _run() -> void:
 	if RenderSettings.preset_name(3) != "Ultra":
 		failures.append("preset 3 should be Ultra")
 
-	# The preset sizes the grids the pipeline fetches/builds.
+	# T7.0/T7.1 (AC-12): the DEM/GroundTruth and far grids are preset-
+	# independent (every object sits on the same surface on every
+	# preset); only the terrain mesh density is a per-preset LOD.
 	var sized := LocationData.new()
-	RenderSettings.apply_preset(sized, RenderSettings.Preset.FAST)
-	if sized.grid_size != 32 or sized.far_grid_size != 32 or sized.quality_preset != 0:
-		failures.append("Fast should size 32x32 grids, got %d/%d" % [sized.grid_size, sized.far_grid_size])
-	RenderSettings.apply_preset(sized, RenderSettings.Preset.HIGH)
-	if sized.grid_size != 64 or sized.far_grid_size != 64:
-		failures.append("High should size 64x64 grids, got %d" % sized.grid_size)
-	RenderSettings.apply_preset(sized, RenderSettings.Preset.ULTRA)
-	if sized.grid_size != 128 or sized.far_grid_size != 128 or sized.quality_preset != 3:
-		failures.append("Ultra should size 128x128 grids, got %d/%d" % [sized.grid_size, sized.far_grid_size])
+	for p in [0, 1, 2, 3]:
+		RenderSettings.apply_preset(sized, p)
+		if sized.grid_size != RenderSettings.GROUND_POSTS or sized.far_grid_size != 128 \
+				or sized.quality_preset != p:
+			failures.append("preset %d should size %d/128 grids, got %d/%d"
+				% [p, RenderSettings.GROUND_POSTS, sized.grid_size, sized.far_grid_size])
 
 	# High is the default preset for fresh installs.
 	if RenderSettings.new().preset != RenderSettings.Preset.HIGH:
@@ -134,13 +133,13 @@ func _run() -> void:
 			failures.append("tapping Fast should apply and announce it")
 		if not screen._preset_btns[0].button_pressed or screen._preset_btns[1].button_pressed:
 			failures.append("only the chosen preset button should stay pressed")
-		if not screen._summary_label.text.contains("32"):
+		if not screen._summary_label.text.contains("%d×" % RenderSettings.terrain_mesh_posts_for(0)):
 			failures.append("summary should describe the Fast budget, got: %s" % screen._summary_label.text)
 		screen._preset_btns[3].pressed.emit()
 		await process_frame
 		if settings.preset != RenderSettings.Preset.ULTRA or announced != [0, 3]:
 			failures.append("tapping Ultra should apply and announce it")
-		if not screen._summary_label.text.contains("128"):
+		if not screen._summary_label.text.contains("%d×" % RenderSettings.terrain_mesh_posts_for(3)):
 			failures.append("summary should describe the Ultra budget, got: %s" % screen._summary_label.text)
 	# Offline storage management: size is readable, label reports it.
 	if screen._storage_label == null or not screen._storage_label.text.contains("MB"):

@@ -110,11 +110,11 @@ func _run() -> void:
 	if view._time_label.text != "12:00":
 		failures.append("noon slot should read 12:00, got %s" % view._time_label.text)
 	var noon_energy := view._sun.light_energy
-	var noon_sky := view._sky_mat.sky_top_color
+	var noon_sky := view._atmos.sky_top_color
 	view.set_time_of_day(0)
 	if view._sun.light_energy >= noon_energy:
 		failures.append("midnight should be darker than noon (%f vs %f)" % [view._sun.light_energy, noon_energy])
-	if view._sky_mat.sky_top_color == noon_sky:
+	if view._atmos.sky_top_color == noon_sky:
 		failures.append("sky should change between noon and midnight")
 	view.set_time_of_day(6)
 	var dawn_rot := view._sun.rotation_degrees
