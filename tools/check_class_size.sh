@@ -1,9 +1,9 @@
 #!/bin/sh
-# Fails if any class file under scripts/ exceeds the 1000-line budget
+# Fails if any class file under scripts/ exceeds the 500-line budget
 # documented in AGENTS.md. Tests and scenes are not classes; only the
 # reusable GDScript classes are measured.
 set -u
-limit=1000
+limit=500
 fail=0
 max=0
 max_file=""

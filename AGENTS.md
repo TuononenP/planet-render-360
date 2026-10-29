@@ -14,7 +14,7 @@
 
 ## Code size
 
-- Keep every class (one GDScript file under `scripts/`) at or under 1000 lines.
+- Keep every class (one GDScript file under `scripts/`) at or under 500 lines.
 - When a file approaches the limit, split it into a focused class with a clear responsibility instead of letting it grow.
 - Run `tools/check_class_size.sh` when you add or grow classes; it fails on any violation.
 

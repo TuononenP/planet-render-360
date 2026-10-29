@@ -18,6 +18,11 @@ var _download_at := Vector2.ZERO
 ## its thread is dropped once superseded.
 var _gen_id := 0
 var _building_world := false
+## True from _start_generation until the view is shown or the run is
+## cancelled and drained. A second start while busy would run two
+## pipeline/build threads over shared static caches and can stall
+## the world build, so starts are ignored until this clears.
+var _generating := false
 
 func _ready() -> void:
 	_store = CacheStore.new()
@@ -32,7 +37,9 @@ func _ready() -> void:
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.finished.connect(_on_generation_finished)
-	_pipeline.cancelled.connect(func() -> void: _show(_picker))
+	_pipeline.cancelled.connect(func() -> void:
+		_generating = false
+		_show(_picker))
 
 	_picker = MapPicker.new()
 	_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -119,6 +126,10 @@ func _show(screen: Control) -> void:
 		s.visible = s == screen
 
 func _start_generation(lat: float, lon: float) -> void:
+	if _generating:
+		print("Generation already in progress; ignoring start")
+		return
+	_generating = true
 	_gen_id += 1
 	_pending = Vector2(lat, lon)
 	var display_name := _picker.selected_name
@@ -130,10 +141,11 @@ func _start_generation(lat: float, lon: float) -> void:
 
 func _on_generation_finished(data: LocationData) -> void:
 	var gen := _gen_id
-	_loading.set_progress(1.0, "Building world")
+	_loading.set_building()
 	_building_world = true
 	var built := await _view.build_location(data)
 	_building_world = false
+	_generating = false
 	if gen != _gen_id:
 		return
 	_store.add_entry(data.place_name, data.latitude, data.longitude)

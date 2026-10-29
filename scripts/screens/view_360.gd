@@ -245,80 +245,55 @@ func _build_hud() -> void:
 ## Rebuild the HUD after an accent change: its styleboxes bake the
 ## palette in at creation, so the simplest correct re-skin is a fresh
 ## build with the visible state carried over.
+
+# --- Delegators: implementation in ViewChrome / ViewConditions. ---
 func refresh_theme() -> void:
-	if _top == null:
-		return
-	var place := _place_pill.text
-	var attribution := _attribution_label.text
-	var weather := _weather_label.text
-	var weather_shown := _weather_label.visible
-	var quality := _quality_label.text
-	var compass := _compass.text
-	var season := _season_btn.selected
-	var hint_shown := _hint.visible
-	for node in [_top, _bottom_root, _hint_timer]:
-		remove_child(node)
-		node.queue_free()
-	_build_hud()
-	_place_pill.text = place
-	_attribution_label.text = attribution
-	_weather_label.text = weather
-	_weather_label.visible = weather_shown
-	_quality_label.text = quality
-	_compass.text = compass
-	_season_btn.select(season)
-	_hint.visible = hint_shown
-	_fit_place_pill()
-	_on_resized()
-	_sync_time_ui()
+	ViewChrome.refresh_theme(self)
 
 func _dismiss_hint() -> void:
-	if _hint == null or not _hint.visible or _hint.modulate.a < 1.0:
-		return
-	var tw := create_tween()
-	tw.tween_property(_hint, "modulate:a", 0.0, 0.5)
-	tw.tween_callback(_hint.hide)
+	ViewChrome._dismiss_hint(self)
 
 func _show_hint() -> void:
-	if _hint == null:
-		return
-	_hint.modulate.a = 1.0
-	_hint.show()
-	if _hint_timer.is_inside_tree():
-		_hint_timer.start()
+	ViewChrome._show_hint(self)
 
-## Long place names ellipsize instead of pushing the compass off
-## screen; short ones keep the pill hugging the text.
 func _fit_place_pill() -> void:
-	if _place_pill == null:
-		return
-	var font := _place_pill.get_theme_font("font")
-	var font_size := _place_pill.get_theme_font_size("font_size")
-	var text_w := font.get_string_size(_place_pill.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	var room := size.x - _top.offset_left + _top.offset_right - 96 - 56 - 36 - 30
-	_place_pill.custom_minimum_size.x = clampf(ceilf(text_w) + 2, 40.0, maxf(room, 40.0))
+	ViewChrome._fit_place_pill(self)
 
 func _on_look_changed() -> void:
-	_compass.text = _rig.compass_text()
-	_dismiss_hint()
+	ViewChrome._on_look_changed(self)
 
 func _on_resized() -> void:
-	if _top == null:
-		return
-	var layout := Responsive.layout_for_width(size.x)
-	var pad := Responsive.page_padding(layout)
-	_top.offset_left = pad
-	_top.offset_right = -pad
-	_top.offset_top = pad
-	_bottom_root.offset_left = pad
-	_bottom_root.offset_right = -pad
-	_bottom_root.offset_bottom = -pad
-	var sheet_width := int(size.x) - pad * 2
-	if Responsive.is_split(layout):
-		sheet_width = mini(sheet_width, 640)
-	_sheet.custom_minimum_size = Vector2(maxi(sheet_width, 280), 0)
-	_sun_icon.visible = Responsive.is_split(layout)
-	_fit_place_pill()
+	ViewChrome._on_resized(self)
+
+func _on_season_selected(index: int) -> void:
+	ViewConditions._on_season_selected(self, index)
+
+func _build_precip() -> void:
+	ViewConditions._build_precip(self)
+
+func _apply_precip(code: int) -> void:
+	ViewConditions._apply_precip(self, code)
+
+func _on_weather(temp_c: float, label: String, cloud_cover: float, code: int) -> void:
+	ViewConditions._on_weather(self, temp_c, label, cloud_cover, code)
+
+func set_time_of_day(hour: int) -> void:
+	ViewConditions.set_time_of_day(self, hour)
+
+func use_live_time() -> void:
+	ViewConditions.use_live_time(self)
+
+func _apply_current_time() -> void:
+	ViewConditions._apply_current_time(self)
+
+func _on_time_slider_changed(value: float) -> void:
+	ViewConditions._on_time_slider_changed(self, value)
+
+func _sync_time_ui() -> void:
+	ViewConditions._sync_time_ui(self)
+
+func _apply_time(hour_f: float) -> void:
+	ViewConditions._apply_time(self, hour_f)
 
 func _build_3d() -> void:
 	_world_root = Node3D.new()
@@ -409,78 +384,6 @@ func _notification(what: int) -> void:
 					(built[1] as Node3D).free()
 		_threads.clear()
 
-func _on_season_selected(index: int) -> void:
-	if _data == null:
-		return
-	_data.season = LocationData.clamp_season(index)
-	if _season_btn != null:
-		_season_btn.select(_data.season)
-	_atmos.set_season(_data.season)
-	# Colours bake per season, so the world rebuilds (threaded, the old
-	# world stays up meanwhile); the ground surface is season-free and
-	# reused.
-	if _season_building:
-		_season_dirty = true
-		return
-	_season_building = true
-	while true:
-		_season_dirty = false
-		var data := _data
-		var built := await build_location(data, _ground)
-		if data != _data or _season_dirty:
-			(built[1] as Node3D).free()
-			if data != _data:
-				break  # another place opened meanwhile
-			continue
-		_rebuild_world(built[1])
-		break
-	_season_building = false
-
-## Rain/snow dressing from the live weather code: one particle system
-## around the camera, off unless the place is actually precipitating.
-func _build_precip() -> void:
-	_precip = GPUParticles3D.new()
-	_precip.amount = 900
-	_precip.lifetime = 1.6
-	_precip.emitting = false
-	_precip.visible = false
-	var mat := ParticleProcessMaterial.new()
-	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	mat.emission_box_extents = Vector3(28, 16, 28)
-	mat.direction = Vector3(0, -1, 0)
-	mat.spread = 6.0
-	mat.gravity = Vector3(0, -22, 0)
-	mat.initial_velocity_min = 4.0
-	mat.initial_velocity_max = 7.0
-	_precip.process_material = mat
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.05, 0.5)
-	var qm := StandardMaterial3D.new()
-	qm.albedo_color = Color(0.75, 0.85, 0.95, 0.55)
-	qm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	qm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	quad.material = qm
-	_precip.draw_pass_1 = quad
-	_rig.add_child(_precip)
-	_precip.position = Vector3(0, 10, 0)
-
-func _apply_precip(code: int) -> void:
-	if _precip == null:
-		return
-	var snowing := code in [71, 73, 75, 77, 85, 86]
-	var raining := code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]
-	_precip.visible = snowing or raining
-	_precip.emitting = snowing or raining
-	if snowing:
-		var mat := _precip.process_material as ParticleProcessMaterial
-		mat.gravity = Vector3(0, -3.5, 0)
-		(_precip.draw_pass_1 as QuadMesh).size = Vector2(0.14, 0.14)
-	elif raining:
-		var mat2 := _precip.process_material as ParticleProcessMaterial
-		mat2.gravity = Vector3(0, -22, 0)
-		(_precip.draw_pass_1 as QuadMesh).size = Vector2(0.05, 0.5)
-
-## `prebuilt` is a build_location result; empty builds synchronously.
 func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	set_quality_preset(data.quality_preset)
 	_data = data
@@ -529,57 +432,6 @@ static func spawn_xz(data: LocationData) -> Vector2:
 static func landmark_yaw(data: LocationData, from: Vector2) -> float:
 	var d := TerrainBuilder.landmark_world_pos(data) - from
 	return atan2(-d.x, -d.y)
-
-func _on_weather(temp_c: float, label: String, cloud_cover: float, code: int) -> void:
-	if _weather_label != null:
-		_weather_label.text = "%.0f°C · %s" % [temp_c, label]
-		_weather_label.visible = true
-	_atmos.set_weather(code, cloud_cover)
-	_apply_precip(code)
-
-# --- Time of day: 24 hourly slots, or live current time ---
-
-func set_time_of_day(hour: int) -> void:
-	_live_time = false
-	_time_hour = float(clampi(hour, 0, 23))
-	_apply_time(_time_hour)
-	_sync_time_ui()
-
-func use_live_time() -> void:
-	_live_time = true
-	_apply_current_time()
-
-func _apply_current_time() -> void:
-	var now := Time.get_time_dict_from_system()
-	_time_hour = float(now.get("hour", 12)) + float(now.get("minute", 0)) / 60.0
-	_apply_time(_time_hour)
-	_sync_time_ui()
-
-func _on_time_slider_changed(value: float) -> void:
-	if _setting_time:
-		return
-	set_time_of_day(int(value))
-
-func _sync_time_ui() -> void:
-	if _sun_slider == null:
-		return
-	_setting_time = true
-	_sun_slider.value = floor(_time_hour)
-	_setting_time = false
-	if _live_time:
-		var now := Time.get_time_dict_from_system()
-		_time_label.text = "%02d:%02d" % [int(now.get("hour", 0)), int(now.get("minute", 0))]
-		_now_btn.text = "●  Live"
-	else:
-		_time_label.text = "%02d:00" % int(_time_hour)
-		_now_btn.text = "↺  Now"
-	HudStyle.apply_live_chip(_now_btn, _live_time)
-
-func _apply_time(hour_f: float) -> void:
-	if _atmos == null:
-		return
-	var lat := _data.latitude if _data != null else _atmos.latitude
-	_atmos.set_time(hour_f, lat)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
