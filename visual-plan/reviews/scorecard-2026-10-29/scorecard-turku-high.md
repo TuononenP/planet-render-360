@@ -1,11 +1,13 @@
 # Scorecard — Turku — High — 2026-10-29
-- Run: preset High, seed 43116, sample rules v1 2026-10-29, cache data v2, OSM absent (0 buildings, 0 roads), satellite real, DEM source z14; pipeline 68.4 s, ground+builders 3.0 s
-- (a) DEM: max 2.72 m / mean 0.74 m over 9 land points (bar ≤ 3 m) → PASS
-  - points (x,z m: rendered − z14): (0,0) -0.04; (0,-400) +0.58; (400,0) +0.05; (0,400) -2.72; (-400,0) -0.35; (0,-800) -0.38; (800,0) -1.68; (0,800) +0.42; (-800,0) -0.39
-- (b) footprints → BLOCKED(no OSM buildings in the extent)
-- (c) heights → BLOCKED(no OSM buildings in the extent)
-- (d) water: no OSM water in the extent; rendered water triangles 0 (absence check) → PASS
-- (d) roads → BLOCKED(no OSM road junctions in the extent)
+- Run: preset High, seed 43116, sample rules v1 2026-10-29, cache data v2, OSM real (2760 buildings, 9235 roads), satellite real, DEM source z14; pipeline 3.5 s, ground+builders 28.0 s
+- (a) DEM: max 3.19 m / mean 0.69 m over 9 land points (bar ≤ 3 m) → FAIL
+  - points (x,z m: rendered − z14): (0,0) +0.04; (0,-400) +0.43; (400,0) -0.01; (0,400) -3.19; (-400,0) -0.20; (0,-800) +0.35; (800,0) -1.64; (0,800) -0.05; (-800,0) -0.29
+- (b) footprints: median IoU 0.950, centroid offset 0.07 m over 20 sampled (bar IoU ≥ 0.85, ≤ 2 m) → PASS
+- (c) heights: median err 0.24 m, coverage 10/20 tagged (bar ≤ 3 m ≈ 1 storey) → PASS
+  - tagged (source expected→rendered): levels 18.0→22.6 m; levels 18.0→18.0 m; levels 9.0→15.3 m; levels 14.4→14.4 m; levels 27.0→27.0 m; levels 3.0→2.8 m; tag_height 22.0→23.5 m; levels 27.0→27.0 m; levels 2.8→2.8 m; levels 10.8→14.6 m
+- (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
+  - samples: (-223,877) visible water at 0.0 m; (-183,842) visible water at 9.3 m; (512,-155) visible water at 7.6 m; (549,-720) visible water at 8.5 m; (348,179) visible water at 9.7 m
+- (d) roads: 5/5 junctions with a rendered ribbon within 3 m (352 of 10647 junctions are passages under OSM buildings, excluded); max ribbon lift 0.41 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
 - (e) turku_cathedral: bearing error 0.034° (model 84.00°, geodesic 83.97°, 635 m; bar ≤ 1°) → PASS; apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)
 - (f) human side-by-side rating (signed checklist, T8.3) → NO-REFERENCE — geometry-only scoring
 - AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)

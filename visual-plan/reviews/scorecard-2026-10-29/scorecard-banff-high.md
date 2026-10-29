@@ -1,8 +1,8 @@
 # Scorecard — Banff — High — 2026-10-29
-- Run: preset High, seed 40130, sample rules v1 2026-10-29, cache data v2, OSM real (1332 buildings, 1153 roads), satellite real, DEM source z14; pipeline 8.7 s, ground+builders 9.1 s
-- (a) DEM: max 0.65 m / mean 0.12 m over 8 land points (bar ≤ 8 m) → PASS
-  - points (x,z m: rendered − z14): (0,0) -0.00; (0,-400) -0.00; (400,0) +0.65; (0,400) +0.00; (-400,0) +0.00; (0,-800) +0.00; (800,0) +0.29; (0,800) +0.00; (-800,0) water, carved -3.4 m — excluded
-- (b) footprints: median IoU 1.000, centroid offset 1.72 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → PASS
+- Run: preset High, seed 40130, sample rules v1 2026-10-29, cache data v2, OSM real (1332 buildings, 1153 roads), satellite real, DEM source z14; pipeline 2.3 s, ground+builders 13.3 s
+- (a) DEM: max 0.29 m / mean 0.04 m over 8 land points (bar ≤ 8 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) -0.00; (0,-400) +0.00; (400,0) +0.29; (0,400) +0.00; (-400,0) +0.00; (0,-800) +0.00; (800,0) -0.06; (0,800) +0.00; (-800,0) water, carved -3.4 m — excluded
+- (b) footprints: median IoU 1.000, centroid offset 0.03 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → PASS
 - (c) heights: coverage 0/10 with height/levels tags → BLOCKED(no tagged sample)
 - (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
   - samples: (-220,703) visible water at 7.5 m; (-558,-130) visible water at 4.6 m; (-294,630) visible water at 0.0 m; (-292,-779) visible water at 9.7 m; (-314,625) visible water at 8.2 m
