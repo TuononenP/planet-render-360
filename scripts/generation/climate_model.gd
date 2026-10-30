@@ -120,36 +120,77 @@ static func grass_tint(data: LocationData, season: int) -> Color:
 		return Color(0.47, 0.38, 0.19, 1.0)
 	return Color(0, 0, 0, 0)
 
-## Seasonal snow for the imagery-draped ground (near GroundMaterial and
-## the far drape rings): satellite mosaics are mostly summer captures,
-## so outside summer the snow the climate puts above the snow line is
-## painted over them; in summer the imagery itself shows the real
-## glaciers. Shared GLSL, spliced into both shaders at "// @SNOW".
+## Live surface state shared by every draped / vegetation / water
+## shader through Godot global shader parameters (project.godot
+## [shader_globals]): one place is shown at a time, and a season change
+## or live weather (snowfall, rain) then updates the world instantly,
+## without a rebuild — and cached worlds carry no place's snow line.
+##  - snow: satellite mosaics are mostly summer captures, so outside
+##    summer the climate snow above the snow line is painted over them
+##    (in summer the imagery shows the real glaciers); trees load snow
+##    by their own height against the same line;
+##  - wetness: rain/drizzle darkens and glosses the ground;
+##  - ice: still water freezes in cold-winter climates.
+## Spliced into shaders at "// @SNOW".
 const SNOW_GLSL := """
-uniform float snow_on = 0.0;
-uniform float snow_y = 100000.0;
-uniform float snow_band = 150.0;
+global uniform float climate_snow_on;
+global uniform float climate_snow_y;
+global uniform float climate_snow_band;
+global uniform float climate_wetness;
+global uniform float climate_water_ice;
 uniform vec3 snow_col : source_color = vec3(0.90, 0.92, 0.95);
-float snow_cover(vec3 p, float ny) {
-	if (snow_on <= 0.0) { return 0.0; }
+float snow_line(vec3 p) {
+	if (climate_snow_on <= 0.0) { return 0.0; }
 	float wob = sin(p.x * 0.011 + sin(p.z * 0.017) * 2.0) * 0.5
 		+ sin(p.z * 0.029 + p.x * 0.007) * 0.3;
-	float h = p.y + wob * snow_band * 0.8;
-	return snow_on * smoothstep(snow_y - snow_band, snow_y + snow_band, h)
-		* smoothstep(0.45, 0.72, ny);
+	float h = p.y + wob * climate_snow_band * 0.8;
+	return climate_snow_on * smoothstep(climate_snow_y - climate_snow_band,
+		climate_snow_y + climate_snow_band, h);
+}
+float snow_cover(vec3 p, float ny) {
+	return snow_line(p) * smoothstep(0.45, 0.72, ny);
 }
 """
 
-## Uniform values for SNOW_GLSL: snow line in render Y (the viewpoint
-## elevation is Y = 0, GroundTruth's datum).
-static func snow_uniforms(data: LocationData) -> Dictionary:
+const GLOBALS := ["climate_snow_on", "climate_snow_y", "climate_snow_band",
+	"climate_wetness", "climate_water_ice"]
+## Open-Meteo WMO codes: falling snow / rain (incl. showers, storms).
+const SNOWING := [71, 73, 75, 77, 85, 86]
+const RAINING := [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
+## Coldest-quarter mean (°C) below which still water freezes over.
+const ICE_C := -4.0
+
+## Snow parameters: snow line in render Y (the viewpoint elevation is
+## Y = 0, GroundTruth's datum). Falling snow at a place cold enough to
+## settle (season temperature ≤ 2 °C at the viewpoint) brings the line
+## down to the viewpoint whatever the season.
+static func snow_uniforms(data: LocationData, weather_code: int = -1) -> Dictionary:
 	var s := LocationData.clamp_season(data.season)
 	var m2u := WorldScale.metres_to_units()
-	return {"snow_on": 0.0 if s == LocationData.Season.SUMMER else 1.0,
-		"snow_y": (snowline_m(data, s) - data.centre_elevation_m) * m2u,
-		"snow_band": 150.0 * m2u}
+	var on := 0.0 if s == LocationData.Season.SUMMER else 1.0
+	var line := (snowline_m(data, s) - data.centre_elevation_m) * m2u
+	if weather_code in SNOWING and (not has(data) or season_temp_c(data, s) <= 2.0):
+		on = 1.0
+		line = minf(line, -30.0 * m2u)
+	return {"climate_snow_on": on, "climate_snow_y": line, "climate_snow_band": 150.0 * m2u}
 
-static func apply_snow(mat: ShaderMaterial, data: LocationData) -> void:
-	var u := snow_uniforms(data)
-	for k in u:
-		mat.set_shader_parameter(k, u[k])
+## Whether still water is frozen this season: winter where the coldest
+## quarter averages ≤ ICE_C (CHELSA), else winter above 60° latitude.
+static func water_frozen(data: LocationData) -> bool:
+	if LocationData.clamp_season(data.season) != LocationData.Season.WINTER:
+		return false
+	if has(data):
+		return float(data.climate["t_cold_c"]) <= ICE_C
+	return absf(data.latitude) >= 60.0
+
+## Every global for `data` under live weather `weather_code` (-1 none).
+static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionary:
+	var g := snow_uniforms(data, weather_code)
+	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
+	g["climate_water_ice"] = 1.0 if water_frozen(data) else 0.0
+	return g
+
+static func apply_globals(data: LocationData, weather_code: int = -1) -> void:
+	var g := globals_for(data, weather_code)
+	for k in g:
+		RenderingServer.global_shader_parameter_set(k, g[k])

@@ -180,13 +180,17 @@ void fragment() {
 	alb = mix(alb, COLOR.rgb, edge);
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel).
-	alb = mix(alb, snow_col, snow_cover(wpos, wny));
+	float sc = snow_cover(wpos, wny);
+	alb = mix(alb, snow_col, sc);
+	// Live rain: wet ground darkens and turns glossy (not under snow).
+	float wet = climate_wetness * (1.0 - sc);
+	alb *= mix(1.0, 0.72, wet);
 	ALBEDO = value_clamp(alb);
 	vec3 nm = W.x * tile(n0, ua, ub) + W.y * tile(n1, ua, ub)
 		+ W.z * tile(n2, ua, ub) + W.w * tile(n3, ua, ub);
 	NORMAL_MAP = mix(nm, vec3(0.5, 0.5, 1.0), max(wf, edge));
 	NORMAL_MAP_DEPTH = 0.8;
-	ROUGHNESS = rough;
-	SPECULAR = 0.35;
+	ROUGHNESS = mix(rough, 0.22, wet * 0.85);
+	SPECULAR = mix(0.35, 0.5, wet);
 }
 """

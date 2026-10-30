@@ -346,6 +346,7 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 	# Range the near/mid rings for the current preset.
 	LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
+	ViewConditions.apply_surface_state(self)  # climate snow, rain, ice
 
 ## Detached world build: touches no scene tree, so it may run off the
 ## main thread (see build_location).
