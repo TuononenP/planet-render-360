@@ -73,11 +73,12 @@ static func apply_environment(env: Environment, preset: int, forward_plus: bool 
 	var f := features_for(preset, forward_plus)
 	var ultra := RenderSettings.clamp_preset(preset) == RenderSettings.Preset.ULTRA
 	env.ssao_enabled = f["ssao"]
-	# Metre world, eye at 30 m: a radius that reads at kerb and cornice
-	# scale. AO only darkens indirect light (light_affect 0) — direct
-	# sun keeps its full strength, as in reality.
-	env.ssao_radius = 2.5
-	env.ssao_intensity = 1.6
+	# Metre world, eye at 30 m, buildings 100 m+ away: a 10 m radius
+	# grounds bases, eaves and courtyards (2.5 m was a few pixels and
+	# invisible in the Paris captures). AO only darkens indirect light
+	# (light_affect 0) — direct sun keeps its full strength.
+	env.ssao_radius = 10.0
+	env.ssao_intensity = 3.0
 	env.ssao_power = 1.4
 	env.ssao_detail = 0.6
 	env.ssao_light_affect = 0.0
