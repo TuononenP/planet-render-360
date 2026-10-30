@@ -26,11 +26,13 @@ extends RefCounted
 ## Sun's angular diameter (deg): physical penumbrae (PCSS) on Ultra.
 const SUN_ANGLE_DEG := 0.53
 ## Ultra volumetric haze: extinction per metre and froxel reach (m).
-## Thin enough that the exponential haze still sets visibility; dense
-## enough that sun-side shafts read at golden hour.
-const VOLUME_PER_M := 0.0012
-const VOLUME_FOG_PER_M := 0.006
-const VOLUME_LENGTH_M := 500.0
+## Thin and short enough that the exponential haze still sets
+## visibility (the Eiffel Tower stays legible from the Tuileries into
+## the sun); dense enough that sun-side shafts read at golden hour.
+## Paris captures 2026-10-30: 0.0012 over 500 m milked the far city.
+const VOLUME_PER_M := 0.0004
+const VOLUME_FOG_PER_M := 0.003
+const VOLUME_LENGTH_M := 250.0
 
 static func is_forward_plus() -> bool:
 	return RenderingServer.get_current_rendering_method() == "forward_plus"
@@ -102,9 +104,10 @@ static func apply_environment(env: Environment, preset: int, forward_plus: bool 
 	# Froxels crowd toward the eye, where shafts are seen.
 	env.volumetric_fog_detail_spread = 2.0
 	# Forward scattering: shafts glow looking toward the sun.
-	env.volumetric_fog_anisotropy = 0.6
-	env.volumetric_fog_gi_inject = 0.6
-	env.volumetric_fog_ambient_inject = 0.35
+	env.volumetric_fog_anisotropy = 0.8
+	# Sun and bounce light only: a uniform ambient fill flattens depth.
+	env.volumetric_fog_gi_inject = 0.3
+	env.volumetric_fog_ambient_inject = 0.0
 	env.volumetric_fog_sky_affect = 0.0
 	env.volumetric_fog_temporal_reprojection_enabled = true
 	if env.sky != null:
