@@ -19,16 +19,12 @@ extends RefCounted
 ## Since the T7.0 metre cutover metres_to_units() is 1.0, so this is
 ## the datum rebase only.
 ##
-## T3.1 detailed-extent remap: the surface always spans the FULL
-## detailed extent (contract §1.2/§2.2). Real z14/z12 grids cover a
-## 576/144 px source window wider than the extent, so the surface
-## resamples the central sub-window (bilinear, clamped) instead of
-## stretching the whole window across the mesh (the v1 compression,
-## which also misaligned DEM features against OSM vectors 4x). The
-## target span is extent_m*2 in ground metres (880 m-equiv under the
-## T1.2 flag, 2400 m after the cutover — the remap needs no code
-## change then). Procedural grids and hand fixtures carry no
-## dem_source and already span the extent, so they map 1:1.
+## T3.1 detailed-extent remap: the surface spans the FULL detailed
+## extent (contract §1.2/§2.2). Real z14/z12 grids cover a 576/144 px
+## window wider than it, so each post samples its own true position in
+## that window (DemRegistration) instead of stretching the window
+## across the mesh (the v1 compression that misaligned DEM against
+## OSM). Procedural grids and fixtures already span the extent, 1:1.
 ##
 ## Construction reads data.heights / data.water_level / data polygons
 ## once (the single authorized reader — grep gate in scenery_test).
@@ -78,8 +74,11 @@ const CARVE_DEPTH_M := 2.0
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
 ## builders construct it from the data they already receive).
-## Requires valid data (heights.size() == grid_size²), as v1 _heights did.
+## Requires valid data (heights.size() == grid_size²); null leaves an
+## empty surface for WorldCache to restore a saved one into.
 func _init(data: LocationData) -> void:
+	if data == null:
+		return
 	var size := data.grid_size
 	_size = size
 	var extent_units := WorldScale.detailed_extent_units()
