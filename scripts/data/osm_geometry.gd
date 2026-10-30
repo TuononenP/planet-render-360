@@ -138,6 +138,24 @@ static func _relation_land(tags: Dictionary, members: Array,
 				holes.append(h)
 		entries.append({"class": cls, "points": o, "holes": holes})
 	return entries
+## Points every `step` metres along a polyline (first vertex included).
+static func along(line: PackedVector2Array, step: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if line.is_empty():
+		return out
+	out.append(line[0])
+	var carry := 0.0
+	for i in line.size() - 1:
+		var a := line[i]
+		var seg := line[i + 1] - a
+		var d := seg.length()
+		var t := step - carry
+		while t <= d:
+			out.append(a + seg * (t / d))
+			t += step
+		carry = d - (t - step)
+	return out
+
 ## A ring is closed when its ends meet (4 cm in internal units).
 static func _is_closed(poly: PackedVector2Array) -> bool:
 	return poly.size() >= 3 and poly[0].distance_to(poly[poly.size() - 1]) < 0.01
