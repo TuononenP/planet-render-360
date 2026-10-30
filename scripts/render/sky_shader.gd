@@ -18,6 +18,9 @@ uniform float sun_disc = 1.0;
 uniform float cloud_cover = 0.3;
 uniform float overcast = 0.0;
 uniform int octaves = 5;
+// 0..3 by tier: High and Ultra add a cirrus veil, edge erosion and a
+// short light march toward the sun.
+uniform int cloud_quality = 2;
 uniform float drift = 0.0;
 uniform vec2 wind = vec2(0.8, 0.6);
 // Season shape of the deck: stretch along the wind (1 = cumulus heaps,
@@ -157,12 +160,25 @@ void sky() {
 
 	float alpha = 0.0;
 	if (y > -0.02) {
+		bool hq = !AT_CUBEMAP_PASS && cloud_quality >= 2;
+		vec2 wd = normalize(wind);
+		vec2 wn = vec2(-wd.y, wd.x);
+		if (hq && overcast < 0.95) {
+			// Cirrus: a thin, high, wind-combed veil above the deck,
+			// brightest toward the sun. Drawn first, so cumulus covers it.
+			vec2 cu = d.xz / (y + 0.04) * 0.55;
+			cu = wd * dot(cu, wd) * 0.22 + wn * dot(cu, wn) * 1.6 + wind * drift * 0.4;
+			cu += 0.6 * vec2(vnoise(cu * 0.5 + 3.1), vnoise(cu * 0.5 + 9.7));
+			float cl;
+			float ci = smoothstep(0.56, 0.86, fbm(cu, 4, cl));
+			ci *= 0.32 * (1.0 - overcast) * smoothstep(0.02, 0.25, y) * (0.35 + 0.65 * cloud_cover);
+			vec3 cic = mix(cloud_lit, vec3(1.0), 0.35) + LIGHT0_COLOR * pow(m, 4.0) * 0.5;
+			col = mix(col, cic, ci);
+		}
 		// Dome projection keeps the horizon finite and compresses the
 		// deck into a band toward the horizon, like a real cloud layer.
 		vec2 uv = d.xz / (y + 0.10) * 1.3;
 		// Stratiform seasons: the noise is stretched along the wind.
-		vec2 wd = normalize(wind);
-		vec2 wn = vec2(-wd.y, wd.x);
 		uv = wd * (dot(uv, wd) / cloud_stretch) + wn * dot(uv, wn) + wind * drift;
 		// Low-frequency domain warp breaks the FBM into billowed
 		// heaps instead of uniform streaks (two extra lookups).
@@ -173,13 +189,30 @@ void sky() {
 		// Value-noise FBM clusters around 0.5, so cover maps onto a
 		// narrow threshold range to give the matching sky fraction.
 		float thr = 0.5 + (0.5 - cloud_cover) * 0.36;
+		if (hq) {
+			// Billowed edges: fine noise erodes the thin margins only,
+			// so heaps get cauliflower rims instead of blurred blobs.
+			float ero = vnoise(uv * 7.0 + wind * drift * 0.6) * 0.65 + vnoise(uv * 17.0) * 0.35;
+			den -= (ero - 0.5) * 0.07 * (1.0 - smoothstep(thr, thr + 0.2, den));
+		}
 		float c = smoothstep(thr - 0.02, thr + cloud_soft, den);
 		// Overcast: the gaps close into a continuous grey deck.
 		c = max(c, overcast * (0.80 + 0.20 * den));
-		// One offset lookup toward the sun: denser sunward = shaded.
+		// Light marched toward the sun through the deck: Beer's law on
+		// the density met on the way, plus the cheap low-vs-sunward
+		// gradient. Thick cores go dark, sunward flanks bright.
 		vec2 sxz = normalize(sun_dir.xz + vec2(1e-4)) * 0.09;
 		float toward = fbm2(uv + sxz);
 		float lit = clamp(0.5 + (low - toward) * 5.0, 0.0, 1.0);
+		if (hq) {
+			float od = max(toward - thr, 0.0);
+			od += max(fbm2(uv + sxz * 2.2) - thr, 0.0);
+			od += max(fbm2(uv + sxz * 3.6) - thr, 0.0);
+			float beer = exp(-od * 7.0);
+			// Powder: thin cloud lit from behind still looks dark at its edge.
+			float powder = 1.0 - exp(-max(den - thr, 0.0) * 18.0);
+			lit = clamp(mix(lit, beer * mix(1.0, powder, 0.4), 0.6), 0.0, 1.0);
+		}
 		float thick = smoothstep(thr, thr + 0.3, den);
 		vec3 cc = mix(cloud_shade, cloud_lit, lit * (1.0 - 0.55 * thick));
 		// Silver lining: thin cloud edges near the sun glow.
