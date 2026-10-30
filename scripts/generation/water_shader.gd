@@ -95,8 +95,14 @@ void vertex() {
 		vec2 pm = wpos.xz / units_per_metre;
 		vec2 wd = normalize(wind);
 		float damp = smoothstep(0.0, 0.6, shorev) * (1.0 - climate_water_ice);
-		vec3 d = gerstner(pm, wd, 46.0, 0.35, TIME)
-			+ gerstner(pm, normalize(wd + vec2(0.4, -0.3)), 27.0, 0.18, TIME * 1.1);
+		// Wavelengths of at least ~6 grid cells (the sea grid is 12.5 m):
+		// shorter swell aliased into rows of dashes toward the horizon.
+		vec3 d = gerstner(pm, wd, 118.0, 0.75, TIME)
+			+ gerstner(pm, normalize(wd + vec2(0.4, -0.3)), 74.0, 0.38, TIME * 1.1);
+		// The DEM has no seabed (ground sits at sea level), so troughs below
+		// the datum would show brown ground through the water: lift the
+		// whole swell so it only ever rises from the datum.
+		d.y += 1.3;
 		VERTEX += d * damp * units_per_metre;
 	}
 }
@@ -143,7 +149,14 @@ void fragment() {
 	// and its triangles wind either way (cull_disabled).
 	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
 	float open_w = smoothstep(0.0, 1.0, clamp(openv, 0.0, 1.0));
-	vec3 col = mix(shallow_color.rgb, deep_color.rgb, open_w);
+	vec3 deep_c = deep_color.rgb;
+	vec3 shallow_c = shallow_color.rgb;
+	if (seav > 0.5) {
+		// Open sea: turquoise over the shelf, deep blue beyond (linear).
+		deep_c = vec3(0.004, 0.034, 0.088);
+		shallow_c = vec3(0.020, 0.185, 0.190);
+	}
+	vec3 col = mix(shallow_c, deep_c, open_w);
 	// Shore foam: a broken, breathing band along the rim; surf on the sea.
 	float shore = clamp(shorev, 0.0, 1.0) * shore_m;
 	float surf = seav > 0.5 ? 1.0 : 0.35;
