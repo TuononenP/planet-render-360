@@ -39,6 +39,21 @@ float t_noise(vec2 p) {
 vec3 t_dehaze(vec3 c) {
 	c = max(c - vec3(0.010, 0.014, 0.022), vec3(0.0)) * 1.08;
 	c.b *= 0.86;
+	// Green-dominant pixels still lean cyan in shade: pull their blue
+	// back toward the red, so lawns read leaf green, not mint.
+	float leaf = smoothstep(0.0, 0.06, c.g - max(c.r, c.b));
+	c.b = mix(c.b, min(c.b, c.r * 0.92), leaf * 0.45);
+	// Sunlit leaf cover is far darker and richer than the aerial photo's
+	// dehazed value (a lit meadow reflects ~0.2, not 0.5): without this
+	// lawns glow neon lime next to stone and trees.
+	float l0 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	c = mix(vec3(l0), c, 1.0 + 0.22 * leaf) * mix(1.0, 0.66, leaf);
+	// Dry grass, soil and sand come out of the dehaze chalky and too
+	// bright: give warm ground its colour back and ease the brightest
+	// values (a sunlit tan hill reflects ~0.35, not 0.7).
+	float warm = smoothstep(0.0, 0.05, c.r - c.b) * (1.0 - leaf);
+	float l1 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	c = mix(vec3(l1), c, 1.0 + 0.32 * warm) * (1.0 - 0.24 * smoothstep(0.30, 0.65, l1));
 	return max(mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 1.12), vec3(0.0));
 }
 
