@@ -73,17 +73,20 @@ static func merge_buildings(root: Node3D) -> int:
 			var key := "%d,%d|%s|%d|%d|%s" % [cell.x, cell.y, detail,
 				mat.get_instance_id() if mat != null else 0, mi.cast_shadow, fmt]
 			if not groups.has(key):
-				var st := SurfaceTool.new()
-				groups[key] = {"st": st, "mat": mat, "cell": cell,
+				var arrays: Array = []
+				arrays.resize(Mesh.ARRAY_MAX)
+				groups[key] = {"arrays": arrays, "mat": mat, "cell": cell,
 					"detail": detail, "shadow": mi.cast_shadow}
-			(groups[key]["st"] as SurfaceTool).append_from(mi.mesh, s, mi.transform)
+			# Kept CPU arrays, not SurfaceTool.append_from: a server
+			# read-back per mesh stalls the build thread (T7.5).
+			MeshArrays.append(groups[key]["arrays"], MeshArrays.surface(mi.mesh, s), mi.transform)
 		merged.append(mi)
 	var n := 0
 	for key in groups:
 		var g: Dictionary = groups[key]
-		var mesh := (g["st"] as SurfaceTool).commit()
-		if mesh == null or mesh.get_surface_count() == 0:
+		if g["arrays"][Mesh.ARRAY_VERTEX] == null:
 			continue
+		var mesh := MeshArrays.mesh(g["arrays"], false)
 		var out := MeshInstance3D.new()
 		out.name = "LodCell_%d_%d_%d" % [g["cell"].x, g["cell"].y, n]
 		out.mesh = mesh

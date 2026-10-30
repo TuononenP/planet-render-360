@@ -57,6 +57,7 @@ class Batch extends RefCounted:
 			arrays[Mesh.ARRAY_TEX_UV] = s[2]
 			arrays[Mesh.ARRAY_INDEX] = s[3]
 			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			MeshArrays.keep_surface(mesh, arrays)
 			mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
 		var mi := MeshInstance3D.new()
 		mi.name = "Detail"
