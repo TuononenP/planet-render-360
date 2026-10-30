@@ -79,6 +79,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		var min_z := INF
 		var max_z := -INF
 		for node in geom:
+			# Overpass emits null for way nodes clipped out of the query
+			# area; skipping them (as OsmGeometry does) keeps one clipped
+			# way from discarding the whole response.
+			if not (node is Dictionary):
+				continue
 			var p := WorldScale.xz_from_latlon(float(node.get("lat", c_lat)),
 				float(node.get("lon", c_lon)), c_lat, c_lon)
 			pts.append(p)
