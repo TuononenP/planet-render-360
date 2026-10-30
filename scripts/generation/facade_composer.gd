@@ -108,6 +108,9 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	alb.linear_to_srgb()
 	alb.generate_mipmaps()
 	var d := {"albedo": ImageTexture.create_from_image(alb)}
+	# Ultra: recessed panes (a curtain wall is flush glass).
+	if detail >= 2 and rgh != null and pattern != "curtain":
+		d["depth"] = depth_from_rough(rgh)
 	if nor != null and rgh != null:
 		nor.generate_mipmaps(true)
 		rgh.generate_mipmaps()
@@ -140,6 +143,19 @@ static func _wall_layer(loader: Callable, set_name: String, map_name: String,
 		for tx in BAYS * reps:
 			out.blit_rect(src, Rect2i(0, 0, n, n), Vector2i(tx * n, ty * n))
 	return out
+
+## Window-reveal depth map for parallax (white = wall face, black =
+## glass set back in its reveal), read off the roughness map: every
+## composer paints glass at roughness ≤ 0.2, and no wall photo goes
+## below 0.46, so a 0.3 threshold separates them. Image ops only
+## (brightness puts 0.3 at mid-grey, a steep contrast snaps both sides).
+static func depth_from_rough(rgh: Image) -> ImageTexture:
+	var img := rgh.duplicate() as Image
+	img.clear_mipmaps()
+	img.adjust_bcs(0.5 / 0.3, 40.0, 1.0)
+	img.convert(Image.FORMAT_L8)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 static func _hash(x: float, z: float) -> float:
 	return fmod(absf(sin(x * 12.9898 + z * 78.233) * 43758.5453), 1.0)

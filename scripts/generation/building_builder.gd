@@ -275,13 +275,13 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 static func _extrude_masses(root: Node3D, data: LocationData,
 		ground: GroundTruth, b: Dictionary, ctx: Dictionary) -> bool:
 	# One look per building: parts inherit the parent's kind, finish and
-	# roof, as they inherit its tags.
+	# roof, as they inherit its tags (and one RoofVariety tint).
+	var first := root.get_child_count()
 	var look := _look_for(b, ctx)
 	var parent_res := _resolve_total(b, b, ctx, {}, look)
 	var legacy := not b.has("height_source")
 	# Parts carry no roof keys (fetcher §2.4), so they inherit the
-	# parent's roof; each part's roof height is recomputed from its
-	# own span below.
+	# parent's roof; each part's roof height comes from its own span.
 	var shape := _effective_shape(str(b.get("roof_shape", "")),
 		str(look["roof_shape"]), legacy)
 	var roof_tag := float(b.get("roof_height_m", 0.0))
@@ -336,6 +336,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 				shape, rh_m * WorldScale.metres_to_units(), b_eff, ctx,
 				storeys, look, mi == main_mass):
 			done = true
+	if done and _batch == null:
+		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 	return done
 
 ## One footprint ring as vertical walls (facade) plus a triangulated

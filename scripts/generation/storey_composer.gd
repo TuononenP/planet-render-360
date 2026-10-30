@@ -71,11 +71,13 @@ static func _base(loader: Callable, set_name: String, map_name: String, w: int,
 	img.resize(w, h, Image.INTERPOLATE_BILINEAR)
 	return img
 
-static func _finish(alb: Image, nor: Image, rgh: Image) -> Dictionary:
+static func _finish(alb: Image, nor: Image, rgh: Image, depth: bool = false) -> Dictionary:
 	# Composed in linear; encode for the sRGB-decoding albedo sampler.
 	alb.linear_to_srgb()
 	alb.generate_mipmaps()
 	var d := {"albedo": ImageTexture.create_from_image(alb), "normal": null, "rough": null}
+	if depth and rgh != null:
+		d["depth"] = FacadeComposer.depth_from_rough(rgh)
 	if nor != null and rgh != null:
 		nor.generate_mipmaps(true)
 		rgh.generate_mipmaps()
@@ -206,7 +208,7 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 		var t := float(gy) / float(gh)
 		grime.fill_rect(Rect2i(0, gy, S, 1), Color(0, 0, 0, t * 0.22))
 	alb.blend_rect(grime, Rect2i(0, 0, S, gh), Vector2i(0, S - gh))
-	return _finish(alb, nor, rgh)
+	return _finish(alb, nor, rgh, detail >= 2)
 
 ## Paris ground floor: rusticated stone, shopfront per bay with a lacquer
 ## fascia, and a tall carriage door (porte cochère) in one bay.
@@ -343,7 +345,7 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 	for gy in 24:
 		grime.fill_rect(Rect2i(0, gy, W, 1), Color(0, 0, 0, float(gy) / 24.0 * 0.25))
 	alb.blend_rect(grime, Rect2i(0, 0, W, 24), Vector2i(0, C - 24))
-	return _finish(alb, nor, rgh)
+	return _finish(alb, nor, rgh, detail >= 2)
 
 ## Legacy full-wall curtain glass: 8×8 sky-reflective panes (lighter
 ## toward the top, per-pane variance), aluminium mullions and spandrels.
