@@ -141,12 +141,35 @@ static func _facade_material_for(set_name: String, rows: int, detail: int,
 		look: Dictionary = {}) -> StandardMaterial3D:
 	var texs := facade_texs(set_name, rows, detail, pattern, look)
 	var m := _material_from(texs, set_name, detail, tint)
+	var tiled := FacadeComposer.is_tiled(pattern)
+	var bay_m := maxf(float(look.get("bay_m", 3.2)), 1.0)
+	var floor_m := float(look.get("floor_h", 3.3))
 	if not look.is_empty():
-		var tiled := FacadeComposer.is_tiled(pattern)
-		m.set_meta("fc_uv", Vector3(maxf(float(look.get("bay_m", 3.2)), 1.0),
+		m.set_meta("fc_uv", Vector3(bay_m,
 			float(FacadeComposer.BAYS if tiled else StoreyComposer.PARIS_BAYS),
 			1.0 if tiled else 0.0))
+	# One texture spans BAYS bays × one storey (tiled) or the Paris bays
+	# × the whole wall (rows storeys).
+	set_recess(m, texs.get("depth"), bay_m * float(FacadeComposer.BAYS if tiled else StoreyComposer.PARIS_BAYS),
+		floor_m * (1.0 if tiled else float(rows)))
 	return m
+
+## Window reveals (Ultra, composed depth map): deep parallax sets the
+## glass RECESS_M behind the wall face. Godot shifts UVs by up to
+## heightmap_scale × 0.01 at full depth, so the scale is the reveal over
+## the texture's span in metres (geometric mean of its width and height:
+## one scale serves both axes).
+const RECESS_M := 0.25
+
+static func set_recess(m: StandardMaterial3D, depth: Variant, u_m: float, v_m: float) -> void:
+	if not (depth is Texture2D):
+		return
+	m.heightmap_enabled = true
+	m.heightmap_texture = depth as Texture2D
+	m.heightmap_deep_parallax = true
+	m.heightmap_min_layers = 8
+	m.heightmap_max_layers = 32
+	m.heightmap_scale = RECESS_M / sqrt(maxf(u_m * v_m, 1.0)) * 100.0
 
 ## UV mapping of a style-resolved facade for BuildingBuilder._walls:
 ## x = metres per window bay, y = bays per texture width, z = 1 when one

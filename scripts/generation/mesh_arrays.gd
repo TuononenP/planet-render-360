@@ -49,8 +49,16 @@ static func append(dst: Array, src: Array, xf: Transform3D) -> void:
 	var sv: PackedVector3Array = src[Mesh.ARRAY_VERTEX]
 	if sv.is_empty():
 		return
+	var base := 0 if dst[Mesh.ARRAY_VERTEX] == null else (dst[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	# A channel only one side carries (wall tangents, roof tint) is
+	# padded with its neutral value so the merged arrays stay aligned.
+	if base > 0:
+		_pad(dst, src, Mesh.ARRAY_TANGENT, base)
+		_pad(dst, src, Mesh.ARRAY_COLOR, base)
+	src = src.duplicate()
+	_pad(src, dst, Mesh.ARRAY_TANGENT, sv.size())
+	_pad(src, dst, Mesh.ARRAY_COLOR, sv.size())
 	var dv: PackedVector3Array = _take(dst, Mesh.ARRAY_VERTEX, PackedVector3Array())
-	var base := dv.size()
 	dv.append_array(xf * sv)
 	dst[Mesh.ARRAY_VERTEX] = dv
 	var nb := xf.basis
@@ -93,6 +101,24 @@ static func append(dst: Array, src: Array, xf: Transform3D) -> void:
 		for i in sv.size():
 			di[start + i] = base + i
 	dst[Mesh.ARRAY_INDEX] = di
+
+## Gives `a` a neutral `slot` channel for its `count` vertices when `b`
+## has that channel and `a` does not (tangent +U, colour white).
+static func _pad(a: Array, b: Array, slot: int, count: int) -> void:
+	if a[slot] != null or b[slot] == null:
+		return
+	if slot == Mesh.ARRAY_COLOR:
+		var c := PackedColorArray()
+		c.resize(count)
+		c.fill(Color.WHITE)
+		a[slot] = c
+	else:
+		var t := PackedFloat32Array()
+		t.resize(count * 4)
+		for i in count:
+			t[i * 4] = 1.0
+			t[i * 4 + 3] = 1.0
+		a[slot] = t
 
 static func _take(dst: Array, slot: int, empty: Variant) -> Variant:
 	var v: Variant = dst[slot]

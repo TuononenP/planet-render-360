@@ -32,6 +32,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
+	var tangents := PackedFloat32Array()
 	var indices := PackedInt32Array()
 	for i in ring.size():
 		var a := ring[i]
@@ -45,8 +46,14 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		var k := verts.size()
 		verts.append_array([Vector3(a.x, base, a.y), Vector3(b.x, base, b.y),
 			Vector3(b.x, top, b.y), Vector3(a.x, top, a.y)])
+		# Tangent along +u (a → b); w makes cross(N, T) · w point up, the
+		# −v direction (v = 0 at the top), as Godot's own generate_tangents
+		# writes it — the facade normal maps and window parallax need it.
+		var t3 := Vector3(e.x, 0.0, e.y).normalized()
+		var w := 1.0 if n3.cross(t3).y > 0.0 else -1.0
 		for j in 4:
 			normals.append(n3)
+			tangents.append_array([t3.x, t3.y, t3.z, w])
 		var u1 := 1.0
 		var v0 := 1.0
 		if uvp.x > 0.0:
@@ -75,6 +82,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_INDEX] = indices
 	# Arrays kept: LodRing merges these on the build thread (T7.5).
 	TerrainBuilder._add(root, MeshArrays.mesh(arrays), mat)

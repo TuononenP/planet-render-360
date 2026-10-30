@@ -265,6 +265,8 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 	var m := _material_from(texs, set_name, detail, tint)
 	m.set_meta("fc_uv", Vector3(maxf(float(style.get("bay_m", 3.2)), 1.0),
 		float(FacadeComposer.BAYS), 1.0))
+	FacadeTextures.set_recess(m, texs.get("depth"), maxf(float(style.get("bay_m", 3.2)), 1.0)
+		* float(FacadeComposer.BAYS), float(style.get("floor_h", 3.3)) * 1.15)
 	_ground_cache[key] = m
 	return m
 
@@ -343,7 +345,7 @@ static func roof_set_material(set_name: String, tint: Color, detail: int = 1) ->
 		return glass_material(1)
 	var m := MaterialLibrary.pbr_material(set_name, tint,
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
-	m.set_meta("roof", true)  # RoofSnow overlays it while snow lies
+	RoofVariety.mark(m)  # RoofSnow overlay + per-building tint
 	return m
 
 ## Satellite sample → roof set + tint through a bounded quantized cache.
