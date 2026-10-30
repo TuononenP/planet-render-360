@@ -178,6 +178,7 @@ func _run() -> void:
 	_chain_checks(failures)
 	await _busy_checks(failures)
 	_null_node_checks(failures)
+	_tree_tag_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -638,3 +639,40 @@ func _null_node_checks(failures: Array[String]) -> void:
 		failures.append("a way with null (clipped) nodes must not drop the response's buildings: %d" % (f["buildings"] as Array).size())
 	if (f["roads"] as Array).is_empty():
 		failures.append("the clipped road itself should keep its in-area nodes")
+
+## Mapped tree detail reaches vegetation: tree node genus/leaf tags, a
+## natural=tree_row expanded into trees, forest leaf_type on the polygon.
+func _tree_tag_checks(failures: Array[String]) -> void:
+	var text := """{"elements":[
+	{"type":"node","id":1,"lat":48.8566,"lon":2.3522,"tags":{"natural":"tree","genus":"Platanus","leaf_cycle":"deciduous"}},
+	{"type":"way","id":2,"tags":{"natural":"tree_row","leaf_type":"broadleaved"},"geometry":[{"lat":48.8566,"lon":2.3522},{"lat":48.8566,"lon":2.3530}]},
+	{"type":"way","id":3,"tags":{"landuse":"forest","leaf_type":"needleleaved"},"geometry":[{"lat":48.857,"lon":2.352},{"lat":48.857,"lon":2.353},{"lat":48.858,"lon":2.353},{"lat":48.857,"lon":2.352}]}
+	]}"""
+	var f := OsmFetcher.parse_features(text, 48.8566, 2.3522)
+	var trees: Array = f["trees"]
+	if trees.is_empty() or str(trees[0].get("genus", "")) != "platanus":
+		failures.append("tree node genus should reach LocationData.trees: %s" % str(trees.slice(0, 1)))
+	var row := 0
+	for t in trees:
+		if bool(t.get("row", false)):
+			row += 1
+			if str(t.get("leaf_type", "")) != "broadleaved":
+				failures.append("tree_row trees should carry the row's leaf_type")
+	# 0.0008° of longitude at 48.86° ≈ 58.6 m → a tree every 8 m: 8 trees.
+	if row < 7 or row > 9:
+		failures.append("a 58 m tree_row should place ~8 trees, got %d" % row)
+	var forest := false
+	for l in f["land"]:
+		if str(l["class"]) == "forest" and str(l.get("leaf_type", "")) == "needleleaved":
+			forest = true
+	if not forest:
+		failures.append("forest polygons should carry leaf_type")
+	if TreeSpecies.species_from_tags({"genus": "platanus"}, "temperate") != "plane" \
+			or TreeSpecies.species_from_tags({"species": "pinus pinea"}, "temperate") != "stone_pine" \
+			or TreeSpecies.species_from_tags({"leaf_type": "needleleaved"}, "boreal") != "spruce" \
+			or TreeSpecies.species_from_tags({"leaf_type": "broadleaved", "leaf_cycle": "evergreen"}, "dry_coast") != "olive" \
+			or TreeSpecies.species_from_tags({}, "temperate") != "":
+		failures.append("genus / species / leaf tags should name the modelled species")
+	for e in TreeSpecies.mix_for_leaf("temperate", "forest", "needleleaved"):
+		if str(e[0]) not in ["spruce", "scots_pine", "stone_pine", "cypress"]:
+			failures.append("a needleleaved forest mix must hold conifers only, got %s" % e[0])
