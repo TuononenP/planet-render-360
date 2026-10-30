@@ -21,6 +21,11 @@ func _init() -> void:
 			or WeatherFetcher.label_for_code(0) != "Clear" \
 			or WeatherFetcher.label_for_code(45) != "Fog":
 		failures.append("WMO code mapping wrong")
+	var tz := WeatherFetcher.parse_current('{"utc_offset_seconds":7200,"current":{"weather_code":0}}')
+	if int(tz.get("utc_offset_s", -1)) != 7200:
+		failures.append("utc_offset_seconds should parse for the true sun's clock: %s" % tz)
+	if w.has("utc_offset_s"):
+		failures.append("missing utc_offset_seconds must stay absent")
 	if not WeatherFetcher.parse_current("{}").is_empty():
 		failures.append("missing current must be empty")
 	if failures.is_empty():
