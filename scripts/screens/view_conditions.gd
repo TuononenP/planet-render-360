@@ -101,6 +101,9 @@ static func _apply_utc_offset(v: View360, hours: float) -> void:
 		_apply_time(v, v._time_hour)
 
 static func spawn_golden_hour(v: View360) -> void:
+	# An hour slot uses the season's date, so the golden hour must be
+	# found on that date too, not on a live-time date still held.
+	v._atmos.date = {}
 	set_time_of_day(v, wrapi(roundi(v._atmos.golden_hour()), 0, 24))
 	v._spawn_golden = true
 
