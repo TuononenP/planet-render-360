@@ -12,12 +12,23 @@ extends RefCounted
 enum Preset { FAST, BALANCED, HIGH, ULTRA }
 
 const PATH := "user://settings.json"
+## Tier names (plan Open Q2, settled in T7.4): the shipping names stay —
+## they say what the user trades — and each tier shows its PRD fidelity
+## level (FIDELITY) and §3.1 generation budget in the settings copy.
+## Every tier is the same place, layout and hues (AC-12): tiers change
+## LOD/texture/shadow cost and wait time, never which real buildings
+## exist (past a cap they become impostors).
 const PRESET_NAMES: Array[String] = ["Fast", "Balanced", "High", "Ultra"]
+## PRD fidelity level per preset (docs/fidelity-scorecard.md §2).
+const FIDELITY: Array[int] = [1, 2, 2, 3]
+## §3.1 budgets: first build on broadband and a cached revisit.
+const FIRST_BUILD: Array[String] = ["≤20 s", "≤45 s", "≤75 s", "~1–2 min"]
+const REVISIT: Array[String] = ["≤3 s", "≤5 s", "≤5 s", "≤8 s"]
 const PRESET_BLURBS: Array[String] = [
-	"Quickest — coarser terrain, fewer buildings and trees, no shadows.",
-	"Balanced detail and speed.",
-	"Recommended default — fine terrain, most buildings and trees, shadows.",
-	"Maximum fidelity — finest terrain, most buildings and trees, shadows. Slowest to render; needs a fast device.",
+	"Fidelity 1 — quickest: coarser terrain mesh, nearby detail only, no shadows. First build ≤20 s, then cached.",
+	"Fidelity 2 — balanced detail and speed, shadows. First build ≤45 s, then cached.",
+	"Fidelity 2 — recommended: fine terrain, sharp satellite imagery, shadows. First build ≤75 s, then cached.",
+	"Fidelity 3 — most faithful: finest terrain mesh, widest detail rings, far shadows. First build ~1–2 min, then cached; needs a fast device.",
 ]
 
 var preset: int = Preset.HIGH
@@ -27,6 +38,9 @@ static func clamp_preset(value: int) -> int:
 
 static func preset_name(value: int) -> String:
 	return PRESET_NAMES[clamp_preset(value)]
+
+static func fidelity_for(value: int) -> int:
+	return FIDELITY[clamp_preset(value)]
 
 # --- Generation budgets (paid once, as loading/render time) ---
 
@@ -117,11 +131,13 @@ static func shadow_blur_for(value: int) -> float:
 static func cloud_octaves_for(value: int) -> int:
 	return [3, 4, 5, 5][clamp_preset(value)]
 
-## Human-readable cost summary for the settings screen, e.g.
-## "48×48 terrain · up to 240 buildings · shadows on".
+## Human-readable cost summary for the settings screen: the tier, its
+## time budget, then what it renders, e.g. "High · Fidelity 2 · first
+## build ≤75 s, revisit ≤5 s · 192×192 terrain · …".
 static func summary_for(value: int) -> String:
 	var p := clamp_preset(value)
-	return "%d×%d terrain · up to %d buildings · %d trees · shadows %s · %.0f%% render scale" % [
+	return "%s · Fidelity %d · first build %s, revisit %s · %d×%d terrain · %d full-detail buildings (the rest as distant masses) · %d trees · shadows %s · %.0f%% render scale" % [
+		preset_name(p), fidelity_for(p), FIRST_BUILD[p], REVISIT[p],
 		terrain_mesh_posts_for(p), terrain_mesh_posts_for(p), max_buildings_for(p),
 		vegetation_count_for(p, false), "on" if shadows_for(p) else "off",
 		render_scale_for(p) * 100.0]
