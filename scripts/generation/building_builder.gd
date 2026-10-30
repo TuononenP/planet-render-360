@@ -357,8 +357,11 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var base := ground.height_at_world(centre.x, centre.y)
 	for p in ring:
 		base = minf(base, ground.height_at_world(p.x, p.y))
-	base -= 0.6
-	var top := base + height_world
+	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
+	# the real height stands above that ground, not above the sunk base.
+	var sink := 0.6 * WorldScale.metres_to_units()
+	base -= sink
+	var top := base + sink + height_world
 	# T4.3: tags → satellite → regional resolution with real storey
 	# rows; past the fidelity radius the ≤6 distant set is shared.
 	var region := str(ctx.get("region", "generic"))
