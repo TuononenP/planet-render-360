@@ -56,7 +56,7 @@ static func build_water(data: LocationData, ground: GroundTruth = null) -> Node3
 		print("WaterBuilder: no OSM water for %s — rendering dry."
 			% data.place_name)
 		return root
-	var mat := real_water_material()
+	var mat := real_water_material(data.quality_preset)
 	var wl := ground.water_level_m
 	var levels := _poly_levels(data, ground, wl)
 	for i in data.land_polygons.size():
@@ -89,8 +89,8 @@ static func _path_dist(p: Vector2, path: PackedVector2Array) -> float:
 	return best
 
 ## Shared water material (T3.8 look v2 lives in WaterSurface).
-static func real_water_material() -> ShaderMaterial:
-	return WaterSurface.material()
+static func real_water_material(preset: int = RenderSettings.Preset.HIGH) -> ShaderMaterial:
+	return WaterSurface.material(preset)
 
 ## Waterways that read as channels (width > 0 with a centreline);
 ## coastline (width 0) is a boundary and only triggers the sea plane.
@@ -376,15 +376,13 @@ static func _resample(pts: PackedVector2Array, step: float) -> PackedVector2Arra
 			out.append(a.lerp(b, float(s) / float(n)))
 	return out
 
-## Open sea past coastline ways: a plane at sea datum (the -3.0
-## legacy sentinel reuses the datum, like FarTerrainBuilder._far_water).
+## Open sea past coastline ways at sea datum (the -3.0 legacy sentinel
+## reuses the datum, like FarTerrainBuilder._far_water): a grid carrying
+## shore distance for surf, foam and the shallow tint (WaterSurface).
 static func _add_sea_plane(root: Node3D, mat: Material, wl: float,
 		ground: GroundTruth) -> void:
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(WorldScale.detailed_extent_units(),
-		WorldScale.detailed_extent_units())
-	var mi := TerrainBuilder._add(root, plane, mat)
-	mi.position.y = wl if is_equal_approx(wl, -3.0) else ground.render_y(0.0)
+	WaterSurface.add_sea_grid(root, ground,
+		wl if is_equal_approx(wl, -3.0) else ground.render_y(0.0), mat)
 
 ## Inland DEM sinks below the datum flood (v1 rule, now gated on OSM
 ## water existing somewhere in the place — never on dry land).
