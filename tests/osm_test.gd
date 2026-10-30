@@ -177,6 +177,7 @@ func _run() -> void:
 	_query_checks(failures)
 	_chain_checks(failures)
 	await _busy_checks(failures)
+	_null_node_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -615,3 +616,25 @@ func _chain_checks(failures: Array[String]) -> void:
 		failures.append("400 must not be retryable")
 	if OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 200):
 		failures.append("200 must not be retryable")
+
+## Overpass clips way geometry to the query area with null entries; one
+## such way must not discard the whole response (lost Turku's OSM data:
+## the payload parsed to nothing and every endpoint was retried).
+func _null_node_checks(failures: Array[String]) -> void:
+	var text := """{"elements":[
+	{"type":"way","id":1,"tags":{"highway":"residential"},"geometry":[null,{"lat":60.4518,"lon":22.2666},{"lat":60.4520,"lon":22.2670},null]},
+	{"type":"way","id":2,"tags":{"building":"yes"},"geometry":[{"lat":60.4518,"lon":22.2666},{"lat":60.4518,"lon":22.2668},{"lat":60.4519,"lon":22.2668},{"lat":60.4519,"lon":22.2666},{"lat":60.4518,"lon":22.2666}]}
+	]}"""
+	# Fail-closed: a script error inside the parser aborts this function
+	# before it could append a failure, so the sentinel stays.
+	var sentinel := "parsing a payload with null way nodes raised a script error"
+	failures.append(sentinel)
+	var got: Variant = OsmFetcher.parse_features(text, 60.4518, 22.2666)
+	if not (got is Dictionary) or not (got as Dictionary).has("buildings"):
+		return
+	failures.erase(sentinel)
+	var f: Dictionary = got
+	if (f["buildings"] as Array).size() != 1:
+		failures.append("a way with null (clipped) nodes must not drop the response's buildings: %d" % (f["buildings"] as Array).size())
+	if (f["roads"] as Array).is_empty():
+		failures.append("the clipped road itself should keep its in-area nodes")
