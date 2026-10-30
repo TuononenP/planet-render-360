@@ -13,12 +13,16 @@ static var _cache: Dictionary = {}
 static var _texs: Dictionary = {}
 
 ## Mipmapped texture of one bundled map (shared with MaterialLibrary's
-## linearised source images).
+## linearised source images). The colour map is re-encoded to sRGB:
+## albedo_texture is a source_color sampler the renderer decodes, so the
+## linear image read dark and over-saturated (T4.7 double decode).
 static func tex(set_name: String, map_name: String) -> Texture2D:
 	var key := set_name + ":" + map_name
 	if _texs.has(key):
 		return _texs[key] as Texture2D
 	var img := (MaterialLibrary._set_image(set_name, map_name)).duplicate() as Image
+	if map_name == "diff":
+		img.linear_to_srgb()
 	if not img.has_mipmaps():
 		img.generate_mipmaps(map_name == "nor")
 	var t := ImageTexture.create_from_image(img)
@@ -121,7 +125,7 @@ static func opera_tile() -> StandardMaterial3D:
 			alb.set_pixel(x, y, c.lightened(jitter))
 			var r := 0.6 if g else (0.12 if band else 0.38)
 			rough.set_pixel(x, y, Color(r, r, r))
-	alb.srgb_to_linear()
+	# Tile colours are sRGB already; the sampler decodes them.
 	alb.generate_mipmaps()
 	rough.generate_mipmaps()
 	var m := StandardMaterial3D.new()

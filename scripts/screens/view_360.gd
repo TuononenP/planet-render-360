@@ -28,6 +28,8 @@ var _now_btn: Button
 var _live_time := true
 var _setting_time := false
 var _time_hour := 12.0
+## Still on the spawn's golden hour (no hour picked since opening).
+var _spawn_golden := false
 var _touches: Dictionary = {}
 var _quality_preset: int = RenderSettings.Preset.HIGH
 var _data: LocationData
@@ -344,6 +346,7 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 	# Range the near/mid rings for the current preset.
 	LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
+	ViewConditions.apply_surface_state(self)  # climate snow, rain, ice
 
 ## Detached world build: touches no scene tree, so it may run off the
 ## main thread (see build_location).
@@ -358,6 +361,9 @@ static func make_world(data: LocationData, ground: GroundTruth) -> Node3D:
 ## screen (macOS beachball), so the caller's screen keeps drawing here.
 ## Pass the result to show_location. A known `ground` is reused.
 func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
+	var cached := await WorldCache.load_world(self, data, ground)
+	if not cached.is_empty():
+		return cached
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
@@ -366,7 +372,9 @@ func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
 	while thread.is_alive():
 		await get_tree().process_frame
 	_threads.erase(thread)
-	return thread.wait_to_finish()
+	var built: Array = thread.wait_to_finish()
+	WorldCache.save_async(self, _threads, data, built)
+	return built
 
 func _notification(what: int) -> void:
 	# A thread outliving its owner aborts the engine on free/quit. The
@@ -390,6 +398,7 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	if _season_btn != null:
 		_season_btn.select(data.season)
 	_atmos.set_season(data.season)
+	_atmos.set_place(data.latitude, data.longitude)
 	_place_pill.text = "◉  %s" % data.place_name
 	_fit_place_pill()
 	_show_hint()
@@ -402,12 +411,14 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_ground = prebuilt[0]
 		_rebuild_world(prebuilt[1])
 	# Spawn at golden hour (PRD §3.3): the judged condition for every
-	# place. The time slider still lets the user leave it afterwards.
-	set_time_of_day(17)
+	# place, now the place's own (T6.2: the hour the true afternoon sun
+	# sits at the reference elevation). The slider still leaves it.
+	ViewConditions.spawn_golden_hour(self)
 	var spawn := spawn_xz(data)
 	_rig.position = Vector3(spawn.x,
 		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
 	_rig.set_look(0.6, -0.10)
+	_atmos.set_probe_origin(_rig.position)
 	if data.landmark_type != "none":
 		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
 		# not dead ahead, so the river/city sweep fills the right. The

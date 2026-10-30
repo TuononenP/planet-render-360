@@ -73,6 +73,12 @@ var _farcity_landuse: Array = []
 var _farcity_towers: Array = []
 var _farcity_done := true
 const FARCITY_WAIT_S := 30.0
+var _climate: ClimateFetcher
+var _climate_data: Dictionary = {}
+var _climate_done := true
+## CHELSA reads are ~3–4 s cold (5 variables × 4 small ranged requests),
+## overlapped with the other fetches; cached revisits read one JSON.
+const CLIMATE_WAIT_S := 15.0
 var _sat: SatelliteFetcher
 var _sat_texture: Texture2D
 var _sat_image: Image
@@ -119,6 +125,11 @@ func _ready() -> void:
 	_osm.failed.connect(func(reason: String) -> void:
 		print("OSM fetch failed, using procedural dressing: %s" % reason)
 		_osm_done = true)
+	_climate = ClimateFetcher.new()
+	add_child(_climate)
+	_climate.finished.connect(func(c: Dictionary) -> void:
+		_climate_data = c
+		_climate_done = true)
 	_farcity = FarCityFetcher.new()
 	add_child(_farcity)
 	_farcity.finished.connect(func(lu: Array, tw: Array) -> void:
@@ -143,6 +154,8 @@ func cancel() -> void:
 		_osm.cancel()
 	if _farcity != null:
 		_farcity.cancel()
+	if _climate != null:
+		_climate.cancel()
 
 func run(lat: float, lon: float, place_name_override: String = "",
 		quality_preset: int = RenderSettings.Preset.HIGH) -> void:
@@ -177,6 +190,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_farcity_landuse = []
 	_farcity_towers = []
 	_farcity.fetch(lat, lon)
+	_climate_done = false
+	_climate_data = {}
+	_climate.fetch(lat, lon)
 	# Satellite drape overlaps the stages too; Fast skips it (the
 	# vertex-colour dressing is its whole point: less data, less time).
 	# Higher presets fetch finer mosaics (T2.2: z16s3 Balanced, z17s7
@@ -208,7 +224,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 			return
 		stage_changed.emit(i, STAGES[i], "in_progress")
 		progress_changed.emit(float(i) / STAGES.size(), STAGES[i])
-		await get_tree().create_timer(0.35).timeout
+		# One frame so the loading screen draws the stage; no fixed pause
+		# (T7.5: real work only, no fake timers).
+		await get_tree().process_frame
 		if _cancelled:
 			cancelled.emit()
 			return
@@ -412,6 +430,20 @@ func _await_osm(data: LocationData) -> void:
 		data.attribution = osm_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + osm_attr
 	await _await_far_city(data)
+	await _await_climate(data)
+
+## CHELSA climate normals (bounded wait; absent → latitude fallbacks).
+func _await_climate(data: LocationData) -> void:
+	var waited := 0.0
+	while not _climate_done and waited < CLIMATE_WAIT_S and not _cancelled:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	if _climate_data.is_empty():
+		print("Climate (CHELSA) unavailable; latitude fallbacks")
+		return
+	data.climate = _climate_data
+	data.attribution += " · Climate: CHELSA V2.1 (Karger et al.)"
+	print("CLIMATE: %s %s" % [str(_climate_data), str(_climate.timings)])
 
 ## T5.4: far built-up landuse + real towers (bounded wait; absent →
 ## the far city continues from imagery alone). Over budget, the fetch

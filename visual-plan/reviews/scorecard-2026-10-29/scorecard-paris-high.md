@@ -1,0 +1,13 @@
+# Scorecard — Paris — High — 2026-10-29
+- Run: preset High, seed 42146, sample rules v1 2026-10-29, cache data v2, OSM real (6265 buildings, 10749 roads), satellite real, DEM source z14; pipeline 5.2 s, ground+builders 33.2 s
+- (a) DEM: max 1.28 m / mean 0.34 m over 8 land points (bar ≤ 3 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) +0.02; (0,-400) -0.10; (400,0) -0.05; (0,400) +1.28; (-400,0) water, carved -3.5 m — excluded; (0,-800) -0.02; (800,0) -0.03; (0,800) -0.01; (-800,0) +1.20
+- (b) footprints: median IoU 1.000, centroid offset 0.00 m over 20 sampled (bar IoU ≥ 0.85, ≤ 2 m) → PASS
+- (c) heights: median err 0.00 m, coverage 15/20 tagged (bar ≤ 3 m ≈ 1 storey) → PASS
+  - tagged (source expected→rendered): levels 18.6→18.6 m; tag_height 16.0→25.7 m; levels 21.7→18.5 m; levels 18.6→18.6 m; levels 18.6→18.6 m; levels 21.7→21.7 m; levels 21.7→21.7 m; levels 3.1→3.1 m; levels 21.7→21.7 m; levels 18.6→18.6 m; levels 15.5→15.5 m; levels 5.6→5.6 m; levels 4.6→23.0 m; levels 18.6→18.6 m; levels 15.5→15.5 m
+- (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
+  - samples: (943,130) visible water at 6.0 m; (1011,86) visible water at 0.5 m; (-58,442) visible water at 7.1 m; (644,696) visible water at 8.1 m; (-1006,-181) visible water at 8.5 m
+- (d) roads: 5/5 junctions with a rendered ribbon within 3 m (1059 of 14779 junctions are passages under OSM buildings, excluded); max ribbon lift 0.13 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
+- (e) eiffel: bearing error 0.038° (model 272.70°, geodesic 272.73°, 4231 m; bar ≤ 1°) → PASS; apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)
+- (f) human side-by-side rating (signed checklist, T8.3) → PENDING
+- AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)

@@ -25,8 +25,11 @@ uniform vec3 translucency : source_color = vec3(0.2, 0.26, 0.08);
 uniform float alpha_cut = 0.5;
 uniform float snow = 0.0;
 uniform float sway = 0.0;
+// @SNOW
 varying vec3 v_n;
+varying vec3 wpos;
 void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	if (sway > 0.0) {
 		vec3 wp = MODEL_MATRIX[3].xyz;
 		float ph = wp.x * 0.37 + wp.z * 0.23;
@@ -42,7 +45,7 @@ void fragment() {
 	vec3 n = normalize(v_n);
 	if (snow > 0.0) {
 		float up = (INV_VIEW_MATRIX * vec4(n, 0.0)).y;
-		c = mix(c, vec3(0.86, 0.88, 0.92), smoothstep(0.25, 0.75, up) * snow);
+		c = mix(c, vec3(0.86, 0.88, 0.92), smoothstep(0.0, 0.6, up) * snow * snow_line(wpos));
 	}
 	ALBEDO = c;
 	ALPHA = t.a;
@@ -61,8 +64,11 @@ uniform sampler2D imp_tex : filter_linear_mipmap, repeat_disable;
 uniform vec3 tint : source_color = vec3(0.36, 0.5, 0.24);
 uniform vec3 bark_tint : source_color = vec3(0.4, 0.35, 0.3);
 uniform float snow = 0.0;
+// @SNOW
 varying vec3 v_n;
+varying vec3 wpos;
 void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_n = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 void fragment() {
@@ -70,7 +76,7 @@ void fragment() {
 	vec3 c = t.r * mix(bark_tint, tint * COLOR.rgb, t.g);
 	vec3 n = normalize(v_n);
 	if (snow > 0.0) {
-		c = mix(c, vec3(0.86, 0.88, 0.92), t.b * snow);
+		c = mix(c, vec3(0.86, 0.88, 0.92), clamp(t.b * 1.6, 0.0, 1.0) * snow * snow_line(wpos));
 	}
 	ALBEDO = c;
 	ALPHA = t.a;
@@ -206,7 +212,7 @@ static func leaf_material(kind: String, tint: Color, snow: float, sway: float,
 		return _mats[key]
 	if _shader_leaf == null:
 		_shader_leaf = Shader.new()
-		_shader_leaf.code = LEAF_SHADER
+		_shader_leaf.code = LEAF_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 	var m := ShaderMaterial.new()
 	m.shader = _shader_leaf
 	m.set_shader_parameter("leaf_tex", FoliageTextures.leaf(kind))
@@ -224,7 +230,7 @@ static func impostor_material(sp: String, bare: bool, season: int, snow: float) 
 		return _mats[key]
 	if _shader_imp == null:
 		_shader_imp = Shader.new()
-		_shader_imp.code = IMPOSTOR_SHADER
+		_shader_imp.code = IMPOSTOR_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 	var s := TreeSpecies.spec(sp)
 	var m := ShaderMaterial.new()
 	m.shader = _shader_imp

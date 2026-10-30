@@ -38,6 +38,17 @@ static func archetype_for(tags: Dictionary) -> String:
 ## never silently defaulted to a wrong class. Order is most-specific
 ## first so multi-key combos (e.g. leisure=pitch on landuse=meadow)
 ## resolve to the specific class.
+## Tree tags carried to vegetation (genus / species / leaf_type /
+## leaf_cycle, lowercased; absent keys omitted) — on tree nodes, tree
+## rows and forest polygons.
+static func tree_tags(tags: Dictionary) -> Dictionary:
+	var out := {}
+	for k in ["genus", "species", "leaf_type", "leaf_cycle"]:
+		var v := str(tags.get(k, "")).strip_edges().to_lower()
+		if v != "":
+			out[k] = v
+	return out
+
 static func land_class(tags: Dictionary) -> String:
 	var natural := str(tags.get("natural", ""))
 	var landuse := str(tags.get("landuse", ""))

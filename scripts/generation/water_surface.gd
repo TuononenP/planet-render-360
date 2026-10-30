@@ -41,6 +41,7 @@ uniform float far_rough = 0.16;
 uniform float spec = 0.34;
 uniform vec2 drift = vec2(0.18, 0.07);
 
+// @SNOW
 varying vec3 wpos;
 varying float openv;
 
@@ -91,14 +92,17 @@ void fragment() {
 	// Fade the micro-normals with distance (no far shimmer); rough
 	// rises instead, which keeps the far sheen soft.
 	s *= wave_amp / (1.0 + dist_m / 90.0);
+	// Frozen water: still, matte, white-grey ice (ClimateModel).
+	s *= 1.0 - climate_water_ice;
 	vec3 n_world = normalize(vec3(-s.x, 1.0, -s.y));
 	// Always the upward normal: water is only ever seen from above,
 	// and its triangles wind either way (cull_disabled).
 	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
 	float open_w = smoothstep(0.0, 1.0, clamp(openv, 0.0, 1.0));
-	ALBEDO = mix(shallow_color.rgb, deep_color.rgb, open_w);
-	ROUGHNESS = mix(near_rough, far_rough, smoothstep(60.0, 900.0, dist_m));
-	SPECULAR = spec;
+	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
+	ALBEDO = mix(mix(shallow_color.rgb, deep_color.rgb, open_w), ice, climate_water_ice);
+	ROUGHNESS = mix(mix(near_rough, far_rough, smoothstep(60.0, 900.0, dist_m)), 0.55, climate_water_ice);
+	SPECULAR = mix(spec, 0.25, climate_water_ice);
 	METALLIC = 0.0;
 }
 """
@@ -110,7 +114,7 @@ static var _mat: ShaderMaterial
 static func material() -> ShaderMaterial:
 	if _mat == null:
 		var sh := Shader.new()
-		sh.code = SHADER
+		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 		_mat = ShaderMaterial.new()
 		_mat.shader = sh
 	_mat.set_shader_parameter("units_per_metre", WorldScale.metres_to_units())

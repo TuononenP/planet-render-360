@@ -95,7 +95,8 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var rings: Array = [poly.get("points", PackedVector2Array())]
 			for hole in poly.get("holes", []):
 				rings.append(hole)
-			green.append({"class": cls, "points": rings[0], "cells": 0, "real_trees": 0})
+			green.append({"class": cls, "points": rings[0], "cells": 0, "real_trees": 0,
+				"leaf_type": str(poly.get("leaf_type", ""))})
 			green[green.size() - 1]["cells"] = _fill(rings, 0, green.size())
 	for poly in data.land_polygons:
 		if str(poly.get("class", "")) == "water":

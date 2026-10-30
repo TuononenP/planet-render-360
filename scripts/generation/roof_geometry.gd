@@ -68,14 +68,13 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 			return null
 	if verts.is_empty():
 		return null
-	var mesh := ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
+	# Arrays kept: MassBatch / LodRing merge roofs on the build thread.
+	return MeshArrays.mesh(arrays)
 
 ## Ridge half-length shrunk until both ends sit inside the ring (0.0
 ## when no fit — the caller falls back to an apex fan).

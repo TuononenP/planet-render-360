@@ -218,6 +218,16 @@ New top-level fields:
 > `InfillPlanner` (T4.5 settlement evidence). Empty = the far city
 > continues from the far imagery drapes alone.
 
+> **Amendment 2026-10-30 (§2.7 climate):** `LocationData.climate:
+> Dictionary` — CHELSA V2.1 1981–2010 normals at the viewpoint (3 × 3
+> cell median): `t_warm_c`, `t_cold_c` (warmest / coldest quarter mean,
+> °C), `precip_mm`, `precip_warm_mm`, `snow_days`, `source`. Producer
+> `ClimateFetcher` via the pipeline (`_await_climate`, bounded 15 s,
+> absence = `{}`). Sole interpreter `ClimateModel` (snow line per season,
+> treeline, biome, summer dryness, snow uniforms); consumers FarSurface,
+> GroundMaterial, TreeSpecies/VegetationBuilder, WorldCache key. Empty =
+> latitude fallbacks (invariant 3: real data first, rules only on absence).
+
 ## 3. GroundTruth API (new, T1.4)
 
 One smoothed/carved height + water + land-cover surface, built once per

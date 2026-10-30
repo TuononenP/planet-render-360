@@ -195,8 +195,15 @@ enum { _PHASE_DETAILED, _PHASE_RING }
 ## state. cancel_request() emits no request_completed, so nothing stale
 ## reaches _on_done.
 func cancel() -> void:
+	# A parse still running off-thread belongs to the abandoned fetch.
+	_parse_gen += 1
 	if _http != null:
 		_http.cancel_request()
+
+## The parse task must not outlive the node it reports back to.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_parse()
 
 func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	cancel()
@@ -223,9 +230,15 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 		_pending_ring_body = "data=" + build_ring_query(lat, lon, ring).uri_encode()
 	# Each phase serves from its own cache entry independently; a phase
 	# with no usable cache goes live while the other stays cached.
+	# A cache entry was validated (_payload_has_buildings) before it was
+	# written, so it is not re-parsed here (T7.5: that probe was a second
+	# full parse on the main thread); _on_parsed falls back to the live
+	# query if a damaged entry parses to no buildings.
+	_detailed_cached = false
 	var dcached := _read_cache(_pending_cache)
-	if dcached != "" and _payload_has_buildings(dcached, lat, lon):
+	if dcached != "":
 		_detailed_text = dcached
+		_detailed_cached = true
 	if want_ring:
 		_ring_text = _read_cache(_pending_ring_cache)
 	if offline_mode:
@@ -250,7 +263,10 @@ var _pending_body := ""
 var _pending_ring_cache := ""
 var _pending_ring_body := ""
 var _detailed_text := ""
+var _detailed_cached := false
 var _ring_text := ""
+var _parse_task := -1
+var _parse_gen := 0
 var _phase := _PHASE_DETAILED
 var _attempt := 0
 
@@ -322,6 +338,7 @@ func _fail_or_retry(reason: String, retryable: bool) -> void:
 		if fb != "" and _payload_has_buildings(fb, _pending_lat, _pending_lon):
 			print("OsmFetcher: %s; using cached %d m data" % [reason, FALLBACK_RADIUS_M])
 			_detailed_text = fb
+			_detailed_cached = false
 			_finish()
 			return
 		failed.emit("%s (tried %d endpoint(s))" % [reason, _attempt + 1])
@@ -342,6 +359,7 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 			_fail_or_retry("Overpass returned no buildings", true)
 			return
 		_detailed_text = text
+		_detailed_cached = false
 		_write_cache(_pending_cache, text)
 		if _pending_ring_body != "" and _ring_text == "":
 			_phase = _PHASE_RING
@@ -359,9 +377,40 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 
 ## Merge the detailed + ring payloads, parse once, and emit both signals:
 ## v1 shapes on the frozen 4-arg signal, §2.5/§2.6 extras on succeeded_v2.
+## The parse (seconds on a dense city) runs on a worker thread so the
+## loading screen keeps drawing and cancel stays immediate (T7.5).
 func _finish() -> void:
-	var parsed := parse_features(
-		merge_payloads(_detailed_text, _ring_text), _pending_lat, _pending_lon)
+	_join_parse()
+	var gen := _parse_gen
+	var detailed := _detailed_text
+	var ring := _ring_text
+	var lat := _pending_lat
+	var lon := _pending_lon
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		var parsed := parse_features(merge_payloads(detailed, ring), lat, lon)
+		_on_parsed.call_deferred(gen, parsed))
+
+func _join_parse() -> void:
+	if _parse_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_parse_task)
+		_parse_task = -1
+
+func _on_parsed(gen: int, parsed: Dictionary) -> void:
+	_join_parse()
+	if gen != _parse_gen:
+		return
+	if _detailed_cached and (parsed["buildings"] as Array).is_empty():
+		# Damaged cache entry: query live instead (offline: fail).
+		push_warning("OsmFetcher: cached payload has no buildings; refetching")
+		_detailed_cached = false
+		_detailed_text = ""
+		_phase = _PHASE_DETAILED
+		_attempt = 0
+		if offline_mode:
+			_fail_or_retry("OSM cache unusable (offline mode)", false)
+		else:
+			_start_attempt()
+		return
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

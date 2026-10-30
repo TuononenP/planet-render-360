@@ -7,9 +7,16 @@ extends Node
 
 signal quality_changed(step_name: String, fps: float)
 
-const STEP_NAMES: Array[String] = ["Low", "Medium", "High", "Ultra"]
 ## Render scale per step lives in RenderSettings.render_scale_for, so
 ## the settings screen's summary and the governor cannot drift apart.
+## The governor never changes the tier (T7.4): its label is the user's
+## tier, plus the reduced render scale while it is stepping down.
+static func step_label(ceiling: int, current: int) -> String:
+	var label := RenderSettings.preset_name(ceiling)
+	if current < ceiling:
+		label += " · %d%% res%s" % [roundi(RenderSettings.render_scale_for(current) * 100.0),
+			"" if RenderSettings.shadows_for(current) else ", no shadows"]
+	return label
 
 var step := 3  # start at the user's ceiling, adapt down if needed
 ## Highest step the user's RenderSettings preset allows (0..3). The
@@ -48,7 +55,7 @@ func _process(delta: float) -> void:
 	if new_step != step:
 		step = new_step
 		_apply()
-	quality_changed.emit(STEP_NAMES[step], current_fps)
+	quality_changed.emit(step_label(ceiling_step, step), current_fps)
 
 func _apply() -> void:
 	if viewport != null:

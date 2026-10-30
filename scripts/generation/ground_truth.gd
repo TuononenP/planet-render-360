@@ -19,16 +19,12 @@ extends RefCounted
 ## Since the T7.0 metre cutover metres_to_units() is 1.0, so this is
 ## the datum rebase only.
 ##
-## T3.1 detailed-extent remap: the surface always spans the FULL
-## detailed extent (contract §1.2/§2.2). Real z14/z12 grids cover a
-## 576/144 px source window wider than the extent, so the surface
-## resamples the central sub-window (bilinear, clamped) instead of
-## stretching the whole window across the mesh (the v1 compression,
-## which also misaligned DEM features against OSM vectors 4x). The
-## target span is extent_m*2 in ground metres (880 m-equiv under the
-## T1.2 flag, 2400 m after the cutover — the remap needs no code
-## change then). Procedural grids and hand fixtures carry no
-## dem_source and already span the extent, so they map 1:1.
+## T3.1 detailed-extent remap: the surface spans the FULL detailed
+## extent (contract §1.2/§2.2). Real z14/z12 grids cover a 576/144 px
+## window wider than it, so each post samples its own true position in
+## that window (DemRegistration) instead of stretching the window
+## across the mesh (the v1 compression that misaligned DEM against
+## OSM). Procedural grids and fixtures already span the extent, 1:1.
 ##
 ## Construction reads data.heights / data.water_level / data polygons
 ## once (the single authorized reader — grep gate in scenery_test).
@@ -78,8 +74,11 @@ const CARVE_DEPTH_M := 2.0
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
 ## builders construct it from the data they already receive).
-## Requires valid data (heights.size() == grid_size²), as v1 _heights did.
+## Requires valid data (heights.size() == grid_size²); null leaves an
+## empty surface for WorldCache to restore a saved one into.
 func _init(data: LocationData) -> void:
+	if data == null:
+		return
 	var size := data.grid_size
 	_size = size
 	var extent_units := WorldScale.detailed_extent_units()
@@ -94,23 +93,20 @@ func _init(data: LocationData) -> void:
 	# (bilinear over the central sub-window for real grids, 1:1 for
 	# procedural/fixtures), then the v1 3x3 centre-double-weighted blur.
 	var frac := _extent_span_frac(data)
+	var geo := DemRegistration.applies(data) and frac < 0.9999
+	var step_m := _step_units / WorldScale.metres_to_units()
 	for z in size:
 		for x in size:
-			_surface[z * size + x] = _resampled_height(data, size, frac, x, z)
+			_surface[z * size + x] = _grid_bilinear(data, DemRegistration.grid_index(
+				data, size, step_m, x, z)) if geo else _resampled_height(data, size, frac, x, z)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	_blur_pass(_surface, tmp, size)
 	_surface = tmp
-	# T3.1 slope-preserving low-relief smooth. Replaces the v1 dune
-	# rule (`range < 20 → lerp 0.87 to centre`), which erased ALL
-	# sub-20 m relief: two extra symmetric 3x3 blur passes instead. A
-	# symmetric kernel preserves planar slopes exactly — each output
-	# is a convex combination of neighbours symmetric about the post,
-	# so a linear ramp maps to itself — while attenuating metre-scale
-	# DEM noise. Flat Paris foreground stays flat; real 5–20 m
-	# undulation and alpine approach slopes survive. Triggered on the
-	# post-remap surface range (metres; squashed units under the
-	# pipeline's legacy_squash A/B path, same trigger points as v1).
+	# T3.1 slope-preserving low-relief smooth (replaces the v1 dune rule
+	# that erased all sub-20 m relief): two extra symmetric 3x3 passes,
+	# which map a linear ramp to itself while attenuating metre-scale
+	# DEM noise. Triggered on the post-remap surface range (metres).
 	var surf_min := INF
 	var surf_max := -INF
 	for h in _surface:
@@ -364,13 +360,19 @@ static func _resampled_height(data: LocationData, size: int, frac: float,
 	var half := float(size) / 2.0
 	var fx := clampf((float(x) - half) * frac + half, 0.0, float(size - 1))
 	var fz := clampf((float(z) - half) * frac + half, 0.0, float(size - 1))
+	return _grid_bilinear(data, Vector2(fx, fz))
+
+## Clamped bilinear read of the heights grid at a fractional index.
+static func _grid_bilinear(data: LocationData, f: Vector2) -> float:
+	var size := data.grid_size
+	var fx := clampf(f.x, 0.0, float(size - 1))
+	var fz := clampf(f.y, 0.0, float(size - 1))
 	var x0 := mini(int(fx), size - 2)
 	var z0 := mini(int(fz), size - 2)
 	var tx := fx - float(x0)
 	var tz := fz - float(z0)
 	var a := lerpf(data.height_at(x0, z0), data.height_at(x0 + 1, z0), tx)
-	var b := lerpf(data.height_at(x0, z0 + 1),
-		data.height_at(x0 + 1, z0 + 1), tx)
+	var b := lerpf(data.height_at(x0, z0 + 1), data.height_at(x0 + 1, z0 + 1), tx)
 	return lerpf(a, b, tz)
 
 ## One 3x3 centre-double-weighted blur pass (the v1 _heights kernel),

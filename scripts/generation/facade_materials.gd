@@ -200,6 +200,8 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 ## turns mortar pink and courses into stripes. Pull such tints 40% toward
 ## their own grey so the photo's colour carries the hue.
 static func _keep_chroma(set_name: String, tint: Color) -> Color:
+	if set_name == "slate":
+		return MaterialLibrary.neutral_slate(tint)
 	if set_name != "brick" and set_name != "terracotta":
 		return tint
 	var g := (tint.r + tint.g + tint.b) / 3.0
@@ -316,7 +318,7 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 static func roof_base_tint(set_name: String) -> Color:
 	match set_name:
 		"slate":
-			return _calib("slate", MaterialLibrary.PRD_SLATE)
+			return MaterialLibrary.neutral_slate(_calib("slate", MaterialLibrary.PRD_SLATE))
 		"membrane":
 			return _calib("membrane", ArchitectureStyle._lin("#8c8882"))
 		"concrete":
@@ -339,8 +341,10 @@ static func _roof_floor(set_name: String, tint: Color) -> Color:
 static func roof_set_material(set_name: String, tint: Color, detail: int = 1) -> Material:
 	if set_name == "glass":
 		return glass_material(1)
-	return MaterialLibrary.pbr_material(set_name, tint,
+	var m := MaterialLibrary.pbr_material(set_name, tint,
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
+	m.set_meta("roof", true)  # RoofSnow overlays it while snow lies
+	return m
 
 ## Satellite sample → roof set + tint through a bounded quantized cache.
 ## Red-dominant samples read terracotta, dark greys slate, mid greys flat

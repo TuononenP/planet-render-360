@@ -56,20 +56,22 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null) -> 
 
 static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 	var p := clampi(data.quality_preset, 0, 3)
-	var biome := TreeSpecies.biome_for(data.latitude, data.longitude, data.centre_elevation_m)
-	var winter := data.season == LocationData.Season.WINTER
-	var cold := biome in ["alpine", "boreal"]
+	var biome := TreeSpecies.biome_for_data(data)
 	var noise := FastNoiseLite.new()
 	noise.seed = data.seed_value + 77
 	noise.frequency = 0.012 / WorldScale.metres_to_units()
 	return {
 		"preset": p, "fidelity": MaterialLibrary.fidelity_for_preset(p),
 		"m2u": WorldScale.metres_to_units(), "biome": biome, "season": data.season,
-		"snow": 0.55 if winter and cold else 0.0,
+		# Snow load outside summer; the shaders gate it per tree by the
+		# tree's own height against the climate snow line (ClimateModel
+		# globals), so slopes above the line carry snow and the valley
+		# below it does not.
+		"snow": 0.0 if data.season == LocationData.Season.SUMMER else 0.85,
 		"sway": 0.0035 if p == 3 else 0.0,
 		"full_r": float(FULL_R[p]), "mid_r": float(MID_R[p]),
 		"budget": int(MESH_BUDGET[p]), "noise": noise,
-		"treeline": TreeSpecies.treeline_m(data.latitude),
+		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
 		"landmark": TerrainBuilder.landmark_world_pos(data) if data.landmark_type != "none" else Vector2(INF, INF),
 	}
 
@@ -104,14 +106,14 @@ static func _add(plan: Dictionary, x: float, z: float, ground: GroundTruth, sp: 
 ## noise) so forests form stands rather than salt-and-pepper; near the
 ## treeline conifers take over and shrink.
 static func _species_at(x: float, z: float, setting: String, ground: GroundTruth,
-		ctx: Dictionary) -> Array:
+		ctx: Dictionary, leaf_type: String = "") -> Array:
 	var noise: FastNoiseLite = ctx["noise"]
 	var u := clampf(0.5 + noise.get_noise_2d(x, z) * 0.9 + (_hash(x, z, 3.1) - 0.5) * 0.45, 0.0, 0.999)
-	var sp := TreeSpecies.pick(TreeSpecies.mix(str(ctx["biome"]), setting), u)
+	var sp := TreeSpecies.pick(TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type), u)
 	var size := 1.0
 	var asl := ground.asl_y(ground.height_at_world(x, z))
 	var tl: float = ctx["treeline"]
-	if asl > tl - 350.0 and str(ctx["biome"]) in ["alpine", "boreal", "temperate"]:
+	if asl > tl - 350.0 and str(ctx["biome"]) in ["alpine", "boreal", "temperate", "dry_coast"]:
 		sp = "spruce" if _hash(x, z, 5.5) < 0.75 else "scots_pine"
 		size = clampf((tl - asl) / 350.0, 0.35, 1.0)
 	return [sp, size]
@@ -135,9 +137,11 @@ static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: Groun
 			mask.green[gid]["real_trees"] = int(mask.green[gid]["real_trees"]) + 1
 		var setting := "street" if mask.built_fraction(x, z) > 0.04 else "park"
 		var pick := _species_at(x, z, setting, ground, ctx)
+		# A mapped genus / leaf type names the tree itself (OSM tags).
+		var tagged := TreeSpecies.species_from_tags(t, str(ctx["biome"]))
 		# Street trees are pollarded/younger than open-grown ones.
 		var size: float = float(pick[1]) * (0.85 if setting == "street" else 1.0)
-		_add(plan, x, z, ground, pick[0], size, 1.0, true)
+		_add(plan, x, z, ground, tagged if tagged != "" else pick[0], size, 1.0, true)
 
 # --- Land-cover fill -----------------------------------------------------
 
@@ -238,7 +242,8 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 				continue
 			if ground.slope_at(x, z) > 1.25:
 				continue
-			var pick := _species_at(x, z, setting if setting != "orchard" else "rural", ground, ctx)
+			var pick := _species_at(x, z, setting if setting != "orchard" else "rural", ground, ctx,
+				str(g.get("leaf_type", "")))
 			var sp: String = pick[0]
 			if setting == "orchard":
 				sp = "olive" if str(ctx["biome"]) in ["mediterranean", "arid"] else "oak"
