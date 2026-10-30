@@ -52,6 +52,30 @@ const GOLDEN_ELEV := 12.42
 ## Lowest pitch the sun light takes, so a sun on the horizon still
 ## lights the scene instead of grazing it black.
 const MIN_LIGHT_PITCH := 6.0
+## Top-of-atmosphere sun energy: with the extinction below it lights the
+## golden-hour reference (12.4°) at the T6.1 grade's 1.5 and noon ~2.6.
+const SUN_E0 := 3.0
+## Effective wavelengths (µm) for the R/G/B light channels and the
+## Rayleigh / aerosol optical depths at 0.55 µm, fitted so the 12.4° sun
+## is the PRD #FFD9A3 (docs: AC-07); aerosol scales with season haze.
+const SUN_LAMBDA := [0.62, 0.55, 0.48]
+const TAU_RAYLEIGH := 0.07
+const TAU_AEROSOL := 0.08
+
+## Kasten–Young relative air mass for a sun `elev_deg` above the horizon.
+static func air_mass(elev_deg: float) -> float:
+	var e := maxf(elev_deg, -0.5)
+	return 1.0 / (sin(deg_to_rad(e)) + 0.50572 * pow(e + 6.07995, -1.6364))
+
+## Direct-beam transmittance per channel (Rayleigh λ⁻⁴ + aerosol λ⁻¹).
+static func sun_transmittance(elev_deg: float, haze: float = 1.0) -> Color:
+	var m := air_mass(elev_deg)
+	var out: Array[float] = []
+	for l in SUN_LAMBDA:
+		var r := float(l) / 0.55
+		out.append(exp(-(TAU_RAYLEIGH * pow(r, -4.0) + TAU_AEROSOL * haze * pow(r, -1.0)) * m))
+	return Color(out[0], out[1], out[2])
+
 ## Mid-month of each season (spring, summer, autumn, winter) in the
 ## northern hemisphere; the south shifts by six months.
 const SEASON_MONTH := [4, 7, 10, 1]
@@ -123,10 +147,17 @@ func _init(preset: int = RenderSettings.Preset.HIGH) -> void:
 	name = "AtmosphereRig"
 	_build_sun()
 	_build_environment()
+	_build_probe()
 	set_quality(preset)
 	_apply()
 
 func _process(delta: float) -> void:
+	if _probe_due > 0.0:
+		_probe_due -= delta
+		if _probe_due <= 0.0:
+			# Any property change re-queues an UPDATE_ONCE capture, which
+			# Godot spreads over six frames (one cube face each).
+			probe.intensity = 1.0 if probe.intensity < 1.0 else 0.9999
 	_drift_accum += delta
 	if _drift_accum < DRIFT_STEP_S:
 		return
@@ -137,6 +168,12 @@ func _process(delta: float) -> void:
 	sky_material.set_shader_parameter("drift", _drift)
 
 # --- State API ---
+
+## Centre of the reflection capture: the viewpoint (camera rig) — call
+## once a place is shown; the probe re-renders there.
+func set_probe_origin(pos: Vector3) -> void:
+	probe.position = pos
+	_refresh_probe()
 
 ## Local clock hour (0-24, fractional) at the place; `on_date`
 ## ({year, month, day}) empty uses the season's mid-month day.
@@ -227,7 +264,15 @@ func _build_sun() -> void:
 	sun.light_energy = 3.0
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	# Splits weighted to the near field (eye 30 m): cascades end at
+	# ~4% / 15% / 42% of the shadow reach (≈100 / 360 / 1000 m on High)
+	# instead of 10/20/50%, so street-level shadows get most texels.
+	sun.directional_shadow_split_1 = 0.04
+	sun.directional_shadow_split_2 = 0.15
+	sun.directional_shadow_split_3 = 0.42
+	sun.directional_shadow_blend_splits = true
 	sun.shadow_bias = 0.06
+	sun.shadow_normal_bias = 1.2
 	add_child(sun)
 
 func _build_environment() -> void:
@@ -276,7 +321,34 @@ func _build_environment() -> void:
 
 # --- State -> light / sky / fog ---
 
+## Reflections of the real surroundings for water, wet ground and
+## glass (Mobile has no SSR): one cubemap rendered from the viewpoint,
+## re-rendered only when the light changes (time, weather, season,
+## place) — never per frame. No box projection: the reflected city and
+## hills sit at their true (far) distance, which is what water and
+## windows at street scale show.
+var probe: ReflectionProbe
+var _probe_due := 0.0
+const PROBE_DEBOUNCE_S := 0.4
+
+func _build_probe() -> void:
+	probe = ReflectionProbe.new()
+	probe.name = "ViewReflections"
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	probe.size = Vector3(4800.0, 1600.0, 4800.0) * units_per_metre
+	probe.max_distance = 30000.0 * units_per_metre
+	probe.box_projection = false
+	probe.enable_shadows = true
+	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	probe.mesh_lod_threshold = 4.0
+	add_child(probe)
+
+func _refresh_probe() -> void:
+	if probe != null:
+		_probe_due = PROBE_DEBOUNCE_S
+
 func _apply() -> void:
+	_refresh_probe()
 	var cover := cloud_cover / 100.0
 	var overcast := smoothstep(0.7, 1.0, cover)
 	var dim := lerpf(1.0, 0.55, cover)
@@ -296,9 +368,14 @@ func _apply() -> void:
 		# real azimuth (node -Z points from the sun to the ground).
 		var pitch := clampf(solar_elevation, MIN_LIGHT_PITCH, 90.0)
 		sun.rotation_degrees = Vector3(-pitch, 180.0 - solar_azimuth, 0)
-		sun.light_energy = (0.75 + 1.35 * clampf(eff * 2.2, 0.0, 1.0)) * dim
-		sun.light_color = Color(1.0, 0.85, 0.64).lerp(
-			Color(1, 0.97, 0.92), clampf(eff * 1.7, 0.0, 1.0))
+		# Direct sun = top-of-atmosphere light × the real path's
+		# extinction (air mass from the true elevation), so colour and
+		# strength follow the actual sun: white-gold at noon, #FFD9A3 at
+		# the golden-hour reference, orange-red at the horizon.
+		var tr := sun_transmittance(solar_elevation, float(s["haze"]))
+		var mx := maxf(tr.r, maxf(tr.g, tr.b))
+		sun.light_color = Color(tr.r / mx, tr.g / mx, tr.b / mx)
+		sun.light_energy = maxf(SUN_E0 * tr.g, 0.22) * dim
 	else:
 		# Moonlight: fixed cool light so night scenes stay readable.
 		sun.rotation_degrees = Vector3(-38, 35, 0)

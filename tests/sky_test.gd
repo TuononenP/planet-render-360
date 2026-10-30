@@ -23,6 +23,15 @@ func _init() -> void:
 	# Sun in the west-north-west (true azimuth ~288°), not a fixed yaw.
 	if absf(rig.solar_azimuth - 288.45) > 0.5:
 		failures.append("golden-hour azimuth %.2f, want 288.45" % rig.solar_azimuth)
+	# Physical sun (air mass + Rayleigh/aerosol extinction): the 12.4°
+	# reference is PRD #FFD9A3; noon whiter and brighter, horizon redder.
+	var gold := rig.sun.light_color
+	if absf(gold.g - 0.851) > 0.02 or absf(gold.b - 0.639) > 0.02:
+		failures.append("golden-hour sun should be #FFD9A3, got %s" % gold.to_html(false))
+	var noon_t := AtmosphereRig.sun_transmittance(60.0)
+	var low_t := AtmosphereRig.sun_transmittance(3.0)
+	if not (noon_t.b / noon_t.r > gold.b and low_t.b / low_t.r < 0.3 and noon_t.g > low_t.g * 4.0):
+		failures.append("sun extinction: noon %s, 3° %s" % [noon_t, low_t])
 	if absf(rig.golden_hour() - 20.25) > 0.26:
 		failures.append("Paris July golden hour should be ~20:15 CEST, got %f" % rig.golden_hour())
 	rig.set_utc_offset(0.0)
