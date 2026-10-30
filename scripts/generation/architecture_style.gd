@@ -16,6 +16,8 @@ const KINDS: Array[String] = ["house", "apartments", "commercial",
 ## panes, loggias; Paris pediments/balconettes/fascias). Seeded per
 ## building so a street is not a row of clones.
 const VARIANTS := 3
+## Brightest linear luminance a wall/roof tint may reach.
+const WALL_ALBEDO_MAX := 0.72
 
 static var _profile_cache: Dictionary = {}
 
@@ -109,7 +111,14 @@ static func _lin(hex: String) -> Color:
 static func _tint(palette: Array, seed_v: float, salt: int) -> Color:
 	if palette.is_empty():
 		return Color(0, 0, 0, 0)
-	return _lin(str(_pick(palette, seed_v, salt)))
+	var c := _lin(str(_pick(palette, seed_v, salt)))
+	# No wall or roof is brighter than clean white paint (~0.72 albedo);
+	# the palette's near-white renders would clip under a sunlit grade.
+	var l := c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
+	if l > WALL_ALBEDO_MAX:
+		c = Color(c.r, c.g, c.b) * (WALL_ALBEDO_MAX / l)
+		c.a = 1.0
+	return c
 
 ## The full look of one building: wall/roof finish, window pattern,
 ## roof shape default, storeys, and the detail probabilities BuildingDetail
