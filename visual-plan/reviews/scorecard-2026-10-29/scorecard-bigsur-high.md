@@ -1,9 +1,10 @@
 # Scorecard — Big Sur — High — 2026-10-29
-- Run: preset High, seed 38091, sample rules v1 2026-10-29, cache data v2, OSM real (78 buildings, 55 roads), satellite real, DEM source z14; pipeline 7.0 s, ground+builders 4.1 s
-- (a) DEM: max 5.14 m / mean 1.60 m over 9 land points (bar ≤ 8 m) → PASS
-  - points (x,z m: rendered − z14): (0,0) +0.19; (0,-400) -5.14; (400,0) +0.55; (0,400) -1.53; (-400,0) +2.24; (0,-800) -0.79; (800,0) +0.34; (0,800) -1.83; (-800,0) +1.75
-- (b) footprints: median IoU 0.894, centroid offset 2.21 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → FAIL
-- (c) heights: median err 3.32 m, coverage 1/10 tagged (bar ≤ 3 m ≈ 1 storey) → FAIL
+- Run: preset High, seed 38091, sample rules v1 2026-10-29, cache data v2, OSM real (78 buildings, 55 roads), satellite real, DEM source z14; pipeline 2.1 s, ground+builders 4.8 s
+- (a) DEM: max 1.03 m / mean 0.45 m over 9 land points (bar ≤ 8 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) +0.01; (0,-400) +0.76; (400,0) -0.66; (0,400) +0.18; (-400,0) +1.03; (0,-800) +0.85; (800,0) +0.08; (0,800) -0.03; (-800,0) +0.48
+- (b) footprints: median IoU 0.894, centroid offset 0.10 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → PASS
+- (c) heights: median err 0.00 m, coverage 1/10 tagged (bar ≤ 3 m ≈ 1 storey) → PASS
+  - tagged (source expected→rendered): levels 2.9→2.9 m
 - (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
   - samples: (-907,121) visible water at 9.5 m; (396,-677) visible water at 7.2 m; (72,60) visible water at 7.3 m; (1166,863) visible water at 8.7 m; (-647,-151) visible water at 9.0 m
 - (d) roads: 5/5 junctions with a rendered ribbon within 3 m (0 of 60 junctions are passages under OSM buildings, excluded); max ribbon lift 0.56 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
