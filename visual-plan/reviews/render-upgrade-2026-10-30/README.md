@@ -24,6 +24,14 @@ the tests and a shader compile check, but no capture shows them.
 | Roads | One shader paints, on every tier: centre lines, lane dividers from the OSM lane count, edge lines on main roads, zebra crossings near junctions on urban streets, kerb and gutter, tyre tracks, cracks and patches, puddles in rain, and snow except in the tracks (`paris-p2-down`, `interlaken-p2-yaw090`). |
 | Parks | MultiMesh grass tufts, wildflowers and shrubs on mapped green land. None on Fast; radius 90 / 170 / 260 m on Balanced / High / Ultra. |
 
+**Other tiers:** `fast/` holds Fast (Mobile renderer) before/after sheets
+for Paris and Interlaken; Interlaken was re-captured after the
+ground-roughness fix (the lawn map's own gloss had put a sun-facing sheen
+on the meadows). Fast reads paler than the old grade, because it has no
+shadows or SSAO under the new exposure. `ultra/` holds after-only Ultra
+shots: the baseline Ultra run built Paris and then never wrote its frames,
+so no before set exists.
+
 **Tests:** full headless suite PASS, except `fidelity_scorecard` Turku (a)
 3.19 m vs the 3 m bar, which fails the same way on `main`. The new
 `tests/render_upgrade_test.gd` passes. `tools/check_class_size.sh` OK

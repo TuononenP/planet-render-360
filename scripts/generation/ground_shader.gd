@@ -245,9 +245,11 @@ void fragment() {
 	NORMAL_MAP_DEPTH = 0.9;
 	AO = contact;
 	AO_LIGHT_AFFECT = 0.2;
-	// The layers' own roughness maps carry gloss variation near by.
+	// The layers' own roughness maps vary the gloss near by, around the
+	// class's matte value: taken raw, the lawn map put a sun-facing sheen
+	// on every meadow that washed it out toward the light.
 	float rmap = mix(nm.a, sn.a, sc);
-	float r = mix(rough, clamp(rmap, 0.35, 1.0), 0.5 * (1.0 - wf));
+	float r = clamp(rough + (rmap - 0.75) * 0.3 * (1.0 - wf), 0.55, 1.0);
 	ROUGHNESS = mix(r, 0.22, wet * 0.85);
 	SPECULAR = mix(0.35, 0.5, wet);
 }
