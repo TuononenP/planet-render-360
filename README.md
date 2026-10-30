@@ -72,6 +72,76 @@ landmarks, buildings, vegetation, time-of-day and season controls, and
 live-weather dressing → on-device history/cache. All data sources are
 settled in the data-source register behind the same `LocationData` contract.
 
+## Project Structure
+
+```text
+planet-render-360/
+├── project.godot              Godot 4.7 project (Forward+, 390×844 mobile-first frame)
+├── export_presets.cfg         macOS / iOS / Android export presets
+├── scenes/
+│   └── main.tscn              Single root scene → scripts/main.gd
+├── scripts/                   All app code (GDScript, ≤500 lines per class)
+│   ├── main.gd                Screen manager: MapPicker → Loading → View360 (+ History, Settings)
+│   ├── ui_theme.gd            Shared "Night Atlas" theme
+│   ├── hud_style.gd           Smoked-glass HUD styling for the 360 view
+│   ├── responsive.gd          Phone / tablet / desktop breakpoints
+│   ├── data/                  Fetch layer: one fetcher per free public source
+│   │   ├── location_data.gd       LocationData — the contract between fetch, generation and render
+│   │   ├── dem_fetcher.gd         AWS Terrain Tiles (Terrarium) elevation mosaics
+│   │   ├── far_field_fetcher.gd   Far DEM rings + imagery drapes past the detailed extent
+│   │   ├── satellite_fetcher.gd   Esri World Imagery terrain drape
+│   │   ├── osm_*.gd               Overpass query, fetch, parse, tag + ring geometry
+│   │   ├── far_city_fetcher.gd    One aggregated Overpass call for the far city ring
+│   │   ├── climate_fetcher.gd     CHELSA V2.1 climatologies via ranged GeoTIFF reads
+│   │   ├── weather_fetcher.gd     Open-Meteo current weather
+│   │   ├── search_fetcher.gd      Nominatim place search
+│   │   ├── tile_fetcher.gd        OSM raster tiles for the picker map
+│   │   ├── cache_store.gd         History + versioned, LRU-capped tile/area cache
+│   │   └── offline_downloader.gd  "Download for offline" cache warmer
+│   ├── generation/            World building from LocationData (true metres)
+│   │   ├── pipeline.gd            Staged, cancellable 5-stage generation pipeline
+│   │   ├── world_scale.gd         Unit conversions + render origin
+│   │   ├── ground_truth.gd        One height / water / land-cover surface per place
+│   │   ├── terrain_builder.gd     Assembles the world: far → terrain → water → buildings → roads → landmarks → vegetation
+│   │   ├── far_*.gd               Far terrain rings and the far city
+│   │   ├── building_*.gd, roof_*.gd, facade_*.gd, storey_composer.gd, architecture_*.gd
+│   │   │                          OSM building extrusion, regional style, roofs and facades
+│   │   ├── road_builder.gd, street_props.gd, water_*.gd, quay_builder.gd, shore_apron.gd
+│   │   ├── tree_*.gd, vegetation_*.gd, foliage_textures.gd, climate_model.gd
+│   │   ├── landmark_*.gd          Registry landmarks (Eiffel, Colosseum, Sagrada…) + OSM archetypes
+│   │   └── material_library.gd, pbr_textures.gd, ground_*.gd, mesh_arrays.gd, mass_batch.gd
+│   ├── render/                Runtime rendering
+│   │   ├── camera_rig.gd          Drag-to-look 360° camera
+│   │   ├── atmosphere_rig.gd      Sun, sky, haze, clouds, weather
+│   │   ├── solar_position.gd      NOAA true solar position
+│   │   ├── lod_ring.gd            Static LOD rings via visibility ranges
+│   │   ├── quality_governor.gd    FPS-driven render-scale / shadow steps
+│   │   ├── render_settings.gd     Fast / Balanced / High / Ultra presets
+│   │   ├── render_quality.gd      Photoreal layer per tier
+│   │   └── world_cache.gd         Built-world cache for fast revisits
+│   └── screens/               UI screens (map picker, loading, 360 view, history, settings)
+├── assets/                    Runtime assets: eiffel.glb, CC0 Poly Haven PBR sets, foliage atlases
+├── assets_src/blender/        Blender sources (offline only, never shipped)
+├── tests/                     Headless Godot test scripts (see Development above)
+├── tools/                     check_class_size.sh, build_ios.sh, foliage texture generator
+├── docs/                      Data-source register, world-model contract, fidelity scorecard,
+│                              architecture styles, technical documentation PDF
+├── .agents/plans/             Architecture and fidelity-redesign plans
+├── visual-plan/               PRD, review captures and scorecards
+└── generated_images/          Logo explorations, prototypes and screenshots
+```
+
+## Documentation
+
+- [Technical documentation (PDF)](docs/technical-documentation.pdf) — architecture,
+  data flow, pipeline, world model, rendering and caching, with diagrams.
+  Source: [`docs/technical-documentation.html`](docs/technical-documentation.html),
+  rebuilt with `node tools/build_docs_pdf.js`.
+- [World-model contract](docs/world-model-contract.md) — `LocationData`, `GroundTruth`, builder signatures.
+- [Data-source register](docs/data-source-register.md) — every external source, licence and fallback.
+- [Fidelity scorecard](docs/fidelity-scorecard.md) — checks that prove the contract holds.
+- [Architecture styles](docs/architecture-styles.md) — regional building styles.
+
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
