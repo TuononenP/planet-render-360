@@ -189,6 +189,19 @@ static func _poly_levels(data: LocationData, ground: GroundTruth,
 			if j != i and bool(est[j][1]) \
 					and (boxes[i] as Rect2).intersects(boxes[j] as Rect2):
 				out[i] = maxf(float(out[i]), float(est[j][0]))
+	# Sub-post bodies (fountains, small ponds) are narrower than the
+	# terrain posts, so the ground cannot be carved for them and a level
+	# at bank − freeboard sits under it (invisible; scorecard (d)). They
+	# rest just above their highest ground instead, like sub-post streams.
+	for i in est:
+		var rr: Rect2 = (boxes[i] as Rect2).grow(-step * 2.0)
+		if maxf(rr.size.x, rr.size.y) >= step * 2.0:
+			continue
+		var top := -INF
+		for q in (data.land_polygons[i]["points"] as PackedVector2Array):
+			top = maxf(top, ground.height_at_world(q.x, q.y))
+		top = maxf(top, ground.height_at_world(rr.get_center().x, rr.get_center().y))
+		out[i] = maxf(float(out[i]), top + 0.06)
 	return out
 
 static func _ring_rect(ring: PackedVector2Array) -> Rect2:
