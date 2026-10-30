@@ -418,6 +418,7 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	_rig.position = Vector3(spawn.x,
 		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
 	_rig.set_look(0.6, -0.10)
+	_atmos.set_probe_origin(_rig.position)
 	if data.landmark_type != "none":
 		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
 		# not dead ahead, so the river/city sweep fills the right. The

@@ -180,6 +180,20 @@ void fragment() {
 	alb = mix(alb, COLOR.rgb, edge);
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel).
+	// Contact shading: ground at a building's foot sees less sky.
+	// Eight class-map taps 1–2 texels (2.3–4.7 m) out; fades with
+	// distance like the near detail. Ambient mostly (AO), a little on
+	// the sun term — the shadow map draws the rest.
+	ivec2 cc = ivec2(floor(cuv + 0.5));
+	float occ = 0.0;
+	for (int k = 0; k < 8; k++) {
+		float ang = float(k) * 0.7853982;
+		float rad = (k % 2 == 0) ? 2.0 : 1.4;
+		ivec2 o = ivec2(round(vec2(cos(ang), sin(ang)) * rad));
+		int nid = int(texelFetch(class_map, clamp(cc + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
+		occ += nid == 1 ? 1.0 : 0.0;
+	}
+	float contact = 1.0 - 0.45 * (occ / 8.0) * (1.0 - wf);
 	float sc = snow_cover(wpos, wny);
 	alb = mix(alb, snow_col, sc);
 	// Live rain: wet ground darkens and turns glossy (not under snow).
@@ -190,6 +204,8 @@ void fragment() {
 		+ W.z * tile(n2, ua, ub) + W.w * tile(n3, ua, ub);
 	NORMAL_MAP = mix(nm, vec3(0.5, 0.5, 1.0), max(wf, edge));
 	NORMAL_MAP_DEPTH = 0.8;
+	AO = contact;
+	AO_LIGHT_AFFECT = 0.2;
 	ROUGHNESS = mix(rough, 0.22, wet * 0.85);
 	SPECULAR = mix(0.35, 0.5, wet);
 }
