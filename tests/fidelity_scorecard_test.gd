@@ -356,11 +356,16 @@ func _check_d(data: LocationData, ground: GroundTruth, water: Node3D, roads: Nod
 	else:
 		var pick := _spread(wpts, 5)
 		var hits := 0
+		var per: Array[String] = []
 		for p in pick:
-			if _near_visible(p, wtris, 10.0, ground):
+			var r := _near_visible(p, wtris, 10.0, ground)
+			if r["ok"]:
 				hits += 1
+			per.append("(%.0f,%.0f) %s" % [p.x, p.y, "visible water at %.1f m" % r["dist"] if r["ok"]
+				else ("nearest water %.1f m%s" % [r["dist"], ", under terrain" if r["dist"] <= 10.0 else ""])])
 		var v2 := "PASS" if hits == pick.size() else "FAIL"
 		lines.append("- (d) water: %d/%d shoreline/centreline samples with visible rendered water within 10 m → %s" % [hits, pick.size(), v2])
+		lines.append("  - samples: " + "; ".join(per))
 		verdicts.append("d-water:" + v2)
 	var junctions := _junctions(data)
 	if junctions.is_empty():
@@ -459,7 +464,11 @@ func _nearest(p: Vector2, tris: Array) -> Dictionary:
 			y = (t[0].y + t[1].y + t[2].y) / 3.0
 	return {"dist": best, "y": y}
 
-func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> bool:
+## Nearest rendered water within `r` that is visible (above the
+## terrain), tested 3 m inside the triangle from its nearest point: at a
+## quay edge the bilinear terrain still blends in the bank top.
+func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> Dictionary:
+	var nearest := INF
 	for t in tris:
 		var a := Vector2(t[0].x, t[0].z)
 		var b := Vector2(t[1].x, t[1].z)
@@ -467,9 +476,9 @@ func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> bo
 		var d := 0.0
 		if not Geometry2D.point_is_inside_triangle(p, a, b, c):
 			d = minf(_seg(p, a, b), minf(_seg(p, b, c), _seg(p, c, a)))
+		nearest = minf(nearest, d)
 		if d > r:
 			continue
-		# Visible: the surface sits at or above the terrain there.
 		var q := p
 		if d > 0.0:
 			q = Geometry2D.get_closest_point_to_segment(p, a, b)
@@ -477,9 +486,11 @@ func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> bo
 				var qe := Geometry2D.get_closest_point_to_segment(p, e[0], e[1])
 				if qe.distance_to(p) < q.distance_to(p):
 					q = qe
+		var cen := (a + b + c) / 3.0
+		q = q.move_toward(cen, minf(3.0, q.distance_to(cen)))
 		if (t[0].y + t[1].y + t[2].y) / 3.0 >= ground.height_at_world(q.x, q.y) - 0.3:
-			return true
-	return false
+			return {"ok": true, "dist": d}
+	return {"ok": false, "dist": nearest}
 
 # --- (e) landmark bearing ---
 
