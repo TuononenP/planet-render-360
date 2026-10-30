@@ -114,6 +114,7 @@ static func apply_surface_state(v: View360) -> void:
 	ClimateModel.apply_globals(v._data, code)
 	if v._generated != null and is_instance_valid(v._generated):
 		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
+		RoofSnow.apply(v._generated, float(ClimateModel.globals_for(v._data, code)["climate_snow_on"]) > 0.0)
 
 ## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
 ## darker albedo. Dry values are kept on the shared material, so the

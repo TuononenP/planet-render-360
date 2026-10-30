@@ -341,8 +341,10 @@ static func _roof_floor(set_name: String, tint: Color) -> Color:
 static func roof_set_material(set_name: String, tint: Color, detail: int = 1) -> Material:
 	if set_name == "glass":
 		return glass_material(1)
-	return MaterialLibrary.pbr_material(set_name, tint,
+	var m := MaterialLibrary.pbr_material(set_name, tint,
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
+	m.set_meta("roof", true)  # RoofSnow overlays it while snow lies
+	return m
 
 ## Satellite sample → roof set + tint through a bounded quantized cache.
 ## Red-dominant samples read terracotta, dark greys slate, mid greys flat

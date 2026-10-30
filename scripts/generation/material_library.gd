@@ -345,6 +345,7 @@ static func slate() -> StandardMaterial3D:
 	var row: Dictionary = PBR_SETS["slate"]
 	_slate_mat = pbr_material("slate", neutral_slate(_calib_tint(row["mean"], PRD_SLATE)),
 		float(ROOF_UV["slate"]))
+	_slate_mat.set_meta("roof", true)
 	return _slate_mat
 
 ## Paris slate and zinc photograph as a neutral, faintly cool grey. The
@@ -494,5 +495,6 @@ static func roof_for_color(c: Color) -> Material:
 	if _roof_mats.size() > 28:
 		return slate()
 	var m := pbr_material(set_name, tint, float(ROOF_UV[set_name]))
+	m.set_meta("roof", true)
 	_roof_mats[key] = m
 	return m
