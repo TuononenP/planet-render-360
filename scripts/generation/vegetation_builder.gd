@@ -57,18 +57,17 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null) -> 
 static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 	var p := clampi(data.quality_preset, 0, 3)
 	var biome := TreeSpecies.biome_for_data(data)
-	var winter := data.season == LocationData.Season.WINTER
-	var cold := biome in ["alpine", "boreal"]
 	var noise := FastNoiseLite.new()
 	noise.seed = data.seed_value + 77
 	noise.frequency = 0.012 / WorldScale.metres_to_units()
 	return {
 		"preset": p, "fidelity": MaterialLibrary.fidelity_for_preset(p),
 		"m2u": WorldScale.metres_to_units(), "biome": biome, "season": data.season,
-		# Snow loads where the viewpoint sits above the season's CHELSA
-		# snow line; without climate data, winter in a cold biome.
-		"snow": 0.55 if (ClimateModel.snowy_at_viewpoint(data, data.season) if ClimateModel.has(data) \
-			else winter and cold) else 0.0,
+		# Snow load outside summer; the shaders gate it per tree by the
+		# tree's own height against the climate snow line (ClimateModel
+		# globals), so slopes above the line carry snow and the valley
+		# below it does not.
+		"snow": 0.0 if data.season == LocationData.Season.SUMMER else 0.85,
 		"sway": 0.0035 if p == 3 else 0.0,
 		"full_r": float(FULL_R[p]), "mid_r": float(MID_R[p]),
 		"budget": int(MESH_BUDGET[p]), "noise": noise,

@@ -11,6 +11,9 @@ static func _on_season_selected(v: View360, index: int) -> void:
 	if v._season_btn != null:
 		v._season_btn.select(v._data.season)
 	v._atmos.set_season(v._data.season)
+	# Climate snow / ice follow the season at once (shader globals); the
+	# rebuild below re-applies them to the new world's roads.
+	apply_surface_state(v)
 	# Colours bake per season, so the world rebuilds (threaded, the old
 	# world stays up meanwhile); the ground surface is season-free and
 	# reused.
@@ -82,6 +85,7 @@ static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: f
 		v._weather_label.visible = true
 	v._atmos.set_weather(code, cloud_cover)
 	_apply_precip(v, code)
+	apply_surface_state(v)
 	if v._weather != null and v._weather.has_utc_offset:
 		_apply_utc_offset(v, float(v._weather.utc_offset_s) / 3600.0)
 
@@ -99,6 +103,41 @@ static func _apply_utc_offset(v: View360, hours: float) -> void:
 		spawn_golden_hour(v)
 	else:
 		_apply_time(v, v._time_hour)
+
+## Climate snow / rain / ice for the shown place and its live weather:
+## shader globals (ClimateModel) plus wet road materials, which are
+## standard materials and so take the wetness here.
+static func apply_surface_state(v: View360) -> void:
+	if v._data == null:
+		return
+	var code := v._atmos.weather_code if v._atmos != null else -1
+	ClimateModel.apply_globals(v._data, code)
+	if v._generated != null and is_instance_valid(v._generated):
+		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
+
+## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
+## darker albedo. Dry values are kept on the shared material, so the
+## change is reversible and applies once per material.
+static func _wet_roads(world: Node, wet: float) -> void:
+	var seen := {}
+	for c in world.get_children():
+		if not (c is MeshInstance3D) or str(c.get_meta("lod_layer", "")) != "Roads":
+			continue
+		var mi := c as MeshInstance3D
+		var mats: Array = [mi.material_override]
+		for s in (mi.mesh.get_surface_count() if mi.mesh != null else 0):
+			mats.append(mi.mesh.surface_get_material(s))
+		for m in mats:
+			if not (m is StandardMaterial3D) or seen.has(m):
+				continue
+			seen[m] = true
+			var sm := m as StandardMaterial3D
+			if not sm.has_meta("dry_rough"):
+				sm.set_meta("dry_rough", sm.roughness)
+				sm.set_meta("dry_albedo", sm.albedo_color)
+			sm.roughness = lerpf(float(sm.get_meta("dry_rough")), 0.18, wet)
+			var a: Color = sm.get_meta("dry_albedo")
+			sm.albedo_color = a.darkened(0.25 * wet)
 
 static func spawn_golden_hour(v: View360) -> void:
 	# An hour slot uses the season's date, so the golden hour must be

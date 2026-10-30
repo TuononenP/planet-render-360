@@ -45,6 +45,8 @@ func _run() -> void:
 		quit(1)
 
 func _decoder_checks(failures: Array[String]) -> void:
+	var sentinel := "_decoder_checks aborted (script error)"
+	failures.append(sentinel)
 	# A full-width row with a horizontal predictor: write deltas, deflate,
 	# decode three samples from the middle.
 	var want := PackedInt32Array()
@@ -69,8 +71,11 @@ func _decoder_checks(failures: Array[String]) -> void:
 	var cell := ClimateFetcher.cell_of(48.8566, 2.3522)
 	if cell != Vector2i(21882, 4217):
 		failures.append("Paris cell should be (21882, 4217) like GDAL, got %s" % cell)
+	failures.erase(sentinel)
 
 func _model_checks(failures: Array[String]) -> void:
+	var sentinel := "_model_checks aborted (script error)"
+	failures.append(sentinel)
 	var by := {}
 	for p in PLACES:
 		by[p[0]] = _data(p)
@@ -105,18 +110,40 @@ func _model_checks(failures: Array[String]) -> void:
 	if ClimateModel.grass_tint(by["Big Sur"], LocationData.Season.SUMMER).a <= 0.0 \
 			or ClimateModel.grass_tint(by["Paris"], LocationData.Season.SUMMER).a > 0.0:
 		failures.append("golden summer grass only where summers are dry")
-	if ClimateModel.snow_uniforms(il)["snow_on"] != 0.0:
+	if ClimateModel.snow_uniforms(il)["climate_snow_on"] != 0.0:
 		failures.append("summer keeps the imagery's own snow (snow_on 0)")
+	# Summer snowfall in the valley (too warm to settle) stays off; in
+	# Banff's winter it brings the line down to the viewpoint.
+	if ClimateModel.snow_uniforms(il, 71)["climate_snow_on"] != 0.0:
+		failures.append("an 18 °C summer snowfall must not settle")
+	var banff: LocationData = by["Banff"]
+	banff.season = LocationData.Season.SPRING
+	if ClimateModel.snow_uniforms(banff, 73)["climate_snow_y"] > 0.0:
+		failures.append("falling snow at Banff should settle at the viewpoint")
 	il.season = LocationData.Season.WINTER
 	var u := ClimateModel.snow_uniforms(il)
-	if u["snow_on"] != 1.0 or absf(float(u["snow_y"]) - (sl_w - 568.0)) > 0.01:
+	if u["climate_snow_on"] != 1.0 or absf(float(u["climate_snow_y"]) - (sl_w - 568.0)) > 0.01:
 		failures.append("winter snow uniforms: %s" % u)
+	# Rain wets the ground; still water freezes only in cold winters.
+	if ClimateModel.globals_for(il, 63)["climate_wetness"] != 1.0 \
+			or ClimateModel.globals_for(il, 0)["climate_wetness"] != 0.0:
+		failures.append("rain codes should wet the ground, clear skies not")
+	var turku: LocationData = by["Turku"]
+	turku.season = LocationData.Season.WINTER
+	banff.season = LocationData.Season.WINTER
+	if ClimateModel.water_frozen(il) or ClimateModel.water_frozen(turku) \
+			or not ClimateModel.water_frozen(banff):
+		failures.append("ice: Interlaken / Turku (coldest quarter > -4 °C) open, Banff frozen")
+	for k in ClimateModel.GLOBALS:
+		if not ProjectSettings.has_setting("shader_globals/" + k):
+			failures.append("project.godot must declare shader global %s" % k)
 	# Without climate data the latitude rules stay in charge.
 	var bare := LocationData.new()
 	bare.latitude = 46.6863
 	if ClimateModel.snowline_m(bare, LocationData.Season.WINTER) != FarSurface.snowline_m(46.6863, LocationData.Season.WINTER) \
 			or ClimateModel.biome(bare) != "":
 		failures.append("no climate → latitude snow line and regional biome")
+	failures.erase(sentinel)
 
 func _live_checks(failures: Array[String]) -> void:
 	var f := ClimateFetcher.new()
