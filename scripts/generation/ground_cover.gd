@@ -19,7 +19,7 @@ extends RefCounted
 const RADIUS_M := [0.0, 90.0, 170.0, 260.0]
 const SPACING_M := [0.0, 3.2, 2.6, 2.1]
 const KINDS := ["tuft", "flower", "shrub"]
-const CLASSES := {"grass": [0.86, 0.10, 0.04], "cemetery": [0.85, 0.05, 0.10],
+const CLASSES := {"grass": [0.86, 0.125, 0.015], "cemetery": [0.85, 0.05, 0.10],
 	"orchard": [0.80, 0.12, 0.08], "forest": [0.45, 0.0, 0.55], "wetland": [0.9, 0.05, 0.05]}
 
 const SHADER := """
@@ -138,9 +138,9 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 				continue
 			var s := (0.7 + 0.6 * _hash(float(i), float(j), 6.0)) * (0.6 + 0.4 * keep)
 			var v := 0.88 + 0.24 * _hash(float(i), float(j), 7.0)
-			# Brighter than the lawn colour: the cards are lit edge-on and
-			# their blades darken toward the base in the texture.
-			var col := Color(grass.r * v, grass.g * v * (0.95 + 0.1 * h1), grass.b * v) * 1.6
+			# Near the (dehazed, darkened) lawn's own value: the blades
+			# darken toward the base in the texture.
+			var col := Color(grass.r * v, grass.g * v * (0.95 + 0.1 * h1), grass.b * v) * 1.2
 			if kind == "flower":
 				col = Color(v, v, v)
 			elif kind == "shrub":
@@ -232,7 +232,7 @@ static func _paint(kind: String, season: int) -> Image:
 			var y := 127.0 - float(t)
 			var x := bx + lean * float(t) * f
 			var wd := maxf(2.2 * (1.0 - f), 0.6)
-			var shade := v * (0.6 + 0.4 * f)
+			var shade := v * (0.78 + 0.32 * f)
 			for dx in range(int(floor(x - wd)), int(ceil(x + wd)) + 1):
 				if dx >= 0 and dx < n and y >= 0.0:
 					img.set_pixel(dx, int(y), Color(shade * 0.85, shade, shade * 0.6, 1.0))

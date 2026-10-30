@@ -145,8 +145,9 @@ void fragment() {
 		vec2 gr = t_relief(g, 26.0, ground_quality >= 2 ? 4 : 2);
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 9.0 * rocky * relief_fade);
 	}
-	// Steep ground is cliff rock (and scree) whatever the cover says.
-	float steep = smoothstep(0.82, 0.6, nw.y);
+	// Very steep ground (past ~45°) is cliff rock and scree whatever the
+	// cover says; grass and scrub hold on gentler slopes.
+	float steep = smoothstep(0.76, 0.52, nw.y);
 	W0 *= 1.0 - steep * 0.9;
 	W1 = W1 * (1.0 - steep * 0.9) + vec4(0.75, 0.0, 0.25, 0.0) * steep * 0.9;
 	float wsum = W0.x + W0.y + W0.z + W0.w + W1.x + W1.y + W1.z + W1.w;
@@ -161,9 +162,22 @@ void fragment() {
 	vec3 base = mix(col, lf, trust);
 	// Rock colour: neutral stone carrying some of the photo's tint.
 	float l_lf = max(lum(lf), 1e-3);
-	vec3 rock_c = mix(vec3(0.34, 0.32, 0.29), lf * (0.33 / l_lf), 0.35);
+	vec3 rock_c = mix(vec3(0.34, 0.32, 0.29), lf * (0.33 / l_lf), 0.5);
 	base = mix(base, rock_c, steep * 0.85);
 	base = value_clamp(base * mix(1.0, macro, 0.8));
+	// Meadows are never one green: broad patches of lush, deep and
+	// sun-dried grass, and finer mottling near the eye. Multiplies the
+	// class colour only where lawn / forest-floor weight sits.
+	float meadow = clamp(W0.y + W1.y * 0.5, 0.0, 1.0) * (1.0 - steep);
+	if (meadow > 0.01) {
+		float m_big = t_noise(g / 71.0) * 0.6 + t_noise(g / 23.0 + 5.3) * 0.4;
+		float m_fine = t_noise(g / 5.1 + 11.0) * 0.6 + t_noise(g / 1.7 + 3.0) * 0.4;
+		vec3 lush = vec3(0.50, 0.64, 0.36);
+		vec3 dried = vec3(0.78, 0.68, 0.34);
+		vec3 tone = mix(lush, dried, smoothstep(0.32, 0.72, m_big));
+		tone *= 0.88 + 0.24 * mix(0.5, m_fine, 1.0 - smoothstep(120.0, 600.0, dist_m));
+		base *= mix(vec3(1.0), tone, meadow * 0.85);
+	}
 	// Photographic layers by weight, each normalised by its mean so the
 	// class colour sets the value and the texture only adds structure.
 	float w[8] = float[8](W0.x, W0.y, W0.z, W0.w, W1.x, W1.y, W1.z, W1.w);
@@ -221,6 +235,12 @@ void fragment() {
 		occ += nid == 1 ? 1.0 : 0.0;
 	}
 	float contact = 1.0 - 0.45 * (occ / 8.0) * (1.0 - wf);
+	// Bare ground is never brighter than light dry soil or old paving
+	// (~0.38 albedo: the sunlit grade lifts it ~1.6x, so more reads as
+	// white); only the snow layer below goes brighter, and high slopes
+	// keep the imagery's own permanent snow and ice.
+	float ground_max = mix(0.38, 0.85, smoothstep(350.0, 1000.0, pm.y));
+	alb *= min(1.0, ground_max / max(lum(alb), 1e-4));
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel); it
 	// slides off cliffs (relief normal) and takes its own texture.
@@ -247,8 +267,8 @@ void fragment() {
 	AO_LIGHT_AFFECT = 0.2;
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
-	float r = mix(rough, clamp(rmap, 0.35, 1.0), 0.5 * (1.0 - wf));
+	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
 	ROUGHNESS = mix(r, 0.22, wet * 0.85);
-	SPECULAR = mix(0.35, 0.5, wet);
+	SPECULAR = mix(0.28, 0.5, wet);
 }
 """
