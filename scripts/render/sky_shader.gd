@@ -131,6 +131,10 @@ void sky() {
 	float band = exp(-hy * 9.0);
 	col = mix(col, glow_color, clamp(band * side * glow_amount, 0.0, 1.0));
 	col += glow_color * (pow(sm, 24.0) * 0.12 + pow(sm, 400.0) * 0.5) * glow_amount;
+	// Sun glare: a tight bright core and a wide soft aureole in the sun's
+	// own light, under the clouds (they cover it where they are thick).
+	col += LIGHT0_COLOR * LIGHT0_ENERGY * sun_disc
+		* (pow(m, 1400.0) * 1.2 + pow(m, 150.0) * 0.16 + pow(m, 14.0) * 0.018 + pow(m, 3.0) * 0.004);
 	if (twilight > 0.001) {
 		// Opposite the low sun: Earth's shadow (blue-grey band on the
 		// horizon) under the pink Belt of Venus.

@@ -52,6 +52,7 @@ static func _height_context(data: LocationData) -> Dictionary:
 	var m2u := WorldScale.metres_to_units()
 	var cell := 150.0 * m2u
 	var cells := {}
+	var all_h: Array = []
 	for b in data.buildings:
 		if not (b is Dictionary):
 			continue
@@ -66,6 +67,8 @@ static func _height_context(data: LocationData) -> Dictionary:
 				* float(ArchitectureStyle.profile(region, kind)["fh"])
 		if h <= 0.0:
 			continue
+		if kind in ["house", "apartments", "commercial"]:
+			all_h.append(h)
 		var p := Vector3(float(bd.get("x", 0.0)), float(bd.get("z", 0.0)), h)
 		var key := Vector3i(int(floor(p.x / cell)), int(floor(p.y / cell)),
 			ArchitectureStyle.KINDS.find(kind))
@@ -74,7 +77,8 @@ static func _height_context(data: LocationData) -> Dictionary:
 		(cells[key] as Array).append(p)
 	return {"region": region, "density": density,
 		"fidelity": MaterialLibrary.fidelity_for_preset(data.quality_preset),
-		"cells": cells, "cell": cell, "radius_u": 150.0 * m2u}
+		"cells": cells, "cell": cell, "radius_u": 150.0 * m2u,
+		"median_h": _median(all_h), "tagged_n": all_h.size()}
 
 ## T4.2 height priority (contract §2.4): `height` tag → `building:levels`
 ## × the kind's regional floor height → same-kind local estimate →
@@ -124,6 +128,12 @@ static func _inferred_total(x: float, z: float, ctx: Dictionary,
 		look: Dictionary) -> Dictionary:
 	var near := _tagged_within(ctx, x, z, str(look["kind"]))
 	var reg := float(look["default_h"])
+	# A small town's density count says "dense" while its own tagged
+	# buildings are low: the regional default never towers over what the
+	# map shows for the place (a village is not a row of 9-storey blocks).
+	if int(ctx.get("tagged_n", 0)) >= 12 \
+			and str(look["kind"]) in ["house", "apartments", "commercial", "farm"]:
+		reg = minf(reg, maxf(float(ctx["median_h"]) * 1.6, 7.5))
 	if near.size() >= 3:
 		var jitter := 0.85 + 0.3 * ArchitectureStyle._h(x * 0.37 + z * 0.91, 8)
 		return {"total_m": _median(near) * jitter, "source": "estimate"}

@@ -90,6 +90,45 @@ func _run() -> void:
 	if absf(b3.dot(ax[1]) - a3.dot(ax[1]) - 1.0) > 0.001 or absf((ax[0] as Vector3).y) > 0.001 \
 			or absf((ax[1] as Vector3).dot(n60)) > 0.001:
 		failures.append("roof slope axes should lie in the roof plane, u level")
+	# Courtyard blocks: a U-shaped footprint takes the inset roof (every
+	# face up-facing, none spanning the courtyard); a small L keeps its ridge.
+	var u_ring := PackedVector2Array([Vector2(0, 0), Vector2(60, 0), Vector2(60, 40),
+		Vector2(45, 40), Vector2(45, 14), Vector2(15, 14), Vector2(15, 40), Vector2(0, 40)])
+	var l_ring := PackedVector2Array([Vector2(0, 0), Vector2(12, 0), Vector2(12, 6),
+		Vector2(6, 6), Vector2(6, 12), Vector2(0, 12)])
+	if not RoofGeometry.needs_inset(u_ring) or RoofGeometry.needs_inset(l_ring):
+		failures.append("only large non-convex footprints should take the inset roof")
+	var u_roof := RoofGeometry.form_mesh(u_ring, 10.0, 3.0, "hipped")
+	if u_roof == null:
+		failures.append("a courtyard block should still get a roof")
+	else:
+		var ua := u_roof.surface_get_arrays(0)
+		var uv: PackedVector3Array = ua[Mesh.ARRAY_VERTEX]
+		var un: PackedVector3Array = ua[Mesh.ARRAY_NORMAL]
+		var down := 0
+		var inside_court := 0
+		for i in uv.size():
+			if un[i].y <= 0.0:
+				down += 1
+		for i in range(0, uv.size(), 3):
+			var c3 := (uv[i] + uv[i + 1] + uv[i + 2]) / 3.0
+			if c3.x > 16.0 and c3.x < 44.0 and c3.z > 15.0:
+				inside_court += 1
+		if down > 0 or inside_court > 0:
+			failures.append("inset roof: %d down-facing normals, %d faces over the courtyard" % [down, inside_court])
+	# Roof tile courses snap to the roof's own axes: two facets 20 degrees
+	# apart on a curved footprint share one frame.
+	var fu := Vector2(1, 0)
+	var nf1 := Vector3(sin(deg_to_rad(10.0)) * 0.5, 0.87, cos(deg_to_rad(10.0)) * 0.5).normalized()
+	var nf2 := Vector3(sin(deg_to_rad(30.0)) * 0.5, 0.87, cos(deg_to_rad(30.0)) * 0.5).normalized()
+	if (RoofGeometry.slope_axes(nf1, fu)[0] as Vector3).distance_to(
+			RoofGeometry.slope_axes(nf2, fu)[0] as Vector3) > 0.001:
+		failures.append("nearby roof facets should share their tile courses")
+	# No wall tint is brighter than clean white paint.
+	for hex in ["#ffffff", "#f4efe4", "#f2ead8"]:
+		var wc := ArchitectureStyle._tint([hex], 0.3, 2)
+		if wc.r * 0.2126 + wc.g * 0.7152 + wc.b * 0.0722 > ArchitectureStyle.WALL_ALBEDO_MAX + 0.001:
+			failures.append("wall tint %s exceeds the albedo cap" % hex)
 	# Terrain layers and palette.
 	for s in TerrainTextures.LAYERS:
 		if not MaterialLibrary.PBR_SETS.has(s) or not FileAccess.file_exists(
