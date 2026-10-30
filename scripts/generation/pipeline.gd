@@ -208,7 +208,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 			return
 		stage_changed.emit(i, STAGES[i], "in_progress")
 		progress_changed.emit(float(i) / STAGES.size(), STAGES[i])
-		await get_tree().create_timer(0.35).timeout
+		# One frame so the loading screen draws the stage; no fixed pause
+		# (T7.5: real work only, no fake timers).
+		await get_tree().process_frame
 		if _cancelled:
 			cancelled.emit()
 			return

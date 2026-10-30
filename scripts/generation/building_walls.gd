@@ -70,15 +70,14 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	if BuildingBuilder._batch != null:
 		BuildingBuilder._batch.add(BuildingBuilder._batch_key, mat, verts, normals, uvs, indices)
 		return
-	var mesh := ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	TerrainBuilder._add(root, mesh, mat)
+	# Arrays kept: LodRing merges these on the build thread (T7.5).
+	TerrainBuilder._add(root, MeshArrays.mesh(arrays), mat)
 
 ## Flat roof cap over the triangulated ring: the whole roof for flat
 ## shapes, the eave-level seal under pitched T4.2 forms (it closes the
@@ -116,15 +115,14 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 	if BuildingBuilder._batch != null:
 		BuildingBuilder._batch.add(BuildingBuilder._batch_key, mat, verts, normals, uvs, indices)
 		return
-	var mesh := ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	TerrainBuilder._add(root, mesh, mat)
+	# Arrays kept: LodRing merges these on the build thread (T7.5).
+	TerrainBuilder._add(root, MeshArrays.mesh(arrays), mat)
 
 ## Floor height / default roof for the legacy box-mesh fallback only
 ## (corrupt footprints, AABB-only v1 dicts): box UVs cannot tile, so that
