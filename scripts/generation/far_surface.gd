@@ -80,7 +80,8 @@ static func snowline_m(lat: float, season: int) -> float:
 static func ramp_color(data: LocationData, nrm: Vector3, h_asl: float,
 		water: bool, noise: float) -> Color:
 	if water:
-		return Color(0.149, 0.263, 0.247).srgb_to_linear()  # #26433F (T3.8)
+		# Alpha 0 flags water for the ring shader's water shading.
+		return Color(0.149, 0.263, 0.247, 0.0).srgb_to_linear()  # #26433F (T3.8)
 	var tl := ClimateModel.treeline_m(data)
 	var sl := ClimateModel.snowline_m(data, data.season)
 	var forest := Color(0.17, 0.25, 0.13)
@@ -120,27 +121,90 @@ uniform float albedo_cap = 0.85;
 // real canopy albedo is ~0.08-0.15, so far imagery gets a gain, with
 // the PRD 0.85 cap applied as a ceiling, not a multiplier.
 uniform float imagery_gain = 1.6;  // FarSurface.IMAGERY_GAIN
+// 0 Fast .. 3 Ultra: relief octaves, photographic detail (High+).
+uniform int far_quality = 2;
 // @SNOW
+// @TERRAIN
 varying vec3 wpos;
-varying float wny;
+varying vec3 wnrm;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	wny = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
+	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 float edge_w(vec2 uv) {
 	vec2 d = min(uv, vec2(1.0) - uv);
 	return smoothstep(0.0, 0.015, min(d.x, d.y));
 }
+float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 void fragment() {
+	vec4 dg = vec4(dFdx(wpos.xz), dFdy(wpos.xz));
+	vec3 dpx = dFdx(wpos);
+	vec3 dpy = dFdy(wpos);
 	vec3 c = COLOR.rgb;
 	float wc = has_coarse * edge_w(UV2);
 	if (wc > 0.0) { c = mix(c, texture(coarse_tex, UV2).rgb * imagery_gain, wc); }
 	float wf = has_fine * edge_w(UV);
 	if (wf > 0.0) { c = mix(c, texture(fine_tex, UV).rgb * imagery_gain, wf); }
-	c = mix(c, snow_col, snow_cover(wpos, wny));
+	// Imagery minus its own baked haze (TerrainGlsl.t_dehaze).
+	c = t_dehaze(c);
+	float dist = length(VERTEX);
+	vec3 nw = normalize(wnrm);
+	// Far lakes and sea (FarSurface.ramp_color alpha 0): a glossy surface
+	// with wind waves instead of matte ground, matching the near water.
+	float water = clamp(1.0 - COLOR.a, 0.0, 1.0);
+	// Ridges and gullies in the light: the ring mesh is 30-70 m between
+	// vertices, so mountainsides were smooth domes under a painted
+	// photo. Noise gradients bend the lighting normal (strongest on steep
+	// ground), with the feature size growing with distance so it never
+	// shimmers.
+	float fade = 1.0 - smoothstep(9000.0, 26000.0, dist);
+	float steep0 = smoothstep(0.93, 0.6, nw.y);
+	if (fade > 0.01) {
+		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
+		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water));
+	}
+	if (water > 0.01) {
+		vec2 wg = t_relief(wpos.xz + vec2(TIME * 0.6, TIME * 0.25), max(25.0, dist * 0.004), 2);
+		nw = normalize(mix(nw, normalize(vec3(-wg.x * 4.0, 1.0, -wg.y * 4.0)), water));
+		c = mix(c, c * 0.55 + vec3(0.012, 0.026, 0.03), water);
+	}
+	// Steep faces read as rock: the photo's value, mostly its own hue
+	// pulled toward neutral stone.
+	float steep = smoothstep(0.8, 0.55, nw.y);
+	float l = lum(c);
+	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), steep * 0.55);
+	vec3 nmap = vec3(0.5, 0.5, 1.0);
+	float dfade = far_quality >= 2 ? 1.0 - smoothstep(2500.0, 7500.0, dist) : 0.0;
+	if (dfade > 0.01) {
+		// Photographic structure where the drape is a blur: cliff rock
+		// on steep ground (biplanar), forest floor / lawn elsewhere by
+		// the photo's greenness. Value only, so the drape keeps its hue.
+		vec4 a;
+		vec4 n;
+		float exg = (2.0 * c.g - c.r - c.b) / max(c.r + c.g + c.b, 1e-3);
+		int layer = steep > 0.4 ? 4 : (exg > 0.06 ? 5 : 6);
+		if (layer == 4) {
+			det_side(4, wpos / 5.0, dpx / 5.0, dpy / 5.0, nw, a, n);
+		} else {
+			det_sample(layer, wpos.xz / 6.0, dg / 6.0, true, a, n);
+		}
+		float r = lum(a.rgb) / max(lum(det_mean[layer]), 1e-3);
+		c *= mix(1.0, clamp(r, 0.55, 1.6), dfade * 0.65 * (1.0 - water));
+		nmap = mix(nmap, n.rgb, dfade * 0.8 * (1.0 - water));
+	}
+	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
+	c = mix(c, snow_col, sc);
+	// Cloud shadows sweeping the far slopes (the near field is lit by the
+	// real shadow map only, so they fade in past the detailed ground).
+	c *= 1.0 - 0.5 * t_cloud_shadow(wpos) * smoothstep(1200.0, 2600.0, dist);
 	ALBEDO = min(c, vec3(albedo_cap));
-	ROUGHNESS = 0.96;
-	SPECULAR = 0.2;
+	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
+	BINORMAL = normalize((VIEW_MATRIX * vec4(cross(tw, nw), 0.0)).xyz);
+	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), sc);
+	ROUGHNESS = mix(mix(0.96, 0.82, steep), mix(0.08, 0.5, climate_water_ice), water);
+	SPECULAR = mix(mix(0.2, 0.3, steep), 0.34, water);
 }
 """
 static var _shader: Shader
@@ -150,7 +214,8 @@ static var _shader: Shader
 ## The 0.85 albedo ceiling matches the near drape cap (PRD §4.4).
 static func drape_material(fine: Texture2D, coarse: Texture2D,
 		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
-	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @TERRAIN", TerrainGlsl.CODE)
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = code
@@ -160,6 +225,9 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		var sh := Shader.new()
 		sh.code = code.replace("cull_back", "cull_disabled")
 		mat.shader = sh
+	var preset := data.quality_preset if data != null else RenderSettings.Preset.HIGH
+	TerrainGlsl.bind(mat, preset)
+	mat.set_shader_parameter("far_quality", RenderSettings.clamp_preset(preset))
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:

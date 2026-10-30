@@ -22,4 +22,12 @@ static var SETS := {
 	"pavement": {"asset": "concrete_pavement", "mean": Color(0.2140, 0.1761, 0.1342), "rough": 0.95, "metal": 0.0},
 	"grass": {"asset": "grass_ground", "mean": Color(0.1562, 0.1180, 0.0482), "rough": 0.97, "metal": 0.0},
 	"rock": {"asset": "brown_mud_rocks_01", "mean": Color(0.0854, 0.0639, 0.0380), "rough": 0.97, "metal": 0.0},
+	# Terrain sets (ground and far-ring shaders): cliff faces, forest
+	# floor, mown lawn, gravel/scree, beach sand, snow.
+	"cliff": {"asset": "rock_face_03", "mean": Color(0.2296, 0.1433, 0.0823), "rough": 0.92, "metal": 0.0},
+	"forest": {"asset": "forest_leaves_02", "mean": Color(0.2789, 0.1666, 0.0465), "rough": 0.97, "metal": 0.0},
+	"lawn": {"asset": "leafy_grass", "mean": Color(0.3113, 0.2295, 0.1011), "rough": 0.96, "metal": 0.0},
+	"gravel": {"asset": "gravel_floor", "mean": Color(0.3627, 0.2382, 0.1302), "rough": 0.95, "metal": 0.0},
+	"sand": {"asset": "coast_sand_01", "mean": Color(0.2236, 0.1706, 0.1067), "rough": 0.96, "metal": 0.0},
+	"snow": {"asset": "snow_02", "mean": Color(0.3786, 0.3782, 0.3883), "rough": 0.7, "metal": 0.0},
 }

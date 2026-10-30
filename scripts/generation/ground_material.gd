@@ -12,8 +12,9 @@ extends RefCounted
 ##   detailed extent) is rasterised from the same OSM land polygons
 ##   GroundTruth.land_class_at reads (first polygon wins, holes
 ##   honoured), then roads and building footprints on top.
-## - Each class picks tiled PBR detail (pavement / grass / rock /
-##   asphalt; world-space UVs at two scales against visible tiling),
+## - Each class picks tiled PBR detail from eight photographic layers
+##   (TerrainTextures: pavement, lawn, rocky ground, asphalt, cliff,
+##   forest floor, gravel, sand; sampled without visible repetition),
 ##   a class base colour, and how much of the LOW-FREQUENCY photo
 ##   (a ~5 m mip) tints it. Inside footprints and on road ribbons the
 ##   photo is never the albedo; urban open ground is pavement; parks
@@ -35,7 +36,6 @@ extends RefCounted
 ## Heights stay GroundTruth's; this class only colours.
 
 const CLASS_TEXELS := 1024
-const TILE_M := 3.0
 ## Metres at which the full photo starts / finishes taking over.
 const NEAR_M := 140.0
 const FAR_M := 900.0
@@ -61,8 +61,6 @@ const DIRT_PATHS := ["path", "track", "bridleway"]
 ## ground is laid paving; paved paths a little; everything else none.
 const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3}
 
-static var _detail_texs: Dictionary = {}
-
 ## The shared ground material for one built place. `photo` is the
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with
 ## no imagery, the procedural colour image TerrainBuilder bakes over
@@ -71,7 +69,8 @@ static var _detail_texs: Dictionary = {}
 static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		has_sat: bool) -> ShaderMaterial:
 	var sh := Shader.new()
-	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @TERRAIN", TerrainGlsl.CODE)
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()
@@ -82,7 +81,6 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)
-	m.set_shader_parameter("tile_m", TILE_M)
 	m.set_shader_parameter("near_m", NEAR_M)
 	m.set_shader_parameter("far_m", FAR_M)
 	m.set_shader_parameter("lum_floor", LUM_FLOOR)
@@ -99,13 +97,9 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("unknown_bare", bare)
 	m.set_shader_parameter("unknown_veg", Color(0.35, 0.48, 0.24))
 	m.set_shader_parameter("unknown_trust", 0.2 if settled else 0.5)
-	var sets := ["pavement", "grass", "rock", "asphalt"]
-	for i in sets.size():
-		var s: String = sets[i]
-		m.set_shader_parameter("d%d" % i, _detail_tex(s, "diff"))
-		m.set_shader_parameter("n%d" % i, _detail_tex(s, "nor"))
-		var mean: Color = MaterialLibrary.PBR_SETS[s]["mean"]
-		m.set_shader_parameter("m%d" % i, Vector3(mean.r, mean.g, mean.b))
+	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
+	TerrainGlsl.bind(m, data.quality_preset)
+	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
 	return m
 
 ## Mip level whose texel is ~LF_M metres: the same ground blur at
@@ -142,17 +136,18 @@ static func photo_gain(photo: Texture2D, rect: Rect2) -> float:
 	var mean := sum / float(maxi(n, 1))
 	return clampf(GAIN_TARGET / maxf(mean, 0.01), 1.0, 1.9)
 
-## Per-class lookup, 32 x 3 RGBA8 (nearest):
-## row 0 detail weights (pavement, grass, rock, asphalt);
+## Per-class lookup, 32 x 4 RGBA8 (nearest):
+## row 0 detail weights (pavement, lawn, rocky ground, asphalt);
 ## row 1 base colour (sRGB) + photo tint trust in A;
 ## row 2 R = full-photo cap with distance, G = roughness, B = how
 ## much of the photo's own fine luminance structure (markings, paving,
 ## mown stripes, ±45% at most) modulates the near ground, A = how much
-## procedural paving (PAVING in the shader, T4.7) the class carries.
+## procedural paving (PAVING in the shader, T4.7) the class carries;
+## row 3 more detail weights (cliff, forest floor, gravel, sand).
 ## `dry` (linear, alpha 1) replaces the grass colour in dry-summer and
 ## arid climates (ClimateModel.grass_tint); alpha 0 keeps the season's.
 static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color(0, 0, 0, 0)) -> Image:
-	var img := Image.create(32, 3, false, Image.FORMAT_RGBA8)
+	var img := Image.create(32, 4, false, Image.FORMAT_RGBA8)
 	# Unused ids must never read as colour: v1 filled (1,0,0,0), which
 	# row 1 decodes as pure red albedo (the Big Sur all-red ground).
 	img.fill(Color(0, 0, 0, 0))
@@ -166,23 +161,24 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 	if dry.a > 0.0:
 		grass = Color(dry.r, dry.g, dry.b).linear_to_srgb()
 	var pave := MaterialLibrary.ground_color("urban")
+	var none := Color(0, 0, 0, 0)
 	var rows := {
-		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0],
-		"road": [Color(0, 0, 0, 1), Color(0.40, 0.39, 0.37), 0.0, 0.25, 0.95, 0.45],
-		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55],
-		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55],
-		"forest": [Color(0, 0.55, 0.45, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6],
-		"field": [Color(0, 0.6, 0.4, 0), MaterialLibrary.ground_color("field"), 0.6, 1.0, 0.97, 0.6],
-		"orchard": [Color(0, 1, 0, 0), MaterialLibrary.ground_color("orchard"), 0.5, 1.0, 0.97, 0.55],
-		"cemetery": [Color(0.3, 0.7, 0, 0), MaterialLibrary.ground_color("cemetery"), 0.4, 0.8, 0.97, 0.5],
-		"pitch": [Color(0, 1, 0, 0), MaterialLibrary.ground_color("pitch"), 0.3, 0.8, 0.97, 0.4],
-		"wetland": [Color(0, 0.8, 0.2, 0), MaterialLibrary.ground_color("wetland"), 0.5, 1.0, 0.9, 0.55],
-		"sand": [Color(0.7, 0, 0.3, 0), MaterialLibrary.ground_color("sand"), 0.4, 1.0, 0.97, 0.45],
-		"rock": [Color(0, 0, 1, 0), MaterialLibrary.ground_color("rock"), 0.5, 1.0, 0.97, 0.6],
-		"quarry": [Color(0, 0, 1, 0), MaterialLibrary.ground_color("quarry"), 0.5, 1.0, 0.97, 0.55],
-		"glacier": [Color(1, 0, 0, 0), MaterialLibrary.ground_color("glacier"), 0.4, 1.0, 0.6, 0.4],
-		"water": [Color(0, 0.2, 0.8, 0), MaterialLibrary.ground_color("wetland"), 0.3, 1.0, 0.9, 0.4],
-		"path": [Color(0.2, 0.2, 0.6, 0), Color(0.58, 0.52, 0.42), 0.15, 0.6, 0.97, 0.5],
+		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
+		"road": [Color(0, 0, 0, 1), Color(0.40, 0.39, 0.37), 0.0, 0.25, 0.95, 0.45, none],
+		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
+		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
+		"forest": [Color(0, 0.25, 0, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6, Color(0, 0.75, 0, 0)],
+		"field": [Color(0, 0.6, 0.2, 0), MaterialLibrary.ground_color("field"), 0.6, 1.0, 0.97, 0.6, Color(0, 0, 0.2, 0)],
+		"orchard": [Color(0, 0.8, 0, 0), MaterialLibrary.ground_color("orchard"), 0.5, 1.0, 0.97, 0.55, Color(0, 0.2, 0, 0)],
+		"cemetery": [Color(0.3, 0.6, 0, 0), MaterialLibrary.ground_color("cemetery"), 0.4, 0.8, 0.97, 0.5, Color(0, 0, 0.1, 0)],
+		"pitch": [Color(0, 1, 0, 0), MaterialLibrary.ground_color("pitch"), 0.3, 0.8, 0.97, 0.4, none],
+		"wetland": [Color(0, 0.6, 0, 0), MaterialLibrary.ground_color("wetland"), 0.5, 1.0, 0.9, 0.55, Color(0, 0.4, 0, 0)],
+		"sand": [none, MaterialLibrary.ground_color("sand"), 0.4, 1.0, 0.97, 0.45, Color(0, 0, 0.2, 0.8)],
+		"rock": [Color(0, 0, 0.3, 0), MaterialLibrary.ground_color("rock"), 0.5, 1.0, 0.97, 0.6, Color(0.5, 0, 0.2, 0)],
+		"quarry": [Color(0, 0, 0.4, 0), MaterialLibrary.ground_color("quarry"), 0.5, 1.0, 0.97, 0.55, Color(0.2, 0, 0.4, 0)],
+		"glacier": [Color(0.5, 0, 0, 0), MaterialLibrary.ground_color("glacier"), 0.4, 1.0, 0.6, 0.4, Color(0, 0, 0, 0.5)],
+		"water": [Color(0, 0.2, 0.3, 0), MaterialLibrary.ground_color("wetland"), 0.3, 1.0, 0.9, 0.4, Color(0, 0, 0, 0.5)],
+		"path": [Color(0.2, 0, 0.2, 0), Color(0.58, 0.52, 0.42), 0.15, 0.6, 0.97, 0.5, Color(0, 0, 0.6, 0)],
 	}
 	for cls in rows:
 		var r: Array = rows[cls]
@@ -192,6 +188,7 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 		img.set_pixel(x, 1, Color(c.r, c.g, c.b, float(r[2])))
 		img.set_pixel(x, 2, Color(float(r[3]), float(r[4]), float(r[5]),
 			float(PAVED.get(cls, 0.0))))
+		img.set_pixel(x, 3, r[6])
 	return img
 
 ## Land-cover id map over the detailed extent (texel centres at
@@ -299,16 +296,3 @@ static func _fill_rings(img: Image, rings: Array, id: int, n: int) -> void:
 			if i1 >= i0:
 				img.fill_rect(Rect2i(i0, j, i1 - i0 + 1, 1), col)
 			k += 2
-
-## Mipmapped copy of a bundled PBR map (MaterialLibrary's runtime
-## textures carry no mipmaps; tiled ground without them shimmers).
-static func _detail_tex(set_name: String, map_name: String) -> Texture2D:
-	var key := set_name + ":" + map_name
-	if _detail_texs.has(key):
-		return _detail_texs[key] as Texture2D
-	var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
-	if not img.has_mipmaps():
-		img.generate_mipmaps()
-	var t := ImageTexture.create_from_image(img)
-	_detail_texs[key] = t
-	return t
