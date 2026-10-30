@@ -1,0 +1,12 @@
+# Scorecard — Banff — High — 2026-10-29
+- Run: preset High, seed 40130, sample rules v1 2026-10-29, cache data v2, OSM real (1332 buildings, 1153 roads), satellite real, DEM source z14; pipeline 8.7 s, ground+builders 9.1 s
+- (a) DEM: max 0.65 m / mean 0.12 m over 8 land points (bar ≤ 8 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) -0.00; (0,-400) -0.00; (400,0) +0.65; (0,400) +0.00; (-400,0) +0.00; (0,-800) +0.00; (800,0) +0.29; (0,800) +0.00; (-800,0) water, carved -3.4 m — excluded
+- (b) footprints: median IoU 1.000, centroid offset 1.72 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → PASS
+- (c) heights: coverage 0/10 with height/levels tags → BLOCKED(no tagged sample)
+- (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
+  - samples: (-220,703) visible water at 7.5 m; (-558,-130) visible water at 4.6 m; (-294,630) visible water at 0.0 m; (-292,-779) visible water at 9.7 m; (-314,625) visible water at 8.2 m
+- (d) roads: 5/5 junctions with a rendered ribbon within 3 m (33 of 1662 junctions are passages under OSM buildings, excluded); max ribbon lift 0.07 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
+- (e) landmark: n/a — no registry landmark for this location → N-A
+- (f) human side-by-side rating (signed checklist, T8.3) → NO-REFERENCE — geometry-only scoring
+- AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)
