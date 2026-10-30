@@ -14,7 +14,17 @@ extends Node3D
 ## (PRD AC-11). Octave count is tier-gated by RenderSettings.
 ## Twilight adds Earth's shadow and the Belt of Venus opposite the sun;
 ## night adds stars, the Milky Way and a moon disc. Each season
-## (SEASON_SKY) shifts sun height, sky hues, haze and cloud shape.
+## (SEASON_SKY) shifts sky hues, haze and cloud shape.
+##
+## The sun is the real one (T6.2): SolarPosition from latitude,
+## longitude, date and UTC time. The hour is the place's local clock
+## time (UTC offset from the weather service, else longitude / 15);
+## without an explicit date the selected season's mid-month day is used
+## (hemisphere-aware). Sky, haze and light key off the solar elevation:
+## it maps onto the reference day arc (DAY_DEG / NIGHT_DEG) and that
+## arc's equivalent hour picks the colour keyframes, so the Paris
+## golden-hour grade (the 17:00 keyframes, sun 12.4° up in the
+## afternoon) is one state any place reaches at its own golden hour.
 ##
 ## Aerial perspective: fog takes the sky's own horizon colour (cooler
 ## and bluer than the sun-side glow) plus Godot's aerial-perspective
@@ -33,31 +43,42 @@ const FOGGY_CODES := [45, 48, 51, 53, 55, 61, 63, 65, 71, 73, 75]
 ## that 4 Hz steps are invisible, and the sky radiance map is only
 ## re-filtered when a uniform changes (TIME would dirty it per frame).
 const DRIFT_STEP_S := 0.25
+## Solar elevation (deg) that maps to the full day arc (+1) and to the
+## deepest night (-1). Full night sky (night_amount 1) sits at -9°.
+const DAY_DEG := 48.0
+const NIGHT_DEG := 20.0
+## Afternoon solar elevation of the PRD golden-hour reference grade.
+const GOLDEN_ELEV := 12.42
+## Lowest pitch the sun light takes, so a sun on the horizon still
+## lights the scene instead of grazing it black.
+const MIN_LIGHT_PITCH := 6.0
+## Mid-month of each season (spring, summer, autumn, winter) in the
+## northern hemisphere; the south shifts by six months.
+const SEASON_MONTH := [4, 7, 10, 1]
 ## Per-season sky character, indexed by LocationData.Season. Summer is
-## the reference grade (PRD Paris 17:00) and is the identity. `elev`
-## scales the sun's arc (low winter sun, long shadows); colour tints
-## shift hue at constant luminance so they hold by day and by night;
+## the reference grade (PRD Paris 17:00) and is the identity. Sun
+## height comes from the real date (T6.2); colour tints shift hue at constant luminance so they hold by day and by night;
 ## `haze` scales clear-air extinction; `stretch` / `soft` shape the
 ## cloud deck; `stars`, `milky` and `milky_tilt` / `milky_yaw` (deg)
 ## set the night sky (summer carries the bright Milky Way core).
 const SEASON_SKY := [
 	# Spring: rinsed clear blue, pink-tinged low sun, building cumulus.
-	{"elev": 0.78, "zenith": [Color(0.26, 0.48, 0.88), 0.15],
+	{"zenith": [Color(0.26, 0.48, 0.88), 0.15],
 		"horizon": [Color(0.78, 0.86, 0.94), 0.15], "glow": [Color(1.0, 0.70, 0.64), 0.18],
 		"haze": 0.85, "stretch": 1.1, "soft": 0.13,
 		"stars": 0.9, "milky": 0.55, "milky_tilt": 55.0, "milky_yaw": 20.0},
 	# Summer: reference grade.
-	{"elev": 1.0, "zenith": [Color(0.24, 0.45, 0.80), 0.0],
+	{"zenith": [Color(0.24, 0.45, 0.80), 0.0],
 		"horizon": [Color(0.76, 0.80, 0.86), 0.0], "glow": [Color(0.94, 0.77, 0.56), 0.0],
 		"haze": 1.0, "stretch": 1.0, "soft": 0.12,
 		"stars": 0.85, "milky": 1.0, "milky_tilt": 78.0, "milky_yaw": 70.0},
 	# Autumn: amber low sun, damp warm haze, layered decks.
-	{"elev": 0.72, "zenith": [Color(0.22, 0.40, 0.74), 0.12],
+	{"zenith": [Color(0.22, 0.40, 0.74), 0.12],
 		"horizon": [Color(0.86, 0.79, 0.66), 0.28], "glow": [Color(1.0, 0.56, 0.24), 0.45],
 		"haze": 1.25, "stretch": 1.35, "soft": 0.17,
 		"stars": 1.0, "milky": 0.8, "milky_tilt": 70.0, "milky_yaw": 125.0},
 	# Winter: low pale sun, cold dry air, rose twilight, flat stratus.
-	{"elev": 0.45, "zenith": [Color(0.52, 0.64, 0.82), 0.25],
+	{"zenith": [Color(0.52, 0.64, 0.82), 0.25],
 		"horizon": [Color(0.84, 0.87, 0.92), 0.28], "glow": [Color(1.0, 0.66, 0.66), 0.32],
 		"haze": 0.8, "stretch": 1.7, "soft": 0.22,
 		"stars": 1.2, "milky": 0.45, "milky_tilt": 50.0, "milky_yaw": 160.0},
@@ -72,7 +93,15 @@ var sky_material: ShaderMaterial
 var units_per_metre := WorldScale.metres_to_units()
 var hour := 17.0
 var latitude := 48.8566
+var longitude := 2.3522
+## Local clock offset from UTC (hours) and whether it came from a real
+## source (the weather service) rather than longitude / 15.
+var utc_offset_h := 0.0
+var utc_offset_known := false
 var date := {}
+## Current true sun (degrees; azimuth clockwise from north).
+var solar_elevation := 0.0
+var solar_azimuth := 0.0
 var cloud_cover := DEFAULT_COVER
 var weather_code := -1
 var season: int = LocationData.Season.SUMMER
@@ -109,13 +138,63 @@ func _process(delta: float) -> void:
 
 # --- State API ---
 
-## Hour of day (0-24, fractional); latitude and date are stored for the
-## true solar position (T6.2) and do not move the sun yet.
+## Local clock hour (0-24, fractional) at the place; `on_date`
+## ({year, month, day}) empty uses the season's mid-month day.
 func set_time(hour_f: float, lat: float = latitude, on_date: Dictionary = {}) -> void:
 	hour = fposmod(hour_f, 24.0)
 	latitude = lat
 	date = on_date
 	_apply()
+
+## Place for the solar position. Without a known UTC offset the clock
+## is approximated from longitude until set_utc_offset lands.
+func set_place(lat: float, lon: float) -> void:
+	latitude = lat
+	longitude = lon
+	if not utc_offset_known:
+		utc_offset_h = roundf(lon / 15.0)
+	_apply()
+
+func set_utc_offset(hours: float) -> void:
+	utc_offset_h = hours
+	utc_offset_known = true
+	_apply()
+
+## The date the sun is computed for: the explicit one, else the season's
+## mid-month day this year (southern hemisphere six months on).
+func solar_date() -> Dictionary:
+	if not date.is_empty():
+		return date
+	var month: int = SEASON_MONTH[season]
+	if latitude < 0.0:
+		month = (month + 5) % 12 + 1
+	return {"year": int(Time.get_date_dict_from_system().get("year", 2026)),
+		"month": month, "day": 15}
+
+func solar_at(hour_f: float) -> Dictionary:
+	return SolarPosition.compute(latitude, longitude, solar_date(), hour_f - utc_offset_h)
+
+## Local hour (quarter-hour steps) at which the afternoon sun sinks
+## through the golden-hour reference elevation; where it never does
+## (polar day or night, low winter sun) the afternoon hour whose sun is
+## closest to it.
+func golden_hour() -> float:
+	var best := 17.0
+	var best_err := INF
+	var prev := solar_at(12.0)
+	for i in range(49, 97):
+		var h := float(i) * 0.25
+		var sp := solar_at(h)
+		var err := absf(float(sp["elevation"]) - GOLDEN_ELEV)
+		if float(prev["elevation"]) >= GOLDEN_ELEV and float(sp["elevation"]) < GOLDEN_ELEV \
+				and float(sp["hour_angle"]) > 0.0:
+			# The nearer of the two steps either side of the crossing.
+			return h - 0.25 if float(prev["elevation"]) - GOLDEN_ELEV < err else h
+		if err < best_err and float(sp["hour_angle"]) > 0.0:
+			best_err = err
+			best = h
+		prev = sp
+	return best
 
 ## Open-Meteo weather code + cloud cover %. Coverage drives the cloud
 ## deck itself, not just the light level.
@@ -202,36 +281,37 @@ func _apply() -> void:
 	var overcast := smoothstep(0.7, 1.0, cover)
 	var dim := lerpf(1.0, 0.55, cover)
 	var s: Dictionary = SEASON_SKY[season]
-	var arc := sin(PI * (hour - 6.0) / 12.0)  # >0 by day, <0 at night
-	# Season-scaled sun height: winter noon sits low and warm.
-	var eff := arc * float(s["elev"])
+	var sp := solar_at(hour)
+	solar_elevation = float(sp["elevation"])
+	solar_azimuth = float(sp["azimuth"])
+	# Day arc of the true sun: >0 by day, <0 at night.
+	var arc := clampf(solar_elevation / (DAY_DEG if solar_elevation >= 0.0 else NIGHT_DEG), -1.0, 1.0)
+	# Equivalent hour on the reference day for the colour keyframes.
+	var arc_h := 12.0 * asin(arc) / PI
+	var key_h := (18.0 - arc_h) if float(sp["hour_angle"]) > 0.0 else (6.0 + arc_h)
+	var eff := arc
 	var night := arc <= -0.08
-	var solar_elev := 0.0
 	if not night:
-		var day_t := clampf((hour - 6.0) / 12.0, 0.0, 1.0)
-		# Elevation follows the sun arc but floors at the PRD golden
-		# band: at 17:00 the sun sits ~10° up, warm #FFD9A3.
-		var elev := clampf(maxf(eff, 0.02) * 48.0, 8.0, 50.0)
-		sun.rotation_degrees = Vector3(-elev, lerpf(-95.0, 95.0, day_t), 0)
+		# The light pitch floors just above the horizon; its yaw is the
+		# real azimuth (node -Z points from the sun to the ground).
+		var pitch := clampf(solar_elevation, MIN_LIGHT_PITCH, 90.0)
+		sun.rotation_degrees = Vector3(-pitch, 180.0 - solar_azimuth, 0)
 		sun.light_energy = (0.75 + 1.35 * clampf(eff * 2.2, 0.0, 1.0)) * dim
 		sun.light_color = Color(1.0, 0.85, 0.64).lerp(
 			Color(1, 0.97, 0.92), clampf(eff * 1.7, 0.0, 1.0))
-		solar_elev = elev
 	else:
 		# Moonlight: fixed cool light so night scenes stay readable.
 		sun.rotation_degrees = Vector3(-38, 35, 0)
 		sun.light_energy = 0.12 * dim
 		sun.light_color = Color(0.62, 0.72, 0.95)
-		# The real sun keeps sinking from the 8° floor, so the dusk glow
-		# slides down continuously instead of jumping to the moon.
-		solar_elev = 8.0 + (arc + 0.08) * 60.0
-	var solar_az := lerpf(-95.0, 95.0, (hour - 6.0) / 12.0)
-	var solar_dir := Basis.from_euler(Vector3(deg_to_rad(-solar_elev), deg_to_rad(solar_az), 0.0)).z
+	# The sky's sun keeps its true position below the horizon, so the
+	# dusk glow slides down continuously instead of jumping to the moon.
+	var solar_dir := SolarPosition.direction(solar_elevation, solar_azimuth)
 	# Glow lingers after sunset and fades out by ~20:30.
 	var dusk := 1.0 - smoothstep(0.08, 0.5, -arc)
 	night_amount = smoothstep(0.12, 0.45, -arc)
 	twilight_amount = exp(-pow((arc + 0.05) / 0.12, 2.0))
-	var zenith := _keyframed(hour, [
+	var zenith := _keyframed(key_h, [
 		[0.0, Color(0.03, 0.05, 0.12)], [5.0, Color(0.06, 0.09, 0.19)],
 		[6.5, Color(0.24, 0.38, 0.62)], [8.0, Color(0.30, 0.50, 0.78)],
 		[12.0, Color(0.24, 0.45, 0.80)], [16.0, Color(0.33, 0.54, 0.82)],
@@ -239,7 +319,7 @@ func _apply() -> void:
 		[19.0, Color(0.13, 0.16, 0.31)], [20.5, Color(0.05, 0.07, 0.15)],
 		[24.0, Color(0.03, 0.05, 0.12)]])
 	# Anti-sun horizon: the haze base. Pale blue by day, never cream.
-	var horizon := _keyframed(hour, [
+	var horizon := _keyframed(key_h, [
 		[0.0, Color(0.07, 0.09, 0.16)], [5.0, Color(0.12, 0.13, 0.21)],
 		[6.5, Color(0.62, 0.60, 0.66)], [8.0, Color(0.76, 0.81, 0.87)],
 		[12.0, Color(0.70, 0.80, 0.91)], [16.0, Color(0.74, 0.80, 0.88)],
@@ -247,7 +327,7 @@ func _apply() -> void:
 		[19.0, Color(0.30, 0.25, 0.33)], [20.5, Color(0.09, 0.10, 0.18)],
 		[24.0, Color(0.07, 0.09, 0.16)]])
 	# Sun-side horizon glow: PRD #F0C48F at 17:00.
-	var glow := _keyframed(hour, [
+	var glow := _keyframed(key_h, [
 		[0.0, Color(0.08, 0.10, 0.18)], [5.0, Color(0.26, 0.19, 0.24)],
 		[6.5, Color(1.00, 0.64, 0.40)], [8.0, Color(1.00, 0.84, 0.66)],
 		[12.0, Color(0.96, 0.95, 0.91)], [16.0, Color(1.00, 0.88, 0.70)],

@@ -7,15 +7,29 @@ func _init() -> void:
 	var failures: Array[String] = []
 	var rig := AtmosphereRig.new()
 
-	# Summer 17:00 is the PRD golden-hour reference and must not drift.
+	# The PRD golden-hour reference grade (the 17:00 keyframes) is the
+	# state of a true afternoon sun 12.4° up: Paris, 15 July, 20:19 CEST
+	# (T6.2 — the hour is the place's real clock, not a fixed arc).
 	rig.set_season(LocationData.Season.SUMMER)
-	rig.set_time(17.0)
-	if not rig.sky_top_color.is_equal_approx(Color(0.44, 0.62, 0.82)):
-		failures.append("summer 17:00 zenith drifted: %s" % rig.sky_top_color)
+	rig.set_place(48.8566, 2.3522)
+	rig.set_utc_offset(2.0)
+	rig.set_time(20.31876, 48.8566, {"year": 2026, "month": 7, "day": 15})
+	var ref := Color(0.44, 0.62, 0.82)
+	var dz := rig.sky_top_color - ref
+	if maxf(absf(dz.r), maxf(absf(dz.g), absf(dz.b))) > 0.005:
+		failures.append("golden-hour reference zenith drifted: %s" % rig.sky_top_color)
 	if absf(-rig.sun.rotation_degrees.x - 12.42) > 0.05:
-		failures.append("summer 17:00 sun should sit ~12.4° up, got %f" % -rig.sun.rotation_degrees.x)
+		failures.append("golden-hour reference sun should sit ~12.4° up, got %f" % -rig.sun.rotation_degrees.x)
+	# Sun in the west-north-west (true azimuth ~288°), not a fixed yaw.
+	if absf(rig.solar_azimuth - 288.45) > 0.5:
+		failures.append("golden-hour azimuth %.2f, want 288.45" % rig.solar_azimuth)
+	if absf(rig.golden_hour() - 20.25) > 0.26:
+		failures.append("Paris July golden hour should be ~20:15 CEST, got %f" % rig.golden_hour())
+	rig.set_utc_offset(0.0)
+	rig.set_time(12.0, 48.8566)
 
-	# Seasons: lower winter noon sun, distinct sky hues.
+	# Seasons: lower winter noon sun (real mid-season dates), distinct
+	# sky hues.
 	var noon_elev := {}
 	var noon_zenith := {}
 	for season in [LocationData.Season.SPRING, LocationData.Season.SUMMER,
@@ -36,9 +50,12 @@ func _init() -> void:
 	rig.set_time(12.0)
 	if rig.night_amount > 0.0 or rig.twilight_amount > 0.01:
 		failures.append("noon should have no stars or twilight bands")
-	rig.set_time(18.0)
+	var sunset := 18.0
+	while sunset < 23.0 and float(rig.solar_at(sunset)["elevation"]) > 0.0:
+		sunset += 0.05
+	rig.set_time(sunset)
 	if rig.twilight_amount < 0.5:
-		failures.append("18:00 should be in twilight, got %f" % rig.twilight_amount)
+		failures.append("sunset (%.2f UTC) should be in twilight, got %f" % [sunset, rig.twilight_amount])
 	rig.set_time(0.0)
 	if rig.night_amount < 0.99:
 		failures.append("midnight should show the full night sky, got %f" % rig.night_amount)

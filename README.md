@@ -59,6 +59,7 @@ godot --headless --script tests/flow_test.gd    # picker -> loading -> 360 flow
 godot --headless --script tests/responsive_test.gd # breakpoints + layout switching
 godot --headless --script tests/zoom_search_test.gd # map/360 zoom, search predictions, time of day
 godot --headless --script tests/sky_test.gd      # sky per season and time of day
+godot --headless --script tests/solar_test.gd    # true sun position vs ephemeris
 godot --headless --script tests/scenery_test.gd  # building scale, terrain normals, water, landmark
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
 ```
