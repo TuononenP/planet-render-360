@@ -79,7 +79,6 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(class_map(data)))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))
-	ClimateModel.apply_snow(m, data)
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)

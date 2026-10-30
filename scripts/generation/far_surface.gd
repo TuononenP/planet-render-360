@@ -160,8 +160,6 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		var sh := Shader.new()
 		sh.code = code.replace("cull_back", "cull_disabled")
 		mat.shader = sh
-	if data != null:
-		ClimateModel.apply_snow(mat, data)
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:
