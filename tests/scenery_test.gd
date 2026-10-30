@@ -28,8 +28,9 @@ func _run() -> void:
 	data.buildings = [{"x": 0.0, "z": 0.0, "size_x": 10.0, "size_z": 8.0, "height": 20.0, "name": "t"}]
 	var world := TerrainBuilder.build_world(data)
 	var yr := _rect_mass_yrange(world, Vector2.ZERO, Vector2(10, 8))
-	if absf(yr.y - yr.x - 20.0 * m2u_t) > 0.01:
-		failures.append("20m building should be 20 world units tall, got %s" % str(yr))
+	# 20 m stand above the ground; the walls also sink 0.6 below it.
+	if absf(yr.y - yr.x - (20.0 + 0.6) * m2u_t) > 0.01:
+		failures.append("20m building should stand 20 world units above its ground, got %s" % str(yr))
 	# Buildings sit on the processed ground (flat 3.0, sunk 0.6), never float.
 	elif absf(yr.x - 2.4) > 0.01:
 		failures.append("building base should be at 2.4 on flat ground, got %f" % yr.x)
@@ -343,8 +344,8 @@ func _probe_ground(failures: Array[String], label: String, data: LocationData) -
 			failures.append("%s: authored building at %s not placed" % [label, str(xz)])
 			continue
 		var want := _rect_base(ground, xz, size)
-		if absf(yr.x - want) > 0.05 or absf(yr.y - yr.x - ehw) > 0.05:
-			failures.append("%s: building at %s spans %s, want base %f height %f"
+		if absf(yr.x - want) > 0.05 or absf(yr.y - yr.x - ehw - 0.6) > 0.05:
+			failures.append("%s: building at %s spans %s, want base %f height %f + 0.6 sink"
 				% [label, str(xz), str(yr), want, ehw])
 	# Tree trunks (T5.1): instanced species, one MultiMesh per
 	# species/LOD/sector; every instance origin is the trunk base on
@@ -507,13 +508,14 @@ func _probe_footprints(failures: Array[String]) -> void:
 	var world := TerrainBuilder.build_world(data, ground)
 	var base := 3.0 - 0.6
 	var mu := WorldScale.metres_to_units()
+	# Heights stand above the ground (3.0); the walls sink 0.6 below it.
 	_check_extruded(failures, world, "diamond",
 		PackedVector2Array([Vector2(4, 0), Vector2(0, 4), Vector2(-4, 0),
-			Vector2(0, -4)]), base, base + 20.0 * mu, 32.0)
+			Vector2(0, -4)]), base, base + 0.6 + 20.0 * mu, 32.0)
 	_check_extruded(failures, world, "L",
 		PackedVector2Array([Vector2(26, -4), Vector2(26, 4), Vector2(30, 4),
 			Vector2(30, 0), Vector2(34, 0), Vector2(34, -4)]),
-		base, base + 12.0 * mu, 48.0)
+		base, base + 0.6 + 12.0 * mu, 48.0)
 	_check_fallback_box(failures, world, ground, Vector2(51, 51), Vector2(6, 6), 12.0 * mu)
 	_check_fallback_box(failures, world, ground, Vector2(-40, 0), Vector2(10, 8), 20.0 * mu)
 	_check_no_fallback_box(failures, world, Vector2(0, 0), 20.0 * mu)
@@ -714,8 +716,8 @@ func _check_fallback_box(failures: Array[String], world: Node3D,
 		failures.append("fallback AABB at %s not placed" % str(xz))
 		return
 	var want := _rect_base(ground, xz, size)
-	if absf(yr.x - want) > 0.05 or absf(yr.y - yr.x - ehw) > 0.05:
-		failures.append("fallback at %s spans %s, want base %f height %f"
+	if absf(yr.x - want) > 0.05 or absf(yr.y - yr.x - ehw - 0.6) > 0.05:
+		failures.append("fallback at %s spans %s, want base %f height %f + 0.6 sink"
 			% [str(xz), str(yr), want, ehw])
 
 ## Wall y-span [base, top] of the mass extruded from the AABB rectangle
