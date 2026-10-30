@@ -164,6 +164,36 @@ func _run() -> void:
 	screen.queue_free()
 	settings.set_preset(RenderSettings.Preset.HIGH)
 
+	# Renderer features per tier: Ultra on Forward+ carries the full
+	# light-transport set, Fast none; Mobile never asks for Forward+-only
+	# effects; each tier's features include the tier below's.
+	var ultra := RenderQuality.features_for(RenderSettings.Preset.ULTRA, true)
+	for k in ["ssao", "ssil", "ssr", "sdfgi", "volumetric_fog", "taa"]:
+		if not ultra[k]:
+			failures.append("Ultra on Forward+ should enable %s" % k)
+		for p in 4:
+			if RenderQuality.features_for(p, false)[k]:
+				failures.append("Mobile preset %d should not enable Forward+-only %s" % [p, k])
+		if RenderQuality.features_for(RenderSettings.Preset.FAST, true)[k]:
+			failures.append("Fast should not pay for %s" % k)
+		for p in 3:
+			if RenderQuality.features_for(p, true)[k] and not RenderQuality.features_for(p + 1, true)[k]:
+				failures.append("%s on preset %d should stay on above it" % [k, p])
+	if float(ultra["sun_angle"]) <= 0.0 or int(ultra["shadow_atlas"]) <= int(RenderQuality.features_for(2, true)["shadow_atlas"]):
+		failures.append("Ultra should have a physical sun penumbra and a larger shadow map than High")
+	if int(RenderQuality.features_for(RenderSettings.Preset.ULTRA, false)["shadow_atlas"]) > 4096:
+		failures.append("Mobile shadow map should stay within 4096")
+	# AC-12: the rig keeps ACES and the haze on every tier; Ultra's
+	# volume takes the haze colour.
+	var rig := AtmosphereRig.new(RenderSettings.Preset.ULTRA)
+	for p in 4:
+		rig.set_quality(p)
+		if rig.environment.tonemap_mode != Environment.TONE_MAPPER_ACES or not rig.environment.fog_enabled:
+			failures.append("preset %d should keep ACES and the exponential haze" % p)
+	if not rig.environment.volumetric_fog_albedo.is_equal_approx(rig.haze_color):
+		failures.append("volumetric fog should take the haze colour")
+	rig.free()
+
 	if failures.is_empty():
 		print("SETTINGS OK: preset budgets, grid sizing, persistence, governor ceiling, settings screen")
 		quit(0)

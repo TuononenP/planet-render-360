@@ -244,12 +244,20 @@ func set_season(value: int) -> void:
 	season = LocationData.clamp_season(value)
 	_apply()
 
-## Shadow reach/softness and cloud octaves for a RenderSettings preset.
+## Shadow reach/softness, cloud octaves and the tier's renderer
+## features (RenderQuality) for a RenderSettings preset.
 func set_quality(preset: int) -> void:
 	_preset = RenderSettings.clamp_preset(preset)
 	sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_preset)
 	sun.shadow_blur = RenderSettings.shadow_blur_for(_preset)
 	sky_material.set_shader_parameter("octaves", RenderSettings.cloud_octaves_for(_preset))
+	RenderQuality.apply_environment(environment, _preset)
+	RenderQuality.apply_light(sun, _preset)
+	if is_inside_tree():
+		RenderQuality.apply_viewport(get_viewport(), _preset)
+
+func _ready() -> void:
+	RenderQuality.apply_viewport(get_viewport(), _preset)
 
 func is_foggy() -> bool:
 	return weather_code in FOGGY_CODES
@@ -322,7 +330,8 @@ func _build_environment() -> void:
 # --- State -> light / sky / fog ---
 
 ## Reflections of the real surroundings for water, wet ground and
-## glass (Mobile has no SSR): one cubemap rendered from the viewpoint,
+## glass (Mobile has no SSR; on Forward+ SSR refines it on screen):
+## one cubemap rendered from the viewpoint,
 ## re-rendered only when the light changes (time, weather, season,
 ## place) — never per frame. No box projection: the reflected city and
 ## hills sit at their true (far) distance, which is what water and
@@ -460,6 +469,7 @@ func _apply() -> void:
 	var per_m := FOG_PER_M if is_foggy() else HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
 	environment.fog_density = per_m / maxf(units_per_metre, 1e-4)
 	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
+	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
 
 ## Shifts `c` toward the hue of `target` by `w` at constant luminance,
 ## so a season tint never brightens the night or darkens the noon sky.
