@@ -13,9 +13,10 @@ extends RefCounted
 ## surface per finish keeps draw calls to a handful. Real `bridge=yes`
 ## ways become decks with fascia sides and parapets, arched from bank to
 ## bank to clear the water/road beneath; non-bridge segments over water
-## are dropped (no shards in the river); tunnels are skipped. Dashed
-## centre lines, and solid edge lines on main roads, only at Fidelity 3
-## (PRD §3.4/§4.4). v1 bare centrelines
+## are dropped (no shards in the river); tunnels are skipped. Asphalt
+## is RoadSurface's shader: lane markings, crossings, kerbs, wear and
+## weather on every tier, from the per-vertex lanes / rank / urban flag
+## / junction distance written here. v1 bare centrelines
 ## are still accepted as {width 1.7 units, class unclassified}.
 ## TerrainBuilder.build_world adopts the children flat.
 
@@ -36,10 +37,6 @@ const EXTENT_U := WorldScale.DETAILED_EXTENT_M * 0.5 - 2.0
 ## setts/gravel sit warmer and lighter than asphalt.
 const FINISH_HEX := {"asphalt": "#585552", "paving": "#8a8274",
 	"sett": "#837a6e", "gravel": "#9a8c72", "deck": "#a39d92"}
-## Edge lines (F3): main roads at least this wide, inset from the edge.
-const EDGE_LINE_MIN_M := 7.0
-const EDGE_LINE_INSET_M := 0.35
-
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -102,13 +99,8 @@ static func _material(finish: String) -> Material:
 			m = _pbr("pavement", FINISH_HEX[finish])
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
-		"mark":
-			var mk := StandardMaterial3D.new()
-			mk.albedo_color = Color(0.74, 0.72, 0.66)
-			mk.roughness = 0.7
-			m = mk
 		_:
-			m = _pbr("asphalt", FINISH_HEX["asphalt"])
+			m = RoadSurface.material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 	_mats[finish] = m
 	return m
 
@@ -123,7 +115,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 	_mats.clear()
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
-	var fidelity := MaterialLibrary.fidelity_for_preset(data.quality_preset)
+	var junc := RoadSurface.junctions(data)
 	var batches := {}
 	for line in data.roads:
 		var r := _parse(line, m2u)
@@ -138,16 +130,13 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 			_bridge(batches, dense, float(r["width_u"]), surf, m2u)
 			continue
 		var lift := float(LIFT_M[int(r["rank"])]) * m2u
+		# RoadSurface attributes: lanes, rank, kerbed urban street.
+		var mid := dense[dense.size() / 2]
+		var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
+		var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
+			1.0 if urban else 0.0, 1.0)
 		for run in _dry_runs(dense, surf):
-			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift)
-			if fidelity >= 3 and int(r["rank"]) >= 1 and float(r["width_u"]) >= 5.0 * m2u:
-				_centre_dashes(_batch(batches, "mark"), run, surf, lift + 0.01 * m2u, m2u)
-			if fidelity >= 3 and int(r["rank"]) >= 2 and str(r["finish"]) == "asphalt" \
-					and float(r["width_u"]) >= EDGE_LINE_MIN_M * m2u:
-				var off := float(r["width_u"]) * 0.5 - EDGE_LINE_INSET_M * m2u
-				for sgn in [1.0, -1.0]:
-					_edge_line(_batch(batches, "mark"), run, surf,
-						lift + 0.01 * m2u, off * sgn, 0.06 * m2u)
+			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -220,10 +209,12 @@ static func _side(pts: PackedVector2Array, i: int) -> Vector2:
 ## Flat ribbon draped on the surface: both edges sample the terrain at
 ## every vertex. UVs in metres/4 so the asphalt grain keeps its size.
 static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
-		surf: _Surface, lift: float) -> void:
+		surf: _Surface, lift: float, attr: Color = Color(0, 0.5, 0, 1),
+		junc: Dictionary = {}) -> void:
 	var half := width * 0.5
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
+	b.pad()
 	var k0 := b.verts.size()
 	for i in pts.size():
 		if i > 0:
@@ -239,6 +230,9 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		var v := along / m2u / 4.0
 		b.uvs.append(Vector2(0.0, v))
 		b.uvs.append(Vector2(width / m2u / 4.0, v))
+		attr.a = RoadSurface.junction_frac(junc, pts[i]) if not junc.is_empty() else 1.0
+		b.colors.append_array([attr, attr])
+		b.uv2s.append_array([Vector2(width / m2u, 0.0), Vector2(width / m2u, 0.0)])
 	for i in pts.size() - 1:
 		var a := k0 + i * 2
 		_quad_up(b, a, a + 1, a + 2, a + 3)
@@ -252,54 +246,6 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 		b.indices.append_array([a, bb, c, bb, d, c])
 	else:
 		b.indices.append_array([a, c, bb, bb, c, d])
-
-## Dashed centre line (3 m dash, 6 m gap, 0.12 m wide) — Fidelity 3 only.
-static func _centre_dashes(b: _Batch, pts: PackedVector2Array, surf: _Surface,
-		lift: float, m2u: float) -> void:
-	var dash := 3.0 * m2u
-	var period := 9.0 * m2u
-	var hw := 0.06 * m2u
-	var t := 0.0
-	for i in range(1, pts.size()):
-		var a := pts[i - 1]
-		var c := pts[i]
-		var seg := a.distance_to(c)
-		if seg < 0.00001:
-			continue
-		var dir := (c - a) / seg
-		var s0 := 0.0
-		while s0 < seg:
-			var phase := fmod(t + s0, period)
-			var run := minf(seg - s0, (dash - phase) if phase < dash else (period - phase))
-			if phase < dash and run > 0.0001:
-				var p0 := a + dir * s0
-				var p1 := a + dir * (s0 + run)
-				var nrm := Vector2(-dir.y, dir.x) * hw
-				var k := b.verts.size()
-				for q in [p0 + nrm, p0 - nrm, p1 + nrm, p1 - nrm]:
-					var qq: Vector2 = q
-					b.verts.append(Vector3(qq.x, surf.height(qq.x, qq.y) + lift, qq.y))
-					b.normals.append(Vector3.UP)
-					b.uvs.append(Vector2.ZERO)
-				_quad_up(b, k, k + 1, k + 2, k + 3)
-			s0 += maxf(run, 0.0001)
-		t += seg
-
-## Solid line of half-width hw at a mitred offset from the centreline
-## (edge marking, Fidelity 3 only).
-static func _edge_line(b: _Batch, pts: PackedVector2Array, surf: _Surface,
-		lift: float, off: float, hw: float) -> void:
-	var k0 := b.verts.size()
-	for i in pts.size():
-		var s := _side(pts, i)
-		for q in [pts[i] + s * (off + hw), pts[i] + s * (off - hw)]:
-			var qq: Vector2 = q
-			b.verts.append(Vector3(qq.x, surf.height(qq.x, qq.y) + lift, qq.y))
-			b.normals.append(Vector3.UP)
-			b.uvs.append(Vector2.ZERO)
-	for i in pts.size() - 1:
-		var a := k0 + i * 2
-		_quad_up(b, a, a + 1, a + 2, a + 3)
 
 ## Bridge deck on a real `bridge=yes` way: the deck runs bank to bank,
 ## rising in a smooth arch so its middle clears the water (or ground)
@@ -420,15 +366,27 @@ class _Batch extends RefCounted:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var uv2s := PackedVector2Array()
 	var indices := PackedInt32Array()
 
+	## Attribute rows for vertices added without them (bridge decks).
+	func pad() -> void:
+		while colors.size() < verts.size():
+			colors.append(Color(0, 0.5, 0, 1))
+		while uv2s.size() < verts.size():
+			uv2s.append(Vector2.ZERO)
+
 	func mesh() -> ArrayMesh:
+		pad()
 		var m := ArrayMesh.new()
 		var arrays: Array = []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = verts
 		arrays[Mesh.ARRAY_NORMAL] = normals
 		arrays[Mesh.ARRAY_TEX_UV] = uvs
+		arrays[Mesh.ARRAY_COLOR] = colors
+		arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 		arrays[Mesh.ARRAY_INDEX] = indices
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		return m
