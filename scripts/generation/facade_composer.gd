@@ -103,6 +103,9 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 				_adobe(alb, nor, rgh, ox, bay, hv, frame)
 			"curtain":
 				_curtain(alb, nor, rgh, ox, hv)
+	# Composed in linear; albedo_texture is a source_color sampler the
+	# renderer sRGB-decodes, so encode once here (T4.7 double decode).
+	alb.linear_to_srgb()
 	alb.generate_mipmaps()
 	var d := {"albedo": ImageTexture.create_from_image(alb)}
 	if nor != null and rgh != null:

@@ -72,6 +72,8 @@ static func _base(loader: Callable, set_name: String, map_name: String, w: int,
 	return img
 
 static func _finish(alb: Image, nor: Image, rgh: Image) -> Dictionary:
+	# Composed in linear; encode for the sRGB-decoding albedo sampler.
+	alb.linear_to_srgb()
 	alb.generate_mipmaps()
 	var d := {"albedo": ImageTexture.create_from_image(alb), "normal": null, "rough": null}
 	if nor != null and rgh != null:
