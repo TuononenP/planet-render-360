@@ -134,6 +134,17 @@ static func _material_from(texs: Dictionary, set_name: String, detail: int,
 		m.roughness = 1.0
 	else:
 		m.roughness = 0.3 if set_name == "glass" else 0.9
+	# Frames, glass and mouldings paint over the tinted wall in their own
+	# colours (FacadePaint); the detail normal is the facade's own, so
+	# painted bevels keep their relief.
+	if texs.get("paint") is Texture2D:
+		m.detail_enabled = true
+		m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+		m.detail_albedo = texs["paint"] as Texture2D
+		if m.normal_texture != null:
+			m.detail_normal = m.normal_texture
+	CityLights.mark(m, texs.get("emit"))
+	WallVariety.mark(m)  # per-building tint + foot shade
 	return m
 
 static func _facade_material_for(set_name: String, rows: int, detail: int,

@@ -73,6 +73,7 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TANGENT] = tangents_for(normals)
 	# Arrays kept: MassBatch / LodRing merge roofs on the build thread.
 	return MeshArrays.mesh(arrays)
 
@@ -199,5 +200,31 @@ static func push_tri(verts: PackedVector3Array, normals: PackedVector3Array,
 	verts.append_array([v0, v1, v2])
 	for j in 3:
 		normals.append(front)
-	uvs.append_array([Vector2(v0.x, v0.z) * 0.05, Vector2(v1.x, v1.z) * 0.05,
-		Vector2(v2.x, v2.z) * 0.05])
+	# UVs measured on the roof plane: u along the eave, v down the slope,
+	# so tile courses run parallel to the eave and keep their size on a
+	# steep mansard instead of stretching like a plan projection.
+	var ax := slope_axes(front)
+	for v in [v0, v1, v2]:
+		uvs.append(Vector2(v.dot(ax[0]), v.dot(ax[1])) * 0.05)
+
+## [along-eave, down-slope] unit axes on a roof plane of normal `n`
+## (world X/Z on near-flat faces).
+static func slope_axes(n: Vector3) -> Array:
+	var h := Vector2(n.x, n.z)
+	if h.length() < 0.05:
+		return [Vector3(1, 0, 0), Vector3(0, 0, 1)]
+	h = h.normalized()
+	var d := Vector3(h.x, 0.0, h.y)
+	var down := (d - n * d.dot(n)).normalized()
+	return [Vector3(-h.y, 0.0, h.x), down]
+
+## Tangents for soup faces built by push_tri: +u along the eave, w so the
+## binormal points to −v (Godot generate_tangents convention).
+static func tangents_for(normals: PackedVector3Array) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for n in normals:
+		var ax := slope_axes(n)
+		var t: Vector3 = ax[0]
+		var w := 1.0 if n.cross(t).dot(-(ax[1] as Vector3)) > 0.0 else -1.0
+		out.append_array([t.x, t.y, t.z, w])
+	return out

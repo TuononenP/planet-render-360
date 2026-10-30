@@ -33,10 +33,11 @@ static func _h(x: float, z: float) -> float:
 
 ## Window pane: dark PRD glass with a sky-reflection band at the top,
 ## the odd lit or curtained pane by hash.
-static func _pane(alb: Image, r: Rect2i, hv: float) -> void:
+static func _pane(alb: Image, r: Rect2i, hv: float, emit: Image = null) -> void:
 	var glass := FacadeComposer.GLASS
+	FacadePaint.pane(emit, r, hv)
 	if hv > 0.94:
-		glass = _lin("#d9a25a")  # lit interior
+		glass = FacadePaint.DAY_ROOM  # lit interior (glows at night)
 	elif hv > 0.80:
 		glass = _lin("#5b5550")  # drawn curtain
 	alb.fill_rect(r, glass)
@@ -90,26 +91,28 @@ static func _finish(alb: Image, nor: Image, rgh: Image, depth: bool = false) -> 
 static func compose_haussmann(set_name: String, rows: int, detail: int,
 		loader: Callable, variant: int = 0) -> Dictionary:
 	rows = clampi(rows, 1, 8)
-	var alb := _base(loader, set_name, "diff", S, S)
+	var base := _base(loader, set_name, "diff", S, S)
+	# Stone relief shades `base` (tinted); joinery, glass, iron paint `alb`.
+	var alb := FacadePaint.layer(base)
+	var emit := FacadePaint.emit_layer(base) if detail >= 1 else null
 	var nor: Image = null
 	var rgh: Image = null
 	if detail >= 1:
 		nor = _base(loader, set_name, "nor", S, S)
 		rgh = _base(loader, set_name, "rough", S, S)
-	var frame := _lin("#ece6d6")
-	var cornice := _lin("#e6d9bc")
+	var frame := _lin("#e2dccd")
 	var shadow := _lin("#8f8068")
 	var iron := _lin("#1c1d20")
-	var groove := Color(0.03, 0.03, 0.03)
 	var shutter := _lin("#8a9294")
 	var fascia := _lin(PARIS_FASCIA[(variant * 2 + rows) % PARIS_FASCIA.size()])
 	var bay_w := float(S) / float(PARIS_BAYS)
 	# Main cornice with dentils under the roof.
 	var top := 12
-	alb.fill_rect(Rect2i(0, 0, S, 8), cornice)
-	alb.fill_rect(Rect2i(0, 8, S, 4), shadow)
+	FacadePaint.shade(base, Rect2i(0, 0, S, 8), FacadePaint.LIGHT)
+	FacadePaint.shade(base, Rect2i(0, 8, S, 4), FacadePaint.SHADOW)
 	for dx in range(0, S, 8):
-		alb.fill_rect(Rect2i(dx, 8, 4, 3), cornice)
+		FacadePaint.shade(base, Rect2i(dx, 8, 4, 3), FacadePaint.LIGHT)
+	FacadePaint.streaks(base, 0, S, 12, 40, 3.1, 0.12)
 	if nor != null:
 		nor.fill_rect(Rect2i(0, 0, S, 3), Color(0.5, 0.7, 1.0))
 		nor.fill_rect(Rect2i(0, 8, S, 4), Color(0.5, 0.3, 1.0))
@@ -134,15 +137,15 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 		var rhi := int(rh)
 		y += rh
 		if rfb == 0 and rows >= 2:
-			_paris_ground(alb, nor, rgh, ry, rhi, bay_w, fascia, frame, variant)
+			_paris_ground(alb, base, nor, rgh, ry, rhi, bay_w, fascia, frame, variant, emit)
 			continue
 		# String course at the floor line.
-		alb.fill_rect(Rect2i(0, ry, S, 2), cornice)
-		alb.fill_rect(Rect2i(0, ry + 2, S, 1), shadow)
+		FacadePaint.shade(base, Rect2i(0, ry, S, 2), FacadePaint.LIGHT)
+		FacadePaint.shade(base, Rect2i(0, ry + 2, S, 1), FacadePaint.SHADOW)
 		var rusticated := rfb == 1 and rows >= 5
 		if rusticated:
 			for gy in range(ry + 6, ry + rhi, 9):
-				alb.fill_rect(Rect2i(0, gy, S, 1), shadow)
+				FacadePaint.shade(base, Rect2i(0, gy, S, 1), FacadePaint.SHADOW)
 		var balcony := (rfb == 2 and rows >= 4) or (rfb == 5 and rows >= 7) \
 			or (rfb == rows - 1 and rows in [5, 6] and variant % 2 == 0)
 		var win_h := int(rh * (0.55 if rusticated else 0.70))
@@ -153,8 +156,10 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 			var ix := int(float(col) * bay_w + (bay_w - win_w) * 0.5)
 			var wr := Rect2i(ix, fy, win_w, win_h)
 			if detail >= 2:
-				alb.fill_rect(Rect2i(ix - 6, fy - 5, win_w + 12, 2), groove)
-				alb.fill_rect(Rect2i(ix - 6, fy + win_h + 3, win_w + 12, 2), groove)
+				FacadePaint.shade(base, Rect2i(ix - 6, fy - 5, win_w + 12, 2), FacadePaint.SHADOW)
+				FacadePaint.shade(base, Rect2i(ix - 6, fy + win_h + 3, win_w + 12, 2), FacadePaint.SHADOW)
+			FacadePaint.streaks(base, ix - 4, ix + win_w + 4, fy + win_h + 4,
+				int(rh * 0.45), hv * 17.0 + float(r))
 			if variant == 2 and hv < 0.25 and not rusticated:  # ≤30% shutters
 				var sw := maxi(win_w / 2, 6)
 				alb.fill_rect(Rect2i(ix - sw - 2, fy, sw, win_h), shutter)
@@ -166,14 +171,14 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 			if rfb == 2 and variant != 1:
 				var pw := win_w + 14
 				for k in 5:
-					alb.fill_rect(Rect2i(ix - 7 + k * 2, fy - 8 - k, pw - k * 4, 1), cornice)
-				alb.fill_rect(Rect2i(ix - 7, fy - 7, pw, 3), cornice)
-				alb.fill_rect(Rect2i(ix - 7, fy - 4, pw, 1), shadow)
+					FacadePaint.shade(base, Rect2i(ix - 7 + k * 2, fy - 8 - k, pw - k * 4, 1), FacadePaint.LIGHT)
+				FacadePaint.shade(base, Rect2i(ix - 7, fy - 7, pw, 3), FacadePaint.LIGHT)
+				FacadePaint.shade(base, Rect2i(ix - 7, fy - 4, pw, 1), FacadePaint.SHADOW)
 			else:
-				alb.fill_rect(Rect2i(ix - 5, fy - 6, win_w + 10, 4), cornice)
-				alb.fill_rect(Rect2i(ix - 5, fy - 2, win_w + 10, 1), shadow)
+				FacadePaint.shade(base, Rect2i(ix - 5, fy - 6, win_w + 10, 4), FacadePaint.LIGHT)
+				FacadePaint.shade(base, Rect2i(ix - 5, fy - 2, win_w + 10, 1), FacadePaint.SHADOW)
 			alb.fill_rect(Rect2i(ix - 4, fy - 3, win_w + 8, win_h + 6), frame)
-			_pane(alb, wr, hv)
+			_pane(alb, wr, hv, emit)
 			# French window leaves: centre mullion + transoms.
 			alb.fill_rect(Rect2i(ix + win_w / 2 - 1, fy, 2, win_h), frame)
 			alb.fill_rect(Rect2i(ix, fy + win_h / 3, win_w, 2), frame)
@@ -191,10 +196,11 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 			# window bottoms across the whole front.
 			var by := fy + win_h - int(rh * 0.06)
 			var rail_h := int(rh * 0.24)
-			alb.fill_rect(Rect2i(0, by, S, 4), cornice)
-			alb.fill_rect(Rect2i(0, by + 4, S, 3), shadow)
+			FacadePaint.shade(base, Rect2i(0, by, S, 4), FacadePaint.LIGHT)
+			FacadePaint.shade(base, Rect2i(0, by + 4, S, 3), FacadePaint.SHADOW)
 			for cx in range(4, S, 21):
-				alb.fill_rect(Rect2i(cx, by + 7, 4, 3), cornice)  # consoles
+				FacadePaint.shade(base, Rect2i(cx, by + 7, 4, 3), FacadePaint.LIGHT)  # consoles
+			FacadePaint.streaks(base, 0, S, by + 10, int(rh * 0.5), float(r) * 5.3, 0.10)
 			_rail(alb, 0, S, by - rail_h, rail_h, iron)
 			if nor != null:
 				nor.fill_rect(Rect2i(0, by, S, 2), Color(0.5, 0.75, 1.0))
@@ -207,19 +213,17 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 	for gy in gh:
 		var t := float(gy) / float(gh)
 		grime.fill_rect(Rect2i(0, gy, S, 1), Color(0, 0, 0, t * 0.22))
-	alb.blend_rect(grime, Rect2i(0, 0, S, gh), Vector2i(0, S - gh))
-	return _finish(alb, nor, rgh, detail >= 2)
+	base.blend_rect(grime, Rect2i(0, 0, S, gh), Vector2i(0, S - gh))
+	return FacadePaint.finish(base, alb, emit, nor, rgh, _depth_fn(detail))
 
 ## Paris ground floor: rusticated stone, shopfront per bay with a lacquer
 ## fascia, and a tall carriage door (porte cochère) in one bay.
-static func _paris_ground(alb: Image, nor: Image, rgh: Image, ry: int, rh: int,
-		bay_w: float, fascia: Color, frame: Color, variant: int) -> void:
-	var shadow := _lin("#8f8068")
-	var light := _lin("#e6d9bc")
-	alb.fill_rect(Rect2i(0, ry, S, 4), light)  # entablature over the shops
-	alb.fill_rect(Rect2i(0, ry + 4, S, 2), shadow)
+static func _paris_ground(alb: Image, base: Image, nor: Image, rgh: Image, ry: int, rh: int,
+		bay_w: float, fascia: Color, frame: Color, variant: int, emit: Image = null) -> void:
+	FacadePaint.shade(base, Rect2i(0, ry, S, 4), FacadePaint.LIGHT)  # entablature over the shops
+	FacadePaint.shade(base, Rect2i(0, ry + 4, S, 2), FacadePaint.SHADOW)
 	for gy in range(ry + 10, ry + rh, 8):
-		alb.fill_rect(Rect2i(0, gy, S, 1), shadow)
+		FacadePaint.shade(base, Rect2i(0, gy, S, 1), FacadePaint.SHADOW)
 	var door := (variant + 2) % PARIS_BAYS
 	for col in PARIS_BAYS:
 		var x0 := int(float(col) * bay_w)
@@ -228,7 +232,7 @@ static func _paris_ground(alb: Image, nor: Image, rgh: Image, ry: int, rh: int,
 		if col == door:
 			var dw := int(bay_w * 0.56)
 			var dx := x0 + (int(bay_w) - dw) / 2
-			alb.fill_rect(Rect2i(dx - 3, ry + 10, dw + 6, rh - 10), light)
+			FacadePaint.shade(base, Rect2i(dx - 3, ry + 10, dw + 6, rh - 10), FacadePaint.LIGHT)
 			alb.fill_rect(Rect2i(dx, ry + 13, dw, rh - 13), _lin("#2b3a30"))
 			alb.fill_rect(Rect2i(dx + dw / 2 - 1, ry + 13, 2, rh - 13), _lin("#151a16"))
 			for py in range(ry + 22, ry + rh - 4, 14):
@@ -247,6 +251,7 @@ static func _paris_ground(alb: Image, nor: Image, rgh: Image, ry: int, rh: int,
 		alb.fill_rect(Rect2i(ox, gy0, ow, gh), fascia)
 		var pane := Rect2i(ox + 3, gy0 + 2, ow - 6, gh - 8)
 		alb.fill_rect(pane, _lin("#2a2e30"))
+		FacadePaint.pane(emit, pane, 1.0 - hv * 0.5)
 		alb.fill_rect(Rect2i(pane.position.x, pane.position.y + pane.size.y / 3,
 			pane.size.x, pane.size.y * 2 / 3), _lin("#4a4438") if hv > 0.5 else _lin("#33383a"))
 		alb.fill_rect(Rect2i(ox + ow / 2 - 1, gy0, 2, gh), fascia)
@@ -261,8 +266,10 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 		look: Dictionary, fascia: Color, loader: Callable) -> Dictionary:
 	var C := FacadeComposer.CELL
 	var W := C * FacadeComposer.BAYS
-	var alb := FacadeComposer._wall_layer(loader, set_name, "diff",
+	var base := FacadeComposer._wall_layer(loader, set_name, "diff",
 		int(FacadeComposer.PHOTO_REPS.get(set_name, 1)))
+	var alb := FacadePaint.layer(base)
+	var emit := FacadePaint.emit_layer(base) if detail >= 1 else null
 	var nor: Image = null
 	var rgh: Image = null
 	if detail >= 1:
@@ -274,8 +281,8 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 	var variant := int(look.get("variant", 0))
 	var dark := Color(0.03, 0.03, 0.03)
 	# Floor line separating the ground storey from the storeys above.
-	alb.fill_rect(Rect2i(0, 0, W, 4), _lin("#bdb6a8"))
-	alb.fill_rect(Rect2i(0, 4, W, 2), dark)
+	FacadePaint.shade(base, Rect2i(0, 0, W, 4), FacadePaint.LIGHT)
+	FacadePaint.shade(base, Rect2i(0, 4, W, 2), FacadePaint.SHADOW)
 	if nor != null:
 		nor.fill_rect(Rect2i(0, 0, W, 3), Color(0.5, 0.7, 1.0))
 	var door := variant % FacadeComposer.BAYS
@@ -304,6 +311,7 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 					var pane := Rect2i(ox + 9, gy + 3, C - 18, gh - 6)
 					alb.fill_rect(pane, _lin("#30363a"))
 					var lit := kind == "signage" or hv > 0.55
+					FacadePaint.pane(emit, pane, 0.99 if lit else 0.0)
 					alb.fill_rect(Rect2i(pane.position.x, pane.position.y + pane.size.y / 3,
 						pane.size.x, pane.size.y * 2 / 3), _lin("#9a8a6a") if lit else _lin("#454a4c"))
 					alb.fill_rect(Rect2i(ox + C / 2 - 1, gy, 2, gh), frame)
@@ -318,7 +326,7 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 			"render", "stone":
 				if kind == "stone":
 					for gy in range(14, C, 12):
-						alb.fill_rect(Rect2i(ox, gy, C, 1), _lin("#6a6050"))
+						FacadePaint.shade(base, Rect2i(ox, gy, C, 1), FacadePaint.SHADOW)
 				if bay == door and kind == "render":
 					alb.fill_rect(Rect2i(ox + 42, 34, 44, C - 34), frame)
 					alb.fill_rect(Rect2i(ox + 46, 38, 36, C - 38), _lin("#5a3f2a"))
@@ -334,7 +342,7 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 						alb.fill_rect(Rect2i(wx - 22, ly, 18, 1), dark)
 						alb.fill_rect(Rect2i(wx + ww + 4, ly, 18, 1), dark)
 				alb.fill_rect(Rect2i(wx - 3, wy - 3, ww + 6, wh + 6), frame)
-				_pane(alb, Rect2i(wx, wy, ww, wh), hv)
+				_pane(alb, Rect2i(wx, wy, ww, wh), hv, emit)
 				alb.fill_rect(Rect2i(wx + ww / 2 - 1, wy, 3, wh), frame)
 				alb.fill_rect(Rect2i(wx - 5, wy + wh + 3, ww + 10, 4), frame)
 				_bevel(nor, Rect2i(wx - 3, wy - 3, ww + 6, wh + 6), 3, detail >= 2)
@@ -344,8 +352,11 @@ static func compose_ground(set_name: String, kind: String, detail: int,
 	var grime := Image.create(W, 24, false, Image.FORMAT_RGBA8)
 	for gy in 24:
 		grime.fill_rect(Rect2i(0, gy, W, 1), Color(0, 0, 0, float(gy) / 24.0 * 0.25))
-	alb.blend_rect(grime, Rect2i(0, 0, W, 24), Vector2i(0, C - 24))
-	return _finish(alb, nor, rgh, detail >= 2)
+	base.blend_rect(grime, Rect2i(0, 0, W, 24), Vector2i(0, C - 24))
+	return FacadePaint.finish(base, alb, emit, nor, rgh, _depth_fn(detail))
+
+static func _depth_fn(detail: int) -> Callable:
+	return Callable(FacadeComposer, "depth_from_rough") if detail >= 2 else Callable()
 
 ## Legacy full-wall curtain glass: 8×8 sky-reflective panes (lighter
 ## toward the top, per-pane variance), aluminium mullions and spandrels.

@@ -93,7 +93,11 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 ## emitted triangle faces down, so the front face points up — the same
 ## convention as the terrain mesh.
 static func _roof_cap(root: Node3D, ring: PackedVector2Array,
-		idx: PackedInt32Array, top: float, mat: Material) -> void:
+		idx: PackedInt32Array, top: float, mat: Material, trim: int = 0) -> void:
+	# Cornice / parapet relief at the wall top (BuildingTrim, near only);
+	# a parapet sinks the deck behind it.
+	BuildingTrim.add(root, ring, top, trim)
+	top = BuildingTrim.deck(top, trim)
 	# triangulate_polygon normalizes its output winding (a CW input
 	# still yields CCW triplets), so the flip is read off the first
 	# emitted triangle, not the ring: front.y equals its 2D cross.
@@ -128,6 +132,11 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	# +X tangent: the cap's normal map lights correctly (+v runs to +Z).
+	var tangents := PackedFloat32Array()
+	for i in verts.size():
+		tangents.append_array([1.0, 0.0, 0.0, 1.0])
+	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_INDEX] = indices
 	# Arrays kept: LodRing merges these on the build thread (T7.5).
 	TerrainBuilder._add(root, MeshArrays.mesh(arrays), mat)
