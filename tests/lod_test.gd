@@ -96,8 +96,9 @@ func _run() -> void:
 			failures.append("landmark moved across presets: %s" % str(landmark_y))
 			break
 	_impostor_checks(failures)
+	_material_leak_checks(failures)
 	if failures.is_empty():
-		print("LOD OK: preset-invariant layout (buildings + landmark), apply ranges only, merge keeps geometry, T7.3 capped buildings become impostors at identical footprints/heights")
+		print("LOD OK: preset-invariant layout (buildings + landmark), apply ranges only, merge keeps geometry, T7.3 capped buildings become impostors at identical footprints/heights, T7.2 materials shared (no per-building leak)")
 		quit(0)
 	else:
 		for f in failures:
@@ -173,3 +174,52 @@ func _impostor_checks(failures: Array[String]) -> void:
 		failures.append("AC-12: %d real footprint corners missing on a preset (dropped buildings)" % missing)
 	if moved > 0:
 		failures.append("AC-12: %d footprint corners change height between presets" % moved)
+
+## T7.2: materials are shared, never minted per building. Four times the
+## buildings in the same place must not add materials beyond the bounded
+## per-place caches (variants, quantized tints), and after the LodRing
+## merge the draw count follows cells x materials, not buildings.
+func _material_leak_checks(failures: Array[String]) -> void:
+	var counts := []
+	var meshes := []
+	for side in [10, 20]:
+		var data := _data(RenderSettings.Preset.HIGH)
+		data.buildings = []
+		var k := 0
+		for gx in side:
+			for gz in side:
+				var c := Vector2(float(gx - side / 2) * 30.0 + 15.0, float(gz - side / 2) * 30.0 + 15.0)
+				data.buildings.append({"x": c.x, "z": c.y, "size_x": 16.0, "size_z": 12.0,
+					"height": 12.0 + float((gx * 7 + gz * 3) % 5) * 3.0, "name": "m%d" % k,
+					"footprint": PackedVector2Array([c + Vector2(-8, -6), c + Vector2(8, -6),
+						c + Vector2(8, 6), c + Vector2(-8, 6)])})
+				k += 1
+		var root := BuildingBuilder.build_buildings(data, GroundTruth.new(data))
+		var flat := Node3D.new()
+		for c in root.get_children():
+			root.remove_child(c)
+			if not c.has_meta("lod_layer"):
+				c.set_meta("lod_layer", "Buildings")
+			flat.add_child(c)
+		root.free()
+		LodRing.merge_buildings(flat)
+		var mats := {}
+		var n := 0
+		for c in flat.get_children():
+			if not (c is MeshInstance3D) or str(c.get_meta("lod_layer", "")) != "Buildings":
+				continue
+			var mi := c as MeshInstance3D
+			n += 1
+			for si in mi.mesh.get_surface_count():
+				var m := mi.get_active_material(si)
+				if m != null:
+					mats[m.get_instance_id()] = true
+		counts.append(mats.size())
+		meshes.append(n)
+		flat.free()
+	if counts[1] > counts[0] + 8:
+		failures.append("T7.2: 4x buildings added %d materials (%d -> %d): per-building material leak"
+			% [counts[1] - counts[0], counts[0], counts[1]])
+	if meshes[1] > counts[1] * 4:
+		failures.append("T7.2: %d merged building meshes for %d materials: merge not batching" % [meshes[1], counts[1]])
+	print("LOD T7.2 materials 100 -> 400 buildings: %d -> %d, merged meshes %d -> %d" % [counts[0], counts[1], meshes[0], meshes[1]])
