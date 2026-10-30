@@ -154,6 +154,12 @@ var far_landuse: Array = []
 ## same ring — {footprint: PackedVector2Array, x, z, height} metres. The
 ## only source of far modern-tower clusters (La Défense); never invented.
 var far_towers: Array = []
+## v2 (contract §2.7 amendment 2026-10-30): CHELSA V2.1 1981–2010 climate
+## normals at the viewpoint (3 × 3 km median) — t_warm_c / t_cold_c (mean
+## of the warmest / coldest quarter, °C), precip_mm / precip_warm_mm
+## (annual / warmest quarter), snow_days, source. Empty = unavailable;
+## ClimateModel then keeps its latitude fallbacks.
+var climate: Dictionary = {}
 
 func is_valid() -> bool:
 	return latitude >= -90.0 and latitude <= 90.0 \

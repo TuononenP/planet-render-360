@@ -60,6 +60,7 @@ godot --headless --script tests/responsive_test.gd # breakpoints + layout switch
 godot --headless --script tests/zoom_search_test.gd # map/360 zoom, search predictions, time of day
 godot --headless --script tests/sky_test.gd      # sky per season and time of day
 godot --headless --script tests/solar_test.gd    # true sun position vs ephemeris
+godot --headless --script tests/climate_test.gd  # CHELSA reader + climate model (CLIMATE_LIVE=1 for a live read)
 godot --headless --script tests/scenery_test.gd  # building scale, terrain normals, water, landmark
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
 godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)

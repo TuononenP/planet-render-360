@@ -56,7 +56,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null) -> 
 
 static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 	var p := clampi(data.quality_preset, 0, 3)
-	var biome := TreeSpecies.biome_for(data.latitude, data.longitude, data.centre_elevation_m)
+	var biome := TreeSpecies.biome_for_data(data)
 	var winter := data.season == LocationData.Season.WINTER
 	var cold := biome in ["alpine", "boreal"]
 	var noise := FastNoiseLite.new()
@@ -65,11 +65,14 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 	return {
 		"preset": p, "fidelity": MaterialLibrary.fidelity_for_preset(p),
 		"m2u": WorldScale.metres_to_units(), "biome": biome, "season": data.season,
-		"snow": 0.55 if winter and cold else 0.0,
+		# Snow loads where the viewpoint sits above the season's CHELSA
+		# snow line; without climate data, winter in a cold biome.
+		"snow": 0.55 if (ClimateModel.snowy_at_viewpoint(data, data.season) if ClimateModel.has(data) \
+			else winter and cold) else 0.0,
 		"sway": 0.0035 if p == 3 else 0.0,
 		"full_r": float(FULL_R[p]), "mid_r": float(MID_R[p]),
 		"budget": int(MESH_BUDGET[p]), "noise": noise,
-		"treeline": TreeSpecies.treeline_m(data.latitude),
+		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
 		"landmark": TerrainBuilder.landmark_world_pos(data) if data.landmark_type != "none" else Vector2(INF, INF),
 	}
 
@@ -111,7 +114,7 @@ static func _species_at(x: float, z: float, setting: String, ground: GroundTruth
 	var size := 1.0
 	var asl := ground.asl_y(ground.height_at_world(x, z))
 	var tl: float = ctx["treeline"]
-	if asl > tl - 350.0 and str(ctx["biome"]) in ["alpine", "boreal", "temperate"]:
+	if asl > tl - 350.0 and str(ctx["biome"]) in ["alpine", "boreal", "temperate", "dry_coast"]:
 		sp = "spruce" if _hash(x, z, 5.5) < 0.75 else "scots_pine"
 		size = clampf((tl - asl) / 350.0, 0.35, 1.0)
 	return [sp, size]
