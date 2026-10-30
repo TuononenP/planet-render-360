@@ -33,8 +33,8 @@ Left: branch before (109242d). Right: a99e752. Forward+, Ultra, same sun.
 
 | Image | What changed |
 |---|---|
-| `window-recesses-closeup.jpg`, `window-recesses-roof-closeup.jpg` (2× crops) | Glass sits 0.25 m back in its reveal (deep parallax over a depth map read off the composed roughness map): from above the lintel hides the top of each pane, as a real recess does. Walls now carry tangents, so the facade normal maps light correctly too. Ultra only; High is unchanged. |
-| `roof-variety-seine.jpg`, `roof-variety-courtyards.jpg` | Each real building's roof takes its own seeded tint (lightness ±12%, warm/cool ±5%) on the shared roof materials: neighbouring slate roofs read as separate roofs of different age and weathering, no extra materials or draw calls. Tints average 1 (facade_relief_test). |
+| `window-recesses-closeup.jpg`, `window-recesses-roof-closeup.jpg` (2× crops) | Glass sits 0.25 m back in its reveal (deep parallax over a depth map read off the composed roughness map): from above the lintel hides the top of each pane, as a real recess does. Recesses are Ultra only. Walls now carry tangents on every tier, so the facade normal maps light correctly too. |
+| `roof-variety-seine.jpg`, `roof-variety-courtyards.jpg` | Each real building's roof takes its own seeded tint (lightness ±12%, warm/cool ±5%) on the shared roof materials: neighbouring slate roofs read as separate roofs of different age and weathering, no extra materials or draw calls, same on every tier. Tints average 1 (facade_relief_test). |
 
 Frame cost on lavapipe for these close views rose from ≈6 s to ≈9 s
 (parallax is per-pixel on every Ultra facade); real-GPU cost unmeasured.
