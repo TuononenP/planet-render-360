@@ -1,0 +1,12 @@
+# Scorecard — Paris — High — 2026-10-29
+- Run: preset High, seed 42146, sample rules v1 2026-10-29, cache data v2, OSM real (6265 buildings, 10749 roads), satellite real, DEM source z14; pipeline 5.0 s, ground+builders 25.7 s
+- (a) DEM: max 2.79 m / mean 0.61 m over 8 land points (bar ≤ 3 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) +0.01; (0,-400) -0.78; (400,0) -0.05; (0,400) +1.11; (-400,0) water, carved -3.6 m — excluded; (0,-800) -0.10; (800,0) +0.01; (0,800) -0.03; (-800,0) +2.79
+- (b) footprints: median IoU 1.000, centroid offset 1.95 m over 20 sampled (bar IoU ≥ 0.85, ≤ 2 m) → PASS
+- (c) heights: median err 0.87 m, coverage 15/20 tagged (bar ≤ 3 m ≈ 1 storey) → PASS
+- (d) water: 5/5 shoreline/centreline samples with visible rendered water within 10 m → PASS
+  - samples: (943,130) visible water at 6.0 m; (1011,86) visible water at 0.5 m; (-58,442) visible water at 7.1 m; (644,696) visible water at 8.1 m; (-1006,-181) visible water at 8.5 m
+- (d) roads: 5/5 junctions with a rendered ribbon within 3 m (1059 of 14779 junctions are passages under OSM buildings, excluded); max ribbon lift 0.12 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
+- (e) eiffel: bearing error 0.038° (model 272.70°, geodesic 272.73°, 4231 m; bar ≤ 1°) → PASS; apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)
+- (f) human side-by-side rating (signed checklist, T8.3) → PENDING
+- AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)

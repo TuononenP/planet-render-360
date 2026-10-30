@@ -1,0 +1,11 @@
+# Scorecard — Turku — High — 2026-10-29
+- Run: preset High, seed 43116, sample rules v1 2026-10-29, cache data v2, OSM absent (0 buildings, 0 roads), satellite real, DEM source z14; pipeline 68.4 s, ground+builders 3.0 s
+- (a) DEM: max 2.72 m / mean 0.74 m over 9 land points (bar ≤ 3 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) -0.04; (0,-400) +0.58; (400,0) +0.05; (0,400) -2.72; (-400,0) -0.35; (0,-800) -0.38; (800,0) -1.68; (0,800) +0.42; (-800,0) -0.39
+- (b) footprints → BLOCKED(no OSM buildings in the extent)
+- (c) heights → BLOCKED(no OSM buildings in the extent)
+- (d) water: no OSM water in the extent; rendered water triangles 0 (absence check) → PASS
+- (d) roads → BLOCKED(no OSM road junctions in the extent)
+- (e) turku_cathedral: bearing error 0.034° (model 84.00°, geodesic 83.97°, 635 m; bar ≤ 1°) → PASS; apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)
+- (f) human side-by-side rating (signed checklist, T8.3) → NO-REFERENCE — geometry-only scoring
+- AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)
