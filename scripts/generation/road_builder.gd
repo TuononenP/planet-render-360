@@ -116,6 +116,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	var junc := RoadSurface.junctions(data)
+	var urban_map := RoadSurface.urban_raster(data)
 	var batches := {}
 	for line in data.roads:
 		var r := _parse(line, m2u)
@@ -132,11 +133,13 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 		var lift := float(LIFT_M[int(r["rank"])]) * m2u
 		# RoadSurface attributes: lanes, rank, kerbed urban street.
 		var mid := dense[dense.size() / 2]
-		var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
+		var urban := int(r["rank"]) >= 1 and RoadSurface.is_urban(urban_map, mid)
 		var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
 			1.0 if urban else 0.0, 1.0)
 		for run in _dry_runs(dense, surf):
-			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc)
+			# Junction distance only feeds markings (rank >= 1 asphalt).
+			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr,
+				junc if int(r["rank"]) >= 1 and finish == "asphalt" else {})
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():

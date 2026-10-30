@@ -160,7 +160,8 @@ void fragment() {
 	float fade = 1.0 - smoothstep(9000.0, 26000.0, dist);
 	float steep0 = smoothstep(0.93, 0.6, nw.y);
 	if (fade > 0.01) {
-		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
+		int oct = far_quality >= 3 ? 4 : (far_quality >= 2 ? 3 : 2);
+		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), dist > 7000.0 ? 2 : oct);
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water));
 	}
 	if (water > 0.01) {

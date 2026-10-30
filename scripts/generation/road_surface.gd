@@ -224,6 +224,29 @@ static func junctions(data: LocationData) -> Dictionary:
 		out[cell] = arr
 	return out
 
+## Urban land (OSM landuse read as "urban") as a coarse raster over the
+## detailed extent, scan-filled once: one point-in-polygon test per road
+## over every land polygon cost seconds in Paris.
+const URBAN_N := 256
+
+static func urban_raster(data: LocationData) -> Image:
+	var img := Image.create(URBAN_N, URBAN_N, false, Image.FORMAT_R8)
+	img.fill(Color(0, 0, 0))
+	for poly in data.land_polygons:
+		if poly is Dictionary and str((poly as Dictionary).get("class", "")) == "urban":
+			var rings: Array = [(poly as Dictionary).get("points", PackedVector2Array())]
+			for hole in (poly as Dictionary).get("holes", []):
+				if hole is PackedVector2Array:
+					rings.append(hole)
+			GroundMaterial._fill_rings(img, rings, 255, URBAN_N)
+	return img
+
+static func is_urban(img: Image, p: Vector2) -> bool:
+	var e := WorldScale.detailed_extent_units()
+	var i := int((p.x / e + 0.5) * URBAN_N)
+	var j := int((p.y / e + 0.5) * URBAN_N)
+	return i >= 0 and j >= 0 and i < URBAN_N and j < URBAN_N and img.get_pixel(i, j).r > 0.5
+
 ## Distance to the nearest junction over JUNCTION_M (capped at 1).
 static func junction_frac(buckets: Dictionary, p: Vector2) -> float:
 	var c := Vector2i(floori(p.x / JUNCTION_M), floori(p.y / JUNCTION_M))

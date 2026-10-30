@@ -101,11 +101,15 @@ func commit(root: Node3D, prefix: String, extra_meta: Callable = Callable()) -> 
 		arrays[Mesh.ARRAY_NORMAL] = g["n"]
 		arrays[Mesh.ARRAY_TEX_UV] = g["uv"]
 		arrays[Mesh.ARRAY_COLOR] = g["c"]
-		arrays[Mesh.ARRAY_TANGENT] = tangents(g["v"], g["n"], g["uv"], g["i"])
-		arrays[Mesh.ARRAY_INDEX] = g["i"]
 		# Building impostors are merged by LodRing afterwards; keep their
 		# arrays (far-city batches are never merged, so they do not).
-		var mesh := MeshArrays.mesh(arrays, str(meta.get("lod_layer", "")) == "Buildings")
+		var near := str(meta.get("lod_layer", "")) == "Buildings"
+		# Tangents only where normal maps can show: the far city sits
+		# kilometres out (its 500k triangles took ~4 s of tangents).
+		if near:
+			arrays[Mesh.ARRAY_TANGENT] = tangents(g["v"], g["n"], g["uv"], g["i"])
+		arrays[Mesh.ARRAY_INDEX] = g["i"]
+		var mesh := MeshArrays.mesh(arrays, near)
 		var mi := MeshInstance3D.new()
 		mi.name = "%s_%d" % [prefix, n]
 		mi.mesh = mesh

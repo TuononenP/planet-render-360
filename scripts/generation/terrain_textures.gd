@@ -3,10 +3,11 @@ extends RefCounted
 
 ## The terrain's photographic detail sets as two Texture2DArrays shared by
 ## the near ground (GroundShader) and the far rings (FarSurface): one
-## array of albedos (linear data, read raw) and one of normal maps with
-## the set's roughness packed into alpha, so a layer costs one albedo
-## and one normal fetch. Layer order is LAYERS; GroundMaterial's palette
-## weights index it.
+## array of albedos (linear data, read raw) and one of normal maps, so a
+## layer costs one albedo and one normal fetch. (Roughness stays the
+## land class's: the sets' own maps were glossy enough to sheen meadows,
+## and packing them cost a per-pixel GDScript pass of seconds.) Layer
+## order is LAYERS; GroundMaterial's palette weights index it.
 ##
 ## Phones (Fast/Balanced) get 512 px layers (≈11 MB per array instead of
 ## ≈44 MB); desktop tiers the bundled 1024 px.
@@ -25,7 +26,7 @@ static func size_for(preset: int) -> int:
 ## worlds then reference them as external resources instead of
 ## embedding ~100 MB of layers in every WorldCache scene.
 const DIR := "user://terrain"
-const VERSION := 1
+const VERSION := 2
 
 ## {"albedo": Texture2DArray, "normal": Texture2DArray} at `size` px.
 static func arrays(size: int = 1024) -> Dictionary:
@@ -59,18 +60,7 @@ static func _build(size: int) -> Dictionary:
 	var nor: Array[Image] = []
 	for s in LAYERS:
 		alb.append(_layer(s, "diff", size))
-		var n := _layer(s, "nor", size)
-		var r := _layer(s, "rough", size)
-		# Roughness into the normal map's alpha (one fetch per layer).
-		n.clear_mipmaps()
-		r.clear_mipmaps()
-		var nd := n.get_data()
-		var rd := r.get_data()
-		for i in range(0, nd.size(), 4):
-			nd[i + 3] = rd[i]
-		n = Image.create_from_data(size, size, false, Image.FORMAT_RGBA8, nd)
-		n.generate_mipmaps(true)
-		nor.append(n)
+		nor.append(_layer(s, "nor", size))
 	var a := Texture2DArray.new()
 	a.create_from_images(alb)
 	var b := Texture2DArray.new()
@@ -91,7 +81,7 @@ static func tiles() -> PackedFloat32Array:
 static func _layer(set_name: String, map_name: String, size: int) -> Image:
 	var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
 	img.clear_mipmaps()
-	img.convert(Image.FORMAT_RGBA8)
+	img.convert(Image.FORMAT_RGB8)
 	if img.get_width() != size or img.get_height() != size:
 		img.resize(size, size, Image.INTERPOLATE_CUBIC)
 	img.generate_mipmaps(map_name == "nor")

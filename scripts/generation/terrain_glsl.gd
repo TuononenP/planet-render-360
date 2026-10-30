@@ -108,7 +108,7 @@ vec2 t_relief(vec2 g, float scale_m, int oct) {
 }
 
 // Layer `l` at metre coords g with screen gradients dg (dFdx, dFdy of
-// g taken outside any branch). Out: albedo (rgb), normal + rough (a).
+// g taken outside any branch). Out: albedo (rgb), normal (rgb).
 void det_sample(int l, vec2 g, vec4 dg, bool vary, out vec4 a, out vec4 n) {
 	float ts = 1.0 / det_tile[l];
 	vec2 uv = g * ts;
