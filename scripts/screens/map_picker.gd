@@ -199,15 +199,12 @@ func _ready() -> void:
 	_quick_box.add_theme_constant_override("separation", 8)
 	_quick_label = UiTheme.section_label("Quick picks")
 	_quick_box.add_child(_quick_label)
-	var quick_row := HBoxContainer.new()
-	quick_row.add_theme_constant_override("separation", 8)
+	var quick_row := GridContainer.new()
+	quick_row.columns = 3
+	quick_row.add_theme_constant_override("h_separation", 8)
+	quick_row.add_theme_constant_override("v_separation", 8)
 	_quick_box.add_child(quick_row)
-	var quicks: Array = [
-			["Paris", "Paris, France", 48.8566, 2.3522],
-			["Alps", "Interlaken, Switzerland", 46.6863, 7.8632],
-			["Banff", "Banff, Canada", 51.1789, -115.5708],
-			["Big Sur", "Big Sur, United States", 36.2704, -121.8081],
-			["Tokyo", "Tokyo, Japan", 35.6762, 139.6503]]
+	var quicks: Array = LocationData.quick_picks()
 	for qi in quicks.size():
 		var quick: Array = quicks[qi]
 		var chip := UiTheme.chip_button(str(quick[0]))
