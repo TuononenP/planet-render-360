@@ -92,6 +92,7 @@ func _score(loc: Dictionary, preset: int) -> Dictionary:
 		"real" if pipe.used_osm else "absent", data.buildings.size(), data.roads.size(),
 		"real" if pipe.used_satellite else "absent", str(data.dem_source.get("source_zoom", "?")),
 		fetch_ms / 1000.0, (Time.get_ticks_msec() - t1) / 1000.0])
+	_osm_real = pipe.used_osm
 	var ok := true
 	for r in [_check_a(loc, data, ground), _check_bc(loc, data, ground, buildings),
 			_check_d(data, ground, water, roads), _check_e(data)]:
@@ -163,6 +164,7 @@ func _dem_z14(lat: float, lon: float) -> float:
 	return lerpf(lerpf(v[0][0], v[0][1], tx), lerpf(v[1][0], v[1][1], tx), ty)
 
 var _tiles := {}
+var _osm_real := true
 
 func _tile(x: int, y: int) -> Image:
 	var key := Vector2i(x, y)
@@ -293,6 +295,8 @@ func _measure(poly: PackedVector2Array, tris: Array) -> Dictionary:
 	var union := 0
 	var sum := Vector2.ZERO
 	var cover_n := 0
+	var osm_sum := Vector2.ZERO
+	var osm_n := 0
 	var top := -INF
 	var y := box.position.y + 0.5
 	while y < box.end.y:
@@ -314,6 +318,9 @@ func _measure(poly: PackedVector2Array, tris: Array) -> Dictionary:
 				top = maxf(top, hit)
 			if in_r or in_osm:
 				union += 1
+			if in_osm:
+				osm_sum += p
+				osm_n += 1
 			if in_r:
 				sum += p
 				cover_n += 1
@@ -322,7 +329,7 @@ func _measure(poly: PackedVector2Array, tris: Array) -> Dictionary:
 	if cover_n == 0:
 		return {"iou": 0.0, "offset": 10.0, "top": -INF}
 	return {"iou": float(inter) / float(maxi(union, 1)),
-		"offset": (sum / float(cover_n)).distance_to(_centroid(poly)), "top": top}
+		"offset": (sum / float(cover_n)).distance_to(osm_sum / float(maxi(osm_n, 1))), "top": top}
 
 func _expected_height(b: Dictionary, ctx: Dictionary) -> float:
 	var src := str(b.get("height_source", ""))
@@ -338,6 +345,9 @@ func _expected_height(b: Dictionary, ctx: Dictionary) -> float:
 func _check_d(data: LocationData, ground: GroundTruth, water: Node3D, roads: Node3D) -> Dictionary:
 	var lines: Array[String] = []
 	var verdicts: Array[String] = []
+	if not _osm_real:
+		return {"lines": ["- (d) water + roads → BLOCKED(data-unavailable — OSM fetch failed; geometry-only scoring)"],
+			"verdicts": ["d-water:BLOCKED", "d-roads:BLOCKED"]}
 	var wpts: Array[Vector2] = []
 	for l in data.land_polygons:
 		if l is Dictionary and str(l.get("class", "")) == "water":
