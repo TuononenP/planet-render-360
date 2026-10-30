@@ -30,6 +30,9 @@ exact-size from `https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/…`
 (per-asset URLs in `https://api.polyhaven.com/files/{id}`). All CC0 1.0
 (public domain, attribution not required; courtesy credit recommended).
 39 files, ≈23 MB under `assets/textures/` as `<set>_{diff,nor,rough}.jpg`.
+Render upgrade (2026-10-30): six terrain sets added the same way (18 files,
+≈17 MB, 1k jpg, CC0), packed at runtime into the terrain layer arrays
+(`TerrainTextures`).
 
 | set | Poly Haven asset | diff / nor / rough bytes | use |
 |---|---|---|---|
@@ -46,6 +49,12 @@ exact-size from `https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/…`
 | pavement | `concrete_pavement` | 926197 / 1184345 / 475799 | pavement/urban ground |
 | grass | `grass_ground` | 876584 / 1310516 / 328190 | grass-class ground |
 | rock | `brown_mud_rocks_01` | 887215 / 1400087 / 719533 | rock/quarry ground |
+| cliff | `rock_face_03` | 927082 / 1146788 / 638904 | cliff faces and steep ground (terrain layer, biplanar) |
+| forest | `forest_leaves_02` | 437891 / 577163 / 192523 | forest floor (terrain layer) |
+| lawn | `leafy_grass` | 1195394 / 1466049 / 511385 | mown lawns, parks, meadows (terrain layer) |
+| gravel | `gravel_floor` | 1327302 / 1538430 / 697340 | gravel paths, scree, quarries (terrain layer) |
+| sand | `coast_sand_01` | 960614 / 1146826 / 383892 | beaches and sand (terrain layer) |
+| snow | `snow_02` | 325497 / 1081858 / 146089 | climate snow over terrain (terrain layer) |
 
 Glass is the documented absence: the API catalog (869 textures,
 2026-10-28) returns 0 hits for "glass", so curtain-wall glass stays
