@@ -86,13 +86,15 @@ static func layer_of(file_name: String) -> String:
 	if base.begins_with("osm_v") or base.begins_with("osm4_") \
 			or base.begins_with("osm3_"):
 		return "osm"
+	if base.begins_with("climate_v"):
+		return "climate"
 	return ""
 
 static func is_v2_name(file_name: String) -> bool:
 	var base := file_name.get_file()
 	var tag := "_v%d_" % DATA_VERSION
 	return base.begins_with("dem" + tag) or base.begins_with("sat" + tag) \
-		or base.begins_with("osm" + tag)
+		or base.begins_with("osm" + tag) or base.begins_with("climate" + tag)
 
 ## Full v2 key set warming/covering a place at a preset (High default,
 ## the app default): {"dem": [...], "sat": [...], "osm": [...]}.

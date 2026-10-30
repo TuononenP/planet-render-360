@@ -63,17 +63,14 @@ static func drape_uv(data: LocationData, drape: Dictionary, xm: float, zm: float
 	var size: Vector2i = drape["size_px"]
 	return (p - (drape["origin_px"] as Vector2)) / Vector2(size)
 
-## Alpine treeline (m ASL) by latitude: ~3900 m in the tropics, ~2100 m
-## at 45 deg (Alps), ~650 m at 65 deg, sea level past ~74 deg.
+## Latitude-only treeline / snowline (ClimateModel owns both; these
+## delegators keep existing callers). Place colours use the CHELSA
+## isotherms through ClimateModel when climate data exists.
 static func treeline_m(lat: float) -> float:
-	var a := absf(lat)
-	return clampf(3900.0 - 72.0 * maxf(a - 20.0, 0.0), 0.0, 3900.0)
+	return ClimateModel.latitude_treeline_m(lat)
 
-## Snowline (m ASL) by latitude and season: permanent summer snow sits
-## ~900 m above the treeline; winter snow reaches well below it.
 static func snowline_m(lat: float, season: int) -> float:
-	var offs := [350.0, 900.0, 600.0, -900.0]  # spring, summer, autumn, winter
-	return maxf(treeline_m(lat) + float(offs[clampi(season, 0, 3)]), 0.0)
+	return ClimateModel.latitude_snowline_m(lat, season)
 
 ## Mountain colour ramp for terrain with no imagery (returned LINEAR,
 ## from sRGB picks — the v1 ramp fed sRGB values as linear and washed
@@ -84,10 +81,16 @@ static func ramp_color(data: LocationData, nrm: Vector3, h_asl: float,
 		water: bool, noise: float) -> Color:
 	if water:
 		return Color(0.149, 0.263, 0.247).srgb_to_linear()  # #26433F (T3.8)
-	var tl := treeline_m(data.latitude)
-	var sl := snowline_m(data.latitude, data.season)
+	var tl := ClimateModel.treeline_m(data)
+	var sl := ClimateModel.snowline_m(data, data.season)
 	var forest := Color(0.17, 0.25, 0.13)
 	var meadow := Color(0.33, 0.42, 0.20)
+	# Climate (CHELSA): dry summers turn the meadows golden, arid ground
+	# reads sparse; forests stay dark (evergreen oak, chaparral, pine).
+	var dry := ClimateModel.grass_tint(data, data.season)
+	if dry.a > 0.0:
+		meadow = Color(dry.r, dry.g, dry.b).linear_to_srgb()
+		forest = forest.lerp(meadow, 0.35 if ClimateModel.arid(data) else 0.15)
 	var alpine := Color(0.42, 0.43, 0.32)
 	var rock := Color(0.40, 0.38, 0.36)
 	var snow := Color(0.90, 0.92, 0.95)
@@ -117,6 +120,13 @@ uniform float albedo_cap = 0.85;
 // real canopy albedo is ~0.08-0.15, so far imagery gets a gain, with
 // the PRD 0.85 cap applied as a ceiling, not a multiplier.
 uniform float imagery_gain = 1.6;  // FarSurface.IMAGERY_GAIN
+// @SNOW
+varying vec3 wpos;
+varying float wny;
+void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wny = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
+}
 float edge_w(vec2 uv) {
 	vec2 d = min(uv, vec2(1.0) - uv);
 	return smoothstep(0.0, 0.015, min(d.x, d.y));
@@ -127,6 +137,7 @@ void fragment() {
 	if (wc > 0.0) { c = mix(c, texture(coarse_tex, UV2).rgb * imagery_gain, wc); }
 	float wf = has_fine * edge_w(UV);
 	if (wf > 0.0) { c = mix(c, texture(fine_tex, UV).rgb * imagery_gain, wf); }
+	c = mix(c, snow_col, snow_cover(wpos, wny));
 	ALBEDO = min(c, vec3(albedo_cap));
 	ROUGHNESS = 0.96;
 	SPECULAR = 0.2;
@@ -138,16 +149,19 @@ static var _shader: Shader
 ## the vertex-colour ramp, each drape faded out at its window edge.
 ## The 0.85 albedo ceiling matches the near drape cap (PRD §4.4).
 static func drape_material(fine: Texture2D, coarse: Texture2D,
-		double_sided: bool = false) -> ShaderMaterial:
+		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
+	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 	if _shader == null:
 		_shader = Shader.new()
-		_shader.code = _SHADER_CODE
+		_shader.code = code
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader
 	if double_sided:
 		var sh := Shader.new()
-		sh.code = _SHADER_CODE.replace("cull_back", "cull_disabled")
+		sh.code = code.replace("cull_back", "cull_disabled")
 		mat.shader = sh
+	if data != null:
+		ClimateModel.apply_snow(mat, data)
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:
@@ -178,7 +192,7 @@ static func drape_albedo(data: LocationData, xm: float, zm: float) -> Color:
 static func drape_mesh(verts: PackedVector3Array, normals: PackedVector3Array,
 		colors: PackedColorArray, uvs: PackedVector2Array, uv2s: PackedVector2Array,
 		indices: PackedInt32Array, fine: Texture2D, coarse: Texture2D,
-		double_sided: bool = false) -> MeshInstance3D:
+		double_sided: bool = false, data: LocationData = null) -> MeshInstance3D:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
@@ -191,5 +205,5 @@ static func drape_mesh(verts: PackedVector3Array, normals: PackedVector3Array,
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
-	mi.material_override = drape_material(fine, coarse, double_sided)
+	mi.material_override = drape_material(fine, coarse, double_sided, data)
 	return mi

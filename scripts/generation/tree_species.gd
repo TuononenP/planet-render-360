@@ -97,6 +97,24 @@ static func tint(name: String, season: int) -> Color:
 
 ## Biome for a place: coarse climate from the architecture region,
 ## latitude, and the viewpoint altitude (metres ASL).
+## Biome for a place: the CHELSA climate class (ClimateModel) where the
+## climate is known, keeping the regional species flavour where climate
+## and region agree it is temperate (alpine / east Asian mixes); the
+## regional + latitude rule below otherwise.
+static func biome_for_data(data: LocationData) -> String:
+	var regional := biome_for(data.latitude, data.longitude, data.centre_elevation_m)
+	var climatic := ClimateModel.biome(data)
+	if climatic == "":
+		return regional
+	if climatic == "temperate" and regional in ["alpine", "east_asia"]:
+		return regional
+	# Summer-dry climates outside the Mediterranean basin (California,
+	# central Chile, the Cape, SW Australia): live oak, pine and cypress
+	# rather than the olive / stone pine / palm of the Old World mix.
+	if climatic == "mediterranean" and regional not in ["mediterranean", "arid"]:
+		return "dry_coast"
+	return climatic
+
 static func biome_for(lat: float, lon: float, altitude_m: float) -> String:
 	var region := ArchitectureStyle.region_for(lat, lon)
 	var alat := absf(lat)
@@ -128,6 +146,12 @@ static func mix(biome: String, setting: String) -> Array:
 			if setting == "street":
 				return [["plane", 0.55], ["lime", 0.1], ["stone_pine", 0.15], ["palm", 0.1], ["cypress", 0.1]]
 			return [["stone_pine", 0.3], ["olive", 0.25], ["cypress", 0.2], ["plane", 0.15], ["palm", 0.1]]
+		"dry_coast":
+			if setting == "forest":
+				return [["oak", 0.45], ["scots_pine", 0.3], ["cypress", 0.15], ["spruce", 0.1]]
+			if setting == "street":
+				return [["plane", 0.35], ["oak", 0.25], ["palm", 0.15], ["cypress", 0.15], ["lime", 0.1]]
+			return [["oak", 0.45], ["scots_pine", 0.25], ["cypress", 0.2], ["plane", 0.1]]
 		"boreal":
 			if setting == "forest":
 				return [["spruce", 0.42], ["scots_pine", 0.33], ["birch", 0.25]]

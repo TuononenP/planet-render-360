@@ -329,7 +329,7 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 		if not coarse.is_empty():
 			uv2s[i] = FarSurface.drape_uv(data, coarse, v.x / m2u, v.z / m2u)
 	return FarSurface.drape_mesh(verts, nrms, cols, uvs, uv2s, indices,
-		fine.get("texture", null), coarse.get("texture", null))
+		fine.get("texture", null), coarse.get("texture", null), false, data)
 
 ## Far ring: the whole z8 tile as a grid mesh in true geometry — raw
 ## heights at the true tile span, positioned by far_centre_frac (no
@@ -397,7 +397,7 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null) -> Mesh
 				continue
 			indices.append_array([a, b, c, b, d, c])
 	return FarSurface.drape_mesh(verts, normals, colors, uvs, uvs, indices,
-		drape.get("texture", null), null)
+		drape.get("texture", null), null, false, data)
 
 static func _inside(v: Vector3, r: float) -> bool:
 	return maxf(absf(v.x), absf(v.z)) < r
