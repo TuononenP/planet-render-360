@@ -69,8 +69,9 @@ func _job(ok: bool) -> void:
 			child.queue_free()
 
 ## Total bytes held in the offline cache (DEM/OSM/satellite/tiles).
+## Downloaded data plus built worlds (WorldCache, user://worlds).
 static func cache_size_bytes() -> int:
-	return _dir_size("user://cache")
+	return _dir_size("user://cache") + _dir_size("user://worlds")
 
 static func _dir_size(path: String) -> int:
 	var total := 0
@@ -95,6 +96,7 @@ static func _dir_size(path: String) -> int:
 ## places simply re-download on next open). Resets the LRU index too.
 static func clear_cache() -> void:
 	_remove_dir("user://cache")
+	_remove_dir("user://worlds")
 	DirAccess.make_dir_recursive_absolute("user://cache")
 	CacheStore.reset_lru()
 

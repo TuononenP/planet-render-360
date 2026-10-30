@@ -141,6 +141,19 @@ func _run() -> void:
 			failures.append("tapping Ultra should apply and announce it")
 		if not screen._summary_label.text.contains("%d×" % RenderSettings.terrain_mesh_posts_for(3)):
 			failures.append("summary should describe the Ultra budget, got: %s" % screen._summary_label.text)
+		# T7.4: the tier shows its PRD fidelity level and §3.1 wait.
+		if not (screen._summary_label.text.contains("Fidelity 3") and screen._summary_label.text.contains(RenderSettings.FIRST_BUILD[3])):
+			failures.append("Ultra summary should state Fidelity 3 and its ~1–2 min first build: %s" % screen._summary_label.text)
+	if Array(RenderSettings.FIDELITY) != [1, 2, 2, 3]:
+		failures.append("presets should map to PRD Fidelity 1/2/2/3")
+	for p in 4:
+		if not RenderSettings.PRESET_BLURBS[p].begins_with("Fidelity %d" % RenderSettings.FIDELITY[p]) \
+				or not RenderSettings.PRESET_BLURBS[p].contains(RenderSettings.FIRST_BUILD[p]):
+			failures.append("preset %d copy should state its fidelity and first-build budget" % p)
+	# The governor reports reductions under the user's tier, never a tier of its own.
+	if QualityGovernor.step_label(2, 2) != "High" or not QualityGovernor.step_label(2, 0).begins_with("High · 65% res"):
+		failures.append("governor label should be the tier plus any reduction: %s / %s"
+			% [QualityGovernor.step_label(2, 2), QualityGovernor.step_label(2, 0)])
 	# Offline storage management: size is readable, label reports it.
 	if screen._storage_label == null or not screen._storage_label.text.contains("MB"):
 		failures.append("settings should report offline cache size")
