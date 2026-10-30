@@ -178,6 +178,25 @@ One Markdown report per scored run, stored next to the captures it judges
 - Captures: <paths>
 ```
 
+### Automation (T8.1, 2026-10-29)
+
+`godot --headless --script tests/fidelity_scorecard_test.gd` runs checks
+(a)–(e) on all five golden locations and writes the §6 report per
+location to `SCORECARD_OUT` (default `user://scorecard`;
+`SCORECARD_PRESET` 0–3, `SCORECARD_ONLY` one location key). Rendered
+output is measured, not builder bookkeeping: (a) GroundTruth vs an
+independent bilinear z14 sample at the 9 points (points in mapped water
+are carved on purpose and listed, not scored; fewer than 6 land points
+blocks); (b/c) roof triangles attributed by centroid-in-footprint on a
+1 m grid — IoU, area-centroid offset, top above the lowest footprint
+ground; (d) visible water within 10 m, 3 m inside the nearest water
+triangle; road junctions inside OSM footprints (passages) excluded and
+counted; a failed OSM fetch blocks (d); (e) model vs geodesic bearing.
+The fixed sample sets are the rules in the test header (`SAMPLE_RULES`),
+versioned with it. Apparent height, AC-06 and AC-14 stay BLOCKED
+headless; (f) stays the signed checklist. First run:
+`visual-plan/reviews/scorecard-2026-10-29/`.
+
 ## 7. Validation of this doc (T0.2 gate)
 
 - [x] Reviewed against PRD AC-01…AC-18: every AC maps to ≥1 scorecard check (§5 table, 18/18 rows).
