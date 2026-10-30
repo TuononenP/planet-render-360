@@ -62,6 +62,7 @@ godot --headless --script tests/sky_test.gd      # sky per season and time of da
 godot --headless --script tests/solar_test.gd    # true sun position vs ephemeris
 godot --headless --script tests/scenery_test.gd  # building scale, terrain normals, water, landmark
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
+godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)
 ```
 
 Current MVP: map picker (tap/search/coordinates) → staged loading pipeline

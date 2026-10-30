@@ -360,6 +360,9 @@ static func make_world(data: LocationData, ground: GroundTruth) -> Node3D:
 ## screen (macOS beachball), so the caller's screen keeps drawing here.
 ## Pass the result to show_location. A known `ground` is reused.
 func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
+	var cached := await WorldCache.load_world(self, data, ground)
+	if not cached.is_empty():
+		return cached
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
@@ -368,7 +371,9 @@ func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
 	while thread.is_alive():
 		await get_tree().process_frame
 	_threads.erase(thread)
-	return thread.wait_to_finish()
+	var built: Array = thread.wait_to_finish()
+	WorldCache.save_async(self, _threads, data, built)
+	return built
 
 func _notification(what: int) -> void:
 	# A thread outliving its owner aborts the engine on free/quit. The
