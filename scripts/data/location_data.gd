@@ -193,6 +193,29 @@ static func known_places() -> Array:
 		{"name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093},
 		{"name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
 		{"name": "Helsinki, Finland", "lat": 60.1699, "lon": 24.9384},
+		{"name": "Stockholm, Sweden", "lat": 59.3293, "lon": 18.0686},
+		{"name": "Monaco", "lat": 43.7384, "lon": 7.4246},
+		{"name": "Dubai, United Arab Emirates", "lat": 25.2048, "lon": 55.2708},
+		{"name": "Seoul, South Korea", "lat": 37.5665, "lon": 126.9780},
+	]
+
+## One-tap presets for the map picker: [chip label, place name, lat, lon].
+## Chosen to contrast (Haussmann Paris, neon Tokyo, Gulf towers, Nordic
+## waterfront, alpine, coast) so they double as test scenarios.
+static func quick_picks() -> Array:
+	return [
+		["Paris", "Paris, France", 48.8566, 2.3522],
+		["Alps", "Interlaken, Switzerland", 46.6863, 7.8632],
+		["Banff", "Banff, Canada", 51.1789, -115.5708],
+		["Big Sur", "Big Sur, United States", 36.2704, -121.8081],
+		["Tokyo", "Tokyo, Japan", 35.6762, 139.6503],
+		["New York", "New York, United States", 40.7128, -74.0060],
+		["Stockholm", "Stockholm, Sweden", 59.3293, 18.0686],
+		["Monaco", "Monaco", 43.7384, 7.4246],
+		["Dubai", "Dubai, United Arab Emirates", 25.2048, 55.2708],
+		["London", "London, United Kingdom", 51.5074, -0.1278],
+		["Rome", "Rome, Italy", 41.9028, 12.4964],
+		["Seoul", "Seoul, South Korea", 37.5665, 126.9780],
 	]
 
 static func suggestions_for(query: String) -> Array:

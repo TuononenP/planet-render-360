@@ -120,7 +120,7 @@ func _run() -> void:
 	if picker._quick_box == null:
 		_fail(failures, "picker should offer one-tap quick picks")
 	else:
-		var quick_row := picker._quick_box.get_child(1) as HBoxContainer
+		var quick_row := picker._quick_box.get_child(1) as GridContainer
 		if quick_row == null or quick_row.get_child_count() < 3:
 			_fail(failures, "quick picks should offer at least 3 places")
 		else:
