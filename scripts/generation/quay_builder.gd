@@ -32,7 +32,9 @@ static var _stone_mat: StandardMaterial3D
 static func stone_material() -> StandardMaterial3D:
 	if _stone_mat == null:
 		var row: Dictionary = MaterialLibrary.PBR_SETS["render"]
-		var mean: Color = (row["mean"] as Color).srgb_to_linear()
+		# Set means are already linear (a second decode read the stone
+		# ~1.6x too bright: pale, textureless quay slabs).
+		var mean: Color = row["mean"]
 		var target := QUAY_STONE.srgb_to_linear()
 		var tint := Color(target.r / maxf(mean.r, 0.01),
 			target.g / maxf(mean.g, 0.01),

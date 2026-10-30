@@ -115,6 +115,7 @@ static func apply_surface_state(v: View360) -> void:
 	if v._generated != null and is_instance_valid(v._generated):
 		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
 		RoofSnow.apply(v._generated, float(ClimateModel.globals_for(v._data, code)["climate_snow_on"]) > 0.0)
+		_city_lights(v)
 
 ## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
 ## darker albedo. Dry values are kept on the shared material, so the
@@ -171,6 +172,7 @@ static func _apply_current_time(v: View360) -> void:
 		var lat := v._data.latitude if v._data != null else v._atmos.latitude
 		v._atmos.set_time(v._time_hour, lat, {"year": int(now.get("year", 2026)),
 			"month": int(now.get("month", 1)), "day": int(now.get("day", 1))})
+	_city_lights(v)
 	_sync_time_ui(v)
 
 static func _on_time_slider_changed(v: View360, value: float) -> void:
@@ -197,4 +199,10 @@ static func _apply_time(v: View360, hour_f: float) -> void:
 		return
 	var lat := v._data.latitude if v._data != null else v._atmos.latitude
 	v._atmos.set_time(hour_f, lat)
+	_city_lights(v)
+
+## Lit windows follow the sky's darkness (CityLights).
+static func _city_lights(v: View360) -> void:
+	if v._atmos != null and v._generated != null and is_instance_valid(v._generated):
+		CityLights.apply(v._generated, CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount))
 

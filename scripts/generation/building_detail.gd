@@ -55,6 +55,7 @@ class Batch extends RefCounted:
 			arrays[Mesh.ARRAY_VERTEX] = s[0]
 			arrays[Mesh.ARRAY_NORMAL] = s[1]
 			arrays[Mesh.ARRAY_TEX_UV] = s[2]
+			arrays[Mesh.ARRAY_TANGENT] = MassBatch.tangents(s[0], s[1], s[2], s[3])
 			arrays[Mesh.ARRAY_INDEX] = s[3]
 			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 			MeshArrays.keep_surface(mesh, arrays)
@@ -131,9 +132,11 @@ static func _mat(key: String) -> Material:
 	var m: Material
 	match key:
 		"brick":
-			m = MaterialLibrary.pbr_material("brick", Color.WHITE, 8.0)
+			# Unit-box UVs per face: ~1 repeat per chimney face keeps
+			# brick courses at real size (8 drew 11 cm bricks).
+			m = MaterialLibrary.pbr_material("brick", Color.WHITE, 1.0)
 		"concrete":
-			m = MaterialLibrary.pbr_material("concrete", Color.WHITE, 8.0)
+			m = MaterialLibrary.pbr_material("concrete", Color.WHITE, 1.5)
 		"ac":
 			m = _flat(Color(0.62, 0.64, 0.66), 0.7)
 		"tank":

@@ -43,6 +43,7 @@ static func begin_build() -> void:
 	_distant_mats.clear()
 	_distant_roof_mats.clear()
 	_roof_mats.clear()
+	BuildingTrim._mats.clear()
 	MaterialLibrary.begin_build()
 
 ## Live census for the T4.3/T7.2 instance-count asserts.

@@ -625,8 +625,11 @@ static func _cap_match(verts: PackedVector3Array,
 	var want: Array = []
 	for p in ring:
 		want.append(p)
+	# A flat roof's deck sits behind its parapet (BuildingTrim), the
+	# parapet's coping at the wall top.
+	var deck := BuildingTrim.deck(top, BuildingTrim.PARAPET)
 	for v in verts:
-		if absf(v.y - top) > 0.01:
+		if absf(v.y - top) > 0.01 and absf(v.y - deck) > 0.01:
 			return false
 		var hit := -1
 		for i in want.size():
