@@ -431,7 +431,7 @@ func _z14_reference(lat: float, lon: float, grid: int) -> Dictionary:
 	var size := 256 * 3
 	var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
 	for t in tiles:
-		var path := "user://cache/dem_14_%d_%d.png" % [t.x, t.y]
+		var path := CacheStore.dem_path(14, t.x, t.y)  # v2 key (T2.5)
 		if not FileAccess.file_exists(path):
 			return {"ok": false, "reason": "missing cache " + path}
 		var img := Image.new()
