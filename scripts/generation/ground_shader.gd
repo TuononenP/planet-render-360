@@ -20,6 +20,7 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 uniform sampler2D photo : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D class_map : filter_nearest, repeat_disable;
 uniform sampler2D palette : filter_nearest, repeat_disable;
+uniform sampler2D canopy_map : filter_linear, repeat_disable;
 uniform float class_n = 1024.0;
 uniform int max_id = 16;
 uniform float extent_u = 220.0;
@@ -135,6 +136,9 @@ void fragment() {
 			pave += bw * p2.a;
 		}
 	}
+	// Under tree crowns (mapped trees) and in forest cover the ground is
+	// shaded: less sky (AO) and darker litter.
+	float canopy = max(texture(canopy_map, wpos.xz / extent_u + 0.5).r, clamp(W1.y * 1.2, 0.0, 1.0));
 	// Crag relief: noise gradients bend the lighting normal on steep and
 	// rocky ground, so DEM slabs read as ribbed rock faces.
 	vec3 nw = normalize(wnrm);
@@ -142,7 +146,8 @@ void fragment() {
 	float rocky = clamp(steep0 + W0.z + W1.x * 0.8 + W1.z * 0.4, 0.0, 1.0);
 	float relief_fade = 1.0 - smoothstep(600.0, 2400.0, dist_m);
 	if (rocky * relief_fade > 0.01) {
-		vec2 gr = t_relief(g, 26.0, ground_quality >= 2 ? 4 : 2);
+		int oct = ground_quality >= 3 ? 4 : (ground_quality >= 2 ? 3 : 2);
+		vec2 gr = t_relief(g, 26.0, dist_m > 900.0 ? 2 : oct);
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 9.0 * rocky * relief_fade);
 	}
 	// Steep ground is cliff rock (and scree) whatever the cover says.
@@ -167,7 +172,9 @@ void fragment() {
 	// Photographic layers by weight, each normalised by its mean so the
 	// class colour sets the value and the texture only adds structure.
 	float w[8] = float[8](W0.x, W0.y, W0.z, W0.w, W1.x, W1.y, W1.z, W1.w);
-	bool vary = ground_quality >= 1;
+	// Offset variation only where repetition could show (past ~450 m the
+	// photo has taken over): one fetch per layer instead of two there.
+	bool vary = ground_quality >= 1 && dist_m < 450.0;
 	vec3 det = vec3(0.0);
 	vec4 nm = vec4(0.0);
 	float wt = 0.0;
@@ -220,13 +227,14 @@ void fragment() {
 		int nid = int(texelFetch(class_map, clamp(cc + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
 		occ += nid == 1 ? 1.0 : 0.0;
 	}
-	float contact = 1.0 - 0.45 * (occ / 8.0) * (1.0 - wf);
+	float contact = (1.0 - 0.45 * (occ / 8.0) * (1.0 - wf)) * (1.0 - 0.45 * canopy);
+	alb *= 1.0 - 0.2 * canopy;
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel); it
 	// slides off cliffs (relief normal) and takes its own texture.
 	float sc = snow_cover(wpos, nw.y);
 	vec4 sa = vec4(0.0);
-	vec4 sn = vec4(0.5, 0.5, 1.0, 0.7);
+	vec4 sn = vec4(0.5, 0.5, 1.0, 1.0);
 	if (sc > 0.01) {
 		det_sample(8, g, dg, vary, sa, sn);
 		alb = mix(alb, snow_col * clamp(sa.rgb / det_mean[8], vec3(0.75), vec3(1.2)), sc);
@@ -245,12 +253,9 @@ void fragment() {
 	NORMAL_MAP_DEPTH = 0.9;
 	AO = contact;
 	AO_LIGHT_AFFECT = 0.2;
-	// The layers' own roughness maps vary the gloss near by, around the
-	// class's matte value: taken raw, the lawn map put a sun-facing sheen
-	// on every meadow that washed it out toward the light.
-	float rmap = mix(nm.a, sn.a, sc);
-	float r = clamp(rough + (rmap - 0.75) * 0.3 * (1.0 - wf), 0.55, 1.0);
-	ROUGHNESS = mix(r, 0.22, wet * 0.85);
+	// The class's matte roughness (the sets' own maps sheened meadows),
+	// a little glossier under snow; rain glosses it.
+	ROUGHNESS = mix(mix(rough, 0.7, sc), 0.22, wet * 0.85);
 	SPECULAR = mix(0.35, 0.5, wet);
 }
 """

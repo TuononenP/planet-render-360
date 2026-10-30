@@ -37,6 +37,30 @@ func _run() -> void:
 			% [env.glow_bloom, env.glow_hdr_threshold])
 	if env.ambient_light_sky_contribution < 1.0 or env.tonemap_mode != Environment.TONE_MAPPER_ACES:
 		failures.append("ambient should be the sky, tonemap ACES")
+	# Tier exposure: lean tiers darker and crisper, the curve unchanged.
+	var lean := Environment.new()
+	PostGrade.apply(lean)
+	PostGrade.apply_tier(lean, RenderSettings.Preset.FAST, true)
+	var full := Environment.new()
+	PostGrade.apply(full)
+	PostGrade.apply_tier(full, RenderSettings.Preset.ULTRA, true)
+	if lean.tonemap_exposure >= full.tonemap_exposure or lean.adjustment_saturation != full.adjustment_saturation \
+			or lean.tonemap_white != full.tonemap_white:
+		failures.append("Fast should take a lower exposure on the same curve and saturation")
+	# Canopy shade under mapped trees; urban raster for road kerbs.
+	var cd := _flat(RenderSettings.Preset.HIGH)
+	cd.trees = [{"x": 100.0, "z": -50.0}]
+	cd.land_polygons = [{"class": "urban", "points": PackedVector2Array([Vector2(-200, -200),
+		Vector2(0, -200), Vector2(0, 0), Vector2(-200, 0)])}]
+	var cmap := GroundMaterial.canopy_map(cd)
+	var cn := cmap.get_width()
+	var ext := WorldScale.detailed_extent_units()
+	if cmap.get_pixel(int((100.0 / ext + 0.5) * cn), int((-50.0 / ext + 0.5) * cn)).r < 0.9 \
+			or cmap.get_pixel(int((300.0 / ext + 0.5) * cn), int((300.0 / ext + 0.5) * cn)).r > 0.0:
+		failures.append("canopy map should shade under trees only")
+	var um := RoadSurface.urban_raster(cd)
+	if not RoadSurface.is_urban(um, Vector2(-100, -100)) or RoadSurface.is_urban(um, Vector2(100, 100)):
+		failures.append("urban raster should follow the urban land polygon")
 	# Facade layers.
 	var look := {"frame": Color(0.8, 0.8, 0.78), "window": "casement", "variant": 1}
 	var texs := FacadeComposer.compose_tile("limestone", "punched", 1, look,
@@ -185,7 +209,7 @@ func _run() -> void:
 			failures.append("High park cover: %d instances, %d on the building" % [count, on_building])
 	failures.erase(failures[0])
 	if failures.is_empty():
-		print("RENDER UPGRADE OK: grade, facade paint + night lights, wall tints, roof UVs, terrain layers, sea shore, road junctions, ground cover")
+		print("RENDER UPGRADE OK: grade + tier exposure, canopy, urban raster, facade paint + night lights, wall tints, roof UVs, terrain layers, sea shore, road junctions, ground cover")
 		quit(0)
 	else:
 		for f in failures:

@@ -24,6 +24,17 @@ const AMBIENT_ENERGY := 0.55
 const GLOW_THRESHOLD := 1.0
 const GLOW_INTENSITY := 0.32
 
+## Exposure and contrast per tier: the same curve, hue and saturation
+## everywhere (AC-12), but tiers without shadows (Fast) or without SSAO
+## (the Mobile renderer, Balanced) have no dark contact and shade terms,
+## and at the shadowed tiers' exposure they read pale and milky.
+static func apply_tier(env: Environment, preset: int, forward_plus: bool) -> void:
+	var p := RenderSettings.clamp_preset(preset)
+	var lean := not forward_plus or p == RenderSettings.Preset.FAST
+	var mid := forward_plus and p == RenderSettings.Preset.BALANCED
+	env.tonemap_exposure = EXPOSURE * (0.86 if lean else (0.93 if mid else 1.0))
+	env.adjustment_contrast = CONTRAST + (0.05 if lean else (0.02 if mid else 0.0))
+
 static func apply(env: Environment) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_color = Color(0.73, 0.80, 0.85)  # #B9CBD8, unused at full sky

@@ -76,6 +76,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	var m2u := WorldScale.metres_to_units()
 	m.set_shader_parameter("photo", photo)
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(class_map(data)))
+	m.set_shader_parameter("canopy_map", ImageTexture.create_from_image(canopy_map(data)))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
@@ -256,6 +257,28 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				_fill_rings(img, [PackedVector2Array([Vector2(bx - hx, bz - hz),
 					Vector2(bx + hx, bz - hz), Vector2(bx + hx, bz + hz),
 					Vector2(bx - hx, bz + hz)])], ID["building"], n)
+	return img
+
+## Tree crowns over the detailed extent (R8, CANOPY_TEXELS², linear
+## filtered in the shader): each mapped tree stamps a crown-sized disc,
+## so the ground beneath reads shaded on every tier — Fast has no shadow
+## map, and elsewhere the shadow covers only the sun term.
+const CANOPY_TEXELS := 512
+const CROWN_M := 4.5
+
+static func canopy_map(data: LocationData, n: int = CANOPY_TEXELS) -> Image:
+	var img := Image.create(n, n, false, Image.FORMAT_R8)
+	img.fill(Color(0, 0, 0))
+	var e := WorldScale.detailed_extent_units()
+	var ts := e / float(n)
+	var r := maxi(int(round(CROWN_M * WorldScale.metres_to_units() / ts)), 1)
+	for t in data.trees:
+		if not (t is Dictionary):
+			continue
+		var i := int((float(t.get("x", 0.0)) / e + 0.5) * n)
+		var j := int((float(t.get("z", 0.0)) / e + 0.5) * n)
+		img.fill_rect(Rect2i(i - r + 1, j - r + 1, 2 * r - 1, 2 * r - 1), Color(0.7, 0, 0))
+		img.fill_rect(Rect2i(i - r / 2, j - r / 2, r + 1, r + 1), Color(1, 0, 0))
 	return img
 
 ## Even-odd scanline fill of the rings (outer + holes) with `id`.

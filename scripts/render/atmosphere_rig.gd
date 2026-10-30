@@ -254,6 +254,7 @@ func set_quality(preset: int) -> void:
 	sky_material.set_shader_parameter("octaves", RenderSettings.cloud_octaves_for(_preset))
 	sky_material.set_shader_parameter("cloud_quality", _preset)
 	RenderQuality.apply_environment(environment, _preset)
+	PostGrade.apply_tier(environment, _preset, RenderQuality.is_forward_plus())
 	RenderQuality.apply_light(sun, _preset)
 	if is_inside_tree():
 		RenderQuality.apply_viewport(get_viewport(), _preset)
