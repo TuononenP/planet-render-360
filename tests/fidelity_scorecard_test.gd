@@ -191,6 +191,7 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 	var offsets: Array = []
 	var errs: Array = []
 	var tagged := 0
+	var per_c: Array[String] = []
 	var ctx := BuildingHeights._height_context(data)
 	for b in sample:
 		var poly: PackedVector2Array = b["footprint"]
@@ -201,10 +202,17 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 		if expect > 0.0:
 			tagged += 1
 			if m["top"] > -INF:
-				var c := _centroid(poly)
-				errs.append(absf(m["top"] - ground.height_at_world(c.x, c.y) - expect))
+				# OSM height is from the lowest ground at the footprint
+				# (the builder's wall base, before its 0.6 m sink).
+				var base := INF
+				for q in poly:
+					base = minf(base, ground.height_at_world(q.x, q.y))
+				var got := float(m["top"]) - base
+				errs.append(absf(got - expect))
+				per_c.append("%s %.1f→%.1f m" % [str(b.get("height_source", "")), expect, got])
 			else:
 				errs.append(expect)  # fail-closed: nothing rendered
+				per_c.append("%s %.1f→none" % [str(b.get("height_source", "")), expect])
 	var iou := _median(ious)
 	var off := _median(offsets)
 	var urban := bool(loc["urban"])
@@ -219,6 +227,7 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 		vc = "PASS" if med <= 3.0 else "FAIL"
 		lines.append("- (c) heights: median err %.2f m, coverage %d/%d tagged (bar ≤ 3 m ≈ 1 storey) → %s"
 			% [med, tagged, sample.size(), vc])
+		lines.append("  - tagged (source expected→rendered): " + "; ".join(per_c))
 	return {"lines": lines, "verdicts": ["b:" + vb, "c:" + vc]}
 
 func _building_sample(data: LocationData, want: int) -> Array:
