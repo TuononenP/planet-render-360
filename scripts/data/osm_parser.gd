@@ -4,6 +4,9 @@ extends RefCounted
 ## Overpass JSON -> LocationData feature arrays. Owns parse_features
 ## (element dispatch + dedup), building:part nesting, payload merge
 ## and the v1 roads shim. Tag/geometry rules live in OsmTags/OsmGeometry.
+## Spacing of the trees placed along a natural=tree_row way (metres).
+const TREE_ROW_M := 8.0
+
 static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictionary:
 	var buildings: Array = []
 	var roads: Array = []
@@ -43,7 +46,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"size_x": 8.0, "size_z": 8.0})
 			if str(el_tags.get("natural", "")) == "tree":
 				var tp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
-				trees.append({"x": tp.x, "z": tp.y})
+				var tree := {"x": tp.x, "z": tp.y}
+				tree.merge(OsmTags.tree_tags(el_tags))
+				trees.append(tree)
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
@@ -53,6 +58,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					and el.has("members"):
 				var members: Array = el.get("members", [])
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
+					if str(entry["class"]) == "forest":
+						(entry as Dictionary).merge(OsmTags.tree_tags(el_tags))
 					land.append(entry)
 				var rel_arch := OsmTags.archetype_for(el_tags)
 				if rel_arch != "":
@@ -129,7 +136,16 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"size_z": clampf(max_z - min_z, 6.0, 240.0)})
 			var cls := OsmTags.land_class(el_tags)
 			if cls != "" and geom.size() >= 3:
-				land.append({"class": cls, "points": poly, "holes": []})
+				var entry := {"class": cls, "points": poly, "holes": []}
+				if cls == "forest":
+					entry.merge(OsmTags.tree_tags(el_tags))
+				land.append(entry)
+			elif str(el_tags.get("natural", "")) == "tree_row":
+				# A mapped row of trees: one tree every TREE_ROW_M along it.
+				for tp in OsmGeometry.along(poly, TREE_ROW_M):
+					var tree := {"x": tp.x, "z": tp.y, "row": true}
+					tree.merge(OsmTags.tree_tags(el_tags))
+					trees.append(tree)
 	_nest_parts(buildings, part_ways)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,

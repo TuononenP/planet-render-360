@@ -174,6 +174,73 @@ static func mix(biome: String, setting: String) -> Array:
 		return [["plane", 0.5], ["lime", 0.3], ["oak", 0.1], ["birch", 0.1]]
 	return [["oak", 0.3], ["lime", 0.3], ["plane", 0.2], ["birch", 0.2]]
 
+## OSM genus (Latin, lowercased) → the nearest modelled species.
+const GENUS := {
+	"platanus": "plane", "tilia": "lime", "quercus": "oak", "fagus": "oak",
+	"castanea": "oak", "carpinus": "oak", "juglans": "oak",
+	"acer": "lime", "aesculus": "lime", "ulmus": "lime", "fraxinus": "lime",
+	"robinia": "lime", "prunus": "lime", "sorbus": "lime", "malus": "lime",
+	"celtis": "lime", "styphnolobium": "lime", "sophora": "lime", "gleditsia": "lime",
+	"pyrus": "lime", "magnolia": "lime", "ginkgo": "lime", "zelkova": "lime",
+	"liquidambar": "oak", "liriodendron": "plane", "paulownia": "plane", "catalpa": "plane",
+	"betula": "birch", "populus": "birch", "salix": "birch", "alnus": "birch",
+	"olea": "olive", "ceratonia": "olive",
+	"pinus": "scots_pine", "picea": "spruce", "abies": "spruce",
+	"pseudotsuga": "spruce", "larix": "spruce", "tsuga": "spruce",
+	"cupressus": "cypress", "juniperus": "cypress", "thuja": "cypress",
+	"taxus": "cypress", "sequoia": "spruce", "sequoiadendron": "spruce",
+	"cedrus": "stone_pine",
+	"phoenix": "palm", "washingtonia": "palm", "trachycarpus": "palm",
+	"cocos": "palm", "roystonea": "palm", "syagrus": "palm",
+}
+
+## Species for a mapped tree from its OSM tags (genus / species /
+## leaf_type / leaf_cycle), or "" when they say nothing usable. Umbrella
+## pines get their own model; an evergreen broadleaf in a dry-summer
+## climate is the olive-like holm/live oak form.
+static func species_from_tags(tags: Dictionary, biome: String) -> String:
+	var genus := str(tags.get("genus", ""))
+	if genus == "" and tags.has("species"):
+		genus = str(tags["species"]).get_slice(" ", 0)
+	if genus == "pinus" and str(tags.get("species", "")).contains("pinea"):
+		return "stone_pine"
+	if GENUS.has(genus):
+		return GENUS[genus]
+	var leaf := str(tags.get("leaf_type", ""))
+	if leaf == "needleleaved":
+		return conifer_for(biome)
+	if leaf == "broadleaved":
+		if str(tags.get("leaf_cycle", "")) == "evergreen" and biome in ["mediterranean", "dry_coast", "arid"]:
+			return "olive"
+		return "oak" if biome != "boreal" else "birch"
+	return ""
+
+static func conifer_for(biome: String) -> String:
+	match biome:
+		"mediterranean":
+			return "stone_pine"
+		"dry_coast", "arid":
+			return "cypress"
+	return "spruce"
+
+## The biome mix narrowed to the forest's mapped leaf_type: conifers
+## only for needleleaved, broadleaves only for broadleaved; "mixed" or
+## unmapped keep the biome's own mix.
+static func mix_for_leaf(biome: String, setting: String, leaf_type: String) -> Array:
+	var base := mix(biome, setting)
+	if leaf_type != "needleleaved" and leaf_type != "broadleaved":
+		return base
+	var want_conifer := leaf_type == "needleleaved"
+	var out: Array = []
+	for e in base:
+		var sp := str(e[0])
+		var conifer := str(spec(sp).get("gen", "")) == "conifer" or sp in ["scots_pine", "stone_pine"]
+		if conifer == want_conifer:
+			out.append(e)
+	if out.is_empty():
+		out.append([conifer_for(biome) if want_conifer else ("birch" if biome == "boreal" else "oak"), 1.0])
+	return out
+
 ## Deterministic weighted pick (u in [0, 1)).
 static func pick(mix_rows: Array, u: float) -> String:
 	var total := 0.0
