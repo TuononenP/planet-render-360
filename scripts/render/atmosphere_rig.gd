@@ -166,6 +166,7 @@ func _process(delta: float) -> void:
 	_drift = fmod(_drift + _drift_accum * lerpf(0.004, 0.008, cloud_cover / 100.0), 1000.0)
 	_drift_accum = 0.0
 	sky_material.set_shader_parameter("drift", _drift)
+	RenderingServer.global_shader_parameter_set("cloud_shadow_drift", _drift)
 
 # --- State API ---
 
@@ -251,6 +252,7 @@ func set_quality(preset: int) -> void:
 	sun.directional_shadow_max_distance = RenderSettings.shadow_distance_for(_preset)
 	sun.shadow_blur = RenderSettings.shadow_blur_for(_preset)
 	sky_material.set_shader_parameter("octaves", RenderSettings.cloud_octaves_for(_preset))
+	sky_material.set_shader_parameter("cloud_quality", _preset)
 	RenderQuality.apply_environment(environment, _preset)
 	RenderQuality.apply_light(sun, _preset)
 	if is_inside_tree():
@@ -299,31 +301,8 @@ func _build_environment() -> void:
 	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	sky.radiance_size = Sky.RADIANCE_SIZE_128
 	environment.sky = sky
-	# Ambient comes from the sky so materials stay grounded in it.
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_color = Color(0.73, 0.80, 0.85)  # #B9CBD8
-	# Lifted from 0.52: shadowed DEM slopes read near-black, not skylit.
-	environment.ambient_light_energy = 0.62
-	environment.ambient_light_sky_contribution = 0.6
-	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 0.94
-	environment.adjustment_enabled = true
-	environment.adjustment_contrast = 1.08
-	environment.adjustment_saturation = 1.12
-	environment.fog_enabled = true
-	environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
-	environment.fog_light_energy = 1.0
-	environment.fog_sun_scatter = 0.25
-	# The sky shader draws its own horizon haze; fog stays off it so
-	# the cloud deck is not double-hazed.
-	environment.fog_sky_affect = 0.0
-	# Far geometry picks up the sky's directional colour: warm toward
-	# the sun, blue-grey away from it.
-	environment.fog_aerial_perspective = 0.55
-	environment.glow_enabled = true
-	environment.glow_bloom = 0.10
-	environment.glow_intensity = 0.4
-	environment.glow_strength = 1.0
+	# Ambient sky light, ACES grade, glow and haze model (every tier).
+	PostGrade.apply(environment)
 	world_environment.environment = environment
 	add_child(world_environment)
 
@@ -465,6 +444,10 @@ func _apply() -> void:
 	var tilt := deg_to_rad(float(s["milky_tilt"]))
 	var yaw := deg_to_rad(float(s["milky_yaw"]))
 	p.set_shader_parameter("milky_normal", Vector3(sin(tilt) * cos(yaw), cos(tilt), sin(tilt) * sin(yaw)))
+	# Far terrain's cloud shadows follow this deck (TerrainGlsl).
+	RenderingServer.global_shader_parameter_set("cloud_shadow_cover", 0.0 if night else cover * (1.0 - overcast))
+	RenderingServer.global_shader_parameter_set("cloud_shadow_stretch", float(s["stretch"]))
+	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
 	environment.fog_light_color = haze_color
 	var per_m := FOG_PER_M if is_foggy() else HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
 	environment.fog_density = per_m / maxf(units_per_metre, 1e-4)

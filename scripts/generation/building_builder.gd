@@ -404,7 +404,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		_walls(root, ring, g_top, top, facade, maxf(1.0, v_rep - 1.0))
 	else:
 		_walls(root, ring, base, top, facade, v_rep)
-	_roof_cap(root, ring, idx, top, roof_mat)
+	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape, centre.length() / WorldScale.metres_to_units()))
 	if shape != "flat" and roof_h_world > 0.01:
 		# Eave overhang (style metres) for gabled/hipped/pyramidal roofs:
 		# the eave line drops by the roof's own slope so the pitch is kept.
@@ -476,8 +476,8 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0) -> void:
 	BuildingWalls._walls(root, ring, base, top, mat, v_repeat)
 
-static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array, top: float, mat: Material) -> void:
-	BuildingWalls._roof_cap(root, ring, idx, top, mat)
+static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array, top: float, mat: Material, trim: int = 0) -> void:
+	BuildingWalls._roof_cap(root, ring, idx, top, mat, trim)
 
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material) -> void:

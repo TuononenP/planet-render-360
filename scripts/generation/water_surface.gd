@@ -6,123 +6,51 @@ extends RefCounted
 ## (shader, colour, micro-normals) and the surface tessellation evolve
 ## without growing the builder.
 ##
-## Look (PRD §4.3): a dark green-grey/teal body (#2C5566-class) that
-## shallows toward the shore, procedural travelling micro-normals in
-## metres (no texture dependency, mobile-cheap: 4 sine slopes + 2
-## value-noise octaves), Fresnel-weighted sky reflection and sun glint
-## from the engine's own sky radiance + directional light. SPECULAR is
-## held low (F0 ≈ 0.018, f90 ≈ 0.9 in Godot's dielectric model) so the
-## surface reads dark when looking down and only brightens at grazing
-## angles — the v1 material (SPECULAR 0.6 + a speckle texture used as
-## a biased normal map) mirrored the pale golden-hour sky everywhere
-## and read as a mint/cream sheet. Detail fades and roughness rises
-## with distance so far water never shimmers. No screen-space
-## refraction or depth reads: water stays opaque on every tier.
+## Look (PRD §4.3; GLSL and its wave/foam/flow model in WaterShader):
+## a dark green-grey/teal body (#2C5566-class) that shallows toward the
+## shore, Fresnel-weighted sky reflection and sun glint from the
+## engine's own sky radiance + directional light. SPECULAR is held low
+## (F0 ≈ 0.018) so the surface reads dark when looking down and only
+## brightens at grazing angles. No screen-space refraction or depth
+## reads: water stays opaque on every tier.
 ##
 ## Per-vertex COLOR.r carries "openness" (0 at the shoreline → 1 at
-## OPEN_RAMP_M from it); meshes without COLOR (sea/datum planes) read
-## as open water.
+## OPEN_RAMP_M from it), COLOR.g the sea flag, COLOR.b the shore
+## distance over SHORE_M and UV2 the river flow (WaterShader); meshes
+## without COLOR (the datum plane) read as open water.
 
 ## Shore → open-water colour ramp (metres from the nearest shoreline).
 const OPEN_RAMP_M := 30.0
 
-const SHADER := """
-shader_type spatial;
-render_mode cull_disabled, depth_draw_opaque, specular_schlick_ggx;
+## Shore distance (m) that COLOR.b spans (0 at the rim → 1): the foam
+## band and surf read it (WaterShader).
+const SHORE_M := 40.0
+## Downstream drift of a river's surface pattern (m/s): rivers, streams.
+const RIVER_FLOW := 0.9
+const STREAM_FLOW := 0.6
 
-// Body colours (sRGB): open water ≈ Seine/Aura green-grey teal, the
-// shore band lighter and greener (shallow, silty).
-uniform vec4 deep_color : source_color = vec4(0.150, 0.262, 0.250, 1.0);
-uniform vec4 shallow_color : source_color = vec4(0.235, 0.300, 0.250, 1.0);
-uniform float units_per_metre = 1.0;
-uniform float wave_amp = 1.0;
-uniform float near_rough = 0.06;
-uniform float far_rough = 0.16;
-uniform float spec = 0.34;
-uniform vec2 drift = vec2(0.18, 0.07);
+static var _mats: Dictionary = {}
 
-// @SNOW
-varying vec3 wpos;
-varying float openv;
-
-void vertex() {
-	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	openv = COLOR.r;
-}
-
-float hash12(vec2 p) {
-	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
-
-// Value noise derivative (iq): returns d/dx, d/dy.
-vec2 noise_grad(vec2 x) {
-	vec2 i = floor(x);
-	vec2 f = fract(x);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	vec2 du = 6.0 * f * (1.0 - f);
-	float a = hash12(i);
-	float b = hash12(i + vec2(1.0, 0.0));
-	float c = hash12(i + vec2(0.0, 1.0));
-	float d = hash12(i + vec2(1.0, 1.0));
-	return du * (vec2(b - a, c - a) + (a - b - c + d) * u.yx);
-}
-
-// Slope of one travelling sine wave (deep-water dispersion).
-vec2 wave_slope(vec2 p, vec2 dir, float len, float steep, float t) {
-	float k = 6.2831853 / len;
-	float ph = dot(dir, p) * k - t * sqrt(9.81 * k);
-	return dir * (steep * cos(ph));
-}
-
-void fragment() {
-	vec2 pm = wpos.xz / units_per_metre;
-	float dist_m = length(wpos - CAMERA_POSITION_WORLD) / units_per_metre;
-	float t = TIME;
-	vec2 s = vec2(0.0);
-	// Low sine steepness: alone they band into visible stripes; the
-	// value-noise octaves break them into irregular chop.
-	s += wave_slope(pm, normalize(vec2(0.86, 0.51)), 3.7, 0.032, t);
-	s += wave_slope(pm, normalize(vec2(-0.42, 0.91)), 2.3, 0.026, t);
-	s += wave_slope(pm, normalize(vec2(0.97, -0.24)), 1.3, 0.020, t);
-	s += wave_slope(pm, normalize(vec2(-0.71, -0.70)), 0.8, 0.016, t);
-	s += noise_grad(pm * 0.55 + drift * t) * 0.070;
-	s += noise_grad(pm * 1.9 - drift.yx * t * 1.6) * 0.040;
-	// Fade the micro-normals with distance (no far shimmer); rough
-	// rises instead, which keeps the far sheen soft.
-	s *= wave_amp / (1.0 + dist_m / 90.0);
-	// Frozen water: still, matte, white-grey ice (ClimateModel).
-	s *= 1.0 - climate_water_ice;
-	vec3 n_world = normalize(vec3(-s.x, 1.0, -s.y));
-	// Always the upward normal: water is only ever seen from above,
-	// and its triangles wind either way (cull_disabled).
-	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
-	float open_w = smoothstep(0.0, 1.0, clamp(openv, 0.0, 1.0));
-	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
-	ALBEDO = mix(mix(shallow_color.rgb, deep_color.rgb, open_w), ice, climate_water_ice);
-	ROUGHNESS = mix(mix(near_rough, far_rough, smoothstep(60.0, 900.0, dist_m)), 0.55, climate_water_ice);
-	SPECULAR = mix(spec, 0.25, climate_water_ice);
-	METALLIC = 0.0;
-}
-"""
-
-static var _mat: ShaderMaterial
-
-## Shared water material; units_per_metre tracks WorldScale (the
-## legacy 880 m equivalence flag may flip between builds/tests).
-static func material() -> ShaderMaterial:
-	if _mat == null:
+## Shared water material per tier (WaterShader; swell on High/Ultra);
+## units_per_metre tracks WorldScale (the legacy 880 m equivalence flag
+## may flip between builds/tests).
+static func material(preset: int = RenderSettings.Preset.HIGH) -> ShaderMaterial:
+	preset = RenderSettings.clamp_preset(preset)
+	if not _mats.has(preset):
 		var sh := Shader.new()
-		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
-		_mat = ShaderMaterial.new()
-		_mat.shader = sh
-	_mat.set_shader_parameter("units_per_metre", WorldScale.metres_to_units())
-	return _mat
+		sh.code = WaterShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		var m := ShaderMaterial.new()
+		m.shader = sh
+		m.set_shader_parameter("water_quality", preset)
+		m.set_shader_parameter("shore_m", SHORE_M)
+		_mats[preset] = m
+	var mat: ShaderMaterial = _mats[preset]
+	mat.set_shader_parameter("units_per_metre", WorldScale.metres_to_units())
+	return mat
 
 static func _commit(root: Node3D, verts: PackedVector3Array,
 		colors: PackedColorArray, indices: PackedInt32Array,
-		mat: Material) -> void:
+		mat: Material, flow: PackedVector2Array = PackedVector2Array()) -> void:
 	if indices.is_empty():
 		return
 	var normals := PackedVector3Array()
@@ -139,6 +67,8 @@ static func _commit(root: Node3D, verts: PackedVector3Array,
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	if flow.size() == verts.size():
+		arrays[Mesh.ARRAY_TEX_UV2] = flow
 	arrays[Mesh.ARRAY_INDEX] = indices
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	TerrainBuilder._add(root, mesh, mat)
@@ -170,7 +100,9 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var openness := PackedFloat32Array()
 	openness.resize(rims.size())
 	openness.fill(0.0)
-	var reach := int(ceil(ramp / grid))
+	var shore := PackedFloat32Array(openness)
+	var shore_u := SHORE_M * WorldScale.metres_to_units()
+	var reach := int(ceil(maxf(ramp, shore_u) / grid))
 	var z: float = bb[1] + grid * 0.5
 	while z < bb[3]:
 		var x: float = bb[0] + grid * 0.5
@@ -182,6 +114,7 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 				if d > grid * 0.45:
 					pts.append(c)
 					openness.append(clampf(d / maxf(ramp, 0.001), 0.0, 1.0))
+					shore.append(clampf(d / shore_u, 0.0, 1.0))
 			x += grid
 		z += grid
 	var tri := Geometry2D.triangulate_delaunay(pts)
@@ -190,12 +123,13 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 		pts = part
 		openness.resize(part.size())
 		openness.fill(0.0)
+		shore = PackedFloat32Array(openness)
 		tri = Geometry2D.triangulate_polygon(part)
 	var verts := PackedVector3Array()
 	var colors := PackedColorArray()
 	for i in pts.size():
 		verts.append(Vector3(pts[i].x, level, pts[i].y))
-		colors.append(Color(openness[i], 0.0, 0.0))
+		colors.append(Color(openness[i], 0.0, shore[i]))
 	var indices := PackedInt32Array()
 	for t in range(0, tri.size(), 3):
 		var cen := (pts[tri[t]] + pts[tri[t + 1]] + pts[tri[t + 2]]) / 3.0
@@ -212,8 +146,12 @@ static func add_ribbon(root: Node3D, line: PackedVector2Array,
 		mat: Material, lift: float = 0.05) -> void:
 	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
 	var mid_open := clampf(half / maxf(ramp, 0.001), 0.0, 1.0)
+	var mid_shore := clampf(half / (SHORE_M * WorldScale.metres_to_units()), 0.0, 1.0)
+	# OSM draws waterways downstream: the surface drifts along the line.
+	var speed := (STREAM_FLOW if draped else RIVER_FLOW) * WorldScale.metres_to_units()
 	var verts := PackedVector3Array()
 	var colors := PackedColorArray()
+	var flow := PackedVector2Array()
 	var indices := PackedInt32Array()
 	for i in line.size():
 		var prev := line[maxi(i - 1, 0)]
@@ -236,13 +174,82 @@ static func add_ribbon(root: Node3D, line: PackedVector2Array,
 			var y := ground.height_at_world(p.x, p.y) + 0.06 if draped \
 				else row_level
 			verts.append(Vector3(p.x, y, p.y))
-			colors.append(Color(mid_open if j == 1 else 0.0, 0.0, 0.0))
+			colors.append(Color(mid_open if j == 1 else 0.0, 0.0, mid_shore if j == 1 else 0.0))
+			flow.append(dir * speed)
 		if i > 0:
 			var k := i * 3
 			var q := k - 3
 			indices.append_array([q, q + 1, k, q + 1, k + 1, k,
 				q + 1, q + 2, k + 1, q + 2, k + 2, k + 1])
+	_commit(root, verts, colors, indices, mat, flow)
+
+## Open sea over the detailed extent as a grid at `level` (replacing the
+## flat plane): quads kept wherever a corner is water, each vertex with
+## its distance to the nearest land (chamfer distance transform over
+## the DEM's dry posts) for the shallow tint, surf and foam, and the sea
+## flag for swell. `cells` quads per side.
+static func add_sea_grid(root: Node3D, ground: GroundTruth, level: float,
+		mat: Material, cells: int = 192) -> void:
+	var n := cells + 1
+	var e := WorldScale.detailed_extent_units()
+	var stp := e / float(cells)
+	var dist := PackedFloat32Array()
+	dist.resize(n * n)
+	for j in n:
+		for i in n:
+			var x := -e * 0.5 + float(i) * stp
+			var z := -e * 0.5 + float(j) * stp
+			dist[j * n + i] = 0.0 if ground.height_at_world(x, z) > level + 0.25 else 1e9
+	_chamfer(dist, n, stp)
+	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
+	var shore_u := SHORE_M * WorldScale.metres_to_units()
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	for j in n:
+		for i in n:
+			var d := dist[j * n + i]
+			verts.append(Vector3(-e * 0.5 + float(i) * stp, level, -e * 0.5 + float(j) * stp))
+			colors.append(Color(clampf(d / ramp, 0.0, 1.0), 1.0, clampf(d / shore_u, 0.0, 1.0)))
+	var indices := PackedInt32Array()
+	for j in cells:
+		for i in cells:
+			var a := j * n + i
+			if dist[a] <= 0.0 and dist[a + 1] <= 0.0 and dist[a + n] <= 0.0 \
+					and dist[a + n + 1] <= 0.0:
+				continue
+			indices.append_array([a, a + 1, a + n, a + 1, a + n + 1, a + n])
 	_commit(root, verts, colors, indices, mat)
+
+## Two-pass chamfer distance (units) to the zero cells, in place.
+static func _chamfer(d: PackedFloat32Array, n: int, stp: float) -> void:
+	var a := stp
+	var b := stp * 1.4142
+	for j in n:
+		for i in n:
+			var k := j * n + i
+			var v := d[k]
+			if i > 0:
+				v = minf(v, d[k - 1] + a)
+			if j > 0:
+				v = minf(v, d[k - n] + a)
+				if i > 0:
+					v = minf(v, d[k - n - 1] + b)
+				if i < n - 1:
+					v = minf(v, d[k - n + 1] + b)
+			d[k] = v
+	for j in range(n - 1, -1, -1):
+		for i in range(n - 1, -1, -1):
+			var k := j * n + i
+			var v := d[k]
+			if i < n - 1:
+				v = minf(v, d[k + 1] + a)
+			if j < n - 1:
+				v = minf(v, d[k + n] + a)
+				if i < n - 1:
+					v = minf(v, d[k + n + 1] + b)
+				if i > 0:
+					v = minf(v, d[k + n - 1] + b)
+			d[k] = v
 
 ## Closed ring resampled ≤ sp apart (vertices kept exactly).
 static func _resample_ring(ring: PackedVector2Array, sp: float) -> Array:

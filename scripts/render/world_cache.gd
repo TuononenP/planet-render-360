@@ -15,7 +15,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 7
+const BUILD_VERSION := 8
 const DIR := "user://worlds"
 const MAX_BYTES := 1024 * 1024 * 1024
 ## Sources whose output a cached world freezes (debug-build fingerprint).
