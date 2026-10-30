@@ -82,6 +82,11 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 		_grout(alb, nor, W)
 		if win == "casement":
 			win = "wide"
+	# Everything below is paint over the (tinted) wall: frames, glass and
+	# shutters keep their own colours (FacadePaint).
+	var base := alb
+	alb = FacadePaint.layer(base)
+	var emit := FacadePaint.emit_layer(base) if detail >= 1 and not glass else null
 	for bay in BAYS:
 		var ox := bay * CELL
 		var hv := _hash(float(bay) * 9.3 + float(pattern.length()) + variant * 4.1, 3.7)
@@ -89,37 +94,41 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 		match pattern:
 			"punched", "tiles":
 				_window(alb, nor, rgh, ox, hv, frame, shutter, shutter_p, detail, win,
-					hr < rails)
+					hr < rails, emit)
+				_sill_streaks(base, ox, win, hv)
 			"clapboard":
 				_window(alb, nor, rgh, ox, hv, frame, shutter, shutter_p, detail,
-					"small" if win == "casement" else win, hr < rails)
+					"small" if win == "casement" else win, hr < rails, emit)
 			"strip":
 				_strip(alb, nor, rgh, ox, hv, frame)
+				FacadePaint.pane(emit, Rect2i(ox + 2, 48, CELL - 4, 31), hv)
 			"balcony":
 				_balcony(alb, nor, rgh, ox, hv, frame, variant)
+				FacadePaint.pane(emit, Rect2i(ox + 61, 33, 52, 63), hv)
+				FacadePaint.pane(emit, Rect2i(ox + 13, 36, 34, 41), fmod(hv * 7.3, 1.0))
 			"industrial":
 				_clerestory(alb, nor, rgh, ox, bay, frame)
 			"adobe":
 				_adobe(alb, nor, rgh, ox, bay, hv, frame)
+				if bay % 2 == 0 and hv <= 0.7:
+					FacadePaint.pane(emit, Rect2i(ox + 57, 44, 17, 26), hv)
 			"curtain":
 				_curtain(alb, nor, rgh, ox, hv)
-	# Composed in linear; albedo_texture is a source_color sampler the
-	# renderer sRGB-decodes, so encode once here (T4.7 double decode).
-	alb.linear_to_srgb()
-	alb.generate_mipmaps()
-	var d := {"albedo": ImageTexture.create_from_image(alb)}
+				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63), hv)
 	# Ultra: recessed panes (a curtain wall is flush glass).
-	if detail >= 2 and rgh != null and pattern != "curtain":
-		d["depth"] = depth_from_rough(rgh)
-	if nor != null and rgh != null:
-		nor.generate_mipmaps(true)
-		rgh.generate_mipmaps()
-		d["normal"] = ImageTexture.create_from_image(nor)
-		d["rough"] = ImageTexture.create_from_image(rgh)
-	else:
-		d["normal"] = null
-		d["rough"] = null
-	return d
+	var depth_fn := Callable(FacadeComposer, "depth_from_rough") \
+		if detail >= 2 and pattern != "curtain" else Callable()
+	if glass:
+		# Curtain glass has no wall photo to tint: one flat layer.
+		base.blend_rect(alb, Rect2i(0, 0, W, CELL), Vector2i.ZERO)
+		return FacadePaint.finish(base, null, null, nor, rgh, depth_fn)
+	return FacadePaint.finish(base, alb, emit, nor, rgh, depth_fn)
+
+## Dirt washed down from each sill (base layer, so it takes the tint).
+static func _sill_streaks(base: Image, ox: int, win: String, hv: float) -> void:
+	var box := _window_box(win)
+	var wx := ox + (CELL - box.x) / 2
+	FacadePaint.streaks(base, wx - 4, wx + box.x + 4, box.z + box.y + 9, CELL / 3, hv * 31.0)
 
 ## The photographic base tiled across the whole strip: one bay cell holds
 ## `reps` x `reps` copies, so the grain is real-sized and repeats cleanly.
@@ -198,7 +207,7 @@ static func _window_box(win: String) -> Vector3i:
 ## bays), glazing bars per vocabulary, optional wrought-iron balconette.
 static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 		frame: Color, shutter: Color, shutter_p: float, detail: int,
-		win: String, rail: bool) -> void:
+		win: String, rail: bool, emit: Image = null) -> void:
 	var box := _window_box(win)
 	var ww := box.x
 	var wh := box.y
@@ -216,10 +225,11 @@ static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 	alb.fill_rect(Rect2i(wx - 3, wy - 3, ww + 6, wh + 6), frame)
 	var pane := GLASS
 	if hv > 0.93:
-		pane = Color(0.55, 0.36, 0.14)  # lit interior
+		pane = FacadePaint.DAY_ROOM  # lit interior (glows at night)
 	elif hv > 0.78:
 		pane = Color(0.20, 0.19, 0.17)  # curtain drawn
 	alb.fill_rect(Rect2i(wx, wy, ww, wh), pane)
+	FacadePaint.pane(emit, Rect2i(wx, wy, ww, wh), hv)
 	alb.fill_rect(Rect2i(wx, wy, ww, maxi(wh / 6, 2)), _lin(Color(0.24, 0.30, 0.35)))
 	match win:
 		"sash":
@@ -250,8 +260,8 @@ static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 		for bx in range(wx - 4, wx + ww + 4, 4):
 			alb.fill_rect(Rect2i(bx, ry, 1, wh / 4), iron)
 	if nor != null:
-		var lo := Color(0.38, 0.38, 1.0)
-		var hi := Color(0.62, 0.62, 1.0) if detail >= 2 else Color(0.62, 0.5, 1.0)
+		var lo := Color(0.30, 0.30, 1.0)
+		var hi := Color(0.70, 0.70, 1.0) if detail >= 2 else Color(0.70, 0.5, 1.0)
 		nor.fill_rect(Rect2i(wx - 3, wy - 3, ww + 6, 3), lo)
 		nor.fill_rect(Rect2i(wx - 3, wy - 3, 3, wh + 6), lo)
 		nor.fill_rect(Rect2i(wx + ww, wy - 3, 3, wh + 6), hi)

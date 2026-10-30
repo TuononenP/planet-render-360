@@ -155,7 +155,7 @@ const SLATE := ["#4f5760", "#5a626b", "#46505a"]
 const TERRA := ["#b5542f", "#a8482a", "#c0643a", "#9a4a2c"]
 const WARM_RENDER := ["#e9dfc4", "#f0e6d0", "#d9c9a0", "#e5d4c0", "#e8e4dc", "#d8b9a0"]
 const BRICK := ["#9c4a35", "#8a3f30", "#b0634a", "#7b4a3a"]
-const CONCRETE := ["#cfcac0", "#bdb8ac", "#d8d0c0", "#a8b0a8"]
+const CONCRETE := ["#b6b1a7", "#a7a296", "#bfb7a8", "#959c95"]
 ## Shopfront fascia lacquers (sRGB): dark greens, oxblood, navy, umber.
 const FASCIA := ["#2e3b34", "#4a1c22", "#283040", "#4a3a2a", "#1e2a24"]
 

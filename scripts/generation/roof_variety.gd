@@ -30,7 +30,8 @@ static func tint_for(x: float, z: float) -> Color:
 	return Color(l * (1.0 + w), l, l * (1.0 - w))
 
 ## Tints the roof surfaces of `root`'s children from index `first` on (one
-## building's meshes) with the building's colour.
+## building's meshes) with the building's colour, and its wall surfaces
+## with WallVariety's.
 static func tint(root: Node, first: int, x: float, z: float) -> void:
 	var c := tint_for(x, z)
 	for k in range(first, root.get_child_count()):
@@ -40,23 +41,28 @@ static func tint(root: Node, first: int, x: float, z: float) -> void:
 		var mesh := mi.mesh as ArrayMesh
 		var hit := false
 		for s in mesh.get_surface_count():
-			hit = hit or is_roof(mi.material_override if mi.material_override != null
-				else mesh.surface_get_material(s))
+			var sm := mi.material_override if mi.material_override != null \
+				else mesh.surface_get_material(s)
+			hit = hit or is_roof(sm) or WallVariety.is_wall(sm)
 		if hit:
-			mi.mesh = _recoloured(mesh, mi.material_override, c)
+			mi.mesh = _recoloured(mesh, mi.material_override, c,
+				WallVariety.tint_for(x, z))
 
 ## `mesh` rebuilt with colour `c` on its roof surfaces, from its kept
 ## arrays (no server read-back on the build thread).
-static func _recoloured(mesh: ArrayMesh, over: Material, c: Color) -> ArrayMesh:
+static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color) -> ArrayMesh:
 	var out := ArrayMesh.new()
 	for s in mesh.get_surface_count():
 		var mat := mesh.surface_get_material(s)
 		var arrays := MeshArrays.surface(mesh, s).duplicate()
-		if is_roof(over if over != null else mat):
+		var active := over if over != null else mat
+		if is_roof(active):
 			var cols := PackedColorArray()
 			cols.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
 			cols.fill(c)
 			arrays[Mesh.ARRAY_COLOR] = cols
+		elif WallVariety.is_wall(active):
+			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c)
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		if mat != null:
 			out.surface_set_material(s, mat)
