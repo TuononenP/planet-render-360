@@ -169,9 +169,26 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   fine for buildings). Added as the first fallback in `OsmFetcher.ENDPOINTS`
   because the main instance answered the full 800 m query with HTTP 502
   "at capacity" during the same session (the retry chain is therefore 5
-  attempts: main, OSM-FR, maps.mail.ru, private.coffee, main again).
+  attempts: main, OSM-FR, maps.mail.ru, private.coffee, and — since
+  2026-10-31 — z.overpass-api.de in place of a second main attempt).
   `overpass.kumi.systems`, `z.`/`lz4.overpass-api.de` timed out from the
   probing host and are not wired.
+- Overpass outage probe (2026-10-31, Interlaken, 150 m building query, 20 s
+  budget): `overpass-api.de`, `maps.mail.ru`, `private.coffee`, `kumi`,
+  `lz4.`, `overpass.osm.jp` timed out; `overpass.openstreetmap.fr` HTTP 200
+  in 2.3 s; `z.overpass-api.de` HTTP 200 in 17.7 s (now the fifth endpoint,
+  replacing the repeated main instance).
+- OSM API fallback (same date): `GET https://api.openstreetmap.org/api/0.6/map?bbox=`
+  → HTTP 200, 12 MB XML in 17 s for a 1.7 × 1.8 km box (no key; ODbL, same
+  attribution). The API caps a request at 50 000 nodes (HTTP 400), so
+  `OsmApiFallback.RADII_M` steps 1200 → 800 → 400 m. `OsmApiFallback`
+  converts the XML to Overpass `out geom` JSON (0.3 s for 12 MB, float64
+  coordinates) so `OsmParser` is unchanged. Live in-engine run (Interlaken,
+  Overpass bypassed): 1200 m → 400, stepped to 800 m, 2225 buildings /
+  988 roads in 6.7 s, cached under the `r800` key.
+- Detailed-phase fallback order in `OsmFetcher`: every Overpass endpoint →
+  cached payload at the same place (any radius, ≤150 m) → OSM API bbox →
+  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
 
 ## Verified evidence — data-source gate T0.4 (2026-10-28)
 
