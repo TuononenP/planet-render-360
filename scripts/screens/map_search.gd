@@ -40,6 +40,12 @@ static func looks_like_coordinates(text: String) -> bool:
 	return parts.size() == 2 and parts[0].strip_edges().is_valid_float() \
 		and parts[1].strip_edges().is_valid_float()
 
+## "lat, lon" clamped to the valid range (x = lat, y = lon).
+static func parse_coordinates(text: String) -> Vector2:
+	var parts := text.split(",")
+	return Vector2(clampf(parts[0].strip_edges().to_float(), -90.0, 90.0),
+		clampf(parts[1].strip_edges().to_float(), -180.0, 180.0))
+
 static func request_remote(p: MapPicker) -> void:
 	var cleaned := p._search.text.strip_edges()
 	if cleaned.length() < 2 or looks_like_coordinates(cleaned):
@@ -98,8 +104,8 @@ static func select(p: MapPicker, place: String, lat: float, lon: float) -> void:
 static func submit(p: MapPicker, text: String) -> void:
 	var cleaned := text.strip_edges()
 	if looks_like_coordinates(cleaned):
-		var parts := cleaned.split(",")
-		p._on_picked(parts[0].strip_edges().to_float(), parts[1].strip_edges().to_float())
+		var ll := parse_coordinates(cleaned)
+		p._on_picked(ll.x, ll.y)
 		return
 	for place in LocationData.known_places():
 		if cleaned.to_lower() == str(place["name"]).to_lower() \
