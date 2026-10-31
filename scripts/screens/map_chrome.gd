@@ -54,6 +54,7 @@ static func _apply_theme(p: MapPicker) -> void:
 		p._bg.color = UiTheme.BG
 	p._name_label.add_theme_color_override("font_color", UiTheme.INK)
 	p._region_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	style_cached_chip(p._cached_chip)
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
 			p._quality_label, p._download_status]:
@@ -95,6 +96,47 @@ static func set_download_status(p: MapPicker, text: String) -> void:
 		p._download_status.text = text
 		p._download_status.visible = text != ""
 
+## "Cached" badge under the region (design system: Badge, accent-soft):
+## the place's layers are on the device, so Explore opens without waiting.
+static func make_cached_chip() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var chip := PanelContainer.new()
+	chip.name = "Chip"
+	var inner := HBoxContainer.new()
+	inner.add_theme_constant_override("separation", 6)
+	chip.add_child(inner)
+	var glyph := TextureRect.new()
+	glyph.name = "Glyph"
+	glyph.texture = UiIcon.texture("hard-drive", 14)
+	glyph.custom_minimum_size = Vector2(14, 14)
+	glyph.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glyph.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(glyph)
+	inner.add_child(UiTheme.label("Cached", 12, UiTheme.TEAL))
+	row.add_child(chip)
+	row.visible = false
+	style_cached_chip(row)
+	return row
+
+static func style_cached_chip(row: Control) -> void:
+	var chip: PanelContainer = row.get_node("Chip")
+	var st := UiTheme.style(UiTheme.TEAL_SOFT, UiTheme.RADIUS_PILL)
+	st.content_margin_left = 10
+	st.content_margin_right = 10
+	st.content_margin_top = 3
+	st.content_margin_bottom = 3
+	chip.add_theme_stylebox_override("panel", st)
+	(chip.find_child("Glyph", true, false) as TextureRect).modulate = UiTheme.TEAL
+	for l in chip.find_children("*", "Label", true, false):
+		l.add_theme_color_override("font_color", UiTheme.TEAL)
+
+## Show the badge when every layer of the selected place is on the device.
+static func refresh_cached(p: MapPicker) -> void:
+	if p._cached_chip != null:
+		p._cached_chip.visible = CacheStore.keys_fully_cached(
+			CacheStore.place_cache_keys(p._lat, p._lon, p._quality))
+
 ## Locks Explore while a generation is still running (including a
 ## cancelled world build that has not wound down), so a press is not
 ## silently swallowed. The label only changes when a previous scene is
@@ -109,10 +151,14 @@ static func set_render_busy(p: MapPicker, busy: bool, finishing: bool) -> void:
 static func set_download_busy(p: MapPicker, busy: bool) -> void:
 	if p._download_btn != null:
 		p._download_btn.disabled = busy
+	if not busy:
+		refresh_cached(p)  # a finished download makes the place cached
 
 ## Shows the chosen preset in the footer and on the settings button's
 ## tooltip, so the current quality is visible before opening the menu.
 static func set_quality_preset(p: MapPicker, preset_value: int) -> void:
+	p._quality = preset_value
+	refresh_cached(p)
 	if p._quality_label != null:
 		p._quality_label.text = "Quality · %s" % RenderSettings.preset_name(preset_value)
 	if p._settings_btn != null:

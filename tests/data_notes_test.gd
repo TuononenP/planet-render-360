@@ -148,4 +148,19 @@ func _loading_checks(failures: Array[String]) -> void:
 	ls.begin("Elsewhere")
 	if line.visible:
 		failures.append("a new run starts with no warning line")
+	# A saved copy is real data: named on its row, caution only when partial.
+	ls.set_stage(2, "", "active")
+	ls.set_layer_detail("map", "Offline copy", false)
+	ls.set_stage(2, "", "done")
+	var map_row: Dictionary = ls._rows[2]
+	if map_row["detail"].text != "Offline copy" or map_row["dot"].state != StageDot.State.DONE:
+		failures.append("an offline copy stays done and keeps its detail, got '%s'" % map_row["detail"].text)
+	ls.begin("Elsewhere")
+	ls.set_stage(2, "", "active")
+	ls.set_layer_detail("map", "Nearby · 330 m", true)
+	ls.add_degraded("map")
+	if map_row["detail"].text != "Nearby · 330 m" or map_row["dot"].state != StageDot.State.DEGRADED:
+		failures.append("a nearby copy is a caution row with its distance, got '%s'" % map_row["detail"].text)
+	if not line.text.contains("nearby spot") or line.text.contains("Using estimates"):
+		failures.append("nearby data must not read as estimates, got '%s'" % line.text)
 	ls.free()

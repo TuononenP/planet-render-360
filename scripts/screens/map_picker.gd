@@ -57,6 +57,8 @@ var _exit_btn: Button
 var _download_status: Label
 var _tip: Label
 var _quality_label: Label
+var _quality := 2  # RenderSettings.Preset of the footer label (cache keys follow it)
+var _cached_chip: HBoxContainer
 var _quick_box: VBoxContainer
 var _quick_scroll: ScrollContainer
 var _quick_grid: GridContainer
@@ -222,6 +224,8 @@ func _ready() -> void:
 	_info_col.add_child(_name_label)
 	_region_label = UiTheme.label("France", 14, UiTheme.MUTED)
 	_info_col.add_child(_region_label)
+	_cached_chip = MapChrome.make_cached_chip()
+	_info_col.add_child(_cached_chip)
 	_coords_box = MarginContainer.new()
 	_coords_box.add_theme_constant_override("margin_top", 10)
 	_info_col.add_child(_coords_box)
@@ -383,3 +387,4 @@ func _refresh_labels() -> void:
 	_show_place(selected_name if selected_name != "" \
 		else LocationData.known_place(_lat, _lon))
 	_coord_label.text = UiTheme.coords(_lat, _lon)
+	MapChrome.refresh_cached(self)

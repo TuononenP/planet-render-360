@@ -39,6 +39,8 @@ func _ready() -> void:
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.finished.connect(_on_generation_finished)
+	_pipeline.layer_detail.connect(func(layer: String, detail: String, partial: bool) -> void:
+		_loading.set_layer_detail(layer, detail, partial))
 	_pipeline.degraded_layer.connect(func(layer: String) -> void: _loading.add_degraded(layer))
 	_pipeline.stage_data.connect(func(i: int, d: LocationData) -> void: _loading.show_stage_data(i, d))
 	_pipeline.cancelled.connect(func() -> void:
@@ -104,6 +106,7 @@ func _ready() -> void:
 	_history.back_requested.connect(func() -> void: _show(_picker))
 	_history.place_selected.connect(func(lat: float, lon: float) -> void:
 		if _generating:
+			_history.toast("Still finishing the last scene. Try again in a moment.")
 			return
 		_picker.selected_name = ""
 		_start_generation(lat, lon))

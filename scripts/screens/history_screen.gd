@@ -10,6 +10,9 @@ var _margin: MarginContainer
 var _title: Label
 var _count_label: Label
 var _current_layout: int = Responsive.Layout.COMPACT
+var _toast: PanelContainer
+var _toast_label: Label
+var _toast_tween: Tween
 
 func _ready() -> void:
 	var bg := ColorRect.new()
@@ -62,10 +65,44 @@ func _ready() -> void:
 	_list.add_theme_constant_override("h_separation", 20)
 	_list.add_theme_constant_override("v_separation", 20)
 	scroll.add_child(_list)
+	_build_toast()
 	resized.connect(_on_resized)
 	_on_resized()
 	if _store != null:
 		refresh()
+
+## Glass pill near the bottom edge for a short message ("Still finishing
+## the last scene"); it fades by itself.
+func _build_toast() -> void:
+	_toast = PanelContainer.new()
+	_toast.visible = false
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_toast.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_toast.offset_bottom = -28.0
+	var st := UiTheme.style(UiTheme.GLASS_FILL, UiTheme.RADIUS_PILL, UiTheme.GLASS_EDGE, true)
+	st.content_margin_left = 18
+	st.content_margin_right = 18
+	st.content_margin_top = 12
+	st.content_margin_bottom = 12
+	_toast.add_theme_stylebox_override("panel", st)
+	_toast_label = UiTheme.label("", 14, UiTheme.INK)
+	_toast.add_child(_toast_label)
+	add_child(_toast)
+
+func toast(text: String, seconds: float = 3.0) -> void:
+	if _toast == null:
+		return
+	_toast_label.text = text
+	_toast.visible = true
+	_toast.modulate.a = 1.0
+	if _toast_tween != null:
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.tween_interval(seconds)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.4)
+	_toast_tween.tween_callback(func() -> void: _toast.visible = false)
 
 func _on_resized() -> void:
 	if _title == null:
@@ -91,7 +128,7 @@ func _card_style() -> StyleBoxFlat:
 	st.set_content_margin_all(0)
 	return st
 
-func _chip(text: String) -> PanelContainer:
+func _chip(text: String, icon: String = "") -> PanelContainer:
 	var chip := PanelContainer.new()
 	var st := UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_PILL)
 	st.content_margin_left = 10
@@ -99,7 +136,20 @@ func _chip(text: String) -> PanelContainer:
 	st.content_margin_top = 4
 	st.content_margin_bottom = 4
 	chip.add_theme_stylebox_override("panel", st)
-	chip.add_child(UiTheme.label(text, 12, UiTheme.MUTED))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	chip.add_child(row)
+	if icon != "":
+		var glyph := TextureRect.new()
+		glyph.texture = UiIcon.texture(icon, 14)
+		glyph.custom_minimum_size = Vector2(14, 14)
+		glyph.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		glyph.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		glyph.modulate = UiTheme.MUTED
+		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(glyph)
+	row.add_child(UiTheme.label(text, 12, UiTheme.MUTED))
 	return chip
 
 func refresh() -> void:
@@ -174,7 +224,7 @@ func refresh() -> void:
 		texts.add_child(UiTheme.data_label(UiTheme.coords(lat, lon), 13, UiTheme.MUTED, true))
 		var tags := HBoxContainer.new()
 		tags.add_theme_constant_override("separation", 6)
-		tags.add_child(_chip("⬇ Cached"))
+		tags.add_child(_chip("Cached", "hard-drive"))
 		tags.add_child(_chip("Works offline"))
 		texts.add_child(tags)
 		var open_btn := UiTheme.primary_button("Open 360° view")

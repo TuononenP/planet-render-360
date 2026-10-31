@@ -166,6 +166,26 @@ func _run() -> void:
 	if picker._render_btn.disabled or picker._render_btn.text != MapChrome.EXPLORE:
 		_fail(failures, "Explore should return to normal when idle")
 
+	# Cached badge: shown only when every layer of the place is on the device.
+	var cache_dir := "user://responsive_cache"
+	DirAccess.make_dir_recursive_absolute(cache_dir)
+	CacheStore.dir_override = cache_dir
+	MapChrome.refresh_cached(picker)
+	if picker._cached_chip.visible:
+		_fail(failures, "a place with nothing on the device must not wear the Cached badge")
+	var cache_keys := CacheStore.place_cache_keys(picker._lat, picker._lon, picker._quality)
+	var written: Array[String] = []
+	for layer in ["dem", "sat", "osm"]:
+		for k in cache_keys[layer]:
+			FileAccess.open(str(k), FileAccess.WRITE).store_string("x")
+			written.append(str(k))
+	MapChrome.refresh_cached(picker)
+	if not picker._cached_chip.visible:
+		_fail(failures, "a fully cached place should wear the Cached badge")
+	for k in written:
+		DirAccess.remove_absolute(k)
+	CacheStore.dir_override = ""
+
 	# Hover contrast: text must stay readable on every hover box
 	# (regression: OptionButton had no font_hover_color, so Godot's
 	# default made the label nearly invisible on hover).
@@ -233,6 +253,9 @@ func _run() -> void:
 	await process_frame
 	if history._list.columns != 3:
 		_fail(failures, "history at 1280pt should be 3 columns")
+	history.toast("Still finishing the last scene.")
+	if not history._toast.visible or history._toast_label.text != "Still finishing the last scene.":
+		_fail(failures, "history toast should show its message")
 	history.queue_free()
 
 	# Loading card is capped and centred on wide screens, full-bleed on phones

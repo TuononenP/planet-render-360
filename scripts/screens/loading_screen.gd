@@ -34,6 +34,7 @@ var _eta_label: Label
 var _note_row: HBoxContainer  # caution line while a data layer is not responding
 var _note_label: Label
 var _degraded: Array[String] = []
+var _details := {}  # layer -> {"text", "partial"} from set_layer_detail
 var _cancel_btn: Button
 var _push: Control
 var _two_col := false
@@ -258,7 +259,7 @@ func add_degraded(layer: String, detail: String = "Estimated") -> void:
 	if _note_label == null or _degraded.has(layer):
 		return
 	_degraded.append(layer)
-	_note_label.text = DataNotes.loading_line(_degraded)
+	_refresh_note()
 	_note_label.visible = true
 	_note_row.visible = true
 	_preview.degraded = true
@@ -267,7 +268,32 @@ func add_degraded(layer: String, detail: String = "Estimated") -> void:
 		var row: Dictionary = _rows[int(LAYER_ROW[layer])]
 		row["degraded"] = true
 		_paint_row(row, StageDot.State.DEGRADED)
-		row["detail"].text = detail
+		row["detail"].text = str(_details[layer]["text"]) if _details.has(layer) else detail
+
+## A layer is arriving from a saved or reduced source ("Nearby · 450 m",
+## "Offline copy"): its row says where from instead of how long it took.
+## Partial layers are also passed to add_degraded by the pipeline, which
+## then shows the same text in caution tone; a complete one stays done.
+func set_layer_detail(layer: String, detail: String, partial: bool) -> void:
+	if not LAYER_ROW.has(layer) or _rows.is_empty():
+		return
+	_details[layer] = {"text": detail, "partial": partial}
+	var row: Dictionary = _rows[int(LAYER_ROW[layer])]
+	row["detail"].text = detail
+
+## The caution line: layers on estimates, then layers on partial data.
+func _refresh_note() -> void:
+	var estimated: Array = []
+	for layer in _degraded:
+		if not _details.has(layer):
+			estimated.append(layer)
+	var lines: Array[String] = []
+	if not estimated.is_empty():
+		lines.append(DataNotes.loading_line(estimated))
+	for layer in _degraded:
+		if _details.has(layer):
+			lines.append(DataNotes.partial_line(str(_details[layer]["text"])))
+	_note_label.text = " ".join(lines)
 
 ## "Venice, Italy" lands as the name "Venice" over the region "Italy".
 func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
@@ -278,6 +304,7 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
 	_coords.text = "" if is_nan(lat) or is_nan(lon) else UiTheme.coords(lat, lon)
 	_coords.visible = _coords.text != ""
 	_degraded.clear()
+	_details.clear()
 	if _note_label != null:
 		_note_label.visible = false
 		_note_row.visible = false
@@ -292,6 +319,13 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
 		_paint_row(row, StageDot.State.PENDING)
 		row["detail"].text = ""
 	_on_resized()
+
+## True when set_layer_detail named where this stage's layer came from.
+func _has_detail(index: int) -> bool:
+	for layer in _details:
+		if int(LAYER_ROW[layer]) == index:
+			return true
+	return false
 
 func _paint_row(row: Dictionary, state: StageDot.State) -> void:
 	row["dot"].state = state
@@ -325,7 +359,7 @@ func set_stage(index: int, _label: String, state: String) -> void:
 			# Real detail only: how long the stage actually waited on data
 			# (stages with nothing to wait for stay blank).
 			var took := (Time.get_ticks_msec() - int(row["started"])) / 1000.0
-			if int(row["started"]) > 0 and took >= 0.1:
+			if int(row["started"]) > 0 and took >= 0.1 and not _has_detail(index):
 				row["detail"].text = "%.1f s" % took
 	else:
 		_active_index = index

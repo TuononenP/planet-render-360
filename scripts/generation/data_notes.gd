@@ -51,6 +51,13 @@ static func loading_line(keys: Array) -> String:
 		return ""
 	return "Not responding: %s. Using estimates." % ", ".join(names)
 
+## Loading line for a map that answered from a saved or reduced source
+## (OsmFetcher.fallback_used): the data is real, just not all of it.
+static func partial_line(detail: String) -> String:
+	if detail.begins_with("Nearby"):
+		return "The live map is unavailable. Using saved data from a nearby spot."
+	return "The live map is slow. Showing the part of the area it returned."
+
 ## True unless the map answered, validly, with no buildings (open sea,
 ## wilderness): that is an empty place, not an outage.
 static func osm_outage(reason: String) -> bool:
