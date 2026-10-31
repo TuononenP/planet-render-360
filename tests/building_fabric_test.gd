@@ -170,6 +170,32 @@ func _run() -> void:
 			if absf(nrm.y) < 0.26:
 				failures.append("chamfered roof has a near-vertical shard at %s" % str(m2))
 				break
+	# Courtyard eaves: the roof covers the block minus the courtyard (no
+	# triangles dropped along the hole's edge).
+	var cy := RoofGeometry.form_mesh(_rect(0, 0, 40, 40), 10.0, 4.0, "mansard",
+		PackedByteArray(), false, [_rect(12, 12, 28, 28)])
+	var cov := 0.0
+	var cyv: PackedVector3Array = MeshArrays.surface(cy, 0)[Mesh.ARRAY_VERTEX] if cy != null else PackedVector3Array()
+	for k in range(0, cyv.size(), 3):
+		var e1 := Vector2(cyv[k + 1].x - cyv[k].x, cyv[k + 1].z - cyv[k].z)
+		var e2 := Vector2(cyv[k + 2].x - cyv[k].x, cyv[k + 2].z - cyv[k].z)
+		cov += absf(e1.cross(e2)) * 0.5
+	if absf(cov - (1600.0 - 256.0)) > 1344.0 * 0.03:
+		failures.append("courtyard roof covers %.0f m² of 1344 (gaps at the eaves?)" % cov)
+	# Many-cornered narrow houses still rise to a ridge (the slope run fits
+	# the footprint) and a very narrow one still gets a roof (lower, as its
+	# pitch is capped).
+	for wd in [6.0, 2.6]:
+		var jog := PackedVector2Array([Vector2(0, 0), Vector2(wd * 0.5, -0.3), Vector2(wd, 0),
+			Vector2(wd, 4), Vector2(wd, 8), Vector2(wd, 14), Vector2(wd * 0.5, 14.3),
+			Vector2(0, 14), Vector2(0, 9), Vector2(0, 4)])
+		var hm := RoofGeometry.form_mesh(jog, 10.0, 3.5, "gabled")
+		var peak := 10.0
+		if hm != null:
+			for v in (MeshArrays.surface(hm, 0)[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+				peak = maxf(peak, v.y)
+		if peak < 10.0 + (3.2 if wd > 5.0 else 1.2):
+			failures.append("%.1f m wide 10-corner house roof peaks at %.2f m (want ~3.5)" % [wd, peak - 10.0])
 
 	# --- Relief: a near Paris block carries 3D balconies/rails. ---
 	data = _data()

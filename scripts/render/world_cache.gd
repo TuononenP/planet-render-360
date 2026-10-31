@@ -15,7 +15,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 11
+const BUILD_VERSION := 12
 const DIR := "user://worlds"
 const MAX_BYTES := 1024 * 1024 * 1024
 ## Sources whose output a cached world freezes (debug-build fingerprint).
@@ -154,7 +154,7 @@ static func _load_ground(path: String, data: LocationData) -> GroundTruth:
 	var g := GroundTruth.new(null)
 	for k in GROUND_FIELDS:
 		g.set(k, state[k])
-	g._land = data.land_polygons
+	g.set_land(data.land_polygons)
 	g._buildings = data.buildings
 	return g
 

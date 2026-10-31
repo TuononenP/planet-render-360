@@ -73,8 +73,9 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 		# Courtyard blocks, concave masses and curved outlines slope to every
 		# eave (RoofSkeleton): party gables or a fitted ridge there stood as
 		# screens and shards across the roofscape.
-		RoofSkeleton.faces(ring, holes, top, rh, shape in ["mansard", "gambrel"],
-			verts, normals, uvs, u)
+		if not RoofSkeleton.faces(ring, holes, top, rh, shape in ["mansard", "gambrel"],
+				verts, normals, uvs, u) and holes.is_empty():
+			apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		shape = ""
 	elif not RoofForms.boxy(ring):
 		party = PackedByteArray()  # party gables only on parcel-like rings
@@ -90,8 +91,9 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 		"skillion":
 			RoofForms.skillion(ring, c, top, rh, party, verts, normals, uvs)
 		"round":
-			if not RoofForms.barrel(ring, c, top, rh, verts, normals, uvs):
-				RoofForms.ridged(ring, c, top, rh, "gabled", party, gable_front, verts, normals, uvs)
+			if not RoofForms.barrel(ring, c, top, rh, verts, normals, uvs) \
+					and not RoofForms.ridged(ring, c, top, rh, "gabled", party, gable_front, verts, normals, uvs):
+				apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		"":
 			pass
 		_:
