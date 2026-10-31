@@ -238,6 +238,10 @@ func _run() -> void:
 	var history := HistoryScreen.new()
 	root.add_child(history)
 	history.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	# An empty history is one full-width card; the grid needs a place
+	var store := CacheStore.new()
+	store.entries.append({"name": "Paris", "lat": 48.8566, "lon": 2.3522})
+	history._store = store
 	history.size = Vector2(390, 844)
 	history._on_resized()
 	await process_frame

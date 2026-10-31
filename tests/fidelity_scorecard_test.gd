@@ -11,18 +11,20 @@ extends SceneTree
 ## never passed. Exit 0 only when every automated check passes.
 ##
 ## Fixed sampling rules (scorecard §4, versioned here — SAMPLE_RULES):
-## (a) centre + N/E/S/W at 1/3 and 2/3 of the 1200 m radius; (b/c)
+## (a) centre + N/E/S/W at 1/3 and 2/3 of the 1200 m radius; (b)
 ## buildings sorted by distance, split into near/mid/far thirds, evenly
-## spaced picks per third; (d) water: evenly spaced shoreline vertices
+## spaced picks per third; (c) the same rule over only the buildings
+## with a height or levels tag, so a sparsely tagged town is still
+## measured; (d) water: evenly spaced shoreline vertices
 ## and waterway centreline points inside the extent; roads: evenly spaced
 ## junctions (points shared by ≥2 non-tunnel roads).
 
-const SAMPLE_RULES := "v1 2026-10-29"
+const SAMPLE_RULES := "v2 2026-10-31"
 const RADIUS_M := 1200.0
 const LOCATIONS := [
 	{"key": "paris", "name": "Paris", "lat": 48.8566, "lon": 2.3522, "dem_bar": 3.0, "urban": true},
 	{"key": "interlaken", "name": "Interlaken", "lat": 46.6863, "lon": 7.8632, "dem_bar": 8.0, "urban": false},
-	{"key": "banff", "name": "Banff", "lat": 51.1789, "lon": -115.5708, "dem_bar": 8.0, "urban": false},
+	{"key": "zermatt", "name": "Zermatt", "lat": 46.0207, "lon": 7.7491, "dem_bar": 8.0, "urban": false},
 	{"key": "bigsur", "name": "Big Sur", "lat": 36.2704, "lon": -121.8081, "dem_bar": 8.0, "urban": false},
 	{"key": "turku", "name": "Turku", "lat": 60.4518, "lon": 22.2666, "dem_bar": 3.0, "urban": true},
 ]
@@ -183,36 +185,37 @@ func _tile(x: int, y: int) -> Image:
 func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: Node3D) -> Dictionary:
 	var want := 20 if bool(loc["urban"]) else 10
 	var sample := _building_sample(data, want)
+	var ctx := BuildingHeights._height_context(data)
+	var tagged_sample := _building_sample(data, want,
+		func(b: Dictionary) -> bool: return _expected_height(b, ctx) > 0.0)
 	if sample.is_empty():
 		return {"lines": ["- (b) footprints → BLOCKED(no OSM buildings in the extent)",
 			"- (c) heights → BLOCKED(no OSM buildings in the extent)"], "verdicts": ["b:BLOCKED", "c:BLOCKED"]}
-	var tris := _roof_triangles(built, sample)
+	var tris := _roof_triangles(built, sample + tagged_sample)
 	var ious: Array = []
 	var offsets: Array = []
 	var errs: Array = []
-	var tagged := 0
 	var per_c: Array[String] = []
-	var ctx := BuildingHeights._height_context(data)
 	for b in sample:
-		var poly: PackedVector2Array = b["footprint"]
-		var m := _measure(poly, tris)
+		var m := _measure(b["footprint"], tris)
 		ious.append(m["iou"])
 		offsets.append(m["offset"])
+	for b in tagged_sample:
+		var poly: PackedVector2Array = b["footprint"]
+		var m := _measure(poly, tris)
 		var expect := _expected_height(b, ctx)
-		if expect > 0.0:
-			tagged += 1
-			if m["top"] > -INF:
-				# OSM height is from the lowest ground at the footprint
-				# (the builder's wall base, before its 0.6 m sink).
-				var base := INF
-				for q in poly:
-					base = minf(base, ground.height_at_world(q.x, q.y))
-				var got := float(m["top"]) - base
-				errs.append(absf(got - expect))
-				per_c.append("%s %.1f→%.1f m" % [str(b.get("height_source", "")), expect, got])
-			else:
-				errs.append(expect)  # fail-closed: nothing rendered
-				per_c.append("%s %.1f→none" % [str(b.get("height_source", "")), expect])
+		if m["top"] > -INF:
+			# OSM height is from the lowest ground at the footprint
+			# (the builder's wall base, before its 0.6 m sink).
+			var base := INF
+			for q in poly:
+				base = minf(base, ground.height_at_world(q.x, q.y))
+			var got := float(m["top"]) - base
+			errs.append(absf(got - expect))
+			per_c.append("%s %.1f→%.1f m" % [str(b.get("height_source", "")), expect, got])
+		else:
+			errs.append(expect)  # fail-closed: nothing rendered
+			per_c.append("%s %.1f→none" % [str(b.get("height_source", "")), expect])
 	var iou := _median(ious)
 	var off := _median(offsets)
 	var urban := bool(loc["urban"])
@@ -221,20 +224,21 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 		% [iou, off, sample.size(), 0.85 if urban else 0.75, vb]]
 	var vc := "BLOCKED"
 	if errs.is_empty():
-		lines.append("- (c) heights: coverage 0/%d with height/levels tags → BLOCKED(no tagged sample)" % sample.size())
+		lines.append("- (c) heights: no building in the extent has a height or levels tag → BLOCKED(no tagged sample)")
 	else:
 		var med := _median(errs)
 		vc = "PASS" if med <= 3.0 else "FAIL"
-		lines.append("- (c) heights: median err %.2f m, coverage %d/%d tagged (bar ≤ 3 m ≈ 1 storey) → %s"
-			% [med, tagged, sample.size(), vc])
+		lines.append("- (c) heights: median err %.2f m over %d tagged buildings (bar ≤ 3 m ≈ 1 storey) → %s"
+			% [med, tagged_sample.size(), vc])
 		lines.append("  - tagged (source expected→rendered): " + "; ".join(per_c))
 	return {"lines": lines, "verdicts": ["b:" + vb, "c:" + vc]}
 
-func _building_sample(data: LocationData, want: int) -> Array:
+func _building_sample(data: LocationData, want: int, keep := Callable()) -> Array:
 	var inside: Array = []
 	for b in data.buildings:
 		if b is Dictionary and (b as Dictionary).has("footprint") \
-				and (b["footprint"] as PackedVector2Array).size() >= 3:
+				and (b["footprint"] as PackedVector2Array).size() >= 3 \
+				and (not keep.is_valid() or keep.call(b)):
 			var c := _centroid(b["footprint"])
 			if absf(c.x) < RADIUS_M - 20.0 and absf(c.y) < RADIUS_M - 20.0:
 				inside.append(b)

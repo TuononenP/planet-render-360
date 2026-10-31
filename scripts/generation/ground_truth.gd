@@ -70,6 +70,9 @@ var _level: PackedFloat32Array = PackedFloat32Array()
 ## Big Sur. Now every carve is a few metres under its own water.
 const FREEBOARD_M := 0.4
 const CARVE_DEPTH_M := 2.0
+## Height step (metres) at which _blur_pass stops averaging across a
+## neighbour: DEM noise is well under it, escarpment posts well over.
+const EDGE_SIGMA_M := 3.0
 
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
@@ -377,18 +380,27 @@ static func _grid_bilinear(data: LocationData, f: Vector2) -> float:
 
 ## One 3x3 centre-double-weighted blur pass (the v1 _heights kernel),
 ## src → dst; edges reuse the nearest post (clamped, like height_at).
+## Edge-aware: a neighbour's weight falls off with its height step
+## from the centre (Gaussian, EDGE_SIGMA_M), so metre-scale DEM noise
+## still smooths but escarpments keep their height (Turku: a 12 m drop
+## in 20 m was rounded 3.2 m low). Opposite neighbours on a linear ramp
+## differ by the same step, so a ramp still maps to itself.
 static func _blur_pass(src: PackedFloat32Array, dst: PackedFloat32Array,
 		size: int) -> void:
+	var inv := 1.0 / (EDGE_SIGMA_M * EDGE_SIGMA_M)
 	for z in size:
 		for x in size:
-			var sum := _clamped_post(src, size, x, z) * 2.0
+			var c := _clamped_post(src, size, x, z)
+			var sum := c * 2.0
 			var n := 2.0
 			for dz in [-1, 0, 1]:
 				for dx in [-1, 0, 1]:
 					if dx == 0 and dz == 0:
 						continue
-					sum += _clamped_post(src, size, x + dx, z + dz)
-					n += 1.0
+					var h := _clamped_post(src, size, x + dx, z + dz)
+					var w := exp(-(h - c) * (h - c) * inv)
+					sum += h * w
+					n += w
 			dst[z * size + x] = sum / n
 
 static func _clamped_post(src: PackedFloat32Array, size: int, x: int,

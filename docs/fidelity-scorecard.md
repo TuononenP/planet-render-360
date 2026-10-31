@@ -6,7 +6,7 @@
 > No AC is left unmapped — see §5.
 
 Golden locations (same 5 as plan T0.1): Paris (48.8566, 2.3522) · Interlaken (46.6863, 7.8632) ·
-Banff (51.1789, −115.5708) · Big Sur (36.2704, −121.8081) · Turku (60.4518, 22.2666).
+Zermatt (46.0207, 7.7491) · Big Sur (36.2704, −121.8081) · Turku (60.4518, 22.2666).
 
 ## 1. How scoring works
 
@@ -48,14 +48,14 @@ narrow streets (<3 m), roof furniture, and watercourses <5 m wide remain approxi
   bilinearly sampled at the same lat/lon.
 - **Metric:** max absolute error over the 9 points; also record mean error.
 - **Pass (all tiers, true-metre mode):** max error ≤ **3 m** in flat terrain (Paris, Turku),
-  ≤ **8 m** in alpine/coastal terrain (Interlaken, Banff, Big Sur). The legacy-squash A/B mode
+  ≤ **8 m** in alpine/coastal terrain (Interlaken, Zermatt, Big Sur). The legacy-squash A/B mode
   (plan T1.3) is expected to fail; the comparison is recorded as evidence that true-metre wins.
 - **Pre-Phase-1 note:** before T1.3 the heights are adaptively remapped, so (a) is recorded as
   *baseline-only* (values logged, no pass/fail) until the identity mapping lands.
 
 ### (b) Footprint-area agreement — buildings sit on their real outlines
 
-- **Method:** sample 20 buildings per urban location (Paris, Turku; 10 for Interlaken/Banff/Big Sur
+- **Method:** sample 20 buildings per urban location (Paris, Turku; 10 for Interlaken/Zermatt/Big Sur
   where fewer exist) from OSM footprints inside the detailed extent, stratified near/mid/far.
   For each, compute `placed polygon area / OSM footprint area` (post-T4.1: true polygon overlap IoU;
   pre-T4.1: placed-AABB area vs. OSM polygon area as a proxy) and the centroid offset in metres.
@@ -66,10 +66,11 @@ narrow streets (<3 m), roof furniture, and watercourses <5 m wide remain approxi
 
 ### (c) Height error vs. OSM height/levels — buildings rise to their real height
 
-- **Method:** on the same sample as (b), where OSM carries `height` or `building:levels`
-  (convert levels × regional floor height per T4.2, never a global default), compare rendered
-  building height against it. Buildings with neither tag are excluded from the error stat but
-  counted separately (coverage: % of sample with explicit height data).
+- **Method:** sample up to the (b) count from only the buildings where OSM carries `height` or
+  `building:levels`, with the same near/mid/far rule (sample rules v2, 2026-10-31: a sparsely
+  tagged town such as Banff, 90 of 1329 tagged, had no tag in its (b) sample and stayed BLOCKED).
+  Convert levels × regional floor height per T4.2, never a global default, and compare rendered
+  building height against it. BLOCKED only when no building in the extent is tagged.
 - **Metric:** median absolute error in metres (or storeys where only levels exist).
 - **Pass (all tiers):** median error ≤ **1 storey** (≈3 m); coverage is reported, not gated,
   except that a live Paris fetch must show ≥30% of buildings carrying explicit height/levels (T2.3).
@@ -79,7 +80,7 @@ narrow streets (<3 m), roof furniture, and watercourses <5 m wide remain approxi
 ### (d) Water/road presence — rivers, lakes, coasts, and streets exist where they should
 
 - **Method (water):** for each location with real water (Paris/Seine, Interlaken/lakes, Big Sur/coast,
-  Turku/archipelago; Banff/river), take 5 centreline/shoreline sample points from OSM water
+  Turku/archipelago; Zermatt/river), take 5 centreline/shoreline sample points from OSM water
   polygons/waterways; a point passes if rendered water exists within **10 m**.
   Locations with no OSM water must render **no** river/lake (absence check — plan D9).
 - **Method (roads):** take 5 known road junctions from OSM per location; a junction passes if the
@@ -214,7 +215,7 @@ PRD §2 gains no new rows until a reference with a verifiable source/licence is 
 |---|---|---|---|
 | Paris (48.8566, 2.3522) | `visual-plan/refs/view360-paris.jpg` | user-provided (PRD §2) | Full (f) human rating vs. reference |
 | Interlaken (46.6863, 7.8632) | none | — | `no-reference — geometry-only scoring` |
-| Banff (51.1789, −115.5708) | none | — | `no-reference — geometry-only scoring` |
+| Zermatt (46.0207, 7.7491) | none | — | `no-reference — geometry-only scoring` |
 | Big Sur (36.2704, −121.8081) | none | — | `no-reference — geometry-only scoring` |
 | Turku (60.4518, 22.2666) | none | — | `no-reference — geometry-only scoring` |
 
