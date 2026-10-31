@@ -25,6 +25,10 @@ func _ready() -> void:
 		_pool.append(TileConnection.new())
 	set_process(false)
 
+func _exit_tree() -> void:
+	for c in _pool:
+		c.close()
+
 static func global_pixel(lat: float, lon: float, zoom: int) -> Vector2:
 	var n := float(1 << zoom) * 256.0
 	var px := (lon + 180.0) / 360.0 * n

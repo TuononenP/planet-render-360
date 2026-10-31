@@ -33,11 +33,25 @@ func start(t: Vector3i, path: String, headers: PackedStringArray) -> void:
 	_retried = false
 	_started_ms = Time.get_ticks_msec()
 
+## Backstop for a connection freed without close().
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_client.close()
+
 ## Drop the tile in flight. A half-read response cannot be reused, so the
 ## connection closes; the next tile reconnects.
 func cancel() -> void:
 	if busy and _sent:
 		_client.close()
+	busy = false
+
+## Close the kept-alive connection for good (the fetcher is leaving the
+## tree). A bare HTTPClient never closes itself, unlike HTTPRequest on
+## exit tree: a DNS lookup still queued at engine shutdown runs on the
+## resolver thread after IP is half torn down and aborts the process
+## ("Pure virtual function called").
+func close() -> void:
+	_client.close()
 	busy = false
 
 ## Advance the request. Returns [] while pending, else [ok, code, body]
