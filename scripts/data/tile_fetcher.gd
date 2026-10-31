@@ -9,24 +9,21 @@ extends Node
 signal tile_ready(z: int, x: int, y: int, texture: Texture2D)
 signal tile_failed(z: int, x: int, y: int)
 
-const URL_TEMPLATE := "https://tile.openstreetmap.org/%d/%d/%d.png"
+const PATH_TEMPLATE := "/%d/%d/%d.png"
 const CACHE_DIR := "user://cache/tiles"
 const USER_AGENT := "PlanetRender360/0.1"
+const CONNECTIONS := 6
 
-var _pool: Array[HTTPRequest] = []
+## Kept-alive connections (TileConnection), one tile each at a time.
+var _pool: Array[TileConnection] = []
 var _queue: Array[Vector3i] = []
-var _busy: Dictionary = {}
 var _pending: Dictionary = {}  # Vector3i -> bool, queued or in flight
-var _inflight: Dictionary = {}  # HTTPRequest -> Vector3i being downloaded
-var _callbacks: Dictionary = {}  # HTTPRequest -> its request_completed callable
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
-	for i in 6:
-		var http := HTTPRequest.new()
-		http.timeout = 20.0
-		add_child(http)
-		_pool.append(http)
+	for i in CONNECTIONS:
+		_pool.append(TileConnection.new())
+	set_process(false)
 
 static func global_pixel(lat: float, lon: float, zoom: int) -> Vector2:
 	var n := float(1 << zoom) * 256.0
@@ -89,17 +86,10 @@ func discard_queued_except(keep: Array) -> void:
 	var keep_set: Dictionary = {}
 	for k in keep:
 		keep_set[k] = true
-	for http in _inflight.keys():
-		var tile: Vector3i = _inflight[http]
-		if not keep_set.has(tile):
-			var done: Callable = _callbacks.get(http, Callable())
-			if done.is_valid() and http.request_completed.is_connected(done):
-				http.request_completed.disconnect(done)
-			_inflight.erase(http)
-			_callbacks.erase(http)
-			_busy[http] = false
-			_pending.erase(tile)
-			http.cancel_request()
+	for conn in _pool:
+		if conn.busy and not keep_set.has(conn.tile):
+			_pending.erase(conn.tile)
+			conn.cancel()
 	var kept: Array[Vector3i] = []
 	for k in keep:
 		if _queue.has(k):
@@ -111,42 +101,30 @@ func discard_queued_except(keep: Array) -> void:
 	_pump()
 
 func _pump() -> void:
-	for http in _pool:
-		if not bool(_busy.get(http, false)) and not _queue.is_empty():
+	for conn in _pool:
+		if not conn.busy and not _queue.is_empty():
 			var t: Vector3i = _queue.pop_front()
-			_fetch(http, t)
+			conn.start(t, PATH_TEMPLATE % [t.x, t.y, t.z],
+				PackedStringArray(["User-Agent: %s" % USER_AGENT]))
+	set_process(_pool.any(func(c: TileConnection) -> bool: return c.busy))
 
-func _fetch(http: HTTPRequest, t: Vector3i) -> void:
-	_busy[http] = true
-	_inflight[http] = t
-	var url := URL_TEMPLATE % [t.x, t.y, t.z]
-	var done := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-		_busy[http] = false
-		_inflight.erase(http)
-		_callbacks.erase(http)
-		_pending.erase(t)
-		if result == HTTPRequest.RESULT_SUCCESS and code == 200:
-			var cache_path := "%s/%d_%d_%d.png" % [CACHE_DIR, t.x, t.y, t.z]
-			var f := FileAccess.open(cache_path, FileAccess.WRITE)
-			if f != null:
-				f.store_buffer(body)
-			var img := Image.new()
-			if img.load_png_from_buffer(body) == OK:
-				tile_ready.emit(t.x, t.y, t.z, ImageTexture.create_from_image(img))
-				_pump()
-				return
-		tile_failed.emit(t.x, t.y, t.z)
-		_pump()
-	_callbacks[http] = done
-	http.request_completed.connect(done, CONNECT_ONE_SHOT)
-	var err := http.request(url, ["User-Agent: %s" % USER_AGENT])
-	if err != OK:
-		# request_completed never fires on a refused request: free the
-		# pool slot now or six such failures would kill the fetcher.
-		http.request_completed.disconnect(done)
-		_busy[http] = false
-		_inflight.erase(http)
-		_callbacks.erase(http)
-		_pending.erase(t)
-		tile_failed.emit(t.x, t.y, t.z)
-		_pump()
+func _process(_delta: float) -> void:
+	for conn in _pool:
+		var t := conn.tile
+		var res := conn.poll()
+		if not res.is_empty():
+			_done(t, bool(res[0]), int(res[1]), res[2])
+	_pump()
+
+func _done(t: Vector3i, ok: bool, code: int, body: PackedByteArray) -> void:
+	_pending.erase(t)
+	if ok and code == 200:
+		var cache_path := "%s/%d_%d_%d.png" % [CACHE_DIR, t.x, t.y, t.z]
+		var f := FileAccess.open(cache_path, FileAccess.WRITE)
+		if f != null:
+			f.store_buffer(body)
+		var img := Image.new()
+		if img.load_png_from_buffer(body) == OK:
+			tile_ready.emit(t.x, t.y, t.z, ImageTexture.create_from_image(img))
+			return
+	tile_failed.emit(t.x, t.y, t.z)

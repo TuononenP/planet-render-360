@@ -76,8 +76,8 @@ func _run() -> void:
 	live.discard_queued_except([Vector3i(15, 2000, 2000)])
 	if not live._pending.is_empty():
 		failures.append("stale in-flight tiles should be cancelled, pending=%s" % str(live._pending.keys()))
-	for http in live._pool:
-		if bool(live._busy.get(http, false)):
+	for conn in live._pool:
+		if conn.busy:
 			failures.append("cancelled downloads should free their pool slot")
 			break
 	live.queue_free()
