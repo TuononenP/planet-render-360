@@ -25,6 +25,9 @@ signal failed(reason: String)
 ## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
 ## answering nothing, not even a one-node query, so it is tried last.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
+## The reason both tiers give for a valid but empty answer (open sea,
+## wilderness); DataNotes.osm_outage matches on it.
+const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
 	"https://overpass.openstreetmap.fr/api/interpreter",
@@ -32,6 +35,31 @@ const ENDPOINTS: Array[String] = [
 	"https://z.overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
 ]
+
+## ENDPOINTS with the instances whose URL contains one of `first` moved
+## to the front, in that order; the rest keep ENDPOINTS order. Callers
+## name hosts instead of indexing, so reordering ENDPOINTS cannot
+## silently change another query's mirrors.
+static func endpoint_order(first: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for host in first:
+		for ep in ENDPOINTS:
+			if ep.contains(host) and not out.has(ep):
+				out.append(ep)
+	for ep in ENDPOINTS:
+		if not out.has(ep):
+			out.append(ep)
+	return out
+
+## The ring runs alongside the detailed query, so it starts on a mirror:
+## starting both on the main instance took two of its per-IP slots and
+## could queue the detailed query behind the app's own garnish.
+static func ring_endpoints() -> Array[String]:
+	return endpoint_order(["openstreetmap.fr", "mail.ru"])
+
+## Seconds the best-effort ring may still run once the detailed data is
+## ready; past this the fetch finishes with the detailed data alone.
+const RING_GRACE_S := 10.0
 
 ## Per-attempt HTTP timeout. The query's own [timeout:30] fires
 ## first on a healthy connection; this only bounds a hung one.
@@ -106,20 +134,26 @@ static func ring_radius_for_preset(preset: int) -> int:
 var _http: HTTPRequest
 var _detailed_req: OverpassRequest
 var _ring_req: OverpassRequest
+var _ring_grace: Timer
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
 	_http.timeout = ATTEMPT_TIMEOUT
 	add_child(_http)
 	_http.request_completed.connect(_on_api_done)
-	_detailed_req = OverpassRequest.new()
+	_detailed_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
 	add_child(_detailed_req)
 	_detailed_req.answered.connect(_on_detailed_answered)
 	_detailed_req.exhausted.connect(_on_detailed_exhausted)
-	_ring_req = OverpassRequest.new()
+	_ring_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
 	add_child(_ring_req)
 	_ring_req.answered.connect(_on_ring_answered)
 	_ring_req.exhausted.connect(_on_ring_exhausted)
+	_ring_grace = Timer.new()
+	_ring_grace.one_shot = true
+	_ring_grace.wait_time = RING_GRACE_S
+	_ring_grace.timeout.connect(_on_ring_grace)
+	add_child(_ring_grace)
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 
 
@@ -221,6 +255,8 @@ func cancel() -> void:
 		_detailed_req.cancel()
 	if _ring_req != null:
 		_ring_req.cancel()
+	if _ring_grace != null:
+		_ring_grace.stop()
 
 ## The parse task must not outlive the node it reports back to.
 func _notification(what: int) -> void:
@@ -274,11 +310,11 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	if want_ring and _ring_text == "":
 		_ring_pending = true
 		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
-			_check_ring)
+			_check_ring, ring_endpoints())
 	if _detailed_text != "":
 		_detailed_done()
 	else:
-		_detailed_req.run(_pending_body, _check_detailed)
+		_detailed_req.run(_pending_body, _detailed_check(lat, lon), ENDPOINTS)
 
 var _pending_lat := 0.0
 var _pending_lon := 0.0
@@ -340,12 +376,15 @@ static func next_attempt(attempt: int, retryable: bool) -> int:
 ## replication or hold a partial extract, so OverpassRequest tries the
 ## next instance (a genuinely empty area just pays a few fast empty
 ## responses). This also covers corrupt payloads, which parse to nothing.
-func _check_detailed(text: String) -> String:
-	if _payload_has_buildings(text, _pending_lat, _pending_lon):
-		return ""
-	return "Overpass returned no buildings"
+## Runs on OverpassRequest's worker thread, so it captures the centre
+## instead of reading this node's state.
+static func _detailed_check(lat: float, lon: float) -> Callable:
+	return func(text: String) -> String:
+		if _payload_has_buildings(text, lat, lon):
+			return ""
+		return "Overpass " + NO_BUILDINGS
 
-func _check_ring(text: String) -> String:
+static func _check_ring(text: String) -> String:
 	return "" if _payload_usable(text) else "Overpass ring query returned an unusable payload"
 
 func _on_detailed_answered(text: String) -> void:
@@ -359,6 +398,7 @@ func _on_detailed_exhausted(reason: String, attempts: int) -> void:
 	_detailed_fallback(reason)
 
 func _on_ring_answered(text: String) -> void:
+	_ring_grace.stop()
 	_ring_text = text
 	_write_cache(_pending_ring_cache, text)
 	_ring_pending = false
@@ -367,6 +407,7 @@ func _on_ring_answered(text: String) -> void:
 ## The ring is best-effort garnish: its failure degrades to the detailed
 ## data, never to a failed fetch.
 func _on_ring_exhausted(reason: String, _attempts: int) -> void:
+	_ring_grace.stop()
 	push_warning("OsmFetcher: ring query failed (%s); detailed data only" % reason)
 	_ring_text = ""
 	_ring_pending = false
@@ -374,7 +415,14 @@ func _on_ring_exhausted(reason: String, _attempts: int) -> void:
 
 func _detailed_done() -> void:
 	_detailed_ready = true
+	if _ring_pending:
+		_ring_grace.start()
 	_try_finish()
+
+func _on_ring_grace() -> void:
+	if _detailed_ready and _ring_pending:
+		_ring_req.cancel()
+		_on_ring_exhausted("no answer %d s after the detailed data" % int(RING_GRACE_S), 0)
 
 func _try_finish() -> void:
 	if _detailed_ready and not _ring_pending:
@@ -436,7 +484,7 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 	if gen != _parse_gen:
 		return
 	if int(converted["buildings"]) == 0:
-		_api_failed("returned no buildings", _api_reason)
+		_api_failed(NO_BUILDINGS, _api_reason)
 		return
 	_detailed_text = converted["json"]
 	_detailed_cached = false
@@ -477,7 +525,8 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 		if offline_mode:
 			_detailed_fallback("OSM cache unusable (offline mode)")
 		else:
-			_detailed_req.run(_pending_body, _check_detailed)
+			_detailed_req.run(_pending_body, _detailed_check(_pending_lat, _pending_lon),
+				ENDPOINTS)
 		return
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])

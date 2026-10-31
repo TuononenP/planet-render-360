@@ -12,7 +12,7 @@ extends Node
 ##    Paris because OSM maps it, never because a rule guessed it.
 ## Absence is graceful: a failed/uncached fetch emits empty arrays and
 ## SettlementMap falls back to the far imagery drapes alone. Endpoints
-## start at a mirror (ENDPOINT_ORDER) so the call never queues behind the
+## start at a mirror (endpoints()) so the call never queues behind the
 ## detailed OsmFetcher request on the main instance.
 
 signal finished(landuse: Array, towers: Array)
@@ -24,27 +24,33 @@ const CAP_LANDUSE := 6000
 const CAP_RELATIONS := 400
 const CAP_TOWERS := 1500
 const ATTEMPT_TIMEOUT := 45.0
-const ENDPOINT_ORDER: Array[int] = [1, 3, 0, 2]
 const LANDUSE := "^(residential|commercial|industrial|retail)$"
 
 var offline_mode := false
 ## {ms, bytes, cached, landuse, towers} of the last fetch.
 var timings: Dictionary = {}
 
-var _http: HTTPRequest
+var _req: OverpassRequest
 var _busy := false
-var _attempt := 0
 var _lat := 0.0
 var _lon := 0.0
 var _cache := ""
-var _body := ""
 var _t0 := 0
 
 func _ready() -> void:
-	_http = HTTPRequest.new()
-	_http.timeout = ATTEMPT_TIMEOUT
-	add_child(_http)
-	_http.request_completed.connect(_on_done)
+	_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
+	add_child(_req)
+	_req.answered.connect(_on_answered)
+	_req.exhausted.connect(func(reason: String, _attempts: int) -> void:
+		print("FarCityFetcher: %s; far city from imagery only" % reason)
+		_emit("", false))
+
+## Mirrors first, the main instance third (the detailed query starts
+## there), four attempts. Named by host so reordering
+## OsmFetcher.ENDPOINTS cannot change them.
+static func endpoints() -> Array[String]:
+	return OsmFetcher.endpoint_order(["openstreetmap.fr", "private.coffee",
+		"//overpass-api.de", "mail.ru"]).slice(0, 4)
 
 func is_busy() -> bool:
 	return _busy
@@ -64,8 +70,8 @@ static func build_query(lat: float, lon: float, radius_m: int = RADIUS_M) -> Str
 			% [TOWER_MIN_M, TOWER_MIN_LEVELS, around, CAP_TOWERS]
 
 func cancel() -> void:
-	if _http != null:
-		_http.cancel_request()
+	if _req != null:
+		_req.cancel()
 	_busy = false
 
 func fetch(lat: float, lon: float) -> void:
@@ -82,34 +88,11 @@ func fetch(lat: float, lon: float) -> void:
 	if offline_mode:
 		_emit("", true)
 		return
-	_body = "data=" + build_query(lat, lon).uri_encode()
-	_attempt = 0
-	_start()
+	_req.run("data=" + build_query(lat, lon).uri_encode(),
+		func(text: String) -> String: return "" if _usable(text) else "unusable payload",
+		endpoints())
 
-func _start() -> void:
-	var url := OsmFetcher.ENDPOINTS[ENDPOINT_ORDER[_attempt]]
-	var err := _http.request(url, ["Content-Type: application/x-www-form-urlencoded",
-		"User-Agent: PlanetRender360/0.1"], HTTPClient.METHOD_POST, _body)
-	if err != OK:
-		_retry("request failed to start: %s" % err, true)
-
-func _retry(reason: String, retryable: bool) -> void:
-	if retryable and _attempt + 1 < ENDPOINT_ORDER.size():
-		_attempt += 1
-		_start()
-		return
-	print("FarCityFetcher: %s; far city from imagery only" % reason)
-	_emit("", false)
-
-func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		_retry("Overpass failed (result=%d code=%d)" % [result, code],
-			OsmFetcher.is_retryable(result, code))
-		return
-	var text := body.get_string_from_utf8()
-	if not _usable(text):
-		_retry("unusable payload", true)
-		return
+func _on_answered(text: String) -> void:
 	OsmFetcher._write_cache(_cache, text)
 	_emit(text, false)
 
