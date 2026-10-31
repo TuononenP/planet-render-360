@@ -44,7 +44,7 @@ const vec3 WATER_TEXT = vec3(0.663, 0.788, 0.918);
 const vec3 PARK = vec3(0.208, 0.400, 0.314);
 const vec3 PARK_DEEP = vec3(0.157, 0.302, 0.235);
 const vec3 PARK_TEXT = vec3(0.659, 0.816, 0.706);
-const vec3 ROAD_WARM = vec3(0.722, 0.573, 0.310); // horizon-golden, dimmed
+const vec3 ROAD_WARM = vec3(0.600, 0.502, 0.357); // horizon-golden, dimmed
 
 void fragment() {
 	vec4 c = COLOR;
