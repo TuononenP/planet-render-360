@@ -10,6 +10,13 @@ config/description="Render any point on the map as a 3D, 360-degree view."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.png"
+; Brand boot splash (design system: stacked lockup on the Night ground,
+; sky-000 #06090f). The square PNG is scaled to fit and letterboxed with
+; the same colour, so it reads as one flat ground at any window shape.
+boot_splash/bg_color=Color(0.0235, 0.0353, 0.0588, 1)
+boot_splash/image="res://assets/brand/pr360-splash.png"
+boot_splash/fullsize=true
+boot_splash/use_filter=true
 
 [display]
 
