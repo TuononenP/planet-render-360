@@ -116,6 +116,16 @@ func _run() -> void:
 				inside_court += 1
 		if down > 0 or inside_court > 0:
 			failures.append("inset roof: %d down-facing normals, %d faces over the courtyard" % [down, inside_court])
+	# A facade stepping in and out by 30 cm (mapped bays) must not turn
+	# into fins under the inset roof: the eave ring is simplified first.
+	var teeth := PackedVector2Array()
+	for k in 40:
+		teeth.append(Vector2(float(k) * 1.5, 0.3 if k % 2 == 1 else 0.0))
+	teeth.append_array(PackedVector2Array([Vector2(60, 40), Vector2(45, 40), Vector2(45, 14),
+		Vector2(15, 14), Vector2(15, 40), Vector2(0, 40)]))
+	var smooth := RoofGeometry.simplify_ring(teeth, RoofGeometry.INSET_SIMPLIFY_M)
+	if smooth.size() > 10 or smooth.size() < 8:
+		failures.append("serrated eave should simplify to its 8 corners, got %d" % smooth.size())
 	# Roof tile courses snap to the roof's own axes: two facets 20 degrees
 	# apart on a curved footprint share one frame.
 	var fu := Vector2(1, 0)

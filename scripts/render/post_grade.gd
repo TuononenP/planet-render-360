@@ -16,7 +16,10 @@ extends RefCounted
 ## ACES with a white point of 6: highlights (sun-lit stone, sky near the
 ## sun, glints) roll off like film instead of clipping at 1.0, which
 ## washed the frame toward white; exposure lifts the mid-tones back.
-const EXPOSURE := 1.45
+## 1.25, not 1.45: at golden hour a slope facing the low sun gets ~3.4x
+## the light of flat ground, and at 1.45 anything over ~0.3 albedo there
+## (pale soil, rock, render) compressed to colourless white.
+const EXPOSURE := 1.25
 const WHITE := 6.0
 const CONTRAST := 1.1
 const SATURATION := 1.1
