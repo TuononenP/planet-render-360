@@ -131,12 +131,22 @@ func _start_generation(lat: float, lon: float) -> void:
 		return
 	_generating = true
 	_gen_id += 1
+	var gen := _gen_id
 	_pending = Vector2(lat, lon)
 	var display_name := _picker.selected_name
 	if display_name == "":
 		display_name = LocationData.known_place(lat, lon)
 	_loading.begin(display_name)
 	_show(_loading)
+	# run() starts every fetcher synchronously (cached satellite tiles
+	# decode inline), which would freeze the picker on screen. Let the
+	# loading screen draw first.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if gen != _gen_id:
+		_generating = false
+		_show(_picker)
+		return
 	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
 
 func _on_generation_finished(data: LocationData) -> void:
