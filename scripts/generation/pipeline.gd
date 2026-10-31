@@ -383,17 +383,17 @@ func _await_satellite(data: LocationData) -> void:
 		data.attribution = far_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + far_attr
 
-## Nearest first, except monuments (columns, obelisks) in range rank
-## first: they are few, and one cut by the cap would be extruded as a
-## windowed tower instead of drawn as a monument.
+## Nearest first, except monuments (columns, obelisks) and observation
+## wheels in range rank first: they are few, and one cut by the cap
+## would be extruded as a windowed tower or slab instead.
 static func rank_landmarks(cands: Array) -> Array:
 	var ranked := cands.duplicate()
 	var reach2: float = TerrainBuilder.LANDMARK_MAX_M ** 2
 	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var da := float(a["x"]) ** 2 + float(a["z"]) ** 2
 		var db := float(b["x"]) ** 2 + float(b["z"]) ** 2
-		var ma: bool = a.get("monument", false) and da <= reach2
-		var mb: bool = b.get("monument", false) and db <= reach2
+		var ma: bool = (a.get("monument", false) or a["archetype"] == "big_wheel") and da <= reach2
+		var mb: bool = (b.get("monument", false) or b["archetype"] == "big_wheel") and db <= reach2
 		return da < db if ma == mb else ma)
 	return ranked
 

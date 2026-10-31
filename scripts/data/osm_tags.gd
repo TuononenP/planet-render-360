@@ -11,6 +11,8 @@ extends RefCounted
 static func archetype_for(tags: Dictionary) -> String:
 	var b := str(tags.get("building", ""))
 	var mm := str(tags.get("man_made", ""))
+	if str(tags.get("attraction", "")) == "big_wheel":
+		return "big_wheel"
 	if mm == "lighthouse" or b == "lighthouse":
 		return "lighthouse"
 	if mm == "windmill":
