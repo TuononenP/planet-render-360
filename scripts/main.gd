@@ -38,7 +38,7 @@ func _ready() -> void:
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.finished.connect(_on_generation_finished)
 	_pipeline.cancelled.connect(func() -> void:
-		_generating = false
+		_set_generating(false)
 		_show(_picker))
 
 	_picker = MapPicker.new()
@@ -58,9 +58,13 @@ func _ready() -> void:
 				else LocationData.known_place(_download_at.x, _download_at.y),
 				_download_at.x, _download_at.y)
 		_picker.set_download_status("⬇  Saved for offline (%d/%d)" % [ok_count, total] \
+		_picker.set_download_busy(false)
 			if ok_count > 0 else "⬇  Download failed — check connection"))
 	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
 		_download_at = Vector2(lat, lon)
+		if _downloader.is_running():
+			return
+		_picker.set_download_busy(true)
 		_picker.set_download_status("⬇  Downloading… 0/%d" % OfflineDownloader.JOBS)
 		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
@@ -94,6 +98,8 @@ func _ready() -> void:
 	_history.back_requested.connect(func() -> void: _show(_picker))
 	_history.place_selected.connect(func(lat: float, lon: float) -> void:
 		_picker.selected_name = ""
+		if _generating:
+			return
 		_start_generation(lat, lon))
 	add_child(_history)
 
@@ -126,10 +132,14 @@ func _show(screen: Control) -> void:
 		s.visible = s == screen
 
 func _start_generation(lat: float, lon: float) -> void:
+func _set_generating(busy: bool) -> void:
+	_generating = busy
+	_picker.set_render_busy(busy)
+
 	if _generating:
 		print("Generation already in progress; ignoring start")
 		return
-	_generating = true
+	_set_generating(true)
 	_gen_id += 1
 	var gen := _gen_id
 	_pending = Vector2(lat, lon)
@@ -144,7 +154,7 @@ func _start_generation(lat: float, lon: float) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	if gen != _gen_id:
-		_generating = false
+		_set_generating(false)
 		_show(_picker)
 		return
 	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
@@ -155,7 +165,7 @@ func _on_generation_finished(data: LocationData) -> void:
 	_building_world = true
 	var built := await _view.build_location(data)
 	_building_world = false
-	_generating = false
+	_set_generating(false)
 	if gen != _gen_id:
 		return
 	_store.add_entry(data.place_name, data.latitude, data.longitude)

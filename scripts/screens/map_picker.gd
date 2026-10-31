@@ -334,6 +334,12 @@ func _set_selected_quick(index: int) -> void:
 func set_download_status(text: String) -> void:
 	MapChrome.set_download_status(self, text)
 
+func set_render_busy(busy: bool) -> void:
+	MapChrome.set_render_busy(self, busy)
+
+func set_download_busy(busy: bool) -> void:
+	MapChrome.set_download_busy(self, busy)
+
 func set_quality_preset(preset_value: int) -> void:
 	MapChrome.set_quality_preset(self, preset_value)
 

@@ -89,6 +89,20 @@ static func set_download_status(p: MapPicker, text: String) -> void:
 	if p._download_btn != null:
 		p._download_btn.text = text
 
+## Locks Render while a generation is still running (including a
+## cancelled world build that has not wound down), so a press is not
+## silently swallowed.
+static func set_render_busy(p: MapPicker, busy: bool) -> void:
+	if p._render_btn != null:
+		p._render_btn.disabled = busy
+		p._render_btn.text = "Finishing previous render…" if busy else "Render in 360°  →"
+
+## Locks Save for offline while a download runs; a second press would
+## otherwise retarget the pending history entry.
+static func set_download_busy(p: MapPicker, busy: bool) -> void:
+	if p._download_btn != null:
+		p._download_btn.disabled = busy
+
 ## Shows the chosen preset in the sheet footer and on the settings
 ## button's tooltip, so the current quality is visible before opening
 ## the menu.

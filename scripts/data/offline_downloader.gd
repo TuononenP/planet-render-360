@@ -24,6 +24,9 @@ var _done := 0
 var _ok := 0
 var _running := false
 
+func is_running() -> bool:
+	return _running
+
 func download(lat: float, lon: float, quality_preset: int = 2) -> void:
 	if _running:
 		return
