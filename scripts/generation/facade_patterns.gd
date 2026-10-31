@@ -19,8 +19,8 @@ extends RefCounted
 ##              (Singapore / Malaysia / HK shophouses).
 ## Mouldings are light/shadow on the base layer (they take the wall's own
 ## tint, like StoreyComposer's stone relief); frames, glass, shutters and
-## bands go on the paint layer (FacadePaint). Names no other project
-## class but FacadePaint; FacadeComposer passes its look values in `pv`.
+## bands go on the paint layer (FacadePaint). FacadeComposer passes its
+## look values in `pv` and owns the shared window table, pane and hash.
 
 const NAMES: Array[String] = ["panel", "ornate", "brownstone", "shophouse"]
 ## Matches FacadeComposer.CELL (pinned by tests/architecture_test.gd).
@@ -41,7 +41,7 @@ static func prepass(pattern: String, base: Image, nor: Image, w: int, pv: Dictio
 		"panel":
 			for bay in w / CELL:
 				var ox := bay * CELL
-				var tone := _hash(float(bay) * 3.1 + float(variant) * 1.7, 2.3)
+				var tone := FacadeComposer._hash(float(bay) * 3.1 + float(variant) * 1.7, 2.3)
 				var c := Color(1, 1, 1, 0.07) if tone > 0.5 else Color(0, 0, 0, 0.07)
 				FacadePaint.shade(base, Rect2i(ox, 0, CELL, CELL), c)
 			for x in range(0, w, CELL):
@@ -112,7 +112,7 @@ static func _panel(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 
 static func _ornate(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 		ox: int, bay_i: int, hv: float, pv: Dictionary) -> void:
-	var box := _box(str(pv.get("window", "casement")))
+	var box := FacadeComposer._window_box(str(pv.get("window", "casement")))
 	var ww := box.x
 	var wh := box.y
 	var wy := box.z
@@ -139,7 +139,7 @@ static func _ornate(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image
 	var rows := 2 if str(pv.get("window", "")) in ["sash", "french"] else 1
 	_win(alb, nor, rgh, emit, Rect2i(wx, wy, ww, wh), frame, pv["glass"], hv, cols, rows)
 	FacadePaint.streaks(base, wx - 4, wx + ww + 4, wy + wh + 10, CELL / 3, hv * 29.0)
-	var hr := _hash(float(bay_i) * 2.7 + float(pv.get("variant", 0)) * 1.3, 8.9)
+	var hr := FacadeComposer._hash(float(bay_i) * 2.7 + float(pv.get("variant", 0)) * 1.3, 8.9)
 	if hr < float(pv.get("rails", 0.0)):
 		_rail(alb, wx - 4, wy + wh - wh / 4, ww + 8, wh / 4)
 	if nor != null:
@@ -148,9 +148,10 @@ static func _ornate(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image
 
 static func _brownstone(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 		ox: int, hv: float, pv: Dictionary) -> void:
-	var ww := 36
-	var wh := 76
-	var wy := 22
+	var box := window_box("brownstone", "")
+	var ww := box.x
+	var wh := box.y
+	var wy := box.z
 	var wx := ox + (CELL - ww) / 2
 	# Heavy stone lintel with a projecting cap.
 	FacadePaint.shade(base, Rect2i(wx - 11, wy - 17, ww + 22, 3), FacadePaint.LIGHT)
@@ -171,9 +172,10 @@ static func _brownstone(alb: Image, nor: Image, rgh: Image, emit: Image, base: I
 
 static func _shophouse(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 		ox: int, hv: float, pv: Dictionary) -> void:
-	var ww := 40
-	var wh := 70
-	var wy := 30
+	var box := window_box("shophouse", "")
+	var ww := box.x
+	var wh := box.y
+	var wy := box.z
 	var wx := ox + (CELL - ww) / 2
 	var frame: Color = pv["frame"]
 	var shutter: Color = pv["shutter"]
@@ -202,7 +204,7 @@ static func _shophouse(alb: Image, nor: Image, rgh: Image, emit: Image, base: Im
 				alb.fill_rect(Rect2i(sx + 2, ly, 14, 1), DARK.lerp(shutter, 0.55))
 	FacadePaint.shade(base, Rect2i(wx - 8, wy + wh + 3, ww + 16, 4), FacadePaint.LIGHT)
 	FacadePaint.shade(base, Rect2i(wx - 8, wy + wh + 7, ww + 16, 2), FacadePaint.SHADOW)
-	var hr := _hash(float(ox) * 0.031 + float(pv.get("variant", 0)) * 1.3, 4.1)
+	var hr := FacadeComposer._hash(float(ox) * 0.031 + float(pv.get("variant", 0)) * 1.3, 4.1)
 	if hr < float(pv.get("rails", 0.0)):
 		_rail(alb, wx - 6, wy + wh - 18, ww + 12, 18)
 	if nor != null:
@@ -245,18 +247,12 @@ static func _band(base: Image, nor: Image, w: int, y: int, h: int) -> void:
 		nor.fill_rect(Rect2i(0, y, w, 1), Color(0.5, 0.3, 1.0))
 		nor.fill_rect(Rect2i(0, y + h, w, 2), Color(0.5, 0.72, 1.0))
 
-## Window box (w, h, top y) per vocabulary — FacadeComposer._window_box.
-static func _box(win: String) -> Vector3i:
-	match win:
-		"french":
-			return Vector3i(38, 80, 24)
-		"sash":
-			return Vector3i(40, 70, 26)
-		"wide":
-			return Vector3i(70, 48, 34)
-		"small":
-			return Vector3i(32, 46, 36)
-	return Vector3i(44, 64, 28)
-
-static func _hash(x: float, z: float) -> float:
-	return fmod(absf(sin(x * 12.9898 + z * 78.233) * 43758.5453), 1.0)
+## Window box (width, height, top; px of a 128 px storey) as painted by
+## `pattern`: what FacadeRelief aligns 3D sills and balconettes to.
+static func window_box(pattern: String, win: String) -> Vector3i:
+	match pattern:
+		"brownstone":
+			return Vector3i(36, 76, 22)
+		"shophouse":
+			return Vector3i(40, 70, 30)
+	return FacadeComposer._window_box(win)

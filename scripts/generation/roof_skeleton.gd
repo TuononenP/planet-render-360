@@ -22,7 +22,15 @@ static func faces(ring: PackedVector2Array, holes: Array, top: float, rh: float,
 		mansard: bool, verts: PackedVector3Array, normals: PackedVector3Array,
 		uvs: PackedVector2Array, fu: Vector2) -> bool:
 	var m := WorldScale.metres_to_units()
-	var run := clampf(rh * 1.1, 1.2 * m, 3.6 * m)
+	# The slope reaches full height `run` in from the eaves; on a footprint
+	# narrower than twice that it stops at the deepest point inside, so a
+	# narrow house still rises to a full-height ridge.
+	var run := minf(clampf(rh * 1.1, 1.2 * m, 3.6 * m), _depth(ring, holes) * 0.96)
+	if run < 0.3 * m:
+		return false
+	# ...but no steeper than ~50° (the mansard's lower slope ~67°): a narrow
+	# wing takes a lower roof rather than a near-vertical one.
+	rh = minf(rh, run * 1.2)
 	var step := clampf(run * 1.2, 2.0 * m, 4.5 * m)
 	var pts := PackedVector2Array()
 	var lift := PackedFloat32Array()
@@ -46,6 +54,12 @@ static func faces(ring: PackedVector2Array, holes: Array, top: float, rh: float,
 		return false
 	var tri := Geometry2D.triangulate_delaunay(pts)
 	var before := verts.size()
+	# Courtyards shrunk a hair for the probes: is_point_in_polygon counts a
+	# point on the edge as inside, which dropped every slope triangle whose
+	# base runs along the courtyard eave.
+	var cores: Array = []
+	for h in holes:
+		cores.append_array(Geometry2D.offset_polygon(h as PackedVector2Array, -0.05 * m))
 	for k in range(0, tri.size() - 2, 3):
 		var a := tri[k]
 		var b := tri[k + 1]
@@ -53,7 +67,7 @@ static func faces(ring: PackedVector2Array, holes: Array, top: float, rh: float,
 		# Eave-level triangles lie on the seal cap: drop them (no z-fight).
 		if lift[a] + lift[b] + lift[c] <= 0.0:
 			continue
-		if not _inside(ring, holes, [(pts[a] + pts[b] + pts[c]) / 3.0,
+		if not _inside(ring, cores, [(pts[a] + pts[b] + pts[c]) / 3.0,
 				(pts[a] + pts[b]) * 0.5, (pts[b] + pts[c]) * 0.5, (pts[c] + pts[a]) * 0.5]):
 			continue
 		RoofGeometry.push_tri(verts, normals, uvs, Vector2.ZERO,
@@ -85,6 +99,29 @@ static func _add_ring(r: PackedVector2Array, step: float, f: float,
 			seen[key] = true
 			pts.append(p)
 			lift.append(f)
+
+## Deepest inset (units) the footprint minus its courtyards allows: the
+## largest d whose inward offset is still non-empty (bisection).
+static func _depth(ring: PackedVector2Array, holes: Array) -> float:
+	var lo := 0.0
+	var hi := RingGeometry.aabb(ring).size.length() * 0.5
+	for _i in 10:
+		var d := (lo + hi) * 0.5
+		if _survives(ring, holes, d):
+			lo = d
+		else:
+			hi = d
+	return lo
+
+static func _survives(ring: PackedVector2Array, holes: Array, d: float) -> bool:
+	var inner: Array = Geometry2D.offset_polygon(ring, -d, Geometry2D.JOIN_MITER)
+	for h in holes:
+		var next: Array = []
+		for g in Geometry2D.offset_polygon(h as PackedVector2Array, d, Geometry2D.JOIN_MITER):
+			for c in inner:
+				next.append_array(Geometry2D.clip_polygons(c as PackedVector2Array, g as PackedVector2Array))
+		inner = next
+	return not inner.is_empty()
 
 static func _inside(ring: PackedVector2Array, holes: Array, probes: Array) -> bool:
 	for p in probes:

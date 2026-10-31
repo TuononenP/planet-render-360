@@ -25,6 +25,11 @@ static var _plans: Dictionary = {}
 static func begin_build() -> void:
 	_plans.clear()
 
+## Releases the plans (each holds a copy of its building's tags) once the
+## city is built; nothing reads them after the build.
+static func end_build() -> void:
+	_plans.clear()
+
 ## Stable identity of a mass: its centroid (internal units).
 static func key_of(x: float, z: float) -> String:
 	return "%.2f,%.2f" % [x, z]

@@ -112,7 +112,8 @@ static func storey_rows(d: Dictionary, uvp: Vector3) -> Array:
 		out.append({"y0": base, "y1": g_top, "storey": 0, "ground": true,
 			"win0": base, "win1": g_top, "win_w": 0.7, "balcony": false,
 			"balconette": false, "slab": g_top, "rail_h": 0.0})
-	var box := FacadeComposer._window_box(str(look.get("window", "casement")))
+	var box := FacadePatterns.window_box(str(look.get("pattern", "")),
+		str(look.get("window", "casement")))
 	var cell := float(FacadeComposer.CELL)
 	var rh := (top - y0) / float(n)
 	var rows_b: Array = relief.get("balcony_rows", [])

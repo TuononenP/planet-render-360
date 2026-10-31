@@ -170,10 +170,15 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 				str(look["roof_shape"]), legacy)
 			var span_m := minf(float(b["size_x"]), float(b["size_z"])) \
 				/ WorldScale.metres_to_units()
-			var rh_m := minf(_roof_height_m(shape, span_m,
-				float(b.get("roof_height_m", 0.0)), float(look["pitch"])),
-				maxf(float(res["total_m"]) - 0.5, 0.0))
-			var wall_w := (float(res["total_m"]) - rh_m) * WorldScale.metres_to_units()
+			var rh_m := _roof_height_m(shape, span_m,
+				float(b.get("roof_height_m", 0.0)), float(look["pitch"]))
+			# As BuildingMasses.plan: tagged levels are the storeys under the
+			# roof, which stands on top; other totals include the roof.
+			var wall_m := float(res["total_m"])
+			if str(res["source"]) != "levels" or legacy:
+				rh_m = minf(rh_m, maxf(wall_m - 0.5, 0.0))
+				wall_m -= rh_m
+			var wall_w := wall_m * WorldScale.metres_to_units()
 			if legacy:
 				wall_w = clampf(wall_w, 7.2, 76.0)
 			LegacyBoxBuilder.building(root, pos, float(b["size_x"]), float(b["size_z"]),
@@ -182,6 +187,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		placed += 1
 	last_stats["real"] = placed
 	_party = null
+	BuildingMasses.end_build()
 	impostor.commit(root, "Impostor")
 	if aabb_fallbacks > 0:
 		push_warning("BuildingBuilder: %d of %d real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle)."
@@ -304,6 +310,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
 		centre.length() / WorldScale.metres_to_units()), cap, party)
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
+	var roofed := false
 	if shape != "flat" and roof_h_world > 0.01:
 		# Eave overhang (style metres) for gabled/hipped/pyramidal roofs:
 		# the eave line drops by the roof's own slope so the pitch is kept.
@@ -313,10 +320,15 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 				and not party.has(1) and holes.is_empty():
 			var half := maxf(_ring_span_m(ring) * WorldScale.metres_to_units() * 0.5, 0.01)
 			var drop := minf(eave_u * roof_h_world / half, height_world * 0.25)
-			_roof_form(root, RoofGeometry.offset_ring(ring, eave_u), top - drop,
+			roofed = _roof_form(root, RoofGeometry.offset_ring(ring, eave_u), top - drop,
 				roof_h_world + drop, shape, roof_mat, party, gable_front)
 		else:
-			_roof_form(root, ring, top, roof_h_world, shape, roof_mat, party, gable_front, holes)
+			roofed = _roof_form(root, ring, top, roof_h_world, shape, roof_mat, party, gable_front, holes)
+	if not roofed:
+		# No pitched roof built (flat, or no form fits): dormers, stacks and
+		# gables must not stand on a roof that is not there.
+		shape = "flat"
+		roof_h_world = 0.0
 	if not distant and _batch == null and not look.is_empty() \
 			and centre.length() < FacadeRelief.RADIUS_M * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(ground.height_at_world(centre.x, centre.y)
@@ -397,12 +409,13 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Ar
 
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
-		gable_front: bool = false, holes: Array = []) -> void:
+		gable_front: bool = false, holes: Array = []) -> bool:
 	var mesh := RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes)
 	if mesh != null and _batch != null:
 		_batch.add_mesh(_batch_key, mat, mesh)
 	elif mesh != null:
 		TerrainBuilder._add(root, mesh, mat)
+	return mesh != null
 
 static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> bool:
 	for c in data.landmark_candidates:
