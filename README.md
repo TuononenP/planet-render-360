@@ -58,8 +58,9 @@ godot --headless --script tests/dem_test.gd     # live DEM decode (network once)
 godot --headless --script tests/flow_test.gd    # picker -> loading -> 360 flow
 godot --headless --script tests/responsive_test.gd # breakpoints + layout switching
 godot --headless --script tests/zoom_search_test.gd # map/360 zoom, search predictions, time of day
-godot --headless --script tests/sky_test.gd      # sky per season and time of day
+godot --headless --script tests/sky_test.gd      # sky per season, time of day and weather
 godot --headless --script tests/solar_test.gd    # true sun position vs ephemeris
+godot --headless --script tests/lightning_test.gd # thunderstorm lightning by weather, season, day
 godot --headless --script tests/climate_test.gd  # CHELSA reader + climate model (CLIMATE_LIVE=1 for a live read)
 godot --headless --script tests/scenery_test.gd  # building scale, terrain normals, water, landmark
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)

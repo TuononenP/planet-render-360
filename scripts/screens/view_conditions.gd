@@ -62,21 +62,34 @@ static func _build_precip(v: View360) -> void:
 	v._rig.add_child(v._precip)
 	v._precip.position = Vector3(0, 10, 0)
 
+## Density, size and fall speed follow the intensity (WeatherLook):
+## drizzle is a sparse fine mist, a downpour dense long streaks.
 static func _apply_precip(v: View360, code: int) -> void:
 	if v._precip == null:
 		return
-	var snowing := code in [71, 73, 75, 77, 85, 86]
-	var raining := code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]
-	v._precip.visible = snowing or raining
-	v._precip.emitting = snowing or raining
-	if snowing:
-		var mat := v._precip.process_material as ParticleProcessMaterial
-		mat.gravity = Vector3(0, -3.5, 0)
-		(v._precip.draw_pass_1 as QuadMesh).size = Vector2(0.14, 0.14)
-	elif raining:
-		var mat2 := v._precip.process_material as ParticleProcessMaterial
-		mat2.gravity = Vector3(0, -22, 0)
-		(v._precip.draw_pass_1 as QuadMesh).size = Vector2(0.05, 0.5)
+	var look := WeatherLook.for_code(code, v._atmos.cloud_cover if v._atmos != null else 100.0)
+	var kind := str(look["precip"])
+	v._precip.visible = kind != "none"
+	v._precip.emitting = kind != "none"
+	if kind == "none":
+		return
+	var pp := WeatherLook.particle_params(look)
+	v._precip.amount_ratio = float(pp["amount_ratio"])
+	(v._precip.process_material as ParticleProcessMaterial).gravity = Vector3(0, float(pp["gravity"]), 0)
+	(v._precip.draw_pass_1 as QuadMesh).size = pp["size"]
+	v._precip.set_meta("precip_base", Color(0.95, 0.96, 1.0, float(pp["alpha"])) if kind == "snow"
+		else Color(0.75, 0.85, 0.95, float(pp["alpha"])))
+	_precip_tint(v)
+
+## Unshaded particles take the scene's light level, so night rain is a
+## faint shimmer, not glowing streaks.
+static func _precip_tint(v: View360) -> void:
+	if v._precip == null or v._atmos == null or not v._precip.has_meta("precip_base"):
+		return
+	var base: Color = v._precip.get_meta("precip_base")
+	var light := lerpf(0.12, 1.0, clampf(v._atmos.sun.light_energy / 1.5, 0.0, 1.0))
+	var qm := (v._precip.draw_pass_1 as QuadMesh).material as StandardMaterial3D
+	qm.albedo_color = Color(base.r * light, base.g * light, base.b * light, base.a)
 
 ## `prebuilt` is a build_location result; empty builds synchronously.
 static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: float, code: int) -> void:
@@ -112,6 +125,12 @@ static func apply_surface_state(v: View360) -> void:
 		return
 	var code := v._atmos.weather_code if v._atmos != null else -1
 	ClimateModel.apply_globals(v._data, code)
+	if v._atmos != null:
+		# Snow underfoot brightens the bounce light; bolts land on terrain.
+		v._atmos.set_snow_ground(ClimateModel.has(v._data)
+			and ClimateModel.snowy_at_viewpoint(v._data, v._data.season))
+		if v._ground != null:
+			v._atmos.lightning.ground_height = v._ground.height_at_world
 	if v._generated != null and is_instance_valid(v._generated):
 		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
 		RoofSnow.apply(v._generated, float(ClimateModel.globals_for(v._data, code)["climate_snow_on"]) > 0.0)
@@ -173,6 +192,7 @@ static func _apply_current_time(v: View360) -> void:
 		v._atmos.set_time(v._time_hour, lat, {"year": int(now.get("year", 2026)),
 			"month": int(now.get("month", 1)), "day": int(now.get("day", 1))})
 	_city_lights(v)
+	_precip_tint(v)
 	_sync_time_ui(v)
 
 static func _on_time_slider_changed(v: View360, value: float) -> void:
@@ -200,6 +220,7 @@ static func _apply_time(v: View360, hour_f: float) -> void:
 	var lat := v._data.latitude if v._data != null else v._atmos.latitude
 	v._atmos.set_time(hour_f, lat)
 	_city_lights(v)
+	_precip_tint(v)
 
 ## Lit windows follow the sky's darkness (CityLights).
 static func _city_lights(v: View360) -> void:

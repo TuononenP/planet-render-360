@@ -30,6 +30,8 @@ static func label_for_code(code: int) -> String:
 		3: return "Overcast"
 		45, 48: return "Fog"
 		51, 53, 55: return "Drizzle"
+		56, 57: return "Freezing drizzle"
+		66, 67: return "Freezing rain"
 		61, 63, 65, 80, 81, 82: return "Rain"
 		71, 73, 75, 77, 85, 86: return "Snow"
 		95, 96, 99: return "Thunderstorm"

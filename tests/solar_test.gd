@@ -91,4 +91,28 @@ func _rig_checks(failures: Array[String]) -> void:
 	var g := rig.golden_hour()
 	if is_nan(g) or g < 12.0 or g > 24.0:
 		failures.append("polar golden hour out of range: %f" % g)
+	_moon_checks(rig, failures)
 	rig.free()
+
+## The real moon: phase from the date, light from where it stands.
+func _moon_checks(rig: AtmosphereRig, failures: Array[String]) -> void:
+	var full := SolarPosition.moon(48.8566, 2.3522, {"year": 2026, "month": 1, "day": 3}, 10.0)
+	var new := SolarPosition.moon(48.8566, 2.3522, {"year": 2026, "month": 1, "day": 18}, 19.9)
+	if float(full["illum"]) < 0.97 or float(new["illum"]) > 0.03:
+		failures.append("moon phase: full %f, new %f" % [full["illum"], new["illum"]])
+	rig.set_place(48.8566, 2.3522)
+	rig.set_utc_offset(1.0)
+	# Paris, local midnight: the full moon rides high in the south, the
+	# new moon is down with the sun.
+	rig.set_time(0.0, 48.8566, {"year": 2026, "month": 1, "day": 4})
+	var full_e := rig.sun.light_energy
+	var mf := rig.moon_state
+	var light_from := Basis.from_euler(rig.sun.rotation).z
+	var want := SolarPosition.direction(float(mf["elevation"]), float(mf["azimuth"]))
+	if rig.moon_up < 1.0 or Vector2(light_from.x, light_from.z).normalized().dot(Vector2(want.x, want.z).normalized()) < 0.999:
+		failures.append("full-moon light should come from the moon (%s)" % mf)
+	rig.set_time(0.0, 48.8566, {"year": 2026, "month": 1, "day": 19})
+	if rig.moon_up > 0.0 or float(rig.sky_material.get_shader_parameter("moon")) > 0.0:
+		failures.append("new moon at midnight should be below the horizon")
+	if not (full_e > rig.sun.light_energy * 4.0 and rig.sun.light_energy > 0.0):
+		failures.append("full moon should outshine a moonless night: %f vs %f" % [full_e, rig.sun.light_energy])
