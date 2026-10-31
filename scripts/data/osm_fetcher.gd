@@ -22,13 +22,15 @@ signal failed(reason: String)
 ## answered a live probe (2026-10-31) while the main one timed out. The
 ## OSM-FR instance (global data, free fair-use) answered while the main
 ## one reported "at capacity" (HTTP 502), so it is the first fallback.
+## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
+## answering nothing, not even a one-node query, so it is tried last.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
 	"https://overpass.openstreetmap.fr/api/interpreter",
 	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-	"https://overpass.private.coffee/api/interpreter",
 	"https://z.overpass-api.de/api/interpreter",
+	"https://overpass.private.coffee/api/interpreter",
 ]
 
 ## Per-attempt HTTP timeout. The query's own [timeout:30] fires
@@ -38,11 +40,12 @@ const ENDPOINTS: Array[String] = [
 ## Paris 800 m response is ≈8 MB and measured 25–47 s end to end.
 const ATTEMPT_TIMEOUT := 60.0
 
-## Worst-case seconds for both fetch phases (detailed, then the
-## best-effort ring): one attempt timeout per endpoint per phase, plus
-## slack each. Callers waiting on succeeded/failed must wait at least
-## this long or a late rescue is dropped. Typical is far lower (a fast
-## 502 moves on in ~1 s); only hung connections pay the full budget.
+## Worst-case seconds for both fetch phases (detailed and the
+## best-effort ring, now concurrent, so this is a generous bound): one
+## attempt timeout per endpoint per phase, plus slack each. Callers
+## waiting on succeeded/failed must wait at least this long or a late
+## rescue is dropped. Typical is far lower (a fast 502 moves on in ~1 s,
+## a silent mirror in OverpassRequest.FIRST_BYTE_TIMEOUT).
 ## Plus one OSM API attempt (a 400 steps down a radius in ~1 s).
 static func retry_budget_seconds() -> float:
 	return 2.0 * (float(ENDPOINTS.size()) * ATTEMPT_TIMEOUT + 5.0) \
@@ -99,13 +102,24 @@ static func ring_radius_for_preset(preset: int) -> int:
 		_:
 			return 1600
 
+## OSM API fallback only; Overpass goes through the two requests below.
 var _http: HTTPRequest
+var _detailed_req: OverpassRequest
+var _ring_req: OverpassRequest
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
 	_http.timeout = ATTEMPT_TIMEOUT
 	add_child(_http)
-	_http.request_completed.connect(_on_done)
+	_http.request_completed.connect(_on_api_done)
+	_detailed_req = OverpassRequest.new()
+	add_child(_detailed_req)
+	_detailed_req.answered.connect(_on_detailed_answered)
+	_detailed_req.exhausted.connect(_on_detailed_exhausted)
+	_ring_req = OverpassRequest.new()
+	add_child(_ring_req)
+	_ring_req.answered.connect(_on_ring_answered)
+	_ring_req.exhausted.connect(_on_ring_exhausted)
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 
 
@@ -192,19 +206,21 @@ static func roads_to_v1(roads: Array) -> Array:
 ## serves the on-device cache or fails immediately — never the network.
 var offline_mode := false
 
-enum { _PHASE_DETAILED, _PHASE_RING, _PHASE_API }
-
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
 ## restarted generation left its Overpass request running, so the next
 ## fetch burned every retry on 44 and then lost the real response's
 ## state. cancel_request() emits no request_completed, so nothing stale
-## reaches _on_done.
+## reaches the handlers.
 func cancel() -> void:
 	# A parse still running off-thread belongs to the abandoned fetch.
 	_parse_gen += 1
 	if _http != null:
 		_http.cancel_request()
+	if _detailed_req != null:
+		_detailed_req.cancel()
+	if _ring_req != null:
+		_ring_req.cancel()
 
 ## The parse task must not outlive the node it reports back to.
 func _notification(what: int) -> void:
@@ -227,13 +243,14 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	_pending_cache = CacheStore.osm_path(lat, lon, radius)
 	_pending_body = "data=" + build_query(lat, lon, radius).uri_encode()
 	_pending_ring_cache = ""
-	_pending_ring_body = ""
 	_detailed_text = ""
 	_ring_text = ""
+	_detailed_ready = false
+	_ring_pending = false
+	_tried = 1
 	var want_ring := ring > radius
 	if want_ring:
 		_pending_ring_cache = CacheStore.osm_ring_path(lat, lon, ring)
-		_pending_ring_body = "data=" + build_ring_query(lat, lon, ring).uri_encode()
 	# Each phase serves from its own cache entry independently; a phase
 	# with no usable cache goes live while the other stays cached.
 	# A cache entry was validated (_payload_has_buildings) before it was
@@ -249,32 +266,33 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 		_ring_text = _read_cache(_pending_ring_cache)
 	if offline_mode:
 		if _detailed_text != "":
-			_finish()
+			_detailed_done()
 		else:
-			_phase = _PHASE_DETAILED
-			_attempt = 0
-			_fail_or_retry("OSM not cached (offline mode)", false)
+			_detailed_fallback("OSM not cached (offline mode)")
 		return
-	if _detailed_text != "" and (not want_ring or _ring_text != ""):
-		_finish()
-		return
-	_phase = _PHASE_DETAILED if _detailed_text == "" else _PHASE_RING
-	_attempt = 0
-	_start_attempt()
+	# Both phases go live at once; _try_finish waits for the pair.
+	if want_ring and _ring_text == "":
+		_ring_pending = true
+		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
+			_check_ring)
+	if _detailed_text != "":
+		_detailed_done()
+	else:
+		_detailed_req.run(_pending_body, _check_detailed)
 
 var _pending_lat := 0.0
 var _pending_lon := 0.0
 var _pending_cache := ""
 var _pending_body := ""
 var _pending_ring_cache := ""
-var _pending_ring_body := ""
 var _detailed_text := ""
 var _detailed_cached := false
+var _detailed_ready := false
 var _ring_text := ""
+var _ring_pending := false
 var _parse_task := -1
 var _parse_gen := 0
-var _phase := _PHASE_DETAILED
-var _attempt := 0
+var _tried := 1
 var _api_tier := 0
 var _api_reason := ""
 
@@ -314,32 +332,53 @@ static func is_retryable(result: int, code: int) -> bool:
 		return true
 	return code in [429, 500, 502, 503, 504]
 
-func _start_attempt() -> void:
-	var headers := ["Content-Type: application/x-www-form-urlencoded",
-		"User-Agent: PlanetRender360/0.1"]
-	var body := _pending_body if _phase == _PHASE_DETAILED else _pending_ring_body
-	var err := _http.request(ENDPOINTS[_attempt], headers,
-		HTTPClient.METHOD_POST, body)
-	if err != OK:
-		_fail_or_retry("Overpass request failed to start: %s" % err, true)
-
 ## Next attempt index for a failed attempt, or -1 to give up.
 static func next_attempt(attempt: int, retryable: bool) -> int:
 	return attempt + 1 if retryable and attempt + 1 < ENDPOINTS.size() else -1
 
-func _fail_or_retry(reason: String, retryable: bool) -> void:
-	var next := next_attempt(_attempt, retryable)
-	if next >= 0:
-		_attempt = next
-		_start_attempt()
-	elif _phase == _PHASE_RING:
-		# The ring is best-effort garnish: its failure degrades to the
-		# detailed data, never to a failed fetch.
-		push_warning("OsmFetcher: ring query failed (%s); detailed data only" % reason)
-		_ring_text = ""
+## One instance returning no buildings is not authoritative: it may lag
+## replication or hold a partial extract, so OverpassRequest tries the
+## next instance (a genuinely empty area just pays a few fast empty
+## responses). This also covers corrupt payloads, which parse to nothing.
+func _check_detailed(text: String) -> String:
+	if _payload_has_buildings(text, _pending_lat, _pending_lon):
+		return ""
+	return "Overpass returned no buildings"
+
+func _check_ring(text: String) -> String:
+	return "" if _payload_usable(text) else "Overpass ring query returned an unusable payload"
+
+func _on_detailed_answered(text: String) -> void:
+	_detailed_text = text
+	_detailed_cached = false
+	_write_cache(_pending_cache, text)
+	_detailed_done()
+
+func _on_detailed_exhausted(reason: String, attempts: int) -> void:
+	_tried = attempts
+	_detailed_fallback(reason)
+
+func _on_ring_answered(text: String) -> void:
+	_ring_text = text
+	_write_cache(_pending_ring_cache, text)
+	_ring_pending = false
+	_try_finish()
+
+## The ring is best-effort garnish: its failure degrades to the detailed
+## data, never to a failed fetch.
+func _on_ring_exhausted(reason: String, _attempts: int) -> void:
+	push_warning("OsmFetcher: ring query failed (%s); detailed data only" % reason)
+	_ring_text = ""
+	_ring_pending = false
+	_try_finish()
+
+func _detailed_done() -> void:
+	_detailed_ready = true
+	_try_finish()
+
+func _try_finish() -> void:
+	if _detailed_ready and not _ring_pending:
 		_finish()
-	else:
-		_detailed_fallback(reason)
 
 ## Detailed phase out of live Overpass options. Register fallback order:
 ## same-place cache (any radius) → OSM API bbox → nearby cache → procedural.
@@ -351,7 +390,6 @@ func _detailed_fallback(reason: String) -> void:
 		return
 	_api_tier = 0
 	_api_reason = reason
-	_phase = _PHASE_API
 	_request_api()
 
 ## Serve the nearest cached payload within max_m that holds buildings.
@@ -362,7 +400,7 @@ func _use_cached(reason: String, max_m: float) -> bool:
 			print("OsmFetcher: %s; using cached %s" % [reason, path.get_file()])
 			_detailed_text = text
 			_detailed_cached = false
-			_finish()
+			_detailed_done()
 			return true
 	return false
 
@@ -374,47 +412,12 @@ func _request_api() -> void:
 		_api_failed("failed to start: %s" % err, _api_reason)
 
 func _api_failed(why: String, reason: String) -> void:
-	_phase = _PHASE_DETAILED
 	var full := "%s; OSM API %s" % [reason, why]
 	if not _use_cached(full, NEARBY_M):
-		failed.emit("%s (tried %d endpoint(s))" % [full, _attempt + 1])
+		_ring_req.cancel()
+		failed.emit("%s (tried %d endpoint(s))" % [full, _tried])
 
-func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-	if _phase == _PHASE_API:
-		_on_api_done(result, code, body)
-		return
-	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		_fail_or_retry("Overpass failed (result=%d code=%d)" % [result, code],
-			is_retryable(result, code))
-		return
-	var text := body.get_string_from_utf8()
-	if _phase == _PHASE_DETAILED:
-		if not _payload_has_buildings(text, _pending_lat, _pending_lon):
-			# One instance returning no buildings is not authoritative:
-			# it may lag replication or hold a partial extract. Try the
-			# next instance before giving up (a genuinely empty area
-			# just pays a few fast empty responses). This also covers
-			# corrupt payloads, which parse to nothing.
-			_fail_or_retry("Overpass returned no buildings", true)
-			return
-		_detailed_text = text
-		_detailed_cached = false
-		_write_cache(_pending_cache, text)
-		if _pending_ring_body != "" and _ring_text == "":
-			_phase = _PHASE_RING
-			_attempt = 0
-			_start_attempt()
-		else:
-			_finish()
-	else:
-		if not _payload_usable(text):
-			_fail_or_retry("Overpass ring query returned an unusable payload", true)
-			return
-		_ring_text = text
-		_write_cache(_pending_ring_cache, text)
-		_finish()
-
-func _on_api_done(result: int, code: int, body: PackedByteArray) -> void:
+func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 	if result == HTTPRequest.RESULT_SUCCESS and code == 400 \
 			and _api_tier + 1 < OsmApiFallback.RADII_M.size():
 		_api_tier += 1  # over the API's 50 000-node cap: try a smaller box
@@ -435,12 +438,11 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 	if int(converted["buildings"]) == 0:
 		_api_failed("returned no buildings", _api_reason)
 		return
-	_phase = _PHASE_DETAILED
 	_detailed_text = converted["json"]
 	_detailed_cached = false
 	_write_cache(CacheStore.osm_path(_pending_lat, _pending_lon,
 		OsmApiFallback.RADII_M[_api_tier]), _detailed_text)
-	_finish()
+	_detailed_done()
 
 ## Merge the detailed + ring payloads, parse once, and emit both signals:
 ## v1 shapes on the frozen 4-arg signal, §2.5/§2.6 extras on succeeded_v2.
@@ -471,12 +473,11 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 		push_warning("OsmFetcher: cached payload has no buildings; refetching")
 		_detailed_cached = false
 		_detailed_text = ""
-		_phase = _PHASE_DETAILED
-		_attempt = 0
+		_detailed_ready = false
 		if offline_mode:
-			_fail_or_retry("OSM cache unusable (offline mode)", false)
+			_detailed_fallback("OSM cache unusable (offline mode)")
 		else:
-			_start_attempt()
+			_detailed_req.run(_pending_body, _check_detailed)
 		return
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
