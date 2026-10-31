@@ -23,6 +23,11 @@ const CAP_LANDUSE := 1600
 const CAP_LEISURE := 700
 const CAP_BARRIERS := 1600
 const CAP_TREE_NODES := 8000
+## Railway track + platform ways, and station / subway-entrance nodes.
+## A dense rail hub (a terminus throat, a yard) is a few hundred ways;
+## Midtown Manhattan carries ≈250 subway entrances within 1200 m.
+const CAP_RAIL := 2500
+const CAP_RAIL_NODES := 800
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
@@ -83,6 +88,10 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_BARRIERS],
 		'way["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out geom 100;'
 			% [radius_m, lat, lon],
+		'way["railway"~"^(rail|subway|light_rail|tram|narrow_gauge|monorail|funicular|preserved|platform)$"](around:%d,%.6f,%.6f);out geom %d;'
+			% [radius_m, lat, lon, CAP_RAIL],
+		'node["railway"~"^(station|halt|subway_entrance|train_station_entrance|tram_stop)$"](around:%d,%.6f,%.6f);out %d;'
+			% [radius_m, lat, lon, CAP_RAIL_NODES],
 		'node["natural"="tree"](around:%d,%.6f,%.6f);out %d;'
 			% [radius_m, lat, lon, CAP_TREE_NODES],
 		'node["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out 100;'

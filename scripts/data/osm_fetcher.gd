@@ -11,6 +11,9 @@ extends Node
 signal succeeded(buildings: Array, roads: Array, land: Array, landmarks: Array)
 ## Closure W2 companion: extras the frozen 4-arg signal cannot carry.
 signal succeeded_v2(roads_v2: Array, waterways: Array, trees: Array, barriers: Array)
+## Railway layer (OsmRail shapes): track ways, platforms, and station /
+## subway-entrance nodes. Emitted before `succeeded`, like succeeded_v2.
+signal succeeded_rail(railways: Array, platforms: Array, stops: Array)
 signal failed(reason: String)
 
 ## Overpass endpoints, tried in order. The main instance regularly
@@ -481,5 +484,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 		return
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
+	succeeded_rail.emit(parsed.get("railways", []),
+		parsed.get("rail_platforms", []), parsed.get("transit_stops", []))
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),
 		parsed["land"], parsed.get("landmarks", []))

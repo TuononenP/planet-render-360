@@ -15,11 +15,15 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var waterways: Array = []
 	var trees: Array = []
 	var barriers: Array = []
+	var railways: Array = []
+	var platforms: Array = []
+	var stops: Array = []
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
-			"barriers": barriers}
+			"barriers": barriers, "railways": railways,
+			"rail_platforms": platforms, "transit_stops": stops}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -49,6 +53,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var tree := {"x": tp.x, "z": tp.y}
 				tree.merge(OsmTags.tree_tags(el_tags))
 				trees.append(tree)
+			# Stations, halts and subway / station entrances.
+			if OsmRail.is_stop(el_tags):
+				stops.append(OsmRail.stop_entry(el_tags, WorldScale.xz_from_latlon(
+					float(el["lat"]), float(el["lon"]), c_lat, c_lon)))
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
@@ -116,6 +124,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"size_x": entry["size_x"], "size_z": entry["size_z"]})
 		elif el_tags.has("building:part"):
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
+		elif OsmRail.is_track(el_tags):
+			railways.append(OsmRail.track_entry(el_tags, poly))
+		elif OsmRail.is_platform(el_tags):
+			platforms.append(OsmRail.platform_entry(el_tags, poly))
 		elif el_tags.has("highway"):
 			roads.append(OsmTags._road_entry(el_tags, poly))
 		elif el_tags.has("waterway"):
@@ -154,7 +166,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	_monument_landmarks(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
-		"barriers": barriers}
+		"barriers": barriers, "railways": railways,
+		"rail_platforms": platforms, "transit_stops": stops}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

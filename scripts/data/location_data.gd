@@ -149,6 +149,16 @@ var trees: Array = []
 ## wall, hedge, ...). Parsed by OsmFetcher; carried by the pipeline since
 ## closure W2; meshed by a Phase-4/5 consumer (no builder claims it).
 var barriers: Array = []
+## Railway layer (OsmRail): running track ways — {points, class (rail,
+## subway, light_rail, tram, ...), gauge_m, service, bridge, tunnel,
+## layer, electrified, embedded, name} in metre XZ. Meshed by RailBuilder.
+var railways: Array = []
+## Railway platforms (railway=platform ways and areas) — {points, closed,
+## height_m, width_m, covered, layer, tunnel, name}.
+var rail_platforms: Array = []
+## Stations, halts and subway / station entrances as points — {x, z,
+## kind, station, name, ref, direction, wheelchair, elevator, tunnel}.
+var transit_stops: Array = []
 ## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
 ## past the detailed extent — {class: residential|commercial|industrial|
 ## retail, points: PackedVector2Array, holes: Array} in metre XZ, from

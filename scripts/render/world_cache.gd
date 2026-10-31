@@ -15,7 +15,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 11
+const BUILD_VERSION := 12
 const DIR := "user://worlds"
 const MAX_BYTES := 1024 * 1024 * 1024
 ## Sources whose output a cached world freezes (debug-build fingerprint).
@@ -30,6 +30,7 @@ static func key(data: LocationData) -> String:
 	var fp := [BUILD_VERSION, data.quality_preset, data.season, data.grid_size,
 		data.heights.size(), data.buildings.size(), data.roads.size(),
 		data.land_polygons.size(), data.waterways.size(), data.trees.size(),
+		data.railways.size(), data.rail_platforms.size(), data.transit_stops.size(),
 		data.landmark_type, str(data.dem_source), str(data.satellite_source),
 		data.far_landuse.size(), data.far_towers.size(), str(data.climate), _sources()]
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),

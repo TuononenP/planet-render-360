@@ -64,6 +64,7 @@ godot --headless --script tests/lightning_test.gd # thunderstorm lightning by we
 godot --headless --script tests/climate_test.gd  # CHELSA reader + climate model (CLIMATE_LIVE=1 for a live read)
 godot --headless --script tests/scenery_test.gd  # building scale, terrain normals, water, landmark
 godot --headless --script tests/building_fabric_test.gd # party walls, street roofs, courtyards, facade relief
+godot --headless --script tests/rail_test.gd        # railways: track, viaducts, platforms, subway entrances
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
 godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)
 ```

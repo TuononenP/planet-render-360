@@ -110,6 +110,8 @@ static func build_world(data: LocationData, ground: GroundTruth = null) -> Node3
 		_adopt_flat(root, BuildingBuilder.build_buildings(data, ground))
 	if not data.buildings.is_empty():
 		_adopt_flat(root, RoadBuilder.build_roads(data, ground))
+	if RailBuilder.has_rail(data):
+		_adopt_flat(root, RailBuilder.build_rail(data, ground))
 	if data.landmark_type != "none":
 		root.add_child(_landmark(data, ground))
 	_landmark_candidates(root, data, ground)

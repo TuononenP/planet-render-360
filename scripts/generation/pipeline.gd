@@ -66,6 +66,9 @@ var _osm_landmarks: Array = []
 var _osm_waterways: Array = []
 var _osm_trees: Array = []
 var _osm_barriers: Array = []
+var _osm_railways: Array = []
+var _osm_platforms: Array = []
+var _osm_stops: Array = []
 var _osm_done := false
 ## T5.4 far city ring query (FarCityFetcher): one cached Overpass call,
 ## overlapped with everything, awaited (bounded) after the OSM stage.
@@ -123,6 +126,10 @@ func _ready() -> void:
 		_osm_waterways = w
 		_osm_trees = t
 		_osm_barriers = br)
+	_osm.succeeded_rail.connect(func(rw: Array, pf: Array, st: Array) -> void:
+		_osm_railways = rw
+		_osm_platforms = pf
+		_osm_stops = st)
 	_osm.failed.connect(func(reason: String) -> void:
 		print("OSM fetch failed, using procedural dressing: %s" % reason)
 		if DataNotes.osm_outage(reason):
@@ -194,6 +201,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_osm_waterways = []
 	_osm_trees = []
 	_osm_barriers = []
+	_osm_railways = []
+	_osm_platforms = []
+	_osm_stops = []
 	_osm.fetch(lat, lon)
 	_farcity_done = false
 	_farcity_landuse = []
@@ -400,6 +410,9 @@ func _await_osm(data: LocationData) -> void:
 		data.waterways = _osm_waterways
 		data.trees = _osm_trees
 		data.barriers = _osm_barriers
+		data.railways = _osm_railways
+		data.rail_platforms = _osm_platforms
+		data.transit_stops = _osm_stops
 		var cands := _osm_landmarks.duplicate()
 		cands.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
