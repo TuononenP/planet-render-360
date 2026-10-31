@@ -25,6 +25,10 @@ const OPEN_RAMP_M := 30.0
 ## Shore distance (m) that COLOR.b spans (0 at the rim → 1): the foam
 ## band and surf read it (WaterShader).
 const SHORE_M := 40.0
+## Most interior samples one water polygon part gets (see add_polygon).
+const MAX_INTERIOR_POINTS := 4000
+## How much wider the sea's shallow-to-deep ramp is than OPEN_RAMP_M.
+const SEA_RAMP_SCALE := 5.0
 ## Downstream drift of a river's surface pattern (m/s): rivers, streams.
 const RIVER_FLOW := 0.9
 const STREAM_FLOW := 0.6
@@ -87,6 +91,12 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var grid := maxf(step, 1.0)
 	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
 	var bb := _bbox(part)
+	# A sea or bay clipped to the extent spans km: at the post step that is
+	# ~20k interior points, and Delaunay triangulation of that many never
+	# returned on Nice's bay. Spread at most MAX_INTERIOR_POINTS; the
+	# shoreline ramp still comes from the resampled rim.
+	grid = maxf(grid, sqrt((float(bb[2]) - float(bb[0])) * (float(bb[3]) - float(bb[1]))
+		/ float(MAX_INTERIOR_POINTS)))
 	var rims := PackedVector2Array(_resample_ring(part, rim_sp))
 	for h in holes:
 		if not (h is PackedVector2Array):
@@ -103,6 +113,7 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var shore := PackedFloat32Array(openness)
 	var shore_u := SHORE_M * WorldScale.metres_to_units()
 	var reach := int(ceil(maxf(ramp, shore_u) / grid))
+	var rim_count := pts.size()
 	var z: float = bb[1] + grid * 0.5
 	while z < bb[3]:
 		var x: float = bb[0] + grid * 0.5
@@ -117,6 +128,14 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 					shore.append(clampf(d / shore_u, 0.0, 1.0))
 			x += grid
 		z += grid
+	# Godot's Delaunay degenerates on exact collinear runs (a polygon
+	# clipped to the extent) and on a regular lattice: 2.4k points took
+	# 380 s and returned 248k triangles. A deterministic nudge, 2 cm on
+	# the shoreline and a fifth of a cell inside, restores it (40 ms).
+	var jittered := PackedVector2Array()
+	for k in pts.size():
+		jittered.append(_nudge(pts[k], 0.02 if k < rim_count else grid * 0.2))
+	pts = jittered
 	var tri := Geometry2D.triangulate_delaunay(pts)
 	if tri.is_empty():
 		# Degenerate input (duplicate/collinear rim): exact rim only.
@@ -201,7 +220,8 @@ static func add_sea_grid(root: Node3D, ground: GroundTruth, level: float,
 			var z := -e * 0.5 + float(j) * stp
 			dist[j * n + i] = 0.0 if ground.height_at_world(x, z) > level + 0.25 else 1e9
 	_chamfer(dist, n, stp)
-	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
+	# The sea shelf shades over ~150 m, not a river's 30 m.
+	var ramp := OPEN_RAMP_M * SEA_RAMP_SCALE * WorldScale.metres_to_units()
 	var shore_u := SHORE_M * WorldScale.metres_to_units()
 	var verts := PackedVector3Array()
 	var colors := PackedColorArray()
@@ -268,6 +288,12 @@ static func _resample_ring(ring: PackedVector2Array, sp: float) -> Array:
 				seen[key] = true
 				out.append(p)
 	return out
+
+## `p` moved by a stable pseudo-random offset of at most `amp` per axis.
+static func _nudge(p: Vector2, amp: float) -> Vector2:
+	var h1 := fposmod(sin(p.x * 12.9898 + p.y * 78.233) * 43758.5453, 1.0)
+	var h2 := fposmod(sin(p.x * 39.346 + p.y * 11.135) * 24634.6345, 1.0)
+	return p + Vector2(h1 - 0.5, h2 - 0.5) * 2.0 * amp
 
 static func _bucket(pts: PackedVector2Array, cell: float) -> Dictionary:
 	var out := {}

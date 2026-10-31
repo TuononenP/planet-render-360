@@ -21,6 +21,8 @@ const LIT := ["primary", "secondary", "tertiary", "residential", "unclassified",
 	"tertiary_link"]
 const MAJOR := ["primary", "secondary", "trunk", "primary_link", "secondary_link"]
 const LANTERN_REGIONS := ["haussmann", "france", "central_europe", "west_europe_brick", "alpine"]
+## Linear colour of free-standing walls: grey-beige weathered masonry.
+const WALL_STONE := Color(0.26, 0.24, 0.21)
 ## barrier class → [kind, height m, thickness m]
 const BARRIERS := {
 	"wall": ["wall", 1.8, 0.4], "city_wall": ["wall", 6.0, 1.6],
@@ -237,7 +239,11 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 						_wall_piece(bufs["hedge"], p0, p1, y0, y1, hgt, thick, 0.1 * m2u, m2u)
 	var season: int = ctx["season"]
 	var mats := {
-		"wall": MaterialLibrary.pbr_material("stone", Color(0.92, 0.9, 0.86), 1.0),
+		# Limestone calibrated to weathered masonry: the "stone" set is an
+		# orange sandstone photo too saturated to neutralise (walls read
+		# as orange timber boxes).
+		"wall": MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
+			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0),
 		"fence": _fence_material(),
 		"hedge": TreeMeshLibrary.leaf_material("broad", TreeSpecies.tint("oak", mini(season, 2)) * 0.85, 0.0, 0.0, true),
 		"hedge_core": _core_material(),
