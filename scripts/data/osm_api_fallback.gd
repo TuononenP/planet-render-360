@@ -10,7 +10,25 @@ extends RefCounted
 const URL := "https://api.openstreetmap.org/api/0.6/map"
 ## Bbox half-widths tried in order; 400 (too many nodes) steps down.
 const RADII_M: Array[int] = [1200, 800, 400]
+## Responses after which a smaller box can still succeed: 400 (over the
+## node cap), 429 (rate limited) and 509 (bandwidth limit exceeded).
+const STEP_DOWN_CODES: Array[int] = [400, 429, 509]
+## Seconds one extra step down may add to the fetch budget: these
+## answers arrive in about a second, so a step is cheap.
+const STEP_BUDGET_S := 15.0
 const M_PER_DEG := 111320.0
+
+static func steps_down(result: int, code: int) -> bool:
+	return result == HTTPRequest.RESULT_SUCCESS and code in STEP_DOWN_CODES
+
+static func extra_budget_seconds() -> float:
+	return (RADII_M.size() - 1) * STEP_BUDGET_S
+
+## `building=no` marks a non-building, and a way with fewer than three
+## resolved nodes (a relation with no such member) is no footprint;
+## neither counts as a building.
+static func names_building(tags: Dictionary) -> bool:
+	return tags.has("building") and str(tags["building"]) != "no"
 
 static func url_for(lat: float, lon: float, radius_m: int) -> String:
 	var dlat := radius_m / M_PER_DEG
@@ -86,18 +104,20 @@ static func to_overpass_json(xml: PackedByteArray) -> Dictionary:
 				if not tags.is_empty():
 					elements.append({"type": "way", "id": id, "tags": tags,
 						"geometry": geom})
-					buildings += int(tags.has("building"))
+					buildings += int(geom.size() >= 3 and names_building(tags))
 			"relation":
 				if str(tags.get("type", "")) == "multipolygon":
 					var out_members: Array = []
+					var with_geometry := 0
 					for m in members:
 						if str(m["type"]) == "way":
+							var mg: Array = way_geom.get(m["ref"], [])
+							with_geometry += int(mg.size() >= 3)
 							out_members.append({"type": "way", "ref": m["ref"],
-								"role": m["role"],
-								"geometry": way_geom.get(m["ref"], [])})
+								"role": m["role"], "geometry": mg})
 					if not out_members.is_empty() and not tags.is_empty():
 						elements.append({"type": "relation", "id": id,
 							"tags": tags, "members": out_members})
-						buildings += int(tags.has("building"))
+						buildings += int(with_geometry > 0 and names_building(tags))
 		cur = ""
 	return {"json": JSON.stringify({"elements": elements}), "buildings": buildings}

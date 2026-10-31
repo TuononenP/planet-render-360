@@ -69,6 +69,12 @@ static func osm_path(lat: float, lon: float, radius_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_r%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), radius_m]
 
+## Payload converted from the OSM API when Overpass was down: lossy, so it
+## never sits under osm_path (the key a fresh Overpass answer is read from).
+static func osm_api_path(lat: float, lon: float, radius_m: int) -> String:
+	return "%s/osm_v%d_%d_%d_api%d.json" % [base_dir(), DATA_VERSION,
+		quant(lat), quant(lon), radius_m]
+
 static func osm_ring_path(lat: float, lon: float, ring_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_ring%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), ring_m]
