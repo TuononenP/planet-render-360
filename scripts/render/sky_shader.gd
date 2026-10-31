@@ -36,6 +36,13 @@ uniform float star_gain = 1.0;
 uniform float milky_gain = 1.0;
 uniform vec3 milky_normal = vec3(0.0, 0.2, 0.98);
 uniform float moon = 0.0;
+// Lit fraction of the moon (phase): scales its halo and star washout.
+uniform float moon_illum = 1.0;
+// Lightning (LightningRig): flash level, direction toward the strike and
+// glow narrowness (1 tight, 0 broad: diffused by rain or snow).
+uniform float flash = 0.0;
+uniform vec3 flash_dir = vec3(0.0, 1.0, 0.0);
+uniform float flash_spread = 1.0;
 
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -155,7 +162,7 @@ void sky() {
 		vec3 night_sky = vec3(0.50, 0.55, 0.72) * lane * (0.25 + 0.75 * dust) * rift * 0.07 * milky_gain;
 		night_sky += stars(d, lane * milky_gain) * star_gain;
 		// The moon washes out faint stars around it.
-		night_sky *= 1.0 - 0.7 * pow(m, 6.0) * moon;
+		night_sky *= 1.0 - 0.7 * pow(m, 6.0) * moon * moon_illum;
 		col += night_sky * night_amount * smoothstep(0.0, 0.22, y) * (1.0 - overcast);
 	}
 	// Below the horizon: haze first (aerial perspective samples here),
@@ -221,6 +228,12 @@ void sky() {
 		vec3 cc = mix(cloud_shade, cloud_lit, lit * (1.0 - 0.55 * thick));
 		// Silver lining: thin cloud edges near the sun glow.
 		cc += LIGHT0_COLOR * pow(m, 6.0) * (1.0 - thick) * 0.6 * (1.0 - overcast);
+		if (flash > 0.001) {
+			// Lightning lights the deck from inside: thick cores glow,
+			// brightest around the strike, the whole deck faintly.
+			float fl = pow(max(dot(d, flash_dir), 0.0), mix(4.0, 40.0, flash_spread));
+			cc += vec3(0.78, 0.82, 1.0) * flash * (fl * (0.25 + 0.75 * thick) * 0.9 + 0.06);
+		}
 		// Distant clouds sink into the horizon haze.
 		cc = mix(cc, mix(horizon_color, glow_color, band * side * glow_amount), exp(-hy * 9.0) * 0.65);
 		alpha = c * smoothstep(-0.01, 0.10, y) * 0.96;
@@ -230,14 +243,20 @@ void sky() {
 	float disc = smoothstep(0.99985, 0.99994, mu);
 	col += LIGHT0_COLOR * LIGHT0_ENERGY * disc * sun_disc * 6.0 * (1.0 - alpha);
 	if (moon > 0.001) {
-		// Moon: a mottled disc (maria) with a cool halo that also
-		// brightens thin cloud near it.
+		// Moon: a mottled disc (maria) lit by the true sun, so its phase
+		// and the tilt of the terminator are real; earthshine keeps the
+		// dark limb faint. A cool halo, by lit fraction, brightens thin
+		// cloud near it.
 		vec3 t = normalize(cross(sun_dir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4));
-		vec2 q = vec2(dot(d, t), dot(d, cross(t, sun_dir))) / 0.0155;
+		vec3 b = cross(t, sun_dir);
+		vec2 q = vec2(dot(d, t), dot(d, b)) / 0.0155;
 		float maria = vnoise3(vec3(q * 2.6, 1.3)) * 0.6 + vnoise3(vec3(q * 6.0, 7.1)) * 0.4;
+		vec2 qn = q * (0.0155 / 0.0173);
+		vec3 sn = t * qn.x + b * qn.y - sun_dir * sqrt(max(1.0 - dot(qn, qn), 0.0));
+		float day_side = smoothstep(-0.04, 0.06, dot(sn, solar_dir));
 		vec3 face = vec3(0.93, 0.94, 0.98) * (0.62 + 0.45 * smoothstep(0.35, 0.65, maria));
-		col += face * disc * 1.5 * moon * (1.0 - 0.95 * alpha);
-		col += vec3(0.50, 0.58, 0.78) * (pow(m, 90.0) * 0.12 + pow(m, 10.0) * 0.035) * moon;
+		col += face * (0.03 + 0.97 * day_side) * disc * 1.5 * moon * (1.0 - 0.95 * alpha);
+		col += vec3(0.50, 0.58, 0.78) * (pow(m, 90.0) * 0.12 + pow(m, 10.0) * 0.035) * moon * moon_illum;
 	}
 	COLOR = col;
 }

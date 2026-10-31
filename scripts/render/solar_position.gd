@@ -47,6 +47,30 @@ static func compute(lat: float, lon: float, date: Dictionary, utc_hour: float) -
 		"declination": rad_to_deg(decl),
 	}
 
+## Low-precision Moon (Astronomical Almanac series, ~1°; no parallax):
+## elevation / azimuth as in compute(), `phase` 0 new -> 0.5 full -> 1
+## and `illum`, the lit fraction of the disc.
+static func moon(lat: float, lon: float, date: Dictionary, utc_hour: float) -> Dictionary:
+	var d := julian_day(date, utc_hour) - 2451545.0
+	var lam := deg_to_rad(218.316 + 13.176396 * d + 6.289 * sin(deg_to_rad(134.963 + 13.064993 * d)))
+	var beta := deg_to_rad(5.128 * sin(deg_to_rad(93.272 + 13.229350 * d)))
+	var g := deg_to_rad(357.529 + 0.98560028 * d)
+	var lam_sun := deg_to_rad(280.459 + 0.98564736 * d + 1.915 * sin(g) + 0.020 * sin(2.0 * g))
+	var eps := deg_to_rad(23.439 - 0.0000004 * d)
+	var ra := atan2(cos(eps) * sin(lam) - tan(beta) * sin(eps), cos(lam))
+	var decl := asin(sin(beta) * cos(eps) + cos(beta) * sin(eps) * sin(lam))
+	var ha := deg_to_rad(fposmod(280.46061837 + 360.98564736629 * d + lon - rad_to_deg(ra), 360.0))
+	var la := deg_to_rad(clampf(lat, -89.99, 89.99))
+	var sin_el := clampf(sin(la) * sin(decl) + cos(la) * cos(decl) * cos(ha), -1.0, 1.0)
+	var az := rad_to_deg(atan2(sin(ha), cos(ha) * sin(la) - tan(decl) * cos(la))) + 180.0
+	var elong := cos(beta) * cos(lam - lam_sun)
+	return {
+		"elevation": rad_to_deg(asin(sin_el)),
+		"azimuth": fposmod(az, 360.0),
+		"phase": fposmod(rad_to_deg(lam - lam_sun), 360.0) / 360.0,
+		"illum": (1.0 - elong) * 0.5,
+	}
+
 ## World-space unit vector toward the sun (x east, y up, z south — the
 ## WorldScale frame, where north is -Z).
 static func direction(elevation: float, azimuth: float) -> Vector3:

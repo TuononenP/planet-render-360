@@ -26,6 +26,16 @@ func _init() -> void:
 		failures.append("utc_offset_seconds should parse for the true sun's clock: %s" % tz)
 	if w.has("utc_offset_s"):
 		failures.append("missing utc_offset_seconds must stay absent")
+	if WeatherFetcher.label_for_code(56) != "Freezing drizzle" \
+			or WeatherFetcher.label_for_code(66) != "Freezing rain" \
+			or WeatherFetcher.label_for_code(96) != "Thunderstorm":
+		failures.append("freezing / storm labels wrong")
+	# Visibility by intensity, and only thunderstorms are storms.
+	var vis := func(c: int) -> float: return float(WeatherLook.for_code(c, 100.0)["visibility_m"])
+	if not (vis.call(61) > vis.call(63) and vis.call(63) > vis.call(65) and vis.call(65) > vis.call(45)):
+		failures.append("rain visibility should fall with intensity, fog lowest")
+	if WeatherLook.for_code(65, 100.0)["storm"] or not WeatherLook.for_code(95, 100.0)["storm"]:
+		failures.append("storm flag wrong")
 	if not WeatherFetcher.parse_current("{}").is_empty():
 		failures.append("missing current must be empty")
 	if failures.is_empty():

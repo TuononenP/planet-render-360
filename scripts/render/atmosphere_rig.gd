@@ -13,8 +13,14 @@ extends Node3D
 ## live cloud-cover %. No cloud geometry exists, so nothing can facet
 ## (PRD AC-11). Octave count is tier-gated by RenderSettings.
 ## Twilight adds Earth's shadow and the Belt of Venus opposite the sun;
-## night adds stars, the Milky Way and a moon disc. Each season
-## (SEASON_SKY) shifts sky hues, haze and cloud shape.
+## night adds stars, the Milky Way and the real moon (position and
+## phase; moonlight follows the lit fraction). Each season
+## (SkyPalette.SEASON_SKY) shifts sky hues, haze and cloud shape.
+##
+## Weather (WeatherLook) sets more than the deck: visibility (fog, rain
+## and snow at their real murk), how far the direct sun dims, how soft
+## the shadows go as the diffuse sky takes over, ambient and exposure,
+## and dark blue-green storm bases. Thunderstorms add LightningRig.
 ##
 ## The sun is the real one (T6.2): SolarPosition from latitude,
 ## longitude, date and UTC time. The hour is the place's local clock
@@ -36,9 +42,6 @@ const DEFAULT_COVER := 30.0
 ## Clear-air haze extinction per metre: ~36% at 10 km, ~74% at 30 km,
 ## so ridges 5-30 km away stay legible as hazed silhouettes.
 const HAZE_PER_M := 4.5e-5
-## Fog / drizzle / snow weather: ~1 km visibility.
-const FOG_PER_M := 2.0e-3
-const FOGGY_CODES := [45, 48, 51, 53, 55, 61, 63, 65, 71, 73, 75]
 ## Seconds between cloud-drift uniform steps. Drift is slow enough
 ## that 4 Hz steps are invisible, and the sky radiance map is only
 ## re-filtered when a uniform changes (TIME would dirty it per frame).
@@ -76,38 +79,6 @@ static func sun_transmittance(elev_deg: float, haze: float = 1.0) -> Color:
 		out.append(exp(-(TAU_RAYLEIGH * pow(r, -4.0) + TAU_AEROSOL * haze * pow(r, -1.0)) * m))
 	return Color(out[0], out[1], out[2])
 
-## Mid-month of each season (spring, summer, autumn, winter) in the
-## northern hemisphere; the south shifts by six months.
-const SEASON_MONTH := [4, 7, 10, 1]
-## Per-season sky character, indexed by LocationData.Season. Summer is
-## the reference grade (PRD Paris 17:00) and is the identity. Sun
-## height comes from the real date (T6.2); colour tints shift hue at constant luminance so they hold by day and by night;
-## `haze` scales clear-air extinction; `stretch` / `soft` shape the
-## cloud deck; `stars`, `milky` and `milky_tilt` / `milky_yaw` (deg)
-## set the night sky (summer carries the bright Milky Way core).
-const SEASON_SKY := [
-	# Spring: rinsed clear blue, pink-tinged low sun, building cumulus.
-	{"zenith": [Color(0.26, 0.48, 0.88), 0.15],
-		"horizon": [Color(0.78, 0.86, 0.94), 0.15], "glow": [Color(1.0, 0.70, 0.64), 0.18],
-		"haze": 0.85, "stretch": 1.1, "soft": 0.13,
-		"stars": 0.9, "milky": 0.55, "milky_tilt": 55.0, "milky_yaw": 20.0},
-	# Summer: reference grade.
-	{"zenith": [Color(0.24, 0.45, 0.80), 0.0],
-		"horizon": [Color(0.76, 0.80, 0.86), 0.0], "glow": [Color(0.94, 0.77, 0.56), 0.0],
-		"haze": 1.0, "stretch": 1.0, "soft": 0.12,
-		"stars": 0.85, "milky": 1.0, "milky_tilt": 78.0, "milky_yaw": 70.0},
-	# Autumn: amber low sun, damp warm haze, layered decks.
-	{"zenith": [Color(0.22, 0.40, 0.74), 0.12],
-		"horizon": [Color(0.86, 0.79, 0.66), 0.28], "glow": [Color(1.0, 0.56, 0.24), 0.45],
-		"haze": 1.25, "stretch": 1.35, "soft": 0.17,
-		"stars": 1.0, "milky": 0.8, "milky_tilt": 70.0, "milky_yaw": 125.0},
-	# Winter: low pale sun, cold dry air, rose twilight, flat stratus.
-	{"zenith": [Color(0.52, 0.64, 0.82), 0.25],
-		"horizon": [Color(0.84, 0.87, 0.92), 0.28], "glow": [Color(1.0, 0.66, 0.66), 0.32],
-		"haze": 0.8, "stretch": 1.7, "soft": 0.22,
-		"stars": 1.2, "milky": 0.45, "milky_tilt": 50.0, "milky_yaw": 160.0},
-]
-
 var sun: DirectionalLight3D
 var world_environment: WorldEnvironment
 var environment: Environment
@@ -134,20 +105,41 @@ var season: int = LocationData.Season.SUMMER
 var sky_top_color := Color(0.50, 0.66, 0.80)
 var sky_horizon_color := Color(0.86, 0.84, 0.80)
 var haze_color := Color(0.80, 0.82, 0.84)
+var cloud_shade_color := Color(0.55, 0.58, 0.64)
 ## 0 by day -> 1 in full night (stars, Milky Way); twilight peaks as the
 ## sun crosses the horizon (Earth's shadow, Belt of Venus).
 var night_amount := 0.0
 var twilight_amount := 0.0
+## Live weather's effect on light, haze and particles (WeatherLook).
+var weather_look := WeatherLook.for_code(-1, DEFAULT_COVER)
+## The real moon at the current hour (SolarPosition.moon) and how far
+## it has risen (0 set .. 1 up).
+var moon_state := {}
+var moon_up := 0.0
+## Climate snow lying at the viewpoint (ViewConditions): bright bounce.
+var snow_ground := false
+var lightning: LightningRig
 var _preset: int = RenderSettings.Preset.HIGH
 var _drift := 0.0
 var _drift_accum := 0.0
+var _flash_on := false
+var _flash_sky_gain := 1.0
 
+## Night light: full-moon energy on top of a faint skyglow (airglow,
+## starlight, distant towns) that keeps moonless nights readable.
+const MOON_E := 0.14
+const SKYGLOW_E := 0.025
+const MOON_COLOR := Color(0.62, 0.72, 0.95)
+## Exposure lift in full night: the eye adapts, the scene stays legible.
+const NIGHT_EXPOSURE_LIFT := 0.12
 
 func _init(preset: int = RenderSettings.Preset.HIGH) -> void:
 	name = "AtmosphereRig"
 	_build_sun()
 	_build_environment()
 	_build_probe()
+	lightning = LightningRig.new()
+	add_child(lightning)
 	set_quality(preset)
 	_apply()
 
@@ -158,6 +150,11 @@ func _process(delta: float) -> void:
 			# Any property change re-queues an UPDATE_ONCE capture, which
 			# Godot spreads over six frames (one cube face each).
 			probe.intensity = 1.0 if probe.intensity < 1.0 else 0.9999
+	# Lightning writes the sky only while a flash is lit (it dirties the
+	# radiance map); flashes never re-capture the reflection probe.
+	if lightning.active or _flash_on:
+		lightning.step(delta)
+		_push_flash()
 	_drift_accum += delta
 	if _drift_accum < DRIFT_STEP_S:
 		return
@@ -174,6 +171,7 @@ func _process(delta: float) -> void:
 ## once a place is shown; the probe re-renders there.
 func set_probe_origin(pos: Vector3) -> void:
 	probe.position = pos
+	lightning.centre = pos
 	_refresh_probe()
 
 ## Local clock hour (0-24, fractional) at the place; `on_date`
@@ -203,7 +201,7 @@ func set_utc_offset(hours: float) -> void:
 func solar_date() -> Dictionary:
 	if not date.is_empty():
 		return date
-	var month: int = SEASON_MONTH[season]
+	var month: int = SkyPalette.SEASON_MONTH[season]
 	if latitude < 0.0:
 		month = (month + 5) % 12 + 1
 	return {"year": int(Time.get_date_dict_from_system().get("year", 2026)),
@@ -235,11 +233,18 @@ func golden_hour() -> float:
 	return best
 
 ## Open-Meteo weather code + cloud cover %. Coverage drives the cloud
-## deck itself, not just the light level.
+## deck itself; the code sets visibility, light and lightning.
 func set_weather(code: int, cover: float) -> void:
 	weather_code = code
 	cloud_cover = clampf(cover, 0.0, 100.0)
+	weather_look = WeatherLook.for_code(code, cloud_cover)
 	_apply()
+
+## Snow lying at the viewpoint brightens the ground bounce light.
+func set_snow_ground(on: bool) -> void:
+	if on != snow_ground:
+		snow_ground = on
+		_apply()
 
 func set_season(value: int) -> void:
 	season = LocationData.clamp_season(value)
@@ -255,6 +260,8 @@ func set_quality(preset: int) -> void:
 	sky_material.set_shader_parameter("cloud_quality", _preset)
 	RenderQuality.apply_environment(environment, _preset)
 	RenderQuality.apply_light(sun, _preset)
+	sun.shadow_opacity = float(weather_look["shadow_opacity"])
+	_update_lightning()
 	if is_inside_tree():
 		RenderQuality.apply_viewport(get_viewport(), _preset)
 
@@ -262,7 +269,7 @@ func _ready() -> void:
 	RenderQuality.apply_viewport(get_viewport(), _preset)
 
 func is_foggy() -> bool:
-	return weather_code in FOGGY_CODES
+	return WeatherLook.is_foggy(weather_look)
 
 # --- Construction ---
 
@@ -337,10 +344,12 @@ func _refresh_probe() -> void:
 
 func _apply() -> void:
 	_refresh_probe()
+	var look := weather_look
 	var cover := cloud_cover / 100.0
 	var overcast := smoothstep(0.7, 1.0, cover)
-	var dim := lerpf(1.0, 0.55, cover)
-	var s: Dictionary = SEASON_SKY[season]
+	var dim := float(look["sun_dim"])
+	var darken := float(look["cloud_darken"])
+	var s: Dictionary = SkyPalette.SEASON_SKY[season]
 	var sp := solar_at(hour)
 	solar_elevation = float(sp["elevation"])
 	solar_azimuth = float(sp["azimuth"])
@@ -364,11 +373,11 @@ func _apply() -> void:
 		var mx := maxf(tr.r, maxf(tr.g, tr.b))
 		sun.light_color = Color(tr.r / mx, tr.g / mx, tr.b / mx)
 		sun.light_energy = maxf(SUN_E0 * tr.g, 0.22) * dim
+		moon_up = 0.0
 	else:
-		# Moonlight: fixed cool light so night scenes stay readable.
-		sun.rotation_degrees = Vector3(-38, 35, 0)
-		sun.light_energy = 0.12 * dim
-		sun.light_color = Color(0.62, 0.72, 0.95)
+		_moonlight(dim)
+	# Cloud and rain soften shadows as the diffuse sky takes over.
+	sun.shadow_opacity = float(look["shadow_opacity"])
 	# The sky's sun keeps its true position below the horizon, so the
 	# dusk glow slides down continuously instead of jumping to the moon.
 	var solar_dir := SolarPosition.direction(solar_elevation, solar_azimuth)
@@ -376,36 +385,15 @@ func _apply() -> void:
 	var dusk := 1.0 - smoothstep(0.08, 0.5, -arc)
 	night_amount = smoothstep(0.12, 0.45, -arc)
 	twilight_amount = exp(-pow((arc + 0.05) / 0.12, 2.0))
-	var zenith := _keyframed(key_h, [
-		[0.0, Color(0.03, 0.05, 0.12)], [5.0, Color(0.06, 0.09, 0.19)],
-		[6.5, Color(0.24, 0.38, 0.62)], [8.0, Color(0.30, 0.50, 0.78)],
-		[12.0, Color(0.24, 0.45, 0.80)], [16.0, Color(0.33, 0.54, 0.82)],
-		[17.0, Color(0.44, 0.62, 0.82)], [18.0, Color(0.38, 0.47, 0.66)],
-		[19.0, Color(0.13, 0.16, 0.31)], [20.5, Color(0.05, 0.07, 0.15)],
-		[24.0, Color(0.03, 0.05, 0.12)]])
-	# Anti-sun horizon: the haze base. Pale blue by day, never cream.
-	var horizon := _keyframed(key_h, [
-		[0.0, Color(0.07, 0.09, 0.16)], [5.0, Color(0.12, 0.13, 0.21)],
-		[6.5, Color(0.62, 0.60, 0.66)], [8.0, Color(0.76, 0.81, 0.87)],
-		[12.0, Color(0.70, 0.80, 0.91)], [16.0, Color(0.74, 0.80, 0.88)],
-		[17.0, Color(0.76, 0.80, 0.86)], [18.0, Color(0.72, 0.62, 0.62)],
-		[19.0, Color(0.30, 0.25, 0.33)], [20.5, Color(0.09, 0.10, 0.18)],
-		[24.0, Color(0.07, 0.09, 0.16)]])
-	# Sun-side horizon glow: PRD #F0C48F at 17:00.
-	var glow := _keyframed(key_h, [
-		[0.0, Color(0.08, 0.10, 0.18)], [5.0, Color(0.26, 0.19, 0.24)],
-		[6.5, Color(1.00, 0.64, 0.40)], [8.0, Color(1.00, 0.84, 0.66)],
-		[12.0, Color(0.96, 0.95, 0.91)], [16.0, Color(1.00, 0.88, 0.70)],
-		[17.0, Color(0.94, 0.77, 0.56)], [18.0, Color(1.00, 0.55, 0.32)],
-		[19.0, Color(0.52, 0.30, 0.30)], [20.5, Color(0.10, 0.11, 0.19)],
-		[24.0, Color(0.08, 0.10, 0.18)]])
+	var sky := SkyPalette.colors_at(key_h, season)
+	var zenith: Color = sky["zenith"]
+	var horizon: Color = sky["horizon"]
+	var glow: Color = sky["glow"]
 	var low_sun := dusk if night else 1.0 - clampf((eff - 0.15) * 2.0, 0.0, 0.75)
-	zenith = _tint(zenith, s["zenith"][0], s["zenith"][1])
-	horizon = _tint(horizon, s["horizon"][0], s["horizon"][1])
-	glow = _tint(glow, s["glow"][0], s["glow"][1])
-	# Overcast greys the whole dome; brightness follows the day level.
+	# Overcast greys the whole dome; brightness follows the day level and
+	# a storm deck darkens it further.
 	var day_level := 0.12 if night else clampf(0.55 + arc * 1.0, 0.55, 1.0)
-	var grey := Color(0.66, 0.69, 0.73) * day_level
+	var grey := Color(0.66, 0.69, 0.73) * day_level * (1.0 - 0.35 * darken)
 	zenith = zenith.lerp(grey * 0.92, overcast * 0.9)
 	horizon = horizon.lerp(grey * 1.08, overcast * 0.85)
 	glow = glow.lerp(horizon, overcast * 0.9)
@@ -422,16 +410,24 @@ func _apply() -> void:
 		shade = Color(0.05, 0.06, 0.10).lerp(shade, dusk * 0.6)
 	lit = lit.lerp(grey * 1.15, overcast)
 	shade = shade.lerp(grey * 0.82, overcast)
+	# Storm bases: lower, darker and faintly blue-green underneath.
+	shade = shade * (1.0 - 0.5 * darken) * (look["cloud_tint"] as Color)
+	lit = lit.lerp(shade, 0.4 * darken)
+	cloud_shade_color = shade
+	# Ground bounce under the horizon: snow cover reflects most light.
+	var ground := Color(0.80, 0.82, 0.86) if snow_ground or look["precip"] == "snow" \
+		else Color(0.42, 0.38, 0.33)
 	var p := sky_material
 	p.set_shader_parameter("zenith_color", zenith)
 	p.set_shader_parameter("horizon_color", horizon)
 	p.set_shader_parameter("glow_color", glow)
-	p.set_shader_parameter("ground_color", Color(0.42, 0.38, 0.33) * day_level)
+	p.set_shader_parameter("ground_color", ground * day_level)
 	p.set_shader_parameter("cloud_lit", lit)
 	p.set_shader_parameter("cloud_shade", shade)
 	p.set_shader_parameter("glow_amount", low_sun * (1.0 - overcast))
 	p.set_shader_parameter("sun_disc", (0.0 if night else 1.0) * (1.0 - overcast))
-	p.set_shader_parameter("moon", (1.0 if night else 0.0) * (1.0 - overcast))
+	p.set_shader_parameter("moon", moon_up * (1.0 - overcast))
+	p.set_shader_parameter("moon_illum", float(moon_state.get("illum", 1.0)))
 	p.set_shader_parameter("cloud_cover", cover)
 	p.set_shader_parameter("overcast", overcast)
 	p.set_shader_parameter("cloud_stretch", float(s["stretch"]))
@@ -448,28 +444,45 @@ func _apply() -> void:
 	RenderingServer.global_shader_parameter_set("cloud_shadow_cover", 0.0 if night else cover * (1.0 - overcast))
 	RenderingServer.global_shader_parameter_set("cloud_shadow_stretch", float(s["stretch"]))
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
-	environment.fog_light_color = haze_color
-	var per_m := FOG_PER_M if is_foggy() else HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
-	environment.fog_density = per_m / maxf(units_per_metre, 1e-4)
+	environment.fog_light_color = haze_color.darkened(0.3 * darken)
+	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
+	environment.fog_density = WeatherLook.fog_per_m(look, haze) / maxf(units_per_metre, 1e-4)
 	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
+	# Diffuse sky light takes over under cloud; the eye adapts to storms
+	# and to the night.
+	environment.ambient_light_energy = PostGrade.AMBIENT_ENERGY * float(look["ambient_gain"])
+	environment.tonemap_exposure = PostGrade.EXPOSURE \
+		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount)
 	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
+	_update_lightning()
 
-## Shifts `c` toward the hue of `target` by `w` at constant luminance,
-## so a season tint never brightens the night or darkens the noon sky.
-static func _tint(c: Color, target: Color, w: float) -> Color:
-	if w <= 0.0:
-		return c
-	var lum := c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
-	var t_lum := target.r * 0.2126 + target.g * 0.7152 + target.b * 0.0722
-	var t := target * (lum / maxf(t_lum, 1e-4))
-	t.a = 1.0
-	return c.lerp(t, w)
+## Night light from the real moon while it is up, its strength
+## following the lit fraction; once it sets only the skyglow remains.
+func _moonlight(dim: float) -> void:
+	moon_state = SolarPosition.moon(latitude, longitude, solar_date(), hour - utc_offset_h)
+	var el := float(moon_state["elevation"])
+	moon_up = smoothstep(-0.5, 4.0, el)
+	if moon_up > 0.0:
+		var pitch := clampf(el, MIN_LIGHT_PITCH, 90.0)
+		sun.rotation_degrees = Vector3(-pitch, 180.0 - float(moon_state["azimuth"]), 0)
+	else:
+		# Skyglow has no source: a high, soft light.
+		sun.rotation_degrees = Vector3(-70.0, 180.0 - solar_azimuth, 0)
+	sun.light_energy = (SKYGLOW_E + MOON_E * pow(float(moon_state["illum"]), 0.7) * moon_up) * dim
+	sun.light_color = MOON_COLOR
 
-static func _keyframed(hour_f: float, keys: Array) -> Color:
-	for i in keys.size() - 1:
-		var h0 := float(keys[i][0])
-		var h1 := float(keys[i + 1][0])
-		if hour_f >= h0 and hour_f <= h1:
-			var t := 0.0 if h1 == h0 else (hour_f - h0) / (h1 - h0)
-			return (keys[i][1] as Color).lerp(keys[i + 1][1], t)
-	return keys[keys.size() - 1][1]
+## Storm state for the lightning: flashes read strongest at night and
+## under the darkest decks.
+func _update_lightning() -> void:
+	var daylight := smoothstep(-6.0, 15.0, solar_elevation) * float(weather_look["sun_dim"])
+	_flash_sky_gain = lerpf(1.0, 0.25, daylight)
+	lightning.set_conditions(weather_look, season, daylight, _preset,
+		environment.fog_density * units_per_metre)
+	if _flash_on and not lightning.active:
+		_push_flash()
+
+func _push_flash() -> void:
+	_flash_on = lightning.flash_level > 0.0
+	sky_material.set_shader_parameter("flash", lightning.flash_level * _flash_sky_gain)
+	sky_material.set_shader_parameter("flash_dir", lightning.flash_dir)
+	sky_material.set_shader_parameter("flash_spread", lightning.flash_spread)

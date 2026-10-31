@@ -84,6 +84,42 @@ func _init() -> void:
 	if rig.environment.fog_density <= winter_fog:
 		failures.append("autumn haze should be denser than crisp winter air")
 
+	# Weather sets the light, not just the deck (WeatherLook).
+	rig.set_season(LocationData.Season.SUMMER)
+	rig.set_time(12.0)
+	rig.set_weather(0, 5.0)
+	var clear_shadow := rig.sun.shadow_opacity
+	var clear_ambient := rig.environment.ambient_light_energy
+	var clear_fog := rig.environment.fog_density
+	var clear_energy := rig.sun.light_energy
+	var clear_ground: Color = rig.sky_material.get_shader_parameter("ground_color")
+	rig.set_weather(3, 100.0)
+	if not (rig.sun.shadow_opacity < clear_shadow * 0.7 and rig.environment.ambient_light_energy > clear_ambient):
+		failures.append("overcast should soften shadows (%f) and lift diffuse light (%f)"
+			% [rig.sun.shadow_opacity, rig.environment.ambient_light_energy])
+	var overcast_shade := rig.cloud_shade_color
+	var fogs := {}
+	for code in [61, 65, 45]:
+		rig.set_weather(code, 100.0)
+		fogs[code] = rig.environment.fog_density
+	if not (clear_fog < fogs[61] and fogs[61] < fogs[65] and fogs[65] < fogs[45]):
+		failures.append("murk should rise clear < light rain < heavy rain < fog: %f %s" % [clear_fog, fogs])
+	if not rig.is_foggy():
+		failures.append("fog code 45 should count as foggy")
+	rig.set_weather(65, 100.0)
+	if rig.sun.light_energy >= clear_energy * 0.6:
+		failures.append("heavy rain should dim the sun: %f vs clear %f" % [rig.sun.light_energy, clear_energy])
+	rig.set_weather(95, 100.0)
+	if rig.cloud_shade_color.get_luminance() >= overcast_shade.get_luminance() * 0.8:
+		failures.append("storm bases should be darker than plain overcast")
+	if rig.environment.tonemap_exposure <= PostGrade.EXPOSURE:
+		failures.append("a storm should lift exposure so the scene stays readable")
+	rig.set_weather(73, 100.0)
+	var snow_ground: Color = rig.sky_material.get_shader_parameter("ground_color")
+	if snow_ground.get_luminance() <= clear_ground.get_luminance() * 1.5:
+		failures.append("falling snow should brighten the ground bounce")
+	rig.set_weather(-1, AtmosphereRig.DEFAULT_COVER)
+
 	rig.free()
 	if failures.is_empty():
 		print("SKY OK: golden-hour reference, seasonal sun/hues/clouds, twilight, night")
