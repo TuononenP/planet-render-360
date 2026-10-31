@@ -12,6 +12,11 @@ signal succeeded(buildings: Array, roads: Array, land: Array, landmarks: Array)
 ## Closure W2 companion: extras the frozen 4-arg signal cannot carry.
 signal succeeded_v2(roads_v2: Array, waterways: Array, trees: Array, barriers: Array)
 signal failed(reason: String)
+## Emitted just before `succeeded` when the answer is not a fresh full
+## Overpass reply: `detail` is the loading row's short mono text ("Nearby ·
+## 450 m", "Offline copy", "Within 800 m"), `partial` whether part of the
+## view is left without map data.
+signal fallback_used(detail: String, partial: bool)
 
 ## Overpass endpoints, tried in order. The main instance regularly
 ## times out (result=13) or returns 502 when overloaded; a transient
@@ -74,10 +79,11 @@ const ATTEMPT_TIMEOUT := 60.0
 ## waiting on succeeded/failed must wait at least this long or a late
 ## rescue is dropped. Typical is far lower (a fast 502 moves on in ~1 s,
 ## a silent mirror in OverpassRequest.FIRST_BYTE_TIMEOUT).
-## Plus one OSM API attempt (a 400 steps down a radius in ~1 s).
+## Plus one OSM API attempt, and a second's worth of each step down to a
+## smaller box (OsmApiFallback.STEP_DOWN_CODES) so a late result lands.
 static func retry_budget_seconds() -> float:
 	return 2.0 * (float(ENDPOINTS.size()) * ATTEMPT_TIMEOUT + 5.0) \
-		+ ATTEMPT_TIMEOUT + 5.0
+		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
 
 const CACHE_DIR := "user://cache"
 
@@ -249,6 +255,8 @@ var offline_mode := false
 func cancel() -> void:
 	# A parse still running off-thread belongs to the abandoned fetch.
 	_parse_gen += 1
+	# So does any step of the OSM API fallback.
+	_api_tier = 0
 	if _http != null:
 		_http.cancel_request()
 	if _detailed_req != null:
@@ -284,6 +292,9 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	_detailed_ready = false
 	_ring_pending = false
 	_tried = 1
+	_api_reason = ""
+	_fallback_detail = ""
+	_fallback_partial = false
 	var want_ring := ring > radius
 	if want_ring:
 		_pending_ring_cache = CacheStore.osm_ring_path(lat, lon, ring)
@@ -331,6 +342,8 @@ var _parse_gen := 0
 var _tried := 1
 var _api_tier := 0
 var _api_reason := ""
+var _fallback_detail := ""
+var _fallback_partial := false
 
 static func _read_cache(path: String) -> String:
 	if path == "" or not FileAccess.file_exists(path):
@@ -353,6 +366,12 @@ static func _write_cache(path: String, text: String) -> void:
 static func _payload_has_buildings(text: String, lat: float, lon: float) -> bool:
 	var probe := parse_features(text, lat, lon)
 	return not (probe["buildings"] as Array).is_empty()
+
+## Cheap stand-in for _payload_has_buildings on payloads that were
+## validated before they were cached: no parse on the main thread, and
+## the full parse then happens once, in _finish().
+static func _mentions_buildings(text: String) -> bool:
+	return text.contains("\"building\"")
 
 ## A ring payload is usable when it is valid JSON with an element list
 ## (empty is fine — the ring carries majors only, never buildings).
@@ -440,12 +459,18 @@ func _detailed_fallback(reason: String) -> void:
 	_api_reason = reason
 	_request_api()
 
-## Serve the nearest cached payload within max_m that holds buildings.
+## Serve the nearest cached payload within max_m that holds buildings,
+## and say so: a payload keyed more than SAME_PLACE_M away leaves part of
+## the view empty ("Nearby"), a closer one is only a stale copy.
 func _use_cached(reason: String, max_m: float) -> bool:
 	for path in OsmNearbyCache.candidates(_pending_lat, _pending_lon, max_m).slice(0, 3):
 		var text := _read_cache(path)
-		if text != "" and _payload_has_buildings(text, _pending_lat, _pending_lon):
+		if text != "" and _mentions_buildings(text):
 			print("OsmFetcher: %s; using cached %s" % [reason, path.get_file()])
+			var d := OsmNearbyCache.distance_m(path, _pending_lat, _pending_lon)
+			_fallback_partial = d > SAME_PLACE_M
+			_fallback_detail = "Nearby · %d m" % snappedi(int(d), 10) \
+				if _fallback_partial else "Offline copy"
 			_detailed_text = text
 			_detailed_cached = false
 			_detailed_done()
@@ -466,9 +491,9 @@ func _api_failed(why: String, reason: String) -> void:
 		failed.emit("%s (tried %d endpoint(s))" % [full, _tried])
 
 func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-	if result == HTTPRequest.RESULT_SUCCESS and code == 400 \
+	if OsmApiFallback.steps_down(result, code) \
 			and _api_tier + 1 < OsmApiFallback.RADII_M.size():
-		_api_tier += 1  # over the API's 50 000-node cap: try a smaller box
+		_api_tier += 1  # over the node cap or throttled: try a smaller box
 		_request_api()
 		return
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
@@ -488,8 +513,14 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 		return
 	_detailed_text = converted["json"]
 	_detailed_cached = false
-	_write_cache(CacheStore.osm_path(_pending_lat, _pending_lon,
-		OsmApiFallback.RADII_M[_api_tier]), _detailed_text)
+	# Not under osm_path: that key means "a fresh Overpass answer", and
+	# this payload is lossy, so Overpass is asked again next time.
+	var radius: int = OsmApiFallback.RADII_M[_api_tier]
+	_write_cache(CacheStore.osm_api_path(_pending_lat, _pending_lon, radius),
+		_detailed_text)
+	if radius < DETAILED_RADIUS_M:
+		_fallback_detail = "Within %d m" % radius
+		_fallback_partial = true
 	_detailed_done()
 
 ## Merge the detailed + ring payloads, parse once, and emit both signals:
@@ -528,6 +559,8 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 			_detailed_req.run(_pending_body, _detailed_check(_pending_lat, _pending_lon),
 				ENDPOINTS)
 		return
+	if _fallback_detail != "":
+		fallback_used.emit(_fallback_detail, _fallback_partial)
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

@@ -48,6 +48,22 @@ const API_XML := """<?xml version="1.0" encoding="UTF-8"?>
  </relation>
 </osm>"""
 
+## Nothing here is a usable building: building=no, a way with two
+## resolved nodes, and a building relation whose members have no geometry.
+const EMPTY_XML := """<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6">
+ <node id="1" lat="48.8566" lon="2.3522"/>
+ <node id="2" lat="48.8566" lon="2.3526"/>
+ <node id="3" lat="48.8569" lon="2.3526"/>
+ <way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="1"/>
+  <tag k="building" v="no"/></way>
+ <way id="11"><nd ref="1"/><nd ref="2"/><tag k="building" v="yes"/></way>
+ <relation id="20">
+  <member type="way" ref="900" role="outer"/>
+  <tag k="type" v="multipolygon"/><tag k="building" v="yes"/>
+ </relation>
+</osm>"""
+
 const CACHED_PAYLOAD := """{"elements":[
  {"type":"way","id":1,"tags":{"building":"yes"},
   "geometry":[{"lat":48.8566,"lon":2.3522},{"lat":48.8566,"lon":2.3526},
@@ -55,6 +71,8 @@ const CACHED_PAYLOAD := """{"elements":[
 
 var _ok := false
 var _failed_reason := ""
+var _detail := ""
+var _partial := false
 
 func _init() -> void:
 	_run()
@@ -64,6 +82,7 @@ func _run() -> void:
 	_url_checks(failures)
 	_convert_checks(failures)
 	_nearby_checks(failures)
+	_api_checks(failures)
 	await _fallback_flow_checks(failures)
 	if failures.is_empty():
 		print("OSM FALLBACK OK: api url, xml convert, nearby cache, cache fallback order")
@@ -139,6 +158,33 @@ func _convert_checks(failures: Array[String]) -> void:
 	if int(OsmApiFallback.to_overpass_json(PackedByteArray())["buildings"]) != 0:
 		failures.append("empty body must convert to zero buildings")
 
+func _api_checks(failures: Array[String]) -> void:
+	if int(OsmApiFallback.to_overpass_json(EMPTY_XML.to_utf8_buffer())["buildings"]) != 0:
+		failures.append("building=no, 2-node ways and geometry-less relations are not buildings")
+	for code in [400, 429, 509]:
+		if not OsmApiFallback.steps_down(HTTPRequest.RESULT_SUCCESS, code):
+			failures.append("HTTP %d must step down to a smaller box" % code)
+	for code in [200, 404, 500]:
+		if OsmApiFallback.steps_down(HTTPRequest.RESULT_SUCCESS, code):
+			failures.append("HTTP %d must not step down" % code)
+	if OsmApiFallback.steps_down(HTTPRequest.RESULT_CANT_CONNECT, 400):
+		failures.append("a transport error is not an HTTP answer to step down on")
+	# The lossy API payload never takes the key a fresh Overpass answer uses.
+	var api := CacheStore.osm_api_path(LAT, LON, 1200)
+	if api == CacheStore.osm_path(LAT, LON, 1200) or CacheStore.layer_of(api) != "osm":
+		failures.append("API cache key must differ from the Overpass key but stay in the osm layer")
+	_with_cache_dir({
+		"osm_v2_48857_2352_api1200.json": CACHED_PAYLOAD,
+		"osm_v2_48857_2352_r800.json": CACHED_PAYLOAD,
+	})
+	var order := OsmNearbyCache.candidates(LAT, LON, OsmFetcher.SAME_PLACE_M)
+	if order.size() != 2 or not order[0].ends_with("_r800.json"):
+		failures.append("an Overpass payload goes before an API one at the same spot: %s" % [order])
+	var d := OsmNearbyCache.distance_m(order[0], LAT, LON)
+	if d < 20.0 or d > 80.0 or OsmNearbyCache.distance_m("osm_v2_1_2_ring1600.json", LAT, LON) >= 0.0:
+		failures.append("distance_m wrong: %s" % d)
+	CacheStore.dir_override = ""
+
 func _with_cache_dir(files: Dictionary) -> String:
 	var dir := "user://osm_fallback_test_cache"
 	DirAccess.make_dir_recursive_absolute(dir)
@@ -172,12 +218,17 @@ func _run_fetch(files: Dictionary) -> void:
 	_with_cache_dir(files)
 	_ok = false
 	_failed_reason = ""
+	_detail = ""
+	_partial = false
 	var f := OsmFetcher.new()
 	root.add_child(f)
 	await process_frame
 	f.offline_mode = true
 	f.succeeded.connect(func(_b, _r, _l, _lm) -> void: _ok = true)
 	f.failed.connect(func(reason: String) -> void: _failed_reason = reason)
+	f.fallback_used.connect(func(detail: String, partial: bool) -> void:
+		_detail = detail
+		_partial = partial)
 	f.fetch(LAT, LON, 0)
 	for i in 600:
 		if _ok or _failed_reason != "":
@@ -191,10 +242,14 @@ func _fallback_flow_checks(failures: Array[String]) -> void:
 	await _run_fetch({"osm_v2_48857_2352_r800.json": CACHED_PAYLOAD})
 	if not _ok:
 		failures.append("same-place r800 cache not served (failed: %s)" % _failed_reason)
+	if _detail != "Offline copy" or _partial:
+		failures.append("a same-place copy is an offline copy, not partial: %s/%s" % [_detail, _partial])
 	# Only a neighbour ~330 m away: served after the API step is skipped.
 	await _run_fetch({"osm_v2_48860_2352_r1200.json": CACHED_PAYLOAD})
 	if not _ok:
 		failures.append("nearby cache not served (failed: %s)" % _failed_reason)
+	if not _detail.begins_with("Nearby · ") or not _detail.ends_with(" m") or not _partial:
+		failures.append("a neighbouring cache must be reported as partial: %s/%s" % [_detail, _partial])
 	# Only a far-away entry: fails and names the OSM API step.
 	await _run_fetch({"osm_v2_48920_2352_r1200.json": CACHED_PAYLOAD})
 	if _ok or not _failed_reason.contains("OSM API"):

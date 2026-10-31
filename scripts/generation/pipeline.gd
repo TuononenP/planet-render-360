@@ -14,6 +14,10 @@ signal progress_changed(fraction: float, label: String)
 signal finished(data: LocationData)
 signal cancelled
 signal degraded_layer(layer: String)
+## A layer arrived, but from a saved or reduced source: `detail` is the
+## short text for its loading row ("Nearby · 450 m", "Offline copy"). When
+## `partial` the layer is also noted as degraded, after this signal.
+signal layer_detail(layer: String, detail: String, partial: bool)
 ## The data as it stands after a stage, for the loading preview
 ## (heights + imagery after 0, buildings after 2). Read-only for listeners.
 signal stage_data(index: int, data: LocationData)
@@ -118,6 +122,10 @@ func _ready() -> void:
 		_osm_land = l
 		_osm_landmarks = lm
 		_osm_done = true)
+	_osm.fallback_used.connect(func(detail: String, partial: bool) -> void:
+		layer_detail.emit("map", detail, partial)
+		if partial:
+			_note("map"))
 	_osm.succeeded_v2.connect(func(r2: Array, w: Array, t: Array, br: Array) -> void:
 		_osm_roads_v2 = r2
 		_osm_waterways = w
@@ -392,8 +400,8 @@ static func rank_landmarks(cands: Array) -> Array:
 	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var da := float(a["x"]) ** 2 + float(a["z"]) ** 2
 		var db := float(b["x"]) ** 2 + float(b["z"]) ** 2
-		var ma: bool = (a.get("monument", false) or a["archetype"] == "big_wheel") and da <= reach2
-		var mb: bool = (b.get("monument", false) or b["archetype"] == "big_wheel") and db <= reach2
+		var ma: bool = (a.get("monument", false) or a.get("archetype", "") == "big_wheel") and da <= reach2
+		var mb: bool = (b.get("monument", false) or b.get("archetype", "") == "big_wheel") and db <= reach2
 		return da < db if ma == mb else ma)
 	return ranked
 
