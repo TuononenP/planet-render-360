@@ -7,6 +7,9 @@ extends Control
 
 signal back_requested
 signal preset_changed(preset: int)
+signal accent_changed(index: int)
+## 0 Auto, 1 Compact, 2 Wide: forces the stacked or two-column layout.
+signal layout_changed(index: int)
 
 var _settings: RenderSettings
 var _preset_btns: Array[Button] = []
@@ -14,6 +17,9 @@ var _summary_label: Label
 var _storage_label: Label
 var _margin: MarginContainer
 var _grid: GridContainer
+var _accent_btns: Array[Button] = []
+var _layout_btns: Array[Button] = []
+var _layout_index := 0
 
 func _ready() -> void:
 	var bg := ColorRect.new()
@@ -46,6 +52,32 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 14)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(col)
+	col.add_child(UiTheme.section_label("Appearance"))
+	var look := PanelContainer.new()
+	look.add_theme_stylebox_override("panel", UiTheme.glass_panel(UiTheme.RADIUS_L))
+	col.add_child(look)
+	var look_col := VBoxContainer.new()
+	look_col.add_theme_constant_override("separation", 10)
+	look.add_child(look_col)
+	look_col.add_child(UiTheme.label("Accent", 15, UiTheme.INK, true))
+	_choice_row(look_col, UiTheme.theme_names + ["Auto"], _accent_btns,
+		func(i: int) -> void:
+			if i == UiTheme.AUTO_CHIP:
+				UiTheme.auto_mode = true
+			else:
+				UiTheme.apply_palette(i)
+			accent_changed.emit(i))
+	look_col.add_child(UiTheme.label("Layout", 15, UiTheme.INK, true))
+	_choice_row(look_col, ["Auto", "Compact", "Wide"], _layout_btns,
+		func(i: int) -> void:
+			_layout_index = i
+			layout_changed.emit(i))
+	var look_note := UiTheme.label(
+		"Auto follows the window. Compact and Wide force the phone or tablet arrangement on any screen.",
+		14, UiTheme.MUTED)
+	look_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	look_col.add_child(look_note)
+
 	col.add_child(UiTheme.section_label("Render quality"))
 	var subtitle := UiTheme.label(
 		"Higher quality renders terrain and places more accurately, but takes longer to build and more power to draw.",
@@ -110,13 +142,13 @@ func _style_preset(btn: Button) -> void:
 	for key in ["font_color", "font_hover_color", "font_pressed_color",
 			"font_hover_pressed_color", "font_focus_color"]:
 		btn.add_theme_color_override(key, UiTheme.INK)
-	var base := UiTheme.style(UiTheme.SURFACE, 20, UiTheme.LINE)
+	var base := UiTheme.style(UiTheme.SURFACE, UiTheme.RADIUS_L, UiTheme.LINE)
 	base.set_content_margin_all(18)
 	btn.add_theme_stylebox_override("normal", base)
-	var hover := UiTheme.style(Color(0.10, 0.16, 0.17), 20, Color(UiTheme.TEAL, 0.6))
+	var hover := UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_L, Color(UiTheme.TEAL, 0.6))
 	hover.set_content_margin_all(18)
 	btn.add_theme_stylebox_override("hover", hover)
-	var chosen := UiTheme.style(Color(UiTheme.TEAL, 0.12), 20, UiTheme.TEAL, true)
+	var chosen := UiTheme.style(UiTheme.TEAL_SOFT, UiTheme.RADIUS_L, UiTheme.TEAL, true)
 	chosen.set_content_margin_all(18)
 	chosen.set_border_width_all(2)
 	chosen.shadow_color = Color(UiTheme.TEAL, 0.18)
@@ -127,8 +159,50 @@ func _style_preset(btn: Button) -> void:
 	focus.set_border_width_all(2)
 	btn.add_theme_stylebox_override("focus", focus)
 
+## A wrapping row of exclusive chips; `pick(index)` runs on a choice.
+func _choice_row(parent: Control, names: Array, into: Array[Button], pick: Callable) -> Array[Button]:
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 8)
+	parent.add_child(flow)
+	var group := ButtonGroup.new()
+	for i in names.size():
+		var chip := UiTheme.chip_button(str(names[i]))
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		chip.custom_minimum_size = Vector2(96, 44)
+		chip.button_group = group
+		var index := i
+		chip.pressed.connect(func() -> void:
+			pick.call(index)
+			_refresh_appearance())
+		into.append(chip)
+		flow.add_child(chip)
+	return into
+
+func _refresh_appearance() -> void:
+	for i in _accent_btns.size():
+		var chosen := i == UiTheme.AUTO_CHIP if UiTheme.auto_mode else i == UiTheme.theme_index
+		var chip := _accent_btns[i]
+		chip.set_pressed_no_signal(chosen)
+		UiTheme.apply_chip(chip, chosen)
+		# Each chip shows its colour; the chosen one shows a check on its fill.
+		if chosen:
+			UiIcon.apply(chip, "check", 16, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+		elif i == UiTheme.AUTO_CHIP:
+			chip.icon = null
+		else:
+			chip.icon = UiTheme.dot(UiTheme.ACCENTS[i])
+			chip.expand_icon = false
+			for key in ["icon_normal_color", "icon_hover_color", "icon_focus_color",
+					"icon_pressed_color", "icon_hover_pressed_color"]:
+				chip.add_theme_color_override(key, Color.WHITE)
+	for i in _layout_btns.size():
+		_layout_btns[i].set_pressed_no_signal(i == _layout_index)
+		UiTheme.apply_chip(_layout_btns[i], i == _layout_index)
+
 ## Re-skin after an accent change (preset cards bake the palette in).
 func refresh_theme() -> void:
+	_refresh_appearance()
 	for btn in _preset_btns:
 		_style_preset(btn)
 	if _summary_label != null:
@@ -165,6 +239,7 @@ func _refresh() -> void:
 		_preset_btns[i].set_pressed_no_signal(i == current)
 	if _summary_label != null:
 		_summary_label.text = RenderSettings.summary_for(current)
+	_refresh_appearance()
 	_refresh_storage()
 
 func _refresh_storage() -> void:

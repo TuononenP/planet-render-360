@@ -81,3 +81,80 @@ static func half_extent(ring: PackedVector2Array, c: Vector2, axis: Vector2) -> 
 	for p in ring:
 		e = maxf(e, absf((p - c).dot(axis)))
 	return e
+
+## One weakly simple ring for `outer` with `holes` cut in (keyhole
+## bridges: each hole, rightmost first, joins the nearest outer vertex by
+## a doubled seam), so Geometry2D.triangulate_polygon — which knows no
+## holes — can triangulate a courtyard block. Holes run against the
+## outer's winding. The seam goes to the nearest outer vertex it can
+## reach without crossing an edge; drop_hole_triangles filters the rest.
+static func bridge_holes(outer: PackedVector2Array, holes: Array) -> PackedVector2Array:
+	var out := PackedVector2Array(outer)
+	var ccw := signed_area(outer) > 0.0
+	var sorted := holes.duplicate()
+	sorted.sort_custom(func(a: PackedVector2Array, b: PackedVector2Array) -> bool:
+		return aabb(a).end.x > aabb(b).end.x)
+	for h in sorted:
+		var hole := PackedVector2Array(h as PackedVector2Array)
+		if hole.size() < 3:
+			continue
+		if (signed_area(hole) > 0.0) == ccw:
+			hole.reverse()
+		var hi := 0
+		for i in hole.size():
+			if hole[i].x > hole[hi].x:
+				hi = i
+		var oi := _visible_vertex(out, hole[hi], sorted)
+		var seam := PackedVector2Array()
+		for k in hole.size() + 1:
+			seam.append(hole[(hi + k) % hole.size()])
+		seam.append(out[oi])
+		var joined := out.slice(0, oi + 1)
+		joined.append_array(seam)
+		joined.append_array(out.slice(oi + 1))
+		out = joined
+	return out
+
+## Nearest vertex of `out` whose seam to p crosses no edge of `out` or of
+## any hole (the nearest vertex outright when none is clear).
+static func _visible_vertex(out: PackedVector2Array, p: Vector2, holes: Array) -> int:
+	var order: Array = range(out.size())
+	order.sort_custom(func(i: int, j: int) -> bool:
+		return out[i].distance_squared_to(p) < out[j].distance_squared_to(p))
+	for i in order:
+		if _seam_clear(out[i], p, out, holes):
+			return i
+	return order[0] if not order.is_empty() else 0
+
+static func _seam_clear(a: Vector2, b: Vector2, out: PackedVector2Array, holes: Array) -> bool:
+	var rings: Array = [out]
+	rings.append_array(holes)
+	for r in rings:
+		var ring := r as PackedVector2Array
+		for j in ring.size():
+			var c := ring[j]
+			var d := ring[(j + 1) % ring.size()]
+			# Edges sharing a seam end touch it there by construction.
+			if c.is_equal_approx(a) or d.is_equal_approx(a) \
+					or c.is_equal_approx(b) or d.is_equal_approx(b):
+				continue
+			if Geometry2D.segment_intersects_segment(a, b, c, d) != null:
+				return false
+	return true
+
+## Triangles of `idx` (indexing `ring`) whose centroid is outside every
+## hole: a keyhole triangulation can still span a courtyard when a seam
+## had no clear vertex.
+static func drop_hole_triangles(ring: PackedVector2Array, idx: PackedInt32Array,
+		holes: Array) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for t in idx.size() / 3:
+		var c := (ring[idx[t * 3]] + ring[idx[t * 3 + 1]] + ring[idx[t * 3 + 2]]) / 3.0
+		var in_hole := false
+		for h in holes:
+			if (h as PackedVector2Array).size() >= 3 and point_in_ring(c, h):
+				in_hole = true
+				break
+		if not in_hole:
+			out.append_array([idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]])
+	return out

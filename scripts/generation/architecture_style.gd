@@ -16,14 +16,31 @@ const KINDS: Array[String] = ["house", "apartments", "commercial",
 ## panes, loggias; Paris pediments/balconettes/fascias). Seeded per
 ## building so a street is not a row of clones.
 const VARIANTS := 3
+## Facade looks per (era, kind) inside a city zone: every material
+## pick (wall set + tint, shutter, pattern, variant, fascia, roof finish)
+## is coupled to one of LOOKS seeds, so a city's many eras stay within the
+## per-place material budget (lod_test T7.2); WallVariety's per-building
+## vertex tint and the geometry picks (roof shape, storeys, relief) keep
+## each building distinct.
+const LOOKS := 2
 ## Brightest linear luminance a wall/roof tint may reach.
 const WALL_ALBEDO_MAX := 0.72
 
 static var _profile_cache: Dictionary = {}
 
-## Style region for a viewpoint: first matching coarse box, else "generic"
-## (the temperate-mixed GENERIC profile).
+## Style region for a viewpoint: a city zone (CityStyles: London,
+## Manhattan, Tokyo ... -> that city's row), else the first matching
+## coarse country box, else "generic" (the temperate-mixed GENERIC
+## profile).
 static func region_for(lat: float, lon: float) -> String:
+	var city := CityStyles.region_at(lat, lon)
+	if city != "":
+		return city
+	return country_region_for(lat, lon)
+
+## The coarse country box region alone (no city zones): for callers that
+## key off the broad climate/culture region (vegetation, street lamps).
+static func country_region_for(lat: float, lon: float) -> String:
 	for box in ArchitectureData.BOXES:
 		var b: Array = box
 		if lat >= float(b[1]) and lat <= float(b[3]) \
@@ -33,6 +50,36 @@ static func region_for(lat: float, lon: float) -> String:
 
 static func has_region(region: String) -> bool:
 	return region == "generic" or ArchitectureData.REGIONS.has(region)
+
+## The country region a city or era row descends from ("paris_hbm" ->
+## "haussmann", "london" -> "west_europe_brick"): the first BASE ancestor
+## that is a country box region. Country regions return themselves.
+static func country_region(region: String) -> String:
+	var r := region
+	for i in 8:
+		if r == "generic" or _box_regions().has(r):
+			return r
+		r = str(ArchitectureData.BASE.get(r, "generic"))
+	return "generic"
+
+static var _box_set: Dictionary = {}
+
+static func _box_regions() -> Dictionary:
+	if _box_set.is_empty():
+		for box in ArchitectureData.BOXES:
+			_box_set[str((box as Array)[0])] = true
+	return _box_set
+
+## City key for a region or one of its eras ("paris_hbm" -> "paris"),
+## "" outside every city.
+static func city_of(region: String) -> String:
+	var r := region
+	for i in 8:
+		var c := CityStyles.city_of_region(r)
+		if c != "" or not ArchitectureData.BASE.has(r):
+			return c
+		r = str(ArchitectureData.BASE[r])
+	return ""
 
 ## Building kind from the OSM `building` value, then its `use` hint
 ## (amenity/shop/...), then levels / footprint area / density for the
@@ -61,7 +108,8 @@ static func kind_for(b: Dictionary, density: String, area_m2: float) -> String:
 	return "apartments" if area_m2 >= 350.0 else "house"
 
 ## Merged kind profile: GENERIC <- BASE chain <- region row (see the key
-## legend in ArchitectureData). Cached; callers must not mutate it.
+## legend in ArchitectureData; era -> city -> country -> ... chains run
+## up to 6 deep). Cached; callers must not mutate it.
 static func profile(region: String, kind: String) -> Dictionary:
 	var key := region + "|" + kind
 	if _profile_cache.has(key):
@@ -70,7 +118,7 @@ static func profile(region: String, kind: String) -> Dictionary:
 	var merged: Dictionary = (generic.get(kind, generic["house"]) as Dictionary).duplicate()
 	var chain: Array[String] = []
 	var r := region
-	while r != "" and chain.size() < 4:
+	while r != "" and chain.size() < 6:
 		chain.push_front(r)
 		r = str(ArchitectureData.BASE.get(r, ""))
 	for name in chain:
@@ -123,24 +171,35 @@ static func _tint(palette: Array, seed_v: float, salt: int) -> Color:
 ## The full look of one building: wall/roof finish, window pattern,
 ## roof shape default, storeys, and the detail probabilities BuildingDetail
 ## rolls against. `b` is the §2.4 building dict (kind/use/levels/religion
-## tags); seed_v is the building's stable 0..1 hash.
+## tags, start_year/heritage/architecture); seed_v is the building's
+## stable 0..1 hash. Inside a city the building is first refined to an
+## era row (BuildingEra) from its own cues; `ctx` (the build context)
+## adds the distance-from-core cue. The look also carries "city", "era"
+## and the 3D "relief" dict (profile `rv`, gable picked per building).
 static func resolve(b: Dictionary, region: String, density: String,
-		seed_v: float, area_m2: float) -> Dictionary:
+		seed_v: float, area_m2: float, ctx: Dictionary = {}) -> Dictionary:
 	var kind := kind_for(b, density, area_m2)
-	var p := profile(region, kind)
-	var wall: Array = _pick(p["w"] as Array, seed_v, 1)
-	var roof: Array = _pick(p["rf"] as Array, seed_v, 4)
+	var era := BuildingEra.refine(region, kind, b, ctx, seed_v, area_m2)
+	var p := profile(era, kind)
+	var city := city_of(region)
+	var ms := seed_v
+	if city != "":
+		ms = (floorf(_h(seed_v, 31) * float(LOOKS)) + 0.5) / float(LOOKS) * 0.913 + 0.041
+	var wall: Array = _pick(p["w"] as Array, ms, 1)
+	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)
-	var pattern := _pattern_of(p, seed_v, 13)
+	var pattern := _pattern_of(p, ms, 13)
 	if str(wall[0]) == "glass":
 		pattern = "curtain"
-	elif str(wall[0]) == "wood" and pattern in ["strip", "balcony", "tiles"]:
+	elif str(wall[0]) == "wood" and pattern in ["strip", "balcony", "tiles", "panel"]:
 		pattern = "clapboard"
-	var ground := _ground_of(p, kind, density, seed_v)
+	elif str(wall[0]) in ["brick", "stone", "limestone"] and pattern == "clapboard":
+		pattern = "punched"
+	var ground := _ground_of(p, kind, density, ms)
 	var st: Array = p["st"]
 	var lo := int(st[0])
 	var hi := int(st[1])
-	if kind == "apartments" or kind == "commercial":
+	if (kind == "apartments" or kind == "commercial") and not bool(p.get("fix", false)):
 		if density == "dense":
 			lo += 1
 			hi = int(ceil(float(hi) * 1.5))
@@ -151,22 +210,38 @@ static func resolve(b: Dictionary, region: String, density: String,
 	var fh := float(p["fh"])
 	var rise := 0.0 if shape == "flat" else clampf(2.4 * float(p["pitch"]), 1.2, 4.0)
 	return {
-		"region": region, "kind": kind,
-		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, seed_v, 2),
+		"region": region, "kind": kind, "city": city, "era": era,
+		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, ms, 2),
 		"pattern": pattern, "bay_m": float(p["bay"]),
-		"frame": _lin(str(p["fr"])), "shutter": _lin(str(p["sh"])),
+		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
 		"roof_shape": shape, "pitch": float(p["pitch"]),
-		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, seed_v, 6),
+		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, ms, 6),
 		"floor_h": fh, "storeys": storeys, "default_h": float(storeys) * fh + rise,
 		"chimney": float(p["ch"]), "dormer": float(p.get("dm", 0.0)),
 		"equip": float(p.get("eq", 0.0)),
 		"tower": _tower(p, b),
 		"window": str(p.get("wn", "casement")), "rails": float(p.get("rl", 0.0)),
-		"ground": ground, "ground_colour": _tint(p.get("gc", []) as Array, seed_v, 15),
+		"ground": ground, "ground_colour": _tint(p.get("gc", []) as Array, ms, 15),
 		"eave": float(p.get("ev", 0.3)),
-		"variant": int(_h(seed_v, 14) * float(VARIANTS)) % VARIANTS,
+		"variant": int(_h(ms, 14) * float(VARIANTS)) % VARIANTS,
+		"relief": _relief(p, seed_v),
 	}
+
+## A hex colour key that may also be a palette (one pick per building).
+static func _hex(v: Variant, seed_v: float, salt: int) -> String:
+	if v is Array:
+		return str(_pick(v as Array, seed_v, salt))
+	return str(v)
+
+## The building's 3D relief dict (profile `rv`, a copy): a weighted
+## `gable` list becomes one gable for this building.
+static func _relief(p: Dictionary, seed_v: float) -> Dictionary:
+	var rv: Dictionary = (p.get("rv", {}) as Dictionary).duplicate(true)
+	var gable: Variant = rv.get("gable", "")
+	if gable is Array:
+		rv["gable"] = _pick_weighted(gable as Array, seed_v, 19)
+	return rv
 
 ## Window pattern: a plain id, or weighted [[id, weight], ...] so a street
 ## mixes punched, balcony and ribbon fronts the way real ones do.
@@ -229,7 +304,7 @@ static func distant_look(region: String) -> Dictionary:
 	var roof: Array = roofs[0]
 	return {"wall_set": str(wall[0]), "tints": tints,
 		"pattern": _distant_pattern(p, str(wall[0])), "bay_m": float(p["bay"]),
-		"frame": _lin(str(p["fr"])), "shutter": _lin(str(p["sh"])),
+		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], 0.5, 17)),
 		"shutter_p": float(p["sp"]), "window": str(p.get("wn", "casement")),
 		"rails": float(p.get("rl", 0.0)), "variant": 0,
 		"roof_set": str(roof[0]), "roof_colours": [_tint(roof[1] as Array, 0.4, 10),
@@ -249,9 +324,15 @@ static func _distant_pattern(p: Dictionary, wall_set: String) -> String:
 		out = "clapboard"
 	return out
 
-## Kind for a procedural infill building (OSM silent): the region's mix.
+## Kind for a procedural infill building (OSM silent): the region's mix
+## (else the nearest BASE ancestor's, else the default).
 static func infill_kind(region: String, seed_v: float) -> String:
-	var mix: Dictionary = ArchitectureData.INFILL_MIX.get(region, ArchitectureData.INFILL_DEFAULT)
+	var r := region
+	for i in 8:
+		if ArchitectureData.INFILL_MIX.has(r) or not ArchitectureData.BASE.has(r):
+			break
+		r = str(ArchitectureData.BASE[r])
+	var mix: Dictionary = ArchitectureData.INFILL_MIX.get(r, ArchitectureData.INFILL_DEFAULT)
 	var pairs: Array = []
 	for k in mix:
 		pairs.append([k, mix[k]])

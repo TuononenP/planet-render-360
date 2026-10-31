@@ -36,16 +36,19 @@ static func _area_m2(b: Dictionary) -> float:
 		return absf(RingGeometry.signed_area(fp as PackedVector2Array)) / (m2u * m2u)
 	return float(b.get("size_x", 0.0)) * float(b.get("size_z", 0.0)) / (m2u * m2u)
 
-## One building's ArchitectureStyle look, seeded by its position.
+## One building's ArchitectureStyle look, seeded by its position; the
+## ctx's city frame (cores / districts) feeds BuildingEra's distance cue.
 static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
 	var seed_v := TerrainBuilder._hash(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 	return ArchitectureStyle.resolve(b, str(ctx["region"]), str(ctx["density"]),
-		seed_v, _area_m2(b))
+		seed_v, _area_m2(b), ctx)
 
 ## Per-build context: the style region and settlement density, plus the
 ## tagged heights (tag/levels resolved, in a 150 m spatial hash keyed by
 ## building kind) that feed the neighbour estimate — a house is judged
-## against nearby houses, never against a tagged tower.
+## against nearby houses, never against a tagged tower. Inside a city
+## zone it also carries CityStyles.local_frame: "city", "cores" and
+## "districts" in the build's local metre frame (viewpoint at origin).
 static func _height_context(data: LocationData) -> Dictionary:
 	var region := ArchitectureStyle.region_for(data.latitude, data.longitude)
 	var density := _density(data)
@@ -75,10 +78,12 @@ static func _height_context(data: LocationData) -> Dictionary:
 		if not cells.has(key):
 			cells[key] = []
 		(cells[key] as Array).append(p)
-	return {"region": region, "density": density,
+	var ctx := {"region": region, "density": density,
 		"fidelity": MaterialLibrary.fidelity_for_preset(data.quality_preset),
 		"cells": cells, "cell": cell, "radius_u": 150.0 * m2u,
 		"median_h": _median(all_h), "tagged_n": all_h.size()}
+	ctx.merge(CityStyles.local_frame(region, data.latitude, data.longitude))
+	return ctx
 
 ## T4.2 height priority (contract §2.4): `height` tag → `building:levels`
 ## × the kind's regional floor height → same-kind local estimate →
@@ -171,26 +176,38 @@ static func _median(a: Array) -> float:
 		return float(a[n / 2])
 	return (float(a[n / 2 - 1]) + float(a[n / 2])) * 0.5
 
-## Canonical roof shape from the raw `roof:shape` tag. Pitched-family
-## aliases map to their nearest modelled form (skillion/gambrel read
-## as gabled, cone as pyramidal, round/onion as dome); anything else
-## unknown reads as flat. Untagged ("") takes the regional default —
-## except legacy dicts without height_source, which keep the flat cap
-## their wall heights were pinned against.
+## Canonical roof shape from the raw `roof:shape` tag, one of: flat,
+## gabled, hipped, mansard, pyramidal, dome, gambrel, skillion,
+## half-hipped, saltbox, round. Aliases map to their nearest modelled
+## form (shed/lean_to → skillion, barrel → round, onion → dome,
+## cone/pyramid → pyramidal, crosspitched/side_hipped → hipped);
+## many/complex and anything unknown read as flat. Untagged ("") takes
+## the regional default — except legacy dicts without height_source,
+## which keep the flat cap their wall heights were pinned against.
 static func _effective_shape(raw: String, default_roof: String, legacy: bool) -> String:
 	match raw.strip_edges().to_lower():
 		"flat":
 			return "flat"
-		"gabled", "gambrel", "skillion", "saltbox", "shed":
+		"gabled":
 			return "gabled"
-		"hipped":
+		"hipped", "crosspitched", "side_hipped":
 			return "hipped"
 		"mansard":
 			return "mansard"
 		"pyramidal", "pyramid", "cone":
 			return "pyramidal"
-		"dome", "round", "onion":
+		"dome", "onion":
 			return "dome"
+		"gambrel":
+			return "gambrel"
+		"skillion", "shed", "lean_to":
+			return "skillion"
+		"half-hipped", "half_hipped":
+			return "half-hipped"
+		"saltbox":
+			return "saltbox"
+		"round", "barrel":
+			return "round"
 		"":
 			return "flat" if legacy else default_roof
 		_:
@@ -220,6 +237,14 @@ static func _roof_height_m(shape: String, span_m: float, tag_m: float,
 			return clampf(span_m * 0.32 * pitch, 1.0 * lo, 5.0 * hi)
 		"dome":
 			return clampf(span_m * 0.30 * pitch, 1.0 * lo, 6.0 * hi)
+		"gambrel", "saltbox":
+			return clampf(span_m * 0.30 * pitch, 1.5 * lo, 5.0 * hi)
+		"half-hipped":
+			return clampf(span_m * 0.26 * pitch, 1.2 * lo, 4.2 * hi)
+		"skillion":
+			return clampf(span_m * 0.15 * pitch, 0.8 * lo, 3.0 * hi)
+		"round":
+			return clampf(span_m * 0.25 * pitch, 1.0 * lo, 5.0 * hi)
 	return 0.0
 
 static func _ring_span_m(ring: PackedVector2Array) -> float:

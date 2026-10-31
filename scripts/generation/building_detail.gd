@@ -158,7 +158,8 @@ static func _mat(key: String) -> Material:
 ## height, both in internal units; `near` gates everything except towers.
 static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		wall_h: float, shape: String, roof_h: float, look: Dictionary,
-		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool) -> void:
+		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool,
+		party: PackedByteArray = PackedByteArray(), gable_front: bool = false) -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
 	if not near and not religious:
 		return
@@ -178,8 +179,12 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		_tower(batch, ring, c, u, lu, lv, top, wall_h, basis, look, wall_mat, roof_mat)
 	if near:
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
-		_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
-		_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
+		var stacks := RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look)
+		if not stacks:
+			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
+		if not RooflineDetail.bay_dormers(batch, ring, top, roof_h, shape, party,
+				gable_front, look, roof_mat, seed_v):
+			_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
 		if shape == "flat":
 			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
 	batch.flush(root)

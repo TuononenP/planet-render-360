@@ -116,7 +116,7 @@ static func biome_for_data(data: LocationData) -> String:
 	return climatic
 
 static func biome_for(lat: float, lon: float, altitude_m: float) -> String:
-	var region := ArchitectureStyle.region_for(lat, lon)
+	var region := ArchitectureStyle.country_region_for(lat, lon)
 	var alat := absf(lat)
 	if alat < 23.5 or (region == "southeast_asia" and alat < 18.0):
 		return "tropical"

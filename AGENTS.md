@@ -12,6 +12,11 @@
 - Match the existing code style in the files you touch.
 - Do not add unrelated refactors or features.
 
+## Design system
+
+- Always try to follow the Planet Render 360 design system: https://claude.ai/artifact/HR5RqAmnw7rfRyHWozGGFT
+- Use its tokens, typography, iconography, glass recipes, voice and data formatting for any UI or visual change; read its `project/README.md` first.
+
 ## Code size
 
 - Keep every class (one GDScript file under `scripts/`) at or under 500 lines.
@@ -21,3 +26,6 @@
 ## Verification
 
 - Verify changes by running the relevant tests or build before reporting done.
+- Run Godot tests so they don't interrupt the user: always pass `--headless` (no window, no focus steal) and run them with `run_in_background`, then check the result when notified.
+- Only `tests/screenshot_test.gd` and `tests/world_cache_test.gd` need a real window; run them in the background too, and batch them at the end instead of after every change.
+- Screenshot/capture scripts (ad-hoc `godot --path . --script ...` runs, not just `tests/`) also open a window. Never pass `--always-on-top`; run them in the background, batch captures into one run, and add `--position 4000,4000` so the window opens off the user's screen.

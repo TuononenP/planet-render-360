@@ -6,6 +6,7 @@ extends Control
 var _picker: MapPicker
 var _loading: LoadingScreen
 var _view: View360
+var _notice: DataNotice
 var _history: HistoryScreen
 var _settings_screen: SettingsScreen
 var _pipeline: GenerationPipeline
@@ -25,6 +26,7 @@ var _building_world := false
 var _generating := false
 
 func _ready() -> void:
+	theme = UiTheme.base_theme()
 	_store = CacheStore.new()
 	_store.load_store()
 	_settings = RenderSettings.new()
@@ -37,6 +39,8 @@ func _ready() -> void:
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.finished.connect(_on_generation_finished)
+	_pipeline.degraded_layer.connect(func(layer: String) -> void: _loading.add_degraded(layer))
+	_pipeline.stage_data.connect(func(i: int, d: LocationData) -> void: _loading.show_stage_data(i, d))
 	_pipeline.cancelled.connect(func() -> void:
 		_set_generating(false)
 		_show(_picker))
@@ -51,28 +55,23 @@ func _ready() -> void:
 	_downloader = OfflineDownloader.new()
 	add_child(_downloader)
 	_downloader.progress.connect(func(done: int, total: int) -> void:
-		_picker.set_download_status("⬇  Downloading… %d/%d" % [done, total]))
+		_picker.set_download_status("Downloading… %d/%d" % [done, total]))
 	_downloader.finished.connect(func(ok_count: int, total: int) -> void:
 		if ok_count > 0:
 			_store.add_entry(_picker.selected_name if _picker.selected_name != "" \
 				else LocationData.known_place(_download_at.x, _download_at.y),
 				_download_at.x, _download_at.y)
-		_picker.set_download_status("⬇  Saved for offline (%d/%d)" % [ok_count, total] \
 		_picker.set_download_busy(false)
-			if ok_count > 0 else "⬇  Download failed — check connection"))
+		_picker.set_download_status("Saved for offline (%d/%d)" % [ok_count, total] \
+			if ok_count > 0 else "Download failed — check connection"))
 	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
-		_download_at = Vector2(lat, lon)
 		if _downloader.is_running():
 			return
 		_picker.set_download_busy(true)
-		_picker.set_download_status("⬇  Downloading… 0/%d" % OfflineDownloader.JOBS)
+		_download_at = Vector2(lat, lon)
+		_picker.set_download_status("Downloading… 0/%d" % OfflineDownloader.JOBS)
 		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
-	_picker.palette_changed.connect(func(_i: int) -> void:
-		_view.refresh_theme()
-		_settings_screen.refresh_theme()
-		_loading.refresh_theme()
-		_history.refresh())
 	add_child(_picker)
 	_picker.set_quality_preset(_settings.preset)
 
@@ -83,7 +82,8 @@ func _ready() -> void:
 		_pipeline.cancel()
 		# Past the pipeline (world building) nothing emits cancelled.
 		if _building_world:
-			_show(_picker))
+			_show(_picker)
+			_picker.set_render_busy(true, true))
 	add_child(_loading)
 
 	_view = View360.new()
@@ -92,14 +92,20 @@ func _ready() -> void:
 	add_child(_view)
 	_view.set_quality_preset(_settings.preset)
 
+	# Above the view: plain-language notice when live data did not arrive.
+	_notice = DataNotice.new()
+	_notice.retry_requested.connect(func() -> void:
+		_start_generation(_pending.x, _pending.y))
+	add_child(_notice)
+
 	_history = HistoryScreen.new()
 	_history.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_history.bind_store(_store)
 	_history.back_requested.connect(func() -> void: _show(_picker))
 	_history.place_selected.connect(func(lat: float, lon: float) -> void:
-		_picker.selected_name = ""
 		if _generating:
 			return
+		_picker.selected_name = ""
 		_start_generation(lat, lon))
 	add_child(_history)
 
@@ -107,6 +113,13 @@ func _ready() -> void:
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_settings_screen.bind_settings(_settings)
 	_settings_screen.back_requested.connect(func() -> void: _show(_picker))
+	AccentSun.refresh = _refresh_accent
+	_settings_screen.accent_changed.connect(func(_i: int) -> void:
+		var at := _picker.selected_point()
+		AccentSun.follow_now(at.x, at.y)
+		_refresh_accent())
+	_settings_screen.layout_changed.connect(func(i: int) -> void:
+		_picker.set_layout_override(i))
 	_settings_screen.preset_changed.connect(func(p: int) -> void:
 		_picker.set_quality_preset(p)
 		_view.set_quality_preset(p))
@@ -127,15 +140,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			_request_exit()
 			get_viewport().set_input_as_handled()
 
+## Re-skin every screen after the accent moved (a pick, or the sun).
+func _refresh_accent() -> void:
+	_picker.refresh_theme()
+	_view.refresh_theme()
+	_notice.refresh_theme()
+	_loading.refresh_theme()
+	_history.refresh()
+
 func _show(screen: Control) -> void:
 	for s in [_picker, _loading, _view, _history, _settings_screen]:
 		s.visible = s == screen
+	_notice.set_on_screen(screen == _view)
+	if screen != _view:
+		var at := _picker.selected_point()
+		AccentSun.follow_now(at.x, at.y)
 
-func _start_generation(lat: float, lon: float) -> void:
 func _set_generating(busy: bool) -> void:
 	_generating = busy
 	_picker.set_render_busy(busy)
 
+func _start_generation(lat: float, lon: float) -> void:
 	if _generating:
 		print("Generation already in progress; ignoring start")
 		return
@@ -146,7 +171,8 @@ func _set_generating(busy: bool) -> void:
 	var display_name := _picker.selected_name
 	if display_name == "":
 		display_name = LocationData.known_place(lat, lon)
-	_loading.begin(display_name)
+	_loading.begin(display_name, lat, lon)
+	_notice.clear()
 	_show(_loading)
 	# run() starts every fetcher synchronously (cached satellite tiles
 	# decode inline), which would freeze the picker on screen. Let the
@@ -170,4 +196,5 @@ func _on_generation_finished(data: LocationData) -> void:
 		return
 	_store.add_entry(data.place_name, data.latitude, data.longitude)
 	_view.show_location(data, built)
+	_notice.show_notes(data.data_notes)
 	_show(_view)

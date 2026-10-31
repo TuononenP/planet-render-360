@@ -17,6 +17,8 @@ extends RefCounted
 ## FacadeComposer (one direction), never the material classes.
 
 const PARIS_BAYS := 6
+## Cornice band at the top of the Paris facade texture (px of S).
+const PARIS_CORNICE := 12
 const S := 512
 
 ## Shop fascia palette (sRGB): Paris dark lacquers; others pick from the
@@ -31,20 +33,11 @@ static func _lin(hex: String) -> Color:
 static func _h(x: float, z: float) -> float:
 	return FacadeComposer._hash(x, z)
 
-## Window pane: dark PRD glass with a sky-reflection band at the top,
-## the odd lit or curtained pane by hash.
+## Window pane: FacadeComposer.glass_pane (sky-reflective glass, the odd
+## curtain, blind or lit room by hash).
 static func _pane(alb: Image, r: Rect2i, hv: float, emit: Image = null) -> void:
-	var glass := FacadeComposer.GLASS
 	FacadePaint.pane(emit, r, hv)
-	if hv > 0.94:
-		glass = FacadePaint.DAY_ROOM  # lit interior (glows at night)
-	elif hv > 0.80:
-		glass = _lin("#5b5550")  # drawn curtain
-	alb.fill_rect(r, glass)
-	var sky_h := maxi(r.size.y / 5, 2)
-	alb.fill_rect(Rect2i(r.position.x, r.position.y, r.size.x, sky_h), _lin("#3c4c58"))
-	alb.fill_rect(Rect2i(r.position.x, r.position.y + sky_h, r.size.x, maxi(sky_h / 2, 1)),
-		_lin("#2c3840"))
+	FacadeComposer.glass_pane(alb, r, hv)
 
 ## Wrought-iron rail: top bar, bottom bar, balusters with a scroll dot.
 static func _rail(alb: Image, x0: int, x1: int, y: int, h: int, iron: Color) -> void:
@@ -86,6 +79,45 @@ static func _finish(alb: Image, nor: Image, rgh: Image, depth: bool = false) -> 
 		d["rough"] = ImageTexture.create_from_image(rgh)
 	return d
 
+## Row layout of the Paris facade (texture px from the top, S tall), top
+## row first: y/h of the row, window top and height, balcony slab line and
+## rail height, and which rows are ground, entresol (rusticated), balcony
+## or balconette rows. FacadeRelief builds the same balconies in 3D from
+## it, so stone and iron line up with the painted windows.
+## Ground floor 1.3x, entresol 0.85x (when present); cornice band on top.
+static func paris_rows(rows: int, variant: int) -> Array:
+	rows = clampi(rows, 1, 8)
+	var weights: Array[float] = []
+	var total := 0.0
+	for r in rows:
+		var rfb := rows - 1 - r
+		var w := 1.0
+		if rfb == 0 and rows >= 2:
+			w = 1.3
+		elif rfb == 1 and rows >= 5:
+			w = 0.85
+		weights.append(w)
+		total += w
+	var out: Array = []
+	var y := float(PARIS_CORNICE)
+	var avail := float(S - PARIS_CORNICE)
+	for r in rows:
+		var rfb := rows - 1 - r
+		var rh := avail * weights[r] / total
+		var rusticated := rfb == 1 and rows >= 5
+		var balcony := (rfb == 2 and rows >= 4) or (rfb == 5 and rows >= 7) \
+			or (rfb == rows - 1 and rows in [5, 6] and variant % 2 == 0)
+		var win_h := float(int(rh * (0.55 if rusticated else 0.70)))
+		var win_y := float(int(y) + int(rh * (0.22 if rusticated else 0.16)))
+		out.append({"y": y, "h": rh, "ground": rfb == 0 and rows >= 2,
+			"rusticated": rusticated, "balcony": balcony,
+			"balconette": not balcony and not rusticated and not (rfb == 0 and rows >= 2) \
+				and (variant == 0 or (variant == 3 and rfb % 2 == 1)),
+			"win_y": win_y, "win_h": win_h,
+			"slab_y": win_y + win_h - float(int(rh * 0.06)), "rail_h": float(int(rh * 0.24))})
+		y += rh
+	return out
+
 ## Paris Haussmann facade over a photographic wall base; `rows` real
 ## storeys (1..8) spanning the wall height, PARIS_BAYS bays across.
 static func compose_haussmann(set_name: String, rows: int, detail: int,
@@ -107,7 +139,7 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 	var fascia := _lin(PARIS_FASCIA[(variant * 2 + rows) % PARIS_FASCIA.size()])
 	var bay_w := float(S) / float(PARIS_BAYS)
 	# Main cornice with dentils under the roof.
-	var top := 12
+	var top := PARIS_CORNICE
 	FacadePaint.shade(base, Rect2i(0, 0, S, 8), FacadePaint.LIGHT)
 	FacadePaint.shade(base, Rect2i(0, 8, S, 4), FacadePaint.SHADOW)
 	for dx in range(0, S, 8):
@@ -116,40 +148,26 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 	if nor != null:
 		nor.fill_rect(Rect2i(0, 0, S, 3), Color(0.5, 0.7, 1.0))
 		nor.fill_rect(Rect2i(0, 8, S, 4), Color(0.5, 0.3, 1.0))
-	# Row heights: ground floor 1.3x, entresol 0.85x (when present).
-	var weights: Array[float] = []
-	var total := 0.0
+	var layout := paris_rows(rows, variant)
 	for r in rows:
+		var row: Dictionary = layout[r]
 		var rfb := rows - 1 - r
-		var w := 1.0
-		if rfb == 0 and rows >= 2:
-			w = 1.3
-		elif rfb == 1 and rows >= 5:
-			w = 0.85
-		weights.append(w)
-		total += w
-	var y := float(top)
-	var avail := float(S - top)
-	for r in rows:
-		var rfb := rows - 1 - r
-		var rh := avail * weights[r] / total
-		var ry := int(y)
+		var rh: float = row["h"]
+		var ry := int(row["y"])
 		var rhi := int(rh)
-		y += rh
 		if rfb == 0 and rows >= 2:
 			_paris_ground(alb, base, nor, rgh, ry, rhi, bay_w, fascia, frame, variant, emit)
 			continue
 		# String course at the floor line.
 		FacadePaint.shade(base, Rect2i(0, ry, S, 2), FacadePaint.LIGHT)
 		FacadePaint.shade(base, Rect2i(0, ry + 2, S, 1), FacadePaint.SHADOW)
-		var rusticated := rfb == 1 and rows >= 5
+		var rusticated: bool = row["rusticated"]
 		if rusticated:
 			for gy in range(ry + 6, ry + rhi, 9):
 				FacadePaint.shade(base, Rect2i(0, gy, S, 1), FacadePaint.SHADOW)
-		var balcony := (rfb == 2 and rows >= 4) or (rfb == 5 and rows >= 7) \
-			or (rfb == rows - 1 and rows in [5, 6] and variant % 2 == 0)
-		var win_h := int(rh * (0.55 if rusticated else 0.70))
-		var fy := ry + int(rh * (0.22 if rusticated else 0.16))
+		var balcony: bool = row["balcony"]
+		var win_h := int(row["win_h"])
+		var fy := int(row["win_y"])
 		var win_w := mini(int(win_h * 0.56), int(bay_w * 0.5))
 		for col in PARIS_BAYS:
 			var hv := _h(float(col) * 9.3 + float(variant) * 1.7, float(r) * 3.9)
@@ -187,15 +205,13 @@ static func compose_haussmann(set_name: String, rows: int, detail: int,
 			if rgh != null:
 				rgh.fill_rect(wr, Color(0.2, 0.2, 0.2))
 			# Balconette across the lower window (variant rhythm).
-			var balconette := not balcony and not rusticated \
-				and (variant == 0 or (variant == 3 and rfb % 2 == 1))
-			if balconette:
+			if row["balconette"]:
 				_rail(alb, ix - 3, ix + win_w + 3, fy + win_h - win_h / 4, win_h / 4, iron)
 		if balcony:
 			# Continuous stone slab + wrought-iron railing over the
 			# window bottoms across the whole front.
-			var by := fy + win_h - int(rh * 0.06)
-			var rail_h := int(rh * 0.24)
+			var by := int(row["slab_y"])
+			var rail_h := int(row["rail_h"])
 			FacadePaint.shade(base, Rect2i(0, by, S, 4), FacadePaint.LIGHT)
 			FacadePaint.shade(base, Rect2i(0, by + 4, S, 3), FacadePaint.SHADOW)
 			for cx in range(4, S, 21):

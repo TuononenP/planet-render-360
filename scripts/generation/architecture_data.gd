@@ -13,12 +13,21 @@ extends RefCounted
 ##   p     window pattern     FacadeComposer.PATTERNS id
 ##   bay   metres per window bay (UV tiling, so windows keep real size)
 ##   fr    window frame hex    sh/sp  shutter hex / probability per bay
-##   r     roof shapes        [[flat|gabled|hipped|mansard|pyramidal|dome, weight], ...]
+##   r     roof shapes        [[shape, weight], ...] — flat, gabled, hipped, mansard,
+##         pyramidal, dome, gambrel, skillion, half-hipped, saltbox, round
 ##   pitch roof rise multiplier (1.0 = BuildingBuilder default rise)
 ##   rf    roof finishes      [[roof set, [sRGB hex tints]], ...]
 ##   fh    metres per storey  st  untagged storey range [min, max]
 ##   ch/dm/eq  chimney / dormer / rooftop-equipment probability
 ##   tw    religious tower: spire | bell | onion | minaret | pagoda | shikhara
+##   fix   true = `st` is the typology's real range (no density stretch)
+##   sh    may also be a palette [hex, ...] (one colour per building)
+##   rv    3D relief Dictionary (look["relief"]; a row's rv replaces its
+##         parent's): balcony_rows Array[int] (storeys from ground=0),
+##         balconette, deep_balcony, awning, fire_escape, stoop, signage,
+##         oriel (0..1 odds), awning_colours [sRGB hex], string_course,
+##         quoins (bool), gable "" | step | neck | bell (or weighted
+##         [[gable, w], ...], picked per building)
 
 ## Ordered first-match boxes [region, south, west, north, east]. Coarse by
 ## design — borders are approximate, and neighbouring regions share most
@@ -77,6 +86,13 @@ const BOXES := [
 	["south_asia", 5.50, 66.50, 36.00, 97.50],
 	["australia", -44.00, 112.00, -10.00, 154.00],
 	["australia", -47.50, 166.00, -34.00, 179.00],     # New Zealand
+	["mountain_lodge", 50.95, -116.50, 51.45, -115.20], # Banff, Lake Louise, Canmore
+	["mountain_lodge", 52.78, -118.25, 53.00, -117.90], # Jasper
+	["mountain_lodge", 50.05, -123.05, 50.20, -122.85], # Whistler
+	["mountain_lodge", 35.80, -121.98, 36.45, -121.55], # Big Sur
+	["mountain_lodge", 38.85, -120.30, 39.35, -119.85], # Lake Tahoe
+	["mountain_lodge", 39.12, -106.92, 39.25, -106.75], # Aspen
+	["mountain_lodge", 43.40, -110.90, 43.60, -110.65], # Jackson Hole
 	["north_america", 18.80, -160.60, 22.40, -154.70], # Hawaii
 	["north_america", 51.00, -170.00, 72.00, -129.00], # Alaska
 	["north_america", 41.60, -141.00, 83.00, -52.00],  # Canada
@@ -86,11 +102,16 @@ const BOXES := [
 ]
 
 ## Regions that inherit unlisted kinds from another before GENERIC.
-const BASE := {
+## City and era rows add their own links (ArchitectureParis / Cities*),
+## merged into BASE below.
+const COUNTRY_BASE := {
 	"alpine": "central_europe",
 	"haussmann": "france",
 	"france": "central_europe",
 }
+static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, ArchitectureParis.BASE,
+	ArchitectureCitiesEurope.BASE, ArchitectureCitiesAmericas.BASE,
+	ArchitectureCitiesAsia.BASE])
 
 ## OSM `building=*` values that name a kind outright. `yes`, `residential`
 ## and friends are decided by levels / footprint / density instead.
@@ -133,18 +154,31 @@ const USE_TAGS := {
 }
 
 ## Untagged-building mix per region for procedural infill (weights per
-## kind). Regions not listed use INFILL_DEFAULT.
+## kind). Regions not listed use their BASE chain's mix, else
+## INFILL_DEFAULT.
 const INFILL_DEFAULT := {
 	"house": 52, "apartments": 20, "commercial": 8, "industrial": 5,
 	"civic": 4, "farm": 3, "outbuilding": 8,
 }
 const INFILL_MIX := {
 	"haussmann": {"apartments": 78, "commercial": 10, "civic": 6, "house": 2, "outbuilding": 4},
+	"london": {"house": 46, "apartments": 34, "commercial": 10, "civic": 4, "outbuilding": 6},
+	"amsterdam": {"house": 30, "apartments": 50, "commercial": 12, "civic": 4, "outbuilding": 4},
+	"berlin": {"apartments": 72, "commercial": 12, "civic": 6, "house": 4, "outbuilding": 6},
+	"barcelona": {"apartments": 76, "commercial": 12, "civic": 6, "house": 2, "outbuilding": 4},
+	"rome": {"apartments": 70, "commercial": 14, "civic": 6, "house": 6, "outbuilding": 4},
+	"new_york": {"apartments": 66, "commercial": 16, "house": 10, "civic": 4, "outbuilding": 4},
+	"chicago": {"apartments": 44, "house": 34, "commercial": 12, "civic": 4, "outbuilding": 6},
+	"san_francisco": {"apartments": 50, "house": 34, "commercial": 10, "outbuilding": 6},
+	"tokyo": {"house": 38, "apartments": 36, "commercial": 18, "industrial": 2, "outbuilding": 6},
+	"hong_kong": {"apartments": 74, "commercial": 18, "civic": 4, "outbuilding": 4},
+	"singapore": {"apartments": 66, "commercial": 20, "civic": 6, "house": 4, "outbuilding": 4},
 	"eastern_europe": {"apartments": 48, "house": 28, "commercial": 6, "industrial": 6, "civic": 4, "outbuilding": 8},
 	"east_asia": {"apartments": 62, "commercial": 14, "house": 12, "civic": 4, "industrial": 4, "outbuilding": 4},
 	"japan": {"house": 46, "apartments": 30, "commercial": 12, "industrial": 4, "outbuilding": 8},
 	"alpine": {"house": 58, "farm": 12, "apartments": 12, "commercial": 6, "civic": 4, "outbuilding": 8},
 	"north_america": {"house": 64, "commercial": 10, "apartments": 10, "industrial": 6, "outbuilding": 10},
+	"mountain_lodge": {"house": 56, "apartments": 12, "commercial": 10, "civic": 4, "farm": 4, "outbuilding": 14},
 	"australia": {"house": 68, "apartments": 10, "commercial": 6, "industrial": 6, "outbuilding": 10},
 	"middle_east": {"house": 34, "apartments": 36, "commercial": 12, "outbuilding": 12, "civic": 6},
 	"south_asia": {"house": 40, "apartments": 28, "commercial": 16, "outbuilding": 12, "civic": 4},
@@ -187,7 +221,7 @@ const GENERIC := {
 		"g": [["shop", 1]], "gc": FASCIA},
 	"industrial": {"w": [["concrete", CONCRETE]], "p": "industrial", "bay": 4.0,
 		"fr": "#3a3d42", "sh": "#3a3d42", "sp": 0.0,
-		"r": [["gabled", 3], ["flat", 2]], "pitch": 0.35,
+		"r": [["gabled", 3], ["flat", 2], ["round", 1]], "pitch": 0.35,
 		"rf": [["slate", ["#8d8a86", "#6a7580", "#7a7e80"]], ["membrane", []]],
 		"fh": 5.0, "st": [1, 2], "ch": 0.0, "dm": 0.0, "eq": 0.5, "ev": 0.2},
 	"religious": {"w": [["stone", []], ["render", WARM_RENDER]], "p": "punched", "bay": 4.4,
@@ -215,5 +249,16 @@ const GENERIC := {
 
 ## Per-region, per-kind overrides (merged over BASE chain, then GENERIC).
 
-## Per-region profiles live in ArchitectureRegions (data-only split).
-const REGIONS = ArchitectureRegions.REGIONS
+## Per-region profiles live in ArchitectureRegions (countries) and the
+## city / era files (data-only split), merged once here.
+static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, ArchitectureMountain.REGIONS,
+	ArchitectureParis.REGIONS, ArchitectureCitiesEurope.REGIONS,
+	ArchitectureCitiesAmericas.REGIONS, ArchitectureCitiesAsia.REGIONS])
+
+static func _merged(tables: Array) -> Dictionary:
+	var out := {}
+	for t in tables:
+		for k in (t as Dictionary):
+			assert(not out.has(k), "duplicate architecture region " + str(k))
+			out[k] = (t as Dictionary)[k]
+	return out

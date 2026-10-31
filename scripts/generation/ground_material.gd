@@ -56,6 +56,12 @@ const ID := {
 const PAVED_PATHS := ["footway", "pedestrian", "steps", "cycleway",
 	"living_street", "corridor", "platform"]
 const DIRT_PATHS := ["path", "track", "bridleway"]
+## Excess-green window for "vegetation" on unmapped ground; arid
+## climates raise it (the default reads sand as half-green).
+const VEG_LO := 0.03
+const VEG_HI := 0.12
+const ARID_VEG_LO := 0.11
+const ARID_VEG_HI := 0.24
 
 ## Procedural paving weight per class (palette row 2 A): open urban
 ## ground is laid paving; paved paths a little; everything else none.
@@ -95,7 +101,17 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	# colour — a full 5 m photo there is the blurry smear v1 showed.
 	var bare := Color(0.54, 0.51, 0.45) if settled else Color(0.55, 0.50, 0.40)
 	m.set_shader_parameter("unknown_bare", bare)
-	m.set_shader_parameter("unknown_veg", Color(0.35, 0.48, 0.24))
+	# Dry climates (arid, or a dry summer) read unmapped "green" as the dry
+	# grass colour and need a stronger green signal in the photo before
+	# any ground counts as vegetation.
+	var dry := ClimateModel.grass_tint(data, data.season)
+	var veg_col := Color(0.35, 0.48, 0.24)
+	if dry.a > 0.0:
+		veg_col = Color(dry.r, dry.g, dry.b).linear_to_srgb()
+	m.set_shader_parameter("unknown_veg", veg_col)
+	var arid := ClimateModel.arid(data)
+	m.set_shader_parameter("veg_lo", ARID_VEG_LO if arid else VEG_LO)
+	m.set_shader_parameter("veg_hi", ARID_VEG_HI if arid else VEG_HI)
 	m.set_shader_parameter("unknown_trust", 0.2 if settled else 0.5)
 	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
 	TerrainGlsl.bind(m, data.quality_preset)

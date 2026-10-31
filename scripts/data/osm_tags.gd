@@ -31,6 +31,20 @@ static func archetype_for(tags: Dictionary) -> String:
 		return "stadium"
 	return ""
 
+## "obelisk" / "column" for a historic monument or memorial (a building
+## way such as Nelson's Column, or man_made=obelisk|column), "" otherwise.
+## The parser turns the tall slender ones into free-standing landmarks.
+static func monument_kind(tags: Dictionary) -> String:
+	var mm := str(tags.get("man_made", ""))
+	if mm not in ["obelisk", "column"] \
+			and str(tags.get("historic", "")) not in ["monument", "memorial"]:
+		return ""
+	var name := str(tags.get("name", "")).to_lower()
+	if mm == "obelisk" or str(tags.get("memorial", "")) == "obelisk" \
+			or name.contains("obelisk") or name.contains("obelisco"):
+		return "obelisk"
+	return "column"
+
 ## Contract-§2.6 land cover class (T2.4): the v1 set
 ## (water/forest/grass/field/urban) plus wetland/sand/rock/glacier/
 ## orchard/cemetery/pitch/quarry. "" = unmapped — documented in the
@@ -178,22 +192,17 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		aabb: Rect2) -> Dictionary:
 	var res := _resolve_height(tags)
 	var centre := OsmGeometry._polygon_centroid(pts, aabb.get_center())
-	var roof_h := _tag_metres(tags.get("roof:height", ""), 0.5, 100.0)
-	var min_h := _tag_metres(tags.get("min_height", ""), 0.0, 400.0)
-	return {
+	var entry := {
 		"footprint": pts,
+		# Inner rings (courtyards); only multipolygon relations fill it.
+		"holes": [],
 		"x": centre.x, "z": centre.y,
 		"size_x": clampf(aabb.size.x, 12.0, 136.0),
 		"size_z": clampf(aabb.size.y, 12.0, 136.0),
 		"height": res["height"], "height_source": res["height_source"],
 		"levels": res["levels"],
-		"min_height_m": 0.0 if is_nan(min_h) else min_h,
 		"colour": str(tags.get("building:colour", "")),
 		"material": str(tags.get("building:material", tags.get("material", ""))),
-		"roof_shape": str(tags.get("roof:shape", "")),
-		"roof_colour": str(tags.get("roof:colour", "")),
-		"roof_material": str(tags.get("roof:material", "")),
-		"roof_height_m": 0.0 if is_nan(roof_h) else roof_h,
 		"parts": [],
 		"name": str(tags.get("name", "")),
 		# Type tags ArchitectureStyle keys off: the raw `building` value
@@ -203,7 +212,52 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"use": _building_use(tags),
 		"religion": str(tags.get("religion", "")),
 		"denomination": str(tags.get("denomination", "")),
+		# Age / protection hints for style and weathering.
+		"start_year": _start_year(tags.get("start_date", "")),
+		"heritage": _tag_truthy(tags.get("heritage", "")) \
+			or tags.has("heritage:operator") \
+			or str(tags.get("historic", "")) in ["building", "yes"],
+		"architecture": str(tags.get("building:architecture", "")).strip_edges().to_lower(),
+		"monument": monument_kind(tags),
 	}
+	entry.merge(_roof_tags(tags))
+	return entry
+
+## Roof and vertical-extent keys shared by buildings and their parts:
+## roof shape/colour/material as raw strings, metres and level counts
+## as numbers (0 when absent or out of range).
+static func _roof_tags(tags: Dictionary) -> Dictionary:
+	var roof_h := _tag_metres(tags.get("roof:height", ""), 0.5, 100.0)
+	var min_h := _tag_metres(tags.get("min_height", ""), 0.0, 400.0)
+	return {
+		"roof_shape": str(tags.get("roof:shape", "")),
+		"roof_colour": str(tags.get("roof:colour", "")),
+		"roof_material": str(tags.get("roof:material", "")),
+		"roof_height_m": 0.0 if is_nan(roof_h) else roof_h,
+		"roof_levels": _tag_int(tags.get("roof:levels", 0), 0, 10),
+		"min_height_m": 0.0 if is_nan(min_h) else min_h,
+		"min_level": _tag_int(tags.get("building:min_level", 0), 0, 200),
+	}
+
+## Construction year from `start_date`: "1890", "1890-05-01", "~1890",
+## "1890s", "before 1900" read the first four-digit year; century
+## notation "C19" reads its midpoint (1850). 0 when unknown.
+static func _start_year(raw: Variant) -> int:
+	var s := str(raw).strip_edges().to_lower()
+	if s.length() >= 2 and s.begins_with("c") and s.substr(1).is_valid_int():
+		var c := s.substr(1).to_int()
+		return (c - 1) * 100 + 50 if c >= 1 and c <= 21 else 0
+	var run := 0
+	for i in s.length():
+		if not "0123456789".contains(s[i]):
+			run = 0
+			continue
+		run += 1
+		var next_digit := i + 1 < s.length() and "0123456789".contains(s[i + 1])
+		if run == 4 and not next_digit:
+			var y := s.substr(i - 3, 4).to_int()
+			return y if y >= 1000 and y <= 2100 else 0
+	return 0
 
 ## What a building is used for, from the first of amenity / shop /
 ## office / tourism / craft / industrial / man_made that is present

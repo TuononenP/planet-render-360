@@ -345,8 +345,14 @@ func _expected_height(b: Dictionary, ctx: Dictionary) -> float:
 	if src == "tag_height":
 		return float(b.get("height", 0.0))
 	if src == "levels" and int(b.get("levels", 0)) > 0:
+		# OSM building:levels counts the storeys under the roof (roof:levels
+		# are separate), so the rendered top is the storeys plus the roof
+		# the builder stands on them (BuildingMasses: roof:height /
+		# roof:levels when tagged, else the shape's rise).
 		var look := BuildingHeights._look_for(b, ctx)
-		return float(b["levels"]) * float(look["floor_h"])
+		var plan := BuildingMasses.plan(b, ctx)
+		var rh := float(plan[0]["rh_m"]) if not plan.is_empty() and (b.get("parts", []) as Array).is_empty() else 0.0
+		return float(b["levels"]) * float(look["floor_h"]) + rh
 	return 0.0
 
 # --- (d) water + roads ---

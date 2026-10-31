@@ -159,3 +159,48 @@ static func _statue(lm: LandmarkMesh) -> void:
 	lm.beam("Copper", lel, Vector3(-2.6, b + 21.5, 2.6), 1.3, 1.2)
 	lm.box("Copper", Vector3(-3.6, b + 23.0, 2.4), Vector3(0.6, 7.2, 4.1),
 		Basis(Vector3.BACK, 0.18) * Basis(Vector3.UP, 0.3))
+
+# --- Memorial column and obelisk ---
+
+## Free-standing memorial column (Nelson's Column, Vendome, the Monument):
+## stepped granite plinth, tapering Portland-stone shaft, bronze capital
+## and a figure on top. Proportions follow Nelson's Column (51.6 m:
+## plinth 19 %, shaft 57 %, capital 7 %, figure 10 %). Windowless: OSM
+## maps these as `building=yes`, which would otherwise get floors of
+## windows like a block of flats.
+static func column(lm: LandmarkMesh, h: float) -> void:
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#8E8A84", 3.0))
+	lm.use("Shaft", LandmarkMaterials.pbr("limestone", "#BDB6A6", 4.0))
+	lm.use("Bronze", LandmarkMaterials.paint("#5E6B52", 0.55, 0.5))
+	var plinth := h * 0.19
+	var pw := h * 0.1
+	var step := h * 0.03
+	lm.box("Granite", Vector3(0, step * 0.5, 0), Vector3(pw * 2.3, step, pw * 2.3))
+	lm.box("Granite", Vector3(0, step + (plinth - step * 1.6) * 0.5, 0),
+		Vector3(pw * 2.0, plinth - step * 1.6, pw * 2.0))
+	lm.box("Granite", Vector3(0, plinth - step * 0.3, 0), Vector3(pw * 2.15, step * 0.6, pw * 2.15))
+	var r0 := h * 0.033
+	var r1 := r0 * 0.85
+	var shaft_h := h * 0.57
+	lm.frustum("Shaft", Vector3(0, plinth, 0), r0, r1, shaft_h, 28)
+	var cap_y := plinth + shaft_h
+	var cap_h := h * 0.07
+	lm.lathe("Bronze", Vector3(0, cap_y, 0), PackedVector2Array([Vector2(r1, 0),
+		Vector2(r1 * 1.2, cap_h * 0.4), Vector2(r1 * 1.5, cap_h * 0.8),
+		Vector2(r1 * 1.6, cap_h)]), 24)
+	lm.box("Shaft", Vector3(0, cap_y + cap_h + h * 0.01, 0), Vector3(r1 * 3.6, h * 0.02, r1 * 3.6))
+	var fig_y := cap_y + cap_h + h * 0.02
+	lm.frustum("Granite", Vector3(0, fig_y, 0), r1 * 0.9, r1 * 0.7, h * 0.03, 12)
+	lm.lathe("Bronze", Vector3(0, fig_y + h * 0.03, 0), PackedVector2Array([Vector2(r1 * 0.5, 0),
+		Vector2(r1 * 0.42, h * 0.04), Vector2(r1 * 0.5, h * 0.06), Vector2(r1 * 0.3, h * 0.075),
+		Vector2(r1 * 0.12, h * 0.085)]), 10)
+
+## Obelisk: square tapering shaft on a stepped base, pyramidion on top.
+static func obelisk(lm: LandmarkMesh, h: float) -> void:
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#8E8A84", 3.0))
+	lm.use("Shaft", LandmarkMaterials.pbr("limestone", "#C4BBA8", 4.0))
+	var hb := h * 0.075
+	lm.box("Granite", Vector3(0, h * 0.015, 0), Vector3(hb * 2.4, h * 0.03, hb * 2.4))
+	lm.box("Granite", Vector3(0, h * 0.045, 0), Vector3(hb * 2.0, h * 0.03, hb * 2.0))
+	lm.spire("Shaft", Vector3(0, h * 0.06, 0), h * 0.05, h * 0.84, h * 0.034)
+	lm.spire("Shaft", Vector3(0, h * 0.9, 0), h * 0.034, h * 0.1, 0.0)

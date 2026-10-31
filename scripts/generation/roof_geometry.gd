@@ -22,24 +22,6 @@ static func offset_ring(ring: PackedVector2Array, d: float) -> PackedVector2Arra
 		return ring
 	return _shift_ring(ring, d)
 
-## The ring moved inward by d (mitred, capped at 3d): the line a chamfered
-## roof's slope meets its flat top. Inward past a narrow wing's half
-## width the result self-intersects; callers drop faces that invert.
-static func inset_ring(ring: PackedVector2Array, d: float) -> PackedVector2Array:
-	if d <= 0.0 or ring.size() < 3:
-		return ring
-	var out := _shift_ring(ring, -d, 1.6)
-	# A mitred point at a sharp corner can land outside the footprint (or
-	# far across a courtyard): pull such points back toward their vertex.
-	for i in out.size():
-		var k := 0
-		while k < 4 and not Geometry2D.is_point_in_polygon(out[i], ring):
-			out[i] = ring[i].lerp(out[i], 0.5)
-			k += 1
-		if k == 4:
-			out[i] = ring[i]
-	return out
-
 static func _shift_ring(ring: PackedVector2Array, d: float,
 		miter: float = 3.0) -> PackedVector2Array:
 	var ccw := RingGeometry.signed_area(ring) > 0.0
@@ -67,11 +49,16 @@ static func _shift_ring(ring: PackedVector2Array, d: float,
 ## normals (front = clockwise from outside, Godot convention). Rings
 ## whose centroid falls outside (extreme concavity) keep the flat seal
 ## cap only — a closed roof beats a broken fancy one.
+## `party` (one flag per ring edge, PartyWalls) keeps gables on shared
+## walls; `gable_front` turns a terrace ridge to face them with gables;
+## `holes` (courtyards) take a chamfered roof sloping to both eaves.
 static func form_mesh(ring: PackedVector2Array, top: float,
-		rh: float, shape: String) -> ArrayMesh:
+		rh: float, shape: String, party: PackedByteArray = PackedByteArray(),
+		gable_front: bool = false, holes: Array = []) -> ArrayMesh:
 	if rh <= 0.01 or ring.size() < 3:
 		return null
-	var inset := shape in ["gabled", "hipped", "mansard", "pyramidal"] and needs_inset(ring)
+	var pitched := shape in RoofForms.RIDGED or shape == "pyramidal"
+	var inset := pitched and (not holes.is_empty() or needs_inset(ring) or ring.size() > 8)
 	var c := RingGeometry.interior_point(ring)
 	if not inset and not RingGeometry.point_in_ring(c, ring):
 		return null
@@ -79,24 +66,32 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	# to its street keeps its roof aligned with it (axis-aligned
 	# footprints reduce to the old AABB axis).
 	var u := RingGeometry.dominant_axis(ring)
-	var lu := RingGeometry.half_extent(ring, c, u)
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	if inset:
-		inset_faces(ring, top, rh, verts, normals, uvs, u)
+		# Courtyard blocks, concave masses and curved outlines slope to every
+		# eave (RoofSkeleton): party gables or a fitted ridge there stood as
+		# screens and shards across the roofscape.
+		RoofSkeleton.faces(ring, holes, top, rh, shape in ["mansard", "gambrel"],
+			verts, normals, uvs, u)
+		shape = ""
+	elif not RoofForms.boxy(ring):
+		party = PackedByteArray()  # party gables only on parcel-like rings
+	if shape in RoofForms.RIDGED:
+		if not RoofForms.ridged(ring, c, top, rh, shape, party, gable_front, verts, normals, uvs):
+			apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		shape = ""
 	match shape:
-		"gabled":
-			ridge_faces(ring, c, u, lu * 0.98, top, rh, verts, normals, uvs)
-		"hipped":
-			ridge_faces(ring, c, u, lu * 0.45, top, rh, verts, normals, uvs)
-		"mansard":
-			mansard_faces(ring, c, u, lu * 0.45, top, rh, verts, normals, uvs)
 		"pyramidal":
 			apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		"dome":
 			apex_faces(ring, c, top, rh, verts, normals, uvs, true, u)
+		"skillion":
+			RoofForms.skillion(ring, c, top, rh, party, verts, normals, uvs)
+		"round":
+			if not RoofForms.barrel(ring, c, top, rh, verts, normals, uvs):
+				RoofForms.ridged(ring, c, top, rh, "gabled", party, gable_front, verts, normals, uvs)
 		"":
 			pass
 		_:
@@ -121,119 +116,6 @@ static func needs_inset(ring: PackedVector2Array) -> bool:
 		return false
 	var hull_area := absf(RingGeometry.signed_area(Geometry2D.convex_hull(ring)))
 	return hull_area > 0.0 and area / hull_area < INSET_CONVEX_RATIO
-
-## Chamfered roof for large concave footprints: every ring edge slopes up
-## to the ring inset by about a mansard's run, and the inset ring takes a
-## flat cap. Faces are forced to face up (the centroid test of push_tri
-## would flip those on the inner side of a courtyard), and a quad whose
-## inset edge reverses (a wing narrower than twice the run) is dropped.
-static func inset_faces(ring: PackedVector2Array, top: float, rh: float,
-		verts: PackedVector3Array, normals: PackedVector3Array,
-		uvs: PackedVector2Array, fu: Vector2) -> void:
-	var m := WorldScale.metres_to_units()
-	var inner := inset_ring(ring, clampf(rh * 1.1, 1.2 * m, 3.6 * m))
-	var up := top + rh
-	var n := ring.size()
-	for i in n:
-		var j := (i + 1) % n
-		var a := ring[i]
-		var b := ring[j]
-		if (b - a).length() < 0.001 or (inner[j] - inner[i]).dot(b - a) <= 0.0:
-			continue
-		var a3 := Vector3(a.x, top, a.y)
-		var b3 := Vector3(b.x, top, b.y)
-		var ia3 := Vector3(inner[i].x, up, inner[i].y)
-		var ib3 := Vector3(inner[j].x, up, inner[j].y)
-		push_tri(verts, normals, uvs, Vector2.ZERO, a3, b3, ib3, fu, true)
-		push_tri(verts, normals, uvs, Vector2.ZERO, a3, ib3, ia3, fu, true)
-	var cap := Geometry2D.triangulate_polygon(inner)
-	for k in range(0, cap.size() - 2, 3):
-		# A cap sliver bridging a notch (an inset ring that is not quite
-		# simple) would float over the courtyard: keep what stands on the
-		# footprint.
-		if not Geometry2D.is_point_in_polygon(
-				(inner[cap[k]] + inner[cap[k + 1]] + inner[cap[k + 2]]) / 3.0, ring):
-			continue
-		push_tri(verts, normals, uvs, Vector2.ZERO,
-			Vector3(inner[cap[k]].x, up, inner[cap[k]].y),
-			Vector3(inner[cap[k + 1]].x, up, inner[cap[k + 1]].y),
-			Vector3(inner[cap[k + 2]].x, up, inner[cap[k + 2]].y), fu, true)
-
-## Ridge half-length shrunk until both ends sit inside the ring (0.0
-## when no fit — the caller falls back to an apex fan).
-static func fit_ridge(c: Vector2, u: Vector2, ru: float,
-		ring: PackedVector2Array) -> float:
-	var guard := 0
-	while ru > 0.05 and guard < 12 \
-			and (not RingGeometry.point_in_ring(c + u * ru, ring) \
-				or not RingGeometry.point_in_ring(c - u * ru, ring)):
-		ru *= 0.85
-		guard += 1
-	if not RingGeometry.point_in_ring(c + u * ru, ring) \
-			or not RingGeometry.point_in_ring(c - u * ru, ring):
-		return 0.0
-	return ru
-
-## One quad per ring edge from the eaves to the raised ridge segment:
-## full-span ridges read as gabled (near-vertical gable ends), short
-## ridges as hipped.
-static func ridge_faces(ring: PackedVector2Array, c: Vector2, u: Vector2,
-		ru: float, top: float, rh: float, verts: PackedVector3Array,
-		normals: PackedVector3Array, uvs: PackedVector2Array) -> void:
-	ru = fit_ridge(c, u, ru, ring)
-	if ru <= 0.0:
-		apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
-		return
-	var r1 := c + u * ru
-	var r2 := c - u * ru
-	var d := r2 - r1
-	var denom := maxf(d.length_squared(), 0.000001)
-	for i in ring.size():
-		var a := ring[i]
-		var b := ring[(i + 1) % ring.size()]
-		if (b - a).length() < 0.001:
-			continue
-		var pa := r1 + d * clampf((a - r1).dot(d) / denom, 0.0, 1.0)
-		var pb := r1 + d * clampf((b - r1).dot(d) / denom, 0.0, 1.0)
-		var a3 := Vector3(a.x, top, a.y)
-		var b3 := Vector3(b.x, top, b.y)
-		var pa3 := Vector3(pa.x, top + rh, pa.y)
-		var pb3 := Vector3(pb.x, top + rh, pb.y)
-		push_tri(verts, normals, uvs, c, a3, pa3, pb3, u)
-		push_tri(verts, normals, uvs, c, a3, pb3, b3, u)
-
-## Two pitches per edge: a steep lower slope to a mid ring, then a
-## shallow upper slope to the short ridge — the mansard profile.
-static func mansard_faces(ring: PackedVector2Array, c: Vector2, u: Vector2,
-		ru: float, top: float, rh: float, verts: PackedVector3Array,
-		normals: PackedVector3Array, uvs: PackedVector2Array) -> void:
-	ru = fit_ridge(c, u, ru, ring)
-	if ru <= 0.0:
-		apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
-		return
-	var r1 := c + u * ru
-	var r2 := c - u * ru
-	var d := r2 - r1
-	var denom := maxf(d.length_squared(), 0.000001)
-	for i in ring.size():
-		var a := ring[i]
-		var b := ring[(i + 1) % ring.size()]
-		if (b - a).length() < 0.001:
-			continue
-		var qa := r1 + d * clampf((a - r1).dot(d) / denom, 0.0, 1.0)
-		var qb := r1 + d * clampf((b - r1).dot(d) / denom, 0.0, 1.0)
-		var a3 := Vector3(a.x, top, a.y)
-		var b3 := Vector3(b.x, top, b.y)
-		var ma := a.lerp(qa, 0.38)
-		var mb := b.lerp(qb, 0.38)
-		var ma3 := Vector3(ma.x, top + rh * 0.62, ma.y)
-		var mb3 := Vector3(mb.x, top + rh * 0.62, mb.y)
-		var ta3 := Vector3(qa.x, top + rh, qa.y)
-		var tb3 := Vector3(qb.x, top + rh, qb.y)
-		push_tri(verts, normals, uvs, c, a3, b3, mb3, u)
-		push_tri(verts, normals, uvs, c, a3, mb3, ma3, u)
-		push_tri(verts, normals, uvs, c, ma3, mb3, tb3, u)
-		push_tri(verts, normals, uvs, c, ma3, tb3, ta3, u)
 
 ## Fan to a raised centroid apex (domed adds a mid ring at 70% rise);
 ## triangles whose centroid falls outside the ring are culled — the

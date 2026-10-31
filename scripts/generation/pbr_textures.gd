@@ -92,6 +92,11 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 	if MaterialLibrary._pbr_mats.has(key):
 		return MaterialLibrary._pbr_mats[key] as StandardMaterial3D
 	if MaterialLibrary._pbr_mats.size() >= 64:
+		# Full: reuse one of the same set (a brick chimney must not come
+		# back as the first slate ever made).
+		for k in MaterialLibrary._pbr_mats:
+			if str(k).begins_with(set_name + "|"):
+				return MaterialLibrary._pbr_mats[k] as StandardMaterial3D
 		return MaterialLibrary._pbr_mats.values()[0] as StandardMaterial3D
 	var row: Dictionary = MaterialLibrary.PBR_SETS.get(set_name, MaterialLibrary.PBR_SETS["limestone"])
 	var m := StandardMaterial3D.new()
@@ -109,7 +114,8 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 	return m
 
 ## OSM `building:colour` / `roof:colour`: #rgb/#rrggbb hex (with or
-## without #) plus the common named colours, returned linear with
+## without #) plus the common named colours (tuned table first, then any
+## CSS colour name via Color.from_string), returned linear with
 ## alpha 1; unparseable/empty reads alpha 0 (caller keeps its tint).
 static func parse_colour_tag(s: String) -> Color:
 	var t := s.strip_edges().to_lower()
@@ -141,6 +147,14 @@ static func parse_colour_tag(s: String) -> Color:
 		var c := Color.html(named[t])
 		c.a = 1.0
 		return c.srgb_to_linear()
+	# Any other CSS/X11 name (lightyellow, tan, darksalmon...). Godot's
+	# table only spells "gray", so British "grey" is normalised first.
+	var css := t.replace(" ", "").replace("_", "").replace("grey", "gray")
+	var sentinel := Color(-1, -1, -1, -1)
+	var named_c := Color.from_string(css, sentinel)
+	if named_c != sentinel and named_c.a > 0.0:
+		named_c.a = 1.0
+		return named_c.srgb_to_linear()
 	return Color(0, 0, 0, 0)
 
 ## Photographic PBR ground per land class (T4.3): the T2.4 §2.6 class

@@ -182,7 +182,10 @@ func _impostor_checks(failures: Array[String]) -> void:
 func _material_leak_checks(failures: Array[String]) -> void:
 	var counts := []
 	var meshes := []
-	for side in [10, 20]:
+	# Both sizes read "dense" and span the same 2x2 merge cells (a 10x10
+	# grid reads "mid" and resolves to houses, so comparing it with a dense
+	# grid measured the switch between building kinds, not a leak).
+	for side in [14, 26]:
 		var data := _data(RenderSettings.Preset.HIGH)
 		data.buildings = []
 		var k := 0
@@ -218,7 +221,7 @@ func _material_leak_checks(failures: Array[String]) -> void:
 		meshes.append(n)
 		flat.free()
 	if counts[1] > counts[0] + 8:
-		failures.append("T7.2: 4x buildings added %d materials (%d -> %d): per-building material leak"
+		failures.append("T7.2: 3.4x buildings added %d materials (%d -> %d): per-building material leak"
 			% [counts[1] - counts[0], counts[0], counts[1]])
 	if meshes[1] > counts[1] * 4:
 		failures.append("T7.2: %d merged building meshes for %d materials: merge not batching" % [meshes[1], counts[1]])

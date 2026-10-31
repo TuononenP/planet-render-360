@@ -55,6 +55,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
 			if str(el_tags.get("type", "")) == "multipolygon" \
+					and el.has("members") and el_tags.has("building"):
+				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
+					buildings, landmarks)
+			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members"):
 				var members: Array = el.get("members", [])
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
@@ -147,9 +151,64 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					tree.merge(OsmTags.tree_tags(el_tags))
 					trees.append(tree)
 	_nest_parts(buildings, part_ways)
+	_monument_landmarks(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers}
+
+## Building multipolygon relation (courtyard blocks): one building per
+## stitched outer ring, its contained inner rings as `holes`. Tags live
+## on the relation, so every outer shares them; a landmark archetype is
+## emitted once, sized from the first outer.
+static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
+		c_lon: float, buildings: Array, landmarks: Array) -> void:
+	var arch := OsmTags.archetype_for(tags)
+	for r in OsmGeometry._relation_rings(members, c_lat, c_lon):
+		var outer: PackedVector2Array = r["outer"]
+		var entry := OsmTags._building_entry(tags, outer, OsmGeometry._ring_aabb(outer))
+		entry["holes"] = r["holes"]
+		buildings.append(entry)
+		if arch != "":
+			landmarks.append({
+				"x": entry["x"], "z": entry["z"], "archetype": arch,
+				"name": str(tags.get("name", "")),
+				"height": entry["height"],
+				"size_x": entry["size_x"], "size_z": entry["size_z"]})
+			arch = ""
+
+## Tall slender memorials (Nelson's Column, obelisks) mapped as buildings
+## become free-standing column / obelisk landmarks, so they are not built
+## as windowed towers. Judged on the tallest piece (the building or one of
+## its parts: Nelson's 46 m shaft stands on a 30 m plinth-and-lions
+## footprint): at least 20 m high and 2.5x taller than it is wide, so
+## memorial halls, statue groups and low shrines stay buildings.
+const MONUMENT_MIN_HEIGHT_M := 20.0
+const MONUMENT_SLENDERNESS := 2.5
+
+static func _monument_landmarks(buildings: Array, landmarks: Array) -> void:
+	for b in buildings:
+		var kind := str((b as Dictionary).get("monument", ""))
+		if kind == "":
+			continue
+		var h := float(b["height"])
+		var ring: PackedVector2Array = b["footprint"]
+		for part in b["parts"]:
+			if float(part["height"]) > h:
+				h = float(part["height"])
+				ring = part["footprint"]
+		var box := OsmGeometry._ring_aabb(ring)
+		if h < MONUMENT_MIN_HEIGHT_M or h < MONUMENT_SLENDERNESS * maxf(box.size.x, box.size.y):
+			continue
+		var at := Vector2(float(b["x"]), float(b["z"]))
+		var listed := false
+		for lm in landmarks:
+			if Vector2(float(lm["x"]), float(lm["z"])).distance_to(at) < 6.0:
+				listed = true
+		if listed:
+			continue
+		landmarks.append({"x": at.x, "z": at.y, "archetype": kind,
+			"name": str(b.get("name", "")), "height": h,
+			"size_x": 24.0, "size_z": 24.0})
 
 ## Nest building:part ways into their parents by centroid containment
 ## (smallest containing footprint wins; AABB pre-filter keeps the
@@ -187,7 +246,7 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 		var res := OsmTags._resolve_height(tags, {
 			"height": parent["height"],
 			"height_source": parent["height_source"]})
-		(parent["parts"] as Array).append({
+		var part := {
 			"footprint": pts, "x": centre.x, "z": centre.y,
 			"size_x": clampf(paabb.size.x, 12.0, 136.0),
 			"size_z": clampf(paabb.size.y, 12.0, 136.0),
@@ -195,7 +254,10 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 			"levels": res["levels"],
 			"colour": str(tags.get("building:colour", "")),
 			"material": str(tags.get("building:material", tags.get("material", ""))),
-		})
+		}
+		# Parts carry their own roof (domes, towers, stepped wings).
+		part.merge(OsmTags._roof_tags(tags))
+		(parent["parts"] as Array).append(part)
 ## Concatenate two Overpass responses' element lists, detailed first so
 ## the parse-time id-dedup keeps the detailed copy. Either side may be
 ## "" or invalid — the other side still parses.

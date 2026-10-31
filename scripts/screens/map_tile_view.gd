@@ -24,22 +24,40 @@ const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
 const MAX_ANCESTOR_DROP := 4
 
-## Night Atlas map: OSM tiles inverted and hue-rotated back so roads
-## and water keep their meaning on a dark ground (the CSS recipe
-## invert + hue-rotate(180deg) + light desaturate + gamma lift). Applied to the
-## tile layer only; the pin and attribution live in a child layer.
-const DARK_SHADER := """
+## Planet Render 360 map: the standard OSM tile recoloured into the
+## design system's cool Day grounds (sky-100/200/300, ink, horizon-day
+## water, a lichen-leaning green) so it still reads as a familiar map:
+## water is blue, parks are green, major roads are warm. Colours are
+## classified by hue and rebuilt from lightness, so labels, casings and
+## road hierarchy survive. Applied to the tile layer only; the pin and
+## attribution live in a child layer.
+const MAP_SHADER := """
 shader_type canvas_item;
+const vec3 INK = vec3(0.051, 0.078, 0.125);      // ink
+const vec3 MUTED = vec3(0.275, 0.318, 0.388);    // ink-muted
+const vec3 CASING = vec3(0.780, 0.808, 0.847);
+const vec3 BUILDING = vec3(0.875, 0.894, 0.918); // sky-300
+const vec3 LAND = vec3(0.929, 0.941, 0.957);     // sky-100
+const vec3 WATER = vec3(0.737, 0.851, 0.937);    // horizon-day, lifted
+const vec3 PARK = vec3(0.804, 0.910, 0.827);
+const vec3 PARK_DEEP = vec3(0.612, 0.792, 0.663);
+const vec3 ROAD_WARM = vec3(0.953, 0.863, 0.706); // horizon-golden, softened
+
 void fragment() {
 	vec4 c = COLOR;
-	mat3 m = mat3(
-		vec3(-0.574, 0.426, 0.426),
-		vec3(1.430, 0.430, 1.430),
-		vec3(0.144, 0.144, -0.856));
-	vec3 h = m * (vec3(1.0) - c.rgb);
-	float l = dot(h, vec3(0.299, 0.587, 0.114));
-	h = mix(vec3(l), h, 0.7);
-	h = pow(clamp(h, 0.0, 1.0), vec3(0.72)) * 1.15 + 0.03;
+	float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 n = mix(INK, MUTED, smoothstep(0.0, 0.35, l));
+	n = mix(n, CASING, smoothstep(0.35, 0.73, l));
+	n = mix(n, BUILDING, smoothstep(0.73, 0.84, l));
+	n = mix(n, LAND, smoothstep(0.84, 0.94, l));
+	n = mix(n, vec3(1.0), smoothstep(0.94, 1.0, l));
+	float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+	float water = smoothstep(0.06, 0.12, c.b - c.r) * smoothstep(0.0, 0.04, c.b - c.g + 0.04);
+	float park = smoothstep(0.03, 0.07, c.g - c.r) * smoothstep(0.03, 0.07, c.g - c.b) * (1.0 - water);
+	float warm = smoothstep(0.12, 0.20, chroma) * (1.0 - water) * (1.0 - park);
+	vec3 h = mix(n, WATER * clamp(l / 0.785, 0.6, 1.08), water);
+	h = mix(h, mix(PARK_DEEP, PARK, smoothstep(0.72, 0.92, l)), park);
+	h = mix(h, ROAD_WARM * clamp(l / 0.9, 0.7, 1.05), warm);
 	COLOR = vec4(clamp(h, 0.0, 1.0), c.a);
 }
 """
@@ -54,11 +72,12 @@ var focus_offset := Vector2.ZERO:
 	set(value):
 		focus_offset = value
 		queue_redraw()
-		if _marker != null:
-			_marker.queue_redraw()
+		if _pin != null:
+			_pin.point = _focus()
 
 var _fetcher: TileFetcher
 var _marker: Control
+var _pin: MapPin
 var _textures: Dictionary = {}  # "z/x/y" -> Texture2D
 var _requested_tile := Vector2i(1 << 30, 1 << 30)
 var _requested_zoom := -1
@@ -81,11 +100,13 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
-	var dark := Shader.new()
-	dark.code = DARK_SHADER
-	var dark_mat := ShaderMaterial.new()
-	dark_mat.shader = dark
-	material = dark_mat
+	var shader := Shader.new()
+	shader.code = MAP_SHADER
+	var map_mat := ShaderMaterial.new()
+	map_mat.shader = shader
+	material = map_mat
+	_pin = MapPin.new()
+	add_child(_pin)
 	_marker = Control.new()
 	_marker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -98,6 +119,7 @@ func _ready() -> void:
 		queue_redraw())
 	resized.connect(func() -> void:
 		refresh_tiles()
+		_pin.point = _focus()
 		_marker.queue_redraw())
 	refresh_tiles()
 
@@ -106,6 +128,8 @@ func set_lat_lon(lat: float, lon: float) -> void:
 	centre_lon = lon
 	refresh_tiles()
 	queue_redraw()
+	if _pin != null:
+		_pin.ping()
 
 func pin_lat_lon() -> Vector2:
 	return Vector2(centre_lat, centre_lon)
@@ -369,7 +393,7 @@ func _find_ancestor(tx: int, ty: int) -> Vector3i:
 	return Vector3i(-1, -1, -1)
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.88, 0.89, 0.86))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.949, 0.937, 0.914))
 	var centre_px := TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level)
 	var tile_centre := Vector2i(centre_px / 256.0)
 	var half := _tile_half_extents()
@@ -394,34 +418,29 @@ func _draw() -> void:
 				continue
 			# Simple style, before any tile arrives: a flat cell with a
 			# hairline grid so the map reads as a map from frame one.
-			var shade := Color(0.87, 0.89, 0.84) if (tx + ty) % 2 == 0 \
-				else Color(0.85, 0.87, 0.82)
+			var shade := Color(0.949, 0.937, 0.914) if (tx + ty) % 2 == 0 \
+				else Color(0.925, 0.914, 0.890)
 			draw_rect(dest, shade)
-			draw_rect(dest, Color(0.78, 0.80, 0.75), false, 1.0)
+			draw_rect(dest, Color(0.86, 0.85, 0.83), false, 1.0)
 
 func _focus() -> Vector2:
 	return size / 2.0 + focus_offset
 
-## Redraw the pin layer after a palette change.
+## Redraw the pin and attribution after a palette change.
 func refresh_style() -> void:
+	if _pin != null:
+		_pin.queue_redraw()
 	if _marker != null:
 		_marker.queue_redraw()
 
-## Pin glow and attribution, drawn above the shaded tile layer so they
-## keep their real colours.
+## Attribution, drawn above the recoloured tile layer and the pin
+## (MapPin) so it keeps its real colours: a glass-strong chip.
 func _draw_marker() -> void:
-	var p := _focus()
-	_marker.draw_circle(p, 28.0, Color(UiTheme.TEAL, 0.10))
-	_marker.draw_circle(p, 17.0, Color(UiTheme.TEAL, 0.22))
-	_marker.draw_circle(p + Vector2(0, -14), 11, UiTheme.TEAL)
-	_marker.draw_circle(p + Vector2(0, -14), 4.5, UiTheme.INK)
-	_marker.draw_colored_polygon(PackedVector2Array(
-		[p + Vector2(-7, -8), p + Vector2(7, -8), p]), UiTheme.TEAL)
 	# Attribution, bottom-right and never hidden (tile usage policy)
 	var font := get_theme_default_font()
 	var text := "© OpenStreetMap contributors"
-	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
-	_marker.draw_rect(Rect2(size - text_size - Vector2(12, 20), text_size + Vector2(8, 4)),
-		Color(0.04, 0.08, 0.09, 0.8))
-	_marker.draw_string(font, size - text_size - Vector2(8, 6), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UiTheme.MUTED)
+	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+	var chip := UiTheme.style(UiTheme.CARD, UiTheme.RADIUS_XS, UiTheme.GLASS_EDGE)
+	_marker.draw_style_box(chip, Rect2(size - text_size - Vector2(16, 20), text_size + Vector2(12, 8)))
+	_marker.draw_string(font, Vector2(size.x - text_size.x - 10, size.y - 16 - font.get_descent(12)), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UiTheme.MUTED)

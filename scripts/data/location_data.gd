@@ -105,6 +105,10 @@ static func clamp_season(value: int) -> int:
 	return clampi(value, Season.SPRING, Season.WINTER)
 var seed_value: int = 0
 var attribution: String = ""
+## Live layers that fell back to estimates, as DataNotes rows
+## {layer, effect, glyph} in plain words; empty when everything arrived.
+## The 360 view shows them as a notice (design system DataNotice).
+var data_notes: Array = []
 ## Real OSM features in world XZ space; empty means procedural dressing.
 ## Any notable OSM feature near the viewpoint (church, lighthouse,
 ## castle, stadium...), rendered on the fly as its archetype model
@@ -181,6 +185,7 @@ static func known_places() -> Array:
 		{"name": "Big Sur, United States", "lat": 36.2704, "lon": -121.8081},
 		{"name": "London, United Kingdom", "lat": 51.5074, "lon": -0.1278},
 		{"name": "Rome, Italy", "lat": 41.9028, "lon": 12.4964},
+		{"name": "Venice, Italy", "lat": 45.4408, "lon": 12.3155},
 		{"name": "Barcelona, Spain", "lat": 41.3874, "lon": 2.1686},
 		{"name": "Athens, Greece", "lat": 37.9838, "lon": 23.7275},
 		{"name": "Reykjavik, Iceland", "lat": 64.1466, "lon": -21.9426},
@@ -215,6 +220,7 @@ static func quick_picks() -> Array:
 		["Dubai", "Dubai, United Arab Emirates", 25.2048, 55.2708],
 		["London", "London, United Kingdom", 51.5074, -0.1278],
 		["Rome", "Rome, Italy", 41.9028, 12.4964],
+		["Venice", "Venice, Italy", 45.4408, 12.3155],
 		["Seoul", "Seoul, South Korea", 37.5665, 126.9780],
 	]
 

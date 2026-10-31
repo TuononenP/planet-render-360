@@ -42,7 +42,11 @@ static func kind(shape: String, dist_m: float) -> int:
 static func deck(top: float, trim: int) -> float:
 	return top - PARAPET_H_M * WorldScale.metres_to_units() if trim == PARAPET else top
 
-static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int) -> void:
+## Party edges (PartyWalls) get no cornice: the street front runs on into
+## the neighbour's. Parapets stay on them (a firewall parapet is real, and
+## the sunk deck needs its inner face there).
+static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
+		party: PackedByteArray = PackedByteArray()) -> void:
 	if trim == NONE or ring.size() < 3 or BuildingBuilder._batch != null:
 		return
 	var m := WorldScale.metres_to_units()
@@ -55,6 +59,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int) -
 		var y0 := top - CORNICE_DROP_M * m
 		var y1 := y0 + CORNICE_FACE_M * m
 		for i in ring.size():
+			if party.size() == ring.size() and party[i] == 1:
+				continue
 			var j := (i + 1) % ring.size()
 			var a := ring[i]
 			var b := ring[j]
