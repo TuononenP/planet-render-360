@@ -25,23 +25,26 @@ const PREVIEW_DROP := 2
 const MAX_ANCESTOR_DROP := 4
 
 ## Planet Render 360 map: the standard OSM tile recoloured into the
-## design system's cool Day grounds (sky-100/200/300, ink, horizon-day
-## water, a lichen-leaning green) so it still reads as a familiar map:
-## water is blue, parks are green, major roads are warm. Colours are
-## classified by hue and rebuilt from lightness, so labels, casings and
-## road hierarchy survive. Applied to the tile layer only; the pin and
-## attribution live in a child layer.
+## design system's Night grounds (sky-300 land, ink labels, horizon-day
+## water, a lichen-leaning green) lifted enough to read as a familiar
+## map: water is blue, parks are green, major roads are warm. Colours
+## are classified by hue and rebuilt from lightness, so labels, casings
+## and road hierarchy survive; dark OSM text becomes light. Applied to
+## the tile layer only; the pin and attribution live in a child layer.
 const MAP_SHADER := """
 shader_type canvas_item;
-const vec3 INK = vec3(0.051, 0.078, 0.125);      // ink
-const vec3 MUTED = vec3(0.275, 0.318, 0.388);    // ink-muted
-const vec3 CASING = vec3(0.780, 0.808, 0.847);
-const vec3 BUILDING = vec3(0.875, 0.894, 0.918); // sky-300
-const vec3 LAND = vec3(0.929, 0.941, 0.957);     // sky-100
-const vec3 WATER = vec3(0.737, 0.851, 0.937);    // horizon-day, lifted
-const vec3 PARK = vec3(0.804, 0.910, 0.827);
-const vec3 PARK_DEEP = vec3(0.612, 0.792, 0.663);
-const vec3 ROAD_WARM = vec3(0.953, 0.863, 0.706); // horizon-golden, softened
+const vec3 INK = vec3(0.929, 0.945, 0.965);      // ink
+const vec3 MUTED = vec3(0.643, 0.682, 0.741);    // ink-muted
+const vec3 CASING = vec3(0.086, 0.118, 0.169);
+const vec3 BUILDING = vec3(0.173, 0.220, 0.314);
+const vec3 LAND = vec3(0.141, 0.188, 0.267);     // sky-300, lifted
+const vec3 ROAD = vec3(0.529, 0.576, 0.659);
+const vec3 WATER = vec3(0.184, 0.365, 0.541);    // horizon-day, deepened
+const vec3 WATER_TEXT = vec3(0.663, 0.788, 0.918);
+const vec3 PARK = vec3(0.208, 0.400, 0.314);
+const vec3 PARK_DEEP = vec3(0.157, 0.302, 0.235);
+const vec3 PARK_TEXT = vec3(0.659, 0.816, 0.706);
+const vec3 ROAD_WARM = vec3(0.722, 0.573, 0.310); // horizon-golden, dimmed
 
 void fragment() {
 	vec4 c = COLOR;
@@ -50,14 +53,15 @@ void fragment() {
 	n = mix(n, CASING, smoothstep(0.35, 0.73, l));
 	n = mix(n, BUILDING, smoothstep(0.73, 0.84, l));
 	n = mix(n, LAND, smoothstep(0.84, 0.94, l));
-	n = mix(n, vec3(1.0), smoothstep(0.94, 1.0, l));
+	n = mix(n, ROAD, smoothstep(0.94, 1.0, l));
 	float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
 	float water = smoothstep(0.06, 0.12, c.b - c.r) * smoothstep(0.0, 0.04, c.b - c.g + 0.04);
 	float park = smoothstep(0.03, 0.07, c.g - c.r) * smoothstep(0.03, 0.07, c.g - c.b) * (1.0 - water);
 	float warm = smoothstep(0.12, 0.20, chroma) * (1.0 - water) * (1.0 - park);
-	vec3 h = mix(n, WATER * clamp(l / 0.785, 0.6, 1.08), water);
-	h = mix(h, mix(PARK_DEEP, PARK, smoothstep(0.72, 0.92, l)), park);
-	h = mix(h, ROAD_WARM * clamp(l / 0.9, 0.7, 1.05), warm);
+	vec3 h = mix(n, mix(WATER_TEXT, WATER, smoothstep(0.45, 0.75, l)), water);
+	vec3 grass = mix(PARK_DEEP, PARK, smoothstep(0.72, 0.92, l));
+	h = mix(h, mix(PARK_TEXT, grass, smoothstep(0.45, 0.7, l)), park);
+	h = mix(h, ROAD_WARM * (1.05 - 0.30 * smoothstep(0.65, 0.95, l)), warm);
 	COLOR = vec4(clamp(h, 0.0, 1.0), c.a);
 }
 """
@@ -107,6 +111,7 @@ func _ready() -> void:
 	material = map_mat
 	_pin = MapPin.new()
 	add_child(_pin)
+	_pin.point = _focus()
 	_marker = Control.new()
 	_marker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -419,7 +424,7 @@ func _draw() -> void:
 			# Simple style, before any tile arrives: a flat cell with a
 			# hairline grid so the map reads as a map from frame one.
 			var shade := Color(0.949, 0.937, 0.914) if (tx + ty) % 2 == 0 \
-				else Color(0.925, 0.914, 0.890)
+				else Color(0.918, 0.906, 0.882)
 			draw_rect(dest, shade)
 			draw_rect(dest, Color(0.86, 0.85, 0.83), false, 1.0)
 

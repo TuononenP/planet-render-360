@@ -10,16 +10,18 @@ extends RefCounted
 ##   bloom term spreads every pixel over the frame and reads as milk.
 ## - Ambient light is the sky itself, so shade turns blue under a blue
 ##   sky, grey under overcast and dark at night; no fixed fill colour.
-## - Contrast and a touch of saturation over ACES, which rolls off
-##   highlights and greys the mid-tones on its own.
+## - Contrast over ACES, which rolls off highlights and greys the
+##   mid-tones on its own.
 
 ## ACES with a white point of 6: highlights (sun-lit stone, sky near the
 ## sun, glints) roll off like film instead of clipping at 1.0, which
-## washed the frame toward white; exposure lifts the mid-tones back.
-const EXPOSURE := 1.45
+## washed the frame toward white; exposure lifts the mid-tones back. At
+## 1.45 sun-lit limestone and plazas still burned to white, and the extra
+## saturation pushed sky-lit shade to a strong blue: 1.3 and neutral.
+const EXPOSURE := 1.3
 const WHITE := 6.0
 const CONTRAST := 1.1
-const SATURATION := 1.1
+const SATURATION := 1.0
 const AMBIENT_ENERGY := 0.55
 const GLOW_THRESHOLD := 1.0
 const GLOW_INTENSITY := 0.32
