@@ -573,7 +573,31 @@ func _busy_checks(failures: Array[String]) -> void:
 	busy.cancel()
 	if busy._http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
 		failures.append("cancel() must stop the in-flight request")
+	# Overpass goes through the two OverpassRequests, each with its own
+	# HTTPRequest: fetch() and cancel() must abandon both.
+	for req in [busy._detailed_req, busy._ring_req]:
+		var http: HTTPRequest = (req as OverpassRequest)._http
+		if http.request("http://127.0.0.1:9/") != OK:
+			failures.append("test precondition: loopback request should start")
+		busy.fetch(48.8566, 2.3522)
+		if http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED \
+				or http.request("http://127.0.0.1:9/") != OK:
+			failures.append("fetch() must cancel the in-flight Overpass request")
+		busy.cancel()
+		if http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+			failures.append("cancel() must stop the in-flight Overpass request")
 	busy.free()
+	# Concurrent queries start on different instances, and the far-city
+	# order names hosts, so reordering ENDPOINTS cannot change it.
+	var ring := OsmFetcher.ring_endpoints()
+	if ring.size() != OsmFetcher.ENDPOINTS.size() or ring[0] == OsmFetcher.ENDPOINTS[0]:
+		failures.append("ring query must cover every endpoint and start on a mirror: %s" % [ring])
+	var far := FarCityFetcher.endpoints()
+	if far.size() != 4 or not far[0].contains("openstreetmap.fr") \
+			or not far[1].contains("private.coffee") \
+			or far[2] != "https://overpass-api.de/api/interpreter" \
+			or not far[3].contains("mail.ru"):
+		failures.append("far-city endpoints wrong: %s" % [far])
 
 func _chain_checks(failures: Array[String]) -> void:
 	# Transient Overpass failures (client timeout, 502 from an
