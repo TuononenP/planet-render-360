@@ -16,8 +16,8 @@ func _run() -> void:
 	loading.begin("Paris, France")
 	loading.set_progress(1.0, "Done")
 	loading.set_building()
-	if loading._stage_label.text != "Building world…":
-		failures.append("stage should be Building world…, got %s"
+	if loading._stage_label.text != "Building the scene":
+		failures.append("stage should be Building the scene, got %s"
 			% loading._stage_label.text)
 	if loading._percent_label.text == "100%":
 		failures.append("percent must not read 100% while building")

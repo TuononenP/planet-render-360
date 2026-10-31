@@ -27,6 +27,11 @@ const CAP_TREE_NODES := 8000
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
 const CAP_RELATIONS := 220
+## Building multipolygon relations (courtyard blocks mapped as an outer
+## ring with inner-ring holes — common in central Paris). Own cap so
+## they never compete with the land/water relation budget. Not 900:
+## "out geom 900" is the retired v1 cap the query tests guard against.
+const CAP_BUILDING_RELATIONS := 1000
 ## Ring (low-detail majors) caps: small payload by construction; the
 ## 1600 m Paris ring carries ≈630 elements (≈590 highways) in ≈0.8 MB.
 const CAP_RING_HIGHWAYS := 800
@@ -52,6 +57,8 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 	var clauses: Array[String] = [
 		'way["building"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_BUILDINGS],
+		'relation["building"]["type"="multipolygon"](around:%d,%.6f,%.6f);out geom %d;'
+			% [radius_m, lat, lon, CAP_BUILDING_RELATIONS],
 		'way["building:part"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_PARTS],
 		'way["highway"](around:%d,%.6f,%.6f);out geom %d;'

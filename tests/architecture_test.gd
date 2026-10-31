@@ -5,27 +5,30 @@ extends SceneTree
 ## the region table, kind classification, profile completeness, facade tile
 ## textures, real-bay wall UVs, roof alignment, infill variety, and the
 ## per-build material cache reset (an overflow used to fall back to the
-## Paris facade for every later city in a session).
+## Paris facade for every later city in a session). Cities: zones before
+## the country boxes, era refinement from real cues, relief dicts, and
+## city looks that genuinely differ from each other.
 
 const CITIES := {
-	"paris": [48.8566, 2.3522, "haussmann"], "london": [51.5074, -0.1278, "west_europe_brick"],
-	"dublin": [53.3498, -6.2603, "west_europe_brick"], "amsterdam": [52.3676, 4.9041, "west_europe_brick"],
-	"copenhagen": [55.6761, 12.5683, "west_europe_brick"], "berlin": [52.52, 13.405, "central_europe"],
+	"paris": [48.8566, 2.3522, "haussmann"], "london": [51.5074, -0.1278, "london"],
+	"dublin": [53.3498, -6.2603, "west_europe_brick"], "amsterdam": [52.3676, 4.9041, "amsterdam"],
+	"copenhagen": [55.6761, 12.5683, "west_europe_brick"], "berlin": [52.52, 13.405, "berlin"],
 	"vienna": [48.2082, 16.3738, "central_europe"], "prague": [50.0755, 14.4378, "central_europe"],
 	"warsaw": [52.2297, 21.0122, "central_europe"], "interlaken": [46.6863, 7.8632, "alpine"],
-	"zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
+	"banff": [51.1789, -115.5708, "mountain_lodge"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
+	"whistler": [50.1163, -122.9574, "mountain_lodge"], "zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
 	"helsinki": [60.1699, 24.9384, "nordic"], "turku": [60.4518, 22.2666, "nordic"],
 	"stockholm": [59.3293, 18.0686, "nordic"], "oslo": [59.9139, 10.7522, "nordic"],
 	"reykjavik": [64.1466, -21.9426, "nordic"], "madrid": [40.4168, -3.7038, "mediterranean"],
-	"barcelona": [41.3874, 2.1686, "mediterranean"], "lisbon": [38.7223, -9.1393, "mediterranean"],
-	"rome": [41.9028, 12.4964, "mediterranean"], "athens": [37.9838, 23.7275, "mediterranean"],
+	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "mediterranean"],
+	"rome": [41.9028, 12.4964, "rome"], "athens": [37.9838, 23.7275, "mediterranean"],
 	"cairo": [30.0444, 31.2357, "middle_east"], "istanbul": [41.0082, 28.9784, "middle_east"],
 	"dubai": [25.2048, 55.2708, "middle_east"], "algiers": [36.7538, 3.0588, "middle_east"],
-	"tokyo": [35.6762, 139.6503, "japan"], "seoul": [37.5665, 126.978, "east_asia"],
-	"shanghai": [31.2304, 121.4737, "east_asia"], "hong_kong": [22.3193, 114.1694, "east_asia"],
+	"tokyo": [35.6762, 139.6503, "tokyo"], "seoul": [37.5665, 126.978, "east_asia"],
+	"shanghai": [31.2304, 121.4737, "east_asia"], "hong_kong": [22.3193, 114.1694, "hong_kong"],
 	"mumbai": [19.076, 72.8777, "south_asia"], "delhi": [28.6139, 77.209, "south_asia"],
-	"bangkok": [13.7563, 100.5018, "southeast_asia"], "singapore": [1.3521, 103.8198, "southeast_asia"],
-	"jakarta": [-6.2088, 106.8456, "southeast_asia"], "new_york": [40.7128, -74.006, "north_america"],
+	"bangkok": [13.7563, 100.5018, "southeast_asia"], "singapore": [1.3521, 103.8198, "singapore"],
+	"jakarta": [-6.2088, 106.8456, "southeast_asia"], "new_york": [40.7128, -74.006, "new_york"],
 	"houston": [29.7604, -95.3698, "north_america"], "los_angeles": [34.0522, -118.2437, "north_america"],
 	"toronto": [43.6532, -79.3832, "north_america"], "mexico_city": [19.4326, -99.1332, "latin_america"],
 	"rio": [-22.9068, -43.1729, "latin_america"], "buenos_aires": [-34.6037, -58.3816, "latin_america"],
@@ -34,7 +37,29 @@ const CITIES := {
 	"kyiv": [50.4501, 30.5234, "eastern_europe"], "tallinn": [59.437, 24.7536, "eastern_europe"],
 	"lagos": [6.5244, 3.3792, "sub_saharan_africa"], "nairobi": [-1.2921, 36.8219, "sub_saharan_africa"],
 	"cape_town": [-33.9249, 18.4241, "sub_saharan_africa"],
+	"chicago": [41.8819, -87.6278, "chicago"], "san_francisco": [37.7749, -122.4194, "san_francisco"],
+	"brooklyn": [40.6782, -73.9442, "new_york"], "astoria": [40.7644, -73.9235, "new_york"],
+	"la_defense": [48.8920, 2.2380, "haussmann"], "osaka": [34.6937, 135.5023, "japan"],
+	"kowloon": [22.3167, 114.1820, "hong_kong"], "rotterdam": [51.9244, 4.4777, "west_europe_brick"],
+	"milan": [45.4642, 9.19, "mediterranean"], "boston": [42.3601, -71.0589, "north_america"],
 }
+
+## Cities with a zone: the 200-building look census must differ between
+## every pair (task: Paris and elsewhere must not look the same).
+const ZONE_CITIES := {
+	"paris": [48.8566, 2.3522], "london": [51.5074, -0.1278], "amsterdam": [52.3676, 4.9041],
+	"berlin": [52.52, 13.405], "barcelona": [41.3874, 2.1686], "rome": [41.9028, 12.4964],
+	"new_york": [40.7128, -74.006], "chicago": [41.8781, -87.6298],
+	"san_francisco": [37.7749, -122.4194], "tokyo": [35.6812, 139.7671],
+	"hong_kong": [22.3193, 114.1694], "singapore": [1.3521, 103.8198],
+}
+const ROOF_SHAPES := ["flat", "gabled", "hipped", "mansard", "pyramidal", "dome",
+	"gambrel", "skillion", "half-hipped", "saltbox", "round"]
+## Relief schema: key -> expected type (look["relief"], profile `rv`).
+const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
+	"deep_balcony": TYPE_FLOAT, "string_course": TYPE_BOOL, "awning": TYPE_FLOAT,
+	"awning_colours": TYPE_ARRAY, "fire_escape": TYPE_FLOAT, "stoop": TYPE_FLOAT,
+	"signage": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
 const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood"]
@@ -101,6 +126,8 @@ func _run() -> void:
 	_infill_checks(failures)
 	_cache_checks(failures)
 	_authenticity_checks(failures)
+	_era_checks(failures)
+	_city_distinct_checks(failures)
 	if failures.is_empty():
 		print("ARCHITECTURE OK: %d city regions, kinds, %d-region profiles, tiles, UVs, roofs, infill, cache" % [CITIES.size(), ArchitectureData.REGIONS.size()])
 		quit(0)
@@ -117,6 +144,31 @@ func _region_checks(failures: Array[String]) -> void:
 			failures.append("%s: region %s, expected %s" % [city, got, row[2]])
 	if ArchitectureStyle.region_for(0.0, -140.0) != "generic":
 		failures.append("open ocean should fall back to generic")
+	# City rows keep their country underneath (consumers that key off the
+	# broad region use these).
+	if ArchitectureStyle.country_region_for(51.5074, -0.1278) != "west_europe_brick" \
+			or ArchitectureStyle.country_region("london") != "west_europe_brick" \
+			or ArchitectureStyle.country_region("paris_hbm") != "haussmann" \
+			or ArchitectureStyle.country_region("nyc_brownstone") != "north_america" \
+			or ArchitectureStyle.country_region("nordic") != "nordic":
+		failures.append("country_region must walk city/era rows back to their country box region")
+	if ArchitectureStyle.city_of("paris_hbm") != "paris" or ArchitectureStyle.city_of("haussmann") != "paris" \
+			or ArchitectureStyle.city_of("nordic") != "":
+		failures.append("city_of must map eras and city rows to their city")
+	for z in CityStyles.ZONES:
+		if not ArchitectureData.REGIONS.has(str(z[1])):
+			failures.append("zone %s region %s has no row" % [z[0], z[1]])
+		if not CityStyles.CORES.has(str(z[0])) or not BuildingEra.ERAS.has(str(z[0])):
+			failures.append("zone city %s needs CORES and ERAS" % z[0])
+	for city in BuildingEra.ERAS:
+		for e in (BuildingEra.ERAS[city] as Array):
+			if not ArchitectureData.REGIONS.has(str(e[0])):
+				failures.append("era %s/%s has no REGIONS row" % [city, e[0]])
+			elif ArchitectureStyle.city_of(str(e[0])) != city:
+				failures.append("era %s must inherit from city %s" % [e[0], city])
+	for d in CityStyles.DISTRICTS:
+		if ArchitectureStyle.city_of(str(d[1])) != str(d[0]):
+			failures.append("district era %s is not a %s era" % [d[1], d[0]])
 
 func _kind_checks(failures: Array[String]) -> void:
 	var cases := [
@@ -147,7 +199,12 @@ func _profile_checks(failures: Array[String]) -> void:
 	for box in ArchitectureData.BOXES:
 		if not regions.has(box[0]):
 			regions.append(box[0])
+	for region in ArchitectureData.REGIONS:
+		if not regions.has(region):
+			regions.append(region)
 	for region in regions:
+		if ArchitectureStyle.country_region(str(region)) == "generic" and region != "generic":
+			failures.append("region %s does not descend from a country box region" % region)
 		if region != "generic" and not ArchitectureData.REGIONS.has(region):
 			failures.append("region %s has no REGIONS row" % region)
 		for kind in ArchitectureStyle.KINDS:
@@ -185,11 +242,44 @@ func _profile_checks(failures: Array[String]) -> void:
 				if not ["none", "shop", "signage", "render", "stone"].has(str((g as Array)[0])):
 					failures.append("%s/%s unknown ground %s" % [region, kind, (g as Array)[0]])
 			for sh in (p["r"] as Array):
-				if not ["flat", "gabled", "hipped", "mansard", "pyramidal", "dome"].has(str((sh as Array)[0])):
+				if not ROOF_SHAPES.has(str((sh as Array)[0])):
 					failures.append("%s/%s unknown roof shape %s" % [region, kind, (sh as Array)[0]])
 			var st: Array = p["st"]
 			if int(st[0]) < 1 or int(st[1]) < int(st[0]):
 				failures.append("%s/%s bad storey range %s" % [region, kind, st])
+			var shs: Array = p["sh"] if p["sh"] is Array else [p["sh"]]
+			for hex in shs + [p["fr"]]:
+				if not Color.html_is_valid(str(hex)):
+					failures.append("%s/%s bad frame/shutter colour %s" % [region, kind, hex])
+			_relief_schema(failures, "%s/%s" % [region, kind], p.get("rv", {}) as Dictionary, true)
+
+## rv / look["relief"] keys and value types (weighted gable lists allowed
+## in profiles only).
+func _relief_schema(failures: Array[String], where: String, rv: Dictionary, profile_row: bool) -> void:
+	for k in rv:
+		if not RELIEF_KEYS.has(k):
+			failures.append("%s relief key %s unknown" % [where, k])
+			continue
+		var v: Variant = rv[k]
+		if k == "gable" and profile_row and v is Array:
+			for g in (v as Array):
+				if not ["", "step", "neck", "bell"].has(str((g as Array)[0])):
+					failures.append("%s gable %s unknown" % [where, g])
+			continue
+		if typeof(v) != int(RELIEF_KEYS[k]):
+			failures.append("%s relief %s has type %d" % [where, k, typeof(v)])
+		elif k == "gable" and not ["", "step", "neck", "bell"].has(str(v)):
+			failures.append("%s gable %s unknown" % [where, v])
+		elif k == "awning_colours":
+			for hex in (v as Array):
+				if not Color.html_is_valid(str(hex)):
+					failures.append("%s bad awning colour %s" % [where, hex])
+		elif k == "balcony_rows":
+			for row in (v as Array):
+				if typeof(row) != TYPE_INT or int(row) < 0:
+					failures.append("%s bad balcony row %s" % [where, row])
+		elif typeof(v) == TYPE_FLOAT and (float(v) < 0.0 or float(v) > 1.0):
+			failures.append("%s relief %s=%s outside 0..1" % [where, k, v])
 
 func _resolve_checks(failures: Array[String]) -> void:
 	var a := ArchitectureStyle.resolve({"kind": "apartments"}, "nordic", "mid", 0.37, 400.0)
@@ -229,8 +319,14 @@ func _resolve_checks(failures: Array[String]) -> void:
 		failures.append("orthodox church must get onion domes, got %s" % orth["tower"])
 
 func _tile_checks(failures: Array[String]) -> void:
-	var look := {"frame": Color(0.9, 0.9, 0.9), "shutter": Color(0.3, 0.4, 0.3), "shutter_p": 0.4, "bay_m": 3.2}
+	var look := {"frame": Color(0.9, 0.9, 0.9), "shutter": Color(0.3, 0.4, 0.3), "shutter_p": 0.6, "bay_m": 3.2,
+		"rails": 0.5}
 	var loader := Callable(MaterialLibrary, "_set_image")
+	if FacadePatterns.CELL != FacadeComposer.CELL:
+		failures.append("FacadePatterns.CELL must match FacadeComposer.CELL")
+	for pat in FacadePatterns.NAMES:
+		if not FacadeComposer.is_tiled(pat):
+			failures.append("pattern %s must be registered in FacadeComposer.TILED" % pat)
 	for pat in FacadeComposer.TILED:
 		var set_name := "glass" if pat == "curtain" else "render"
 		for detail in [0, 1]:
@@ -424,13 +520,15 @@ func _authenticity_checks(failures: Array[String]) -> void:
 	if sigs.size() < regions.size():
 		failures.append("every region needs its own street signature, %d distinct of %d" % [sigs.size(), regions.size()])
 	# Paris: Haussmann fronts with no separate ground band (it is drawn in).
-	var pa := ArchitectureStyle.resolve({"kind": "apartments"}, "haussmann", "dense", 0.3, 600.0)
+	var pa := ArchitectureStyle.resolve({"kind": "apartments", "levels": 6}, "haussmann", "dense", 0.3, 600.0)
 	if pa["pattern"] != "haussmann" or pa["ground"] != "" or float(pa["bay_m"]) > 2.4:
 		failures.append("Paris apartments must be Haussmann, ground drawn in, bay <= 2.4 m, got %s" % pa)
+	# Inside a city zone variants follow the per-era look index
+	# (ArchitectureStyle.LOOKS, the per-place material budget T7.2).
 	var variants := {}
 	for i in 30:
-		variants[ArchitectureStyle.resolve({"kind": "apartments"}, "haussmann", "dense", float(i) * 0.031, 600.0)["variant"]] = true
-	if variants.size() < 3:
+		variants[ArchitectureStyle.resolve({"kind": "apartments", "levels": 6}, "haussmann", "dense", float(i) * 0.031, 600.0)["variant"]] = true
+	if variants.size() < mini(ArchitectureStyle.LOOKS, ArchitectureStyle.VARIANTS):
 		failures.append("Paris blocks should spread over facade variants, got %d" % variants.size())
 	# Tokyo: commercial gets a signage ground floor, fronts never all glass.
 	var jp_ground := {}
@@ -510,3 +608,122 @@ func _albedo_luma(m: StandardMaterial3D) -> float:
 			var t := m.albedo_color.srgb_to_linear()
 			return 0.2126 * mean.r * t.r + 0.7152 * mean.g * t.g + 0.0722 * mean.b * t.b
 	return 1.0
+
+## Paris-centred build ctx (cores at the origin) or one offset by `east_m`.
+func _paris_ctx(east_m: float = 0.0) -> Dictionary:
+	return CityStyles.local_frame("haussmann", 48.8566, 2.3522 + east_m / (111320.0 * cos(deg_to_rad(48.8566))))
+
+func _era(region: String, b: Dictionary, ctx: Dictionary = {}, area: float = 400.0, seed_v: float = 0.37) -> String:
+	var kind := ArchitectureStyle.kind_for(b, "dense", area)
+	return BuildingEra.refine(region, kind, b, ctx, seed_v, area)
+
+## Era refinement reads real cues before any seeded pick.
+func _era_checks(failures: Array[String]) -> void:
+	var ctx := _paris_ctx()
+	var cases := [
+		[{"kind": "apartments", "start_year": 1930, "x": 0.0, "z": 0.0}, "paris_hbm"],
+		[{"kind": "apartments", "start_year": 1975, "x": 0.0, "z": 0.0}, "paris_modern"],
+		[{"kind": "apartments", "start_year": 1870, "x": 0.0, "z": 0.0}, "haussmann"],
+		[{"kind": "apartments", "start_year": 1905, "x": 0.0, "z": 0.0}, "paris_post_haussmann"],
+		[{"kind": "apartments", "start_year": 1780, "x": 0.0, "z": 0.0}, "paris_faubourg"],
+		[{"kind": "apartments", "levels": 6, "x": 300.0, "z": 200.0}, "haussmann"],
+		[{"kind": "apartments", "levels": 7, "x": 5200.0, "z": 0.0}, "paris_hbm"],
+		[{"kind": "apartments", "levels": 12, "x": 0.0, "z": 0.0}, "paris_modern"],
+		[{"kind": "yes", "levels": 7, "roof_shape": "flat", "x": 0.0, "z": 0.0}, "paris_modern"],
+		[{"kind": "apartments", "levels": 4, "heritage": true, "x": 0.0, "z": 0.0}, "paris_faubourg"],
+		[{"kind": "apartments", "architecture": "art_deco", "levels": 6, "x": 0.0, "z": 0.0}, "paris_hbm"],
+		[{"kind": "house", "x": 3000.0, "z": 0.0}, "paris_pavillon"],
+	]
+	for c in cases:
+		var got := _era("haussmann", c[0], ctx)
+		if got != str(c[1]):
+			failures.append("Paris era for %s = %s, expected %s" % [c[0], got, c[1]])
+	# Untagged near the centre (west of the Marais, which reads faubourg):
+	# mostly Haussmann, but a mixed street.
+	var mix := {}
+	for i in 200:
+		var e := _era("haussmann", {"kind": "apartments", "x": -1200.0 - float(i % 20) * 37.0, "z": 300.0 + float(i / 20) * 41.0},
+			ctx, 400.0, float(i) * 0.0137 + 0.01)
+		mix[e] = int(mix.get(e, 0)) + 1
+	if int(mix.get("haussmann", 0)) < 100 or mix.size() < 3:
+		failures.append("untagged central Paris should be mostly Haussmann with some variety, got %s" % mix)
+	# Other cities.
+	var nyc := CityStyles.local_frame("new_york", 40.7549, -73.9840)
+	var other := [
+		["new_york", {"kind": "apartments", "levels": 30, "x": 0.0, "z": 0.0}, nyc, "nyc_glass"],
+		["new_york", {"kind": "apartments", "architecture": "art_deco", "levels": 30}, nyc, "nyc_prewar"],
+		["new_york", {"kind": "apartments", "levels": 5, "x": 0.0, "z": 0.0}, nyc, "new_york"],
+		["new_york", {"kind": "house", "levels": 4, "x": 0.0, "z": 0.0}, nyc, "nyc_brownstone"],
+		["london", {"kind": "apartments", "levels": 12}, {}, "london_modern"],
+		["london", {"kind": "apartments", "start_year": 1790}, {}, "london_georgian"],
+		["london", {"kind": "apartments", "levels": 6}, {}, "london_mansion"],
+		["berlin", {"kind": "apartments", "start_year": 1975}, {}, "berlin_plattenbau"],
+		["berlin", {"kind": "apartments", "levels": 5}, {}, "berlin"],
+		["amsterdam", {"kind": "house", "levels": 4}, {}, "amsterdam"],
+		["tokyo", {"kind": "house", "levels": 2}, {}, "tokyo_house"],
+		["tokyo", {"kind": "commercial", "levels": 25}, {}, "tokyo_tower"],
+		["hong_kong", {"kind": "apartments", "levels": 32}, {}, "hong_kong"],
+		["hong_kong", {"kind": "apartments", "levels": 6}, {}, "hk_tenement"],
+		["singapore", {"kind": "commercial", "levels": 3}, {}, "sg_shophouse"],
+		["singapore", {"kind": "apartments", "levels": 14}, {}, "singapore"],
+		["san_francisco", {"kind": "house", "levels": 2}, {}, "sf_victorian"],
+		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
+		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],
+	]
+	for o in other:
+		var got := _era(str(o[0]), o[1], o[2], 200.0 if str(o[1]["kind"]) == "house" else 600.0)
+		if got != str(o[3]):
+			failures.append("%s era for %s = %s, expected %s" % [o[0], o[1], got, o[3]])
+	# The look carries city / era / relief; relief follows the schema.
+	var look := ArchitectureStyle.resolve({"kind": "apartments", "levels": 6, "x": 0.0, "z": 0.0},
+		"haussmann", "dense", 0.3, 600.0, ctx)
+	if look.get("city") != "paris" or look.get("era") != "haussmann" or not (look.get("relief") is Dictionary):
+		failures.append("look must carry city/era/relief, got city=%s era=%s" % [look.get("city"), look.get("era")])
+	elif float((look["relief"] as Dictionary).get("balconette", 0.0)) < 0.5 \
+			or not bool((look["relief"] as Dictionary).get("string_course", false)):
+		failures.append("Haussmann relief needs balconettes and a string course, got %s" % look["relief"])
+	var plain := ArchitectureStyle.resolve({"kind": "apartments"}, "nordic", "mid", 0.3, 600.0)
+	if plain.get("city") != "" or plain.get("era") != "nordic" or not (plain.get("relief") is Dictionary):
+		failures.append("country looks carry city '' / era = region / a relief dict")
+	var gables := {}
+	for i in 40:
+		var r := ArchitectureStyle.resolve({"kind": "house", "levels": 4}, "amsterdam", "dense", float(i) * 0.023 + 0.01, 120.0)
+		_relief_schema(failures, "amsterdam look", r["relief"] as Dictionary, false)
+		gables[(r["relief"] as Dictionary).get("gable", "")] = true
+	if not (gables.has("step") and gables.has("neck") and gables.has("bell")):
+		failures.append("Amsterdam canal houses should mix step/neck/bell gables, got %s" % gables.keys())
+	var walk := ArchitectureStyle.resolve({"kind": "apartments", "levels": 5}, "new_york", "dense", 0.4, 300.0)
+	if float((walk["relief"] as Dictionary).get("fire_escape", 0.0)) < 0.7:
+		failures.append("NYC walk-ups need fire escapes, got %s" % walk["relief"])
+	# The build context carries the city frame; levels drive the era there.
+	var data := _flat_data(51.5074, -0.1278)
+	data.buildings = [_bld("apartments", 0.0, 0.0, 30.0, 14.0, 12)]
+	var hctx := BuildingHeights._height_context(data)
+	if hctx.get("city") != "london" or (hctx.get("cores", []) as Array).is_empty():
+		failures.append("London build ctx needs city + cores, got %s" % hctx.get("city"))
+	elif BuildingHeights._look_for(data.buildings[0], hctx)["era"] != "london_modern":
+		failures.append("a 12-level London block should read london_modern")
+
+## 200 seeded buildings per zone city: their wall/pattern/roof/colour
+## censuses must all differ (Paris must not look like anywhere else).
+func _city_distinct_checks(failures: Array[String]) -> void:
+	var sigs := {}
+	for city in ZONE_CITIES:
+		var ll: Array = ZONE_CITIES[city]
+		var region := ArchitectureStyle.region_for(float(ll[0]), float(ll[1]))
+		var ctx := CityStyles.local_frame(region, float(ll[0]), float(ll[1]))
+		var census := {}
+		for i in 200:
+			var sv := float(i) * 0.00731 + 0.003
+			var kinds := ["apartments", "apartments", "commercial", "house", "yes"]
+			var b := {"kind": kinds[i % kinds.size()], "x": (sv * 9000.0 - 4500.0),
+				"z": fmod(sv * 7333.0, 6000.0) - 3000.0, "levels": [0, 0, 3, 5, 6, 8, 12][i % 7]}
+			var r := ArchitectureStyle.resolve(b, region, "dense", sv, 350.0, ctx)
+			var key := "%s/%s/%s" % [r["wall_set"], r["pattern"], r["roof_shape"]]
+			census[key] = int(census.get(key, 0)) + 1
+		var top: Array = census.keys()
+		top.sort_custom(func(a, b): return census[a] > census[b])
+		var sig := ",".join(top.slice(0, 3))
+		if sigs.has(sig):
+			failures.append("%s and %s share the same dominant looks %s" % [city, sigs[sig], sig])
+		sigs[sig] = city

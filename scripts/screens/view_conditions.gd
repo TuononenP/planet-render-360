@@ -191,6 +191,7 @@ static func _apply_current_time(v: View360) -> void:
 		var lat := v._data.latitude if v._data != null else v._atmos.latitude
 		v._atmos.set_time(v._time_hour, lat, {"year": int(now.get("year", 2026)),
 			"month": int(now.get("month", 1)), "day": int(now.get("day", 1))})
+		AccentSun.follow_atmos(v._atmos, v._time_hour)
 	_city_lights(v)
 	_precip_tint(v)
 	_sync_time_ui(v)
@@ -219,6 +220,7 @@ static func _apply_time(v: View360, hour_f: float) -> void:
 		return
 	var lat := v._data.latitude if v._data != null else v._atmos.latitude
 	v._atmos.set_time(hour_f, lat)
+	AccentSun.follow_atmos(v._atmos, hour_f)
 	_city_lights(v)
 	_precip_tint(v)
 

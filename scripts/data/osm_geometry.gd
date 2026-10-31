@@ -117,9 +117,6 @@ static func _join_rings(segs: Array) -> Array:
 ## not areas) yields no entry.
 static func _relation_land(tags: Dictionary, members: Array,
 		c_lat: float, c_lon: float) -> Array:
-	var outers := _join_rings(_member_segments(members, true, c_lat, c_lon))
-	if outers.is_empty():
-		return []
 	var cls := ""
 	if str(tags.get("waterway", "")) == "riverbank":
 		cls = "water"
@@ -129,15 +126,28 @@ static func _relation_land(tags: Dictionary, members: Array,
 		cls = OsmTags.land_class(tags)
 		if cls == "":
 			return []
-	var inners := _join_rings(_member_segments(members, false, c_lat, c_lon))
 	var entries: Array = []
+	for r in _relation_rings(members, c_lat, c_lon):
+		entries.append({"class": cls, "points": r["outer"], "holes": r["holes"]})
+	return entries
+
+## Stitched rings of one multipolygon relation as [{outer, holes}]:
+## each inner ring attaches to the outer containing its first vertex
+## (all inners when there is a single outer). Rings keep the closing
+## duplicate vertex _join_rings produces, like way footprints do.
+static func _relation_rings(members: Array, c_lat: float, c_lon: float) -> Array:
+	var outers := _join_rings(_member_segments(members, true, c_lat, c_lon))
+	if outers.is_empty():
+		return []
+	var inners := _join_rings(_member_segments(members, false, c_lat, c_lon))
+	var out: Array = []
 	for o in outers:
 		var holes: Array = []
 		for h in inners:
 			if outers.size() == 1 or _point_in_ring((h as PackedVector2Array)[0], o):
 				holes.append(h)
-		entries.append({"class": cls, "points": o, "holes": holes})
-	return entries
+		out.append({"outer": o, "holes": holes})
+	return out
 ## Points every `step` metres along a polyline (first vertex included).
 static func along(line: PackedVector2Array, step: float) -> PackedVector2Array:
 	var out := PackedVector2Array()

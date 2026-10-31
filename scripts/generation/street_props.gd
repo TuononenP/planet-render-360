@@ -48,7 +48,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		return 0
 	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
-	var region := ArchitectureStyle.region_for(data.latitude, data.longitude)
+	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude)
 	var lantern_region := region in LANTERN_REGIONS
 	var placed := {"lantern": [], "modern": [], "modern_s": []}
 	var occupied := {}

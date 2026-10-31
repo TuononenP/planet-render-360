@@ -87,19 +87,19 @@ func bind_store(store: CacheStore) -> void:
 	refresh()
 
 func _card_style() -> StyleBoxFlat:
-	var st := UiTheme.style(UiTheme.SURFACE, 24, Color(1, 1, 1, 0.08))
+	var st := UiTheme.style(UiTheme.SURFACE, UiTheme.RADIUS_L, UiTheme.LINE)
 	st.set_content_margin_all(0)
 	return st
 
 func _chip(text: String) -> PanelContainer:
 	var chip := PanelContainer.new()
-	var st := UiTheme.style(Color(1, 1, 1, 0.06), 12)
+	var st := UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_PILL)
 	st.content_margin_left = 10
 	st.content_margin_right = 10
 	st.content_margin_top = 4
 	st.content_margin_bottom = 4
 	chip.add_theme_stylebox_override("panel", st)
-	chip.add_child(UiTheme.label(text, 12, Color(UiTheme.INK, 0.8)))
+	chip.add_child(UiTheme.label(text, 12, UiTheme.MUTED))
 	return chip
 
 func refresh() -> void:
@@ -148,7 +148,7 @@ func refresh() -> void:
 		card.add_child(col)
 		# Preview band: a deep tint per place (stable hash) with a soft
 		# horizon glow, so the list scans as places, not rows.
-		var tints := [Color(0.13, 0.25, 0.30), Color(0.16, 0.22, 0.31), Color(0.27, 0.22, 0.17), Color(0.17, 0.27, 0.21)]
+		var tints := [Color("1a2350"), Color("b8607e").darkened(0.55), Color("7fb8e6").darkened(0.6), Color("f0b06a").darkened(0.65)]  # horizon-* stops, deepened
 		var tint: Color = tints[abs(place.hash()) % tints.size()]
 		var thumb := PanelContainer.new()
 		thumb.custom_minimum_size = Vector2(0, 150 if _current_layout != Responsive.Layout.COMPACT else 120)
@@ -171,7 +171,7 @@ func refresh() -> void:
 		var name_label := UiTheme.label(place, 22, UiTheme.INK, true)
 		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		texts.add_child(name_label)
-		texts.add_child(UiTheme.label("%.4f° N · %.4f° E" % [lat, lon], 13, UiTheme.MUTED))
+		texts.add_child(UiTheme.data_label(UiTheme.coords(lat, lon), 13, UiTheme.MUTED, true))
 		var tags := HBoxContainer.new()
 		tags.add_theme_constant_override("separation", 6)
 		tags.add_child(_chip("⬇ Cached"))

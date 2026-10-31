@@ -135,8 +135,8 @@ func _build_hud() -> void:
 	var compass_disc := PanelContainer.new()
 	compass_disc.custom_minimum_size = Vector2(56, 56)
 	compass_disc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var disc_style := HudStyle.glass(28, HudStyle.ACCENT, HudStyle.GLASS, 0, 4)
-	disc_style.set_border_width_all(2)
+	var disc_style := HudStyle.glass(28, HudStyle.EDGE, HudStyle.GLASS_STRONG, 0, 4)
+	disc_style.set_border_width_all(1)
 	compass_disc.add_theme_stylebox_override("panel", disc_style)
 	_top.add_child(compass_disc)
 	var compass_col := VBoxContainer.new()
@@ -239,7 +239,7 @@ func _build_hud() -> void:
 	_quality_label = HudStyle.label("High · 60 fps", 12, HudStyle.TEXT_DIM)
 	_quality_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dock.add_child(_quality_label)
-	_attribution_label = HudStyle.label("", 10, HudStyle.TEXT_FAINT)
+	_attribution_label = HudStyle.label("", 12, HudStyle.TEXT_DIM)
 	_attribution_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dock.add_child(_attribution_label)

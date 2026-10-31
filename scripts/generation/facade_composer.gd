@@ -11,8 +11,10 @@ extends RefCounted
 ## variant), not per storey count. T4.6: a regional window vocabulary
 ## (casement, french, sash, wide, small), balconettes, per-building
 ## variants (which bays carry shutters, blinds, lit panes, loggias),
-## sky-reflective curtain glass and the Japanese tiled front. The Paris
-## full facade, ground storeys and legacy glass live in StoreyComposer.
+## sky-reflective curtain glass and the Japanese tiled front. City / era
+## patterns (panel, ornate, brownstone, shophouse) are drawn by
+## FacadePatterns. The Paris full facade, ground storeys and legacy glass
+## live in StoreyComposer.
 ## Drawn colours are linear, like the photographic bases.
 
 ## Dark PRD glass base (#2E3A40, linear) for window panes in solid walls.
@@ -26,7 +28,7 @@ const MULLION := Color(0.52, 0.54, 0.56)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
-	"industrial", "adobe", "curtain", "tiles"]
+	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse"]
 const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small"]
 ## Photo repeats per bay cell: brick courses and boards must read at
 ## real size, so those bases tile 2x2 inside each bay.
@@ -85,6 +87,10 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	# Everything below is paint over the (tinted) wall: frames, glass and
 	# shutters keep their own colours (FacadePaint).
 	var base := alb
+	var pv := {"frame": frame, "shutter": shutter, "shutter_p": shutter_p, "window": win,
+		"rails": rails, "variant": int(variant), "glass": GLASS}
+	if FacadePatterns.has(pattern):
+		FacadePatterns.prepass(pattern, base, nor, W, pv)
 	alb = FacadePaint.layer(base)
 	var emit := FacadePaint.emit_layer(base) if detail >= 1 and not glass else null
 	for bay in BAYS:
@@ -115,6 +121,8 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 			"curtain":
 				_curtain(alb, nor, rgh, ox, hv)
 				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63), hv)
+			_:
+				FacadePatterns.bay(pattern, alb, nor, rgh, emit, base, ox, bay, hv, pv)
 	# Ultra: recessed panes (a curtain wall is flush glass).
 	var depth_fn := Callable(FacadeComposer, "depth_from_rough") \
 		if detail >= 2 and pattern != "curtain" else Callable()
@@ -223,14 +231,8 @@ static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 			alb.fill_rect(Rect2i(wx + ww + 4, ly, sw, 1), dark)
 	alb.fill_rect(Rect2i(wx - 4, wy - 7, ww + 8, 3), dark)
 	alb.fill_rect(Rect2i(wx - 3, wy - 3, ww + 6, wh + 6), frame)
-	var pane := GLASS
-	if hv > 0.93:
-		pane = FacadePaint.DAY_ROOM  # lit interior (glows at night)
-	elif hv > 0.78:
-		pane = Color(0.20, 0.19, 0.17)  # curtain drawn
-	alb.fill_rect(Rect2i(wx, wy, ww, wh), pane)
+	glass_pane(alb, Rect2i(wx, wy, ww, wh), hv)
 	FacadePaint.pane(emit, Rect2i(wx, wy, ww, wh), hv)
-	alb.fill_rect(Rect2i(wx, wy, ww, maxi(wh / 6, 2)), _lin(Color(0.24, 0.30, 0.35)))
 	match win:
 		"sash":
 			alb.fill_rect(Rect2i(wx, wy + wh / 2 - 1, ww, 4), frame)
@@ -267,6 +269,29 @@ static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 		nor.fill_rect(Rect2i(wx + ww, wy - 3, 3, wh + 6), hi)
 		nor.fill_rect(Rect2i(wx - 3, wy + wh, ww + 6, 3), hi)
 		rgh.fill_rect(Rect2i(wx, wy, ww, wh), Color(0.2, 0.2, 0.2))
+
+## One pane by its hash: mostly glass carrying a sky reflection (light
+## at the head, deepening down, its strength varying pane to pane), some
+## sheer curtains, blinds or a lit room — never the flat black hole an
+## unlit pane read as from the street.
+static func glass_pane(alb: Image, r: Rect2i, hv: float) -> void:
+	if hv > 0.93:
+		alb.fill_rect(r, FacadePaint.DAY_ROOM)  # lit interior (glows at night)
+		return
+	if hv > 0.84:
+		alb.fill_rect(r, Color(0.42, 0.40, 0.36))  # sheer curtain
+		alb.fill_rect(Rect2i(r.position.x + r.size.x / 2 - 1, r.position.y, 2, r.size.y), Color(0.30, 0.28, 0.25))
+		return
+	if hv > 0.78:
+		alb.fill_rect(r, Color(0.36, 0.33, 0.28))  # blind, slats every 3 px
+		for y in range(r.position.y, r.end.y, 3):
+			alb.fill_rect(Rect2i(r.position.x, y, r.size.x, 1), Color(0.24, 0.22, 0.19))
+		return
+	var sky := 0.55 + 0.9 * fposmod(hv * 7.31, 1.0)
+	for y in r.size.y:
+		var t := float(y) / maxf(r.size.y - 1, 1)
+		var c := GLASS.lerp(SKY_GLASS_TOP, clampf((1.0 - t * 1.6) * sky * 0.8, 0.0, 1.0))
+		alb.fill_rect(Rect2i(r.position.x, r.position.y + y, r.size.x, 1), c.lerp(SKY_GLASS, 0.35))
 
 ## Small glazed ceramic tiles (Japanese / East Asian mid-rise fronts):
 ## a fine grout grid blended over the photo, a bevel per course.

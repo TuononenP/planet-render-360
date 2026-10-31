@@ -179,6 +179,10 @@ func _run() -> void:
 	await _busy_checks(failures)
 	_null_node_checks(failures)
 	_tree_tag_checks(failures)
+	_building_relation_checks(failures)
+	_building_tag_checks(failures)
+	_roof_shape_checks(failures)
+	_material_map_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -500,10 +504,12 @@ func _query_checks(failures: Array[String]) -> void:
 	for p in [0, 1, 2, 3]:
 		if OsmFetcher.ring_radius_for_preset(p) != rings[p]:
 			failures.append("preset %d ring radius wrong" % p)
-	# Detailed query: 15 tiered around-clauses (11 T2.3 + 4 T2.4
-	# multipolygon-relation statements), per-layer caps, no v1 cap.
+	# Detailed query: 16 tiered around-clauses (11 T2.3 + 4 T2.4
+	# multipolygon-relation statements + building relations), per-layer
+	# caps, no v1 cap.
 	var q := OsmFetcher.build_query(48.8566, 2.3522)
 	for clause in ['way["building"]', 'way["building:part"]', 'way["highway"]',
+			'relation["building"]["type"="multipolygon"]',
 			'way["waterway"]', 'way["natural"]', 'way["landuse"]', 'way["leisure"]',
 			'relation["waterway"]["type"="multipolygon"]',
 			'relation["natural"]["type"="multipolygon"]',
@@ -516,16 +522,18 @@ func _query_checks(failures: Array[String]) -> void:
 		failures.append("query must not carry the v1 out-geom-900 cap")
 	if not q.contains("out geom %d" % OsmFetcher.CAP_BUILDINGS) or not q.contains("[timeout:30]"):
 		failures.append("query missing tiered caps / [timeout:30]")
-	# Regression: 15 around clauses need 15 radius/lat/lon triplets. A
+	if not q.contains("out geom %d" % OsmQuery.CAP_BUILDING_RELATIONS):
+		failures.append("query missing building-relation cap")
+	# Regression: 16 around clauses need 16 radius/lat/lon triplets. A
 	# short % argument list leaves raw placeholders in the query and
 	# Godot prints "not enough arguments for format string".
 	if q.contains("%"):
 		failures.append("query still has unformatted placeholders: %s" % q)
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 15:
-		failures.append("expected 15 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 16:
+		failures.append("expected 16 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 15:
+	if q420.count("420,48.856600,2.352200") != 16:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)
@@ -676,3 +684,161 @@ func _tree_tag_checks(failures: Array[String]) -> void:
 	for e in TreeSpecies.mix_for_leaf("temperate", "forest", "needleleaved"):
 		if str(e[0]) not in ["spruce", "scots_pine", "stone_pine", "cypress"]:
 			failures.append("a needleleaved forest mix must hold conifers only, got %s" % e[0])
+
+## Building multipolygon relation (courtyard block): one building per
+## outer ring with its inner ring as a hole; tags (incl. archetype) come
+## from the relation; plain way buildings carry an empty `holes`.
+const FIXTURE_BLD_REL := """
+{"elements":[
+ {"type":"relation","id":801,"tags":{"type":"multipolygon","building":"church","name":"Court Church","building:levels":"6","roof:shape":"mansard"},
+  "members":[
+   {"type":"way","ref":8011,"role":"outer",
+    "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8560,"lon":2.3520},
+                {"lat":48.8566,"lon":2.3520}]},
+   {"type":"way","ref":8012,"role":"outer",
+    "geometry":[{"lat":48.8566,"lon":2.3520},{"lat":48.8566,"lon":2.3510},
+                {"lat":48.8560,"lon":2.3510}]},
+   {"type":"way","ref":8013,"role":"inner",
+    "geometry":[{"lat":48.8562,"lon":2.3514},{"lat":48.8562,"lon":2.3516},
+                {"lat":48.8564,"lon":2.3516},{"lat":48.8564,"lon":2.3514},
+                {"lat":48.8562,"lon":2.3514}]}]},
+ {"type":"way","id":802,"tags":{"building":"yes"},
+  "geometry":[{"lat":48.8570,"lon":2.3530},{"lat":48.8570,"lon":2.3532},
+              {"lat":48.8571,"lon":2.3532},{"lat":48.8571,"lon":2.3530},
+              {"lat":48.8570,"lon":2.3530}]},
+ {"type":"way","id":803,"tags":{"building:part":"yes","height":"30","roof:shape":"dome","roof:colour":"#556677","roof:material":"copper","roof:height":"6","roof:levels":"1","min_height":"20","building:min_level":"6"},
+  "geometry":[{"lat":48.85605,"lon":2.35105},{"lat":48.85605,"lon":2.35115},
+              {"lat":48.85615,"lon":2.35115},{"lat":48.85615,"lon":2.35105},
+              {"lat":48.85605,"lon":2.35105}]}
+]}
+"""
+
+func _building_relation_checks(failures: Array[String]) -> void:
+	var f := OsmFetcher.parse_features(FIXTURE_BLD_REL, 48.8566, 2.3522)
+	var bs: Array = f["buildings"]
+	if bs.size() != 2:
+		failures.append("building relation + way should yield 2 buildings, got %d" % bs.size())
+		return
+	var rel := _by_name(bs, "Court Church")
+	if rel.is_empty():
+		failures.append("building relation should emit a building entry")
+		return
+	var fp: PackedVector2Array = rel["footprint"]
+	var holes: Array = rel["holes"]
+	# Outer halves stitch into a closed 5-pt ring (closing node kept,
+	# like way footprints); the 5-pt inner becomes the one hole.
+	if fp.size() != 5 or fp[0].distance_to(fp[4]) > 0.001:
+		failures.append("relation footprint should be the closed outer ring: %s" % [fp])
+	if holes.size() != 1 or (holes[0] as PackedVector2Array).size() != 5:
+		failures.append("relation building should carry 1 hole: %s" % [holes])
+	elif not OsmGeometry._point_in_ring((holes[0] as PackedVector2Array)[0], fp):
+		failures.append("hole should sit inside the footprint")
+	if int(rel["levels"]) != 6 or str(rel["roof_shape"]) != "mansard" \
+			or str(rel["kind"]) != "church":
+		failures.append("relation tags should reach the entry: %s" % [rel])
+	var way_b: Dictionary = bs[0] if bs[0] != rel else bs[1]
+	if not way_b.has("holes") or not (way_b["holes"] as Array).is_empty():
+		failures.append("way buildings should carry an empty holes array")
+	var lms: Array = f["landmarks"]
+	if lms.size() != 1 or str(lms[0]["archetype"]) != "church":
+		failures.append("building relation should yield one church landmark: %s" % [lms])
+	# The part nests into the relation building and keeps its own roof.
+	var parts: Array = rel["parts"]
+	if parts.size() != 1:
+		failures.append("part should nest into the relation building: %d" % parts.size())
+		return
+	var p: Dictionary = parts[0]
+	if str(p.get("roof_shape", "")) != "dome" or str(p.get("roof_colour", "")) != "#556677" \
+			or str(p.get("roof_material", "")) != "copper" \
+			or absf(float(p.get("roof_height_m", 0.0)) - 6.0) > 0.01 \
+			or int(p.get("roof_levels", 0)) != 1 \
+			or absf(float(p.get("min_height_m", 0.0)) - 20.0) > 0.01 \
+			or int(p.get("min_level", 0)) != 6:
+		failures.append("part should keep its roof keys: %s" % [p])
+
+## New per-building tags: roof_levels, min_level, start_year (many
+## start_date spellings), heritage, architecture; defaults when absent.
+func _building_tag_checks(failures: Array[String]) -> void:
+	var box := Rect2(0, 0, 20, 20)
+	var ring := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(20, 20), Vector2(0, 20)])
+	var e := OsmTags._building_entry({"building": "yes", "roof:levels": "2",
+		"building:min_level": "1", "start_date": "1890",
+		"heritage": "2", "building:architecture": "Art_Nouveau"}, ring, box)
+	if int(e["roof_levels"]) != 2 or int(e["min_level"]) != 1 \
+			or int(e["start_year"]) != 1890 or not bool(e["heritage"]) \
+			or str(e["architecture"]) != "art_nouveau":
+		failures.append("new building tags wrong: %s" % [e])
+	var d := OsmTags._building_entry({"building": "yes"}, ring, box)
+	if int(d["roof_levels"]) != 0 or int(d["min_level"]) != 0 \
+			or int(d["start_year"]) != 0 or bool(d["heritage"]) \
+			or str(d["architecture"]) != "" or not (d["holes"] as Array).is_empty():
+		failures.append("absent tags should default to 0/false/empty: %s" % [d])
+	if int(OsmTags._building_entry({"roof:levels": "40"}, ring, box)["roof_levels"]) != 10:
+		failures.append("roof_levels should clamp to 10")
+	for row in [["1890", 1890], ["1890-05-01", 1890], ["~1890", 1890],
+			["C19", 1850], ["c18", 1750], ["1890s", 1890], ["before 1900", 1900],
+			["", 0], ["unknown", 0], ["12345", 0], ["C99", 0]]:
+		var got := OsmTags._start_year(row[0])
+		if got != row[1]:
+			failures.append("start_year(%s) should be %d, got %d" % [row[0], row[1], got])
+	for tags in [{"heritage:operator": "mhs"}, {"historic": "building"}, {"historic": "yes"}]:
+		if not bool(OsmTags._building_entry(tags, ring, box)["heritage"]):
+			failures.append("heritage should read true for %s" % [tags])
+	for tags in [{"heritage": "no"}, {"historic": "memorial"}]:
+		if bool(OsmTags._building_entry(tags, ring, box)["heritage"]):
+			failures.append("heritage should read false for %s" % [tags])
+
+## roof:shape → canonical modelled shape.
+func _roof_shape_checks(failures: Array[String]) -> void:
+	var table := [["flat", "flat"], ["gabled", "gabled"], ["hipped", "hipped"],
+		["mansard", "mansard"], ["pyramidal", "pyramidal"], ["dome", "dome"],
+		["gambrel", "gambrel"], ["skillion", "skillion"], ["shed", "skillion"],
+		["lean_to", "skillion"], ["half-hipped", "half-hipped"],
+		["half_hipped", "half-hipped"], ["saltbox", "saltbox"], ["round", "round"],
+		["barrel", "round"], ["onion", "dome"], ["cone", "pyramidal"],
+		["pyramid", "pyramidal"], ["crosspitched", "hipped"],
+		["side_hipped", "hipped"], ["many", "flat"], ["complex", "flat"],
+		["bogus", "flat"], [" Gabled ", "gabled"]]
+	for row in table:
+		var got := BuildingHeights._effective_shape(row[0], "hipped", false)
+		if got != row[1]:
+			failures.append("_effective_shape(%s) should be %s, got %s" % [row[0], row[1], got])
+	if BuildingHeights._effective_shape("", "mansard", false) != "mansard" \
+			or BuildingHeights._effective_shape("", "mansard", true) != "flat":
+		failures.append("untagged roof should take the default (flat when legacy)")
+
+## OSM material/colour tag maps reach existing PBR sets and CSS names.
+func _material_map_checks(failures: Array[String]) -> void:
+	var roof := {"roof_tiles": "terracotta", "tar_paper": "membrane",
+		"eternit": "slate", "metal_sheet": "slate", "metal sheet": "slate",
+		"stone": "slate", "copper": "terracotta", "zinc": "slate"}
+	for k in roof:
+		if str(MaterialLibrary.ROOF_TAGS.get(k, "")) != roof[k]:
+			failures.append("ROOF_TAGS[%s] should be %s" % [k, roof[k]])
+	var wall := {"tiles": "terracotta", "timber_framing": "wood",
+		"metal_plates": "concrete", "iron": "concrete", "concrete/glass": "concrete",
+		"sandstone": "stone", "plaster": "render", "render": "render"}
+	for k in wall:
+		if str(MaterialLibrary.MATERIAL_TAGS.get(k, "")) != wall[k]:
+			failures.append("MATERIAL_TAGS[%s] should be %s" % [k, wall[k]])
+	# glass is special-cased by FacadeMaterials (no photo set).
+	for k in MaterialLibrary.ROOF_TAGS:
+		if MaterialLibrary.ROOF_TAGS[k] != "glass" and not MaterialLibrary.PBR_SETS.has(MaterialLibrary.ROOF_TAGS[k]):
+			failures.append("ROOF_TAGS[%s] names a missing PBR set" % k)
+	for k in MaterialLibrary.MATERIAL_TAGS:
+		if MaterialLibrary.MATERIAL_TAGS[k] != "glass" and not MaterialLibrary.PBR_SETS.has(MaterialLibrary.MATERIAL_TAGS[k]):
+			failures.append("MATERIAL_TAGS[%s] names a missing PBR set" % k)
+	for n in ["lightyellow", "tan", "gold", "dimgrey", "dimgray", "darksalmon",
+			"silver", "ivory", "light yellow", "light_yellow", "LightYellow", "slategrey"]:
+		if MaterialLibrary.parse_colour_tag(n).a <= 0.0:
+			failures.append("parse_colour_tag(%s) should resolve a CSS colour" % n)
+	if not MaterialLibrary.parse_colour_tag("lightyellow").is_equal_approx(
+			Color8(255, 255, 224).srgb_to_linear()):
+		failures.append("lightyellow should decode to its sRGB value, linearised")
+	# The tuned table still wins over CSS (beige is a warmer stone here).
+	if not MaterialLibrary.parse_colour_tag("beige").is_equal_approx(
+			Color.html("F0E6CE").srgb_to_linear()):
+		failures.append("tuned named colours must keep precedence")
+	for n in ["notacolour", "transparent", ""]:
+		if MaterialLibrary.parse_colour_tag(n).a != 0.0:
+			failures.append("parse_colour_tag(%s) should stay unparsed" % n)

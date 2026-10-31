@@ -31,6 +31,8 @@ static func build(model: Node3D, archetype: String, h: float, size: Vector2,
 		"mosque": _mosque(lm, h, w, l)
 		"temple": _temple(lm, h, w, l, str(look["tower"]))
 		"windmill": _windmill(lm, h)
+		"column": LandmarkMonuments.column(lm, h)
+		"obelisk": LandmarkMonuments.obelisk(lm, h)
 		_: _tower(lm, h, w)
 	lm.commit(model)
 	if size.x > size.y:

@@ -2,30 +2,30 @@ class_name GenerationPipeline
 extends Node
 
 ## Staged, cancellable location-generation pipeline.
-## Stage 0 fetches a real DEM mosaic (DemFetcher 3x3 z14, z12 fallback,
-## AWS Terrain Tiles) and falls back to a deterministic procedural DEM
-## when offline or on error. Both paths normalise into the same
-## LocationData contract with identity true-metre mapping (T1.3).
+## Stage 0 fetches a real DEM mosaic (DemFetcher 3x3 z14, z12 fallback)
+## and falls back to a deterministic procedural DEM when offline or on
+## error; both normalise into the same true-metre LocationData (T1.3).
 ##
-## Deliberate logging choice: every fetcher fallback below (DEM, far
-## DEM, OSM, satellite) logs with print, not push_warning. A failed
-## fetch with a procedural fallback is expected behaviour offline or
-## under server overload, and push_warning printed a WARNING with a
-## GDScript backtrace that read as an engine error. The price is
-## that a permanently broken endpoint also only shows in stdout, so
-## grep the log for "fetch failed" when dressing looks wrong.
+## Fetcher fallbacks log with print (a push_warning backtrace read as an
+## engine error) and are recorded in `degraded` -> LocationData.data_notes.
 
 signal stage_changed(index: int, label: String, state: String)
 signal progress_changed(fraction: float, label: String)
 signal finished(data: LocationData)
 signal cancelled
+signal degraded_layer(layer: String)
+## The data as it stands after a stage, for the loading preview
+## (heights + imagery after 0, buildings after 2). Read-only for listeners.
+signal stage_data(index: int, data: LocationData)
 
+## One stage per live data source, named as the design system names
+## them (the stage the user waits on is the layer that is arriving).
+## "Building the scene" follows the pipeline, in the threaded build.
 const STAGES: Array[String] = [
-	"Fetching elevation",
-	"Mapping land cover",
-	"Placing landmarks",
-	"Adding vegetation",
-	"Finalizing lighting",
+	"Elevation",
+	"Imagery",
+	"Buildings & landmarks",
+	"Weather",
 ]
 
 var _cancelled := false
@@ -53,6 +53,7 @@ const FARFIELD_WAIT_S := 45.0
 var _dem_centre_m := 0.0
 var _dem_vscale := 0.1
 var used_osm := false
+var degraded: Array[String] = []
 var _osm: OsmFetcher
 var _osm_buildings: Array = []
 ## Closure W2: the unfrozen OSM payload — §2.5 attributed road dicts plus
@@ -124,6 +125,8 @@ func _ready() -> void:
 		_osm_barriers = br)
 	_osm.failed.connect(func(reason: String) -> void:
 		print("OSM fetch failed, using procedural dressing: %s" % reason)
+		if DataNotes.osm_outage(reason):
+			_note("map")
 		_osm_done = true)
 	_climate = ClimateFetcher.new()
 	add_child(_climate)
@@ -147,6 +150,11 @@ func _ready() -> void:
 	_sat.failed.connect(func(reason: String) -> void:
 		print("Satellite fetch failed, using colour dressing: %s" % reason)
 		_sat_done = true)
+
+func _note(layer: String) -> void:
+	if not degraded.has(layer):
+		degraded.append(layer)
+		degraded_layer.emit(layer)
 
 func cancel() -> void:
 	_cancelled = true
@@ -176,6 +184,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		data.landmark_lon = float(landmark["lon"])
 	data.seed_value = int(abs(sin(lat * 12.9898 + lon * 78.233) * 43758.5453)) % 100000
 	# Start OSM fetch now so it overlaps the staged timers below.
+	degraded.clear()
 	used_osm = false
 	_osm_done = false
 	_osm_buildings = []
@@ -230,63 +239,29 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		if _cancelled:
 			cancelled.emit()
 			return
-		if i == 0:
-			await _fetch_dem(data)
-			if _cancelled:
-				cancelled.emit()
-				return
-			await _await_satellite(data)
-			if _cancelled:
-				cancelled.emit()
-				return
-		if i == 2:
-			await _await_osm(data)
-			if _cancelled:
-				cancelled.emit()
-				return
+		match i:
+			0:
+				await _fetch_dem(data)
+			1:
+				await _await_satellite(data)
+			2:
+				await _await_osm(data)
+			3:
+				await _await_climate(data)
+		if _cancelled:
+			cancelled.emit()
+			return
+		stage_data.emit(i, data)
 		stage_changed.emit(i, STAGES[i], "done")
 
 	progress_changed.emit(1.0, "Done")
+	data.data_notes = DataNotes.describe(degraded, data.quality_preset > RenderSettings.Preset.FAST)
 	finished.emit(data)
 
-## The v1 adaptive factor (relief remapped to ~30 units). True-metre
-## mode still uses it to un-squash the water plane (see below); the
-## squash path itself is deleted in T3.1 (contract §7 V1).
-static func legacy_vscale_for(relief_m: float) -> float:
-	return clampf(30.0 / maxf(relief_m, 1.0), 0.02, 0.35)
-
-## Pure vertical conversion (T1.3): raw DEM metres ASL → render heights.
-## Identity by default (heights ARE source metres); legacy_squash=true
-## restores the v1 adaptive remap for A/B captures. Returns {heights,
-## centre_elevation_m, relief_metres, water_level, legacy_vscale}.
-## The true-metre water plane is the un-squashed v1 plane
-## (centre − 6/vscale: the raw value v1 mapped to −3.0), so flood
-## extent is unchanged by the unit cutover.
+## Pure vertical conversion (T1.3); see DemConversion.convert_dem_heights.
 static func convert_dem_heights(raw_metres: PackedFloat32Array, grid: int,
 		use_legacy_squash: bool) -> Dictionary:
-	var centre_m := raw_metres[(grid / 2) * grid + grid / 2]
-	var mn := raw_metres[0]
-	var mx := raw_metres[0]
-	for h in raw_metres:
-		mn = minf(mn, h)
-		mx = maxf(mx, h)
-	var vscale := legacy_vscale_for(mx - mn)
-	var out := {
-		"centre_elevation_m": centre_m,
-		"relief_metres": mx - mn,
-		"legacy_vscale": vscale,
-	}
-	if use_legacy_squash:
-		var squashed := PackedFloat32Array()
-		squashed.resize(raw_metres.size())
-		for idx in raw_metres.size():
-			squashed[idx] = (raw_metres[idx] - centre_m) * vscale + 3.0
-		out["heights"] = squashed
-		out["water_level"] = -3.0
-	else:
-		out["heights"] = raw_metres.duplicate()
-		out["water_level"] = centre_m - 6.0 / vscale
-	return out
+	return DemConversion.convert_dem_heights(raw_metres, grid, use_legacy_squash)
 
 func _fetch_dem(data: LocationData) -> void:
 	used_real_dem = false
@@ -310,6 +285,7 @@ func _fetch_dem(data: LocationData) -> void:
 		_dem_vscale = conv["legacy_vscale"]
 	else:
 		data.dem_source = {"source_zoom": 0, "procedural": true}
+		_note("elevation")
 		_build_dem(data)
 	await _apply_far(data)
 
@@ -320,8 +296,7 @@ func _apply_far(data: LocationData) -> void:
 		waited += get_process_delta_time()
 	var grid := data.far_grid_size
 	# True metre span of the z8 far tile (contract §2.2), the span the
-	# far rings already use (the v1 9000-unit far_extent conversion is
-	# gone with the T7.0 metre cutover).
+	# far rings already use (T7.0 metre cutover).
 	data.far_extent_m = FarTerrainBuilder.far_span_m(data)
 	if used_real_dem and _far_heights_m.size() == grid * grid:
 		data.far_centre_frac = _far_fetcher.far_centre_frac
@@ -389,6 +364,8 @@ func _await_satellite(data: LocationData) -> void:
 	while not _sat_done and waited < budget and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+	if _sat_texture == null and data.quality_preset > RenderSettings.Preset.FAST:
+		_note("imagery")
 	if _sat_texture != null:
 		used_satellite = true
 		data.satellite_texture = _sat_texture
@@ -413,6 +390,8 @@ func _await_osm(data: LocationData) -> void:
 	while not _osm_done and waited < OsmFetcher.retry_budget_seconds() and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+	if not _osm_done:
+		_note("map")
 	if not _osm_buildings.is_empty():
 		used_osm = true
 		data.buildings = _osm_buildings
@@ -430,7 +409,6 @@ func _await_osm(data: LocationData) -> void:
 		data.attribution = osm_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + osm_attr
 	await _await_far_city(data)
-	await _await_climate(data)
 
 ## CHELSA climate normals (bounded wait; absent → latitude fallbacks).
 func _await_climate(data: LocationData) -> void:

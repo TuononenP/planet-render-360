@@ -53,31 +53,32 @@ static var PRD_GLASS := Color(0.0273, 0.0423, 0.0513)
 ## default (never to a flat colour).
 static var MATERIAL_TAGS := {
 	"brick": "brick", "brickwork": "brick",
-	"concrete": "concrete", "cement": "concrete", "cement_block": "concrete",
+	"concrete": "concrete", "cement": "concrete", "cement_block": "concrete", "concrete/glass": "concrete",
 	"glass": "glass", "mirror": "glass",
-	"wood": "wood", "timber": "wood", "planks": "wood", "thatch": "wood",
+	"wood": "wood", "timber": "wood", "planks": "wood", "thatch": "wood", "timber_framing": "wood",
 	"stone": "stone", "sandstone": "stone", "granite": "stone",
 	"marble": "stone", "masonry": "stone", "ashlar": "stone", "rubble": "stone",
 	"limestone": "limestone", "chalk": "limestone", "travertine": "limestone",
 	"plaster": "render", "render": "render", "stucco": "render",
 	"metal": "concrete", "steel": "concrete", "aluminium": "concrete",
-	"tin": "concrete",
-	"tile": "terracotta", "ceramic": "terracotta",
+	"tin": "concrete", "metal_plates": "concrete", "iron": "concrete",
+	"tile": "terracotta", "tiles": "terracotta", "ceramic": "terracotta",
 	"canvas": "render", "fabric": "render",
 }
 
 ## `roof:material` values and roof_material() kinds → PBR set.
 static var ROOF_TAGS := {
 	"slate": "slate", "slates": "slate", "slate_tile": "slate",
-	"tile": "terracotta", "tiles": "terracotta", "terracotta": "terracotta",
+	"tile": "terracotta", "tiles": "terracotta", "terracotta": "terracotta", "roof_tiles": "terracotta",
 	"clay": "terracotta", "clay_tile": "terracotta", "ceramic": "terracotta",
-	"concrete": "concrete", "cement": "concrete",
-	"metal": "slate", "steel": "slate", "zinc": "slate", "copper": "terracotta",
+	"concrete": "concrete", "cement": "concrete", "eternit": "slate", "stone": "slate",
+	"metal_sheet": "slate", "metal sheet": "slate", "metal": "slate", "steel": "slate",
+	"zinc": "slate", "copper": "terracotta",
 	"glass": "glass",
 	"wood": "wood", "shingle": "wood", "shingles": "wood", "thatch": "wood",
 	"gravel": "membrane", "bitumen": "membrane", "felt": "membrane",
 	"asphalt": "membrane", "membrane": "membrane", "epdm": "membrane",
-	"tar": "membrane", "pvc": "membrane", "plastic": "membrane",
+	"tar": "membrane", "tar_paper": "membrane", "pvc": "membrane", "plastic": "membrane",
 	"flat": "membrane", "flat_roof": "membrane",
 	"grass": "grass", "sod": "grass", "turf": "grass", "green": "grass",
 }

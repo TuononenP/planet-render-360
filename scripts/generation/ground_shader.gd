@@ -33,6 +33,11 @@ uniform float urban_unknown = 1.0;
 uniform float unknown_trust = 0.3;
 uniform vec3 unknown_bare : source_color = vec3(0.54, 0.51, 0.45);
 uniform vec3 unknown_veg : source_color = vec3(0.35, 0.48, 0.24);
+// Excess-green window that reads as vegetation on unmapped ground. Dry
+// ground (sand, dust) scores ~0.06 on a green index, so arid places raise
+// it to keep desert from being painted as lawn (ground_material.gd).
+uniform float veg_lo = 0.03;
+uniform float veg_hi = 0.12;
 uniform int ground_quality = 2;
 
 // @SNOW
@@ -85,7 +90,7 @@ void fragment() {
 	vec3 lf = t_dehaze(textureLod(photo, UV, lf_lod).rgb * photo_gain);
 	vec3 hf = t_dehaze(texture(photo, UV).rgb * photo_gain);
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
-	float veg = smoothstep(0.03, 0.12, exg);
+	float veg = smoothstep(veg_lo, veg_hi, exg);
 	vec2 g = wpos.xz * u2m;
 	vec3 pm = wpos * u2m;
 	// Screen gradients, taken before any branch (layer fetches use them).
