@@ -18,16 +18,17 @@ signal failed(reason: String)
 ## failure must not lose the whole fetch. Only full-planet instances
 ## belong here — regional ones (osm.ch, maprva.org, ...) silently
 ## return zero buildings outside their extract. The main instance
-## is repeated last: overload is usually a busy slot, so a later
-## retry often succeeds where the first attempt timed out. The OSM-FR
-## instance (global data, free fair-use) answered a live probe while the
-## main one reported "at capacity" (HTTP 502), so it is the first fallback.
+## is not repeated: z.overpass-api.de (same operator, separate pool)
+## answered a live probe (2026-10-31) while the main one timed out. The
+## OSM-FR instance (global data, free fair-use) answered while the main
+## one reported "at capacity" (HTTP 502), so it is the first fallback.
+## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
 	"https://overpass.openstreetmap.fr/api/interpreter",
 	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
-	"https://overpass-api.de/api/interpreter",
+	"https://z.overpass-api.de/api/interpreter",
 ]
 
 ## Per-attempt HTTP timeout. The query's own [timeout:30] fires
@@ -42,8 +43,10 @@ const ATTEMPT_TIMEOUT := 60.0
 ## slack each. Callers waiting on succeeded/failed must wait at least
 ## this long or a late rescue is dropped. Typical is far lower (a fast
 ## 502 moves on in ~1 s); only hung connections pay the full budget.
+## Plus one OSM API attempt (a 400 steps down a radius in ~1 s).
 static func retry_budget_seconds() -> float:
-	return 2.0 * (float(ENDPOINTS.size()) * ATTEMPT_TIMEOUT + 5.0)
+	return 2.0 * (float(ENDPOINTS.size()) * ATTEMPT_TIMEOUT + 5.0) \
+		+ ATTEMPT_TIMEOUT + 5.0
 
 const CACHE_DIR := "user://cache"
 
@@ -69,10 +72,13 @@ const CAP_RING_COASTLINE = OsmQuery.CAP_RING_COASTLINE
 ## the query reaches its 1200 m half-width on every preset (one shared
 ## cache entry per place; presets differ by LOD, never by data — AC-12).
 ## T2.3 measured 800 m Paris at ≈6 MB / 25–40 s; 1200 m is ≈2.25× the
-## area. If every endpoint fails, a cached FALLBACK_RADIUS_M payload is
-## served (register fallback order: smaller radius → cache).
+## area. If every endpoint fails, the cache and the OSM API step in
+## (see _detailed_fallback).
 const DETAILED_RADIUS_M := 1200
-const FALLBACK_RADIUS_M := 800
+## Cache fallback reach (metres): quantised keys of the same place, then
+## neighbouring cached spots once the OSM API has failed too.
+const SAME_PLACE_M := 150.0
+const NEARBY_M := 500.0
 static func radius_for_preset(_preset: int) -> int:
 	return DETAILED_RADIUS_M
 
@@ -186,7 +192,7 @@ static func roads_to_v1(roads: Array) -> Array:
 ## serves the on-device cache or fails immediately — never the network.
 var offline_mode := false
 
-enum { _PHASE_DETAILED, _PHASE_RING }
+enum { _PHASE_DETAILED, _PHASE_RING, _PHASE_API }
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -269,6 +275,8 @@ var _parse_task := -1
 var _parse_gen := 0
 var _phase := _PHASE_DETAILED
 var _attempt := 0
+var _api_tier := 0
+var _api_reason := ""
 
 static func _read_cache(path: String) -> String:
 	if path == "" or not FileAccess.file_exists(path):
@@ -331,19 +339,50 @@ func _fail_or_retry(reason: String, retryable: bool) -> void:
 		_ring_text = ""
 		_finish()
 	else:
-		# Register fallback order: a cached smaller-radius payload
-		# (pre-T7.0 800 m) beats procedural dressing.
-		var fb := _read_cache(CacheStore.osm_path(_pending_lat, _pending_lon,
-			FALLBACK_RADIUS_M))
-		if fb != "" and _payload_has_buildings(fb, _pending_lat, _pending_lon):
-			print("OsmFetcher: %s; using cached %d m data" % [reason, FALLBACK_RADIUS_M])
-			_detailed_text = fb
+		_detailed_fallback(reason)
+
+## Detailed phase out of live Overpass options. Register fallback order:
+## same-place cache (any radius) → OSM API bbox → nearby cache → procedural.
+func _detailed_fallback(reason: String) -> void:
+	if _use_cached(reason, SAME_PLACE_M):
+		return
+	if offline_mode:
+		_api_failed("skipped (offline mode)", reason)
+		return
+	_api_tier = 0
+	_api_reason = reason
+	_phase = _PHASE_API
+	_request_api()
+
+## Serve the nearest cached payload within max_m that holds buildings.
+func _use_cached(reason: String, max_m: float) -> bool:
+	for path in OsmNearbyCache.candidates(_pending_lat, _pending_lon, max_m).slice(0, 3):
+		var text := _read_cache(path)
+		if text != "" and _payload_has_buildings(text, _pending_lat, _pending_lon):
+			print("OsmFetcher: %s; using cached %s" % [reason, path.get_file()])
+			_detailed_text = text
 			_detailed_cached = false
 			_finish()
-			return
-		failed.emit("%s (tried %d endpoint(s))" % [reason, _attempt + 1])
+			return true
+	return false
+
+func _request_api() -> void:
+	var radius := OsmApiFallback.RADII_M[_api_tier]
+	var err := _http.request(OsmApiFallback.url_for(_pending_lat, _pending_lon, radius),
+		["User-Agent: PlanetRender360/0.1"])
+	if err != OK:
+		_api_failed("failed to start: %s" % err, _api_reason)
+
+func _api_failed(why: String, reason: String) -> void:
+	_phase = _PHASE_DETAILED
+	var full := "%s; OSM API %s" % [reason, why]
+	if not _use_cached(full, NEARBY_M):
+		failed.emit("%s (tried %d endpoint(s))" % [full, _attempt + 1])
 
 func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	if _phase == _PHASE_API:
+		_on_api_done(result, code, body)
+		return
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_fail_or_retry("Overpass failed (result=%d code=%d)" % [result, code],
 			is_retryable(result, code))
@@ -374,6 +413,34 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 		_ring_text = text
 		_write_cache(_pending_ring_cache, text)
 		_finish()
+
+func _on_api_done(result: int, code: int, body: PackedByteArray) -> void:
+	if result == HTTPRequest.RESULT_SUCCESS and code == 400 \
+			and _api_tier + 1 < OsmApiFallback.RADII_M.size():
+		_api_tier += 1  # over the API's 50 000-node cap: try a smaller box
+		_request_api()
+		return
+	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
+		_api_failed("failed (result=%d code=%d)" % [result, code], _api_reason)
+		return
+	_join_parse()
+	var gen := _parse_gen
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		_on_api_converted.call_deferred(gen, OsmApiFallback.to_overpass_json(body)))
+
+func _on_api_converted(gen: int, converted: Dictionary) -> void:
+	_join_parse()
+	if gen != _parse_gen:
+		return
+	if int(converted["buildings"]) == 0:
+		_api_failed("returned no buildings", _api_reason)
+		return
+	_phase = _PHASE_DETAILED
+	_detailed_text = converted["json"]
+	_detailed_cached = false
+	_write_cache(CacheStore.osm_path(_pending_lat, _pending_lon,
+		OsmApiFallback.RADII_M[_api_tier]), _detailed_text)
+	_finish()
 
 ## Merge the detailed + ring payloads, parse once, and emit both signals:
 ## v1 shapes on the frozen 4-arg signal, §2.5/§2.6 extras on succeeded_v2.
