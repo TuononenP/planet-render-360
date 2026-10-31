@@ -110,6 +110,7 @@ func _walls_of(node: Node3D) -> Array:
 			if verts.size() > 0 and verts.size() % 4 == 0 and uvs.size() == verts.size() \
 					and mi.material_override is StandardMaterial3D \
 					and (mi.material_override as StandardMaterial3D).albedo_texture != null \
+					and arr[Mesh.ARRAY_INDEX] is PackedInt32Array \
 					and not (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).is_empty() \
 					and (arr[Mesh.ARRAY_NORMAL] as PackedVector3Array)[0].y == 0.0:
 				out.append(mi)

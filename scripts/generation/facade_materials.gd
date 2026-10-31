@@ -186,7 +186,10 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 			# to multiply the sky reflection by (dark tags made black slabs).
 			var mx := maxf(maxf(q.r, q.g), maxf(q.b, 0.001))
 			return Color.WHITE.lerp(Color(q.r / mx, q.g / mx, q.b / mx), 0.45)
-		return _calib(set_name, q)
+		# Mappers' colour names are vivid ("cyan", "lime"); real paint and
+		# render are muted, so cap the saturation before calibrating.
+		var hsv := Color.from_hsv(q.h, minf(q.s, 0.42), q.v)
+		return _keep_chroma(set_name, _calib(set_name, hsv))
 	if set_name == "glass":
 		return Color.WHITE
 	if painted.a > 0.0 and MaterialLibrary.PBR_SETS.has(set_name):
@@ -198,15 +201,16 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 
 ## Brick and terracotta photos are already strongly coloured: a
 ## per-channel calibration toward a red target multiplies that chroma and
-## turns mortar pink and courses into stripes. Pull such tints 40% toward
-## their own grey so the photo's colour carries the hue.
+## turns mortar pink and courses into stripes. Pull such tints 55% toward
+## their own grey so the photo's colour carries the hue (at 40% NYC and
+## London brick still rendered a uniform saturated orange).
 static func _keep_chroma(set_name: String, tint: Color) -> Color:
 	if set_name == "slate":
 		return MaterialLibrary.neutral_slate(tint)
 	if set_name != "brick" and set_name != "terracotta":
 		return tint
 	var g := (tint.r + tint.g + tint.b) / 3.0
-	return tint.lerp(Color(g, g, g), 0.4)
+	return tint.lerp(Color(g, g, g), 0.55)
 
 ## Texture-identity part of a tiled look (frame/shutter colours, window
 ## vocabulary, balconette share, bay).
@@ -293,6 +297,7 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 		if tag.a > 0.0 and tag_set != "glass":
 			var q := Color(roundf(tag.r * 12.0) / 12.0,
 				roundf(tag.g * 12.0) / 12.0, roundf(tag.b * 12.0) / 12.0)
+			q = Color.from_hsv(q.h, minf(q.s, 0.42), q.v)  # muted, as for walls
 			tint = _roof_floor(tag_set, _keep_chroma(tag_set, _calib(tag_set, q)))
 		return roof_set_material(tag_set, tint)
 	var styled := str(style.get("roof_set", ""))

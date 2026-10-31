@@ -13,7 +13,7 @@ extends RefCounted
 ##   and darken toward the street, the top keeps its full tint.
 ## Impostors and far masses carry no colour (white), as for roofs.
 
-const SPREAD := 0.09
+const SPREAD := 0.14
 const WARMTH := 0.04
 ## Shade at the foot of a wall and the height (m) it fades out over.
 const FOOT_SHADE := 0.82

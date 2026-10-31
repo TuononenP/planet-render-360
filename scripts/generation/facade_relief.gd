@@ -258,7 +258,7 @@ static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material
 	var ax := Vector3(dir.x, 0.0, dir.y)
 	var az := Vector3(n.x, 0.0, n.y)
 	var step := float(sp["len_m"]) * m / float(bays)
-	var glass := ReliefKit.flat("#25323c", 0.12, 0.4)
+	var glass := ReliefKit.glass()
 	var depth := 0.6 * m
 	var lo := 0 if from_ground else 1
 	for j in range(0 if bays < 3 else 1, bays, 2):

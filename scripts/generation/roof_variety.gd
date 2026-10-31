@@ -11,7 +11,7 @@ extends RefCounted
 ## tints average 1 so the roofscape's mean colour does not move (AC-12).
 
 ## ± lightness and ± warm/cool shift of a roof's tint.
-const SPREAD := 0.12
+const SPREAD := 0.18
 const WARMTH := 0.05
 
 ## Tags `m` as a roof material: RoofSnow overlays it while snow lies, and

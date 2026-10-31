@@ -26,9 +26,7 @@ static func _mat(key: String) -> Material:
 			m.albedo_color = Color(0.80, 0.76, 0.68)
 			m.roughness = 0.95
 		"glass":
-			m.albedo_color = Color(0.10, 0.13, 0.16)
-			m.roughness = 0.12
-			m.metallic = 0.35
+			return ReliefKit.glass()
 		_:
 			m.albedo_color = Color(0.5, 0.5, 0.5)
 	_mats[key] = m
@@ -142,10 +140,12 @@ static func bay_dormers(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 				Vector3(w, hd, depth)), roof_mat)
 			batch.add("pyramid", BuildingDetail._xf(basis, Vector3(p.x, y0 + hd + 0.25 * m, p.y),
 				Vector3(w * 1.15, 0.5 * m, depth * 1.1)), roof_mat)
+			# Zinc cheeks and front (the roof material), a slim stone surround
+			# and a tall pane: not the white block with a dark hole.
 			var f := p + n * (depth * 0.5 + 0.03 * m)
-			batch.add("box", BuildingDetail._xf(basis, Vector3(f.x, y0 + hd * 0.5, f.y),
-				Vector3(w * 0.92, hd * 0.92, 0.06 * m)), BuildingDetail._mat("cream"))
-			var g := f + n * 0.04 * m
-			batch.add("box", BuildingDetail._xf(basis, Vector3(g.x, y0 + hd * 0.48, g.y),
-				Vector3(w * 0.62, hd * 0.66, 0.04 * m)), _mat("glass"))
+			batch.add("box", BuildingDetail._xf(basis, Vector3(f.x, y0 + hd * 0.47, f.y),
+				Vector3(w * 0.72, hd * 0.80, 0.05 * m)), BuildingDetail._mat("cream"))
+			var g := f + n * 0.035 * m
+			batch.add("box", BuildingDetail._xf(basis, Vector3(g.x, y0 + hd * 0.47, g.y),
+				Vector3(w * 0.62, hd * 0.70, 0.04 * m)), _mat("glass"))
 	return true

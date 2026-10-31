@@ -157,6 +157,20 @@ static func flat(hex: String, rough: float = 0.8, metal: float = 0.0) -> Materia
 	_mats[key] = m
 	return m
 
+## Window glass for 3D relief (oriels, dormers): a mid blue-grey that
+## reads as reflective glass at street distance, glossy with a little
+## metal so it picks up the sky probe instead of rendering black.
+static func glass() -> Material:
+	if _mats.has("glass"):
+		return _mats["glass"] as Material
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color.html("#4f6170")
+	m.roughness = 0.08
+	m.metallic = 0.2
+	m.metallic_specular = 0.7
+	_mats["glass"] = m
+	return m
+
 ## Canvas in an sRGB hex, striped with cream or plain; both faces drawn.
 static func canvas(hex: String, striped: bool) -> Material:
 	var key := "canvas|%s|%s" % [hex, striped]
