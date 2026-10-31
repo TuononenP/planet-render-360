@@ -208,7 +208,7 @@ static func _monument_landmarks(buildings: Array, landmarks: Array) -> void:
 			continue
 		landmarks.append({"x": at.x, "z": at.y, "archetype": kind,
 			"name": str(b.get("name", "")), "height": h,
-			"size_x": 24.0, "size_z": 24.0})
+			"size_x": 24.0, "size_z": 24.0, "monument": true})
 
 ## Nest building:part ways into their parents by centroid containment
 ## (smallest containing footprint wins; AABB pre-filter keeps the

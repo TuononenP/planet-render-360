@@ -56,8 +56,12 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 	return pw
 
 ## Registers one planned mass: its outer edges face out, its courtyard
-## edges face into the courtyard.
+## edges face into the courtyard. A raised part (min_m > 0: arcade,
+## overhang) has no wall from the ground up, so a neighbour must not be
+## culled against it and is left unregistered.
 func add_mass(m: Dictionary, ground: GroundTruth) -> void:
+	if float(m.get("min_m", 0.0)) > 0.0:
+		return
 	var ring: PackedVector2Array = m["ring"]
 	# Same base as BuildingBuilder._extrude_polygon: lowest of the centre
 	# and the ring vertices, so the registered top is the extruded one.

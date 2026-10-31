@@ -54,4 +54,5 @@ static func loading_line(keys: Array) -> String:
 ## True unless the map answered, validly, with no buildings (open sea,
 ## wilderness): that is an empty place, not an outage.
 static func osm_outage(reason: String) -> bool:
-	return not reason.contains("returned no buildings; OSM API returned no buildings")
+	return not reason.contains(
+		"Overpass %s; OSM API %s" % [OsmFetcher.NO_BUILDINGS, OsmFetcher.NO_BUILDINGS])

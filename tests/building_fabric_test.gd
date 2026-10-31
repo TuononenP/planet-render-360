@@ -94,6 +94,15 @@ func _run() -> void:
 	if pieces.size() != 2 or is_inf(float(pieces[1][2])) == is_inf(float(pieces[0][2])):
 		failures.append("half-covered edge partition wrong: %s" % str(pieces))
 
+	# A raised part (arcade, overhang) has no wall from the ground: it
+	# must not cull the neighbour's wall.
+	var pw_raised := PartyWalls.new()
+	pw_raised.add_mass({"ring": _rect(10, 0, 22, 7), "holes": [], "key": "r", "wall_m": 9.0,
+		"min_m": 4.0}, ground)
+	var open_pieces := pw_raised.partition(Vector2(10, 14), Vector2(10, 0), Vector2(1, 0), "me")
+	if open_pieces.size() != 1 or not is_inf(float(open_pieces[0][2])):
+		failures.append("raised part must not register as cover: %s" % str(open_pieces))
+
 	# --- Street roofs: party flags keep a gable on shared edges. ---
 	var ring := _rect(0, 0, 12, 16)
 	var party := PackedByteArray([0, 1, 0, 1])  # x = 12 and x = 0 edges shared
