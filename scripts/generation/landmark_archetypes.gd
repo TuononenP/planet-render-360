@@ -3,7 +3,7 @@ extends RefCounted
 
 ## On-the-fly models for any OSM-tagged notable feature (church,
 ## cathedral, castle, lighthouse, stadium, mosque, temple, windmill,
-## tower) in true metres at the feature's real height and footprint,
+## tower, big_wheel) in true metres at the feature's real height and footprint,
 ## with the same calibrated photographic PBR sets as buildings (T4.3)
 ## and the regional religious look (ArchitectureStyle.religious_look:
 ## wall set + stone/roof colour + tower style spire | bell | onion |
@@ -33,6 +33,7 @@ static func build(model: Node3D, archetype: String, h: float, size: Vector2,
 		"windmill": _windmill(lm, h)
 		"column": LandmarkMonuments.column(lm, h)
 		"obelisk": LandmarkMonuments.obelisk(lm, h)
+		"big_wheel": LandmarkWheel.build(lm, h, l)
 		_: _tower(lm, h, w)
 	lm.commit(model)
 	if size.x > size.y:

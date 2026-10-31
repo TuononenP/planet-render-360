@@ -13,7 +13,7 @@ extends RefCounted
 ## Root sits at ground level (y=0).
 
 const ARCHETYPES := ["church", "cathedral", "castle", "lighthouse", "stadium",
-	"mosque", "temple", "windmill", "tower"]
+	"mosque", "temple", "windmill", "tower", "big_wheel"]
 
 ## The metre-space child every landmark model is built under.
 static func model_root(root: Node3D) -> Node3D:

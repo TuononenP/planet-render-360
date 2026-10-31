@@ -148,6 +148,7 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			ArchitectureStyle.region_for(data.latitude, data.longitude))
 		node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
 			float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
+		node.rotation.y = float(c.get("yaw", 0.0))
 		node.set_meta("lod_layer", "Landmarks")
 		root.add_child(node)
 		placed += 1

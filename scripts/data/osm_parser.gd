@@ -109,11 +109,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			buildings.append(entry)
 			var arch := OsmTags.archetype_for(el_tags)
 			if arch != "":
-				landmarks.append({
+				var lmk := {
 					"x": entry["x"], "z": entry["z"], "archetype": arch,
 					"name": str(el_tags.get("name", "")),
 					"height": entry["height"],
-					"size_x": entry["size_x"], "size_z": entry["size_z"]})
+					"size_x": entry["size_x"], "size_z": entry["size_z"]}
+				if arch == "big_wheel":
+					lmk.merge(_wheel_frame(poly), true)
+				landmarks.append(lmk)
 		elif el_tags.has("building:part"):
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
 		elif el_tags.has("highway"):
@@ -175,6 +178,27 @@ static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
 				"height": entry["height"],
 				"size_x": entry["size_x"], "size_z": entry["size_z"]})
 			arch = ""
+
+## An observation wheel is mapped as a thin slab along the wheel; its
+## longest edge gives the wheel plane. Returns the yaw that turns local
+## +Z onto that edge, with the footprint measured along it (size_z) and
+## across it (size_x), so the wheel stands at its true bearing.
+static func _wheel_frame(poly: PackedVector2Array) -> Dictionary:
+	var u := Vector2(0, 1)
+	var best := 0.0
+	for i in poly.size() - 1:
+		var e := poly[i + 1] - poly[i]
+		if e.length() > best:
+			best = e.length()
+			u = e / best
+	var v := Vector2(-u.y, u.x)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in poly:
+		var q := Vector2(p.dot(v), p.dot(u))
+		lo = lo.min(q)
+		hi = hi.max(q)
+	return {"yaw": atan2(u.x, u.y), "size_x": hi.x - lo.x, "size_z": hi.y - lo.y}
 
 ## Tall slender memorials (Nelson's Column, obelisks) mapped as buildings
 ## become free-standing column / obelisk landmarks, so they are not built
