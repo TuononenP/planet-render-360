@@ -109,6 +109,18 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		var min_m := maxf(float(md.get("min_height_m", 0.0)), float(md.get("min_level", 0)) * fh)
 		if min_m > wall - 1.0:
 			min_m = 0.0  # a min above the top is a tagging slip, not a floating box
+		# Untagged arch and ramp parts of a mapped building=bridge (the Rialto)
+		# are stone: left to the infill mix, the sloped parts drew an
+		# outbuilding's orange plank roof.
+		if str(b.get("kind", "")) == "bridge":
+			if str(b_eff.get("material", "")) == "":
+				b_eff["material"] = "stone"
+				if str(b_eff.get("colour", "")) == "":
+					b_eff["colour"] = "#d8d2c4"
+			if str(b_eff.get("roof_material", "")) == "":
+				b_eff["roof_material"] = "concrete"
+				if str(b_eff.get("roof_colour", "")) == "":
+					b_eff["roof_colour"] = "#d8d2c4"
 		# A tall slender part of a church is a campanile (Venice maps ~140):
 		# a brick shaft under a pointed roof, not a grey rod.
 		var span_m := BuildingHeights._ring_span_m(ring)
@@ -123,6 +135,13 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 			var cone := minf(maxf(rh, span_m * 1.4), wall * 0.3)
 			wall -= cone - rh
 			rh = cone
+		# A black colour tag on a raised part of a church is the mapper's
+		# belfry opening: drawn literally it is a pure-black hole in the
+		# tower, so the part takes the style's wall instead.
+		if str(look["kind"]) == "religious" and min_m > 0.0:
+			var tag := MaterialLibrary.parse_colour_tag(str(b_eff.get("colour", "")))
+			if tag.a > 0.0 and tag.get_luminance() < 0.12:
+				b_eff["colour"] = ""
 		var holes: Array = []
 		for h in md.get("holes", []):
 			if h is PackedVector2Array:

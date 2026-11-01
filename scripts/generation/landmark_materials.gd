@@ -79,10 +79,15 @@ static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
 	if _cache.has(key):
 		return _cache[key] as StandardMaterial3D
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(hex)
+	# Lifted toward a slate blue: the bare hex times the concrete texture
+	# is near-black, and a large flat window rendered as a black hole.
+	m.albedo_color = Color(hex).lerp(Color("#56697a"), 0.8)
 	m.albedo_texture = tex("concrete", "diff")
-	m.roughness = 0.08
-	m.metallic = 0.65
+	# Dark glass, not a mirror: a mostly metallic pane reflects the dark
+	# environment and renders pure black on a large flat window (the church
+	# archetype's front windows).
+	m.roughness = 0.12
+	m.metallic = 0.2
 	m.uv1_scale = Vector3(0.05, 0.05, 0.05)
 	_cache[key] = m
 	return m

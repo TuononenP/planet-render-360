@@ -28,6 +28,7 @@ uniform float near_m = 140.0;
 uniform float far_m = 900.0;
 uniform float photo_gain = 1.0;
 uniform float lf_lod = 0.0;
+uniform float ground_max_low = 0.38;
 uniform float lum_floor = 0.055;
 uniform float urban_unknown = 1.0;
 uniform float unknown_trust = 0.3;
@@ -247,7 +248,7 @@ void fragment() {
 	// (~0.38 albedo: the sunlit grade lifts it ~1.6x, so more reads as
 	// white); only the snow layer below goes brighter, and high slopes
 	// keep the imagery's own permanent snow and ice.
-	float ground_max = mix(0.38, 0.85, smoothstep(350.0, 1000.0, pm.y));
+	float ground_max = mix(ground_max_low, 0.85, smoothstep(350.0, 1000.0, pm.y));
 	alb *= min(1.0, ground_max / max(lum(alb), 1e-4));
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel); it

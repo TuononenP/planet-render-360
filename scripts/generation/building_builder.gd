@@ -135,10 +135,11 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var edge := WorldScale.detailed_extent_units() * 0.5 * 0.98
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
-		func(b: Dictionary) -> bool: return _accepted(data, b, site, edge))
+		func(b: Dictionary) -> bool:
+			return _accepted(data, b, site, edge) and not _in_open_water(ground, b))
 	for b in sorted:
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
-		if not _accepted(data, b, site, edge):
+		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
 			continue
 		if placed >= cap:
 			# T7.3: past the preset cap a real building is never dropped:
@@ -221,6 +222,32 @@ static func _accepted(data: LocationData, b: Dictionary, site: Vector2, edge: fl
 	if data.landmark_type != "none" and Vector2(x, z).distance_to(site) < 68.0:
 		return false
 	return not _near_landmark_candidate(data, x, z) and absf(x) <= edge and absf(z) <= edge
+
+## A mapped building whose centre and four corner probes all stand in
+## water is a polygon mismatch against the canal, not a building in the
+## water. Landing-stage canopies (building=roof, use=pier: open roofs on
+## posts) would be drawn as walled, windowed houses standing in the canal,
+## so they go too. Named buildings, other tagged uses (lighthouses,
+## monitoring stations) and boats, bridges, stations and churches are meant
+## to sit on or by water.
+const WATER_OK_KINDS: Array[String] = ["boat", "houseboat", "boathouse", "bridge",
+	"ship", "train_station", "transportation", "church", "cathedral", "chapel"]
+
+static func _in_open_water(ground: GroundTruth, b: Dictionary) -> bool:
+	var canopy := str(b.get("kind", "")) == "roof" or str(b.get("use", "")) == "pier"
+	if not canopy and (str(b.get("kind", "")) in WATER_OK_KINDS \
+			or str(b.get("name", "")) != "" or str(b.get("use", "")) != ""):
+		return false
+	var x := float(b["x"])
+	var z := float(b["z"])
+	var hx := float(b.get("size_x", 0.0)) * 0.35
+	var hz := float(b.get("size_z", 0.0)) * 0.35
+	var probes: Array[Vector2] = [Vector2.ZERO, Vector2(hx, hz), Vector2(-hx, hz),
+		Vector2(hx, -hz), Vector2(-hx, -hz)]
+	for o in probes:
+		if ground.water_at(x + o.x, z + o.y) <= 0.0:
+			return false
+	return true
 
 ## One footprint ring as vertical walls (facade) plus a triangulated
 ## roof cap: rotation, L/T/concave shapes, and party-wall adjacency

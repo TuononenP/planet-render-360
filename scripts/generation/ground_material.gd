@@ -43,6 +43,12 @@ const FAR_M := 900.0
 const LF_M := 5.0
 const GAIN_TARGET := 0.20
 const LUM_FLOOR := 0.055
+## Bare-ground luminance ceiling (linear): the generic fallback, and the
+## range a measured per-place ceiling stays inside.
+const GROUND_CEILING := 0.38
+const CEILING_MIN := 0.28
+const CEILING_MAX := 0.46
+const CEILING_PERCENTILE := 0.9
 
 ## Class ids in the map (0 = unmapped ground, photo decides).
 const ID := {
@@ -81,7 +87,8 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()
 	m.set_shader_parameter("photo", photo)
-	m.set_shader_parameter("class_map", ImageTexture.create_from_image(class_map(data)))
+	var cmap := class_map(data)
+	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
@@ -90,7 +97,10 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("near_m", NEAR_M)
 	m.set_shader_parameter("far_m", FAR_M)
 	m.set_shader_parameter("lum_floor", LUM_FLOOR)
-	m.set_shader_parameter("photo_gain", photo_gain(photo, photo_rect) if has_sat else 1.0)
+	var gain := photo_gain(photo, photo_rect) if has_sat else 1.0
+	m.set_shader_parameter("photo_gain", gain)
+	m.set_shader_parameter("ground_max_low",
+		ground_ceiling(photo, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
 	m.set_shader_parameter("lf_lod", lf_lod(data) if has_sat else 0.0)
 	# Unmapped non-green ground: settled places read as pavement,
 	# wild high-relief places as bare earth/rock (v1 settled rule).
@@ -151,6 +161,41 @@ static func photo_gain(photo: Texture2D, rect: Rect2) -> float:
 			n += 1
 	var mean := sum / float(maxi(n, 1))
 	return clampf(GAIN_TARGET / maxf(mean, 0.01), 1.0, 1.9)
+
+## Ceiling for bare-ground luminance at this place: the 90th percentile
+## of the photo's own luminance (after `gain`) over open ground — unmapped,
+## urban, path and sand texels of the class map — so pale desert soil or
+## white quay stone keeps its value and a dark-paved city is not lifted
+## to a generic figure. Falls back to GROUND_CEILING with no readable
+## photo or too few open-ground samples.
+static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
+		cmap: Image) -> float:
+	if photo == null or cmap == null:
+		return GROUND_CEILING
+	var img := photo.get_image()
+	if img == null or img.is_empty() or img.is_compressed():
+		return GROUND_CEILING
+	var w := img.get_width()
+	var h := img.get_height()
+	var n := cmap.get_width()
+	var open_ids: Array[int] = [ID[""], ID["urban"], ID["path"], ID["sand"]]
+	var lums: Array[float] = []
+	for j in 48:
+		for i in 48:
+			var fu := (float(i) + 0.5) / 48.0
+			var fv := (float(j) + 0.5) / 48.0
+			var id := int(cmap.get_pixel(int(fu * n), int(fv * n)).r * 255.0 + 0.5)
+			if not open_ids.has(id):
+				continue
+			var c := img.get_pixel(
+				clampi(int((rect.position.x + rect.size.x * fu) * w), 0, w - 1),
+				clampi(int((rect.position.y + rect.size.y * fv) * h), 0, h - 1)).srgb_to_linear()
+			lums.append((0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) * gain)
+	if lums.size() < 24:
+		return GROUND_CEILING
+	lums.sort()
+	return clampf(lums[int(CEILING_PERCENTILE * float(lums.size() - 1))],
+		CEILING_MIN, CEILING_MAX)
 
 ## Per-class lookup, 32 x 4 RGBA8 (nearest):
 ## row 0 detail weights (pavement, lawn, rocky ground, asphalt);

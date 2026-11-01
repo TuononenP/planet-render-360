@@ -236,14 +236,17 @@ static func _chimneys(batch: Batch, ring: PackedVector2Array, c: Vector2,
 		batch.add("box", _xf(basis, _at(c, u, v, du, dv, top + surface - 0.4 * m2u + h * 0.5),
 			Vector3(0.9 * m2u, h, 0.9 * m2u)), wall_mat)
 		if str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) == "bell":
-			# Venetian camino a fumaiolo: the stack flares into an inverted
-			# bell with a small tiled cap.
+			# Venetian camino a fumaiolo: a collar on the stack, the flared
+			# bell widening above it (an inverted cone, its point hidden in
+			# the collar) and a tiled hat on the rim.
 			var y_top := top + surface - 0.4 * m2u + h
+			batch.add("cyl", _xf(basis, _at(c, u, v, du, dv, y_top + 0.15 * m2u),
+				Vector3(1.15 * m2u, 0.3 * m2u, 1.15 * m2u)), _mat("cream"))
 			batch.add("cone", _xf(basis * Basis(Vector3.RIGHT, PI),
-				_at(c, u, v, du, dv, y_top + 0.35 * m2u),
-				Vector3(1.5 * m2u, 0.7 * m2u, 1.5 * m2u)), _mat("cream"))
-			batch.add("pyramid", _xf(basis, _at(c, u, v, du, dv, y_top + 0.85 * m2u),
-				Vector3(1.7 * m2u, 0.3 * m2u, 1.7 * m2u)), _mat("terracotta"))
+				_at(c, u, v, du, dv, y_top + 0.55 * m2u),
+				Vector3(1.45 * m2u, 0.5 * m2u, 1.45 * m2u)), _mat("cream"))
+			batch.add("pyramid", _xf(basis, _at(c, u, v, du, dv, y_top + 0.97 * m2u),
+				Vector3(1.55 * m2u, 0.35 * m2u, 1.55 * m2u)), _mat("terracotta"))
 
 ## Altana: the timber roof terrace on posts that stands on many Venetian
 ## roofs. On a share of pitched roofs (look relief `altana`), a railed

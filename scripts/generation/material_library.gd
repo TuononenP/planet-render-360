@@ -240,6 +240,10 @@ static func shore_material() -> StandardMaterial3D:
 	if _shore_mat == null:
 		_shore_mat = StandardMaterial3D.new()
 		_shore_mat.vertex_color_use_as_albedo = true
+		# The apron colours are the ground palette's sRGB bases; read as
+		# linear they rendered about twice as bright as the ground they
+		# border (white wedges along every bank).
+		_shore_mat.vertex_color_is_srgb = true
 		_shore_mat.albedo_texture = detail_texture()
 		_shore_mat.roughness = 0.95
 		# Apron strips wind either way (landward flips per station),
