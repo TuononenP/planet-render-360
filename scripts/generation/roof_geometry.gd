@@ -3,7 +3,8 @@ extends RefCounted
 
 ## Pitched roof meshes over a cleaned footprint ring (T4.2 forms, split
 ## out of BuildingBuilder in T4.6): gabled/hipped/mansard ridge faces
-## along the footprint's own long side, pyramidal/dome apex fans, and
+## along the footprint's own long side, pyramidal apex fans, lathed
+## dome/onion/cone landmark roofs (RoofDomes), and
 ## eave overhangs (offset_ring) so a chalet's roof reaches past its
 ## walls. A leaf class like RingGeometry: it names no builder, returns
 ## meshes, and the caller attaches materials.
@@ -86,8 +87,9 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	match shape:
 		"pyramidal":
 			apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
-		"dome":
-			apex_faces(ring, c, top, rh, verts, normals, uvs, true, u)
+		"dome", "onion", "cone":
+			if not RoofDomes.faces(ring, c, top, rh, shape, verts, normals, uvs):
+				apex_faces(ring, c, top, rh, verts, normals, uvs, shape != "cone", u)
 		"skillion":
 			RoofForms.skillion(ring, c, top, rh, party, verts, normals, uvs)
 		"round":

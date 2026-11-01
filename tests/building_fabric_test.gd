@@ -115,7 +115,8 @@ func _run() -> void:
 			if absf(nrm.x) > 0.35 and nrm.y > 0.2:
 				failures.append("roof slopes toward a party wall (normal %s)" % str(nrm))
 				break
-	for shape in ["gambrel", "skillion", "half-hipped", "saltbox", "round", "mansard"]:
+	for shape in ["gambrel", "skillion", "half-hipped", "saltbox", "round", "mansard",
+			"dome", "onion", "cone"]:
 		var sm := RoofGeometry.form_mesh(ring, 10.0, 3.0, shape)
 		if sm == null or (MeshArrays.surface(sm, 0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
 			failures.append("roof shape %s produced no mesh" % shape)

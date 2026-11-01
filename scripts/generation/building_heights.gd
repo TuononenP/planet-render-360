@@ -177,10 +177,10 @@ static func _median(a: Array) -> float:
 	return (float(a[n / 2 - 1]) + float(a[n / 2])) * 0.5
 
 ## Canonical roof shape from the raw `roof:shape` tag, one of: flat,
-## gabled, hipped, mansard, pyramidal, dome, gambrel, skillion,
-## half-hipped, saltbox, round. Aliases map to their nearest modelled
-## form (shed/lean_to → skillion, barrel → round, onion → dome,
-## cone/pyramid → pyramidal, crosspitched/side_hipped → hipped);
+## gabled, hipped, mansard, pyramidal, dome, onion, cone, gambrel,
+## skillion, half-hipped, saltbox, round. Aliases map to their nearest
+## modelled form (shed/lean_to → skillion, barrel → round,
+## pyramid → pyramidal, crosspitched/side_hipped → hipped);
 ## many/complex and anything unknown read as flat. Untagged ("") takes
 ## the regional default — except legacy dicts without height_source,
 ## which keep the flat cap their wall heights were pinned against.
@@ -194,10 +194,14 @@ static func _effective_shape(raw: String, default_roof: String, legacy: bool) ->
 			return "hipped"
 		"mansard":
 			return "mansard"
-		"pyramidal", "pyramid", "cone":
+		"pyramidal", "pyramid":
 			return "pyramidal"
-		"dome", "onion":
+		"dome":
 			return "dome"
+		"onion":
+			return "onion"
+		"cone":
+			return "cone"
 		"gambrel":
 			return "gambrel"
 		"skillion", "shed", "lean_to":
@@ -216,8 +220,10 @@ static func _effective_shape(raw: String, default_roof: String, legacy: bool) ->
 ## Roof rise in metres: the `roof:height` tag when present, else a
 ## shape default scaled by the footprint's short span and the style's
 ## regional pitch (steep alpine/German roofs, low Nordic/Australian ones;
-## flat reads 0 — the cap is the roof). The caller additionally caps the
-## rise below the total height so the wall keeps ≥0.5 m.
+## flat reads 0 — the cap is the roof). Domes, onions and cones are
+## geometry, not regional style: a half-span dome, a tall onion and a
+## spire, unscaled by pitch. The caller additionally caps the rise below
+## the total height so the wall keeps ≥0.5 m.
 static func _roof_height_m(shape: String, span_m: float, tag_m: float,
 		pitch: float = 1.0) -> float:
 	if tag_m > 0.0:
@@ -236,7 +242,11 @@ static func _roof_height_m(shape: String, span_m: float, tag_m: float,
 		"pyramidal":
 			return clampf(span_m * 0.32 * pitch, 1.0 * lo, 5.0 * hi)
 		"dome":
-			return clampf(span_m * 0.30 * pitch, 1.0 * lo, 6.0 * hi)
+			return maxf(span_m * 0.5, 1.0)
+		"onion":
+			return maxf(span_m * 1.1, 1.0)
+		"cone":
+			return clampf(span_m * 1.6, 1.0, 80.0)
 		"gambrel", "saltbox":
 			return clampf(span_m * 0.30 * pitch, 1.5 * lo, 5.0 * hi)
 		"half-hipped":

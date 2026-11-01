@@ -146,18 +146,27 @@ static func _adopt_flat(root: Node3D, subtree: Node3D) -> void:
 		root.add_child(c)
 	subtree.free()
 
-## Notable OSM features near the viewpoint as archetypes (nearest
-## five; the curated registry landmark above stays the hero). True
+## Landmark candidates (LandmarkSites: registry extras, then OSM
+## features) near the viewpoint: a registry `type` builds its hand-made
+## model, an OSM feature its archetype, and a mapped landmark nothing
+## (BuildingBuilder draws it from its own parts). True
 ## metre position (T5.2): no framing cut — the v1 ±105-unit window is
 ## gone; only the LANDMARK_MAX_M haze limit applies.
 static func _landmark_candidates(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
-	var placed := 0
 	for c in data.landmark_candidates:
-		if placed >= 5:
-			break
+		if bool(c.get("mapped", false)):
+			continue
 		var cx := float(c.get("x", 0.0))
 		var cz := float(c.get("z", 0.0))
 		if Vector2(cx, cz).length() > LANDMARK_MAX_M:
+			continue
+		if c.has("type"):
+			var hero := LandmarkBuilder.build(str(c["type"]))
+			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, c,
+				float(c.get("clear_m", 40.0)) * 0.5), cz)
+			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
+			hero.set_meta("lod_layer", "Landmarks")
+			root.add_child(hero)
 			continue
 		var node := LandmarkBuilder.build_archetype(
 			str(c.get("archetype", "tower")), float(c.get("height", 30.0)),
@@ -168,7 +177,6 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 		node.rotation.y = float(c.get("yaw", 0.0))
 		node.set_meta("lod_layer", "Landmarks")
 		root.add_child(node)
-		placed += 1
 
 static func _mat(color: Color, roughness: float = 0.95) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -414,9 +422,20 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 		ground = GroundTruth.new(data)
 	var pos := landmark_world_pos(data)
 	var root := LandmarkBuilder.build(data.landmark_type)
-	root.position = Vector3(pos.x, site_ground_y(data, ground, pos.x, pos.y, 20.0) - 0.3, pos.y)
+	var entry := LocationData.entry_for_type(data.landmark_type)
+	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
+	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)
+	root.rotation.y = -deg_to_rad(float(entry.get("yaw_deg", 0.0)))
 	root.set_meta("lod_layer", "Landmarks")
 	return root
+
+## Base Y of a registry model: the water surface for a bridge standing
+## in water (`base: water`), else the lowest ground under its footprint.
+static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
+		entry: Dictionary, half: float) -> float:
+	if str(entry.get("base", "")) == "water":
+		return ground.water_level_at(x, z) if ground.is_inside(x, z) else ground.water_level_m
+	return site_ground_y(data, ground, x, z, half) - 0.3
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
 	var mi := _add(parent, _cyl(radius * 0.8, radius, 1.0, 6), mat)

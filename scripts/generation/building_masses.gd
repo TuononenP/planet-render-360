@@ -89,11 +89,16 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 				and shape in ["hipped", "mansard", "half-hipped", "pyramidal"] and RoofForms.boxy(ring):
 			shape = "gabled"
 		var roof_tag := float(b.get("roof_height_m", 0.0))
+		var capped := not single and str(md.get("roof_shape", "")) == "" and _capped(masses, mi, ring)
 		if not single:
 			if str(md.get("roof_shape", "")) != "":
 				shape = BuildingHeights._effective_shape(str(md["roof_shape"]), parent_shape, false)
 			if float(md.get("roof_height_m", 0.0)) > 0.0:
 				roof_tag = float(md["roof_height_m"])
+			# An untagged part another part stands on (a drum under its dome)
+			# is flat: its roof is the next part's floor.
+			if capped:
+				shape = "flat"
 		var roof_levels := int(b_eff.get("roof_levels", 0))
 		if roof_tag <= 0.0 and roof_levels > 0 and shape != "flat":
 			roof_tag = float(roof_levels) * fh * 0.95
@@ -107,8 +112,11 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		if legacy:
 			wall = clampf(wall, 7.2, 76.0)
 		var min_m := maxf(float(md.get("min_height_m", 0.0)), float(md.get("min_level", 0)) * fh)
-		if min_m > wall - 1.0:
-			min_m = 0.0  # a min above the top is a tagging slip, not a floating box
+		# A part that is only roof (a dome on its drum: min_height at the
+		# drum top, the rest roof:height) keeps its lift; any other min
+		# above the top is a tagging slip, not a floating box.
+		if min_m > wall - 1.0 and not (rh > 0.0 and min_m <= wall + 0.01):
+			min_m = 0.0
 		# Untagged arch and ramp parts of a mapped building=bridge (the Rialto)
 		# are stone: left to the infill mix, the sloped parts drew an
 		# outbuilding's orange plank roof.
@@ -125,7 +133,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		# a brick shaft under a pointed roof, not a grey rod.
 		var span_m := BuildingHeights._ring_span_m(ring)
 		if str(look["kind"]) == "religious" and min_m <= 0.0 and wall >= 14.0 \
-				and span_m <= 8.0 and shape != "dome":
+				and span_m <= 8.0 and shape not in RoofDomes.SHAPES and not capped:
 			if str(b_eff.get("material", "")) == "":
 				b_eff["material"] = "brick"
 				# Untagged: Venetian red brick, not the row's pale stone tint.
@@ -153,9 +161,26 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		out.append({"ring": ring, "holes": holes, "centre": Vector2(cx, cz),
 			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
-			"main": mi == main_mass, "look": look})
+			# A mapped landmark's parts are its towers and domes: no made-up
+			# tower, stacks or dormers on any of them.
+			"main": mi == main_mass and not bool(b.get("mapped_landmark", false)),
+			"look": look})
 	_plans[ck] = out
 	return out
+
+## True when another part stands on part `mi`: lifted to this part's
+## top (within 1 m) with its centre inside this ring.
+static func _capped(masses: Array, mi: int, ring: PackedVector2Array) -> bool:
+	var top := float((masses[mi] as Dictionary).get("height", 0.0))
+	for j in masses.size():
+		if j == mi or not (masses[j] is Dictionary):
+			continue
+		var o := masses[j] as Dictionary
+		var lift := float(o.get("min_height_m", 0.0))
+		if lift > 0.0 and absf(lift - top) <= 1.0 and RingGeometry.point_in_ring(
+				Vector2(float(o.get("x", 0.0)), float(o.get("z", 0.0))), ring):
+			return true
+	return false
 
 ## Index of the largest footprint: roofline detail goes on it only (a
 ## church of five parts has one tower, not five).

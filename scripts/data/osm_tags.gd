@@ -181,7 +181,7 @@ static func waterway_class_width(water_class: String) -> float:
 ## `default` into regional inference.
 static func _resolve_height(tags: Dictionary, inherit: Dictionary = {}) -> Dictionary:
 	var levels := _tag_int(tags.get("building:levels", 0), 0, 200)
-	var h := _tag_metres(tags.get("height", ""), 0.5, 400.0)
+	var h := _tag_metres(tags.get("height", ""), 0.5, 1000.0)
 	if not is_nan(h):
 		return {"height": h, "height_source": "tag_height", "levels": levels}
 	if levels > 0:
@@ -235,7 +235,7 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 ## as numbers (0 when absent or out of range).
 static func _roof_tags(tags: Dictionary) -> Dictionary:
 	var roof_h := _tag_metres(tags.get("roof:height", ""), 0.5, 100.0)
-	var min_h := _tag_metres(tags.get("min_height", ""), 0.0, 400.0)
+	var min_h := _tag_metres(tags.get("min_height", ""), 0.0, 1000.0)
 	return {
 		"roof_shape": str(tags.get("roof:shape", "")),
 		"roof_colour": str(tags.get("roof:colour", "")),

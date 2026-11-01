@@ -299,6 +299,50 @@ static func landmarks() -> Array:
 		{"type": "sydney_opera", "name": "Sydney Opera House", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
 			"wiki_title": "Sydney Opera House", "height_m": 65.0,
 			"aliases": ["sydney opera", "opera house, sydney"]},
+		# Preset skylines (yaw_deg turns the model onto its real bearing).
+		{"type": "burj_khalifa", "name": "Burj Khalifa", "lat": 25.1972, "lon": 55.2744, "radius_m": 8000.0,
+			"wiki_title": "Burj Khalifa", "height_m": 828.0, "clear_m": 90.0, "kind": "Skyscraper",
+			"aliases": ["burj khalifa", "burj dubai"]},
+		# Lower Manhattan's streets run close to the Midtown grid (29°).
+		{"type": "one_wtc", "name": "One World Trade Center", "lat": 40.7130, "lon": -74.0132, "radius_m": 6000.0,
+			"wiki_title": "One World Trade Center", "height_m": 541.3, "clear_m": 50.0, "yaw_deg": 29.0,
+			"kind": "Skyscraper", "aliases": ["one world trade", "one wtc", "freedom tower"]},
+		{"type": "empire_state", "name": "Empire State Building", "lat": 40.7484, "lon": -73.9857, "radius_m": 6000.0,
+			"wiki_title": "Empire State Building", "height_m": 443.2, "clear_m": 70.0, "yaw_deg": 29.0,
+			"kind": "Skyscraper", "aliases": ["empire state"]},
+		{"type": "salute", "name": "Santa Maria della Salute", "lat": 45.4309, "lon": 12.3346, "radius_m": 3000.0,
+			"wiki_title": "Santa Maria della Salute", "height_m": 60.0, "clear_m": 45.0, "yaw_deg": 150.0,
+			"kind": "Basilica", "aliases": ["santa maria della salute", "basilica della salute"]},
+		{"type": "monte_carlo_casino", "name": "Monte Carlo Casino", "lat": 43.7393, "lon": 7.4283, "radius_m": 2500.0,
+			"wiki_title": "Monte Carlo Casino", "height_m": 34.0, "clear_m": 60.0, "yaw_deg": -30.0,
+			"kind": "Casino", "aliases": ["monte carlo casino", "casino de monte-carlo", "casino de monte carlo"]},
+		{"type": "gwanghwamun", "name": "Gwanghwamun", "lat": 37.5760, "lon": 126.9769, "radius_m": 3000.0,
+			"wiki_title": "Gwanghwamun", "height_m": 19.0, "clear_m": 30.0, "kind": "Palace gate",
+			"aliases": ["gwanghwamun", "광화문"]},
+		{"type": "banff_springs", "name": "Banff Springs Hotel", "lat": 51.1643, "lon": -115.5618, "radius_m": 3000.0,
+			"wiki_title": "Banff Springs Hotel", "height_m": 59.5, "clear_m": 120.0, "yaw_deg": 225.0,
+			"kind": "Hotel", "aliases": ["banff springs"]},
+		{"type": "stockholm_city_hall", "name": "Stockholm City Hall", "lat": 59.3275, "lon": 18.0543, "radius_m": 4000.0,
+			"wiki_title": "Stockholm City Hall", "height_m": 106.0, "clear_m": 75.0, "kind": "City hall",
+			"aliases": ["stockholm city hall", "stadshuset"]},
+		# Bridges: built along their axis (span_m long, yaw_deg turning the
+		# model's +X onto it) on the water surface (base: water).
+		{"type": "golden_gate", "name": "Golden Gate Bridge", "lat": 37.8197, "lon": -122.4786, "radius_m": 8000.0,
+			"wiki_title": "Golden Gate Bridge", "height_m": 227.0, "clear_m": 20.0, "yaw_deg": 85.0,
+			"span_m": 2040.0, "base": "water", "kind": "Bridge", "aliases": ["golden gate bridge"]},
+		{"type": "tower_bridge", "name": "Tower Bridge", "lat": 51.5055, "lon": -0.0754, "radius_m": 5000.0,
+			"wiki_title": "Tower Bridge", "height_m": 65.0, "clear_m": 30.0, "yaw_deg": 95.0,
+			"span_m": 256.0, "base": "water", "kind": "Bridge", "aliases": ["tower bridge"]},
+		{"type": "brooklyn_bridge", "name": "Brooklyn Bridge", "lat": 40.7056, "lon": -73.9964, "radius_m": 5000.0,
+			"wiki_title": "Brooklyn Bridge", "height_m": 84.3, "clear_m": 22.0, "yaw_deg": 46.0,
+			"span_m": 1132.0, "base": "water", "kind": "Bridge", "aliases": ["brooklyn bridge"]},
+		{"type": "sydney_harbour_bridge", "name": "Sydney Harbour Bridge", "lat": -33.8523, "lon": 151.2106,
+			"radius_m": 5000.0, "wiki_title": "Sydney Harbour Bridge", "height_m": 134.0, "clear_m": 40.0,
+			"yaw_deg": -73.0, "span_m": 1149.0, "base": "water", "kind": "Bridge",
+			"aliases": ["sydney harbour bridge", "harbour bridge"]},
+		{"type": "bixby_creek_bridge", "name": "Bixby Creek Bridge", "lat": 36.3714, "lon": -121.9019, "radius_m": 2000.0,
+			"wiki_title": "Bixby Creek Bridge", "height_m": 79.0, "clear_m": 12.0, "yaw_deg": 52.0,
+			"span_m": 218.0, "kind": "Bridge", "aliases": ["bixby creek bridge", "bixby bridge"]},
 	]
 
 static func distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -326,3 +370,24 @@ static func landmark_entry(lat: float, lon: float, name: String) -> Dictionary:
 static func landmark_for(lat: float, lon: float, name: String) -> String:
 	var entry := landmark_entry(lat, lon, name)
 	return str(entry.get("type", "none")) if not entry.is_empty() else "none"
+
+## Registry entry of `type`, {} when unknown. Optional fields: yaw_deg
+## (the model turned clockwise from its built frame, +X east and −Z
+## north; default 0), clear_m (cleared grounds, default 68) and kind
+## (the callout label when it stands beside the primary).
+static func entry_for_type(type: String) -> Dictionary:
+	for entry in landmarks():
+		if str(entry["type"]) == type:
+			return entry
+	return {}
+
+## Every other registry landmark whose radius covers the viewpoint: the
+## second and third icons of a skyline (LandmarkSites builds them as
+## candidates beside the primary).
+static func registry_extras(lat: float, lon: float, primary_type: String) -> Array:
+	var out: Array = []
+	for entry in landmarks():
+		if str(entry["type"]) != primary_type \
+				and distance_m(lat, lon, float(entry["lat"]), float(entry["lon"])) <= float(entry["radius_m"]):
+			out.append(entry)
+	return out

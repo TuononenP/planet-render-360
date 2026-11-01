@@ -141,7 +141,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
 		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
 			continue
-		if placed >= cap:
+		if placed >= cap and not bool(b.get("mapped_landmark", false)):
 			# T7.3: past the preset cap a real building is never dropped:
 			# the same footprint/height/roof resolve, extruded as a
 			# batched impostor mass (shared distant materials, no ground
@@ -219,8 +219,10 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 static func _accepted(data: LocationData, b: Dictionary, site: Vector2, edge: float) -> bool:
 	var x := float(b["x"])
 	var z := float(b["z"])
-	if data.landmark_type != "none" and Vector2(x, z).distance_to(site) < 68.0:
-		return false
+	if data.landmark_type != "none":
+		var entry := LocationData.entry_for_type(data.landmark_type)
+		if LandmarkSites.span_dist(Vector2(x, z), site, entry) < LandmarkSites.clear_m(entry):
+			return false
 	return not _near_landmark_candidate(data, x, z) and absf(x) <= edge and absf(z) <= edge
 
 ## A mapped building whose centre and four corner probes all stand in
@@ -294,8 +296,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var region := str(ctx.get("region", "generic"))
 	var fidelity := int(ctx.get("fidelity", 2))
 	var seed_v := TerrainBuilder._hash(centre.x, centre.y)
-	var distant := _batch != null or centre.length() / WorldScale.metres_to_units() \
-		> MaterialLibrary.full_detail_radius_m(fidelity)
+	# A mapped landmark keeps full detail at any distance: it is the skyline.
+	var distant := _batch != null or (not bool(b.get("mapped_landmark", false)) \
+		and centre.length() / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
 	# Roof sampling spans the ring's AABB so the mosaic read covers it.
@@ -305,6 +308,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		Callable(TerrainBuilder, "satellite_uv"))
 	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
 		hint, fidelity, distant, seed_v, look)
+	if bool(b.get("mapped_landmark", false)) and not distant:
+		roof_mat = HeroLook.roof(b, roof_mat)
 	# Tile repeats follow the real storey count, kept within ~30% of the
 	# style's floor height so a roof carved out of the total never squashes
 	# the windows (a mansard eats most of an attic floor).
@@ -321,7 +326,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var raised := float(mass.get("min_m", 0.0)) > 0.0
 	if FacadeMaterials.facade_uv(facade).z > 0.0 and v_rep >= 2.0 and _batch == null and not raised:
 		ground_mat = FacadeMaterials.ground_for_building(b, fidelity, distant, look)
-	if ground_mat != null:
+	if top - base < 0.05 * WorldScale.metres_to_units():
+		pass  # a part that is only roof (a dome on its drum) has no walls
+	elif ground_mat != null:
 		var m2u := WorldScale.metres_to_units()
 		var fh_u := float(look["floor_h"]) * m2u
 		var gh_u := fh_u * (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
@@ -444,9 +451,13 @@ static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
 
+## A mapped landmark candidate clears nothing: its own building is the model.
 static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> bool:
 	for c in data.landmark_candidates:
-		if Vector2(x - float(c.get("x", 0.0)), z - float(c.get("z", 0.0))).length() < 36.0:
+		if bool(c.get("mapped", false)):
+			continue
+		if LandmarkSites.span_dist(Vector2(x, z), Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0))),
+				c) < float(c.get("clear_m", LandmarkSites.OSM_CLEAR_M)):
 			return true
 	return false
 
