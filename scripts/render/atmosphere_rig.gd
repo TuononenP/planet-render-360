@@ -183,8 +183,12 @@ func set_time(hour_f: float, lat: float = latitude, on_date: Dictionary = {}) ->
 	_apply()
 
 ## Place for the solar position. Without a known UTC offset the clock
-## is approximated from longitude until set_utc_offset lands.
+## is approximated from longitude until set_utc_offset lands; a new
+## place forgets the last one's offset (Tokyo after Paris must not keep
+## Paris's clock if its own weather never arrives).
 func set_place(lat: float, lon: float) -> void:
+	if absf(lat - latitude) > 0.01 or absf(lon - longitude) > 0.01:
+		utc_offset_known = false
 	latitude = lat
 	longitude = lon
 	if not utc_offset_known:
