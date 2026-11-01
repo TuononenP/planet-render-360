@@ -39,6 +39,19 @@ func _run() -> void:
 		"Colosseum": "colosseum",
 		"Statue of Liberty": "statue_liberty",
 		"Sydney Opera House": "sydney_opera",
+		"Burj Khalifa": "burj_khalifa",
+		"One World Trade Center": "one_wtc",
+		"Empire State Building": "empire_state",
+		"Santa Maria della Salute": "salute",
+		"Casino de Monte-Carlo": "monte_carlo_casino",
+		"Gwanghwamun Gate": "gwanghwamun",
+		"Fairmont Banff Springs": "banff_springs",
+		"Stockholm City Hall": "stockholm_city_hall",
+		"Golden Gate Bridge": "golden_gate",
+		"Tower Bridge": "tower_bridge",
+		"Brooklyn Bridge": "brooklyn_bridge",
+		"Sydney Harbour Bridge": "sydney_harbour_bridge",
+		"Bixby Creek Bridge": "bixby_creek_bridge",
 	}
 	for name in by_name:
 		if LocationData.landmark_for(0.0, 0.0, name) != by_name[name]:
@@ -51,7 +64,15 @@ func _run() -> void:
 		Vector2(41.9028, 12.4964): "colosseum",   # Rome centre
 		Vector2(41.3874, 2.1686): "sagrada",      # Barcelona centre
 		Vector2(30.0444, 31.2357): "pyramid",     # Cairo centre
-		Vector2(40.7128, -74.0060): "statue_liberty",  # New York centre
+		Vector2(40.7128, -74.0060): "one_wtc",    # New York centre
+		Vector2(25.2048, 55.2708): "burj_khalifa",  # Dubai centre
+		Vector2(45.4318, 12.3290): "salute",      # Accademia bridge
+		Vector2(43.7310, 7.4209): "monte_carlo_casino",  # Monaco palace square
+		Vector2(37.5728, 126.9769): "gwanghwamun",  # Gwanghwamun Square
+		Vector2(59.3207, 18.0604): "stockholm_city_hall",  # Monteliusvägen
+		Vector2(37.7749, -122.4194): "golden_gate",  # San Francisco centre
+		Vector2(36.3740, -121.9022): "bixby_creek_bridge",  # Big Sur preset
+		Vector2(40.70265, -73.99686): "brooklyn_bridge",  # Brooklyn Bridge Park
 		Vector2(-33.8688, 151.2093): "sydney_opera",
 		Vector2(35.6762, 139.6503): "tokyo",      # Tokyo centre
 	}
@@ -59,8 +80,17 @@ func _run() -> void:
 		var got := LocationData.landmark_for(coords.x, coords.y, "")
 		if got != by_place[coords]:
 			failures.append("place %s should give %s, got %s" % [coords, by_place[coords], got])
-	if LocationData.landmark_for(51.1789, -115.5708, "Banff, Canada") != "none":
-		failures.append("Banff should have no landmark")
+	if LocationData.landmark_for(51.1789, -115.5708, "Banff, Canada") != "banff_springs":
+		failures.append("Banff should give the Banff Springs Hotel")
+	# A skyline of several registry icons: New York's primary is One WTC,
+	# the Empire State Building and the Statue of Liberty stand beside it.
+	var extras := LocationData.registry_extras(40.7128, -74.0060, "one_wtc").map(
+		func(e: Dictionary) -> String: return str(e["type"]))
+	if not extras.has("empire_state") or not extras.has("statue_liberty") or not extras.has("brooklyn_bridge"):
+		failures.append("New York extras should include empire_state, statue_liberty and brooklyn_bridge, got %s" % [extras])
+	if not LocationData.registry_extras(51.5074, -0.1278, "big_ben").map(
+			func(e: Dictionary) -> String: return str(e["type"])).has("tower_bridge"):
+		failures.append("London's extras should include Tower Bridge")
 
 	# --- 2) Every registry type builds a merged, textured, true-metre
 	# model (T5.3): parts live under a "Model" node whose one uniform
@@ -70,7 +100,11 @@ func _run() -> void:
 	var heights := {"eiffel": 330.0, "tokyo": 332.9, "big_ben": 96.0,
 		"colosseum": 48.0, "sagrada": 172.5, "pyramid": 138.5,
 		"statue_liberty": 93.0, "sydney_opera": 67.0,
-		"turku_cathedral": 86.0, "helsinki_cathedral": 62.0}
+		"turku_cathedral": 86.0, "helsinki_cathedral": 62.0,
+		"burj_khalifa": 828.0, "one_wtc": 541.3, "empire_state": 443.2, "salute": 60.0,
+		"monte_carlo_casino": 34.0, "gwanghwamun": 19.0, "banff_springs": 59.5,
+		"stockholm_city_hall": 106.0, "golden_gate": 227.0, "tower_bridge": 65.0,
+		"brooklyn_bridge": 84.3, "sydney_harbour_bridge": 134.0, "bixby_creek_bridge": 79.0}
 	for entry in LocationData.landmarks():
 		var type := str(entry["type"])
 		var model := LandmarkBuilder.build(type)

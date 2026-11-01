@@ -486,12 +486,13 @@ func _await_osm(data: LocationData) -> void:
 		data.waterways = _osm_waterways
 		data.trees = _osm_trees
 		data.barriers = _osm_barriers
-		var cands := _osm_landmarks.duplicate()
-		cands = rank_landmarks(cands)
-		data.landmark_candidates = cands.slice(0, 8)
+		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
 		var osm_attr := "Map data: © OpenStreetMap contributors"
 		data.attribution = osm_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + osm_attr
+	else:
+		# No map data: the registry's other landmarks still stand.
+		data.landmark_candidates = LandmarkSites.select(data, [])
 	_start_ground(data)
 	await _await_far_city(data)
 

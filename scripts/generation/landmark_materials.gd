@@ -11,15 +11,22 @@ extends RefCounted
 
 static var _cache: Dictionary = {}
 static var _texs: Dictionary = {}
+## Landmarks build beside the buildings (WorldBuildGraph), and HeroLook
+## reaches these caches from the buildings task. Recursive, so pbr() can
+## call tex() while holding it.
+static var _mutex := Mutex.new()
 
 ## Mipmapped texture of one bundled map (shared with MaterialLibrary's
 ## linearised source images). The colour map is re-encoded to sRGB:
 ## albedo_texture is a source_color sampler the renderer decodes, so the
 ## linear image read dark and over-saturated (T4.7 double decode).
 static func tex(set_name: String, map_name: String) -> Texture2D:
+	_mutex.lock()
 	var key := set_name + ":" + map_name
 	if _texs.has(key):
-		return _texs[key] as Texture2D
+		var ret: Texture2D = _texs[key] as Texture2D
+		_mutex.unlock()
+		return ret
 	var img := (MaterialLibrary._set_image(set_name, map_name)).duplicate() as Image
 	if map_name == "diff":
 		img.linear_to_srgb()
@@ -27,7 +34,9 @@ static func tex(set_name: String, map_name: String) -> Texture2D:
 		img.generate_mipmaps(map_name == "nor")
 	var t := ImageTexture.create_from_image(img)
 	_texs[key] = t
-	return t
+	var ret: Texture2D = t
+	_mutex.unlock()
+	return ret
 
 ## Tint (sRGB, for albedo_color) that takes the set's linear mean to
 ## the sRGB `hex` reference colour; wider clamp than buildings so
@@ -44,9 +53,12 @@ static func tint(set_name: String, hex: String) -> Color:
 ## the set's roughness map.
 static func pbr(set_name: String, hex: String, tile_m: float = 4.0,
 		roughness: float = -1.0, metallic: float = 0.0) -> StandardMaterial3D:
+	_mutex.lock()
 	var key := "%s|%s|%.2f|%.2f|%.2f" % [set_name, hex, tile_m, roughness, metallic]
 	if _cache.has(key):
-		return _cache[key] as StandardMaterial3D
+		var ret: StandardMaterial3D = _cache[key] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = tex(set_name, "diff")
 	m.albedo_color = tint(set_name, hex)
@@ -62,7 +74,9 @@ static func pbr(set_name: String, hex: String, tile_m: float = 4.0,
 	var s := 1.0 / maxf(tile_m, 0.05)
 	m.uv1_scale = Vector3(s, s, s)
 	_cache[key] = m
-	return m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret
 
 ## Painted wrought iron / steel: matte paint over pitted metal (the
 ## concrete set's micro-relief reads as weathered paint at member size).
@@ -75,9 +89,12 @@ static func gold() -> StandardMaterial3D:
 
 ## Dark glazing: deep tinted glass with a sharp sky reflection.
 static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
+	_mutex.lock()
 	var key := "glass|" + hex
 	if _cache.has(key):
-		return _cache[key] as StandardMaterial3D
+		var ret: StandardMaterial3D = _cache[key] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
 	var m := StandardMaterial3D.new()
 	# Lifted toward a slate blue: the bare hex times the concrete texture
 	# is near-black, and a large flat window rendered as a black hole.
@@ -90,25 +107,35 @@ static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
 	m.metallic = 0.2
 	m.uv1_scale = Vector3(0.05, 0.05, 0.05)
 	_cache[key] = m
-	return m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret
 
 ## Self-lit lamp / clock-face glow (emission so it reads at dusk).
 static func lit(hex: String, energy: float = 0.6) -> StandardMaterial3D:
+	_mutex.lock()
 	var key := "lit|%s|%.2f" % [hex, energy]
 	if _cache.has(key):
-		return _cache[key] as StandardMaterial3D
+		var ret: StandardMaterial3D = _cache[key] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
 	var m := pbr("render", hex, 3.0, 0.45).duplicate() as StandardMaterial3D
 	m.emission_enabled = true
 	m.emission = Color(hex)
 	m.emission_energy_multiplier = energy
 	_cache[key] = m
-	return m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret
 
 ## Sydney Opera House roof: 1.06 million glossy-white and matte-cream
 ## Swedish tiles in a chevron pattern, 120 mm grid.
 static func opera_tile() -> StandardMaterial3D:
+	_mutex.lock()
 	if _cache.has("opera_tile"):
-		return _cache["opera_tile"] as StandardMaterial3D
+		var ret: StandardMaterial3D = _cache["opera_tile"] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
 	var n := 256
 	var alb := Image.create(n, n, false, Image.FORMAT_RGB8)
 	var rough := Image.create(n, n, false, Image.FORMAT_RGB8)
@@ -143,4 +170,6 @@ static func opera_tile() -> StandardMaterial3D:
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	m.uv1_scale = Vector3(0.52, 0.52, 0.52)  # 16 tiles per ~1.9 m
 	_cache["opera_tile"] = m
-	return m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret

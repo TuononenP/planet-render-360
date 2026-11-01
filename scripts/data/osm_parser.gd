@@ -62,6 +62,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
 					buildings, landmarks)
 			elif str(el_tags.get("type", "")) == "multipolygon" \
+					and el.has("members") and el_tags.has("building:part"):
+				# A part with holes (a cloister court, a ring of chapels):
+				# each outer nests like a part way, carrying its inners.
+				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
+					var pr: PackedVector2Array = r["outer"]
+					part_ways.append({"tags": el_tags, "points": pr,
+						"aabb": OsmGeometry._ring_aabb(pr), "holes": r["holes"]})
+			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members"):
 				var members: Array = el.get("members", [])
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
@@ -119,7 +127,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"wikipedia": OsmTags.wiki_tag(el_tags),
 					"height": entry["height"],
 					"size_x": entry["size_x"], "size_z": entry["size_z"]}
-				_wheel_landmark(lmk, poly, entry["height_source"] != "default")
+				_framed_landmark(lmk, poly, entry["height_source"] != "default")
 				landmarks.append(lmk)
 		elif el_tags.has("building:part"):
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
@@ -146,7 +154,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"height": 30.0,
 					"size_x": clampf(max_x - min_x, 6.0, 240.0),
 					"size_z": clampf(max_z - min_z, 6.0, 240.0)}
-				_wheel_landmark(lmk2, poly, false)
+				_framed_landmark(lmk2, poly, false)
 				landmarks.append(lmk2)
 			var cls := OsmTags.land_class(el_tags)
 			if cls != "" and geom.size() >= 3:
@@ -162,6 +170,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					trees.append(tree)
 	_nest_parts(buildings, part_ways)
 	_monument_landmarks(buildings, landmarks)
+	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers}
@@ -185,17 +194,22 @@ static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
 				"wikipedia": OsmTags.wiki_tag(tags),
 				"height": entry["height"],
 				"size_x": entry["size_x"], "size_z": entry["size_z"]}
-			_wheel_landmark(lmk, outer, entry["height_source"] != "default")
+			_framed_landmark(lmk, outer, entry["height_source"] != "default")
 			landmarks.append(lmk)
 			arch = ""
 
-## Observation wheels on every mapping path (building way, plain way,
-## building relation): true bearing and along/across footprint from the
-## outline, and when the height is only a default, the height a wheel of
-## the footprint's length would have, so a 120 m wheel is not built from
-## a 10 m placeholder.
-static func _wheel_landmark(lmk: Dictionary, poly: PackedVector2Array, height_known: bool) -> void:
-	if lmk["archetype"] != "big_wheel" or poly.size() < 2:
+## Archetypes on every mapping path (building way, plain way, building
+## relation) stand on their outline's own frame: true bearing and
+## along/across footprint, so a church turned to its street is not built
+## on an inflated AABB. Observation wheels, when the height is only a
+## default, also take the height a wheel of the footprint's length would
+## have, so a 120 m wheel is not built from a 10 m placeholder.
+static func _framed_landmark(lmk: Dictionary, poly: PackedVector2Array, height_known: bool) -> void:
+	if lmk["archetype"] != "big_wheel":
+		if poly.size() >= 3:
+			lmk.merge(_wheel_frame(poly), true)
+		return
+	if poly.size() < 2:
 		return
 	lmk.merge(_wheel_frame(poly), true)
 	if not height_known:
@@ -286,7 +300,9 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 				best = i
 				best_area = area
 		if best < 0:
-			buildings.append(OsmTags._building_entry(tags, pts, paabb))
+			var orphan := OsmTags._building_entry(tags, pts, paabb)
+			orphan["holes"] = pw.get("holes", [])
+			buildings.append(orphan)
 			boxes.append(paabb)
 			continue
 		var parent: Dictionary = buildings[best]
@@ -301,6 +317,7 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 			"levels": res["levels"],
 			"colour": str(tags.get("building:colour", "")),
 			"material": str(tags.get("building:material", tags.get("material", ""))),
+			"holes": pw.get("holes", []),
 		}
 		# Parts carry their own roof (domes, towers, stepped wings).
 		part.merge(OsmTags._roof_tags(tags))

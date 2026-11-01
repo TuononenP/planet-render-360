@@ -39,6 +39,15 @@ const CAP_RELATIONS := 220
 ## they never compete with the land/water relation budget. Not 900:
 ## "out geom 900" is the retired v1 cap the query tests guard against.
 const CAP_BUILDING_RELATIONS := 1000
+## Parts within LANDMARK_PARTS_M of a landmark-type building (churches,
+## mosques, temples, castles, towers): the general CAP_PARTS prints in id
+## order and thins a dense city's parts evenly, so a cathedral could lose
+## its dome. Own statement in the same request (no extra Overpass call);
+## parse dedups the overlap. 80 m: `around.set` measures to the outline,
+## and a central dome sits that far in from a big cathedral's walls.
+const CAP_LANDMARK_PARTS := 800
+const LANDMARK_PARTS_M := 80
+const LANDMARK_KINDS := "cathedral|church|chapel|mosque|temple|synagogue|castle|tower"
 ## Ring (low-detail majors) caps: small payload by construction; the
 ## 1600 m Paris ring carries ≈630 elements (≈590 highways) in ≈0.8 MB.
 const CAP_RING_HIGHWAYS := 800
@@ -71,6 +80,12 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_BUILDING_RELATIONS],
 		'way["building:part"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_PARTS],
+		('(way["building"~"^(%s)$"](around:%d,%.6f,%.6f);'
+			+ 'relation["building"~"^(%s)$"]["type"="multipolygon"](around:%d,%.6f,%.6f);)->.lm;'
+			+ '(way["building:part"](around.lm:%d);'
+			+ 'relation["building:part"]["type"="multipolygon"](around.lm:%d););out geom %d;')
+			% [LANDMARK_KINDS, radius_m, lat, lon, LANDMARK_KINDS, radius_m, lat, lon,
+				LANDMARK_PARTS_M, LANDMARK_PARTS_M, CAP_LANDMARK_PARTS],
 		'way["highway"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_HIGHWAYS],
 		'way["waterway"](around:%d,%.6f,%.6f);out geom %d;'

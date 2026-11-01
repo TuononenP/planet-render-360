@@ -125,6 +125,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var surf := _Surface.new(data, ground)
 	var junc := RoadSurface.junctions(data)
 	var batches := {}
+	# A registry bridge's model carries its own deck over its span.
+	var spans := LandmarkSites.bridge_spans(data)
 	for line in data.roads:
 		if abort != null and abort.requested:
 			break
@@ -137,7 +139,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		var dense := _resample(pts, surf.step * 0.34)
 		var finish := str(r["finish"])
 		if bool(r["bridge"]):
-			_bridge(batches, dense, float(r["width_u"]), surf, m2u)
+			for piece in LandmarkSites.outside_spans(dense, spans):
+				_bridge(batches, piece, float(r["width_u"]), surf, m2u)
 			continue
 		var lift := float(LIFT_M[int(r["rank"])]) * m2u
 		# RoadSurface attributes: lanes, rank, kerbed urban street.

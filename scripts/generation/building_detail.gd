@@ -181,7 +181,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 	var basis := Basis(Vector3(u.x, 0, u.y), Vector3.UP, Vector3(v.x, 0, v.y))
 	if religious:
 		_tower(batch, ring, c, u, lu, lv, top, wall_h, basis, look, wall_mat, roof_mat)
-	if near:
+	# A dome, onion or spire carries no stacks, dormers or roof terraces.
+	if near and shape not in RoofDomes.SHAPES:
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
 		# Bell-capped stacks are drawn by _chimneys, so a Venetian terrace
 		# skips the plain party-wall stacks.
@@ -288,7 +289,7 @@ static func _altana(batch: Batch, ring: PackedVector2Array, c: Vector2,
 static func _dormers(batch: Batch, c: Vector2, u: Vector2, v: Vector2,
 		lu: float, lv: float, top: float, roof_h: float, shape: String,
 		basis: Basis, look: Dictionary, roof_mat: Material, seed_v: float) -> void:
-	if shape == "flat" or shape == "dome" or roof_h < 1.4 * WorldScale.metres_to_units():
+	if shape == "flat" or roof_h < 1.4 * WorldScale.metres_to_units():
 		return
 	if ArchitectureStyle._h(seed_v, 25) >= float(look["dormer"]):
 		return

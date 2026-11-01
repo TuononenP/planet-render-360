@@ -59,6 +59,11 @@ func set_place(data: LocationData, ground: GroundTruth) -> void:
 		var xz := Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0)))
 		if not _find(n, xz).is_empty():
 			continue  # "Tour Eiffel" is the curated Eiffel Tower
+		if c.has("type"):
+			var reg := LocationData.entry_for_type(str(c["type"]))
+			if not reg.is_empty():
+				_add(LandmarkVisit.from_registry(reg), xz, float(c.get("height", 20.0)) * 0.5)
+				continue
 		var kind := str(c.get("archetype", "landmark")).replace("_", " ").capitalize()
 		var s := LandmarkVisit.site(n, 0.0, 0.0, kind, "osm", float(c.get("height", 0.0)))
 		s["kind"] = kind
