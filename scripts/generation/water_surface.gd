@@ -93,10 +93,11 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var bb := _bbox(part)
 	# A sea or bay clipped to the extent spans km: at the post step that is
 	# ~20k interior points, and Delaunay triangulation of that many never
-	# returned on Nice's bay. Spread at most MAX_INTERIOR_POINTS; the
-	# shoreline ramp still comes from the resampled rim.
-	grid = maxf(grid, sqrt((float(bb[2]) - float(bb[0])) * (float(bb[3]) - float(bb[1]))
-		/ float(MAX_INTERIOR_POINTS)))
+	# returned on Nice's bay. Spread at most MAX_INTERIOR_POINTS over the
+	# part's own area, not its bounding box: a river crossing the extent
+	# diagonally fills a sliver of its box and lost its interior samples.
+	# The shoreline ramp still comes from the resampled rim.
+	grid = maxf(grid, sqrt(absf(RingGeometry.signed_area(part)) / float(MAX_INTERIOR_POINTS)))
 	var rims := PackedVector2Array(_resample_ring(part, rim_sp))
 	for h in holes:
 		if not (h is PackedVector2Array):
