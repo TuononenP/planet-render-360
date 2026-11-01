@@ -89,6 +89,52 @@ func _run() -> void:
 		loading.set_stage(i, "", "done")
 		if loading._rows[i]["detail"].text != "2.4 s":
 			failures.append("row %d should show its fetch time, got %s" % [i, loading._rows[i]["detail"].text])
+	# The active stage counts the seconds its layer has been fetching (from
+	# the run's start), then gives way to the real time, or to nothing.
+	loading.begin("Paris, France")
+	loading.set_stage(0, "", "in_progress")
+	loading._run_started_msec -= 7000
+	loading.set_stage(0, "", "done")
+	loading.set_stage(2, "", "in_progress")
+	if loading._rows[2]["detail"].text != "7 s":
+		failures.append("the active buildings row should count from the run start, got '%s'"
+			% loading._rows[2]["detail"].text)
+	loading._run_started_msec -= 2000
+	loading._on_pulse()
+	if loading._rows[2]["detail"].text != "9 s":
+		failures.append("the counter should keep running on each pulse, got '%s'"
+			% loading._rows[2]["detail"].text)
+	loading.set_stage_took(2, 9.4)
+	loading.set_stage(2, "", "done")
+	if loading._rows[2]["detail"].text != "9.4 s":
+		failures.append("the finished row should show its real time, got '%s'"
+			% loading._rows[2]["detail"].text)
+	loading.set_stage(3, "", "in_progress")
+	loading._on_pulse()
+	loading.set_stage(3, "", "done")  # nothing left to wait for: no stale count
+	if loading._rows[3]["detail"].text != "":
+		failures.append("a stage done with no time should drop its count, got '%s'"
+			% loading._rows[3]["detail"].text)
+	# Tiles and "Nearby · 450 m" are never overwritten by the count.
+	loading.begin("Paris, France")
+	loading.set_stage(1, "", "in_progress")
+	loading._run_started_msec -= 5000
+	loading.set_stage_progress(1, 3, 49)
+	loading._on_pulse()
+	if loading._rows[1]["detail"].text != "3 / 49 tiles":
+		failures.append("tile counts should stay over the clock, got '%s'" % loading._rows[1]["detail"].text)
+	loading.set_layer_detail("map", "Nearby · 450 m", false)
+	loading.set_stage(2, "", "in_progress")
+	loading._on_pulse()
+	if loading._rows[2]["detail"].text != "Nearby · 450 m":
+		failures.append("a layer's source should stay over the clock, got '%s'" % loading._rows[2]["detail"].text)
+	# The preset being built is named under the coordinates.
+	loading.begin("Paris, France", 48.8622, 2.2887, RenderSettings.Preset.ULTRA)
+	if not loading._quality_row.visible or loading._quality_label.text != "Quality · Ultra":
+		failures.append("loading should name the quality, got '%s'" % loading._quality_label.text)
+	loading.begin("Paris, France")
+	if loading._quality_row.visible:
+		failures.append("no preset given: no quality line")
 	loading.free()
 	if failures.is_empty():
 		print("LOADING BUILDING OK: build bar follows phases, not 100%")

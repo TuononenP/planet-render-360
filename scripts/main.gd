@@ -266,7 +266,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {}) -> void:
 		else _picker.selected_name
 	if display_name == "":
 		display_name = LocationData.known_place(lat, lon)
-	_loading.begin(display_name, lat, lon)
+	_loading.begin(display_name, lat, lon, _settings.preset)
 	_notice.clear()
 	_show(_loading)
 	# run() starts every fetcher synchronously (cached satellite tiles

@@ -337,6 +337,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		stage_data.emit(i, data)
 		if i == 1 and _sat_took > 0.0:
 			stage_took.emit(i, _sat_took)
+		elif i == 2:
+			# Map data and the far-city query both started with the run.
+			stage_took.emit(i, (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0)
 		elif i == 3 and _climate_took > 0.0:
 			stage_took.emit(i, _climate_took)
 		stage_changed.emit(i, STAGES[i], "done")

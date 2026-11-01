@@ -20,6 +20,8 @@ const BUILD_LABEL := "Building the scene"
 var _title: Label
 var _region: Label
 var _coords: Label
+var _quality_row: HBoxContainer  # gauge + "Quality · High": the preset being built
+var _quality_label: Label
 var _eyebrow: Label
 var _brand: TextureRect
 var _margin: MarginContainer
@@ -49,6 +51,8 @@ static var reduce_motion := false
 var _push: Control
 var _two_col := false
 var _active_index := -1
+const NOT_STARTED := -(1 << 40)
+var _run_started_msec := NOT_STARTED  # the fetches all start with stage 0; the row counters read from here
 var _building := false
 var _build_started_msec := 0
 var _build_source: BuildAbort  # the world build's phase, polled while building
@@ -79,6 +83,20 @@ func _ready() -> void:
 	_hero.add_child(_coords)
 	for l in [_eyebrow, _title, _region, _coords]:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_quality_row = HBoxContainer.new()
+	_quality_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_quality_row.add_theme_constant_override("separation", 6)
+	_quality_row.visible = false
+	_hero.add_child(_quality_row)
+	var quality_icon := TextureRect.new()
+	quality_icon.texture = UiIcon.texture("gauge", 14)
+	quality_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	quality_icon.custom_minimum_size = Vector2(14, 14)
+	quality_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	quality_icon.modulate = UiTheme.MUTED
+	_quality_row.add_child(quality_icon)
+	_quality_label = UiTheme.label("", 14, UiTheme.MUTED)
+	_quality_row.add_child(_quality_label)
 	_preview = TerrainLens.new()
 	_preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_preview.item_rect_changed.connect(queue_redraw)
@@ -187,7 +205,7 @@ func _make_row(list: VBoxContainer, label: String) -> Dictionary:
 	row.add_child(detail)
 	list.add_child(row)
 	return {"dot": dot, "name": name_label, "detail": detail, "label": label,
-		"started": 0, "degraded": false}
+		"started": 0, "degraded": false, "ticking": false}
 
 ## Float glass for the stage card, the accent bar, the quiet Cancel.
 func _style() -> void:
@@ -260,6 +278,8 @@ func _fit_lens() -> void:
 	# Estimated from type sizes: before layout the wrapping title reports
 	# a one-character-wide minimum height, which would hide the lens.
 	var text_h := 16.0 + _title.get_theme_font_size("font_size") * 1.15 + 22.0 + 20.0 + 16.0
+	if _quality_row.visible:
+		text_h += 24.0
 	var room: float
 	if _two_col:
 		room = room_y - text_h - 24.0
@@ -296,6 +316,7 @@ func add_degraded(layer: String, detail: String = "Estimated") -> void:
 		row["degraded"] = true
 		_paint_row(row, StageDot.State.DEGRADED)
 		row["detail"].text = str(_details[layer]["text"]) if _details.has(layer) else detail
+		row["ticking"] = false
 
 ## A layer is arriving from a saved or reduced source ("Nearby · 450 m",
 ## "Offline copy"): its row says where from instead of how long it took.
@@ -307,6 +328,7 @@ func set_layer_detail(layer: String, detail: String, partial: bool) -> void:
 	_details[layer] = {"text": detail, "partial": partial}
 	var row: Dictionary = _rows[int(LAYER_ROW[layer])]
 	row["detail"].text = detail
+	row["ticking"] = false
 
 ## The caution line: layers on estimates, then layers on partial data.
 func _refresh_note() -> void:
@@ -323,13 +345,19 @@ func _refresh_note() -> void:
 	_note_label.text = " ".join(lines)
 
 ## "Venice, Italy" lands as the name "Venice" over the region "Italy".
-func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
+## `preset` is the RenderSettings quality being built; named under the
+## coordinates ("Quality · High") so the wait says what it is for.
+func begin(place_name: String, lat: float = NAN, lon: float = NAN, preset: int = -1) -> void:
 	var parts := UiTheme.split_place(place_name)
 	_title.text = parts[0]
 	_region.text = parts[1]
 	_region.visible = _region.text != ""
 	_coords.text = "" if is_nan(lat) or is_nan(lon) else UiTheme.coords(lat, lon)
 	_coords.visible = _coords.text != ""
+	_quality_row.visible = preset >= 0
+	if preset >= 0:
+		_quality_label.text = "Quality · %s" % RenderSettings.preset_name(preset)
+	_run_started_msec = NOT_STARTED
 	_degraded.clear()
 	_details.clear()
 	_stage_frac.clear()
@@ -357,6 +385,7 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
 			.tween_property(_card, "modulate:a", 1.0, 0.24)
 	for row in _rows + [_build_row]:
 		row["degraded"] = false
+		row["ticking"] = false
 		_paint_row(row, StageDot.State.PENDING)
 		row["detail"].text = ""
 	_on_resized()
@@ -381,11 +410,30 @@ func _paint_row(row: Dictionary, state: StageDot.State) -> void:
 	else:
 		name_label.remove_theme_font_override("font")
 
-## The seconds the build has taken, beside the phase it is in.
+## The seconds the build has taken, beside the phase it is in; before
+## it, the seconds the active stage's layer has been fetching.
 func _on_pulse() -> void:
-	if _building and not _failed and _percent_label != null:
+	if _failed or _percent_label == null:
+		return
+	if _building:
 		_build_row["detail"].text = "%d s" % roundi(
 			(Time.get_ticks_msec() - _build_started_msec) / 1000.0)
+	else:
+		_tick_active_row()
+
+## A running count on the active stage while it has nothing better to
+## say (tiles, "Nearby · 450 m"). Layers are fetched alongside the first
+## stage, so it counts from the run's start: the same clock the finished
+## row reports.
+func _tick_active_row() -> void:
+	if _active_index < 0 or _active_index >= _rows.size() or _run_started_msec == NOT_STARTED:
+		return
+	var row: Dictionary = _rows[_active_index]
+	if row["detail"].text != "" and not row["ticking"]:
+		return
+	var seconds := roundi((Time.get_ticks_msec() - _run_started_msec) / 1000.0)
+	row["ticking"] = seconds >= 1
+	row["detail"].text = "%d s" % seconds if seconds >= 1 else ""
 
 func _process(delta: float) -> void:
 	if not _building or _failed or not visible:
@@ -461,6 +509,9 @@ func set_stage(index: int, _label: String, state: String) -> void:
 	if state == "done":
 		if _active_index == index:
 			_active_index = -1
+		if row["ticking"]:  # the running count gives way to the real time, or nothing
+			row["detail"].text = ""
+			row["ticking"] = false
 		_announcer.say("%s %s" % [row["label"], "estimated" if row["degraded"] else "done"])
 		if row["degraded"]:
 			_paint_row(row, StageDot.State.DEGRADED)  # stays flagged: it finished on estimates
@@ -479,7 +530,10 @@ func set_stage(index: int, _label: String, state: String) -> void:
 	else:
 		_active_index = index
 		row["started"] = Time.get_ticks_msec()
+		if index == 0 or _run_started_msec == NOT_STARTED:
+			_run_started_msec = int(row["started"])
 		_paint_row(row, StageDot.State.ACTIVE)
+		_tick_active_row()
 
 ## The pipeline's data after a stage: draws what landed into the lens.
 func show_stage_data(index: int, data: LocationData) -> void:
@@ -524,6 +578,7 @@ func set_stage_progress(index: int, done: int, total: int) -> void:
 		return
 	_stage_frac[index] = frac
 	_rows[index]["detail"].text = "%d / %d tiles" % [done, total]
+	_rows[index]["ticking"] = false
 	set_progress((index + frac) / _rows.size(), GenerationPipeline.STAGES[index])
 
 ## The real fetch time of a layer that ran alongside earlier stages, so
