@@ -15,8 +15,10 @@ const SMOOTH_M := 40.0
 ## Centreline sample spacing, metres.
 const SAMPLE_M := 4.0
 ## Largest cut or fill a post takes (source metres), so a real hillside
-## road is not bulldozed flat.
-const MAX_SHIFT_M := 2.5
+## road is not bulldozed flat. DEM noise and post-grid creases fit within
+## a metre; at 2.5 m a crest on a Turku hill street was cut 2.3 m, and on
+## a 9–25 m grid the ground beside the street went down with it.
+const MAX_SHIFT_M := 1.0
 
 ## Grades `surface` (size × size posts, `step` units apart, source
 ## metres in Y) in place. `level` marks carved water posts (-INF = dry).
