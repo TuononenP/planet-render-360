@@ -73,8 +73,11 @@ func _run() -> void:
 	var g: GroundTruth = main._view._ground
 	if g == null or absf(g.height_at_world(100.0, -200.0) - GroundTruth.new(data).height_at_world(100.0, -200.0)) > 0.001:
 		failures.append("restored GroundTruth should sample like a rebuilt one")
-	# Budget: a 1-byte cap evicts every entry.
-	if WorldCache.enforce_budget(1) < 1 or FileAccess.file_exists(scene):
+	# Budget: a 1-byte cap evicts every entry, the newest too when asked.
+	WorldCache.enforce_budget(1)
+	if not FileAccess.file_exists(scene):
+		failures.append("the default trim should keep the newest world")
+	if WorldCache.enforce_budget(1, false) < 1 or FileAccess.file_exists(scene):
 		failures.append("budget should evict the oldest world")
 	if failures.is_empty():
 		print("WORLD CACHE OK: background save, identical cached world + ground, faster revisit, budget eviction")

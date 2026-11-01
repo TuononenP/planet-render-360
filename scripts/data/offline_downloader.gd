@@ -102,6 +102,7 @@ static func clear_cache() -> void:
 	_remove_dir("user://worlds")
 	DirAccess.make_dir_recursive_absolute("user://cache")
 	CacheStore.reset_lru()
+	WorldCache.enforce_budget()  # recount the now-empty worlds
 
 static func _remove_dir(path: String) -> void:
 	var dir := DirAccess.open(path)

@@ -5,8 +5,9 @@ extends RefCounted
 ## its GroundTruth instead of rebuilding them (Paris High: ~31 s of build
 ## → ~1.5 s threaded load on the capture machine). The first visit pays a
 ## background save after the view opens. Worlds live apart from the data
-## cache (user://worlds, own MAX_BYTES budget, oldest-first eviction) so a
-## ~200 MB world never evicts DEM/OSM/satellite tiles.
+## cache (user://worlds, oldest-first eviction) but share the settings size
+## limit: they keep at most half of it, so a ~200 MB world can never push
+## out every DEM/OSM/satellite tile.
 ##
 ## Key: place (quantized lat/lon) + preset + season + a fingerprint of the
 ## LocationData the world was built from + BUILD_VERSION. Bump
@@ -17,11 +18,11 @@ extends RefCounted
 
 const BUILD_VERSION := 32
 const DIR := "user://worlds"
-const MAX_BYTES := 1024 * 1024 * 1024
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
 
 static var _source_hash := ""
+static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
 
 static func enabled() -> bool:
 	return DisplayServer.get_name() != "headless"
@@ -176,7 +177,6 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 		DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp),
 			ProjectSettings.globalize_path(p["scene"]))
 		print("WORLD CACHE saved %s in %d ms" % [p["scene"].get_file(), Time.get_ticks_msec() - t0])
-		enforce_budget()
 		return [])
 	var tree := view.get_tree()
 	var pump := func() -> void:
@@ -190,6 +190,9 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	if threads.has(th):
 		threads.erase(th)
 		th.wait_to_finish()
+	# On the main thread: CacheStore's LRU state is not thread-safe.
+	_bytes = -1
+	CacheStore.enforce_size_cap()  # trims worlds, then the data's share
 
 ## The world packed for saving, or null (cache off, or pack failed).
 ## Packing walks every node, so build_location runs it on the build
@@ -230,6 +233,7 @@ static func _load_ground(path: String, data: LocationData) -> GroundTruth:
 	return g
 
 static func _remove(p: Dictionary) -> void:
+	_bytes = -1
 	for k in p:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(p[k]))
 
@@ -241,8 +245,22 @@ static func _touch(p: Dictionary) -> void:
 		f.seek(0)
 		f.store_8(b)  # same byte back: refreshes the mtime only
 
-## Evicts the least recently used worlds until the directory fits.
-static func enforce_budget(max_bytes: int = MAX_BYTES) -> int:
+## Bytes the built worlds hold (cached; rescanned after a change).
+static func total_bytes() -> int:
+	if _bytes < 0:
+		enforce_budget(1 << 62)
+	return _bytes
+
+## Evicts the least recently used worlds until the directory fits
+## max_bytes (default: half the settings size limit). `keep_newest`
+## spares the most recent world (the one just saved or opened) even when
+## it alone is over the share, so a big place is not rebuilt every visit.
+static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int:
+	if max_bytes < 0:
+		max_bytes = CacheStore.max_cache_bytes / 2
+	if not DirAccess.dir_exists_absolute(DIR):
+		_bytes = 0
+		return 0
 	var entries: Array = []
 	var total := 0
 	for f in DirAccess.get_files_at(DIR):
@@ -256,6 +274,8 @@ static func enforce_budget(max_bytes: int = MAX_BYTES) -> int:
 		entries.append({"p": {"scene": scene, "ground": ground}, "bytes": bytes,
 			"t": FileAccess.get_modified_time(ground if FileAccess.file_exists(ground) else scene)})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["t"] < b["t"])
+	if keep_newest and not entries.is_empty():
+		entries.pop_back()
 	var removed := 0
 	for e in entries:
 		if total <= max_bytes:
@@ -263,6 +283,7 @@ static func enforce_budget(max_bytes: int = MAX_BYTES) -> int:
 		_remove(e["p"])
 		total -= int(e["bytes"])
 		removed += 1
+	_bytes = total
 	return removed
 
 static func _size(path: String) -> int:

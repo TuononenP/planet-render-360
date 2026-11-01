@@ -38,9 +38,10 @@ const DATA_VERSION := 2
 const CACHE_DIR := "user://cache"
 const LRU_FILE := "lru.json"
 
-## LRU size cap in bytes (default 512 MB: an Ultra place holds ~50 MB,
-## so ~10 places stay cached). Static var (not const) so tests can
-## shrink it; production never changes it at runtime.
+## The settings size limit in bytes (default 512 MB: an Ultra place holds
+## ~50 MB). It covers downloaded data and built worlds together: worlds
+## keep at most half (WorldCache.enforce_budget) and data fills the rest
+## (data_cap). Set from the cache_limit_mb pref by UiPrefs.apply.
 static var max_cache_bytes := 512 * 1024 * 1024
 ## Test hook (offline_mode precedent): when non-empty, all cache paths
 ## resolve under this directory instead of CACHE_DIR, so eviction and
@@ -52,6 +53,16 @@ var entries: Array[Dictionary] = []
 static var _lru: Dictionary = {}  # relpath -> {"bytes": int, "atime": float}
 static var _lru_loaded := false
 static var _tracked_bytes := -1  # -1 = unknown, rescan on next write
+
+## Bytes downloaded data may hold: the limit minus what built worlds
+## use. Tests (under dir_override, or headless with the world cache off)
+## never count or trim the real worlds.
+static func data_cap() -> int:
+	var worlds := WorldCache.total_bytes() if _shares_with_worlds() else 0
+	return maxi(0, max_cache_bytes - worlds)
+
+static func _shares_with_worlds() -> bool:
+	return dir_override == "" and WorldCache.enabled()
 
 static func base_dir() -> String:
 	return dir_override if dir_override != "" else CACHE_DIR
@@ -341,7 +352,7 @@ static func note_written(path: String, atime_override: float = -1.0) -> void:
 	_lru[rel] = {"bytes": size, "atime": now}
 	_tracked_bytes += size - old
 	_save_lru()
-	if _tracked_bytes > max_cache_bytes:
+	if _tracked_bytes > data_cap():
 		enforce_size_cap()
 
 static func _scan_bytes() -> int:
@@ -379,15 +390,20 @@ static func _scan_dir(dir_path: String, out: Array) -> void:
 		name = dir.get_next()
 	dir.list_dir_end()
 
-## Evict oldest-atime-first until the cache fits max_cache_bytes.
+## Trim built worlds to their share, then evict data oldest-atime-first
+## until it fits data_cap().
 ## Legacy (non-v2) files go first — they are dead weight no fetcher
 ## reads. The LRU index itself is never evicted. Returns bytes freed.
 static func enforce_size_cap() -> int:
+	# Worlds back to their half first; the cached total spares a rescan.
+	if _shares_with_worlds() and WorldCache.total_bytes() > max_cache_bytes / 2:
+		WorldCache.enforce_budget()
+	var cap := data_cap()
 	var files := _scan_files()
 	var total := 0
 	for e in files:
 		total += int(e["bytes"])
-	if total <= max_cache_bytes:
+	if total <= cap:
 		_tracked_bytes = total
 		return 0
 	files.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -401,7 +417,7 @@ static func enforce_size_cap() -> int:
 	var freed := 0
 	var kept := {}
 	for e in files:
-		if total <= max_cache_bytes:
+		if total <= cap:
 			kept[str(e["rel"])] = {"bytes": int(e["bytes"]),
 				"atime": float(e["atime"])}
 		else:
