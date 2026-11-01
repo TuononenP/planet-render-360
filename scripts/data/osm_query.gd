@@ -15,6 +15,13 @@ const OVERPASS_TIMEOUT_S := 30
 ## response ≈9 MB / <60 s per phase.
 ## T7.0: scaled ×2.25 with the 800 → 1200 m radius (area ratio).
 const CAP_BUILDINGS := 7000
+## Overpass prints in id order, not by distance, so in a dense city
+## (Shibuya: ~3× the cap within 1200 m) one capped statement thins the
+## whole disc evenly, the blocks around the viewer included, and the
+## gaps render as lawn. The core disc is therefore fetched first with
+## its own cap, complete, and the ring beyond it fills the rest.
+const CORE_RADIUS_M := 500
+const CAP_BUILDINGS_CORE := 4500
 const CAP_PARTS := 2200
 const CAP_HIGHWAYS := 13000
 const CAP_WATERWAYS := 880
@@ -54,9 +61,12 @@ const CAP_RING_COASTLINE := 100
 ## radius_m defaults to OsmFetcher.DETAILED_RADIUS_M (1200).
 static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 	var head := "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S
+	var core := mini(CORE_RADIUS_M, radius_m / 2)
 	var clauses: Array[String] = [
 		'way["building"](around:%d,%.6f,%.6f);out geom %d;'
-			% [radius_m, lat, lon, CAP_BUILDINGS],
+			% [core, lat, lon, CAP_BUILDINGS_CORE],
+		'(way["building"](around:%d,%.6f,%.6f); - way["building"](around:%d,%.6f,%.6f););out geom %d;'
+			% [radius_m, lat, lon, core, lat, lon, CAP_BUILDINGS],
 		'relation["building"]["type"="multipolygon"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_BUILDING_RELATIONS],
 		'way["building:part"](around:%d,%.6f,%.6f);out geom %d;'
