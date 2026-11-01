@@ -5,12 +5,18 @@ extends RefCounted
 ## there, hold W A S D (arrows keep looking) to walk. Both stay within
 ## View360.can_move_in_place, where the buildings and trees still surround
 ## the camera; farther places are for Go there. The eye keeps its height
-## over the ground and over the roofs beside it (View360.eye_y). One
+## over the ground and over the roofs beside it (View360.eye_y); hold E
+## to rise above that and Q to come back down, and the height is kept
+## while walking. One
 ## instance per view holds the walking state; the ray march, the glide
 ## and the tap rules are static so tests can drive them.
 
 const WALK_MPS := 14.0
 const RUN_MULT := 3.0
+## Rising (E) and descending (Q): metres per second, and how far above
+## the eye level the camera may climb.
+const RISE_MPS := 20.0
+const LIFT_MAX_M := 200.0
 ## A press that stays within TAP_MAX_PX and TAP_MAX_S is a tap; it acts
 ## after TAP_WAIT_S so a double click (reset zoom) cancels it.
 const TAP_MAX_PX := 8.0
@@ -27,6 +33,7 @@ var _tap_ms := -1
 var _tap_seq := 0
 var _eye_clock := 0.0
 var _eye_target := 0.0
+var _lift := 0.0
 var _moving := false
 
 ## Where the ray from `origin` along `dir` meets the terrain, in metres
@@ -148,16 +155,24 @@ static func keys_free(v: View360) -> bool:
 	var focus := v.get_viewport().gui_get_focus_owner() if v.is_inside_tree() else null
 	return not (focus is LineEdit or focus is TextEdit)
 
-## Per-frame W A S D walking (Shift runs). Called from View360._process.
+## `lift` metres above the eye level after `delta` seconds of rising
+## (`rise` 1), descending (-1) or neither (0); never below the eye level.
+static func lifted(lift: float, rise: int, delta: float, run: bool = false) -> float:
+	return clampf(lift + float(rise) * RISE_MPS * (RUN_MULT if run else 1.0) * delta, 0.0, LIFT_MAX_M)
+
+## Per-frame W A S D walking and E / Q rising (Shift runs and climbs
+## faster). Called from View360._process.
 func process_keys(v: View360, delta: float) -> void:
 	if v._data == null or v._ground == null or v._rig == null or not v.is_visible_in_tree():
 		return
 	var fwd := 0
 	var side := 0
+	var rise := 0
 	if keys_free(v):
 		fwd = int(Input.is_key_pressed(KEY_W)) - int(Input.is_key_pressed(KEY_S))
 		side = int(Input.is_key_pressed(KEY_D)) - int(Input.is_key_pressed(KEY_A))
-	if fwd == 0 and side == 0:
+		rise = int(Input.is_key_pressed(KEY_E)) - int(Input.is_key_pressed(KEY_Q))
+	if fwd == 0 and side == 0 and rise == 0:
 		if _moving:
 			_moving = false
 			v._atmos.set_probe_origin(v._rig.position)
@@ -168,8 +183,13 @@ func process_keys(v: View360, delta: float) -> void:
 	var forward := Vector2(-sin(yaw), -cos(yaw))
 	var right := Vector2(cos(yaw), -sin(yaw))
 	var dir := (forward * float(fwd) + right * float(side)).normalized()
-	var speed := WALK_MPS * (RUN_MULT if Input.is_key_pressed(KEY_SHIFT) else 1.0)
+	var run := Input.is_key_pressed(KEY_SHIFT)
+	var speed := WALK_MPS * (RUN_MULT if run else 1.0)
 	var here := Vector2(v._rig.position.x, v._rig.position.z)
+	if not _moving:
+		# Whatever height the camera stands at above the eye level here is kept.
+		_lift = clampf(v._rig.position.y - View360.eye_y(v._data, v._ground, here, false), 0.0, LIFT_MAX_M)
+	_lift = lifted(_lift, rise, delta, run)
 	var next := here + dir * speed * delta
 	if not View360.can_move_in_place(next, v._ground):
 		# Slide along the edge instead of stopping dead.
@@ -182,6 +202,6 @@ func process_keys(v: View360, delta: float) -> void:
 		_eye_clock = EYE_EVERY_S
 		_eye_target = View360.eye_y(v._data, v._ground, next, false)
 	_moving = true
-	var y := lerpf(v._rig.position.y, _eye_target, 1.0 - exp(-8.0 * delta))
+	var y := lerpf(v._rig.position.y, _eye_target + _lift, 1.0 - exp(-8.0 * delta))
 	v._rig.position = Vector3(next.x, y, next.y)
 	v._on_look_changed()

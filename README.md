@@ -30,7 +30,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Make the rendered 3D 360-degree view the main focus once loaded.
 - Support full-screen mode with intuitive view controls.
 - History and Recents show the view as you left it, and reopening a place restores where you were looking.
-- In the 360 view: tap the ground or hold W A S D to walk inside the built area; play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
+- In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
 - Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, cache size, and render quality (Fast / Balanced / High / Ultra).

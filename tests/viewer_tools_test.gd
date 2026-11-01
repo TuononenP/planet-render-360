@@ -320,6 +320,10 @@ func _walk_maths() -> void:
 	_check(ViewWalk.glide_seconds(5.0) == ViewWalk.GLIDE_MIN_S and ViewWalk.glide_seconds(5000.0) == ViewWalk.GLIDE_MAX_S,
 		"glides take between the minimum and the maximum")
 	_check(ViewWalk.ground_hit(Vector3(0, 30, 0), Vector3(0, 0.1, -1), null) == Vector2.INF, "no ground, no hit")
+	_check(is_equal_approx(ViewWalk.lifted(0.0, 1, 1.0), ViewWalk.RISE_MPS), "E climbs RISE_MPS a second")
+	_check(ViewWalk.lifted(0.0, -1, 1.0) == 0.0, "Q never goes below the eye level")
+	_check(ViewWalk.lifted(ViewWalk.LIFT_MAX_M, 1, 5.0) == ViewWalk.LIFT_MAX_M, "the climb stops at the ceiling")
+	_check(ViewWalk.lifted(0.0, 1, 1.0, true) > ViewWalk.lifted(0.0, 1, 1.0), "Shift climbs faster")
 
 # --- Search: a pasted link opens its view ---
 
