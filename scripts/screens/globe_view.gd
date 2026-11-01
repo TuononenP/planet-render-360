@@ -23,7 +23,6 @@ uniform vec2 disc_centre;  // local points
 uniform float radius;
 uniform vec4 backdrop : source_color;
 uniform vec4 halo : source_color;
-uniform bool day = false;
 """ + MapTileView.RECOLOUR + """
 void fragment() {
 	vec4 tint = COLOR;  // modulate, so the globe can cross-fade
@@ -76,7 +75,7 @@ func _ready() -> void:
 	_mat = ShaderMaterial.new()
 	_mat.shader = shader
 	_mat.set_shader_parameter("world", _texture)
-	_mat.set_shader_parameter("day", UiTheme.is_day)
+	MapTileView.apply_map_palette(_mat)
 	_mat.set_shader_parameter("backdrop", UiTheme.SKY_000)
 	_mat.set_shader_parameter("halo", Color(UiTheme.HORIZON_DAY, 0.35))
 	material = _mat
