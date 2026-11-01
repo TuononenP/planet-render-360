@@ -80,6 +80,15 @@ var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
 var _focus_queued := false
 var selected_name := ""
+## The landmark a marker tap selected (LandmarkVisit site), {} for none.
+## Explore renders from its standoff, facing it.
+var selected_landmark: Dictionary = {}
+# Landmark markers and details (MapLandmarkHome).
+var _wiki: WikiFetcher
+var _landmark_timer: Timer
+var _landmark_key := ""
+var _landmark_card: LandmarkCard
+var _landmark_box: MarginContainer
 var _searcher: SearchFetcher
 # Selected place's real data (MapFacts), search modes (MapSearch) and
 # home states (MapHome).
@@ -297,6 +306,7 @@ func _ready() -> void:
 	_btn_row = BoxContainer.new()
 	_btn_row.add_theme_constant_override("separation", 8)
 	_action_col.add_child(_btn_row)
+	MapLandmarkHome.build(self)
 	_render_btn = UiTheme.primary_button("Explore in 360°")
 	_render_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiIcon.apply(_render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
@@ -487,6 +497,7 @@ func _on_picked(lat: float, lon: float) -> void:
 	if _canvas != null:
 		_canvas.set_lat_lon(lat, lon)
 	if _globe != null:
+	MapLandmarkHome.clear(self)
 		_globe.pin = Vector2(lat, lon)
 		_globe.queue_redraw()
 	_refresh_labels()
@@ -498,6 +509,7 @@ func selected_point() -> Vector2:
 	return Vector2(_lat, _lon)
 
 ## Name over region ("Venice" / "Italy"), coordinates as an instrument
+	MapLandmarkHome.request(self)
 ## readout. Search results and failures arrive as plain text.
 func _show_place(full_name: String) -> void:
 	var parts := UiTheme.split_place(full_name)

@@ -79,6 +79,23 @@ static func osm_ring_path(lat: float, lon: float, ring_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_ring%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), ring_m]
 
+## Landmark lookups (WikiFetcher): nearby articles per 0.01° cell and
+## radius, one summary per article, one photo per Commons file. Not a
+## world layer: they ride the LRU like search results.
+static func wiki_near_path(lat: float, lon: float, radius_m: int) -> String:
+	return "%s/wiki_near_%d_%d_r%d.json" % [base_dir(),
+		int(round(lat * 100.0)), int(round(lon * 100.0)), radius_m]
+
+static func wiki_summary_path(lang: String, title: String) -> String:
+	return "%s/wiki_sum_%s_%s.json" % [base_dir(), lang,
+		title.sha1_text().substr(0, 16)]
+
+static func wiki_photo_path(file: String) -> String:
+	return "%s/wiki_img_%s.json" % [base_dir(), file.sha1_text().substr(0, 16)]
+
+static func wiki_photo_bytes_path(file: String) -> String:
+	return "%s/wiki_img_%s.bin" % [base_dir(), file.sha1_text().substr(0, 16)]
+
 ## Layer owning a cache file name: "dem", "sat", "osm", or "" for
 ## anything else (map tiles, search results, the LRU index itself).
 ## Legacy prefixes map to their layer too, so per-layer accounting

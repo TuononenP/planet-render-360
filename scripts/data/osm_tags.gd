@@ -47,6 +47,11 @@ static func monument_kind(tags: Dictionary) -> String:
 		return "obelisk"
 	return "column"
 
+## The feature's `wikipedia` tag ("en:Eiffel Tower"), "" when untagged:
+## the landmark panel reads that article directly (WikiFetcher).
+static func wiki_tag(tags: Dictionary) -> String:
+	return str(tags.get("wikipedia", "")).strip_edges()
+
 ## Contract-§2.6 land cover class (T2.4): the v1 set
 ## (water/forest/grass/field/urban) plus wetland/sand/rock/glacier/
 ## orchard/cemetery/pitch/quarry. "" = unmapped — documented in the

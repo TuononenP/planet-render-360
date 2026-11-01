@@ -6,6 +6,9 @@ signal back_requested
 signal data_sources_requested
 ## Data-quality badge tapped: reopen the DataNotice.
 signal data_quality_requested
+## Go there for a landmark outside the built area: render a new scene
+## at (lat, lon), its standoff, facing `site` (main runs the pipeline).
+signal visit_requested(site: Dictionary, lat: float, lon: float)
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
@@ -15,6 +18,10 @@ var _sun: DirectionalLight3D
 var _atmos: AtmosphereRig
 var _governor: QualityGovernor
 var _weather: WeatherFetcher
+## Landmark details (callout taps) and nearby articles for callouts.
+var _wiki: WikiFetcher
+var _landmark_panel: LandmarkPanel
+var _visit_tween: Tween
 # HUD (built and laid out by ViewChrome).
 var _hud: Control
 var _fade: Control
@@ -80,6 +87,11 @@ const FRAME_MIN_M := 400.0
 const FRAME_READ_M := 800.0
 ## Far plane past the 30 km outer terrain ring's corners.
 const CAMERA_FAR_M := 45000.0
+## Go there moves the camera within the built world while its target is
+## this close to the centre (half the ±1200 m detailed extent: the
+## buildings and trees still surround it); past it a new scene is built.
+const IN_PLACE_M := 600.0
+const NEARBY_RADIUS_M := 10000
 
 func _ready() -> void:
 	_container = SubViewportContainer.new()
@@ -104,6 +116,11 @@ func _ready() -> void:
 	add_child(_weather)
 	_weather.succeeded.connect(_on_weather)
 	_weather.failed.connect(func(_r: String) -> void: ViewChrome.weather_failed(self))
+	_wiki = WikiFetcher.new()
+	add_child(_wiki)
+	_wiki.nearby_ready.connect(func(lat: float, lon: float, _r: int, sites: Array) -> void:
+		if _data != null and is_equal_approx(lat, _data.latitude) and is_equal_approx(lon, _data.longitude):
+			_callouts.add_sites(sites))
 
 	_build_hud()
 
@@ -294,19 +311,28 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
 	_rig.set_look(0.6, -0.10)
 	_atmos.set_probe_origin(_rig.position)
-	if data.landmark_type != "none":
+	if not data.focus.is_empty():
+		# Came to see a landmark: face it, its middle at the view centre.
+		var look := aim(_rig.position, focus_point(data, _ground, data.focus))
+		_rig.set_look(look.x, look.y)
+	elif data.landmark_type != "none":
 		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
 		# not dead ahead, so the river/city sweep fills the right. The
 		# landmark stands at its true site (T5.2); the look aims at it.
 		_rig.set_look(landmark_yaw(data, spawn) - 0.12, -0.08)
+	if _landmark_panel != null:
+		_landmark_panel.close()
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
+	if _wiki != null:
+		_wiki.nearby(data.latitude, data.longitude, NEARBY_RADIUS_M)
 
 ## Camera ground position (metres): the viewpoint itself, unless the
 ## viewpoint sits on its landmark — then FRAME_READ_M back along the v1
 ## framing direction (landmark ENE of the camera), inside the extent.
 static func spawn_xz(data: LocationData) -> Vector2:
-	if data.landmark_type == "none":
+	# A landmark visit already stands off from its focus (LandmarkVisit).
+	if data.landmark_type == "none" or not data.focus.is_empty():
 		return Vector2.ZERO
 	var lp := TerrainBuilder.landmark_world_pos(data)
 	if lp.length() >= FRAME_MIN_M:
@@ -318,6 +344,69 @@ static func spawn_xz(data: LocationData) -> Vector2:
 static func landmark_yaw(data: LocationData, from: Vector2) -> float:
 	var d := TerrainBuilder.landmark_world_pos(data) - from
 	return atan2(-d.x, -d.y)
+
+## World point to aim at for a landmark site: its middle, or the summit
+## of a peak (the terrain carries it).
+static func focus_point(data: LocationData, ground: GroundTruth, site: Dictionary) -> Vector3:
+	var xz := WorldScale.xz_from_latlon(float(site["lat"]), float(site["lon"]),
+		data.latitude, data.longitude)
+	var y := 0.0
+	if ground != null:
+		y = ground.height_at_world(xz.x, xz.y) if ground.is_inside(xz.x, xz.y) \
+			else TerrainBuilder.site_ground_y(data, ground, xz.x, xz.y)
+	if str(site.get("kind", "")) != "Peak":
+		y += maxf(float(site.get("height_m", 0.0)), 30.0) * 0.5
+	return Vector3(xz.x, y, xz.y)
+
+## (yaw, pitch) that looks from `from` at `to` (CameraRig: forward is -Z
+## rotated by yaw, positive pitch looks up), pitch kept gentle.
+static func aim(from: Vector3, to: Vector3) -> Vector2:
+	var d := to - from
+	var flat := Vector2(d.x, d.z).length()
+	return Vector2(atan2(-d.x, -d.z), clampf(atan2(d.y, maxf(flat, 1.0)), -0.35, 0.6))
+
+## Whether the camera can walk to `t` (metres from the scene centre)
+## without leaving the built neighbourhood.
+static func can_move_in_place(t: Vector2, ground: GroundTruth) -> bool:
+	return t.length() <= IN_PLACE_M and ground != null and ground.is_inside(t.x, t.y)
+
+## Callout tapped: the landmark panel with its details.
+func open_landmark(site: Dictionary) -> void:
+	if _landmark_panel != null:
+		_landmark_panel.open(site, _callouts.distance_to(site))
+
+## Go there: stand off from the landmark on the line from the camera to
+## it (the heading holds), and face it. Inside the built area the camera
+## glides there; farther, a new scene is built around the standoff.
+func visit(site: Dictionary) -> void:
+	if _data == null or _rig == null:
+		return
+	var lp := WorldScale.xz_from_latlon(float(site["lat"]), float(site["lon"]),
+		_data.latitude, _data.longitude)
+	var cam := Vector2(_rig.position.x, _rig.position.z)
+	var dir := (lp - cam).normalized()
+	if (lp - cam).length() < 1.0:
+		var b := deg_to_rad(LandmarkVisit.default_bearing(_data.latitude))
+		dir = -Vector2(sin(b), -cos(b))
+	var t := lp - dir * LandmarkVisit.standoff_m(site)
+	if not can_move_in_place(t, _ground):
+		var ll := WorldScale.latlon_from_xz(t.x, t.y, _data.latitude, _data.longitude)
+		visit_requested.emit(site, ll.x, ll.y)
+		return
+	var to := Vector3(t.x, _ground.height_at_world(t.x, t.y) + EYE_HEIGHT_M, t.y)
+	var look := aim(to, focus_point(_data, _ground, site))
+	var yaw_to := _rig.yaw + wrapf(look.x - _rig.yaw, -PI, PI)
+	if _visit_tween != null:
+		_visit_tween.kill()
+	var from := _rig.position
+	var yaw_from := _rig.yaw
+	var pitch_from := _rig.pitch
+	_visit_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_visit_tween.tween_method(func(k: float) -> void:
+		_rig.position = from.lerp(to, k)
+		_rig.set_look(lerpf(yaw_from, yaw_to, k), lerpf(pitch_from, look.y, k))
+		_on_look_changed(), 0.0, 1.0, maxf(UiPrefs.motion(1.6), 0.01))
+	_visit_tween.tween_callback(func() -> void: _atmos.set_probe_origin(_rig.position))
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

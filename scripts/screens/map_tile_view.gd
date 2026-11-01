@@ -15,6 +15,8 @@ extends Control
 ## stands in for a missing detail tile, so pan/zoom never blanks.
 
 signal picked(lat: float, lon: float)
+## A tap landed on a landmark marker (MapLandmarks site).
+signal landmark_picked(site: Dictionary)
 ## Zoomed out past MIN_ZOOM: the picker morphs to the globe.
 signal zoom_past_min
 
@@ -97,6 +99,8 @@ var focus_offset := Vector2.ZERO:
 var _fetcher: TileFetcher
 var _marker: Control
 var _pin: MapPin
+## Landmark markers (MapLandmarks), fed by the picker.
+var landmarks: MapLandmarks
 var _textures: Dictionary = {}  # "z/x/y" -> Texture2D
 var _requested_tile := Vector2i(1 << 30, 1 << 30)
 var _requested_zoom := -1
@@ -127,6 +131,11 @@ func _ready() -> void:
 	map_mat.shader = shader
 	map_mat.set_shader_parameter("day", UiTheme.is_day)
 	material = map_mat
+	# Under the pin, so a selected landmark wears the needle.
+	landmarks = MapLandmarks.new(self)
+	add_child(landmarks)
+	draw.connect(landmarks.queue_redraw)
+	mouse_exited.connect(func() -> void: landmarks.hover_at(Vector2(-1e4, -1e4)))
 	_pin = MapPin.new()
 	add_child(_pin)
 	_pin.point = _focus()
@@ -279,7 +288,11 @@ func _is_double_tap(at: Vector2) -> bool:
 	return double
 
 func _tap(at: Vector2) -> void:
-	if _is_double_tap(at):
+	var site := landmarks.hit_at(at) if landmarks != null else {}
+	if not site.is_empty():
+		_last_tap_msec = 0  # a marker tap never starts a double tap
+		landmark_picked.emit(site)
+	elif _is_double_tap(at):
 		zoom_at(at, 1)
 	else:
 		_pick_at(at)
@@ -319,6 +332,9 @@ func _gui_input(event: InputEvent) -> void:
 		_mouse_moved += mm.relative.length()
 		if _mouse_moved > TAP_MAX_PX:
 			pan_by_pixels(mm.relative)
+	elif event is InputEventMouseMotion and landmarks != null:
+		var over := landmarks.hover_at((event as InputEventMouseMotion).position)
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if over else Control.CURSOR_ARROW
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
 		magnify(mg.factor, mg.position)

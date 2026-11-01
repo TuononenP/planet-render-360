@@ -173,10 +173,13 @@ func cancel() -> void:
 	if _climate != null:
 		_climate.cancel()
 
+## `focus`: the landmark the viewer came to see (LandmarkVisit site);
+## the view aims at it (LocationData.focus).
 func run(lat: float, lon: float, place_name_override: String = "",
-		quality_preset: int = RenderSettings.Preset.HIGH) -> void:
+		quality_preset: int = RenderSettings.Preset.HIGH, focus: Dictionary = {}) -> void:
 	_cancelled = false
 	var data := LocationData.new()
+	data.focus = focus
 	# The preset sizes the DEM grids before any fetch, so Fast really
 	# downloads/builds less and High really samples finer terrain.
 	RenderSettings.apply_preset(data, quality_preset)

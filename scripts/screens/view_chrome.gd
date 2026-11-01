@@ -50,6 +50,16 @@ static func build(v: View360) -> void:
 	v._hud.add_child(v._fade)
 	v._callouts = ViewCallouts.new(v)
 	v._fade.add_child(v._callouts)
+	# The landmark sheet stays up while the HUD idles (on _hud, not _fade).
+	v._landmark_panel = LandmarkPanel.new(v._wiki)
+	v._hud.add_child(v._landmark_panel)
+	v._landmark_panel.go_requested.connect(v.visit)
+	v._landmark_panel.closed.connect(func() -> void: layout(v))
+	v._landmark_panel.card.minimum_size_changed.connect(func() -> void:
+		(func() -> void: layout(v)).call_deferred())
+	v._callouts.site_tapped.connect(func(site: Dictionary) -> void:
+		v.open_landmark(site)
+		layout(v))
 
 	v._top = VBoxContainer.new()
 	v._top.add_theme_constant_override("separation", 8)
@@ -389,7 +399,7 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 			v._inspector_open = not v._inspector_open
 			layout(v)
 		KEY_ESCAPE:
-			return v._callouts.dismiss()
+			return v._landmark_panel.close() or v._callouts.dismiss()
 		_:
 			return false
 	return true
@@ -475,6 +485,26 @@ static func layout(v: View360) -> void:
 		v._sheet.position = Vector2(roundf((w - bar_w) / 2.0), h - pad - attr_h - 8.0 - sheet_h)
 	v._sheet.size = Vector2(bar_w, sheet_h)
 
+	_place_landmark_panel(v, lay, inspector, pad, w, h, attr_h, bar_w)
+
 	v._hint.reset_size()
 	var hint_bottom := v._sheet.position.y - 12.0 if not inspector else h - pad - attr_h - 12.0
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
+
+## The landmark sheet: a left side panel under the place pill on
+## desktop; on phones and tablets a bottom sheet up to half the height,
+## in the controls bar's place (the bar steps aside while it is open).
+static func _place_landmark_panel(v: View360, lay: Responsive.Layout, inspector: bool,
+		pad: float, w: float, h: float, attr_h: float, bar_w: float) -> void:
+	var lp := v._landmark_panel
+	if lp == null or not lp.is_open():
+		return
+	var bottom := h - pad - attr_h - 8.0
+	if inspector:
+		var top := v._top.position.y + v._top.size.y + 12.0
+		lp.place(Rect2(pad, top, minf(float(Responsive.sidebar_width(lay)), w - pad * 2.0),
+			bottom - top), false)
+		return
+	v._sheet.visible = false
+	var max_h := clampf(h * 0.5, 240.0, bottom - pad)
+	lp.place(Rect2(roundf((w - bar_w) / 2.0), bottom - max_h, bar_w, max_h), true)

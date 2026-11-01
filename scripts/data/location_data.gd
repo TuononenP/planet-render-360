@@ -94,6 +94,10 @@ var landmark_type: String = "none"  # see landmarks() for the types
 var has_landmark_site: bool = false
 var landmark_lat: float = 0.0
 var landmark_lon: float = 0.0
+## Landmark the viewer came to see (LandmarkVisit site), {} for none.
+## The viewpoint already stands off from it; View360 only aims at it.
+## Camera-only, so it is not part of the WorldCache key.
+var focus: Dictionary = {}
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
 const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
@@ -266,24 +270,34 @@ static func known_place(lat: float, lon: float) -> String:
 static func landmarks() -> Array:
 	return [
 		{"type": "turku_cathedral", "name": "Turku Cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
+			"wiki_title": "Turku Cathedral", "height_m": 101.0,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
 		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
+			"wiki_title": "Helsinki Cathedral", "height_m": 62.0,
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
 		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
+			"wiki_title": "Eiffel Tower", "height_m": 330.0,
 			"aliases": ["eiffel", "tour eiffel"]},
 		{"type": "tokyo", "name": "Tokyo Tower", "lat": 35.6586, "lon": 139.7454, "radius_m": 9500.0,
+			"wiki_title": "Tokyo Tower", "height_m": 333.0,
 			"aliases": ["tokyo tower", "tokyo tawā"]},
 		{"type": "big_ben", "name": "Big Ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
+			"wiki_title": "Big Ben", "height_m": 96.0,
 			"aliases": ["big ben", "elizabeth tower"]},
 		{"type": "colosseum", "name": "Colosseum", "lat": 41.8902, "lon": 12.4922, "radius_m": 6000.0,
+			"wiki_title": "Colosseum", "height_m": 48.0,
 			"aliases": ["colosseum", "colosseo", "coliseum"]},
 		{"type": "sagrada", "name": "Sagrada Família", "lat": 41.4036, "lon": 2.1744, "radius_m": 5000.0,
+			"wiki_title": "Sagrada Família", "height_m": 172.0,
 			"aliases": ["sagrada", "sagrada familia", "sagrada família"]},
 		{"type": "pyramid", "name": "Great Pyramid of Giza", "lat": 29.9792, "lon": 31.1342, "radius_m": 13000.0,
+			"wiki_title": "Great Pyramid of Giza", "height_m": 139.0,
 			"aliases": ["pyramid", "giza", "khufu", "cheops"]},
 		{"type": "statue_liberty", "name": "Statue of Liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
+			"wiki_title": "Statue of Liberty", "height_m": 93.0,
 			"aliases": ["statue of liberty", "lady liberty"]},
 		{"type": "sydney_opera", "name": "Sydney Opera House", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
+			"wiki_title": "Sydney Opera House", "height_m": 65.0,
 			"aliases": ["sydney opera", "opera house, sydney"]},
 	]
 

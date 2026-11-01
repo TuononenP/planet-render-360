@@ -16,6 +16,8 @@ var _pipeline: GenerationPipeline
 var _store: CacheStore
 var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
+## Landmark the pending run faces (LandmarkVisit site), {} for none.
+var _pending_focus: Dictionary = {}
 var _downloader: OfflineDownloader
 var _download_at := Vector2.ZERO
 ## Bumped per generation and on cancel, so a world still building on
@@ -77,7 +79,14 @@ func _ready() -> void:
 
 	_picker = MapPicker.new()
 	_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_picker.render_requested.connect(_start_generation)
+	_picker.render_requested.connect(func(lat: float, lon: float) -> void:
+		# A selected landmark is seen from its standoff, not stood on.
+		var site := _picker.selected_landmark
+		if site.is_empty():
+			_start_generation(lat, lon)
+			return
+		var at := LandmarkVisit.viewpoint(site, LandmarkVisit.default_bearing(lat))
+		_start_generation(at.x, at.y, site))
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
@@ -129,13 +138,17 @@ func _ready() -> void:
 		_show(_settings_screen)
 		_settings_screen.show_data_sources())
 	_view.data_quality_requested.connect(func() -> void: _notice.open())
+	# Go there, beyond the built area: a new scene at the landmark's standoff.
+	_view.visit_requested.connect(func(site: Dictionary, lat: float, lon: float) -> void:
+		if not _generating:
+			_start_generation(lat, lon, site))
 	add_child(_view)
 	_view.set_quality_preset(_settings.preset)
 
 	# Above the view: plain-language notice when live data did not arrive.
 	_notice = DataNotice.new()
 	_notice.retry_requested.connect(func() -> void:
-		_start_generation(_pending.x, _pending.y))
+		_start_generation(_pending.x, _pending.y, _pending_focus))
 	add_child(_notice)
 
 	_history = HistoryScreen.new()
@@ -234,7 +247,7 @@ func _set_generating(busy: bool) -> void:
 	_generating = busy
 	_picker.set_render_busy(busy)
 
-func _start_generation(lat: float, lon: float) -> void:
+func _start_generation(lat: float, lon: float, focus: Dictionary = {}) -> void:
 	if _generating:
 		print("Generation already in progress; ignoring start")
 		return
@@ -244,7 +257,9 @@ func _start_generation(lat: float, lon: float) -> void:
 	_arm_timeout(gen)
 	_picker.set_render_status("")
 	_pending = Vector2(lat, lon)
-	var display_name := _picker.selected_name
+	_pending_focus = focus
+	var display_name := str(focus.get("name", _picker.selected_name)) if not focus.is_empty() \
+		else _picker.selected_name
 	if display_name == "":
 		display_name = LocationData.known_place(lat, lon)
 	_loading.begin(display_name, lat, lon)
@@ -259,7 +274,8 @@ func _start_generation(lat: float, lon: float) -> void:
 		_set_generating(false)
 		_show(_picker)
 		return
-	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
+	_pipeline.run(lat, lon, display_name if not focus.is_empty() else _picker.selected_name,
+		_settings.preset, focus)
 
 ## Stops generation `gen` if it is still running after
 ## generation_timeout_s: cancels the fetch, asks a world build to stop at

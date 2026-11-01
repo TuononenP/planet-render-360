@@ -6,16 +6,26 @@ extends Control
 ## glass label (accent-soft icon tile, display-s name, body-s meta line)
 ## appears above it, tied to it by a 1px ink leader line. At most two at
 ## once; the nearer to the centre wins. Esc closes them until they leave
-## the view centre. Sites come from the place's curated landmark and its
-## named OSM landmark candidates.
+## the view centre. Sites come from the place's curated landmark, its
+## named OSM landmark candidates, nearby articles (add_sites) and the
+## landmark the viewer came to see (LocationData.focus). Each site is a
+## LandmarkVisit site plus its world `pos`; tapping a callout opens it in
+## the landmark panel (site_tapped).
+
+signal site_tapped(site: Dictionary)
 
 const CONE_DEG := 8.0
 const DWELL_S := 0.4
 const MAX_SHOWN := 2
 const LIFT := 72.0
+const TAP_MAX_PX := 14.0
+## Two sites this close (metres) are one place: the first one wins.
+const SAME_SITE_M := 60.0
 
 var _view: View360
-var _sites: Array = []  # {id, name, kind, icon, pos: Vector3}
+var _data: LocationData
+var _ground: GroundTruth
+var _sites: Array = []  # LandmarkVisit site + {pos: Vector3}
 var _since := {}  # id -> seconds inside the cone
 var _dismissed := {}  # id -> true until it leaves the cone
 var _cards := {}  # id -> PanelContainer
@@ -30,26 +40,78 @@ func _init(view: View360) -> void:
 func set_place(data: LocationData, ground: GroundTruth) -> void:
 	clear()
 	_sites.clear()
+	_data = data
+	_ground = ground
 	if data == null:
 		return
 	if data.landmark_type != "none":
 		var lp := TerrainBuilder.landmark_world_pos(data)
-		_sites.append({"id": "curated", "name": LocationData.landmark_name(data.landmark_type),
-			"kind": "Landmark", "icon": "landmark", "pos": _site(ground, lp.x, lp.y, 60.0)})
+		var entry := LocationData.landmark_entry(data.landmark_lat, data.landmark_lon,
+			LocationData.landmark_name(data.landmark_type))
+		var s := LandmarkVisit.from_registry(entry) if not entry.is_empty() \
+			else LandmarkVisit.site(LocationData.landmark_name(data.landmark_type), 0.0, 0.0, "Landmark", "curated")
+		_add(s, lp, 60.0)
 	for i in data.landmark_candidates.size():
 		var c: Dictionary = data.landmark_candidates[i]
 		var n := str(c.get("name", ""))
 		if n == "":
 			continue
+		var xz := Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0)))
+		if not _find(n, xz).is_empty():
+			continue  # "Tour Eiffel" is the curated Eiffel Tower
 		var kind := str(c.get("archetype", "landmark")).replace("_", " ").capitalize()
-		_sites.append({"id": "osm%d" % i, "name": n, "kind": kind,
-			"icon": "mountain" if kind == "Peak" else "building-2",
-			"pos": _site(ground, float(c.get("x", 0.0)), float(c.get("z", 0.0)),
-				float(c.get("height", 20.0)) * 0.5)})
+		var s := LandmarkVisit.site(n, 0.0, 0.0, kind, "osm", float(c.get("height", 0.0)))
+		s["kind"] = kind
+		s["wikipedia"] = str(c.get("wikipedia", ""))
+		_add(s, xz, float(c.get("height", 20.0)) * 0.5)
+	if not data.focus.is_empty():
+		add_sites([data.focus])
 
-func _site(ground: GroundTruth, x: float, z: float, lift: float) -> Vector3:
-	var y := ground.height_at_world(x, z) if ground != null else 0.0
-	return Vector3(x, y + lift, z)
+## More sites by lat/lon (nearby articles, the focus): placed on the
+## ground out to the far rings; a site already shown (same name or
+## within SAME_SITE_M) only lends it its article.
+func add_sites(sites: Array) -> void:
+	if _data == null:
+		return
+	for s in sites:
+		var xz := WorldScale.xz_from_latlon(float(s["lat"]), float(s["lon"]), _data.latitude, _data.longitude)
+		if xz.length() > TerrainBuilder.LANDMARK_MAX_M:
+			continue
+		var known := _find(str(s["name"]), xz)
+		if not known.is_empty():
+			if str(known.get("wiki_title", "")) == "" and str(known.get("wikipedia", "")) == "":
+				known["wiki_title"] = str(s.get("wiki_title", ""))
+				known["wiki_lang"] = str(s.get("wiki_lang", ""))
+				if str(known.get("description", "")) in ["", known.get("kind", "")]:
+					known["description"] = str(s.get("description", ""))
+			continue
+		var lift := 0.0 if str(s.get("kind", "")) == "Peak" else maxf(float(s.get("height_m", 0.0)) * 0.5, 20.0)
+		_add(s.duplicate(), xz, lift)
+
+func _find(name: String, xz: Vector2) -> Dictionary:
+	var by_name := WikiParse.match_name(name, _sites)
+	if not by_name.is_empty():
+		return by_name
+	for s in _sites:
+		var p: Vector3 = s["pos"]
+		if Vector2(p.x, p.z).distance_to(xz) < SAME_SITE_M:
+			return s
+	return {}
+
+func _add(s: Dictionary, xz: Vector2, lift: float) -> void:
+	if float(s.get("lat", 0.0)) == 0.0 and float(s.get("lon", 0.0)) == 0.0 and _data != null:
+		var ll := WorldScale.latlon_from_xz(xz.x, xz.y, _data.latitude, _data.longitude)
+		s["lat"] = ll.x
+		s["lon"] = ll.y
+	var y := 0.0
+	if _ground != null:
+		y = TerrainBuilder.site_ground_y(_data, _ground, xz.x, xz.y) \
+			if not _ground.is_inside(xz.x, xz.y) else _ground.height_at_world(xz.x, xz.y)
+	s["pos"] = Vector3(xz.x, y + lift, xz.y)
+	_sites.append(s)
+
+func sites() -> Array:
+	return _sites
 
 func clear() -> void:
 	for id in _cards:
@@ -116,7 +178,12 @@ func _process(delta: float) -> void:
 
 func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	var card := PanelContainer.new()
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A tap opens the landmark (design system Callout); a drag that
+	# starts on the card still looks around.
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.tooltip_text = "Show details"
+	card.gui_input.connect(func(e: InputEvent) -> void: _card_input(card, s, e))
 	var st := UiTheme.style(UiTheme.CARD, UiTheme.RADIUS_M, UiTheme.GLASS_EDGE, true)
 	st.content_margin_left = 8
 	st.content_margin_top = 8
@@ -145,6 +212,28 @@ func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	create_tween().set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT) \
 		.tween_property(card, "modulate:a", 1.0, UiPrefs.motion(0.24))
 	return card
+
+func _card_input(card: Control, s: Dictionary, e: InputEvent) -> void:
+	var press := e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+	if not press and not e is InputEventScreenTouch:
+		if e is InputEventMouseMotion or e is InputEventScreenDrag:
+			_view._gui_input(e)  # keep looking around across the card
+		return
+	var pos: Vector2 = e.position
+	if e.is_pressed():
+		card.set_meta("down", pos)
+	elif card.has_meta("down"):
+		var moved := (card.get_meta("down") as Vector2).distance_to(pos)
+		card.remove_meta("down")
+		if moved <= TAP_MAX_PX:
+			site_tapped.emit(s)
+	card.accept_event()
+
+## Metres from the camera to a site.
+func distance_to(s: Dictionary) -> float:
+	if _view._rig == null or not s.has("pos"):
+		return -1.0
+	return (s["pos"] as Vector3).distance_to(_view._rig.global_position)
 
 ## "450 m" below a kilometre, "6.2 km" above.
 static func distance_text(m: float) -> String:

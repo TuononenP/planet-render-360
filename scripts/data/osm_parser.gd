@@ -42,6 +42,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				landmarks.append({
 					"x": np.x, "z": np.y, "archetype": node_arch,
 					"name": str(el_tags.get("name", "")),
+					"wikipedia": OsmTags.wiki_tag(el_tags),
 					"height": float(str(el_tags.get("height", "30")).replace("m", "")),
 					"size_x": 8.0, "size_z": 8.0})
 			if str(el_tags.get("natural", "")) == "tree":
@@ -75,6 +76,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 							"x": box.get_center().x, "z": box.get_center().y,
 							"archetype": rel_arch,
 							"name": str(el_tags.get("name", "")),
+							"wikipedia": OsmTags.wiki_tag(el_tags),
 							"height": 30.0,
 							"size_x": clampf(box.size.x, 6.0, 240.0),
 							"size_z": clampf(box.size.y, 6.0, 240.0)})
@@ -112,6 +114,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var lmk := {
 					"x": entry["x"], "z": entry["z"], "archetype": arch,
 					"name": str(el_tags.get("name", "")),
+					"wikipedia": OsmTags.wiki_tag(el_tags),
 					"height": entry["height"],
 					"size_x": entry["size_x"], "size_z": entry["size_z"]}
 				_wheel_landmark(lmk, poly, entry["height_source"] != "default")
@@ -137,6 +140,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var lmk2 := {
 					"x": (min_x + max_x) / 2.0, "z": (min_z + max_z) / 2.0,
 					"archetype": arch2, "name": str(el_tags.get("name", "")),
+					"wikipedia": OsmTags.wiki_tag(el_tags),
 					"height": 30.0,
 					"size_x": clampf(max_x - min_x, 6.0, 240.0),
 					"size_z": clampf(max_z - min_z, 6.0, 240.0)}
@@ -176,6 +180,7 @@ static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
 			var lmk := {
 				"x": entry["x"], "z": entry["z"], "archetype": arch,
 				"name": str(tags.get("name", "")),
+				"wikipedia": OsmTags.wiki_tag(tags),
 				"height": entry["height"],
 				"size_x": entry["size_x"], "size_z": entry["size_z"]}
 			_wheel_landmark(lmk, outer, entry["height_source"] != "default")
