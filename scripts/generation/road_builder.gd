@@ -109,7 +109,7 @@ static func _material(finish: String) -> Material:
 	var m: Material
 	match finish:
 		"paving", "sett", "gravel":
-			m = _pbr("pavement", FINISH_HEX[finish])
+			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear())
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
 		_:
@@ -141,7 +141,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
-			_road(own, data.roads[i], m2u, surf, ground, junc, spans, abort)
+			_road(own, data.roads[i], i, m2u, surf, ground, junc, spans, abort)
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
 	WorkerThreadPool.wait_for_group_task_completion(group)
@@ -157,13 +157,14 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		mi.name = "Road_" + str(finish)
 		mi.mesh = b.mesh()
 		mi.material_override = _material(str(finish))
+		# Ribbons lie 3–5 cm proud of the ground: only decks cast.
+		if not (str(finish) in ["bridge", "deck"]):
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
-## Height of the drawn terrain at XZ (what a ribbon is laid on), for
-## tests and other flush-placed props.
-## One road element into `batches`: draped ribbons on dry land, decks
-## on its bridge spans.
-static func _road(batches: Dictionary, line: Variant, m2u: float, surf: _Surface,
+## One road element (number `index`) into `batches`: draped ribbons on
+## dry land, decks on its bridge spans.
+static func _road(batches: Dictionary, line: Variant, index: int, m2u: float, surf: _Surface,
 		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort) -> void:
 	var r := _parse(line, m2u)
 	if r.is_empty():
@@ -187,11 +188,21 @@ static func _road(batches: Dictionary, line: Variant, m2u: float, surf: _Surface
 		if abort != null and abort.requested:
 			break
 		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
-			surf, lift, attr, junc)
+			surf, lift, attr, junc, depth_layer(int(r["rank"]), finish, index))
 
+## Height of the drawn terrain at XZ (what a ribbon is laid on), for
+## tests and other flush-placed props.
 static func surface_height(data: LocationData, ground: GroundTruth, x: float,
 		z: float) -> float:
 	return _Surface.new(data, ground).height(x, z)
+
+## Depth layer a ribbon is drawn at (RoadSurface.DEPTH_GLSL, UV2.y):
+## main roads over streets over paths, asphalt over the other finishes
+## of its rank, and a fixed step per road so two streets overlapping at
+## a junction never tie. A 1-5 cm lift alone is below the depth
+## buffer's resolution a few hundred metres out, so they flickered.
+static func depth_layer(rank: int, finish: String, index: int) -> float:
+	return 1.0 + float(rank) * 2.0 + (1.0 if finish == "asphalt" else 0.0) + float(index % 7) * 0.13
 
 static func _batch(batches: Dictionary, finish: String) -> _Batch:
 	if not batches.has(finish):
@@ -264,13 +275,13 @@ static func _side(pts: PackedVector2Array, i: int) -> Vector2:
 ## the asphalt grain keeps its size.
 static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		surf: _Surface, lift: float, attr: Color = Color(0, 0.5, 0, 1),
-		junc: Dictionary = {}) -> void:
+		junc: Dictionary = {}, layer: float = 1.0) -> void:
 	var half := width * 0.5
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
 	b.pad()
 	var u1 := width / m2u / 4.0
-	var w2 := Vector2(width / m2u, 0.0)
+	var w2 := Vector2(width / m2u, layer)
 	var weld := {}
 	var prev: Array = []
 	for i in pts.size():
@@ -378,7 +389,7 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 	var dist := PackedFloat32Array([0.0])
 	for i in range(1, n):
 		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
-	var top := _batch(batches, "asphalt")
+	var top := _batch(batches, "bridge")
 	var side := _batch(batches, "deck")
 	var half := width * 0.5
 	var k0 := top.verts.size()

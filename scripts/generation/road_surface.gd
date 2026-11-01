@@ -16,12 +16,49 @@ extends RefCounted
 ##   the low spots, snow settles except in the tyre tracks.
 ##
 ## Vertex data (RoadBuilder): UV = (across, along) in 4 m units, UV2.x
-## the ribbon width in metres, COLOR = (lanes / 8, rank / 2, urban kerb
-## flag, distance to the nearest junction / JUNCTION_M).
+## the ribbon width in metres, UV2.y its depth layer, COLOR = (lanes / 8,
+## rank / 2, urban kerb flag, distance to the nearest junction / JUNCTION_M).
 
 const JUNCTION_M := 30.0
 ## Junction nodes are matched on a 0.5 m grid (OSM shares node coords).
 const NODE_SNAP := 2.0
+
+## Vertex-stage depth bias by layer (UV2.y, RoadBuilder.depth_layer):
+## clip z scaled up by DEPTH_EPS per layer reads as the surface drawn a
+## fraction of its distance nearer (reverse Z), on screen where it was.
+## A fixed lift can't hold the order at every range; this does at any
+## depth precision. Off in the orthographic (sun shadow) pass.
+const DEPTH_EPS := 0.0002
+const DEPTH_GLSL := """
+	POSITION = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
+	if (PROJECTION_MATRIX[3][3] < 0.5) {
+		POSITION.z *= 1.0 + %f * UV2.y;
+	}
+""" % DEPTH_EPS
+
+## Paving, setts and gravel: StandardMaterial3D's tinted PBR set on the
+## ribbon UV, with the same depth bias as the asphalt.
+const PAVED_CODE := """
+shader_type spatial;
+render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+
+uniform sampler2D alb_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D nor_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D rough_tex : hint_roughness_r, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec3 tint = vec3(1.0);
+uniform float metallic = 0.0;
+
+void vertex() {
+// @DEPTH
+}
+
+void fragment() {
+	ALBEDO = tint * texture(alb_tex, UV).rgb;
+	NORMAL_MAP = texture(nor_tex, UV).rgb;
+	ROUGHNESS = texture(rough_tex, UV).r;
+	METALLIC = metallic;
+}
+"""
 
 const CODE := """
 shader_type spatial;
@@ -45,6 +82,7 @@ void vertex() {
 	width_m = UV2.x;
 	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
 	BINORMAL = normalize(cross(TANGENT, NORMAL));
+// @DEPTH
 }
 
 float r_hash(vec2 p) {
@@ -168,6 +206,7 @@ void fragment() {
 """
 
 static var _mat: ShaderMaterial
+static var _paved_shader: Shader
 static var _texs: Dictionary = {}
 
 ## The shared asphalt material, calibrated to `target` (linear albedo).
@@ -175,7 +214,7 @@ static func material(target: Color) -> ShaderMaterial:
 	if _mat != null:
 		return _mat
 	var sh := Shader.new()
-	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL).replace("// @DEPTH", DEPTH_GLSL)
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	var mean: Color = (MaterialLibrary.PBR_SETS["asphalt"] as Dictionary)["mean"]
@@ -186,6 +225,23 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("rough_tex", _tex("rough"))
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
 	return _mat
+
+## A paved finish's material: PBR set `set_name` calibrated to `target`
+## (linear albedo), one per call (RoadBuilder caches per finish).
+static func paved_material(set_name: String, target: Color) -> ShaderMaterial:
+	if _paved_shader == null:
+		_paved_shader = Shader.new()
+		_paved_shader.code = PAVED_CODE.replace("// @DEPTH", DEPTH_GLSL)
+	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
+	var t := MaterialLibrary._calib_tint(row["mean"], target)
+	var m := ShaderMaterial.new()
+	m.shader = _paved_shader
+	m.set_shader_parameter("tint", Vector3(t.r, t.g, t.b))
+	m.set_shader_parameter("metallic", float(row["metal"]))
+	m.set_shader_parameter("alb_tex", PbrTextures._set_tex(set_name, "diff"))
+	m.set_shader_parameter("nor_tex", PbrTextures._set_tex(set_name, "nor"))
+	m.set_shader_parameter("rough_tex", PbrTextures._set_tex(set_name, "rough"))
+	return m
 
 static func _tex(map_name: String) -> Texture2D:
 	if _texs.has(map_name):

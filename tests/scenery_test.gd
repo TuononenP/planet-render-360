@@ -586,6 +586,22 @@ func _probe_roads(failures: Array[String]) -> void:
 		failures.append("tunnel road should build no geometry")
 	if worst > 0.05 * WorldScale.metres_to_units() + 0.0001:
 		failures.append("road ribbons must sit flush (<=0.05 m), worst offset %.4f units" % worst)
+	# Overlapping ribbons hold their order by depth layer (UV2.y), not by
+	# a centimetre lift the depth buffer loses at range; flush ribbons
+	# cast no shadow.
+	for child in roads.get_children():
+		var rm := child as MeshInstance3D
+		if rm == null:
+			continue
+		if rm.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			failures.append("%s: road ribbons should not cast shadows" % rm.name)
+		for l in rm.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2] as PackedVector2Array:
+			if l.y < 1.0:
+				failures.append("%s: ribbon vertex without a depth layer" % rm.name)
+				break
+	if RoadBuilder.depth_layer(1, "asphalt", 6) >= RoadBuilder.depth_layer(2, "paving", 0) \
+			or RoadBuilder.depth_layer(0, "asphalt", 6) >= RoadBuilder.depth_layer(1, "paving", 0):
+		failures.append("road depth layers must order by rank before finish and road")
 	roads.free()
 
 ## Below Ultra the terrain mesh has fewer posts than GroundTruth, and
