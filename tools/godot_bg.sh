@@ -11,6 +11,9 @@
 #   plain app runs                             -> guarded for the first
 #                                                 GODOT_FOCUS_GUARD_SECS (5),
 #                                                 then you can click into it
+#   plain app runs typed in a terminal (a tty) -> not guarded: it is your
+#                                                 own run, and bouncing
+#                                                 focus back flickers it
 #
 # Also: strips --always-on-top, adds --windowed unless a window mode is
 # given (projects that start full screen would otherwise take a Space).
@@ -55,7 +58,10 @@ prev=$(front_field bundleID | sed -n 's/.*bundleID="\([^"]*\)".*/\1/p')
 pid=$!
 trap 'kill -TERM "$pid" 2>/dev/null' INT TERM HUP
 
-if [ -n "$prev" ]; then
+mine=0
+[ -t 0 ] && [ "$scripted" = 0 ] && mine=1
+
+if [ -n "$prev" ] && [ "$mine" = 0 ]; then
 	(
 		limit=${GODOT_FOCUS_GUARD_SECS:-5}
 		start=$SECONDS
