@@ -324,6 +324,11 @@ func set_download_busy(busy: bool) -> void:
 func set_quality_preset(preset_value: int) -> void:
 	MapChrome.set_quality_preset(self, preset_value)
 
+## Dark or Light map tiles (MapTileView.MapStyle).
+func set_map_style(style: int) -> void:
+	if _canvas != null:
+		_canvas.set_map_style(style)
+
 func effective_layout() -> int:
 	return MapChrome.effective_layout(self)
 

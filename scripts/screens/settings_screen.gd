@@ -10,6 +10,8 @@ signal preset_changed(preset: int)
 signal accent_changed(index: int)
 ## 0 Auto, 1 Compact, 2 Wide: forces the stacked or two-column layout.
 signal layout_changed(index: int)
+## MapTileView.MapStyle: 0 Dark, 1 Light.
+signal map_style_changed(style: int)
 
 var _settings: RenderSettings
 var _preset_btns: Array[Button] = []
@@ -19,6 +21,7 @@ var _margin: MarginContainer
 var _grid: GridContainer
 var _accent_btns: Array[Button] = []
 var _layout_btns: Array[Button] = []
+var _map_btns: Array[Button] = []
 var _layout_index := 0
 
 func _ready() -> void:
@@ -77,6 +80,18 @@ func _ready() -> void:
 		14, UiTheme.MUTED)
 	look_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	look_col.add_child(look_note)
+	look_col.add_child(UiTheme.label("Map", 15, UiTheme.INK, true))
+	_choice_row(look_col, MapTileView.MAP_STYLE_NAMES, _map_btns,
+		func(i: int) -> void:
+			if _settings == null:
+				_settings = RenderSettings.new()
+			_settings.set_map_style(i)
+			map_style_changed.emit(i))
+	var map_note := UiTheme.label(
+		"Dark keeps the map in night tones. Light shows it like a printed atlas.",
+		14, UiTheme.MUTED)
+	map_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	look_col.add_child(map_note)
 
 	col.add_child(UiTheme.section_label("Render quality"))
 	var subtitle := UiTheme.label(
@@ -199,6 +214,10 @@ func _refresh_appearance() -> void:
 	for i in _layout_btns.size():
 		_layout_btns[i].set_pressed_no_signal(i == _layout_index)
 		UiTheme.apply_chip(_layout_btns[i], i == _layout_index)
+	var map_style: int = _settings.map_style if _settings != null else 0
+	for i in _map_btns.size():
+		_map_btns[i].set_pressed_no_signal(i == map_style)
+		UiTheme.apply_chip(_map_btns[i], i == map_style)
 
 ## Re-skin after an accent change (preset cards bake the palette in).
 func refresh_theme() -> void:

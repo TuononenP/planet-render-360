@@ -32,6 +32,8 @@ const PRESET_BLURBS: Array[String] = [
 ]
 
 var preset: int = Preset.HIGH
+## Picker map look (MapTileView.MapStyle): 0 Dark, the default, 1 Light.
+var map_style: int = 0
 
 static func clamp_preset(value: int) -> int:
 	return clampi(value, Preset.FAST, Preset.ULTRA)
@@ -159,14 +161,19 @@ func load_settings() -> void:
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
 		preset = clamp_preset(int(parsed.get("preset", Preset.HIGH)))
+		map_style = clampi(int(parsed.get("map_style", 0)), 0, 1)
 
 func save_settings() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("RenderSettings: cannot write %s" % PATH)
 		return
-	f.store_string(JSON.stringify({"preset": clamp_preset(preset)}))
+	f.store_string(JSON.stringify({"preset": clamp_preset(preset), "map_style": map_style}))
 
 func set_preset(value: int) -> void:
 	preset = clamp_preset(value)
+	save_settings()
+
+func set_map_style(value: int) -> void:
+	map_style = clampi(value, 0, 1)
 	save_settings()

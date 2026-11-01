@@ -74,6 +74,7 @@ func _ready() -> void:
 	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
 	_picker.set_quality_preset(_settings.preset)
+	_picker.set_map_style(_settings.map_style)
 
 	_loading = LoadingScreen.new()
 	_loading.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -120,6 +121,8 @@ func _ready() -> void:
 		_refresh_accent())
 	_settings_screen.layout_changed.connect(func(i: int) -> void:
 		_picker.set_layout_override(i))
+	_settings_screen.map_style_changed.connect(func(style: int) -> void:
+		_picker.set_map_style(style))
 	_settings_screen.preset_changed.connect(func(p: int) -> void:
 		_picker.set_quality_preset(p)
 		_view.set_quality_preset(p))

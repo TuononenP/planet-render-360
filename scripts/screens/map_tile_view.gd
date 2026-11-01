@@ -31,7 +31,12 @@ const MAX_ANCESTOR_DROP := 4
 ## are classified by hue and rebuilt from lightness, so labels, casings
 ## and road hierarchy survive; dark OSM text becomes light. Applied to
 ## the tile layer only; the pin and attribution live in a child layer.
-const MAP_SHADER := """
+## Two styles share one classifier (MAP_BODY): Dark (Night grounds, the
+## default) and Light (Day grounds, see MAP_PALETTE_LIGHT).
+enum MapStyle { DARK, LIGHT }
+const MAP_STYLE_NAMES: Array[String] = ["Dark", "Light"]
+
+const MAP_PALETTE_DARK := """
 shader_type canvas_item;
 const vec3 INK = vec3(0.929, 0.945, 0.965);      // ink
 const vec3 MUTED = vec3(0.643, 0.682, 0.741);    // ink-muted
@@ -45,7 +50,27 @@ const vec3 PARK = vec3(0.208, 0.400, 0.314);
 const vec3 PARK_DEEP = vec3(0.157, 0.302, 0.235);
 const vec3 PARK_TEXT = vec3(0.659, 0.816, 0.706);
 const vec3 ROAD_WARM = vec3(0.600, 0.502, 0.357); // horizon-golden, dimmed
+"""
 
+## Day grounds: sky-100 land, white roads, ink labels, horizon-day water
+## and aurora-leaning parks, so the light map reads like a printed atlas.
+const MAP_PALETTE_LIGHT := """
+shader_type canvas_item;
+const vec3 INK = vec3(0.051, 0.078, 0.125);      // ink (Day)
+const vec3 MUTED = vec3(0.275, 0.318, 0.388);    // ink-muted (Day)
+const vec3 CASING = vec3(0.722, 0.753, 0.800);
+const vec3 BUILDING = vec3(0.851, 0.871, 0.898);
+const vec3 LAND = vec3(0.949, 0.957, 0.969);     // sky-100 (Day)
+const vec3 ROAD = vec3(1.0, 1.0, 1.0);           // sky-200 (Day)
+const vec3 WATER = vec3(0.667, 0.800, 0.922);    // horizon-day, lifted
+const vec3 WATER_TEXT = vec3(0.114, 0.373, 0.659); // accent-glacier (Day)
+const vec3 PARK = vec3(0.788, 0.882, 0.800);
+const vec3 PARK_DEEP = vec3(0.698, 0.827, 0.722);
+const vec3 PARK_TEXT = vec3(0.043, 0.443, 0.282);  // accent-aurora (Day)
+const vec3 ROAD_WARM = vec3(0.973, 0.855, 0.659);  // horizon-golden, light
+"""
+
+const MAP_BODY := """
 void fragment() {
 	vec4 c = COLOR;
 	float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
@@ -69,6 +94,7 @@ void fragment() {
 var centre_lat := 48.8566
 var centre_lon := 2.3522
 var zoom_level := 12
+var map_style: int = MapStyle.DARK
 ## Where the picked place sits, as an offset from the view centre. The
 ## picker moves it into the part of the map that is not covered by a
 ## sheet or side panel, so the pin is never hidden behind chrome.
@@ -104,11 +130,7 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
-	var shader := Shader.new()
-	shader.code = MAP_SHADER
-	var map_mat := ShaderMaterial.new()
-	map_mat.shader = shader
-	material = map_mat
+	_apply_map_style()
 	_pin = MapPin.new()
 	add_child(_pin)
 	_pin.point = _focus()
@@ -127,6 +149,27 @@ func _ready() -> void:
 		_pin.point = _focus()
 		_marker.queue_redraw())
 	refresh_tiles()
+
+## Full canvas_item shader source for a MapStyle.
+static func shader_code_for(style: int) -> String:
+	var palette: String = MAP_PALETTE_LIGHT if style == MapStyle.LIGHT else MAP_PALETTE_DARK
+	return palette + MAP_BODY
+
+func set_map_style(style: int) -> void:
+	var clamped := clampi(style, MapStyle.DARK, MapStyle.LIGHT)
+	if clamped == map_style and material != null:
+		return
+	map_style = clamped
+	if is_inside_tree():
+		_apply_map_style()
+
+func _apply_map_style() -> void:
+	var shader := Shader.new()
+	shader.code = shader_code_for(map_style)
+	var map_mat := ShaderMaterial.new()
+	map_mat.shader = shader
+	material = map_mat
+	queue_redraw()
 
 func set_lat_lon(lat: float, lon: float) -> void:
 	centre_lat = lat
