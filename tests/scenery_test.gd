@@ -599,9 +599,20 @@ func _probe_roads(failures: Array[String]) -> void:
 			if l.y < 1.0:
 				failures.append("%s: ribbon vertex without a depth layer" % rm.name)
 				break
-	if RoadBuilder.depth_layer(1, "asphalt", 6) >= RoadBuilder.depth_layer(2, "paving", 0) \
-			or RoadBuilder.depth_layer(0, "asphalt", 6) >= RoadBuilder.depth_layer(1, "paving", 0):
+	var top := RoadSurface.DEPTH_STEPS - 1
+	if RoadBuilder.depth_layer(1, "asphalt", top) >= RoadBuilder.depth_layer(2, "paving", 0) \
+			or RoadBuilder.depth_layer(0, "asphalt", top) >= RoadBuilder.depth_layer(1, "paving", 0) \
+			or RoadBuilder.depth_layer(1, "paving", top) >= RoadBuilder.depth_layer(1, "asphalt", 0):
 		failures.append("road depth layers must order by rank before finish and road")
+	# Roads meeting at a node take different steps, even 7 or 14 apart.
+	var net := LocationData.new()
+	for i in 15:
+		net.roads.append(PackedVector2Array([Vector2(i * 10.0, 50.0), Vector2(i * 10.0, 0.0)]))
+	net.roads[7] = PackedVector2Array([Vector2(0, 0), Vector2(70, 0)])
+	net.roads[14] = PackedVector2Array([Vector2(70, 0), Vector2(140, 0)])
+	var steps := RoadSurface.depth_steps(net)
+	if steps[0] == steps[7] or steps[7] == steps[14]:
+		failures.append("roads meeting at a junction must not share a depth step: %s" % [steps])
 	roads.free()
 
 ## Below Ultra the terrain mesh has fewer posts than GroundTruth, and

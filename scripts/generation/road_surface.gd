@@ -27,8 +27,11 @@ const NODE_SNAP := 2.0
 ## clip z scaled up by DEPTH_EPS per layer reads as the surface drawn a
 ## fraction of its distance nearer (reverse Z), on screen where it was.
 ## A fixed lift can't hold the order at every range; this does at any
-## depth precision. Off in the orthographic (sun shadow) pass.
-const DEPTH_EPS := 0.0002
+## depth precision. Off in the orthographic (sun shadow) pass. Kept small:
+## the top layer (~6.8) reads ~0.14 m nearer at 1 km, so a road just
+## behind a crest or a kerb stays hidden, while one step (0.11 layer) is
+## still ~40 steps of the 32-bit float depth buffer.
+const DEPTH_EPS := 0.00002
 const DEPTH_GLSL := """
 	POSITION = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
 	if (PROJECTION_MATRIX[3][3] < 0.5) {
@@ -37,7 +40,10 @@ const DEPTH_GLSL := """
 """ % DEPTH_EPS
 
 ## Paving, setts and gravel: StandardMaterial3D's tinted PBR set on the
-## ribbon UV, with the same depth bias as the asphalt.
+## ribbon UV, with the same depth bias and weather as the asphalt (rain
+## darkens and glosses it, snow settles). The ribbons carry no tangents
+## and turn with the road, so the normal map's frame is taken from the
+## UV's screen derivatives.
 const PAVED_CODE := """
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
@@ -47,15 +53,35 @@ uniform sampler2D nor_tex : hint_normal, filter_linear_mipmap_anisotropic, repea
 uniform sampler2D rough_tex : hint_roughness_r, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec3 tint = vec3(1.0);
 uniform float metallic = 0.0;
+// @SNOW
+varying vec3 wpos;
 
 void vertex() {
+	wpos = VERTEX;
 // @DEPTH
 }
 
 void fragment() {
-	ALBEDO = tint * texture(alb_tex, UV).rgb;
-	NORMAL_MAP = texture(nor_tex, UV).rgb;
-	ROUGHNESS = texture(rough_tex, UV).r;
+	vec3 dp1 = dFdx(VERTEX);
+	vec3 dp2 = dFdy(VERTEX);
+	vec2 duv1 = dFdx(UV);
+	vec2 duv2 = dFdy(UV);
+	vec3 dp2perp = cross(dp2, NORMAL);
+	vec3 dp1perp = cross(NORMAL, dp1);
+	vec3 t = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 b = dp2perp * duv1.y + dp1perp * duv2.y;
+	float inv = inversesqrt(max(max(dot(t, t), dot(b, b)), 1e-20));
+	TANGENT = t * inv;
+	BINORMAL = b * inv;
+	vec3 col = tint * texture(alb_tex, UV).rgb;
+	float rough = texture(rough_tex, UV).r;
+	float wet = climate_wetness;
+	col *= mix(1.0, 0.75, wet);
+	rough = mix(rough, 0.18, wet);
+	float sc = snow_cover(wpos, 1.0);
+	ALBEDO = mix(col, snow_col, sc * 0.9);
+	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), sc);
+	ROUGHNESS = mix(rough, 0.7, sc);
 	METALLIC = metallic;
 }
 """
@@ -231,7 +257,8 @@ static func material(target: Color) -> ShaderMaterial:
 static func paved_material(set_name: String, target: Color) -> ShaderMaterial:
 	if _paved_shader == null:
 		_paved_shader = Shader.new()
-		_paved_shader.code = PAVED_CODE.replace("// @DEPTH", DEPTH_GLSL)
+		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+			.replace("// @DEPTH", DEPTH_GLSL)
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	var t := MaterialLibrary._calib_tint(row["mean"], target)
 	var m := ShaderMaterial.new()
@@ -252,17 +279,55 @@ static func _tex(map_name: String) -> Texture2D:
 	_texs[map_name] = ImageTexture.create_from_image(img)
 	return _texs[map_name]
 
+static func _points(line: Variant) -> PackedVector2Array:
+	return line if line is PackedVector2Array \
+		else (line as Dictionary).get("points", PackedVector2Array()) if line is Dictionary \
+		else PackedVector2Array()
+
+## Depth steps a road can take inside its rank and finish (RoadBuilder.depth_layer).
+const DEPTH_STEPS := 8
+
+## Depth step per road (0 .. DEPTH_STEPS - 1): greedy, in road order, so
+## roads that share a node (meet at a junction) take different steps and
+## never draw at the same depth. Only a road meeting more than
+## DEPTH_STEPS - 1 others can repeat a neighbour's step.
+static func depth_steps(data: LocationData) -> PackedByteArray:
+	var n := data.roads.size()
+	var at := {}  # snapped node -> roads through it
+	for i in n:
+		for p in _points(data.roads[i]):
+			var k := Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))
+			var roads: PackedInt32Array = at.get(k, PackedInt32Array())
+			if roads.is_empty() or roads[roads.size() - 1] != i:
+				roads.append(i)
+				at[k] = roads
+	var steps := PackedByteArray()
+	steps.resize(n)
+	steps.fill(255)
+	for i in n:
+		var used := 0
+		for p in _points(data.roads[i]):
+			var roads: PackedInt32Array = at[Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))]
+			if roads.size() < 2:
+				continue
+			for j in roads:
+				if j != i and steps[j] != 255:
+					used |= 1 << steps[j]
+		var s := i % DEPTH_STEPS
+		for c in DEPTH_STEPS:
+			if used & (1 << c) == 0:
+				s = c
+				break
+		steps[i] = s
+	return steps
+
 ## Junction nodes of the road network, bucketed by JUNCTION_M cells:
 ## coordinates (snapped to 1 / NODE_SNAP m) shared by two or more ways.
 static func junctions(data: LocationData) -> Dictionary:
 	var owner := {}
 	var count := {}
 	for i in data.roads.size():
-		var line: Variant = data.roads[i]
-		var pts: PackedVector2Array = line if line is PackedVector2Array \
-			else (line as Dictionary).get("points", PackedVector2Array()) if line is Dictionary \
-			else PackedVector2Array()
-		for p in pts:
+		for p in _points(data.roads[i]):
 			var k := Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))
 			if owner.get(k, -1) != i:
 				count[k] = int(count.get(k, 0)) + 1

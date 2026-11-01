@@ -121,7 +121,8 @@ static func _apply(node: Node, preset: int, layer: String) -> void:
 ## flush roads and water never cast (they were ~40% of Paris shadow-
 ## pass triangles); far terrain casts valley-wall shadows on High+.
 static func _shadow(gi: GeometryInstance3D, preset: int, layer: String) -> void:
-	if layer == "Roads" or layer == "Water" or layer == "FarCity":
+	# Roads set their own: flush ribbons off, bridge decks on (RoadBuilder).
+	if layer == "Water" or layer == "FarCity":
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	elif layer == "FarTerrain":
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON \
