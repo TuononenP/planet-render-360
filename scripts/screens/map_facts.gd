@@ -5,8 +5,9 @@ extends RefCounted
 ## Readouts for elevation and local time, weather as a HudChip). One
 ## Open-Meteo request per selection, after a short pause so panning and
 ## typing send nothing; it carries the point's elevation, its UTC offset
-## and current weather. Nothing is shown until real values arrive, and a
-## failed request hides them (never a guess). A connection failure puts
+## and current weather. Until real values arrive the same slots hold
+## ink-muted "—" placeholders so the panel doesn't jump when they land
+## (never a guessed value); a failed request hides them. A connection failure puts
 ## the picker in its offline state. Operates on the picker via `p`.
 
 const PAUSE_S := 0.6
@@ -44,12 +45,29 @@ static func build(p: MapPicker) -> void:
 	p._weather_parts = chip
 	p._weather_chip.visible = false
 
-## A new point: clear the old values and ask again after the pause.
+## A new point: swap the old values for placeholders and ask again after
+## the pause.
 static func request(p: MapPicker) -> void:
 	if p._facts_timer == null:
 		return
-	hide_facts(p)
+	show_placeholders(p)
 	p._facts_timer.start()
+
+## Reserve the readouts' and chip's space with "—" until real data lands.
+static func show_placeholders(p: MapPicker) -> void:
+	p._facts_offset_s = -1
+	p._elev_readout.visible = true
+	p._elev_readout.set_pending()
+	p._time_readout.visible = true
+	p._time_readout.set_pending()
+	p._facts_box.visible = true
+	var parts: Array = p._weather_parts
+	(parts[1] as TextureRect).texture = UiIcon.texture("cloud", 18)
+	(parts[2] as Label).text = "— °C"
+	(parts[3] as Label).text = "Weather"
+	for i in [2, 3]:
+		(parts[i] as Label).add_theme_color_override("font_color", UiTheme.MUTED)
+	p._weather_chip.visible = true
 
 static func hide_facts(p: MapPicker) -> void:
 	p._facts_box.visible = false
@@ -70,6 +88,8 @@ static func _on_facts(p: MapPicker, temp_c: float, label: String, code: int) -> 
 	(parts[1] as TextureRect).texture = UiIcon.texture(HudParts.weather_icon(code), 18)
 	(parts[2] as Label).text = "%d °C" % roundi(temp_c)
 	(parts[3] as Label).text = label
+	for i in [2, 3]:
+		(parts[i] as Label).add_theme_color_override("font_color", UiTheme.INK)
 	p._weather_chip.visible = true
 
 static func _refresh_clock(p: MapPicker) -> void:

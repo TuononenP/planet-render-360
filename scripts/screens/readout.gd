@@ -23,7 +23,14 @@ func _init(label_text: String = "", large: bool = false) -> void:
 	_detail.size_flags_vertical = Control.SIZE_SHRINK_END
 	row.add_child(_detail)
 
+## Holds the slot with an ink-muted "—" until the real value arrives.
+func set_pending() -> void:
+	_value.text = "—"
+	_detail.visible = false
+	_value.add_theme_color_override("font_color", UiTheme.MUTED)
+
 func set_value(value: String, detail: String = "") -> void:
+	_value.add_theme_color_override("font_color", UiTheme.INK)
 	_value.text = value
 	_detail.text = detail
 	_detail.visible = detail != ""

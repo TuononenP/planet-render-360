@@ -61,12 +61,12 @@ static func parse_current(text: String) -> Dictionary:
 	return {}
 
 func fetch(lat: float, lon: float) -> void:
+	# A newer point supersedes one still in flight; cancel first so the
+	# request never starts while busy (Godot logs an error on ERR_BUSY).
+	if _http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		_http.cancel_request()
 	var err := _http.request(URL_TEMPLATE % [lat, lon],
 		["User-Agent: %s" % USER_AGENT, "Accept: application/json"])
-	if err == ERR_BUSY:
-		_http.cancel_request()
-		err = _http.request(URL_TEMPLATE % [lat, lon],
-			["User-Agent: %s" % USER_AGENT, "Accept: application/json"])
 	if err != OK:
 		failed.emit("Weather request failed to start: %s" % err)
 
