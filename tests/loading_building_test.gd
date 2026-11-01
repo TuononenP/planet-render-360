@@ -64,6 +64,31 @@ func _run() -> void:
 	loading.add_degraded("weather")
 	if loading._rows[3]["dot"].state != StageDot.State.DEGRADED:
 		failures.append("a missing climate source should degrade the Weather row")
+	# Imagery tiles move the row count and the bar through the stage's quarter.
+	loading.begin("Paris, France")
+	loading.set_stage(1, "Imagery", "in_progress")
+	loading.set_stage_progress(1, 0, 169)
+	loading.set_stage_progress(1, 84, 169)
+	var half: float = loading._progress.value
+	if loading._rows[1]["detail"].text != "84 / 169 tiles":
+		failures.append("imagery row should count tiles, got %s" % loading._rows[1]["detail"].text)
+	if absf(half - (1.0 + 84.0 / 169.0) / 4.0 * 100.0) > 0.01:
+		failures.append("bar should sit inside the imagery quarter, got %.2f" % half)
+	loading.set_stage_progress(1, 9, 49)  # lower-zoom retry restarts its count
+	if loading._progress.value < half:
+		failures.append("the bar must not go backwards on a retry")
+	loading.set_stage_progress(0, 5, 10)  # not the active stage: ignored
+	if loading._rows[0]["detail"].text != "":
+		failures.append("progress for an inactive stage should be ignored")
+	# A layer fetched alongside earlier stages shows its own fetch time even
+	# when the stage had nothing left to wait for.
+	loading.begin("Paris, France")
+	for i in [1, 3]:
+		loading.set_stage(i, "", "in_progress")
+		loading.set_stage_took(i, 2.4)
+		loading.set_stage(i, "", "done")
+		if loading._rows[i]["detail"].text != "2.4 s":
+			failures.append("row %d should show its fetch time, got %s" % [i, loading._rows[i]["detail"].text])
 	loading.free()
 	if failures.is_empty():
 		print("LOADING BUILDING OK: build bar follows phases, not 100%")

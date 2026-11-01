@@ -11,6 +11,12 @@ extends Node
 
 signal stage_changed(index: int, label: String, state: String)
 signal progress_changed(fraction: float, label: String)
+## Work done inside a stage, for its loading row and the overall bar:
+## `done` of `total` units (imagery tiles).
+signal stage_progress(index: int, done: int, total: int)
+## How long an overlapped layer's fetch really took, from its own start
+## (the stage row only waits for what is left of it, often nothing).
+signal stage_took(index: int, seconds: float)
 signal finished(data: LocationData)
 signal cancelled
 signal degraded_layer(layer: String)
@@ -33,6 +39,7 @@ const STAGES: Array[String] = [
 ]
 
 var _cancelled := false
+var _sat_tiles := Vector2i.ZERO  # latest tile_progress (done, total)
 var used_real_dem := false
 ## A/B switch (T1.3; the squash path is deleted in T3.1, contract §7 V1):
 ## while true, _fetch_dem/_apply_far restore the v1 adaptive squash
@@ -81,6 +88,9 @@ const FARCITY_WAIT_S := 30.0
 var _climate: ClimateFetcher
 var _climate_data: Dictionary = {}
 var _climate_done := true
+var _fetch_started_msec := 0
+var _sat_took := 0.0  # seconds from run start to the mosaic settling
+var _climate_took := 0.0
 ## CHELSA reads are ~3–4 s cold (5 variables × 4 small ranged requests),
 ## overlapped with the other fetches; cached revisits read one JSON.
 const CLIMATE_WAIT_S := 15.0
@@ -149,6 +159,7 @@ func _ready() -> void:
 	add_child(_climate)
 	_climate.finished.connect(func(c: Dictionary) -> void:
 		_climate_data = c
+		_climate_took = (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0
 		_climate_done = true)
 	_farcity = FarCityFetcher.new()
 	add_child(_farcity)
@@ -163,7 +174,11 @@ func _ready() -> void:
 		_sat_image = img
 		_sat_origin = origin
 		_sat_zoom = zoom
+		_sat_took = (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0
 		_sat_done = true)
+	_sat.tile_progress.connect(func(done: int, total: int) -> void:
+		_sat_tiles = Vector2i(done, total)
+		stage_progress.emit(1, done, total))
 	_sat.failed.connect(func(reason: String) -> void:
 		print("Satellite fetch failed, using colour dressing: %s" % reason)
 		_sat_done = true)
@@ -258,6 +273,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_osm_waterways = []
 	_osm_trees = []
 	_osm_barriers = []
+	_fetch_started_msec = Time.get_ticks_msec()
+	_sat_took = 0.0
+	_climate_took = 0.0
 	_osm.fetch(lat, lon)
 	_farcity_done = false
 	_farcity_landuse = []
@@ -272,6 +290,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	# High, z18s13 Ultra) over the same ground window.
 	used_satellite = false
 	_sat_done = false
+	_sat_tiles = Vector2i.ZERO
 	_sat_texture = null
 	_sat_image = null
 	if quality_preset > RenderSettings.Preset.FAST:
@@ -316,6 +335,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 			cancelled.emit()
 			return
 		stage_data.emit(i, data)
+		if i == 1 and _sat_took > 0.0:
+			stage_took.emit(i, _sat_took)
+		elif i == 3 and _climate_took > 0.0:
+			stage_took.emit(i, _climate_took)
 		stage_changed.emit(i, STAGES[i], "done")
 
 	# The prewarm must be done before the build thread reads those caches;
@@ -433,6 +456,9 @@ func _await_satellite(data: LocationData) -> void:
 	# interrupts. Fits the §3.1 tier budgets (High ≤75 s, Ultra ≤150 s).
 	var budget := clampf(12.0 + float(_sat.pending_tile_count()) * 0.6, 20.0, 120.0)
 	var waited := 0.0
+	# Tiles already settled while the earlier stage ran (cache hits).
+	if not _sat_done:
+		stage_progress.emit(1, _sat_tiles.x, maxi(_sat_tiles.y, _sat.pending_tile_count()))
 	while not _sat_done and waited < budget and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()

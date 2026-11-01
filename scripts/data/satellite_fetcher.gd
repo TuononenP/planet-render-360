@@ -22,9 +22,12 @@ extends Node
 
 signal succeeded(texture: Texture2D, image: Image, origin_px: Vector2, zoom: int)
 signal failed(reason: String)
+## Tiles settled so far (fetched, cached or given up on) of the current
+## mosaic. Restarts from 0 when a lower-zoom fallback mosaic begins.
+signal tile_progress(done: int, total: int)
 
 const URL_TEMPLATE := "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%d/%d/%d"  # z/y/x
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 const CACHE_DIR := "user://cache"
 const TILE_PX := 256
 const POOL_SIZE := 8  # parallel tile downloads; Ultra fetches 169 tiles
@@ -177,6 +180,7 @@ func _tile_done(t: Vector2i, img: Image) -> void:
 	if img != null:
 		_images[t] = img
 	_remaining -= 1
+	tile_progress.emit(_tiles.size() - maxi(_remaining, 0), _tiles.size())
 	if _remaining <= 0 and not _emitted:
 		_emitted = true
 		_stitch()

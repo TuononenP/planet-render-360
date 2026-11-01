@@ -68,6 +68,10 @@ func _ready() -> void:
 			_loading.set_stage(i, label, state))
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
+	_pipeline.stage_progress.connect(func(i: int, done: int, total: int) -> void:
+		_loading.set_stage_progress(i, done, total))
+	_pipeline.stage_took.connect(func(i: int, seconds: float) -> void:
+		_loading.set_stage_took(i, seconds))
 	_pipeline.finished.connect(_on_generation_finished)
 	_pipeline.layer_detail.connect(func(layer: String, detail: String, partial: bool) -> void:
 		_loading.set_layer_detail(layer, detail, partial))

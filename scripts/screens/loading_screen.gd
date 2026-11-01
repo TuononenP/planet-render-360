@@ -37,6 +37,8 @@ var _eta_label: Label
 var _note_row: HBoxContainer  # caution line while a data layer is not responding
 var _note_label: Label
 var _degraded: Array[String] = []
+var _took := {}  # stage index -> fetch seconds from set_stage_took
+var _stage_frac := {}  # stage index -> furthest set_stage_progress fraction
 var _details := {}  # layer -> {"text", "partial"} from set_layer_detail
 var _cancel_btn: Button
 var _error_row: HBoxContainer  # Try again + Back to map (show_error)
@@ -330,6 +332,8 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
 	_coords.visible = _coords.text != ""
 	_degraded.clear()
 	_details.clear()
+	_stage_frac.clear()
+	_took.clear()
 	if _note_label != null:
 		_note_label.visible = false
 		_note_row.visible = false
@@ -465,7 +469,12 @@ func set_stage(index: int, _label: String, state: String) -> void:
 			# Real detail only: how long the stage actually waited on data
 			# (stages with nothing to wait for stay blank).
 			var took := (Time.get_ticks_msec() - int(row["started"])) / 1000.0
-			if int(row["started"]) > 0 and took >= 0.1 and not _has_detail(index):
+			# Layers fetched alongside earlier stages report their own time.
+			if _took.has(index):
+				took = float(_took[index])
+			elif int(row["started"]) <= 0:
+				took = 0.0
+			if took >= 0.1 and not _has_detail(index):
 				row["detail"].text = "%.1f s" % took
 	else:
 		_active_index = index
@@ -503,6 +512,24 @@ func show_stage_data(index: int, data: LocationData) -> void:
 			var z := float(b.get("z", 0.0)) - sz * 0.5
 			boxes.append(Rect2(x / extent + 0.5, z / extent + 0.5, sx / extent, sz / extent))
 		_preview.set_buildings(boxes)
+
+## Units done inside the active stage (imagery tiles): the row counts
+## them and the bar moves through the stage's quarter instead of waiting
+## at its start. Never goes backwards (a lower-zoom retry restarts the count).
+func set_stage_progress(index: int, done: int, total: int) -> void:
+	if index != _active_index or total <= 0 or index >= _rows.size():
+		return
+	var frac := clampf(float(done) / total, 0.0, 1.0)
+	if frac < float(_stage_frac.get(index, 0.0)):
+		return
+	_stage_frac[index] = frac
+	_rows[index]["detail"].text = "%d / %d tiles" % [done, total]
+	set_progress((index + frac) / _rows.size(), GenerationPipeline.STAGES[index])
+
+## The real fetch time of a layer that ran alongside earlier stages, so
+## its row shows it even when nothing was left to wait for.
+func set_stage_took(index: int, seconds: float) -> void:
+	_took[index] = seconds
 
 func set_progress(fraction: float, label: String) -> void:
 	var f := clampf(fraction, 0.0, 1.0)
