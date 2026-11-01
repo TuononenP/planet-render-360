@@ -151,6 +151,10 @@ func set_buildings(boxes: Array[Rect2]) -> void:
 	_fade_in("buildings")
 
 func _fade_in(key: String) -> void:
+	if UiPrefs.reduce_motion:
+		_fade[key] = 1.0  # the preview updates in steps
+		queue_redraw()
+		return
 	var t := create_tween()
 	t.tween_method(func(v: float) -> void:
 		_fade[key] = v

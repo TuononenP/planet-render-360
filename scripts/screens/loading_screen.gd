@@ -8,10 +8,13 @@ extends Control
 ## phones. The lens fills in from real data as each stage lands.
 
 signal cancel_requested
+## Error state actions (show_error): only when nothing could be built.
+signal retry_requested
+signal back_requested
 
 const NOTE := "First visits take a minute or two while we gather the terrain. Next time it opens instantly."
 ## Degraded layer key (DataNotes) -> the stage row that was waiting on it.
-const LAYER_ROW := {"elevation": 0, "imagery": 1, "map": 2}
+const LAYER_ROW := {"elevation": 0, "imagery": 1, "map": 2, "weather": 3}
 const BUILD_LABEL := "Building the scene"
 
 var _title: Label
@@ -36,13 +39,18 @@ var _note_label: Label
 var _degraded: Array[String] = []
 var _details := {}  # layer -> {"text", "partial"} from set_layer_detail
 var _cancel_btn: Button
+var _error_row: HBoxContainer  # Try again + Back to map (show_error)
+var _failed := false
+var _announcer: Announcer  # StageProgress announces each completed stage
+## Reduced motion swaps the build shimmer for a static striped fill.
+static var reduce_motion := false
 var _push: Control
 var _two_col := false
 var _active_index := -1
-## Reduced motion swaps the build shimmer for a static striped fill.
-static var reduce_motion := false
 var _building := false
 var _build_started_msec := 0
+var _build_source: BuildAbort  # the world build's phase, polled while building
+var _build_shown := 0.0  # eased 0..1 fraction of the build on the bar
 var _fit_queued := false
 
 func _ready() -> void:
@@ -129,8 +137,23 @@ func _ready() -> void:
 	_cancel_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_cancel_btn.pressed.connect(func() -> void: cancel_requested.emit())
 	_side.add_child(_cancel_btn)
+	_error_row = HBoxContainer.new()
+	_error_row.add_theme_constant_override("separation", 8)
+	_error_row.visible = false
+	_side.add_child(_error_row)
+	var retry := UiTheme.primary_button("Try again")
+	UiIcon.apply(retry, "rotate-ccw", 20, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+	retry.pressed.connect(func() -> void: retry_requested.emit())
+	_error_row.add_child(retry)
+	var back := UiTheme.quiet_button("Back to map")
+	back.pressed.connect(func() -> void: back_requested.emit())
+	_error_row.add_child(back)
+	# The indeterminate shimmer over the bar while the scene builds.
+	_progress.draw.connect(_draw_build_fill)
 
-	_brand = Brand.rect(Brand.MARK, 32)
+	_announcer = Announcer.new()
+	add_child(_announcer)
+	_brand = Brand.rect(Brand.mark(), 32)
 	add_child(_brand)
 
 	# Elapsed time while the scene builds (no byte count to show).
@@ -217,7 +240,7 @@ func _on_resized() -> void:
 	_side.alignment = BoxContainer.ALIGNMENT_CENTER if _two_col else BoxContainer.ALIGNMENT_BEGIN
 	_hero.size_flags_vertical = Control.SIZE_SHRINK_CENTER if _two_col else Control.SIZE_SHRINK_BEGIN
 	_title.add_theme_font_size_override("font_size", 36 if phone else 48)
-	_eta_label.visible = _two_col or size.y >= 900.0
+	_eta_label.visible = true
 	_push.visible = not _two_col
 	_fit_lens()
 	if not _fit_queued and size.y > 0.0:
@@ -240,7 +263,7 @@ func _fit_lens() -> void:
 		room = room_y - text_h - 24.0
 	else:
 		var card_h := maxf(_card.size.y, _card.get_combined_minimum_size().y)
-		room = room_y - text_h - card_h - _cancel_btn.custom_minimum_size.y - 3.0 * 16.0
+		room = room_y - text_h - card_h - 48.0 - 3.0 * 16.0
 	# Breathing room above and below the dial, inside its own rect.
 	var gap := 40.0 if _two_col else 24.0
 	var side := minf(target, floorf(minf(room - gap,
@@ -313,9 +336,21 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN) -> void:
 	_progress.value = 0
 	_active_index = -1
 	_building = false
+	_build_source = null
+	_build_shown = 0.0
 	_percent_label.text = "0%"
 	_stage_label.text = "Starting…"
 	_preview.clear()
+	_preview.failed = false
+	_failed = false
+	_cancel_btn.visible = true
+	_error_row.visible = false
+	_style()
+	# StageProgress rises in (ease-enter, duration-standard).
+	if not reduce_motion and is_inside_tree():
+		_card.modulate.a = 0.0
+		create_tween().set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT) \
+			.tween_property(_card, "modulate:a", 1.0, 0.24)
 	for row in _rows + [_build_row]:
 		row["degraded"] = false
 		_paint_row(row, StageDot.State.PENDING)
@@ -342,10 +377,78 @@ func _paint_row(row: Dictionary, state: StageDot.State) -> void:
 	else:
 		name_label.remove_theme_font_override("font")
 
+## The seconds the build has taken, beside the phase it is in.
 func _on_pulse() -> void:
-	if _building and _percent_label != null:
-		_percent_label.text = "%d s" % int(
-			(Time.get_ticks_msec() - _build_started_msec) / 1000)
+	if _building and not _failed and _percent_label != null:
+		_build_row["detail"].text = "%d s" % roundi(
+			(Time.get_ticks_msec() - _build_started_msec) / 1000.0)
+
+func _process(delta: float) -> void:
+	if not _building or _failed or not visible:
+		return
+	_advance_build(delta)
+	if not reduce_motion:
+		_progress.queue_redraw()
+
+## The build thread reports phases, not a fraction, so the bar eases
+## toward the phase it is in: quickly to the start of a new phase, then
+## slowly through it (never past 90% of it), so a long phase keeps moving
+## and the bar can't read as done before the world is.
+func _advance_build(delta: float) -> void:
+	var index := _build_source.step if _build_source != null else 0
+	var lo := BuildAbort.fraction_before(index)
+	var hi := BuildAbort.fraction_before(index + 1)
+	var rate := 6.0 if _build_shown < lo - 0.001 else 0.35
+	_build_shown += (lerpf(lo, hi, 0.9) - _build_shown) * (1.0 - exp(-delta * rate))
+	_progress.value = _build_shown * 100.0
+	_percent_label.text = "%d%%" % int(_build_shown * 100.0)
+	_stage_label.text = "%s · %s" % [BUILD_LABEL, BuildAbort.label_of(index)]
+
+## A soft light sweeping the filled part of the bar (duration-slow pace),
+## or static stripes under reduced motion. Only while the scene builds.
+func _draw_build_fill() -> void:
+	if not _building or _failed:
+		return
+	var r := Rect2(Vector2.ZERO, Vector2(_progress.size.x * _build_shown, _progress.size.y))
+	if reduce_motion:
+		var x := -r.size.y
+		while x < r.size.x:
+			_progress.draw_line(Vector2(x, r.size.y), Vector2(x + r.size.y, 0.0),
+				Color(UiTheme.ON_ACCENT, 0.35), 2.0)
+			x += 8.0
+		return
+	var t := fmod(Time.get_ticks_msec() / 1600.0, 1.0)
+	var band := r.size.x * 0.25
+	var cx := -band + t * (r.size.x + band * 2.0)
+	var steps := 12
+	for i in steps:
+		var a := float(i) / steps
+		var x0 := cx - band / 2.0 + a * band
+		var glow := sin(a * PI) * 0.45
+		_progress.draw_rect(Rect2(x0, 0.0, band / steps + 0.5, r.size.y).intersection(r),
+			Color(UiTheme.INK, glow))
+
+## Nothing could be built: the failed stage turns signal-error with its
+## reason, completed stages keep their tick, the lens and bar turn
+## error, and Cancel gives way to Try again with Back to map beside it.
+func show_error(reason: String) -> void:
+	_failed = true
+	_building = false
+	var index := _active_index
+	var row: Dictionary = _build_row if index < 0 else _rows[index]
+	_paint_row(row, StageDot.State.ERROR)
+	row["detail"].text = reason
+	row["detail"].add_theme_color_override("font_color", UiTheme.SIGNAL_ERROR)
+	_stage_label.text = reason
+	_preview.failed = true
+	var fill := UiTheme.style(UiTheme.SIGNAL_ERROR, UiTheme.RADIUS_PILL)
+	fill.set_content_margin_all(0)
+	_progress.add_theme_stylebox_override("fill", fill)
+	_cancel_btn.visible = false
+	_error_row.visible = true
+
+func is_failed() -> bool:
+	return _failed
 
 func set_stage(index: int, _label: String, state: String) -> void:
 	if index < 0 or index >= _rows.size():
@@ -354,6 +457,7 @@ func set_stage(index: int, _label: String, state: String) -> void:
 	if state == "done":
 		if _active_index == index:
 			_active_index = -1
+		_announcer.say("%s %s" % [row["label"], "estimated" if row["degraded"] else "done"])
 		if row["degraded"]:
 			_paint_row(row, StageDot.State.DEGRADED)  # stays flagged: it finished on estimates
 		else:
@@ -407,14 +511,16 @@ func set_progress(fraction: float, label: String) -> void:
 	_percent_label.text = "%d%%" % int(round(f * 100.0))
 	_preview.progress = f
 
-## Fetch pipeline is done; the threaded world build has no measurable
-## fraction, so show elapsed seconds instead of a misleading 100%.
-func set_building() -> void:
+## Fetch pipeline is done; the threaded world build reports the phase it
+## is in through `source`, and the bar restarts at 0 for it.
+func set_building(source: BuildAbort) -> void:
 	_building = true
+	_build_source = source
+	_build_shown = 0.0
 	_build_started_msec = Time.get_ticks_msec()
 	_active_index = -1
-	_progress.value = 100.0
+	_progress.value = 0.0
 	_preview.progress = 1.0
-	_stage_label.text = BUILD_LABEL
+	_stage_label.text = "%s · %s" % [BUILD_LABEL, BuildAbort.label_of(0)]
 	_paint_row(_build_row, StageDot.State.ACTIVE)
-	_percent_label.text = "0 s"
+	_percent_label.text = "0%"

@@ -223,6 +223,7 @@ static func make_world(data: LocationData, ground: GroundTruth,
 		abort: BuildAbort = null) -> Node3D:
 	var world := TerrainBuilder.build_world(data, ground, abort)
 	# T7.1: merge building masses per material/cell (preset-independent).
+	BuildAbort.mark(abort, BuildAbort.Step.MERGE)
 	LodRing.merge_buildings(world)
 	return world
 

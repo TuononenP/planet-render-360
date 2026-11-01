@@ -106,17 +106,21 @@ static func build_world(data: LocationData, ground: GroundTruth = null,
 		ground = GroundTruth.new(data)
 	var root := Node3D.new()
 	root.name = "GeneratedWorld"
+	BuildAbort.mark(abort, BuildAbort.Step.FAR)
 	root.add_child(FarTerrainBuilder.build_far(data, ground))
 	if abort != null and abort.requested:
 		return root
+	BuildAbort.mark(abort, BuildAbort.Step.GROUND)
 	root.add_child(_terrain_mesh(data, ground))
 	root.add_child(WaterBuilder.build_water(data, ground))
 	if abort != null and abort.requested:
 		return root
+	BuildAbort.mark(abort, BuildAbort.Step.BUILDINGS)
 	if not debug_hide_buildings:
 		_adopt_flat(root, BuildingBuilder.build_buildings(data, ground))
 	if abort != null and abort.requested:
 		return root
+	BuildAbort.mark(abort, BuildAbort.Step.ROADS)
 	if not data.buildings.is_empty():
 		_adopt_flat(root, RoadBuilder.build_roads(data, ground))
 	if data.landmark_type != "none":
@@ -124,6 +128,7 @@ static func build_world(data: LocationData, ground: GroundTruth = null,
 	_landmark_candidates(root, data, ground)
 	if abort != null and abort.requested:
 		return root
+	BuildAbort.mark(abort, BuildAbort.Step.VEGETATION)
 	_adopt_flat(root, VegetationBuilder.build_vegetation(data, ground))
 	return root
 

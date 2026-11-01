@@ -240,9 +240,9 @@ func _release_build() -> void:
 
 func _on_generation_finished(data: LocationData) -> void:
 	var gen := _gen_id
-	_loading.set_building()
-	_building_world = true
 	var abort := BuildAbort.new()
+	_loading.set_building(abort)
+	_building_world = true
 	_build_abort = abort
 	var built := await _view.build_location(data, null, abort)
 	# A build the grace period already released must not touch the
