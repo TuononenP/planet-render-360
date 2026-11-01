@@ -36,6 +36,9 @@ uniform float star_gain = 1.0;
 uniform float milky_gain = 1.0;
 uniform vec3 milky_normal = vec3(0.0, 0.2, 0.98);
 uniform float moon = 0.0;
+// True moon direction: LIGHT0's pitch is floored above the horizon, so a
+// low moon would be drawn too high from it.
+uniform vec3 moon_dir = vec3(0.0, 1.0, 0.0);
 // Lit fraction of the moon (phase): scales its halo and star washout.
 uniform float moon_illum = 1.0;
 // Lightning (LightningRig): flash level, direction toward the strike and
@@ -162,7 +165,7 @@ void sky() {
 		vec3 night_sky = vec3(0.50, 0.55, 0.72) * lane * (0.25 + 0.75 * dust) * rift * 0.07 * milky_gain;
 		night_sky += stars(d, lane * milky_gain) * star_gain;
 		// The moon washes out faint stars around it.
-		night_sky *= 1.0 - 0.7 * pow(m, 6.0) * moon * moon_illum;
+		night_sky *= 1.0 - 0.7 * pow(max(dot(d, moon_dir), 0.0), 6.0) * moon * moon_illum;
 		col += night_sky * night_amount * smoothstep(0.0, 0.22, y) * (1.0 - overcast);
 	}
 	// Below the horizon: haze first (aerial perspective samples here),
@@ -247,16 +250,18 @@ void sky() {
 		// and the tilt of the terminator are real; earthshine keeps the
 		// dark limb faint. A cool halo, by lit fraction, brightens thin
 		// cloud near it.
-		vec3 t = normalize(cross(sun_dir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4));
-		vec3 b = cross(t, sun_dir);
+		float mm = max(dot(d, moon_dir), 0.0);
+		float mdisc = smoothstep(0.99985, 0.99994, dot(d, moon_dir));
+		vec3 t = normalize(cross(moon_dir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4));
+		vec3 b = cross(t, moon_dir);
 		vec2 q = vec2(dot(d, t), dot(d, b)) / 0.0155;
 		float maria = vnoise3(vec3(q * 2.6, 1.3)) * 0.6 + vnoise3(vec3(q * 6.0, 7.1)) * 0.4;
 		vec2 qn = q * (0.0155 / 0.0173);
-		vec3 sn = t * qn.x + b * qn.y - sun_dir * sqrt(max(1.0 - dot(qn, qn), 0.0));
+		vec3 sn = t * qn.x + b * qn.y - moon_dir * sqrt(max(1.0 - dot(qn, qn), 0.0));
 		float day_side = smoothstep(-0.04, 0.06, dot(sn, solar_dir));
 		vec3 face = vec3(0.93, 0.94, 0.98) * (0.62 + 0.45 * smoothstep(0.35, 0.65, maria));
-		col += face * (0.03 + 0.97 * day_side) * disc * 1.5 * moon * (1.0 - 0.95 * alpha);
-		col += vec3(0.50, 0.58, 0.78) * (pow(m, 90.0) * 0.12 + pow(m, 10.0) * 0.035) * moon * moon_illum;
+		col += face * (0.03 + 0.97 * day_side) * mdisc * 1.5 * moon * (1.0 - 0.95 * alpha);
+		col += vec3(0.50, 0.58, 0.78) * (pow(mm, 90.0) * 0.12 + pow(mm, 10.0) * 0.035) * moon * moon_illum;
 	}
 	COLOR = col;
 }

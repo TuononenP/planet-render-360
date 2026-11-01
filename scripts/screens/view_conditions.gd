@@ -215,9 +215,27 @@ static func jump_to(v: View360, kind: String) -> void:
 		"sunset":
 			set_time_minutes(v, t.y)
 		"moon":
-			set_time_minutes(v, (t.x + t.y) / 2.0 + 720.0)
+			set_time_minutes(v, _moonlit_night(v, t))
 		_:
 			set_time_minutes(v, (t.x + t.y) / 2.0)
+
+## The minute of the night (sunset `t.y` to the next sunrise `t.x`) the
+## moon stands highest, so the Night jump shows it; the middle of the
+## night when it never rises above the horizon then.
+static func _moonlit_night(v: View360, t: Vector2) -> float:
+	var mid := (t.x + t.y) / 2.0 + 720.0
+	if v._atmos == null:
+		return mid
+	var best := 2.0
+	var best_m := mid
+	var m := t.y
+	while m <= t.x + 1440.0:
+		var e := float(v._atmos.moon_at(fposmod(m, 1440.0) / 60.0)["elevation"])
+		if e > best:
+			best = e
+			best_m = m
+		m += 10.0
+	return best_m
 
 ## Sunrise and sunset (x, y) in minutes since local midnight for the
 ## place and date, from the solar model at 10-minute steps (the sun's

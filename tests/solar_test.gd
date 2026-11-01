@@ -114,5 +114,13 @@ func _moon_checks(rig: AtmosphereRig, failures: Array[String]) -> void:
 	rig.set_time(0.0, 48.8566, {"year": 2026, "month": 1, "day": 19})
 	if rig.moon_up > 0.0 or float(rig.sky_material.get_shader_parameter("moon")) > 0.0:
 		failures.append("new moon at midnight should be below the horizon")
+	# A low moon is drawn where it stands, not at the light's floored pitch.
+	rig.set_time(17.3, 48.8566, {"year": 2026, "month": 1, "day": 3})
+	var low_dir: Vector3 = rig.sky_material.get_shader_parameter("moon_dir")
+	var low_el := float(rig.moon_state["elevation"])
+	if rig.moon_up <= 0.0 or low_el > AtmosphereRig.MIN_LIGHT_PITCH \
+			or absf(low_dir.y - sin(deg_to_rad(low_el))) > 0.001:
+		failures.append("low moon should keep its true elevation in the sky: %s at %f" % [low_dir, low_el])
+	rig.set_time(0.0, 48.8566, {"year": 2026, "month": 1, "day": 19})
 	if not (full_e > rig.sun.light_energy * 4.0 and rig.sun.light_energy > 0.0):
 		failures.append("full moon should outshine a moonless night: %f vs %f" % [full_e, rig.sun.light_energy])

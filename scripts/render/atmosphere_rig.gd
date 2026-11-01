@@ -432,6 +432,9 @@ func _apply() -> void:
 	p.set_shader_parameter("sun_disc", (0.0 if night else 1.0) * (1.0 - overcast))
 	p.set_shader_parameter("moon", moon_up * (1.0 - overcast))
 	p.set_shader_parameter("moon_illum", float(moon_state.get("illum", 1.0)))
+	if moon_up > 0.0:
+		p.set_shader_parameter("moon_dir", SolarPosition.direction(
+			float(moon_state["elevation"]), float(moon_state["azimuth"])))
 	p.set_shader_parameter("cloud_cover", cover)
 	p.set_shader_parameter("overcast", overcast)
 	p.set_shader_parameter("cloud_stretch", float(s["stretch"]))
@@ -459,6 +462,10 @@ func _apply() -> void:
 		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount)
 	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
 	_update_lightning()
+
+## The moon's place at a local clock hour (see solar_at).
+func moon_at(hour_f: float) -> Dictionary:
+	return SolarPosition.moon(latitude, longitude, solar_date(), hour_f - utc_offset_h)
 
 ## Night light from the real moon while it is up, its strength
 ## following the lit fraction; once it sets only the skyglow remains.
