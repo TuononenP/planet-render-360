@@ -16,6 +16,8 @@ static func _select_season(v: View360, index: int) -> void:
 	v._data.season = LocationData.clamp_season(index)
 	if v._season_btn != null:
 		v._season_btn.select(v._data.season)
+	if v._sun_arc != null and v._date.is_empty():
+		v._sun_arc.set_day(v._data.season, "")
 	v._atmos.set_season(v._data.season)
 	# Climate snow / ice follow the season at once (shader globals); the
 	# rebuild below re-applies them to the new world's roads.
@@ -255,12 +257,13 @@ static func date_text(date: Dictionary, with_year: bool = true) -> String:
 	var text := "%d %s" % [int(date["day"]), LocationData.MONTH_SHORT[int(date["month"]) - 1]]
 	return "%s %d" % [text, int(date["year"])] if with_year else text
 
-## The picked date moved: the arc's label and the date tool follow it.
+## The picked date moved: the arc's day chip and the date tool follow it.
 static func date_changed(v: View360) -> void:
 	if v._sun_arc != null:
-		# On the arc the year only shows when it is not this year: the bar is narrow.
+		# On the chip the year only shows when it is not this year: the bar is narrow.
 		var this_year := int(Time.get_date_dict_from_system().get("year", 0))
-		v._sun_arc.set_date_text(date_text(v._date, not v._date.is_empty() and int(v._date["year"]) != this_year))
+		var season := v._data.season if v._data != null else LocationData.Season.SUMMER
+		v._sun_arc.set_day(season, date_text(v._date, not v._date.is_empty() and int(v._date["year"]) != this_year))
 	ViewTools.sync(v)
 
 # --- Time-lapse ---
@@ -361,6 +364,8 @@ static func _sync_time_ui(v: View360) -> void:
 	var t := sun_times(v)
 	var elev := v._atmos.solar_elevation if v._atmos != null else 0.0
 	v._sun_arc.set_state(v._time_hour * 60.0, t.x, t.y, elev, v._live_time)
+	if v._atmos != null:
+		v._sun_arc.set_zone(v._atmos.utc_offset_h, v._atmos.utc_offset_known)
 	ViewChrome.update_scrim(v)
 
 static func _apply_time(v: View360, hour_f: float) -> void:

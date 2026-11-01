@@ -4,12 +4,15 @@ extends RefCounted
 ## HUD for View360, laid out as the design system's 360° viewer:
 ## top-left the exit IconButton and the PlacePill (the Compass tape under
 ## it on phones), top-centre the Compass ring, top-right the weather
-## HudChip and the data-quality StatusBadge, and at the bottom a
-## glass-strong bar with the SunArc over season / FOV / fullscreen (and
-## gyro on mobile). On desktop the same controls sit in a right inspector
-## toggled with I. Attribution stays bottom-left. After 3.5 s without
-## input everything but the exit button and attribution fades out; any
-## input brings it back. Operates on the view's controls via `v`.
+## HudChip, the data-quality StatusBadge and fullscreen. The controls
+## (ViewerControls) are one glass-strong panel: the SunArc (time, play,
+## the day chip, the arc, four jumps), then the Show chips and the photo
+## and link actions; a bottom sheet on phones and tablets, the right
+## inspector on desktop (I, or its chevron, hides it). Zoom (and gyro on
+## mobile) is a glass stack on the scene's edge beside the controls.
+## Attribution stays bottom-left. After 3.5 s without input everything but
+## the exit button and attribution fades out; any input brings it back.
+## Operates on the view's controls via `v`.
 
 const IDLE_S := 3.5
 const FADE_OUT_S := 0.6  # duration-slow
@@ -17,7 +20,6 @@ const FADE_IN_S := 0.16  # duration-quick
 const BAR_MAX := 560
 const INSPECTOR_W := 320  # size-inspector
 const PILL_MAX := 280
-const SEASON_ICONS := ["flower-2", "sun", "leaf", "snowflake"]  # Spring .. Winter
 
 static func build(v: View360) -> void:
 	v._hud = _layer()
@@ -97,6 +99,9 @@ static func build(v: View360) -> void:
 	v._quality_badge.tooltip_text = "Data quality"
 	v._quality_badge.pressed.connect(func() -> void: v.data_quality_requested.emit())
 	v._top_right.add_child(v._quality_badge)
+	v._fullscreen_btn = HudParts.icon_button("maximize", "Fullscreen (F)")
+	v._fullscreen_btn.pressed.connect(func() -> void: toggle_fullscreen(v))
+	v._top_right.add_child(v._fullscreen_btn)
 
 	v._hint = PanelContainer.new()
 	v._hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -117,20 +122,26 @@ static func build(v: View360) -> void:
 	v._hud.add_child(v._hint_timer)
 
 	v._sheet = PanelContainer.new()
-	v._sheet.add_theme_stylebox_override("panel", HudStyle.panel(UiTheme.RADIUS_L, 16, 12))
+	# 16 at the sides so the three Show chips share one row at 320.
+	v._sheet.add_theme_stylebox_override("panel", HudStyle.panel(UiTheme.RADIUS_L, 16, 16))
 	UiTheme.add_sheen(v._sheet, UiTheme.RADIUS_L)
 	v._fade.add_child(v._sheet)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
+	col.add_theme_constant_override("separation", 12)
 	v._sheet.add_child(col)
-	# Collapse handle on top of the sheet; the round tab brings it back.
+	# Phones and tablets: the grabber on top hides the sheet; on desktop the
+	# arc's chevron does. The round tab brings it back.
 	v._sheet_grip = Button.new()
 	v._sheet_grip.flat = true
 	v._sheet_grip.focus_mode = Control.FOCUS_ALL
-	v._sheet_grip.custom_minimum_size = Vector2(0, 28)
+	v._sheet_grip.custom_minimum_size = Vector2(0, 20)
 	v._sheet_grip.tooltip_text = "Hide controls"
 	v._sheet_grip.accessibility_name = "Hide controls"
 	v._sheet_grip.pressed.connect(func() -> void: toggle_sheet(v))
+	v._sheet_grip.draw.connect(func() -> void:
+		var g := v._sheet_grip
+		g.draw_style_box(UiTheme.style(UiTheme.LINE_STRONG, 3),
+			Rect2(roundf((g.size.x - 36.0) / 2.0), roundf((g.size.y - 5.0) / 2.0), 36.0, 5.0)))
 	col.add_child(v._sheet_grip)
 	v._sheet_tab = HudParts.icon_button("chevron-up", "Show controls")
 	v._sheet_tab.visible = false
@@ -143,39 +154,53 @@ static func build(v: View360) -> void:
 	v._sun_arc.now_requested.connect(v.use_live_time)
 	v._sun_arc.lapse_toggled.connect(func() -> void: ViewConditions.toggle_lapse(v))
 	v._sun_arc.lapse_speed_requested.connect(func() -> void: ViewConditions.cycle_lapse_speed(v))
+	v._sun_arc.day_requested.connect(func() -> void: ViewTools.toggle_date(v))
+	v._sun_arc.collapse_requested.connect(func() -> void: toggle_sheet(v))
 	col.add_child(v._sun_arc)
-	var row := HFlowContainer.new()  # wraps in the narrow inspector
-	row.add_theme_constant_override("h_separation", 4)
-	row.add_theme_constant_override("v_separation", 4)
-	col.add_child(row)
-	v._season_btn = SegmentedControl.new(LocationData.SEASON_NAMES, SEASON_ICONS, true)
-	v._season_btn.select(LocationData.Season.SUMMER)
-	v._season_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v._season_btn.item_selected.connect(v._on_season_selected)
-	row.add_child(v._season_btn)
-	var fov_out := HudParts.icon_button("minus", "Zoom out")
-	fov_out.pressed.connect(func() -> void: v._rig.handle_zoom(1.0 / 1.12))
-	row.add_child(fov_out)
-	var fov_in := HudParts.icon_button("plus", "Zoom in")
-	fov_in.pressed.connect(func() -> void: v._rig.handle_zoom(1.12))
-	row.add_child(fov_in)
-	v._nearby_btn = HudParts.icon_button("landmark", "Nearby landmarks")
-	v._nearby_btn.tooltip_text = "Nearby landmarks (L)"
-	v._nearby_btn.pressed.connect(func() -> void: toggle_nearby(v))
-	row.add_child(v._nearby_btn)
-	v._fullscreen_btn = HudParts.icon_button("maximize", "Fullscreen")
-	v._fullscreen_btn.pressed.connect(func() -> void: toggle_fullscreen(v))
-	row.add_child(v._fullscreen_btn)
+	var rule := ColorRect.new()
+	rule.color = UiTheme.LINE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(rule)
+	var show_col := VBoxContainer.new()
+	show_col.add_theme_constant_override("separation", 4)
+	col.add_child(show_col)
+	show_col.add_child(UiTheme.text("SHOW", "eyebrow", UiTheme.MUTED))
+	var chips := HFlowContainer.new()  # wraps on the narrowest phones
+	chips.add_theme_constant_override("h_separation", 6)
+	chips.add_theme_constant_override("v_separation", 0)
+	show_col.add_child(chips)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	col.add_child(actions)
+
+	# Zoom (and gyro on mobile) on the scene's edge: scroll, pinch and = / -
+	# zoom too, so phones leave the buttons out.
+	v._zoom_stack = VBoxContainer.new()
+	v._zoom_stack.add_theme_constant_override("separation", 8)
+	v._fade.add_child(v._zoom_stack)
 	if OS.has_feature("mobile"):
 		v._gyro_btn = HudParts.icon_button("smartphone", "Gyro look")
 		v._gyro_btn.pressed.connect(func() -> void: toggle_gyro(v))
-		row.add_child(v._gyro_btn)
-	var tools := HFlowContainer.new()
-	tools.add_theme_constant_override("h_separation", 4)
-	tools.add_theme_constant_override("v_separation", 4)
-	col.add_child(tools)
-	v._quality_label = UiTheme.data_label("", 13, UiTheme.MUTED, true)
-	col.add_child(v._quality_label)
+		v._zoom_stack.add_child(v._gyro_btn)
+	var zoom := PanelContainer.new()
+	zoom.name = "Zoom"
+	var inset := int((HudParts.SIZE_TOUCH - HudParts.SIZE_HUD) / 2.0)
+	var stack_glass := HudParts.glass(int(HudParts.SIZE_HUD / 2.0) - 1, inset)
+	stack_glass.set_content_margin_all(0)
+	zoom.add_theme_stylebox_override("panel", stack_glass)
+	v._zoom_stack.add_child(zoom)
+	var zoom_col := VBoxContainer.new()
+	zoom_col.add_theme_constant_override("separation", 0)
+	zoom.add_child(zoom_col)
+	for z in [["plus", "Zoom in (=)", 1.12], ["minus", "Zoom out (−)", 1.0 / 1.12]]:
+		var b := HudParts.icon_button(str(z[0]), str(z[1]))
+		var clear := StyleBoxEmpty.new()
+		for state in ["normal", "pressed", "disabled", "hover", "hover_pressed"]:
+			b.add_theme_stylebox_override(state, clear)
+		var factor: float = z[2]
+		b.pressed.connect(func() -> void: v._rig.handle_zoom(factor))
+		zoom_col.add_child(b)
 
 	v._exit_btn = HudParts.icon_button("arrow-left", "Back to map")
 	v._exit_btn.pressed.connect(func() -> void: v.back_requested.emit())
@@ -186,7 +211,7 @@ static func build(v: View360) -> void:
 
 	v._announcer = Announcer.new(2.0)
 	v._hud.add_child(v._announcer)
-	ViewTools.build(v, tools)
+	ViewTools.build(v, chips, actions)
 
 	v._idle_timer = Timer.new()
 	v._idle_timer.one_shot = true
@@ -248,6 +273,7 @@ static func refresh_theme(v: View360) -> void:
 		return
 	v._season_btn.restyle()
 	v._sun_arc.restyle()
+	v._sheet_grip.queue_redraw()
 	ViewTools.sync(v)
 	v._minimap.restyle()
 	v._compass.queue_redraw()
@@ -359,10 +385,10 @@ static func toggle_nearby(v: View360, by_key: bool = false) -> void:
 			lp.focus_list()
 	layout(v)
 
-## The button lights (accent fill, on-accent icon) while the list is up.
+## The Nearby chip is selected while the list is up.
 static func sync_nearby(v: View360) -> void:
 	if v._nearby_btn != null:
-		HudParts.apply_icon_button(v._nearby_btn, v._landmark_panel.is_listing())
+		HudParts.apply_chip(v._nearby_btn, v._landmark_panel.is_listing())
 
 ## Nearby articles arrived while the panel is up: the list takes them
 ## now, or when Back returns to it from a card.
@@ -424,7 +450,7 @@ static func _sync_fullscreen(v: View360) -> void:
 	var full := DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN,
 		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 	HudParts.set_icon(v._fullscreen_btn, "minimize" if full else "maximize")
-	v._fullscreen_btn.tooltip_text = "Exit fullscreen" if full else "Fullscreen"
+	v._fullscreen_btn.tooltip_text = "Exit fullscreen (F)" if full else "Fullscreen (F)"
 
 ## Gyro look (mobile): off by default; View360._process applies it.
 static func toggle_gyro(v: View360) -> void:
@@ -524,6 +550,8 @@ static func layout(v: View360) -> void:
 		if not phone:
 			chip_home.move_child(v._weather_chip, 0)
 	v._tape_row.visible = phone
+	# Fullscreen is the window's: not on phones and tablets.
+	v._fullscreen_btn.visible = not phone and not OS.has_feature("mobile")
 	# Top-right chips first: the pill takes the room left between.
 	v._top_right.reset_size()
 	var right_w := v._top_right.get_combined_minimum_size().x
@@ -564,11 +592,12 @@ static func layout(v: View360) -> void:
 	# Bar or inspector.
 	var bar_w: float = float(INSPECTOR_W) if inspector \
 		else (w - pad * 2.0 if phone else minf(float(BAR_MAX), w - pad * 2.0))
-	v._sun_arc.set_arc_height(56.0 if h < 500.0 else (72.0 if h < 760.0 else 108.0))
+	v._sun_arc.set_arc_height(56.0 if h < 500.0 else (72.0 if h < 760.0 else 96.0))
 	v._sun_arc.set_compact(bar_w < 380.0 or h < 500.0)
-	v._season_btn.set_icon_only(bar_w < 460.0)
+	# The inspector hides by the arc's chevron, the sheet by its grabber.
+	v._sun_arc.set_collapsible(inspector)
+	v._sheet_grip.visible = not inspector
 	v._sheet.visible = v._inspector_open
-	UiIcon.apply(v._sheet_grip, "chevron-right" if inspector else "chevron-down", 18, UiTheme.MUTED, UiTheme.INK)
 	v._sheet_tab.visible = not v._inspector_open
 	UiIcon.apply(v._sheet_tab, "chevron-left" if inspector else "chevron-up", 22, UiTheme.INK, UiTheme.INK)
 	v._sheet.custom_minimum_size = Vector2(bar_w, 0)
@@ -584,6 +613,7 @@ static func layout(v: View360) -> void:
 	_place_landmark_panel(v, lay, inspector, pad, w, h, attr_h, bar_w)
 
 	ViewTools.layout(v, lay, inspector, pad, w, h, attr_h, Rect2(v._sheet.position, v._sheet.size))
+	_place_zoom_stack(v, phone, pad, inset, w, h, attr_h)
 
 	v._hint.reset_size()
 	# A sheet in the bar's place (the landmark sheet, the date sheet) covers
@@ -599,6 +629,28 @@ static func layout(v: View360) -> void:
 	if v._sheet_tab.visible and not inspector:
 		hint_bottom = tab_y - 8.0
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
+
+## The zoom stack (and gyro): bottom-right on the scene's edge; beside
+## the inspector, or above the controls sheet, where it would meet them.
+## Phones zoom by pinch, so only gyro stays there.
+static func _place_zoom_stack(v: View360, phone: bool, pad: float, inset: float,
+		w: float, h: float, attr_h: float) -> void:
+	var zoom := v._zoom_stack.get_node("Zoom") as Control
+	zoom.visible = not phone
+	v._zoom_stack.visible = zoom.visible or v._gyro_btn != null
+	v._zoom_stack.reset_size()
+	var zs := v._zoom_stack.get_combined_minimum_size()
+	v._zoom_stack.size = zs
+	var at := Vector2(w - pad - zs.x + inset, h - pad - zs.y + inset)
+	if phone:
+		at.y = h - pad - attr_h - 8.0 - zs.y + inset
+	var sheet := Rect2(v._sheet.position, v._sheet.size).grow(8.0)
+	if v._sheet.visible and Rect2(at, zs).intersects(sheet):
+		if v._sheet.position.y < h * 0.5:
+			at.x = v._sheet.position.x - 8.0 - zs.x + inset  # beside the inspector
+		else:
+			at.y = v._sheet.position.y - 8.0 - zs.y + inset  # above the sheet
+	v._zoom_stack.position = at
 
 ## The landmark sheet: a left side panel under the place pill on
 ## desktop; on phones and tablets a bottom sheet up to half the height,

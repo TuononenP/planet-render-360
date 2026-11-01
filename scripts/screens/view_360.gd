@@ -44,7 +44,7 @@ var _weather_label: Label
 var _quality_badge: Button
 var _sheet_grip: Button
 var _sheet_tab: Button
-var _quality_label: Label
+var _zoom_stack: VBoxContainer
 var _sheet: PanelContainer
 var _sun_arc: SunArc
 var _time_label: Label
@@ -154,9 +154,6 @@ func _ready() -> void:
 	_governor.viewport = _viewport
 	_governor.sun = _sun
 	_governor.set_preset(_quality_preset)
-	_governor.quality_changed.connect(func(step_name: String, fps: float) -> void:
-		if _quality_label != null:
-			_quality_label.text = "Quality · %s · %d fps" % [step_name, int(round(fps))])
 	_weather = WeatherFetcher.new()
 	add_child(_weather)
 	_weather.succeeded.connect(_on_weather)
@@ -353,6 +350,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	_data = data
 	if _season_btn != null:
 		_season_btn.select(data.season)
+	if _sun_arc != null and _date.is_empty():
+		_sun_arc.set_day(data.season, "")
 	_atmos.set_season(data.season)
 	_atmos.set_place(data.latitude, data.longitude)
 	_show_hint()

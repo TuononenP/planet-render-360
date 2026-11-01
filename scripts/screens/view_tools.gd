@@ -1,27 +1,39 @@
 class_name ViewTools
 extends RefCounted
 
-## The viewer's extra tools and the HUD that carries them: a row of round
-## buttons under the zoom row (date, photo, copy view link, horizon labels,
-## mini-map), the date picker sheet, the mini-map inset, the horizon-label
-## layer and a toast for their outcomes. Operates on the view's controls via
-## `v`, like ViewChrome (which builds the rows and calls into here).
+## The viewer's extra tools and the HUD that carries them (design system
+## ViewerControls): the Show chips (horizon labels, mini-map, nearby
+## landmarks), the labelled actions (save a photo, copy the view link),
+## the day and season sheet opened by the sun arc's day chip, the mini-map
+## inset, the horizon-label layer and a toast for their outcomes. Operates
+## on the view's controls via `v`, like ViewChrome (which builds the panel
+## and calls into here).
 
-const ICONS := {"date": "calendar", "photo": "camera", "link": "link",
-	"labels": "tag", "map": "map"}
-const TIPS := {"date": "Pick a date", "photo": "Save a photo (P)",
-	"link": "Copy a link to this view (C)", "labels": "Name peaks, towns and lakes (N)",
-	"map": "Mini-map (M)"}
+const CHIPS := [["labels", "tag", "Labels", "Name peaks, towns and lakes (N)"],
+	["map", "map", "Mini-map", "Mini-map (M)"],
+	["nearby", "landmark", "Nearby", "Nearby landmarks (L)"]]
+const ACTIONS := [["photo", "camera", "Save photo", "Save a photo (P)"],
+	["link", "link", "Copy link", "Copy a link to this view (C)"]]
+const DATE_TIP := "Pick a day or season"
 const MAP_GAP := 12.0
 
-## Builds the tool buttons into `row` and the overlays into the view's HUD.
-static func build(v: View360, row: Container) -> void:
-	for key in ["date", "photo", "link", "labels", "map"]:
-		var b := HudParts.icon_button(str(ICONS[key]), str(TIPS[key]))
-		b.tooltip_text = str(TIPS[key])
-		b.pressed.connect(_action.bind(v, key))
-		v._tool_btns[key] = b
-		row.add_child(b)
+## Builds the Show chips into `chips`, the actions into `actions` and the
+## overlays into the view's HUD. The sun arc's day chip is the date tool.
+static func build(v: View360, chips: Container, actions: Container) -> void:
+	for c in CHIPS:
+		var b := HudParts.chip(str(c[1]), str(c[2]))
+		b.tooltip_text = str(c[3])
+		b.pressed.connect(_action.bind(v, str(c[0])))
+		v._tool_btns[c[0]] = b
+		chips.add_child(b)
+	v._nearby_btn = v._tool_btns["nearby"]
+	for a in ACTIONS:
+		var b := HudParts.outline_button(str(a[1]), str(a[2]))
+		b.tooltip_text = str(a[3])
+		b.pressed.connect(_action.bind(v, str(a[0])))
+		v._tool_btns[a[0]] = b
+		actions.add_child(b)
+	v._tool_btns["date"] = v._sun_arc.day_btn
 	v._horizon = HorizonLabels.new(v)
 	v._hud.add_child(v._horizon)
 	v._hud.move_child(v._horizon, v._fade.get_index())
@@ -33,6 +45,9 @@ static func build(v: View360, row: Container) -> void:
 		ViewConditions.set_date(v, date))
 	v._date_picker.season_requested.connect(func() -> void:
 		v._on_season_selected(v._data.season if v._data != null else LocationData.Season.SUMMER))
+	v._date_picker.season_picked.connect(func(index: int) -> void: v._on_season_selected(index))
+	# The season segments live in the sheet; the view keeps them in step.
+	v._season_btn = v._date_picker.seasons
 	v._date_picker.closed.connect(func() -> void:
 		sync(v)
 		ViewChrome.layout(v))
@@ -55,19 +70,20 @@ static func _action(v: View360, key: String) -> void:
 			toggle_labels(v)
 		"map":
 			toggle_minimap(v)
+		"nearby":
+			ViewChrome.toggle_nearby(v)
 
-## Lit (accent fill) while a tool is on: the date picker is up or a date
-## is picked, the labels or the mini-map are switched on (the mini-map may
-## be hidden for the moment by a sheet; it is still on).
+## A chip is selected (a check on accent-soft) while its layer is on: the
+## labels, the mini-map (which a sheet may hide for the moment; it is still
+## on) or the nearby list.
 static func sync(v: View360) -> void:
 	if v._tool_btns.is_empty():
 		return
-	var lit := {"date": v._date_picker.visible or not v._date.is_empty(),
-		"labels": v._horizon.enabled, "map": UiPrefs.minimap}
-	for key in v._tool_btns:
-		HudParts.apply_icon_button(v._tool_btns[key], bool(lit.get(key, false)))
+	HudParts.apply_chip(v._tool_btns["labels"], v._horizon.enabled)
+	HudParts.apply_chip(v._tool_btns["map"], UiPrefs.minimap)
+	ViewChrome.sync_nearby(v)
 	var picked := ViewConditions.date_text(v._date)
-	(v._tool_btns["date"] as Button).tooltip_text = "Date: %s" % picked if picked != "" else str(TIPS["date"])
+	(v._tool_btns["date"] as Button).tooltip_text = "Date: %s" % picked if picked != "" else DATE_TIP
 
 # --- Toast ---
 
@@ -87,7 +103,7 @@ static func toggle_date(v: View360) -> void:
 	else:
 		var now := ViewConditions.place_now(v)
 		v._date_picker.open_for(v._date, {"year": int(now["year"]), "month": int(now["month"]),
-			"day": int(now["day"])})
+			"day": int(now["day"])}, v._data.season)
 	sync(v)
 	ViewChrome.layout(v)
 
@@ -195,6 +211,6 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 			picker.position = Vector2(roundf((w - ps.x) / 2.0),
 				maxf(h - pad - attr_h - 8.0 - ps.y, pad))
 			v._minimap.visible = false
-	# Toast: above the bar on phones, bottom-right of the free area otherwise.
+	# Toast: above the controls on phones, bottom-right of the free area otherwise.
 	if v._toast.visible:
 		v._toast.place(v.size, pad, sheet.position.y if v._sheet.visible else h - pad - attr_h, phone)

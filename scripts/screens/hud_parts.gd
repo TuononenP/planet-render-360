@@ -64,6 +64,76 @@ static func set_icon(b: Button, icon_name: String, active: bool = false) -> void
 	b.set_meta("icon", icon_name)
 	apply_icon_button(b, active)
 
+## Chip (the viewer controls' Show row): 36 visible in a 44 hit row,
+## label type and a leading icon. Selected is a check on accent-soft
+## with an accent border; the label stays ink, so the sun remains the
+## only accent fill in the controls.
+static func chip(icon_name: String, label: String) -> Button:
+	var b := Button.new()
+	b.text = label
+	b.accessibility_name = label
+	b.custom_minimum_size = Vector2(0, SIZE_TOUCH)
+	b.focus_mode = Control.FOCUS_ALL
+	b.set_meta("icon", icon_name)
+	b.add_theme_font_override("font", UiTheme.sans(600))
+	b.add_theme_font_size_override("font_size", 14)
+	apply_chip(b, false)
+	return b
+
+static func apply_chip(b: Button, selected: bool) -> void:
+	var s := UiTheme.style(UiTheme.TEAL_SOFT if selected else Color.TRANSPARENT, UiTheme.RADIUS_PILL,
+		UiTheme.TEAL if selected else UiTheme.LINE_STRONG)
+	s.content_margin_left = 8
+	s.content_margin_right = 10
+	s.content_margin_top = 0
+	s.content_margin_bottom = 0
+	s.set_expand_margin(SIDE_TOP, -4)
+	s.set_expand_margin(SIDE_BOTTOM, -4)
+	var hover := s.duplicate() as StyleBoxFlat
+	if not selected:
+		hover.bg_color = Color(UiTheme.INK, 0.06)
+	for state in ["normal", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(state, s)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("hover_pressed", hover)
+	var focus := UiTheme._focus_ring(UiTheme.RADIUS_PILL)
+	focus.set_expand_margin(SIDE_TOP, -2)
+	focus.set_expand_margin(SIDE_BOTTOM, -2)
+	b.add_theme_stylebox_override("focus", focus)
+	UiTheme._set_font_colors(b, UiTheme.INK)
+	var tint := UiTheme.TEAL if selected else UiTheme.INK
+	UiIcon.apply(b, "check" if selected else str(b.get_meta("icon", "info")), 16, tint, tint)
+	b.add_theme_constant_override("h_separation", 6)
+	b.set_meta("selected", selected)
+
+## The viewer controls' labelled actions (Save photo, Copy link): an icon
+## and a verb, outlined in line-strong on the glass, 40 visible in a 44 row.
+static func outline_button(icon_name: String, label: String) -> Button:
+	var b := Button.new()
+	b.text = label
+	b.custom_minimum_size = Vector2(0, SIZE_TOUCH)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.focus_mode = Control.FOCUS_ALL
+	b.add_theme_font_override("font", UiTheme.sans(600))
+	b.add_theme_font_size_override("font_size", 14)
+	b.add_theme_constant_override("h_separation", 8)
+	var s := UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_PILL, UiTheme.LINE_STRONG)
+	s.content_margin_left = 12
+	s.content_margin_right = 12
+	s.content_margin_top = 0
+	s.content_margin_bottom = 0
+	s.set_expand_margin(SIDE_TOP, -2)
+	s.set_expand_margin(SIDE_BOTTOM, -2)
+	var hover := s.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(UiTheme.INK, 0.06)
+	b.add_theme_stylebox_override("normal", s)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", hover)
+	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
+	UiTheme._set_font_colors(b, UiTheme.INK)
+	UiIcon.apply(b, icon_name, 18, UiTheme.INK, UiTheme.INK)
+	return b
+
 ## PlacePill: HUD glass, size-hud tall, at most 280 wide; the name in
 ## Instrument Serif truncates, the coordinates sit under it in mono.
 ## Returns [pill, name_label, coords_label].

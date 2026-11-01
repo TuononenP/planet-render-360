@@ -398,8 +398,8 @@ func _view_wiring() -> void:
 	_check(absf(view._time_hour - 8.0) < 0.001, "and the time: %s" % view._time_hour)
 	_check(view._atmos.solar_date() == {"year": 2026, "month": 4, "day": 20}, "the sun is computed for that day")
 	var this_year := int(Time.get_date_dict_from_system().get("year", 0))
-	_check(view._sun_arc._date_label.visible and view._sun_arc._date_label.text \
-		== ("20 Apr" if this_year == 2026 else "20 Apr 2026"), "the arc names the date: %s" % view._sun_arc._date_label.text)
+	_check(view._sun_arc.day_btn.text == ("20 Apr" if this_year == 2026 else "20 Apr 2026"),
+		"the day chip names the date: %s" % view._sun_arc.day_btn.text)
 	_check(ViewConditions.date_text(view._date) == "20 Apr 2026" and ViewConditions.date_text(view._date, false) == "20 Apr",
 		"the label reads with or without its year")
 	var back := view.camera_state()
@@ -415,6 +415,13 @@ func _view_wiring() -> void:
 	for key in ["date", "photo", "link", "labels", "map"]:
 		_check(view._tool_btns.has(key) and (view._tool_btns[key] as Button).tooltip_text != "", "tool button: " + key)
 	_check(view._sun_arc._play_btn != null and view._sun_arc._play_btn.tooltip_text == "Play the day", "the arc has a play button")
+	_check(view._season_btn == view._date_picker.seasons and view._season_btn.item_count == 4,
+		"the seasons live in the day and season sheet")
+	var noon_jump := view._sun_arc._jumps[1]
+	_check(noon_jump.text.length() == 5 and noon_jump.text[2] == ":" and noon_jump.accessibility_name.begins_with("Noon, "),
+		"the jumps show their times: %s" % noon_jump.text)
+	_check(view._tool_btns["photo"].text == "Save photo" and view._tool_btns["link"].text == "Copy link",
+		"photo and link are labelled")
 	var emitted: Array = []
 	view.pref_changed.connect(func(k: String, v: Variant) -> void: emitted.append([k, v]))
 	var press := func(code: Key) -> void:
@@ -438,12 +445,13 @@ func _view_wiring() -> void:
 	_check(UiPrefs.minimap and not view._minimap.visible, "an open landmark sheet hides the on mini-map")
 	press.call(KEY_M)
 	_check(not UiPrefs.minimap and emitted.has(["minimap", false]), "M switches it off even while a sheet hides it")
-	_check(not (view._tool_btns["map"] as Button).get_theme_stylebox("normal").bg_color.is_equal_approx(UiTheme.TEAL),
-		"the map button goes dark with it")
+	_check(not (view._tool_btns["map"] as Button).get_meta("selected", true),
+		"the map chip goes off with it")
 	press.call(KEY_M)
 	_check(UiPrefs.minimap and not view._minimap.visible, "M switches it back on, still hidden by the sheet")
-	_check((view._tool_btns["map"] as Button).get_theme_stylebox("normal").bg_color.is_equal_approx(UiTheme.TEAL),
-		"and the button lights though the inset is hidden")
+	_check((view._tool_btns["map"] as Button).get_meta("selected", false)
+		and (view._tool_btns["map"] as Button).get_theme_stylebox("normal").bg_color.is_equal_approx(UiTheme.TEAL_SOFT),
+		"and the chip is selected though the inset is hidden")
 	view._landmark_panel.close()
 	ViewChrome.layout(view)
 	_check(view._minimap.visible, "closing the sheet brings it back")
@@ -471,7 +479,7 @@ func _view_wiring() -> void:
 	var date_cleared: bool = view._date.is_empty()
 	while view._season_building:
 		await process_frame
-	_check(date_cleared and not view._sun_arc._date_label.visible, "a season button returns to the season's own day")
+	_check(date_cleared and view._sun_arc.day_btn.text == "Summer", "a season returns to the season's own day")
 	ViewConditions.use_live_time(view)
 	_check(view._live_time and view._date.is_empty(), "Now clears the date")
 	ViewTools.toggle_date(view)
@@ -536,6 +544,8 @@ func _view_wiring() -> void:
 	view._inspector_open = false
 	ViewChrome.layout(view)
 	_check(view._sheet_tab.visible, "controls hidden on a phone: the tab offers them back")
+	_check(not view._fullscreen_btn.visible and not view._zoom_stack.get_node("Zoom").visible,
+		"phones leave out fullscreen and the zoom buttons")
 	view._landmark_panel.open_list([])
 	ViewChrome.layout(view)
 	_check(not view._sheet_tab.visible, "the landmark sheet in the bar's place hides the tab")

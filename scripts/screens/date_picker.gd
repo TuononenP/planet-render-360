@@ -1,16 +1,22 @@
 class_name DatePicker
 extends PanelContainer
 
-## Pick any calendar day for the sun's path (solstice, a birthday, "sunset
-## on my trip"): a glass sheet over the viewer with a month and a year
-## stepper, a Monday-first day grid and quick picks (Today, the two
-## solstices, Reset to the season's own day). A day emits date_picked; the
-## view maps it to its season and runs the solar model for it. Esc (the
-## viewer's key handler) or the close button dismisses it.
+## The day and season sheet: the season (its own mid-month day) or any
+## calendar day for the sun's path (solstice, a birthday, "sunset on my
+## trip"). A glass sheet over the viewer, opened from the sun arc's day
+## chip: "Day and season" with a close button, the four seasons (icon
+## over name), then a month and a year stepper, a Monday-first day grid
+## and quick picks (Today, the two solstices, Reset to the season's own
+## day). A day emits date_picked; the view maps it to its season and
+## runs the solar model for it. A season emits season_picked and the sheet
+## stays open. Esc (the viewer's key handler) or the close button
+## dismisses it.
 
 signal date_picked(date: Dictionary)
 ## Back to the season's own mid-month day.
 signal season_requested
+## A season segment: that season's own day (the view rebuilds in it).
+signal season_picked(index: int)
 signal closed
 
 const CELL := 40
@@ -28,6 +34,8 @@ var _today := {}
 var _month_label: Label
 var _year_label: Label
 var _grid: GridContainer
+## The season segments; the view keeps them in step with its season.
+var seasons: SegmentedControl
 
 func _init() -> void:
 	visible = false
@@ -37,6 +45,24 @@ func _init() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	add_child(col)
+
+	var title_row := HBoxContainer.new()
+	col.add_child(title_row)
+	var title := UiTheme.text("Day and season", "title")
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_row.add_child(title)
+	title_row.add_child(_stepper("x", "Close", close_picker))
+	seasons = SegmentedControl.new(LocationData.SEASON_NAMES, SunArc.SEASON_ICONS, true)
+	seasons.set_stacked(true)
+	seasons.select(LocationData.Season.SUMMER)
+	seasons.item_selected.connect(func(index: int) -> void: season_picked.emit(index))
+	col.add_child(seasons)
+	var rule := ColorRect.new()
+	rule.color = UiTheme.LINE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(rule)
 
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 4)
@@ -56,8 +82,6 @@ func _init() -> void:
 	_year_label.custom_minimum_size.x = 48
 	head.add_child(_year_label)
 	head.add_child(_stepper("chevron-right", "Next year", func() -> void: _step_year(1)))
-	var close := _stepper("x", "Close", close_picker)
-	head.add_child(close)
 
 	var days := GridContainer.new()
 	days.columns = 7
@@ -131,8 +155,11 @@ static func cells(year: int, month: int) -> Array[int]:
 
 # --- State ---
 
-## Opens on `date` (empty: today in `today`).
-func open_for(date: Dictionary, today: Dictionary) -> void:
+## Opens on `date` (empty: today in `today`), the season segment on
+## `season`.
+func open_for(date: Dictionary, today: Dictionary, season: int = -1) -> void:
+	if season >= 0:
+		seasons.select(season)
 	_today = today
 	_selected = date
 	var shown := date if not date.is_empty() else today

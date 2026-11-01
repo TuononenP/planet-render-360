@@ -348,11 +348,11 @@ func _view_wiring() -> void:
 	var names := _labels(panel.list)
 	_check(names.find("Old tower") != -1 and names.find("Old tower") < names.find("Old chapel"),
 		"the nearer one comes first: %s" % [names])
-	_check((btn.get_theme_stylebox("normal") as StyleBoxFlat).bg_color == UiTheme.TEAL, "the button lights while the list is up")
+	_check((btn.get_theme_stylebox("normal") as StyleBoxFlat).bg_color == UiTheme.TEAL_SOFT, "the Nearby chip is selected while the list is up")
 	_check(panel.position.x < view.size.x / 2.0 and panel.size.y > 0.0, "laid out as the left side panel: %s %s" % [panel.position, panel.size])
 	btn.pressed.emit()
-	_check(not panel.is_open() and (btn.get_theme_stylebox("normal") as StyleBoxFlat).bg_color != UiTheme.TEAL,
-		"the button closes it and goes dark")
+	_check(not panel.is_open() and (btn.get_theme_stylebox("normal") as StyleBoxFlat).bg_color != UiTheme.TEAL_SOFT,
+		"the chip closes it and goes off")
 	_check(ViewChrome.handle_key(view, _key(KEY_L)) and panel.is_listing(), "L opens the list")
 	_check(view.get_viewport().gui_get_focus_owner() == _open_button(panel.list, 0), "L puts focus on the nearest landmark")
 	_check(ViewChrome.handle_key(view, _key(KEY_L)) and not panel.is_open(), "L closes it")

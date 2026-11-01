@@ -6,13 +6,15 @@ extends PanelContainer
 ## 600 label. `glass` is for the viewer's bar (glass-strong track);
 ## otherwise the track is sky-300 on solid ground. Mirrors OptionButton's
 ## select / selected / item_count / item_selected so it can stand in
-## for one. `icon_only` keeps each label as the tooltip (seasons on
-## narrow phones).
+## for one. `icon_only` keeps each label as the tooltip. `stacked` sets
+## each icon over its name in ink on an outlined track (the seasons in
+## the day and season sheet).
 
 signal item_selected(index: int)
 
 var selected := -1
 var icon_only := false
+var stacked := false
 var _glass := false
 var _labels: Array = []
 var _icons: Array = []
@@ -48,6 +50,10 @@ func select(index: int) -> void:
 	selected = index
 	restyle()
 
+func set_stacked(on: bool) -> void:
+	stacked = on
+	restyle()
+
 func set_icon_only(on: bool) -> void:
 	if on != icon_only:
 		icon_only = on
@@ -57,6 +63,8 @@ func set_icon_only(on: bool) -> void:
 func restyle() -> void:
 	var track := UiTheme.style(UiTheme.CARD if _glass else UiTheme.FIELD, UiTheme.RADIUS_PILL,
 		UiTheme.GLASS_EDGE if _glass else UiTheme.LINE)
+	if stacked:
+		track = UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_M, UiTheme.LINE_STRONG)
 	track.set_content_margin_all(3)
 	add_theme_stylebox_override("panel", track)
 	for i in _buttons.size():
@@ -65,7 +73,7 @@ func restyle() -> void:
 		b.set_pressed_no_signal(on)
 		var has_icon := i < _icons.size() and str(_icons[i]) != ""
 		b.text = "" if icon_only and has_icon else str(_labels[i])
-		var text_color := UiTheme.ON_ACCENT if on else UiTheme.MUTED
+		var text_color := UiTheme.ON_ACCENT if on else (UiTheme.INK if stacked else UiTheme.MUTED)
 		for key in ["font_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
 			b.add_theme_color_override(key, text_color)
 		b.add_theme_color_override("font_hover_color", UiTheme.ON_ACCENT if on else UiTheme.INK)
@@ -73,9 +81,17 @@ func restyle() -> void:
 		if has_icon:
 			UiIcon.apply(b, str(_icons[i]), 18, text_color, UiTheme.ON_ACCENT)
 			b.add_theme_constant_override("h_separation", 4)
-		var seg := UiTheme.style(UiTheme.TEAL if on else Color.TRANSPARENT, UiTheme.RADIUS_PILL)
-		seg.content_margin_left = 12
-		seg.content_margin_right = 12
+			if stacked:
+				b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		b.custom_minimum_size.y = 52 if stacked else 42
+		var seg := UiTheme.style(UiTheme.TEAL if on else Color.TRANSPARENT,
+			UiTheme.RADIUS_S if stacked else UiTheme.RADIUS_PILL)
+		seg.content_margin_left = 4 if stacked else 12
+		seg.content_margin_right = 4 if stacked else 12
+		if stacked:
+			seg.content_margin_top = 6
+			seg.content_margin_bottom = 6
 		var hover := seg.duplicate() as StyleBoxFlat
 		if not on:
 			hover.bg_color = Color(UiTheme.INK, 0.06)
@@ -83,4 +99,4 @@ func restyle() -> void:
 		b.add_theme_stylebox_override("pressed", seg)
 		b.add_theme_stylebox_override("hover", hover)
 		b.add_theme_stylebox_override("hover_pressed", seg)
-		b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
+		b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_S if stacked else UiTheme.RADIUS_PILL))
