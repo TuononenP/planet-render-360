@@ -218,6 +218,18 @@ func _run() -> void:
 			failures.append("tapping a prediction should select Paris (lat=%f name=%s)" % [picker._lat, picker.selected_name])
 		if picker._suggest_panel.visible:
 			failures.append("prediction panel should hide after selection")
+	# The spinner waits BUSY_DELAY after typing, and goes when the answer lands.
+	picker._search.text = "xyzzy"
+	picker._on_search_text_changed("xyzzy")
+	if picker._search_busy.visible:
+		failures.append("spinner should not show the instant text is typed")
+	await create_timer(MapSearch.BUSY_DELAY + 0.1).timeout
+	if not picker._search_busy.visible:
+		failures.append("spinner should show after the typing pause")
+	MapSearch.ensure_searcher(picker)
+	picker._searcher.suggestions_ready.emit("xyzzy", [])
+	if picker._search_busy.visible:
+		failures.append("spinner should hide when suggestions arrive")
 	picker.queue_free()
 
 	# --- Panels over the map: wheel and pinch in a sheet gap zoom the map under it ---

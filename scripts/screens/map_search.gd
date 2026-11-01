@@ -8,7 +8,12 @@ extends RefCounted
 ## "46.5, 7.9" typed or pasted selects that point directly, in either
 ## mode; the hash toggle switches the field to coordinate entry (mono,
 ## no predictions). A search with no match shows the design system's
-## no-results state with "Use coordinates".
+## no-results state with "Use coordinates". While remote predictions are
+## pending, a spinner appears in the field after BUSY_DELAY so the list
+## is known to be coming.
+
+## Typing this long without an answer shows the spinner.
+const BUSY_DELAY := 0.3
 
 static func ensure_searcher(p: MapPicker) -> void:
 	if p._searcher != null:
@@ -16,12 +21,14 @@ static func ensure_searcher(p: MapPicker) -> void:
 	p._searcher = SearchFetcher.new()
 	p.add_child(p._searcher)
 	p._searcher.succeeded.connect(func(n: String, la: float, lo: float) -> void:
+		set_busy(p, false)
 		p._on_picked(la, lo)
 		p.selected_name = n
 		p._show_place(n))
 	# A failed search keeps the selected place: no match opens the
 	# no-results state under the field; no connection is the offline state.
 	p._searcher.failed.connect(func(reason: String) -> void:
+		set_busy(p, false)
 		if reason == SearchFetcher.UNREACHABLE:
 			p.set_offline(true)
 		else:
@@ -29,6 +36,7 @@ static func ensure_searcher(p: MapPicker) -> void:
 	p._searcher.suggestions_ready.connect(func(query: String, results: Array) -> void:
 		if query != p._search.text.strip_edges().to_lower():
 			return  # stale response for text the user has already changed
+		set_busy(p, false)
 		if not results.is_empty():
 			show_suggestions(p, results))
 
@@ -46,6 +54,8 @@ static func on_text_changed(p: MapPicker, text: String) -> void:
 		return
 	show_suggestions(p, LocationData.suggestions_for(cleaned))
 	p._suggest_timer.start()
+	set_busy(p, false)
+	p._search_busy_timer.start(BUSY_DELAY)
 
 static func looks_like_coordinates(text: String) -> bool:
 	if not text.contains(","):
@@ -138,6 +148,7 @@ static func build_mode_toggle(p: MapPicker) -> void:
 	p._mode_btn.offset_bottom = 22
 	p._mode_btn.pressed.connect(func() -> void: set_coord_mode(p, not p._coord_mode, true))
 	p._search.add_child(p._mode_btn)
+	build_busy(p)
 	set_coord_mode(p, false)
 
 ## `focus`: the user switched, so put the caret in the field.
@@ -173,8 +184,41 @@ static func placeholder(p: MapPicker) -> String:
 	return "Search" if p._current_layout == Responsive.Layout.COMPACT else "Search places or coordinates"
 
 static func hide_suggestions(p: MapPicker) -> void:
+	set_busy(p, false)
 	if p._suggest_panel != null:
 		p._suggest_panel.visible = false
+
+## The in-field spinner (left of the clear button) and the pause before
+## it shows. Stopping it also cancels a pending show.
+static func build_busy(p: MapPicker) -> void:
+	p._search_busy = UiIcon.rect("loader-circle", 20, UiTheme.TEAL)
+	p._search_busy.visible = false
+	p._search_busy.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	p._search_busy.offset_left = -104
+	p._search_busy.offset_right = -84
+	p._search_busy.offset_top = -10
+	p._search_busy.offset_bottom = 10
+	p._search_busy.pivot_offset = Vector2(10, 10)
+	p._search.add_child(p._search_busy)
+	p._search_busy_timer = Timer.new()
+	p._search_busy_timer.one_shot = true
+	p._search_busy_timer.timeout.connect(func() -> void: set_busy(p, true))
+	p.add_child(p._search_busy_timer)
+
+static func set_busy(p: MapPicker, on: bool) -> void:
+	if p._search_busy == null:
+		return
+	if p._search_busy_tween != null:
+		p._search_busy_tween.kill()
+		p._search_busy_tween = null
+	if not on:
+		p._search_busy_timer.stop()
+	p._search_busy.visible = on
+	p._search_busy.modulate = UiTheme.TEAL
+	if on:
+		p._search_busy.rotation = 0.0
+		p._search_busy_tween = p._search_busy.create_tween().set_loops()
+		p._search_busy_tween.tween_property(p._search_busy, "rotation", TAU, 0.9).from(0.0)
 
 static func select(p: MapPicker, place: String, lat: float, lon: float) -> void:
 	hide_suggestions(p)

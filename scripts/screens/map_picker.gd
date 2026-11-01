@@ -92,6 +92,9 @@ var _landmark_key := ""
 var _landmark_card: LandmarkCard
 var _landmark_box: MarginContainer
 var _searcher: SearchFetcher
+var _search_busy: TextureRect
+var _search_busy_timer: Timer
+var _search_busy_tween: Tween
 # Selected place's real data (MapFacts), search modes (MapSearch) and
 # home states (MapHome).
 var _facts_fetcher: WeatherFetcher
