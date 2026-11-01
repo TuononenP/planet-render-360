@@ -200,6 +200,23 @@ func _run() -> void:
 	if not attr_ok:
 		failures.append("asphalt ribbons should use RoadSurface with lanes and width per vertex")
 	roads.free()
+	# A bay clipped to the extent (long collinear edges, regular interior
+	# lattice): Godot's Delaunay used to take minutes and return ~50x too
+	# many triangles for it.
+	var bay := PackedVector2Array([Vector2(-1200, -300), Vector2(1200, -300),
+		Vector2(1200, 365), Vector2(-1200, 365)])
+	var bay_root := Node3D.new()
+	var bay_t := Time.get_ticks_msec()
+	WaterSurface.add_polygon(bay_root, bay, [], 0.0, 9.4, WaterSurface.material(2))
+	var bay_ms := Time.get_ticks_msec() - bay_t
+	var bay_mi := bay_root.get_child(0) as MeshInstance3D if bay_root.get_child_count() > 0 else null
+	if bay_mi == null:
+		failures.append("a wide bay should build a surface")
+	else:
+		var bay_tris := (bay_mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		if bay_ms > 5000 or bay_tris > 20000 or bay_tris < 200:
+			failures.append("wide bay surface: %d triangles in %d ms" % [bay_tris, bay_ms])
+	bay_root.free()
 	# Ground cover on a park polygon.
 	for preset in [RenderSettings.Preset.FAST, RenderSettings.Preset.HIGH]:
 		var pd := _flat(preset)
