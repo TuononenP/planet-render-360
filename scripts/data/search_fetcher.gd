@@ -14,7 +14,7 @@ signal suggestions_ready(query: String, results: Array)
 
 const ENDPOINT := "https://nominatim.openstreetmap.org/search"
 const CACHE_DIR := "user://cache"
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 ## Failure copy in the design system's voice: what still works, no codes.
 const UNREACHABLE := "Search is unavailable right now. Coordinates like 46.5, 7.9 still work."
 const NO_MATCH := "No places match \"%s\". Try a landmark, a town or coordinates like 46.5, 7.9"
@@ -43,20 +43,28 @@ static func build_url(query: String) -> String:
 	return "%s?format=jsonv2&limit=1&q=%s" % [ENDPOINT, query.uri_encode()]
 
 static func build_suggest_url(query: String) -> String:
-	return "%s?format=jsonv2&limit=5&q=%s" % [ENDPOINT, query.uri_encode()]
+	# Ask for extra so a city ranked below POIs still makes the top 5.
+	return "%s?format=jsonv2&limit=10&q=%s" % [ENDPOINT, query.uri_encode()]
 
+## Settlement kinds, listed ahead of landmarks, streets and the like.
+const CITY_TYPES := ["city", "town", "municipality", "village"]
+
+## Cities first (a search can match a place inside the same city), the
+## server's own relevance order kept within each group.
 static func parse_results(text: String) -> Array:
-	var out: Array = []
+	var cities: Array = []
+	var others: Array = []
 	var parsed: Variant = JSON.parse_string(text)
 	if parsed is Array:
 		for item in parsed:
 			if item is Dictionary:
-				out.append({
+				var kind := str(item.get("addresstype", item.get("type", "")))
+				(cities if kind in CITY_TYPES else others).append({
 					"name": short_name(str(item.get("display_name", ""))),
 					"lat": float(item.get("lat", 0.0)),
 					"lon": float(item.get("lon", 0.0)),
 				})
-	return out
+	return cities + others
 
 static func parse_first(text: String) -> Dictionary:
 	var results := parse_results(text)

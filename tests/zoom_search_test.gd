@@ -189,6 +189,10 @@ func _run() -> void:
 		failures.append("parse_results fields wrong: %s" % str(results))
 	if SearchFetcher.parse_results("not json").size() != 0:
 		failures.append("parse_results should tolerate bad JSON")
+	var mixed := "[{\"display_name\":\"Paris Hotel, Paris, France\",\"addresstype\":\"tourism\",\"lat\":\"1\",\"lon\":\"1\"},{\"display_name\":\"Paris, Ile-de-France, France\",\"addresstype\":\"city\",\"lat\":\"48.8566\",\"lon\":\"2.3522\"}]"
+	var ordered := SearchFetcher.parse_results(mixed)
+	if ordered.size() != 2 or str(ordered[0].get("name", "")) != "Paris, Ile-de-France":
+		failures.append("parse_results should list cities first, got %s" % str(ordered))
 	var local := LocationData.suggestions_for("par")
 	if local.is_empty() or str(local[0].get("name", "")) != "Paris, France":
 		failures.append("local suggestions for 'par' should start with Paris, got %s" % str(local))
