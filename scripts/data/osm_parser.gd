@@ -34,6 +34,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			seen[key] = true
 		var raw_tags: Variant = el.get("tags", {})
 		var el_tags: Dictionary = raw_tags if raw_tags is Dictionary else {}
+		if (el_tags.has("building") or el_tags.has("building:part")) and OsmTags.underground(el_tags):
+			continue
 		# Point features (lighthouses, towers are often single nodes).
 		if str(el.get("type", "")) == "node" and el.has("lat") and el.has("lon"):
 			var node_arch := OsmTags.archetype_for(el_tags)

@@ -122,6 +122,25 @@ static func _tag_int(raw: Variant, lo: int, hi: int) -> int:
 		return 0
 	return clampi(s.to_int(), lo, hi)
 
+## A building or part that lies wholly below the surface: tagged
+## location=underground, or every `level` (single, "a;b" or "a-b")
+## below zero. Such a hall under a square must not stand on top of it.
+static func underground(tags: Dictionary) -> bool:
+	if str(tags.get("location", "")).strip_edges() == "underground":
+		return true
+	var raw := str(tags.get("level", "")).strip_edges()
+	if raw == "":
+		return false
+	for part in raw.replace(";", " ").split(" ", false):
+		var hi := part.strip_edges()
+		for i in range(1, hi.length()):
+			if hi[i] == "-" and hi[i - 1].is_valid_int():
+				hi = hi.substr(i + 1)  # a range "a-b": its top
+				break
+		if not hi.is_valid_float() or hi.to_float() >= 0.0:
+			return false
+	return true
+
 ## OSM boolean tags: anything present except explicit no/false/0.
 static func _tag_truthy(raw: Variant) -> bool:
 	var s := str(raw).strip_edges().to_lower()

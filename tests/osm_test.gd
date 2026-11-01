@@ -183,6 +183,7 @@ func _run() -> void:
 	_building_tag_checks(failures)
 	_roof_shape_checks(failures)
 	_material_map_checks(failures)
+	_underground_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -866,3 +867,26 @@ func _material_map_checks(failures: Array[String]) -> void:
 	for n in ["notacolour", "transparent", ""]:
 		if MaterialLibrary.parse_colour_tag(n).a != 0.0:
 			failures.append("parse_colour_tag(%s) should stay unparsed" % n)
+
+## Halls under a square (Seoul's King Sejong Story, level=-1) are not
+## built on top of it; ground-level and mixed buildings stay.
+func _underground_checks(failures: Array[String]) -> void:
+	for tags in [{"building": "yes", "level": "-1"}, {"building": "yes", "level": "-2;-1"},
+			{"building": "yes", "level": "-2--1"}, {"building": "yes", "location": "underground"}]:
+		if not OsmTags.underground(tags):
+			failures.append("underground building not recognised: %s" % tags)
+	for tags in [{"building": "yes"}, {"building": "yes", "level": "0"}, {"building": "yes", "level": "-1;0"},
+			{"building": "yes", "level": "-1-2"}, {"building": "yes", "level": "G"}]:
+		if OsmTags.underground(tags):
+			failures.append("surface building taken as underground: %s" % tags)
+	var text := JSON.stringify({"elements": [
+		{"type": "way", "id": 1, "tags": {"building": "yes", "level": "-1", "name": "Under"},
+			"geometry": [{"lat": 48.8566, "lon": 2.3522}, {"lat": 48.8567, "lon": 2.3522},
+				{"lat": 48.8567, "lon": 2.3524}, {"lat": 48.8566, "lon": 2.3524}, {"lat": 48.8566, "lon": 2.3522}]},
+		{"type": "way", "id": 2, "tags": {"building": "yes", "name": "Over"},
+			"geometry": [{"lat": 48.8570, "lon": 2.3522}, {"lat": 48.8571, "lon": 2.3522},
+				{"lat": 48.8571, "lon": 2.3524}, {"lat": 48.8570, "lon": 2.3524}, {"lat": 48.8570, "lon": 2.3522}]}]})
+	var names: Array = OsmFetcher.parse_features(text, 48.8566, 2.3522)["buildings"].map(
+		func(b: Dictionary) -> String: return str(b.get("name", "")))
+	if names != ["Over"]:
+		failures.append("parser should skip the underground building, got %s" % [names])
