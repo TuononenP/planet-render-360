@@ -146,6 +146,24 @@ func _map_markers() -> void:
 	map.picked.connect(func(_a: float, _b: float) -> void: got["picked"] = true)
 	map._tap(map._focus())
 	_check(not (got["landmark"] as Dictionary).is_empty() and not got["picked"], "marker tap selects the landmark, not a point")
+	# A click with touch emulation on: the emulated touch comes first,
+	# then the real button. Only one of them may tap.
+	got["landmark"] = {}
+	var hits := [0]
+	map.landmark_picked.connect(func(_s: Dictionary) -> void: hits[0] += 1)
+	var at := map._focus() + Vector2(6, -4)
+	for down in [true, false]:
+		var touch := InputEventScreenTouch.new()
+		touch.device = InputEvent.DEVICE_ID_EMULATION
+		touch.pressed = down
+		touch.position = at
+		map._gui_input(touch)
+		var mb := InputEventMouseButton.new()
+		mb.button_index = MOUSE_BUTTON_LEFT
+		mb.pressed = down
+		mb.position = at
+		map._gui_input(mb)
+	_check(hits[0] == 1 and not got["picked"], "an emulated touch does not tap the marker twice: %d" % hits[0])
 	map.landmarks.set_sites(WikiParse.parse_nearby(NEARBY))
 	map.zoom_level = 10
 	_check(map.landmarks.sites().size() == LocationData.landmarks().size(), "articles wait for zoom 11")

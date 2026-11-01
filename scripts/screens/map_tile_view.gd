@@ -337,6 +337,12 @@ func _tap(at: Vector2) -> void:
 		_pick_at(at)
 
 func _gui_input(event: InputEvent) -> void:
+	# Touch emulated from the mouse (and mouse from touch) arrives beside
+	# the real event, so one click tapped twice: a marker tap recentred
+	# the map, then the second tap picked the spot the marker had left.
+	if event.device == InputEvent.DEVICE_ID_EMULATION:
+		accept_event()
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		match mb.button_index:
