@@ -10,6 +10,8 @@ extends RefCounted
 ## Operates on the picker via `p`.
 
 const PAUSE_S := 0.6
+## A tapped landmark is shown at least this close.
+const SELECT_ZOOM := 13
 
 static func build(p: MapPicker) -> void:
 	p._wiki = WikiFetcher.new()
@@ -56,9 +58,13 @@ static func search_radius_m(lat: float, zoom: int, view: Vector2) -> int:
 	var r := view.length() / 2.0 * m_per_px
 	return clampi(int(ceil(r / 1000.0)) * 1000, 1000, 10000)
 
-## Select a tapped landmark: the pin, name and readouts follow it, and
-## its details load into the card.
+## Select a tapped landmark: the pin, name and readouts follow it, the
+## map zooms in to SELECT_ZOOM if it is further out, and its details load
+## into the card.
 static func select(p: MapPicker, site: Dictionary) -> void:
+	# Small islands (Suomenlinna) are missing from the map data below this
+	# zoom, which left the pin in open water.
+	p._canvas.zoom_level = maxi(p._canvas.zoom_level, SELECT_ZOOM)
 	p._on_picked(float(site["lat"]), float(site["lon"]))
 	p.selected_name = str(site["name"])
 	p.selected_landmark = site
