@@ -7,7 +7,11 @@ extends Control
 ## double-tap zooms in, a short tap places the pin, arrow keys pan and
 ## +/- zoom when focused. Attribution is always visible.
 ##
-## Progressive rendering, fast first paint: (1) a flat simple style
+## Drawing: by default the design system Map style from OpenFreeMap vector
+## tiles (VectorMapLayer, child of this view). `vector = false` keeps the
+## recoloured OSM raster path below, which the raster tests exercise.
+##
+## Raster progressive rendering, fast first paint: (1) a flat simple style
 ## (plain tile cells) draws instantly with no network, (2) one coarse
 ## tile per 4x4 detail block is fetched first and drawn scaled up as a
 ## blurry preview, (3) full-detail tiles stream in centre-out and
@@ -103,6 +107,9 @@ void fragment() {
 var centre_lat := 48.8566
 var centre_lon := 2.3522
 var zoom_level := 12
+## Draw the vector Map style (VectorMapLayer) instead of recoloured OSM
+## raster tiles. Set before the view enters the tree.
+var vector := true
 ## Where the picked place sits, as an offset from the view centre. The
 ## picker moves it into the part of the map that is not covered by a
 ## sheet or side panel, so the pin is never hidden behind chrome.
@@ -114,6 +121,7 @@ var focus_offset := Vector2.ZERO:
 			_pin.point = _focus()
 
 var _fetcher: TileFetcher
+var _vector: VectorMapLayer
 var _marker: Control
 var _pin: MapPin
 ## Landmark markers (MapLandmarks), fed by the picker.
@@ -142,13 +150,19 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
-	var shader := Shader.new()
-	shader.code = MAP_SHADER
-	var map_mat := ShaderMaterial.new()
-	map_mat.shader = shader
-	apply_map_palette(map_mat)
-	material = map_mat
-	# Under the pin, so a selected landmark wears the needle.
+	if vector:
+		_vector = VectorMapLayer.new()
+		_vector.view = self
+		add_child(_vector)
+	else:
+		var shader := Shader.new()
+		shader.code = MAP_SHADER
+		var map_mat := ShaderMaterial.new()
+		map_mat.shader = shader
+		apply_map_palette(map_mat)
+		material = map_mat
+	# Under the pin, so a selected landmark wears the needle (and above the
+	# vector map layer, so landmarks sit over its tiles and labels).
 	landmarks = MapLandmarks.new(self)
 	add_child(landmarks)
 	draw.connect(landmarks.queue_redraw)
@@ -161,11 +175,12 @@ func _ready() -> void:
 	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_marker.draw.connect(_draw_marker)
 	add_child(_marker)
-	_fetcher = TileFetcher.new()
-	add_child(_fetcher)
-	_fetcher.tile_ready.connect(func(z: int, x: int, y: int, tex: Texture2D) -> void:
-		_textures["%d/%d/%d" % [z, x, y]] = tex
-		queue_redraw())
+	if not vector:
+		_fetcher = TileFetcher.new()
+		add_child(_fetcher)
+		_fetcher.tile_ready.connect(func(z: int, x: int, y: int, tex: Texture2D) -> void:
+			_textures["%d/%d/%d" % [z, x, y]] = tex
+			queue_redraw())
 	resized.connect(func() -> void:
 		refresh_tiles()
 		_pin.point = _focus()
@@ -254,6 +269,9 @@ static func preview_tiles_for(wanted: Array, zoom: int) -> Array:
 	return preview
 
 func refresh_tiles() -> void:
+	if _vector != null:
+		_vector.refresh()
+		return
 	if _fetcher == null:
 		return
 	var tile_centre := _centre_tile()
@@ -512,6 +530,10 @@ func _find_ancestor(tx: int, ty: int) -> Vector3i:
 	return Vector3i(-1, -1, -1)
 
 func _draw() -> void:
+	if _vector != null:
+		# map-land under the tiles: the map reads as land from frame one.
+		draw_rect(Rect2(Vector2.ZERO, size), MapStyle.colors()["land"])
+		return
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.949, 0.937, 0.914))
 	var centre_px := TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level)
 	var tile_centre := Vector2i(centre_px / 256.0)
@@ -545,6 +567,10 @@ func _draw() -> void:
 func _focus() -> Vector2:
 	return size / 2.0 + focus_offset
 
+## Where the picked place sits on screen (centre plus focus_offset).
+func focus_point() -> Vector2:
+	return _focus()
+
 ## Points a material that includes RECOLOUR at the live theme's map
 ## palette. Theme switches rebuild the screens, so setting it when the
 ## material is made keeps it current.
@@ -566,7 +592,10 @@ func refresh_style() -> void:
 func _draw_marker() -> void:
 	# Attribution, bottom-right and never hidden (tile usage policy)
 	var font := get_theme_default_font()
-	var text := "© OpenStreetMap contributors"
+	# OpenFreeMap asks for "© OpenMapTiles" + OSM; its own name is optional
+	# and lives in the picker's attribution line, so the chip fits a phone.
+	var text := "© OpenStreetMap contributors · © OpenMapTiles" if _vector != null \
+		else "© OpenStreetMap contributors"
 	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 	var chip := UiTheme.style(UiTheme.CARD, UiTheme.RADIUS_XS, UiTheme.GLASS_EDGE)
 	_marker.draw_style_box(chip, Rect2(size - text_size - Vector2(16, 20), text_size + Vector2(12, 8)))

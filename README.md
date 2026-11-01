@@ -50,6 +50,7 @@ godot --headless --script tests/smoke_test.gd   # contract checks
 godot --headless --script tests/osm_test.gd     # OSM parser (offline fixture)
 godot --headless --script tests/tiles_test.gd   # tile math + pool drain
 godot --headless --script tests/progressive_map_test.gd # progressive map: preview first, detail centre-out
+godot --headless --script tests/vector_map_test.gd # vector map: MVT decode, Map style rules, tile build
 godot --headless --script tests/landmark_test.gd # landmark registry, models, placement
 godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile cancellation on far pans
 godot --headless --script tests/search_test.gd  # place-search parser

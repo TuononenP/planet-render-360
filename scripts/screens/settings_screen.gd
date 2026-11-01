@@ -20,7 +20,8 @@ signal units_changed
 static var reopen := false
 const SOURCES := [
 	["Map data", "© OpenStreetMap contributors · ODbL", "https://www.openstreetmap.org/copyright"],
-	["Map tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
+	["Map tiles", "OpenFreeMap © OpenMapTiles · MIT", "https://openfreemap.org/"],
+	["Globe tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
 	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
 	["Climate", "CHELSA V2.1 (Karger et al.) · CC BY 4.0", "https://chelsa-climate.org/"],

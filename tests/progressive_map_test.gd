@@ -56,6 +56,7 @@ func _run() -> void:
 
 	# --- 4) + 5) Live view: preview requested, ancestor stands in ---
 	var map := MapTileView.new()
+	map.vector = false  # these pin the raster tile path
 	root.add_child(map)
 	map.size = Vector2(390, 500)
 	await process_frame
