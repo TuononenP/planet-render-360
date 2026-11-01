@@ -121,10 +121,24 @@ static func _apron_append(verts: Array, normals: Array, colors: Array,
 	uvs.append(outer * 0.22)
 	return k
 
-static func _apron_quad(indices: Array, k0: int, k1: int) -> void:
+## Two triangles between stations k0 and k1, each wound to face up
+## (the material culls back faces, which Godot lit near-black).
+static func _apron_quad(verts: Array, indices: Array, k0: int, k1: int) -> void:
 	if k0 < 0 or k1 < 0:
 		return
-	indices.append_array([k0, k0 + 1, k1, k1, k0 + 1, k1 + 1])
+	_apron_tri(verts, indices, k0, k0 + 1, k1)
+	_apron_tri(verts, indices, k1, k0 + 1, k1 + 1)
+
+static func _apron_tri(verts: Array, indices: Array, a: int, b: int,
+		c: int) -> void:
+	var va: Vector3 = verts[a]
+	var vb: Vector3 = verts[b]
+	var vc: Vector3 = verts[c]
+	# Godot front faces wind clockwise seen from the normal side.
+	if (vc - va).cross(vb - va).y >= 0.0:
+		indices.append_array([a, b, c])
+	else:
+		indices.append_array([a, c, b])
 
 ## Apron band around one ring: water_inside rings blend outward
 ## (lake shores), island holes blend inward (their land is inside).
@@ -135,6 +149,8 @@ static func _apron_ring(verts: Array, normals: Array, colors: Array,
 	var inset := width * 0.15
 	var first := -1
 	var prev := -1
+	var prev_side := Vector2.ZERO
+	var broken := false
 	# Banded index: lagoon and island rings run to thousands of vertices.
 	var side := PolygonIndex.new(ring)
 	for i in ring.size():
@@ -152,15 +168,23 @@ static func _apron_ring(verts: Array, normals: Array, colors: Array,
 			var landward := n
 			if side.contains(probe) == water_inside:
 				landward = -n
+			# A strip never bridges a skipped stretch or a landward
+			# flip: either would stretch or twist one quad across it.
+			if prev >= 0 and landward.dot(prev_side) < 0.0:
+				prev = -1
+				broken = true
+			prev_side = landward
 			var k := _apron_append(verts, normals, colors, uvs,
 				c - landward * inset, c + landward * width,
 				ground, bound)
 			if first < 0 and k >= 0:
 				first = k
-			_apron_quad(indices, prev, k)
-			if k >= 0:
-				prev = k
-	_apron_quad(indices, prev, first)
+			_apron_quad(verts, indices, prev, k)
+			prev = k
+			if k < 0:
+				broken = true
+	if not broken:
+		_apron_quad(verts, indices, prev, first)
 
 ## Apron bands along both banks of a channel run, tucked slightly
 ## under the ribbon edge at the waterline.
@@ -184,9 +208,8 @@ static func _apron_line(verts: Array, normals: Array, colors: Array,
 				var k := _apron_append(verts, normals, colors, uvs,
 					c + n * half * 0.9, c + n * (half + width),
 					ground, bound)
-				_apron_quad(indices, prev, k)
-				if k >= 0:
-					prev = k
+				_apron_quad(verts, indices, prev, k)
+				prev = k
 
 ## Apron band on the land side of a coastline run: the side with a
 ## mapped non-water cover wins, else the higher ground (real data
@@ -197,6 +220,7 @@ static func _apron_coast(verts: Array, normals: Array, colors: Array,
 		bound: float) -> void:
 	var inset := width * 0.15
 	var prev := -1
+	var prev_side := Vector2.ZERO
 	for i in line.size() - 1:
 		var a := line[i]
 		var b := line[i + 1]
@@ -209,12 +233,14 @@ static func _apron_coast(verts: Array, normals: Array, colors: Array,
 		for s in steps:
 			var c := a.lerp(b, (float(s) + 0.5) / float(steps))
 			var landward := _coast_land_side(c, n, ground, width)
+			if landward.dot(prev_side) < 0.0:
+				prev = -1
+			prev_side = landward
 			var k := _apron_append(verts, normals, colors, uvs,
 				c - landward * inset, c + landward * width,
 				ground, bound)
-			_apron_quad(indices, prev, k)
-			if k >= 0:
-				prev = k
+			_apron_quad(verts, indices, prev, k)
+			prev = k
 
 static func _coast_land_side(c: Vector2, n: Vector2, ground: GroundTruth,
 		width: float) -> Vector2:

@@ -174,6 +174,10 @@ func _init(data: LocationData) -> void:
 				var a := lerpf(data.height_at(x0, z0), data.height_at(x0 + 1, z0), tx2)
 				var b := lerpf(data.height_at(x0, z0 + 1), data.height_at(x0 + 1, z0 + 1), tx2)
 				_surface[z * size + x] = lerpf(a, b, tz2)
+	# ArcticDEM (≥60°N) is a surface model: strip roofs and tree crowns.
+	if BareEarth.applies(data):
+		BareEarth.strip(_surface, size, _step_units, float(size) / 2.0,
+			data.buildings)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	_blur_pass(_surface, tmp, size)

@@ -265,9 +265,9 @@ static func shore_material() -> StandardMaterial3D:
 	m.vertex_color_is_srgb = true
 	m.albedo_texture = detail_texture()
 	m.roughness = 0.95
-	# Apron strips wind either way (landward flips per station),
-	# so back-face culling is off — like the water shader.
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# ShoreApron winds every triangle to face up, so back faces cull
+	# (drawn double-sided, a flipped face lit near-black).
+	m.cull_mode = BaseMaterial3D.CULL_BACK
 	_mat_mutex.lock()
 	if _shore_mat != null:
 		var raced: StandardMaterial3D = _shore_mat
