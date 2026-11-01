@@ -173,7 +173,7 @@ func _ready() -> void:
 
 	_announcer = Announcer.new()
 	add_child(_announcer)
-	_brand = Brand.rect(Brand.mark(), 32)
+	_brand = Brand.rect(Brand.mark(), 44)
 	add_child(_brand)
 
 	# Elapsed time while the scene builds (no byte count to show).
@@ -253,7 +253,7 @@ func _on_resized() -> void:
 	_margin.add_theme_constant_override("margin_right", 72 if _two_col else gutter)
 	_margin.add_theme_constant_override("margin_top", 64 if _two_col else 60)
 	_margin.add_theme_constant_override("margin_bottom", 32 if _two_col else gutter)
-	_brand.position = Vector2(gutter, 20 if phone else 24)
+	_brand.position = Vector2(gutter, 16 if phone else 24)
 	_brand.size = _brand.custom_minimum_size
 	_side.custom_minimum_size = Vector2(376 if _two_col else 0, 0)
 	_side.size_flags_vertical = Control.SIZE_SHRINK_CENTER if _two_col else Control.SIZE_EXPAND_FILL
