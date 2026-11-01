@@ -4,8 +4,9 @@ extends Control
 ## Design-system DataNotice over the 360 view: when live data did not
 ## arrive (LocationData.data_notes) a float-glass card says what happened
 ## and what the view does instead, in plain words (never a provider or
-## error code). "Dismiss" folds it into a "Partial data" badge that stays
-## in the corner and reopens it; "Try again" asks for a fresh generation.
+## error code). "Dismiss" folds it into the viewer's data-quality badge
+## ("Partial" / "Low"), which reopens it (open); "Try again" asks for a
+## fresh generation.
 ## It sits below the top bar so it never covers the dock or the scene's
 ## centre, and does not intercept drags anywhere outside itself.
 
@@ -18,7 +19,6 @@ var _notes: Array = []
 var _on_screen := false
 var _open := false
 var _card: PanelContainer
-var _badge: PanelContainer
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -48,19 +48,23 @@ func refresh_theme() -> void:
 func is_open() -> bool:
 	return _open
 
+## The viewer's data-quality badge was tapped.
+func open() -> void:
+	if _notes.is_empty():
+		return
+	_open = true
+	_apply_state()
+
 func _rebuild() -> void:
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
 	_card = null
-	_badge = null
 	visible = _on_screen and not _notes.is_empty()
 	if _notes.is_empty():
 		return
 	_card = _build_card()
-	_badge = _build_badge()
 	add_child(_card)
-	add_child(_badge)
 	_apply_state()
 	_layout()
 
@@ -77,9 +81,8 @@ func _build_card() -> PanelContainer:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 12)
 	col.add_child(head)
-	var icon := UiTheme.label("⚠", 20, _tone())
-	icon.custom_minimum_size = Vector2(24, 0)
-	icon.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	var icon := UiIcon.rect("triangle-alert", 20, _tone())
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	head.add_child(icon)
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -92,9 +95,7 @@ func _build_card() -> PanelContainer:
 	for note in _notes:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		var glyph := UiTheme.label(str(note["glyph"]), 14, UiTheme.MUTED)
-		glyph.custom_minimum_size = Vector2(18, 0)
-		row.add_child(glyph)
+		row.add_child(UiIcon.rect(str(note.get("icon", "info")), 18, UiTheme.MUTED))
 		row.add_child(UiTheme.label(str(note["layer"]), 14, UiTheme.INK, true))
 		var effect := _wrapped("· %s" % str(note["effect"]), UiTheme.MUTED)
 		row.add_child(effect)
@@ -128,34 +129,6 @@ func _text_button(text: String, color: Color, on_press: Callable) -> Button:
 	b.pressed.connect(on_press)
 	return b
 
-## The StatusBadge ("Partial data", caution tone) inside a glass chip, as
-## the design system asks for badges over the scene.
-func _build_badge() -> PanelContainer:
-	var chip := PanelContainer.new()
-	chip.mouse_filter = Control.MOUSE_FILTER_PASS
-	chip.add_theme_stylebox_override("panel", HudStyle.panel(UiTheme.RADIUS_PILL, 6, 4))
-	var b := Button.new()
-	b.text = "⚠  %s" % ("No live data" if DataNotes.is_error(_notes) else "Partial data")
-	b.custom_minimum_size = Vector2(0, 32)
-	b.tooltip_text = "Some data was unavailable. Show details."
-	b.add_theme_font_size_override("font_size", 13)
-	b.add_theme_font_override("font", UiTheme.sans(600))
-	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(key, _tone())
-	var outline := UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_XS, _tone())
-	outline.content_margin_top = 2
-	outline.content_margin_bottom = 2
-	outline.content_margin_left = 8
-	outline.content_margin_right = 8
-	for state in ["normal", "hover", "pressed"]:
-		b.add_theme_stylebox_override(state, outline)
-	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_XS))
-	b.pressed.connect(func() -> void:
-		_open = true
-		_apply_state())
-	chip.add_child(b)
-	return chip
-
 func _dismiss() -> void:
 	_open = false
 	_apply_state()
@@ -163,7 +136,6 @@ func _dismiss() -> void:
 func _apply_state() -> void:
 	if _card != null:
 		_card.visible = _open
-		_badge.visible = not _open
 	_layout()
 
 func _layout() -> void:
@@ -173,10 +145,8 @@ func _layout() -> void:
 	var w := clampf(size.x - pad * 2.0, 280.0, float(CARD_W))
 	_card.custom_minimum_size.x = w
 	_card.position = Vector2(roundf((size.x - w) / 2.0), pad + TOP_BAR_H)
-	_badge.position = Vector2(pad, pad + TOP_BAR_H)
 	# Wrapped labels learn their height only once the width is known.
 	_card.reset_size()
-	_badge.reset_size()
 	_card.size.x = w
 	call_deferred("_settle")
 

@@ -15,6 +15,11 @@ var _http: HTTPRequest
 ## the true sun's local clock (T6.2); has_utc_offset is false until then.
 var utc_offset_s := 0
 var has_utc_offset := false
+## Ground elevation of the point (Open-Meteo's DEM, metres), and
+## whether the last failure was the device being offline.
+var elevation_m := 0.0
+var has_elevation := false
+var offline := false
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
@@ -50,16 +55,24 @@ static func parse_current(text: String) -> Dictionary:
 		}
 		if parsed.has("utc_offset_seconds"):
 			out["utc_offset_s"] = int(parsed["utc_offset_seconds"])
+		if parsed.has("elevation") and parsed["elevation"] != null:
+			out["elevation"] = float(parsed["elevation"])
 		return out
 	return {}
 
 func fetch(lat: float, lon: float) -> void:
 	var err := _http.request(URL_TEMPLATE % [lat, lon],
 		["User-Agent: %s" % USER_AGENT, "Accept: application/json"])
+	if err == ERR_BUSY:
+		_http.cancel_request()
+		err = _http.request(URL_TEMPLATE % [lat, lon],
+			["User-Agent: %s" % USER_AGENT, "Accept: application/json"])
 	if err != OK:
 		failed.emit("Weather request failed to start: %s" % err)
 
 func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	offline = result in [HTTPRequest.RESULT_CANT_CONNECT, HTTPRequest.RESULT_CANT_RESOLVE,
+		HTTPRequest.RESULT_CONNECTION_ERROR]
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		failed.emit("Weather failed (result=%d code=%d)" % [result, code])
 		return
@@ -70,5 +83,7 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 	if parsed.has("utc_offset_s"):
 		utc_offset_s = int(parsed["utc_offset_s"])
 		has_utc_offset = true
+	has_elevation = parsed.has("elevation")
+	elevation_m = float(parsed.get("elevation", 0.0))
 	succeeded.emit(float(parsed["temp"]), str(parsed["label"]),
 		float(parsed["cloud"]), int(parsed["code"]))

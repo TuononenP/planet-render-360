@@ -116,13 +116,15 @@ func _notice_checks(failures: Array[String]) -> void:
 	if card.size.y < card.get_combined_minimum_size().y - 1.0:
 		failures.append("card must be tall enough for its wrapped text")
 	_find_button(n, "Dismiss").pressed.emit()
-	if n.is_open() or not (n.get_child(1) as Control).visible or card.visible:
-		failures.append("Dismiss should fold the card into the Partial data badge")
-	if not _all_text(n).contains("Partial data"):
-		failures.append("the badge should read Partial data")
-	_find_button(n, "Partial data").pressed.emit()
+	if n.is_open() or card.visible:
+		failures.append("Dismiss should fold the card away (into the viewer's quality badge)")
+	n.open()  # the viewer's data-quality badge
 	if not n.is_open():
-		failures.append("the badge should reopen the card")
+		failures.append("the quality badge should reopen the card")
+	if HudParts.data_quality(DataNotes.describe(["map", "imagery"]))[0] != "Partial" \
+			or HudParts.data_quality([])[0] != "High" \
+			or HudParts.data_quality(DataNotes.describe(["elevation", "imagery", "map"]))[0] != "Low":
+		failures.append("data quality should read High / Partial / Low")
 	_find_button(n, "Try again").pressed.emit()
 	if retries[0] != 1:
 		failures.append("Try again should request a new generation once")

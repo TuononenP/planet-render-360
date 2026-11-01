@@ -2,31 +2,54 @@ class_name View360
 extends Control
 
 signal back_requested
+## Attribution tapped: open Settings → Data sources.
+signal data_sources_requested
+## Data-quality badge tapped: reopen the DataNotice.
+signal data_quality_requested
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
 var _rig: CameraRig
 var _world_root: Node3D
-var _place_pill: Label
-var _attribution_label: Label
-var _compass: Label
-var _sun_slider: HSlider
 var _sun: DirectionalLight3D
 var _atmos: AtmosphereRig
 var _governor: QualityGovernor
-var _quality_label: Label
 var _weather: WeatherFetcher
+# HUD (built and laid out by ViewChrome).
+var _hud: Control
+var _fade: Control
+var _callouts: ViewCallouts
+var _top: VBoxContainer
+var _top_right: HBoxContainer
+var _place_box: PanelContainer
+var _place_pill: Label
+var _place_coords: Label
+var _compass: CompassDial
+var _weather_chip: PanelContainer
+var _weather_icon: TextureRect
+var _weather_value: Label
 var _weather_label: Label
-var _top: HBoxContainer
+var _quality_badge: Button
+var _quality_label: Label
 var _sheet: PanelContainer
-var _bottom_root: VBoxContainer
+var _sun_arc: SunArc
+var _time_label: Label
+var _fullscreen_btn: Button
+var _gyro_btn: Button
+var _gyro_on := false
+var _exit_btn: Button
+var _attribution: Button
 var _hint: PanelContainer
 var _hint_timer: Timer
-var _sun_icon: Label
-var _time_label: Label
-var _now_btn: Button
+var _idle_timer: Timer
+var _fade_tween: Tween
+var _hud_hidden := false
+var _announcer: Announcer
+var _scrims: Array = []
+var _inspector_open := true
+var _sun_times_key: Array = []
+var _sun_times := Vector2(390.0, 1170.0)
 var _live_time := true
-var _setting_time := false
 var _time_hour := 12.0
 ## Still on the spawn's golden hour (no hour picked since opening).
 var _spawn_golden := false
@@ -41,7 +64,7 @@ var _season_building := false
 var _season_dirty := false
 ## Live build_location threads, joined before the view is freed.
 var _threads: Array[Thread] = []
-var _season_btn: OptionButton
+var _season_btn: SegmentedControl
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -80,10 +103,7 @@ func _ready() -> void:
 	_weather = WeatherFetcher.new()
 	add_child(_weather)
 	_weather.succeeded.connect(_on_weather)
-	_weather.failed.connect(func(_r: String) -> void:
-		if _weather_label != null:
-			_weather_label.text = ""
-			_weather_label.visible = false)
+	_weather.failed.connect(func(_r: String) -> void: ViewChrome.weather_failed(self))
 
 	_build_hud()
 
@@ -99,154 +119,9 @@ func _ready() -> void:
 	resized.connect(_on_resized)
 	_on_resized()
 
-## Heads-up layer (see HudStyle): smoked-glass pills up top, a slim
-## floating dock below and a drag hint that fades once the user looks
-## around, so the scene keeps the screen.
+## Heads-up layer: the design system's viewer HUD (see ViewChrome).
 func _build_hud() -> void:
-	_top = HBoxContainer.new()
-	_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_top.add_theme_constant_override("separation", 10)
-	_top.offset_left = 16
-	_top.offset_top = 16
-	_top.offset_right = -16
-	add_child(_top)
-	var back_btn := HudStyle.button("←  Map", Vector2(96, 52), 16, 26)
-	back_btn.pressed.connect(func() -> void: back_requested.emit())
-	_top.add_child(back_btn)
-	var place := PanelContainer.new()
-	place.custom_minimum_size = Vector2(0, 52)
-	place.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	place.add_theme_stylebox_override("panel", HudStyle.panel(26, 18, 6))
-	_top.add_child(place)
-	var place_col := VBoxContainer.new()
-	place_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	place_col.add_theme_constant_override("separation", 0)
-	place.add_child(place_col)
-	_place_pill = HudStyle.label("◉  Paris, France", 16)
-	_place_pill.clip_text = true
-	_place_pill.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	place_col.add_child(_place_pill)
-	_weather_label = HudStyle.label("", 12, HudStyle.ACCENT)
-	_weather_label.visible = false
-	place_col.add_child(_weather_label)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_top.add_child(spacer)
-	var compass_disc := PanelContainer.new()
-	compass_disc.custom_minimum_size = Vector2(56, 56)
-	compass_disc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var disc_style := HudStyle.glass(28, HudStyle.EDGE, HudStyle.GLASS_STRONG, 0, 4)
-	disc_style.set_border_width_all(1)
-	compass_disc.add_theme_stylebox_override("panel", disc_style)
-	_top.add_child(compass_disc)
-	var compass_col := VBoxContainer.new()
-	compass_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	compass_col.add_theme_constant_override("separation", -4)
-	compass_disc.add_child(compass_col)
-	var needle := HudStyle.label("▲", 11, HudStyle.ACCENT)
-	needle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	compass_col.add_child(needle)
-	_compass = HudStyle.label("N", 15)
-	_compass.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	compass_col.add_child(_compass)
-
-	# Bottom: drag hint over a slim floating dock, both centred.
-	_bottom_root = VBoxContainer.new()
-	_bottom_root.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_bottom_root.alignment = BoxContainer.ALIGNMENT_END
-	_bottom_root.add_theme_constant_override("separation", 12)
-	_bottom_root.offset_left = 16
-	_bottom_root.offset_right = -16
-	_bottom_root.offset_top = -380
-	_bottom_root.offset_bottom = -16
-	add_child(_bottom_root)
-	_hint = PanelContainer.new()
-	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint.add_theme_stylebox_override("panel", HudStyle.panel(20, 16, 8))
-	var hint_label := HudStyle.label("✥  Drag to look around · Pinch or scroll to zoom", 13, HudStyle.TEXT)
-	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint.add_child(hint_label)
-	_bottom_root.add_child(_hint)
-	_hint_timer = Timer.new()
-	_hint_timer.one_shot = true
-	_hint_timer.wait_time = 6.0
-	_hint_timer.timeout.connect(_dismiss_hint)
-	add_child(_hint_timer)
-	_sheet = PanelContainer.new()
-	_sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_sheet.add_theme_stylebox_override("panel", HudStyle.panel(28, 18, 14))
-	_bottom_root.add_child(_sheet)
-
-	var dock := VBoxContainer.new()
-	dock.add_theme_constant_override("separation", 12)
-	_sheet.add_child(dock)
-	var sun_row := HBoxContainer.new()
-	sun_row.add_theme_constant_override("separation", 8)
-	dock.add_child(sun_row)
-	_sun_icon = HudStyle.label("☀", 20, HudStyle.ACCENT)
-	_sun_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	sun_row.add_child(_sun_icon)
-	var prev_btn := HudStyle.button("‹", Vector2(44, 44), 20, 22)
-	prev_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) - 1, 0, 24)))
-	sun_row.add_child(prev_btn)
-	_sun_slider = HSlider.new()
-	_sun_slider.min_value = 0.0
-	_sun_slider.max_value = 23.0
-	_sun_slider.step = 1.0
-	_sun_slider.tick_count = 24
-	_sun_slider.ticks_on_borders = true
-	_sun_slider.value = 12
-	_sun_slider.focus_mode = Control.FOCUS_NONE
-	_sun_slider.custom_minimum_size = Vector2(0, 44)
-	_sun_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_sun_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	HudStyle.apply_slider(_sun_slider)
-	_sun_slider.value_changed.connect(_on_time_slider_changed)
-	sun_row.add_child(_sun_slider)
-	var next_btn := HudStyle.button("›", Vector2(44, 44), 20, 22)
-	next_btn.pressed.connect(func() -> void: set_time_of_day(wrapi(int(floor(_time_hour)) + 1, 0, 24)))
-	sun_row.add_child(next_btn)
-	_time_label = HudStyle.label("12:00", 24)
-	_time_label.custom_minimum_size = Vector2(66, 0)
-	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	sun_row.add_child(_time_label)
-
-	var mode_row := HBoxContainer.new()
-	mode_row.add_theme_constant_override("separation", 10)
-	dock.add_child(mode_row)
-	_season_btn = OptionButton.new()
-	for i in LocationData.SEASON_NAMES.size():
-		_season_btn.add_item("❋  %s" % LocationData.SEASON_NAMES[i], i)
-	_season_btn.select(LocationData.Season.SUMMER)
-	_season_btn.focus_mode = Control.FOCUS_NONE
-	_season_btn.custom_minimum_size = Vector2(0, 44)
-	_season_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_season_btn.add_theme_font_size_override("font_size", 15)
-	HudStyle.apply_option(_season_btn)
-	_season_btn.item_selected.connect(_on_season_selected)
-	mode_row.add_child(_season_btn)
-	_now_btn = HudStyle.button("Now", Vector2(120, 44), 14, 18)
-	_now_btn.pressed.connect(use_live_time)
-	mode_row.add_child(_now_btn)
-
-	var rule := ColorRect.new()
-	rule.color = HudStyle.EDGE
-	rule.custom_minimum_size = Vector2(0, 1)
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dock.add_child(rule)
-	_quality_label = HudStyle.label("High · 60 fps", 12, HudStyle.TEXT_DIM)
-	_quality_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dock.add_child(_quality_label)
-	_attribution_label = HudStyle.label("", 12, HudStyle.TEXT_DIM)
-	_attribution_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_attribution_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dock.add_child(_attribution_label)
-
-## Rebuild the HUD after an accent change: its styleboxes bake the
-## palette in at creation, so the simplest correct re-skin is a fresh
-## build with the visible state carried over.
+	ViewChrome.build(self)
 
 # --- Delegators: implementation in ViewChrome / ViewConditions. ---
 func refresh_theme() -> void:
@@ -257,9 +132,6 @@ func _dismiss_hint() -> void:
 
 func _show_hint() -> void:
 	ViewChrome._show_hint(self)
-
-func _fit_place_pill() -> void:
-	ViewChrome._fit_place_pill(self)
 
 func _on_look_changed() -> void:
 	ViewChrome._on_look_changed(self)
@@ -287,9 +159,6 @@ func use_live_time() -> void:
 
 func _apply_current_time() -> void:
 	ViewConditions._apply_current_time(self)
-
-func _on_time_slider_changed(value: float) -> void:
-	ViewConditions._on_time_slider_changed(self, value)
 
 func _sync_time_ui() -> void:
 	ViewConditions._sync_time_ui(self)
@@ -399,17 +268,14 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_season_btn.select(data.season)
 	_atmos.set_season(data.season)
 	_atmos.set_place(data.latitude, data.longitude)
-	_place_pill.text = "◉  %s" % data.place_name
-	_fit_place_pill()
 	_show_hint()
-	if _attribution_label != null:
-		_attribution_label.text = data.attribution
 	if prebuilt.is_empty():
 		_ground = GroundTruth.new(data)
 		_rebuild_world()
 	else:
 		_ground = prebuilt[0]
 		_rebuild_world(prebuilt[1])
+	ViewChrome.show_place(self, data)
 	# Spawn at golden hour (PRD §3.3): the judged condition for every
 	# place, now the place's own (T6.2: the hour the true afternoon sun
 	# sits at the reference elevation). The slider still leaves it.
@@ -491,6 +357,28 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_rig.handle_drag(event.relative)
 		_on_look_changed()
+
+## Any input while the view is up brings the HUD back (ViewChrome.wake).
+func _input(event: InputEvent) -> void:
+	if is_visible_in_tree() and (event is InputEventMouseMotion or event is InputEventMouseButton \
+			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
+		ViewChrome.wake(self)
+
+## Viewer keys (arrows, +/−, [ ], 1–4, H, F, I, Esc for callouts).
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or not is_visible_in_tree():
+		return
+	if ViewChrome.handle_key(self, key):
+		get_viewport().set_input_as_handled()
+
+## Gyro look on mobile: pauses while a finger is on the scene.
+func _process(delta: float) -> void:
+	if _gyro_on and _touches.is_empty() and is_visible_in_tree():
+		var g := Input.get_gyroscope()
+		if g.length() > 0.01:
+			_rig.set_look(_rig.yaw + g.y * delta, _rig.pitch + g.x * delta)
+			_on_look_changed()
 
 func _touch_distance() -> float:
 	if _touches.size() < 2:

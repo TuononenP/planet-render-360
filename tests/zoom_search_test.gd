@@ -101,9 +101,15 @@ func _run() -> void:
 	if cam.fov <= fov0:
 		failures.append("360 wheel-down should zoom back out (fov %f)" % cam.fov)
 
-	# --- Time of day: 24 slots, distinct sun, live Now mode ---
-	if view._sun_slider.step != 1.0 or view._sun_slider.max_value != 23.0:
-		failures.append("time slider should offer 24 hourly slots (0-23, step 1)")
+	# --- Time of day: the sun arc, distinct sun, live Now mode ---
+	if view._sun_arc == null:
+		failures.append("the 360 view should offer the sun arc scrubber")
+	ViewConditions.set_time_minutes(view, 14 * 60 + 30)
+	if view._time_label.text != "14:30" or view._live_time:
+		failures.append("scrubbing to 14:30 should read 14:30 and leave live time, got %s" % view._time_label.text)
+	var rise_set := ViewConditions.sun_times(view)
+	if not (rise_set.x < rise_set.y):
+		failures.append("sunrise should come before sunset, got %s" % rise_set)
 	view.set_time_of_day(12)
 	if view._live_time:
 		failures.append("picking an hour slot should leave live mode")
@@ -214,8 +220,90 @@ func _run() -> void:
 			failures.append("prediction panel should hide after selection")
 	picker.queue_free()
 
+	# --- Panels over the map: wheel and pinch in a sheet gap zoom the map under it ---
+	var panels := MapPicker.new()
+	root.add_child(panels)
+	panels.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panels.size = Vector2(390, 844)
+	await process_frame
+	await process_frame
+	var pcanvas := panels._canvas
+	var pz0 := pcanvas.zoom_level
+	panels._sheet.gui_input.emit(_wheel(MOUSE_BUTTON_WHEEL_UP, Vector2(60, 30)))
+	if pcanvas.zoom_level != pz0 + 1:
+		failures.append("wheel over the sheet should zoom the map (was %d, now %d)" % [pz0, pcanvas.zoom_level])
+	var pz1 := pcanvas.zoom_level
+	var pinch_a := InputEventScreenTouch.new()
+	pinch_a.index = 0
+	pinch_a.pressed = true
+	pinch_a.position = Vector2(60, 30)
+	panels._sheet.gui_input.emit(pinch_a)
+	var pinch_b := InputEventScreenTouch.new()
+	pinch_b.index = 1
+	pinch_b.pressed = true
+	pinch_b.position = Vector2(120, 30)
+	panels._sheet.gui_input.emit(pinch_b)
+	var pinch_out := InputEventScreenDrag.new()
+	pinch_out.index = 1
+	pinch_out.position = Vector2(220, 30)
+	panels._sheet.gui_input.emit(pinch_out)
+	if pcanvas.zoom_level != pz1 + 1:
+		failures.append("two fingers spreading on the sheet should zoom in (now %d)" % pcanvas.zoom_level)
+	var pz2 := pcanvas.zoom_level
+	var magnify := InputEventMagnifyGesture.new()
+	magnify.factor = 1.4
+	magnify.position = Vector2(100, 200)
+	panels._side.gui_input.emit(magnify)
+	if pcanvas.zoom_level != pz2 + 1:
+		failures.append("trackpad pinch over the side panel should zoom in (now %d)" % pcanvas.zoom_level)
+	panels.queue_free()
+
+	# --- A scroll area with room to scroll keeps the wheel; a full one passes it on ---
+	var scroll := ScrollContainer.new()
+	scroll.size = Vector2(200, 100)
+	var tall := Control.new()
+	tall.custom_minimum_size = Vector2(200, 400)
+	scroll.add_child(tall)
+	root.add_child(scroll)
+	await process_frame
+	await process_frame
+	if not MapTileView._can_scroll(scroll):
+		failures.append("a scroll area with room to scroll should keep the wheel")
+	tall.custom_minimum_size = Vector2(200, 50)
+	await process_frame
+	await process_frame
+	if MapTileView._can_scroll(scroll):
+		failures.append("a scroll area that fits should pass the wheel on to the map")
+	scroll.queue_free()
+
+	# --- Globe: two fingers spreading zoom into the flat map ---
+	var globe := GlobeView.new()
+	root.add_child(globe)
+	globe.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	globe.size = Vector2(390, 844)
+	await process_frame
+	var globe_zoomed: Array = []
+	globe.zoom_to_map.connect(func(_la: float, _lo: float) -> void: globe_zoomed.append(true))
+	var g_a := InputEventScreenTouch.new()
+	g_a.index = 0
+	g_a.pressed = true
+	g_a.position = Vector2(150, 400)
+	globe._gui_input(g_a)
+	var g_b := InputEventScreenTouch.new()
+	g_b.index = 1
+	g_b.pressed = true
+	g_b.position = Vector2(240, 400)
+	globe._gui_input(g_b)
+	var g_out := InputEventScreenDrag.new()
+	g_out.index = 1
+	g_out.position = Vector2(330, 400)
+	globe._gui_input(g_out)
+	if globe_zoomed.size() != 1:
+		failures.append("two fingers spreading on the globe should zoom to the map once (got %d)" % globe_zoomed.size())
+	globe.queue_free()
+
 	if failures.is_empty():
-		print("ZOOM_SEARCH OK: map pan/wheel/pinch, 360 wheel zoom, viewport sizing, search predictions, 24h + live time")
+		print("ZOOM_SEARCH OK: map pan/wheel/pinch, panel and globe zoom, 360 wheel zoom, viewport sizing, search predictions, 24h + live time")
 		quit(0)
 	else:
 		for f in failures:

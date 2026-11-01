@@ -438,6 +438,7 @@ func _await_climate(data: LocationData) -> void:
 		waited += get_process_delta_time()
 	if _climate_data.is_empty():
 		print("Climate (CHELSA) unavailable; latitude fallbacks")
+		_note("weather")
 		return
 	data.climate = _climate_data
 	data.attribution += " · Climate: CHELSA V2.1 (Karger et al.)"

@@ -7,19 +7,24 @@ extends RefCounted
 ## what the view does instead, and never a provider, API or error code
 ## (those stay in the log).
 
-## Layer key -> row shown to the user, in display order.
+## Layer key -> row shown to the user, in display order (`icon` is a
+## Lucide name in assets/icons/).
 const LAYERS := {
-	"elevation": {"layer": "Elevation", "effect": "terrain is simulated", "glyph": "▲"},
-	"imagery": {"layer": "Imagery", "effect": "ground colours are estimated", "glyph": "▦"},
-	"map": {"layer": "Map details", "effect": "buildings, roads and water are approximate", "glyph": "⌂"},
+	"elevation": {"layer": "Elevation", "effect": "terrain is simulated", "icon": "mountain"},
+	"imagery": {"layer": "Imagery", "effect": "ground colours are estimated", "icon": "layers"},
+	"map": {"layer": "Map details", "effect": "buildings, roads and water are approximate", "icon": "building-2"},
+	"weather": {"layer": "Weather", "effect": "the climate is estimated from latitude", "icon": "thermometer"},
 }
+## Layers whose loss alone means nothing live came back (offline);
+## the climate source can fail on its own while the rest is live.
+const CORE := ["elevation", "imagery", "map"]
 
 ## Rows for the layers that degraded, in LAYERS order; unknown keys drop.
 ## Each row records whether every layer the pipeline tried degraded
 ## (imagery is not tried on the Fast preset, so it cannot be missing).
 static func describe(keys: Array, imagery_attempted: bool = true) -> Array:
 	var offline := true
-	for key in LAYERS:
+	for key in CORE:
 		if not keys.has(key) and (imagery_attempted or key != "imagery"):
 			offline = false
 	var out: Array = []

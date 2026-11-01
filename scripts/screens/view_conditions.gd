@@ -25,6 +25,8 @@ static func _on_season_selected(v: View360, index: int) -> void:
 		v._season_dirty = false
 		var data := v._data
 		var built := await v.build_location(data, v._ground)
+		if built.size() < 2:
+			break  # stopped part-way: keep the current world
 		if data != v._data or v._season_dirty:
 			(built[1] as Node3D).free()
 			if data != v._data:
@@ -93,9 +95,8 @@ static func _precip_tint(v: View360) -> void:
 
 ## `prebuilt` is a build_location result; empty builds synchronously.
 static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: float, code: int) -> void:
-	if v._weather_label != null:
-		v._weather_label.text = "%.0f°C · %s" % [temp_c, label]
-		v._weather_label.visible = true
+	if v._weather_chip != null:
+		ViewChrome.set_weather(v, temp_c, label, code)
 	v._atmos.set_weather(code, cloud_cover)
 	_apply_precip(v, code)
 	apply_surface_state(v)
@@ -196,24 +197,65 @@ static func _apply_current_time(v: View360) -> void:
 	_precip_tint(v)
 	_sync_time_ui(v)
 
-static func _on_time_slider_changed(v: View360, value: float) -> void:
-	if v._setting_time:
-		return
-	set_time_of_day(v, int(value))
+## A minute of the place's day (the sun arc, the [ ] keys); leaves
+## live time like an hour slot does.
+static func set_time_minutes(v: View360, minutes: float) -> void:
+	v._live_time = false
+	v._spawn_golden = false
+	v._time_hour = fposmod(minutes, 1440.0) / 60.0
+	_apply_time(v, v._time_hour)
+	_sync_time_ui(v)
+
+## Sun arc jumps: sunrise, solar noon, sunset, or the middle of the night.
+static func jump_to(v: View360, kind: String) -> void:
+	var t := sun_times(v)
+	match kind:
+		"sunrise":
+			set_time_minutes(v, t.x)
+		"sunset":
+			set_time_minutes(v, t.y)
+		"moon":
+			set_time_minutes(v, (t.x + t.y) / 2.0 + 720.0)
+		_:
+			set_time_minutes(v, (t.x + t.y) / 2.0)
+
+## Sunrise and sunset (x, y) in minutes since local midnight for the
+## place and date, from the solar model at 10-minute steps (the sun's
+## upper limb at -0.833°). Polar night gives (720, 720), polar day
+## (0, 1440), so the arc's curve still sits right of the horizon.
+static func sun_times(v: View360) -> Vector2:
+	if v._atmos == null:
+		return Vector2(390.0, 1170.0)
+	var key := [v._atmos.latitude, v._atmos.longitude, v._atmos.solar_date(), v._atmos.utc_offset_h]
+	if v._sun_times_key == key:
+		return v._sun_times
+	var rise := -1.0
+	var set_m := -1.0
+	var prev := float(v._atmos.solar_at(0.0)["elevation"])
+	var any_up := prev > -0.833
+	for i in range(1, 145):
+		var m := float(i) * 10.0
+		var e := float(v._atmos.solar_at(m / 60.0)["elevation"])
+		any_up = any_up or e > -0.833
+		if prev <= -0.833 and e > -0.833 and rise < 0.0:
+			rise = m - 10.0 * (e + 0.833) / maxf(e - prev, 0.001)
+		elif prev > -0.833 and e <= -0.833:
+			set_m = m - 10.0 * (e + 0.833) / minf(e - prev, -0.001)
+		prev = e
+	var out := Vector2(rise, set_m)
+	if rise < 0.0 or set_m < 0.0:
+		out = Vector2(0.0, 1440.0) if any_up else Vector2(720.0, 720.0)
+	v._sun_times_key = key
+	v._sun_times = out
+	return out
 
 static func _sync_time_ui(v: View360) -> void:
-	if v._sun_slider == null:
+	if v._sun_arc == null:
 		return
-	v._setting_time = true
-	v._sun_slider.value = floor(v._time_hour)
-	v._setting_time = false
-	if v._live_time:
-		v._time_label.text = "%02d:%02d" % [int(v._time_hour), int(fmod(v._time_hour, 1.0) * 60.0 + 0.001)]
-		v._now_btn.text = "●  Live"
-	else:
-		v._time_label.text = "%02d:00" % int(v._time_hour)
-		v._now_btn.text = "↺  Now"
-	HudStyle.apply_live_chip(v._now_btn, v._live_time)
+	var t := sun_times(v)
+	var elev := v._atmos.solar_elevation if v._atmos != null else 0.0
+	v._sun_arc.set_state(v._time_hour * 60.0, t.x, t.y, elev, v._live_time)
+	ViewChrome.update_scrim(v)
 
 static func _apply_time(v: View360, hour_f: float) -> void:
 	if v._atmos == null:
