@@ -36,7 +36,7 @@ static func read(bytes: PackedByteArray, wanted: Dictionary) -> Dictionary:
 		var field := key >> 3
 		var wire := key & 7
 		if field == 3 and wire == WIRE_LEN:
-			var length := r._varint()
+			var length := r._len()
 			var end := mini(r._p + length, bytes.size())
 			var layer := r._layer(end, wanted)
 			r._p = end
@@ -63,6 +63,15 @@ func _varint() -> int:
 		shift += 7
 	return result
 
+## A length prefix. A corrupt one (negative after a 10-byte varint) ends
+## the read instead of moving _p backwards.
+func _len() -> int:
+	var n := _varint()
+	if n < 0:
+		_p = _b.size() + 1
+		return 0
+	return n
+
 static func _zigzag(n: int) -> int:
 	return (n >> 1) ^ -(n & 1)
 
@@ -73,7 +82,7 @@ func _skip(wire: int) -> void:
 		WIRE_64:
 			_p += 8
 		WIRE_LEN:
-			var length := _varint()
+			var length := _len()
 			_p += length
 		WIRE_32:
 			_p += 4
@@ -98,7 +107,7 @@ func _layer(end: int, wanted: Dictionary) -> Dictionary:
 	while _p < end:
 		var key := _varint()
 		if key >> 3 == 1 and key & 7 == WIRE_LEN:
-			name = _string(_varint())
+			name = _string(_len())
 			break
 		_skip(key & 7)
 	if not wanted.has(name):
@@ -114,7 +123,7 @@ func _layer(end: int, wanted: Dictionary) -> Dictionary:
 			else:
 				_skip(wire)
 			continue
-		var length := _varint()
+		var length := _len()
 		var sub_end := mini(_p + length, end)
 		match field:
 			2:
@@ -162,7 +171,7 @@ func _feature(end: int) -> Array:
 		if field == 3 and wire == WIRE_VARINT:
 			type = _varint()
 		elif (field == 2 or field == 4) and wire == WIRE_LEN:
-			var packed_len := _varint()  # read first: it advances _p
+			var packed_len := _len()  # read first: it advances _p
 			var packed_end := mini(_p + packed_len, end)
 			var arr := PackedInt32Array()
 			while _p < packed_end:
@@ -183,7 +192,7 @@ func _value(end: int) -> Variant:
 		var wire := key & 7
 		match field:
 			1:
-				v = _string(_varint())
+				v = _string(_len())
 			2:
 				if _p + 4 <= _b.size():
 					v = _b.decode_float(_p)

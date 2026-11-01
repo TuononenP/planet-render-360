@@ -270,6 +270,10 @@ static func preview_tiles_for(wanted: Array, zoom: int) -> Array:
 
 func refresh_tiles() -> void:
 	if _vector != null:
+		# Remember what was asked for, so a pan refreshes once per tile it
+		# crosses (pan_by_pixels), not on every motion event.
+		_requested_tile = _centre_tile()
+		_requested_zoom = zoom_level
 		_vector.refresh()
 		return
 	if _fetcher == null:

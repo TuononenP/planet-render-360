@@ -22,7 +22,8 @@ var _widths: Dictionary = {}
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Offsets too: the parent is already sized when we enter.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 ## New candidates in screen space; lays them out and redraws.
 func set_labels(candidates: Array, graticule: Array) -> void:
@@ -40,24 +41,31 @@ func _font(kind: String) -> Font:
 	var f: Font
 	match kind:
 		"country", "suburb", "state":
-			var v := FontVariation.new()
-			v.base_font = UiTheme.sans(600 if kind == "country" else 500)
-			v.spacing_glyph = 2 if kind == "country" else 1
-			f = v
+			f = _sans(600 if kind == "country" else 500, 2 if kind == "country" else 1)
 		"city", "peak", "landmark":
-			f = UiTheme.sans(500)
+			f = _sans(500, 0)
 		"water", "river":
+			# Hydrography in slanted serif: x_axis.y is the slant FreeType reads.
 			var v := FontVariation.new()
 			v.base_font = UiTheme.display()
-			v.variation_transform = Transform2D(Vector2(1, 0), Vector2(-0.2, 1), Vector2.ZERO)
+			v.variation_transform = Transform2D(Vector2(1.0, 0.2), Vector2(0.0, 1.0), Vector2.ZERO)
 			v.spacing_glyph = 1
 			f = v
 		"ele":
 			f = UiTheme.data(true)
 		_:
-			f = UiTheme.sans(400)
+			f = _sans(400, 0)
 	_fonts[kind] = f
 	return f
+
+## Instrument Sans at a weight and tracking, one variation deep on the font
+## file: a FontVariation over UiTheme.sans() would drop the inner weight.
+static func _sans(weight: int, tracking: int) -> Font:
+	var v := FontVariation.new()
+	v.base_font = load(UiTheme.FONT_SANS) as Font
+	v.variation_opentype = {"wght": weight}
+	v.spacing_glyph = tracking
+	return v
 
 func _color(kind: String) -> Color:
 	var c := MapStyle.colors()

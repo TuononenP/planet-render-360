@@ -2,17 +2,25 @@ class_name VectorTileBuilder
 extends RefCounted
 
 ## Turns a decoded vector tile (MvtReader) into draw batches for one style
-## zoom, in tile pixels (0..px_size): triangulated fills batched by order
-## and colour, polylines (dashes pre-cut into segments) batched the same
-## way, and label candidates. Pure data, so it runs on a worker thread
-## next to the decode; VectorTileNode only replays the batches.
+## zoom, in tile pixels (0..px_size): every fill and every line ends up in a
+## triangle mesh batched by draw order and colour (lines meshed by
+## LineMesher), plus label candidates. Pure data, so it runs on a worker
+## thread next to the decode; VectorTileNode only replays the meshes, one
+## canvas_item_add_triangle_array per batch.
 ##
-## Result: { "fills": [{order, color, points, indices}],
-##           "lines": [{order, color, width, polylines, segments}],
+## Result: { "batches": [{order, points, colors, indices}] sorted by order,
 ##           "labels": [{text, kind, priority, size, pos, angle, run, sub?}] }
-## each list sorted by order (labels by priority).
 
-static func build(decoded: Dictionary, zoom: float, colors: Dictionary, px_size: float) -> Dictionary:
+## Holes smaller than this (px²) are invisible; skipping them keeps a lake
+## district or an archipelago quick to bridge and triangulate.
+const MIN_HOLE_AREA := 4.0
+## At most this many holes per polygon, the largest first.
+const MAX_HOLES := 48
+
+## `cancel` is a one-element Array the owner sets to true to stop early
+## (the screen is leaving); the result is then {}.
+static func build(decoded: Dictionary, zoom: float, colors: Dictionary, px_size: float,
+		cancel: Array = [false]) -> Dictionary:
 	var fills: Dictionary = {}
 	var lines: Dictionary = {}
 	var labels: Array = []
@@ -22,6 +30,8 @@ static func build(decoded: Dictionary, zoom: float, colors: Dictionary, px_size:
 		var k := px_size / float(layer["extent"])
 		var xf := Transform2D().scaled(Vector2(k, k))
 		for f in layer["features"]:
+			if cancel[0]:
+				return {}
 			var feature: Dictionary = f
 			var tags: Dictionary = feature["tags"]
 			var ftype: int = feature["type"]
@@ -64,59 +74,98 @@ static func build(decoded: Dictionary, zoom: float, colors: Dictionary, px_size:
 		kept.append(label)
 	kept.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["priority"]) < int(b["priority"]))
-	return {"fills": _sorted(fills), "lines": _sorted(lines), "labels": kept}
-
-static func _sorted(batches: Dictionary) -> Array:
-	var out: Array = batches.values()
-	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+	var batches: Array = fills.values()
+	for b in lines.values():
+		if cancel[0]:
+			return {}
+		var batch: Dictionary = b
+		var mesh := {"order": batch["order"], "points": PackedVector2Array(),
+			"colors": PackedColorArray(), "indices": PackedInt32Array()}
+		LineMesher.append(mesh, batch["lines"], float(batch["width"]), batch["color"],
+			not bool(batch["dashed"]))
+		batches.append(mesh)
+	batches.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return float(a["order"]) < float(b["order"]))
-	return out
+	return {"batches": batches, "labels": kept}
+
+static func _box_area(box: Rect2) -> float:
+	return box.size.x * box.size.y
 
 static func _add_polygon(fills: Dictionary, fill: Array, rings: Array, xf: Transform2D) -> void:
 	if rings.is_empty():
 		return
 	var outer: PackedVector2Array = xf * (rings[0] as PackedVector2Array)
-	if _sub_pixel(outer):
+	if _box_area(RingGeometry.aabb(outer)) < MIN_HOLE_AREA:
 		return
-	# Sub-pixel holes are invisible; skipping them keeps continental tiles
-	# (an ocean with hundreds of islets) quick to bridge and triangulate.
 	var holes: Array = []
 	for i in range(1, rings.size()):
 		var hole: PackedVector2Array = xf * (rings[i] as PackedVector2Array)
-		if not _sub_pixel(hole):
+		if _box_area(RingGeometry.aabb(hole)) >= MIN_HOLE_AREA:
 			holes.append(hole)
+	if holes.size() > MAX_HOLES:
+		holes.sort_custom(func(a: PackedVector2Array, b: PackedVector2Array) -> bool:
+			return _box_area(RingGeometry.aabb(a)) > _box_area(RingGeometry.aabb(b)))
+		holes.resize(MAX_HOLES)
 	var ring := outer
+	var idx := PackedInt32Array()
 	if not holes.is_empty():
 		ring = RingGeometry.bridge_holes(outer, holes)
-	var idx := Geometry2D.triangulate_polygon(ring)
+		idx = Geometry2D.triangulate_polygon(ring)
+		if not idx.is_empty():
+			idx = _drop_hole_triangles(ring, idx, holes)
+	if idx.is_empty():
+		# No holes, or the keyhole ring would not triangulate: the outer
+		# ring alone beats losing a whole lake or coastline.
+		ring = outer
+		idx = Geometry2D.triangulate_polygon(ring)
 	if idx.is_empty():
 		return  # degenerate after clipping at the tile edge
-	if not holes.is_empty():
-		idx = RingGeometry.drop_hole_triangles(ring, idx, holes)
 	var color: Color = fill[1]
 	var key := "%.2f|%s" % [float(fill[0]), color.to_html(true)]
 	if not fills.has(key):
-		fills[key] = {"order": float(fill[0]), "color": color,
-			"points": PackedVector2Array(), "indices": PackedInt32Array()}
+		fills[key] = {"order": float(fill[0]), "points": PackedVector2Array(),
+			"colors": PackedColorArray(), "indices": PackedInt32Array()}
 	var batch: Dictionary = fills[key]
 	# Take the arrays out (leaving empties) so appends don't copy them:
 	# packed arrays are copy-on-write while the dictionary still holds one.
 	var points: PackedVector2Array = batch["points"]
+	var cols: PackedColorArray = batch["colors"]
 	var indices: PackedInt32Array = batch["indices"]
 	batch["points"] = PackedVector2Array()
+	batch["colors"] = PackedColorArray()
 	batch["indices"] = PackedInt32Array()
 	var offset := points.size()
 	points.append_array(ring)
+	var start := cols.size()
+	cols.resize(start + ring.size())
+	for i in ring.size():
+		cols[start + i] = color
 	for v in idx:
 		indices.append(v + offset)
 	batch["points"] = points
+	batch["colors"] = cols
 	batch["indices"] = indices
 
-static func _sub_pixel(ring: PackedVector2Array) -> bool:
-	var box := RingGeometry.aabb(ring)
-	return box.size.x < 1.0 and box.size.y < 1.0
+## RingGeometry.drop_hole_triangles with a bounding-box check first, so a
+## triangle only runs point-in-ring against holes it could be inside.
+static func _drop_hole_triangles(ring: PackedVector2Array, idx: PackedInt32Array, holes: Array) -> PackedInt32Array:
+	var boxes: Array[Rect2] = []
+	for h in holes:
+		boxes.append(RingGeometry.aabb(h))
+	var out := PackedInt32Array()
+	for t in idx.size() / 3:
+		var c := (ring[idx[t * 3]] + ring[idx[t * 3 + 1]] + ring[idx[t * 3 + 2]]) / 3.0
+		var in_hole := false
+		for i in holes.size():
+			if boxes[i].has_point(c) and RingGeometry.point_in_ring(c, holes[i]):
+				in_hole = true
+				break
+		if not in_hole:
+			out.append_array(PackedInt32Array([idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]]))
+	return out
 
-## spec: [order, colour, width, dash] from MapStyle.lines_for.
+## spec: [order, colour, width, dash] from MapStyle.lines_for. Dashed lines
+## are cut here and meshed as separate pieces.
 static func _add_line(lines: Dictionary, spec: Array, line: PackedVector2Array) -> void:
 	var width: float = spec[2]
 	if width <= 0.05 or line.size() < 2:
@@ -126,17 +175,16 @@ static func _add_line(lines: Dictionary, spec: Array, line: PackedVector2Array) 
 	var key := "%.2f|%s|%.2f|%s" % [float(spec[0]), color.to_html(true), width, str(dash)]
 	if not lines.has(key):
 		lines[key] = {"order": float(spec[0]), "color": color, "width": width,
-			"polylines": [], "segments": PackedVector2Array()}
-	var batch: Dictionary = lines[key]
+			"dashed": not dash.is_empty(), "lines": []}
+	var pieces: Array = lines[key]["lines"]
 	if dash.is_empty():
-		(batch["polylines"] as Array).append(line)
-	else:
-		var segments: PackedVector2Array = batch["segments"]
-		batch["segments"] = PackedVector2Array()  # no copy-on-write while appending
-		segments.append_array(dash_segments(line, float(dash[0]) * width, float(dash[1]) * width))
-		batch["segments"] = segments
+		pieces.append(line)
+		return
+	var segs := dash_segments(line, float(dash[0]) * width, float(dash[1]) * width)
+	for i in range(0, segs.size() - 1, 2):
+		pieces.append(PackedVector2Array([segs[i], segs[i + 1]]))
 
-## A polyline cut into on/off dashes, as segment pairs for draw_multiline.
+## A polyline cut into on/off dashes, as segment pairs.
 ## The pattern carries across vertices so corners don't restart it.
 static func dash_segments(line: PackedVector2Array, on: float, off: float) -> PackedVector2Array:
 	var out := PackedVector2Array()

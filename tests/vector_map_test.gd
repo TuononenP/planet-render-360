@@ -82,6 +82,8 @@ func _run() -> void:
 	junk.resize(64)
 	junk.fill(0xff)
 	MvtReader.read(junk, wanted)
+	# A layer whose length decodes negative (10-byte varint) must not rewind.
+	MvtReader.read(PackedByteArray([0x1a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0x1a]), wanted)
 
 	var tilejson := '{"tiles": ["https://tiles.openfreemap.org/planet/20261025_080012_pt/{z}/{x}/{y}.pbf"]}'
 	var path := VectorTileFetcher.tiles_path_from_tilejson(tilejson)
@@ -94,6 +96,12 @@ func _run() -> void:
 		failures.append("gzip body should inflate to the tile")
 	if VectorTileFetcher.inflate(bytes) != bytes:
 		failures.append("a plain body should pass through inflate")
+	var portal := "<html>Sign in to Wi-Fi</html>".to_utf8_buffer()
+	if not VectorTileFetcher.looks_like_tile(VectorTileFetcher.Kind.VECTOR, bytes) \
+			or not VectorTileFetcher.looks_like_tile(VectorTileFetcher.Kind.VECTOR, bytes.compress(FileAccess.COMPRESSION_GZIP)) \
+			or VectorTileFetcher.looks_like_tile(VectorTileFetcher.Kind.VECTOR, portal) \
+			or VectorTileFetcher.looks_like_tile(VectorTileFetcher.Kind.DEM, portal):
+		failures.append("tile bodies are recognised and a captive portal page is not")
 
 	var primary: Array = MapStyle.ROADS[5][2]
 	if absf(MapStyle.width(primary, 14.0) - 4.5) > 1e-4 or MapStyle.width(primary, 3.0) != 0.6:
@@ -120,21 +128,40 @@ func _run() -> void:
 		failures.append("minor streets wait for zoom 12")
 
 	var built := VectorTileBuilder.build(tile, 13.0, MapStyle.NIGHT, 512.0)
-	var fills: Array = built["fills"]
+	var batches: Array = built["batches"]
+	var fills := batches.filter(func(b: Dictionary) -> bool: return float(b["order"]) == 12.0)
 	if fills.size() != 1 or (fills[0]["indices"] as PackedInt32Array).size() != 8 * 3:
 		# A square with a square hole bridged into one ring: 8 triangles.
 		failures.append("lake should triangulate to 8 triangles around its hole, got %s" % [fills])
 	else:
 		var pts: PackedVector2Array = fills[0]["points"]
 		var idx: PackedInt32Array = fills[0]["indices"]
+		if (fills[0]["colors"] as PackedColorArray).size() != pts.size():
+			failures.append("fill meshes carry a colour per vertex")
 		for t in idx.size() / 3:
 			var c := (pts[idx[t * 3]] + pts[idx[t * 3 + 1]] + pts[idx[t * 3 + 2]]) / 3.0
 			if Rect2(50, 50, 25, 25).has_point(c):
 				failures.append("a lake triangle covers the island at %s" % c)
 				break
-	var lines: Array = built["lines"]
-	if lines.size() != 2 or float(lines[0]["order"]) < 40.0:
-		failures.append("bridge should give casing + fill above surface roads, got %d batches" % lines.size())
+	var roads := batches.filter(func(b: Dictionary) -> bool: return float(b["order"]) >= 40.0)
+	if roads.size() != 2 or float(roads[0]["order"]) > float(roads[1]["order"]):
+		failures.append("bridge should give casing then fill above surface roads, got %d batches" % roads.size())
+	for i in range(1, batches.size()):
+		if float(batches[i - 1]["order"]) > float(batches[i]["order"]):
+			failures.append("batches must be in one global draw order")
+			break
+	if not VectorTileBuilder.build(tile, 13.0, MapStyle.NIGHT, 512.0, [true]).is_empty():
+		failures.append("a cancelled build returns nothing")
+	var mesh := {"points": PackedVector2Array(), "colors": PackedColorArray(), "indices": PackedInt32Array()}
+	LineMesher.append(mesh, [PackedVector2Array([Vector2(0, 0), Vector2(10, 0)])], 4.0, Color.WHITE)
+	var mp: PackedVector2Array = mesh["points"]
+	var mc: PackedColorArray = mesh["colors"]
+	# One segment (8 vertices, 6 triangles) plus a round cap at each end
+	# (9 vertices, 8 triangles each).
+	if mp.size() != 8 + 2 * 9 or (mesh["indices"] as PackedInt32Array).size() != 3 * (6 + 2 * 8):
+		failures.append("line mesh size: %d points" % mp.size())
+	elif mc[0].a != 0.0 or mc[1].a != 1.0 or not mp[0].is_equal_approx(Vector2(0, 2.5)) and not mp[0].is_equal_approx(Vector2(0, -2.5)):
+		failures.append("line mesh: feathered edge at width/2 + 0.5 should be clear")
 	var kinds: Array = (built["labels"] as Array).map(func(l: Dictionary) -> String: return str(l["kind"]))
 	if not ("peak" in kinds) or ("landmark" in kinds):
 		failures.append("at zoom 13: peak labelled, landmark not yet (zoom 14+): %s" % [kinds])
@@ -144,20 +171,37 @@ func _run() -> void:
 			or not dashes[1].is_equal_approx(Vector2(3, 0)):
 		failures.append("dash pattern: %s" % [dashes])
 
-	var cover := VectorMapLayer.tiles_for(Vector2(1000, 1000), Vector2(1280, 800), 6)
+	var cover := VectorMapLayer.tiles_for(Vector2(1000, 1000), Vector2(1280, 800), 6, 0.0)
 	if VectorMapLayer.data_zoom(6) != 5 or cover.is_empty() or (cover[0] as Vector3i).x != 5:
 		failures.append("zoom 6 shows data zoom 5")
 	elif cover.size() != 12:
 		failures.append("1280x800 at (1000,1000) needs 4x3 512px tiles, got %d" % cover.size())
 	elif cover[0] != Vector3i(5, 3, 2):
 		failures.append("the tile under the view centre comes first, got %s" % cover[0])
+	if VectorMapLayer.tiles_for(Vector2(1000, 1000), Vector2(1280, 800), 6).size() != 16:
+		failures.append("the default 256px margin adds a row: 4x4 tiles")
+
+	# Hillshade: a ramp rising to the east faces the north-west light
+	# partly, so it is lit (alpha > 0); flat ground stays clear.
+	var dem := Image.create(256, 256, false, Image.FORMAT_RGB8)
+	for y in 256:
+		for x in 256:
+			var h := 32768.0 + (x * 20.0 if x >= 128 else 0.0)
+			dem.set_pixel(x, y, Color8(int(h / 256.0), int(h) % 256, 0))
+	var shade := Hillshade.bake(dem.save_png_to_buffer(), 30.0, 0.5, Color.BLACK, Color.WHITE)
+	if shade == null:
+		failures.append("hillshade should bake a Terrarium PNG")
+	elif shade.get_pixel(32, 128).a > 0.01 or shade.get_pixel(200, 128).a < 0.05:
+		failures.append("hillshade: flat ground clear, the slope shaded (%s, %s)" % [shade.get_pixel(32, 128), shade.get_pixel(200, 128)])
+	if Hillshade.bake("not a png".to_utf8_buffer(), 30.0, 0.5, Color.BLACK, Color.WHITE) != null:
+		failures.append("hillshade ignores bodies that are not PNGs")
 	if VectorMapLayer.data_zoom(15) != 14 or VectorMapLayer.data_zoom(16) != 14:
 		failures.append("data zoom caps at 14 (overzoom past it)")
 	_finish(failures)
 
 func _finish(failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("VECTOR_MAP OK: MVT decode, truncation, TileJSON, inflate, style rules, build, dashes, cover")
+		print("VECTOR_MAP OK: MVT decode, corrupt input, TileJSON, inflate, tile check, style rules, build, line mesh, cover, hillshade")
 		quit(0)
 	else:
 		for f in failures:

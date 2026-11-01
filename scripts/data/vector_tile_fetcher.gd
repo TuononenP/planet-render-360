@@ -5,9 +5,10 @@ extends Node
 ## vector tiles (OpenMapTiles schema, gzip-encoded MVT) or AWS Terrarium
 ## DEM PNGs for hillshade. Same discipline as TileFetcher: kept-alive
 ## connections, centre-out queue, only visible tiles, on-device cache.
-## OpenFreeMap tiles live under a dated path that its TileJSON names; the
-## path is fetched once, cached, and reused offline (cached tiles are keyed
-## by z/x/y alone, so they outlive a new planet build).
+## OpenFreeMap tiles live under a dated path that its TileJSON names. The
+## TileJSON is asked for on every start (old builds are retired); until it
+## answers, and offline, the last path from disk serves. Cached tiles are
+## keyed by z/x/y alone, so they outlive a new planet build.
 
 signal tile_ready(z: int, x: int, y: int, body: PackedByteArray)
 signal tile_failed(z: int, x: int, y: int)
@@ -25,6 +26,8 @@ const PATH_CACHE := "user://cache/vector/tiles_path.txt"
 const CONNECTIONS := 6
 ## The TileJSON request rides a connection under this sentinel "tile".
 const TILEJSON_KEY := Vector3i(-1, -1, -1)
+## After a failed TileJSON request, ask again after this long.
+const TILEJSON_RETRY_MS := 30000
 
 var kind := Kind.VECTOR
 
@@ -34,6 +37,7 @@ var _pending: Dictionary = {}  # Vector3i -> true, queued or in flight
 ## "/planet/<build>/%d/%d/%d.pbf" once known; "" until the TileJSON lands.
 var _tiles_path := ""
 var _tilejson_state := 0  # 0 not asked, 1 in flight, 2 done, 3 failed
+var _tilejson_retry_ms := 0
 
 func _init(tile_kind: Kind = Kind.VECTOR) -> void:
 	kind = tile_kind
@@ -121,13 +125,18 @@ func discard_queued_except(keep: Array) -> void:
 	_pump()
 
 func _pump() -> void:
-	if kind == Kind.VECTOR and _tiles_path == "":
-		if _tilejson_state == 3:
+	if kind == Kind.VECTOR:
+		if _tilejson_state == 3 and Time.get_ticks_msec() >= _tilejson_retry_ms:
+			_tilejson_state = 0
+		if _tilejson_state == 0 and not _queue.is_empty():
+			for conn in _pool:
+				if not conn.busy:
+					_tilejson_state = 1
+					conn.start(TILEJSON_KEY, TILEJSON_PATH, _headers())
+					break
+		if _tiles_path == "" and _tilejson_state == 3:
 			_fail_queue()
-		elif _tilejson_state == 0 and not _queue.is_empty():
-			_tilejson_state = 1
-			_pool[0].start(TILEJSON_KEY, TILEJSON_PATH, _headers())
-	else:
+	if kind == Kind.DEM or _tiles_path != "":
 		for conn in _pool:
 			if not conn.busy and not _queue.is_empty():
 				var t: Vector3i = _queue.pop_front()
@@ -163,6 +172,7 @@ func _on_tilejson(ok: bool, body: PackedByteArray) -> void:
 	var path := tiles_path_from_tilejson(inflate(body).get_string_from_utf8()) if ok else ""
 	if path == "":
 		_tilejson_state = 3
+		_tilejson_retry_ms = Time.get_ticks_msec() + TILEJSON_RETRY_MS
 		push_warning("VectorTileFetcher: OpenFreeMap TileJSON unavailable")
 		return
 	_tiles_path = path
@@ -177,9 +187,28 @@ func _fail_queue() -> void:
 		tile_failed.emit(t.x, t.y, t.z)
 	_queue.clear()
 
+## Whether a 200 body is really a tile (not, say, a captive portal's page).
+static func looks_like_tile(tile_kind: Kind, body: PackedByteArray) -> bool:
+	if body.size() < 2:
+		return false
+	if tile_kind == Kind.DEM:
+		return body[0] == 0x89 and body[1] == 0x50  # PNG
+	return (body[0] == 0x1f and body[1] == 0x8b) or body[0] == 0x1a  # gzip, or an MVT layer
+
 func _done(t: Vector3i, ok: bool, code: int, body: PackedByteArray) -> void:
 	_pending.erase(t)
-	if not ok or code != 200 or body.is_empty():
+	if ok and code == 404 and kind == Kind.VECTOR and _tilejson_state != 2:
+		# The cached build may have been retired: ask the TileJSON again and
+		# retry the tile under whatever path it names.
+		_tiles_path = ""
+		_tilejson_state = 0
+		_pending[t] = true
+		_queue.push_front(t)
+		return
+	if ok and (code == 204 or (code == 200 and body.is_empty())) and kind == Kind.VECTOR:
+		tile_ready.emit(t.x, t.y, t.z, PackedByteArray())  # an empty tile: open sea
+		return
+	if not ok or code != 200 or not looks_like_tile(kind, body):
 		tile_failed.emit(t.x, t.y, t.z)
 		return
 	var f := FileAccess.open(cache_path(t.x, t.y, t.z), FileAccess.WRITE)
