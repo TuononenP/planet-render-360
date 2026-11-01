@@ -233,15 +233,22 @@ func cancel() -> void:
 		_climate.cancel()
 
 ## `focus`: the landmark the viewer came to see (LandmarkVisit site);
-## the view aims at it (LocationData.focus).
+## the view aims at it (LocationData.focus). `view`: a saved camera or
+## shared link (ViewLink.to_view) that reopens instead of the opening
+## view, and sets the season the world is built in.
 func run(lat: float, lon: float, place_name_override: String = "",
-		quality_preset: int = RenderSettings.Preset.HIGH, focus: Dictionary = {}) -> void:
+		quality_preset: int = RenderSettings.Preset.HIGH, focus: Dictionary = {},
+		view: Dictionary = {}) -> void:
 	_cancelled = false
 	var data := LocationData.new()
 	data.focus = focus
 	# A quick-pick preset's pin opens on its curated view, whichever
 	# screen (picker, History, Retry, search) started the run.
-	if focus.is_empty():
+	if not view.is_empty():
+		data.view = view
+		if view.has("season"):
+			data.season = LocationData.clamp_season(int(view["season"]))
+	elif focus.is_empty():
 		data.view = PresetViews.for_pin(lat, lon)
 	# The preset sizes the DEM grids before any fetch, so Fast really
 	# downloads/builds less and High really samples finer terrain.

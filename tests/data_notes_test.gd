@@ -121,10 +121,10 @@ func _notice_checks(failures: Array[String]) -> void:
 	n.open()  # the viewer's data-quality badge
 	if not n.is_open():
 		failures.append("the quality badge should reopen the card")
-	if HudParts.data_quality(DataNotes.describe(["map", "imagery"]))[0] != "Partial" \
-			or HudParts.data_quality([])[0] != "High" \
-			or HudParts.data_quality(DataNotes.describe(["elevation", "imagery", "map"]))[0] != "Low":
-		failures.append("data quality should read High / Partial / Low")
+	if HudParts.data_quality(DataNotes.describe(["map", "imagery"]))[0] != "Partial data" \
+			or HudParts.data_quality([])[0] != "Full data" \
+			or HudParts.data_quality(DataNotes.describe(["elevation", "imagery", "map"]))[0] != "Estimated":
+		failures.append("data quality should read Full data / Partial data / Estimated")
 	_find_button(n, "Try again").pressed.emit()
 	if retries[0] != 1:
 		failures.append("Try again should request a new generation once")

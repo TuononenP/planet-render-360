@@ -140,6 +140,11 @@ func _ready() -> void:
 	_layout_btns = _layout_seg._buttons
 	SettingsRows.add(look, SettingsRows.row("Layout", _layout_seg,
 		"Auto follows the window. Compact and Wide force the phone or tablet arrangement."))
+	var stamp := SettingsRows.toggle("Stamp photos", true,
+		func(on: bool) -> void: _on_viewer_pref("photo_stamp", on),
+		"Adds the place, coordinates, time and data credit to photos saved from the 360 view.")
+	_toggles["photo_stamp"] = stamp
+	SettingsRows.add(look, stamp)
 
 	col.add_child(UiTheme.section_label("Render quality"))
 	var subtitle := UiTheme.label(
@@ -344,7 +349,8 @@ func _refresh_appearance() -> void:
 			(_unit_segs[key] as SegmentedControl).select(1 if bool(_settings.pref(key)) else 0)
 		for key in _toggles:
 			var on := {"reduce_motion": UiPrefs.reduce_motion, "solid_panels": UiPrefs.solid_panels,
-				"high_contrast": UiPrefs.high_contrast}.get(key, false) as bool
+				"high_contrast": UiPrefs.high_contrast,
+				"photo_stamp": UiPrefs.photo_stamp}.get(key, false) as bool
 			(_toggles[key] as Button).set_pressed_no_signal(on)
 			(_toggles[key] as Button).queue_redraw()
 
@@ -365,6 +371,13 @@ func _on_access(key: String, on: bool) -> void:
 	UiPrefs.apply(_settings)
 	if key != "reduce_motion":
 		_rebuild_app()
+
+## Viewer switches apply at once and need no rebuild.
+func _on_viewer_pref(key: String, on: bool) -> void:
+	if _settings == null:
+		return
+	_settings.set_pref(key, on)
+	UiPrefs.apply(_settings)
 
 func _rebuild_app() -> void:
 	UiPrefs.apply(_settings)

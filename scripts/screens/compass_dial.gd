@@ -12,7 +12,7 @@ signal north_requested
 
 const CARDINALS: Array[String] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 const RING := 80.0
-const TAPE_W := 240.0
+const TAPE_W := 160.0
 const TAPE_H := 52.0
 
 var tape := false

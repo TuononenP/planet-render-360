@@ -27,6 +27,49 @@ func _wait_view(main: Node, timeout_sec: float) -> void:
 			and Time.get_ticks_msec() - start < int(timeout_sec * 1000.0):
 		await process_frame
 
+## Names the Overpass query would return around Interlaken, injected so the
+## shots need no request; the mini-map's tiles and the view's own data still
+## come from the cache or the network like the rest of this run.
+func _alpine_names() -> Array:
+	var sites: Array = []
+	for row in [["Eiger", "Peak", 46.5775, 8.0053, 3967.0], ["Mönch", "Peak", 46.5586, 7.9971, 4107.0],
+			["Jungfrau", "Peak", 46.5367, 7.9626, 4158.0], ["Schynige Platte", "Peak", 46.6495, 7.9078, 1967.0],
+			["Niesen", "Peak", 46.6459, 7.6513, 2362.0], ["Interlaken", "Town", 46.6863, 7.8632, -1.0],
+			["Thun", "City", 46.7580, 7.6280, -1.0], ["Brienz", "Village", 46.7545, 8.0384, -1.0],
+			["Brienzersee", "Lake", 46.7300, 7.9700, -1.0]]:
+		sites.append({"name": row[0], "kind": row[1], "lat": row[2], "lon": row[3], "ele_m": row[4]})
+	return sites
+
+## Viewer tools over the alpine view: names on the skyline, the mini-map,
+## the date sheet and a stamped photo. UiPrefs are set directly (not via the
+## HUD buttons) so the run never saves them to the real settings.
+func _viewer_tools(main: Node) -> void:
+	var view: View360 = main._view
+	view._horizon._on_sites(_alpine_names())
+	view._horizon.set_enabled(true)
+	UiPrefs.horizon_labels = true
+	UiPrefs.minimap = true
+	ViewChrome.layout(view)
+	ViewTools.toggle_date(view)
+	await _resize(1280, 800)
+	await create_timer(2.0).timeout  # mini-map tiles
+	await _snap("07-viewer-tools-desktop")
+	await _resize(390, 844)
+	await create_timer(1.0).timeout
+	await _snap("07b-viewer-tools-phone")
+	ViewTools.toggle_date(view)
+	var img := view.snapshot()
+	if img != null:
+		var lines := PhotoMode.stamp_lines(view._data.place_name, view._data.latitude,
+			view._data.longitude, UiTheme.clock(view._time_hour), "", view._data.attribution)
+		var stamped := await PhotoMode.stamped(view, img, lines)
+		stamped.save_png("user://shots/07c-photo-stamped.png")
+		print("SHOT 07c-photo-stamped ", stamped.get_size(), " raw ", img.get_size())
+	view._horizon.set_enabled(false)
+	UiPrefs.horizon_labels = false
+	UiPrefs.minimap = false
+	ViewChrome.layout(view)
+
 func _run() -> void:
 	# The app starts full screen (display/window/size/mode); this tool
 	# drives window sizes itself, so opt back out to windowed first.
@@ -75,6 +118,7 @@ func _run() -> void:
 	await _snap("05-view360-interlaken-phone")
 	await _resize(1280, 800)
 	await _snap("05b-view360-interlaken-desktop")
+	await _viewer_tools(main)
 	# Landmark viewpoint: the Eiffel Tower at its real coordinates.
 	main._start_generation(48.8584, 2.2945)
 	await _wait_view(main, 60.0)

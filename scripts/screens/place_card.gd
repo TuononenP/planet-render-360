@@ -5,7 +5,8 @@ extends Button
 ## home's "Around the world" grid: a sky-and-ridge thumbnail over the
 ## place name in Instrument Serif. A toggle: the selected place gets an
 ## accent ring (the pressed style). The thumbnail is a stand-in until a
-## place has a generated one, picked from the name so it stays stable.
+## place has its own picture (set_photo), picked from the name so it
+## stays stable.
 
 const SKIES := [
 	["0a1030", "1a2350", "2c3466", "0c1222", "151d33"],  # night
@@ -61,6 +62,11 @@ static func make(place_name: String, thumb_height: int = 56) -> PlaceCard:
 	c.restyle()
 	return c
 
+## The place's own picture in place of the stand-in.
+func set_photo(tex: Texture2D) -> void:
+	_art.photo = tex
+	_art.queue_redraw()
+
 ## Solid card (sky-200, line edge); selected = 2px accent ring.
 func restyle() -> void:
 	var base := UiTheme.style(UiTheme.SURFACE, UiTheme.RADIUS_M, UiTheme.LINE)
@@ -85,6 +91,7 @@ func restyle() -> void:
 ## and a snow cap; drawn from the design system's Scene stand-in.
 class _Thumb extends Control:
 	var sky: Array = SKIES[2]
+	var photo: Texture2D
 
 	func _init() -> void:
 		clip_contents = true
@@ -111,6 +118,10 @@ class _Thumb extends Control:
 			var a := PI * 1.5 + (PI / 2.0) * k / 6.0
 			pts.append(Vector2(w - r, r) + Vector2(cos(a), sin(a)) * r)
 		pts.append(Vector2(w, h))
+		if photo != null:
+			draw_colored_polygon(pts, Color.WHITE, RoundedPhoto.cover_uvs(pts, w, h,
+				float(photo.get_width()), float(photo.get_height())), photo)
+			return
 		var colors := PackedColorArray()
 		for p in pts:
 			colors.append(_sky_at(p.y))

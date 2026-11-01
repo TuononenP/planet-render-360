@@ -15,6 +15,11 @@ static var solid_panels := false
 ## Increase contrast: ink-muted reads as ink, line as line-strong, and
 ## the glass edge thickens.
 static var high_contrast := false
+## The 360 viewer's own switches: names along the skyline, the mini-map
+## inset, and the stamp on saved photos.
+static var horizon_labels := false
+static var minimap := false
+static var photo_stamp := true
 
 static func apply(s: RenderSettings) -> void:
 	UiTheme.units_imperial = bool(s.pref("imperial"))
@@ -24,6 +29,9 @@ static func apply(s: RenderSettings) -> void:
 	reduce_motion = _or_os(s.pref("reduce_motion"), "accessibility_should_reduce_animation")
 	solid_panels = _or_os(s.pref("solid_panels"), "accessibility_should_reduce_transparency")
 	high_contrast = _or_os(s.pref("high_contrast"), "accessibility_should_increase_contrast")
+	horizon_labels = bool(s.pref("horizon_labels"))
+	minimap = bool(s.pref("minimap"))
+	photo_stamp = bool(s.pref("photo_stamp"))
 	LoadingScreen.reduce_motion = reduce_motion
 	UiTheme.text_scale = clampf(float(s.pref("text_scale")), 0.85, 2.0)
 	UiTheme.apply_mode(int(s.pref("theme")))

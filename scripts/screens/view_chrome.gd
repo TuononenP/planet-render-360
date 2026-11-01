@@ -56,8 +56,9 @@ static func build(v: View360) -> void:
 	v._landmark_panel.go_requested.connect(v.visit)
 	v._landmark_panel.closer_requested.connect(v.visit.bind(true))
 	v._landmark_panel.closed.connect(func() -> void: layout(v))
-	v._landmark_panel.card.minimum_size_changed.connect(func() -> void:
+	v._landmark_panel.content_resized.connect(func() -> void:
 		(func() -> void: layout(v)).call_deferred())
+	v._landmark_panel.state_changed.connect(func() -> void: sync_nearby(v))
 	v._callouts.site_tapped.connect(func(site: Dictionary) -> void:
 		v.open_landmark(site)
 		layout(v))
@@ -71,6 +72,12 @@ static func build(v: View360) -> void:
 	v._place_pill = pill[1]
 	v._place_coords = pill[2]
 	v._top.add_child(v._place_box)
+	# Phones: the heading tape and the weather chip share the row under the pill.
+	v._tape_row = HBoxContainer.new()
+	v._tape_row.add_theme_constant_override("separation", 8)
+	v._tape_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v._tape_row.visible = false
+	v._top.add_child(v._tape_row)
 	v._compass = CompassDial.new()
 	v._compass.north_requested.connect(func() -> void: turn_north(v))
 	v._fade.add_child(v._compass)
@@ -86,7 +93,7 @@ static func build(v: View360) -> void:
 	v._weather_label = chip[3]
 	v._weather_chip.visible = false
 	v._top_right.add_child(v._weather_chip)
-	v._quality_badge = HudParts.status_badge("High", "good", "gauge")
+	v._quality_badge = HudParts.status_badge("Full data", "good", "gauge")
 	v._quality_badge.tooltip_text = "Data quality"
 	v._quality_badge.pressed.connect(func() -> void: v.data_quality_requested.emit())
 	v._top_right.add_child(v._quality_badge)
@@ -116,11 +123,26 @@ static func build(v: View360) -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	v._sheet.add_child(col)
+	# Collapse handle on top of the sheet; the round tab brings it back.
+	v._sheet_grip = Button.new()
+	v._sheet_grip.flat = true
+	v._sheet_grip.focus_mode = Control.FOCUS_ALL
+	v._sheet_grip.custom_minimum_size = Vector2(0, 28)
+	v._sheet_grip.tooltip_text = "Hide controls"
+	v._sheet_grip.accessibility_name = "Hide controls"
+	v._sheet_grip.pressed.connect(func() -> void: toggle_sheet(v))
+	col.add_child(v._sheet_grip)
+	v._sheet_tab = HudParts.icon_button("chevron-up", "Show controls")
+	v._sheet_tab.visible = false
+	v._sheet_tab.pressed.connect(func() -> void: toggle_sheet(v))
+	v._fade.add_child(v._sheet_tab)
 	v._sun_arc = SunArc.new()
 	v._time_label = v._sun_arc.time_label
 	v._sun_arc.scrubbed.connect(func(m: float) -> void: ViewConditions.set_time_minutes(v, m))
 	v._sun_arc.jump_requested.connect(func(kind: String) -> void: ViewConditions.jump_to(v, kind))
 	v._sun_arc.now_requested.connect(v.use_live_time)
+	v._sun_arc.lapse_toggled.connect(func() -> void: ViewConditions.toggle_lapse(v))
+	v._sun_arc.lapse_speed_requested.connect(func() -> void: ViewConditions.cycle_lapse_speed(v))
 	col.add_child(v._sun_arc)
 	var row := HFlowContainer.new()  # wraps in the narrow inspector
 	row.add_theme_constant_override("h_separation", 4)
@@ -137,6 +159,10 @@ static func build(v: View360) -> void:
 	var fov_in := HudParts.icon_button("plus", "Zoom in")
 	fov_in.pressed.connect(func() -> void: v._rig.handle_zoom(1.12))
 	row.add_child(fov_in)
+	v._nearby_btn = HudParts.icon_button("landmark", "Nearby landmarks")
+	v._nearby_btn.tooltip_text = "Nearby landmarks (L)"
+	v._nearby_btn.pressed.connect(func() -> void: toggle_nearby(v))
+	row.add_child(v._nearby_btn)
 	v._fullscreen_btn = HudParts.icon_button("maximize", "Fullscreen")
 	v._fullscreen_btn.pressed.connect(func() -> void: toggle_fullscreen(v))
 	row.add_child(v._fullscreen_btn)
@@ -144,6 +170,10 @@ static func build(v: View360) -> void:
 		v._gyro_btn = HudParts.icon_button("smartphone", "Gyro look")
 		v._gyro_btn.pressed.connect(func() -> void: toggle_gyro(v))
 		row.add_child(v._gyro_btn)
+	var tools := HFlowContainer.new()
+	tools.add_theme_constant_override("h_separation", 4)
+	tools.add_theme_constant_override("v_separation", 4)
+	col.add_child(tools)
 	v._quality_label = UiTheme.data_label("", 13, UiTheme.MUTED, true)
 	col.add_child(v._quality_label)
 
@@ -156,6 +186,7 @@ static func build(v: View360) -> void:
 
 	v._announcer = Announcer.new(2.0)
 	v._hud.add_child(v._announcer)
+	ViewTools.build(v, tools)
 
 	v._idle_timer = Timer.new()
 	v._idle_timer.one_shot = true
@@ -172,6 +203,11 @@ static func _layer() -> Control:
 
 # --- Content ---
 
+## Hide or show the controls sheet (phone sheet, desktop inspector).
+static func toggle_sheet(v: View360) -> void:
+	v._inspector_open = not v._inspector_open
+	layout(v)
+
 ## A place opened: pill, data-quality badge, attribution and callouts.
 static func show_place(v: View360, data: LocationData) -> void:
 	var parts := UiTheme.split_place(data.place_name)
@@ -180,7 +216,7 @@ static func show_place(v: View360, data: LocationData) -> void:
 	v._place_coords.text = UiTheme.coords(data.latitude, data.longitude).replace("° ", "°\u00a0")
 	var q := HudParts.data_quality(data.data_notes)
 	HudParts.apply_status_badge(v._quality_badge, q[0], q[1], "gauge")
-	v._quality_badge.tooltip_text = "Data quality: %s" % q[0]
+	v._quality_badge.tooltip_text = q[2]
 	v._attribution.text = HudParts.short_sources(data.attribution)
 	v._attribution.tooltip_text = data.attribution
 	v._attribution.visible = v._attribution.text != ""
@@ -212,6 +248,8 @@ static func refresh_theme(v: View360) -> void:
 		return
 	v._season_btn.restyle()
 	v._sun_arc.restyle()
+	ViewTools.sync(v)
+	v._minimap.restyle()
 	v._compass.queue_redraw()
 	if v._gyro_btn != null:
 		HudParts.apply_icon_button(v._gyro_btn, v._gyro_on)
@@ -308,6 +346,30 @@ static func announce(v: View360, landmark: String = "") -> void:
 		parts.append(landmark)
 	v._announcer.say(". ".join(parts))
 
+## The nearby-landmarks list (button and L): up when it is down, down
+## when it is up. It lists what stands around the camera now. Opened
+## with the key, focus goes to its first row.
+static func toggle_nearby(v: View360, by_key: bool = false) -> void:
+	var lp := v._landmark_panel
+	if lp.is_listing():
+		lp.close()
+	else:
+		lp.open_list(v._callouts.nearest(), v._nearby_pending)
+		if by_key:
+			lp.focus_list()
+	layout(v)
+
+## The button lights (accent fill, on-accent icon) while the list is up.
+static func sync_nearby(v: View360) -> void:
+	if v._nearby_btn != null:
+		HudParts.apply_icon_button(v._nearby_btn, v._landmark_panel.is_listing())
+
+## Nearby articles arrived while the panel is up: the list takes them
+## now, or when Back returns to it from a card.
+static func refresh_nearby(v: View360) -> void:
+	if v._landmark_panel != null and v._landmark_panel.is_open():
+		v._landmark_panel.update_list(v._callouts.nearest(), v._nearby_pending)
+
 ## Turns the view to north over duration-gentle.
 static func turn_north(v: View360) -> void:
 	var from := v._rig.yaw
@@ -397,9 +459,31 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 		KEY_F:
 			toggle_fullscreen(v)
 		KEY_I:
-			v._inspector_open = not v._inspector_open
-			layout(v)
+			toggle_sheet(v)
+		KEY_L:
+			# One press, bare: not a held key repeating, not Cmd/Ctrl/Alt+L.
+			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
+				return false
+			toggle_nearby(v, true)
+		KEY_P, KEY_C, KEY_N, KEY_M, KEY_T:
+			# One press, bare: Cmd/Ctrl+C and the like belong to the system.
+			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
+				return false
+			match key.keycode:
+				KEY_P:
+					ViewTools.photo(v)
+				KEY_C:
+					ViewTools.copy_link(v)
+				KEY_N:
+					ViewTools.toggle_labels(v)
+				KEY_M:
+					ViewTools.toggle_minimap(v)
+				_:
+					ViewConditions.toggle_lapse(v)
 		KEY_ESCAPE:
+			if v._date_picker.visible:
+				v._date_picker.close_picker()
+				return true
 			return v._landmark_panel.close() or v._callouts.dismiss()
 		_:
 			return false
@@ -432,6 +516,14 @@ static func layout(v: View360) -> void:
 	v._exit_btn.position = Vector2(pad - inset, pad - inset)
 	v._exit_btn.size = Vector2(HudParts.SIZE_TOUCH, HudParts.SIZE_TOUCH)
 
+	# Phones keep the weather chip beside the heading tape, so the pill
+	# shares the top row with the quality badge only.
+	var chip_home: Control = v._tape_row if phone else v._top_right
+	if v._weather_chip.get_parent() != chip_home:
+		v._weather_chip.reparent(chip_home)
+		if not phone:
+			chip_home.move_child(v._weather_chip, 0)
+	v._tape_row.visible = phone
 	# Top-right chips first: the pill takes the room left between.
 	v._top_right.reset_size()
 	var right_w := v._top_right.get_combined_minimum_size().x
@@ -441,8 +533,9 @@ static func layout(v: View360) -> void:
 	# Compass: ring at top-centre, or the tape under the pill on phones.
 	v._compass.set_tape(phone)
 	if phone:
-		if v._compass.get_parent() != v._top:
-			v._compass.reparent(v._top)
+		if v._compass.get_parent() != v._tape_row:
+			v._compass.reparent(v._tape_row)
+			v._tape_row.move_child(v._compass, 0)
 	else:
 		if v._compass.get_parent() != v._fade:
 			v._compass.reparent(v._fade)
@@ -474,8 +567,10 @@ static func layout(v: View360) -> void:
 	v._sun_arc.set_arc_height(56.0 if h < 500.0 else (72.0 if h < 760.0 else 108.0))
 	v._sun_arc.set_compact(bar_w < 380.0 or h < 500.0)
 	v._season_btn.set_icon_only(bar_w < 460.0)
-	v._quality_label.visible = inspector
-	v._sheet.visible = not inspector or v._inspector_open
+	v._sheet.visible = v._inspector_open
+	UiIcon.apply(v._sheet_grip, "chevron-right" if inspector else "chevron-down", 18, UiTheme.MUTED, UiTheme.INK)
+	v._sheet_tab.visible = not v._inspector_open
+	UiIcon.apply(v._sheet_tab, "chevron-left" if inspector else "chevron-up", 22, UiTheme.INK, UiTheme.INK)
 	v._sheet.custom_minimum_size = Vector2(bar_w, 0)
 	v._sheet.reset_size()
 	var sheet_h := v._sheet.get_combined_minimum_size().y
@@ -488,8 +583,16 @@ static func layout(v: View360) -> void:
 
 	_place_landmark_panel(v, lay, inspector, pad, w, h, attr_h, bar_w)
 
+	ViewTools.layout(v, lay, inspector, pad, w, h, attr_h, Rect2(v._sheet.position, v._sheet.size))
+
 	v._hint.reset_size()
+	var tab_y := h - pad - attr_h - 8.0 - HudParts.SIZE_TOUCH
+	v._sheet_tab.size = Vector2(HudParts.SIZE_TOUCH, HudParts.SIZE_TOUCH)
+	v._sheet_tab.position = Vector2(w - pad - HudParts.SIZE_TOUCH + inset if inspector \
+		else roundf((w - HudParts.SIZE_TOUCH) / 2.0), tab_y)
 	var hint_bottom := v._sheet.position.y - 12.0 if not inspector else h - pad - attr_h - 12.0
+	if not v._inspector_open and not inspector:
+		hint_bottom = tab_y - 8.0
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
 
 ## The landmark sheet: a left side panel under the place pill on

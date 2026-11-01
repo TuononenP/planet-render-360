@@ -9,6 +9,10 @@ signal data_quality_requested
 ## Go there for a landmark outside the built area: render a new scene
 ## at (lat, lon), its standoff, facing `site` (main runs the pipeline).
 signal visit_requested(site: Dictionary, lat: float, lon: float)
+## A viewer preference changed (horizon labels, mini-map): main saves it.
+signal pref_changed(key: String, value: Variant)
+## The view settled after opening: its picture for History and Recents.
+signal snapshot_ready(lat: float, lon: float, image: Image)
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
@@ -28,6 +32,7 @@ var _fade: Control
 var _callouts: ViewCallouts
 var _top: VBoxContainer
 var _top_right: HBoxContainer
+var _tape_row: HBoxContainer
 var _place_box: PanelContainer
 var _place_pill: Label
 var _place_coords: Label
@@ -37,6 +42,8 @@ var _weather_icon: TextureRect
 var _weather_value: Label
 var _weather_label: Label
 var _quality_badge: Button
+var _sheet_grip: Button
+var _sheet_tab: Button
 var _quality_label: Label
 var _sheet: PanelContainer
 var _sun_arc: SunArc
@@ -44,6 +51,10 @@ var _time_label: Label
 var _fullscreen_btn: Button
 var _gyro_btn: Button
 var _gyro_on := false
+var _nearby_btn: Button
+## The nearby articles for this place have not answered yet (the list
+## says it is looking, not that it found none).
+var _nearby_pending := false
 var _exit_btn: Button
 var _attribution: Button
 var _hint: PanelContainer
@@ -72,6 +83,18 @@ var _season_dirty := false
 ## Live build_location threads, joined before the view is freed.
 var _threads: Array[Thread] = []
 var _season_btn: SegmentedControl
+## Tools (ViewTools): date, photo, link, labels, mini-map buttons by key.
+var _tool_btns: Dictionary = {}
+var _horizon: HorizonLabels
+var _minimap: MiniMap
+var _date_picker: DatePicker
+var _toast: Toast
+var _photo_busy := false
+## Picked calendar day ({} = the season's own day) and the sun arc's
+## time-lapse.
+var _date: Dictionary = {}
+var _lapse := TimeLapse.new()
+var _walk := ViewWalk.new()
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -133,7 +156,7 @@ func _ready() -> void:
 	_governor.set_preset(_quality_preset)
 	_governor.quality_changed.connect(func(step_name: String, fps: float) -> void:
 		if _quality_label != null:
-			_quality_label.text = "%s · %d fps" % [step_name, int(round(fps))])
+			_quality_label.text = "Quality · %s · %d fps" % [step_name, int(round(fps))])
 	_weather = WeatherFetcher.new()
 	add_child(_weather)
 	_weather.succeeded.connect(_on_weather)
@@ -142,7 +165,9 @@ func _ready() -> void:
 	add_child(_wiki)
 	_wiki.nearby_ready.connect(func(lat: float, lon: float, _r: int, sites: Array) -> void:
 		if _data != null and is_equal_approx(lat, _data.latitude) and is_equal_approx(lon, _data.longitude):
-			_callouts.add_sites(sites))
+			_callouts.add_sites(sites)
+			_nearby_pending = false
+			ViewChrome.refresh_nearby(self))
 
 	_build_hud()
 
@@ -344,7 +369,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		# Came to see a landmark: face it, its middle at the view centre.
 		look = aim(_rig.position, focus_point(data, _ground, data.focus))
 	elif not data.view.is_empty():
-		# A quick-pick preset: its curated bearing and pitch.
+		# A quick-pick preset, a saved camera or a shared link: its
+		# bearing and pitch.
 		look = Vector2(-deg_to_rad(float(data.view["bearing"])),
 			deg_to_rad(float(data.view.get("pitch", 0.0))))
 	elif data.landmark_type != "none":
@@ -354,7 +380,9 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		look = Vector2(landmark_yaw(data, spawn) - 0.12, OPEN_PITCH_MIN)
 	else:
 		look = Vector2(default_yaw(data, _ground, spawn), OPEN_PITCH_MIN)
-	look = opening_look(look)
+	# A restored view keeps its exact pitch; an opening one never stares down.
+	if not bool(data.view.get("restore", false)):
+		look = opening_look(look)
 	# Nothing right in front may block the opening look.
 	var lift := view_clearance_y(data, _ground, spawn, look.x, look.y)
 	if lift > _rig.position.y:
@@ -363,12 +391,58 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 			look = opening_look(aim(_rig.position, focus_point(data, _ground, data.focus)))
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
+	_restore_conditions(data)
 	if _landmark_panel != null:
 		_landmark_panel.close()
+	if _horizon != null:
+		_horizon.set_place(data, _ground)
+	if _minimap != null:
+		_minimap.set_place(data)
+	if _date_picker != null:
+		_date_picker.close_picker()
+	_queue_snapshot(data)
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
 	if _wiki != null:
+		_nearby_pending = true
 		_wiki.nearby(data.latitude, data.longitude, NEARBY_RADIUS_M)
+
+## Zoom, date and time a saved camera or shared link carries (the
+## season was applied above, before the world was built).
+func _restore_conditions(data: LocationData) -> void:
+	_rig.set_zoom(float(data.view.get("zoom", 1.0)))
+	if data.view.has("date"):
+		_date = data.view["date"]
+		ViewConditions._date_changed(self)
+		ViewConditions._apply_time(self, _time_hour)
+	if data.view.has("minutes"):
+		ViewConditions.set_time_minutes(self, float(data.view["minutes"]))
+	ViewTools.sync(self)
+
+## The camera as it stands, as ViewLink state ({} before a place shows).
+func camera_state() -> Dictionary:
+	if _data == null or _ground == null or _rig == null:
+		return {}
+	return ViewLink.capture(_data, _ground, _rig)
+
+## The scene as drawn now at the viewport's full size; null when nothing
+## is drawn (headless) or no place is shown.
+func snapshot() -> Image:
+	if _viewport == null or _data == null or DisplayServer.get_name() == "headless":
+		return null
+	var img := _viewport.get_texture().get_image()
+	return null if img == null or img.is_empty() else img
+
+## A few seconds after opening (once the descent has settled) the view's
+## picture goes to History, so a place has one even if the app is closed
+## from here.
+func _queue_snapshot(data: LocationData) -> void:
+	await get_tree().create_timer(4.5).timeout
+	if _data != data or not is_visible_in_tree():
+		return
+	var img := snapshot()
+	if img != null:
+		snapshot_ready.emit(data.latitude, data.longitude, img)
 
 ## `look` (yaw, pitch) with its pitch raised to OPEN_PITCH_MIN.
 static func opening_look(look: Vector2) -> Vector2:
@@ -600,18 +674,7 @@ func visit(site: Dictionary, closer: bool = false) -> void:
 		return
 	var to := Vector3(t.x, eye_y(_data, _ground, t, false), t.y)
 	var look := aim(to, focus_point(_data, _ground, site))
-	var yaw_to := _rig.yaw + wrapf(look.x - _rig.yaw, -PI, PI)
-	if _visit_tween != null:
-		_visit_tween.kill()
-	var from := _rig.position
-	var yaw_from := _rig.yaw
-	var pitch_from := _rig.pitch
-	_visit_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_visit_tween.tween_method(func(k: float) -> void:
-		_rig.position = from.lerp(to, k)
-		_rig.set_look(lerpf(yaw_from, yaw_to, k), lerpf(pitch_from, look.y, k))
-		_on_look_changed(), 0.0, 1.0, maxf(UiPrefs.motion(1.6), 0.01))
-	_visit_tween.tween_callback(func() -> void: _atmos.set_probe_origin(_rig.position))
+	ViewWalk.glide(self, to, look.x, look.y, 1.6)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -623,8 +686,14 @@ func _gui_input(event: InputEvent) -> void:
 			_rig.handle_zoom(1.0 / 1.12)
 			accept_event()
 		elif mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and mb.double_click:
+			_walk.cancel_tap()
 			_rig.reset_zoom()
 			accept_event()
+		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				_walk.press(mb.position)
+			else:
+				_walk.release(self, mb.position)
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
 		_magnify_accum *= mg.factor
@@ -641,7 +710,12 @@ func _gui_input(event: InputEvent) -> void:
 			_touches[st.index] = st.position
 			if _touches.size() == 2:
 				_pinch_base = _touch_distance()
+				_walk.cancel_tap()
+			else:
+				_walk.press(st.position)
 		else:
+			if _touches.size() == 1:
+				_walk.release(self, st.position)
 			_touches.erase(st.index)
 		accept_event()
 	elif event is InputEventScreenDrag:
@@ -667,7 +741,7 @@ func _input(event: InputEvent) -> void:
 			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
 		ViewChrome.wake(self)
 
-## Viewer keys (arrows, +/−, [ ], 1–4, H, F, I, Esc for callouts).
+## Viewer keys (arrows, +/−, [ ], 1–4, H, F, I, L, Esc for callouts).
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or not is_visible_in_tree():
@@ -677,6 +751,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
+	if _lapse.playing and is_visible_in_tree():
+		ViewConditions.lapse_tick(self, delta)
+	_walk.process_keys(self, delta)
 	if _gyro_on and _touches.is_empty() and is_visible_in_tree():
 		var g := Input.get_gyroscope()
 		if g.length() > 0.01:

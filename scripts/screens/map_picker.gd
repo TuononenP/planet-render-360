@@ -12,6 +12,8 @@ signal history_requested
 signal settings_requested
 signal download_requested(lat: float, lon: float)
 signal exit_requested
+## A pasted view link was opened: its ViewLink state (main renders it).
+signal view_link_requested(state: Dictionary)
 
 # Paris is the starting place (its quick pick starts selected), so the
 # first Explore opens on its curated view.

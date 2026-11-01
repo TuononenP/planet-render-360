@@ -104,6 +104,8 @@ var view: Dictionary = {}
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
 const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
+const MONTH_SHORT: Array[String] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+	"Aug", "Sep", "Oct", "Nov", "Dec"]
 ## Season chosen in the 360 view; TerrainBuilder bakes its ground and
 ## leaf colours from it (snow line, autumn canopy, spring grass).
 var season: int = Season.SUMMER

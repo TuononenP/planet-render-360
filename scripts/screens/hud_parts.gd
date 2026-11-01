@@ -172,14 +172,14 @@ static func apply_status_badge(b: Button, text: String, tone: String, icon_name:
 	b.add_theme_stylebox_override("hover", hover)
 	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
 
-## Data quality from the view's DataNotes: "High", "Partial" or "Low",
-## always with the gauge icon. Returns [word, tone].
+## Data quality from the view's DataNotes: "Full data", "Partial data" or
+## "Estimated", always with the gauge icon. Returns [label, tone, tooltip].
 static func data_quality(notes: Array) -> Array:
 	if notes.is_empty():
-		return ["High", "good"]
+		return ["Full data", "good", "All live data arrived for this view"]
 	if DataNotes.is_error(notes):
-		return ["Low", "error"]
-	return ["Partial", "caution"]
+		return ["Estimated", "error", "No live data arrived. Tap for details"]
+	return ["Partial data", "caution", "Some data is estimated. Tap for details"]
 
 ## Attribution: a tiny HUD-glass pill at opacity-attribution (1 on
 ## hover or focus), caption type, sources joined with " · ".

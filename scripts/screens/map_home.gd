@@ -55,6 +55,9 @@ static func refresh_recent(p: MapPicker) -> void:
 		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		card.set_meta("lat", lat)
 		card.set_meta("lon", lon)
+		var photo := PlaceThumb.load_texture(lat, lon)
+		if photo != null:
+			card.set_photo(photo)
 		card.pressed.connect(func() -> void: p._select_suggestion(full, lat, lon))
 		p._recent_row.add_child(card)
 	p._recent_box.visible = not entries.is_empty()

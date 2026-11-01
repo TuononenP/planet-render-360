@@ -4,8 +4,8 @@ extends Control
 ## History and favourites (design system Layout → History): places you
 ## rendered as PlaceCard size="m" in a grid (2 columns on phones, 3–4 on
 ## wider windows) or as list rows, switched with a List/Grid control in
-## the title row. Each shows a stand-in thumbnail, the name in
-## Instrument Serif, the region, when you were there ("Today, 09:12"),
+## the title row. Each shows its thumbnail (the view as you left it, a
+## stand-in until it has one), the name in Instrument Serif, the region, when you were there ("Today, 09:12"),
 ## its real cache state and size. Favourites pin to the top in their own
 ## section. Tap opens the place; the star pins it. In the list, swipe
 ## right to favourite and left to remove from cache; on desktop the same
@@ -294,7 +294,14 @@ func _badge(word: String, tone: String, icon: String) -> PanelContainer:
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return p
 
-func _thumb(place: String, height: float) -> PanelContainer:
+## The place's own picture when it has one, else the stand-in glyph.
+func _thumb(place: String, height: float, e: Dictionary = {}) -> Control:
+	var tex := PlaceThumb.load_texture(float(e.get("lat", 0.0)), float(e.get("lon", 0.0))) \
+		if not e.is_empty() else null
+	if tex != null:
+		var photo := RoundedPhoto.new(tex, UiTheme.RADIUS_S)
+		photo.custom_minimum_size = Vector2(0, height)
+		return photo
 	var tint := Color(str(TINTS[abs(place.hash()) % TINTS.size()])).darkened(0.55)
 	var thumb := PanelContainer.new()
 	thumb.custom_minimum_size = Vector2(0, height)
@@ -355,7 +362,7 @@ func _card(e: Dictionary) -> Button:
 	col.add_theme_constant_override("separation", 8)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(col)
-	var thumb := _thumb(full, 120.0 if _current_layout == Responsive.Layout.COMPACT else 150.0)
+	var thumb := _thumb(full, 120.0 if _current_layout == Responsive.Layout.COMPACT else 150.0, e)
 	col.add_child(thumb)
 	var head := HBoxContainer.new()
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -393,7 +400,7 @@ func _row(e: Dictionary) -> Button:
 	r.add_theme_constant_override("separation", 12)
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(r)
-	var thumb := _thumb(full, 56.0)
+	var thumb := _thumb(full, 56.0, e)
 	thumb.custom_minimum_size.x = 72
 	thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(thumb)

@@ -42,6 +42,15 @@ static func ensure_searcher(p: MapPicker) -> void:
 
 static func on_text_changed(p: MapPicker, text: String) -> void:
 	var cleaned := text.strip_edges()
+	if ViewLink.looks_like_link(cleaned):
+		p._suggest_timer.stop()
+		var state := ViewLink.parse(cleaned)
+		if state.is_empty():
+			show_no_results(p, cleaned)
+		else:
+			show_suggestions(p, [{"name": link_label(state), "lat": state["lat"],
+				"lon": state["lon"], "view": state}])
+		return
 	if looks_like_coordinates(cleaned):
 		p._suggest_timer.stop()
 		hide_suggestions(p)
@@ -56,6 +65,10 @@ static func on_text_changed(p: MapPicker, text: String) -> void:
 	p._suggest_timer.start()
 	set_busy(p, false)
 	p._search_busy_timer.start(BUSY_DELAY)
+
+## "Shared view · 48.8622° N  2.2887° E": the row a pasted link becomes.
+static func link_label(state: Dictionary) -> String:
+	return "Shared view · %s" % UiTheme.coords(float(state["lat"]), float(state["lon"]))
 
 static func looks_like_coordinates(text: String) -> bool:
 	if not text.contains(","):
@@ -107,7 +120,11 @@ static func show_suggestions(p: MapPicker, results: Array) -> void:
 		row.custom_minimum_size = Vector2(0, 48)
 		row.add_theme_font_size_override("font_size", 15)
 		style_row(row)
-		row.pressed.connect(func() -> void: select(p, place, lat, lon))
+		if item.has("view"):
+			var state: Dictionary = item["view"]
+			row.pressed.connect(func() -> void: open_link(p, state))
+		else:
+			row.pressed.connect(func() -> void: select(p, place, lat, lon))
 		p._suggest_list.add_child(row)
 	p._suggest_panel.visible = true
 
@@ -230,8 +247,20 @@ static func select(p: MapPicker, place: String, lat: float, lon: float) -> void:
 	p.selected_name = place
 	p._show_place(place)
 
+## Opens a pasted link's view: closes the suggestions and asks main to render it.
+static func open_link(p: MapPicker, state: Dictionary) -> void:
+	hide_suggestions(p)
+	p.view_link_requested.emit(state)
+
 static func submit(p: MapPicker, text: String) -> void:
 	var cleaned := text.strip_edges()
+	if ViewLink.looks_like_link(cleaned):
+		var state := ViewLink.parse(cleaned)
+		if state.is_empty():
+			show_no_results(p, cleaned)
+		else:
+			open_link(p, state)
+		return
 	if looks_like_coordinates(cleaned):
 		var ll := parse_coordinates(cleaned)
 		p._on_picked(ll.x, ll.y)

@@ -29,10 +29,43 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Support caching areas for faster repeat views (planned).
 - Make the rendered 3D 360-degree view the main focus once loaded.
 - Support full-screen mode with intuitive view controls.
+- History and Recents show the view as you left it, and reopening a place restores where you were looking.
+- In the 360 view: tap the ground or hold W A S D to walk inside the built area; play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it.
 
 ## Platforms
 
 Initial development targets **macOS** for easier development and testing, followed by **iOS** and **Android**.
+
+### Building releases
+
+Release builds run from GitHub Actions on demand: **Actions → Build → Run workflow**
+([`.github/workflows/build.yml`](.github/workflows/build.yml)). Inputs:
+
+- `platform`: `both`, `macos` or `ios`
+- `macos_signing`: `adhoc` (no secrets needed) or `notarized` (Developer ID signed, notarized, stapled)
+- `version`: the marketing version, e.g. `0.1.0`; the build number is the workflow run number
+- `testflight`: upload the iOS build to TestFlight, or attach the `.ipa` to the run instead
+
+The macOS `.dmg` is attached to the run as an artifact. Secrets live in the `release`
+environment and are never committed:
+
+| Secret | Used for |
+| --- | --- |
+| `APPLE_TEAM_ID` | iOS signing |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | App Store Connect API key (Admin role): iOS automatic signing, TestFlight upload, macOS notarization |
+| `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Name (TEAMID)` |
+| `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD` | the Developer ID certificate exported as `.p12` (`base64 -i cert.p12`) |
+
+The first TestFlight upload also needs an App Store Connect app record for
+`com.planetrender360.app`. The same scripts run locally:
+
+```sh
+tools/build_macos.sh               # ../build/macos/PlanetRender360.dmg (ad-hoc; set MACOS_SIGN_IDENTITY + ASC_* to notarize)
+IOS_UPLOAD=0 tools/build_ios_release.sh  # ../build/ios/export/*.ipa (needs APPLE_TEAM_ID + ASC_*)
+```
+
+An ad-hoc macOS build opens on other Macs after `xattr -dr com.apple.quarantine "Planet Render 360.app"`.
+Exported builds keep their data in `~/Library/Application Support/Planet Render 360/`.
 
 ## Development
 
@@ -52,6 +85,8 @@ godot --headless --script tests/tiles_test.gd   # tile math + pool drain
 godot --headless --script tests/progressive_map_test.gd # progressive map: preview first, detail centre-out
 godot --headless --script tests/vector_map_test.gd # vector map: MVT decode, Map style rules, tile build
 godot --headless --script tests/landmark_test.gd # landmark registry, models, placement
+godot --headless --script tests/landmark_list_test.gd # 360 view's nearby-landmarks list, panel flow, L key
+godot --headless --script tests/viewer_tools_test.gd # view links, camera per place, thumbnails, photo, time-lapse, dates, horizon labels, mini-map, walking
 godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile cancellation on far pans
 godot --headless --script tests/search_test.gd  # place-search parser
 godot --headless --script tests/weather_test.gd # weather parser
@@ -99,6 +134,9 @@ planet-render-360/
 │   │   ├── weather_fetcher.gd     Open-Meteo current weather
 │   │   ├── search_fetcher.gd      Nominatim place search
 │   │   ├── tile_fetcher.gd        OSM raster tiles for the picker map
+│   │   ├── horizon_fetcher.gd     One Overpass call for the named peaks, towns and lakes (horizon labels)
+│   │   ├── view_link.gd           Shareable view links + the camera state History keeps per place
+│   │   ├── place_thumb.gd         The History / Recents picture of a place
 │   │   ├── cache_store.gd         History + versioned, LRU-capped tile/area cache
 │   │   └── offline_downloader.gd  "Download for offline" cache warmer
 │   ├── generation/            World building from LocationData (true metres)
@@ -122,11 +160,13 @@ planet-render-360/
 │   │   ├── render_settings.gd     Fast / Balanced / High / Ultra presets
 │   │   ├── render_quality.gd      Photoreal layer per tier
 │   │   └── world_cache.gd         Built-world cache for fast revisits
-│   └── screens/               UI screens (map picker, loading, 360 view, history, settings)
+│   └── screens/               UI screens (map picker, loading, 360 view, history, settings);
+│                              the viewer's tools: view_tools, photo_mode, time_lapse, date_picker,
+│                              horizon_labels, mini_map, view_walk
 ├── assets/                    Runtime assets: eiffel.glb, CC0 Poly Haven PBR sets, foliage atlases
 ├── assets_src/blender/        Blender sources (offline only, never shipped)
 ├── tests/                     Headless Godot test scripts (see Development above)
-├── tools/                     check_class_size.sh, build_ios.sh, foliage texture generator
+├── tools/                     check_class_size.sh, build_ios.sh, build_ios_release.sh, build_macos.sh, foliage texture generator
 ├── docs/                      Data-source register, world-model contract, fidelity scorecard,
 │                              architecture styles, technical documentation PDF
 ├── .agents/plans/             Architecture and fidelity-redesign plans

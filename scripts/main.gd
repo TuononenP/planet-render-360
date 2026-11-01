@@ -18,6 +18,8 @@ var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
 ## Landmark the pending run faces (LandmarkVisit site), {} for none.
 var _pending_focus: Dictionary = {}
+## Saved camera or shared link the pending run reopens, {} for none.
+var _pending_view: Dictionary = {}
 var _downloader: OfflineDownloader
 var _download_at := Vector2.ZERO
 ## Bumped per generation and on cancel, so a world still building on
@@ -91,6 +93,10 @@ func _ready() -> void:
 			return
 		var at := LandmarkVisit.viewpoint(site, LandmarkVisit.default_bearing(lat))
 		_start_generation(at.x, at.y, site))
+	# A pasted "Copy view link": that exact view, whoever's it was.
+	_picker.view_link_requested.connect(func(state: Dictionary) -> void:
+		_picker.selected_name = ""
+		_start_generation(float(state["lat"]), float(state["lon"]), {}, ViewLink.to_view(state)))
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
@@ -142,6 +148,11 @@ func _ready() -> void:
 		_show(_settings_screen)
 		_settings_screen.show_data_sources())
 	_view.data_quality_requested.connect(func() -> void: _notice.open())
+	_view.pref_changed.connect(func(key: String, value: Variant) -> void:
+		_settings.set_pref(key, value))
+	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
+		PlaceThumb.save(image, lat, lon)
+		_history.refresh())
 	# Go there, beyond the built area: a new scene at the landmark's standoff.
 	_view.visit_requested.connect(func(site: Dictionary, lat: float, lon: float) -> void:
 		if not _generating:
@@ -152,7 +163,7 @@ func _ready() -> void:
 	# Above the view: plain-language notice when live data did not arrive.
 	_notice = DataNotice.new()
 	_notice.retry_requested.connect(func() -> void:
-		_start_generation(_pending.x, _pending.y, _pending_focus))
+		_start_generation(_pending.x, _pending.y, _pending_focus, _pending_view))
 	add_child(_notice)
 
 	_history = HistoryScreen.new()
@@ -205,6 +216,7 @@ func _ready() -> void:
 ## Quit the app. Full screen hides the OS window controls, so the
 ## picker Exit button and these keys are the way out on desktop.
 func _request_exit() -> void:
+	_leave_view()
 	get_tree().quit()
 
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
@@ -237,7 +249,20 @@ func _refresh_accent() -> void:
 	_history.refresh()
 	_settings_screen.refresh_theme()
 
+## Leaving the viewer: History keeps where the person was looking and the
+## picture of it, so reopening the place restores both.
+func _leave_view() -> void:
+	if _view == null or not _view.visible:
+		return
+	var state := _view.camera_state()
+	if state.is_empty():
+		return
+	_store.set_camera(float(state["lat"]), float(state["lon"]), state)
+	PlaceThumb.save(_view.snapshot(), float(state["lat"]), float(state["lon"]))
+
 func _show(screen: Control) -> void:
+	if screen != _view:
+		_leave_view()
 	for s in [_picker, _loading, _view, _history, _settings_screen]:
 		s.visible = s == screen
 	if screen == _picker:
@@ -251,10 +276,16 @@ func _set_generating(busy: bool) -> void:
 	_generating = busy
 	_picker.set_render_busy(busy)
 
-func _start_generation(lat: float, lon: float, focus: Dictionary = {}) -> void:
+func _start_generation(lat: float, lon: float, focus: Dictionary = {},
+		view: Dictionary = {}) -> void:
 	if _generating:
 		print("Generation already in progress; ignoring start")
 		return
+	# Reopening a place restores where the person last looked.
+	if view.is_empty() and focus.is_empty():
+		var camera := _store.camera_for(lat, lon)
+		if not camera.is_empty():
+			view = ViewLink.to_view(camera)
 	_set_generating(true)
 	_gen_id += 1
 	var gen := _gen_id
@@ -262,6 +293,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {}) -> void:
 	_picker.set_render_status("")
 	_pending = Vector2(lat, lon)
 	_pending_focus = focus
+	_pending_view = view
 	var display_name := str(focus.get("name", _picker.selected_name)) if not focus.is_empty() \
 		else _picker.selected_name
 	if display_name == "":
@@ -279,7 +311,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {}) -> void:
 		_show(_picker)
 		return
 	_pipeline.run(lat, lon, display_name if not focus.is_empty() else _picker.selected_name,
-		_settings.preset, focus)
+		_settings.preset, focus, view)
 
 ## Stops generation `gen` if it is still running after
 ## generation_timeout_s: cancels the fetch, asks a world build to stop at

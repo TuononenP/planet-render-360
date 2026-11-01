@@ -108,6 +108,10 @@ func _add(s: Dictionary, xz: Vector2, lift: float) -> void:
 		var ll := WorldScale.latlon_from_xz(xz.x, xz.y, _data.latitude, _data.longitude)
 		s["lat"] = ll.x
 		s["lon"] = ll.y
+		# LandmarkVisit.site made the id from the 0, 0 it was given: every
+		# such site shared it, and the card, callouts and article fetch
+		# (all keyed by id) mixed them up.
+		s["id"] = "%s:%.5f,%.5f" % [s.get("source", "osm"), ll.x, ll.y]
 	var y := 0.0
 	if _ground != null:
 		y = TerrainBuilder.site_ground_y(_data, _ground, xz.x, xz.y) \
@@ -256,6 +260,12 @@ func distance_to(s: Dictionary) -> float:
 	if _view._rig == null or not s.has("pos"):
 		return -1.0
 	return (s["pos"] as Vector3).distance_to(_view._rig.global_position)
+
+## The sites nearest the camera, nearest first, as LandmarkList rows.
+func nearest(limit: int = LandmarkList.MAX_ROWS) -> Array:
+	if _view._rig == null:
+		return []
+	return LandmarkList.rank(_sites, _view._rig.global_position, limit)
 
 ## "450 m" below a kilometre, "6.2 km" above.
 static func distance_text(m: float) -> String:

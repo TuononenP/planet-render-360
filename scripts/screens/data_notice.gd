@@ -5,7 +5,7 @@ extends Control
 ## arrive (LocationData.data_notes) a float-glass card says what happened
 ## and what the view does instead, in plain words (never a provider or
 ## error code). "Dismiss" folds it into the viewer's data-quality badge
-## ("Partial" / "Low"), which reopens it (open); "Try again" asks for a
+## ("Partial data" / "Estimated"), which reopens it (open); "Try again" asks for a
 ## fresh generation.
 ## It sits below the top bar so it never covers the dock or the scene's
 ## centre, and does not intercept drags anywhere outside itself.

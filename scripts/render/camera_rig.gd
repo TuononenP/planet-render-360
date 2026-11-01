@@ -40,6 +40,10 @@ func handle_zoom(factor: float) -> void:
 	zoom_factor = clampf(zoom_factor * factor, 0.7, 2.8)
 	_apply()
 
+func set_zoom(factor: float) -> void:
+	zoom_factor = clampf(factor, 0.7, 2.8)
+	_apply()
+
 func reset_zoom() -> void:
 	zoom_factor = 1.0
 	_apply()

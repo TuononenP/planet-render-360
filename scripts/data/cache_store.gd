@@ -168,11 +168,15 @@ static func keys_fully_cached(keys: Dictionary) -> bool:
 				return false
 	return true
 
+## The History file: under dir_override in tests, never the real one.
+static func store_path() -> String:
+	return dir_override.path_join("history.json") if dir_override != "" else PATH
+
 func load_store() -> void:
 	entries.clear()
-	if not FileAccess.file_exists(PATH):
+	if not FileAccess.file_exists(store_path()):
 		return
-	var f := FileAccess.open(PATH, FileAccess.READ)
+	var f := FileAccess.open(store_path(), FileAccess.READ)
 	if f == null:
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
@@ -182,9 +186,9 @@ func load_store() -> void:
 				entries.append(item)
 
 func save_store() -> void:
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	var f := FileAccess.open(store_path(), FileAccess.WRITE)
 	if f == null:
-		push_warning("CacheStore: cannot write %s" % PATH)
+		push_warning("CacheStore: cannot write %s" % store_path())
 		return
 	f.store_string(JSON.stringify(entries))
 
@@ -194,22 +198,45 @@ func save_store() -> void:
 func add_entry(place_name: String, lat: float, lon: float,
 		cache_keys: Dictionary = {}) -> void:
 	var favourite := false
+	var camera := {}
 	for e in entries:
 		if abs(float(e.get("lat", 999.0)) - lat) < 0.0001 and abs(float(e.get("lon", 999.0)) - lon) < 0.0001:
 			favourite = favourite or bool(e.get("favourite", false))
+			if camera.is_empty():
+				camera = e.get("camera", {})
 	entries = entries.filter(func(e: Dictionary) -> bool:
 		return not (abs(float(e.get("lat", 999.0)) - lat) < 0.0001 \
 			and abs(float(e.get("lon", 999.0)) - lon) < 0.0001))
 	var keys := cache_keys if not cache_keys.is_empty() \
 		else place_cache_keys(lat, lon)
-	entries.push_front({
+	var entry := {
 		"name": place_name, "lat": lat, "lon": lon,
 		"cached": true, "timestamp": Time.get_unix_time_from_system(),
 		"cache_version": DATA_VERSION, "cache_keys": keys, "favourite": favourite,
-	})
+	}
+	if not camera.is_empty():
+		entry["camera"] = camera
+	entries.push_front(entry)
 	while entries.size() > MAX_ENTRIES:
 		entries.pop_back()
 	save_store()
+
+## Where the person was looking when they left the place (ViewLink
+## state: yaw as bearing, pitch, eye position and height, zoom), kept
+## on its History entry so reopening restores it. {} for none.
+func camera_for(lat: float, lon: float) -> Dictionary:
+	for e in entries:
+		if abs(float(e.get("lat", 999.0)) - lat) < 0.0001 and abs(float(e.get("lon", 999.0)) - lon) < 0.0001:
+			var cam: Variant = e.get("camera", {})
+			return cam if cam is Dictionary else {}
+	return {}
+
+func set_camera(lat: float, lon: float, camera: Dictionary) -> void:
+	for e in entries:
+		if abs(float(e.get("lat", 999.0)) - lat) < 0.0001 and abs(float(e.get("lon", 999.0)) - lon) < 0.0001:
+			e["camera"] = camera
+			save_store()
+			return
 
 ## Per-layer presence for a history entry (see keys_cached_status).
 ## Entries written before cache v2 carry no keys and report empty.
@@ -217,6 +244,8 @@ func entry_cache_status(entry: Dictionary) -> Dictionary:
 	return keys_cached_status(entry.get("cache_keys", {}))
 
 func clear() -> void:
+	for e in entries:
+		PlaceThumb.remove(float(e.get("lat", 0.0)), float(e.get("lon", 0.0)))
 	entries.clear()
 	save_store()
 
@@ -243,6 +272,7 @@ func remove_place(entry: Dictionary) -> void:
 		for k in keys[layer]:
 			if FileAccess.file_exists(str(k)):
 				DirAccess.remove_absolute(str(k))
+	PlaceThumb.remove(float(entry.get("lat", 0.0)), float(entry.get("lon", 0.0)))
 	entries.erase(entry)
 	_tracked_bytes = -1
 	save_store()

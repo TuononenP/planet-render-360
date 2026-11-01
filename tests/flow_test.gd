@@ -54,7 +54,22 @@ func _run() -> void:
 		printerr("FLOW FAIL: history not recorded for Paris")
 		quit(1)
 		return
-	print("FLOW OK: picker -> loading -> 360 view + history for Paris")
+	# Leaving the viewer keeps where the person was looking on the History
+	# entry, and reopening Paris resolves to that exact view.
+	main._view._rig.set_look(-1.0, 0.2)
+	main._show(main._picker)
+	var cam: Dictionary = main._store.camera_for(48.8566, 2.3522)
+	if cam.is_empty() or absf(float(cam["bearing"]) - fposmod(rad_to_deg(1.0), 360.0)) > 0.01 \
+			or absf(float(cam["pitch"]) - rad_to_deg(0.2)) > 0.01:
+		printerr("FLOW FAIL: leaving the view did not keep the camera: %s" % [cam])
+		quit(1)
+		return
+	var view := ViewLink.to_view(cam)
+	if not bool(view["restore"]) or absf(float(view["bearing"]) - float(cam["bearing"])) > 0.001:
+		printerr("FLOW FAIL: the saved camera does not reopen as a view: %s" % [view])
+		quit(1)
+		return
+	print("FLOW OK: picker -> loading -> 360 view + history for Paris, camera kept on leaving")
 	print("FLOW INFO: used_real_dem=%s used_osm=%s" % [
 		main._pipeline.used_real_dem, main._pipeline.used_osm])
 	quit(0)

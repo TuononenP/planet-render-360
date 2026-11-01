@@ -1,0 +1,458 @@
+extends SceneTree
+
+## Viewer tools: godot --headless --script tests/viewer_tools_test.gd
+## View links and the camera kept per place, thumbnails, photo naming and
+## stamp text, the time-lapse, the date picker's calendar, the horizon
+## labels' data and line of sight, the mini-map's tile maths, tap-to-walk,
+## and the real View360 wiring (restore, HUD buttons, keys). Offline: the
+## view's weather and horizon fetchers never reach the network, and every
+## cache lives in a temp directory.
+
+const CACHE := "user://viewer_tools_test_cache"
+
+var failures: Array[String] = []
+
+func _init() -> void:
+	_run()
+
+func _check(ok: bool, what: String) -> void:
+	if not ok:
+		failures.append(what)
+
+func _run() -> void:
+	CacheStore.dir_override = CACHE
+	PlaceThumb.dir_override = CACHE + "/thumbs"
+	DirAccess.make_dir_recursive_absolute(CACHE)
+	_view_link()
+	_seasons()
+	_store_camera()
+	_thumbs()
+	_photo_names()
+	_time_lapse()
+	_calendar()
+	_horizon_data()
+	_line_of_sight()
+	_minimap_maths()
+	_walk_maths()
+	await _search_link()
+	await _view_wiring()
+	_clean(CACHE)
+	CacheStore.dir_override = ""
+	PlaceThumb.dir_override = ""
+	if failures.is_empty():
+		print("VIEWER TOOLS OK: links, camera per place, thumbnails, photo, time-lapse, calendar, horizon labels, mini-map, walking, HUD wiring")
+		quit(0)
+	else:
+		for f in failures:
+			printerr("VIEWER TOOLS FAIL: ", f)
+		quit(1)
+
+static func _clean(dir_path: String) -> void:
+	for f in DirAccess.get_files_at(dir_path):
+		DirAccess.remove_absolute(dir_path.path_join(f))
+	for d in DirAccess.get_directories_at(dir_path):
+		_clean(dir_path.path_join(d))
+	DirAccess.remove_absolute(dir_path)
+
+# --- View links ---
+
+func _view_link() -> void:
+	var state := {"lat": 48.8622, "lon": 2.2887, "eye_lat": 48.8625, "eye_lon": 2.2891,
+		"eye_m": 6.0, "bearing": 142.0, "pitch": 4.0, "zoom": 1.5, "minutes": 1050.0,
+		"season": 2, "date": {"year": 2026, "month": 6, "day": 21}}
+	var link := ViewLink.encode(state)
+	_check(link.begins_with("pr360://view?lat=48.86220&lon=2.28870"), "link starts with the scheme and origin: " + link)
+	_check(ViewLink.looks_like_link("  " + link + "\n"), "a pasted link with spaces is recognised")
+	var back := ViewLink.parse(link)
+	_check(not back.is_empty(), "the link parses")
+	for key in ["lat", "lon", "eye_lat", "eye_lon", "eye_m", "bearing", "pitch"]:
+		_check(absf(float(back.get(key, 1e9)) - float(state[key])) < 0.001, "round trip %s: %s" % [key, back.get(key)])
+	_check(absf(float(back["zoom"]) - 1.5) < 0.01 and int(back["minutes"]) == 1050 and int(back["season"]) == 2,
+		"zoom, minutes and season survive")
+	_check(back["date"] == {"year": 2026, "month": 6, "day": 21}, "the picked date survives: %s" % [back.get("date")])
+	var bare := ViewLink.parse(ViewLink.encode({"lat": 10.0, "lon": 20.0, "eye_m": 30.0, "bearing": 0.0, "pitch": 0.0}))
+	_check(not bare.has("eye_lat") and not bare.has("zoom") and not bare.has("date"), "optional fields stay out when unset")
+	_check(ViewLink.parse("https://example.com").is_empty(), "other text is not a link")
+	_check(ViewLink.parse("pr360://view?lon=2").is_empty(), "no latitude, no view")
+	_check(ViewLink.parse("pr360://view?lat=95&lon=2").is_empty(), "latitude out of range")
+	_check(ViewLink.parse("pr360://view?lat=x&lon=2").is_empty(), "a non-number is refused")
+	var odd := ViewLink.parse("pr360://view?lat=1&lon=2&h=9999&p=200&z=9&d=2026-02-30")
+	_check(float(odd["eye_m"]) <= 400.0 and float(odd["pitch"]) <= 68.0 and float(odd["zoom"]) <= 2.8,
+		"wild numbers are clamped")
+	_check(not odd.has("date"), "February 30th is not a date")
+	_check(ViewLink.parse_date("2024-02-29") == {"year": 2024, "month": 2, "day": 29}, "leap day")
+	_check(ViewLink.parse_date("2026-02-29").is_empty(), "no leap day in 2026")
+	var view := ViewLink.to_view(back)
+	_check(bool(view["restore"]) and not bool(view["clear"]) and float(view["eye_m"]) == 6.0,
+		"to_view restores exactly, without the clearance lift")
+	_check(PresetViews.eye_xz(view, 48.8622, 2.2887).length() > 1.0, "the eye offset resolves through PresetViews")
+
+func _seasons() -> void:
+	var d := func(m: int) -> Dictionary: return {"year": 2026, "month": m, "day": 15}
+	_check(ViewLink.season_for_date(d.call(1), 50.0) == LocationData.Season.WINTER, "January is winter in the north")
+	_check(ViewLink.season_for_date(d.call(4), 50.0) == LocationData.Season.SPRING, "April is spring in the north")
+	_check(ViewLink.season_for_date(d.call(7), 50.0) == LocationData.Season.SUMMER, "July is summer in the north")
+	_check(ViewLink.season_for_date(d.call(10), 50.0) == LocationData.Season.AUTUMN, "October is autumn in the north")
+	_check(ViewLink.season_for_date(d.call(12), 50.0) == LocationData.Season.WINTER, "December is winter in the north")
+	_check(ViewLink.season_for_date(d.call(1), -33.0) == LocationData.Season.SUMMER, "January is summer in the south")
+	_check(ViewLink.season_for_date(d.call(7), -33.0) == LocationData.Season.WINTER, "July is winter in the south")
+	_check(ViewLink.season_for_date(d.call(10), -33.0) == LocationData.Season.SPRING, "October is spring in the south")
+	_check(ViewLink.days_in_month(2100, 2) == 28 and ViewLink.days_in_month(2000, 2) == 29, "century leap rules")
+
+# --- Camera per place (History) ---
+
+func _store_camera() -> void:
+	var store := CacheStore.new()
+	store.add_entry("Paris, France", 48.8622, 2.2887)
+	_check(store.camera_for(48.8622, 2.2887).is_empty(), "a new entry has no camera")
+	var cam := {"lat": 48.8622, "lon": 2.2887, "eye_m": 31.0, "bearing": 200.0, "pitch": -3.0, "zoom": 1.2}
+	store.set_camera(48.8622, 2.2887, cam)
+	_check(float(store.camera_for(48.8622, 2.2887)["bearing"]) == 200.0, "the camera is kept on its entry")
+	_check(store.camera_for(10.0, 10.0).is_empty(), "another place has none")
+	store.add_entry("Paris, France", 48.8622, 2.2887)
+	_check(float(store.camera_for(48.8622, 2.2887).get("bearing", -1.0)) == 200.0,
+		"visiting again keeps the saved camera")
+	var reloaded := CacheStore.new()
+	reloaded.load_store()
+	_check(float(reloaded.camera_for(48.8622, 2.2887).get("pitch", 99.0)) == -3.0, "the camera survives a reload")
+	_check(reloaded.entries.size() == 1, "one entry per place")
+	store.clear()
+
+# --- Thumbnails ---
+
+func _thumbs() -> void:
+	var wide := Image.create(1600, 600, false, Image.FORMAT_RGBA8)
+	wide.fill(Color(0.2, 0.5, 0.8))
+	var s := PlaceThumb.shrink(wide)
+	_check(s != null and s.get_width() == PlaceThumb.WIDTH and s.get_height() == PlaceThumb.HEIGHT,
+		"a wide capture is cropped and shrunk to card size")
+	var tall := Image.create(300, 900, false, Image.FORMAT_RGB8)
+	var t := PlaceThumb.shrink(tall)
+	_check(t != null and t.get_width() == PlaceThumb.WIDTH and t.get_height() == PlaceThumb.HEIGHT, "a tall one too")
+	_check(PlaceThumb.shrink(null) == null and PlaceThumb.shrink(Image.new()) == null, "nothing to shrink, nothing saved")
+	_check(not PlaceThumb.save(null, 1.0, 2.0) and not PlaceThumb.exists(1.0, 2.0), "a null picture saves nothing")
+	_check(PlaceThumb.save(wide, 48.8622, 2.2887) and PlaceThumb.exists(48.8622, 2.2887), "a picture is saved per place")
+	var tex := PlaceThumb.load_texture(48.8622, 2.2887)
+	_check(tex != null and tex.get_width() == PlaceThumb.WIDTH, "and loads back at card size")
+	_check(PlaceThumb.load_texture(0.5, 0.5) == null, "a place without one has none")
+	_check(PlaceThumb.path(48.8622, 2.2887) == PlaceThumb.path(48.86224, 2.28871), "the key is the quantised place")
+	PlaceThumb.remove(48.8622, 2.2887)
+	_check(not PlaceThumb.exists(48.8622, 2.2887), "removed with its place")
+	var poly := RoundedPhoto.outline(100.0, 60.0, 10.0, false)
+	_check(poly.size() == 4 * (RoundedPhoto.SEGMENTS + 1), "four rounded corners: %d points" % poly.size())
+	var top := RoundedPhoto.outline(100.0, 60.0, 10.0, true)
+	_check(top.has(Vector2(100.0, 60.0)) and top.has(Vector2(0.0, 60.0)), "top-only keeps the bottom corners square")
+	var uvs := RoundedPhoto.cover_uvs(PackedVector2Array([Vector2(0, 0), Vector2(100, 50)]), 100.0, 50.0, 400.0, 100.0)
+	_check(absf(uvs[0].x - 0.25) < 0.001 and absf(uvs[1].x - 0.75) < 0.001 and absf(uvs[0].y) < 0.001 and absf(uvs[1].y - 1.0) < 0.001,
+		"a wide photo in a card crops its sides: %s" % [uvs])
+	# A store entry's removal drops its picture.
+	var store := CacheStore.new()
+	store.add_entry("Thumbed", 12.0, 34.0)
+	PlaceThumb.save(wide, 12.0, 34.0)
+	store.remove_place(store.entries[0])
+	_check(not PlaceThumb.exists(12.0, 34.0), "remove_place deletes the picture")
+
+# --- Photo ---
+
+func _photo_names() -> void:
+	_check(PhotoMode.slug("Paris, France") == "paris-france", "slug: " + PhotoMode.slug("Paris, France"))
+	_check(PhotoMode.slug("  --Big   Sur!! ") == "big-sur", "slug trims and joins: " + PhotoMode.slug("  --Big   Sur!! "))
+	_check(PhotoMode.slug("!!!") == "", "nothing left of punctuation")
+	_check(PhotoMode.file_name("Rome, Italy", {"year": 2026, "month": 11, "day": 1, "hour": 17, "minute": 5})
+		== "planet-render-360_rome-italy_20261101-1705.png", "file name: " + PhotoMode.file_name("Rome, Italy", {"year": 2026, "month": 11, "day": 1, "hour": 17, "minute": 5}))
+	_check(PhotoMode.file_name("", {}).contains("_view_"), "an unnamed place still gets a name")
+	var lines := PhotoMode.stamp_lines("Venice, Italy", 45.4318, 12.329, "17:30", "21 Jun 2026", "© OpenStreetMap contributors")
+	_check(lines.size() == 3 and lines[0] == "Venice, Italy", "three stamp lines")
+	_check(lines[1].contains("45.4318° N") and lines[1].contains("17:30, 21 Jun 2026"), "coordinates, time and date: " + lines[1])
+	_check(PhotoMode.stamp_lines("X", 0.0, 0.0, "09:00", "", "").size() == 2, "no credit, no third line")
+	_check(PhotoMode.stamp_lines("X", 0.0, 0.0, "09:00", "", "")[1].ends_with("09:00"), "no date, just the time")
+	_check(PhotoMode.stamp_unit(1080) > PhotoMode.stamp_unit(480) and PhotoMode.stamp_unit(100) == 14.0,
+		"the stamp scales with the picture")
+
+# --- Time-lapse ---
+
+func _time_lapse() -> void:
+	var m := TimeLapse.advance(360.0, 1.0, 360.0, 1080.0, 1)
+	_check(absf(m - (360.0 + 720.0 / TimeLapse.DAY_S)) < 0.001, "one second moves a twentieth of the daylight: %s" % m)
+	_check(absf(TimeLapse.advance(360.0, 1.0, 360.0, 1080.0, 4) - 360.0 - 4.0 * 720.0 / TimeLapse.DAY_S) < 0.001, "4x is four times as fast")
+	var wrapped := TimeLapse.advance(1070.0, 1.0, 360.0, 1080.0, 1)
+	_check(wrapped >= 360.0 and wrapped < 400.0, "past sunset it loops to sunrise: %s" % wrapped)
+	_check(TimeLapse.advance(100.0, 0.0, 360.0, 1080.0, 1) == 360.0, "from the night it starts at sunrise")
+	_check(TimeLapse.window(720.0, 720.0) == Vector2(0, 1440), "polar night plays the whole day")
+	_check(TimeLapse.window(0.0, 1440.0) == Vector2(0, 1440), "polar day plays the whole day")
+	var full := 0.0
+	for i in 20:
+		full = TimeLapse.advance(full, 1.0, 720.0, 720.0, 1)
+	_check(absf(full - 1440.0 * 0.0) < 1440.0, "stays inside the day")
+	var lapse := TimeLapse.new()
+	_check(lapse.tick(1.0, 600.0, 360.0, 1080.0, false) < 0.0, "paused: nothing to apply")
+	lapse.play()
+	_check(lapse.tick(0.01, 600.0, 360.0, 1080.0, false) < 0.0, "between applied frames: nothing yet")
+	_check(lapse.tick(0.05, 600.0, 360.0, 1080.0, false) > 600.0, "an applied frame moves the clock")
+	lapse.stop()
+	lapse.play()
+	_check(lapse.tick(0.5, 600.0, 360.0, 1080.0, true) < 0.0, "reduced motion waits for its step")
+	var step := lapse.tick(0.6, 600.0, 360.0, 1080.0, true)
+	_check(step - 600.0 > 20.0, "reduced motion jumps a coarse step: %s" % step)
+	_check(lapse.speed() == 1 and lapse.cycle_speed() == 2 and lapse.cycle_speed() == 4 and lapse.cycle_speed() == 1,
+		"speeds cycle 1x, 2x, 4x")
+
+# --- Calendar ---
+
+func _calendar() -> void:
+	_check(DatePicker.first_column(2026, 6) == 0, "1 June 2026 is a Monday")
+	_check(DatePicker.first_column(2026, 11) == 6, "1 November 2026 is a Sunday")
+	var cells := DatePicker.cells(2024, 2)
+	_check(cells.size() == DatePicker.first_column(2024, 2) + 29, "February 2024 has 29 days")
+	_check(cells[cells.size() - 1] == 29 and cells[DatePicker.first_column(2024, 2)] == 1,
+		"cells run 1 .. days after the blanks (0)")
+	var picker := DatePicker.new()
+	root.add_child(picker)
+	var got: Array = []
+	picker.date_picked.connect(func(d: Dictionary) -> void: got.append(d))
+	picker.open_for({}, {"year": 2026, "month": 11, "day": 1})
+	_check(picker.visible and picker.shown_month() == Vector2i(2026, 11), "opens on today's month")
+	picker._step_month(1)
+	_check(picker.shown_month() == Vector2i(2026, 12), "next month")
+	picker._step_month(1)
+	_check(picker.shown_month() == Vector2i(2027, 1), "December rolls into January")
+	picker._step_year(-2)
+	_check(picker.shown_month() == Vector2i(2025, 1), "year stepper")
+	picker._quick("jun")
+	_check(got.size() == 1 and got[0] == {"year": 2025, "month": 6, "day": 21} and not picker.visible,
+		"the June solstice quick pick picks 21 June of the shown year and closes: %s" % [got])
+	picker.open_for({"year": 2026, "month": 3, "day": 9}, {"year": 2026, "month": 11, "day": 1})
+	_check(picker.shown_month() == Vector2i(2026, 3), "reopens on the picked date's month")
+	picker.free()
+
+# --- Horizon labels ---
+
+func _horizon_data() -> void:
+	var text := JSON.stringify({"elements": [
+		{"type": "node", "lat": 46.55, "lon": 8.0, "tags": {"natural": "peak", "name": "Finsteraarhorn", "ele": "4274"}},
+		{"type": "node", "lat": 46.55, "lon": 8.0, "tags": {"natural": "peak", "name": "Finsteraarhorn", "ele": "4274"}},
+		{"type": "node", "lat": 46.7, "lon": 7.9, "tags": {"place": "town", "name": "Interlaken"}},
+		{"type": "node", "lat": 46.6, "lon": 7.7, "tags": {"place": "hamlet", "name": "Skipped"}},
+		{"type": "node", "lat": 46.6, "lon": 7.7, "tags": {"natural": "peak"}},
+		{"type": "way", "center": {"lat": 46.69, "lon": 7.85}, "tags": {"natural": "water", "water": "lake", "name": "Thunersee"}},
+		{"type": "way", "tags": {"natural": "water", "water": "lake", "name": "No centre"}},
+		{"type": "node", "lat": 46.7, "lon": 7.9, "tags": {"place": "city", "name": "Bern"}}]})
+	var sites := HorizonFetcher.parse(text)
+	var names := sites.map(func(s: Dictionary) -> String: return "%s:%s" % [s["kind"], s["name"]])
+	_check(names == ["Peak:Finsteraarhorn", "Town:Interlaken", "Lake:Thunersee", "City:Bern"],
+		"peaks, towns and lakes in, duplicates, unnamed and hamlets out: %s" % [names])
+	_check(float(sites[0]["ele_m"]) == 4274.0 and float(sites[1]["ele_m"]) < 0.0, "ele read, unknown is -1")
+	_check(HorizonFetcher.parse_ele("3 967") == 3967.0 and HorizonFetcher.parse_ele("1,200.5 m") == 1200.5
+		and HorizonFetcher.parse_ele("4000;4010") == 4000.0 and HorizonFetcher.parse_ele("high") < 0.0, "elevation formats")
+	_check(HorizonFetcher.parse("not json").is_empty() and HorizonFetcher.parse("").is_empty(), "garbage gives no sites")
+	_check(HorizonFetcher.build_query(46.0, 7.0).contains('"natural"="peak"') and HorizonFetcher.build_query(46.0, 7.0).contains("out tags center"),
+		"the query asks for peaks and a centre for lakes")
+	_check(HorizonFetcher.cache_path(46.0, 7.0).contains("osm_v2_") and HorizonFetcher.cache_path(46.0, 7.0).ends_with(".json"),
+		"cached in the osm layer")
+	var peak := {"kind": "Peak", "ele_m": 4000.0}
+	var town := {"kind": "Town", "ele_m": -1.0}
+	_check(HorizonLabels.prominence(peak, 20000.0, 8.0) > HorizonLabels.prominence(town, 3000.0, 0.0), "a high peak outranks a town")
+	_check(HorizonLabels.prominence(peak, 20000.0, 8.0) > HorizonLabels.prominence(peak, 20000.0, 2.0), "a peak standing higher in view outranks a lower one")
+	_check(HorizonLabels.prominence({"kind": "City", "ele_m": -1.0}, 5000.0, 0.0) > HorizonLabels.prominence({"kind": "Village", "ele_m": -1.0}, 5000.0, 0.0),
+		"a city outranks a village")
+	_check(HorizonLabels.data_line(peak, 41000.0) == "4,000 m · 41 km", "peak data line: " + HorizonLabels.data_line(peak, 41000.0))
+	_check(HorizonLabels.data_line(town, 2400.0) == "2.4 km", "place data line: " + HorizonLabels.data_line(town, 2400.0))
+	UiTheme.units_imperial = true
+	_check(HorizonLabels.data_line(peak, 41000.0).begins_with("13,123 ft"), "imperial elevation: " + HorizonLabels.data_line(peak, 41000.0))
+	UiTheme.units_imperial = false
+
+func _line_of_sight() -> void:
+	var flat := func(_x: float, _z: float) -> float: return 0.0
+	var origin := Vector3(0, 30, 0)
+	_check(HorizonLabels.line_of_sight(origin, Vector3(0, 500, -20000), flat), "open ground: the peak is in view")
+	# A 400 m ridge 3 km north hides a 300 m summit 20 km away, not a 4000 m one.
+	var ridge := func(_x: float, z: float) -> float: return 400.0 if absf(z + 3000.0) < 600.0 else 0.0
+	_check(not HorizonLabels.line_of_sight(origin, Vector3(0, 300, -20000), ridge), "a ridge hides a low summit behind it")
+	_check(HorizonLabels.line_of_sight(origin, Vector3(0, 4000, -20000), ridge), "a tall summit shows over it")
+	_check(not HorizonLabels.line_of_sight(origin, Vector3(0, 100, -20000), func(_x: float, z: float) -> float:
+		return 200.0 if z < -10.0 else 0.0), "a rise right in front hides everything behind it")
+
+# --- Mini-map ---
+
+func _minimap_maths() -> void:
+	_check(absf(MiniMap.metres_per_pixel(0.0, 14) - 9.5546) < 0.01, "equator metres per pixel at z14: %s" % MiniMap.metres_per_pixel(0.0, 14))
+	_check(MiniMap.metres_per_pixel(60.0, 14) < MiniMap.metres_per_pixel(0.0, 14) * 0.51, "half as many metres per pixel at 60°")
+	var c := MiniMap.camera_pixel(Vector2(1000, 2000), 100.0, -50.0, 5.0)
+	_check(c == Vector2(1020, 1990), "east moves right, north moves up: %s" % c)
+	var inside := MiniMap.wanted_tiles(Vector2(128, 128), 100.0, 14)
+	_check(inside.size() == 1 and inside[0] == Vector3i(14, 0, 0), "a window inside one tile wants one: %s" % [inside])
+	var corner := MiniMap.wanted_tiles(Vector2(256, 256), 100.0, 14)
+	_check(corner.size() == 4, "on a tile corner it wants four: %d" % corner.size())
+	_check(absf(MiniMap.horizontal_fov(70.0, 16.0 / 9.0) - 102.0) < 1.5, "wide-screen horizontal field of view: %s" % MiniMap.horizontal_fov(70.0, 16.0 / 9.0))
+	_check(absf(MiniMap.horizontal_fov(70.0, 1.0) - 70.0) < 0.01, "square: the same")
+
+# --- Walking ---
+
+func _walk_maths() -> void:
+	_check(ViewWalk.is_tap(Vector2(10, 10), Vector2(13, 12), 120), "a short press is a tap")
+	_check(not ViewWalk.is_tap(Vector2(10, 10), Vector2(60, 10), 120), "a drag is not")
+	_check(not ViewWalk.is_tap(Vector2(10, 10), Vector2(10, 10), 900), "a long press is not")
+	_check(ViewWalk.glide_seconds(5.0) == ViewWalk.GLIDE_MIN_S and ViewWalk.glide_seconds(5000.0) == ViewWalk.GLIDE_MAX_S,
+		"glides take between the minimum and the maximum")
+	_check(ViewWalk.ground_hit(Vector3(0, 30, 0), Vector3(0, 0.1, -1), null) == Vector2.INF, "no ground, no hit")
+
+# --- Search: a pasted link opens its view ---
+
+func _search_link() -> void:
+	var picker := MapPicker.new()
+	root.add_child(picker)
+	picker.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	picker.size = Vector2(390, 844)
+	await process_frame
+	await process_frame
+	var got: Array = []
+	picker.view_link_requested.connect(func(state: Dictionary) -> void: got.append(state))
+	var link := ViewLink.encode({"lat": 46.69, "lon": 7.858, "eye_m": 4.0, "bearing": 147.0, "pitch": -4.0})
+	picker._search.text = link
+	picker._on_search_text_changed(link)
+	await process_frame
+	_check(picker._suggest_panel.visible and picker._suggest_list.get_child_count() == 1,
+		"a pasted link offers one row")
+	var row := picker._suggest_list.get_child(0) as Button
+	_check(row != null and row.text.begins_with("Shared view · 46.6900° N"), "the row names the shared view: %s" % (row.text if row != null else "-"))
+	if row != null:
+		row.pressed.emit()
+	_check(got.size() == 1 and absf(float(got[0]["lat"]) - 46.69) < 0.001 and float(got[0]["bearing"]) == 147.0,
+		"tapping it opens that view: %s" % [got])
+	MapSearch.submit(picker, "  " + link + " ")
+	_check(got.size() == 2, "Enter opens it too")
+	MapSearch.submit(picker, "pr360://view?lat=x&lon=1")
+	_check(got.size() == 2, "a broken link opens nothing")
+	var near := MapSearch.looks_like_coordinates(link)
+	_check(not near, "a link is not read as coordinates")
+	picker.queue_free()
+	await process_frame
+
+# --- The real view ---
+
+func _flat(lat: float, lon: float, name: String) -> LocationData:
+	var flat := LocationData.new()
+	flat.grid_size = 8
+	flat.heights.resize(64)
+	for i in 64:
+		flat.heights[i] = 3.0
+	flat.place_name = name
+	flat.latitude = lat
+	flat.longitude = lon
+	return flat
+
+func _view_wiring() -> void:
+	var view := View360.new()
+	root.add_child(view)
+	view.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	view.size = Vector2(1280, 800)
+	await process_frame
+	view._wiki.offline_mode = true
+	view._horizon._fetcher.offline_mode = true
+	view._weather.queue_free()
+	view._weather = null
+	var data := _flat(60.4518, 22.2666, "Testville")
+	data.view = ViewLink.to_view({"lat": 60.4518, "lon": 22.2666, "eye_m": 31.0, "bearing": 200.0,
+		"pitch": -6.0, "zoom": 1.4, "minutes": 480.0, "season": 0,
+		"date": {"year": 2026, "month": 4, "day": 20}})
+	data.season = 0
+	view.show_location(data)
+	await process_frame
+	await process_frame
+	_check(absf(rad_to_deg(-view._rig.yaw) - 200.0) < 0.01 or absf(fposmod(rad_to_deg(-view._rig.yaw), 360.0) - 200.0) < 0.01,
+		"the saved bearing is restored: %s" % rad_to_deg(-view._rig.yaw))
+	_check(absf(rad_to_deg(view._rig.pitch) + 6.0) < 0.01, "a pitch below the horizon is kept: %s" % rad_to_deg(view._rig.pitch))
+	_check(absf(view._rig.zoom_factor - 1.4) < 0.001, "the zoom is restored")
+	var ground_y := view._ground.height_at_world(view._rig.position.x, view._rig.position.z)
+	_check(absf(view._rig.position.y - ground_y - 31.0) < 0.01, "the eye stands where it did: %s" % (view._rig.position.y - ground_y))
+	_check(view._date == {"year": 2026, "month": 4, "day": 20}, "the date is restored: %s" % [view._date])
+	_check(absf(view._time_hour - 8.0) < 0.001, "and the time: %s" % view._time_hour)
+	_check(view._atmos.solar_date() == {"year": 2026, "month": 4, "day": 20}, "the sun is computed for that day")
+	var this_year := int(Time.get_date_dict_from_system().get("year", 0))
+	_check(view._sun_arc._date_label.visible and view._sun_arc._date_label.text \
+		== ("20 Apr" if this_year == 2026 else "20 Apr 2026"), "the arc names the date: %s" % view._sun_arc._date_label.text)
+	_check(ViewConditions.date_text(view._date) == "20 Apr 2026" and ViewConditions.date_text(view._date, false) == "20 Apr",
+		"the label reads with or without its year")
+	var back := view.camera_state()
+	_check(absf(float(back["bearing"]) - 200.0) < 0.01 and absf(float(back["eye_m"]) - 31.0) < 0.01
+		and absf(float(back["zoom"]) - 1.4) < 0.001 and not back.has("eye_lat"),
+		"camera_state captures the camera: %s" % [back])
+	var link := ViewTools.current_link(view)
+	var linked := ViewLink.parse(link)
+	_check(int(linked["minutes"]) == 480 and int(linked["season"]) == 0 and linked["date"] == view._date,
+		"the copied link carries time, season and date: " + link)
+
+	# HUD tools exist, the keys reach them.
+	for key in ["date", "photo", "link", "labels", "map"]:
+		_check(view._tool_btns.has(key) and (view._tool_btns[key] as Button).tooltip_text != "", "tool button: " + key)
+	_check(view._sun_arc._play_btn != null and view._sun_arc._play_btn.tooltip_text == "Play the day", "the arc has a play button")
+	var emitted: Array = []
+	view.pref_changed.connect(func(k: String, v: Variant) -> void: emitted.append([k, v]))
+	var press := func(code: Key) -> void:
+		var ev := InputEventKey.new()
+		ev.keycode = code
+		ev.pressed = true
+		ViewChrome.handle_key(view, ev)
+	press.call(KEY_N)
+	_check(view._horizon.enabled and UiPrefs.horizon_labels and emitted.has(["horizon_labels", true]), "N turns the horizon labels on and saves it")
+	press.call(KEY_N)
+	_check(not view._horizon.enabled, "and off")
+	press.call(KEY_M)
+	_check(UiPrefs.minimap and view._minimap.visible, "M shows the mini-map")
+	press.call(KEY_M)
+	_check(not view._minimap.visible, "and hides it")
+	press.call(KEY_T)
+	_check(view._lapse.playing and not view._live_time, "T plays the time-lapse and leaves live time")
+	_check(view._sun_arc._speed_btn.visible and view._sun_arc._play_btn.tooltip_text == "Pause time-lapse", "the arc shows pause and the speed")
+	view._process(0.2)
+	var after := view._time_hour * 60.0
+	_check(absf(after - 480.0) > 1.0, "a frame moves the sun: %s" % after)
+	ViewConditions.set_time_minutes(view, 600.0)
+	_check(not view._lapse.playing, "scrubbing the arc stops the time-lapse")
+	press.call(KEY_T)
+	ViewConditions.cycle_lapse_speed(view)
+	_check(view._lapse.speed() == 2 and view._sun_arc._speed_btn.text == "2×", "the speed button cycles")
+	ViewConditions.toggle_lapse(view)
+	# Date: pick a winter day; the season follows, the sun moves.
+	var before_elev := view._atmos.solar_elevation
+	await ViewConditions.set_date(view, {"year": 2026, "month": 12, "day": 21})
+	_check(view._date == {"year": 2026, "month": 12, "day": 21} and view._data.season == LocationData.Season.WINTER,
+		"a December day makes it winter")
+	_check(view._season_btn.selected == LocationData.Season.WINTER, "the season control follows")
+	_check(view._atmos.solar_elevation < before_elev, "the winter sun stands lower: %s -> %s" % [before_elev, view._atmos.solar_elevation])
+	ViewConditions._on_season_selected(view, LocationData.Season.SUMMER)
+	var date_cleared: bool = view._date.is_empty()
+	while view._season_building:
+		await process_frame
+	_check(date_cleared and not view._sun_arc._date_label.visible, "a season button returns to the season's own day")
+	ViewConditions.use_live_time(view)
+	_check(view._live_time and view._date.is_empty(), "Now clears the date")
+	ViewTools.toggle_date(view)
+	_check(view._date_picker.visible, "the date button opens the picker")
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.pressed = true
+	_check(ViewChrome.handle_key(view, esc) and not view._date_picker.visible, "Esc closes the picker")
+
+	# Walking: a tap on the ground glides there, far taps are refused.
+	var cam := view._rig.camera
+	var hit := ViewWalk.ground_hit(cam.global_position, Vector3(0.0, -0.5, -1.0).normalized(), view._ground)
+	_check(hit != Vector2.INF, "a ray looking down meets the ground")
+	if hit != Vector2.INF:
+		var expect := cam.global_position.z - (cam.global_position.y
+			- view._ground.height_at_world(cam.global_position.x, cam.global_position.z)) / 0.5
+		_check(absf(hit.y - expect) < 3.0, "at the right distance: %s vs %s" % [hit.y, expect])
+	_check(ViewWalk.ground_hit(cam.global_position, Vector3(0, 0.3, -1).normalized(), view._ground) == Vector2.INF, "a ray at the sky meets nothing")
+	var here := Vector2(view._rig.position.x, view._rig.position.z)
+	_check(view._walk.walk_to(view, here + Vector2(0, -40)), "walking 40 m is allowed")
+	await create_timer(ViewWalk.GLIDE_MAX_S + 0.5).timeout
+	_check(absf(view._rig.position.z - (here.y - 40.0)) < 0.5, "and arrives: %s" % view._rig.position)
+	_check(not view._walk.walk_to(view, Vector2(0, 5000)), "5 km is past the built area")
+
+	# Photo with no picture (headless): a plain message, no crash.
+	ViewTools.photo(view)
+	_check(view._toast.visible and view._toast.title_text() == "Couldn't take the photo", "no picture: a plain message")
+	ViewTools.copy_link(view)
+	_check(view._toast.title_text() == "View link copied", "copying a link says so")
+	view.queue_free()
+	await process_frame

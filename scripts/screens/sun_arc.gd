@@ -14,6 +14,9 @@ extends VBoxContainer
 signal scrubbed(minutes: float)
 signal jump_requested(kind: String)
 signal now_requested
+## Time-lapse play / pause and its speed (1×, 2×, 4×).
+signal lapse_toggled
+signal lapse_speed_requested
 
 const PAD_X := 18.0
 const JUMPS := [["sunrise", "Sunrise"], ["sun", "Noon"], ["sunset", "Sunset"], ["moon", "Night"]]
@@ -25,6 +28,11 @@ var elevation := 0.0
 var live := false
 var time_label: Label
 var _elev_label: Label
+var _date_label: Label
+var _play_btn: Button
+var _speed_btn: Button
+var _lapse_playing := false
+var _compact := false
 var _now_btn: Button
 var _arc: Control
 var _jumps: Array[Button] = []
@@ -36,8 +44,30 @@ func _init() -> void:
 	head.add_theme_constant_override("separation", 8)
 	add_child(head)
 	time_label = UiTheme.data_label("12:00", 24, UiTheme.INK, true)
-	time_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(time_label)
+	_date_label = UiTheme.label("", 14, UiTheme.MUTED)
+	_date_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# The bar is narrow: a long date gives way to the controls beside it.
+	_date_label.clip_text = true
+	_date_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_date_label.visible = false
+	head.add_child(_date_label)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(gap)
+	_play_btn = Button.new()
+	_play_btn.custom_minimum_size = Vector2(36, 32)
+	_play_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_play_btn.pressed.connect(func() -> void: lapse_toggled.emit())
+	head.add_child(_play_btn)
+	_speed_btn = Button.new()
+	_speed_btn.text = "1×"
+	_speed_btn.tooltip_text = "Time-lapse speed"
+	_speed_btn.custom_minimum_size = Vector2(0, 32)
+	_speed_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_speed_btn.visible = false
+	_speed_btn.pressed.connect(func() -> void: lapse_speed_requested.emit())
+	head.add_child(_speed_btn)
 	_now_btn = Button.new()
 	_now_btn.text = "Now"
 	_now_btn.tooltip_text = "Follow the place's live clock"
@@ -80,6 +110,8 @@ func set_arc_height(h: float) -> void:
 
 ## Jump buttons show only their icons (the label stays the tooltip).
 func set_compact(compact: bool) -> void:
+	_compact = compact
+	_elev_label.text = _elev_text()
 	for i in _jumps.size():
 		_jumps[i].text = "" if compact else str(JUMPS[i][1])
 
@@ -91,25 +123,52 @@ func set_state(at_minutes: float, rise: float, set_m: float, elev: float, is_liv
 	live = is_live
 	time_label.text = "%02d:%02d" % [int(minutes / 60.0), int(fmod(minutes, 60.0) + 0.001)]
 	var deg := roundi(elev)
-	_elev_label.text = "%s%d° %s" % ["+" if deg > 0 else "", deg,
-		"above horizon" if _is_up() else "below horizon"]
-	_now_btn.visible = not live
+	_elev_label.text = _elev_text()
+	_now_btn.visible = not live and not _lapse_playing
 	# An adjustable control for screen readers: "Sun, 14:30, 38° above horizon".
 	_arc.accessibility_name = "Sun, %s, %d° %s horizon" % [time_label.text, absi(deg),
 		"above" if _is_up() else "below"]
 	_arc.queue_redraw()
 
+## The narrow bar keeps the number only (the arc's hollow sun says "below").
+func _elev_text() -> String:
+	var deg := roundi(elevation)
+	var num := "%s%d°" % ["+" if deg > 0 else "", deg]
+	return num if _compact else "%s %s" % [num, "above horizon" if _is_up() else "below horizon"]
+
+## The picked date ("21 Jun 2026"), "" for the season's own day.
+func set_date_text(text: String) -> void:
+	_date_label.text = text
+	_date_label.visible = text != ""
+
+## Time-lapse playing (the button pauses, the speed shows) and its speed.
+func set_lapse(playing: bool, speed: int) -> void:
+	_lapse_playing = playing
+	_speed_btn.visible = playing
+	_speed_btn.text = "%d×" % speed
+	_now_btn.visible = not live and not playing
+	_style_play()
+
+func _style_play() -> void:
+	var icon := "pause" if _lapse_playing else "play"
+	_play_btn.tooltip_text = "Pause time-lapse" if _lapse_playing else "Play the day"
+	_play_btn.accessibility_name = _play_btn.tooltip_text
+	UiIcon.apply(_play_btn, icon, 18, UiTheme.TEAL, UiTheme.TEAL)
+
 func restyle() -> void:
 	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		_now_btn.add_theme_color_override(key, UiTheme.TEAL)
-	_now_btn.add_theme_font_override("font", UiTheme.sans(600))
-	_now_btn.add_theme_font_size_override("font_size", 14)
+		_speed_btn.add_theme_color_override(key, UiTheme.TEAL)
+	for b: Button in [_now_btn, _speed_btn]:
+		b.add_theme_font_override("font", UiTheme.sans(600))
+		b.add_theme_font_size_override("font_size", 14)
+	_style_play()
 	var clear := UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_PILL)
 	clear.content_margin_left = 12
 	clear.content_margin_right = 12
 	var lit := clear.duplicate() as StyleBoxFlat
 	lit.bg_color = UiTheme.LINE
-	for b: Button in [_now_btn] + _jumps:
+	for b: Button in [_now_btn, _speed_btn, _play_btn] + _jumps:
 		b.add_theme_stylebox_override("normal", clear)
 		b.add_theme_stylebox_override("pressed", lit)
 		b.add_theme_stylebox_override("hover", lit)

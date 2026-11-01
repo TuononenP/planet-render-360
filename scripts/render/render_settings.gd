@@ -49,6 +49,7 @@ const PREF_DEFAULTS := {
 	"imperial": false, "dms": false, "clock_12h": false,
 	"cache_limit_mb": 512, "text_scale": 1.0,
 	"onboarded": false,
+	"horizon_labels": false, "minimap": false, "photo_stamp": true,
 }
 
 static func clamp_preset(value: int) -> int:
