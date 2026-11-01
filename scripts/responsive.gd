@@ -4,16 +4,17 @@ extends RefCounted
 ## Mobile-first responsive rules shared by every screen.
 ##
 ## Layouts are chosen from the logical width (points) of the screen:
-##   COMPACT   < 640   phone portrait: single column, map fills the middle
-##   MEDIUM    640-1099 tablet / landscape phone / small window: split view
-##   EXPANDED  >= 1100 desktop: split view, wider sidebar, 3-col history
+##   COMPACT   < 600   phone portrait: single column, map fills the middle
+##   MEDIUM    600-1023 tablet / landscape phone / small window: split view
+##   EXPANDED  >= 1024 desktop: side panel (size-panel), right inspector
+## (design system Layout → Breakpoints; gutters space-4 / space-6).
 ## Screens rebuild their container arrangement when the layout changes,
 ## so resizing a macOS window (or rotating a phone) relayouts live.
 
 enum Layout { COMPACT, MEDIUM, EXPANDED }
 
-const MEDIUM_MIN := 640.0
-const EXPANDED_MIN := 1100.0
+const MEDIUM_MIN := 600.0
+const EXPANDED_MIN := 1024.0
 
 static func layout_for_width(width: float) -> Layout:
 	if width >= EXPANDED_MIN:
@@ -21,6 +22,39 @@ static func layout_for_width(width: float) -> Layout:
 	if width >= MEDIUM_MIN:
 		return Layout.MEDIUM
 	return Layout.COMPACT
+
+## Layout for a whole window: the width decides, except a short
+## landscape window (a phone on its side, height < 500), which takes the
+## side-panel arrangement so the map keeps its height.
+static func layout_for_size(s: Vector2) -> Layout:
+	if s.y < 500.0 and s.x > s.y:
+		return Layout.EXPANDED
+	return layout_for_width(s.x)
+
+## Extra content scale for the window (Window.content_scale_factor).
+## canvas_items/expand fits the 390x844 portrait frame, so a short
+## landscape window (a phone on its side, a wide desktop strip) drew
+## every control at under half size; there points stay at least 1:1.
+static func content_scale_factor(win: Vector2) -> float:
+	if win.x <= 0.0 or win.y <= 0.0:
+		return 1.0
+	var fit := minf(win.x / 390.0, win.y / 844.0)
+	var landscape := minf(1.0, minf(win.x / 844.0, win.y / 390.0))
+	return maxf(fit, landscape) / fit
+
+## Safe-area insets (notch, Dynamic Island, home indicator) in the
+## control's own units, as [left, top, right, bottom]. Desktop windows
+## have none.
+static func safe_insets(c: Control) -> Array[float]:
+	if not OS.has_feature("mobile") or not c.is_inside_tree():
+		return [0.0, 0.0, 0.0, 0.0]
+	var win := Vector2(DisplayServer.window_get_size())
+	var safe := DisplayServer.get_display_safe_area()
+	if win.x <= 0.0 or win.y <= 0.0:
+		return [0.0, 0.0, 0.0, 0.0]
+	var k := c.get_viewport_rect().size / win
+	return [safe.position.x * k.x, safe.position.y * k.y,
+		maxf(win.x - safe.end.x, 0.0) * k.x, maxf(win.y - safe.end.y, 0.0) * k.y]
 
 static func layout_name(layout: Layout) -> String:
 	match layout:
@@ -38,17 +72,15 @@ static func page_padding(layout: Layout) -> int:
 	match layout:
 		Layout.COMPACT:
 			return 16
-		Layout.MEDIUM:
-			return 24
 		_:
-			return 32
+			return 24
 
 static func sidebar_width(layout: Layout) -> int:
 	match layout:
 		Layout.MEDIUM:
 			return 340
 		Layout.EXPANDED:
-			return 400
+			return 376  # size-panel
 		_:
 			return 0
 
@@ -65,11 +97,11 @@ static func content_max_width(layout: Layout) -> int:
 static func history_columns(layout: Layout) -> int:
 	match layout:
 		Layout.COMPACT:
-			return 1
-		Layout.MEDIUM:
 			return 2
-		_:
+		Layout.MEDIUM:
 			return 3
+		_:
+			return 4
 
 static func title_size(layout: Layout) -> int:
 	return 28 if layout == Layout.COMPACT else 34

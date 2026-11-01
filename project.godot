@@ -96,3 +96,7 @@ cloud_sun_dir={
 "type": "vec3",
 "value": Vector3(0, 1, 0)
 }
+
+[gui]
+
+common/show_focus_state_on_pointer_event=0

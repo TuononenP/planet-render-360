@@ -241,11 +241,18 @@ static func suggestions_for(query: String) -> Array:
 	out.append_array(contains)
 	return out.slice(0, 5)
 
+## Display name of a curated landmark type ("eiffel" -> "Eiffel Tower").
+static func landmark_name(type: String) -> String:
+	for entry in landmarks():
+		if str(entry["type"]) == type:
+			return str(entry.get("name", type.capitalize()))
+	return type.capitalize()
+
 static func known_place(lat: float, lon: float) -> String:
 	for place in known_places():
 		if abs(lat - float(place["lat"])) < 0.4 and abs(lon - float(place["lon"])) < 0.4:
 			return str(place["name"])
-	return "%.4f°, %.4f°" % [lat, lon]
+	return UiTheme.coords(lat, lon)
 
 ## Curated landmark registry: the places users actually search for by
 ## name. Each entry renders on the fly as a procedural model
@@ -258,25 +265,25 @@ static func known_place(lat: float, lon: float) -> String:
 ## cathedral whatever pin the geocoder returned.
 static func landmarks() -> Array:
 	return [
-		{"type": "turku_cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
+		{"type": "turku_cathedral", "name": "Turku Cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
-		{"type": "helsinki_cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
+		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
-		{"type": "eiffel", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
+		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
 			"aliases": ["eiffel", "tour eiffel"]},
-		{"type": "tokyo", "lat": 35.6586, "lon": 139.7454, "radius_m": 9500.0,
+		{"type": "tokyo", "name": "Tokyo Tower", "lat": 35.6586, "lon": 139.7454, "radius_m": 9500.0,
 			"aliases": ["tokyo tower", "tokyo tawā"]},
-		{"type": "big_ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
+		{"type": "big_ben", "name": "Big Ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
 			"aliases": ["big ben", "elizabeth tower"]},
-		{"type": "colosseum", "lat": 41.8902, "lon": 12.4922, "radius_m": 6000.0,
+		{"type": "colosseum", "name": "Colosseum", "lat": 41.8902, "lon": 12.4922, "radius_m": 6000.0,
 			"aliases": ["colosseum", "colosseo", "coliseum"]},
-		{"type": "sagrada", "lat": 41.4036, "lon": 2.1744, "radius_m": 5000.0,
+		{"type": "sagrada", "name": "Sagrada Família", "lat": 41.4036, "lon": 2.1744, "radius_m": 5000.0,
 			"aliases": ["sagrada", "sagrada familia", "sagrada família"]},
-		{"type": "pyramid", "lat": 29.9792, "lon": 31.1342, "radius_m": 13000.0,
+		{"type": "pyramid", "name": "Great Pyramid of Giza", "lat": 29.9792, "lon": 31.1342, "radius_m": 13000.0,
 			"aliases": ["pyramid", "giza", "khufu", "cheops"]},
-		{"type": "statue_liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
+		{"type": "statue_liberty", "name": "Statue of Liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
 			"aliases": ["statue of liberty", "lady liberty"]},
-		{"type": "sydney_opera", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
+		{"type": "sydney_opera", "name": "Sydney Opera House", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
 			"aliases": ["sydney opera", "opera house, sydney"]},
 	]
 

@@ -8,6 +8,16 @@ extends RefCounted
 
 const MARK := "res://assets/brand/pr360-mark-dark.svg"
 const WORDMARK := "res://assets/brand/pr360-wordmark-dark.svg"
+const MARK_LIGHT := "res://assets/brand/pr360-mark-light.svg"
+const WORDMARK_LIGHT := "res://assets/brand/pr360-wordmark-light.svg"
+
+## The variant for the current ground: -dark files on Night grounds,
+## -light on Day (the logo's colours are fixed, never the accent).
+static func mark() -> String:
+	return MARK_LIGHT if UiTheme.is_day else MARK
+
+static func wordmark() -> String:
+	return WORDMARK_LIGHT if UiTheme.is_day else WORDMARK
 
 static var _cache := {}
 

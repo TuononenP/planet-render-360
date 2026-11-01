@@ -39,6 +39,8 @@ var _cancel_btn: Button
 var _push: Control
 var _two_col := false
 var _active_index := -1
+## Reduced motion swaps the build shimmer for a static striped fill.
+static var reduce_motion := false
 var _building := false
 var _build_started_msec := 0
 var _fit_queued := false

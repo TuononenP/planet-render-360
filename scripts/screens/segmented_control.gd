@@ -1,0 +1,86 @@
+class_name SegmentedControl
+extends PanelContainer
+
+## One choice from two to five options (design system SegmentedControl):
+## a pill track, the selected segment an accent fill with an on-accent
+## 600 label. `glass` is for the viewer's bar (glass-strong track);
+## otherwise the track is sky-300 on solid ground. Mirrors OptionButton's
+## select / selected / item_count / item_selected so it can stand in
+## for one. `icon_only` keeps each label as the tooltip (seasons on
+## narrow phones).
+
+signal item_selected(index: int)
+
+var selected := -1
+var icon_only := false
+var _glass := false
+var _labels: Array = []
+var _icons: Array = []
+var _buttons: Array[Button] = []
+
+var item_count: int:
+	get:
+		return _buttons.size()
+
+func _init(labels: Array = [], icons: Array = [], glass: bool = false) -> void:
+	_labels = labels
+	_icons = icons
+	_glass = glass
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	add_child(row)
+	for i in labels.size():
+		var b := Button.new()
+		b.toggle_mode = true
+		b.tooltip_text = str(labels[i])
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(44, 42)
+		b.add_theme_font_size_override("font_size", 14)
+		var index := i
+		b.pressed.connect(func() -> void:
+			select(index)
+			item_selected.emit(index))
+		row.add_child(b)
+		_buttons.append(b)
+	restyle()
+
+func select(index: int) -> void:
+	selected = index
+	restyle()
+
+func set_icon_only(on: bool) -> void:
+	if on != icon_only:
+		icon_only = on
+		restyle()
+
+## Re-skin after an accent change; also applies the selection.
+func restyle() -> void:
+	var track := UiTheme.style(UiTheme.CARD if _glass else UiTheme.FIELD, UiTheme.RADIUS_PILL,
+		UiTheme.GLASS_EDGE if _glass else UiTheme.LINE)
+	track.set_content_margin_all(3)
+	add_theme_stylebox_override("panel", track)
+	for i in _buttons.size():
+		var b := _buttons[i]
+		var on := i == selected
+		b.set_pressed_no_signal(on)
+		var has_icon := i < _icons.size() and str(_icons[i]) != ""
+		b.text = "" if icon_only and has_icon else str(_labels[i])
+		var text_color := UiTheme.ON_ACCENT if on else UiTheme.MUTED
+		for key in ["font_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
+			b.add_theme_color_override(key, text_color)
+		b.add_theme_color_override("font_hover_color", UiTheme.ON_ACCENT if on else UiTheme.INK)
+		b.add_theme_font_override("font", UiTheme.sans(600 if on else 500))
+		if has_icon:
+			UiIcon.apply(b, str(_icons[i]), 18, text_color, UiTheme.ON_ACCENT)
+			b.add_theme_constant_override("h_separation", 4)
+		var seg := UiTheme.style(UiTheme.TEAL if on else Color.TRANSPARENT, UiTheme.RADIUS_PILL)
+		seg.content_margin_left = 12
+		seg.content_margin_right = 12
+		var hover := seg.duplicate() as StyleBoxFlat
+		if not on:
+			hover.bg_color = Color(UiTheme.INK, 0.06)
+		b.add_theme_stylebox_override("normal", seg)
+		b.add_theme_stylebox_override("pressed", seg)
+		b.add_theme_stylebox_override("hover", hover)
+		b.add_theme_stylebox_override("hover_pressed", seg)
+		b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))

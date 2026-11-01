@@ -9,13 +9,23 @@ extends RefCounted
 ## carries ink only; secondary text goes on GLASS_STRONG.
 
 static var ACCENT := Color("8cc8ff")  # Glacier, follows UiTheme.apply_palette
-const GLASS := Color(0.043, 0.063, 0.098, 0.66)  # glass
-const GLASS_STRONG := Color(0.043, 0.063, 0.098, 0.84)  # glass-strong
-const GLASS_HOVER := Color(0.145, 0.176, 0.225, 0.78)
-const EDGE := Color(0.929, 0.945, 0.965, 0.14)  # glass-edge
-const TEXT := Color("edf1f6")  # ink
-const TEXT_DIM := Color("a4aebd")  # ink-muted, glass-strong only
-const TEXT_FAINT := Color("828c9c")  # ink-faint, placeholders and disabled
+## Token colours, following UiTheme's theme (Night / Day) via sync_palette.
+static var GLASS := Color(0.043, 0.063, 0.098, 0.66)  # glass
+static var GLASS_STRONG := Color(0.043, 0.063, 0.098, 0.84)  # glass-strong
+static var GLASS_HOVER := Color(0.145, 0.176, 0.225, 0.78)
+static var EDGE := Color(0.929, 0.945, 0.965, 0.14)  # glass-edge
+static var TEXT := Color("edf1f6")  # ink
+static var TEXT_DIM := Color("a4aebd")  # ink-muted, glass-strong only
+static var TEXT_FAINT := Color("828c9c")  # ink-faint, placeholders and disabled
+
+static func sync_palette() -> void:
+	GLASS = UiTheme.GLASS_FILL
+	GLASS_STRONG = UiTheme.CARD
+	GLASS_HOVER = Color(UiTheme.GLASS_FILL.lerp(UiTheme.INK, 0.12), maxf(UiTheme.GLASS_FILL.a, 0.78))
+	EDGE = UiTheme.GLASS_EDGE
+	TEXT = UiTheme.INK
+	TEXT_DIM = UiTheme.MUTED
+	TEXT_FAINT = UiTheme.FAINT
 
 static func glass(radius: int, border: Color = EDGE, bg: Color = GLASS,
 		margin_x: int = 16, margin_y: int = 10) -> StyleBoxFlat:

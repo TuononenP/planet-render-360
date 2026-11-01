@@ -66,7 +66,7 @@ static func go(index: int) -> void:
 	UiTheme.theme_index = index
 	var to := UiTheme.ACCENTS[index]
 	var tree := Engine.get_main_loop() as SceneTree
-	if tree == null or from.is_equal_approx(to):
+	if tree == null or from.is_equal_approx(to) or UiPrefs.reduce_motion:
 		_paint(to)
 		return
 	_tween = tree.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

@@ -36,7 +36,10 @@ static func apply(b: Button, icon_name: String, size: int = 22,
 	# Left of a label, centred when the button is icon-only (centred
 	# with a label the engine draws the text on top of the icon).
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT if b.text != "" else HORIZONTAL_ALIGNMENT_CENTER
-	b.expand_icon = true
+	# Not expand_icon: Godot leaves an expanded icon out of the minimum
+	# size, so it vanished on content-sized buttons and shrank on short
+	# ones. icon_max_width alone draws the 2x raster at `size`.
+	b.expand_icon = false
 	b.add_theme_constant_override("icon_max_width", size)
 	b.add_theme_constant_override("h_separation", 8)
 	for key in ["icon_normal_color", "icon_hover_color", "icon_focus_color"]:
@@ -44,6 +47,17 @@ static func apply(b: Button, icon_name: String, size: int = 22,
 	for key in ["icon_pressed_color", "icon_hover_pressed_color"]:
 		b.add_theme_color_override(key, active_color)
 	b.add_theme_color_override("icon_disabled_color", Color(color, 0.5))
+
+## A standalone icon (no button), tinted through modulate.
+static func rect(icon_name: String, size: int, color: Color) -> TextureRect:
+	var r := TextureRect.new()
+	r.texture = texture(icon_name, size)
+	r.custom_minimum_size = Vector2(size, size)
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.modulate = color
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
 
 ## A round, text-free icon button for rails and HUDs (44pt hit area).
 static func button(icon_name: String, tooltip: String, size: int = 22) -> Button:

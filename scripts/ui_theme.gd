@@ -45,6 +45,10 @@ static var SIGNAL_CAUTION := Color("f2c36b")
 static var FOCUS := Color("f4f7fb")
 static var SIGNAL_ERROR := Color("ff8f66")
 const HORIZON_NIGHT := Color("1a2350")  # descent glow; same in every theme
+## The other horizon-* stops (sun-arc track); decorative, same in every theme.
+const HORIZON_DAWN := Color("d98a8f")
+const HORIZON_DAY := Color("7fb8e6")
+const HORIZON_DUSK := Color("b8607e")
 
 const RADIUS_XS := 6
 const RADIUS_S := 10
@@ -59,13 +63,81 @@ static var theme_index := 0
 static var auto_mode := false
 const AUTO_CHIP := 5
 static var theme_names: Array[String] = ["Glacier", "Aurora", "Dusk", "Dawn", "Lichen"]
-const ACCENTS: Array[Color] = [
+## The live theme's accents (Night is luminous, Day deep), in swatch order.
+static var ACCENTS: Array[Color] = NIGHT_ACCENTS.duplicate()
+const NIGHT_ACCENTS: Array[Color] = [
 	Color("8cc8ff"),  # Glacier (default)
 	Color("6fe3a5"),  # Aurora
 	Color("ffa46e"),  # Dusk
 	Color("f5a3c3"),  # Dawn
 	Color("cddc7a"),  # Lichen
 ]
+const DAY_ACCENTS: Array[Color] = [
+	Color("1d5fa8"), Color("0b7148"), Color("a8410f"), Color("ad3767"), Color("566510"),
+]
+
+## Night (the default and the reference) and Day: the same token names,
+## so components never branch on the theme (design system Colour).
+const NIGHT := {
+	"sky_000": Color("06090f"), "sky_100": Color("0b1019"), "sky_200": Color("121925"),
+	"sky_300": Color("1b2433"), "line": Color(0.929, 0.945, 0.965, 0.10),
+	"line_strong": Color("6a7584"), "glass": Color(0.043, 0.063, 0.098, 0.66),
+	"glass_strong": Color(0.043, 0.063, 0.098, 0.84), "glass_edge": Color(0.929, 0.945, 0.965, 0.14),
+	"ink": Color("edf1f6"), "ink_muted": Color("a4aebd"), "ink_faint": Color("828c9c"),
+	"on_accent": Color("07101a"), "signal_good": Color("7cc0ff"), "signal_caution": Color("f2c36b"),
+	"signal_error": Color("ff8f66"), "focus": Color("f4f7fb"),
+}
+const DAY := {
+	"sky_000": Color("e6eaef"), "sky_100": Color("f2f4f7"), "sky_200": Color("ffffff"),
+	"sky_300": Color("e3e8ee"), "line": Color(0.051, 0.078, 0.125, 0.10),
+	"line_strong": Color("7a8494"), "glass": Color(0.969, 0.977, 0.984, 0.74),
+	"glass_strong": Color(0.969, 0.977, 0.984, 0.92), "glass_edge": Color(1.0, 1.0, 1.0, 0.70),
+	"ink": Color("0d1420"), "ink_muted": Color("465163"), "ink_faint": Color("576274"),
+	"on_accent": Color("ffffff"), "signal_good": Color("1a5fa3"), "signal_caution": Color("8a5600"),
+	"signal_error": Color("b23c12"), "focus": Color("0d1420"),
+}
+## 0 Night, 1 Day, 2 Match system (Settings → Appearance → Theme).
+static var theme_mode := 0
+static var is_day := false
+
+## Points every colour token at Night or Day ("Match system" asks the
+## OS), then applies Solid panels and Increase contrast (UiPrefs).
+## Screens built afterwards pick the palette up; Main rebuilds the
+## screens after a switch, which is instant (no glide).
+static func apply_mode(mode: int) -> void:
+	theme_mode = mode
+	is_day = mode == 1 or (mode == 2 and DisplayServer.is_dark_mode_supported()
+		and not DisplayServer.is_dark_mode())
+	var t: Dictionary = DAY if is_day else NIGHT
+	SKY_000 = t["sky_000"]
+	BG = t["sky_100"]
+	SURFACE = t["sky_200"]
+	FIELD = t["sky_300"]
+	LINE = t["line"]
+	LINE_STRONG = t["line_strong"]
+	GLASS_FILL = t["glass"]
+	DARK_PANEL = t["glass"]
+	CARD = t["glass_strong"]
+	GLASS_EDGE = t["glass_edge"]
+	INK = t["ink"]
+	MUTED = t["ink_muted"]
+	FAINT = t["ink_faint"]
+	ON_ACCENT = t["on_accent"]
+	SIGNAL_GOOD = t["signal_good"]
+	SIGNAL_CAUTION = t["signal_caution"]
+	SIGNAL_ERROR = t["signal_error"]
+	FOCUS = t["focus"]
+	if UiPrefs.solid_panels:
+		GLASS_FILL = Color(SURFACE, 0.96)
+		DARK_PANEL = GLASS_FILL
+		CARD = Color(SURFACE, 1.0)
+	if UiPrefs.high_contrast:
+		MUTED = INK
+		LINE = LINE_STRONG
+		GLASS_EDGE = Color(INK, 0.45)
+	ACCENTS = (DAY_ACCENTS if is_day else NIGHT_ACCENTS).duplicate()
+	HudStyle.sync_palette()
+	set_accent(ACCENTS[clampi(theme_index, 0, ACCENTS.size() - 1)])
 
 static var _font_cache := {}
 
@@ -87,6 +159,10 @@ static func base_theme() -> Theme:
 	var t := Theme.new()
 	t.default_font = sans()
 	t.default_font_size = 15
+	# Ink by default, so a control without its own colours still reads in
+	# both themes.
+	for type in ["Label", "Button", "LineEdit", "OptionButton", "PopupMenu"]:
+		t.set_color("font_color", type, INK)
 	return t
 
 ## Instrument Sans at a weight (400 body, 600 titles, labels and buttons).
@@ -126,7 +202,7 @@ static func apply_palette(index: int) -> void:
 static func set_accent(c: Color) -> void:
 	TEAL = c
 	TEAL_DARK = TEAL.darkened(0.25)
-	TEAL_SOFT = Color(TEAL, 0.16)
+	TEAL_SOFT = Color(TEAL, 0.12 if is_day else 0.16)
 	HudStyle.ACCENT = TEAL
 
 static func style(bg: Color, radius: int = 16, border: Color = Color.TRANSPARENT, shadow: bool = false) -> StyleBoxFlat:
@@ -143,7 +219,7 @@ static func style(bg: Color, radius: int = 16, border: Color = Color.TRANSPARENT
 		s.border_color = border
 		s.set_border_width_all(1)
 	if shadow:
-		s.shadow_color = Color(0, 0, 0, 0.40)
+		s.shadow_color = Color(0.09, 0.137, 0.22, 0.16) if is_day else Color(0, 0, 0, 0.40)
 		s.shadow_size = 14
 		s.shadow_offset = Vector2(0, 10)
 	return s
@@ -158,24 +234,138 @@ static func glass_panel(radius: int = RADIUS_XL) -> StyleBoxFlat:
 	return st
 
 ## Label in Instrument Sans: semibold (600) when `bold`, else regular.
+## Motion tokens (design system Motion), in seconds.
+const DURATION := {"instant": 0.09, "quick": 0.16, "standard": 0.24,
+	"gentle": 0.38, "slow": 0.6, "descent": 2.4}
+
+## The type scale by token name: [family, size, weight]. Family is
+## "display" (Instrument Serif), "sans" (Instrument Sans) or "mono"
+## (IBM Plex Mono, tabular figures).
+const TYPE := {
+	"display-xl": ["display", 48, 400], "display-l": ["display", 36, 400],
+	"display-m": ["display", 28, 400], "display-s": ["display", 22, 400],
+	"title": ["sans", 20, 600], "headline": ["sans", 17, 600], "body": ["sans", 15, 400],
+	"body-s": ["sans", 14, 400], "label": ["sans", 14, 600], "caption": ["sans", 12, 500],
+	"data-l": ["mono", 24, 500], "data": ["mono", 15, 400], "data-s": ["mono", 13, 500],
+	"eyebrow": ["mono", 12, 500],
+}
+
+## A label set in a named text style ("body-s", "data-l", ...).
+static func text(value: String, style_name: String, color: Color = INK) -> Label:
+	var t: Array = TYPE[style_name]
+	match str(t[0]):
+		"display":
+			return display_label(value, int(t[1]), color)
+		"mono":
+			return data_label(value, int(t[1]), color, int(t[2]) >= 500)
+	var l := label(value, int(t[1]), color)
+	if int(t[2]) != 400:
+		l.add_theme_font_override("font", sans(int(t[2])))
+	return l
+
+## Text size from Settings → Appearance (85%–200%). Every label scales;
+## display styles stop at 130% so a place name never pushes Explore off
+## screen (design system Accessibility → Large text).
+static var text_scale := 1.0
+const DISPLAY_SCALE_CAP := 1.3
+
 static func label(text: String, size: int, color: Color = INK, bold: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", roundi(size * text_scale))
 	l.add_theme_color_override("font_color", color)
-	if bold:
-		l.add_theme_font_override("font", sans(600))
+	l.add_theme_font_override("font", sans(600 if bold else 400))
 	return l
 
 ## Coordinates as the design system sets them: 4 decimals, hemisphere
 ## letter, two spaces between ("45.9763° N  7.6586° E").
 static func coords(lat: float, lon: float) -> String:
+	if units_dms:
+		return "%s %s  %s %s" % [_dms(lat), "N" if lat >= 0.0 else "S",
+			_dms(lon), "E" if lon >= 0.0 else "W"]
 	return "%.4f° %s  %.4f° %s" % [absf(lat), "N" if lat >= 0.0 else "S",
 		absf(lon), "E" if lon >= 0.0 else "W"]
+
+## Settings → Units (RenderSettings persists them): imperial elevation,
+## degrees-minutes-seconds coordinates, 12-hour clock.
+static var units_imperial := false
+static var units_dms := false
+static var units_12h := false
+
+static func _dms(v: float) -> String:
+	var a := absf(v)
+	var d := int(a)
+	var m := int((a - d) * 60.0)
+	var sec := (a - d - m / 60.0) * 3600.0
+	return "%d° %02d′ %04.1f″" % [d, m, sec]
+
+## Thousands grouped with commas ("4,478").
+static func grouped(n: int) -> String:
+	var digits := str(absi(n))
+	var out := ""
+	while digits.length() > 3:
+		out = "," + digits.right(3) + out
+		digits = digits.left(digits.length() - 3)
+	return ("-" if n < 0 else "") + digits + out
+
+## Elevation with locale grouping and a space before the unit:
+## "4,478 m" or "14,692 ft".
+static func elevation(metres: float) -> String:
+	if units_imperial:
+		return "%s ft" % grouped(roundi(metres * 3.28084))
+	return "%s m" % grouped(roundi(metres))
+
+## Local clock time, 24-hour unless Settings asks for 12.
+static func clock(hour_f: float) -> String:
+	var minutes := roundi(fposmod(hour_f, 24.0) * 60.0) % 1440
+	var h := int(minutes / 60.0)
+	var m := minutes % 60
+	if units_12h:
+		return "%d:%02d %s" % [(h + 11) % 12 + 1, m, "AM" if h < 12 else "PM"]
+	return "%02d:%02d" % [h, m]
+
+## "UTC+1", "UTC−3:30", "UTC" from an offset in seconds.
+static func utc_label(offset_s: int) -> String:
+	if offset_s == 0:
+		return "UTC"
+	var a := absi(offset_s)
+	var hrs := int(a / 3600.0)
+	var mins := int((a % 3600) / 60.0)
+	var sign := "+" if offset_s > 0 else "−"
+	return "UTC%s%d" % [sign, hrs] if mins == 0 else "UTC%s%d:%02d" % [sign, hrs, mins]
+
+## Cache size: whole megabytes under 1 GB ("86 MB"), one decimal above
+## ("1.4 GB").
+static func cache_size(bytes: int) -> String:
+	var mb := float(bytes) / 1048576.0
+	if mb < 1024.0:
+		return "%d MB" % roundi(mb)
+	return "%.1f GB" % (mb / 1024.0)
+
+const MONTHS: Array[String] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+## When something happened, in the device's local time: "Today, 09:12",
+## "Yesterday", "3 Oct" ("3 Oct 2025" in an earlier year). `now` is for tests.
+static func relative_time(unix: float, now: float = -1.0) -> String:
+	if now < 0.0:
+		now = Time.get_unix_time_from_system()
+	var bias := int(Time.get_time_zone_from_system().get("bias", 0)) * 60
+	var at := int(unix) + bias
+	var days := floori(float(int(now) + bias) / 86400.0) - floori(float(at) / 86400.0)
+	var d := Time.get_datetime_dict_from_unix_time(at)
+	if days <= 0:
+		return "Today, %02d:%02d" % [d["hour"], d["minute"]]
+	if days == 1:
+		return "Yesterday"
+	var today := Time.get_datetime_dict_from_unix_time(int(now) + bias)
+	var date := "%d %s" % [d["day"], MONTHS[int(d["month"]) - 1]]
+	return date if d["year"] == today["year"] else "%s %d" % [date, d["year"]]
 
 ## Place names and arrival titles in Instrument Serif.
 static func display_label(text: String, size: int, color: Color = INK) -> Label:
 	var l := label(text, size, color)
+	l.add_theme_font_size_override("font_size", roundi(size * minf(text_scale, DISPLAY_SCALE_CAP)))
 	l.add_theme_font_override("font", display())
 	return l
 
@@ -190,9 +380,32 @@ static func _set_font_colors(b: Control, color: Color) -> void:
 			"font_focus_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(key, color)
 
+## Panel glass's lit top (glass-sheen): a 24pt gradient inside the top
+## edge, from the sheen colour to clear, kept off the rounded corners.
+static func add_sheen(panel: Control, radius: int) -> void:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0.55 if is_day else 0.08))
+	g.set_color(1, Color(1, 1, 1, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(0, 1)
+	tex.width = 4
+	tex.height = 24
+	# Drawn on the panel itself: a child would be stretched over the whole
+	# content rect by the container (a tinted box behind the content).
+	panel.draw.connect(func() -> void:
+		panel.draw_texture_rect(tex, Rect2(radius, 1, maxf(panel.size.x - 2.0 * radius, 0.0), 24), false))
+	panel.queue_redraw()
+
+## The focus-ring token: a 2pt gap, then a 2pt solid `focus` ring that
+## follows the control's radius. Keyboard focus only (project setting
+## gui/common/show_focus_state_on_pointer_event is off).
 static func _focus_ring(radius: int) -> StyleBoxFlat:
-	var f := style(Color.TRANSPARENT, radius, FOCUS)
+	var f := style(Color.TRANSPARENT, mini(radius + 4, RADIUS_PILL), FOCUS)
+	f.draw_center = false
 	f.set_border_width_all(2)
+	f.set_expand_margin_all(4)
 	return f
 
 static func apply_primary(b: Button) -> void:
@@ -400,6 +613,9 @@ static func apply_icon(b: Button) -> void:
 	for key in ["font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(key, ON_ACCENT)  # active = accent fill + on-accent glyph
 	b.add_theme_stylebox_override("focus", _focus_ring(RADIUS_PILL))
+	# Round glyph buttons: the glyph sits in the middle, no text padding.
+	for state in ["normal", "hover", "pressed"]:
+		(b.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
 
 static func icon_button(text: String) -> Button:
 	var b := Button.new()

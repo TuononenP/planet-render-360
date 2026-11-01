@@ -7,7 +7,8 @@ extends RefCounted
 ## and draw cost), and the 360 view's render scale and shadows (frame
 ## time). High is the default preset.
 ## Held in memory in Main's RenderSettings instance and persisted as
-## JSON in user://settings.json, like CacheStore's history.
+## JSON in user://settings.json, like CacheStore's history. The same
+## file keeps the Appearance choices (accent, Auto accent, layout).
 
 enum Preset { FAST, BALANCED, HIGH, ULTRA }
 
@@ -32,6 +33,23 @@ const PRESET_BLURBS: Array[String] = [
 ]
 
 var preset: int = Preset.HIGH
+## Appearance: accent swatch index (Glacier 0 is the default), whether
+## Auto lets the sun pick it, and the layout override (0 Auto,
+## 1 Compact, 2 Wide).
+var accent: int = 0
+var accent_auto := false
+var layout: int = 0
+## The other Appearance, accessibility, Units and Cache choices, by key;
+## unset keys read their PREF_DEFAULTS value. A null default follows the
+## OS (see UiPrefs.apply).
+var prefs := {}
+const PREF_DEFAULTS := {
+	"theme": 2,  # 0 Night, 1 Day, 2 Match system
+	"reduce_motion": null, "solid_panels": null, "high_contrast": null,
+	"imperial": false, "dms": false, "clock_12h": false,
+	"cache_limit_mb": 512, "text_scale": 1.0,
+	"onboarded": false,
+}
 
 static func clamp_preset(value: int) -> int:
 	return clampi(value, Preset.FAST, Preset.ULTRA)
@@ -159,14 +177,44 @@ func load_settings() -> void:
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
 		preset = clamp_preset(int(parsed.get("preset", Preset.HIGH)))
+		accent = clampi(int(parsed.get("accent", 0)), 0, UiTheme.ACCENTS.size() - 1)
+		accent_auto = bool(parsed.get("accent_auto", false))
+		layout = clampi(int(parsed.get("layout", 0)), 0, 2)
+		for key in PREF_DEFAULTS:
+			if parsed.has(key):
+				prefs[key] = parsed[key]
 
-func save_settings() -> void:
+## Merges `changes` into the saved file, so saving one choice never
+## resets another that this instance never loaded.
+func save_settings(changes: Dictionary) -> void:
+	var saved := {}
+	if FileAccess.file_exists(PATH):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PATH))
+		if parsed is Dictionary:
+			saved = parsed
+	saved.merge(changes, true)
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("RenderSettings: cannot write %s" % PATH)
 		return
-	f.store_string(JSON.stringify({"preset": clamp_preset(preset)}))
+	f.store_string(JSON.stringify(saved))
 
 func set_preset(value: int) -> void:
 	preset = clamp_preset(value)
-	save_settings()
+	save_settings({"preset": preset})
+
+func set_accent(index: int, auto: bool) -> void:
+	accent = clampi(index, 0, UiTheme.ACCENTS.size() - 1)
+	accent_auto = auto
+	save_settings({"accent": accent, "accent_auto": accent_auto})
+
+func pref(key: String) -> Variant:
+	return prefs.get(key, PREF_DEFAULTS.get(key))
+
+func set_pref(key: String, value: Variant) -> void:
+	prefs[key] = value
+	save_settings({key: value})
+
+func set_layout(index: int) -> void:
+	layout = clampi(index, 0, 2)
+	save_settings({"layout": layout})
