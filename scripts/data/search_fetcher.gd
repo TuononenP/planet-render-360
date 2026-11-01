@@ -44,14 +44,16 @@ static func build_url(query: String) -> String:
 
 static func build_suggest_url(query: String) -> String:
 	# Ask for extra so a city ranked below POIs still makes the top 5.
-	return "%s?format=jsonv2&limit=10&q=%s" % [ENDPOINT, query.uri_encode()]
+	return "%s?format=jsonv2&addressdetails=1&limit=10&q=%s" % [ENDPOINT, query.uri_encode()]
 
 ## Settlement kinds, listed ahead of landmarks, streets and the like.
 const CITY_TYPES := ["city", "town", "municipality", "village"]
 
 ## Cities first (a search can match a place inside the same city), the
-## server's own relevance order kept within each group.
-static func parse_results(text: String) -> Array:
+## server's own relevance order kept within each group. An address query
+## (`address`: it has a street number) keeps the server's order, since
+## the house is the answer and a city would only bury it.
+static func parse_results(text: String, address: bool = false) -> Array:
 	var cities: Array = []
 	var others: Array = []
 	var parsed: Variant = JSON.parse_string(text)
@@ -59,12 +61,32 @@ static func parse_results(text: String) -> Array:
 		for item in parsed:
 			if item is Dictionary:
 				var kind := str(item.get("addresstype", item.get("type", "")))
-				(cities if kind in CITY_TYPES else others).append({
-					"name": short_name(str(item.get("display_name", ""))),
+				(cities if kind in CITY_TYPES and not address else others).append({
+					"name": result_name(item),
 					"lat": float(item.get("lat", 0.0)),
 					"lon": float(item.get("lon", 0.0)),
 				})
 	return cities + others
+
+## "Mannerheimintie 5, Helsinki" for a house, so the city is not lost;
+## everything else is the first two parts of the display name.
+static func result_name(item: Dictionary) -> String:
+	var addr: Variant = item.get("address", {})
+	if addr is Dictionary and addr.has("house_number"):
+		var road := str(addr.get("road", addr.get("pedestrian", "")))
+		if road != "":
+			var line := "%s %s" % [road, str(addr["house_number"])]
+			for key in ["city", "town", "village", "municipality"]:
+				if addr.has(key):
+					return "%s, %s" % [line, str(addr[key])]
+			return line
+	return short_name(str(item.get("display_name", "")))
+
+static func has_digit(query: String) -> bool:
+	for c in query:
+		if c >= "0" and c <= "9":
+			return true
+	return false
 
 static func parse_first(text: String) -> Dictionary:
 	var results := parse_results(text)
@@ -136,7 +158,8 @@ func suggest(query: String) -> void:
 	if FileAccess.file_exists(cache_path):
 		var f := FileAccess.open(cache_path, FileAccess.READ)
 		if f != null:
-			suggestions_ready.emit(cleaned, parse_results(f.get_as_text()))
+			suggestions_ready.emit(cleaned,
+				parse_results(f.get_as_text(), has_digit(cleaned)))
 			return
 	_suggest_busy = true
 	_suggest_query = cleaned
@@ -155,7 +178,7 @@ func _on_suggest_done(result: int, code: int, _h: PackedStringArray, body: Packe
 		var f := FileAccess.open(_suggest_cache, FileAccess.WRITE)
 		if f != null:
 			f.store_string(text)
-		suggestions_ready.emit(query, parse_results(text))
+		suggestions_ready.emit(query, parse_results(text, has_digit(query)))
 	else:
 		suggestions_ready.emit(query, [])
 	if _suggest_queued != "" and _suggest_queued != query:
