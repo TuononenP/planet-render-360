@@ -222,8 +222,10 @@ New top-level fields:
 > Dictionary` — CHELSA V2.1 1981–2010 normals at the viewpoint (3 × 3
 > cell median): `t_warm_c`, `t_cold_c` (warmest / coldest quarter mean,
 > °C), `precip_mm`, `precip_warm_mm`, `snow_days`, `source`. Producer
-> `ClimateFetcher` via the pipeline (`_await_climate`, bounded 15 s,
-> absence = `{}`). Sole interpreter `ClimateModel` (snow line per season,
+> `ClimateFetcher` via the pipeline (`_await_climate`, bounded 25 s,
+> absence = `{}`). When CHELSA fails or runs past 14 s, the same keys come
+> from Open-Meteo's daily ERA5 archive 2001–2010 (`source` says which;
+> `snow_days` is then the days with a mean ≤ 0 °C). Sole interpreter `ClimateModel` (snow line per season,
 > treeline, biome, summer dryness, snow uniforms); consumers FarSurface,
 > GroundMaterial, TreeSpecies/VegetationBuilder, WorldCache key. Empty =
 > latitude fallbacks (invariant 3: real data first, rules only on absence).

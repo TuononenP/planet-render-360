@@ -4,8 +4,9 @@ extends SceneTree
 ## godot --headless --script tests/climate_test.gd
 ## Offline: the GeoTIFF strip decoder on a synthetic strip, the grid
 ## cell maths, and the model on CHELSA values measured 2026-10-30 at
-## the golden locations. CLIMATE_LIVE=1 also reads Paris from the
-## CHELSA object store and checks it against those values.
+## the golden locations, and the ERA5 fallback's normals on a synthetic
+## year. CLIMATE_LIVE=1 also reads Paris from the CHELSA object store
+## and from the ERA5 fallback and checks both against those values.
 
 ## [name, lat, lon, centre elevation m, t_warm, t_cold, precip, precip_warm, snow_days]
 const PLACES := [
@@ -33,11 +34,12 @@ func _run() -> void:
 	var failures: Array[String] = []
 	_decoder_checks(failures)
 	_model_checks(failures)
+	_fallback_checks(failures)
 	if OS.get_environment("CLIMATE_LIVE") == "1":
 		await _live_checks(failures)
 	if failures.is_empty():
-		print("CLIMATE OK: strip decoder + predictor, grid cells, snow lines / treeline / biomes / dryness on 6 places, latitude fallback%s"
-			% (", live CHELSA Paris" if OS.get_environment("CLIMATE_LIVE") == "1" else ""))
+		print("CLIMATE OK: strip decoder + predictor, grid cells, snow lines / treeline / biomes / dryness on 6 places, latitude fallback, ERA5 normals%s"
+			% (", live CHELSA + ERA5 Paris" if OS.get_environment("CLIMATE_LIVE") == "1" else ""))
 		quit(0)
 	else:
 		for f in failures:
@@ -145,6 +147,41 @@ func _model_checks(failures: Array[String]) -> void:
 		failures.append("no climate → latitude snow line and regional biome")
 	failures.erase(sentinel)
 
+## Two years where month m averages m °C and every day rains 1 mm:
+## warmest quarter Oct–Dec (10 °C, 92 mm), coldest Jan–Mar (1 °C),
+## 365 mm a year, January's 31 days at 0 °C count as snow days.
+func _fallback_checks(failures: Array[String]) -> void:
+	var sentinel := "_fallback_checks aborted (script error)"
+	failures.append(sentinel)
+	const MONTH_DAYS := [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+	var days := []
+	var temps := []
+	var precs := []
+	for y in [2001, 2002]:
+		for m in 12:
+			for d in MONTH_DAYS[m]:
+				days.append("%d-%02d-%02d" % [y, m + 1, d + 1])
+				temps.append(float(m))
+				precs.append(1.0)
+	precs[40] = null
+	var c := ClimateFetcher.normals_from_daily({"daily": {"time": days,
+		"temperature_2m_mean": temps, "precipitation_sum": precs}})
+	if c.is_empty() or not is_equal_approx(float(c["t_warm_c"]), 10.0) \
+			or not is_equal_approx(float(c["t_cold_c"]), 1.0) \
+			or not is_equal_approx(float(c["precip_mm"]), 364.5) \
+			or not is_equal_approx(float(c["precip_warm_mm"]), 92.0) \
+			or not is_equal_approx(float(c["snow_days"]), 31.0):
+		failures.append("ERA5 normals on the synthetic years: %s" % c)
+	if not ClimateFetcher.normals_from_daily({"daily": {"time": ["2001-01-01"],
+			"temperature_2m_mean": [1.0], "precipitation_sum": [0.0]}}).is_empty():
+		failures.append("a response missing months must give no normals")
+	if not ClimateFetcher.normals_from_daily({"error": true, "reason": "rate limit"}).is_empty():
+		failures.append("an error response must give no normals")
+	if ClimateFetcher.credit_for({"source": ClimateFetcher.FALLBACK_SOURCE}) != ClimateFetcher.FALLBACK_CREDIT \
+			or ClimateFetcher.credit_for({"source": ClimateFetcher.SOURCE}) != ClimateFetcher.CREDIT:
+		failures.append("the credit line follows the climate source")
+	failures.erase(sentinel)
+
 func _live_checks(failures: Array[String]) -> void:
 	var f := ClimateFetcher.new()
 	root.add_child(f)
@@ -152,7 +189,16 @@ func _live_checks(failures: Array[String]) -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(ClimateFetcher.cache_path(48.8566, 2.3522)))
 	f.fetch(48.8566, 2.3522)
 	var c: Dictionary = await f.finished
-	if c.is_empty() or absf(float(c.get("t_warm_c", 0.0)) - 18.55) > 0.5 \
+	if c.get("source", "") != ClimateFetcher.SOURCE or absf(float(c.get("t_warm_c", 0.0)) - 18.55) > 0.5 \
 			or absf(float(c.get("precip_mm", 0.0)) - 658.8) > 20.0:
 		failures.append("live CHELSA Paris: %s %s" % [c, f.timings])
+	print("live CHELSA Paris: %s" % f.timings)
+	f._lat = 48.8566
+	f._lon = 2.3522
+	f._fetch_fallback()
+	c = await f.finished
+	if c.get("source", "") != ClimateFetcher.FALLBACK_SOURCE or absf(float(c.get("t_warm_c", 0.0)) - 18.55) > 1.5 \
+			or absf(float(c.get("precip_mm", 0.0)) - 658.8) > 100.0:
+		failures.append("live ERA5 Paris: %s %s" % [c, f.timings])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(ClimateFetcher.cache_path(48.8566, 2.3522)))
 	f.queue_free()

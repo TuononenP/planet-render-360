@@ -100,9 +100,10 @@ var _climate_done := true
 var _fetch_started_msec := 0
 var _sat_took := 0.0  # seconds from run start to the mosaic settling
 var _climate_took := 0.0
-## CHELSA reads are ~3–4 s cold (5 variables × 4 small ranged requests),
-## overlapped with the other fetches; cached revisits read one JSON.
-const CLIMATE_WAIT_S := 15.0
+## CHELSA reads are three ~2–3 s round trips cold, overlapped with the
+## other fetches; past ClimateFetcher.CHELSA_BUDGET_S the ERA5 fallback
+## takes the rest of this wait. Cached revisits read one JSON.
+const CLIMATE_WAIT_S := 25.0
 var _sat: SatelliteFetcher
 var _sat_texture: Texture2D
 var _sat_image: Image
@@ -557,18 +558,18 @@ func _await_osm(data: LocationData) -> void:
 	_start_ground(data)
 	await _await_far_city(data)
 
-## CHELSA climate normals (bounded wait; absent → latitude fallbacks).
+## Climate normals, CHELSA or ERA5 (bounded wait; absent → latitude fallbacks).
 func _await_climate(data: LocationData) -> void:
 	var waited := 0.0
 	while not _climate_done and waited < CLIMATE_WAIT_S and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	if _climate_data.is_empty():
-		print("Climate (CHELSA) unavailable; latitude fallbacks")
+		print("Climate (CHELSA, ERA5) unavailable; latitude fallbacks")
 		_note("weather")
 		return
 	data.climate = _climate_data
-	_credits[3] = "Climate: CHELSA V2.1 (Karger et al.)"
+	_credits[3] = ClimateFetcher.credit_for(_climate_data)
 	print("CLIMATE: %s %s" % [str(_climate_data), str(_climate.timings)])
 
 ## T5.4: far built-up landuse + real towers (bounded wait; absent →

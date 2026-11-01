@@ -13,6 +13,7 @@ const SOURCES := [
 	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
 	["Climate", "CHELSA V2.1 (Karger et al.) · CC BY 4.0", "https://chelsa-climate.org/"],
+	["Climate fallback", "ERA5 (Copernicus) via Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Weather", "Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Place search", "Nominatim · ODbL", "https://operations.osmfoundation.org/policies/nominatim/"],
 	["Landmark details", "Wikipedia · CC BY-SA 4.0", "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"],
