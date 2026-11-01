@@ -28,55 +28,72 @@ const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
 const MAX_ANCESTOR_DROP := 4
 
-## Planet Render 360 map: the standard OSM tile recoloured into the
-## design system's Night grounds (sky-300 land, ink labels, horizon-day
-## water, a lichen-leaning green) lifted enough to read as a familiar
-## map: water is blue, parks are green, major roads are warm. Colours
-## are classified by hue and rebuilt from lightness, so labels, casings
-## and road hierarchy survive; dark OSM text becomes light. Applied to
+## Planet Render 360 map (design system Map style, interim): the standard
+## OSM tile recoloured into the `map-*` palette of the live theme. Night
+## is a mid-tone dusk slate, lighter than panel glass; Day is a cool
+## paper. Colours are classified by hue and rebuilt from lightness, so
+## labels, casings and road hierarchy survive. Only Carto's darker,
+## saturated motorway/trunk colours keep the one warm road tone;
+## primary and secondary roads go neutral (`road_major`). Applied to
 ## the tile layer only; the pin and attribution live in a child layer.
-## The Day theme keeps the light OSM tile itself, a little muted, as its
-## light basemap (`day`).
 ## The recolour as a function, shared with GlobeView so the globe and
-## the flat map read as one surface (`day` keeps the light tile).
+## the flat map read as one surface. Set its uniforms with
+## apply_map_palette().
 const RECOLOUR := """
-const vec3 INK = vec3(0.929, 0.945, 0.965);      // ink
-const vec3 MUTED = vec3(0.643, 0.682, 0.741);    // ink-muted
-const vec3 CASING = vec3(0.086, 0.118, 0.169);
-const vec3 BUILDING = vec3(0.173, 0.220, 0.314);
-const vec3 LAND = vec3(0.141, 0.188, 0.267);     // sky-300, lifted
-const vec3 ROAD = vec3(0.529, 0.576, 0.659);
-const vec3 WATER = vec3(0.184, 0.365, 0.541);    // horizon-day, deepened
-const vec3 WATER_TEXT = vec3(0.663, 0.788, 0.918);
-const vec3 PARK = vec3(0.208, 0.400, 0.314);
-const vec3 PARK_DEEP = vec3(0.157, 0.302, 0.235);
-const vec3 PARK_TEXT = vec3(0.659, 0.816, 0.706);
-const vec3 ROAD_WARM = vec3(0.600, 0.502, 0.357); // horizon-golden, dimmed
+uniform vec3 ink;
+uniform vec3 muted;
+uniform vec3 casing;
+uniform vec3 building;
+uniform vec3 land;
+uniform vec3 road;
+uniform vec3 road_major;
+uniform vec3 road_warm;
+uniform vec3 water;
+uniform vec3 water_text;
+uniform vec3 park;
+uniform vec3 park_deep;
+uniform vec3 park_text;
 
 vec3 recolour(vec3 c) {
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
-	if (day) {
-		return mix(c, vec3(l), 0.25) * 0.98;
-	}
-	vec3 n = mix(INK, MUTED, smoothstep(0.0, 0.35, l));
-	n = mix(n, CASING, smoothstep(0.35, 0.73, l));
-	n = mix(n, BUILDING, smoothstep(0.73, 0.84, l));
-	n = mix(n, LAND, smoothstep(0.84, 0.94, l));
-	n = mix(n, ROAD, smoothstep(0.94, 1.0, l));
+	vec3 n = mix(ink, muted, smoothstep(0.0, 0.35, l));
+	n = mix(n, casing, smoothstep(0.35, 0.73, l));
+	n = mix(n, building, smoothstep(0.73, 0.84, l));
+	n = mix(n, land, smoothstep(0.84, 0.94, l));
+	n = mix(n, road, smoothstep(0.94, 1.0, l));
 	float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-	float water = smoothstep(0.06, 0.12, c.b - c.r) * smoothstep(0.0, 0.04, c.b - c.g + 0.04);
-	float park = smoothstep(0.03, 0.07, c.g - c.r) * smoothstep(0.03, 0.07, c.g - c.b) * (1.0 - water);
-	float warm = smoothstep(0.12, 0.20, chroma) * (1.0 - water) * (1.0 - park);
-	vec3 h = mix(n, mix(WATER_TEXT, WATER, smoothstep(0.45, 0.75, l)), water);
-	vec3 grass = mix(PARK_DEEP, PARK, smoothstep(0.72, 0.92, l));
-	h = mix(h, mix(PARK_TEXT, grass, smoothstep(0.45, 0.7, l)), park);
-	h = mix(h, ROAD_WARM * (1.05 - 0.30 * smoothstep(0.65, 0.95, l)), warm);
+	float is_water = smoothstep(0.06, 0.12, c.b - c.r) * smoothstep(0.0, 0.04, c.b - c.g + 0.04);
+	float is_park = smoothstep(0.03, 0.07, c.g - c.r) * smoothstep(0.03, 0.07, c.g - c.b) * (1.0 - is_water);
+	float warm = smoothstep(0.12, 0.20, chroma) * (1.0 - is_water) * (1.0 - is_park);
+	vec3 h = mix(n, mix(water_text, water, smoothstep(0.45, 0.75, l)), is_water);
+	vec3 grass = mix(park_deep, park, smoothstep(0.72, 0.92, l));
+	h = mix(h, mix(park_text, grass, smoothstep(0.45, 0.7, l)), is_park);
+	// Only Carto's darker motorway/trunk colours stay warm; the lighter
+	// primary/secondary fills go neutral, so one road class is warm.
+	h = mix(h, mix(road_warm, road_major, smoothstep(0.74, 0.84, l)), warm);
 	return clamp(h, 0.0, 1.0);
 }
 """
+## The `map-*` tokens the recolour targets, per theme (design system
+## Map style). Values are sRGB, like COLOR in a 2D shader.
+const MAP_PALETTES := {
+	"night": {
+		"ink": Color("f2f5f8"), "muted": Color("c9d0d9"), "casing": Color("3b4451"),
+		"building": Color("555f6e"), "land": Color("47515f"), "road": Color("8e98a6"),
+		"road_major": Color("adb5c1"), "road_warm": Color("dcc59a"), "water": Color("263b55"),
+		"water_text": Color("9cc0e6"), "park": Color("4a5f55"), "park_deep": Color("465b51"),
+		"park_text": Color("b9d3c2"),
+	},
+	"day": {
+		"ink": Color("1f2733"), "muted": Color("4a5463"), "casing": Color("cfd3d8"),
+		"building": Color("e1e2dd"), "land": Color("eef0ec"), "road": Color("ffffff"),
+		"road_major": Color("ffffff"), "road_warm": Color("f7d79c"), "water": Color("a9cbe8"),
+		"water_text": Color("24507a"), "park": Color("d6e6cf"), "park_deep": Color("c4d9bb"),
+		"park_text": Color("3d5a46"),
+	},
+}
 const MAP_SHADER := """
 shader_type canvas_item;
-uniform bool day = false;
 """ + RECOLOUR + """
 void fragment() {
 	COLOR = vec4(recolour(COLOR.rgb), COLOR.a);
@@ -129,7 +146,7 @@ func _ready() -> void:
 	shader.code = MAP_SHADER
 	var map_mat := ShaderMaterial.new()
 	map_mat.shader = shader
-	map_mat.set_shader_parameter("day", UiTheme.is_day)
+	apply_map_palette(map_mat)
 	material = map_mat
 	# Under the pin, so a selected landmark wears the needle.
 	landmarks = MapLandmarks.new(self)
@@ -527,6 +544,15 @@ func _draw() -> void:
 
 func _focus() -> Vector2:
 	return size / 2.0 + focus_offset
+
+## Points a material that includes RECOLOUR at the live theme's map
+## palette. Theme switches rebuild the screens, so setting it when the
+## material is made keeps it current.
+static func apply_map_palette(mat: ShaderMaterial) -> void:
+	var palette: Dictionary = MAP_PALETTES["day" if UiTheme.is_day else "night"]
+	for key in palette:
+		var c: Color = palette[key]
+		mat.set_shader_parameter(key, Vector3(c.r, c.g, c.b))
 
 ## Redraw the pin and attribution after a palette change.
 func refresh_style() -> void:
