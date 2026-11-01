@@ -3,12 +3,15 @@ extends PanelContainer
 
 ## The landmark sheet over the 360 view (design system Callout: "Tapping
 ## one opens the landmark in the sheet"). Panel glass holding a
-## LandmarkCard with Go there; a close button and Esc dismiss it. On
-## desktop it is a left side panel (the controls inspector holds the
-## right); on phones and tablets a bottom sheet that rests at half height
-## while the controls bar steps aside. ViewChrome.layout places it.
+## LandmarkCard with Go there and Get closer; a close button and Esc
+## dismiss it. On desktop it is a left side panel (the controls inspector
+## holds the right); on phones and tablets a bottom sheet that rests at
+## half height while the controls bar steps aside. ViewChrome.layout
+## places it.
 
 signal go_requested(site: Dictionary)
+## Get closer: Go there from a tighter standoff.
+signal closer_requested(site: Dictionary)
 signal closed
 
 var card: LandmarkCard
@@ -48,6 +51,9 @@ func _init(fetcher: WikiFetcher) -> void:
 	card.go_requested.connect(func(s: Dictionary) -> void:
 		close()
 		go_requested.emit(s))
+	card.closer_requested.connect(func(s: Dictionary) -> void:
+		close()
+		closer_requested.emit(s))
 	pad.add_child(card)
 
 func open(site: Dictionary, distance_m: float = -1.0) -> void:

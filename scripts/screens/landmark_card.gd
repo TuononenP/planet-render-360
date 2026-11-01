@@ -10,6 +10,8 @@ extends VBoxContainer
 ## readouts with one plain line saying what is missing.
 
 signal go_requested(site: Dictionary)
+## Get closer: the same visit from a tighter standoff (LandmarkVisit.close_standoff_m).
+signal closer_requested(site: Dictionary)
 
 const EXTRACT_CHARS := 420
 const PHOTO_H := 168.0
@@ -35,10 +37,11 @@ var _extract: Label
 var _more: Button
 var _attribution: Label
 var _go: Button
+var _closer: Button
 var _url := ""
 
 ## `header`: show the eyebrow and name (the map home already names the
-## selection). `go`: show the Go there primary (the map keeps Explore).
+## selection). `go`: show Go there and Get closer (the map keeps Explore).
 func _init(fetcher: WikiFetcher, header: bool = true, go: bool = true) -> void:
 	_fetcher = fetcher
 	add_theme_constant_override("separation", 12)
@@ -95,6 +98,11 @@ func _init(fetcher: WikiFetcher, header: bool = true, go: bool = true) -> void:
 	_go.visible = go
 	_go.pressed.connect(func() -> void: go_requested.emit(site))
 	add_child(_go)
+	_closer = UiTheme.ghost_button("Get closer")
+	UiIcon.apply(_closer, "maximize", 20)
+	_closer.visible = go
+	_closer.pressed.connect(func() -> void: closer_requested.emit(site))
+	add_child(_closer)
 	if _fetcher != null:
 		_fetcher.info_ready.connect(_on_info)
 		_fetcher.info_failed.connect(_on_failed)

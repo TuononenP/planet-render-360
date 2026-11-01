@@ -54,6 +54,7 @@ static func build(v: View360) -> void:
 	v._landmark_panel = LandmarkPanel.new(v._wiki)
 	v._hud.add_child(v._landmark_panel)
 	v._landmark_panel.go_requested.connect(v.visit)
+	v._landmark_panel.closer_requested.connect(v.visit.bind(true))
 	v._landmark_panel.closed.connect(func() -> void: layout(v))
 	v._landmark_panel.card.minimum_size_changed.connect(func() -> void:
 		(func() -> void: layout(v)).call_deferred())

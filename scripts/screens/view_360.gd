@@ -567,7 +567,9 @@ func open_landmark(site: Dictionary) -> void:
 ## Go there: stand off from the landmark on the line from the camera to
 ## it (the heading holds), and face it. Inside the built area the camera
 ## glides there; farther, a new scene is built around the standoff.
-func visit(site: Dictionary) -> void:
+## `closer` stands at LandmarkVisit.close_standoff_m instead: no farther
+## out than the camera already is, and no nearer than CLOSE_MIN_M.
+func visit(site: Dictionary, closer: bool = false) -> void:
 	if _data == null or _rig == null:
 		return
 	var lp := WorldScale.xz_from_latlon(float(site["lat"]), float(site["lon"]),
@@ -577,7 +579,11 @@ func visit(site: Dictionary) -> void:
 	if (lp - cam).length() < 1.0:
 		var b := deg_to_rad(LandmarkVisit.default_bearing(_data.latitude))
 		dir = -Vector2(sin(b), -cos(b))
-	var t := lp - dir * LandmarkVisit.standoff_m(site)
+	var standoff := LandmarkVisit.standoff_m(site)
+	if closer:
+		standoff = minf(LandmarkVisit.close_standoff_m(site),
+			maxf((lp - cam).length(), LandmarkVisit.CLOSE_MIN_M))
+	var t := lp - dir * standoff
 	if not can_move_in_place(t, _ground):
 		var ll := WorldScale.latlon_from_xz(t.x, t.y, _data.latitude, _data.longitude)
 		visit_requested.emit(site, ll.x, ll.y)

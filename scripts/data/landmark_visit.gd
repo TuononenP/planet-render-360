@@ -14,6 +14,9 @@ const WATER_M := 1000.0
 const DEFAULT_M := 300.0
 const MIN_M := 180.0
 const MAX_M := 700.0
+## Get closer: this share of the standoff, never nearer than CLOSE_MIN_M.
+const CLOSE_FACTOR := 0.4
+const CLOSE_MIN_M := 80.0
 
 static func site(name: String, lat: float, lon: float, description: String = "",
 		source: String = "wiki", height_m: float = 0.0) -> Dictionary:
@@ -72,6 +75,11 @@ static func standoff_m(s: Dictionary) -> float:
 	if h <= 0.0:
 		return DEFAULT_M
 	return clampf(h * 2.2, MIN_M, MAX_M)
+
+## Metres between the viewpoint and the landmark for Get closer: near
+## enough that a tower rises over the viewer and a facade fills the view.
+static func close_standoff_m(s: Dictionary) -> float:
+	return maxf(standoff_m(s) * CLOSE_FACTOR, CLOSE_MIN_M)
 
 ## Compass bearing (degrees, from the landmark) the viewer stands on by
 ## default: the scene opens at afternoon golden hour, so standing

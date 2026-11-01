@@ -96,6 +96,12 @@ func _visit_math() -> void:
 	_check(is_equal_approx(LandmarkVisit.standoff_m(eiffel), LandmarkVisit.MAX_M), "a 330 m tower is seen from the max standoff")
 	_check(is_equal_approx(LandmarkVisit.standoff_m({"kind": "Peak"}), LandmarkVisit.PEAK_M), "peak standoff")
 	_check(is_equal_approx(LandmarkVisit.standoff_m({"kind": "Building"}), LandmarkVisit.DEFAULT_M), "unknown height standoff")
+	_check(is_equal_approx(LandmarkVisit.close_standoff_m(eiffel), LandmarkVisit.MAX_M * LandmarkVisit.CLOSE_FACTOR),
+		"Get closer takes the Eiffel Tower in to %.0f m" % LandmarkVisit.close_standoff_m(eiffel))
+	_check(is_equal_approx(LandmarkVisit.close_standoff_m({"kind": "Building", "height_m": 30.0}), LandmarkVisit.CLOSE_MIN_M),
+		"a low building never gets nearer than the floor")
+	_check(is_equal_approx(LandmarkVisit.close_standoff_m({"kind": "Peak"}), LandmarkVisit.PEAK_M * LandmarkVisit.CLOSE_FACTOR),
+		"a peak keeps a mountain's distance")
 	var vp := LandmarkVisit.viewpoint(eiffel, LandmarkVisit.default_bearing(48.8584))
 	var d := LocationData.distance_m(float(eiffel["lat"]), float(eiffel["lon"]), vp.x, vp.y)
 	_check(absf(d - LandmarkVisit.MAX_M) < LandmarkVisit.MAX_M * 0.02, "viewpoint at the standoff: %.1f m" % d)
