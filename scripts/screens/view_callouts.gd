@@ -183,6 +183,15 @@ func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	card.tooltip_text = "Show details"
+	# The whole card is the button: reachable by keyboard and named for
+	# screen readers, with the focus ring on keyboard focus.
+	card.focus_mode = Control.FOCUS_ALL
+	card.accessibility_name = "%s, %s. Show details" % [s["name"], s["kind"]]
+	card.focus_entered.connect(card.queue_redraw)
+	card.focus_exited.connect(card.queue_redraw)
+	card.draw.connect(func() -> void:
+		if card.has_focus():
+			card.draw_style_box(UiTheme._focus_ring(UiTheme.RADIUS_M), Rect2(Vector2.ZERO, card.size)))
 	card.gui_input.connect(func(e: InputEvent) -> void: _card_input(card, s, e))
 	var st := UiTheme.style(UiTheme.CARD, UiTheme.RADIUS_M, UiTheme.GLASS_EDGE, true)
 	st.content_margin_left = 8
@@ -217,6 +226,11 @@ func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	return card
 
 func _card_input(card: Control, s: Dictionary, e: InputEvent) -> void:
+	if e is InputEventKey and (e as InputEventKey).pressed and not (e as InputEventKey).echo \
+			and (e as InputEventKey).keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		site_tapped.emit(s)
+		card.accept_event()
+		return
 	var press := e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
 	if not press and not e is InputEventScreenTouch:
 		if e is InputEventMouseMotion or e is InputEventScreenDrag:

@@ -222,5 +222,20 @@ func _callout_icon_tap() -> void:
 		e.position = at - card.get_global_rect().position
 		card.gui_input.emit(e)
 	_check(tapped.size() == 1, "tapping the icon opens the landmark")
+	# Anywhere on the card, including its padding and the text.
+	for pt in [Vector2(3, 3), card.size - Vector2(3, 3), card.size / 2.0 + Vector2(40, 0)]:
+		for pressed in [true, false]:
+			var e2 := InputEventMouseButton.new()
+			e2.button_index = MOUSE_BUTTON_LEFT
+			e2.pressed = pressed
+			e2.position = pt
+			card.gui_input.emit(e2)
+	_check(tapped.size() == 4, "tapping the padding and the text opens it too: %d" % tapped.size())
+	var key := InputEventKey.new()
+	key.keycode = KEY_ENTER
+	key.pressed = true
+	card.gui_input.emit(key)
+	_check(tapped.size() == 5 and card.focus_mode == Control.FOCUS_ALL, "Enter on the focused card opens it")
+	_check(str(card.accessibility_name).contains("Show details"), "card is named for screen readers")
 	view.queue_free()
 	await process_frame
