@@ -198,6 +198,9 @@ func _run() -> void:
 	var house := "[{\"display_name\":\"5, Mannerheimintie, Kluuvi, Helsinki, Finland\",\"addresstype\":\"place\",\"lat\":\"60.17\",\"lon\":\"24.94\",\"address\":{\"house_number\":\"5\",\"road\":\"Mannerheimintie\",\"city\":\"Helsinki\"}}]"
 	if str(SearchFetcher.parse_results(house, true)[0].get("name", "")) != "Mannerheimintie 5, Helsinki":
 		failures.append("a house result should name street, number and city")
+	var settlement := "[{\"name\":\"Helsinki\",\"display_name\":\"Helsinki, Helsingin seutukunta, Uusimaa, Suomi / Finland\",\"addresstype\":\"city\",\"lat\":\"60.17\",\"lon\":\"24.94\",\"address\":{\"city\":\"Helsinki\",\"country\":\"Suomi / Finland\"}}]"
+	if str(SearchFetcher.parse_results(settlement)[0].get("name", "")) != "Helsinki, Finland":
+		failures.append("a city result should read City, Country like the local list")
 	var local := LocationData.suggestions_for("par")
 	if local.is_empty() or str(local[0].get("name", "")) != "Paris, France":
 		failures.append("local suggestions for 'par' should start with Paris, got %s" % str(local))

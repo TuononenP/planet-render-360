@@ -44,7 +44,7 @@ static func build_url(query: String) -> String:
 
 static func build_suggest_url(query: String) -> String:
 	# Ask for extra so a city ranked below POIs still makes the top 5.
-	return "%s?format=jsonv2&addressdetails=1&limit=10&q=%s" % [ENDPOINT, query.uri_encode()]
+	return "%s?format=jsonv2&addressdetails=1&limit=10&accept-language=en&q=%s" % [ENDPOINT, query.uri_encode()]
 
 ## Settlement kinds, listed ahead of landmarks, streets and the like.
 const CITY_TYPES := ["city", "town", "municipality", "village"]
@@ -69,9 +69,15 @@ static func parse_results(text: String, address: bool = false) -> Array:
 	return cities + others
 
 ## "Mannerheimintie 5, Helsinki" for a house, so the city is not lost;
+## "Helsinki, Finland" for a settlement, the same as the on-device list
+## so the row does not change when the remote answer replaces it;
 ## everything else is the first two parts of the display name.
 static func result_name(item: Dictionary) -> String:
 	var addr: Variant = item.get("address", {})
+	var kind := str(item.get("addresstype", item.get("type", "")))
+	if kind in CITY_TYPES and addr is Dictionary and addr.has("country") \
+			and str(item.get("name", "")) != "":
+		return "%s, %s" % [str(item["name"]), str(addr["country"]).split(" / ")[-1]]
 	if addr is Dictionary and addr.has("house_number"):
 		var road := str(addr.get("road", addr.get("pedestrian", "")))
 		if road != "":
