@@ -159,35 +159,86 @@ func _run() -> void:
 			failures.append("tapping Fast should apply and announce it")
 		if not screen._preset_btns[0].button_pressed or screen._preset_btns[1].button_pressed:
 			failures.append("only the chosen preset button should stay pressed")
-		if not screen._summary_label.text.contains("%d×" % RenderSettings.terrain_mesh_posts_for(0)):
-			failures.append("summary should describe the Fast budget, got: %s" % screen._summary_label.text)
+		var fast_posts := RenderSettings.terrain_mesh_posts_for(0)
+		if (screen._specs["terrain"] as Readout).value_text() != "%d × %d" % [fast_posts, fast_posts]:
+			failures.append("readouts should describe the Fast budget, got: %s" % (screen._specs["terrain"] as Readout).value_text())
 		screen._preset_btns[3].pressed.emit()
 		await process_frame
 		if settings.preset != RenderSettings.Preset.ULTRA or announced != [0, 3]:
 			failures.append("tapping Ultra should apply and announce it")
-		if not screen._summary_label.text.contains("%d×" % RenderSettings.terrain_mesh_posts_for(3)):
-			failures.append("summary should describe the Ultra budget, got: %s" % screen._summary_label.text)
-		# T7.4: the tier shows its PRD fidelity level and §3.1 wait.
-		if not (screen._summary_label.text.contains("Fidelity 3") and screen._summary_label.text.contains(RenderSettings.FIRST_BUILD[3])):
-			failures.append("Ultra summary should state Fidelity 3 and its ~1–2 min first build: %s" % screen._summary_label.text)
+		var ultra_posts := RenderSettings.terrain_mesh_posts_for(3)
+		if (screen._specs["terrain"] as Readout).value_text() != "%d × %d" % [ultra_posts, ultra_posts]:
+			failures.append("readouts should describe the Ultra budget, got: %s" % (screen._specs["terrain"] as Readout).value_text())
+		# T7.4: the tier shows its §3.1 wait in the Render quality row.
+		if not screen.summary_for("quality").contains(RenderSettings.FIRST_BUILD[3]):
+			failures.append("Ultra summary should state its ~1–2 min first build: %s" % screen.summary_for("quality"))
 	if Array(RenderSettings.FIDELITY) != [1, 2, 2, 3]:
 		failures.append("presets should map to PRD Fidelity 1/2/2/3")
-	for p in 4:
-		if not RenderSettings.PRESET_BLURBS[p].begins_with("Fidelity %d" % RenderSettings.FIDELITY[p]) \
-				or not RenderSettings.PRESET_BLURBS[p].contains(RenderSettings.FIRST_BUILD[p]):
-			failures.append("preset %d copy should state its fidelity and first-build budget" % p)
+	# T7.4: each preset card states its fidelity and first-build budget.
+	for p in screen._preset_btns.size():
+		var words: Array[String] = []
+		for l in screen._preset_btns[p].find_children("*", "Label", true, false):
+			words.append((l as Label).text)
+		if not ("Fidelity %d" % RenderSettings.FIDELITY[p]) in words or not RenderSettings.FIRST_BUILD[p] in words:
+			failures.append("preset %d card should state its fidelity and first-build budget: %s" % [p, words])
 	# The governor reports reductions under the user's tier, never a tier of its own.
 	if QualityGovernor.step_label(2, 2) != "High" or not QualityGovernor.step_label(2, 0).begins_with("High · 65% res"):
 		failures.append("governor label should be the tier plus any reduction: %s / %s"
 			% [QualityGovernor.step_label(2, 2), QualityGovernor.step_label(2, 0)])
 	# Offline storage management: size is readable, label reports it.
-	if screen._storage_label == null or not (screen._storage_label.text.contains(" MB ")
-			or screen._storage_label.text.contains(" GB ")):
+	if screen._usage == null or not (screen.summary_for("storage").contains(" MB of ")
+			or screen.summary_for("storage").contains(" GB of ")):
 		failures.append("settings should report offline cache size")
 	if OfflineDownloader.cache_size_bytes() < 0:
 		failures.append("cache size should be readable")
 	if OfflineDownloader.JOBS != 4:
 		failures.append("offline download should cover DEM, far DEM, OSM, satellite")
+	# Categories: phones open one page from the menu and step back to it;
+	# wide windows show the rail beside the chosen page.
+	screen.size = Vector2(390, 844)
+	screen._on_resized()
+	screen.step_back()
+	if not screen._menu.visible or screen._rail.visible:
+		failures.append("phone settings should open on the category menu")
+	screen.open_category("units")
+	if screen._menu.visible or not screen._pages["units"].visible or screen._pages["appearance"].visible:
+		failures.append("a category should replace the menu on phones")
+	if not screen.step_back() or not screen._menu.visible:
+		failures.append("back on a phone page should return to the menu")
+	screen.size = Vector2(1280, 800)
+	screen._on_resized()
+	if not screen._rail.visible or screen._menu.visible or not screen._pages["units"].visible:
+		failures.append("desktop settings should show the rail beside the page")
+	if screen.step_back():
+		failures.append("desktop settings has no menu to step back to")
+	screen.show_data_sources()
+	if not screen._pages["sources"].visible or screen._pages["units"].visible:
+		failures.append("the attribution should open Settings on Data sources")
+	# Narrowing an open two-pane Settings keeps the page; Back from a
+	# page opened by the attribution leaves Settings, not to a menu.
+	screen.size = Vector2(390, 844)
+	screen._on_resized()
+	if screen._menu.visible or not screen._pages["sources"].visible:
+		failures.append("narrowing Settings should keep the open page")
+	if screen.step_back():
+		failures.append("Back from the attribution's Data sources should leave Settings")
+	screen.visible = false
+	screen.visible = true
+	if not screen._menu.visible:
+		failures.append("each phone visit should start on the menu")
+	# Wide never squeezes two panes into a phone-width window.
+	screen._layout_index = 2
+	screen._on_resized()
+	if screen._rail.visible:
+		failures.append("Wide should not force the rail into a phone-width window")
+	screen._layout_index = 0
+	screen.size = Vector2(1280, 800)
+	screen._on_resized()
+	if screen._grid.columns != 2:
+		failures.append("desktop presets should sit in two columns")
+	for item in screen._cat_items:
+		if (item["summary"] as Label).text == "":
+			failures.append("category %s should summarise its values" % item["id"])
 	screen.queue_free()
 	settings.set_preset(RenderSettings.Preset.HIGH)
 

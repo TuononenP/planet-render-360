@@ -65,6 +65,16 @@ static func layout_name(layout: Layout) -> String:
 		_:
 			return "Expanded"
 
+## The Layout override from Settings → Appearance (0 Auto, 1 Compact,
+## 2 Wide): the layout it forces, or -1 to follow the window.
+static func override_layout(index: int) -> int:
+	match index:
+		1:
+			return Layout.COMPACT
+		2:
+			return Layout.MEDIUM
+	return -1
+
 static func is_split(layout: Layout) -> bool:
 	return layout != Layout.COMPACT
 

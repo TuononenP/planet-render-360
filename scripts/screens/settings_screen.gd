@@ -1,12 +1,13 @@
 class_name SettingsScreen
 extends Control
 
-## Settings (design system Layout → Settings): Appearance (theme,
-## accent, the accessibility switches, layout), render quality (a preset
-## trades accuracy for render time; see RenderSettings), Cache (size,
-## limit, clear), Units, Data sources and About. Every choice applies at
-## once and is saved on-device for the next launch. Rows are size-control
-## tall on sky-200, separated by `line` (SettingsRows).
+## Settings (design system Screens → SettingsScreen): eight categories
+## shown one at a time. Tablet and desktop windows get two panes, a
+## category rail on sky-200 beside the chosen page; phones get a menu of
+## category rows that opens one page at a time. Every category row
+## carries a one-line summary of its current values. The pages are built
+## by SettingsPages; every choice applies at once and is saved on-device
+## for the next launch.
 
 signal back_requested
 signal preset_changed(preset: int)
@@ -18,290 +19,413 @@ signal units_changed
 
 ## Set before a theme rebuild so Main reopens Settings afterwards.
 static var reopen := false
-const SOURCES := [
-	["Map data", "© OpenStreetMap contributors · ODbL", "https://www.openstreetmap.org/copyright"],
-	["Map tiles", "OpenFreeMap © OpenMapTiles · MIT", "https://openfreemap.org/"],
-	["Globe tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
-	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
-	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
-	["Climate", "CHELSA V2.1 (Karger et al.) · CC BY 4.0", "https://chelsa-climate.org/"],
-	["Weather", "Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
-	["Place search", "Nominatim · ODbL", "https://operations.osmfoundation.org/policies/nominatim/"],
-	["Landmark details", "Wikipedia · CC BY-SA 4.0", "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"],
-	["Landmark photos", "Wikimedia Commons · credited on each photo", "https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia"],
-	["Textures", "Poly Haven · CC0", "https://polyhaven.com/license"],
+## Where Settings was when a theme switch rebuilt the app (the category,
+## and on phones whether its page was open rather than the menu), so the
+## rebuilt screen reopens there.
+static var last_category := "appearance"
+static var last_in_page := false
+
+## [eyebrow, [[id, icon, name, lead], ...]] in rail order.
+const CATEGORIES := [
+	["Look and feel", [
+		["appearance", "palette", "Appearance", "Night or Day, and the one accent that marks what is selected."],
+		["access", "eye", "Accessibility", "Larger text, calmer motion and stronger contrast."]]],
+	["The view", [
+		["quality", "gauge", "Render quality", "Higher quality is more faithful to the real place, but takes longer to build and more power to draw."],
+		["units", "ruler", "Units", "How elevation, coordinates and time are written."],
+		["photos", "camera", "Photos", "Pictures saved from the 360° view."]]],
+	["Data", [
+		["storage", "hard-drive", "Storage", "Places you open are kept on this device, so they open instantly next time, even offline."],
+		["sources", "layers", "Data sources", "Where the map, terrain, imagery and weather come from. Each opens its licence."],
+		["about", "info", "About", "Planet Render 360 and the open work it is built on."]]],
 ]
-const LICENCES := [
-	["Instrument Serif and Instrument Sans", "SIL Open Font License", "https://openfontlicense.org/"],
-	["IBM Plex Mono", "SIL Open Font License", "https://openfontlicense.org/"],
-	["Lucide icons", "ISC License", "https://lucide.dev/license"],
-]
+const RAIL_W := 300
+const RAIL_W_MEDIUM := 248
+const PAGE_MAX_W := 680
 
 var _settings: RenderSettings
 var _preset_btns: Array[Button] = []
-var _summary_label: Label
-var _storage_label: Label
-var _margin: MarginContainer
+var _preset_checks: Array[Control] = []
+var _specs: Dictionary = {}  # key -> Readout
+var _specs_title: Label
+var _usage: Readout
+var _usage_of: Label
+var _usage_bar: ProgressBar
+var _cache_bytes := 0
 var _grid: GridContainer
 var _accent_btns: Array[Button] = []
 var _layout_btns: Array[Button] = []
 var _layout_index := 0
-var _scroll: ScrollContainer
-## First row of the Data sources section (show_data_sources).
-var _sources_anchor: Control
 var _theme_seg: SegmentedControl
 var _text_seg: SegmentedControl
-const TEXT_SCALES := [0.85, 1.0, 1.3, 1.5, 2.0]
 var _layout_seg: SegmentedControl
 var _unit_segs: Dictionary = {}  # pref key -> SegmentedControl
+var _unit_samples: Dictionary = {}  # pref key -> Label
 var _toggles: Dictionary = {}  # pref key -> Button
 var _limit_slider: HSlider
 var _limit_label: Label
-var _godot_licence: Label
+
+var _bg: ColorRect
+var _rail: PanelContainer
+var _rail_margin: MarginContainer
+var _rail_foot: Control
+var _top: MarginContainer
+var _top_title: Label
+var _scroll: ScrollContainer
+var _page_margin: MarginContainer
+var _menu: VBoxContainer
+var _page_head: VBoxContainer
+var _page_title: Label
+var _page_lead: Label
+var _pages: Dictionary = {}  # id -> page
+## One entry per category row, rail and menu alike:
+## {id, button, tile, icon, summary, menu}.
+var _cat_items: Array[Dictionary] = []
+var _current := ""
+var _in_page := false
+var _compact := false
+## Opened straight on a page from elsewhere (the viewer's attribution):
+## Back leaves Settings instead of showing a menu the person never saw.
+var _leave_on_back := false
+## The next showing keeps `_in_page` (the reopen after a rebuild).
+var _keep_page := false
+var _specs_grid: GridContainer
+var _laid_out := false
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = UiTheme.BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	_margin = MarginContainer.new()
-	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_margin)
-	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 20)
-	_margin.add_child(outer)
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 14)
-	outer.add_child(header)
-	var back := UiTheme.icon_button("")
-	UiIcon.apply(back, "arrow-left", 22)
-	back.tooltip_text = "Back to map"
-	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	back.pressed.connect(func() -> void: back_requested.emit())
-	header.add_child(back)
-	var title := UiTheme.display_label("Settings", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(title)
-	var scroll := ScrollContainer.new()
-	_scroll = scroll
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outer.add_child(scroll)
+	_current = last_category
+	if reopen:
+		_in_page = last_in_page
+		_keep_page = true
+	_bg = ColorRect.new()
+	_bg.color = UiTheme.BG
+	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_bg)
+	var split := HBoxContainer.new()
+	split.set_anchors_preset(Control.PRESET_FULL_RECT)
+	split.add_theme_constant_override("separation", 0)
+	add_child(split)
+	split.add_child(_build_rail())
+	var main := VBoxContainer.new()
+	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main.add_theme_constant_override("separation", 0)
+	split.add_child(main)
+	_top = MarginContainer.new()
+	main.add_child(_top)
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 12)
+	_top.add_child(top_row)
+	top_row.add_child(_back_button(func() -> void:
+		if not step_back():
+			back_requested.emit()))
+	_top_title = UiTheme.text("Settings", "title")
+	_top_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_top_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	top_row.add_child(_top_title)
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	UiTheme.apply_scroll(_scroll)
+	main.add_child(_scroll)
+	_page_margin = MarginContainer.new()
+	_page_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_page_margin)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(col)
-	col.add_child(UiTheme.section_label("Appearance"))
-	var look := SettingsRows.group()
-	col.add_child(look)
-	_theme_seg = SegmentedControl.new(["Night", "Day", "Match system"])
-	_theme_seg.custom_minimum_size.x = 300
-	_theme_seg.item_selected.connect(_on_theme)
-	SettingsRows.add(look, SettingsRows.row("Theme", _theme_seg))
-	var accent_box := VBoxContainer.new()
-	accent_box.add_theme_constant_override("separation", 8)
-	var accent_pad := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		accent_pad.add_theme_constant_override("margin_" + side, 16 if side in ["left", "right"] else 12)
-	accent_pad.add_child(accent_box)
-	accent_box.add_child(UiTheme.label("Accent", 15, UiTheme.INK))
-	_choice_row(accent_box, UiTheme.theme_names + ["Auto"], _accent_btns,
-		func(i: int) -> void:
-			if i == UiTheme.AUTO_CHIP:
-				UiTheme.auto_mode = true
-			else:
-				UiTheme.apply_palette(i)
-			if _settings != null:
-				_settings.set_accent(UiTheme.theme_index, UiTheme.auto_mode)
-			accent_changed.emit(i))
-	SettingsRows.add(look, accent_pad)
-	for t in [["reduce_motion", "Reduce motion", "Cross-fades instead of camera flights, springs and morphs."],
-			["solid_panels", "Solid panels", "Opaque panels instead of glass over the map and the scene."],
-			["high_contrast", "Increase contrast", "Stronger text, lines and glass edges."]]:
-		var key: String = t[0]
-		var tog := SettingsRows.toggle(t[1], false, func(on: bool) -> void: _on_access(key, on), t[2])
-		_toggles[key] = tog
-		SettingsRows.add(look, tog)
-	_text_seg = SegmentedControl.new(["85%", "100%", "130%", "150%", "200%"])
-	_text_seg.custom_minimum_size.x = 300
-	_text_seg.item_selected.connect(func(i: int) -> void:
-		if _settings != null:
-			_settings.set_pref("text_scale", TEXT_SCALES[i])
-			_rebuild_app())
-	SettingsRows.add(look, SettingsRows.row("Text size", _text_seg))
-	_layout_seg = SegmentedControl.new(["Auto", "Compact", "Wide"])
-	_layout_seg.custom_minimum_size.x = 260
-	_layout_seg.item_selected.connect(func(i: int) -> void:
-		_layout_index = i
-		if _settings != null:
-			_settings.set_layout(i)
-		layout_changed.emit(i))
-	_layout_btns = _layout_seg._buttons
-	SettingsRows.add(look, SettingsRows.row("Layout", _layout_seg,
-		"Auto follows the window. Compact and Wide force the phone or tablet arrangement."))
-	var stamp := SettingsRows.toggle("Stamp photos", true,
-		func(on: bool) -> void: _on_viewer_pref("photo_stamp", on),
-		"Adds the place, coordinates, time and data credit to photos saved from the 360 view.")
-	_toggles["photo_stamp"] = stamp
-	SettingsRows.add(look, stamp)
-
-	col.add_child(UiTheme.section_label("Render quality"))
-	var subtitle := UiTheme.label(
-		"Higher quality renders terrain and places more accurately, but takes longer to build and more power to draw.",
-		15, UiTheme.MUTED)
-	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(subtitle)
-	_grid = GridContainer.new()
-	_grid.columns = 1
-	_grid.add_theme_constant_override("h_separation", 12)
-	_grid.add_theme_constant_override("v_separation", 12)
-	col.add_child(_grid)
-	var group := ButtonGroup.new()
-	for p in RenderSettings.PRESET_NAMES.size():
-		var btn := Button.new()
-		btn.toggle_mode = true
-		btn.button_group = group
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 124)
-		btn.tooltip_text = RenderSettings.preset_name(p)
-		_style_preset(btn)
-		# Top-aligned text (a Button centres its own text, so cards with
-		# shorter blurbs would drop their titles out of line).
-		var level := "●".repeat(p + 1) + "○".repeat(RenderSettings.PRESET_NAMES.size() - p - 1)
-		var tag := "  ·  Recommended" if p == int(RenderSettings.Preset.HIGH) else ""
-		var card := MarginContainer.new()
-		for side in ["left", "right", "top", "bottom"]:
-			card.add_theme_constant_override("margin_" + side, 18)
-		var lines := VBoxContainer.new()
-		lines.add_theme_constant_override("separation", 4)
-		card.add_child(lines)
-		lines.add_child(UiTheme.label(RenderSettings.preset_name(p) + tag, 15, UiTheme.INK, true))
-		lines.add_child(UiTheme.label(level, 13, UiTheme.MUTED))
-		var blurb := UiTheme.label(RenderSettings.PRESET_BLURBS[p], 14, UiTheme.INK)
-		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lines.add_child(blurb)
-		for l in lines.get_children():
-			(l as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-		SettingsRows._fill_button(btn, card, 124)
-		var preset_value := p
-		btn.pressed.connect(func() -> void: _select(preset_value))
-		_preset_btns.append(btn)
-		_grid.add_child(btn)
-	_summary_label = UiTheme.label("", 14, UiTheme.TEAL, true)
-	_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(_summary_label)
-	var note := UiTheme.label(
-		"Applies to the next place you render. A place already open keeps its terrain, but its render scale and shadows update straight away.",
-		14, UiTheme.MUTED)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(note)
-
-	col.add_child(UiTheme.section_label("Cache"))
-	var cache := SettingsRows.group()
-	col.add_child(cache)
-	_storage_label = UiTheme.label("", 14, UiTheme.MUTED)
-	_storage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var storage_pad := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		storage_pad.add_theme_constant_override("margin_" + side, 16 if side in ["left", "right"] else 12)
-	storage_pad.add_child(_storage_label)
-	SettingsRows.add(cache, storage_pad)
-	var limit_row := HBoxContainer.new()
-	limit_row.add_theme_constant_override("separation", 12)
-	_limit_slider = HSlider.new()
-	_limit_slider.min_value = 256
-	_limit_slider.max_value = 8192
-	_limit_slider.step = 256
-	_limit_slider.custom_minimum_size = Vector2(200, 44)
-	_limit_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	HudStyle.apply_slider(_limit_slider)
-	_limit_slider.value_changed.connect(func(v: float) -> void:
-		_limit_label.text = UiTheme.cache_size(int(v) * 1048576))
-	_limit_slider.drag_ended.connect(func(_changed: bool) -> void: _on_cache_limit())
-	limit_row.add_child(_limit_slider)
-	_limit_label = UiTheme.data_label("", 15, UiTheme.MUTED)
-	_limit_label.custom_minimum_size.x = 72
-	limit_row.add_child(_limit_label)
-	SettingsRows.add(cache, SettingsRows.row("Size limit", limit_row))
-	var clear_pad := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		clear_pad.add_theme_constant_override("margin_" + side, 16 if side in ["left", "right"] else 12)
-	var clear_cache_btn := SettingsRows.destructive("Clear cache")
-	clear_cache_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	clear_cache_btn.pressed.connect(_confirm_clear)
-	clear_pad.add_child(clear_cache_btn)
-	SettingsRows.add(cache, clear_pad)
-
-	col.add_child(UiTheme.section_label("Units"))
-	var units := SettingsRows.group()
-	col.add_child(units)
-	for u in [["imperial", "Elevation", ["Metric", "Imperial"]],
-			["dms", "Coordinates", ["Decimal", "Degrees, minutes, seconds"]],
-			["clock_12h", "Time", ["24-hour", "12-hour"]]]:
-		var key: String = u[0]
-		var seg := SegmentedControl.new(u[2])
-		seg.custom_minimum_size.x = 300
-		seg.item_selected.connect(func(i: int) -> void: _on_unit(key, i == 1))
-		_unit_segs[key] = seg
-		SettingsRows.add(units, SettingsRows.row(u[1], seg))
-
-	col.add_child(UiTheme.section_label("Data sources"))
-	var sources := SettingsRows.group()
-	col.add_child(sources)
-	for src in SOURCES:
-		var link := SettingsRows.link(src[0], src[1], src[2])
-		SettingsRows.add(sources, link)
-		if _sources_anchor == null:
-			_sources_anchor = link
-
-	col.add_child(UiTheme.section_label("About"))
-	var about := SettingsRows.group()
-	col.add_child(about)
-	var version := str(ProjectSettings.get_setting("application/config/version", ""))
-	var engine := Engine.get_version_info()
-	SettingsRows.add(about, SettingsRows.row("Planet Render 360",
-		UiTheme.data_label(version if version != "" else "Development build", 15, UiTheme.MUTED),
-		"Built with Godot Engine %s" % engine.get("string", "")))
-	for lic in LICENCES:
-		SettingsRows.add(about, SettingsRows.link(lic[0], lic[1], lic[2]))
-	var godot_row := SettingsRows.toggle("Godot Engine", false, func(on: bool) -> void:
-		_godot_licence.get_parent().visible = on, "MIT License · show the licence text")
-	SettingsRows.add(about, godot_row)
-	_godot_licence = UiTheme.text(Engine.get_license_text(), "caption", UiTheme.MUTED)
-	_godot_licence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var lic_pad := MarginContainer.new()
-	lic_pad.visible = false
-	for side in ["left", "right", "top", "bottom"]:
-		lic_pad.add_theme_constant_override("margin_" + side, 16)
-	lic_pad.add_child(_godot_licence)
-	SettingsRows.add(about, lic_pad)
+	col.add_theme_constant_override("separation", 24)
+	_page_margin.add_child(col)
+	_menu = _build_menu()
+	col.add_child(_menu)
+	_page_head = VBoxContainer.new()
+	_page_head.add_theme_constant_override("separation", 4)
+	col.add_child(_page_head)
+	_page_title = UiTheme.text("", "title")
+	_page_head.add_child(_page_title)
+	_page_lead = UiTheme.label("", 15, UiTheme.MUTED)
+	_page_lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_page_head.add_child(_page_lead)
+	for pair in [["appearance", SettingsPages.appearance], ["access", SettingsPages.accessibility],
+			["quality", SettingsPages.quality], ["units", SettingsPages.units],
+			["photos", SettingsPages.photos], ["storage", SettingsPages.storage],
+			["sources", SettingsPages.sources], ["about", SettingsPages.about]]:
+		var build: Callable = pair[1]
+		var page: Control = build.call(self)
+		_pages[pair[0]] = page
+		col.add_child(page)
 	resized.connect(_on_resized)
+	visibility_changed.connect(_on_visibility_changed)
 	_on_resized()
+	_restyle_cats()
 	_refresh()
 
-## Preset card: quiet glass until chosen, then an accent edge and tint
-## (the pressed state doubles as the selected state).
-func _style_preset(btn: Button) -> void:
-	for key in ["font_color", "font_hover_color", "font_pressed_color",
-			"font_hover_pressed_color", "font_focus_color"]:
-		btn.add_theme_color_override(key, UiTheme.INK)
-	var base := UiTheme.style(UiTheme.SURFACE, UiTheme.RADIUS_L, UiTheme.LINE)
-	base.set_content_margin_all(18)
-	btn.add_theme_stylebox_override("normal", base)
-	var hover := UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_L, Color(UiTheme.TEAL, 0.6))
-	hover.set_content_margin_all(18)
-	btn.add_theme_stylebox_override("hover", hover)
-	var chosen := UiTheme.style(UiTheme.TEAL_SOFT, UiTheme.RADIUS_L, UiTheme.TEAL, true)
-	chosen.set_content_margin_all(18)
-	chosen.set_border_width_all(2)
-	chosen.shadow_color = Color(UiTheme.TEAL, 0.18)
-	chosen.shadow_size = 12
-	btn.add_theme_stylebox_override("pressed", chosen)
-	btn.add_theme_stylebox_override("hover_pressed", chosen)
-	var focus := UiTheme.style(Color.TRANSPARENT, 20, UiTheme.TEAL)
-	focus.set_border_width_all(2)
-	btn.add_theme_stylebox_override("focus", focus)
+## Each visit starts on the phone menu (except the reopen after a
+## rebuild) and reads the cache size afresh.
+func _on_visibility_changed() -> void:
+	if not visible:
+		return
+	if not _keep_page:
+		_in_page = false
+	_keep_page = false
+	_leave_on_back = false
+	_refresh_storage()
+	_show_current()
+
+## The rail: back and title, the grouped category rows, a foot line.
+func _build_rail() -> PanelContainer:
+	_rail = PanelContainer.new()
+	_rail.add_theme_stylebox_override("panel", _rail_style())
+	_rail_margin = MarginContainer.new()
+	for side in ["left", "right"]:
+		_rail_margin.add_theme_constant_override("margin_" + side, 16)
+	for side in ["top", "bottom"]:
+		_rail_margin.add_theme_constant_override("margin_" + side, 24)
+	_rail.add_child(_rail_margin)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 16)
+	_rail_margin.add_child(col)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	col.add_child(head)
+	head.add_child(_back_button(func() -> void: back_requested.emit()))
+	var title := UiTheme.text("Settings", "title")
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(title)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	UiTheme.apply_scroll(scroll)
+	col.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 4)
+	scroll.add_child(list)
+	for g in CATEGORIES:
+		var eyebrow := MarginContainer.new()
+		eyebrow.add_theme_constant_override("margin_left", 12)
+		eyebrow.add_theme_constant_override("margin_top", 0 if list.get_child_count() == 0 else 12)
+		eyebrow.add_theme_constant_override("margin_bottom", 2)
+		eyebrow.add_child(UiTheme.section_label(g[0]))
+		list.add_child(eyebrow)
+		for c in g[1]:
+			list.add_child(_cat_row(c, false))
+	var foot := UiTheme.label("Changes apply at once and are kept on this device.", 14, UiTheme.MUTED)
+	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_rail_foot = _pad_h(foot, 12)
+	col.add_child(_rail_foot)
+	return _rail
+
+## Phones: the categories as rows in three solid groups.
+func _build_menu() -> VBoxContainer:
+	var menu := VBoxContainer.new()
+	menu.add_theme_constant_override("separation", 20)
+	for g in CATEGORIES:
+		var sect := VBoxContainer.new()
+		sect.add_theme_constant_override("separation", 8)
+		sect.add_child(_pad_h(UiTheme.section_label(g[0]), 4))
+		var group := SettingsRows.group()
+		for c in g[1]:
+			SettingsRows.add(group, _cat_row(c, true))
+		sect.add_child(group)
+		menu.add_child(sect)
+	var version := UiTheme.label("Planet Render 360 · %s" % version_text(), 14, UiTheme.MUTED)
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu.add_child(version)
+	return menu
+
+## A category row: icon tile, name, the summary of its current values,
+## and on phones a trailing chevron.
+func _cat_row(c: Array, in_menu: bool) -> Button:
+	var b := Button.new()
+	b.tooltip_text = str(c[2])
+	var pad := MarginContainer.new()
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_" + side, 12)
+	for side in ["top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 8)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(row)
+	var tile := PanelContainer.new()
+	tile.custom_minimum_size = Vector2(36, 36)
+	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var center := CenterContainer.new()
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(center)
+	var icon := UiIcon.rect(str(c[1]), 20, UiTheme.MUTED)
+	center.add_child(icon)
+	row.add_child(tile)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.alignment = BoxContainer.ALIGNMENT_CENTER
+	text.add_theme_constant_override("separation", 0)
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(text)
+	var name_l := UiTheme.label(str(c[2]), 15, UiTheme.INK, true)
+	name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(name_l)
+	var summary := UiTheme.label("", 14, UiTheme.MUTED)
+	summary.clip_text = true
+	summary.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	summary.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(summary)
+	if in_menu:
+		var chevron := UiIcon.rect("chevron-right", 20, UiTheme.FAINT)
+		chevron.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(chevron)
+	SettingsRows._fill_button(b, pad, 60 if in_menu else 56)
+	var id := str(c[0])
+	b.pressed.connect(func() -> void: open_category(id))
+	_cat_items.append({"id": id, "button": b, "tile": tile, "icon": icon,
+		"summary": summary, "menu": in_menu})
+	return b
+
+func _back_button(on_press: Callable) -> Button:
+	var back := UiTheme.icon_button("")
+	UiIcon.apply(back, "arrow-left", 22)
+	back.tooltip_text = "Back"
+	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	back.pressed.connect(on_press)
+	return back
+
+func _pad_h(c: Control, px: int) -> MarginContainer:
+	var m := MarginContainer.new()
+	m.add_theme_constant_override("margin_left", px)
+	m.add_theme_constant_override("margin_right", px)
+	m.add_child(c)
+	return m
+
+## sky-200 with a `line` edge on the page side only.
+func _rail_style() -> StyleBoxFlat:
+	var st := UiTheme.style(UiTheme.SURFACE, 0, UiTheme.LINE)
+	st.set_border_width_all(0)
+	st.border_width_right = 1
+	st.set_content_margin_all(0)
+	return st
+
+## Rail rows: the chosen one is accent-soft with an accent edge and an
+## accent tile; menu rows are plain rows that tint on hover.
+func _style_cat(item: Dictionary) -> void:
+	var b: Button = item["button"]
+	var active: bool = not bool(item["menu"]) and str(item["id"]) == _current
+	if bool(item["menu"]):
+		b.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		b.add_theme_stylebox_override("hover", UiTheme.style(Color(UiTheme.INK, 0.04), 0))
+		b.add_theme_stylebox_override("pressed", UiTheme.style(Color(UiTheme.INK, 0.08), 0))
+	else:
+		var chosen := UiTheme.style(UiTheme.TEAL_SOFT, UiTheme.RADIUS_M, UiTheme.TEAL)
+		var rest: StyleBox = chosen if active else StyleBoxEmpty.new()
+		b.add_theme_stylebox_override("normal", rest)
+		b.add_theme_stylebox_override("hover", chosen if active else UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_M))
+		b.add_theme_stylebox_override("pressed", chosen)
+	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_M))
+	var tile := UiTheme.style(UiTheme.TEAL if active else UiTheme.FIELD, UiTheme.RADIUS_S)
+	tile.set_content_margin_all(0)
+	(item["tile"] as PanelContainer).add_theme_stylebox_override("panel", tile)
+	(item["icon"] as TextureRect).modulate = UiTheme.ON_ACCENT if active else UiTheme.MUTED
+
+## Opens a category: the page beside the rail, or on phones the page in
+## place of the menu.
+func open_category(id: String) -> void:
+	if not _pages.has(id):
+		return
+	_current = id
+	_in_page = true
+	_leave_on_back = false
+	_show_current()
+	_restyle_cats()
+	if _scroll != null:
+		_scroll.scroll_vertical = 0
+
+## Back one level: on phones a page returns to the menu. False when
+## there is nothing to step back to (the caller leaves Settings).
+func step_back() -> bool:
+	if _leave_on_back:
+		return false
+	if _compact and _in_page:
+		_in_page = false
+		_show_current()
+		return true
+	return false
+
+func _show_current() -> void:
+	if _menu == null:
+		return
+	var show_page := not _compact or _in_page
+	_menu.visible = not show_page
+	_page_head.visible = show_page
+	_page_title.visible = not _compact
+	for id in _pages:
+		(_pages[id] as Control).visible = show_page and id == _current
+	var c := _category(_current)
+	_page_title.text = str(c[2])
+	_page_lead.text = str(c[3])
+	_top_title.text = str(c[2]) if show_page else "Settings"
+
+func _restyle_cats() -> void:
+	for item in _cat_items:
+		_style_cat(item)
+
+func _category(id: String) -> Array:
+	for g in CATEGORIES:
+		for c in g[1]:
+			if c[0] == id:
+				return c
+	return CATEGORIES[0][1][0]
+
+## Compact forces the phone menu. Wide (a forced tablet layout on the
+## map) follows the window here like Auto: two panes need tablet width,
+## and a forced rail would leave a phone window a page too narrow for
+## its own controls.
+func _layout() -> Responsive.Layout:
+	if Responsive.override_layout(_layout_index) == Responsive.Layout.COMPACT:
+		return Responsive.Layout.COMPACT
+	return Responsive.layout_for_size(size)
+
+func _on_resized() -> void:
+	if _page_margin == null:
+		return
+	var layout := _layout()
+	var was_compact := _compact
+	_compact = layout == Responsive.Layout.COMPACT
+	# Narrowing an open two-pane Settings keeps the page in view.
+	if _laid_out and _compact and not was_compact and is_visible_in_tree():
+		_in_page = true
+	_laid_out = true
+	_rail.visible = not _compact
+	_top.visible = _compact
+	var rail_w := RAIL_W if layout == Responsive.Layout.EXPANDED else RAIL_W_MEDIUM
+	_rail.custom_minimum_size.x = rail_w
+	# Short windows give the foot line's room to the category rows.
+	_rail_foot.visible = size.y >= 860.0
+	var pad := 16
+	var top := 4
+	if layout == Responsive.Layout.EXPANDED:
+		pad = 48
+		top = 40
+	elif layout == Responsive.Layout.MEDIUM:
+		pad = 32
+		top = 40
+	var avail := size.x - (0.0 if _compact else float(rail_w))
+	_page_margin.add_theme_constant_override("margin_left", pad)
+	_page_margin.add_theme_constant_override("margin_right", maxi(pad, int(avail) - PAGE_MAX_W - pad))
+	_page_margin.add_theme_constant_override("margin_top", top)
+	_page_margin.add_theme_constant_override("margin_bottom", pad)
+	var edge := Responsive.page_padding(Responsive.Layout.COMPACT)
+	for side in ["left", "right", "bottom"]:
+		_top.add_theme_constant_override("margin_" + side, edge)
+	_top.add_theme_constant_override("margin_top", edge + 8)
+	var page_w := minf(avail - 2.0 * pad, PAGE_MAX_W)
+	if _grid != null:
+		_grid.columns = 2 if page_w >= 520.0 else 1
+	if _specs_grid != null:
+		_specs_grid.columns = 3 if page_w >= 340.0 * UiTheme.text_scale else 2
+	_show_current()
+
+## Opened from the viewer's attribution: straight to Data sources.
+func show_data_sources() -> void:
+	open_category("sources")
+	_leave_on_back = true
 
 ## A wrapping row of exclusive chips; `pick(index)` runs on a choice.
 func _choice_row(parent: Control, names: Array, into: Array[Button], pick: Callable) -> Array[Button]:
@@ -333,7 +457,7 @@ func _refresh_appearance() -> void:
 		if chosen:
 			UiIcon.apply(chip, "check", 16, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 		elif i == UiTheme.AUTO_CHIP:
-			chip.icon = null
+			UiIcon.apply(chip, "sunrise", 16, UiTheme.INK, UiTheme.ON_ACCENT)
 		else:
 			chip.icon = UiTheme.dot(UiTheme.ACCENTS[i])
 			chip.expand_icon = false
@@ -344,7 +468,7 @@ func _refresh_appearance() -> void:
 		_layout_seg.select(_layout_index)
 	if _settings != null and _theme_seg != null:
 		_theme_seg.select(int(_settings.pref("theme")))
-		_text_seg.select(TEXT_SCALES.find(float(_settings.pref("text_scale"))))
+		_text_seg.select(SettingsPages.TEXT_SCALES.find(float(_settings.pref("text_scale"))))
 		for key in _unit_segs:
 			(_unit_segs[key] as SegmentedControl).select(1 if bool(_settings.pref(key)) else 0)
 		for key in _toggles:
@@ -353,6 +477,52 @@ func _refresh_appearance() -> void:
 				"photo_stamp": UiPrefs.photo_stamp}.get(key, false) as bool
 			(_toggles[key] as Button).set_pressed_no_signal(on)
 			(_toggles[key] as Button).queue_redraw()
+	SettingsPages.show_unit_samples(self)
+	_refresh_summaries()
+
+## Each category row's one line of current values.
+func _refresh_summaries() -> void:
+	for item in _cat_items:
+		(item["summary"] as Label).text = summary_for(str(item["id"]))
+
+func summary_for(id: String) -> String:
+	match id:
+		"appearance":
+			var theme_i := int(_settings.pref("theme")) if _settings != null else 0
+			var theme_name: String = ["Night", "Day", "Match system"][clampi(theme_i, 0, 2)]
+			var accent: String = "Auto" if UiTheme.auto_mode else UiTheme.theme_names[UiTheme.theme_index]
+			return "%s · %s" % [theme_name, accent]
+		"access":
+			var parts: Array[String] = ["Text %d%%" % roundi(UiTheme.text_scale * 100.0)]
+			if UiPrefs.reduce_motion:
+				parts.append("Reduce motion")
+			if UiPrefs.solid_panels:
+				parts.append("Solid panels")
+			if UiPrefs.high_contrast:
+				parts.append("More contrast")
+			return " · ".join(parts)
+		"quality":
+			var p := _settings.preset if _settings != null else int(RenderSettings.Preset.HIGH)
+			return "%s · first build %s" % [RenderSettings.preset_name(p),
+				RenderSettings.FIRST_BUILD[RenderSettings.clamp_preset(p)]]
+		"units":
+			return "%s · %s · %s" % ["Imperial" if UiTheme.units_imperial else "Metric",
+				"DMS" if UiTheme.units_dms else "Decimal", "12-hour" if UiTheme.units_12h else "24-hour"]
+		"photos":
+			return "Stamp on" if UiPrefs.photo_stamp else "Stamp off"
+		"storage":
+			var limit := int(_settings.pref("cache_limit_mb")) if _settings != null else 512
+			return "%s of %s" % [UiTheme.cache_size(_cache_bytes), UiTheme.cache_size(limit * 1048576)]
+		"sources":
+			return "%d sources and licences" % SettingsPages.SOURCES.size()
+		"about":
+			var v := version_text()
+			return v if v == "Development build" else "Version %s" % v
+	return ""
+
+func version_text() -> String:
+	var version := str(ProjectSettings.get_setting("application/config/version", ""))
+	return version if version != "" else "Development build"
 
 ## Theme: saved, then the app rebuilds every screen in the new palette
 ## and comes back here (an instant switch, no glide).
@@ -369,6 +539,7 @@ func _on_access(key: String, on: bool) -> void:
 		return
 	_settings.set_pref(key, on)
 	UiPrefs.apply(_settings)
+	_refresh_summaries()
 	if key != "reduce_motion":
 		_rebuild_app()
 
@@ -378,9 +549,12 @@ func _on_viewer_pref(key: String, on: bool) -> void:
 		return
 	_settings.set_pref(key, on)
 	UiPrefs.apply(_settings)
+	_refresh_summaries()
 
 func _rebuild_app() -> void:
 	UiPrefs.apply(_settings)
+	last_category = _current
+	last_in_page = _in_page
 	if is_inside_tree() and get_tree().current_scene != null \
 			and get_tree().current_scene.scene_file_path != "":
 		reopen = true
@@ -391,6 +565,8 @@ func _on_unit(key: String, on: bool) -> void:
 		return
 	_settings.set_pref(key, on)
 	UiPrefs.apply(_settings)
+	SettingsPages.show_unit_samples(self)
+	_refresh_summaries()
 	units_changed.emit()
 
 func _on_cache_limit() -> void:
@@ -410,7 +586,7 @@ func _confirm_clear() -> void:
 			OfflineDownloader.clear_cache()
 			_refresh_storage())
 
-## Re-skin after an accent change (preset cards bake the palette in).
+## Re-skin after an accent change (rows, cards and bars bake it in).
 func refresh_theme() -> void:
 	_refresh_appearance()
 	for seg in [_theme_seg, _text_seg, _layout_seg] + _unit_segs.values():
@@ -419,33 +595,18 @@ func refresh_theme() -> void:
 	for key in _toggles:
 		(_toggles[key] as Button).queue_redraw()
 	for btn in _preset_btns:
-		_style_preset(btn)
-	if _summary_label != null:
-		_summary_label.add_theme_color_override("font_color", UiTheme.TEAL)
-
-func _on_resized() -> void:
-	if _margin == null:
-		return
-	var layout := Responsive.layout_for_width(size.x)
-	var pad := Responsive.page_padding(layout)
-	_margin.add_theme_constant_override("margin_left", pad)
-	_margin.add_theme_constant_override("margin_right", pad)
-	_margin.add_theme_constant_override("margin_top", pad + 8)
-	_margin.add_theme_constant_override("margin_bottom", pad)
-	if _grid != null:
-		_grid.columns = 4 if layout == Responsive.Layout.EXPANDED \
-			else (2 if layout == Responsive.Layout.MEDIUM else 1)
-
-## Opened from the viewer's attribution: scroll to Data sources.
-func show_data_sources() -> void:
-	if _scroll != null and _sources_anchor != null:
-		await get_tree().process_frame
-		_scroll.ensure_control_visible(_sources_anchor)
+		SettingsPages.style_preset(btn)
+	for check in _preset_checks:
+		(check as PanelContainer).add_theme_stylebox_override("panel", SettingsPages.check_style())
+	if _usage_bar != null:
+		SettingsPages.style_usage_bar(_usage_bar)
+	_restyle_cats()
 
 func bind_settings(settings: RenderSettings) -> void:
 	_settings = settings
 	_layout_index = settings.layout
 	_refresh()
+	_on_resized()
 
 func _select(preset_value: int) -> void:
 	if _settings == null:
@@ -459,15 +620,28 @@ func _refresh() -> void:
 		else int(RenderSettings.Preset.HIGH)
 	for i in _preset_btns.size():
 		_preset_btns[i].set_pressed_no_signal(i == current)
-	if _summary_label != null:
-		_summary_label.text = RenderSettings.summary_for(current)
+		_preset_checks[i].visible = i == current
+	SettingsPages.show_specs(self, RenderSettings.clamp_preset(current))
+	_show_storage()
 	_refresh_appearance()
-	_refresh_storage()
 
+## Reads the cache size from disk (a walk of the cache folders), so it
+## runs when Settings is shown and after the cache changes, not on
+## every refresh.
 func _refresh_storage() -> void:
+	_cache_bytes = OfflineDownloader.cache_size_bytes()
+	_show_storage()
+
+func _show_storage() -> void:
+	var limit_mb := 512
 	if _limit_slider != null and _settings != null:
 		_limit_slider.set_value_no_signal(float(_settings.pref("cache_limit_mb")))
 		_limit_label.text = UiTheme.cache_size(int(_limit_slider.value) * 1048576)
-	if _storage_label != null:
-		_storage_label.text = "Downloaded places use %s on this device. Clearing frees the space; saved places stay in History and re-download when opened." \
-			% UiTheme.cache_size(OfflineDownloader.cache_size_bytes())
+		limit_mb = int(_limit_slider.value)
+	if _usage != null:
+		var size_text := UiTheme.cache_size(_cache_bytes)
+		var gap := size_text.find(" ")
+		_usage.set_value(size_text.substr(0, gap), size_text.substr(gap + 1))
+		_usage_of.text = "of %s" % UiTheme.cache_size(limit_mb * 1048576)
+		_usage_bar.value = clampf(float(_cache_bytes) / float(limit_mb * 1048576), 0.0, 1.0)
+	_refresh_summaries()

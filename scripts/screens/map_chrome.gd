@@ -31,13 +31,7 @@ static func _on_resized(p: MapPicker) -> void:
 		p._apply_layout(Responsive.layout_for_size(p.size))
 
 static func _on_layout_selected(p: MapPicker, index: int) -> void:
-	match index:
-		1:
-			p._forced_layout = Responsive.Layout.COMPACT
-		2:
-			p._forced_layout = Responsive.Layout.MEDIUM
-		_:
-			p._forced_layout = -1
+	p._forced_layout = Responsive.override_layout(index)
 	_on_resized(p)
 
 ## The rail around the nav icons is glass on the map; in the side panel

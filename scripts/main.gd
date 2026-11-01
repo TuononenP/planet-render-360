@@ -231,7 +231,8 @@ func _request_exit() -> void:
 	get_tree().quit()
 
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
-## History and Settings return to the map, loading cancels) and quits
+## History and Settings return to the map, a Settings page on phones
+## returns to its menu, loading cancels) and quits
 ## only from the map itself.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -243,6 +244,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_request_exit()
 			elif _loading.visible:
 				_loading.cancel_requested.emit()
+			elif _settings_screen.visible and _settings_screen.step_back():
+				pass
 			elif _settings_screen.visible and _settings_from != null:
 				_show(_settings_from)
 			else:
