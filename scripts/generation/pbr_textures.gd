@@ -5,10 +5,43 @@ extends RefCounted
 ## MaterialLibrary: set images, weather tiling, calibration tints
 ## and cached PBR materials. Set tables and caches stay in
 ## MaterialLibrary (single source); this class is the loader.
+static var _mutex := Mutex.new()
+## Set when _pbr_mats went past its 64 cap (see pbr_material).
+static var cap_reached := false
+## Parallel build stages (WorldBuildGraph), per pool thread: the cache a
+## stage sees and its rank in the serial stage order. Keys round tint and
+## repeat, so two stages can ask one key with slightly different values;
+## serially the earliest stage's first request made it. Here a lower rank
+## asking an entry a later stage made rewrites those two values, so the
+## shared material ends as the serial build leaves it.
+static var _stage := {}
+static var _rank_of := {}
+
+static func push_stage(cache: Dictionary, rank: int) -> void:
+	_mutex.lock()
+	_stage[OS.get_thread_caller_id()] = [cache, rank]
+	_mutex.unlock()
+
+static func pop_stage() -> void:
+	_mutex.lock()
+	_stage.erase(OS.get_thread_caller_id())
+	_mutex.unlock()
+
+## Called before a parallel build's stages start.
+static func begin_stages() -> void:
+	_mutex.lock()
+	_rank_of.clear()
+	cap_reached = false
+	_mutex.unlock()
+
 static func _set_image(set_name: String, map_name: String) -> Image:
 	var key := set_name + ":" + map_name
+	_mutex.lock()
 	if MaterialLibrary._set_images.has(key):
-		return MaterialLibrary._set_images[key] as Image
+		var cached: Image = MaterialLibrary._set_images[key] as Image
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
 	var img: Image = null
 	var path := MaterialLibrary.TEXTURE_DIR + set_name + "_" + map_name + ".jpg"
 	if FileAccess.file_exists(path):
@@ -20,15 +53,22 @@ static func _set_image(set_name: String, map_name: String) -> Image:
 				if set_name == "terracotta":
 					_weather_tiles(img)
 	if img == null:
-		if not MaterialLibrary._set_images.has("warned:" + set_name):
+		_mutex.lock()
+		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
+		_mutex.unlock()
+		if not has_warned:
+			_mutex.lock()
 			MaterialLibrary._set_images["warned:" + set_name] = true
+			_mutex.unlock()
 			push_warning("MaterialLibrary: bundled PBR set '%s' unreadable; procedural fallback." % set_name)
 		img = Image.create(64, 64, false, Image.FORMAT_RGB8)
 		if map_name == "nor":
 			img.fill(Color(0.5, 0.5, 1.0))
 		else:
 			MaterialLibrary.speckle(img, Color(0.5, 0.5, 0.5), 700, 3.1, 0.08)
+	_mutex.lock()
 	MaterialLibrary._set_images[key] = img
+	_mutex.unlock()
 	return img
 
 ## Remap a linear clay-tile image to weathered terracotta (see
@@ -61,15 +101,21 @@ static func _weather_tiles(img: Image) -> void:
 ## the CPU composers and the GroundMaterial shader (raw samplers).
 static func _set_tex(set_name: String, map_name: String) -> Texture2D:
 	var key := "t:" + set_name + ":" + map_name
+	_mutex.lock()
 	if MaterialLibrary._set_texs.has(key):
-		return MaterialLibrary._set_texs[key] as Texture2D
+		var cached_t: Texture2D = MaterialLibrary._set_texs[key] as Texture2D
+		_mutex.unlock()
+		return cached_t
+	_mutex.unlock()
 	var img := (_set_image(set_name, map_name) as Image).duplicate() as Image
 	if map_name == "diff":
 		img.linear_to_srgb()
 	if not img.has_mipmaps():
 		img.generate_mipmaps()
 	var t := ImageTexture.create_from_image(img)
+	_mutex.lock()
 	MaterialLibrary._set_texs[key] = t
+	_mutex.unlock()
 	return t
 
 ## Per-channel tint taking a set mean to a target, clamped so texture
@@ -86,18 +132,38 @@ static func _calib_tint(mean: Color, target: Color) -> Color:
 ## albedo_color is a source_color uniform the renderer sRGB-decodes, so
 ## it is stored encoded (T4.7 — passing the linear tint raw squared it:
 ## near-black navy asphalt and slate, blown-out bright tints).
+## Locked: the parallel world build reaches it from several tasks. The
+## 64 cap and its fallbacks follow insertion order, which only a serial
+## build fixes, so cap_reached records any build that went past 64
+## distinct keys and WorldBuildGraph then rebuilds serially.
 static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 		uv_scale: float = 1.0, detail: int = 1) -> StandardMaterial3D:
 	var key := "%s|%s|%.2f|%d" % [set_name, tint.to_html(), uv_scale, detail]
-	if MaterialLibrary._pbr_mats.has(key):
-		return MaterialLibrary._pbr_mats[key] as StandardMaterial3D
-	if MaterialLibrary._pbr_mats.size() >= 64:
+	_mutex.lock()
+	var ctx: Array = _stage.get(OS.get_thread_caller_id(), [MaterialLibrary._pbr_mats, -1])
+	var mats: Dictionary = ctx[0]
+	var rank: int = ctx[1]
+	if mats.has(key):
+		var cached: StandardMaterial3D = mats[key] as StandardMaterial3D
+		if rank >= 0 and rank < int(_rank_of.get(cached.get_instance_id(), rank)):
+			cached.albedo_color = tint.linear_to_srgb()
+			cached.uv1_scale = Vector3(uv_scale, uv_scale, uv_scale)
+			_rank_of[cached.get_instance_id()] = rank
+		_mutex.unlock()
+		return cached
+	if mats.size() >= 64:
+		if is_same(mats, MaterialLibrary._pbr_mats):
+			cap_reached = true
 		# Full: reuse one of the same set (a brick chimney must not come
 		# back as the first slate ever made).
-		for k in MaterialLibrary._pbr_mats:
+		var reuse: StandardMaterial3D = mats.values()[0] as StandardMaterial3D
+		for k in mats:
 			if str(k).begins_with(set_name + "|"):
-				return MaterialLibrary._pbr_mats[k] as StandardMaterial3D
-		return MaterialLibrary._pbr_mats.values()[0] as StandardMaterial3D
+				reuse = mats[k] as StandardMaterial3D
+				break
+		_mutex.unlock()
+		return reuse
+	_mutex.unlock()
 	var row: Dictionary = MaterialLibrary.PBR_SETS.get(set_name, MaterialLibrary.PBR_SETS["limestone"])
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = _set_tex(set_name, "diff")
@@ -110,7 +176,21 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 		m.roughness = float(row["rough"])
 	m.metallic = float(row["metal"])
 	m.uv1_scale = Vector3(uv_scale, uv_scale, uv_scale)
-	MaterialLibrary._pbr_mats[key] = m
+	_mutex.lock()
+	if mats.has(key):  # another stage made it meanwhile: share theirs
+		var other: StandardMaterial3D = mats[key] as StandardMaterial3D
+		if rank >= 0 and rank < int(_rank_of.get(other.get_instance_id(), rank)):
+			other.albedo_color = m.albedo_color
+			other.uv1_scale = m.uv1_scale
+			_rank_of[other.get_instance_id()] = rank
+		m = other
+	else:
+		if mats.size() >= 64 and is_same(mats, MaterialLibrary._pbr_mats):
+			cap_reached = true  # two stages raced past the cap
+		mats[key] = m
+		if rank >= 0:
+			_rank_of[m.get_instance_id()] = rank
+	_mutex.unlock()
 	return m
 
 ## OSM `building:colour` / `roof:colour`: #rgb/#rrggbb hex (with or

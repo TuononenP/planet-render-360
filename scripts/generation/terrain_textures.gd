@@ -17,6 +17,7 @@ const TILE_M := [3.0, 2.6, 4.0, 4.0, 9.0, 3.2, 2.4, 4.0, 5.0]
 const SNOW := 8
 
 static var _arrays: Dictionary = {}
+static var _mutex := Mutex.new()
 
 static func size_for(preset: int) -> int:
 	return 512 if RenderSettings.clamp_preset(preset) <= RenderSettings.Preset.BALANCED else 1024
@@ -29,8 +30,12 @@ const VERSION := 1
 
 ## {"albedo": Texture2DArray, "normal": Texture2DArray} at `size` px.
 static func arrays(size: int = 1024) -> Dictionary:
+	_mutex.lock()
 	if _arrays.has(size):
-		return _arrays[size]
+		var cached: Dictionary = _arrays[size] as Dictionary
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
 	var key := "%s/layers_%d_v%d_%d" % [DIR, size, VERSION, hash(",".join(LAYERS))]
 	var paths: Array[String] = [key + "_albedo.res", key + "_normal.res"]
 	if FileAccess.file_exists(paths[0]) and FileAccess.file_exists(paths[1]):
@@ -38,20 +43,34 @@ static func arrays(size: int = 1024) -> Dictionary:
 		var ln := ResourceLoader.load(paths[1]) as Texture2DArray
 		if la != null and ln != null and la.get_layers() == LAYERS.size() \
 				and la.get_width() == size and ln.get_width() == size:
+			_mutex.lock()
+			if _arrays.has(size):
+				var raced: Dictionary = _arrays[size] as Dictionary
+				_mutex.unlock()
+				return raced
 			_arrays[size] = {"albedo": la, "normal": ln}
+			_mutex.unlock()
 			return _arrays[size]
 	var built := _build(size)
 	# The headless dummy renderer keeps no texture data: never persist
-	# an empty array. Saved via a temp name so a reader never sees half.
+	# an empty array. Saved via a temp name so a reader never sees half;
+	# the name is per thread, so two threads that both missed (the build
+	# prewarm and a build) each write their own and rename atomically.
 	if DisplayServer.get_name() != "headless":
 		DirAccess.make_dir_recursive_absolute(DIR)
 		for i in 2:
 			var res: Texture2DArray = built["albedo" if i == 0 else "normal"]
-			var tmp: String = paths[i] + ".tmp.res"
+			var tmp: String = paths[i] + ".%d.tmp.res" % OS.get_thread_caller_id()
 			if ResourceSaver.save(res, tmp) == OK \
 					and DirAccess.rename_absolute(tmp, paths[i]) == OK:
 				res.take_over_path(paths[i])
+	_mutex.lock()
+	if _arrays.has(size):
+		var raced2: Dictionary = _arrays[size] as Dictionary
+		_mutex.unlock()
+		return raced2
 	_arrays[size] = built
+	_mutex.unlock()
 	return built
 
 static func _build(size: int) -> Dictionary:

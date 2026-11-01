@@ -36,8 +36,8 @@ class Batch extends RefCounted:
 		var indices: PackedInt32Array = dst[3]
 		var offset := verts.size()
 		var nb := xf.basis.inverse().transposed()
-		for v in (src[Mesh.ARRAY_VERTEX] as PackedVector3Array):
-			verts.append(xf * v)
+		# Transform3D * PackedVector3Array runs the same xform per vertex.
+		verts.append_array(xf * (src[Mesh.ARRAY_VERTEX] as PackedVector3Array))
 		for n in (src[Mesh.ARRAY_NORMAL] as PackedVector3Array):
 			normals.append((nb * n).normalized())
 		uvs.append_array(src[Mesh.ARRAY_TEX_UV] as PackedVector2Array)

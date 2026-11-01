@@ -47,12 +47,13 @@ const FINISH_HEX := {"asphalt": "#585552", "paving": "#8a8274",
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
-static func build_roads(data: LocationData, ground: GroundTruth = null) -> Node3D:
+## `abort` stops it between rows / items; a stopped result is dropped.
+static func build_roads(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var root := Node3D.new()
 	root.name = "Roads"
-	_roads(root, data, ground)
+	_roads(root, data, ground, abort)
 	return root
 
 ## {points, width_u, finish, rank, bridge} for one road element, or {}
@@ -118,13 +119,15 @@ static func _pbr(set_name: String, hex: String) -> Material:
 		MaterialLibrary._calib_tint(row["mean"], target), 1.0)
 	return m
 
-static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
+static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	_mats.clear()
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	var junc := RoadSurface.junctions(data)
 	var batches := {}
 	for line in data.roads:
+		if abort != null and abort.requested:
+			break
 		var r := _parse(line, m2u)
 		if r.is_empty():
 			continue
@@ -143,6 +146,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 		var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
 			1.0 if urban else 0.0, 1.0)
 		for run in _dry_runs(dense, surf):
+			if abort != null and abort.requested:
+				break
 			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc)
 	for finish in batches:
 		var b: _Batch = batches[finish]
@@ -238,8 +243,10 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		b.uvs.append(Vector2(0.0, v))
 		b.uvs.append(Vector2(width / m2u / 4.0, v))
 		attr.a = RoadSurface.junction_frac(junc, pts[i]) if not junc.is_empty() else 1.0
-		b.colors.append_array([attr, attr])
-		b.uv2s.append_array([Vector2(width / m2u, 0.0), Vector2(width / m2u, 0.0)])
+		# Drop Array literal alloc in hot loop: push individually.
+		b.colors.push_back(attr); b.colors.push_back(attr)
+		var w2 := Vector2(width / m2u, 0.0)
+		b.uv2s.push_back(w2); b.uv2s.push_back(w2)
 	for i in pts.size() - 1:
 		var a := k0 + i * 2
 		_quad_up(b, a, a + 1, a + 2, a + 3)
@@ -249,10 +256,13 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 	var va := b.verts[a]
 	var front := (b.verts[c] - va).cross(b.verts[bb] - va)
+	# Avoid Array literal alloc in hot loop: push indices individually.
 	if front.y >= 0.0:
-		b.indices.append_array([a, bb, c, bb, d, c])
+		b.indices.push_back(a); b.indices.push_back(bb); b.indices.push_back(c)
+		b.indices.push_back(bb); b.indices.push_back(d); b.indices.push_back(c)
 	else:
-		b.indices.append_array([a, c, bb, bb, c, d])
+		b.indices.push_back(a); b.indices.push_back(c); b.indices.push_back(bb)
+		b.indices.push_back(bb); b.indices.push_back(c); b.indices.push_back(d)
 
 ## Deck heights along a bridge polyline (world units, one per point):
 ## bank to bank, rising in a smooth arch toward BRIDGE_CLEAR_M over the
@@ -361,9 +371,10 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 			_wall(side, ia, ib, deck[i], deck[i + 1], deck[i] + para, deck[i + 1] + para,
 				-sa.normalized())
 			var k := side.verts.size()
-			side.verts.append_array([Vector3(oa.x, deck[i] + para, oa.y),
-				Vector3(ia.x, deck[i] + para, ia.y), Vector3(ob.x, deck[i + 1] + para, ob.y),
-				Vector3(ib.x, deck[i + 1] + para, ib.y)])
+			side.verts.push_back(Vector3(oa.x, deck[i] + para, oa.y))
+			side.verts.push_back(Vector3(ia.x, deck[i] + para, ia.y))
+			side.verts.push_back(Vector3(ob.x, deck[i + 1] + para, ob.y))
+			side.verts.push_back(Vector3(ib.x, deck[i + 1] + para, ib.y))
 			for q in 4:
 				side.normals.append(Vector3.UP)
 				side.uvs.append(Vector2(float(q % 2), float(q / 2)))
@@ -383,27 +394,32 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		var va := side.verts[a]
 		var front := (side.verts[a + 2] - va).cross(side.verts[a + 1] - va)
 		if front.y <= 0.0:
-			side.indices.append_array([a, a + 1, a + 2, a + 1, a + 3, a + 2])
+			side.indices.push_back(a); side.indices.push_back(a + 1); side.indices.push_back(a + 2)
+			side.indices.push_back(a + 1); side.indices.push_back(a + 3); side.indices.push_back(a + 2)
 		else:
-			side.indices.append_array([a, a + 2, a + 1, a + 1, a + 2, a + 3])
+			side.indices.push_back(a); side.indices.push_back(a + 2); side.indices.push_back(a + 1)
+			side.indices.push_back(a + 1); side.indices.push_back(a + 2); side.indices.push_back(a + 3)
 
 ## Vertical quad a→b between bottom (ya0, yb0) and top (ya1, yb1),
 ## front face toward `out`.
 static func _wall(b: _Batch, a: Vector2, c: Vector2, ya0: float, yc0: float,
 		ya1: float, yc1: float, out: Vector2) -> void:
 	var k := b.verts.size()
-	b.verts.append_array([Vector3(a.x, ya0, a.y), Vector3(c.x, yc0, c.y),
-		Vector3(c.x, yc1, c.y), Vector3(a.x, ya1, a.y)])
+	b.verts.push_back(Vector3(a.x, ya0, a.y)); b.verts.push_back(Vector3(c.x, yc0, c.y))
+	b.verts.push_back(Vector3(c.x, yc1, c.y)); b.verts.push_back(Vector3(a.x, ya1, a.y))
 	var n3 := Vector3(out.x, 0.0, out.y)
 	for q in 4:
 		b.normals.append(n3)
 	var len_u := a.distance_to(c)
-	b.uvs.append_array([Vector2(0, 1), Vector2(len_u, 1), Vector2(len_u, 0), Vector2(0, 0)])
+	b.uvs.push_back(Vector2(0, 1)); b.uvs.push_back(Vector2(len_u, 1))
+	b.uvs.push_back(Vector2(len_u, 0)); b.uvs.push_back(Vector2(0, 0))
 	var front := (b.verts[k + 2] - b.verts[k]).cross(b.verts[k + 1] - b.verts[k])
 	if front.dot(n3) >= 0.0:
-		b.indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
+		b.indices.push_back(k); b.indices.push_back(k + 1); b.indices.push_back(k + 2)
+		b.indices.push_back(k); b.indices.push_back(k + 2); b.indices.push_back(k + 3)
 	else:
-		b.indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+		b.indices.push_back(k); b.indices.push_back(k + 2); b.indices.push_back(k + 1)
+		b.indices.push_back(k); b.indices.push_back(k + 3); b.indices.push_back(k + 2)
 
 ## Mesh arrays of one finish (merged across every road).
 class _Batch extends RefCounted:
@@ -450,19 +466,26 @@ class _Surface extends RefCounted:
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
 
 	func height(x: float, z: float) -> float:
-		var bil := ground.height_at_world(x, z)
+		# Fused bilinear + triangle height sample: read same
+		# 4 posts once, do 3 lerps, compute tri and bil from same data, return
+		# max. Bit-identical to the previous two separate reads: the 4 posts,
+		# fx/fz/tx/tz and the lerp order are exactly as before.
 		if size < 2:
-			return bil
+			return ground.height_at_world(x, z)
 		var fx := clampf(x / step + float(size) * 0.5, 0.0, float(size - 1))
 		var fz := clampf(z / step + float(size) * 0.5, 0.0, float(size - 1))
 		var x0 := mini(int(fx), size - 2)
 		var z0 := mini(int(fz), size - 2)
 		var tx := fx - float(x0)
 		var tz := fz - float(z0)
-		var ha := ground.surface_at_post(x0, z0)
-		var hb := ground.surface_at_post(x0 + 1, z0)
-		var hc := ground.surface_at_post(x0, z0 + 1)
-		var hd := ground.surface_at_post(x0 + 1, z0 + 1)
+		var ha: float = ground.surface_at_post(x0, z0)
+		var hb: float = ground.surface_at_post(x0 + 1, z0)
+		var hc: float = ground.surface_at_post(x0, z0 + 1)
+		var hd: float = ground.surface_at_post(x0 + 1, z0 + 1)
+		# Bilinear from same 4 posts (same 3 lerps as GroundTruth.height_at_world).
+		var a := lerpf(ha, hb, tx)
+		var b := lerpf(hc, hd, tx)
+		var bil := lerpf(a, b, tz)
 		var tri: float
 		if tx + tz <= 1.0:
 			tri = ha + (hb - ha) * tx + (hc - ha) * tz

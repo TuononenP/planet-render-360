@@ -12,6 +12,9 @@ extends SceneTree
 ##  - Thread: joined (wait_to_finish)
 ##  - WorkerThreadPool task: waited for, and on NOTIFICATION_PREDELETE
 ##  - HTTPRequest: parented (add_child), so exit tree cancels it
+## Fork-join scripts (JOINED_IN_CALL) wait for every task they add before
+## the adding call returns, so no task can outlive a caller to need the
+## PREDELETE join; they must still wait (wait_for_).
 
 ## [creates, required tokens (all), what is missing]
 const RULES := [
@@ -22,6 +25,7 @@ const RULES := [
 		["wait_for_", "NOTIFICATION_PREDELETE"], "wait for the task, also on NOTIFICATION_PREDELETE"],
 	[["HTTPRequest.new()"], ["add_child("], "add_child() it so exit tree cancels it"],
 ]
+const JOINED_IN_CALL := ["res://scripts/generation/world_build_graph.gd"]
 
 func _init() -> void:
 	_run()
@@ -39,6 +43,8 @@ func _run() -> void:
 				continue
 			guarded += 1
 			for need: String in rule[1]:
+				if need == "NOTIFICATION_PREDELETE" and path in JOINED_IN_CALL:
+					continue
 				if not code.contains(need):
 					failures.append("%s creates %s but lacks %s: %s"
 						% [path, "/".join(creates), need, rule[2]])

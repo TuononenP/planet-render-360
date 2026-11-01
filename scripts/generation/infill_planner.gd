@@ -58,6 +58,17 @@ func _init(data: LocationData, ground: GroundTruth, smap: SettlementMap,
 func _cell(x: float, z: float) -> Vector2i:
 	return Vector2i(floori(x / HASH_CELL_M), floori(z / HASH_CELL_M))
 
+func _has_near(x: float, z: float, r: float) -> bool:
+	var c := _cell(x, z)
+	var reach := int(ceil(r / HASH_CELL_M))
+	for i in range(c.x - reach, c.x + reach + 1):
+		for j in range(c.y - reach, c.y + reach + 1):
+			for b in _hash.get(Vector2i(i, j), []):
+				var d := Vector2(float(b["x"]) - x, float(b["z"]) - z).length()
+				if d <= r:
+					return true
+	return false
+
 ## Real buildings within r of XZ, nearest first (at most k).
 func _near(x: float, z: float, r: float, k: int) -> Array:
 	var out: Array = []
@@ -75,7 +86,7 @@ func _near(x: float, z: float, r: float, k: int) -> Array:
 func allows(x: float, z: float) -> bool:
 	if fallback:
 		return true
-	if not _near(x, z, ABSENT_M, 1).is_empty():
+	if _has_near(x, z, ABSENT_M):
 		return false  # OSM maps buildings here: present, maybe sparse
 	if _ground.slope_at(x, z) > MAX_SLOPE:
 		return false

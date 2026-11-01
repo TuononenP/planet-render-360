@@ -108,13 +108,40 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 	var loader := Callable(MaterialLibrary, "_set_image")
 	var d: Dictionary
 	if tiled:
-		d = FacadeComposer.compose_tile(set_name, pattern, detail, look, loader)
+		d = composed(["tile", set_name, pattern, detail, look], func() -> Dictionary:
+			return FacadeComposer.compose_tile(set_name, pattern, detail, look, loader))
 	elif set_name == "glass":
-		d = StoreyComposer.compose_glass(detail)
+		d = composed(["glass", detail], func() -> Dictionary:
+			return StoreyComposer.compose_glass(detail))
 	else:
-		d = StoreyComposer.compose_haussmann(set_name, rows, detail, loader, variant)
+		d = composed(["storeys", set_name, rows, detail, variant], func() -> Dictionary:
+			return StoreyComposer.compose_haussmann(set_name, rows, detail, loader, variant))
 	FacadeMaterials._facade_texs[key] = d
 	return d
+
+## Composed facade textures kept from the last build, keyed by the exact
+## composer inputs. The per-build caches key by rounded values (the first
+## request decides) and are cleared per build, so this sits under them:
+## a season or preset rebuild, or the next place, reuses compositions
+## whose inputs are identical, so the pixels are too. end_build keeps
+## only what that build used, which its world references anyway.
+static var _store := {}
+static var _store_used := {}
+
+static func composed(inputs: Array, make: Callable) -> Dictionary:
+	var k := var_to_str(inputs)
+	_store_used[k] = true
+	if _store.has(k):
+		return _store[k] as Dictionary
+	var d: Dictionary = make.call()
+	_store[k] = d
+	return d
+
+static func end_build() -> void:
+	for k in _store.keys():
+		if not _store_used.has(k):
+			_store.erase(k)
+	_store_used.clear()
 
 static func _material_from(texs: Dictionary, set_name: String, detail: int,
 		tint: Color) -> StandardMaterial3D:

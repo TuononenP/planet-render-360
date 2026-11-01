@@ -91,6 +91,15 @@ var _sat_origin := Vector2.ZERO
 var _sat_zoom := 16
 var _sat_done := false
 var used_satellite := false
+## GroundTruth built on WorkerThreadPool as soon as DEM + OSM are in
+## (it reads nothing the far-city and climate stages write), so its
+## seconds overlap those waits instead of opening the world build.
+var _ground_task := -1
+## BuildPrewarm on WorkerThreadPool during the fetch (skipped when a
+## cached world is on its way); waited for before `finished`.
+var _prewarm_task := -1
+var _ground_data: LocationData = null
+var _ground: GroundTruth = null
 
 func _ready() -> void:
 	_fetcher = DemFetcher.new()
@@ -164,6 +173,41 @@ func _note(layer: String) -> void:
 		degraded.append(layer)
 		degraded_layer.emit(layer)
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_ground()
+		_join_prewarm()
+
+func _join_prewarm() -> void:
+	if _prewarm_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_prewarm_task)
+		_prewarm_task = -1
+
+func _join_ground() -> void:
+	if _ground_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_ground_task)
+		_ground_task = -1
+
+## The GroundTruth built early for `data`, waiting (frame by frame) for
+## the task if it is still running; null when none was built for it.
+func ground_for(data: LocationData) -> GroundTruth:
+	if data != _ground_data:
+		return null
+	while _ground_task >= 0 and not WorkerThreadPool.is_task_completed(_ground_task):
+		await get_tree().process_frame
+	_join_ground()
+	var g := _ground
+	_ground = null
+	_ground_data = null
+	return g
+
+func _start_ground(data: LocationData) -> void:
+	_join_ground()
+	_ground = null
+	_ground_data = data
+	var build := func() -> void: _ground = GroundTruth.new(data)
+	_ground_task = WorkerThreadPool.add_task(build, true, "GroundTruth")
+
 func cancel() -> void:
 	_cancelled = true
 	if _osm != null:
@@ -198,6 +242,11 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		data.landmark_lat = float(landmark["lat"])
 		data.landmark_lon = float(landmark["lon"])
 	data.seed_value = int(abs(sin(lat * 12.9898 + lon * 78.233) * 43758.5453)) % 100000
+	if not WorldCache.prefetch(lat, lon, data.quality_preset, data.season):
+		_join_prewarm()
+		var preset := data.quality_preset
+		_prewarm_task = WorkerThreadPool.add_task(func() -> void: BuildPrewarm.run(preset),
+			true, "BuildPrewarm")
 	# Start OSM fetch now so it overlaps the staged timers below.
 	degraded.clear()
 	used_osm = false
@@ -269,6 +318,14 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		stage_data.emit(i, data)
 		stage_changed.emit(i, STAGES[i], "done")
 
+	# The prewarm must be done before the build thread reads those caches;
+	# waited frame by frame (its TerrainTextures save needs main flushes).
+	while _prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(_prewarm_task):
+		await get_tree().process_frame
+	_join_prewarm()
+	if _cancelled:
+		cancelled.emit()
+		return
 	progress_changed.emit(1.0, "Done")
 	data.data_notes = DataNotes.describe(degraded, data.quality_preset > RenderSettings.Preset.FAST)
 	finished.emit(data)
@@ -435,6 +492,7 @@ func _await_osm(data: LocationData) -> void:
 		var osm_attr := "Map data: © OpenStreetMap contributors"
 		data.attribution = osm_attr if data.attribution.is_empty() \
 			else data.attribution + " · " + osm_attr
+	_start_ground(data)
 	await _await_far_city(data)
 
 ## CHELSA climate normals (bounded wait; absent → latitude fallbacks).

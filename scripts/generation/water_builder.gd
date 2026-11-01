@@ -42,7 +42,8 @@ const _UNKNOWN_SHORE := Color(0.60, 0.56, 0.46)
 
 ## Water subtree: real surfaces, or an empty node when the place has
 ## no OSM water (polygons, waterways, coastline) at all.
-static func build_water(data: LocationData, ground: GroundTruth = null) -> Node3D:
+## `abort` stops it between rows / items; a stopped result is dropped.
+static func build_water(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var root := Node3D.new()
@@ -58,19 +59,35 @@ static func build_water(data: LocationData, ground: GroundTruth = null) -> Node3
 		return root
 	var mat := real_water_material(data.quality_preset)
 	var wl := ground.water_level_m
-	var levels := _poly_levels(data, ground, wl)
+	# Clip each water polygon once and reuse: _poly_levels and
+	# _add_polygon_surface previously clipped the same polygon twice via
+	# Geometry2D.intersect_polygons. Cache parts keyed by polygon index.
+	var clip_cache := {}
+	var levels := _poly_levels(data, ground, wl, clip_cache, abort)
+	if abort != null and abort.requested:
+		return root
 	for i in data.land_polygons.size():
+		if abort != null and abort.requested:
+			break
 		if levels.has(i):
 			_add_polygon_surface(root, data, data.land_polygons[i], mat,
-				float(levels[i]))
+				float(levels[i]), clip_cache, i, abort)
 	for w in channels:
-		_add_channel_ribbon(root, data, w, ground, mat, wl)
+		if abort != null and abort.requested:
+			break
+		_add_channel_ribbon(root, data, w, ground, mat, wl, abort)
+	if abort != null and abort.requested:
+		return root
 	if coast:
 		_add_sea_plane(root, mat, wl, ground)
 	else:
 		_add_datum_plane(root, mat, wl)
+	if abort != null and abort.requested:
+		return root
 	QuayBuilder.build(root, data, ground, channels, wl, levels)
-	_shore_aprons(root, data, ground, channels)
+	if abort != null and abort.requested:
+		return root
+	_shore_aprons(root, data, ground, channels, abort)
 	return root
 
 ## DEPRECATED (§7 V16, T3.4): the synthetic S-curve is deleted — this
@@ -155,23 +172,29 @@ static func _body_estimate(ground: GroundTruth, banks: Array, wl: float) -> Arra
 ## among the dry-estimated bodies their clipped bounds touch, so the
 ## pieces meet flush instead of stepping down to the datum.
 static func _poly_levels(data: LocationData, ground: GroundTruth,
-		wl: float) -> Dictionary:
+		wl: float, clip_cache: Dictionary = {}, abort: BuildAbort = null) -> Dictionary:
 	var step := _post_step(data)
 	var est := {}
 	var boxes := {}
 	for i in data.land_polygons.size():
+		if abort != null and abort.requested:
+			break
 		var poly: Dictionary = data.land_polygons[i]
 		if str(poly.get("class", "")) != "water":
 			continue
 		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
 		if pts.size() < 3:
 			continue
-		var parts := _clip_water_poly(pts)
+		var parts: Array = clip_cache.get(i, []) if clip_cache.has(i) else _clip_water_poly(pts)
+		if clip_cache.has(i) == false and not parts.is_empty():
+			clip_cache[i] = parts
 		if parts.is_empty():
 			continue
 		var banks: Array = []
 		var r := Rect2()
 		for k in parts.size():
+			if abort != null and abort.requested:
+				break
 			var part: PackedVector2Array = parts[k]
 			banks.append_array(_outside_samples(part,
 				maxf(step * 0.75, 1.0), step * 1.5))
@@ -181,8 +204,12 @@ static func _poly_levels(data: LocationData, ground: GroundTruth,
 		boxes[i] = r.grow(step * 2.0)
 	var out := {}
 	for i in est:
+		if abort != null and abort.requested:
+			break
 		out[i] = float(est[i][0])
 	for i in est:
+		if abort != null and abort.requested:
+			break
 		if bool(est[i][1]):
 			continue
 		for j in est:
@@ -194,6 +221,8 @@ static func _poly_levels(data: LocationData, ground: GroundTruth,
 	# at bank − freeboard sits under it (invisible; scorecard (d)). They
 	# rest just above their highest ground instead, like sub-post streams.
 	for i in est:
+		if abort != null and abort.requested:
+			break
 		var rr: Rect2 = (boxes[i] as Rect2).grow(-step * 2.0)
 		if maxf(rr.size.x, rr.size.y) >= step * 2.0:
 			continue
@@ -246,15 +275,18 @@ static func _outside_samples(ring: PackedVector2Array, stride: float,
 ## level. Clipped to the detailed extent (past the mesh the far field
 ## owns the water); holes subtract (islands stay land).
 static func _add_polygon_surface(root: Node3D, data: LocationData,
-		poly: Dictionary, mat: Material, body_level: float) -> void:
+		poly: Dictionary, mat: Material, body_level: float, clip_cache: Dictionary = {}, cache_key: int = -1, abort: BuildAbort = null) -> void:
 	var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
 	if pts.size() < 3:
 		return
 	var step := _post_step(data)
 	var holes: Array = poly.get("holes", [])
 	var level := body_level + _POLY_LIFT
-	for part in _clip_water_poly(pts):
-		WaterSurface.add_polygon(root, part, holes, level, step, mat)
+	var parts: Array = clip_cache.get(cache_key, []) if cache_key >= 0 and clip_cache.has(cache_key) else _clip_water_poly(pts)
+	for part in parts:
+		if abort != null and abort.requested:
+			break
+		WaterSurface.add_polygon(root, part, holes, level, step, mat, abort)
 
 ## Water polygon intersected with the detailed extent (past the mesh
 ## the far field owns the water).
@@ -273,7 +305,7 @@ static func _clip_water_poly(pts: PackedVector2Array) -> Array:
 ## honest carve is sub-post, so a flat ribbon would bury).
 static func _add_channel_ribbon(root: Node3D, data: LocationData,
 		w: Dictionary, ground: GroundTruth, mat: Material,
-		wl: float) -> void:
+		wl: float, abort: BuildAbort = null) -> void:
 	var pts: PackedVector2Array = w.get("points", PackedVector2Array())
 	var half := float(w.get("width_m", 0.0)) * 0.5 \
 		* WorldScale.metres_to_units()
@@ -283,6 +315,8 @@ static func _add_channel_ribbon(root: Node3D, data: LocationData,
 	var bound := WorldScale.detailed_extent_units() * 0.5 + half + 2.0
 	var draped := half < step * 0.25
 	for run in _clip_runs(pts, bound):
+		if abort != null and abort.requested:
+			break
 		var line := _resample(run, maxf(step * 0.5, 1.0))
 		if line.size() < 2:
 			continue
@@ -299,7 +333,7 @@ static func _add_channel_ribbon(root: Node3D, data: LocationData,
 			level = _body_level(ground,
 				_outside_samples(line, maxf(step * 0.75, 1.0),
 					half + step * 0.75, false), wl) + _RIBBON_LIFT
-		WaterSurface.add_ribbon(root, line, half, ground, level, draped, mat)
+		WaterSurface.add_ribbon(root, line, half, ground, level, draped, mat, 0.05, abort)
 
 static func _mostly_in_water_polys(line: PackedVector2Array,
 		ground: GroundTruth) -> bool:
@@ -404,8 +438,8 @@ static func _coastlines(data: LocationData) -> Array:
 	return ShoreApron._coastlines(data)
 
 static func _shore_aprons(root: Node3D, data: LocationData,
-		ground: GroundTruth, channels: Array) -> void:
-	ShoreApron._shore_aprons(root, data, ground, channels)
+		ground: GroundTruth, channels: Array, abort: BuildAbort = null) -> void:
+	ShoreApron._shore_aprons(root, data, ground, channels, abort)
 
 static func bridge_ways_over_water(data: LocationData, ground: GroundTruth = null) -> Array:
 	return ShoreApron.bridge_ways_over_water(data, ground)

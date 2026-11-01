@@ -175,25 +175,124 @@ static func drape_bytes(data: LocationData) -> Array:
 
 func _from_drapes(data: LocationData) -> void:
 	var bytes := drape_bytes(data)
-	var feats := {}
+	# Per-row/column drape UVs: U depends only on X (lon), V only on Z (lat),
+	# so col/row UVs are computed once and reused for every cell.
+	var xs := PackedFloat32Array()
+	xs.resize(n)
+	for i in n:
+		xs[i] = (float(i - half) + 0.5) * CELL_M
+	var zs := PackedFloat32Array()
+	zs.resize(n)
+	for j in n:
+		zs[j] = (float(j - half) + 0.5) * CELL_M
+	var infos: Array = []
+	for di in data.far_drapes.size():
+		var d: Dictionary = data.far_drapes[di]
+		var img: Variant = d.get("image", null)
+		if not (img is Image):
+			continue
+		var w := (img as Image).get_width()
+		var h := (img as Image).get_height()
+		var origin: Vector2 = d.get("origin_px", Vector2.ZERO)
+		var size_px: Vector2i = d.get("size_px", Vector2i(w, h))
+		var zoom := int(d.get("zoom", 0))
+		var mpp := DemFetcher.metres_per_px(data.latitude, zoom)
+		var step := CELL_M / float(SAMPLES) / maxf(mpp, 0.01)
+		var col_uv := PackedFloat32Array()
+		col_uv.resize(n)
+		for i in n:
+			var ll := WorldScale.latlon_from_xz(xs[i], 0.0, data.latitude, data.longitude)
+			var px := TileFetcher.global_pixel(ll.x, ll.y, zoom)
+			col_uv[i] = (px.x - origin.x) / float(maxi(size_px.x, 1))
+		var row_uv := PackedFloat32Array()
+		row_uv.resize(n)
+		for j in n:
+			var ll2 := WorldScale.latlon_from_xz(0.0, zs[j], data.latitude, data.longitude)
+			var py := TileFetcher.global_pixel(ll2.x, ll2.y, zoom)
+			row_uv[j] = (py.y - origin.y) / float(maxi(size_px.y, 1))
+		var buf: PackedByteArray = bytes[di] if di < bytes.size() else PackedByteArray()
+		infos.append({"di": di, "w": w, "h": h, "step": step,
+			"col_uv": col_uv, "row_uv": row_uv, "buf": buf})
 	var ls := {}
 	var gs := {}
 	var r2 := RADIUS_M * RADIUS_M
+	var l_vals := PackedFloat64Array()
+	l_vals.resize(n * n)
+	var g_vals := PackedFloat64Array()
+	g_vals.resize(n * n)
+	var std_vals := PackedFloat64Array()
+	std_vals.resize(n * n)
+	var br_vals := PackedFloat64Array()
+	br_vals.resize(n * n)
+	var drape_of := PackedByteArray()
+	drape_of.resize(n * n)
+	var has_feat := PackedByteArray()
+	has_feat.resize(n * n)
 	for j in n:
+		var zf := zs[j]
 		for i in n:
-			var c := centre(i, j)
-			if c.length_squared() > r2:
+			var xf := xs[i]
+			if xf * xf + zf * zf > r2:
 				continue
-			var p := probe(data, bytes, c.x, c.y, CELL_M)
-			if p.is_empty():
+			var found_di := -1
+			var fl := 0.0
+			var fg := 0.0
+			var fstd := 0.0
+			var fbr := 0.0
+			for info in infos:
+				var cuv: float = (info["col_uv"] as PackedFloat32Array)[i]
+				if cuv <= 0.0 or cuv >= 1.0:
+					continue
+				var ruv: float = (info["row_uv"] as PackedFloat32Array)[j]
+				if ruv <= 0.0 or ruv >= 1.0:
+					continue
+				var w2: int = info["w"]
+				var h2: int = info["h"]
+				var step2: float = info["step"]
+				var buf2: PackedByteArray = info["buf"]
+				if buf2.is_empty():
+					continue
+				var px0 := cuv * float(w2) - step2 * 2.0
+				var pz0 := ruv * float(h2) - step2 * 2.0
+				var sl := 0.0
+				var sl2 := 0.0
+				var sg := 0.0
+				var sbr := 0.0
+				for sj in SAMPLES:
+					var pz := clampi(int(pz0 + step2 * float(sj)), 0, h2 - 1)
+					for si in SAMPLES:
+						var px := clampi(int(px0 + step2 * float(si)), 0, w2 - 1)
+						var o := (pz * w2 + px) * 3
+						var rcol := float(buf2[o]) / 255.0
+						var gcol := float(buf2[o + 1]) / 255.0
+						var bcol := float(buf2[o + 2]) / 255.0
+						var lcol := 0.299 * rcol + 0.587 * gcol + 0.114 * bcol
+						sl += lcol
+						sl2 += lcol * lcol
+						sg += gcol - (rcol + bcol) * 0.5
+						sbr += bcol - rcol
+				var k2 := float(SAMPLES * SAMPLES)
+				var mean2 := sl / k2
+				fl = mean2
+				fg = sg / k2
+				fstd = sqrt(maxf(sl2 / k2 - mean2 * mean2, 0.0))
+				fbr = sbr / k2
+				found_di = int(info["di"])
+				break
+			if found_di < 0:
 				continue
-			feats[index(i, j)] = p
-			var di := int(p["drape"])
-			if not ls.has(di):
-				ls[di] = []
-				gs[di] = []
-			(ls[di] as Array).append(float(p["l"]))
-			(gs[di] as Array).append(float(p["g"]))
+			var kidx := j * n + i
+			l_vals[kidx] = fl
+			g_vals[kidx] = fg
+			std_vals[kidx] = fstd
+			br_vals[kidx] = fbr
+			drape_of[kidx] = found_di
+			has_feat[kidx] = 1
+			if not ls.has(found_di):
+				ls[found_di] = []
+				gs[found_di] = []
+			(ls[found_di] as Array).append(fl)
+			(gs[found_di] as Array).append(fg)
 	var l0 := {}
 	var g0 := {}
 	for di in ls:
@@ -201,14 +300,15 @@ func _from_drapes(data: LocationData) -> void:
 		g0[di] = _median(gs[di])
 	var raw := PackedFloat32Array()
 	raw.resize(n * n)
-	for k in feats:
-		var p: Dictionary = feats[k]
-		var di := int(p["drape"])
-		var cover := cover_of(float(p["l"]), float(p["g"]), l0[di], g0[di],
-			float(p["br"]))
+	for k in n * n:
+		if has_feat[k] == 0:
+			continue
+		var di := int(drape_of[k])
+		var cover := cover_of(float(l_vals[k]), float(g_vals[k]), l0[di], g0[di],
+			float(br_vals[k]))
 		blocked[k] = cover
 		if cover == 0:
-			raw[k] = built_score(float(p["l"]), float(p["g"]), float(p["std"]),
+			raw[k] = built_score(float(l_vals[k]), float(g_vals[k]), float(std_vals[k]),
 				l0[di], g0[di])
 	# 3x3 smoothing (blocked cells stay 0): settlements are contiguous,
 	# a lone grey cluster in a field is not a town.

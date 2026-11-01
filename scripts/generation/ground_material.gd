@@ -97,10 +97,15 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("near_m", NEAR_M)
 	m.set_shader_parameter("far_m", FAR_M)
 	m.set_shader_parameter("lum_floor", LUM_FLOOR)
-	var gain := photo_gain(photo, photo_rect) if has_sat else 1.0
+	# The mosaic's CPU copy (the image the texture was made from) instead
+	# of photo.get_image(), a GPU read-back that stalls the build thread.
+	var img: Image = null
+	if has_sat:
+		img = data.satellite_image if data.satellite_image != null else _image_of(photo)
+	var gain := photo_gain_image(img, photo_rect) if has_sat else 1.0
 	m.set_shader_parameter("photo_gain", gain)
 	m.set_shader_parameter("ground_max_low",
-		ground_ceiling(photo, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
+		ground_ceiling_image(img, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
 	m.set_shader_parameter("lf_lod", lf_lod(data) if has_sat else 0.0)
 	# Unmapped non-green ground: settled places read as pavement,
 	# wild high-relief places as bare earth/rock (v1 settled rule).
@@ -139,13 +144,8 @@ static func lf_lod(data: LocationData) -> float:
 
 ## One achromatic gain taking the photo's mean linear luminance over
 ## the detailed extent to GAIN_TARGET (clamped 1.0–1.9: lift only).
-static func photo_gain(photo: Texture2D, rect: Rect2) -> float:
-	if photo == null:
-		return 1.0
-	var img := photo.get_image()
-	if img == null or img.is_empty():
-		return 1.0
-	if img.is_compressed():
+static func photo_gain_image(img: Image, rect: Rect2) -> float:
+	if img == null or img.is_empty() or img.is_compressed():
 		return 1.0
 	var w := img.get_width()
 	var h := img.get_height()
@@ -162,18 +162,15 @@ static func photo_gain(photo: Texture2D, rect: Rect2) -> float:
 	var mean := sum / float(maxi(n, 1))
 	return clampf(GAIN_TARGET / maxf(mean, 0.01), 1.0, 1.9)
 
-## Ceiling for bare-ground luminance at this place: the 90th percentile
-## of the photo's own luminance (after `gain`) over open ground — unmapped,
-## urban, path and sand texels of the class map — so pale desert soil or
-## white quay stone keeps its value and a dark-paved city is not lifted
-## to a generic figure. Falls back to GROUND_CEILING with no readable
-## photo or too few open-ground samples.
-static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
-		cmap: Image) -> float:
-	if photo == null or cmap == null:
-		return GROUND_CEILING
-	var img := photo.get_image()
-	if img == null or img.is_empty() or img.is_compressed():
+## photo_gain_image over the texture's own (read-back) image.
+static func photo_gain(photo: Texture2D, rect: Rect2) -> float:
+	return photo_gain_image(_image_of(photo), rect)
+
+static func _image_of(photo: Texture2D) -> Image:
+	return photo.get_image() if photo != null else null
+
+static func ground_ceiling_image(img: Image, rect: Rect2, gain: float, cmap: Image) -> float:
+	if img == null or img.is_empty() or img.is_compressed() or cmap == null:
 		return GROUND_CEILING
 	var w := img.get_width()
 	var h := img.get_height()
@@ -196,6 +193,16 @@ static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
 	lums.sort()
 	return clampf(lums[int(CEILING_PERCENTILE * float(lums.size() - 1))],
 		CEILING_MIN, CEILING_MAX)
+
+## Ceiling for bare-ground luminance at this place: the 90th percentile
+## of the photo's own luminance (after `gain`) over open ground — unmapped,
+## urban, path and sand texels of the class map — so pale desert soil or
+## white quay stone keeps its value and a dark-paved city is not lifted
+## to a generic figure. Falls back to GROUND_CEILING with no readable
+## photo or too few open-ground samples.
+static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
+		cmap: Image) -> float:
+	return ground_ceiling_image(_image_of(photo), rect, gain, cmap)
 
 ## Per-class lookup, 32 x 4 RGBA8 (nearest):
 ## row 0 detail weights (pavement, lawn, rocky ground, asphalt);

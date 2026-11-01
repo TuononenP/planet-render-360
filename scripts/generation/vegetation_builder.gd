@@ -32,7 +32,8 @@ const IMPOSTOR_FACTOR := 6
 static var last_stats: Dictionary = {}
 
 ## Vegetation subtree: real trees + land-cover fill + street props.
-static func build_vegetation(data: LocationData, ground: GroundTruth = null) -> Node3D:
+## `abort` stops it between rows / items; a stopped result is dropped.
+static func build_vegetation(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var t0 := Time.get_ticks_msec()
@@ -41,11 +42,17 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null) -> 
 	var ctx := _context(data, ground)
 	var mask := VegetationMask.new(data, ground)
 	var plan := {"pos": [], "sp": [], "scale": [], "real": []}
-	_plant_osm_trees(plan, data, ground, mask, ctx)
-	_fill_cover(plan, data, ground, mask, ctx)
+	_plant_osm_trees(plan, data, ground, mask, ctx, abort)
+	if abort != null and abort.requested:
+		return root
+	_fill_cover(plan, data, ground, mask, ctx, abort)
+	if abort != null and abort.requested:
+		return root
 	var fallback := data.trees.is_empty() and mask.green.is_empty()
 	if fallback:
-		_fallback_scatter(plan, data, ground, mask, ctx)
+		_fallback_scatter(plan, data, ground, mask, ctx, abort)
+		if abort != null and abort.requested:
+			return root
 	var stats := _emit(root, plan, ctx)
 	stats["fallback"] = fallback
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
@@ -122,8 +129,10 @@ static func _species_at(x: float, z: float, setting: String, ground: GroundTruth
 # --- Real OSM trees ------------------------------------------------------
 
 static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: GroundTruth,
-		mask: VegetationMask, ctx: Dictionary) -> void:
+		mask: VegetationMask, ctx: Dictionary, abort: BuildAbort = null) -> void:
 	for t in data.trees:
+		if abort != null and abort.requested:
+			break
 		if not (t is Dictionary):
 			continue
 		var x := float(t.get("x", 0.0))
@@ -152,7 +161,7 @@ static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: Groun
 ## impostor budget with proportionally broader crowns so the canopy
 ## still reads closed.
 static func _fill_cover(plan: Dictionary, data: LocationData, ground: GroundTruth,
-		mask: VegetationMask, ctx: Dictionary) -> void:
+		mask: VegetationMask, ctx: Dictionary, abort: BuildAbort = null) -> void:
 	if mask.green.is_empty():
 		return
 	var m2u: float = ctx["m2u"]
@@ -179,11 +188,13 @@ static func _fill_cover(plan: Dictionary, data: LocationData, ground: GroundTrut
 	var s_near := maxf(FOREST_SPACING_M, sqrt(near_a / near_cap)) if near_a > 0.0 else FOREST_SPACING_M
 	var s_far := maxf(FOREST_SPACING_M * 1.3, sqrt(far_a / (float(budget * IMPOSTOR_FACTOR) * 0.8))) if far_a > 0.0 else 12.0
 	ctx["forest_spacing"] = [s_near, s_far]
-	_fill_band(plan, ground, mask, ctx, s_near, 0.0, mid_u)
-	_fill_band(plan, ground, mask, ctx, s_far, mid_u, INF)
+	_fill_band(plan, ground, mask, ctx, s_near, 0.0, mid_u, abort)
+	if abort != null and abort.requested:
+		return
+	_fill_band(plan, ground, mask, ctx, s_far, mid_u, INF, abort)
 
 static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMask,
-		ctx: Dictionary, spacing_m: float, r_in: float, r_out: float) -> void:
+		ctx: Dictionary, spacing_m: float, r_in: float, r_out: float, abort: BuildAbort = null) -> void:
 	var m2u: float = ctx["m2u"]
 	var s := spacing_m * m2u
 	var lim := minf(r_out, mask.half * 1.42)
@@ -192,6 +203,8 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 	var dens_scale := (spacing_m / FOREST_SPACING_M) * (spacing_m / FOREST_SPACING_M)
 	var noise: FastNoiseLite = ctx["noise"]
 	for gz in range(-steps, steps + 1):
+		if abort != null and abort.requested:
+			break
 		for gx in range(-steps, steps + 1):
 			var x := (float(gx) + (_hash(gx, gz, 1.0) - 0.5) * 0.8) * s
 			var z := (float(gz) + (_hash(gx, gz, 2.0) - 0.5) * 0.8) * s
@@ -257,7 +270,7 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 ## Absence fallback (no OSM trees and no green land cover at all): the
 ## v1 count of trees scattered off buildings/roads/water.
 static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: GroundTruth,
-		mask: VegetationMask, ctx: Dictionary) -> void:
+		mask: VegetationMask, ctx: Dictionary, abort: BuildAbort = null) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 21
 	var urban := not data.buildings.is_empty() or data.relief_metres < 120.0
@@ -265,6 +278,8 @@ static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: Grou
 	var m2u: float = ctx["m2u"]
 	var r_max := ground.extent_m * 0.93 * m2u
 	for i in count:
+		if abort != null and abort.requested:
+			break
 		var ang := rng.randf_range(0.0, TAU)
 		var dist := rng.randf_range(60.0 * m2u, r_max)
 		var x := cos(ang) * dist

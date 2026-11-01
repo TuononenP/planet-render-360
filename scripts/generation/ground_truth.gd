@@ -58,6 +58,7 @@ var _step_units: float = 1.0
 var _half_units: float = 0.0
 var _land: Array = []
 var _land_index: Array = []  # PolygonIndex per _land entry, same order
+var _index = null  # GroundIndex, untyped to break load cycle
 var _buildings: Array = []
 ## Local water surface per post (render units) for posts a water body
 ## or channel carved; -INF = no carve (water_level_at falls back to the
@@ -85,6 +86,16 @@ func set_land(polys: Array) -> void:
 	for poly in _land:
 		_land_index.append(PolygonIndex.new(
 			poly.get("points", PackedVector2Array()), poly.get("holes", [])))
+	_rebuild_index()
+
+func _rebuild_index() -> void:
+	if _land.is_empty() and _buildings.is_empty():
+		_index = null
+		return
+	# Only build GroundIndex when we have a size (post-_init or WorldCache restore).
+	if _size > 0 or not _land.is_empty():
+		var _gi = load("res://scripts/generation/ground_index.gd") as GDScript
+		_index = _gi.new(self)
 
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
@@ -110,10 +121,59 @@ func _init(data: LocationData) -> void:
 	var frac := _extent_span_frac(data)
 	var geo := DemRegistration.applies(data) and frac < 0.9999
 	var step_m := _step_units / WorldScale.metres_to_units()
-	for z in size:
+	if geo:
+		# Per-axis tables: grid_index x depends only on x (lon), z only on lat.
+		var tx := PackedFloat32Array()
+		var tz := PackedFloat32Array()
+		tx.resize(size)
+		tz.resize(size)
+		# grid_index is separable (latlon_from_xz: lat from z only, lon from
+		# x only, cos of the viewpoint's latitude), so one column/row call
+		# yields the exact float32 index the per-post call returns.
+		var grid := data.grid_size
 		for x in size:
-			_surface[z * size + x] = _grid_bilinear(data, DemRegistration.grid_index(
-				data, size, step_m, x, z)) if geo else _resampled_height(data, size, frac, x, z)
+			tx[x] = DemRegistration.grid_index(data, size, step_m, x, 0).x
+		for z in size:
+			tz[z] = DemRegistration.grid_index(data, size, step_m, 0, z).y
+		# Bilinear with 4 direct reads + 3 lerps, same as _grid_bilinear.
+		for z in size:
+			var fz := clampf(tz[z], 0.0, float(grid - 1))
+			var z0 := mini(int(fz), grid - 2)
+			var tz_w := fz - float(z0)
+			for x in size:
+				var fx := clampf(tx[x], 0.0, float(grid - 1))
+				var x0 := mini(int(fx), grid - 2)
+				var tx_w := fx - float(x0)
+				var a := lerpf(data.height_at(x0, z0), data.height_at(x0 + 1, z0), tx_w)
+				var b := lerpf(data.height_at(x0, z0 + 1), data.height_at(x0 + 1, z0 + 1), tx_w)
+				_surface[z * size + x] = lerpf(a, b, tz_w)
+	elif frac >= 0.9999:
+		# 1:1 fast path — bit-identical to v1, no remap.
+		for z in size:
+			for x in size:
+				_surface[z * size + x] = data.height_at(x, z)
+	else:
+		# Central sub-window bilinear via per-axis tables.
+		var half := float(size) * 0.5
+		var fx_table := PackedFloat32Array()
+		var fz_table := PackedFloat32Array()
+		fx_table.resize(size)
+		fz_table.resize(size)
+		for x in size:
+			fx_table[x] = clampf((float(x) - half) * frac + half, 0.0, float(size - 1))
+		for z in size:
+			fz_table[z] = clampf((float(z) - half) * frac + half, 0.0, float(size - 1))
+		for z in size:
+			var fz2 := fz_table[z]
+			var z0 := mini(int(fz2), size - 2)
+			var tz2 := fz2 - float(z0)
+			for x in size:
+				var fx2 := fx_table[x]
+				var x0 := mini(int(fx2), size - 2)
+				var tx2 := fx2 - float(x0)
+				var a := lerpf(data.height_at(x0, z0), data.height_at(x0 + 1, z0), tx2)
+				var b := lerpf(data.height_at(x0, z0 + 1), data.height_at(x0 + 1, z0 + 1), tx2)
+				_surface[z * size + x] = lerpf(a, b, tz2)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	_blur_pass(_surface, tmp, size)
@@ -164,6 +224,8 @@ func _init(data: LocationData) -> void:
 	for h2 in _surface:
 		surface_min = minf(surface_min, h2)
 		surface_max = maxf(surface_max, h2)
+	# Build eager spatial index now that _surface/_level are final (read-only thereafter).
+	_rebuild_index()
 
 ## Width-aware channel carve for OSM waterway lines (T3.4, contract
 ## §2.6/§3): posts near a centreline dip toward water_level_m - 0.7
@@ -386,18 +448,52 @@ static func _blur_pass(src: PackedFloat32Array, dst: PackedFloat32Array,
 	var inv := 1.0 / (EDGE_SIGMA_M * EDGE_SIGMA_M)
 	for z in size:
 		for x in size:
-			var c := _clamped_post(src, size, x, z)
-			var sum := c * 2.0
-			var n := 2.0
-			for dz in [-1, 0, 1]:
-				for dx in [-1, 0, 1]:
-					if dx == 0 and dz == 0:
-						continue
-					var h := _clamped_post(src, size, x + dx, z + dz)
-					var w := exp(-(h - c) * (h - c) * inv)
-					sum += h * w
-					n += w
-			dst[z * size + x] = sum / n
+			# Interior fast path — no clamp calls, same dz,dx order.
+			if x > 0 and x < size - 1 and z > 0 and z < size - 1:
+				var c := src[z * size + x]
+				var sum := c * 2.0
+				var n := 2.0
+				# dz=-1: dx=-1,0,1
+				var h := src[(z - 1) * size + (x - 1)]
+				var w := exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				h = src[(z - 1) * size + x]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				h = src[(z - 1) * size + (x + 1)]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				# dz=0: dx=-1,1
+				h = src[z * size + (x - 1)]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				h = src[z * size + (x + 1)]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				# dz=1: dx=-1,0,1
+				h = src[(z + 1) * size + (x - 1)]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				h = src[(z + 1) * size + x]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				h = src[(z + 1) * size + (x + 1)]
+				w = exp(-(h - c) * (h - c) * inv)
+				sum += h * w; n += w
+				dst[z * size + x] = sum / n
+			else:
+				var c := _clamped_post(src, size, x, z)
+				var sum := c * 2.0
+				var n := 2.0
+				for dz in [-1, 0, 1]:
+					for dx in [-1, 0, 1]:
+						if dx == 0 and dz == 0:
+							continue
+						var h := _clamped_post(src, size, x + dx, z + dz)
+						var w := exp(-(h - c) * (h - c) * inv)
+						sum += h * w
+						n += w
+				dst[z * size + x] = sum / n
 
 static func _clamped_post(src: PackedFloat32Array, size: int, x: int,
 		z: int) -> float:
@@ -467,6 +563,12 @@ func water_level_at(x: float, z: float) -> float:
 ## below carries the v1 building circle test exactly.
 func land_class_at(x: float, z: float) -> String:
 	var p := Vector2(x, z)
+	if _index != null:
+		var cands: Array = _index.land_candidates_at(x, z)
+		for idx in cands:
+			if (_land_index[idx] as PolygonIndex).contains(p):
+				return str(_land[idx].get("class", ""))
+		return ""
 	for k in _land.size():
 		if (_land_index[k] as PolygonIndex).contains(p):
 			return str(_land[k].get("class", ""))
@@ -492,6 +594,24 @@ func is_inside(x: float, z: float) -> bool:
 ## test (max footprint half-size + 1.6 margin), so vegetation and
 ## infill exclusion sample ground instead of cross-calling builders.
 func is_built_at(x: float, z: float) -> bool:
+	if _index != null:
+		var cands: Array = _index.built_candidates_at(x, z)
+		if not cands.is_empty():
+			for b in cands:
+				if not (b is Dictionary):
+					continue
+				var dx := x - float(b.get("x", 0.0))
+				var dz := z - float(b.get("z", 0.0))
+				var reach := maxf(float(b.get("size_x", 0.0)),
+					float(b.get("size_z", 0.0))) * 0.5 + 1.6
+				if dx * dx + dz * dz < reach * reach:
+					return true
+			return false
+		# Empty cell but inside grid = definitely not built.
+		if _index._built_grid_w > 0 and _index._built_grid_h > 0:
+			if x >= _index._built_grid_origin.x and x <= _index._built_grid_origin.x + float(_index._built_grid_w) * _index._built_grid_step.x \
+					and z >= _index._built_grid_origin.y and z <= _index._built_grid_origin.y + float(_index._built_grid_h) * _index._built_grid_step.y:
+				return false
 	for b in _buildings:
 		if not (b is Dictionary):
 			continue

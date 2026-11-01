@@ -40,28 +40,39 @@ static var _party: PartyWalls = null
 ## Last build's census: {real, impostors, infill, far_blocks, far_towers}.
 static var last_stats: Dictionary = {}
 
+## Set by WorldBuildGraph, which clears the facade/mass caches itself
+## before its tasks start, so no task's cache entries are lost mid-build.
+static var _suppress_begin_build := false
+
 ## Buildings subtree: real OSM extrusions (+ impostors past the cap),
 ## absence-only infill, and the real-data far city.
-static func build_buildings(data: LocationData, ground: GroundTruth = null) -> Node3D:
+static func build_buildings(data: LocationData, ground: GroundTruth = null,
+		abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
-	FacadeMaterials.begin_build()
-	BuildingMasses.begin_build()
+	if not _suppress_begin_build:
+		FacadeMaterials.begin_build()
+		BuildingMasses.begin_build()
 	last_stats = {"real": 0, "impostors": 0, "infill": 0}
 	var root := Node3D.new()
 	root.name = "Buildings"
 	var smap := SettlementMap.build(data)
 	if not data.buildings.is_empty():
-		_real_buildings(root, data, ground)
+		_real_buildings(root, data, ground, abort)
+		if abort != null and abort.requested:
+			return root
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
-	_buildings(root, data, ground, smap)
+	_buildings(root, data, ground, smap, abort)
+	if abort != null and abort.requested:
+		return root
 	FarCityBuilder.build(root, data, ground, smap)
+	FacadeTextures.end_build()
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
 	return root
 
 static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
-		smap: SettlementMap = null) -> void:
+		smap: SettlementMap = null, abort: BuildAbort = null) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = data.seed_value + 7
 	var ctx := _height_context(data)
@@ -70,6 +81,8 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 	# 2x the preset count, in a 9-98 ring: the foreground roofscape
 	# must reach the frame bottom (PRD §4.2), not start past a hole.
 	for i in RenderSettings.procedural_buildings_for(data.quality_preset) * 2:
+		if abort != null and abort.requested:
+			break
 		var angle := rng.randf_range(0.0, TAU)
 		var dist := 60.0 + pow(rng.randf(), 0.75) * 332.0
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
@@ -116,7 +129,7 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
-static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
+static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	var sorted := data.buildings.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
@@ -138,6 +151,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		func(b: Dictionary) -> bool:
 			return _accepted(data, b, site, edge) and not _in_open_water(ground, b))
 	for b in sorted:
+		if abort != null and abort.requested:
+			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
 		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
 			continue
@@ -298,11 +313,13 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		> MaterialLibrary.full_detail_radius_m(fidelity)
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
-	# Roof sampling spans the ring's AABB so the mosaic read covers it.
-	var bb := RingGeometry.aabb(ring)
-	var hint := MaterialLibrary.sampled_roof_color(data,
-		centre.x, centre.y, bb.size.x, bb.size.y,
-		Callable(TerrainBuilder, "satellite_uv"))
+	# Roof sampling spans the ring's AABB — skip for distant where never read.
+	var hint := Color(0, 0, 0, 0)
+	if not distant:
+		var bb := RingGeometry.aabb(ring)
+		hint = MaterialLibrary.sampled_roof_color(data,
+			centre.x, centre.y, bb.size.x, bb.size.y,
+			Callable(TerrainBuilder, "satellite_uv"))
 	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
 		hint, fidelity, distant, seed_v, look)
 	# Tile repeats follow the real storey count, kept within ~30% of the

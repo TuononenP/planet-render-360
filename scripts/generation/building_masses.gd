@@ -21,14 +21,19 @@ const INHERITED_ROOF_KEYS: Array[String] = ["roof_shape", "roof_colour",
 	"roof_material", "roof_height_m", "roof_levels"]
 
 static var _plans: Dictionary = {}
+static var _mutex := Mutex.new()
 
 static func begin_build() -> void:
+	_mutex.lock()
 	_plans.clear()
+	_mutex.unlock()
 
 ## Releases the plans (each holds a copy of its building's tags) once the
 ## city is built; nothing reads them after the build.
 static func end_build() -> void:
+	_mutex.lock()
 	_plans.clear()
+	_mutex.unlock()
 
 ## Stable identity of a mass: its centroid (internal units).
 static func key_of(x: float, z: float) -> String:
@@ -43,8 +48,12 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	if fp0 is PackedVector2Array and not (fp0 as PackedVector2Array).is_empty():
 		var f := fp0 as PackedVector2Array
 		ck += "|%d|%s" % [f.size(), key_of(f[0].x, f[0].y)]
+	_mutex.lock()
 	if _plans.has(ck):
-		return _plans[ck] as Array
+		var cached: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
 	var out: Array = []
 	var look := BuildingHeights._look_for(b, ctx)
 	var parent_res := BuildingHeights._resolve_total(b, b, ctx, {}, look)
@@ -154,7 +163,13 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
 			"main": mi == main_mass, "look": look})
+	_mutex.lock()
+	if _plans.has(ck):
+		var raced: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return raced
 	_plans[ck] = out
+	_mutex.unlock()
 	return out
 
 ## Index of the largest footprint: roofline detail goes on it only (a

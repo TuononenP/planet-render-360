@@ -84,7 +84,7 @@ static func _commit(root: Node3D, verts: PackedVector3Array,
 ## also replaces the v1 half-post block grid for holed polygons, so
 ## islands keep their real outline.
 static func add_polygon(root: Node3D, part: PackedVector2Array,
-		holes: Array, level: float, step: float, mat: Material) -> void:
+		holes: Array, level: float, step: float, mat: Material, abort: BuildAbort = null) -> void:
 	if part.size() < 3:
 		return
 	var rim_sp := maxf(step * 0.5, 0.5)
@@ -120,6 +120,8 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var rim_count := pts.size()
 	var z: float = bb[1] + grid * 0.5
 	while z < bb[3]:
+		if abort != null and abort.requested:
+			return
 		var x: float = bb[0] + grid * 0.5
 		while x < bb[2]:
 			var c := Vector2(x, z)
@@ -164,7 +166,7 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 ## hug the ground + 0.06; others sit flat at `level`.
 static func add_ribbon(root: Node3D, line: PackedVector2Array,
 		half: float, ground: GroundTruth, level: float, draped: bool,
-		mat: Material, lift: float = 0.05) -> void:
+		mat: Material, lift: float = 0.05, abort: BuildAbort = null) -> void:
 	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
 	var mid_open := clampf(half / maxf(ramp, 0.001), 0.0, 1.0)
 	var mid_shore := clampf(half / (SHORE_M * WorldScale.metres_to_units()), 0.0, 1.0)
@@ -175,6 +177,8 @@ static func add_ribbon(root: Node3D, line: PackedVector2Array,
 	var flow := PackedVector2Array()
 	var indices := PackedInt32Array()
 	for i in line.size():
+		if abort != null and abort.requested:
+			return
 		var prev := line[maxi(i - 1, 0)]
 		var next := line[mini(i + 1, line.size() - 1)]
 		var dir := next - prev
@@ -210,18 +214,22 @@ static func add_ribbon(root: Node3D, line: PackedVector2Array,
 ## the DEM's dry posts) for the shallow tint, surf and foam, and the sea
 ## flag for swell. `cells` quads per side.
 static func add_sea_grid(root: Node3D, ground: GroundTruth, level: float,
-		mat: Material, cells: int = 192) -> void:
+		mat: Material, cells: int = 192, abort: BuildAbort = null) -> void:
 	var n := cells + 1
 	var e := WorldScale.detailed_extent_units()
 	var stp := e / float(cells)
 	var dist := PackedFloat32Array()
 	dist.resize(n * n)
 	for j in n:
+		if abort != null and abort.requested:
+			return
 		for i in n:
 			var x := -e * 0.5 + float(i) * stp
 			var z := -e * 0.5 + float(j) * stp
 			dist[j * n + i] = 0.0 if ground.height_at_world(x, z) > level + 0.25 else 1e9
-	_chamfer(dist, n, stp)
+	_chamfer(dist, n, stp, abort)
+	if abort != null and abort.requested:
+		return
 	# The sea shelf shades over ~150 m, not a river's 30 m.
 	var ramp := OPEN_RAMP_M * SEA_RAMP_SCALE * WorldScale.metres_to_units()
 	var shore_u := SHORE_M * WorldScale.metres_to_units()
@@ -243,10 +251,12 @@ static func add_sea_grid(root: Node3D, ground: GroundTruth, level: float,
 	_commit(root, verts, colors, indices, mat)
 
 ## Two-pass chamfer distance (units) to the zero cells, in place.
-static func _chamfer(d: PackedFloat32Array, n: int, stp: float) -> void:
+static func _chamfer(d: PackedFloat32Array, n: int, stp: float, abort: BuildAbort = null) -> void:
 	var a := stp
 	var b := stp * 1.4142
 	for j in n:
+		if abort != null and abort.requested:
+			return
 		for i in n:
 			var k := j * n + i
 			var v := d[k]
@@ -260,6 +270,8 @@ static func _chamfer(d: PackedFloat32Array, n: int, stp: float) -> void:
 					v = minf(v, d[k - n + 1] + b)
 			d[k] = v
 	for j in range(n - 1, -1, -1):
+		if abort != null and abort.requested:
+			return
 		for i in range(n - 1, -1, -1):
 			var k := j * n + i
 			var v := d[k]

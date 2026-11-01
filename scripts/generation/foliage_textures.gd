@@ -26,6 +26,7 @@ const LEAF_SIZE := 1024
 const BARK_SIZE := Vector2i(512, 1024)
 
 static var _textures: Dictionary = {}
+static var _mutex := Mutex.new()
 
 ## Leaf atlas texture (RGBA, coverage-preserving mipmaps).
 static func leaf(kind: String) -> Texture2D:
@@ -39,8 +40,12 @@ static func bark_normal(kind: String) -> Texture2D:
 	return _cached("bark_" + kind + "_n", func() -> Image: return paint_bark(kind, 0.5)[1], false)
 
 static func _cached(name: String, painter: Callable, alpha_cut: bool) -> Texture2D:
+	_mutex.lock()
 	if _textures.has(name):
-		return _textures[name] as Texture2D
+		var cached: Texture2D = _textures[name] as Texture2D
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
 	var img: Image = null
 	var path := DIR + name + ".png"
 	if FileAccess.file_exists(path):
@@ -53,7 +58,13 @@ static func _cached(name: String, painter: Callable, alpha_cut: bool) -> Texture
 	if alpha_cut:
 		preserve_coverage(img, 0.5)
 	var tex := ImageTexture.create_from_image(img)
+	_mutex.lock()
+	if _textures.has(name):
+		var raced: Texture2D = _textures[name] as Texture2D
+		_mutex.unlock()
+		return raced
 	_textures[name] = tex
+	_mutex.unlock()
 	return tex
 
 ## Alpha-tested foliage thins out with distance because box-filtered

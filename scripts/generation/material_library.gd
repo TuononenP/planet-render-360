@@ -144,7 +144,6 @@ const TERRACOTTA_CONTRAST := 0.6
 static var _set_images: Dictionary = {}
 static var _set_texs: Dictionary = {}
 static var _pbr_mats: Dictionary = {}
-
 ## One bundled map as a linear-space Image, cached. Colour maps are
 ## linearised (no hardware sRGB decode on runtime textures); normal and
 ## roughness maps are data and stay raw. A missing/unreadable set warns
@@ -171,8 +170,12 @@ static func parse_colour_tag(s: String) -> Color:
 	return PbrTextures.parse_colour_tag(s)
 
 func ground_material(land_class: String) -> Material:
+	_mat_mutex.lock()
 	if _ground_mats.has(land_class) and has_ground_class(land_class):
-		return _ground_mats[land_class]
+		var cached: Material = _ground_mats[land_class] as Material
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var m: Material
 	if has_ground_class(land_class) and land_class != "water":
 		var set_name: String = GROUND_SETS[land_class]
@@ -182,7 +185,13 @@ func ground_material(land_class: String) -> Material:
 	else:
 		m = _mat(ground_color(land_class))
 	if has_ground_class(land_class):
+		_mat_mutex.lock()
+		if _ground_mats.has(land_class):
+			var raced: Material = _ground_mats[land_class] as Material
+			_mat_mutex.unlock()
+			return raced
 		_ground_mats[land_class] = m
+		_mat_mutex.unlock()
 	return m
 
 ## Per-class ground colour for the full contract §2.6 set (T3.5): the
@@ -237,18 +246,30 @@ static func has_ground_class(land_class: String) -> bool:
 ## over a photographic grain, so WaterBuilder's shoreline band reads
 ## as wet-to-dry cover instead of a flat tint. One shared instance.
 static func shore_material() -> StandardMaterial3D:
-	if _shore_mat == null:
-		_shore_mat = StandardMaterial3D.new()
-		_shore_mat.vertex_color_use_as_albedo = true
-		# The apron colours are the ground palette's sRGB bases; read as
-		# linear they rendered about twice as bright as the ground they
-		# border (white wedges along every bank).
-		_shore_mat.vertex_color_is_srgb = true
-		_shore_mat.albedo_texture = detail_texture()
-		_shore_mat.roughness = 0.95
-		# Apron strips wind either way (landward flips per station),
-		# so back-face culling is off — like the water shader.
-		_shore_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat_mutex.lock()
+	if _shore_mat != null:
+		var cached_shore: StandardMaterial3D = _shore_mat
+		_mat_mutex.unlock()
+		return cached_shore
+	_mat_mutex.unlock()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	# The apron colours are the ground palette's sRGB bases; read as
+	# linear they rendered about twice as bright as the ground they
+	# border (white wedges along every bank).
+	m.vertex_color_is_srgb = true
+	m.albedo_texture = detail_texture()
+	m.roughness = 0.95
+	# Apron strips wind either way (landward flips per station),
+	# so back-face culling is off — like the water shader.
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat_mutex.lock()
+	if _shore_mat != null:
+		var raced: StandardMaterial3D = _shore_mat
+		_mat_mutex.unlock()
+		return raced
+	_shore_mat = m
+	_mat_mutex.unlock()
 	return _shore_mat
 
 ## Seine PBR water (v1 construction moved from TerrainBuilder._water).
@@ -273,6 +294,7 @@ static var _leaf_card_tex: Texture2D
 static var _roof_mats: Dictionary = {}
 static var _ground_mats: Dictionary = {}
 static var _shore_mat: StandardMaterial3D
+static var _mat_mutex := Mutex.new()
 
 static func _mat(color: Color, roughness: float = 0.95) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -298,11 +320,22 @@ static func speckle(img: Image, base: Color, n: int, seed_v: float, amp: float) 
 			clampf(base.b + v * 0.85, 0.0, 1.0)))
 
 static func detail_texture() -> Texture2D:
+	_mat_mutex.lock()
 	if _detail_tex != null:
-		return _detail_tex
+		var cached: Texture2D = _detail_tex
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var img := Image.create(128, 128, true, Image.FORMAT_RGBA8)
 	speckle(img, Color(0.94, 0.94, 0.94), 2600, 4.2, 0.10)
-	_detail_tex = ImageTexture.create_from_image(img)
+	var tex := ImageTexture.create_from_image(img)
+	_mat_mutex.lock()
+	if _detail_tex != null:
+		var raced: Texture2D = _detail_tex
+		_mat_mutex.unlock()
+		return raced
+	_detail_tex = tex
+	_mat_mutex.unlock()
 	return _detail_tex
 
 ## Satellite drape material (T3.2): the mosaic imagery is the albedo
@@ -327,12 +360,23 @@ static func satellite_ground_material(tex: Texture2D) -> StandardMaterial3D:
 ## to the PRD #46525E base. Still the shared fallback for missing
 ## imagery and degenerate satellite samples (roof_for_color rules).
 static func slate() -> StandardMaterial3D:
+	_mat_mutex.lock()
 	if _slate_mat != null:
-		return _slate_mat
+		var cached: StandardMaterial3D = _slate_mat
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var row: Dictionary = PBR_SETS["slate"]
-	_slate_mat = pbr_material("slate", neutral_slate(_calib_tint(row["mean"], PRD_SLATE)),
+	var m := pbr_material("slate", neutral_slate(_calib_tint(row["mean"], PRD_SLATE)),
 		float(ROOF_UV["slate"]))
-	RoofVariety.mark(_slate_mat)
+	RoofVariety.mark(m)
+	_mat_mutex.lock()
+	if _slate_mat != null:
+		var raced: StandardMaterial3D = _slate_mat
+		_mat_mutex.unlock()
+		return raced
+	_slate_mat = m
+	_mat_mutex.unlock()
 	return _slate_mat
 
 ## Paris slate and zinc photograph as a neutral, faintly cool grey. The
@@ -349,11 +393,22 @@ static func neutral_slate(tint: Color) -> Color:
 	return tint.lerp(Color(g, g, g, tint.a), SLATE_GREY_PULL)
 
 static func leaf_texture() -> Texture2D:
+	_mat_mutex.lock()
 	if _leaf_tex != null:
-		return _leaf_tex
+		var cached: Texture2D = _leaf_tex
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var img := Image.create(128, 128, true, Image.FORMAT_RGBA8)
 	speckle(img, Color(0.84, 0.87, 0.82), 3200, 6.4, 0.08)
-	_leaf_tex = ImageTexture.create_from_image(img)
+	var tex := ImageTexture.create_from_image(img)
+	_mat_mutex.lock()
+	if _leaf_tex != null:
+		var raced: Texture2D = _leaf_tex
+		_mat_mutex.unlock()
+		return raced
+	_leaf_tex = tex
+	_mat_mutex.unlock()
 	return _leaf_tex
 
 # --- Facade/roof-for-building materials moved to FacadeMaterials (T4.6).
@@ -363,8 +418,10 @@ static func leaf_texture() -> Texture2D:
 ## across generations — a session visiting a few places would otherwise
 ## fill them and render later cities in earlier ones' materials.
 static func begin_build() -> void:
-	_pbr_mats.clear()
+	_mat_mutex.lock()
 	_roof_mats.clear()
+	_pbr_mats.clear()
+	_mat_mutex.unlock()
 
 ## Live census of this library's caches (FacadeMaterials.material_instance_count
 ## adds the facade/roof families on top for the T4.3/T7.2 asserts).
@@ -378,8 +435,12 @@ static func material_instance_count() -> Dictionary:
 
 static func leaves(season: int = LocationData.Season.SUMMER) -> Array:
 	var key := LocationData.clamp_season(season)
+	_mat_mutex.lock()
 	if _leaf_mats_by_season.has(key):
-		return _leaf_mats_by_season[key]
+		var cached: Array = _leaf_mats_by_season[key] as Array
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var palettes: Array = [
 		[Color(0.38, 0.55, 0.30), Color(0.45, 0.60, 0.33), Color(0.32, 0.48, 0.27)],  # spring
 		[Color(0.30, 0.45, 0.26), Color(0.36, 0.50, 0.28), Color(0.24, 0.38, 0.22)],  # summer
@@ -394,14 +455,24 @@ static func leaves(season: int = LocationData.Season.SUMMER) -> Array:
 			var m := _mat(Color(c.r * v, c.g * v, c.b * (2.0 - v) * 0.96), 0.92)
 			m.albedo_texture = leaf_texture()
 			mats.append(m)
+	_mat_mutex.lock()
+	if _leaf_mats_by_season.has(key):
+		var raced: Array = _leaf_mats_by_season[key] as Array
+		_mat_mutex.unlock()
+		return raced
 	_leaf_mats_by_season[key] = mats
+	_mat_mutex.unlock()
 	return mats
 
 ## Leaf-cluster alpha texture: crossed alpha cards read as foliage
 ## mass from any angle, where a shaded sphere reads as a lollipop.
 static func leaf_card_texture() -> Texture2D:
+	_mat_mutex.lock()
 	if _leaf_card_tex != null:
-		return _leaf_card_tex
+		var cached: Texture2D = _leaf_card_tex
+		_mat_mutex.unlock()
+		return cached
+	_mat_mutex.unlock()
 	var img := Image.create(256, 256, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	for i in 1100:
@@ -414,8 +485,14 @@ static func leaf_card_texture() -> Texture2D:
 		var s := 3 + int(_hash(i * 5.1, 7.7) * 4.0)
 		img.fill_rect(Rect2i(int(cx), int(cy), s, maxi(2, s - 1)), leaf)
 	var tex := ImageTexture.create_from_image(img)
+	_mat_mutex.lock()
+	if _leaf_card_tex != null:
+		var raced: Texture2D = _leaf_card_tex
+		_mat_mutex.unlock()
+		return raced
 	_leaf_card_tex = tex
-	return tex
+	_mat_mutex.unlock()
+	return _leaf_card_tex
 
 ## Real roof colour for one footprint, averaged from the satellite
 ## mosaic (the only view of a roof a map actually gives you). Alpha 0
@@ -477,11 +554,25 @@ static func roof_for_color(c: Color) -> Material:
 	if set_name == "slate":
 		tint = neutral_slate(tint)
 	var key := "%s|%s" % [set_name, tint.to_html()]
+	_mat_mutex.lock()
 	if _roof_mats.has(key):
-		return _roof_mats[key] as Material
+		var cached: Material = _roof_mats[key] as Material
+		_mat_mutex.unlock()
+		return cached
 	if _roof_mats.size() > 28:
+		_mat_mutex.unlock()
 		return slate()
+	_mat_mutex.unlock()
 	var m := pbr_material(set_name, tint, float(ROOF_UV[set_name]))
 	RoofVariety.mark(m)
+	_mat_mutex.lock()
+	if _roof_mats.has(key):
+		var raced: Material = _roof_mats[key] as Material
+		_mat_mutex.unlock()
+		return raced
+	if _roof_mats.size() > 28:
+		_mat_mutex.unlock()
+		return slate()
 	_roof_mats[key] = m
+	_mat_mutex.unlock()
 	return m

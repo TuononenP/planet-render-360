@@ -48,23 +48,78 @@ static func _sources() -> String:
 		_source_hash = str(hash(acc))
 	return _source_hash
 
+## Scene path a threaded load was started for ahead of time ("" none).
+static var _prefetched := ""
+
+## Starts loading the newest cached world for this place, preset and
+## season while the pipeline still reads its data: the full key needs
+## the finished LocationData, but its prefix is known up front. When
+## load_world later asks for the same file it is already loading (or
+## loaded); a different key just drops it. True when a world was found.
+static func prefetch(lat: float, lon: float, preset: int, season: int) -> bool:
+	if not enabled() or not DirAccess.dir_exists_absolute(DIR):
+		return false
+	var prefix := "world_%d_%d_p%d_s%d_" % [CacheStore.quant(lat), CacheStore.quant(lon),
+		preset, season]
+	var best := ""
+	var best_t := -1
+	for f in DirAccess.get_files_at(DIR):
+		if f.begins_with(prefix) and f.ends_with(".scn") and not f.ends_with(".tmp.scn"):
+			var t := FileAccess.get_modified_time(DIR + "/" + f)
+			if t > best_t:
+				best = DIR + "/" + f
+				best_t = t
+	if best == "":
+		return false
+	if best == _prefetched or best in _dropped:
+		return true
+	_drop_prefetch()
+	if ResourceLoader.load_threaded_request(best, "PackedScene", true,
+			ResourceLoader.CACHE_MODE_IGNORE) == OK:
+		_prefetched = best
+	return true
+
+## Unused prefetches still loading; collected once done, so their
+## scenes are released without blocking the main thread on them.
+static var _dropped: Array[String] = []
+
+static func _drop_prefetch() -> void:
+	if _prefetched != "":
+		_dropped.append(_prefetched)
+		_prefetched = ""
+	for path in _dropped.duplicate():
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			ResourceLoader.load_threaded_get(path)
+			_dropped.erase(path)
+
 static func _paths(data: LocationData) -> Dictionary:
 	var k := key(data)
 	return {"scene": "%s/%s.scn" % [DIR, k], "ground": "%s/%s.ground" % [DIR, k]}
 
 ## [ground, world] from the cache, or [] when absent/unreadable. Loads on
 ## a worker thread while `view` keeps drawing; a known `ground` (season
-## rebuild) is reused instead of the saved one.
-static func load_world(view: Node, data: LocationData, ground: GroundTruth) -> Array:
+## rebuild) is reused instead of the saved one. The world is instanced
+## on a Thread too (detached nodes), tracked in `threads` so the view
+## joins it if it is freed meanwhile.
+static func load_world(view: Node, threads: Array, data: LocationData,
+		ground: GroundTruth) -> Array:
 	if not enabled():
 		return []
 	var p := _paths(data)
 	if not FileAccess.file_exists(p["scene"]) or not FileAccess.file_exists(p["ground"]):
+		_drop_prefetch()
 		return []
 	var t0 := Time.get_ticks_msec()
-	if ResourceLoader.load_threaded_request(p["scene"], "PackedScene", true,
-			ResourceLoader.CACHE_MODE_IGNORE) != OK:
-		return []
+	if _prefetched == p["scene"]:
+		_prefetched = ""  # already loading: collect it below
+	elif p["scene"] in _dropped:
+		_dropped.erase(p["scene"])  # an earlier prefetch of this file: reuse it
+		_drop_prefetch()
+	else:
+		_drop_prefetch()
+		if ResourceLoader.load_threaded_request(p["scene"], "PackedScene", true,
+				ResourceLoader.CACHE_MODE_IGNORE) != OK:
+			return []
 	while ResourceLoader.load_threaded_get_status(p["scene"]) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
 		await view.get_tree().process_frame
 	var ps := ResourceLoader.load_threaded_get(p["scene"]) as PackedScene
@@ -73,7 +128,13 @@ static func load_world(view: Node, data: LocationData, ground: GroundTruth) -> A
 		push_warning("WorldCache: unreadable entry %s; rebuilding" % p["scene"])
 		_remove(p)
 		return []
-	var world := ps.instantiate() as Node3D
+	var th := Thread.new()
+	threads.append(th)
+	th.start(func() -> Node3D: return ps.instantiate() as Node3D)
+	while th.is_alive():
+		await view.get_tree().process_frame
+	threads.erase(th)
+	var world: Node3D = th.wait_to_finish()
 	if world == null:
 		_remove(p)
 		return []
@@ -89,13 +150,12 @@ static func load_world(view: Node, data: LocationData, ground: GroundTruth) -> A
 ## each frame. The view joins the thread on exit like its build threads.
 const PUMP_US := 4000
 
-static func save_async(view: Node, threads: Array, data: LocationData, built: Array) -> void:
+static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
+		packed: PackedScene = null) -> void:
 	if not enabled() or built.size() < 2 or not (built[1] is Node3D):
 		return
-	var world: Node3D = built[1]
-	_own(world, world)
-	var ps := PackedScene.new()
-	if ps.pack(world) != OK:
+	var ps := packed if packed != null else pack(built[1])
+	if ps == null:
 		return
 	var p := _paths(data)
 	var ground_bytes := var_to_bytes(_ground_state(built[0] as GroundTruth))
@@ -130,6 +190,17 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	if threads.has(th):
 		threads.erase(th)
 		th.wait_to_finish()
+
+## The world packed for saving, or null (cache off, or pack failed).
+## Packing walks every node, so build_location runs it on the build
+## thread while the world is still detached and pristine, not on the
+## main thread before the view can show.
+static func pack(world: Node3D) -> PackedScene:
+	if not enabled() or world == null:
+		return null
+	_own(world, world)
+	var ps := PackedScene.new()
+	return ps if ps.pack(world) == OK else null
 
 static func _own(n: Node, owner_node: Node) -> void:
 	for c in n.get_children():

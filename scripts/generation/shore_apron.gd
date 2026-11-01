@@ -26,8 +26,9 @@ static func _coastlines(data: LocationData) -> Array:
 ## band tucks slightly under the water surface at its inner edge and
 ## ducks below it where the ground drops, so it never z-fights or
 ## floats; stations over open water or past the mesh are skipped.
+## `abort` stops it between rows / items; a stopped result is dropped.
 static func _shore_aprons(root: Node3D, data: LocationData,
-		ground: GroundTruth, channels: Array) -> void:
+		ground: GroundTruth, channels: Array, abort: BuildAbort = null) -> void:
 	var step := WaterBuilder._post_step(data)
 	var width := maxf(step * 1.25, 2.0)
 	var stride := maxf(step * 0.75, 1.0)
@@ -38,6 +39,8 @@ static func _shore_aprons(root: Node3D, data: LocationData,
 	var uvs: Array = []
 	var indices: Array = []
 	for poly in data.land_polygons:
+		if abort != null and abort.requested:
+			break
 		if str(poly.get("class", "")) != "water":
 			continue
 		var pts: PackedVector2Array = \
@@ -54,6 +57,8 @@ static func _shore_aprons(root: Node3D, data: LocationData,
 					_apron_ring(verts, normals, colors, uvs, indices,
 						hpart, false, ground, width, stride, bound)
 	for w in channels:
+		if abort != null and abort.requested:
+			break
 		var cpts: PackedVector2Array = \
 			w.get("points", PackedVector2Array())
 		var half := float(w.get("width_m", 0.0)) * 0.5 \
@@ -62,6 +67,8 @@ static func _shore_aprons(root: Node3D, data: LocationData,
 			_apron_line(verts, normals, colors, uvs, indices, run,
 				half, ground, width, stride, bound)
 	for w in _coastlines(data):
+		if abort != null and abort.requested:
+			break
 		var kpts: PackedVector2Array = \
 			(w as Dictionary).get("points", PackedVector2Array())
 		for run in WaterBuilder._clip_runs(kpts, bound + width):
@@ -89,10 +96,10 @@ static func _apron_append(verts: Array, normals: Array, colors: Array,
 		bound: float) -> int:
 	if absf(outer.x) > bound or absf(outer.y) > bound:
 		return -1
+	if ground.water_at(outer.x, outer.y) > 0.01:
+		return -1
 	var cls := ground.land_class_at(outer.x, outer.y)
 	if cls == "water":
-		return -1
-	if ground.water_at(outer.x, outer.y) > 0.01:
 		return -1
 	var c := WaterBuilder._UNKNOWN_SHORE
 	if MaterialLibrary.has_ground_class(cls):

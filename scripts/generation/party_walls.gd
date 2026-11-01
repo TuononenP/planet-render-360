@@ -75,12 +75,13 @@ func add_mass(m: Dictionary, ground: GroundTruth) -> void:
 		_add_ring(h as PackedVector2Array, str(m["key"]), top, true)
 
 func _add_ring(ring: PackedVector2Array, key: String, top: float, hole: bool) -> void:
+	var ccw := RingGeometry.signed_area(ring) > 0.0
 	for i in ring.size():
 		var a := ring[i]
 		var b := ring[(i + 1) % ring.size()]
 		if a.distance_to(b) < 0.01:
 			continue
-		_insert(_edges, a, b, [a, b, key, top, outward(ring, i, hole), _edges_added])
+		_insert(_edges, a, b, [a, b, key, top, _outward_ccw(ring, i, hole, ccw), _edges_added])
 		_edges_added += 1
 
 func _insert(grid: Dictionary, a: Vector2, b: Vector2, rec: Array) -> void:
@@ -95,17 +96,20 @@ func _insert(grid: Dictionary, a: Vector2, b: Vector2, rec: Array) -> void:
 ## Outward unit normal of edge i (away from the building's material: into
 ## the courtyard for a hole ring), the convention BuildingWalls uses.
 static func outward(ring: PackedVector2Array, i: int, hole: bool = false) -> Vector2:
+	return _outward_ccw(ring, i, hole, RingGeometry.signed_area(ring) > 0.0)
+
+static func _outward_ccw(ring: PackedVector2Array, i: int, hole: bool, ccw: bool) -> Vector2:
 	var e := ring[(i + 1) % ring.size()] - ring[i]
-	var n := Vector2(e.y, -e.x).normalized() if RingGeometry.signed_area(ring) > 0.0 \
-		else Vector2(-e.y, e.x).normalized()
+	var n := Vector2(e.y, -e.x).normalized() if ccw else Vector2(-e.y, e.x).normalized()
 	return -n if hole else n
 
 ## Per-edge partitions of `ring` (Array per edge, see partition()).
 func ring_cover(ring: PackedVector2Array, key: String, hole: bool = false) -> Array:
+	var ccw := RingGeometry.signed_area(ring) > 0.0
 	var out: Array = []
 	for i in ring.size():
 		out.append(partition(ring[i], ring[(i + 1) % ring.size()],
-			outward(ring, i, hole), key))
+			_outward_ccw(ring, i, hole, ccw), key))
 	return out
 
 ## The edge a→b (outward normal n) split into [t0, t1, top_y] pieces over

@@ -27,6 +27,7 @@ const LOOKS := 2
 const WALL_ALBEDO_MAX := 0.72
 
 static var _profile_cache: Dictionary = {}
+static var _mutex := Mutex.new()
 
 ## Style region for a viewpoint: a city zone (CityStyles: London,
 ## Manhattan, Tokyo ... -> that city's row), else the first matching
@@ -65,9 +66,11 @@ static func country_region(region: String) -> String:
 static var _box_set: Dictionary = {}
 
 static func _box_regions() -> Dictionary:
+	_mutex.lock()
 	if _box_set.is_empty():
 		for box in ArchitectureData.BOXES:
 			_box_set[str((box as Array)[0])] = true
+	_mutex.unlock()
 	return _box_set
 
 ## City key for a region or one of its eras ("paris_hbm" -> "paris"),
@@ -112,8 +115,12 @@ static func kind_for(b: Dictionary, density: String, area_m2: float) -> String:
 ## up to 6 deep). Cached; callers must not mutate it.
 static func profile(region: String, kind: String) -> Dictionary:
 	var key := region + "|" + kind
+	_mutex.lock()
 	if _profile_cache.has(key):
-		return _profile_cache[key] as Dictionary
+		var cached: Dictionary = _profile_cache[key] as Dictionary
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
 	var generic: Dictionary = ArchitectureData.GENERIC
 	var merged: Dictionary = (generic.get(kind, generic["house"]) as Dictionary).duplicate()
 	var chain: Array[String] = []
@@ -126,7 +133,13 @@ static func profile(region: String, kind: String) -> Dictionary:
 		var row: Dictionary = kinds.get(kind, {})
 		for k in row:
 			merged[k] = row[k]
+	_mutex.lock()
+	if _profile_cache.has(key):
+		var raced: Dictionary = _profile_cache[key] as Dictionary
+		_mutex.unlock()
+		return raced
 	_profile_cache[key] = merged
+	_mutex.unlock()
 	return merged
 
 ## Deterministic 0..1 value for (seed, salt) — same hash family as

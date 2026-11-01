@@ -54,8 +54,9 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var idx := PackedInt32Array()
+	var _ccw := RingGeometry.signed_area(ring) > 0.0
 	if trim == CORNICE:
-		var outer := _offset(ring, CORNICE_OUT_M * m)
+		var outer := _offset(ring, CORNICE_OUT_M * m, _ccw)
 		var y0 := top - CORNICE_DROP_M * m
 		var y1 := y0 + CORNICE_FACE_M * m
 		for i in ring.size():
@@ -66,7 +67,7 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 			var b := ring[j]
 			var oa := outer[i]
 			var ob := outer[j]
-			var out := _out_normal(ring, i)
+			var out := _out_normal_ccw(ring, i, _ccw)
 			# Soffit (faces down), front (faces out), wash (faces up/out).
 			_quad(verts, normals, uvs, idx, Vector3(a.x, y0, a.y), Vector3(b.x, y0, b.y),
 				Vector3(ob.x, y0, ob.y), Vector3(oa.x, y0, oa.y), Vector3.DOWN)
@@ -76,14 +77,14 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 				Vector3(b.x, top, b.y), Vector3(a.x, top, a.y),
 				Vector3(out.x * 0.6, 0.8, out.y * 0.6).normalized())
 	else:
-		var inner := _offset(ring, -PARAPET_T_M * m)
-		var cin := _offset(ring, -(PARAPET_T_M + COPING_M) * m)
-		var cout := _offset(ring, COPING_M * m)
+		var inner := _offset(ring, -PARAPET_T_M * m, _ccw)
+		var cin := _offset(ring, -(PARAPET_T_M + COPING_M) * m, _ccw)
+		var cout := _offset(ring, COPING_M * m, _ccw)
 		var y0 := deck(top, trim)
 		var y1 := top - COPING_H_M * m
 		for i in ring.size():
 			var j := (i + 1) % ring.size()
-			var o3 := Vector3(_out_normal(ring, i).x, 0.0, _out_normal(ring, i).y)
+			var o3 := Vector3(_out_normal_ccw(ring, i, _ccw).x, 0.0, _out_normal_ccw(ring, i, _ccw).y)
 			# Inner face looks onto the sunk deck (the wall is the outer).
 			_quad(verts, normals, uvs, idx, Vector3(inner[i].x, y0, inner[i].y),
 				Vector3(inner[j].x, y0, inner[j].y), Vector3(inner[j].x, y1, inner[j].y),
@@ -131,17 +132,20 @@ static func _quad(verts: PackedVector3Array, normals: PackedVector3Array,
 
 ## Outward unit normal (XZ) of edge i → i+1.
 static func _out_normal(ring: PackedVector2Array, i: int) -> Vector2:
+	return _out_normal_ccw(ring, i, RingGeometry.signed_area(ring) > 0.0)
+
+static func _out_normal_ccw(ring: PackedVector2Array, i: int, ccw: bool) -> Vector2:
 	var e := ring[(i + 1) % ring.size()] - ring[i]
-	var ccw := RingGeometry.signed_area(ring) > 0.0
 	return (Vector2(e.y, -e.x) if ccw else Vector2(-e.y, e.x)).normalized()
 
 ## The ring offset by d (outward > 0, inward < 0), mitred, miter capped.
-static func _offset(ring: PackedVector2Array, d: float) -> PackedVector2Array:
+static func _offset(ring: PackedVector2Array, d: float, ccw: Variant = null) -> PackedVector2Array:
+	var _ccw: bool = ccw if ccw != null else RingGeometry.signed_area(ring) > 0.0
 	var out := PackedVector2Array()
 	var n := ring.size()
 	for i in n:
-		var n0 := _out_normal(ring, (i - 1 + n) % n)
-		var n1 := _out_normal(ring, i)
+		var n0 := _out_normal_ccw(ring, (i - 1 + n) % n, _ccw)
+		var n1 := _out_normal_ccw(ring, i, _ccw)
 		var denom := 1.0 + n0.dot(n1)
 		var off := (n0 + n1) * d / maxf(denom, 0.0001)
 		if off.length() > absf(d) * 3.0:

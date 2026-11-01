@@ -104,34 +104,60 @@ static func build_world(data: LocationData, ground: GroundTruth = null,
 	# (contract §3); direct callers get a fresh surface here instead.
 	if ground == null:
 		ground = GroundTruth.new(data)
+	# WorldBuildGraph runs the stages concurrently (serial on the main
+	# thread, or with WorldBuildGraph.force_serial).
+	# load() breaks the TerrainBuilder <-> WorldBuildGraph class cycle.
+	var wbg = load("res://scripts/generation/world_build_graph.gd") as GDScript
+	if wbg.force_serial:
+		return _build_serial(data, ground, abort)
+	return wbg.build(data, ground, abort)
+
+## The serial build, stage by stage; per-stage ms land in abort.ms.
+static func _build_serial(data: LocationData, ground: GroundTruth,
+		abort: BuildAbort = null) -> Node3D:
+	var t0 := Time.get_ticks_msec()
 	var root := Node3D.new()
 	root.name = "GeneratedWorld"
 	BuildAbort.mark(abort, BuildAbort.Step.FAR)
-	root.add_child(FarTerrainBuilder.build_far(data, ground))
+	root.add_child(FarTerrainBuilder.build_far(data, ground, abort))
+	_stage_ms(abort, BuildAbort.Step.FAR, t0)
 	if abort != null and abort.requested:
 		return root
+	var t := Time.get_ticks_msec()
 	BuildAbort.mark(abort, BuildAbort.Step.GROUND)
-	root.add_child(_terrain_mesh(data, ground))
-	root.add_child(WaterBuilder.build_water(data, ground))
+	root.add_child(_terrain_mesh(data, ground, abort))
+	root.add_child(WaterBuilder.build_water(data, ground, abort))
+	_stage_ms(abort, BuildAbort.Step.GROUND, t)
 	if abort != null and abort.requested:
 		return root
+	t = Time.get_ticks_msec()
 	BuildAbort.mark(abort, BuildAbort.Step.BUILDINGS)
 	if not debug_hide_buildings:
-		_adopt_flat(root, BuildingBuilder.build_buildings(data, ground))
+		_adopt_flat(root, BuildingBuilder.build_buildings(data, ground, abort))
+	_stage_ms(abort, BuildAbort.Step.BUILDINGS, t)
 	if abort != null and abort.requested:
 		return root
+	t = Time.get_ticks_msec()
 	BuildAbort.mark(abort, BuildAbort.Step.ROADS)
 	if not data.buildings.is_empty():
-		_adopt_flat(root, RoadBuilder.build_roads(data, ground))
+		_adopt_flat(root, RoadBuilder.build_roads(data, ground, abort))
 	if data.landmark_type != "none":
 		root.add_child(_landmark(data, ground))
 	_landmark_candidates(root, data, ground)
+	_stage_ms(abort, BuildAbort.Step.ROADS, t)
 	if abort != null and abort.requested:
 		return root
+	t = Time.get_ticks_msec()
 	BuildAbort.mark(abort, BuildAbort.Step.VEGETATION)
-	_adopt_flat(root, VegetationBuilder.build_vegetation(data, ground))
+	_adopt_flat(root, VegetationBuilder.build_vegetation(data, ground, abort))
+	_stage_ms(abort, BuildAbort.Step.VEGETATION, t)
+	if abort != null:
+		print("%s total=%d serial" % [abort.timings_line(), Time.get_ticks_msec() - t0])
 	return root
 
+static func _stage_ms(abort: BuildAbort, s: BuildAbort.Step, since: int) -> void:
+	if abort != null:
+		abort.set_ms(s, Time.get_ticks_msec() - since)
 
 ## Transitional (T1.4): the T1.1c builders already return contract §4
 ## subtrees, but scenery/settings tests scan world children flat, so
@@ -213,7 +239,8 @@ static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
 	var mosaic_px := float(satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
 	return (px - data.satellite_origin_px) / mosaic_px
 
-static func _terrain_mesh(data: LocationData, ground: GroundTruth = null) -> MeshInstance3D:
+## `abort` stops it between rows / items; a stopped result is dropped.
+static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> MeshInstance3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	# Mesh density is the preset's LOD knob over the preset-independent
@@ -241,6 +268,21 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null) -> Mes
 	var has_sat := data.satellite_texture != null
 	var tangents := PackedFloat32Array()
 	var fallback: Image = null
+	# Outer-ring bounds per land polygon (min at 2i, max at 2i+1) for the
+	# no-imagery colour bake: a post outside them has no crossings, so
+	# land_color_bboxes skips the full point-in-polygon scan exactly.
+	var land_bboxes := PackedVector2Array()
+	if not has_sat and not data.land_polygons.is_empty():
+		land_bboxes.resize(data.land_polygons.size() * 2)
+		for i in data.land_polygons.size():
+			var pts: PackedVector2Array = (data.land_polygons[i] as Dictionary).get("points", PackedVector2Array())
+			var bmin := Vector2(INF, INF)
+			var bmax := Vector2(-INF, -INF)
+			for p in pts:
+				bmin = bmin.min(p)
+				bmax = bmax.max(p)
+			land_bboxes[i * 2] = bmin
+			land_bboxes[i * 2 + 1] = bmax
 	if not has_sat:
 		fallback = Image.create(size, size, false, Image.FORMAT_RGB8)
 	var grass := Color(0.35, 0.48, 0.24)  # PRD grass #5A7A3C
@@ -254,6 +296,8 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null) -> Mes
 	elif data.season == LocationData.Season.SPRING:
 		grass = Color(0.48, 0.62, 0.36)
 	for z in size:
+		if abort != null and abort.requested:
+			return MeshInstance3D.new()  # partial rows: no mesh (dropped anyway)
 		for x in size:
 			var wx := (x - size / 2.0) * step
 			var wz := (z - size / 2.0) * step
@@ -317,8 +361,12 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null) -> Mes
 				# per-post "photo" over the extent (linear → sRGB so
 				# the shader's source_color decode restores it).
 				uvs.append(Vector2(float(x) + 0.5, float(z) + 0.5) / float(size))
-				fallback.set_pixel(x, z, land_color(Vector2(wx, wz),
-					data.land_polygons, base_color).linear_to_srgb())
+				var lc := base_color
+				if not land_bboxes.is_empty():
+					lc = land_color_bboxes(Vector2(wx, wz), data.land_polygons, land_bboxes, base_color)
+				else:
+					lc = land_color(Vector2(wx, wz), data.land_polygons, base_color)
+				fallback.set_pixel(x, z, lc.linear_to_srgb())
 	for z in size - 1:
 		for x in size - 1:
 			var a := z * size + x
@@ -358,6 +406,25 @@ static func point_in_polygon(point: Vector2, polygon: PackedVector2Array) -> boo
 
 static func land_color(point: Vector2, land: Array, fallback: Color) -> Color:
 	for poly in land:
+		if point_in_polygon(point, poly["points"]):
+			match str(poly["class"]):
+				"water": return Color(0.30, 0.50, 0.60)
+				"forest": return Color(0.27, 0.41, 0.25)
+				"grass": return Color(0.47, 0.60, 0.37)
+				"field": return Color(0.70, 0.63, 0.43)
+				"urban": return Color(0.64, 0.61, 0.55)
+	return fallback
+
+## land_color with each polygon's outer-ring bounds (`bounds`: min at
+## 2i, max at 2i+1) tested first, inclusively, so the answer is the same.
+static func land_color_bboxes(point: Vector2, land: Array, bounds: PackedVector2Array,
+		fallback: Color) -> Color:
+	for i in land.size():
+		var poly: Dictionary = land[i]
+		var lo := bounds[i * 2]
+		var hi := bounds[i * 2 + 1]
+		if point.x < lo.x or point.x > hi.x or point.y < lo.y or point.y > hi.y:
+			continue
 		if point_in_polygon(point, poly["points"]):
 			match str(poly["class"]):
 				"water": return Color(0.30, 0.50, 0.60)

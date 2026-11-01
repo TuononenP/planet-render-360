@@ -85,25 +85,34 @@ static func _quad(arr: Array, a: Vector2, b: Vector2, y0: float, y1: float,
 	var e := b - a
 	var n3 := Vector3(n.x, 0.0, n.y)
 	var k := verts.size()
-	verts.append_array([Vector3(a.x, y0, a.y), Vector3(b.x, y0, b.y),
-		Vector3(b.x, y1, b.y), Vector3(a.x, y1, a.y)])
+	# Avoid Array literal alloc in hot loop: push individually.
+	verts.push_back(Vector3(a.x, y0, a.y)); verts.push_back(Vector3(b.x, y0, b.y))
+	verts.push_back(Vector3(b.x, y1, b.y)); verts.push_back(Vector3(a.x, y1, a.y))
 	# Tangent along +u (a → b); w makes cross(N, T) · w point up, the
 	# −v direction (v = 0 at the top), as Godot's own generate_tangents
 	# writes it — the facade normal maps and window parallax need it.
-	var t3 := Vector3(e.x, 0.0, e.y).normalized()
-	var w := 1.0 if n3.cross(t3).y > 0.0 else -1.0
+	# Skip when batch mode: MassBatch discards tangents (recomputes later in commit).
+	var use_tangents := BuildingBuilder._batch == null
+	var t3 := Vector3.ZERO
+	var w := 1.0
+	if use_tangents:
+		t3 = Vector3(e.x, 0.0, e.y).normalized()
+		w = 1.0 if n3.cross(t3).y > 0.0 else -1.0
 	for j in 4:
 		normals.append(n3)
-		tangents.append_array([t3.x, t3.y, t3.z, w])
-	uvs.append_array([Vector2(0, uv.y), Vector2(uv.x, uv.y),
-		Vector2(uv.x, 0), Vector2(0, 0)])
+		if use_tangents:
+			tangents.push_back(t3.x); tangents.push_back(t3.y); tangents.push_back(t3.z); tangents.push_back(w)
+	uvs.push_back(Vector2(0, uv.y)); uvs.push_back(Vector2(uv.x, uv.y))
+	uvs.push_back(Vector2(uv.x, 0)); uvs.push_back(Vector2(0, 0))
 	# Forward order faces (e.y, -e.x): with s < 0 that is the
 	# outward normal already, else the reversed order is emitted.
 	var s := e.x * n.y - e.y * n.x
 	if s > 0.0:
-		indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+		indices.push_back(k); indices.push_back(k + 2); indices.push_back(k + 1)
+		indices.push_back(k); indices.push_back(k + 3); indices.push_back(k + 2)
 	else:
-		indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
+		indices.push_back(k); indices.push_back(k + 1); indices.push_back(k + 2)
+		indices.push_back(k); indices.push_back(k + 2); indices.push_back(k + 3)
 
 static func _emit(root: Node3D, arr: Array, mat: Material) -> void:
 	if (arr[4] as PackedInt32Array).is_empty():
@@ -162,9 +171,9 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 		var i1 := idx[t * 3 + 1]
 		var i2 := idx[t * 3 + 2]
 		if flip:
-			indices.append_array([i0, i2, i1])
+			indices.push_back(i0); indices.push_back(i2); indices.push_back(i1)
 		else:
-			indices.append_array([i0, i1, i2])
+			indices.push_back(i0); indices.push_back(i1); indices.push_back(i2)
 	if BuildingBuilder._batch != null:
 		BuildingBuilder._batch.add(BuildingBuilder._batch_key, mat, verts, normals, uvs, indices)
 		return
@@ -175,8 +184,9 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	# +X tangent: the cap's normal map lights correctly (+v runs to +Z).
 	var tangents := PackedFloat32Array()
+	tangents.resize(verts.size() * 4)
 	for i in verts.size():
-		tangents.append_array([1.0, 0.0, 0.0, 1.0])
+		tangents[i * 4] = 1.0; tangents[i * 4 + 1] = 0.0; tangents[i * 4 + 2] = 0.0; tangents[i * 4 + 3] = 1.0
 	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_INDEX] = indices
 	# Arrays kept: LodRing merges these on the build thread (T7.5).

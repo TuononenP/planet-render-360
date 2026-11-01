@@ -58,11 +58,32 @@ static func _bevel(nor: Image, r: Rect2i, b: int, deep: bool) -> void:
 	nor.fill_rect(Rect2i(r.end.x - b, r.position.y, b, r.size.y), hi)
 	nor.fill_rect(Rect2i(r.position.x, r.end.y - b, r.size.x, b), hi)
 
+static var _base_cache: Dictionary = {}
+static var _base_mutex := Mutex.new()
+static func clear_cache() -> void:
+	_base_mutex.lock()
+	_base_cache.clear()
+	_base_mutex.unlock()
+
 static func _base(loader: Callable, set_name: String, map_name: String, w: int,
 		h: int) -> Image:
+	# Cached base layer (cap 32) similar to FacadeComposer._wall_layer: key by
+	# set,map,size,return duplicate() so callers can mutate freely.
+	var key := "%s|%s|%d|%d" % [set_name, map_name, w, h]
+	_base_mutex.lock()
+	if _base_cache.has(key):
+		var cached: Image = _base_cache[key] as Image
+		_base_mutex.unlock()
+		return cached.duplicate() as Image
+	_base_mutex.unlock()
 	var img := (loader.call(set_name, map_name) as Image).duplicate() as Image
 	img.convert(Image.FORMAT_RGBA8)
 	img.resize(w, h, Image.INTERPOLATE_BILINEAR)
+	_base_mutex.lock()
+	if _base_cache.size() >= 32:
+		_base_cache.erase(_base_cache.keys()[0])
+	_base_cache[key] = img.duplicate()
+	_base_mutex.unlock()
 	return img
 
 static func _finish(alb: Image, nor: Image, rgh: Image, depth: bool = false) -> Dictionary:

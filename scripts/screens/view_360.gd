@@ -268,24 +268,29 @@ static func make_world(data: LocationData, ground: GroundTruth,
 ## Returns [] when `abort` was requested (timeout / cancel).
 func build_location(data: LocationData, ground: GroundTruth = null,
 		abort: BuildAbort = null) -> Array:
-	var cached := await WorldCache.load_world(self, data, ground)
+	var cached := await WorldCache.load_world(self, _threads, data, ground)
 	if not cached.is_empty():
 		return cached
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data)
-		return [g, make_world(data, g, abort)])
+		var w := make_world(data, g, abort)
+		# Packed here, detached and pristine, so the save costs the main
+		# thread nothing before the view shows.
+		var stopped := abort != null and abort.requested
+		return [g, w, null if stopped else WorldCache.pack(w)])
 	while thread.is_alive():
 		await get_tree().process_frame
 	_threads.erase(thread)
 	var built: Array = thread.wait_to_finish()
+	var packed: PackedScene = built.pop_back()
 	if abort != null and abort.requested:
 		# Stopped part-way (timeout / cancel): never show or cache it.
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return []
-	WorldCache.save_async(self, _threads, data, built)
+	WorldCache.save_async(self, _threads, data, built, packed)
 	return built
 
 func _notification(what: int) -> void:
@@ -299,9 +304,13 @@ func _notification(what: int) -> void:
 				RenderingServer.force_sync()
 				OS.delay_msec(1)
 			if t.is_started():
-				var built: Array = t.wait_to_finish()
-				if built.size() > 1 and built[1] is Node3D:
-					(built[1] as Node3D).free()
+				# Build threads return [ground, world, packed]; the cache's
+				# instancing thread returns the world itself.
+				var r: Variant = t.wait_to_finish()
+				if r is Node3D:
+					(r as Node3D).free()
+				elif r is Array and (r as Array).size() > 1 and r[1] is Node3D:
+					(r[1] as Node3D).free()
 		_threads.clear()
 
 func show_location(data: LocationData, prebuilt: Array = []) -> void:

@@ -317,7 +317,9 @@ func _on_generation_finished(data: LocationData) -> void:
 	_loading.set_building(abort)
 	_building_world = true
 	_build_abort = abort
-	var built := await _view.build_location(data, null, abort)
+	# GroundTruth was built while the far-city and climate stages waited.
+	var ground: GroundTruth = await _pipeline.ground_for(data)
+	var built := await _view.build_location(data, ground, abort)
 	# A build the grace period already released must not touch the
 	# state of a newer run.
 	if _build_abort == abort:

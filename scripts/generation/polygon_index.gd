@@ -57,10 +57,22 @@ func bounds() -> Rect2:
 func contains(p: Vector2) -> bool:
 	if _rings.is_empty() or not _box.has_point(p):
 		return false
-	var b := clampi(int(floor((p.y - _y0) / _band_h)), 0, _bands.size() - 1)
+	var band := clampi(int(floor((p.y - _y0) / _band_h)), 0, _bands.size() - 1)
+	# Single-ring fast path — no PackedByteArray alloc.
+	if _rings.size() == 1:
+		var parity2 := 0
+		for code in (_bands[band] as Array):
+			var ring2: PackedVector2Array = _rings[0]
+			var i2: int = code & 0xFFFFFFFF
+			var pi2 := ring2[i2]
+			var pj2 := ring2[i2 - 1 if i2 > 0 else ring2.size() - 1]
+			if (pi2.y > p.y) != (pj2.y > p.y) \
+					and p.x < (pj2.x - pi2.x) * (p.y - pi2.y) / (pj2.y - pi2.y) + pi2.x:
+				parity2 ^= 1
+		return parity2 == 1
 	var parity := PackedByteArray()
 	parity.resize(_rings.size())
-	for code in (_bands[b] as Array):
+	for code in (_bands[band] as Array):
 		var ri: int = code >> 32
 		var ring: PackedVector2Array = _rings[ri]
 		var i: int = code & 0xFFFFFFFF

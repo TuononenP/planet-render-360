@@ -21,18 +21,52 @@ static func global_px(data: LocationData, xm: float, zm: float, zoom: int) -> Ve
 	var ll := WorldScale.latlon_from_xz(xm, zm, data.latitude, data.longitude)
 	return TileFetcher.global_pixel(ll.x, ll.y, zoom)
 
+## Mercator U/V (0..1) of a viewpoint-relative metre position: U=(lon+180)/360,
+## V=(1-asinh(tan φ)/π)/2. Multiplying by n=(1<<zoom)*256 last is bit-identical
+## to TileFetcher.global_pixel (same ops, same order, ×n last).
+static func merc_uv(data: LocationData, xm: float, zm: float) -> Vector2:
+	var ll := WorldScale.latlon_from_xz(xm, zm, data.latitude, data.longitude)
+	var u := (ll.y + 180.0) / 360.0
+	var lat := clampf(ll.x, -85.0, 85.0)
+	var v := (1.0 - asinh(tan(deg_to_rad(lat))) / PI) / 2.0
+	return Vector2(u, v)
+
 ## Ring height at metre XZ as Vector2(height_m, weight): weight 1 deep
 ## inside the window, fading to 0 over RING_FADE_PX at its edge, 0
 ## outside. Bilinear over pixel centres.
 static func ring_sample(data: LocationData, ring: Dictionary, xm: float, zm: float) -> Vector2:
+	# Typed locals to avoid per-call Dictionary variant overhead.
 	var w: int = ring["width"]
 	var h: int = ring["height"]
-	var p := global_px(data, xm, zm, int(ring["zoom"])) \
-		- (ring["origin_px"] as Vector2) - Vector2(0.5, 0.5)
+	var zoom: int = int(ring["zoom"])
+	var origin: Vector2 = ring["origin_px"] as Vector2
+	var heights: PackedFloat32Array = ring["heights"] as PackedFloat32Array
+	var p := global_px(data, xm, zm, zoom) - origin - Vector2(0.5, 0.5)
 	var edge := minf(minf(p.x, p.y), minf(float(w - 1) - p.x, float(h - 1) - p.y))
 	if edge <= 0.0:
 		return Vector2.ZERO
-	var heights: PackedFloat32Array = ring["heights"]
+	var x0 := mini(int(p.x), w - 2)
+	var y0 := mini(int(p.y), h - 2)
+	var tx := p.x - float(x0)
+	var ty := p.y - float(y0)
+	var i := y0 * w + x0
+	var a := lerpf(heights[i], heights[i + 1], tx)
+	var b := lerpf(heights[i + w], heights[i + w + 1], tx)
+	return Vector2(lerpf(a, b, ty), clampf(edge / RING_FADE_PX, 0.0, 1.0))
+
+## UV-cached variant: caller computed U/V once via merc_uv and reuses for
+## every ring and drape (284k vertices on Ultra). ×n last keeps bit-identical.
+static func ring_sample_uv(ring: Dictionary, u: float, v: float) -> Vector2:
+	var w: int = ring["width"]
+	var h: int = ring["height"]
+	var zoom: int = int(ring["zoom"])
+	var origin: Vector2 = ring["origin_px"] as Vector2
+	var heights: PackedFloat32Array = ring["heights"] as PackedFloat32Array
+	var n := float(1 << zoom) * 256.0
+	var p := Vector2(u * n, v * n) - origin - Vector2(0.5, 0.5)
+	var edge := minf(minf(p.x, p.y), minf(float(w - 1) - p.x, float(h - 1) - p.y))
+	if edge <= 0.0:
+		return Vector2.ZERO
 	var x0 := mini(int(p.x), w - 2)
 	var y0 := mini(int(p.y), h - 2)
 	var tx := p.x - float(x0)
@@ -57,11 +91,34 @@ static func height_m(data: LocationData, xm: float, zm: float,
 			h = lerpf(h, s.x, w)
 	return h
 
+## UV-cached height: same but caller supplied U/V once per vertex.
+static func height_m_uv(data: LocationData, u: float, v: float,
+		fallback_m: float, outer_fade: float = 1.0) -> float:
+	var h := fallback_m
+	var n := data.dem_rings.size()
+	for k in range(n - 1, -1, -1):
+		var s := ring_sample_uv(data.dem_rings[k], u, v)
+		var w: float = s.y * (outer_fade if k == n - 1 else 1.0)
+		if w > 0.0:
+			h = lerpf(h, s.x, w)
+	return h
+
 ## Drape UV (0..1 inside the window, outside = not covered).
 static func drape_uv(data: LocationData, drape: Dictionary, xm: float, zm: float) -> Vector2:
-	var p := global_px(data, xm, zm, int(drape["zoom"]))
-	var size: Vector2i = drape["size_px"]
-	return (p - (drape["origin_px"] as Vector2)) / Vector2(size)
+	var zoom: int = int(drape["zoom"])
+	var origin: Vector2 = drape["origin_px"] as Vector2
+	var size: Vector2i = drape["size_px"] as Vector2i
+	var p := global_px(data, xm, zm, zoom)
+	return (p - origin) / Vector2(size)
+
+## UV-cached drape UV: caller computed U/V once per vertex.
+static func drape_uv_uv(drape: Dictionary, u: float, v: float) -> Vector2:
+	var zoom: int = int(drape["zoom"])
+	var origin: Vector2 = drape["origin_px"] as Vector2
+	var size: Vector2i = drape["size_px"] as Vector2i
+	var n := float(1 << zoom) * 256.0
+	var p := Vector2(u * n, v * n)
+	return (p - origin) / Vector2(size)
 
 ## Latitude-only treeline / snowline (ClimateModel owns both; these
 ## delegators keep existing callers). Place colours use the CHELSA
@@ -71,6 +128,20 @@ static func treeline_m(lat: float) -> float:
 
 static func snowline_m(lat: float, season: int) -> float:
 	return ClimateModel.latitude_snowline_m(lat, season)
+
+## Per-build climate params hoisted from ramp_color: compute once per
+## FarTerrainBuilder.build_far, reuse for 284k vertices.
+static func climate_params(data: LocationData) -> Dictionary:
+	var tl: float = ClimateModel.treeline_m(data)
+	var sl: float = ClimateModel.snowline_m(data, data.season)
+	var forest := Color(0.17, 0.25, 0.13)
+	var meadow := Color(0.33, 0.42, 0.20)
+	var dry: Color = ClimateModel.grass_tint(data, data.season)
+	var arid: bool = ClimateModel.arid(data)
+	if dry.a > 0.0:
+		meadow = Color(dry.r, dry.g, dry.b).linear_to_srgb()
+		forest = forest.lerp(meadow, 0.35 if arid else 0.15)
+	return {"tl": tl, "sl": sl, "forest": forest, "meadow": meadow, "dry_a": dry.a, "arid": arid}
 
 ## Mountain colour ramp for terrain with no imagery (returned LINEAR,
 ## from sRGB picks — the v1 ramp fed sRGB values as linear and washed
@@ -82,16 +153,17 @@ static func ramp_color(data: LocationData, nrm: Vector3, h_asl: float,
 	if water:
 		# Alpha 0 flags water for the ring shader's water shading.
 		return Color(0.149, 0.263, 0.247, 0.0).srgb_to_linear()  # #26433F (T3.8)
-	var tl := ClimateModel.treeline_m(data)
-	var sl := ClimateModel.snowline_m(data, data.season)
+	var tl: float = ClimateModel.treeline_m(data)
+	var sl: float = ClimateModel.snowline_m(data, data.season)
 	var forest := Color(0.17, 0.25, 0.13)
 	var meadow := Color(0.33, 0.42, 0.20)
 	# Climate (CHELSA): dry summers turn the meadows golden, arid ground
 	# reads sparse; forests stay dark (evergreen oak, chaparral, pine).
-	var dry := ClimateModel.grass_tint(data, data.season)
+	var dry: Color = ClimateModel.grass_tint(data, data.season)
+	var arid: bool = ClimateModel.arid(data)
 	if dry.a > 0.0:
 		meadow = Color(dry.r, dry.g, dry.b).linear_to_srgb()
-		forest = forest.lerp(meadow, 0.35 if ClimateModel.arid(data) else 0.15)
+		forest = forest.lerp(meadow, 0.35 if arid else 0.15)
 	var alpine := Color(0.42, 0.43, 0.32)
 	var rock := Color(0.40, 0.38, 0.36)
 	var snow := Color(0.90, 0.92, 0.95)
@@ -103,6 +175,31 @@ static func ramp_color(data: LocationData, nrm: Vector3, h_asl: float,
 	var high := smoothstep(tl, tl + 500.0, h_asl)
 	c = c.lerp(rock, clampf(maxf(steep, high * 0.85), 0.0, 1.0))
 	# Snow settles on what is not too steep to hold it.
+	var hold := smoothstep(0.45, 0.70, nrm.y)
+	var snow_w := smoothstep(sl - 200.0, sl + 200.0, h_asl + (noise - 0.5) * 160.0) * hold
+	c = c.lerp(snow, snow_w)
+	var shade := 0.92 + noise * 0.16
+	return Color(c.r * shade, c.g * shade, c.b * shade).srgb_to_linear()
+
+## Cached variant: uses precomputed climate_params to avoid per-vertex
+## ClimateModel lookups (treeline/snowline/grass_tint/arid) — same math.
+static func ramp_color_cached(climate: Dictionary, nrm: Vector3, h_asl: float,
+		water: bool, noise: float) -> Color:
+	if water:
+		return Color(0.149, 0.263, 0.247, 0.0).srgb_to_linear()
+	var tl: float = climate["tl"]
+	var sl: float = climate["sl"]
+	var forest: Color = climate["forest"]
+	var meadow: Color = climate["meadow"]
+	var alpine := Color(0.42, 0.43, 0.32)
+	var rock := Color(0.40, 0.38, 0.36)
+	var snow := Color(0.90, 0.92, 0.95)
+	var flat := clampf((nrm.y - 0.80) / 0.15, 0.0, 1.0)
+	var c := forest.lerp(meadow, clampf(flat * 0.8 + (noise - 0.5) * 0.5, 0.0, 1.0))
+	c = c.lerp(alpine, smoothstep(tl - 150.0, tl + 150.0, h_asl))
+	var steep := 1.0 - smoothstep(0.55, 0.80, nrm.y)
+	var high := smoothstep(tl, tl + 500.0, h_asl)
+	c = c.lerp(rock, clampf(maxf(steep, high * 0.85), 0.0, 1.0))
 	var hold := smoothstep(0.45, 0.70, nrm.y)
 	var snow_w := smoothstep(sl - 200.0, sl + 200.0, h_asl + (noise - 0.5) * 160.0) * hold
 	c = c.lerp(snow, snow_w)

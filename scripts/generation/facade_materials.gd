@@ -44,6 +44,9 @@ static func begin_build() -> void:
 	_distant_roof_mats.clear()
 	_roof_mats.clear()
 	BuildingTrim._mats.clear()
+	FacadeComposer.clear_cache()
+	StoreyComposer.clear_cache()
+	FacadeTextures._store_used.clear()
 	MaterialLibrary.begin_build()
 
 ## Live census for the T4.3/T7.2 instance-count asserts.
@@ -264,8 +267,9 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 	if _facade_texs.has(tkey):
 		texs = _facade_texs[tkey]
 	else:
-		texs = StoreyComposer.compose_ground(set_name, kind, detail, style, fascia,
-			Callable(MaterialLibrary, "_set_image"))
+		texs = FacadeTextures.composed(["ground", set_name, kind, detail, style, fascia],
+			func() -> Dictionary: return StoreyComposer.compose_ground(set_name, kind, detail,
+				style, fascia, Callable(MaterialLibrary, "_set_image")))
 		_facade_texs[tkey] = texs
 	var m := _material_from(texs, set_name, detail, tint)
 	m.set_meta("fc_uv", Vector3(maxf(float(style.get("bay_m", 3.2)), 1.0),

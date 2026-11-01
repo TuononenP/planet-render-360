@@ -37,6 +37,13 @@ const PHOTO_REPS := {"brick": 2, "wood": 2}
 ## concrete's streaks and blotches read as dirty noise at ~4 cm/px.
 const KEEP_CONTRAST := {"concrete": 0.4, "stone": 0.7, "render": 0.7}
 
+static var _wall_cache: Dictionary = {}
+static var _wall_mutex := Mutex.new()
+static func clear_cache() -> void:
+	_wall_mutex.lock()
+	_wall_cache.clear()
+	_wall_mutex.unlock()
+
 static func is_tiled(pattern: String) -> bool:
 	return pattern in TILED
 
@@ -142,9 +149,21 @@ static func _sill_streaks(base: Image, ox: int, win: String, hv: float) -> void:
 ## `reps` x `reps` copies, so the grain is real-sized and repeats cleanly.
 static func _wall_layer(loader: Callable, set_name: String, map_name: String,
 		reps: int, turn: bool = false) -> Image:
+	var n := CELL / reps
+	var key := "%s|%s|%d|%d" % [set_name, map_name, n, 1 if turn else 0]
+	_wall_mutex.lock()
+	if _wall_cache.has(key):
+		var cached: Image = _wall_cache[key] as Image
+		_wall_mutex.unlock()
+		var src2 := cached.duplicate() as Image
+		var out2 := Image.create(CELL * BAYS, CELL, false, Image.FORMAT_RGBA8)
+		for ty in reps:
+			for tx in BAYS * reps:
+				out2.blit_rect(src2, Rect2i(0, 0, n, n), Vector2i(tx * n, ty * n))
+		return out2
+	_wall_mutex.unlock()
 	var src := (loader.call(set_name, map_name) as Image).duplicate() as Image
 	src.convert(Image.FORMAT_RGBA8)
-	var n := CELL / reps
 	src.resize(n, n, Image.INTERPOLATE_BILINEAR)
 	if map_name == "diff" and KEEP_CONTRAST.has(set_name):
 		_soften(src, float(KEEP_CONTRAST[set_name]))
@@ -155,6 +174,13 @@ static func _wall_layer(loader: Callable, set_name: String, map_name: String,
 				for x in n:
 					var c := src.get_pixel(x, y)
 					src.set_pixel(x, y, Color(c.g, 1.0 - c.r, c.b, 1.0))
+	# Memoise the resized source (32 cap, per-build only).
+	_wall_mutex.lock()
+	if _wall_cache.size() >= 32:
+		# Evict oldest (insertion-order dict).
+		_wall_cache.erase(_wall_cache.keys()[0])
+	_wall_cache[key] = src.duplicate()
+	_wall_mutex.unlock()
 	var out := Image.create(CELL * BAYS, CELL, false, Image.FORMAT_RGBA8)
 	for ty in reps:
 		for tx in BAYS * reps:

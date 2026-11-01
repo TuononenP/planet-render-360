@@ -64,20 +64,45 @@ const RADIAL_ASPECT := 1.5
 const OUTER_SKIRT_FRAC := 0.02
 
 ## Far-field subtree: gap-filler apron + mid ring + far ring + far skirt.
-static func build_far(data: LocationData, ground: GroundTruth = null) -> Node3D:
+## `abort` stops it between rows / items; a stopped result is dropped.
+static func build_far(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var root := Node3D.new()
 	root.name = "FarTerrain"
 	root.add_child(_far_ground(data, ground))
 	var t0 := Time.get_ticks_msec()
-	var bands := _ring_bands(data, ground)
+	# 1.4b GroundTruth reuse: FarSampler._water_index_from_ground reuses
+	# GroundTruth._land_index filtered to class=="water" (same PolygonIndex
+	# objects, same input order, same priority). GroundTruth is read-only
+	# after _init so sharing is thread-safe; fallback to rebuilding from
+	# data.land_polygons preserves fingerprint on standalone callers/tests
+	# where ground is null or incomplete. _water_bounds reject is kept
+	# (FarSampler._in_osm_water) for thousands of vertex tests far from
+	# water. Verified: filter is str(poly.get("class",""))=="water" and
+	# points/holes identical in both paths.
+	var water: Array
+	if ground != null and ground._land.size() == ground._land_index.size() and ground._land.size() > 0:
+		water = FarSampler._water_index_from_ground(ground)
+	else:
+		water = _water_index(data)
+	# Freshly built ground above is always index-complete, so reuse is
+	# the hot path; fallback only for direct _ring_bands/_far_terrain callers
+	# or WorldCache restore where ground may be null/incomplete.
+	var wbounds := _water_bounds(water)
+	var bands := _ring_bands(data, ground, water, wbounds, abort)
+	if abort != null and abort.requested:
+		return root
 	for band in bands:
 		root.add_child(band)
-	var farring := _far_terrain(data, ground)
+	var farring := _far_terrain(data, ground, water, wbounds, abort)
+	if abort != null and abort.requested:
+		return root
 	farring.name = "FarRing"
 	root.add_child(farring)
-	var skirt := _far_skirt(data, ground)
+	var skirt := _far_skirt(data, ground, abort)
+	if abort != null and abort.requested:
+		return root
 	skirt.name = "FarSkirt"
 	root.add_child(skirt)
 	print("FAR-TERRAIN built in %d ms (rings=%d drapes=%d bands=%d)" % [
@@ -135,14 +160,18 @@ static func _blend_height(data: LocationData, ground: GroundTruth,
 		surf: Dictionary, x: float, z: float) -> float:
 	return FarSampler._blend_height(data, ground, surf, x, z)
 
+static func _blend_height_uv(data: LocationData, ground: GroundTruth,
+		surf: Dictionary, x: float, z: float, u: float, v: float) -> float:
+	return FarSampler._blend_height_uv(data, ground, surf, x, z, u, v)
+
 static func _water_index(data: LocationData) -> Array:
 	return FarSampler._water_index(data)
 
 static func _far_water(h: float, water_level_m: float, in_osm: bool) -> bool:
 	return FarSampler._far_water(h, water_level_m, in_osm)
 
-static func _in_osm_water(p: Vector2, index: Array) -> bool:
-	return FarSampler._in_osm_water(p, index)
+static func _in_osm_water(p: Vector2, index: Array, bounds: Rect2 = Rect2()) -> bool:
+	return FarSampler._in_osm_water(p, index, bounds)
 
 static func far_color_at(data: LocationData, nrm: Vector3, h_asl: float,
 		water: bool, x: float, z: float) -> Color:
@@ -204,12 +233,13 @@ static func _far_ground(data: LocationData, ground: GroundTruth) -> MeshInstance
 ## a distance-scaled skirt at the outer edge. Normals come from the
 ## mesh neighbours (one height sample per vertex). Empty (no meshes)
 ## when there is no far data to blend toward.
-static func _ring_bands(data: LocationData, ground: GroundTruth = null) -> Array:
+static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: Array = [], wbounds: Rect2 = Rect2(), abort: BuildAbort = null) -> Array:
 	var grid := data.far_grid_size
 	if data.far_heights.size() != grid * grid or grid < 2:
 		return []
 	if ground == null:
 		ground = GroundTruth.new(data)
+	var _has_water_arg := not water.is_empty() or wbounds.has_area()
 	var surf := _surface(data)
 	var s_0: float = surf["s_0"]
 	var r_out: float = surf["r1"]
@@ -232,9 +262,13 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null) -> Array
 			k_mid = k
 			break
 	var loops := radii.size()
+	# Per-build climate hoist: compute once, reuse for 284k vertices.
+	var climate := FarSurface.climate_params(data)
 	var pos := PackedVector3Array()
 	pos.resize(loops * per)
 	for k in loops:
+		if abort != null and abort.requested:
+			return []
 		var r := radii[k]
 		for side in 4:
 			for i in segs:
@@ -246,15 +280,20 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null) -> Array
 					p = Vector2(-t, r)
 				elif side == 3:
 					p = Vector2(-r, -t)
+				# U/V cached height: compute merc U/V once per vertex, reuse for rings+drapes.
+				var uv := FarSurface.merc_uv(data, p.x / m2u, p.y / m2u)
 				pos[k * per + side * segs + i] = Vector3(p.x,
-					_blend_height(data, ground, surf, p.x, p.y), p.y)
+					_blend_height_uv(data, ground, surf, p.x, p.y, uv.x, uv.y), p.y)
 	var normals := PackedVector3Array()
 	normals.resize(pos.size())
 	var colors := PackedColorArray()
 	colors.resize(pos.size())
-	var water := _water_index(data)
-	var wbounds := _water_bounds(water)
+	if not _has_water_arg:
+		water = _water_index(data)
+		wbounds = _water_bounds(water)
 	for k in loops:
+		if abort != null and abort.requested:
+			return []
 		var ki := maxi(k - 1, 0) * per
 		var ko := mini(k + 1, loops - 1) * per
 		for j in per:
@@ -265,8 +304,9 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null) -> Array
 			if nrm.y < 0.0:
 				nrm = -nrm
 			normals[k * per + j] = nrm
-			colors[k * per + j] = far_color_at(data, nrm, ground.asl_y(v.y),
-				_is_wet(ground, v.y, Vector2(v.x, v.z), water, wbounds), v.x, v.z)
+			colors[k * per + j] = FarSampler.far_color_at_cached(climate, data, nrm,
+				ground.asl_y(v.y), _is_wet(ground, v.y, Vector2(v.x, v.z), water, wbounds),
+				v.x, v.z)
 	var out: Array = []
 	var mid := _band_mesh(data, pos, normals, colors, per, 0, k_mid,
 		_drapes_for(data, MID_RADIUS_M), 0.0)
@@ -300,8 +340,8 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 		var outer := k * per
 		for j in per:
 			var j1 := (j + 1) % per
-			indices.append_array([outer + j, outer + j1, inner + j,
-				outer + j1, inner + j1, inner + j])
+			indices.push_back(outer + j); indices.push_back(outer + j1); indices.push_back(inner + j)
+			indices.push_back(outer + j1); indices.push_back(inner + j1); indices.push_back(inner + j)
 	if skirt_u > 0.0:
 		# Outer skirt: same XZ as the edge loop, dropped, so the
 		# ring/far hand-off never shows a void sliver from any yaw.
@@ -314,20 +354,25 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 			cols.append(cols[edge + j])
 		for j in per:
 			var j1 := (j + 1) % per
-			indices.append_array([edge + j, base + j, edge + j1,
-				edge + j1, base + j, base + j1])
+			indices.push_back(edge + j); indices.push_back(base + j); indices.push_back(edge + j1)
+			indices.push_back(edge + j1); indices.push_back(base + j); indices.push_back(base + j1)
 	var fine: Dictionary = drapes[0] if drapes[0] != null else {}
 	var coarse: Dictionary = drapes[1] if drapes[1] != null else {}
+	# Typed locals for drape dict fields: avoid per-vertex Dictionary lookups.
+	var fine_empty: bool = fine.is_empty()
+	var coarse_empty: bool = coarse.is_empty()
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
 	uvs.resize(verts.size())
 	uv2s.resize(verts.size())
 	for i in verts.size():
 		var v := verts[i]
-		if not fine.is_empty():
-			uvs[i] = FarSurface.drape_uv(data, fine, v.x / m2u, v.z / m2u)
-		if not coarse.is_empty():
-			uv2s[i] = FarSurface.drape_uv(data, coarse, v.x / m2u, v.z / m2u)
+		# U/V once per vertex, reused for both drapes (bit-identical to per-drape global_px).
+		var uv_cache := FarSurface.merc_uv(data, v.x / m2u, v.z / m2u)
+		if not fine_empty:
+			uvs[i] = FarSurface.drape_uv_uv(fine, uv_cache.x, uv_cache.y)
+		if not coarse_empty:
+			uv2s[i] = FarSurface.drape_uv_uv(coarse, uv_cache.x, uv_cache.y)
 	return FarSurface.drape_mesh(verts, nrms, cols, uvs, uv2s, indices,
 		fine.get("texture", null), coarse.get("texture", null), false, data)
 
@@ -339,7 +384,7 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 ## is the separate _far_skirt mesh.
 ## Keeps the v1 grid²-vertex shape (tests build a 16x16 mesh) and the
 ## empty-mesh-on-absence contract.
-static func _far_terrain(data: LocationData, ground: GroundTruth = null) -> MeshInstance3D:
+static func _far_terrain(data: LocationData, ground: GroundTruth = null, water: Array = [], wbounds: Rect2 = Rect2(), abort: BuildAbort = null) -> MeshInstance3D:
 	var grid := data.far_grid_size
 	if data.far_heights.size() != grid * grid or grid < 2:
 		return MeshInstance3D.new()
@@ -348,25 +393,38 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null) -> Mesh
 	var surf := _surface(data)
 	var span_u: float = surf["span_u"]
 	var r1: float = surf["r1"]
-	var water := _water_index(data)
+	var _has_w := not water.is_empty() or wbounds.has_area()
+	if not _has_w:
+		water = _water_index(data)
+		wbounds = _water_bounds(water)
+	# The union-bounds reject is new on the z8 grid: a 1-unit margin keeps
+	# it from flipping a post on a polygon's float32 bounds edge (each
+	# PolygonIndex.contains still applies its own exact box test).
+	var wsafe := wbounds.grow(1.0) if wbounds.has_area() else wbounds
 	var m2u := WorldScale.metres_to_units()
 	var step_m := far_span_m(data) / float(grid - 1)
 	# Coarsest drape (widest reach) as the far ring's imagery.
 	var drape: Dictionary = data.far_drapes[data.far_drapes.size() - 1] \
 		if not data.far_drapes.is_empty() else {}
+	var drape_empty: bool = drape.is_empty()
+	var climate_far := FarSurface.climate_params(data)
 	var uvs := PackedVector2Array()
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	for z in grid:
+		if abort != null and abort.requested:
+			return MeshInstance3D.new()
 		for x in grid:
 			var wx := (float(x) / float(grid - 1) - data.far_centre_frac.x) * span_u
 			var wz := (float(z) / float(grid - 1) - data.far_centre_frac.y) * span_u
 			var raw := _sea_floor(ground, data.far_heights[z * grid + x])
 			var h := ground.render_y(raw)
+			# U/V once per vertex for blend + drape + water test.
+			var uv_cache := FarSurface.merc_uv(data, wx / m2u, wz / m2u)
 			if maxf(absf(wx), absf(wz)) < r1:
-				h = _blend_height(data, ground, surf, wx, wz) - TUCK_M * m2u
+				h = _blend_height_uv(data, ground, surf, wx, wz, uv_cache.x, uv_cache.y) - TUCK_M * m2u
 			verts.append(Vector3(wx, h, wz))
 			var hx0 := _sea_floor(ground, data.far_heights[z * grid + maxi(x - 1, 0)])
 			var hx1 := _sea_floor(ground, data.far_heights[z * grid + mini(x + 1, grid - 1)])
@@ -376,14 +434,16 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null) -> Mesh
 			var nrm := Vector3(-(hx1 - hx0) / run_m, 1.0,
 				-(hz1 - hz0) / run_m).normalized()
 			normals.append(nrm)
+			var in_osm := _in_osm_water(Vector2(wx, wz), water, wsafe)
 			var wet := _far_water(raw,
-				ground.asl_y(ground.water_level_m),
-				_in_osm_water(Vector2(wx, wz), water))
-			colors.append(far_color_at(data, nrm, ground.asl_y(ground.render_y(raw)),
+				ground.asl_y(ground.water_level_m), in_osm)
+			colors.append(FarSampler.far_color_at_cached(climate_far, data, nrm, ground.asl_y(ground.render_y(raw)),
 				wet, float(x), float(z)))
-			uvs.append(FarSurface.drape_uv(data, drape, wx / m2u, wz / m2u) \
-				if not drape.is_empty() else Vector2(-1.0, -1.0))
+			uvs.append(FarSurface.drape_uv_uv(drape, uv_cache.x, uv_cache.y) \
+				if not drape_empty else Vector2(-1.0, -1.0))
 	for z in grid - 1:
+		if abort != null and abort.requested:
+			return MeshInstance3D.new()
 		for x in grid - 1:
 			var a := z * grid + x
 			var b := a + 1
@@ -395,7 +455,8 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null) -> Mesh
 			if _inside(verts[a], r1) and _inside(verts[b], r1) \
 					and _inside(verts[c], r1) and _inside(verts[d], r1):
 				continue
-			indices.append_array([a, b, c, b, d, c])
+			indices.push_back(a); indices.push_back(b); indices.push_back(c)
+			indices.push_back(b); indices.push_back(d); indices.push_back(c)
 	return FarSurface.drape_mesh(verts, normals, colors, uvs, uvs, indices,
 		drape.get("texture", null), null, false, data)
 
@@ -408,7 +469,7 @@ static func _inside(v: Vector3, r: float) -> bool:
 ## side (viewpoint near a tile corner) and must read as falling
 ## ground, never a void band or disc edge. Double-sided: from inside,
 ## the sightline past a high edge meets the wall, not the void.
-static func _far_skirt(data: LocationData, ground: GroundTruth = null) -> MeshInstance3D:
+static func _far_skirt(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> MeshInstance3D:
 	var grid := data.far_grid_size
 	if data.far_heights.size() != grid * grid or grid < 2:
 		return MeshInstance3D.new()
@@ -430,6 +491,8 @@ static func _far_skirt(data: LocationData, ground: GroundTruth = null) -> MeshIn
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	for vi in per:
+		if abort != null and abort.requested:
+			return MeshInstance3D.new()
 		var x := vi % grid
 		var z := vi / grid
 		var wx := (float(x) / float(grid - 1) - data.far_centre_frac.x) * span_u
@@ -448,6 +511,6 @@ static func _far_skirt(data: LocationData, ground: GroundTruth = null) -> MeshIn
 		colors.append(c.darkened(0.25))
 	for j in per.size():
 		var j1 := (j + 1) % per.size()
-		indices.append_array([2 * j, 2 * j1, 2 * j + 1,
-			2 * j1, 2 * j1 + 1, 2 * j + 1])
+		indices.push_back(2 * j); indices.push_back(2 * j1); indices.push_back(2 * j + 1)
+		indices.push_back(2 * j1); indices.push_back(2 * j1 + 1); indices.push_back(2 * j + 1)
 	return TerrainBuilder._colored_mesh(verts, normals, colors, indices, 1.0, true)

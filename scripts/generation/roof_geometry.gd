@@ -196,9 +196,19 @@ static func slope_axes(n: Vector3, fu: Vector2 = Vector2.ZERO) -> Array:
 static func tangents_for(normals: PackedVector3Array,
 		fu: Vector2 = Vector2.ZERO) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
+	out.resize(normals.size() * 4)
+	var idx := 0
+	var last_n := Vector3.INF
+	var last_ax: Array = []
+	var last_t := Vector3.ZERO
+	var last_w := 0.0
 	for n in normals:
-		var ax := slope_axes(n, fu)
-		var t: Vector3 = ax[0]
-		var w := 1.0 if n.cross(t).dot(-(ax[1] as Vector3)) > 0.0 else -1.0
-		out.append_array([t.x, t.y, t.z, w])
+		# Normals repeat 3x per triangle — reuse axes.
+		if last_ax.is_empty() or n != last_n:
+			last_ax = slope_axes(n, fu)
+			last_n = n
+			last_t = last_ax[0] as Vector3
+			last_w = 1.0 if n.cross(last_t).dot(-(last_ax[1] as Vector3)) > 0.0 else -1.0
+		out[idx] = last_t.x; out[idx + 1] = last_t.y; out[idx + 2] = last_t.z; out[idx + 3] = last_w
+		idx += 4
 	return out

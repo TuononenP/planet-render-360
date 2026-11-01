@@ -40,6 +40,18 @@ static func _mid_dem_height(data: LocationData, ground: GroundTruth, span_u: flo
 	return ground.render_y(_sea_floor(ground,
 		FarSurface.height_m(data, x / m2u, z / m2u, far_m, fade)))
 
+## UV-cached variant: caller computed U/V once per vertex for ring sampling.
+static func _mid_dem_height_uv(data: LocationData, ground: GroundTruth, span_u: float, x: float, z: float, u: float, v: float) -> float:
+	var uv := _tile_uv(data, span_u, x, z)
+	var far_m := _sample_far_dem(data, uv.x, uv.y)
+	if data.dem_rings.is_empty():
+		return ground.render_y(_sea_floor(ground, far_m))
+	var m2u := WorldScale.metres_to_units()
+	var d_m := maxf(absf(x), absf(z)) / m2u
+	var fade := 1.0 - smoothstep(FarTerrainBuilder.OUTER_RADIUS_M * FarTerrainBuilder.OUTER_FADE, FarTerrainBuilder.OUTER_RADIUS_M, d_m)
+	return ground.render_y(_sea_floor(ground,
+		FarSurface.height_m_uv(data, u, v, far_m, fade)))
+
 ## Terrarium encodes ocean BATHYMETRY (Big Sur's shelf reads -2400 m):
 ## past the detailed sea plane the far surface IS the sea, so heights
 ## clamp to sea level (T3.7). Legacy-squash/procedural data (the -3.0
@@ -77,6 +89,28 @@ static func _blend_height(data: LocationData, ground: GroundTruth,
 		* (1.0 - smoothstep(s_0, edge_hi + (edge_hi - s_0), d))
 	return h - lip
 
+## UV-cached blend: same but U/V computed once per vertex.
+static func _blend_height_uv(data: LocationData, ground: GroundTruth,
+		surf: Dictionary, x: float, z: float, u: float, v: float) -> float:
+	var d := maxf(absf(x), absf(z))
+	var s_0: float = surf["s_0"]
+	var w := smoothstep(s_0, s_0 + float(surf["blend_u"]), d)
+	var dem := _mid_dem_height_uv(data, ground, float(surf["span_u"]), x, z, u, v)
+	if w >= 1.0:
+		return dem
+	# Carved water channels (GroundTruth waterway carve) are NOT ground
+	# the ring may inherit: past the extent the carve clamps outward
+	# and the blend turned it into a 190 m cyan trench beside the Aare
+	# at Interlaken (water surfaces stop at the extent). Ground deeper
+	# than the DEM by more than FarTerrainBuilder.CARVE_TOL_M is lifted to it.
+	var g := maxf(ground.height_at_world(x, z),
+		dem - FarTerrainBuilder.CARVE_TOL_M * WorldScale.metres_to_units())
+	var h := lerpf(g, dem, w)
+	var edge_hi: float = surf["edge_hi"]
+	var lip := FarTerrainBuilder.INNER_TUCK_M * WorldScale.metres_to_units() \
+		* (1.0 - smoothstep(s_0, edge_hi + (edge_hi - s_0), d))
+	return h - lip
+
 ## OSM water polygons (+ hole rings) as edge-banded PolygonIndex
 ## entries: far rings test thousands of vertices, and one lagoon polygon
 ## (Venice: ~15k vertices, a thousand island holes) made a plain
@@ -95,6 +129,34 @@ static func _water_index(data: LocationData) -> Array:
 		out.append(PolygonIndex.new(pts, poly.get("holes", [])))
 	return out
 
+## GroundTruth reuse (1.4b): GroundTruth._land_index already holds a
+## PolygonIndex per data.land_polygons entry in the same order, built from
+## the same points/holes. Filtering it to class=="water" yields the identical
+## Array (same objects, same order, same priority) without rebuilding the
+## banded index, and GroundTruth is read-only after _init so sharing is
+## thread-safe. Falls back to _water_index(data) when ground is null or has
+## no land_index to preserve fingerprint on standalone / test paths.
+static func _water_index_from_ground(ground) -> Array:
+	if ground == null:
+		return []
+	# ground is GroundTruth — untyped to avoid load cycle.
+	var land: Array = ground._land
+	var idx: Array = ground._land_index
+	if land.is_empty() or idx.is_empty() or land.size() != idx.size():
+		return []
+	var out: Array = []
+	for k in land.size():
+		var poly: Dictionary = land[k] if land[k] is Dictionary else {}
+		if str(poly.get("class", "")) != "water":
+			continue
+		var pi = idx[k]
+		if pi != null and not (pi as PolygonIndex).is_empty():
+			out.append(pi)
+		else:
+			# Defensive: skip degenerate (should match _water_index's <3 guard).
+			continue
+	return out
+
 ## Metres ASL reading as open water in true-metre mode (Terrarium
 ## sea pixels decode to ~0 m). The v1 below-datum rule floods every
 ## far valley below the viewpoint in true-metre mode (and misses the
@@ -110,7 +172,10 @@ static func _far_water(h: float, water_level_m: float, in_osm: bool) -> bool:
 		return h < water_level_m + 1.0
 	return h < FarTerrainBuilder.SEA_LEVEL_M
 
-static func _in_osm_water(p: Vector2, index: Array) -> bool:
+static func _in_osm_water(p: Vector2, index: Array, bounds: Rect2 = Rect2()) -> bool:
+	# Early reject via union bounds: saves thousands of polygon_index checks far from water.
+	if bounds.has_area() and not bounds.has_point(p):
+		return false
 	for entry in index:
 		if (entry as PolygonIndex).contains(p):
 			return true
@@ -122,6 +187,12 @@ static func _in_osm_water(p: Vector2, index: Array) -> bool:
 static func far_color_at(data: LocationData, nrm: Vector3, h_asl: float,
 		water: bool, x: float, z: float) -> Color:
 	return FarSurface.ramp_color(data, nrm, h_asl, water,
+		TerrainBuilder._hash(x * 1.3, z * 1.7))
+
+## Cached variant uses precomputed climate_params to avoid per-vertex CHELSA lookups.
+static func far_color_at_cached(climate: Dictionary, data: LocationData, nrm: Vector3, h_asl: float,
+		water: bool, x: float, z: float) -> Color:
+	return FarSurface.ramp_color_cached(climate, nrm, h_asl, water,
 		TerrainBuilder._hash(x * 1.3, z * 1.7))
 
 ## Seam hook (T3.6/T3.7): the far albedo the rings render at world XZ
@@ -148,8 +219,7 @@ static func _water_bounds(index: Array) -> Rect2:
 
 static func _is_wet(ground: GroundTruth, h_render: float, p: Vector2,
 		index: Array, bounds: Rect2) -> bool:
-	var in_osm := bounds.has_area() and bounds.has_point(p) \
-		and _in_osm_water(p, index)
+	var in_osm := _in_osm_water(p, index, bounds)
 	return _far_water(ground.asl_y(h_render),
 		ground.asl_y(ground.water_level_m), in_osm)
 
