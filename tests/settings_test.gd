@@ -72,6 +72,32 @@ func _run() -> void:
 		failures.append("preset should persist across instances")
 	saved.set_preset(RenderSettings.Preset.HIGH)
 
+	# Appearance persists too, and saving the preset from a fresh
+	# instance keeps it; the device's own choices are restored after.
+	var device := RenderSettings.new()
+	device.load_settings()
+	saved.set_accent(3, true)
+	saved.set_layout(2)
+	RenderSettings.new().set_preset(RenderSettings.Preset.HIGH)
+	var looks := RenderSettings.new()
+	looks.load_settings()
+	if looks.accent != 3 or not looks.accent_auto or looks.layout != 2:
+		failures.append("accent/layout should persist, got %d/%s/%d"
+			% [looks.accent, looks.accent_auto, looks.layout])
+	device.set_accent(device.accent, device.accent_auto)
+	device.set_layout(device.layout)
+
+	# Data formatting from the design system.
+	if UiTheme.cache_size(86 * 1048576) != "86 MB" \
+			or UiTheme.cache_size(int(1.4 * 1073741824.0)) != "1.4 GB":
+		failures.append("cache size should read 86 MB / 1.4 GB")
+	var now := Time.get_unix_time_from_system()
+	if not UiTheme.relative_time(now, now).begins_with("Today, ") \
+			or UiTheme.relative_time(now - 86400.0, now) != "Yesterday":
+		failures.append("relative time should read Today, hh:mm / Yesterday")
+	if LocationData.known_place(10.0, -20.0) != "10.0000° N  20.0000° W":
+		failures.append("unnamed points should use the coordinate format")
+
 	# The governor honours the ceiling in both directions.
 	var governor := QualityGovernor.new()
 	var viewport := SubViewport.new()
@@ -155,7 +181,8 @@ func _run() -> void:
 		failures.append("governor label should be the tier plus any reduction: %s / %s"
 			% [QualityGovernor.step_label(2, 2), QualityGovernor.step_label(2, 0)])
 	# Offline storage management: size is readable, label reports it.
-	if screen._storage_label == null or not screen._storage_label.text.contains("MB"):
+	if screen._storage_label == null or not (screen._storage_label.text.contains(" MB ")
+			or screen._storage_label.text.contains(" GB ")):
 		failures.append("settings should report offline cache size")
 	if OfflineDownloader.cache_size_bytes() < 0:
 		failures.append("cache size should be readable")

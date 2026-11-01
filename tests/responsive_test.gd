@@ -26,18 +26,18 @@ func _run() -> void:
 	# Breakpoint thresholds
 	if Responsive.layout_for_width(390.0) != Responsive.Layout.COMPACT:
 		_fail(failures, "390pt should be COMPACT")
-	if Responsive.layout_for_width(639.0) != Responsive.Layout.COMPACT:
-		_fail(failures, "639pt should be COMPACT")
-	if Responsive.layout_for_width(640.0) != Responsive.Layout.MEDIUM:
-		_fail(failures, "640pt should be MEDIUM")
-	if Responsive.layout_for_width(1099.0) != Responsive.Layout.MEDIUM:
-		_fail(failures, "1099pt should be MEDIUM")
-	if Responsive.layout_for_width(1100.0) != Responsive.Layout.EXPANDED:
-		_fail(failures, "1100pt should be EXPANDED")
-	if Responsive.history_columns(Responsive.Layout.COMPACT) != 1 \
-			or Responsive.history_columns(Responsive.Layout.MEDIUM) != 2 \
-			or Responsive.history_columns(Responsive.Layout.EXPANDED) != 3:
-		_fail(failures, "history columns should be 1/2/3 by layout")
+	if Responsive.layout_for_width(599.0) != Responsive.Layout.COMPACT:
+		_fail(failures, "599pt should be COMPACT")
+	if Responsive.layout_for_width(600.0) != Responsive.Layout.MEDIUM:
+		_fail(failures, "600pt should be MEDIUM")
+	if Responsive.layout_for_width(1023.0) != Responsive.Layout.MEDIUM:
+		_fail(failures, "1023pt should be MEDIUM")
+	if Responsive.layout_for_width(1024.0) != Responsive.Layout.EXPANDED:
+		_fail(failures, "1024pt should be EXPANDED")
+	if Responsive.history_columns(Responsive.Layout.COMPACT) != 2 \
+			or Responsive.history_columns(Responsive.Layout.MEDIUM) != 3 \
+			or Responsive.history_columns(Responsive.Layout.EXPANDED) != 4:
+		_fail(failures, "history columns should be 2/3/4 by layout")
 	if Responsive.page_padding(Responsive.Layout.COMPACT) >= Responsive.page_padding(Responsive.Layout.EXPANDED):
 		_fail(failures, "padding should grow with layout")
 
@@ -245,18 +245,19 @@ func _run() -> void:
 	history.size = Vector2(390, 844)
 	history._on_resized()
 	await process_frame
-	if history._list.columns != 1:
-		_fail(failures, "history at 390pt should be 1 column")
+	# Design system: 2 columns on phones, 3–5 on wider windows.
+	if history._list.columns != 2:
+		_fail(failures, "history at 390pt should be 2 columns")
 	history.size = Vector2(834, 1112)
 	history._on_resized()
 	await process_frame
-	if history._list.columns != 2:
-		_fail(failures, "history at 834pt should be 2 columns")
+	if history._list.columns != 3:
+		_fail(failures, "history at 834pt should be 3 columns")
 	history.size = Vector2(1280, 800)
 	history._on_resized()
 	await process_frame
-	if history._list.columns != 3:
-		_fail(failures, "history at 1280pt should be 3 columns")
+	if history._list.columns != 4:
+		_fail(failures, "history at 1280pt should be 4 columns")
 	history.toast("Still finishing the last scene.")
 	if not history._toast.visible or history._toast_label.text != "Still finishing the last scene.":
 		_fail(failures, "history toast should show its message")

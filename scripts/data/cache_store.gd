@@ -176,6 +176,10 @@ func save_store() -> void:
 ## that generated at another preset pass place_cache_keys(lat, lon, p)).
 func add_entry(place_name: String, lat: float, lon: float,
 		cache_keys: Dictionary = {}) -> void:
+	var favourite := false
+	for e in entries:
+		if abs(float(e.get("lat", 999.0)) - lat) < 0.0001 and abs(float(e.get("lon", 999.0)) - lon) < 0.0001:
+			favourite = favourite or bool(e.get("favourite", false))
 	entries = entries.filter(func(e: Dictionary) -> bool:
 		return not (abs(float(e.get("lat", 999.0)) - lat) < 0.0001 \
 			and abs(float(e.get("lon", 999.0)) - lon) < 0.0001))
@@ -184,7 +188,7 @@ func add_entry(place_name: String, lat: float, lon: float,
 	entries.push_front({
 		"name": place_name, "lat": lat, "lon": lon,
 		"cached": true, "timestamp": Time.get_unix_time_from_system(),
-		"cache_version": DATA_VERSION, "cache_keys": keys,
+		"cache_version": DATA_VERSION, "cache_keys": keys, "favourite": favourite,
 	})
 	while entries.size() > MAX_ENTRIES:
 		entries.pop_back()
@@ -197,6 +201,33 @@ func entry_cache_status(entry: Dictionary) -> Dictionary:
 
 func clear() -> void:
 	entries.clear()
+	save_store()
+
+## History favourites pin to the top (HistoryScreen).
+func set_favourite(entry: Dictionary, on: bool) -> void:
+	entry["favourite"] = on
+	save_store()
+
+## Bytes the entry's cached files take on the device.
+static func entry_bytes(entry: Dictionary) -> int:
+	var total := 0
+	var keys: Dictionary = entry.get("cache_keys", {})
+	for layer in keys:
+		for k in keys[layer]:
+			total += _file_bytes(str(k))
+	return total
+
+## Remove from cache: deletes the entry's cached files (tiles shared
+## with a nearby place download again when that place opens) and drops
+## it from History.
+func remove_place(entry: Dictionary) -> void:
+	var keys: Dictionary = entry.get("cache_keys", {})
+	for layer in keys:
+		for k in keys[layer]:
+			if FileAccess.file_exists(str(k)):
+				DirAccess.remove_absolute(str(k))
+	entries.erase(entry)
+	_tracked_bytes = -1
 	save_store()
 
 # --- LRU size cap + per-layer invalidation (all static) ---
