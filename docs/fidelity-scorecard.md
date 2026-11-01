@@ -226,3 +226,32 @@ comparison instead of a grade (see §3(f) and §6 report format `NO-REFERENCE`).
 photos, and must never be scored against as references. Plan Open Q3 stays open:
 adding a CC-licensed or user-provided photo for a listed location upgrades it to
 full (f) scoring; the PRD §2 row and this table are updated together in that task.
+
+## 9. Preset vantage ratings — realism v3 (R-1.1)
+
+Each quick-pick preset now has CC-licensed reference photos, listed with licence and source in
+`visual-plan/refs/<id>/README.md` (the photos themselves are gitignored and kept locally). That upgrades all 13 preset vantages to full (f) scoring.
+The renders are the curated opening views (`PresetViews`). One row per preset per round. A grade
+from an agent is a pre-rating; the human gate (plan §Verification 5) re-rates it.
+
+Round r4, 2026-11-01:
+- Captures: `visual-plan/reviews/vantage-r4-2026-11-01/` (Venice:
+  `vantage-r4-venice-2026-11-01/`).
+- Conditions: High preset, local golden hour, clear summer.
+- Rater: Claude (agent pre-rating).
+
+| preset | grade | biggest remaining tell |
+|---|---|---|
+| Paris | recognisable | Grass tufts on the Trocadéro paving; plaza too bright |
+| Alps | recognisable | Lakes and peaks right; valley floor reads flat green, no rock band on the far peaks |
+| Banff | stylised | No Banff Springs Hotel model (generic blocks); woods uniform |
+| Big Sur | stylised | No Bixby arch; coast and creek right; dry hills too yellow |
+| Tokyo | stylised | Scramble and plazas render as lawn; uniform pale towers, no signs |
+| New York | recognisable | Skyline layout right; far towers are flat prisms; water too cyan |
+| Stockholm | recognisable | Gamla stan reads as generic blocks; no Riddarholmen spire |
+| Monaco | recognisable | Harbour and Monte-Carlo right; marina without boats |
+| Dubai | recognisable | Burj Khalifa centred but stepped grey prism; far towers flat |
+| London | recognisable | Palace, Big Ben and the Eye placed right; facades too clean |
+| Rome | recognisable | Colosseum framed as in the photo; Oppio slope reads as lawn |
+| Venice | recognisable | Canal and Salute right; grassy banks where there are fondamenta |
+| Seoul | stylised | No Gwanghwamun gate model; square reads as a park |

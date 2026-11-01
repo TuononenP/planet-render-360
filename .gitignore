@@ -70,3 +70,7 @@ generated_images/.tbh-generated-images.lock
 # Raw image-generation dumps at the repo root of generated_images/;
 # curated results belong in named subfolders (prototypes/, screenshots/)
 /generated_images/call_*
+
+visual-plan/reviews/**/*.png
+visual-plan/reviews/**/*.jpg
+visual-plan/refs/**/*.jpg
