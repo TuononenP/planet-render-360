@@ -11,13 +11,17 @@ extends RefCounted
 ## `h` = overall height (top of the highest capsule), `l` = footprint
 ## length along the wheel. Mapped footprints that cover only the base
 ## (shorter than ~0.6 h) fall back to a diameter from the height.
+## Largest wheel diameter per unit of overall height (the rest is the
+## capsules above the rim and the clearance under it).
+const DIAMETER_PER_HEIGHT := 0.88
+
 static func build(lm: LandmarkMesh, h: float, l: float) -> void:
 	lm.use("Steel", LandmarkMaterials.paint("#E6E9EC", 0.45, 0.55))
 	lm.use("Cable", LandmarkMaterials.paint("#B9C0C7", 0.5, 0.7))
 	lm.use("Capsule", LandmarkMaterials.glass("#7F97A6"))
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#BDB9B0", 4.0))
-	var d := l if l >= h * 0.6 else h * 0.88
-	d = minf(d, h * 0.88)
+	var d := l if l >= h * 0.6 else h * DIAMETER_PER_HEIGHT
+	d = minf(d, h * DIAMETER_PER_HEIGHT)
 	var r := d * 0.5
 	var cs := clampf(d * 0.035, 1.2, 5.0)  # capsule size
 	var hub_y := maxf(h - r - cs * 1.1, r + cs * 1.5)
@@ -50,16 +54,16 @@ static func build(lm: LandmarkMesh, h: float, l: float) -> void:
 				hub + pts[k] + Vector3(-sx * rim_off, 0, 0), cable)
 	lm.beam("Steel", hub + Vector3(-hub_len * 0.5, 0, 0), hub + Vector3(hub_len * 0.5, 0, 0),
 		clampf(d * 0.035, 1.0, 5.0))
-	# Capsules ride outside the rim, long axis parallel to the axle.
+	# Capsules ride outside the rim, long axis parallel to the axle, and
+	# hang upright like real gondolas (they never tilt with the rim).
 	var n := clampi(int(round(d * 0.26)), 12, 40)
 	for k in n:
 		var a := TAU * float(k) / float(n)
 		var dir := Vector3(0, cos(a), sin(a))
 		var c := hub + dir * (r + cs * 0.65)
-		var basis := Basis(Vector3.RIGHT, -a)
-		lm.box("Capsule", c, Vector3(cs * 1.5, cs * 0.8, cs * 0.8), basis)
+		lm.box("Capsule", c, Vector3(cs * 1.5, cs * 0.8, cs * 0.8))
 		for sx in [-1.0, 1.0]:
-			lm.box("Steel", c + Vector3(sx * cs * 0.75, 0, 0), Vector3(cs * 0.08, cs * 0.85, cs * 0.85), basis)
+			lm.box("Steel", c + Vector3(sx * cs * 0.75, 0, 0), Vector3(cs * 0.08, cs * 0.85, cs * 0.85))
 		lm.beam("Steel", hub + dir * r, c - dir * cs * 0.4, rim_w * 0.5)
 	# A-frame legs from a splayed footing to each end of the hub.
 	var spread := clampf(d * 0.2, 3.0, 26.0)

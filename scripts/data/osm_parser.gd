@@ -114,8 +114,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"name": str(el_tags.get("name", "")),
 					"height": entry["height"],
 					"size_x": entry["size_x"], "size_z": entry["size_z"]}
-				if arch == "big_wheel":
-					lmk.merge(_wheel_frame(poly), true)
+				_wheel_landmark(lmk, poly, entry["height_source"] != "default")
 				landmarks.append(lmk)
 		elif el_tags.has("building:part"):
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
@@ -135,12 +134,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		else:
 			var arch2 := OsmTags.archetype_for(el_tags)
 			if arch2 != "":
-				landmarks.append({
+				var lmk2 := {
 					"x": (min_x + max_x) / 2.0, "z": (min_z + max_z) / 2.0,
 					"archetype": arch2, "name": str(el_tags.get("name", "")),
 					"height": 30.0,
 					"size_x": clampf(max_x - min_x, 6.0, 240.0),
-					"size_z": clampf(max_z - min_z, 6.0, 240.0)})
+					"size_z": clampf(max_z - min_z, 6.0, 240.0)}
+				_wheel_landmark(lmk2, poly, false)
+				landmarks.append(lmk2)
 			var cls := OsmTags.land_class(el_tags)
 			if cls != "" and geom.size() >= 3:
 				var entry := {"class": cls, "points": poly, "holes": []}
@@ -172,12 +173,27 @@ static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
 		entry["holes"] = r["holes"]
 		buildings.append(entry)
 		if arch != "":
-			landmarks.append({
+			var lmk := {
 				"x": entry["x"], "z": entry["z"], "archetype": arch,
 				"name": str(tags.get("name", "")),
 				"height": entry["height"],
-				"size_x": entry["size_x"], "size_z": entry["size_z"]})
+				"size_x": entry["size_x"], "size_z": entry["size_z"]}
+			_wheel_landmark(lmk, outer, entry["height_source"] != "default")
+			landmarks.append(lmk)
 			arch = ""
+
+## Observation wheels on every mapping path (building way, plain way,
+## building relation): true bearing and along/across footprint from the
+## outline, and when the height is only a default, the height a wheel of
+## the footprint's length would have, so a 120 m wheel is not built from
+## a 10 m placeholder.
+static func _wheel_landmark(lmk: Dictionary, poly: PackedVector2Array, height_known: bool) -> void:
+	if lmk["archetype"] != "big_wheel" or poly.size() < 2:
+		return
+	lmk.merge(_wheel_frame(poly), true)
+	if not height_known:
+		lmk["height"] = maxf(float(lmk["height"]),
+			float(lmk["size_z"]) / LandmarkWheel.DIAMETER_PER_HEIGHT)
 
 ## An observation wheel is mapped as a thin slab along the wheel; its
 ## longest edge gives the wheel plane. Returns the yaw that turns local

@@ -32,6 +32,11 @@ func _init() -> void:
 		{"x": 99999.0, "z": 0.0, "monument": true}, {"x": 20.0, "z": 0.0}])
 	if ranked.map(func(c: Dictionary) -> float: return c["x"]) != [500.0, 10.0, 20.0, 99999.0]:
 		failures.append("monument in range must rank first: %s" % str(ranked))
+	var wheels := GenerationPipeline.rank_landmarks([
+		{"x": 10.0, "z": 0.0, "archetype": "church"},
+		{"x": 300.0, "z": 0.0, "archetype": "big_wheel"}])
+	if wheels.map(func(c: Dictionary) -> float: return c["x"]) != [300.0, 10.0]:
+		failures.append("observation wheel in range must rank first: %s" % str(wheels))
 	if failures.is_empty():
 		print("SEARCH OK: parse, short name, empty, encoding")
 		quit(0)
