@@ -11,6 +11,9 @@ const TIMEOUT_MS := 20000
 ## Reads per poll while the body streams in (a tile is 10–40 KB).
 const READS_PER_POLL := 8
 
+## Host this connection talks to (TileFetcher: OSM; VectorTileFetcher:
+## OpenFreeMap or the Terrarium DEM bucket).
+var host := HOST
 ## Tile in flight; meaningful only while busy.
 var tile := Vector3i.ZERO
 var busy := false
@@ -79,7 +82,7 @@ func poll() -> Array:
 		HTTPClient.STATUS_DISCONNECTED:
 			if _sent:
 				return _retry_or_fail()  # server closed an idle keep-alive
-			if _client.connect_to_host(HOST, 443, TLSOptions.client()) != OK:
+			if _client.connect_to_host(host, 443, TLSOptions.client()) != OK:
 				return _fail()
 		HTTPClient.STATUS_CONNECTED:
 			if not _sent:

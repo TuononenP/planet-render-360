@@ -330,7 +330,7 @@ func _ready() -> void:
 	_action_col.add_child(_render_status)
 	_footer = HBoxContainer.new()
 	_footer.add_theme_constant_override("separation", 8)
-	_tip = UiTheme.label("© OpenStreetMap contributors · OpenFreeMap", 12, UiTheme.MUTED)
+	_tip = UiTheme.label("© OpenStreetMap contributors · © OpenMapTiles · OpenFreeMap · Terrain: AWS Terrain Tiles", 12, UiTheme.MUTED)
 	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_footer.add_child(_tip)

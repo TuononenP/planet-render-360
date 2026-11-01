@@ -38,6 +38,7 @@ func _run() -> void:
 
 	# --- View: a wide viewport needs tiles beyond the old +/-2 range ---
 	var map := MapTileView.new()
+	map.vector = false  # these pin the raster tile path
 	root.add_child(map)
 	map.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	map.size = Vector2(1600, 1200)
