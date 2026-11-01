@@ -306,10 +306,10 @@ func _ready() -> void:
 	_info_col.add_child(_facts_box)
 	_info_col.add_child(_weather_chip)
 	_weather_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	MapLandmarkHome.build(self)
 	_btn_row = BoxContainer.new()
 	_btn_row.add_theme_constant_override("separation", 8)
 	_action_col.add_child(_btn_row)
-	MapLandmarkHome.build(self)
 	_render_btn = UiTheme.primary_button("Explore in 360°")
 	_render_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiIcon.apply(_render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
@@ -497,6 +497,7 @@ func _on_picked(lat: float, lon: float) -> void:
 	set_render_status("")
 	_set_selected_quick(-1)
 	selected_name = ""
+	MapLandmarkHome.clear(self)
 	_lat = lat
 	_lon = lon
 	# Keep the map centred on the choice: search and quick picks arrive
@@ -504,11 +505,11 @@ func _on_picked(lat: float, lon: float) -> void:
 	if _canvas != null:
 		_canvas.set_lat_lon(lat, lon)
 	if _globe != null:
-	MapLandmarkHome.clear(self)
 		_globe.pin = Vector2(lat, lon)
 		_globe.queue_redraw()
 	_refresh_labels()
 	MapFacts.request(self)
+	MapLandmarkHome.request(self)
 	AccentSun.follow_now(lat, lon)
 
 ## The selected point, for the Auto accent when no scene is up.
@@ -516,7 +517,6 @@ func selected_point() -> Vector2:
 	return Vector2(_lat, _lon)
 
 ## Name over region ("Venice" / "Italy"), coordinates as an instrument
-	MapLandmarkHome.request(self)
 ## readout. Search results and failures arrive as plain text.
 func _show_place(full_name: String) -> void:
 	var parts := UiTheme.split_place(full_name)
