@@ -147,6 +147,10 @@ void fragment() {
 	if (wf > 0.0) { c = mix(c, texture(fine_tex, UV).rgb * imagery_gain, wf); }
 	// Imagery minus its own baked haze (TerrainGlsl.t_dehaze).
 	c = t_dehaze(c);
+	// Forest and meadow on a mountainside are not rock: the imagery's
+	// greenness holds back the crag relief, stone tint and cliff detail
+	// that otherwise frosted forested slopes with pale speckle.
+	float vegf = smoothstep(0.03, 0.12, (2.0 * c.g - c.r - c.b) / max(c.r + c.g + c.b, 1e-3));
 	float dist = length(VERTEX);
 	vec3 nw = normalize(wnrm);
 	// Far lakes and sea (FarSurface.ramp_color alpha 0): a glossy surface
@@ -161,7 +165,7 @@ void fragment() {
 	float steep0 = smoothstep(0.93, 0.6, nw.y);
 	if (fade > 0.01) {
 		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
-		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water));
+		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf));
 	}
 	if (water > 0.01) {
 		vec2 wg = t_relief(wpos.xz + vec2(TIME * 0.6, TIME * 0.25), max(25.0, dist * 0.004), 2);
@@ -172,7 +176,7 @@ void fragment() {
 	// pulled toward neutral stone.
 	float steep = smoothstep(0.8, 0.55, nw.y);
 	float l = lum(c);
-	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), steep * 0.55);
+	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), steep * 0.55 * (1.0 - 0.8 * vegf));
 	vec3 nmap = vec3(0.5, 0.5, 1.0);
 	float dfade = far_quality >= 2 ? 1.0 - smoothstep(2500.0, 7500.0, dist) : 0.0;
 	if (dfade > 0.01) {
@@ -182,7 +186,7 @@ void fragment() {
 		vec4 a;
 		vec4 n;
 		float exg = (2.0 * c.g - c.r - c.b) / max(c.r + c.g + c.b, 1e-3);
-		int layer = steep > 0.4 ? 4 : (exg > 0.06 ? 5 : 6);
+		int layer = steep > 0.4 && vegf < 0.5 ? 4 : (exg > 0.06 ? 5 : 6);
 		if (layer == 4) {
 			det_side(4, wpos / 5.0, dpx / 5.0, dpy / 5.0, nw, a, n);
 		} else {

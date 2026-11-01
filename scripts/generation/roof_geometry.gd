@@ -14,6 +14,10 @@ extends RefCounted
 ## into spokes of stretched slivers with a serrated eave.
 const INSET_MIN_AREA_M2 := 380.0
 const INSET_CONVEX_RATIO := 0.94
+## Mapped facades step in and out by a few decimetres (bays, pilasters);
+## under the inset roof every step became a narrow sunlit fin. The eave
+## ring is simplified within this many metres first.
+const INSET_SIMPLIFY_M := 0.9
 
 ## The ring offset outward by d (mitred, miter capped at 3d) — the eave
 ## line of an overhanging roof. Winding-agnostic; d <= 0 returns it as is.
@@ -84,7 +88,8 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	if inset:
-		inset_faces(ring, top, rh, verts, normals, uvs, u)
+		inset_faces(simplify_ring(ring, INSET_SIMPLIFY_M * WorldScale.metres_to_units()),
+			top, rh, verts, normals, uvs, u)
 		shape = ""
 	match shape:
 		"gabled":
@@ -111,6 +116,54 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	arrays[Mesh.ARRAY_TANGENT] = tangents_for(normals, u)
 	# Arrays kept: MassBatch / LodRing merge roofs on the build thread.
 	return MeshArrays.mesh(arrays)
+
+## Closed-ring Douglas-Peucker: the ring within `tol` of the original,
+## split at vertex 0 and the vertex farthest from it. Returns the ring
+## unchanged when the result would be degenerate or self-intersecting.
+static func simplify_ring(ring: PackedVector2Array, tol: float) -> PackedVector2Array:
+	var n := ring.size()
+	if n < 5 or tol <= 0.0:
+		return ring
+	var far := 0
+	for i in n:
+		if ring[i].distance_squared_to(ring[0]) > ring[far].distance_squared_to(ring[0]):
+			far = i
+	if far == 0:
+		return ring
+	var keep := PackedByteArray()
+	keep.resize(n)
+	keep[0] = 1
+	keep[far] = 1
+	_dp(ring, 0, far, tol, keep)
+	_dp(ring, far, n, tol, keep)
+	var out := PackedVector2Array()
+	for i in n:
+		if keep[i] == 1:
+			out.append(ring[i])
+	if out.size() < 3 or Geometry2D.triangulate_polygon(out).is_empty():
+		return ring
+	return out
+
+## Marks the vertices of ring[i0..i1] (i1 may equal ring.size(), meaning
+## vertex 0 again) that stray more than tol from the chord.
+static func _dp(ring: PackedVector2Array, i0: int, i1: int, tol: float,
+		keep: PackedByteArray) -> void:
+	if i1 - i0 < 2:
+		return
+	var a := ring[i0]
+	var b := ring[i1 % ring.size()]
+	var best := -1.0
+	var at := -1
+	for i in range(i0 + 1, i1):
+		var d := ring[i].distance_to(Geometry2D.get_closest_point_to_segment(ring[i], a, b))
+		if d > best:
+			best = d
+			at = i
+	if best <= tol:
+		return
+	keep[at] = 1
+	_dp(ring, i0, at, tol, keep)
+	_dp(ring, at, i1, tol, keep)
 
 ## True for a large footprint that is clearly not convex (courtyard
 ## blocks, U and L wings): see INSET_MIN_AREA_M2.

@@ -139,7 +139,9 @@ void fragment() {
 	// rocky ground, so DEM slabs read as ribbed rock faces.
 	vec3 nw = normalize(wnrm);
 	float steep0 = smoothstep(0.86, 0.6, nw.y);
-	float rocky = clamp(steep0 + W0.z + W1.x * 0.8 + W1.z * 0.4, 0.0, 1.0);
+	// Forested and grassy slopes keep their own shading: only bare ground
+	// takes the rock relief (it frosted wooded mountainsides).
+	float rocky = clamp(steep0 + W0.z + W1.x * 0.8 + W1.z * 0.4, 0.0, 1.0) * (1.0 - 0.8 * veg);
 	float relief_fade = 1.0 - smoothstep(600.0, 2400.0, dist_m);
 	if (rocky * relief_fade > 0.01) {
 		vec2 gr = t_relief(g, 26.0, ground_quality >= 2 ? 4 : 2);
@@ -147,7 +149,7 @@ void fragment() {
 	}
 	// Very steep ground (past ~45°) is cliff rock and scree whatever the
 	// cover says; grass and scrub hold on gentler slopes.
-	float steep = smoothstep(0.76, 0.52, nw.y);
+	float steep = smoothstep(0.76, 0.52, nw.y) * (1.0 - 0.7 * veg);
 	W0 *= 1.0 - steep * 0.9;
 	W1 = W1 * (1.0 - steep * 0.9) + vec4(0.75, 0.0, 0.25, 0.0) * steep * 0.9;
 	float wsum = W0.x + W0.y + W0.z + W0.w + W1.x + W1.y + W1.z + W1.w;
