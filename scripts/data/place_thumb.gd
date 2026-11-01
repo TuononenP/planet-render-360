@@ -12,6 +12,8 @@ const DIR := "user://thumbs"
 const WIDTH := 320
 const HEIGHT := 200
 const QUALITY := 0.82
+## Brightest channel a frame may peak at and still count as blank.
+const BLANK_MAX := 0.03
 
 ## Test hook (CacheStore.dir_override precedent): thumbnails resolve
 ## under this directory instead of DIR.
@@ -24,7 +26,9 @@ static func path(lat: float, lon: float) -> String:
 	return "%s/%d_%d.jpg" % [dir, CacheStore.quant(lat), CacheStore.quant(lon)]
 
 ## `img` centre-cropped to the card's aspect and shrunk to WIDTH x HEIGHT,
-## null for an empty image (a headless renderer reads back nothing).
+## null for an empty image (a headless renderer reads back nothing) or a
+## blank one (a viewport read back in the frame after a resize is black).
+## A blank frame never replaces a place's picture.
 static func shrink(img: Image) -> Image:
 	if img == null or img.is_empty() or img.get_width() < 2 or img.get_height() < 2:
 		return null
@@ -42,7 +46,17 @@ static func shrink(img: Image) -> Image:
 		out = out.get_region(Rect2i(0, (h - ch) / 2, w, ch))
 	out.convert(Image.FORMAT_RGB8)
 	out.resize(WIDTH, HEIGHT, Image.INTERPOLATE_LANCZOS)
-	return out
+	return null if is_blank(out) else out
+
+## No pixel brighter than BLANK_MAX: nothing was drawn. Even a night scene
+## has its sky glow, moon or lit windows above that; sampled on a grid.
+static func is_blank(img: Image) -> bool:
+	for y in range(0, img.get_height(), 4):
+		for x in range(0, img.get_width(), 4):
+			var c := img.get_pixel(x, y)
+			if maxf(c.r, maxf(c.g, c.b)) > BLANK_MAX:
+				return false
+	return true
 
 ## Shrinks and writes `img` for the place; false when nothing was saved.
 static func save(img: Image, lat: float, lon: float) -> bool:

@@ -57,10 +57,11 @@ static func advance(minutes: float, dt: float, rise: float, set_m: float, speed_
 		m = w.x + fmod(m - w.x, span)
 	return m
 
-## Minute to show after a frame of `delta` seconds, or -1 when nothing
+## Seconds of play to apply after a frame of `delta`, or -1 when nothing
 ## should change yet (between applied frames, or between reduced-motion
-## steps).
-func tick(delta: float, minutes: float, rise: float, set_m: float, reduced: bool) -> float:
+## steps). The caller advances the clock by them (advance), so the sun's
+## day is only looked up on frames that apply.
+func tick(delta: float, reduced: bool) -> float:
 	if not playing:
 		return -1.0
 	_idle += delta
@@ -69,4 +70,4 @@ func tick(delta: float, minutes: float, rise: float, set_m: float, reduced: bool
 		return -1.0
 	var dt := _idle
 	_idle = 0.0
-	return advance(minutes, dt, rise, set_m, speed())
+	return dt

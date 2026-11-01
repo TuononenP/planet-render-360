@@ -7,7 +7,7 @@ extends RefCounted
 static func _on_season_selected(v: View360, index: int) -> void:
 	# A season button means the season's own mid-month day again.
 	v._date = {}
-	_date_changed(v)
+	date_changed(v)
 	await _select_season(v, index)
 
 static func _select_season(v: View360, index: int) -> void:
@@ -172,7 +172,7 @@ static func spawn_golden_hour(v: View360) -> void:
 	# found on that date too, not on a live-time date still held.
 	v._atmos.date = {}
 	v._date = {}
-	_date_changed(v)
+	date_changed(v)
 	set_time_of_day(v, wrapi(roundi(v._atmos.golden_hour()), 0, 24))
 	v._spawn_golden = true
 
@@ -192,15 +192,13 @@ static func use_live_time(v: View360) -> void:
 	_sync_lapse(v)
 	v._live_time = true
 	v._date = {}
-	_date_changed(v)
+	date_changed(v)
 	_apply_current_time(v)
 
 ## Live time is the place's own clock and date (UTC + its offset), not
 ## the device's.
 static func _apply_current_time(v: View360) -> void:
-	var offset_h := v._atmos.utc_offset_h if v._atmos != null else 0.0
-	var now := Time.get_datetime_dict_from_unix_time(
-		int(Time.get_unix_time_from_system() + offset_h * 3600.0))
+	var now := place_now(v)
 	v._time_hour = float(now.get("hour", 12)) + float(now.get("minute", 0)) / 60.0
 	if v._atmos != null:
 		var lat := v._data.latitude if v._data != null else v._atmos.latitude
@@ -210,6 +208,15 @@ static func _apply_current_time(v: View360) -> void:
 	_city_lights(v)
 	_precip_tint(v)
 	_sync_time_ui(v)
+
+## The place's own clock now ({year, month, day, hour, minute, ...}): UTC
+## plus its offset, approximated from the longitude until the real one
+## arrives. One source for live time, the date picker's today and photo
+## names.
+static func place_now(v: View360) -> Dictionary:
+	var offset_h := v._atmos.utc_offset_h if v._atmos != null else 0.0
+	return Time.get_datetime_dict_from_unix_time(
+		int(Time.get_unix_time_from_system() + offset_h * 3600.0))
 
 ## A minute of the place's day (the sun arc, the [ ] keys); leaves
 ## live time like an hour slot does.
@@ -233,7 +240,7 @@ static func set_date(v: View360, date: Dictionary) -> void:
 	v._live_time = false
 	v._spawn_golden = false
 	v._date = date
-	_date_changed(v)
+	date_changed(v)
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
 	var season := ViewLink.season_for_date(date, v._data.latitude)
@@ -248,7 +255,8 @@ static func date_text(date: Dictionary, with_year: bool = true) -> String:
 	var text := "%d %s" % [int(date["day"]), LocationData.MONTH_SHORT[int(date["month"]) - 1]]
 	return "%s %d" % [text, int(date["year"])] if with_year else text
 
-static func _date_changed(v: View360) -> void:
+## The picked date moved: the arc's label and the date tool follow it.
+static func date_changed(v: View360) -> void:
 	if v._sun_arc != null:
 		# On the arc the year only shows when it is not this year: the bar is narrow.
 		var this_year := int(Time.get_date_dict_from_system().get("year", 0))
@@ -278,11 +286,11 @@ static func _sync_lapse(v: View360) -> void:
 ## A frame while playing: the next minute of the day, applied on the
 ## lapse's own cadence (View360._process).
 static func lapse_tick(v: View360, delta: float) -> void:
+	var dt := v._lapse.tick(delta, UiPrefs.reduce_motion)
+	if dt < 0.0:
+		return  # between applied frames: no solar work at all
 	var t := sun_times(v)
-	var m := v._lapse.tick(delta, v._time_hour * 60.0, t.x, t.y, UiPrefs.reduce_motion)
-	if m < 0.0:
-		return
-	v._time_hour = m / 60.0
+	v._time_hour = TimeLapse.advance(v._time_hour * 60.0, dt, t.x, t.y, v._lapse.speed()) / 60.0
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
 

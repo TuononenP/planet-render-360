@@ -586,12 +586,17 @@ static func layout(v: View360) -> void:
 	ViewTools.layout(v, lay, inspector, pad, w, h, attr_h, Rect2(v._sheet.position, v._sheet.size))
 
 	v._hint.reset_size()
+	# A sheet in the bar's place (the landmark sheet, the date sheet) covers
+	# the spot the round tab would take: the tab waits until it closes.
+	var bar_taken: bool = not inspector and ((v._landmark_panel != null and v._landmark_panel.is_open())
+		or (v._date_picker != null and v._date_picker.visible))
+	v._sheet_tab.visible = not v._inspector_open and not bar_taken
 	var tab_y := h - pad - attr_h - 8.0 - HudParts.SIZE_TOUCH
 	v._sheet_tab.size = Vector2(HudParts.SIZE_TOUCH, HudParts.SIZE_TOUCH)
 	v._sheet_tab.position = Vector2(w - pad - HudParts.SIZE_TOUCH + inset if inspector \
 		else roundf((w - HudParts.SIZE_TOUCH) / 2.0), tab_y)
 	var hint_bottom := v._sheet.position.y - 12.0 if not inspector else h - pad - attr_h - 12.0
-	if not v._inspector_open and not inspector:
+	if v._sheet_tab.visible and not inspector:
 		hint_bottom = tab_y - 8.0
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
 

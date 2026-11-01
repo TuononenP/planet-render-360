@@ -20,6 +20,9 @@ var _pending: Vector2 = Vector2(48.8566, 2.3522)
 var _pending_focus: Dictionary = {}
 ## Saved camera or shared link the pending run reopens, {} for none.
 var _pending_view: Dictionary = {}
+## The view's look (View360.look_key) when its History picture was last
+## taken: leaving an unchanged view skips the read-back and the encode.
+var _thumb_key: Array = []
 var _downloader: OfflineDownloader
 var _download_at := Vector2.ZERO
 ## Bumped per generation and on cancel, so a world still building on
@@ -51,6 +54,9 @@ func _fit_content_scale() -> void:
 	win.content_scale_factor = Responsive.content_scale_factor(Vector2(win.size))
 
 func _ready() -> void:
+	# Before anything reads user://: bring the data across from Godot's
+	# default user directory the first time the app runs from its own.
+	UserDirMigration.run()
 	_store = CacheStore.new()
 	_store.load_store()
 	_settings = RenderSettings.new()
@@ -151,8 +157,11 @@ func _ready() -> void:
 	_view.pref_changed.connect(func(key: String, value: Variant) -> void:
 		_settings.set_pref(key, value))
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
-		PlaceThumb.save(image, lat, lon)
-		_history.refresh())
+		if PlaceThumb.save(image, lat, lon):
+			_thumb_key = _view.look_key()
+		# History rebuilds when it opens; only a visible one needs it now.
+		if _history.visible:
+			_history.refresh())
 	# Go there, beyond the built area: a new scene at the landmark's standoff.
 	_view.visit_requested.connect(func(site: Dictionary, lat: float, lon: float) -> void:
 		if not _generating:
@@ -163,7 +172,9 @@ func _ready() -> void:
 	# Above the view: plain-language notice when live data did not arrive.
 	_notice = DataNotice.new()
 	_notice.retry_requested.connect(func() -> void:
-		_start_generation(_pending.x, _pending.y, _pending_focus, _pending_view))
+		# Keep where the person is looking first, then reopen there.
+		_leave_view()
+		_start_generation(_pending.x, _pending.y, _pending_focus, _retry_view()))
 	add_child(_notice)
 
 	_history = HistoryScreen.new()
@@ -258,7 +269,26 @@ func _leave_view() -> void:
 	if state.is_empty():
 		return
 	_store.set_camera(float(state["lat"]), float(state["lon"]), state)
-	PlaceThumb.save(_view.snapshot(), float(state["lat"]), float(state["lon"]))
+	# The picture costs a full-size read-back and an encode: only when the
+	# view changed since the last one.
+	var key := _view.look_key()
+	if key != _thumb_key and PlaceThumb.save(_view.snapshot(), float(state["lat"]), float(state["lon"])):
+		_thumb_key = key
+
+## What Try again reopens: the camera the person was last at (saved on
+## leaving), keeping the time, season and date a shared link carried. A
+## landmark visit reopens as it was asked for.
+func _retry_view() -> Dictionary:
+	if not _pending_focus.is_empty():
+		return _pending_view
+	var camera := _store.camera_for(_pending.x, _pending.y)
+	if camera.is_empty():
+		return _pending_view
+	var view := _pending_view.duplicate()
+	view.erase("eye_lat")
+	view.erase("eye_lon")
+	view.merge(ViewLink.to_view(camera), true)
+	return view
 
 func _show(screen: Control) -> void:
 	if screen != _view:

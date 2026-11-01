@@ -86,6 +86,20 @@ func _view_link() -> void:
 	_check(bool(view["restore"]) and not bool(view["clear"]) and float(view["eye_m"]) == 6.0,
 		"to_view restores exactly, without the clearance lift")
 	_check(PresetViews.eye_xz(view, 48.8622, 2.2887).length() > 1.0, "the eye offset resolves through PresetViews")
+	var far := ViewLink.parse("pr360://view?lat=48.86&lon=2.29&el=10&eo=100&h=6&b=0&p=0")
+	_check(not far.is_empty() and not far.has("eye_lat") and not far.has("eye_lon"),
+		"an eye thousands of km from the origin is dropped: the view opens at its origin: %s" % [far])
+	var edge := WorldScale.latlon_from_xz(0.0, -1300.0, 48.86, 2.29)
+	_check(not ViewLink.parse("pr360://view?lat=48.86&lon=2.29&el=%.5f&eo=%.5f" % [edge.x, edge.y]).has("eye_lat"),
+		"an eye just past the built ground is dropped too")
+	var inside := WorldScale.latlon_from_xz(300.0, -900.0, 48.86, 2.29)
+	_check(ViewLink.parse("pr360://view?lat=48.86&lon=2.29&el=%.5f&eo=%.5f" % [inside.x, inside.y]).has("eye_lat"),
+		"an eye on the built ground is kept")
+	_check(not ViewLink.to_view({"lat": 48.86, "lon": 2.29, "eye_lat": 10.0, "eye_lon": 100.0}).has("eye_lat"),
+		"to_view drops a far eye as well")
+	for row in PresetViews.ROWS:
+		if row.has("eye_lat"):
+			_check(ViewLink.to_view(row).has("eye_lat"), "%s: a curated eye is within reach" % row["id"])
 
 func _seasons() -> void:
 	var d := func(m: int) -> Dictionary: return {"year": 2026, "month": m, "day": 15}
@@ -123,10 +137,19 @@ func _store_camera() -> void:
 func _thumbs() -> void:
 	var wide := Image.create(1600, 600, false, Image.FORMAT_RGBA8)
 	wide.fill(Color(0.2, 0.5, 0.8))
+	var black := Image.create(800, 500, false, Image.FORMAT_RGBA8)
+	black.fill(Color.BLACK)
+	_check(PlaceThumb.shrink(black) == null and not PlaceThumb.save(black, 5.0, 6.0),
+		"a black frame (read back right after a resize) is never saved")
+	var night := Image.create(800, 500, false, Image.FORMAT_RGBA8)
+	night.fill(Color(0.01, 0.012, 0.02))
+	night.fill_rect(Rect2i(0, 300, 800, 40), Color(0.12, 0.1, 0.2))  # the horizon glow
+	_check(PlaceThumb.shrink(night) != null, "a dark night scene with its sky glow is a picture")
 	var s := PlaceThumb.shrink(wide)
 	_check(s != null and s.get_width() == PlaceThumb.WIDTH and s.get_height() == PlaceThumb.HEIGHT,
 		"a wide capture is cropped and shrunk to card size")
 	var tall := Image.create(300, 900, false, Image.FORMAT_RGB8)
+	tall.fill(Color(0.6, 0.7, 0.5))
 	var t := PlaceThumb.shrink(tall)
 	_check(t != null and t.get_width() == PlaceThumb.WIDTH and t.get_height() == PlaceThumb.HEIGHT, "a tall one too")
 	_check(PlaceThumb.shrink(null) == null and PlaceThumb.shrink(Image.new()) == null, "nothing to shrink, nothing saved")
@@ -185,14 +208,16 @@ func _time_lapse() -> void:
 		full = TimeLapse.advance(full, 1.0, 720.0, 720.0, 1)
 	_check(absf(full - 1440.0 * 0.0) < 1440.0, "stays inside the day")
 	var lapse := TimeLapse.new()
-	_check(lapse.tick(1.0, 600.0, 360.0, 1080.0, false) < 0.0, "paused: nothing to apply")
+	_check(lapse.tick(1.0, false) < 0.0, "paused: nothing to apply")
 	lapse.play()
-	_check(lapse.tick(0.01, 600.0, 360.0, 1080.0, false) < 0.0, "between applied frames: nothing yet")
-	_check(lapse.tick(0.05, 600.0, 360.0, 1080.0, false) > 600.0, "an applied frame moves the clock")
+	_check(lapse.tick(0.01, false) < 0.0, "between applied frames: nothing yet")
+	var dt := lapse.tick(0.05, false)
+	_check(absf(dt - 0.06) < 0.0001, "an applied frame carries the time since the last: %s" % dt)
+	_check(TimeLapse.advance(600.0, dt, 360.0, 1080.0, lapse.speed()) > 600.0, "and moves the clock")
 	lapse.stop()
 	lapse.play()
-	_check(lapse.tick(0.5, 600.0, 360.0, 1080.0, true) < 0.0, "reduced motion waits for its step")
-	var step := lapse.tick(0.6, 600.0, 360.0, 1080.0, true)
+	_check(lapse.tick(0.5, true) < 0.0, "reduced motion waits for its step")
+	var step := TimeLapse.advance(600.0, lapse.tick(0.6, true), 360.0, 1080.0, lapse.speed())
 	_check(step - 600.0 > 20.0, "reduced motion jumps a coarse step: %s" % step)
 	_check(lapse.speed() == 1 and lapse.cycle_speed() == 2 and lapse.cycle_speed() == 4 and lapse.cycle_speed() == 1,
 		"speeds cycle 1x, 2x, 4x")
@@ -401,6 +426,24 @@ func _view_wiring() -> void:
 	_check(UiPrefs.minimap and view._minimap.visible, "M shows the mini-map")
 	press.call(KEY_M)
 	_check(not view._minimap.visible, "and hides it")
+	# A sheet hides the inset for the moment; M still switches the
+	# preference, both ways, and the button tells the truth.
+	press.call(KEY_M)
+	view._landmark_panel.open_list([])
+	ViewChrome.layout(view)
+	_check(UiPrefs.minimap and not view._minimap.visible, "an open landmark sheet hides the on mini-map")
+	press.call(KEY_M)
+	_check(not UiPrefs.minimap and emitted.has(["minimap", false]), "M switches it off even while a sheet hides it")
+	_check(not (view._tool_btns["map"] as Button).get_theme_stylebox("normal").bg_color.is_equal_approx(UiTheme.TEAL),
+		"the map button goes dark with it")
+	press.call(KEY_M)
+	_check(UiPrefs.minimap and not view._minimap.visible, "M switches it back on, still hidden by the sheet")
+	_check((view._tool_btns["map"] as Button).get_theme_stylebox("normal").bg_color.is_equal_approx(UiTheme.TEAL),
+		"and the button lights though the inset is hidden")
+	view._landmark_panel.close()
+	ViewChrome.layout(view)
+	_check(view._minimap.visible, "closing the sheet brings it back")
+	press.call(KEY_M)
 	press.call(KEY_T)
 	_check(view._lapse.playing and not view._live_time, "T plays the time-lapse and leaves live time")
 	_check(view._sun_arc._speed_btn.visible and view._sun_arc._play_btn.tooltip_text == "Pause time-lapse", "the arc shows pause and the speed")
@@ -454,5 +497,49 @@ func _view_wiring() -> void:
 	_check(view._toast.visible and view._toast.title_text() == "Couldn't take the photo", "no picture: a plain message")
 	ViewTools.copy_link(view)
 	_check(view._toast.title_text() == "View link copied", "copying a link says so")
+
+	# A photo that cannot be written says so; a cancelled dialog says nothing.
+	var saved: Array = []
+	PhotoMode._write(Image.create(4, 4, false, Image.FORMAT_RGB8), "/nonexistent-dir-pr360/x.png",
+		func(path: String, failed: bool) -> void: saved.append([path, failed]))
+	_check(saved == [["", true]], "a failed write is reported as a failure: %s" % [saved])
+	saved.clear()
+	var ok_path := ProjectSettings.globalize_path(CACHE).path_join("photo.png")
+	PhotoMode._write(Image.create(4, 4, false, Image.FORMAT_RGB8), ok_path,
+		func(path: String, failed: bool) -> void: saved.append([path, failed]))
+	_check(saved == [[ok_path, false]] and FileAccess.file_exists(ok_path), "a written photo reports its path")
+
+	# The letter keys are not the view's while a text field has the keyboard.
+	_check(ViewWalk.keys_free(view), "bare keys walk")
+	var field := LineEdit.new()
+	view.add_child(field)
+	field.grab_focus()
+	_check(not ViewWalk.keys_free(view), "a focused text field keeps W A S D")
+	field.queue_free()
+
+	# The History picture is only re-taken when the view changed.
+	var key := view.look_key()
+	_check(not key.is_empty() and key == view.look_key(), "an unchanged view has an unchanged look")
+	view._rig.set_look(view._rig.yaw + 0.3, view._rig.pitch)
+	_check(key != view.look_key(), "turning changes it")
+	key = view.look_key()
+	ViewConditions.set_time_minutes(view, view._time_hour * 60.0 + 30.0)
+	_check(key != view.look_key(), "so does the time")
+
+	# Phones: with the controls tucked away, the round tab never sits on a
+	# sheet that takes the bar's place.
+	view.size = Vector2(390, 844)
+	view._inspector_open = false
+	ViewChrome.layout(view)
+	_check(view._sheet_tab.visible, "controls hidden on a phone: the tab offers them back")
+	view._landmark_panel.open_list([])
+	ViewChrome.layout(view)
+	_check(not view._sheet_tab.visible, "the landmark sheet in the bar's place hides the tab")
+	view._landmark_panel.close()
+	ViewChrome.layout(view)
+	ViewTools.toggle_date(view)
+	_check(not view._sheet_tab.visible, "so does the date sheet")
+	ViewTools.toggle_date(view)
+	_check(view._sheet_tab.visible, "and it returns when the sheet closes")
 	view.queue_free()
 	await process_frame

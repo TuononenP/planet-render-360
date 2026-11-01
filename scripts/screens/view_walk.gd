@@ -139,12 +139,24 @@ static func _to_viewport(v: View360, pos: Vector2) -> Vector2:
 
 # --- Keys ---
 
+## The bare letter keys are the view's: not while Cmd, Ctrl or Alt is held
+## (Cmd+W, Ctrl+S and the like belong to the system), and not while a text
+## field has the keyboard.
+static func keys_free(v: View360) -> bool:
+	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_ALT):
+		return false
+	var focus := v.get_viewport().gui_get_focus_owner() if v.is_inside_tree() else null
+	return not (focus is LineEdit or focus is TextEdit)
+
 ## Per-frame W A S D walking (Shift runs). Called from View360._process.
 func process_keys(v: View360, delta: float) -> void:
 	if v._data == null or v._ground == null or v._rig == null or not v.is_visible_in_tree():
 		return
-	var fwd := int(Input.is_key_pressed(KEY_W)) - int(Input.is_key_pressed(KEY_S))
-	var side := int(Input.is_key_pressed(KEY_D)) - int(Input.is_key_pressed(KEY_A))
+	var fwd := 0
+	var side := 0
+	if keys_free(v):
+		fwd = int(Input.is_key_pressed(KEY_W)) - int(Input.is_key_pressed(KEY_S))
+		side = int(Input.is_key_pressed(KEY_D)) - int(Input.is_key_pressed(KEY_A))
 	if fwd == 0 and side == 0:
 		if _moving:
 			_moving = false

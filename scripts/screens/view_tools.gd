@@ -32,7 +32,7 @@ static func build(v: View360, row: Container) -> void:
 	v._date_picker.date_picked.connect(func(date: Dictionary) -> void:
 		ViewConditions.set_date(v, date))
 	v._date_picker.season_requested.connect(func() -> void:
-		ViewConditions._on_season_selected(v, v._data.season if v._data != null else 1))
+		v._on_season_selected(v._data.season if v._data != null else LocationData.Season.SUMMER))
 	v._date_picker.closed.connect(func() -> void:
 		sync(v)
 		ViewChrome.layout(v))
@@ -57,12 +57,13 @@ static func _action(v: View360, key: String) -> void:
 			toggle_minimap(v)
 
 ## Lit (accent fill) while a tool is on: the date picker is up or a date
-## is picked, the labels or the mini-map are showing.
+## is picked, the labels or the mini-map are switched on (the mini-map may
+## be hidden for the moment by a sheet; it is still on).
 static func sync(v: View360) -> void:
 	if v._tool_btns.is_empty():
 		return
 	var lit := {"date": v._date_picker.visible or not v._date.is_empty(),
-		"labels": v._horizon.enabled, "map": v._minimap.visible}
+		"labels": v._horizon.enabled, "map": UiPrefs.minimap}
 	for key in v._tool_btns:
 		HudParts.apply_icon_button(v._tool_btns[key], bool(lit.get(key, false)))
 	var picked := ViewConditions.date_text(v._date)
@@ -84,8 +85,7 @@ static func toggle_date(v: View360) -> void:
 	if v._date_picker.visible:
 		v._date_picker.close_picker()
 	else:
-		var now := Time.get_datetime_dict_from_unix_time(
-			int(Time.get_unix_time_from_system() + v._atmos.utc_offset_h * 3600.0))
+		var now := ViewConditions.place_now(v)
 		v._date_picker.open_for(v._date, {"year": int(now["year"]), "month": int(now["month"]),
 			"day": int(now["day"])})
 	sync(v)
@@ -119,18 +119,18 @@ static func photo(v: View360) -> void:
 	v._photo_busy = true
 	flash(v)
 	var data := v._data
-	var local := Time.get_datetime_dict_from_unix_time(
-		int(Time.get_unix_time_from_system() + v._atmos.utc_offset_h * 3600.0))
+	var local := ViewConditions.place_now(v)
 	if UiPrefs.photo_stamp:
 		var lines := PhotoMode.stamp_lines(data.place_name, data.latitude, data.longitude,
 			UiTheme.clock(v._time_hour), ViewConditions.date_text(v._date),
 			HudParts.short_sources(data.attribution))
 		img = await PhotoMode.stamped(v, img, lines)
-	PhotoMode.save(img, PhotoMode.file_name(data.place_name, local), func(path: String) -> void:
+	PhotoMode.save(img, PhotoMode.file_name(data.place_name, local), func(path: String, failed: bool) -> void:
 		v._photo_busy = false
-		if path == "":
-			return
-		say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
+		if failed:
+			say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
+		elif path != "":
+			say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
 
 ## A brief white flash over the scene, like a shutter (none under Reduce motion).
 static func flash(v: View360) -> void:
@@ -154,8 +154,10 @@ static func toggle_labels(v: View360) -> void:
 	v.pref_changed.emit("horizon_labels", UiPrefs.horizon_labels)
 	sync(v)
 
+## Flips the preference, not the inset's visibility: a sheet may be hiding
+## the inset for the moment, and the person still means to switch it off.
 static func toggle_minimap(v: View360) -> void:
-	UiPrefs.minimap = not v._minimap.visible
+	UiPrefs.minimap = not UiPrefs.minimap
 	v._minimap.visible = UiPrefs.minimap
 	v.pref_changed.emit("minimap", UiPrefs.minimap)
 	sync(v)

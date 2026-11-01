@@ -22,6 +22,11 @@ extends RefCounted
 const SCHEME := "pr360://view"
 ## Eye offsets below this (metres) are the origin itself.
 const EYE_SAME_M := 1.0
+## The eye must stand on the built ground: within this of the origin
+## (half the detailed extent, less a margin for the clearance look), as
+## the curated preset eyes do. A link whose eye lies farther (a typo, a
+## hand-edited link) opens at its origin rather than over unbuilt land.
+const EYE_MAX_M := WorldScale.DETAILED_EXTENT_M * 0.5 - 100.0
 
 static func looks_like_link(text: String) -> bool:
 	return text.strip_edges().to_lower().begins_with(SCHEME)
@@ -73,6 +78,7 @@ static func parse(text: String) -> Dictionary:
 	if _num(kv, "el") and _num(kv, "eo"):
 		out["eye_lat"] = clampf(float(kv["el"]), -90.0, 90.0)
 		out["eye_lon"] = clampf(float(kv["eo"]), -180.0, 180.0)
+		_drop_far_eye(out)
 	if _num(kv, "z"):
 		out["zoom"] = clampf(float(kv["z"]), 0.7, 2.8)
 	if _num(kv, "t"):
@@ -101,6 +107,16 @@ static func days_in_month(year: int, month: int) -> int:
 	if month == 2:
 		return 29 if (year % 4 == 0 and year % 100 != 0) or year % 400 == 0 else 28
 	return 30 if month in [4, 6, 9, 11] else 31
+
+## Removes an eye position that does not stand on the built ground.
+static func _drop_far_eye(state: Dictionary) -> void:
+	if not state.has("eye_lat"):
+		return
+	var xz := WorldScale.xz_from_latlon(float(state["eye_lat"]), float(state.get("eye_lon", 0.0)),
+		float(state["lat"]), float(state["lon"]))
+	if xz.length() > EYE_MAX_M:
+		state.erase("eye_lat")
+		state.erase("eye_lon")
 
 static func _num(kv: Dictionary, key: String) -> bool:
 	return kv.has(key) and str(kv[key]).is_valid_float()
@@ -136,6 +152,7 @@ static func to_view(state: Dictionary) -> Dictionary:
 	for key in ["eye_lat", "eye_lon", "zoom", "minutes", "season", "date"]:
 		if state.has(key):
 			v[key] = state[key]
+	_drop_far_eye(v)
 	return v
 
 ## Season (LocationData.Season) of a calendar date at `lat`: the

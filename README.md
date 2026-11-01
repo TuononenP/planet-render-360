@@ -87,6 +87,7 @@ godot --headless --script tests/vector_map_test.gd # vector map: MVT decode, Map
 godot --headless --script tests/landmark_test.gd # landmark registry, models, placement
 godot --headless --script tests/landmark_list_test.gd # 360 view's nearby-landmarks list, panel flow, L key
 godot --headless --script tests/viewer_tools_test.gd # view links, camera per place, thumbnails, photo, time-lapse, dates, horizon labels, mini-map, walking
+godot --headless --script tests/user_dir_test.gd # moving data from Godot's default user directory
 godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile cancellation on far pans
 godot --headless --script tests/search_test.gd  # place-search parser
 godot --headless --script tests/weather_test.gd # weather parser
@@ -120,6 +121,7 @@ planet-render-360/
 │   └── main.tscn              Single root scene → scripts/main.gd
 ├── scripts/                   All app code (GDScript, ≤500 lines per class)
 │   ├── main.gd                Screen manager: MapPicker → Loading → View360 (+ History, Settings)
+│   ├── user_dir_migration.gd  First launch from the app's own user directory: brings the old data across
 │   ├── ui_theme.gd            Shared "Night Atlas" theme
 │   ├── hud_style.gd           Smoked-glass HUD styling for the 360 view
 │   ├── responsive.gd          Phone / tablet / desktop breakpoints

@@ -61,7 +61,7 @@ func _viewer_tools(main: Node) -> void:
 	var img := view.snapshot()
 	if img != null:
 		var lines := PhotoMode.stamp_lines(view._data.place_name, view._data.latitude,
-			view._data.longitude, UiTheme.clock(view._time_hour), "", view._data.attribution)
+			view._data.longitude, UiTheme.clock(view._time_hour), "", HudParts.short_sources(view._data.attribution))
 		var stamped := await PhotoMode.stamped(view, img, lines)
 		stamped.save_png("user://shots/07c-photo-stamped.png")
 		print("SHOT 07c-photo-stamped ", stamped.get_size(), " raw ", img.get_size())

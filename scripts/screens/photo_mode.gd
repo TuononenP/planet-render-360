@@ -130,23 +130,28 @@ static func stamped(host: Node, photo: Image, lines: Array[String]) -> Image:
 	return out
 
 ## Saves `img` as `file`: the system dialog where there is one, else the
-## Pictures / photos folder. `done(path)` gets the saved path, "" when the
-## person cancelled or the write failed.
+## Pictures / photos folder. `done(path, failed)` gets the saved path; ""
+## with failed false when the person cancelled, failed true when the write
+## did not succeed (no space, a read-only folder).
 static func save(img: Image, file: String, done: Callable) -> void:
 	if not OS.has_feature("mobile") and DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
 		var err := DisplayServer.file_dialog_show("Save photo", fallback_dir(), file, false,
 			DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, PackedStringArray(["*.png ; PNG image"]),
 			func(ok: bool, paths: PackedStringArray, _filter: int) -> void:
 				if not ok or paths.is_empty():
-					done.call("")
+					done.call("", false)
 					return
 				var path := paths[0]
 				if path.get_extension().to_lower() != "png":
 					path += ".png"
-				done.call(path if img.save_png(path) == OK else ""))
+				_write(img, path, done))
 		if err == OK:
 			return
 	var dir := fallback_dir()
 	DirAccess.make_dir_recursive_absolute(dir)
-	var path := dir.path_join(file)
-	done.call(path if img.save_png(path) == OK else "")
+	_write(img, dir.path_join(file), done)
+
+## Writes the PNG and reports it to `done(path, failed)`.
+static func _write(img: Image, path: String, done: Callable) -> void:
+	var ok := img.save_png(path) == OK
+	done.call(path if ok else "", not ok)

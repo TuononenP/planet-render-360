@@ -413,8 +413,8 @@ func _restore_conditions(data: LocationData) -> void:
 	_rig.set_zoom(float(data.view.get("zoom", 1.0)))
 	if data.view.has("date"):
 		_date = data.view["date"]
-		ViewConditions._date_changed(self)
-		ViewConditions._apply_time(self, _time_hour)
+		ViewConditions.date_changed(self)
+		_apply_time(_time_hour)
 	if data.view.has("minutes"):
 		ViewConditions.set_time_minutes(self, float(data.view["minutes"]))
 	ViewTools.sync(self)
@@ -424,6 +424,13 @@ func camera_state() -> Dictionary:
 	if _data == null or _ground == null or _rig == null:
 		return {}
 	return ViewLink.capture(_data, _ground, _rig)
+
+## Everything that changes the view's picture: camera, time, season and
+## date. Equal keys mean an equal History picture.
+func look_key() -> Array:
+	if _data == null:
+		return []
+	return [camera_state(), snappedf(_time_hour, 0.01), _data.season, _date]
 
 ## The scene as drawn now at the viewport's full size; null when nothing
 ## is drawn (headless) or no place is shown.

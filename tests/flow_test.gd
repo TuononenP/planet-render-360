@@ -64,6 +64,12 @@ func _run() -> void:
 		printerr("FLOW FAIL: leaving the view did not keep the camera: %s" % [cam])
 		quit(1)
 		return
+	# Try again reopens at that camera, not the one the run started with.
+	var retry: Dictionary = main._retry_view()
+	if not bool(retry.get("restore", false)) or absf(float(retry["bearing"]) - float(cam["bearing"])) > 0.001:
+		printerr("FLOW FAIL: Try again does not reopen at the saved camera: %s" % [retry])
+		quit(1)
+		return
 	var view := ViewLink.to_view(cam)
 	if not bool(view["restore"]) or absf(float(view["bearing"]) - float(cam["bearing"])) > 0.001:
 		printerr("FLOW FAIL: the saved camera does not reopen as a view: %s" % [view])
