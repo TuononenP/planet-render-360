@@ -28,7 +28,7 @@ const ROAD_SNAP_M := 30.0
 const ENTRANCE_R: Array[float] = [300.0, 600.0, 1200.0, 1700.0]
 const NYC_GREEN := Color(0.10, 0.22, 0.15)
 const STEEL := Color(0.56, 0.58, 0.59)
-const GLOBE_GREEN := Color(0.30, 0.95, 0.45)
+const GLOBE_GREEN := Color(0.05, 0.62, 0.20)
 const TOTEM_LIGHT := Color(0.92, 0.94, 0.97)
 const SIGN_BLACK := Color(0.035, 0.035, 0.04)
 
@@ -63,7 +63,7 @@ static func build(root: Node3D, data: LocationData, surf: RoadBuilder._Surface,
 	RailMesh.add(root, bufs["stair"], RailMesh.colour_mat("entrance_stair", 0.0, 0.85),
 		"Rail_entrance_stair")
 	RailMesh.add(root, bufs["globe"], RailMesh.glow_mat(GLOBE_GREEN if north_america \
-		else TOTEM_LIGHT), "Rail_entrance_light")
+		else TOTEM_LIGHT, 0.8 if north_america else 1.6), "Rail_entrance_light")
 	RailMesh.add(root, bufs["glass"], _glass_mat(), "Rail_entrance_glass")
 	return todo.size()
 
