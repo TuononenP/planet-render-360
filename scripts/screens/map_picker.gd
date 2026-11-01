@@ -13,8 +13,10 @@ signal settings_requested
 signal download_requested(lat: float, lon: float)
 signal exit_requested
 
-var _lat := 48.8566
-var _lon := 2.3522
+# Paris is the starting place (its quick pick starts selected), so the
+# first Explore opens on its curated view.
+var _lat := float(PresetViews.ROWS[0]["lat"])
+var _lon := float(PresetViews.ROWS[0]["lon"])
 var _canvas: MapTileView
 var _coord_label: Label
 var _name_label: Label

@@ -98,6 +98,9 @@ var landmark_lon: float = 0.0
 ## The viewpoint already stands off from it; View360 only aims at it.
 ## Camera-only, so it is not part of the WorldCache key.
 var focus: Dictionary = {}
+## Curated opening view (PresetViews row) when the pin is a quick-pick
+## preset's origin, {} otherwise. Camera-only, like focus.
+var view: Dictionary = {}
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
 const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
@@ -182,7 +185,7 @@ func height_at(x: int, z: int) -> float:
 static func known_places() -> Array:
 	# On-device gazetteer: instant search predictions with no network,
 	# and reverse lookup for the place card. Coordinates remain the truth.
-	return [
+	var places: Array = [
 		{"name": "Paris, France", "lat": 48.8566, "lon": 2.3522},
 		{"name": "Interlaken, Switzerland", "lat": 46.6863, "lon": 7.8632},
 		{"name": "Banff, Canada", "lat": 51.1789, "lon": -115.5708},
@@ -207,26 +210,24 @@ static func known_places() -> Array:
 		{"name": "Dubai, United Arab Emirates", "lat": 25.2048, "lon": 55.2708},
 		{"name": "Seoul, South Korea", "lat": 37.5665, "lon": 126.9780},
 	]
+	# A preset city resolves to its curated origin, so searching "Tokyo"
+	# opens the same view as its quick pick.
+	for place in places:
+		var at := PresetViews.origin_for_name(str(place["name"]))
+		if at != Vector2.INF:
+			place["lat"] = at.x
+			place["lon"] = at.y
+	return places
 
 ## One-tap presets for the map picker: [chip label, place name, lat, lon].
 ## Chosen to contrast (Haussmann Paris, neon Tokyo, Gulf towers, Nordic
-## waterfront, alpine, coast) so they double as test scenarios.
+## waterfront, alpine, coast) so they double as test scenarios. Each
+## pin is its PresetViews origin, so it opens on the curated view.
 static func quick_picks() -> Array:
-	return [
-		["Paris", "Paris, France", 48.8566, 2.3522],
-		["Alps", "Interlaken, Switzerland", 46.6863, 7.8632],
-		["Banff", "Banff, Canada", 51.1789, -115.5708],
-		["Big Sur", "Big Sur, United States", 36.2704, -121.8081],
-		["Tokyo", "Tokyo, Japan", 35.6762, 139.6503],
-		["New York", "New York, United States", 40.7128, -74.0060],
-		["Stockholm", "Stockholm, Sweden", 59.3293, 18.0686],
-		["Monaco", "Monaco", 43.7384, 7.4246],
-		["Dubai", "Dubai, United Arab Emirates", 25.2048, 55.2708],
-		["London", "London, United Kingdom", 51.5074, -0.1278],
-		["Rome", "Rome, Italy", 41.9028, 12.4964],
-		["Venice", "Venice, Italy", 45.4375, 12.3358],
-		["Seoul", "Seoul, South Korea", 37.5665, 126.9780],
-	]
+	var out: Array = []
+	for row in PresetViews.ROWS:
+		out.append([str(row["label"]), str(row["name"]), float(row["lat"]), float(row["lon"])])
+	return out
 
 static func suggestions_for(query: String) -> Array:
 	var q := query.strip_edges().to_lower()

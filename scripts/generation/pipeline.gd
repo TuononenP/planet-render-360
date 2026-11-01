@@ -180,6 +180,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_cancelled = false
 	var data := LocationData.new()
 	data.focus = focus
+	# A quick-pick preset's pin opens on its curated view, whichever
+	# screen (picker, History, Retry, search) started the run.
+	if focus.is_empty():
+		data.view = PresetViews.for_pin(lat, lon)
 	# The preset sizes the DEM grids before any fetch, so Fast really
 	# downloads/builds less and High really samples finer terrain.
 	RenderSettings.apply_preset(data, quality_preset)

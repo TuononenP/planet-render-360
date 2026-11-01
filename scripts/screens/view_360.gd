@@ -85,6 +85,23 @@ const EYE_HEIGHT_M := 30.0
 ## — never the landmark.
 const FRAME_MIN_M := 400.0
 const FRAME_READ_M := 800.0
+## Generic eye clearance: the eye stays CLEAR_ABOVE_M over every roof
+## within CLEAR_RADIUS_M (CLEAR_REACH_M bounds a footprint's centroid-
+## to-edge span for the pre-check).
+const CLEAR_RADIUS_M := 25.0
+const CLEAR_ABOVE_M := 6.0
+const CLEAR_REACH_M := 400.0
+## Opening-look clearance: within VIEW_CLEAR_M and VIEW_WEDGE (radians
+## either side of the look), no roof or mapped forest canopy (CANOPY_M
+## tall) may rise above the look line; the eye lifts until none does,
+## at most VIEW_LIFT_MAX_M over its ground.
+const VIEW_CLEAR_M := 80.0
+const VIEW_WEDGE := 0.3
+const CANOPY_M := 25.0
+const VIEW_LIFT_MAX_M := 150.0
+## Generic opening heading: built mass within this radius, in sectors.
+const HEADING_RADIUS_M := 600.0
+const HEADING_SECTORS := 16
 ## Far plane past the 30 km outer terrain ring's corners.
 const CAMERA_FAR_M := 45000.0
 ## Go there moves the camera within the built world while its target is
@@ -307,19 +324,30 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	# sits at the reference elevation). The slider still leaves it.
 	ViewConditions.spawn_golden_hour(self)
 	var spawn := spawn_xz(data)
-	_rig.position = Vector3(spawn.x,
-		_ground.height_at_world(spawn.x, spawn.y) + EYE_HEIGHT_M, spawn.y)
-	_rig.set_look(0.6, -0.10)
-	_atmos.set_probe_origin(_rig.position)
+	_rig.position = Vector3(spawn.x, eye_y(data, _ground, spawn), spawn.y)
+	var look: Vector2
 	if not data.focus.is_empty():
 		# Came to see a landmark: face it, its middle at the view centre.
-		var look := aim(_rig.position, focus_point(data, _ground, data.focus))
-		_rig.set_look(look.x, look.y)
+		look = aim(_rig.position, focus_point(data, _ground, data.focus))
+	elif not data.view.is_empty():
+		# A quick-pick preset: its curated bearing and pitch.
+		look = Vector2(-deg_to_rad(float(data.view["bearing"])),
+			deg_to_rad(float(data.view.get("pitch", 0.0))))
 	elif data.landmark_type != "none":
 		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
 		# not dead ahead, so the river/city sweep fills the right. The
 		# landmark stands at its true site (T5.2); the look aims at it.
-		_rig.set_look(landmark_yaw(data, spawn) - 0.12, -0.08)
+		look = Vector2(landmark_yaw(data, spawn) - 0.12, -0.08)
+	else:
+		look = Vector2(default_yaw(data, _ground, spawn), -0.10)
+	# Nothing right in front may block the opening look.
+	var lift := view_clearance_y(data, _ground, spawn, look.x, look.y)
+	if lift > _rig.position.y:
+		_rig.position.y = lift
+		if not data.focus.is_empty():
+			look = aim(_rig.position, focus_point(data, _ground, data.focus))
+	_atmos.set_probe_origin(_rig.position)
+	_rig.set_look(look.x, look.y)
 	if _landmark_panel != null:
 		_landmark_panel.close()
 	if _weather != null:
@@ -331,6 +359,9 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 ## viewpoint sits on its landmark — then FRAME_READ_M back along the v1
 ## framing direction (landmark ENE of the camera), inside the extent.
 static func spawn_xz(data: LocationData) -> Vector2:
+	# A preset's curated eye (PresetViews) needs no framing step-back.
+	if not data.view.is_empty():
+		return PresetViews.eye_xz(data.view, data.latitude, data.longitude)
 	# A landmark visit already stands off from its focus (LandmarkVisit).
 	if data.landmark_type == "none" or not data.focus.is_empty():
 		return Vector2.ZERO
@@ -338,6 +369,155 @@ static func spawn_xz(data: LocationData) -> Vector2:
 	if lp.length() >= FRAME_MIN_M:
 		return Vector2.ZERO
 	return lp - TerrainBuilder.LANDMARK_POS.normalized() * FRAME_READ_M
+
+## Camera Y over metre position `xz`. A preset's curated eye stands
+## eye_m over the ground, never below its ASL floor (decks, clifftops).
+## Anywhere else the eye is EYE_HEIGHT_M over the ground, lifted
+## CLEAR_ABOVE_M over every roof within CLEAR_RADIUS_M, so a pin inside
+## or beside a tower opens above it rather than inside its walls.
+## `curated` false (Go there) ignores the preset eye.
+static func eye_y(data: LocationData, ground: GroundTruth, xz: Vector2,
+		curated: bool = true) -> float:
+	var y := ground.height_at_world(xz.x, xz.y)
+	if curated and not data.view.is_empty():
+		y += float(data.view.get("eye_m", EYE_HEIGHT_M))
+		if data.view.has("asl_m"):
+			y = maxf(y, ground.render_y(float(data.view["asl_m"])))
+		return y
+	return maxf(y + EYE_HEIGHT_M, roof_clearance_y(data, ground, xz))
+
+## Highest roof within CLEAR_RADIUS_M of `xz` (render Y) plus
+## CLEAR_ABOVE_M, -INF when none. Uses the data-level heights (tag,
+## levels or the parser default, parts included), measured to the
+## footprint itself, not its centroid.
+static func roof_clearance_y(data: LocationData, ground: GroundTruth, xz: Vector2) -> float:
+	var top := -INF
+	for b in data.buildings:
+		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
+		var c := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
+		if fp.size() < 3 or c.distance_to(xz) > CLEAR_RADIUS_M + CLEAR_REACH_M:
+			continue
+		if _ring_distance(xz, fp) > CLEAR_RADIUS_M:
+			continue
+		var h := float(b.get("height", 0.0))
+		for part in b.get("parts", []):
+			h = maxf(h, float((part as Dictionary).get("height", 0.0)))
+		top = maxf(top, ground.height_at_world(c.x, c.y) + h)
+	return top + CLEAR_ABOVE_M
+
+## Lowest eye Y (render) at `xz` from which the look (`yaw`, `pitch`)
+## passes CLEAR_ABOVE_M over every roof, and over the canopy of mapped
+## forest, within VIEW_CLEAR_M inside ±VIEW_WEDGE of it; capped at
+## VIEW_LIFT_MAX_M over the ground. -INF when nothing is in front.
+## Roofs use the data-level heights, as roof_clearance_y.
+static func view_clearance_y(data: LocationData, ground: GroundTruth, xz: Vector2,
+		yaw: float, pitch: float) -> float:
+	# A preset row may opt out ("clear": false) where buildings beside
+	# the look frame the view rather than block it (a canal's banks).
+	if not bool(data.view.get("clear", true)):
+		return -INF
+	var bearing := -yaw
+	var dir := Vector2(sin(bearing), -cos(bearing))
+	var drop := tan(clampf(pitch, -1.2, 1.2))
+	var need := -INF
+	for b in data.buildings:
+		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
+		var c := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
+		if fp.size() < 3 or c.distance_to(xz) > VIEW_CLEAR_M + CLEAR_REACH_M:
+			continue
+		var d := _wedge_distance(xz, dir, fp)
+		if d > VIEW_CLEAR_M:
+			continue
+		var h := float(b.get("height", 0.0))
+		for part in b.get("parts", []):
+			h = maxf(h, float((part as Dictionary).get("height", 0.0)))
+		need = maxf(need, ground.height_at_world(c.x, c.y) + h + CLEAR_ABOVE_M - d * drop)
+	for k in range(-2, 3):
+		var ray := dir.rotated(VIEW_WEDGE * float(k) / 2.0)
+		for step in range(1, 9):
+			var d := VIEW_CLEAR_M * float(step) / 8.0
+			var p := xz + ray * d
+			if ground.is_inside(p.x, p.y) and ground.land_class_at(p.x, p.y) == "forest":
+				need = maxf(need, ground.height_at_world(p.x, p.y) + CANOPY_M + CLEAR_ABOVE_M - d * drop)
+	if need == -INF:
+		return need
+	return minf(need, ground.height_at_world(xz.x, xz.y) + VIEW_LIFT_MAX_M)
+
+## Nearest distance from `p` to the part of a closed ring that lies
+## within ±VIEW_WEDGE of `dir`, INF when none does. Checks the ring's
+## vertices, its closest point and where the look's centre line
+## crosses it.
+static func _wedge_distance(p: Vector2, dir: Vector2, ring: PackedVector2Array) -> float:
+	if Geometry2D.is_point_in_polygon(p, ring):
+		return 0.0
+	var best := INF
+	var tip := p + dir * VIEW_CLEAR_M
+	for i in ring.size():
+		var a := ring[i]
+		var b := ring[(i + 1) % ring.size()]
+		var hit: Variant = Geometry2D.segment_intersects_segment(p, tip, a, b)
+		var pts: Array[Vector2] = [a, Geometry2D.get_closest_point_to_segment(p, a, b)]
+		if hit != null:
+			pts.append(hit as Vector2)
+		for q in pts:
+			var v := q - p
+			if v.length() < best and absf(dir.angle_to(v)) <= VIEW_WEDGE:
+				best = v.length()
+	return best
+
+## Distance from `p` to a closed ring, 0 inside it.
+static func _ring_distance(p: Vector2, ring: PackedVector2Array) -> float:
+	if Geometry2D.is_point_in_polygon(p, ring):
+		return 0.0
+	var best := INF
+	for i in ring.size():
+		var q := Geometry2D.get_closest_point_to_segment(p, ring[i], ring[(i + 1) % ring.size()])
+		best = minf(best, p.distance_to(q))
+	return best
+
+## Opening yaw where there is no preset view and no landmark: toward the
+## most built mass (footprint × height) within HEADING_RADIUS_M, else
+## toward the most water, else the v1 default. Neighbouring sectors
+## count half, so a district outweighs one lone tower.
+static func default_yaw(data: LocationData, ground: GroundTruth, xz: Vector2) -> float:
+	var mass := PackedFloat32Array()
+	mass.resize(HEADING_SECTORS)
+	for b in data.buildings:
+		var d := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0))) - xz
+		if d.length() < 1.0 or d.length() > HEADING_RADIUS_M:
+			continue
+		mass[_sector(d)] += float(b.get("size_x", 0.0)) * float(b.get("size_z", 0.0)) \
+			* float(b.get("height", 0.0))
+	var best := _best_sector(mass)
+	if best < 0 and ground != null:
+		for s in HEADING_SECTORS:
+			var bearing := float(s) * TAU / HEADING_SECTORS
+			for k in range(1, 7):
+				var p := xz + Vector2(sin(bearing), -cos(bearing)) * HEADING_RADIUS_M * k / 6.0
+				if ground.is_inside(p.x, p.y) and ground.water_at(p.x, p.y) > 0.0:
+					mass[s] += 1.0
+		best = _best_sector(mass)
+	if best < 0:
+		return 0.6
+	return -float(best) * TAU / HEADING_SECTORS
+
+## Sector index of a metre direction (sector 0 faces north, clockwise).
+static func _sector(d: Vector2) -> int:
+	var bearing := wrapf(atan2(d.x, -d.y), 0.0, TAU)
+	return int(round(bearing / TAU * HEADING_SECTORS)) % HEADING_SECTORS
+
+## Sector holding the most (its neighbours at half weight), -1 when
+## all are empty.
+static func _best_sector(mass: PackedFloat32Array) -> int:
+	var best := -1
+	var best_sum := 0.0
+	for s in HEADING_SECTORS:
+		var sum := mass[s] + 0.5 * (mass[(s + HEADING_SECTORS - 1) % HEADING_SECTORS]
+			+ mass[(s + 1) % HEADING_SECTORS])
+		if sum > best_sum:
+			best_sum = sum
+			best = s
+	return best
 
 ## Yaw that faces the landmark's true site from `from` (CameraRig:
 ## forward is -Z rotated by yaw; north = -Z).
@@ -393,7 +573,7 @@ func visit(site: Dictionary) -> void:
 		var ll := WorldScale.latlon_from_xz(t.x, t.y, _data.latitude, _data.longitude)
 		visit_requested.emit(site, ll.x, ll.y)
 		return
-	var to := Vector3(t.x, _ground.height_at_world(t.x, t.y) + EYE_HEIGHT_M, t.y)
+	var to := Vector3(t.x, eye_y(_data, _ground, t, false), t.y)
 	var look := aim(to, focus_point(_data, _ground, site))
 	var yaw_to := _rig.yaw + wrapf(look.x - _rig.yaw, -PI, PI)
 	if _visit_tween != null:

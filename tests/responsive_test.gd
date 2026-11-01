@@ -61,7 +61,7 @@ func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2
 	picker.render_requested.connect(on_render)
 	bar.pressed.emit()
 	picker.render_requested.disconnect(on_render)
-	if got.size() != 1 or absf(got[0] - 35.6762) > 0.01:
+	if got.size() != 1 or absf(got[0] - float(LocationData.quick_picks()[4][2])) > 0.01:
 		_fail(failures, "%s: the Explore bar should start Tokyo, got %s" % [label, str(got)])
 	scroll.scroll_vertical = 0
 	for i in 3:
@@ -192,7 +192,7 @@ func _run() -> void:
 			(quick_row.get_child(4) as Button).pressed.emit()  # Tokyo
 			await process_frame
 			var tokyo_chip := quick_row.get_child(4) as Button
-			if abs(picker._lat - 35.6762) > 0.01 or picker.selected_name != "Tokyo, Japan":
+			if abs(picker._lat - float(LocationData.quick_picks()[4][2])) > 0.01 or picker.selected_name != "Tokyo, Japan":
 				_fail(failures, "place card should select Tokyo, got %f / %s" % [picker._lat, picker.selected_name])
 			if not tokyo_chip.button_pressed:
 				_fail(failures, "Tokyo card should stay pressed after tapping it")
