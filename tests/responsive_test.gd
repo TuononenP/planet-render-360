@@ -11,6 +11,64 @@ func _init() -> void:
 func _fail(failures: Array[String], msg: String) -> void:
 	failures.append(msg)
 
+func _centre_in(c: Control, scroll: ScrollContainer) -> bool:
+	var mid := c.get_global_rect().get_center().y
+	var view := scroll.get_global_rect()
+	return mid >= view.position.y and mid <= view.end.y
+
+## Explore sits above the Around the world shelf. With the panel scrolled
+## down to the shelf, a pick keeps the scroll (the card stays in view) and
+## a pinned Explore bar for the place starts the scene.
+func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2, label: String) -> void:
+	# A returning user sees the whole shelf (first launch shows three cards).
+	for chip in picker._quick_chips:
+		chip.visible = true
+	# Measured without the optional elevation, time and weather rows
+	# (no timer, so a pick doesn't bring their placeholders back).
+	picker._facts_timer = null
+	MapFacts.hide_facts(picker)
+	picker.size = win
+	picker._on_resized()
+	await process_frame
+	await process_frame
+	var expanded := picker.effective_layout() == Responsive.Layout.EXPANDED
+	var scroll: ScrollContainer = picker._side_scroll if expanded else picker._sheet_scroll
+	var bar: Button = picker._side_explore if expanded else picker._sheet_explore
+	if bar.visible:
+		_fail(failures, "%s: the Explore bar should hide while Explore is in view" % label)
+	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
+	for i in 3:
+		await process_frame
+	if _centre_in(picker._render_btn, scroll):
+		_fail(failures, "%s: test window should be short enough to scroll Explore away" % label)
+		return
+	if not bar.visible:
+		_fail(failures, "%s: the Explore bar should show while Explore is scrolled away" % label)
+	var card := picker._quick_grid.get_child(4) as Button  # Tokyo, on the shelf
+	scroll.ensure_control_visible(card)
+	for i in 2:
+		await process_frame
+	var kept := scroll.scroll_vertical
+	card.pressed.emit()
+	for i in 3:
+		await process_frame
+	if scroll.scroll_vertical != kept or not _centre_in(card, scroll):
+		_fail(failures, "%s: a shelf pick should keep the picked card in view" % label)
+	if not bar.visible or bar.text != "Explore Tokyo in 360°":
+		_fail(failures, "%s: the bar should offer the picked place, got '%s'" % [label, bar.text])
+	var got: Array[float] = []
+	var on_render := func(lat: float, _lon: float) -> void: got.append(lat)
+	picker.render_requested.connect(on_render)
+	bar.pressed.emit()
+	picker.render_requested.disconnect(on_render)
+	if got.size() != 1 or absf(got[0] - 35.6762) > 0.01:
+		_fail(failures, "%s: the Explore bar should start Tokyo, got %s" % [label, str(got)])
+	scroll.scroll_vertical = 0
+	for i in 3:
+		await process_frame
+	if bar.visible:
+		_fail(failures, "%s: the bar should hide once Explore scrolls back into view" % label)
+
 func _run() -> void:
 	var failures: Array[String] = []
 
@@ -148,6 +206,12 @@ func _run() -> void:
 			await process_frame
 			if tokyo_chip.button_pressed:
 				_fail(failures, "manual map pick should clear the Tokyo selection")
+	await _check_explore_bar(failures, picker, Vector2(1280, 520), "side panel")
+	await _check_explore_bar(failures, picker, Vector2(390, 560), "phone sheet")
+	picker.size = Vector2(1280, 800)
+	picker._on_resized()
+	await process_frame
+	await process_frame
 	# A pasted "lat, lon" selects that point, no separate fields needed.
 	picker._on_search("46.5, 7.9")
 	if abs(picker._lat - 46.5) > 0.001 or abs(picker._lon - 7.9) > 0.001:

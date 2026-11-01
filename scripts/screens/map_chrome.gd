@@ -71,6 +71,9 @@ static func _apply_theme(p: MapPicker) -> void:
 	UiTheme.apply_primary(p._render_btn)
 	UiTheme.apply_ghost(p._download_btn)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+	for bar in [p._side_explore, p._sheet_explore]:
+		UiTheme.apply_primary(bar)
+		UiIcon.apply(bar, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	UiIcon.apply(p._download_btn, "hard-drive", 20)
 	for btn in [p._history_btn, p._settings_btn, p._exit_btn, p._zoom_in_btn, p._zoom_out_btn, p._globe_btn]:
 		UiTheme.apply_rail_icon(btn)
@@ -154,6 +157,7 @@ static func set_render_busy(p: MapPicker, busy: bool, finishing: bool) -> void:
 	if p._render_btn != null:
 		p._render_btn.disabled = busy
 		p._render_btn.text = FINISHING if busy and finishing else EXPLORE
+		MapHome.queue_explore_bar(p)
 
 ## Locks Save for offline while a download runs; a second press would
 ## otherwise retarget the pending history entry.

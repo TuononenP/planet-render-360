@@ -208,6 +208,60 @@ static func apply_rail(p: MapPicker) -> void:
 		st.set_content_margin_all(8 if collapsed else 24)
 		p._side.add_theme_stylebox_override("panel", st)
 	p._queue_focus_update()
+	queue_explore_bar(p)
+
+## Explore sits above the Around the world shelf, so scrolling down to
+## the shelf hides it. While it is out of sight, a pinned "Explore
+## <place> in 360°" bar sits at the bottom of the side panel / phone
+## sheet; the scroll stays put, so the picked card stays in view.
+static func build_explore_bars(p: MapPicker) -> void:
+	var side_body := VBoxContainer.new()
+	side_body.add_theme_constant_override("separation", 12)
+	p._side.remove_child(p._side_scroll)
+	p._side_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	side_body.add_child(p._side_scroll)
+	p._side.add_child(side_body)
+	p._side_explore = _explore_bar(p)
+	side_body.add_child(p._side_explore)
+	p._sheet_explore = _explore_bar(p)
+	p._sheet_scroll.get_parent().add_child(p._sheet_explore)
+	for scroll: ScrollContainer in [p._side_scroll, p._sheet_scroll]:
+		var bar := scroll.get_v_scroll_bar()
+		bar.value_changed.connect(func(_v: float) -> void: queue_explore_bar(p))
+		bar.changed.connect(func() -> void: queue_explore_bar(p))
+		scroll.resized.connect(func() -> void: queue_explore_bar(p))
+
+static func _explore_bar(p: MapPicker) -> Button:
+	var b := UiTheme.primary_button(MapChrome.EXPLORE)
+	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	UiIcon.apply(b, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+	b.visible = false
+	b.pressed.connect(func() -> void: p.render_requested.emit(p._lat, p._lon))
+	return b
+
+static func queue_explore_bar(p: MapPicker) -> void:
+	if p._side_explore != null and p.is_inside_tree():
+		p.call_deferred("_update_explore_bar")
+
+static func update_explore_bar(p: MapPicker) -> void:
+	var text := p._render_btn.text
+	if not p._render_btn.disabled and p._name_label.text != "":
+		text = "Explore %s in 360°" % p._name_label.text
+	for bar: Button in [p._side_explore, p._sheet_explore]:
+		var scroll: ScrollContainer = p._side_scroll if bar == p._side_explore else p._sheet_scroll
+		bar.visible = _explore_hidden(p, scroll)
+		bar.text = text
+		bar.disabled = p._render_btn.disabled
+
+## Explore is in this scroll area (the layout put it there) but scrolled
+## more than halfway out of it. The bottom edge is the parent's, as if the
+## bar were hidden: the bar's own height must not keep it showing.
+static func _explore_hidden(p: MapPicker, scroll: ScrollContainer) -> bool:
+	if not scroll.is_visible_in_tree() or not scroll.is_ancestor_of(p._render_btn):
+		return false
+	var mid := p._render_btn.get_global_rect().get_center().y
+	return mid < scroll.get_global_rect().position.y \
+		or mid > scroll.get_parent_control().get_global_rect().end.y
 
 ## / or ⌘F / Ctrl+F focus search, Enter explores the selected place,
 ## Esc leaves the search field (before Main's Esc would quit).

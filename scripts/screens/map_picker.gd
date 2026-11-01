@@ -113,6 +113,9 @@ var _globe: GlobeView
 var _globe_btn: Button
 var _collapse_btn: Button
 var _side_rail: VBoxContainer
+# Pinned Explore bars, shown while Explore is scrolled out of sight.
+var _side_explore: Button
+var _sheet_explore: Button
 var _side_collapsed := false
 # Phone sheet detents (MapSheet).
 var _grabber: Control
@@ -369,6 +372,7 @@ func _ready() -> void:
 	MapSearch.build_mode_toggle(self)
 	MapHome.build(self)
 	MapSheet.build(self)
+	MapHome.build_explore_bars(self)
 	MapHome.build_globe(self)
 	MapHome.build_rail(self)
 	_quick_box.add_child(_recent_box)
@@ -466,6 +470,9 @@ func _queue_focus_update() -> void:
 func _update_focus() -> void:
 	MapChrome._update_focus(self)
 
+func _update_explore_bar() -> void:
+	MapHome.update_explore_bar(self)
+
 func _on_search_text_changed(text: String) -> void:
 	MapSearch.on_text_changed(self, text)
 
@@ -516,6 +523,7 @@ func _show_place(full_name: String) -> void:
 	_name_label.text = parts[0]
 	_region_label.text = parts[1]
 	_region_label.visible = parts[1] != ""
+	MapHome.queue_explore_bar(self)
 
 func _refresh_labels() -> void:
 	_show_place(selected_name if selected_name != "" \
