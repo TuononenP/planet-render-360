@@ -42,6 +42,7 @@ func _run() -> void:
 	await _map_markers()
 	await _card_states()
 	_osm_tag()
+	await _callout_icon_tap()
 	DirAccess.remove_absolute(CACHE)
 	if failures.is_empty():
 		print("LANDMARK INFO OK: parsers, standoff, aim, map markers, card states, OSM tag")
@@ -196,3 +197,30 @@ func _osm_tag() -> void:
 	var parsed := OsmParser.parse_features(text, 60.4524, 22.2781)
 	var lm: Array = parsed.get("landmarks", [])
 	_check(lm.size() == 1 and str(lm[0].get("wikipedia", "")) == "fi:Torni", "OSM landmark keeps its wikipedia tag")
+
+## The callout's icon tile must not swallow a tap meant for the card.
+func _callout_icon_tap() -> void:
+	var view := Control.new()
+	var callouts := ViewCallouts.new(null)
+	root.add_child(view)
+	view.add_child(callouts)
+	var site := LandmarkVisit.site("Eiffel Tower", 48.8584, 2.2945, "Tower", "curated")
+	var card := callouts._make_card(site, 700.0)
+	card.position = Vector2(20, 20)
+	await process_frame
+	await process_frame
+	var tapped := []
+	callouts.site_tapped.connect(func(s: Dictionary) -> void: tapped.append(s))
+	var tile := card.get_child(0).get_child(0) as Control
+	_check(tile.mouse_filter == Control.MOUSE_FILTER_IGNORE, "icon tile ignores the mouse so the card gets the tap")
+	var at := tile.get_global_rect().get_center()
+	_check(callouts.get_viewport().gui_get_hovered_control() != tile, "icon tile is never the hovered control")
+	for pressed in [true, false]:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = pressed
+		e.position = at - card.get_global_rect().position
+		card.gui_input.emit(e)
+	_check(tapped.size() == 1, "tapping the icon opens the landmark")
+	view.queue_free()
+	await process_frame

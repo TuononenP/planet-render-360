@@ -191,10 +191,12 @@ func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	st.content_margin_right = 16
 	card.add_theme_stylebox_override("panel", st)
 	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 12)
 	card.add_child(row)
 	var tile := PanelContainer.new()
 	tile.custom_minimum_size = Vector2(36, 36)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE  # the icon taps through to the card
 	tile.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.TEAL_SOFT, UiTheme.RADIUS_S))
 	var icon := UiIcon.rect(str(s["icon"]), 20, UiTheme.TEAL)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -202,6 +204,7 @@ func _make_card(s: Dictionary, distance_m: float) -> PanelContainer:
 	tile.add_child(icon)
 	row.add_child(tile)
 	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 0)
 	row.add_child(col)
 	col.add_child(UiTheme.display_label(str(s["name"]), 22))
