@@ -11,7 +11,7 @@ extends RefCounted
 ## Faded lagoon stucco: salmon, ochre, rust, pink, cream.
 const VENETIAN := ["#d89a78", "#c8844f", "#b86a4a", "#e0b4a0", "#d8b878", "#e6d2a8", "#c98a6a", "#dcc59a"]
 const ISTRIAN := ["#e8e2d2", "#ddd5c0", "#d4ccb8"]
-const VENETIAN_ROOF := ["#b5542f", "#a8482a", "#c0643a", "#9a4a2c", "#c47a4a"]
+const VENETIAN_ROOF := ["#8f5b47", "#85503d", "#9b6349", "#7a4b3b", "#a27258"]
 const VENETIAN_SHUTTER := ["#3f5a3a", "#4a5f3e", "#2f4a3a", "#5a3a2a"]
 
 ## Gamla stan plaster and the Östermalm / Södermalm blocks around it.
