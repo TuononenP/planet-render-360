@@ -19,11 +19,25 @@ var _download_at := Vector2.ZERO
 ## its thread is dropped once superseded.
 var _gen_id := 0
 var _building_world := false
+## Stop request of the world build in progress; null when none is ours.
+var _build_abort: BuildAbort = null
+## Longest the picker stays on "Finishing…" after a stop request. One
+## build stage can run much longer (or never return), and must not lock
+## Explore for good; its late result is discarded.
+const ABORT_GRACE_S := 20.0
+var abort_grace_s := ABORT_GRACE_S  # tests shorten it
 ## True from _start_generation until the view is shown or the run is
 ## cancelled and drained. A second start while busy would run two
 ## pipeline/build threads over shared static caches and can stall
-## the world build, so starts are ignored until this clears.
+## the world build, so starts are ignored until this clears (or until
+## ABORT_GRACE_S after a stop request, the one accepted exception).
 var _generating := false
+## Longest a place may take (fetch + world build) before the run is
+## stopped and the user is told, so a pathological area can never leave
+## the loading screen up for good.
+const GENERATION_TIMEOUT_S := 600.0
+const TIMEOUT_MESSAGE := "Stopped after 10 minutes: this place took too long to build. Try a spot nearby."
+var generation_timeout_s := GENERATION_TIMEOUT_S  # tests shorten it
 
 func _ready() -> void:
 	theme = UiTheme.base_theme()
@@ -85,7 +99,7 @@ func _ready() -> void:
 		# Past the pipeline (world building) nothing emits cancelled.
 		if _building_world:
 			_show(_picker)
-			_picker.set_render_busy(true, true))
+			_abort_build())
 	add_child(_loading)
 
 	_view = View360.new()
@@ -170,6 +184,8 @@ func _start_generation(lat: float, lon: float) -> void:
 	_set_generating(true)
 	_gen_id += 1
 	var gen := _gen_id
+	_arm_timeout(gen)
+	_picker.set_render_status("")
 	_pending = Vector2(lat, lon)
 	var display_name := _picker.selected_name
 	if display_name == "":
@@ -188,13 +204,51 @@ func _start_generation(lat: float, lon: float) -> void:
 		return
 	_pipeline.run(lat, lon, _picker.selected_name, _settings.preset)
 
+## Stops generation `gen` if it is still running after
+## generation_timeout_s: cancels the fetch, asks a world build to stop at
+## its next stage, and returns to the picker with a plain message.
+func _arm_timeout(gen: int) -> void:
+	await get_tree().create_timer(generation_timeout_s).timeout
+	if not _generating or gen != _gen_id:
+		return
+	print("Generation timed out after %d s" % int(generation_timeout_s))
+	_gen_id += 1
+	_pipeline.cancel()
+	_show(_picker)
+	_picker.set_render_status(TIMEOUT_MESSAGE)
+	if _building_world:
+		_abort_build()
+
+## Asks the world build in progress to stop at its next stage and shows
+## "Finishing…" until it does, or until ABORT_GRACE_S at the latest: a
+## stage that never returns must not leave Explore disabled for good.
+## A build released this way winds down on its own thread.
+func _abort_build() -> void:
+	var abort := _build_abort
+	if abort == null:
+		return
+	abort.requested = true
+	_picker.set_render_busy(true, true)
+	await get_tree().create_timer(abort_grace_s).timeout
+	if _build_abort == abort:
+		_release_build()
+
+func _release_build() -> void:
+	_build_abort = null
+	_building_world = false
+	_set_generating(false)
+
 func _on_generation_finished(data: LocationData) -> void:
 	var gen := _gen_id
 	_loading.set_building()
 	_building_world = true
-	var built := await _view.build_location(data)
-	_building_world = false
-	_set_generating(false)
+	var abort := BuildAbort.new()
+	_build_abort = abort
+	var built := await _view.build_location(data, null, abort)
+	# A build the grace period already released must not touch the
+	# state of a newer run.
+	if _build_abort == abort:
+		_release_build()
 	if gen != _gen_id:
 		return
 	_store.add_entry(data.place_name, data.latitude, data.longitude)

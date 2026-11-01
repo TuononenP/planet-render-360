@@ -219,8 +219,9 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 
 ## Detached world build: touches no scene tree, so it may run off the
 ## main thread (see build_location).
-static func make_world(data: LocationData, ground: GroundTruth) -> Node3D:
-	var world := TerrainBuilder.build_world(data, ground)
+static func make_world(data: LocationData, ground: GroundTruth,
+		abort: BuildAbort = null) -> Node3D:
+	var world := TerrainBuilder.build_world(data, ground, abort)
 	# T7.1: merge building masses per material/cell (preset-independent).
 	LodRing.merge_buildings(world)
 	return world
@@ -229,7 +230,9 @@ static func make_world(data: LocationData, ground: GroundTruth) -> Node3D:
 ## seconds on dense cities; run on the main thread it froze the loading
 ## screen (macOS beachball), so the caller's screen keeps drawing here.
 ## Pass the result to show_location. A known `ground` is reused.
-func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
+## Returns [] when `abort` was requested (timeout / cancel).
+func build_location(data: LocationData, ground: GroundTruth = null,
+		abort: BuildAbort = null) -> Array:
 	var cached := await WorldCache.load_world(self, data, ground)
 	if not cached.is_empty():
 		return cached
@@ -237,11 +240,16 @@ func build_location(data: LocationData, ground: GroundTruth = null) -> Array:
 	_threads.append(thread)
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data)
-		return [g, make_world(data, g)])
+		return [g, make_world(data, g, abort)])
 	while thread.is_alive():
 		await get_tree().process_frame
 	_threads.erase(thread)
 	var built: Array = thread.wait_to_finish()
+	if abort != null and abort.requested:
+		# Stopped part-way (timeout / cancel): never show or cache it.
+		if built.size() > 1 and built[1] is Node3D:
+			(built[1] as Node3D).free()
+		return []
 	WorldCache.save_async(self, _threads, data, built)
 	return built
 

@@ -96,7 +96,10 @@ static func _box_mesh() -> BoxMesh:
 		_unit_box.size = Vector3.ONE
 	return _unit_box
 
-static func build_world(data: LocationData, ground: GroundTruth = null) -> Node3D:
+## `abort` (optional) stops the build at the next stage boundary: it
+## returns what it has, and View360.build_location drops it.
+static func build_world(data: LocationData, ground: GroundTruth = null,
+		abort: BuildAbort = null) -> Node3D:
 	# Transitional: the pipeline constructs GroundTruth once in stage 3
 	# (contract §3); direct callers get a fresh surface here instead.
 	if ground == null:
@@ -104,17 +107,26 @@ static func build_world(data: LocationData, ground: GroundTruth = null) -> Node3
 	var root := Node3D.new()
 	root.name = "GeneratedWorld"
 	root.add_child(FarTerrainBuilder.build_far(data, ground))
+	if abort != null and abort.requested:
+		return root
 	root.add_child(_terrain_mesh(data, ground))
 	root.add_child(WaterBuilder.build_water(data, ground))
+	if abort != null and abort.requested:
+		return root
 	if not debug_hide_buildings:
 		_adopt_flat(root, BuildingBuilder.build_buildings(data, ground))
+	if abort != null and abort.requested:
+		return root
 	if not data.buildings.is_empty():
 		_adopt_flat(root, RoadBuilder.build_roads(data, ground))
 	if data.landmark_type != "none":
 		root.add_child(_landmark(data, ground))
 	_landmark_candidates(root, data, ground)
+	if abort != null and abort.requested:
+		return root
 	_adopt_flat(root, VegetationBuilder.build_vegetation(data, ground))
 	return root
+
 
 ## Transitional (T1.4): the T1.1c builders already return contract §4
 ## subtrees, but scenery/settings tests scan world children flat, so
