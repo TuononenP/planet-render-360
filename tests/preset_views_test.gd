@@ -14,8 +14,9 @@ func _init() -> void:
 	_heading()
 	_water_datum()
 	_view_clearance()
+	_opening_look()
 	if failures.is_empty():
-		print("PRESET VIEWS OK: rows, pins, gazetteer, spawn, eye, clearance, heading, water datum, look clearance")
+		print("PRESET VIEWS OK: rows, pins, gazetteer, spawn, eye, clearance, heading, water datum, look clearance, opening pitch")
 		quit(0)
 	else:
 		for f in failures:
@@ -172,3 +173,12 @@ func _view_clearance() -> void:
 	_check(is_equal_approx(y, g + View360.VIEW_LIFT_MAX_M), "the lift is capped: %.1f" % (y - g))
 	data.view = {"clear": false}
 	_check(View360.view_clearance_y(data, ground, Vector2.ZERO, 0.0, 0.0) == -INF, "a row with clear=false is never lifted")
+
+func _opening_look() -> void:
+	var down := View360.opening_look(Vector2(1.2, -0.35))
+	_check(is_equal_approx(down.y, View360.OPEN_PITCH_MIN) and is_equal_approx(down.x, 1.2),
+		"an aim below the horizon opens level, heading kept: %s" % down)
+	_check(is_equal_approx(View360.opening_look(Vector2(0.0, -0.1)).y, View360.OPEN_PITCH_MIN),
+		"a slight dip opens level")
+	_check(is_equal_approx(View360.opening_look(Vector2(0.0, 0.21)).y, 0.21), "a rising look is kept")
+	_check(View360.OPEN_PITCH_MIN >= 0.0, "the opening pitch floor is not downward")

@@ -99,6 +99,11 @@ const VIEW_CLEAR_M := 80.0
 const VIEW_WEDGE := 0.3
 const CANOPY_M := 25.0
 const VIEW_LIFT_MAX_M := 150.0
+## An opening look never tilts below the horizon (radians, +pitch up): a
+## level or rising look frames the place; a downward one stares at the
+## ground (an aim at a landmark below a lifted eye, a preset's dip, the
+## generic default). The viewer can still drag down.
+const OPEN_PITCH_MIN := 0.0
 ## Generic opening heading: built mass within this radius, in sectors.
 const HEADING_RADIUS_M := 600.0
 const HEADING_SECTORS := 16
@@ -346,15 +351,16 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		# Open with the landmark left-of-centre (PRD §4.1: 0.36 W),
 		# not dead ahead, so the river/city sweep fills the right. The
 		# landmark stands at its true site (T5.2); the look aims at it.
-		look = Vector2(landmark_yaw(data, spawn) - 0.12, -0.08)
+		look = Vector2(landmark_yaw(data, spawn) - 0.12, OPEN_PITCH_MIN)
 	else:
-		look = Vector2(default_yaw(data, _ground, spawn), -0.10)
+		look = Vector2(default_yaw(data, _ground, spawn), OPEN_PITCH_MIN)
+	look = opening_look(look)
 	# Nothing right in front may block the opening look.
 	var lift := view_clearance_y(data, _ground, spawn, look.x, look.y)
 	if lift > _rig.position.y:
 		_rig.position.y = lift
 		if not data.focus.is_empty():
-			look = aim(_rig.position, focus_point(data, _ground, data.focus))
+			look = opening_look(aim(_rig.position, focus_point(data, _ground, data.focus)))
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
 	if _landmark_panel != null:
@@ -363,6 +369,10 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_weather.fetch(data.latitude, data.longitude)
 	if _wiki != null:
 		_wiki.nearby(data.latitude, data.longitude, NEARBY_RADIUS_M)
+
+## `look` (yaw, pitch) with its pitch raised to OPEN_PITCH_MIN.
+static func opening_look(look: Vector2) -> Vector2:
+	return Vector2(look.x, maxf(look.y, OPEN_PITCH_MIN))
 
 ## Camera ground position (metres): the viewpoint itself, unless the
 ## viewpoint sits on its landmark — then FRAME_READ_M back along the v1
