@@ -32,6 +32,7 @@ var _stack_gap: Control
 var _right_col: VBoxContainer
 var _side: PanelContainer
 var _side_col: VBoxContainer
+var _side_scroll: ScrollContainer
 var _sheet: PanelContainer
 var _sheet_body: VBoxContainer
 var _sheet_cols: BoxContainer
@@ -55,6 +56,9 @@ var _settings_btn: Button
 var _download_btn: Button
 var _exit_btn: Button
 var _download_status: Label
+## Last Explore outcome (a timeout); separate from the download line so
+## neither overwrites the other.
+var _render_status: Label
 var _tip: Label
 var _quality_label: Label
 var _quality := 2  # RenderSettings.Preset of the footer label (cache keys follow it)
@@ -77,12 +81,52 @@ var _current_layout: int = Responsive.Layout.COMPACT
 var _focus_queued := false
 var selected_name := ""
 var _searcher: SearchFetcher
+# Selected place's real data (MapFacts), search modes (MapSearch) and
+# home states (MapHome).
+var _facts_fetcher: WeatherFetcher
+var _facts_timer: Timer
+var _facts_box: HBoxContainer
+var _elev_readout: Readout
+var _time_readout: Readout
+var _weather_chip: PanelContainer
+var _weather_parts: Array = []
+var _facts_offset_s := -1
+var _mode_btn: Button
+var _coord_mode := false
+var _store: CacheStore
+var _recent_box: VBoxContainer
+var _recent_row: HBoxContainer
+var _first_note: Label
+var _offline_badge: Button
+var _offline := false
+var _toast: Toast
+var _globe: GlobeView
+var _globe_btn: Button
+var _collapse_btn: Button
+var _side_rail: VBoxContainer
+var _side_collapsed := false
+# Phone sheet detents (MapSheet).
+var _grabber: Control
+var _sheet_scroll: ScrollContainer
+var _scrim: ColorRect
+var _detent: int = MapSheet.Detent.HALF
+var _sheet_tween: Tween
+var _drag := {}
 
 ## Container that never eats clicks: the map underneath must stay
 ## draggable in every gap between floating controls.
 func _passive(node: Control) -> Control:
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
+
+## The glass panels and the scroll areas in them pass zoom input to the map
+## under them (MapTileView.panel_zoom_input); their taps stay with them.
+func _wire_zoom(node: Control) -> void:
+	if node is PanelContainer or node is ScrollContainer:
+		node.gui_input.connect(_canvas.panel_zoom_input.bind(node))
+	for child in node.get_children():
+		if child is Control:
+			_wire_zoom(child as Control)
 
 func _vbox(sep: int, flags: int = Control.SIZE_FILL) -> VBoxContainer:
 	var v := VBoxContainer.new()
@@ -105,14 +149,23 @@ func _ready() -> void:
 	_canvas.picked.connect(_on_picked)
 	_map_wrap.add_child(_canvas)
 	_zoom_in_btn = UiIcon.button("plus", "Zoom in")
-	_zoom_in_btn.pressed.connect(func() -> void: _canvas.zoom_in())
+	_zoom_in_btn.pressed.connect(func() -> void:
+		if MapHome.globe_shown(self):
+			MapHome.show_globe(self, false)
+		else:
+			_canvas.zoom_in())
 	_zoom_out_btn = UiIcon.button("minus", "Zoom out")
 	_zoom_out_btn.pressed.connect(func() -> void: _canvas.zoom_out())
-	_zoom_rail = UiTheme.rail([_zoom_in_btn, _zoom_out_btn], true)
+	# Globe / flat: the map offers the globe below its widest zoom.
+	_globe_btn = UiIcon.button("globe", "Globe")
+	_globe_btn.pressed.connect(func() -> void:
+		MapHome.show_globe(self, not MapHome.globe_shown(self)))
+	_zoom_rail = UiTheme.rail([_zoom_in_btn, _zoom_out_btn, _globe_btn], true)
 	_zoom_rail.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 	_zoom_rail.anchor_top = 0.40
 	_zoom_rail.anchor_bottom = 0.40
 	_zoom_rail.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_zoom_rail.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # wider than 48: keep the gutter
 	_zoom_rail.offset_left = -64
 	_zoom_rail.offset_right = -16
 	_map_wrap.add_child(_zoom_rail)
@@ -135,7 +188,7 @@ func _ready() -> void:
 	# panel (with the nav icons) and as a pill on tablets.
 	_brand = HBoxContainer.new()
 	_brand.add_theme_constant_override("separation", 8)
-	_wordmark = Brand.rect(Brand.WORDMARK, 36)
+	_wordmark = Brand.rect(Brand.wordmark(), 36)
 	_wordmark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_brand.add_child(_wordmark)
 	var brand_gap := Control.new()
@@ -200,6 +253,8 @@ func _ready() -> void:
 		var qlat := float(quick[2])
 		var qlon := float(quick[3])
 		var qindex := qi
+		card.set_meta("lat", qlat)
+		card.set_meta("lon", qlon)
 		card.pressed.connect(func() -> void:
 			_select_suggestion(qname, qlat, qlon)
 			_set_selected_quick(qindex))
@@ -235,6 +290,10 @@ func _ready() -> void:
 	coords_col.add_child(_coords_label)
 	_coord_label = UiTheme.data_label("", 15, UiTheme.INK)
 	coords_col.add_child(_coord_label)
+	MapFacts.build(self)
+	_info_col.add_child(_facts_box)
+	_info_col.add_child(_weather_chip)
+	_weather_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_btn_row = BoxContainer.new()
 	_btn_row.add_theme_constant_override("separation", 8)
 	_action_col.add_child(_btn_row)
@@ -249,16 +308,20 @@ func _ready() -> void:
 	_download_btn.tooltip_text = "Save for offline"
 	_download_btn.pressed.connect(func() -> void: download_requested.emit(_lat, _lon))
 	_btn_row.add_child(_download_btn)
-	_download_status = UiTheme.label("", 12, UiTheme.MUTED)
+	_download_status = UiTheme.text("", "body-s", UiTheme.MUTED)
 	_download_status.visible = false
 	_action_col.add_child(_download_status)
+	_render_status = UiTheme.text("", "body-s", UiTheme.MUTED)
+	_render_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_render_status.visible = false
+	_action_col.add_child(_render_status)
 	_footer = HBoxContainer.new()
 	_footer.add_theme_constant_override("separation", 8)
 	_tip = UiTheme.label("© OpenStreetMap contributors · OpenFreeMap", 12, UiTheme.MUTED)
 	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_footer.add_child(_tip)
-	_quality_label = UiTheme.label("High", 12, UiTheme.MUTED)
+	_quality_label = UiTheme.text("High", "body-s", UiTheme.MUTED)
 	_quality_label.size_flags_vertical = Control.SIZE_SHRINK_END
 	_footer.add_child(_quality_label)
 
@@ -270,8 +333,17 @@ func _ready() -> void:
 	_side = PanelContainer.new()
 	_side.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_side.add_theme_stylebox_override("panel", _side_style())
-	_side_col = _vbox(16)
-	_side.add_child(_side_col)
+	# Scrolls when the window is too short for it (a phone on its side).
+	_side_scroll = ScrollContainer.new()
+	_side_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_side_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	UiTheme.apply_scroll(_side_scroll)
+	_side.add_child(_side_scroll)
+	_side_col = _vbox(16, Control.SIZE_EXPAND_FILL)
+	_side_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_side_scroll.add_child(_side_col)
+	UiTheme.add_sheen(_sheet, UiTheme.RADIUS_XL)
+	UiTheme.add_sheen(_side, UiTheme.RADIUS_L)
 	_top_col = _vbox(10)
 	_passive(_top_col)
 	_top_row = HBoxContainer.new()
@@ -284,11 +356,24 @@ func _ready() -> void:
 	_right_col = _vbox(0, Control.SIZE_EXPAND_FILL)
 	_passive(_right_col)
 
+	MapSearch.build_mode_toggle(self)
+	MapHome.build(self)
+	MapSheet.build(self)
+	MapHome.build_globe(self)
+	MapHome.build_rail(self)
+	_quick_box.add_child(_recent_box)
+	_quick_box.move_child(_recent_box, 0)
+	_quick_box.add_child(_first_note)
+	_quick_box.move_child(_first_note, 2)
+	_wire_zoom(_sheet)
+	_wire_zoom(_side)
 	resized.connect(_on_resized)
 	for node in [_sheet, _side, _top_col]:
 		node.resized.connect(_queue_focus_update)
 	_apply_layout(Responsive.layout_for_width(size.x))
 	_refresh_labels()
+	MapHome.refresh_recent(self)
+	MapFacts.request(self)
 
 
 # --- Delegators: implementation in MapChrome / MapSearch. ---
@@ -300,6 +385,31 @@ func _suggest_style() -> StyleBoxFlat:
 
 func _on_resized() -> void:
 	MapChrome._on_resized(self)
+	if _toast != null:
+		MapHome.apply_offline(self)
+		MapHome.place_toast(self)
+
+## History for the Recent places rail and the first-launch state.
+func bind_store(store: CacheStore) -> void:
+	_store = store
+	MapHome.refresh_recent(self)
+
+func refresh_recent() -> void:
+	MapHome.refresh_recent(self)
+
+## Settings → Units: reformat coordinates and the place's readouts.
+func refresh_units() -> void:
+	_refresh_labels()
+	MapFacts.request(self)
+
+func set_offline(on: bool) -> void:
+	MapHome.set_offline(self, on)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and is_visible_in_tree() \
+			and MapHome.handle_key(self, key):
+		get_viewport().set_input_as_handled()
 
 func _on_layout_selected(index: int) -> void:
 	MapChrome._on_layout_selected(self, index)
@@ -311,14 +421,18 @@ func set_layout_override(index: int) -> void:
 ## Re-skin every control after an accent change (see UiTheme.apply_palette).
 func refresh_theme() -> void:
 	MapChrome._apply_theme(self)
+	MapSearch.set_coord_mode(self, _coord_mode)
 
 func _set_selected_quick(index: int) -> void:
 	MapChrome._set_selected_quick(self, index)
 
 func set_download_status(text: String) -> void:
-	MapChrome.set_download_status(self, text)
+	MapHome.set_save_label(self, text)
 
 ## `finishing`: a cancelled scene is still winding down, so say so.
+func set_render_status(text: String) -> void:
+	MapChrome.set_render_status(self, text)
+
 func set_render_busy(busy: bool, finishing: bool = false) -> void:
 	MapChrome.set_render_busy(self, busy, finishing)
 
@@ -333,6 +447,8 @@ func effective_layout() -> int:
 
 func _apply_layout(layout: Responsive.Layout) -> void:
 	MapChrome._apply_layout(self, layout)
+	MapSheet.apply_layout(self)
+	MapHome.apply_rail(self)
 
 func _queue_focus_update() -> void:
 	MapChrome._queue_focus_update(self)
@@ -360,6 +476,8 @@ func _ensure_searcher() -> void:
 
 func _on_picked(lat: float, lon: float) -> void:
 	_hide_suggestions()
+	set_download_status("")  # a search or save message was about the last place
+	set_render_status("")
 	_set_selected_quick(-1)
 	selected_name = ""
 	_lat = lat
@@ -368,7 +486,11 @@ func _on_picked(lat: float, lon: float) -> void:
 	# without a map tap, so without this the pin stayed on the old place.
 	if _canvas != null:
 		_canvas.set_lat_lon(lat, lon)
+	if _globe != null:
+		_globe.pin = Vector2(lat, lon)
+		_globe.queue_redraw()
 	_refresh_labels()
+	MapFacts.request(self)
 	AccentSun.follow_now(lat, lon)
 
 ## The selected point, for the Auto accent when no scene is up.

@@ -15,6 +15,8 @@ extends Control
 ## stands in for a missing detail tile, so pan/zoom never blanks.
 
 signal picked(lat: float, lon: float)
+## Zoomed out past MIN_ZOOM: the picker morphs to the globe.
+signal zoom_past_min
 
 const MIN_ZOOM := 4
 const MAX_ZOOM := 15
@@ -31,8 +33,11 @@ const MAX_ANCESTOR_DROP := 4
 ## are classified by hue and rebuilt from lightness, so labels, casings
 ## and road hierarchy survive; dark OSM text becomes light. Applied to
 ## the tile layer only; the pin and attribution live in a child layer.
-const MAP_SHADER := """
-shader_type canvas_item;
+## The Day theme keeps the light OSM tile itself, a little muted, as its
+## light basemap (`day`).
+## The recolour as a function, shared with GlobeView so the globe and
+## the flat map read as one surface (`day` keeps the light tile).
+const RECOLOUR := """
 const vec3 INK = vec3(0.929, 0.945, 0.965);      // ink
 const vec3 MUTED = vec3(0.643, 0.682, 0.741);    // ink-muted
 const vec3 CASING = vec3(0.086, 0.118, 0.169);
@@ -46,9 +51,11 @@ const vec3 PARK_DEEP = vec3(0.157, 0.302, 0.235);
 const vec3 PARK_TEXT = vec3(0.659, 0.816, 0.706);
 const vec3 ROAD_WARM = vec3(0.600, 0.502, 0.357); // horizon-golden, dimmed
 
-void fragment() {
-	vec4 c = COLOR;
-	float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+vec3 recolour(vec3 c) {
+	float l = dot(c, vec3(0.299, 0.587, 0.114));
+	if (day) {
+		return mix(c, vec3(l), 0.25) * 0.98;
+	}
 	vec3 n = mix(INK, MUTED, smoothstep(0.0, 0.35, l));
 	n = mix(n, CASING, smoothstep(0.35, 0.73, l));
 	n = mix(n, BUILDING, smoothstep(0.73, 0.84, l));
@@ -62,7 +69,15 @@ void fragment() {
 	vec3 grass = mix(PARK_DEEP, PARK, smoothstep(0.72, 0.92, l));
 	h = mix(h, mix(PARK_TEXT, grass, smoothstep(0.45, 0.7, l)), park);
 	h = mix(h, ROAD_WARM * (1.05 - 0.30 * smoothstep(0.65, 0.95, l)), warm);
-	COLOR = vec4(clamp(h, 0.0, 1.0), c.a);
+	return clamp(h, 0.0, 1.0);
+}
+"""
+const MAP_SHADER := """
+shader_type canvas_item;
+uniform bool day = false;
+""" + RECOLOUR + """
+void fragment() {
+	COLOR = vec4(recolour(COLOR.rgb), COLOR.a);
 }
 """
 
@@ -96,6 +111,8 @@ var _mouse_moved := 0.0
 var _last_tap_msec := 0
 var _last_tap_pos := Vector2.ZERO
 var _magnify_accum := 1.0
+var _panel_touches: Dictionary = {}  # touch index -> canvas position, for pinches on a panel
+var _panel_pinch_base := 0.0
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(0, 240)
@@ -108,6 +125,7 @@ func _ready() -> void:
 	shader.code = MAP_SHADER
 	var map_mat := ShaderMaterial.new()
 	map_mat.shader = shader
+	map_mat.set_shader_parameter("day", UiTheme.is_day)
 	material = map_mat
 	_pin = MapPin.new()
 	add_child(_pin)
@@ -149,6 +167,8 @@ func zoom_out() -> void:
 func zoom_at(at: Vector2, steps: int) -> void:
 	var new_zoom := clampi(zoom_level + steps, MIN_ZOOM, MAX_ZOOM)
 	if new_zoom == zoom_level:
+		if steps < 0 and zoom_level == MIN_ZOOM:
+			zoom_past_min.emit()
 		return
 	var anchor := TileFetcher.lat_lon_from_pixel(
 		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - _focus()),
@@ -301,13 +321,7 @@ func _gui_input(event: InputEvent) -> void:
 			pan_by_pixels(mm.relative)
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
-		_magnify_accum *= mg.factor
-		if _magnify_accum > 1.18:
-			_magnify_accum = 1.0
-			zoom_at(mg.position, 1)
-		elif _magnify_accum < 0.85:
-			_magnify_accum = 1.0
-			zoom_at(mg.position, -1)
+		magnify(mg.factor, mg.position)
 		accept_event()
 	elif event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
@@ -318,7 +332,7 @@ func _gui_input(event: InputEvent) -> void:
 				_touch_down_pos = st.position
 				_touch_moved = 0.0
 			elif _touches.size() == 2:
-				_pinch_base = _touch_distance()
+				_pinch_base = _touch_distance(_touches)
 		else:
 			var was_pinch := _touches.size() >= 2
 			_touches.erase(st.index)
@@ -338,13 +352,9 @@ func _gui_input(event: InputEvent) -> void:
 			return
 		_touches[sd.index] = sd.position
 		if _touches.size() >= 2:
-			var dist := _touch_distance()
-			if _pinch_base > 0.0 and dist / _pinch_base > 1.22:
+			var dist := _touch_distance(_touches)
+			if pinch_step(dist, _pinch_base, _touch_midpoint(_touches)):
 				_pinch_base = dist
-				zoom_at(_touch_midpoint(), 1)
-			elif _pinch_base > 0.0 and dist / _pinch_base < 0.82:
-				_pinch_base = dist
-				zoom_at(_touch_midpoint(), -1)
 			else:
 				pan_by_pixels(sd.relative)
 		else:
@@ -374,17 +384,88 @@ func _gui_input(event: InputEvent) -> void:
 			picked.emit(centre_lat, centre_lon)
 		accept_event()
 
-func _touch_distance() -> float:
-	if _touches.size() < 2:
+static func _touch_distance(touches: Dictionary) -> float:
+	if touches.size() < 2:
 		return 0.0
-	var pts: Array = _touches.values()
+	var pts: Array = touches.values()
 	return (pts[0] as Vector2).distance_to(pts[1])
 
-func _touch_midpoint() -> Vector2:
-	if _touches.is_empty():
+func _touch_midpoint(touches: Dictionary) -> Vector2:
+	if touches.is_empty():
 		return _focus()
-	var pts: Array = _touches.values()
+	var pts: Array = touches.values()
 	return pts[0] if pts.size() == 1 else ((pts[0] as Vector2) + (pts[1] as Vector2)) / 2.0
+
+## Pinch: whole zoom levels once the fingers have moved apart or together
+## by a fifth since `base`. Returns true when it zoomed.
+func pinch_step(dist: float, base: float, at: Vector2) -> bool:
+	if base <= 0.0:
+		return false
+	if dist / base > 1.22:
+		zoom_at(at, 1)
+	elif dist / base < 0.82:
+		zoom_at(at, -1)
+	else:
+		return false
+	return true
+
+## Trackpad pinch: whole zoom levels once the accumulated factor passes a
+## fifth either way, so a slow gesture steps once per fifth.
+func magnify(factor: float, at: Vector2) -> void:
+	_magnify_accum *= factor
+	if _magnify_accum > 1.18:
+		_magnify_accum = 1.0
+		zoom_at(at, 1)
+	elif _magnify_accum < 0.85:
+		_magnify_accum = 1.0
+		zoom_at(at, -1)
+
+## Zoom input from a glass panel or scroll area laid over the map (the
+## sheet, the side panel and the lists in them): the wheel, a trackpad
+## pinch and a two-finger pinch zoom the map under it, while the panel
+## keeps its taps and drags. A scroll area with room to scroll keeps the
+## wheel for itself.
+func panel_zoom_input(event: InputEvent, from: Control) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not mb.pressed or _can_scroll(from):
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_at(_from_panel(from, mb.position), 1)
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_at(_from_panel(from, mb.position), -1)
+	elif event is InputEventMagnifyGesture:
+		var mg := event as InputEventMagnifyGesture
+		magnify(mg.factor, _from_panel(from, mg.position))
+	elif event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			_panel_touches[st.index] = _from_panel(from, st.position)
+			if _panel_touches.size() == 2:
+				_panel_pinch_base = _touch_distance(_panel_touches)
+		else:
+			_panel_touches.erase(st.index)
+	elif event is InputEventScreenDrag:
+		var sd := event as InputEventScreenDrag
+		if not _panel_touches.has(sd.index):
+			return
+		_panel_touches[sd.index] = _from_panel(from, sd.position)
+		if _panel_touches.size() >= 2:
+			var dist := _touch_distance(_panel_touches)
+			if pinch_step(dist, _panel_pinch_base, _touch_midpoint(_panel_touches)):
+				_panel_pinch_base = dist
+
+## A point of `from` (a panel, unscaled) in this canvas's own space.
+func _from_panel(from: Control, at: Vector2) -> Vector2:
+	return at + from.global_position - global_position
+
+## A scroll area with room to scroll keeps the wheel for itself.
+static func _can_scroll(from: Control) -> bool:
+	var sc := from as ScrollContainer
+	if sc == null or sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+		return false
+	var bar := sc.get_v_scroll_bar()
+	return bar.max_value > bar.page
 
 ## Nearest cached ancestor (Vector3i z/x/y) that can stand in for the
 ## detail tile (tx, ty), or (-1, -1, -1) when none is loaded yet.

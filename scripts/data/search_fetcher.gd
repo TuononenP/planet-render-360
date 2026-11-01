@@ -15,9 +15,13 @@ signal suggestions_ready(query: String, results: Array)
 const ENDPOINT := "https://nominatim.openstreetmap.org/search"
 const CACHE_DIR := "user://cache"
 const USER_AGENT := "PlanetRender360/0.1"
+## Failure copy in the design system's voice: what still works, no codes.
+const UNREACHABLE := "Search is unavailable right now. Coordinates like 46.5, 7.9 still work."
+const NO_MATCH := "No places match \"%s\". Try a landmark, a town or coordinates like 46.5, 7.9"
 
 var _http: HTTPRequest
 var _busy := false
+var _query := ""
 var _suggest_http: HTTPRequest
 var _suggest_busy := false
 var _suggest_query := ""
@@ -70,6 +74,7 @@ func search(query: String) -> void:
 	var cleaned := query.strip_edges().to_lower()
 	if cleaned.is_empty():
 		return
+	_query = query.strip_edges()
 	var cache_path := "%s/search_%s.json" % [CACHE_DIR,
 		cleaned.sha1_text().substr(0, 12)]
 	if FileAccess.file_exists(cache_path):
@@ -83,14 +88,16 @@ func search(query: String) -> void:
 		["User-Agent: %s" % USER_AGENT, "Accept: application/json"])
 	if err != OK:
 		_busy = false
-		failed.emit("Search request failed to start: %s" % err)
+		push_warning("SearchFetcher: request failed to start: %s" % err)
+		failed.emit(UNREACHABLE)
 
 var _pending_cache := ""
 
 func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 	_busy = false
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		failed.emit("Search failed (result=%d code=%d)" % [result, code])
+		push_warning("SearchFetcher: search failed (result=%d code=%d)" % [result, code])
+		failed.emit(UNREACHABLE)
 		return
 	var text := body.get_string_from_utf8()
 	var f := FileAccess.open(_pending_cache, FileAccess.WRITE)
@@ -101,7 +108,7 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 func _emit_parsed(text: String) -> void:
 	var first := parse_first(text)
 	if first.is_empty():
-		failed.emit("No results for that search")
+		failed.emit(NO_MATCH % _query)
 		return
 	succeeded.emit(short_name(str(first["name"])),
 		float(first["lat"]), float(first["lon"]))

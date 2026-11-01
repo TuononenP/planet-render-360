@@ -22,11 +22,13 @@ static func _suggest_style(p: MapPicker) -> StyleBoxFlat:
 	st.content_margin_bottom = 8
 	return st
 
+## Through the picker's own _apply_layout, so the sheet detents and the
+## side rail follow every layout pass too.
 static func _on_resized(p: MapPicker) -> void:
 	if p._forced_layout >= 0:
-		_apply_layout(p, p._forced_layout)
+		p._apply_layout(p._forced_layout)
 	else:
-		_apply_layout(p, Responsive.layout_for_width(p.size.x))
+		p._apply_layout(Responsive.layout_for_size(p.size))
 
 static func _on_layout_selected(p: MapPicker, index: int) -> void:
 	match index:
@@ -57,7 +59,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	style_cached_chip(p._cached_chip)
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
-			p._quality_label, p._download_status]:
+			p._quality_label, p._download_status, p._render_status]:
 		section.add_theme_color_override("font_color", UiTheme.MUTED)
 	UiTheme.apply_field(p._search, true)
 	p._suggest_panel.add_theme_stylebox_override("panel", _suggest_style(p))
@@ -70,7 +72,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	UiTheme.apply_ghost(p._download_btn)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	UiIcon.apply(p._download_btn, "hard-drive", 20)
-	for btn in [p._history_btn, p._settings_btn, p._exit_btn, p._zoom_in_btn, p._zoom_out_btn]:
+	for btn in [p._history_btn, p._settings_btn, p._exit_btn, p._zoom_in_btn, p._zoom_out_btn, p._globe_btn]:
 		UiTheme.apply_rail_icon(btn)
 	p._nav.add_theme_stylebox_override("panel", _nav_style(p))
 	var rail_st := UiTheme.style(UiTheme.GLASS_FILL, UiTheme.RADIUS_PILL, UiTheme.GLASS_EDGE, true)
@@ -95,6 +97,13 @@ static func set_download_status(p: MapPicker, text: String) -> void:
 	if p._download_status != null:
 		p._download_status.text = text
 		p._download_status.visible = text != ""
+
+## Explore outcome under the buttons (a timed-out place), on its own
+## line so download progress never overwrites it, or it the progress.
+static func set_render_status(p: MapPicker, text: String) -> void:
+	if p._render_status != null:
+		p._render_status.text = text
+		p._render_status.visible = text != ""
 
 ## "Cached" badge under the region (design system: Badge, accent-soft):
 ## the place's layers are on the device, so Explore opens without waiting.
@@ -180,19 +189,22 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 	if p._stack == null or p._side_col == null:
 		return  # not ready yet; _ready applies the initial layout
 	p._current_layout = layout
-	# Compact is height-tight: the coordinates caption gives its height
-	# back to the map. The layout override lives in Settings, so any
-	# forced layout stays reversible from there.
+	_move(p._suggest_panel, p._search_box)
+	if not p._coord_mode:
+		p._search.placeholder_text = MapSearch.placeholder(p)
+	# The layout override lives in Settings, so any forced layout stays
+	# reversible from there. Phones keep the coordinates: the sheet's
+	# peek detent shows the name, coordinates and Explore.
 	var compact := layout == Responsive.Layout.COMPACT
 	var expanded := layout == Responsive.Layout.EXPANDED
-	p._coords_box.visible = not compact
 	p._brand_pill.visible = not compact
 	p._name_label.add_theme_font_size_override("font_size", 36 if expanded else 28)
 	var pad := Responsive.page_padding(layout)
-	p._overlay.add_theme_constant_override("margin_left", pad)
-	p._overlay.add_theme_constant_override("margin_right", pad)
-	p._overlay.add_theme_constant_override("margin_top", pad)
-	p._overlay.add_theme_constant_override("margin_bottom", pad)
+	var safe := Responsive.safe_insets(p)
+	p._overlay.add_theme_constant_override("margin_left", pad + int(safe[0]))
+	p._overlay.add_theme_constant_override("margin_right", pad + int(safe[2]))
+	p._overlay.add_theme_constant_override("margin_top", pad + int(safe[1]))
+	p._overlay.add_theme_constant_override("margin_bottom", pad + int(safe[3]))
 	p._nav.add_theme_stylebox_override("panel", _nav_style(p))
 	# Buttons: Explore + a full-width Save below in the panel and on
 	# tablets; on phones Save is an icon beside Explore.
@@ -207,8 +219,9 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 	p._quick_grid.columns = 3 if expanded else maxi(1, p._quick_chips.size())
 	p._quick_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if expanded \
 		else ScrollContainer.SCROLL_MODE_AUTO
-	p._quick_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if expanded \
-		else ScrollContainer.SCROLL_MODE_DISABLED
+	# The panel grid shows whole cards; the side panel itself scrolls
+	# (an inner scroll area cut the last row in half above the footer).
+	p._quick_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	p._quick_scroll.custom_minimum_size = Vector2.ZERO if expanded else Vector2(0, 104)
 	p._quick_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
 	p._quick_box.size_flags_vertical = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
@@ -244,6 +257,10 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 		p._side.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		if compact:
 			_move_all([p._search_box, p._nav], p._top_row)
+			# Predictions run the full width under the top row: in the
+			# field's column the no-results card squeezed the row wider
+			# than the phone.
+			_move(p._suggest_panel, p._top_col)
 			_move(p._brand_pill, p._side_col)  # parked, hidden: phones have no brand row
 		else:
 			var pill_style := UiTheme.style(UiTheme.GLASS_FILL, UiTheme.RADIUS_PILL, UiTheme.GLASS_EDGE, true)
@@ -276,6 +293,9 @@ static func _update_focus(p: MapPicker) -> void:
 	var origin := p._canvas.get_global_rect().position
 	var centre := p._canvas.size / 2.0
 	var want := centre
+	p._zoom_rail.visible = true
+	p._zoom_rail.anchor_top = 0.40
+	p._zoom_rail.anchor_bottom = 0.40
 	if p._current_layout == Responsive.Layout.EXPANDED:
 		if p._side.visible and p._side.is_inside_tree():
 			var left := p._side.get_global_rect().end.x - origin.x
@@ -285,4 +305,17 @@ static func _update_focus(p: MapPicker) -> void:
 		var bottom := p._sheet.get_global_rect().position.y - origin.y
 		if bottom > top + 80.0:
 			want = Vector2(centre.x, (top + bottom) / 2.0)
+		# The zoom rail stays in the map strip between the top bar and the
+		# sheet (it overlapped the sheet's top), and steps aside when the
+		# sheet leaves it no room.
+		var rail_h := p._zoom_rail.get_combined_minimum_size().y
+		var lo := top + 12.0 + rail_h / 2.0
+		var hi := bottom - 12.0 - rail_h / 2.0
+		p._zoom_rail.visible = hi >= lo
+		var at := clampf(p._canvas.size.y * 0.40, lo, maxf(hi, lo)) / maxf(p._canvas.size.y, 1.0)
+		p._zoom_rail.anchor_top = at
+		p._zoom_rail.anchor_bottom = at
 	p._canvas.focus_offset = (want - centre).round()
+	if p._globe != null:
+		p._globe.focus_offset = p._canvas.focus_offset
+		p._globe.queue_redraw()
