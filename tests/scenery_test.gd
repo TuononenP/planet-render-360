@@ -77,6 +77,25 @@ func _run() -> void:
 			% rground.water_level_at(0.0, 0.0))
 	if rground.water_at(0.0, 0.0) < 1.0 or rground.water_at(900.0, 900.0) > 0.0:
 		failures.append("carved polygon should hold water, its banks stay dry")
+	# A bridge over it keeps its slab out of the water but stays a gentle
+	# deck: no hump past the camber cap, no ramp past RAMP_GRADE (the
+	# old clearance-driven arch humped Paris bridges 15-50 m).
+	var m2u_b := WorldScale.metres_to_units()
+	var span := RoadBuilder._resample(PackedVector2Array([Vector2(-700, 0), Vector2(700, 0)]), 20.0)
+	var deck := RoadBuilder.deck_profile(span, RoadBuilder._Surface.new(river, rground), m2u_b)
+	var top_cap := 3.0 + (RoadBuilder.DECK_DEPTH_M + 0.5 + 0.05 + RoadBuilder.BRIDGE_RISE_M) * m2u_b
+	for i in deck.size():
+		var p := span[i]
+		if rground.water_at(p.x, p.y) > 0.0 \
+				and deck[i] - RoadBuilder.DECK_DEPTH_M * m2u_b < rground.water_level_at(p.x, p.y):
+			failures.append("bridge slab dips into the water at %s" % str(p))
+			break
+		if deck[i] > top_cap + 0.001:
+			failures.append("bridge deck humps to %.2f, cap %.2f" % [deck[i], top_cap])
+			break
+		if i > 0 and absf(deck[i] - deck[i - 1]) > RoadBuilder.RAMP_GRADE * p.distance_to(span[i - 1]) + 0.001:
+			failures.append("bridge deck steeper than %.2f at %s" % [RoadBuilder.RAMP_GRADE, str(p)])
+			break
 	rm.free()
 
 	# Far terrain: real-DEM backdrop mesh exists, spans its extent, and

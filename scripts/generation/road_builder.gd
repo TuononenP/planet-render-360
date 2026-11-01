@@ -11,8 +11,8 @@ extends RefCounted
 ## follow its creases. `surface` picks the finish (asphalt, paving/sett,
 ## gravel), footways/paths read as pavement, and one merged
 ## surface per finish keeps draw calls to a handful. Real `bridge=yes`
-## ways become decks with fascia sides and parapets, arched from bank to
-## bank to clear the water/road beneath; non-bridge segments over water
+## ways become decks with fascia sides and parapets, gently arched bank to
+## bank (grade and rise capped); non-bridge segments over water
 ## are dropped (no shards in the river); tunnels are skipped. Asphalt
 ## is RoadSurface's shader: lane markings, crossings, kerbs, wear and
 ## weather on every tier, from the per-vertex lanes / rank / urban flag
@@ -27,6 +27,13 @@ const LIFT_M := [0.03, 0.04, 0.05]
 const BRIDGE_CLEAR_M := 5.0
 const DECK_DEPTH_M := 0.9
 const PARAPET_M := 1.0
+## Deck camber limits: the arch is never steeper than BRIDGE_GRADE nor
+## higher than BRIDGE_RISE_M above the line between its banks (city DEMs
+## put a river at quay height, so full clearance would hump every deck).
+const BRIDGE_GRADE := 0.05
+const BRIDGE_RISE_M := 3.0
+## Steepest ramp easing a deck lifted clear of the water.
+const RAMP_GRADE := 0.08
 ## Half-extent of the detailed surface the ribbons are clipped to
 ## (metres; the v1 108 of a 110-unit half extent).
 const EXTENT_U := WorldScale.DETAILED_EXTENT_M * 0.5 - 2.0
@@ -247,9 +254,62 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 	else:
 		b.indices.append_array([a, c, bb, bb, c, d])
 
-## Bridge deck on a real `bridge=yes` way: the deck runs bank to bank,
-## rising in a smooth arch so its middle clears the water (or ground)
-## below by BRIDGE_CLEAR_M; slab fascias on both sides and parapets.
+## Deck heights along a bridge polyline (world units, one per point):
+## bank to bank, rising in a smooth arch toward BRIDGE_CLEAR_M over the
+## water (0.6 m over ground) below, capped at BRIDGE_GRADE and
+## BRIDGE_RISE_M so a short or low crossing stays nearly flat. The slab
+## never dips into the water: an end the river carve reaches is lifted
+## to the water, and every wet point keeps the slab above it.
+static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float) -> PackedFloat32Array:
+	var n := pts.size()
+	var total := 0.0
+	var dist := PackedFloat32Array([0.0])
+	for i in range(1, n):
+		total += pts[i].distance_to(pts[i - 1])
+		dist.append(total)
+	var deck := PackedFloat32Array()
+	if total <= 0.0:
+		return deck
+	var slab := (DECK_DEPTH_M + 0.5) * m2u
+	var h0 := _deck_floor(pts[0], surf, slab)
+	var h1 := _deck_floor(pts[n - 1], surf, slab)
+	var need := 0.0
+	for i in n:
+		var t := dist[i] / total
+		var under := surf.height(pts[i].x, pts[i].y)
+		var water := surf.ground.water_at(pts[i].x, pts[i].y) > 0.0
+		var floor_y := maxf(under, surf.ground.water_level_at(pts[i].x, pts[i].y) if water else under)
+		var clear := BRIDGE_CLEAR_M * m2u if water else 0.6 * m2u
+		# Points by the banks would need a huge arch to clear the
+		# water there; the middle two-thirds set the rise.
+		need = maxf(need, (floor_y + clear - lerpf(h0, h1, t)) / maxf(sin(PI * t), 0.5))
+	var rise := clampf(need, 0.0, minf(BRIDGE_GRADE * total / PI, BRIDGE_RISE_M * m2u))
+	# Lift over the arch where the slab would touch the water, eased out
+	# at RAMP_GRADE both ways so it reads as a ramp, not a step.
+	var lift := PackedFloat32Array()
+	for i in n:
+		var t := dist[i] / total
+		var arch := lerpf(h0, h1, t) + 0.05 * m2u + rise * sin(PI * t)
+		deck.append(arch)
+		lift.append(maxf(_deck_floor(pts[i], surf, slab) - arch, 0.0))
+	for i in range(1, n):
+		lift[i] = maxf(lift[i], lift[i - 1] - RAMP_GRADE * (dist[i] - dist[i - 1]))
+	for i in range(n - 2, -1, -1):
+		lift[i] = maxf(lift[i], lift[i + 1] - RAMP_GRADE * (dist[i + 1] - dist[i]))
+	for i in n:
+		deck[i] += lift[i]
+	return deck
+
+## Lowest deck height at a point: the drawn ground, or over water the
+## water surface plus `slab` (slab depth and a little air).
+static func _deck_floor(p: Vector2, surf: _Surface, slab: float) -> float:
+	var h := surf.height(p.x, p.y)
+	if surf.ground.water_at(p.x, p.y) > 0.0:
+		h = maxf(h, surf.ground.water_level_at(p.x, p.y) + slab)
+	return h
+
+## Bridge deck on a real `bridge=yes` way (profile from deck_profile),
+## with slab fascias on both sides and parapets.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: _Surface, m2u: float) -> void:
 	var inside := PackedVector2Array()
@@ -260,28 +320,12 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		return
 	pts = inside
 	var n := pts.size()
-	var total := 0.0
+	var deck := deck_profile(pts, surf, m2u)
+	if deck.is_empty():
+		return
 	var dist := PackedFloat32Array([0.0])
 	for i in range(1, n):
-		total += pts[i].distance_to(pts[i - 1])
-		dist.append(total)
-	if total <= 0.0:
-		return
-	var h0 := surf.height(pts[0].x, pts[0].y)
-	var h1 := surf.height(pts[n - 1].x, pts[n - 1].y)
-	var need := 0.0
-	for i in n:
-		var t := dist[i] / total
-		var base := lerpf(h0, h1, t)
-		var under := surf.height(pts[i].x, pts[i].y)
-		var water := surf.ground.water_at(pts[i].x, pts[i].y) > 0.0
-		var floor_y := maxf(under, surf.ground.water_level_at(pts[i].x, pts[i].y) if water else under)
-		var clear := BRIDGE_CLEAR_M * m2u if water else 0.6 * m2u
-		need = maxf(need, (floor_y + clear - base) / maxf(sin(PI * clampf(t, 0.02, 0.98)), 0.25))
-	var deck := PackedFloat32Array()
-	for i in n:
-		var t := dist[i] / total
-		deck.append(lerpf(h0, h1, t) + 0.05 * m2u + maxf(need, 0.0) * sin(PI * t))
+		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
 	var top := _batch(batches, "asphalt")
 	var side := _batch(batches, "deck")
 	var half := width * 0.5
