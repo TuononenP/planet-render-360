@@ -323,6 +323,11 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	WorldCache.save_async(self, _threads, data, built, packed)
 	return built
 
+## A build or cache thread is still running: freeing the view now
+## blocks until it ends (see _notification).
+func has_running_threads() -> bool:
+	return _threads.any(func(t: Thread) -> bool: return t.is_alive())
+
 func _notification(what: int) -> void:
 	# A thread outliving its owner aborts the engine on free/quit. The
 	# builders make RenderingServer read-backs (surface_get_arrays,

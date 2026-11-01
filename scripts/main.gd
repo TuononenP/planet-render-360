@@ -48,6 +48,12 @@ var _generating := false
 const GENERATION_TIMEOUT_S := 600.0
 const TIMEOUT_MESSAGE := "Stopped after 10 minutes: this place took too long to build. Try a spot nearby."
 var generation_timeout_s := GENERATION_TIMEOUT_S  # tests shorten it
+## Longest quitting waits for the view's build and cache-save threads
+## (a large city's save takes over ten seconds) before quitting anyway.
+const QUIT_WAIT_S := 30.0
+const CLOSING_TITLE := "Saving this place for next time"
+const CLOSING_MESSAGE := "Closing as soon as it's saved."
+var _quitting := false
 
 func _fit_content_scale() -> void:
 	var win := get_window()
@@ -69,6 +75,9 @@ func _ready() -> void:
 	theme = UiTheme.base_theme()
 	get_window().size_changed.connect(_fit_content_scale)
 	_fit_content_scale()
+	# The window's close button and the app menu's Quit come through
+	# _request_exit too, so a world still saving is waited for there.
+	get_tree().auto_accept_quit = false
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
 	_pipeline.stage_changed.connect(
@@ -226,9 +235,34 @@ func _ready() -> void:
 
 ## Quit the app. Full screen hides the OS window controls, so the
 ## picker Exit button and these keys are the way out on desktop.
+## A world still saving to the cache (or building) is waited for with
+## frames running, at most QUIT_WAIT_S: joining it in the view's
+## teardown blocks the main thread for seconds and macOS shows the
+## busy cursor.
 func _request_exit() -> void:
+	if _quitting:
+		return
+	_quitting = true
 	_leave_view()
+	if _build_abort != null:
+		_build_abort.requested = true
+	if _view.has_running_threads():
+		_say_closing()
+		var deadline := Time.get_ticks_msec() + int(QUIT_WAIT_S * 1000.0)
+		while _view.has_running_threads() and Time.get_ticks_msec() < deadline:
+			await get_tree().process_frame
 	get_tree().quit()
+
+func _say_closing() -> void:
+	if _view.visible:
+		ViewTools.say(_view, CLOSING_TITLE, CLOSING_MESSAGE, "neutral")
+	elif _picker.visible:
+		_picker._toast.show_message(CLOSING_TITLE, CLOSING_MESSAGE)
+		MapHome.place_toast(_picker)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_request_exit()
 
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
 ## History and Settings return to the map, a Settings page on phones
