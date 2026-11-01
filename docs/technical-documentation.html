@@ -158,7 +158,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 		<div class="meta">
 			<div>ENGINE<b>Godot 4.7 · GDScript</b></div>
 			<div>TARGETS<b>macOS · iOS · Android</b></div>
-			<div>EDITION<b>October 2026</b></div>
+			<div>EDITION<b>November 2026</b></div>
 			<div>LICENSE<b>MIT</b></div>
 		</div>
 	</div>
@@ -172,28 +172,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 	<ol class="toc">
 		<li><span class="n">01</span><span class="t">Overview &amp; principles</span><span class="d">Goals, hard constraints, layered architecture</span><span class="p">3</span></li>
 		<li><span class="n">02</span><span class="t">Screens &amp; user flow</span><span class="d">Screen manager, state transitions, UI</span><span class="p">4</span></li>
-		<li><span class="n">03</span><span class="t">Data sources</span><span class="d">Nine free public sources, register gate</span><span class="p">5</span></li>
-		<li><span class="n">04</span><span class="t">Generation pipeline</span><span class="d">Five stages, overlapped fetches, fallbacks</span><span class="p">6</span></li>
+		<li><span class="n">03</span><span class="t">Data sources</span><span class="d">Twelve free public sources, register gate</span><span class="p">5</span></li>
+		<li><span class="n">04</span><span class="t">Generation pipeline</span><span class="d">Four stages, overlapped fetches, fallbacks</span><span class="p">6</span></li>
 		<li><span class="n">05</span><span class="t">World model</span><span class="d">LocationData, WorldScale, GroundTruth</span><span class="p">7</span></li>
-		<li><span class="n">06</span><span class="t">World assembly</span><span class="d">Builder order, buildings, vegetation, landmarks</span><span class="p">8</span></li>
+		<li><span class="n">06</span><span class="t">World assembly</span><span class="d">Parallel build, buildings, vegetation</span><span class="p">8</span></li>
 		<li><span class="n">07</span><span class="t">LOD &amp; rendering</span><span class="d">Static LOD rings, atmosphere, sun</span><span class="p">9</span></li>
 		<li><span class="n">08</span><span class="t">Quality presets &amp; governor</span><span class="d">Fast → Ultra, FPS-driven stepping</span><span class="p">10</span></li>
 		<li><span class="n">09</span><span class="t">Caching &amp; offline</span><span class="d">Data cache, built-world cache, history</span><span class="p">11</span></li>
-		<li><span class="n">10</span><span class="t">Landmarks</span><span class="d">Curated registry and OSM archetypes</span><span class="p">12</span></li>
+		<li><span class="n">10</span><span class="t">Landmarks</span><span class="d">Registry, mapped OSM, archetypes, Wikipedia</span><span class="p">12</span></li>
 		<li><span class="n">11</span><span class="t">Code organisation &amp; testing</span><span class="d">Packages, size budget, test suite</span><span class="p">13</span></li>
 		<li><span class="n">12</span><span class="t">Gallery &amp; attribution</span><span class="d">Captures, licences, credits</span><span class="p">14</span></li>
 	</ol>
 
 	<h2 style="margin-top:9mm">At a glance</h2>
 	<div class="cols3" style="grid-template-columns:repeat(4,1fr)">
-		<div class="stat"><div class="v" style="color:var(--teal)">96</div><div class="l">GDScript classes</div></div>
-		<div class="stat"><div class="v" style="color:var(--blue)">23.2k</div><div class="l">Lines of code</div></div>
-		<div class="stat"><div class="v" style="color:var(--violet)">31</div><div class="l">Headless tests</div></div>
-		<div class="stat"><div class="v" style="color:var(--amber)">9</div><div class="l">Free data sources</div></div>
-		<div class="stat"><div class="v" style="color:var(--coral)">5</div><div class="l">Pipeline stages</div></div>
+		<div class="stat"><div class="v" style="color:var(--teal)">209</div><div class="l">GDScript classes</div></div>
+		<div class="stat"><div class="v" style="color:var(--blue)">45.9k</div><div class="l">Lines of code</div></div>
+		<div class="stat"><div class="v" style="color:var(--violet)">52</div><div class="l">Test scripts</div></div>
+		<div class="stat"><div class="v" style="color:var(--amber)">12</div><div class="l">Free data sources</div></div>
+		<div class="stat"><div class="v" style="color:var(--coral)">4</div><div class="l">Pipeline stages</div></div>
 		<div class="stat"><div class="v" style="color:var(--green)">2.4 km</div><div class="l">Detailed extent</div></div>
 		<div class="stat"><div class="v" style="color:var(--blue)">33 km</div><div class="l">DEM horizon</div></div>
-		<div class="stat"><div class="v" style="color:var(--teal)">10</div><div class="l">Bespoke landmarks</div></div>
+		<div class="stat"><div class="v" style="color:var(--teal)">23</div><div class="l">Bespoke landmarks</div></div>
 	</div>
 	<div class="note" style="margin-top:6mm">Source of truth: this PDF summarises the code and the living documents in <code>docs/</code> (world-model contract, data-source register, fidelity scorecard) and <code>.agents/plans/</code>. Where they differ, the code and the contract win.</div>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>2</span></div>
@@ -237,22 +237,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<g transform="translate(24 46)">
 					<rect width="434" height="50" rx="10" fill="#14b8a6"/>
 					<text x="14" y="21" fill="#fff" font-weight="800">UI layer</text>
-					<text x="14" y="38" fill="#e6fffb" font-size="10.5">MapPicker · LoadingScreen · View360 · History · Settings · main.gd</text>
+					<text x="14" y="38" fill="#e6fffb" font-size="10.5">Onboarding · MapPicker + map/ · Loading · View360 + tools · History · Settings</text>
 				</g>
 				<g transform="translate(24 104)">
 					<rect width="434" height="50" rx="10" fill="#3b82f6"/>
 					<text x="14" y="21" fill="#fff" font-weight="800">Session layer</text>
-					<text x="14" y="38" fill="#e6efff" font-size="10.5">GenerationPipeline — staged, cancellable job · progress signals</text>
+					<text x="14" y="38" fill="#e6efff" font-size="10.5">GenerationPipeline — 4 cancellable stages · progress signals · 10 min timeout</text>
 				</g>
 				<g transform="translate(24 162)">
 					<rect width="434" height="50" rx="10" fill="#7c5cf0"/>
 					<text x="14" y="21" fill="#fff" font-weight="800">Data layer</text>
-					<text x="14" y="38" fill="#efeaff" font-size="10.5">Fetchers → LocationData contract · CacheStore (user://cache)</text>
+					<text x="14" y="38" fill="#efeaff" font-size="10.5">World fetchers → LocationData · map, wiki, search fetchers · CacheStore</text>
 				</g>
 				<g transform="translate(24 220)">
 					<rect width="434" height="50" rx="10" fill="#f59e0b"/>
 					<text x="14" y="21" fill="#fff" font-weight="800">Generation layer</text>
-					<text x="14" y="38" fill="#fff6e6" font-size="10.5">WorldScale · GroundTruth · terrain, water, buildings, roads, trees, landmarks</text>
+					<text x="14" y="38" fill="#fff6e6" font-size="10.5">WorldScale · GroundTruth · WorldBuildGraph runs the builders in parallel</text>
 				</g>
 				<g transform="translate(24 278)">
 					<rect width="434" height="50" rx="10" fill="#f0566a"/>
@@ -266,23 +266,29 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 			</g>
 			<g font-size="11">
 				<text x="500" y="32" fill="#44506a" font-weight="700" letter-spacing="2" font-size="10.5">FREE PUBLIC SOURCES</text>
-				<g transform="translate(500 46)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#22a35a"/><text x="26" y="18" fill="#0f1a2e">AWS Terrain Tiles · DEM</text>
+				<g transform="translate(500 40)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#22a35a"/><text x="26" y="16" fill="#0f1a2e">AWS Terrain Tiles · DEM</text>
 				</g>
-				<g transform="translate(500 80)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#3b82f6"/><text x="26" y="18" fill="#0f1a2e">Esri World Imagery</text>
+				<g transform="translate(500 67)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#3b82f6"/><text x="26" y="16" fill="#0f1a2e">Esri World Imagery</text>
 				</g>
-				<g transform="translate(500 114)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#7c5cf0"/><text x="26" y="18" fill="#0f1a2e">OSM Overpass · features</text>
+				<g transform="translate(500 94)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#7c5cf0"/><text x="26" y="16" fill="#0f1a2e">OSM Overpass · OSM API</text>
+				</g>
+				<g transform="translate(500 121)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#f59e0b"/><text x="26" y="16" fill="#0f1a2e">CHELSA V2.1 · climate</text>
 				</g>
 				<g transform="translate(500 148)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#f59e0b"/><text x="26" y="18" fill="#0f1a2e">CHELSA V2.1 · climate</text>
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#14b8a6"/><text x="26" y="16" fill="#0f1a2e">Open-Meteo · weather</text>
 				</g>
-				<g transform="translate(500 182)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#14b8a6"/><text x="26" y="18" fill="#0f1a2e">Open-Meteo · weather</text>
+				<g transform="translate(500 175)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#f0566a"/><text x="26" y="16" fill="#0f1a2e">Nominatim · search</text>
 				</g>
-				<g transform="translate(500 216)">
-					<rect width="190" height="28" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="14" r="5" fill="#f0566a"/><text x="26" y="18" fill="#0f1a2e">Nominatim · OSM tiles</text>
+				<g transform="translate(500 202)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#44506a"/><text x="26" y="16" fill="#0f1a2e">OpenFreeMap · OSM tiles</text>
+				</g>
+				<g transform="translate(500 229)">
+					<rect width="190" height="24" rx="7" fill="#fff" stroke="#dfe4ee"/><circle cx="14" cy="12" r="5" fill="#0f1a2e"/><text x="26" y="16" fill="#0f1a2e">Wikipedia · Commons</text>
 				</g>
 				<g transform="translate(500 262)">
 					<rect width="190" height="66" rx="7" fill="#fff" stroke="#dfe4ee" stroke-dasharray="4 3"/>
@@ -320,53 +326,61 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<rect x="520" y="110" width="150" height="74" rx="14" fill="#7c5cf0"/>
 				<rect x="30" y="226" width="150" height="54" rx="12" fill="#fff" stroke="#dfe4ee"/>
 				<rect x="275" y="226" width="150" height="54" rx="12" fill="#fff" stroke="#dfe4ee"/>
-				<rect x="30" y="16" width="150" height="54" rx="12" fill="#fff" stroke="#dfe4ee"/>
+				<rect x="30" y="16" width="150" height="54" rx="12" fill="#fff" stroke="#dfe4ee" stroke-dasharray="4 3"/>
+				<rect x="275" y="16" width="150" height="54" rx="12" fill="#fff" stroke="#dfe4ee"/>
 			</g>
 			<g fill="#fff" text-anchor="middle">
 				<text x="105" y="142" font-size="14" font-weight="800">MapPicker</text>
-				<text x="105" y="162" font-size="10" fill="#e6fffb">tap · search · coordinates</text>
+				<text x="105" y="162" font-size="10" fill="#e6fffb">globe · vector map · search</text>
 				<text x="350" y="142" font-size="14" font-weight="800">LoadingScreen</text>
-				<text x="350" y="162" font-size="10" fill="#e6efff">5 stage rows · progress</text>
+				<text x="350" y="162" font-size="10" fill="#e6efff">4 stages + building the scene</text>
 				<text x="595" y="142" font-size="14" font-weight="800">View360</text>
-				<text x="595" y="162" font-size="10" fill="#efeaff">drag-look · time · season</text>
+				<text x="595" y="162" font-size="10" fill="#efeaff">drag-look · tools · landmarks</text>
 			</g>
 			<g fill="#0f1a2e" text-anchor="middle">
 				<text x="105" y="250" font-size="13" font-weight="800">HistoryScreen</text>
-				<text x="105" y="267" font-size="9.5" fill="#7a859c">recent places · cached revisit</text>
+				<text x="105" y="267" font-size="9.5" fill="#7a859c">recent · favourites · reopen</text>
 				<text x="350" y="250" font-size="13" font-weight="800">Offline download</text>
 				<text x="350" y="267" font-size="9.5" fill="#7a859c">OfflineDownloader warms caches</text>
-				<text x="105" y="40" font-size="13" font-weight="800">SettingsScreen</text>
-				<text x="105" y="57" font-size="9.5" fill="#7a859c">quality preset · palette</text>
+				<text x="105" y="40" font-size="13" font-weight="800">Onboarding</text>
+				<text x="105" y="57" font-size="9.5" fill="#7a859c">first launch · 3 screens</text>
+				<text x="350" y="40" font-size="13" font-weight="800">SettingsScreen</text>
+				<text x="350" y="57" font-size="9.5" fill="#7a859c">theme · accent · quality · units</text>
 			</g>
 			<g stroke="#0f1a2e" stroke-width="1.6" fill="none">
-				<path d="M180 136 H270" marker-end="url(#a2)"/>
+				<path d="M180 128 H270" marker-end="url(#a2)"/>
 				<path d="M425 136 H515" marker-end="url(#a2)"/>
 				<path d="M595 184 C 595 214, 595 214, 560 214 C 360 214, 150 214, 140 188" marker-end="url(#a2)"/>
-				<path d="M88 110 V74" marker-end="url(#a2)"/><path d="M122 74 V108" marker-end="url(#a2)"/>
-				<path d="M88 184 V222" marker-end="url(#a2)"/><path d="M122 226 V188" marker-end="url(#a2)"/>
-				<path d="M180 168 C 230 168, 250 250, 272 252" marker-end="url(#a2)" stroke-dasharray="4 3"/>
+				<path d="M105 70 V106" marker-end="url(#a2)"/>
+				<path d="M150 110 C 150 70, 220 43, 271 43" marker-end="url(#a2)"/>
+				<path d="M560 110 C 560 70, 490 43, 429 43" marker-end="url(#a2)"/>
+				<path d="M64 184 V222" marker-end="url(#a2)"/><path d="M96 226 V188" marker-end="url(#a2)"/>
+				<path d="M160 184 C 175 230, 250 205, 290 223" marker-end="url(#a2)" stroke-dasharray="4 3"/>
 			</g>
-			<path d="M350 110 C 350 82, 160 82, 160 106" stroke="#f0566a" stroke-width="1.6" fill="none" marker-end="url(#a2c)"/>
+			<path d="M275 166 H184" stroke="#f0566a" stroke-width="1.6" fill="none" marker-end="url(#a2c)"/>
 			<g font-size="10" fill="#44506a" font-weight="600">
-				<text x="225" y="128" text-anchor="middle">render_requested</text>
+				<text x="227" y="121" text-anchor="middle">render_requested</text>
 				<text x="470" y="128" text-anchor="middle">finished(data)</text>
 				<text x="380" y="208" text-anchor="middle">back_requested</text>
-				<text x="62" y="96">open</text><text x="130" y="96">back</text>
-				<text x="200" y="232">download_requested</text>
-				<text x="255" y="78" fill="#f0566a">cancel → cancelled (≤1 s)</text>
+				<text x="99" y="92" text-anchor="end">first launch</text>
+				<text x="58" y="208" text-anchor="end">open</text><text x="101" y="208">back</text>
+				<text x="200" y="76">settings</text>
+				<text x="500" y="76" text-anchor="end">data sources</text>
+				<text x="184" y="250" font-size="9">download_requested</text>
+				<text x="229" y="159" text-anchor="middle" fill="#f0566a">cancel · timeout</text>
 			</g>
 		</svg>
-		<div class="cap"><b>Figure 2.</b> Screen state machine. A generation id is bumped on every start and cancel, so a world still building on its thread is dropped once superseded; starts are ignored while a run is in flight.</div>
+		<div class="cap"><b>Figure 2.</b> Screen state machine. A generation id is bumped on every start and cancel, so a world still building on its thread is dropped once superseded; starts are ignored while a run is in flight. A place that takes longer than 10 minutes is stopped and returns to the map with a plain message. Esc steps back one screen.</div>
 	</div>
 
 	<div class="cols" style="grid-template-columns: 1.15fr 1fr">
 		<div>
 			<h3>Interaction model</h3>
 			<ul>
-				<li><b>Map picker</b> — a Godot-native map of real OSM raster tiles (<code>MapTileView</code>), centred on the selection; a progressive preview loads first, then detail centre-out.</li>
-				<li><b>Search</b> — Nominatim, user-triggered only (no autocomplete), one request in flight, plus a bundled gazetteer and raw coordinates.</li>
-				<li><b>Loading</b> — five stage rows driven by <code>stage_changed</code> and <code>progress_changed</code>; cancel returns to the picker within a second.</li>
-				<li><b>360 view</b> — drag to look (yaw wraps, pitch clamps), pinch/scroll zoom, time-of-day slider with a "now" button, season and weather conditions, compass and attribution.</li>
+				<li><b>Map home</b> — a turning globe, then OpenFreeMap vector tiles drawn in the design system's Map style with Terrarium hillshade (<code>scripts/map/</code>); landmark markers from the registry and Wikipedia; OSM raster tiles as the fallback.</li>
+				<li><b>Search</b> — instant on-device predictions, then debounced Nominatim results with one request in flight; raw coordinates and pasted view links work too.</li>
+				<li><b>Loading</b> — four stage rows plus "Building the scene", driven by <code>stage_changed</code>, <code>stage_progress</code> and the build's phases; the terrain lens previews data as it lands; cancel returns within a second.</li>
+				<li><b>360 view</b> — drag to look, pinch/scroll zoom, sun-arc time and date, seasons, live weather, compass and callouts; tools: walk, time-lapse, horizon labels, mini-map, photo, view links, nearby landmarks.</li>
 				<li><b>Responsive</b> — one 390×844 pt design frame, <code>canvas_items</code> stretch, and phone / tablet / desktop breakpoints in <code>responsive.gd</code>.</li>
 			</ul>
 		</div>
@@ -384,46 +398,55 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="page">
 	<div class="kicker">03 · Data</div>
 	<h1>Data sources</h1>
-	<p class="lede">No source enters the fetch layer until its row in <code>docs/data-source-register.md</code> is complete: endpoint, format, licence, direct-mobile access, free-without-key, and a fallback. Each source has exactly one fetcher module.</p>
+	<p class="lede">No source enters the fetch layer until its row in <code>docs/data-source-register.md</code> is complete: endpoint, format, licence, direct-mobile access, free-without-key, and a fallback. Every request goes through a fetcher module in <code>scripts/data/</code>.</p>
 
 	<div class="fig">
-		<svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+		<svg viewBox="0 0 700 394" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
 			<defs>
 				<radialGradient id="hub" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#1d3461"/><stop offset="1" stop-color="#0b1426"/></radialGradient>
 			</defs>
 			<g stroke="#c5cde0" stroke-width="1.4" fill="none">
-				<path d="M350 165 L120 52"/><path d="M350 165 L120 165"/><path d="M350 165 L120 278"/>
-				<path d="M350 165 L580 52"/><path d="M350 165 L580 165"/><path d="M350 165 L580 278"/>
-				<path d="M350 165 L350 32"/><path d="M350 165 L350 300"/>
+				<path d="M350 136 L120 38"/><path d="M350 136 L120 136"/><path d="M350 136 L120 234"/>
+				<path d="M350 136 L580 38"/><path d="M350 136 L580 136"/><path d="M350 136 L580 234"/>
 			</g>
-			<circle cx="350" cy="165" r="74" fill="url(#hub)"/>
-			<circle cx="350" cy="165" r="84" fill="none" stroke="#14b8a6" stroke-width="1" stroke-dasharray="3 4"/>
-			<text x="350" y="150" text-anchor="middle" fill="#8fa0c4" font-size="9.5" font-weight="700" letter-spacing="1.5">DEVICE</text>
-			<text x="350" y="170" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">LocationData</text>
-			<text x="350" y="188" text-anchor="middle" fill="#9fb0d4" font-size="9.5">via user://cache</text>
+			<circle cx="350" cy="136" r="74" fill="url(#hub)"/>
+			<circle cx="350" cy="136" r="84" fill="none" stroke="#14b8a6" stroke-width="1" stroke-dasharray="3 4"/>
+			<text x="350" y="121" text-anchor="middle" fill="#8fa0c4" font-size="9.5" font-weight="700" letter-spacing="1.5">DEVICE</text>
+			<text x="350" y="141" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">LocationData</text>
+			<text x="350" y="159" text-anchor="middle" fill="#9fb0d4" font-size="9.5">via user://cache</text>
 			<g font-size="10.5">
-				<g transform="translate(14 28)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#22a35a" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Elevation · DemFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Terrarium PNG · z14 / z12 / z8</text></g>
-				<g transform="translate(14 141)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#3b82f6" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Imagery · SatelliteFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Esri JPEG · z16–z17 drape</text></g>
-				<g transform="translate(14 254)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#7c5cf0" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Features · OsmFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Overpass JSON · 5-endpoint retry</text></g>
-				<g transform="translate(486 28)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#f59e0b" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Climate · ClimateFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">CHELSA GeoTIFF · HTTP ranges</text></g>
-				<g transform="translate(486 141)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#14b8a6" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Far field · FarFieldFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">DEM rings + drapes to 33 km</text></g>
-				<g transform="translate(486 254)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#f0566a" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Far city · FarCityFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">One Overpass call · 12 km</text></g>
-				<g transform="translate(265 6)"><rect width="170" height="34" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="85" y="21" text-anchor="middle" font-weight="700" fill="#0f1a2e">Weather · Open-Meteo</text></g>
-				<g transform="translate(250 290)"><rect width="200" height="34" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="100" y="21" text-anchor="middle" font-weight="700" fill="#0f1a2e">Search · Nominatim  ·  Map tiles</text></g>
+				<g transform="translate(14 14)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#22a35a" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Elevation · DemFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Terrarium PNG · z14 / z12 / z8</text></g>
+				<g transform="translate(14 112)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#3b82f6" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Imagery · SatelliteFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Esri JPEG · z16–z17 drape</text></g>
+				<g transform="translate(14 210)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#7c5cf0" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Features · OsmFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">Overpass ×5 · OSM API · nearby cache</text></g>
+				<g transform="translate(486 14)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#f59e0b" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Climate · ClimateFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">CHELSA GeoTIFF · HTTP ranges</text></g>
+				<g transform="translate(486 112)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#14b8a6" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Far field · FarFieldFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">DEM rings + drapes to 33 km</text></g>
+				<g transform="translate(486 210)"><rect width="200" height="48" rx="10" fill="#fff" stroke="#f0566a" stroke-width="1.5"/><text x="12" y="20" font-weight="800" fill="#0f1a2e">Far city · FarCityFetcher</text><text x="12" y="36" fill="#7a859c" font-size="9.5">One Overpass call · 12 km</text></g>
+			</g>
+			<line x1="0" y1="272" x2="700" y2="272" stroke="#c5cde0" stroke-width="1.2" stroke-dasharray="4 4"/>
+			<text x="0" y="291" fill="#44506a" font-size="9.5" font-weight="700" letter-spacing="1.5">UI FETCHERS · MAP HOME AND 360 VIEW, OUTSIDE LOCATIONDATA</text>
+			<g font-size="10.5">
+				<g transform="translate(0 300)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Map · VectorTileFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">OpenFreeMap MVT + Terrarium hillshade</text></g>
+				<g transform="translate(239 300)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Globe · TileFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">OSM raster · globe, mini-map, fallback</text></g>
+				<g transform="translate(478 300)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Search · SearchFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">Nominatim · debounced predictions</text></g>
+				<g transform="translate(0 348)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Landmarks · WikiFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">Wikipedia GeoSearch, summary · Commons</text></g>
+				<g transform="translate(239 348)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Weather · WeatherFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">Open-Meteo · map facts, 360 sky</text></g>
+				<g transform="translate(478 348)"><rect width="222" height="42" rx="9" fill="#fff" stroke="#dfe4ee"/><text x="12" y="18" font-weight="800" fill="#0f1a2e">Horizon · HorizonFetcher</text><text x="12" y="33" fill="#7a859c" font-size="9">One Overpass call · peaks, towns, lakes</text></g>
 			</g>
 		</svg>
-		<div class="cap"><b>Figure 3.</b> Fetch topology. Every fetcher writes a versioned cache file first and normalises into the <code>LocationData</code> contract; generation code never sees raw provider payloads.</div>
+		<div class="cap"><b>Figure 3.</b> Fetch topology. World fetchers cache first and normalise into the <code>LocationData</code> contract, so generation never sees raw provider payloads. UI fetchers feed the map home and the 360 view directly, with their own caches.</div>
 	</div>
 
 	<table>
 		<tr><th>Need</th><th>Source</th><th>Format &amp; access</th><th>Licence</th><th>Fallback</th></tr>
 		<tr><td><b>Elevation</b></td><td>AWS Terrain Tiles</td><td>PNG, h = R·256 + G + B/256 − 32768 m</td><td>Attribution (EU-DEM, USGS, SRTM…)</td><td>lower zoom → cache → procedural DEM</td></tr>
 		<tr><td><b>Imagery</b></td><td>Esri World Imagery</td><td>JPEG 256 px tiles, bounded pool</td><td>Esri ToU, noncommercial</td><td>lower zoom → cache → vertex colour</td></tr>
-		<tr><td><b>Buildings, roads, land</b></td><td>OSM Overpass</td><td>JSON <code>out geom</code>, identifying UA</td><td>ODbL</td><td>cache → absence-only dressing</td></tr>
+		<tr><td><b>Buildings, roads, land</b></td><td>OSM Overpass · OSM API</td><td>JSON <code>out geom</code>, 5 instances, identifying UA</td><td>ODbL</td><td>cache → OSM API → nearby cache → absence-only</td></tr>
 		<tr><td><b>Climate</b></td><td>CHELSA V2.1</td><td>GeoTIFF row reads, ~0.3–0.6 MB/place</td><td>CC BY 4.0</td><td>latitude rules (ClimateModel)</td></tr>
 		<tr><td><b>Weather</b></td><td>Open-Meteo</td><td>JSON current conditions</td><td>CC BY</td><td>omit weather dressing</td></tr>
-		<tr><td><b>Search / map</b></td><td>Nominatim · OSM tiles</td><td>JSON ≤1 req/s · PNG tiles</td><td>ODbL</td><td>gazetteer · blank map + pin</td></tr>
-		<tr><td><b>Textures</b></td><td>Poly Haven (build time)</td><td>13 PBR sets, 1k jpg in <code>assets/</code></td><td>CC0</td><td>procedural textures</td></tr>
+		<tr><td><b>Search</b></td><td>Nominatim</td><td>JSON · debounced · 1 in flight</td><td>ODbL</td><td>gazetteer · coordinates</td></tr>
+		<tr><td><b>Map</b></td><td>OpenFreeMap</td><td>MVT + Terrarium hillshade</td><td>ODbL · OpenMapTiles</td><td>cache · OSM raster tiles</td></tr>
+		<tr><td><b>Landmarks</b></td><td>Wikipedia, Commons</td><td>GeoSearch · summary · photo</td><td>CC BY-SA · per photo</td><td>registry markers only</td></tr>
+		<tr><td><b>Textures</b></td><td>Poly Haven (build time)</td><td>19 PBR sets, 1k jpg in <code>assets/</code></td><td>CC0</td><td>procedural textures</td></tr>
 	</table>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>5</span></div>
 </section>
@@ -432,24 +455,24 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="page">
 	<div class="kicker">04 · Pipeline</div>
 	<h1>Generation pipeline</h1>
-	<p class="lede"><code>GenerationPipeline</code> (<code>scripts/generation/pipeline.gd</code>) runs five frozen stages. All network fetches start together in <code>run()</code> and overlap; each stage awaits only what it needs, with a bounded wait so a slow source degrades a layer instead of blocking the view.</p>
+	<p class="lede"><code>GenerationPipeline</code> (<code>scripts/generation/pipeline.gd</code>) runs four stages, one per live data source as the loading screen names them. All network fetches start together in <code>run()</code> and overlap; each stage awaits only what it needs, with a bounded wait so a slow source degrades a layer instead of blocking the view.</p>
 
 	<div class="fig">
-		<svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+		<svg viewBox="0 0 700 356" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
 			<g font-size="10" fill="#7a859c">
-				<line x1="150" y1="22" x2="150" y2="300" stroke="#dfe4ee"/>
-				<line x1="250" y1="22" x2="250" y2="300" stroke="#dfe4ee"/>
-				<line x1="350" y1="22" x2="350" y2="300" stroke="#dfe4ee"/>
-				<line x1="450" y1="22" x2="450" y2="300" stroke="#dfe4ee"/>
-				<line x1="550" y1="22" x2="550" y2="300" stroke="#dfe4ee"/>
-				<line x1="650" y1="22" x2="650" y2="300" stroke="#dfe4ee"/>
+				<line x1="150" y1="22" x2="150" y2="340" stroke="#dfe4ee"/>
+				<line x1="240" y1="22" x2="240" y2="340" stroke="#dfe4ee"/>
+				<line x1="320" y1="22" x2="320" y2="340" stroke="#dfe4ee"/>
+				<line x1="470" y1="22" x2="470" y2="340" stroke="#dfe4ee"/>
+				<line x1="540" y1="22" x2="540" y2="340" stroke="#dfe4ee"/>
+				<line x1="690" y1="22" x2="690" y2="340" stroke="#dfe4ee"/>
 			</g>
-			<g font-size="10.5" font-weight="700" fill="#fff" text-anchor="middle">
-				<rect x="150" y="10" width="98" height="26" rx="6" fill="#22a35a"/><text x="199" y="27">1 Elevation</text>
-				<rect x="250" y="10" width="98" height="26" rx="6" fill="#3b82f6"/><text x="299" y="27">2 Land cover</text>
-				<rect x="350" y="10" width="98" height="26" rx="6" fill="#7c5cf0"/><text x="399" y="27">3 Landmarks</text>
-				<rect x="450" y="10" width="98" height="26" rx="6" fill="#f59e0b"/><text x="499" y="27">4 Vegetation</text>
-				<rect x="550" y="10" width="98" height="26" rx="6" fill="#f0566a"/><text x="599" y="27">5 Lighting</text>
+			<g font-size="10" font-weight="700" fill="#fff" text-anchor="middle">
+				<rect x="150" y="10" width="88" height="26" rx="6" fill="#22a35a"/><text x="194" y="27">1 Elevation</text>
+				<rect x="240" y="10" width="78" height="26" rx="6" fill="#3b82f6"/><text x="279" y="27">2 Imagery</text>
+				<rect x="320" y="10" width="148" height="26" rx="6" fill="#7c5cf0"/><text x="394" y="27">3 Buildings &amp; landmarks</text>
+				<rect x="470" y="10" width="68" height="26" rx="6" fill="#f59e0b"/><text x="504" y="27">4 Weather</text>
+				<rect x="540" y="10" width="150" height="26" rx="6" fill="#0f1a2e"/><text x="615" y="27">Building the scene</text>
 			</g>
 			<g font-size="10.5" fill="#0f1a2e" font-weight="600">
 				<text x="10" y="64">DEM mosaic z14</text>
@@ -459,35 +482,40 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<text x="10" y="184">OSM features</text>
 				<text x="10" y="214">Far city</text>
 				<text x="10" y="244">CHELSA climate</text>
-				<text x="10" y="274">GroundTruth</text>
-				<text x="10" y="296">World build</text>
+				<text x="10" y="274">BuildPrewarm</text>
+				<text x="10" y="304">GroundTruth</text>
+				<text x="10" y="334">World build</text>
 			</g>
 			<g>
-				<rect x="150" y="54" width="90" height="14" rx="7" fill="#22a35a"/>
-				<rect x="150" y="84" width="70" height="14" rx="7" fill="#22a35a" opacity=".7"/>
-				<rect x="150" y="114" width="150" height="14" rx="7" fill="#14b8a6" opacity=".75"/>
-				<rect x="300" y="114" width="0" height="14"/>
-				<rect x="150" y="144" width="180" height="14" rx="7" fill="#3b82f6"/>
+				<rect x="150" y="54" width="80" height="14" rx="7" fill="#22a35a"/>
+				<rect x="150" y="84" width="66" height="14" rx="7" fill="#22a35a" opacity=".7"/>
+				<rect x="150" y="114" width="86" height="14" rx="7" fill="#14b8a6" opacity=".75"/>
+				<rect x="150" y="144" width="164" height="14" rx="7" fill="#3b82f6"/>
 				<rect x="150" y="174" width="270" height="14" rx="7" fill="#7c5cf0"/>
-				<rect x="150" y="204" width="230" height="14" rx="7" fill="#f0566a" opacity=".75"/>
-				<rect x="150" y="234" width="110" height="14" rx="7" fill="#f59e0b"/>
-				<rect x="420" y="264" width="40" height="14" rx="7" fill="#0f1a2e"/>
-				<rect x="460" y="288" width="190" height="14" rx="7" fill="url(#bw)"/>
+				<rect x="150" y="204" width="312" height="14" rx="7" fill="#f0566a" opacity=".75"/>
+				<rect x="150" y="234" width="96" height="14" rx="7" fill="#f59e0b"/>
+				<rect x="150" y="264" width="200" height="14" rx="7" fill="#7a859c"/>
+				<text x="158" y="274.5" font-size="8.6" fill="#fff" font-weight="600">texture caches, during the fetch</text>
+				<rect x="420" y="294" width="76" height="14" rx="7" fill="#0f1a2e"/>
+				<rect x="540" y="324" width="150" height="14" rx="7" fill="url(#bw)"/>
 			</g>
 			<defs><linearGradient id="bw" x1="0" x2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#f0566a"/></linearGradient></defs>
 			<g font-size="9" fill="#44506a">
-				<text x="306" y="125">applied in stage 1 · ≤45 s</text>
-				<text x="336" y="155">awaited stage 2</text>
-				<text x="426" y="185">awaited stage 3</text>
-				<text x="386" y="215">≤30 s after OSM</text>
-				<text x="266" y="245">≤15 s · cached 5 ms</text>
-				<text x="466" y="275">built once, shared</text>
+				<text x="236" y="65">≤16 s</text>
+				<text x="222" y="95">≤12 s</text>
+				<text x="244" y="125">≤45 s, applied in stage 1</text>
+				<text x="322" y="155">awaited stage 2 · 20–120 s</text>
+				<text x="426" y="185">Overpass ×5 → fallbacks</text>
+				<text x="468" y="215">≤30 s after OSM</text>
+				<text x="252" y="245">≤15 s · cached 5 ms · awaited stage 4</text>
+				<text x="502" y="305">worker thread</text>
+				<text x="532" y="350" text-anchor="end">WorldBuildGraph · 7 builder tasks at once →</text>
 			</g>
 			<g stroke="#0f1a2e" stroke-width="1.2" stroke-dasharray="2 3">
-				<line x1="240" y1="61" x2="250" y2="61"/><line x1="330" y1="151" x2="350" y2="151"/>
+				<line x1="420" y1="188" x2="420" y2="294"/>
 			</g>
 		</svg>
-		<div class="cap"><b>Figure 4.</b> Overlapped fetch timeline (schematic). Stage rows are emitted as <code>stage_changed(i, label, "in_progress" | "done")</code>; <code>progress_changed</code> reports real items done/total, never a timer.</div>
+		<div class="cap"><b>Figure 4.</b> Overlapped fetch timeline (schematic). Stage rows are emitted as <code>stage_changed(i, label, "in_progress" | "done")</code>; <code>stage_progress</code> and <code>progress_changed</code> report real items done/total, never a timer. <code>GroundTruth</code> starts on a worker thread as soon as the OSM data is in, so it overlaps the far-city and climate waits.</div>
 	</div>
 
 	<h2>Fallback chains</h2>
@@ -512,20 +540,21 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				</g>
 				<text x="0" y="124" fill="#7c5cf0" font-weight="800">OSM</text>
 				<g transform="translate(70 108)">
-					<rect width="125" height="26" rx="13" fill="#7c5cf0"/><text x="62" y="17" fill="#fff" text-anchor="middle">Overpass ×5</text>
-					<rect x="150" width="125" height="26" rx="13" fill="#7c5cf0" opacity=".75"/><text x="212" y="17" fill="#fff" text-anchor="middle">tag defaults</text>
-					<rect x="300" width="125" height="26" rx="13" fill="#7c5cf0" opacity=".55"/><text x="362" y="17" fill="#fff" text-anchor="middle">on-device cache</text>
-					<rect x="450" width="150" height="26" rx="13" fill="#fff" stroke="#7c5cf0"/><text x="525" y="17" fill="#7c5cf0" text-anchor="middle">absence-only infill</text>
+					<rect width="100" height="26" rx="13" fill="#7c5cf0"/><text x="50" y="17" fill="#fff" text-anchor="middle">Overpass ×5</text>
+					<rect x="122" width="108" height="26" rx="13" fill="#7c5cf0" opacity=".8"/><text x="176" y="17" fill="#fff" text-anchor="middle">same-place cache</text>
+					<rect x="252" width="100" height="26" rx="13" fill="#7c5cf0" opacity=".65"/><text x="302" y="17" fill="#fff" text-anchor="middle">OSM API bbox</text>
+					<rect x="374" width="100" height="26" rx="13" fill="#7c5cf0" opacity=".5"/><text x="424" y="17" fill="#fff" text-anchor="middle">nearby cache</text>
+					<rect x="496" width="134" height="26" rx="13" fill="#fff" stroke="#7c5cf0"/><text x="563" y="17" fill="#7c5cf0" text-anchor="middle">absence-only infill</text>
 				</g>
 			</g>
 			<g stroke="#7a859c" stroke-width="1.3">
 				<line x1="197" y1="21" x2="218" y2="21" marker-end="url(#a4)"/><line x1="347" y1="21" x2="368" y2="21" marker-end="url(#a4)"/><line x1="497" y1="21" x2="518" y2="21" marker-end="url(#a4)"/>
 				<line x1="197" y1="71" x2="218" y2="71" marker-end="url(#a4)"/><line x1="347" y1="71" x2="368" y2="71" marker-end="url(#a4)"/><line x1="497" y1="71" x2="518" y2="71" marker-end="url(#a4)"/>
-				<line x1="197" y1="121" x2="218" y2="121" marker-end="url(#a4)"/><line x1="347" y1="121" x2="368" y2="121" marker-end="url(#a4)"/><line x1="497" y1="121" x2="518" y2="121" marker-end="url(#a4)"/>
+				<line x1="172" y1="121" x2="189" y2="121" marker-end="url(#a4)"/><line x1="302" y1="121" x2="319" y2="121" marker-end="url(#a4)"/><line x1="424" y1="121" x2="441" y2="121" marker-end="url(#a4)"/><line x1="546" y1="121" x2="563" y2="121" marker-end="url(#a4)"/>
 			</g>
 		</svg>
 	</div>
-	<p>After stage 3 the pipeline constructs <code>GroundTruth</code> once and <code>View360</code> builds the world on a background thread. A cancel bumps the generation id in <code>main.gd</code>, so a superseded world is freed rather than shown.</p>
+	<p>A cached payload is served before any of this; missing tags fall back to documented defaults inside the parser. After the last stage the pipeline waits for <code>BuildPrewarm</code>, then <code>View360</code> builds the world on a background thread through <code>WorldBuildGraph</code> ("Building the scene"). A cancel or the 10-minute timeout bumps the generation id in <code>main.gd</code> and asks a running build to stop at its next stage (<code>BuildAbort</code>), so a superseded world is freed rather than shown and never cached.</p>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>6</span></div>
 </section>
 
@@ -549,26 +578,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 					<text x="22" y="47">DemFetcher</text><text x="22" y="85">FarFieldFetcher</text><text x="22" y="123">SatelliteFetcher</text>
 					<text x="22" y="161">OsmFetcher</text><text x="22" y="199">FarCityFetcher</text><text x="22" y="237">ClimateFetcher</text>
 				</g>
-				<rect x="190" y="28" width="200" height="220" rx="14" fill="#0b1426"/>
+				<rect x="190" y="28" width="200" height="240" rx="14" fill="#0b1426"/>
 				<text x="290" y="52" text-anchor="middle" fill="#fff" font-weight="800" font-size="13">LocationData</text>
 				<g fill="#b9c6e4" font-size="9.6" font-family="JetBrains Mono, monospace">
 					<text x="206" y="78">heights · grid_size</text>
 					<text x="206" y="96">centre_elevation_m</text>
 					<text x="206" y="114">dem_rings · far_heights</text>
 					<text x="206" y="132">satellite_image / _origin</text>
-					<text x="206" y="150">buildings · roads</text>
+					<text x="206" y="150">buildings · roads · barriers</text>
 					<text x="206" y="168">land · waterways · trees</text>
 					<text x="206" y="186">landmark_candidates</text>
 					<text x="206" y="204">far_landuse · far_towers</text>
-					<text x="206" y="222">climate · season</text>
-					<text x="206" y="240">quality_preset · seed</text>
+					<text x="206" y="222">climate · season · seed</text>
+					<text x="206" y="240">quality_preset · data_notes</text>
+					<text x="206" y="258">focus · view (camera)</text>
 				</g>
-				<rect x="440" y="88" width="120" height="100" rx="14" fill="#f59e0b"/>
-				<text x="500" y="118" text-anchor="middle" fill="#fff" font-weight="800" font-size="13">GroundTruth</text>
+				<rect x="440" y="78" width="120" height="120" rx="14" fill="#f59e0b"/>
+				<text x="500" y="106" text-anchor="middle" fill="#fff" font-weight="800" font-size="13">GroundTruth</text>
 				<g fill="#fff8ea" font-size="9.4" text-anchor="middle" font-family="JetBrains Mono, monospace">
-					<text x="500" y="138">height_at_world</text><text x="500" y="152">water_at</text>
-					<text x="500" y="166">land_class_at</text><text x="500" y="180">slope_at</text>
+					<text x="500" y="126">height_at_world</text><text x="500" y="140">water_at</text>
+					<text x="500" y="154">land_class_at</text><text x="500" y="168">slope_at</text>
 				</g>
+				<text x="500" y="188" text-anchor="middle" fill="#fff" font-size="8.6" font-weight="700">GroundIndex · PolygonIndex</text>
 				<g fill="#fff" stroke="#dfe4ee">
 					<rect x="600" y="28" width="94" height="28" rx="7"/><rect x="600" y="62" width="94" height="28" rx="7"/>
 					<rect x="600" y="96" width="94" height="28" rx="7"/><rect x="600" y="130" width="94" height="28" rx="7"/>
@@ -593,7 +624,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<path d="M560 138 C 580 138, 580 246, 596 246" marker-end="url(#a5)"/>
 			</g>
 			<path d="M390 70 C 520 70, 520 20, 596 30" stroke="#7a859c" stroke-dasharray="4 3" stroke-width="1.2" fill="none" marker-end="url(#a5)"/>
-			<text x="470" y="276" text-anchor="middle" font-size="9.5" fill="#44506a">builders read geometry from LocationData, but heights, water and land class only via GroundTruth</text>
+			<text x="470" y="290" text-anchor="middle" font-size="9.5" fill="#44506a">builders read geometry from LocationData, but heights, water and land class only via GroundTruth</text>
 		</svg>
 		<div class="cap"><b>Figure 5.</b> Data contract. Builders take <code>(data: LocationData, ground: GroundTruth)</code>, emit metre-space <code>Node3D</code> subtrees, and build materials only through <code>MaterialLibrary</code>.</div>
 	</div>
@@ -604,7 +635,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 			<p><code>WorldScale</code> owns every conversion. One unit is one metre horizontally <i>and</i> vertically — the v1 220-unit world and adaptive vertical squash are gone. <code>+X</code> is east, <code>+Z</code> is south (north is <code>−Z</code>).</p>
 			<p>The detailed world is <b>2400 m</b> across (<code>DETAILED_EXTENT_M</code>). The render origin is set once per place at the viewpoint (lat, lon, <code>centre_elevation_m</code>), so the camera always works near the floating-point sweet spot.</p>
 			<h3>GroundTruth</h3>
-			<p>Built once per place from DEM posts, OSM polygons and waterways: a smoothed surface flattened only where OSM says so (building pads, roads) with water carved in. All samplers are pure bilinear reads — outside the extent they clamp to the nearest edge and never return NaN.</p>
+			<p>Built once per place from DEM posts, OSM polygons and waterways, on a worker thread as soon as the OSM data is in: a smoothed surface flattened only where OSM says so (building pads, roads) with water carved in. <code>GroundIndex</code> and <code>PolygonIndex</code> grids answer land-class, building and point-in-polygon lookups exactly like the full scans they replace. All samplers are pure bilinear reads — outside the extent they clamp to the nearest edge and never return NaN.</p>
 		</div>
 		<div class="fig" style="margin-top:2mm">
 			<svg viewBox="0 0 300 260" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
@@ -635,10 +666,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="page">
 	<div class="kicker">06 · Assembly</div>
 	<h1>World assembly</h1>
-	<p class="lede"><code>TerrainBuilder.build_world(data, ground)</code> assembles the scene in dependency order. Later layers sample the surfaces earlier ones define, so trees never land on roads, buildings or water.</p>
+	<p class="lede"><code>TerrainBuilder.build_world(data, ground)</code> hands the scene to <code>WorldBuildGraph</code>: seven builder tasks run at once on <code>WorkerThreadPool</code>, each reading only <code>data</code> and <code>ground</code>, and their subtrees are adopted in a fixed order, so the parallel world matches the serial one byte for byte. Every layer samples the same <code>GroundTruth</code>, and vegetation masks built from the same data keep trees off roads, buildings and water.</p>
 
 	<div class="fig">
 		<svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+			<g stroke="#0f1a2e" stroke-width="1.2" fill="none"><path d="M24 40 V32 H676 V40"/></g>
+			<text x="350" y="22" text-anchor="middle" font-size="9.5" font-weight="700" fill="#44506a">all seven run at once on WorkerThreadPool · BuildPrewarm filled the texture caches during the fetch</text>
 			<g font-size="11" font-weight="700" fill="#fff">
 				<g transform="translate(20 20)">
 					<polygon points="0,190 90,190 110,160 20,160" fill="#14b8a6"/>
@@ -658,18 +691,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<text x="165" y="132" font-weight="800">Terrain mesh</text><text x="165" y="146" font-size="9" fill="#44506a">GroundMaterial drape</text>
 				<text x="260" y="142" font-weight="800">Water</text><text x="260" y="156" font-size="9" fill="#44506a">polygons, quays, shore</text>
 				<text x="355" y="102" font-weight="800">Buildings</text><text x="355" y="116" font-size="9" fill="#44506a">OSM + absence infill</text>
-				<text x="450" y="132" font-weight="800">Roads</text><text x="450" y="146" font-size="9" fill="#44506a">draped ribbons, props</text>
+				<text x="450" y="132" font-weight="800">Roads</text><text x="450" y="146" font-size="9" fill="#44506a">ribbons, props</text>
 				<text x="545" y="62" font-weight="800">Landmarks</text><text x="545" y="76" font-size="9" fill="#44506a">registry + candidates</text>
 				<text x="640" y="117" font-weight="800">Vegetation</text><text x="640" y="131" font-size="9" fill="#44506a">species by climate</text>
 			</g>
 			<line x1="20" y1="232" x2="680" y2="232" stroke="#0f1a2e" stroke-width="1.2"/>
-			<text x="350" y="248" text-anchor="middle" font-size="9.5" fill="#7a859c">TerrainBuilder.build_world() — children adopted flat and tagged with their lod_layer for LodRing</text>
+			<text x="350" y="248" text-anchor="middle" font-size="9.5" fill="#7a859c">WorldBuildGraph.build() — subtrees adopted in this order and tagged with their lod_layer for LodRing</text>
 		</svg>
-		<div class="cap"><b>Figure 6.</b> Build order. Each builder returns a contract subtree; <code>_adopt_flat</code> lifts its children into the root and records the layer they came from.</div>
+		<div class="cap"><b>Figure 6.</b> Adoption order. Each builder returns a detached contract subtree; <code>_adopt_flat</code> lifts its children into the root and records the layer they came from. A stop request (<code>BuildAbort</code>) returns an empty world; if the shared PBR material cache overflows, the build reruns serially for an exact order.</div>
 	</div>
 
 	<h2>Building subsystem</h2>
-	<p>Buildings are the largest subsystem (≈20 classes). Real OSM footprints are extruded first; procedural infill is <b>absence-only and style-matched</b> (<code>InfillPlanner</code>, <code>SettlementMap</code>) and never contradicts mapped data.</p>
+	<p>Buildings are the largest subsystem (≈35 classes). Real OSM footprints are extruded first; procedural infill is <b>absence-only and style-matched</b> (<code>InfillPlanner</code>, <code>SettlementMap</code>) and never contradicts mapped data.</p>
 	<div class="fig" style="padding:3mm">
 		<svg viewBox="0 0 700 120" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
 			<defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c5cf0"/></marker></defs>
@@ -767,14 +800,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 			<circle cx="190" cy="46" r="6" fill="#ffd27a"/>
 			<g font-size="9" fill="#fff" font-weight="700"><text x="22" y="72">night</text><text x="160" y="72">golden hour</text><text x="330" y="72">solar noon</text><text x="460" y="72">afternoon</text><text x="640" y="72">night</text></g>
 			<g font-size="9.6" fill="#0f1a2e">
-				<g transform="translate(10 94)"><rect width="160" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="10" y="19" font-weight="800">SolarPosition</text><text x="10" y="35" fill="#7a859c" font-size="8.8">NOAA equations, true sun</text></g>
-				<g transform="translate(183 94)"><rect width="160" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="10" y="19" font-weight="800">AtmosphereRig</text><text x="10" y="35" fill="#7a859c" font-size="8.8">sun, aerial haze, clouds</text></g>
-				<g transform="translate(356 94)"><rect width="160" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="10" y="19" font-weight="800">SkyShader</text><text x="10" y="35" fill="#7a859c" font-size="8.8">Rayleigh-ish gradient dome</text></g>
-				<g transform="translate(529 94)"><rect width="161" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="10" y="19" font-weight="800">ViewConditions</text><text x="10" y="35" fill="#7a859c" font-size="8.8">season, rain, snow, roofs</text></g>
+				<g transform="translate(10 94)"><rect width="128" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="9" y="19" font-weight="800">SolarPosition</text><text x="9" y="35" fill="#7a859c" font-size="8.6">NOAA, true sun + moon</text></g>
+				<g transform="translate(148 94)"><rect width="128" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="9" y="19" font-weight="800">AtmosphereRig</text><text x="9" y="35" fill="#7a859c" font-size="8.6">SkyPalette · SkyShader</text></g>
+				<g transform="translate(286 94)"><rect width="128" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="9" y="19" font-weight="800">WeatherLook</text><text x="9" y="35" fill="#7a859c" font-size="8.6">live weather · LightningRig</text></g>
+				<g transform="translate(424 94)"><rect width="128" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="9" y="19" font-weight="800">PostGrade</text><text x="9" y="35" fill="#7a859c" font-size="8.6">ACES grade · CityLights</text></g>
+				<g transform="translate(562 94)"><rect width="128" height="48" rx="8" fill="#fff" stroke="#dfe4ee"/><text x="9" y="19" font-weight="800">ViewConditions</text><text x="9" y="35" fill="#7a859c" font-size="8.6">season, rain, snow, roofs</text></g>
 			</g>
 		</svg>
 	</div>
-	<p>The view opens on the place's golden hour; the time slider and "now" button move the true solar position for the location's date. Live Open-Meteo weather drives cloud cover and precipitation, and <code>RoofSnow</code> and <code>ClimateModel</code> lay snow on roofs and ground from the season and CHELSA snow days. <code>RenderQuality</code> adds the photoreal layer per tier (SSAO, volumetrics, window recesses on Ultra).</p>
+	<p>The view opens on the place's golden hour; the sun arc and date picker move the true solar position for the location and any calendar date, and the time-lapse plays the day. Live Open-Meteo weather drives cloud cover and precipitation through <code>WeatherLook</code>, with <code>LightningRig</code> strikes only in thunderstorms; <code>CityLights</code> lights windows at dusk. <code>RoofSnow</code> and <code>ClimateModel</code> lay snow on roofs and ground from the season and CHELSA snow days. <code>RenderQuality</code> adds the photoreal layer per tier (SSAO, volumetrics, window recesses on Ultra).</p>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>9</span></div>
 </section>
 
@@ -853,7 +887,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 	<p class="lede">Two independent caches with separate budgets: the <b>data cache</b> holds fetched tiles and responses, the <b>world cache</b> holds finished worlds. A ~200 MB world can never evict the DEM, OSM or satellite tiles it was built from.</p>
 
 	<div class="fig">
-		<svg viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+		<svg viewBox="0 0 700 336" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
 			<defs>
 				<marker id="a9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#0f1a2e"/></marker>
 				<marker id="a9g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22a35a"/></marker>
@@ -871,22 +905,23 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 					<rect width="390" height="120" rx="14" fill="#e8f7ef" stroke="#22a35a" stroke-width="1.5"/>
 					<text x="16" y="24" font-weight="800" fill="#16804a">WorldCache · user://worlds</text>
 					<text x="16" y="44" fill="#0f1a2e" font-size="10">Key = place (quantised) + preset + season</text>
-					<text x="16" y="60" fill="#0f1a2e" font-size="10">+ LocationData fingerprint + BUILD_VERSION (7)</text>
+					<text x="16" y="60" fill="#0f1a2e" font-size="10">+ LocationData fingerprint + BUILD_VERSION</text>
 					<text x="16" y="80" fill="#0f1a2e" font-size="10">1 GB budget · oldest-first eviction · debug builds</text>
 					<text x="16" y="96" fill="#0f1a2e" font-size="10">also hash generator sources (never a stale world)</text>
 					<text x="374" y="24" text-anchor="end" font-size="20" font-weight="800" fill="#22a35a">~1.5 s</text>
 					<text x="374" y="40" text-anchor="end" font-size="9" fill="#16804a">vs ~31 s build (Paris High)</text>
 				</g>
 				<g transform="translate(300 182)">
-					<rect width="390" height="128" rx="14" fill="#eef2fd" stroke="#3b82f6" stroke-width="1.5"/>
+					<rect width="390" height="144" rx="14" fill="#eef2fd" stroke="#3b82f6" stroke-width="1.5"/>
 					<text x="16" y="24" font-weight="800" fill="#2563eb">CacheStore · user://cache</text>
 					<g font-family="JetBrains Mono, monospace" font-size="9.4" fill="#0f1a2e">
 						<text x="16" y="46">dem_v&lt;V&gt;_&lt;z&gt;_&lt;x&gt;_&lt;y&gt;.png</text>
 						<text x="16" y="62">sat_v&lt;V&gt;_&lt;z&gt;_&lt;x&gt;_&lt;y&gt;.jpg</text>
 						<text x="16" y="78">osm_v&lt;V&gt;_&lt;lat_q&gt;_&lt;lon_q&gt;_r&lt;radius&gt;.json</text>
-						<text x="16" y="94">climate_v2_*.json · lru.json</text>
+						<text x="16" y="94">climate_v2_*.json · wiki_* · lru.json</text>
+						<text x="16" y="110">tiles/ (raster) · vector/ (map tiles, hillshade)</text>
 					</g>
-					<text x="16" y="116" fill="#44506a" font-size="9.6">LRU size cap · bump DATA_VERSION or invalidate_layer()</text>
+					<text x="16" y="132" fill="#44506a" font-size="9.6">LRU size cap · bump DATA_VERSION or invalidate_layer()</text>
 				</g>
 			</g>
 			<g fill="none" stroke-width="1.6">
@@ -894,7 +929,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<path d="M222 146 C 250 100, 260 78, 296 78" stroke="#22a35a" marker-end="url(#a9g)"/>
 				<path d="M222 174 C 250 220, 260 246, 296 246" stroke="#0f1a2e" marker-end="url(#a9)"/>
 			</g>
-			<g font-size="10" font-weight="700"><text x="232" y="96" fill="#22a35a">yes → load world</text><text x="232" y="236" fill="#0f1a2e">no → pipeline</text></g>
+			<g font-size="10" font-weight="700" text-anchor="end"><text x="226" y="110" fill="#22a35a">yes → load world</text><text x="226" y="214" fill="#0f1a2e">no → pipeline</text></g>
 			<path d="M495 138 V178" stroke="#7a859c" stroke-dasharray="4 3" stroke-width="1.4" fill="none"/>
 			<text x="505" y="163" font-size="9.5" fill="#7a859c">first visit: background save after the view opens</text>
 		</svg>
@@ -904,7 +939,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 	<div class="cols">
 		<div>
 			<h3>History</h3>
-			<p><code>CacheStore</code> is also the history store: a JSON file in <code>user://</code>. Generated terrain is reproducible from the stored coordinates and seed, so history entries double as cache keys and carry their v2 key set.</p>
+			<p><code>CacheStore</code> is also the history store: a JSON file in <code>user://</code>. Generated terrain is reproducible from the stored coordinates and seed, so history entries double as cache keys and carry their v2 key set. Each entry also keeps the camera as you left it (<code>ViewLink</code>) and a picture of the view (<code>PlaceThumb</code>, <code>user://thumbs</code>).</p>
+			<p>On macOS <code>user://</code> is <code>~/Library/Application Support/Planet Render 360</code>; <code>UserDirMigration</code> moves data from Godot's default directory on the first launch after the switch.</p>
 			<h3>Versioning</h3>
 			<p>Legacy v1 keys (<code>dem_</code>, <code>sat_</code>, <code>osm3_</code>) are ignored, never migrated; the LRU reaps them first under cap pressure. Area keys quantise coordinates to <code>round(deg × 1000)</code>.</p>
 		</div>
@@ -921,11 +957,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="page">
 	<div class="kicker">10 · Landmarks</div>
 	<h1>Landmarks</h1>
-	<p class="lede">Recognisable structures come from two paths. A <b>curated registry</b> of famous landmarks is modelled on the fly in true metres; any other notable OSM feature near the viewpoint is matched to an <b>archetype</b> (church, tower, dome, stadium…).</p>
+	<p class="lede">Recognisable structures come from three paths: a <b>curated registry</b> modelled on the fly in true metres, <b>well-mapped OSM landmarks</b> drawn from their own building parts, and <b>archetypes</b> (church, tower, dome, stadium, wheel…) for any other notable OSM feature. Wikipedia supplies the markers and details people tap.</p>
 
 	<div class="fig">
-		<svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
-			<rect x="0" y="0" width="720" height="360" rx="10" fill="#0b1426"/>
+		<svg viewBox="0 0 720 290" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+			<rect x="0" y="0" width="720" height="290" rx="10" fill="#0b1426"/>
 			<g stroke="#1d2c4d" stroke-width="0.8">
 				<line x1="0" y1="60" x2="720" y2="60"/><line x1="0" y1="120" x2="720" y2="120"/><line x1="0" y1="180" x2="720" y2="180" stroke="#2a3d66"/>
 				<line x1="0" y1="240" x2="720" y2="240"/><line x1="0" y1="300" x2="720" y2="300"/>
@@ -942,55 +978,92 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<path d="M580 210 L620 200 L660 208 L668 236 L640 250 L600 246 L584 232z"/>
 				<path d="M268 24 L300 20 L318 30 L300 42 L276 40z"/>
 			</g>
-			<g font-size="10.5" font-weight="700">
-				<g transform="translate(365 82)"><circle r="9" fill="#14b8a6" opacity=".25"/><circle r="4" fill="#14b8a6"/></g>
-				<text x="300" y="72" fill="#cfe9e3">Eiffel</text>
-				<g transform="translate(360 77)"><circle r="3.5" fill="#f59e0b"/></g>
-				<text x="300" y="86" fill="#ffd78a" font-size="9">Big Ben</text>
-				<g transform="translate(385 96)"><circle r="3.5" fill="#f0566a"/></g>
-				<text x="392" y="108" fill="#ffb3bd" font-size="9">Colosseum</text>
-				<g transform="translate(364 97)"><circle r="3.5" fill="#7c5cf0"/></g>
-				<text x="314" y="110" fill="#c9bdff" font-size="9">Sagrada</text>
-				<g transform="translate(405 60)"><circle r="3.5" fill="#3b82f6"/></g>
-				<g transform="translate(410 59)"><circle r="3.5" fill="#3b82f6"/></g>
-				<text x="420" y="54" fill="#bcd5ff" font-size="9">Turku · Helsinki</text>
-				<g transform="translate(422 120)"><circle r="3.5" fill="#f59e0b"/></g>
-				<text x="430" y="126" fill="#ffd78a" font-size="9">Giza</text>
-				<g transform="translate(212 99)"><circle r="3.5" fill="#22a35a"/></g>
-				<text x="152" y="96" fill="#a6e9c0" font-size="9">Liberty</text>
-				<g transform="translate(639 109)"><circle r="3.5" fill="#f0566a"/></g>
-				<text x="648" y="112" fill="#ffb3bd" font-size="9">Tokyo</text>
-				<g transform="translate(662 248)"><circle r="3.5" fill="#14b8a6"/></g>
-				<text x="606" y="268" fill="#cfe9e3" font-size="9">Sydney Opera</text>
+			<g stroke="#5f7299" stroke-width="0.8">
+				<line x1="346" y1="64" x2="357" y2="75"/><line x1="346" y1="78" x2="361" y2="81"/>
+				<line x1="346" y1="91" x2="372" y2="92"/><line x1="346" y1="104" x2="361" y2="98"/>
 			</g>
-			<text x="16" y="346" fill="#5f7299" font-size="9">Registry landmarks, schematic equirectangular projection</text>
+			<g font-size="9" font-weight="700">
+				<circle cx="360" cy="77" r="3.5" fill="#f59e0b"/>
+				<g transform="translate(365 82)"><circle r="8" fill="#14b8a6" opacity=".25"/><circle r="3.5" fill="#14b8a6"/></g>
+				<circle cx="375" cy="92.5" r="3" fill="#f0566a"/>
+				<circle cx="364" cy="97" r="3.5" fill="#7c5cf0"/>
+				<circle cx="385" cy="89" r="3" fill="#3b82f6"/>
+				<circle cx="385" cy="96" r="3.5" fill="#f0566a"/>
+				<circle cx="396" cy="61" r="3" fill="#22a35a"/>
+				<circle cx="405" cy="59" r="3" fill="#3b82f6"/>
+				<circle cx="410" cy="60" r="3" fill="#3b82f6"/>
+				<circle cx="422" cy="120" r="3.5" fill="#f59e0b"/>
+				<circle cx="470.5" cy="129.6" r="3.5" fill="#14b8a6"/>
+				<circle cx="614" cy="105" r="3.5" fill="#7c5cf0"/>
+				<circle cx="639.5" cy="108.7" r="3.5" fill="#f0566a"/>
+				<circle cx="662.4" cy="247.7" r="3.5" fill="#14b8a6"/>
+				<circle cx="212" cy="98.6" r="3.5" fill="#22a35a"/>
+				<circle cx="129" cy="77.7" r="3.5" fill="#f59e0b"/>
+				<circle cx="115" cy="104.4" r="3" fill="#3b82f6"/>
+				<circle cx="116.2" cy="108.5" r="3" fill="#3b82f6"/>
+				<g text-anchor="end">
+					<text x="344" y="67" fill="#ffd78a">London ×2</text>
+					<text x="344" y="81" fill="#cfe9e3" font-size="10">Paris</text>
+					<text x="344" y="94" fill="#ffb3bd">Monaco</text>
+					<text x="344" y="107" fill="#c9bdff">Barcelona</text>
+					<text x="108" y="116" fill="#bcd5ff">California ×2</text>
+					<text x="608" y="99" fill="#c9bdff">Seoul</text>
+				</g>
+				<text x="391" y="87" fill="#bcd5ff">Venice</text>
+				<text x="392" y="103" fill="#ffb3bd">Rome</text>
+				<text x="380" y="48" fill="#bcd5ff">Stockholm · Turku · Helsinki</text>
+				<text x="430" y="126" fill="#ffd78a">Giza</text>
+				<text x="478" y="134" fill="#cfe9e3">Dubai</text>
+				<text x="648" y="112" fill="#ffb3bd">Tokyo</text>
+				<text x="606" y="268" fill="#cfe9e3">Sydney ×2</text>
+				<text x="222" y="102" fill="#a6e9c0">New York ×4</text>
+				<text x="137" y="74" fill="#ffd78a">Banff</text>
+			</g>
+			<text x="16" y="278" fill="#5f7299" font-size="9">Registry landmarks, schematic equirectangular projection</text>
 		</svg>
-		<div class="cap"><b>Figure 10.</b> Curated registry (<code>LocationData</code>). Each entry has a trigger radius (2.5–13 km); inside it, the landmark is placed at its true bearing and distance.</div>
+		<div class="cap"><b>Figure 10.</b> Curated registry (<code>LocationData</code>): 23 landmarks in 18 builder classes, listed without their <code>Landmark</code> prefix. Inside an entry's 2–13 km trigger radius the landmark stands at its true bearing and distance, beside any other registry sites in range.</div>
 	</div>
 
 	<div class="cols">
 		<div>
-			<table style="margin-top:0">
-				<tr><th>Landmark</th><th>Class</th><th class="num">Height</th></tr>
-				<tr><td>Eiffel Tower</td><td><code>LandmarkEiffel</code></td><td class="num">330 m</td></tr>
-				<tr><td>Tokyo Tower</td><td><code>LandmarkTokyo</code></td><td class="num">332.9 m</td></tr>
-				<tr><td>Elizabeth Tower</td><td><code>LandmarkWestminster</code></td><td class="num">96 m</td></tr>
-				<tr><td>Colosseum</td><td><code>LandmarkColosseum</code></td><td class="num">48 m</td></tr>
-				<tr><td>Sagrada Família</td><td><code>LandmarkSagrada</code></td><td class="num">as built 2026</td></tr>
-				<tr><td>Giza · Liberty</td><td><code>LandmarkMonuments</code></td><td class="num">true metres</td></tr>
-				<tr><td>Sydney Opera House</td><td><code>LandmarkOpera</code></td><td class="num">true metres</td></tr>
-				<tr><td>Helsinki · Turku cathedrals</td><td><code>LandmarkCathedrals</code></td><td class="num">true metres</td></tr>
+			<table style="margin-top:0;font-size:7.6pt">
+				<tr><th style="width:40%">Landmark</th><th style="width:34%">Class</th><th class="num">Height</th></tr>
+				<tr><td>Eiffel Tower</td><td><code>Eiffel</code></td><td class="num">330 m</td></tr>
+				<tr><td>Tokyo Tower</td><td><code>Tokyo</code></td><td class="num">333 m</td></tr>
+				<tr><td>Big Ben</td><td><code>Westminster</code></td><td class="num">96 m</td></tr>
+				<tr><td>Colosseum</td><td><code>Colosseum</code></td><td class="num">48 m</td></tr>
+				<tr><td>Sagrada Família</td><td><code>Sagrada</code></td><td class="num">172 m</td></tr>
+				<tr><td>Giza · Liberty</td><td><code>Monuments</code></td><td class="num">139 · 93 m</td></tr>
+				<tr><td>Sydney Opera House</td><td><code>Opera</code></td><td class="num">65 m</td></tr>
+				<tr><td>Helsinki · Turku</td><td><code>Cathedrals</code></td><td class="num">62 · 101 m</td></tr>
+				<tr><td>Burj Khalifa</td><td><code>Burj</code></td><td class="num">828 m</td></tr>
 			</table>
 		</div>
 		<div>
-			<h3>How a landmark is made</h3>
-			<ul>
-				<li><code>LandmarkMesh</code> accumulates merged geometry; <code>LandmarkMaterials</code> supplies calibrated photographic PBR materials.</li>
-				<li>Models are generated on device — no downloads. <code>assets/eiffel.glb</code> is the Blender pipeline proof (<code>assets_src/blender/</code>).</li>
-				<li>Up to five nearest OSM candidates per view become <code>LandmarkArchetypes</code>, within the haze limit.</li>
-				<li>The registry landmark stays the hero; the spawn view frames it from a readable distance.</li>
-			</ul>
+			<table style="margin-top:0;font-size:7.6pt">
+				<tr><th style="width:40%">Landmark</th><th style="width:34%">Class</th><th class="num">Height</th></tr>
+				<tr><td>One WTC · Empire State</td><td><code>NycTowers</code></td><td class="num">541 · 443 m</td></tr>
+				<tr><td>Salute, Venice</td><td><code>Salute</code></td><td class="num">60 m</td></tr>
+				<tr><td>Monte Carlo Casino</td><td><code>Casino</code></td><td class="num">34 m</td></tr>
+				<tr><td>Gwanghwamun</td><td><code>Gwanghwamun</code></td><td class="num">19 m</td></tr>
+				<tr><td>Banff Springs Hotel</td><td><code>Banff</code></td><td class="num">60 m</td></tr>
+				<tr><td>Stockholm City Hall</td><td><code>Stockholm</code></td><td class="num">106 m</td></tr>
+				<tr><td>Golden Gate · Brooklyn</td><td><code>SuspensionBridges</code></td><td class="num">227 · 84 m</td></tr>
+				<tr><td>Tower Bridge</td><td><code>TowerBridge</code></td><td class="num">65 m</td></tr>
+				<tr><td>Sydney Harbour · Bixby</td><td><code>ArchBridges</code></td><td class="num">134 · 79 m</td></tr>
+			</table>
 		</div>
+	</div>
+	<h3>How a landmark is made</h3>
+	<div class="cols" style="gap:4mm">
+		<ul>
+			<li><code>LandmarkMesh</code> merges geometry, <code>LandmarkMaterials</code> supplies calibrated PBR; models are built on device (<code>assets/eiffel.glb</code> proves the Blender path).</li>
+			<li><code>LandmarkSites</code> picks what a place builds: registry sites in range, then ranked OSM features (6–10 by preset) inside the 9 km haze limit.</li>
+		</ul>
+		<ul>
+			<li><code>LandmarkFidelity</code> keeps a well-mapped landmark's real building and its <code>building:part</code> domes; the rest become <code>LandmarkArchetypes</code>.</li>
+			<li><code>WikiFetcher</code> markers and the <code>LandmarkCard</code> on the map and in the view; <code>LandmarkVisit</code> picks the standoff for Go there.</li>
+		</ul>
 	</div>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>12</span></div>
 </section>
@@ -999,27 +1072,29 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="page">
 	<div class="kicker">11 · Code</div>
 	<h1>Code organisation &amp; testing</h1>
-	<p class="lede">Every class is one GDScript file under <code>scripts/</code> and stays at or under <b>500 lines</b>; <code>tools/check_class_size.sh</code> fails the build on any violation. Large concerns split into focused helpers (for example <code>building_builder</code> → walls, heights, detail, roofs).</p>
+	<p class="lede">Every class is one GDScript file under <code>scripts/</code> and stays at or under <b>1000 lines</b>; <code>tools/check_class_size.sh</code> fails the build on any violation. Large concerns split into focused helpers (for example <code>building_builder</code> → walls, heights, detail, roofs; <code>view_360</code> → chrome, conditions, tools, walk).</p>
 
 	<div class="fig">
-		<svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+		<svg viewBox="0 0 700 230" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
 			<text x="0" y="14" font-size="10" font-weight="800" fill="#44506a" letter-spacing="1">LINES OF GDSCRIPT PER PACKAGE</text>
 			<g font-size="10.5" font-weight="700" fill="#0f1a2e" text-anchor="end">
-				<text x="120" y="47">generation/</text><text x="120" y="80">data/</text><text x="120" y="113">screens/</text><text x="120" y="146">render/</text><text x="120" y="179">root</text>
+				<text x="120" y="47">generation/</text><text x="120" y="80">screens/</text><text x="120" y="113">data/</text><text x="120" y="146">render/</text><text x="120" y="179">root</text><text x="120" y="212">map/</text>
 			</g>
 			<g>
 				<rect x="130" y="34" width="500" height="20" rx="5" fill="#f59e0b"/>
-				<rect x="130" y="67" width="118" height="20" rx="5" fill="#7c5cf0"/>
-				<rect x="130" y="100" width="86" height="20" rx="5" fill="#14b8a6"/>
-				<rect x="130" y="133" width="54" height="20" rx="5" fill="#f0566a"/>
-				<rect x="130" y="166" width="22" height="20" rx="5" fill="#3b82f6"/>
+				<rect x="130" y="67" width="214" height="20" rx="5" fill="#14b8a6"/>
+				<rect x="130" y="100" width="125" height="20" rx="5" fill="#7c5cf0"/>
+				<rect x="130" y="133" width="51" height="20" rx="5" fill="#f0566a"/>
+				<rect x="130" y="166" width="37" height="20" rx="5" fill="#3b82f6"/>
+				<rect x="130" y="199" width="31" height="20" rx="5" fill="#22a35a"/>
 			</g>
 			<g font-size="9.6" fill="#44506a">
-				<text x="620" y="48" fill="#fff" font-weight="700" text-anchor="end">14 916 · 57 classes</text>
-				<text x="256" y="81">3 508 · 16 classes</text>
-				<text x="224" y="114">2 558 · 9 classes</text>
-				<text x="192" y="147">1 614 · 10 classes</text>
-				<text x="160" y="180">656 · 4 classes</text>
+				<text x="620" y="48" fill="#fff" font-weight="700" text-anchor="end">23 948 · 105 classes</text>
+				<text x="352" y="81">10 238 · 41 classes</text>
+				<text x="263" y="114">6 000 · 30 classes</text>
+				<text x="189" y="147">2 420 · 15 classes</text>
+				<text x="175" y="180">1 790 · 10 classes</text>
+				<text x="169" y="213">1 502 · 8 classes</text>
 			</g>
 		</svg>
 	</div>
@@ -1031,28 +1106,29 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 				<tr><td><code>data/</code></td><td>Fetchers, parsers, contract, cache, history</td></tr>
 				<tr><td><code>generation/</code></td><td>Pipeline, ground surface, every builder, materials</td></tr>
 				<tr><td><code>render/</code></td><td>Camera, atmosphere, LOD, governor, presets, world cache</td></tr>
-				<tr><td><code>screens/</code></td><td>Picker, map tiles, loading, 360 view, history, settings</td></tr>
-				<tr><td><code>scripts/*.gd</code></td><td>Screen manager, theme, HUD style, responsive rules</td></tr>
+				<tr><td><code>screens/</code></td><td>Onboarding, map home, loading, 360 view and its tools, history, settings</td></tr>
+				<tr><td><code>map/</code></td><td>Vector map: MVT decode, Map style, hillshade, labels</td></tr>
+				<tr><td><code>scripts/*.gd</code></td><td>Screen manager, theme, prefs, icons, responsive rules, user-dir migration</td></tr>
 			</table>
 			<h3>Conventions</h3>
 			<ul>
 				<li>Each class opens with a <code>##</code> doc comment stating its responsibility and the contract or plan task it implements.</li>
-				<li>Static builders with <code>(data, ground)</code> signatures; heavy mesh work on a background thread via <code>MeshArrays</code>.</li>
+				<li>Static builders with <code>(data, ground)</code> signatures; heavy mesh work on worker threads via <code>MeshArrays</code> and <code>WorldBuildGraph</code>.</li>
 			</ul>
 		</div>
 		<div>
-			<h3>Test suite (31 headless scripts)</h3>
+			<h3>Test suite (52 scripts)</h3>
 			<table style="margin-top:0">
 				<tr><th>Area</th><th>Tests</th></tr>
-				<tr><td>Contracts &amp; flow</td><td>smoke, flow, class_registry, build_guard, leak</td></tr>
-				<tr><td>Data parsing</td><td>osm, dem, tiles, search, weather, climate</td></tr>
-				<tr><td>World &amp; scale</td><td>world_scale, terrain_scale, scenery, architecture, facade_relief, far_city, lod</td></tr>
-				<tr><td>Sky &amp; light</td><td>sky, solar (vs ephemeris)</td></tr>
-				<tr><td>UI</td><td>responsive, zoom_search, map_pan, progressive_map, exit_tile, settings, loading_building</td></tr>
-				<tr><td>Landmarks</td><td>landmark</td></tr>
-				<tr><td>Windowed</td><td>screenshot, world_cache, fidelity_scorecard</td></tr>
+				<tr><td>Contracts &amp; flow</td><td>smoke, flow, class_registry, build_guard, leak, shutdown_guard, generation_timeout, data_notes, user_dir</td></tr>
+				<tr><td>Data &amp; fetch</td><td>osm, osm_fallback, dem, tiles, search, weather, climate</td></tr>
+				<tr><td>World &amp; scale</td><td>world_scale, terrain_scale, ground_index, polygon_index, scenery, arid_ground, building_fabric, architecture, facade_relief, far_city, wheel_ground, lod, parallel_build</td></tr>
+				<tr><td>Sky &amp; light</td><td>sky, solar (vs ephemeris), lightning, accent_sun, render_upgrade</td></tr>
+				<tr><td>UI &amp; map</td><td>responsive, zoom_search, map_pan, progressive_map, vector_map, exit_tile, settings, loading_building</td></tr>
+				<tr><td>Landmarks &amp; viewer</td><td>landmark, landmark_fidelity, landmark_info, landmark_list, monument, preset_views, viewer_tools</td></tr>
+				<tr><td>Windowed · live</td><td>screenshot, world_cache · fidelity_scorecard</td></tr>
 			</table>
-			<p style="font-size:8.4pt">Run any test with <code>godot --headless --script tests/&lt;name&gt;.gd</code>; windowed tests drop <code>--headless</code>. The fidelity scorecard (<code>docs/fidelity-scorecard.md</code>) checks golden locations — Paris, Interlaken, Banff, Big Sur, Turku.</p>
+			<p style="font-size:8.4pt">Run any test with <code>godot --headless --script tests/&lt;name&gt;.gd</code>; windowed tests drop <code>--headless</code> and on macOS run through <code>tools/godot_bg.sh</code>. The fidelity scorecard (<code>docs/fidelity-scorecard.md</code>) checks golden locations — Paris, Interlaken, Banff, Big Sur, Turku.</p>
 		</div>
 	</div>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>13</span></div>
@@ -1074,7 +1150,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 	<div class="cap"><b>Left:</b> per-building roof variety. <b>Right:</b> window recesses on Ultra.</div>
 
 	<h2>Attribution</h2>
-	<p style="font-size:8.4pt;color:var(--ink-2)">© OpenStreetMap contributors (ODbL) · Elevation: AWS Terrain Tiles / Tilezen (EU-DEM / Copernicus, USGS 3DEP, SRTM and others) · Imagery: Esri, Vantor, Earthstar Geographics and the GIS User Community · Climate: CHELSA V2.1 (Karger et al., 2017, CC BY 4.0) · Weather: Open-Meteo (CC BY) · Search: Nominatim · Textures: Poly Haven (CC0) · Foliage textures: own procedural work (CC0). Code distributed under the MIT License.</p>
+	<p style="font-size:8.4pt;color:var(--ink-2)">© OpenStreetMap contributors (ODbL) · Elevation: AWS Terrain Tiles / Tilezen (EU-DEM / Copernicus, USGS 3DEP, SRTM and others) · Imagery: Esri, Vantor, Earthstar Geographics and the GIS User Community · Climate: CHELSA V2.1 (Karger et al., 2017, CC BY 4.0) · Weather: Open-Meteo (CC BY) · Search: Nominatim · Map: OpenFreeMap © OpenMapTiles · Landmark text: Wikipedia (CC BY-SA 4.0) · Photos: Wikimedia Commons, credited per photo · Textures: Poly Haven (CC0) · Foliage textures: own procedural work (CC0). Code distributed under the MIT License.</p>
 	<div class="folio"><span>Planet Render 360 · Technical documentation</span><span>14</span></div>
 </section>
 
