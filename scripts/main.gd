@@ -251,6 +251,7 @@ func _request_exit() -> void:
 		var deadline := Time.get_ticks_msec() + int(QUIT_WAIT_S * 1000.0)
 		while _view.has_running_threads() and Time.get_ticks_msec() < deadline:
 			await get_tree().process_frame
+	CacheStore.flush_lru()
 	get_tree().quit()
 
 func _say_closing() -> void:

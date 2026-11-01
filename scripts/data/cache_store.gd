@@ -37,6 +37,8 @@ const MAX_ENTRIES := 50
 const DATA_VERSION := 2
 const CACHE_DIR := "user://cache"
 const LRU_FILE := "lru.json"
+## Share of data_cap() an over-cap cache is trimmed down to.
+const TRIM_TO := 0.9
 
 ## The settings size limit in bytes (default 512 MB: an Ultra place holds
 ## ~50 MB). It covers downloaded data and built worlds together: worlds
@@ -52,6 +54,7 @@ var entries: Array[Dictionary] = []
 
 static var _lru: Dictionary = {}  # relpath -> {"bytes": int, "atime": float}
 static var _lru_loaded := false
+static var _lru_pending := ""  # index path a coalesced save is queued for
 static var _tracked_bytes := -1  # -1 = unknown, rescan on next write
 
 ## Bytes downloaded data may hold: the limit minus what built worlds
@@ -308,16 +311,44 @@ static func _ensure_lru() -> void:
 		_lru = parsed
 
 static func _save_lru() -> void:
-	DirAccess.make_dir_recursive_absolute(base_dir())
-	var f := FileAccess.open(_lru_path(), FileAccess.WRITE)
+	if _lru_pending == _lru_path():
+		_lru_pending = ""
+	_write_lru(_lru_path())
+
+static func _write_lru(path: String) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(_lru))
+
+## Hits and writes rewrite the index once per frame, not each: a cached
+## Ultra place reads ~300 tiles, and every full rewrite of a few thousand
+## rows held the main thread ~4 ms (over a second as the place started).
+## The queued save keeps the index path it was queued for, so a test
+## switching dir_override cannot land it in the other directory.
+static func _queue_lru_save() -> void:
+	var path := _lru_path()
+	if _lru_pending == path:
+		return
+	if _lru_pending != "":
+		flush_lru()
+	_lru_pending = path
+	flush_lru.call_deferred()
+
+## Writes a queued index save now (the app calls it before quitting).
+static func flush_lru() -> void:
+	if _lru_pending == "":
+		return
+	var path := _lru_pending
+	_lru_pending = ""
+	_write_lru(path)
 
 ## Drop the in-memory LRU state (used after clear_cache deletes the
 ## directory out from under it, and by tests for a clean slate).
 static func reset_lru() -> void:
 	_lru = {}
 	_lru_loaded = false
+	_lru_pending = ""
 	_tracked_bytes = -1
 
 static func _rel(path: String) -> String:
@@ -336,7 +367,7 @@ static func note_read(path: String, atime_override: float = -1.0) -> void:
 	var now := Time.get_unix_time_from_system() \
 		if atime_override < 0.0 else atime_override
 	_lru[_rel(path)] = {"bytes": _file_bytes(path), "atime": now}
-	_save_lru()
+	_queue_lru_save()
 
 ## Record a cache write, enforcing the size cap when the tracked
 ## total exceeds it. atime_override is a test hook (default: now).
@@ -351,7 +382,7 @@ static func note_written(path: String, atime_override: float = -1.0) -> void:
 	var size := _file_bytes(path)
 	_lru[rel] = {"bytes": size, "atime": now}
 	_tracked_bytes += size - old
-	_save_lru()
+	_queue_lru_save()
 	if _tracked_bytes > data_cap():
 		enforce_size_cap()
 
@@ -385,13 +416,16 @@ static func _scan_dir(dir_path: String, out: Array) -> void:
 			var row := _lru.get(rel, {}) as Dictionary
 			var atime := float(row.get("atime",
 				FileAccess.get_modified_time(full)))
+			# A stat, not an open: this runs over every cache file.
 			out.append({"path": full, "rel": rel,
-				"bytes": _file_bytes(full), "atime": atime})
+				"bytes": maxi(FileAccess.get_size(full), 0), "atime": atime})
 		name = dir.get_next()
 	dir.list_dir_end()
 
-## Trim built worlds to their share, then evict data oldest-atime-first
-## until it fits data_cap().
+## Trim built worlds to their share, then, once data is over data_cap(),
+## evict it oldest-atime-first down to TRIM_TO of the cap: a cache kept
+## at the cap rescanned every file (thousands, ~0.3 s on the main thread)
+## on each tile a new place wrote.
 ## Legacy (non-v2) files go first — they are dead weight no fetcher
 ## reads. The LRU index itself is never evicted. Returns bytes freed.
 static func enforce_size_cap() -> int:
@@ -414,10 +448,11 @@ static func enforce_size_cap() -> int:
 		if float(a["atime"]) != float(b["atime"]):
 			return float(a["atime"]) < float(b["atime"])
 		return str(a["rel"]) < str(b["rel"]))
+	var target := int(cap * TRIM_TO)
 	var freed := 0
 	var kept := {}
 	for e in files:
-		if total <= cap:
+		if total <= target:
 			kept[str(e["rel"])] = {"bytes": int(e["bytes"]),
 				"atime": float(e["atime"])}
 		else:

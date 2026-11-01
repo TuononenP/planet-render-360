@@ -36,6 +36,9 @@ var _lat := 0.0
 var _lon := 0.0
 var _cache := ""
 var _t0 := 0
+var _parse_task := -1
+## Bumped per fetch and cancel: a parse finishing late is dropped.
+var _gen := 0
 
 func _ready() -> void:
 	_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
@@ -43,7 +46,12 @@ func _ready() -> void:
 	_req.answered.connect(_on_answered)
 	_req.exhausted.connect(func(reason: String, _attempts: int) -> void:
 		print("FarCityFetcher: %s; far city from imagery only" % reason)
-		_emit("", false))
+		_emit(0, false, parse("", _lat, _lon)))
+
+## The parse task must not outlive the node it reports back to.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_parse()
 
 ## Mirrors first, the main instance third (the detailed query starts
 ## there), four attempts. Named by host so reordering
@@ -70,6 +78,7 @@ static func build_query(lat: float, lon: float, radius_m: int = RADIUS_M) -> Str
 			% [TOWER_MIN_M, TOWER_MIN_LEVELS, around, CAP_TOWERS]
 
 func cancel() -> void:
+	_gen += 1
 	if _req != null:
 		_req.cancel()
 	_busy = false
@@ -82,27 +91,57 @@ func fetch(lat: float, lon: float) -> void:
 	_cache = cache_path(lat, lon)
 	_busy = true
 	var cached := OsmFetcher._read_cache(_cache)
-	if cached != "" and _usable(cached):
-		_emit(cached, true)
+	if cached != "":
+		_parse_off_thread(cached, true)
 		return
+	_request()
+
+func _request() -> void:
 	if offline_mode:
-		_emit("", true)
+		_emit(0, true, parse("", _lat, _lon))
 		return
-	_req.run("data=" + build_query(lat, lon).uri_encode(),
+	_req.run("data=" + build_query(_lat, _lon).uri_encode(),
 		func(text: String) -> String: return "" if _usable(text) else "unusable payload",
 		endpoints())
 
 func _on_answered(text: String) -> void:
 	OsmFetcher._write_cache(_cache, text)
-	_emit(text, false)
+	_parse_off_thread(text, false)
 
 static func _usable(text: String) -> bool:
 	var parsed: Variant = JSON.parse_string(text)
 	return parsed is Dictionary and (parsed as Dictionary).get("elements", null) is Array
 
-func _emit(text: String, cached: bool) -> void:
-	var parsed := parse(text, _lat, _lon)
-	timings = {"ms": Time.get_ticks_msec() - _t0, "bytes": text.length(),
+## A city's payload (~10 MB) takes ~0.3 s to check and parse: on a
+## worker, so the loading screen keeps drawing. A cached payload that is
+## not usable comes back empty and the network is asked instead.
+func _parse_off_thread(text: String, cached: bool) -> void:
+	_join_parse()
+	var gen := _gen
+	var lat := _lat
+	var lon := _lon
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		var parsed := parse(text, lat, lon) if not cached or _usable(text) else {}
+		_on_parsed.call_deferred(gen, text.length(), cached, parsed))
+
+func _join_parse() -> void:
+	if _parse_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_parse_task)
+		_parse_task = -1
+
+## A stale parse returns before joining: the task id may already be a
+## newer parse's (the next _parse_off_thread joined this one).
+func _on_parsed(gen: int, bytes: int, cached: bool, parsed: Dictionary) -> void:
+	if gen != _gen:
+		return
+	_join_parse()
+	if parsed.is_empty():
+		_request()
+		return
+	_emit(bytes, cached, parsed)
+
+func _emit(bytes: int, cached: bool, parsed: Dictionary) -> void:
+	timings = {"ms": Time.get_ticks_msec() - _t0, "bytes": bytes,
 		"cached": cached, "landuse": (parsed["landuse"] as Array).size(),
 		"towers": (parsed["towers"] as Array).size()}
 	_busy = false
