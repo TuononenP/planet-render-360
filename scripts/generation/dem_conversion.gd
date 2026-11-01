@@ -17,7 +17,10 @@ static func legacy_vscale_for(relief_m: float) -> float:
 ## centre_elevation_m, relief_metres, water_level, legacy_vscale}.
 ## The true-metre water plane is the un-squashed v1 plane
 ## (centre − 6/vscale: the raw value v1 mapped to −3.0), so flood
-## extent is unchanged by the unit cutover.
+## extent is unchanged by the unit cutover — but never above the
+## grid's lowest sample: that rule follows the pin's own elevation, so
+## a hilltop pin (Trocadéro, Harder Kulm) would otherwise lift every
+## water body to it and flood the lowlands below.
 static func convert_dem_heights(raw_metres: PackedFloat32Array, grid: int,
 		use_legacy_squash: bool) -> Dictionary:
 	var centre_m := raw_metres[(grid / 2) * grid + grid / 2]
@@ -41,5 +44,5 @@ static func convert_dem_heights(raw_metres: PackedFloat32Array, grid: int,
 		out["water_level"] = -3.0
 	else:
 		out["heights"] = raw_metres.duplicate()
-		out["water_level"] = centre_m - 6.0 / vscale
+		out["water_level"] = minf(centre_m - 6.0 / vscale, mn)
 	return out
