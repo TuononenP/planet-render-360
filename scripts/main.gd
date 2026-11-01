@@ -9,6 +9,9 @@ var _view: View360
 var _notice: DataNotice
 var _history: HistoryScreen
 var _settings_screen: SettingsScreen
+## Where Settings' back button returns (the map, or the viewer when
+## its attribution opened Data sources).
+var _settings_from: Control
 var _pipeline: GenerationPipeline
 var _store: CacheStore
 var _settings: RenderSettings
@@ -39,12 +42,23 @@ const GENERATION_TIMEOUT_S := 600.0
 const TIMEOUT_MESSAGE := "Stopped after 10 minutes: this place took too long to build. Try a spot nearby."
 var generation_timeout_s := GENERATION_TIMEOUT_S  # tests shorten it
 
+func _fit_content_scale() -> void:
+	var win := get_window()
+	win.content_scale_factor = Responsive.content_scale_factor(Vector2(win.size))
+
 func _ready() -> void:
-	theme = UiTheme.base_theme()
 	_store = CacheStore.new()
 	_store.load_store()
 	_settings = RenderSettings.new()
 	_settings.load_settings()
+	# Theme, units and accessibility, then the saved accent, so every
+	# screen is built in them.
+	UiPrefs.apply(_settings)
+	UiTheme.apply_palette(_settings.accent)
+	UiTheme.auto_mode = _settings.accent_auto
+	theme = UiTheme.base_theme()
+	get_window().size_changed.connect(_fit_content_scale)
+	_fit_content_scale()
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
 	_pipeline.stage_changed.connect(
@@ -67,29 +81,34 @@ func _ready() -> void:
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
-	_picker.settings_requested.connect(func() -> void: _show(_settings_screen))
+	_picker.settings_requested.connect(func() -> void:
+		_settings_from = _picker
+		_show(_settings_screen))
 	_downloader = OfflineDownloader.new()
 	add_child(_downloader)
 	_downloader.progress.connect(func(done: int, total: int) -> void:
-		_picker.set_download_status("Downloading… %d/%d" % [done, total]))
+		_picker.set_download_status("Saving… %d/%d" % [done, total]))
 	_downloader.finished.connect(func(ok_count: int, total: int) -> void:
 		if ok_count > 0:
 			_store.add_entry(_picker.selected_name if _picker.selected_name != "" \
 				else LocationData.known_place(_download_at.x, _download_at.y),
 				_download_at.x, _download_at.y)
 		_picker.set_download_busy(false)
-		_picker.set_download_status("Saved for offline (%d/%d)" % [ok_count, total] \
-			if ok_count > 0 else "Download failed — check connection"))
+		_picker.set_download_status(("Saved for offline" if ok_count == total \
+			else "Partly saved (%d/%d)" % [ok_count, total]) \
+			if ok_count > 0 else "Couldn't save. Try again"))
 	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
 		if _downloader.is_running():
 			return
 		_picker.set_download_busy(true)
 		_download_at = Vector2(lat, lon)
-		_picker.set_download_status("Downloading… 0/%d" % OfflineDownloader.JOBS)
+		_picker.set_download_status("Saving… 0/%d" % OfflineDownloader.JOBS)
 		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
+	_picker.bind_store(_store)
 	_picker.set_quality_preset(_settings.preset)
+	_picker.set_layout_override(_settings.layout)
 
 	_loading = LoadingScreen.new()
 	_loading.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -105,6 +124,11 @@ func _ready() -> void:
 	_view = View360.new()
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.back_requested.connect(func() -> void: _show(_picker))
+	_view.data_sources_requested.connect(func() -> void:
+		_settings_from = _view
+		_show(_settings_screen)
+		_settings_screen.show_data_sources())
+	_view.data_quality_requested.connect(func() -> void: _notice.open())
 	add_child(_view)
 	_view.set_quality_preset(_settings.preset)
 
@@ -129,12 +153,14 @@ func _ready() -> void:
 	_settings_screen = SettingsScreen.new()
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_settings_screen.bind_settings(_settings)
-	_settings_screen.back_requested.connect(func() -> void: _show(_picker))
+	_settings_screen.back_requested.connect(func() -> void:
+		_show(_settings_from if _settings_from != null else _picker))
 	AccentSun.refresh = _refresh_accent
 	_settings_screen.accent_changed.connect(func(_i: int) -> void:
 		var at := _picker.selected_point()
 		AccentSun.follow_now(at.x, at.y)
 		_refresh_accent())
+	_settings_screen.units_changed.connect(func() -> void: _picker.refresh_units())
 	_settings_screen.layout_changed.connect(func(i: int) -> void:
 		_picker.set_layout_override(i))
 	_settings_screen.preset_changed.connect(func(p: int) -> void:
@@ -143,19 +169,47 @@ func _ready() -> void:
 	add_child(_settings_screen)
 
 	_show(_picker)
+	# First launch only (nothing visited, never onboarded): three screens
+	# over the turning globe, ending on the map with search focused.
+	if _store.entries.is_empty() and not bool(_settings.pref("onboarded")):
+		var onboarding := OnboardingScreen.new()
+		onboarding.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(onboarding)
+		onboarding.finished.connect(func() -> void:
+			_settings.set_pref("onboarded", true)
+			onboarding.queue_free()
+			_picker._search.grab_focus())
+	if SettingsScreen.reopen:
+		# Rebuilt after a theme switch: back where the person was.
+		SettingsScreen.reopen = false
+		_settings_from = _picker
+		_show(_settings_screen)
 
 ## Quit the app. Full screen hides the OS window controls, so the
 ## picker Exit button and these keys are the way out on desktop.
 func _request_exit() -> void:
 	get_tree().quit()
 
+## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
+## History and Settings return to the map, loading cancels) and quits
+## only from the map itself.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var key := event as InputEventKey
-		if key.keycode == KEY_ESCAPE \
-				or (key.keycode == KEY_Q and (key.ctrl_pressed or key.meta_pressed)):
+		if key.keycode == KEY_Q and (key.ctrl_pressed or key.meta_pressed):
 			_request_exit()
-			get_viewport().set_input_as_handled()
+		elif key.keycode == KEY_ESCAPE:
+			if _picker.visible:
+				_request_exit()
+			elif _loading.visible:
+				_loading.cancel_requested.emit()
+			elif _settings_screen.visible and _settings_from != null:
+				_show(_settings_from)
+			else:
+				_show(_picker)
+		else:
+			return
+		get_viewport().set_input_as_handled()
 
 ## Re-skin every screen after the accent moved (a pick, or the sun).
 func _refresh_accent() -> void:
@@ -164,10 +218,13 @@ func _refresh_accent() -> void:
 	_notice.refresh_theme()
 	_loading.refresh_theme()
 	_history.refresh()
+	_settings_screen.refresh_theme()
 
 func _show(screen: Control) -> void:
 	for s in [_picker, _loading, _view, _history, _settings_screen]:
 		s.visible = s == screen
+	if screen == _picker:
+		_picker.refresh_recent()
 	_notice.set_on_screen(screen == _view)
 	if screen != _view:
 		var at := _picker.selected_point()
@@ -255,3 +312,4 @@ func _on_generation_finished(data: LocationData) -> void:
 	_view.show_location(data, built)
 	_notice.show_notes(data.data_notes)
 	_show(_view)
+	ViewChrome.arrive(_view)
