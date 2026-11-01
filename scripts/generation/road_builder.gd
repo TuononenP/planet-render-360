@@ -34,9 +34,11 @@ const BRIDGE_GRADE := 0.05
 const BRIDGE_RISE_M := 3.0
 ## Steepest ramp easing a deck lifted clear of the water.
 const RAMP_GRADE := 0.08
-## Half-extent of the detailed surface the ribbons are clipped to
-## (metres; the v1 108 of a 110-unit half extent).
-const EXTENT_U := WorldScale.DETAILED_EXTENT_M * 0.5 - 2.0
+## Margin inside the drawn terrain mesh's edge the roads are clipped to
+## (metres). The mesh is not centred: its last post row stops one post
+## short of the extent's +X / +Z edge, and past it only the far terrain
+## lies under a ribbon.
+const EDGE_M := 2.0
 ## Finish albedos (sRGB; calibrated in linear against each set's mean).
 ## T4.7: asphalt is a weathered #585552 albedo so lit asphalt renders
 ## at the PRD's #4C4C4E–#5C5A58 through the ACES grade (the #4C4C4E
@@ -44,6 +46,9 @@ const EXTENT_U := WorldScale.DETAILED_EXTENT_M * 0.5 - 2.0
 ## setts/gravel sit warmer and lighter than asphalt.
 const FINISH_HEX := {"asphalt": "#585552", "paving": "#8a8274",
 	"sett": "#837a6e", "gravel": "#9a8c72", "deck": "#a39d92"}
+## Road-list chunks built in parallel (fixed, so the mesh never depends
+## on the core count).
+const CHUNKS := 4
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -124,34 +129,26 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	var junc := RoadSurface.junctions(data)
-	var batches := {}
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
-	for line in data.roads:
-		if abort != null and abort.requested:
-			break
-		var r := _parse(line, m2u)
-		if r.is_empty():
-			continue
-		var pts: PackedVector2Array = r["points"]
-		if pts.size() < 2:
-			continue
-		var dense := _resample(pts, surf.step * 0.34)
-		var finish := str(r["finish"])
-		if bool(r["bridge"]):
-			for piece in LandmarkSites.outside_spans(dense, spans):
-				_bridge(batches, piece, float(r["width_u"]), surf, m2u)
-			continue
-		var lift := float(LIFT_M[int(r["rank"])]) * m2u
-		# RoadSurface attributes: lanes, rank, kerbed urban street.
-		var mid := dense[dense.size() / 2]
-		var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
-		var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
-			1.0 if urban else 0.0, 1.0)
-		for run in _dry_runs(dense, surf):
+	# Fixed chunks of the road list, built at once and joined in order:
+	# the same mesh whichever threads ran them.
+	var n := data.roads.size()
+	var parts: Array = []
+	parts.resize(CHUNKS)
+	var job := func(c: int) -> void:
+		var own := {}
+		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
-			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc)
+			_road(own, data.roads[i], m2u, surf, ground, junc, spans, abort)
+		parts[c] = own
+	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	var batches := {}
+	for own in parts:
+		for finish in own:
+			_batch(batches, finish).join(own[finish])
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -164,6 +161,34 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 
 ## Height of the drawn terrain at XZ (what a ribbon is laid on), for
 ## tests and other flush-placed props.
+## One road element into `batches`: draped ribbons on dry land, decks
+## on its bridge spans.
+static func _road(batches: Dictionary, line: Variant, m2u: float, surf: _Surface,
+		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort) -> void:
+	var r := _parse(line, m2u)
+	if r.is_empty():
+		return
+	var pts: PackedVector2Array = r["points"]
+	if pts.size() < 2:
+		return
+	var dense := _resample(pts, surf.step * 0.34)
+	var finish := str(r["finish"])
+	if bool(r["bridge"]):
+		for piece in LandmarkSites.outside_spans(dense, spans):
+			_bridge(batches, piece, float(r["width_u"]), surf, m2u)
+		return
+	var lift := float(LIFT_M[int(r["rank"])]) * m2u
+	# RoadSurface attributes: lanes, rank, kerbed urban street.
+	var mid := dense[dense.size() / 2]
+	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
+	var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
+		1.0 if urban else 0.0, 1.0)
+	for run in _dry_runs(dense, surf):
+		if abort != null and abort.requested:
+			break
+		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
+			surf, lift, attr, junc)
+
 static func surface_height(data: LocationData, ground: GroundTruth, x: float,
 		z: float) -> float:
 	return _Surface.new(data, ground).height(x, z)
@@ -185,14 +210,27 @@ static func _resample(pts: PackedVector2Array, max_len: float) -> PackedVector2A
 			out.append(a.lerp(b, float(k) / float(n)))
 	return out
 
+## Drops the resampled points that sit on a straight stretch, keeping
+## rows at most `max_len` apart: RoadDrape cuts each quad along the
+## terrain creases itself, so finer rows only cost vertices.
+static func _straighten(pts: PackedVector2Array, max_len: float) -> PackedVector2Array:
+	var out := PackedVector2Array([pts[0]])
+	for i in range(1, pts.size() - 1):
+		var d0 := pts[i] - out[out.size() - 1]
+		var d1 := pts[i + 1] - pts[i]
+		var bend := absf(d0.normalized().cross(d1.normalized())) > 0.001
+		if bend or (pts[i + 1] - out[out.size() - 1]).length() > max_len:
+			out.append(pts[i])
+	out.append(pts[pts.size() - 1])
+	return out
+
 ## Maximal runs of the polyline that are on land and on the detailed
 ## surface (≥2 points each): a non-bridge way never lays shards on water.
 static func _dry_runs(pts: PackedVector2Array, surf: _Surface) -> Array:
 	var runs: Array = []
 	var cur := PackedVector2Array()
 	for p in pts:
-		var ok := absf(p.x) <= EXTENT_U and absf(p.y) <= EXTENT_U \
-			and surf.ground.water_at(p.x, p.y) <= 0.0
+		var ok := surf.inside(p) and surf.ground.water_at(p.x, p.y) <= 0.0
 		if ok:
 			cur.append(p)
 		else:
@@ -221,8 +259,9 @@ static func _side(pts: PackedVector2Array, i: int) -> Vector2:
 	var k := 1.0 / maxf(m.dot(n1), 0.4)
 	return m * k
 
-## Flat ribbon draped on the surface: both edges sample the terrain at
-## every vertex. UVs in metres/4 so the asphalt grain keeps its size.
+## Flat ribbon draped on the surface, cut along the drawn terrain's
+## creases (RoadDrape) so no ridge pokes through it. UVs in metres/4 so
+## the asphalt grain keeps its size.
 static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		surf: _Surface, lift: float, attr: Color = Color(0, 0.5, 0, 1),
 		junc: Dictionary = {}) -> void:
@@ -230,29 +269,20 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
 	b.pad()
-	var k0 := b.verts.size()
+	var u1 := width / m2u / 4.0
+	var w2 := Vector2(width / m2u, 0.0)
+	var weld := {}
+	var prev: Array = []
 	for i in pts.size():
 		if i > 0:
 			along += pts[i].distance_to(pts[i - 1])
 		var s := _side(pts, i) * half
-		var l := pts[i] + s
-		var r := pts[i] - s
-		b.verts.append(Vector3(l.x, surf.height(l.x, l.y) + lift, l.y))
-		b.verts.append(Vector3(r.x, surf.height(r.x, r.y) + lift, r.y))
-		var n := surf.normal(pts[i].x, pts[i].y)
-		b.normals.append(n)
-		b.normals.append(n)
-		var v := along / m2u / 4.0
-		b.uvs.append(Vector2(0.0, v))
-		b.uvs.append(Vector2(width / m2u / 4.0, v))
-		attr.a = RoadSurface.junction_frac(junc, pts[i]) if not junc.is_empty() else 1.0
-		# Drop Array literal alloc in hot loop: push individually.
-		b.colors.push_back(attr); b.colors.push_back(attr)
-		var w2 := Vector2(width / m2u, 0.0)
-		b.uv2s.push_back(w2); b.uv2s.push_back(w2)
-	for i in pts.size() - 1:
-		var a := k0 + i * 2
-		_quad_up(b, a, a + 1, a + 2, a + 3)
+		var row: Array = [pts[i] + s, pts[i] - s, along / m2u / 4.0,
+			RoadSurface.junction_frac(junc, pts[i]) if not junc.is_empty() else 1.0,
+			surf.normal(pts[i].x, pts[i].y)]
+		if i > 0:
+			RoadDrape.quad(b, surf, lift, attr, w2, u1, weld, prev, row)
+		prev = row
 
 ## Two triangles over left/right pairs (a,b) → (c,d), wound so the front
 ## face points up whichever way the polyline runs.
@@ -272,8 +302,11 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 ## water (0.6 m over ground) below, capped at BRIDGE_GRADE and
 ## BRIDGE_RISE_M so a short or low crossing stays nearly flat. The slab
 ## never dips into the water: an end the river carve reaches is lifted
-## to the water, and every wet point keeps the slab above it.
-static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float) -> PackedFloat32Array:
+## to the water, and every wet point keeps the slab above it. With a
+## `half` width the flat deck also clears the ground under both edges
+## (a bank sloping across the way), lifted like a ribbon.
+static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
+		half: float = 0.0) -> PackedFloat32Array:
 	var n := pts.size()
 	var total := 0.0
 	var dist := PackedFloat32Array([0.0])
@@ -284,8 +317,8 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float) ->
 	if total <= 0.0:
 		return deck
 	var slab := (DECK_DEPTH_M + 0.5) * m2u
-	var h0 := _deck_floor(pts[0], surf, slab)
-	var h1 := _deck_floor(pts[n - 1], surf, slab)
+	var h0 := _deck_floor(pts, 0, surf, slab, half)
+	var h1 := _deck_floor(pts, n - 1, surf, slab, half)
 	var need := 0.0
 	for i in n:
 		var t := dist[i] / total
@@ -304,7 +337,7 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float) ->
 		var t := dist[i] / total
 		var arch := lerpf(h0, h1, t) + 0.05 * m2u + rise * sin(PI * t)
 		deck.append(arch)
-		lift.append(maxf(_deck_floor(pts[i], surf, slab) - arch, 0.0))
+		lift.append(maxf(_deck_floor(pts, i, surf, slab, half) + 0.05 * m2u - arch, 0.0))
 	for i in range(1, n):
 		lift[i] = maxf(lift[i], lift[i - 1] - RAMP_GRADE * (dist[i] - dist[i - 1]))
 	for i in range(n - 2, -1, -1):
@@ -313,10 +346,16 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float) ->
 		deck[i] += lift[i]
 	return deck
 
-## Lowest deck height at a point: the drawn ground, or over water the
-## water surface plus `slab` (slab depth and a little air).
-static func _deck_floor(p: Vector2, surf: _Surface, slab: float) -> float:
+## Lowest deck height at point i: the drawn ground under its centre and
+## both edges (`half` out), or over water the water surface plus `slab`
+## (slab depth and a little air).
+static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: float,
+		half: float) -> float:
+	var p := pts[i]
 	var h := surf.height(p.x, p.y)
+	if half > 0.0:
+		var s := _side(pts, i) * half
+		h = maxf(h, maxf(surf.height(p.x + s.x, p.y + s.y), surf.height(p.x - s.x, p.y - s.y)))
 	if surf.ground.water_at(p.x, p.y) > 0.0:
 		h = maxf(h, surf.ground.water_level_at(p.x, p.y) + slab)
 	return h
@@ -327,13 +366,13 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: _Surface, m2u: float) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
-		if absf(p.x) <= EXTENT_U and absf(p.y) <= EXTENT_U:
+		if surf.inside(p):
 			inside.append(p)
 	if inside.size() < 2:
 		return
 	pts = inside
 	var n := pts.size()
-	var deck := deck_profile(pts, surf, m2u)
+	var deck := deck_profile(pts, surf, m2u, width * 0.5)
 	if deck.is_empty():
 		return
 	var dist := PackedFloat32Array([0.0])
@@ -440,6 +479,19 @@ class _Batch extends RefCounted:
 		while uv2s.size() < verts.size():
 			uv2s.append(Vector2.ZERO)
 
+	## Appends `o`'s rows and triangles after this batch's own.
+	func join(o: _Batch) -> void:
+		pad()
+		o.pad()
+		var k := verts.size()
+		verts.append_array(o.verts)
+		normals.append_array(o.normals)
+		uvs.append_array(o.uvs)
+		colors.append_array(o.colors)
+		uv2s.append_array(o.uv2s)
+		for i in o.indices:
+			indices.append(i + k)
+
 	func mesh() -> ArrayMesh:
 		pad()
 		var m := ArrayMesh.new()
@@ -462,13 +514,29 @@ class _Surface extends RefCounted:
 	var ground: GroundTruth
 	var size := 0
 	var step := 1.0
+	## The preset's terrain mesh (TerrainBuilder._terrain_mesh): coarser
+	## than the post grid below Ultra, its posts sampled bilinearly. Its
+	## chords sit above GroundTruth in every hollow, so a ribbon draped
+	## on the full grid alone vanishes under it in patches.
+	var mesh_size := 0
+	var mesh_step := 1.0
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
+		mesh_size = mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset), size)
+		mesh_step = WorldScale.detailed_extent_units() / float(maxi(mesh_size - 1, 1))
+
+	## True inside the drawn mesh, EDGE_M clear of its edge.
+	func inside(p: Vector2) -> bool:
+		var lo := -float(mesh_size) * 0.5 * mesh_step + EDGE_M
+		var hi := (float(mesh_size) * 0.5 - 1.0) * mesh_step - EDGE_M
+		return p.x >= lo and p.x <= hi and p.y >= lo and p.y <= hi
 
 	func height(x: float, z: float) -> float:
+		if mesh_size >= 2 and mesh_size != size:
+			return maxf(_mesh_tri(x, z), ground.height_at_world(x, z))
 		# Fused bilinear + triangle height sample: read same
 		# 4 posts once, do 3 lerps, compute tri and bil from same data, return
 		# max. Bit-identical to the previous two separate reads: the 4 posts,
@@ -495,6 +563,25 @@ class _Surface extends RefCounted:
 		else:
 			tri = hd + (hc - hd) * (1.0 - tx) + (hb - hd) * (1.0 - tz)
 		return maxf(tri, bil)
+
+	## Height of the coarse mesh's own triangle (split a-b-c / b-d-c).
+	func _mesh_tri(x: float, z: float) -> float:
+		var hs := float(mesh_size) * 0.5
+		var fx := clampf(x / mesh_step + hs, 0.0, float(mesh_size - 1))
+		var fz := clampf(z / mesh_step + hs, 0.0, float(mesh_size - 1))
+		var x0 := mini(int(fx), mesh_size - 2)
+		var z0 := mini(int(fz), mesh_size - 2)
+		var tx := fx - float(x0)
+		var tz := fz - float(z0)
+		var px := (float(x0) - hs) * mesh_step
+		var pz := (float(z0) - hs) * mesh_step
+		var hb := ground.height_at_world(px + mesh_step, pz)
+		var hc := ground.height_at_world(px, pz + mesh_step)
+		if tx + tz <= 1.0:
+			var ha := ground.height_at_world(px, pz)
+			return ha + (hb - ha) * tx + (hc - ha) * tz
+		var hd := ground.height_at_world(px + mesh_step, pz + mesh_step)
+		return hd + (hc - hd) * (1.0 - tx) + (hb - hd) * (1.0 - tz)
 
 	func normal(x: float, z: float) -> Vector3:
 		var e := step * 0.5

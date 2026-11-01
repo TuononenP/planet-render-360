@@ -240,6 +240,10 @@ func _run() -> void:
 	_probe_roads(failures)
 	if failures.size() == r0:
 		print("ROADS OK: v2 dicts + tunnel skip + v1 compat")
+	var c0 := failures.size()
+	_probe_coarse_mesh_roads(failures)
+	if failures.size() == c0:
+		print("ROADS OK: ribbons above the coarser preset terrain mesh")
 
 	if failures.is_empty():
 		print("SCENERY OK: building scale, terrain normals, water carve, landmark parts")
@@ -583,6 +587,94 @@ func _probe_roads(failures: Array[String]) -> void:
 	if worst > 0.05 * WorldScale.metres_to_units() + 0.0001:
 		failures.append("road ribbons must sit flush (<=0.05 m), worst offset %.4f units" % worst)
 	roads.free()
+
+## Below Ultra the terrain mesh has fewer posts than GroundTruth, and
+## its chords span every hollow above the fine surface: a ribbon draped
+## on the fine grid alone was hidden under the drawn ground in patches.
+## Every ribbon vertex must clear the drawn mesh triangle beneath it.
+func _probe_coarse_mesh_roads(failures: Array[String]) -> void:
+	var n := RenderSettings.GROUND_POSTS
+	var data := LocationData.new()
+	data.grid_size = n
+	data.quality_preset = RenderSettings.Preset.FAST
+	data.heights.resize(n * n)
+	for z in n:
+		for x in n:
+			# Undulating ground: hollows every few posts.
+			data.heights[z * n + x] = 20.0 + 2.5 * sin(float(x) * 1.3) * cos(float(z) * 1.1)
+	data.water_level = -50.0
+	data.seed_value = 42
+	data.roads = [{"points": PackedVector2Array([Vector2(-300, 13), Vector2(300, 37)]),
+		"width_m": 12.0, "lanes": 2, "surface": "", "bridge": false,
+		"tunnel": false, "layer": 0, "class": "footway"}]
+	var ground := GroundTruth.new(data)
+	var tm := TerrainBuilder._terrain_mesh(data, ground)
+	var tv: PackedVector3Array = tm.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var size := int(round(sqrt(float(tv.size()))))
+	var step := tv[1].x - tv[0].x
+	if size >= n:
+		failures.append("coarse-mesh probe: preset mesh should be coarser than the grid")
+	var roads := RoadBuilder.build_roads(data, ground)
+	var worst := 0.0
+	for child in roads.get_children():
+		var mi := child as MeshInstance3D
+		if mi == null:
+			continue
+		for v in mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array:
+			var fx := (v.x - tv[0].x) / step
+			var fz := (v.z - tv[0].z) / step
+			var x0 := clampi(int(fx), 0, size - 2)
+			var z0 := clampi(int(fz), 0, size - 2)
+			var tx := fx - float(x0)
+			var tz := fz - float(z0)
+			var ha := tv[z0 * size + x0].y
+			var hb := tv[z0 * size + x0 + 1].y
+			var hc := tv[(z0 + 1) * size + x0].y
+			var hd := tv[(z0 + 1) * size + x0 + 1].y
+			var drawn := ha + (hb - ha) * tx + (hc - ha) * tz if tx + tz <= 1.0 \
+				else hd + (hc - hd) * (1.0 - tx) + (hb - hd) * (1.0 - tz)
+			worst = maxf(worst, drawn - v.y)
+	if worst > 0.001:
+		failures.append("road ribbon sinks %.3f units under the drawn coarse terrain" % worst)
+	roads.free()
+	tm.free()
+	# The mesh's last post row stops one post short of +X / +Z: a road
+	# running out to the extent edge stops on the drawn mesh.
+	var edge := LocationData.new()
+	edge.grid_size = 8
+	edge.heights.resize(64)
+	edge.heights.fill(3.0)
+	edge.water_level = -3.0
+	edge.roads = [{"points": PackedVector2Array([Vector2(0, 0), Vector2(1199, 0)]),
+		"width_m": 6.0, "lanes": 0, "surface": "", "bridge": false,
+		"tunnel": false, "layer": 0, "class": "residential"}]
+	var eground := GroundTruth.new(edge)
+	var mesh_max := (8.0 * 0.5 - 1.0) * WorldScale.detailed_extent_units() / 7.0
+	var eroads := RoadBuilder.build_roads(edge, eground)
+	for child in eroads.get_children():
+		for v in (child as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array:
+			if v.x > mesh_max:
+				failures.append("road ribbon runs past the drawn terrain edge to x=%.1f" % v.x)
+				break
+	eroads.free()
+	# A deck over a bank that slopes across the way clears the ground
+	# under both edges, not just its centreline.
+	var bank := LocationData.new()
+	bank.grid_size = 8
+	bank.heights.resize(64)
+	for z in 8:
+		for x in 8:
+			bank.heights[z * 8 + x] = float(z) * 40.0
+	bank.water_level = -50.0
+	var bground := GroundTruth.new(bank)
+	var bsurf := RoadBuilder._Surface.new(bank, bground)
+	var span := PackedVector2Array([Vector2(-200, 0), Vector2(0, 0), Vector2(200, 0)])
+	var deck := RoadBuilder.deck_profile(span, bsurf, 1.0, 10.0)
+	for i in span.size():
+		var high := bsurf.height(span[i].x, span[i].y + 10.0)
+		if deck[i] < high + 0.049:
+			failures.append("bridge deck sinks under its uphill edge: %.3f < %.3f" % [deck[i], high])
+			break
 
 ## One extruded ring: wall corners match the OSM points exactly
 ## (rotation preserved, nothing re-squared), every wall front face
