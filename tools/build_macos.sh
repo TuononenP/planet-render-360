@@ -14,9 +14,12 @@ MODE=--export-release
 [ "$1" = "--debug" ] && MODE=--export-debug
 OUT=../build/macos/PlanetRender360.dmg
 
+. tools/version_stamp.sh
+stamp_version
+
 PRESET_BACKUP="$(mktemp)"
 cp export_presets.cfg "$PRESET_BACKUP"
-restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; }
+restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; restore_version; }
 trap restore_preset EXIT INT TERM
 
 # Only the macOS preset (preset.0) has these keys, so a plain sed is safe.

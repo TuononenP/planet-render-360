@@ -9,9 +9,12 @@ set -e
 : "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID to your Apple Developer Team ID}"
 cd "$(dirname "$0")/.."
 
+. tools/version_stamp.sh
+stamp_version
+
 PRESET_BACKUP="$(mktemp)"
 cp export_presets.cfg "$PRESET_BACKUP"
-restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; }
+restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; restore_version; }
 trap restore_preset EXIT INT TERM
 sed -i '' "s/application\/app_store_team_id=\"\"/application\/app_store_team_id=\"$APPLE_TEAM_ID\"/" export_presets.cfg
 

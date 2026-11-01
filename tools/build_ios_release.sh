@@ -17,9 +17,12 @@ set -e
 : "${ASC_KEY_PATH:?Set ASC_KEY_PATH to the App Store Connect .p8 key}"
 cd "$(dirname "$0")/.."
 
+. tools/version_stamp.sh
+stamp_version
+
 PRESET_BACKUP="$(mktemp)"
 cp export_presets.cfg "$PRESET_BACKUP"
-restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; }
+restore_preset() { cp "$PRESET_BACKUP" export_presets.cfg; rm -f "$PRESET_BACKUP"; restore_version; }
 trap restore_preset EXIT INT TERM
 IOS_OPTS='/^\[preset.2.options\]/,$'
 sed -i '' "s/application\/app_store_team_id=\"\"/application\/app_store_team_id=\"$APPLE_TEAM_ID\"/" export_presets.cfg
