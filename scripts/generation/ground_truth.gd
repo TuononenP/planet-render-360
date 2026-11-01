@@ -144,6 +144,9 @@ func _init(data: LocationData) -> void:
 	# T3.4 waterway carve (contract §3; §7 V16 deleted the synthetic
 	# S-curve this replaces): width-aware channels on real centrelines.
 	_carve_waterways(data)
+	# Streets and main roads sit on a smoothed profile (RoadGrading).
+	RoadGrading.grade(_surface, _level, size, _step_units,
+		[] if data.buildings.is_empty() else data.roads, WorldScale.metres_to_units())
 	# Y-scale conversion (see header): carving above is in source
 	# metres; the stored surface and water datum are render units.
 	if not is_equal_approx(data.water_level, -3.0):
