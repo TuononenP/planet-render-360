@@ -33,7 +33,7 @@ var _card: PanelContainer  # the stage card
 var _progress: ProgressBar
 var _stage_label: Label
 var _percent_label: Label
-var _rows: Array = []  # {dot, name, detail, label, started} per pipeline stage
+var _rows: Array = []  # {dot, name, detail, label, started, active, done} per pipeline stage
 var _build_row: Dictionary = {}
 var _eta_label: Label
 var _note_row: HBoxContainer  # caution line while a data layer is not responding
@@ -50,7 +50,6 @@ var _announcer: Announcer  # StageProgress announces each completed stage
 static var reduce_motion := false
 var _push: Control
 var _two_col := false
-var _active_index := -1
 const NOT_STARTED := -(1 << 40)
 var _run_started_msec := NOT_STARTED  # the fetches all start with stage 0; the row counters read from here
 var _building := false
@@ -205,7 +204,7 @@ func _make_row(list: VBoxContainer, label: String) -> Dictionary:
 	row.add_child(detail)
 	list.add_child(row)
 	return {"dot": dot, "name": name_label, "detail": detail, "label": label,
-		"started": 0, "degraded": false, "ticking": false}
+		"started": 0, "degraded": false, "ticking": false, "active": false, "done": false}
 
 ## Float glass for the stage card, the accent bar, the quiet Cancel.
 func _style() -> void:
@@ -366,7 +365,6 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN, preset: int =
 		_note_label.visible = false
 		_note_row.visible = false
 	_progress.value = 0
-	_active_index = -1
 	_building = false
 	_build_source = null
 	_build_shown = 0.0
@@ -386,6 +384,8 @@ func begin(place_name: String, lat: float = NAN, lon: float = NAN, preset: int =
 	for row in _rows + [_build_row]:
 		row["degraded"] = false
 		row["ticking"] = false
+		row["active"] = false
+		row["done"] = false
 		_paint_row(row, StageDot.State.PENDING)
 		row["detail"].text = ""
 	_on_resized()
@@ -411,7 +411,7 @@ func _paint_row(row: Dictionary, state: StageDot.State) -> void:
 		name_label.remove_theme_font_override("font")
 
 ## The seconds the build has taken, beside the phase it is in; before
-## it, the seconds the active stage's layer has been fetching.
+## it, the seconds each active stage's layer has been fetching.
 func _on_pulse() -> void:
 	if _failed or _percent_label == null:
 		return
@@ -419,21 +419,38 @@ func _on_pulse() -> void:
 		_build_row["detail"].text = "%d s" % roundi(
 			(Time.get_ticks_msec() - _build_started_msec) / 1000.0)
 	else:
-		_tick_active_row()
+		for row in _rows:
+			_tick_row(row)
 
-## A running count on the active stage while it has nothing better to
-## say (tiles, "Nearby · 450 m"). Layers are fetched alongside the first
-## stage, so it counts from the run's start: the same clock the finished
-## row reports.
-func _tick_active_row() -> void:
-	if _active_index < 0 or _active_index >= _rows.size() or _run_started_msec == NOT_STARTED:
+## A running count on an active stage while it has nothing better to
+## say (tiles, "Nearby · 450 m"). The layers are all fetched from the
+## run's start, so each counts from it: the same clock the finished row
+## reports.
+func _tick_row(row: Dictionary) -> void:
+	if not row["active"] or _run_started_msec == NOT_STARTED:
 		return
-	var row: Dictionary = _rows[_active_index]
 	if row["detail"].text != "" and not row["ticking"]:
 		return
 	var seconds := roundi((Time.get_ticks_msec() - _run_started_msec) / 1000.0)
 	row["ticking"] = seconds >= 1
 	row["detail"].text = "%d s" % seconds if seconds >= 1 else ""
+
+## The fetch bar while the layers arrive side by side: a finished stage
+## counts whole, an active one by its own units (imagery tiles). Named
+## after the first layer still arriving; never goes backwards.
+func _refresh_fetch_bar() -> void:
+	var sum := 0.0
+	var waiting := ""
+	for i in _rows.size():
+		var row: Dictionary = _rows[i]
+		if row["done"]:
+			sum += 1.0
+			continue
+		sum += float(_stage_frac.get(i, 0.0))
+		if waiting == "" and row["active"]:
+			waiting = row["label"]
+	set_progress(maxf(sum / _rows.size(), _progress.value / 100.0),
+		waiting if waiting != "" else _stage_label.text)
 
 func _process(delta: float) -> void:
 	if not _building or _failed or not visible:
@@ -486,8 +503,11 @@ func _draw_build_fill() -> void:
 func show_error(reason: String) -> void:
 	_failed = true
 	_building = false
-	var index := _active_index
-	var row: Dictionary = _build_row if index < 0 else _rows[index]
+	var row := _build_row
+	for r in _rows:
+		if r["active"]:
+			row = r
+			break
 	_paint_row(row, StageDot.State.ERROR)
 	row["detail"].text = reason
 	row["detail"].add_theme_color_override("font_color", UiTheme.SIGNAL_ERROR)
@@ -507,8 +527,8 @@ func set_stage(index: int, _label: String, state: String) -> void:
 		return
 	var row: Dictionary = _rows[index]
 	if state == "done":
-		if _active_index == index:
-			_active_index = -1
+		row["active"] = false
+		row["done"] = true
 		if row["ticking"]:  # the running count gives way to the real time, or nothing
 			row["detail"].text = ""
 			row["ticking"] = false
@@ -527,13 +547,15 @@ func set_stage(index: int, _label: String, state: String) -> void:
 				took = 0.0
 			if took >= 0.1 and not _has_detail(index):
 				row["detail"].text = "%.1f s" % took
+		_refresh_fetch_bar()
 	else:
-		_active_index = index
+		row["active"] = true
 		row["started"] = Time.get_ticks_msec()
 		if index == 0 or _run_started_msec == NOT_STARTED:
 			_run_started_msec = int(row["started"])
 		_paint_row(row, StageDot.State.ACTIVE)
-		_tick_active_row()
+		_tick_row(row)
+		_refresh_fetch_bar()
 
 ## The pipeline's data after a stage: draws what landed into the lens.
 func show_stage_data(index: int, data: LocationData) -> void:
@@ -567,11 +589,11 @@ func show_stage_data(index: int, data: LocationData) -> void:
 			boxes.append(Rect2(x / extent + 0.5, z / extent + 0.5, sx / extent, sz / extent))
 		_preview.set_buildings(boxes)
 
-## Units done inside the active stage (imagery tiles): the row counts
-## them and the bar moves through the stage's quarter instead of waiting
-## at its start. Never goes backwards (a lower-zoom retry restarts the count).
+## Units done inside an active stage (imagery tiles): the row counts
+## them and the bar moves with them instead of waiting for the whole
+## layer. Never goes backwards (a lower-zoom retry restarts the count).
 func set_stage_progress(index: int, done: int, total: int) -> void:
-	if index != _active_index or total <= 0 or index >= _rows.size():
+	if index < 0 or index >= _rows.size() or total <= 0 or not _rows[index]["active"]:
 		return
 	var frac := clampf(float(done) / total, 0.0, 1.0)
 	if frac < float(_stage_frac.get(index, 0.0)):
@@ -579,7 +601,7 @@ func set_stage_progress(index: int, done: int, total: int) -> void:
 	_stage_frac[index] = frac
 	_rows[index]["detail"].text = "%d / %d tiles" % [done, total]
 	_rows[index]["ticking"] = false
-	set_progress((index + frac) / _rows.size(), GenerationPipeline.STAGES[index])
+	_refresh_fetch_bar()
 
 ## The real fetch time of a layer that ran alongside earlier stages, so
 ## its row shows it even when nothing was left to wait for.
@@ -600,7 +622,8 @@ func set_building(source: BuildAbort) -> void:
 	_build_source = source
 	_build_shown = 0.0
 	_build_started_msec = Time.get_ticks_msec()
-	_active_index = -1
+	for row in _rows:
+		row["active"] = false
 	_progress.value = 0.0
 	_preview.progress = 1.0
 	_stage_label.text = "%s · %s" % [BUILD_LABEL, BuildAbort.label_of(0)]

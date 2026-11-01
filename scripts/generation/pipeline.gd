@@ -29,7 +29,8 @@ signal layer_detail(layer: String, detail: String, partial: bool)
 signal stage_data(index: int, data: LocationData)
 
 ## One stage per live data source, named as the design system names
-## them (the stage the user waits on is the layer that is arriving).
+## them. The fetches all run at once, so every stage is in progress from
+## the start and each finishes when its own layer lands, in any order.
 ## "Building the scene" follows the pipeline, in the threaded build.
 const STAGES: Array[String] = [
 	"Elevation",
@@ -39,6 +40,14 @@ const STAGES: Array[String] = [
 ]
 
 var _cancelled := false
+var _stages_left := 0
+## False while a run's elevation stage is still landing: the ground
+## build reads its heights, so the buildings stage waits on it.
+var _elevation_landed := true
+## Stage index -> its credit line, joined in stage order once all have
+## landed (arrival order must not reorder the attribution).
+var _credits := {}
+const IMAGERY_CREDIT := "Imagery: Esri, Vantor, Earthstar Geographics"
 var _sat_tiles := Vector2i.ZERO  # latest tile_progress (done, total)
 var used_real_dem := false
 ## A/B switch (T1.3; the squash path is deleted in T3.1, contract §7 V1):
@@ -317,39 +326,34 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_farfield_drapes = []
 	_farfield.fetch(lat, lon, quality_preset > RenderSettings.Preset.FAST)
 
+	# Every layer is on its way: all rows start now, and each stage waits
+	# for its own layer alongside the others (not awaited one by one).
+	_credits.clear()
+	_elevation_landed = false
+	_stages_left = STAGES.size()
 	for i in STAGES.size():
-		if _cancelled:
-			cancelled.emit()
-			return
 		stage_changed.emit(i, STAGES[i], "in_progress")
-		progress_changed.emit(float(i) / STAGES.size(), STAGES[i])
-		# One frame so the loading screen draws the stage; no fixed pause
-		# (T7.5: real work only, no fake timers).
+	# One frame so the loading screen draws the stages; no fixed pause
+	# (T7.5: real work only, no fake timers).
+	await get_tree().process_frame
+	if _cancelled:
+		cancelled.emit()
+		return
+	for i in STAGES.size():
+		_run_stage(i, data)
+	while _stages_left > 0:
 		await get_tree().process_frame
-		if _cancelled:
-			cancelled.emit()
-			return
-		match i:
-			0:
-				await _fetch_dem(data)
-			1:
-				await _await_satellite(data)
-			2:
-				await _await_osm(data)
-			3:
-				await _await_climate(data)
-		if _cancelled:
-			cancelled.emit()
-			return
-		stage_data.emit(i, data)
-		if i == 1 and _sat_took > 0.0:
-			stage_took.emit(i, _sat_took)
-		elif i == 2:
-			# Map data and the far-city query both started with the run.
-			stage_took.emit(i, (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0)
-		elif i == 3 and _climate_took > 0.0:
-			stage_took.emit(i, _climate_took)
-		stage_changed.emit(i, STAGES[i], "done")
+	if _cancelled:
+		cancelled.emit()
+		return
+	# T3.7: far drapes are the same Esri source (register row).
+	if not used_satellite and not data.far_drapes.is_empty():
+		_credits[1] = IMAGERY_CREDIT
+	var credits: Array[String] = []
+	for i in STAGES.size():
+		if _credits.has(i):
+			credits.append(str(_credits[i]))
+	data.attribution = " · ".join(credits)
 
 	# The prewarm must be done before the build thread reads those caches;
 	# waited frame by frame (its TerrainTextures save needs main flushes).
@@ -362,6 +366,31 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	progress_changed.emit(1.0, "Done")
 	data.data_notes = DataNotes.describe(degraded, data.quality_preset > RenderSettings.Preset.FAST)
 	finished.emit(data)
+
+## One stage, started by run() beside the others: waits for its layer,
+## lands it on `data` and finishes its row, however long the rest take.
+func _run_stage(i: int, data: LocationData) -> void:
+	match i:
+		0:
+			await _fetch_dem(data)
+			_elevation_landed = true
+		1:
+			await _await_satellite(data)
+		2:
+			await _await_osm(data)
+		3:
+			await _await_climate(data)
+	if not _cancelled:
+		stage_data.emit(i, data)
+		if i == 1 and _sat_took > 0.0:
+			stage_took.emit(i, _sat_took)
+		elif i == 2:
+			# Map data and the far-city query both started with the run.
+			stage_took.emit(i, (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0)
+		elif i == 3 and _climate_took > 0.0:
+			stage_took.emit(i, _climate_took)
+		stage_changed.emit(i, STAGES[i], "done")
+	_stages_left -= 1
 
 ## Pure vertical conversion (T1.3); see DemConversion.convert_dem_heights.
 static func convert_dem_heights(raw_metres: PackedFloat32Array, grid: int,
@@ -380,7 +409,7 @@ func _fetch_dem(data: LocationData) -> void:
 	if _dem_heights.size() == data.grid_size * data.grid_size:
 		used_real_dem = true
 		data.dem_source = _fetcher.dem_source
-		data.attribution = "Elevation: AWS Terrain Tiles — EU-DEM / Copernicus, USGS 3DEP, SRTM and other sources (see docs/data-source-register.md)"
+		_credits[0] = "Elevation: AWS Terrain Tiles — EU-DEM / Copernicus, USGS 3DEP, SRTM and other sources (see docs/data-source-register.md)"
 		var conv := convert_dem_heights(_dem_heights, data.grid_size, legacy_squash)
 		data.heights = conv["heights"]
 		data.centre_elevation_m = conv["centre_elevation_m"]
@@ -482,14 +511,7 @@ func _await_satellite(data: LocationData) -> void:
 		data.satellite_zoom = _sat_zoom
 		data.satellite_source = _sat.satellite_source
 		data.satellite_metres_per_px = float(data.satellite_source.get("metres_per_px", 0.0))
-		var sat_attr := "Imagery: Esri, Vantor, Earthstar Geographics"
-		data.attribution = sat_attr if data.attribution.is_empty() \
-			else data.attribution + " · " + sat_attr
-	elif not data.far_drapes.is_empty():
-		# T3.7: far drapes are the same Esri source (register row).
-		var far_attr := "Imagery: Esri, Vantor, Earthstar Geographics"
-		data.attribution = far_attr if data.attribution.is_empty() \
-			else data.attribution + " · " + far_attr
+		_credits[1] = IMAGERY_CREDIT
 
 ## Nearest first, except monuments (columns, obelisks) and observation
 ## wheels in range rank first: they are few, and one cut by the cap
@@ -523,12 +545,15 @@ func _await_osm(data: LocationData) -> void:
 		data.trees = _osm_trees
 		data.barriers = _osm_barriers
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
-		var osm_attr := "Map data: © OpenStreetMap contributors"
-		data.attribution = osm_attr if data.attribution.is_empty() \
-			else data.attribution + " · " + osm_attr
+		_credits[2] = "Map data: © OpenStreetMap contributors"
 	else:
 		# No map data: the registry's other landmarks still stand.
 		data.landmark_candidates = LandmarkSites.select(data, [])
+	# The ground build reads the elevation stage's heights.
+	while not _elevation_landed and not _cancelled:
+		await get_tree().process_frame
+	if _cancelled:
+		return
 	_start_ground(data)
 	await _await_far_city(data)
 
@@ -543,7 +568,7 @@ func _await_climate(data: LocationData) -> void:
 		_note("weather")
 		return
 	data.climate = _climate_data
-	data.attribution += " · Climate: CHELSA V2.1 (Karger et al.)"
+	_credits[3] = "Climate: CHELSA V2.1 (Karger et al.)"
 	print("CLIMATE: %s %s" % [str(_climate_data), str(_climate.timings)])
 
 ## T5.4: far built-up landuse + real towers (bounded wait; absent →

@@ -64,16 +64,35 @@ func _run() -> void:
 	loading.add_degraded("weather")
 	if loading._rows[3]["dot"].state != StageDot.State.DEGRADED:
 		failures.append("a missing climate source should degrade the Weather row")
-	# Imagery tiles move the row count and the bar through the stage's quarter.
+	# The layers are fetched side by side: every row is in progress at
+	# once, each counts its own wait, and one can finish before another.
 	loading.begin("Paris, France")
-	loading.set_stage(1, "Imagery", "in_progress")
+	for i in GenerationPipeline.STAGES.size():
+		loading.set_stage(i, GenerationPipeline.STAGES[i], "in_progress")
+	loading._run_started_msec -= 4000
+	loading._on_pulse()
+	for i in loading._rows.size():
+		if loading._rows[i]["dot"].state != StageDot.State.ACTIVE or loading._rows[i]["detail"].text != "4 s":
+			failures.append("row %d should be active and counting alongside the others, got '%s'"
+				% [i, loading._rows[i]["detail"].text])
+	loading.set_stage(3, "", "done")
+	if loading._rows[3]["dot"].state != StageDot.State.DONE or not loading._rows[1]["active"]:
+		failures.append("weather should finish while imagery is still arriving")
+	if absf(loading._progress.value - 25.0) > 0.01 or loading._stage_label.text != "Elevation":
+		failures.append("one of four layers in: 25%% named after the first still arriving, got %.1f %s"
+			% [loading._progress.value, loading._stage_label.text])
+	# Imagery tiles move the row count and the bar with the other layers.
+	loading.begin("Paris, France")
+	for i in GenerationPipeline.STAGES.size():
+		loading.set_stage(i, GenerationPipeline.STAGES[i], "in_progress")
+	loading.set_stage(0, "", "done")
 	loading.set_stage_progress(1, 0, 169)
 	loading.set_stage_progress(1, 84, 169)
 	var half: float = loading._progress.value
 	if loading._rows[1]["detail"].text != "84 / 169 tiles":
 		failures.append("imagery row should count tiles, got %s" % loading._rows[1]["detail"].text)
 	if absf(half - (1.0 + 84.0 / 169.0) / 4.0 * 100.0) > 0.01:
-		failures.append("bar should sit inside the imagery quarter, got %.2f" % half)
+		failures.append("bar should count elevation and the imagery tiles, got %.2f" % half)
 	loading.set_stage_progress(1, 9, 49)  # lower-zoom retry restarts its count
 	if loading._progress.value < half:
 		failures.append("the bar must not go backwards on a retry")

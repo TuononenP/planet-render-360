@@ -347,7 +347,7 @@ func _run() -> void:
 	if loading._percent_label == null or loading._percent_label.text != "60%":
 		_fail(failures, "loading should show a live percent, got %s" % str(loading._percent_label.text if loading._percent_label else null))
 	loading.set_stage(0, GenerationPipeline.STAGES[0], "in_progress")
-	if loading._active_index != 0:
+	if not loading._rows[0]["active"]:
 		_fail(failures, "loading should track the active stage for its pulse")
 	# Whole card fits the window at phone, desktop, and short-window
 	# heights: every stage row and Cancel stay on screen (the preview
