@@ -24,6 +24,8 @@ const ZONES := [
 	["berlin", "berlin", 52.5200, 13.4050, 12.0],
 	["barcelona", "barcelona", 41.3874, 2.1686, 8.0],
 	["rome", "rome", 41.9028, 12.4964, 9.0],
+	["venice", "venice", 45.4375, 12.3358, 3.0],        # old city + Giudecca
+	["stockholm", "stockholm", 59.3293, 18.0686, 6.0],
 	["new_york", "new_york", 40.7831, -73.9712, 11.0],  # Manhattan
 	["new_york", "new_york", 40.6800, -73.9600, 7.0],   # inner Brooklyn
 	["new_york", "new_york", 40.7500, -73.8950, 5.5],   # inner Queens
@@ -44,6 +46,8 @@ const CORES := {
 	"berlin": [[52.5170, 13.3889]],                        # Mitte
 	"barcelona": [[41.3874, 2.1686]],                      # Plaça de Catalunya
 	"rome": [[41.8986, 12.4769]],                          # Pantheon
+	"venice": [[45.4343, 12.3388]],                        # Piazza San Marco
+	"stockholm": [[59.3251, 18.0711]],                     # Gamla stan
 	"new_york": [[40.7549, -73.9840], [40.7075, -74.0113]],  # Midtown, Downtown
 	"chicago": [[41.8819, -87.6278]],                      # the Loop
 	"san_francisco": [[37.7936, -122.3965]],               # Financial District

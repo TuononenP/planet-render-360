@@ -27,7 +27,8 @@ extends RefCounted
 ##         balconette, deep_balcony, awning, fire_escape, stoop, signage,
 ##         oriel (0..1 odds), awning_colours [sRGB hex], string_course,
 ##         quoins (bool), gable "" | step | neck | bell (or weighted
-##         [[gable, w], ...], picked per building)
+##         [[gable, w], ...], picked per building), altana (0..1 odds of
+##         a timber roof terrace), chimney_cap "bell" (flared Venetian stack)
 
 ## Ordered first-match boxes [region, south, west, north, east]. Coarse by
 ## design — borders are approximate, and neighbouring regions share most
@@ -110,8 +111,8 @@ const COUNTRY_BASE := {
 	"france": "central_europe",
 }
 static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, ArchitectureParis.BASE,
-	ArchitectureCitiesEurope.BASE, ArchitectureCitiesAmericas.BASE,
-	ArchitectureCitiesAsia.BASE])
+	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
+	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE])
 
 ## OSM `building=*` values that name a kind outright. `yes`, `residential`
 ## and friends are decided by levels / footprint / density instead.
@@ -166,6 +167,8 @@ const INFILL_MIX := {
 	"amsterdam": {"house": 30, "apartments": 50, "commercial": 12, "civic": 4, "outbuilding": 4},
 	"berlin": {"apartments": 72, "commercial": 12, "civic": 6, "house": 4, "outbuilding": 6},
 	"barcelona": {"apartments": 76, "commercial": 12, "civic": 6, "house": 2, "outbuilding": 4},
+	"venice": {"apartments": 56, "house": 20, "commercial": 14, "civic": 4, "outbuilding": 6},
+	"stockholm": {"apartments": 66, "commercial": 14, "house": 8, "civic": 6, "outbuilding": 6},
 	"rome": {"apartments": 70, "commercial": 14, "civic": 6, "house": 6, "outbuilding": 4},
 	"new_york": {"apartments": 66, "commercial": 16, "house": 10, "civic": 4, "outbuilding": 4},
 	"chicago": {"apartments": 44, "house": 34, "commercial": 12, "civic": 4, "outbuilding": 6},
@@ -253,7 +256,8 @@ const GENERIC := {
 ## city / era files (data-only split), merged once here.
 static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, ArchitectureMountain.REGIONS,
 	ArchitectureParis.REGIONS, ArchitectureCitiesEurope.REGIONS,
-	ArchitectureCitiesAmericas.REGIONS, ArchitectureCitiesAsia.REGIONS])
+	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
+	ArchitectureCitiesAsia.REGIONS])
 
 static func _merged(tables: Array) -> Dictionary:
 	var out := {}

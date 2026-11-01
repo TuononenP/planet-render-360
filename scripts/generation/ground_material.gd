@@ -99,7 +99,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	# Unmapped ground takes a class-like base (pavement or earth, or
 	# grass where the photo is green) and only a share of the photo's
 	# colour — a full 5 m photo there is the blurry smear v1 showed.
-	var bare := Color(0.54, 0.51, 0.45) if settled else Color(0.55, 0.50, 0.40)
+	var bare := Color(0.47, 0.45, 0.41) if settled else Color(0.55, 0.50, 0.40)
 	m.set_shader_parameter("unknown_bare", bare)
 	# Dry climates (arid, or a dry summer) read unmapped "green" as the dry
 	# grass colour and need a stronger green signal in the photo before

@@ -18,7 +18,7 @@ const CITIES := {
 	"banff": [51.1789, -115.5708, "mountain_lodge"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
 	"whistler": [50.1163, -122.9574, "mountain_lodge"], "zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
 	"helsinki": [60.1699, 24.9384, "nordic"], "turku": [60.4518, 22.2666, "nordic"],
-	"stockholm": [59.3293, 18.0686, "nordic"], "oslo": [59.9139, 10.7522, "nordic"],
+	"stockholm": [59.3293, 18.0686, "stockholm"], "venice": [45.4375, 12.3358, "venice"], "oslo": [59.9139, 10.7522, "nordic"],
 	"reykjavik": [64.1466, -21.9426, "nordic"], "madrid": [40.4168, -3.7038, "mediterranean"],
 	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "mediterranean"],
 	"rome": [41.9028, 12.4964, "rome"], "athens": [37.9838, 23.7275, "mediterranean"],
@@ -59,7 +59,8 @@ const ROOF_SHAPES := ["flat", "gabled", "hipped", "mansard", "pyramidal", "dome"
 const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"deep_balcony": TYPE_FLOAT, "string_course": TYPE_BOOL, "awning": TYPE_FLOAT,
 	"awning_colours": TYPE_ARRAY, "fire_escape": TYPE_FLOAT, "stoop": TYPE_FLOAT,
-	"signage": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL}
+	"signage": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL,
+	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
 const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood"]

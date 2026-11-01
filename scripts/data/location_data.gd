@@ -185,7 +185,7 @@ static func known_places() -> Array:
 		{"name": "Big Sur, United States", "lat": 36.2704, "lon": -121.8081},
 		{"name": "London, United Kingdom", "lat": 51.5074, "lon": -0.1278},
 		{"name": "Rome, Italy", "lat": 41.9028, "lon": 12.4964},
-		{"name": "Venice, Italy", "lat": 45.4408, "lon": 12.3155},
+		{"name": "Venice, Italy", "lat": 45.4375, "lon": 12.3358},
 		{"name": "Barcelona, Spain", "lat": 41.3874, "lon": 2.1686},
 		{"name": "Athens, Greece", "lat": 37.9838, "lon": 23.7275},
 		{"name": "Reykjavik, Iceland", "lat": 64.1466, "lon": -21.9426},
@@ -220,7 +220,7 @@ static func quick_picks() -> Array:
 		["Dubai", "Dubai, United Arab Emirates", 25.2048, 55.2708],
 		["London", "London, United Kingdom", 51.5074, -0.1278],
 		["Rome", "Rome, Italy", 41.9028, 12.4964],
-		["Venice", "Venice, Italy", 45.4408, 12.3155],
+		["Venice", "Venice, Italy", 45.4375, 12.3358],
 		["Seoul", "Seoul, South Korea", 37.5665, 126.9780],
 	]
 

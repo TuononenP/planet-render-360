@@ -149,6 +149,10 @@ static func _mat(key: String) -> Material:
 			m = _flat(Color(0.42, 0.50, 0.48), 0.6)
 		"cream":
 			m = _flat(Color(0.93, 0.90, 0.82), 0.85)
+		"timber":
+			m = _flat(Color(0.40, 0.29, 0.19), 0.9)
+		"terracotta":
+			m = MaterialLibrary.pbr_material("terracotta", Color.WHITE, 1.0)
 		_:
 			m = _flat(Color(0.5, 0.5, 0.5), 0.9)
 	_mats[key] = m
@@ -179,12 +183,16 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		_tower(batch, ring, c, u, lu, lv, top, wall_h, basis, look, wall_mat, roof_mat)
 	if near:
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
-		var stacks := RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look)
+		# Bell-capped stacks are drawn by _chimneys, so a Venetian terrace
+		# skips the plain party-wall stacks.
+		var stacks := str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) != "bell" \
+			and RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look)
 		if not stacks:
 			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if not RooflineDetail.bay_dormers(batch, ring, top, roof_h, shape, party,
 				gable_front, look, roof_mat, seed_v):
 			_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
+		_altana(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if shape == "flat":
 			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
 	batch.flush(root)
@@ -227,6 +235,52 @@ static func _chimneys(batch: Batch, ring: PackedVector2Array, c: Vector2,
 		var h := (ridge - surface) + 0.9 * m2u + 0.4 * m2u
 		batch.add("box", _xf(basis, _at(c, u, v, du, dv, top + surface - 0.4 * m2u + h * 0.5),
 			Vector3(0.9 * m2u, h, 0.9 * m2u)), wall_mat)
+		if str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) == "bell":
+			# Venetian camino a fumaiolo: the stack flares into an inverted
+			# bell with a small tiled cap.
+			var y_top := top + surface - 0.4 * m2u + h
+			batch.add("cone", _xf(basis * Basis(Vector3.RIGHT, PI),
+				_at(c, u, v, du, dv, y_top + 0.35 * m2u),
+				Vector3(1.5 * m2u, 0.7 * m2u, 1.5 * m2u)), _mat("cream"))
+			batch.add("pyramid", _xf(basis, _at(c, u, v, du, dv, y_top + 0.85 * m2u),
+				Vector3(1.7 * m2u, 0.3 * m2u, 1.7 * m2u)), _mat("terracotta"))
+
+## Altana: the timber roof terrace on posts that stands on many Venetian
+## roofs. On a share of pitched roofs (look relief `altana`), a railed
+## platform level with the ridge over the roof slope.
+static func _altana(batch: Batch, ring: PackedVector2Array, c: Vector2,
+		u: Vector2, v: Vector2, lu: float, lv: float, top: float,
+		roof_h: float, shape: String, basis: Basis, look: Dictionary,
+		seed_v: float, area_m2: float) -> void:
+	var odds := float((look.get("relief", {}) as Dictionary).get("altana", 0.0))
+	if odds <= 0.0 or shape == "flat" or area_m2 < 120.0 \
+			or ArchitectureStyle._h(seed_v, 41) >= odds:
+		return
+	var m2u := WorldScale.metres_to_units()
+	var du := lu * (0.15 if ArchitectureStyle._h(seed_v, 42) < 0.5 else -0.15)
+	var dv := lv * (0.35 if ArchitectureStyle._h(seed_v, 43) < 0.5 else -0.35)
+	if not RingGeometry.point_in_ring(c + u * du + v * dv, ring):
+		return
+	var w := minf(3.6 * m2u, lu * 0.8)
+	var d := minf(2.6 * m2u, lv * 0.6)
+	var y := top + roof_h + 0.4 * m2u
+	var timber := _mat("timber")
+	batch.add("box", _xf(basis, _at(c, u, v, du, dv, y), Vector3(w, 0.12 * m2u, d)), timber)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var px: float = du + float(sx) * (w * 0.5 - 0.08 * m2u)
+			var pz: float = dv + float(sz) * (d * 0.5 - 0.08 * m2u)
+			var surface := _roof_y(shape, px, pz, lu, lv, roof_h)
+			var ph := (y - (top + surface)) + 1.0 * m2u
+			batch.add("box", _xf(basis, _at(c, u, v, px, pz, top + surface + ph * 0.5),
+				Vector3(0.14 * m2u, ph, 0.14 * m2u)), timber)
+	# Rails along the four sides.
+	for sz in [-1.0, 1.0]:
+		batch.add("box", _xf(basis, _at(c, u, v, du, dv + sz * d * 0.5, y + 1.0 * m2u),
+			Vector3(w, 0.08 * m2u, 0.08 * m2u)), timber)
+	for sx in [-1.0, 1.0]:
+		batch.add("box", _xf(basis, _at(c, u, v, du + sx * w * 0.5, dv, y + 1.0 * m2u),
+			Vector3(0.08 * m2u, 0.08 * m2u, d)), timber)
 
 static func _dormers(batch: Batch, c: Vector2, u: Vector2, v: Vector2,
 		lu: float, lv: float, top: float, roof_h: float, shape: String,

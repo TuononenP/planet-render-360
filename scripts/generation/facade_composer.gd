@@ -29,7 +29,7 @@ const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
 	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse"]
-const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small"]
+const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small", "gothic"]
 ## Photo repeats per bay cell: brick courses and boards must read at
 ## real size, so those bases tile 2x2 inside each bay.
 const PHOTO_REPS := {"brick": 2, "wood": 2}
@@ -209,6 +209,8 @@ static func _window_box(win: String) -> Vector3i:
 			return Vector3i(76, 50, 32)
 		"small":
 			return Vector3i(32, 46, 34)
+		"gothic":
+			return Vector3i(36, 70, 30)
 	return Vector3i(44, 66, 26)
 
 ## Window with frame, sill and lintel shadow (shutters on a share of
@@ -229,11 +231,25 @@ static func _window(alb: Image, nor: Image, rgh: Image, ox: int, hv: float,
 		for ly in range(wy, wy + wh, 6):
 			alb.fill_rect(Rect2i(wx - sw - 4, ly, sw, 1), dark)
 			alb.fill_rect(Rect2i(wx + ww + 4, ly, sw, 1), dark)
-	alb.fill_rect(Rect2i(wx - 4, wy - 7, ww + 8, 3), dark)
+	if win == "gothic":
+		# Venetian Gothic: a pointed stone arch over the opening, glazed up
+		# to the point, in place of the lintel shadow.
+		var rise := ww / 2 + 4
+		for i in rise:
+			var fw := ww + 6 - (i * (ww + 6)) / rise
+			alb.fill_rect(Rect2i(wx - 3 + (ww + 6 - fw) / 2, wy - 3 - i, fw, 1), frame)
+			var gw := fw - 6
+			if gw > 2 and i < rise - 4:
+				alb.fill_rect(Rect2i(wx + (ww - gw) / 2, wy - 3 - i, gw, 1), GLASS)
+	else:
+		alb.fill_rect(Rect2i(wx - 4, wy - 7, ww + 8, 3), dark)
 	alb.fill_rect(Rect2i(wx - 3, wy - 3, ww + 6, wh + 6), frame)
 	glass_pane(alb, Rect2i(wx, wy, ww, wh), hv)
 	FacadePaint.pane(emit, Rect2i(wx, wy, ww, wh), hv)
 	match win:
+		"gothic":
+			# Colonnette: the slim central shaft of a bifora.
+			alb.fill_rect(Rect2i(wx + ww / 2 - 2, wy - 3, 4, wh + 3), frame)
 		"sash":
 			alb.fill_rect(Rect2i(wx, wy + wh / 2 - 1, ww, 4), frame)
 			for k in [1, 2]:

@@ -11,7 +11,7 @@ outranks the map):
 1. **Region** — `ArchitectureStyle.region_for(lat, lon)`: a **city zone**
    first (`CityStyles.ZONES`, centre + radius km: Paris intra-muros →
    `haussmann`, `london`, `amsterdam`, `berlin`, `barcelona`, `rome`,
-   `new_york` (Manhattan + inner Brooklyn + inner Queens), `chicago`,
+   `venice`, `stockholm`, `new_york` (Manhattan + inner Brooklyn + inner Queens), `chicago`,
    `san_francisco`, `tokyo`, `hong_kong`, `singapore`), else the first match
    in the coarse, ordered box table `ArchitectureData.BOXES` (17 country
    style regions, e.g. `nordic`, `middle_east`, `japan`, `north_america`).
@@ -74,6 +74,8 @@ outranks the map):
 | Berlin (`berlin`, Gründerzeit: pastel render, ornate, Erker, 5 storeys) | `berlin_plattenbau` 1960–1990 or ≥9 levels away from Mitte (panel); `berlin_modern` ≥1991 |
 | Barcelona (`barcelona`, Eixample: ochre stone, iron balcony every bay, flat) | `barcelona_gothic` pre-1860 / small old plots near the core; `barcelona_modern` |
 | Rome (`rome`: ochre/sienna render, green shutters, hipped terracotta) | `rome_palazzina` 1945–1990 or ≥5 levels beyond 3.5 km (deep balconies); `rome_modern` |
+| Venice (`venice`: faded salmon / ochre / rust stucco, Istrian-stone trim, Venetian Gothic pointed windows with a colonnette, terracotta roofs, bell-topped chimneys, altane roof terraces, 3–4 storeys) | `venice_modern` ≥6 levels or big flat-roofed blocks (post-war edge) |
+| Stockholm (`stockholm`: Gamla stan ochre, rust and cream plaster, copper-green / slate / tile roofs, 4–6 storeys) | `stockholm_modern` ≥9 levels, big flat-roofed blocks or post-war cues (Million Programme, glass offices) |
 | New York (`new_york`, brick walk-ups + fire escapes) | `nyc_brownstone` 1840–1899 / houses / small 3–4 levels; `nyc_prewar` 1900–1945, Art Deco, 10–19 levels; `nyc_glass` ≥1950 or ≥20 levels |
 | Chicago (`chicago`, brick 2-/3-flats) | `chicago_greystone`; `chicago_tower` ≥12 levels |
 | San Francisco (`san_francisco`, Edwardian stucco bays) | `sf_victorian` (painted timber, clapboard, bay windows); `sf_tower` ≥9 levels |

@@ -91,6 +91,9 @@ void fragment() {
 	vec3 hf = t_dehaze(texture(photo, UV).rgb * photo_gain);
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
 	float veg = smoothstep(veg_lo, veg_hi, exg);
+	// Teal shallows and wet flats (Venice's lagoon) are green-ish too, but
+	// carry far more blue than grass does: not vegetation.
+	veg *= 1.0 - smoothstep(0.55, 0.8, lf.b / max(lf.g, 1e-3));
 	vec2 g = wpos.xz * u2m;
 	vec3 pm = wpos * u2m;
 	// Screen gradients, taken before any branch (layer fetches use them).
@@ -162,7 +165,7 @@ void fragment() {
 	// wide pavement and lawns are never a flat slab; plus noise-driven
 	// patches the photo cannot carry at grazing angles.
 	float big = lum(t_dehaze(textureLod(photo, UV, lf_lod + 3.0).rgb * photo_gain));
-	float macro = clamp(lum(lf) / max(big, 1e-3), 0.72, 1.3);
+	float macro = clamp(lum(lf) / max(big, 1e-3), 0.72, 1.18);
 	macro *= 0.92 + 0.16 * t_noise(g / 47.0);
 	vec3 base = mix(col, lf, trust);
 	// Rock colour: neutral stone carrying some of the photo's tint.

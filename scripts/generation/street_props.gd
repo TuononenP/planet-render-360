@@ -321,7 +321,9 @@ static func _fence_material() -> StandardMaterial3D:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	m.alpha_scissor_threshold = 0.4
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.metallic = 0.5
-	m.roughness = 0.5
+	# Painted iron: a half-metallic picket mirrored the sky and read as a
+	# pale slatted wall from across a canal.
+	m.metallic = 0.0
+	m.roughness = 0.75
 	_mats["fence"] = m
 	return m

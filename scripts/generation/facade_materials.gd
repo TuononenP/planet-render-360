@@ -301,7 +301,11 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 			tint = _roof_floor(tag_set, _keep_chroma(tag_set, _calib(tag_set, q)))
 		return roof_set_material(tag_set, tint)
 	var styled := str(style.get("roof_set", ""))
-	if not MaterialLibrary._degenerate_roof_sample(colour_hint):
+	# A grey sample on a pitched roof in a terracotta region is shadow, moss
+	# or a panel, not slate: keep the style's tiles (Venice, Rome, ...).
+	var grey_tiles := styled == "terracotta" and shape != "flat" \
+		and _sample_set(colour_hint, shape, styled) != "terracotta"
+	if not grey_tiles and not MaterialLibrary._degenerate_roof_sample(colour_hint):
 		return roof_for_color(colour_hint, _sample_set(colour_hint, shape, styled))
 	if shape == "flat":
 		var flat_set := styled if styled in ["membrane", "concrete"] else "membrane"

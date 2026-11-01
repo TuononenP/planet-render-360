@@ -91,6 +91,16 @@ const ERAS := {
 		["rome_modern", ACC, 1991, 2100, MODERN + ["rationalism", "rationalist",
 			"razionalismo"], 0.5, 0.0, 99.0],
 	],
+	"venice": [
+		["venice", ALL, 1100, 1945, ["gothic", "venetian_gothic", "byzantine", "renaissance",
+			"baroque", "neoclassicism", "vernacular", "palazzo"], 8.0, 0.0, 99.0],
+		["venice_modern", ACC, 1946, 2100, MODERN, 0.3, 0.0, 99.0],
+	],
+	"stockholm": [
+		["stockholm", ALL, 1500, 1945, ["swedish_grace", "national_romantic", "neoclassicism",
+			"classicism", "baroque", "renaissance", "art_nouveau", "jugendstil"], 5.0, 0.0, 99.0],
+		["stockholm_modern", ACC, 1946, 2100, MODERN + ["million_programme"], 1.6, 0.0, 99.0],
+	],
 	"new_york": [
 		["new_york", AC, 1870, 1929, ["tenement", "renaissance_revival",
 			"romanesque_revival", "walk_up"], 5.0, 0.0, 99.0],
@@ -282,6 +292,16 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 				return "rome_palazzina"
 			if old or (dist >= 0.0 and dist < 2.5):
 				return "rome"
+		"venice":
+			if lv >= 6 or (roof == "flat" and lv >= 4 and area >= 600.0):
+				return "venice_modern"
+			if old or lv >= 1:
+				return "venice"
+		"stockholm":
+			if lv >= 9 or (roof == "flat" and lv >= 5 and area >= 500.0):
+				return "stockholm_modern"
+			if old:
+				return "stockholm"
 		"new_york":
 			if lv >= 20:
 				return "nyc_glass"

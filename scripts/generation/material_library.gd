@@ -204,7 +204,7 @@ static func ground_color(land_class: String) -> Color:
 		"field":
 			return Color(0.70, 0.63, 0.43)
 		"urban":
-			return Color(0.64, 0.61, 0.55)
+			return Color(0.57, 0.55, 0.50)
 		"wetland":
 			return Color(0.38, 0.42, 0.27)
 		"sand":

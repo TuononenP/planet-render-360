@@ -109,6 +109,20 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		var min_m := maxf(float(md.get("min_height_m", 0.0)), float(md.get("min_level", 0)) * fh)
 		if min_m > wall - 1.0:
 			min_m = 0.0  # a min above the top is a tagging slip, not a floating box
+		# A tall slender part of a church is a campanile (Venice maps ~140):
+		# a brick shaft under a pointed roof, not a grey rod.
+		var span_m := BuildingHeights._ring_span_m(ring)
+		if str(look["kind"]) == "religious" and min_m <= 0.0 and wall >= 14.0 \
+				and span_m <= 8.0 and shape != "dome":
+			if str(b_eff.get("material", "")) == "":
+				b_eff["material"] = "brick"
+				# Untagged: Venetian red brick, not the row's pale stone tint.
+				if str(b_eff.get("colour", "")) == "":
+					b_eff["colour"] = "#b0583c"
+			shape = "pyramidal"
+			var cone := minf(maxf(rh, span_m * 1.4), wall * 0.3)
+			wall -= cone - rh
+			rh = cone
 		var holes: Array = []
 		for h in md.get("holes", []):
 			if h is PackedVector2Array:
