@@ -11,6 +11,9 @@ const WORDMARK := "res://assets/brand/pr360-wordmark-dark.svg"
 const MARK_LIGHT := "res://assets/brand/pr360-mark-light.svg"
 const WORDMARK_LIGHT := "res://assets/brand/pr360-wordmark-light.svg"
 
+## Sent as the User-Agent header on every external API request.
+const USER_AGENT := "planet-render-360"
+
 ## The variant for the current ground: -dark files on Night grounds,
 ## -light on Day (the logo's colours are fixed, never the accent).
 static func mark() -> String:

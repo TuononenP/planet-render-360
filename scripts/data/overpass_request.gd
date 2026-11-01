@@ -80,7 +80,7 @@ func _start() -> void:
 	_token += 1
 	var err := _http.request(_endpoints[_attempt],
 		["Content-Type: application/x-www-form-urlencoded",
-			"User-Agent: PlanetRender360/0.1"],
+			"User-Agent: " + Brand.USER_AGENT],
 		HTTPClient.METHOD_POST, _body)
 	if err != OK:
 		_fail("Overpass request failed to start: %s" % err, true)

@@ -36,7 +36,7 @@ const DRAPE_LAYERS: Array = [
 const TILE_PX := 256
 const POOL_SIZE := 12
 const TILE_TIMEOUT := 15.0
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 ## Extra pixels around each window so bilinear + edge fades never
 ## read outside it at the exact reach.
 const MARGIN_PX := 4

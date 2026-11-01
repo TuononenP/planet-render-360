@@ -8,7 +8,7 @@ signal succeeded(temp_c: float, label: String, cloud_cover: float, code: int)
 signal failed(reason: String)
 
 const URL_TEMPLATE := "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,cloud_cover&timezone=auto"
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 
 var _http: HTTPRequest
 ## The place's UTC offset from the last response (`timezone=auto`), for

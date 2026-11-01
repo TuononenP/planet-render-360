@@ -480,7 +480,7 @@ func _use_cached(reason: String, max_m: float) -> bool:
 func _request_api() -> void:
 	var radius := OsmApiFallback.RADII_M[_api_tier]
 	var err := _http.request(OsmApiFallback.url_for(_pending_lat, _pending_lon, radius),
-		["User-Agent: PlanetRender360/0.1"])
+		["User-Agent: " + Brand.USER_AGENT])
 	if err != OK:
 		_api_failed("failed to start: %s" % err, _api_reason)
 

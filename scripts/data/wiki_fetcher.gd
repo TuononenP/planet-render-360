@@ -17,7 +17,7 @@ signal info_ready(id: String, info: Dictionary)
 signal info_failed(id: String, reason: String)
 signal photo_ready(id: String, texture: Texture2D, credit: String)
 
-const USER_AGENT := "PlanetRender360/0.1 (https://github.com/TuononenP/planet-render-360)"
+const USER_AGENT := Brand.USER_AGENT + " (https://github.com/TuononenP/planet-render-360)"
 ## Panel copy in the design system's voice: the card still shows the
 ## name, kind and readouts, so these read as a missing layer, not errors.
 const NO_ARTICLE := "No article found for this place."

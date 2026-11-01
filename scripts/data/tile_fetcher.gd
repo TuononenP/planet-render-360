@@ -11,7 +11,7 @@ signal tile_failed(z: int, x: int, y: int)
 
 const PATH_TEMPLATE := "/%d/%d/%d.png"
 const CACHE_DIR := "user://cache/tiles"
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 const CONNECTIONS := 6
 
 ## Kept-alive connections (TileConnection), one tile each at a time.

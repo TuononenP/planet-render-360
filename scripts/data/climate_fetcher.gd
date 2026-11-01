@@ -16,7 +16,7 @@ signal finished(climate: Dictionary)
 
 const BASE := "https://os.zhdk.cloud.switch.ch/chelsav2/GLOBAL/climatologies/1981-2010/bio/CHELSA_%s_1981-2010_V.2.1.tif"
 const SOURCE := "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)"
-const USER_AGENT := "PlanetRender360/0.1"
+const USER_AGENT := Brand.USER_AGENT
 ## Fixed CHELSA 30" grid (identical in every bio file).
 const WIDTH := 43200
 const HEIGHT := 20880

@@ -205,7 +205,7 @@ func _load_mosaic_tile(t: Vector2i) -> void:
 		_mosaic_tile_done(t, null)
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
 	var url := URL_TEMPLATE % [ZOOM_NEAR, t.x, t.y]
-	var err := http.request(url, ["User-Agent: PlanetRender360/0.1"])
+	var err := http.request(url, ["User-Agent: " + Brand.USER_AGENT])
 	if err != OK:
 		http.request_completed.disconnect(done)
 		http.set_meta("busy", false)
@@ -280,7 +280,7 @@ func _fetch_at_zoom(lat: float, lon: float, grid: int) -> void:
 		failed.emit("DEM tile z%d/%d/%d not cached (offline mode)" % [_zoom, tile.x, tile.y])
 		return
 	var url := URL_TEMPLATE % [_zoom, tile.x, tile.y]
-	var err := _http.request(url, ["User-Agent: PlanetRender360/0.1"])
+	var err := _http.request(url, ["User-Agent: " + Brand.USER_AGENT])
 	if err != OK:
 		failed.emit("HTTP request failed to start: %s" % err)
 
