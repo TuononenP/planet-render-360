@@ -217,6 +217,9 @@ static func _outside_samples(ring: PackedVector2Array, stride: float,
 		offset: float, closed: bool = true) -> Array:
 	var out: Array = []
 	var segs := ring.size() if closed else ring.size() - 1
+	# Banded ring index: a lagoon ring has ~15k vertices and as many
+	# samples, so a plain point-in-polygon per sample took over a minute.
+	var inside := PolygonIndex.new(ring) if closed else null
 	for i in segs:
 		var a := ring[i]
 		var b := ring[(i + 1) % ring.size()]
@@ -233,9 +236,9 @@ static func _outside_samples(ring: PackedVector2Array, stride: float,
 				# test is meaningless on an unclosed line).
 				out.append(c + n * offset)
 				out.append(c - n * offset)
-			elif not TerrainBuilder.point_in_polygon(c + n * offset, ring):
+			elif not inside.contains(c + n * offset):
 				out.append(c + n * offset)
-			elif not TerrainBuilder.point_in_polygon(c - n * offset, ring):
+			elif not inside.contains(c - n * offset):
 				out.append(c - n * offset)
 	return out
 

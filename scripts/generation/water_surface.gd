@@ -103,13 +103,15 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var shore := PackedFloat32Array(openness)
 	var shore_u := SHORE_M * WorldScale.metres_to_units()
 	var reach := int(ceil(maxf(ramp, shore_u) / grid))
+	# One banded index for "in the water, not on an island": a lagoon
+	# part with a thousand island holes took over a minute per-sample.
+	var wet := PolygonIndex.new(part, holes)
 	var z: float = bb[1] + grid * 0.5
 	while z < bb[3]:
 		var x: float = bb[0] + grid * 0.5
 		while x < bb[2]:
 			var c := Vector2(x, z)
-			if Geometry2D.is_point_in_polygon(c, part) \
-					and not _in_any_hole(c, holes):
+			if wet.contains(c):
 				var d := _nearest(buckets, c, grid, reach)
 				if d > grid * 0.45:
 					pts.append(c)
@@ -133,8 +135,7 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var indices := PackedInt32Array()
 	for t in range(0, tri.size(), 3):
 		var cen := (pts[tri[t]] + pts[tri[t + 1]] + pts[tri[t + 2]]) / 3.0
-		if Geometry2D.is_point_in_polygon(cen, part) \
-				and not _in_any_hole(cen, holes):
+		if wet.contains(cen):
 			indices.append_array([tri[t], tri[t + 1], tri[t + 2]])
 	_commit(root, verts, colors, indices, mat)
 
@@ -294,13 +295,6 @@ static func _nearest(buckets: Dictionary, c: Vector2, cell: float,
 			for p in buckets[k] as PackedVector2Array:
 				best = minf(best, p.distance_to(c))
 	return best
-
-static func _in_any_hole(c: Vector2, holes: Array) -> bool:
-	for h in holes:
-		if h is PackedVector2Array \
-				and Geometry2D.is_point_in_polygon(c, h as PackedVector2Array):
-			return true
-	return false
 
 ## [minx, minz, maxx, maxz] bounds of a ring.
 static func _bbox(ring: PackedVector2Array) -> Array:

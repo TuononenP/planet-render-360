@@ -262,19 +262,13 @@ func _from_landuse(data: LocationData) -> PackedByteArray:
 		var j0 := clampi(int(floor(bb.position.y / CELL_M)) + half, 0, n - 1)
 		var i1 := clampi(int(floor(bb.end.x / CELL_M)) + half, 0, n - 1)
 		var j1 := clampi(int(floor(bb.end.y / CELL_M)) + half, 0, n - 1)
-		var holes: Array = pd.get("holes", [])
+		# Banded index: a big landuse polygon with many holes is otherwise
+		# a full vertex + hole walk per cell (same lagoon-scale hang).
+		var poly_index := PolygonIndex.new(pts, pd.get("holes", []))
 		for j in range(j0, j1 + 1):
 			for i in range(i0, i1 + 1):
 				var p := centre(i, j)
-				if not Geometry2D.is_point_in_polygon(p, pts):
-					continue
-				var holed := false
-				for hole in holes:
-					if hole is PackedVector2Array \
-							and Geometry2D.is_point_in_polygon(p, hole):
-						holed = true
-						break
-				if holed:
+				if not poly_index.contains(p):
 					continue
 				var k := index(i, j)
 				in_osm[k] = 1

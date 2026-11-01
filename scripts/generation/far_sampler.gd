@@ -77,9 +77,11 @@ static func _blend_height(data: LocationData, ground: GroundTruth,
 		* (1.0 - smoothstep(s_0, edge_hi + (edge_hi - s_0), d))
 	return h - lip
 
-## Bboxes of OSM water polygons (+ hole rings) for a cheap per-vertex
-## reject before point-in-polygon. Covers lakes/rivers/sea inside OSM
-## range; past that the DEM sea rule in _far_water applies.
+## OSM water polygons (+ hole rings) as edge-banded PolygonIndex
+## entries: far rings test thousands of vertices, and one lagoon polygon
+## (Venice: ~15k vertices, a thousand island holes) made a plain
+## per-vertex point-in-polygon walk take minutes. Covers lakes/rivers/sea
+## inside OSM range; past that the DEM sea rule in _far_water applies.
 static func _water_index(data: LocationData) -> Array:
 	var out: Array = []
 	for poly in data.land_polygons:
@@ -90,15 +92,7 @@ static func _water_index(data: LocationData) -> Array:
 		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
 		if pts.size() < 3:
 			continue
-		var mn := pts[0]
-		var mx := pts[0]
-		for p in pts:
-			mn.x = minf(mn.x, p.x)
-			mn.y = minf(mn.y, p.y)
-			mx.x = maxf(mx.x, p.x)
-			mx.y = maxf(mx.y, p.y)
-		out.append({"rect": Rect2(mn, mx - mn), "pts": pts,
-			"holes": poly.get("holes", [])})
+		out.append(PolygonIndex.new(pts, poly.get("holes", [])))
 	return out
 
 ## Metres ASL reading as open water in true-metre mode (Terrarium
@@ -118,18 +112,7 @@ static func _far_water(h: float, water_level_m: float, in_osm: bool) -> bool:
 
 static func _in_osm_water(p: Vector2, index: Array) -> bool:
 	for entry in index:
-		var r: Rect2 = entry["rect"]
-		if not r.has_point(p):
-			continue
-		if not TerrainBuilder.point_in_polygon(p, entry["pts"]):
-			continue
-		var holed := false
-		for hole in entry["holes"]:
-			if hole is PackedVector2Array \
-					and TerrainBuilder.point_in_polygon(p, hole):
-				holed = true
-				break
-		if not holed:
+		if (entry as PolygonIndex).contains(p):
 			return true
 	return false
 
@@ -158,9 +141,9 @@ static func far_albedo_at(data: LocationData, nrm: Vector3, h_asl: float,
 static func _water_bounds(index: Array) -> Rect2:
 	if index.is_empty():
 		return Rect2()
-	var r: Rect2 = index[0]["rect"]
+	var r: Rect2 = (index[0] as PolygonIndex).bounds()
 	for entry in index:
-		r = r.merge(entry["rect"])
+		r = r.merge((entry as PolygonIndex).bounds())
 	return r
 
 static func _is_wet(ground: GroundTruth, h_render: float, p: Vector2,

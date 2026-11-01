@@ -128,6 +128,8 @@ static func _apron_ring(verts: Array, normals: Array, colors: Array,
 	var inset := width * 0.15
 	var first := -1
 	var prev := -1
+	# Banded index: lagoon and island rings run to thousands of vertices.
+	var side := PolygonIndex.new(ring)
 	for i in ring.size():
 		var a := ring[i]
 		var b := ring[(i + 1) % ring.size()]
@@ -141,8 +143,7 @@ static func _apron_ring(verts: Array, normals: Array, colors: Array,
 			var c := a.lerp(b, (float(s) + 0.5) / float(steps))
 			var probe := c + n * width * 0.5
 			var landward := n
-			if TerrainBuilder.point_in_polygon(probe, ring) \
-					== water_inside:
+			if side.contains(probe) == water_inside:
 				landward = -n
 			var k := _apron_append(verts, normals, colors, uvs,
 				c - landward * inset, c + landward * width,

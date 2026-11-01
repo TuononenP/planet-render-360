@@ -57,6 +57,7 @@ var _size: int = 0
 var _step_units: float = 1.0
 var _half_units: float = 0.0
 var _land: Array = []
+var _land_index: Array = []  # PolygonIndex per _land entry, same order
 var _buildings: Array = []
 ## Local water surface per post (render units) for posts a water body
 ## or channel carved; -INF = no carve (water_level_at falls back to the
@@ -74,6 +75,17 @@ const CARVE_DEPTH_M := 2.0
 ## neighbour: DEM noise is well under it, escarpment posts well over.
 const EDGE_SIGMA_M := 3.0
 
+## Land polygons plus their edge-banded indices (land_class_at runs per
+## tree / building / probe, and a lagoon polygon has tens of thousands
+## of vertices). WorldCache calls this on a restored ground too, which
+## never runs _init's build.
+func set_land(polys: Array) -> void:
+	_land = polys
+	_land_index.clear()
+	for poly in _land:
+		_land_index.append(PolygonIndex.new(
+			poly.get("points", PackedVector2Array()), poly.get("holes", [])))
+
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
 ## builders construct it from the data they already receive).
@@ -89,7 +101,7 @@ func _init(data: LocationData) -> void:
 	_half_units = extent_units * 0.5
 	extent_m = _half_units / WorldScale.metres_to_units()
 	water_level_m = data.water_level
-	_land = data.land_polygons
+	set_land(data.land_polygons)
 	_buildings = data.buildings
 	_surface.resize(size * size)
 	# T3.1 remap: resample the heights window onto the surface posts
@@ -128,7 +140,7 @@ func _init(data: LocationData) -> void:
 	# carved to the global datum instead).
 	_level.resize(size * size)
 	_level.fill(-INF)
-	_carve_polygons(data)
+	_carve_polygons()
 	# T3.4 waterway carve (contract §3; §7 V16 deleted the synthetic
 	# S-curve this replaces): width-aware channels on real centrelines.
 	_carve_waterways(data)
@@ -149,14 +161,6 @@ func _init(data: LocationData) -> void:
 	for h2 in _surface:
 		surface_min = minf(surface_min, h2)
 		surface_max = maxf(surface_max, h2)
-
-## Whether a point falls inside any hole ring (islands stay dry).
-static func _in_holes(p: Vector2, holes: Array) -> bool:
-	for h in holes:
-		if h is PackedVector2Array \
-				and WorldScale.point_in_polygon(p, h as PackedVector2Array):
-			return true
-	return false
 
 ## Width-aware channel carve for OSM waterway lines (T3.4, contract
 ## §2.6/§3): posts near a centreline dip toward water_level_m - 0.7
@@ -215,40 +219,31 @@ func _channel_level(line: PackedVector2Array, i: int, half: float) -> float:
 ## Bank-levelled polygon carve: each OSM water polygon sits at the 10th
 ## percentile of its dry pre-carve bank samples − freeboard (the
 ## WaterBuilder rule), and posts inside carve CARVE_DEPTH_M under it.
-func _carve_polygons(data: LocationData) -> void:
+func _carve_polygons() -> void:
+	# [points, PolygonIndex] per water polygon; the index is the one
+	# set_land already built (_land is data.land_polygons, same order).
 	var water: Array = []
-	for poly in data.land_polygons:
+	for k in _land.size():
+		var poly: Dictionary = _land[k]
 		if str(poly.get("class", "")) != "water":
 			continue
 		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
 		if pts.size() < 3:
 			continue
-		var r := Rect2(pts[0], Vector2.ZERO)
-		for q in pts:
-			r = r.expand(q)
-		water.append([pts, poly.get("holes", []), r])
+		water.append([pts, _land_index[k]])
 	var size := _size
 	var hu := float(size) / 2.0
 	var levels: Array = []
 	for wpoly in water:
 		levels.append(_polygon_level(wpoly, water))
+	# Row scanline over each polygon's indexed edges: a lagoon with a
+	# thousand island holes covers every post, and testing each post
+	# against every vertex never finished (Venice, Stockholm).
 	for k in water.size():
-		var pts: PackedVector2Array = water[k][0]
-		var r: Rect2 = water[k][2]
 		var level: float = levels[k]
-		var x0 := clampi(int(floor(r.position.x / _step_units + hu)), 0, size - 1)
-		var x1 := clampi(int(ceil(r.end.x / _step_units + hu)), 0, size - 1)
-		var z0 := clampi(int(floor(r.position.y / _step_units + hu)), 0, size - 1)
-		var z1 := clampi(int(ceil(r.end.y / _step_units + hu)), 0, size - 1)
-		for z in range(z0, z1 + 1):
-			for x in range(x0, x1 + 1):
-				var p := Vector2((float(x) - hu) * _step_units,
-					(float(z) - hu) * _step_units)
-				if WorldScale.point_in_polygon(p, pts) \
-						and not _in_holes(p, water[k][1]):
-					var i := z * size + x
-					_surface[i] = minf(_surface[i], level - CARVE_DEPTH_M)
-					_level[i] = maxf(_level[i], level)
+		for i in (water[k][1] as PolygonIndex).posts_inside(size, _step_units, hu):
+			_surface[i] = minf(_surface[i], level - CARVE_DEPTH_M)
+			_level[i] = maxf(_level[i], level)
 
 ## One polygon's surface from dry bank samples inside the extent (not
 ## in any water polygon); with <3 such samples (a lake filling the
@@ -289,9 +284,7 @@ func _polygon_level(wpoly: Array, water: Array) -> float:
 
 static func _in_water(p: Vector2, water: Array) -> bool:
 	for w in water:
-		if (w[2] as Rect2).has_point(p) \
-				and WorldScale.point_in_polygon(p, w[0]) \
-				and not _in_holes(p, w[1]):
+		if (w[1] as PolygonIndex).contains(p):
 			return true
 	return false
 
@@ -471,11 +464,9 @@ func water_level_at(x: float, z: float) -> float:
 ## below carries the v1 building circle test exactly.
 func land_class_at(x: float, z: float) -> String:
 	var p := Vector2(x, z)
-	for poly in _land:
-		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
-		if WorldScale.point_in_polygon(p, pts) \
-				and not _in_holes(p, poly.get("holes", [])):
-			return str(poly.get("class", ""))
+	for k in _land.size():
+		if (_land_index[k] as PolygonIndex).contains(p):
+			return str(_land[k].get("class", ""))
 	return ""
 
 ## Slope gradient (rise over run, 0.0 = flat) from central
