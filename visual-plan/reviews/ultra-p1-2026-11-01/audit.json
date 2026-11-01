@@ -1,0 +1,9050 @@
+{
+  "dubai": [
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 399
+    },
+    {
+      "albedo": 0.937,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.933,
+        0.787
+      ],
+      "uses": 320
+    },
+    {
+      "albedo": 0.161,
+      "material": "unnamed",
+      "rgb": [
+        0.147,
+        0.163,
+        0.179
+      ],
+      "uses": 320
+    },
+    {
+      "albedo": 0.419,
+      "class": "concrete",
+      "material": "roof:concrete|ffffffff",
+      "rgb": [
+        0.482,
+        0.413,
+        0.296
+      ],
+      "uses": 75
+    },
+    {
+      "albedo": 0.485,
+      "material": "distant:2|middle_east",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 56
+    },
+    {
+      "albedo": 0.485,
+      "material": "distant:2|middle_east",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 55
+    },
+    {
+      "albedo": 0.641,
+      "material": "distant:2|middle_east",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 48
+    },
+    {
+      "albedo": 0.71,
+      "material": "distant:2|middle_east",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 45
+    },
+    {
+      "albedo": 0.472,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.464,
+        0.398
+      ],
+      "uses": 19
+    },
+    {
+      "albedo": 0.163,
+      "class": "glass",
+      "material": "glass:1",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.145,
+        0.167,
+        0.188
+      ],
+      "uses": 17
+    },
+    {
+      "albedo": 0.352,
+      "class": "concrete",
+      "material": "facade:concrete|adobe|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.376,
+        0.352,
+        0.285
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.085,
+      "material": "unnamed",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.14,
+      "material": "unnamed",
+      "rgb": [
+        0.18,
+        0.135,
+        0.081
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.103,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.116,
+        0.101,
+        0.093
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|adobe|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.456,
+        0.401,
+        0.285
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.352,
+      "class": "concrete",
+      "material": "facade:concrete|adobe|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.376,
+        0.352,
+        0.285
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|small|0.0|3.6|0",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.44,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.489,
+        0.437,
+        0.323
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.62,
+      "material": "unnamed",
+      "rgb": [
+        0.677,
+        0.614,
+        0.502
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|balcony|0|2|e5bc6dff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.692,
+      "material": "unnamed",
+      "rgb": [
+        0.783,
+        0.687,
+        0.473
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|small|0.0|3.6|2",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|balcony|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.456,
+        0.401,
+        0.285
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|balcony|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.033,
+      "material": "unnamed",
+      "rgb": [
+        0.022,
+        0.033,
+        0.064
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.349,
+      "material": "unnamed",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.262,
+      "material": "roof:slate|ffffd5ff",
+      "rgb": [
+        0.288,
+        0.265,
+        0.164
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|balcony|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.595,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.614,
+        0.594,
+        0.553
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.158,
+      "material": "facade:stone|adobe|0|2|ffffffff|1a110b|1b2514|0.0|small|0.0|3.6|0",
+      "rgb": [
+        0.256,
+        0.14,
+        0.045
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.158,
+      "class": "concrete",
+      "material": "roof:concrete|ffffeaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.16,
+        0.097
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.44,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.489,
+        0.437,
+        0.323
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|balcony|0|2|ffdd8eff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.107,
+      "class": "terracotta",
+      "material": "roof:terracotta|95d5bfff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.088,
+        0.036
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.482,
+      "material": "ground_storey:render|shop|e5bc6dff|0b0804|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.598,
+        0.469,
+        0.264
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|adobe|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|balcony|0|2|e5bc6dff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|balcony|0|2|ffdd8eff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.074,
+      "material": "unnamed",
+      "rgb": [
+        0.102,
+        0.068,
+        0.042
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|adobe|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.084,
+      "material": "unnamed",
+      "rgb": [
+        0.069,
+        0.087,
+        0.107
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|balcony|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.43,
+      "material": "unnamed",
+      "rgb": [
+        0.475,
+        0.426,
+        0.34
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|small|0.0|3.6|2",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.114,
+        0.126,
+        0.137
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.133,
+      "class": "concrete",
+      "material": "roof:concrete|d5eabfff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.143,
+        0.135,
+        0.079
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.352,
+      "class": "concrete",
+      "material": "facade:concrete|balcony|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.376,
+        0.352,
+        0.285
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.075,
+      "class": "concrete",
+      "material": "roof:concrete|808080ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.086,
+        0.074,
+        0.053
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.413,
+      "material": "unnamed",
+      "rgb": [
+        0.435,
+        0.413,
+        0.353
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.16,
+      "class": "concrete",
+      "material": "roof:concrete|ffffbfff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.186,
+        0.16,
+        0.079
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.072,
+      "class": "concrete",
+      "material": "roof:concrete|6a8080ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.072,
+        0.074,
+        0.053
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.473,
+      "material": "unnamed",
+      "rgb": [
+        0.551,
+        0.464,
+        0.34
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.147,
+      "material": "facade:stone|adobe|0|2|f5f5f5ff|1a110b|1b2514|0.0|small|0.0|3.6|2",
+      "rgb": [
+        0.237,
+        0.131,
+        0.042
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.352,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "rgb": [
+        0.376,
+        0.352,
+        0.285
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.153,
+      "material": "facade:stone|adobe|0|2|ffffffff|1a110b|1b2514|0.0|small|0.0|3.6|2",
+      "rgb": [
+        0.247,
+        0.136,
+        0.044
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.151,
+      "class": "concrete",
+      "material": "roof:concrete|ffffd5ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.186,
+        0.147,
+        0.088
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.145,
+      "class": "concrete",
+      "material": "roof:concrete|eaffbfff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.158,
+        0.147,
+        0.079
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|0b0804|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.665,
+      "material": "facade:render|punched|0|2|ffffd5ff|dcd6c6|1b2514|0.0|small|0.0|2.8|1",
+      "rgb": [
+        0.772,
+        0.648,
+        0.517
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.081,
+      "material": "pbr:slate|606a78ff|8.00|1",
+      "rgb": [
+        0.072,
+        0.082,
+        0.093
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.224,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.21,
+        0.231,
+        0.203
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.637,
+      "material": "ground_storey:render|shop|fffcb0ff|0b0804|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.731,
+        0.631,
+        0.424
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "rgb": [
+        0.456,
+        0.401,
+        0.285
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.44,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|0b0804|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.489,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.448,
+      "material": "facade:render|adobe|0|2|dbaa71ff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.577,
+        0.428,
+        0.274
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.44,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|110b06|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "rgb": [
+        0.489,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|small|0.0|3.6|0",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.097,
+      "material": "pbr:slate|767e8cff|8.00|1",
+      "rgb": [
+        0.088,
+        0.098,
+        0.108
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.128,
+      "material": "facade:wood|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.147,
+        0.125,
+        0.098
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.567,
+      "material": "facade:render|adobe|0|2|ffdd8eff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.678,
+        0.556,
+        0.346
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|0b0804|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.153,
+      "class": "concrete",
+      "material": "roof:concrete|d5ffffff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.143,
+        0.16,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.391,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.392,
+        0.398,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.314,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|1",
+      "rgb": [
+        0.293,
+        0.324,
+        0.285
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|070b09|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|1",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|030604|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.692,
+      "material": "unnamed",
+      "rgb": [
+        0.675,
+        0.703,
+        0.635
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.075,
+      "class": "terracotta",
+      "material": "roof:terracotta|808080ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.053,
+        0.024
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.583,
+      "material": "unnamed",
+      "rgb": [
+        0.626,
+        0.579,
+        0.502
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.482,
+      "material": "ground_storey:render|shop|e5bc6dff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.598,
+        0.469,
+        0.264
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffdeff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.787,
+        0.697,
+        0.537
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|adobe|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|070b09|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.336,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "rgb": [
+        0.622,
+        0.272,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.383,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.404,
+        0.383,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "material": "unnamed",
+      "rgb": [
+        0.251,
+        0.221,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.205
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.482,
+      "material": "ground_storey:render|shop|e5bc6dff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.598,
+        0.469,
+        0.264
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.151,
+      "material": "unnamed",
+      "rgb": [
+        0.113,
+        0.158,
+        0.192
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.382,
+      "material": "unnamed",
+      "rgb": [
+        0.586,
+        0.352,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "material": "facade:stone|adobe|0|2|f5f5f5ff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.237,
+        0.131,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.122,
+      "class": "concrete",
+      "material": "roof:concrete|bfd5d5ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.129,
+        0.123,
+        0.088
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffdeff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.787,
+        0.697,
+        0.537
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030604|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|1",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.074,
+      "class": "concrete",
+      "material": "roof:concrete|808055ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.086,
+        0.074,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.028,
+      "material": "unnamed",
+      "rgb": [
+        0.024,
+        0.029,
+        0.027
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.613,
+      "material": "unnamed",
+      "rgb": [
+        0.586,
+        0.619,
+        0.635
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.637,
+      "material": "ground_storey:render|shop|fffcb0ff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.731,
+        0.631,
+        0.424
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.143,
+      "class": "concrete",
+      "material": "roof:concrete|d5ffeaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.143,
+        0.147,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.44,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.489,
+        0.437,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.581,
+      "material": "facade:render|punched|0|2|ffe58eff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.684,
+        0.575,
+        0.345
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.485,
+      "material": "facade:render|adobe|0|2|e5bc6dff|1a110b|1b2514|0.0|small|0.0|3.6|0",
+      "rgb": [
+        0.603,
+        0.472,
+        0.266
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.708,
+      "material": "facade:render|punched|0|2|ffffd9ff|dcd6c6|1b2514|0.0|small|0.0|2.8|1",
+      "rgb": [
+        0.78,
+        0.705,
+        0.527
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.14,
+      "class": "concrete",
+      "material": "roof:concrete|bfffeaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.129,
+        0.147,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.51,
+      "material": "facade:render|punched|0|2|ffbe8eff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.477,
+        0.345
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.252,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.27,
+        0.251,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.133,
+      "class": "concrete",
+      "material": "roof:concrete|d5ead5ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.143,
+        0.135,
+        0.088
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|110b06|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "terracotta",
+      "material": "roof:terracotta|bfffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.254,
+        0.123,
+        0.055
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.091,
+      "class": "concrete",
+      "material": "roof:concrete|80aa55ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.086,
+        0.098,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|balcony|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.128,
+      "material": "facade:wood|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.147,
+        0.125,
+        0.098
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.119,
+      "material": "facade:wood|punched|0|2|f5f5f5ff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.135,
+        0.116,
+        0.092
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.637,
+      "material": "ground_storey:render|shop|fffcb0ff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.731,
+        0.631,
+        0.424
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.406,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.467,
+        0.4,
+        0.284
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.153,
+      "material": "facade:stone|adobe|0|2|ffffffff|1a110b|1b2514|0.0|small|0.0|3.6|1",
+      "rgb": [
+        0.247,
+        0.136,
+        0.044
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.314,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.292,
+        0.324,
+        0.284
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.119,
+      "material": "facade:wood|punched|0|2|f5f5f5ff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.136,
+        0.117,
+        0.092
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.252,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.27,
+        0.251,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|balcony|0|2|fffcb0ff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.709,
+      "material": "facade:render|punched|0|2|ffffd9ff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.781,
+        0.706,
+        0.527
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.482,
+      "material": "ground_storey:render|shop|e5bc6dff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.598,
+        0.469,
+        0.264
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "terracotta",
+      "material": "roof:terracotta|d5ffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.283,
+        0.114,
+        0.059
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|balcony|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.482,
+      "material": "ground_storey:render|shop|e5bc6dff|1a110b|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.598,
+        0.469,
+        0.264
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.121,
+      "class": "concrete",
+      "material": "roof:concrete|bfd5bfff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.129,
+        0.123,
+        0.079
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.637,
+      "material": "ground_storey:render|shop|fffcb0ff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.731,
+        0.631,
+        0.424
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "material": "facade:stone|adobe|0|2|f5f5f5ff|1a110b|1b2514|0.0|small|0.0|3.6|0",
+      "rgb": [
+        0.237,
+        0.131,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|030604|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.637,
+      "material": "ground_storey:render|shop|fffcb0ff|040806|2|1a110b|1b2514|0.0|casement|0.0|3.6|2",
+      "rgb": [
+        0.731,
+        0.631,
+        0.424
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.098,
+      "class": "concrete",
+      "material": "roof:concrete|aaaa80ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.115,
+        0.098,
+        0.053
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.132,
+      "class": "concrete",
+      "material": "roof:concrete|d5eaaaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.143,
+        0.135,
+        0.071
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.563,
+      "material": "ground_storey:render|shop|ffdd8eff|060b11|2|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.673,
+        0.553,
+        0.343
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|balcony|0|2|ffffdeff|1a110b|1b2514|0.0|casement|0.0|3.6|0",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.144,
+      "class": "concrete",
+      "material": "roof:concrete|eaffaaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.158,
+        0.147,
+        0.071
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.084,
+      "class": "concrete",
+      "material": "roof:concrete|809580ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.086,
+        0.086,
+        0.053
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|05080d|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|0",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|070b09|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.119,
+      "material": "facade:wood|punched|0|2|f5f5f5ff|dcd6c6|1b2514|0.0|small|0.0|2.8|1",
+      "rgb": [
+        0.136,
+        0.117,
+        0.092
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.138,
+      "class": "concrete",
+      "material": "roof:concrete|ffeaaaff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.135,
+        0.071
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.383,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|110304|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "rgb": [
+        0.404,
+        0.383,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.136,
+      "class": "concrete",
+      "material": "roof:concrete|eaead5ff",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.158,
+        0.135,
+        0.088
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.342,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030604|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.4|2",
+      "rgb": [
+        0.314,
+        0.353,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|casement|0.0|3.6|1",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.641,
+      "material": "facade:render|adobe|0|2|fffcb0ff|1a110b|1b2514|0.0|small|0.0|3.6|2",
+      "rgb": [
+        0.736,
+        0.635,
+        0.427
+      ],
+      "uses": 1
+    }
+  ],
+  "london": [
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 644
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 275
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.017,
+        0.013
+      ],
+      "uses": 209
+    },
+    {
+      "albedo": 0.746,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.711,
+        0.342
+      ],
+      "uses": 209
+    },
+    {
+      "albedo": 0.161,
+      "material": "unnamed",
+      "rgb": [
+        0.147,
+        0.163,
+        0.179
+      ],
+      "uses": 157
+    },
+    {
+      "albedo": 0.937,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.933,
+        0.787
+      ],
+      "uses": 157
+    },
+    {
+      "albedo": 0.503,
+      "material": "unnamed",
+      "rgb": [
+        0.517,
+        0.504,
+        0.454
+      ],
+      "uses": 155
+    },
+    {
+      "albedo": 0.087,
+      "material": "unnamed",
+      "rgb": [
+        0.127,
+        0.078,
+        0.052
+      ],
+      "uses": 112
+    },
+    {
+      "albedo": 0.097,
+      "material": "distant_roof:london|2",
+      "rgb": [
+        0.088,
+        0.098,
+        0.108
+      ],
+      "uses": 93
+    },
+    {
+      "albedo": 0.248,
+      "material": "distant:2|london",
+      "rgb": [
+        0.403,
+        0.215,
+        0.119
+      ],
+      "uses": 63
+    },
+    {
+      "albedo": 0.249,
+      "material": "distant:2|london",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 62
+    },
+    {
+      "albedo": 0.249,
+      "material": "distant:2|london",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 60
+    },
+    {
+      "albedo": 0.126,
+      "material": "distant:2|london",
+      "rgb": [
+        0.373,
+        0.062,
+        0.029
+      ],
+      "uses": 57
+    },
+    {
+      "albedo": 0.098,
+      "material": "unnamed",
+      "rgb": [
+        0.193,
+        0.076,
+        0.034
+      ],
+      "uses": 43
+    },
+    {
+      "albedo": 0.163,
+      "class": "glass",
+      "material": "glass:1",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.145,
+        0.167,
+        0.188
+      ],
+      "uses": 34
+    },
+    {
+      "albedo": 0.068,
+      "material": "unnamed",
+      "rgb": [
+        0.109,
+        0.059,
+        0.038
+      ],
+      "uses": 33
+    },
+    {
+      "albedo": 0.472,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.464,
+        0.398
+      ],
+      "uses": 32
+    },
+    {
+      "albedo": 0.102,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.115,
+        0.099,
+        0.092
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.114,
+        0.126,
+        0.137
+      ],
+      "uses": 20
+    },
+    {
+      "albedo": 0.11,
+      "material": "pbr:slate|878f9fff|8.00|1",
+      "rgb": [
+        0.102,
+        0.111,
+        0.123
+      ],
+      "uses": 18
+    },
+    {
+      "albedo": 0.259,
+      "material": "roof:slate|ffffffff",
+      "rgb": [
+        0.256,
+        0.265,
+        0.214
+      ],
+      "uses": 18
+    },
+    {
+      "albedo": 0.082,
+      "material": "roof:slate|6a6a6aff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.082
+      ],
+      "uses": 14
+    },
+    {
+      "albedo": 0.085,
+      "material": "unnamed",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 14
+    },
+    {
+      "albedo": 0.51,
+      "material": "facade:render|punched|0|2|ffbe8eff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.477,
+        0.345
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.455,
+        0.401,
+        0.284
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.122,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|fffffeff|e7e0d2|060606|0.0|sash|0.0|2.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.273,
+        0.084,
+        0.049
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.248,
+      "material": "roof:slate|ffffeaff",
+      "rgb": [
+        0.272,
+        0.248,
+        0.181
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.6|2",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.053,
+      "material": "unnamed",
+      "rgb": [
+        0.053,
+        0.053,
+        0.053
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.419,
+      "material": "unnamed",
+      "rgb": [
+        0.733,
+        0.357,
+        0.102
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.165,
+      "material": "roof:slate|ead5aaff",
+      "rgb": [
+        0.176,
+        0.166,
+        0.131
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.231,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|fffffeff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.43,
+        0.182,
+        0.138
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.14,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|fffffeff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.298,
+        0.1,
+        0.064
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|e7e0d2|1b2514|0.0|sash|0.0|2.6|2",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.496,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.635,
+        0.465,
+        0.388
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.134,
+      "class": "brick",
+      "material": "facade:brick|panel|0|2|ffffffff|cecec6|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.206,
+        0.117,
+        0.083
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.823,
+      "material": "ground_storey:render|render|ffffffff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.862,
+        0.821,
+        0.728
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.13,
+      "material": "roof:slate|aaaa95ff",
+      "rgb": [
+        0.128,
+        0.132,
+        0.115
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.086,
+      "class": "brick",
+      "material": "facade:brick|balcony|0|2|fff1eaff|cecec6|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.145,
+        0.073,
+        0.045
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.122,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|fffffeff|e7e0d2|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.273,
+        0.084,
+        0.049
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.182,
+      "material": "roof:slate|ffeabfff",
+      "rgb": [
+        0.192,
+        0.182,
+        0.148
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.741,
+        0.714,
+        0.646
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.094,
+      "material": "unnamed",
+      "rgb": [
+        0.198,
+        0.068,
+        0.042
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.094,
+      "material": "unnamed",
+      "rgb": [
+        0.079,
+        0.096,
+        0.12
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.214,
+      "material": "roof:slate|ffffaaff",
+      "rgb": [
+        0.24,
+        0.215,
+        0.131
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.62,
+      "material": "unnamed",
+      "rgb": [
+        0.677,
+        0.614,
+        0.502
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.213,
+      "material": "roof:slate|ffffd5ff",
+      "rgb": [
+        0.224,
+        0.215,
+        0.164
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.246,
+      "material": "roof:slate|ffffbfff",
+      "rgb": [
+        0.272,
+        0.248,
+        0.148
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.132,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.8|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.235,
+        0.109,
+        0.063
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.823,
+      "material": "ground_storey:render|render|ffffffff|070b09|2|e7e0d2|060606|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.862,
+        0.821,
+        0.728
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.237,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.385,
+        0.205,
+        0.117
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.823,
+      "material": "ground_storey:render|render|ffffffff|070b09|2|e7e0d2|060606|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.862,
+        0.821,
+        0.728
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.081,
+      "material": "roof:slate|6a6a55ff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.066
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.823,
+      "material": "ground_storey:render|render|ffffffff|060606|2|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.862,
+        0.821,
+        0.728
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.122,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffeedfff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.264,
+        0.086,
+        0.056
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.197,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.367,
+        0.158,
+        0.075
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.201,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffeedfff|e7e0d2|1b2514|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.381,
+        0.155,
+        0.121
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.464,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|1.00|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|070b09|2|e7e0d2|060606|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.382,
+      "material": "unnamed",
+      "rgb": [
+        0.586,
+        0.352,
+        0.068
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.463,
+      "material": "ground_storey:stone|shop|ffffffff|060606|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.717,
+        0.417,
+        0.166
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|1a0303|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.231,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|fffffeff|e7e0d2|1b2514|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.43,
+        0.182,
+        0.138
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.14,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|fffffeff|060606|2|e7e0d2|1b2514|0.0|sash|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.298,
+        0.1,
+        0.064
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.085,
+      "material": "pbr:slate|637081ff|8.00|1",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.251,
+      "material": "unnamed",
+      "rgb": [
+        0.267,
+        0.249,
+        0.22
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|balcony|0|2|ffffffff|cecec6|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|1a0303|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.595,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.614,
+        0.594,
+        0.553
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.232,
+      "material": "unnamed",
+      "rgb": [
+        0.38,
+        0.2,
+        0.119
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|0.50|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.777,
+      "material": "unnamed",
+      "rgb": [
+        0.807,
+        0.776,
+        0.701
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.022,
+      "material": "unnamed",
+      "rgb": [
+        0.026,
+        0.022,
+        0.016
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.112,
+      "class": "terracotta",
+      "material": "pbr:terracotta|d2ac9bff|4.40|1",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.279,
+        0.071,
+        0.029
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.399,
+      "material": "facade:stone|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.555,
+        0.381,
+        0.123
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.144,
+      "material": "roof:slate|aabfbfff",
+      "rgb": [
+        0.128,
+        0.149,
+        0.148
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.114,
+      "material": "unnamed",
+      "rgb": [
+        0.078,
+        0.12,
+        0.162
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.163,
+      "material": "roof:slate|d5d5bfff",
+      "rgb": [
+        0.16,
+        0.166,
+        0.148
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.076,
+      "class": "terracotta",
+      "material": "roof:terracotta|8080aaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.053,
+        0.032
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.157,
+      "material": "roof:slate|aad5d5ff",
+      "rgb": [
+        0.128,
+        0.166,
+        0.164
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.586,
+      "material": "unnamed",
+      "rgb": [
+        0.712,
+        0.572,
+        0.353
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.349,
+      "material": "unnamed",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.142,
+      "material": "roof:slate|aabf95ff",
+      "rgb": [
+        0.128,
+        0.149,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.132,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.235,
+        0.109,
+        0.063
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.424,
+      "material": "facade:stone|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.38,
+        0.122
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.221,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.316,
+        0.202,
+        0.129
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.078,
+      "material": "unnamed",
+      "rgb": [
+        0.091,
+        0.076,
+        0.05
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.1,
+      "material": "roof:slate|958055ff",
+      "rgb": [
+        0.112,
+        0.099,
+        0.066
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.178,
+      "material": "roof:slate|eaeabfff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.148
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.131,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffdebdff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.132,
+        0.128
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.428,
+      "material": "facade:stone|punched|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.69,
+        0.381,
+        0.123
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|1a0303|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|060606|2|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.741,
+        0.714,
+        0.646
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.132,
+      "material": "roof:slate|bfaa80ff",
+      "rgb": [
+        0.144,
+        0.132,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.183,
+      "material": "roof:slate|ffea95ff",
+      "rgb": [
+        0.208,
+        0.182,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|fffffcff|e7e0d2|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.756,
+        0.713,
+        0.617
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.14,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|fffffeff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.298,
+        0.1,
+        0.064
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.611,
+      "material": "facade:stone|ornate|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.704,
+        0.606,
+        0.376
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.09,
+      "material": "facade:stone|punched|0|2|ff5b9aff|070605|070605|0.0|french|0.0|4.4|2",
+      "rgb": [
+        0.251,
+        0.048,
+        0.027
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|2",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.496,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.635,
+        0.465,
+        0.389
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.414,
+      "material": "facade:stone|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "rgb": [
+        0.623,
+        0.381,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.118,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|bad9aeff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.122,
+        0.122,
+        0.069
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.235,
+      "class": "brick",
+      "material": "facade:brick|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.358,
+        0.208,
+        0.134
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.063,
+      "material": "facade:stone|punched|0|2|4d72ffff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.074,
+        0.061,
+        0.056
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.205
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.027,
+        0.007
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "material": "unnamed",
+      "rgb": [
+        0.251,
+        0.221,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.461,
+      "material": "unnamed",
+      "rgb": [
+        0.576,
+        0.449,
+        0.24
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.424,
+      "material": "unnamed",
+      "rgb": [
+        0.532,
+        0.411,
+        0.225
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.082,
+      "material": "unnamed",
+      "rgb": [
+        0.069,
+        0.085,
+        0.091
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.031,
+      "material": "unnamed",
+      "rgb": [
+        0.026,
+        0.032,
+        0.037
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.845,
+      "material": "unnamed",
+      "rgb": [
+        0.879,
+        0.846,
+        0.728
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.016,
+        0.016
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.56,
+      "material": "unnamed",
+      "rgb": [
+        0.615,
+        0.556,
+        0.434
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.334,
+      "material": "unnamed",
+      "rgb": [
+        0.361,
+        0.331,
+        0.28
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.22,
+      "material": "unnamed",
+      "rgb": [
+        0.076,
+        0.239,
+        0.462
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.833,
+      "material": "unnamed",
+      "rgb": [
+        0.818,
+        0.857,
+        0.635
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.081,
+      "material": "unnamed",
+      "rgb": [
+        0.069,
+        0.083,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.017,
+        0.016
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.042,
+      "material": "unnamed",
+      "rgb": [
+        0.043,
+        0.042,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.799,
+      "material": "unnamed",
+      "rgb": [
+        0.794,
+        0.817,
+        0.635
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.523,
+      "material": "unnamed",
+      "rgb": [
+        0.487,
+        0.528,
+        0.571
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.024,
+      "material": "unnamed",
+      "rgb": [
+        0.019,
+        0.025,
+        0.024
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.488,
+      "material": "unnamed",
+      "rgb": [
+        0.511,
+        0.486,
+        0.434
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.493,
+      "material": "unnamed",
+      "rgb": [
+        0.544,
+        0.489,
+        0.381
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.095,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffe1daff|070605|070605|0.0|french|0.0|4.4|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.205,
+        0.068,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.463,
+      "material": "unnamed",
+      "rgb": [
+        0.502,
+        0.461,
+        0.371
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.112,
+        0.147,
+        0.084
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.126,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ff674dff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.368,
+        0.063,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.399,
+      "material": "facade:stone|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.555,
+        0.381,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.027,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|4d4d4dff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.043,
+        0.023,
+        0.015
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.102,
+      "class": "terracotta",
+      "material": "roof:terracotta|95bfffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.079,
+        0.047
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|e7e0d2|1b2514|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.496,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.635,
+        0.465,
+        0.388
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.031,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|4d4d4dff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.047,
+        0.028,
+        0.019
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.044,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|4d4d4dff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.05,
+        0.043,
+        0.03
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|070b09|2|e7e0d2|060606|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.74,
+        0.713,
+        0.658
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.985,
+      "material": "facade:render|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.986,
+        0.984,
+        0.982
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.193,
+      "material": "facade:render|punched|0|2|4d4d4dff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.201,
+        0.192,
+        0.185
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.611,
+      "material": "facade:stone|ornate|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.704,
+        0.606,
+        0.376
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.213,
+      "material": "facade:wood|clapboard|0|2|ffffe3ff|dcd6c6|1b2514|0.0|casement|0.0|3.0|0",
+      "rgb": [
+        0.316,
+        0.195,
+        0.096
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.122,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|bad9ffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.122,
+        0.122,
+        0.12
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.399,
+      "material": "facade:stone|punched|0|2|ffffffff|e7e0d2|060606|0.0|sash|0.0|2.6|2",
+      "rgb": [
+        0.555,
+        0.381,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|1a0303|2|e7e0d2|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.289,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.327,
+        0.286,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.21,
+        0.231,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.03,
+      "material": "unnamed",
+      "rgb": [
+        0.023,
+        0.028,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.036,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.044,
+        0.025
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.052,
+      "material": "unnamed",
+      "rgb": [
+        0.195,
+        0.014,
+        0.018
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.084,
+        0.033
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.741,
+        0.714,
+        0.646
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffffff|060606|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.732,
+        0.704,
+        0.637
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.782,
+      "material": "unnamed",
+      "rgb": [
+        0.827,
+        0.78,
+        0.669
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.419,
+      "material": "unnamed",
+      "rgb": [
+        0.521,
+        0.399,
+        0.328
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffffff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.745,
+        0.702,
+        0.615
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.715,
+      "material": "facade:render|ornate|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.755,
+        0.712,
+        0.624
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.611,
+      "material": "facade:stone|ornate|0|2|ffffffff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.704,
+        0.606,
+        0.376
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.433,
+      "material": "ground_storey:stone|shop|ffffffff|1a0303|2|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.577,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.386,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.361,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.399,
+      "material": "facade:stone|punched|0|2|ffffffff|e7e0d2|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.554,
+        0.38,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.151,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffe0ff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.156
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.117,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|c6c6ffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.101,
+        0.117,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.164,
+      "material": "roof:slate|d5d5d5ff",
+      "rgb": [
+        0.16,
+        0.166,
+        0.164
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|1a0303|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.101,
+      "material": "roof:slate|95806aff",
+      "rgb": [
+        0.112,
+        0.099,
+        0.082
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.176,
+      "class": "concrete",
+      "material": "facade:concrete|ornate|0|2|ff674dff|e7e0d2|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.504,
+        0.09,
+        0.055
+      ],
+      "uses": 1
+    }
+  ],
+  "new_york": [
+    {
+      "albedo": 0.161,
+      "material": "unnamed",
+      "rgb": [
+        0.147,
+        0.163,
+        0.179
+      ],
+      "uses": 608
+    },
+    {
+      "albedo": 0.937,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.933,
+        0.787
+      ],
+      "uses": 608
+    },
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 555
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 435
+    },
+    {
+      "albedo": 0.103,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.116,
+        0.101,
+        0.093
+      ],
+      "uses": 84
+    },
+    {
+      "albedo": 0.503,
+      "material": "unnamed",
+      "rgb": [
+        0.517,
+        0.504,
+        0.454
+      ],
+      "uses": 67
+    },
+    {
+      "albedo": 0.156,
+      "material": "distant:2|new_york",
+      "rgb": [
+        0.403,
+        0.095,
+        0.043
+      ],
+      "uses": 54
+    },
+    {
+      "albedo": 0.156,
+      "material": "distant:2|new_york",
+      "rgb": [
+        0.403,
+        0.095,
+        0.043
+      ],
+      "uses": 53
+    },
+    {
+      "albedo": 0.137,
+      "material": "distant:2|new_york",
+      "rgb": [
+        0.269,
+        0.107,
+        0.052
+      ],
+      "uses": 47
+    },
+    {
+      "albedo": 0.077,
+      "material": "distant:2|new_york",
+      "rgb": [
+        0.206,
+        0.044,
+        0.024
+      ],
+      "uses": 42
+    },
+    {
+      "albedo": 0.068,
+      "material": "unnamed",
+      "rgb": [
+        0.109,
+        0.059,
+        0.038
+      ],
+      "uses": 26
+    },
+    {
+      "albedo": 0.163,
+      "class": "glass",
+      "material": "glass:1",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.145,
+        0.167,
+        0.188
+      ],
+      "uses": 26
+    },
+    {
+      "albedo": 0.472,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.464,
+        0.398
+      ],
+      "uses": 24
+    },
+    {
+      "albedo": 0.459,
+      "material": "roof:slate|ffffffff",
+      "rgb": [
+        0.496,
+        0.463,
+        0.312
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.376,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|3.30|1",
+      "rgb": [
+        0.398,
+        0.377,
+        0.296
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.266,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "rgb": [
+        0.509,
+        0.211,
+        0.103
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.167,
+      "class": "concrete",
+      "material": "pbr:concrete|f8ffffff|3.30|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.167,
+        0.167,
+        0.166
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.114,
+        0.126,
+        0.137
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.496,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.8|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.635,
+        0.465,
+        0.389
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.51,
+      "material": "facade:render|punched|0|2|ffbe8eff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.477,
+        0.345
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.403,
+        0.215,
+        0.138
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.143,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.224,
+        0.123,
+        0.096
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.455,
+        0.401,
+        0.284
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|060606|2|dcd6c6|1b2514|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.125,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.267,
+        0.09,
+        0.053
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.144,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.292,
+        0.108,
+        0.07
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.326,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.327,
+        0.332,
+        0.272
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.166,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.245,
+        0.147,
+        0.126
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.759,
+      "material": "unnamed",
+      "rgb": [
+        0.791,
+        0.759,
+        0.665
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.24,
+      "material": "roof:slate|ffffd5ff",
+      "rgb": [
+        0.24,
+        0.248,
+        0.164
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.096,
+      "material": "unnamed",
+      "rgb": [
+        0.103,
+        0.094,
+        0.086
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.419,
+      "material": "unnamed",
+      "rgb": [
+        0.521,
+        0.399,
+        0.328
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.144,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.292,
+        0.108,
+        0.07
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.24,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.421,
+        0.195,
+        0.151
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.62,
+      "material": "unnamed",
+      "rgb": [
+        0.677,
+        0.614,
+        0.502
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.195,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|ffffffff|070605|1b2514|0.0|sash|0.0|2.1|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.282,
+        0.177,
+        0.127
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.249,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.4,
+        0.215,
+        0.138
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.464,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|1.00|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|0.50|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.014,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.014,
+        0.016
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.382,
+      "material": "unnamed",
+      "rgb": [
+        0.586,
+        0.352,
+        0.068
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.084,
+        0.033
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.085,
+      "material": "pbr:slate|637081ff|8.00|1",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.598,
+      "class": "limestone",
+      "material": "facade:limestone|punched|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.677,
+        0.593,
+        0.42
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.47,
+      "material": "facade:stone|brownstone|0|2|ffffffff|070605|07110b|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.546,
+        0.472,
+        0.225
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.023,
+        0.023,
+        0.023
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.347,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|ffffffff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.491,
+        0.315,
+        0.239
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.036,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.044,
+        0.025
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.415,
+      "material": "unnamed",
+      "rgb": [
+        0.429,
+        0.413,
+        0.391
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.084,
+      "class": "concrete",
+      "material": "pbr:concrete|7c91c8ff|3.30|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.084,
+        0.084,
+        0.083
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.405,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.327,
+        0.437,
+        0.323
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.442,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.502,
+        0.437,
+        0.323
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.089,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.144,
+        0.077,
+        0.049
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.161,
+      "material": "facade:stone|brownstone|0|2|e4d5ffff|070605|1b2514|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.244,
+        0.141,
+        0.113
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.393,
+      "material": "pbr:stone|ffffffff|0.50|1",
+      "rgb": [
+        0.513,
+        0.384,
+        0.131
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.544,
+      "material": "unnamed",
+      "rgb": [
+        0.604,
+        0.538,
+        0.42
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.243,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.8|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.243,
+        0.243,
+        0.24
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.411,
+      "material": "unnamed",
+      "rgb": [
+        0.43,
+        0.414,
+        0.331
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.089,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.144,
+        0.077,
+        0.049
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.47,
+      "material": "facade:stone|brownstone|0|2|ffffffff|070605|1b2514|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.546,
+        0.472,
+        0.225
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.405,
+      "material": "unnamed",
+      "rgb": [
+        0.435,
+        0.403,
+        0.33
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.232,
+      "material": "unnamed",
+      "rgb": [
+        0.38,
+        0.2,
+        0.119
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.289,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.437,
+        0.257,
+        0.18
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.143,
+      "material": "roof:slate|bfbf6aff",
+      "rgb": [
+        0.144,
+        0.149,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.146,
+      "material": "roof:slate|d5bf6aff",
+      "rgb": [
+        0.16,
+        0.149,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.137,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffecc6ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.14,
+        0.133
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.1,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|f5f5f5ff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.151,
+        0.088,
+        0.062
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.162,
+      "material": "roof:slate|ead56aff",
+      "rgb": [
+        0.176,
+        0.166,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.186,
+      "material": "roof:slate|ffea95ff",
+      "rgb": [
+        0.224,
+        0.182,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.043,
+      "material": "unnamed",
+      "rgb": [
+        0.01,
+        0.042,
+        0.144
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.161,
+      "material": "facade:stone|brownstone|0|2|e4d5ffff|070605|07110b|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.244,
+        0.141,
+        0.113
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.197,
+      "material": "roof:slate|ffffbfff",
+      "rgb": [
+        0.208,
+        0.199,
+        0.148
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.082,
+      "material": "roof:slate|6a6a6aff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.386,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.361,
+        0.068
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.206,
+      "material": "roof:slate|ffff95ff",
+      "rgb": [
+        0.208,
+        0.215,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.176,
+      "material": "roof:slate|eaea95ff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.097,
+      "material": "facade:stone|brownstone|0|2|937dceff|070605|e7e0d2|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.157,
+        0.082,
+        0.065
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.15,
+      "class": "concrete",
+      "material": "facade:concrete|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.174,
+        0.148,
+        0.104
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.022,
+      "material": "unnamed",
+      "rgb": [
+        0.026,
+        0.022,
+        0.016
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.195,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|ffffffff|070605|07110b|0.0|sash|0.0|2.1|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.282,
+        0.177,
+        0.127
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.072,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|aedbffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.098,
+        0.066,
+        0.052
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.084,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|aedbffff|060606|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.108,
+        0.079,
+        0.068
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.084,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|aedbffff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.108,
+        0.079,
+        0.068
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.072,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|aedbffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.098,
+        0.066,
+        0.052
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.052,
+      "material": "unnamed",
+      "rgb": [
+        0.195,
+        0.014,
+        0.018
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.097,
+      "material": "facade:stone|brownstone|0|2|937dceff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.157,
+        0.082,
+        0.065
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.274,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.391,
+        0.249,
+        0.175
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.358,
+      "material": "facade:stone|brownstone|0|2|ffffffff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.341,
+        0.376,
+        0.225
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.433,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.458,
+        0.437,
+        0.323
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.347,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|ffffffff|070605|e7e0d2|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.491,
+        0.315,
+        0.239
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.516,
+      "material": "facade:stone|brownstone|0|2|ffffffff|070605|e7e0d2|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.764,
+        0.472,
+        0.225
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.185,
+      "class": "brick",
+      "material": "facade:brick|clapboard|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.249,
+        0.172,
+        0.13
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.594,
+      "material": "facade:stone|ornate|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.626,
+        0.606,
+        0.376
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.111,
+      "material": "pbr:slate|a48b7bff|8.00|1",
+      "rgb": [
+        0.124,
+        0.108,
+        0.095
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.373,
+      "material": "facade:wood|clapboard|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.416,
+        0.367,
+        0.301
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.15,
+      "class": "concrete",
+      "material": "facade:concrete|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.174,
+        0.148,
+        0.104
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.617,
+      "class": "concrete",
+      "material": "facade:concrete|ornate|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.627,
+        0.625,
+        0.514
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.294,
+      "material": "roof:slate|ffffeaff",
+      "rgb": [
+        0.32,
+        0.298,
+        0.181
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|curtain|0|2|ffffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.189,
+      "material": "roof:slate|eaffaaff",
+      "rgb": [
+        0.176,
+        0.199,
+        0.131
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.047,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|4d4d4dff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.054,
+        0.047,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|deffdeff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.116,
+        0.155,
+        0.154
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.595,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.614,
+        0.594,
+        0.553
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.081,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|8c8c8cff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.071,
+        0.083,
+        0.094
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|c6ffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.103,
+        0.155,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.121,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|6cd9ffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.076,
+        0.133,
+        0.136
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.226,
+      "class": "concrete",
+      "material": "facade:concrete|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.183,
+        0.244,
+        0.18
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.18,
+      "class": "concrete",
+      "material": "facade:concrete|ornate|0|2|ff7756ff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.476,
+        0.104,
+        0.062
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffd1ff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.141
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.129,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ff7756ff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.348,
+        0.073,
+        0.039
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.114,
+      "material": "unnamed",
+      "rgb": [
+        0.078,
+        0.12,
+        0.162
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.561,
+      "material": "unnamed",
+      "rgb": [
+        0.615,
+        0.556,
+        0.445
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.459,
+      "material": "unnamed",
+      "rgb": [
+        0.481,
+        0.457,
+        0.412
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.714,
+      "material": "unnamed",
+      "rgb": [
+        0.703,
+        0.725,
+        0.635
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.579,
+      "material": "unnamed",
+      "rgb": [
+        0.548,
+        0.585,
+        0.61
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.026,
+      "material": "unnamed",
+      "rgb": [
+        0.022,
+        0.027,
+        0.026
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.314,
+      "material": "unnamed",
+      "rgb": [
+        0.145,
+        0.367,
+        0.283
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.449,
+      "material": "unnamed",
+      "rgb": [
+        0.481,
+        0.446,
+        0.381
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.239,
+      "material": "unnamed",
+      "rgb": [
+        0.271,
+        0.235,
+        0.188
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.398,
+      "material": "unnamed",
+      "rgb": [
+        0.45,
+        0.391,
+        0.315
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.024,
+      "material": "unnamed",
+      "rgb": [
+        0.026,
+        0.023,
+        0.021
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.042,
+      "material": "unnamed",
+      "rgb": [
+        0.043,
+        0.042,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.243,
+      "material": "unnamed",
+      "rgb": [
+        0.263,
+        0.243,
+        0.188
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.392,
+      "material": "unnamed",
+      "rgb": [
+        0.456,
+        0.384,
+        0.28
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.291,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|ffffffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.441,
+        0.257,
+        0.181
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.132,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|bad9ffff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.131,
+        0.133,
+        0.136
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffe8ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.156
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.084,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|8c8c8cff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|2",
+      "rgb": [
+        0.073,
+        0.085,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.243,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.243,
+        0.243,
+        0.239
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.265,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffffffff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.262,
+        0.265,
+        0.272
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.118,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|fdeee1ff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.176,
+        0.105,
+        0.075
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.586,
+      "material": "unnamed",
+      "rgb": [
+        0.712,
+        0.572,
+        0.353
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.289,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.327,
+        0.286,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.1,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|f5f5f5ff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.151,
+        0.088,
+        0.062
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.221,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.304,
+        0.202,
+        0.173
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.027,
+        0.007
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.205
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.464,
+      "material": "unnamed",
+      "rgb": [
+        0.487,
+        0.463,
+        0.402
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.017,
+        0.017
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.363,
+      "material": "unnamed",
+      "rgb": [
+        0.343,
+        0.367,
+        0.381
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.129,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffd9c6ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.128,
+        0.133
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.143,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff7deff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.146,
+        0.15
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.148,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.736,
+      "material": "facade:render|ornate|0|2|fffffdff|dcd6c6|1b2514|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.745,
+        0.745,
+        0.619
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.496,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.635,
+        0.465,
+        0.389
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|070b09|2|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.54,
+      "class": "limestone",
+      "material": "facade:limestone|ornate|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.572,
+        0.534,
+        0.506
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|070b09|2|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.139,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffefdeff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.141,
+        0.15
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffefff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.151,
+        0.161
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff5e2ff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.149,
+        0.157
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.143,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.224,
+        0.123,
+        0.096
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.15,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|f7ffe0ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.129,
+        0.155,
+        0.156
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.425,
+      "material": "facade:stone|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.677,
+        0.38,
+        0.123
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.46,
+      "material": "ground_storey:stone|shop|ffffffff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "rgb": [
+        0.705,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.591,
+      "class": "limestone",
+      "material": "facade:limestone|ornate|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.501,
+        0.61,
+        0.674
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.206,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "rgb": [
+        0.307,
+        0.184,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.151,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffe2ff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.157
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.204,
+      "material": "facade:wood|clapboard|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|2",
+      "rgb": [
+        0.244,
+        0.198,
+        0.149
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.145,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff4d1ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.148,
+        0.145
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff8e2ff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.151,
+        0.157
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.15,
+      "material": "facade:stone|brownstone|0|2|bfc6ffff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.205,
+        0.131,
+        0.179
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.084,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|8c8c8cff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.073,
+        0.085,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.047,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|4d4d4dff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.054,
+        0.047,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.067,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|8488a5ff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.092,
+        0.06,
+        0.055
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.1,
+      "material": "facade:stone|brownstone|0|2|8084ffff|070605|1b2514|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.136,
+        0.087,
+        0.119
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.102,
+      "class": "concrete",
+      "material": "pbr:concrete|90a8ffff|3.30|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.097,
+        0.097,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.102,
+      "class": "brick",
+      "material": "facade:brick|brownstone|0|2|aedbffff|070605|1b2514|0.0|sash|0.0|2.1|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.121,
+        0.097,
+        0.09
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.275,
+      "material": "facade:stone|brownstone|0|2|bfffffff|070605|07110b|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.205,
+        0.301,
+        0.225
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.066,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|5d6c96ff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.065,
+        0.066,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.072,
+      "class": "brick",
+      "material": "facade:brick|curtain|0|2|aedbffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.099,
+        0.066,
+        0.052
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.084,
+      "class": "brick",
+      "material": "ground_storey:brick|shop|aedbffff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.108,
+        0.079,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.129,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffd597ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.13,
+        0.104
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.139,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|efefffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.122,
+        0.141,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff2f2ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.147,
+        0.168
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.119,
+      "class": "grass",
+      "material": "pbr:grass|ffffffff|3.00|1",
+      "outlier": "grass range 0.15–0.25",
+      "rgb": [
+        0.155,
+        0.116,
+        0.047
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.151,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffe8ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.161
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.05,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|4d4d96ff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.054,
+        0.047,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "pbr:concrete|90ffffff|3.30|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.097,
+        0.167,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.094,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ff8c8cff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.083,
+        0.094
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.133,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffbdffff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.196,
+        0.115,
+        0.118
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.15,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffd4ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.155,
+        0.147
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.14,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffefefff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.141,
+        0.161
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.127,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffb17bff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.247,
+        0.099,
+        0.049
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.138,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffb17bff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.266,
+        0.108,
+        0.056
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.201,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.262,
+        0.187,
+        0.149
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.14,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|fff1e2ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.142,
+        0.152
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.121,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|c6c6ffff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "rgb": [
+        0.103,
+        0.12,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.081,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|6c7effff|060606|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.076,
+        0.077,
+        0.136
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.1,
+      "material": "facade:stone|brownstone|0|2|8084ffff|070605|e7e0d2|0.0|sash|0.0|2.1|2",
+      "rgb": [
+        0.136,
+        0.087,
+        0.119
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.066,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|5d6c96ff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.065,
+        0.066,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.119,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ff7756ff|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.323,
+        0.067,
+        0.034
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.084,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|8c8c8cff|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "rgb": [
+        0.073,
+        0.085,
+        0.097
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.047,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|4d4d4dff|060606|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.054,
+        0.047,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.077,
+      "class": "concrete",
+      "material": "pbr:concrete|4d91c8ff|3.30|1",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.052,
+        0.084,
+        0.083
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.144,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|d9ffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.11,
+        0.151,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.185,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|baffffff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.131,
+        0.199,
+        0.204
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.053,
+      "class": "concrete",
+      "material": "facade:concrete|brownstone|0|2|4d4d4dff|070605|e7e0d2|0.0|sash|0.0|2.1|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.06,
+        0.053,
+        0.04
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.16,
+      "material": "facade:wood|brownstone|0|2|ffe4a7ff|070605|07110b|0.0|sash|0.0|2.1|0",
+      "rgb": [
+        0.256,
+        0.138,
+        0.085
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.044,
+      "class": "concrete",
+      "material": "facade:concrete|curtain|0|2|4d4d4dff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.05,
+        0.043,
+        0.031
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.047,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|4d4d4dff|060606|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.054,
+        0.047,
+        0.035
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.131,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffddc6ff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.131,
+        0.133
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.145,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|efffefff|0b0c0e|0b0c0e|0.0|sash|0.0|3.0|0",
+      "rgb": [
+        0.122,
+        0.151,
+        0.161
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.469,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "outlier": "brick range 0.20–0.35",
+      "rgb": [
+        0.563,
+        0.45,
+        0.376
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.415,
+      "material": "ground_storey:stone|stone|ffffffff|030b25|2|0b0c0e|0b0c0e|0.0|sash|0.0|2.8|0",
+      "rgb": [
+        0.492,
+        0.417,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.132,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffd9bfff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.133,
+        0.132,
+        0.133
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.142,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|c6ffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.101,
+        0.151,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.121,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|6cd9ffff|030b25|2|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.076,
+        0.133,
+        0.136
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.127,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffb17bff|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.247,
+        0.099,
+        0.049
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.138,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|ffb17bff|030b25|2|dcd6c6|1b2514|0.0|sash|0.0|2.6|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.266,
+        0.108,
+        0.056
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.146,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|c6ffffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.103,
+        0.155,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.128,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffd9b3ff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.13,
+        0.128,
+        0.12
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|dcd6c6|1b2514|0.0|sash|0.0|3.6|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.087,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|8c8cffff|0b0c0e|1b2514|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.071,
+        0.083,
+        0.172
+      ],
+      "uses": 1
+    }
+  ],
+  "paris": [
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 1503
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 654
+    },
+    {
+      "albedo": 0.746,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.711,
+        0.342
+      ],
+      "uses": 632
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.017,
+        0.013
+      ],
+      "uses": 632
+    },
+    {
+      "albedo": 0.102,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.115,
+        0.099,
+        0.092
+      ],
+      "uses": 98
+    },
+    {
+      "albedo": 0.085,
+      "material": "distant_roof:haussmann|2",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 96
+    },
+    {
+      "albedo": 0.098,
+      "material": "unnamed",
+      "rgb": [
+        0.193,
+        0.076,
+        0.034
+      ],
+      "uses": 75
+    },
+    {
+      "albedo": 0.466,
+      "material": "distant:2|",
+      "rgb": [
+        0.545,
+        0.458,
+        0.306
+      ],
+      "uses": 62
+    },
+    {
+      "albedo": 0.49,
+      "material": "distant:2|",
+      "rgb": [
+        0.574,
+        0.483,
+        0.319
+      ],
+      "uses": 62
+    },
+    {
+      "albedo": 0.452,
+      "material": "distant:2|",
+      "rgb": [
+        0.533,
+        0.444,
+        0.296
+      ],
+      "uses": 60
+    },
+    {
+      "albedo": 0.478,
+      "material": "distant:2|",
+      "rgb": [
+        0.574,
+        0.468,
+        0.299
+      ],
+      "uses": 60
+    },
+    {
+      "albedo": 0.472,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.464,
+        0.398
+      ],
+      "uses": 34
+    },
+    {
+      "albedo": 0.087,
+      "material": "unnamed",
+      "rgb": [
+        0.127,
+        0.078,
+        0.052
+      ],
+      "uses": 30
+    },
+    {
+      "albedo": 0.068,
+      "material": "unnamed",
+      "rgb": [
+        0.109,
+        0.059,
+        0.038
+      ],
+      "uses": 29
+    },
+    {
+      "albedo": 0.092,
+      "class": "terracotta",
+      "material": "pbr:terracotta|ad8c97ff|4.40|1",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.23,
+        0.058,
+        0.028
+      ],
+      "uses": 28
+    },
+    {
+      "albedo": 0.12,
+      "material": "pbr:slate|8f9dafff|8.00|1",
+      "rgb": [
+        0.108,
+        0.122,
+        0.135
+      ],
+      "uses": 28
+    },
+    {
+      "albedo": 0.163,
+      "class": "glass",
+      "material": "glass:1",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.145,
+        0.167,
+        0.188
+      ],
+      "uses": 27
+    },
+    {
+      "albedo": 0.092,
+      "material": "pbr:slate|6c7889ff|8.00|1",
+      "rgb": [
+        0.081,
+        0.093,
+        0.106
+      ],
+      "uses": 27
+    },
+    {
+      "albedo": 0.503,
+      "material": "unnamed",
+      "rgb": [
+        0.517,
+        0.504,
+        0.454
+      ],
+      "uses": 24
+    },
+    {
+      "albedo": 0.151,
+      "class": "terracotta",
+      "material": "pbr:terracotta|ffe1c1ff|4.40|1",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.384,
+        0.093,
+        0.036
+      ],
+      "uses": 24
+    },
+    {
+      "albedo": 0.249,
+      "material": "roof:slate|ffffffff",
+      "rgb": [
+        0.256,
+        0.248,
+        0.23
+      ],
+      "uses": 21
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.114,
+        0.126,
+        0.137
+      ],
+      "uses": 20
+    },
+    {
+      "albedo": 0.081,
+      "material": "pbr:slate|606a78ff|8.00|1",
+      "rgb": [
+        0.072,
+        0.082,
+        0.093
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.403,
+      "material": "facade:stone|punched|0|2|ffffffff|e0d8c6|413223|0.6|french|0.0|2.6|2",
+      "rgb": [
+        0.57,
+        0.381,
+        0.123
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.105,
+      "material": "pbr:slate|7c8a9cff|8.00|1",
+      "rgb": [
+        0.093,
+        0.107,
+        0.12
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.541,
+      "material": "facade:render|punched|0|2|ffce8eff|e0d8c6|41463f|0.7|french|0.3|2.0|0",
+      "rgb": [
+        0.678,
+        0.519,
+        0.346
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.589,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|7|2|ffffffff|2.4|2",
+      "rgb": [
+        0.685,
+        0.581,
+        0.393
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.455,
+        0.401,
+        0.284
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.51,
+      "material": "facade:render|punched|0|2|ffbe8eff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.477,
+        0.345
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.548,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|7|2|ffffffff|2.4|0",
+      "rgb": [
+        0.635,
+        0.541,
+        0.366
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.237,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|e0d8c6|1b2514|0.0|casement|0.1|2.8|0",
+      "rgb": [
+        0.384,
+        0.205,
+        0.116
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.537,
+      "material": "ground_storey:render|shop|ffce8eff|030604|2|e0d8c6|41463f|0.7|french|0.3|2.0|0",
+      "rgb": [
+        0.673,
+        0.516,
+        0.343
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.51,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|6|2|ffffffff|2.4|0",
+      "rgb": [
+        0.588,
+        0.503,
+        0.343
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|punched|0|2|ffffdeff|e0d8c6|322519|0.7|french|0.3|2.0|2",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffdeff|110b06|2|e0d8c6|322519|0.7|french|0.3|2.0|2",
+      "rgb": [
+        0.787,
+        0.697,
+        0.537
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.094,
+      "material": "unnamed",
+      "rgb": [
+        0.079,
+        0.096,
+        0.12
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.62,
+      "material": "unnamed",
+      "rgb": [
+        0.677,
+        0.614,
+        0.502
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.456,
+      "material": "unnamed",
+      "rgb": [
+        0.514,
+        0.449,
+        0.352
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.178,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.339,
+        0.14,
+        0.075
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.536,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|5|2|ffffffff|2.4|0",
+      "rgb": [
+        0.622,
+        0.528,
+        0.355
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.542,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|8|2|ffffffff|2.4|0",
+      "rgb": [
+        0.629,
+        0.535,
+        0.361
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.548,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|6|2|ffffffff|2.4|2",
+      "rgb": [
+        0.635,
+        0.541,
+        0.369
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.576,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|5|2|ffffffff|2.4|2",
+      "rgb": [
+        0.672,
+        0.568,
+        0.382
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.307,
+      "class": "brick",
+      "material": "facade:brick|ornate|0|2|ffffffff|e0d8c6|1b2514|0.0|casement|0.1|2.8|2",
+      "rgb": [
+        0.514,
+        0.257,
+        0.192
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|1a1d1f|1a1d1f|0.0|wide|0.0|3.0|2",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|balcony|0|2|ffffffff|1a1d1f|1a1d1f|0.0|wide|0.0|3.0|0",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.267,
+      "material": "roof:slate|ffffeaff",
+      "rgb": [
+        0.304,
+        0.265,
+        0.181
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.414,
+      "material": "facade:stone|punched|0|2|ffffffff|e0d8c6|1b2514|0.6|french|0.0|2.6|0",
+      "rgb": [
+        0.623,
+        0.381,
+        0.123
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.583,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|8|2|ffffffff|2.4|2",
+      "rgb": [
+        0.678,
+        0.574,
+        0.388
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.082,
+      "material": "unnamed",
+      "rgb": [
+        0.148,
+        0.069,
+        0.028
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.382,
+      "material": "unnamed",
+      "rgb": [
+        0.586,
+        0.352,
+        0.068
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.227,
+      "material": "roof:slate|ffffbfff",
+      "rgb": [
+        0.24,
+        0.232,
+        0.148
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.082,
+      "material": "roof:slate|6a6a6aff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.082
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.574,
+      "material": "facade:render|punched|0|2|ffe096ff|0b0c0e|25322b|0.6|french|0.2|2.0|0",
+      "rgb": [
+        0.685,
+        0.563,
+        0.365
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|punched|0|2|ffffdeff|0b0c0e|1b251d|0.6|french|0.2|2.0|2",
+      "rgb": [
+        0.793,
+        0.702,
+        0.54
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.114,
+      "class": "terracotta",
+      "material": "roof:terracotta|aad5ffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.088,
+        0.047
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.464,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|1.00|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.79,
+      "material": "unnamed",
+      "rgb": [
+        0.848,
+        0.787,
+        0.638
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.393,
+      "material": "pbr:stone|ffffffff|0.50|1",
+      "rgb": [
+        0.513,
+        0.384,
+        0.131
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.071,
+      "material": "unnamed",
+      "rgb": [
+        0.254,
+        0.023,
+        0.01
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.096,
+      "material": "roof:slate|808055ff",
+      "rgb": [
+        0.096,
+        0.099,
+        0.066
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.232,
+      "class": "brick",
+      "material": "pbr:brick|ffffffff|1.00|1",
+      "rgb": [
+        0.38,
+        0.2,
+        0.119
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.114,
+      "material": "unnamed",
+      "rgb": [
+        0.078,
+        0.12,
+        0.162
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.113,
+      "material": "roof:slate|95956aff",
+      "rgb": [
+        0.112,
+        0.116,
+        0.082
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.571,
+      "material": "ground_storey:render|shop|ffe096ff|030604|2|0b0c0e|25322b|0.6|french|0.2|2.0|0",
+      "rgb": [
+        0.68,
+        0.559,
+        0.363
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|0.50|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.03,
+      "material": "unnamed",
+      "rgb": [
+        0.023,
+        0.028,
+        0.068
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.586,
+      "material": "unnamed",
+      "rgb": [
+        0.712,
+        0.572,
+        0.353
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.386,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.361,
+        0.068
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.411,
+      "material": "unnamed",
+      "rgb": [
+        0.43,
+        0.414,
+        0.331
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.052,
+      "material": "unnamed",
+      "rgb": [
+        0.195,
+        0.014,
+        0.018
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.595,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.614,
+        0.594,
+        0.553
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.705,
+      "material": "ground_storey:render|shop|ffffdeff|110b06|2|0b0c0e|1b251d|0.6|french|0.2|2.0|2",
+      "rgb": [
+        0.787,
+        0.697,
+        0.537
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.153,
+      "class": "terracotta",
+      "material": "roof:terracotta|d5ffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.283,
+        0.123,
+        0.063
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.152,
+      "class": "concrete",
+      "material": "ground_storey:concrete|shop|f5f5f5ff|110b06|2|0b0c0e|0b0c0e|0.0|casement|0.0|3.2|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.172,
+        0.15,
+        0.111
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.152,
+      "class": "glass",
+      "material": "facade:glass|curtain|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|3.2|2",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.133,
+        0.155,
+        0.177
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.036,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.044,
+        0.025
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.149,
+      "material": "roof:slate|d5bf95ff",
+      "rgb": [
+        0.16,
+        0.149,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.178,
+      "material": "roof:slate|ffea80ff",
+      "rgb": [
+        0.192,
+        0.182,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.419,
+      "material": "unnamed",
+      "rgb": [
+        0.521,
+        0.399,
+        0.328
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.177,
+      "material": "roof:slate|eaeaaaff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.131
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.097,
+      "material": "roof:slate|80806aff",
+      "rgb": [
+        0.096,
+        0.099,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.18,
+      "material": "pbr:slate|d9eaffff|8.00|1",
+      "rgb": [
+        0.164,
+        0.182,
+        0.2
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.161,
+      "material": "roof:slate|bfd5d5ff",
+      "rgb": [
+        0.144,
+        0.166,
+        0.164
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.152,
+      "class": "terracotta",
+      "material": "roof:terracotta|eaffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.311,
+        0.114,
+        0.055
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.177,
+      "material": "roof:slate|d5eaeaff",
+      "rgb": [
+        0.16,
+        0.182,
+        0.181
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.525,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|4|2|ffffffff|2.6|2",
+      "rgb": [
+        0.613,
+        0.516,
+        0.362
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.126,
+      "material": "roof:slate|95aa80ff",
+      "rgb": [
+        0.112,
+        0.132,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.114,
+      "class": "terracotta",
+      "material": "roof:terracotta|aad5eaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.088,
+        0.044
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.187,
+      "material": "roof:slate|ffeaaaff",
+      "rgb": [
+        0.224,
+        0.182,
+        0.131
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.127,
+      "class": "terracotta",
+      "material": "roof:terracotta|aaffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.105,
+        0.055
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.176,
+      "material": "roof:slate|eaea95ff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.084,
+      "material": "roof:slate|806a55ff",
+      "rgb": [
+        0.096,
+        0.083,
+        0.066
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.082,
+      "class": "terracotta",
+      "material": "roof:terracotta|8095aaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.061,
+        0.032
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.069,
+      "material": "roof:slate|6a5555ff",
+      "rgb": [
+        0.08,
+        0.066,
+        0.066
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.145,
+      "material": "roof:slate|bfbf95ff",
+      "rgb": [
+        0.144,
+        0.149,
+        0.115
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.172,
+      "material": "roof:slate|ffd5eaff",
+      "rgb": [
+        0.192,
+        0.166,
+        0.181
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.121,
+      "class": "terracotta",
+      "material": "roof:terracotta|aaeaffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.097,
+        0.051
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.675,
+      "material": "unnamed",
+      "rgb": [
+        0.696,
+        0.674,
+        0.623
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.147,
+      "material": "facade:stone|punched|0|2|f5f5f5ff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.237,
+        0.131,
+        0.042
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.153,
+      "material": "facade:stone|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.247,
+        0.136,
+        0.044
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|french|0.0|3.4|2",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "material": "unnamed",
+      "rgb": [
+        0.251,
+        0.221,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.059,
+      "material": "unnamed",
+      "rgb": [
+        0.098,
+        0.051,
+        0.023
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.017,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.018,
+        0.017
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|0",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.21,
+        0.231,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.485,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|2|2|ffffffff|2.6|2",
+      "rgb": [
+        0.574,
+        0.476,
+        0.315
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.205
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.027,
+        0.007
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.544,
+      "material": "unnamed",
+      "rgb": [
+        0.604,
+        0.538,
+        0.42
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.084,
+        0.033
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.289,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.327,
+        0.286,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.407,
+      "class": "concrete",
+      "material": "facade:concrete|strip|0|2|ffffffff|dcd6c6|1b2514|0.0|french|0.0|3.4|0",
+      "rgb": [
+        0.468,
+        0.401,
+        0.285
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.134,
+      "class": "terracotta",
+      "material": "roof:terracotta|bfffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.254,
+        0.105,
+        0.059
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.573,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|3|2|ffffffff|2.4|2",
+      "rgb": [
+        0.67,
+        0.564,
+        0.378
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.543,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|1|2|ffffffff|2.4|2",
+      "rgb": [
+        0.64,
+        0.533,
+        0.352
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.59,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|2|2|ffffffff|2.4|2",
+      "rgb": [
+        0.686,
+        0.581,
+        0.393
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.408,
+      "material": "unnamed",
+      "rgb": [
+        0.435,
+        0.406,
+        0.353
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.5,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|5|2|ffffffff|2.6|2",
+      "rgb": [
+        0.587,
+        0.49,
+        0.341
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.473,
+      "class": "limestone",
+      "material": "facade:limestone|haussmann|5|2|ffffffff|2.6|0",
+      "rgb": [
+        0.561,
+        0.464,
+        0.305
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.429,
+      "material": "unnamed",
+      "rgb": [
+        0.551,
+        0.403,
+        0.324
+      ],
+      "uses": 1
+    }
+  ],
+  "rome": [
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 467
+    },
+    {
+      "albedo": 0.161,
+      "material": "unnamed",
+      "rgb": [
+        0.147,
+        0.163,
+        0.179
+      ],
+      "uses": 379
+    },
+    {
+      "albedo": 0.937,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.933,
+        0.787
+      ],
+      "uses": 379
+    },
+    {
+      "albedo": 0.098,
+      "material": "unnamed",
+      "rgb": [
+        0.193,
+        0.076,
+        0.034
+      ],
+      "uses": 321
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 65
+    },
+    {
+      "albedo": 0.151,
+      "material": "distant_roof:rome|2",
+      "rgb": [
+        0.384,
+        0.093,
+        0.036
+      ],
+      "uses": 38
+    },
+    {
+      "albedo": 0.252,
+      "material": "distant:2|rome",
+      "rgb": [
+        0.473,
+        0.193,
+        0.186
+      ],
+      "uses": 32
+    },
+    {
+      "albedo": 0.476,
+      "material": "distant:2|rome",
+      "rgb": [
+        0.736,
+        0.428,
+        0.186
+      ],
+      "uses": 32
+    },
+    {
+      "albedo": 0.31,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "rgb": [
+        0.593,
+        0.246,
+        0.119
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.112,
+      "class": "terracotta",
+      "material": "pbr:terracotta|d2ac9bff|4.40|1",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.279,
+        0.071,
+        0.029
+      ],
+      "uses": 20
+    },
+    {
+      "albedo": 0.558,
+      "material": "distant:2|rome",
+      "rgb": [
+        0.797,
+        0.519,
+        0.242
+      ],
+      "uses": 18
+    },
+    {
+      "albedo": 0.476,
+      "material": "distant:2|rome",
+      "rgb": [
+        0.736,
+        0.428,
+        0.186
+      ],
+      "uses": 17
+    },
+    {
+      "albedo": 0.14,
+      "material": "unnamed",
+      "rgb": [
+        0.18,
+        0.135,
+        0.081
+      ],
+      "uses": 16
+    },
+    {
+      "albedo": 0.558,
+      "material": "facade:render|punched|0|2|ffce64ff|cebe9a|111d0c|0.8|french|0.3|2.8|0",
+      "rgb": [
+        0.797,
+        0.519,
+        0.242
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.163,
+      "class": "glass",
+      "material": "glass:1",
+      "outlier": "glass range 0.08–0.15",
+      "rgb": [
+        0.145,
+        0.167,
+        0.188
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.121,
+      "class": "terracotta",
+      "material": "pbr:terracotta|f0ae9cff|4.40|1",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.319,
+        0.072,
+        0.029
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.075,
+      "class": "terracotta",
+      "material": "roof:terracotta|808080ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.053,
+        0.024
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.015
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.62,
+      "material": "unnamed",
+      "rgb": [
+        0.677,
+        0.614,
+        0.502
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.164,
+      "material": "unnamed",
+      "rgb": [
+        0.471,
+        0.087,
+        0.026
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.692,
+      "material": "unnamed",
+      "rgb": [
+        0.783,
+        0.687,
+        0.473
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.403,
+      "material": "ground_storey:render|shop|ff8a4dff|05080d|2|cebe9a|1a1108|0.8|french|0.3|2.8|2",
+      "rgb": [
+        0.673,
+        0.344,
+        0.185
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.405,
+      "material": "facade:render|punched|0|2|ff8a4dff|cebe9a|1a1108|0.8|french|0.3|2.8|2",
+      "rgb": [
+        0.678,
+        0.346,
+        0.186
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.555,
+      "material": "ground_storey:render|shop|ffce64ff|251106|2|cebe9a|111d0c|0.8|french|0.3|2.8|0",
+      "rgb": [
+        0.791,
+        0.516,
+        0.24
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.085,
+      "material": "unnamed",
+      "rgb": [
+        0.075,
+        0.087,
+        0.1
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.114,
+        0.126,
+        0.137
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.103,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.116,
+        0.101,
+        0.093
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.213,
+      "material": "roof:slate|ffffd5ff",
+      "rgb": [
+        0.224,
+        0.215,
+        0.164
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.089,
+      "class": "terracotta",
+      "material": "roof:terracotta|80aabfff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.07,
+        0.036
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.424,
+      "material": "roof:slate|ffffffff",
+      "rgb": [
+        0.496,
+        0.414,
+        0.312
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.082,
+      "material": "roof:slate|6a6a6aff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.082
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.51,
+      "material": "facade:render|punched|0|2|ffbe8eff|dcd6c6|1b2514|0.0|small|0.0|2.8|0",
+      "rgb": [
+        0.676,
+        0.477,
+        0.345
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.404,
+      "class": "concrete",
+      "material": "facade:concrete|punched|0|2|ffffffff|dcd6c6|1b2514|0.0|small|0.0|2.8|2",
+      "rgb": [
+        0.455,
+        0.401,
+        0.284
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.405,
+      "material": "facade:render|punched|0|2|ff8a4dff|dccaa4|111d0c|0.8|french|0.3|3.2|2",
+      "rgb": [
+        0.678,
+        0.346,
+        0.186
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.558,
+      "material": "facade:render|punched|0|2|ffce64ff|dccaa4|0d1a0b|0.8|french|0.3|3.2|0",
+      "rgb": [
+        0.797,
+        0.519,
+        0.242
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.472,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.464,
+        0.398
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.586,
+      "material": "unnamed",
+      "rgb": [
+        0.712,
+        0.572,
+        0.353
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.429,
+      "material": "unnamed",
+      "rgb": [
+        0.551,
+        0.403,
+        0.324
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.096,
+      "material": "roof:slate|808055ff",
+      "rgb": [
+        0.096,
+        0.099,
+        0.066
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.082,
+      "class": "terracotta",
+      "material": "roof:terracotta|8095aaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.061,
+        0.032
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.689,
+      "material": "facade:render|punched|0|2|ffffc2ff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.781,
+        0.684,
+        0.471
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.102,
+      "class": "terracotta",
+      "material": "roof:terracotta|95bfeaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.079,
+        0.044
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.558,
+      "material": "facade:render|punched|0|2|ffce64ff|0b0c0e|0d1a0b|0.6|french|0.2|2.8|0",
+      "rgb": [
+        0.797,
+        0.519,
+        0.242
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.595,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.614,
+        0.594,
+        0.553
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.464,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|1.00|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.555,
+      "material": "ground_storey:render|shop|ffce64ff|030604|2|0b0c0e|0d1a0b|0.6|french|0.2|2.8|0",
+      "rgb": [
+        0.791,
+        0.516,
+        0.24
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.076,
+      "class": "terracotta",
+      "material": "roof:terracotta|808095ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.053,
+        0.028
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.114,
+      "class": "terracotta",
+      "material": "roof:terracotta|aad5eaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.088,
+        0.044
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.121,
+      "class": "terracotta",
+      "material": "roof:terracotta|aaeaffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.226,
+        0.097,
+        0.047
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.405,
+      "material": "facade:render|punched|0|2|ff8a4dff|0b0c0e|111d0c|0.6|french|0.2|2.8|2",
+      "rgb": [
+        0.678,
+        0.346,
+        0.186
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.403,
+      "material": "ground_storey:render|shop|ff8a4dff|110b06|2|0b0c0e|111d0c|0.6|french|0.2|2.8|2",
+      "rgb": [
+        0.673,
+        0.344,
+        0.185
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.704,
+      "class": "limestone",
+      "material": "facade:limestone|punched|0|2|ffffffff|dcd6c6|1b2514|0.5|french|0.0|3.6|2",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.766,
+        0.705,
+        0.509
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|0.50|1",
+      "rgb": [
+        0.549,
+        0.455,
+        0.295
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.232,
+      "material": "unnamed",
+      "rgb": [
+        0.38,
+        0.2,
+        0.119
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.422,
+      "material": "unnamed",
+      "rgb": [
+        0.435,
+        0.426,
+        0.34
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.057,
+      "material": "unnamed",
+      "rgb": [
+        0.023,
+        0.068,
+        0.042
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.07,
+      "class": "terracotta",
+      "material": "roof:terracotta|6a8095ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.141,
+        0.053,
+        0.028
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.782,
+      "material": "unnamed",
+      "rgb": [
+        0.827,
+        0.78,
+        0.669
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.171,
+      "material": "roof:slate|d5ea80ff",
+      "rgb": [
+        0.16,
+        0.182,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.165,
+      "class": "terracotta",
+      "material": "roof:terracotta|eaffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.311,
+        0.132,
+        0.067
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.159,
+      "material": "roof:slate|d5d580ff",
+      "rgb": [
+        0.16,
+        0.166,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.071,
+      "material": "unnamed",
+      "rgb": [
+        0.254,
+        0.023,
+        0.01
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.544,
+      "material": "unnamed",
+      "rgb": [
+        0.604,
+        0.538,
+        0.42
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.084,
+        0.033
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.108,
+      "class": "terracotta",
+      "material": "roof:terracotta|95d5eaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.088,
+        0.044
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.116,
+      "material": "roof:slate|aa956aff",
+      "rgb": [
+        0.128,
+        0.116,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.349,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.182,
+      "material": "roof:slate|ffeabfff",
+      "rgb": [
+        0.192,
+        0.182,
+        0.148
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.65,
+      "class": "limestone",
+      "material": "facade:limestone|punched|0|2|ffffffff|dcd6c6|1b2514|0.5|french|0.0|3.6|0",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.713,
+        0.647,
+        0.487
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.245,
+      "material": "roof:slate|ffffeaff",
+      "rgb": [
+        0.256,
+        0.248,
+        0.181
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.084,
+      "material": "roof:slate|806a55ff",
+      "rgb": [
+        0.096,
+        0.083,
+        0.066
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.101,
+      "class": "terracotta",
+      "material": "roof:terracotta|95bfd5ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.079,
+        0.04
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.095,
+      "class": "terracotta",
+      "material": "roof:terracotta|95aabfff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.198,
+        0.07,
+        0.036
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.1,
+      "material": "roof:slate|958055ff",
+      "rgb": [
+        0.112,
+        0.099,
+        0.066
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.069,
+      "class": "terracotta",
+      "material": "roof:terracotta|6a8080ff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.141,
+        0.053,
+        0.024
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.71,
+      "material": "facade:render|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|2",
+      "rgb": [
+        0.749,
+        0.706,
+        0.626
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.127,
+      "class": "terracotta",
+      "material": "roof:terracotta|bfeaffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.254,
+        0.097,
+        0.051
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.061,
+      "material": "unnamed",
+      "rgb": [
+        0.075,
+        0.058,
+        0.04
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.163,
+      "material": "unnamed",
+      "rgb": [
+        0.296,
+        0.133,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.396,
+      "material": "unnamed",
+      "rgb": [
+        0.479,
+        0.385,
+        0.255
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.476,
+      "material": "unnamed",
+      "rgb": [
+        0.563,
+        0.466,
+        0.315
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.297,
+      "material": "unnamed",
+      "rgb": [
+        0.387,
+        0.283,
+        0.166
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.182,
+      "material": "unnamed",
+      "rgb": [
+        0.27,
+        0.165,
+        0.085
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.205
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.027,
+        0.007
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.289,
+      "class": "concrete",
+      "material": "facade:concrete|industrial|0|2|ffffffff|0b0c0e|0b0c0e|0.0|casement|0.0|4.0|2",
+      "outlier": "concrete range 0.30–0.45",
+      "rgb": [
+        0.327,
+        0.286,
+        0.203
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.072,
+      "material": "roof:membrane|ffffd5ff",
+      "rgb": [
+        0.089,
+        0.071,
+        0.027
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.777,
+      "material": "unnamed",
+      "rgb": [
+        0.807,
+        0.776,
+        0.701
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.386,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.361,
+        0.068
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.349,
+      "material": "unnamed",
+      "rgb": [
+        0.361,
+        0.351,
+        0.296
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.076,
+      "class": "terracotta",
+      "material": "roof:terracotta|8080aaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.17,
+        0.053,
+        0.032
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|2",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.25,
+      "class": "brick",
+      "material": "facade:brick|punched|0|2|ffffffff|070605|070605|0.0|french|0.0|4.4|0",
+      "rgb": [
+        0.404,
+        0.215,
+        0.138
+      ],
+      "uses": 1
+    }
+  ]
+}

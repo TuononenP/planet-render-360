@@ -134,9 +134,11 @@ static func _mat(key: String) -> Material:
 		"brick":
 			# Unit-box UVs per face: ~1 repeat per chimney face keeps
 			# brick courses at real size (8 drew 11 cm bricks).
-			m = MaterialLibrary.pbr_material("brick", Color.WHITE, 1.0)
+			m = MaterialLibrary.pbr_material("brick", MaterialLibrary._calib_tint(
+				(MaterialLibrary.PBR_SETS["brick"] as Dictionary)["mean"], MaterialLibrary.PRD_BRICK), 1.0)
 		"concrete":
-			m = MaterialLibrary.pbr_material("concrete", Color.WHITE, 1.5)
+			m = MaterialLibrary.pbr_material("concrete", MaterialLibrary._calib_tint(
+				(MaterialLibrary.PBR_SETS["concrete"] as Dictionary)["mean"], MaterialLibrary.PRD_CONCRETE), 1.5)
 		"ac":
 			m = _flat(Color(0.62, 0.64, 0.66), 0.7)
 		"tank":

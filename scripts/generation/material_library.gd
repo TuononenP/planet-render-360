@@ -47,6 +47,11 @@ static var PBR_SETS: Dictionary = PbrCatalog.SETS
 static var PRD_LIMESTONE := Color(0.6052, 0.5025, 0.3297)
 static var PRD_SLATE := Color(0.0612, 0.0844, 0.1119)
 static var PRD_GLASS := Color(0.0273, 0.0423, 0.0513)
+## Detail-set targets (R-1.4 ranges, linear): chimney and gable brick,
+## plant-room concrete; the bare photo means sat far below them (brick
+## 0.085, concrete 0.15).
+static var PRD_BRICK := Color(0.42, 0.20, 0.12)
+static var PRD_CONCRETE := Color(0.36, 0.35, 0.33)
 
 ## OSM `material` / `building:material` values → PBR set. English and
 ## common tag spellings; unlisted values fall through to the regional

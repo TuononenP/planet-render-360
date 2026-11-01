@@ -403,7 +403,7 @@ static func compose_glass(detail: int) -> Dictionary:
 	var mull := FacadeComposer.MULLION
 	for py in 8:
 		for px in 8:
-			var v := 0.88 + _h(float(px) * 3.1, float(py) * 7.7) * 0.24
+			var v := 0.76 + _h(float(px) * 3.1, float(py) * 7.7) * 0.2
 			var sky := FacadeComposer.SKY_GLASS.lerp(FacadeComposer.SKY_GLASS_TOP,
 				1.0 - float(py) / 8.0)
 			alb.fill_rect(Rect2i(px * step, py * step, step, step),

@@ -20,11 +20,13 @@ extends RefCounted
 ## Dark PRD glass base (#2E3A40, linear) for window panes in solid walls.
 const GLASS := Color(0.0273, 0.0423, 0.0513)
 ## Curtain-wall glass reflects sky: blue-grey, lighter toward the top
-## (a black slab is what an unlit pane looks like, not a tower).
-const SKY_GLASS := Color(0.105, 0.155, 0.205)
-const SKY_GLASS_TOP := Color(0.20, 0.27, 0.34)
-const SPANDREL := Color(0.30, 0.31, 0.32)
-const MULLION := Color(0.52, 0.54, 0.56)
+## (a black slab is what an unlit pane looks like, not a tower). The
+## cell averages ~0.14 linear albedo (R-1.4 glass 0.08–0.15): at 0.28 it
+## read as render; the brightness comes from the reflection instead.
+const SKY_GLASS := Color(0.055, 0.08, 0.105)
+const SKY_GLASS_TOP := Color(0.085, 0.115, 0.145)
+const SPANDREL := Color(0.15, 0.155, 0.16)
+const MULLION := Color(0.36, 0.375, 0.39)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",

@@ -188,7 +188,8 @@ static func _gable(kit: ReliefKit, sp: Dictionary, d: Dictionary, kind: String) 
 	var look: Dictionary = d["look"]
 	var mat := ReliefKit.stone(str(look.get("wall_set", "brick")), look.get("wall_colour", Color(0, 0, 0, 0)))
 	if str(look.get("wall_set", "")) == "brick":
-		mat = MaterialLibrary.pbr_material("brick", Color(1, 1, 1), 0.5)
+		mat = MaterialLibrary.pbr_material("brick", MaterialLibrary._calib_tint(
+			(MaterialLibrary.PBR_SETS["brick"] as Dictionary)["mean"], MaterialLibrary.PRD_BRICK), 0.5)
 	var n: Vector2 = sp["n"]
 	var a: Vector2 = sp["a"]
 	var top := float(d["top"])

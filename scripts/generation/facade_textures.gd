@@ -151,7 +151,8 @@ static func _material_from(texs: Dictionary, set_name: String, detail: int,
 	m.albedo_color = tint.linear_to_srgb()
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	if set_name == "glass":
-		m.metallic = 0.45
+		# Dark albedo, strong reflection: glass is mostly what it mirrors.
+		m.metallic = 0.6
 		m.metallic_specular = 0.7
 	else:
 		m.metallic = float((MaterialLibrary.PBR_SETS[set_name] as Dictionary)["metal"])

@@ -20,7 +20,13 @@ static func mark(m: StandardMaterial3D, emit: Variant) -> void:
 	m.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 	m.emission_texture = emit as Texture2D
 	m.emission_energy_multiplier = 0.0
-	m.set_meta(META, true)
+	m.set_meta(META, 1.0)
+
+## Lets `m`'s own emission follow the night at `scale` × the pane energy
+## (shop signs and other emissive colour, dark by day).
+static func mark_glow(m: StandardMaterial3D, scale: float) -> void:
+	m.emission_energy_multiplier = 0.0
+	m.set_meta(META, scale)
 
 ## Night share (0 day .. 1 night) from the rig's sky state: rooms light
 ## up through dusk, before full darkness.
@@ -46,4 +52,4 @@ static func apply(world: Node, amount: float) -> void:
 		for m in mats:
 			if m is StandardMaterial3D and not seen.has(m) and (m as Material).has_meta(META):
 				seen[m] = true
-				(m as StandardMaterial3D).emission_energy_multiplier = energy
+				(m as StandardMaterial3D).emission_energy_multiplier = energy * float(m.get_meta(META))

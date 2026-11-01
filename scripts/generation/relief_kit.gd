@@ -16,8 +16,21 @@ static var _mats: Dictionary = {}
 func _arrays(mat: Material) -> Array:
 	if not surfaces.has(mat):
 		surfaces[mat] = [PackedVector3Array(), PackedVector3Array(),
-			PackedVector2Array(), PackedInt32Array()]
+			PackedVector2Array(), PackedInt32Array(), PackedFloat32Array()]
 	return surfaces[mat]
+
+## One tangent per vertex, `count` times: +u direction `du` made
+## perpendicular to `n`, w so cross(n, t) · w points along −v (`dnv`),
+## as BuildingWalls writes them — the stone's normal map needs them.
+static func _tangents(tangents: PackedFloat32Array, n: Vector3, du: Vector3,
+		dnv: Vector3, count: int) -> void:
+	var t := du - n * n.dot(du)
+	if t.length_squared() < 1e-10:
+		t = n.cross(Vector3.UP if absf(n.y) < 0.9 else Vector3.RIGHT)
+	t = t.normalized()
+	var w := 1.0 if n.cross(t).dot(dnv) >= 0.0 else -1.0
+	for j in count:
+		tangents.push_back(t.x); tangents.push_back(t.y); tangents.push_back(t.z); tangents.push_back(w)
 
 ## Quad p0-p1-p2-p3 (counter-clockwise seen from the side `n` points to),
 ## UVs from `uv0` to `uv1` (u along p0→p1, v down from p3 to p0).
@@ -34,6 +47,8 @@ func quad(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3,
 		normals.append(n)
 	uvs.append_array([Vector2(uv0.x, uv1.y), Vector2(uv1.x, uv1.y),
 		Vector2(uv1.x, uv0.y), Vector2(uv0.x, uv0.y)])
+	var tangents: PackedFloat32Array = a[4]
+	_tangents(tangents, n, (p1 - p0) * signf(uv1.x - uv0.x), (p3 - p0) * signf(uv1.y - uv0.y), 4)
 	# Godot's front face is clockwise seen from outside: pick the order
 	# whose winding faces n.
 	if (p2 - p0).cross(p1 - p0).dot(n) >= 0.0:
@@ -55,6 +70,8 @@ func tri(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, n: Vector3) -> vo
 	for p in [p0, p1, p2]:
 		normals.append(n)
 		uvs.append(Vector2((p - p0).dot(ax), (p - p0).dot(ay)) * 0.5)
+	var tangents: PackedFloat32Array = a[4]
+	_tangents(tangents, n, ax, -ay, 3)
 	if (p2 - p0).cross(p1 - p0).dot(n) >= 0.0:
 		indices.append_array([k, k + 1, k + 2])
 	else:
@@ -98,6 +115,7 @@ func flush(root: Node3D, name: String) -> void:
 		arrays[Mesh.ARRAY_VERTEX] = s[0]
 		arrays[Mesh.ARRAY_NORMAL] = s[1]
 		arrays[Mesh.ARRAY_TEX_UV] = s[2]
+		arrays[Mesh.ARRAY_TANGENT] = s[4]
 		arrays[Mesh.ARRAY_INDEX] = s[3]
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
@@ -115,7 +133,21 @@ func flush(root: Node3D, name: String) -> void:
 static func stone(set_name: String, tint: Color) -> Material:
 	if not set_name in ["limestone", "stone", "render", "concrete"]:
 		set_name = "limestone" if tint.a <= 0.0 or tint.r >= tint.b else "stone"
-	return MaterialLibrary.pbr_material(set_name, Color(0.96, 0.95, 0.92), 0.5)
+	# Calibrated like the walls (the bare photos are 0.15–0.27 linear, so
+	# sills and string courses read as dark bands on pale stone).
+	return MaterialLibrary.pbr_material(set_name, MaterialLibrary._calib_tint(
+		(MaterialLibrary.PBR_SETS[set_name] as Dictionary)["mean"], STONE_TARGETS[set_name]), 0.5)
+
+## Sign glow at full night, × CityLights.NIGHT_ENERGY (~1.6).
+const SIGN_GLOW := 0.6
+
+## Linear relief-stone targets per finish (R-1.4 ranges).
+const STONE_TARGETS := {
+	"limestone": Color(0.557, 0.462, 0.303),  # PRD limestone × 0.92, as the cornice
+	"stone": Color(0.52, 0.45, 0.34),
+	"render": Color(0.62, 0.60, 0.56),
+	"concrete": Color(0.36, 0.35, 0.33),
+}
 
 ## Wrought iron: vertical bars between rails with a scroll band, alpha-cut.
 static func iron() -> Material:
@@ -189,7 +221,8 @@ static func canvas(hex: String, striped: bool) -> Material:
 	_mats[key] = m
 	return m
 
-## Shop sign panel: a saturated colour that glows faintly at night.
+## Shop sign panel: a saturated colour, lit from dusk (CityLights), unlit
+## by day.
 static func sign(hex: String) -> Material:
 	var key := "sign|" + hex
 	if _mats.has(key):
@@ -199,6 +232,6 @@ static func sign(hex: String) -> Material:
 	m.roughness = 0.4
 	m.emission_enabled = true
 	m.emission = Color.html(hex)
-	m.emission_energy_multiplier = 0.6
+	CityLights.mark_glow(m, SIGN_GLOW)
 	_mats[key] = m
 	return m
