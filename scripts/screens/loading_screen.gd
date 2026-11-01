@@ -12,7 +12,7 @@ signal cancel_requested
 signal retry_requested
 signal back_requested
 
-const NOTE := "First visits take a minute or two while we gather the terrain. Next time it opens instantly."
+const NOTE := "First visits take a minute or two while we gather the terrain. Next time it opens faster."
 ## Degraded layer key (DataNotes) -> the stage row that was waiting on it.
 const LAYER_ROW := {"elevation": 0, "imagery": 1, "map": 2, "weather": 3}
 const BUILD_LABEL := "Building the scene"
