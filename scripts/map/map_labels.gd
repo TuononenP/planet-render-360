@@ -62,7 +62,7 @@ func _font(kind: String) -> Font:
 ## file: a FontVariation over UiTheme.sans() would drop the inner weight.
 static func _sans(weight: int, tracking: int) -> Font:
 	var v := FontVariation.new()
-	v.base_font = load(UiTheme.FONT_SANS) as Font
+	v.base_font = UiTheme.sans_file()
 	v.variation_opentype = {"wght": weight}
 	v.spacing_glyph = tracking
 	return v

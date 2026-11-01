@@ -154,6 +154,11 @@ static func _font(path: String) -> Font:
 		_font_cache[path] = f
 	return _font_cache[path]
 
+## The Instrument Sans file itself, for callers that wrap it in their own
+## FontVariation (map labels), through the same import fallback.
+static func sans_file() -> Font:
+	return _font(FONT_SANS)
+
 ## Root theme: Instrument Sans at 15pt (body) for every Control.
 static func base_theme() -> Theme:
 	var t := Theme.new()
