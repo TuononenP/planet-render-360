@@ -116,6 +116,26 @@ func _run() -> void:
 				inside_court += 1
 		if down > 0 or inside_court > 0:
 			failures.append("inset roof: %d down-facing normals, %d faces over the courtyard" % [down, inside_court])
+	# A facade stepping in and out by 30 cm (mapped bays) must not turn
+	# into fins under the inset roof: a mitred inset made every step a
+	# sunlit fin; RoofSkeleton keeps each eave point at the eave.
+	var teeth := PackedVector2Array()
+	for k in 40:
+		teeth.append(Vector2(float(k) * 1.5, 0.3 if k % 2 == 1 else 0.0))
+	teeth.append_array(PackedVector2Array([Vector2(60, 40), Vector2(45, 40), Vector2(45, 14),
+		Vector2(15, 14), Vector2(15, 40), Vector2(0, 40)]))
+	var teeth_roof := RoofGeometry.form_mesh(teeth, 10.0, 3.0, "hipped")
+	if teeth_roof == null:
+		failures.append("a serrated courtyard block should still get a roof")
+	else:
+		var tv: PackedVector3Array = teeth_roof.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var fins := 0
+		for i in range(0, tv.size(), 3):
+			var fn := (tv[i + 1] - tv[i]).cross(tv[i + 2] - tv[i])
+			if fn.length() > 1e-6 and absf(fn.normalized().y) < 0.5:
+				fins += 1
+		if fins > 0:
+			failures.append("serrated eave: %d roof faces steeper than 60 degrees" % fins)
 	# Roof tile courses snap to the roof's own axes: two facets 20 degrees
 	# apart on a curved footprint share one frame.
 	var fu := Vector2(1, 0)
@@ -200,6 +220,23 @@ func _run() -> void:
 	if not attr_ok:
 		failures.append("asphalt ribbons should use RoadSurface with lanes and width per vertex")
 	roads.free()
+	# A bay clipped to the extent (long collinear edges, regular interior
+	# lattice): Godot's Delaunay used to take minutes and return ~50x too
+	# many triangles for it.
+	var bay := PackedVector2Array([Vector2(-1200, -300), Vector2(1200, -300),
+		Vector2(1200, 365), Vector2(-1200, 365)])
+	var bay_root := Node3D.new()
+	var bay_t := Time.get_ticks_msec()
+	WaterSurface.add_polygon(bay_root, bay, [], 0.0, 9.4, WaterSurface.material(2))
+	var bay_ms := Time.get_ticks_msec() - bay_t
+	var bay_mi := bay_root.get_child(0) as MeshInstance3D if bay_root.get_child_count() > 0 else null
+	if bay_mi == null:
+		failures.append("a wide bay should build a surface")
+	else:
+		var bay_tris := (bay_mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		if bay_ms > 5000 or bay_tris > 20000 or bay_tris < 200:
+			failures.append("wide bay surface: %d triangles in %d ms" % [bay_tris, bay_ms])
+	bay_root.free()
 	# Ground cover on a park polygon.
 	for preset in [RenderSettings.Preset.FAST, RenderSettings.Preset.HIGH]:
 		var pd := _flat(preset)

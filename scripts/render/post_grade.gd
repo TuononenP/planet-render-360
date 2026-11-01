@@ -17,8 +17,11 @@ extends RefCounted
 ## sun, glints) roll off like film instead of clipping at 1.0, which
 ## washed the frame toward white; exposure lifts the mid-tones back. At
 ## 1.45 sun-lit limestone and plazas still burned to white, and the extra
-## saturation pushed sky-lit shade to a strong blue: 1.3 and neutral.
-const EXPOSURE := 1.3
+## saturation pushed sky-lit shade to a strong blue: lower and neutral.
+## 1.25, not 1.3: at golden hour a slope facing the low sun gets ~3.4x
+## the light of flat ground, and anything over ~0.3 albedo there (pale
+## soil, rock, render) compressed to colourless white.
+const EXPOSURE := 1.25
 const WHITE := 6.0
 const CONTRAST := 1.1
 const SATURATION := 1.0
