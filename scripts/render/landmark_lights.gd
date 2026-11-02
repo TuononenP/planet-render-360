@@ -22,8 +22,10 @@ extends RefCounted
 const SPOTS := 4
 ## Footprints longer than ELONGATED × their width line their long sides.
 const ELONGATED := 2.0
-const SIDE_STEP_M := 70.0
-const MAX_PER_SIDE := 6
+const SIDE_STEP_M := 45.0
+const MAX_PER_SIDE := 10
+## Long fronts take more, weaker spots that overlap into an even wash.
+const SIDE_ENERGY := 0.75
 ## Spot energy at full night (Godot units, not physical).
 const ENERGY := 7.0
 const COLOUR := Color(1.0, 0.87, 0.68)
@@ -89,7 +91,7 @@ static func dress(hero: Node3D, type: String) -> int:
 	var c := box.get_center()
 	var base_y := box.position.y + LAMP_Y_M * m
 	var aim_y := box.position.y + box.size.y * 0.45
-	# [lamp, aim point, half-width it must cover]
+	# [lamp, aim point, half-width it must cover, energy share]
 	var lamps: Array = []
 	var long_x := box.size.x >= box.size.z
 	var long_len := maxf(box.size.x, box.size.z)
@@ -105,14 +107,14 @@ static func dress(hero: Node3D, type: String) -> int:
 				# Back from the face by the depth, so the wash spreads evenly.
 				var face: Vector3 = Vector3(c.x, 0.0, c.z) + along * t * long_len + across * side * short_half
 				var p: Vector3 = face + across * side * maxf(short_half, SETBACK_M * m)
-				lamps.append([Vector3(p.x, base_y, p.z), Vector3(face.x, aim_y, face.z), cover])
+				lamps.append([Vector3(p.x, base_y, p.z), Vector3(face.x, aim_y, face.z), cover, SIDE_ENERGY])
 	else:
 		var half := maxf(box.size.x, box.size.z) * 0.5
 		var dist := half + SETBACK_M * m
 		for k in SPOTS:
 			var a := TAU * (float(k) + 0.5) / float(SPOTS)
 			lamps.append([Vector3(c.x + cos(a) * dist, base_y, c.z + sin(a) * dist),
-				Vector3(c.x, aim_y, c.z), half])
+				Vector3(c.x, aim_y, c.z), half, 1.0])
 	var holder := Node3D.new()
 	holder.name = "LandmarkLights"
 	for lamp in lamps:
@@ -130,7 +132,7 @@ static func dress(hero: Node3D, type: String) -> int:
 		spot.light_energy = 0.0
 		spot.shadow_enabled = false
 		spot.visible = false
-		spot.set_meta(StreetLights.META, ENERGY)
+		spot.set_meta(StreetLights.META, ENERGY * float(lamp[3]))
 		holder.add_child(spot)
 		# SpotLight3D shines down its -Z.
 		spot.transform = Transform3D(Basis.looking_at(aim - p, Vector3.UP), p)

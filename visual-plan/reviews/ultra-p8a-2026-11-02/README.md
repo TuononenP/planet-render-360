@@ -101,7 +101,6 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
 - **Furniture from OSM:** needs a live refetch of a cached place to see mapped benches and signals instead of
   the fill.
 - **Leaf litter:** added after these captures (`road_decals_test`), not yet seen in a render.
-- From the earlier review: floodlight scallops on the Westminster river front.
 
 ## Resolved after these captures (`../ultra-p8e-2026-11-02/`)
 
@@ -114,3 +113,6 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
 - **The "palms" in New York** are broadleaf street trees with high crowns. In the backlit rain haze of
   `ultra-p7c` only the thin trunk and crown top showed. The p7f golden close-up reads correctly; NYC resolves
   to the temperate mix.
+- **Floodlight scallops** on the Westminster river front are gone (`../ultra-p8f-2026-11-02/`). Long fronts
+  now take a spot every 45 m (was 70, up to 10 a side), each at 0.75 energy, so the cones overlap into an
+  even wash.

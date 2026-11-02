@@ -12,11 +12,11 @@ func _init() -> void:
 func _run() -> void:
 	var failures: Array[String] = ["sentinel: the run did not finish (script error?)"]
 	var m := WorldScale.metres_to_units()
-	var hero := LandmarkBuilder.build("empire_state")
+	var hero := LandmarkBuilder.build("colosseum")
 	var box := LandmarkLights.local_aabb(hero)
-	if box.size.y < 370.0 * m:
-		failures.append("Empire State bounds should be its full height, got %f m" % (box.size.y / m))
-	if LandmarkLights.dress(hero, "empire_state") != LandmarkLights.SPOTS:
+	if box.size.y < 45.0 * m:
+		failures.append("Colosseum bounds should be its full height, got %f m" % (box.size.y / m))
+	if LandmarkLights.dress(hero, "colosseum") != LandmarkLights.SPOTS:
 		failures.append("a solid landmark should get %d spots" % LandmarkLights.SPOTS)
 	var holder := hero.get_node_or_null("LandmarkLights")
 	if holder != null:
