@@ -66,6 +66,7 @@ static func build(type: String) -> Node3D:
 		"gwanghwamun": LandmarkGwanghwamun.build(model)
 		"banff_springs": LandmarkBanff.build(model)
 		"stockholm_city_hall": LandmarkStockholm.build(model)
+		"riddarholmen": LandmarkStockholm.riddarholmen(model)
 		"golden_gate": LandmarkSuspensionBridges.golden_gate(model)
 		"brooklyn_bridge": LandmarkSuspensionBridges.brooklyn(model)
 		"tower_bridge": LandmarkTowerBridge.build(model)

@@ -96,6 +96,12 @@ static func far_grid_size_for(_value: int) -> int:
 static func satellite_zoom_for(value: int) -> int:
 	return [16, 16, 17, 17][clamp_preset(value)]
 
+## Desktop Ultra's inner mosaic: z18 (≈0.3–0.6 m/px) over ~700 m round
+## the viewpoint, blended over the main mosaic's fine detail
+## (GroundMaterial). Whole at z18 or not at all: no fallback zoom.
+const SATELLITE_INNER_ZOOM := 18
+const SATELLITE_INNER_SPAN := 7
+
 ## Largest mosaic side in tiles (15 × 256 = 3840 px ≤ the 4096 px
 ## mobile texture limit).
 const SATELLITE_MAX_SPAN := 15

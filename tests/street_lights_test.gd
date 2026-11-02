@@ -54,6 +54,24 @@ func _run() -> void:
 	var glass := StreetProps._lamp_mesh("modern").surface_get_material(1) as StandardMaterial3D
 	if glass == null or not glass.has_meta(CityLights.META) or glass.emission_energy_multiplier != 0.0:
 		failures.append("lamp glass should be dark by day and lit with the windows at night")
+	# Regional lamp families: by country first, then region.
+	for c in [["haussmann", "FR", "residential", "lantern"], ["haussmann", "FR", "primary", "lantern"],
+			["west_europe_brick", "GB", "residential", "heritage"], ["west_europe_brick", "GB", "primary", "modern"],
+			["west_europe_brick", "NL", "residential", "lantern"], ["north_america", "US", "residential", "cobra"],
+			["north_america", "", "primary", "cobra"], ["japan", "JP", "residential", "utility"],
+			["east_asia", "KR", "primary", "modern"], ["middle_east", "AE", "residential", "modern_s"]]:
+		var got := StreetProps.lamp_style(StreetProps.lamp_family(c[0], c[1]), c[0], c[2])
+		if got != c[3]:
+			failures.append("%s/%s %s should get %s lamps, got %s" % [c[0], c[1], c[2], c[3], got])
+	for style in ["heritage", "cobra", "utility"]:
+		var lm := StreetProps._lamp_mesh(style)
+		var head: Vector3 = StreetLights.HEADS.get(style, StreetLights.LANTERN_HEAD)
+		var gl := lm.surface_get_arrays(1)[Mesh.ARRAY_VERTEX] as PackedVector3Array
+		var gc := Vector3.ZERO
+		for v in gl:
+			gc += v / float(gl.size())
+		if lm.get_surface_count() != 2 or gc.distance_to(head) > 0.6:
+			failures.append("%s lamp glass at %s should sit at its light head %s" % [style, gc, head])
 	root.free()
 	failures.erase(failures[0])
 	if failures.is_empty():

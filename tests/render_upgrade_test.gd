@@ -220,6 +220,17 @@ func _run() -> void:
 	if not attr_ok:
 		failures.append("asphalt ribbons should use RoadSurface with lanes and width per vertex")
 	roads.free()
+	# Centre line: yellow in the Americas (and Norway), white elsewhere.
+	var mat := RoadSurface.material(Color(0.05, 0.05, 0.05))
+	for c in [["US", 0.0, true], ["NO", 0.0, true], ["FR", -74.0, false], ["", -74.0, true], ["", 2.35, false]]:
+		var cd := _flat(RenderSettings.Preset.HIGH)
+		cd.country = c[0]
+		cd.longitude = c[1]
+		RoadSurface.set_place(cd)
+		var cc: Color = mat.get_shader_parameter("centre_col")
+		if (cc.b < cc.r * 0.3) != bool(c[2]):
+			failures.append("centre line for country '%s' at lon %.1f: %s" % [c[0], c[1], cc])
+	RoadSurface.set_place(_flat(RenderSettings.Preset.HIGH))
 	# A bay clipped to the extent (long collinear edges, regular interior
 	# lattice): Godot's Delaunay used to take minutes and return ~50x too
 	# many triangles for it.

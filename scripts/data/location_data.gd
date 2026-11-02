@@ -89,6 +89,11 @@ var satellite_source: Dictionary = {}
 ## derived from zoom + latitude (contract §2.3). UV/alignment math uses
 ## this, not magic spans. 0.0 means "no imagery this run".
 var satellite_metres_per_px: float = 0.0
+## Desktop Ultra's sharper inner mosaic (SATELLITE_INNER_ZOOM, SPAN tiles
+## a side round the viewpoint) over the main one; null elsewhere or when
+## it did not arrive whole. Origin in global pixels at that zoom.
+var satellite_inner_texture: Texture2D
+var satellite_inner_origin_px: Vector2 = Vector2.ZERO
 var landmark_type: String = "none"  # see landmarks() for the types
 ## True site of the landmark (landmarks() entry), so TerrainBuilder
 ## can place the model at its real bearing from the viewpoint instead
@@ -161,6 +166,9 @@ var trees: Array = []
 ## wall, hedge, ...). Parsed by OsmFetcher; carried by the pipeline since
 ## closure W2; meshed by a Phase-4/5 consumer (no builder claims it).
 var barriers: Array = []
+## OSM street furniture nodes {x, z, kind, shelter} near the viewpoint
+## (OsmParser.furniture_kind); StreetFurniture dresses them on desktop Ultra.
+var street_furniture: Array = []
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
@@ -294,9 +302,20 @@ static func landmarks() -> Array:
 	if _all_landmarks.is_empty():
 		var all := _core_landmarks()
 		all.append_array(LandmarkRegistries.entries())
+		all.append_array(_regional_extras())
 		_core_count = _core_landmarks().size()
 		_all_landmarks = all
 	return _all_landmarks
+
+## Regional-tier entries with their models in the core landmark classes:
+## seen beside a core icon (Riddarholmen from Monteliusvägen, next to
+## City Hall), never ahead of it.
+static func _regional_extras() -> Array:
+	return [
+		{"type": "riddarholmen", "name": "Riddarholmen Church", "lat": 59.32468, "lon": 18.06454, "radius_m": 3000.0,
+			"wiki_title": "Riddarholmen Church", "height_m": 90.0, "clear_m": 50.0, "yaw_deg": -7.8, "kind": "Church",
+			"aliases": ["riddarholmen church", "riddarholmskyrkan"]},
+	]
 
 ## Built once: the lookups below loop the registry on every call.
 static var _all_landmarks: Array = []

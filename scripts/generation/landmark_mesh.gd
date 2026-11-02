@@ -113,6 +113,11 @@ func beam(key: String, a: Vector3, b: Vector3, w: float, d: float = -1.0,
 func lathe(key: String, base: Vector3, prof: PackedVector2Array, seg: int,
 		sx: float = 1.0, sz: float = 1.0, rot: float = 0.0, smooth: bool = true,
 		cap: bool = true) -> void:
+	# Desktop Ultra (MaterialLibrary.hi_res, set per world build): round
+	# forms take twice the segments, so domes and drums stop faceting up
+	# close. Faceted forms (square spires, octagons) keep their sides.
+	if smooth and seg >= 10 and MaterialLibrary.hi_res:
+		seg *= 2
 	var rings: Array = []
 	var norms: Array = []
 	var vs: Array = []

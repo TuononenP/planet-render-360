@@ -110,7 +110,9 @@ var cloud_shade_color := Color(0.55, 0.58, 0.64)
 ## the night skyglow. Set per place (ViewConditions.apply_surface_state).
 var city_glow := 0.0
 ## Skyglow colour at full city and full night (sodium and warm LED mix).
-const CITY_SKYGLOW := Color(0.20, 0.14, 0.09)
+const CITY_SKYGLOW := Color(0.075, 0.05, 0.032)
+## Hue of an overcast night deck over a full city (sodium/LED orange-grey).
+const CITY_DECK := Color(0.74, 0.63, 0.55)
 
 func set_city_glow(value: float) -> void:
 	city_glow = clampf(value, 0.0, 1.0)
@@ -458,6 +460,8 @@ func _apply() -> void:
 		moon_up = 0.0
 	else:
 		_moonlight(dim)
+	# A full deck hides the disc: no hard glint on water and glass.
+	sun.light_specular = lerpf(1.0, 0.12, overcast)
 	# Cloud and rain soften shadows as the diffuse sky takes over.
 	sun.shadow_opacity = float(look["shadow_opacity"])
 	# The sky's sun keeps its true position below the horizon, so the
@@ -475,7 +479,9 @@ func _apply() -> void:
 	# Overcast greys the whole dome; brightness follows the day level and
 	# a storm deck darkens it further.
 	var day_level := 0.12 if night else clampf(0.55 + arc * 1.0, 0.55, 1.0)
-	var grey := Color(0.66, 0.69, 0.73) * day_level * (1.0 - 0.35 * darken)
+	# A city's night deck is lit from below by its lamps: warm, not blue.
+	var grey := Color(0.66, 0.69, 0.73).lerp(CITY_DECK, city_glow * night_amount) \
+		* day_level * (1.0 - 0.35 * darken)
 	zenith = zenith.lerp(grey * 0.92, overcast * 0.9)
 	horizon = horizon.lerp(grey * 1.08, overcast * 0.85)
 	glow = glow.lerp(horizon, overcast * 0.9)

@@ -4,7 +4,8 @@ extends RefCounted
 ## The asphalt look for RoadBuilder: one ShaderMaterial that paints a
 ## road from its own coordinates instead of separate marking meshes
 ## (which were Ultra-only and ignored lanes and junctions):
-## - markings on every tier: dashed centre line, a double solid line on
+## - markings on every tier: dashed centre line (yellow in the Americas,
+##   Norway and Finland), a double solid line on
 ##   wide main roads, lane dividers from the OSM lane count, edge lines
 ##   on main roads, zebra crossings on urban streets near junctions;
 ##   paint stops short of junctions and wears in patches;
@@ -95,6 +96,8 @@ uniform sampler2D nor_tex : hint_normal, filter_linear_mipmap_anisotropic, repea
 uniform sampler2D rough_tex : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec3 tint = vec3(1.0);
 uniform vec3 paint_col = vec3(0.70, 0.69, 0.65);
+// The line between opposing traffic: white, or yellow (YELLOW_CENTRE).
+uniform vec3 centre_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
 uniform float junction_m = 30.0;
 // @SNOW
@@ -178,14 +181,16 @@ void fragment() {
 	}
 	// Markings.
 	float paint = 0.0;
+	float centre = 0.0;
 	float jfade = smoothstep(6.0, 9.0, jd);
 	float dash = band(mod(y, 9.0), 1.5, 1.5, faa);
 	if (rank >= 1 && w >= 5.0) {
 		if (rank >= 2 && w >= 9.0) {
-			paint += band(x, w * 0.5 - 0.14, 0.06, aa) + band(x, w * 0.5 + 0.14, 0.06, aa);
+			centre = band(x, w * 0.5 - 0.14, 0.06, aa) + band(x, w * 0.5 + 0.14, 0.06, aa);
 		} else if (lanes >= 2) {
-			paint += band(x, w * 0.5, 0.06, aa) * dash;
+			centre = band(x, w * 0.5, 0.06, aa) * dash;
 		}
+		paint += centre;
 		for (int k = 1; k < 8; k++) {
 			if (k >= lanes) {
 				break;
@@ -208,7 +213,8 @@ void fragment() {
 	}
 	paint = clamp(paint, 0.0, 1.0) * (1.0 - kerb);
 	paint *= 0.55 + 0.45 * smoothstep(0.25, 0.6, r_noise(g * 2.3));
-	col = mix(col, paint_col, paint);
+	float yel = clamp(centre * jfade / max(paint, 0.001), 0.0, 1.0) * step(0.001, paint);
+	col = mix(col, mix(paint_col, centre_col, yel), paint);
 	rough = mix(rough, 0.6, paint);
 	nm = mix(nm, vec3(0.5, 0.5, 1.0), paint * 0.7);
 	// Rain: darker, glossy, puddles in the low spots.
@@ -231,7 +237,18 @@ void fragment() {
 }
 """
 
+## Countries whose line between opposing traffic is yellow (MUTCD and
+## its Latin American kin; Norway and Finland). Unknown country: the
+## Americas by longitude.
+const YELLOW_CENTRE := ["US", "CA", "MX", "GT", "BZ", "HN", "SV", "NI", "CR", "PA",
+	"CO", "VE", "EC", "PE", "BO", "CL", "AR", "UY", "PY", "BR", "PR", "NO", "FI"]
+## Worn traffic yellow (linear albedo).
+const YELLOW := Color(0.62, 0.40, 0.05)
+
 static var _mat: ShaderMaterial
+static var _centre := Color(0.70, 0.69, 0.65)
+## Painted kerb band: granite or concrete by region (KerbBuilder.stone_for).
+static var _kerb := Color(0.36, 0.35, 0.33)
 static var _paved_shader: Shader
 static var _texs: Dictionary = {}
 
@@ -250,7 +267,24 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("nor_tex", _tex("nor"))
 	_mat.set_shader_parameter("rough_tex", _tex("rough"))
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
+	_mat.set_shader_parameter("centre_col", _centre)
+	_mat.set_shader_parameter("kerb_col", _kerb)
 	return _mat
+
+## True where the place paints its centre line yellow.
+static func yellow_centre(data: LocationData) -> bool:
+	if data.country != "":
+		return YELLOW_CENTRE.has(data.country.to_upper())
+	return data.longitude > -170.0 and data.longitude < -30.0
+
+## Sets the centre-line and kerb colours for `data`'s place (RoadBuilder,
+## per build).
+static func set_place(data: LocationData) -> void:
+	_centre = YELLOW if yellow_centre(data) else Color(0.70, 0.69, 0.65)
+	_kerb = KerbBuilder.stone_for(data)
+	if _mat != null:
+		_mat.set_shader_parameter("centre_col", _centre)
+		_mat.set_shader_parameter("kerb_col", _kerb)
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish).

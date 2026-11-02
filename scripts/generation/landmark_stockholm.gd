@@ -105,3 +105,80 @@ static func _crown(lm: LandmarkMesh, base: Vector3, r: float) -> void:
 	for k in 4:
 		var a := TAU * k / 4.0
 		lm.frustum("Gilt", base + Vector3(cos(a) * r, r * 0.7, sin(a) * r), r * 0.2, 0.0, r * 0.8, 4)
+
+## Riddarholmen Church (Riddarholmskyrkan, late 13th century) in true
+## metres, the nave along +X (east): a red-brown Gothic brick nave under
+## a steep copper roof, lower aisles lined with burial chapels, the two
+## copper-domed royal chapels (the Caroline to the north, the Gustavian
+## to the south), a polygonal choir at the east end, and at the west end
+## the square brick tower with its belfry stage under the cast-iron
+## openwork spire of 1841 (after the 1835 lightning fire), a lattice of
+## X-braced faces tapering to the 90 m tip.
+const RIDDARHOLMEN_TOP_M := 90.0
+
+static func riddarholmen(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#7A3A2A", 2.5))
+	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#6E9C88", 2.0, 0.55, 0.3))
+	lm.use("Windows", LandmarkMaterials.glass("#1E2427"))
+	lm.use("Iron", LandmarkMaterials.paint("#2A2C2D", 0.5, 0.7))
+	lm.use("Gilt", LandmarkMaterials.gold())
+	var along := Basis(Vector3.UP, PI * 0.5)  # gable ridges run along X
+	# Nave, aisles with their chapels, steep copper roofs.
+	lm.box("Brick", Vector3(4, 9, 0), Vector3(48, 18, 13))
+	lm.gable("Copper", Vector3(4, 18, 0), 13, 48, 8.5, along, 0.6, "Brick")
+	for sgn in [-1.0, 1.0]:
+		lm.box("Brick", Vector3(4, 5.5, 9.5 * sgn), Vector3(40, 11, 6))
+		lm.box("Copper", Vector3(4, 11.3, 9.5 * sgn), Vector3(41, 0.6, 6.6))
+		# Royal chapels: square brick drums under copper domes.
+		var cc := Vector3(10, 0, 15.2 * sgn)
+		lm.box("Brick", cc + Vector3(0, 6.5, 0), Vector3(9.5, 13, 9.5))
+		lm.lathe("Copper", cc + Vector3(0, 13, 0), PackedVector2Array([Vector2(5.0, 0),
+			Vector2(4.7, 2.2), Vector2(3.7, 4.4), Vector2(1.9, 6.1), Vector2(0.5, 6.9),
+			Vector2(0.3, 8.6), Vector2(0.0, 9.0)]), 16)
+		# Tall lancet windows down the nave above the aisle roofs.
+		for k in 7:
+			var x := -16.0 + k * 6.0
+			lm.box("Windows", Vector3(x, 14.5, 6.55 * sgn), Vector3(1.6, 5.5, 0.12))
+	# Polygonal choir to the east.
+	var apse := PackedVector2Array()
+	for k in 7:
+		var a := -PI * 0.5 + PI * float(k) / 6.0
+		apse.append(Vector2(28 + cos(a) * 6.5, sin(a) * 6.5))
+	lm.poly_prism("Brick", apse, 0.0, 18.0)
+	lm.lathe("Copper", Vector3(28, 18, 0), PackedVector2Array([Vector2(7.1, 0), Vector2(0.0, 6.5)]), 6)
+	# West tower: brick shaft, belfry stage with arched openings.
+	var tx := -24.5
+	lm.box("Brick", Vector3(tx, 19, 0), Vector3(10, 38, 10))
+	lm.box("Brick", Vector3(tx, 42, 0), Vector3(9.6, 8, 9.6))
+	for f in 4:
+		var n := Vector3(cos(f * PI * 0.5), 0, sin(f * PI * 0.5))
+		var side := n.cross(Vector3.UP)
+		for s in [-1.8, 1.8]:
+			lm.box("Windows", Vector3(tx, 42.5, 0) + n * 4.86 + side * s,
+				Vector3(1.2, 5.0, 1.2) * (Vector3.ONE - n.abs()) + n.abs() * 0.12)
+		lm.box("Windows", Vector3(tx, 30, 0) + n * 5.06, Vector3(1.4, 4.0, 1.4) * (Vector3.ONE - n.abs()) + n.abs() * 0.12)
+	lm.box("Iron", Vector3(tx, 46.3, 0), Vector3(10.2, 0.6, 10.2))
+	# The openwork spire: four X-braced faces from 46.6 m, corner ribs,
+	# rings every stage, a thin needle and gilt finial to 90 m.
+	var y0 := 46.6
+	var y1 := 86.0
+	var stages := 7
+	for k in stages:
+		var ya := lerpf(y0, y1, float(k) / float(stages))
+		var yb := lerpf(y0, y1, float(k + 1) / float(stages))
+		var ha := lerpf(4.4, 0.35, float(k) / float(stages))
+		var hb := lerpf(4.4, 0.35, float(k + 1) / float(stages))
+		var ring_a := _square(tx, ya, ha)
+		var ring_b := _square(tx, yb, hb)
+		for f in 4:
+			var g := (f + 1) % 4
+			lm.lattice_panel("Iron", ring_a[f], ring_a[g], ring_b[f], ring_b[g], 0.16)
+			lm.beam("Iron", ring_a[f], ring_b[f], 0.3, 0.3)
+	lm.beam("Iron", Vector3(tx, y1, 0), Vector3(tx, RIDDARHOLMEN_TOP_M - 1.2, 0), 0.22, 0.22)
+	lm.lathe("Gilt", Vector3(tx, RIDDARHOLMEN_TOP_M - 1.2, 0), PackedVector2Array([Vector2(0.3, 0),
+		Vector2(0.4, 0.5), Vector2(0.0, 1.2)]), 8)
+	lm.commit(model)
+
+static func _square(x: float, y: float, h: float) -> Array:
+	return [Vector3(x - h, y, -h), Vector3(x + h, y, -h), Vector3(x + h, y, h), Vector3(x - h, y, h)]

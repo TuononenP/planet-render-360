@@ -22,13 +22,15 @@ const FADE_LENGTH_M := 60.0
 ## Lamp heads in the lamp meshes' own metres (StreetProps._lamp_mesh).
 const LANTERN_HEAD := Vector3(0.0, 4.1, 0.0)
 const COBRA_HEAD := Vector3(1.85, 8.0, 0.0)
+## Spot heads of the regional arm styles (the rest use COBRA_HEAD).
+const HEADS := {"cobra": Vector3(2.6, 8.85, 0.0), "utility": Vector3(1.15, 5.58, 0.0)}
 const SODIUM_REGIONS := ["eastern_europe", "middle_east", "south_asia", "latin_america",
 	"sub_saharan_africa"]
 
 static func colour_for(style: String, region: String) -> Color:
 	if region in SODIUM_REGIONS:
 		return Color(1.0, 0.62, 0.30)   # ~2000 K high-pressure sodium
-	if style == "lantern":
+	if style == "lantern" or style == "heritage":
 		return Color(1.0, 0.78, 0.52)   # ~2700 K warm LED / gas look
 	return Color(1.0, 0.90, 0.78)       # ~4000 K LED
 
@@ -49,7 +51,7 @@ static func add(root: Node3D, placed: Dictionary, region: String, m2u: float) ->
 		var t: Transform3D = all[i][1]
 		var style: String = all[i][2]
 		var light: Light3D
-		if style == "lantern":
+		if style == "lantern" or style == "heritage":
 			var omni := OmniLight3D.new()
 			omni.omni_range = LANTERN_RANGE_M * m2u
 			omni.omni_attenuation = 1.3
@@ -61,7 +63,7 @@ static func add(root: Node3D, placed: Dictionary, region: String, m2u: float) ->
 			spot.spot_angle = SPOT_ANGLE_DEG
 			spot.spot_attenuation = 0.9
 			# SpotLight3D shines down its -Z; turn that to -Y.
-			spot.transform = Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), t * COBRA_HEAD)
+			spot.transform = Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), t * (HEADS.get(style, COBRA_HEAD) as Vector3))
 			light = spot
 		light.light_color = colour_for(style, region)
 		light.light_energy = 0.0

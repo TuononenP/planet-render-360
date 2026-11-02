@@ -250,6 +250,8 @@ var offline_mode := false
 var country := ""
 ## Railway dicts of the last parsed payload (OsmTags._rail_entry).
 var railways: Array = []
+## Street furniture nodes of the last success (OsmParser.furniture_kind).
+var furniture: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -572,6 +574,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 		fallback_used.emit(_fallback_detail, _fallback_partial)
 	country = str(parsed.get("country", ""))
 	railways = parsed.get("railways", [])
+	furniture = parsed.get("furniture", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

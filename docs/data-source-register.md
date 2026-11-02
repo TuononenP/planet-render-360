@@ -80,8 +80,15 @@ from `https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/…` (URLs from
 builds (`MaterialLibrary.hi_res`, `PbrTextures.map_path`); everything else
 keeps the 1k files. Excluded from the iOS export (`export_presets.cfg`).
 Sets: limestone, stone, render, brick, concrete, wood, slate, terracotta,
-membrane, asphalt, pavement. The terrain sets (cliff, forest, lawn, gravel,
-sand, snow, grass, rock) stay 1k for now.
+membrane, asphalt, pavement.
+
+Terrain layers (added the same day): lawn (`leafy_grass`), rock
+(`brown_mud_rocks_01`), cliff (`rock_face_03`), forest (`forest_leaves_02`),
+gravel (`gravel_floor`), sand (`coast_sand_01`), snow (`snow_02`) at 2k from
+the same CDN, CC0 1.0, 21 files ≈75 MB. Every file verified as a 2048×2048
+JPEG before bundling. `TerrainTextures` builds desktop Ultra's terrain arrays
+from them at 2048 px, block-compressed (BC1 albedo, BC3 normal + roughness).
+Only `grass` (the building-ground set, not a terrain layer) stays 1k.
 
 ## Foliage, bark and tree-impostor textures — T5.1 (2026-10-28)
 
@@ -293,3 +300,35 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
 - The owner's iPad Pro was `unavailable` at build time, so on-device
   install/run is the one remaining iOS check: connect/unlock it and run
   the `xcrun devicectl` command printed by the script.
+
+## Street furniture, kerbs and decals — Ultra pass Phase 7 (2026-11-02)
+
+- **OSM street furniture nodes**: `amenity=bench|waste_basket`,
+  `highway=traffic_signals|bus_stop` (+ `shelter=yes`), `barrier=bollard`
+  within 450 m (`OsmQuery.FURNITURE_RADIUS_M`), the last statement of the
+  detailed Overpass query. ODbL, same attribution as the rest of the map
+  data. Cached payloads from before the change carry none; StreetFurniture
+  then uses its sparse fill.
+- **Furniture, kerb and decal geometry/textures**: own procedural work
+  (`StreetFurniture`, `KerbBuilder`, `RoadDecals`), no third-party pixels
+  or meshes — CC0 1.0 by this project. The plan's CC0 model downloads
+  were not needed: true-metre procedural kits keep the regional variants
+  (North American mast arms, Japanese horizontal heads, British black
+  bins, Dutch red-brown bollards) cheap and import-free.
+
+## Desktop-Ultra z18 inner imagery — Ultra pass Phase 6 (2026-11-02)
+
+Same source as the main drape (Esri World Imagery tiles, see above), one
+zoom finer: a 7×7 z18 mosaic round the viewpoint (≈700 m in Paris),
+fetched beside the main mosaic on desktop Ultra only and blended over its
+fine detail (`GroundMaterial.inner_map`). Same attribution, same tile
+cache (`sat_v2_18_*`).
+
+## Riddarholmen Church — Ultra pass Phase 8 (2026-11-02)
+
+`riddarholmen`, 90 m to the tip of the 1841 cast-iron openwork spire:
+Wikipedia "Riddarholmen Church" (height and spire history). Footprint and
+placement from its OSM outline (way `building=church`, name
+Riddarholmskyrkan): 62.7 × 39.9 m, nave axis 7.8° north of east, so the
+model is ≈64 × 40 m, yaw −7.8°, and the registry point (59.32468 N,
+18.06454 E) puts the model's centre on the outline's. Model `LandmarkStockholm.riddarholmen`, own work.

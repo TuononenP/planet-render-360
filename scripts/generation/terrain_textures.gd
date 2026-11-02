@@ -9,7 +9,9 @@ extends RefCounted
 ## weights index it.
 ##
 ## Phones (Fast/Balanced) get 512 px layers (≈11 MB per array instead of
-## ≈44 MB); desktop tiers the bundled 1024 px.
+## ≈44 MB); desktop tiers the bundled 1024 px; desktop Ultra 2048 px from
+## the 2K sets (assets/textures/2k/), block-compressed (BC1 albedo, BC3
+## normal + roughness) so the pair stays ≈60 MB instead of ≈400 MB.
 
 const LAYERS := ["pavement", "lawn", "rock", "asphalt", "cliff", "forest", "gravel", "sand", "snow"]
 ## Metres one texture repeat spans on the ground, per layer.
@@ -19,7 +21,11 @@ const SNOW := 8
 static var _arrays: Dictionary = {}
 static var _mutex := Mutex.new()
 
+const HI_RES := 2048
+
 static func size_for(preset: int) -> int:
+	if RenderQuality.ultra_desktop(preset):
+		return HI_RES
 	return 512 if RenderSettings.clamp_preset(preset) <= RenderSettings.Preset.BALANCED else 1024
 
 ## Packed arrays persist under user:// (built once per install): built
@@ -90,6 +96,12 @@ static func _build(size: int) -> Dictionary:
 		n = Image.create_from_data(size, size, false, Image.FORMAT_RGBA8, nd)
 		n.generate_mipmaps(true)
 		nor.append(n)
+	if size >= HI_RES:
+		for img in alb:
+			img.convert(Image.FORMAT_RGB8)
+			img.compress(Image.COMPRESS_S3TC)
+		for img in nor:
+			img.compress(Image.COMPRESS_S3TC)
 	var a := Texture2DArray.new()
 	a.create_from_images(alb)
 	var b := Texture2DArray.new()
@@ -108,7 +120,7 @@ static func tiles() -> PackedFloat32Array:
 	return PackedFloat32Array(TILE_M)
 
 static func _layer(set_name: String, map_name: String, size: int) -> Image:
-	var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
+	var img := (MaterialLibrary._set_image(set_name, map_name, size >= HI_RES) as Image).duplicate() as Image
 	img.clear_mipmaps()
 	img.convert(Image.FORMAT_RGBA8)
 	if img.get_width() != size or img.get_height() != size:

@@ -5,14 +5,18 @@ extends RefCounted
 ## * Lampposts: only along real OSM carriageways in built-up blocks
 ##   (lit streets), every 25 m alternating sides on the verge, never in
 ##   a footprint / carriageway / water. Regional style: cast-iron lantern
-##   (Paris + historic European cores) or modern arm luminaire. Instanced
+##   (Paris + historic European cores), black heritage post (British and
+##   Irish side streets), galvanised cobra-head (North America), concrete
+##   utility pole with a bracket lamp (Japanese and Korean side streets)
+##   or modern arm luminaire. Instanced
 ##   (MultiMesh per style). Radius per preset: Fast none, Balanced
 ##   120 m, High 220 m, Ultra 600 m.
 ## * Barriers: real OSM barrier=wall/city_wall/retaining_wall (stone
 ##   PBR), fence/railing/guard_rail (alpha-tested picket panels on
 ##   posts), hedge (leaf-textured clipped hedge) — draped on GroundTruth,
 ##   merged into one mesh per kind. Absent in data → absent in the world.
-## Benches/street furniture nodes are not in the OSM payload yet (gap).
+## * Benches, bins, bollards, signals and bus stops: StreetFurniture
+##   (desktop Ultra).
 
 const LAMP_SPACING_M := 25.0
 const PROP_R := [0.0, 120.0, 220.0, 600.0]
@@ -21,6 +25,9 @@ const LIT := ["primary", "secondary", "tertiary", "residential", "unclassified",
 	"tertiary_link"]
 const MAJOR := ["primary", "secondary", "trunk", "primary_link", "secondary_link"]
 const LANTERN_REGIONS := ["haussmann", "france", "central_europe", "west_europe_brick", "alpine"]
+const HERITAGE_COUNTRIES := ["GB", "IE", "IM", "JE", "GG"]
+const COBRA_COUNTRIES := ["US", "CA"]
+const UTILITY_COUNTRIES := ["JP", "KR", "TW"]
 ## Linear colour of free-standing walls: grey-beige weathered masonry.
 const WALL_STONE := Color(0.26, 0.24, 0.21)
 ## barrier class → [kind, height m, thickness m]
@@ -39,7 +46,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	var bar := _barriers(root, data, ground, ctx)
-	return {"lamps": lamps, "barrier_m": bar}
+	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture}
 
 # --- Lampposts -----------------------------------------------------------
 
@@ -51,8 +59,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
-	var lantern_region := region in LANTERN_REGIONS
-	var placed := {"lantern": [], "modern": [], "modern_s": []}
+	var family := lamp_family(region, data.country)
+	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": []}
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
 	for r in data.roads:
@@ -72,8 +80,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			continue
 		if cls not in LIT or pts.size() < 2:
 			continue
-		var style := "lantern" if lantern_region and (region == "haussmann" or cls not in MAJOR) \
-			else ("modern" if cls in MAJOR else "modern_s")
+		var style := lamp_style(family, region, cls)
 		var off := (width_m * 0.5 + 1.1) * m2u
 		var step := LAMP_SPACING_M * m2u
 		var carry := step * 0.5
@@ -103,7 +110,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				occupied[ok] = true
 				var toward := -nrm * side
 				var yaw := atan2(-toward.y, toward.x)
-				var h := 1.0 if style != "modern_s" else 0.75
+				var h := 0.75 if style == "modern_s" or (style == "cobra" and cls not in MAJOR) else 1.0
 				var basis := Basis(Vector3.UP, yaw).scaled(Vector3(m2u, m2u * h, m2u))
 				(placed[style] as Array).append(Transform3D(basis,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
@@ -117,7 +124,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			continue
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = _lamp_mesh("lantern" if style == "lantern" else "modern")
+		mm.mesh = _lamp_mesh("modern" if style == "modern_s" else style)
 		mm.instance_count = xf.size()
 		for k in xf.size():
 			mm.set_instance_transform(k, xf[k])
@@ -128,6 +135,35 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		total += xf.size()
 	return total
 
+## The place's lamp family: "lantern", "heritage", "cobra", "utility" or
+## "modern" (by ISO country first, then the country region).
+static func lamp_family(region: String, country: String) -> String:
+	var iso := country.to_upper()
+	if iso in HERITAGE_COUNTRIES:
+		return "heritage"
+	if iso in COBRA_COUNTRIES or (iso == "" and region == "north_america"):
+		return "cobra"
+	if iso in UTILITY_COUNTRIES or (iso == "" and region == "japan"):
+		return "utility"
+	if region in LANTERN_REGIONS:
+		return "lantern"
+	return "modern"
+
+## Lamp style for one road of class `cls` in `family`: the period styles
+## line side streets (all of Paris), main roads take the arm luminaire.
+static func lamp_style(family: String, region: String, cls: String) -> String:
+	var major := cls in MAJOR
+	match family:
+		"cobra":
+			return "cobra"
+		"lantern":
+			if region == "haussmann" or not major:
+				return "lantern"
+		"heritage", "utility":
+			if not major:
+				return family
+	return "modern" if major else "modern_s"
+
 ## Lamp meshes in metres: metal surface + emissive glass surface.
 static func _lamp_mesh(style: String) -> ArrayMesh:
 	if _lamp_meshes.has(style):
@@ -136,8 +172,9 @@ static func _lamp_mesh(style: String) -> ArrayMesh:
 	var glass := TreeMeshLibrary.Buf.new()
 	var metal_col: Color
 	var glass_col: Color
-	if style == "lantern":
-		metal_col = Color(0.11, 0.14, 0.12)
+	if style == "lantern" or style == "heritage":
+		# Paris green-black cast iron; the British post is gloss black.
+		metal_col = Color(0.11, 0.14, 0.12) if style == "lantern" else Color(0.03, 0.03, 0.035)
 		glass_col = Color(1.0, 0.86, 0.62)
 		# Plinth, fluted shaft, collar, lantern housing + cap + finial.
 		TreeMeshLibrary._tube(metal, [Vector3(0, -0.3, 0), Vector3(0, 0.55, 0)], [0.2, 0.17], 8, 0.8, 1.0)
@@ -147,6 +184,31 @@ static func _lamp_mesh(style: String) -> ArrayMesh:
 		TreeMeshLibrary._tube(glass, [Vector3(0, 3.85, 0), Vector3(0, 4.45, 0)], [0.13, 0.27], 4, 1.0, 1.0)
 		TreeMeshLibrary._tube(metal, [Vector3(0, 4.45, 0), Vector3(0, 4.7, 0)], [0.32, 0.05], 4, 1.0, 1.0)
 		TreeMeshLibrary._tube(metal, [Vector3(0, 4.7, 0), Vector3(0, 4.9, 0)], [0.04, 0.01], 6, 1.0, 1.0)
+	elif style == "cobra":
+		# Galvanised tapered pole, an upswept arm, the cobra head tipped up.
+		metal_col = Color(0.50, 0.51, 0.50)
+		glass_col = Color(1.0, 0.95, 0.85)
+		TreeMeshLibrary._tube(metal, [Vector3(0, -0.3, 0), Vector3(0, 0.5, 0)], [0.2, 0.19], 8, 0.8, 1.0)
+		TreeMeshLibrary._tube(metal, [Vector3(0, 0.5, 0), Vector3(0, 8.6, 0)], [0.12, 0.07], 8, 0.9, 1.0)
+		var carm: Array = TreeMeshLibrary._bezier(Vector3(0, 8.0, 0), Vector3(0.2, 9.0, 0), Vector3(2.2, 9.05, 0), 6)
+		TreeMeshLibrary._tube(metal, carm, [0.06, 0.055, 0.05, 0.05, 0.045, 0.045, 0.04], 6, 1.0, 1.0)
+		TreeMeshLibrary._tube(metal, [Vector3(2.1, 9.05, 0), Vector3(2.45, 9.08, 0), Vector3(2.85, 9.05, 0),
+			Vector3(3.05, 8.98, 0)], [0.1, 0.19, 0.17, 0.06], 8, 1.0, 1.0)
+		_box(glass, Vector3(2.6, 8.9, 0), Vector3(0.5, 0.04, 0.24))
+	elif style == "utility":
+		# Concrete utility pole: crossarm and insulators up top, a small
+		# bracket lamp over the street at 5.5 m.
+		metal_col = Color(0.47, 0.46, 0.43)
+		glass_col = Color(1.0, 0.97, 0.92)
+		TreeMeshLibrary._tube(metal, [Vector3(0, -0.3, 0), Vector3(0, 11.0, 0)], [0.17, 0.11], 8, 0.9, 1.0)
+		_box(metal, Vector3(0, 10.2, 0), Vector3(0.12, 0.12, 1.8))
+		for z in [-0.75, -0.25, 0.25, 0.75]:
+			_box(metal, Vector3(0, 10.33, z), Vector3(0.07, 0.14, 0.07))
+		_box(metal, Vector3(0, 8.6, 0), Vector3(0.12, 0.12, 1.2))
+		TreeMeshLibrary._tube(metal, [Vector3(0, 5.3, 0), Vector3(0.6, 5.65, 0), Vector3(1.05, 5.7, 0)],
+			[0.035, 0.03, 0.03], 6, 1.0, 1.0)
+		_box(metal, Vector3(1.15, 5.68, 0), Vector3(0.42, 0.09, 0.2))
+		_box(glass, Vector3(1.15, 5.62, 0), Vector3(0.34, 0.03, 0.15))
 	else:
 		metal_col = Color(0.42, 0.44, 0.46)
 		glass_col = Color(1.0, 0.97, 0.9)

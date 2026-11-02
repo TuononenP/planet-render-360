@@ -106,6 +106,9 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		img = data.satellite_image if data.satellite_image != null else _image_of(photo)
 	var gain := photo_gain_image(img, photo_rect) if has_sat else 1.0
 	m.set_shader_parameter("photo_gain", gain)
+	if has_sat and data.satellite_inner_texture != null:
+		m.set_shader_parameter("photo_inner", data.satellite_inner_texture)
+		m.set_shader_parameter("inner_map", inner_map(data))
 	m.set_shader_parameter("ground_max_low",
 		ground_ceiling_image(img, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
 	m.set_shader_parameter("lf_lod", lf_lod(data) if has_sat else 0.0)
@@ -134,6 +137,19 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	TerrainGlsl.bind(m, data.quality_preset)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
 	return m
+
+## Main-photo UV → inner-mosaic UV as (scale u, scale v, offset u,
+## offset v). Exact, not fitted: a global pixel at the inner zoom is the
+## main zoom's pixel × 2^(inner − main), so the map is affine in the
+## main UV the vertices already carry (TerrainBuilder.satellite_uv).
+static func inner_map(data: LocationData) -> Vector4:
+	var zoom := int(data.satellite_source.get("source_zoom", data.satellite_zoom))
+	var k := pow(2.0, float(RenderSettings.SATELLITE_INNER_ZOOM - zoom))
+	var main_px := float(TerrainBuilder.satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
+	var inner_px := float(RenderSettings.SATELLITE_INNER_SPAN * SatelliteFetcher.TILE_PX)
+	var off := (data.satellite_origin_px * k - data.satellite_inner_origin_px) / inner_px
+	var sc := main_px * k / inner_px
+	return Vector4(sc, sc, off.x, off.y)
 
 ## Mip level whose texel is ~LF_M metres: the same ground blur at
 ## every satellite zoom (tier invariance).

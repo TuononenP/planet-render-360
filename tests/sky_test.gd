@@ -98,6 +98,8 @@ func _init() -> void:
 		failures.append("overcast should soften shadows (%f) and lift diffuse light (%f)"
 			% [rig.sun.shadow_opacity, rig.environment.ambient_light_energy])
 	var overcast_shade := rig.cloud_shade_color
+	if rig.sun.light_specular > 0.2:
+		failures.append("a full deck should drop the sun's specular glint, got %f" % rig.sun.light_specular)
 	var fogs := {}
 	for code in [61, 65, 45]:
 		rig.set_weather(code, 100.0)

@@ -158,8 +158,8 @@ static var _pbr_mats: Dictionary = {}
 ## once and falls back to a procedural grain (register fallback order).
 
 # --- Delegators: implementation in PbrTextures. ---
-static func _set_image(set_name: String, map_name: String) -> Image:
-	return PbrTextures._set_image(set_name, map_name)
+static func _set_image(set_name: String, map_name: String, hi: bool = hi_res) -> Image:
+	return PbrTextures._set_image(set_name, map_name, hi)
 
 static func _weather_tiles(img: Image) -> void:
 	PbrTextures._weather_tiles(img)

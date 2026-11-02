@@ -23,6 +23,9 @@ const VARIANTS := 3
 ## vertex tint and the geometry picks (roof shape, storeys, relief) keep
 ## each building distinct.
 const LOOKS := 2
+## Desktop Ultra's look count (build context "looks"): more variety per
+## era and kind for the price of a few more shared materials.
+const ULTRA_LOOKS := 5
 ## Brightest linear luminance a wall/roof tint may reach.
 const WALL_ALBEDO_MAX := 0.72
 
@@ -207,7 +210,8 @@ static func resolve(b: Dictionary, region: String, density: String,
 	var city := city_of(region)
 	var ms := seed_v
 	if city != "":
-		ms = (floorf(_h(seed_v, 31) * float(LOOKS)) + 0.5) / float(LOOKS) * 0.913 + 0.041
+		var looks := float(ctx.get("looks", LOOKS))
+		ms = (floorf(_h(seed_v, 31) * looks) + 0.5) / looks * 0.913 + 0.041
 	var wall: Array = _pick(p["w"] as Array, ms, 1)
 	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)

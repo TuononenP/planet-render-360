@@ -30,6 +30,11 @@ const CAP_LANDUSE := 1600
 const CAP_LEISURE := 700
 const CAP_BARRIERS := 1600
 const CAP_TREE_NODES := 8000
+## Street furniture nodes (benches, bins, bollards, signals, bus stops)
+## near the viewpoint only: desktop Ultra dresses the streets it shows up
+## close (StreetFurniture.RADIUS_M).
+const CAP_FURNITURE := 4000
+const FURNITURE_RADIUS_M := 450
 ## Railway track ways (a city terminus yard is ~400 within 1200 m) and
 ## squares mapped outside the highway statement (place=square,
 ## area:highway, multipolygon squares).
@@ -138,6 +143,12 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 		# building style follows the real border, not a lat/lon box.
 		'is_in(%.6f,%.6f)->.ci;area.ci["admin_level"="2"]["ISO3166-1"];out tags 4;'
 			% [lat, lon],
+		# Street furniture last: a timeout drops it before anything else.
+		('(node["amenity"~"^(bench|waste_basket)$"](around:%d,%.6f,%.6f);'
+			+ 'node["highway"~"^(traffic_signals|bus_stop)$"](around:%d,%.6f,%.6f);'
+			+ 'node["barrier"="bollard"](around:%d,%.6f,%.6f););out %d;')
+			% [FURNITURE_RADIUS_M, lat, lon, FURNITURE_RADIUS_M, lat, lon,
+				FURNITURE_RADIUS_M, lat, lon, CAP_FURNITURE],
 	]
 	return head + "".join(PackedStringArray(clauses))
 

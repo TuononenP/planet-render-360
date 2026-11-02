@@ -3,7 +3,8 @@ extends SceneTree
 ## Headless: godot --headless --script tests/pbr_2k_test.gd
 ## Desktop Ultra's 2K photo sets (Phase 6): PbrTextures.map_path picks
 ## assets/textures/2k/ only on a hi-res build and only where the 2K file is
-## bundled (the terrain sets stay 1K), and a 2K image really is 2048 px.
+## bundled, a 2K image really is 2048 px, and desktop Ultra's terrain
+## layers are 2048 px arrays built from the 2K terrain sets.
 
 func _init() -> void:
 	_run()
@@ -11,13 +12,14 @@ func _init() -> void:
 func _run() -> void:
 	var failures: Array[String] = ["sentinel: the run did not finish (script error?)"]
 	for s in ["limestone", "stone", "render", "brick", "concrete", "wood", "slate",
-			"terracotta", "membrane", "asphalt", "pavement"]:
+			"terracotta", "membrane", "asphalt", "pavement", "lawn", "rock", "cliff", "forest",
+		"gravel", "sand", "snow"]:
 		for map_name in ["diff", "nor", "rough"]:
 			if not PbrTextures.map_path(s, map_name, true).contains("/2k/"):
 				failures.append("%s_%s should resolve to its 2K file on Ultra" % [s, map_name])
 			if PbrTextures.map_path(s, map_name, false).contains("/2k/"):
 				failures.append("%s_%s should stay 1K off Ultra" % [s, map_name])
-	if PbrTextures.map_path("lawn", "diff", true).contains("/2k/"):
+	if PbrTextures.map_path("grass", "diff", true).contains("/2k/"):
 		failures.append("a set with no 2K file should fall back to 1K")
 	MaterialLibrary.hi_res = true
 	var hi := PbrTextures._set_image("brick", "diff")
@@ -25,6 +27,13 @@ func _run() -> void:
 	var lo := PbrTextures._set_image("brick", "diff")
 	if hi.get_width() != 2048 or lo.get_width() != 1024:
 		failures.append("brick photo sizes %d (Ultra) / %d (else), want 2048 / 1024" % [hi.get_width(), lo.get_width()])
+	if RenderQuality.ultra_desktop(RenderSettings.Preset.ULTRA):
+		if TerrainTextures.size_for(RenderSettings.Preset.ULTRA) != 2048 \
+				or TerrainTextures.size_for(RenderSettings.Preset.HIGH) != 1024:
+			failures.append("terrain layers: 2048 px on desktop Ultra, 1024 on High")
+	var layer := TerrainTextures._layer("lawn", "diff", TerrainTextures.HI_RES)
+	if layer.get_width() != 2048:
+		failures.append("a 2K terrain layer should come from the 2K photo, got %d px" % layer.get_width())
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("PBR 2K OK: 2K sets on Ultra builds only, 1K fallback, real 2048 px")

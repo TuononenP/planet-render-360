@@ -59,9 +59,12 @@ static var _mats: Dictionary = {}
 static func build_roads(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
+	RoadSurface.set_place(data)
 	var root := Node3D.new()
 	root.name = "Roads"
 	_roads(root, data, ground, abort)
+	RoadDecals.build(root, data, ground)
+	KerbBuilder.build(root, data, ground)
 	RailBuilder.build(root, data, ground, abort)
 	return root
 

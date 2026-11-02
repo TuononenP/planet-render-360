@@ -110,6 +110,11 @@ var _sat_image: Image
 var _sat_origin := Vector2.ZERO
 var _sat_zoom := 16
 var _sat_done := false
+## Desktop Ultra's z18 inner mosaic (RenderSettings.SATELLITE_INNER_*).
+var _sat_inner: SatelliteFetcher
+var _inner_texture: Texture2D
+var _inner_origin := Vector2.ZERO
+var _inner_done := true
 var used_satellite := false
 ## GroundTruth built on WorkerThreadPool as soon as DEM + OSM are in
 ## (it reads nothing the far-city and climate stages write), so its
@@ -192,6 +197,16 @@ func _ready() -> void:
 	_sat.failed.connect(func(reason: String) -> void:
 		print("Satellite fetch failed, using colour dressing: %s" % reason)
 		_sat_done = true)
+	_sat_inner = SatelliteFetcher.new()
+	add_child(_sat_inner)
+	_sat_inner.succeeded.connect(func(tex: Texture2D, _img: Image, origin: Vector2, zoom: int) -> void:
+		# A lower-zoom fallback adds nothing over the main mosaic.
+		if zoom == RenderSettings.SATELLITE_INNER_ZOOM:
+			_inner_texture = tex
+			_inner_origin = origin
+		_inner_done = true)
+	_sat_inner.failed.connect(func(_reason: String) -> void:
+		_inner_done = true)
 
 func _note(layer: String) -> void:
 	if not degraded.has(layer):
@@ -315,6 +330,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 			RenderSettings.satellite_span_for(quality_preset, lat))
 	else:
 		_sat_done = true
+	_inner_texture = null
+	_inner_done = not RenderQuality.ultra_desktop(quality_preset)
+	if not _inner_done:
+		_sat_inner.fetch(lat, lon, RenderSettings.SATELLITE_INNER_ZOOM, RenderSettings.SATELLITE_INNER_SPAN)
 	# Far backdrop fetch overlaps everything else; converted in stage 0
 	# once the detailed centre/scale are known.
 	_far_done = false
@@ -499,7 +518,7 @@ func _await_satellite(data: LocationData) -> void:
 	# Tiles already settled while the earlier stage ran (cache hits).
 	if not _sat_done:
 		stage_progress.emit(1, _sat_tiles.x, maxi(_sat_tiles.y, _sat.pending_tile_count()))
-	while not _sat_done and waited < budget and not _cancelled:
+	while not (_sat_done and _inner_done) and waited < budget and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	if _sat_texture == null and data.quality_preset > RenderSettings.Preset.FAST:
@@ -512,6 +531,8 @@ func _await_satellite(data: LocationData) -> void:
 		data.satellite_zoom = _sat_zoom
 		data.satellite_source = _sat.satellite_source
 		data.satellite_metres_per_px = float(data.satellite_source.get("metres_per_px", 0.0))
+		data.satellite_inner_texture = _inner_texture
+		data.satellite_inner_origin_px = _inner_origin
 		_credits[1] = IMAGERY_CREDIT
 
 ## Nearest first, except monuments (columns, obelisks) and observation
@@ -547,6 +568,7 @@ func _await_osm(data: LocationData) -> void:
 		data.barriers = _osm_barriers
 		data.country = _osm.country
 		data.railways = _osm.railways
+		data.street_furniture = _osm.furniture
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
 		_credits[2] = "Map data: © OpenStreetMap contributors"
 	else:

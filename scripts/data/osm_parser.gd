@@ -7,6 +7,19 @@ extends RefCounted
 ## Spacing of the trees placed along a natural=tree_row way (metres).
 const TREE_ROW_M := 8.0
 
+## Street furniture kind of a node ("" when it is none): bench, bin,
+## bollard, signals or bus_stop (StreetFurniture).
+static func furniture_kind(tags: Dictionary) -> String:
+	match str(tags.get("amenity", "")):
+		"bench": return "bench"
+		"waste_basket": return "bin"
+	match str(tags.get("highway", "")):
+		"traffic_signals": return "signals"
+		"bus_stop": return "bus_stop"
+	if str(tags.get("barrier", "")) == "bollard":
+		return "bollard"
+	return ""
+
 static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictionary:
 	var buildings: Array = []
 	var roads: Array = []
@@ -16,12 +29,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var trees: Array = []
 	var barriers: Array = []
 	var railways: Array = []
+	var furniture: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
-			"barriers": barriers, "country": country, "railways": railways}
+			"barriers": barriers, "country": country, "railways": railways,
+			"furniture": furniture}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -59,6 +74,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var tree := {"x": tp.x, "z": tp.y}
 				tree.merge(OsmTags.tree_tags(el_tags))
 				trees.append(tree)
+			var fk := furniture_kind(el_tags)
+			if fk != "":
+				var fp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				furniture.append({"x": fp.x, "z": fp.y, "kind": fk,
+					"shelter": str(el_tags.get("shelter", "")) == "yes"})
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
@@ -197,7 +217,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
-		"barriers": barriers, "country": country, "railways": railways}
+		"barriers": barriers, "country": country, "railways": railways,
+			"furniture": furniture}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

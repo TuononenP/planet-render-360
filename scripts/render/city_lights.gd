@@ -59,6 +59,8 @@ static func apply(world: Node, amount: float) -> void:
 		var mats: Array = [(n as GeometryInstance3D).material_override]
 		for s in (mesh.get_surface_count() if mesh != null else 0):
 			mats.append(mesh.surface_get_material(s))
+			if n is MeshInstance3D:
+				mats.append((n as MeshInstance3D).get_surface_override_material(s))  # LandmarkLights glow
 		for m in mats:
 			if not (m is Material) or seen.has(m) or not (m as Material).has_meta(META):
 				continue

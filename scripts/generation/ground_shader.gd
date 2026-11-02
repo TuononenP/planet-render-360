@@ -27,6 +27,12 @@ uniform float u2m = 1.0;
 uniform float near_m = 140.0;
 uniform float far_m = 900.0;
 uniform float photo_gain = 1.0;
+// Desktop Ultra's z18 inner mosaic: uv = UV * inner_map.xy +
+// inner_map.zw (exact: a z18 pixel is the main zoom's pixel × 2^dz);
+// inner_map.x 0 = none. Sharpens the photo's fine
+// structure only (the low-frequency class signal stays the main photo's).
+uniform sampler2D photo_inner : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform vec4 inner_map = vec4(0.0);
 uniform float lf_lod = 0.0;
 uniform float ground_max_low = 0.38;
 uniform float lum_floor = 0.055;
@@ -90,6 +96,12 @@ void fragment() {
 	float dist_m = length(VERTEX) * u2m;
 	vec3 lf = t_dehaze(textureLod(photo, UV, lf_lod).rgb * photo_gain);
 	vec3 hf = t_dehaze(texture(photo, UV).rgb * photo_gain);
+	if (inner_map.x > 0.0) {
+		vec2 iuv = UV * inner_map.xy + inner_map.zw;
+		vec2 ie = min(iuv, 1.0 - iuv);
+		float inside = smoothstep(0.0, 0.1, min(ie.x, ie.y));
+		hf = mix(hf, t_dehaze(texture(photo_inner, iuv).rgb * photo_gain), inside);
+	}
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
 	float veg = smoothstep(veg_lo, veg_hi, exg);
 	// Teal shallows and wet flats (Venice's lagoon) are green-ish too, but

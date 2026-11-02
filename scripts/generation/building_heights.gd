@@ -81,7 +81,9 @@ static func _height_context(data: LocationData) -> Dictionary:
 	var ctx := {"region": region, "density": density,
 		"fidelity": MaterialLibrary.fidelity_for_preset(data.quality_preset),
 		"cells": cells, "cell": cell, "radius_u": 150.0 * m2u,
-		"median_h": _median(all_h), "tagged_n": all_h.size()}
+		"median_h": _median(all_h), "tagged_n": all_h.size(),
+		"looks": ArchitectureStyle.ULTRA_LOOKS if RenderQuality.ultra_desktop(data.quality_preset)
+			else ArchitectureStyle.LOOKS}
 	ctx.merge(CityStyles.local_frame(region, data.latitude, data.longitude))
 	return ctx
 

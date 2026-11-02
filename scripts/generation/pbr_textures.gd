@@ -42,8 +42,8 @@ static func map_path(set_name: String, map_name: String, hi_res: bool = Material
 		return MaterialLibrary.TEXTURE_DIR + "2k/" + file
 	return MaterialLibrary.TEXTURE_DIR + file
 
-static func _set_image(set_name: String, map_name: String) -> Image:
-	var path := map_path(set_name, map_name)
+static func _set_image(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> Image:
+	var path := map_path(set_name, map_name, hi_res)
 	var key := set_name + ":" + map_name + (":2k" if path.contains("/2k/") else "")
 	_mutex.lock()
 	if MaterialLibrary._set_images.has(key):
