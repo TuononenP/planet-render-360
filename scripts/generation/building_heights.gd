@@ -95,6 +95,12 @@ static func _height_context(data: LocationData) -> Dictionary:
 ## predate v2 (fixtures) and keep their carried height verbatim. Returns
 ## {total_m, source}; total includes the roof (OSM `height` semantics),
 ## the caller splits wall/roof from the shape.
+## OSM building values that are low-rise almost everywhere: an inferred
+## (untagged) height is capped at LOW_RISE_STOREYS of the look's floor.
+const LOW_RISE_USES := ["retail", "supermarket", "warehouse", "industrial", "garage",
+	"garages", "parking", "kiosk", "service", "shed", "hangar", "barn"]
+const LOW_RISE_STOREYS := 4.0
+
 static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		parent_res: Dictionary, look: Dictionary) -> Dictionary:
 	var src := str(m.get("height_source", b.get("height_source", "")))
@@ -119,8 +125,14 @@ static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		if levels > 0:
 			return {"total_m": float(levels) * float(look["floor_h"]),
 				"source": "levels"}
-	return _inferred_total(float(m.get("x", b.get("x", 0.0))),
+	var est := _inferred_total(float(m.get("x", b.get("x", 0.0))),
 		float(m.get("z", b.get("z", 0.0))), ctx, look)
+	# A mall, shed or garage among towers is not a tower: the same-kind
+	# neighbour median (offices and retail are both "commercial") made
+	# an untagged Dubai Mall block 61 m tall beside the vantage.
+	if str(m.get("kind", b.get("kind", ""))) in LOW_RISE_USES:
+		est["total_m"] = minf(float(est["total_m"]), LOW_RISE_STOREYS * float(look["floor_h"]))
+	return est
 
 ## Step 3 of the priority: the data-derived local estimate. The plan
 ## names a satellite/DEM-derived estimate; what is honest today is the
