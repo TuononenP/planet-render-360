@@ -45,6 +45,8 @@ func _run() -> void:
 		failures.append("Greek roofs should carry solar water heaters")
 	if not _any(10, {"city": "", "region": "central_europe"}, "skylight"):
 		failures.append("other flat roofs should get skylights")
+	if not _any(5, {"city": "", "region": "central_europe"}, "core"):
+		failures.append("big flat roofs should carry a stair/lift overrun")
 	if _any(20, {"city": "", "region": "central_europe"}, "cedar"):
 		failures.append("water towers belong to New York")
 	var a := _mats_for({"city": "tokyo", "region": "japan"}, 0.42)
@@ -65,7 +67,7 @@ func _run() -> void:
 	root.free()
 	failures.erase(failures[0])
 	if failures.is_empty():
-		print("ROOF CLUTTER OK: regional mixes (NYC towers, Asian condensers, Gulf tanks, Greek heaters, skylights), stable, Ultra only")
+		print("ROOF CLUTTER OK: regional mixes (NYC towers, Asian condensers, Gulf tanks, Greek heaters, skylights, overruns), stable, Ultra only")
 		quit(0)
 	else:
 		for f in failures:

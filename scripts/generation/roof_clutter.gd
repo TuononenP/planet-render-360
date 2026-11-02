@@ -14,6 +14,7 @@ extends RefCounted
 ##     (a tilted collector and its tank);
 ##   - elsewhere: skylights, roof hatches, aerial masts, the odd dish,
 ##     and solar arrays on big roofs.
+## A stair or lift overrun stands on most roofs over 150 m² everywhere.
 ## Every pick is seeded by the building, so the roofscape is stable. The
 ## pieces go into BuildingDetail's batch (one mesh per building, merged
 ## per cell by LodRing).
@@ -41,8 +42,12 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 	var placed := 0
 	if city == "new_york" and area_m2 > 250.0 and _h(seed_v, 71) < 0.45:
 		placed += _water_tower(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
+	# A stair or lift overrun crowns nearly every multi-storey flat roof.
+	if area_m2 > 150.0 and _h(seed_v, 70) < 0.8:
+		placed += _overrun(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 	if city in ASIA or region in ASIA_REGIONS:
-		placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 3 + int(_h(seed_v, 72) * 6.0))
+		placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v,
+			clampi(int(area_m2 / 250.0), 1, 5))
 		if _h(seed_v, 73) < 0.35:
 			placed += _sign_frame(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 	elif city in TANK_CITIES or region in TANK_REGIONS:
@@ -108,13 +113,31 @@ static func _water_tower(batch: BuildingDetail.Batch, ring: PackedVector2Array, 
 		Vector3(p.x, top + legs + tank_h * m + 0.7 * m, p.y)), _mat("cedar_roof"))
 	return 1
 
+static func _overrun(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector2,
+		u: Vector2, v: Vector2, lu: float, lv: float, top: float, basis: Basis, seed_v: float) -> int:
+	var h := lerpf(2.8, 3.8, _h(seed_v, 86))
+	return _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 84, top + h * 0.5 * _m(), "box",
+		Vector3(lerpf(3.0, 6.0, _h(seed_v, 87)), h, lerpf(2.6, 4.5, _h(seed_v, 88))), "core")
+
+## `banks` rows of 3-6 condensers side by side, the way they line East
+## Asian roofs, plus a steel water tank on half the roofs.
 static func _condensers(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, top: float, basis: Basis,
-		seed_v: float, n: int) -> int:
+		seed_v: float, banks: int) -> int:
 	var placed := 0
-	for i in n:
-		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 100 + i * 2, top + 0.35 * _m(),
-			"box", Vector3(0.9, 0.7, 0.4), "ac")
+	var m := _m()
+	for i in banks:
+		var p := _spot(ring, c, u, v, lu, lv, seed_v, 100 + i * 2)
+		if p == Vector2.INF:
+			continue
+		var n := 3 + int(_h(seed_v, 110 + i) * 4.0)
+		for k in n:
+			var q := p + u * (float(k) - float(n - 1) * 0.5) * 1.05 * m
+			if not RingGeometry.point_in_ring(q, ring):
+				continue
+			batch.add("box", Transform3D(basis.scaled_local(Vector3(0.9, 0.7, 0.4) * m),
+				Vector3(q.x, top + 0.35 * m, q.y)), _mat("ac"))
+			placed += 1
 	if _h(seed_v, 99) < 0.5:
 		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 98, top + 1.0 * _m(),
 			"box", Vector3(2.0, 2.0, 1.6), "tank_steel")
@@ -213,6 +236,9 @@ static func _mat(key: String) -> Material:
 		"cedar_roof":
 			m.albedo_color = Color(0.22, 0.20, 0.19)
 			m.roughness = 0.8
+		"core":
+			m.albedo_color = Color(0.62, 0.61, 0.58)
+			m.roughness = 0.85
 		"ac":
 			m.albedo_color = Color(0.70, 0.71, 0.70)
 			m.roughness = 0.6
