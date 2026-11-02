@@ -7,6 +7,8 @@ extends RefCounted
 ## city-centre search; Wat Pho and Wat Arun appear beside it. The Hue gate
 ## and the Saigon cathedral are turned onto the real bearings of their sites
 ## (Ngo Mon faces about 143 degrees, the cathedral facade about 138).
+## The cathedral stands 60.5 m to the top of its tower crosses (57.6 m
+## towers, 3.5 m crosses; Vietnamese Wikipedia).
 
 static func entries() -> Array:
 	return [
@@ -53,7 +55,7 @@ static func entries() -> Array:
 				"five phoenix pavilion", "lầu ngũ phụng"]},
 		{"type": "saigon_notre_dame", "name": "Notre-Dame Cathedral Basilica of Saigon",
 			"lat": 10.77977, "lon": 106.69904, "radius_m": 4500.0,
-			"wiki_title": "Saigon Notre-Dame Basilica", "height_m": 58.0, "clear_m": 62.0, "yaw_deg": -42.0,
+			"wiki_title": "Saigon Notre-Dame Basilica", "height_m": 60.5, "clear_m": 62.0, "yaw_deg": -42.0,
 			"kind": "Cathedral",
 			"aliases": ["notre-dame cathedral basilica of saigon", "saigon notre-dame basilica",
 				"saigon notre dame cathedral", "notre dame cathedral saigon", "notre-dame cathedral saigon",

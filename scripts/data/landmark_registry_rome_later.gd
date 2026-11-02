@@ -31,7 +31,7 @@ static func entries() -> Array:
 				"basilica di san giovanni in laterano", "lateran basilica", "lateran baptistery"]},
 		{"type": "st_paul_outside_the_walls", "name": "Basilica of St Paul Outside the Walls",
 			"lat": 41.85875, "lon": 12.47643, "radius_m": 5000.0,
-			"wiki_title": "Basilica of Saint Paul Outside the Walls", "height_m": 38.0, "kind": "Basilica",
+			"wiki_title": "Basilica of Saint Paul Outside the Walls", "height_m": 65.0, "kind": "Basilica",
 			"clear_m": 130.0, "yaw_deg": 101.0,
 			"aliases": ["st paul outside the walls", "st. paul outside the walls", "saint paul outside the walls",
 				"san paolo fuori le mura", "basilica di san paolo fuori le mura", "basilica of st paul outside the walls"]},

@@ -12,7 +12,7 @@ extends RefCounted
 static func entries() -> Array:
 	return [
 		{"type": "turku_castle", "name": "Turku Castle", "lat": 60.43535, "lon": 22.22875,
-			"radius_m": 4000.0, "wiki_title": "Turku Castle", "height_m": 32.5,
+			"radius_m": 4000.0, "wiki_title": "Turku Castle", "height_m": 38.0,
 			"kind": "Castle", "clear_m": 85.0, "yaw_deg": -1.4,
 			"aliases": ["turku castle", "turun linna", "åbo slott", "abo slott"]},
 		{"type": "naantali_convent_church", "name": "Naantali Convent Church", "lat": 60.47113, "lon": 22.01527,

@@ -3,12 +3,16 @@ extends RefCounted
 
 ## Registry entries for the mideast africa landmark batch, in the
 ## format of LocationData.landmarks(). Types are built by LandmarkSetMideastAfrica.
+## Models are built in the compass frame (+Z south) unless yawed: yaw_deg
+## turns a model's +Z onto bearing 180 + yaw_deg (Sheikh Zayed's prayer
+## hall to its qibla, 12 degrees south of west; Burj Al Arab's sail to
+## the sea; Petra's Treasury to face east).
 
 static func entries() -> Array:
 	return [
 		{"type": "sheikh_zayed_mosque", "name": "Sheikh Zayed Grand Mosque", "lat": 24.4128, "lon": 54.4750,
 			"radius_m": 3000.0, "wiki_title": "Sheikh Zayed Mosque", "height_m": 107.0, "clear_m": 220.0,
-			"yaw_deg": 50.0, "kind": "Mosque",
+			"yaw_deg": 78.0, "kind": "Mosque",
 			"aliases": ["sheikh zayed grand mosque", "sheikh zayed mosque", "zayed grand mosque",
 				"جامع الشيخ زايد"]},
 		{"type": "burj_al_arab", "name": "Burj Al Arab", "lat": 25.1412, "lon": 55.1853,

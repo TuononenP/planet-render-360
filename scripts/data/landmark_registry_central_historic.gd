@@ -43,7 +43,7 @@ static func entries() -> Array:
 			"wiki_title": "Porta Nigra", "height_m": 29.6, "clear_m": 32.0, "yaw_deg": 30.0, "kind": "Gate",
 			"aliases": ["porta nigra", "porta nigra trier"]},
 		{"type": "berlin_cathedral", "name": "Berlin Cathedral", "lat": 52.5193, "lon": 13.4010, "radius_m": 4000.0,
-			"wiki_title": "Berlin Cathedral", "height_m": 114.0, "clear_m": 85.0, "kind": "Cathedral",
+			"wiki_title": "Berlin Cathedral", "height_m": 98.0, "clear_m": 85.0, "yaw_deg": 90.0, "kind": "Cathedral",
 			"aliases": ["berlin cathedral", "berliner dom", "berliner domkirche"]},
 		# Austria and Hungary
 		{"type": "hohensalzburg_fortress", "name": "Hohensalzburg Fortress", "lat": 47.7948, "lon": 13.0476,

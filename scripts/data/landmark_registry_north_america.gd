@@ -46,7 +46,7 @@ static func entries() -> Array:
 			"wiki_title": "Hoover Dam", "height_m": 27.0, "clear_m": 60.0, "yaw_deg": 30.0, "kind": "Dam",
 			"aliases": ["hoover dam", "boulder dam"]},
 		{"type": "chateau_frontenac", "name": "Château Frontenac", "lat": 46.8119, "lon": -71.2050,
-			"radius_m": 3500.0, "wiki_title": "Château Frontenac", "height_m": 78.0, "clear_m": 85.0,
+			"radius_m": 3500.0, "wiki_title": "Château Frontenac", "height_m": 79.9, "clear_m": 85.0,
 			"yaw_deg": -35.0, "kind": "Hotel",
 			"aliases": ["château frontenac", "chateau frontenac"]},
 		{"type": "the_strat", "name": "The STRAT Las Vegas", "lat": 36.1475, "lon": -115.1556,
