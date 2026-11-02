@@ -78,6 +78,11 @@ server, free with no paywall. Architecture:
 [`.agents/plans/2026-10-27-planet-render-360-architecture.md`](.agents/plans/2026-10-27-planet-render-360-architecture.md),
 data-source gate: [`docs/data-source-register.md`](docs/data-source-register.md).
 
+The bundled world map (`assets/map/*.tilepack`, about 200 MB) is stored in
+Git LFS: run `git lfs install` once before cloning, or `git lfs pull` in an
+existing clone, otherwise those files are pointers and the zoomed-out map
+streams instead. Rebuild it with `tools/build_map_pack.sh`.
+
 Run: open the project in Godot 4.7.2, or from the repo root:
 
 ```sh
@@ -90,6 +95,7 @@ godot --headless --script tests/osm_test.gd     # OSM parser (offline fixture)
 godot --headless --script tests/osm_fallback_test.gd # Overpass fallbacks: OSM API bbox, nearby cache
 godot --headless --script tests/tiles_test.gd   # tile math + pool drain
 godot --headless --script tests/map_pan_test.gd # tiles follow the drag, no repeated queueing
+godot --headless --script tests/map_pack_test.gd # bundled map packs: round trip, full coverage, fetchers
 godot --headless --script tests/progressive_map_test.gd # progressive map: preview first, detail centre-out
 godot --headless --script tests/vector_map_test.gd # vector map: MVT decode, Map style rules, tile build
 godot --headless --script tests/landmark_test.gd # landmark registry, models, placement

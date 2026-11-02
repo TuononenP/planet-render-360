@@ -4,7 +4,8 @@ extends Node
 ## OSM raster tiles for the picker map, per the OSMF Tile Usage Policy:
 ## HTTPS tile.openstreetmap.org, identifying User-Agent, visible
 ## attribution (in MapTileView), on-device caching, no bulk prefetch —
-## only the tiles visible in the picker are ever requested.
+## only the tiles visible in the picker are ever requested. The globe's
+## few world tiles ship bundled in a MapPack and are looked up first.
 
 signal tile_ready(z: int, x: int, y: int, texture: Texture2D)
 signal tile_failed(z: int, x: int, y: int)
@@ -13,6 +14,9 @@ const PATH_TEMPLATE := "/%d/%d/%d.png"
 const CACHE_DIR := "user://cache/tiles"
 const USER_AGENT := Brand.USER_AGENT
 const CONNECTIONS := 6
+
+## Bundled tiles, looked up before the disk cache.
+var pack := MapPack.shared(MapPack.OSM)
 
 ## Kept-alive connections (TileConnection), one tile each at a time.
 var _pool: Array[TileConnection] = []
@@ -70,6 +74,11 @@ func request_tile(z: int, x: int, y: int) -> void:
 	var key := Vector3i(z, x, y)
 	if _pending.has(key):
 		return  # already queued or downloading; duplicates bury new tiles
+	if pack.has_tile(z, x, y):
+		var bundled := Image.new()
+		if bundled.load_png_from_buffer(pack.get_tile(z, x, y)) == OK:
+			tile_ready.emit(z, x, y, ImageTexture.create_from_image(bundled))
+			return
 	var cache_path := "%s/%d_%d_%d.png" % [CACHE_DIR, z, x, y]
 	if FileAccess.file_exists(cache_path):
 		var img := Image.new()

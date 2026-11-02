@@ -8,7 +8,8 @@ extends Node
 ## OpenFreeMap tiles live under a dated path that its TileJSON names. The
 ## TileJSON is asked for on every start (old builds are retired); until it
 ## answers, and offline, the last path from disk serves. Cached tiles are
-## keyed by z/x/y alone, so they outlive a new planet build.
+## keyed by z/x/y alone, so they outlive a new planet build. Tiles in
+## the bundled MapPack (the zoomed-out levels) never touch the network.
 
 signal tile_ready(z: int, x: int, y: int, body: PackedByteArray)
 signal tile_failed(z: int, x: int, y: int)
@@ -30,6 +31,8 @@ const TILEJSON_KEY := Vector3i(-1, -1, -1)
 const TILEJSON_RETRY_MS := 30000
 
 var kind := Kind.VECTOR
+## Bundled tiles, looked up before the disk cache.
+var pack: MapPack
 
 var _pool: Array[TileConnection] = []
 var _queue: Array[Vector3i] = []
@@ -41,6 +44,7 @@ var _tilejson_retry_ms := 0
 
 func _init(tile_kind: Kind = Kind.VECTOR) -> void:
 	kind = tile_kind
+	pack = MapPack.shared(MapPack.OMT if kind == Kind.VECTOR else MapPack.DEM)
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
@@ -92,6 +96,9 @@ func request_tile(z: int, x: int, y: int) -> void:
 		return
 	var key := Vector3i(z, x, y)
 	if _pending.has(key):
+		return
+	if pack.has_tile(z, x, y):
+		tile_ready.emit(z, x, y, pack.get_tile(z, x, y))
 		return
 	var path := cache_path(z, x, y)
 	if FileAccess.file_exists(path):
