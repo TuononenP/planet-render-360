@@ -1,6 +1,6 @@
 extends SceneTree
 
-## World cache key: godot --headless --script tests/world_cache_key_test.gd
+## World cache key and save pump: godot --headless --script tests/world_cache_key_test.gd
 ## A world built after a far DEM / far-field fetch fell back (procedural
 ## backdrop, no rings, no drapes) must not share a key with the world
 ## built from the real far data, or a revisit on a good connection would
@@ -35,6 +35,17 @@ func _run() -> void:
 			failures.append("dropping only %s leaves the key unchanged" % layer)
 	if WorldCache.key(good) != WorldCache.key(good):
 		failures.append("key is not stable for the same data")
+	# Save pump: a slow frame gets a bigger slice, a quit takes the most.
+	if WorldCache.pump_budget_us(7000) != WorldCache.PUMP_US:
+		failures.append("a fast frame should keep the base pump slice")
+	if WorldCache.pump_budget_us(28000) <= WorldCache.PUMP_US:
+		failures.append("a 28 ms frame should pump longer than the base slice")
+	if WorldCache.pump_budget_us(10000000) != WorldCache.PUMP_MAX_US:
+		failures.append("the pump slice should be capped")
+	WorldCache.hurry = true
+	if WorldCache.pump_budget_us(7000) != WorldCache.HURRY_US:
+		failures.append("quitting should take the hurry slice")
+	WorldCache.hurry = false
 	if failures.is_empty():
 		print("WORLD CACHE KEY PASS")
 		quit(0)

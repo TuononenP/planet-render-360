@@ -148,9 +148,26 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 ## packed now (cheap, before the world enters the tree). Writing it reads
 ## every mesh back from the server, and each read from a worker thread
 ## waits for a main-thread flush (one per frame: minutes for a city), so
-## while the save runs the main thread services the queue for PUMP_US
-## each frame. The view joins the thread on exit like its build threads.
+## while the save runs the main thread services the queue each frame.
+## A mesh costs the main thread ~1.2 ms of servicing whatever the frame
+## rate, so a fixed slice made the save last frames / fps (Helsinki on
+## Ultra: 5 s at 135 fps, 18 s at 35, 56 s at 9). The slice is PUMP_US at
+## least, and PUMP_FRAME_SHARE of the frame when frames are slow, up to
+## PUMP_MAX_US; while quitting nothing is drawn, so it takes HURRY_US.
+## The view joins the thread on exit like its build threads.
 const PUMP_US := 4000
+const PUMP_FRAME_SHARE := 0.25
+const PUMP_MAX_US := 33000
+const HURRY_US := 40000
+## Set when the app is quitting: finish the save as fast as possible.
+static var hurry := false
+
+## Main-thread microseconds to service the save's mesh reads in a frame
+## that took `frame_us`.
+static func pump_budget_us(frame_us: int) -> int:
+	if hurry:
+		return HURRY_US
+	return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, PUMP_MAX_US)
 
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
 		packed: PackedScene = null) -> void:
@@ -180,10 +197,13 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 		print("WORLD CACHE saved %s in %d ms" % [p["scene"].get_file(), Time.get_ticks_msec() - t0])
 		return [])
 	var tree := view.get_tree()
+	var last_us := [Time.get_ticks_usec()]
 	var pump := func() -> void:
 		var t := Time.get_ticks_usec()
-		while th.is_alive() and Time.get_ticks_usec() - t < PUMP_US:
+		var budget := pump_budget_us(t - last_us[0])
+		while th.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
+		last_us[0] = t
 	tree.process_frame.connect(pump)
 	while th.is_alive():
 		await tree.process_frame

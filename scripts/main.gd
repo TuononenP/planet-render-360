@@ -254,6 +254,7 @@ func _request_exit() -> void:
 	if _quitting:
 		return
 	_quitting = true
+	WorldCache.hurry = true
 	_leave_view()
 	if _build_abort != null:
 		_build_abort.requested = true
