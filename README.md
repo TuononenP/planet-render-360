@@ -30,7 +30,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Make the rendered 3D 360-degree view the main focus once loaded.
 - Support full-screen mode with intuitive view controls.
 - History and Recents show the view as you left it, and reopening a place restores where you were looking.
-- In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
+- In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; fly a drone over the whole detailed area (G: W A S D fly with momentum, E / Q climb up to 500 m over the ground, Shift speeds up, on-screen sticks on touch screens); play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
 - Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, cache size, and render quality (Fast / Balanced / High / Ultra).
@@ -100,6 +100,7 @@ godot --headless --script tests/monument_test.gd # memorial columns and obelisks
 godot --headless --script tests/wheel_ground_test.gd # observation wheels + restored ground
 godot --headless --script tests/preset_views_test.gd # curated preset vantages and the generic eye
 godot --headless --script tests/viewer_tools_test.gd # view links, camera per place, thumbnails, photo, time-lapse, dates, horizon labels, mini-map, walking
+godot --headless --script tests/drone_test.gd # drone mode: steering, roam edge, hover, sticks, readout, take-off and landing
 godot --headless --script tests/user_dir_test.gd # moving data from Godot's default user directory
 godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile cancellation on far pans
 godot --headless --script tests/search_test.gd  # place-search parser

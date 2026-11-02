@@ -320,6 +320,12 @@ static func elevation(metres: float) -> String:
 		return "%s ft" % grouped(roundi(metres * 3.28084))
 	return "%s m" % grouped(roundi(metres))
 
+## Speed with a space before the unit: "54 km/h" or "34 mph".
+static func speed(mps: float) -> String:
+	if units_imperial:
+		return "%d mph" % roundi(mps * 2.23694)
+	return "%d km/h" % roundi(mps * 3.6)
+
 ## Local clock time, 24-hour unless Settings asks for 12.
 static func clock(hour_f: float) -> String:
 	var minutes := roundi(fposmod(hour_f, 24.0) * 60.0) % 1440

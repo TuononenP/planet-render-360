@@ -95,6 +95,7 @@ var _photo_busy := false
 var _date: Dictionary = {}
 var _lapse := TimeLapse.new()
 var _walk := ViewWalk.new()
+var _drone := ViewDrone.new()
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -346,6 +347,8 @@ func _notification(what: int) -> void:
 		_threads.clear()
 
 func show_location(data: LocationData, prebuilt: Array = []) -> void:
+	if _drone.on:
+		_drone.exit(self, false)
 	set_quality_preset(data.quality_preset)
 	_data = data
 	if _season_btn != null:
@@ -496,7 +499,11 @@ static func eye_y(data: LocationData, ground: GroundTruth, xz: Vector2,
 ## footprint itself, not its centroid.
 static func roof_clearance_y(data: LocationData, ground: GroundTruth, xz: Vector2) -> float:
 	var top := -INF
-	for b in data.buildings:
+	return roof_clearance_among(data.buildings, ground, xz)
+
+## roof_clearance_y over `buildings` only (a nearby subset of the data's).
+static func roof_clearance_among(buildings: Array, ground: GroundTruth, xz: Vector2) -> float:
+	for b in buildings:
 		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
 		var c := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 		if fp.size() < 3 or c.distance_to(xz) > CLEAR_RADIUS_M + CLEAR_REACH_M:
@@ -700,7 +707,7 @@ func _gui_input(event: InputEvent) -> void:
 			_walk.cancel_tap()
 			_rig.reset_zoom()
 			accept_event()
-		elif mb.button_index == MOUSE_BUTTON_LEFT:
+		elif mb.button_index == MOUSE_BUTTON_LEFT and not _drone.on:
 			if mb.pressed:
 				_walk.press(mb.position)
 			else:
@@ -722,10 +729,10 @@ func _gui_input(event: InputEvent) -> void:
 			if _touches.size() == 2:
 				_pinch_base = _touch_distance()
 				_walk.cancel_tap()
-			else:
+			elif not _drone.on:
 				_walk.press(st.position)
 		else:
-			if _touches.size() == 1:
+			if _touches.size() == 1 and not _drone.on:
 				_walk.release(self, st.position)
 			_touches.erase(st.index)
 		accept_event()
@@ -752,7 +759,7 @@ func _input(event: InputEvent) -> void:
 			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
 		ViewChrome.wake(self)
 
-## Viewer keys (arrows, +/−, [ ], 1–4, H, F, I, L, Esc for callouts).
+## Viewer keys (arrows, +/−, [ ], 1–4, G, H, F, I, L, Esc for callouts).
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or not is_visible_in_tree():
@@ -764,7 +771,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if _lapse.playing and is_visible_in_tree():
 		ViewConditions.lapse_tick(self, delta)
-	_walk.process_keys(self, delta)
+	if _drone.on:
+		_drone.process(self, delta)
+	else:
+		_walk.process_keys(self, delta)
 	if _gyro_on and _touches.is_empty() and is_visible_in_tree():
 		var g := Input.get_gyroscope()
 		if g.length() > 0.01:
