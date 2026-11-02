@@ -101,15 +101,52 @@ static func _precip_tint(v: View360) -> void:
 	var qm := (v._precip.draw_pass_1 as QuadMesh).material as StandardMaterial3D
 	qm.albedo_color = Color(base.r * light, base.g * light, base.b * light, base.a)
 
-## `prebuilt` is a build_location result; empty builds synchronously.
+## The place's live weather arrived: kept, and shown unless a preset is
+## picked in the Conditions sheet (then only its clock is taken).
 static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: float, code: int) -> void:
-	if v._weather_chip != null:
-		ViewChrome.set_weather(v, temp_c, label, code)
-	v._atmos.set_weather(code, cloud_cover)
-	_apply_precip(v, code)
-	apply_surface_state(v)
+	v._live_weather = [temp_c, label, cloud_cover, code]
+	if v._weather_pick == 0:
+		_show_weather(v)
 	if v._weather != null and v._weather.has_utc_offset:
 		_apply_utc_offset(v, float(v._weather.utc_offset_s) / 3600.0)
+
+## A weather segment in the Conditions sheet (DatePicker.WEATHER): Live
+## (0) is the place's real weather, the rest force a WMO code and cloud
+## cover through the same sky, precipitation and wet-surface path.
+static func pick_weather(v: View360, index: int) -> void:
+	v._weather_pick = clampi(index, 0, DatePicker.WEATHER.size() - 1)
+	if v._date_picker != null:
+		v._date_picker.select_weather(v._weather_pick)
+	_show_weather(v)
+
+## A new place opens on its live weather, which it has yet to fetch.
+static func reset_weather(v: View360) -> void:
+	v._live_weather = []
+	pick_weather(v, 0)
+
+static func _show_weather(v: View360) -> void:
+	var lw: Array = v._live_weather
+	if v._weather_pick == 0:
+		if lw.is_empty():
+			_apply_weather(v, -1, AtmosphereRig.DEFAULT_COVER)
+			ViewChrome.weather_failed(v)
+			return
+		if v._weather_chip != null:
+			ViewChrome.set_weather(v, float(lw[0]), str(lw[1]), int(lw[3]))
+		_apply_weather(v, int(lw[3]), float(lw[2]))
+		return
+	var w: Array = DatePicker.WEATHER[v._weather_pick]
+	if v._weather_chip != null:
+		ViewChrome.set_weather_picked(v, str(w[0]), str(w[1]),
+			"" if lw.is_empty() else "%d °C %s" % [roundi(float(lw[0])), str(lw[1])])
+	_apply_weather(v, int(w[2]), float(w[3]))
+
+static func _apply_weather(v: View360, code: int, cover: float) -> void:
+	if v._atmos == null:
+		return
+	v._atmos.set_weather(code, cover)
+	_apply_precip(v, code)
+	apply_surface_state(v)
 
 ## The real local clock arrived: keep the spawn at the place's golden
 ## hour and live time on the real clock; a picked hour keeps its label

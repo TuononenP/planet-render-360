@@ -1,22 +1,26 @@
 class_name DatePicker
 extends PanelContainer
 
-## The day and season sheet: the season (its own mid-month day) or any
-## calendar day for the sun's path (solstice, a birthday, "sunset on my
-## trip"). A glass sheet over the viewer, opened from the sun arc's day
-## chip: "Day and season" with a close button, the four seasons (icon
-## over name), then a month and a year stepper, a Monday-first day grid
-## and quick picks (Today, the two solstices, Reset to the season's own
-## day). A day emits date_picked; the view maps it to its season and
-## runs the solar model for it. A season emits season_picked and the sheet
-## stays open. Esc (the viewer's key handler) or the close button
-## dismisses it.
+## The Conditions sheet (design system DatePicker): the season (its own
+## mid-month day), the weather, or any calendar day for the sun's path
+## (solstice, a birthday, "sunset on my trip"). A glass sheet over the
+## viewer, opened from the sun arc's day chip or the weather chip:
+## "Conditions" with a close button, the four seasons (icon over name),
+## the weather (Live and seven presets, two rows of four), then a month
+## and a year stepper, a Monday-first day grid and quick picks (Today, the
+## two solstices, Reset to the season's own day). A day emits date_picked;
+## the view maps it to its season and runs the solar model for it. A
+## season emits season_picked and a weather segment weather_picked; the
+## sheet stays open for both. Esc (the viewer's key handler) or the close
+## button dismisses it.
 
 signal date_picked(date: Dictionary)
 ## Back to the season's own mid-month day.
 signal season_requested
 ## A season segment: that season's own day (the view rebuilds in it).
 signal season_picked(index: int)
+## A weather segment: an index into WEATHER (0 = Live).
+signal weather_picked(index: int)
 signal closed
 
 const CELL := 40
@@ -26,6 +30,14 @@ const WEEKDAYS := ["M", "T", "W", "T", "F", "S", "S"]
 const MONTHS := ["January", "February", "March", "April", "May", "June", "July",
 	"August", "September", "October", "November", "December"]
 const WIDTH := CELL * 7 + 32
+## Weather segments per row (WEATHER fills two rows).
+const ROW_SEGMENTS := 4
+## The weather segments: [label, icon, WMO code, cloud cover %]. Live (the
+## place's real weather) first; the presets force a code and cover.
+const WEATHER := [["Live", "thermometer", -1, -1.0], ["Clear", "sun", 0, 0.0],
+	["Cloudy", "cloud", 3, 100.0], ["Fog", "cloud-fog", 45, 100.0],
+	["Rain", "cloud-drizzle", 61, 100.0], ["Heavy rain", "cloud-rain", 65, 100.0],
+	["Snow", "snowflake", 73, 100.0], ["Storm", "cloud-lightning", 95, 100.0]]
 
 var _year := 2026
 var _month := 6
@@ -36,6 +48,10 @@ var _year_label: Label
 var _grid: GridContainer
 ## The season segments; the view keeps them in step with its season.
 var seasons: SegmentedControl
+## The weather's two rows of four: one radio group across both.
+var weather_rows: Array[SegmentedControl] = []
+## The weather segment that is on (index into WEATHER).
+var weather := 0
 
 func _init() -> void:
 	visible = false
@@ -48,7 +64,7 @@ func _init() -> void:
 
 	var title_row := HBoxContainer.new()
 	col.add_child(title_row)
-	var title := UiTheme.text("Day and season", "title")
+	var title := UiTheme.text("Conditions", "title")
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_row.add_child(title)
@@ -58,11 +74,31 @@ func _init() -> void:
 	seasons.select(LocationData.Season.SUMMER)
 	seasons.item_selected.connect(func(index: int) -> void: season_picked.emit(index))
 	col.add_child(seasons)
-	var rule := ColorRect.new()
-	rule.color = UiTheme.LINE
-	rule.custom_minimum_size = Vector2(0, 1)
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(rule)
+	col.add_child(_rule())
+	# One outlined box holds both rows, so they read as one control.
+	var box := PanelContainer.new()
+	var track := UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_M, UiTheme.LINE_STRONG)
+	track.set_content_margin_all(3)
+	box.add_theme_stylebox_override("panel", track)
+	col.add_child(box)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 2)
+	box.add_child(rows)
+	for r in 2:
+		var part := WEATHER.slice(r * ROW_SEGMENTS, (r + 1) * ROW_SEGMENTS)
+		var row := SegmentedControl.new(part.map(func(w: Array) -> String: return str(w[0])),
+			part.map(func(w: Array) -> String: return str(w[1])), true)
+		row.bare = true
+		row.set_stacked(true)
+		row.set_font_size(13)
+		var base := r * ROW_SEGMENTS
+		row.item_selected.connect(func(index: int) -> void:
+			select_weather(base + index)
+			weather_picked.emit(base + index))
+		rows.add_child(row)
+		weather_rows.append(row)
+	select_weather(0)
+	col.add_child(_rule())
 
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 4)
@@ -117,6 +153,19 @@ func _init() -> void:
 		var kind: String = q[1]
 		b.pressed.connect(func() -> void: _quick(kind))
 		quick.add_child(b)
+
+func _rule() -> ColorRect:
+	var rule := ColorRect.new()
+	rule.color = UiTheme.LINE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rule
+
+## Turns on one weather segment (index into WEATHER) across both rows.
+func select_weather(index: int) -> void:
+	weather = clampi(index, 0, WEATHER.size() - 1)
+	for r in weather_rows.size():
+		weather_rows[r].select(weather - r * ROW_SEGMENTS if floori(weather / float(ROW_SEGMENTS)) == r else -1)
 
 func _stepper(icon_name: String, tip: String, action: Callable) -> Button:
 	var b := Button.new()

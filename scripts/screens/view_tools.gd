@@ -14,7 +14,7 @@ const CHIPS := [["labels", "tag", "Labels", "Name peaks, towns and lakes (N)"],
 	["nearby", "landmark", "Nearby", "Nearby landmarks (L)"]]
 const ACTIONS := [["photo", "camera", "Save photo", "Save a photo (P)"],
 	["link", "link", "Copy link", "Copy a link to this view (C)"]]
-const DATE_TIP := "Pick a day or season"
+const DATE_TIP := "Pick a day, season or weather"
 const MAP_GAP := 12.0
 
 ## Builds the Show chips into `chips`, the actions into `actions` and the
@@ -46,6 +46,8 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._date_picker.season_requested.connect(func() -> void:
 		v._on_season_selected(v._data.season if v._data != null else LocationData.Season.SUMMER))
 	v._date_picker.season_picked.connect(func(index: int) -> void: v._on_season_selected(index))
+	v._date_picker.weather_picked.connect(func(index: int) -> void: ViewConditions.pick_weather(v, index))
+	v._date_picker.select_weather(v._weather_pick)
 	# The season segments live in the sheet; the view keeps them in step.
 	v._season_btn = v._date_picker.seasons
 	v._date_picker.closed.connect(func() -> void:

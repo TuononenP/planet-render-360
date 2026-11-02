@@ -22,6 +22,10 @@ var _sun: DirectionalLight3D
 var _atmos: AtmosphereRig
 var _governor: QualityGovernor
 var _weather: WeatherFetcher
+## The Conditions sheet's weather segment (DatePicker.WEATHER, 0 = Live)
+## and the place's last live reading [temp_c, label, cover, code].
+var _weather_pick := 0
+var _live_weather: Array = []
 ## Landmark details (callout taps) and nearby articles for callouts.
 var _wiki: WikiFetcher
 var _landmark_panel: LandmarkPanel
@@ -409,6 +413,7 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	if _date_picker != null:
 		_date_picker.close_picker()
 	_queue_snapshot(data)
+	ViewConditions.reset_weather(self)
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
 	if _wiki != null:

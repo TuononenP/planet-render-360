@@ -94,6 +94,15 @@ static func build(v: View360) -> void:
 	v._weather_value = chip[2]
 	v._weather_label = chip[3]
 	v._weather_chip.visible = false
+	# A tap opens the Conditions sheet, where the weather is picked.
+	v._weather_chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	v._weather_chip.gui_input.connect(func(e: InputEvent) -> void:
+		# A tap arrives as an emulated mouse click too, so only the mouse
+		# event is read: reading the touch as well would toggle twice.
+		if e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+				and not e.is_pressed():
+			v._weather_chip.accept_event()
+			ViewTools.toggle_date(v))
 	v._top_right.add_child(v._weather_chip)
 	v._quality_badge = HudParts.status_badge("Full data", "good", "gauge")
 	v._quality_badge.tooltip_text = "Data quality"
@@ -283,15 +292,51 @@ static func show_place(v: View360, data: LocationData) -> void:
 static func set_weather(v: View360, temp_c: float, label: String, code: int) -> void:
 	v._weather_icon.texture = UiIcon.texture(HudParts.weather_icon(code), 18)
 	v._weather_value.text = "%d °C" % roundi(temp_c)
+	v._weather_value.visible = true
 	v._weather_label.text = label
-	# At 150% text and above, and on phones, the chip keeps the value only.
-	v._weather_label.visible = label != "" and UiTheme.text_scale < 1.5 \
-		and Responsive.layout_for_size(v.size) != Responsive.Layout.COMPACT
+	v._weather_chip.tooltip_text = "Pick the weather"
+	sync_weather_label(v)
 	v._weather_chip.visible = true
 	v._on_resized.call_deferred()
 
+## At 150% text and above, and on phones, the live chip keeps the value
+## only. Re-run on every layout: the window can resize after the weather
+## arrived. A picked preset has no value, so its name always stays.
+static func sync_weather_label(v: View360) -> void:
+	if v._weather_label == null:
+		return
+	var phone := Responsive.layout_for_size(v.size) == Responsive.Layout.COMPACT
+	var show := v._weather_label.text != "" and UiTheme.text_scale < 1.5 and not phone
+	if v._weather_pick != 0 and v._weather_label.text != "":
+		# The name is all a picked chip says: it stays unless, on a phone,
+		# it would run past the gutter after the heading tape.
+		show = true
+		if phone:
+			var name_w := v._weather_label.get_theme_font("font").get_string_size(
+				v._weather_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				v._weather_label.get_theme_font_size("font_size")).x
+			var pad := float(Responsive.page_padding(Responsive.Layout.COMPACT))
+			var chip_w := name_w + 12.0 + 18.0 + 8.0 + 12.0
+			var room := v.size.x - pad - (pad + HudParts.SIZE_HUD + 8.0) - (CompassDial.TAPE_W + 24.0) - 8.0
+			show = chip_w <= room
+	v._weather_label.visible = show
+
+## A weather preset is on: its glyph and name alone, no temperature (a
+## live reading beside a picked condition would misreport the place).
+## `live` names the real weather for the tooltip ("12 °C Clear"; "" when
+## it has not arrived).
+static func set_weather_picked(v: View360, label: String, icon_name: String, live: String) -> void:
+	v._weather_icon.texture = UiIcon.texture(icon_name, 18)
+	v._weather_value.visible = false
+	v._weather_label.text = label
+	v._weather_label.visible = true
+	v._weather_chip.tooltip_text = "Weather you picked" + (". Live: %s" % live if live != "" else "")
+	v._weather_chip.visible = true
+	v._on_resized.call_deferred()
+
+## No live weather: the chip goes, unless a picked preset holds it.
 static func weather_failed(v: View360) -> void:
-	if v._weather_chip != null:
+	if v._weather_chip != null and v._weather_pick == 0:
 		v._weather_chip.visible = false
 
 ## Re-skin after an accent change. Only the accent-painted parts move,
@@ -600,6 +645,7 @@ static func layout(v: View360) -> void:
 		if not phone:
 			chip_home.move_child(v._weather_chip, 0)
 	v._tape_row.visible = phone
+	sync_weather_label(v)
 	# Fullscreen is the window's: not on phones and tablets.
 	v._fullscreen_btn.visible = not phone and not OS.has_feature("mobile")
 	# Top-right chips first: the pill takes the room left between.

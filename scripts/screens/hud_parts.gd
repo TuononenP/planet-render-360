@@ -195,8 +195,14 @@ static func weather_icon(code: int) -> String:
 		return "sun"
 	if code == 2:
 		return "cloud-sun"
+	if code in [45, 48]:
+		return "cloud-fog"
 	if code in [71, 73, 75, 77, 85, 86]:
 		return "snowflake"
+	if code >= 95:
+		return "cloud-lightning"
+	if code in [51, 53, 55, 56, 57]:
+		return "cloud-drizzle"
 	if code >= 51:
 		return "cloud-rain"
 	return "cloud"

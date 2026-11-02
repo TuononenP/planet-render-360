@@ -8,13 +8,16 @@ extends PanelContainer
 ## select / selected / item_count / item_selected so it can stand in
 ## for one. `icon_only` keeps each label as the tooltip. `stacked` sets
 ## each icon over its name in ink on an outlined track (the seasons in
-## the day and season sheet).
+## the Conditions sheet's seasons and weather).
 
 signal item_selected(index: int)
 
 var selected := -1
 var icon_only := false
 var stacked := false
+var font_size := 14
+## No track of its own: the rows of a group that draws one outline.
+var bare := false
 var _glass := false
 var _labels: Array = []
 var _icons: Array = []
@@ -54,6 +57,12 @@ func set_stacked(on: bool) -> void:
 	stacked = on
 	restyle()
 
+## The label size: the weather rows in the Conditions sheet set 13 so
+## "Heavy rain" fits a quarter of the sheet.
+func set_font_size(px: int) -> void:
+	font_size = px
+	restyle()
+
 func set_icon_only(on: bool) -> void:
 	if on != icon_only:
 		icon_only = on
@@ -65,7 +74,9 @@ func restyle() -> void:
 		UiTheme.GLASS_EDGE if _glass else UiTheme.LINE)
 	if stacked:
 		track = UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_M, UiTheme.LINE_STRONG)
-	track.set_content_margin_all(3)
+	if bare:
+		track = UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_M)
+	track.set_content_margin_all(0 if bare else 3)
 	add_theme_stylebox_override("panel", track)
 	for i in _buttons.size():
 		var b := _buttons[i]
@@ -78,6 +89,7 @@ func restyle() -> void:
 			b.add_theme_color_override(key, text_color)
 		b.add_theme_color_override("font_hover_color", UiTheme.ON_ACCENT if on else UiTheme.INK)
 		b.add_theme_font_override("font", UiTheme.sans(600 if on else 500))
+		b.add_theme_font_size_override("font_size", font_size)
 		if has_icon:
 			UiIcon.apply(b, str(_icons[i]), 18, text_color, UiTheme.ON_ACCENT)
 			b.add_theme_constant_override("h_separation", 4)

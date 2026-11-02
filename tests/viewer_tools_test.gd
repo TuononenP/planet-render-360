@@ -489,6 +489,60 @@ func _view_wiring() -> void:
 	esc.pressed = true
 	_check(ViewChrome.handle_key(view, esc) and not view._date_picker.visible, "Esc closes the picker")
 
+	# Weather: the Conditions sheet picks a preset over the live weather.
+	var picker := view._date_picker
+	_check(picker.weather_rows.size() == 2 and picker.weather_rows[0].item_count == 4
+		and picker.weather_rows[1].item_count == 4, "the sheet has two rows of four weather segments")
+	for w in DatePicker.WEATHER:
+		_check(FileAccess.file_exists("res://assets/icons/%s.svg" % w[1]), "weather icon ships: %s" % w[1])
+	_check(HudParts.weather_icon(45) == "cloud-fog" and HudParts.weather_icon(53) == "cloud-drizzle"
+		and HudParts.weather_icon(63) == "cloud-rain" and HudParts.weather_icon(95) == "cloud-lightning",
+		"the live chip's glyphs match the presets")
+	ViewConditions._on_weather(view, 21.0, "Clear", 5.0, 0)
+	_check(view._weather_pick == 0 and view._atmos.weather_code == 0 and view._weather_value.visible,
+		"live weather shows while Live is on")
+	picker.weather_rows[1].item_selected.emit(2)
+	_check(view._weather_pick == 6 and view._atmos.weather_code == 73
+		and view._precip != null and view._precip.emitting, "Snow forces snowfall")
+	_check(picker.weather_rows[0].selected == -1 and picker.weather_rows[1].selected == 2,
+		"one weather segment is on across both rows")
+	_check(view._weather_chip.visible and not view._weather_value.visible and view._weather_label.text == "Snow",
+		"the chip names the picked weather without a temperature")
+	ViewConditions._on_weather(view, 22.0, "Clear", 5.0, 0)
+	_check(view._atmos.weather_code == 73 and float(view._live_weather[0]) == 22.0,
+		"live weather landing later keeps the pick")
+	ViewConditions.pick_weather(view, 7)
+	_check(bool(view._atmos.weather_look["storm"]), "Storm brings the thunderstorm")
+	ViewConditions.pick_weather(view, 0)
+	_check(view._atmos.weather_code == 0 and not view._precip.emitting and view._weather_value.visible
+		and picker.weather_rows[0].selected == 0, "Live returns to the real weather")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = false
+	view._weather_chip.gui_input.emit(click)
+	_check(picker.visible, "the weather chip opens the Conditions sheet")
+	picker.close_picker()
+	# A phone: the live chip keeps the value only, and no chip runs past
+	# the right gutter, picked or not (the window may resize after it filled).
+	view.size = Vector2(390, 844)
+	ViewChrome.layout(view)
+	await process_frame
+	_check(not view._weather_label.visible, "the live chip drops its word on a phone")
+	for pick in [1, 5, 7, 0]:
+		ViewConditions.pick_weather(view, pick)
+		ViewChrome.layout(view)
+		await process_frame
+		var right := view._weather_chip.global_position.x + view._weather_chip.size.x
+		_check(right <= 390.0 - 16.0 + 0.5, "the weather chip stays inside the phone's gutter (pick %d): %s" % [pick, right])
+	view.size = Vector2(1280, 800)
+	ViewChrome.layout(view)
+	await process_frame
+	_check(view._weather_label.visible, "the live chip shows its word on a desktop")
+	ViewConditions.pick_weather(view, 4)
+	ViewConditions.reset_weather(view)
+	_check(view._weather_pick == 0 and view._live_weather.is_empty() and picker.weather == 0
+		and view._atmos.weather_code == -1, "a new place opens on Live")
+
 	# Walking: a tap on the ground glides there, far taps are refused.
 	var cam := view._rig.camera
 	var hit := ViewWalk.ground_hit(cam.global_position, Vector3(0.0, -0.5, -1.0).normalized(), view._ground)
