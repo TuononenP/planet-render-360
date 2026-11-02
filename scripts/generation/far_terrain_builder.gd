@@ -264,9 +264,12 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: A
 	var loops := radii.size()
 	# Per-build climate hoist: compute once, reuse for 284k vertices.
 	var climate := FarSurface.climate_params(data)
-	var pos := PackedVector3Array()
-	pos.resize(loops * per)
-	for k in loops:
+	# Native kernel when the library is built (same positions, every core).
+	var pos := FarSampler.native_ring_positions(data, ground, surf, radii, segs)
+	var native := not pos.is_empty()
+	if not native:
+		pos.resize(loops * per)
+	for k in 0 if native else loops:
 		if abort != null and abort.requested:
 			return []
 		var r := radii[k]
@@ -284,14 +287,19 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: A
 				var uv := FarSurface.merc_uv(data, p.x / m2u, p.y / m2u)
 				pos[k * per + side * segs + i] = Vector3(p.x,
 					_blend_height_uv(data, ground, surf, p.x, p.y, uv.x, uv.y), p.y)
-	var normals := PackedVector3Array()
-	normals.resize(pos.size())
-	var colors := PackedColorArray()
-	colors.resize(pos.size())
 	if not _has_water_arg:
 		water = _water_index(data)
 		wbounds = _water_bounds(water)
-	for k in loops:
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var nc := FarSampler.native_ring_colors(pos, loops, per, climate, ground, water, wbounds)
+	if not nc.is_empty():
+		normals = nc[0]
+		colors = nc[1]
+	else:
+		normals.resize(pos.size())
+		colors.resize(pos.size())
+	for k in 0 if not nc.is_empty() else loops:
 		if abort != null and abort.requested:
 			return []
 		var ki := maxi(k - 1, 0) * per
