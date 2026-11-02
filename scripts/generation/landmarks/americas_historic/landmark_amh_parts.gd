@@ -29,23 +29,24 @@ static func slab(lm: LandmarkMesh, key: String, c: Vector3, h: float, hx0: float
 ## Flight of `n` treads, `w` wide, centred on local x = 0 and rising
 ## toward local -Z from (z0, y0) at the foot to (z1, y1) at the head;
 ## the blocks run back to `z_back`. `o` and `r` place the local frame
-## (r turns local +Z onto the outward direction of the face).
-static func stair(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: float, z0: float,
-		y0: float, z1: float, y1: float, z_back: float, n: int) -> void:
+## (r turns local +Z onto the outward direction of the face). `bevel`
+## > 0 rounds the worn nosings of low stone risers.
+static func stair(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: float, z0: float, y0: float,
+		z1: float, y1: float, z_back: float, n: int, bevel: float = -1.0) -> void:
 	var rise := (y1 - y0) / float(n)
 	for i in n:
 		var top := y0 + rise * float(i + 1)
 		var zf := lerpf(z0, z1, float(i) / float(n))
 		lm.box(key, o + r * Vector3(0, top - rise * 0.5, (zf + z_back) * 0.5),
-			Vector3(w, rise, zf - z_back), r)
+			Vector3(w, rise, zf - z_back), r, bevel)
 
 ## Flight of `n` treads that follows a stepped outer profile (radius,
 ## y) rising from y0 to y1, each tread `off` proud of the surface, so
 ## the stair lands on every ledge; `rail_w` > 0 adds a parapet along
 ## both sides in `rail_key`. Local frame as for stair().
 static func stair_hug(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: float,
-		outer: PackedVector2Array, y0: float, y1: float, n: int, z_back: float,
-		off: float = 0.4, rail_w: float = 0.0, rail_key: String = "") -> void:
+		outer: PackedVector2Array, y0: float, y1: float, n: int, z_back: float, off: float = 0.4,
+		rail_w: float = 0.0, rail_key: String = "") -> void:
 	var rise := (y1 - y0) / float(n)
 	for i in n:
 		var ym := y0 + rise * (float(i) + 0.5)
@@ -54,8 +55,9 @@ static func stair_hug(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: fl
 		lm.box(key, o + r * Vector3(0, ym, (zf + z_back) * 0.5), Vector3(w, rise, depth), r)
 		if rail_w > 0.0:
 			for s in [-1.0, 1.0]:
-				lm.box(rail_key, o + r * Vector3(s * (w + rail_w) * 0.5, ym + 0.35,
-					(zf + z_back) * 0.5), Vector3(rail_w, rise + 0.7, depth), r)
+				lm.box(rail_key,
+					o + r * Vector3(s * (w + rail_w) * 0.5, ym + 0.35, (zf + z_back) * 0.5),
+					Vector3(rail_w, rise + 0.7, depth), r)
 
 ## Radius of a stepped profile at height y (flat ledges are skipped).
 static func _outer_at(outer: PackedVector2Array, y: float) -> float:
@@ -68,17 +70,17 @@ static func _outer_at(outer: PackedVector2Array, y: float) -> float:
 
 ## The two sloping side walls of a stair (alfardas): beams `bw` wide
 ## and `bd` deep along the flight, at x = +-(w / 2 + bw / 2).
-static func rails(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: float, z0: float,
-		y0: float, z1: float, y1: float, bw: float, bd: float) -> void:
+static func rails(lm: LandmarkMesh, key: String, o: Vector3, r: Basis, w: float, z0: float, y0: float,
+		z1: float, y1: float, bw: float, bd: float) -> void:
 	for s in [-1.0, 1.0]:
 		var x: float = s * (w * 0.5 + bw * 0.5)
-		lm.beam(key, o + r * Vector3(x, y0 + bd * 0.5, z0), o + r * Vector3(x, y1 - bd * 0.5, z1),
-			bw, bd, r * Vector3.RIGHT)
+		lm.beam(key, o + r * Vector3(x, y0 + bd * 0.5, z0), o + r * Vector3(x, y1 - bd * 0.5, z1), bw,
+			bd, r * Vector3.RIGHT)
 
 ## Ring of `n` tapered columns of radius r0 -> r1 and height `h`
 ## around `c` at ring radius `ring_r`, starting at angle `a0`.
-static func column_ring(lm: LandmarkMesh, key: String, c: Vector3, ring_r: float, n: int,
-		r0: float, r1: float, h: float, a0: float = 0.0, seg: int = 12) -> void:
+static func column_ring(lm: LandmarkMesh, key: String, c: Vector3, ring_r: float, n: int, r0: float,
+		r1: float, h: float, a0: float = 0.0, seg: int = 12) -> void:
 	for k in n:
 		var a := a0 + TAU * float(k) / float(n)
 		lm.frustum(key, c + Vector3(cos(a) * ring_r, 0, sin(a) * ring_r), r0, r1, h, seg)
@@ -88,3 +90,50 @@ static func column_ring(lm: LandmarkMesh, key: String, c: Vector3, ring_r: float
 static func opening(lm: LandmarkMesh, key: String, c: Vector3, r: Basis, w: float, h: float,
 		depth: float = 0.3) -> void:
 	lm.box(key, c, Vector3(w, h, depth), r)
+
+## Teotihuacan talud-tablero body on a hx x hz rectangle at `c`: the
+## sloping talud (`th` tall, battered in by `batter`), then the
+## tablero (`tb` tall), a vertical panel whose projecting frame (top
+## and bottom rails, posts every ~`bay` m) surrounds a recessed
+## field. Returns the height of the body's top above c.
+static func talud_tablero(lm: LandmarkMesh, key: String, frame_key: String, c: Vector3, hx: float,
+		hz: float, th: float, tb: float, batter: float, bay: float = 8.0) -> float:
+	slab(lm, key, c, th, hx, hz, hx - batter, hz - batter)
+	var fx := hx - batter + 0.3
+	var fz := hz - batter + 0.3
+	var y := c.y + th
+	lm.box(key, Vector3(c.x, y + tb * 0.5, c.z), Vector3(2.0 * fx - 0.7, tb, 2.0 * fz - 0.7))
+	for q in 4:
+		var r := Basis(Vector3.UP, PI * 0.5 * float(q))
+		var span := fx if q % 2 == 0 else fz
+		var depth := fz if q % 2 == 0 else fx
+		var o := Vector3(c.x, y, c.z)
+		lm.box(frame_key, o + r * Vector3(0, tb * 0.09, depth - 0.3),
+			Vector3(2.0 * span, tb * 0.18, 0.6), r)
+		lm.box(frame_key, o + r * Vector3(0, tb * 0.88, depth - 0.3),
+			Vector3(2.0 * span, tb * 0.24, 0.6), r)
+		var posts := maxi(1, int(round(2.0 * span / bay)))
+		for i in posts + 1:
+			var x := -span + 0.3 + (2.0 * span - 0.6) * float(i) / float(posts)
+			lm.box(frame_key, o + r * Vector3(x, tb * 0.5, depth - 0.3), Vector3(0.6, tb * 0.6, 0.6), r)
+	lm.box(frame_key, Vector3(c.x, y + tb + 0.1, c.z), Vector3(2.0 * fx + 0.2, 0.2, 2.0 * fz + 0.2))
+	return th + tb + 0.2
+
+## Maya corbel-vaulted gallery seen through a row of doorways: the
+## dark gallery back wall and the stepped soffits of the vault, `w`
+## long, the springing at `spring` above `c` (floor centre), `d` deep
+## (local +Z the open side), rising `rise` to the capstones; `shade`
+## "" leaves out the back wall when the caller builds it.
+static func corbel_vault(lm: LandmarkMesh, key: String, shade: String, c: Vector3, r: Basis, w: float,
+		d: float, spring: float, rise: float) -> void:
+	if shade != "":
+		lm.box(shade, c + r * Vector3(0, spring * 0.5, -d * 0.5 + 0.1), Vector3(w, spring, 0.2), r, 0.0)
+	var steps := 5
+	for i in steps:
+		var t := float(i) / float(steps)
+		var inset := d * 0.42 * (t + 1.0 / float(steps))
+		var y := spring + rise * t
+		for s in [-1.0, 1.0]:
+			var z: float = s * (d * 0.5 - inset * 0.5)
+			lm.box(key, c + r * Vector3(0, y + rise / float(steps) * 0.5, z),
+				Vector3(w, rise / float(steps), inset), r, 0.0)

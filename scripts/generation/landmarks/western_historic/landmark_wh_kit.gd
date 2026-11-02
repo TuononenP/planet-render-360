@@ -58,35 +58,31 @@ static func lancet_row(lm: LandmarkMesh, key: String, p0: Vector3, p1: Vector3, 
 		var p := p0.lerp(p1, (float(i) + 0.5) / float(count))
 		lancet(lm, key, Vector3(p.x, y0, p.z) + n * 0.12, n, w, h, head)
 
-## Rose window: glass disc with a stone rim and `spokes` radial bars.
+## Rose window: the traceried rose of LandmarkWhGothic.
 static func rose(lm: LandmarkMesh, glass: String, stone: String, c: Vector3, n: Vector3, rad: float,
 		spokes: int = 12) -> void:
-	lm.disc(glass, c, n, rad, 24)
-	var a := along(n)
-	for k in 24:
-		var t0 := TAU * float(k) / 24.0
-		var t1 := TAU * float(k + 1) / 24.0
-		lm.beam(stone, c + (a * cos(t0) + Vector3.UP * sin(t0)) * rad,
-			c + (a * cos(t1) + Vector3.UP * sin(t1)) * rad, 0.35, 0.3, n)
-	for k in spokes:
-		var t := TAU * float(k) / float(spokes)
-		lm.beam(stone, c + n * 0.05, c + (a * cos(t) + Vector3.UP * sin(t)) * rad, 0.2, 0.25, n)
+	LandmarkWhGothic.rose(lm, glass, stone, c, n, rad, spokes)
 
-## Pinnacle: square shaft with a pyramid cap, base-anchored.
+## Pinnacle: the crocketed pinnacle of LandmarkWhGothic, base-anchored.
 static func pinnacle(lm: LandmarkMesh, key: String, base: Vector3, hw: float, shaft: float,
 		cap: float) -> void:
-	lm.box(key, base + Vector3(0, shaft * 0.5, 0), Vector3(hw * 2.0, shaft, hw * 2.0))
-	lm.spire(key, base + Vector3(0, shaft, 0), hw * 1.15, cap)
+	LandmarkWhGothic.pinnacle(lm, key, base, hw, shaft, cap)
 
-## Flying buttress: an arched flyer from the pier top `a` to the wall `b`.
+## Flying buttress from the pier top `a` to the wall `b`: an arched
+## soffit under a straight raking coping, joined by a pierced spandrel
+## of short struts.
 static func flyer(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, w: float,
 		bulge: float = 1.2) -> void:
 	var prev := a
-	for i in 4:
-		var t := float(i + 1) / 4.0
+	var top := Vector3.UP * (bulge + w * 0.9)
+	for i in 6:
+		var t := float(i + 1) / 6.0
 		var p := a.lerp(b, t) + Vector3.UP * bulge * sin(PI * t)
 		lm.beam(key, prev, p, w, w * 0.8)
+		if i < 5:
+			lm.beam(key, p, a.lerp(b, t) + top, w * 0.5, w * 0.3)
 		prev = p
+	lm.beam(key, a + Vector3.UP * w * 0.9, b + top, w * 0.9, w * 0.6)
 
 ## Straight crenellated wall from a to b (ground points), `h` high.
 static func crenel_wall(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h: float,
@@ -105,14 +101,23 @@ static func crenel_ring(lm: LandmarkMesh, key: String, base: Vector3, rad: float
 		lm.box(key, base + Vector3(cos(a) * rad, h * 0.5, sin(a) * rad), Vector3(thick, h, w),
 			Basis(Vector3.UP, -a))
 
-## Round tower: shaft (r0 at the foot, r1 at the top), corbelled
-## crown ring and a conical roof of `roof_h` over a small overhang.
+## Round tower: battered foot, shaft (r0 at the foot, r1 at the top), a
+## string course, the crown ring on a machicolation corbel table and a
+## conical roof of `roof_h` over a small overhang with its finial.
 static func round_tower(lm: LandmarkMesh, wall: String, roof: String, base: Vector3, r0: float,
 		r1: float, h: float, roof_h: float, seg: int = 14) -> void:
 	lm.frustum(wall, base, r0, r1, h, seg)
+	# Battered foot, a string course, the crown ring on its corbels.
+	lm.frustum(wall, base, r0 * 1.14, r0 * 1.0, minf(h * 0.18, 4.0), seg)
+	lm.frustum(wall, base + Vector3(0, h * 0.55, 0), lerpf(r0, r1, 0.55) * 1.03, lerpf(r0, r1, 0.55) * 1.03,
+		0.4, seg)
 	lm.frustum(wall, base + Vector3(0, h - 0.8, 0), r1 * 1.12, r1 * 1.12, 1.0, seg)
+	LandmarkWhGothic.machicolation_ring(lm, wall, base + Vector3(0, h - 2.0, 0), r1, 1.4, 1.6)
 	lm.lathe(roof, base + Vector3(0, h + 0.2, 0), PackedVector2Array([Vector2(r1 * 1.22, 0),
 		Vector2(r1 * 0.5, roof_h * 0.7), Vector2(0.0, roof_h)]), seg)
+	# Finial (épi) on the cone.
+	lm.frustum(roof, base + Vector3(0, h + 0.2 + roof_h * 0.92, 0), r1 * 0.05, r1 * 0.03, roof_h * 0.18, 6)
+	lm.lathe(roof, base + Vector3(0, h + 0.2 + roof_h * 1.06, 0), LandmarkWestKit.ball(r1 * 0.05), 6)
 
 ## Gold ball finial.
 static func ball(lm: LandmarkMesh, key: String, base: Vector3, r: float) -> void:
@@ -161,33 +166,52 @@ static func aisled_body(lm: LandmarkMesh, stone: String, roof: String, glass: St
 	for sz in [-1.0, 1.0]:
 		var n := Vector3(0, 0, sz)
 		leanto(lm, roof, x0, x1, sz, ha + 0.3, ha_h, hc, y_in, oz)
-		lancet_row(lm, glass, Vector3(x0, 0, oz + sz * ha), Vector3(x1, 0, oz + sz * ha), n, bays, bay * 0.36,
-			ha_h * 0.46, ha_h * 0.26, bay * 0.2)
-		lancet_row(lm, glass, Vector3(x0, 0, oz + sz * hc), Vector3(x1, 0, oz + sz * hc), n, bays, bay * 0.36,
-			(hc_h - y_in) * 0.55, y_in + 1.0, bay * 0.18)
+		LandmarkWhGothic.window_row(lm, glass, stone, Vector3(x0, 0, oz + sz * ha), Vector3(x1, 0, oz + sz * ha), n,
+			bays, bay * 0.4, ha_h * 0.46, ha_h * 0.26, bay * 0.2, 2)
+		LandmarkWhGothic.window_row(lm, glass, stone, Vector3(x0, 0, oz + sz * hc), Vector3(x1, 0, oz + sz * hc), n,
+			bays, bay * 0.46, (hc_h - y_in) * 0.55, y_in + 1.0, bay * 0.18, 3)
+		# Parapets on the aisle and clerestory walls, a string course under the sills.
+		LandmarkWhGothic.parapet(lm, stone, Vector3(x0, ha_h, oz + sz * ha), Vector3(x1, ha_h, oz + sz * ha), n, 1.0,
+			2.0)
+		LandmarkWhGothic.parapet(lm, stone, Vector3(x0, hc_h, oz + sz * hc), Vector3(x1, hc_h, oz + sz * hc), n, 1.2,
+			2.0)
+		LandmarkWestKit.blk(lm, stone, (x0 + x1) * 0.5, ha_h * 0.24, oz + sz * (ha + 0.1), x1 - x0, 0.35, 0.5)
 		for k in bays + 1:
 			var x := x0 + bay * float(k)
-			LandmarkWestKit.blk(lm, stone, x, 0, oz + sz * (ha + 1.1), 1.4, ha_h + 1.5, 2.0)
-			pinnacle(lm, stone, Vector3(x, ha_h + 1.5, oz + sz * (ha + 1.1)), 0.55, 1.2, 2.8)
+			LandmarkWhGothic.buttress(lm, stone, Vector3(x, 0, oz + sz * ha), n, 1.4, 2.4, ha_h + 1.5, 3)
+			pinnacle(lm, stone, Vector3(x, ha_h + 1.5, oz + sz * (ha + 0.6)), 0.55, 1.2, 2.8)
 			flyer(lm, stone, Vector3(x, ha_h + 2.0, oz + sz * (ha + 0.5)),
 				Vector3(x, hc_h - 3.0, oz + sz * (hc + 0.1)), 0.8, 0.8)
+			LandmarkWhGothic.buttress(lm, stone, Vector3(x, y_in, oz + sz * hc), n, 1.0, 0.8, hc_h - y_in - 1.0, 2)
 
 ## Square Perpendicular tower: shaft of side `size` from c.y to h with
-## string courses, two tall lancets per stage on each of `faces`
-## (horizontal outward normals) above y_vis, a parapet slab and four
-## corner pinnacles. Returns the height of the highest pinnacle tip.
+## string courses and clasping corner buttresses, two traceried
+## windows per stage on each of `faces` (horizontal outward normals)
+## above y_vis, a pierced parapet and four corner pinnacles. Returns the height of the highest pinnacle tip.
 static func square_tower(lm: LandmarkMesh, stone: String, glass: String, c: Vector3, size: float,
 		h: float, y_vis: float, faces: Array, pin_shaft: float = 2.5, pin_cap: float = 3.2) -> float:
 	LandmarkWestKit.blk(lm, stone, c.x, c.y, c.z, size, h - c.y, size)
 	var span := h - y_vis
 	for k in 3:
 		LandmarkWestKit.blk(lm, stone, c.x, y_vis + span * float(k) * 0.34, c.z, size + 0.6, 0.6, size + 0.6)
+	# Clasping buttresses up each corner, set back stage by stage.
+	for q in [Vector2(-1, -1), Vector2(-1, 1), Vector2(1, -1), Vector2(1, 1)]:
+		for ax in [Vector3(q.x, 0, 0), Vector3(0, 0, q.y)]:
+			var o: Vector3 = ax
+			var side: Vector3 = Vector3(0, 0, q.y) if o.x != 0.0 else Vector3(q.x, 0, 0)
+			LandmarkWhGothic.buttress(lm, stone, Vector3(c.x, c.y, c.z) + o * size * 0.5 + side * (size * 0.5 - 0.6),
+				o, 1.2, 1.4, h - c.y - 1.0, 4)
 	for f in faces:
 		var fn: Vector3 = f
 		var fp := c + fn * (size * 0.5)
 		var half := along(fn) * size * 0.2
-		lancet_row(lm, glass, fp - half, fp + half, fn, 2, size * 0.14, span * 0.28, y_vis + span * 0.06, size * 0.1)
-		lancet_row(lm, glass, fp - half, fp + half, fn, 2, size * 0.16, span * 0.3, y_vis + span * 0.46, size * 0.12)
+		LandmarkWhGothic.window_row(lm, glass, stone, fp - half, fp + half, fn, 2, size * 0.15, span * 0.28,
+			y_vis + span * 0.06, size * 0.1, 2)
+		LandmarkWhGothic.window_row(lm, glass, stone, fp - half, fp + half, fn, 2, size * 0.17, span * 0.3,
+			y_vis + span * 0.46, size * 0.12, 2)
+		var hw := along(fn) * (size * 0.5 + 0.4)
+		LandmarkWhGothic.parapet(lm, stone, fp - hw + Vector3(0, h + 0.8, 0), fp + hw + Vector3(0, h + 0.8, 0), fn,
+			1.4, 1.5)
 	LandmarkWestKit.blk(lm, stone, c.x, h, c.z, size + 0.8, 0.8, size + 0.8)
 	for q in [Vector2(-1, -1), Vector2(-1, 1), Vector2(1, -1), Vector2(1, 1)]:
 		pinnacle(lm, stone, Vector3(c.x + q.x * size * 0.5, h + 0.8, c.z + q.y * size * 0.5), 0.7,

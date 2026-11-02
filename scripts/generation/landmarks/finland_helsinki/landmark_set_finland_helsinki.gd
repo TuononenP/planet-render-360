@@ -9,8 +9,8 @@ static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"uspenski_cathedral": LandmarkFhHelsinkiSacred.uspenski(model)
 		"temppeliaukio_church": LandmarkFhHelsinkiSacred.temppeliaukio(model)
-		"st_johns_church_helsinki": LandmarkFhHelsinkiSacred.stjohns(model)
-		"kallio_church": LandmarkFhHelsinkiSacred.kallio(model)
+		"st_johns_church_helsinki": LandmarkFhHelsinkiChurches.stjohns(model)
+		"kallio_church": LandmarkFhHelsinkiChurches.kallio(model)
 		"national_museum_of_finland": LandmarkFhHelsinkiCivic.natmuseum(model)
 		"parliament_house_helsinki": LandmarkFhHelsinkiCivic.parliament(model)
 		"presidential_palace_helsinki": LandmarkFhHelsinkiCivic.presidential(model)

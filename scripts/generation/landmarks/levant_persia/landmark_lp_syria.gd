@@ -1,17 +1,23 @@
 class_name LandmarkLpSyria
 extends RefCounted
 
-## Two Syrian landmarks in true metres, built in compass frame (+X east,
-## -Z north): the Umayyad Mosque of Damascus and the Crusader castle of
-## Krak des Chevaliers.
+## The Umayyad Mosque of Damascus in true metres, built in compass frame
+## (+X east, -Z north). Krak des Chevaliers is in LandmarkLpKrak.
 
 # --- Umayyad Mosque, Damascus ---
 
-## 157 x 97 m Roman temenos: arcaded courtyard (122 x 50 m) on the north,
-## the three-aisled prayer hall (136 x 37 m) on the south with its gabled
-## lead roofs, the high central transept front and the Dome of the Eagle
-## (36 m) on its octagonal drum; the Dome of the Treasury on eight columns;
-## the Minarets of Jesus (SE, 77 m), the Bride (north) and Qaitbay (SW).
+## 157 x 97 m Roman temenos (705-715): the courtyard on the north ringed on
+## three sides by porticoes of large round arches on alternating piers and
+## paired columns under an upper storey of double arches, with the
+## Treasury dome on eight Roman columns (west), the Dome of the Clocks
+## (east) and the ablution fountain; the prayer hall (136 x 37 m) on the
+## south: its courtyard arcade of 2 x 11 arches, three gabled lead roofs,
+## the high transept with its pedimented, mosaic-clad front and the Dome of
+## the Eagle (36 m) on an octagonal drum with two windows a side; the
+## Minaret of Jesus (south-east, 77 m: square body with two covered
+## galleries, octagonal stage, two open galleries, spire), the Minaret of
+## the Bride on the north wall (four galleries, lead roof, spire) and
+## Qaitbay's octagonal Mamluk minaret (south-west, three galleries).
 static func umayyad(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#DAC9A2", 4.0))
@@ -19,163 +25,217 @@ static func umayyad(model: Node3D) -> void:
 	lm.use("Court", LandmarkMaterials.pbr("pavement", "#D6C8A8", 6.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#231D17", 3.0, 0.92))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.box("Court", Vector3(0, -0.2, 0), Vector3(160, 0.4, 100))
-	# Outer walls and the three courtyard wings (north, east, west).
+	lm.use("Mosaic", LandmarkMaterials.pbr("render", "#8C8A4A", 2.0, 0.35))
+	lm.box("Court", Vector3(0, 0.1, 0), Vector3(160, 0.2, 100), Basis(), 0.0)
+	# Outer Roman walls with pilasters and a cornice; the courtyard wings.
 	lm.box("Stone", Vector3(0, 7.5, -47.25), Vector3(157, 15.0, 2.5))
+	for i in 26:
+		var x := -75.0 + 6.0 * float(i)
+		lm.box("Stone", Vector3(x, 7.0, -48.7), Vector3(1.4, 14.0, 0.5))
 	for s in [-1.0, 1.0]:
-		lm.box("Stone", Vector3(s * 71.5, 5.5, -17.0), Vector3(15.0, 11.0, 61.0))
-		_arcade(lm, Vector3(s * 61.0, 0, -16.5), -s * PI * 0.5, 49.0, 6)
-	lm.box("Stone", Vector3(0, 5.5, -42.0), Vector3(157, 11.0, 8.0))
-	_arcade(lm, Vector3(0, 0, -38.0), 0.0, 122.0, 16)
-	# Prayer hall: courtyard arcade, three E-W lead roofs, transept, dome.
+		lm.box("Stone", Vector3(float(s) * 74.0, 6.0, -17.0), Vector3(9.0, 12.0, 61.0))
+		for i in 10:
+			lm.box("Stone", Vector3(float(s) * 78.7, 7.0, -44.0 + 6.0 * float(i)), Vector3(0.5, 14.0, 1.4))
+		_portico(lm, Vector3(float(s) * 61.0, 0.2, -16.5), -float(s) * PI * 0.5, 49.0, 7, 8.4)
+	_portico(lm, Vector3(0, 0.2, -38.0), 0.0, 122.0, 17, 7.9)
+	_prayer_hall(lm)
+	_courtyard_domes(lm)
+	_minaret_jesus(lm, Vector3(74.0, 0, 44.0))
+	_minaret_bride(lm, Vector3(0.0, 0, -45.0))
+	_minaret_qaitbay(lm, Vector3(-74.0, 0, 44.0))
+	lm.commit(model)
+
+## Courtyard portico of `n` bays along `length` (front plane at `front`,
+## facing yaw, `depth` back to the outer wall): round arches on piers,
+## paired columns before the intermediate piers, the dark depth of the
+## portico and the upper storey of double arched openings over it.
+static func _portico(lm: LandmarkMesh, front: Vector3, yaw: float, length: float, n: int, depth: float) -> void:
+	var r := LandmarkLpParts.across(yaw)
+	var f := LandmarkLpParts.outward(yaw)
+	var basis := Basis(Vector3.UP, yaw)
+	var pitch := length / float(n)
+	var lower := LandmarkLpDetail.bays(n, length, pitch * 0.34, 4.2)
+	LandmarkLpParts.slab(lm, "Stone", LandmarkLpParts.arcade_outline(length, 7.0, lower, 8), front, yaw, 1.6)
+	lm.box("Dark", front - f * (depth - 0.05) + Vector3(0, 3.5, 0), Vector3(length, 7.0, 0.1), basis, 0.0)
+	# Upper storey: two small round arches over every lower bay.
+	var upper := LandmarkLpDetail.bays(n * 2, length, pitch * 0.17, 1.2)
+	LandmarkLpDetail.arcade_skin(lm, "Stone", "Dark", front + Vector3(0, 7.0, 0), yaw, length, 3.6, upper, 0.6, 6)
+	lm.box("Stone", front - f * (0.3 + depth * 0.5) + Vector3(0, 8.8, 0), Vector3(length, 3.6, depth - 0.6), basis)
+	lm.box("Stone", front + f * 0.15 + Vector3(0, 10.75, 0), Vector3(length + 0.6, 0.3, 0.9), basis)
+	# Paired columns before every other pier (pier, two columns, pier...).
+	for i in range(1, n):
+		if i % 3 == 0:
+			continue
+		var u := -length * 0.5 + pitch * float(i)
+		LandmarkLpParts.column(lm, "Stone", front + r * u + f * 0.45, 0.32, 4.4, 0.6, 10)
+		lm.box("Mosaic", front + r * u + f * 0.02 + Vector3(0, 5.6, 0), Vector3(pitch * 0.3, 1.2, 0.06), basis, 0.0)
+
+## Prayer hall: walls, courtyard arcade, three roofs, transept, Eagle dome.
+static func _prayer_hall(lm: LandmarkMesh) -> void:
 	lm.box("Stone", Vector3(0, 7.5, 28.25), Vector3(157, 15.0, 40.5))
-	LandmarkLpParts.slab(lm, "Stone", LandmarkLpParts.arcade_outline(136.0, 14.0,
-		_bays(17, 8.0, 2.2, 5.0), 6), Vector3(0, 0, 8.0), PI, 3.0)
-	lm.box("Dark", Vector3(0, 3.5, 11.05), Vector3(136.0, 7.0, 0.1))
+	var arches: Array = []
+	for i in 11:
+		for s in [-1.0, 1.0]:
+			arches.append([float(s) * (12.0 + 5.09 * (float(i) + 0.5)), 1.9, 5.4, 1.9])
+	arches.sort_custom(func(p: Array, q: Array) -> bool: return float(p[0]) < float(q[0]))
+	LandmarkLpParts.slab(lm, "Stone", LandmarkLpParts.arcade_outline(136.0, 14.0, arches, 6), Vector3(0, 0.2, 8.0), PI, 3.0)
+	lm.box("Dark", Vector3(0, 3.8, 11.05), Vector3(136.0, 7.2, 0.1), Basis(), 0.0)
+	for ar in arches:
+		lm.box("Stone", Vector3(float(ar[0]), 9.6, 7.9), Vector3(1.2, 2.0, 0.2), Basis(), 0.0)
+		LandmarkLpParts.arch_panel(lm, "Dark", Vector3(float(ar[0]) - 0.9, 9.0, 7.98), PI, 0.5, 1.4, 0.5)
+		LandmarkLpParts.arch_panel(lm, "Dark", Vector3(float(ar[0]) + 0.9, 9.0, 7.98), PI, 0.5, 1.4, 0.5)
+	lm.box("Stone", Vector3(0, 14.2, 7.8), Vector3(137.0, 0.4, 0.8))
 	for z in [14.2, 26.5]:
 		lm.gable("Lead", Vector3(0, 15.0, z), 12.4, 157.0, 4.0, Basis(Vector3.UP, PI * 0.5), 0.2, "Stone")
 	lm.gable("Lead", Vector3(0, 15.0, 40.8), 15.6, 157.0, 4.0, Basis(Vector3.UP, PI * 0.5), 0.2, "Stone")
+	# Transept: high walls with clerestory windows, gable roof, mosaic front.
 	lm.box("Stone", Vector3(0, 10.0, 28.25), Vector3(24.0, 20.0, 40.5))
 	lm.gable("Lead", Vector3(0, 20.0, 28.25), 24.0, 40.5, 4.0, Basis(), 0.0, "Stone")
-	LandmarkLpParts.iwan(lm, "Stone", "Dark", Vector3(0, 0, 6.0), PI, 24.0, 24.0, 4.2, 9.0, 6.5, 5.0)
+	for s in [-1.0, 1.0]:
+		for i in 5:
+			LandmarkLpParts.arch_panel(lm, "Dark", Vector3(float(s) * 12.02, 15.6, 12.0 + 8.0 * float(i)),
+				float(s) * PI * 0.5, 0.8, 1.8, 0.8)
+	var fz := 8.0
+	var tri := LandmarkLpDetail.bays(3, 18.0, 2.1, 6.0)
+	tri[1] = [0.0, 3.0, 6.4, 3.0]
+	LandmarkLpDetail.arcade_skin(lm, "Stone", "Dark", Vector3(0, 0.2, fz - 0.6), PI, 24.0, 11.0, tri, 0.6, 8)
+	LandmarkLpDetail.arcade_skin(lm, "Mosaic", "Dark", Vector3(0, 11.2, fz - 0.6), PI, 24.0, 8.6,
+		LandmarkLpDetail.bays(3, 15.0, 1.4, 3.6), 0.6, 8)
+	lm.box("Stone", Vector3(0, 11.1, fz - 1.3), Vector3(24.6, 0.4, 1.0))
+	lm.box("Stone", Vector3(0, 20.0, fz - 0.9), Vector3(24.6, 0.4, 0.8))
+	lm.box("Mosaic", Vector3(0, 21.0, fz - 0.15), Vector3(14.0, 1.6, 0.1), Basis(), 0.0)
+	# Dome of the Eagle: octagonal drum, two windows a side, lead dome, finial.
 	var dc := Vector3(0, 0, 28.25)
 	lm.frustum("Stone", dc + Vector3(0, 18.0, 0), 8.8, 8.8, 10.5, 8, PI / 8.0)
-	for k in 8:
-		var a := TAU * float(k) / 8.0 + PI / 8.0
-		lm.box("Dark", dc + Vector3(cos(a) * 8.1, 24.0, sin(a) * 8.1), Vector3(0.3, 3.4, 2.4),
-			Basis(Vector3.UP, -a))
-	lm.lathe("Lead", dc + Vector3(0, 28.5, 0), LandmarkLpParts.dome_profile(9.2, 7.5, 8, 0.25), 24)
-	# Dome of the Treasury on eight columns, in the western courtyard.
-	var tc := Vector3(-36.0, 0, -22.0)
-	lm.frustum("Stone", tc, 3.9, 3.7, 2.8, 8)
+	lm.frustum("Stone", dc + Vector3(0, 27.9, 0), 9.2, 9.3, 0.6, 8, PI / 8.0)
 	for k in 8:
 		var a := TAU * float(k) / 8.0
-		lm.frustum("Stone", tc + Vector3(cos(a) * 3.2, 2.8, sin(a) * 3.2), 0.4, 0.34, 5.6, 8)
-	lm.frustum("Stone", tc + Vector3(0, 8.4, 0), 3.7, 3.5, 3.0, 8, PI / 8.0)
-	lm.lathe("Lead", tc + Vector3(0, 11.4, 0), LandmarkLpParts.dome_profile(3.8, 3.4, 6, 0.1), 16)
-	# Minarets: Jesus (tallest), the Bride on the north wall, Qaitbay.
-	_minaret(lm, Vector3(74.0, 0, 44.0), 6.6, 44.0, 2.9, 16.0, 15.4)
-	_minaret(lm, Vector3(0.0, 0, -45.0), 5.6, 36.0, 2.5, 12.0, 11.5)
-	_minaret(lm, Vector3(-74.0, 0, 44.0), 5.6, 30.0, 2.5, 11.0, 10.5)
-	lm.commit(model)
+		var d := Vector3(cos(a), 0, sin(a))
+		var r := Vector3(-d.z, 0, d.x)
+		for s in [-1.0, 1.0]:
+			LandmarkLpParts.arch_panel(lm, "Dark", dc + d * 8.15 + r * (float(s) * 1.4) + Vector3(0, 22.4, 0),
+				PI * 0.5 - a, 0.55, 2.4, 0.55)
+		lm.box("Stone", dc + d * 8.1 + Vector3(0, 23.2, 0), Vector3(0.5, 4.6, 0.3), Basis.looking_at(d))
+	lm.lathe("Lead", dc + Vector3(0, 28.5, 0), LandmarkLpParts.dome_profile(9.2, 6.6, 10, 0.25), 32)
+	LandmarkLpParts.needle(lm, "Gold", dc + Vector3(0, 35.1, 0),
+		PackedVector2Array([Vector2(0, 0.25), Vector2(0.4, 0.15), Vector2(0.9, 0.04)]), 8)
 
-## Row of `n` equal round-arched bays along `length` in front of a wing:
-## arcade slab (3 m) over a dark plate, then a plain upper storey.
-static func _arcade(lm: LandmarkMesh, front: Vector3, yaw: float, length: float, n: int) -> void:
-	var r := LandmarkLpParts.across(yaw)
-	var f := LandmarkLpParts.outward(yaw)
-	LandmarkLpParts.slab(lm, "Stone", LandmarkLpParts.arcade_outline(length, 6.4,
-		_bays(n, length / float(n), 1.7, 3.8), 6), front, yaw, 3.0)
-	lm.box("Dark", front - f * 3.05 + Vector3(0, 3.0, 0), Vector3(length * absf(r.x) + 0.1 * absf(f.x),
-		6.0, length * absf(r.z) + 0.1 * absf(f.z)))
-	lm.box("Stone", front - f * 1.5 + Vector3(0, 8.6, 0), Vector3(length * absf(r.x) + 3.0 * absf(f.x),
-		4.4, length * absf(r.z) + 3.0 * absf(f.z)))
-	for i in n * 2:
-		var u := -length * 0.5 + (float(i) + 0.5) * length / float(n * 2)
-		LandmarkLpParts.arch_panel(lm, "Dark", front + r * u + Vector3(0, 6.9, 0) + f * 0.04, yaw, 0.8, 1.6, 0.8)
+## Dome of the Treasury on eight columns (west), the Dome of the Clocks
+## (east) and the ablution fountain kiosk in the middle of the court.
+static func _courtyard_domes(lm: LandmarkMesh) -> void:
+	for side in [-1.0, 1.0]:
+		var tc := Vector3(float(side) * 36.0, 0.2, -22.0)
+		var rr := 3.2 if side < 0.0 else 2.6
+		for k in 8:
+			var a := TAU * float(k) / 8.0
+			LandmarkLpParts.column(lm, "Stone", tc + Vector3(cos(a) * rr, 0, sin(a) * rr), 0.32, 5.4, 0.7, 10)
+		lm.frustum("Stone", tc + Vector3(0, 5.4, 0), rr + 0.6, rr + 0.5, 0.5, 8, PI / 8.0)
+		lm.frustum("Mosaic", tc + Vector3(0, 5.9, 0), rr + 0.45, rr + 0.35, 3.0, 8, PI / 8.0)
+		lm.frustum("Stone", tc + Vector3(0, 8.9, 0), rr + 0.6, rr + 0.5, 0.3, 8, PI / 8.0)
+		lm.lathe("Lead", tc + Vector3(0, 9.2, 0), LandmarkLpParts.dome_profile(rr + 0.4, rr * 0.9, 6, 0.1), 16)
+	var fc := Vector3(0, 0.2, -16.0)
+	lm.frustum("Stone", fc, 4.0, 4.0, 0.6, 8, PI / 8.0)
+	for k in 8:
+		var a := TAU * float(k) / 8.0
+		lm.frustum("Stone", fc + Vector3(cos(a) * 3.2, 0.6, sin(a) * 3.2), 0.2, 0.18, 3.4, 8)
+	lm.frustum("Stone", fc + Vector3(0, 4.0, 0), 3.7, 3.6, 0.4, 8, PI / 8.0)
+	lm.lathe("Lead", fc + Vector3(0, 4.4, 0), LandmarkLpParts.dome_profile(3.4, 2.4, 5, 0.2), 16)
 
-## `n` arched bays of half-width a (spring height s) at pitch `pitch`,
-## centred on u = 0, as arcade_outline entries.
-static func _bays(n: int, pitch: float, a: float, s: float) -> Array:
-	var out: Array = []
-	for i in n:
-		out.append([(float(i) - float(n - 1) * 0.5) * pitch, a, s, a])
-	return out
+## Covered gallery round a square shaft of `side` at height y: corbelled
+## floor, posts and a lead pent roof.
+static func _covered_gallery(lm: LandmarkMesh, base: Vector3, side: float, y: float) -> void:
+	var w := side + 2.4
+	lm.box("Stone", base + Vector3(0, y - 0.6, 0), Vector3(side + 0.8, 0.6, side + 0.8))
+	lm.box("Stone", base + Vector3(0, y - 0.15, 0), Vector3(w, 0.3, w))
+	for sx in [-1.0, 1.0]:
+		for i in 4:
+			var t := -w * 0.5 + 0.3 + (w - 0.6) * float(i) / 3.0
+			lm.box("Stone", base + Vector3(float(sx) * (w * 0.5 - 0.3), y + 1.4, t), Vector3(0.25, 2.8, 0.25), Basis(), 0.0)
+			lm.box("Stone", base + Vector3(t, y + 1.4, float(sx) * (w * 0.5 - 0.3)), Vector3(0.25, 2.8, 0.25), Basis(), 0.0)
+	lm.box("Dark", base + Vector3(0, y + 1.4, 0), Vector3(side + 0.1, 2.6, side + 0.1), Basis(), 0.0)
+	lm.spire("Lead", base + Vector3(0, y + 2.8, 0), w * 0.5 + 0.3, 0.9, side * 0.5, 4)
 
-## Damascene minaret: square shaft with two covered galleries, octagonal
-## upper stage with an open gallery, lead spire and gilded finial. Top at
-## base.y + sq_h + 0.8 + oct_h + spire_h + 0.8.
-static func _minaret(lm: LandmarkMesh, base: Vector3, side: float, sq_h: float, oct_r: float,
-		oct_h: float, spire_h: float) -> void:
-	lm.box("Stone", base + Vector3(0, sq_h * 0.5, 0), Vector3(side, sq_h, side))
-	for f in [0.42, 0.9]:
-		lm.box("Stone", base + Vector3(0, sq_h * f, 0), Vector3(side + 1.0, 0.7, side + 1.0))
-		lm.box("Dark", base + Vector3(0, sq_h * f - 2.3, 0), Vector3(side + 0.2, 3.0, side - 2.0))
-		lm.box("Dark", base + Vector3(0, sq_h * f - 2.3, 0), Vector3(side - 2.0, 3.0, side + 0.2))
-	var y0 := sq_h + 0.8
-	lm.box("Stone", base + Vector3(0, sq_h + 0.4, 0), Vector3(side + 1.6, 0.8, side + 1.6))
-	lm.frustum("Stone", base + Vector3(0, y0, 0), oct_r, oct_r * 0.92, oct_h, 8, PI / 8.0)
-	lm.frustum("Stone", base + Vector3(0, y0 + oct_h * 0.55, 0), oct_r * 1.5, oct_r * 1.5, 0.5, 8, PI / 8.0)
-	lm.frustum("Dark", base + Vector3(0, y0 + oct_h * 0.2, 0), oct_r * 0.97, oct_r * 0.97, oct_h * 0.2, 8,
-		PI / 8.0)
-	lm.spire("Lead", base + Vector3(0, y0 + oct_h, 0), oct_r * 1.0, spire_h, 0.0, 8)
-	LandmarkLpParts.needle(lm, "Gold", base + Vector3(0, y0 + oct_h + spire_h, 0),
-		PackedVector2Array([Vector2(0, 0.14), Vector2(0.8, 0.05)]), 6)
+## Open gallery round an octagonal stage of radius r at height y: corbel
+## ring, floor and railing posts.
+static func _open_gallery(lm: LandmarkMesh, base: Vector3, r: float, y: float) -> void:
+	lm.frustum("Stone", base + Vector3(0, y - 0.8, 0), r, r * 1.45, 0.8, 8, PI / 8.0)
+	lm.frustum("Stone", base + Vector3(0, y, 0), r * 1.5, r * 1.5, 0.25, 8, PI / 8.0)
+	for k in 16:
+		var a := TAU * float(k) / 16.0
+		lm.box("Stone", base + Vector3(cos(a) * r * 1.42, y + 0.6, sin(a) * r * 1.42), Vector3(0.12, 0.9, 0.12),
+			Basis(), 0.0)
+	lm.frustum("Stone", base + Vector3(0, y + 1.05, 0), r * 1.45, r * 1.45, 0.12, 8, PI / 8.0)
 
-# --- Krak des Chevaliers ---
+## Minaret of Jesus (77 m): square body (6.6 m) with two covered galleries,
+## octagonal stage with two open galleries and windows, pencil spire.
+static func _minaret_jesus(lm: LandmarkMesh, base: Vector3) -> void:
+	var side := 6.6
+	lm.box("Stone", base + Vector3(0, 22.0, 0), Vector3(side, 44.0, side))
+	for k in 4:
+		var yaw := PI * 0.5 * float(k)
+		var d := LandmarkLpParts.outward(yaw)
+		for y in [12.0, 21.0, 30.0, 39.0]:
+			LandmarkLpParts.arch_panel(lm, "Dark", base + d * (side * 0.5 + 0.02) + Vector3(0, float(y), 0), yaw,
+				0.4, 1.4, 0.4)
+	_covered_gallery(lm, base, side, 18.5)
+	_covered_gallery(lm, base, side, 40.4)
+	lm.box("Stone", base + Vector3(0, 44.4, 0), Vector3(side + 1.6, 0.8, side + 1.6))
+	var y0 := 44.8
+	lm.frustum("Stone", base + Vector3(0, y0, 0), 2.9, 2.7, 16.0, 8, PI / 8.0)
+	for k in 8:
+		var a := TAU * (float(k) + 0.5) / 8.0
+		var d := Vector3(cos(a), 0, sin(a))
+		LandmarkLpParts.arch_panel(lm, "Dark", base + d * 2.62 + Vector3(0, y0 + 2.0, 0), PI * 0.5 - a, 0.45, 1.6, 0.45)
+		LandmarkLpParts.arch_panel(lm, "Dark", base + d * 2.55 + Vector3(0, y0 + 10.4, 0), PI * 0.5 - a, 0.4, 1.4, 0.4)
+	_open_gallery(lm, base, 2.8, y0 + 7.0)
+	_open_gallery(lm, base, 2.7, y0 + 15.2)
+	lm.spire("Lead", base + Vector3(0, y0 + 16.0, 0), 2.75, 15.4, 0.0, 8)
+	LandmarkLpParts.needle(lm, "Gold", base + Vector3(0, y0 + 31.4, 0),
+		PackedVector2Array([Vector2(0, 0.14), Vector2(0.3, 0.2), Vector2(0.5, 0.05), Vector2(0.8, 0.05)]), 6)
 
-## Concentric Hospitaller castle on its spur (y = 0 is the outer ward; the
-## rock under the 10-sided outer curtain goes 20 m below): outer wall of
-## round towers with machicolated merlons, the raised inner ward behind its
-## sloping glacis with four big round towers (the Grand Master's tower at
-## the south-west, 34 m), square towers, the chapel and the Knights' hall.
-static func krak(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Wall", LandmarkMaterials.pbr("limestone", "#C9B78F", 4.0))
-	lm.use("Rock", LandmarkMaterials.pbr("rock", "#8D7D63", 8.0))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#7F8387", 5.0))
-	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#1F1A15", 3.0, 0.92))
-	var ring := PackedVector2Array([Vector2(-36, -62), Vector2(0, -66), Vector2(34, -56),
-		Vector2(42, -20), Vector2(42, 25), Vector2(34, 58), Vector2(-2, 66), Vector2(-34, 56),
-		Vector2(-44, 20), Vector2(-44, -24)])
-	lm.poly_prism("Rock", ring, -20.0, 0.0)
-	for i in ring.size():
-		var p := ring[i]
-		var q := ring[(i + 1) % ring.size()]
-		var a := Vector3(p.x, 4.5, p.y)
-		var b := Vector3(q.x, 4.5, q.y)
-		lm.beam("Wall", a, b, 3.5, 9.0)
-		LandmarkLpParts.merlons(lm, "Wall", Vector3(p.x, 9.0, p.y), Vector3(q.x, 9.0, q.y), 1.0, 1.1, 1.0, 2.2)
-		_round_tower(lm, Vector3(p.x, 0, p.y), 5.0, 13.0)
-		if p.distance_to(q) > 40.0:
-			_round_tower(lm, Vector3((p.x + q.x) * 0.5, 0, (p.y + q.y) * 0.5), 4.6, 12.0)
-	# Inner ward: platform, sloping glacis, curtain wall.
-	var cx := -1.0
-	var cz := 3.0
-	lm.box("Wall", Vector3(cx, 6.0, cz), Vector3(52, 12.0, 70))
-	_glacis(lm, Vector3(cx, 0, cz), Vector2(33.0, 42.0), Vector2(26.0, 35.0), 12.0)
-	for s in [-1.0, 1.0]:
-		lm.box("Wall", Vector3(cx + s * 25.0, 16.0, cz), Vector3(3.0, 8.0, 70))
-		lm.box("Wall", Vector3(cx, 16.0, cz + s * 34.0), Vector3(52, 8.0, 3.0))
-		LandmarkLpParts.merlons(lm, "Wall", Vector3(cx + s * 25.0, 20.0, cz - 35.0),
-			Vector3(cx + s * 25.0, 20.0, cz + 35.0), 1.0, 1.2, 1.0, 2.2)
-		LandmarkLpParts.merlons(lm, "Wall", Vector3(cx - 26.0, 20.0, cz + s * 34.0),
-			Vector3(cx + 26.0, 20.0, cz + s * 34.0), 1.0, 1.2, 1.0, 2.2)
-	_round_tower(lm, Vector3(-27.0, 0, 38.0), 8.2, 34.0)
-	_round_tower(lm, Vector3(-1.0, 0, 41.0), 7.6, 31.0)
-	_round_tower(lm, Vector3(25.0, 0, 38.0), 7.2, 29.5)
-	_round_tower(lm, Vector3(-27.0, 0, 3.0), 6.6, 27.5)
-	for t in [Vector3(-1, 0, -32), Vector3(25, 0, -32), Vector3(25, 0, 6)]:
-		lm.box("Wall", (t as Vector3) + Vector3(0, 19.0, 0), Vector3(8.5, 14.0, 8.5))
-	# Chapel (north) and Knights' hall (west) in the inner court.
-	lm.box("Wall", Vector3(-1, 16.0, -18), Vector3(22, 8.0, 11))
-	lm.gable("Roof", Vector3(-1, 20.0, -18), 11.0, 22.0, 3.5, Basis(Vector3.UP, PI * 0.5), 0.4, "Wall")
-	lm.box("Wall", Vector3(-19, 16.5, 8), Vector3(10, 9.0, 36))
-	lm.gable("Roof", Vector3(-19, 21.0, 8), 10.0, 36.0, 3.0, Basis(), 0.4, "Wall")
-	lm.commit(model)
+## Minaret of the Bride on the north wall: square tower with four
+## galleries (the top one under a lead roof) and a slender spire.
+static func _minaret_bride(lm: LandmarkMesh, base: Vector3) -> void:
+	var side := 5.6
+	lm.box("Stone", base + Vector3(0, 18.0, 0), Vector3(side, 36.0, side))
+	for k in 4:
+		var yaw := PI * 0.5 * float(k)
+		var d := LandmarkLpParts.outward(yaw)
+		for y in [17.0, 25.0, 31.5]:
+			LandmarkLpParts.arch_panel(lm, "Dark", base + d * (side * 0.5 + 0.02) + Vector3(0, float(y), 0), yaw,
+				0.45, 1.6, 0.45)
+	for y in [16.0, 23.0, 29.5]:
+		lm.box("Stone", base + Vector3(0, float(y), 0), Vector3(side + 1.6, 0.4, side + 1.6))
+		for sx in [-1.0, 1.0]:
+			lm.box("Stone", base + Vector3(float(sx) * (side * 0.5 + 0.7), float(y) + 0.55, 0), Vector3(0.12, 0.7, side + 1.4),
+				Basis(), 0.0)
+			lm.box("Stone", base + Vector3(0, float(y) + 0.55, float(sx) * (side * 0.5 + 0.7)), Vector3(side + 1.4, 0.7, 0.12),
+				Basis(), 0.0)
+	_covered_gallery(lm, base, side, 36.4)
+	lm.frustum("Stone", base + Vector3(0, 39.6, 0), 1.4, 1.3, 4.0, 8, PI / 8.0)
+	lm.spire("Lead", base + Vector3(0, 43.6, 0), 1.5, 4.8, 0.0, 8)
+	LandmarkLpParts.needle(lm, "Gold", base + Vector3(0, 48.4, 0), PackedVector2Array([Vector2(0, 0.1), Vector2(0.6, 0.04)]), 6)
 
-## Round tower of radius r rising to `top`: battered base, straight shaft,
-## corbelled (machicolated) head with a merlon ring.
-static func _round_tower(lm: LandmarkMesh, base: Vector3, r: float, top: float) -> void:
-	var prof := PackedVector2Array([Vector2(r * 1.3, -3.0), Vector2(r * 1.3, 0.0),
-		Vector2(r * 1.15, top * 0.25), Vector2(r, top * 0.4), Vector2(r, top - 2.4),
-		Vector2(r * 1.14, top - 2.0), Vector2(r * 1.14, top)])
-	lm.lathe("Wall", base, prof, 16)
-	for k in 12:
-		var a := TAU * float(k) / 12.0
-		lm.box("Wall", base + Vector3(cos(a) * r * 1.06, top + 0.6, sin(a) * r * 1.06),
-			Vector3(1.0, 1.2, 1.2), Basis(Vector3.UP, -a))
-
-## Sloping skirt of four trapezoids from the rectangle `outer` (half-extents
-## in x, z) at y = 0 up to `inner` at height h, centred on c.
-static func _glacis(lm: LandmarkMesh, c: Vector3, outer: Vector2, inner: Vector2, h: float) -> void:
-	var o := [Vector3(-outer.x, 0, -outer.y), Vector3(outer.x, 0, -outer.y),
-		Vector3(outer.x, 0, outer.y), Vector3(-outer.x, 0, outer.y)]
-	var n := [Vector3(-inner.x, h, -inner.y), Vector3(inner.x, h, -inner.y),
-		Vector3(inner.x, h, inner.y), Vector3(-inner.x, h, inner.y)]
-	var out_n := [Vector3(0, outer.y - inner.y, -h), Vector3(h, outer.x - inner.x, 0),
-		Vector3(0, outer.y - inner.y, h), Vector3(-h, outer.x - inner.x, 0)]
-	for i in 4:
-		var j := (i + 1) % 4
-		lm.quad("Wall", c + (o[i] as Vector3), c + (o[j] as Vector3), c + (n[j] as Vector3),
-			c + (n[i] as Vector3), (out_n[i] as Vector3).normalized())
+## Qaitbay's minaret (1488): octagonal Mamluk shaft in receding stages,
+## three muqarnas galleries, a pavilion of posts and the bulb finial.
+static func _minaret_qaitbay(lm: LandmarkMesh, base: Vector3) -> void:
+	lm.box("Stone", base + Vector3(0, 7.0, 0), Vector3(5.6, 14.0, 5.6))
+	var stages := [[14.0, 2.6, 11.0], [25.0, 2.2, 8.0], [33.0, 1.8, 5.0]]
+	for st in stages:
+		var y: float = st[0]
+		var r: float = st[1]
+		var h: float = st[2]
+		lm.frustum("Stone", base + Vector3(0, y, 0), r, r * 0.97, h, 8, PI / 8.0)
+		for k in 8:
+			var a := TAU * (float(k) + 0.5) / 8.0
+			var d := Vector3(cos(a), 0, sin(a))
+			LandmarkLpParts.arch_panel(lm, "Dark", base + d * (r * 0.95) + Vector3(0, y + h * 0.3, 0), PI * 0.5 - a,
+				r * 0.18, h * 0.3, r * 0.2)
+		_open_gallery(lm, base, r * 0.97, y + h)
+	var top := 38.0 + 1.2
+	for k in 8:
+		var a := TAU * float(k) / 8.0
+		lm.box("Stone", base + Vector3(cos(a) * 1.2, top + 1.2, sin(a) * 1.2), Vector3(0.2, 2.4, 0.2), Basis(), 0.0)
+	lm.frustum("Stone", base + Vector3(0, top + 2.4, 0), 1.5, 1.5, 0.3, 8, PI / 8.0)
+	lm.lathe("Lead", base + Vector3(0, top + 2.7, 0), LandmarkLpParts.bulb_profile(1.2, 2.4, 1.15, 8, 1.3), 12)
+	LandmarkLpParts.needle(lm, "Gold", base + Vector3(0, top + 5.1, 0), PackedVector2Array([Vector2(0, 0.08), Vector2(0.7, 0.04)]), 6)

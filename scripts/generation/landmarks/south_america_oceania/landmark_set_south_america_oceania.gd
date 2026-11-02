@@ -19,7 +19,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"auckland_sky_tower": LandmarkSaoTowers.sky_tower(model)
 		"sydney_tower": LandmarkSaoTowers.sydney_tower(model)
 		"flinders_street_station": LandmarkSaoAustralia.flinders(model)
-		"parliament_house_canberra": LandmarkSaoAustralia.parliament(model)
+		"parliament_house_canberra": LandmarkSaoCanberra.parliament(model)
 		_:
 			return false
 	return true

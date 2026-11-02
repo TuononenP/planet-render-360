@@ -74,9 +74,9 @@ static func arch_pts(cx: float, spring: float, r: float, ry: float, seg: int) ->
 ## Row of arches between pier centres `piers` (x), as solid masonry of
 ## half-thickness hz: piers from y0, springing at `spring`, openings
 ## rising rise_k * half-span (capped to leave 1.2 m over the crown) and
-## the wall carried up to `top`.
+## the wall carried up to `top`, centred on z = zc.
 static func arcade(lm: LandmarkMesh, key: String, piers: PackedFloat32Array, y0: float, top: float,
-		spring: float, rise_k: float, pier_w: float, hz: float, seg: int = 10) -> void:
+		spring: float, rise_k: float, pier_w: float, hz: float, seg: int = 10, zc: float = 0.0) -> void:
 	for i in piers.size() - 1:
 		var xl := piers[i]
 		var xr := piers[i + 1]
@@ -86,7 +86,7 @@ static func arcade(lm: LandmarkMesh, key: String, piers: PackedFloat32Array, y0:
 		poly.append_array(arch_pts((xl + xr) * 0.5, spring, r, ry, seg))
 		poly.append_array(PackedVector2Array([Vector2(xr - pier_w * 0.5, y0), Vector2(xr, y0),
 			Vector2(xr, top), Vector2(xl, top)]))
-		extrude_xy(lm, key, poly, -hz, hz)
+		extrude_xy(lm, key, poly, zc - hz, zc + hz)
 
 ## Evenly spaced pier positions: n bays between x0 and x1.
 static func pier_line(x0: float, x1: float, n: int) -> PackedFloat32Array:
@@ -121,7 +121,11 @@ static func cable_y(p: Dictionary, x: float) -> float:
 ## tx0/tx1 tower x, e0/e1 cable end x, top, low, end0/end1, sag0/sag1
 ## (see cable_y), z cable half-spacing, deck_y, w cable width, step hanger
 ## spacing, hw hanger width, dz (z of the deck edge the hangers reach, else
-## z), vee (inclined V hangers), side (hang the side spans too).
+## z), vee (inclined V hangers), side (hang the side spans too; or
+## side0 / side1 for one side span only), round (wire cables as round
+## tubes of diameter w, with a clamped cable band at every hanger),
+## pair (two hanger ropes per band, this far apart along the cable),
+## stack (a second cable this far above the first, as on Lisbon's).
 static func suspension(lm: LandmarkMesh, key: String, p: Dictionary) -> void:
 	var tx0: float = p["tx0"]
 	var tx1: float = p["tx1"]
@@ -131,6 +135,11 @@ static func suspension(lm: LandmarkMesh, key: String, p: Dictionary) -> void:
 	var step: float = p["step"]
 	var w: float = p["w"]
 	var hw: float = p.get("hw", 0.3)
+	var round_c: bool = p.get("round", false)
+	var pair: float = p.get("pair", 0.0)
+	var stack: float = p.get("stack", 0.0)
+	var side0: bool = p.get("side0", p.get("side", false))
+	var side1: bool = p.get("side1", p.get("side", false))
 	for zs in [-1.0, 1.0]:
 		var z: float = zs * float(p["z"])
 		var dz: float = zs * float(p.get("dz", p["z"]))
@@ -143,16 +152,35 @@ static func suspension(lm: LandmarkMesh, key: String, p: Dictionary) -> void:
 				var cx := lerpf(a, b, float(k) / n)
 				pts.append(Vector3(cx, cable_y(p, cx), z))
 		pts.append(Vector3(e1, cable_y(p, e1), z))
-		cable_poly(lm, key, pts, w)
-		var x0: float = e0 if p.get("side", false) else tx0
-		var x1: float = e1 if p.get("side", false) else tx1
+		var lifts: Array[float] = [0.0]
+		if stack > 0.0:
+			lifts.append(stack)
+		for lift in lifts:
+			var lp := PackedVector3Array()
+			for q in pts:
+				lp.append(q + Vector3(0, lift, 0))
+			if round_c:
+				LandmarkCoreBBridgeKit.tube(lm, key, lp, w * 0.5, 10)
+			else:
+				cable_poly(lm, key, lp, w)
+		var x0: float = e0 if side0 else tx0
+		var x1: float = e1 if side1 else tx1
 		var x := x0 + step
 		while x < x1 - step * 0.5:
 			var cy := cable_y(p, x)
 			if cy - deck_y > 2.0 and absf(x - tx0) > 6.0 and absf(x - tx1) > 6.0:
+				if round_c:
+					# Cable band: a split cast clamp round the cable.
+					var bl := maxf(w * 1.2, 0.8)
+					LandmarkCoreBBridgeKit.tube(lm, key, PackedVector3Array([
+						Vector3(x - bl, cable_y(p, x - bl), z), Vector3(x + bl, cable_y(p, x + bl), z)]),
+						w * 0.62, 8)
 				if p.get("vee", false):
 					lm.beam(key, Vector3(x, cy, z), Vector3(x - step * 0.5, deck_y, dz), hw, hw)
 					lm.beam(key, Vector3(x, cy, z), Vector3(x + step * 0.5, deck_y, dz), hw, hw)
+				elif pair > 0.0:
+					for o in [-pair * 0.5, pair * 0.5]:
+						lm.beam(key, Vector3(x + o, deck_y, dz), Vector3(x + o, cy, z), hw, hw)
 				else:
 					lm.beam(key, Vector3(x, deck_y, dz), Vector3(x, cy, z), hw, hw)
 			x += step
@@ -182,9 +210,25 @@ static func deck_girder(lm: LandmarkMesh, x0: float, x1: float, y: float, half_w
 	var length := x1 - x0
 	lm.box("Deck", Vector3(mid, y - 0.25, 0), Vector3(length, 0.5, half_w * 2.0))
 	if cell > 0.0:
-		for z in [-half_w + 0.6, half_w - 0.6]:
+		var tz := half_w - 0.6
+		for z in [-tz, tz]:
 			truss_side(lm, "Steel", x0, x1, y - depth, y - 0.5, z, cell, 0.9)
-		lm.box("Steel", Vector3(mid, y - depth + 0.4, 0), Vector3(length, 0.8, half_w * 2.0 - 1.0))
+		# Lower lateral bracing (an X in plan every cell), a cross frame
+		# at every panel point and the road's crash barriers and railings.
+		var n := maxi(int(round(length / cell)), 1)
+		var yb := y - depth + 0.4
+		for k in n:
+			var xa := lerpf(x0, x1, float(k) / n)
+			var xb := lerpf(x0, x1, float(k + 1) / n)
+			lm.beam("Steel", Vector3(xa, yb, -tz), Vector3(xb, yb, tz), 0.5, 0.5)
+			lm.beam("Steel", Vector3(xa, yb, tz), Vector3(xb, yb, -tz), 0.5, 0.5)
+			lm.beam("Steel", Vector3(xa, yb, -tz), Vector3(xa, yb, tz), 0.7, 0.9)
+			lm.beam("Steel", Vector3(xa, yb, -tz * 0.5), Vector3(xa, y - 0.6, -tz * 0.05), 0.4, 0.4)
+			lm.beam("Steel", Vector3(xa, yb, tz * 0.5), Vector3(xa, y - 0.6, tz * 0.05), 0.4, 0.4)
+		for z in [-half_w + 0.2, half_w - 0.2, -0.3, 0.3]:
+			lm.box("Concrete", Vector3(mid, y + 0.45, z), Vector3(length, 0.9, 0.35), Basis(), 0.0)
+		for z in [-half_w - 0.3, half_w + 0.3]:
+			railing(lm, "Steel", Vector3(x0, y, z), Vector3(x1, y, z), 1.2, 4.0)
 	else:
 		lm.box("Steel", Vector3(mid, y - 0.5 - (depth - 0.5) * 0.5, 0),
 			Vector3(length, depth - 0.5, half_w * 2.0 - 3.0))
@@ -206,7 +250,7 @@ static func viaduct(lm: LandmarkMesh, xa: float, ya: float, xb: float, yb: float
 		lm.box("Concrete", c + Vector3(0, -depth * 0.5, 0), Vector3(l + 0.2, depth - 0.5, half_w * 2.0 - 2.0), r)
 		var py: float = y1 - depth
 		for z in [-half_w * 0.45, half_w * 0.45]:
-			lm.box("Concrete", Vector3(x1, (py - 2.0) * 0.5, z), Vector3(3.0, py + 2.0, 3.0))
+			lm.box("Concrete", Vector3(x1, py * 0.5, z), Vector3(3.0, py, 3.0))
 
 ## Two-legged tower from y0 to `top`: legs at ±leg_z tapering from
 ## half-widths leg0 to leg1 (x, z), cross beams at the heights in
@@ -244,3 +288,117 @@ static func figure(lm: LandmarkMesh, key: String, base: Vector3, h: float) -> vo
 		Vector2(h * 0.2, h * 0.7), Vector2(h * 0.09, h * 0.78), Vector2(h * 0.08, h * 0.9),
 		Vector2(0.0, h)])
 	lm.lathe(key, base, prof, 8)
+
+## Railing along a-b: posts every `step` metres, h tall, with a
+## handrail and a middle rail.
+static func railing(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h: float, step: float) -> void:
+	var n := maxi(int(round(a.distance_to(b) / step)), 1)
+	for i in n + 1:
+		var p := a.lerp(b, float(i) / n)
+		lm.beam(key, p, p + Vector3(0, h, 0), 0.12, 0.12)
+	lm.beam(key, a + Vector3(0, h, 0), b + Vector3(0, h, 0), 0.14, 0.1)
+	lm.beam(key, a + Vector3(0, h * 0.5, 0), b + Vector3(0, h * 0.5, 0), 0.08, 0.08)
+
+## Prism along X from x0 to x1 over a cross-section polygon (z, y): the
+## way a box-girder deck or a pylon of constant section is one solid.
+static func extrude_yz(lm: LandmarkMesh, key: String, poly: PackedVector2Array, x0: float, x1: float) -> void:
+	var area := 0.0
+	for i in poly.size():
+		var p := poly[i]
+		var q := poly[(i + 1) % poly.size()]
+		area += p.x * q.y - q.x * p.y
+	var sgn := 1.0 if area > 0.0 else -1.0
+	var u := 0.0
+	for i in poly.size():
+		var p := poly[i]
+		var q := poly[(i + 1) % poly.size()]
+		var e := q - p
+		if e.length() < 0.001:
+			continue
+		var n := Vector3(0, -e.x, e.y).normalized() * sgn
+		lm.quad(key, Vector3(x0, p.y, p.x), Vector3(x0, q.y, q.x), Vector3(x1, q.y, q.x),
+			Vector3(x1, p.y, p.x), n, Vector2(u, 0))
+		u += e.length()
+	var idx := Geometry2D.triangulate_polygon(poly)
+	for t in range(0, idx.size(), 3):
+		var a := poly[idx[t]]
+		var b := poly[idx[t + 1]]
+		var c := poly[idx[t + 2]]
+		for x in [x0, x1]:
+			var n := Vector3(1.0 if x == x1 else -1.0, 0, 0)
+			lm.tri(key, Vector3(x, a.y, a.x), Vector3(x, b.y, b.x), Vector3(x, c.y, c.x), n, n, n,
+				Vector2(a.x, -a.y), Vector2(b.x, -b.y), Vector2(c.x, -c.y))
+
+## Cast-steel cable saddle on a tower top at `c` (its base), for a cable
+## of diameter w running along X: a stepped bed and the curved cover the
+## cable bends over.
+static func saddle(lm: LandmarkMesh, key: String, c: Vector3, w: float) -> void:
+	var l := w * 7.0
+	lm.box(key, c + Vector3(0, w * 0.4, 0), Vector3(l, w * 0.8, w * 3.4))
+	var prof := PackedVector2Array()
+	for k in 9:
+		var a := PI * float(k) / 8.0
+		prof.append(Vector2(-cos(a) * l * 0.45, w * 0.8 + sin(a) * w * 1.6))
+	var poly := PackedVector2Array([Vector2(-l * 0.5, w * 0.8)])
+	poly.append_array(prof)
+	poly.append(Vector2(l * 0.5, w * 0.8))
+	for i in poly.size():
+		poly[i] += Vector2(c.x, c.y)
+	extrude_xy(lm, key, poly, c.z - w * 1.3, c.z + w * 1.3)
+
+## Cable anchorage at the end x of a suspension bridge, the cables
+## leaving towards -dir (the span): a massive concrete block `length`
+## long and 2 half_w wide with its front face sloping up to `top` along
+## the cables, a splay chamber house on the slope and a stepped plinth.
+static func anchorage(lm: LandmarkMesh, key: String, x: float, dir: float, top: float, half_w: float,
+		length: float) -> void:
+	var poly := PackedVector2Array([Vector2(x, 0), Vector2(x + dir * length, 0),
+		Vector2(x + dir * length, top * 0.8), Vector2(x + dir * length * 0.55, top),
+		Vector2(x + dir * length * 0.15, top), Vector2(x, top * 0.55)])
+	extrude_xy(lm, key, poly, -half_w, half_w)
+	lm.box(key, Vector3(x + dir * length * 0.5, 1.5, 0), Vector3(length + 4.0, 3.0, half_w * 2.0 + 4.0))
+	# Splay chamber roofs over the two cable entries and the top cornice.
+	for s in [-1.0, 1.0]:
+		lm.box(key, Vector3(x + dir * length * 0.3, top * 0.85, s * half_w * 0.6),
+			Vector3(length * 0.3, top * 0.25, half_w * 0.6))
+	lm.box(key, Vector3(x + dir * length * 0.35, top + 0.6, 0), Vector3(length * 0.42, 1.2, half_w * 2.0 + 1.0))
+
+## Couchant stone lion of body length l at `base` (feet), facing `dir`
+## (±X or ±Z): plinth-free body, haunch, forepaws, maned head, tail.
+static func lion(lm: LandmarkMesh, key: String, base: Vector3, dir: Vector3, l: float) -> void:
+	var f := dir.normalized()
+	var s := Vector3.UP.cross(f).normalized()
+	var bs := Basis(s, Vector3.UP, f)
+	# Body: a lathed barrel lying along f.
+	var body_c := base + Vector3(0, l * 0.2, 0)
+	lm.beam(key, body_c - f * l * 0.32, body_c + f * l * 0.18, l * 0.34, l * 0.3, s)
+	lm.box(key, body_c - f * l * 0.3 - Vector3(0, l * 0.04, 0), Vector3(l * 0.4, l * 0.3, l * 0.28), bs)
+	# Forepaws stretched forward.
+	for k in [-1.0, 1.0]:
+		lm.box(key, base + f * l * 0.3 + s * k * l * 0.1 + Vector3(0, l * 0.05, 0),
+			Vector3(l * 0.1, l * 0.1, l * 0.32), bs)
+	# Mane and head, raised.
+	var head := base + f * l * 0.3 + Vector3(0, l * 0.42, 0)
+	lm.lathe(key, head - f * l * 0.05 - Vector3(0, l * 0.2, 0), PackedVector2Array([Vector2(l * 0.15, 0),
+		Vector2(l * 0.2, l * 0.12), Vector2(l * 0.19, l * 0.24), Vector2(l * 0.12, l * 0.32),
+		Vector2(0.0, l * 0.34)]), 10)
+	lm.beam(key, head + f * l * 0.04, head + f * l * 0.17, l * 0.13, l * 0.12, s)
+	# Tail curled along the flank.
+	lm.beam(key, body_c - f * l * 0.45 - Vector3(0, l * 0.12, 0), body_c - f * l * 0.1 + s * l * 0.17 - Vector3(0, l * 0.18, 0),
+		l * 0.04, l * 0.04)
+
+## Lattice member a-b (a riveted tie or boom): two flat chords `w` apart
+## across `side` joined by zig-zag lacing bars.
+static func lattice_member(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, w: float,
+		side: Vector3) -> void:
+	var ax := (b - a).normalized()
+	var o := (side - ax * side.dot(ax)).normalized() * w * 0.5
+	var bar := maxf(w * 0.16, 0.15)
+	lm.beam(key, a + o, b + o, bar * 1.6, w * 0.45, ax.cross(o))
+	lm.beam(key, a - o, b - o, bar * 1.6, w * 0.45, ax.cross(o))
+	var n := maxi(int(a.distance_to(b) / (w * 1.1)), 1)
+	for k in n:
+		var p := a.lerp(b, float(k) / n)
+		var q := a.lerp(b, float(k + 1) / n)
+		var sg := 1.0 if k % 2 == 0 else -1.0
+		lm.beam(key, p + o * sg, q - o * sg, bar, bar * 0.6)

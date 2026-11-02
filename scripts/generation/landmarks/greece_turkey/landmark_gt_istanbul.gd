@@ -1,20 +1,27 @@
 class_name LandmarkGtIstanbul
 extends RefCounted
 
-## Two imperial Ottoman complexes of Istanbul in true metres: the Topkapi
-## Palace and Sinan's Suleymaniye Mosque.
-
-# --- Suleymaniye -------------------------------------------------------------
+## Sinan's Suleymaniye Mosque in Istanbul in true metres (the Topkapi
+## Palace is LandmarkGtTopkapi).
 
 const SULEY_TOP := 76.0
+const HX := 29.25
+const HZ := 28.75
+const COURT_Z := -75.75
+const ARC_H := 5.0
+const ARC_TOP := 9.6
 
-## Suleymaniye Mosque, origin under the great dome, courtyard to -Z and
-## prayer hall to +Z: the 58 x 57 m hall with its 26.5 m dome rising to
-## 53 m on a square of tympana, the semi-domes before and behind, the
-## four weight turrets, five alternating domes down each aisle, the
-## 47 x 57 m courtyard with its domed arcade and ablution fountain, and
-## four minarets: two of 76 m (three balconies) beside the hall and two
-## lower ones at the far courtyard corners.
+## Suleymaniye Mosque (1550-57), origin under the great dome, courtyard
+## to -Z and the qibla wall to +Z: the 58.5 x 57.5 m prayer hall, its
+## 26.5 m dome on a drum of 32 windows rising to 53 m on the square of
+## four weight turrets, with the semi-domes on the qibla axis and the
+## arched, windowed tympana either side, five domes of alternating size
+## down each aisle; tiers of pointed windows in stone frames, the
+## two-storey arcaded galleries along both side facades, the portal on
+## the courtyard front; the 57 x 47 m courtyard whose arcade of 24
+## columns carries 28 domes, its outer walls and monumental gate, the
+## ablution fountain; and the four minarets at its corners, the pair by
+## the hall 76 m tall with three balconies, the far pair 56 m with two.
 static func suleymaniye(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Wall", LandmarkMaterials.pbr("limestone", "#CFC6B1", 4.0))
@@ -23,215 +30,220 @@ static func suleymaniye(model: Node3D) -> void:
 	lm.use("Windows", LandmarkMaterials.glass("#26323A"))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Court", LandmarkMaterials.pbr("pavement", "#B9B1A0", 4.0))
-	# Prayer hall with its cornice, the central square and the semi-domes.
-	LandmarkGtUtil.block(lm, "Wall", -29.0, 29.0, 0.0, 24.0, -28.5, 28.5)
-	LandmarkGtUtil.block(lm, "Pale", -29.4, 29.4, 24.0, 24.8, -28.9, 28.9)
+	lm.use("Dark", LandmarkMaterials.pbr("stone", "#3A352E", 3.0))
+	_hall(lm)
+	_hall_windows(lm)
+	_galleries(lm)
+	_courtyard(lm)
+	for sx in [-1.0, 1.0]:
+		LandmarkGtOttoman.minaret(lm, "Pale", "Lead", "Gilt", Vector3(sx * 30.6, 0, -HZ - 0.4), 2.0, SULEY_TOP,
+			[0.53, 0.68, 0.82])
+		LandmarkGtOttoman.minaret(lm, "Pale", "Lead", "Gilt", Vector3(sx * 30.6, 0, COURT_Z - 1.2), 1.7, 56.0, [0.62, 0.8])
+	lm.commit(model)
+
+## Prayer hall masses: the walls and their cornice, the central square,
+## the semi-domes, the four weight turrets, the tympana, the great dome
+## with its windows and alem, and the aisle domes.
+static func _hall(lm: LandmarkMesh) -> void:
+	LandmarkGtUtil.block(lm, "Wall", -HX, HX, 0.0, 24.0, -HZ, HZ)
+	for e in [[Vector3(-HX, 24.0, HZ), Vector3(HX, 24.0, HZ), Vector3.BACK], [Vector3(HX, 24.0, -HZ), Vector3(-HX, 24.0, -HZ),
+			Vector3.FORWARD], [Vector3(HX, 24.0, HZ), Vector3(HX, 24.0, -HZ), Vector3.RIGHT],
+			[Vector3(-HX, 24.0, -HZ), Vector3(-HX, 24.0, HZ), Vector3.LEFT]]:
+		LandmarkDetail.cornice(lm, "Pale", e[0], e[1], e[2], 0.8, false)
+	LandmarkGtUtil.block(lm, "Pale", -HX, HX, 24.0, 24.8, -HZ, HZ)
 	LandmarkGtUtil.block(lm, "Wall", -13.25, 13.25, 24.8, 36.5, -13.25, 13.25)
 	for end in [-1.0, 1.0]:
 		var z0: float = minf(end * 13.25, end * 26.5)
 		var z1: float = maxf(end * 13.25, end * 26.5)
 		LandmarkGtUtil.block(lm, "Wall", -13.25, 13.25, 24.8, 28.5, z0, z1)
 		LandmarkGtUtil.half_dome(lm, "Lead", Vector3(0, 28.5, end * 13.25), 13.25, 11.5, Vector3(0, 0, end), 8, 20)
+		# Windows round the semi-dome's foot.
+		for k in 7:
+			var a := PI * (float(k) + 0.5) / 7.0 - PI * 0.5
+			var d := Vector3(sin(a), 0, cos(a) * end)
+			LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(0, 25.3, end * 13.25) + d * 13.2, d, 1.1, 2.2, 0.25)
 		for sx in [-1.0, 1.0]:
 			# Weight turret at each corner of the central square.
 			var tp := Vector3(sx * 13.25, 24.8, end * 13.25)
-			lm.frustum("Wall", tp, 2.6, 2.3, 14.2, 12)
-			lm.lathe("Lead", tp + Vector3(0, 14.2, 0), SEuUtil.dome(2.5, 2.4, 5), 12)
-	# Great dome, its drum windows and the gilt alem.
+			lm.frustum("Wall", tp, 2.75, 2.55, 14.2, 8, PI / 8.0)
+			for k2 in 8:
+				var a2 := TAU * float(k2) / 8.0
+				var d2 := Vector3(cos(a2), 0, sin(a2))
+				LandmarkGtOttoman.window(lm, "Pale", "Dark", tp + d2 * 2.45 + Vector3(0, 10.0, 0), d2, 0.6, 1.6, 0.15)
+			LandmarkGtOttoman.small_dome(lm, "Pale", "Lead", "Gilt", tp + Vector3(0, 14.2, 0), 2.4, 0.8, 12)
+	# Tympana either side of the central square: great arch and windows.
+	for sx in [-1.0, 1.0]:
+		var xf: float = sx * 13.25
+		var n := Vector3(sx, 0, 0)
+		LandmarkGtOttoman.pointed_arch(lm, "Pale", Vector3(xf + sx * 0.1, 25.8, -10.0), Vector3(xf + sx * 0.1, 25.8, 10.0),
+			10.0, 0.9, 0.5)
+		for row in [[27.0, 5, 1.4, 3.0], [31.2, 4, 1.2, 2.6]]:
+			for k in int(row[1]):
+				var z := -9.0 + 18.0 * (float(k) + 0.5) / float(row[1])
+				LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(xf, float(row[0]), z), n, float(row[2]),
+					float(row[3]), 0.3)
+	# Great dome, the 32 drum windows between its pilasters, the alem.
 	var dc := Vector3(0, 36.5, 0)
 	LandmarkKits.dome_on_drum(lm, "Wall", "Lead", dc, 13.25, 4.5, 10.6, 0.9, 40)
 	for k in 32:
-		var a := TAU * float(k) / 32.0
-		lm.box("Windows", dc + Vector3(cos(a) * 13.3, 2.3, sin(a) * 13.3), Vector3(1.0, 2.8, 0.6),
-			Basis(Vector3.UP, PI * 0.5 - a))
-	lm.beam("Gilt", Vector3(0, 52.0, 0), Vector3(0, 53.0, 0), 0.25, 0.25)
-	# Aisle domes, large and small alternating.
-	for sx in [-1.0, 1.0]:
+		var a3 := TAU * (float(k) + 0.25) / 32.0
+		var d3 := Vector3(cos(a3), 0, sin(a3))
+		LandmarkGtOttoman.window(lm, "Pale", "Windows", dc + d3 * 13.3 + Vector3(0, 0.8, 0), d3, 1.1, 2.9, 0.3)
+	lm.frustum("Gilt", Vector3(0, 52.0, 0), 0.18, 0.12, 1.0, 8)
+	lm.lathe("Gilt", Vector3(0, 52.6, 0), SEuUtil.dome(0.35, 0.3, 4), 10)
+	# Aisle domes, large and small alternating, on low drums.
+	for sx2 in [-1.0, 1.0]:
 		for i in 5:
-			var r := 5.2 if i % 2 == 0 else 3.9
-			lm.lathe("Lead", Vector3(sx * 21.2, 24.8, -22.8 + 11.4 * float(i)), SEuUtil.dome(r, r * 0.85, 6), 18)
-		SEuUtil.face_row(lm, "Windows", Vector3(sx * 13.25, 0, 0), Vector3(0, 0, 1), Vector3(sx, 0, 0),
-			26.5, 3, 7.5, 3.4, 8.5)
-	# Window tiers on the hall walls (the courtyard front keeps its portal).
+			var r := 5.0 if i % 2 == 0 else 3.8
+			LandmarkGtOttoman.small_dome(lm, "Wall", "Lead", "Gilt", Vector3(sx2 * 21.2, 24.8, -22.8 + 11.4 * float(i)),
+				r, 1.2, 18)
+
+## Tiers of pointed windows on the qibla, side and courtyard facades,
+## and the courtyard portal with its muqarnas hood.
+static func _hall_windows(lm: LandmarkMesh) -> void:
+	var bays := 7
+	for i in bays:
+		var t := -HX + 2.0 * HX * (float(i) + 0.5) / float(bays)
+		for tier in [[2.4, 1.9, 3.2], [9.2, 2.2, 4.4], [16.2, 2.0, 4.0], [21.0, 1.3, 2.2]]:
+			LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(t, float(tier[0]), HZ), Vector3.BACK,
+				float(tier[1]), float(tier[2]), 0.35)
+			if float(tier[0]) > 12.0:
+				for sx in [-1.0, 1.0]:
+					LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(sx * HX, float(tier[0]), t), Vector3(sx, 0, 0),
+						float(tier[1]), float(tier[2]), 0.35)
+				if absf(t) > 6.0:
+					LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(t, float(tier[0]), -HZ), Vector3.FORWARD,
+						float(tier[1]), float(tier[2]), 0.35)
+	# Portal: projecting frame, dark doorway, muqarnas hood in tiers.
+	var pz := -HZ
+	LandmarkGtUtil.block(lm, "Pale", -4.5, 4.5, 0.0, 15.5, pz - 1.2, pz)
+	LandmarkGtUtil.block(lm, "Dark", -1.6, 1.6, 0.0, 5.2, pz - 1.25, pz - 1.2)
+	for k in 5:
+		var w := 6.4 - 0.9 * float(k)
+		LandmarkGtUtil.block(lm, "Pale", -w * 0.5, w * 0.5, 13.2 - 1.2 * float(k), 13.8 - 1.2 * float(k),
+			pz - 1.25 - 0.18 * float(k), pz - 1.2)
+	LandmarkGtOttoman.pointed_arch(lm, "Pale", Vector3(-3.4, 8.0, pz - 1.3), Vector3(3.4, 8.0, pz - 1.3), 5.6, 0.6, 0.35)
+	LandmarkDetail.cornice(lm, "Pale", Vector3(-4.6, 15.5, pz - 1.2), Vector3(4.6, 15.5, pz - 1.2), Vector3.FORWARD, 0.6,
+		false)
+
+## Two-storey arcaded galleries along both side facades: piers and
+## columns, pointed arches on both storeys, the upper floor, its
+## parapet and the lead lean-to roof against the wall.
+static func _galleries(lm: LandmarkMesh) -> void:
 	for sx in [-1.0, 1.0]:
-		for tier in [[3.5, 2.0, 3.6], [11.0, 2.4, 5.0], [18.5, 2.0, 4.0]]:
-			SEuUtil.face_row(lm, "Windows", Vector3(sx * 29.0, 0, 0), Vector3(0, 0, 1), Vector3(sx, 0, 0),
-				float(tier[0]), 7, 7.4, float(tier[1]), float(tier[2]))
-	for tier in [[3.5, 2.0, 3.6], [11.0, 2.4, 5.0], [18.5, 2.0, 4.0]]:
-		SEuUtil.face_row(lm, "Windows", Vector3(0, 0, 28.5), Vector3(1, 0, 0), Vector3(0, 0, 1),
-			float(tier[0]), 7, 7.4, float(tier[1]), float(tier[2]))
-		if float(tier[0]) > 8.0:
-			SEuUtil.face_row(lm, "Windows", Vector3(0, 0, -28.5), Vector3(1, 0, 0), Vector3(0, 0, -1),
-				float(tier[0]), 7, 7.4, float(tier[1]), float(tier[2]))
-	SEuUtil.face_row(lm, "Windows", Vector3(0, 0, -28.5), Vector3(1, 0, 0), Vector3(0, 0, -1), 0.0, 1, 1.0, 5.0, 11.0, true)
-	# Courtyard: paving, three arcaded bands and the portico before the hall.
-	LandmarkGtUtil.block(lm, "Court", -28.5, 28.5, 0.0, 0.15, -75.5, -28.5)
-	for band in [[-28.5, 28.5, -75.5, -68.5], [-28.5, -21.5, -68.5, -35.5], [21.5, 28.5, -68.5, -35.5],
-			[-28.5, 28.5, -35.5, -28.5]]:
-		LandmarkGtUtil.block(lm, "Pale", band[0], band[1], 6.8, 7.5, band[2], band[3])
-	LandmarkGtUtil.block(lm, "Wall", -28.5, 28.5, 0.0, 6.8, -75.5, -74.3)
-	LandmarkGtUtil.block(lm, "Wall", -28.5, -27.3, 0.0, 6.8, -75.5, -35.5)
-	LandmarkGtUtil.block(lm, "Wall", 27.3, 28.5, 0.0, 6.8, -75.5, -35.5)
-	for i in 11:
-		var x := -21.5 + 4.3 * float(i)
-		lm.frustum("Pale", Vector3(x, 0, -68.5), 0.42, 0.36, 6.8, 10)
-		lm.frustum("Pale", Vector3(x, 0, -35.5), 0.42, 0.36, 6.8, 10)
-	for i in range(1, 8):
-		var z := -68.5 + 4.125 * float(i)
-		lm.frustum("Pale", Vector3(-21.5, 0, z), 0.42, 0.36, 6.8, 10)
-		lm.frustum("Pale", Vector3(21.5, 0, z), 0.42, 0.36, 6.8, 10)
-	for i in 8:
-		lm.lathe("Lead", Vector3(-24.5 + 7.0 * float(i), 7.5, -72.0), SEuUtil.dome(3.3, 2.7, 4), 12)
-	for i in 5:
-		for sx in [-1.0, 1.0]:
-			lm.lathe("Lead", Vector3(sx * 25.0, 7.5, -65.0 + 5.8 * float(i)), SEuUtil.dome(3.3, 2.7, 4), 12)
-		lm.lathe("Lead", Vector3(-20.0 + 10.0 * float(i), 7.5, -32.0), SEuUtil.dome(3.3, 2.7, 4), 12)
-	# Ablution fountain: eight columns under a small dome.
-	lm.frustum("Pale", Vector3(0, 0.15, -52.0), 3.4, 3.2, 0.7, 16)
+		var xo: float = sx * (HX + 4.2)
+		var z0 := -23.0
+		var z1 := 23.0
+		var n := 9
+		LandmarkGtUtil.block(lm, "Pale", minf(sx * HX, xo), maxf(sx * HX, xo), 0.0, 0.5, z0 - 0.8, z1 + 0.8)
+		var y0 := 0.5
+		for st in 2:
+			var ch := 4.0 if st == 0 else 3.0
+			for k in n + 1:
+				var z := lerpf(z0, z1, float(k) / float(n))
+				LandmarkGtOttoman.column(lm, "Pale", Vector3(xo, y0, z), 0.42 if st == 0 else 0.34, ch)
+			for k2 in n:
+				var za := lerpf(z0, z1, float(k2) / float(n))
+				var zb := lerpf(z0, z1, float(k2 + 1) / float(n))
+				LandmarkGtOttoman.pointed_arch(lm, "Pale", Vector3(xo, y0 + ch, za), Vector3(xo, y0 + ch, zb), 2.6, 0.4, 0.8)
+			var sp := y0 + ch + 3.0
+			LandmarkGtUtil.block(lm, "Wall", minf(sx * HX, xo - sx * 0.4), maxf(sx * HX, xo + sx * 0.4), sp, sp + 0.6, z0 - 0.8,
+				z1 + 0.8)
+			if st == 0:
+				LandmarkGtUtil.block(lm, "Pale", xo - 0.3, xo + 0.3, sp + 0.6, sp + 1.6, z0 - 0.8, z1 + 0.8)
+			y0 = sp + 0.6
+		var ry := y0
+		var hi := Vector3(sx * HX, ry + 0.9, 0)
+		var lo := Vector3(xo + sx * 0.6, ry, 0)
+		lm.quad("Lead", hi + Vector3(0, 0, z0 - 0.9), hi + Vector3(0, 0, z1 + 0.9), lo + Vector3(0, 0, z1 + 0.9),
+			lo + Vector3(0, 0, z0 - 0.9), Vector3(sx * 0.9, 4.8, 0).normalized())
+		for ez in [z0 - 0.8, z1 + 0.8]:
+			LandmarkGtUtil.block(lm, "Wall", minf(sx * HX, xo + sx * 0.6), maxf(sx * HX, xo + sx * 0.6), 0.0, ry,
+				float(ez) - 0.6, float(ez) + 0.6)
+
+## Courtyard: paving, the arcade of 24 columns with pointed arches and
+## 28 domes, the outer walls with their windows, the gate and the
+## ablution fountain.
+static func _courtyard(lm: LandmarkMesh) -> void:
+	var cx := 28.5
+	var zf := -HZ
+	var zb := COURT_Z
+	var ix := cx - 6.333
+	var zi_f := zf - 6.25
+	var zi_b := zb + 6.25
+	LandmarkGtUtil.block(lm, "Court", -cx, cx, 0.0, 0.15, zb, zf)
+	# Arcade columns: 8 along each long side, 4 more along each short side.
+	var cols: Array = []
 	for k in 8:
-		var af := TAU * float(k) / 8.0
-		lm.frustum("Pale", Vector3(cos(af) * 2.6, 0.85, -52.0 + sin(af) * 2.6), 0.2, 0.17, 3.0, 8)
-	lm.lathe("Lead", Vector3(0, 3.85, -52.0), SEuUtil.dome(3.2, 2.0, 5), 16)
-	# Minarets: tall pair by the hall, shorter pair at the far corners.
-	for sx in [-1.0, 1.0]:
-		LandmarkGtUtil.minaret(lm, "Pale", "Lead", Vector3(sx * 32.0, 0, -29.0), 2.0, SULEY_TOP, [0.5, 0.7, 0.86])
-		LandmarkGtUtil.minaret(lm, "Pale", "Lead", Vector3(sx * 31.0, 0, -77.5), 1.85, 63.0, [0.55, 0.8])
-	lm.commit(model)
-
-# --- Topkapi -----------------------------------------------------------------
-
-const TOPKAPI_TOP := 38.0
-
-## Topkapi Palace, origin in the middle of the Second Court (Divan
-## Square), the way in from the Gate of Salutation at +Z and the Gate of
-## Felicity at -Z: the Gate of Salutation between its two octagonal
-## lead-capped towers, the crenellated walls, the Imperial Council hall
-## with the Tower of Justice (the tallest structure of the palace) on
-## the left, the Harem's roofs behind it, the kitchens with their ten
-## domes and twenty chimneys on the right, the Gate of Felicity under its
-## great eaves, the Audience Chamber, the Treasury and Ahmed III's
-## library of the Third Court and the kiosks of the Fourth Court.
-static func topkapi(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D5CAB0", 4.0))
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#E8E2D2", 3.0))
-	lm.use("Lead", LandmarkMaterials.pbr("slate", "#70777E", 3.0))
-	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#A35B3C", 3.0))
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#B38465", 3.0))
-	lm.use("Court", LandmarkMaterials.pbr("pavement", "#B8AE98", 4.0))
-	lm.use("Dark", LandmarkMaterials.pbr("stone", "#34302B", 3.0))
-	lm.use("Gilt", LandmarkMaterials.gold())
-	LandmarkGtUtil.block(lm, "Court", -36.0, 36.0, 0.0, 0.15, -56.0, 56.0)
-	LandmarkGtUtil.block(lm, "Court", -36.0, 36.0, 0.0, 2.5, -105.0, -56.0)
-	_salutation(lm, Vector3(0, 0, 58.0))
-	_council(lm)
-	_harem(lm)
-	_kitchens(lm)
-	_felicity(lm, Vector3(0, 0, -51.0))
-	# Third and Fourth Court: Audience Chamber, Treasury, library, kiosks.
-	LandmarkGtUtil.block(lm, "Marble", -9.0, 9.0, 2.5, 8.5, -70.0, -58.0)
-	lm.gable("Lead", Vector3(0, 8.5, -64.0), 12.0, 18.0, 3.4, Basis(Vector3.UP, PI * 0.5), 0.9, "Marble")
-	LandmarkGtUtil.block(lm, "Stone", -34.0, -10.0, 2.5, 8.0, -90.0, -78.0)
-	for i in 5:
-		lm.lathe("Lead", Vector3(-30.0 + 5.4 * float(i), 8.0, -84.0), SEuUtil.dome(2.6, 2.2, 5), 12)
-	LandmarkGtUtil.block(lm, "Marble", 10.0, 21.0, 2.5, 9.0, -92.0, -81.0)
-	lm.lathe("Lead", Vector3(15.5, 9.0, -86.5), SEuUtil.dome(4.4, 3.4, 6), 16)
-	_kiosk(lm, Vector3(16.0, 2.5, -100.0))
-	LandmarkGtUtil.block(lm, "Marble", -26.0, -14.0, 2.5, 8.0, -103.0, -93.0)
-	lm.lathe("Lead", Vector3(-20.0, 8.0, -98.0), SEuUtil.dome(4.6, 3.6, 6), 16)
-	lm.commit(model)
-
-## Gate of Salutation at `c` (the middle of its court face): crenellated
-## gate block with a pointed passage, flanked by two octagonal towers
-## under tall lead cones, and the crenellated walls running out.
-static func _salutation(lm: LandmarkMesh, c: Vector3) -> void:
-	LandmarkGtUtil.block(lm, "Stone", c.x - 9.0, c.x + 9.0, 0.0, 11.0, c.z - 5.0, c.z + 5.0)
-	for sz in [-1.0, 1.0]:
-		SEuUtil.opening(lm, "Dark", Vector3(0, 0, c.z + sz * 5.05), Vector3(1, 0, 0) * sz, Vector3.UP, 5.0, 8.0, true)
-		LandmarkCeParts.merlons(lm, "Stone", Vector3(c.x - 9.0, 11.0, c.z + sz * 4.7),
-			Vector3(c.x + 9.0, 11.0, c.z + sz * 4.7), 1.8, 0.9, 1.1, 0.8)
-	for sx in [-1.0, 1.0]:
-		var tp := Vector3(c.x + sx * 12.5, 0, c.z)
-		lm.frustum("Stone", tp, 4.6, 4.3, 18.0, 8)
-		lm.frustum("Marble", tp + Vector3(0, 17.0, 0), 4.9, 4.9, 1.0, 8)
-		lm.spire("Lead", tp + Vector3(0, 18.0, 0), 4.9, 10.0, 0.0, 8)
-		LandmarkGtUtil.block(lm, "Stone", c.x + sx * 22.0 - 11.0, c.x + sx * 22.0 + 11.0, 0.0, 7.0, c.z - 1.5, c.z + 1.5)
-		LandmarkCeParts.merlons(lm, "Stone", Vector3(c.x + sx * 17.0, 7.0, c.z), Vector3(c.x + sx * 33.0, 7.0, c.z),
-			2.0, 1.0, 1.0, 1.2)
-
-## Imperial Council: a long hall of three domes beside the court with an
-## arcade, and the Tower of Justice beyond it.
-static func _council(lm: LandmarkMesh) -> void:
-	LandmarkGtUtil.block(lm, "Stone", -49.0, -37.0, 0.0, 8.0, -36.0, -6.0)
-	for i in 3:
-		lm.lathe("Lead", Vector3(-43.0, 8.0, -29.0 + 10.0 * float(i)), SEuUtil.dome(4.2, 3.4, 6), 16)
-	for i in 8:
-		lm.frustum("Marble", Vector3(-35.8, 0, -33.0 + 3.6 * float(i)), 0.3, 0.26, 5.4, 10)
-	LandmarkGtUtil.block(lm, "Marble", -36.6, -35.0, 5.4, 6.0, -34.0, -5.0)
-	# Tower of Justice: square shaft, belvedere with arches, pyramid roof.
-	var tc := Vector3(-43.5, 0, -43.0)
-	LandmarkGtUtil.block(lm, "Stone", tc.x - 4.5, tc.x + 4.5, 0.0, 22.0, tc.z - 4.5, tc.z + 4.5)
-	for tier in [[5.0, 1.6, 2.6], [12.0, 1.6, 3.0], [18.0, 1.6, 3.0]]:
-		for k in 4:
-			var out := Vector3(sin(PI * 0.5 * float(k)), 0, cos(PI * 0.5 * float(k)))
-			SEuUtil.opening(lm, "Dark", tc + out * 4.55 + Vector3(0, float(tier[0]), 0), Vector3.UP.cross(out), Vector3.UP,
-				float(tier[1]), float(tier[2]), true)
-	LandmarkGtUtil.block(lm, "Marble", tc.x - 5.0, tc.x + 5.0, 22.0, 22.7, tc.z - 5.0, tc.z + 5.0)
-	for j in 4:
-		var off := -3.7 + 2.467 * float(j)
-		lm.frustum("Marble", tc + Vector3(off, 22.7, 3.7), 0.3, 0.26, 3.9, 8)
-		lm.frustum("Marble", tc + Vector3(off, 22.7, -3.7), 0.3, 0.26, 3.9, 8)
-		if j == 1 or j == 2:
-			lm.frustum("Marble", tc + Vector3(3.7, 22.7, off), 0.3, 0.26, 3.9, 8)
-			lm.frustum("Marble", tc + Vector3(-3.7, 22.7, off), 0.3, 0.26, 3.9, 8)
-	LandmarkGtUtil.block(lm, "Marble", tc.x - 5.0, tc.x + 5.0, 26.6, 27.3, tc.z - 5.0, tc.z + 5.0)
-	lm.spire("Lead", tc + Vector3(0, 27.3, 0), 5.2, 9.7, 0.0, 4)
-	lm.beam("Gilt", tc + Vector3(0, 36.9, 0), tc + Vector3(0, TOPKAPI_TOP, 0), 0.3, 0.3)
-
-## The Harem: a rambling mass of tile-roofed blocks of varied height
-## behind the council hall, with a few lead domes.
-static func _harem(lm: LandmarkMesh) -> void:
-	for ix in 4:
-		for iz in 6:
-			if (ix == 0 and iz == 5) or (ix == 3 and iz == 0):
-				continue
-			var n := ix * 6 + iz
-			var h := 6.5 + 4.0 * LandmarkGtUtil.hash01(n, 4)
-			var c := Vector3(-92.0 + 10.2 * float(ix), 0, -38.0 + 9.4 * float(iz))
-			LandmarkGtUtil.block(lm, "Stone", c.x - 5.0, c.x + 5.0, 0.0, h, c.z - 4.5, c.z + 4.5)
-			if LandmarkGtUtil.hash01(n, 8) > 0.82:
-				lm.lathe("Lead", c + Vector3(0, h, 0), SEuUtil.dome(3.4, 2.8, 6), 14)
-			else:
-				var turn := Basis(Vector3.UP, PI * 0.5) if LandmarkGtUtil.hash01(n, 6) > 0.5 else Basis()
-				lm.gable("Tile", c + Vector3(0, h, 0), 9.0, 10.0, 2.6, turn, 0.6, "Stone")
-
-## The kitchens along the court's east side: portico, ten domed kitchens
-## and their twenty tall chimneys.
-static func _kitchens(lm: LandmarkMesh) -> void:
-	LandmarkGtUtil.block(lm, "Brick", 34.0, 46.0, 0.0, 6.5, -38.0, 38.0)
-	LandmarkGtUtil.block(lm, "Stone", 32.0, 34.5, 5.2, 5.9, -38.0, 38.0)
-	for i in 19:
-		lm.frustum("Marble", Vector3(33.0, 0, -36.0 + 4.0 * float(i)), 0.3, 0.26, 5.2, 10)
-	for i in 10:
-		var z := -34.2 + 7.6 * float(i)
-		lm.lathe("Lead", Vector3(40.0, 6.5, z), SEuUtil.dome(3.4, 2.4, 5), 14)
-		for cx in [36.8, 43.2]:
-			lm.frustum("Brick", Vector3(cx, 6.5, z), 1.0, 0.85, 4.8, 10)
-			lm.frustum("Lead", Vector3(cx, 11.3, z), 1.15, 0.0, 2.2, 10)
-
-## Gate of Felicity at `c`: marble gate hall with six slender columns
-## and the huge overhanging roof.
-static func _felicity(lm: LandmarkMesh, c: Vector3) -> void:
-	LandmarkGtUtil.block(lm, "Marble", c.x - 12.0, c.x + 12.0, 0.0, 6.5, c.z - 5.0, c.z + 4.0)
-	LandmarkGtUtil.block(lm, "Dark", c.x - 2.2, c.x + 2.2, 0.0, 5.0, c.z + 3.95, c.z + 4.1)
-	for i in 6:
-		lm.frustum("Marble", Vector3(c.x - 10.0 + 4.0 * float(i), 0, c.z + 6.6), 0.32, 0.27, 5.8, 10)
-	lm.gable("Lead", c + Vector3(0, 6.9, 0.8), 15.0, 28.0, 4.6, Basis(Vector3.UP, PI * 0.5), 2.6, "Marble")
-
-## Cruciform kiosk (Baghdad Kiosk) on its terrace at `c`: four iwans round
-## a square domed hall.
-static func _kiosk(lm: LandmarkMesh, c: Vector3) -> void:
-	LandmarkGtUtil.block(lm, "Marble", c.x - 4.5, c.x + 4.5, c.y, c.y + 7.0, c.z - 4.5, c.z + 4.5)
-	LandmarkGtUtil.block(lm, "Marble", c.x - 6.8, c.x + 6.8, c.y, c.y + 5.0, c.z - 2.4, c.z + 2.4)
-	LandmarkGtUtil.block(lm, "Marble", c.x - 2.4, c.x + 2.4, c.y, c.y + 5.0, c.z - 6.8, c.z + 6.8)
-	lm.lathe("Lead", c + Vector3(0, 7.0, 0), SEuUtil.dome(4.6, 4.2, 7), 20)
+		var x := -ix + 2.0 * ix * float(k) / 7.0
+		cols.append(Vector3(x, 0.15, zi_f))
+		cols.append(Vector3(x, 0.15, zi_b))
+	for j in range(1, 5):
+		var z := zi_f + (zi_b - zi_f) * float(j) / 5.0
+		cols.append(Vector3(-ix, 0.15, z))
+		cols.append(Vector3(ix, 0.15, z))
+	for p in cols:
+		LandmarkGtOttoman.column(lm, "Pale", p, 0.45, ARC_H)
+	# Arches along the inner lines, the roof slab with its cornice.
+	var lines := [[Vector3(-ix, 0, zi_f), Vector3(ix, 0, zi_f), 7], [Vector3(-ix, 0, zi_b), Vector3(ix, 0, zi_b), 7],
+		[Vector3(-ix, 0, zi_f), Vector3(-ix, 0, zi_b), 5], [Vector3(ix, 0, zi_f), Vector3(ix, 0, zi_b), 5]]
+	for ln in lines:
+		var a: Vector3 = ln[0]
+		var b: Vector3 = ln[1]
+		var nb: int = ln[2]
+		for k in nb:
+			var pa := a.lerp(b, float(k) / float(nb)) + Vector3(0, ARC_H + 0.15, 0)
+			var pb := a.lerp(b, float(k + 1) / float(nb)) + Vector3(0, ARC_H + 0.15, 0)
+			LandmarkGtOttoman.pointed_arch(lm, "Pale", pa, pb, pa.distance_to(pb) * 0.52, 0.5, 0.95)
+	for band in [[-cx, cx, zi_f - 0.6, zf], [-cx, cx, zb, zi_b + 0.6], [-cx, -ix + 0.6, zi_b, zi_f], [ix - 0.6, cx, zi_b, zi_f]]:
+		LandmarkGtUtil.block(lm, "Pale", band[0], band[1], ARC_TOP - 0.6, ARC_TOP, band[2], band[3])
+	for e in [[Vector3(-ix - 0.6, ARC_TOP - 0.6, zi_f - 0.6), Vector3(ix + 0.6, ARC_TOP - 0.6, zi_f - 0.6), Vector3.FORWARD],
+			[Vector3(ix + 0.6, ARC_TOP - 0.6, zi_b + 0.6), Vector3(-ix - 0.6, ARC_TOP - 0.6, zi_b + 0.6), Vector3.BACK]]:
+		LandmarkDetail.cornice(lm, "Pale", e[0], e[1], e[2], 0.45, false)
+	# Spandrel walls over the arches up to the roof slab.
+	for ln2 in lines:
+		var a2: Vector3 = ln2[0]
+		var b2: Vector3 = ln2[1]
+		var dir := (b2 - a2).normalized()
+		var bas := Basis(dir, Vector3.UP, dir.cross(Vector3.UP).normalized())
+		lm.box("Wall", (a2 + b2) * 0.5 + Vector3(0, ARC_TOP - 1.2, 0), Vector3(a2.distance_to(b2) + 1.0, 1.2, 0.9), bas)
+	# The 28 domes: nine on each long side (the middle one over the hall
+	# portico larger), five down each short side.
+	for k in 9:
+		var x2 := -cx + 2.0 * cx * (float(k) + 0.5) / 9.0
+		LandmarkGtOttoman.small_dome(lm, "Wall", "Lead", "Gilt", Vector3(x2, ARC_TOP, (zf + zi_f) * 0.5),
+			3.3 if k == 4 else 2.8, 1.0, 16)
+		LandmarkGtOttoman.small_dome(lm, "Wall", "Lead", "Gilt", Vector3(x2, ARC_TOP, (zb + zi_b) * 0.5), 2.8, 1.0, 16)
+	for j in 5:
+		var z2 := zi_f + (zi_b - zi_f) * (float(j) + 0.5) / 5.0
+		for sx in [-1.0, 1.0]:
+			LandmarkGtOttoman.small_dome(lm, "Wall", "Lead", "Gilt", Vector3(sx * (cx + ix) * 0.5, ARC_TOP, z2), 2.8, 1.0, 16)
+	# Outer walls with a window in every bay, and the gate.
+	LandmarkGtUtil.block(lm, "Wall", -cx, cx, 0.0, ARC_TOP - 0.6, zb - 1.2, zb)
+	for sx2 in [-1.0, 1.0]:
+		LandmarkGtUtil.block(lm, "Wall", sx2 * cx - 0.6, sx2 * cx + 0.6, 0.0, ARC_TOP - 0.6, zb, zf)
+		for j2 in 5:
+			var z3 := zi_f + (zi_b - zi_f) * (float(j2) + 0.5) / 5.0
+			LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(sx2 * (cx + 0.6), 1.6, z3), Vector3(sx2, 0, 0), 1.4, 3.0, 0.3)
+	for k2 in 9:
+		if k2 == 4:
+			continue
+		var x3 := -cx + 2.0 * cx * (float(k2) + 0.5) / 9.0
+		LandmarkGtOttoman.window(lm, "Pale", "Windows", Vector3(x3, 1.6, zb - 1.2), Vector3.FORWARD, 1.4, 3.0, 0.3)
+	LandmarkGtUtil.block(lm, "Pale", -4.0, 4.0, 0.0, 13.0, zb - 2.2, zb + 0.4)
+	LandmarkGtUtil.block(lm, "Dark", -1.5, 1.5, 0.0, 4.6, zb - 2.25, zb - 2.2)
+	for k3 in 4:
+		var w := 5.6 - 0.9 * float(k3)
+		LandmarkGtUtil.block(lm, "Pale", -w * 0.5, w * 0.5, 10.8 - 1.0 * float(k3), 11.3 - 1.0 * float(k3),
+			zb - 2.25 - 0.16 * float(k3), zb - 2.2)
+	LandmarkGtOttoman.pointed_arch(lm, "Pale", Vector3(-3.0, 6.5, zb - 2.3), Vector3(3.0, 6.5, zb - 2.3), 4.8, 0.55, 0.3)
+	LandmarkDetail.cornice(lm, "Pale", Vector3(-4.1, 13.0, zb - 2.2), Vector3(4.1, 13.0, zb - 2.2), Vector3.FORWARD, 0.5, false)
+	# Ablution fountain: an octagonal basin, columns and a lead roof.
+	var fc := Vector3(0, 0.15, (zf + zb) * 0.5)
+	lm.frustum("Pale", fc, 3.6, 3.4, 0.9, 8, PI / 8.0)
+	lm.frustum("Pale", fc + Vector3(0, 0.9, 0), 2.2, 2.2, 2.2, 8, PI / 8.0)
+	for k4 in 8:
+		var af := TAU * float(k4) / 8.0
+		LandmarkGtOttoman.column(lm, "Pale", fc + Vector3(cos(af) * 3.0, 0.9, sin(af) * 3.0), 0.2, 3.0)
+	lm.frustum("Lead", fc + Vector3(0, 3.9, 0), 4.2, 1.2, 1.4, 8, PI / 8.0)
+	LandmarkGtOttoman.small_dome(lm, "Pale", "Lead", "Gilt", fc + Vector3(0, 5.3, 0), 1.3, 0.4, 12)

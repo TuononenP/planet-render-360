@@ -30,22 +30,36 @@ static func pediment(lm: LandmarkMesh, key: String, c: Vector3, w: float, rise: 
 		depth: float = 1.6, face_key: String = "") -> void:
 	lm.gable(key, c, w, depth, rise, Basis(), 0.0, face_key if face_key != "" else key)
 
-## Plain palazzo block facing `out` (+/-X or +/-Z): `c` is the footprint
-## centre at ground level, w along the facade, h tall, d deep. A cornice,
-## a belt course over the ground floor and `floors` rows of `bays`
-## shuttered windows on the front.
+## Palazzo block facing `out` (+/-X or +/-Z): `c` is the footprint
+## centre at ground level, w along the facade, h tall, d deep. A plinth,
+## string courses at every floor, quoined corners, a moulded crowning
+## cornice and `floors` rows of `bays` framed windows cut into the front
+## (heads per LandmarkRmLKit.windows `head`); a hipped roof in
+## `roof_key` when given.
 static func block(lm: LandmarkMesh, wall: String, c: Vector3, w: float, h: float, d: float,
-		out: Vector3, floors: int, bays: int, win_w: float = 1.3, win_h: float = 2.3) -> void:
+		out: Vector3, floors: int, bays: int, win_w: float = 1.3, win_h: float = 2.3,
+		roof_key: String = "", head: int = 0) -> void:
 	var along := Vector3.UP.cross(out)
 	var size := Vector3(w, h, d) if absf(out.z) > 0.5 else Vector3(d, h, w)
 	lm.box(wall, c + Vector3(0, h * 0.5, 0), size)
-	lm.box("Trim", c + Vector3(0, h + 0.4, 0), Vector3(size.x + 1.0, 0.8, size.z + 1.0))
+	lm.box("Trim", c + Vector3(0, 0.45, 0), Vector3(size.x + 1.0, 0.9, size.z + 1.0))
+	lm.box("Trim", c + Vector3(0, h - 0.3, 0), Vector3(size.x + 0.9, 0.6, size.z + 0.9))
 	var floor_h := h / float(floors)
-	lm.box("Trim", c + Vector3(0, floor_h, 0), Vector3(size.x + 0.3, 0.4, size.z + 0.3))
+	for f in range(1, floors):
+		lm.box("Trim", c + Vector3(0, floor_h * float(f), 0), Vector3(size.x + 0.9, 0.4, size.z + 0.9))
 	var o := c + out * d * 0.5
-	for f in floors:
-		SEuUtil.face_row(lm, "Shadow", o, along, out, floor_h * float(f) + (floor_h - win_h) * 0.4,
-			bays, w / float(bays), win_w, win_h)
+	var origin := o - along * w * 0.5
+	LandmarkRmLKit.windows(lm, wall, "Shadow", "Trim", origin, along, out, w, h - 0.6, bays, floors,
+		Vector2(win_w, win_h), maxf((floor_h - win_h) * 0.45, 1.0), floor_h, head)
+	var ch := clampf(h * 0.05, 0.7, 1.6)
+	LandmarkDetail.cornice(lm, "Trim", origin + Vector3(0, h, 0) + out * 0.4 - along * 0.4,
+		origin + Vector3(0, h, 0) + out * 0.4 + along * (w + 0.4), out, ch, false)
+	for s in [0.0, 1.0]:
+		var side := along * (-1.0 if s < 0.5 else 1.0)
+		LandmarkRmLKit.quoins(lm, "Trim", origin + along * w * s + out * 0.35, out, side, 0.9, h - 0.6)
+	if roof_key != "":
+		LandmarkRmLKit.hip_roof(lm, roof_key, c + Vector3(0, h + ch * 0.6, 0), size.x, size.z,
+			minf(size.x, size.z) * 0.16, 0.3)
 
 ## Drum with window openings and pilasters, cornice, ribbed dome,
 ## columned lantern and a gilded ball and cross; the cross ends `top_h`
@@ -76,23 +90,38 @@ static func dome_stack(lm: LandmarkMesh, base: Vector3, r: float, drum_h: float,
 
 ## Round-arched tower on a square plan, centred on `base`: `tiers` are
 ## (height, half width) pairs from the ground up, each ringed by a
-## cornice band and, from the second tier on, with arched belfry
-## openings on all four faces; capped by a pyramid reaching `total_h`.
+## cornice band on a frieze of small corbels and, from the second tier
+## on, open on all four faces in an arcade of real round-arched openings
+## (two or three a face, with archivolts and a colonnette between
+## each pair); capped by a pyramid reaching `total_h`.
 static func tower(lm: LandmarkMesh, wall: String, base: Vector3, tiers: PackedVector2Array,
 		total_h: float, cap_key: String = "Dome") -> void:
 	var y := 0.0
 	for t in tiers.size():
 		var th := tiers[t].x
 		var hw := tiers[t].y
-		lm.box(wall, base + Vector3(0, y + th * 0.5, 0), Vector3(hw * 2.0, th, hw * 2.0))
+		var inset := 0.4 if t >= 1 else 0.0
+		lm.box(wall, base + Vector3(0, y + th * 0.5, 0), Vector3((hw - inset) * 2.0, th, (hw - inset) * 2.0))
 		lm.box("Trim", base + Vector3(0, y + th, 0), Vector3(hw * 2.0 + 0.6, 0.5, hw * 2.0 + 0.6))
-		if t >= 1:
-			for f in 4:
-				var out := Vector3(0, 0, 1).rotated(Vector3.UP, PI * 0.5 * float(f))
-				var o := base + out * (hw + 0.05) + Vector3(0, y, 0)
+		for f in 4:
+			var out := Vector3(0, 0, 1).rotated(Vector3.UP, PI * 0.5 * float(f))
+			var r := Vector3.UP.cross(out)
+			# Corbel frieze under the cornice.
+			var cn := int(hw * 2.0 / 0.7)
+			for k in cn:
+				lm.box("Trim", base + out * (hw + 0.1) + r * (-hw + 0.7 * (float(k) + 0.5)) + Vector3(0, y + th - 0.45, 0),
+					Vector3(0.3, 0.4, 0.2), Basis(r, Vector3.UP, out), 0.0)
+			if t >= 1:
 				var n := 3 if hw > 3.0 else 2
-				SEuUtil.face_row(lm, "Shadow", o, Vector3.UP.cross(out), out, th * 0.22, n,
-					hw * 1.6 / float(n), hw * 1.2 / float(n), th * 0.58)
+				var span := hw * 1.25 / float(n)
+				var o := base + out * (hw - inset) - r * hw + Vector3(0, y, 0)
+				LandmarkRmLKit.arcade(lm, wall, "Shadow", o, r, out, hw * 2.0, th - 0.2, n, span, th * 0.55, inset,
+					th * 0.15)
+				LandmarkRmLKit.archivolts(lm, "Trim", o, r, out, hw * 2.0, n, span, th * 0.55, inset, 0.25)
+				for k in n:
+					var cx := -hw + hw * 2.0 / float(n) * (float(k) + 0.5)
+					LandmarkRmLKit.column_lite(lm, "Trim", base + out * (hw - inset * 0.5) + r * cx + Vector3(0, y + th * 0.15, 0),
+						0.14, th * 0.4)
 		y += th + 0.5
 	lm.spire(cap_key, base + Vector3(0, y, 0), tiers[tiers.size() - 1].y + 0.3, total_h - y, 0.0, 4)
 

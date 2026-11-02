@@ -17,14 +17,14 @@ static func build(model: Node3D, type: String) -> bool:
 		"washington_monument": LandmarkNaMonuments.washington_monument(model)
 		"lincoln_memorial": LandmarkNaMonuments.lincoln_memorial(model)
 		"angel_of_independence": LandmarkNaMonuments.angel_of_independence(model)
-		"us_capitol": LandmarkNaBuildings.us_capitol(model)
+		"us_capitol": LandmarkNaCapitol.build(model)
 		"white_house": LandmarkNaBuildings.white_house(model)
 		"bellas_artes": LandmarkNaBuildings.bellas_artes(model)
-		"chateau_frontenac": LandmarkNaBuildings.chateau_frontenac(model)
+		"chateau_frontenac": LandmarkNaFrontenac.build(model)
 		"gateway_arch": LandmarkNaCivil.gateway_arch(model)
 		"hoover_dam": LandmarkNaCivil.hoover_dam(model)
 		"hollywood_sign": LandmarkNaCivil.hollywood_sign(model)
-		"el_castillo": LandmarkNaCivil.el_castillo(model)
+		"el_castillo": LandmarkNaCastillo.build(model)
 		_:
 			return false
 	return true

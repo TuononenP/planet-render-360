@@ -9,8 +9,8 @@ static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"supreme_harmony": LandmarkAeChina.supreme_harmony(model)
 		"temple_of_heaven": LandmarkAeChina.temple_of_heaven(model)
-		"great_wall_badaling": LandmarkAeChina.great_wall(model)
-		"potala_palace": LandmarkAeChina.potala(model)
+		"great_wall_badaling": LandmarkAeFort.great_wall(model)
+		"potala_palace": LandmarkAeFort.potala(model)
 		"oriental_pearl": LandmarkAeShanghai.pearl(model)
 		"shanghai_tower": LandmarkAeShanghai.shanghai_tower(model)
 		"shanghai_wfc": LandmarkAeShanghai.swfc(model)

@@ -5,10 +5,13 @@ extends RefCounted
 ## registry type of LandmarkRegistryIndiaHistoric. Returns false for a type it does
 ## not own so LandmarkBuilder tries the next set.
 
+const RF = preload("res://scripts/generation/landmarks/india_historic/landmark_ind_red_fort.gd")
+const AF = preload("res://scripts/generation/landmarks/india_historic/landmark_ind_amber.gd")
+
 static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"red_fort_delhi":
-			LandmarkIndMughal.red_fort_delhi(model)
+			RF.red_fort_delhi(model)
 		"humayuns_tomb":
 			LandmarkIndMughal.humayuns_tomb(model)
 		"jama_masjid_delhi":
@@ -26,7 +29,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"victoria_memorial_kolkata":
 			LandmarkIndPalaces.victoria_memorial_kolkata(model)
 		"amber_fort":
-			LandmarkIndPalaces.amber_fort(model)
+			AF.amber_fort(model)
 		_:
 			return false
 	return true

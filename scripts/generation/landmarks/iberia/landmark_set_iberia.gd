@@ -9,13 +9,13 @@ static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"royal_palace_madrid": LandmarkIbRoyal.palace(model)
 		"almudena_cathedral": LandmarkIbRoyal.almudena(model)
-		"toledo_alcazar": LandmarkIbRoyal.toledo_alcazar(model)
+		"toledo_alcazar": LandmarkIbToledo.toledo_alcazar(model)
 		"segovia_aqueduct": LandmarkIbArches.segovia(model)
-		"mezquita_cordoba": LandmarkIbArches.mezquita(model)
-		"seville_alcazar": LandmarkIbArches.seville_alcazar(model)
-		"santiago_cathedral": LandmarkIbAtlantic.santiago(model)
-		"pena_palace": LandmarkIbAtlantic.pena(model)
-		"jeronimos_monastery": LandmarkIbAtlantic.jeronimos(model)
+		"mezquita_cordoba": LandmarkIbCordoba.mezquita(model)
+		"seville_alcazar": LandmarkIbSeville.seville_alcazar(model)
+		"santiago_cathedral": LandmarkIbSantiago.santiago(model)
+		"pena_palace": LandmarkIbPena.pena(model)
+		"jeronimos_monastery": LandmarkIbJeronimos.jeronimos(model)
 		_:
 			return false
 	return true

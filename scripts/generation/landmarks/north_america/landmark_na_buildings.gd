@@ -1,235 +1,348 @@
 class_name LandmarkNaBuildings
 extends RefCounted
 
-## Four grand buildings in true metres: the US Capitol and the White
-## House in Washington, Mexico City's Palacio de Bellas Artes and
-## Quebec's Château Frontenac.
+## Two grand buildings in true metres: the White House in Washington
+## and Mexico City's Palacio de Bellas Artes.
 
-const CAPITOL_TOP_M := 88.0
 const WHITE_HOUSE_TOP_M := 21.0
 const BELLAS_ARTES_TOP_M := 52.0
-const FRONTENAC_TOP_M := 78.0
 
-## US Capitol: the long north-south block (Senate wing north, House wing
-## south, the central block between, joined by lower links) with its
-## colonnaded east porticos and pediments, and above the Rotunda the
-## cast-iron dome: the columned peristyle, the attic drum, the ribbed
-## shell, the tholos and the bronze Statue of Freedom, to 88 m. The east
-## front faces +X.
-static func us_capitol(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#E9E6DE", 3.0))
-	lm.use("Dome", LandmarkMaterials.paint("#F2F1ED", 0.5, 0.1))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#7E8884", 3.0))
-	lm.use("Windows", LandmarkMaterials.glass("#2A3236"))
-	lm.use("Bronze", LandmarkMaterials.paint("#5C4B34", 0.5, 0.5))
-	lm.box("Marble", Vector3(0, -0.5, 0), Vector3(118.0, 1.4, 236.0))
-	# [z centre, z length, x depth, height]: Senate, link, centre, link, House.
-	var blocks := [[-78.0, 70.0, 50.0, 23.0], [-37.0, 12.0, 36.0, 17.0], [0.0, 62.0, 56.0, 28.0],
-		[37.0, 12.0, 36.0, 17.0], [78.0, 70.0, 50.0, 23.0]]
-	for b in blocks:
-		var z: float = b[0]
-		var zl: float = b[1]
-		var xd: float = b[2]
-		var h: float = b[3]
-		lm.box("Marble", Vector3(0, h * 0.5, z), Vector3(xd, h, zl))
-		lm.box("Marble", Vector3(0, h + 0.6, z), Vector3(xd + 1.2, 1.2, zl + 1.2))
-		if h < 20.0 or z == 0.0:
-			continue
-		LandmarkNaParts.hip(lm, "Roof", Vector3(0, h + 1.2, z), Basis(), xd * 0.5, zl * 0.5, 0.6, 3.5)
-	for b in blocks:
-		var z: float = b[0]
-		var zl: float = b[1]
-		var xd: float = b[2]
-		var h: float = b[3]
-		var cols := maxi(2, floori((zl - 8.0) / 4.2))
-		var rows := maxi(2, floori(h / 6.0))
-		for s in [-1.0, 1.0]:
-			var r := Basis(Vector3.UP, s * PI * 0.5)
-			LandmarkNaParts.windows(lm, "Windows", Vector3(s * xd * 0.5, 0, z), r, zl - 8.0, 4.0,
-				h - 3.0, rows, cols, Vector2(1.4, 2.6), 0.1)
-	# East porticos (centre 12 columns, each wing 8) with pediments.
-	for p in [[0.0, 44.0, 15.0, 5.0], [-78.0, 28.0, 11.0, 3.4], [78.0, 28.0, 11.0, 3.4]]:
-		var pz: float = p[0]
-		var pw: float = p[1]
-		var ph: float = p[2]
-		var px := 28.0 if pz == 0.0 else 25.0
-		lm.box("Marble", Vector3(px + 5.0, 0.6, pz), Vector3(10.0, 1.2, pw + 2.0))
-		LandmarkNaParts.columns(lm, "Marble", Vector3(px + 8.5, 1.2, pz - pw * 0.5 + 1.0),
-			Vector3(px + 8.5, 1.2, pz + pw * 0.5 - 1.0), 12 if pz == 0.0 else 8, 0.9, 0.8, ph, 10)
-		lm.box("Marble", Vector3(px + 5.0, 1.2 + ph + 1.1, pz), Vector3(10.0, 2.2, pw + 1.0))
-		lm.gable("Marble", Vector3(px + 5.0, 1.2 + ph + 2.2, pz), pw + 1.0, 10.0, float(p[3]),
-			Basis(Vector3.UP, PI * 0.5), 0.2, "Marble")
-	# Dome: drum with its 36-column peristyle, entablature, attic, shell.
-	lm.frustum("Marble", Vector3(0, 28.0, 0), 17.0, 17.0, 2.0, 32)
-	lm.frustum("Dome", Vector3(0, 30.0, 0), 14.6, 14.6, 12.0, 32)
-	for k in 36:
-		var a := TAU * float(k) / 36.0
-		lm.frustum("Dome", Vector3(cos(a) * 15.4, 30.0, sin(a) * 15.4), 0.5, 0.45, 12.0, 8)
-	lm.frustum("Dome", Vector3(0, 42.0, 0), 16.2, 16.2, 3.0, 32)
-	lm.frustum("Dome", Vector3(0, 45.0, 0), 13.6, 13.2, 7.0, 32)
-	lm.lathe("Dome", Vector3(0, 52.0, 0), PackedVector2Array([Vector2(13.2, 0.0), Vector2(12.9, 3.0),
-		Vector2(12.0, 7.5), Vector2(10.2, 12.0), Vector2(7.5, 16.0), Vector2(5.0, 19.5),
-		Vector2(3.7, 22.0)]), 32)
-	lm.frustum("Dome", Vector3(0, 74.0, 0), 3.6, 3.3, 5.0, 16)
-	for k in 8:
-		var a := TAU * float(k) / 8.0
-		lm.frustum("Marble", Vector3(cos(a) * 3.6, 74.0, sin(a) * 3.6), 0.3, 0.3, 5.0, 6)
-	lm.lathe("Dome", Vector3(0, 79.0, 0), PackedVector2Array([Vector2(4.2, 0.0), Vector2(3.0, 1.0),
-		Vector2(1.6, 3.0)]), 16)
-	lm.lathe("Bronze", Vector3(0, 82.0, 0), PackedVector2Array([Vector2(1.1, 0.0), Vector2(0.9, 2.4),
-		Vector2(0.8, 3.8), Vector2(0.6, 4.6), Vector2(0.45, 5.3), Vector2(0.3, 5.8),
-		Vector2(0.1, CAPITOL_TOP_M - 82.0)]), 10)
-	lm.commit(model)
-
-## White House: the 52 m sandstone block of three storeys on a raised
-## basement under its balustrade and low hipped roof with chimneys, the
-## north portico with six columns and pediment (−Z), the curved south
-## portico (+Z), and the West and East Wings joined by colonnades.
+## White House (1792-1800, James Hoban): the 51.2 x 26 m Aquia sandstone
+## block, painted white, of eleven bays on the long fronts and three
+## storeys (ground floor, State Floor, Second Floor) under the dentilled
+## cornice, the vase balustrade and the low hipped roof of the 1927
+## third floor with its chimneys; State Floor windows under alternating
+## triangular and segmental pediments; the North Portico (1829, -Z) of
+## unfluted Ionic columns under a pediment; the bowed South Portico
+## (1824, +Z) of six Ionic columns round the Blue Room, with the Truman
+## Balcony and the curved flights of steps; and the low West and East
+## Wings joined by colonnades.
 static func white_house(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Wall", LandmarkMaterials.pbr("limestone", "#EDEBE4", 3.0))
 	lm.use("Roof", LandmarkMaterials.pbr("slate", "#6C7074", 3.0))
 	lm.use("Windows", LandmarkMaterials.glass("#2A3236"))
-	lm.box("Wall", Vector3(0, 7.7, 0), Vector3(51.8, 15.4, 25.9))
-	lm.box("Wall", Vector3(0, 16.0, 0), Vector3(52.6, 1.2, 26.7))
-	LandmarkNaParts.hip(lm, "Roof", Vector3(0, 16.6, 0), Basis(), 24.5, 11.5, 0.78, 2.6)
-	for cx in [-20.0, -10.0, 10.0, 20.0]:
-		for cz in [-5.0, 5.0]:
-			lm.box("Wall", Vector3(cx, 20.0, cz), Vector3(1.4, 2.0, 1.4))
+	lm.use("Trim", LandmarkMaterials.paint("#F4F3EF", 0.55, 0.05))
+	var hx := 25.9
+	var hz := 12.95
+	lm.box("Wall", Vector3(0, 7.5, 0), Vector3(hx * 2.0, 15.0, hz * 2.0))
+	# Rusticated ground floor joints and the State Floor string course.
 	for q in 4:
 		var r := Basis(Vector3.UP, PI * 0.5 * q)
-		var span: float = 44.0 if q % 2 == 0 else 20.0
-		var face: float = 12.95 if q % 2 == 0 else 25.9
-		LandmarkNaParts.windows(lm, "Windows", r * Vector3(0, 0, face), r, span, 2.2, 14.6, 4,
-			11 if q % 2 == 0 else 5, Vector2(1.3, 2.0), 0.1)
-	# North portico: six columns under a pediment.
-	lm.box("Wall", Vector3(0, 0.3, -18.5), Vector3(17.0, 0.6, 11.0))
-	LandmarkNaParts.columns(lm, "Wall", Vector3(-7.0, 0.6, -22.5), Vector3(7.0, 0.6, -22.5), 6,
-		0.7, 0.6, 11.4)
-	lm.box("Wall", Vector3(0, 12.8, -18.5), Vector3(17.6, 1.6, 10.8))
-	lm.gable("Wall", Vector3(0, 13.6, -18.5), 17.6, 10.8, 3.4, Basis(), 0.2, "Wall")
-	# South portico: the rounded bow with its half ring of columns.
-	lm.frustum("Wall", Vector3(0, 0, 12.95), 7.8, 7.8, 14.0, 24)
-	for k in 7:
-		var a := PI * float(k) / 6.0
-		lm.frustum("Wall", Vector3(cos(a) * 9.2, 0.6, 12.95 + sin(a) * 9.2), 0.5, 0.45, 12.0, 8)
-	lm.frustum("Wall", Vector3(0, 12.6, 12.95), 9.9, 9.9, 1.2, 24)
-	# Wings and their colonnades.
+		var face: float = hz if q % 2 == 0 else hx
+		var span: float = hx * 2.0 if q % 2 == 0 else hz * 2.0
+		for k in 4:
+			lm.box("Wall", r * Vector3(0, 0.9 + 0.95 * k, face + 0.02), Vector3(span, 0.08, 0.08), r, 0.0)
+		lm.box("Wall", r * Vector3(0, 4.4, face + 0.15), Vector3(span + 0.3, 0.4, 0.3), r, 0.0)
+	# Windows: eleven bays on the long fronts, five on the ends.
+	for q in 4:
+		var r := Basis(Vector3.UP, PI * 0.5 * q)
+		var long := q % 2 == 0
+		var face: float = hz if long else hx
+		var bays := 11 if long else 5
+		var span: float = (hx * 2.0 if long else hz * 2.0) - 4.0
+		for i in bays:
+			var x := -span * 0.5 + span * (float(i) + 0.5) / float(bays)
+			var n := r * Vector3(0, 0, 1)
+			var central := long and absf(float(i) - 5.0) < 1.5
+			if q == 0 and central:
+				continue # the South Portico's bow covers the middle bays
+			LandmarkDetail.window(lm, "Trim", "Windows", r * Vector3(x, 2.2, face), n, 1.3, 2.0, false, 0.18)
+			LandmarkDetail.window(lm, "Trim", "Windows", r * Vector3(x, 7.0, face), n, 1.5, 3.4, false, 0.2)
+			LandmarkDetail.window(lm, "Trim", "Windows", r * Vector3(x, 12.2, face), n, 1.4, 2.4, false, 0.18)
+			# State Floor pediments, triangular and segmental by turns.
+			var pc := r * Vector3(x, 9.55, face + 0.3)
+			if i % 2 == 0:
+				lm.gable("Trim", pc, 2.4, 0.4, 0.6, Basis(r.x, Vector3.UP, r.z), 0.1, "Trim")
+			else:
+				var prev := pc + r.x * 1.2
+				for k in 6:
+					var t := PI * float(k + 1) / 6.0
+					var p := pc + r.x * cos(t) * 1.2 + Vector3(0, sin(t) * 0.45, 0)
+					lm.beam("Trim", prev, p, 0.22, 0.4, r.z)
+					prev = p
+	# Cornice with dentils, vase balustrade, the hipped roof.
+	for q in 4:
+		var r := Basis(Vector3.UP, PI * 0.5 * q)
+		var face: float = hz if q % 2 == 0 else hx
+		var half: float = hx if q % 2 == 0 else hz
+		LandmarkDetail.cornice(lm, "Wall", r * Vector3(-half - 1.0, 15.0, face), r * Vector3(half + 1.0, 15.0, face),
+			r * Vector3(0, 0, 1), 1.0, true)
+		LandmarkNaParts.balusters(lm, "Wall", r * Vector3(-half, 16.0, face + 0.3), r * Vector3(half, 16.0, face + 0.3),
+			1.0, 0.4, 4.7, true)
+	LandmarkNaParts.hip(lm, "Roof", Vector3(0, 16.0, 0), Basis(), hx - 1.2, hz - 1.2, 0.72, 3.2)
+	for cx in [-20.0, -10.0, 10.0, 20.0]:
+		for cz in [-5.0, 5.0]:
+			lm.box("Wall", Vector3(cx, 19.8, cz), Vector3(1.4, 2.4, 1.6))
+			lm.box("Trim", Vector3(cx, 21.0 - 0.15, cz), Vector3(1.7, 0.3, 1.9), Basis(), 0.0)
+	# Third-floor dormers on the roof slopes.
+	for x in [-16.0, -8.0, 0.0, 8.0, 16.0]:
+		for s in [-1.0, 1.0]:
+			var dc := Vector3(x, 17.4, s * (hz - 2.6))
+			lm.box("Roof", dc, Vector3(1.8, 1.6, 1.4))
+			lm.box("Windows", dc + Vector3(0, 0, s * 0.72), Vector3(1.0, 1.0, 0.05), Basis(), 0.0)
+	_wh_north_portico(lm, hz)
+	_wh_south_portico(lm, hz)
+	_wh_wings(lm, hx)
+	lm.commit(model)
+
+## North Portico: four Ionic columns across the front, two more down
+## each side, entablature and pediment, over the entrance (-Z).
+static func _wh_north_portico(lm: LandmarkMesh, hz: float) -> void:
+	lm.box("Wall", Vector3(0, 0.3, -hz - 5.2), Vector3(17.0, 0.6, 10.4))
+	for k in 4:
+		lm.box("Wall", Vector3(0, 0.3 - 0.075 * k, -hz - 10.6 - 0.4 * k), Vector3(12.0, 0.6 - 0.15 * k, 0.4), Basis(), 0.0)
+	var cols: Array[Vector3] = []
+	for x in [-6.9, -2.3, 2.3, 6.9]:
+		cols.append(Vector3(x, 0.6, -hz - 9.4))
+	for x in [-6.9, 6.9]:
+		for z in [-hz - 6.2, -hz - 3.0]:
+			cols.append(Vector3(x, 0.6, z))
+	for c in cols:
+		LandmarkDetail.column(lm, "Trim", c, 0.75, 13.2, "ionic", 0)
+	lm.box("Wall", Vector3(0, 14.4, -hz - 5.2), Vector3(16.4, 1.2, 10.4))
+	LandmarkDetail.cornice(lm, "Wall", Vector3(-8.8, 15.0, -hz - 10.4), Vector3(8.8, 15.0, -hz - 10.4),
+		Vector3.FORWARD, 1.0, true)
+	lm.gable("Roof", Vector3(0, 16.0, -hz - 5.2), 17.2, 10.4, 3.2, Basis(), 0.4, "Wall")
 	for s in [-1.0, 1.0]:
-		lm.box("Wall", Vector3(s * 31.9, 2.6, 0), Vector3(12.0, 5.2, 5.0))
-		var c := Vector3(s * 51.9, 0, 0)
+		lm.beam("Wall", Vector3(s * 9.0, 16.0, -hz - 10.6), Vector3(0, 19.2, -hz - 10.6), 0.6, 0.7, Vector3.UP)
+	lm.box("Windows", Vector3(0, 3.0, -hz - 0.05), Vector3(2.0, 3.8, 0.2))
+	LandmarkDetail.arch(lm, "Trim", Vector3(0, 4.9, -hz), Vector3.FORWARD, 2.0, 0.35, 0.25)
+	# The lantern hanging in the porch.
+	lm.beam("Trim", Vector3(0, 14.0, -hz - 5.2), Vector3(0, 11.5, -hz - 5.2), 0.06, 0.06)
+	lm.lathe("Trim", Vector3(0, 10.4, -hz - 5.2), PackedVector2Array([Vector2(0.1, 0.0), Vector2(0.45, 0.3),
+		Vector2(0.5, 0.8), Vector2(0.2, 1.1)]), 8)
+
+## South Portico: the rusticated bow of the ground floor with its arched
+## openings, the Blue Room's bowed wall, six Ionic columns, the Truman
+## Balcony (1948), the entablature and balustrade, and the two curved
+## flights of steps down to the South Lawn (+Z).
+static func _wh_south_portico(lm: LandmarkMesh, hz: float) -> void:
+	var c := Vector3(0, 0, hz)
+	lm.frustum("Wall", c, 9.8, 9.8, 4.4, 32)
+	lm.frustum("Wall", c + Vector3(0, 4.4, 0), 7.8, 7.8, 10.6, 32)
+	for k in 5:
+		var a := PI * (float(k) + 0.5) / 5.0
+		var d := Vector3(cos(a), 0, sin(a))
+		LandmarkDetail.window(lm, "Trim", "Windows", c + d * 9.8 + Vector3(0, 2.2, 0), d, 1.6, 2.6, true, 0.2)
+	for k in 3:
+		var a := PI * (float(k) + 1.0) / 4.0
+		var d := Vector3(cos(a), 0, sin(a))
+		LandmarkDetail.window(lm, "Trim", "Windows", c + d * 7.8 + Vector3(0, 7.0, 0), d, 1.5, 3.6, false, 0.2)
+		LandmarkDetail.window(lm, "Trim", "Windows", c + d * 7.8 + Vector3(0, 12.3, 0), d, 1.4, 2.4, false, 0.18)
+	for k in 6:
+		var a := PI * (float(k) + 0.5) / 6.0
+		LandmarkDetail.column(lm, "Trim", c + Vector3(cos(a), 0, sin(a)) * 9.0 + Vector3(0, 4.4, 0), 0.62, 10.6,
+			"ionic", 0)
+	# Truman Balcony at the Second Floor, railing on its rim.
+	lm.frustum("Wall", c + Vector3(0, 10.0, 0), 8.6, 8.6, 0.3, 32)
+	LandmarkNaParts.ring_rail(lm, "Trim", c + Vector3(0, 10.3, 0), 8.4, 1.0, 0.25)
+	lm.frustum("Wall", c + Vector3(0, 15.0, 0), 10.0, 10.0, 1.0, 32)
+	LandmarkNaParts.ring(lm, "Wall", c + Vector3(0, 16.0, 0), 9.7, 0.6, 0.3, 32)
+	LandmarkNaParts.ring_posts(lm, "Wall", c + Vector3(0, 16.0, 0), 9.7, 0.9, 120, 0.16, 0.16)
+	LandmarkNaParts.ring(lm, "Wall", c + Vector3(0, 16.9, 0), 9.7, 0.6, 0.2, 32)
+	# Curved double flight from the portico floor down each side.
+	for s in [-1.0, 1.0]:
+		for k in 20:
+			var t := float(k) / 19.0
+			var a := lerpf(0.35, 1.25, t)
+			var d := Vector3(cos(a) * float(s), 0, sin(a))
+			var top := 4.4 - 0.21 * float(k)
+			lm.box("Wall", c + d * 12.0 + Vector3(0, top * 0.5, 0), Vector3(3.2, top, 0.62),
+				Basis.looking_at(d.cross(Vector3.UP)), 0.0)
+
+## West and East Wings with their colonnades along the South Lawn side.
+static func _wh_wings(lm: LandmarkMesh, hx: float) -> void:
+	for s in [-1.0, 1.0]:
+		var link := Vector3(s * (hx + 6.0), 0, 2.0)
+		lm.box("Wall", link + Vector3(0, 2.6, -1.2), Vector3(12.0, 5.2, 3.6))
+		for k in 5:
+			LandmarkNaParts.column_lite(lm, "Trim", link + Vector3(-4.8 + 2.4 * k, 0, 1.8), 0.3, 4.6, 0.0, 10)
+		lm.box("Wall", link + Vector3(0, 4.9, 0.6), Vector3(12.4, 0.6, 3.6))
+		var c := Vector3(s * (hx + 26.0), 0, 0)
 		lm.box("Wall", c + Vector3(0, 4.75, 0), Vector3(26.0, 9.5, 22.0))
 		LandmarkNaParts.hip(lm, "Roof", c + Vector3(0, 9.5, 0), Basis(), 13.5, 11.5, 0.75, 1.8)
 		for fz in [-1.0, 1.0]:
-			LandmarkNaParts.windows(lm, "Windows", c + Vector3(0, 0, fz * 11.0),
-				Basis(Vector3.UP, 0.0 if fz > 0.0 else PI), 22.0, 1.8, 8.4, 2, 6, Vector2(1.3, 2.0), 0.1)
-	lm.commit(model)
+			LandmarkDetail.pierced_face(lm, "Wall", "Windows", c + Vector3(-13.0 * fz, 0, fz * 11.0),
+				Vector3(fz, 0, 0), Vector3(0, 0, fz), 26.0, 9.2, 7, 2, Vector2(1.3, 2.0), 1.4, 4.4, 0.25)
+			LandmarkDetail.cornice(lm, "Wall", c + Vector3(-13.2, 9.5, fz * 11.25), c + Vector3(13.2, 9.5, fz * 11.25),
+				Vector3(0, 0, fz), 0.6, false)
 
-## Palacio de Bellas Artes: the white Carrara-marble body on its
-## stylobate with the arched front colonnade (+Z), the cornice, the two
-## smaller domes and the great tiled central dome with its lantern,
-## to 52 m.
+## Palacio de Bellas Artes (1904-1934, Adamo Boari, Federico Mariscal):
+## the white Carrara-marble Art Nouveau body on its beige Yautepec
+## marble stylobate, its main front (+Z) facing south onto Avenida
+## Juárez, the Alameda Central along its west side. The front: the projecting central portal with its
+## great arch, bronze doors and the "Harmony" group by Leonardo
+## Bistolfi on top, between paired columns; arcaded wings with arched
+## windows below and a colonnaded storey above; the dentilled cornice
+## and balustrade. On the roof the two smaller tiled domes over the
+## corner pavilions and the great central dome of orange and yellow
+## tile gores between white ribs, its drum of paired pilasters and
+## oculi, and the glass crown with the bronze eagle to 52 m. Agustí
+## Querol's four Pegasus groups stand on the plaza.
 static func bellas_artes(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#E7E4DD", 3.0))
 	lm.use("Dome", LandmarkMaterials.pbr("brick", "#C77035", 3.0))
+	lm.use("Yellow", LandmarkMaterials.pbr("brick", "#D9A93A", 3.0))
 	lm.use("Tile", LandmarkMaterials.pbr("slate", "#3A8C98", 2.5))
 	lm.use("Windows", LandmarkMaterials.glass("#2A3236"))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.box("Marble", Vector3(0, 0.75, 0), Vector3(102.0, 1.5, 76.0))
-	lm.box("Marble", Vector3(0, 13.0, 0), Vector3(96.0, 23.0, 70.0))
-	lm.box("Marble", Vector3(0, 24.0, 0), Vector3(98.0, 2.0, 72.0))
-	for sx in [-1.0, 1.0]:
-		lm.box("Marble", Vector3(sx * 38.0, 28.0, 0), Vector3(20.0, 6.0, 60.0))
-	# Front: arched openings between paired columns, windows elsewhere.
-	for x in [-18.0, 0.0, 18.0]:
-		lm.box("Windows", Vector3(x, 10.0, 35.1), Vector3(7.0, 14.0, 0.3))
-	LandmarkNaParts.columns(lm, "Marble", Vector3(-27.0, 1.5, 36.5), Vector3(27.0, 1.5, 36.5), 8,
-		0.8, 0.7, 20.0)
-	LandmarkNaParts.windows(lm, "Windows", Vector3(0, 0, 35.0), Basis(), 90.0, 4.0, 20.0, 2, 14,
-		Vector2(1.6, 3.4), 0.1)
-	for q in [1, 2, 3]:
+	lm.use("Bronze", LandmarkMaterials.paint("#4B4033", 0.5, 0.5))
+	lm.use("Base", LandmarkMaterials.pbr("limestone", "#CDBF9F", 3.0))
+	lm.box("Base", Vector3(0, 0.75, 0), Vector3(102.0, 1.5, 76.0))
+	lm.box("Marble", Vector3(0, 12.75, 0), Vector3(95.4, 22.5, 69.4))
+	# Front steps across the portal.
+	for k in 5:
+		lm.box("Base", Vector3(0, 0.75 - 0.15 * k, 38.2 + 0.4 * k), Vector3(40.0 - 2.0 * k, 1.5 - 0.3 * k, 0.4),
+			Basis(), 0.0)
+	# Window bays on every face: arched ground floor, square upper floor
+	# between pairs of engaged columns.
+	for q in 4:
 		var r := Basis(Vector3.UP, PI * 0.5 * q)
-		var span: float = 64.0 if q % 2 == 1 else 90.0
-		var face: float = 48.0 if q % 2 == 1 else 35.0
-		LandmarkNaParts.windows(lm, "Windows", r * Vector3(0, 0, face), r, span, 4.0, 20.0, 2,
-			12 if q % 2 == 1 else 14, Vector2(1.6, 3.4), 0.1)
-	# Side domes (teal tile) and the central dome (orange tile).
+		var long := q % 2 == 0
+		var face: float = 34.7 if long else 47.7
+		var span: float = 92.0 if long else 66.0
+		var bays := 13 if long else 9
+		var n := r * Vector3(0, 0, 1)
+		for i in bays:
+			var x := -span * 0.5 + span * (float(i) + 0.5) / float(bays)
+			if q == 0 and absf(x) < 15.0:
+				continue # the central portal
+			LandmarkDetail.window(lm, "Marble", "Windows", r * Vector3(x, 6.0, face), n, 2.4, 5.2, true, 0.3)
+			LandmarkDetail.window(lm, "Marble", "Windows", r * Vector3(x, 15.4, face), n, 2.0, 3.6, false, 0.3)
+			for s in [-1.0, 1.0]:
+				var px: float = x + float(s) * span / float(bays) * 0.5
+				LandmarkNaParts.column_lite(lm, "Marble", r * Vector3(px - float(s) * 0.55, 11.4, face + 0.5), 0.36,
+					9.4, 1.0, 8)
+		lm.box("Marble", r * Vector3(0, 11.2, face + 0.3), Vector3(span + 2.0, 0.6, 0.6), r)
+		LandmarkDetail.cornice(lm, "Marble", r * Vector3(-span * 0.5 - 1.4, 22.5, face + 0.2),
+			r * Vector3(span * 0.5 + 1.4, 22.5, face + 0.2), n, 1.5, true)
+		LandmarkNaParts.balusters(lm, "Marble", r * Vector3(-span * 0.5, 24.0, face), r * Vector3(span * 0.5, 24.0, face),
+			1.2, 0.45, 6.0, true)
+	_ba_portal(lm)
+	# Corner pavilions' attic and their tiled domes.
 	for sx in [-1.0, 1.0]:
-		lm.frustum("Marble", Vector3(sx * 38.0, 31.0, 0), 8.5, 8.5, 4.0, 20)
-		lm.lathe("Tile", Vector3(sx * 38.0, 35.0, 0), _dome(8.8, 8.0), 20)
-		lm.frustum("Gold", Vector3(sx * 38.0, 43.0, 0), 0.5, 0.2, 2.0, 8)
-	lm.frustum("Marble", Vector3(0, 25.0, 0), 15.5, 15.5, 8.0, 32)
+		var p := Vector3(sx * 38.0, 24.0, 0)
+		lm.box("Marble", p + Vector3(0, 3.0, 0), Vector3(20.0, 6.0, 60.0))
+		lm.frustum("Marble", p + Vector3(0, 6.0, 0), 8.6, 8.6, 1.0, 32)
+		lm.frustum("Marble", p + Vector3(0, 7.0, 0), 8.3, 8.3, 3.0, 32)
+		LandmarkNaParts.ring_posts(lm, "Marble", p + Vector3(0, 7.0, 0), 8.4, 3.0, 16, 0.5, 0.4)
+		lm.lathe("Tile", p + Vector3(0, 10.0, 0), LandmarkKits._dome_profile(8.8, 8.0, 10), 32)
+		for i in 8:
+			var a := TAU * float(i) / 8.0
+			var d := Vector3(cos(a), 0, sin(a))
+			var prof := LandmarkKits._dome_profile(8.95, 8.1, 8)
+			for j in 7:
+				lm.beam("Marble", p + Vector3(0, 10.0, 0) + d * prof[j].x + Vector3(0, prof[j].y, 0),
+					p + Vector3(0, 10.0, 0) + d * prof[j + 1].x + Vector3(0, prof[j + 1].y, 0), 0.4, 0.25,
+					d.cross(Vector3.UP))
+		lm.frustum("Gold", p + Vector3(0, 17.6, 0), 0.9, 0.6, 0.8, 12)
+		lm.frustum("Gold", p + Vector3(0, 18.4, 0), 0.5, 0.15, 2.4, 8)
+	_ba_dome(lm, Vector3(0, 24.0, 0))
+	# The four Pegasus groups on the plaza in front.
+	for x in [-30.0, -18.0, 18.0, 30.0]:
+		_pegasus(lm, Vector3(x, 0, 44.0))
+	lm.commit(model)
+
+## The central portal: a projecting pavilion with the great arch, its
+## glazed screen and bronze doors, paired Corinthian columns either side
+## and the "Harmony" sculpture group on the attic above.
+static func _ba_portal(lm: LandmarkMesh) -> void:
+	var z := 34.7
+	lm.box("Marble", Vector3(0, 13.0, z + 1.8), Vector3(28.0, 23.0, 3.6))
+	lm.box("Windows", Vector3(0, 8.0, z + 3.62), Vector3(10.0, 13.0, 0.1))
+	for x in [-3.4, 0.0, 3.4]:
+		lm.box("Bronze", Vector3(x, 3.6, z + 3.7), Vector3(2.6, 4.2, 0.2))
+	for k in 3:
+		lm.box("Marble", Vector3(0, 6.0 + 4.0 * k, z + 3.66), Vector3(10.0, 0.3, 0.2), Basis(), 0.0)
+	LandmarkDetail.arch(lm, "Marble", Vector3(0, 14.5, z + 3.6), Vector3.BACK, 10.0, 1.2, 0.6)
+	for s in [-1.0, 1.0]:
+		for k in 2:
+			LandmarkDetail.column(lm, "Marble", Vector3(s * (8.4 + 2.2 * k), 1.5, z + 4.6), 0.75, 17.0, "corinthian", 0)
+		lm.box("Marble", Vector3(s * 9.5, 19.4, z + 4.6), Vector3(4.6, 1.8, 2.2))
+	LandmarkDetail.cornice(lm, "Marble", Vector3(-14.5, 22.5, z + 3.6), Vector3(14.5, 22.5, z + 3.6), Vector3.BACK, 1.6, true)
+	lm.box("Marble", Vector3(0, 26.0, z + 1.8), Vector3(22.0, 3.5, 3.0))
+	# Harmony: the central figure between the groups of the passions.
+	LandmarkKits.statue_figure(lm, "Marble", Vector3(0, 27.75, z + 2.4), 5.0, true)
+	for x in [-7.0, -4.0, 4.0, 7.0]:
+		LandmarkKits.statue_figure(lm, "Marble", Vector3(x, 27.75, z + 2.4), 3.4)
+
+## The central dome: drum with paired pilasters and oculi, the shell in
+## alternating orange and yellow tile gores between white ribs, and the
+## glass crown under the bronze eagle.
+static func _ba_dome(lm: LandmarkMesh, b: Vector3) -> void:
+	lm.frustum("Marble", b, 16.4, 16.4, 1.2, 48)
+	lm.frustum("Marble", b + Vector3(0, 1.2, 0), 15.5, 15.5, 7.8, 48)
 	for k in 16:
 		var a := TAU * float(k) / 16.0
-		lm.frustum("Marble", Vector3(cos(a) * 15.8, 25.0, sin(a) * 15.8), 0.45, 0.45, 8.0, 8)
-	lm.lathe("Dome", Vector3(0, 33.0, 0), _dome(15.2, 14.0), 32)
-	lm.frustum("Marble", Vector3(0, 47.0, 0), 2.2, 1.9, 3.5, 12)
-	lm.lathe("Gold", Vector3(0, 50.5, 0), PackedVector2Array([Vector2(1.6, 0.0), Vector2(1.0, 0.8),
-		Vector2(0.15, BELLAS_ARTES_TOP_M - 50.5)]), 8)
-	lm.commit(model)
-
-static func _dome(r: float, h: float) -> PackedVector2Array:
-	var p := PackedVector2Array()
-	for i in 9:
-		var a := PI * 0.5 * float(i) / 8.0
-		p.append(Vector2(r * cos(a), h * sin(a)))
-	return p
-
-## Château Frontenac: the baronial hotel above the St Lawrence — the long
-## river wing (+Z) with its steep green copper roofs, dormers and round
-## corner turrets, the two rear wings swept back from it, and the great
-## central tower under its pyramidal roof (78 m).
-static func chateau_frontenac(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#B09A74", 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#CFC6B2", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#5F8B78", 2.0))
-	lm.use("Windows", LandmarkMaterials.glass("#2A3236"))
-	_wing(lm, Vector3(0, 0, 4.0), Vector2(94.0, 22.0), 38.0, 18.0)
-	_wing(lm, Vector3(-42.0, 0, -32.0), Vector2(20.0, 56.0), 34.0, 15.0)
-	_wing(lm, Vector3(42.0, 0, -32.0), Vector2(20.0, 56.0), 34.0, 15.0)
-	_wing(lm, Vector3(0, 0, -58.0), Vector2(104.0, 16.0), 30.0, 12.0)
-	# Central tower and its pyramidal roof.
-	lm.box("Brick", Vector3(0, 26.0, 8.0), Vector3(24.0, 52.0, 22.0))
-	lm.box("Trim", Vector3(0, 52.4, 8.0), Vector3(25.4, 1.0, 23.4))
-	LandmarkNaParts.hip(lm, "Roof", Vector3(0, 52.9, 8.0), Basis(), 13.2, 12.2, 0.16, FRONTENAC_TOP_M - 52.9)
-	for q in 4:
-		var r := Basis(Vector3.UP, PI * 0.5 * q)
-		var face: float = 11.0 if q % 2 == 0 else 12.0
-		LandmarkNaParts.windows(lm, "Windows", Vector3(0, 0, 8.0) + r * Vector3(0, 0, face), r,
-			18.0, 20.0, 50.0, 8, 4, Vector2(1.3, 2.0), 0.1)
-	# Corner turrets with conical copper caps.
-	for p in [Vector3(-47.0, 0, 15.0), Vector3(47.0, 0, 15.0), Vector3(-52.0, 0, -86.0 + 20.0),
-			Vector3(52.0, 0, -86.0 + 20.0), Vector3(-12.0, 0, 15.0), Vector3(12.0, 0, 15.0)]:
-		lm.lathe("Brick", p, PackedVector2Array([Vector2(4.2, 0.0), Vector2(4.2, 44.0)]), 14)
-		lm.frustum("Trim", p + Vector3(0, 44.0, 0), 4.6, 4.6, 0.6, 14)
-		lm.lathe("Roof", p + Vector3(0, 44.6, 0), PackedVector2Array([Vector2(5.0, 0.0),
-			Vector2(2.2, 8.0), Vector2(0.0, 15.0)]), 14)
-	lm.commit(model)
-
-## One storeyed block at `c` (size X x Z) with a steep hipped copper
-## roof `rise` high, a window row per storey and dormers on the long
-## slopes.
-static func _wing(lm: LandmarkMesh, c: Vector3, size: Vector2, walls: float, rise: float) -> void:
-	lm.box("Brick", c + Vector3(0, walls * 0.5, 0), Vector3(size.x, walls, size.y))
-	lm.box("Trim", c + Vector3(0, walls - 0.4, 0), Vector3(size.x + 0.6, 0.8, size.y + 0.6))
-	LandmarkNaParts.hip(lm, "Roof", c + Vector3(0, walls, 0), Basis(), size.x * 0.5 + 0.8,
-		size.y * 0.5 + 0.8, 0.3, rise)
-	var storeys := floori(walls / 3.6)
-	for q in 4:
-		var r := Basis(Vector3.UP, PI * 0.5 * q)
-		var span: float = size.x if q % 2 == 0 else size.y
-		var face: float = size.y * 0.5 if q % 2 == 0 else size.x * 0.5
-		LandmarkNaParts.windows(lm, "Windows", c + r * Vector3(0, 0, face), r, span - 4.0, 2.0,
-			walls - 2.0, storeys, maxi(3, floori(span / 4.2)), Vector2(1.2, 1.9), 0.1)
-	if size.y > size.x:
-		return
-	var n := maxi(2, floori(size.x / 9.0))
-	for k in n:
-		var x := -size.x * 0.38 + size.x * 0.76 * (float(k) + 0.5) / float(n)
+		var d := Vector3(cos(a), 0, sin(a))
 		for s in [-1.0, 1.0]:
-			var dc := c + Vector3(x, walls + rise * 0.3, s * (size.y * 0.5 + 0.8) * 0.72)
-			lm.box("Brick", dc + Vector3(0, 1.2, 0), Vector3(2.4, 2.4, 2.0))
-			lm.gable("Roof", dc + Vector3(0, 2.4, 0), 2.4, 2.0, 1.4, Basis(), 0.2, "Brick")
+			var pa := a + float(s) * 0.035
+			lm.box("Marble", b + Vector3(cos(pa), 0, sin(pa)) * 15.7 + Vector3(0, 5.1, 0), Vector3(0.6, 7.8, 0.5),
+				Basis.looking_at(Vector3(cos(pa), 0, sin(pa))))
+		var wa := a + TAU / 32.0
+		var wd := Vector3(cos(wa), 0, sin(wa))
+		lm.disc("Windows", b + wd * 15.56 + Vector3(0, 5.2, 0), wd, 1.2, 12)
+		for i in 12:
+			var t0 := TAU * float(i) / 12.0
+			var t1 := TAU * float(i + 1) / 12.0
+			var tv := wd.cross(Vector3.UP)
+			lm.beam("Marble", b + wd * 15.62 + Vector3(0, 5.2, 0) + (tv * cos(t0) + Vector3.UP * sin(t0)) * 1.35,
+				b + wd * 15.62 + Vector3(0, 5.2, 0) + (tv * cos(t1) + Vector3.UP * sin(t1)) * 1.35, 0.3, 0.25, wd)
+	lm.lathe("Marble", b + Vector3(0, 9.0, 0), PackedVector2Array([Vector2(15.5, 0.0), Vector2(16.3, 0.5),
+		Vector2(16.5, 1.0), Vector2(15.6, 1.1)]), 48)
+	# Shell gores: 16 sectors alternately orange and yellow.
+	var sh := b + Vector3(0, 10.0, 0)
+	var prof := LandmarkKits._dome_profile(15.4, 11.0, 12)
+	var gores := 16
+	for g in gores:
+		var key := "Dome" if g % 2 == 0 else "Yellow"
+		var rows: Array = []
+		for j in prof.size() - 1:
+			var row := PackedVector3Array()
+			for i in 5:
+				var a := TAU * (float(g) + float(i) / 4.0) / float(gores)
+				row.append(sh + Vector3(cos(a) * prof[j].x, prof[j].y, sin(a) * prof[j].x))
+			rows.append(row)
+		lm.grid(key, rows, sh, true)
+	var rp := LandmarkKits._dome_profile(15.6, 11.15, 12)
+	for g in gores:
+		var a := TAU * float(g) / float(gores)
+		var d := Vector3(cos(a), 0, sin(a))
+		for j in rp.size() - 2:
+			lm.beam("Marble", sh + d * rp[j].x + Vector3(0, rp[j].y, 0), sh + d * rp[j + 1].x + Vector3(0, rp[j + 1].y, 0),
+				0.5, 0.3, d.cross(Vector3.UP))
+	# Glass crown, its ribs, and the bronze eagle.
+	var cr := sh + Vector3(0, prof[prof.size() - 2].y, 0)
+	lm.frustum("Marble", cr, 3.4, 3.2, 0.8, 24)
+	lm.lathe("Windows", cr + Vector3(0, 0.8, 0), PackedVector2Array([Vector2(3.0, 0.0), Vector2(2.8, 1.6),
+		Vector2(1.8, 2.8), Vector2(0.6, 3.4)]), 16)
+	LandmarkNaParts.ring_posts(lm, "Gold", cr + Vector3(0, 0.8, 0), 3.0, 2.0, 16, 0.12, 0.12)
+	var e := cr + Vector3(0, 4.2, 0)
+	lm.frustum("Bronze", e - Vector3(0, 0.1, 0), 0.7, 0.5, 0.6, 10)
+	lm.lathe("Bronze", e + Vector3(0, 0.5, 0), PackedVector2Array([Vector2(0.35, 0.0), Vector2(0.5, 0.6),
+		Vector2(0.3, 1.2), Vector2(0.18, 1.5), Vector2(0.0, 1.7)]), 10, 1.0, 1.4)
+	for s in [-1.0, 1.0]:
+		var root := e + Vector3(float(s) * 0.3, 1.0, 0)
+		for nz in [-1.0, 1.0]:
+			lm.tri("Bronze", root, e + Vector3(float(s) * 2.4, BELLAS_ARTES_TOP_M - e.y, -0.3), e + Vector3(float(s) * 2.0, 0.7, -0.2),
+				Vector3(0, 0, nz), Vector3(0, 0, nz), Vector3(0, 0, nz), Vector2.ZERO, Vector2(2.0, 0), Vector2(2.0, -1.0))
+
+## A rearing bronze Pegasus on its marble pedestal at `b` (Querol, 1900s).
+static func _pegasus(lm: LandmarkMesh, b: Vector3) -> void:
+	lm.box("Marble", b + Vector3(0, 1.4, 0), Vector3(3.0, 2.8, 4.6))
+	lm.box("Marble", b + Vector3(0, 2.95, 0), Vector3(3.4, 0.3, 5.0))
+	var h := b + Vector3(0, 3.1, 0)
+	# Body rearing up on the hind legs, then the neck and head.
+	lm.beam("Bronze", h + Vector3(0, 1.2, -0.9), h + Vector3(0, 2.2, 0.6), 0.9, 1.0)
+	for s in [-1.0, 1.0]:
+		lm.beam("Bronze", h + Vector3(float(s) * 0.25, 0.9, -0.6), h + Vector3(float(s) * 0.25, 0.0, -0.8), 0.18, 0.18)
+		lm.beam("Bronze", h + Vector3(float(s) * 0.25, 2.4, 0.4), h + Vector3(float(s) * 0.25, 2.2, 1.2), 0.16, 0.16)
+	lm.beam("Bronze", h + Vector3(0, 2.6, 0.5), h + Vector3(0, 3.7, 0.9), 0.4, 0.35)
+	lm.box("Bronze", h + Vector3(0, 3.8, 1.2), Vector3(0.35, 0.4, 0.8))
+	for s in [-1.0, 1.0]:
+		var root := h + Vector3(float(s) * 0.3, 2.0, 0)
+		for nz in [-1.0, 1.0]:
+			lm.tri("Bronze", root, h + Vector3(float(s) * 2.0, 3.8, -0.6), h + Vector3(float(s) * 1.6, 1.6, -0.9),
+				Vector3(0, 0, nz), Vector3(0, 0, nz), Vector3(0, 0, nz), Vector2.ZERO, Vector2(2.0, 0), Vector2(2.0, -1.0))

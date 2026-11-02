@@ -7,10 +7,10 @@ extends RefCounted
 
 static func build(model: Node3D, type: String) -> bool:
 	match type:
-		"koutoubia_mosque": LandmarkAfhMorocco.koutoubia(model)
+		"koutoubia_mosque": LandmarkAfhKoutoubia.build(model)
 		"hassan_tower_rabat": LandmarkAfhMorocco.hassan_tower(model)
 		"ait_benhaddou": LandmarkAfhMorocco.ait_benhaddou(model)
-		"great_mosque_kairouan": LandmarkAfhTunisia.kairouan(model)
+		"great_mosque_kairouan": LandmarkAfhKairouan.build(model)
 		"el_djem_amphitheatre": LandmarkAfhTunisia.el_djem(model)
 		"lalibela_st_george": LandmarkAfhEthiopia.lalibela_st_george(model)
 		"aksum_obelisk": LandmarkAfhEthiopia.aksum_obelisk(model)

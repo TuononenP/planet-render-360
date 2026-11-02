@@ -11,23 +11,31 @@ const MONKS_TOP_M := 30.0
 ## Mountain sections, base to summit: [y, half width, front depth (+Z,
 ## toward the viewers), back depth (-Z)]. Between y 79 and 121 the front
 ## is a near-vertical cliff, the carved face; below it the talus slope.
-const RUSH_RINGS := [[-6.0, 80.0, 50.0, 62.0], [0.0, 80.0, 50.0, 62.0], [11.0, 77.0, 46.0, 59.0],
-	[25.0, 74.0, 40.0, 56.0], [41.0, 71.0, 33.0, 53.0], [59.0, 68.0, 26.0, 50.0],
-	[79.0, 66.0, 20.0, 46.0], [94.0, 64.0, 18.0, 43.0], [108.0, 62.0, 18.0, 40.0],
-	[121.0, 60.0, 18.0, 36.0], [130.0, 52.0, 16.0, 28.0], [135.0, 36.0, 12.0, 18.0]]
+const RUSH_RINGS := [[0.0, 80.0, 50.0, 62.0], [11.0, 77.0, 46.0, 59.0], [25.0, 74.0, 40.0, 56.0],
+	[41.0, 71.0, 33.0, 53.0], [59.0, 68.0, 26.0, 50.0], [79.0, 66.0, 20.0, 46.0],
+	[94.0, 64.0, 18.0, 43.0], [108.0, 62.0, 18.0, 40.0], [121.0, 60.0, 18.0, 36.0],
+	[130.0, 52.0, 16.0, 28.0], [135.0, 36.0, 12.0, 18.0]]
 const RUSH_SEG := 72
 ## Head height (chin to crown) in metres.
 const HEAD_H := 18.3
 ## Heads from the viewers' left: [x centre, chin y, set-back (m), kind]
-## 0 Washington, 1 Jefferson, 2 Lincoln, 3 Theodore Roosevelt.
-const HEADS := [[-32.0, 94.0, 0.0, 0], [-16.0, 91.0, -2.0, 1], [8.0, 92.0, 0.0, 2],
-	[26.0, 89.0, -1.0, 3]]
+## (kind 0 Washington, 1 Jefferson, 2 Lincoln, 3 Theodore Roosevelt):
+## Washington, Jefferson behind his shoulder, Roosevelt in the recess,
+## then Lincoln.
+const HEADS := [[-32.0, 94.0, 0.0, 0], [-15.5, 91.5, -2.0, 1], [2.5, 89.0, -4.0, 3],
+	[21.0, 91.0, -1.0, 2]]
+## Relief grid of each head: columns across, rows up.
+const HEAD_NU := 40
+const HEAD_NV := 56
 
 ## Mount Rushmore: the granite mountain mass (135 m above the base
 ## viewing platform at y = 0, superelliptic sections with a rough
-## shoulder) and, on its flat southeast-facing cliff, the four 18 m
-## heads of Washington, Jefferson, Lincoln and Roosevelt carved in
-## relief, the lower slopes under pine forest. Built with the faces toward +Z; yaw turns them southeast.
+## shoulder), the crags of the summit ridge and, on its flat
+## southeast-facing cliff, the four 60 ft (18 m) heads carved in relief
+## (from the viewers' left Washington, Jefferson, Roosevelt and
+## Lincoln), Washington's collar below his chin, the talus of blasted
+## granite under the carving and the lower slopes under pine forest.
+## Built with the faces toward +Z; yaw turns them southeast.
 static func mount_rushmore(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Rock", LandmarkMaterials.pbr("cliff", "#8F8A84", 8.0))
@@ -42,8 +50,8 @@ static func mount_rushmore(model: Node3D) -> void:
 			row.append(_rush_point(y, TAU * float(k) / float(RUSH_SEG)))
 		rows.append(row)
 	# Pine forest on the lower slopes (rings up to y = 59), bare granite above.
-	lm.grid("Forest", rows.slice(0, 6), Vector3(0, 70, -10), true)
-	lm.grid("Rock", rows.slice(5), Vector3(0, 70, -10), true)
+	lm.grid("Forest", rows.slice(0, 5), Vector3(0, 70, -10), true)
+	lm.grid("Rock", rows.slice(4), Vector3(0, 70, -10), true)
 	var top: PackedVector3Array = rows[rows.size() - 1]
 	var poly := PackedVector2Array()
 	for k in RUSH_SEG:
@@ -57,8 +65,11 @@ static func mount_rushmore(model: Node3D) -> void:
 			Vector3(p2.x, RUSHMORE_TOP_M, p2.y), Vector3.UP, Vector3.UP, Vector3.UP, p0, p1, p2)
 	for h in HEADS:
 		_head(lm, "Face", float(h[0]), float(h[1]), float(h[2]), int(h[3]))
-	lm.box("Platform", Vector3(0, -0.1, 63.0), Vector3(60.0, 1.0, 14.0))
-	lm.box("Platform", Vector3(0, 0.9, 69.7), Vector3(60.0, 1.2, 0.5))
+	_collar(lm, -32.0, 94.0)
+	_talus(lm)
+	_crags(lm)
+	lm.box("Platform", Vector3(0, 0.5, 63.0), Vector3(60.0, 1.0, 14.0))
+	lm.box("Platform", Vector3(0, 1.6, 69.7), Vector3(60.0, 1.2, 0.5))
 	lm.commit(model)
 
 ## Section half width, front and back depth at height y.
@@ -97,8 +108,8 @@ static func _face_z(x: float, y: float) -> float:
 ## One carved head: a relief grid over the cliff, cells with no relief
 ## skipped, normals from the depth gradient.
 static func _head(lm: LandmarkMesh, key: String, cx: float, y0: float, dz: float, kind: int) -> void:
-	var nu := 26
-	var nv := 38
+	var nu := HEAD_NU
+	var nv := HEAD_NV
 	var half_w := 5.8
 	var y_lo := y0 - 0.6
 	var y_hi := y0 + HEAD_H + 0.8
@@ -145,6 +156,50 @@ static func _head(lm: LandmarkMesh, key: String, cx: float, y0: float, dz: float
 			lm.tri(key, p00, p11, p01, n00, n11, n01, Vector2(p00.x, p00.y), Vector2(p11.x, p11.y),
 				Vector2(p01.x, p01.y))
 
+## Washington's coat collar and shoulders below his chin at (cx, y0):
+## a stepped relief of lapels and the cravat on the cliff.
+static func _collar(lm: LandmarkMesh, cx: float, y0: float) -> void:
+	for i in 7:
+		var t := float(i) / 6.0
+		var y := y0 - 1.0 - t * 7.0
+		var w := 4.0 + t * 9.0
+		var z := _face_z(cx, y)
+		lm.box("Face", Vector3(cx, y, z + 1.2 - t * 0.6), Vector3(w, 1.1, 2.4),
+			Basis(Vector3.RIGHT, -0.25))
+	for s in [-1.0, 1.0]:
+		lm.beam("Face", Vector3(cx + s * 0.8, y0 - 1.0, _face_z(cx, y0 - 1.0) + 2.4),
+			Vector3(cx + s * 4.6, y0 - 7.5, _face_z(cx, y0 - 7.5) + 1.9), 1.4, 0.8, Vector3(s, 0, 0))
+	lm.box("Face", Vector3(cx, y0 - 2.0, _face_z(cx, y0 - 2.0) + 2.6), Vector3(1.6, 2.0, 0.8))
+
+## The talus: blocks of blasted granite heaped on the slope under the
+## carved cliff (about 450,000 short tons were removed from the face).
+static func _talus(lm: LandmarkMesh) -> void:
+	var rs := 17
+	for i in 90:
+		rs = (rs * 1103515245 + 12345) % 2147483648
+		var u := float(rs % 10000) / 10000.0
+		rs = (rs * 1103515245 + 12345) % 2147483648
+		var v := float(rs % 10000) / 10000.0
+		var x := lerpf(-46.0, 36.0, u)
+		var y := lerpf(58.0, 80.0, v)
+		var sec := _section(y)
+		var z := sec.y * pow(maxf(1.0 - pow(absf(x) / sec.x, 4.0), 0.0), 0.25)
+		var sz := 1.4 + 2.2 * fmod(u * 7.31 + v * 3.17, 1.0)
+		lm.box("Rock", Vector3(x, y + sz * 0.3, z + sz * 0.2), Vector3(sz * 1.3, sz * 0.8, sz),
+			Basis(Vector3.UP, u * 6.0) * Basis(Vector3.RIGHT, v * 0.6))
+
+## Granite crags standing out of the shoulders of the summit ridge
+## behind and beside the heads.
+static func _crags(lm: LandmarkMesh) -> void:
+	for i in 14:
+		var a := PI * (1.02 + 0.96 * float(i) / 13.0)
+		var y := 108.0 + 14.0 * fmod(float(i) * 0.618, 1.0)
+		var p := _rush_point(y, a) * Vector3(0.96, 1.0, 0.96)
+		var h := minf(RUSHMORE_TOP_M + 0.5 - y, 6.0 + 5.0 * fmod(float(i) * 0.37, 1.0))
+		lm.lathe("Rock", p - Vector3(0, 1.5, 0),
+			PackedVector2Array([Vector2(h * 0.5, 0.0), Vector2(h * 0.42, h * 0.5),
+			Vector2(h * 0.24, h * 0.85), Vector2(h * 0.06, h + 1.5)]), 6, 1.3, 0.8, float(i), false)
+
 ## Relief depth (m) of a head at x in -1..1 across the face and v in
 ## 0..1 from chin to crown: an ellipsoid skull with brow, eye sockets,
 ## nose, cheeks, mouth and chin, then the hair, beard, moustache or
@@ -175,45 +230,90 @@ static func _face_depth(x: float, v: float, kind: int) -> float:
 		_:
 			f += 0.6 * smoothstep(0.6, 0.9, y)
 			f += 0.8 * exp(-pow((y + 0.3) / 0.07, 2.0) - pow(x / 0.4, 2.0))
-			f += 0.6 * exp(-pow((sqrt(pow(absf(x) - 0.38, 2.0) + pow(y - 0.17, 2.0)) - 0.13) / 0.04, 2.0))
+			f += 0.6 * exp(-pow((sqrt(pow(absf(x) - 0.38, 2.0) + pow(y - 0.17, 2.0)) - 0.13) / 0.04,
+				2.0))
 	return maxf(6.2 * sqrt(body) + f * smoothstep(0.0, 0.12, body), 0.0)
 
 ## Monks Mound: the largest earthwork of the Americas, 30 m high over a
-## 286 x 237 m base, four rounded terraces stepping up toward the north
-## (the 10 m south terrace, the 20 m main body, the 26 m and 30 m
-## summit terraces) under turf, with the modern stair on the south
-## face. The south ramp faces +Z; yaw turns the axis onto Cahokia's grid.
+## 291 x 236 m base (the length taking in the access ramp at the south
+## end), four terraces stepping up toward the north (the 10 m first
+## terrace to the south with its ramp, the 20 m main body, the 26 m and
+## 30 m summit terraces) with rounded shoulders, the slumped east and
+## west flanks, all under turf, and the modern concrete stair with its
+## landings and handrails up the south face along the line of the old
+## timber stair. The south ramp faces +Z; yaw turns the axis onto
+## Cahokia's grid.
 static func monks_mound(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Turf", LandmarkMaterials.pbr("lawn", "#869A57", 5.0))
-	lm.use("Stair", LandmarkMaterials.pbr("wood", "#8A6E4C", 2.0))
-	_mound_tier(lm, "Turf", 0.0, -57.75, -2.0, 22.0, 118.0, 87.75, 88.0, 57.75)
-	_mound_tier(lm, "Turf", 0.0, 57.75, -2.0, 12.0, 105.0, 87.75, 90.0, 72.75)
+	lm.use("Stair", LandmarkMaterials.pbr("concrete", "#A39E94", 2.0))
+	lm.use("Rail", LandmarkMaterials.paint("#3E4347", 0.5, 0.6))
+	_mound_tier(lm, "Turf", 0.0, -57.75, 0.0, 20.0, 118.0, 87.75, 88.0, 57.75)
+	_mound_tier(lm, "Turf", 0.0, 57.75, 0.0, 10.0, 105.0, 87.75, 90.0, 72.75)
 	_mound_tier(lm, "Turf", 0.0, -65.0, 20.0, 6.0, 80.0, 50.0, 71.0, 41.0)
 	_mound_tier(lm, "Turf", 0.0, -70.0, 26.0, 4.0, 60.0, 30.0, 54.0, 24.0)
-	LandmarkAmhParts.stair(lm, "Stair", Vector3.ZERO, Basis(), 4.5, 15.4, 10.0, 0.4, 20.0, -4.0, 50)
-	LandmarkAmhParts.stair(lm, "Stair", Vector3.ZERO, Basis(), 4.5, -14.6, 20.0, -23.6, 26.0, -28.0, 30)
-	LandmarkAmhParts.stair(lm, "Stair", Vector3.ZERO, Basis(), 4.5, -39.6, 26.0, -45.6, 30.0, -50.0, 20)
+	# The access ramp up the south end to the first terrace.
+	var ramp := [PackedVector3Array([Vector3(-22.0, 0.0, 146.0), Vector3(22.0, 0.0, 146.0)]),
+		PackedVector3Array([Vector3(-16.0, 5.0, 136.0), Vector3(16.0, 5.0, 136.0)]),
+		PackedVector3Array([Vector3(-14.0, 10.0, 124.0), Vector3(14.0, 10.0, 124.0)])]
+	lm.grid("Turf", ramp, Vector3(0, 1, 0.4))
+	for s in [-1.0, 1.0]:
+		lm.quad("Turf", Vector3(s * 22.0, 0.0, 146.0), Vector3(s * 16.0, 5.0, 136.0),
+			Vector3(s * 14.0, 10.0, 124.0), Vector3(s * 30.0, 0.0, 120.0),
+			Vector3(s, 0.4, 0.2).normalized())
+	# Stair flights (foot z, foot y, head z, head y, treads) with landings.
+	var flights := [[15.4, 10.0, 0.4, 20.0, 50], [-14.6, 20.0, -23.6, 26.0, 30],
+		[-39.6, 26.0, -45.6, 30.0, 20]]
+	for f in flights:
+		var z0: float = f[0]
+		var y0: float = f[1]
+		var z1: float = f[2]
+		var y1: float = f[3]
+		var n: int = f[4]
+		LandmarkAmhParts.stair(lm, "Stair", Vector3.ZERO, Basis(), 4.5, z0, y0, z1, y1, z1 - 4.4, n)
+		lm.box("Stair", Vector3(0, y1 - 0.1, z1 - 3.2), Vector3(5.5, 0.2, 2.4))
+		lm.box("Stair", Vector3(0, y0 + 0.05, z0 + 1.2), Vector3(5.5, 0.1, 2.4))
+		# Handrails both sides: posts every 2 m and a sloping rail.
+		for s in [-1.0, 1.0]:
+			var x: float = s * 2.45
+			var posts := int(absf(z0 - z1) / 2.0) + 1
+			for i in posts + 1:
+				var t := float(i) / float(posts)
+				var p := Vector3(x, lerpf(y0, y1, t), lerpf(z0, z1, t))
+				lm.beam("Rail", p, p + Vector3(0, 1.05, 0), 0.06, 0.06)
+			lm.beam("Rail", Vector3(x, y0 + 1.0, z0), Vector3(x, y1 + 1.0, z1), 0.06, 0.06,
+				Vector3.RIGHT)
+			lm.beam("Rail", Vector3(x, y0 + 0.5, z0), Vector3(x, y1 + 0.5, z1), 0.04, 0.04,
+				Vector3.RIGHT)
 	lm.commit(model)
 
 ## Rounded-rectangle tier (superellipse, exponent 5) from half extents
 ## (hx0, hz0) at y0 to (hx1, hz1) at y0 + h, centred at (cx, cz), with
-## its flat top closed.
+## its flat top closed: the flank rises from a concave toe to a rounded
+## shoulder, and the east and west sides bulge where they have slumped.
 static func _mound_tier(lm: LandmarkMesh, key: String, cx: float, cz: float, y0: float, h: float,
 		hx0: float, hz0: float, hx1: float, hz1: float) -> void:
-	var seg := 64
-	var base := PackedVector3Array()
-	var top := PackedVector3Array()
+	var seg := 72
+	# Profile across the flank: (share of the way in, share of the height).
+	var prof := [[0.0, 0.0], [0.18, 0.08], [0.42, 0.3], [0.66, 0.62], [0.86, 0.88], [1.0, 1.0]]
+	var rows: Array = []
 	var poly := PackedVector2Array()
-	for k in seg + 1:
-		var a := TAU * float(k) / float(seg)
-		var ux := signf(cos(a)) * pow(absf(cos(a)), 0.4)
-		var uz := signf(sin(a)) * pow(absf(sin(a)), 0.4)
-		base.append(Vector3(cx + hx0 * ux, y0, cz + hz0 * uz))
-		top.append(Vector3(cx + hx1 * ux, y0 + h, cz + hz1 * uz))
-		if k < seg:
-			poly.append(Vector2(cx + hx1 * ux, cz + hz1 * uz))
-	lm.grid(key, [base, top], Vector3(cx, y0 + h * 0.5, cz), true)
+	for j in prof.size():
+		var t: float = prof[j][0]
+		var yy: float = y0 + h * float(prof[j][1])
+		var row := PackedVector3Array()
+		for k in seg + 1:
+			var a := TAU * float(k) / float(seg)
+			var ux := signf(cos(a)) * pow(absf(cos(a)), 0.4)
+			var uz := signf(sin(a)) * pow(absf(sin(a)), 0.4)
+			var slump := 1.0 + 0.035 * absf(cos(a)) * sin(3.0 * a + 0.7) * (1.0 - t)
+			var hx := lerpf(hx0, hx1, t) * slump
+			var hz := lerpf(hz0, hz1, t)
+			row.append(Vector3(cx + hx * ux, yy, cz + hz * uz))
+			if j == prof.size() - 1 and k < seg:
+				poly.append(Vector2(cx + hx * ux, cz + hz * uz))
+		rows.append(row)
+	lm.grid(key, rows, Vector3(cx, y0 + h * 0.5, cz), true)
 	var idx := Geometry2D.triangulate_polygon(poly)
 	for t in range(0, idx.size(), 3):
 		var p0 := poly[idx[t]]

@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Helpers shared by the ancient Rome landmark builders (true metres on
 ## LandmarkMesh): arched walls with real soffits, Roman columns, coffered
-## barrel vaults, pediments, spiral-relief columns and ruined wall tops.
+## barrel vaults, pediments, and ruined wall tops.
 
 ## Wall face along `right` from local x0 to x1 (origin `o` at the foot of
 ## x = 0), facing `out`, between y0 and y1 and `depth` thick inward, pierced
@@ -215,25 +215,6 @@ static func barrel_vault(lm: LandmarkMesh, key: String, dark: String, c: Vector3
 			var db := axis * s1
 			lm.quad(dark, q0 + da, q1 + da, q1 + db, q0 + db, n)
 			lm.quad(dark, q1 + da, q2 + da, q2 + db, q1 + db, n)
-
-## Column of Trajan / Marcus Aurelius shaft: tapering drum from r0 to r1
-## with a helical relief ribbon of `turns` turns in `relief`.
-static func spiral_column(lm: LandmarkMesh, shaft: String, relief: String, base: Vector3,
-		h: float, r0: float, r1: float, turns: float, per_turn: int = 14) -> void:
-	lm.lathe(shaft, base, PackedVector2Array([Vector2(r0, 0), Vector2(r0 * 0.99 + r1 * 0.01, h * 0.5),
-		Vector2(r1, h)]), 24)
-	var n := int(turns * float(per_turn))
-	var band := h / turns * 0.78
-	for i in n:
-		var f0 := float(i) / float(n)
-		var f1 := float(i + 1) / float(n)
-		var a0 := TAU * turns * f0
-		var a1 := TAU * turns * f1
-		var rr0 := lerpf(r0, r1, f0) + 0.06
-		var rr1 := lerpf(r0, r1, f1) + 0.06
-		lm.beam(relief, base + Vector3(cos(a0) * rr0, h * f0 + band * 0.5, sin(a0) * rr0),
-			base + Vector3(cos(a1) * rr1, h * f1 + band * 0.5, sin(a1) * rr1), band,
-			0.26, Vector3.UP, false)
 
 ## Merlons round a drum: `n` blocks w wide at radius r on height y.
 static func merlons_ring(lm: LandmarkMesh, key: String, c: Vector3, r: float, y: float, n: int,

@@ -1,16 +1,20 @@
 class_name LandmarkChTowers
 extends RefCounted
 
-## Three Gothic towers of the Danube lands in true metres: the Old Town
-## Hall tower of Prague with its Astronomical Clock (the dial on the
-## south face, +Z, 69.5 m), the Powder Tower (sooty gate tower with
-## corner turrets and a copper spire, passage along Z, 65 m) and
-## Budapest's Fisherman's Bastion with Matthias Church (seven white
-## cones on a curved loggia, church with the 80 m Bela tower to its west).
+## Two Gothic towers of Prague in true metres: the Old Town Hall tower
+## (square, 1364, 69.5 m) with the Astronomical Clock on its south face
+## (+Z), the Marian chapel oriel (1381) on its east face and the row of
+## town hall houses running west along the square, and the Powder Tower
+## (late Gothic gate tower of 1475, 65 m, neo-Gothic dress by Josef
+## Mocker 1875-86: gallery, corner turrets, hipped roof; passage along Z).
 
 # --- Old Town Hall tower and Astronomical Clock ---
 
 const ORLOJ_TOP := 69.5
+## Half-width of the square tower shaft.
+const ORLOJ_HW := 5.2
+## Gallery floor level, at the head of the shaft.
+const ORLOJ_GALLERY := 52.0
 
 static func orloj(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -19,221 +23,398 @@ static func orloj(model: Node3D) -> void:
 	lm.use("Roof", LandmarkMaterials.pbr("slate", "#4F5A55", 2.5))
 	lm.use("Windows", LandmarkMaterials.glass("#222B30"))
 	lm.use("Blue", LandmarkMaterials.paint("#2D4F86", 0.45, 0.2))
+	lm.use("Earth", LandmarkMaterials.paint("#3B2E26", 0.5, 0.1))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Wing", LandmarkMaterials.pbr("render", "#D8C697", 3.0))
+	lm.use("Ochre", LandmarkMaterials.pbr("render", "#C9A36B", 3.0))
+	lm.use("Sgraffito", LandmarkMaterials.pbr("render", "#8C826F", 2.0))
 	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#9A4A30", 2.5))
-	# Shaft in two stages with string courses, belvedere gallery above.
-	lm.box("Pale", Vector3(0, 0.5, 0), Vector3(11.2, 1.0, 11.2))
-	lm.box("Stone", Vector3(0, 18.5, 0), Vector3(10.4, 35.0, 10.4))
-	LandmarkChParts.band(lm, "Pale", 36.0, 5.2, 5.2, 0.9, 0.35)
-	lm.box("Stone", Vector3(0, 45.5, 0), Vector3(9.4, 17.1, 9.4))
-	LandmarkChParts.band(lm, "Pale", 20.0, 5.2, 5.2, 0.5, 0.2)
-	LandmarkChParts.band(lm, "Pale", 54.0, 4.7, 4.7, 1.4, 0.7)
-	lm.box("Stone", Vector3(0, 58.5, 0), Vector3(6.6, 7.0, 6.6))
-	for f in 4:
-		var b := Basis(Vector3.UP, PI * 0.5 * f)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 11.0, 5.2), 1, 1.0, 0.9, 5.0, b)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 27.0, 5.2), 2, 3.0, 0.9, 4.6, b)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 40.0, 4.7), 2, 3.0, 1.0, 5.2, b)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 55.5, 3.3), 2, 3.4, 1.9, 5.2, b)
-		for k in [-1.0, 1.0]:
-			lm.box("Stone", b * Vector3(k * 3.9, 58.5, 3.9), Vector3(1.6, 7.0, 1.6))
-	LandmarkChParts.band(lm, "Pale", 62.0, 4.7, 4.7, 0.8, 0.45)
-	# Four corner pinnacles round a slim octagonal spire with a gilt finial.
+	_orloj_shaft(lm)
+	_orloj_top(lm)
+	_orloj_clock(lm)
+	_orloj_oriel(lm)
+	_orloj_houses(lm)
+	lm.commit(model)
+
+## Square stone shaft with corner lesenes, string courses and lancets.
+static func _orloj_shaft(lm: LandmarkMesh) -> void:
+	var hw := ORLOJ_HW
+	var g := ORLOJ_GALLERY
+	lm.box("Pale", Vector3(0, 0.5, 0), Vector3(hw * 2.0 + 0.8, 1.0, hw * 2.0 + 0.8))
+	lm.box("Stone", Vector3(0, g * 0.5, 0), Vector3(hw * 2.0, g, hw * 2.0))
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
-			LandmarkChParts.turret(lm, "Stone", "Roof", Vector3(sx * 4.1, 62.8, sz * 4.1), 0.95, 3.0, 3.0)
-	lm.lathe("Roof", Vector3(0, 62.8, 0), PackedVector2Array([Vector2(3.6, 0), Vector2(1.6, 3.2),
-		Vector2(0.3, 5.0)]), 8, 1.0, 1.0, PI / 8.0, false)
-	LandmarkChParts.finial(lm, "Gilt", Vector3(0, 67.8, 0), ORLOJ_TOP - 67.8, 0.35)
-	# The Astronomical Clock and calendar dial on the south face.
-	var b0 := Basis()
-	LandmarkChParts.pointed(lm, "Pale", Vector3(0, 1.0, 5.2), 4.6, 10.5, b0, 0.05)
-	lm.disc("Gilt", Vector3(0, 7.6, 5.4), Vector3.BACK, 1.75, 28)
-	lm.disc("Blue", Vector3(0, 7.6, 5.48), Vector3.BACK, 1.42, 28)
-	lm.disc("Gilt", Vector3(0, 3.7, 5.4), Vector3.BACK, 1.55, 28)
-	lm.disc("Blue", Vector3(0, 3.7, 5.48), Vector3.BACK, 1.25, 28)
-	# Oriel chapel on the east face with its pointed cap.
+			lm.box("Pale", Vector3(sx * (hw - 0.3), g * 0.5, sz * (hw - 0.3)), Vector3(1.0, g, 1.0))
+	for y in [14.5, 30.0, 42.0]:
+		LandmarkChParts.band(lm, "Pale", y, hw, hw, 0.5, 0.25)
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		var n := b.z
+		var face := b * Vector3(0, 0, hw)
+		# The south face carries the clock low down; the others a lancet.
+		if f != 0:
+			LandmarkChParts.lancet(lm, "Pale", "Windows", face + Vector3(0, 7.0, 0), n, 1.3, 5.0, 1)
+		LandmarkChParts.lancet(lm, "Pale", "Windows", face + Vector3(0, 19.0, 0), n, 1.4, 5.4, 1)
+		for x in [-1.8, 1.8]:
+			LandmarkChParts.lancet(lm, "Pale", "Windows", face + b * Vector3(x, 33.0, 0), n, 1.1, 5.0, 1)
+			LandmarkChParts.lancet(lm, "Pale", "Windows", face + b * Vector3(x, 44.5, 0), n, 1.2, 5.2, 1)
+		# Corbel table carrying the projecting gallery.
+		var a := b * Vector3(-hw + 0.8, g, hw)
+		var e := b * Vector3(hw - 0.8, g, hw)
+		LandmarkChParts.corbels(lm, "Pale", a, e, n * 1.0, 1.1, 1.4)
+
+## Gallery with tracery parapet, four corner bartizans with spires, the
+## steep central roof with lucarnes and the gilt finial.
+static func _orloj_top(lm: LandmarkMesh) -> void:
+	var hw := ORLOJ_HW
+	var g := ORLOJ_GALLERY
+	var gw := hw + 1.0
+	lm.box("Pale", Vector3(0, g + 0.35, 0), Vector3(gw * 2.0, 0.7, gw * 2.0))
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		LandmarkChParts.tracery_parapet(lm, "Pale", b * Vector3(-gw + 1.3, g + 0.7, gw - 0.15),
+			b * Vector3(gw - 1.3, g + 0.7, gw - 0.15), 1.2, 1.1, 0.22)
+	# Inner wall of the belvedere stage under the roof.
+	lm.box("Stone", Vector3(0, g + 2.2, 0), Vector3(hw * 1.6, 3.0, hw * 1.6))
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		for x in [-1.5, 1.5]:
+			LandmarkChParts.lancet(lm, "Pale", "Windows", b * Vector3(x, g + 1.0, hw * 0.8), b.z, 0.8, 2.4, 0)
+	# Corner bartizans on corbelled bases.
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var p := Vector3(sx * (gw - 0.4), 0, sz * (gw - 0.4))
+			lm.lathe("Pale", p + Vector3(0, g - 2.5, 0), PackedVector2Array([Vector2(0.15, 0), Vector2(0.6, 0.9),
+				Vector2(1.05, 2.0), Vector2(1.2, 2.5)]), 8, 1.0, 1.0, PI / 8.0, false)
+			lm.lathe("Stone", p + Vector3(0, g, 0), PackedVector2Array([Vector2(1.15, 0), Vector2(1.1, 4.8)]), 8,
+				1.0, 1.0, PI / 8.0, false)
+			lm.frustum("Pale", p + Vector3(0, g + 4.6, 0), 1.3, 1.3, 0.4, 8, PI / 8.0)
+			for k in 4:
+				var a := PI * 0.5 * float(k) + PI * 0.25
+				var d := Vector3(cos(a), 0, sin(a))
+				LandmarkChParts.lancet(lm, "Pale", "Windows", p + d * 1.1 + Vector3(0, g + 1.6, 0), d, 0.45, 1.8, 0, 0.12)
+			lm.lathe("Roof", p + Vector3(0, g + 5.0, 0), PackedVector2Array([Vector2(1.45, 0), Vector2(1.0, 1.4),
+				Vector2(0.5, 4.0), Vector2(0.05, 6.4)]), 8, 1.0, 1.0, PI / 8.0, false)
+			LandmarkChParts.finial(lm, "Gilt", p + Vector3(0, g + 11.4, 0), 1.2, 0.18)
+	# Steep central roof, its lucarnes and the finial.
+	var rb := Vector3(0, g + 3.7, 0)
+	lm.lathe("Roof", rb, PackedVector2Array([Vector2(hw * 1.18, 0), Vector2(hw * 0.95, 1.2), Vector2(3.0, 4.6),
+		Vector2(1.5, 8.0), Vector2(0.25, 11.2)]), 4, 1.0, 1.0, PI * 0.25, false)
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		var lc := rb + b * Vector3(0, 1.8, 3.6)
+		lm.box("Stone", lc + Vector3(0, 0.8, 0), Vector3(1.4, 1.6, 1.6), b)
+		lm.gable("Roof", lc + Vector3(0, 1.6, 0), 1.4, 1.6, 1.0, b, 0.1, "Stone")
+		LandmarkChParts.lancet(lm, "Pale", "Windows", lc + b * Vector3(0, 0.2, 0.8), b.z, 0.6, 1.2, 0, 0.1)
+	var tip := rb + Vector3(0, 11.2, 0)
+	lm.lathe("Gilt", tip - Vector3(0, 0.4, 0), PackedVector2Array([Vector2(0.15, 0), Vector2(0.45, 0.5),
+		Vector2(0.5, 0.8), Vector2(0.3, 1.2), Vector2(0.08, 1.4)]), 10)
+	LandmarkChParts.finial(lm, "Gilt", tip + Vector3(0, 1.0, 0), ORLOJ_TOP - tip.y - 1.0, 0.25)
+
+## The Astronomical Clock (1410) in its late Gothic stone case on the
+## south face: the astronomical dial (blue day sky, dark night, the
+## eccentric zodiac ring, 24 Old Czech hours) with two figures each side,
+## the calendar dial below with four more, the apostles' windows and the
+## crocketed canopy with the cockerel.
+static func _orloj_clock(lm: LandmarkMesh) -> void:
+	var z := ORLOJ_HW
+	var n := Vector3.BACK
+	# Stone case: back panel, side piers with pinnacles, base.
+	lm.box("Pale", Vector3(0, 7.5, z + 0.2), Vector3(6.4, 12.0, 0.4))
+	lm.box("Pale", Vector3(0, 1.4, z + 0.5), Vector3(7.0, 0.8, 1.0))
+	for sx in [-1.0, 1.0]:
+		lm.box("Stone", Vector3(sx * 3.3, 7.6, z + 0.5), Vector3(0.6, 12.4, 0.7))
+		LandmarkChParts.pinnacle(lm, "Pale", Vector3(sx * 3.3, 13.8, z + 0.5), 0.6, 3.2)
+	# Astronomical dial.
+	var dc := Vector3(0, 8.4, z + 0.42)
+	lm.disc("Gilt", dc, n, 1.95, 36)
+	lm.disc("Blue", dc + n * 0.04, n, 1.72, 36)
+	_horizon(lm, "Earth", dc + n * 0.07, 1.72, -0.55)
+	var zc := dc + Vector3(0, 0.42, 0) + n * 0.12
+	var prev := zc + Vector3(1.12, 0, 0)
+	for k in 24:
+		var a := TAU * float(k + 1) / 24.0
+		var q := zc + Vector3(cos(a), sin(a), 0) * 1.12
+		lm.beam("Gilt", prev, q, 0.14, 0.06, n)
+		prev = q
+	for k in 24:
+		var a := TAU * (float(k) + 0.5) / 24.0
+		lm.box("Gilt", dc + Vector3(cos(a), sin(a), 0) * 1.84 + n * 0.08, Vector3(0.12, 0.2, 0.05),
+			Basis(Vector3.BACK, a - PI * 0.5), 0.0)
+	lm.beam("Gilt", dc + n * 0.18, dc + Vector3(1.2, 1.1, 0) + n * 0.18, 0.08, 0.04, n)
+	lm.disc("Gilt", dc + Vector3(0.95, 0.87, 0) + n * 0.22, n, 0.2, 12)
+	lm.beam("Gilt", dc + n * 0.2, dc + Vector3(-0.9, 0.6, 0) + n * 0.2, 0.06, 0.04, n)
+	lm.disc("Earth", dc + Vector3(-0.7, 0.47, 0) + n * 0.24, n, 0.16, 12)
+	# Calendar dial below.
+	var cc := Vector3(0, 3.7, z + 0.42)
+	lm.disc("Gilt", cc, n, 1.6, 36)
+	lm.disc("Blue", cc + n * 0.04, n, 1.35, 36)
+	lm.disc("Gilt", cc + n * 0.08, n, 0.5, 20)
+	for k in 12:
+		var a := TAU * float(k) / 12.0
+		lm.disc("Ochre", cc + Vector3(cos(a), sin(a), 0) * 0.95 + n * 0.09, n, 0.3, 10)
+	# Figures: Vanity, Avarice, Death and the Turk by the upper dial,
+	# the philosopher, archangel, astronomer and chronicler by the lower.
+	for sx in [-1.0, 1.0]:
+		for k in 2:
+			var x: float = sx * (2.25 + 0.55 * k)
+			lm.box("Pale", Vector3(x, 7.0, z + 0.7), Vector3(0.5, 0.2, 0.5))
+			LandmarkKits.statue_figure(lm, "Ochre", Vector3(x, 7.1, z + 0.7), 1.25, k == 0)
+			lm.box("Pale", Vector3(x, 3.0, z + 0.7), Vector3(0.5, 0.2, 0.5))
+			LandmarkKits.statue_figure(lm, "Ochre", Vector3(x, 3.1, z + 0.7), 1.3, k == 1)
+	# Apostles' windows, the canopy and the cockerel.
+	for sx in [-0.7, 0.7]:
+		LandmarkChParts.arched_window(lm, "Pale", "Windows", Vector3(sx, 11.0, z + 0.4), n, 0.9, 1.4, 0.15)
+	LandmarkChParts.wimperg(lm, "Pale", Vector3(0, 13.1, z + 0.4), n, 6.2, 4.2, 0.35)
+	lm.box("Gilt", Vector3(0, 13.0, z + 0.7), Vector3(0.3, 0.4, 0.2), Basis(), 0.0)
+
+## Night half of the astronomical dial: the disc below a chord at `cut`
+## (a fraction of r below the centre is negative), facing +Z.
+static func _horizon(lm: LandmarkMesh, key: String, c: Vector3, r: float, cut: float) -> void:
+	var n := Vector3.BACK
+	var a0 := asin(cut)
+	var steps := 14
+	var y := r * cut
+	for i in steps:
+		var t0 := lerpf(PI - a0, TAU + a0, float(i) / float(steps))
+		var t1 := lerpf(PI - a0, TAU + a0, float(i + 1) / float(steps))
+		lm.tri(key, c + Vector3(0, y, 0), c + Vector3(cos(t0), sin(t0), 0) * r, c + Vector3(cos(t1), sin(t1), 0) * r,
+			n, n, n, Vector2.ZERO, Vector2(cos(t0), sin(t0)) * r, Vector2(cos(t1), sin(t1)) * r)
+
+## Marian chapel oriel on the east face: a five-sided (5/8) bay on a
+## corbel cone, tracery lancets between buttresses, a pointed roof.
+static func _orloj_oriel(lm: LandmarkMesh) -> void:
+	var c := Vector3(ORLOJ_HW, 0, 0)
 	var poly := PackedVector2Array()
 	for i in 5:
 		var a := -PI * 0.5 + PI * float(i) / 4.0
-		poly.append(Vector2(5.2 + cos(a) * 2.6, sin(a) * 2.6))
+		poly.append(Vector2(c.x + cos(a) * 2.6, sin(a) * 2.6))
+	lm.lathe("Pale", c + Vector3(0, 8.0, 0), PackedVector2Array([Vector2(0.4, 0), Vector2(1.6, 1.6),
+		Vector2(2.5, 2.8), Vector2(2.7, 3.0)]), 8, 1.0, 1.0, PI / 8.0, false)
 	lm.poly_prism("Pale", poly, 11.0, 19.0)
-	lm.lathe("Roof", Vector3(5.2, 19.0, 0), PackedVector2Array([Vector2(3.0, 0), Vector2(0.2, 5.5)]), 8,
-		1.0, 1.0, PI / 8.0, false)
+	lm.lathe("Roof", c + Vector3(0, 19.0, 0), PackedVector2Array([Vector2(3.0, 0), Vector2(1.6, 3.0),
+		Vector2(0.2, 5.5)]), 8, 1.0, 1.0, PI / 8.0, false)
+	LandmarkChParts.finial(lm, "Gilt", c + Vector3(0, 24.4, 0), 1.2, 0.2)
 	for k in 4:
 		var a := -PI * 0.5 + PI * (float(k) + 0.5) / 4.0
-		var b := Basis(Vector3.UP, PI * 0.5 - a)
-		LandmarkChParts.pointed(lm, "Windows", Vector3(5.2, 12.5, 0) + b * Vector3(0, 0, 2.4), 0.9, 4.6, b)
-	# Town hall wing running north from the tower.
-	lm.box("Wing", Vector3(0, 8.0, -21.0), Vector3(14.0, 16.0, 30.0))
-	lm.gable("Tile", Vector3(0, 16.0, -21.0), 14.0, 30.0, 7.0, Basis(), 0.6, "Wing")
-	for sx in [-1.0, 1.0]:
-		var b := Basis(Vector3.UP, PI * 0.5 * sx)
-		for r in 2:
-			LandmarkChParts.row(lm, "Windows", b * Vector3(0, 3.0 + 6.0 * r, 7.0) + Vector3(0, 0, -21.0), 6, 4.6,
-				1.4, 2.8, b, false)
-	lm.commit(model)
+		var d := Vector3(cos(a), 0, sin(a))
+		LandmarkChParts.lancet(lm, "Stone", "Windows", c + d * 2.42 + Vector3(0, 12.0, 0), d, 0.9, 5.4, 1, 0.2)
+		LandmarkChParts.wimperg(lm, "Stone", c + d * 2.42 + Vector3(0, 17.5, 0), d, 1.2, 1.6, 0.2)
+	for k in 5:
+		var a := -PI * 0.5 + PI * float(k) / 4.0
+		var d := Vector3(cos(a), 0, sin(a))
+		lm.box("Stone", c + d * 2.7 + Vector3(0, 15.0, 0), Vector3(0.35, 8.0, 0.35), Basis(Vector3.UP, -a))
+		LandmarkChParts.pinnacle(lm, "Stone", c + d * 2.7 + Vector3(0, 19.0, 0), 0.35, 2.2)
+
+## The town hall houses west of the tower along the square: Kriz house
+## (neo-Gothic), Mikes house (neo-Renaissance), the Cockerel house and
+## the Minute house with its sgraffito and arcade, under tiled roofs.
+static func _orloj_houses(lm: LandmarkMesh) -> void:
+	# [west x, east x, eave height, wall key, arched windows]
+	var houses := [[-15.0, -5.2, 17.0, "Ochre", true], [-24.0, -15.0, 18.0, "Wing", false],
+		[-31.0, -24.0, 16.5, "Ochre", false], [-43.0, -31.0, 17.5, "Sgraffito", false]]
+	var depth := 16.0
+	for h in houses:
+		var x0: float = h[0]
+		var x1: float = h[1]
+		var eave: float = h[2]
+		var key: String = h[3]
+		var wdt := x1 - x0
+		var cx := (x0 + x1) * 0.5
+		var zc := ORLOJ_HW - depth * 0.5
+		lm.box(key, Vector3(cx, eave * 0.5, zc), Vector3(wdt, eave, depth))
+		lm.box("Pale", Vector3(cx, eave - 0.3, zc), Vector3(wdt + 0.1, 0.6, depth + 0.8))
+		LandmarkDetail.cornice(lm, "Pale", Vector3(x0, eave - 0.6, ORLOJ_HW), Vector3(x1, eave - 0.6, ORLOJ_HW),
+			Vector3.BACK, 0.6, false)
+		lm.gable("Tile", Vector3(cx, eave, zc), depth, wdt, 7.5, Basis(Vector3.UP, PI * 0.5), 0.4, key)
+		# Dormers on the square side of the roof.
+		var dn := maxi(int(wdt / 4.5), 1)
+		for i in dn:
+			var dx := x0 + wdt * (float(i) + 0.5) / float(dn)
+			var dp := Vector3(dx, eave + 1.6, ORLOJ_HW - 2.4)
+			lm.box(key, dp + Vector3(0, 0.8, 0), Vector3(1.6, 1.8, 1.6))
+			lm.gable("Tile", dp + Vector3(0, 1.7, 0), 1.6, 1.8, 1.0, Basis(), 0.15, key)
+			LandmarkDetail.window(lm, "Pale", "Windows", dp + Vector3(0, 0.9, 0.8), Vector3.BACK, 0.7, 1.0, false, 0.12)
+		# Storeys of windows on the square front.
+		var cols := maxi(int(wdt / 3.0), 2)
+		for r in 3:
+			var y := 5.6 + 4.0 * r
+			for i in cols:
+				var wx := x0 + wdt * (float(i) + 0.5) / float(cols)
+				var wc := Vector3(wx, y, ORLOJ_HW)
+				if bool(h[4]):
+					LandmarkChParts.lancet(lm, "Pale", "Windows", wc - Vector3(0, 1.2, 0), Vector3.BACK, 1.1, 2.8, 1, 0.2)
+				else:
+					LandmarkDetail.window(lm, "Pale", "Windows", wc + Vector3(0, 0.2, 0), Vector3.BACK, 1.1, 2.0, false, 0.18)
+		# Ground storey: doors, or the Minute house's arcade.
+		if key == "Sgraffito":
+			for i in 3:
+				var ax := x0 + wdt * (float(i) + 0.5) / 3.0
+				LandmarkDetail.arch(lm, "Pale", Vector3(ax, 2.6, ORLOJ_HW), Vector3.BACK, 3.0, 0.4, 0.3)
+				lm.box("Windows", Vector3(ax, 1.6, ORLOJ_HW + 0.02), Vector3(3.0, 3.2, 0.04), Basis(), 0.0)
+			# Sgraffito panels framed between the storeys.
+			for r in 3:
+				lm.box("Pale", Vector3((x0 + x1) * 0.5, 7.3 + 4.0 * r, ORLOJ_HW + 0.06), Vector3(wdt - 0.4, 0.25, 0.12),
+					Basis(), 0.0)
+		else:
+			LandmarkDetail.arch(lm, "Pale", Vector3(cx, 2.4, ORLOJ_HW), Vector3.BACK, 2.0, 0.3, 0.25)
+			lm.box("Windows", Vector3(cx, 1.2, ORLOJ_HW + 0.02), Vector3(2.0, 2.4, 0.04), Basis(), 0.0)
+		LandmarkChParts.band(lm, "Pale", 0.0, wdt * 0.5, depth * 0.5, 0.8, 0.15, Vector3(cx, 0, zc))
+	# West end gable of the Minute house, facing the little square.
+	for r in 3:
+		for i in 4:
+			LandmarkDetail.window(lm, "Pale", "Windows", Vector3(-43.0, 5.8 + 4.0 * r, ORLOJ_HW - 2.5 - 3.6 * i),
+				Vector3.LEFT, 1.0, 2.0, false, 0.18)
 
 # --- Powder Tower ---
 
 const POWDER_TOP := 65.0
-const POWDER_HALF := 8.0
+## Half-width of the square tower (about 14 m across).
+const POWDER_HALF := 7.0
+## Gallery level at the head of the shaft.
+const POWDER_GALLERY := 40.0
 
 static func powder(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7B7568", 3.0))
 	lm.use("Pale", LandmarkMaterials.pbr("stone", "#9A9382", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("concrete", "#5E8A76", 2.0, 0.55, 0.3))
+	lm.use("Dark", LandmarkMaterials.pbr("stone", "#4E4A42", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("slate", "#3F4447", 2.0))
 	lm.use("Windows", LandmarkMaterials.glass("#222B30"))
 	lm.use("Gilt", LandmarkMaterials.gold())
+	_powder_body(lm)
+	_powder_decor(lm)
+	_powder_top(lm)
+	lm.commit(model)
+
+## Shaft with the vaulted gate passage (pointed arch, along Z).
+static func _powder_body(lm: LandmarkMesh) -> void:
 	var h := POWDER_HALF
-	# Body: two piers and a lintel course leave the 4.6 m gate passage.
+	var g := POWDER_GALLERY
+	var pw := 2.6
+	var spring := 6.0
 	for sx in [-1.0, 1.0]:
-		lm.box("Pale", Vector3(sx * 5.45, 0.6, 0), Vector3(6.3, 1.2, h * 2.0 + 1.2))
-		lm.box("Stone", Vector3(sx * 5.15, 20.6, 0), Vector3(5.7, 38.8, h * 2.0))
-	lm.box("Stone", Vector3(0, 23.7, 0), Vector3(4.6, 33.0, h * 2.0))
-	LandmarkChParts.band(lm, "Pale", 13.0, h, h, 0.6, 0.35)
-	LandmarkChParts.band(lm, "Pale", 22.0, h, h, 0.6, 0.3)
-	LandmarkChParts.band(lm, "Pale", 36.0, h, h, 2.2, 0.8)
-	lm.box("Pale", Vector3(0, 40.3, 0), Vector3(h * 2.0 + 2.0, 1.2, h * 2.0 + 2.0))
+		lm.box("Pale", Vector3(sx * (h + pw) * 0.5, 0.6, 0), Vector3(h - pw + 0.8, 1.2, h * 2.0 + 0.8))
+		lm.box("Stone", Vector3(sx * (h + pw) * 0.5, spring * 0.5, 0), Vector3(h - pw, spring, h * 2.0))
+	lm.box("Stone", Vector3(0, (spring + 4.6 + g) * 0.5, 0), Vector3(h * 2.0, g - spring - 4.6, h * 2.0))
+	# Spandrels and soffit of the pointed passage vault.
+	var arc := LandmarkChParts.pointed_arc(pw, 4)
+	for sz in [-1.0, 1.0]:
+		var zf: float = sz * h
+		var nz := Vector3(0, 0, sz)
+		for i in arc.size() - 1:
+			var a := Vector3(arc[i].x, spring + arc[i].y, zf)
+			var b := Vector3(arc[i + 1].x, spring + arc[i + 1].y, zf)
+			lm.quad("Stone", a, b, Vector3(b.x, spring + 4.6, zf), Vector3(a.x, spring + 4.6, zf), nz)
+	for i in arc.size() - 1:
+		var a := Vector3(arc[i].x, spring + arc[i].y, 0)
+		var b := Vector3(arc[i + 1].x, spring + arc[i + 1].y, 0)
+		var dn := Vector3(-(b - a).y, (b - a).x, 0).normalized()
+		var mid := (a + b) * 0.5
+		if dn.dot(Vector3(-mid.x, spring - mid.y, 0)) < 0.0:
+			dn = -dn
+		lm.quad("Dark", a + Vector3(0, 0, -h), b + Vector3(0, 0, -h), b + Vector3(0, 0, h), a + Vector3(0, 0, h), dn)
+	for sx in [-1.0, 1.0]:
+		lm.quad("Dark", Vector3(sx * pw, 0, -h), Vector3(sx * pw, 0, h), Vector3(sx * pw, spring, h),
+			Vector3(sx * pw, spring, -h), Vector3(-sx, 0, 0))
+	# Net-vault ribs across the passage.
+	for k in 5:
+		var zk := -h + h * 2.0 * (float(k) + 0.5) / 5.0
+		for i in arc.size() - 1:
+			lm.beam("Pale", Vector3(arc[i].x, spring + arc[i].y - 0.1, zk),
+				Vector3(arc[i + 1].x, spring + arc[i + 1].y - 0.1, zk), 0.25, 0.2, Vector3(0, 0, 1))
+
+## Facade dress on all four faces: gate archivolt and wimperg with the
+## kings' statues (W and E faces), string courses, tiers of blind
+## tracery and tall traceried lancets, buttress lesenes with pinnacles.
+static func _powder_decor(lm: LandmarkMesh) -> void:
+	var h := POWDER_HALF
+	for y in [12.5, 22.0, 34.5]:
+		LandmarkChParts.band(lm, "Pale", y, h, h, 0.6, 0.3)
 	for f in 4:
 		var b := Basis(Vector3.UP, PI * 0.5 * f)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 15.0, h), 3, 3.6, 1.3, 4.0, b)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 25.0, h), 3, 3.6, 1.7, 7.5, b)
-		LandmarkChParts.row(lm, "Windows", b * Vector3(0, 42.0, 5.5), 2, 4.0, 1.4, 4.4, b)
-	# Corner turrets climb out of the corbel table beside the upper stage.
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			LandmarkChParts.turret(lm, "Stone", "Roof", Vector3(sx * 7.3, 36.0, sz * 7.3), 1.5, 11.0, 8.0)
-	# Upper stage, copper pyramid roof and the finial.
-	lm.box("Stone", Vector3(0, 44.6, 0), Vector3(11.0, 7.4, 11.0))
-	LandmarkChParts.band(lm, "Pale", 48.0, 5.5, 5.5, 0.9, 0.6)
-	lm.spire("Roof", Vector3(0, 48.9, 0), 6.4, 11.5, 0.9)
-	LandmarkChParts.finial(lm, "Gilt", Vector3(0, 60.4, 0), POWDER_TOP - 60.4, 0.9)
-	lm.commit(model)
+		var n := b.z
+		var face := b * Vector3(0, 0, h)
+		var gate := f % 2 == 0
+		# Corner lesenes with pinnacles at each string course.
+		for sx in [-1.0, 1.0]:
+			lm.box("Pale", face + b * Vector3(sx * (h - 0.5), 18.0, 0.2), Vector3(0.8, 34.0, 0.4), b)
+			for y in [13.1, 22.6]:
+				LandmarkChParts.pinnacle(lm, "Pale", face + b * Vector3(sx * (h - 0.5), y, 0.45), 0.6, 3.0)
+		if gate:
+			# Archivolt, wimperg, and the two kings in canopied niches.
+			var arc := LandmarkChParts.pointed_arc(3.0, 5)
+			for i in arc.size() - 1:
+				lm.beam("Pale", face + b * Vector3(arc[i].x, 6.0 + arc[i].y, 0.2),
+					face + b * Vector3(arc[i + 1].x, 6.0 + arc[i + 1].y, 0.2), 0.5, 0.4, n)
+			LandmarkChParts.wimperg(lm, "Pale", face + Vector3(0, 6.0, 0), n, 7.0, 6.2, 0.4)
+			for sx in [-1.0, 1.0]:
+				var sp := face + b * Vector3(sx * 4.6, 7.0, 0.5)
+				lm.box("Pale", sp, Vector3(1.2, 0.4, 1.0), b)
+				LandmarkKits.statue_figure(lm, "Pale", sp + Vector3(0, 0.2, 0), 2.2)
+				LandmarkChParts.pinnacle(lm, "Pale", sp + Vector3(0, 2.6, 0), 1.1, 3.0)
+		else:
+			for sx in [-3.0, 0.0, 3.0]:
+				LandmarkChParts.lancet(lm, "Pale", "Dark", face + b * Vector3(sx, 3.0, 0), n, 1.6, 7.0, 1, 0.25)
+		# Blind tracery tier between the first two courses.
+		for i in 5:
+			var x := -4.4 + 2.2 * i
+			LandmarkChParts.lancet(lm, "Pale", "Dark", face + b * Vector3(x, 14.0, 0), n, 1.3, 6.4, 1, 0.22)
+			lm.box("Pale", face + b * Vector3(x + 1.1, 17.6, 0.15), Vector3(0.22, 7.2, 0.3), b, 0.0)
+		# Tall traceried windows in the main stage with their wimpergs.
+		for x in [-2.5, 2.5]:
+			LandmarkChParts.lancet(lm, "Pale", "Windows", face + b * Vector3(x, 23.6, 0), n, 2.2, 9.5, 1, 0.3)
+			LandmarkChParts.wimperg(lm, "Pale", face + b * Vector3(x, 31.0, 0.1), n, 2.8, 3.0, 0.3)
+		# Blind arcade frieze under the corbel table.
+		for i in 9:
+			LandmarkChParts.lancet(lm, "Pale", "Dark", face + b * Vector3(-4.8 + 1.2 * i, 35.4, 0), n, 0.8, 2.6, 0, 0.18)
+		LandmarkChParts.corbels(lm, "Pale", face + b * Vector3(-h + 0.6, POWDER_GALLERY, 0),
+			face + b * Vector3(h - 0.6, POWDER_GALLERY, 0), n * 1.0, 1.2, 1.6)
 
-# --- Fisherman's Bastion and Matthias Church ---
-
-const BASTION_TOP := 80.0
-const BASTION_CENTRE := Vector3(-14.0, 0.0, -2.0)
-const BASTION_R := 46.0
-
-static func bastion(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Wall", LandmarkMaterials.pbr("limestone", "#D2C9AE", 3.0))
-	lm.use("White", LandmarkMaterials.pbr("limestone", "#E9E4D4", 3.0))
-	lm.use("Stone", LandmarkMaterials.pbr("stone", "#8E8672", 3.0))
-	lm.use("Cone", LandmarkMaterials.pbr("limestone", "#B8B4A6", 1.8))
-	lm.use("Spire", LandmarkMaterials.pbr("stone", "#9C978A", 2.5))
-	lm.use("Roof", LandmarkMaterials.pbr("terracotta", "#B9582F", 2.0))
-	lm.use("RoofG", LandmarkMaterials.pbr("terracotta", "#4F7F5A", 2.0))
-	lm.use("RoofY", LandmarkMaterials.pbr("terracotta", "#D9A93C", 2.0))
-	lm.use("RoofB", LandmarkMaterials.pbr("terracotta", "#3C5C8C", 2.0))
-	lm.use("Windows", LandmarkMaterials.glass("#222B30"))
-	lm.use("Gilt", LandmarkMaterials.gold())
-	_matthias(lm)
-	_loggia(lm)
-	lm.commit(model)
-
-## Church of Our Lady: nave and transept under the patterned Zsolnay
-## roof, polygonal chancel and the Bela tower at the south-west corner.
-static func _matthias(lm: LandmarkMesh) -> void:
-	var c := Vector3(-42.0, 0, 6.0)
-	lm.box("Wall", c + Vector3(-5.0, 8.5, 0), Vector3(30.0, 17.0, 18.0))
-	lm.gable("Roof", c + Vector3(-5.0, 17.0, 0), 18.0, 30.0, 12.0, Basis(Vector3.UP, PI * 0.5), 0.5, "Wall")
-	lm.box("Wall", c + Vector3(-2.0, 8.5, 0), Vector3(14.0, 17.0, 34.0))
-	lm.gable("Roof", c + Vector3(-2.0, 17.0, 0), 14.0, 34.0, 9.5, Basis(), 0.5, "Wall")
-	lm.box("Wall", c + Vector3(16.0, 7.5, 0), Vector3(12.0, 15.0, 15.0))
-	lm.gable("Roof", c + Vector3(16.0, 15.0, 0), 15.0, 12.0, 10.5, Basis(Vector3.UP, PI * 0.5), 0.4, "Wall")
-	lm.frustum("Wall", c + Vector3(22.0, 0, 0), 8.1, 8.1, 15.0, 8, PI / 8.0)
-	lm.lathe("Roof", c + Vector3(22.0, 15.0, 0), PackedVector2Array([Vector2(8.6, 0), Vector2(0.0, 13.0)]), 8,
-		1.0, 1.0, PI / 8.0, false)
-	# Chevron bands in green, ochre and blue over both nave slopes.
-	var bands := {0.2: "RoofG", 0.45: "RoofY", 0.7: "RoofB"}
-	for sz in [-1.0, 1.0]:
-		var up := Vector3(0, 12.0, -sz * 9.5).normalized()
-		var out := Vector3(0, 9.5, sz * 12.0).normalized() * 0.12
-		for t in bands:
-			var mid := c + Vector3(-5.0, 17.0 + 12.0 * t, sz * 9.5 * (1.0 - t))
-			var prev := Vector3(mid.x - 14.0, mid.y, mid.z) + out - up * 1.3
-			for i in range(1, 13):
-				var p := Vector3(mid.x - 14.0 + 2.4 * i, mid.y, mid.z) + out + up * (1.3 if i % 2 == 0 else -1.3)
-				lm.beam(bands[t], prev, p, 0.7, 0.15, out)
-				prev = p
-	# Buttresses with pinnacles, tall windows and the west rose.
-	for sz in [-1.0, 1.0]:
-		for i in 6:
-			var x := -18.0 + 5.6 * i
-			if absf(x + 2.0) < 7.5:
-				continue
-			lm.box("White", c + Vector3(x, 8.0, sz * 9.4), Vector3(1.2, 16.0, 1.8))
-			lm.spire("White", c + Vector3(x, 16.0, sz * 9.4), 0.6, 4.0)
-		var b := Basis(Vector3.UP, 0.0 if sz > 0.0 else PI)
-		for x in [-15.2, 7.8]:
-			LandmarkChParts.pointed(lm, "Windows", c + Vector3(x, 4.0, sz * 9.0), 2.2, 8.5, b)
-		LandmarkChParts.pointed(lm, "Windows", c + Vector3(-2.0, 6.0, sz * 17.0), 3.6, 9.0, b)
-	LandmarkChParts.pointed(lm, "Windows", c + Vector3(-20.0, 6.0, 0), 5.0, 14.0, Basis(Vector3.UP, -PI * 0.5))
-	# Bela tower: square shaft, octagonal belfry, corner turrets, stone spire.
-	var tw := c + Vector3(-15.0, 0, 12.5)
-	lm.box("Wall", tw + Vector3(0, 20.0, 0), Vector3(10.0, 40.0, 10.0))
-	LandmarkChParts.band(lm, "White", 28.0, 5.0, 5.0, 0.6, 0.25, tw)
-	LandmarkChParts.band(lm, "White", 39.0, 5.0, 5.0, 1.0, 0.5, tw)
+## Gallery, corner turrets, the steep hipped roof with its lucarnes and
+## the finial.
+static func _powder_top(lm: LandmarkMesh) -> void:
+	var h := POWDER_HALF
+	var g := POWDER_GALLERY
+	var gw := h + 1.0
+	lm.box("Pale", Vector3(0, g + 0.4, 0), Vector3(gw * 2.0, 0.8, gw * 2.0))
 	for f in 4:
 		var b := Basis(Vector3.UP, PI * 0.5 * f)
-		LandmarkChParts.row(lm, "Windows", tw + b * Vector3(0, 12.0, 5.0), 2, 3.4, 1.3, 6.0, b)
-		LandmarkChParts.row(lm, "Windows", tw + b * Vector3(0, 31.0, 5.0), 1, 1.0, 1.8, 6.0, b)
-	lm.frustum("Wall", tw + Vector3(0, 40.0, 0), 5.41, 5.41, 12.0, 8, PI / 8.0)
-	for f in 8:
-		var b := Basis(Vector3.UP, PI * 0.25 * f)
-		LandmarkChParts.pointed(lm, "Windows", tw + Vector3(0, 42.0, 0) + b * Vector3(0, 0, 5.0), 1.6, 8.0, b)
+		LandmarkChParts.tracery_parapet(lm, "Pale", b * Vector3(-gw + 1.6, g + 0.8, gw - 0.15),
+			b * Vector3(gw - 1.6, g + 0.8, gw - 0.15), 1.3, 1.2, 0.24)
+	lm.box("Stone", Vector3(0, g + 3.3, 0), Vector3(h * 1.6, 5.0, h * 1.6))
+	LandmarkChParts.band(lm, "Pale", g + 5.6, h * 0.8, h * 0.8, 0.5, 0.3)
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		for x in [-2.2, 2.2]:
+			LandmarkChParts.lancet(lm, "Pale", "Windows", b * Vector3(x, g + 1.6, h * 0.8), b.z, 1.0, 3.0, 0, 0.2)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
-			LandmarkChParts.turret(lm, "White", "Spire", tw + Vector3(sx * 4.4, 40.0, sz * 4.4), 1.0, 14.0, 7.0)
-	lm.lathe("Spire", tw + Vector3(0, 52.0, 0), PackedVector2Array([Vector2(5.6, 0), Vector2(4.6, 4.0),
-		Vector2(3.2, 10.0), Vector2(1.6, 17.0), Vector2(0.6, 22.0), Vector2(0.15, 25.0)]), 8, 1.0, 1.0,
-		PI / 8.0, false)
-	LandmarkChParts.finial(lm, "Gilt", tw + Vector3(0, 77.0, 0), BASTION_TOP - 77.0, 0.5)
-
-## The curved loggia on the cliff edge: arcaded gallery, seven conical
-## towers (the central one tallest) and the deep retaining wall below.
-static func _loggia(lm: LandmarkMesh) -> void:
-	var c := BASTION_CENTRE
-	var last := 6
-	for k in last + 1:
-		var a := deg_to_rad(-54.0 + 18.0 * k)
-		var dir := Vector3(cos(a), 0, sin(a))
-		var p := c + dir * BASTION_R
-		var body := 12.0 if k == 3 else 10.5
-		var cone := 10.0 if k == 3 else 8.0
-		lm.frustum("White", p, 2.8, 2.6, body, 12)
-		lm.frustum("White", p + Vector3(0, body, 0), 3.3, 3.0, 0.9, 12)
-		lm.lathe("Cone", p + Vector3(0, body + 0.9, 0), PackedVector2Array([Vector2(3.4, 0), Vector2(3.0, 1.2),
-			Vector2(2.1, 4.0), Vector2(1.0, cone * 0.75), Vector2(0.12, cone)]), 12)
-		LandmarkChParts.finial(lm, "Cone", p + Vector3(0, body + 0.9 + cone, 0), 1.4, 0.3)
-		var b := Basis(Vector3.UP, atan2(dir.x, dir.z))
-		LandmarkChParts.row(lm, "Windows", p + b * Vector3(0, 3.2, 2.8), 2, 1.9, 0.9, 3.6, b, false)
-		LandmarkChParts.row(lm, "Windows", p + b * Vector3(0, 7.2, 2.7), 1, 1.0, 0.9, 2.6, b, false)
-		if k == last:
-			break
-		# Gallery to the next tower: roofed arcade inside, windowed wall out.
-		var a1 := deg_to_rad(-54.0 + 18.0 * (k + 1))
-		var q := c + Vector3(cos(a1), 0, sin(a1)) * BASTION_R
-		var pi_ := c + dir * (BASTION_R - 2.2)
-		var qi := c + Vector3(cos(a1), 0, sin(a1)) * (BASTION_R - 2.2)
-		LandmarkChParts.wall(lm, "White", p, q, 4.8, 5.5, 5.4)
-		LandmarkChParts.wall(lm, "White", c + dir * (BASTION_R + 2.0), c + Vector3(cos(a1), 0, sin(a1)) * (BASTION_R + 2.0),
-			0.0, 4.8, 0.7)
-		LandmarkChParts.wall(lm, "White", pi_, qi, 4.2, 4.8, 0.8)
-		LandmarkChParts.wall(lm, "Stone", c + dir * (BASTION_R + 3.4), c + Vector3(cos(a1), 0, sin(a1)) * (BASTION_R + 3.4),
-			-14.0, 0.2, 3.4)
-		var out_p := c + dir * (BASTION_R + 2.0)
-		var out_q := c + Vector3(cos(a1), 0, sin(a1)) * (BASTION_R + 2.0)
-		var mid_dir := (dir + Vector3(cos(a1), 0, sin(a1))).normalized()
-		var wb := Basis(Vector3.UP, atan2(mid_dir.x, mid_dir.z))
-		for i in range(1, 6):
-			var f := float(i) / 6.0
-			var col := pi_.lerp(qi, f)
-			lm.frustum("White", Vector3(col.x, 0.0, col.z), 0.3, 0.26, 4.4, 8)
-			var wm := out_p.lerp(out_q, f) + mid_dir * 0.35
-			LandmarkChParts.round_arch(lm, "Windows", Vector3(wm.x, 0.8, wm.z), 1.0, 3.2, wb)
+			var p := Vector3(sx * (gw - 0.6), 0, sz * (gw - 0.6))
+			lm.lathe("Pale", p + Vector3(0, g - 4.0, 0), PackedVector2Array([Vector2(0.2, 0), Vector2(0.9, 1.6),
+				Vector2(1.45, 3.4), Vector2(1.6, 4.0)]), 8, 1.0, 1.0, PI / 8.0, false)
+			lm.lathe("Stone", p + Vector3(0, g, 0), PackedVector2Array([Vector2(1.5, 0), Vector2(1.45, 7.0)]), 8,
+				1.0, 1.0, PI / 8.0, false)
+			for k in 4:
+				var a := PI * 0.5 * float(k) + PI * 0.25
+				var d := Vector3(cos(a), 0, sin(a))
+				LandmarkChParts.lancet(lm, "Pale", "Windows", p + d * 1.42 + Vector3(0, g + 2.4, 0), d, 0.55, 2.6, 0, 0.12)
+			lm.frustum("Pale", p + Vector3(0, g + 6.8, 0), 1.7, 1.7, 0.5, 8, PI / 8.0)
+			lm.lathe("Roof", p + Vector3(0, g + 7.3, 0), PackedVector2Array([Vector2(1.75, 0), Vector2(1.2, 2.0),
+				Vector2(0.5, 6.0), Vector2(0.05, 9.0)]), 8, 1.0, 1.0, PI / 8.0, false)
+			LandmarkChParts.finial(lm, "Gilt", p + Vector3(0, g + 16.2, 0), 1.6, 0.22)
+	# Hipped roof: steep faces, a gabled lucarne on each side.
+	var rb := Vector3(0, g + 6.1, 0)
+	lm.lathe("Roof", rb, PackedVector2Array([Vector2(h * 1.2, 0), Vector2(h * 0.95, 2.0), Vector2(3.4, 8.0),
+		Vector2(1.2, 12.5), Vector2(0.3, 13.6)]), 4, 1.0, 1.0, PI * 0.25, false)
+	for f in 4:
+		var b := Basis(Vector3.UP, PI * 0.5 * f)
+		var lc := rb + b * Vector3(0, 2.2, 4.2)
+		lm.box("Stone", lc + Vector3(0, 1.1, 0), Vector3(2.0, 2.2, 1.8), b)
+		LandmarkChParts.wimperg(lm, "Pale", lc + b * Vector3(0, 2.2, 0.9), b.z, 2.2, 2.2, 0.2)
+		lm.gable("Roof", lc + Vector3(0, 2.2, 0), 2.0, 1.8, 1.8, b, 0.1, "Stone")
+		LandmarkChParts.lancet(lm, "Pale", "Windows", lc + b * Vector3(0, 0.3, 0.9), b.z, 0.8, 1.6, 0, 0.12)
+	var tip := rb + Vector3(0, 13.6, 0)
+	lm.lathe("Gilt", tip - Vector3(0, 0.3, 0), PackedVector2Array([Vector2(0.2, 0), Vector2(0.55, 0.5),
+		Vector2(0.6, 0.9), Vector2(0.35, 1.3), Vector2(0.1, 1.5)]), 10)
+	LandmarkChParts.finial(lm, "Gilt", tip + Vector3(0, 1.1, 0), POWDER_TOP - tip.y - 1.1, 0.3)

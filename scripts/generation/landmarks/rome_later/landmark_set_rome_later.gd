@@ -8,8 +8,8 @@ extends RefCounted
 static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"piazza_navona": LandmarkRmLBaroque.navona(model)
-		"il_gesu": LandmarkRmLBaroque.gesu(model)
-		"sant_ivo_alla_sapienza": LandmarkRmLBaroque.ivo(model)
+		"il_gesu": LandmarkRmLChurches.gesu(model)
+		"sant_ivo_alla_sapienza": LandmarkRmLChurches.ivo(model)
 		"spanish_steps": LandmarkRmLPiazzas.steps(model)
 		"piazza_del_popolo": LandmarkRmLPiazzas.popolo(model)
 		"capitoline_hill": LandmarkRmLHills.capitoline(model)

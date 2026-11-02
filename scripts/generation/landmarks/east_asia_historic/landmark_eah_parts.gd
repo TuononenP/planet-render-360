@@ -38,6 +38,12 @@ static func irimoya(lm: LandmarkMesh, key: String, gable_key: String, c: Vector3
 	lm.gable(key, c + Vector3(0, rise_hip, 0), ridge.y, ridge.x, rise_gable,
 		Basis(Vector3.UP, PI * 0.5), 0.0, gable_key)
 
+## irimoya with the gable ridge along Z (gable ends facing +-Z).
+static func irimoya_z(lm: LandmarkMesh, key: String, gable_key: String, c: Vector3, eave: Vector2,
+		ridge: Vector2, rise_hip: float, rise_gable: float, lift: float = 0.8) -> void:
+	LandmarkAeParts.hip_roof(lm, key, c, eave, ridge, rise_hip, lift)
+	lm.gable(key, c + Vector3(0, rise_hip, 0), ridge.x, ridge.y, rise_gable, Basis(), 0.0, gable_key)
+
 ## Curled ridge-end ornament (shibi / chiwen) rising h from `base`,
 ## leaning toward the ridge centre in direction `inward` (+1 / -1 along X).
 static func horn(lm: LandmarkMesh, key: String, base: Vector3, h: float, inward: float,
@@ -52,7 +58,7 @@ static func stairs(lm: LandmarkMesh, key: String, x: float, z_front: float, y0: 
 		steps: int, rise: float, tread: float) -> void:
 	for i in steps:
 		var top := y0 + rise * (i + 1)
-		var base := y0 - 0.4
+		var base := maxf(y0 - 0.4, 0.0)
 		lm.box(key, Vector3(x, (base + top) * 0.5, z_front - tread * (i + 0.5)),
 			Vector3(w, top - base, tread))
 

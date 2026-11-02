@@ -1,112 +1,15 @@
 class_name LandmarkAfhMorocco
 extends RefCounted
 
-## Three Moroccan monuments in true metres: the Koutoubia Mosque of
-## Marrakesh (77 m sandstone minaret), the unfinished Hassan Tower of
-## Rabat with its field of column stumps, and the rammed-earth ksar of
-## Ait Benhaddou climbing its hill.
-
-# --- Koutoubia Mosque ---
-
-## Qibla (mihrab) wall to the south (+Z), origin at the centre of the
-## 92 x 62 m mosque: the courtyard in the north part between two wings,
-## the prayer hall across the south under a green-tile T of nave and
-## transept, and the 77 m minaret at the north-east corner.
-static func koutoubia(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Sandstone", LandmarkMaterials.pbr("stone", "#C58B69", 4.0))
-	lm.use("Plaster", LandmarkMaterials.pbr("render", "#D8B48C", 4.0))
-	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#2E7A55", 3.0))
-	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Dark", LandmarkMaterials.glass("#2A1E16"))
-	lm.use("Court", LandmarkMaterials.pbr("pavement", "#D9C6A4", 5.0))
-	_koutoubia_hall(lm)
-	_koutoubia_minaret(lm, Vector3(30, 0, -26))
-	lm.commit(model)
-
-static func _koutoubia_hall(lm: LandmarkMesh) -> void:
-	lm.box("Court", Vector3(0, -0.4, 1), Vector3(104, 0.8, 72))
-	lm.box("Plaster", Vector3(0, 5.5, 17), Vector3(92, 11, 30))
-	lm.box("Plaster", Vector3(0, 4.0, -27), Vector3(46, 8, 6))
-	for s in [-1.0, 1.0]:
-		lm.box("Plaster", Vector3(s * 34.5, 4.5, -14), Vector3(23, 9, 32))
-	# Green-tile roof: the central nave meets the transept along the qibla wall.
-	lm.gable("Tile", Vector3(0, 11, 14.5), 10.0, 25.0, 3.0, Basis(), 0.2, "Plaster")
-	lm.gable("Tile", Vector3(0, 11, 27), 10.0, 92.0, 3.0, Basis(Vector3.UP, PI * 0.5), 0.2, "Plaster")
-	# Arcades on the courtyard faces, small windows on the outer walls.
-	for s in [-1.0, 1.0]:
-		SEuUtil.face_row(lm, "Dark", Vector3(s * 23.0, 0, -11), Vector3(0, 0, 1),
-			Vector3(-s, 0, 0), 0.0, 6, 4.0, 2.2, 4.8)
-		SEuUtil.face_row(lm, "Dark", Vector3(s * 46.0, 0, -14), Vector3(0, 0, 1),
-			Vector3(s, 0, 0), 5.0, 6, 5.0, 1.0, 2.2)
-		SEuUtil.face_row(lm, "Dark", Vector3(s * 46.0, 0, 17), Vector3(0, 0, 1),
-			Vector3(s, 0, 0), 5.5, 5, 5.5, 1.0, 2.4)
-		SEuUtil.face_row(lm, "Dark", Vector3(s * 34.5, 0, -30), Vector3(1, 0, 0),
-			Vector3(0, 0, -1), 4.0, 3, 6.0, 1.0, 2.2)
-	SEuUtil.face_row(lm, "Dark", Vector3(0, 0, -24), Vector3(1, 0, 0), Vector3(0, 0, 1),
-		0.0, 9, 4.8, 2.4, 5.0)
-	SEuUtil.face_row(lm, "Dark", Vector3(0, 0, 2), Vector3(1, 0, 0), Vector3(0, 0, -1),
-		0.0, 11, 4.0, 2.6, 6.8)
-	SEuUtil.face_row(lm, "Dark", Vector3(0, 0, 32), Vector3(1, 0, 0), Vector3(0, 0, 1),
-		5.5, 10, 8.5, 1.1, 2.4)
-	# Plaster merlons crown every wall.
-	var edges := [[-46, 32, 46, 32, 11], [-46, 2, -46, 32, 11], [46, 2, 46, 32, 11],
-		[-46, 2, 46, 2, 11], [-46, -30, -46, 2, 9], [46, -30, 46, 2, 9],
-		[-46, -30, -23, -30, 9], [23, -30, 46, -30, 9], [-23, -30, -23, 2, 9],
-		[23, -30, 23, 2, 9], [-23, -30, 23, -30, 8], [-23, -24, 23, -24, 8]]
-	for e in edges:
-		SEuUtil.crenels(lm, "Plaster", Vector3(e[0], e[4], e[1]), Vector3(e[2], e[4], e[3]),
-			0.8, 1.1, 0.7)
-
-## 77 m minaret: 12.8 m square shaft of pink sandstone (55.7 m) with a
-## different arrangement of windows and blind arches on every face, a
-## green and white zellij frieze and merlons, then the 6.4 m lantern
-## (to 69.5 m), its small dome and the finial of three copper balls.
-static func _koutoubia_minaret(lm: LandmarkMesh, b: Vector3) -> void:
-	var hw := 6.4
-	lm.box("Sandstone", b + Vector3(0, 27.84, 0), Vector3(12.8, 55.68, 12.8))
-	var faces: Array[Vector3] = [Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(-1, 0, 0)]
-	for f in 4:
-		var out: Vector3 = faces[f]
-		var c := b + out * hw
-		for k in 5:
-			var y := 11.0 + 7.6 * float(k)
-			var us: Array[float] = [0.0]
-			if (f + k) % 3 == 1:
-				us = [-2.4, 2.4]
-			elif (f + k) % 3 == 2:
-				us = [-3.8, 0.0, 3.8]
-			for u in us:
-				LandmarkAfhParts.face_quad(lm, "Plaster", c, out, u, y - 0.4, 2.4, 4.2, 0.04)
-				LandmarkAfhParts.face_quad(lm, "Dark", c, out, u, y, 1.2, 2.6, 0.09)
-		# Row of four blind polylobed arches under the frieze.
-		for u in [-4.5, -1.5, 1.5, 4.5]:
-			LandmarkAfhParts.face_quad(lm, "Plaster", c, out, u, 46.6, 2.6, 3.6, 0.04)
-			LandmarkAfhParts.face_quad(lm, "Dark", c, out, u, 47.1, 1.6, 2.4, 0.09)
-		# Lantern windows.
-		var lc := b + out * 3.2
-		LandmarkAfhParts.face_quad(lm, "Plaster", lc, out, 0.0, 58.0, 4.4, 5.4, 0.04)
-		LandmarkAfhParts.face_quad(lm, "Dark", lc, out, 0.0, 58.8, 2.4, 3.8, 0.09)
-	LandmarkAfhParts.face_quad(lm, "Dark", b + Vector3(0, 0, -hw), Vector3(0, 0, -1), 0.0, 0.0,
-		3.4, 5.0, 0.09)
-	lm.box("Tile", b + Vector3(0, 53.0, 0), Vector3(13.0, 2.4, 13.0))
-	LandmarkAfhParts.merlon_ring(lm, "Sandstone", b + Vector3(0, 55.68, 0), hw, hw, 0.9, 1.4)
-	lm.box("Sandstone", b + Vector3(0, 62.59, 0), Vector3(6.4, 13.82, 6.4))
-	lm.box("Tile", b + Vector3(0, 67.0, 0), Vector3(6.7, 1.2, 6.7))
-	LandmarkAfhParts.merlon_ring(lm, "Sandstone", b + Vector3(0, 69.5, 0), 3.2, 3.2, 0.8, 1.1)
-	LandmarkMaParts.dome(lm, "Tile", b + Vector3(0, 69.5, 0), 3.0, 2.8, 12, 0.35)
-	# Finial: pole with three copper balls shrinking upward (2.0 m widest).
-	LandmarkMaParts.needle(lm, "Gold", b + Vector3(0, 72.0, 0),
-		PackedVector2Array([Vector2(0, 0.16), Vector2(5.0, 0.06)]), 6)
-	LandmarkMaParts.sphere(lm, "Gold", b + Vector3(0, 73.0, 0), 1.0, 14, 8)
-	LandmarkMaParts.sphere(lm, "Gold", b + Vector3(0, 74.8, 0), 0.75, 12, 6)
-	LandmarkMaParts.sphere(lm, "Gold", b + Vector3(0, 76.0, 0), 0.55, 10, 6)
+## Two Moroccan monuments in true metres: the unfinished Hassan Tower
+## of Rabat with its field of column stumps, and the rammed-earth ksar of
+## Ait Benhaddou climbing its hill. The Koutoubia is LandmarkAfhKoutoubia.
 
 # --- Hassan Tower, Rabat ---
 
 ## Origin at the foot of the tower in the north wall of the unfinished
 ## Almohad mosque; the qibla points south (+Z). The 44 m red sandstone
-## tower (16 m square, six panelled storeys, broken top) and, south of it,
+## tower (16 m square, six ramp storeys, broken top) and, south of it,
 ## the 183 x 139 m ground plan with about 350 column stumps and the low
 ## remains of the perimeter wall.
 static func hassan_tower(model: Node3D) -> void:
@@ -121,25 +24,52 @@ static func hassan_tower(model: Node3D) -> void:
 	_hassan_walls(lm)
 	lm.commit(model)
 
+## The 16 m square shaft to its unfinished 44 m top. Each face is framed
+## by plain margins and composed differently, as on the real tower: the
+## horseshoe windows of the ramp storeys up the middle and sides, a
+## register of large polylobed blind arches in alfiz frames on engaged
+## columns, and a sebka lattice of interlaced lozenges filling the upper
+## part; a moulded band runs under the broken parapet.
 static func _hassan_body(lm: LandmarkMesh) -> void:
 	lm.box("Tower", Vector3(0, 21.5, 0), Vector3(16, 43.0, 16))
-	lm.box("Trim", Vector3(0, 5.6, 0), Vector3(16.5, 0.8, 16.5))
+	lm.box("Trim", Vector3(0, 0.5, 0), Vector3(16.8, 1.0, 16.8))
 	lm.box("Trim", Vector3(0, 41.3, 0), Vector3(16.5, 1.0, 16.5))
+	lm.box("Trim", Vector3(0, 40.4, 0), Vector3(16.3, 0.5, 16.3))
 	var faces: Array[Vector3] = [Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(-1, 0, 0)]
 	for f in 4:
 		var out: Vector3 = faces[f]
+		var right := Vector3.UP.cross(out).normalized()
 		var c := out * 8.0
-		for k in 6:
-			var y := 7.0 + 5.6 * float(k)
-			var us: Array[float] = [-3.9, 3.9]
-			var w := 6.0
-			if (f + k) % 2 == 0:
-				us = [-5.2, 0.0, 5.2]
-				w = 3.8
+		for s in [-1.0, 1.0]:
+			lm.beam("Trim", c + right * 7.4 * float(s) + out * 0.1 + Vector3(0, 1.0, 0),
+				c + right * 7.4 * float(s) + out * 0.1 + Vector3(0, 40.2, 0), 0.2, 1.2, out)
+		# Ramp-storey windows: the middle line on every face, the outer
+		# lines on alternate storeys.
+		for k in 4:
+			var y := 5.0 + 4.6 * float(k)
+			var us: Array[float] = [0.0]
+			if (f + k) % 2 == 1:
+				us = [-4.4, 0.0, 4.4]
 			for u in us:
-				LandmarkAfhParts.face_quad(lm, "Trim", c, out, u, y, w, 4.4, 0.05)
-				LandmarkAfhParts.face_quad(lm, "Dark", c, out, u, y + 0.7, w * 0.5, 3.0, 0.1)
-	LandmarkAfhParts.face_quad(lm, "Dark", Vector3(0, 0, 8), Vector3(0, 0, 1), 0.0, 0.0, 3.4, 5.0, 0.1)
+				var p: Vector3 = c + right * u + Vector3(0, y, 0)
+				LandmarkAfhDetail.niche(lm, "Trim", "Dark", p, out, 1.1, 2.4, "horseshoe", 0.26, 0.2)
+				LandmarkAfhDetail.alfiz(lm, "Trim", p - Vector3(0, 0.3, 0), out, 2.1, 3.1, 0.18, 0.08)
+		# Blind polylobed arches on engaged columns, two or three per face.
+		var na := 3 if f % 2 == 0 else 2
+		var w := 3.6 if na == 3 else 5.4
+		for i in na:
+			var u := (float(i) - float(na - 1) * 0.5) * (w + 1.0)
+			var p := c + right * u + Vector3(0, 23.6, 0)
+			LandmarkAfhDetail.niche(lm, "Trim", "Dark", p, out, w, 5.6, "lobed", 0.34, 0.24, false, 7)
+			LandmarkAfhDetail.alfiz(lm, "Trim", p - Vector3(0, 0.2, 0), out, w + 1.0, 6.3, 0.26, 0.12)
+			for s in [-1.0, 1.0]:
+				LandmarkAfhDetail.drum_column(lm, "Trim", p + right * (w * 0.5 + 0.12) * float(s) + out * 0.2,
+					0.2, 3.1, 1, 8)
+		# Sebka net over the upper register.
+		LandmarkAfhDetail.sebka(lm, "Trim", "Dark", c + Vector3(0, 31.0, 0), out, 12.4, 8.6,
+			5 if f % 2 == 0 else 4, 3, 0.32, 0.22)
+	LandmarkAfhDetail.niche(lm, "Trim", "Dark", Vector3(0, 0, 8), Vector3(0, 0, 1), 3.0, 4.8, "horseshoe",
+		0.45, 0.32, false)
 	# Broken parapet: stumps of uneven height round the top edge.
 	var n := 0
 	for i in 5:
@@ -151,8 +81,9 @@ static func _hassan_body(lm: LandmarkMesh) -> void:
 			lm.box("Tower", Vector3(s * 7.3, 43.0 + hb * 0.5, p), Vector3(1.4, hb, 2.2))
 			n += 1
 
-## Column stumps on a 7.25 x 6.3 m grid across the prayer hall and the
-## side colonnades; the sahn beside the tower stays open.
+## About 350 column stumps of stacked stone drums on a 7.25 x 6.3 m grid
+## across the prayer hall and the side colonnades; the sahn beside the
+## tower stays open. Most have been set up again to a few drums.
 static func _hassan_columns(lm: LandmarkMesh) -> void:
 	for i in 25:
 		var x := -87.0 + 7.25 * float(i)
@@ -161,7 +92,10 @@ static func _hassan_columns(lm: LandmarkMesh) -> void:
 			if (absf(x) < 45.0 and z < 50.0) or LandmarkAfhParts.hash01(i, j) < 0.14:
 				continue
 			var h := 1.2 + 3.0 * LandmarkAfhParts.hash01(j + 31, i)
-			lm.frustum("Column", Vector3(x, -0.3, z), 0.58, 0.52, h + 0.3, 8)
+			var drums := clampi(int(h / 0.75), 2, 5)
+			LandmarkAfhDetail.drum_column(lm, "Column", Vector3(x, 0, z), 0.56, h, drums, 10, false)
+			lm.lathe("Column", Vector3(x, 0, z), PackedVector2Array([Vector2(0.72, 0), Vector2(0.62, 0.12)]),
+				10, 1.0, 1.0, 0.0, false, false)
 
 ## Stubs of the perimeter wall (north z = -8, south z = 131, x = +-91.5).
 static func _hassan_walls(lm: LandmarkMesh) -> void:
@@ -193,10 +127,13 @@ static func _ait_ground(x: float, z: float) -> float:
 	l = 1.0 - l * l * (3.0 - 2.0 * l)
 	return -3.0 + 36.0 * u * fade * l
 
-## The fortified rammed-earth village on its hillside, facing the river to
-## the south (+Z): about 80 stacked clay houses inside a crenellated
-## wall, eight corner towers with zigzag bands in their upper parts, a
-## gate between two low towers, and the agadir (granary fort) on the crest.
+## The fortified rammed-earth and adobe village (ighrem) on its hillside
+## above the Ounila, facing the river to the south (+Z): about 80
+## stacked clay houses with parapeted roof terraces, stepped merlon
+## horns and small framed windows, the tall towered houses (tighremt)
+## with decorated corner towers, inside a crenellated wall with eight
+## corner towers banded with zigzags in their upper parts, a gate between
+## two low towers, and the ruined agadir (granary fort) on the crest.
 static func ait_benhaddou(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Earth", LandmarkMaterials.pbr("render", "#B58459", 3.0))
@@ -232,11 +169,54 @@ static func _ait_houses(lm: LandmarkMesh) -> void:
 				minf(_ait_ground(x - w * 0.5, z - d * 0.5), _ait_ground(x + w * 0.5, z - d * 0.5))) - 2.0
 			var top := gy + h
 			lm.box("Earth", Vector3(x, (top + low) * 0.5, z), Vector3(w, top - low, d))
-			var face := Vector3(x, 0, z + d * 0.5)
-			LandmarkAfhParts.face_quad(lm, "Dark", face, Vector3(0, 0, 1), -w * 0.25, gy + 2.2, 0.7, 1.0, 0.04)
-			LandmarkAfhParts.face_quad(lm, "Dark", face, Vector3(0, 0, 1), w * 0.25, gy + 2.2, 0.7, 1.0, 0.04)
+			_ait_house_top(lm, Vector3(x, top, z), w, d, h > 7.6, ix * 31 + iz)
+			# Small framed windows high on the valley side, slits lower down.
+			var face := Vector3(x, gy, z + d * 0.5)
+			for u in [-w * 0.25, w * 0.25]:
+				LandmarkAfhDetail.niche(lm, "Decor", "Dark", face + Vector3(float(u), 3.6, 0), Vector3(0, 0, 1),
+					0.6, 0.8, "rect", 0.14, 0.1, true)
+			LandmarkAfhDetail.niche(lm, "Earth", "Dark", face + Vector3(0, 1.4, 0), Vector3(0, 0, 1), 0.25, 0.9,
+				"rect", 0.1, 0.08, false)
 			if h > 7.2:
-				LandmarkAfhParts.face_quad(lm, "Dark", face, Vector3(0, 0, 1), 0.0, gy + 5.0, 0.6, 0.8, 0.04)
+				LandmarkAfhDetail.niche(lm, "Decor", "Dark", face + Vector3(0, 6.0, 0), Vector3(0, 0, 1), 0.5, 0.7,
+					"rect", 0.12, 0.1, true)
+			var side := Vector3(x + w * 0.5, gy, z)
+			LandmarkAfhDetail.niche(lm, "Decor", "Dark", side + Vector3(0, 3.8, 0), Vector3(1, 0, 0), 0.5, 0.7,
+				"rect", 0.12, 0.1, true)
+
+## Roof terrace of a house whose roof centre is `c`: a parapet with
+## stepped merlon horns at the corners, or for a tighremt (fortified
+## house) four tapering corner towers with zigzag and blind-arch work in
+## their upper parts and merlon crowns.
+static func _ait_house_top(lm: LandmarkMesh, c: Vector3, w: float, d: float, towered: bool, seed: int) -> void:
+	var hx := w * 0.5
+	var hz := d * 0.5
+	for s in [-1.0, 1.0]:
+		lm.box("Earth", c + Vector3(0, 0.3, s * (hz - 0.15)), Vector3(w, 0.6, 0.3), Basis(), 0.0)
+		lm.box("Earth", c + Vector3(s * (hx - 0.15), 0.3, 0), Vector3(0.3, 0.6, d - 0.6), Basis(), 0.0)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var corner := c + Vector3(sx * (hx - 0.6), 0, sz * (hz - 0.6))
+			if towered:
+				var th := 2.6 + 1.2 * LandmarkAfhParts.hash01(seed, int(sx + 2.0 * sz + 5.0))
+				var base := corner - Vector3(0, 2.0, 0)
+				lm.spire("Earth", base, 0.95, th + 2.0, 0.75)
+				var out_x := Vector3(sx, 0, 0)
+				var out_z := Vector3(0, 0, sz)
+				var y := c.y + th - 1.5
+				LandmarkAfhParts.zigzag(lm, "Decor", corner + out_z * 0.78, out_z, 0.7, y, 0.6, 3)
+				LandmarkAfhParts.zigzag(lm, "Decor", corner + out_x * 0.78, out_x, 0.7, y, 0.6, 3)
+				LandmarkAfhDetail.niche(lm, "Decor", "Dark", Vector3(corner.x, y - 1.3, corner.z) + out_z * 0.8,
+					out_z, 0.35, 0.9, "pointed", 0.1, 0.08, false)
+				var tc := corner + Vector3(0, th, 0)
+				lm.box("Earth", tc + Vector3(0, 0.15, 0), Vector3(1.8, 0.3, 1.8), Basis(), 0.0)
+				for e in 4:
+					var rot := Basis(Vector3.UP, PI * 0.5 * float(e))
+					var m: Vector3 = tc + rot * Vector3(0.65, 0.3, 0.65)
+					LandmarkAfhDetail.stepped_merlon(lm, "Earth", m, rot * Vector3(1, 0, 0), 0.45, 0.7, 0.4)
+			else:
+				var m := c + Vector3(sx * (hx - 0.2), 0.6, sz * (hz - 0.2))
+				LandmarkAfhDetail.stepped_merlon(lm, "Earth", m, Vector3(1, 0, 0), 0.5, 0.8, 0.4)
 
 ## Wall ring, corner and gate towers and the agadir on the crest.
 static func _ait_defences(lm: LandmarkMesh) -> void:

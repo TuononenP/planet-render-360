@@ -1,20 +1,29 @@
 class_name LandmarkGtBronzeAge
 extends RefCounted
 
-## Aegean Bronze Age sites in true metres: the Lion Gate and Treasury of
-## Atreus at Mycenae, and the Minoan palace of Knossos with Evans's
-## reconstructed red columns.
-
-# --- Mycenae ---------------------------------------------------------------
+## Mycenae in true metres: the Lion Gate with its bastion, Grave Circle A
+## inside the walls and the Treasury of Atreus (the Minoan palace of
+## Knossos is LandmarkGtKnossos).
 
 const MYC_TOP := 9.0
+## Cyclopean courses (height min / spread) and blocks (length min / spread).
+const CYCLOPEAN := [Vector2(0.8, 0.4), Vector2(1.3, 1.6), 0.18]
+## Conglomerate pseudo-ashlar of the 13th-century BC gate works.
+const ASHLAR := [Vector2(0.7, 0.2), Vector2(1.4, 0.9), 0.04]
 
-## Lion Gate, origin at the middle of the gate's outer face, front to +Z:
-## the 3 m wide doorway under its 4.7 m lintel, the relieving triangle
-## with the two lionesses about a column, the conglomerate cyclopean
-## walls with the bastion that flanks the approach on the left, and,
-## drawn nearer than it lies, the Treasury of Atreus (the grassed beehive
-## mound, its dromos and the green-columned facade).
+## Lion Gate (c. 1250 BC), origin at the middle of the threshold on the
+## gate's outer face, front to +Z (the approach from the north-west):
+## the two conglomerate door-post monoliths leaning in from 3.1 m apart
+## at the threshold to 2.8 m under the 4.5 m lintel; the limestone
+## relieving slab (3.6 m at its base, 3.3 m high) with the two
+## lionesses, forepaws on a double altar, flanking the Minoan column
+## with its capital and beam ends, their separately carved heads lost;
+## the corbelled courses each side of the slab; the cyclopean walls,
+## and on the approach's left the conglomerate bastion (14.8 x 7.2 m)
+## that makes the 15 x 7.2 m court before the gate. Inside: Grave
+## Circle A (27.5 m across, a double ring of upright slabs round six
+## shaft graves) and the Granary; drawn nearer than it lies, the
+## Treasury of Atreus.
 static func lion_gate(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Wall", LandmarkMaterials.pbr("stone", "#9D917C", 3.0))
@@ -23,192 +32,247 @@ static func lion_gate(model: Node3D) -> void:
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#3C342B", 2.5))
 	lm.use("Green", LandmarkMaterials.pbr("stone", "#6C7B5E", 2.0))
 	lm.use("Floor", LandmarkMaterials.pbr("gravel", "#A8987C", 3.0))
-	# Cyclopean wall on both sides of the passage, the bastion, and the
-	# masonry over the lintel.
-	_masonry(lm, -26.0, -1.5, -7.0, 0.0, 0.0, MYC_TOP, 1)
-	_masonry(lm, 1.5, 26.0, -7.0, 0.0, 0.0, MYC_TOP, 2)
-	_masonry(lm, -1.5, 1.5, -7.0, 0.0, 4.1, MYC_TOP, 3)
-	_masonry(lm, -26.0, -8.0, 0.0, 9.5, 0.0, MYC_TOP, 4)
-	for k in 3:
-		LandmarkGtUtil.block(lm, "Relief", -2.35, 2.35, 3.1, 4.1, -2.1 - 2.1 * float(k), -2.1 * float(k))
-	LandmarkGtUtil.block(lm, "Floor", -1.5, 1.5, 0.0, 0.05, -7.0, 0.0)
-	LandmarkGtUtil.block(lm, "Floor", -8.0, 26.0, 0.0, 0.05, 0.0, 9.5)
-	# Relieving triangle: the slab with the lionesses and their pillar,
-	# standing 0.3 m proud of the courses.
-	var rz := 0.3
-	lm.tri("Relief", Vector3(-1.5, 4.1, rz), Vector3(1.5, 4.1, rz), Vector3(0, 7.5, rz),
-		Vector3.BACK, Vector3.BACK, Vector3.BACK, Vector2(0, 0), Vector2(3, 0), Vector2(1.5, -3.4))
-	lm.frustum("Wall", Vector3(0, 4.5, rz + 0.1), 0.2, 0.3, 1.6, 10)
-	LandmarkGtUtil.block(lm, "Wall", -0.55, 0.55, 6.05, 6.35, rz, rz + 0.4)
-	LandmarkGtUtil.block(lm, "Wall", -0.45, 0.45, 4.1, 4.5, rz, rz + 0.4)
+	lm.use("Conglom", LandmarkMaterials.pbr("stone", "#8C7A66", 2.5))
+	lm.use("Red", LandmarkMaterials.pbr("stone", "#8E4E3E", 2.0))
+	# Cyclopean walls either side of the gate, conglomerate facing next to it.
+	_lay(lm, "Wall", Vector3(-26.0, 0, 0), Vector3(-4.2, 0, 0), Vector3.BACK, 6.0, 0.0, MYC_TOP, CYCLOPEAN, 1)
+	_lay(lm, "Wall", Vector3(4.2, 0, 0), Vector3(26.0, 0, 0), Vector3.BACK, 6.0, 0.0, MYC_TOP, CYCLOPEAN, 2)
 	for s in [-1.0, 1.0]:
-		lm.beam("Wall", Vector3(s * 1.3, 4.35, rz + 0.3), Vector3(s * 0.55, 5.55, rz + 0.3), 0.3, 0.6, Vector3.BACK)
-		lm.beam("Wall", Vector3(s * 0.62, 5.55, rz + 0.3), Vector3(s * 0.45, 6.05, rz + 0.3), 0.3, 0.32, Vector3.BACK)
-		lm.beam("Wall", Vector3(s * 0.55, 5.4, rz + 0.3), Vector3(s * 0.32, 4.5, rz + 0.3), 0.3, 0.22, Vector3.BACK)
-		lm.beam("Wall", Vector3(s * 1.0, 4.45, rz + 0.3), Vector3(s * 1.3, 5.2, rz + 0.3), 0.3, 0.3, Vector3.BACK)
-	_atreus(lm, Vector3(75.0, 0, -40.0))
+		var x0: float = 2.1 * s
+		var x1: float = 4.2 * s
+		_lay(lm, "Conglom", Vector3(minf(x0, x1), 0, 0), Vector3(maxf(x0, x1), 0, 0), Vector3.BACK, 6.0, 0.0, MYC_TOP,
+			ASHLAR, 5 + int(s))
+		# Door-post monolith, leaning in, and the pivot block behind it.
+		lm.beam("Conglom", Vector3(s * 1.9, 0.03, -1.0), Vector3(s * 1.74, 3.1, -1.0), 0.7, 2.0, Vector3.RIGHT)
+		LandmarkGtUtil.block(lm, "Conglom", s * 1.55 - 0.3, s * 1.55 + 0.3, 0.0, 3.1, -2.6, -2.0)
+	# Threshold, lintel and the passage floor behind.
+	LandmarkGtUtil.block(lm, "Conglom", -1.6, 1.6, 0.0, 0.12, -2.0, 0.0)
+	for k in 2:
+		LandmarkGtUtil.block(lm, "Shadow", -0.9 + 1.6 * float(k), -0.75 + 1.6 * float(k), 0.12, 0.13, -1.9, 0.0)
+	LandmarkGtUtil.block(lm, "Conglom", -2.25, 2.25, 3.1, 4.1, -2.0, 0.0)
+	LandmarkGtUtil.block(lm, "Floor", -2.1, 2.1, 0.0, 0.05, -6.0, -2.0)
+	# Masonry above the lintel: the backing, and corbelled courses beside
+	# the relieving triangle.
+	_lay(lm, "Conglom", Vector3(-2.25, 0, -0.7), Vector3(2.25, 0, -0.7), Vector3.BACK, 5.3, 4.1, MYC_TOP, ASHLAR, 7)
+	var y := 4.1
+	var row := 0
+	while y < MYC_TOP - 0.01:
+		var hh := minf(0.55 + 0.2 * LandmarkGtUtil.hash01(row, 77), MYC_TOP - y)
+		var hw := maxf(1.8 * (1.0 - (y + hh * 0.5 - 4.1) / 3.3), 0.0)
+		if hw < 0.05:
+			LandmarkGtUtil.block(lm, "Conglom", -2.25, 2.25, y, y + hh - 0.03, -0.7, 0.0)
+		else:
+			LandmarkGtUtil.block(lm, "Conglom", -2.25, -hw - 0.02, y, y + hh - 0.03, -0.7, 0.0)
+			LandmarkGtUtil.block(lm, "Conglom", hw + 0.02, 2.25, y, y + hh - 0.03, -0.7, 0.0)
+		y += hh
+		row += 1
+	_relief(lm)
+	# Court before the gate: the bastion on the left, the older wall's
+	# slope on the right.
+	LandmarkGtUtil.block(lm, "Floor", -3.6, 3.6, 0.0, 0.05, 0.0, 15.0)
+	_lay(lm, "Conglom", Vector3(-3.6, 0, 0.0), Vector3(-3.6, 0, 14.8), Vector3.RIGHT, 7.2, 0.0, 8.4, ASHLAR, 11)
+	_lay(lm, "Conglom", Vector3(-10.8, 0, 14.8), Vector3(-3.6, 0, 14.8), Vector3.BACK, 1.0, 0.0, 8.4, ASHLAR, 12)
+	_lay(lm, "Wall", Vector3(3.6, 0, 15.0), Vector3(3.6, 0, 0.0), Vector3.LEFT, 4.0, 0.0, 5.5, CYCLOPEAN, 13)
+	_grave_circle(lm, Vector3(13.0, 0, -24.0))
+	_granary(lm, Vector3(-6.5, 0, -11.0))
+	LandmarkGtUtil.block(lm, "Floor", -26.0, 26.0, 0.0, 0.04, -40.0, -6.0)
+	_atreus(lm, Vector3(75.0, 0, -50.0))
 	lm.commit(model)
 
-## Masonry between the extents: courses 0.8-1.2 m high of blocks 1.3-2.9
-## m long with slightly uneven faces, so the cyclopean look survives.
-static func _masonry(lm: LandmarkMesh, x0: float, x1: float, z0: float, z1: float, y0: float,
-		y1: float, salt: int) -> void:
+## Blocks laid course by course along the face line a..b (at ground,
+## y0..y1 high), front facing `out`, each `depth` deep behind the face.
+## `kind` is [course height (min, spread), length (min, spread), how
+## far a block face may stand proud]; `salt` varies the pattern.
+static func _lay(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, out: Vector3, depth: float,
+		y0: float, y1: float, kind: Array, salt: int) -> void:
+	var ch: Vector2 = kind[0]
+	var bl: Vector2 = kind[1]
+	var rough: float = kind[2]
+	var dir := (b - a).normalized()
+	var run := a.distance_to(b)
+	var o := out.normalized()
+	var bas := Basis(dir, Vector3.UP, o)
 	var y := y0
 	var row := 0
 	while y < y1 - 0.01:
-		var hh := minf(0.8 + 0.4 * LandmarkGtUtil.hash01(row, salt), y1 - y)
-		var x := x0
+		var hh := minf(ch.x + ch.y * LandmarkGtUtil.hash01(row, salt), y1 - y)
+		if y1 - y - hh < ch.x * 0.5:
+			hh = y1 - y
+		var t := 0.0
 		var k := 0
-		while x < x1 - 0.01:
-			var w := minf(1.3 + 1.6 * LandmarkGtUtil.hash01(row * 31 + k, salt + 7), x1 - x)
-			if x1 - x - w < 0.8:
-				w = x1 - x
-			var zf := z1 + 0.18 * (LandmarkGtUtil.hash01(row * 57 + k, salt + 13) - 0.3)
-			LandmarkGtUtil.block(lm, "Wall", x, x + w - 0.04, y, y + hh, z0, zf)
-			x += w
+		while t < run - 0.01:
+			var w := minf(bl.x + bl.y * LandmarkGtUtil.hash01(row * 31 + k, salt + 7), run - t)
+			if run - t - w < bl.x * 0.6:
+				w = run - t
+			var proud := rough * (LandmarkGtUtil.hash01(row * 57 + k, salt + 13) - 0.3)
+			var c := a + dir * (t + w * 0.5) + Vector3(0, y + hh * 0.5, 0) - o * (depth * 0.5 - proud)
+			lm.box(key, c, Vector3(w - 0.04, hh - 0.03, depth), bas)
+			t += w
 			k += 1
 		y += hh
 		row += 1
 
-## Treasury of Atreus at `c` (the mound centre), dromos and facade to +Z.
+## The relieving slab over the lintel (front face at z = 0.05): the
+## triangle itself, the double altar, the column tapering downward with
+## its cushion capital, abacus and the four beam ends, and the two
+## lionesses rearing against it (hind legs on the lintel, forepaws on
+## the altars, necks raised toward the lost heads).
+static func _relief(lm: LandmarkMesh) -> void:
+	var z0 := 0.05
+	var zb := -0.7
+	var l := Vector3(-1.8, 4.1, z0)
+	var r := Vector3(1.8, 4.1, z0)
+	var t := Vector3(0, 7.4, z0)
+	lm.tri("Relief", l, r, t, Vector3.BACK, Vector3.BACK, Vector3.BACK, Vector2(0, 0), Vector2(3.6, 0), Vector2(1.8, -3.3))
+	for s in [-1.0, 1.0]:
+		var e: Vector3 = l if s < 0.0 else r
+		var n := Vector3(s * 3.3, 1.8, 0).normalized()
+		lm.quad("Relief", e, t, t + Vector3(0, 0, zb - z0), e + Vector3(0, 0, zb - z0), n)
+	var f := z0 + 0.15
+	for s in [-1.0, 1.0]:
+		LandmarkGtUtil.block(lm, "Relief", s * 0.62 - 0.27, s * 0.62 + 0.27, 4.1, 4.5, z0, z0 + 0.25)
+		LandmarkGtUtil.block(lm, "Relief", s * 0.62 - 0.33, s * 0.62 + 0.33, 4.5, 4.62, z0, z0 + 0.3)
+	LandmarkGtUtil.block(lm, "Relief", -0.95, 0.95, 4.62, 4.7, z0, z0 + 0.3)
+	lm.lathe("Relief", Vector3(0, 4.7, f - 0.1), PackedVector2Array([Vector2(0.2, 0), Vector2(0.2, 0.06),
+		Vector2(0.15, 0.08), Vector2(0.22, 1.5), Vector2(0.24, 1.55), Vector2(0.32, 1.66), Vector2(0.3, 1.74)]), 16)
+	LandmarkGtUtil.block(lm, "Relief", -0.38, 0.38, 6.44, 6.56, z0, z0 + 0.3)
+	for k in 4:
+		LandmarkGtUtil.cylinder(lm, "Relief", Vector3(-0.27 + 0.18 * float(k), 6.65, z0),
+			Vector3(-0.27 + 0.18 * float(k), 6.65, z0 + 0.28), 0.075, 0.075, 8)
+	LandmarkGtUtil.block(lm, "Relief", -0.45, 0.45, 6.74, 6.88, z0, z0 + 0.3)
+	for s in [-1.0, 1.0]:
+		var bk := Vector3.BACK
+		var p := func(x: float, yy: float) -> Vector3:
+			return Vector3(s * x, yy, f)
+		lm.beam("Relief", p.call(1.45, 4.1), p.call(1.38, 4.8), 0.28, 0.17, bk)
+		lm.beam("Relief", p.call(1.18, 4.1), p.call(1.26, 4.8), 0.28, 0.17, bk)
+		lm.beam("Relief", p.call(1.38, 4.7), p.call(1.08, 5.15), 0.32, 0.48, bk)
+		lm.beam("Relief", p.call(1.2, 4.98), p.call(0.66, 5.72), 0.34, 0.46, bk)
+		lm.beam("Relief", p.call(0.7, 5.62), p.call(0.48, 6.02), 0.34, 0.42, bk)
+		lm.beam("Relief", p.call(0.56, 5.58), p.call(0.42, 4.95), 0.26, 0.15, bk)
+		lm.beam("Relief", p.call(0.42, 4.95), p.call(0.4, 4.7), 0.26, 0.13, bk)
+		lm.beam("Relief", p.call(0.78, 5.4), p.call(0.66, 4.85), 0.24, 0.14, bk)
+		lm.beam("Relief", p.call(0.66, 4.85), p.call(0.66, 4.62), 0.24, 0.12, bk)
+		lm.beam("Relief", p.call(1.42, 4.9), p.call(1.62, 5.12), 0.12, 0.07, bk)
+		lm.beam("Relief", p.call(1.62, 5.12), p.call(1.56, 5.45), 0.12, 0.07, bk)
+		lm.beam("Relief", p.call(0.5, 5.98), p.call(0.48, 6.3), 0.3, 0.3, bk)
+
+## Grave Circle A at `c`: the double ring of upright slabs 27.5 m across
+## capped by horizontal slabs, its entrance toward the gate (+Z), and
+## the outlines of the six shaft graves inside.
+static func _grave_circle(lm: LandmarkMesh, c: Vector3) -> void:
+	for ring in [13.75, 12.85]:
+		var n := int(TAU * float(ring) / 1.05)
+		for k in n:
+			var a := TAU * (float(k) + 0.5) / float(n) + PI * 0.5
+			var off := absf(wrapf(a - PI * 0.5, -PI, PI))
+			if off < 0.1:
+				continue
+			var d := Vector3(cos(a), 0, sin(a))
+			var hh := 1.15 + 0.25 * LandmarkGtUtil.hash01(k, int(ring))
+			lm.box("Relief", c + d * float(ring) + Vector3(0, hh * 0.5, 0), Vector3(0.98, hh, 0.32),
+				Basis(Vector3.UP, -a + PI * 0.5))
+			if float(ring) > 13.0 and LandmarkGtUtil.hash01(k, 91) > 0.35:
+				lm.box("Relief", c + d * 13.3 + Vector3(0, 1.48, 0), Vector3(1.0, 0.18, 1.25),
+					Basis(Vector3.UP, -a + PI * 0.5))
+	for g in 6:
+		var gc := c + Vector3(-6.0 + 5.0 * float(g % 3), 0, -3.5 + (7.0 if g >= 3 else 0.0))
+		var hx := 1.4 + 0.6 * LandmarkGtUtil.hash01(g, 3)
+		var hz := 2.0 + 0.8 * LandmarkGtUtil.hash01(g, 4)
+		for s in [-1.0, 1.0]:
+			LandmarkGtUtil.block(lm, "Wall", gc.x - hx, gc.x + hx, 0.0, 0.45, gc.z + s * hz - 0.3, gc.z + s * hz + 0.3)
+			LandmarkGtUtil.block(lm, "Wall", gc.x + s * hx - 0.3, gc.x + s * hx + 0.3, 0.0, 0.45, gc.z - hz, gc.z + hz)
+		LandmarkGtUtil.block(lm, "Shadow", gc.x - hx + 0.3, gc.x + hx - 0.3, 0.0, 0.06, gc.z - hz + 0.3, gc.z + hz - 0.3)
+
+## The Granary at `c`: rubble walls of its long rooms standing to about
+## two metres just inside the gate.
+static func _granary(lm: LandmarkMesh, c: Vector3) -> void:
+	for w in [[-3.0, 3.0, -5.0, -4.3], [-3.0, 3.0, 4.3, 5.0], [-3.0, -2.3, -4.3, 4.3], [2.3, 3.0, -4.3, 4.3],
+			[-2.3, 2.3, -0.35, 0.35]]:
+		_lay(lm, "Wall", Vector3(c.x + w[0], 0, c.z + w[3]), Vector3(c.x + w[1], 0, c.z + w[3]), Vector3.BACK,
+			float(w[3]) - float(w[2]), 0.0, 2.0, [Vector2(0.45, 0.2), Vector2(0.7, 0.6), 0.06], 31)
+
+## Treasury of Atreus at `c` (the tholos centre), dromos and facade to
+## +Z: the 36 m dromos, 6 m wide, between conglomerate ashlar walls that
+## rise from 0.5 m at the open end to 10 m at the facade, the hill
+## banked behind them; the 10.5 m facade with the 2.7 x 5.4 m door in
+## its stepped frame, the 8 m lintel, the open relieving triangle, the
+## green half-columns tapering downward beside the door, the smaller
+## pair beside the triangle, the red bands of spiral slabs; the grassed
+## mound over the 14.5 m tholos behind.
 static func _atreus(lm: LandmarkMesh, c: Vector3) -> void:
-	lm.lathe("Mound", c, PackedVector2Array([Vector2(13.5, 0), Vector2(13.2, 3.5), Vector2(12.0, 6.6),
-		Vector2(8.5, 8.5), Vector2(3.5, 8.95), Vector2(0, 9.0)]), 28)
-	var zf := c.z + 12.0
-	# Facade: ashlar either side of the 2.7 x 5.4 m door, the lintel and
-	# the dark relieving triangle over it, half columns beside the jambs.
+	lm.lathe("Mound", c, PackedVector2Array([Vector2(16.0, 0), Vector2(15.4, 3.0), Vector2(13.6, 6.4),
+		Vector2(10.0, 9.0), Vector2(5.0, 10.3), Vector2(0, 10.6)]), 32)
+	var zf := c.z + 12.65
 	var cx := c.x
-	LandmarkGtUtil.block(lm, "Floor", cx - 3.0, cx + 3.0, 0.0, 0.05, zf, zf + 26.0)
-	_masonry(lm, cx - 7.5, cx - 1.35, zf - 1.5, zf, 0.0, MYC_TOP, 21)
-	_masonry(lm, cx + 1.35, cx + 7.5, zf - 1.5, zf, 0.0, MYC_TOP, 22)
-	LandmarkGtUtil.block(lm, "Relief", cx - 4.0, cx + 4.0, 5.4, 6.5, zf - 1.5, zf + 0.05)
-	LandmarkGtUtil.block(lm, "Shadow", cx - 1.35, cx + 1.35, 0.0, 5.4, zf - 1.45, zf - 1.35)
-	lm.tri("Shadow", Vector3(cx - 1.6, 6.5, zf + 0.06), Vector3(cx + 1.6, 6.5, zf + 0.06),
-		Vector3(cx, 8.7, zf + 0.06), Vector3.BACK, Vector3.BACK, Vector3.BACK, Vector2(0, 0),
-		Vector2(3.2, 0), Vector2(1.6, -2.2))
-	_masonry(lm, cx - 7.5, cx + 7.5, zf - 1.5, zf, 6.5, MYC_TOP, 23)
+	LandmarkGtUtil.block(lm, "Floor", cx - 3.0, cx + 3.0, 0.0, 0.05, zf, zf + 36.0)
 	for s in [-1.0, 1.0]:
-		lm.frustum("Green", Vector3(cx + s * 1.9, 0, zf + 0.35), 0.38, 0.5, 4.6, 12)
-		LandmarkGtUtil.block(lm, "Green", cx + s * 1.9 - 0.45, cx + s * 1.9 + 0.45, 4.6, 4.9, zf - 0.1, zf + 0.8)
-	# Dromos: ashlar side walls stepping down to the open end.
+		var xf: float = cx + s * 3.0
+		var y := 0.0
+		var row := 0
+		while y < 10.0 - 0.01:
+			var hh := minf(0.75 + 0.15 * LandmarkGtUtil.hash01(row, 51 + int(s)), 10.0 - y)
+			var top := y + hh
+			var reach := 36.0 * clampf(1.0 - (top - 0.5) / 9.5, 0.04, 1.0)
+			_lay(lm, "Conglom", Vector3(xf, 0, zf), Vector3(xf, 0, zf + reach), Vector3(-s, 0, 0), 2.6, y, top,
+				ASHLAR, 60 + row * 3 + int(s))
+			y = top
+			row += 1
+		# Hill banked behind the wall.
+		var xo: float = cx + s * 5.6
+		var xg: float = cx + s * 14.0
+		lm.quad("Mound", Vector3(xo, 10.0, zf), Vector3(xo, 0.5, zf + 36.0), Vector3(xg, 0.0, zf + 36.0),
+			Vector3(xg, 0.0, zf), Vector3(s * 9.5, 8.4, 0).normalized())
+		lm.tri("Mound", Vector3(xo, 0.5, zf + 36.0), Vector3(xg, 0.0, zf + 36.0), Vector3(xo, 0.0, zf + 36.0),
+			Vector3.BACK, Vector3.BACK, Vector3.BACK, Vector2.ZERO, Vector2(8.4, 0), Vector2(0, -0.5))
+	# Facade: masonry either side of the door (5.4 m deep passage), lintel,
+	# courses round the open relieving triangle.
 	for s in [-1.0, 1.0]:
-		for k in 12:
-			var dlen := 25.0 * (1.0 - float(k) / 12.0)
-			LandmarkGtUtil.block(lm, "Wall", cx + s * 3.0 - (1.5 if s < 0.0 else 0.0),
-				cx + s * 3.0 + (0.0 if s < 0.0 else 1.5), 0.75 * float(k), 0.75 * float(k + 1),
-				zf, zf + dlen + 1.0)
+		var x0: float = cx + s * 1.35
+		var x1: float = cx + s * 3.0
+		_lay(lm, "Conglom", Vector3(minf(x0, x1), 0, zf), Vector3(maxf(x0, x1), 0, zf), Vector3.BACK, 5.4, 0.0, 5.4,
+			ASHLAR, 80 + int(s))
+		# Stepped door frame (two fasciae).
+		for k in 2:
+			LandmarkGtUtil.block(lm, "Conglom", cx + s * (1.35 + 0.18 * float(k)) - 0.09, cx + s * (1.35 + 0.18 * float(k)) + 0.09,
+				0.0, 5.4 + 0.18 * float(k), zf, zf + 0.08 * float(2 - k))
+	LandmarkGtUtil.block(lm, "Shadow", cx - 1.35, cx + 1.35, 0.0, 5.4, zf - 5.4, zf - 5.3)
+	for s in [-1.0, 1.0]:
+		LandmarkGtUtil.block(lm, "Shadow", cx + s * 1.35 - 0.02, cx + s * 1.35 + 0.02, 0.0, 5.4, zf - 5.4, zf)
+	LandmarkGtUtil.block(lm, "Conglom", cx - 3.0, cx + 3.0, 5.4, 6.6, zf - 5.4, zf + 0.1)
+	var y2 := 6.6
+	var r2 := 0
+	while y2 < 10.5 - 0.01:
+		var hh2 := minf(0.6, 10.5 - y2)
+		var hw := maxf(1.5 * (1.0 - (y2 + hh2 * 0.5 - 6.6) / 3.2), 0.0)
+		if hw < 0.05:
+			LandmarkGtUtil.block(lm, "Conglom", cx - 3.0, cx + 3.0, y2, y2 + hh2 - 0.03, zf - 2.0, zf)
+		else:
+			LandmarkGtUtil.block(lm, "Conglom", cx - 3.0, cx - hw, y2, y2 + hh2 - 0.03, zf - 2.0, zf)
+			LandmarkGtUtil.block(lm, "Conglom", cx + hw, cx + 3.0, y2, y2 + hh2 - 0.03, zf - 2.0, zf)
+		y2 += hh2
+		r2 += 1
+	lm.tri("Shadow", Vector3(cx - 1.5, 6.6, zf - 1.9), Vector3(cx + 1.5, 6.6, zf - 1.9), Vector3(cx, 9.8, zf - 1.9),
+		Vector3.BACK, Vector3.BACK, Vector3.BACK, Vector2.ZERO, Vector2(3.0, 0), Vector2(1.5, -3.2))
+	# Red spiral bands across the facade and the half-columns.
+	LandmarkGtUtil.block(lm, "Red", cx - 3.0, cx + 3.0, 6.6, 7.0, zf, zf + 0.12)
+	LandmarkGtUtil.block(lm, "Red", cx - 3.0, cx + 3.0, 10.1, 10.5, zf - 0.1, zf + 0.12)
+	for k in 10:
+		lm.disc("Red", Vector3(cx - 2.7 + 0.6 * float(k), 6.8, zf + 0.13), Vector3.BACK, 0.16, 10)
+	for s in [-1.0, 1.0]:
+		_half_column(lm, Vector3(cx + s * 2.05, 0, zf), 5.4, 0.36)
+		_half_column(lm, Vector3(cx + s * 1.95, 7.0, zf), 3.0, 0.22)
 
-# --- Knossos ---------------------------------------------------------------
-
-const KN_L1 := 4.3
-const KN_L2 := 8.6
-const KN_L3 := 12.9
-
-## Palace of Knossos, origin at the middle of the Central Court, north
-## to -Z: the court with its colonnaded east wing stepping down the
-## slope in four terraces, the west wing with its upper hall and portico,
-## the north entrance passage with the bull relief and its porch of
-## red columns, the two-storey South Propylaeum with horns of
-## consecration, the West Court with its granary pits and the Theatral
-## Area. y = 0 is the ground at the foot of the east terraces; every
-## column is a Minoan one, red, tapering downward, black cushion capital.
-static func knossos(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Plaster", LandmarkMaterials.pbr("render", "#D9C297", 3.0))
-	lm.use("Gypsum", LandmarkMaterials.pbr("limestone", "#CBBE9E", 3.0))
-	lm.use("Red", LandmarkMaterials.pbr("render", "#B03F2A", 2.0))
-	lm.use("Black", LandmarkMaterials.pbr("concrete", "#2B2521", 2.0))
-	lm.use("Roof", LandmarkMaterials.pbr("concrete", "#A39580", 3.0))
-	lm.use("Court", LandmarkMaterials.pbr("gravel", "#CDBB94", 4.0))
-	lm.use("Dark", LandmarkMaterials.pbr("stone", "#3A3029", 3.0))
-	lm.use("Fresco", LandmarkMaterials.pbr("render", "#C46A45", 2.0))
-	# Podium under the court and the west side, paved courts on top.
-	LandmarkGtUtil.block(lm, "Gypsum", -86.0, 16.0, 0.0, KN_L1, -54.0, 54.0)
-	LandmarkGtUtil.block(lm, "Court", -14.0, 14.0, KN_L1, KN_L1 + 0.04, -26.0, 26.0)
-	LandmarkGtUtil.block(lm, "Court", -84.0, -48.0, KN_L1, KN_L1 + 0.04, -14.0, 40.0)
-	# East wing: four terraces down the hillside, porticoes on the court.
-	_story(lm, 15.0, 58.0, 0.0, KN_L1, -26.0, 38.0)
-	_story(lm, 15.0, 46.0, KN_L1, KN_L2, -22.0, 34.0)
-	_story(lm, 17.0, 30.0, KN_L2, KN_L3, -12.0, 28.0)
-	for k in 13:
-		var z := -18.0 + 4.0 * float(k)
-		_minoan(lm, Vector3(13.8, KN_L1, z), 3.6)
-		lm.box("Dark", Vector3(15.05, KN_L1 + 1.5, z + 2.0), Vector3(0.2, 2.4, 2.0))
-	LandmarkGtUtil.block(lm, "Roof", 12.6, 16.0, KN_L2 - 0.7, KN_L2, -20.0, 32.0)
-	for k in 9:
-		var z2 := -10.0 + 4.5 * float(k)
-		_minoan(lm, Vector3(15.8, KN_L2, z2), 3.6)
-		lm.box("Dark", Vector3(17.05, KN_L2 + 1.5, z2 + 2.2), Vector3(0.2, 2.4, 2.0))
-	LandmarkGtUtil.block(lm, "Roof", 14.6, 18.0, KN_L3 - 0.7, KN_L3, -12.0, 28.0)
-	# West wing and its upper hall with the porticoes toward the court.
-	_story(lm, -46.0, -15.0, KN_L1, KN_L2, -34.0, 34.0)
-	_story(lm, -38.0, -17.0, KN_L2, KN_L3, -18.0, 16.0)
-	for k in 6:
-		var z3 := -14.0 + 5.6 * float(k)
-		_minoan(lm, Vector3(-13.8, KN_L1, z3), 3.6)
-		lm.box("Dark", Vector3(-14.95, KN_L1 + 1.5, z3 + 2.8), Vector3(0.2, 2.4, 2.4))
-	LandmarkGtUtil.block(lm, "Roof", -15.2, -12.6, KN_L2 - 0.7, KN_L2, -16.0, 16.0)
+## Engaged Mycenaean half-column at `base` against the facade (+Z):
+## shaft swelling upward with zigzag bands, torus capital and abacus.
+static func _half_column(lm: LandmarkMesh, base: Vector3, h: float, r: float) -> void:
+	var cap := r * 1.1
+	lm.lathe("Green", base, PackedVector2Array([Vector2(r * 1.25, 0), Vector2(r * 1.25, r * 0.25),
+		Vector2(r * 0.85, r * 0.3), Vector2(r * 1.08, h - cap)]), 16)
 	for k in 5:
-		_minoan(lm, Vector3(-15.8, KN_L2, -12.0 + 6.0 * float(k)), 3.6)
-	LandmarkGtUtil.block(lm, "Roof", -17.4, -14.6, KN_L3 - 0.7, KN_L3, -14.0, 14.0)
-	# North entrance: the two wings of the passage, its roof, the long
-	# porch with three great pillars and the bull relief on the west wall.
-	_story(lm, -14.0, -3.5, KN_L1, KN_L2, -36.0, -26.0)
-	_story(lm, 3.5, 14.0, KN_L1, KN_L2, -36.0, -26.0)
-	LandmarkGtUtil.block(lm, "Roof", -3.5, 3.5, KN_L2 - 0.5, KN_L2, -36.0, -26.0)
-	LandmarkGtUtil.block(lm, "Plaster", -9.5, -8.0, KN_L1, KN_L2 + 0.8, -52.0, -36.0)
-	LandmarkGtUtil.block(lm, "Plaster", 8.0, 9.5, KN_L1, KN_L2 + 0.8, -52.0, -36.0)
-	LandmarkGtUtil.block(lm, "Roof", -9.8, 9.8, KN_L2 + 0.8, KN_L2 + 1.4, -52.0, -36.0)
-	for x in [-4.5, 0.0, 4.5]:
-		_minoan(lm, Vector3(x, KN_L1, -50.0), 4.9, 0.45)
-	_bull(lm, Vector3(-8.0, KN_L1 + 2.2, -43.0))
-	# South Propylaeum: two storeys of columns, horns on the parapet.
-	_story(lm, -17.0, 11.0, KN_L1, KN_L3, 34.0, 46.0)
-	for k in 5:
-		var x2 := -12.0 + 5.5 * float(k)
-		_minoan(lm, Vector3(x2, KN_L1, 47.2), 3.6)
-		_minoan(lm, Vector3(x2, KN_L2, 47.2), 3.6)
-		lm.box("Dark", Vector3(x2 + 2.7, KN_L1 + 1.5, 46.05), Vector3(2.4, 2.4, 0.2))
-		lm.box("Dark", Vector3(x2 + 2.7, KN_L2 + 1.5, 46.05), Vector3(2.4, 2.4, 0.2))
-		for hs in [-1.0, 1.0]:
-			lm.beam("Gypsum", Vector3(x2 + 2.7 + hs * 0.35, KN_L3, 45.4), Vector3(x2 + 2.7 + hs * 0.75, KN_L3 + 0.9, 45.4), 0.3, 0.3)
-	LandmarkGtUtil.block(lm, "Roof", -17.2, 11.2, KN_L2 - 0.7, KN_L2, 46.0, 49.0)
-	LandmarkGtUtil.block(lm, "Roof", -17.2, 11.2, KN_L3 - 0.7, KN_L3, 46.0, 49.0)
-	# Theatral Area and the West Court's causeways and granary pits.
-	for k in 7:
-		LandmarkGtUtil.block(lm, "Gypsum", -44.0, -27.0, KN_L1, KN_L1 + 0.4 * float(k + 1),
-			-37.0 - 1.1 * float(k + 1), -37.0 - 1.1 * float(k))
-	LandmarkGtUtil.block(lm, "Gypsum", -84.0, -48.0, KN_L1, KN_L1 + 0.12, 8.0, 9.6)
-	LandmarkGtUtil.block(lm, "Gypsum", -66.0, -64.4, KN_L1, KN_L1 + 0.12, -14.0, 40.0)
-	for p in [Vector2(-76.0, 22.0), Vector2(-70.0, 28.0), Vector2(-76.0, 32.0)]:
-		lm.lathe("Gypsum", Vector3(p.x, KN_L1, p.y), PackedVector2Array([Vector2(2.9, 0), Vector2(2.9, 0.9),
-			Vector2(2.2, 0.9), Vector2(2.2, 0)]), 16, 1.0, 1.0, 0.0, false, false)
-	lm.commit(model)
-
-## A storey block from level y0 to y1 with its flat clay-and-gypsum roof
-## slab (0.3 m thick, overhanging 0.25 m).
-static func _story(lm: LandmarkMesh, x0: float, x1: float, y0: float, y1: float, z0: float,
-		z1: float) -> void:
-	LandmarkGtUtil.block(lm, "Plaster", x0, x1, y0, y1 - 0.3, z0, z1)
-	LandmarkGtUtil.block(lm, "Roof", x0 - 0.25, x1 + 0.25, y1 - 0.3, y1, z0 - 0.25, z1 + 0.25)
-
-## Minoan column of total height h: red shaft tapering downward, black
-## cushion capital and abacus.
-static func _minoan(lm: LandmarkMesh, base: Vector3, h: float, r: float = 0.36) -> void:
-	var cap := 0.42
-	lm.lathe("Red", base, PackedVector2Array([Vector2(r * 0.78, 0), Vector2(r, h - cap)]), 12)
-	lm.lathe("Black", base + Vector3(0, h - cap, 0), PackedVector2Array([Vector2(r, 0),
-		Vector2(r * 1.45, cap * 0.35), Vector2(r * 1.3, cap * 0.7)]), 12)
-	lm.box("Black", base + Vector3(0, h - cap * 0.15, 0), Vector3(r * 3.0, cap * 0.3, r * 3.0))
-
-## The charging bull relief on the passage wall, facing east (+X): `c` is
-## the middle of its panel.
-static func _bull(lm: LandmarkMesh, c: Vector3) -> void:
-	LandmarkGtUtil.block(lm, "Gypsum", c.x - 0.05, c.x + 0.1, c.y - 1.6, c.y + 1.6, c.z - 3.4, c.z + 3.4)
-	var x := c.x + 0.2
-	LandmarkGtUtil.block(lm, "Fresco", x - 0.12, x + 0.12, c.y - 0.5, c.y + 0.45, c.z - 1.7, c.z + 1.0)
-	LandmarkGtUtil.block(lm, "Fresco", x - 0.12, x + 0.12, c.y - 0.2, c.y + 0.9, c.z + 0.5, c.z + 1.4)
-	LandmarkGtUtil.block(lm, "Fresco", x - 0.12, x + 0.12, c.y + 0.2, c.y + 0.7, c.z + 1.4, c.z + 2.3)
-	lm.beam("Fresco", Vector3(x, c.y + 0.7, c.z + 2.1), Vector3(x, c.y + 1.2, c.z + 1.9), 0.1, 0.2)
-	for lz in [-1.5, -0.9, 0.2, 0.8]:
-		LandmarkGtUtil.block(lm, "Fresco", x - 0.12, x + 0.12, c.y - 1.2, c.y - 0.45, c.z + lz, c.z + lz + 0.3)
+		var yb := (h - cap) * (0.12 + 0.18 * float(k))
+		var rr := lerpf(r * 0.85, r * 1.08, yb / (h - cap)) + 0.03
+		lm.frustum("Green", base + Vector3(0, yb, 0), rr, rr, 0.08, 16)
+	lm.lathe("Green", base + Vector3(0, h - cap, 0), PackedVector2Array([Vector2(r * 1.08, 0),
+		Vector2(r * 1.4, cap * 0.35), Vector2(r * 1.35, cap * 0.6), Vector2(r * 1.1, cap * 0.65)]), 16)
+	lm.box("Green", base + Vector3(0, h - cap * 0.17, 0), Vector3(r * 3.0, cap * 0.34, r * 2.2))

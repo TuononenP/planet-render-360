@@ -2,9 +2,9 @@ class_name LandmarkGtUtil
 extends RefCounted
 
 ## Shared parts of the Greece and Turkey landmark batch (true metres on
-## LandmarkMesh): fluted Doric columns, solid pediments, lying column
-## drums, half domes, Ottoman minarets and a stateless scatter. Each
-## takes the material KEY to draw with.
+## LandmarkMesh): fluted drums and part-built Doric columns, the Doric
+## entablature, solid pediments, lying cylinders, steps, half domes and
+## a stateless scatter. Each takes the material KEY to draw with.
 
 ## Stateless 0..1 scatter of index `i`: a model is identical every build.
 static func hash01(i: int, salt: int = 0) -> float:
@@ -15,21 +15,6 @@ static func block(lm: LandmarkMesh, key: String, x0: float, x1: float, y0: float
 		z0: float, z1: float) -> void:
 	lm.box(key, Vector3((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5),
 		Vector3(x1 - x0, y1 - y0, z1 - z0))
-
-## Fluted Doric column of total height h standing on `base`: faceted
-## entasis shaft (the facets read as flutes), echinus and square abacus.
-static func doric(lm: LandmarkMesh, key: String, base: Vector3, h: float, r0: float,
-		r1: float, flutes: int = 20) -> void:
-	var cap := minf(h * 0.1, r0 * 0.9)
-	var shaft := h - cap
-	var prof := PackedVector2Array()
-	for k in 4:
-		var t := float(k) / 3.0
-		prof.append(Vector2(lerpf(r0, r1, t) + r0 * 0.03 * sin(PI * t), shaft * t))
-	lm.lathe(key, base, prof, flutes, 1.0, 1.0, 0.0, false)
-	lm.lathe(key, base + Vector3(0, shaft, 0), PackedVector2Array([Vector2(r1, 0),
-		Vector2(r1 * 1.12, cap * 0.1), Vector2(r1 * 1.5, cap * 0.55)]), 12)
-	lm.box(key, base + Vector3(0, shaft + cap * 0.78, 0), Vector3(r0 * 2.3, cap * 0.44, r0 * 2.3))
 
 ## Solid cylinder (or frustum, ra to rb) between two arbitrary points:
 ## lying column drums, beams of any heading.
@@ -98,21 +83,98 @@ static func half_dome(lm: LandmarkMesh, key: String, c: Vector3, r: float, h: fl
 		rows.append(row)
 	lm.grid(key, rows, c, true)
 
-## Ottoman minaret `h` tall to the finial tip: square plinth, tapering
-## round shaft, balconies at the given fractions of h and a lead cap.
-static func minaret(lm: LandmarkMesh, stone: String, cap: String, base: Vector3, r: float,
-		h: float, balconies: Array) -> void:
-	var plinth := h * 0.09
-	var cap_h := h * 0.15
-	var top := h - cap_h
-	lm.box(stone, base + Vector3(0, plinth * 0.5, 0), Vector3(r * 3.4, plinth, r * 3.4))
-	lm.lathe(stone, base + Vector3(0, plinth, 0), PackedVector2Array([Vector2(r * 1.1, 0),
-		Vector2(r * 0.8, top - plinth)]), 16)
-	for f in balconies:
-		var y: float = h * float(f)
-		lm.lathe(stone, base + Vector3(0, y, 0), PackedVector2Array([Vector2(r * 0.8, -r * 0.5),
-			Vector2(r * 1.6, 0), Vector2(r * 1.75, 0), Vector2(r * 1.75, r), Vector2(r * 1.5, r)]),
-			16, 1.0, 1.0, 0.0, false)
-	lm.lathe(cap, base + Vector3(0, top, 0), PackedVector2Array([Vector2(r * 1.05, 0),
-		Vector2(r * 0.85, cap_h * 0.04), Vector2(r * 0.62, cap_h * 0.16), Vector2(r * 0.4, cap_h * 0.55),
-		Vector2(r * 0.14, cap_h * 0.92), Vector2(0, cap_h)]), 16)
+## Blocks laid in `n` courses between the extents, joints staggered
+## every `l` metres along the long side.
+static func courses(lm: LandmarkMesh, key: String, x0: float, x1: float, y0: float, y1: float,
+		z0: float, z1: float, n: int, l: float) -> void:
+	var ch := (y1 - y0) / float(n)
+	var along_x := (x1 - x0) >= (z1 - z0)
+	var span := (x1 - x0) if along_x else (z1 - z0)
+	for k in n:
+		var t := 0.0 if k % 2 == 0 else -l * 0.5
+		while t < span - 0.01:
+			var u0 := maxf(t, 0.0)
+			var u1 := minf(t + l, span)
+			if along_x:
+				LandmarkGtUtil.block(lm, key, x0 + u0, x0 + u1 - 0.03, y0 + ch * k, y0 + ch * (k + 1) - 0.02, z0, z1)
+			else:
+				LandmarkGtUtil.block(lm, key, x0, x1, y0 + ch * k, y0 + ch * (k + 1) - 0.02, z0 + u0, z0 + u1 - 0.03)
+			t += l
+
+## Fluted drum (or stump) from a to b, radius ra at a and rb at b, with
+## `flutes` concave flutes and flat ends: lying column drums and the
+## stumps of columns still on the stylobate.
+static func fluted(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, ra: float, rb: float,
+		flutes: int = 20) -> void:
+	var axis := (b - a).normalized()
+	var s := axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized()
+	var t := axis.cross(s)
+	var per := 3
+	var cols := flutes * per
+	var rows: Array = []
+	for e in [[a, ra], [b, rb]]:
+		var c: Vector3 = e[0]
+		var r: float = e[1]
+		var ring := PackedVector3Array()
+		for i in cols + 1:
+			var ang := TAU * float(i) / float(cols)
+			var depth := sin(PI * float(i % per) / float(per)) * r * 0.05
+			ring.append(c + (s * cos(ang) + t * sin(ang)) * (r - depth))
+		rows.append(ring)
+	lm.grid(key, rows, (a + b) * 0.5, true)
+	lm.disc(key, a, -axis, ra * 0.97, flutes)
+	lm.disc(key, b, axis, rb * 0.97, flutes)
+
+## Doric entablature along a..b (face line at the column axis, `a`, `b`
+## at the architrave soffit), front facing `out`: architrave with its
+## taenia, regulae under each triglyph, a frieze of `n` triglyphs (three
+## proud glyph bars each) between recessed metopes, and the geison with
+## a mutule over every triglyph and metope. `d` is the architrave depth;
+## heights arch_h / frieze_h / geison_h. Triglyphs are drawn on the
+## front only (`both` draws the back face too).
+static func doric_entablature(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, out: Vector3,
+		d: float, arch_h: float, frieze_h: float, geison_h: float, n: int, both: bool = false) -> void:
+	var dir := (b - a).normalized()
+	var o := out.normalized()
+	var run := a.distance_to(b)
+	var bas := Basis(dir, Vector3.UP, o)
+	var mid := (a + b) * 0.5
+	lm.box(key, mid + Vector3(0, arch_h * 0.45, 0), Vector3(run, arch_h * 0.9, d), bas)
+	lm.box(key, mid + Vector3(0, arch_h * 0.95, 0), Vector3(run + 0.02, arch_h * 0.1, d + 0.08), bas, 0.0)
+	var fy := arch_h + frieze_h * 0.5
+	lm.box(key, mid + Vector3(0, fy, 0), Vector3(run, frieze_h, d * 0.86), bas)
+	var tw := frieze_h * 0.62
+	var sides := [1.0, -1.0] if both else [1.0]
+	for sg in sides:
+		var so: Vector3 = o * float(sg)
+		for i in n:
+			var p := a.lerp(b, float(i) / float(maxi(n - 1, 1)))
+			var face := p + so * d * 0.43
+			for k in 3:
+				lm.box(key, face + dir * tw * (float(k) - 1.0) * 0.36 + Vector3(0, fy, 0) + so * 0.04,
+					Vector3(tw * 0.24, frieze_h * 0.94, 0.08), bas, 0.0)
+			lm.box(key, face + Vector3(0, fy + frieze_h * 0.47, 0) + so * 0.05, Vector3(tw * 1.05, frieze_h * 0.07, 0.1),
+				bas, 0.0)
+			lm.box(key, p + so * (d * 0.5 + 0.03) + Vector3(0, arch_h * 0.84, 0), Vector3(tw, arch_h * 0.06, 0.06),
+				bas, 0.0)
+	var gy := arch_h + frieze_h
+	lm.box(key, mid + Vector3(0, gy + geison_h * 0.6, 0) + o * d * 0.12, Vector3(run + d * 0.5, geison_h * 0.8,
+		d * 1.25), bas)
+	lm.box(key, mid + Vector3(0, gy + geison_h * 0.08, 0), Vector3(run, geison_h * 0.16, d), bas, 0.0)
+	var nm := maxi(n * 2 - 1, 1)
+	for i in nm:
+		var p2 := a.lerp(b, float(i) / float(maxi(nm - 1, 1)))
+		lm.box(key, p2 + o * d * 0.6 + Vector3(0, gy + geison_h * 0.15, 0), Vector3(tw * 0.9, geison_h * 0.12,
+			d * 0.18), bas, 0.0)
+
+## Doric column (LandmarkDetail) of total height h and lower radius r at
+## `base`, or, when `upto` < h, only the stack of its first drums up to
+## that height (a column re-erected part way), the top drum's bed bare.
+static func doric_column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: float,
+		flutes: int = 20, upto: float = -1.0) -> void:
+	if upto < 0.0 or upto >= h - 0.01:
+		LandmarkDetail.column(lm, key, base, r, h, "doric", flutes)
+		return
+	var shaft := h - r * 0.9
+	var rt := r if upto <= shaft * 0.33 else lerpf(r, r * 0.83, (upto / shaft - 0.33) / 0.67)
+	fluted(lm, key, base, base + Vector3(0, upto, 0), r, rt, flutes)

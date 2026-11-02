@@ -10,7 +10,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"grand_palace_bangkok":
 			LandmarkMseBangkok.grand_palace(model)
 		"wat_pho":
-			LandmarkMseBangkok.wat_pho(model)
+			LandmarkMseWatPho.wat_pho(model)
 		"wat_chaiwatthanaram":
 			LandmarkMseThai.chaiwatthanaram(model)
 		"wat_rong_khun":
@@ -22,7 +22,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"hue_ngo_mon_gate":
 			LandmarkMseVietnam.ngo_mon(model)
 		"saigon_notre_dame":
-			LandmarkMseVietnam.saigon_notre_dame(model)
+			LandmarkMseSaigon.saigon_notre_dame(model)
 		"pha_that_luang":
 			LandmarkMseStupas.pha_that_luang(model)
 		"ananda_temple_bagan":

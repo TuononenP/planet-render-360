@@ -49,10 +49,10 @@ static func roof_statue(lm: LandmarkMesh, key: String, base: Vector3, h: float, 
 
 ## Urn on a pedestal (roof vases).
 static func urn(lm: LandmarkMesh, key: String, base: Vector3, h: float) -> void:
-	lm.box(key, base + Vector3(0, h * 0.15, 0), Vector3(h * 0.4, h * 0.3, h * 0.4))
+	lm.box(key, base + Vector3(0, h * 0.15, 0), Vector3(h * 0.4, h * 0.3, h * 0.4), Basis(), 0.0)
 	lm.lathe(key, base + Vector3(0, h * 0.3, 0), PackedVector2Array([Vector2(h * 0.12, 0),
 		Vector2(h * 0.2, h * 0.2), Vector2(h * 0.24, h * 0.4), Vector2(h * 0.14, h * 0.6),
-		Vector2(h * 0.0, h * 0.7)]), 8)
+		Vector2(h * 0.0, h * 0.7)]), 6)
 
 ## Low parapet from `a` to `b` (both at the parapet foot): a `h` high,
 ## `t` thick wall under a slightly wider cap.
@@ -121,3 +121,160 @@ static func peristyle(lm: LandmarkMesh, shaft: String, cap: String, c: Vector3, 
 	for i in n:
 		var a := start + TAU * float(i) / float(n)
 		column(lm, shaft, cap, c + Vector3(cos(a) * rad, 0, sin(a) * rad), r, h, 8)
+
+## Classical column for long façade runs, about 200 triangles at 10
+## sides (lighter than LandmarkDetail.column): square plinth, attic base
+## mouldings, a shaft with entasis and a capital: "corinthian" (acanthus
+## bell, one leaf tier, two at 16+ sides, corner volutes), "ionic"
+## (volutes on the face looking along `face`) or Tuscan. `h` runs from
+## the plinth foot to the top of the abacus; base and capital draw in
+## `cap` when set (bronze capitals on granite shafts).
+static func order_column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: float,
+		order: String = "corinthian", face: Vector3 = Vector3(0, 0, 1), seg: int = 10, cap: String = "") -> void:
+	var ck := key if cap == "" else cap
+	var base_h := r * 0.9
+	var cap_h := r * (2.2 if order == "corinthian" else (1.2 if order == "ionic" else 0.8))
+	lm.box(ck, base + Vector3(0, base_h * 0.2, 0), Vector3(r * 2.6, base_h * 0.4, r * 2.6), Basis(), 0.0)
+	var torus := PackedVector2Array([Vector2(r * 1.25, 0), Vector2(r * 1.3, base_h * 0.2),
+		Vector2(r * 1.08, base_h * 0.35), Vector2(r * 1.14, base_h * 0.5), Vector2(r * 1.02, base_h * 0.6)])
+	if seg < 10:
+		torus = PackedVector2Array([Vector2(r * 1.28, 0), Vector2(r * 1.2, base_h * 0.3), Vector2(r * 1.02, base_h * 0.6)])
+	lm.lathe(ck, base + Vector3(0, base_h * 0.4, 0), torus, seg, 1.0, 1.0, 0.0, true, false)
+	var sh := h - base_h - cap_h
+	var sb := base + Vector3(0, base_h, 0)
+	lm.lathe(key, sb, PackedVector2Array([Vector2(r, 0), Vector2(r * 0.98, sh * 0.35),
+		Vector2(r * 0.86, sh)]), seg, 1.0, 1.0, 0.0, true, false)
+	var cb := sb + Vector3(0, sh, 0)
+	var ra := r * 0.86
+	var fb := facing(face)
+	match order:
+		"corinthian":
+			lm.lathe(ck, cb, PackedVector2Array([Vector2(ra * 1.06, 0), Vector2(ra, cap_h * 0.08),
+				Vector2(ra * 1.04, cap_h * 0.5), Vector2(ra * 1.3, cap_h * 0.85)]), seg, 1.0, 1.0, 0.0, true, false)
+			var tiers := 2 if seg >= 16 else 1
+			for tier in tiers:
+				for i in 8:
+					var a := TAU * (float(i) + 0.5 * float(tier) + 0.5) / 8.0
+					var d := Vector3(cos(a), 0, sin(a))
+					var tall := 0.62 if (i + tier) % 2 == 0 else 0.4
+					var lb := cb + d * ra + Vector3(0, cap_h * 0.25 * float(tier), 0)
+					lm.beam(ck, lb, lb + d * r * 0.36 + Vector3(0, cap_h * tall, 0), r * 0.55, r * 0.12,
+						d.cross(Vector3.UP))
+			for i in 4:
+				var a := TAU * (float(i) + 0.5) / 4.0 + PI * 0.25
+				var d := Vector3(cos(a), 0, sin(a))
+				lm.beam(ck, cb + d * ra + Vector3(0, cap_h * 0.55, 0), cb + d * r * 1.6 + Vector3(0, cap_h * 0.86, 0),
+					r * 0.2)
+			lm.box(ck, cb + Vector3(0, cap_h * 0.93, 0), Vector3(r * 2.9, cap_h * 0.14, r * 2.9), fb, 0.0)
+		"ionic":
+			lm.lathe(ck, cb, PackedVector2Array([Vector2(ra, 0), Vector2(ra * 1.15, cap_h * 0.35)]), seg,
+				1.0, 1.0, 0.0, true, false)
+			lm.box(ck, cb + Vector3(0, cap_h * 0.55, 0), Vector3(r * 2.8, cap_h * 0.4, r * 1.8), fb, 0.0)
+			for s in [-1.0, 1.0]:
+				for f in [-1.0, 1.0]:
+					lm.disc(ck, cb + fb.x * (s * r * 1.15) + fb.z * (f * r * 0.92) + Vector3(0, cap_h * 0.5, 0),
+						fb.z * f, r * 0.42, 8)
+			lm.box(ck, cb + Vector3(0, cap_h * 0.87, 0), Vector3(r * 2.7, cap_h * 0.26, r * 2.7), fb, 0.0)
+		_:
+			lm.lathe(ck, cb, PackedVector2Array([Vector2(ra * 1.06, 0), Vector2(ra * 1.06, cap_h * 0.15),
+				Vector2(ra, cap_h * 0.2), Vector2(ra * 1.4, cap_h * 0.62)]), seg, 1.0, 1.0, 0.0, true, false)
+			lm.box(ck, cb + Vector3(0, cap_h * 0.81, 0), Vector3(r * 2.6, cap_h * 0.38, r * 2.6), fb, 0.0)
+
+## Square pilaster on a wall face (`out` its normal, `base` on the face
+## at the foot): plinth, shaft and a moulded capital block.
+static func pilaster(lm: LandmarkMesh, key: String, base: Vector3, out: Vector3, w: float, h: float,
+		d: float = 0.35) -> void:
+	var b := facing(out)
+	lm.box(key, base + out * (d * 0.65) + Vector3(0, w * 0.35, 0), Vector3(w * 1.25, w * 0.7, d * 1.3), b, 0.0)
+	lm.box(key, base + out * (d * 0.5) + Vector3(0, h * 0.5, 0), Vector3(w, h - w * 0.6, d), b, 0.0)
+	lm.box(key, base + out * (d * 0.7) + Vector3(0, h - w * 0.3, 0), Vector3(w * 1.3, w * 0.6, d * 1.4), b, 0.0)
+
+## Light balustrade from `a` to `b` (both at its foot), for long roof
+## runs: plinth, handrail, square balusters at `pitch` and a pedestal
+## every `bay` metres.
+static func balustrade(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h: float = 1.0,
+		pitch: float = 0.55, bay: float = 5.0) -> void:
+	var dl := a.distance_to(b)
+	if dl < 0.5:
+		return
+	var dir := (b - a) / dl
+	var bs := Basis(dir, Vector3.UP, dir.cross(Vector3.UP).normalized())
+	var mid := (a + b) * 0.5
+	lm.box(key, mid + Vector3(0, h * 0.07, 0), Vector3(dl, h * 0.14, h * 0.32), bs, 0.0)
+	lm.box(key, mid + Vector3(0, h * 0.92, 0), Vector3(dl, h * 0.16, h * 0.36), bs, 0.0)
+	var n := int(dl / pitch)
+	for i in n:
+		lm.box(key, a + dir * (pitch * (float(i) + 0.5)) + Vector3(0, h * 0.5, 0),
+			Vector3(h * 0.16, h * 0.7, h * 0.16), bs, 0.0)
+	var piers := maxi(int(dl / bay), 1)
+	for i in piers + 1:
+		lm.box(key, a.lerp(b, float(i) / float(piers)) + Vector3(0, h * 0.5, 0), Vector3(h * 0.4, h, h * 0.4), bs, 0.0)
+
+## Robed roof statue of height h on a pedestal (about 120 triangles):
+## draped body, shoulders, head and two arms.
+static func figure(lm: LandmarkMesh, key: String, base: Vector3, h: float, pedestal: float = 1.0) -> void:
+	lm.box(key, base + Vector3(0, pedestal * 0.5, 0), Vector3(h * 0.36, pedestal, h * 0.36), Basis(), 0.0)
+	var b := base + Vector3(0, pedestal, 0)
+	lm.lathe(key, b, PackedVector2Array([Vector2(h * 0.15, 0), Vector2(h * 0.13, h * 0.3),
+		Vector2(h * 0.1, h * 0.55), Vector2(h * 0.12, h * 0.72), Vector2(h * 0.06, h * 0.8)]), 6, 1.0, 0.75)
+	lm.lathe(key, b + Vector3(0, h * 0.8, 0), PackedVector2Array([Vector2(h * 0.03, 0),
+		Vector2(h * 0.06, h * 0.06), Vector2(h * 0.05, h * 0.15), Vector2(0.0, h * 0.2)]), 6)
+	for s in [-1.0, 1.0]:
+		var sh := b + Vector3(s * h * 0.11, h * 0.7, 0)
+		lm.beam(key, sh, sh + Vector3(s * h * 0.04, -h * 0.18, h * 0.06), h * 0.05)
+		lm.beam(key, sh + Vector3(s * h * 0.04, -h * 0.18, h * 0.06), sh + Vector3(0, -h * 0.2, h * 0.16), h * 0.045)
+
+## Round-arched kokoshnik gable (the Russian ogee/semicircular gable) of
+## width w standing on `c` (centre of its foot on the wall face) facing
+## `out`: a curved band of `depth` with an infill shield.
+static func kokoshnik(lm: LandmarkMesh, band: String, fill: String, c: Vector3, out: Vector3, w: float,
+		depth: float = 0.5, ogee: bool = false) -> void:
+	var right := facing(out).x
+	var r := w * 0.5
+	var bw := maxf(w * 0.09, 0.15)
+	var pts: Array[Vector3] = []
+	var n := 8
+	for i in n + 1:
+		var t := PI * float(i) / float(n)
+		var y := sin(t) * r
+		if ogee:
+			y = sin(t) * r * 1.15 + (r * 0.45 * pow(sin(t), 6.0))
+		pts.append(c + right * (cos(t) * r) + Vector3(0, y, 0))
+	for i in n:
+		lm.beam(band, pts[i] + out * (depth * 0.5), pts[i + 1] + out * (depth * 0.5), depth, bw, out)
+	for i in n:
+		lm.tri(fill, c + out * 0.06, pts[i] + out * 0.06, pts[i + 1] + out * 0.06, out, out, out,
+			Vector2.ZERO, Vector2(cos(PI * float(i) / n), 0.5), Vector2(cos(PI * float(i + 1) / n), 0.5))
+
+## Onion dome of radius r, height h at `base`, in `n` vertical gores
+## cycling through the material `keys` (the enamelled and gilded
+## patterned domes); `twist` turns the gores into spiral bands, `sub`
+## splits each gore for a rounder shell.
+static func striped_onion(lm: LandmarkMesh, keys: Array, base: Vector3, r: float, h: float,
+		n: int = 12, twist: float = 0.0, sub: int = 2) -> void:
+	var prof := PackedVector2Array([Vector2(r * 0.55, 0), Vector2(r * 0.85, h * 0.07),
+		Vector2(r, h * 0.24), Vector2(r * 0.92, h * 0.42), Vector2(r * 0.58, h * 0.62),
+		Vector2(r * 0.22, h * 0.82), Vector2(0.0, h)])
+	var m := n * sub
+	for g in m:
+		var key: String = keys[(g / sub) % keys.size()]
+		for j in prof.size() - 1:
+			var p0 := prof[j]
+			var p1 := prof[j + 1]
+			var tw0 := twist * p0.y / h
+			var tw1 := twist * p1.y / h
+			var a0 := TAU * float(g) / float(m)
+			var a1 := TAU * float(g + 1) / float(m)
+			var v00 := base + Vector3(cos(a0 + tw0) * p0.x, p0.y, sin(a0 + tw0) * p0.x)
+			var v10 := base + Vector3(cos(a1 + tw0) * p0.x, p0.y, sin(a1 + tw0) * p0.x)
+			var v01 := base + Vector3(cos(a0 + tw1) * p1.x, p1.y, sin(a0 + tw1) * p1.x)
+			var v11 := base + Vector3(cos(a1 + tw1) * p1.x, p1.y, sin(a1 + tw1) * p1.x)
+			var dp := p1 - p0
+			var n0 := (Vector3(cos(a0 + tw0), 0, sin(a0 + tw0)) * dp.y - Vector3.UP * dp.x).normalized()
+			var n1 := (Vector3(cos(a1 + tw0), 0, sin(a1 + tw0)) * dp.y - Vector3.UP * dp.x).normalized()
+			var u0 := Vector2(a0 * r, -p0.y)
+			var u1 := Vector2(a1 * r, -p1.y)
+			if p0.x > 0.0001:
+				lm.tri(key, v00, v10, v11, n0, n1, n1, u0, Vector2(u1.x, u0.y), u1)
+			if p1.x > 0.0001:
+				lm.tri(key, v00, v11, v01, n0, n1, n0, u0, u1, Vector2(u0.x, u1.y))

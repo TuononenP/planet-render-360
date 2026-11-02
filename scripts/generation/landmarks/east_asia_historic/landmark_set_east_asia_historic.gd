@@ -11,10 +11,10 @@ static func build(model: Node3D, type: String) -> bool:
 		"big_wild_goose_pagoda": LandmarkEahXian.wild_goose(model)
 		"summer_palace_buddhist_incense": LandmarkEahChina.incense_tower(model)
 		"tiananmen_gate": LandmarkEahChina.tiananmen(model)
-		"leshan_giant_buddha": LandmarkEahChina.leshan(model)
+		"leshan_giant_buddha": LandmarkEahLeshan.leshan(model)
 		"todaiji_daibutsuden": LandmarkEahTemples.todaiji(model)
 		"kiyomizu_dera": LandmarkEahTemples.kiyomizu(model)
-		"senso_ji": LandmarkEahTemples.senso_ji(model)
+		"senso_ji": LandmarkEahSensoji.senso_ji(model)
 		"osaka_castle": LandmarkEahCastles.osaka(model)
 		"matsumoto_castle": LandmarkEahCastles.matsumoto(model)
 		_:

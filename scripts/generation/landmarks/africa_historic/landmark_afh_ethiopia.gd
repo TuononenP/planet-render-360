@@ -45,16 +45,94 @@ static func lalibela_st_george(model: Node3D) -> void:
 		var rot := Basis(Vector3.UP, float(a) * PI * 0.5)
 		var dir: Vector3 = rot * Vector3(1, 0, 0)
 		var side: Vector3 = rot * Vector3(0, 0, 1)
-		SEuUtil.face_row(lm, "Dark", dir * 6.0, side, dir, f + 2.4, 2, 1.8, 1.1, 2.8)
-		SEuUtil.face_row(lm, "Dark", dir * 6.0, side, dir, f + 6.4, 2, 1.8, 1.0, 2.2)
-		SEuUtil.face_row(lm, "Dark", dir * 6.0, side, dir, f + 10.5, 1, 1.0, 0.9, 1.1)
+		# Arm end: a door (west, north and south arms; the east arm holds
+		# the sanctuary), then two tiers of windows and a small top light.
+		var end := dir * 6.0
+		if a != 0:
+			LandmarkAfhDetail.niche(lm, "Church", "Dark", end + Vector3(0, f + 1.8, 0), dir, 1.4, 2.8, "rect",
+				0.3, 0.2, false)
+			LandmarkAfhDetail.niche(lm, "Church", "Dark", end + Vector3(0, f + 6.4, 0), dir, 1.0, 1.8, "rect",
+				0.22, 0.16, true)
+			_aksumite_heads(lm, end + Vector3(0, f + 6.4, 0), dir, 1.0, 1.8)
+		else:
+			for u in [-0.9, 0.9]:
+				var p: Vector3 = end + side * float(u) + Vector3(0, f + 2.6, 0)
+				LandmarkAfhDetail.niche(lm, "Church", "Church", p, dir, 0.8, 1.6, "rect", 0.22, 0.16, true)
+				_aksumite_heads(lm, p, dir, 0.8, 1.6)
+				LandmarkAfhDetail.niche(lm, "Church", "Dark", end + side * float(u) + Vector3(0, f + 6.4, 0), dir,
+					0.8, 1.8, "rect", 0.2, 0.16, true)
+		for u in [-1.0, 1.0]:
+			_ogive(lm, end + side * float(u) + Vector3(0, f + 10.3, 0), dir, 0.7, 1.3)
+		# Arm sides: a blind Aksumite window below, a real one in the
+		# middle tier and a pointed (floral ogive) light above.
 		for sgn in [-1.0, 1.0]:
-			var o: Vector3 = dir * 4.05 + side * float(sgn) * 2.1
 			var out: Vector3 = side * float(sgn)
-			SEuUtil.face_row(lm, "Dark", o, dir, out, f + 2.4, 1, 1.0, 1.0, 2.6)
-			SEuUtil.face_row(lm, "Dark", o, dir, out, f + 6.4, 1, 1.0, 0.9, 2.0)
-			SEuUtil.face_row(lm, "Dark", o, dir, out, f + 10.5, 1, 1.0, 0.8, 1.0)
+			var o: Vector3 = dir * 4.05 + out * 2.1
+			var lo: Vector3 = o + Vector3(0, f + 2.6, 0)
+			LandmarkAfhDetail.niche(lm, "Church", "Church", lo, out, 0.9, 1.7, "rect", 0.22, 0.16, true)
+			_aksumite_heads(lm, lo, out, 0.9, 1.7)
+			var mid: Vector3 = o + Vector3(0, f + 6.5, 0)
+			LandmarkAfhDetail.niche(lm, "Church", "Dark", mid, out, 0.9, 1.6, "rect", 0.2, 0.16, true)
+			_aksumite_heads(lm, mid, out, 0.9, 1.6)
+			_ogive(lm, o + Vector3(0, f + 10.3, 0), out, 0.8, 1.3)
+	# Roof: raised borders tracing the nested crosses.
+	for k in 3:
+		var hw: float = [2.5, 1.5, 0.8][k]
+		var arm: float = [6.4, 5.4, 3.8][k]
+		var y: float = f + [12.8, 13.7, 14.6][k] - 0.05
+		_cross_rim(lm, y, hw, arm)
+	_la_tombs(lm)
 	lm.commit(model)
+
+## Upper-tier floral ogive window: a pointed opening whose frame holds
+## a trefoil tracery inside.
+static func _ogive(lm: LandmarkMesh, p: Vector3, out: Vector3, w: float, h: float) -> void:
+	LandmarkAfhDetail.niche(lm, "Church", "Dark", p, out, w, h, "pointed", 0.16, 0.12, true)
+	LandmarkAfhDetail.niche(lm, "Church", "Dark", p + Vector3(0, h * 0.12, 0), out, w * 0.62, h * 0.72, "lobed",
+		0.05, 0.07, false, 3)
+	lm.beam("Church", p + out * 0.035, p + out * 0.035 + Vector3(0, h * 0.12, 0), 0.06, 0.07, out)
+
+## Projecting frame-beam ends ("monkey heads") at the four corners of an
+## Aksumite window frame whose sill centre is `p` on a face.
+static func _aksumite_heads(lm: LandmarkMesh, p: Vector3, out: Vector3, w: float, h: float) -> void:
+	var right := Vector3.UP.cross(out).normalized()
+	for su in [-1.0, 1.0]:
+		for sv in [0.0, 1.0]:
+			var q: Vector3 = p + right * (w * 0.5 + 0.24) * float(su) + Vector3(0, -0.12 + (h + 0.24) * float(sv), 0)
+			lm.beam("Church", q, q + out * 0.32, 0.22, 0.22, Vector3.UP, true)
+
+## Low rim (a cross outline of beams) at height y round a cross of
+## centre half-width hw and arm reach `arm`.
+static func _cross_rim(lm: LandmarkMesh, y: float, hw: float, arm: float) -> void:
+	var pts: Array[Vector2] = []
+	for q in 4:
+		var r := Basis(Vector3.UP, float(q) * PI * 0.5)
+		for v in [Vector3(arm, 0, -hw), Vector3(arm, 0, hw), Vector3(hw, 0, hw)]:
+			var w: Vector3 = r * (v as Vector3)
+			pts.append(Vector2(w.x, w.z))
+	for i in pts.size():
+		var a := pts[i]
+		var b := pts[(i + 1) % pts.size()]
+		lm.beam("Church", Vector3(a.x, y + 0.08, a.y), Vector3(b.x, y + 0.08, b.y), 0.2, 0.16, Vector3.UP)
+
+## Open tombs cut into the trench walls (rectangular cells with
+## rock-cut frames), at varying heights round the cross.
+static func _la_tombs(lm: LandmarkMesh) -> void:
+	var w := LA_WV
+	var l := LA_LV
+	var spots := [[Vector3(l, 0, -4.0), Vector3(-1, 0, 0)], [Vector3(l, 0, 4.0), Vector3(-1, 0, 0)],
+		[Vector3(-4.0, 0, l), Vector3(0, 0, -1)], [Vector3(4.0, 0, l), Vector3(0, 0, -1)],
+		[Vector3(-4.0, 0, -l), Vector3(0, 0, 1)], [Vector3(4.0, 0, -l), Vector3(0, 0, 1)],
+		[Vector3(w, 0, 8.5), Vector3(-1, 0, 0)], [Vector3(-w, 0, 8.5), Vector3(1, 0, 0)],
+		[Vector3(w, 0, -8.5), Vector3(-1, 0, 0)], [Vector3(-w, 0, -8.5), Vector3(1, 0, 0)],
+		[Vector3(8.5, 0, w), Vector3(0, 0, -1)], [Vector3(8.5, 0, -w), Vector3(0, 0, 1)],
+		[Vector3(-8.5, 0, w), Vector3(0, 0, -1)], [Vector3(-8.5, 0, -w), Vector3(0, 0, 1)]]
+	for i in spots.size():
+		var p: Vector3 = spots[i][0]
+		var out: Vector3 = spots[i][1]
+		var y := 1.0 + 6.0 * LandmarkAfhParts.hash01(i, 3)
+		LandmarkAfhDetail.niche(lm, "Tuff", "Dark", p + Vector3(0, y, 0), out, 1.2 + 0.6 * LandmarkAfhParts.hash01(i, 9),
+			1.4, "rect", 0.25, 0.18, true)
 
 ## The rock mass round the trench: eight blocks (four corners, four arm
 ## ends) each stacked in four layers that step in from the outer faces. The
@@ -181,8 +259,8 @@ static func _stele(lm: LandmarkMesh, xf: Transform3D, spec: Array, e0: int, e1: 
 		LandmarkAfhParts.tapered(lm, "Stele", xf, y0, y1, wa, da, wb, db)
 		if e < 0:
 			for sgn in [-1.0, 1.0]:
-				var p: Vector3 = xf * Vector3(0, 0.1, float(sgn) * (da * 0.5 + 0.03))
-				_window(lm, p, bx, by, bz * float(sgn), wa * 0.3, base_h * 0.7)
+				_false_door(lm, xf * Vector3(0, 0.1, float(sgn) * (da * 0.5)), bx, by, bz * float(sgn),
+					wa * 0.42, base_h * 0.78)
 			continue
 		LandmarkAfhParts.tapered(lm, "Stele", xf, y1 - 0.3, y1, wb + 0.22, db + 0.22, wb + 0.22, db + 0.22)
 		var wm := (wa + wb) * 0.5
@@ -190,13 +268,62 @@ static func _stele(lm: LandmarkMesh, xf: Transform3D, spec: Array, e0: int, e1: 
 		var wy := y0 + sh * 0.2
 		for sgn in [-1.0, 1.0]:
 			for u in [-0.28, 0.0, 0.28]:
-				var p: Vector3 = xf * Vector3(float(u) * wm, wy, float(sgn) * (dm * 0.5 + 0.03))
-				_window(lm, p, bx, by, bz * float(sgn), wm * 0.14, sh * 0.5)
-			var q: Vector3 = xf * Vector3(float(sgn) * (wm * 0.5 + 0.03), wy, 0)
-			_window(lm, q, bz, by, bx * float(sgn), dm * 0.3, sh * 0.5)
+				var p: Vector3 = xf * Vector3(float(u) * wm, wy, float(sgn) * (dm * 0.5))
+				_framed(lm, p, bx, by, bz * float(sgn), wm * 0.14, sh * 0.5)
+			var q: Vector3 = xf * Vector3(float(sgn) * (wm * 0.5), wy, 0)
+			_framed(lm, q, bz, by, bx * float(sgn), dm * 0.3, sh * 0.5)
+			# Round beam ends ("monkey heads") in the band under the cornice.
+			var nb := maxi(int(wb / 0.32), 3)
+			for k in nb:
+				var u := (float(k) + 0.5) / float(nb) - 0.5
+				var hp: Vector3 = xf * Vector3(u * wb * 0.92, y1 - 0.55, float(sgn) * db * 0.5)
+				lm.beam("Stele", hp, hp + bz * float(sgn) * 0.1, 0.16, 0.16, by, true)
+			var ns := maxi(int(db / 0.32), 2)
+			for k in ns:
+				var u := (float(k) + 0.5) / float(ns) - 0.5
+				var hp: Vector3 = xf * Vector3(float(sgn) * wb * 0.5, y1 - 0.55, u * db * 0.9)
+				lm.beam("Stele", hp, hp + bx * float(sgn) * 0.1, 0.16, 0.16, by, true)
+
+## A carved false door w x h whose sill centre `p` lies on the face:
+## a framed door with its beam-end corners, two panels and the lock.
+static func _false_door(lm: LandmarkMesh, p: Vector3, right: Vector3, up: Vector3, out: Vector3,
+		w: float, h: float) -> void:
+	_window(lm, p, right, up, out, w, h)
+	for su in [-1.0, 1.0]:
+		lm.beam("Stele", p + right * (w * 0.5 + 0.06) * float(su) + out * 0.05,
+			p + right * (w * 0.5 + 0.06) * float(su) + out * 0.05 + up * (h + 0.12), 0.12, 0.1, out)
+		for sv in [0.0, 1.0]:
+			var q: Vector3 = p + right * (w * 0.5 + 0.1) * float(su) + up * (h + 0.06) * float(sv)
+			lm.beam("Stele", q, q + out * 0.14, 0.16, 0.16, up, true)
+	lm.beam("Stele", p + up * (h + 0.06) - right * (w * 0.5 + 0.12) + out * 0.05,
+		p + up * (h + 0.06) + right * (w * 0.5 + 0.12) + out * 0.05, 0.12, 0.1, out)
+	# Door leaves (two panels) and the carved lock.
+	for sv in [0.25, 0.7]:
+		var c: Vector3 = p + up * h * float(sv) + out * 0.045
+		lm.beam("Stele", c - right * w * 0.3, c + right * w * 0.3, 0.05, h * 0.3, out)
+	lm.beam("Stele", p + up * h * 0.5 + right * w * 0.25, p + up * h * 0.5 + right * w * 0.25 + out * 0.08,
+		0.08, 0.14, up, true)
+
+## Framed window recess at `p` (bottom centre on the face): a dark
+## opening with a thin projecting frame and its cross mullion.
+static func _framed(lm: LandmarkMesh, p: Vector3, right: Vector3, up: Vector3, out: Vector3,
+		w: float, h: float) -> void:
+	_window(lm, p, right, up, out, w, h)
+	var f := 0.05
+	for su in [-1.0, 1.0]:
+		lm.beam("Stele", p + right * (w * 0.5 + f * 0.5) * float(su) + out * 0.03 - up * f,
+			p + right * (w * 0.5 + f * 0.5) * float(su) + out * 0.03 + up * (h + f), f, 0.06, out)
+	for sv in [0.0, 1.0]:
+		lm.beam("Stele", p + up * (h + f * 0.5) * float(sv) - up * f * 0.5 * (1.0 - float(sv)) * 2.0
+			- right * (w * 0.5 + f) + out * 0.03, p + up * (h + f * 0.5) * float(sv)
+			- up * f * 0.5 * (1.0 - float(sv)) * 2.0 + right * (w * 0.5 + f) + out * 0.03, f, 0.06, out)
+	lm.beam("Stele", p + up * h * 0.5 - right * w * 0.5 + out * 0.02, p + up * h * 0.5 + right * w * 0.5 + out * 0.02,
+		0.04, 0.04, out)
+	lm.beam("Stele", p + out * 0.02, p + up * h + out * 0.02, 0.04, 0.04, out)
 
 ## Dark recess quad at `p` (bottom centre), w wide along `right`, h tall.
 static func _window(lm: LandmarkMesh, p: Vector3, right: Vector3, up: Vector3, out: Vector3,
 		w: float, h: float) -> void:
-	LandmarkAfhParts.quad_out(lm, "Dark", p - right * w * 0.5, p + right * w * 0.5,
-		p + right * w * 0.5 + up * h, p - right * w * 0.5 + up * h, out)
+	var q := p + out * 0.025
+	LandmarkAfhParts.quad_out(lm, "Dark", q - right * w * 0.5, q + right * w * 0.5,
+		q + right * w * 0.5 + up * h, q - right * w * 0.5 + up * h, out)

@@ -24,7 +24,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"arktikum_rovaniemi": LandmarkFrNorth.arktikum(model)
 		"lumberjacks_candle_bridge": LandmarkFrNorth.candle_bridge(model)
 		"santa_claus_village": LandmarkFrNorth.santa_village(model)
-		"lahti_ski_jumping_hills": LandmarkFrNorth.lahti(model)
+		"lahti_ski_jumping_hills": LandmarkFrLahti.lahti(model)
 		"kerimaki_church": LandmarkFrTimber.kerimaki(model)
 		"petajavesi_old_church": LandmarkFrTimber.petajavesi(model)
 		"ainola": LandmarkFrTimber.ainola(model)

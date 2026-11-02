@@ -69,7 +69,8 @@ static func royal_palace(model: Node3D) -> void:
 
 ## Silver Pagoda (Wat Preah Keo Morakot): the vihear on a raised marble
 ## base under its three-tier roof and naga-horn ridge, the two stupas, the
-## library, Phnom Mondap and the Ramayana cloister enclosing the compound.
+## library, the bell tower, King Norodom's equestrian statue under its
+## pavilion, Phnom Mondap and the Reamker-mural cloister round the compound.
 static func silver_pagoda(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#E2DACB", 3.0))
@@ -98,6 +99,29 @@ static func silver_pagoda(model: Node3D) -> void:
 	lm.lathe("Hill", Vector3(-24.0, 0, 28.0), PackedVector2Array([Vector2(9.0, 0), Vector2(7.0, 3.0),
 		Vector2(4.5, 5.4), Vector2(0.0, 6.4)]), 16)
 	U.prasat(lm, "Marble", "Wall", "Red", Vector3(-24.0, 6.2, 28.0), 1.5, 6.0, 2, 0.4)
+	# Bell tower (north-east) and the pavilion over King Norodom's
+	# equestrian statue (east of the vihear, south of the axis).
+	U.hall(lm, "Wall", "Marble", "Roof", "Red", Vector3(44.0, 0, -50.0), Basis(), 5.0, 5.0, 1.2, 7.0,
+		2.6, 2, 3)
+	var sp := Vector3(44.0, 0, 16.0)
+	lm.box("Marble", sp + Vector3(0, 0.2, 0), Vector3(7.0, 0.4, 8.0))
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			U.colonette(lm, "Marble", sp + Vector3(sx * 2.8, 0.4, sz * 3.3), 0.3, 5.6)
+	lm.box("Marble", sp + Vector3(0, 6.2, 0), Vector3(7.0, 0.4, 8.0))
+	U.tiered_roof(lm, "Roof", "Marble", "Red", sp + Vector3(0, 6.4, 0), Basis(), 6.4, 7.4, 2.4, 2)
+	# The king on his horse, on a tall pedestal.
+	lm.box("Marble", sp + Vector3(0, 1.4, 0), Vector3(1.6, 2.0, 3.2))
+	var hb := sp + Vector3(0, 2.4, 0)
+	lm.box("Gold", hb + Vector3(0, 1.2, 0), Vector3(0.8, 0.8, 1.9))
+	lm.beam("Gold", hb + Vector3(0, 1.4, 0.8), hb + Vector3(0, 2.2, 1.2), 0.4, 0.5)
+	lm.box("Gold", hb + Vector3(0, 2.2, 1.45), Vector3(0.3, 0.35, 0.7))
+	lm.beam("Gold", hb + Vector3(0, 1.4, -0.9), hb + Vector3(0, 0.6, -1.2), 0.15, 0.15)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			lm.beam("Gold", hb + Vector3(sx * 0.25, 0.9, sz * 0.75), hb + Vector3(sx * 0.25, 0.0, sz * 0.78),
+				0.16, 0.16)
+	LandmarkKits.statue_figure(lm, "Gold", hb + Vector3(0, 1.0, -0.1), 1.8)
 	# Cloister: gabled gallery ranges round the compound.
 	var hx := 75.0
 	var hz := 70.0

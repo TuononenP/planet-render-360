@@ -134,3 +134,199 @@ static func hip_roof(lm: LandmarkMesh, key: String, c: Vector3, eave: Vector2, t
 		cap.append(Vector2(v.x, v.z))
 	var cy: float = (last[0] as Vector3).y
 	lm.poly_prism(key, cap, cy - 0.2, cy)
+
+## Corner point of hip_roof at height fraction t (0 eave, 1 ridge) on
+## the corner (sx, sz) = (+-1, +-1); matches hip_roof's swept surface.
+static func hip_corner(c: Vector3, eave: Vector2, top: Vector2, rise: float, lift: float, t: float,
+		sx: float, sz: float) -> Vector3:
+	var f := 1.0 - pow(1.0 - t, 1.8)
+	var hx := lerpf(eave.x * 0.5, top.x * 0.5, f)
+	var hz := lerpf(eave.y * 0.5, top.y * 0.5, f)
+	var y := rise * t + (1.0 - t) * (1.0 - t) * lift + lift * 0.75 * (1.0 - t)
+	return c + Vector3(sx * hx, y, sz * hz)
+
+## The four hip ridges of a hip_roof (rolls `w` wide riding the arris)
+## and, when `beasts` > 0, the file of glazed ridge beasts led by the
+## immortal on a hen at each eave corner (rank by number: the Hall of
+## Supreme Harmony alone carries ten).
+static func hip_ridges(lm: LandmarkMesh, key: String, c: Vector3, eave: Vector2, top: Vector2,
+		rise: float, lift: float, w: float, beasts: int = 0) -> void:
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var prev := hip_corner(c, eave, top, rise, lift, 0.0, sx, sz) + Vector3(0, w * 0.35, 0)
+			for k in range(1, 7):
+				var p := hip_corner(c, eave, top, rise, lift, float(k) / 6.0, sx, sz) + Vector3(0, w * 0.35, 0)
+				lm.beam(key, prev, p, w, w * 0.8)
+				prev = p
+			if beasts <= 0:
+				continue
+			var a := hip_corner(c, eave, top, rise, lift, 0.02, sx, sz)
+			var b := hip_corner(c, eave, top, rise, lift, 0.4, sx, sz)
+			var dir := (b - a).normalized()
+			var flat := Vector3(dir.x, 0, dir.z).normalized()
+			var basis := Basis(flat.cross(Vector3.UP).normalized(), Vector3.UP, flat)
+			for i in beasts + 1:
+				var p := a.lerp(b, (float(i) + 0.5) / float(beasts + 1)) + Vector3(0, w * 0.8, 0)
+				var s := w * (1.2 if i == 0 else 1.0)
+				lm.box(key, p + Vector3(0, s * 0.45, 0), Vector3(s * 0.55, s * 0.9, s * 0.7), basis, 0.0)
+				lm.box(key, p + Vector3(0, s * 1.05, 0) - flat * s * 0.2, Vector3(s * 0.4, s * 0.4, s * 0.55), basis, 0.0)
+
+## Chiwen: the dragon-fish ridge-end ornament, `h` tall, standing at
+## `c` with its open jaw biting the ridge toward `inward` (+-1 on x):
+## body, swallowing jaw, curled-back tail and the sword hilt behind.
+static func chiwen(lm: LandmarkMesh, key: String, c: Vector3, h: float, inward: float) -> void:
+	var w := h * 0.28
+	lm.box(key, c + Vector3(0, h * 0.35, 0), Vector3(h * 0.55, h * 0.7, w), Basis(), 0.0)
+	lm.box(key, c + Vector3(inward * h * 0.3, h * 0.28, 0), Vector3(h * 0.25, h * 0.4, w * 0.9), Basis(), 0.0)
+	var prev := c + Vector3(0, h * 0.7, 0)
+	for i in 6:
+		var a := PI * 0.5 + float(i + 1) / 6.0 * PI * 1.1
+		var p := c + Vector3(-inward * (h * 0.12 - cos(a) * h * 0.2), h * 0.72 + sin(a) * h * 0.22, 0)
+		lm.beam(key, prev, p, w * 0.7, w * 0.8)
+		prev = p
+	lm.beam(key, c + Vector3(-inward * h * 0.32, h * 0.5, 0), c + Vector3(-inward * h * 0.36, h * 1.0, 0),
+		w * 0.35, w * 0.35)
+
+## Chinese marble balustrade from a to b (on the deck): sill, carved
+## square posts with cloud-capped heads every ~pitch m, a pierced panel
+## and handrail in each bay; `spout` (a horizontal outward vector, zero
+## for none) adds the dragon-head drain spout under every post;
+## `end_post` false leaves the post at b to the next run.
+static func cn_balustrade(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h: float = 1.3,
+		pitch: float = 2.0, spout: Vector3 = Vector3.ZERO, end_post: bool = true) -> void:
+	var dl := a.distance_to(b)
+	if dl < 0.5:
+		return
+	var dir := (b - a) / dl
+	var basis := Basis(dir, Vector3.UP, dir.cross(Vector3.UP).normalized())
+	var n := maxi(int(round(dl / pitch)), 1)
+	var bay := dl / float(n)
+	lm.box(key, (a + b) * 0.5 + Vector3(0, 0.09, 0), Vector3(dl, 0.18, 0.4), basis, 0.0)
+	var head := PackedVector2Array([Vector2(0.15, 0), Vector2(0.18, 0.1), Vector2(0.15, 0.26), Vector2(0.0, 0.4)])
+	for i in n + (1 if end_post else 0):
+		var p := a + dir * bay * float(i)
+		lm.box(key, p + Vector3(0, h * 0.4, 0), Vector3(0.24, h * 0.8, 0.24), basis, 0.0)
+		lm.lathe(key, p + Vector3(0, h * 0.8, 0), head, 4, 1.0, 1.0, PI * 0.25, false)
+		if spout != Vector3.ZERO:
+			lm.beam(key, p - Vector3(0, 0.25, 0) + spout * 0.1, p - Vector3(0, 0.3, 0) + spout * 0.9, 0.26, 0.3)
+		if i < n:
+			var m := p + dir * bay * 0.5
+			lm.box(key, m + Vector3(0, h * 0.42, 0), Vector3(bay - 0.24, h * 0.42, 0.12), basis, 0.0)
+			lm.box(key, m + Vector3(0, h * 0.7, 0), Vector3(bay - 0.24, 0.11, 0.15), basis, 0.0)
+
+## Balustrade round a closed polygon of deck points (XZ at height y),
+## spouts pointing out of the polygon.
+static func cn_balustrade_loop(lm: LandmarkMesh, key: String, pts: PackedVector2Array, y: float,
+		h: float = 1.3, pitch: float = 2.0, spouts: bool = true) -> void:
+	var ctr := Vector2.ZERO
+	for p in pts:
+		ctr += p
+	ctr /= float(pts.size())
+	for i in pts.size():
+		var p := pts[i]
+		var q := pts[(i + 1) % pts.size()]
+		var m := (p + q) * 0.5 - ctr
+		var e := (q - p).normalized()
+		var o := Vector2(e.y, -e.x)
+		if o.dot(m) < 0.0:
+			o = -o
+		cn_balustrade(lm, key, Vector3(p.x, y, p.y), Vector3(q.x, y, q.y), h, pitch,
+			Vector3(o.x, 0, o.y) if spouts else Vector3.ZERO)
+
+## Rectangle of corners for a balustrade loop, inset `inset` from a
+## w x d deck centred on (cx, cz).
+static func rect_pts(cx: float, cz: float, w: float, d: float, inset: float = 0.3) -> PackedVector2Array:
+	var hx := w * 0.5 - inset
+	var hz := d * 0.5 - inset
+	return PackedVector2Array([Vector2(cx - hx, cz - hz), Vector2(cx + hx, cz - hz),
+		Vector2(cx + hx, cz + hz), Vector2(cx - hx, cz + hz)])
+
+## Dougong bracket sets every `pitch` m round a w x d rectangle at
+## height y (bottom), `h` tall: three tiers of blocks and arms, each
+## cantilevering further out, carrying the eave purlin.
+static func brackets(lm: LandmarkMesh, key: String, c: Vector3, w: float, d: float, h: float,
+		pitch: float = 1.6) -> void:
+	for side in 4:
+		var along := Vector3.RIGHT if side < 2 else Vector3.BACK
+		var out := (Vector3.BACK if side == 0 else Vector3.FORWARD) if side < 2 else \
+			(Vector3.RIGHT if side == 2 else Vector3.LEFT)
+		var run := w if side < 2 else d
+		var off := (d if side < 2 else w) * 0.5
+		var basis := Basis(along, Vector3.UP, out)
+		var n := maxi(int(run / pitch), 1)
+		for i in n:
+			var p := c + along * (run * ((float(i) + 0.5) / float(n) - 0.5)) + out * off
+			for k in 3:
+				var ky := h * (float(k) + 0.5) / 3.0
+				lm.box(key, p + Vector3(0, ky, 0) + out * (0.15 + 0.25 * k),
+					Vector3(0.45 + 0.35 * k, h / 3.0 * 0.9, 0.3 + 0.5 * k), basis, 0.0)
+	# The purlin they carry.
+	lm.box(key, c + Vector3(0, h + 0.15, 0), Vector3(w + 1.6, 0.3, d + 1.6), Basis(), 0.0)
+
+## Flight of `n` steps against a terrace wall: `foot` is the wall's
+## foot at the flight's centre line, `out` the unit vector away from
+## the wall, `rise` the terrace height, `w` the flight's width. Each
+## step is a solid block, the lowest reaching furthest out.
+static func steps(lm: LandmarkMesh, key: String, foot: Vector3, out: Vector3, w: float, rise: float,
+		n: int, run: float = 0.32) -> void:
+	var basis := Basis(out.cross(Vector3.UP).normalized(), Vector3.UP, out)
+	for k in n:
+		var top := rise * float(n - k) / float(n)
+		var depth := run * float(k + 1)
+		lm.box(key, foot + Vector3(0, top * 0.5, 0) + out * depth * 0.5, Vector3(w, top, depth), basis, 0.0)
+
+## Thick eave of a hip_roof (same c, eave, lift): a fascia board
+## `th` deep riding the swept eave line, and exposed rafter ends every
+## `pitch` m running back under it to the wall rectangle `wall`.
+static func eave_fascia(lm: LandmarkMesh, key: String, c: Vector3, eave: Vector2, lift: float, th: float,
+		wall: Vector2 = Vector2.ZERO, pitch: float = 0.6) -> void:
+	var corners := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1), Vector2(-1, -1)]
+	for side in 4:
+		var a: Vector2 = corners[side]
+		var b: Vector2 = corners[side + 1]
+		var pa := c + Vector3(a.x * eave.x * 0.5, lift, a.y * eave.y * 0.5)
+		var pb := c + Vector3(b.x * eave.x * 0.5, lift, b.y * eave.y * 0.5)
+		var mid := (a + b) * 0.5
+		var out := Vector3(mid.x, 0, mid.y).normalized()
+		var prev := pa + Vector3(0, lift * 0.75 - th * 0.5, 0)
+		for q in range(1, 13):
+			var f := float(q) / 12.0
+			var e := absf(f - 0.5) * 2.0
+			var p := pa.lerp(pb, f) + Vector3(0, pow(e, 3.0) * lift * 0.75 - th * 0.5, 0)
+			lm.beam(key, prev, p, th, 0.25, Vector3.UP)
+			prev = p
+		if wall == Vector2.ZERO:
+			continue
+		var run := pa.distance_to(pb)
+		var n := int(run / pitch)
+		var wy := c.y - th * 0.5
+		for i in range(1, n):
+			var f := float(i) / float(n)
+			var e := absf(f - 0.5) * 2.0
+			var p := pa.lerp(pb, f) + Vector3(0, pow(e, 3.0) * lift * 0.75 - th, 0) - out * 0.15
+			var w := Vector3(p.x, wy, p.z)
+			w = Vector3(clampf(w.x, c.x - wall.x * 0.5, c.x + wall.x * 0.5), wy, clampf(w.z, c.z - wall.y * 0.5, c.z + wall.y * 0.5))
+			lm.beam(key, w, p, 0.12, 0.16)
+
+## Flat-faced band between two closed XZ polygons (same point count,
+## either winding) at y0 and y1: one quad per edge with its true face
+## normal, so notched (re-entrant) plans shade correctly.
+static func poly_band(lm: LandmarkMesh, key: String, p0: PackedVector2Array, y0: float,
+		p1: PackedVector2Array, y1: float) -> void:
+	var area := 0.0
+	for i in p0.size():
+		var q := p0[(i + 1) % p0.size()]
+		area += p0[i].x * q.y - q.x * p0[i].y
+	var sgn := 1.0 if area > 0.0 else -1.0
+	for i in p0.size():
+		var k := (i + 1) % p0.size()
+		var a := Vector3(p0[i].x, y0, p0[i].y)
+		var b := Vector3(p0[k].x, y0, p0[k].y)
+		var c := Vector3(p1[k].x, y1, p1[k].y)
+		var d := Vector3(p1[i].x, y1, p1[i].y)
+		var e := p0[k] - p0[i]
+		var out := Vector3(e.y, 0, -e.x).normalized() * sgn
+		var n := (b - a).cross(d - a).normalized()
+		if n.dot(out) < 0.0:
+			n = -n
+		lm.quad(key, a, b, c, d, n)

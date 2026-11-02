@@ -2,18 +2,22 @@ class_name LandmarkLpSilkRoad
 extends RefCounted
 
 ## Persian and Timurid Islamic architecture in true metres: the Imam
-## (Shah) Mosque of Isfahan, the Registan of Samarkand and the Po-i-Kalyan
-## complex of Bukhara. Glazed tile (cobalt, turquoise) over baked brick, tall
-## pointed iwan portals (pishtaqs), bulbous domes and tapering minarets.
+## (Shah) Mosque of Isfahan and the Po-i-Kalyan complex of Bukhara (the
+## Registan is in LandmarkLpRegistan). Glazed tile (cobalt, turquoise)
+## over baked brick, tall pointed iwan portals (pishtaqs), bulbous domes
+## and tapering minarets.
 
 # --- Imam (Shah) Mosque, Isfahan ---
 
 ## Built with the portal facing +Z (yaw 177 turns it onto the north-facing
-## square). Courtyard 70 x 70 m turned 45 degrees to the qibla (axis towards
-## +X, -Z), four iwans, arcaded walls, the sanctuary with the 52 m double-
-## shell dome (swelling turquoise bulb on a cobalt drum), the twin 48 m
-## minarets at its iwan, the 33 m vestibule dome and the 27 m entrance portal
-## with its twin 42 m minarets between two arcaded wings.
+## square). The courtyard turned 45 degrees to the qibla (axis towards +X,
+## -Z) with four iwans and two storeys of tiled arched niches between
+## them, each in its frame; the sanctuary with the 52 m double-shell dome
+## (turquoise bulb on a windowed cobalt drum with its inscription band)
+## and the 48 m minarets at its iwan; the domed halls through the side
+## iwans; the 33 m vestibule dome and the 27.5 m entrance portal with its
+## muqarnas hood between minarets whose galleries stand at 33.5 m, between
+## the two arcaded wings on the square.
 static func imam_mosque(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#C8A569", 3.5))
@@ -25,9 +29,9 @@ static func imam_mosque(model: Node3D) -> void:
 	lm.use("Gold", LandmarkMaterials.gold())
 	var phi := -PI * 0.25
 	var rot := Basis(Vector3.UP, phi)
-	lm.box("Court", Vector3(0, -0.2, 0), Vector3(80, 0.4, 80), rot)
-	lm.box("Dark", rot * Vector3(0, 0.0, 0), Vector3(20, 0.15, 12), rot)
-	# Courtyard walls (two storeys of blind arches) with the four iwans.
+	lm.box("Court", Vector3(0, 0.1, 0), Vector3(80, 0.2, 80), rot, 0.0)
+	lm.box("Dark", Vector3(0, 0.25, 0), Vector3(20, 0.1, 12), rot, 0.0)
+	# Courtyard walls (two storeys of framed niches) with the four iwans.
 	for k in 4:
 		var yaw := PI * 0.5 * float(k)
 		var turn := Basis(Vector3.UP, yaw)
@@ -35,131 +39,104 @@ static func imam_mosque(model: Node3D) -> void:
 		var along := turn * Vector3(1, 0, 0)
 		var sanct := k == 0
 		var iw := 32.0 if sanct else 24.0
-		var seg := (80.0 - iw) * 0.5
+		var seg := (70.0 - iw) * 0.5
 		for s in [-1.0, 1.0]:
 			var cu: float = s * (iw * 0.5 + seg * 0.5)
 			var wc := -inward * 37.5 + along * cu
-			lm.box("Brick", rot * (wc + Vector3(0, 7.0, 0)), Vector3(seg, 14.0, 5.0), rot * turn)
-			lm.box("Tile", rot * (wc + Vector3(0, 14.4, 0)), Vector3(seg, 0.8, 5.2), rot * turn)
-		var face := -inward * 35.0 + inward * 0.04
-		for u in [-33.5, -27.0, -20.5, 20.5, 27.0, 33.5]:
-			if absf(u) < iw * 0.5 + 2.0:
-				continue
-			var p: Vector3 = rot * (face + along * u)
-			LandmarkLpParts.arch_panel(lm, "Dark", p, yaw + phi, 1.6, 3.0, 1.6)
-			LandmarkLpParts.arch_panel(lm, "Dark", p + Vector3(0, 7.0, 0), yaw + phi, 1.4, 2.4, 1.4)
-		LandmarkLpParts.iwan(lm, "Tile", "Dark", rot * (-inward * 34.0), yaw + phi, iw,
-			34.0 if sanct else 21.0, 7.5 if sanct else 5.0, 17.0 if sanct else 10.0,
-			11.5 if sanct else 7.0, 8.0 if sanct else 5.0)
-	# Sanctuary: iwan hall, chamber, side prayer halls, the 52 m dome, minarets.
+			lm.box("Brick", rot * (wc + along * (float(s) * 2.5) + Vector3(0, 7.0, 0)), Vector3(seg + 5.0, 14.0, 5.0),
+				rot * turn)
+			lm.box("Turq", rot * (wc + Vector3(0, 14.3, 0) + inward * 2.2), Vector3(seg, 0.6, 0.8), rot * turn)
+			var face := rot * (-inward * 35.0 + along * cu)
+			var n := int(seg / 5.6)
+			var lower := LandmarkLpDetail.bays(n, seg, 1.8, 3.4, 2.3)
+			var upper := LandmarkLpDetail.bays(n, seg, 1.6, 2.6, 2.0)
+			LandmarkLpDetail.arcade_skin(lm, "Tile", "Dark", face + Vector3(0, 0.2, 0), yaw + phi, seg, 7.0, lower, 0.7, 6)
+			LandmarkLpDetail.arcade_skin(lm, "Tile", "Dark", face + Vector3(0, 7.2, 0), yaw + phi, seg, 6.8, upper, 0.7, 6)
+			for ar in lower:
+				var u: float = ar[0]
+				var r := rot * along
+				LandmarkLpDetail.alfiz(lm, "Turq", face + r * u + Vector3(0, 0.2, 0), yaw + phi, 1.8, 6.1, 0.24, 0.05)
+				LandmarkLpDetail.alfiz(lm, "Turq", face + r * u + Vector3(0, 7.2, 0), yaw + phi, 1.6, 5.0, 0.22, 0.05)
+		var front := rot * (-inward * 34.0) + Vector3(0, 0.2, 0)
+		var ih := 34.0 if sanct else 21.0
+		var a := 7.5 if sanct else 5.0
+		var sp := 17.0 if sanct else 10.0
+		var ri := 11.5 if sanct else 7.0
+		LandmarkLpParts.iwan(lm, "Tile", "Dark", front, yaw + phi, iw, ih, a, sp, ri, 8.0 if sanct else 5.0)
+		_pishtaq_dress(lm, front, yaw + phi, iw, ih, a, sp, ri)
+	# Sanctuary: iwan hall, dome chamber, side prayer halls, the 52 m dome, minarets.
 	lm.box("Brick", rot * Vector3(0, 14.0, -48.0), Vector3(32, 28.0, 12), rot)
 	lm.box("Brick", rot * Vector3(0, 13.5, -72.0), Vector3(36, 27.0, 36), rot)
 	lm.box("Tile", rot * Vector3(0, 27.4, -72.0), Vector3(36.6, 0.8, 36.6), rot)
 	for s in [-1.0, 1.0]:
-		var hp := rot * Vector3(s * 28.0, 0, -72.0)
+		var hp := rot * Vector3(float(s) * 28.0, 0, -72.0)
 		lm.box("Brick", hp + Vector3(0, 8.0, 0), Vector3(20, 16.0, 36), rot)
-		lm.frustum("Tile", hp + Vector3(0, 16.0, 0), 6.0, 6.0, 3.0, 16)
-		lm.lathe("Turq", hp + Vector3(0, 19.0, 0), LandmarkLpParts.bulb_profile(6.2, 7.5, 1.08), 16)
-		_tile_minaret(lm, "Brick", "Tile", rot * Vector3(s * 18.5, 0, -39.0), 2.2, 48.0)
+		_drum(lm, hp + Vector3(0, 16.0, 0), 6.0, 3.0, 12)
+		lm.lathe("Turq", hp + Vector3(0, 19.0, 0), LandmarkLpParts.bulb_profile(6.2, 7.5, 1.08), 24)
+		LandmarkLpDetail.tile_minaret(lm, "Brick", "Tile", rot * Vector3(float(s) * 18.5, 0, -39.0), 2.2, 48.0,
+			38.0, "Gold")
 	var dc := rot * Vector3(0, 0, -72.0)
-	lm.frustum("Tile", dc + Vector3(0, 27.8, 0), 12.5, 12.5, 7.4, 28)
-	lm.lathe("Turq", dc + Vector3(0, 35.2, 0), LandmarkLpParts.bulb_profile(12.7, 15.6, 1.1, 14, 1.25), 28)
+	_drum(lm, dc + Vector3(0, 27.8, 0), 12.5, 7.4, 16)
+	lm.lathe("Turq", dc + Vector3(0, 35.2, 0), LandmarkLpParts.bulb_profile(12.7, 15.6, 1.1, 16, 1.25), 40)
 	LandmarkLpParts.needle(lm, "Gold", dc + Vector3(0, 50.8, 0),
-		PackedVector2Array([Vector2(0, 0.4), Vector2(1.2, 0.06)]), 8)
-	# Entrance: facade wings on the square, vestibule with its dome, portal and minarets.
+		PackedVector2Array([Vector2(0, 0.4), Vector2(0.4, 0.3), Vector2(0.7, 0.12), Vector2(1.2, 0.06)]), 8)
+	# Entrance: wings on the square, vestibule dome, portal and its minarets.
 	var zf := 68.0
 	for s in [-1.0, 1.0]:
-		var wc := Vector3(-30.0 + s * 31.0, 0, zf - 3.0)
+		var wc := Vector3(-30.0 + float(s) * 31.0, 0, zf - 3.0)
 		lm.box("Brick", wc + Vector3(0, 6.5, 0), Vector3(32, 13.0, 6.0))
-		lm.box("Tile", wc + Vector3(0, 13.4, 0), Vector3(32.4, 0.8, 6.2))
-		for u in [-10.5, -3.5, 3.5, 10.5]:
-			LandmarkLpParts.arch_panel(lm, "Dark", wc + Vector3(u, 0, 3.04), 0.0, 1.7, 3.2, 1.7)
-			LandmarkLpParts.arch_panel(lm, "Dark", wc + Vector3(u, 7.2, 3.04), 0.0, 1.4, 2.4, 1.4)
+		lm.box("Turq", wc + Vector3(0, 13.3, 0.6), Vector3(32.4, 0.6, 5.2))
+		var lower := LandmarkLpDetail.bays(5, 32.0, 2.0, 3.4, 2.4)
+		var upper := LandmarkLpDetail.bays(5, 32.0, 1.7, 2.6, 2.0)
+		LandmarkLpDetail.arcade_skin(lm, "Brick", "Dark", wc + Vector3(0, 0.2, 3.7), 0.0, 32.0, 6.6, lower, 0.7, 6)
+		LandmarkLpDetail.arcade_skin(lm, "Brick", "Dark", wc + Vector3(0, 6.8, 3.7), 0.0, 32.0, 6.2, upper, 0.7, 6)
+		for ar in lower:
+			LandmarkLpDetail.alfiz(lm, "Tile", wc + Vector3(float(ar[0]), 0.2, 3.7), 0.0, 2.0, 6.2, 0.25, 0.05)
 	lm.box("Brick", Vector3(-30.0, 10.0, 46.0), Vector3(26, 20.0, 30))
-	lm.frustum("Tile", Vector3(-30.0, 20.0, 46.0), 9.0, 9.0, 4.0, 16)
-	lm.lathe("Turq", Vector3(-30.0, 24.0, 46.0), LandmarkLpParts.bulb_profile(9.2, 9.0, 1.1), 20)
-	LandmarkLpParts.iwan(lm, "Tile", "Dark", Vector3(-30.0, 0, zf + 1.0), 0.0, 30.0, 27.0, 6.6, 14.0, 8.8, 8.0)
+	_drum(lm, Vector3(-30.0, 20.0, 46.0), 9.0, 4.0, 12)
+	lm.lathe("Turq", Vector3(-30.0, 24.0, 46.0), LandmarkLpParts.bulb_profile(9.2, 9.0, 1.1), 32)
+	var pf := Vector3(-30.0, 0.2, zf + 1.0)
+	LandmarkLpParts.iwan(lm, "Tile", "Dark", pf, 0.0, 30.0, 27.3, 6.6, 14.0, 8.8, 8.0)
+	_pishtaq_dress(lm, pf, 0.0, 30.0, 27.3, 6.6, 14.0, 8.8)
 	for s in [-1.0, 1.0]:
-		_tile_minaret(lm, "Brick", "Tile", Vector3(-30.0 + s * 12.8, 0, zf - 3.0), 1.9, 42.0)
+		LandmarkLpDetail.tile_minaret(lm, "Brick", "Tile", Vector3(-30.0 + float(s) * 12.8, 0, zf - 3.0), 1.9, 42.0,
+			33.5, "Gold")
 	lm.commit(model)
 
-## Slender tiled minaret of height h: brick shaft with glazed bands, a
-## corbelled balcony, an eight-sided glazed lantern and a bulb cap.
-static func _tile_minaret(lm: LandmarkMesh, brick: String, tile: String, base: Vector3, r: float,
-		h: float) -> void:
-	var body := h * 0.8
-	lm.lathe(brick, base, PackedVector2Array([Vector2(r * 1.35, 0.0), Vector2(r * 1.35, h * 0.06),
-		Vector2(r * 1.12, h * 0.08), Vector2(r * 0.82, body)]), 16)
-	for f in [0.2, 0.42, 0.62, 0.76]:
-		var rr := r * lerpf(1.12, 0.82, (f - 0.08) / 0.72) + 0.1
-		lm.frustum(tile, base + Vector3(0, h * f, 0), rr, rr, h * 0.05, 16)
-	lm.frustum(brick, base + Vector3(0, body, 0), r * 0.95, r * 1.7, h * 0.03, 16)
-	lm.frustum(brick, base + Vector3(0, body + h * 0.03, 0), r * 1.7, r * 1.7, h * 0.015, 16)
-	lm.frustum(tile, base + Vector3(0, body + h * 0.045, 0), r * 0.9, r * 0.9, h * 0.075, 10)
-	lm.lathe(tile, base + Vector3(0, body + h * 0.12, 0),
-		LandmarkLpParts.bulb_profile(r * 1.0, h * 0.08, 1.15, 8), 12)
-
-# --- Registan, Samarkand ---
-
-## Compass frame with the square open to the south: Ulugh Beg Madrasa (west,
-## 1420), Sher-Dor (east, 1636, two ribbed turquoise domes, 38 m portal) and
-## Tilya-Kori (north, 1660, long two-storey facade, blue 35 m dome), each a
-## tiled pishtaq between two storeys of blind arches and four corner minarets.
-static func registan(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#C9A872", 3.5))
-	lm.use("Tile", LandmarkMaterials.pbr("render", "#2A63B0", 2.0, 0.34))
-	lm.use("Turq", LandmarkMaterials.pbr("render", "#30AEB6", 2.0, 0.3))
-	lm.use("Cream", LandmarkMaterials.pbr("render", "#E6D9B6", 2.0, 0.5))
-	lm.use("Court", LandmarkMaterials.pbr("pavement", "#CFBE98", 6.0))
-	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#17120E", 3.0, 0.92))
-	lm.box("Court", Vector3(0, -0.15, 29.0), Vector3(112, 0.3, 74))
-	# Ulugh Beg (west, faces east) and Sher-Dor (east, faces west).
-	_madrasa(lm, Vector3(-50, 0, 33.5), PI * 0.5, 58.0, 52.0, 12.0, 22.0, 35.0, 6.2, 14.0, 11.0, 33.0)
-	_madrasa(lm, Vector3(50, 0, 33.5), -PI * 0.5, 62.0, 56.0, 12.5, 24.0, 38.0, 6.6, 16.0, 12.0, 30.0)
-	for s in [-1.0, 1.0]:
-		var dp := Vector3(50.0 + 14.0, 0, 33.5 + s * 19.5)
-		lm.frustum("Tile", dp + Vector3(0, 12.5, 0), 5.6, 5.6, 8.4, 20)
-		LandmarkLpParts.ribbed_dome(lm, "Turq", dp + Vector3(0, 20.9, 0),
-			LandmarkLpParts.bulb_profile(6.3, 9.6, 1.12, 12, 1.15), 16, 0.045)
-	# Tilya-Kori (north, faces south) with the mosque dome behind its portal.
-	_madrasa(lm, Vector3(0, 0, -4.5), 0.0, 84.0, 60.0, 13.0, 22.0, 27.0, 5.6, 13.0, 9.0, 24.0)
-	var dc := Vector3(0, 0, -34.0)
-	lm.frustum("Tile", dc + Vector3(0, 13.0, 0), 10.0, 10.0, 8.0, 24)
-	LandmarkLpParts.ribbed_dome(lm, "Turq", dc + Vector3(0, 21.0, 0),
-		LandmarkLpParts.bulb_profile(10.8, 14.0, 1.1, 12, 1.2), 20, 0.03)
-	lm.commit(model)
-
-## One madrasa: a body of `width` x `depth` standing behind the front plane
-## point `p` (facing `yaw`), two tiers of blind arches on the wings, the
-## tiled pishtaq (pw x ph, niche half-width a, spring, rise) and four
-## corner minarets (the front pair mh tall, the rear pair two thirds).
-static func _madrasa(lm: LandmarkMesh, p: Vector3, yaw: float, width: float, depth: float, wall_h: float,
-		pw: float, ph: float, a: float, spring: float, rise: float, mh: float) -> void:
-	var r := LandmarkLpParts.across(yaw)
+## Tile dress of an iwan front (front plane `front`, the face pw x ph, the
+## niche a / spring / rise): turquoise frame, cream inscription band under
+## the cornice, the cable archivolt and the stepped muqarnas hood.
+static func _pishtaq_dress(lm: LandmarkMesh, front: Vector3, yaw: float, pw: float, ph: float, a: float,
+		spring: float, rise: float) -> void:
 	var f := LandmarkLpParts.outward(yaw)
-	var basis := Basis(Vector3.UP, yaw)
-	lm.box("Brick", p - f * depth * 0.5 + Vector3(0, wall_h * 0.5, 0), Vector3(width, wall_h, depth), basis)
-	lm.box("Tile", p + Vector3(0, wall_h + 0.4, 0) - f * 0.1, Vector3(width + 0.4, 0.8, 0.8), basis)
-	var u := pw * 0.5 + 5.0
-	while u < width * 0.5 - 4.0:
-		for s in [-1.0, 1.0]:
-			var q: Vector3 = p + r * (s * u) + f * 0.04
-			LandmarkLpParts.arch_panel(lm, "Dark", q, yaw, 1.5, 2.7, 1.5)
-			LandmarkLpParts.arch_panel(lm, "Dark", q + Vector3(0, 6.6, 0), yaw, 1.3, 2.2, 1.3)
-		u += 5.6
-	LandmarkLpParts.iwan(lm, "Tile", "Dark", p + f * 1.5, yaw, pw, ph, a, spring, rise, 5.5)
-	for s in [-1.0, 1.0]:
-		_tile_minaret(lm, "Brick", "Tile", p + r * (s * (width * 0.5 - 2.4)) - f * 2.4, 2.1, mh)
-		_tile_minaret(lm, "Brick", "Tile", p + r * (s * (width * 0.5 - 2.4)) - f * (depth - 2.4), 2.1, mh * 0.66)
+	LandmarkLpDetail.alfiz(lm, "Turq", front, yaw, pw * 0.5 - 1.0, ph - 1.2, 0.6, 0.15)
+	LandmarkLpDetail.alfiz(lm, "Cream", front, yaw, a + 0.9, spring + rise + 1.0, 0.45, 0.1)
+	lm.box("Cream", front + f * 0.1 + Vector3(0, ph - 2.3, 0), Vector3(pw - 3.0, 1.0, 0.2), Basis(Vector3.UP, yaw), 0.0)
+	LandmarkLpDetail.arch_band(lm, "Turq", front, yaw, a, spring, rise, 0.4, 0.08, 8)
+	LandmarkLpDetail.muqarnas_hood(lm, "Cream", front, yaw, a, spring, rise, 4, 0.8)
+
+## Cobalt drum with `n` grilled windows, a cream inscription band and a
+## turquoise cornice ring.
+static func _drum(lm: LandmarkMesh, base: Vector3, r: float, h: float, n: int) -> void:
+	lm.frustum("Tile", base, r, r, h, 40)
+	lm.frustum("Cream", base + Vector3(0, h * 0.68, 0), r + 0.06, r + 0.06, h * 0.2, 40)
+	lm.frustum("Turq", base + Vector3(0, h - 0.4, 0), r + 0.1, r + 0.3, 0.4, 40)
+	for k in n:
+		var t := TAU * (float(k) + 0.5) / float(n)
+		var d := Vector3(cos(t), 0, sin(t))
+		LandmarkLpParts.arch_panel(lm, "Dark", base + d * (r + 0.02) + Vector3(0, h * 0.12, 0), PI * 0.5 - t,
+			r * 0.07, h * 0.32, r * 0.08)
 
 # --- Kalyan Minaret and Po-i-Kalyan, Bukhara ---
 
-## The 47 m baked-brick Kalyan Minaret (1127) at the south-east corner of the
-## Kalyan Mosque, which fills the west of the square with its arcaded
-## courtyard of small domes, its tiled portal and the blue 36 m dome; the
-## Mir-i-Arab Madrasa (1535) faces it from the east with two blue domes,
-## bazaar and baths on the north and south. Compass frame.
+## The baked-brick Kalyan Minaret (1127, 45.6 m to the lantern cornice, 9 m
+## across at the base, 6 m at the top) at the south-east corner of the
+## Kalyan Mosque (about 127 x 78 m): its court ringed by arcaded galleries
+## under 288 small domes, the tiled east portal and the blue 30 m dome on
+## its drum over the west sanctuary. The Mir-i-Arab Madrasa (1535, 73 x 55
+## m) faces it from the east with its portal, two blue domes and corner
+## guldastas; bazaar and baths close the square on the north and south.
+## Compass frame.
 static func kalyan(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#C4A068", 3.5))
@@ -167,58 +144,145 @@ static func kalyan(model: Node3D) -> void:
 	lm.use("Turq", LandmarkMaterials.pbr("render", "#30AEB6", 2.0, 0.3))
 	lm.use("Court", LandmarkMaterials.pbr("pavement", "#CBB78E", 6.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#17120E", 3.0, 0.92))
-	lm.box("Court", Vector3(32, -0.15, -5), Vector3(60, 0.3, 80))
-	# Kalyan Mosque: gallery ring round a 94 x 56 m court, sanctuary and dome.
-	lm.box("Court", Vector3(-58, -0.15, -5), Vector3(116, 0.3, 80))
-	lm.box("Brick", Vector3(-58, 7.0, -39.0), Vector3(120, 14.0, 12.0))
-	lm.box("Brick", Vector3(-58, 7.0, 29.0), Vector3(120, 14.0, 12.0))
-	lm.box("Brick", Vector3(-4.0, 7.0, -5.0), Vector3(12.0, 14.0, 80.0))
-	lm.box("Brick", Vector3(-103.0, 9.5, -5.0), Vector3(30.0, 19.0, 80.0))
-	for i in 22:
-		for z in [-39.0, 29.0]:
-			_small_dome(lm, Vector3(-112.0 + 5.4 * float(i), 14.0, z), 2.6)
-	for i in 7:
-		_small_dome(lm, Vector3(-4.0, 14.0, -35.0 + 11.0 * float(i)), 2.6)
-	LandmarkLpParts.iwan(lm, "Tile", "Dark", Vector3(3.5, 0, -5.0), PI * 0.5, 24.0, 30.0, 6.0, 15.0, 9.5, 6.0)
-	var dc := Vector3(-103.0, 19.0, -5.0)
-	lm.frustum("Tile", dc, 11.0, 11.0, 6.0, 24)
-	lm.lathe("Turq", dc + Vector3(0, 6.0, 0), LandmarkLpParts.bulb_profile(11.2, 11.0, 1.08, 12, 1.1), 24)
-	# Mir-i-Arab Madrasa (east, faces west) with its two blue domes.
-	_madrasa(lm, Vector3(62, 0, -5.0), -PI * 0.5, 70.0, 56.0, 14.0, 24.0, 30.0, 6.0, 15.0, 9.5, 24.0)
+	lm.use("Cream", LandmarkMaterials.pbr("render", "#E6D9B6", 2.0, 0.5))
+	lm.box("Court", Vector3(-30, 0.1, -5), Vector3(176, 0.2, 90), Basis(), 0.0)
+	_kalyan_mosque(lm)
+	# Mir-i-Arab Madrasa (east, faces west), its two blue domes, guldastas.
+	LandmarkLpRegistan.madrasa(lm, Vector3(62, 0.2, -5.0), -PI * 0.5, 73.0, 55.0, 14.0, 24.0, 30.0, 6.0, 15.0,
+		9.5, 0.0)
 	for s in [-1.0, 1.0]:
-		var dp := Vector3(62.0 + 22.0, 14.0, -5.0 + s * 16.0)
-		lm.frustum("Tile", dp, 7.5, 7.5, 6.0, 20)
-		lm.lathe("Turq", dp + Vector3(0, 6.0, 0), LandmarkLpParts.bulb_profile(7.8, 11.0, 1.1, 12, 1.2), 20)
-	# Bazaar (north) and baths (south) of the kosh with their small domes.
-	lm.box("Brick", Vector3(32, 3.5, -49.0), Vector3(60, 7.0, 10.0))
-	lm.box("Brick", Vector3(32, 3.5, 40.0), Vector3(60, 7.0, 10.0))
-	for x in [16.0, 28.0, 40.0, 52.0]:
-		_small_dome(lm, Vector3(x, 7.0, -49.0), 3.4)
-		_small_dome(lm, Vector3(x, 7.0, 40.0), 3.4)
+		var dp := Vector3(62.0 + 20.0, 14.0, -5.0 + float(s) * 16.0)
+		_drum(lm, dp, 7.5, 6.0, 12)
+		lm.lathe("Turq", dp + Vector3(0, 6.0, 0), LandmarkLpParts.bulb_profile(7.8, 11.0, 1.1, 12, 1.2), 32)
+	# Bazaar (north) and baths (south) of the square with their small domes.
+	for z in [-49.0, 40.0]:
+		lm.box("Brick", Vector3(32, 3.5, z), Vector3(60, 7.0, 10.0))
+		for i in 8:
+			LandmarkLpParts.arch_panel(lm, "Dark", Vector3(5.5 + 7.5 * float(i), 0.2, float(z) + 5.02 * (1.0 if z < 0.0 else -1.0)),
+				0.0 if z < 0.0 else PI, 1.2, 2.2, 1.4)
+		for x in [16.0, 28.0, 40.0, 52.0]:
+			_small_dome(lm, Vector3(float(x), 7.0, float(z)), 3.4)
 	_kalyan_minaret(lm, Vector3(8.0, 0, 50.5))
 	lm.commit(model)
 
-static func _small_dome(lm: LandmarkMesh, base: Vector3, r: float) -> void:
-	lm.lathe("Brick", base, LandmarkLpParts.dome_profile(r, r * 0.85, 3), 8)
+## Kalyan Mosque: outer walls, the gallery bays round the court each under
+## its own small dome, the arcaded court fronts, east portal, west dome.
+static func _kalyan_mosque(lm: LandmarkMesh) -> void:
+	var x0 := -118.0
+	var x1 := -2.0
+	var z0 := -44.0
+	var z1 := 34.0
+	var wh := 9.0
+	var pitch := 4.6
+	# Courtyard (inside the galleries): x -88 .. -14, z -30 .. 20.
+	var cx0 := -88.0
+	var cx1 := -14.0
+	var cz0 := -30.0
+	var cz1 := 20.0
+	# Gallery masses: north, south, east ranges and the west sanctuary block.
+	lm.box("Brick", Vector3((x0 + x1) * 0.5, wh * 0.5, (z0 + cz0) * 0.5), Vector3(x1 - x0, wh, cz0 - z0))
+	lm.box("Brick", Vector3((x0 + x1) * 0.5, wh * 0.5, (cz1 + z1) * 0.5), Vector3(x1 - x0, wh, z1 - cz1))
+	lm.box("Brick", Vector3((cx1 + x1) * 0.5, wh * 0.5, (cz0 + cz1) * 0.5), Vector3(x1 - cx1, wh, cz1 - cz0))
+	lm.box("Brick", Vector3((x0 + cx0) * 0.5, wh * 0.5, (cz0 + cz1) * 0.5), Vector3(cx0 - x0, wh, cz1 - cz0))
+	# Small domes over every gallery bay (skipping the main dome and portal).
+	var dc := Vector3(-103.0, 0, -5.0)
+	var n_x := int((x1 - x0) / pitch)
+	var n_z := int((z1 - z0) / pitch)
+	for i in n_x:
+		for j in n_z:
+			var p := Vector3(x0 + pitch * (float(i) + 0.5), wh, z0 + pitch * (float(j) + 0.5))
+			var in_court := p.x > cx0 and p.x < cx1 and p.z > cz0 and p.z < cz1
+			var under_dome := absf(p.x - dc.x) < 13.0 and absf(p.z - dc.z) < 13.0
+			if in_court or under_dome or (p.x > cx1 and absf(p.z + 5.0) < 13.0):
+				continue
+			_small_dome(lm, p, 1.9)
+	# Arcaded court fronts: pointed arches in a tiled-frame brick skin.
+	var fronts := [[Vector3((cx0 + cx1) * 0.5, 0.2, cz0), PI * 0.0, cx1 - cx0],
+		[Vector3((cx0 + cx1) * 0.5, 0.2, cz1), PI, cx1 - cx0],
+		[Vector3(cx1, 0.2, (cz0 + cz1) * 0.5), -PI * 0.5, cz1 - cz0],
+		[Vector3(cx0, 0.2, (cz0 + cz1) * 0.5), PI * 0.5, cz1 - cz0]]
+	for fr in fronts:
+		var fp: Vector3 = fr[0]
+		var yaw: float = fr[1]
+		var w: float = fr[2]
+		var n := int(w / pitch)
+		var ar := LandmarkLpDetail.bays(n, w, 1.5, 3.4, 2.0)
+		LandmarkLpDetail.arcade_skin(lm, "Brick", "Dark", fp + LandmarkLpParts.outward(yaw) * 0.6, yaw, w, wh - 0.2,
+			ar, 0.6, 6)
+		lm.box("Tile", fp + LandmarkLpParts.outward(yaw) * 0.7 + Vector3(0, wh - 1.2, 0),
+			Vector3(absf(LandmarkLpParts.across(yaw).x) * w + 0.1, 0.5, absf(LandmarkLpParts.across(yaw).z) * w + 0.1),
+			Basis(), 0.0)
+	# West sanctuary: pishtaq on the court, drum and the 30 m blue dome.
+	var sf := Vector3(cx0 + 1.0, 0.2, -5.0)
+	LandmarkLpParts.iwan(lm, "Tile", "Dark", sf, PI * 0.5, 20.0, 21.0, 4.5, 10.0, 6.5, 5.0)
+	_pishtaq_dress(lm, sf, PI * 0.5, 20.0, 21.0, 4.5, 10.0, 6.5)
+	lm.box("Brick", dc + Vector3(0, 8.0, 0), Vector3(24, 16.0, 24))
+	_drum(lm, dc + Vector3(0, 16.0, 0), 8.6, 5.0, 16)
+	lm.lathe("Turq", dc + Vector3(0, 21.0, 0), LandmarkLpParts.bulb_profile(8.8, 8.2, 1.08, 14, 1.1), 40)
+	LandmarkLpParts.needle(lm, "Turq", dc + Vector3(0, 29.2, 0), PackedVector2Array([Vector2(0, 0.25), Vector2(0.8, 0.06)]), 8)
+	# East portal on the square: tall pishtaq with corner turrets.
+	var ef := Vector3(3.5, 0.2, -5.0)
+	LandmarkLpParts.iwan(lm, "Tile", "Dark", ef, PI * 0.5, 24.0, 28.0, 6.0, 14.0, 9.5, 6.0)
+	_pishtaq_dress(lm, ef, PI * 0.5, 24.0, 28.0, 6.0, 14.0, 9.5)
+	for s in [-1.0, 1.0]:
+		var g := Vector3(1.8, 0.2, -5.0 + float(s) * 12.4)
+		lm.frustum("Brick", g, 1.4, 1.2, 28.6, 16)
+		lm.frustum("Tile", g + Vector3(0, 28.6, 0), 1.5, 1.5, 0.5, 16)
+		lm.lathe("Turq", g + Vector3(0, 29.1, 0), LandmarkLpParts.bulb_profile(1.2, 1.6, 1.1, 6, 1.2), 12)
+	# Outer corner turrets of the mosque.
+	for c in [Vector3(x0, 0, z0), Vector3(x0, 0, z1), Vector3(x1, 0, z0)]:
+		lm.frustum("Brick", (c as Vector3) + Vector3(0, 0.2, 0), 2.4, 2.1, wh + 2.0, 16)
+		lm.lathe("Brick", (c as Vector3) + Vector3(0, wh + 2.2, 0), LandmarkLpParts.dome_profile(2.2, 1.8, 4), 12)
 
-## 47 m brick minaret: 9 m base tapering to 6 m under the rotunda, ten
-## ornamental brick belts, a glazed blue inscription frieze, the muqarnas
-## cornice, the sixteen-arched lantern and a small conical cap.
+static func _small_dome(lm: LandmarkMesh, base: Vector3, r: float) -> void:
+	lm.frustum("Brick", base, r * 1.05, r * 1.0, r * 0.25, 8)
+	lm.lathe("Brick", base + Vector3(0, r * 0.25, 0), LandmarkLpParts.dome_profile(r, r * 0.8, 3), 8)
+
+## The minaret: stone plinth with three limestone bands, the tapering
+## brick shaft (9 m to 6 m across) girdled by fourteen ornamental brick
+## belts (lozenge bonding on every other one) and the blue-glazed
+## inscription frieze, the muqarnas cornice, the sixteen-arched lantern,
+## its crowning cornice and the low cap (47 m).
 static func _kalyan_minaret(lm: LandmarkMesh, base: Vector3) -> void:
-	lm.lathe("Brick", base + Vector3(0, -1.0, 0), PackedVector2Array([Vector2(5.5, 0.0), Vector2(5.5, 4.0),
-		Vector2(4.5, 4.0), Vector2(3.0, 38.0)]), 16)
-	for y in [7.0, 12.5, 17.0, 21.5, 25.5, 29.0, 34.5]:
-		var rr := lerpf(4.5, 3.0, (y - 3.0) / 35.0) + 0.16
-		lm.frustum("Brick", base + Vector3(0, y, 0), rr, rr, 0.6, 16)
-	var rt := lerpf(4.5, 3.0, 29.5 / 35.0) + 0.14
-	lm.frustum("Tile", base + Vector3(0, 30.2, 0), rt, rt, 2.4, 16)
-	lm.frustum("Brick", base + Vector3(0, 37.0, 0), 3.1, 4.4, 3.0, 16)
-	lm.frustum("Brick", base + Vector3(0, 40.0, 0), 4.6, 4.6, 0.5, 16)
-	lm.frustum("Brick", base + Vector3(0, 40.5, 0), 3.1, 3.1, 5.5, 16)
+	lm.frustum("Brick", base, 5.4, 5.3, 1.4, 24)
+	for k in 3:
+		lm.frustum("Cream", base + Vector3(0, 0.15 + 0.42 * float(k), 0), 5.45, 5.45, 0.22, 24)
+	var sb := base + Vector3(0, 1.4, 0)
+	var sh := 35.1
+	var r0 := 4.5
+	var r1 := 3.0
+	lm.lathe("Brick", sb, PackedVector2Array([Vector2(r0, 0.0), Vector2(lerpf(r0, r1, 0.45), sh * 0.5),
+		Vector2(r1, sh)]), 32)
+	for k in 14:
+		var y := 1.6 + 2.45 * float(k)
+		var rr := lerpf(r0, r1, (y - 0.8) / sh) + 0.05
+		lm.frustum("Brick", sb + Vector3(0, y, 0), rr, rr - 0.01, 0.35, 32)
+		if k % 2 == 1:
+			var n := int(TAU * rr / 0.9)
+			for i in n:
+				var a := TAU * (float(i) + 0.5) / float(n)
+				var d := Vector3(cos(a), 0, sin(a))
+				lm.box("Brick", sb + d * (rr - 0.02) + Vector3(0, y + 1.2, 0), Vector3(0.45, 0.45, 0.1),
+					Basis.looking_at(d) * Basis(Vector3(0, 0, 1), PI * 0.25), 0.0)
+	var rt := lerpf(r0, r1, 31.0 / sh) + 0.08
+	lm.frustum("Tile", sb + Vector3(0, 30.6, 0), rt, rt - 0.02, 1.6, 32)
+	# Muqarnas cornice: five corbel rings flaring out under the lantern.
+	var cb := sb + Vector3(0, sh, 0)
+	for k in 5:
+		var t0 := float(k) / 5.0
+		var t1 := float(k + 1) / 5.0
+		lm.frustum("Brick", cb + Vector3(0, 0.7 * float(k), 0), lerpf(r1, 4.3, t0 * t0), lerpf(r1, 4.3, t1 * t1), 0.7, 32)
+	lm.frustum("Brick", cb + Vector3(0, 3.5, 0), 4.4, 4.4, 0.4, 32)
+	# Lantern: sixteen arched openings between brick piers.
+	var lb := cb + Vector3(0, 3.9, 0)
+	lm.frustum("Brick", lb, 3.1, 3.1, 4.6, 32)
 	for k in 16:
 		var a := TAU * float(k) / 16.0
-		lm.box("Dark", base + Vector3(cos(a) * 3.1, 43.0, sin(a) * 3.1), Vector3(0.25, 3.4, 1.3),
-			Basis(Vector3.UP, -a))
-	lm.frustum("Tile", base + Vector3(0, 46.0, 0), 3.35, 3.35, 0.4, 16)
-	lm.lathe("Brick", base + Vector3(0, 46.0, 0), PackedVector2Array([Vector2(3.3, 0.0), Vector2(1.6, 0.6),
-		Vector2(0.1, 1.0)]), 16)
+		var d := Vector3(cos(a), 0, sin(a))
+		LandmarkLpParts.arch_panel(lm, "Dark", lb + d * 3.12 + Vector3(0, 0.6, 0), PI * 0.5 - a, 0.42, 2.0, 0.6)
+		var dp := Vector3(cos(a + PI / 16.0), 0, sin(a + PI / 16.0))
+		lm.box("Brick", lb + dp * 3.15 + Vector3(0, 2.0, 0), Vector3(0.4, 4.0, 0.3), Basis.looking_at(dp))
+	lm.frustum("Tile", lb + Vector3(0, 3.6, 0), 3.18, 3.18, 0.5, 32)
+	lm.frustum("Brick", lb + Vector3(0, 4.6, 0), 3.15, 3.5, 0.5, 32)
+	lm.lathe("Brick", lb + Vector3(0, 5.1, 0), PackedVector2Array([Vector2(3.4, 0.0), Vector2(2.4, 0.45),
+		Vector2(1.0, 0.75), Vector2(0.1, 0.8)]), 24)

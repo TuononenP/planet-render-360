@@ -202,9 +202,10 @@ static func cloister(lm: LandmarkMesh, wall: String, roof: String, c: Vector3, h
 		lm.box(wall, c + Vector3(xc, wall_h * 0.5, 0), Vector3(thick, wall_h, hz * 2.0 - thick * 2.0))
 		lm.gable(roof, c + Vector3(xc, wall_h, 0), thick, hz * 2.0 - thick * 2.0, rise, Basis(), 0.5, wall)
 
-## Row of `n` posts of `size` between the ground points a..b, `h` tall.
+## Row of `n` posts of `size` between the ground points a..b, `h` tall
+## (`bevel` as LandmarkMesh.box: 0 keeps long rows light).
 static func posts(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, n: int, h: float,
-		size: float) -> void:
+		size: float, bevel: float = -1.0) -> void:
 	for i in n:
 		lm.box(key, a.lerp(b, float(i) / float(maxi(n - 1, 1))) + Vector3(0, h * 0.5, 0),
-			Vector3(size, h, size))
+			Vector3(size, h, size), Basis(), bevel)

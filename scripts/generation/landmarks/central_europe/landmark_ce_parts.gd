@@ -84,3 +84,130 @@ static func dome(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: floa
 		var a := PI * 0.5 * float(i) / 8.0
 		p.append(Vector2(r * cos(a), h * sin(a)))
 	lm.lathe(key, base, p, seg)
+
+## Gothic lancet window: opening w wide, h from the sill (`sill`, the
+## centre of its bottom edge on a wall facing `n`) to the apex of an
+## equilateral pointed head. A moulded frame stands proud of the wall,
+## glass sits just in front of it, `mullions` divide the lights and a
+## round tracery eye fills the head.
+static func lancet(lm: LandmarkMesh, frame: String, glass: String, sill: Vector3, n: Vector3,
+		w: float, h: float, mullions: int = 1, depth: float = 0.35) -> void:
+	var nn := n.normalized()
+	var r := Vector3.UP.cross(nn).normalized()
+	var spring := maxf(h - w * 0.866, 0.2)
+	var fw := clampf(w * 0.1, 0.12, 0.6)
+	var g := sill + nn * 0.03
+	var up := Vector3.UP
+	lm.quad(glass, g - r * w * 0.5, g + r * w * 0.5, g + r * w * 0.5 + up * spring,
+		g - r * w * 0.5 + up * spring, nn)
+	var gs := g + up * spring
+	var head := _pointed(w * 0.5, 5)
+	for i in head.size() - 1:
+		var a := head[i]
+		var b := head[i + 1]
+		lm.tri(glass, gs, gs + r * a.x + up * a.y, gs + r * b.x + up * b.y, nn, nn, nn,
+			Vector2.ZERO, a, b)
+	var fc := sill + nn * depth * 0.5
+	var wo := w * 0.5 + fw * 0.5
+	for s in [-1.0, 1.0]:
+		lm.beam(frame, fc + r * wo * float(s), fc + r * wo * float(s) + up * spring, fw, depth, r)
+	var arc := _pointed(wo, 5)
+	for i in arc.size() - 1:
+		lm.beam(frame, fc + up * spring + r * arc[i].x + up * arc[i].y,
+			fc + up * spring + r * arc[i + 1].x + up * arc[i + 1].y, fw, depth, nn)
+	lm.box(frame, fc + nn * depth * 0.2 - up * fw * 0.3, Vector3(w + fw * 3.0, fw * 0.6, depth * 1.4),
+		Basis(r, up, nn), 0.0)
+	var bar := fw * 0.6
+	for m in mullions:
+		var x := w * ((float(m) + 1.0) / float(mullions + 1) - 0.5)
+		lm.beam(frame, fc + r * x, fc + r * x + up * (spring + w * 0.12), bar, depth * 0.7, r)
+	# Tracery eye in the head.
+	var ec := fc + up * (spring + w * 0.42)
+	var er := w * 0.2
+	for k in 8:
+		var a0 := TAU * float(k) / 8.0
+		var a1 := TAU * float(k + 1) / 8.0
+		lm.beam(frame, ec + (r * cos(a0) + up * sin(a0)) * er, ec + (r * cos(a1) + up * sin(a1)) * er,
+			bar, depth * 0.7, nn)
+
+## One side of an equilateral pointed arch of half-span hs, as (x, y)
+## from the left springer (-hs, 0) up to the apex and down to (hs, 0).
+static func _pointed(hs: float, steps: int) -> PackedVector2Array:
+	var p := PackedVector2Array()
+	for i in steps + 1:
+		var t := PI - (PI / 3.0) * float(i) / float(steps)
+		p.append(Vector2(hs + cos(t) * hs * 2.0, sin(t) * hs * 2.0))
+	for i in range(steps - 1, -1, -1):
+		var q := p[i]
+		p.append(Vector2(-q.x, q.y))
+	return p
+
+## Gothic pinnacle w square and h tall from `base`: a shaft, four
+## gablets crossing at its head, a crocketed needle and a cross-flower
+## finial.
+static func pinnacle(lm: LandmarkMesh, key: String, base: Vector3, w: float, h: float) -> void:
+	var sh := h * 0.42
+	lm.box(key, base + Vector3(0, sh * 0.5, 0), Vector3(w, sh, w))
+	var gb := base + Vector3(0, sh, 0)
+	lm.gable(key, gb, w, w, w * 0.75, Basis(), 0.04, key)
+	lm.gable(key, gb, w, w, w * 0.75, Basis(Vector3.UP, PI * 0.5), 0.04, key)
+	var nh := h - sh - w * 0.35
+	lm.spire(key, gb, w * 0.36, nh)
+	# Crockets up the four arrises, then the finial.
+	var n := clampi(int(nh / maxf(w * 0.6, 0.3)), 2, 6)
+	for e in 4:
+		var a := PI * 0.25 + PI * 0.5 * float(e)
+		var d := Vector3(cos(a), 0, sin(a))
+		for k in n:
+			var t := (float(k) + 0.6) / float(n + 0.5)
+			var p := gb + d * w * 0.36 * 1.414 * (1.0 - t) + Vector3(0, nh * t, 0)
+			lm.box(key, p + d * w * 0.08, Vector3(w * 0.16, w * 0.12, w * 0.16), Basis(Vector3.UP, -a), 0.0)
+	var tip := gb + Vector3(0, nh, 0)
+	lm.box(key, tip, Vector3(w * 0.34, w * 0.12, w * 0.12), Basis(), 0.0)
+	lm.box(key, tip, Vector3(w * 0.12, w * 0.12, w * 0.34), Basis(), 0.0)
+	lm.beam(key, tip - Vector3(0, w * 0.1, 0), tip + Vector3(0, w * 0.35, 0), w * 0.1, w * 0.1)
+
+## Gothic wimperg: an open triangular gable `w` wide and `h` tall over a
+## window or portal, its foot centred at `c` on a wall facing `n`, with
+## crockets on the rakes and a finial.
+static func wimperg(lm: LandmarkMesh, key: String, c: Vector3, n: Vector3, w: float, h: float,
+		depth: float = 0.4) -> void:
+	var nn := n.normalized()
+	var r := Vector3.UP.cross(nn).normalized()
+	var b := c + nn * depth * 0.5
+	var apex := b + Vector3(0, h, 0)
+	var bw := clampf(w * 0.08, 0.15, 0.8)
+	for s in [-1.0, 1.0]:
+		var foot := b + r * w * 0.5 * float(s)
+		lm.beam(key, foot, apex, bw, depth, nn)
+		for k in 3:
+			var p := foot.lerp(apex, (float(k) + 0.7) / 3.7) + Vector3(0, bw * 0.6, 0)
+			lm.box(key, p, Vector3(bw * 0.8, bw * 0.7, depth * 0.8), Basis(r, Vector3.UP, nn), 0.0)
+	lm.beam(key, b - r * w * 0.5, b + r * w * 0.5, bw, depth, nn)
+	lm.beam(key, apex, apex + Vector3(0, bw * 2.2, 0), bw * 0.9, bw * 0.9)
+	lm.box(key, apex + Vector3(0, bw * 1.6, 0), Vector3(bw * 2.0, bw * 0.5, bw * 0.5), Basis(r, Vector3.UP, nn), 0.0)
+
+## Ring of `count` small round-headed openings (drum and gallery windows)
+## of w x h around a vertical axis at `c` (sill level), radius r: framed
+## by an arch of beams over each, glass on the wall.
+static func arched_ring(lm: LandmarkMesh, frame: String, glass: String, c: Vector3, r: float,
+		count: int, w: float, h: float, phase: float = 0.0) -> void:
+	for i in count:
+		var a := phase + TAU * (float(i) + 0.5) / float(count)
+		var d := Vector3(cos(a), 0, sin(a))
+		var rt := d.cross(Vector3.UP).normalized()
+		var p := c + d * (r + 0.03)
+		var oh := h - w * 0.5
+		lm.quad(glass, p - rt * w * 0.5, p + rt * w * 0.5, p + rt * w * 0.5 + Vector3(0, oh, 0),
+			p - rt * w * 0.5 + Vector3(0, oh, 0), d)
+		var fw := clampf(w * 0.14, 0.1, 0.5)
+		var fc := c + d * (r + fw * 0.4)
+		var prev := fc - rt * (w * 0.5 + fw * 0.5)
+		lm.beam(frame, prev, prev + Vector3(0, oh, 0), fw, fw, rt)
+		prev += Vector3(0, oh, 0)
+		for k in 6:
+			var t := PI - PI * float(k + 1) / 6.0
+			var q := fc + Vector3(0, oh, 0) + (rt * cos(t) + Vector3.UP * sin(t)) * (w * 0.5 + fw * 0.5)
+			lm.beam(frame, prev, q, fw, fw, d)
+			prev = q
+		lm.beam(frame, prev, prev - Vector3(0, oh, 0), fw, fw, rt)
