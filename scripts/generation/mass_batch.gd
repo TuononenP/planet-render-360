@@ -61,6 +61,41 @@ func add(key: String, mat: Material, verts: PackedVector3Array,
 	g["i"] = idx
 	triangles += indices.size() / 3
 
+## A whole group's arrays at once, colours included (a native kernel's
+## run of add() calls, CityKernels.fabric): appended in that order.
+func add_group(key: String, mat: Material, verts: PackedVector3Array,
+		normals: PackedVector3Array, uvs: PackedVector2Array, colors: PackedColorArray,
+		indices: PackedInt32Array) -> void:
+	var g := _group(key, mat)
+	var v: PackedVector3Array = g["v"]
+	var nr: PackedVector3Array = g["n"]
+	var uv: PackedVector2Array = g["uv"]
+	var col: PackedColorArray = g["c"]
+	var idx: PackedInt32Array = g["i"]
+	g["v"] = null
+	g["n"] = null
+	g["uv"] = null
+	g["c"] = null
+	g["i"] = null
+	var base := v.size()
+	v.append_array(verts)
+	nr.append_array(normals)
+	uv.append_array(uvs)
+	col.append_array(colors)
+	if base == 0:
+		idx.append_array(indices)
+	else:
+		var start := idx.size()
+		idx.resize(start + indices.size())
+		for t in indices.size():
+			idx[start + t] = indices[t] + base
+	g["v"] = v
+	g["n"] = nr
+	g["uv"] = uv
+	g["c"] = col
+	g["i"] = idx
+	triangles += indices.size() / 3
+
 ## Surface 0 of an ArrayMesh (indexed or not), e.g. RoofGeometry forms.
 func add_mesh(key: String, mat: Material, mesh: Mesh) -> void:
 	if mesh == null or mesh.get_surface_count() == 0:
@@ -133,8 +168,13 @@ static func _tint(mat: Material, p: Vector3) -> Color:
 ## Per-vertex tangents from UV gradients (Godot convention: +u tangent,
 ## w so the binormal points to −v), so the shared facade and roof normal
 ## maps light batched masses the way they light real buildings.
+## Native MassKernels (native/, tools/build_native.sh) when loaded.
+static var _native := ClassDB.class_exists("MassKernels")
+
 static func tangents(v: PackedVector3Array, n: PackedVector3Array,
 		uv: PackedVector2Array, idx: PackedInt32Array) -> PackedFloat32Array:
+	if _native:
+		return ClassDB.class_call_static("MassKernels", "tangents", v, n, uv, idx)
 	var tu := PackedVector3Array()
 	tu.resize(v.size())
 	var tv := PackedVector3Array()

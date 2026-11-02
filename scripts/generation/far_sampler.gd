@@ -11,23 +11,28 @@ static func _tile_uv(data: LocationData, span_u: float, wx: float, wz: float) ->
 ## Native FarKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("FarKernels")
 
+## The far surface and ground the native kernels sample (FarKernels,
+## CityKernels: far_sampling.h reads these keys).
+static func native_params(data: LocationData, ground: GroundTruth, surf: Dictionary) -> Dictionary:
+	return {
+		"lat": data.latitude, "lon": data.longitude,
+		"m2u": WorldScale.metres_to_units(), "far_centre_frac": data.far_centre_frac,
+		"s_0": surf.get("s_0", 0.0), "blend_u": surf.get("blend_u", 0.0),
+		"span_u": surf.get("span_u", 1.0), "edge_hi": surf.get("edge_hi", 0.0),
+		"far_grid_size": data.far_grid_size, "far_heights": data.far_heights,
+		"water_level_m": ground.water_level_m, "datum_m": ground.datum_m,
+		"y_scale": ground._y_scale, "step_units": ground._step_units, "size": ground._size,
+		"surface": ground._surface, "half_units": ground._half_units, "level": ground._level,
+	}
+
 ## FarTerrainBuilder._ring_bands' positions from the native kernel;
 ## empty without the library (the caller runs its own loop).
 static func native_ring_positions(data: LocationData, ground: GroundTruth,
 		surf: Dictionary, radii: Array[float], segs: int) -> PackedVector3Array:
 	if not _native:
 		return PackedVector3Array()
-	var params := {
-		"lat": data.latitude, "lon": data.longitude,
-		"m2u": WorldScale.metres_to_units(), "far_centre_frac": data.far_centre_frac,
-		"s_0": surf["s_0"], "blend_u": surf["blend_u"], "span_u": surf["span_u"],
-		"edge_hi": surf["edge_hi"], "far_grid_size": data.far_grid_size,
-		"water_level_m": ground.water_level_m, "datum_m": ground.datum_m,
-		"y_scale": ground._y_scale, "step_units": ground._step_units, "size": ground._size,
-	}
 	return ClassDB.class_call_static("FarKernels", "ring_positions",
-		PackedFloat64Array(radii), segs, params, data.far_heights, ground._surface,
-		data.dem_rings)
+		PackedFloat64Array(radii), segs, native_params(data, ground, surf), data.dem_rings)
 
 ## Its [normals, colors] from the native kernel; empty without it.
 static func native_ring_colors(pos: PackedVector3Array, loops: int, per: int,

@@ -1,4 +1,8 @@
+#include "city_kernels.h"
 #include "far_kernels.h"
+#include "mass_kernels.h"
+#include "party_index.h"
+#include "roof_kernels.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -11,7 +15,11 @@ static void initialize(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	GDREGISTER_CLASS(CityKernels);
 	GDREGISTER_CLASS(FarKernels);
+	GDREGISTER_CLASS(MassKernels);
+	GDREGISTER_CLASS(PartyIndex);
+	GDREGISTER_CLASS(RoofKernels);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

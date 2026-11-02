@@ -32,12 +32,18 @@ const OPEN := -INF
 var _edges := {}
 var _edges_added := 0
 var _roads := {}
+## Native PartyIndex (native/, tools/build_native.sh) holding the same
+## grid when the library is loaded; null runs the script's own.
+var _idx: RefCounted = null
+static var _native := ClassDB.class_exists("PartyIndex")
 
 ## Index over every mass `accept(b)` keeps (the builder's own skip rules,
 ## so a removed landmark parcel never hides its neighbours' walls).
 static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 		accept: Callable = Callable()) -> PartyWalls:
 	var pw := PartyWalls.new()
+	if _native:
+		pw._idx = ClassDB.instantiate("PartyIndex")
 	for b in data.buildings:
 		if not (b is Dictionary) or (accept.is_valid() and not bool(accept.call(b))):
 			continue
@@ -52,7 +58,10 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 		var hw := float((r as Dictionary).get("width_m", 8.0)) * 0.5 if r is Dictionary else 4.0
 		var p := pts as PackedVector2Array
 		for i in p.size() - 1:
-			pw._insert(pw._roads, p[i], p[i + 1], [p[i], p[i + 1], hw * WorldScale.metres_to_units()])
+			if pw._idx != null:
+				pw._idx.add_road(p[i], p[i + 1], hw * WorldScale.metres_to_units())
+			else:
+				pw._insert(pw._roads, p[i], p[i + 1], [p[i], p[i + 1], hw * WorldScale.metres_to_units()])
 	return pw
 
 ## Registers one planned mass: its outer edges face out, its courtyard
@@ -75,6 +84,9 @@ func add_mass(m: Dictionary, ground: GroundTruth) -> void:
 		_add_ring(h as PackedVector2Array, str(m["key"]), top, true)
 
 func _add_ring(ring: PackedVector2Array, key: String, top: float, hole: bool) -> void:
+	if _idx != null:
+		_idx.add_ring(ring, key, top, hole)
+		return
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	for i in ring.size():
 		var a := ring[i]
@@ -105,6 +117,8 @@ static func _outward_ccw(ring: PackedVector2Array, i: int, hole: bool, ccw: bool
 
 ## Per-edge partitions of `ring` (Array per edge, see partition()).
 func ring_cover(ring: PackedVector2Array, key: String, hole: bool = false) -> Array:
+	if _idx != null:
+		return _idx.ring_cover(ring, key, hole)
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	var out: Array = []
 	for i in ring.size():
@@ -195,6 +209,8 @@ static func party_flags(cover: Array) -> PackedByteArray:
 ## True when an exposed wall a→b (outward n) stands on a street: a road
 ## runs within STREET_M of its foot, measured from its midpoint.
 func faces_street(a: Vector2, b: Vector2, n: Vector2) -> bool:
+	if _idx != null:
+		return _idx.faces_street(a, b, n)
 	var m := WorldScale.metres_to_units()
 	var p := (a + b) * 0.5 + n * 1.5 * m
 	var reach := STREET_M * m

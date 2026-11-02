@@ -25,8 +25,7 @@ public:
 	// FarTerrainBuilder._ring_bands' vertex positions: loops of
 	// 4 * segs vertices around the square rings at `radii`.
 	static PackedVector3Array ring_positions(const PackedFloat64Array &radii, int segs,
-			const Dictionary &params, const PackedFloat32Array &far_heights,
-			const PackedFloat32Array &ground_surface, const Array &dem_rings);
+			const Dictionary &params, const Array &dem_rings);
 	// Its normals and colours over those positions: [normals, colors].
 	// `water` holds the PolygonIndex objects of the OSM water.
 	static Array ring_colors(const PackedVector3Array &pos, int loops, int per,

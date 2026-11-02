@@ -34,6 +34,8 @@ const THIN_FAR := 0.55
 const MAX_SLOPE := 0.3
 const STREET_M := 12.0
 const LANDMARK_CLEAR_M := 120.0
+## Native CityKernels when loaded.
+static var _native := ClassDB.class_exists("CityKernels")
 
 static func _hash(x: float, z: float, salt: float = 0.0) -> float:
 	return fposmod(sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453, 1.0)
@@ -48,7 +50,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var b := FarCityBuilder.new()
 	b._setup(data, ground, smap)
 	b._towers()
-	if smap != null and not smap.is_empty():
+	if smap != null and not smap.is_empty() and not b._native_fabric():
 		b._fabric()
 	var batch := b.batch
 	stats = {"far_blocks": b.blocks, "far_towers": b.towers,
@@ -237,6 +239,45 @@ func _fabric() -> void:
 						var side := (lot - STREET_M) * fill
 						_mass(lc, Vector2(side * lerpf(0.8, 1.0, _hash(lc.x, lc.y, 2.0)),
 							side * lerpf(0.75, 1.0, _hash(lc.x, lc.y, 4.0))), yaw, prof, d, kind)
+
+## _fabric in native code (CityKernels, tools/build_native.sh): the same
+## masses into the same batches. False without the library.
+func _native_fabric() -> bool:
+	if not _native:
+		return false
+	var mats: Array = _dfs + _drs
+	var fuv := PackedVector3Array()
+	for m in _dfs:
+		fuv.append(FacadeMaterials.facade_uv(m))
+	var tint := PackedByteArray()
+	for m in mats:
+		tint.append(1 if WallVariety.is_wall(m) else 2 if RoofVariety.is_roof(m) else 0)
+	# MassBatch groups by material identity; the sets repeat materials.
+	var canon := PackedInt32Array()
+	for m in mats:
+		canon.append(mats.find(m))
+	var towers := PackedInt32Array()
+	for cell: Vector2i in _tower_cells:
+		if cell.x >= 0 and cell.y >= 0 and cell.x < smap.n and cell.y < smap.n:
+			towers.append(smap.index(cell.x, cell.y))
+	var city := {
+		"far_ok": _far_ok, "sea": _sea, "h_edge": _h_edge,
+		"n": smap.n, "half": smap.half, "score": smap.score, "cls": smap.cls,
+		"blocked": smap.blocked, "tower_cells": towers,
+		"apt": ArchitectureStyle.profile(_region, "apartments"),
+		"house": ArchitectureStyle.profile(_region, "house"),
+		"ind": ArchitectureStyle.profile(_region, "industrial"),
+		"com": ArchitectureStyle.profile(_region, "commercial"),
+		"landmarks": PackedVector2Array(_landmarks),
+		"n_dfs": _dfs.size(), "n_drs": _drs.size(), "facade_uv": fuv, "tint": tint,
+		"canon": canon,
+	}
+	var out: Dictionary = ClassDB.class_call_static("CityKernels", "fabric", city,
+		FarSampler.native_params(data, ground, _surf), data.dem_rings)
+	for g: Array in out["groups"]:
+		batch.add_group(g[0], mats[g[1]], g[2], g[3], g[4], g[5], g[6])
+	blocks += int(out["blocks"])
+	return true
 
 ## One block mass: walls tiled per bay/storey + a regional roof form.
 func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,

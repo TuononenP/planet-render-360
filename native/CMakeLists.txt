@@ -6,12 +6,24 @@ cmake_minimum_required(VERSION 3.17)
 project(planet_render LANGUAGES CXX)
 
 set(GODOTCPP_API_VERSION "4.7" CACHE STRING "")
+# The kernels must round exactly like GDScript: no fused multiply-add,
+# also in godot-cpp's own Vector2 maths (length, normalize, rotated).
+add_compile_options(-ffp-contract=off)
 add_subdirectory(godot-cpp)
 
 add_library(planet_render SHARED
 	src/register_types.cpp
+	src/city_kernels.cpp
+	src/city_kernels.h
 	src/far_kernels.cpp
 	src/far_kernels.h
+	src/far_sampling.h
+	src/roof_kernels.cpp
+	src/roof_kernels.h
+	src/mass_kernels.cpp
+	src/mass_kernels.h
+	src/party_index.cpp
+	src/party_index.h
 	src/parallel.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)
@@ -23,8 +35,6 @@ set_target_properties(planet_render PROPERTIES
 	CXX_EXTENSIONS OFF
 	CXX_VISIBILITY_PRESET ${GODOTCPP_SYMBOL_VISIBILITY}
 	POSITION_INDEPENDENT_CODE ON
-	# The kernels must round exactly like GDScript: no fused multiply-add.
-	COMPILE_OPTIONS "-ffp-contract=off"
 	LIBRARY_OUTPUT_DIRECTORY "$<1:${OUTPUT_DIR}>"
 	RUNTIME_OUTPUT_DIRECTORY "$<1:${OUTPUT_DIR}>"
 	PREFIX "lib"

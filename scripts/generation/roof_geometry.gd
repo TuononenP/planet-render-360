@@ -15,6 +15,8 @@ extends RefCounted
 ## into spokes of stretched slivers with a serrated eave.
 const INSET_MIN_AREA_M2 := 380.0
 const INSET_CONVEX_RATIO := 0.94
+## Native RoofKernels (native/, tools/build_native.sh) when loaded.
+static var _native := ClassDB.class_exists("RoofKernels")
 
 ## The ring offset outward by d (mitred, miter capped at 3d) — the eave
 ## line of an overhanging roof. Winding-agnostic; d <= 0 returns it as is.
@@ -58,6 +60,8 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 		gable_front: bool = false, holes: Array = []) -> ArrayMesh:
 	if rh <= 0.01 or ring.size() < 3:
 		return null
+	if _native:
+		return _native_mesh(ring, top, rh, shape, party, gable_front, holes)
 	var pitched := shape in RoofForms.RIDGED or shape == "pyramidal"
 	var inset := pitched and (not holes.is_empty() or needs_inset(ring) or ring.size() > 8)
 	var c := RingGeometry.interior_point(ring)
@@ -109,6 +113,21 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_TANGENT] = tangents_for(normals, u)
 	# Arrays kept: MassBatch / LodRing merge roofs on the build thread.
+	return MeshArrays.mesh(arrays)
+
+## form_mesh's faces from the native RoofKernels (same arrays).
+static func _native_mesh(ring: PackedVector2Array, top: float, rh: float, shape: String,
+		party: PackedByteArray, gable_front: bool, holes: Array) -> ArrayMesh:
+	var f: Array = ClassDB.class_call_static("RoofKernels", "form", ring, top, rh, shape,
+		party, gable_front, holes)
+	if f.is_empty():
+		return null
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = f[0]
+	arrays[Mesh.ARRAY_NORMAL] = f[1]
+	arrays[Mesh.ARRAY_TEX_UV] = f[2]
+	arrays[Mesh.ARRAY_TANGENT] = f[3]
 	return MeshArrays.mesh(arrays)
 
 ## True for a large footprint that is clearly not convex (courtyard
