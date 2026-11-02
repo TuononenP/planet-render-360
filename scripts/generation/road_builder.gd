@@ -116,6 +116,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	var junc := RoadSurface.junctions(data)
+	var pits := SubwayEntrances.pits(data)
 	var batches := {}
 	for line in data.roads:
 		var r := _parse(line, m2u)
@@ -125,6 +126,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 		if pts.size() < 2:
 			continue
 		var dense := _resample(pts, surf.step * 0.34)
+		if not pits.is_empty():
+			dense = RoadPits.densify(dense, pits, float(r["width_u"]) * 0.5)
 		var finish := str(r["finish"])
 		if bool(r["bridge"]):
 			_bridge(batches, dense, float(r["width_u"]), surf, m2u)
@@ -136,7 +139,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth) -> voi
 		var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
 			1.0 if urban else 0.0, 1.0)
 		for run in _dry_runs(dense, surf):
-			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc)
+			_ribbon(_batch(batches, finish), run, float(r["width_u"]), surf, lift, attr, junc,
+				pits)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -210,7 +214,7 @@ static func _side(pts: PackedVector2Array, i: int) -> Vector2:
 ## every vertex. UVs in metres/4 so the asphalt grain keeps its size.
 static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		surf: _Surface, lift: float, attr: Color = Color(0, 0.5, 0, 1),
-		junc: Dictionary = {}) -> void:
+		junc: Dictionary = {}, pits: Array = []) -> void:
 	var half := width * 0.5
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
@@ -235,6 +239,11 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 		b.uv2s.append_array([Vector2(width / m2u, 0.0), Vector2(width / m2u, 0.0)])
 	for i in pts.size() - 1:
 		var a := k0 + i * 2
+		if not pits.is_empty() and RoadPits.blocked(
+				Vector2(b.verts[a].x, b.verts[a].z), Vector2(b.verts[a + 1].x, b.verts[a + 1].z),
+				Vector2(b.verts[a + 2].x, b.verts[a + 2].z),
+				Vector2(b.verts[a + 3].x, b.verts[a + 3].z), pits):
+			continue
 		_quad_up(b, a, a + 1, a + 2, a + 3)
 
 ## Two triangles over left/right pairs (a,b) → (c,d), wound so the front

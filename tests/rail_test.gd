@@ -43,6 +43,7 @@ func _run() -> void:
 	var failures: Array[String] = []
 	_parse(failures)
 	_build(failures)
+	_roads_skip_pits(failures)
 	if failures.is_empty():
 		print("RAIL TEST OK")
 		quit(0)
@@ -177,3 +178,44 @@ func _build(failures: Array[String]) -> void:
 	if light == null or _max_y(light) < RoadBuilder.surface_height(eu, eu_ground, 10.0, 10.0) + 3.0:
 		failures.append("European entrance should carry a lit totem, not globes")
 	eu_root.free()
+
+## A footway laid straight across a stairwell must stop at the opening:
+## no road triangle may sit over the pit, while the footway still exists
+## on both sides of it.
+func _roads_skip_pits(failures: Array[String]) -> void:
+	var data := _data(40.7500, -73.9880)
+	data.buildings = [{"x": 0.0, "z": 60.0, "size_x": 12.0, "size_z": 12.0,
+		"footprint": PackedVector2Array([Vector2(-6, 54), Vector2(6, 54), Vector2(6, 66),
+		Vector2(-6, 66)]), "height": 10.0, "height_source": "default", "levels": 3,
+		"kind": "yes", "use": "", "material": "", "colour": "", "parts": [], "holes": []}]
+	data.roads = [{"points": _line(-40, -20, 60, -20), "class": "footway", "width_m": 3.0,
+		"lanes": 0, "surface": "paving_stones", "bridge": false, "tunnel": false, "layer": 0}]
+	data.transit_stops = [{"x": 10.0, "z": -20.0, "kind": "subway_entrance", "direction": 90.0,
+		"elevator": false, "tunnel": false}]
+	var pits := SubwayEntrances.pits(data)
+	if pits.size() != 1:
+		failures.append("footway test: expected 1 pit")
+		return
+	var roads := RoadBuilder.build_roads(data, GroundTruth.new(data))
+	var inside := 0
+	var outside := 0
+	for c in roads.get_children():
+		if not (c is MeshInstance3D):
+			continue
+		var arr: Array = (c as MeshInstance3D).mesh.surface_get_arrays(0)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		for t in range(0, idx.size(), 3):
+			var m := (v[idx[t]] + v[idx[t + 1]] + v[idx[t + 2]]) / 3.0
+			var d := Vector2(m.x, m.z) - (pits[0]["c"] as Vector2)
+			var f: Vector2 = pits[0]["f"]
+			if absf(d.dot(Vector2(-f.y, f.x))) < float(pits[0]["hw"]) \
+					and absf(d.dot(f)) < float(pits[0]["hl"]):
+				inside += 1
+			else:
+				outside += 1
+	roads.free()
+	if inside > 0:
+		failures.append("footway covers the stairwell (%d triangles)" % inside)
+	if outside < 20:
+		failures.append("footway vanished instead of stopping at the pit (%d)" % outside)
