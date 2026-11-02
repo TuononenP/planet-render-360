@@ -32,9 +32,12 @@ extends SceneTree
 const SIZE := Vector2i(1280, 800)
 const PLACE_TIMEOUT_S := 600.0
 const SETTLE_S := 2.5
-## Frames drawn per settle: enough for SDFGI to converge on Ultra.
+## Frames drawn by a place's first settle: enough for SDFGI to converge
+## on Ultra. The settles between its later shots (a new hour, the roofs
+## look) start from a converged scene and draw SHOT_SETTLE_FRAMES.
 const SETTLE_FRAMES := 240
 ## Height of the --times=roofs look above the opening eye.
+const SHOT_SETTLE_FRAMES := 60
 const ROOFS_UP_M := 140.0
 const STEP := 4  # stats sample every 4th pixel in x and y
 ## Upper, middle and lower row bands (sky, skyline, ground at a level look).
@@ -151,7 +154,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	ViewConditions._apply_precip(view, 0)
 	ViewConditions.apply_surface_state(view)
 	ViewConditions.spawn_golden_hour(view)
-	await _settle(settle_s)
+	await _settle(settle_s, SETTLE_FRAMES)
 	var rig := view._rig
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
@@ -183,35 +186,35 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		var eye := rig.position
 		rig.position = eye + Vector3(0.0, ROOFS_UP_M, 0.0)
 		rig.set_look(open.x, -0.55)
-		await _settle(1.0)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "roofs")
 		rig.position = eye
 		rig.set_look(open.x, open.y)
-		await _settle(1.0)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
 	if times.has("noon"):
 		ViewConditions.jump_to(view, "noon")
-		await _settle(1.0)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_noon")
 	if times.has("night"):
 		ViewConditions.jump_to(view, "moon")
-		await _settle(1.0)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_night")
 	if times.has("late"):
 		# Two hours after sunset: full dark, homes still lit (the moon jump
 		# can land in a bright moonlit sky with the windows barely on).
 		ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
-		await _settle(1.0)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_late")
 	_contact_sheet(id)
 
-## Waits `seconds` while drawing at least SETTLE_FRAMES frames. Off-screen,
+## Waits `seconds` while drawing at least `frames` frames. Off-screen,
 ## macOS stops redrawing the window (two frames in 30 s), so a plain timer
 ## left Ultra's SDFGI unconverged: the first place lost its sky and bounce
 ## light and only later places, after the earlier shots' draws, were lit.
-func _settle(seconds: float) -> void:
+func _settle(seconds: float, frames: int) -> void:
 	var end := Time.get_ticks_msec() + int(seconds * 1000.0)
 	var drawn := 0
-	while drawn < SETTLE_FRAMES or Time.get_ticks_msec() < end:
+	while drawn < frames or Time.get_ticks_msec() < end:
 		await process_frame
 		RenderingServer.force_draw(false)
 		drawn += 1
