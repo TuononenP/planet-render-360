@@ -83,7 +83,7 @@ void QuadSink::box(const Vector3 &c, const Vector3 &ax, const Vector3 &az, const
 	const Vector3 hx = ax * size.x * 0.5f;
 	const Vector3 hy = Vector3(0, 1, 0) * size.y * 0.5f;
 	const Vector3 hz = az * size.z * 0.5f;
-	const Vector2 z2;
+	const Vector2 z2(0, 0);
 	const Vector2 uvx = Vector2(size.x, size.y) * 0.5f;
 	quad(c - hx - hy + hz, c + hx - hy + hz, c + hx + hy + hz, c - hx + hy + hz, az, z2, uvx);
 	quad(c + hx - hy - hz, c - hx - hy - hz, c - hx + hy - hz, c + hx + hy - hz, -az, z2, uvx);
