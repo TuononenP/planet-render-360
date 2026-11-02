@@ -15,7 +15,8 @@ extends RefCounted
 ## StreetLights.META, the glow materials CityLights.META). Every hero's
 ## own lamps (its "Lamp" part: bridge necklaces, lanterns, beacons) go
 ## dark by day and a little brighter at night. The Eiffel Tower also
-## sparkles: SPARKLES white flashes over the iron for the first
+## sparkles: SPARKLES white flashes (each kept ~4 px wide at any
+## distance) over the iron for the first
 ## SPARKLE_MIN minutes of every night hour, as the real one does.
 
 const SPOTS := 4
@@ -32,7 +33,7 @@ const LAMP_Y_M := 1.0
 ## Self-lit towers: [lamp colour, CityLights glow scale].
 ## Night lamp energy against the part's own (always-on) energy.
 const LAMP_GAIN := 1.4
-const SPARKLES := 1500
+const SPARKLES := 3000
 const SPARKLE_MIN := 5.0
 const SPARKLE_M := 0.9
 const SPARKLE_CODE := """
@@ -41,8 +42,13 @@ render_mode unshaded, cull_disabled, shadows_disabled;
 uniform float night_energy = 0.0;
 uniform float city_hour = 20.0;
 varying float seed;
+uniform float quad_u = 1.0;
 void vertex() {
 	seed = float(INSTANCE_ID);
+	// Seen from across the city a 0.9 m flash is under a pixel: grow it
+	// to stay ~4 px wide (0.004 rad) at any distance.
+	float dist = length(INV_VIEW_MATRIX[3].xyz - MODEL_MATRIX[3].xyz);
+	VERTEX *= max(1.0, dist * 0.004 / quad_u);
 	// Billboard: the quad faces the camera at the instance's position.
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1],
 		INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
@@ -50,13 +56,13 @@ void vertex() {
 void fragment() {
 	float minute = fract(city_hour) * 60.0;
 	float on = step(minute, %f) * step(0.05, night_energy);
-	float flash = step(0.82, fract(sin(seed * 12.9898 + floor(TIME * 9.0) * 78.233) * 43758.5453));
+	float flash = step(0.7, fract(sin(seed * 12.9898 + floor(TIME * 9.0) * 78.233) * 43758.5453));
 	float r = length(UV - 0.5) * 2.0;
 	if (on * flash < 0.5 || r > 1.0) {
 		discard;
 	}
 	ALBEDO = vec3(1.0);
-	EMISSION = vec3(1.0, 0.97, 0.9) * 6.0 * (1.0 - r * r);
+	EMISSION = vec3(0.95, 0.97, 1.0) * 12.0 * (1.0 - r * r);
 }
 """ % SPARKLE_MIN
 const GLOW := {
@@ -185,6 +191,7 @@ static func _sparkle(hero: Node3D) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = sh
 	mat.set_meta(CityLights.META, 1.0)
+	mat.set_shader_parameter("quad_u", quad.size.x)
 	quad.material = mat
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
