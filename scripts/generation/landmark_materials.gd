@@ -73,6 +73,9 @@ static func pbr(set_name: String, hex: String, tile_m: float = 4.0,
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var s := 1.0 / maxf(tile_m, 0.05)
 	m.uv1_scale = Vector3(s, s, s)
+	# LandmarkShader weathers these on desktop Ultra.
+	m.set_meta(LandmarkShader.META, set_name)
+	m.set_meta("landmark_hex", hex)
 	_cache[key] = m
 	var ret: StandardMaterial3D = m
 	_mutex.unlock()

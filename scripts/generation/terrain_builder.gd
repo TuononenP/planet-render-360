@@ -191,6 +191,7 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			var hero := LandmarkBuilder.build(str(c["type"]))
 			if RenderQuality.ultra_desktop(data.quality_preset):
 				LandmarkLights.dress(hero, str(c["type"]))
+				LandmarkShader.upgrade(hero)
 			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, c,
 				float(c.get("clear_m", 40.0)) * 0.5), cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
@@ -201,6 +202,8 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			str(c.get("archetype", "tower")), float(c.get("height", 30.0)),
 			Vector2(float(c.get("size_x", 12.0)), float(c.get("size_z", 12.0))),
 			ArchitectureStyle.region_for(data.latitude, data.longitude, data.country))
+		if LandmarkShader.enabled(data.quality_preset):
+			LandmarkShader.upgrade(node)
 		node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
 			float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
 		node.rotation.y = float(c.get("yaw", 0.0))
@@ -497,6 +500,7 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	var root := LandmarkBuilder.build(data.landmark_type)
 	if RenderQuality.ultra_desktop(data.quality_preset):
 		LandmarkLights.dress(root, data.landmark_type)
+		LandmarkShader.upgrade(root)
 	var entry := LocationData.entry_for_type(data.landmark_type)
 	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)

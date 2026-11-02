@@ -8,7 +8,7 @@ extends SceneTree
 ## 2 m) of its registry height_m.
 
 const REQUIRED := ["type", "name", "lat", "lon", "radius_m", "aliases", "wiki_title", "height_m"]
-const MAX_TRIS := 60000
+const MAX_TRIS := 150000
 
 func _run() -> void:
 	var failures: Array[String] = []

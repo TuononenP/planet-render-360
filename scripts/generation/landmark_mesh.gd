@@ -62,8 +62,24 @@ func quad(key: String, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
 	tri(key, a, b, c, n, n, n, ua, ub, uc)
 	tri(key, a, c, d, n, n, n, ua, uc, ud)
 
+## No real arris is knife-sharp: boxes this thick or more get a rounded
+## chamfer (BEVEL_SHARE of their thinnest side, at most BEVEL_MAX_M).
+const BEVEL_MIN_M := 0.3
+const BEVEL_SHARE := 0.06
+const BEVEL_MAX_M := 0.15
+
 ## Axis box centred at `center` with full `size`, oriented by `basis`.
-func box(key: String, center: Vector3, size: Vector3, basis: Basis = Basis()) -> void:
+## `bevel` < 0 picks the chamfer from the size, 0 keeps sharp edges.
+func box(key: String, center: Vector3, size: Vector3, basis: Basis = Basis(),
+		bevel: float = -1.0) -> void:
+	var thin := minf(size.x, minf(size.y, size.z))
+	var c := bevel
+	if c < 0.0:
+		c = minf(thin * BEVEL_SHARE, BEVEL_MAX_M) if thin >= BEVEL_MIN_M else 0.0
+	c = minf(c, thin * 0.45)
+	if c > 0.001:
+		_bevel_box(key, center, size, basis, c)
+		return
 	var hx := basis.x * size.x * 0.5
 	var hy := basis.y * size.y * 0.5
 	var hz := basis.z * size.z * 0.5
@@ -75,6 +91,59 @@ func box(key: String, center: Vector3, size: Vector3, basis: Basis = Basis()) ->
 		var side: Vector3 = f[2]
 		quad(key, o - side - up, o + side - up, o + side + up, o - side + up,
 			(f[0] as Vector3).normalized())
+
+## Box with every edge chamfered by `c`: inset faces, edge strips whose
+## normals blend the two faces (they shade as a rounded arris) and a
+## triangle at each corner.
+func _bevel_box(key: String, center: Vector3, size: Vector3, basis: Basis, c: float) -> void:
+	var ax: Array[Vector3] = [basis.x.normalized(), basis.y.normalized(), basis.z.normalized()]
+	var h := [size.x * 0.5, size.y * 0.5, size.z * 0.5]
+	var hin := [h[0] - c, h[1] - c, h[2] - c]
+	# Vertex on face (axis a, sign s) at the corner with signs sg.
+	var fv := func(a: int, s: float, sg: Vector3) -> Vector3:
+		var p := center
+		for k in 3:
+			p += ax[k] * (float(h[k]) * s if k == a else float(hin[k]) * sg[k])
+		return p
+	var faces := [[0, 1.0, 1, 2], [0, -1.0, 1, 2], [1, 1.0, 2, 0], [1, -1.0, 2, 0],
+		[2, 1.0, 1, 0], [2, -1.0, 1, 0]]
+	for f in faces:
+		var a: int = f[0]
+		var s: float = f[1]
+		var up_k: int = f[2]
+		var side_k: int = f[3]
+		var o: Vector3 = center + ax[a] * float(h[a]) * s
+		var up: Vector3 = ax[up_k] * float(hin[up_k])
+		var side: Vector3 = ax[side_k] * float(hin[side_k])
+		quad(key, o - side - up, o + side - up, o + side + up, o - side + up, ax[a] * s)
+	# Edge strips: faces a and b meet along axis k.
+	for a in 3:
+		for b in range(a + 1, 3):
+			var k := 3 - a - b
+			for sa in [-1.0, 1.0]:
+				for sb in [-1.0, 1.0]:
+					var g0 := Vector3.ZERO
+					g0[a] = sa
+					g0[b] = sb
+					g0[k] = -1.0
+					var g1 := g0
+					g1[k] = 1.0
+					var na: Vector3 = ax[a] * sa
+					var nb: Vector3 = ax[b] * sb
+					var a0: Vector3 = fv.call(a, sa, g0)
+					var a1: Vector3 = fv.call(a, sa, g1)
+					var b0: Vector3 = fv.call(b, sb, g0)
+					var b1: Vector3 = fv.call(b, sb, g1)
+					var len_k := float(hin[k]) * 2.0
+					tri(key, a0, a1, b1, na, na, nb, Vector2.ZERO, Vector2(len_k, 0), Vector2(len_k, -c))
+					tri(key, a0, b1, b0, na, nb, nb, Vector2.ZERO, Vector2(len_k, -c), Vector2(0, -c))
+	for i in 8:
+		var g := Vector3(1.0 if i & 1 else -1.0, 1.0 if i & 2 else -1.0, 1.0 if i & 4 else -1.0)
+		var vx: Vector3 = fv.call(0, g.x, g)
+		var vy: Vector3 = fv.call(1, g.y, g)
+		var vz: Vector3 = fv.call(2, g.z, g)
+		tri(key, vx, vy, vz, ax[0] * g.x, ax[1] * g.y, ax[2] * g.z,
+			Vector2.ZERO, Vector2(c, 0), Vector2(0, -c))
 
 ## Square-section member from `a` to `b`, `w` wide and `d` deep; `side`
 ## orients the width axis (projected perpendicular to the member).
