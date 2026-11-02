@@ -28,6 +28,8 @@ add_library(planet_render SHARED
 	src/party_index.h
 	src/quad_sink.cpp
 	src/quad_sink.h
+	src/ribbon_draper.cpp
+	src/ribbon_draper.h
 	src/parallel.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)

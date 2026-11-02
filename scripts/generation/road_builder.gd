@@ -135,6 +135,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	_mats.clear()
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
+	surf.use_native()
 	var junc := RoadSurface.junctions(data)
 	var steps := RoadSurface.depth_steps(data)
 	# A registry bridge's model carries its own deck over its span.
@@ -323,6 +324,12 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
 	b.pad()
+	if surf.native != null:
+		var jf := PackedFloat64Array()
+		for p in pts:
+			jf.append(RoadSurface.junction_frac(junc, p) if not junc.is_empty() else 1.0)
+		b.append(surf.native.ribbon(pts, width, lift, attr, jf, layer, m2u, b.verts.size()))
+		return
 	var u1 := width / m2u / 4.0
 	var w2 := Vector2(width / m2u, layer)
 	var weld := {}
@@ -534,6 +541,15 @@ class _Batch extends RefCounted:
 		while uv2s.size() < verts.size():
 			uv2s.append(Vector2.ZERO)
 
+	## Appends RibbonDraper.ribbon's arrays (indices already offset).
+	func append(a: Array) -> void:
+		verts.append_array(a[0])
+		normals.append_array(a[1])
+		uvs.append_array(a[2])
+		colors.append_array(a[3])
+		uv2s.append_array(a[4])
+		indices.append_array(a[5])
+
 	## Appends `o`'s rows and triangles after this batch's own.
 	func join(o: _Batch) -> void:
 		pad()
@@ -575,6 +591,9 @@ class _Surface extends RefCounted:
 	## on the full grid alone vanishes under it in patches.
 	var mesh_size := 0
 	var mesh_step := 1.0
+	## RibbonDraper (native/, tools/build_native.sh) set up on this
+	## surface by use_native(), else null: _ribbon lays its ribbons.
+	var native: Object = null
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
@@ -582,6 +601,12 @@ class _Surface extends RefCounted:
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
 		mesh_size = mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset), size)
 		mesh_step = WorldScale.detailed_extent_units() / float(maxi(mesh_size - 1, 1))
+
+	func use_native() -> void:
+		if ClassDB.class_exists("RibbonDraper"):
+			native = ClassDB.instantiate("RibbonDraper")
+			native.setup(ground._surface, ground._size, ground._step_units, ground.water_level_m,
+				size, step, mesh_size, mesh_step)
 
 	## True inside the drawn mesh, EDGE_M clear of its edge.
 	func inside(p: Vector2) -> bool:
