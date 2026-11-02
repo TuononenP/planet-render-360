@@ -85,6 +85,21 @@ func _run() -> void:
 	if outer.filter(func(f: Dictionary) -> bool: return f["facade"]).is_empty():
 		failures.append("exposed end wall lost its facade")
 	root.free()
+	# A tower over a 4-level neighbour: a firewall band, then windows above.
+	data = _data()
+	data.buildings = [_bldg(_rect(-2, 0, 10, 14), 30), _bldg(_rect(10, 0, 22, 14), 4)]
+	root = BuildingBuilder.build_buildings(data, GroundTruth.new(data))
+	var band_top := -INF
+	var windows_from := INF
+	for f in _faces_on_x(root, 10.0):
+		if f["facade"]:
+			windows_from = minf(windows_from, f["y0"])
+		elif f["wall"]:
+			band_top = maxf(band_top, f["y1"])
+	if is_inf(windows_from) or absf(windows_from - band_top) > 0.05 \
+			or band_top - 3.0 > 4.0 * 3.4 + BuildingWalls.FIREWALL_BAND_M * m2u + 0.1:
+		failures.append("tower side over a low neighbour: firewall to %.1f, windows from %.1f" % [band_top, windows_from])
+	root.free()
 
 	# Partition: half-covered edge splits in two pieces.
 	var pw := PartyWalls.new()

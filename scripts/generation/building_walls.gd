@@ -26,6 +26,10 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 ## an edge at its neighbours: wall below a neighbour's top is skipped,
 ## wall above a lower neighbour goes to `fire` (a blank firewall), and
 ## only exposed stretches carry the windowed facade.
+## Height (m) of blank firewall above a lower neighbour before the
+## windowed facade resumes on a wall that rises well past it.
+const FIREWALL_BAND_M := 9.0
+
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
 		fire: Material = null, invert: bool = false) -> void:
@@ -67,8 +71,17 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 			elif nb_top < top - 0.3 * m2u:
 				var y0 := maxf(base, nb_top)
 				var arr := blank if fire != null else face
-				_quad(arr, a, b, y0, top, n, Vector2((b - a).length() / m2u / 4.0,
-					(top - y0) / m2u / 4.0))
+				# Blank only just above the neighbour: a tower's side rising
+				# well past it has windows (a Manhattan tower, not a row house).
+				var y1 := top
+				if fire != null and uvp.x > 0.0 and top - y0 > FIREWALL_BAND_M * m2u * 1.5:
+					y1 = y0 + FIREWALL_BAND_M * m2u
+					var len_m := (b - a).length() / m2u
+					var u1 := 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
+					var v_up := (v_repeat if uvp.z > 0.0 else 1.0) * (top - y1) / maxf(top - base, 1e-4)
+					_quad(face, a, b, y1, top, n, Vector2(u1, v_up))
+				_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
+					(y1 - y0) / m2u / 4.0))
 	_emit(root, face, mat)
 	if fire != null:
 		_emit(root, blank, fire)
