@@ -95,12 +95,22 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
 ## Open
 
 - **Ultra hero LOD0:** only the curve density is done. Per-landmark extra ornament (real mullions, tracery,
-  cornices in geometry) is not. The other
-  agent's `LandmarkShader` gives Ultra landmark surfaces weathering, ashlar coursing and rust. The Eiffel
-  Tower's night-glow overrides keep its iron on the standard material, so it misses that shader.
-- **Sparkle:** not yet seen in a capture. `late` lands at an arbitrary minute; a capture at hh:01 is needed.
-- **Furniture from OSM:** needs a live refetch of a cached place to see mapped benches and signals instead
-  of the fill.
+  cornices in geometry) is not. The other agent's `LandmarkShader` gives Ultra landmark surfaces weathering,
+  ashlar coursing and rust. The Eiffel Tower's night-glow overrides keep its iron on the standard material,
+  so it misses that shader.
+- **Furniture from OSM:** needs a live refetch of a cached place to see mapped benches and signals instead of
+  the fill.
 - **Leaf litter:** added after these captures (`road_decals_test`), not yet seen in a render.
-- From the earlier review: floodlight scallops on the Westminster river front, palm-like far trees in New
-  York.
+- From the earlier review: floodlight scallops on the Westminster river front.
+
+## Resolved after these captures (`../ultra-p8e-2026-11-02/`)
+
+- **Sparkle seen** (`paris_vantage_sparkle.jpg`, new `--times=sparkle`: a minute past the first full hour
+  an hour after sunset). At first it was invisible: the 0.9 m flashes were under a pixel 1.4 km away. Now
+  3000 flashes, each kept about 4 px wide at any distance, 30% lit per tick, scatter white over the gold
+  tower.
+- **`--times=night`** now falls back to 90 minutes after sunset when moonrise lands with the sun up. Paris
+  and New York night shots are luma 0.03–0.07, where they were a grey 0.28 dusk.
+- **The "palms" in New York** are broadleaf street trees with high crowns. In the backlit rain haze of
+  `ultra-p7c` only the thin trunk and crown top showed. The p7f golden close-up reads correctly; NYC resolves
+  to the temperate mix.
