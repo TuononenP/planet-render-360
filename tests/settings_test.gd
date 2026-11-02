@@ -60,9 +60,9 @@ func _run() -> void:
 			failures.append("preset %d should size %d/128 grids, got %d/%d"
 				% [p, RenderSettings.GROUND_POSTS, sized.grid_size, sized.far_grid_size])
 
-	# High is the default preset for fresh installs.
-	if RenderSettings.new().preset != RenderSettings.Preset.HIGH:
-		failures.append("default preset should be High")
+	# Ultra is the default preset for fresh desktop installs.
+	if RenderSettings.new().preset != RenderSettings.Preset.ULTRA:
+		failures.append("default preset should be Ultra on desktop")
 	# Persistence round-trip, then restore the default for the device.
 	var saved := RenderSettings.new()
 	saved.set_preset(RenderSettings.Preset.HIGH)

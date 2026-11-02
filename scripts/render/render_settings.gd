@@ -5,7 +5,7 @@ extends RefCounted
 ## every costly step: DEM grid resolution (terrain accuracy and mesh
 ## build time), how many OSM buildings / trees are placed (build time
 ## and draw cost), and the 360 view's render scale and shadows (frame
-## time). High is the default preset.
+## time). Ultra is the default preset on desktop, High on phones.
 ## Held in memory in Main's RenderSettings instance and persisted as
 ## JSON in user://settings.json, like CacheStore's history. The same
 ## file keeps the Appearance choices (accent, Auto accent, layout).
@@ -29,7 +29,7 @@ const FIDELITY: Array[int] = [1, 2, 2, 3]
 const FIRST_BUILD: Array[String] = ["≤20 s", "≤45 s", "≤75 s", "~1–2 min"]
 const REVISIT: Array[String] = ["≤3 s", "≤5 s", "≤5 s", "≤8 s"]
 
-var preset: int = Preset.HIGH
+var preset: int = default_preset()
 ## Appearance: accent swatch index (Glacier 0 is the default), whether
 ## Auto lets the sun pick it, and the layout override (0 Auto,
 ## 1 Compact, 2 Wide).
@@ -49,6 +49,11 @@ const PREF_DEFAULTS := {
 	"onboarded": false,
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
 }
+
+## Fresh-install preset: Ultra on desktop (Forward+, where its extras
+## live), High on phones.
+static func default_preset() -> int:
+	return Preset.ULTRA if OS.has_feature("pc") else Preset.HIGH
 
 static func clamp_preset(value: int) -> int:
 	return clampi(value, Preset.FAST, Preset.ULTRA)
@@ -168,7 +173,7 @@ func load_settings() -> void:
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
-		preset = clamp_preset(int(parsed.get("preset", Preset.HIGH)))
+		preset = clamp_preset(int(parsed.get("preset", default_preset())))
 		accent = clampi(int(parsed.get("accent", 0)), 0, UiTheme.ACCENTS.size() - 1)
 		accent_auto = bool(parsed.get("accent_auto", false))
 		layout = clampi(int(parsed.get("layout", 0)), 0, 2)

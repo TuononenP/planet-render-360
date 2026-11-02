@@ -278,7 +278,7 @@ func _notification(what: int) -> void:
 
 func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	cancel()
-	# Default preset 2 is RenderSettings.Preset.HIGH (the app default);
+	# Default preset 2 is RenderSettings.Preset.HIGH (the phone default);
 	# out-of-range presets fall back to it, not to Fast.
 	var p := preset if preset >= 0 and preset <= 3 else 2
 	var radius := radius_for_preset(p)
