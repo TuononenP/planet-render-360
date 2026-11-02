@@ -110,7 +110,15 @@ static func show_suggestions(p: MapPicker, results: Array) -> void:
 	if results.is_empty():
 		p._suggest_panel.visible = false
 		return
-	for item in results.slice(0, 5):
+	# A place can come back twice (city node and boundary) under one label.
+	var seen := {}
+	var shown: Array = []
+	for item in results:
+		var key := str(item.get("name", "")).to_lower()
+		if not seen.has(key):
+			seen[key] = true
+			shown.append(item)
+	for item in shown.slice(0, 5):
 		var place := str(item.get("name", ""))
 		var lat := float(item.get("lat", 0.0))
 		var lon := float(item.get("lon", 0.0))
