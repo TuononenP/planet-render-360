@@ -230,6 +230,28 @@ func _run() -> void:
 			failures.append("tapping a prediction should select Paris (lat=%f name=%s)" % [picker._lat, picker.selected_name])
 		if picker._suggest_panel.visible:
 			failures.append("prediction panel should hide after selection")
+	# A place the server returns twice under one label shows as one row.
+	MapSearch.show_suggestions(picker, [
+		{"name": "Phnom Penh, Cambodia", "lat": 11.56, "lon": 104.93},
+		{"name": "Phnom Penh, Cambodia", "lat": 11.57, "lon": 104.92},
+		{"name": "phnom penh, cambodia", "lat": 11.55, "lon": 104.91},
+		{"name": "Phnom Penh International Airport, Cambodia", "lat": 11.55, "lon": 104.84}])
+	await process_frame
+	if picker._suggest_list.get_child_count() != 2:
+		failures.append("duplicate labels should collapse to 2 rows, got %d" % picker._suggest_list.get_child_count())
+	elif (picker._suggest_list.get_child(0) as Button).text != "Phnom Penh, Cambodia" \
+			or (picker._suggest_list.get_child(1) as Button).text != "Phnom Penh International Airport, Cambodia":
+		failures.append("dedupe should keep the first of each label in order")
+	# Duplicates must not eat into the cap of 5 distinct rows.
+	var many: Array = []
+	for i in 4:
+		many.append({"name": "Springfield, United States", "lat": 1.0, "lon": 1.0})
+	for i in 6:
+		many.append({"name": "Place %d, Nowhere" % i, "lat": 1.0, "lon": 1.0})
+	MapSearch.show_suggestions(picker, many)
+	await process_frame
+	if picker._suggest_list.get_child_count() != 5:
+		failures.append("5 distinct rows should show past duplicates, got %d" % picker._suggest_list.get_child_count())
 	# The spinner waits BUSY_DELAY after typing, and goes when the answer lands.
 	picker._search.text = "xyzzy"
 	picker._on_search_text_changed("xyzzy")
