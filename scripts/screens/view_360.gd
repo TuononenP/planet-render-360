@@ -498,11 +498,11 @@ static func eye_y(data: LocationData, ground: GroundTruth, xz: Vector2,
 ## levels or the parser default, parts included), measured to the
 ## footprint itself, not its centroid.
 static func roof_clearance_y(data: LocationData, ground: GroundTruth, xz: Vector2) -> float:
-	var top := -INF
 	return roof_clearance_among(data.buildings, ground, xz)
 
 ## roof_clearance_y over `buildings` only (a nearby subset of the data's).
 static func roof_clearance_among(buildings: Array, ground: GroundTruth, xz: Vector2) -> float:
+	var top := -INF
 	for b in buildings:
 		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
 		var c := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))

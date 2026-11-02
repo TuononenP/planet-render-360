@@ -36,8 +36,8 @@ const SETTLE_S := 2.5
 ## on Ultra. The settles between its later shots (a new hour, the roofs
 ## look) start from a converged scene and draw SHOT_SETTLE_FRAMES.
 const SETTLE_FRAMES := 240
-## Height of the --times=roofs look above the opening eye.
 const SHOT_SETTLE_FRAMES := 60
+## Height of the --times=roofs look above the opening eye.
 const ROOFS_UP_M := 140.0
 const STEP := 4  # stats sample every 4th pixel in x and y
 ## Upper, middle and lower row bands (sky, skyline, ground at a level look).

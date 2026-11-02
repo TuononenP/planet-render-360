@@ -143,21 +143,6 @@ func _run() -> void:
 			{"footprint": _rect(84, 4, 90, 10), "x": 87.0}, true)]}), ctx)
 	if sky.size() != 1:
 		failures.append("a skybridge got a ground mass under it")
-
-	# --- Courtyard: inner ring walls face into the hole; cap avoids it. ---
-	var bridged := RingGeometry.bridge_holes(_rect(0, 0, 40, 40), [_rect(12, 12, 28, 28)])
-	var tri := Geometry2D.triangulate_polygon(bridged)
-	if tri.size() < 3:
-		failures.append("keyhole courtyard ring did not triangulate")
-	data = _data()
-	data.buildings = [_bldg(_rect(-20, -20, 20, 20), 5, {"holes": [_rect(-8, -8, 8, 8)], "roof_shape": "flat"})]
-	root = BuildingBuilder.build_buildings(data, GroundTruth.new(data))
-	var inward := 0
-	for f in _faces_on_x(root, -8.0):
-		if f["facade"]:
-			inward += 1
-	if inward == 0:
-		failures.append("courtyard has no inward facade walls")
 	# Parts lifted by storeys only: the base reaches their floor at the
 	# look's floor height, and is flat under them.
 	var storey_part := pent.merged({"min_height_m": 0.0, "min_level": 10, "roof_shape": ""}, true)
@@ -183,6 +168,21 @@ func _run() -> void:
 			"min_height_m": 0.0, "min_level": 10, "roof_shape": "flat"}]}), ctx)
 	if by_storeys.size() != 1 or float(by_storeys[0]["min_m"]) > 0.0:
 		failures.append("a storey-sized part lifted past its top added a base (%d masses)" % by_storeys.size())
+
+	# --- Courtyard: inner ring walls face into the hole; cap avoids it. ---
+	var bridged := RingGeometry.bridge_holes(_rect(0, 0, 40, 40), [_rect(12, 12, 28, 28)])
+	var tri := Geometry2D.triangulate_polygon(bridged)
+	if tri.size() < 3:
+		failures.append("keyhole courtyard ring did not triangulate")
+	data = _data()
+	data.buildings = [_bldg(_rect(-20, -20, 20, 20), 5, {"holes": [_rect(-8, -8, 8, 8)], "roof_shape": "flat"})]
+	root = BuildingBuilder.build_buildings(data, GroundTruth.new(data))
+	var inward := 0
+	for f in _faces_on_x(root, -8.0):
+		if f["facade"]:
+			inward += 1
+	if inward == 0:
+		failures.append("courtyard has no inward facade walls")
 	root.free()
 
 	# --- Chamfered roofs: no face over the courtyard or off a concave
