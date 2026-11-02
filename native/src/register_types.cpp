@@ -1,5 +1,6 @@
 #include "city_kernels.h"
 #include "far_kernels.h"
+#include "ground_kernels.h"
 #include "mass_kernels.h"
 #include "party_index.h"
 #include "roof_kernels.h"
@@ -17,6 +18,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	}
 	GDREGISTER_CLASS(CityKernels);
 	GDREGISTER_CLASS(FarKernels);
+	GDREGISTER_CLASS(GroundKernels);
 	GDREGISTER_CLASS(MassKernels);
 	GDREGISTER_CLASS(PartyIndex);
 	GDREGISTER_CLASS(RoofKernels);

@@ -181,6 +181,10 @@ static func far_albedo_at(data: LocationData, nrm: Vector3, h_asl: float,
 		water: bool, x: float, z: float) -> Color:
 	return FarSampler.far_albedo_at(data, nrm, h_asl, water, x, z)
 
+static func far_albedo_at_cached(climate: Dictionary, data: LocationData, nrm: Vector3,
+		h_asl: float, water: bool, x: float, z: float) -> Color:
+	return FarSampler.far_albedo_at_cached(climate, data, nrm, h_asl, water, x, z)
+
 static func _water_bounds(index: Array) -> Rect2:
 	return FarSampler._water_bounds(index)
 

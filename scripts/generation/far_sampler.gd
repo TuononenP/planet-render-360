@@ -248,6 +248,16 @@ static func far_albedo_at(data: LocationData, nrm: Vector3, h_asl: float,
 		return c
 	return far_color_at(data, nrm, h_asl, water, x, z)
 
+## far_albedo_at with climate_params computed once (same math): the
+## per-vertex ClimateModel lookups cost the terrain mesh seconds.
+static func far_albedo_at_cached(climate: Dictionary, data: LocationData, nrm: Vector3,
+		h_asl: float, water: bool, x: float, z: float) -> Color:
+	var m2u := WorldScale.metres_to_units()
+	var c := FarSurface.drape_albedo(data, x / m2u, z / m2u)
+	if c.a > 0.0:
+		return c
+	return far_color_at_cached(climate, data, nrm, h_asl, water, x, z)
+
 ## Union bbox of the water index, for a one-test reject far from OSM.
 static func _water_bounds(index: Array) -> Rect2:
 	if index.is_empty():

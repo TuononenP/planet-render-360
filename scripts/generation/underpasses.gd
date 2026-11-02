@@ -44,6 +44,13 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	if bridges.is_empty() or lower.is_empty():
 		return
 	var src := surface.duplicate()
+	# Bounding boxes skip the pairs that cannot cross: Venice tested every
+	# bridge segment against every segment of thousands of ways. The 1 m
+	# margin covers segment_intersects_segment's tolerance, so the hits
+	# (and their order) are the same.
+	var boxes: Array[Rect2] = []
+	for w in lower:
+		boxes.append(_box((w as Dictionary)["points"]))
 	# Per lower way: [arc position, floor height] of each crossing.
 	var cuts := {}
 	# Posts carrying a bridge end stay put: the deck sits on its banks.
@@ -61,9 +68,10 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var h_a := RoadGrading._sample(src, size, step, bp[0])
 		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1])
 		var b_layer := _layer(b)
+		var b_box := _box(bp)
 		for k in lower.size():
 			var w: Dictionary = lower[k]
-			if _layer(w) >= b_layer:
+			if _layer(w) >= b_layer or not b_box.intersects(boxes[k], true):
 				continue
 			var wp: PackedVector2Array = w["points"]
 			var clear := _clearance(str(w.get("class", "")))
@@ -138,6 +146,10 @@ static func _clearance(cls: String) -> float:
 		"footway", "path", "steps", "cycleway", "bridleway", "pedestrian", "track", "corridor":
 			return CLEAR_PATH_M
 	return CLEAR_ROAD_M
+
+## Bounds of a way's points, grown by a metre.
+static func _box(pts: PackedVector2Array) -> Rect2:
+	return RingGeometry.aabb(pts).grow(1.0)
 
 static func _length(pts: PackedVector2Array) -> float:
 	var total := 0.0

@@ -36,6 +36,8 @@ extends RefCounted
 ## Heights stay GroundTruth's; this class only colours.
 
 const CLASS_TEXELS := 1024
+## Native GroundKernels (native/, tools/build_native.sh) when loaded.
+static var _native := ClassDB.class_exists("GroundKernels")
 ## Metres at which the full photo starts / finishes taking over.
 const NEAR_M := 140.0
 const FAR_M := 900.0
@@ -267,6 +269,14 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 	var img := Image.create(n, n, false, Image.FORMAT_R8)
 	img.fill(Color(0, 0, 0))
+	# With the native GroundKernels the fills queue up in paint order and
+	# rasterise at once on every core; otherwise each fills right away.
+	var fills: Array = []
+	var paint := func(rings: Array, id: int) -> void:
+		if _native:
+			fills.append([id, rings])
+		else:
+			_fill_rings(img, rings, id, n)
 	var polys: Array = data.land_polygons
 	for k in range(polys.size() - 1, -1, -1):
 		var poly = polys[k]
@@ -279,7 +289,7 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 		for hole in (poly as Dictionary).get("holes", []):
 			if hole is PackedVector2Array:
 				rings.append(hole)
-		_fill_rings(img, rings, int(ID[cls]), n)
+		paint.call(rings, int(ID[cls]))
 	var m2u := WorldScale.metres_to_units()
 	for line in data.roads:
 		var pts := PackedVector2Array()
@@ -292,7 +302,7 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			if bool(road.get("area", false)):
 				var area_rings: Array = [road.get("points", PackedVector2Array())]
 				area_rings.append_array(road.get("holes", []))
-				_fill_rings(img, area_rings, ID["urban"], n)
+				paint.call(area_rings, ID["urban"])
 				continue
 			pts = road.get("points", PackedVector2Array())
 			width = maxf(float(road.get("width_m", 0.0)) * m2u, 0.4)
@@ -312,8 +322,8 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			var dir := d.normalized()
 			var nrm := Vector2(-dir.y, dir.x) * width * 0.5
 			var cap := dir * width * 0.5
-			_fill_rings(img, [PackedVector2Array([a - cap + nrm, b + cap + nrm,
-				b + cap - nrm, a - cap - nrm])], id, n)
+			paint.call([PackedVector2Array([a - cap + nrm, b + cap + nrm,
+				b + cap - nrm, a - cap - nrm])], id)
 	# Track on its own bed reads as gravel; street track is the road's.
 	for rw in data.railways:
 		if not (rw is Dictionary) or bool(rw.get("tunnel", false)) \
@@ -326,23 +336,36 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			if rd.length() < 0.001:
 				continue
 			var rn := Vector2(-rd.y, rd.x).normalized() * rh
-			_fill_rings(img, [PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
-				rp[i + 1] - rn, rp[i] - rn])], ID["path"], n)
+			paint.call([PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
+				rp[i + 1] - rn, rp[i] - rn])], ID["path"])
 	for b in data.buildings:
 		if not (b is Dictionary):
 			continue
 		var fp: Variant = (b as Dictionary).get("footprint", null)
 		if fp is PackedVector2Array and (fp as PackedVector2Array).size() >= 3:
-			_fill_rings(img, [fp], ID["building"], n)
+			paint.call([fp], ID["building"])
 		else:
 			var bx := float(b.get("x", 0.0))
 			var bz := float(b.get("z", 0.0))
 			var hx := float(b.get("size_x", 0.0)) * 0.5
 			var hz := float(b.get("size_z", 0.0)) * 0.5
 			if hx > 0.0 and hz > 0.0:
-				_fill_rings(img, [PackedVector2Array([Vector2(bx - hx, bz - hz),
+				paint.call([PackedVector2Array([Vector2(bx - hx, bz - hz),
 					Vector2(bx + hx, bz - hz), Vector2(bx + hx, bz + hz),
-					Vector2(bx - hx, bz + hz)])], ID["building"], n)
+					Vector2(bx - hx, bz + hz)])], ID["building"])
+	if _native and not fills.is_empty():
+		# Each class id's texel byte as fill_rect writes it.
+		var probe := Image.create(1, 1, false, Image.FORMAT_R8)
+		var bytes := {}
+		for f: Array in fills:
+			var id: int = f[0]
+			if not bytes.has(id):
+				probe.fill(Color(float(id) / 255.0, 0, 0))
+				bytes[id] = probe.get_data()[0]
+			f[0] = bytes[id]
+		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
+			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
+				WorldScale.detailed_extent_units(), fills))
 	return img
 
 ## Even-odd scanline fill of the rings (outer + holes) with `id`.

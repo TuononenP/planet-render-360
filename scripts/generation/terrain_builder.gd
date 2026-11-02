@@ -304,6 +304,9 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 		grass = Color(0.60, 0.62, 0.55)
 	elif data.season == LocationData.Season.SPRING:
 		grass = Color(0.48, 0.62, 0.36)
+	# Climate once per mesh, not per post (far_albedo_at's ClimateModel
+	# lookups cost seconds over the grid).
+	var climate := FarSurface.climate_params(data)
 	for z in size:
 		if abort != null and abort.requested:
 			return MeshInstance3D.new()  # partial rows: no mesh (dropped anyway)
@@ -357,8 +360,8 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 			# own colour here, which the shader fades to in the edge
 			# band so the near/far hand-off has no colour seam.
 			var s := 0.85 + 0.15 * clampf(normal.y, 0.0, 1.0)
-			var fc := FarTerrainBuilder.far_albedo_at(data, normal, ground.asl_y(h),
-				ground.water_at(wx, wz) > 0.05, wx, wz)
+			var fc := FarTerrainBuilder.far_albedo_at_cached(climate, data, normal,
+				ground.asl_y(h), ground.water_at(wx, wz) > 0.05, wx, wz)
 			colors.append(Color(fc.r, fc.g, fc.b, s))
 			tangents.append_array([1.0, 0.0, 0.0, 1.0])
 			if has_sat:
