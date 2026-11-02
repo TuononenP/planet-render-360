@@ -224,6 +224,9 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 	var first := root.get_child_count()
 	var m2u := WorldScale.metres_to_units()
 	var done := false
+	# Its meshes upload once, tinted (RoofVariety), not twice.
+	if _batch == null:
+		MeshArrays.hold()
 	for m in BuildingMasses.plan(b, ctx):
 		var md := m as Dictionary
 		if _extrude_polygon(root, data, ground, md["ring"], float(md["wall_m"]) * m2u,
@@ -232,6 +235,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 			done = true
 	if done and _batch == null:
 		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)))
+	if _batch == null:
+		MeshArrays.release()
 	return done
 
 ## True for a real building that stands: not the landmark's own footprint

@@ -3,6 +3,7 @@
 #include "ground_kernels.h"
 #include "mass_kernels.h"
 #include "party_index.h"
+#include "quad_sink.h"
 #include "roof_kernels.h"
 
 #include <gdextension_interface.h>
@@ -21,6 +22,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(GroundKernels);
 	GDREGISTER_CLASS(MassKernels);
 	GDREGISTER_CLASS(PartyIndex);
+	GDREGISTER_CLASS(QuadSink);
 	GDREGISTER_CLASS(RoofKernels);
 }
 

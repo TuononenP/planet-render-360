@@ -26,6 +26,8 @@ add_library(planet_render SHARED
 	src/mass_kernels.h
 	src/party_index.cpp
 	src/party_index.h
+	src/quad_sink.cpp
+	src/quad_sink.h
 	src/parallel.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)

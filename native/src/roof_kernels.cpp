@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <cmath>
+#include <cstring>
 #include <set>
 #include <string>
 #include <utility>
@@ -63,10 +64,22 @@ double hip_end(const std::string &s) {
 	return 0.98;
 }
 
+// Plain vectors while building (a packed array's push_back is a call
+// through the extension API); packed once in RoofKernels::form.
 struct Faces {
-	PackedVector3Array verts, normals;
-	PackedVector2Array uvs;
+	std::vector<Vector3> verts, normals;
+	std::vector<Vector2> uvs;
 };
+
+template <typename P, typename T>
+P packed(const std::vector<T> &v) {
+	P out;
+	out.resize((int64_t)v.size());
+	if (!v.empty()) {
+		std::memcpy(out.ptrw(), v.data(), v.size() * sizeof(T));
+	}
+	return out;
+}
 
 // --- RingGeometry ---
 
@@ -194,7 +207,7 @@ void push_tri(Faces &f, const Vector2 &c, Vector3 v0, Vector3 v1, Vector3 v2, co
 	}
 }
 
-PackedFloat32Array tangents_for(const PackedVector3Array &normals, const Vector2 &fu) {
+PackedFloat32Array tangents_for(const std::vector<Vector3> &normals, const Vector2 &fu) {
 	PackedFloat32Array out;
 	out.resize(normals.size() * 4);
 	float *o = out.ptrw();
@@ -202,7 +215,7 @@ PackedFloat32Array tangents_for(const PackedVector3Array &normals, const Vector2
 	Vector3 last_n(INFINITY, INFINITY, INFINITY);
 	Vector3 last_t, last_d;
 	float last_w = 0.0f;
-	for (int64_t k = 0; k < normals.size(); k++) {
+	for (size_t k = 0; k < normals.size(); k++) {
 		Vector3 n = normals[k];
 		if (!have || n != last_n) {
 			slope_axes(n, fu, last_t, last_d);
@@ -606,7 +619,7 @@ bool domes(Faces &f, const Ring &ring, const Vector2 &c, double top, double rh, 
 			ring_n[k].push_back(Vector3(D(o.x) * D(v.x), v.y, D(o.y) * D(v.x)).normalized());
 		}
 	}
-	int64_t before = f.verts.size();
+	size_t before = f.verts.size();
 	for (int k = 0; k < np - 1; k++) {
 		for (int64_t i = 0; i < n; i++) {
 			int64_t j = (i + 1) % n;
@@ -760,17 +773,18 @@ bool skeleton(Faces &f, const Ring &ring, const Rings &holes, double top, double
 		return false;
 	}
 	PackedInt32Array tri = g->triangulate_delaunay(pts);
-	int64_t before = f.verts.size();
+	size_t before = f.verts.size();
 	Rings cores;
 	for (const Ring &h : holes) {
 		for (const Ring &cr : to_rings(g->offset_polygon(h, -0.05, Geometry2D::JOIN_SQUARE))) {
 			cores.push_back(cr);
 		}
 	}
+	const int32_t *tp = tri.ptr();
 	for (int64_t k = 0; k + 2 < tri.size(); k += 3) {
-		int32_t a = tri[k];
-		int32_t b = tri[k + 1];
-		int32_t c = tri[k + 2];
+		int32_t a = tp[k];
+		int32_t b = tp[k + 1];
+		int32_t c = tp[k + 2];
 		if ((double)lift[a] + (double)lift[b] + (double)lift[c] <= 0.0) {
 			continue;
 		}
@@ -844,13 +858,13 @@ Array RoofKernels::form(const PackedVector2Array &ring, double top, double rh, c
 	} else if (shape != "") {
 		return none;
 	}
-	if (f.verts.is_empty()) {
+	if (f.verts.empty()) {
 		return none;
 	}
 	Array out;
-	out.push_back(f.verts);
-	out.push_back(f.normals);
-	out.push_back(f.uvs);
+	out.push_back(packed<PackedVector3Array>(f.verts));
+	out.push_back(packed<PackedVector3Array>(f.normals));
+	out.push_back(packed<PackedVector2Array>(f.uvs));
 	out.push_back(tangents_for(f.normals, u));
 	return out;
 }

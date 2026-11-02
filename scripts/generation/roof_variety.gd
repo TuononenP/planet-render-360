@@ -40,9 +40,9 @@ static func tint(root: Node, first: int, x: float, z: float) -> void:
 			continue
 		var mesh := mi.mesh as ArrayMesh
 		var hit := false
-		for s in mesh.get_surface_count():
+		for s in MeshArrays.surface_count(mesh):
 			var sm := mi.material_override if mi.material_override != null \
-				else mesh.surface_get_material(s)
+				else _surface_material(mesh, s)
 			hit = hit or is_roof(sm) or WallVariety.is_wall(sm)
 		if hit:
 			mi.mesh = _recoloured(mesh, mi.material_override, c,
@@ -50,11 +50,18 @@ static func tint(root: Node, first: int, x: float, z: float) -> void:
 
 ## `mesh` rebuilt with colour `c` on its roof surfaces, from its kept
 ## arrays (no server read-back on the build thread).
+## A held mesh (MeshArrays.hold) is coloured in place: its first upload.
 static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color) -> ArrayMesh:
-	var out := ArrayMesh.new()
-	for s in mesh.get_surface_count():
-		var mat := mesh.surface_get_material(s)
-		var arrays := MeshArrays.surface(mesh, s).duplicate()
+	var held := mesh.get_surface_count() == 0
+	var src: Array = []
+	for s in MeshArrays.surface_count(mesh):
+		src.append(MeshArrays.surface(mesh, s))
+	var out := mesh if held else ArrayMesh.new()
+	if held:
+		out.set_meta(MeshArrays.META, [])
+	for s in src.size():
+		var mat := _surface_material(mesh, s)
+		var arrays: Array = (src[s] as Array).duplicate()
 		var active := over if over != null else mat
 		if is_roof(active):
 			var cols := PackedColorArray()
@@ -68,3 +75,7 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			out.surface_set_material(s, mat)
 		MeshArrays.keep_surface(out, arrays)
 	return out
+
+## Surface `s`'s material; none on a held mesh (MeshArrays.mesh sets none).
+static func _surface_material(mesh: ArrayMesh, s: int) -> Material:
+	return mesh.surface_get_material(s) if s < mesh.get_surface_count() else null

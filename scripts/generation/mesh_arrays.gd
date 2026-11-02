@@ -12,13 +12,42 @@ extends RefCounted
 
 const META := "src_arrays"
 
+## Thread whose kept meshes wait for release() before their upload (one
+## building's meshes, so RoofVariety tints them before they reach the
+## server instead of uploading every one twice); the meshes held.
+static var _hold_thread := -1
+static var _held: Array[ArrayMesh] = []
+
 ## One-surface ArrayMesh from `arrays`; `keep` stores them for merging.
 static func mesh(arrays: Array, keep: bool = true) -> ArrayMesh:
 	var m := ArrayMesh.new()
+	if keep and _hold_thread == OS.get_thread_caller_id():
+		m.set_meta(META, [arrays])
+		_held.append(m)
+		return m
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	if keep:
 		m.set_meta(META, [arrays])
 	return m
+
+## Holds this thread's kept meshes (no surfaces yet) until release().
+static func hold() -> void:
+	_hold_thread = OS.get_thread_caller_id()
+
+## Uploads the held meshes not yet given surfaces and stops holding.
+static func release() -> void:
+	for m in _held:
+		if m.get_surface_count() == 0:
+			for arrays in m.get_meta(META):
+				m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_held.clear()
+	_hold_thread = -1
+
+## Surfaces of `m`, counting a held mesh's kept arrays.
+static func surface_count(m: Mesh) -> int:
+	if m.get_surface_count() == 0 and m.has_meta(META):
+		return (m.get_meta(META) as Array).size()
+	return m.get_surface_count()
 
 ## Records `arrays` as the next surface of `m` (multi-surface meshes
 ## built with add_surface_from_arrays directly).

@@ -12,6 +12,14 @@ extends RefCounted
 var surfaces: Dictionary = {}
 
 static var _mats: Dictionary = {}
+## Native QuadSink (native/, tools/build_native.sh) when loaded: one per
+## material in `surfaces`, same arrays as the script quads.
+static var _native := ClassDB.class_exists("QuadSink")
+
+func _sink(mat: Material) -> Object:
+	if not surfaces.has(mat):
+		surfaces[mat] = ClassDB.instantiate("QuadSink")
+	return surfaces[mat]
 
 func _arrays(mat: Material) -> Array:
 	if not surfaces.has(mat):
@@ -36,6 +44,9 @@ static func _tangents(tangents: PackedFloat32Array, n: Vector3, du: Vector3,
 ## UVs from `uv0` to `uv1` (u along p0→p1, v down from p3 to p0).
 func quad(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3,
 		n: Vector3, uv0: Vector2 = Vector2.ZERO, uv1: Vector2 = Vector2.ONE) -> void:
+	if _native:
+		_sink(mat).quad(p0, p1, p2, p3, n, uv0, uv1)
+		return
 	var a := _arrays(mat)
 	var verts: PackedVector3Array = a[0]
 	var normals: PackedVector3Array = a[1]
@@ -58,6 +69,9 @@ func quad(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3,
 
 ## One triangle facing `n` (winding picked like quad).
 func tri(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, n: Vector3) -> void:
+	if _native:
+		_sink(mat).tri(p0, p1, p2, n)
+		return
 	var a := _arrays(mat)
 	var verts: PackedVector3Array = a[0]
 	var normals: PackedVector3Array = a[1]
@@ -80,6 +94,9 @@ func tri(mat: Material, p0: Vector3, p1: Vector3, p2: Vector3, n: Vector3) -> vo
 ## Axis box: centre `c`, x along `ax` (unit, horizontal), z along `az`
 ## (unit, horizontal, the wall's outward normal), size (x, y, z).
 func box(mat: Material, c: Vector3, ax: Vector3, az: Vector3, size: Vector3) -> void:
+	if _native:
+		_sink(mat).box(c, ax, az, size)
+		return
 	var hx := ax * size.x * 0.5
 	var hy := Vector3.UP * size.y * 0.5
 	var hz := az * size.z * 0.5
@@ -109,7 +126,7 @@ func flush(root: Node3D, name: String) -> void:
 		return
 	var mesh := ArrayMesh.new()
 	for mat in surfaces:
-		var s: Array = surfaces[mat]
+		var s: Array = surfaces[mat].arrays() if _native else surfaces[mat]
 		var arrays: Array = []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = s[0]
