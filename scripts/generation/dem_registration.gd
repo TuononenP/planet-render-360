@@ -26,9 +26,8 @@ static func applies(data: LocationData) -> bool:
 static func grid_index(data: LocationData, size: int, step_m: float,
 		x: int, z: int) -> Vector2:
 	var zoom := int(data.dem_source.get("source_zoom", 0))
-	var window_px := DemFetcher.WINDOW_NEAR_PX if zoom == DemFetcher.ZOOM_NEAR else 144.0
 	var grid := data.grid_size
-	var step_px := window_px / float(maxi(grid, 1))
+	var step_px := window_px(data) / float(maxi(grid, 1))
 	var ll := WorldScale.latlon_from_xz((float(x) - float(size) * 0.5) * step_m,
 		(float(z) - float(size) * 0.5) * step_m, data.latitude, data.longitude)
 	var d := _px(ll.x, ll.y, zoom) - _px(data.latitude, data.longitude, zoom)
@@ -36,6 +35,14 @@ static func grid_index(data: LocationData, size: int, step_m: float,
 	# the value centred half a pixel further on; undo that here.
 	return Vector2(float(grid) * 0.5 + (d.x - 0.5) / step_px,
 		float(grid) * 0.5 + (d.y - 0.5) / step_px)
+
+## Heights-window width (source-zoom pixels) DemFetcher sampled: the
+## recorded one when it widened the window at high latitude, else the
+## fixed z14 576 px / z12 144 px.
+static func window_px(data: LocationData) -> float:
+	var zoom := int(data.dem_source.get("source_zoom", 0))
+	var fixed := DemFetcher.WINDOW_NEAR_PX if zoom == DemFetcher.ZOOM_NEAR else 144.0
+	return float(data.dem_source.get("window_px", fixed))
 
 ## Global Web-Mercator pixel of lat/lon at `zoom` (256 px tiles).
 static func _px(lat: float, lon: float, zoom: int) -> Vector2:

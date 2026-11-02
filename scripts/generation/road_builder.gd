@@ -23,6 +23,9 @@ extends RefCounted
 ## Ribbon lift above the surface in metres, by draw rank (paths under
 ## streets under main roads, so crossings do not z-fight): ≤ 0.05 m.
 const LIFT_M := [0.03, 0.04, 0.05]
+## Paved areas (squares) lie under every ribbon, paths included.
+const AREA_LIFT_M := 0.02
+const AREA_LAYER := 0.5
 ## Bridge deck: clearance over water/ground, slab depth, parapet height.
 const BRIDGE_CLEAR_M := 5.0
 const DECK_DEPTH_M := 0.9
@@ -59,6 +62,7 @@ static func build_roads(data: LocationData, ground: GroundTruth = null, abort: B
 	var root := Node3D.new()
 	root.name = "Roads"
 	_roads(root, data, ground, abort)
+	RailBuilder.build(root, data, ground, abort)
 	return root
 
 ## {points, width_u, finish, rank, bridge} for one road element, or {}
@@ -174,6 +178,10 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	var pts: PackedVector2Array = r["points"]
 	if pts.size() < 2:
 		return
+	if line is Dictionary and bool((line as Dictionary).get("area", false)):
+		_area(_batch(batches, str(r["finish"])), pts, (line as Dictionary).get("holes", []),
+			surf, AREA_LIFT_M * m2u, m2u)
+		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
 	if bool(r["bridge"]):
@@ -191,6 +199,36 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 			break
 		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
 			surf, lift, attr, junc, depth_layer(int(r["rank"]), finish, step))
+
+## Paved area (a square) filled flat on the drawn terrain: the outer
+## ring ear-clipped, triangles over its holes, open water or past the
+## drawn mesh dropped, the rest cut and laid like ribbon pieces under
+## every ribbon (AREA_LAYER). An outline ribbon only drew its edge.
+static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surface,
+		lift: float, m2u: float) -> void:
+	if ring.size() < 3:
+		return
+	var idx := Geometry2D.triangulate_polygon(ring)
+	if idx.is_empty():
+		return
+	b.pad()
+	var attr := Color(0.0, 0.0, 0.0, 1.0)
+	var w2 := Vector2(0.0, AREA_LAYER)
+	var weld := {}
+	for t in range(0, idx.size(), 3):
+		var tri := PackedVector2Array([ring[idx[t]], ring[idx[t + 1]], ring[idx[t + 2]]])
+		var c := (tri[0] + tri[1] + tri[2]) / 3.0
+		if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
+			continue
+		if surf.ground.water_at(c.x, c.y) > 0.0:
+			continue
+		var in_hole := false
+		for h in holes:
+			if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
+				in_hole = true
+				break
+		if not in_hole:
+			RoadDrape.tri(b, surf, lift, attr, w2, weld, tri, m2u)
 
 ## Height of the drawn terrain at XZ (what a ribbon is laid on), for
 ## tests and other flush-placed props.
@@ -374,9 +412,10 @@ static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: f
 	return h
 
 ## Bridge deck on a real `bridge=yes` way (profile from deck_profile),
-## with slab fascias on both sides and parapets.
+## with slab fascias on both sides and parapets; the deck top goes to
+## the `top_finish` batch (RailBuilder lays ballast there).
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
-		surf: _Surface, m2u: float) -> void:
+		surf: _Surface, m2u: float, top_finish: String = "bridge") -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -391,7 +430,7 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 	var dist := PackedFloat32Array([0.0])
 	for i in range(1, n):
 		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
-	var top := _batch(batches, "bridge")
+	var top := _batch(batches, top_finish)
 	var side := _batch(batches, "deck")
 	var half := width * 0.5
 	var k0 := top.verts.size()

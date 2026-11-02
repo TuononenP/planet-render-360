@@ -38,6 +38,9 @@ const TILE_TIMEOUT := 12.0
 ## preset's grid resamples this fixed window, so a finer grid is more
 ## accurate, not wider — tiers never move the layout (plan invariant 5).
 const WINDOW_NEAR_PX := 576.0
+## Margin the near window keeps past the detailed extent where the fixed
+## window would fall short of it (pixels shrink with cos(latitude)).
+const WINDOW_MARGIN := 1.08
 ## Web-mercator metres per pixel at the equator for zoom 0.
 const M_PX_Z0 := 156543.03392
 
@@ -84,17 +87,40 @@ static func tile_xy(lat: float, lon: float, zoom: int) -> Vector2i:
 	var y := int((1.0 - asinh(tan(lat_rad)) / PI) / 2.0 * n)
 	return Vector2i(clampi(x, 0, int(n) - 1), clampi(y, 0, int(n) - 1))
 
-## 3x3 tiles around the viewpoint tile at the given zoom (same layout as
-## SatelliteFetcher.mosaic_tiles, kept local so DEM never depends on it).
+## Tiles around the viewpoint tile at the given zoom, span_for(lat)
+## across at the near zoom (same layout as SatelliteFetcher.mosaic_tiles,
+## kept local so DEM never depends on it).
 static func mosaic_tiles(lat: float, lon: float, zoom: int) -> Array[Vector2i]:
 	var centre := tile_xy(lat, lon, zoom)
 	var out: Array[Vector2i] = []
 	var max_tile := 1 << zoom
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
+	var r := (span_for(lat) - 1) / 2 if zoom == ZOOM_NEAR else 1
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
 			out.append(Vector2i(clampi(centre.x + dx, 0, max_tile - 1),
 				clampi(centre.y + dy, 0, max_tile - 1)))
 	return out
+
+## Heights-window width in pixels at `zoom` (near or mid): the fixed
+## v1 ground (576 z14 px) wherever it covers the detailed extent, else
+## the extent plus WINDOW_MARGIN. Above ~63°N z14 pixels are under
+## 4.4 m, 576 of them fall short of the 2.4 km world, and GroundTruth
+## took the unregistered path: terrain stretched against the map.
+static func window_px(lat: float, zoom: int = ZOOM_NEAR) -> float:
+	var base := WINDOW_NEAR_PX / float(1 << (ZOOM_NEAR - zoom)) \
+		if zoom <= ZOOM_NEAR else WINDOW_NEAR_PX
+	var extent_m := WorldScale.detailed_extent_units() / WorldScale.metres_to_units()
+	return maxf(base, ceilf(extent_m * WINDOW_MARGIN / metres_per_px(lat, zoom)))
+
+## Near mosaic tiles across: 3 while the fixed window fits (its edge
+## posts clamp, as v1's did), else the odd span whose edge stays a
+## half window from a viewpoint anywhere in the centre tile.
+static func span_for(lat: float) -> int:
+	var w := window_px(lat, ZOOM_NEAR)
+	if w <= WINDOW_NEAR_PX:
+		return SPAN_NEAR
+	var n := ceili(w / float(TILE_PX)) + 1
+	return n if n % 2 == 1 else n + 1
 
 ## Web-mercator metres per pixel at a latitude/zoom (z14 ≈ 9.6 m/px at
 ## the equator, ≈ 6.3 m/px at Paris — the register's corrected values).
@@ -232,20 +258,23 @@ func _stitch_mosaic() -> void:
 			_mosaic_images.size(), _mosaic_tiles.size()])
 		_fetch_mid_internal()
 		return
-	var size := TILE_PX * SPAN_NEAR
+	var span := span_for(_pending_lat)
+	var r := (span - 1) / 2
+	var size := TILE_PX * span
 	var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
 	for t in _mosaic_tiles:
 		var src: Image = _mosaic_images[t]
 		if src.get_format() != Image.FORMAT_RGB8:
 			src.convert(Image.FORMAT_RGB8)
-		var dst := Vector2i((t.x - (_mosaic_centre.x - 1)) * TILE_PX,
-			(t.y - (_mosaic_centre.y - 1)) * TILE_PX)
+		var dst := Vector2i((t.x - (_mosaic_centre.x - r)) * TILE_PX,
+			(t.y - (_mosaic_centre.y - r)) * TILE_PX)
 		mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), dst)
-	# Viewpoint pixel inside the mosaic: the centre tile starts at (256, 256).
+	# Viewpoint pixel inside the mosaic: the centre tile starts r tiles in.
 	var frac := tile_frac(_pending_lat, _pending_lon, ZOOM_NEAR)
-	var centre := Vector2((1.0 + frac.x) * TILE_PX, (1.0 + frac.y) * TILE_PX)
+	var centre := Vector2((float(r) + frac.x) * TILE_PX, (float(r) + frac.y) * TILE_PX)
 	var grid := _pending_grid
-	var step_px := WINDOW_NEAR_PX / float(maxi(grid, 1))
+	var window := window_px(_pending_lat, ZOOM_NEAR)
+	var step_px := window / float(maxi(grid, 1))
 	var heights := PackedFloat32Array()
 	heights.resize(grid * grid)
 	for z in grid:
@@ -257,11 +286,15 @@ func _stitch_mosaic() -> void:
 		"zoom_near": ZOOM_NEAR,
 		"zoom_mid": ZOOM_MID,
 		"zoom_far": FAR_ZOOM,
-		"span_near": SPAN_NEAR,
+		"span_near": span,
 		"metres_per_px": metres_per_px(_pending_lat, ZOOM_NEAR),
 		"tile_count": _mosaic_tiles.size(),
 		"source_zoom": ZOOM_NEAR,
 	}
+	# Only a widened window is recorded: dem_source is in the world-cache
+	# key, so every world the fixed window fits keeps its cached build.
+	if window > WINDOW_NEAR_PX:
+		dem_source["window_px"] = window
 	succeeded.emit(heights, grid)
 
 func _fetch_at_zoom(lat: float, lon: float, grid: int) -> void:
@@ -322,7 +355,8 @@ func _emit_from_image(img: Image) -> void:
 		# Fixed 144 px window (~110 m/sample at the old 48 grid): the
 		# quality preset's grid resamples the same ground extent, so a
 		# finer grid is genuinely more accurate, not just wider.
-		var step_px := 144.0 / float(maxi(grid, 1))
+		var window := window_px(_pending_lat, _zoom)
+		var step_px := window / float(maxi(grid, 1))
 		for z in grid:
 			for x in grid:
 				var px := clampi(int(centre.x + (x - grid / 2.0) * step_px), 0, size - 1)
@@ -338,4 +372,6 @@ func _emit_from_image(img: Image) -> void:
 				"tile_count": 1,
 				"source_zoom": ZOOM_MID,
 			}
+			if window > 144.0:
+				dem_source["window_px"] = window
 	succeeded.emit(heights, grid)

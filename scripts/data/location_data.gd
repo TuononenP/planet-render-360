@@ -161,6 +161,10 @@ var trees: Array = []
 ## wall, hedge, ...). Parsed by OsmFetcher; carried by the pipeline since
 ## closure W2; meshed by a Phase-4/5 consumer (no builder claims it).
 var barriers: Array = []
+## Railway lines (rail, tram, light rail, metro above ground) —
+## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
+## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
+var railways: Array = []
 ## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
 ## past the detailed extent — {class: residential|commercial|industrial|
 ## retail, points: PackedVector2Array, holes: Array} in metre XZ, from

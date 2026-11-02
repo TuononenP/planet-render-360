@@ -506,10 +506,10 @@ func _query_checks(failures: Array[String]) -> void:
 	for p in [0, 1, 2, 3]:
 		if OsmFetcher.ring_radius_for_preset(p) != rings[p]:
 			failures.append("preset %d ring radius wrong" % p)
-	# Detailed query: 18 tiered around-clauses (11 T2.3 + 4 T2.4
+	# Detailed query: 23 tiered around-clauses (11 T2.3 + 4 T2.4
 	# multipolygon-relation statements + building relations + the two
-	# landmark-kind selectors of the landmark-parts statement), per-layer
-	# caps, no v1 cap.
+	# landmark-kind selectors of the landmark-parts statement + railways
+	# + the four square selectors), per-layer caps, no v1 cap.
 	var q := OsmFetcher.build_query(48.8566, 2.3522)
 	for clause in ['way["building"]', 'way["building:part"]', 'way["highway"]',
 			'relation["building"]["type"="multipolygon"]',
@@ -531,7 +531,7 @@ func _query_checks(failures: Array[String]) -> void:
 			or not q.contains('relation["building:part"]["type"="multipolygon"]') \
 			or not q.contains("out geom %d" % OsmQuery.CAP_LANDMARK_PARTS):
 		failures.append("query missing the landmark-parts statement")
-	# Regression: 18 around clauses need 18 radius/lat/lon triplets. A
+	# Regression: 23 around clauses need 23 radius/lat/lon triplets. A
 	# short % argument list leaves raw placeholders in the query and
 	# Godot prints "not enough arguments for format string".
 	if q.contains("%"):
@@ -545,11 +545,11 @@ func _query_checks(failures: Array[String]) -> void:
 			or not (with_country["buildings"] as Array).is_empty() \
 			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
 		failures.append("parse must read the is_in area's ISO code and nothing else from it")
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 18:
-		failures.append("expected 18 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 23:
+		failures.append("expected 23 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 18:
+	if q420.count("420,48.856600,2.352200") != 23:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)

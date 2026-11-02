@@ -70,6 +70,12 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 		if r is Dictionary:
 			if bool((r as Dictionary).get("tunnel", false)):
 				continue
+			if bool((r as Dictionary).get("area", false)):
+				# A square: no synthetic planting on it, mapped trees stand.
+				var rings: Array = [(r as Dictionary).get("points", PackedVector2Array())]
+				rings.append_array((r as Dictionary).get("holes", []))
+				_fill(rings, ROAD_EDGE, 0)
+				continue
 			pts = (r as Dictionary).get("points", PackedVector2Array())
 			width_m = float((r as Dictionary).get("width_m", 6.0))
 			foot = str((r as Dictionary).get("class", "")) in FOOT_CLASSES
@@ -83,6 +89,15 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
 			_add_segment(pts[i], pts[i + 1], core, edge)
+	# Track on its own bed is kept clear like a carriageway.
+	for rw in data.railways:
+		if not (rw is Dictionary) or bool(rw.get("tunnel", false)) \
+				or bool(rw.get("embedded", false)):
+			continue
+		var rp: PackedVector2Array = rw.get("points", PackedVector2Array())
+		var rh := float(rw.get("width_m", 3.3)) * 0.5 * m2u
+		for i in rp.size() - 1:
+			_add_segment(rp[i], rp[i + 1], rh, rh + 1.0 * m2u)
 	timings["roads"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	# Green cover: grass first so forest/orchard/cemetery polygons drawn

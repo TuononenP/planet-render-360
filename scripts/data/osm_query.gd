@@ -30,6 +30,15 @@ const CAP_LANDUSE := 1600
 const CAP_LEISURE := 700
 const CAP_BARRIERS := 1600
 const CAP_TREE_NODES := 8000
+## Railway track ways (a city terminus yard is ~400 within 1200 m) and
+## squares mapped outside the highway statement (place=square,
+## area:highway, multipolygon squares).
+const CAP_RAILWAYS := 2500
+const CAP_SQUARES := 400
+## Marks a response as this query's (an Overpass `make` element): a
+## cached detailed payload without it predates railways and squares,
+## so it is refetched (and still served if the network fails).
+const QUERY_MARK := "pr360_q3"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
@@ -72,6 +81,9 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 	var head := "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S
 	var core := mini(CORE_RADIUS_M, radius_m / 2)
 	var clauses: Array[String] = [
+		# The mark prints first, so a payload the timeout cut short still
+		# reads as this query's (it is cached either way).
+		"make %s;out;" % QUERY_MARK,
 		'way["building"](around:%d,%.6f,%.6f);out geom %d;'
 			% [core, lat, lon, CAP_BUILDINGS_CORE],
 		'(way["building"](around:%d,%.6f,%.6f); - way["building"](around:%d,%.6f,%.6f););out geom %d;'
@@ -88,6 +100,16 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 				LANDMARK_PARTS_M, LANDMARK_PARTS_M, CAP_LANDMARK_PARTS],
 		'way["highway"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_HIGHWAYS],
+		# Track and squares straight after the streets: a dense city can hit
+		# the server timeout, which drops the statements printed last.
+		('way["railway"~"^(%s)$"](around:%d,%.6f,%.6f);out geom %d;')
+			% ["|".join(PackedStringArray(OsmTags.RAIL_CLASSES)), radius_m, lat, lon, CAP_RAILWAYS],
+		('(way["area:highway"="pedestrian"](around:%d,%.6f,%.6f);'
+			+ 'way["place"="square"](around:%d,%.6f,%.6f);'
+			+ 'relation["highway"]["type"="multipolygon"](around:%d,%.6f,%.6f);'
+			+ 'relation["place"="square"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon,
+				radius_m, lat, lon, CAP_SQUARES],
 		'way["waterway"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_WATERWAYS],
 		'relation["waterway"]["type"="multipolygon"](around:%d,%.6f,%.6f);out geom %d;'
@@ -118,6 +140,10 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [lat, lon],
 	]
 	return head + "".join(PackedStringArray(clauses))
+
+## Whether a cached detailed payload came from the current query.
+static func is_current(text: String) -> bool:
+	return text.contains(QUERY_MARK)
 
 ## Second, low-detail ring query (plan §3.1 Ultra budget): major roads
 ## + waterways + coastline out to ring_m. Best-effort — merged over the

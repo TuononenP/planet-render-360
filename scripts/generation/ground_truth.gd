@@ -209,8 +209,12 @@ func _init(data: LocationData) -> void:
 	# S-curve this replaces): width-aware channels on real centrelines.
 	_carve_waterways(data)
 	# Streets and main roads sit on a smoothed profile (RoadGrading).
+	var ways := data.roads + data.railways
 	RoadGrading.grade(_surface, _level, size, _step_units,
-		[] if data.buildings.is_empty() else data.roads, WorldScale.metres_to_units())
+		[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units())
+	# Ways under a bridge are cut down to clear its deck.
+	Underpasses.carve(_surface, _level, size, _step_units, ways,
+		WorldScale.metres_to_units())
 	# Y-scale conversion (see header): carving above is in source
 	# metres; the stored surface and water datum are render units.
 	if not is_equal_approx(data.water_level, -3.0):
@@ -396,19 +400,15 @@ static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 ## Fraction of the heights grid covered by the detailed surface
 ## (T3.1 remap): extent ground span / heights-window ground span.
 ## Real grids report metres_per_px + source_zoom in dem_source (the
-## z14 window is DemFetcher.WINDOW_NEAR_PX; the z12 fallback window
-## is the 144 px of DemFetcher._emit_from_image — same ground by T2.1
-## design). Procedural grids ({source_zoom: 0}) and fixtures (empty
-## dem_source) already span the extent → 1.0. Clamped to ≤1.0: the
-## mosaic always covers the extent (251 px worst case at the equator).
+## window is DemRegistration.window_px: 576 z14 / 144 z12 px, widened
+## past ~63°N so it still covers the extent). Procedural grids
+## ({source_zoom: 0}) and fixtures (empty dem_source) already span the
+## extent → 1.0. Clamped to ≤1.0.
 static func _extent_span_frac(data: LocationData) -> float:
 	var mpp := float(data.dem_source.get("metres_per_px", 0.0))
 	if mpp <= 0.0:
 		return 1.0
-	var src_zoom := int(data.dem_source.get("source_zoom", 0))
-	var window_px := DemFetcher.WINDOW_NEAR_PX \
-		if src_zoom == DemFetcher.ZOOM_NEAR else 144.0
-	var span_m := window_px * mpp
+	var span_m := DemRegistration.window_px(data) * mpp
 	if span_m <= 0.0:
 		return 1.0
 	var extent_span_m := WorldScale.detailed_extent_units() \

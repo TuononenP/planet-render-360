@@ -122,6 +122,64 @@ static func _tag_int(raw: Variant, lo: int, hi: int) -> int:
 		return 0
 	return clampi(s.to_int(), lo, hi)
 
+## Railway classes drawn as track (platforms and disused lines are not).
+const RAIL_CLASSES := ["rail", "tram", "light_rail", "subway", "narrow_gauge",
+	"monorail", "funicular"]
+
+## Track class of a railway way, or "" when it is not drawn track.
+static func rail_class(tags: Dictionary) -> String:
+	var cls := str(tags.get("railway", ""))
+	return cls if cls in RAIL_CLASSES else ""
+
+## One railway dict: the gauge (mm tag, else 1000 mm tram / 1435 mm),
+## whether the track is set in a street (trams unless embedded=no, or
+## embedded=yes) and the bed width (ballast shoulders past the rails).
+static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
+	var cls := rail_class(tags)
+	var gauge_mm := _tag_int(str(tags.get("gauge", "")).split(";")[0], 0, 3000)
+	if gauge_mm < 300:
+		gauge_mm = 1000 if cls == "tram" else 1435
+	var gauge := float(gauge_mm) / 1000.0
+	var emb := str(tags.get("embedded", "")).strip_edges().to_lower()
+	var embedded := emb in ["yes", "partial"] or (cls == "tram" and emb != "no")
+	return {"points": pts, "class": cls, "gauge_m": gauge, "embedded": embedded,
+		"bridge": _tag_truthy(tags.get("bridge", "")),
+		"tunnel": _tag_truthy(tags.get("tunnel", "")) or underground(tags)
+			or _tag_truthy(tags.get("covered", "")),
+		"layer": _tag_int(tags.get("layer", 0), -10, 10),
+		"width_m": gauge + (0.3 if embedded else 1.9)}
+
+## Highway class of a paved area mapped as a closed way or multipolygon
+## (a square, a pedestrian zone): highway=* with area=yes,
+## area:highway=pedestrian, or place=square; "" otherwise. Indoor and
+## underground ones (a station concourse) are not drawn. A multipolygon
+## (`is_area`) is an area without area=yes.
+static func paved_area_class(tags: Dictionary, is_area: bool = false) -> String:
+	if _tag_truthy(tags.get("indoor", "")) or _tag_truthy(tags.get("tunnel", "")) \
+			or underground(tags) or _tag_int(tags.get("layer", 0), -10, 10) < 0:
+		return ""
+	if tags.has("highway") and (is_area or str(tags.get("area", "")) == "yes"):
+		return str(tags["highway"])
+	if str(tags.get("area:highway", "")) == "pedestrian":
+		return "pedestrian"
+	if str(tags.get("place", "")) == "square" and not tags.has("building"):
+		return "pedestrian"
+	return ""
+
+## One paved-area road dict: a filled polygon (`area`, outer ring
+## `points` without the closing repeat, `holes`) that RoadBuilder lays
+## flat instead of a ribbon; width_m stays the class default for the
+## consumers that only walk its outline.
+static func _area_entry(tags: Dictionary, cls: String, outer: PackedVector2Array,
+		holes: Array) -> Dictionary:
+	var ring := outer
+	if ring.size() >= 2 and ring[0].distance_to(ring[ring.size() - 1]) < 0.01:
+		ring = ring.slice(0, ring.size() - 1)
+	return {"points": ring, "holes": holes, "area": true, "class": cls,
+		"width_m": road_class_width(cls), "lanes": 0,
+		"surface": str(tags.get("surface", "")), "bridge": false, "tunnel": false,
+		"layer": _tag_int(tags.get("layer", 0), -10, 10)}
+
 ## A building or part that lies wholly below the surface: tagged
 ## location=underground, or every `level` (single, "a;b" or "a-b")
 ## below zero. Such a hall under a square must not stand on top of it.

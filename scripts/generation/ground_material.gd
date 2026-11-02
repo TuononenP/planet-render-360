@@ -289,6 +289,11 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			var road: Dictionary = line
 			if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)):
 				continue
+			if bool(road.get("area", false)):
+				var area_rings: Array = [road.get("points", PackedVector2Array())]
+				area_rings.append_array(road.get("holes", []))
+				_fill_rings(img, area_rings, ID["urban"], n)
+				continue
 			pts = road.get("points", PackedVector2Array())
 			width = maxf(float(road.get("width_m", 0.0)) * m2u, 0.4)
 			var rc := str(road.get("class", ""))
@@ -309,6 +314,20 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			var cap := dir * width * 0.5
 			_fill_rings(img, [PackedVector2Array([a - cap + nrm, b + cap + nrm,
 				b + cap - nrm, a - cap - nrm])], id, n)
+	# Track on its own bed reads as gravel; street track is the road's.
+	for rw in data.railways:
+		if not (rw is Dictionary) or bool(rw.get("tunnel", false)) \
+				or bool(rw.get("bridge", false)) or bool(rw.get("embedded", false)):
+			continue
+		var rp: PackedVector2Array = rw.get("points", PackedVector2Array())
+		var rh := float(rw.get("width_m", 3.3)) * 0.5 * m2u
+		for i in rp.size() - 1:
+			var rd := rp[i + 1] - rp[i]
+			if rd.length() < 0.001:
+				continue
+			var rn := Vector2(-rd.y, rd.x).normalized() * rh
+			_fill_rings(img, [PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
+				rp[i + 1] - rn, rp[i] - rn])], ID["path"], n)
 	for b in data.buildings:
 		if not (b is Dictionary):
 			continue

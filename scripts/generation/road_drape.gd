@@ -45,14 +45,29 @@ static func quad(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
 	t1.add(r1[1], Vector2(u1, v1), r1[3], r1[4])
 	t1.add(r1[0], Vector2(0.0, v1), r1[3], r1[4])
 	for t in [t0, t1]:
-		var pieces: Array = [t]
-		for fam in 3:
-			var next: Array = []
-			for pc in pieces:
-				_cut(pc as _Poly, fam, surf, next)
-			pieces = next
+		_lay(b, surf, lift, attr, w2, weld, t)
+
+## One flat triangle of a paved area (`pts`, three XZ corners), its UV
+## the world XZ in 4 m units, laid like a ribbon piece.
+static func tri(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
+		attr: Color, w2: Vector2, weld: Dictionary, pts: PackedVector2Array, m2u: float) -> void:
+	var t := _Poly.new()
+	for p in pts:
+		t.add(p, p / m2u / 4.0, 1.0, surf.normal(p.x, p.y))
+	_lay(b, surf, lift, attr, w2, weld, t)
+
+## Cuts one convex piece along the drawn mesh's three line families and
+## emits the pieces.
+static func _lay(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
+		attr: Color, w2: Vector2, weld: Dictionary, t: _Poly) -> void:
+	var pieces: Array = [t]
+	for fam in 3:
+		var next: Array = []
 		for pc in pieces:
-			_emit(b, surf, lift, attr, w2, weld, pc as _Poly)
+			_cut(pc as _Poly, fam, surf, next)
+		pieces = next
+	for pc in pieces:
+		_emit(b, surf, lift, attr, w2, weld, pc as _Poly)
 
 ## Splits `poly` at every integer line of family `fam` (mesh-cell fx,
 ## fz or fx + fz) it crosses, appending the convex pieces to `out`.

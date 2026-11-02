@@ -248,6 +248,8 @@ var offline_mode := false
 ## ISO 3166-1 alpha-2 country of the last parsed viewpoint ("" unknown:
 ## API fallback, or a payload cached before the query asked for it).
 var country := ""
+## Railway dicts of the last parsed payload (OsmTags._rail_entry).
+var railways: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -284,6 +286,7 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	_pending_lat = lat
 	_pending_lon = lon
 	country = ""
+	railways = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
 	# query shape, not the detailed query at a larger radius).
@@ -310,7 +313,9 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	# query if a damaged entry parses to no buildings.
 	_detailed_cached = false
 	var dcached := _read_cache(_pending_cache)
-	if dcached != "":
+	# A payload from an older query (no railways/squares) goes live once;
+	# _detailed_fallback still serves it if the network fails.
+	if dcached != "" and OsmQuery.is_current(dcached):
 		_detailed_text = dcached
 		_detailed_cached = true
 	if want_ring:
@@ -566,6 +571,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	if _fallback_detail != "":
 		fallback_used.emit(_fallback_detail, _fallback_partial)
 	country = str(parsed.get("country", ""))
+	railways = parsed.get("railways", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

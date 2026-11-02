@@ -15,12 +15,13 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var waterways: Array = []
 	var trees: Array = []
 	var barriers: Array = []
+	var railways: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
-			"barriers": barriers, "country": country}
+			"barriers": barriers, "country": country, "railways": railways}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -75,6 +76,12 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					var pr: PackedVector2Array = r["outer"]
 					part_ways.append({"tags": el_tags, "points": pr,
 						"aabb": OsmGeometry._ring_aabb(pr), "holes": r["holes"]})
+			elif str(el_tags.get("type", "")) == "multipolygon" \
+					and el.has("members") and OsmTags.paved_area_class(el_tags, true) != "":
+				# A square mapped with holes (a statue plinth, a fountain).
+				var area_cls := OsmTags.paved_area_class(el_tags, true)
+				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
+					roads.append(OsmTags._area_entry(el_tags, area_cls, r["outer"], r["holes"]))
 			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members"):
 				var members: Array = el.get("members", [])
@@ -138,7 +145,18 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		elif el_tags.has("building:part"):
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
 		elif el_tags.has("highway"):
-			roads.append(OsmTags._road_entry(el_tags, poly))
+			# A closed highway area (a square) is filled, not outlined.
+			var sq := OsmTags.paved_area_class(el_tags)
+			if sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
+				roads.append(OsmTags._area_entry(el_tags, sq, poly, []))
+			elif sq == "" or not OsmGeometry._is_closed(poly):
+				roads.append(OsmTags._road_entry(el_tags, poly))
+		elif OsmTags.rail_class(el_tags) != "":
+			railways.append(OsmTags._rail_entry(el_tags, poly))
+		elif OsmTags.paved_area_class(el_tags) != "" and OsmTags.land_class(el_tags) == "" \
+				and OsmGeometry._is_closed(poly) and poly.size() >= 4:
+			roads.append(OsmTags._area_entry(el_tags,
+				OsmTags.paved_area_class(el_tags), poly, []))
 		elif el_tags.has("waterway"):
 			if str(el_tags.get("waterway", "")) == "riverbank" \
 					and OsmGeometry._is_closed(poly):
@@ -179,7 +197,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
-		"barriers": barriers, "country": country}
+		"barriers": barriers, "country": country, "railways": railways}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live
