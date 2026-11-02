@@ -1,0 +1,52 @@
+class_name LandmarkRegistryAmericasHistoric
+extends RefCounted
+
+## Registry entries for the americas_historic landmark batch, in the
+## format of LocationData.landmarks(). Types are built by LandmarkSetAmericasHistoric.
+
+static func entries() -> Array:
+	return [
+		{"type": "teotihuacan_pyramid_sun", "name": "Pyramid of the Sun", "lat": 19.6926, "lon": -98.8444,
+			"radius_m": 4000.0, "wiki_title": "Pyramid of the Sun", "height_m": 65.5, "clear_m": 150.0,
+			"yaw_deg": 105.5, "kind": "Pyramid",
+			"aliases": ["pyramid of the sun", "pirámide del sol", "piramide del sol", "teotihuacan",
+				"teotihuacán"]},
+		{"type": "palenque_inscriptions", "name": "Temple of the Inscriptions", "lat": 17.48365,
+			"lon": -92.04697, "radius_m": 4000.0, "wiki_title": "Temple of the Inscriptions",
+			"height_m": 27.2, "clear_m": 110.0, "yaw_deg": 30.0, "kind": "Pyramid",
+			"aliases": ["temple of the inscriptions", "templo de las inscripciones", "palenque"]},
+		{"type": "tikal_temple_i", "name": "Tikal Temple I", "lat": 17.2219, "lon": -89.6228,
+			"radius_m": 4000.0, "wiki_title": "Tikal Temple I", "height_m": 47.0, "clear_m": 45.0,
+			"yaw_deg": 90.0, "kind": "Pyramid",
+			"aliases": ["tikal temple i", "temple of the great jaguar", "templo del gran jaguar", "tikal"]},
+		{"type": "uxmal_magician", "name": "Pyramid of the Magician", "lat": 20.3594, "lon": -89.7714,
+			"radius_m": 3500.0, "wiki_title": "Pyramid of the Magician", "height_m": 35.0, "clear_m": 50.0,
+			"yaw_deg": 115.0, "kind": "Pyramid",
+			"aliases": ["pyramid of the magician", "pirámide del adivino", "piramide del adivino",
+				"casa del adivino", "temple of the magician", "uxmal"]},
+		{"type": "mexico_city_cathedral", "name": "Mexico City Metropolitan Cathedral", "lat": 19.4344,
+			"lon": -99.1332, "radius_m": 4500.0, "wiki_title": "Mexico City Metropolitan Cathedral",
+			"height_m": 67.0, "clear_m": 75.0, "yaw_deg": 7.7, "kind": "Cathedral",
+			"aliases": ["mexico city metropolitan cathedral", "metropolitan cathedral of mexico city",
+				"catedral metropolitana de la ciudad de méxico", "catedral metropolitana de mexico",
+				"catedral de méxico", "mexico city cathedral"]},
+		{"type": "jefferson_memorial", "name": "Jefferson Memorial", "lat": 38.88137, "lon": -77.03657,
+			"radius_m": 4000.0, "wiki_title": "Jefferson Memorial", "height_m": 33.8, "clear_m": 55.0,
+			"kind": "Memorial", "aliases": ["jefferson memorial", "thomas jefferson memorial"]},
+		{"type": "independence_hall", "name": "Independence Hall", "lat": 39.94889, "lon": -75.1500,
+			"radius_m": 3500.0, "wiki_title": "Independence Hall", "height_m": 51.4, "clear_m": 50.0,
+			"yaw_deg": 9.1, "kind": "Hall",
+			"aliases": ["independence hall", "pennsylvania state house", "old state house philadelphia"]},
+		{"type": "mount_rushmore", "name": "Mount Rushmore", "lat": 43.8789, "lon": -103.4592,
+			"radius_m": 5000.0, "wiki_title": "Mount Rushmore", "height_m": 135.0, "clear_m": 105.0,
+			"yaw_deg": -45.0, "kind": "Monument",
+			"aliases": ["mount rushmore", "mt rushmore", "mt. rushmore", "shrine of democracy"]},
+		{"type": "el_capitolio_havana", "name": "El Capitolio, Havana", "lat": 23.13527, "lon": -82.35971,
+			"radius_m": 4500.0, "wiki_title": "National Capitol of Cuba", "height_m": 91.7,
+			"clear_m": 120.0, "yaw_deg": -11.1, "kind": "Capitol",
+			"aliases": ["el capitolio, havana", "el capitolio de la habana", "capitolio de la habana",
+				"capitolio nacional de cuba", "national capitol of cuba", "el capitolio de cuba"]},
+		{"type": "monks_mound", "name": "Monks Mound", "lat": 38.6603, "lon": -90.0625,
+			"radius_m": 4000.0, "wiki_title": "Monks Mound", "height_m": 30.0, "clear_m": 170.0,
+			"yaw_deg": 7.0, "kind": "Mound", "aliases": ["monks mound", "cahokia mounds", "cahokia"]},
+	]

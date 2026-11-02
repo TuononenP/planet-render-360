@@ -218,6 +218,19 @@ static func known_places() -> Array:
 		{"name": "Monaco", "lat": 43.7384, "lon": 7.4246},
 		{"name": "Dubai, United Arab Emirates", "lat": 25.2048, "lon": 55.2708},
 		{"name": "Seoul, South Korea", "lat": 37.5665, "lon": 126.9780},
+		{"name": "Phnom Penh, Cambodia", "lat": 11.5560, "lon": 104.9282},
+		{"name": "Angkor, Cambodia", "lat": 13.4125, "lon": 103.8670},
+		{"name": "Giza, Egypt", "lat": 29.9773, "lon": 31.1325},
+		{"name": "Luxor, Egypt", "lat": 25.6989, "lon": 32.6421},
+		{"name": "Istanbul, Turkey", "lat": 41.0082, "lon": 28.9784},
+		{"name": "Jerusalem", "lat": 31.7767, "lon": 35.2345},
+		{"name": "Prague, Czechia", "lat": 50.0755, "lon": 14.4178},
+		{"name": "Vienna, Austria", "lat": 48.2082, "lon": 16.3738},
+		{"name": "Florence, Italy", "lat": 43.7731, "lon": 11.2558},
+		{"name": "Moscow, Russia", "lat": 55.7539, "lon": 37.6208},
+		{"name": "Beijing, China", "lat": 39.9042, "lon": 116.4074},
+		{"name": "Kyoto, Japan", "lat": 35.0116, "lon": 135.7681},
+		{"name": "Agra, India", "lat": 27.1751, "lon": 78.0421},
 	]
 	# A preset city resolves to its curated origin, so searching "Tokyo"
 	# opens the same view as its quick pick.
@@ -278,6 +291,18 @@ static func known_place(lat: float, lon: float) -> String:
 ## which is the strongest signal: "Turun tuomiokirkko, 1" is the
 ## cathedral whatever pin the geocoder returned.
 static func landmarks() -> Array:
+	if _all_landmarks.is_empty():
+		var all := _core_landmarks()
+		all.append_array(LandmarkRegistries.entries())
+		_core_count = _core_landmarks().size()
+		_all_landmarks = all
+	return _all_landmarks
+
+## Built once: the lookups below loop the registry on every call.
+static var _all_landmarks: Array = []
+static var _core_count := 0
+
+static func _core_landmarks() -> Array:
 	return [
 		{"type": "turku_cathedral", "name": "Turku Cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
 			"wiki_title": "Turku Cathedral", "height_m": 101.0,
@@ -361,21 +386,38 @@ static func distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 	return Vector2(east, north).length()
 
 ## Registry entry for this viewpoint/search, or {} for none. A name
-## match wins outright; otherwise the nearest site inside its radius.
+## match wins outright; otherwise the nearest site inside its radius
+## (the core landmarks, then `icon` entries, then the rest).
 static func landmark_entry(lat: float, lon: float, name: String) -> Dictionary:
 	var lowered := name.to_lower()
+	var named: Dictionary = {}
+	var named_len := 0
 	for entry in landmarks():
 		for alias in entry["aliases"]:
-			if lowered.contains(str(alias)):
-				return entry
-	var best: Dictionary = {}
-	var best_dist := INF
-	for entry in landmarks():
-		var d := distance_m(lat, lon, float(entry["lat"]), float(entry["lon"]))
-		if d <= float(entry["radius_m"]) and d < best_dist:
-			best = entry
-			best_dist = d
-	return best
+			# The longest alias wins: "louvre pyramid" over "pyramid".
+			if str(alias).length() > named_len and lowered.contains(str(alias)):
+				named = entry
+				named_len = str(alias).length()
+	if not named.is_empty():
+		return named
+	# The original icons outrank the regional batches (a Paris centre is
+	# the Eiffel Tower, not the nearer Notre-Dame), then the regional
+	# `icon` entries (Athens opens on the Parthenon, not the nearer
+	# Zappeion); nearest within a tier.
+	var all := landmarks()
+	var regional := all.slice(_core_count)
+	var icons := regional.filter(func(e: Dictionary) -> bool: return bool(e.get("icon", false)))
+	for tier in [all.slice(0, _core_count), icons, regional]:
+		var best: Dictionary = {}
+		var best_dist := INF
+		for entry in tier:
+			var d := distance_m(lat, lon, float(entry["lat"]), float(entry["lon"]))
+			if d <= float(entry["radius_m"]) and d < best_dist:
+				best = entry
+				best_dist = d
+		if not best.is_empty():
+			return best
+	return {}
 
 static func landmark_for(lat: float, lon: float, name: String) -> String:
 	var entry := landmark_entry(lat, lon, name)

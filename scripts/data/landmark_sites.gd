@@ -12,7 +12,10 @@ extends RefCounted
 ## A bridge (`span_m`) clears along its whole span, not round its centre.
 
 ## Candidates per quality preset (FAST, BALANCED, HIGH, ULTRA).
-const MAX_BY_PRESET: Array[int] = [6, 8, 10, 10]
+const MAX_BY_PRESET: Array[int] = [10, 16, 22, 26]
+## Registry icons beside the primary per preset, nearest first: a
+## historic centre (Rome, Athens) stands a dozen of them together.
+const MAX_REGISTRY_EXTRAS_BY_PRESET: Array[int] = [6, 12, 18, 22]
 ## Clearance around a registry landmark (its own footprint and grounds)
 ## and around an OSM archetype, metres.
 const REGISTRY_CLEAR_M := 68.0
@@ -24,7 +27,13 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 	if data.landmark_type != "none":
 		clear.append([TerrainBuilder.landmark_site_xz(data),
 			LocationData.entry_for_type(data.landmark_type)])
-	for e in LocationData.registry_extras(data.latitude, data.longitude, data.landmark_type):
+	var extras := LocationData.registry_extras(data.latitude, data.longitude, data.landmark_type)
+	# Dense skylines (Rome, Athens, London, Paris): the nearest few only.
+	extras.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return LocationData.distance_m(data.latitude, data.longitude, float(a["lat"]), float(a["lon"])) \
+			< LocationData.distance_m(data.latitude, data.longitude, float(b["lat"]), float(b["lon"])))
+	var preset := clampi(data.quality_preset, 0, MAX_BY_PRESET.size() - 1)
+	for e in extras.slice(0, MAX_REGISTRY_EXTRAS_BY_PRESET[preset]):
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
 			data.latitude, data.longitude)
@@ -35,7 +44,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"registry": true})
 		clear.append([p, entry])
-	var cap: int = MAX_BY_PRESET[clampi(data.quality_preset, 0, MAX_BY_PRESET.size() - 1)]
+	var cap: int = MAX_BY_PRESET[preset]
 	for c in ranked_osm:
 		if out.size() >= cap:
 			break

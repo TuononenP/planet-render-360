@@ -6,62 +6,38 @@ extends RefCounted
 # --- Giza ---
 
 ## The Giza plateau around Khufu (registry point): Khufu (230.3 m base,
-## 138.5 m now), Khafre (215.3 m, 136.4 m, casing cap kept) and
-## Menkaure (103.4 m, 61 m) at their surveyed offsets, sides on the
-## compass; Khufu's three queens' pyramids to the east and the Sphinx
-## facing east. Stripped faces read as ~40 stepped courses.
+## 138.5 m now) and its three queens' pyramids to the east, sides on the
+## compass. Khafre, Menkaure and the Sphinx are registry landmarks of
+## their own at the same surveyed offsets (LandmarkSetEgypt,
+## LandmarkMaAncient), so they are not drawn here a second time.
+## Stripped faces read as ~40 stepped courses.
 static func giza(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Limestone", LandmarkMaterials.pbr("limestone", "#C2A574", 6.0))
 	lm.use("Casing", LandmarkMaterials.pbr("limestone", "#DCCDA8", 5.0))
-	lm.use("Sphinx", LandmarkMaterials.pbr("limestone", "#B8976A", 3.0))
-	_pyramid(lm, Vector3.ZERO, 115.15, 138.5, 146.6, 40, 0.0)
-	_pyramid(lm, Vector3(-328.0, 0, 343.0), 107.65, 136.4, 143.5, 38, 0.78)
-	_pyramid(lm, Vector3(-588.0, 0, 741.0), 51.7, 61.0, 65.5, 18, 0.0)
+	_pyramid(lm, "Limestone", Vector3.ZERO, 115.15, 138.5, 146.6, 40)
 	for k in 3:
-		_pyramid(lm, Vector3(150.0, 0, -40.0 + float(k) * 55.0), 23.0, 29.0, 30.0, 8, 0.0)
-	_sphinx(lm, Vector3(328.0, 0, 431.0))
+		_pyramid(lm, "Casing", Vector3(150.0, 0, -40.0 + float(k) * 55.0), 23.0, 29.0, 30.0, 8)
 	lm.commit(model)
 
 ## Square pyramid of half-base `hb`, built to `h` (true apex `apex`),
-## `steps` stripped courses; `cap` fraction of height up which the
-## smooth casing survives (Khafre).
-static func _pyramid(lm: LandmarkMesh, c: Vector3, hb: float, h: float, apex: float,
-		steps: int, cap: float) -> void:
+## `steps` stripped courses, in material `mat`.
+static func _pyramid(lm: LandmarkMesh, mat: String, c: Vector3, hb: float, h: float,
+		apex: float, steps: int) -> void:
 	var prof := PackedVector2Array()
 	var k := sqrt(2.0)
-	var cap_y := h * cap if cap > 0.0 else h
 	for s in steps:
-		var y0 := cap_y * float(s) / float(steps)
-		var y1 := cap_y * float(s + 1) / float(steps)
+		var y0 := h * float(s) / float(steps)
+		var y1 := h * float(s + 1) / float(steps)
 		var r0 := hb * (1.0 - y0 / apex) * k
 		var r1 := hb * (1.0 - y1 / apex) * k
 		prof.append(Vector2(r0, y0))
 		prof.append(Vector2(r0 - 0.35 * k, y1))
 		prof.append(Vector2(r1, y1))
-	lm.lathe("Limestone", c, prof, 4, 1.0, 1.0, PI * 0.25, false, cap > 0.0)
+	lm.lathe(mat, c, prof, 4, 1.0, 1.0, PI * 0.25, false, false)
 	var top_r := hb * (1.0 - h / apex) * k
-	if cap > 0.0:
-		var r_cap := hb * (1.0 - cap_y / apex) * k
-		lm.lathe("Casing", c + Vector3(0, cap_y, 0), PackedVector2Array([Vector2(r_cap, 0),
-			Vector2(top_r, h - cap_y)]), 4, 1.0, 1.0, PI * 0.25, false)
-	else:
-		lm.lathe("Limestone", c + Vector3(0, cap_y, 0), PackedVector2Array([Vector2(top_r, 0),
-			Vector2(0.0, 0.0)]), 4, 1.0, 1.0, PI * 0.25, false)
-
-## Great Sphinx: 73 m long, 20 m high, facing east (+X).
-static func _sphinx(lm: LandmarkMesh, c: Vector3) -> void:
-	lm.box("Sphinx", c + Vector3(-8.0, 5.0, 0), Vector3(48.0, 10.0, 17.0))
-	lm.lathe("Sphinx", c + Vector3(-30.0, 0, 0), PackedVector2Array([Vector2(8.0, 0),
-		Vector2(8.0, 9.0), Vector2(5.0, 13.0)]), 10, 1.0, 1.0)
-	for s in [-1.0, 1.0]:
-		lm.box("Sphinx", c + Vector3(24.0, 2.0, s * 5.0), Vector3(20.0, 4.0, 4.5))
-	lm.box("Sphinx", c + Vector3(15.0, 9.0, 0), Vector3(10.0, 12.0, 12.0))
-	lm.box("Sphinx", c + Vector3(17.5, 15.5, 0), Vector3(7.0, 6.0, 5.0))
-	lm.spire("Sphinx", c + Vector3(15.0, 12.0, 0), 6.5, 8.0, 2.0)
-	# Rock-cut enclosure around the body.
-	lm.box("Limestone", c + Vector3(-2.0, 4.0, 14.0), Vector3(80.0, 8.0, 3.0))
-	lm.box("Limestone", c + Vector3(-2.0, 4.0, -14.0), Vector3(80.0, 8.0, 3.0))
+	lm.lathe(mat, c + Vector3(0, h, 0), PackedVector2Array([Vector2(top_r, 0),
+		Vector2(0.0, 0.0)]), 4, 1.0, 1.0, PI * 0.25, false)
 
 # --- Statue of Liberty ---
 

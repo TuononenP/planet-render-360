@@ -15,6 +15,26 @@ extends RefCounted
 const ARCHETYPES := ["church", "cathedral", "castle", "lighthouse", "stadium",
 	"mosque", "temple", "windmill", "tower", "big_wheel"]
 
+## Region batches of bespoke landmarks, tried in order for a type the
+## core match above does not know (LandmarkSet*.build returns false for
+## a type it does not own).
+static func region_sets() -> Array[Callable]:
+	return LandmarkRegistries.sets()
+
+## Builds `type` from the first region set that owns it.
+static func build_bespoke(model: Node3D, type: String) -> bool:
+	for set_build in region_sets():
+		if set_build.call(model, type):
+			return true
+	return false
+
+## True when `type` has a hand-built model (not the archetype fallback).
+static func is_bespoke(type: String) -> bool:
+	var probe := Node3D.new()
+	var ok := build_bespoke(probe, type)
+	probe.free()
+	return ok
+
 ## The metre-space child every landmark model is built under.
 static func model_root(root: Node3D) -> Node3D:
 	var model := Node3D.new()
@@ -52,7 +72,9 @@ static func build(type: String) -> Node3D:
 		"sydney_harbour_bridge": LandmarkArchBridges.harbour(model)
 		"bixby_creek_bridge": LandmarkArchBridges.bixby(model)
 		_:
-			if type in ARCHETYPES:
+			if build_bespoke(model, type):
+				pass
+			elif type in ARCHETYPES:
 				LandmarkArchetypes.build(model, type, 45.0, Vector2(120.0, 120.0))
 			else:
 				LandmarkArchetypes.build(model, "tower", 120.0, Vector2(24.0, 24.0))
