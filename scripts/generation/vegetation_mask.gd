@@ -83,6 +83,16 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
 			_add_segment(pts[i], pts[i + 1], core, edge)
+	# Subway stairwells (ground pits) are paved ground: nothing grows or
+	# stands in them. Inflated a cell so no trunk leans over the opening.
+	for pit in SubwayEntrances.pits(data):
+		var pc: Vector2 = pit["c"]
+		var pf: Vector2 = pit["f"]
+		var pr := Vector2(-pf.y, pf.x)
+		var pw: float = (float(pit["hw"]) + 0.8) * m2u
+		var pl: float = (float(pit["hl"]) + 0.8) * m2u
+		_fill([PackedVector2Array([pc - pr * pw - pf * pl, pc + pr * pw - pf * pl,
+			pc + pr * pw + pf * pl, pc - pr * pw + pf * pl])], ROAD, 0)
 	timings["roads"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	# Green cover: grass first so forest/orchard/cemetery polygons drawn

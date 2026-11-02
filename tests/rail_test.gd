@@ -44,6 +44,7 @@ func _run() -> void:
 	_parse(failures)
 	_build(failures)
 	_roads_skip_pits(failures)
+	_mask_blocks_pits(failures)
 	if failures.is_empty():
 		print("RAIL TEST OK")
 		quit(0)
@@ -219,3 +220,17 @@ func _roads_skip_pits(failures: Array[String]) -> void:
 		failures.append("footway covers the stairwell (%d triangles)" % inside)
 	if outside < 20:
 		failures.append("footway vanished instead of stopping at the pit (%d)" % outside)
+
+## Trees, bushes and street lamps consult VegetationMask: the stairwell
+## and its margin must read as blocked ground, open sidewalk beside it not.
+func _mask_blocks_pits(failures: Array[String]) -> void:
+	var data := _data(40.7500, -73.9880)
+	data.transit_stops = [{"x": 10.0, "z": -20.0, "kind": "subway_entrance", "direction": 90.0,
+		"elevator": false, "tunnel": false}]
+	var pit: Dictionary = SubwayEntrances.pits(data)[0]
+	var mask := VegetationMask.new(data, GroundTruth.new(data))
+	var c: Vector2 = pit["c"]
+	if not mask.blocked(c.x, c.y, VegetationMask.ROAD):
+		failures.append("pit centre not blocked for planting")
+	if mask.blocked(c.x, c.y + 12.0, VegetationMask.ROAD):
+		failures.append("open ground 12 m from the pit wrongly blocked")
