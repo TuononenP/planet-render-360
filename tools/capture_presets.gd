@@ -3,7 +3,7 @@ extends SceneTree
 ## Capture-and-compare run over the golden set (realism v3, R-1.1).
 ## Windowed, off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
-##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle]
+##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle] [--season=autumn]
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##
@@ -75,6 +75,9 @@ var _had_history := false
 var _weather_in := false
 ## WMO weather code every capture forces (--weather=, default clear).
 var _weather_code := 0
+## Season every place is shot in (--season=spring|summer|autumn|winter or
+## 0..3); -1 keeps the place's own.
+var _season := -1
 
 func _init() -> void:
 	_run()
@@ -126,6 +129,9 @@ func _run() -> void:
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
 	_weather_code = int(a.get("weather", 0))
+	var season_arg := str(a.get("season", ""))
+	var names := ["spring", "summer", "autumn", "winter"]
+	_season = names.find(season_arg) if season_arg in names else (int(season_arg) if season_arg.is_valid_int() else -1)
 	for place in _places(str(a["places"])):
 		await _capture(main, view, place, times, a.has("audit"), float(a.get("settle", SETTLE_S)))
 	_write_stats()
@@ -155,6 +161,9 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
 		await process_frame
 	# Clear captures keep a few clouds; forced weather comes overcast.
+	if _season >= 0 and view._data.season != _season:
+		# Seasons bake into the world: this rebuilds it in that season.
+		await ViewConditions._select_season(view, _season)
 	view._atmos.set_weather(_weather_code, 15.0 if _weather_code == 0 else 100.0)
 	ViewConditions._apply_precip(view, _weather_code)
 	ViewConditions.apply_surface_state(view)

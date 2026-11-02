@@ -98,9 +98,12 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
   cornices in geometry) is not. The other agent's `LandmarkShader` gives Ultra landmark surfaces weathering,
   ashlar coursing and rust. The Eiffel Tower's night-glow overrides keep its iron on the standard material,
   so it misses that shader.
-- **Furniture from OSM:** needs a live refetch of a cached place to see mapped benches and signals instead of
-  the fill.
-- **Leaf litter:** added after these captures (`road_decals_test`), not yet seen in a render.
+- **Leaf litter:** in the scene (`road_decals_test`; 858 mapped trees within 250 m of the Paris view, 179
+  in New York), but too small to judge in the capture framings. It needs a street-level autumn shot under
+  street trees.
+- **Saving a season-rebuilt world** to the world cache logs "Resource was not pre cached … circular
+  reference" (36–39 per save, `world_cache.gd` save thread). This is pre-existing: the same autumn capture
+  on 3d0f4f2, before this pass, logs 36. Not investigated further. A cached autumn world may be incomplete.
 
 ## Resolved after these captures (`../ultra-p8e-2026-11-02/`)
 
@@ -116,3 +119,9 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
 - **Floodlight scallops** on the Westminster river front are gone (`../ultra-p8f-2026-11-02/`). Long fronts
   now take a spot every 45 m (was 70, up to 10 a side), each at 0.75 energy, so the cones overlap into an
   even wash.
+- **Furniture from OSM now arrives.** The detailed query's mark moved to `pr360_q4`, so cached payloads go
+  live once and the old copy is still served if the network fails. The fresh New York payload has 571
+  furniture nodes within 400 m (339 benches, 89 bins, 109 bollards, 20 signals, 14 stops). Paris: 183. The
+  first Paris refetch timed out at Overpass (35 s, served the old copy); a retry succeeded.
+- **`--season=`** (spring|summer|autumn|winter or 0–3) shoots every place in that season, rebuilding the
+  world through the view's own season path. Autumn captures are in `../ultra-p7g-2026-11-02/`.

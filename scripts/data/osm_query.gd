@@ -41,9 +41,10 @@ const FURNITURE_RADIUS_M := 450
 const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
 ## Marks a response as this query's (an Overpass `make` element): a
-## cached detailed payload without it predates railways and squares,
-## so it is refetched (and still served if the network fails).
-const QUERY_MARK := "pr360_q3"
+## cached detailed payload without it predates the current statements
+## (q3 railways and squares, q4 street furniture), so it is refetched
+## (and still served if the network fails).
+const QUERY_MARK := "pr360_q4"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
