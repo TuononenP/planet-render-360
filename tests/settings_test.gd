@@ -70,7 +70,17 @@ func _run() -> void:
 	reloaded.load_settings()
 	if reloaded.preset != RenderSettings.Preset.HIGH:
 		failures.append("preset should persist across instances")
+	# A file saved before the Ultra default (no version) moves High to Ultra once.
+	saved.save_settings({"preset": RenderSettings.Preset.HIGH, "preset_version": 0})
+	var migrated := RenderSettings.new()
+	migrated.load_settings()
+	if migrated.preset != RenderSettings.Preset.ULTRA:
+		failures.append("legacy High should migrate to Ultra")
 	saved.set_preset(RenderSettings.Preset.HIGH)
+	var kept := RenderSettings.new()
+	kept.load_settings()
+	if kept.preset != RenderSettings.Preset.HIGH:
+		failures.append("High chosen after the migration should stay")
 
 	# Appearance persists too, and saving the preset from a fresh
 	# instance keeps it; the device's own choices are restored after.

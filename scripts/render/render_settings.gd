@@ -50,6 +50,9 @@ const PREF_DEFAULTS := {
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
 }
 
+## Bumped when the desktop default changes; older files migrate once.
+const PRESET_VERSION := 1
+
 ## Fresh-install preset: Ultra on desktop (Forward+, where its extras
 ## live), High on phones.
 static func default_preset() -> int:
@@ -180,6 +183,11 @@ func load_settings() -> void:
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
 		preset = clamp_preset(int(parsed.get("preset", default_preset())))
+		if int(parsed.get("preset_version", 0)) < PRESET_VERSION:
+			# Files saved while High was the desktop default move to Ultra once.
+			if preset == Preset.HIGH:
+				preset = default_preset()
+			save_settings({"preset": preset, "preset_version": PRESET_VERSION})
 		accent = clampi(int(parsed.get("accent", 0)), 0, UiTheme.ACCENTS.size() - 1)
 		accent_auto = bool(parsed.get("accent_auto", false))
 		layout = clampi(int(parsed.get("layout", 0)), 0, 2)
@@ -204,7 +212,7 @@ func save_settings(changes: Dictionary) -> void:
 
 func set_preset(value: int) -> void:
 	preset = clamp_preset(value)
-	save_settings({"preset": preset})
+	save_settings({"preset": preset, "preset_version": PRESET_VERSION})
 
 func set_accent(index: int, auto: bool) -> void:
 	accent = clampi(index, 0, UiTheme.ACCENTS.size() - 1)
