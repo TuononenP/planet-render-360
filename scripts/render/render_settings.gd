@@ -112,7 +112,11 @@ static func satellite_span_for(value: int, lat: float = 0.0) -> int:
 ## extent (v1 caps covered ~250 m); past LodRing.MERGE_M they merge per
 ## material, so draw cost stays bounded. Past the cap the farthest real
 ## buildings become batched impostor masses (T7.3) — never dropped.
-static func max_buildings_for(value: int) -> int:
+## Desktop Ultra (Forward+) affords 10000 inside its longer first build;
+## phones keep 6000.
+static func max_buildings_for(value: int, forward_plus: bool = RenderQuality.is_forward_plus()) -> int:
+	if forward_plus and clamp_preset(value) == Preset.ULTRA:
+		return 10000
 	return [600, 1200, 2500, 6000][clamp_preset(value)]
 
 static func vegetation_count_for(value: int, urban: bool) -> int:

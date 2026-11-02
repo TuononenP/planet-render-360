@@ -131,6 +131,18 @@ func _run() -> void:
 	var rl := BuildingMasses.plan(_bldg(_rect(30, 0, 42, 14), 6, {"roof_levels": 2}), ctx)
 	if float(rl[0]["rh_m"]) < 2.0 * fh * 0.9:
 		failures.append("roof:levels=2 gave a %.2f m roof" % rl[0]["rh_m"])
+	# Only rooftop parts mapped (375 Pearl): the outline stands under them.
+	var pent := {"footprint": _rect(64, 4, 70, 10), "x": 67.0, "z": 7.0, "height": 60.0,
+		"height_source": "tag_height", "levels": 0, "min_height_m": 50.0, "roof_shape": "flat"}
+	var tower := BuildingMasses.plan(_bldg(_rect(60, 0, 74, 14), 16,
+		{"height": 50.0, "height_source": "tag_height", "roof_shape": "flat", "parts": [pent]}), ctx)
+	if tower.size() != 2 or float(tower[0]["min_m"]) > 0.0 or float(tower[0]["wall_m"]) < 49.0:
+		failures.append("rooftop-only parts left no ground mass (%d masses)" % tower.size())
+	var sky := BuildingMasses.plan(_bldg(_rect(80, 0, 94, 14), 16,
+		{"kind": "bridge", "height": 50.0, "height_source": "tag_height", "parts": [pent.merged(
+			{"footprint": _rect(84, 4, 90, 10), "x": 87.0}, true)]}), ctx)
+	if sky.size() != 1:
+		failures.append("a skybridge got a ground mass under it")
 
 	# --- Courtyard: inner ring walls face into the hole; cap avoids it. ---
 	var bridged := RingGeometry.bridge_holes(_rect(0, 0, 40, 40), [_rect(12, 12, 28, 28)])

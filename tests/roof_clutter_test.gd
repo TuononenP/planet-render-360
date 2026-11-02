@@ -1,0 +1,73 @@
+extends SceneTree
+
+## Headless: godot --headless --script tests/roof_clutter_test.gd
+## Rooftop clutter (RoofClutter, desktop Ultra flat roofs): each city or
+## region gets its own mix (New York water towers, East Asian condensers,
+## Gulf tanks, Greek solar heaters, skylights elsewhere), the same roof
+## always gets the same pieces, and lower tiers get none.
+
+func _init() -> void:
+	_run()
+
+func _ring(half: float) -> PackedVector2Array:
+	return PackedVector2Array([Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+
+## Materials RoofClutter put in a batch, for `look` on a 24 m square roof.
+func _mats_for(look: Dictionary, seed_v: float, country: String = "") -> Dictionary:
+	var batch := BuildingDetail.Batch.new()
+	var ring := _ring(12.0)
+	var basis := Basis()
+	RoofClutter.add(batch, ring, Vector2.ZERO, Vector2.RIGHT, Vector2(0, 1), 12.0, 12.0,
+		30.0, basis, look, seed_v, 576.0, country)
+	var out := {}
+	for k in RoofClutter._mats:
+		if batch.surfaces.has(RoofClutter._mats[k]):
+			out[k] = true
+	return out
+
+func _any(seeds: int, look: Dictionary, key: String, country: String = "") -> bool:
+	for i in seeds:
+		if _mats_for(look, float(i) * 0.137 + 0.01, country).has(key):
+			return true
+	return false
+
+func _run() -> void:
+	var failures: Array[String] = ["sentinel: the run did not finish (script error?)"]
+	if not _any(20, {"city": "new_york", "region": "north_america"}, "cedar"):
+		failures.append("New York roofs should carry wooden water towers")
+	if not _any(5, {"city": "tokyo", "region": "japan"}, "ac"):
+		failures.append("Tokyo roofs should carry AC condensers")
+	if not _any(10, {"city": "dubai", "region": "middle_east"}, "tank_white") \
+			and not _any(10, {"city": "dubai", "region": "middle_east"}, "tank_black"):
+		failures.append("Gulf roofs should carry water tanks")
+	if not _any(5, {"city": "", "region": "mediterranean"}, "solar", "GR"):
+		failures.append("Greek roofs should carry solar water heaters")
+	if not _any(10, {"city": "", "region": "central_europe"}, "skylight"):
+		failures.append("other flat roofs should get skylights")
+	if _any(20, {"city": "", "region": "central_europe"}, "cedar"):
+		failures.append("water towers belong to New York")
+	var a := _mats_for({"city": "tokyo", "region": "japan"}, 0.42)
+	var b := _mats_for({"city": "tokyo", "region": "japan"}, 0.42)
+	if a != b:
+		failures.append("the same roof should always get the same clutter")
+	# Off the Ultra flag, BuildingDetail adds none of it.
+	var root := Node3D.new()
+	var look := ArchitectureStyle.resolve({"kind": "commercial", "levels": 6, "x": 0.0, "z": 0.0},
+		"tokyo", "dense", 0.3, 576.0)
+	BuildingDetail.add(root, _ring(12.0), 30.0, 30.0, "flat", 0.0, look, null, null, 0.3, true)
+	for c in root.get_children():
+		var mesh := (c as MeshInstance3D).mesh
+		for s in mesh.get_surface_count():
+			if RoofClutter._mats.values().has(mesh.surface_get_material(s)):
+				failures.append("lower tiers should get no rooftop clutter")
+				break
+	root.free()
+	failures.erase(failures[0])
+	if failures.is_empty():
+		print("ROOF CLUTTER OK: regional mixes (NYC towers, Asian condensers, Gulf tanks, Greek heaters, skylights), stable, Ultra only")
+		quit(0)
+	else:
+		for f in failures:
+			printerr("ROOF CLUTTER FAIL: ", f)
+		quit(1)

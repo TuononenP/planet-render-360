@@ -171,7 +171,8 @@ static func _mat(key: String) -> Material:
 static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		wall_h: float, shape: String, roof_h: float, look: Dictionary,
 		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool,
-		party: PackedByteArray = PackedByteArray(), gable_front: bool = false) -> void:
+		party: PackedByteArray = PackedByteArray(), gable_front: bool = false,
+		ultra: bool = false, country: String = "") -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
 	if not near and not religious:
 		return
@@ -204,6 +205,9 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		_altana(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if shape == "flat":
 			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
+			# Desktop Ultra: the city's own rooftop clutter.
+			if ultra:
+				RoofClutter.add(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2, country)
 	batch.flush(root)
 
 ## Roof surface height above the eaves at an offset from the centre, by

@@ -3,7 +3,7 @@ extends SceneTree
 ## Capture-and-compare run over the golden set (realism v3, R-1.1).
 ## Windowed, off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
-##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late]
+##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs]
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
@@ -17,6 +17,7 @@ extends SceneTree
 ##   <id>_close1/2.jpg           narrow-FOV close-ups of the opening look
 ##   <id>_vantage_noon/night.jpg same opening look at noon and at night
 ##   <id>_vantage_late.jpg       two hours after sunset (--times=late)
+##   <id>_roofs.jpg              from 140 m up, looking down the opening look (--times=roofs)
 ##   <id>_sheet.jpg              render beside the first reference photo
 ##   stats.json                  luma, saturation, colourfulness per frame
 ##                               and band, flagged against the references
@@ -31,6 +32,10 @@ extends SceneTree
 const SIZE := Vector2i(1280, 800)
 const PLACE_TIMEOUT_S := 600.0
 const SETTLE_S := 2.5
+## Frames drawn per settle: enough for SDFGI to converge on Ultra.
+const SETTLE_FRAMES := 240
+## Height of the --times=roofs look above the opening eye.
+const ROOFS_UP_M := 140.0
 const STEP := 4  # stats sample every 4th pixel in x and y
 ## Upper, middle and lower row bands (sky, skyline, ground at a level look).
 const BANDS := {"upper": [0.0, 0.35], "middle": [0.35, 0.65], "lower": [0.65, 1.0]}
@@ -146,7 +151,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	ViewConditions._apply_precip(view, 0)
 	ViewConditions.apply_surface_state(view)
 	ViewConditions.spawn_golden_hour(view)
-	await create_timer(settle_s).timeout
+	await _settle(settle_s)
 	var rig := view._rig
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
@@ -173,21 +178,43 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	await _snap(view, id, "close2")
 	rig.reset_zoom()
 	rig.set_look(open.x, open.y)
+	if times.has("roofs"):
+		# Rooftops (clutter, roof forms) are out of sight from the street.
+		var eye := rig.position
+		rig.position = eye + Vector3(0.0, ROOFS_UP_M, 0.0)
+		rig.set_look(open.x, -0.55)
+		await _settle(1.0)
+		await _snap(view, id, "roofs")
+		rig.position = eye
+		rig.set_look(open.x, open.y)
+		await _settle(1.0)
 	if times.has("noon"):
 		ViewConditions.jump_to(view, "noon")
-		await create_timer(1.0).timeout
+		await _settle(1.0)
 		await _snap(view, id, "vantage_noon")
 	if times.has("night"):
 		ViewConditions.jump_to(view, "moon")
-		await create_timer(1.0).timeout
+		await _settle(1.0)
 		await _snap(view, id, "vantage_night")
 	if times.has("late"):
 		# Two hours after sunset: full dark, homes still lit (the moon jump
 		# can land in a bright moonlit sky with the windows barely on).
 		ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
-		await create_timer(1.0).timeout
+		await _settle(1.0)
 		await _snap(view, id, "vantage_late")
 	_contact_sheet(id)
+
+## Waits `seconds` while drawing at least SETTLE_FRAMES frames. Off-screen,
+## macOS stops redrawing the window (two frames in 30 s), so a plain timer
+## left Ultra's SDFGI unconverged: the first place lost its sky and bounce
+## light and only later places, after the earlier shots' draws, were lit.
+func _settle(seconds: float) -> void:
+	var end := Time.get_ticks_msec() + int(seconds * 1000.0)
+	var drawn := 0
+	while drawn < SETTLE_FRAMES or Time.get_ticks_msec() < end:
+		await process_frame
+		RenderingServer.force_draw(false)
+		drawn += 1
 
 ## The 3D view only: the SubViewport's own texture carries no HUD.
 ## force_draw renders synchronously, so captures stay fresh even while

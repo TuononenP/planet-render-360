@@ -49,11 +49,15 @@ final state after the fixes below.
 - Post-parallax lookups use the surface's derivatives (`textureGrad`); the combined normal is kept inside
   the unit disc (Godot rebuilds z from xy); pane roughness 0.12–0.18.
 
-## Open: Ultra's first place renders without indirect light
+## Resolved: Ultra's first place rendered without indirect light (a capture fault)
 
-With Tokyo as the first place of a session at Ultra, everything out of direct sun loses its sky/indirect
-light (black shadowed ground, dark walls; Tokyo building band luma 0.13 vs 0.25). Reproducible:
-Tokyo after Paris is fine (0.41), Tokyo first at High is fine (0.49), Paris first is fine. Not the facade
-shader (same with it off), not SDFGI convergence (same after a 10 s settle) and not fixed by restarting
-SDFGI. Likely the same fault as the black foreground in the baseline New York vantage. Captures that
-need a correct first place should run another place first; to fix in the lighting pass (Phase 5).
+With Tokyo as the first place of a capture run at Ultra, everything out of direct sun lost its sky and
+bounce light (black shade, dark walls; vantage luma 0.34 vs 0.41 after Paris). Switching SDFGI off
+alone brought the shade back, but nothing in the scene or the settings differed between the runs. The
+cause was the capture tool: off-screen (`--position 4000,4000`) macOS stops redrawing the window, so
+the settle timer drew 2 frames in 30 s and SDFGI never converged. Each shot forces a draw, so a second
+place inherited the first place's shots and looked fine; a 10 s settle "didn't help" for the same
+reason. The live app draws every frame and was never affected. `capture_presets.gd` now settles by
+forcing at least 240 draws (`_settle`), after the place opens and after each time jump; Tokyo first
+captures at 0.44 (`../diag-fix-2026-11-02/`, removed after checking). Likely also the black foreground
+in the baseline New York vantage.

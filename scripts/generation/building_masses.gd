@@ -64,6 +64,10 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	var single := masses.is_empty()
 	if single:
 		masses = [b]
+	else:
+		var base := _missing_base(b, masses)
+		if not base.is_empty():
+			masses = [base] + masses
 	var main_mass := _largest(masses)
 	var fh := float(look["floor_h"])
 	for mi in masses.size():
@@ -182,6 +186,41 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	_plans[ck] = out
 	_mutex.unlock()
 	return out
+
+## The outline as a mass from the ground to the lowest part when every
+## part is lifted: a tower mapped with only its rooftop parts (375 Pearl
+## Street, New York: penthouses at min_height 155 over a 155 m outline)
+## otherwise drew its penthouses floating over an empty lot. {} when a
+## part already stands on the ground, and for skybridges, canopies and
+## outlines that are lifted themselves (open underneath for real).
+static func _missing_base(b: Dictionary, parts: Array) -> Dictionary:
+	if str(b.get("kind", "")) in ["bridge", "roof"] or float(b.get("min_height_m", 0.0)) > 0.0 \
+			or int(b.get("min_level", 0)) > 0:
+		return {}
+	var lowest := INF
+	for p in parts:
+		if not (p is Dictionary):
+			continue
+		var pd := p as Dictionary
+		var lift := float(pd.get("min_height_m", 0.0))
+		if lift <= 0.0 and int(pd.get("min_level", 0)) > 0:
+			lift = float(pd["min_level"]) * 3.0
+		if lift <= 0.0:
+			return {}
+		lowest = minf(lowest, lift)
+	if lowest == INF:
+		return {}
+	var base := b.duplicate()
+	base.erase("parts")
+	base["height"] = lowest
+	base["height_source"] = "tag_height"
+	base["min_height_m"] = 0.0
+	base["min_level"] = 0
+	# Its roof is the parts' floor (flat, via _capped).
+	base["roof_shape"] = ""
+	base["roof_height_m"] = 0.0
+	base["roof_levels"] = 0
+	return base
 
 ## True when another part stands on part `mi`: lifted to this part's
 ## top (within 1 m) with its centre inside this ring.
