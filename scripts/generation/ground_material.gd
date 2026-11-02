@@ -76,7 +76,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		has_sat: bool) -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-		.replace("// @TERRAIN", TerrainGlsl.CODE)
+		.replace("// @TERRAIN", TerrainGlsl.CODE).replace("// @PITS", GroundPits.GLSL)
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()
@@ -115,6 +115,15 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("unknown_trust", 0.2 if settled else 0.5)
 	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
 	TerrainGlsl.bind(m, data.quality_preset)
+	# Sunken openings (subway stairwells) are holes in the ground.
+	var pits := SubwayEntrances.pits(data)
+	if not pits.is_empty():
+		var pt := GroundPits.textures(pits, CLASS_TEXELS)
+		m.set_shader_parameter("pit_map", pt["map"])
+		m.set_shader_parameter("pit_data", pt["data"])
+		m.set_shader_parameter("pit_count", int(pt["count"]))
+	else:
+		m.set_shader_parameter("pit_count", 0)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
 	return m
 

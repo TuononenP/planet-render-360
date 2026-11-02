@@ -34,6 +34,8 @@ const FIXTURE := """
 ]}
 """
 
+const E_AT := Vector2(20.0, -20.0)
+
 func _init() -> void:
 	_run()
 
@@ -134,6 +136,26 @@ func _build(failures: Array[String]) -> void:
 	var steel := _named(root, "Rail_el_steel")
 	if steel != null and _max_y(steel) < g0 + RailBuilder.VIADUCT_CLEAR_M - 0.5:
 		failures.append("viaduct deck too low: %.2f" % _max_y(steel))
+	# The stair well is a real hole: one ground pit, a stair 2.5 m+ under
+	# the sidewalk, and a pit texture that marks the opening.
+	var pits := SubwayEntrances.pits(data)
+	if pits.size() != 1:
+		failures.append("expected 1 ground pit, got %d" % pits.size())
+	else:
+		var tex := GroundPits.textures(pits, GroundMaterial.CLASS_TEXELS)
+		if int(tex["count"]) != 1:
+			failures.append("pit texture count wrong")
+		var map: Image = (tex["map"] as ImageTexture).get_image()
+		var c: Vector2 = pits[0]["c"]
+		var n := GroundMaterial.CLASS_TEXELS
+		var ext := WorldScale.detailed_extent_units()
+		var px := map.get_pixel(int((c.x / ext + 0.5) * n), int((c.y / ext + 0.5) * n))
+		if px.r <= 0.0:
+			failures.append("pit map does not mark the opening")
+	var stair := _named(root, "Rail_entrance_stair")
+	var gs := RoadBuilder.surface_height(data, ground, E_AT.x, E_AT.y)
+	if stair == null or stair.mesh.get_aabb().position.y > gs - 2.5:
+		failures.append("stair well is not sunk under the sidewalk")
 	var plat := _named(root, "Rail_platform")
 	var want := g0 + RailStations.RAIL_TOP_M + RailStations.MAINLINE_HEIGHT_M
 	if plat != null and absf(_max_y(plat) - want) > 0.2:

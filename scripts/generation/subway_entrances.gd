@@ -19,7 +19,12 @@ extends RefCounted
 
 const WELL_W_M := 1.9
 const WELL_L_M := 5.0
-const TREADS := 16
+## The stair: a 0.2 m level threshold, TREADS treads of RUN_M falling
+## RISE_M each (2.7 m down), then a landing under the far wall.
+const TREADS := 15
+const RUN_M := 0.30
+const RISE_M := 0.18
+const THRESHOLD_M := 0.2
 const RAIL_H_M := 1.07
 const POST_SPACING_M := 1.25
 const LAMP_H_M := 2.3
@@ -32,9 +37,10 @@ const GLOBE_GREEN := Color(0.05, 0.62, 0.20)
 const TOTEM_LIGHT := Color(0.92, 0.94, 0.97)
 const SIGN_BLACK := Color(0.035, 0.035, 0.04)
 
-static func build(root: Node3D, data: LocationData, surf: RoadBuilder._Surface,
-		preset: int, north_america: bool) -> int:
-	var r: float = ENTRANCE_R[preset]
+## Entrances drawn for `data` within the preset's reach: [{s, at, fwd}].
+## Shared by build() and pits() so the ground hole and the stair agree.
+static func placements(data: LocationData) -> Array:
+	var r: float = ENTRANCE_R[RenderSettings.clamp_preset(data.quality_preset)]
 	var todo: Array = []
 	for s in data.transit_stops:
 		if not (s is Dictionary) or str(s.get("kind", "")) != "subway_entrance" \
@@ -43,20 +49,39 @@ static func build(root: Node3D, data: LocationData, surf: RoadBuilder._Surface,
 		var p := Vector2(float(s.get("x", 0.0)), float(s.get("z", 0.0)))
 		if p.length() > r or absf(p.x) > RailBuilder.EXTENT or absf(p.y) > RailBuilder.EXTENT:
 			continue
-		todo.append(s)
+		todo.append({"s": s, "at": p, "fwd": Vector2.ZERO})
+	if todo.is_empty():
+		return todo
+	var segs := _road_grid(data)
+	for t in todo:
+		t["fwd"] = _facing(t["s"], t["at"], segs)
+	return todo
+
+## Ground holes for the stair wells (GroundPits shape, units).
+static func pits(data: LocationData) -> Array:
+	var out: Array = []
+	for t in placements(data):
+		if bool((t["s"] as Dictionary).get("elevator", false)):
+			continue
+		var f: Vector2 = t["fwd"]
+		out.append({"c": (t["at"] as Vector2) + f * WELL_L_M * 0.5, "f": f,
+			"hw": WELL_W_M * 0.5, "hl": WELL_L_M * 0.5})
+	return out
+
+static func build(root: Node3D, data: LocationData, surf: RoadBuilder._Surface,
+		_preset: int, north_america: bool) -> int:
+	var todo := placements(data)
 	if todo.is_empty():
 		return 0
-	var segs := _road_grid(data)
 	var bufs := {}
-	for k in ["metal", "infill", "stair", "globe", "glass"]:
+	for k in ["metal", "infill", "stair", "globe", "glass", "lit"]:
 		bufs[k] = TreeMeshLibrary.Buf.new()
-	for s in todo:
-		var at := Vector2(float(s["x"]), float(s["z"]))
-		var fwd := _facing(s, at, segs)
+	for t in todo:
+		var s: Dictionary = t["s"]
 		if bool(s.get("elevator", false)):
-			_kiosk(bufs, at, fwd, surf, north_america)
+			_kiosk(bufs, t["at"], t["fwd"], surf, north_america)
 		else:
-			_stair(bufs, at, fwd, surf, north_america)
+			_stair(bufs, t["at"], t["fwd"], surf, north_america)
 	RailMesh.add(root, bufs["metal"], RailMesh.colour_mat("entrance_metal", 0.5, 0.45),
 		"Rail_entrance_metal")
 	RailMesh.add(root, bufs["infill"], RailMesh.infill_mat(), "Rail_entrance_infill")
@@ -64,6 +89,8 @@ static func build(root: Node3D, data: LocationData, surf: RoadBuilder._Surface,
 		"Rail_entrance_stair")
 	RailMesh.add(root, bufs["globe"], RailMesh.glow_mat(GLOBE_GREEN if north_america \
 		else TOTEM_LIGHT, 0.8 if north_america else 1.6), "Rail_entrance_light")
+	RailMesh.add(root, bufs["lit"], RailMesh.glow_mat(Color(1.0, 0.66, 0.34), 0.5),
+		"Rail_entrance_glow")
 	RailMesh.add(root, bufs["glass"], _glass_mat(), "Rail_entrance_glass")
 	return todo.size()
 
@@ -166,25 +193,8 @@ static func _stair(bufs: Dictionary, at: Vector2, fwd: Vector2, surf: RoadBuilde
 	var fr := _Frame.new(at, fwd, _ground(surf, at, fwd))
 	var hw := WELL_W_M * 0.5
 	var wi := hw - 0.12
+	_well(bufs["stair"], bufs["lit"], fr)
 	var stair: TreeMeshLibrary.Buf = bufs["stair"]
-	# Treads falling into shadow, each with a lighter nosing.
-	var dz := (WELL_L_M - 0.2) / float(TREADS)
-	for k in TREADS:
-		var depth := pow(float(k) / float(TREADS - 1), 0.6)
-		var lum := lerpf(0.46, 0.03, depth)
-		var z0 := 0.1 + float(k) * dz
-		var z1 := z0 + dz
-		var nose := Color(0.78, 0.66, 0.22) * lerpf(1.0, 0.08, depth)
-		nose.a = 1.0
-		RailMesh.quad(stair, fr.p(-wi, 0.01, z0), fr.p(wi, 0.01, z0), fr.p(wi, 0.01, z0 + 0.05),
-			fr.p(-wi, 0.01, z0 + 0.05), Vector3.UP, nose)
-		RailMesh.quad(stair, fr.p(-wi, 0.01, z0 + 0.05), fr.p(wi, 0.01, z0 + 0.05),
-			fr.p(wi, 0.01, z1), fr.p(-wi, 0.01, z1), Vector3.UP, Color(lum, lum * 0.98, lum * 0.95))
-		# Side walls of the well read as a darker margin.
-		var wall := Color(lum * 0.45, lum * 0.45, lum * 0.45)
-		for sgn: float in [1.0, -1.0]:
-			RailMesh.quad(stair, fr.p(wi * sgn, 0.011, z0), fr.p((wi - 0.14) * sgn, 0.011, z0),
-				fr.p((wi - 0.14) * sgn, 0.011, z1), fr.p(wi * sgn, 0.011, z1), Vector3.UP, wall)
 	# Granite coping under the railing on the three closed sides.
 	var coping := Color(0.62, 0.61, 0.58)
 	for sgn: float in [1.0, -1.0]:
@@ -221,6 +231,62 @@ static func _stair(bufs: Dictionary, at: Vector2, fwd: Vector2, surf: RoadBuilde
 		RailMesh.post(metal, foot, fr.along(), 0.14, 0.14, 3.0, STEEL.darkened(0.2))
 		RailMesh.box(bufs["globe"], foot + Vector3(0, 3.35, 0), fr.along() * 0.22,
 			Vector3(0, 0.25, 0), fr.across() * 0.22, TOTEM_LIGHT, false)
+
+## Colour of a surface `depth` metres below the sidewalk: daylit at the
+## top, falling off to near black at the landing (the only light there
+## is the lit doorway). Reads as depth from every angle.
+static func _shade(depth: float, base: float = 0.5) -> Color:
+	var t := clampf(depth / (RISE_M * float(TREADS)), 0.0, 1.0)
+	var l := base * lerpf(1.0, 0.07, pow(t, 0.5))
+	return Color(l, l * 0.98, l * 0.94)
+
+## The sunken stairwell under the opening (the ground shader has cut the
+## hole, GroundPits): treads and risers, two side walls, the far wall and
+## the landing floor, with a warm lit doorway low on the far wall.
+static func _well(b: TreeMeshLibrary.Buf, lit: TreeMeshLibrary.Buf, fr: _Frame) -> void:
+	var wi := WELL_W_M * 0.5
+	var depth := RISE_M * float(TREADS)
+	var z_land := THRESHOLD_M + RUN_M * float(TREADS)
+	# Threshold, treads (+ a pale nosing on each), risers.
+	RailMesh.quad(b, fr.p(-wi, 0.0, 0.0), fr.p(wi, 0.0, 0.0), fr.p(wi, 0.0, THRESHOLD_M),
+		fr.p(-wi, 0.0, THRESHOLD_M), Vector3.UP, _shade(0.0, 0.34))
+	for k in TREADS:
+		var z0 := THRESHOLD_M + RUN_M * float(k)
+		var z1 := z0 + RUN_M
+		var y := -RISE_M * float(k)
+		var col := _shade(-y, 0.30)
+		RailMesh.quad(b, fr.p(-wi, y, z0), fr.p(wi, y, z0), fr.p(wi, y, z1), fr.p(-wi, y, z1),
+			Vector3.UP, col)
+		RailMesh.quad(b, fr.p(-wi, y + 0.002, z0), fr.p(wi, y + 0.002, z0),
+			fr.p(wi, y + 0.002, z0 + 0.05), fr.p(-wi, y + 0.002, z0 + 0.05), Vector3.UP,
+			col * 1.35)
+		# Riser under the tread's far edge (faces the lower tread).
+		var y2 := y - RISE_M
+		RailMesh.quad(b, fr.p(-wi, y, z1), fr.p(wi, y, z1), fr.p(wi, y2, z1), fr.p(-wi, y2, z1),
+			fr.along(), _shade(-y2, 0.2))
+	# Landing floor and far wall.
+	RailMesh.quad(b, fr.p(-wi, -depth, z_land), fr.p(wi, -depth, z_land),
+		fr.p(wi, -depth, WELL_L_M), fr.p(-wi, -depth, WELL_L_M), Vector3.UP, _shade(depth, 0.22))
+	RailMesh.quad(b, fr.p(-wi, 0.0, WELL_L_M), fr.p(wi, 0.0, WELL_L_M),
+		fr.p(wi, -depth, WELL_L_M), fr.p(-wi, -depth, WELL_L_M), -fr.along(),
+		_shade(depth * 0.6, 0.26))
+	# Side walls in horizontal bands, each shaded by its depth (white wall
+	# tile in reality; the shade carries it).
+	var bands := 6
+	for sgn: float in [1.0, -1.0]:
+		var n := fr.across() * -sgn
+		for j in bands:
+			var y0 := -depth * float(j) / float(bands)
+			var y1 := -depth * float(j + 1) / float(bands)
+			RailMesh.quad(b, fr.p(wi * sgn, y0, 0.0), fr.p(wi * sgn, y0, WELL_L_M),
+				fr.p(wi * sgn, y1, WELL_L_M), fr.p(wi * sgn, y1, 0.0), n,
+				_shade(-(y0 + y1) * 0.5, 0.27))
+	# Lit doorway: a warm panel low on the far wall.
+	var w := fr.p(0.0, -depth + 0.9, WELL_L_M - 0.02)
+	var ax := fr.across() * 0.42
+	var up := Vector3(0, 0.6, 0)
+	RailMesh.quad(lit, w - ax - up, w + ax - up, w + ax + up, w - ax + up, -fr.along(),
+		Color.WHITE)
 
 ## One railing run a→b (local x/z): posts, top and bottom rails, and the
 ## alpha-tested baluster infill between them.

@@ -42,6 +42,7 @@ uniform int ground_quality = 2;
 
 // @SNOW
 // @TERRAIN
+// @PITS
 varying vec3 wpos;
 varying vec3 wnrm;
 
@@ -86,6 +87,9 @@ float paving(vec2 g) {
 }
 
 void fragment() {
+	if (pit_count > 0 && in_pit(wpos.xz, extent_u, class_n)) {
+		discard;
+	}
 	float dist_m = length(VERTEX) * u2m;
 	vec3 lf = t_dehaze(textureLod(photo, UV, lf_lod).rgb * photo_gain);
 	vec3 hf = t_dehaze(texture(photo, UV).rgb * photo_gain);
