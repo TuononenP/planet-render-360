@@ -26,6 +26,19 @@ func _mats_for(look: Dictionary, seed_v: float, country: String = "") -> Diction
 			out[k] = true
 	return out
 
+## Whether every vertex RoofClutter adds on a narrow 25 × 6 m roof stays
+## over it (a hair of slack for tilted dishes and collectors).
+func _stays_on_roof(look: Dictionary, seed_v: float, country: String = "") -> bool:
+	var batch := BuildingDetail.Batch.new()
+	var ring := PackedVector2Array([Vector2(-12.5, -3), Vector2(12.5, -3), Vector2(12.5, 3), Vector2(-12.5, 3)])
+	RoofClutter.add(batch, ring, Vector2.ZERO, Vector2.RIGHT, Vector2(0, 1), 12.5, 3.0,
+		30.0, Basis(), look, seed_v, 300.0, country)
+	for mat in batch.surfaces:
+		for p in (batch.surfaces[mat][0] as PackedVector3Array):
+			if absf(p.x) > 12.5 + 0.3 or absf(p.z) > 3.0 + 0.3:
+				return false
+	return true
+
 func _any(seeds: int, look: Dictionary, key: String, country: String = "") -> bool:
 	for i in seeds:
 		if _mats_for(look, float(i) * 0.137 + 0.01, country).has(key):
@@ -47,6 +60,15 @@ func _run() -> void:
 		failures.append("other flat roofs should get skylights")
 	if not _any(5, {"city": "", "region": "central_europe"}, "core"):
 		failures.append("big flat roofs should carry a stair/lift overrun")
+	if not _any(5, {"city": "", "region": "middle_east"}, "solar", "IL") \
+			or _any(20, {"city": "", "region": "middle_east"}, "dish", "IL"):
+		failures.append("Israeli roofs should carry solar water heaters, not the region's tanks")
+	for look: Dictionary in [{"city": "new_york", "region": "north_america"}, {"city": "tokyo", "region": "japan"},
+			{"city": "dubai", "region": "middle_east"}, {"city": "", "region": "central_europe"}]:
+		for i in 40:
+			if not _stays_on_roof(look, float(i) * 0.113 + 0.02, "GR" if i % 2 == 0 else ""):
+				failures.append("a %s piece hangs over a narrow roof's edge (seed %d)" % [look["city"], i])
+				break
 	if _any(20, {"city": "", "region": "central_europe"}, "cedar"):
 		failures.append("water towers belong to New York")
 	var a := _mats_for({"city": "tokyo", "region": "japan"}, 0.42)

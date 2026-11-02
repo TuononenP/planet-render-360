@@ -27,6 +27,8 @@ const SOLAR_HEATER_CITIES := ["athens"]
 ## Solar water heaters crown most flat roofs in Greece, Cyprus and Israel.
 const SOLAR_HEATER_COUNTRIES := ["GR", "CY", "IL"]
 
+const CORNERS: Array[Vector2] = [Vector2.ZERO, Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]
+
 static var _mats: Dictionary = {}
 
 ## Adds one flat roof's clutter to `batch`. `c`, `u`, `v`, `lu`, `lv`:
@@ -50,11 +52,12 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 			clampi(int(area_m2 / 250.0), 1, 5))
 		if _h(seed_v, 73) < 0.35:
 			placed += _sign_frame(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
+	# Before the regional tanks: Israel is in the Middle East region.
+	elif city in SOLAR_HEATER_CITIES or country.to_upper() in SOLAR_HEATER_COUNTRIES:
+		placed += _solar_heaters(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1 + int(_h(seed_v, 76) * 3.0))
 	elif city in TANK_CITIES or region in TANK_REGIONS:
 		placed += _tanks(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1 + int(_h(seed_v, 74) * 3.0))
 		placed += _dishes(batch, ring, c, u, v, lu, lv, top, basis, seed_v, int(_h(seed_v, 75) * 3.0))
-	elif city in SOLAR_HEATER_CITIES or country.to_upper() in SOLAR_HEATER_COUNTRIES:
-		placed += _solar_heaters(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1 + int(_h(seed_v, 76) * 3.0))
 	else:
 		placed += _skylights(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 		if area_m2 > 600.0 and _h(seed_v, 77) < 0.3:
@@ -64,7 +67,7 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 80, top + 0.25 * _m(),
 			"box", Vector3(0.9, 0.5, 0.9), "steel")
 	if _h(seed_v, 79) < 0.3:
-		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 81, top + 2.0 * _m(),
+		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 82, top + 2.0 * _m(),
 			"cyl", Vector3(0.08, 4.0, 0.08), "steel")
 	return placed
 
@@ -74,20 +77,29 @@ static func _m() -> float:
 static func _h(seed_v: float, salt: int) -> float:
 	return ArchitectureStyle._h(seed_v, salt)
 
-## A spot on the roof (offset within 0.8 of the half extents), or
-## Vector2.INF when it falls outside an irregular footprint.
+## A spot on the roof for a piece `half` metres across each way (along
+## u, v), offset within 0.8 of the room the half extents leave it; its
+## centre and corners all on the roof, else Vector2.INF (an irregular
+## footprint, or a roof too small for the piece).
 static func _spot(ring: PackedVector2Array, c: Vector2, u: Vector2, v: Vector2,
-		lu: float, lv: float, seed_v: float, salt: int) -> Vector2:
-	var du := (_h(seed_v, salt) - 0.5) * lu * 1.6
-	var dv := (_h(seed_v, salt + 1) - 0.5) * lv * 1.6
+		lu: float, lv: float, seed_v: float, salt: int, half: Vector2 = Vector2.ZERO) -> Vector2:
+	var hu := half.x * _m()
+	var hv := half.y * _m()
+	if hu >= lu or hv >= lv:
+		return Vector2.INF
+	var du := (_h(seed_v, salt) - 0.5) * (lu - hu) * 1.6
+	var dv := (_h(seed_v, salt + 1) - 0.5) * (lv - hv) * 1.6
 	var p := c + u * du + v * dv
-	return p if RingGeometry.point_in_ring(p, ring) else Vector2.INF
+	for k: Vector2 in CORNERS:
+		if not RingGeometry.point_in_ring(p + u * k.x * hu + v * k.y * hv, ring):
+			return Vector2.INF
+	return p
 
 ## One primitive of `size` metres centred at height `y` on a seeded spot.
 static func _piece(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, basis: Basis, seed_v: float,
 		salt: int, y: float, kind: String, size: Vector3, mat: String) -> int:
-	var p := _spot(ring, c, u, v, lu, lv, seed_v, salt)
+	var p := _spot(ring, c, u, v, lu, lv, seed_v, salt, Vector2(size.x, size.z) * 0.5)
 	if p == Vector2.INF:
 		return 0
 	batch.add(kind, Transform3D(basis.scaled_local(size * _m()), Vector3(p.x, y, p.y)), _mat(mat))
@@ -95,11 +107,11 @@ static func _piece(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vec
 
 static func _water_tower(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, top: float, basis: Basis, seed_v: float) -> int:
-	var p := _spot(ring, c, u, v, lu, lv, seed_v, 90)
+	var r := lerpf(1.8, 2.6, _h(seed_v, 92))
+	var p := _spot(ring, c, u, v, lu, lv, seed_v, 90, Vector2(r, r) * 1.05)
 	if p == Vector2.INF:
 		return 0
 	var m := _m()
-	var r := lerpf(1.8, 2.6, _h(seed_v, 92))
 	var legs := 3.0 * m
 	var tank_h := lerpf(3.2, 4.4, _h(seed_v, 93))
 	for k in 4:
@@ -127,10 +139,10 @@ static func _condensers(batch: BuildingDetail.Batch, ring: PackedVector2Array, c
 	var placed := 0
 	var m := _m()
 	for i in banks:
-		var p := _spot(ring, c, u, v, lu, lv, seed_v, 100 + i * 2)
+		var n := 3 + int(_h(seed_v, 110 + i) * 4.0)
+		var p := _spot(ring, c, u, v, lu, lv, seed_v, 100 + i * 2, Vector2(float(n) * 0.525, 0.2))
 		if p == Vector2.INF:
 			continue
-		var n := 3 + int(_h(seed_v, 110 + i) * 4.0)
 		for k in n:
 			var q := p + u * (float(k) - float(n - 1) * 0.5) * 1.05 * m
 			if not RingGeometry.point_in_ring(q, ring):
@@ -138,7 +150,7 @@ static func _condensers(batch: BuildingDetail.Batch, ring: PackedVector2Array, c
 			batch.add("box", Transform3D(basis.scaled_local(Vector3(0.9, 0.7, 0.4) * m),
 				Vector3(q.x, top + 0.35 * m, q.y)), _mat("ac"))
 			placed += 1
-	if _h(seed_v, 99) < 0.5:
+	if _h(seed_v, 97) < 0.5:
 		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 98, top + 1.0 * _m(),
 			"box", Vector3(2.0, 2.0, 1.6), "tank_steel")
 	return placed
@@ -153,7 +165,7 @@ static func _tanks(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vec
 		seed_v: float, n: int) -> int:
 	var placed := 0
 	for i in n:
-		var white := _h(seed_v, 131 + i) < 0.6
+		var white := _h(seed_v, 190 + i) < 0.6
 		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 130 + i * 3, top + 0.7 * _m(),
 			"cyl", Vector3(1.2, 1.4, 1.2), "tank_white" if white else "tank_black")
 	return placed
@@ -163,7 +175,7 @@ static func _dishes(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Ve
 		seed_v: float, n: int) -> int:
 	var placed := 0
 	for i in n:
-		var p := _spot(ring, c, u, v, lu, lv, seed_v, 140 + i * 3)
+		var p := _spot(ring, c, u, v, lu, lv, seed_v, 140 + i * 3, Vector2(0.5, 0.5))
 		if p == Vector2.INF:
 			continue
 		# A dish faces up and toward the equator: tip the hemisphere over.
@@ -182,7 +194,8 @@ static func _solar_heaters(batch: BuildingDetail.Batch, ring: PackedVector2Array
 	var m := _m()
 	var tilt := basis * Basis(Vector3.RIGHT, deg_to_rad(40.0))
 	for i in n:
-		var p := _spot(ring, c, u, v, lu, lv, seed_v, 150 + i * 3)
+		# The collector and the tank behind it.
+		var p := _spot(ring, c, u, v, lu, lv, seed_v, 150 + i * 3, Vector2(1.0, 1.2))
 		if p == Vector2.INF:
 			continue
 		batch.add("box", Transform3D(tilt.scaled_local(Vector3(2.0, 0.08, 1.2) * m),
