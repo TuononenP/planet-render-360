@@ -101,9 +101,6 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
 - **Leaf litter:** in the scene (`road_decals_test`; 858 mapped trees within 250 m of the Paris view, 179
   in New York), but too small to judge in the capture framings. It needs a street-level autumn shot under
   street trees.
-- **Saving a season-rebuilt world** to the world cache logs "Resource was not pre cached … circular
-  reference" (36–39 per save, `world_cache.gd` save thread). This is pre-existing: the same autumn capture
-  on 3d0f4f2, before this pass, logs 36. Not investigated further. A cached autumn world may be incomplete.
 
 ## Resolved after these captures (`../ultra-p8e-2026-11-02/`)
 
@@ -125,3 +122,9 @@ All at `--preset=3`. Earlier rounds of this pass are in `../ultra-p7c-2026-11-02
   first Paris refetch timed out at Overpass (35 s, served the old copy); a retry succeeded.
 - **`--season=`** (spring|summer|autumn|winter or 0–3) shoots every place in that season, rebuilding the
   world through the view's own season path. Autumn captures are in `../ultra-p7g-2026-11-02/`.
+- **Season-rebuild cache saves fixed.** A world rebuilt for a new season logged "Resource was not pre cached
+  … circular reference" 36–39 times per world-cache save. It was pre-existing: 3d0f4f2, before this pass,
+  logged 36. Cause: the save runs on a thread while `RoofSnow.apply` swapped the shared roof materials'
+  `next_pass` on the main thread. The snow pass is now each roofed building mesh's own `material_overlay`
+  (a node property the packed copy never sees). Winter Paris, Interlaken and Banff saved clean, and Banff's
+  roofs still carry snow (`../ultra-p8g-2026-11-02/banff_roofs.jpg`, `roof_snow_test`).

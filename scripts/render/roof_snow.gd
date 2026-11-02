@@ -3,10 +3,14 @@ extends RefCounted
 
 ## Snow lying on roofs. Roof materials are standard PBR materials (no
 ## shader of their own to read the climate globals), so while climate
-## snow is on, every roof-tagged material (meta "roof", set where roof
-## materials are made) gets a shared overlay pass: up-facing roof planes
-## above the snow line turn white, walls and steep mansard faces shed it.
-## The pass is detached again when snow is off, so summer pays nothing.
+## snow is on, every building mesh carrying a roof-tagged material (meta
+## "roof", set where roof materials are made) gets a shared overlay pass
+## (material_overlay): up-facing planes above the snow line turn white,
+## walls and steep mansard faces shed it. The pass is detached again when
+## snow is off, so summer pays nothing. It sits on the instance, not the
+## shared material (next_pass): a world is packed for WorldCache before
+## this runs and saved on a thread meanwhile, and changing a shared
+## material's resources under that save broke it ("not pre cached").
 
 const SHADER := """
 shader_type spatial;
@@ -42,10 +46,10 @@ static func overlay() -> ShaderMaterial:
 		_overlay.shader = sh
 	return _overlay
 
-## Attaches (on) or detaches (off) the overlay on every roof material of
-## `world`'s buildings. Returns the number of roof materials touched.
+## Attaches (on) or detaches (off) the overlay on every building mesh
+## of `world` that carries a roof material. Returns the meshes touched.
 static func apply(world: Node, on: bool) -> int:
-	var seen := {}
+	var touched := 0
 	for c in world.get_children():
 		if not (c is MeshInstance3D):
 			continue
@@ -56,8 +60,7 @@ static func apply(world: Node, on: bool) -> int:
 		var mats: Array = [mi.material_override]
 		for s in (mi.mesh.get_surface_count() if mi.mesh != null else 0):
 			mats.append(mi.mesh.surface_get_material(s))
-		for m in mats:
-			if m is BaseMaterial3D and not seen.has(m) and (m as Material).has_meta("roof"):
-				seen[m] = true
-				(m as BaseMaterial3D).next_pass = overlay() if on else null
-	return seen.size()
+		if mats.any(func(m: Variant) -> bool: return m is Material and (m as Material).has_meta("roof")):
+			mi.material_overlay = overlay() if on else null
+			touched += 1
+	return touched
