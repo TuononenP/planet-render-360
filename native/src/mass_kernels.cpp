@@ -1,8 +1,7 @@
 #include "mass_kernels.h"
 
-#include "parallel.h"
-
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -15,6 +14,14 @@ namespace godot {
 PackedFloat32Array MassKernels::tangents(const PackedVector3Array &v, const PackedVector3Array &n,
 		const PackedVector2Array &uv, const PackedInt32Array &idx) {
 	const int64_t nv = v.size();
+	// A malformed batch fails like the script would, never reading or
+	// writing past an array.
+	ERR_FAIL_COND_V_MSG(n.size() < nv || uv.size() < nv || idx.size() % 3 != 0, PackedFloat32Array(),
+			"MassKernels.tangents: normals, UVs and indices don't match the vertices.");
+	for (int64_t k = 0; k < idx.size(); k++) {
+		ERR_FAIL_COND_V_MSG(idx[k] < 0 || idx[k] >= nv, PackedFloat32Array(),
+				"MassKernels.tangents: an index is out of range.");
+	}
 	const Vector3 *vp = v.ptr();
 	const Vector3 *np = n.ptr();
 	const Vector2 *up = uv.ptr();
@@ -48,24 +55,22 @@ PackedFloat32Array MassKernels::tangents(const PackedVector3Array &v, const Pack
 	PackedFloat32Array out;
 	out.resize(nv * 4);
 	float *op = out.ptrw();
-	const int64_t chunk = 4096;
-	parallel_for((int)((nv + chunk - 1) / chunk), [&](int c) {
-		int64_t end = Math::min((int64_t)(c + 1) * chunk, nv);
-		for (int64_t i = (int64_t)c * chunk; i < end; i++) {
-			Vector3 nn = np[i];
-			Vector3 t = tu[i] - nn * nn.dot(tu[i]);
-			if ((double)t.length_squared() < 1e-12) {
-				t = std::abs((double)nn.x) < 0.9 ? Vector3(1, 0, 0) : Vector3(0, 0, 1);
-				t = (t - nn * nn.dot(t));
-			}
-			t = t.normalized();
-			float w = nn.cross(t).dot(-tv[i]) >= 0.0 ? 1.0f : -1.0f;
-			op[i * 4] = t.x;
-			op[i * 4 + 1] = t.y;
-			op[i * 4 + 2] = t.z;
-			op[i * 4 + 3] = w;
+	// Inline: this already runs on a build worker, and a few vector ops
+	// per vertex cost less than starting threads from every worker.
+	for (int64_t i = 0; i < nv; i++) {
+		Vector3 nn = np[i];
+		Vector3 t = tu[i] - nn * nn.dot(tu[i]);
+		if ((double)t.length_squared() < 1e-12) {
+			t = std::abs((double)nn.x) < 0.9 ? Vector3(1, 0, 0) : Vector3(0, 0, 1);
+			t = (t - nn * nn.dot(t));
 		}
-	});
+		t = t.normalized();
+		float w = nn.cross(t).dot(-tv[i]) >= 0.0 ? 1.0f : -1.0f;
+		op[i * 4] = t.x;
+		op[i * 4 + 1] = t.y;
+		op[i * 4 + 2] = t.z;
+		op[i * 4 + 3] = w;
+	}
 	return out;
 }
 

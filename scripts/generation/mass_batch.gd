@@ -165,12 +165,12 @@ static func _tint(mat: Material, p: Vector3) -> Color:
 		return RoofVariety.tint_for(p.x, p.z)
 	return Color.WHITE
 
-## Per-vertex tangents from UV gradients (Godot convention: +u tangent,
-## w so the binormal points to −v), so the shared facade and roof normal
-## maps light batched masses the way they light real buildings.
 ## Native MassKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("MassKernels")
 
+## Per-vertex tangents from UV gradients (Godot convention: +u tangent,
+## w so the binormal points to −v), so the shared facade and roof normal
+## maps light batched masses the way they light real buildings.
 static func tangents(v: PackedVector3Array, n: PackedVector3Array,
 		uv: PackedVector2Array, idx: PackedInt32Array) -> PackedFloat32Array:
 	if _native:
