@@ -54,6 +54,11 @@ var _pending_lat := 0.0
 var _pending_lon := 0.0
 var _centre_tile := Vector2i.ZERO
 var _emitted := false
+## Bumped per mosaic. Requests still in flight from an earlier mosaic
+## (a lower-zoom fallback, or a new fetch while the last one runs) keep
+## their tile in the cache but must not settle tiles of this one: they
+## would count it complete early and report it incomplete.
+var _generation := 0
 ## Contract §2.3 source record, set on every success: {zoom, span,
 ## tile_count, metres_per_px, source_zoom, source_span}. source_* differ
 ## from requested after a lower-zoom fallback. Cleared at fetch start.
@@ -117,8 +122,9 @@ func _start_mosaic(zoom: int, span: int) -> void:
 	_images.clear()
 	_remaining = _tiles.size()
 	_emitted = false
+	_generation += 1
 	for t in _tiles:
-		_load_tile(t)
+		_load_tile(t, _generation)
 
 ## Tiles in the current (or last) mosaic; the pipeline sizes its wait
 ## budget from this. 0 before the first fetch.
@@ -128,7 +134,9 @@ func pending_tile_count() -> int:
 func _cache_path(t: Vector2i) -> String:
 	return CacheStore.sat_path(_zoom, t.x, t.y)
 
-func _load_tile(t: Vector2i, attempt: int = 0) -> void:
+func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
+	if gen != _generation:
+		return
 	var path := _cache_path(t)
 	if FileAccess.file_exists(path):
 		var img := Image.new()
@@ -142,7 +150,7 @@ func _load_tile(t: Vector2i, attempt: int = 0) -> void:
 	var http := _free_http()
 	if http == null:
 		# Pool busy: retry on the next process frame until a slot frees.
-		get_tree().create_timer(0.25).timeout.connect(func() -> void: _load_tile(t, attempt))
+		get_tree().create_timer(0.25).timeout.connect(func() -> void: _load_tile(t, gen, attempt))
 		return
 	var done := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 		http.set_meta("busy", false)
@@ -151,6 +159,8 @@ func _load_tile(t: Vector2i, attempt: int = 0) -> void:
 			if f != null:
 				f.store_buffer(body)
 				CacheStore.note_written(path)
+			if gen != _generation:
+				return
 			var img := Image.new()
 			if img.load_jpg_from_buffer(body) == OK:
 				_tile_done(t, img)
@@ -158,8 +168,8 @@ func _load_tile(t: Vector2i, attempt: int = 0) -> void:
 		if attempt < 1:
 			# One retry: a single transient blip must not fail a
 			# 169-tile Ultra mosaic (or force a full lower-zoom refetch).
-			get_tree().create_timer(0.5).timeout.connect(func() -> void: _load_tile(t, attempt + 1))
-		else:
+			get_tree().create_timer(0.5).timeout.connect(func() -> void: _load_tile(t, gen, attempt + 1))
+		elif gen == _generation:
 			_tile_done(t, null)
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
 	var url := URL_TEMPLATE % [_zoom, t.y, t.x]
