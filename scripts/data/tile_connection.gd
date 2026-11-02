@@ -10,6 +10,12 @@ const HOST := "tile.openstreetmap.org"
 const TIMEOUT_MS := 20000
 ## Reads per poll while the body streams in (a tile is 10–40 KB).
 const READS_PER_POLL := 8
+## A kept-alive connection idle longer than this is closed before its
+## next tile. Servers drop idle TLS sessions (tile.openstreetmap.org
+## between 20 and 100 s, live probe 2026-11-01); reusing a dropped one
+## makes Godot log "mbedtls error: returned -0x6c00" before the retry
+## reconnects. Reconnecting up front costs the same and stays quiet.
+const IDLE_MAX_MS := 15000
 
 ## Host this connection talks to (TileFetcher: OSM; VectorTileFetcher:
 ## OpenFreeMap or the Terrarium DEM bucket).
@@ -25,8 +31,16 @@ var _body := PackedByteArray()
 var _sent := false
 var _retried := false
 var _started_ms := 0
+var _idle_since_ms := 0
+
+## True when a connection idle since `idle_ms` ago is not worth reusing.
+static func is_stale(idle_ms: int) -> bool:
+	return idle_ms > IDLE_MAX_MS
 
 func start(t: Vector3i, path: String, headers: PackedStringArray) -> void:
+	if _client.get_status() != HTTPClient.STATUS_DISCONNECTED \
+			and is_stale(Time.get_ticks_msec() - _idle_since_ms):
+		_client.close()
 	tile = t
 	busy = true
 	_path = path
@@ -47,6 +61,7 @@ func cancel() -> void:
 	if busy and _sent:
 		_client.close()
 	busy = false
+	_idle_since_ms = Time.get_ticks_msec()
 
 ## Close the kept-alive connection for good (the fetcher is leaving the
 ## tree). A bare HTTPClient never closes itself, unlike HTTPRequest on
@@ -77,6 +92,7 @@ func poll() -> Array:
 	if _sent and _client.has_response() \
 			and st in [HTTPClient.STATUS_CONNECTED, HTTPClient.STATUS_DISCONNECTED]:
 		busy = false
+		_idle_since_ms = Time.get_ticks_msec()
 		return [true, _client.get_response_code(), _body]
 	match st:
 		HTTPClient.STATUS_DISCONNECTED:

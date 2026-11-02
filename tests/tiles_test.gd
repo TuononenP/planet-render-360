@@ -18,6 +18,10 @@ func _run() -> void:
 			failures.append("roundtrip drift %s -> %s" % [coords, back])
 	if TileFetcher.global_pixel(0, 0, 1) != Vector2(256, 256):
 		failures.append("origin pixel at z1 should be (256,256)")
+	# Idle keep-alives are dropped by the server; reuse must reconnect first.
+	if TileConnection.is_stale(TileConnection.IDLE_MAX_MS) \
+			or not TileConnection.is_stale(TileConnection.IDLE_MAX_MS + 1):
+		failures.append("TileConnection.is_stale should flip just past IDLE_MAX_MS")
 	if not failures.is_empty():
 		for f in failures:
 			printerr("TILES FAIL: ", f)

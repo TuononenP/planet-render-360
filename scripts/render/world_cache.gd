@@ -32,7 +32,8 @@ static func key(data: LocationData) -> String:
 		data.heights.size(), data.buildings.size(), data.roads.size(),
 		data.land_polygons.size(), data.waterways.size(), data.trees.size(),
 		data.landmark_type, str(data.dem_source), str(data.satellite_source),
-		data.far_landuse.size(), data.far_towers.size(), str(data.climate), _sources()]
+		data.far_landuse.size(), data.far_towers.size(), str(data.climate),
+		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(), _sources()]
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]
