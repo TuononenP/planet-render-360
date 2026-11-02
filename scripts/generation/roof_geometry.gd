@@ -118,8 +118,11 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 ## form_mesh's faces from the native RoofKernels (same arrays).
 static func _native_mesh(ring: PackedVector2Array, top: float, rh: float, shape: String,
 		party: PackedByteArray, gable_front: bool, holes: Array) -> ArrayMesh:
-	var f: Array = ClassDB.class_call_static("RoofKernels", "form", ring, top, rh, shape,
-		party, gable_front, holes)
+	return mesh_of(ClassDB.class_call_static("RoofKernels", "form", ring, top, rh, shape,
+		party, gable_front, holes))
+
+## The mesh of RoofKernels.form's faces `f` (null for []).
+static func mesh_of(f: Array) -> ArrayMesh:
 	if f.is_empty():
 		return null
 	var arrays: Array = []

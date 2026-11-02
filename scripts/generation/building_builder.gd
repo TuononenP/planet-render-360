@@ -37,6 +37,10 @@ static var _batch_key := ""
 ## Shared-wall index of the real buildings while they extrude (null for
 ## infill and the far city, which never abut mapped parcels).
 static var _party: PartyWalls = null
+## Native roof forms computed up front (_prepare_roofs), keyed by their
+## exact form inputs, and the ring covers that pass computed, by mass key.
+static var _roofs: Dictionary = {}
+static var _covers: Dictionary = {}
 ## Last build's census: {real, impostors, infill, far_blocks, far_towers}.
 static var last_stats: Dictionary = {}
 
@@ -156,6 +160,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	_party = PartyWalls.build(data, ground, ctx,
 		func(b: Dictionary) -> bool:
 			return _accepted(data, b, site, edge) and not _in_open_water(ground, b))
+	if RoofGeometry._native:
+		_prepare_roofs(data, ground, ctx, sorted, site, edge)
 	for b in sorted:
 		if abort != null and abort.requested:
 			break
@@ -209,6 +215,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		placed += 1
 	last_stats["real"] = placed
 	_party = null
+	_roofs.clear()
+	_covers.clear()
 	BuildingMasses.end_build()
 	impostor.commit(root, "Impostor")
 	if aabb_fallbacks > 0:
@@ -298,9 +306,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		idx = RingGeometry.drop_hole_triangles(cap, idx, holes)
 	if idx.size() < 3:
 		return false
-	var base := ground.height_at_world(centre.x, centre.y)
-	for p in ring:
-		base = minf(base, ground.height_at_world(p.x, p.y))
+	var base := _mass_base(ground, ring, centre)
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
 	var sink := 0.6 * WorldScale.metres_to_units()
@@ -314,7 +320,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var party := PackedByteArray()
 	var fire: Material = null
 	if _party != null and mass.has("key"):
-		cover = _party.ring_cover(ring, str(mass["key"]))
+		cover = _cover_for(ring, str(mass["key"]), true)
 		party = PartyWalls.party_flags(cover)
 		fire = PartyWalls.firewall(look)
 	# T4.3: tags → satellite → regional resolution with real storey
@@ -374,19 +380,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		centre.length() / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
-	if shape != "flat" and roof_h_world > 0.01:
-		# Eave overhang (style metres) for gabled/hipped/pyramidal roofs:
-		# the eave line drops by the roof's own slope so the pitch is kept.
-		# A terrace keeps its eaves flush (no overhang into the neighbour).
-		var eave_u := float(look.get("eave", 0.0)) * WorldScale.metres_to_units()
-		if eave_u > 0.0 and shape in ["gabled", "hipped", "pyramidal"] \
-				and not party.has(1) and holes.is_empty():
-			var half := maxf(_ring_span_m(ring) * WorldScale.metres_to_units() * 0.5, 0.01)
-			var drop := minf(eave_u * roof_h_world / half, height_world * 0.25)
-			roofed = _roof_form(root, RoofGeometry.offset_ring(ring, eave_u), top - drop,
-				roof_h_world + drop, shape, roof_mat, party, gable_front)
-		else:
-			roofed = _roof_form(root, ring, top, roof_h_world, shape, roof_mat, party, gable_front, holes)
+	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
+	if not job.is_empty():
+		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6])
 	if not roofed:
 		# No pitched roof built (flat, or no form fits): dormers, stacks and
 		# gables must not stand on a roof that is not there.
@@ -474,12 +470,80 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Ar
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
 		gable_front: bool = false, holes: Array = []) -> bool:
-	var mesh := RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes)
+	var key := [ring, top, rh, shape, party, gable_front, holes] if not _roofs.is_empty() else []
+	var mesh := RoofGeometry.mesh_of(_roofs[key]) if _roofs.has(key) \
+		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes)
 	if mesh != null and _batch != null:
 		_batch.add_mesh(_batch_key, mat, mesh)
 	elif mesh != null:
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
+
+## Lowest ground under a mass's ring and centre.
+static func _mass_base(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2) -> float:
+	var base := ground.height_at_world(centre.x, centre.y)
+	for p in ring:
+		base = minf(base, ground.height_at_world(p.x, p.y))
+	return base
+
+## The roof form's inputs [ring, top, rh, shape, party, gable_front,
+## holes] for a pitched mass, or [] when it has none. Eave overhang (style
+## metres) for gabled/hipped/pyramidal roofs: the eave line drops by the
+## roof's own slope so the pitch is kept. A terrace keeps its eaves flush
+## (no overhang into the neighbour).
+static func _roof_job(ring: PackedVector2Array, top: float, height_world: float,
+		shape: String, roof_h_world: float, look: Dictionary, party: PackedByteArray,
+		holes: Array) -> Array:
+	if shape == "flat" or roof_h_world <= 0.01:
+		return []
+	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
+	var eave_u := float(look.get("eave", 0.0)) * WorldScale.metres_to_units()
+	if eave_u > 0.0 and shape in ["gabled", "hipped", "pyramidal"] \
+			and not party.has(1) and holes.is_empty():
+		var half := maxf(_ring_span_m(ring) * WorldScale.metres_to_units() * 0.5, 0.01)
+		var drop := minf(eave_u * roof_h_world / half, height_world * 0.25)
+		return [RoofGeometry.offset_ring(ring, eave_u), top - drop, roof_h_world + drop,
+			shape, party, gable_front, []]
+	return [ring, top, roof_h_world, shape, party, gable_front, holes]
+
+## _party.ring_cover, reusing the one _prepare_roofs computed for this
+## mass (`take` hands it over: the walls may read it, nothing reuses it).
+static func _cover_for(ring: PackedVector2Array, key: String, take: bool = false) -> Array:
+	var hit: Array = _covers.get(key, [])
+	if not hit.is_empty() and hit[0] == ring:
+		if take:
+			_covers.erase(key)
+		return hit[1]
+	var cover := _party.ring_cover(ring, key)
+	if not take:
+		_covers[key] = [ring, cover]
+	return cover
+
+## Every standing mass's roof form, computed up front on every core
+## (RoofKernels.form_many) with _extrude_polygon's own inputs: _roof_form
+## takes a result only when its call matches it exactly.
+static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Dictionary,
+		sorted: Array, site: Vector2, edge: float) -> void:
+	var m2u := WorldScale.metres_to_units()
+	var jobs: Array = []
+	for b in sorted:
+		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+			continue
+		for m in BuildingMasses.plan(b, ctx):
+			var md := m as Dictionary
+			var ring: PackedVector2Array = md["ring"]
+			var height_world := float(md["wall_m"]) * m2u
+			var party := PackedByteArray()
+			if _party != null and md.has("key"):
+				party = PartyWalls.party_flags(_cover_for(ring, str(md["key"])))
+			var job := _roof_job(ring, _mass_base(ground, ring, md["centre"]) + height_world,
+				height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
+				md.get("holes", []))
+			if not job.is_empty():
+				jobs.append(job)
+	var res: Array = ClassDB.class_call_static("RoofKernels", "form_many", jobs)
+	for i in jobs.size():
+		_roofs[jobs[i]] = res[i]
 
 ## A mapped landmark candidate clears nothing: its own building is the model.
 static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> bool:

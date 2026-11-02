@@ -22,6 +22,9 @@ public:
 	// [verts, normals, uvs, tangents], or [] where form_mesh returns null.
 	static Array form(const PackedVector2Array &ring, double top, double rh, const String &shape,
 			const PackedByteArray &party, bool gable_front, const Array &holes);
+	// form() over `jobs` ([ring, top, rh, shape, party, gable_front, holes]
+	// each) on every core, results in job order.
+	static Array form_many(const Array &jobs);
 };
 
 } // namespace godot

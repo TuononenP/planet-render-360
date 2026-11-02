@@ -1,5 +1,7 @@
 #include "roof_kernels.h"
 
+#include "parallel.h"
+
 #include <godot_cpp/classes/geometry2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -869,10 +871,31 @@ Array RoofKernels::form(const PackedVector2Array &ring, double top, double rh, c
 	return out;
 }
 
+Array RoofKernels::form_many(const Array &jobs) {
+	const int n = (int)jobs.size();
+	std::vector<Array> in((size_t)n);
+	for (int i = 0; i < n; i++) {
+		in[i] = jobs[i];
+	}
+	std::vector<Array> res((size_t)n);
+	Geometry2D::get_singleton();
+	parallel_for(n, [&](int i) {
+		const Array &j = in[i];
+		res[i] = form(j[0], j[1], j[2], j[3], j[4], j[5], j[6]);
+	});
+	Array out;
+	out.resize(n);
+	for (int i = 0; i < n; i++) {
+		out[i] = res[i];
+	}
+	return out;
+}
+
 void RoofKernels::_bind_methods() {
 	ClassDB::bind_static_method("RoofKernels",
 			D_METHOD("form", "ring", "top", "rh", "shape", "party", "gable_front", "holes"),
 			&RoofKernels::form);
+	ClassDB::bind_static_method("RoofKernels", D_METHOD("form_many", "jobs"), &RoofKernels::form_many);
 }
 
 } // namespace godot
