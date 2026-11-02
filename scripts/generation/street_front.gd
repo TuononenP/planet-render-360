@@ -43,6 +43,9 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 		var salt := float(i) * 1.37
 		if shops and rows[0]["ground"] and not raised:
 			_awnings(kit, sp, rows[0], relief, seed_v, salt)
+			# Desktop Ultra near the eye: the lit shop spills onto the pavement.
+			if bool(d.get("shop_lights", false)):
+				ShopLights.note(sp["a"], sp["dir"], sp["n"], float(sp["len_m"]), float(rows[0]["y0"]))
 		if not stooped and not raised and i == longest and ArchitectureStyle._h(seed_v, 81) < float(relief.get("stoop", 0.0)):
 			_stoop(kit, sp, float(d["ground_y"]), stone)
 			stooped = true

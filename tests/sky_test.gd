@@ -120,6 +120,49 @@ func _init() -> void:
 		failures.append("falling snow should brighten the ground bounce")
 	rig.set_weather(-1, AtmosphereRig.DEFAULT_COVER)
 
+	# City skyglow: an overcast city night glows; the countryside stays dark.
+	rig.set_time(rig.golden_hour() + 4.0)
+	rig.set_weather(61, 100.0)
+	rig.set_city_glow(0.0)
+	var dark_deck: Color = rig.sky_material.get_shader_parameter("cloud_shade")
+	rig.set_city_glow(1.0)
+	var lit_deck: Color = rig.sky_material.get_shader_parameter("cloud_shade")
+	if lit_deck.get_luminance() < dark_deck.get_luminance() * 2.0 or lit_deck.r <= lit_deck.b:
+		failures.append("a city's overcast night should glow warm: %s vs %s" % [lit_deck, dark_deck])
+	rig.set_city_glow(0.0)
+	rig.set_weather(-1, AtmosphereRig.DEFAULT_COVER)
+
+	# Desktop Ultra's street probes: none off it, box-projected round the eye.
+	if not rig._street_probes.is_empty():
+		failures.append("street reflection probes are desktop Ultra only")
+	rig._set_street_probes(true)
+	# A street rising 1 m in 10 to the east, the eye 30 m over it.
+	var um := rig.units_per_metre
+	rig.ground_at = func(x: float, _z: float) -> float: return x * 0.1
+	rig.set_probe_origin(Vector3(10.0, 31.0, 0.0) * um)
+	if rig._street_probes.size() != AtmosphereRig.STREET_PROBE_OFFSETS.size() \
+			or not rig._street_probes[0].box_projection:
+		failures.append("street probes should be box-projected")
+	for sp: ReflectionProbe in rig._street_probes:
+		var street := sp.position.x * 0.1
+		var bottom := sp.position.y - sp.size.y * 0.5
+		var capture := sp.position.y + sp.origin_offset.y
+		if absf(bottom - (street - AtmosphereRig.STREET_BELOW_M * um)) > 0.01 * um \
+				or absf(capture - (street + 30.0 * um)) > 0.01 * um:
+			failures.append("a street box should stand on its street and capture at eye height: %s" % sp.position)
+			break
+	if not is_equal_approx(rig._street_probes[1].position.x, 150.0 * um):
+		failures.append("street probes should follow the eye")
+	# A drone far up: the capture stays inside its box.
+	rig.set_probe_origin(Vector3(10.0, 400.0, 0.0) * um)
+	var top_sp := rig._street_probes[0]
+	if absf(top_sp.origin_offset.y) > top_sp.size.y * 0.5:
+		failures.append("a high eye should keep each street capture inside its box")
+	rig.ground_at = Callable()
+	rig._set_street_probes(false)
+	if not rig._street_probes.is_empty():
+		failures.append("street probes should go when Ultra is left")
+
 	rig.free()
 	if failures.is_empty():
 		print("SKY OK: golden-hour reference, seasonal sun/hues/clouds, twilight, night")

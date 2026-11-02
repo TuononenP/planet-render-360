@@ -134,6 +134,10 @@ static func apply_surface_state(v: View360) -> void:
 		return
 	var code := v._atmos.weather_code if v._atmos != null else -1
 	ClimateModel.apply_globals(v._data, code)
+	# Night skyglow follows how built-up the place is (~1500 mapped
+	# buildings in the detailed extent reads as a full city).
+	if v._atmos != null:
+		v._atmos.set_city_glow(float(v._data.buildings.size()) / 1500.0)
 	if v._atmos != null:
 		# Snow underfoot brightens the bounce light; bolts land on terrain.
 		v._atmos.set_snow_ground(ClimateModel.has(v._data)

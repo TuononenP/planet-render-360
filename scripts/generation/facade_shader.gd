@@ -94,10 +94,11 @@ float hdist(float a, float b) {
 	return abs(mod(a - b + 12.0, 24.0) - 12.0);
 }
 // Share of a building's rooms lit at `h`: homes peak near 21:00 and thin
-// out after 23:00 with a small breakfast bump; offices empty after 20:00.
+// out after 23:00 with a small breakfast bump; offices mostly empty after
+// 20:00, but cleaners and lights left on keep a sixth of the floors lit.
 float occupancy(float h, bool office) {
 	if (office) {
-		return 0.06 + 0.66 * (1.0 - smoothstep(18.5, 21.0, h)) * smoothstep(6.0, 8.0, h);
+		return 0.16 + 0.56 * (1.0 - smoothstep(18.5, 21.0, h)) * smoothstep(6.0, 8.0, h);
 	}
 	float d = hdist(h, 20.5);
 	float m = hdist(h, 6.7);
@@ -218,8 +219,15 @@ void fragment() {
 	float seed = h13(vec3(cell, bld));
 	float night = clamp(night_energy / 2.6, 0.0, 1.0);
 	float occ = occupancy(city_hour, curtain_wall) * mix(0.5, 1.4, h12(vec2(bld, 7.0)));
-	float lit = step(h13(vec3(cell + 0.37, bld + 11.0)), occ) * night;
-	vec3 lamp = lamp_colour(h13(vec3(cell, bld + 3.7)), TIME);
+	// Offices light a floor in stretches of five bays, homes room by room.
+	vec2 lc = curtain_wall ? vec2(floor(cell.x / 5.0), cell.y) : cell;
+	float lit = step(h13(vec3(lc + 0.37, bld + 11.0)), occ) * night;
+	vec3 lamp = lamp_colour(h13(vec3(lc, bld + 3.7)), TIME);
+	// Panes under ~2 px glow at the building's lit share in an average warm
+	// white: picked one by one they alias to white speckle on the skyline.
+	float sub = smoothstep(0.25, 0.7, max(length(gx * cells), length(gy * cells)));
+	lit = mix(lit, occ * night, sub);
+	lamp = mix(lamp, vec3(1.0, 0.80, 0.58), sub);
 
 	// The room: trace the eye ray from the pane into a box one bay wide,
 	// one storey tall and room_depth deep (x along u, y down, z into it).
@@ -267,8 +275,9 @@ void fragment() {
 	vec3 inside = room * mix(day_room, lamp_k * mix(1.0, 0.55, back) * lit, night);
 	vec3 drape_e = fabric * mix(0.07 * (1.0 - night), 0.55 * lit, night);
 	inside = mix(inside, drape_e, drape);
-	// Tinted curtain walls show less of the room.
-	float transmit = curtain_wall ? 0.35 : 0.85;
+	// Tinted curtain walls show less of the room by day; at night the lit
+	// floors behind them read strongly.
+	float transmit = curtain_wall ? mix(0.35, 0.8, night) : 0.85;
 	vec3 glass_e = inside * transmit * mix(vec3(1.0), lamp * night_energy * 1.4, step(0.001, lit));
 
 	vec3 glass_alb = curtain_wall ? base * 0.8 : mix(vec3(0.015), fabric * 0.18, drape);

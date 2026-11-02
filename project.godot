@@ -56,7 +56,8 @@ renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
 reflections/reflection_atlas/reflection_size=512
 reflections/reflection_atlas/reflection_size.mobile=256
-reflections/reflection_atlas/reflection_count=4
+reflections/reflection_atlas/reflection_count=8
+reflections/reflection_atlas/reflection_count.mobile=4
 environment/defaults/default_clear_color=Color(0.925, 0.937, 0.929, 1)
 textures/vram_compression/import_etc2_astc=true
 

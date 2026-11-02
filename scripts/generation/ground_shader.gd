@@ -265,6 +265,11 @@ void fragment() {
 	// Live rain: wet ground darkens and turns glossy (not under snow).
 	float wet = climate_wetness * (1.0 - sc);
 	alb *= mix(1.0, 0.72, wet);
+	// Puddles in the low spots of flat paving (squares, pavements), as on
+	// the roads (RoadSurface): street and shop light mirrors in them.
+	float puddle = smoothstep(0.6, 0.7, t_noise(g / 3.5) * 0.7 + t_noise(g / 11.0) * 0.3)
+		* wet * pave * (1.0 - steep) * (1.0 - wf);
+	alb = mix(alb, alb * 0.55, puddle);
 	ALBEDO = value_clamp(alb);
 	// Lighting normal: relief-bent world normal into view space.
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
@@ -272,14 +277,14 @@ void fragment() {
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
 	BINORMAL = normalize((VIEW_MATRIX * vec4(cross(tw, nw), 0.0)).xyz);
 	vec3 nmap = mix(nm.rgb, sn.rgb, sc);
-	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), max(wf, edge));
+	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), max(max(wf, edge), puddle));
 	NORMAL_MAP_DEPTH = 0.9;
 	AO = contact;
 	AO_LIGHT_AFFECT = 0.2;
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
-	ROUGHNESS = mix(r, 0.22, wet * 0.85);
+	ROUGHNESS = mix(mix(r, 0.22, wet * 0.85), 0.03, puddle);
 	SPECULAR = mix(0.28, 0.5, wet);
 }
 """

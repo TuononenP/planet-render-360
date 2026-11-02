@@ -54,19 +54,23 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 		FacadeMaterials.begin_build()
 		BuildingMasses.begin_build()
 	last_stats = {"real": 0, "impostors": 0, "infill": 0}
+	ShopLights.begin_build()
 	var root := Node3D.new()
 	root.name = "Buildings"
 	var smap := SettlementMap.build(data)
 	if not data.buildings.is_empty():
 		_real_buildings(root, data, ground, abort)
 		if abort != null and abort.requested:
+			ShopLights.discard()
 			return root
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
 	_buildings(root, data, ground, smap, abort)
 	if abort != null and abort.requested:
+		ShopLights.discard()
 		return root
 	FarCityBuilder.build(root, data, ground, smap)
+	ShopLights.add(root)
 	if FacadeShader.enabled(data.quality_preset):
 		FacadeShader.upgrade(root)
 	FacadeTextures.end_build()
@@ -393,7 +397,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade,
 			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
-			"party_flags": party})
+			"party_flags": party, "shop_lights": RenderQuality.ultra_desktop(preset)
+				and centre.length() < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,

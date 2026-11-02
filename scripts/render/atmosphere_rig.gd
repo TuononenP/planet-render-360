@@ -106,6 +106,15 @@ var sky_top_color := Color(0.50, 0.66, 0.80)
 var sky_horizon_color := Color(0.86, 0.84, 0.80)
 var haze_color := Color(0.80, 0.82, 0.84)
 var cloud_shade_color := Color(0.55, 0.58, 0.64)
+## How built-up the shown place is (0 countryside .. 1 dense city): scales
+## the night skyglow. Set per place (ViewConditions.apply_surface_state).
+var city_glow := 0.0
+## Skyglow colour at full city and full night (sodium and warm LED mix).
+const CITY_SKYGLOW := Color(0.20, 0.14, 0.09)
+
+func set_city_glow(value: float) -> void:
+	city_glow = clampf(value, 0.0, 1.0)
+	_apply()
 ## 0 by day -> 1 in full night (stars, Milky Way); twilight peaks as the
 ## sun crosses the horizon (Earth's shadow, Belt of Venus).
 var night_amount := 0.0
@@ -150,6 +159,8 @@ func _process(delta: float) -> void:
 			# Any property change re-queues an UPDATE_ONCE capture, which
 			# Godot spreads over six frames (one cube face each).
 			probe.intensity = 1.0 if probe.intensity < 1.0 else 0.9999
+			for sp in _street_probes:
+				sp.intensity = probe.intensity
 	# Lightning writes the sky only while a flash is lit (it dirties the
 	# radiance map); flashes never re-capture the reflection probe.
 	if lightning.active or _flash_on:
@@ -171,6 +182,7 @@ func _process(delta: float) -> void:
 ## once a place is shown; the probe re-renders there.
 func set_probe_origin(pos: Vector3) -> void:
 	probe.position = pos
+	_place_street_probes()
 	lightning.centre = pos
 	_refresh_probe()
 
@@ -267,6 +279,8 @@ func set_quality(preset: int) -> void:
 	RenderQuality.apply_light(sun, _preset)
 	sun.shadow_opacity = float(weather_look["shadow_opacity"])
 	_update_lightning()
+	_set_street_probes(RenderQuality.ultra_desktop(_preset))
+	_refresh_probe()
 	if is_inside_tree():
 		RenderQuality.apply_viewport(get_viewport(), _preset)
 
@@ -347,6 +361,69 @@ func _refresh_probe() -> void:
 	if probe != null:
 		_probe_due = PROBE_DEBOUNCE_S
 
+## Desktop Ultra: box-projected probes around the eye, so glass and wet
+## paving nearby reflect the street itself rather than the sky-scale
+## capture. A smaller probe wins inside its box; past them the view probe
+## still holds. Refreshed with it (one probe property change re-captures).
+const STREET_PROBE_OFFSETS: Array[Vector3] = [Vector3(0, 0, 0), Vector3(140, 0, 0),
+	Vector3(-140, 0, 0), Vector3(0, 0, 140), Vector3(0, 0, -140)]
+const STREET_PROBE_SIZE_M := Vector3(160.0, 90.0, 160.0)
+## A street box reaches this far below its street (kerbs, slopes).
+const STREET_BELOW_M := 4.0
+## Eye height over the street assumed when no ground is known.
+const STREET_EYE_M := 30.0
+var _street_probes: Array[ReflectionProbe] = []
+## Ground height (render Y) at (x, z), set by the view once its ground is
+## known: each street box stands on the street under it.
+var ground_at: Callable
+
+func _set_street_probes(on: bool) -> void:
+	# Already in the wanted state (probes present exactly when on).
+	if on != _street_probes.is_empty():
+		return
+	for sp in _street_probes:
+		sp.queue_free()
+	_street_probes.clear()
+	if not on:
+		return
+	for off in STREET_PROBE_OFFSETS:
+		var sp := ReflectionProbe.new()
+		sp.name = "StreetReflections"
+		sp.update_mode = ReflectionProbe.UPDATE_ONCE
+		sp.size = STREET_PROBE_SIZE_M * units_per_metre
+		sp.box_projection = true
+		sp.blend_distance = 20.0 * units_per_metre
+		sp.max_distance = 600.0 * units_per_metre
+		sp.enable_shadows = true
+		sp.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+		add_child(sp)
+		_street_probes.append(sp)
+	_place_street_probes()
+
+## Each street box stands on the street under it (STREET_BELOW_M into
+## the ground), and captures from the eye's height over its own street,
+## kept inside the box: box projection then lines the reflections up
+## with the street the glass and paving face.
+func _place_street_probes() -> void:
+	var m := units_per_metre
+	var eye := probe.position
+	var eye_ground := _ground_y(eye.x, eye.z, eye.y - STREET_EYE_M * m)
+	for i in _street_probes.size():
+		var sp := _street_probes[i]
+		var at := eye + STREET_PROBE_OFFSETS[i] * m
+		var street := _ground_y(at.x, at.z, eye_ground)
+		var bottom := street - STREET_BELOW_M * m
+		sp.position = Vector3(at.x, bottom + STREET_PROBE_SIZE_M.y * 0.5 * m, at.z)
+		var capture := street + clampf(eye.y - eye_ground, 1.5 * m,
+			(STREET_PROBE_SIZE_M.y - STREET_BELOW_M - 1.0) * m)
+		sp.origin_offset = Vector3(0.0, capture - sp.position.y, 0.0)
+
+func _ground_y(x: float, z: float, fallback: float) -> float:
+	if not ground_at.is_valid():
+		return fallback
+	var y: Variant = ground_at.call(x, z)
+	return float(y) if y is float and not is_nan(y) else fallback
+
 func _apply() -> void:
 	_refresh_probe()
 	var look := weather_look
@@ -415,6 +492,18 @@ func _apply() -> void:
 		shade = Color(0.05, 0.06, 0.10).lerp(shade, dusk * 0.6)
 	lit = lit.lerp(grey * 1.15, overcast)
 	shade = shade.lerp(grey * 0.82, overcast)
+	if night_amount > 0.0 and city_glow > 0.0:
+		# Skyglow: the city's lights on the cloud base and the low sky,
+		# orange-grey, strongest under a full deck; a clear sky keeps a
+		# faint dome toward the horizon.
+		var g := CITY_SKYGLOW * city_glow * night_amount
+		lit += g * lerpf(0.5, 1.6, cover)
+		shade += g * lerpf(0.4, 1.3, cover)
+		horizon += g * lerpf(0.6, 1.2, overcast)
+		zenith += g * lerpf(0.15, 0.9, overcast)
+		sky_top_color = zenith
+		sky_horizon_color = horizon
+		haze_color = horizon.lerp(zenith, 0.22)
 	# Storm bases: lower, darker and faintly blue-green underneath.
 	shade = shade * (1.0 - 0.5 * darken) * (look["cloud_tint"] as Color)
 	lit = lit.lerp(shade, 0.4 * darken)
