@@ -5,6 +5,7 @@ extends SceneTree
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
 ##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs]
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
+##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -72,6 +73,8 @@ var _audit := {}
 var _had_history := false
 ## The place's own weather answered (or failed): its UTC offset is set.
 var _weather_in := false
+## WMO weather code every capture forces (--weather=, default clear).
+var _weather_code := 0
 
 func _init() -> void:
 	_run()
@@ -122,6 +125,7 @@ func _run() -> void:
 		_weather_in = true)
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
+	_weather_code = int(a.get("weather", 0))
 	for place in _places(str(a["places"])):
 		await _capture(main, view, place, times, a.has("audit"), float(a.get("settle", SETTLE_S)))
 	_write_stats()
@@ -150,8 +154,9 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	var wait := Time.get_ticks_msec()
 	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
 		await process_frame
-	view._atmos.set_weather(0, 15.0)
-	ViewConditions._apply_precip(view, 0)
+	# Clear captures keep a few clouds; forced weather comes overcast.
+	view._atmos.set_weather(_weather_code, 15.0 if _weather_code == 0 else 100.0)
+	ViewConditions._apply_precip(view, _weather_code)
 	ViewConditions.apply_surface_state(view)
 	ViewConditions.spawn_golden_hour(view)
 	await _settle(settle_s, SETTLE_FRAMES)
