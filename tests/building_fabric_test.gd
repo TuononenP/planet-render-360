@@ -158,6 +158,31 @@ func _run() -> void:
 			inward += 1
 	if inward == 0:
 		failures.append("courtyard has no inward facade walls")
+	# Parts lifted by storeys only: the base reaches their floor at the
+	# look's floor height, and is flat under them.
+	var storey_part := pent.merged({"min_height_m": 0.0, "min_level": 10, "roof_shape": ""}, true)
+	var by_levels := BuildingMasses.plan(_bldg(_rect(100, 0, 114, 14), 16,
+		{"height": 50.0, "height_source": "tag_height", "parts": [storey_part.merged(
+			{"footprint": _rect(104, 4, 110, 10), "x": 107.0}, true)]}), ctx)
+	var lf := float((by_levels[0]["look"] as Dictionary)["floor_h"])
+	if by_levels.size() != 2 or absf(float(by_levels[0]["wall_m"]) - 10.0 * lf) > 0.6 \
+			or str(by_levels[0]["shape"]) != "flat":
+		failures.append("min_level parts: base wall %.2f (want %.2f), %s roof" % [by_levels[0]["wall_m"],
+			10.0 * lf, by_levels[0]["shape"]])
+	# A min above the part's own top is a slip the part stands on the
+	# ground for: no outline block swallows it.
+	var slipped := BuildingMasses.plan(_bldg(_rect(120, 0, 134, 14), 16,
+		{"height": 50.0, "height_source": "tag_height", "parts": [pent.merged(
+			{"footprint": _rect(124, 4, 130, 10), "x": 127.0, "min_height_m": 20.0, "height": 15.0}, true)]}), ctx)
+	if slipped.size() != 1 or float(slipped[0]["min_m"]) > 0.0:
+		failures.append("a mistagged min under a part's top added a base (%d masses)" % slipped.size())
+	# The same slip on a part sized by storeys (no height tag).
+	var by_storeys := BuildingMasses.plan(_bldg(_rect(140, 0, 154, 14), 16,
+		{"height": 50.0, "height_source": "tag_height", "parts": [{"footprint": _rect(144, 4, 150, 10),
+			"x": 147.0, "z": 7.0, "height": 9.6, "height_source": "levels", "levels": 3,
+			"min_height_m": 0.0, "min_level": 10, "roof_shape": "flat"}]}), ctx)
+	if by_storeys.size() != 1 or float(by_storeys[0]["min_m"]) > 0.0:
+		failures.append("a storey-sized part lifted past its top added a base (%d masses)" % by_storeys.size())
 	root.free()
 
 	# --- Chamfered roofs: no face over the courtyard or off a concave

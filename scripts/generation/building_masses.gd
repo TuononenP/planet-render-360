@@ -54,22 +54,40 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
-	var out: Array = []
 	var look := BuildingHeights._look_for(b, ctx)
 	var parent_res := BuildingHeights._resolve_total(b, b, ctx, {}, look)
 	var legacy := not b.has("height_source")
 	var parent_shape := BuildingHeights._effective_shape(str(b.get("roof_shape", "")),
 		str(look["roof_shape"]), legacy)
+	var fh := float(look["floor_h"])
 	var masses: Array = b.get("parts", [])
 	var single := masses.is_empty()
 	if single:
 		masses = [b]
-	else:
-		var base := _missing_base(b, masses)
+	var out := _plan_masses(b, ctx, masses, single, look, parent_res, legacy, parent_shape, fh)
+	if not single:
+		# Judged on the planned lifts, so a part plan() stands on the ground
+		# (a mistagged min) never gets a block under it.
+		var base := _missing_base(b, out)
 		if not base.is_empty():
-			masses = [base] + masses
+			out = _plan_masses(b, ctx, [base] + masses, false, look, parent_res, legacy,
+				parent_shape, fh)
+	_mutex.lock()
+	if _plans.has(ck):
+		var raced: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return raced
+	_plans[ck] = out
+	_mutex.unlock()
+	return out
+
+## Plans each of `masses` (the parts, the outline under them, or the
+## building itself when `single`) as plan() returns them.
+static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: bool,
+		look: Dictionary, parent_res: Dictionary, legacy: bool, parent_shape: String,
+		fh: float) -> Array:
+	var out: Array = []
 	var main_mass := _largest(masses)
-	var fh := float(look["floor_h"])
 	for mi in masses.size():
 		if not (masses[mi] is Dictionary):
 			continue
@@ -102,7 +120,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 				and shape in ["hipped", "mansard", "half-hipped", "pyramidal"] and RoofForms.boxy(ring):
 			shape = "gabled"
 		var roof_tag := float(b.get("roof_height_m", 0.0))
-		var capped := not single and str(md.get("roof_shape", "")) == "" and _capped(masses, mi, ring)
+		var capped := not single and str(md.get("roof_shape", "")) == "" and _capped(masses, mi, ring, fh)
 		if not single:
 			if str(md.get("roof_shape", "")) != "":
 				shape = BuildingHeights._effective_shape(str(md["roof_shape"]), parent_shape, false)
@@ -124,7 +142,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 			wall = total - rh
 		if legacy:
 			wall = clampf(wall, 7.2, 76.0)
-		var min_m := maxf(float(md.get("min_height_m", 0.0)), float(md.get("min_level", 0)) * fh)
+		var min_m := _lift_m(md, fh)
 		# A part that is only roof (a dome on its drum: min_height at the
 		# drum top, the rest roof:height) keeps its lift; any other min
 		# above the top is a tagging slip, not a floating box.
@@ -178,33 +196,22 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 			# tower, stacks or dormers on any of them.
 			"main": mi == main_mass and not bool(b.get("mapped_landmark", false)),
 			"look": look})
-	_mutex.lock()
-	if _plans.has(ck):
-		var raced: Array = _plans[ck] as Array
-		_mutex.unlock()
-		return raced
-	_plans[ck] = out
-	_mutex.unlock()
 	return out
 
 ## The outline as a mass from the ground to the lowest part when every
 ## part is lifted: a tower mapped with only its rooftop parts (375 Pearl
 ## Street, New York: penthouses at min_height 155 over a 155 m outline)
 ## otherwise drew its penthouses floating over an empty lot. {} when a
-## part already stands on the ground, and for skybridges, canopies and
+## planned part already stands on the ground (`planned`: the parts as
+## _plan_masses planned them), and for skybridges, canopies and
 ## outlines that are lifted themselves (open underneath for real).
-static func _missing_base(b: Dictionary, parts: Array) -> Dictionary:
+static func _missing_base(b: Dictionary, planned: Array) -> Dictionary:
 	if str(b.get("kind", "")) in ["bridge", "roof"] or float(b.get("min_height_m", 0.0)) > 0.0 \
 			or int(b.get("min_level", 0)) > 0:
 		return {}
 	var lowest := INF
-	for p in parts:
-		if not (p is Dictionary):
-			continue
-		var pd := p as Dictionary
-		var lift := float(pd.get("min_height_m", 0.0))
-		if lift <= 0.0 and int(pd.get("min_level", 0)) > 0:
-			lift = float(pd["min_level"]) * 3.0
+	for m in planned:
+		var lift := float((m as Dictionary)["min_m"])
 		if lift <= 0.0:
 			return {}
 		lowest = minf(lowest, lift)
@@ -222,15 +229,20 @@ static func _missing_base(b: Dictionary, parts: Array) -> Dictionary:
 	base["roof_levels"] = 0
 	return base
 
+## A mass's base above the ground (metres): min_height, or min_level
+## storeys of the look's floor height `fh`, whichever is higher.
+static func _lift_m(md: Dictionary, fh: float) -> float:
+	return maxf(float(md.get("min_height_m", 0.0)), float(md.get("min_level", 0)) * fh)
+
 ## True when another part stands on part `mi`: lifted to this part's
 ## top (within 1 m) with its centre inside this ring.
-static func _capped(masses: Array, mi: int, ring: PackedVector2Array) -> bool:
+static func _capped(masses: Array, mi: int, ring: PackedVector2Array, fh: float) -> bool:
 	var top := float((masses[mi] as Dictionary).get("height", 0.0))
 	for j in masses.size():
 		if j == mi or not (masses[j] is Dictionary):
 			continue
 		var o := masses[j] as Dictionary
-		var lift := float(o.get("min_height_m", 0.0))
+		var lift := _lift_m(o, fh)
 		if lift > 0.0 and absf(lift - top) <= 1.0 and RingGeometry.point_in_ring(
 				Vector2(float(o.get("x", 0.0)), float(o.get("z", 0.0))), ring):
 			return true
