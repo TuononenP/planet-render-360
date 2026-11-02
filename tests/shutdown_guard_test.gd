@@ -25,7 +25,8 @@ const RULES := [
 		["wait_for_", "NOTIFICATION_PREDELETE"], "wait for the task, also on NOTIFICATION_PREDELETE"],
 	[["HTTPRequest.new()"], ["add_child("], "add_child() it so exit tree cancels it"],
 ]
-const JOINED_IN_CALL := ["res://scripts/generation/world_build_graph.gd"]
+const JOINED_IN_CALL := ["res://scripts/generation/world_build_graph.gd",
+	"res://scripts/generation/road_builder.gd"]
 
 func _init() -> void:
 	_run()

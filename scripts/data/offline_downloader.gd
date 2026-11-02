@@ -72,50 +72,18 @@ func _job(ok: bool) -> void:
 			child.queue_free()
 
 ## Total bytes held in the offline cache (DEM/OSM/satellite/tiles).
-## Downloaded data plus built worlds (WorldCache, user://worlds).
+## Downloaded data plus built worlds (WorldCache, user://worlds), from
+## their running totals: walking a large cache would hold the main
+## thread for seconds.
 static func cache_size_bytes() -> int:
-	return _dir_size("user://cache") + _dir_size("user://worlds")
-
-static func _dir_size(path: String) -> int:
-	var total := 0
-	var dir := DirAccess.open(path)
-	if dir == null:
-		return 0
-	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		var full := path + "/" + name
-		if dir.current_is_dir():
-			total += _dir_size(full)
-		else:
-			var f := FileAccess.open(full, FileAccess.READ)
-			if f != null:
-				total += int(f.get_length())
-		name = dir.get_next()
-	dir.list_dir_end()
-	return total
+	return CacheStore.data_bytes() + WorldCache.total_bytes()
 
 ## Delete the whole offline cache (history entries stay; their
 ## places simply re-download on next open). Resets the LRU index too.
+## The folders are moved aside at once and deleted on a worker.
 static func clear_cache() -> void:
-	_remove_dir("user://cache")
-	_remove_dir("user://worlds")
-	DirAccess.make_dir_recursive_absolute("user://cache")
 	CacheStore.reset_lru()
+	CacheStore.discard_dir("user://cache")
+	CacheStore.discard_dir("user://worlds")
+	DirAccess.make_dir_recursive_absolute("user://cache")
 	WorldCache.enforce_budget()  # recount the now-empty worlds
-
-static func _remove_dir(path: String) -> void:
-	var dir := DirAccess.open(path)
-	if dir == null:
-		return
-	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		var full := path + "/" + name
-		if dir.current_is_dir():
-			_remove_dir(full)
-		else:
-			dir.remove(name)
-		name = dir.get_next()
-	dir.list_dir_end()
-	DirAccess.remove_absolute(path)

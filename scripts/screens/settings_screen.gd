@@ -511,7 +511,7 @@ func summary_for(id: String) -> String:
 		"photos":
 			return "Stamp on" if UiPrefs.photo_stamp else "Stamp off"
 		"storage":
-			var limit := int(_settings.pref("cache_limit_mb")) if _settings != null else 512
+			var limit := int(_settings.pref("cache_limit_mb")) if _settings != null else 2048
 			return "%s of %s" % [UiTheme.cache_size(_cache_bytes), UiTheme.cache_size(limit * 1048576)]
 		"sources":
 			return "%d sources and licences" % SettingsPages.SOURCES.size()
@@ -574,7 +574,7 @@ func _on_cache_limit() -> void:
 		return
 	_settings.set_pref("cache_limit_mb", int(_limit_slider.value))
 	UiPrefs.apply(_settings)
-	CacheStore.enforce_size_cap()
+	CacheStore.enforce_size_cap(false)
 	_refresh_storage()
 
 ## Clear cache, behind a confirmation that shows what it frees.
@@ -633,7 +633,7 @@ func _refresh_storage() -> void:
 	_show_storage()
 
 func _show_storage() -> void:
-	var limit_mb := 512
+	var limit_mb := 2048
 	if _limit_slider != null and _settings != null:
 		_limit_slider.set_value_no_signal(float(_settings.pref("cache_limit_mb")))
 		_limit_label.text = UiTheme.cache_size(int(_limit_slider.value) * 1048576)

@@ -354,8 +354,10 @@ static func storage(s: SettingsScreen) -> VBoxContainer:
 	limit_row.add_theme_constant_override("separation", 12)
 	s._limit_slider = HSlider.new()
 	s._limit_slider.min_value = 256
-	s._limit_slider.max_value = 8192
+	s._limit_slider.max_value = CacheStore.MAX_LIMIT_MB
 	s._limit_slider.step = 256
+	# Exponential, so 256 MB to a few GB keeps most of the track.
+	s._limit_slider.exp_edit = true
 	s._limit_slider.custom_minimum_size = Vector2(200, 44)
 	s._limit_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	HudStyle.apply_slider(s._limit_slider)
