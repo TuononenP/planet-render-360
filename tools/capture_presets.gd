@@ -3,7 +3,7 @@ extends SceneTree
 ## Capture-and-compare run over the golden set (realism v3, R-1.1).
 ## Windowed, off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
-##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs]
+##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle]
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##
@@ -202,8 +202,19 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _snap(view, id, "vantage_noon")
 	if times.has("night"):
 		ViewConditions.jump_to(view, "moon")
+		# Moonrise can come with the sun still up: then shoot the moonlit
+		# night 90 minutes after sunset instead of a grey dusk.
+		if view._atmos.night_amount < 0.9:
+			ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 90.0)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_night")
+	if times.has("sparkle"):
+		# A minute past the first full hour an hour after sunset: the
+		# Eiffel Tower sparkles (LandmarkLights) for five minutes then.
+		var on := ceilf((ViewConditions.sun_times(view).y + 60.0) / 60.0) * 60.0 + 1.0
+		ViewConditions.set_time_minutes(view, on)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
+		await _snap(view, id, "vantage_sparkle")
 	if times.has("late"):
 		# Two hours after sunset: full dark, homes still lit (the moon jump
 		# can land in a bright moonlit sky with the windows barely on).

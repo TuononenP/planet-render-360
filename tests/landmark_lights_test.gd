@@ -89,22 +89,23 @@ func _run() -> void:
 		if top < 250.0:
 			failures.append("sparkles should climb the tower, highest at %.0f m" % top)
 	eiffel.free()
-	# A bridge necklace is dark by day and lit at night.
-	var bridge := LandmarkBuilder.build("golden_gate")
-	LandmarkLights.dress(bridge, "golden_gate")
+	# A landmark's own lamp (here a lighthouse lantern) is dark by day and
+	# lit at night.
+	var bridge := LandmarkBuilder.build("lighthouse")
+	LandmarkLights.dress(bridge, "lighthouse")
 	var lamp: MeshInstance3D = null
 	for mi in LandmarkBuilder.parts(bridge):
 		if str(mi.name).ends_with("Lamp"):
 			lamp = mi
 	var lo := lamp.get_surface_override_material(0) as StandardMaterial3D if lamp != null else null
 	if lo == null or not lo.has_meta(CityLights.META):
-		failures.append("bridge lamps should be night-driven")
+		failures.append("landmark lamps should be night-driven")
 	else:
 		CityLights.apply(bridge, 0.0)
 		var day := lo.emission_energy_multiplier
 		CityLights.apply(bridge, 1.0)
 		if day != 0.0 or lo.emission_energy_multiplier < 1.2:
-			failures.append("bridge lamps: %.2f by day, %.2f at night" % [day, lo.emission_energy_multiplier])
+			failures.append("landmark lamps: %.2f by day, %.2f at night" % [day, lo.emission_energy_multiplier])
 	bridge.free()
 	failures.erase(failures[0])
 	if failures.is_empty():
