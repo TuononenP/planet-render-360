@@ -34,8 +34,17 @@ static func begin_stages() -> void:
 	cap_reached = false
 	_mutex.unlock()
 
+## Path of one set map: the 2K file on desktop Ultra builds
+## (MaterialLibrary.hi_res) when it is bundled, else the 1K one.
+static func map_path(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> String:
+	var file := set_name + "_" + map_name + ".jpg"
+	if hi_res and FileAccess.file_exists(MaterialLibrary.TEXTURE_DIR + "2k/" + file):
+		return MaterialLibrary.TEXTURE_DIR + "2k/" + file
+	return MaterialLibrary.TEXTURE_DIR + file
+
 static func _set_image(set_name: String, map_name: String) -> Image:
-	var key := set_name + ":" + map_name
+	var path := map_path(set_name, map_name)
+	var key := set_name + ":" + map_name + (":2k" if path.contains("/2k/") else "")
 	_mutex.lock()
 	if MaterialLibrary._set_images.has(key):
 		var cached: Image = MaterialLibrary._set_images[key] as Image
@@ -43,7 +52,6 @@ static func _set_image(set_name: String, map_name: String) -> Image:
 		return cached
 	_mutex.unlock()
 	var img: Image = null
-	var path := MaterialLibrary.TEXTURE_DIR + set_name + "_" + map_name + ".jpg"
 	if FileAccess.file_exists(path):
 		var loaded := Image.load_from_file(path)
 		if loaded != null and not loaded.is_empty() and loaded.get_width() >= 64:
@@ -100,7 +108,7 @@ static func _weather_tiles(img: Image) -> void:
 ## near-black asphalt). The cached Image stays linear and mip-free for
 ## the CPU composers and the GroundMaterial shader (raw samplers).
 static func _set_tex(set_name: String, map_name: String) -> Texture2D:
-	var key := "t:" + set_name + ":" + map_name
+	var key := "t:" + set_name + ":" + map_name + (":2k" if map_path(set_name, map_name).contains("/2k/") else "")
 	_mutex.lock()
 	if MaterialLibrary._set_texs.has(key):
 		var cached_t: Texture2D = MaterialLibrary._set_texs[key] as Texture2D

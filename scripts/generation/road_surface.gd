@@ -271,13 +271,15 @@ static func paved_material(set_name: String, target: Color) -> ShaderMaterial:
 	return m
 
 static func _tex(map_name: String) -> Texture2D:
-	if _texs.has(map_name):
-		return _texs[map_name]
+	# Keyed by resolution too: desktop Ultra builds read the 2K asphalt.
+	var key := map_name + (":2k" if MaterialLibrary.hi_res else "")
+	if _texs.has(key):
+		return _texs[key]
 	var img := (MaterialLibrary._set_image("asphalt", map_name) as Image).duplicate() as Image
 	if not img.has_mipmaps():
 		img.generate_mipmaps(map_name == "nor")
-	_texs[map_name] = ImageTexture.create_from_image(img)
-	return _texs[map_name]
+	_texs[key] = ImageTexture.create_from_image(img)
+	return _texs[key]
 
 static func _points(line: Variant) -> PackedVector2Array:
 	return line if line is PackedVector2Array \

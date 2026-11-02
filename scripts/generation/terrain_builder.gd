@@ -104,6 +104,7 @@ static func build_world(data: LocationData, ground: GroundTruth = null,
 	# (contract §3); direct callers get a fresh surface here instead.
 	if ground == null:
 		ground = GroundTruth.new(data)
+	MaterialLibrary.hi_res = RenderQuality.ultra_desktop(data.quality_preset)
 	# WorldBuildGraph runs the stages concurrently (serial on the main
 	# thread, or with WorldBuildGraph.force_serial).
 	# load() breaks the TerrainBuilder <-> WorldBuildGraph class cycle.

@@ -137,6 +137,9 @@ static func full_detail_radius_m(fidelity: int) -> float:
 	return 300.0
 
 const TEXTURE_DIR := "res://assets/textures/"
+## Desktop Ultra builds read the 2K photo sets under TEXTURE_DIR/2k/
+## (PbrTextures.map_path); set once per world build (TerrainBuilder).
+static var hi_res := false
 
 ## T4.7: the clay-tile photo is a dark, high-contrast red (linear mean
 ## 0.106/0.035/0.012, gaps near-black) that reads as harsh red with

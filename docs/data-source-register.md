@@ -70,6 +70,19 @@ manual sRGB→linear, probe-verified); `.import` files generate on the
 first clean editor import (blocked 2026-10-28 by an unrelated
 `view_360.gd:427` parse error from another session's E-owned edit).
 
+## Desktop-Ultra 2K PBR sets — Ultra pass Phase 6 (2026-11-02)
+
+The 11 building, roof and street sets above, again at 2k (2048² jpg:
+Diffuse + nor_gl + Rough), same Poly Haven assets, downloaded exact-size
+from `https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/…` (URLs from
+`https://api.polyhaven.com/files/{id}`), CC0 1.0. 33 files, ≈82 MB under
+`assets/textures/2k/<set>_{diff,nor,rough}.jpg`. Read only on desktop Ultra
+builds (`MaterialLibrary.hi_res`, `PbrTextures.map_path`); everything else
+keeps the 1k files. Excluded from the iOS export (`export_presets.cfg`).
+Sets: limestone, stone, render, brick, concrete, wood, slate, terracotta,
+membrane, asphalt, pavement. The terrain sets (cliff, forest, lawn, gravel,
+sand, snow, grass, rock) stay 1k for now.
+
 ## Foliage, bark and tree-impostor textures — T5.1 (2026-10-28)
 
 Own procedural work, no third-party pixels: **CC0 1.0** (dedicated by

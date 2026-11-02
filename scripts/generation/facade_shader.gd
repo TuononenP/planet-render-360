@@ -304,7 +304,7 @@ static func shader() -> Shader:
 ## Full-size mipmapped texture of one bundled photo map (linear, as the
 ## composers read it), shared by every facade of the set.
 static func photo_texture(set_name: String, map_name: String) -> Texture2D:
-	var key := set_name + ":" + map_name
+	var key := set_name + ":" + map_name + (":2k" if MaterialLibrary.hi_res else "")
 	_photo_mutex.lock()
 	var cached: Texture2D = _photos.get(key)
 	_photo_mutex.unlock()
