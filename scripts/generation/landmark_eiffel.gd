@@ -16,6 +16,10 @@ const TOP_Y := 276.0
 const ANTENNA_Y := 330.0
 const FLOOR1_Y := 57.6
 const FLOOR2_Y := 115.7
+## Corner chords are laced box girders below this height.
+const LACE_Y := 200.0
+## Top of the masonry footings each corner chord stands on.
+const FOOT_Y := 1.5
 
 ## Outer half-width of the tower (centre to the outer pier edge) by
 ## height — the published elevation's exponential-looking flare.
@@ -42,11 +46,13 @@ static func build(model: Node3D) -> void:
 	lm.use("Decks", deck)
 	lm.use("Glass", LandmarkMaterials.glass("#3A4448"))
 	lm.use("Antenna", LandmarkMaterials.paint("#D9D6CF", 0.5, 0.3))
+	lm.use("Masonry", LandmarkMaterials.pbr("limestone", "#B9AE98", 3.0))
 	var levels := _levels()
 	var piers := {"PierS": Vector2(1, 1), "PierE": Vector2(1, -1),
 		"PierN": Vector2(-1, -1), "PierW": Vector2(-1, 1)}
 	for key in piers:
 		_pier(lm, key, piers[key], levels)
+	_footings(lm, piers.values())
 	_arches(lm)
 	_floor1(lm)
 	_floor2(lm)
@@ -59,7 +65,7 @@ static func build(model: Node3D) -> void:
 static func _levels() -> PackedFloat32Array:
 	var ys := PackedFloat32Array()
 	for i in 4:
-		ys.append(FLOOR1_Y * float(i) / 4.0)
+		ys.append(lerpf(FOOT_Y, FLOOR1_Y, float(i) / 4.0))
 	for i in 5:
 		ys.append(FLOOR1_Y + (FLOOR2_Y - FLOOR1_Y) * float(i) / 5.0)
 	var y := FLOOR2_Y
@@ -83,9 +89,9 @@ static func _pier(lm: LandmarkMesh, key: String, q: Vector2, ys: PackedFloat32Ar
 		var y1 := ys[li + 1]
 		var c0: Array = corners.call(y0)
 		var c1: Array = corners.call(y1)
-		var chord := lerpf(2.6, 0.9, y0 / TOP_Y)
+		var cw := lerpf(2.6, 0.9, y0 / TOP_Y)
 		for k in 4:
-			lm.beam(key, c0[k], c1[k], chord, chord)
+			chord(lm, key, c0[k], c1[k], cw, y0 < LACE_Y)
 		var w := lerpf(0.75, 0.32, y0 / TOP_Y)
 		var cols := 2 if y0 < FLOOR1_Y else 1
 		var rows := 2 if y0 < FLOOR1_Y else 1
@@ -97,6 +103,44 @@ static func _pier(lm: LandmarkMesh, key: String, q: Vector2, ys: PackedFloat32Ar
 		for k in 4:
 			var k2 := (k + 1) % 4
 			_face(lm, key, c0[k], c0[k2], c1[k], c1[k2], w, cols, rows)
+
+## A corner chord: below LACE_Y a built-up box girder of
+## four corner angles with zig-zag lacing on every face (as riveted);
+## higher up, where the members are slim, a plain bar.
+static func chord(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, s: float, lace: bool) -> void:
+	if not lace:
+		lm.beam(key, a, b, s, s)
+		return
+	var axis := (b - a).normalized()
+	var u := Vector3.RIGHT - axis * Vector3.RIGHT.dot(axis)
+	u = u.normalized()
+	var v := axis.cross(u).normalized()
+	var h := s * 0.5
+	var cs: Array[Vector3] = [u * h + v * h, -u * h + v * h, -u * h - v * h, u * h - v * h]
+	var aw := s * 0.22
+	for cc in cs:
+		lm.beam(key, a + cc, b + cc, aw, aw)
+	var m := maxi(int(a.distance_to(b) / (s * 1.5)), 1)
+	for f in 4:
+		var e0 := cs[f]
+		var e1 := cs[(f + 1) % 4]
+		for i in m:
+			var p := a.lerp(b, float(i) / float(m)) + (e0 if i % 2 == 0 else e1)
+			var q := a.lerp(b, float(i + 1) / float(m)) + (e1 if i % 2 == 0 else e0)
+			lm.beam(key, p, q, aw * 0.45, aw * 0.3)
+
+## Masonry footings: every corner chord of every pier stands on its
+## own dressed-stone block (the 1887 foundations), drawn as a plinth
+## with a weathered top course.
+static func _footings(lm: LandmarkMesh, quads: Array) -> void:
+	for qv in quads:
+		var q: Vector2 = qv
+		var o := outer(FOOT_Y)
+		var i := inner(FOOT_Y)
+		for c in [Vector2(i, i), Vector2(o, i), Vector2(o, o), Vector2(i, o)]:
+			var p := Vector3(q.x * c.x, 0, q.y * c.y)
+			lm.box("Masonry", p + Vector3(0, FOOT_Y * 0.35, 0), Vector3(6.5, FOOT_Y * 0.7, 6.5))
+			lm.box("Masonry", p + Vector3(0, FOOT_Y * 0.85, 0), Vector3(5.2, FOOT_Y * 0.3, 5.2))
 
 static func _face(lm: LandmarkMesh, key: String, p0: Vector3, p1: Vector3,
 		q0: Vector3, q1: Vector3, w: float, cols: int, rows: int) -> void:
@@ -140,9 +184,21 @@ static func _arches(lm: LandmarkMesh) -> void:
 static func _floor1(lm: LandmarkMesh) -> void:
 	var y0 := FLOOR1_Y
 	var hw := outer(y0) + 0.5
-	lm.box("Decks", Vector3(0, y0 + 0.9, 0), Vector3(hw * 2.0, 1.8, hw * 2.0))
+	# The platform is a square ring round the open central void (the
+	# glass floor's edge), its pavilions along the four sides.
+	var ring := 14.0
+	for side in 4:
+		var rot := Basis(Vector3.UP, PI * 0.5 * float(side))
+		lm.box("Decks", rot * Vector3(-ring * 0.5, y0 + 0.9, hw - ring * 0.5), Vector3(hw * 2.0 - ring, 1.8, ring), rot)
+		lm.box("Glass", rot * Vector3(0, y0 + 4.2, hw - ring * 0.55), Vector3(hw * 1.3, 4.6, ring * 0.6), rot)
+		lm.box("Decks", rot * Vector3(0, y0 + 6.7, hw - ring * 0.55), Vector3(hw * 1.32, 0.4, ring * 0.64), rot)
+		# Glass-floor balustrade round the void.
+		var vi := hw - ring
+		lm.beam("Decks", rot * Vector3(-vi, y0 + 2.9, vi), rot * Vector3(vi, y0 + 2.9, vi), 0.12, 0.12)
+		for k in 12:
+			var x := -vi + 2.0 * vi * float(k) / 11.0
+			lm.beam("Decks", rot * Vector3(x, y0 + 1.8, vi), rot * Vector3(x, y0 + 2.9, vi), 0.08, 0.08)
 	_frieze(lm, hw, y0 + 1.8, 6.2, 15)
-	lm.box("Glass", Vector3(0, y0 + 4.2, 0), Vector3(hw * 1.55, 4.6, hw * 1.55))
 
 static func _floor2(lm: LandmarkMesh) -> void:
 	var y0 := FLOOR2_Y

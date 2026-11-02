@@ -1,13 +1,18 @@
 class_name LandmarkStockholm
 extends RefCounted
 
-## Stockholm City Hall (Östberg, 1923) in true metres: the dark red
-## brick block round its two courts — the open Borgargården to the west
-## and the covered Blue Hall to the east — under verdigris copper roofs,
-## the arcaded water front to Riddarfjärden (+Z, south), the slim NE
-## turret with its copper lantern, and the 106 m tower at the south-east
-## corner: brick shaft, belfry stage, copper lantern and spire carrying
-## the three gilded crowns.
+## Stockholm City Hall (Östberg, 1911-1923) in true metres: the dark
+## red block of about eight million hand-made "munktegel" bricks round
+## its two courts — the open Borgargården to the west and the covered
+## Blue Hall to the east — under verdigris copper roofs with dormers, a
+## pale stone plinth and string courses, rows of deep-set windows, the
+## arcaded water front to Riddarfjärden (+Z, south) with its terrace
+## and steps, the slim NE turret with its copper lantern and golden
+## starlets, and the 106 m tower at the south-east corner: a brick
+## shaft whose faces are cut by tall recessed niches, the belfry stage
+## with arched openings, corner turrets and a gallery, the copper
+## lantern, and the spire carrying the three gilded crowns; Birger
+## Jarl's gilded cenotaph at its foot.
 
 const TOP_M := 106.0
 const SIZE := Vector2(116.0, 74.0)
@@ -35,69 +40,230 @@ static func build(model: Node3D) -> void:
 		var size := Vector3(float(w[2]), float(w[4]), float(w[3]))
 		lm.box("Brick", c + Vector3(0, size.y * 0.5, 0), size)
 		lm.box("Stone", c + Vector3(0, size.y - 0.3, 0), size + Vector3(0.4, 0.6 - size.y, 0.4))
+		lm.box("Stone", c + Vector3(0, 0.6, 0), size + Vector3(0.5, 1.2 - size.y, 0.5))
 		var along_x := size.x > size.z
-		lm.gable("Copper", c + Vector3(0, size.y, 0), minf(size.x, size.z), maxf(size.x, size.z),
-			minf(size.x, size.z) * 0.32, Basis(Vector3.UP, PI * 0.5) if along_x else Basis(), 0.5, "Brick")
-	# The covered Blue Hall fills the eastern court.
-	lm.box("Brick", Vector3(hx * 0.5 + 4.0, 11.0, 0), Vector3(hx - 2.0 * WING_M + 4.0, 22.0, SIZE.y - 2.0 * WING_M))
-	lm.box("Copper", Vector3(hx * 0.5 + 4.0, 22.3, 0), Vector3(hx - 2.0 * WING_M + 4.0, 0.6, SIZE.y - 2.0 * WING_M))
-	# Windows: three rows on the north front, one over the water arcade.
+		var rb := Basis(Vector3.UP, PI * 0.5) if along_x else Basis()
+		var rise := minf(size.x, size.z) * 0.32
+		lm.gable("Copper", c + Vector3(0, size.y, 0), minf(size.x, size.z), maxf(size.x, size.z), rise, rb, 0.5, "Brick")
+		# Copper ridge roll and standing seams down both slopes.
+		var run := maxf(size.x, size.z)
+		var half := minf(size.x, size.z) * 0.5 + 0.5
+		lm.box("Copper", c + Vector3(0, size.y + rise + 0.15, 0), Vector3(0.4, 0.4, run + 0.5), rb, 0.0)
+		var seams := int(run / 1.6)
+		for k in seams + 1:
+			var u := -run * 0.5 + run * k / seams
+			for s in [-1.0, 1.0]:
+				var e := rb * Vector3(s * half, 0, u)
+				var t := rb * Vector3(0, 0, u)
+				lm.beam("Copper", c + e + Vector3(0, size.y - 0.15 + 0.08, 0), c + t + Vector3(0, size.y + rise + 0.08, 0),
+					0.08, 0.1)
+		# Copper dormers along the long slopes of the tall wings.
+		if size.y >= WALL_M:
+			var nd := int(run / 9.0)
+			for k in nd:
+				var u := -run * 0.5 + run * (k + 0.5) / nd
+				for s in [-1.0, 1.0]:
+					var dc := c + rb * Vector3(s * half * 0.55, size.y + rise * 0.42, u)
+					var fb := rb * Basis(Vector3.UP, s * PI * 0.5)
+					lm.box("Copper", dc + Vector3(0, 0.9, 0), Vector3(1.8, 1.8, 2.0), fb)
+					lm.box("Windows", dc + fb * Vector3(0, 0.9, 1.02), Vector3(1.0, 1.0, 0.05), fb, 0.0)
+					lm.gable("Copper", dc + Vector3(0, 1.8, 0), 1.8, 2.0, 0.8, fb, 0.1, "Copper")
+	# The covered Blue Hall fills the eastern court, its clerestory roof.
+	var bh := Vector3(hx * 0.5 + 4.0, 0, 0)
+	var bsize := Vector2(hx - 2.0 * WING_M + 4.0, SIZE.y - 2.0 * WING_M)
+	lm.box("Brick", bh + Vector3(0, 11.0, 0), Vector3(bsize.x, 22.0, bsize.y))
+	lm.box("Copper", bh + Vector3(0, 22.3, 0), Vector3(bsize.x, 0.6, bsize.y))
+	for k in 6:
+		lm.box("Windows", bh + Vector3(-bsize.x * 0.5 + bsize.x * (k + 0.5) / 6.0, 23.0, 0), Vector3(3.0, 1.2, bsize.y * 0.6))
+	_north_front(lm, hx, hz)
+	_water_front(lm, hx, hz)
+	# West and east fronts: windows in three rows.
+	# (the low water wing's ends are left out).
+	for s in [-1.0, 1.0]:
+		var n := Vector3(s, 0, 0)
+		var z0: float = hz - 10.0 if s > 0.0 else -hz + 1.0
+		LandmarkDetail.pierced_face(lm, "Brick", "Windows", Vector3(s * hx, 1.2, z0), Vector3(0, 0, -s), n,
+			SIZE.y - 11.0, WALL_M - 2.0, 15, 3, Vector2(1.3, 2.8), 4.0, 6.5, 0.4)
+	_ne_turret(lm, Vector3(hx - 6.0, 0, -hz + 6.0))
+	_tower(lm, Vector3(hx - 9.0, 0, hz - 9.0))
+	lm.commit(model)
+
+## North front: windows in three rows set deep in the brick (real
+## reveals), the grand doors under stone arches and stone sills.
+static func _north_front(lm: LandmarkMesh, hx: float, hz: float) -> void:
+	var n := Vector3(0, 0, -1)
+	LandmarkDetail.pierced_face(lm, "Brick", "Windows", Vector3(hx, 1.2, -hz), Vector3(-1, 0, 0), n,
+		SIZE.x, WALL_M - 2.0, 26, 3, Vector2(1.4, 3.0), 4.6, 6.5, 0.45)
 	for k in 26:
-		var x := -hx + 3.0 + (SIZE.x - 6.0) * k / 25.0
+		var x := hx - SIZE.x * (k + 0.5) / 26.0
 		for row in 3:
-			lm.box("Windows", Vector3(x, 6.0 + 6.5 * row, -hz - 0.1),
-				Vector3(1.4, 3.2 if row < 2 else 2.4, 0.2))
-		lm.box("Windows", Vector3(x, 10.5, hz + 0.1), Vector3(1.2, 2.6, 0.2))
-	# Water-front arcade: dark openings and stone columns.
-	for k in 14:
-		var x := -hx + 6.0 + (SIZE.x - 30.0) * k / 13.0
-		lm.box("BrickDark", Vector3(x, 3.0, hz + 0.1), Vector3(4.6, 6.0, 0.2))
-		lm.lathe("Stone", Vector3(x + 3.0, 0, hz + 0.4), PackedVector2Array([Vector2(0.45, 0),
-			Vector2(0.4, 6.0)]), 8)
-	# NE turret with its copper lantern.
-	var tc := Vector3(hx - 6.0, 0, -hz + 6.0)
+			lm.box("Stone", Vector3(x, 1.2 + 4.6 + 6.5 * row - 0.12, -hz - 0.55), Vector3(1.8, 0.24, 0.3), Basis(), 0.0)
+	for x in [-20.0, 20.0]:
+		lm.box("BrickDark", Vector3(float(x), 2.6, -hz - 0.47), Vector3(3.0, 3.6, 0.1))
+		_round_arch(lm, "Stone", Vector3(float(x), 4.4, -hz - 0.5), n, 3.4, 0.5)
+
+## Water front: the arcade of stone columns and brick arches along the
+## low south wing, a row of arched windows above it, the terrace with
+## its steps down to Riddarfjärden.
+static func _water_front(lm: LandmarkMesh, hx: float, hz: float) -> void:
+	var n := Vector3(0, 0, 1)
+	var z := hz + 0.2
+	lm.box("BrickDark", Vector3(-12.0, 3.5, hz - 0.6), Vector3(SIZE.x - 30.0, 7.0, 1.2))
+	var count := 14
+	var span := (SIZE.x - 30.0) / count
+	for k in count + 1:
+		var x := -hx + 3.0 + span * k
+		lm.lathe("Stone", Vector3(x, 0, z + 0.6), PackedVector2Array([Vector2(0.6, 0), Vector2(0.5, 0.4),
+			Vector2(0.45, 0.6), Vector2(0.4, 4.6), Vector2(0.55, 5.0), Vector2(0.6, 5.4)]), 12)
+	lm.box("Brick", Vector3(-12.0, 10.2, z + 0.6), Vector3(SIZE.x - 30.0, 9.6, 1.2))
+	for k in count:
+		var x := -hx + 3.0 + span * (k + 0.5)
+		_round_arch(lm, "Brick", Vector3(x, 5.4, z + 1.2), n, span - 1.0, 0.7)
+		_lunette(lm, Vector3(x, 5.4, z + 1.22), n, (span - 1.0) * 0.5)
+	lm.box("Stone", Vector3(-12.0, 13.0, z + 0.7), Vector3(SIZE.x - 30.0, 0.4, 1.4))
+	for k in count:
+		var x := -hx + 3.0 + span * (k + 0.5)
+		lm.box("Windows", Vector3(x, 10.4, z + 1.25), Vector3(1.2, 2.2, 0.06), Basis(), 0.0)
+		_round_arch(lm, "Stone", Vector3(x, 11.5, z + 1.2), n, 1.2, 0.18)
+	# Terrace and the steps to the water.
+	lm.box("Stone", Vector3(0, 0.3, hz + 8.0), Vector3(SIZE.x, 0.6, 14.0))
+	lm.box("Stone", Vector3(0, 1.0, hz + 14.8), Vector3(SIZE.x, 0.8, 0.5))
+	for k in 4:
+		lm.box("Stone", Vector3(-20.0, 0.075 + 0.15 * k, hz + 16.5 - 0.5 * k), Vector3(20.0, 0.15 + 0.3 * k, 0.5))
+
+## Dark half-round fill under an arcade arch (the shadowed vault).
+static func _lunette(lm: LandmarkMesh, c: Vector3, n: Vector3, r: float) -> void:
+	var right := Vector3.UP.cross(n).normalized()
+	for i in 10:
+		var t0 := PI * i / 10.0
+		var t1 := PI * (i + 1) / 10.0
+		lm.tri("BrickDark", c, c + (right * cos(t0) + Vector3.UP * sin(t0)) * r,
+			c + (right * cos(t1) + Vector3.UP * sin(t1)) * r, n, n, n, Vector2.ZERO,
+			Vector2(cos(t0), sin(t0)) * r, Vector2(cos(t1), sin(t1)) * r)
+
+## A light round arch (archivolt) of `segs` beams over a `span` opening
+## springing at `c`, on a wall facing `n`.
+static func _round_arch(lm: LandmarkMesh, key: String, c: Vector3, n: Vector3, span: float, band: float) -> void:
+	var right := Vector3.UP.cross(n).normalized()
+	var rad := span * 0.5 + band * 0.5
+	var prev := c + right * rad
+	for i in 10:
+		var t := PI * float(i + 1) / 10.0
+		var p := c + right * cos(t) * rad + Vector3(0, sin(t) * rad, 0)
+		lm.beam(key, prev, p, band, band * 0.8, n)
+		prev = p
+
+## NE turret: brick shaft with string courses and slit windows, an
+## octagonal copper lantern with openings, gilt starlets, cap and vane.
+static func _ne_turret(lm: LandmarkMesh, tc: Vector3) -> void:
 	lm.box("Brick", tc + Vector3(0, 21.0, 0), Vector3(6.0, 42.0, 6.0))
+	for k in 3:
+		lm.box("Stone", tc + Vector3(0, 28.0 + 5.0 * k, 0), Vector3(6.4, 0.3, 6.4), Basis(), 0.0)
+	for f in 4:
+		var r := Basis(Vector3.UP, PI * 0.5 * f)
+		for k in 2:
+			lm.box("Windows", tc + r * Vector3(0, 32.0 + 5.0 * k, 3.02), Vector3(0.7, 2.6, 0.06), r, 0.0)
 	lm.frustum("Copper", tc + Vector3(0, 42.0, 0), 3.6, 2.4, 4.0, 8, PI / 8.0)
+	for k in 8:
+		var a := PI / 8.0 + PI * 0.25 * k + PI / 8.0
+		lm.box("Windows", tc + Vector3(cos(a) * 2.6, 44.6, sin(a) * 2.6), Vector3(0.8, 1.6, 0.06),
+			Basis(Vector3.UP, -a + PI * 0.5), 0.0)
 	lm.lathe("Copper", tc + Vector3(0, 46.0, 0), PackedVector2Array([Vector2(2.4, 0),
-		Vector2(2.0, 1.6), Vector2(0.9, 3.4), Vector2(0.0, 7.0)]), 8)
+		Vector2(2.0, 1.6), Vector2(0.9, 3.4), Vector2(0.0, 7.0)]), 16)
+	for k in 8:
+		var a := TAU * k / 8.0
+		_star(lm, tc + Vector3(cos(a) * 2.1, 47.2, sin(a) * 2.1), 0.35)
 	lm.frustum("Gilt", tc + Vector3(0, 53.0, 0), 0.3, 0.05, 1.6, 6)
-	# The tower at the south-east corner by the water.
-	var t := Vector3(hx - 9.0, 0, hz - 9.0)
+
+## A gilt starlet: three crossed bars.
+static func _star(lm: LandmarkMesh, c: Vector3, r: float) -> void:
+	for k in 3:
+		var a := PI * k / 3.0
+		var d := Vector3(cos(a) * r, sin(a) * r, 0)
+		lm.beam("Gilt", c - d, c + d, r * 0.25, r * 0.25)
+
+## The tower by the water: brick shaft cut on each face by three tall
+## recessed niches between proud piers, small windows lighting the
+## stair, the stone belt; the belfry stage with paired arched openings,
+## four corner turrets and the gallery; the copper lantern ribbed in
+## gilt, the spire and the three crowns.
+static func _tower(lm: LandmarkMesh, t: Vector3) -> void:
 	var shaft := 76.0
-	lm.box("Brick", t + Vector3(0, shaft * 0.5, 0), Vector3(16.0, shaft, 16.0))
+	var w := 16.0
+	lm.box("Brick", t + Vector3(0, shaft * 0.5, 0), Vector3(w - 1.2, shaft, w - 1.2))
+	lm.box("Stone", t + Vector3(0, 0.8, 0), Vector3(w + 0.6, 1.6, w + 0.6))
 	for f in 4:
 		var r := Basis(Vector3.UP, PI * 0.5 * f)
+		# Piers: corners and between the niches, the niches' arched heads.
+		for k in 4:
+			var x := -w * 0.5 + 0.9 + (w - 1.8) * k / 3.0
+			lm.box("Brick", t + r * Vector3(x, shaft * 0.5, w * 0.5 - 0.6), Vector3(1.8, shaft, 1.2), r)
 		for k in 3:
-			lm.box("BrickDark", t + r * Vector3(-4.5 + 4.5 * k, 46.0, 8.1), Vector3(1.6, 40.0, 0.2), r)
-		lm.box("Windows", t + r * Vector3(0, 8.0, 8.05), Vector3(2.0, 5.0, 0.2), r)
+			var x := -w * 0.5 + 0.9 + (w - 1.8) * (k + 0.5) / 3.0
+			var nw := (w - 1.8) / 3.0 - 1.8
+			lm.box("Brick", t + r * Vector3(x, 66.0 + 2.0, w * 0.5 - 0.6), Vector3(nw, 4.0, 1.2), r)
+			_round_arch(lm, "BrickDark", t + r * Vector3(x, 66.0 - nw * 0.5, w * 0.5 - 0.3), r * Vector3.BACK, nw, 0.5)
+			for m in 5:
+				lm.box("Windows", t + r * Vector3(x, 14.0 + 10.0 * m, w * 0.5 - 1.18), Vector3(0.6, 1.6, 0.06), r, 0.0)
+		# Ground storey portal and windows.
+		lm.box("Windows", t + r * Vector3(0, 6.0, w * 0.5 + 0.02), Vector3(2.4, 5.0, 0.06), r, 0.0)
+		_round_arch(lm, "Stone", t + r * Vector3(0, 8.5, w * 0.5 + 0.05), r * Vector3.BACK, 2.6, 0.4)
 	lm.box("Stone", t + Vector3(0, shaft + 0.5, 0), Vector3(17.6, 1.0, 17.6))
-	# Belfry stage with tall arched openings and its gallery.
-	lm.box("Brick", t + Vector3(0, shaft + 6.0, 0), Vector3(13.0, 10.0, 13.0))
+	# Belfry stage: paired arched openings, corner turrets, gallery.
+	var by := shaft + 1.0
+	lm.box("Brick", t + Vector3(0, by + 5.0, 0), Vector3(13.0, 10.0, 13.0))
 	for f in 4:
 		var r := Basis(Vector3.UP, PI * 0.5 * f)
 		for k in [-1.0, 1.0]:
-			lm.box("BrickDark", t + r * Vector3(k * 3.0, shaft + 6.0, 6.55), Vector3(2.2, 7.0, 0.2), r)
-		for k in [-1.0, 1.0]:
-			lm.lathe("Copper", t + r * Vector3(k * 6.2, shaft + 11.0, 6.2), PackedVector2Array([
-				Vector2(0.7, 0), Vector2(0.0, 2.6)]), 6)
+			lm.box("BrickDark", t + r * Vector3(k * 3.0, by + 4.0, 6.51), Vector3(2.2, 6.0, 0.1), r, 0.0)
+			_round_arch(lm, "Stone", t + r * Vector3(k * 3.0, by + 7.0, 6.55), r * Vector3.BACK, 2.2, 0.35)
+			for m in 4:
+				lm.box("Brick", t + r * Vector3(k * 3.0, by + 2.0 + 1.3 * m, 6.6), Vector3(2.2, 0.15, 0.3), r, 0.0)
+		# Gallery railing on the stone belt.
+		for k in 17:
+			lm.box("Copper", t + r * Vector3(-8.0 + k, shaft + 1.6, 8.4), Vector3(0.1, 1.2, 0.1), r, 0.0)
+		lm.box("Copper", t + r * Vector3(0, shaft + 2.2, 8.4), Vector3(16.8, 0.12, 0.12), r, 0.0)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var tc := t + Vector3(sx * 6.2, by, sz * 6.2)
+			lm.frustum("Brick", tc, 0.9, 0.9, 10.0, 8, PI / 8.0)
+			lm.lathe("Copper", tc + Vector3(0, 10.0, 0), PackedVector2Array([Vector2(1.1, 0), Vector2(0.7, 1.0),
+				Vector2(0.0, 3.0)]), 8, 1.0, 1.0, PI / 8.0, false)
+			lm.frustum("Gilt", tc + Vector3(0, 13.0, 0), 0.08, 0.02, 0.8, 4)
 	lm.box("Stone", t + Vector3(0, shaft + 11.2, 0), Vector3(14.2, 0.6, 14.2))
-	# Copper lantern, ribbed in gilt, and the spire.
+	# Copper lantern: bell-shaped octagon, ribbed in gilt, with openings.
 	var ly := shaft + 11.5
-	lm.lathe("Copper", t + Vector3(0, ly, 0), PackedVector2Array([Vector2(6.0, 0), Vector2(5.4, 3.0),
-		Vector2(3.6, 5.0), Vector2(3.2, 8.0), Vector2(1.6, 10.0), Vector2(0.7, 13.5)]), 8,
-		1.0, 1.0, PI / 8.0, false)
+	var prof := PackedVector2Array([Vector2(6.0, 0), Vector2(5.4, 3.0),
+		Vector2(3.6, 5.0), Vector2(3.2, 8.0), Vector2(1.6, 10.0), Vector2(0.7, 13.5)])
+	lm.lathe("Copper", t + Vector3(0, ly, 0), prof, 8, 1.0, 1.0, PI / 8.0, false)
+	var k8 := 1.0 / cos(PI / 8.0)
 	for k in 8:
 		var a := PI / 8.0 + PI * 0.25 * k
-		lm.beam("Gilt", t + Vector3(cos(a) * 6.05, ly, sin(a) * 6.05),
-			t + Vector3(cos(a) * 3.65, ly + 5.0, sin(a) * 3.65), 0.25, 0.15)
-	# The three crowns stacked on the spire tip.
+		for j in prof.size() - 1:
+			lm.beam("Gilt", t + Vector3(cos(a) * (prof[j].x + 0.05), ly + prof[j].y, sin(a) * (prof[j].x + 0.05)),
+				t + Vector3(cos(a) * (prof[j + 1].x + 0.05), ly + prof[j + 1].y, sin(a) * (prof[j + 1].x + 0.05)), 0.25, 0.15)
+		var am := a + PI / 8.0
+		lm.box("Windows", t + Vector3(cos(am), 0, sin(am)) * (3.4 / k8 + 0.06) + Vector3(0, ly + 6.5, 0),
+			Vector3(0.9, 2.2, 0.06), Basis(Vector3.UP, -am + PI * 0.5), 0.0)
+	# The spire and the three crowns.
 	var cy := ly + 13.5
 	lm.frustum("Gilt", t + Vector3(0, cy, 0), 0.25, 0.25, TOP_M - cy, 6)
+	lm.lathe("Gilt", t + Vector3(0, cy + 1.0, 0), PackedVector2Array([Vector2(0.0, 0), Vector2(0.45, 0.2),
+		Vector2(0.5, 0.5), Vector2(0.45, 0.8), Vector2(0.0, 1.0)]), 10)
 	for k in 3:
 		var a := TAU * k / 3.0
 		var off := Vector3(cos(a), 0, sin(a)) * 0.9
 		_crown(lm, t + off + Vector3(0, TOP_M - 2.4, 0), 0.7)
-	lm.commit(model)
+		lm.beam("Gilt", t + Vector3(0, TOP_M - 3.4, 0), t + off + Vector3(0, TOP_M - 2.4, 0), 0.12, 0.12)
+	# Birger Jarl's cenotaph under its canopy at the tower's east foot.
+	var cen := t + Vector3(w * 0.5 + 3.0, 0, 0)
+	lm.box("Stone", cen + Vector3(0, 0.5, 0), Vector3(2.4, 1.0, 3.6))
+	lm.box("Gilt", cen + Vector3(0, 1.3, 0), Vector3(1.6, 0.6, 2.8))
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			lm.frustum("Stone", cen + Vector3(sx * 1.4, 0, sz * 2.0), 0.15, 0.15, 3.4, 6)
+	lm.lathe("Copper", cen + Vector3(0, 3.4, 0), PackedVector2Array([Vector2(2.4, 0), Vector2(0.0, 1.6)]), 4,
+		0.8, 1.15, PI * 0.25, false)
 
 ## A small open crown: a gilt band with four points, r in radius.
 static func _crown(lm: LandmarkMesh, base: Vector3, r: float) -> void:
@@ -105,6 +271,8 @@ static func _crown(lm: LandmarkMesh, base: Vector3, r: float) -> void:
 	for k in 4:
 		var a := TAU * k / 4.0
 		lm.frustum("Gilt", base + Vector3(cos(a) * r, r * 0.7, sin(a) * r), r * 0.2, 0.0, r * 0.8, 4)
+		lm.lathe("Gilt", base + Vector3(cos(a + PI * 0.25) * r * 1.1, r * 0.7, sin(a + PI * 0.25) * r * 1.1),
+			PackedVector2Array([Vector2(0.0, 0), Vector2(r * 0.12, r * 0.12), Vector2(0.0, r * 0.24)]), 6)
 
 ## Riddarholmen Church (Riddarholmskyrkan, late 13th century) in true
 ## metres, the nave along +X (east): a red-brown Gothic brick nave under

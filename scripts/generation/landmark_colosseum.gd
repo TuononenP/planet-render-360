@@ -3,9 +3,12 @@ extends RefCounted
 
 ## The Colosseum in true metres: a 189 x 156 m ellipse, 48 m high.
 ## The surviving northern outer ring keeps all four storeys — three
-## travertine arcades of 80 round-headed bays (Tuscan, Ionic and
-## Corinthian half-columns with entablatures) under the windowed attic
-## — and steps down at both broken ends into the brick buttress wedges;
+## travertine arcades of 80 round-headed bays, each arch under a
+## moulded archivolt springing from impost blocks, framed by engaged
+## half-columns (Tuscan, Ionic and Corinthian, with their capitals) and
+## a three-part entablature per storey — under the attic with its
+## Corinthian pilasters, small windows in alternate bays and three
+## corbels per bay that carried the velarium masts; it steps down at both broken ends into the brick buttress wedges;
 ## to the south the lower inner ring stands exposed. Inside, the ruined
 ## cavea of radial brick walls rakes down to the podium, the arena floor
 ## is partly rebuilt over the open hypogeum maze.
@@ -83,17 +86,84 @@ static func _outer_ring(lm: LandmarkMesh) -> void:
 			lm.box("Brick", (p + q) * 0.5 + off + Vector3(0, 14.0 + float(k) * 10.0, 0),
 				Vector3(3.0, 10.0, 14.0), Basis(Vector3.UP, atan2(dir.x, dir.z) + PI * 0.5))
 
-## Engaged half-column at each pier and the tier's entablature.
+## Engaged half-column at each pier (base, shaft, the tier's capital),
+## the impost blocks and moulded archivolt of the bay's arch, and the
+## tier's entablature: architrave, frieze and projecting cornice.
 static func _order(lm: LandmarkMesh, p0: Vector3, p1: Vector3, y0: float, y1: float, tier: int) -> void:
 	var out := Vector3(p0.x / (A * A), 0, p0.z / (B * B)).normalized()
-	var col := p0 + out * 0.55
-	lm.frustum("Travertine", col + Vector3(0, y0 + 0.4, 0), 0.75, 0.65, y1 - y0 - 2.0, 8)
-	lm.box("Travertine", col + Vector3(0, y1 - 1.4, 0), Vector3(1.8, 0.7, 1.8),
-		Basis(Vector3.UP, atan2(out.x, out.z)))
 	var o1 := Vector3(p1.x / (A * A), 0, p1.z / (B * B)).normalized()
-	var band := 1.3 if tier < 2 else 1.6
-	lm.beam("Travertine", p0 + out * 0.6 + Vector3(0, y1 - band * 0.5, 0),
-		p1 + o1 * 0.6 + Vector3(0, y1 - band * 0.5, 0), band, 1.4, Vector3.UP)
+	var face := Basis(Vector3.UP, atan2(out.x, out.z))
+	var col := p0 + out * 0.55
+	var ent := 1.3 if tier < 2 else 1.6
+	var ch := y1 - y0 - ent
+	# Pedestal-plinth and Attic base (Ionic and Corinthian storeys).
+	var base_h := 0.0 if tier == 0 else 0.9
+	if tier > 0:
+		lm.box("Travertine", col + Vector3(0, y0 + 0.45, 0), Vector3(1.9, 0.9, 1.9), face)
+	lm.lathe("Travertine", col + Vector3(0, y0 + base_h, 0), PackedVector2Array([Vector2(0.85, 0),
+		Vector2(0.88, 0.15), Vector2(0.76, 0.32), Vector2(0.72, 0.45)]), 12)
+	var sh := ch - 1.1 - base_h
+	lm.lathe("Travertine", col + Vector3(0, y0 + base_h + 0.45, 0), PackedVector2Array([Vector2(0.72, 0),
+		Vector2(0.71, sh * 0.35), Vector2(0.66, sh * 0.75), Vector2(0.62, sh - 0.45)]), 12)
+	var cb := col + Vector3(0, y0 + base_h + sh, 0)
+	match tier:
+		0:
+			# Tuscan: necking, echinus, square abacus.
+			lm.frustum("Travertine", cb, 0.64, 0.64, 0.25, 12)
+			lm.lathe("Travertine", cb + Vector3(0, 0.25, 0), PackedVector2Array([Vector2(0.64, 0),
+				Vector2(0.8, 0.2), Vector2(0.88, 0.4)]), 12)
+			lm.box("Travertine", cb + Vector3(0, 0.75, 0), Vector3(1.85, 0.45, 1.85), face)
+		1:
+			# Ionic: echinus, the volute pair and abacus.
+			lm.frustum("Travertine", cb, 0.66, 0.72, 0.3, 12)
+			for sv in [-1.0, 1.0]:
+				var side := face * Vector3(float(sv) * 0.72, 0, 0)
+				lm.disc("Travertine", cb + side + Vector3(0, 0.5, 0) + face * Vector3(0, 0, 0.56), out, 0.3, 10)
+				lm.beam("Travertine", cb + side + Vector3(0, 0.5, 0) - face * Vector3(0, 0, 0.55),
+					cb + side + Vector3(0, 0.5, 0) + face * Vector3(0, 0, 0.55), 0.55, 0.5)
+			lm.box("Travertine", cb + Vector3(0, 0.88, 0), Vector3(1.9, 0.3, 1.6), face)
+		_:
+			# Corinthian: bell with two tiers of leaves, corner volutes,
+			# concave abacus.
+			lm.lathe("Travertine", cb, PackedVector2Array([Vector2(0.62, 0), Vector2(0.64, 0.5),
+				Vector2(0.76, 0.95)]), 12)
+			for row in 2:
+				for i in 6:
+					var a := TAU * (float(i) + 0.5 * float(row)) / 6.0
+					var d := Vector3(cos(a), 0, sin(a))
+					lm.beam("Travertine", cb + d * 0.6 + Vector3(0, 0.05 + 0.35 * float(row), 0),
+						cb + d * 0.82 + Vector3(0, 0.45 + 0.35 * float(row), 0), 0.28, 0.08, d.cross(Vector3.UP))
+			for i in 4:
+				var a := TAU * (float(i) + 0.5) / 4.0
+				var d := Vector3(cos(a), 0, sin(a))
+				lm.beam("Travertine", cb + d * 0.6 + Vector3(0, 0.6, 0), cb + d * 1.0 + Vector3(0, 0.98, 0), 0.14)
+			lm.box("Travertine", cb + Vector3(0, 1.05, 0), Vector3(1.95, 0.2, 1.95), face)
+	# Impost blocks and the archivolt round the arch.
+	var along := p1 - p0
+	var w := along.length()
+	var dir := along / w
+	var ow := w * 0.62
+	var spring := y0 + (y1 - y0) * 0.5
+	var r := minf(ow * 0.5, (y1 - spring) * 0.85)
+	var c := (p0 + p1) * 0.5 + out * 0.15
+	for sv in [-1.0, 1.0]:
+		lm.box("Travertine", c + dir * float(sv) * (ow * 0.5 + 0.1) + Vector3(0, spring - 0.15, 0),
+			Vector3(0.7, 0.35, 0.45), face)
+	var prev := c - dir * (ow * 0.5 + 0.25) + Vector3(0, spring, 0)
+	for k in range(1, 9):
+		var t := PI - PI * float(k) / 8.0
+		var q := c + dir * cos(t) * (ow * 0.5 + 0.25) + Vector3(0, spring + sin(t) * (r + 0.25), 0)
+		lm.beam("Travertine", prev, q, 0.45, 0.3, out)
+		prev = q
+	# Entablature: architrave, frieze, cornice (projecting, moulded).
+	var e0 := p0 + Vector3(0, y1 - ent, 0)
+	var e1 := p1 + Vector3(0, y1 - ent, 0)
+	lm.beam("Travertine", e0 + out * 0.5 + Vector3(0, ent * 0.17, 0), e1 + o1 * 0.5 + Vector3(0, ent * 0.17, 0),
+		ent * 0.34, 1.2, Vector3.UP)
+	lm.beam("Travertine", e0 + out * 0.4 + Vector3(0, ent * 0.5, 0), e1 + o1 * 0.4 + Vector3(0, ent * 0.5, 0),
+		ent * 0.32, 1.0, Vector3.UP)
+	LandmarkDetail.cornice(lm, "Travertine", e0 + out * 0.9 + Vector3(0, ent * 0.66, 0),
+		e1 + o1 * 0.9 + Vector3(0, ent * 0.66, 0), (out + o1).normalized(), ent * 0.34, false)
 
 ## Attic storey: solid wall, Corinthian pilasters, a window in every
 ## other bay, consoles for the velarium masts and the crowning cornice.
@@ -109,12 +179,39 @@ static func _attic(lm: LandmarkMesh, p0: Vector3, p1: Vector3, i: int) -> void:
 		in1 + Vector3(0, y1, 0), in0 + Vector3(0, y1, 0), -out)
 	lm.quad("Travertine", p0 + Vector3(0, y1, 0), p1 + Vector3(0, y1, 0),
 		in1 + Vector3(0, y1, 0), in0 + Vector3(0, y1, 0), Vector3.UP)
-	lm.beam("Travertine", p0 + out * 0.3 + Vector3(0, y0 + 6.5, 0),
-		p0 + out * 0.3 + Vector3(0, y1 - 1.5, 0), 1.2, 0.6)
+	var face := Basis(Vector3.UP, atan2(out.x, out.z))
+	# Plinth course, Corinthian pilaster with base and capital.
+	lm.beam("Travertine", p0 + out * 0.2 + Vector3(0, y0 + 0.6, 0), p1 + out * 0.2 + Vector3(0, y0 + 0.6, 0),
+		1.2, 0.4, Vector3.UP)
+	lm.box("Travertine", p0 + out * 0.3 + Vector3(0, y0 + 1.6, 0), Vector3(1.5, 0.8, 0.6), face)
+	lm.beam("Travertine", p0 + out * 0.3 + Vector3(0, y0 + 2.0, 0),
+		p0 + out * 0.3 + Vector3(0, y1 - 3.2, 0), 1.2, 0.6)
+	lm.box("Travertine", p0 + out * 0.38 + Vector3(0, y1 - 2.7, 0), Vector3(1.5, 1.0, 0.75), face)
+	for k in 3:
+		lm.box("Travertine", p0 + out * 0.62 + Vector3(-0.0, y1 - 3.0 + 0.3 * float(k), 0),
+			Vector3(1.25 + 0.08 * float(k), 0.22, 0.2), face, 0.0)
+	# Three corbels per bay that carried the velarium masts.
+	for k in 3:
+		var cp := p0.lerp(p1, (float(k) + 0.5) / 3.0) + out * 0.35
+		lm.box("Travertine", cp + Vector3(0, y0 + 2.2, 0), Vector3(0.7, 0.9, 0.8), face)
 	if i % 2 == 0:
-		var m := (p0 + p1) * 0.5 + out * 0.05
-		lm.box("Shadow", m + Vector3(0, y0 + 4.2, 0), Vector3(2.2, 2.6, 0.1),
-			Basis(Vector3.UP, atan2(out.x, out.z)))
+		# Small window: a real opening through the attic wall.
+		var m := (p0 + p1) * 0.5
+		var dirb := (p1 - p0).normalized()
+		var hw := 1.1
+		var wy0 := y0 + 4.6
+		var wy1 := wy0 + 2.8
+		var inb := -out * 2.4
+		for sv in [-1.0, 1.0]:
+			var e := m + dirb * float(sv) * hw
+			lm.quad("Shadow", e + Vector3(0, wy0, 0) + out * 0.02, e + Vector3(0, wy1, 0) + out * 0.02,
+				e + Vector3(0, wy1, 0) + inb, e + Vector3(0, wy0, 0) + inb, -dirb * float(sv))
+		lm.quad("Shadow", m - dirb * hw + Vector3(0, wy0, 0) + out * 0.02, m + dirb * hw + Vector3(0, wy0, 0) + out * 0.02,
+			m + dirb * hw + Vector3(0, wy0, 0) + inb, m - dirb * hw + Vector3(0, wy0, 0) + inb, Vector3.UP)
+		lm.quad("Shadow", m - dirb * hw + Vector3(0, wy1, 0) + out * 0.02, m + dirb * hw + Vector3(0, wy1, 0) + out * 0.02,
+			m + dirb * hw + Vector3(0, wy1, 0) + inb, m - dirb * hw + Vector3(0, wy1, 0) + inb, Vector3.DOWN)
+		lm.box("Shadow", m + Vector3(0, (wy0 + wy1) * 0.5, 0) + out * 0.03, Vector3(2.2, 2.8, 0.06), face, 0.0)
+		lm.box("Travertine", m + Vector3(0, wy0 - 0.15, 0) + out * 0.25, Vector3(2.8, 0.3, 0.5), face, 0.0)
 	var o1 := Vector3(p1.x / (A * A), 0, p1.z / (B * B)).normalized()
 	lm.beam("Travertine", p0 + out * 0.5 + Vector3(0, y1 - 0.6, 0),
 		p1 + o1 * 0.5 + Vector3(0, y1 - 0.6, 0), 1.2, 1.4, Vector3.UP)
@@ -219,7 +316,8 @@ static func _cavea(lm: LandmarkMesh) -> void:
 	lm.grid("InnerRing", rows, Vector3.UP)
 
 ## Podium wall, open hypogeum maze (raised just above grade so the
-## terrain cannot swallow it) and the part-rebuilt arena floor.
+## terrain cannot swallow it: nothing is sunk below y = 0) and the
+## part-rebuilt arena floor.
 static func _arena(lm: LandmarkMesh) -> void:
 	var a := 41.5
 	var b := 24.0
@@ -228,12 +326,12 @@ static func _arena(lm: LandmarkMesh) -> void:
 		var p := _pt(a + 5.0, b + 5.0, float(i))
 		poly.append(Vector2(p.x, p.z))
 	poly.reverse()
-	lm.poly_prism("Arena", poly, -1.0, 0.4)
+	lm.poly_prism("Arena", poly, 0.0, 0.4)
 	for i in BAYS:
 		var p0 := _pt(a + 5.0, b + 5.0, float(i))
 		var p1 := _pt(a + 5.0, b + 5.0, float(i + 1))
 		var n := (p0 - p1).cross(Vector3.UP).normalized()
-		lm.quad("Travertine", p0 + Vector3(0, -1.0, 0), p1 + Vector3(0, -1.0, 0),
+		lm.quad("Travertine", p0, p1,
 			p1 + Vector3(0, 4.5, 0), p0 + Vector3(0, 4.5, 0), -n if n.dot(p0) > 0.0 else n)
 	# Hypogeum: long walls parallel to the major axis, cross walls.
 	for k in 9:
