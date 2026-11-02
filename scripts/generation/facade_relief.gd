@@ -18,10 +18,16 @@ extends RefCounted
 ## - bay windows (`oriel`): canted glazed bays up the street front.
 ## StreetFront adds the ground floor and street furniture of the facade.
 ## Driven by the look's `relief` dict (ArchitectureStyle); seeded per
-## building; distance-gated like BuildingTrim (every tier, AC-12).
+## building; distance-gated like BuildingTrim (the same on every tier,
+## AC-12, except desktop Ultra, which builds it out to its detail ring).
 
 ## Relief only within this distance of the viewpoint (m).
 const RADIUS_M := 300.0
+## Desktop Ultra's relief ring (m), inside LodRing.DETAIL_M's 700 m.
+const ULTRA_RADIUS_M := 650.0
+
+static func radius_m(preset: int) -> float:
+	return ULTRA_RADIUS_M if RenderQuality.ultra_desktop(preset) else RADIUS_M
 ## Shortest exposed stretch that gets relief (m).
 const MIN_SPAN_M := 1.5
 ## Patterns whose windows are punched openings (sills, balconettes).

@@ -178,6 +178,7 @@ func set_probe_origin(pos: Vector3) -> void:
 ## ({year, month, day}) empty uses the season's mid-month day.
 func set_time(hour_f: float, lat: float = latitude, on_date: Dictionary = {}) -> void:
 	hour = fposmod(hour_f, 24.0)
+	CityLights.hour = hour
 	latitude = lat
 	date = on_date
 	_apply()

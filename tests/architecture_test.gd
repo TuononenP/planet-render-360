@@ -11,37 +11,37 @@ extends SceneTree
 
 const CITIES := {
 	"paris": [48.8566, 2.3522, "haussmann"], "london": [51.5074, -0.1278, "london"],
-	"dublin": [53.3498, -6.2603, "west_europe_brick"], "amsterdam": [52.3676, 4.9041, "amsterdam"],
-	"copenhagen": [55.6761, 12.5683, "west_europe_brick"], "berlin": [52.52, 13.405, "berlin"],
-	"vienna": [48.2082, 16.3738, "central_europe"], "prague": [50.0755, 14.4378, "central_europe"],
-	"warsaw": [52.2297, 21.0122, "central_europe"], "interlaken": [46.6863, 7.8632, "alpine"],
-	"banff": [51.1789, -115.5708, "mountain_lodge"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
+	"dublin": [53.3498, -6.2603, "dublin"], "amsterdam": [52.3676, 4.9041, "amsterdam"],
+	"copenhagen": [55.6761, 12.5683, "copenhagen"], "berlin": [52.52, 13.405, "berlin"],
+	"vienna": [48.2082, 16.3738, "vienna"], "prague": [50.0755, 14.4378, "prague"],
+	"warsaw": [52.2297, 21.0122, "central_europe"], "interlaken": [46.6863, 7.8632, "interlaken"],
+	"banff": [51.1789, -115.5708, "banff"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
 	"whistler": [50.1163, -122.9574, "mountain_lodge"], "zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
-	"helsinki": [60.1699, 24.9384, "nordic"], "turku": [60.4518, 22.2666, "nordic"],
-	"stockholm": [59.3293, 18.0686, "stockholm"], "venice": [45.4375, 12.3358, "venice"], "oslo": [59.9139, 10.7522, "nordic"],
-	"reykjavik": [64.1466, -21.9426, "nordic"], "madrid": [40.4168, -3.7038, "mediterranean"],
-	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "mediterranean"],
-	"rome": [41.9028, 12.4964, "rome"], "athens": [37.9838, 23.7275, "mediterranean"],
-	"cairo": [30.0444, 31.2357, "middle_east"], "istanbul": [41.0082, 28.9784, "middle_east"],
-	"dubai": [25.2048, 55.2708, "middle_east"], "algiers": [36.7538, 3.0588, "middle_east"],
-	"tokyo": [35.6762, 139.6503, "tokyo"], "seoul": [37.5665, 126.978, "east_asia"],
-	"shanghai": [31.2304, 121.4737, "east_asia"], "hong_kong": [22.3193, 114.1694, "hong_kong"],
-	"mumbai": [19.076, 72.8777, "south_asia"], "delhi": [28.6139, 77.209, "south_asia"],
-	"bangkok": [13.7563, 100.5018, "southeast_asia"], "singapore": [1.3521, 103.8198, "singapore"],
+	"helsinki": [60.1699, 24.9384, "helsinki"], "turku": [60.4518, 22.2666, "nordic"],
+	"stockholm": [59.3293, 18.0686, "stockholm"], "venice": [45.4375, 12.3358, "venice"], "oslo": [59.9139, 10.7522, "oslo"],
+	"reykjavik": [64.1466, -21.9426, "nordic"], "madrid": [40.4168, -3.7038, "madrid"],
+	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "lisbon"],
+	"rome": [41.9028, 12.4964, "rome"], "athens": [37.9838, 23.7275, "athens"],
+	"cairo": [30.0444, 31.2357, "cairo"], "istanbul": [41.0082, 28.9784, "istanbul"],
+	"dubai": [25.2048, 55.2708, "dubai"], "algiers": [36.7538, 3.0588, "middle_east"],
+	"tokyo": [35.6762, 139.6503, "tokyo"], "seoul": [37.5665, 126.978, "seoul"],
+	"shanghai": [31.2304, 121.4737, "shanghai"], "hong_kong": [22.3193, 114.1694, "hong_kong"],
+	"mumbai": [19.076, 72.8777, "mumbai"], "delhi": [28.6139, 77.209, "south_asia"],
+	"bangkok": [13.7563, 100.5018, "bangkok"], "singapore": [1.3521, 103.8198, "singapore"],
 	"jakarta": [-6.2088, 106.8456, "southeast_asia"], "new_york": [40.7128, -74.006, "new_york"],
-	"houston": [29.7604, -95.3698, "north_america"], "los_angeles": [34.0522, -118.2437, "north_america"],
-	"toronto": [43.6532, -79.3832, "north_america"], "mexico_city": [19.4326, -99.1332, "latin_america"],
-	"rio": [-22.9068, -43.1729, "latin_america"], "buenos_aires": [-34.6037, -58.3816, "latin_america"],
-	"sydney": [-33.8688, 151.2093, "australia"], "auckland": [-36.8509, 174.7645, "australia"],
-	"moscow": [55.7558, 37.6173, "eastern_europe"], "st_petersburg": [59.9311, 30.3609, "eastern_europe"],
+	"houston": [29.7604, -95.3698, "north_america"], "los_angeles": [34.0522, -118.2437, "los_angeles"],
+	"toronto": [43.6532, -79.3832, "toronto"], "mexico_city": [19.4326, -99.1332, "mexico_city"],
+	"rio": [-22.9068, -43.1729, "rio"], "buenos_aires": [-34.6037, -58.3816, "buenos_aires"],
+	"sydney": [-33.8688, 151.2093, "sydney"], "auckland": [-36.8509, 174.7645, "australia"],
+	"moscow": [55.7558, 37.6173, "eastern_europe"], "st_petersburg": [59.9311, 30.3609, "st_petersburg"],
 	"kyiv": [50.4501, 30.5234, "eastern_europe"], "tallinn": [59.437, 24.7536, "eastern_europe"],
 	"lagos": [6.5244, 3.3792, "sub_saharan_africa"], "nairobi": [-1.2921, 36.8219, "sub_saharan_africa"],
-	"cape_town": [-33.9249, 18.4241, "sub_saharan_africa"],
+	"cape_town": [-33.9249, 18.4241, "cape_town"],
 	"chicago": [41.8819, -87.6278, "chicago"], "san_francisco": [37.7749, -122.4194, "san_francisco"],
 	"brooklyn": [40.6782, -73.9442, "new_york"], "astoria": [40.7644, -73.9235, "new_york"],
 	"la_defense": [48.8920, 2.2380, "haussmann"], "osaka": [34.6937, 135.5023, "japan"],
 	"kowloon": [22.3167, 114.1820, "hong_kong"], "rotterdam": [51.9244, 4.4777, "west_europe_brick"],
-	"milan": [45.4642, 9.19, "mediterranean"], "boston": [42.3601, -71.0589, "north_america"],
+	"milan": [45.4642, 9.19, "milan"], "boston": [42.3601, -71.0589, "boston"],
 }
 
 ## Cities with a zone: the 200-building look census must differ between
@@ -52,6 +52,20 @@ const ZONE_CITIES := {
 	"new_york": [40.7128, -74.006], "chicago": [41.8781, -87.6298],
 	"san_francisco": [37.7749, -122.4194], "tokyo": [35.6812, 139.7671],
 	"hong_kong": [22.3193, 114.1694], "singapore": [1.3521, 103.8198],
+	"seoul": [37.5728, 126.9769], "dubai": [25.1925, 55.2741], "monaco": [43.7384, 7.4246],
+	"interlaken": [46.6863, 7.8632], "banff": [51.1772, -115.5714],
+	"copenhagen": [55.6761, 12.5683], "oslo": [59.9139, 10.7522], "helsinki": [60.1699, 24.9384],
+	"edinburgh": [55.9533, -3.1883], "dublin": [53.3498, -6.2603], "brussels": [50.8503, 4.3517],
+	"st_petersburg": [59.9343, 30.3351], "madrid": [40.4168, -3.7038], "lisbon": [38.7223, -9.1393],
+	"milan": [45.4642, 9.19], "florence": [43.7696, 11.2558], "istanbul": [41.02, 28.98],
+	"athens": [37.9838, 23.7275], "vienna": [48.2082, 16.3738], "prague": [50.0755, 14.4378],
+	"budapest": [47.4979, 19.0402], "munich": [48.1351, 11.582], "kyoto": [35.0116, 135.7681],
+	"shanghai": [31.2304, 121.4737], "beijing": [39.9042, 116.4074], "bangkok": [13.7563, 100.5018],
+	"mumbai": [19.0, 72.83], "cairo": [30.0444, 31.2357], "cape_town": [-33.9249, 18.4241],
+	"toronto": [43.6532, -79.3832], "montreal": [45.5017, -73.5673], "boston": [42.3601, -71.0589],
+	"washington": [38.9072, -77.0369], "los_angeles": [34.0522, -118.2437],
+	"mexico_city": [19.4326, -99.1332], "rio": [-22.95, -43.2], "buenos_aires": [-34.6037, -58.3816],
+	"sydney": [-33.8688, 151.2093], "melbourne": [-37.8136, 144.9631],
 }
 const ROOF_SHAPES := ["flat", "gabled", "hipped", "mansard", "pyramidal", "dome",
 	"gambrel", "skillion", "half-hipped", "saltbox", "round"]
@@ -146,6 +160,53 @@ func _region_checks(failures: Array[String]) -> void:
 			failures.append("%s: region %s, expected %s" % [city, got, row[2]])
 	if ArchitectureStyle.region_for(0.0, -140.0) != "generic":
 		failures.append("open ocean should fall back to generic")
+	# The map's ISO country beats the lat/lon boxes near borders; with no
+	# country known the boxes decide as before.
+	for row in [
+			[48.5726, 7.8156, "DE", "central_europe"],    # Kehl, across the Rhine
+			[48.5726, 7.8156, "", "france"],              # ... the box alone
+			[47.5596, 7.5886, "CH", "alpine"],            # Basel
+			[47.5900, 7.5600, "FR", "france"],            # Saint-Louis, by Basel
+			[43.7102, 7.2620, "FR", "mediterranean"],     # Nice
+			[43.7384, 7.4246, "MC", "mediterranean"],     # Monaco
+			[36.1408, -5.3536, "GI", "mediterranean"],    # Gibraltar
+			[50.6292, 3.0573, "FR", "west_europe_brick"], # Lille (Flemish brick)
+			[45.8150, 15.9819, "HR", "central_europe"],   # Zagreb
+			[43.5081, 16.4402, "HR", "mediterranean"],    # Split
+			[46.0569, 14.5058, "SI", "central_europe"],   # Ljubljana
+			[45.0703, 7.6869, "IT", "mediterranean"],     # Turin, not the French Alps
+			[39.1000, 26.5500, "GR", "mediterranean"],    # Lesbos, inside the Turkey box
+			[43.1155, 131.8855, "RU", "eastern_europe"],  # Vladivostok, inside the Japan box
+			[32.5149, -117.0382, "MX", "latin_america"],  # Tijuana, inside the US box
+			[24.5551, -81.7800, "US", "north_america"],   # Key West
+			[51.1789, -115.5708, "CA", "mountain_lodge"], # Banff keeps its box
+			[64.1814, -51.6941, "GL", "nordic"],          # Nuuk, in no box
+			[48.5726, 7.8156, "ZZ", "france"]]:           # unknown code: boxes
+		var got_c := ArchitectureStyle.country_region_for(float(row[0]), float(row[1]), str(row[2]))
+		if got_c != str(row[3]):
+			failures.append("country %s at %s,%s: region %s, expected %s" % [row[2], row[0], row[1], got_c, row[3]])
+	# Every quick pick but Big Sur (a coast, not a town) stands in its own
+	# city's style zone, so its view reads as that city.
+	for row in PresetViews.ROWS:
+		var city := CityStyles.city_of_region(CityStyles.region_at(float(row["lat"]), float(row["lon"])))
+		var want: String = str({"alps": "interlaken", "big_sur": ""}.get(str(row["id"]), str(row["id"])))
+		if city != want:
+			failures.append("quick pick %s stands in city zone '%s', expected '%s'" % [row["id"], city, want])
+	if ArchitectureStyle.region_for(48.8566, 2.3522, "FR") != "haussmann" \
+			or ArchitectureStyle.region_for(51.5074, -0.1278, "GB") != "london":
+		failures.append("a city zone must still beat the country")
+	var box_regions := {}
+	for box in ArchitectureData.BOXES:
+		box_regions[str(box[0])] = true
+	for iso in ArchitectureData.COUNTRY_REGIONS:
+		for r in ArchitectureData.COUNTRY_REGIONS[iso]:
+			if not box_regions.has(r):
+				failures.append("country %s names %s, not a box region" % [iso, r])
+	for box in ArchitectureData.BOXES:
+		if (box as Array).size() > 5:
+			for iso in str(box[5]).split(" "):
+				if not ArchitectureData.COUNTRY_REGIONS.has(iso):
+					failures.append("box %s lists %s, missing from COUNTRIES" % [box[0], iso])
 	# City rows keep their country underneath (consumers that key off the
 	# broad region use these).
 	if ArchitectureStyle.country_region_for(51.5074, -0.1278) != "west_europe_brick" \
@@ -671,6 +732,36 @@ func _era_checks(failures: Array[String]) -> void:
 		["san_francisco", {"kind": "house", "levels": 2}, {}, "sf_victorian"],
 		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
 		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],
+		["seoul", {"kind": "apartments", "levels": 18}, {}, "seoul"],
+		["seoul", {"kind": "apartments", "levels": 4}, {}, "seoul_villa"],
+		["seoul", {"kind": "house", "heritage": true}, {}, "seoul_hanok"],
+		["seoul", {"kind": "commercial", "levels": 30}, {}, "seoul_tower"],
+		["dubai", {"kind": "commercial", "levels": 50}, {}, "dubai_tower"],
+		["dubai", {"kind": "apartments", "levels": 9}, {}, "dubai"],
+		["dubai", {"kind": "house", "levels": 2}, {}, "dubai_villa"],
+		["dubai", {"kind": "house", "heritage": true}, {}, "dubai_heritage"],
+		["monaco", {"kind": "apartments", "levels": 6}, {}, "monaco"],
+		["monaco", {"kind": "apartments", "levels": 24}, {}, "monaco_tower"],
+		["monaco", {"kind": "house", "heritage": true, "levels": 4}, {}, "monaco_old"],
+		["interlaken", {"kind": "house", "levels": 3}, {}, "interlaken"],
+		["interlaken", {"kind": "commercial", "levels": 5}, {}, "interlaken_hotel"],
+		["banff", {"kind": "house", "levels": 2}, {}, "banff_house"],
+		["banff", {"kind": "commercial", "heritage": true}, {}, "banff_heritage"],
+		["banff", {"kind": "commercial", "levels": 2}, {}, "banff"],
+		# Cities on the data-driven storey-band rule (BuildingEra._banded).
+		["athens", {"kind": "apartments", "levels": 6}, {}, "athens"],
+		["athens", {"kind": "house", "heritage": true}, {}, "athens_neoclassical"],
+		["edinburgh", {"kind": "apartments", "levels": 8}, {}, "edinburgh_old"],
+		["edinburgh", {"kind": "apartments", "levels": 4}, {}, "edinburgh"],
+		["kyoto", {"kind": "house", "levels": 2}, {}, "kyoto_machiya"],
+		["kyoto", {"kind": "apartments", "levels": 6}, {}, "kyoto"],
+		["beijing", {"kind": "house", "levels": 1}, {}, "beijing_hutong"],
+		["beijing", {"kind": "commercial", "levels": 30}, {}, "beijing_tower"],
+		["cairo", {"kind": "apartments", "levels": 10}, {}, "cairo"],
+		["cairo", {"kind": "apartments", "architecture": "art_deco"}, {}, "cairo_khedival"],
+		["boston", {"kind": "house", "start_year": 1870, "levels": 4}, {}, "boston_backbay"],
+		["toronto", {"kind": "apartments", "levels": 40}, {}, "toronto_tower"],
+		["rio", {"kind": "apartments", "levels": 12}, {}, "rio"],
 	]
 	for o in other:
 		var got := _era(str(o[0]), o[1], o[2], 200.0 if str(o[1]["kind"]) == "house" else 600.0)

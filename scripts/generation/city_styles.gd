@@ -34,6 +34,47 @@ const ZONES := [
 	["tokyo", "tokyo", 35.6812, 139.7671, 18.0],
 	["hong_kong", "hong_kong", 22.3193, 114.1694, 14.0],
 	["singapore", "singapore", 1.3521, 103.8198, 22.0],
+	["seoul", "seoul", 37.5400, 126.9900, 16.0],
+	["dubai", "dubai", 25.1900, 55.2700, 9.0],          # Downtown, SZR, Business Bay
+	["dubai", "dubai", 25.2630, 55.3000, 6.0],          # Deira, Bur Dubai
+	["dubai", "dubai", 25.0800, 55.1400, 5.0],          # Marina, JLT
+	["monaco", "monaco", 43.7384, 7.4246, 2.2],
+	["interlaken", "interlaken", 46.6863, 7.8632, 3.5],  # with Matten, Unterseen
+	["banff", "banff", 51.1784, -115.5708, 3.0],
+	["copenhagen", "copenhagen", 55.6761, 12.5683, 5.0],
+	["oslo", "oslo", 59.9139, 10.7522, 5.0],
+	["helsinki", "helsinki", 60.1699, 24.9384, 5.0],
+	["edinburgh", "edinburgh", 55.9533, -3.1883, 5.0],
+	["dublin", "dublin", 53.3498, -6.2603, 5.0],
+	["brussels", "brussels", 50.8503, 4.3517, 5.0],
+	["st_petersburg", "st_petersburg", 59.9343, 30.3351, 7.0],
+	["madrid", "madrid", 40.4168, -3.7038, 7.0],
+	["lisbon", "lisbon", 38.7223, -9.1393, 5.0],
+	["milan", "milan", 45.4642, 9.1900, 6.0],
+	["florence", "florence", 43.7696, 11.2558, 3.5],
+	["istanbul", "istanbul", 41.0200, 28.9800, 9.0],   # peninsula, Beyoğlu, Beşiktaş, Levent
+	["athens", "athens", 37.9838, 23.7275, 6.0],
+	["vienna", "vienna", 48.2082, 16.3738, 7.0],
+	["prague", "prague", 50.0755, 14.4378, 7.0],
+	["budapest", "budapest", 47.4979, 19.0402, 7.0],
+	["munich", "munich", 48.1351, 11.5820, 6.0],
+	["kyoto", "kyoto", 35.0116, 135.7681, 5.0],
+	["shanghai", "shanghai", 31.2304, 121.4737, 14.0],
+	["beijing", "beijing", 39.9042, 116.4074, 14.0],
+	["bangkok", "bangkok", 13.7563, 100.5018, 12.0],
+	["mumbai", "mumbai", 19.0000, 72.8300, 12.0],     # the island city to Bandra
+	["cairo", "cairo", 30.0444, 31.2357, 10.0],
+	["cape_town", "cape_town", -33.9249, 18.4241, 5.0],
+	["toronto", "toronto", 43.6532, -79.3832, 8.0],
+	["montreal", "montreal", 45.5017, -73.5673, 6.0],
+	["boston", "boston", 42.3601, -71.0589, 6.0],
+	["washington", "washington", 38.9072, -77.0369, 7.0],
+	["los_angeles", "los_angeles", 34.0522, -118.2437, 18.0],
+	["mexico_city", "mexico_city", 19.4326, -99.1332, 9.0],
+	["rio", "rio", -22.9500, -43.2000, 10.0],         # Centro to Ipanema
+	["buenos_aires", "buenos_aires", -34.6037, -58.3816, 9.0],
+	["sydney", "sydney", -33.8688, 151.2093, 7.0],
+	["melbourne", "melbourne", -37.8136, 144.9631, 6.0],
 ]
 
 ## Cores the era rules measure distance from (historic centre or CBD,
@@ -54,6 +95,45 @@ const CORES := {
 	"tokyo": [[35.6812, 139.7671], [35.6896, 139.6995]],   # Marunouchi, Shinjuku
 	"hong_kong": [[22.2830, 114.1585], [22.2980, 114.1720]],  # Central, Tsim Sha Tsui
 	"singapore": [[1.2840, 103.8510]],                     # Raffles Place
+	"seoul": [[37.5700, 126.9830], [37.4979, 127.0276]],   # Jongno, Gangnam
+	"dubai": [[25.1972, 55.2744], [25.2697, 55.3095], [25.0805, 55.1403]],  # Downtown, Deira, Marina
+	"monaco": [[43.7396, 7.4277]],                         # Casino
+	"interlaken": [[46.6863, 7.8560]],                     # Höheweg
+	"banff": [[51.1770, -115.5710]],                       # Banff Avenue
+	"copenhagen": [[55.6795, 12.5850]],                    # Kongens Nytorv
+	"oslo": [[59.9133, 10.7389]],                          # Karl Johans gate
+	"helsinki": [[60.1694, 24.9522]],                      # Senate Square
+	"edinburgh": [[55.9500, -3.1880]],                     # the Royal Mile
+	"dublin": [[53.3473, -6.2591]],                        # O'Connell Bridge
+	"brussels": [[50.8467, 4.3525]],                       # Grand-Place
+	"st_petersburg": [[59.9390, 30.3158]],                 # Palace Square
+	"madrid": [[40.4169, -3.7035]],                        # Puerta del Sol
+	"lisbon": [[38.7075, -9.1364]],                        # Praça do Comércio
+	"milan": [[45.4642, 9.1900]],                          # the Duomo
+	"florence": [[43.7731, 11.2560]],                      # the Duomo
+	"istanbul": [[41.0170, 28.9700], [41.0370, 28.9850]],  # Eminönü, Taksim
+	"athens": [[37.9755, 23.7348]],                        # Syntagma
+	"vienna": [[48.2085, 16.3731]],                        # Stephansplatz
+	"prague": [[50.0875, 14.4213]],                        # Old Town Square
+	"budapest": [[47.4977, 19.0548]],                      # Deák tér
+	"munich": [[48.1374, 11.5755]],                        # Marienplatz
+	"kyoto": [[35.0037, 135.7596]],                        # Shijō-Karasuma
+	"shanghai": [[31.2304, 121.4737], [31.2397, 121.4998]],  # People's Square, Lujiazui
+	"beijing": [[39.9055, 116.3976], [39.9100, 116.4580]],   # Tiananmen, CBD
+	"bangkok": [[13.7460, 100.5340], [13.7520, 100.4940]],   # Siam, Rattanakosin
+	"mumbai": [[18.9320, 72.8340], [19.0660, 72.8680]],    # Fort, BKC
+	"cairo": [[30.0444, 31.2357]],                         # Tahrir
+	"cape_town": [[-33.9249, 18.4241]],                    # the CBD
+	"toronto": [[43.6480, -79.3810]],                      # Financial District
+	"montreal": [[45.5017, -73.5673]],                     # Downtown
+	"boston": [[42.3550, -71.0600]],                       # Downtown Crossing
+	"washington": [[38.8977, -77.0365]],                   # the White House
+	"los_angeles": [[34.0505, -118.2550]],                 # Downtown
+	"mexico_city": [[19.4326, -99.1332]],                  # the Zócalo
+	"rio": [[-22.9068, -43.1729]],                         # Centro
+	"buenos_aires": [[-34.6083, -58.3712]],                # Plaza de Mayo
+	"sydney": [[-33.8650, 151.2094]],                      # the CBD
+	"melbourne": [[-37.8136, 144.9631]],                   # the CBD
 }
 
 ## Named districts with a dominant sub-style: [city, era, lat, lon,
@@ -106,6 +186,94 @@ const DISTRICTS := [
 	["singapore", "sg_shophouse", 1.3066, 103.8518, 0.6, 20.0],  # Little India
 	["singapore", "sg_shophouse", 1.3120, 103.9010, 0.8, 10.0],  # Joo Chiat
 	["singapore", "sg_tower", 1.2840, 103.8510, 1.0, 20.0],      # CBD
+	["seoul", "seoul_hanok", 37.5826, 126.9837, 0.6, 40.0],      # Bukchon
+	["seoul", "seoul_hanok", 37.5744, 126.9897, 0.2, 40.0],      # Ikseon-dong
+	["seoul", "seoul_hanok", 37.5790, 126.9700, 0.5, 12.0],      # Seochon
+	["seoul", "seoul_tower", 37.5250, 126.9250, 1.0, 20.0],      # Yeouido
+	["seoul", "seoul_tower", 37.5030, 127.0400, 1.2, 15.0],      # Teheran-ro
+	["seoul", "seoul_tower", 37.5680, 126.9800, 0.7, 8.0],       # Jongno CBD
+	["dubai", "dubai_tower", 25.2100, 55.2750, 1.5, 20.0],       # Sheikh Zayed Road
+	["dubai", "dubai_tower", 25.1950, 55.2780, 1.0, 20.0],       # Downtown
+	["dubai", "dubai_tower", 25.1860, 55.2650, 1.0, 15.0],       # Business Bay
+	["dubai", "dubai_tower", 25.0800, 55.1400, 1.5, 20.0],       # Marina
+	["dubai", "dubai_heritage", 25.2635, 55.2995, 0.25, 40.0],   # Al Fahidi
+	["dubai", "dubai_heritage", 25.2680, 55.2900, 0.3, 30.0],    # Al Shindagha
+	["dubai", "dubai_villa", 25.2050, 55.2450, 2.0, 6.0],        # Jumeirah
+	["monaco", "monaco_old", 43.7311, 7.4197, 0.35, 40.0],       # Le Rocher
+	["monaco", "monaco_tower", 43.7280, 7.4150, 0.4, 10.0],      # Fontvieille
+	["monaco", "monaco_tower", 43.7460, 7.4330, 0.4, 8.0],       # Larvotto
+	["interlaken", "interlaken_hotel", 46.6860, 7.8560, 0.5, 12.0],  # Höheweg
+	["banff", "banff_heritage", 51.1640, -115.5617, 0.4, 20.0],  # Banff Springs
+	["copenhagen", "copenhagen_old", 55.6800, 12.5900, 0.35, 20.0],  # Nyhavn
+	["copenhagen", "copenhagen_modern", 55.6300, 12.5800, 1.2, 20.0],  # Ørestad
+	["oslo", "oslo_wood", 59.9200, 10.7470, 0.2, 30.0],          # Damstredet
+	["oslo", "oslo_modern", 59.9070, 10.7590, 0.5, 20.0],        # Bjørvika
+	["helsinki", "helsinki_empire", 60.1720, 24.9550, 0.5, 8.0],  # Kruununhaka
+	["helsinki", "helsinki_functional", 60.1800, 24.9200, 1.0, 3.0],  # Töölö
+	["helsinki", "helsinki_modern", 60.1870, 24.9770, 0.6, 20.0],  # Kalasatama
+	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
+	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
+	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands
+	["brussels", "brussels_old", 50.8467, 4.3525, 0.4, 15.0],    # Grand-Place
+	["brussels", "brussels_modern", 50.8400, 4.3800, 0.8, 15.0],  # European Quarter
+	["st_petersburg", "spb_imperial", 59.9390, 30.3158, 0.8, 8.0],  # Palace Square
+	["madrid", "madrid_austrias", 40.4140, -3.7100, 0.6, 15.0],  # Madrid de los Austrias
+	["madrid", "madrid_modern", 40.4500, -3.6930, 0.6, 15.0],    # AZCA
+	["madrid", "madrid_modern", 40.4770, -3.6880, 0.6, 20.0],    # Cuatro Torres
+	["lisbon", "lisbon_pombaline", 38.7110, -9.1370, 0.4, 30.0],  # Baixa
+	["lisbon", "lisbon_alfama", 38.7115, -9.1300, 0.4, 30.0],    # Alfama
+	["lisbon", "lisbon_modern", 38.7630, -9.0950, 1.0, 20.0],    # Parque das Nações
+	["milan", "milan_modern", 45.4840, 9.1900, 0.6, 20.0],       # Porta Nuova
+	["milan", "milan_modern", 45.4780, 9.1560, 0.5, 20.0],       # CityLife
+	["istanbul", "istanbul_pera", 41.0330, 28.9770, 1.0, 10.0],  # Beyoğlu
+	["istanbul", "istanbul_wood", 41.0300, 28.9490, 0.6, 15.0],  # Fener-Balat
+	["istanbul", "istanbul_tower", 41.0800, 29.0110, 1.2, 20.0],  # Levent
+	["athens", "athens_neoclassical", 37.9720, 23.7290, 0.4, 20.0],  # Plaka
+	["vienna", "vienna_baroque", 48.2085, 16.3731, 0.8, 4.0],    # Innere Stadt
+	["vienna", "vienna_modern", 48.2330, 16.4130, 0.6, 20.0],    # Donau City
+	["prague", "prague_old", 50.0875, 14.4213, 0.6, 8.0],        # Staré Město
+	["prague", "prague_old", 50.0880, 14.4040, 0.5, 8.0],        # Malá Strana
+	["budapest", "budapest_castle", 47.5000, 19.0340, 0.5, 20.0],  # Castle District
+	["munich", "munich_altstadt", 48.1374, 11.5755, 0.7, 4.0],   # Altstadt
+	["kyoto", "kyoto_machiya", 35.0037, 135.7788, 0.5, 30.0],    # Gion
+	["kyoto", "kyoto_machiya", 34.9980, 135.7810, 0.6, 20.0],    # Higashiyama
+	["kyoto", "kyoto_machiya", 35.0300, 135.7450, 0.8, 8.0],     # Nishijin
+	["shanghai", "shanghai_bund", 31.2400, 121.4900, 0.5, 30.0],  # the Bund
+	["shanghai", "shanghai_tower", 31.2390, 121.5050, 1.5, 30.0],  # Lujiazui
+	["shanghai", "shanghai_shikumen", 31.2200, 121.4700, 1.0, 8.0],  # Xintiandi, Tianzifang
+	["beijing", "beijing_hutong", 39.9370, 116.4030, 1.0, 25.0],  # Nanluoguxiang
+	["beijing", "beijing_hutong", 39.9400, 116.3850, 0.8, 20.0],  # Shichahai
+	["beijing", "beijing_hutong", 39.8960, 116.3980, 0.6, 15.0],  # Qianmen
+	["beijing", "beijing_tower", 39.9100, 116.4580, 1.2, 25.0],  # CBD
+	["bangkok", "bangkok_tower", 13.7240, 100.5290, 1.2, 20.0],  # Silom, Sathorn
+	["bangkok", "bangkok_tower", 13.7380, 100.5600, 1.5, 10.0],  # Sukhumvit
+	["bangkok", "bangkok_shophouse", 13.7400, 100.5080, 1.0, 10.0],  # Chinatown
+	["mumbai", "mumbai_gothic", 18.9320, 72.8340, 1.0, 20.0],    # Fort
+	["mumbai", "mumbai_deco", 18.9400, 72.8240, 0.8, 20.0],      # Marine Drive, the Oval
+	["mumbai", "mumbai_tower", 19.0000, 72.8300, 1.2, 15.0],     # Lower Parel
+	["cairo", "cairo_khedival", 30.0480, 31.2420, 1.0, 20.0],    # Downtown
+	["cairo", "cairo_islamic", 30.0500, 31.2620, 0.6, 25.0],     # al-Muizz
+	["cape_town", "cape_town_bokaap", -33.9210, 18.4150, 0.4, 40.0],  # Bo-Kaap
+	["cape_town", "cape_town_modern", -33.9180, 18.4250, 0.8, 10.0],  # CBD, Foreshore
+	["toronto", "toronto_tower", 43.6480, -79.3810, 1.2, 20.0],  # Financial District
+	["montreal", "montreal_old", 45.5050, -73.5550, 0.6, 15.0],  # Vieux-Montréal
+	["montreal", "montreal_tower", 45.5017, -73.5673, 0.8, 10.0],  # Downtown
+	["boston", "boston_backbay", 42.3503, -71.0810, 0.8, 15.0],  # Back Bay
+	["boston", "boston_backbay", 42.3588, -71.0707, 0.5, 15.0],  # Beacon Hill
+	["boston", "boston_tower", 42.3550, -71.0550, 0.6, 15.0],    # Financial District
+	["washington", "washington_federal", 38.8940, -77.0300, 1.2, 15.0],  # Federal Triangle, the Mall
+	["los_angeles", "la_tower", 34.0505, -118.2550, 1.2, 20.0],  # Downtown
+	["los_angeles", "la_spanish", 34.1100, -118.2900, 2.0, 4.0],  # Los Feliz, Silver Lake
+	["mexico_city", "cdmx_colonial", 19.4326, -99.1332, 1.0, 15.0],  # Centro Histórico
+	["mexico_city", "cdmx_modern", 19.4270, -99.1680, 1.0, 10.0],  # Reforma
+	["rio", "rio_colonial", -22.9068, -43.1729, 1.0, 10.0],      # Centro
+	["buenos_aires", "ba_tower", -34.6110, -58.3630, 0.8, 20.0],  # Puerto Madero
+	["buenos_aires", "ba_chorizo", -34.6210, -58.3730, 0.7, 8.0],  # San Telmo
+	["sydney", "sydney_tower", -33.8650, 151.2094, 1.0, 20.0],   # the CBD
+	["sydney", "sydney_terrace", -33.8850, 151.2280, 1.0, 15.0],  # Paddington
+	["sydney", "sydney_terrace", -33.8860, 151.2110, 0.7, 10.0],  # Surry Hills
+	["melbourne", "melbourne_tower", -37.8136, 144.9631, 1.0, 20.0],  # the CBD
+	["melbourne", "melbourne_terrace", -37.7990, 144.9780, 1.0, 15.0],  # Fitzroy, Carlton
 ]
 
 ## The zone row containing (lat, lon), or [] outside every city.

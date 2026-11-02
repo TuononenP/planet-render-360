@@ -30,10 +30,13 @@ extends RefCounted
 ##         [[gable, w], ...], picked per building), altana (0..1 odds of
 ##         a timber roof terrace), chimney_cap "bell" (flared Venetian stack)
 
-## Ordered first-match boxes [region, south, west, north, east]. Coarse by
-## design — borders are approximate, and neighbouring regions share most
-## traits — but specific/small areas come before the large ones that
-## contain them. tests/architecture_test.gd pins ~45 cities.
+## Ordered first-match boxes [region, south, west, north, east, (ISO codes)].
+## Coarse by design — borders are approximate, and neighbouring regions
+## share most traits — but specific/small areas come before the large ones
+## that contain them. tests/architecture_test.gd pins ~45 cities. When the
+## map data names the country (LocationData.country), a box with ISO codes
+## applies only to those countries, and one without only where its region
+## is among the country's COUNTRY_REGIONS: Kehl reads German, not French.
 const BOXES := [
 	["haussmann", 48.80, 2.22, 48.91, 2.47],           # Paris core
 	["southeast_asia", 1.15, 103.55, 1.50, 104.15],    # Singapore
@@ -44,26 +47,27 @@ const BOXES := [
 	["middle_east", 30.00, 7.50, 37.50, 11.60],        # Tunisia
 	["eastern_europe", 59.50, 28.60, 60.60, 31.00],    # St Petersburg
 	["eastern_europe", 53.90, 20.90, 59.70, 28.30],    # Baltics
-	["alpine", 45.80, 5.95, 47.85, 10.50],             # Switzerland
-	["alpine", 46.40, 9.50, 47.70, 13.80],             # Tyrol / Salzburg / Bavarian Alps
-	["alpine", 44.80, 5.90, 46.40, 7.70],              # French Alps
-	["west_europe_brick", 49.80, -10.70, 60.90, 1.80], # Ireland + UK
-	["west_europe_brick", 49.50, 2.50, 53.60, 7.25],   # Belgium + Netherlands
-	["west_europe_brick", 54.50, 8.00, 57.80, 15.20],  # Denmark
+	["alpine", 45.80, 5.95, 47.85, 10.50, "CH LI"],    # Switzerland
+	["alpine", 46.40, 9.50, 47.70, 13.80, "AT DE IT LI CH"], # Tyrol / Salzburg / Bavarian Alps
+	["alpine", 44.80, 5.90, 46.40, 7.70, "FR"],        # French Alps
+	["mediterranean", 41.30, 2.90, 44.20, 9.70, "FR MC"], # Provence, Riviera, Corsica
+	["west_europe_brick", 49.80, -10.70, 60.90, 1.80, "GB IE IM JE GG"], # Ireland + UK
+	["west_europe_brick", 49.50, 2.50, 53.60, 7.25, "BE NL LU FR"], # Belgium + Netherlands + French Flanders
+	["west_europe_brick", 54.50, 8.00, 57.80, 15.20, "DK DE SE"], # Denmark, Schleswig, Skåne
 	["nordic", 63.20, -24.60, 66.60, -13.40],          # Iceland
 	["nordic", 59.70, 20.50, 70.20, 29.80],            # Finland
 	["nordic", 55.30, 10.90, 69.10, 24.20],            # Sweden
 	["nordic", 57.90, 4.50, 71.20, 31.20],             # Norway
-	["mediterranean", 36.80, -9.60, 42.20, -6.10],     # Portugal
-	["mediterranean", 36.00, -9.40, 43.90, -1.00],     # Spain west/south
-	["mediterranean", 38.00, -1.00, 43.90, 4.40],      # Spain east + Balearics
-	["mediterranean", 36.60, 6.60, 47.10, 18.60],      # Italy
+	["mediterranean", 36.80, -9.60, 42.20, -6.10, "PT ES"], # Portugal
+	["mediterranean", 36.00, -9.40, 43.90, -1.00, "ES GI PT"], # Spain west/south
+	["mediterranean", 38.00, -1.00, 43.90, 4.40, "ES AD"], # Spain east + Balearics
+	["mediterranean", 36.60, 6.60, 47.10, 18.60, "IT SM VA"], # Italy
 	["france", 41.30, -5.20, 51.20, 9.70],             # France
 	["central_europe", 47.20, 5.80, 55.10, 15.10],     # Germany
 	["central_europe", 45.40, 9.50, 51.10, 22.90],     # Austria, Czechia, Slovakia, Hungary, Slovenia
 	["central_europe", 49.00, 14.10, 54.90, 24.20],    # Poland
-	["mediterranean", 41.80, 13.40, 45.40, 19.60],     # Dalmatian coast
-	["mediterranean", 34.80, 19.30, 41.80, 26.30],     # Greece
+	["mediterranean", 41.80, 13.40, 45.40, 19.60, "HR ME AL"], # Dalmatian coast
+	["mediterranean", 34.80, 19.30, 41.80, 26.30, "GR AL"], # Greece
 	["mediterranean", 35.80, 26.90, 36.80, 28.40],     # Dodecanese
 	["middle_east", 38.80, 40.00, 43.60, 50.40],       # Caucasus
 	["eastern_europe", 41.20, 19.00, 52.50, 41.00],    # Balkans, Romania, Ukraine, Belarus
@@ -102,6 +106,40 @@ const BOXES := [
 	["latin_america", -56.00, -118.50, 32.80, -34.00],
 ]
 
+## Country -> style regions [regions, ISO 3166-1 alpha-2 codes]: the first
+## region is the country's own (used when no box matches), the rest are
+## the boxes it may also fall in (a Croatian point may read Dalmatian or
+## Habsburg). Countries left out keep the plain box lookup.
+const COUNTRIES := [
+	["west_europe_brick", "GB IE IM JE GG NL BE LU DK"],
+	["france haussmann", "FR"],
+	["central_europe", "DE AT CZ SK HU PL SI"],
+	["mediterranean central_europe", "HR"],
+	["alpine", "CH LI"],
+	["nordic", "SE NO FI IS FO GL AX SJ"],
+	["mediterranean", "ES PT IT MT CY GR SM VA GI AL ME MC AD"],
+	["eastern_europe central_europe", "UA RO RS"],
+	["eastern_europe", "RU BY MD BG BA MK XK EE LV LT KZ UZ TM KG TJ"],
+	["middle_east", "TR GE AM AZ EG LY TN DZ MA EH SY LB IL PS JO IQ SA YE OM AE QA BH KW IR AF"],
+	["sub_saharan_africa", "NG GH KE ZA TZ UG ET ER DJ SO SN CI CM AO MZ ZW ZM BW NA MW RW BI CD CG GA GQ BJ TG BF GN SL LR GM GW MG LS SZ CF SS"],
+	["south_asia", "IN PK BD NP LK BT MV"],
+	["east_asia", "CN TW HK MO KR KP MN"],
+	["japan", "JP"],
+	["southeast_asia", "TH VN LA KH MM MY SG ID PH BN TL"],
+	["australia", "AU NZ"],
+	["north_america mountain_lodge", "US CA"],
+	["latin_america", "MX GT BZ SV HN NI CR PA CU JM HT DO PR BS TT BB CO VE EC PE BO CL AR UY PY BR GY SR"],
+]
+static var COUNTRY_REGIONS: Dictionary = _country_regions()
+
+static func _country_regions() -> Dictionary:
+	var out := {}
+	for row in COUNTRIES:
+		var regions := str((row as Array)[0]).split(" ")
+		for iso in str((row as Array)[1]).split(" "):
+			out[iso] = regions
+	return out
+
 ## Regions that inherit unlisted kinds from another before GENERIC.
 ## City and era rows add their own links (ArchitectureParis / Cities*),
 ## merged into BASE below.
@@ -112,7 +150,9 @@ const COUNTRY_BASE := {
 }
 static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, ArchitectureParis.BASE,
 	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
-	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE])
+	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesNorth.BASE,
+	ArchitectureCitiesSouth.BASE, ArchitectureCitiesCentral.BASE, ArchitectureCitiesWorld.BASE,
+	ArchitectureCitiesNewWorld.BASE])
 
 ## OSM `building=*` values that name a kind outright. `yes`, `residential`
 ## and friends are decided by levels / footprint / density instead.
@@ -176,6 +216,10 @@ const INFILL_MIX := {
 	"tokyo": {"house": 38, "apartments": 36, "commercial": 18, "industrial": 2, "outbuilding": 6},
 	"hong_kong": {"apartments": 74, "commercial": 18, "civic": 4, "outbuilding": 4},
 	"singapore": {"apartments": 66, "commercial": 20, "civic": 6, "house": 4, "outbuilding": 4},
+	"seoul": {"apartments": 58, "commercial": 20, "house": 12, "civic": 4, "outbuilding": 6},
+	"dubai": {"apartments": 52, "commercial": 20, "house": 16, "civic": 4, "outbuilding": 8},
+	"monaco": {"apartments": 78, "commercial": 14, "civic": 4, "house": 2, "outbuilding": 2},
+	"interlaken": {"house": 50, "apartments": 22, "commercial": 14, "civic": 4, "outbuilding": 10},
 	"eastern_europe": {"apartments": 48, "house": 28, "commercial": 6, "industrial": 6, "civic": 4, "outbuilding": 8},
 	"east_asia": {"apartments": 62, "commercial": 14, "house": 12, "civic": 4, "industrial": 4, "outbuilding": 4},
 	"japan": {"house": 46, "apartments": 30, "commercial": 12, "industrial": 4, "outbuilding": 8},
@@ -257,7 +301,9 @@ const GENERIC := {
 static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, ArchitectureMountain.REGIONS,
 	ArchitectureParis.REGIONS, ArchitectureCitiesEurope.REGIONS,
 	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
-	ArchitectureCitiesAsia.REGIONS])
+	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesSouth.REGIONS,
+	ArchitectureCitiesCentral.REGIONS, ArchitectureCitiesWorld.REGIONS,
+	ArchitectureCitiesNewWorld.REGIONS])
 
 static func _merged(tables: Array) -> Dictionary:
 	var out := {}

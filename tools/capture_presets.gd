@@ -3,7 +3,8 @@ extends SceneTree
 ## Capture-and-compare run over the golden set (realism v3, R-1.1).
 ## Windowed, off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
-##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night]
+##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late]
+##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -15,6 +16,7 @@ extends SceneTree
 ##   <id>_h000/090/180/270.jpg   N, E, S, W at golden hour
 ##   <id>_close1/2.jpg           narrow-FOV close-ups of the opening look
 ##   <id>_vantage_noon/night.jpg same opening look at noon and at night
+##   <id>_vantage_late.jpg       two hours after sunset (--times=late)
 ##   <id>_sheet.jpg              render beside the first reference photo
 ##   stats.json                  luma, saturation, colourfulness per frame
 ##                               and band, flagged against the references
@@ -113,7 +115,7 @@ func _run() -> void:
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
 	for place in _places(str(a["places"])):
-		await _capture(main, view, place, times, a.has("audit"))
+		await _capture(main, view, place, times, a.has("audit"), float(a.get("settle", SETTLE_S)))
 	_write_stats()
 	if a.has("audit"):
 		_write_json("audit.json", _audit)
@@ -122,7 +124,7 @@ func _run() -> void:
 	quit(0)
 
 func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringArray,
-		audit: bool) -> void:
+		audit: bool, settle_s: float = SETTLE_S) -> void:
 	var id := str(place["id"])
 	main._picker.selected_name = str(place["name"])
 	_weather_in = false
@@ -144,7 +146,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	ViewConditions._apply_precip(view, 0)
 	ViewConditions.apply_surface_state(view)
 	ViewConditions.spawn_golden_hour(view)
-	await create_timer(SETTLE_S).timeout
+	await create_timer(settle_s).timeout
 	var rig := view._rig
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
@@ -179,6 +181,12 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		ViewConditions.jump_to(view, "moon")
 		await create_timer(1.0).timeout
 		await _snap(view, id, "vantage_night")
+	if times.has("late"):
+		# Two hours after sunset: full dark, homes still lit (the moon jump
+		# can land in a bright moonlit sky with the windows barely on).
+		ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
+		await create_timer(1.0).timeout
+		await _snap(view, id, "vantage_late")
 	_contact_sheet(id)
 
 ## The 3D view only: the SubViewport's own texture carries no HUD.

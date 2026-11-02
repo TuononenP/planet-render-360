@@ -67,6 +67,8 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	if abort != null and abort.requested:
 		return root
 	FarCityBuilder.build(root, data, ground, smap)
+	if FacadeShader.enabled(data.quality_preset):
+		FacadeShader.upgrade(root)
 	FacadeTextures.end_build()
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
 	return root
@@ -358,8 +360,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	for h in holes:
 		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null else []
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true)
+	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
-		centre.length() / WorldScale.metres_to_units()), cap, party)
+		centre.length() / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
 	if shape != "flat" and roof_h_world > 0.01:
@@ -381,7 +384,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		shape = "flat"
 		roof_h_world = 0.0
 	if not distant and _batch == null and not look.is_empty() \
-			and centre.length() < FacadeRelief.RADIUS_M * WorldScale.metres_to_units():
+			and centre.length() < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(ground.height_at_world(centre.x, centre.y)
 			+ float(look["floor_h"]) * WorldScale.metres_to_units()
 			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
@@ -394,7 +397,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,
-			look, facade, roof_mat, seed_v, centre.length() < BuildingDetail.NEAR_RADIUS,
+			look, facade, roof_mat, seed_v, centre.length() < BuildingDetail.near_radius(preset),
 			party, gable_front)
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church
 		# towers are skyline and stay in every ring.

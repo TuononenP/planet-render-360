@@ -6,7 +6,7 @@ extends RefCounted
 ## Pure functions over building dicts and a height-context dict.
 static func _legacy_region(data: LocationData) -> String:
 	if data != null and ArchitectureStyle.region_for(
-			data.latitude, data.longitude) == "haussmann":
+			data.latitude, data.longitude, data.country) == "haussmann":
 		return "haussmann"
 	return "urban"
 
@@ -50,7 +50,7 @@ static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
 ## zone it also carries CityStyles.local_frame: "city", "cores" and
 ## "districts" in the build's local metre frame (viewpoint at origin).
 static func _height_context(data: LocationData) -> Dictionary:
-	var region := ArchitectureStyle.region_for(data.latitude, data.longitude)
+	var region := ArchitectureStyle.region_for(data.latitude, data.longitude, data.country)
 	var density := _density(data)
 	var m2u := WorldScale.metres_to_units()
 	var cell := 150.0 * m2u

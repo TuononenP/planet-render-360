@@ -18,7 +18,10 @@ const PATH := "user://settings.json"
 ## level (FIDELITY) and §3.1 generation budget in the settings copy.
 ## Every tier is the same place, layout and hues (AC-12): tiers change
 ## LOD/texture/shadow cost and wait time, never which real buildings
-## exist (past a cap they become impostors).
+## exist (past a cap they become impostors). Desktop Ultra
+## (RenderQuality.ultra_desktop) may add decorative extras on top —
+## shader facades, relief / trim / roof detail out to its 700 m ring —
+## but never moves a real building, road or landmark.
 const PRESET_NAMES: Array[String] = ["Fast", "Balanced", "High", "Ultra"]
 ## PRD fidelity level per preset (docs/fidelity-scorecard.md §2).
 const FIDELITY: Array[int] = [1, 2, 2, 3]

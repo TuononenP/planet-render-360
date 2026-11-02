@@ -17,6 +17,9 @@ extends RefCounted
 var place_name: String = "Unknown place"
 var latitude: float = 0.0
 var longitude: float = 0.0
+## ISO 3166-1 alpha-2 country from the map data ("" unknown): picks the
+## building style region before the coarse lat/lon boxes.
+var country: String = ""
 
 ## RenderSettings.Preset value (0 Fast, 1 Balanced, 2 High) chosen for
 ## this render; TerrainBuilder reads its budgets from it.

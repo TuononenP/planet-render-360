@@ -112,6 +112,10 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_TREE_NODES],
 		'node["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out 100;'
 			% [radius_m, lat, lon],
+		# The country the viewpoint stands in (ISO 3166-1 alpha-2), so the
+		# building style follows the real border, not a lat/lon box.
+		'is_in(%.6f,%.6f)->.ci;area.ci["admin_level"="2"]["ISO3166-1"];out tags 4;'
+			% [lat, lon],
 	]
 	return head + "".join(PackedStringArray(clauses))
 

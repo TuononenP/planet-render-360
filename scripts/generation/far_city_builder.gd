@@ -88,7 +88,7 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	if _far_ok:
 		_surf = FarTerrainBuilder._surface(d)
 	_sea = not is_equal_approx(g.water_level_m, -3.0)
-	_region = ArchitectureStyle.region_for(d.latitude, d.longitude)
+	_region = ArchitectureStyle.region_for(d.latitude, d.longitude, d.country)
 	var fidelity := MaterialLibrary.fidelity_for_preset(d.quality_preset)
 	_dfs = FacadeMaterials.distant_facades(fidelity, _region)
 	_drs = FacadeMaterials.distant_roofs(_region, fidelity)

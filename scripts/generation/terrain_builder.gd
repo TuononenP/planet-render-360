@@ -197,7 +197,7 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 		var node := LandmarkBuilder.build_archetype(
 			str(c.get("archetype", "tower")), float(c.get("height", 30.0)),
 			Vector2(float(c.get("size_x", 12.0)), float(c.get("size_z", 12.0))),
-			ArchitectureStyle.region_for(data.latitude, data.longitude))
+			ArchitectureStyle.region_for(data.latitude, data.longitude, data.country))
 		node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
 			float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
 		node.rotation.y = float(c.get("yaw", 0.0))

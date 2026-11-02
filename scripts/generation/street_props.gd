@@ -50,7 +50,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		return 0
 	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
-	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude)
+	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
 	var lantern_region := region in LANTERN_REGIONS
 	var placed := {"lantern": [], "modern": [], "modern_s": []}
 	var occupied := {}
@@ -108,6 +108,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				(placed[style] as Array).append(Transform3D(basis,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
 			carry = t - seg
+	if RenderQuality.ultra_desktop(int(ctx["preset"])):
+		StreetLights.add(root, placed, region, m2u)
 	var total := 0
 	for style in placed:
 		var xf: Array = placed[style]
@@ -167,7 +169,7 @@ static func _lamp_mesh(style: String) -> ArrayMesh:
 	gm.albedo_color = glass_col
 	gm.emission_enabled = true
 	gm.emission = glass_col
-	gm.emission_energy_multiplier = 1.4
+	CityLights.mark_glow(gm, 0.55)  # lit from dusk, dark by day
 	gm.roughness = 0.15
 	m.surface_set_material(1, gm)
 	_lamp_meshes[style] = m

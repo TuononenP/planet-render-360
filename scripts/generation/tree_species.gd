@@ -102,7 +102,7 @@ static func tint(name: String, season: int) -> Color:
 ## and region agree it is temperate (alpine / east Asian mixes); the
 ## regional + latitude rule below otherwise.
 static func biome_for_data(data: LocationData) -> String:
-	var regional := biome_for(data.latitude, data.longitude, data.centre_elevation_m)
+	var regional := biome_for(data.latitude, data.longitude, data.centre_elevation_m, data.country)
 	var climatic := ClimateModel.biome(data)
 	if climatic == "":
 		return regional
@@ -115,8 +115,8 @@ static func biome_for_data(data: LocationData) -> String:
 		return "dry_coast"
 	return climatic
 
-static func biome_for(lat: float, lon: float, altitude_m: float) -> String:
-	var region := ArchitectureStyle.country_region_for(lat, lon)
+static func biome_for(lat: float, lon: float, altitude_m: float, country: String = "") -> String:
+	var region := ArchitectureStyle.country_region_for(lat, lon, country)
 	var alat := absf(lat)
 	if alat < 23.5 or (region == "southeast_asia" and alat < 18.0):
 		return "tropical"

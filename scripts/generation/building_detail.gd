@@ -14,8 +14,14 @@ extends RefCounted
 ## budget counts).
 
 ## Detail radius in internal units (~250 m): beyond it a chimney is a
-## sub-pixel speck. Towers of worship are exempt (skyline).
+## sub-pixel speck. Towers of worship are exempt (skyline). Desktop
+## Ultra's sharper frame keeps them to its 700 m detail ring.
 const NEAR_RADIUS := 250.0
+const ULTRA_NEAR_RADIUS := 700.0
+
+static func near_radius(preset: int) -> float:
+	return (ULTRA_NEAR_RADIUS if RenderQuality.ultra_desktop(preset) else NEAR_RADIUS) \
+		* WorldScale.metres_to_units()
 
 static var _unit_arrays: Dictionary = {}
 static var _mats: Dictionary = {}

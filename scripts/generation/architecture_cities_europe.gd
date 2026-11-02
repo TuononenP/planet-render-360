@@ -2,7 +2,8 @@ class_name ArchitectureCitiesEurope
 extends RefCounted
 
 ## European city rows (CityStyles zones) and their era rows
-## (BuildingEra): London, Amsterdam, Berlin, Barcelona, Rome. Each city
+## (BuildingEra): London, Amsterdam, Berlin, Barcelona, Rome, Monaco,
+## Interlaken. Each city
 ## row inherits from its country row; eras inherit from the city. Same
 ## key legend as ArchitectureData; `rv` = 3D relief (replaces parent's).
 
@@ -18,6 +19,14 @@ const BERLIN := ["#e8dcc0", "#e6d2b0", "#d9c9a8", "#e8c9a8", "#d8d0b8", "#c8c0a8
 const ROMAN := ["#d8a060", "#c8783c", "#b8603a", "#e0b070", "#d89058", "#c06a40", "#e8c088"]
 const SHOP_DARK := ["#1f2a3a", "#3a1c20", "#20302a", "#2a2a2a", "#5a1a1a"]
 const STRIPES := ["#1f3b2c", "#7a1f24", "#2a2f4a", "#c8a24a", "#e8e4da"]
+## Monaco Belle Époque pastels: salmon, ochre, cream, rose; louvred
+## shutters in green, grey-green and cream.
+const MONACO := ["#e8b89a", "#f0d0a8", "#e8c890", "#f2e2c8", "#e0a890", "#f0c8b0", "#e8d8b8", "#d8a878"]
+const MONACO_SHUTTERS := ["#4f6a4a", "#6a7a6a", "#8a9a7a", "#d8ccb0"]
+const RIVIERA := ["#f0eee8", "#e8e4dc", "#ece4d4", "#f2ebe0"]
+## Bernese Oberland chalets: aged spruce, dark brown to honey.
+const BERNESE := ["#5a3a24", "#6a4228", "#4e3420", "#7a5232", "#8a6040"]
+const ALPINE_SLATE := ["#55606a", "#4f5a5e", "#5a6670"]
 
 const BASE := {
 	"london": "west_europe_brick", "london_georgian": "london", "london_stucco": "london",
@@ -28,6 +37,8 @@ const BASE := {
 	"barcelona": "mediterranean", "barcelona_gothic": "barcelona",
 	"barcelona_modern": "barcelona",
 	"rome": "mediterranean", "rome_palazzina": "rome", "rome_modern": "rome",
+	"monaco": "mediterranean", "monaco_old": "monaco", "monaco_tower": "monaco",
+	"interlaken": "alpine", "interlaken_hotel": "interlaken", "interlaken_modern": "interlaken",
 }
 
 const REGIONS := {
@@ -314,5 +325,109 @@ const REGIONS := {
 			"st": [4, 10], "fix": true, "rv": {}},
 		"civic": {"w": [["limestone", ["#e8e0cc", "#ddd4bc"]]], "p": [["punched", 2], ["strip", 1]],
 			"r": [["flat", 1]], "rf": [["membrane", []]], "rv": {"string_course": true}},
+	},
+	# Monte-Carlo Belle Époque: 5–8 storeys of pastel stucco, tall French
+	# windows with louvred shutters and iron balconettes, hipped terracotta
+	# or slate mansards, cafe awnings below.
+	"monaco": {
+		"apartments": {"w": [["render", MONACO]], "p": [["punched", 3], ["ornate", 2]], "wn": "french",
+			"bay": 2.6, "fr": "#f4f0e6", "sh": MONACO_SHUTTERS, "sp": 0.85, "rl": 0.7,
+			"r": [["hipped", 3], ["mansard", 2], ["flat", 1]], "pitch": 0.6,
+			"rf": [["terracotta", ["#b5542f", "#c0643a", "#a8482a"]], ["slate", ["#55606a", "#5a6670"]]],
+			"fh": 3.3, "st": [5, 8], "fix": true, "ch": 0.2, "dm": 0.3, "eq": 0.3,
+			"g": [["shop", 2], ["stone", 1]], "gc": ["#2e3b34", "#4a1c22", "#283040", "#c8a24a"], "ev": 0.5,
+			"rv": {"balconette": 0.8, "string_course": true, "quoins": true, "awning": 0.35,
+				"awning_colours": ["#2a4a3a", "#8a2a1a", "#c8a24a", "#e8e4da"]}},
+		"commercial": {"w": [["render", MONACO], ["limestone", ["#f0e6d0", "#e8dcc4"]]],
+			"p": [["ornate", 2], ["punched", 2]], "wn": "french", "bay": 2.8, "fr": "#f4f0e6",
+			"sh": MONACO_SHUTTERS, "sp": 0.5, "rl": 0.6, "r": [["hipped", 2], ["mansard", 2]], "pitch": 0.7,
+			"rf": [["slate", ["#55606a", "#5a6670"]], ["terracotta", ["#b5542f"]]], "fh": 3.6, "st": [3, 7],
+			"fix": true, "eq": 0.3, "g": [["shop", 1]], "gc": ["#2e3b34", "#4a1c22", "#c8a24a"],
+			"rv": {"balconette": 0.7, "string_course": true, "awning": 0.5,
+				"awning_colours": ["#2a4a3a", "#8a2a1a", "#c8a24a", "#e8e4da"]}},
+	},
+	# Le Rocher: 3–5 storey Genoese houses, ochre and rose render, green
+	# shutters, terracotta, narrow lanes.
+	"monaco_old": {
+		"house": {"w": [["render", ["#e8c890", "#e0a890", "#d8a878", "#f0d0a8", "#e8b89a"]]],
+			"p": "punched", "wn": "casement", "bay": 2.4, "fr": "#efe6d2", "sh": "#4f6a4a", "sp": 0.9,
+			"r": [["hipped", 2], ["gabled", 2]], "pitch": 0.5,
+			"rf": [["terracotta", ["#b5542f", "#c0643a", "#a8482a"]]], "fh": 3.0, "st": [3, 5],
+			"fix": true, "ch": 0.2, "eq": 0.1, "ev": 0.3, "rv": {"balconette": 0.3}},
+		"apartments": {"w": [["render", ["#e8c890", "#e0a890", "#d8a878", "#f0d0a8"]]],
+			"p": "punched", "wn": "casement", "bay": 2.4, "fr": "#efe6d2", "sh": "#4f6a4a", "sp": 0.9,
+			"r": [["hipped", 2], ["gabled", 1]], "pitch": 0.5,
+			"rf": [["terracotta", ["#b5542f", "#c0643a"]]], "fh": 3.0, "st": [3, 5], "fix": true,
+			"g": [["shop", 1], ["none", 1]], "ev": 0.3, "rv": {"balconette": 0.3, "awning": 0.25,
+				"awning_colours": ["#2a4a3a", "#8a2a1a", "#c8a24a"]}},
+		"commercial": {"w": [["render", ["#e8c890", "#e0a890", "#f0d0a8"]]], "p": "punched",
+			"wn": "casement", "sh": "#4f6a4a", "sp": 0.8, "r": [["hipped", 1]], "pitch": 0.5,
+			"rf": [["terracotta", ["#b5542f"]]], "st": [2, 4], "fix": true, "g": [["shop", 1]],
+			"rv": {"awning": 0.4, "awning_colours": ["#2a4a3a", "#8a2a1a"]}},
+	},
+	# Riviera post-war towers (Larvotto, Fontvieille): white render with
+	# deep continuous terraces and tinted glass, 12–40 storeys.
+	"monaco_tower": {
+		"apartments": {"w": [["render", RIVIERA], ["concrete", ["#e8e4dc"]]],
+			"p": [["balcony", 4], ["strip", 1]], "wn": "wide", "bay": 3.2, "fr": "#8a8c8e", "sp": 0.0,
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.1, "st": [12, 35], "fix": true,
+			"ch": 0.0, "eq": 0.5, "g": [["shop", 1], ["none", 1]], "ev": 0.0, "rv": {"deep_balcony": 0.85}},
+		"commercial": {"w": [["glass", []], ["render", RIVIERA]], "p": [["curtain", 2], ["strip", 2]],
+			"bay": 3.2, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.8, "st": [6, 20],
+			"fix": true, "eq": 0.7, "g": [["shop", 1]], "rv": {}},
+		"civic": {"w": [["render", RIVIERA], ["glass", []]], "p": "strip", "r": [["flat", 1]],
+			"rf": [["membrane", []]], "st": [3, 8], "fix": true, "rv": {}},
+	},
+	# Bernese Oberland chalets: dark timber storeys over a white rendered
+	# base, half-hipped (Gerschild) roofs with wide carved eaves, balcony
+	# rails and shutters on small windows.
+	"interlaken": {
+		"house": {"w": [["wood", BERNESE]], "p": "clapboard", "bay": 2.4, "fr": "#efe6d2",
+			"sh": ["#3f5f3a", "#6a3a2a", "#2f4a3a"], "sp": 0.7, "wn": "small", "rl": 0.6,
+			"g": [["render", 1]], "r": [["half-hipped", 4], ["gabled", 2]], "pitch": 0.6,
+			"rf": [["slate", ["#6a5a4c", "#5e5046", "#4f4a46"]], ["wood", ["#5e4e3e", "#6e5a45"]],
+				["slate", ALPINE_SLATE]],
+			"fh": 2.8, "st": [2, 3], "fix": true, "ch": 0.5, "dm": 0.1, "ev": 1.4,
+			"rv": {"deep_balcony": 0.7}},
+		"apartments": {"w": [["wood", BERNESE], ["render", ["#f2ead8", "#efe3c8", "#f4efe4"]]],
+			"p": [["clapboard", 2], ["punched", 2], ["balcony", 1]], "bay": 2.6, "fr": "#efe6d2",
+			"sh": ["#3f5f3a", "#6a3a2a"], "sp": 0.6, "wn": "small", "rl": 0.5, "g": [["render", 2], ["shop", 1]],
+			"r": [["half-hipped", 3], ["gabled", 2]], "pitch": 0.6,
+			"rf": [["slate", ["#6a5a4c", "#5e5046"]], ["slate", ALPINE_SLATE]],
+			"fh": 2.9, "st": [3, 4], "fix": true, "ch": 0.4, "dm": 0.3, "ev": 1.2,
+			"rv": {"deep_balcony": 0.6}},
+		"commercial": {"w": [["wood", BERNESE], ["render", ["#f2ead8", "#efe3c8"]]], "p": [["punched", 2], ["clapboard", 1]],
+			"bay": 2.6, "fr": "#efe6d2", "sh": "#3f5f3a", "sp": 0.5, "wn": "small", "rl": 0.4,
+			"r": [["half-hipped", 2], ["gabled", 2]], "pitch": 0.6, "rf": [["slate", ["#6a5a4c", "#5e5046"]]],
+			"fh": 3.0, "st": [2, 4], "fix": true, "g": [["shop", 1]], "ev": 1.0,
+			"rv": {"deep_balcony": 0.4, "awning": 0.3, "awning_colours": ["#7a1f24", "#1f3b2c", "#e8e4da"]}},
+	},
+	# Höheweg grand hotels (Victoria-Jungfrau, Metropole's neighbours):
+	# cream render, French windows with balconettes, slate mansards and
+	# hipped roofs with corner turrets.
+	"interlaken_hotel": {
+		"commercial": {"w": [["render", ["#f4ead2", "#efe0c0", "#f2e6d6", "#e8d8b8"]]],
+			"p": [["ornate", 2], ["punched", 2]], "bay": 2.8, "fr": "#f4f0e6", "wn": "french", "rl": 0.8,
+			"sh": "#5b6b4f", "sp": 0.2, "r": [["mansard", 3], ["hipped", 2]], "pitch": 1.0,
+			"rf": [["slate", ALPINE_SLATE]], "fh": 3.5, "st": [4, 6], "fix": true, "ch": 0.4, "dm": 0.7,
+			"eq": 0.1, "g": [["stone", 1], ["shop", 1]], "ev": 0.6,
+			"rv": {"balconette": 0.9, "string_course": true, "quoins": true, "awning": 0.3,
+				"awning_colours": ["#7a1f24", "#1f3b2c", "#e8e4da"]}},
+		"apartments": {"w": [["render", ["#f4ead2", "#efe0c0", "#f2e6d6"]]], "p": "punched", "bay": 2.8,
+			"fr": "#f4f0e6", "wn": "french", "rl": 0.7, "sh": "#5b6b4f", "sp": 0.3,
+			"r": [["mansard", 2], ["hipped", 2]], "pitch": 1.0, "rf": [["slate", ALPINE_SLATE]],
+			"fh": 3.4, "st": [4, 5], "fix": true, "dm": 0.6, "ev": 0.6,
+			"rv": {"balconette": 0.8, "string_course": true}},
+	},
+	"interlaken_modern": {
+		"apartments": {"w": [["render", ["#f2ead8", "#e8e4dc", "#ece4d4"]]], "p": [["balcony", 3], ["punched", 1]],
+			"wn": "wide", "bay": 3.0, "sp": 0.2, "r": [["gabled", 2], ["flat", 2]], "pitch": 0.4,
+			"rf": [["slate", ALPINE_SLATE], ["membrane", []]], "st": [4, 7], "fix": true, "ev": 0.9,
+			"rv": {"deep_balcony": 0.6}},
+		"commercial": {"w": [["render", ["#f2ead8", "#e8e4dc"]], ["glass", []]], "p": [["strip", 2], ["punched", 1]],
+			"r": [["flat", 2], ["gabled", 1]], "pitch": 0.4, "rf": [["membrane", []], ["slate", ALPINE_SLATE]],
+			"st": [2, 5], "fix": true, "g": [["shop", 1]], "rv": {}},
+		"civic": {"w": [["render", ["#f2ead8", "#e8e4dc"]]], "p": "strip", "r": [["flat", 1], ["gabled", 1]],
+			"pitch": 0.4, "rf": [["membrane", []], ["slate", ALPINE_SLATE]], "st": [2, 4], "rv": {}},
 	},
 }

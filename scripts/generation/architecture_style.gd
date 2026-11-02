@@ -30,24 +30,34 @@ static var _profile_cache: Dictionary = {}
 static var _mutex := Mutex.new()
 
 ## Style region for a viewpoint: a city zone (CityStyles: London,
-## Manhattan, Tokyo ... -> that city's row), else the first matching
-## coarse country box, else "generic" (the temperate-mixed GENERIC
-## profile).
-static func region_for(lat: float, lon: float) -> String:
+## Manhattan, Tokyo ... -> that city's row), else the country region
+## (country_region_for), else "generic" (the temperate-mixed GENERIC
+## profile). `country` is LocationData.country ("" unknown).
+static func region_for(lat: float, lon: float, country: String = "") -> String:
 	var city := CityStyles.region_at(lat, lon)
 	if city != "":
 		return city
-	return country_region_for(lat, lon)
+	return country_region_for(lat, lon, country)
 
-## The coarse country box region alone (no city zones): for callers that
-## key off the broad climate/culture region (vegetation, street lamps).
-static func country_region_for(lat: float, lon: float) -> String:
+## The country region alone (no city zones): for callers that key off the
+## broad climate/culture region (vegetation, street lamps). The first
+## matching box that suits the ISO `country` (ArchitectureData.BOXES), else
+## that country's own region; with no known country, the first box.
+static func country_region_for(lat: float, lon: float, country: String = "") -> String:
+	var iso := country.to_upper()
+	var allowed: PackedStringArray = ArchitectureData.COUNTRY_REGIONS.get(iso, PackedStringArray())
 	for box in ArchitectureData.BOXES:
 		var b: Array = box
-		if lat >= float(b[1]) and lat <= float(b[3]) \
-				and lon >= float(b[2]) and lon <= float(b[4]):
-			return str(b[0])
-	return "generic"
+		if lat < float(b[1]) or lat > float(b[3]) or lon < float(b[2]) or lon > float(b[4]):
+			continue
+		if not allowed.is_empty():
+			if b.size() > 5:
+				if not str(b[5]).split(" ").has(iso):
+					continue
+			elif not allowed.has(str(b[0])):
+				continue
+		return str(b[0])
+	return allowed[0] if not allowed.is_empty() else "generic"
 
 static func has_region(region: String) -> bool:
 	return region == "generic" or ArchitectureData.REGIONS.has(region)

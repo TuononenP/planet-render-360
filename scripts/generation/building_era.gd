@@ -33,10 +33,13 @@ const MODERN := ["modern", "modernism", "modernist", "brutalist", "brutalism",
 const OUT_OF_BAND := 0.12
 
 ## Per city: [era key, kinds, year from, year to, building:architecture
-## values, weight, distance band from km, to km]. The city's own region
-## (its signature fabric) is listed like any era. Kinds no era lists
-## (industrial, religious, farm, outbuilding) keep the city row.
-const ERAS := {
+## values, weight, distance band from km, to km, (storey band [min, max]),
+## (heritage era)]. The city's own region (its signature fabric) is listed
+## like any era. Kinds no era lists (industrial, religious, farm,
+## outbuilding) keep the city row. The two optional columns stand in for a
+## city's own structural rules (see _banded); city files add their cities'
+## rows through ERAS below.
+const CITY_ERAS := {
 	"paris": [
 		["haussmann", ACC, 1850, 1914, ["haussmann", "haussmannian", "haussmannien",
 			"second_empire", "napoleon_iii", "neoclassicism", "neoclassical"], 6.0, 0.0, 6.0],
@@ -143,7 +146,46 @@ const ERAS := {
 			"art_deco", "colonial"], 1.5, 0.0, 99.0],
 		["sg_tower", ACC, 1980, 2100, MODERN + ["condominium"], 1.0, 0.0, 99.0],
 	],
+	"seoul": [
+		["seoul", APT, 1975, 2100, ["apartment_complex", "danji"], 5.0, 0.0, 99.0],
+		["seoul_villa", HAC, 1970, 2005, ["villa", "dagagu", "dasedae", "multiplex"], 3.0, 0.0, 99.0],
+		["seoul_hanok", ["house", "commercial"], 1300, 1960, ["hanok", "traditional", "joseon",
+			"korean_traditional"], 0.25, 0.0, 99.0],
+		["seoul_tower", ACC, 1985, 2100, MODERN, 1.0, 0.0, 99.0],
+	],
+	"dubai": [
+		["dubai", AC, 1975, 2100, [], 5.0, 0.0, 99.0],
+		["dubai_tower", ACC, 1995, 2100, MODERN, 2.0, 0.0, 99.0],
+		["dubai_heritage", ["house", "commercial"], 1800, 1969, ["traditional", "vernacular",
+			"emirati", "gulf_vernacular", "islamic"], 0.4, 0.0, 99.0],
+		["dubai_villa", ["house"], 1970, 2100, ["villa"], 4.0, 0.0, 99.0],
+	],
+	"monaco": [
+		["monaco", AC, 1860, 1945, ["belle_epoque", "art_nouveau", "neoclassicism",
+			"eclectic", "art_deco", "historicism"], 5.0, 0.0, 99.0],
+		["monaco_old", HAC, 1200, 1859, ["genoese", "baroque", "vernacular", "medieval",
+			"renaissance"], 0.4, 0.0, 99.0],
+		["monaco_tower", ACC, 1960, 2100, MODERN, 2.5, 0.0, 99.0],
+	],
+	"interlaken": [
+		["interlaken", HAC, 1500, 2100, ["chalet", "swiss_chalet", "heimatstil", "vernacular"],
+			5.0, 0.0, 99.0],
+		["interlaken_hotel", ["commercial", "apartments"], 1860, 1930, ["belle_epoque",
+			"historicism", "neo-baroque", "neoclassicism", "grand_hotel"], 1.0, 0.0, 1.5],
+		["interlaken_modern", ACC, 1955, 2100, MODERN, 1.0, 0.0, 99.0],
+	],
+	"banff": [
+		["banff", AC, 1950, 2100, ["rustic", "mountain_rustic", "national_park_rustic"],
+			5.0, 0.0, 99.0],
+		["banff_heritage", ["commercial", "civic", "apartments"], 1885, 1949, ["scottish_baronial",
+			"chateau", "chateauesque", "tudor_revival", "arts_and_crafts"], 0.6, 0.0, 99.0],
+		["banff_house", ["house"], 1900, 2100, ["cottage", "bungalow", "craftsman"], 3.0, 0.0, 99.0],
+	],
 }
+
+static var ERAS: Dictionary = ArchitectureData._merged([CITY_ERAS, ArchitectureCitiesNorth.ERAS,
+	ArchitectureCitiesSouth.ERAS, ArchitectureCitiesCentral.ERAS, ArchitectureCitiesWorld.ERAS,
+	ArchitectureCitiesNewWorld.ERAS])
 
 ## Sub-region key for one building (see the class doc). `ctx` is the
 ## build context (BuildingHeights._height_context): its `cores` give the
@@ -346,4 +388,65 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 				return "sg_tower"
 			if lv >= 5:
 				return "singapore"
+		"seoul":
+			if lv >= 20 or (kind != "apartments" and lv >= 10):
+				return "seoul_tower"
+			if kind == "house" and old:
+				return "seoul_hanok"
+			if kind == "apartments" and lv >= 10:
+				return "seoul"
+			if lv >= 2 and lv <= 6:
+				return "seoul_villa"
+		"dubai":
+			if lv >= 20 or (kind == "commercial" and lv >= 12):
+				return "dubai_tower"
+			if kind == "house":
+				return "dubai_heritage" if old else "dubai_villa"
+			if old and lv <= 3:
+				return "dubai_heritage"
+			if lv >= 4:
+				return "dubai"
+		"monaco":
+			if lv >= 10:
+				return "monaco_tower"
+			if old and lv <= 5:
+				return "monaco_old"
+			if lv >= 4:
+				return "monaco"
+		"interlaken":
+			if kind == "commercial" and (area >= 700.0 or lv >= 5):
+				return "interlaken_hotel"
+			if lv >= 6 or (roof == "flat" and lv >= 3):
+				return "interlaken_modern"
+			if kind == "house" or (lv >= 1 and lv <= 4):
+				return "interlaken"
+		"banff":
+			if kind == "house":
+				return "banff_house"
+			if old:
+				return "banff_heritage"
+			if lv >= 1:
+				return "banff"
+	return _banded(city, kind, c)
+
+## The data-driven rule for cities without their own arm above: a
+## heritage building goes to the city's heritage era, else the first
+## era (in listed order) whose storey band holds the building's levels.
+static func _banded(city: String, kind: String, c: Dictionary) -> String:
+	var lv := int(c["lv"])
+	var rows: Array = []
+	for e in (ERAS.get(city, []) as Array):
+		var row: Array = e
+		if row.size() > 8 and (row[1] as Array).has(kind):
+			rows.append(row)
+	if bool(c["heritage"]):
+		for row in rows:
+			if row.size() > 9 and bool(row[9]):
+				return str(row[0])
+	if lv <= 0:
+		return ""
+	for row in rows:
+		var band: Array = row[8]
+		if lv >= int(band[0]) and lv <= int(band[1]):
+			return str(row[0])
 	return ""

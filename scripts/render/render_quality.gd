@@ -37,6 +37,12 @@ const VOLUME_LENGTH_M := 250.0
 static func is_forward_plus() -> bool:
 	return RenderingServer.get_current_rendering_method() == "forward_plus"
 
+## Desktop Ultra (Ultra on Forward+): the one gate for Ultra-only extras
+## (FacadeShader, the wider relief / trim / roof-detail rings). Phones
+## and lower tiers keep the shared build.
+static func ultra_desktop(preset: int, forward_plus: bool = is_forward_plus()) -> bool:
+	return forward_plus and RenderSettings.clamp_preset(preset) == RenderSettings.Preset.ULTRA
+
 ## Feature set of `preset` on Forward+ (`forward_plus`) or Mobile.
 static func features_for(preset: int, forward_plus: bool) -> Dictionary:
 	var p := RenderSettings.clamp_preset(preset)

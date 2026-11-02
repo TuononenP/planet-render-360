@@ -15,11 +15,12 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var waterways: Array = []
 	var trees: Array = []
 	var barriers: Array = []
+	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
-			"barriers": barriers}
+			"barriers": barriers, "country": country}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -35,6 +36,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		var raw_tags: Variant = el.get("tags", {})
 		var el_tags: Dictionary = raw_tags if raw_tags is Dictionary else {}
 		if (el_tags.has("building") or el_tags.has("building:part")) and OsmTags.underground(el_tags):
+			continue
+		# The is_in country area: tags only, no geometry.
+		if str(el.get("type", "")) == "area":
+			if country == "":
+				country = str(el_tags.get("ISO3166-1", el_tags.get("ISO3166-1:alpha2", ""))).to_upper()
 			continue
 		# Point features (lighthouses, towers are often single nodes).
 		if str(el.get("type", "")) == "node" and el.has("lat") and el.has("lon"):
@@ -173,7 +179,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
-		"barriers": barriers}
+		"barriers": barriers, "country": country}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live
@@ -302,6 +308,7 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 		if best < 0:
 			var orphan := OsmTags._building_entry(tags, pts, paabb)
 			orphan["holes"] = pw.get("holes", [])
+			orphan["orphan_part"] = true
 			buildings.append(orphan)
 			boxes.append(paabb)
 			continue
@@ -322,6 +329,41 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 		# Parts carry their own roof (domes, towers, stepped wings).
 		part.merge(OsmTags._roof_tags(tags))
 		(parent["parts"] as Array).append(part)
+	_ground_orphans(buildings)
+
+## Smallest footprint (m²) a lifted orphan part must have to be grounded:
+## skybridges and walkway roofs between towers stay up.
+const GROUND_ORPHAN_M2 := 200.0
+
+## A building:part outside every building outline stands alone; lifted
+## off the ground (min_height / building:min_level) with nothing under it
+## — its lower parts lost to a cap or the query edge — it floated as a
+## slab over the skyline (New York). A part that high implies a building
+## below, so it stands on the ground instead.
+static func _ground_orphans(buildings: Array) -> void:
+	for b in buildings:
+		var o: Dictionary = b
+		if not bool(o.get("orphan_part", false)):
+			continue
+		var lift := float(o.get("min_height_m", 0.0))
+		if lift <= 0.0 and int(o.get("min_level", 0)) > 0:
+			lift = float(o["min_level"]) * 3.0
+		var fp: PackedVector2Array = o["footprint"]
+		if lift <= 0.0 or absf(RingGeometry.signed_area(fp)) < GROUND_ORPHAN_M2:
+			continue
+		var at := Vector2(float(o["x"]), float(o["z"]))
+		var held := false
+		for other in buildings:
+			var u: Dictionary = other
+			if is_same(u, o) or float(u.get("height", 0.0)) < lift - 1.5 \
+					or float(u.get("min_height_m", 0.0)) >= lift:
+				continue
+			if OsmGeometry._point_in_ring(at, u["footprint"] as PackedVector2Array):
+				held = true
+				break
+		if not held:
+			o["min_height_m"] = 0.0
+			o["min_level"] = 0
 ## Concatenate two Overpass responses' element lists, detailed first so
 ## the parse-time id-dedup keeps the detailed copy. Either side may be
 ## "" or invalid — the other side still parses.

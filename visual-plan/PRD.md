@@ -136,7 +136,7 @@ Base unit: metres (m). Paris spawn view judged against view360-paris.jpg screen-
 - AC-09 (view360-paris.jpg): Ground never bleaches: max urban-ground luminance 0.85; pavement #8A8274, grass #5A7A3C, DEM slope shading visible on horizon hills.
 - AC-10 (view360-paris.jpg): Trees are 2 textured species (broadleaf + pine), canopy Ø 4–7 m, quay spacing 8–12 m, hue variance ±10%; 0 bare-cone trees.
 - AC-11 (view360-paris.jpg): Clouds are photographic/volumetric-look in the 28–40% H band with #E8C9A0 lit undersides; 0 faceted cloud slabs.
-- AC-12 (picker.png + view360-paris.jpg): Three fidelity options exist, Fidelity 2 is default, switching applies in ≤2 s and moves 0 objects / shifts 0 hues >2% (only §3.4 columns change).
+- AC-12 (picker.png + view360-paris.jpg): Three fidelity options exist, Fidelity 2 is default, switching applies in ≤2 s and moves 0 objects / shifts 0 hues >2% (only §3.4 columns change). Desktop Ultra (2026-11-01) may add decorative extras the other tiers never build (shader facades, wider relief / trim / roof-detail rings); it still moves 0 real buildings, roads or landmarks.
 - AC-13 (picker.png): Fidelity separation is visible side-by-side: F1 ≤1024 px textures/1024 shadows, F2 2048 px/2-cascade shadows + planar reflections, F3 4096 px + bloom 0.3 + glint sparkle + props (lampposts every 25 m).
 - AC-14 (picker.png): Fidelity 1 runs ≥30 fps on a mid-tier phone at ≤400 draw calls with ≤6 shared distant facade/roof materials.
 - AC-15 (picker.png): Picker matches §4.6 geometry within ±2% (title 0.17 H, search 0.21–0.26 H, pin on Paris, card 0.72–0.89 H, teal #3E8F88 button "Render 360 View") and launches the §4.1 spawn view.

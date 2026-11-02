@@ -184,6 +184,7 @@ func _run() -> void:
 	_roof_shape_checks(failures)
 	_material_map_checks(failures)
 	_underground_checks(failures)
+	_orphan_part_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -535,6 +536,15 @@ func _query_checks(failures: Array[String]) -> void:
 	# Godot prints "not enough arguments for format string".
 	if q.contains("%"):
 		failures.append("query still has unformatted placeholders: %s" % q)
+	if not q.contains('is_in(48.856600,2.352200)->.ci;area.ci["admin_level"="2"]["ISO3166-1"]'):
+		failures.append("query must ask for the viewpoint's ISO country")
+	var with_country := OsmFetcher.parse_features(JSON.stringify({"elements": [
+		{"type": "area", "id": 3600002202, "tags": {"admin_level": "2", "ISO3166-1": "fr"}}]}),
+		48.8566, 2.3522)
+	if str(with_country.get("country", "")) != "FR" \
+			or not (with_country["buildings"] as Array).is_empty() \
+			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
+		failures.append("parse must read the is_in area's ISO code and nothing else from it")
 	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 18:
 		failures.append("expected 18 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
@@ -895,3 +905,30 @@ func _underground_checks(failures: Array[String]) -> void:
 		func(b: Dictionary) -> String: return str(b.get("name", "")))
 	if names != ["Over"]:
 		failures.append("parser should skip the underground building, got %s" % [names])
+
+func _box_geom(lat: float, lon: float, dlat: float, dlon: float) -> Array:
+	return [{"lat": lat, "lon": lon}, {"lat": lat + dlat, "lon": lon},
+		{"lat": lat + dlat, "lon": lon + dlon}, {"lat": lat, "lon": lon + dlon}, {"lat": lat, "lon": lon}]
+
+## building:part outside every building: a big lifted part with nothing
+## under it stands on the ground (no floating slab); one standing on
+## another part, or a small skybridge, keeps its lift.
+func _orphan_part_checks(failures: Array[String]) -> void:
+	var text := JSON.stringify({"elements": [
+		{"type": "way", "id": 1, "tags": {"building:part": "yes", "min_height": "60", "height": "90", "name": "Slab"},
+			"geometry": _box_geom(48.8566, 2.3522, 0.00027, 0.00041)},
+		# Upper first: listed after Base it would nest in it as a part.
+		{"type": "way", "id": 3, "tags": {"building:part": "yes", "min_height": "40", "height": "80", "name": "Upper"},
+			"geometry": _box_geom(48.85825, 2.3524, 0.00015, 0.00030)},
+		{"type": "way", "id": 2, "tags": {"building:part": "yes", "height": "45", "name": "Base"},
+			"geometry": _box_geom(48.8580, 2.3522, 0.00040, 0.00060)},
+		{"type": "way", "id": 4, "tags": {"building:part": "yes", "min_height": "20", "height": "24", "name": "Bridge"},
+			"geometry": _box_geom(48.8600, 2.3522, 0.00003, 0.00027)}]})
+	var bs: Array = OsmFetcher.parse_features(text, 48.8566, 2.3522)["buildings"]
+	var lift := func(n: String) -> float: return float(_by_name(bs, n).get("min_height_m", -1.0))
+	if lift.call("Slab") != 0.0:
+		failures.append("an unsupported lifted orphan part should stand on the ground, lift %s" % lift.call("Slab"))
+	if lift.call("Upper") != 40.0:
+		failures.append("an orphan part on another part keeps its lift, got %s" % lift.call("Upper"))
+	if lift.call("Bridge") != 20.0:
+		failures.append("a small lifted part (skybridge) keeps its lift, got %s" % lift.call("Bridge"))

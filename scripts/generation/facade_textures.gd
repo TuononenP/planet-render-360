@@ -173,6 +173,7 @@ static func _material_from(texs: Dictionary, set_name: String, detail: int,
 			m.detail_normal = m.normal_texture
 	CityLights.mark(m, texs.get("emit"))
 	WallVariety.mark(m)  # per-building tint + foot shade
+	m.set_meta("facade_set", set_name)  # FacadeShader swaps these on Ultra
 	return m
 
 static func _facade_material_for(set_name: String, rows: int, detail: int,
@@ -183,6 +184,9 @@ static func _facade_material_for(set_name: String, rows: int, detail: int,
 	var tiled := FacadeComposer.is_tiled(pattern)
 	var bay_m := maxf(float(look.get("bay_m", 3.2)), 1.0)
 	var floor_m := float(look.get("floor_h", 3.3))
+	m.set_meta("facade_rows", rows)
+	m.set_meta("facade_floor_m", floor_m)
+	m.set_meta("facade_pattern", pattern)
 	if not look.is_empty():
 		m.set_meta("fc_uv", Vector3(bay_m,
 			float(FacadeComposer.BAYS if tiled else StoreyComposer.PARIS_BAYS),

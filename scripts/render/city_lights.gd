@@ -10,6 +10,9 @@ extends RefCounted
 ## threshold, so windows halo softly).
 const NIGHT_ENERGY := 2.6
 const META := "city_lit"
+## Scene clock (AtmosphereRig.set_time): the Ultra facade shader lights
+## rooms by the hour (FacadeShader).
+static var hour := 20.0
 
 ## Gives `m` its lit-pane map (off until apply()).
 static func mark(m: StandardMaterial3D, emit: Variant) -> void:
@@ -43,13 +46,25 @@ static func apply(world: Node, amount: float) -> void:
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		stack.append_array(n.get_children())
-		if not (n is MeshInstance3D):
+		if n is Light3D and n.has_meta(StreetLights.META):
+			StreetLights.apply(n as Light3D, amount)
 			continue
-		var mi := n as MeshInstance3D
-		var mats: Array = [mi.material_override]
-		for s in (mi.mesh.get_surface_count() if mi.mesh != null else 0):
-			mats.append(mi.mesh.surface_get_material(s))
+		var mesh: Mesh = null
+		if n is MeshInstance3D:
+			mesh = (n as MeshInstance3D).mesh
+		elif n is MultiMeshInstance3D and (n as MultiMeshInstance3D).multimesh != null:
+			mesh = (n as MultiMeshInstance3D).multimesh.mesh  # lampposts
+		else:
+			continue
+		var mats: Array = [(n as GeometryInstance3D).material_override]
+		for s in (mesh.get_surface_count() if mesh != null else 0):
+			mats.append(mesh.surface_get_material(s))
 		for m in mats:
-			if m is StandardMaterial3D and not seen.has(m) and (m as Material).has_meta(META):
-				seen[m] = true
+			if not (m is Material) or seen.has(m) or not (m as Material).has_meta(META):
+				continue
+			seen[m] = true
+			if m is StandardMaterial3D:
 				(m as StandardMaterial3D).emission_energy_multiplier = energy * float(m.get_meta(META))
+			elif m is ShaderMaterial:
+				(m as ShaderMaterial).set_shader_parameter("night_energy", energy * float(m.get_meta(META)))
+				(m as ShaderMaterial).set_shader_parameter("city_hour", hour)

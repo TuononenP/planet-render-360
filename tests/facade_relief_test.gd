@@ -47,7 +47,9 @@ func _scan(root: Node) -> Dictionary:
 				out["misaligned"] += 1
 			if arrays[Mesh.ARRAY_TANGENT] != null and (arrays[Mesh.ARRAY_TANGENT] as PackedFloat32Array).size() != nv * 4:
 				out["misaligned"] += 1
-			if mat is BaseMaterial3D and (mat as BaseMaterial3D).heightmap_enabled:
+			# Ultra on Forward+ carries the reveals in FacadeShader.
+			if (mat is BaseMaterial3D and (mat as BaseMaterial3D).heightmap_enabled) \
+					or (mat is ShaderMaterial and bool((mat as ShaderMaterial).get_shader_parameter("has_depth"))):
 				out["parallax"] += 1
 				if arrays[Mesh.ARRAY_TANGENT] == null:
 					out["parallax_no_tangent"] += 1

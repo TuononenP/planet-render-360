@@ -27,14 +27,19 @@ const PARAPET_H_M := 0.85
 const PARAPET_T_M := 0.25
 const COPING_M := 0.06
 const COPING_H_M := 0.08
-## Trim only within this distance of the viewpoint (m), on every tier.
+## Trim only within this distance of the viewpoint (m), on every tier
+## but desktop Ultra, which trims out to its detail ring.
 const RADIUS_M := 320.0
+const ULTRA_RADIUS_M := 700.0
 
 static var _mats: Dictionary = {}
 
+static func radius_m(preset: int) -> float:
+	return ULTRA_RADIUS_M if RenderQuality.ultra_desktop(preset) else RADIUS_M
+
 ## Trim kind for a building `dist_m` from the viewpoint.
-static func kind(shape: String, dist_m: float) -> int:
-	if dist_m > RADIUS_M:
+static func kind(shape: String, dist_m: float, radius: float = RADIUS_M) -> int:
+	if dist_m > radius:
 		return NONE
 	return PARAPET if shape == "flat" else CORNICE
 

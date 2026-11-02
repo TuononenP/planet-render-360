@@ -245,6 +245,9 @@ static func roads_to_v1(roads: Array) -> Array:
 ## Test hook (DEM/Satellite T2.1/T2.2 precedent): when true, fetch()
 ## serves the on-device cache or fails immediately — never the network.
 var offline_mode := false
+## ISO 3166-1 alpha-2 country of the last parsed viewpoint ("" unknown:
+## API fallback, or a payload cached before the query asked for it).
+var country := ""
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -280,6 +283,7 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	var ring := ring_radius_for_preset(p)
 	_pending_lat = lat
 	_pending_lon = lon
+	country = ""
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
 	# query shape, not the detailed query at a larger radius).
@@ -561,6 +565,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 		return
 	if _fallback_detail != "":
 		fallback_used.emit(_fallback_detail, _fallback_partial)
+	country = str(parsed.get("country", ""))
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

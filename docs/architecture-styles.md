@@ -8,13 +8,26 @@ block, a Cairo flat-roof house and a Tokyo mansion block rendered alike.
 How it works (plan risk R5 — the table is data, reviewable, and never
 outranks the map):
 
-1. **Region** — `ArchitectureStyle.region_for(lat, lon)`: a **city zone**
-   first (`CityStyles.ZONES`, centre + radius km: Paris intra-muros →
+1. **Region** — `ArchitectureStyle.region_for(lat, lon, country)`: a **city
+   zone** first (`CityStyles.ZONES`, centre + radius km: Paris intra-muros →
    `haussmann`, `london`, `amsterdam`, `berlin`, `barcelona`, `rome`,
    `venice`, `stockholm`, `new_york` (Manhattan + inner Brooklyn + inner Queens), `chicago`,
-   `san_francisco`, `tokyo`, `hong_kong`, `singapore`), else the first match
-   in the coarse, ordered box table `ArchitectureData.BOXES` (17 country
-   style regions, e.g. `nordic`, `middle_east`, `japan`, `north_america`).
+   `san_francisco`, `tokyo`, `hong_kong`, `singapore`, `seoul`, `dubai`
+   (Downtown, Deira, Marina), `monaco`, `interlaken`, `banff`), else the
+   first match in the coarse, ordered box table `ArchitectureData.BOXES` (17
+   country style regions, e.g. `nordic`, `middle_east`, `japan`,
+   `north_america`). **The real country decides near borders:** the map
+   query asks Overpass which country the viewpoint stands in (`is_in` →
+   the `admin_level=2` area's `ISO3166-1` code, `LocationData.country`).
+   With a known code, a box that lists ISO codes applies only to those
+   countries, and one without only where its region is among the country's
+   `ArchitectureData.COUNTRIES` regions; when no box fits, the country's own
+   region wins. Kehl reads German rather than French, Saint-Louis French
+   rather than Swiss, Nice and Monaco Mediterranean, Zagreb and Ljubljana
+   Central European rather than Italian, Lesbos Greek, Vladivostok Russian,
+   Tijuana Latin American, Nuuk Nordic. With no code (offline, the OSM API
+   fallback, a payload cached before the query asked) the boxes decide as
+   before.
    City rows inherit from their country via `BASE`;
    `ArchitectureStyle.country_region(region)` / `country_region_for(lat,
    lon)` give the country region back for callers that key off the broad
@@ -82,6 +95,54 @@ outranks the map):
 | Tokyo (`tokyo`, dense 3–8 storey mixed) | `tokyo_house` (dark kawara roofs); `tokyo_tower` ≥15 levels |
 | Hong Kong (`hong_kong`, 20–40 storey slender towers) | `hk_tenement` 1900–1969 / ≤9 levels (shophouse pattern, signage); `hk_office` |
 | Singapore (`singapore`, HDB slabs with colour bands) | `sg_shophouse` 1840–1959 / ≤4 levels; `sg_tower` ≥30 levels |
+| Seoul (`seoul`, 12–25 storey white apartment-complex slabs; signed commercial streets) | `seoul_villa` 1970–2005 / 2–6 levels (red-brick walk-ups, green-painted flat roofs, water tanks); `seoul_hanok` pre-1960, heritage houses, Bukchon / Ikseon-dong / Seochon (white plaster and dark timber on granite, deep eaves, grey giwa hipped roofs); `seoul_tower` ≥20 levels, Yeouido / Teheran-ro / Jongno (glass) |
+| Dubai (`dubai`, 6–15 storey sand-render blocks with balconies and shops) | `dubai_tower` ≥20 levels, Sheikh Zayed Road / Downtown / Business Bay / Marina (blue-silver curtain walls); `dubai_heritage` pre-1970, Al Fahidi / Al Shindagha (coral stone and gypsum, small screened openings, flat roofs); `dubai_villa` houses, Jumeirah (pale render, parapet or hipped terracotta) |
+| Monaco (`monaco`, Belle Époque: pastel stucco, French windows, louvred shutters, balconettes, terracotta or slate mansards) | `monaco_old` pre-1860, heritage ≤5 levels, Le Rocher (Genoese ochre/rose houses, green shutters); `monaco_tower` ≥1960 or ≥10 levels, Fontvieille / Larvotto (white render, deep terraces) |
+| Interlaken (`interlaken`, Bernese chalets: dark spruce over a white base, half-hipped roofs, 1.4 m eaves, balconies) | `interlaken_hotel` 1860–1930, big or ≥5-level commercial, Höheweg (cream render, slate mansards, balconettes); `interlaken_modern` ≥1955 or ≥6 levels |
+| Banff (`banff`, Banff Avenue: log, river rock and Rundle stone fronts, steep metal gables) | `banff_heritage` 1885–1949 or heritage (Rundle stone, verdigris copper roofs, dormers); `banff_house` (clapboard cottages) |
+| Copenhagen (`copenhagen`, brick and rendered 5-storey blocks, dormered red tile) | `copenhagen_old` pre-1860, Nyhavn (painted plaster townhouses, steep tile); `copenhagen_modern` ≥7 levels, Ørestad |
+| Oslo (`oslo`, bygårder: 4–5 storey render and brick, hipped slate) | `oslo_wood` 1–2 levels / heritage, Damstredet (painted clapboard); `oslo_modern` ≥7 levels, Bjørvika |
+| Helsinki (`helsinki`, Jugend: grey-green render on granite, steep tile / black metal, 5–7 storeys) | `helsinki_empire` 1810–1880, Kruununhaka (ochre render, white pilasters, low black roofs); `helsinki_functional` 1930–1989, Töölö (light render, flat); `helsinki_modern` ≥10 levels, Kalasatama |
+| Edinburgh (`edinburgh`, sandstone tenements, slate, chimney rows) | `edinburgh_old` pre-1767, 6–12 levels, Royal Mile (rubble, crow-step gables); `edinburgh_georgian` 1767–1850, New Town (ashlar terraces); `edinburgh_modern` |
+| Dublin (`dublin`, Georgian red brick, 4 storeys over a basement, parapet slate) | `dublin_victorian` 1–2 level brick cottages; `dublin_modern` ≥6 levels, Docklands |
+| Brussels (`brussels`, maisons de maître: pale render or brick on bluestone, French windows, slate mansards) | `brussels_old` pre-1860, Grand-Place (stone guild houses, step / bell gables); `brussels_modern` ≥6 levels, European Quarter |
+| St Petersburg (`st_petersburg`, 5–6 storey pastel stucco round courtyard wells, low painted metal roofs) | `spb_imperial` 1703–1839 (palaces); `spb_soviet` 8–18 levels beyond 4 km (panel); `spb_modern` |
+| Madrid (`madrid`, ensanche: render and brick, iron balcony per bay, miradores, zinc mansards) | `madrid_austrias` pre-1860 (red brick and granite, slate spires); `madrid_modern` ≥9 levels, AZCA / Cuatro Torres |
+| Lisbon (`lisbon`, azulejo and pastel fronts, iron balconies, terracotta) | `lisbon_pombaline` 1756–1830, Baixa (uniform ochre, mansards); `lisbon_alfama` pre-1755 (small stacked houses); `lisbon_modern` ≥7 levels, Parque das Nações |
+| Milan (`milan`, eclectic and Liberty palazzi: ochre and grey render on ceppo stone) | `milan_rational` 1930–1979, 8–14 levels (brick, klinker, stone); `milan_modern` ≥15 levels, Porta Nuova / CityLife |
+| Florence (`florence`, Renaissance palazzi: intonaco over pietra forte, green shutters, deep eaves) | `florence_umbertino` 1865–1949 on the viali; `florence_modern` |
+| Istanbul (`istanbul`, post-1950 pastel apartment blocks with balconies) | `istanbul_pera` 1860–1949, Beyoğlu (Levantine stone, cumba bays); `istanbul_wood` pre-1923, Fener-Balat (painted timber, projecting storeys); `istanbul_tower` ≥13 levels, Levent |
+| Athens (`athens`, polykatoikia: white concrete, deep balcony per floor, awnings, solar heaters) | `athens_neoclassical` 1834–1940, 1–3 levels, Plaka (ochre and pastel, pediments, tile) |
+| Vienna (`vienna`, Gründerzeit Zinshäuser: 5–6 storeys, ornate render) | `vienna_baroque` pre-1848, Innere Stadt; `vienna_gemeindebau` 1919–1934 (Red Vienna superblocks); `vienna_modern` ≥8 levels, Donau City |
+| Prague (`prague`, historicist and Art Nouveau blocks, steep red tile with towers) | `prague_old` pre-1850, Staré Město / Malá Strana (Baroque pastel, bell gables); `prague_panel` 1955–1995 beyond 3.5 km |
+| Budapest (`budapest`, eclectic bérházak: grey and ochre render, 4–6 storeys) | `budapest_castle` 1686–1849, 1–3 levels (Baroque houses); `budapest_panel` 1955–1995 beyond 3.5 km |
+| Munich (`munich`, Gründerzeit and Jugendstil, pastel render, steep red tile) | `munich_altstadt` pre-1860 (gabled burgher houses); `munich_modern` ≥7 levels |
+| Kyoto (`kyoto`, height-capped beige and brown mid-rise) | `kyoto_machiya` 1–2 levels / heritage, Gion / Higashiyama / Nishijin (timber lattice, kawara, deep eaves) |
+| Shanghai (`shanghai`, 12–30 storey tiled residential towers) | `shanghai_shikumen` 2–3 levels / heritage (grey brick banded red); `shanghai_bund` 1900–1949 (stone banks); `shanghai_walkup` 4–8 levels; `shanghai_tower` ≥10-level commercial, Lujiazui |
+| Beijing (`beijing`, 1990s+ tiled residential compounds) | `beijing_hutong` 1 level / heritage, Nanluoguxiang / Shichahai / Qianmen (grey brick, curved grey tile); `beijing_brick` 1950–1989, 3–6 levels; `beijing_tower` CBD |
+| Bangkok (`bangkok`, condominium towers) | `bangkok_shophouse` 2–5 levels (weathered concrete rows, shutters, signs); `bangkok_tower` Silom / Sathorn / Sukhumvit |
+| Mumbai (`mumbai`, monsoon-stained RCC blocks with grilles and water tanks) | `mumbai_gothic` 1850–1929, Fort (Victorian Gothic and Indo-Saracenic stone); `mumbai_deco` 1930–1955, Marine Drive; `mumbai_tower` ≥16 levels, Lower Parel |
+| Cairo (`cairo`, concrete frames infilled with unplastered red brick, 6–12 storeys) | `cairo_khedival` 1860–1952, Downtown (eclectic stone); `cairo_islamic` pre-1850, al-Muizz (limestone, mashrabiya); `cairo_tower` |
+| Cape Town (`cape_town`, Victorian houses with iron verandahs) | `cape_town_bokaap` heritage houses, Bo-Kaap (bright flat-roofed cottages); `cape_town_modern` ≥4 levels, CBD |
+| Toronto (`toronto`, brick apartment blocks and strips) | `toronto_victorian` 1–3 levels (bay-and-gable houses); `toronto_tower` ≥15 levels (glass condos) |
+| Montreal (`montreal`, plexes with outside staircases) | `montreal_old` pre-1881, Vieux-Montréal (greystone, mansards); `montreal_tower` ≥7 levels |
+| Boston (`boston`, brick walk-ups) | `boston_backbay` 1800–1899, Back Bay / Beacon Hill (brick and brownstone bow fronts, mansards, stoops); `boston_tripledecker` 3 levels beyond 2.5 km (clapboard, stacked porches); `boston_tower` |
+| Washington (`washington`, painted brick rowhouses with bays and turrets) | `washington_federal` civic / commercial 1790–1959 (limestone classicism); `washington_modern` ≥5 levels (the 130 ft cap) |
+| Los Angeles (`los_angeles`, stucco dingbats and ranch houses) | `la_spanish` 1915–1945 (white stucco, red barrel tile); `la_tower` ≥7 levels, Downtown |
+| Mexico City (`mexico_city`, Porfirian and Art Deco Roma / Condesa, water tanks on the roofs) | `cdmx_colonial` pre-1881, Centro Histórico (tezontle stone, Baroque portals); `cdmx_modern` ≥8 levels, Reforma |
+| Rio de Janeiro (`rio`, Copacabana: 8–14 storey white slabs, a balcony per flat) | `rio_colonial` pre-1900, Centro (pastel fronts, iron balconies, tile); `rio_tower` ≥15 levels |
+| Buenos Aires (`buenos_aires`, French academic stone, balconettes, slate mansards, corner domes) | `ba_chorizo` 1–2 levels / heritage, San Telmo (casas chorizo); `ba_tower` ≥13 levels, Puerto Madero |
+| Sydney (`sydney`, interwar brick flats and Federation houses) | `sydney_terrace` 1840–1914, 1–3 levels, Paddington / Surry Hills (iron-lace verandahs, corrugated iron); `sydney_tower` CBD |
+| Melbourne (`melbourne`, interwar brick) | `melbourne_terrace` 1850–1914, Fitzroy / Carlton (boom-style polychrome brick on bluestone, iron lace); `melbourne_tower` CBD |
+
+Cities without hand-written era rules in `BuildingEra._rules` (all those
+after Banff above) use its data-driven `_banded` rule: era rows may end in a
+storey band `[min, max]` and a heritage flag, so a heritage building goes to
+the city's heritage era and an untagged one to the first era whose band
+holds its levels; an era with no band is reached only by its year, style tag
+or district. Their rows live in `ArchitectureCitiesNorth`, `…South`,
+`…Central`, `…World` and `…NewWorld`, each with its own `ERAS` merged into
+`BuildingEra.ERAS`.
 
 Profile keys added for cities: `fix` (storey range is the typology's real
 range, no density stretch), `sh` may be a palette (one shutter / band colour
