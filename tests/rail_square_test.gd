@@ -33,7 +33,7 @@ const PAYLOAD := """{"elements": [
  {"type": "way", "id": 7, "tags": {"building": "yes"},
   "geometry": [{"lat": 60.1710, "lon": 24.9430}, {"lat": 60.1710, "lon": 24.9432},
    {"lat": 60.1711, "lon": 24.9432}, {"lat": 60.1710, "lon": 24.9430}]},
- {"type": "pr360_q3", "id": 1}
+ {"type": "MARK", "id": 1}
 ]}"""
 
 func _run() -> void:
@@ -77,7 +77,8 @@ func _check_parse(failures: Array[String]) -> void:
 	var q := OsmQuery.build_query(60.1699, 24.9384)
 	if not q.contains('way["railway"~') or not q.contains('"place"="square"'):
 		failures.append("query lacks the railway/square statements")
-	if not OsmQuery.is_current(q) or not OsmQuery.is_current(PAYLOAD) \
+	# A cached payload carries the query's current mark (MARK above).
+	if not OsmQuery.is_current(q) or not OsmQuery.is_current(PAYLOAD.replace("MARK", OsmQuery.QUERY_MARK)) \
 			or OsmQuery.is_current('{"elements": []}'):
 		failures.append("query mark not recognised")
 
