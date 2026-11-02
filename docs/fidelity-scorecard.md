@@ -255,3 +255,34 @@ Round r4, 2026-11-01:
 | Rome | recognisable | Colosseum framed as in the photo; Oppio slope reads as lawn |
 | Venice | recognisable | Canal and Salute right; grassy banks where there are fondamenta |
 | Seoul | stylised | No Gwanghwamun gate model; square reads as a park |
+
+Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
+- Captures, Ultra preset, local golden hour, clear summer:
+  - Paris, New York, Tokyo: `visual-plan/reviews/ultra-p7f-2026-11-02/`.
+  - Stockholm, London: `ultra-p8a-2026-11-02/`.
+  - Banff, Seoul: `ultra-p8b-2026-11-02/`.
+  - Venice: `ultra-p8d-2026-11-02/`.
+  - Big Sur, Monaco, Rome: `ultra-p8h-2026-11-03/`.
+  - Dubai: `ultra-p8i-2026-11-03/`, after the low-rise height fix.
+  - Alps: `ultra-p8g-2026-11-02/`, shot in winter (no summer Ultra capture yet).
+- Rater: Claude (agent pre-rating).
+
+| preset | grade | change since r4 | biggest remaining tell |
+|---|---|---|---|
+| Paris | recognisable | — | Grass tufts on the Trocadéro paving; dry basins, no fountains |
+| Alps | recognisable | — | (Winter shot.) Snowy peaks and lake right; valley roofs read as dots |
+| Banff | recognisable | ↑ hotel model | Mount Rundle reads as a rounded green hill, no rock faces |
+| Big Sur | stylised | — | Vantage lands on the bridge approach; Bixby's arch hidden behind the deck |
+| Tokyo | stylised | — | No zebra scramble or daytime screens; plaza patches read as lawn |
+| New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
+| Stockholm | recognisable | ↑ Riddarholmen spire | Low vantage over lawn hides Gamla stan; old town reads as generic blocks |
+| Monaco | recognisable | — | Port Hercule without boats; vantage lower than the photo |
+| Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
+| London | recognisable | — | Westminster Bridge arches missing; backlit golden shot flattens the palace |
+| Rome | recognisable | — | Grass tufts on the asphalt; no stone pines framing the Colosseum |
+| Venice | recognisable | — | Salute only a speck down the canal; grassy bank and modern block in the foreground |
+| Seoul | stylised | gate modelled | Vantage far down Sejong-daero: Gwanghwamun tiny; plaza reads as road |
+
+Found while rating: Dubai's curved wall at the camera was an untagged mall block that inherited the
+neighbouring towers' median height (61 m). Low-rise uses now cap an inferred height at four storeys
+(`BuildingHeights.LOW_RISE_USES`).
