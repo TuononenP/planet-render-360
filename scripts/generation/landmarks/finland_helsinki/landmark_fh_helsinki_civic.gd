@@ -136,96 +136,189 @@ static func _bear(lm: LandmarkMesh, key: String, base: Vector3, l: float) -> voi
 
 ## Sirén's Eduskuntatalo (1931), origin at the OSM footprint centre, front
 ## +Z (turned onto Mannerheimintie by the registry yaw): the 77.8 x 56 m
-## block of red Kalvola granite, 25 m tall in six storeys, raised on its
-## plinth; the broad flight of steps up to the terrace and the 14 fluted
-## columns with stylised Corinthian capitals rising to the fourth storey,
-## carrying the entablature and the attic with its round windows; tall
-## windows in pilastered bays down the flanks, and the set-back top
-## storey round the shallow dome of the 25 m session hall.
+## block of pink Kalvola granite, 25 m tall. Seen from the front: the two
+## blank corner pavilions, the great flight of steps up to the 4.6 m
+## terrace, 14 smooth monolithic columns with stylised Corinthian capitals
+## in front of the recessed wall (arched doors and windows, then two rows
+## of tall windows), the entablature and the attic frieze of 13 round
+## windows, the plain top storey and cornice. Tall paired windows between
+## pilasters down the flanks, the low granite wings by the stairs, and on
+## top the low-pitched dark metal roof rising round the open light court,
+## its walls two rows of windows tall. Four white flagpoles stand before
+## the steps.
 static func parliament(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#A9786C", 4.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#C7A89B", 3.0))
-	lm.use("Step", LandmarkMaterials.pbr("stone", "#9A8F88", 3.0))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#B2968B", 4.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#C6AEA3", 3.0))
+	lm.use("Step", LandmarkMaterials.pbr("stone", "#A79C95", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2A3236"))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#5A6068", 3.0))
+	lm.use("Door", LandmarkMaterials.pbr("wood", "#4A3626", 2.0))
+	lm.use("Roof", LandmarkMaterials.pbr("slate", "#59635F", 3.0, 0.55, 0.35))
+	lm.use("Seam", LandmarkMaterials.pbr("slate", "#7A8580", 3.0, 0.5, 0.4))
+	lm.use("Pole", LandmarkMaterials.paint("#EDEDED", 0.5, 0.3))
 	var x0 := -35.0
 	var x1 := 42.8
 	var cx := (x0 + x1) * 0.5
-	var w := x1 - x0
 	var zb := -26.8
 	var zf := 29.3
 	var zw := 24.7
-	var top := 23.0
-	# Core block behind the portico, the two corner masses flanking it.
-	FhU.blk(lm, "Granite", cx, 0.0, (zb + zw) * 0.5, w, top, zw - zb)
-	FhU.blk(lm, "Step", cx, 0.0, (zb + zw) * 0.5, w + 0.6, 1.4, zw - zb + 0.6)
-	var cl := -29.5
-	var cr := 37.3
-	for p in [[x0, cl], [cr, x1]]:
-		var px0: float = p[0]
-		var px1: float = p[1]
-		FhU.blk(lm, "Granite", (px0 + px1) * 0.5, 0.0, (zw + zf) * 0.5, px1 - px0, top, zf - zw)
-		FhU.blk(lm, "Step", (px0 + px1) * 0.5, 0.0, (zw + zf) * 0.5 + 0.3, px1 - px0 + 0.6, 1.4, zf - zw + 0.6)
-		FhP.pierce(lm, "Granite", "Glass", Vector3(px0, 0, zf), Vector3(px1, 0, zf), Vector3(0, 0, 1), 1.4, 21.0,
-			1, 6, Vector2(1.5, 2.3), 0.9, 3.45, 0.3)
-	# Terrace, steps and the colonnade of 14 columns.
-	FhU.blk(lm, "Step", (cl + cr) * 0.5, 0.0, (zw + zf) * 0.5, cr - cl, 2.4, zf - zw)
-	FhU.steps(lm, "Step", Vector3((cl + cr) * 0.5, 0.0, zf), Vector3(0, 0, 1), cr - cl - 1.0, 0.45, 0.2, 12)
-	for s in [-1.0, 1.0]:
-		FhU.blk(lm, "Granite", (cl + cr) * 0.5 + s * ((cr - cl) * 0.5 + 0.6), 0.0, zf + 2.8, 1.6, 2.6, 5.6)
-	var ca := Vector3(-27.0, 2.4, 27.5)
-	var cb := Vector3(34.75, 2.4, 27.5)
+	var top := 23.2
+	var terr := 4.6
+	var px0 := x0 + 9.0
+	var px1 := x1 - 9.0
+	var span := px1 - px0
+	var bay := span / 14.0
+	# Plinth, the core block and the two corner pavilions with their courses.
+	FhU.blk(lm, "Step", cx, 0.0, (zb + zf) * 0.5, x1 - x0 + 0.8, 1.2, zf - zb + 0.8)
+	var floor_y := 18.6
+	var xi0 := x0 + 16.0
+	var xi1 := x1 - 16.0
+	var zi0 := zb + 12.0
+	var zi1 := zf - 12.0
+	FhU.blk(lm, "Granite", cx, 0.0, (zb + zw) * 0.5, x1 - x0, floor_y, zw - zb)
+	# Above the court floor the block is a ring round the open light court.
+	FhU.blk(lm, "Granite", cx, floor_y, (zb + zi0) * 0.5, x1 - x0, top - floor_y, zi0 - zb)
+	FhU.blk(lm, "Granite", cx, floor_y, (zi1 + zw) * 0.5, x1 - x0, top - floor_y, zw - zi1)
+	FhU.blk(lm, "Granite", (x0 + xi0) * 0.5, floor_y, (zi0 + zi1) * 0.5, xi0 - x0, top - floor_y, zi1 - zi0)
+	FhU.blk(lm, "Granite", (xi1 + x1) * 0.5, floor_y, (zi0 + zi1) * 0.5, x1 - xi1, top - floor_y, zi1 - zi0)
+	for pv in [[x0, px0], [px1, x1]]:
+		var a: float = pv[0]
+		var b: float = pv[1]
+		FhU.blk(lm, "Granite", (a + b) * 0.5, 0.0, (zw + zf) * 0.5, b - a, top, zf - zw)
+		for k in 9:
+			FhP.band(lm, "Trim", Vector3(a, 0, zf), Vector3(b, 0, zf), Vector3(0, 0, 1), terr + 1.4 + 1.5 * float(k),
+				0.1, 0.06)
+		FhU.blk(lm, "Trim", (a + b) * 0.5, 19.8, zf + 0.04, b - a - 1.6, 2.4, 0.16)
+	# Terrace and the flight of steps, widening toward the foot.
+	FhU.blk(lm, "Step", (px0 + px1) * 0.5, 0.0, (zw + zf) * 0.5, span, terr, zf - zw)
+	var flight := 26
+	for k in flight:
+		var d := 0.62 * float(k + 1)
+		var h := terr * float(flight - k) / float(flight)
+		lm.box("Step", Vector3(cx, h * 0.5, zf + d * 0.5), Vector3(span + 2.4 + 0.5 * float(k), h, d))
+	# The colonnade, entablature and attic frieze.
 	for i in 14:
-		var p := ca.lerp(cb, float(i) / 13.0)
-		lm.box("Step", p + Vector3(0, 0.25, 0), Vector3(2.2, 0.5, 2.2))
-		LandmarkDetail.column(lm, "Granite", p + Vector3(0, 0.5, 0), 0.8, 15.1, "corinthian", 20)
-	# Recessed wall behind the columns: three storeys of tall windows between them.
-	FhP.pierce(lm, "Granite", "Glass", Vector3(cl, 0, zw + 0.3), Vector3(ca.x, 0, zw + 0.3), Vector3(0, 0, 1),
-		2.4, 15.6, 1, 1, Vector2(0.01, 0.01), 20.0, 3.6, 0.3)
-	FhP.pierce(lm, "Granite", "Glass", Vector3(cb.x, 0, zw + 0.3), Vector3(cr, 0, zw + 0.3), Vector3(0, 0, 1),
-		2.4, 15.6, 1, 1, Vector2(0.01, 0.01), 20.0, 3.6, 0.3)
-	FhP.pierce(lm, "Granite", "Glass", Vector3(ca.x, 0, zw), Vector3(cb.x, 0, zw), Vector3(0, 0, 1), 2.4, 15.6,
-		13, 4, Vector2(1.7, 2.6), 1.6, 3.6, 0.3)
-	FhP.win_row(lm, "Trim", "Glass", Vector3(ca.x, 0, zw + 0.3), Vector3(cb.x, 0, zw + 0.3), Vector3(0, 0, 1), 2.6,
-		13, 2.2, 3.2, false, 0.3)
-	# Entablature over the columns, then the attic with its round windows.
-	FhU.blk(lm, "Trim", (cl + cr) * 0.5, 18.0, (zw + zf) * 0.5, cr - cl, 1.2, zf - zw)
-	FhU.blk(lm, "Granite", (cl + cr) * 0.5, 19.2, (zw + zf) * 0.5, cr - cl, top - 19.2, zf - zw)
-	LandmarkDetail.cornice(lm, "Trim", Vector3(cl, 19.2, zf), Vector3(cr, 19.2, zf), Vector3(0, 0, 1), 0.7, true)
+		LandmarkDetail.column(lm, "Granite", Vector3(px0 + (float(i) + 0.5) * bay, terr, 27.3), 0.95, 13.8,
+			"corinthian", 0, 20)
+	FhU.blk(lm, "Trim", cx, terr + 13.8, (zw + zf) * 0.5, span, 1.2, zf - zw)
+	FhU.blk(lm, "Granite", cx, terr + 15.0, (zw + zf) * 0.5, span, top - terr - 15.0, zf - zw)
+	LandmarkDetail.cornice(lm, "Trim", Vector3(px0, terr + 15.0, zf), Vector3(px1, terr + 15.0, zf), Vector3(0, 0, 1),
+		0.7, true)
 	for i in 13:
-		var p := ca.lerp(cb, (float(i) + 0.5) / 13.0)
-		var rc := Vector3(p.x, 21.1, zf)
+		var rc := Vector3(px0 + float(i + 1) * bay, 20.8, zf)
 		lm.disc("Glass", rc + Vector3(0, 0, 0.03), Vector3(0, 0, 1), 0.7, 16)
-		FhP.ring(lm, "Trim", rc, Vector3(0, 0, 1), 0.7, 1.0, 0.25, 16)
+		FhP.ring(lm, "Trim", rc, Vector3(0, 0, 1), 0.7, 1.05, 0.22, 16)
+	# The recessed wall behind the columns: arched doors and windows, then
+	# two rows of tall windows between the shafts.
+	for i in 13:
+		var wx := px0 + float(i + 1) * bay
+		if i >= 5 and i <= 7:
+			LandmarkDetail.window(lm, "Trim", "Door", Vector3(wx, terr + 2.6, zw + 0.02), Vector3(0, 0, 1), 1.9, 4.4,
+				true, 0.25)
+		else:
+			LandmarkDetail.window(lm, "Trim", "Glass", Vector3(wx, terr + 2.2, zw + 0.02), Vector3(0, 0, 1), 1.6, 3.6,
+				true, 0.25)
+		LandmarkDetail.window(lm, "Trim", "Glass", Vector3(wx, terr + 6.9, zw + 0.02), Vector3(0, 0, 1), 1.5, 4.2,
+			false, 0.25)
+		LandmarkDetail.window(lm, "Trim", "Glass", Vector3(wx, terr + 11.5, zw + 0.02), Vector3(0, 0, 1), 1.5, 4.0,
+			false, 0.25)
 	# Crowning cornice round the whole block.
-	for face in FhP.faces(cx, (zb + zf) * 0.5, w, zf - zb):
+	for face in FhP.faces(cx, (zb + zf) * 0.5, x1 - x0, zf - zb):
 		LandmarkDetail.cornice(lm, "Trim", (face[0] as Vector3) + Vector3(0, top - 0.8, 0),
 			(face[1] as Vector3) + Vector3(0, top - 0.8, 0), face[2], 0.8, false)
-	# Flanks and back: pilastered bays of windows over the granite base.
-	for s in [-1.0, 1.0]:
-		var x: float = x0 if s < 0.0 else x1
-		var a := Vector3(x, 0, zf if s < 0.0 else zb)
-		var b := Vector3(x, 0, zb if s < 0.0 else zf)
-		FhP.pierce(lm, "Granite", "Glass", a, b, Vector3(s, 0, 0), 1.4, 21.0, 14, 6, Vector2(1.3, 2.3), 0.9,
-			3.45, 0.3)
-		FhP.strips(lm, "Granite", Vector3(x, 0, zb + 2.0), Vector3(x, 0, zf - 2.0), Vector3(s, 0, 0), 4.6, 17.0,
-			15, 0.6, 0.55)
-	FhP.pierce(lm, "Granite", "Glass", Vector3(x1, 0, zb), Vector3(x0, 0, zb), Vector3(0, 0, -1), 1.4, 21.0, 20,
-		6, Vector2(1.3, 2.3), 0.9, 3.45, 0.3)
-	FhP.strips(lm, "Granite", Vector3(x1 - 2.0, 0, zb), Vector3(x0 + 2.0, 0, zb), Vector3(0, 0, -1), 4.6, 17.0,
-		21, 0.6, 0.55)
-	# Set-back top storey, parapet and the shallow session-hall dome.
-	var tz0 := zb + 2.5
-	var tz1 := zw - 1.0
-	FhU.blk(lm, "Granite", cx, top, (tz0 + tz1) * 0.5, w - 5.0, 1.9, tz1 - tz0)
-	for face in FhP.faces(cx, (tz0 + tz1) * 0.5, w - 5.0, tz1 - tz0):
-		FhU.openings(lm, "Glass", face[0], face[1], face[2], top + 0.4, int((face[0] as Vector3).distance_to(face[1]) / 3.5),
-			1.0, 1.1, false, 0.04)
-	FhU.blk(lm, "Trim", cx, top + 1.9, (tz0 + tz1) * 0.5, w - 4.6, 0.25, tz1 - tz0 + 0.4)
-	FhU.blk(lm, "Roof", cx, top - 0.1, (zb + zf) * 0.5, w - 1.0, 0.25, zf - zb - 1.0)
-	lm.lathe("Roof", Vector3(3.4, top + 2.15, 0.9), FhU.dome_prof(6.4, 0.7, 6), 24)
+	# Flanks and back: pilastered bays of paired windows over arched ones.
+	_parl_bays(lm, Vector3(x1, 0, zb + 1.5), Vector3(x1, 0, zf - 1.5), Vector3(1, 0, 0), 14)
+	_parl_bays(lm, Vector3(x0, 0, zb + 1.5), Vector3(x0, 0, zf - 1.5), Vector3(-1, 0, 0), 14)
+	_parl_bays(lm, Vector3(x1 - 1.5, 0, zb), Vector3(x0 + 1.5, 0, zb), Vector3(0, 0, -1), 19)
+	# The low granite wings flanking the stairs.
+	for s: float in [-1.0, 1.0]:
+		var wx0 := x0 - 16.0 if s < 0.0 else x1
+		var wx1 := x0 if s < 0.0 else x1 + 16.0
+		var wz0 := zw - 4.0
+		var wz1 := zf + 9.0
+		var wh := terr + 0.8
+		var wc := Vector3((wx0 + wx1) * 0.5, 0.0, (wz0 + wz1) * 0.5)
+		FhU.blk(lm, "Granite", wc.x, 0.0, wc.z, wx1 - wx0, wh, wz1 - wz0)
+		FhU.blk(lm, "Roof", wc.x, wh, wc.z, wx1 - wx0 - 0.4, 0.2, wz1 - wz0 - 0.4)
+		for face in FhP.faces(wc.x, wc.z, wx1 - wx0, wz1 - wz0):
+			var fa: Vector3 = face[0]
+			var fb: Vector3 = face[1]
+			var fo: Vector3 = face[2]
+			LandmarkDetail.cornice(lm, "Trim", fa + Vector3(0, wh - 0.6, 0), fb + Vector3(0, wh - 0.6, 0), fo, 0.6,
+				false)
+			var inner: bool = (fo.x > 0.5 and s < 0.0) or (fo.x < -0.5 and s > 0.0)
+			if inner:
+				continue
+			FhP.win_row(lm, "Trim", "Glass", fa, fb, fo, 1.0, maxi(int(fa.distance_to(fb) / 3.8), 1), 1.4, 3.1, true,
+				0.2)
+	# Flagpoles on the plaza before the steps.
+	for fx in [px0 + 3.0, px0 + 7.2, px1 - 7.2, px1 - 3.0]:
+		var pz := zf + 0.62 * float(flight) + 3.0
+		lm.box("Step", Vector3(fx, 0.25, pz), Vector3(0.9, 0.5, 0.9))
+		lm.frustum("Pole", Vector3(fx, 0.5, pz), 0.13, 0.06, 17.0, 8)
+	# The roof: dark metal rising from the cornice to the rim of the light
+	# court, standing seams, the court walls with two rows of windows.
+	var eo := 0.25
+	var xo0 := x0 - eo
+	var xo1 := x1 + eo
+	var zo0 := zb - eo
+	var zo1 := zf + eo
+	var rim := top + 2.2
+	var planes := [
+		[Vector3(xo0, top, zo1), Vector3(xo1, top, zo1), Vector3(xi1, rim, zi1), Vector3(xi0, rim, zi1),
+			Vector3(0, 0, 1), zo1 - zi1],
+		[Vector3(xo1, top, zo1), Vector3(xo1, top, zo0), Vector3(xi1, rim, zi0), Vector3(xi1, rim, zi1),
+			Vector3(1, 0, 0), xo1 - xi1],
+		[Vector3(xo1, top, zo0), Vector3(xo0, top, zo0), Vector3(xi0, rim, zi0), Vector3(xi1, rim, zi0),
+			Vector3(0, 0, -1), zi0 - zo0],
+		[Vector3(xo0, top, zo0), Vector3(xo0, top, zo1), Vector3(xi0, rim, zi1), Vector3(xi0, rim, zi0),
+			Vector3(-1, 0, 0), xi0 - xo0]]
+	for pl in planes:
+		var o: Vector3 = pl[4]
+		var run: float = absf(pl[5])
+		lm.quad("Roof", pl[0], pl[1], pl[2], pl[3], (o * (rim - top) + Vector3.UP * run).normalized())
+	# Seams: parallel, from the eave to the rim every 2.4 m.
+	var sx := xi0
+	while sx <= xi1 + 0.01:
+		lm.beam("Seam", Vector3(sx, top + 0.05, zo1), Vector3(sx, rim + 0.05, zi1), 0.12, 0.08, Vector3.RIGHT)
+		lm.beam("Seam", Vector3(sx, top + 0.05, zo0), Vector3(sx, rim + 0.05, zi0), 0.12, 0.08, Vector3.RIGHT)
+		sx += 2.4
+	var sz := zi0
+	while sz <= zi1 + 0.01:
+		lm.beam("Seam", Vector3(xo1, top + 0.05, sz), Vector3(xi1, rim + 0.05, sz), 0.12, 0.08, Vector3.BACK)
+		lm.beam("Seam", Vector3(xo0, top + 0.05, sz), Vector3(xi0, rim + 0.05, sz), 0.12, 0.08, Vector3.BACK)
+		sz += 2.4
+	# The court: flat roof below, granite walls round it, a coping on the rim.
+	lm.quad("Roof", Vector3(xi0, floor_y, zi1), Vector3(xi1, floor_y, zi1), Vector3(xi1, floor_y, zi0),
+		Vector3(xi0, floor_y, zi0), Vector3.UP)
+	var court := [
+		[Vector3(xi0, floor_y, zi1), Vector3(xi1, floor_y, zi1), Vector3(0, 0, -1)],
+		[Vector3(xi1, floor_y, zi1), Vector3(xi1, floor_y, zi0), Vector3(-1, 0, 0)],
+		[Vector3(xi1, floor_y, zi0), Vector3(xi0, floor_y, zi0), Vector3(0, 0, 1)],
+		[Vector3(xi0, floor_y, zi0), Vector3(xi0, floor_y, zi1), Vector3(1, 0, 0)]]
+	for cw in court:
+		var a: Vector3 = cw[0]
+		var b: Vector3 = cw[1]
+		var o: Vector3 = cw[2]
+		lm.quad("Granite", a, b, b + Vector3(0, rim - floor_y, 0), a + Vector3(0, rim - floor_y, 0), o)
+		var m := maxi(int(a.distance_to(b) / 3.8), 1)
+		FhP.win_row(lm, "Trim", "Glass", a, b, o, floor_y + 0.6, m, 1.3, 2.4, false, 0.15)
+		FhP.win_row(lm, "Trim", "Glass", a, b, o, floor_y + 3.7, m, 1.3, 2.6, false, 0.15)
+		FhP.band(lm, "Trim", a + Vector3(0, rim - floor_y, 0), b + Vector3(0, rim - floor_y, 0), -o, rim - 0.4, 0.4,
+			0.2)
+	FhU.blk(lm, "Step", cx - 6.0, floor_y, (zi0 + zi1) * 0.5 + 2.0, 12.0, 1.4, 7.0)
+	FhU.blk(lm, "Step", cx + 8.0, floor_y, (zi0 + zi1) * 0.5 - 3.0, 6.0, 2.0, 4.0)
 	lm.commit(model)
+
+## One pilastered bay run on a flank: pilasters and string courses, a row
+## of arched windows over two rows of tall ones. a..b are ground points.
+static func _parl_bays(lm: LandmarkMesh, a: Vector3, b: Vector3, out: Vector3, bays: int) -> void:
+	FhP.strips(lm, "Trim", a, b, out, 1.2, 21.2, bays + 1, 0.9, 0.3)
+	FhP.band(lm, "Trim", a, b, out, 5.4, 0.35, 0.2)
+	FhP.band(lm, "Trim", a, b, out, 11.9, 0.35, 0.2)
+	FhP.win_row(lm, "Trim", "Glass", a, b, out, 1.8, bays, 1.4, 3.2, true, 0.22)
+	FhP.win_row(lm, "Trim", "Glass", a, b, out, 6.4, bays, 1.4, 4.8, false, 0.22)
+	FhP.win_row(lm, "Trim", "Glass", a, b, out, 12.9, bays, 1.4, 6.0, false, 0.22)
 
 # --- Presidential Palace -------------------------------------------
 
