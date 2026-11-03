@@ -39,14 +39,16 @@ void vertex() {
 	float ph = TIME * 2.3 + wpos.x * 0.9 + wpos.z * 0.7;
 	VERTEX.x += sin(ph) * sway * h * h * (0.4 + gust);
 	VERTEX.z += cos(ph * 0.83) * sway * 0.6 * h * h * (0.4 + gust);
-	// Up-facing normals: cards shade like the ground they stand on.
-	NORMAL = (inverse(MODEL_MATRIX) * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
 }
 void fragment() {
 	vec4 t = texture(tex, UV);
 	if (t.a < 0.5) {
 		discard;
 	}
+	// Up-facing normals: cards shade like the ground they stand on. Set
+	// here, after the back-face flip, or a card seen from behind faces
+	// down and goes black in the sun.
+	NORMAL = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
 	vec3 c = t.rgb * COLOR.rgb;
 	float sc = snow_cover(wpos, 1.0);
 	ALBEDO = mix(c, snow_col, sc * 0.8);
