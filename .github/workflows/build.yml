@@ -30,16 +30,21 @@ permissions:
 
 env:
   VERSION: ${{ inputs.version }}
-  # TestFlight needs a higher build number on every upload.
-  BUILD_NUMBER: ${{ github.run_number }}
+  # BUILD_NUMBER is set by each job's first step: TestFlight needs a
+  # higher build number on every upload, and run_attempt keeps a re-run
+  # from reusing the previous attempt's number (GitHub expressions have
+  # no arithmetic).
 
 jobs:
   macos:
     if: inputs.platform != 'ios'
     runs-on: macos-15
+    timeout-minutes: 90
     environment: release
     steps:
       - uses: actions/checkout@v4
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-godot
 
       - name: Import Developer ID certificate
@@ -75,7 +80,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PlanetRender360-macos-${{ inputs.version }}-${{ github.run_number }}
+          name: PlanetRender360-macos-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/dist/*.dmg
           if-no-files-found: error
 
@@ -88,9 +93,12 @@ jobs:
   ios:
     if: inputs.platform != 'macos'
     runs-on: macos-15
+    timeout-minutes: 90
     environment: release
     steps:
       - uses: actions/checkout@v4
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-godot
 
       - name: Write App Store Connect key
@@ -115,7 +123,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !inputs.testflight }}
         with:
-          name: PlanetRender360-ios-${{ inputs.version }}-${{ github.run_number }}
+          name: PlanetRender360-ios-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/dist/*.ipa
           if-no-files-found: error
 

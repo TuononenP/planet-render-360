@@ -1,0 +1,121 @@
+# Manual Android build: Actions → Android → Run workflow.
+# Signing material lives in the `release` environment's secrets (see README,
+# "Building releases"); nothing secret is committed to this public repo.
+# The .apk is for sideloading/direct distribution: Google Play requires
+# an .aab, which this workflow does not produce. Without a release
+# keystore the .apk is debug-signed instead of release-signed.
+name: Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version (version/name)
+        type: string
+        default: "0.1.0"
+      build_type:
+        description: Build type
+        type: choice
+        options: [release, debug]
+        default: release
+
+permissions:
+  contents: read
+
+env:
+  VERSION: ${{ inputs.version }}
+  # BUILD_NUMBER is set by the first step: version/code must increase on
+  # every upload, and run_attempt keeps a re-run from reusing the
+  # previous attempt's code (GitHub expressions have no arithmetic).
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+
+      - uses: ./.github/actions/setup-godot-linux
+
+      - name: Point Godot at the Android SDK and JDK
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, os, re
+          files = glob.glob(os.path.expanduser("~/.config/godot/editor_settings-*.tres"))
+          assert files, "Godot editor settings not found (did the import step run?)"
+          path = max(files, key=os.path.getmtime)
+          settings = {
+              "export/android/android_sdk_path": os.environ["ANDROID_HOME"],
+              "export/android/java_sdk_path": os.environ["JAVA_HOME"],
+          }
+          text = open(path).read()
+          for key, value in settings.items():
+              line = f'{key} = "{value}"'
+              text, n = re.subn(rf"^{re.escape(key)} = .*$", line, text, flags=re.M)
+              if n == 0:
+                  text += ("" if text.endswith("\n") else "\n") + line + "\n"
+          open(path, "w").write(text)
+          print(f"updated {path}")
+          PY
+
+      - name: Prepare signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            {
+              echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore"
+              echo "ANDROID_KEYSTORE_USER=$ANDROID_KEY_ALIAS"
+            } >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            {
+              echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/debug.keystore"
+              echo "ANDROID_KEYSTORE_USER=androiddebugkey"
+            } >> "$GITHUB_ENV"
+            echo "::notice::No ANDROID_KEYSTORE_* secrets set; the .apk is debug-signed (sideload only)."
+          fi
+
+      - name: Build Android app
+        env:
+          # Scoped to this step only (not $GITHUB_ENV); falls back to the
+          # debug keystore's password when no release secret is set.
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'android' }}
+        run: |
+          if [ "${{ inputs.build_type }}" = "debug" ]; then
+            tools/build_android.sh --debug
+          else
+            tools/build_android.sh
+          fi
+          mkdir -p "$RUNNER_TEMP/dist"
+          mv ../build/android/PlanetRender360.apk "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlanetRender360-android-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
+          path: ${{ runner.temp }}/dist/*.apk
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/debug.keystore"

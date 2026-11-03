@@ -49,6 +49,11 @@ Release builds run from GitHub Actions on demand: **Actions → Build → Run wo
 - `version`: the marketing version, e.g. `0.1.0`; the build number is the workflow run number
 - `testflight`: upload the iOS build to TestFlight, or attach the `.ipa` to the run instead
 
+Android builds run from **Actions → Android → Run workflow**
+([`.github/workflows/android.yml`](.github/workflows/android.yml)) with
+`version` and `build_type` (`release` or `debug`) inputs; the `.apk` is
+attached to the run as an artifact.
+
 The macOS `.dmg` is attached to the run as an artifact. Secrets live in the `release`
 environment and are never committed:
 
@@ -58,6 +63,7 @@ environment and are never committed:
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | App Store Connect API key (Admin role): iOS automatic signing, TestFlight upload, macOS notarization |
 | `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Name (TEAMID)` |
 | `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD` | the Developer ID certificate exported as `.p12` (`base64 -i cert.p12`) |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | Android release keystore (`base64 -i release.keystore`); without them the `.apk` is debug-signed. Either way it is sideload/direct distribution only — Google Play requires an `.aab`, which the workflow does not produce |
 
 The first TestFlight upload also needs an App Store Connect app record for
 `com.planetrender360.app`. The same scripts run locally:
@@ -65,6 +71,7 @@ The first TestFlight upload also needs an App Store Connect app record for
 ```sh
 tools/build_macos.sh               # ../build/macos/PlanetRender360.dmg (ad-hoc; set MACOS_SIGN_IDENTITY + ASC_* to notarize)
 IOS_UPLOAD=0 tools/build_ios_release.sh  # ../build/ios/export/*.ipa (needs APPLE_TEAM_ID + ASC_*)
+tools/build_android.sh             # ../build/android/PlanetRender360.apk (needs JDK 17 + Android SDK; set ANDROID_KEYSTORE_* to release-sign)
 ```
 
 An ad-hoc macOS build opens on other Macs after `xattr -dr com.apple.quarantine "Planet Render 360.app"`.
