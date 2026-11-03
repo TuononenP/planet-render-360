@@ -276,7 +276,7 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Tokyo | stylised | ↑ zebra crossings | No giant screens or crowd; plaza patches still read as lawn; crossings short, not the diagonal scramble |
 | New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
 | Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
-| Monaco | recognisable | — | Port Hercule without boats; vantage lower than the photo |
+| Monaco | recognisable | ↑ marina boats | Boats only where pontoons are mapped and read as water; the preset's basin still shows mostly the photo's own boats; vantage lower than the photo |
 | Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
 | London | recognisable | — | Westminster Bridge arches missing; backlit golden shot flattens the palace |
 | Rome | recognisable | ↑ tufts off the paving | Two tufts left on unmapped dark ground; no stone pines framing the Colosseum |
@@ -287,6 +287,14 @@ Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with t
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
 waterfront road).
+
+Port Hercule's pontoons (`man_made=pier`, `floating=yes`) were mapped but never read. `MarinaBuilder` (desktop
+Ultra) now draws their decks and moors motor yachts and sailboats (7–29 m) stern-to along both sides, 120
+boats in Monaco (`marina_test`). Monaco's detected sea level is −66 m ASL (the DEM's sea floor), so its harbour
+is flat terrain at sea level with the satellite photo's blue sea on it, and `water_at` is 0 there; berths
+count as wet on terrain within 5 m of the pier's height that no building or road covers. Close up it reads
+as a marina (`ultra-p8m-2026-11-03/`), but from the preset eye 550 m away the main basin is still mostly the
+photo's boats. The map query gained piers (`QUERY_MARK` q5): cached places refetch once.
 
 Marked crossings were mapped but invisible: Shibuya's `footway=crossing` ways are rank 0, so they drew at
 depth layer 2, under the carriageway's 4, with no markings anyway. They now get their own "crossing" finish

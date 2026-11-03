@@ -30,13 +30,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var barriers: Array = []
 	var railways: Array = []
 	var furniture: Array = []
+	var piers: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
 			"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture}
+			"furniture": furniture, "piers": piers}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -185,6 +186,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				waterways.append(OsmTags._waterway_entry(el_tags, poly))
 		elif str(el_tags.get("natural", "")) == "coastline":
 			waterways.append(OsmTags._waterway_entry(el_tags, poly, "coastline"))
+		elif str(el_tags.get("man_made", "")) == "pier" and poly.size() >= 2:
+			# A jetty or marina pontoon (floating=yes): MarinaBuilder.
+			piers.append({"points": poly, "floating": str(el_tags.get("floating", "")) == "yes",
+				"width_m": OsmTags._tag_metres(el_tags.get("width", ""), 0.5, 40.0)})
 		elif el_tags.has("barrier"):
 			barriers.append({"points": poly,
 				"class": str(el_tags.get("barrier", "yes"))})
@@ -218,7 +223,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture}
+			"furniture": furniture, "piers": piers}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

@@ -47,7 +47,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	var bar := _barriers(root, data, ground, ctx)
 	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture}
+	var boats := MarinaBuilder.build(root, data, ground, mask)
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats}
 
 # --- Lampposts -----------------------------------------------------------
 

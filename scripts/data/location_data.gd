@@ -169,6 +169,9 @@ var barriers: Array = []
 ## OSM street furniture nodes {x, z, kind, shelter} near the viewpoint
 ## (OsmParser.furniture_kind); StreetFurniture dresses them on desktop Ultra.
 var street_furniture: Array = []
+## OSM man_made=pier ways {points, floating, width_m}: jetties and marina
+## pontoons (MarinaBuilder moors boats along them on desktop Ultra).
+var piers: Array = []
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
@@ -445,7 +448,8 @@ static func landmark_for(lat: float, lon: float, name: String) -> String:
 ## Registry entry of `type`, {} when unknown. Optional fields: yaw_deg
 ## (the model turned clockwise from its built frame, +X east and −Z
 ## north; default 0), clear_m (cleared grounds, default 68) and kind
-## (the callout label when it stands beside the primary).
+## (the callout label when it stands beside the primary) and base_drop_m
+## (how far the model hangs below its origin; lifts it off the ground).
 static func entry_for_type(type: String) -> Dictionary:
 	for entry in landmarks():
 		if str(entry["type"]) == type:

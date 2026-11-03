@@ -42,9 +42,9 @@ const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
 ## Marks a response as this query's (an Overpass `make` element): a
 ## cached detailed payload without it predates the current statements
-## (q3 railways and squares, q4 street furniture), so it is refetched
+## (q3 railways and squares, q4 street furniture, q5 piers), so it is refetched
 ## (and still served if the network fails).
-const QUERY_MARK := "pr360_q4"
+const QUERY_MARK := "pr360_q5"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
@@ -134,7 +134,7 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_RELATIONS],
 		'way["barrier"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_BARRIERS],
-		'way["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out geom 100;'
+		'way["man_made"~"^(tower|lighthouse|windmill|pier)$"](around:%d,%.6f,%.6f);out geom 150;'
 			% [radius_m, lat, lon],
 		'node["natural"="tree"](around:%d,%.6f,%.6f);out %d;'
 			% [radius_m, lat, lon, CAP_TREE_NODES],

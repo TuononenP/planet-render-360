@@ -252,6 +252,8 @@ var country := ""
 var railways: Array = []
 ## Street furniture nodes of the last success (OsmParser.furniture_kind).
 var furniture: Array = []
+## Pier / pontoon ways of the last success (width_m NaN when untagged).
+var piers: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -575,6 +577,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	country = str(parsed.get("country", ""))
 	railways = parsed.get("railways", [])
 	furniture = parsed.get("furniture", [])
+	piers = parsed.get("piers", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

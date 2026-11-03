@@ -332,3 +332,12 @@ placement from its OSM outline (way `building=church`, name
 Riddarholmskyrkan): 62.7 × 39.9 m, nave axis 7.8° north of east, so the
 model is ≈64 × 40 m, yaw −7.8°, and the registry point (59.32468 N,
 18.06454 E) puts the model's centre on the outline's. Model `LandmarkStockholm.riddarholmen`, own work.
+
+## Marina piers and boats — Ultra pass (2026-11-03)
+
+- **OSM piers**: `man_made=pier` ways (+ `floating=yes`, `width`) from the detailed Overpass query (the
+  man_made way statement now also matches `pier`, cap 150); ODbL, same attribution as the map data.
+  Cached payloads from before predate them (`QUERY_MARK` q5), so each place refetches once.
+- **Boat and pontoon geometry**: own procedural work (`MarinaBuilder`), no third-party meshes — CC0 1.0 by
+  this project. Boat counts, sizes and colours are generic (hash-placed along the mapped pontoons), not
+  the real vessels.
