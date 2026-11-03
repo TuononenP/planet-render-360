@@ -38,6 +38,9 @@ const PHOTO_REPS := {"brick": 2, "wood": 2}
 ## Share of a photo's contrast kept once it is shrunk to a bay cell:
 ## concrete's streaks and blotches read as dirty noise at ~4 cm/px.
 const KEEP_CONTRAST := {"concrete": 0.4, "stone": 0.7, "render": 0.7}
+## Clapboard is painted siding: the bundled raw planks' grain and knots,
+## tinted a pastel, read as grime, so siding keeps little of it.
+const SIDING_CONTRAST := 0.25
 
 static var _wall_cache: Dictionary = {}
 static var _wall_mutex := Mutex.new()
@@ -167,7 +170,9 @@ static func _wall_layer(loader: Callable, set_name: String, map_name: String,
 	var src := (loader.call(set_name, map_name) as Image).duplicate() as Image
 	src.convert(Image.FORMAT_RGBA8)
 	src.resize(n, n, Image.INTERPOLATE_BILINEAR)
-	if map_name == "diff" and KEEP_CONTRAST.has(set_name):
+	if map_name == "diff" and turn:
+		_soften(src, SIDING_CONTRAST)
+	elif map_name == "diff" and KEEP_CONTRAST.has(set_name):
 		_soften(src, float(KEEP_CONTRAST[set_name]))
 	if turn:
 		src.rotate_90(CLOCKWISE)

@@ -60,6 +60,11 @@ const ID := {
 	"water": 15, "path": 16,
 }
 
+## Paved sidewalk width beside a road whose `sidewalk` tag names a side
+## (m); inside a city zone (CityStyles) the paving runs on to the building
+## line, which the footprints then paint over.
+const SIDEWALK_M := 3.0
+const SIDEWALK_CITY_M := 7.0
 ## Footpath-like road classes paint pavement / dirt, not asphalt.
 const PAVED_PATHS := ["footway", "pedestrian", "steps", "cycleway",
 	"living_street", "corridor", "platform"]
@@ -307,6 +312,12 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				rings.append(hole)
 		paint.call(rings, int(ID[cls]))
 	var m2u := WorldScale.metres_to_units()
+	# Sidewalks first, so every carriageway paints over them at junctions.
+	var walk_m := SIDEWALK_CITY_M if not CityStyles.zone_at(data.latitude, data.longitude).is_empty() \
+		else SIDEWALK_M
+	for line in data.roads:
+		if line is Dictionary and int((line as Dictionary).get("sidewalk", 0)) != 0:
+			_sidewalks(line, paint, m2u, walk_m)
 	for line in data.roads:
 		var pts := PackedVector2Array()
 		var width := 1.7
@@ -383,6 +394,34 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
 				WorldScale.detailed_extent_units(), fills))
 	return img
+
+## Paved sidewalk band (urban) `walk_m` wide beside the carriageway on
+## each side the road's `sidewalk` bits name: without it the strip between
+## the kerb and a separately mapped footway read as lawn under street trees.
+static func _sidewalks(road: Dictionary, paint: Callable, m2u: float, walk_m: float) -> void:
+	if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) or bool(road.get("area", false)):
+		return
+	var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+	var half := maxf(float(road.get("width_m", 0.0)) * m2u, 0.4) * 0.5
+	var outer := half + walk_m * m2u
+	var sides := int(road.get("sidewalk", 0))
+	for i in pts.size() - 1:
+		var a := pts[i]
+		var b := pts[i + 1]
+		var d := b - a
+		if d.length() < 0.001:
+			continue
+		var dir := d.normalized()
+		# x east, z south: the left of travel (north-bound: west).
+		var left := Vector2(dir.y, -dir.x)
+		var cap := dir * half
+		for side in [[1, 1.0], [2, -1.0]]:
+			if sides & int(side[0]) == 0:
+				continue
+			var n0 := left * float(side[1]) * half * 0.5
+			var n1 := left * float(side[1]) * outer
+			paint.call([PackedVector2Array([a - cap + n0, b + cap + n0, b + cap + n1, a - cap + n1])],
+				ID["urban"])
 
 ## Even-odd scanline fill of the rings (outer + holes) with `id`.
 static func _fill_rings(img: Image, rings: Array, id: int, n: int) -> void:

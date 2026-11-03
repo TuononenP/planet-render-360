@@ -13,7 +13,11 @@ extends RefCounted
 ##   Hong Kong; desktop Ultra only);
 ## - an iron fire escape on the front (`fire_escape`, New York walk-ups);
 ## - a stepped, neck or bell gable rising over the roof on a narrow
-##   gable-fronted house (`gable`, Amsterdam), with its hoist beam.
+##   gable-fronted house (`gable`, Amsterdam), with its hoist beam;
+## - a garage door at street level with the entry stair beside it
+##   (`garage`, San Francisco flats and stucco rowhouses);
+## - a bracketed cornice along the top of a flat-roofed front (`cornice`,
+##   Italianate and Edwardian San Francisco).
 ## Rolls are seeded per building and stretch; geometry goes to FacadeRelief's
 ## ReliefKit, so one building is still one mesh.
 
@@ -35,6 +39,10 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 	var b: Dictionary = d.get("b", {})
 	var shops := str(look.get("ground", "")) in ["shop", "signage"] \
 		or str(look.get("pattern", "")) == "haussmann" or str(b.get("use", "")) in SHOP_USES
+	var garage := has_garage(d)
+	var trim := FacadeRelief.trim_for(look, stone)
+	var corniced := str(d.get("shape", "")) == "flat" \
+		and ArchitectureStyle._h(seed_v, 89) < float(relief.get("cornice", 0.0))
 	var stooped := false
 	var escaped := false
 	var longest := -1
@@ -51,6 +59,11 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 			# Desktop Ultra near the eye: the lit shop spills onto the pavement.
 			if bool(d.get("shop_lights", false)):
 				ShopLights.note(sp["a"], sp["dir"], sp["n"], float(sp["len_m"]), float(rows[0]["y0"]))
+		if garage and i == longest:
+			_garage(kit, sp, rows, float(d["ground_y"]), stone, trim, seed_v)
+			stooped = true
+		if corniced:
+			_cornice(kit, sp, float(d["top"]), trim)
 		if not stooped and not raised and i == longest and ArchitectureStyle._h(seed_v, 81) < float(relief.get("stoop", 0.0)):
 			_stoop(kit, sp, float(d["ground_y"]), stone)
 			stooped = true
@@ -65,6 +78,100 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 			escaped = true
 		if str(relief.get("gable", "")) != "" and bool(d.get("gable_front", false)):
 			_gable(kit, sp, d, str(relief["gable"]))
+
+## A garage at street level (rolled per building on the look's `garage`
+## odds): never under a shopfront or on a raised building. FacadeRelief
+## then starts its bays above the garage storey.
+static func has_garage(d: Dictionary) -> bool:
+	var look: Dictionary = d["look"]
+	var b: Dictionary = d.get("b", {})
+	if bool(d.get("raised", false)) or str(look.get("ground", "")) in ["shop", "signage"] \
+			or str(b.get("use", "")) in SHOP_USES:
+		return false
+	return ArchitectureStyle._h(float(d["seed"]), 90) < float((look.get("relief", {}) as Dictionary).get("garage", 0.0))
+
+const GARAGE_DOORS := ["#f2efe8", "#d8d4cc", "#5a4a3a", "#7a8288", "#e8e0d0", "#3a4a5a"]
+## Riser and tread of the entry stair (m).
+const RISER_M := 0.19
+const TREAD_M := 0.28
+
+## Garage door under the bay (the first window bay of a narrow front, the
+## second of a wider one) and the entry stair on the next bay, climbing
+## along the wall to a door at the first floor: the San Francisco flat
+## raised over its garage.
+static func _garage(kit: ReliefKit, sp: Dictionary, rows: Array, ground_y: float,
+		stone: Material, trim: Material, seed_v: float) -> void:
+	var m := WorldScale.metres_to_units()
+	var dir: Vector2 = sp["dir"]
+	var n: Vector2 = sp["n"]
+	var ax := Vector3(dir.x, 0.0, dir.y)
+	var az := Vector3(n.x, 0.0, n.y)
+	var bays := maxi(int(sp["bays"]), 1)
+	var step := float(sp["len_m"]) * m / float(bays)
+	var door_bay := 0 if bays < 3 else 1
+	var dw := minf(step * 0.86, 2.8 * m)
+	var dh := minf(float(rows[0]["y1"]) - ground_y - 0.35 * m, 2.3 * m)
+	if dh < 1.8 * m:
+		return
+	var dc2: Vector2 = (sp["a"] as Vector2) + dir * step * (float(door_bay) + 0.5)
+	var dc := Vector3(dc2.x, ground_y, dc2.y) + az * 0.03 * m
+	var door := ReliefKit.flat(str(GARAGE_DOORS[int(ArchitectureStyle._h(seed_v, 91) * GARAGE_DOORS.size())
+		% GARAGE_DOORS.size()]), 0.55)
+	kit.quad(door, dc - ax * dw * 0.5, dc + ax * dw * 0.5, dc + ax * dw * 0.5 + Vector3.UP * dh,
+		dc - ax * dw * 0.5 + Vector3.UP * dh, az)
+	# Panel grooves, then the header and jambs in the trim.
+	var groove := ReliefKit.flat("#2e2e2c", 0.8)
+	for k in range(1, 4):
+		var gy := Vector3.UP * dh * float(k) / 4.0 + az * 0.005 * m
+		kit.quad(groove, dc - ax * dw * 0.48 + gy, dc + ax * dw * 0.48 + gy,
+			dc + ax * dw * 0.48 + gy + Vector3.UP * 0.03 * m, dc - ax * dw * 0.48 + gy + Vector3.UP * 0.03 * m, az)
+	kit.box(trim, dc + Vector3.UP * (dh + 0.09 * m), ax, az, Vector3(dw + 0.3 * m, 0.18 * m, 0.12 * m))
+	for s in [-1.0, 1.0]:
+		kit.box(trim, dc + ax * s * (dw * 0.5 + 0.06 * m) + Vector3.UP * dh * 0.5, ax, az,
+			Vector3(0.12 * m, dh, 0.1 * m))
+	if bays < 2 or rows.size() < 2:
+		return
+	# Entry stair on the neighbouring bay, rising away from the garage.
+	var rise := minf(float(rows[1]["y0"]) - ground_y, 3.6 * m)
+	if rise < 0.6 * m:
+		return
+	var sb := door_bay + 1 if door_bay + 1 < bays else door_bay - 1
+	var away := signf(float(sb - door_bay))
+	var steps := ceili(rise / (RISER_M * m))
+	var run := minf(step * 0.9, float(steps) * TREAD_M * m)
+	var tread := run / float(steps)
+	var depth := 1.1 * m
+	var s2: Vector2 = (sp["a"] as Vector2) + dir * step * (float(sb) + 0.5)
+	var start := Vector3(s2.x, ground_y, s2.y) - ax * away * run * 0.5
+	for k in steps:
+		var h := rise * float(k + 1) / float(steps)
+		kit.box(stone, start + ax * away * tread * (float(k) + 0.5) + Vector3.UP * h * 0.5 + az * depth * 0.5,
+			ax, az, Vector3(tread, h, depth))
+	var top := start + ax * away * run + Vector3.UP * rise
+	kit.rail(start + az * depth + Vector3.UP * RISER_M * m, top + az * depth, 0.9 * m, az)
+	# The entry door at the head of the stair.
+	var e := top - ax * away * 0.6 * m + az * 0.03 * m
+	kit.quad(ReliefKit.flat("#4a3a2e", 0.6), e - ax * 0.5 * m, e + ax * 0.5 * m,
+		e + ax * 0.5 * m + Vector3.UP * 2.1 * m, e - ax * 0.5 * m + Vector3.UP * 2.1 * m, az)
+
+## Bracketed cornice along the top of a flat-roofed street front: a band
+## projecting 0.45 m on slim brackets every ~0.6 m, in the trim.
+static func _cornice(kit: ReliefKit, sp: Dictionary, top: float, trim: Material) -> void:
+	var m := WorldScale.metres_to_units()
+	var dir: Vector2 = sp["dir"]
+	var n: Vector2 = sp["n"]
+	var ax := Vector3(dir.x, 0.0, dir.y)
+	var az := Vector3(n.x, 0.0, n.y)
+	var len := float(sp["len_m"]) * m
+	var mid2: Vector2 = (sp["a"] as Vector2) + dir * len * 0.5
+	var mid := Vector3(mid2.x, top, mid2.y)
+	kit.box(trim, mid - Vector3.UP * 0.16 * m + az * 0.225 * m, ax, az, Vector3(len, 0.32 * m, 0.45 * m))
+	kit.box(trim, mid - Vector3.UP * 0.62 * m + az * 0.04 * m, ax, az, Vector3(len, 0.28 * m, 0.08 * m))
+	var count := maxi(roundi(len / (0.6 * m)), 2)
+	for k in count:
+		var t := (float(k) + 0.5) / float(count) * len - len * 0.5
+		kit.box(trim, mid + ax * t - Vector3.UP * 0.44 * m + az * 0.17 * m, ax, az,
+			Vector3(0.07 * m, 0.24 * m, 0.32 * m))
 
 ## Awnings over the shop bays of a ground storey: one colour per building.
 static func _awnings(kit: ReliefKit, sp: Dictionary, ground: Dictionary,

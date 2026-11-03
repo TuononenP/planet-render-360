@@ -74,7 +74,7 @@ const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"deep_balcony": TYPE_FLOAT, "string_course": TYPE_BOOL, "awning": TYPE_FLOAT,
 	"awning_colours": TYPE_ARRAY, "fire_escape": TYPE_FLOAT, "stoop": TYPE_FLOAT,
 	"signage": TYPE_FLOAT, "screens": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL,
-	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING}
+	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
 const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood"]
@@ -729,7 +729,27 @@ func _era_checks(failures: Array[String]) -> void:
 		["hong_kong", {"kind": "apartments", "levels": 6}, {}, "hk_tenement"],
 		["singapore", {"kind": "commercial", "levels": 3}, {}, "sg_shophouse"],
 		["singapore", {"kind": "apartments", "levels": 14}, {}, "singapore"],
-		["san_francisco", {"kind": "house", "levels": 2}, {}, "sf_victorian"],
+		["san_francisco", {"kind": "house", "levels": 2, "heritage": true}, {}, "sf_victorian"],
+		["san_francisco", {"kind": "house", "levels": 2, "start_year": 1890}, {}, "sf_victorian"],
+		["san_francisco", {"kind": "house", "levels": 2, "start_year": 1938}, {}, "sf_stucco"],
+		["san_francisco", {"kind": "apartments", "levels": 4, "start_year": 1912}, {}, "san_francisco"],
+		["san_francisco", {"kind": "apartments", "levels": 14, "start_year": 1926}, {}, "sf_prewar"],
+		["san_francisco", {"kind": "apartments", "levels": 40}, {}, "sf_tower"],
+		["san_francisco", {"kind": "commercial", "levels": 20, "architecture": "art_deco"}, {}, "sf_prewar"],
+		# By district: Sunset house, Nob Hill high-rise, Chinatown walk-up,
+		# Russian Hill flats (local frames at each district's centre).
+		["san_francisco", {"kind": "house", "levels": 2, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7530, -122.4940), "sf_stucco"],
+		["san_francisco", {"kind": "apartments", "levels": 12, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7915, -122.4140), "sf_prewar"],
+		["san_francisco", {"kind": "apartments", "levels": 4, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7945, -122.4065), "sf_chinatown"],
+		["san_francisco", {"kind": "house", "levels": 3, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7990, -122.4180), "san_francisco"],
+		["san_francisco", {"kind": "apartments", "levels": 25, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7915, -122.4140), "sf_prewar"],
+		["san_francisco", {"kind": "apartments", "levels": 35, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("san_francisco", 37.7915, -122.4140), "sf_tower"],
 		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
 		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],
 		["seoul", {"kind": "apartments", "levels": 18}, {}, "seoul"],

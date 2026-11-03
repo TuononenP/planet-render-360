@@ -28,7 +28,10 @@ extends RefCounted
 ##         oriel (0..1 odds), awning_colours [sRGB hex], string_course,
 ##         quoins (bool), gable "" | step | neck | bell (or weighted
 ##         [[gable, w], ...], picked per building), altana (0..1 odds of
-##         a timber roof terrace), chimney_cap "bell" (flared Venetian stack)
+##         a timber roof terrace), chimney_cap "bell" (flared Venetian stack),
+##         garage (0..1 odds of a street-level garage door with the entry
+##         stair beside it), cornice (0..1 odds of a bracketed cornice
+##         along a flat-roofed street front)
 
 ## Ordered first-match boxes [region, south, west, north, east, (ISO codes)].
 ## Coarse by design — borders are approximate, and neighbouring regions

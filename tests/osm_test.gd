@@ -185,6 +185,7 @@ func _run() -> void:
 	_material_map_checks(failures)
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
+	_sidewalk_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -722,6 +723,13 @@ func _tree_tag_checks(failures: Array[String]) -> void:
 			or TreeSpecies.species_from_tags({"leaf_type": "broadleaved", "leaf_cycle": "evergreen"}, "dry_coast") != "olive" \
 			or TreeSpecies.species_from_tags({}, "temperate") != "":
 		failures.append("genus / species / leaf tags should name the modelled species")
+	# San Francisco's mapped street and park trees.
+	for sf in [[{"species": "cupressus macrocarpa"}, "monterey_cypress"], [{"genus": "hesperocyparis"}, "monterey_cypress"],
+			[{"genus": "eucalyptus"}, "eucalyptus"], [{"species": "metrosideros excelsa"}, "metrosideros"],
+			[{"species": "lophostemon confertus"}, "metrosideros"], [{"genus": "cupressus"}, "cypress"]]:
+		if TreeSpecies.species_from_tags(sf[0], "dry_coast") != sf[1]:
+			failures.append("%s should model as %s, got %s" % [sf[0], sf[1],
+				TreeSpecies.species_from_tags(sf[0], "dry_coast")])
 	for e in TreeSpecies.mix_for_leaf("temperate", "forest", "needleleaved"):
 		if str(e[0]) not in ["spruce", "scots_pine", "stone_pine", "cypress"]:
 			failures.append("a needleleaved forest mix must hold conifers only, got %s" % e[0])
@@ -933,3 +941,27 @@ func _orphan_part_checks(failures: Array[String]) -> void:
 		failures.append("an orphan part on another part keeps its lift, got %s" % lift.call("Upper"))
 	if lift.call("Bridge") != 20.0:
 		failures.append("a small lifted part (skybridge) keeps its lift, got %s" % lift.call("Bridge"))
+
+## Road `sidewalk` sides (bits: 1 left, 2 right), as San Francisco maps them.
+func _sidewalk_checks(failures: Array[String]) -> void:
+	for row in [[{"sidewalk:both": "separate"}, 3], [{"sidewalk": "both"}, 3], [{"sidewalk": "right"}, 2],
+			[{"sidewalk:left": "no", "sidewalk:right": "separate"}, 2],
+			[{"sidewalk:left": "yes", "sidewalk:right": "separate"}, 3],
+			[{"sidewalk": "no"}, 0], [{"sidewalk:both": "no"}, 0], [{}, 0],
+			[{"sidewalk": "both", "sidewalk:left": "no"}, 2]]:
+		var got := OsmTags.sidewalk_sides(row[0])
+		if got != int(row[1]):
+			failures.append("sidewalk sides of %s: %d, expected %d" % [row[0], got, row[1]])
+	var road := OsmTags._road_entry({"highway": "tertiary", "sidewalk:both": "separate"},
+		PackedVector2Array([Vector2.ZERO, Vector2(10, 0)]))
+	if int(road.get("sidewalk", -1)) != 3:
+		failures.append("road entry must carry its sidewalk sides: %s" % road)
+	var cable := OsmTags._rail_entry({"railway": "tram", "gauge": "1067", "electrified": "no", "cable_tram": "cable"},
+		PackedVector2Array([Vector2.ZERO, Vector2(10, 0)]))
+	if not bool(cable.get("cable", false)) or absf(float(cable["gauge_m"]) - 1.067) > 0.001 or not bool(cable["embedded"]):
+		failures.append("a cable car track must be embedded, 1067 mm, with its cable slot: %s" % cable)
+	if bool(OsmTags._rail_entry({"railway": "tram"}, PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])).get("cable", true)):
+		failures.append("a plain tram has no cable slot")
+	if not bool(OsmTags._rail_entry({"railway": "tram", "gauge": "1067", "electrified": "no"},
+			PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])).get("cable", false)):
+		failures.append("a non-electrified street tram (Hyde St's track) is a cable car")

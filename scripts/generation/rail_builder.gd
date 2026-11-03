@@ -6,7 +6,8 @@ extends RefCounted
 ## a ballast ribbon (sleepers painted by BALLAST_CODE from the ribbon UV,
 ## no per-sleeper geometry) under two steel rails at the way's gauge;
 ## street tram track is only its two rails, flush in the carriageway and
-## depth-biased over it. Bridges get RoadBuilder's deck with a ballast
+## depth-biased over it (a cable car's sits in a concrete bed and adds
+## the slot rails between them). Bridges get RoadBuilder's deck with a ballast
 ## top; tunnels and covered track are skipped.
 
 const BED_LIFT_M := 0.025
@@ -24,6 +25,13 @@ const SLEEPER_INSET_M := 0.35
 const BALLAST_HEX := "#6f6a63"
 const SLEEPER_HEX := "#8c8984"
 const STEEL_HEX := "#77736f"
+## Gap between the slot rails over a cable car's cable (m), and the
+## concrete bed the cable-car track is set in: its width past the rails
+## (m) and depth layer (over every carriageway, under the rails).
+const CABLE_SLOT_M := 0.03
+const CABLE_BED_M := 1.2
+const CABLE_BED_LAYER := 7.0
+const TRACK_BED_HEX := "#a39d92"
 
 ## Ballast bed: speckled stone, concrete sleepers across it (UV.y along
 ## in 4 m units, UV2.x the bed width in metres), anti-aliased into their
@@ -137,6 +145,13 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			ys.append(surf.height(p.x, p.y) + lift)
 		if embedded:
 			_rails(RoadBuilder._batch(batches, "rail"), run, ys, gauge, 0.0, m2u, RAIL_LAYER)
+			if bool(way.get("cable", false)):
+				# A concrete track bed in the asphalt, and the cable slot:
+				# two steel slot rails either side of a gap.
+				RoadBuilder._ribbon(RoadBuilder._batch(batches, "track_bed"),
+					RoadBuilder._straighten(run, surf.step), gauge + CABLE_BED_M * m2u, surf,
+					STREET_RAIL_LIFT_M * 0.6 * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
+				_rails(RoadBuilder._batch(batches, "rail"), run, ys, CABLE_SLOT_M * m2u, 0.0, m2u, RAIL_LAYER)
 		else:
 			RoadBuilder._ribbon(RoadBuilder._batch(batches, "ballast"),
 				RoadBuilder._straighten(run, surf.step), bed, surf, BED_LIFT_M * m2u,
@@ -229,6 +244,10 @@ static func _material(key: String) -> Material:
 			bm.set_shader_parameter("pitch", SLEEPER_PITCH_M)
 			bm.set_shader_parameter("inset", SLEEPER_INSET_M)
 			m = bm
+		"track_bed":
+			# Depth-layered like the road ribbons (a plain PBR deck would
+			# z-fight the asphalt it is set in).
+			m = RoadSurface.paved_material("pavement", Color.html(TRACK_BED_HEX).srgb_to_linear())
 		"rail":
 			var rsh := Shader.new()
 			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL)

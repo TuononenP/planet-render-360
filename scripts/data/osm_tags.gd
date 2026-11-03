@@ -135,7 +135,10 @@ static func rail_class(tags: Dictionary) -> String:
 
 ## One railway dict: the gauge (mm tag, else 1000 mm tram / 1435 mm),
 ## whether the track is set in a street (trams unless embedded=no, or
-## embedded=yes) and the bed width (ballast shoulders past the rails).
+## embedded=yes), whether a cable runs in a slot between the rails
+## (`cable_tram=cable`, or a street tram with `electrified=no`: San
+## Francisco maps most of its cable-car track only so) and the bed width
+## (ballast shoulders past the rails).
 static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var cls := rail_class(tags)
 	var gauge_mm := _tag_int(str(tags.get("gauge", "")).split(";")[0], 0, 3000)
@@ -145,6 +148,8 @@ static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 	var emb := str(tags.get("embedded", "")).strip_edges().to_lower()
 	var embedded := emb in ["yes", "partial"] or (cls == "tram" and emb != "no")
 	return {"points": pts, "class": cls, "gauge_m": gauge, "embedded": embedded,
+		"cable": cls == "tram" and (str(tags.get("cable_tram", "")).strip_edges().to_lower() in ["cable", "yes"]
+			or str(tags.get("electrified", "")).strip_edges().to_lower() == "no"),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")) or underground(tags)
 			or _tag_truthy(tags.get("covered", "")),
@@ -374,17 +379,69 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 	var lanes := _tag_int(tags.get("lanes", 0), 0, 20)
 	var width_m := road_class_width(road_class)
 	var w := _tag_metres(tags.get("width", ""), 0.5, 100.0)
+	var parking := parking_sides(tags)
 	if not is_nan(w):
 		width_m = w
-	elif lanes > 0:
-		width_m = float(lanes) * 3.0
+	else:
+		if lanes > 0:
+			width_m = float(lanes) * 3.0
+		# `lanes` counts traffic lanes: a tagged parking lane widens the road.
+		if parking > 0:
+			width_m += PARKING_LANE_M * float((parking & 1) + (parking >> 1))
 	return {"points": pts, "width_m": width_m, "lanes": lanes,
+		"width_tagged": not is_nan(w), "parking": parking,
+		"kerb_line": str(tags.get("footway", "")) == "sidewalk",
 		"surface": str(tags.get("surface", "")),
 		"crossing": is_crossing(tags),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
+		"sidewalk": sidewalk_sides(tags),
 		"class": road_class}
+
+## Width of a parking lane along a kerb (m).
+const PARKING_LANE_M := 2.2
+const PARKING_YES: Array[String] = ["lane", "street_side", "on_kerb", "half_on_kerb", "shoulder",
+	"parallel", "diagonal", "perpendicular", "marked", "yes"]
+const PARKING_NO: Array[String] = ["no", "no_parking", "no_stopping", "separate", "fire_lane"]
+
+## Sides of a road with kerbside parking, as bits (1 left, 2 right) from
+## `parking:both|left|right` (and the older `parking:lane:*`); -1 when
+## the road says nothing about parking.
+static func parking_sides(tags: Dictionary) -> int:
+	var sides := -1
+	for scheme in ["parking:", "parking:lane:"]:
+		for side in [["both", 3], ["left", 1], ["right", 2]]:
+			var v := str(tags.get(scheme + str(side[0]), "")).strip_edges().to_lower()
+			if v in PARKING_YES:
+				sides = maxi(sides, 0) | int(side[1])
+			elif v in PARKING_NO:
+				sides = maxi(sides, 0) & ~int(side[1])
+	return sides
+
+## Sides of a road with a sidewalk, as bits (1 left, 2 right) from
+## `sidewalk` and `sidewalk:both|left|right`. `separate` counts: the
+## footway is mapped as its own line, but the paving still runs from the
+## kerb to the building line.
+static func sidewalk_sides(tags: Dictionary) -> int:
+	var sides := 0
+	match str(tags.get("sidewalk", "")).strip_edges().to_lower():
+		"both", "yes", "separate":
+			sides = 3
+		"left":
+			sides = 1
+		"right":
+			sides = 2
+	var both := str(tags.get("sidewalk:both", "")).strip_edges().to_lower()
+	if both != "":
+		sides = 3 if both in ["yes", "separate"] else 0
+	for side in [["sidewalk:left", 1], ["sidewalk:right", 2]]:
+		var v := str(tags.get(side[0], "")).strip_edges().to_lower()
+		if v in ["yes", "separate"]:
+			sides |= int(side[1])
+		elif v == "no":
+			sides &= ~int(side[1])
+	return sides
 ## One contract-§2.6 waterway dict (river/stream/canal lines, plus
 ## coastline ways via forced_class).
 static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,

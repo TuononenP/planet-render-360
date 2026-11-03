@@ -57,6 +57,22 @@ const SPECIES := {
 	"palm": {"gen": "palm", "h": 11.0, "h_var": 0.3, "fronds": 15, "frond_len": 4.2,
 		"trunk_r": 0.22, "leaf": "palm", "bark": "palm", "tint": "palm",
 		"evergreen": true},
+	# Pacific-coast summer-dry trees (dry_coast): the broad, flat-topped,
+	# wind-sheared Monterey cypress of the headlands and parks; tall, open,
+	# grey-green eucalyptus; and the dense dark evergreen street tree of
+	# coastal California and the Cape (Metrosideros, Lophostemon, Ficus).
+	"monterey_cypress": {"gen": "broad", "h": 18.0, "h_var": 0.25, "bole": 0.22, "crown_r": 0.55,
+		"leader": 0.2, "branches": 6, "trunk_r": 0.42, "up": 0.3, "droop": 0.0,
+		"clusters": 52, "card": 3.2, "leaf": "cypress", "bark": "furrowed",
+		"tint": "cypress", "evergreen": true, "flat_top": true},
+	"eucalyptus": {"gen": "broad", "h": 30.0, "h_var": 0.3, "bole": 0.45, "crown_r": 0.24,
+		"leader": 0.7, "branches": 7, "trunk_r": 0.42, "up": 0.65, "droop": 0.35,
+		"clusters": 44, "card": 2.6, "leaf": "olive", "bark": "plane",
+		"tint": "eucalyptus", "evergreen": true},
+	"metrosideros": {"gen": "broad", "h": 9.0, "h_var": 0.25, "bole": 0.2, "crown_r": 0.5,
+		"leader": 0.3, "branches": 6, "trunk_r": 0.3, "up": 0.45, "droop": 0.05,
+		"clusters": 56, "card": 2.6, "leaf": "broad", "bark": "furrowed",
+		"tint": "evergreen", "evergreen": true},
 }
 
 ## Season tints (sRGB), applied over the near-neutral leaf atlases:
@@ -73,6 +89,8 @@ const TINTS := {
 	"spruce": [Color(0.24, 0.37, 0.22), Color(0.21, 0.34, 0.20), Color(0.21, 0.33, 0.20), Color(0.19, 0.29, 0.19)],
 	"cypress": [Color(0.24, 0.37, 0.20), Color(0.22, 0.35, 0.19), Color(0.22, 0.34, 0.19), Color(0.20, 0.31, 0.18)],
 	"palm": [Color(0.40, 0.54, 0.25), Color(0.38, 0.52, 0.24), Color(0.40, 0.52, 0.25), Color(0.38, 0.50, 0.24)],
+	"eucalyptus": [Color(0.46, 0.54, 0.42), Color(0.43, 0.51, 0.40), Color(0.43, 0.50, 0.40), Color(0.41, 0.48, 0.38)],
+	"evergreen": [Color(0.24, 0.38, 0.19), Color(0.21, 0.34, 0.17), Color(0.21, 0.34, 0.17), Color(0.20, 0.32, 0.17)],
 }
 
 ## Bark colour behind impostor bark pixels (impostors store luminance).
@@ -148,10 +166,13 @@ static func mix(biome: String, setting: String) -> Array:
 			return [["stone_pine", 0.3], ["olive", 0.25], ["cypress", 0.2], ["plane", 0.15], ["palm", 0.1]]
 		"dry_coast":
 			if setting == "forest":
-				return [["oak", 0.45], ["scots_pine", 0.3], ["cypress", 0.15], ["spruce", 0.1]]
+				return [["oak", 0.35], ["monterey_cypress", 0.2], ["eucalyptus", 0.2], ["scots_pine", 0.15],
+					["cypress", 0.1]]
 			if setting == "street":
-				return [["plane", 0.35], ["oak", 0.25], ["palm", 0.15], ["cypress", 0.15], ["lime", 0.1]]
-			return [["oak", 0.45], ["scots_pine", 0.25], ["cypress", 0.2], ["plane", 0.1]]
+				return [["metrosideros", 0.3], ["plane", 0.25], ["palm", 0.12], ["lime", 0.1], ["oak", 0.08],
+					["eucalyptus", 0.05], ["cypress", 0.05], ["monterey_cypress", 0.05]]
+			return [["oak", 0.35], ["monterey_cypress", 0.2], ["eucalyptus", 0.15], ["scots_pine", 0.15],
+				["cypress", 0.1], ["plane", 0.05]]
 		"boreal":
 			if setting == "forest":
 				return [["spruce", 0.42], ["scots_pine", 0.33], ["birch", 0.25]]
@@ -188,6 +209,9 @@ const GENUS := {
 	"pinus": "scots_pine", "picea": "spruce", "abies": "spruce",
 	"pseudotsuga": "spruce", "larix": "spruce", "tsuga": "spruce",
 	"cupressus": "cypress", "juniperus": "cypress", "thuja": "cypress",
+	"hesperocyparis": "monterey_cypress", "eucalyptus": "eucalyptus", "corymbia": "eucalyptus",
+	"metrosideros": "metrosideros", "lophostemon": "metrosideros", "ficus": "metrosideros",
+	"pittosporum": "metrosideros", "tristaniopsis": "metrosideros", "arbutus": "olive",
 	"taxus": "cypress", "sequoia": "spruce", "sequoiadendron": "spruce",
 	"cedrus": "stone_pine",
 	"phoenix": "palm", "washingtonia": "palm", "trachycarpus": "palm",
@@ -204,6 +228,8 @@ static func species_from_tags(tags: Dictionary, biome: String) -> String:
 		genus = str(tags["species"]).get_slice(" ", 0)
 	if genus == "pinus" and str(tags.get("species", "")).contains("pinea"):
 		return "stone_pine"
+	if genus == "cupressus" and str(tags.get("species", "")).contains("macrocarpa"):
+		return "monterey_cypress"
 	if GENUS.has(genus):
 		return GENUS[genus]
 	var leaf := str(tags.get("leaf_type", ""))
@@ -234,7 +260,7 @@ static func mix_for_leaf(biome: String, setting: String, leaf_type: String) -> A
 	var out: Array = []
 	for e in base:
 		var sp := str(e[0])
-		var conifer := str(spec(sp).get("gen", "")) == "conifer" or sp in ["scots_pine", "stone_pine"]
+		var conifer := str(spec(sp).get("gen", "")) == "conifer" or sp in ["scots_pine", "stone_pine", "monterey_cypress"]
 		if conifer == want_conifer:
 			out.append(e)
 	if out.is_empty():

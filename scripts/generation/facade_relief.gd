@@ -49,13 +49,15 @@ static func add(root: Node3D, d: Dictionary) -> void:
 		look.get("wall_colour", Color(0, 0, 0, 0)))
 	var party: PartyWalls = d.get("party")
 	var spans := exposed_spans(d["ring"], d["cover"])
+	var garage := StreetFront.has_garage(d)
 	for sp in spans:
 		sp["street"] = party != null and party.faces_street(sp["a"], sp["b"], sp["n"])
 		sp["bays"] = 0 if float(sp["len_m"]) < uvp.x * 0.5 else maxi(1, roundi(float(sp["len_m"]) / uvp.x))
 		_storeys(kit, sp, rows, look, relief, stone, float(d["seed"]), uvp.z == 0.0)
 		if sp["street"] and ArchitectureStyle._h(float(d["seed"]) + float(sp["edge"]) * 0.53, 64) \
 				< float(relief.get("oriel", 0.0)):
-			_oriels(kit, sp, rows, stone, str(look.get("ground", "")) == "")
+			_oriels(kit, sp, rows, oriel_paint(d.get("b", {}), look, stone),
+				trim_for(look, stone), str(look.get("ground", "")) == "" and not garage)
 	StreetFront.add(kit, spans, rows, d, stone)
 	kit.flush(root, "Relief")
 
@@ -251,11 +253,40 @@ static func _quoins(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material
 				+ ax * float(end[2]) * w * 0.5 + az * 0.03 * m
 			kit.box(stone, c, ax, az, Vector3(w, 0.52 * m, 0.06 * m))
 
-## Bay windows on every other bay of a street stretch: a canted stone bay
-## 0.6 m deep up the storeys (from the ground on a house without a shop
-## front), glazed on its front and both canted sides per storey.
-static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material,
-		from_ground: bool) -> void:
+## Painted finishes: a bay on a timber or rendered front is built of the
+## same painted boards or stucco as the wall, not of stone.
+const PAINTED_SETS: Array[String] = ["wood", "render"]
+
+## The bay's own surface: the wall's paint (its colour tag, else the
+## look's wall colour, both as FacadeMaterials paints the wall) on a
+## painted finish; else the relief stone. A flat colour, cached per hex,
+## so painted bays never add to the PBR material cap.
+static func oriel_paint(b: Dictionary, look: Dictionary, stone: Material) -> Material:
+	if not str(look.get("wall_set", "")) in PAINTED_SETS:
+		return stone
+	var c: Color = look.get("wall_colour", Color(0, 0, 0, 0))
+	var tag := MaterialLibrary.parse_colour_tag(str(b.get("colour", "")))
+	if tag.a > 0.0:
+		var q := Color(roundf(tag.r * 16.0) / 16.0, roundf(tag.g * 16.0) / 16.0, roundf(tag.b * 16.0) / 16.0)
+		c = Color.from_hsv(q.h, minf(q.s, 0.42), q.v)
+	if c.a <= 0.0:
+		return stone
+	return ReliefKit.flat(Color(c.r, c.g, c.b).linear_to_srgb().to_html(false), 0.65)
+
+## Trim for a painted bay's cap, corbel and cornice band: the look's window
+## frame colour (Victorian white trim); the relief stone on stone fronts.
+static func trim_for(look: Dictionary, stone: Material) -> Material:
+	if not str(look.get("wall_set", "")) in PAINTED_SETS or not look.has("frame"):
+		return stone
+	var f: Color = look["frame"]
+	return ReliefKit.flat(Color(f.r, f.g, f.b).linear_to_srgb().to_html(false), 0.6)
+
+## Bay windows on every other bay of a street stretch: a canted bay 0.6 m
+## deep up the storeys (from the ground on a house without a shop front),
+## glazed on its front and both canted sides per storey; `paint` is its
+## surface (stone, or the wall's paint), `trim` its cap and corbel.
+static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, paint: Material,
+		trim: Material, from_ground: bool) -> void:
 	var bays := int(sp["bays"])
 	if bays < 1 or rows.size() < 2:
 		return
@@ -290,7 +321,7 @@ static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material
 					fn = -fn
 				var up0 := Vector3.UP * y0
 				var up1 := Vector3.UP * y1
-				kit.quad(stone, p0 + up0, p1 + up0, p1 + up1, p0 + up1, fn)
+				kit.quad(paint, p0 + up0, p1 + up0, p1 + up1, p0 + up1, fn)
 				var g0 := Vector3.UP * lerpf(y0, y1, 0.22)
 				var g1 := Vector3.UP * lerpf(y0, y1, 0.88)
 				var inset := (p1 - p0) * 0.12
@@ -298,9 +329,11 @@ static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material
 					p1 - inset + g1 + fn * 0.01 * m, p0 + inset + g1 + fn * 0.01 * m, fn)
 		if lo > 0:
 			# Corbelled base under a bay that starts above the street.
-			kit.box(stone, Vector3(c2.x, float(rows[lo]["y0"]) - 0.1 * m, c2.y) + az * depth * 0.5,
+			kit.box(trim, Vector3(c2.x, float(rows[lo]["y0"]) - 0.1 * m, c2.y) + az * depth * 0.5,
 				ax, az, Vector3(w, 0.4 * m, depth))
-		# Lead-capped top over the bay.
+		# Cornice band and capped top over the bay.
 		var top := float(rows[-1]["y1"])
-		kit.box(stone, Vector3(c2.x, top + 0.06 * m, c2.y) + az * depth * 0.5, ax, az,
-			Vector3(w, 0.12 * m, depth + 0.08 * m))
+		kit.box(trim, Vector3(c2.x, top - 0.12 * m, c2.y) + az * depth * 0.5, ax, az,
+			Vector3(w + 0.06 * m, 0.24 * m, depth + 0.06 * m))
+		kit.box(trim, Vector3(c2.x, top + 0.06 * m, c2.y) + az * depth * 0.5, ax, az,
+			Vector3(w + 0.14 * m, 0.12 * m, depth + 0.14 * m))

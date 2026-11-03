@@ -13,7 +13,8 @@ extends RefCounted
 ##      matches go to the structural rules, then the narrowest range;
 ##   3. structural rules per city: levels (or tagged height / 3.2 m),
 ##      `roof:shape`, footprint area, `heritage`, distance from the
-##      city core (ctx.cores, metres in the build's local frame);
+##      city core (ctx.cores, metres in the build's local frame) and,
+##      for San Francisco, the most local district circle it stands in;
 ##   4. seeded pick over ERAS weights, x0.12 outside an era's distance
 ##      band, x district multiplier inside a CityStyles district.
 ## Regions that are not a city's come back unchanged. Documented in
@@ -121,10 +122,16 @@ const CITY_ERAS := {
 		["chicago_tower", ACC, 1950, 2100, MODERN, 1.0, 0.0, 99.0],
 	],
 	"san_francisco": [
-		["san_francisco", HAC, 1906, 1945, ["edwardian", "mission_revival", "art_deco"],
-			4.0, 0.0, 99.0],
+		["san_francisco", HAC, 1906, 1925, ["edwardian", "colonial_revival", "classical_revival"],
+			4.0, 0.0, 5.0],
 		["sf_victorian", ["house", "apartments"], 1850, 1905, ["victorian", "queen_anne",
-			"italianate", "stick", "eastlake"], 3.0, 1.0, 99.0],
+			"italianate", "stick", "eastlake"], 3.0, 1.0, 5.5],
+		["sf_stucco", ["house", "apartments"], 1926, 1955, ["mediterranean_revival",
+			"spanish_colonial_revival", "mission_revival", "marina_style", "streamline_moderne",
+			"art_moderne", "storybook"], 3.0, 3.5, 99.0],
+		["sf_prewar", ACC, 1906, 1949, ["art_deco", "beaux_arts", "neoclassical", "neoclassicism",
+			"gothic_revival", "renaissance_revival", "chicago_school"], 0.6, 0.0, 99.0],
+		["sf_chinatown", AC, 1906, 1930, ["chinese", "chinese_revival", "chinoiserie"], 0.2, 0.0, 2.5],
 		["sf_tower", ACC, 1950, 2100, MODERN, 0.8, 0.0, 99.0],
 	],
 	"tokyo": [
@@ -243,8 +250,18 @@ static func cues(b: Dictionary, ctx: Dictionary, area_m2: float) -> Dictionary:
 		dist = INF
 		for core in cores:
 			dist = minf(dist, (pos - (core as Vector2)).length() / 1000.0)
+	# The most local district circle the building stands in (its era key).
+	var district := ""
+	if b.has("x"):
+		var at := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0))) / WorldScale.metres_to_units()
+		var best := INF
+		for d in (ctx.get("districts", []) as Array):
+			var dr: Array = d
+			if float(dr[2]) < best and (at - (dr[1] as Vector2)).length() <= float(dr[2]):
+				best = float(dr[2])
+				district = str(dr[0])
 	return {"arch": str(b.get("architecture", "")).strip_edges().to_lower().replace(" ", "_"),
-		"year": int(b.get("start_year", 0)), "lv": lv,
+		"year": int(b.get("start_year", 0)), "lv": lv, "district": district,
 		"roof": str(b.get("roof_shape", "")).strip_edges().to_lower(),
 		"area": area_m2, "heritage": bool(b.get("heritage", false)), "dist": dist}
 
@@ -361,12 +378,23 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 2:
 				return "chicago"
 		"san_francisco":
+			# The district a building stands in is the strongest cue here:
+			# Victorian belts west of Van Ness, Edwardian rebuilding east of
+			# it after 1906, stucco Marina and Sunset, Nob Hill high-rises.
+			var district := str(c["district"])
 			if lv >= 9:
+				var pre := int(c["year"]) > 0 and int(c["year"]) < 1950
+				if lv <= 30 and (pre or old or district == "sf_prewar"):
+					return "sf_prewar"
 				return "sf_tower"
-			if kind == "house" or old or (lv >= 2 and lv <= 3 and small):
-				return "sf_victorian"
-			if lv >= 3:
-				return "san_francisco"
+			if district == "sf_chinatown" and kind != "house":
+				return "sf_chinatown"
+			if kind == "house" or (lv >= 2 and lv <= 3 and small):
+				if district in ["sf_stucco", "sf_victorian", "san_francisco"]:
+					return district
+				return "sf_victorian" if old else ""
+			if lv >= 3 or (lv <= 0 and district != "sf_tower"):
+				return "sf_stucco" if district == "sf_stucco" else "san_francisco"
 		"tokyo":
 			if kind == "house":
 				return "tokyo_house"

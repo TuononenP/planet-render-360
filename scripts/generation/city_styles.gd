@@ -139,7 +139,9 @@ const CORES := {
 ## Named districts with a dominant sub-style: [city, era, lat, lon,
 ## radius_km, weight multiplier]. Soft — they only scale the era's
 ## weight in BuildingEra's last-resort seeded pick, never override a
-## real cue (a tagged 1970 tower in the Marais stays modern).
+## real cue (a tagged 1970 tower in the Marais stays modern). San
+## Francisco's structural rules also read the most local circle a
+## building stands in (its fabric changes block by block).
 const DISTRICTS := [
 	["paris", "paris_faubourg", 48.8590, 2.3620, 0.9, 5.0],      # Le Marais
 	["paris", "paris_faubourg", 48.8867, 2.3431, 0.6, 5.0],      # Montmartre
@@ -174,7 +176,19 @@ const DISTRICTS := [
 	["chicago", "chicago_tower", 41.8819, -87.6278, 1.3, 10.0],  # the Loop
 	["san_francisco", "sf_victorian", 37.7700, -122.4350, 2.2, 6.0],  # Haight / Alamo Sq
 	["san_francisco", "sf_victorian", 37.7600, -122.4150, 1.2, 4.0],  # Mission
+	["san_francisco", "sf_victorian", 37.7920, -122.4330, 0.9, 4.0],  # Pacific Heights
+	["san_francisco", "sf_victorian", 37.7560, -122.4320, 1.1, 5.0],  # Noe Valley, Castro
+	["san_francisco", "san_francisco", 37.7990, -122.4180, 0.8, 4.0],  # Russian Hill
+	["san_francisco", "san_francisco", 37.8000, -122.4090, 0.5, 4.0],  # North Beach
+	["san_francisco", "sf_stucco", 37.8020, -122.4370, 0.7, 8.0],  # Marina
+	["san_francisco", "sf_stucco", 37.7530, -122.4940, 2.2, 10.0],  # Sunset
+	["san_francisco", "sf_stucco", 37.7790, -122.4870, 1.8, 6.0],  # Richmond
+	["san_francisco", "sf_prewar", 37.7915, -122.4140, 0.5, 10.0],  # Nob Hill
+	["san_francisco", "sf_prewar", 37.7885, -122.4065, 0.45, 6.0],  # Union Square
+	["san_francisco", "sf_chinatown", 37.7945, -122.4065, 0.3, 20.0],  # Chinatown
 	["san_francisco", "sf_tower", 37.7936, -122.3965, 1.0, 20.0],  # FiDi
+	["san_francisco", "sf_tower", 37.7880, -122.3930, 0.7, 15.0],  # SoMa, Rincon Hill
+	["san_francisco", "sf_tower", 37.7700, -122.3920, 0.8, 10.0],  # Mission Bay
 	["tokyo", "tokyo_tower", 35.6896, 139.6995, 0.9, 20.0],      # Shinjuku
 	["tokyo", "tokyo_tower", 35.6812, 139.7671, 0.8, 20.0],      # Marunouchi
 	["tokyo", "tokyo_tower", 35.6605, 139.7292, 0.5, 10.0],      # Roppongi

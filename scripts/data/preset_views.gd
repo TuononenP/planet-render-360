@@ -105,6 +105,15 @@ const ROWS := [
 	{"id": "seoul", "label": "Seoul", "name": "Seoul, South Korea",
 		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.5738, "eye_lon": 126.9769,
 		"eye_m": 6.0, "bearing": 0.0, "pitch": 2.0},
+	# Hyde St at Lombard, top of the crooked block, down the cable-car line
+	# (~352°) to Aquatic Park and Alcatraz (~353°, 2.8 km); the extent
+	# covers the slope down to the bay. Hyde St and the 1067 mm cable-car
+	# track from OSM (Overpass, 2026-11-03). The flats on both sides frame
+	# the street, so the look check is off (one block up it lifted the eye
+	# over a 12-storey block).
+	{"id": "san_francisco", "label": "San Francisco", "name": "San Francisco, United States",
+		"lat": 37.8040, "lon": -122.4195, "eye_lat": 37.80195, "eye_lon": -122.41960,
+		"eye_m": 5.0, "bearing": 352.0, "pitch": -5.0, "clear": false},
 ]
 
 ## The row whose origin lies within MATCH_M of (lat, lon), {} for none.

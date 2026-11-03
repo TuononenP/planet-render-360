@@ -217,6 +217,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					var tree := {"x": tp.x, "z": tp.y, "row": true}
 					tree.merge(OsmTags.tree_tags(el_tags))
 					trees.append(tree)
+	RoadWidths.from_sidewalks(roads)
 	_nest_parts(buildings, part_ways)
 	_monument_landmarks(buildings, landmarks)
 	LandmarkFidelity.mark(buildings, landmarks)
