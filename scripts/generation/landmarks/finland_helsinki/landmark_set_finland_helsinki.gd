@@ -7,6 +7,21 @@ extends RefCounted
 
 static func build(model: Node3D, type: String) -> bool:
 	match type:
+		"otaniemi_chapel": LandmarkFhEspoo.otaniemi_chapel(model)
+		"aalto_university_main": LandmarkFhEspoo.aalto_main(model)
+		"tapiola_church": LandmarkFhEspoo.tapiola_church(model)
+		"tapiola_central_tower": LandmarkFhEspoo.keskustorni(model)
+		"weegee": LandmarkFhEspoo.weegee(model)
+		"kamppi_chapel": LandmarkFhHeroCivic.kamppi(model)
+		"amos_rex": LandmarkFhHeroCivic.amos(model)
+		"havis_amanda": LandmarkFhHeroHarbour.havis(model)
+		"kappeli": LandmarkFhHeroHarbour.kappeli(model)
+		"skywheel_helsinki": LandmarkFhHeroHarbour.skywheel(model)
+		"allas_sea_pool": LandmarkFhHeroHarbour.allas(model)
+		"stockmann_helsinki": LandmarkFhHeroCivic.stockmann(model)
+		"hakaniemi_market_hall": LandmarkFhHeroCivic.hakaniemi(model)
+		"government_palace_helsinki": LandmarkFhHeroCivic.empire(model, true)
+		"helsinki_university_main": LandmarkFhHeroCivic.empire(model, false)
 		"uspenski_cathedral": LandmarkFhHelsinkiSacred.uspenski(model)
 		"temppeliaukio_church": LandmarkFhHelsinkiSacred.temppeliaukio(model)
 		"st_johns_church_helsinki": LandmarkFhHelsinkiChurches.stjohns(model)

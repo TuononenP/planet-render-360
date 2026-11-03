@@ -1,0 +1,517 @@
+{
+  "source": "https://www.openstreetmap.org/copyright",
+  "source_url": "https://api.openstreetmap.org/api/0.6/map?bbox=24.9555,60.1658,24.9605,60.1682",
+  "elements": [
+    {
+      "type": "way",
+      "id": 443717281,
+      "tags": {
+        "addr:city": "Helsinki",
+        "addr:housenumber": "2",
+        "addr:postcode": "00160",
+        "addr:street": "Katajanokanlaituri",
+        "building": "yes"
+      },
+      "geometry": [
+        {
+          "lat": 60.1669578,
+          "lon": 24.9592919
+        },
+        {
+          "lat": 60.1669813,
+          "lon": 24.9592203
+        },
+        {
+          "lat": 60.1671901,
+          "lon": 24.9585968
+        },
+        {
+          "lat": 60.1672757,
+          "lon": 24.958341
+        },
+        {
+          "lat": 60.1672074,
+          "lon": 24.9582504
+        },
+        {
+          "lat": 60.167027,
+          "lon": 24.9587871
+        },
+        {
+          "lat": 60.1669464,
+          "lon": 24.9590286
+        },
+        {
+          "lat": 60.16689,
+          "lon": 24.9591999
+        },
+        {
+          "lat": 60.1669578,
+          "lon": 24.9592919
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 443717282,
+      "tags": {
+        "addr:city": "Helsinki",
+        "addr:housenumber": "2",
+        "addr:postcode": "00160",
+        "addr:street": "Katajanokanlaituri",
+        "building": "yes",
+        "leisure": "sauna",
+        "name": "Allas Pool",
+        "phone": "+358 40 480 4604",
+        "short_name": "Allas",
+        "start_date": "2016",
+        "toilets:wheelchair": "yes",
+        "website": "https://www.allaspool.fi",
+        "wheelchair": "yes",
+        "wheelchair:description": "Accessible entrance & dressing rooms, but no lift to the actual pools./Esteet\u00f6n sis\u00e4\u00e4np\u00e4\u00e4sy & pukuhuoneet, ei allashissi\u00e4."
+      },
+      "geometry": [
+        {
+          "lat": 60.1673684,
+          "lon": 24.9580645
+        },
+        {
+          "lat": 60.1674383,
+          "lon": 24.9578639
+        },
+        {
+          "lat": 60.1674321,
+          "lon": 24.9578122
+        },
+        {
+          "lat": 60.1674293,
+          "lon": 24.9577886
+        },
+        {
+          "lat": 60.1669879,
+          "lon": 24.9580027
+        },
+        {
+          "lat": 60.1669581,
+          "lon": 24.9580172
+        },
+        {
+          "lat": 60.1669318,
+          "lon": 24.9577981
+        },
+        {
+          "lat": 60.1667949,
+          "lon": 24.9578646
+        },
+        {
+          "lat": 60.1668208,
+          "lon": 24.9580811
+        },
+        {
+          "lat": 60.1667816,
+          "lon": 24.9581001
+        },
+        {
+          "lat": 60.1668099,
+          "lon": 24.9583355
+        },
+        {
+          "lat": 60.167249,
+          "lon": 24.9581224
+        },
+        {
+          "lat": 60.1673684,
+          "lon": 24.9580645
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 748795207,
+      "tags": {
+        "building": "shed",
+        "building:levels": "1"
+      },
+      "geometry": [
+        {
+          "lat": 60.1666003,
+          "lon": 24.9596539
+        },
+        {
+          "lat": 60.1665629,
+          "lon": 24.9596038
+        },
+        {
+          "lat": 60.1665937,
+          "lon": 24.9595111
+        },
+        {
+          "lat": 60.166631,
+          "lon": 24.9595612
+        },
+        {
+          "lat": 60.1666003,
+          "lon": 24.9596539
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 748795208,
+      "tags": {
+        "building": "shed",
+        "building:levels": "1"
+      },
+      "geometry": [
+        {
+          "lat": 60.1666759,
+          "lon": 24.9596862
+        },
+        {
+          "lat": 60.1666758,
+          "lon": 24.959601
+        },
+        {
+          "lat": 60.1667716,
+          "lon": 24.9596006
+        },
+        {
+          "lat": 60.1667717,
+          "lon": 24.9596859
+        },
+        {
+          "lat": 60.1666759,
+          "lon": 24.9596862
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 1167548360,
+      "tags": {
+        "addr:city": "Helsinki",
+        "addr:housenumber": "4",
+        "addr:postcode": "00160",
+        "addr:street": "Katajanokanlaituri",
+        "architect": "Anttinen Oiva Arkkitehdit",
+        "brand": "Sokos Hotel",
+        "building": "commercial",
+        "building:levels": "1",
+        "building:material": "wood",
+        "building:prefabricated": "yes",
+        "layer": "1",
+        "level": "0",
+        "name": "Katajanokan Laituri",
+        "roof:shape": "flat",
+        "wheelchair": "yes",
+        "wikidata": "Q132817383",
+        "wikipedia": "fi:Stora Enson p\u00e4\u00e4konttori"
+      },
+      "geometry": [
+        {
+          "lat": 60.1665232,
+          "lon": 24.9609183
+        },
+        {
+          "lat": 60.166519,
+          "lon": 24.9609484
+        },
+        {
+          "lat": 60.1663715,
+          "lon": 24.9613976
+        },
+        {
+          "lat": 60.166349,
+          "lon": 24.9614438
+        },
+        {
+          "lat": 60.1663178,
+          "lon": 24.9614932
+        },
+        {
+          "lat": 60.166207,
+          "lon": 24.9616818
+        },
+        {
+          "lat": 60.166192,
+          "lon": 24.9617328
+        },
+        {
+          "lat": 60.1661906,
+          "lon": 24.9617467
+        },
+        {
+          "lat": 60.1661911,
+          "lon": 24.9617843
+        },
+        {
+          "lat": 60.1661999,
+          "lon": 24.9618404
+        },
+        {
+          "lat": 60.1662001,
+          "lon": 24.9618815
+        },
+        {
+          "lat": 60.1661949,
+          "lon": 24.9619205
+        },
+        {
+          "lat": 60.1659792,
+          "lon": 24.9625825
+        },
+        {
+          "lat": 60.1659594,
+          "lon": 24.9626196
+        },
+        {
+          "lat": 60.1659418,
+          "lon": 24.9625983
+        },
+        {
+          "lat": 60.1658389,
+          "lon": 24.9624621
+        },
+        {
+          "lat": 60.1656556,
+          "lon": 24.9622156
+        },
+        {
+          "lat": 60.1656474,
+          "lon": 24.9622031
+        },
+        {
+          "lat": 60.1656331,
+          "lon": 24.9621805
+        },
+        {
+          "lat": 60.1656308,
+          "lon": 24.9621561
+        },
+        {
+          "lat": 60.1656309,
+          "lon": 24.96213
+        },
+        {
+          "lat": 60.1656381,
+          "lon": 24.9621078
+        },
+        {
+          "lat": 60.1658236,
+          "lon": 24.9615509
+        },
+        {
+          "lat": 60.1658343,
+          "lon": 24.9615198
+        },
+        {
+          "lat": 60.1658508,
+          "lon": 24.9614691
+        },
+        {
+          "lat": 60.1658686,
+          "lon": 24.961441
+        },
+        {
+          "lat": 60.1658975,
+          "lon": 24.9614251
+        },
+        {
+          "lat": 60.1659246,
+          "lon": 24.9614182
+        },
+        {
+          "lat": 60.1659433,
+          "lon": 24.9614093
+        },
+        {
+          "lat": 60.1659593,
+          "lon": 24.9613827
+        },
+        {
+          "lat": 60.1659722,
+          "lon": 24.9613369
+        },
+        {
+          "lat": 60.1660215,
+          "lon": 24.9609923
+        },
+        {
+          "lat": 60.1660425,
+          "lon": 24.9609026
+        },
+        {
+          "lat": 60.1661785,
+          "lon": 24.9604966
+        },
+        {
+          "lat": 60.1661923,
+          "lon": 24.9604805
+        },
+        {
+          "lat": 60.1662121,
+          "lon": 24.9604827
+        },
+        {
+          "lat": 60.1663187,
+          "lon": 24.9606282
+        },
+        {
+          "lat": 60.1663612,
+          "lon": 24.9606914
+        },
+        {
+          "lat": 60.1664981,
+          "lon": 24.9608781
+        },
+        {
+          "lat": 60.1665151,
+          "lon": 24.9608953
+        },
+        {
+          "lat": 60.1665232,
+          "lon": 24.9609183
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 457949936,
+      "tags": {
+        "addr:city": "Helsinki",
+        "addr:housenumber": "2",
+        "addr:postcode": "00160",
+        "addr:street": "Katajanokanlaituri",
+        "attraction": "big_wheel",
+        "email": "skywheelhelsinki@gmail.com",
+        "fee": "yes",
+        "height": "40",
+        "name": "SkyWheel Helsinki",
+        "opening_hours": "Mo-Th 10:00-21:00; Sa 10:00-23:00; Su 10:00-20:00; Fr 10:00-22:00",
+        "phone": "+358 404 804604",
+        "tourism": "attraction",
+        "website": "https://www.skywheel.fi/"
+      },
+      "geometry": [
+        {
+          "lat": 60.1665667,
+          "lon": 24.9594322
+        },
+        {
+          "lat": 60.1665669,
+          "lon": 24.9594704
+        },
+        {
+          "lat": 60.1668897,
+          "lon": 24.9594656
+        },
+        {
+          "lat": 60.1668896,
+          "lon": 24.9594274
+        },
+        {
+          "lat": 60.1665667,
+          "lon": 24.9594322
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 23192809,
+      "tags": {
+        "addr:city": "Helsinki",
+        "addr:housenumber": "1",
+        "addr:postcode": "00160",
+        "addr:street": "Kanavaranta",
+        "architect": "Alvar Aalto",
+        "architect:wikidata": "Q82840",
+        "architect:wikipedia": "fi:Alvar Aalto",
+        "building": "office",
+        "building:colour": "white",
+        "building:levels": "6",
+        "building:material": "marble",
+        "loc_name": "Sokeripala",
+        "name": "Enso-Gutzeitin p\u00e4\u00e4konttori",
+        "roof:shape": "flat",
+        "start_date": "1961",
+        "wikidata": "Q17384048",
+        "wikimedia_commons": "Category:Stora Enso headquarters",
+        "wikipedia": "fi:Stora Enson vanha p\u00e4\u00e4konttori"
+      },
+      "geometry": [
+        {
+          "lat": 60.1681547,
+          "lon": 24.9583265
+        },
+        {
+          "lat": 60.1681238,
+          "lon": 24.9584207
+        },
+        {
+          "lat": 60.1680602,
+          "lon": 24.9586145
+        },
+        {
+          "lat": 60.1680332,
+          "lon": 24.9586968
+        },
+        {
+          "lat": 60.1680178,
+          "lon": 24.9587437
+        },
+        {
+          "lat": 60.1679264,
+          "lon": 24.9586225
+        },
+        {
+          "lat": 60.1678534,
+          "lon": 24.9588449
+        },
+        {
+          "lat": 60.1679448,
+          "lon": 24.9589661
+        },
+        {
+          "lat": 60.1679232,
+          "lon": 24.959032
+        },
+        {
+          "lat": 60.1678956,
+          "lon": 24.9591159
+        },
+        {
+          "lat": 60.1678826,
+          "lon": 24.9590986
+        },
+        {
+          "lat": 60.1676763,
+          "lon": 24.9588251
+        },
+        {
+          "lat": 60.1676606,
+          "lon": 24.9588042
+        },
+        {
+          "lat": 60.167716,
+          "lon": 24.9586315
+        },
+        {
+          "lat": 60.1678888,
+          "lon": 24.9581091
+        },
+        {
+          "lat": 60.1679197,
+          "lon": 24.9580149
+        },
+        {
+          "lat": 60.1680411,
+          "lon": 24.9581759
+        },
+        {
+          "lat": 60.1681547,
+          "lon": 24.9583265
+        }
+      ]
+    }
+  ]
+}

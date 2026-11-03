@@ -7,6 +7,16 @@ extends RefCounted
 
 static func build(model: Node3D, type: String) -> bool:
 	match type:
+		"pre_rup":
+			LandmarkAngBaray.pre_rup(model)
+		"east_mebon":
+			LandmarkAngBaray.east_mebon(model)
+		"ta_som":
+			LandmarkAngCloister.ta_som(model)
+		"banteay_kdei":
+			LandmarkAngCloister.banteay_kdei(model)
+		"neak_pean":
+			LandmarkAngNeakPean.neak_pean(model)
 		_:
 			return false
 	return true

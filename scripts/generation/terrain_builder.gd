@@ -514,6 +514,8 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
+	if str(entry.get("base", "")) == "sea":
+		return ground.render_y(0.0)
 	if str(entry.get("base", "")) == "water":
 		return ground.water_level_at(x, z) if ground.is_inside(x, z) else ground.water_level_m
 	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))

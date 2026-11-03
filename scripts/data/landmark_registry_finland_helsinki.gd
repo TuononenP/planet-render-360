@@ -99,4 +99,4 @@ static func entries() -> Array:
 		{"type": "porvoo_cathedral", "name": "Porvoo Cathedral", "lat": 60.39718, "lon": 25.65785,
 			"radius_m": 4000.0, "wiki_title": "Porvoo Cathedral", "height_m": 20.5, "clear_m": 50.0,
 			"yaw_deg": -7.0, "kind": "Cathedral", "aliases": ["porvoo cathedral", "porvoon tuomiokirkko", "borgå domkyrka"]},
-	]
+	] + LandmarkRegistryHelsinkiHero.entries() + LandmarkRegistryEspooHero.entries()
