@@ -52,6 +52,10 @@ const FINISH_HEX := {"asphalt": "#585552", "paving": "#8a8274",
 ## Road-list chunks built in parallel (fixed, so the mesh never depends
 ## on the core count).
 const CHUNKS := 4
+## A marked crossing is at least this wide (m), and drawn over the
+## carriageways (rank 2 asphalt tops out at layer ~6.8).
+const CROSSING_MIN_M := 4.0
+const CROSSING_LAYER := 6.9
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -80,9 +84,10 @@ static func _parse(line: Variant, m2u: float) -> Dictionary:
 	if bool(road.get("tunnel", false)):
 		return {}
 	var cls := str(road.get("class", "unclassified"))
+	var crossing := bool(road.get("crossing", false))
 	return {"points": road.get("points", PackedVector2Array()),
-		"width_u": maxf(float(road.get("width_m", 0.0)) * m2u, 0.4),
-		"finish": _finish(cls, str(road.get("surface", "")).to_lower()),
+		"width_u": maxf(maxf(float(road.get("width_m", 0.0)), CROSSING_MIN_M if crossing else 0.0) * m2u, 0.4),
+		"finish": "crossing" if crossing else _finish(cls, str(road.get("surface", "")).to_lower()),
 		"rank": _rank(cls), "bridge": bool(road.get("bridge", false)),
 		"class": cls, "lanes": int(road.get("lanes", 0))}
 
@@ -119,6 +124,8 @@ static func _material(finish: String) -> Material:
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear())
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
+		"crossing":
+			m = RoadSurface.crossing_material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 		_:
 			m = RoadSurface.material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 	_mats[finish] = m
@@ -246,6 +253,8 @@ static func surface_height(data: LocationData, ground: GroundTruth, x: float,
 ## streets meeting at a junction never tie. A 1-5 cm lift alone is below
 ## the depth buffer's resolution a few hundred metres out, so they flickered.
 static func depth_layer(rank: int, finish: String, step: int) -> float:
+	if finish == "crossing":
+		return CROSSING_LAYER + float(step) * 0.11  # above every carriageway
 	return 1.0 + float(rank) * 2.0 + (1.0 if finish == "asphalt" else 0.0) + float(step) * 0.11
 
 static func _batch(batches: Dictionary, finish: String) -> _Batch:

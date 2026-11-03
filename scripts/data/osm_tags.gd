@@ -359,6 +359,13 @@ static func _building_use(tags: Dictionary) -> String:
 			return str(tags[key])
 	return ""
 
+## A marked pedestrian/cycle crossing way (footway=crossing,
+## cycleway=crossing, highway=crossing): RoadBuilder paints it with zebra
+## bars over the carriageway it crosses.
+static func is_crossing(tags: Dictionary) -> bool:
+	return str(tags.get("footway", "")) == "crossing" or str(tags.get("cycleway", "")) == "crossing" \
+		or str(tags.get("highway", "")) == "crossing"
+
 ## One contract-§2.5 attributed road dict.
 static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var road_class := str(tags.get("highway", "unclassified"))
@@ -371,6 +378,7 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		width_m = float(lanes) * 3.0
 	return {"points": pts, "width_m": width_m, "lanes": lanes,
 		"surface": str(tags.get("surface", "")),
+		"crossing": is_crossing(tags),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),

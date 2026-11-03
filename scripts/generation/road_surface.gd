@@ -100,6 +100,8 @@ uniform vec3 paint_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 centre_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
 uniform float junction_m = 30.0;
+// 1 on a marked crossing's ribbon: zebra bars along its whole length.
+uniform float zebra_all = 0.0;
 // @SNOW
 varying vec3 wpos;
 varying vec4 attr;
@@ -211,6 +213,9 @@ void fragment() {
 			paint += zb * step(0.6, x) * step(x, w - 0.6);
 		}
 	}
+	if (zebra_all > 0.5) {
+		paint = band(mod(x, 1.0), 0.25, 0.25, aa) * step(0.25, x) * step(x, w - 0.25);
+	}
 	paint = clamp(paint, 0.0, 1.0) * (1.0 - kerb);
 	paint *= 0.55 + 0.45 * smoothstep(0.25, 0.6, r_noise(g * 2.3));
 	float yel = clamp(centre * jfade / max(paint, 0.001), 0.0, 1.0) * step(0.001, paint);
@@ -270,6 +275,13 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("centre_col", _centre)
 	_mat.set_shader_parameter("kerb_col", _kerb)
 	return _mat
+
+## The asphalt material with zebra bars over the whole ribbon: RoadBuilder's
+## "crossing" finish (marked crossing ways, drawn over the carriageways).
+static func crossing_material(target: Color) -> ShaderMaterial:
+	var m := material(target).duplicate() as ShaderMaterial
+	m.set_shader_parameter("zebra_all", 1.0)
+	return m
 
 ## True where the place paints its centre line yellow.
 static func yellow_centre(data: LocationData) -> bool:

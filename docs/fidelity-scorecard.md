@@ -273,7 +273,7 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Alps | recognisable | — | (Winter shot.) Snowy peaks and lake right; valley roofs read as dots |
 | Banff | recognisable | ↑ hotel model | Mount Rundle reads as a rounded green hill, no rock faces |
 | Big Sur | recognisable | ↑ camera moved | Hillsides read as smooth grass; no rock faces under the arch, no surf at the beach |
-| Tokyo | stylised | — | No zebra scramble or daytime screens; plaza patches read as lawn |
+| Tokyo | stylised | ↑ zebra crossings | No giant screens or crowd; plaza patches still read as lawn; crossings short, not the diagonal scramble |
 | New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
 | Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
 | Monaco | recognisable | — | Port Hercule without boats; vantage lower than the photo |
@@ -287,6 +287,11 @@ Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with t
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
 waterfront road).
+
+Marked crossings were mapped but invisible: Shibuya's `footway=crossing` ways are rank 0, so they drew at
+depth layer 2, under the carriageway's 4, with no markings anyway. They now get their own "crossing" finish
+(at least 4 m wide), a depth layer above every carriageway and zebra bars (`RoadSurface.crossing_material`,
+`crossing_test`; every tier, since road markings are on all of them). `ultra-p8l-2026-11-03/`.
 
 Grass tufts (`GroundCover`) grew on mapped squares and footpaths: `VegetationMask` marks them `ROAD_EDGE`
 only, which the cover never checked, so the Trocadéro terrace (a square mapped over a grass polygon) wore
