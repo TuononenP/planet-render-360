@@ -270,6 +270,25 @@ func _run() -> void:
 			failures.append("Fast should not pay for ground cover (%d)" % count)
 		if preset == RenderSettings.Preset.HIGH and (count < 200 or on_building > 0):
 			failures.append("High park cover: %d instances, %d on the building" % [count, on_building])
+		if preset == RenderSettings.Preset.HIGH:
+			# A square mapped over the park (the Trocadéro terrace) and a
+			# footpath across it stay bare.
+			pd.roads = [{"class": "pedestrian", "area": true, "points": PackedVector2Array([
+					Vector2(30, -60), Vector2(70, -60), Vector2(70, -20), Vector2(30, -20)])},
+				{"class": "footway", "width_m": 2.0, "points": PackedVector2Array([Vector2(-70, 40), Vector2(-20, 40)])}]
+			var mask2 := VegetationMask.new(pd, pg)
+			var on_paving := 0
+			var kept := 0
+			var placed2 := GroundCover.plan(pd, pg, mask2)
+			for kind in placed2:
+				for e in placed2[kind]:
+					var o2: Vector3 = e[0]
+					kept += 1
+					if (o2.x > 29.0 and o2.x < 71.0 and o2.z > -61.0 and o2.z < -19.0) \
+							or (o2.x < -19.0 and absf(o2.z - 40.0) < 1.0):
+						on_paving += 1
+			if on_paving > 0 or kept < 150:
+				failures.append("cover on a square or footpath: %d of %d instances" % [on_paving, kept])
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("RENDER UPGRADE OK: grade, facade paint + night lights, wall tints, roof UVs, terrain layers, sea shore, road junctions, ground cover")

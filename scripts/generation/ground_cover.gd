@@ -10,7 +10,9 @@ extends RefCounted
 ##
 ## Placement: jittered grid over the green polygons VegetationMask
 ## rasterised (grass, cemetery, orchard; forest gets ferny shrubs),
-## never on buildings, carriageways or water, inside a radius per tier
+## never on buildings, water, carriageways and their verges, mapped
+## squares or footpaths (ROAD_EDGE: a square mapped over a grass polygon,
+## like the Trocadéro terrace, is paving), inside a radius per tier
 ## (Fast none). Colours follow the season's grass palette and the
 ## climate's dry-summer tint, ±12% per instance. Instances fade out
 ## toward the radius so the edge never shows.
@@ -119,7 +121,8 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 				continue
 			var cls := str((mask.green[id] as Dictionary).get("class", ""))
 			if not CLASSES.has(cls) or mask.blocked(x, z,
-					VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.WATER, 0.6):
+					VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE
+					| VegetationMask.WATER, 0.6):
 				continue
 			var w: Array = CLASSES[cls]
 			var h3 := _hash(float(i), float(j), 3.0)
