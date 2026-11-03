@@ -91,6 +91,21 @@ func _init() -> void:
 	var on_south := blocked.filter(func(b: Array) -> bool: return (b[0] as Vector3).z > 0.0).size()
 	if on_south != 0 or blocked.size() < 4:
 		failures.append("a building should block the south berths only: %d south, %d total" % [on_south, blocked.size()])
+	# A steep ramp across the berths (quay slope): boats would be buried, none placed.
+	var ramp := LocationData.new()
+	RenderSettings.apply_preset(ramp, RenderSettings.Preset.ULTRA)
+	ramp.heights.resize(ramp.grid_size * ramp.grid_size)
+	for zi in ramp.grid_size:
+		for xi in ramp.grid_size:
+			ramp.heights[zi * ramp.grid_size + xi] = float(zi) * 10.0
+	ramp.water_level = -50.0
+	ramp.seed_value = 7
+	ramp.latitude = 43.73
+	ramp.longitude = 7.42
+	ramp.piers = d.piers
+	var steep := (MarinaBuilder.plan(ramp, GroundTruth.new(ramp), m)["boats"] as Array).size()
+	if steep != 0:
+		failures.append("berths across a steep ramp should stay empty, got %d boats" % steep)
 	var root := Node3D.new()
 	var n := MarinaBuilder.build(root, d, ground)
 	if RenderQuality.ultra_desktop(d.quality_preset) and (n != boats.size() or not root.has_node("Marina/Pontoons")):

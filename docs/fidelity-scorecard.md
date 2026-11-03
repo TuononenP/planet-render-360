@@ -276,7 +276,7 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Tokyo | stylised | ↑ zebra crossings | No giant screens or crowd; plaza patches still read as lawn; crossings short, not the diagonal scramble |
 | New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
 | Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
-| Monaco | recognisable | ↑ marina boats | Boats only where pontoons are mapped and read as water; the preset's basin still shows mostly the photo's own boats; vantage lower than the photo |
+| Monaco | recognisable | ↑ marina boats | Port Hercule's basin renders as terraced terrain with the photo's sea on it (the sea plane sits at −66 m); boats only where the pontoons stand in real water; vantage lower than the photo |
 | Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
 | London | recognisable | ↑ bridge arches | Palace reads flat and dark from the low eye; backlit golden shot; bridge is plain stone, not green-and-red iron |
 | Rome | recognisable | ↑ tufts off the paving | Two tufts left on unmapped dark ground; no stone pines framing the Colosseum |
@@ -299,7 +299,13 @@ boats in Monaco (`marina_test`). Monaco's detected sea level is −66 m ASL (the
 is flat terrain at sea level with the satellite photo's blue sea on it, and `water_at` is 0 there; berths
 count as wet on terrain within 5 m of the pier's height that no building or road covers. Close up it reads
 as a marina (`ultra-p8m-2026-11-03/`), but from the preset eye 550 m away the main basin is still mostly the
-photo's boats. The map query gained piers (`QUERY_MARK` q5): cached places refetch once.
+photo's boats. A look from over the basin (`--looks`) shows why: the harbour is a terraced slope of terrain
+(smoothed quay and breakwater DEM) with the photo's sea painted on it, so berths there fail the 2.5 m terrain
+spread rule (boats would sit buried in a ramp) and only the pontoons standing in real water get boats. The
+cause is `DemConversion.convert_dem_heights`: the water plane is `min(centre − 6/vscale, lowest sample)`, the
+v1 "−3.0 plane" un-squashed, so at 600 m relief (Monaco) it sits 66 m below sea level. A coastal place whose
+OSM has `natural=coastline` should put the plane at 0 m ASL instead; that moves every coast's flood extent
+and the far-terrain seam, so it is left as a proposal, not slipped into this pass. The map query gained piers (`QUERY_MARK` q5): cached places refetch once.
 
 Marked crossings were mapped but invisible: Shibuya's `footway=crossing` ways are rank 0, so they drew at
 depth layer 2, under the carriageway's 4, with no markings anyway. They now get their own "crossing" finish

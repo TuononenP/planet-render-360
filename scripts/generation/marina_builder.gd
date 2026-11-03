@@ -27,6 +27,9 @@ const MIN_DEPTH_M := 0.3
 ## Terrain within this of the pier's height counts as a flat basin (m):
 ## the smoothed DEM wobbles ~9 m across Port Hercule's quays and basin.
 const FLAT_M := 5.0
+## A berth's terrain (stern, middle, bow) may differ by this much (m); the
+## boat sits at the median. More and a quay ramp would bury it.
+const SPREAD_M := 2.5
 const GAP_M := 0.9
 const CELL_M := 0.75
 const HULL_COLOURS := [Color(0.88, 0.88, 0.86), Color(0.88, 0.88, 0.86), Color(0.88, 0.88, 0.86),
@@ -95,7 +98,9 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 					continue
 				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < SAIL_SHARE
 				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
-				var y := maxf(ground.water_level_at(stern.x, stern.y), ground.height_at_world(stern.x, stern.y)) - 0.3 * m2u
+				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
+				if is_nan(y):
+					continue
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
 					len_m / MESH_LEN_M * m2u, "sail" if sail else "motor", col])
 			slot += 1
@@ -167,6 +172,20 @@ static func _at(pts: PackedVector2Array, t: float) -> Array:
 		run += seg
 	var last := pts.size() - 1
 	return [pts[last], (pts[last] - pts[last - 1]).normalized()]
+
+## Boat Y at a berth: the water surface in carved water, else the median
+## terrain height (a flat-datum harbour draws its sea as terrain), NAN
+## when the terrain differs by more than SPREAD_M along the boat.
+static func _berth_y(ground: GroundTruth, stern: Vector2, mid: Vector2, bow: Vector2,
+		m2u: float) -> float:
+	if ground.water_at(stern.x, stern.y) > MIN_DEPTH_M * m2u:
+		return ground.water_level_at(stern.x, stern.y)
+	var hs := [ground.height_at_world(stern.x, stern.y), ground.height_at_world(mid.x, mid.y),
+		ground.height_at_world(bow.x, bow.y)]
+	hs.sort()
+	if float(hs[2]) - float(hs[0]) > SPREAD_M * m2u:
+		return NAN
+	return float(hs[1]) - 0.3 * m2u
 
 ## Terrain height along a pier (its median), the berths' reference level.
 static func _pier_height(pts: PackedVector2Array, ground: GroundTruth) -> float:
