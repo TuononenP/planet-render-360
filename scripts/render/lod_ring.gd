@@ -55,6 +55,10 @@ static func far_city_m(preset: int) -> float:
 ## baking its transform into the vertices, and the originals are freed.
 ## Returns the number of meshes merged away.
 static func merge_buildings(root: Node3D) -> int:
+	# With the native MergeKernels (native/, tools/build_native.sh) each
+	# group's surfaces are collected and merged at once, groups across
+	# every core; otherwise each mesh is appended as it is read.
+	var native := ClassDB.class_exists("MergeKernels")
 	var groups := {}
 	var merged: Array[MeshInstance3D] = []
 	for c in root.get_children():
@@ -76,11 +80,24 @@ static func merge_buildings(root: Node3D) -> int:
 				var arrays: Array = []
 				arrays.resize(Mesh.ARRAY_MAX)
 				groups[key] = {"arrays": arrays, "mat": mat, "cell": cell,
-					"detail": detail, "shadow": mi.cast_shadow}
+					"detail": detail, "shadow": mi.cast_shadow, "srcs": [], "xfs": []}
 			# Kept CPU arrays, not SurfaceTool.append_from: a server
 			# read-back per mesh stalls the build thread (T7.5).
-			MeshArrays.append(groups[key]["arrays"], MeshArrays.surface(mi.mesh, s), mi.transform)
+			if native:
+				groups[key]["srcs"].append(MeshArrays.surface(mi.mesh, s))
+				groups[key]["xfs"].append(mi.transform)
+			else:
+				MeshArrays.append(groups[key]["arrays"], MeshArrays.surface(mi.mesh, s), mi.transform)
 		merged.append(mi)
+	if native and not groups.is_empty():
+		var jobs: Array = []
+		for key in groups:
+			jobs.append([groups[key]["srcs"], groups[key]["xfs"]])
+		var res: Array = ClassDB.class_call_static("MergeKernels", "merge_many", jobs)
+		var gi := 0
+		for key in groups:
+			groups[key]["arrays"] = res[gi]
+			gi += 1
 	var n := 0
 	for key in groups:
 		var g: Dictionary = groups[key]

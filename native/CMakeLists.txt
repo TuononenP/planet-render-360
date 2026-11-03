@@ -24,6 +24,8 @@ add_library(planet_render SHARED
 	src/roof_kernels.h
 	src/mass_kernels.cpp
 	src/mass_kernels.h
+	src/merge_kernels.cpp
+	src/merge_kernels.h
 	src/party_index.cpp
 	src/party_index.h
 	src/quad_sink.cpp
