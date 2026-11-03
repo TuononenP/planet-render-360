@@ -130,6 +130,9 @@ var moon_up := 0.0
 ## Climate snow lying at the viewpoint (ViewConditions): bright bounce.
 var snow_ground := false
 var lightning: LightningRig
+## Coastal fog lying on the sea (fog weather at a place with a coastline).
+var marine: MarineLayer
+var _coastal := false
 var _preset: int = RenderSettings.Preset.HIGH
 var _drift := 0.0
 var _drift_accum := 0.0
@@ -151,6 +154,8 @@ func _init(preset: int = RenderSettings.Preset.HIGH) -> void:
 	_build_probe()
 	lightning = LightningRig.new()
 	add_child(lightning)
+	marine = MarineLayer.new()
+	add_child(marine)
 	set_quality(preset)
 	_apply()
 
@@ -291,6 +296,17 @@ func _ready() -> void:
 
 func is_foggy() -> bool:
 	return WeatherLook.is_foggy(weather_look)
+
+## The place's sea level (render Y) and whether it has a coastline: fog
+## there lies on the sea as a marine layer (MarineLayer) instead of
+## filling the air evenly.
+func set_coast(sea_y: float, coastal: bool) -> void:
+	_coastal = coastal
+	marine.set_sea(sea_y, units_per_metre)
+	_apply()
+
+func _marine_on() -> bool:
+	return _coastal and is_foggy()
 
 # --- Construction ---
 
@@ -549,7 +565,10 @@ func _apply() -> void:
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
 	environment.fog_light_color = haze_color.darkened(0.3 * darken)
 	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
-	environment.fog_density = WeatherLook.fog_per_m(look, haze) / maxf(units_per_metre, 1e-4)
+	# A marine layer carries the fog itself; the air above it stays hazy.
+	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)
+	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
+	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
 	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms
 	# and to the night.

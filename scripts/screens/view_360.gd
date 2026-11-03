@@ -401,6 +401,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		if not data.focus.is_empty():
 			look = opening_look(aim(_rig.position, focus_point(data, _ground, data.focus)))
 	_atmos.ground_at = func(x: float, z: float) -> float: return _ground.height_at_world(x, z)
+	_atmos.set_coast(_ground.render_y(0.0), data.waterways.any(func(w: Variant) -> bool:
+		return w is Dictionary and str((w as Dictionary).get("class", "")) == "coastline"))
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
 	_restore_conditions(data)
