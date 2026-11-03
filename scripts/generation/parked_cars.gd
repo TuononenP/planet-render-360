@@ -163,13 +163,19 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		if detail == null:
 			_add_batch(holder, list, mesh(kind), str(group_key), 0.0, 0.0)
 		else:
-			_add_batch(holder, list, detail, str(group_key) + "_near", 0.0, DETAIL_M)
-			_add_batch(holder, list, mesh(kind), str(group_key) + "_far", DETAIL_M, 0.0)
+			var distant := mesh(kind)
+			var near := _add_batch(holder, list, detail, str(group_key) + "_near", 0.0, DETAIL_M)
+			var far := _add_batch(holder, list, distant, str(group_key) + "_far", DETAIL_M, 0.0)
+			# Visibility ranges measure from the AABB centre; differing mesh
+			# bounds would otherwise leave a gap or overlap at the switch.
+			var bounds := _batch_bounds(list, detail.get_aabb().merge(distant.get_aabb()))
+			near.custom_aabb = bounds
+			far.custom_aabb = bounds
 	root.add_child(holder)
 	return cars.size()
 
 static func _add_batch(holder: Node3D, cars: Array, car_mesh: ArrayMesh, batch_name: String,
-		begin_m: float, end_m: float) -> void:
+		begin_m: float, end_m: float) -> MultiMesh:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
@@ -185,6 +191,15 @@ static func _add_batch(holder: Node3D, cars: Array, car_mesh: ArrayMesh, batch_n
 	mmi.visibility_range_begin = begin_m * WorldScale.metres_to_units()
 	mmi.visibility_range_end = end_m * WorldScale.metres_to_units()
 	holder.add_child(mmi)
+	return mm
+
+static func _batch_bounds(cars: Array, local_bounds: AABB) -> AABB:
+	var bounds := AABB()
+	for i in cars.size():
+		var c: Array = cars[i]
+		var car_bounds: AABB = Transform3D(c[1], c[0]) * local_bounds
+		bounds = car_bounds if i == 0 else bounds.merge(car_bounds)
+	return bounds
 
 ## A car along +X, centred on its footprint, wheels on y = 0 (metres).
 static func mesh(kind: String) -> ArrayMesh:

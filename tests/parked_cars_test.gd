@@ -92,6 +92,42 @@ func _run() -> void:
 	high.roads = roads
 	if ParkedCars.build(Node3D.new(), high, GroundTruth.new(high)) != 0:
 		failures.append("parked cars are desktop Ultra only")
+	var ultra := _data()
+	ultra.roads = roads
+	var holder := Node3D.new()
+	var built := ParkedCars.build(holder, ultra, GroundTruth.new(ultra))
+	if built == 0 or holder.get_child_count() == 0:
+		failures.append("Ultra should build parked car batches")
+	else:
+		var batches := holder.get_child(0)
+		var pairs := 0
+		for node in batches.get_children():
+			if not node.name.ends_with("_near"):
+				continue
+			var near := node as MultiMeshInstance3D
+			var far := batches.get_node_or_null(str(near.name).trim_suffix("_near") + "_far") as MultiMeshInstance3D
+			if far == null:
+				failures.append("%s must have a distant batch" % near.name)
+				continue
+			pairs += 1
+			if near.multimesh.custom_aabb != far.multimesh.custom_aabb \
+					or near.multimesh.custom_aabb.size == Vector3.ZERO \
+					or near.visibility_range_end != far.visibility_range_begin:
+				failures.append("%s and its distant batch must share bounds and a switch distance" % near.name)
+		if pairs == 0:
+			failures.append("Ultra should have detailed and distant car batches")
+	holder.free()
+	# The headless renderer does not retain MultiMesh instance transforms,
+	# so check the bounds calculation using known placements directly.
+	var placements := [[Vector3(20, 3, -40), Basis.IDENTITY],
+		[Vector3(35, 4, -30), Basis(Vector3.UP, 0.8)]]
+	var near_box := ParkedCars.CarModels.mesh("sedan").get_aabb()
+	var far_box := ParkedCars.mesh("sedan").get_aabb()
+	var bounds := ParkedCars._batch_bounds(placements, near_box.merge(far_box)).grow(0.001)
+	for car in placements:
+		for box in [near_box, far_box]:
+			if not bounds.encloses(Transform3D(car[1], car[0]) * box):
+				failures.append("shared batch bounds must contain both LODs at every car")
 	for kind in ["sedan", "hatch", "wagon", "suv", "van"]:
 		var mesh := ParkedCars.mesh(kind)
 		if mesh.get_surface_count() < 3:
