@@ -38,7 +38,7 @@ static func begin_stages() -> void:
 ## (MaterialLibrary.hi_res) when it is bundled, else the 1K one.
 static func map_path(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> String:
 	var file := set_name + "_" + map_name + ".jpg"
-	if hi_res and FileAccess.file_exists(MaterialLibrary.TEXTURE_DIR + "2k/" + file):
+	if hi_res and ResourceLoader.exists(MaterialLibrary.TEXTURE_DIR + "2k/" + file):
 		return MaterialLibrary.TEXTURE_DIR + "2k/" + file
 	return MaterialLibrary.TEXTURE_DIR + file
 
@@ -52,10 +52,14 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 		return cached
 	_mutex.unlock()
 	var img: Image = null
-	if FileAccess.file_exists(path):
-		var loaded := Image.load_from_file(path)
+	if ResourceLoader.exists(path):
+		var texture := ResourceLoader.load(path) as Texture2D
+		var loaded := texture.get_image() if texture != null else null
 		if loaded != null and not loaded.is_empty() and loaded.get_width() >= 64:
 			img = loaded
+			if img.is_compressed():
+				img.decompress()
+			img.clear_mipmaps()
 			if map_name == "diff":
 				img.srgb_to_linear()
 				if set_name == "terracotta":
