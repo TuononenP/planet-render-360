@@ -14,6 +14,10 @@ extends RefCounted
 ##   LINE    – PackedVector2Array per line
 ##   POLYGON – [outer, hole, hole...] per polygon (Array of rings)
 ## in tile units (0..extent, y down).
+##
+## Native MvtKernels (native/, tools/build_native.sh) decodes the same tile
+## to the same result when the library is loaded; the script below is the
+## fallback and the reference the native test compares against.
 
 enum { UNKNOWN, POINT, LINE, POLYGON }
 
@@ -22,11 +26,19 @@ const WIRE_64 := 1
 const WIRE_LEN := 2
 const WIRE_32 := 5
 
+static var _native := ClassDB.class_exists("MvtKernels")
+
 var _b: PackedByteArray
 var _p := 0
 
 ## `wanted`: layer name -> Array of tag keys to keep (empty: keep none).
 static func read(bytes: PackedByteArray, wanted: Dictionary) -> Dictionary:
+	if _native:
+		return ClassDB.class_call_static("MvtKernels", "read", bytes, wanted)
+	return read_script(bytes, wanted)
+
+## read() in GDScript, whether or not the native library is loaded.
+static func read_script(bytes: PackedByteArray, wanted: Dictionary) -> Dictionary:
 	var r := MvtReader.new()
 	r._b = bytes
 	r._p = 0

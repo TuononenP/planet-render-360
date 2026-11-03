@@ -7,6 +7,12 @@ extends RefCounted
 ## class-load cycle through it (the load-order-dependent failure noted in
 ## the plan's 2026-10-28 render-check row).
 
+## Rings up to this many vertices (every building) sort all vertices by
+## distance to pick a keyhole seam; bigger ones (map coastlines) pick lazily.
+const SORT_MAX_VERTICES := 512
+## Candidates the lazy pick tries before taking the nearest vertex.
+const LAZY_TRIES := 128
+
 static func signed_area(ring: PackedVector2Array) -> float:
 	var a := 0.0
 	for i in ring.size():
@@ -118,6 +124,8 @@ static func bridge_holes(outer: PackedVector2Array, holes: Array) -> PackedVecto
 ## Nearest vertex of `out` whose seam to p crosses no edge of `out` or of
 ## any hole (the nearest vertex outright when none is clear).
 static func _visible_vertex(out: PackedVector2Array, p: Vector2, holes: Array) -> int:
+	if out.size() > SORT_MAX_VERTICES:
+		return _visible_vertex_lazy(out, p, holes)
 	var order: Array = range(out.size())
 	order.sort_custom(func(i: int, j: int) -> bool:
 		return out[i].distance_squared_to(p) < out[j].distance_squared_to(p))
@@ -126,14 +134,47 @@ static func _visible_vertex(out: PackedVector2Array, p: Vector2, holes: Array) -
 			return i
 	return order[0] if not order.is_empty() else 0
 
+## _visible_vertex for a big ring (a coastline of thousands of vertices):
+## the nearest clear vertex is nearly always among the first few, so pick
+## candidates one at a time instead of sorting them all with a callback.
+## Gives up after LAZY_TRIES and takes the nearest vertex outright.
+static func _visible_vertex_lazy(out: PackedVector2Array, p: Vector2, holes: Array) -> int:
+	var dist := PackedFloat64Array()
+	dist.resize(out.size())
+	for i in out.size():
+		dist[i] = out[i].distance_squared_to(p)
+	var nearest := -1
+	for _try in LAZY_TRIES:
+		var best := -1
+		var best_d := INF
+		for i in dist.size():
+			if dist[i] < best_d:
+				best_d = dist[i]
+				best = i
+		if best < 0:
+			break
+		if nearest < 0:
+			nearest = best
+		if _seam_clear(out[best], p, out, holes):
+			return best
+		dist[best] = INF
+	return maxi(nearest, 0)
+
 static func _seam_clear(a: Vector2, b: Vector2, out: PackedVector2Array, holes: Array) -> bool:
 	var rings: Array = [out]
 	rings.append_array(holes)
+	# An edge wholly outside the seam's box cannot cross it: most of a
+	# coastline's thousands of edges are skipped on four comparisons.
+	var lo := Vector2(minf(a.x, b.x), minf(a.y, b.y)) - Vector2(0.001, 0.001)
+	var hi := Vector2(maxf(a.x, b.x), maxf(a.y, b.y)) + Vector2(0.001, 0.001)
 	for r in rings:
 		var ring := r as PackedVector2Array
 		for j in ring.size():
 			var c := ring[j]
 			var d := ring[(j + 1) % ring.size()]
+			if (c.x < lo.x and d.x < lo.x) or (c.x > hi.x and d.x > hi.x) \
+					or (c.y < lo.y and d.y < lo.y) or (c.y > hi.y and d.y > hi.y):
+				continue
 			# Edges sharing a seam end touch it there by construction.
 			if c.is_equal_approx(a) or d.is_equal_approx(a) \
 					or c.is_equal_approx(b) or d.is_equal_approx(b):

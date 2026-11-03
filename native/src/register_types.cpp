@@ -3,6 +3,7 @@
 #include "ground_kernels.h"
 #include "mass_kernels.h"
 #include "merge_kernels.h"
+#include "mvt_kernels.h"
 #include "party_index.h"
 #include "quad_sink.h"
 #include "ribbon_draper.h"
@@ -24,6 +25,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(GroundKernels);
 	GDREGISTER_CLASS(MassKernels);
 	GDREGISTER_CLASS(MergeKernels);
+	GDREGISTER_CLASS(MvtKernels);
 	GDREGISTER_CLASS(PartyIndex);
 	GDREGISTER_CLASS(QuadSink);
 	GDREGISTER_CLASS(RibbonDraper);
