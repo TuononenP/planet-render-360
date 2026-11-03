@@ -230,7 +230,7 @@ full (f) scoring; the PRD §2 row and this table are updated together in that ta
 ## 9. Preset vantage ratings — realism v3 (R-1.1)
 
 Each quick-pick preset now has CC-licensed reference photos, listed with licence and source in
-`visual-plan/refs/<id>/README.md` (the photos themselves are gitignored and kept locally). That upgrades all 13 preset vantages to full (f) scoring.
+`visual-plan/refs/<id>/README.md` (the photos themselves are gitignored and kept locally). That upgrades all 14 preset vantages to full (f) scoring (San Francisco joined on 2026-11-03).
 The renders are the curated opening views (`PresetViews`). One row per preset per round. A grade
 from an agent is a pre-rating; the human gate (plan §Verification 5) re-rates it.
 
@@ -282,6 +282,27 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Rome | recognisable | ↑ tufts off the paving | Two tufts left on unmapped dark ground; no stone pines framing the Colosseum |
 | Venice | recognisable | — | Salute only a speck down the canal; the foreground bank is ground of class `water` the smoothed DEM leaves above the surface, drawn in the wetland-green bed colour (a grey bed colour fixes the bank but blackens the canal, which tints from the same colour); modern block in the foreground |
 | Seoul | recognisable | ↑ gate modelled, camera moved | Gate small and dark at 240 m; plaza is bare paving and lawns, no columns |
+
+Round sf-r6, 2026-11-03 (San Francisco hero pass, `.agents/plans/2026-11-03-san-francisco-hero.md`):
+- Captures: `visual-plan/reviews/sf-r6-2026-11-03/` (Ultra, local golden hour, clear summer) and
+  `sf-r6-fog-2026-11-03/` (WMO 45).
+- Rater: Claude (agent pre-rating).
+
+| preset | grade | change | biggest remaining tell |
+|---|---|---|---|
+| San Francisco | recognisable | new preset | No street trees on Hyde St (4 mapped); Alcatraz a green lump under the far drape |
+
+San Francisco's fabric now comes from the following, each with its test:
+- Data rows and district circles (`sf_stucco`, `sf_prewar`, `sf_chinatown`, the district cue in `BuildingEra`).
+- Painted bays and cornices on painted fronts (`FacadeRelief.oriel_paint`, `StreetFront._cornice`, `_garage`).
+- Sidewalk paving from `sidewalk` tags (`GroundMaterial._sidewalks`).
+- Kerb widths measured between mapped sidewalks (`RoadWidths`).
+- Parked cars (`ParkedCars`, desktop Ultra).
+- Cable-car beds and slots (`RailBuilder`, `cable_tram` / `electrified=no` trams).
+- Pacific-coast trees (`TreeSpecies`, `dry_coast`).
+- A marine layer in coastal fog (`MarineLayer`).
+
+The generic parts apply wherever their data occurs.
 
 Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with the new
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m

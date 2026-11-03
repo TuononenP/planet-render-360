@@ -91,7 +91,7 @@ outranks the map):
 | Stockholm (`stockholm`: Gamla stan ochre, rust and cream plaster, copper-green / slate / tile roofs, 4–6 storeys) | `stockholm_modern` ≥9 levels, big flat-roofed blocks or post-war cues (Million Programme, glass offices) |
 | New York (`new_york`, brick walk-ups + fire escapes) | `nyc_brownstone` 1840–1899 / houses / small 3–4 levels; `nyc_prewar` 1900–1945, Art Deco, 10–19 levels; `nyc_glass` ≥1950 or ≥20 levels |
 | Chicago (`chicago`, brick 2-/3-flats) | `chicago_greystone`; `chicago_tower` ≥12 levels |
-| San Francisco (`san_francisco`, Edwardian stucco bays) | `sf_victorian` (painted timber, clapboard, bay windows); `sf_tower` ≥9 levels |
+| San Francisco (`san_francisco`, Edwardian flats 1906–1925: pastel stucco, white-trimmed bays, bracketed cornices, garages under) | `sf_victorian` 1850–1905, heritage houses, Haight / Alamo Sq / Mission / Pacific Heights / Noe Valley (painted clapboard, bays, stoops); `sf_stucco` 1926–1955, Marina / Sunset / Richmond (pastel stucco over a garage, side stair, some tile); `sf_prewar` ≥9 levels pre-1950, heritage or Nob Hill / Union Sq, ≤30 levels (buff brick, terracotta, granite); `sf_chinatown` walk-ups in Chinatown (brick and render, fire escapes, red/green/gold awnings and signs); `sf_tower` ≥9 levels otherwise, FiDi / SoMa / Mission Bay (glass). SF's structural rules also read the most local district circle a building stands in. |
 | Tokyo (`tokyo`, dense 3–8 storey mixed) | `tokyo_house` (dark kawara roofs); `tokyo_tower` ≥15 levels |
 | Hong Kong (`hong_kong`, 20–40 storey slender towers) | `hk_tenement` 1900–1969 / ≤9 levels (shophouse pattern, signage); `hk_office` |
 | Singapore (`singapore`, HDB slabs with colour bands) | `sg_shophouse` 1840–1959 / ≤4 levels; `sg_tower` ≥30 levels |
@@ -159,10 +159,15 @@ row's `rv` replaces its parent's. All keys optional:
 balconies), `balconette` / `deep_balcony` / `awning` / `fire_escape` /
 `stoop` / `signage` / `oriel` (0..1 odds), `awning_colours` [sRGB hex],
 `string_course` / `quoins` (bool), `gable` `""|step|neck|bell` (a weighted
-list in the row, one gable picked per building). Examples: Haussmann
+list in the row, one gable picked per building), `garage` (0..1 odds of a
+street-level garage door with the entry stair beside it; the bays then start
+above it), `cornice` (0..1 odds of a bracketed cornice along a flat-roofed
+street front). Bays on painted fronts (`wood`, `render`) take the wall's own
+paint with trim-coloured caps; stone fronts keep stone bays. Examples: Haussmann
 balconies on storeys 2 + 5, balconette 0.6, café awnings 0.5, string course;
 NYC walk-up fire escape 0.8; brownstone stoop 0.95; Barcelona balconette
-0.9; Plattenbau deep balcony 0.7; SF oriel 0.85–0.9; HK tenement signage
+0.9; Plattenbau deep balcony 0.7; SF oriel 0.85–0.9, cornice 0.5–0.7, garage
+0.2–0.9 (stucco rowhouses); HK tenement signage
 0.85. The look also carries `city` (city key or "") and `era` (the row key
 used).
 
