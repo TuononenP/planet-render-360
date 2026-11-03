@@ -153,6 +153,57 @@ static func holes_clear_of(outer: PackedVector2Array, holes: Array) -> Array:
 			boxes.append(box)
 	return clear
 
+## `holes` made fit for one simple ring with `outer`, without losing the
+## islands that tangle: holes that cross each other are merged, and one
+## that reaches the outline is cut to the part inside `outer` (an island
+## generalised into the coast) and pulled `inset` in from it, so none
+## touches the outline or another. The rest come back unchanged, in no
+## particular order.
+static func untangled_holes(outer: PackedVector2Array, holes: Array, inset: float) -> Array:
+	var pieces: Array = holes.duplicate()
+	var i := 0
+	while i < pieces.size():
+		var merged := false
+		var box := aabb(pieces[i]).grow(0.5)
+		for j in range(i + 1, pieces.size()):
+			var other := pieces[j] as PackedVector2Array
+			var other_box := aabb(other).grow(0.5)
+			if box.intersects(other_box) and _ring_crosses(other, other_box, pieces[i]):
+				var union := _solid_parts(Geometry2D.merge_polygons(pieces[i], other))
+				if union.size() == 1:
+					pieces[i] = union[0]
+					pieces.remove_at(j)
+					merged = true
+					break
+		if not merged:
+			i += 1
+	var out: Array = []
+	for piece in pieces:
+		# Clipping against a coastline of thousands of vertices is costly:
+		# only the pieces that reach it are cut and pulled in.
+		if not _ring_crosses(piece, aabb(piece).grow(0.5), outer):
+			out.append(piece)
+			continue
+		for inside in _solid_parts(Geometry2D.intersect_polygons(piece, outer)):
+			out.append_array(_solid_parts(Geometry2D.offset_polygon(inside, -inset)))
+	return out
+
+## The solid polygons of a clipping result, which lists outer boundaries and
+## the holes cut in them alike: those wound as the largest one is.
+static func _solid_parts(polygons: Array) -> Array:
+	var largest := 0.0
+	var clockwise := false
+	for p in polygons:
+		var area := absf(signed_area(p))
+		if area > largest:
+			largest = area
+			clockwise = Geometry2D.is_polygon_clockwise(p)
+	var solid: Array = []
+	for p in polygons:
+		if Geometry2D.is_polygon_clockwise(p) == clockwise:
+			solid.append(p)
+	return solid
+
 ## Whether any edge of `hole` (within `box`, its grown bounds) crosses or
 ## touches an edge of `ring`.
 static func _ring_crosses(hole: PackedVector2Array, box: Rect2, ring: PackedVector2Array) -> bool:

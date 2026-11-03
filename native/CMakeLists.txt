@@ -15,6 +15,8 @@ add_library(planet_render SHARED
 	src/register_types.cpp
 	src/city_kernels.cpp
 	src/city_kernels.h
+	src/earcut_kernels.cpp
+	src/earcut_kernels.h
 	src/far_kernels.cpp
 	src/far_kernels.h
 	src/far_sampling.h

@@ -1,4 +1,5 @@
 #include "city_kernels.h"
+#include "earcut_kernels.h"
 #include "far_kernels.h"
 #include "ground_kernels.h"
 #include "mass_kernels.h"
@@ -21,6 +22,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 		return;
 	}
 	GDREGISTER_CLASS(CityKernels);
+	GDREGISTER_CLASS(EarcutKernels);
 	GDREGISTER_CLASS(FarKernels);
 	GDREGISTER_CLASS(GroundKernels);
 	GDREGISTER_CLASS(MassKernels);

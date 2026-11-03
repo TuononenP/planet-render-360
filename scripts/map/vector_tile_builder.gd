@@ -14,10 +14,18 @@ extends RefCounted
 ## Holes smaller than this (px²) are invisible; skipping them keeps a lake
 ## district or an archipelago quick to bridge and triangulate.
 const MIN_HOLE_AREA := 4.0
-## At most this many holes per polygon, the largest first.
+## At most this many holes per polygon, the largest first (the script's
+## keyhole triangulation; native earcut takes them all).
 const MAX_HOLES := 48
 ## How far (px) the retry's bridge seam is opened, see RingGeometry.bridge_holes.
 const SEAM_SLIVER := 0.003
+## How far (px) a repaired island is pulled in from the coast and its neighbours.
+const ISLAND_INSET := 0.06
+
+## Native EarcutKernels (native/, tools/build_native.sh) triangulates a polygon
+## with its holes in one go; without the library the script bridges the holes
+## itself, which breaks on islands that touch (see _add_polygon).
+static var _earcut := ClassDB.class_exists("EarcutKernels")
 
 ## `cancel` is a one-element Array the owner sets to true to stop early
 ## (the screen is leaving); the result is then {}.
@@ -104,24 +112,34 @@ static func _add_polygon(fills: Dictionary, fill: Array, rings: Array, xf: Trans
 		var hole: PackedVector2Array = xf * (rings[i] as PackedVector2Array)
 		if _box_area(RingGeometry.aabb(hole)) >= MIN_HOLE_AREA:
 			holes.append(hole)
-	if holes.size() > MAX_HOLES:
+	if holes.size() > MAX_HOLES and not _earcut:
 		holes.sort_custom(func(a: PackedVector2Array, b: PackedVector2Array) -> bool:
 			return _box_area(RingGeometry.aabb(a)) > _box_area(RingGeometry.aabb(b)))
 		holes.resize(MAX_HOLES)
 	var ring := outer
 	var idx := PackedInt32Array()
-	if not holes.is_empty():
+	if not holes.is_empty() and _earcut:
+		# Indices into the outline's points followed by each hole's.
+		ring = PackedVector2Array(outer)
+		for hole in holes:
+			ring.append_array(hole)
+		idx = ClassDB.class_call_static("EarcutKernels", "triangulate", outer, holes)
+	elif not holes.is_empty():
 		ring = RingGeometry.bridge_holes(outer, holes)
 		idx = _keyhole_triangles(ring, holes)
 		if idx.is_empty():
-			# Generalised islands that touch the coast, or a seam that doubles
-			# a point, leave the ear clipper no ear, and one bad island would
-			# cost the whole archipelago (the Bahamas at zoom 7). Retry on a
-			# sliver seam without the islands that touch the outline.
-			var clear := RingGeometry.holes_clear_of(outer, holes)
-			if not clear.is_empty():
-				ring = RingGeometry.bridge_holes(outer, clear, SEAM_SLIVER)
-				idx = _keyhole_triangles(ring, clear)
+			# Generalised islands that touch the coast or each other, or a seam
+			# that doubles a point, leave the ear clipper no ear, and one bad
+			# island would cost the whole archipelago (the Bahamas at zoom 7).
+			# Retry on a sliver seam with the islands repaired; failing that,
+			# without the ones that tangle.
+			var fixed: Array = RingGeometry.untangled_holes(outer, holes, ISLAND_INSET).filter(
+				func(h: PackedVector2Array) -> bool: return _box_area(RingGeometry.aabb(h)) >= MIN_HOLE_AREA)
+			var retry := _sliver_keyhole(outer, fixed)
+			if (retry[1] as PackedInt32Array).is_empty():
+				retry = _sliver_keyhole(outer, RingGeometry.holes_clear_of(outer, holes))
+			ring = retry[0]
+			idx = retry[1]
 	if idx.is_empty():
 		# No holes, or the keyhole ring would not triangulate: the outer
 		# ring alone beats losing a whole lake or coastline.
@@ -154,6 +172,14 @@ static func _add_polygon(fills: Dictionary, fill: Array, rings: Array, xf: Trans
 	batch["points"] = points
 	batch["colors"] = cols
 	batch["indices"] = indices
+
+## [ring, triangles] of `outer` with `holes` bridged on a sliver seam;
+## no triangles when there are no holes or the ring would not triangulate.
+static func _sliver_keyhole(outer: PackedVector2Array, holes: Array) -> Array:
+	if holes.is_empty():
+		return [outer, PackedInt32Array()]
+	var ring := RingGeometry.bridge_holes(outer, holes, SEAM_SLIVER)
+	return [ring, _keyhole_triangles(ring, holes)]
 
 ## Triangles of a keyhole ring with the ones inside a hole dropped, or
 ## empty when the ring would not triangulate.
