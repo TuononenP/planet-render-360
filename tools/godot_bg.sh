@@ -2,9 +2,13 @@
 # Godot launcher that keeps windowed runs in the background on macOS.
 #
 # Godot activates itself on launch (activateIgnoringOtherApps), so
-# `open -g` alone can't keep it behind your editor. This wrapper runs
-# the real binary directly (stdout and exit code preserved) and hands
-# focus back to whatever app was in front whenever Godot grabs it.
+# `open -g` alone can't keep it behind your editor. When the
+# godot_noactivate.dylib shim is installed (see tools/godot_noactivate.m)
+# the wrapper injects it and Godot never takes focus at all; --script
+# runs also never order their window on screen, so nothing flashes.
+# Without the shim it falls back to running the real binary directly
+# (stdout and exit code preserved) and handing focus back to whatever
+# app was in front whenever Godot grabs it, which flickers.
 #
 #   --headless, --version, --help, the editor  -> passed through untouched
 #   --script runs (tests, captures)            -> guarded for the whole run
@@ -18,7 +22,8 @@
 # Also: strips --always-on-top, adds --windowed unless a window mode is
 # given (projects that start full screen would otherwise take a Space).
 # GODOT_FOREGROUND=1 bypasses all of this; GODOT_BIN points at a
-# Godot binary installed somewhere else.
+# Godot binary installed somewhere else; GODOT_NOACTIVATE_DYLIB points
+# at the shim (default ~/.local/lib/godot_noactivate.dylib).
 #
 # Install it ahead of Homebrew's godot on PATH so every caller gets it:
 #   cp tools/godot_bg.sh ~/.local/bin/godot
@@ -50,6 +55,15 @@ if [ "${GODOT_FOREGROUND:-0}" = 1 ] || [ "$headless" = 1 ] \
 fi
 
 [ "$has_mode" = 0 ] && args=(--windowed "${args[@]}")
+
+# With the shim there is nothing to guard: Godot never activates. A
+# terminal run is your own and stays unshimmed so it behaves normally.
+shim=${GODOT_NOACTIVATE_DYLIB:-$HOME/.local/lib/godot_noactivate.dylib}
+if [ -f "$shim" ] && { [ "$scripted" = 1 ] || [ ! -t 0 ]; }; then
+	[ "$scripted" = 1 ] && export GODOT_NOACTIVATE_HIDE=1
+	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
+	exec "$REAL" "${args[@]}"
+fi
 
 front_field() { lsappinfo info -only "$1" "$(lsappinfo front)" 2>/dev/null; }
 prev=$(front_field bundleID | sed -n 's/.*bundleID="\([^"]*\)".*/\1/p')
