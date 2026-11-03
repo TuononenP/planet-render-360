@@ -512,6 +512,9 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		else:
 			side.indices.push_back(a); side.indices.push_back(a + 2); side.indices.push_back(a + 1)
 			side.indices.push_back(a + 1); side.indices.push_back(a + 2); side.indices.push_back(a + 3)
+	# A long crossing stands on piers under arched spandrels.
+	if top_finish == "bridge":
+		BridgeArches.add(side, pts, dist, deck, half, depth, surf.ground, m2u)
 
 ## Vertical quad a→b between bottom (ya0, yb0) and top (ya1, yb1),
 ## front face toward `out`.

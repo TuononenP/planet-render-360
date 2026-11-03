@@ -278,7 +278,7 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
 | Monaco | recognisable | ↑ marina boats | Boats only where pontoons are mapped and read as water; the preset's basin still shows mostly the photo's own boats; vantage lower than the photo |
 | Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
-| London | recognisable | — | Westminster Bridge arches missing; backlit golden shot flattens the palace |
+| London | recognisable | ↑ bridge arches | Palace reads flat and dark from the low eye; backlit golden shot; bridge is plain stone, not green-and-red iron |
 | Rome | recognisable | ↑ tufts off the paving | Two tufts left on unmapped dark ground; no stone pines framing the Colosseum |
 | Venice | recognisable | — | Salute only a speck down the canal; grassy bank and modern block in the foreground |
 | Seoul | recognisable | ↑ gate modelled, camera moved | Gate small and dark at 240 m; plaza is bare paving and lawns, no columns |
@@ -287,6 +287,11 @@ Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with t
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
 waterfront road).
+
+Westminster Bridge was a flat slab: `RoadBuilder` drew every bridge as a 0.9 m plank with parapets. `BridgeArches`
+(all tiers) now adds piers every ~32 m, arched spandrel openings and a soffit to any deck with 45+ m of water
+under it (`bridge_arches_test`; `ultra-p8n-2026-11-03/london_vantage.jpg`). It applies to every long river
+crossing, not just London; short bridges stay slabs.
 
 Port Hercule's pontoons (`man_made=pier`, `floating=yes`) were mapped but never read. `MarinaBuilder` (desktop
 Ultra) now draws their decks and moors motor yachts and sailboats (7–29 m) stern-to along both sides, 120
