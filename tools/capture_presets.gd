@@ -6,6 +6,8 @@ extends SceneTree
 ##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle] [--season=autumn]
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
+##        [--looks="lat,lon,height_m,bearing,pitch;..."]  (candidate eyes, one
+##          <id>_look<N>.jpg each: the eye stands height_m over the ground)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -78,6 +80,8 @@ var _weather_code := 0
 ## Season every place is shot in (--season=spring|summer|autumn|winter or
 ## 0..3); -1 keeps the place's own.
 var _season := -1
+## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
+var _looks: Array = []
 
 func _init() -> void:
 	_run()
@@ -129,6 +133,10 @@ func _run() -> void:
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
 	_weather_code = int(a.get("weather", 0))
+	for spec in str(a.get("looks", "")).split(";", false):
+		var f := spec.split(",")
+		if f.size() == 5:
+			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4])])
 	var season_arg := str(a.get("season", ""))
 	var names := ["spring", "summer", "autumn", "winter"]
 	_season = names.find(season_arg) if season_arg in names else (int(season_arg) if season_arg.is_valid_int() else -1)
@@ -230,6 +238,18 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_late")
+	if not _looks.is_empty():
+		ViewConditions.spawn_golden_hour(view)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
+	for k in _looks.size():
+		var l: Array = _looks[k]
+		var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
+		var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
+		rig.position = Vector3(at.x, y, at.y)
+		rig.reset_zoom()
+		rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
+		await _snap(view, id, "look%d" % k)
 	_contact_sheet(id)
 
 ## Waits `seconds` while drawing at least `frames` frames. Off-screen,

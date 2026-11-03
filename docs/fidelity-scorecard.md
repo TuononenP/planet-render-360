@@ -272,16 +272,21 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Paris | recognisable | — | Grass tufts on the Trocadéro paving; dry basins, no fountains |
 | Alps | recognisable | — | (Winter shot.) Snowy peaks and lake right; valley roofs read as dots |
 | Banff | recognisable | ↑ hotel model | Mount Rundle reads as a rounded green hill, no rock faces |
-| Big Sur | stylised | — | Vantage lands on the bridge approach; Bixby's arch hidden behind the deck |
+| Big Sur | recognisable | ↑ camera moved | Hillsides read as smooth grass; no rock faces under the arch, no surf at the beach |
 | Tokyo | stylised | — | No zebra scramble or daytime screens; plaza patches read as lawn |
 | New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
-| Stockholm | recognisable | ↑ Riddarholmen spire | Low vantage over lawn hides Gamla stan; old town reads as generic blocks |
+| Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
 | Monaco | recognisable | — | Port Hercule without boats; vantage lower than the photo |
 | Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
 | London | recognisable | — | Westminster Bridge arches missing; backlit golden shot flattens the palace |
 | Rome | recognisable | — | Grass tufts on the asphalt; no stone pines framing the Colosseum |
 | Venice | recognisable | — | Salute only a speck down the canal; grassy bank and modern block in the foreground |
-| Seoul | stylised | gate modelled | Vantage far down Sejong-daero: Gwanghwamun tiny; plaza reads as road |
+| Seoul | recognisable | ↑ gate modelled, camera moved | Gate small and dark at 240 m; plaza is bare paving and lawns, no columns |
+
+Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with the new
+`--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
+up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
+waterfront road).
 
 Found while rating: Dubai's curved wall at the camera was an untagged mall block that inherited the
 neighbouring towers' median height (61 m). Low-rise uses now cap an inferred height at four storeys

@@ -26,7 +26,8 @@ extends RefCounted
 ##   clear           optional, default true: View360 lifts the eye until
 ##                   nothing right in front blocks the look; false where
 ##                   the buildings beside the look are the framing
-## Every eye below was checked in captures (visual-plan/reviews/vantage-r4-*).
+## Every eye below was checked in captures (visual-plan/reviews/vantage-r4-*;
+## Big Sur, Stockholm and Seoul moved in the Ultra pass, look-* candidates).
 ## Positions were checked against OSM (Nominatim, 2026-11-01).
 
 ## A pin this close to a row's origin opens with that row's view.
@@ -49,11 +50,13 @@ const ROWS := [
 	{"id": "banff", "label": "Banff", "name": "Banff, Canada",
 		"lat": 51.1720, "lon": -115.5640, "eye_lat": 51.1676, "eye_lon": -115.5596,
 		"eye_m": 28.0, "bearing": 205.0, "pitch": -4.0},
-	# Highway 1 pull-out at the north end of Bixby Creek Bridge (the
-	# span ~130 m away at 142°), the coast running south on the right.
+	# The hillside east of the north end of Bixby Creek Bridge, 30 m over
+	# the ground (as the pull-out photos): the arch side-on, the headland
+	# and the open Pacific beyond it. (The old eye stood on the approach
+	# road, with the deck across the frame.)
 	{"id": "big_sur", "label": "Big Sur", "name": "Big Sur, United States",
-		"lat": 36.3740, "lon": -121.9022, "eye_lat": 36.3725, "eye_lon": -121.9028,
-		"eye_m": 4.0, "bearing": 150.0, "pitch": -5.0},
+		"lat": 36.3740, "lon": -121.9022, "eye_lat": 36.3735, "eye_lon": -121.9012,
+		"eye_m": 30.0, "bearing": 200.0, "pitch": -10.0},
 	# Shibuya Crossing from the station side, over the scramble to
 	# QFRONT and Center Gai.
 	{"id": "tokyo", "label": "Tokyo", "name": "Tokyo, Japan",
@@ -67,10 +70,11 @@ const ROWS := [
 	{"id": "new_york", "label": "New York", "name": "New York, United States",
 		"lat": 40.7060, "lon": -74.0040, "eye_lat": 40.70265, "eye_lon": -73.99686,
 		"eye_m": 6.0, "bearing": 298.0, "pitch": 3.0},
-	# Monteliusvägen clifftop: City Hall (335°), Riddarholmen (27°),
-	# Gamla stan (46°) across Riddarfjärden.
+	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
+	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
+	# the path at the waterfront road, so asl_m holds the eye on the cliff.
 	{"id": "stockholm", "label": "Stockholm", "name": "Stockholm, Sweden",
-		"lat": 59.3207, "lon": 18.0604, "eye_m": 6.0, "bearing": 10.0, "pitch": -3.0},
+		"lat": 59.3207, "lon": 18.0604, "eye_m": 6.0, "asl_m": 32.0, "bearing": 10.0, "pitch": -9.0},
 	# Place du Palais on Le Rocher, over Port Hercule to Monte-Carlo and
 	# the Casino (34°).
 	{"id": "monaco", "label": "Monaco", "name": "Monaco",
@@ -95,9 +99,12 @@ const ROWS := [
 	{"id": "venice", "label": "Venice", "name": "Venice, Italy",
 		"lat": 45.4318, "lon": 12.3290, "eye_m": 8.0, "bearing": 104.0, "pitch": -2.0,
 		"clear": false},
-	# Gwanghwamun Square, north to the palace gate (~360 m) and Bugaksan.
+	# Gwanghwamun Square's north half, up the plaza axis to the palace gate
+	# (~240 m) and Bugaksan; the old eye, 120 m south, looked across
+	# Sejong-daero's lanes.
 	{"id": "seoul", "label": "Seoul", "name": "Seoul, South Korea",
-		"lat": 37.5728, "lon": 126.9769, "eye_m": 10.0, "bearing": 4.0, "pitch": 2.0},
+		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.5738, "eye_lon": 126.9769,
+		"eye_m": 6.0, "bearing": 0.0, "pitch": 2.0},
 ]
 
 ## The row whose origin lies within MATCH_M of (lat, lon), {} for none.
