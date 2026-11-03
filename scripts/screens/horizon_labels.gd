@@ -45,6 +45,7 @@ func _ready() -> void:
 	_fetcher = HorizonFetcher.new()
 	add_child(_fetcher)
 	_fetcher.finished.connect(_on_sites)
+	_fetcher.failed.connect(func() -> void: _fetched_for = Vector2(INF, INF))
 
 ## A new place: forget the last one's names (fetched again when on).
 func set_place(data: LocationData, ground: GroundTruth) -> void:

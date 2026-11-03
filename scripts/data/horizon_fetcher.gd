@@ -12,6 +12,7 @@ extends Node
 ## and the view simply has no labels.
 
 signal finished(sites: Array)
+signal failed
 
 const RADIUS_PEAK_M := 45000
 const RADIUS_TOWN_M := 30000
@@ -33,7 +34,8 @@ func _ready() -> void:
 	_req.answered.connect(_on_answered)
 	_req.exhausted.connect(func(reason: String, _attempts: int) -> void:
 		print("HorizonFetcher: %s; no horizon labels" % reason)
-		_emit(""))
+		_emit("")
+		failed.emit())
 
 ## Mirror-first, like the far-city query, so it never queues behind the
 ## detailed one on the main instance.

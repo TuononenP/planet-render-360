@@ -433,6 +433,18 @@ func _view_wiring() -> void:
 	_check(view._horizon.enabled and UiPrefs.horizon_labels and emitted.has(["horizon_labels", true]), "N turns the horizon labels on and saves it")
 	press.call(KEY_N)
 	_check(not view._horizon.enabled, "and off")
+	(view._tool_btns["labels"] as Button).pressed.emit()
+	_check(view._horizon.enabled and UiPrefs.horizon_labels, "the labels button turns labels on")
+	var camera := view._rig.camera
+	var forward := -camera.global_transform.basis.z
+	var target := camera.global_position + Vector3(forward.x, 0.0, forward.z).normalized() * 1000.0
+	view._horizon._items = [{"name": "Test peak", "kind": "Peak", "ele_m": 100.0, "pos": target}]
+	var laid_out := view._horizon.layout_labels(camera, view.size, UiTheme.sans(600), UiTheme.data(true), false)
+	_check(laid_out.size() == 1 and laid_out[0]["line1"] == "Test peak", "a visible site gets a label")
+	view._horizon._fetcher._req.exhausted.emit("test failure", 1)
+	_check(view._horizon._fetched_for == Vector2(INF, INF), "a failed label request can be retried")
+	(view._tool_btns["labels"] as Button).pressed.emit()
+	_check(not view._horizon.enabled, "the labels button turns labels off")
 	press.call(KEY_M)
 	_check(UiPrefs.minimap and view._minimap.visible, "M shows the mini-map")
 	press.call(KEY_M)
