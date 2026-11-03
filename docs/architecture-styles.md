@@ -89,7 +89,7 @@ outranks the map):
 | Rome (`rome`: ochre/sienna render, green shutters, hipped terracotta) | `rome_palazzina` 1945–1990 or ≥5 levels beyond 3.5 km (deep balconies); `rome_modern` |
 | Venice (`venice`: faded salmon / ochre / rust stucco, Istrian-stone trim, Venetian Gothic pointed windows with a colonnette, terracotta roofs, bell-topped chimneys, altane roof terraces, 3–4 storeys) | `venice_modern` ≥6 levels or big flat-roofed blocks (post-war edge) |
 | Stockholm (`stockholm`: Gamla stan ochre, rust and cream plaster, copper-green / slate / tile roofs, 4–6 storeys) | `stockholm_modern` ≥9 levels, big flat-roofed blocks or post-war cues (Million Programme, glass offices) |
-| New York (`new_york`, brick walk-ups + fire escapes) | `nyc_brownstone` 1840–1899 / houses / small 3–4 levels; `nyc_prewar` 1900–1945, Art Deco, 10–19 levels; `nyc_glass` ≥1950 or ≥20 levels |
+| New York (`new_york`, brick walk-ups + fire escapes) | `nyc_brownstone` rowhouses; `nyc_prewar` dated or heritage towers and the Financial District; `nyc_castiron` SoHo/Tribeca, `nyc_loft` DUMBO, `nyc_nycha` LES housing towers; `nyc_pencil` slender supertalls, `nyc_international` dated mid-century commercial towers, and `nyc_glass` contemporary towers. |
 | Chicago (`chicago`, brick 2-/3-flats) | `chicago_greystone`; `chicago_tower` ≥12 levels |
 | San Francisco (`san_francisco`, Edwardian flats 1906–1925: pastel stucco, white-trimmed bays, bracketed cornices, garages under) | `sf_victorian` 1850–1905, heritage houses, Haight / Alamo Sq / Mission / Pacific Heights / Noe Valley (painted clapboard, bays, stoops); `sf_stucco` 1926–1955, Marina / Sunset / Richmond (pastel stucco over a garage, side stair, some tile); `sf_prewar` ≥9 levels pre-1950, heritage or Nob Hill / Union Sq, ≤30 levels (buff brick, terracotta, granite); `sf_chinatown` walk-ups in Chinatown (brick and render, fire escapes, red/green/gold awnings and signs); `sf_tower` ≥9 levels otherwise, FiDi / SoMa / Mission Bay (glass). SF's structural rules also read the most local district circle a building stands in. |
 | Tokyo (`tokyo`, dense 3–8 storey mixed) | `tokyo_house` (dark kawara roofs); `tokyo_tower` ≥15 levels |
@@ -231,3 +231,83 @@ finish, alpha-cut wrought iron, canvas per colour, lit signs).
   (one-sided roof faces); party gables apply only to parcel-like rings
   (irregular and courtyard masses keep sloping to every eave); `tests/architecture_test.gd` pins the regional
   signatures (`_authenticity_checks`).
+
+
+Finnish fabric uses `ArchitectureCitiesFinland`: Helsinki's Empire centre, Jugend belts,
+1920s classicism, wooden Käpylä/Vallila, forest-suburb lamellas, 1965–89 precast panels,
+and contemporary courtyard blocks. Espoo uses Tapiola modernism, Otaniemi brick/copper,
+modern centres and Kauniainen villas. The east-centred Helsinki zone precedes Espoo: Munkkivuori stays Helsinki while
+Tapiola and Otaniemi lie outside its radius; eastern Helsinki remains covered.
+
+Relief keys: `glazed_balcony` (probability) builds a deep balcony with glass fronts and
+vertical aluminium mullions; `turret` (probability) adds one steep-roofed corner tower
+on an exposed street front; `granite_plinth` (boolean) adds rough grey/pink granite
+courses at the base; `snow_guard` (boolean) adds eave rails and roof-ladder rungs on
+pitched roofs. They share the existing facade/roof detail distance and quality gates.
+
+Street and seasonal context for the Finland hero pass: separately mapped sidewalks
+can widen a carriageway only up to mapped tree/cycle/path verges; an ordinary
+`sidewalk=both` does not imply extra carriageway. Parked vehicles respect mapped
+one-way direction and the country's traffic side. Desktop Ultra draws electrified
+contact wires and Finnish span lamps in at most twelve material surfaces, Nordic
+stop signs, glass balcony stacks and ploughed snowbanks. Lower tiers retain the
+existing distance-limited facade relief and post-top lamps.
+
+March uses a place's monthly climate mean when available, otherwise a quarterly
+seasonal estimate. Sub-zero March stays winter. Sea ice uses a soft cold-quarter
+band and a near-shore/shallow-water proxy rather than freezing the entire sea.
+The Baltic colour box darkens coastal water. Above 60°N, the bare-earth filter
+also removes canopy-sized bumps inside mapped forest/park cover; the shared shoreline model uses directed OSM
+coastlines to keep land and water on their mapped sides. This correction does not claim a geoid conversion or change the source
+DEM's stated vertical reference.
+
+The capture loop additionally found a coherent positive northern sea-surface
+bias. `scripts/data/coastal_dem.gd` registers it from consistent OSM open-sea
+samples before the single GroundTruth build; confidence guards and measured
+values are documented in `docs/data-source-register.md`. Tidal polygons share
+the sea datum and sea/ice shader flags. Baltic swell and chop are reduced to
+keep sheltered harbour water below the quays. Visual reference/capture images
+are excluded from Godot's asset import with `visual-plan/.gdignore`; tools read
+them directly as images.
+
+
+Nordic roof metals (G-5, 2026-11-03): `copper` is a separate verdigris PBR set;
+`metal`, `metal_sheet`, `metal sheet`, `steel` and `zinc` map to `sheet_metal`.
+Nordic pitched defaults use charcoal/grey/falu-red sheet metal, and Otaniemi's
+copper roofs use the copper set on flat as well as sloped roofs. Red imagery
+tints a sheet roof's paint without turning its finish into clay tiles; known
+copper also accepts green imagery as patina. Untagged flat Nordic sheet
+profiles still use membrane. Both new sets retain roof tinting and snow.
+Standing seams use normal maps aligned to the existing slope UVs, adding no
+mesh surfaces. See the data-source register and `roof_metals_test`.
+
+When a mapped building has parts, blank part-level facade colour and material
+inherit the parent tags; a part's explicit tags still win. White marble uses
+the existing limestone texture as a pale stone fallback with colour calibrated
+to the mapped tag. This preserves the Enso office's white facade without
+claiming the texture is a marble scan. Calibrated marble colours use a
+high-range material-cache key so distinct pale finishes do not collide; the
+existing material cap can still reuse a family fallback when full.
+
+Harbour dressing (G-6): quay stone follows `KerbBuilder.stone_for`. Ultra adds
+merged mooring bollards to finalized hard banks and up to 24 alongside steamers,
+houseboats and large yachts within the marina's 800 m eye radius. These berths
+require mapped water, a dry bank, hull clearance and shared boat occupancy;
+natural shores and ornamental pools are excluded. Long (170 m+), straight
+mapped quays on tidal water with a clear fairway also berth up to two procedural
+cruise liners (140-300 m, `QuayMoorings.liners`, up to 1200 m from the eye,
+never beside lake water). Vessels are lofted hulls (`HullLoft`) with per-type
+models: `CruiseLinerModel`, `PassengerVesselModel` (classic coastal ship,
+houseboat, tall ship), `MotorYachtModel` (flybridge, sport, runabout, RIB,
+console) and `SailYachtModel`, sharing `VesselMaterials`/`VesselKit`. Marina
+boats are MultiMesh prototypes (`VesselPrototypes`); those beyond 250 m use
+reduced `_far` meshes without rails, rigging and mullions, and the combined
+marina surface budget is `MarinaBuilder.MAX_DRAW_CALLS`. Mapped
+`building=ship|boat|houseboat` features pick a model by type and length (>= 100 m
+is a liner, sailing types a yacht or tall ship, other `boat` features a yacht or
+day boat, anything else a coastal passenger ship) at every tier; those
+individual building-layer meshes are outside the marina budget. Untagged vessels
+use a generic hull colour and height. Snow covers decks/roofs in mapped meshes,
+instanced quay boats and liners.
+
+Stockholm districts distinguish Gamla stan and Riddarholmen medieval fabric, Mariaberget and Vita Bergen timber, Östermalm stone, Swedish Grace, funkis, Million Programme and contemporary waterfront blocks. Mapped dates and architecture tags take precedence over these district defaults; pitched roofs use painted sheet metal, with copper for civic roofs.

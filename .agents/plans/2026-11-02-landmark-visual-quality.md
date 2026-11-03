@@ -23,17 +23,21 @@
 The rebuild agents could not render, so every model was judged by numbers only.
 
 - [ ] **L-1.1** Reference images, 2 per landmark in `visual-plan/refs/landmarks/<type>/`: Commons photos (CC/PD only, author + licence in each folder's README) plus AI-made `ai_front.jpg` / `ai_quarter.jpg` from the user where no photo fits — @claude/loose-ends 2026-11-03 (partial)
+  > 2026-11-03 local registry audit: 445 types, 388 with local photos, 24 with at least two locally present README-listed photos, 49 with no image; `tools/landmark_ref_inventory.gd` regenerates `INVENTORY.tsv` and `MISSING.txt`. Presence and a README filename match do not establish a photo's suitability, licence or viewpoint; JPGs are local and ignored by git. Second photographs were checked and credited for Buckingham Palace and Angkor Wat.
   > Done: 406 Commons photos for 386 of 425 landmarks, each eyeballed (the Wikipedia lead image per landmark, a second photo for 37 of them); wrong-subject, detail-only, interior and engraving picks were dropped. AI-made `ai_front.jpg` from the user for 8 more (Chain Bridge, One WTC, Burj Al Arab, Chrysler, St Mary Axe, Sistine Chapel, Sheikh Zayed, Temppeliaukio; `SOURCE.md` each; Chrysler, Temppeliaukio, Sistine and Sheikh Zayed replaced by clearer second attempts). Missing: the 31 types in `visual-plan/refs/landmarks/MISSING.txt`. `visual-plan/refs/landmarks/README.md` has the status; `PROMPTS.md` has AI prompts with camera bearings for all 425 (`tools/landmark_ref_prompts.gd`).
   > No viewpoint (lat/lon/bearing) is recorded for Commons photos; judged by eye. L-1.3 should take real height/width from the registry and use images for silhouette and detail only.
   > Validation: every registry type has >= 1 image and a README entry.
 - [ ] **L-1.2** (partial, @claude/loose-ends 2026-11-02: `tools/capture_landmarks.gd` shoots any landmark model from 4 bearings on a flat ground disc, `--all`, `--plain`, `--night`, writes sheets + `stats.tsv` (size, lowest y, tris) to `visual-plan/captures/<tag>/`; full run of all 425 models OK, no errors (`visual-plan/captures/all/`, `stats.tsv`); `tools/landmark_compare_sheets.py` builds reference-vs-render review pages (`captures/all/compare/page_NN.jpg`, 12 landmarks each). Still missing: ref-photo viewpoints and the real terrain) Capture tool: render each landmark from its ref viewpoint on the real terrain (Ultra, settled with `force_draw`, off-screen window), output side-by-side sheets
+  > 2026-11-03: model capture fits the projected bounds, accepts custom bearings/elevation, and records camera settings and its flat ground in `cameras.tsv`. An isolated-model baseline covers 445 types (`visual-plan/captures/framing-445/`, including comparison sheets); Buckingham was captured before the subsequent facade fix. `capture_presets.gd --landmarks=<types>` can select registry sites for the real app flow; matched viewpoints and real-terrain validation remain outstanding.
   > Validation: one windowed batch run produces sheets for all 424 without errors.
 - [ ] **L-1.3** Silhouette score: segment the landmark in photo and render, compute IoU and a proportion check (height/width ratio, tower count)
+  > 2026-11-03: `tools/landmark_silhouette_scores.py` scores reviewer-supplied, registered mask pairs and reports IoU and height/width ratios; masks, camera matching, tower counts and the 20-image ranking check remain outstanding.
   > Validation: scores land in a TSV; manual spot check of 20 agrees with the ranking.
 - [ ] **L-1.4** Fix pass on the worst 50 by score, agents iterating with the capture tool until IoU improves
   > Validation: median IoU of the 50 rises; no landmark regresses; catalog test OK.
 
 - [ ] **L-1.5** (user request 2026-11-03) Many landmarks read as too simple and not photorealistic, e.g. Buckingham Palace (a hollow box and a wall; the real facade has a central pavilion, Corinthian columns, the balcony, the Victoria Memorial and forecourt). Raise the plain-looking ones to photo level: more facade articulation and real materials (L-3), baked AO (L-2), forecourts (L-7). Candidates come from the L-1.4 review; Buckingham Palace first.
+  > 2026-11-03: Buckingham's previously occluded east-front ground-floor and pavilion windows are now on their projecting wall faces, and paving covers the forecourt. This is a partial fix; the reference-matched distance review and remaining context are still needed.
   > Validation: side-by-side with the reference reads as the same building at 200 m and 1 km; triangle budget stays within the catalog test.
 - [ ] **L-1.6** (user request 2026-11-03) Extra accuracy for Angkor Wat: researched dimensions and layout (moat, west causeway with naga balustrades, cruciform terrace, west gopura, libraries, galleries, quincunx towers' true profile), courtyard and stone colours from photos.
   > Validation: dimensions listed in the code header with sources; side-by-side with the 2 Commons photos; `landmark_catalog_test` OK; `clear_m` covers the model.
@@ -89,7 +93,6 @@ Procedural boxes and turned profiles stay crude for organic forms.
   > Follow-up waterfront audit: the original mainland photo exposed submerged ordinary buildings. Building floors, storey splits and party-wall datums now share a floor above the wave crest, with platforms/pilings for accepted overwater footprints; canonical water retains distant island sea fill. See [placement evidence and limits](../../visual-plan/reviews/placement-audit-2026-11-03/README.md).
   > Live DEM/OSM: island base -48.6 → 0 m ASL; arrival eye -20.6 → 30 m. Continuous shoreline relief, graded terraces, blended PBR cliff/grass/gravel, summit cellhouse, sash windows and open ruin shells (71,425 tris). Shared-workspace `alcatraz_test`, preset views, viewer tools, cache key and class-size checks pass; isolated landmark/catalog (445) tests pass. Six off-screen captures inspected, including a separate mainland build: `visual-plan/reviews/alcatraz-fix-2026-11-03/`.
 
-
 ## 8. Night lighting
 
 - [ ] **L-8.1** Per-landmark lighting presets: Eiffel hourly sparkle, Empire State crown colours, floodlit domes, lit belfries, bridge cable lights
@@ -108,3 +111,10 @@ Procedural boxes and turned profiles stay crude for organic forms.
   > `column(radial=20)`, `balustrade(radial=8)`, `arch(max_segs=25)` defaults reproduce the old geometry; `window` clamps sill and apron to y >= 0 on ground-floor windows. No caller switched to lighter settings yet (that belongs with L-5.1). Catalog, landmark, fidelity tests OK.
 - [x] **L-9.5** Run the windowed screenshot tests (`tests/screenshot_test.gd`, `tests/world_cache_test.gd`) on the new models — @claude/loose-ends 2026-11-02
   > `world_cache_test` OK (cold 10.5 s, cached 1.4 s). `screenshot_test` exits 0 and writes its shots (no pass line is printed; shots not eyeballed). Both print the same exit-time leak warnings (7 texture RIDs, 3 objects), not compared against a pre-change run.
+
+## 10. Helsinki and Espoo hero additions
+
+- [x] **L-10.1** Helsinki: Kamppi, Amos Rex, Havis Amanda, Kappeli, SkyWheel/Allas, Stockmann, Hakaniemi hall, Government Palace, University — @codex/helsinki_landmarks 2026-11-03
+  > Isolated batch integrated and scratch copy removed. `helsinki_hero_landmarks_test` passes (ten textured models, dimensions/extents/registry lookup); catalog, landmark and fidelity tests pass. Sources and approximate envelopes: `docs/helsinki-landmark-sources.md`. Combined summer/winter captures: `visual-plan/reviews/helsinki-espoo-hero-2026-11-03/`.
+- [x] **L-10.2** Espoo: Otaniemi Chapel, Aalto main building/amphitheatre, Tapiola Church, Keskustorni, Weegee — @codex/espoo_landmarks 2026-11-03
+  > Isolated batch integrated and scratch copy removed. `espoo_hero_landmarks_test` passes (five models, 1,230–6,244 tris); Keskustorni is the city icon. Catalog contains 483 landmarks. Sources and approximate envelopes: `docs/espoo-landmark-sources.md`; same combined review as L-10.1.

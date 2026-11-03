@@ -280,8 +280,16 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Dubai | recognisable | Burj Y-plan | Desert and lagoon ground drape as green and blue patches |
 | London | recognisable | ↑ bridge arches | Palace reads flat and dark from the low eye; backlit golden shot; bridge is plain stone, not green-and-red iron |
 | Rome | recognisable | ↑ tufts off the paving | Two tufts left on unmapped dark ground; no stone pines framing the Colosseum |
-| Venice | recognisable | — | Salute only a speck down the canal; the foreground bank is ground of class `water` the smoothed DEM leaves above the surface, drawn in the wetland-green bed colour (a grey bed colour fixes the bank but blackens the canal, which tints from the same colour); modern block in the foreground |
+| Venice | recognisable | ↑ exposed water-class bank and adjacent unmapped slope use land shading | Salute only a speck down the canal; some foreground terrain remains green and the bank geometry slopes into the canal; modern block in the foreground. The submerged bed retains its previous colour; see `venice-bank-before` and `venice-bank-r2` captures. |
 | Seoul | recognisable | ↑ gate modelled, camera moved | Gate small and dark at 240 m; plaza is bare paving and lawns, no columns |
+
+Round nyc-r1, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r1-2026-11-03/`, Ultra, clear summer, 08:00 local.
+- Agent pre-rating: recognisable; human gate pending. Morning light removes the direct backlight, but blue foamy water and warm blocky towers remain the main tells. This capture predates the Oculus integration.
+
+Round nyc-r2 / nyc-r3, 2026-11-03 (New York hero work in progress):
+- Captures: `visual-plan/reviews/nyc-r2-2026-11-03/` and `nyc-r3-2026-11-03/` (Ultra, clear summer, 08:00 local).
+- Agent pre-rating: recognisable; human gate pending. Waterfront railing and bridge are present; r3 water is grey-green with reduced foam. Warm blocky skyline and pale near-tree polygons remain prominent tells.
 
 Round sf-r6, 2026-11-03 (San Francisco hero pass, `.agents/plans/2026-11-03-san-francisco-hero.md`):
 - Captures: `visual-plan/reviews/sf-r6-2026-11-03/` (Ultra, local golden hour, clear summer) and
@@ -347,3 +355,207 @@ tufts. Fixed (`render_upgrade_test`; 199 of 2,498 test tufts landed on a square 
 Found while rating: Dubai's curved wall at the camera was an untagged mall block that inherited the
 neighbouring towers' median height (61 m). Low-rise uses now cap an inferred height at four storeys
 (`BuildingHeights.LOW_RISE_USES`).
+
+
+Round Helsinki/Espoo R8 summer / R9 January, 2026-11-03:
+- Captures and validation: [hero review](../visual-plan/reviews/helsinki-espoo-hero-2026-11-03/README.md).
+- Rater: agent pre-rating; human gate pending. Photographic target remains open.
+
+| preset | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Helsinki, summer | recognisable | Finland districts, landmarks, Baltic water, corrected coastal DEM registration | Bright simplified waterfront facades and quay edges |
+| Helsinki, winter | recognisable | January 8.75° sun, snow and partial fast ice | Procedural shoreline/ice transition; excessive colourfulness against winter reference |
+| Espoo, summer | recognisable | Tapiola preset, Keskustorni, modernist fabric, calm pool | Simplified surrounding blocks and pool perimeter |
+| Espoo, winter | recognisable | January 8.69° sun and snowy pool/streets | Winter saturation and brightness exceed the reference; coarse bank geometry |
+
+
+Helsinki/Espoo roof-metal refinement, 2026-11-03 (shared G-5):
+- [Summer/winter captures, material gallery and validation](../visual-plan/reviews/helsinki-espoo-roof-metals-2026-11-03/README.md).
+- Agent pre-ratings only; human gate pending. New copper patina, painted sheet metal and standing folds; no photographic claim.
+
+| preset | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Helsinki, summer | recognisable | Patina and painted sheet finishes replace clay/slate surrogates | Mapped ships now lofted hulls (passenger/yacht/liner models, pending re-capture); oversized foreground mass masks Uspenski; bright opening |
+| Helsinki, winter | recognisable | Metal roofs retain existing snow overlay; 8.75° sun | Simplified facades, ship masses and excessive colourfulness against winter reference |
+| Espoo, summer | recognisable | Nordic pitched defaults now use sheet metal | Coarse pool perimeter and repetitive facade detail |
+| Espoo, winter | recognisable | Metal/snow compatibility verified; 8.69° sun | Pool banks and winter brightness/saturation differ from reference |
+
+Helsinki/Espoo harbour refinement, 2026-11-03 (shared G-6):
+- [Summer/winter views, budgets and validation](../visual-plan/reviews/helsinki-espoo-harbour-2026-11-03/README.md).
+- Agent pre-ratings; human gate pending. Regional quay stone, bollards, alongside dressing and mapped vessel hulls are verified. Photographic target remains open.
+
+| preset | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Helsinki, summer | recognisable | Mapped hull/deckhouse and quay bollards; wheel clearance retained | Yellow Enso office masks Uspenski; marina boats now lofted yachts, sailboats and day boats (pending re-capture) |
+| Helsinki, winter | recognisable | Vessel decks retain snow; local water datum verified | Bright, colourful winter waterfront and simplified boat silhouettes |
+| Espoo, summer | recognisable | Harbour dressing correctly excluded from ornamental pool | Coarse pool banks and repetitive surrounding masses |
+| Espoo, winter | recognisable | Pool exclusion retained; 8.69° sun | Winter tone and pool perimeter still differ from reference |
+
+Helsinki/Espoo Mint and Enso refinement, 2026-11-03:
+- [Summer/winter views, ground probe, budgets and validation](../visual-plan/reviews/helsinki-espoo-mint-enso-2026-11-03/README.md).
+- Agent pre-ratings; human gate pending. Source-backed Mint dimensions and the Enso office's inherited pale marble are visible; photographic target remains open.
+
+| preset | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Helsinki, summer | recognisable | Mint reduced to two storeys; Enso office renders pale | Office still masks Uspenski; repetitive windows and simplified boats |
+| Helsinki, winter | recognisable | Mint and office corrections retain snow | Bright snow, colourful water and procedural facades |
+| Espoo, summer | recognisable | Fresh control after facade changes | Coarse pool banks and repetitive surrounding masses |
+| Espoo, winter | recognisable | Fresh control at 8.69° sun | Winter brightness and pool edge differ from reference |
+
+Round sto-r1, 2026-11-03 (Stockholm hero work in progress):
+- Captures: `visual-plan/reviews/sto-r1-2026-11-03/` and `sto-r1-winter-2026-11-03/`, Ultra, clear golden hour. The images predate the Tyska kyrkan and street/bridge changes.
+- Agent pre-rating: recognisable; human gate pending. Foreground road and waterfront blocks obscure the cliff view, the island shoreline is too bare, and moored ships are absent. See the review README for capture limitations.
+
+Round realism-v3-safe-group, 2026-11-03 (interrupted Ultra review):
+- Rater: Codex, provisional visual pre-rating; the human review gate remains open.
+- [Images and recovered statistics](../visual-plan/reviews/realism-v3-safe-group-2026-11-03/). Fifteen presets completed; the Metal renderer stalled during Espoo, before any Espoo shot, and the six controls were not reached. The tree changed during the run, so these images are not a frozen-build acceptance set. The recovered JPEG statistics are approximate and lack the original camera and draw-call metadata.
+- All completed locations include golden-hour, noon and night opening frames; ratings below judge the golden-hour reference sheets. The new temperate-sea adjustment postdates New York's shot.
+
+| preset | provisional grade | principal difference from reference |
+|---|---|---|
+| Paris | recognisable | Tower and gardens align, but the terrace, fountains and street life are sparse. |
+| Alps | recognisable | Valley and lakes read correctly; foreground trees and mountain tones remain simplified. |
+| Banff | stylised | Hotel is very small and the distinctive mountain face reads as a smooth green ridge. |
+| Big Sur | recognisable | Arch and coast are visible; hills and shoreline are smooth and lack rocky surf detail. |
+| Tokyo | stylised | Crossing layout is visible, but the key signage, crowds and surrounding frontage are missing. |
+| New York | recognisable | Skyline reads as Manhattan; the water is overly turquoise and bright, and towers remain simplified. |
+| Stockholm | recognisable | Waterfront and spires read as the city; the foreground and quays differ considerably. |
+| Monaco | stylised | The harbour layout is broad but the densely packed marina and distinctive waterfront are not legible. |
+| Dubai | recognisable | The Burj is on axis; foreground buildings and road terrain are simplified. |
+| London | recognisable | Westminster and bridge identify the scene; the river colour and building massing remain simplified. |
+| Rome | recognisable | Colosseum is clear; the foreground, vegetation and material detail differ. |
+| Venice | stylised | Modern foreground block and absent/obscured Salute dominate the canal view. |
+| Seoul | stylised | The gate is too small and dark, with the plaza's prominent features and people absent. |
+| San Francisco | recognisable | Steep street and bay read correctly; facades, trees and cable tracks are simplified. |
+| Helsinki | recognisable | Cathedral and waterfront read correctly; ships and waterfront buildings are simplified. |
+| Espoo | not rated in this run | Renderer stalled before the first frame; the earlier Helsinki/Espoo round remains separate evidence. |
+
+Recovered golden-frame statistics flag New York's luma, saturation and colourfulness above its reference range; Venice's luma is below and saturation above. These measures are diagnostic, not proof of recognition or photographic quality. Paris, Tokyo and New York have not reached the photographic target in this review.
+
+Round sto-r2, 2026-11-03 (Stockholm hero work in progress):
+- Capture: `visual-plan/reviews/sto-r2-2026-11-03/`, Ultra, clear summer golden hour. This predates the newest landmark batch and marina placement fix.
+- Agent pre-rating: recognisable; human gate pending. The mapped ship has a hull and the foreground lamellas are reduced, but the pale angular island shore, simplified city blocks and foreground road remain visible. Candidate forward eyes were off the mapped path and do not establish a valid preset.
+
+Round sto-r3, 2026-11-03 (Stockholm hero work in progress):
+- Captures: `visual-plan/reviews/sto-r3-2026-11-03/` and `visual-plan/reviews/sto-r3-winter-2026-11-03/`, Ultra, golden hour. Agent pre-rating: recognisable; human gate pending.
+- City Hall and the island spire read clearly, but the pale angular bank, simplified blocks and exposed foreground road still fall short of the photographic target. On-path trials trade the foreground obstruction for the loss of City Hall. Concurrent changes limit direct comparison between these captures; see the review.
+
+Round sto-r4, 2026-11-03 (Stockholm hero work in progress):
+- Capture: `visual-plan/reviews/sto-r4-2026-11-03/`, Ultra summer golden hour. Agent pre-rating: recognisable; human gate pending.
+- Island buildings and waterfront remain simplified, and the road and grass dominate the foreground. The 206 s time to view exceeds the 150 s target under concurrent load; an isolated timing remains necessary.
+
+Round nyc-r4, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r4-2026-11-03/`, Ultra, clear summer, 08:00 local. Agent pre-rating: recognisable; human gate pending.
+- Grey-green water and the bridge read clearly, but the skyline remains simplified, nearby foliage has pale angular patches, and the promenade has repeated benches. The truncated OSM response omitted mapped furniture, so this round does not validate it. See the review README for timings and reference limitations.
+
+Round nyc-r5, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r5-2026-11-03-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Eye-centred map furniture arrived before the server ran out of memory later in the response. The near foliage and simplified skyline still fall short of photographic quality. See the review README for counts, timing and limits.
+
+Round nyc-r6, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r6-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Planned construction towers are excluded. The simplified skyline and pale close foliage still fall short of photographic quality; the Oculus alignment change postdates this capture. The review README records timing and incomplete-data limitations.
+
+Round nyc-r7, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r7-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The bridge close-up shows the suspension model; the proposed Oculus eye landed inside a building and does not validate the model. Skyline simplification and foliage artifacts remain. See the review README for timing and data limitations.
+
+Round nyc-r8, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r8-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- One Manhattan Square now reads as glass behind the bridge. Elevated close views show the Oculus replacement, though one eye intersects a facade. The skyline, trees and foreground remain stylized; see the review README for measurement limits.
+
+Round nyc-r9, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r9-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Eye-centred tree LOD removes the large nearby billboard triangles, but introduces very dark foliage and strong shadows over the waterfront. The skyline and water remain simplified. See the review README for measurement limits.
+
+Round nyc-r10, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r10-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Disabling received leaf shadows did not resolve the dark canopy and made pale patches more visible; the experiment was reverted. See the review README for reference limitations.
+
+Round nyc-r11, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r11-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- A terminal-based procedural ferry appears as a small orange silhouette near Whitehall; close validation is pending. The canopy remains too dark and the skyline simplified.
+
+Round nyc-r12, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r12-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- An elevated view confirms the orange ferry, with shoreline geometry intruding near the vessel. A wider water-clearance search postdates this capture. The skyline and dark canopy still fall short of photographic quality.
+
+Round nyc-r13, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r13-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- A wider water-clearance search places the orange ferry clear of the shoreline intrusion visible in r12. Shoreline geometry, the simplified skyline and dark canopy still fall short of photographic quality.
+
+Round nyc-r14, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r14-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Mapped copper survives the distant roof path, and elevated views show historic stepped and pointed masses. Individual hero crown detailing remains unverified; the skyline and foreground are still stylized.
+
+Round nyc-r15, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r15-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- Explicitly historic prewar towers retain their selected facade material at distance. Their individual crown details remain unverified; the skyline, water and dark canopy are still stylized.
+
+Round nyc-r16, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r16-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The mapped 70 Pine observatory parts use a source-backed glass default, although this view is too distant to judge the detail. The Municipal Building's subsequent figure is not in this capture; the scene remains stylized.
+
+Round nyc-r17, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r17-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The Municipal Building's mapped crown and small gold Civic Fame replacement are visible in the elevated close view. Its figure is simplified, and the 70 Pine lantern remains too small to assess. Skyline, shoreline and tree canopy are still stylized.
+
+Round nyc-r18, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r18-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The Manhattan Bridge approach reaches the portal, but its opening is rectangular in this capture. A curved opening was added afterwards and requires visual review; skyline, shoreline and canopy remain stylized.
+
+Round nyc-r19, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r19-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The entrance opening is curved; gaps above it prompted a subsequent masonry infill. The bridge, skyline and foreground remain simplified.
+
+Round nyc-r20, 2026-11-03 (New York hero work in progress):
+- Capture: `visual-plan/reviews/nyc-r20-2026-11-03/`, Ultra, clear summer, 08:00. Agent pre-rating: recognisable; human gate pending.
+- The entrance has a continuous curved arch connected to the approach. The model and scene remain simplified, including a broad plain deck and conspicuous nearby vegetation.
+
+### Shared shoreline candidate, 2026-11-03
+
+The shared water-domain and surface-patch implementation has been exercised
+on Venice, Amsterdam, Paris, Stockholm, Monaco, Helsinki, Dubai and Big Sur at
+all four presets. Opening and tilted-bank captures are in
+[`shoreline-accepted-2026-11-03`](../visual-plan/reviews/shoreline-accepted-2026-11-03/).
+The name identifies the capture run; **visual acceptance remains open**. These
+images predate the latest paved-area batching optimization, which has a native
+versus script geometry regression test. Some tilted-bank images do not place
+the actual bank close to the camera; additional inspection views are needed.
+
+The 32 captured models reported zero `patch_failure` diagnostics. Big Sur
+had no hard-bank segments at any preset. Stockholm retained its dry peninsula
+and islands, and Dubai retained mapped lawn and water domains. Venice's water
+uses its own water material and bed colour; its foreground still has a sloped
+or green land-side stretch that lacks sufficient mapped support for inferred
+masonry under the selected policy. The Venice visual gate therefore fails;
+adding a city-specific quay or widening the evidence thresholds would conceal
+the missing evidence rather than satisfy this plan.
+
+An intermediate same-machine frozen-input comparison is recorded in the
+[cases and budget table](../visual-plan/reviews/shoreline-accepted-2026-11-03/measurements-v3.md).
+It measured 558.13 s → 520.93 s total cold geometry time across 32 cases
+(−6.7%), and static peak 2414.2 → 2421.6 MiB (+0.3%). The matching process
+peak resident sizes were 4671225856 → 4362649600 bytes (−6.6%). Sixteen
+individual gates failed, including per-case relative-time regressions and Fast
+Helsinki/Amsterdam exceeding 20 s; those two also exceeded that cold budget in
+the control. Concurrent local builds can affect wall-clock measurements, and
+the frozen control incorporates the earlier pre-shoreline integration while
+other shared workspace features evolved. A clean, final same-source rerun is
+still required; the later native paved-area and terrain packing optimizations
+have not yet been measured across the full matrix.
+
+A subsequent isolated Helsinki Fast stage profile reduced total time from
+22.67 s to 4.68 s after indexing repeated tram-to-road coverage queries.
+This is a diagnostic measurement, not a replacement for the full budget
+comparison. Focused Venice and Helsinki edge views are in
+[`shoreline-edge-check-2026-11-03`](../visual-plan/reviews/shoreline-edge-check-2026-11-03/);
+the remaining cities and presets still need equivalent close-up review.
+
+The offline shoreline fixture, OSM, scenery, terrain-scale, coastal-water,
+coastal-DEM, render-upgrade, world-cache-key, serial/parallel, far-city,
+landmark-placement and smoke checks passed on the frozen validation copy. A
+windowed world-cache test passed the cold/revisit comparison, and the windowed
+screenshot test completed. The class-size check passed at 806/1000 lines for
+the largest script. Re-run the relevant checks against the final workspace
+and final native libraries before considering the implementation accepted.

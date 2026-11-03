@@ -19,8 +19,8 @@ an unverified source never blocks the app.
 | Satellite imagery (terrain drape) | Esri World Imagery | `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` — same endpoint at zoom 17 (High) / 18 (Ultra) / 16 (Fast/Balanced); T2.2 | JPEG 256px tiles; service exposes levels 0–23 but true imagery resolution varies by area — Paris verified real (non-blank) at z17 + z18 | Esri Web Site and Service Terms of Use (`https://www.esri.com/en-us/legal/terms/web-site-service`): §2.2 grants free download/view/copy for own internal or **noncommercial** external purposes with proper attribution; §2.2.1 commercial use needs a separate Esri licence + fee; Esri may alter/discontinue free services at its discretion. In-app attribution text (from live service metadata 2026-10-28): "Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community" (note: Maxar renamed to Vantor — update the app's credit string) | Yes — z17 + z18 verified HTTP 200, `image/jpeg`, no auth (2026-10-28): Paris `17/45092/66392` (21,034 bytes) and `18/90184/132784` (19,614 bytes) downloaded and confirmed varied imagery (pixel std ≈55, not blank/oversampled) | Yes — no key/account; **rate limits:** CloudFront-fronted (`Cache-Control: max-age=86400`), no published quota, but the service is meant for interactive use, not bulk download — cache every tile on device (`user://cache`), bounded pool, tier-sized mosaics only | tile failure → lower zoom for that cell → per-tile cache → vertex-colour terrain dressing (Fast preset skips the fetch) | **verified, wired in `SatelliteFetcher` (z16); z17/z18 gate passed for T2.2 — noncommercial-free; re-check licence before any paid/commercial release** |
 | Climate | CHELSA V2.1 climatologies 1981–2010 (bio10 / bio11 / bio12 / bio18 / scd) | `https://os.zhdk.cloud.switch.ch/chelsav2/GLOBAL/climatologies/1981-2010/bio/CHELSA_<var>_1981-2010_V.2.1.tif` — **HTTP range requests** (`Accept-Ranges: bytes`, verified 206) | Global GeoTIFF 43200 × 20880 (30″ ≈ 1 km), uint16, one deflate strip per row, horizontal predictor; GDAL scale/offset per variable (temperatures K × 0.1 − 273.15). Per place: first IFD (16 KB) + 3 strip-table entries + 3 compressed rows (≈10–45 KB) per variable → 3 × 3 cell median | CC BY 4.0 — Karger, D.N. et al. (2017) *Climatologies at high resolution for the earth's land surface areas*, Sci. Data 4, 170122; credited in-app ("Climate: CHELSA V2.1 (Karger et al.)") | Yes — ~0.3–0.6 MB and ~3–4 s per place uncached, verified on Paris / Interlaken / Big Sur (2026-10-30); cached per place (`climate_v2_*.json`, 5 ms) | Yes — no key/account | latitude snow line / treeline / regional biome (ClimateModel fallbacks) | **verified, wired 2026-10-30 (`ClimateFetcher` → `LocationData.climate` → `ClimateModel`)** — supersedes the 2026-10-27 "not wired" decision, which assumed whole-file downloads |
 | Climate (fallback) | Open-Meteo Historical Weather API — ERA5 / ERA5-Land daily, 2001–2010 (`temperature_2m_mean`, `precipitation_sum`) | `https://archive-api.open-meteo.com/v1/archive?latitude=…&longitude=…&start_date=2001-01-01&end_date=2010-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=GMT` | JSON, ~3650 days; ~25 km reanalysis downscaled to the point's elevation by Open-Meteo. Monthly means → warmest / coldest 3-month means, annual and warmest-quarter precipitation; snow days ≈ days with a mean ≤ 0 °C | CC BY 4.0 — Open-Meteo; contains modified Copernicus Climate Change Service information; credited in-app ("Climate: ERA5 (Copernicus) via Open-Meteo") | Yes — ~18 KB gzipped, ~1.5–3 s; weighs ~50 Open-Meteo calls, so only used when CHELSA fails or runs past 14 s; cached per place like CHELSA | Yes — no key/account | latitude rules (ClimateModel) | **wired 2026-11-01 (`ClimateFetcher._fetch_fallback`)** — within 1 °C of CHELSA on Paris / Interlaken / Banff / Turku / Cairo, ~3.5 °C warm at Big Sur (coastal cell) |
-| Land cover (raster, realism v3 R-2.2) | ESA WorldCover 10 m v200 (2021) | `https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_<N or S><lat3><E or W><lon3>_Map.tif` (3° tiles named by their SW corner) — **HTTP range requests** (`Accept-Ranges: bytes`, verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:4326, 36000 × 36000 uint8 classes (10 tree, 20 shrub, 30 grass, 40 crop, 50 built, 60 bare, 70 snow/ice, 80 water, 90 wetland, 95 mangrove, 100 moss), Deflate, no predictor, 1024² tiles, overviews ×2 to 1125². Per place: IFD + tile tables (~16 KB) + ≤ 2×2 tiles for the ±1200 m window, one overview window for the far rings | CC BY 4.0 — “© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium”; credited in-app | Yes — spike 2026-11-01: HEAD 200, range GET 206, header parsed (Paris tile N48E000, 74 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | OSM land cover + today's photo-greenness heuristic (current behaviour) | **spike verified 2026-11-01, not wired** (planned `CogReader` + `LandcoverFetcher`, `.agents/plans/2026-11-01-city-realism-v3.md` R-2.2) |
-| Tree canopy height (raster, realism v3 R-2.2) | Meta / WRI High Resolution Canopy Height Maps v2 (DINOv3 global, ml3) | `https://dataforgood-fb-data.s3.amazonaws.com/forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif` (zoom-10 Bing quadkey, computable from lat/lon; index `tiles.geojson` alongside) — **HTTP range requests** (verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:3857, 32768 × 32768 uint8 canopy height (m), Deflate, no predictor, 512² tiles (mean ~28 KB); IFD1 is a 1-bit mask, overviews 16384…2048. Per place: header + tile tables (~33 KB) + ~3×3 tiles of the 8192² overview (~3 m/px) for the ±1200 m window | CC BY 4.0 — “Canopy height: © Meta and World Resources Institute (High Resolution Canopy Height Maps)”; credited in-app | Yes — spike 2026-11-01: range GET 206, all IFDs parsed (Paris tile `1202200110`, 179 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | WorldCover tree class, then OSM trees + park groves (current behaviour) | **spike verified 2026-11-01, not wired** (R-2.2) |
+| Land cover (raster, realism v3 R-2.2) | ESA WorldCover 10 m v200 (2021) | `https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_<N or S><lat3><E or W><lon3>_Map.tif` (3° tiles named by their SW corner) — **HTTP range requests** (`Accept-Ranges: bytes`, verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:4326, 36000 × 36000 uint8 classes (10 tree, 20 shrub, 30 grass, 40 crop, 50 built, 60 bare, 70 snow/ice, 80 water, 90 wetland, 95 mangrove, 100 moss), Deflate, no predictor, 1024² tiles, overviews ×2 to 1125². Per place: IFD + tile tables (~16 KB) + ≤ 2×2 tiles for the ±1200 m window, one overview window for the far rings | CC BY 4.0 — “© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium”; credited in-app | Yes — spike 2026-11-01: HEAD 200, range GET 206, header parsed (Paris tile N48E000, 74 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | OSM land cover + today's photo-greenness heuristic (current behaviour) | **near-field fetch and ground fallback wired 2026-11-03** (`CogReader`, `CogFetcher`, `LandcoverFetcher`); far-ring coverage remains open |
+| Tree canopy height (raster, realism v3 R-2.2) | Meta / WRI High Resolution Canopy Height Maps v2 (DINOv3 global, ml3) | `https://dataforgood-fb-data.s3.amazonaws.com/forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif` (zoom-10 Bing quadkey, computable from lat/lon; index `tiles.geojson` alongside) — **HTTP range requests** (verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:3857, 32768 × 32768 uint8 canopy height (m), Deflate, no predictor, 512² tiles (mean ~28 KB); IFD1 is a 1-bit mask, overviews 16384…2048. Per place: header + tile tables (~33 KB) + ~3×3 tiles of the 8192² overview (~3 m/px) for the ±1200 m window | CC BY 4.0 — “Canopy height: © Meta and World Resources Institute (High Resolution Canopy Height Maps)”; credited in-app | Yes — spike 2026-11-01: range GET 206, all IFDs parsed (Paris tile `1202200110`, 179 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | WorldCover tree class, then OSM trees + park groves (current behaviour) | **near-field fetch and canopy placement wired 2026-11-03** (`LandcoverFetcher`, `CanopyVegetation`); far-tree coverage remains open |
 | Place search | Nominatim (OSMF) | `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=…` | JSON | ODbL; © OpenStreetMap contributors | Yes — usage policy reviewed (2026-10-27): user-triggered search only, **no autocomplete**, ≤1 req/s (single in-flight request), identifying User-Agent, results cached on device. Endpoint is one switchable constant, as the policy requires. The project owner deliberately adopts this service under these restrictions. | Yes — no key/account | bundled MVP gazetteer (paris/interlaken/banff) + raw coordinates | **verified policy, wired in `SearchFetcher`** |
 | Landmark markers + details | Wikipedia (GeoSearch + REST page summary) and Wikimedia Commons (lead photo) | Nearby: `https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggscoord=LAT\|LON&ggsradius=≤10000&ggslimit=500&ggsprimary=primary&prop=info\|description\|coordinates`; details: `https://{lang}.wikipedia.org/api/rest_v1/page/summary/{Title}`; photo: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:X&prop=imageinfo&iiprop=url\|extmetadata&iiurlwidth=640` then the returned `thumburl` on `thumb.wikimedia.org` | JSON; photo JPEG/PNG/WebP. GeoSearch's coordinate `type` is almost always empty, so `WikiParse` keeps pages whose short description names a physical place (word allowlist/denylist) and ranks them by article `length` | Article text CC BY-SA 4.0 — "Text from Wikipedia · CC BY-SA 4.0" under every extract, plus a Data sources row. Photos only when the file is on Commons (`/wikipedia/commons/`; `/wikipedia/en/` uploads are often non-free logos — the Eiffel Tower's lead image is one), credited per photo with its Artist + LicenseShortName from `extmetadata` | Yes — verified 2026-11-01: GeoSearch 500 pages in 1.7–2.7 s (Paris, Zermatt, Turku; Matterhorn / Eiffel Tower / Turku Cathedral rank top), summary HTTP 200 (`Matterhorn`, `Eiffel_Tower`), imageinfo 200 with credit, `thumburl` 200 `image/jpeg` 145 KB. Note: thumbnails at non-standard widths (e.g. `640px-`) now return HTTP 400 — always use the `thumburl` the API returns | Yes — no key/account. Wikimedia etiquette: identifying User-Agent with contact URL (`WikiFetcher.USER_AGENT`), one request in flight per channel, nearby lookups only after the map settles (0.01° cell + 1 km radius steps), every answer cached on device (`wiki_*` keys, LRU) | no article → card shows name, kind and readouts with "No article found for this place."; offline → cached answers, else "You're offline. Details open when you're back online."; nearby failure → curated registry markers only | **verified, wired in `WikiFetcher` / `WikiParse` (2026-11-01)**. Rejected: Wikidata SPARQL ranked by sitelinks (31 s for Paris, returns languages/events/regions) |
 | Weather (optional) | Open-Meteo | `https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…&current=temperature_2m,weather_code,cloud_cover` | JSON | Open-Meteo terms; weather data CC-BY — attribution in register/app credits | Yes — verified HTTP 200 live (Paris 16.4 °C, overcast) 2026-10-27 | Yes — no key/account | omit weather label/dressing | **verified, wired in `WeatherFetcher`** |
@@ -269,7 +269,7 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
 | T2.1 DEM mosaic z14+z12+z8 | Elevation (DEM) | same endpoint, z14 probed live |
 | T2.2 satellite z17/18/16 | Satellite imagery | same endpoint, z17+z18 probed live |
 | T3.7 far-field DEM rings (~25 m/px z12 to 9.5 km, ~100 m/px z10 to 33 km) + far imagery drapes (~12/50/200 m/px, z13/z11/z9 at mid-latitudes, to 9.5/33/60 km) — `FarFieldFetcher` | Elevation (DEM) + Satellite imagery | same endpoints and cache keys (`dem_v2_*`, `sat_v2_*`), zoom picked per latitude by target m/px; ~32 DEM + ≤~100 low-zoom imagery tiles per cold place, cached per tile, bounded pool of 8; same Esri credit string (pipeline adds it when only far drapes landed); incomplete layer → dropped → coarser ring / z8 grid / colour ramp |
-| T5.4 far-city ring query (built-up `landuse` ways + multipolygons and `building` with height ≥ 50 m / levels ≥ 15, `around:12000`) — `FarCityFetcher` | Land cover + Buildings | same Overpass endpoints (mirror-first order so it never queues behind the detailed query), one request per place, `[timeout:30]`, identifying UA, cached as `osm_v2_<lat>_<lon>_farcity12000.json` (osm layer); measured live 2026-10-28: Paris 5.1 MB / 22 s (1129 landuse, 730 towers), Interlaken 0.8 MB / 7 s, Big Sur 13 KB / 7 s; failure → empty → imagery-only far city |
+| T5.4 far-city ring query (built-up `landuse` ways + multipolygons and `building` with height ≥ 50 m / levels ≥ 15, `around:12000`) — `FarCityFetcher` | Land cover + Buildings | same Overpass endpoints (mirror-first order so it never queues behind the detailed query), one request per place, `[timeout:30]`, identifying UA, cached as `osm_v2_<lat>_<lon>_farcity12000_q2.json` (osm layer); older unversioned entries are offline/failure fallback. Historical query measured live 2026-10-28: Paris 5.1 MB / 22 s (1129 landuse, 730 towers), Interlaken 0.8 MB / 7 s, Big Sur 13 KB / 7 s; failure → empty → imagery-only far city |
 | Horizon labels query (named `natural=peak` to 45 km, `place=city|town|village` to 30 km, lake/reservoir `natural=water` to 20 km, `out tags center 1500`) — `HorizonFetcher` | Names for the skyline (peaks, towns, lakes: name, `ele`, position; no geometry) | same Overpass endpoints, mirror-first order, one request per place, `[timeout:30]`, identifying UA, issued only when the person turns horizon labels on, cached as `osm_v2_<lat>_<lon>_horizon45000.json` (osm layer); failure → empty → no labels; credit is the viewer's existing © OpenStreetMap contributors attribution |
 | T2.3 OSM footprints + rich tags + wider radius | Buildings + roads | same endpoint, tags confirmed live |
 | T2.4 land-cover classes + waterways + relations | Land cover | same endpoint, parse-only change |
@@ -341,3 +341,92 @@ model is ≈64 × 40 m, yaw −7.8°, and the registry point (59.32468 N,
 - **Boat and pontoon geometry**: own procedural work (`MarinaBuilder`), no third-party meshes — CC0 1.0 by
   this project. Boat counts, sizes and colours are generic (hash-placed along the mapped pontoons), not
   the real vessels.
+
+- **Quay dressing (G-6)**: the same own-work boat geometry now includes generic
+  steam vessels and houseboats along mapped quays/retaining walls or finalized
+  hard banks. Positions are deterministic procedural berths, not live vessel
+  locations. Merged bollards and regional stone use existing materials; no new
+  third-party assets. Ornamental pools and dry walls reject boats.
+- **Mapped vessel buildings**: `building=ship|boat|houseboat` retains its OSM
+  footprint, colour and height/levels; `ship:type` or `seamark:ship:type` selects
+  a sailing silhouette when tagged. Missing type/height uses the documented
+  generic motor-vessel fallback in the world-model contract. The mesh replaces
+  ordinary building extrusion; it does not add AIS or claim a ship-specific
+  reconstruction.
+
+### Old Mint reference dimensions (2026-11-03)
+
+OSM way `23192814` supplies the footprint and wall colour but has no height or
+storey tags. The [owner's 2012–13 restoration report](https://www.senaatti.fi/app/uploads/2017/05/3168-2013_Mustonen_Hki_Rahapaja_Kunnostusraportti_web.pdf)
+shows two facade levels and a metal roof (printed pp. 12–15, 46–47). Measuring
+the published 1:200 elevations on the A3 spread gives a rounded main-ridge
+height of about 11.5 m from the low facade base and a 2.5 m roof rise; the
+height carries a 1 m uncertainty and is not a surveyed elevation. The roof
+colour is an approximate dark grey based on the report's NCS S 7502-G, not an
+exact colour conversion. The report dates the building to 1863.
+`BuildingReferences` supplies these only when the
+relevant map values are missing, marks the source and method, and leaves a
+mapped building-part model alone. The raw OSM cache is unchanged.
+
+### Northern coastal DEM registration (2026-11-03)
+
+The Helsinki hero capture exposed a positive sea-surface bias in the cached
+Terrarium tiles: at 60.1657,24.9558 the sampled sea is 16.79 m (z14), 16.85 m
+(z12), and 17.41 m (z11). These are observations of the source tiles, not a
+claim about their underlying datum. [Tilezen's format documentation](https://github.com/tilezen/joerd/blob/master/docs/formats.md)
+states EGM96 heights; [PGC documents ArcticDEM's original ellipsoid reference
+and Esri's orthometric service](https://www.pgc.umn.edu/data/arcticdem/).
+
+`CoastalDem` therefore measures open-water samples 90–200 m to the water side
+of mapped, directed coastlines, requires at least 24 samples with interquartile
+spread at most 2 m, and accepts a positive bias only between 5 and 60 m. It
+subtracts the observed median from the northern near grid and fine rings
+(zoom >=11), retaining the independent coarse fallback. It records
+`coast_bias_m` and `coast_bias_method` in `dem_source`, which participates in the
+world cache key. Inland, already registered and inconsistent samples retain
+their original heights. The correction is idempotent; raw cached source tiles
+remain unchanged. Round 4 measured Helsinki 17.07 m and Espoo 17.31 m.
+
+Helsinki and Espoo visual reference photographs are listed with author,
+file-page and CC licence links in `visual-plan/refs/helsinki/README.md` and
+`visual-plan/refs/espoo/README.md` (three each, including winter).
+
+
+## Nordic roof metals — shared city pass G-5 (2026-11-03)
+
+Build-time bundled source: [ambientCG Metal058C](https://ambientcg.com/a/Metal058C)
+(copper/oxidation) and [Metal014](https://ambientcg.com/a/Metal014) (neutral metal).
+Both are author-created procedural PBR materials, not photographic scans.
+The [ambientCG licence](https://docs.ambientcg.com/license/) is CC0 1.0 Universal,
+including redistribution and modification; no account or key is needed.
+Direct `https://ambientcg.com/get?file=<asset>_<1K|2K>-JPG.zip` downloads were
+verified and decoded at 1024² and 2048² on 2026-11-03. There is no runtime
+API dependency, hotlinking or new app data fetch.
+
+Colour, OpenGL normal and roughness JPEGs are bundled as `copper_*` and
+`sheet_metal_*` under `assets/textures/` and `2k/`. Source URLs, byte counts
+and SHA-256 hashes are in `assets/textures/roof_metals.sources.json`.
+`PbrCatalog` records measured linear RGB means after calibration (64² samples) and scalar
+roughness. The copper default is calibrated to #538472 verdigris; the neutral
+metal supports charcoal, grey and falu-red paint. Its albedo is neutralized and
+contrast reduced to 25% to model paint covering bare-metal oxidation. Low metallic values model
+oxidation/paint on top of the metal rather than mirror-like exposed metal.
+
+`RoofMetalMaps` adds authored standing-fold normals at runtime: six 0.6 m
+pans over a 3.6 m repeat, running down the roof slope. This construction scale
+is a rendering choice, not a measured asset dimension. Composed normal maps
+are capped at 1024²; Ultra still uses the 2048² colour/roughness maps.
+Distant Fast roofs remain albedo-only, snow uses the existing roof overlay,
+and the existing two-material distant roof budget remains unchanged.
+Missing files retain the common warned procedural fallback.
+
+### Shore structures (2026-11-03)
+
+The existing detailed Overpass request additionally includes
+`man_made=quay|embankment`, `barrier=retaining_wall` and `embankment=yes`
+ways. `OsmParser` extracts these independently of ordinary land, roads and
+barriers, retaining source type/id, material and explicit height in the
+optional `LocationData.shore_structures` collection. The public completion
+signals and OSM attribution remain unchanged. The structures were introduced in query revision `pr360_q7`; later query
+revisions retain them and invalidate older detailed responses; old/offline payloads normalize to an
+empty collection. No additional provider or endpoint is introduced.

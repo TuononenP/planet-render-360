@@ -135,9 +135,9 @@ OsmFetcher (**A**). Consumers: BuildingBuilder (**C**), RoadBuilder
 | `footprint` **(new)** | `PackedVector2Array` | yes (v2) | Full OSM polygon in metre XZ (rotation, L/T/courtyard shapes preserved). AABB keys below stay as the corrupt-geometry fallback only |
 | `x`, `z` | `float` | yes | Polygon centroid, metre XZ (v1: world units) |
 | `size_x`, `size_z` | `float` | yes | AABB size in **metres** (v1: world units); fallback path only |
-| `height` | `float` | yes | **Metres** (unchanged unit); resolution order in T4.2: `height` tag → `levels × regional floor height` → estimate → documented regional default — never a global 10 m |
-| `height_source` **(new)** | `String` | yes | `tag_height` \| `levels` \| `estimate` \| `default`; scorecard (c) stratifies on this |
-| `levels` **(new)** | `int` | no | `building:levels`, 0 = untagged |
+| `height` | `float` | yes | **Metres** (unchanged unit); resolution order: mapped `height` → mapped `levels × regional floor height` → source-backed reference → neighbour estimate → documented regional default |
+| `height_source` **(new)** | `String` | yes | `tag_height` \| `levels` \| `reference` \| `estimate` \| `default`. Reference heights are not reported as mapped OSM tags. |
+| `levels` **(new)** | `float` | no | `building:levels` (including fractional values), or a documented reference fallback; 0 = unknown |
 | `min_height_m` **(new)** | `float` | no | `min_height` tag (arcades, pilotis); 0 = ground |
 | `colour` **(new)** | `String` | no | `building:colour` raw tag; MaterialLibrary resolves |
 | `material` **(new)** | `String` | no | `material` tag (`brick`, `glass`, …) |
@@ -146,6 +146,16 @@ OsmFetcher (**A**). Consumers: BuildingBuilder (**C**), RoadBuilder
 | `roof_height_m` **(new)** | `float` | no | `roof:height` tag; 0 = unknown |
 | `parts` **(new)** | `Array` | no | `building:part` sub-polygons, same height/colour keys; empty = single mass |
 | `name` | `String` | no | v1 key kept |
+| `osm_id` | `String` | no | OSM type and id, e.g. `way:23192814`; preserved for source-specific references. |
+| `reference` | `Dictionary` | no | Source URL, enriched fields, height method and uncertainty when `BuildingReferences` fills missing data. Reference values never replace mapped dimensions or a part model. |
+| `vessel_kind` | `String` | no | Only for `kind=ship|boat|houseboat`: normalized `ship:type`, else `seamark:ship:type`, else `motor`. Old cached payloads omit it and use the same fallback. |
+
+Mapped vessels use `ShipBuilder` at every quality tier: their oriented footprint
+sets length, beam and bow, and the local rendered water datum sets the hull's
+position. Tagged height wins, then levels at 2.4 m plus a 1.4 m base allowance;
+otherwise height is `clamp(3 + 0.12 × length, 4.5, 16)` metres. This is a generic
+vessel silhouette, not a surveyed ship model. Vessel heights do not enter the
+neighbour-building estimate. Ultra adds rails; Fast omits detail normal maps.
 
 ### 2.5 Roads (v2: attributed centrelines, T2.3; geometry T4.4)
 
@@ -184,8 +194,11 @@ New top-level fields:
 | Field | Type | Producer → consumers | Notes |
 |---|---|---|---|
 | `waterways` **(new)** | `Array` of `{points: PackedVector2Array, width_m: float, class: String}` | OsmFetcher → WaterBuilder, GroundTruth carve | `waterway` lines (river/stream/canal) + coastline ways; metre XZ. Added T2.3, meshed T3.4 |
+| `shore_structures` | Optional `Array` of `{points: PackedVector2Array, kind: String, id: String, material: String, height_m: float}` | OsmParser → OsmFetcher → pipeline → GroundTruth | Mapped quays, retaining walls and embankments in metre XZ. `id` retains OSM type/id; untagged height is `NAN` (unknown). Old payloads default to `[]`; public fetch signals are unchanged. |
 | `trees` **(new)** | `Array` of `{x: float, z: float}` | OsmFetcher → VegetationBuilder | Real `natural=tree` nodes, metre XZ. Added T2.3, planted T5.1 |
-| `barriers` **(new)** | `Array` of `{points: PackedVector2Array, class: String}` | OsmFetcher → Phase-4/5 consumer (unclaimed) | Linear `barrier=*` features (fence, wall, hedge, …), metre XZ; `class` = raw tag value. Added by amendment 2026-10-28 (T2.x closure W1); pipeline wiring landed (closure W2, 2026-10-28) |
+| `pois` | `Array` of `{x, z, category, kind, name, brand}` | OsmParser → OsmFetcher → pipeline → BuildingBuilder | Tagged shop, amenity, office, tourism, craft and advertising nodes in metre XZ. A bounded follow-up query has its own cache; empty when no nodes are available. Eligible businesses select nearby shopfront edges. |
+| `landcover_image`, `canopy_image` | `Image` (L8) or `null` | LandcoverFetcher → pipeline → GroundMaterial / CanopyVegetation | North-up 2.4 km windows centred on the place: WorldCover class bytes at 256² and canopy-height metres at 768². Each source is optional and cached independently; Fast skips both. OSM ground and mapped trees take precedence. A canopy no-data cell falls back to the WorldCover tree class when available; a valid low canopy value remains authoritative. Entirely no-data rasters do not suppress the existing vegetation fallback. |
+| `barriers` | `Array` of `{points: PackedVector2Array, class: String, height_m: float, material: String, fence_type: String}` | OsmFetcher → StreetProps | Linear `barrier=*` features in metre XZ. The class and material fields preserve raw OSM tags; height accepts metres or feet, with `NAN` when absent or invalid. StreetProps uses a valid mapped height and otherwise falls back to its class default. |
 
 ### 2.7 Landmarks
 
@@ -237,7 +250,7 @@ place from DEM + OSM polygons + waterways. It replaces the v1
 `TerrainBuilder._heights` / `display_heights` lazy path and every
 per-builder height recomputation (plan invariant 2).
 
-- File: `scripts/generation/ground_truth.gd` (does not exist yet).
+- File: `scripts/generation/ground_truth.gd`.
   Owner: **B**. Consumers: **every builder**, `View360` spawn height.
 - Construction: `GroundTruth.new(data: LocationData)` builds the surface
   synchronously from `data` (DEM + polygons + waterways); the pipeline
@@ -245,20 +258,26 @@ per-builder height recomputation (plan invariant 2).
   builder. Construction cost is a pipeline stage with real progress
   (§3.1 of the plan).
 - After T1.4, no builder reads `data.heights` / `data.display_heights`
-  directly (grep gate in test, per T1.4 validation).
+  directly (grep gate in test, per T1.4 validation). `CoastalDem` under
+  `scripts/data/` is a pipeline producer prepass: it registers raw source
+  grids once before GroundTruth construction and supplies no rendered heights
+  to builders.
 
 | API | Signature | Semantics |
 |---|---|---|
 | `height_at_world` | `func height_at_world(x: float, z: float) -> float` | Final render Y (**metres**, origin-relative, §1.3) at metre XZ: smoothed DEM, flattened only where OSM says so (building pads, roads), water-carved channels applied. Clamped to the detailed extent |
-| `water_at` | `func water_at(x: float, z: float) -> float` | Water depth in **metres** at XZ; `0.0` = dry. Covers water polygons, waterway lines (width-aware), and DEM sinks below sea datum |
+| `water_at` | `func water_at(x: float, z: float) -> float` | Water depth in **metres** at XZ; `0.0` = dry. Within the detailed extent, finalized water domains determine coverage: polygons with island holes, width-aware channels and directed coastlines. Low dry land alone does not establish water. |
+| `water_level_at` | `func water_level_at(x: float, z: float) -> float` | Canonical local water-surface Y in render metres. Carving, water meshes, bridge profiles and shoreline walls share this value. A returned fallback outside water does not imply wetness; use `water_at` for coverage. |
 | `land_class_at` | `func land_class_at(x: float, z: float) -> String` | v2 land class (§2.6, incl. `""` = unknown) at XZ; builders use it for material choice, scatter rules, and exclusion (no trees on roads/buildings/water) |
 | `slope_at` | `func slope_at(x: float, z: float) -> float` | Slope gradient (rise over run, `0.0` = flat) from true-metre heights; drives normals, drape tint cap, and snow/vegetation rules |
 | `extent_m` | `var extent_m: float` | Half-extent in metres of the detailed surface (`DETAILED_EXTENT_M / 2`) |
 | `is_inside` | `func is_inside(x: float, z: float) -> bool` | Whether XZ is on the detailed surface (else sample the far-ring surface) |
 
-Sampling rules: bilinear interpolation between grid posts; outside →
-nearest-edge value (never NaN); all samplers are pure reads (no lazy
-mutation — the v1 `display_heights` lazy-fill race is gone).
+Sampling rules: canonical triangle interpolation inside shoreline correction
+patches; bilinear interpolation elsewhere. At an exact hard shoreline,
+ground-height queries choose the land-side top; wall faces are separate
+geometry. Outside → nearest-edge value (never NaN). All finalized samplers
+are pure reads (no lazy mutation).
 
 ## 4. Builder input/output signatures (v2 target)
 
@@ -297,13 +316,24 @@ v2 key grammar (all under `user://cache/`):
 ```text
 dem_v<V>_<z>_<x>_<y>.png          # one Terrarium tile (T2.1 mosaics fetch many)
 sat_v<V>_<z>_<x>_<y>.jpg          # one Esri tile (T2.2 mosaics fetch many)
-osm_v<V>_<lat_q>_<lon_q>_r<radius_m>.json   # one Overpass area response
+osm_v<V>_<lat_q>_<lon_q>_r<radius_m>_q<Q>.json   # detailed Overpass response
+osm_v<V>_<lat_q>_<lon_q>_poi_q1.json            # bounded POI nodes
+osm_v<V>_<lat_q>_<lon_q>_farcity12000_q2.json   # far-city land and towers
+landcover_v<L>_<lat_microdegrees>_<lon_microdegrees>.png  # WorldCover window
+canopy_v<L>_<lat_microdegrees>_<lon_microdegrees>.png     # canopy window
 ```
 
 - `<V>` = `CacheStore.DATA_VERSION` (`const DATA_VERSION := 2`, owner
   **A**; single source — fetchers format keys through it, never inline).
 - Area quantisation for OSM stays `round(deg × 1000)`; the radius suffix
   keeps preset-scaled queries (T2.3) from colliding.
+- `<Q>` is the detailed OSM query version, independently of the POI and
+  far-city query versions; `<L>` is the independent raster-window version.
+  Current-marker detailed payloads from the former unversioned key are copied
+  to the current key; older copies remain available for offline fallback.
+- The built-world key includes geometry-affecting OSM content, raster bytes
+  and dimensions, landmark candidates, seed, and the opening eye used to
+  centre props. Camera bearing and pitch do not change the built-world key.
 - Invalidation: bump `DATA_VERSION` (global) or delete one layer prefix
   (per-layer refresh). v1 files are **ignored, never migrated** — a v2
   client missing a v2 key refetches (§7).
@@ -387,3 +417,75 @@ as "during that task, before its tick".
 - **Budgets:** generation fits the §3.1 tier budget (Ultra 60–120 s
   cold is a pass); every class ≤1000 lines
   (`tools/check_class_size.sh`); `tests/smoke_test.gd` stays green.
+
+### Helsinki / Espoo hero additions (2026-11-03)
+
+Attributed roads additionally carry `sidewalk_separate` (left/right bits for
+explicitly separate mapping), `oneway` (-1 reverse / 0 both / 1 forward),
+`lit` and `trolley_wire` (booleans). `sidewalk` continues to describe pavement
+presence; `sidewalk=both` alone never permits carriageway widening. Width
+inference preserves tagged lanes and stops at mapped cycle/path/tree verges.
+Railways carry the raw `electrified` tag for contact-wire selection. Water
+polygons may carry `tidal=true` (bays/sea/tidal basins), keeping their surface
+at the sea datum rather than a separately estimated inland bank level.
+`dem_source.coast_bias_m` / `coast_bias_method` record a confidence-gated,
+observed open-sea registration for northern surface-model DEMs; raw source
+files are preserved (see the source register). All generated geometry shares
+the corrected near/fine-ring registration.
+
+### Shared shoreline model (2026-11-03)
+
+`GroundTruth.shoreline` owns a `ShorelineModel`, finalized before the world
+build graph starts its parallel stages. It retains pre-carve dry terrain,
+indexed water domains and local levels, oriented shore segments with evidence
+provenance, and canonical corrected surface triangles. Consumers must not
+estimate a second water level or choose a second shoreline. `ShoreDomains`
+keeps polygon holes, buffers uncovered channel runs and assembles directed
+coastline chains through shared extent-border intervals; extent closure edges
+are never interpreted as quays. Touching polygon basins share a level;
+disconnected inland lakes retain separate elevations, connected channel
+endpoints share their profile level, and tidal water uses the sea datum.
+
+The default bank policy is conservative and independent of place identity:
+
+- An explicit quay, retaining wall or embankment must match within 3 m and
+  have compatible direction (absolute direction dot product at least 0.8).
+- Explicit natural land cover vetoes inferred masonry. Otherwise inference
+  requires paving within 8 m and a building footprint within 20 m on the
+  land side at two of three stations over a 10 m section.
+- Hard-bank tops use the median of at least three valid pre-carve dry
+  samples at 2, 5, 10 and 20 m. Water and building interiors are excluded.
+  Insufficient evidence leaves a natural bank with a recorded reason.
+- No imagery colour, city name or aggregate building density participates.
+  Segment `reason` and `sources` remain available for diagnostics and cache
+  inspection; an absence of supporting mapping must remain visible.
+
+`ShoreSurface` subdivides bounded shoreline cells and their neighbour ring
+against exact local edges, preserving holes by planar subdivision rather
+than rejecting triangles by centroid. The native and script paths both
+validate complete cell area. Stations are at most 2 m apart, positions are
+quantized to 1 cm, and wet beds stay at least 2 m below local water.
+`ShoreLod` coarsens only planar background tiles, stitching their shared
+vertices; canonical shoreline patches remain identical across presets.
+A failed patch retains the preceding grid cell and emits `patch_failure`;
+that fallback is a failed visual acceptance gate, not an accepted shoreline.
+Cancellation is checked between bounded patches and classification units.
+
+`ShoreWater` meshes the same wet domains; `ShoreBankMesh` builds connected
+masonry faces down to 0.6 m below water, including landward return faces at
+hard/natural treatment changes. Unmapped parapets and lower walkways are not
+invented. Paving uses its own ground attribute and stone has its own material;
+neither changes the canal's bed colour or water tint. Natural cover remains
+on the land side of an explicitly mapped wall. The natural apron is a wetness attribute on the same canonical dry
+triangles, suppressed along hard banks; no independent ribbon can cross a
+concave water boundary. Roads clip against canonical dry triangles; buildings,
+vegetation, camera clearance and bridges query finalized `GroundTruth`.
+
+World caches serialize the finalized model (domains, segment provenance,
+dry/base grids and patches) and rebuild native/script spatial indexes on
+restore. Incomplete pre-model payloads are rejected. World fingerprints
+include normalized shore structures and the land/water/building/road evidence;
+OSM query revision `pr360_q7` introduced the new structures (retained by
+subsequent query revisions). Detailed-extent
+boundary posts share their carved levels with the far-terrain join. Full
+far-field shoreline reconstruction remains outside this contract.
