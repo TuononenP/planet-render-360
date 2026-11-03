@@ -22,7 +22,9 @@ static func entries() -> Array:
 			LandmarkRegistryEastAsiaHistoric.entries(), LandmarkRegistryIndiaHistoric.entries(),
 			LandmarkRegistryMainlandSeAsia.entries(), LandmarkRegistryAfricaHistoric.entries(),
 			LandmarkRegistryAmericasHistoric.entries(),
-			LandmarkRegistryFinlandHelsinki.entries(), LandmarkRegistryFinlandRegions.entries()]:
+			LandmarkRegistryFinlandHelsinki.entries(), LandmarkRegistryFinlandRegions.entries(),
+			LandmarkRegistrySwedenStockholm.entries(),
+			LandmarkRegistrySanFrancisco.entries()]:
 		all.append_array(batch)
 	return all
 
@@ -41,4 +43,6 @@ static func sets() -> Array[Callable]:
 		LandmarkSetEastAsiaHistoric.build, LandmarkSetIndiaHistoric.build,
 		LandmarkSetMainlandSeAsia.build, LandmarkSetAfricaHistoric.build,
 		LandmarkSetAmericasHistoric.build,
-		LandmarkSetFinlandHelsinki.build, LandmarkSetFinlandRegions.build]
+		LandmarkSetFinlandHelsinki.build, LandmarkSetFinlandRegions.build,
+		LandmarkSetSwedenStockholm.build,
+		LandmarkSetSanFrancisco.build]
