@@ -38,11 +38,18 @@ func _run() -> void:
 		var got := LocationData.landmark_for(lat, lon, str(entry.get("name", "")))
 		if got != type:
 			failures.append("searching '%s' should give %s, got %s" % [entry.get("name"), type, got])
-		if not core and not LandmarkBuilder.is_bespoke(type):
+		if not core and not _in_core_match(type) and not LandmarkBuilder.is_bespoke(type):
 			failures.append("%s has no bespoke builder (would fall back to a generic tower)" % type)
 			continue
 		var model := LandmarkBuilder.build(type)
 		_check_model(failures, type, model, 0.0 if core else float(entry.get("height_m", 0.0)))
+		if entry.has("base_drop_m"):
+			var low := 0.0
+			for m in LandmarkBuilder.parts(model):
+				low = minf(low, (m.transform * m.mesh.get_aabb()).position.y)
+			if absf(low + float(entry["base_drop_m"])) > 2.0:
+				failures.append("%s hangs %.1f m below its origin but base_drop_m is %.1f" % [
+					type, -low, float(entry["base_drop_m"])])
 		model.free()
 	if failures.is_empty():
 		print("LANDMARK CATALOG OK: %d registry landmarks" % entries.size())
@@ -51,6 +58,14 @@ func _run() -> void:
 		for f in failures:
 			printerr("LANDMARK CATALOG FAIL: ", f)
 		quit(1)
+
+## Regional extras whose model lives in a core class and is built by
+## LandmarkBuilder's own match, so no region set owns them.
+func _in_core_match(type: String) -> bool:
+	for e in LocationData._regional_extras():
+		if str(e["type"]) == type:
+			return true
+	return false
 
 ## The 23 landmarks built by LandmarkBuilder's own match.
 func _is_core(type: String) -> bool:

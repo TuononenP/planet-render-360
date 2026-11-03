@@ -509,12 +509,14 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	return root
 
 ## Base Y of a registry model: the water surface for a bridge standing
-## in water (`base: water`), else the lowest ground under its footprint.
+## in water (`base: water`), else the lowest ground under its footprint,
+## raised by `base_drop_m` for a model hung below its origin (a dam
+## whose crest is y = 0 but whose toe stands on the canyon floor).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
 	if str(entry.get("base", "")) == "water":
 		return ground.water_level_at(x, z) if ground.is_inside(x, z) else ground.water_level_m
-	return site_ground_y(data, ground, x, z, half) - 0.3
+	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
 	var mi := _add(parent, _cyl(radius * 0.8, radius, 1.0, 6), mat)

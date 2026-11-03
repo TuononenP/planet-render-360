@@ -6,7 +6,10 @@ extends RefCounted
 ## The Golden Gate Bridge is core and the Transamerica Pyramid is in the
 ## north america batch. The Bay Bridge spans and Alcatraz are built along
 ## +X with y = 0 at the water (`base: water`); yaw_deg = true bearing of
-## +X - 90 (axis = cos, sin in x east, z south).
+## +X - 90 (axis = cos, sin in x east, z south). City Hall and the Palace
+## of Fine Arts sit on the Western Addition / Marina grid, turned 9
+## degrees anticlockwise: City Hall's Polk Street front (+X) bears 81,
+## the Palace's long axis (+X, the span) bears 351.
 
 static func entries() -> Array:
 	return [
@@ -36,4 +39,12 @@ static func entries() -> Array:
 			"radius_m": 8000.0, "wiki_title": "San Francisco–Oakland Bay Bridge", "height_m": 160.0,
 			"clear_m": 30.0, "yaw_deg": -35.5, "span_m": 1300.0, "base": "water", "kind": "Bridge",
 			"aliases": ["bay bridge east span", "eastern span of the bay bridge", "self-anchored suspension bridge"]},
+		{"type": "sf_city_hall", "name": "San Francisco City Hall", "lat": 37.77928, "lon": -122.41924,
+			"radius_m": 4000.0, "wiki_title": "San Francisco City Hall", "height_m": 93.7, "clear_m": 70.0,
+			"yaw_deg": -9.0, "kind": "City hall",
+			"aliases": ["san francisco city hall", "sf city hall", "city hall san francisco"]},
+		{"type": "palace_of_fine_arts", "name": "Palace of Fine Arts", "lat": 37.80292, "lon": -122.44840,
+			"radius_m": 4000.0, "wiki_title": "Palace of Fine Arts", "height_m": 49.4, "clear_m": 65.0,
+			"yaw_deg": -99.0, "span_m": 270.0, "kind": "Monument",
+			"aliases": ["palace of fine arts", "palace of fine arts rotunda", "maybeck rotunda"]},
 	]

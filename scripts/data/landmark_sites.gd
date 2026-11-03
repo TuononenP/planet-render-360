@@ -42,6 +42,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"archetype": str(entry.get("kind", "landmark")), "height": float(entry.get("height_m", 0.0)),
 			"clear_m": clear_m(entry), "yaw_deg": float(entry.get("yaw_deg", 0.0)),
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
+			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
 		clear.append([p, entry])
 	var cap: int = MAX_BY_PRESET[preset]

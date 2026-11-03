@@ -19,8 +19,10 @@ extends RefCounted
 ## Classical column of height h (base to top of the abacus), lower shaft
 ## radius r. order: "doric", "ionic", "corinthian" or "tuscan"; flutes 0
 ## for a plain shaft (Doric 20, Ionic and Corinthian 24 in practice).
+## `radial` is the lathe segment count of the capital and base; lower it
+## (about 10) for a colonnade seen from far away.
 static func column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: float,
-		order: String = "doric", flutes: int = 20) -> void:
+		order: String = "doric", flutes: int = 20, radial: int = 20) -> void:
 	var cap_h := r * (0.9 if order == "doric" or order == "tuscan" else (1.4 if order == "ionic" else 2.4))
 	var base_h := 0.0 if order == "doric" else r * 0.9
 	if base_h > 0.0:
@@ -29,20 +31,20 @@ static func column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: fl
 		lm.lathe(key, base + Vector3(0, base_h * 0.3, 0), PackedVector2Array([Vector2(r * 1.3, 0),
 			Vector2(r * 1.36, base_h * 0.12), Vector2(r * 1.3, base_h * 0.25), Vector2(r * 1.12, base_h * 0.35),
 			Vector2(r * 1.08, base_h * 0.45), Vector2(r * 1.16, base_h * 0.55), Vector2(r * 1.18, base_h * 0.62),
-			Vector2(r * 1.06, base_h * 0.7)]), 24)
+			Vector2(r * 1.06, base_h * 0.7)]), radial + 4)
 	var shaft_h := h - cap_h - base_h
 	var sb := base + Vector3(0, base_h, 0)
 	if flutes > 0:
 		_fluted_shaft(lm, key, sb, r, shaft_h, flutes)
 	else:
 		lm.lathe(key, sb, PackedVector2Array([Vector2(r, 0), Vector2(r * 0.99, shaft_h * 0.33),
-			Vector2(r * 0.93, shaft_h * 0.7), Vector2(r * 0.83, shaft_h)]), 20)
+			Vector2(r * 0.93, shaft_h * 0.7), Vector2(r * 0.83, shaft_h)]), radial)
 	var cb := sb + Vector3(0, shaft_h, 0)
 	var ra := r * 0.83
 	match order:
 		"ionic":
 			lm.lathe(key, cb, PackedVector2Array([Vector2(ra, 0), Vector2(ra * 1.1, cap_h * 0.12),
-				Vector2(ra * 1.15, cap_h * 0.3)]), 20)
+				Vector2(ra * 1.15, cap_h * 0.3)]), radial)
 			# Volutes: a scroll each side, front and back, spiralling in.
 			for side in [-1.0, 1.0]:
 				_volute(lm, key, cb + Vector3(float(side) * r * 1.05, cap_h * 0.32, 0), r * 0.42, float(side))
@@ -50,7 +52,7 @@ static func column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: fl
 			lm.box(key, cb + Vector3(0, cap_h * 0.85, 0), Vector3(r * 2.5, cap_h * 0.3, r * 2.5))
 		"corinthian":
 			lm.lathe(key, cb, PackedVector2Array([Vector2(ra, 0), Vector2(ra * 1.0, cap_h * 0.3),
-				Vector2(ra * 1.12, cap_h * 0.6), Vector2(ra * 1.35, cap_h * 0.84)]), 20)
+				Vector2(ra * 1.12, cap_h * 0.6), Vector2(ra * 1.35, cap_h * 0.84)]), radial)
 			# Two tiers of acanthus leaves curling out, and corner volutes.
 			for tier in 2:
 				for i in 8:
@@ -69,10 +71,10 @@ static func column(lm: LandmarkMesh, key: String, base: Vector3, r: float, h: fl
 			lm.box(key, cb + Vector3(0, cap_h * 0.92, 0), Vector3(r * 2.9, cap_h * 0.16, r * 2.9))
 		_:
 			# Doric / Tuscan: necking rings, echinus, square abacus.
-			lm.frustum(key, cb, ra * 1.04, ra * 1.04, cap_h * 0.12, 20)
+			lm.frustum(key, cb, ra * 1.04, ra * 1.04, cap_h * 0.12, radial)
 			lm.lathe(key, cb + Vector3(0, cap_h * 0.15, 0), PackedVector2Array([Vector2(ra, 0),
 				Vector2(ra * 1.2, cap_h * 0.2), Vector2(ra * 1.45, cap_h * 0.45),
-				Vector2(ra * 1.5, cap_h * 0.55)]), 20)
+				Vector2(ra * 1.5, cap_h * 0.55)]), radial)
 			lm.box(key, cb + Vector3(0, cap_h * 0.85, 0), Vector3(r * 2.5, cap_h * 0.3, r * 2.5))
 
 ## Shaft with entasis and `n` concave flutes, as a grid of rings.
@@ -158,9 +160,10 @@ static func cornice(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, out: 
 			lm.box(key, p, Vector3(step * 0.55, h * 0.16, h * 0.2), basis, 0.0)
 
 ## Balustrade along a-b on the level of a and b: plinth, lathed vase
-## balusters, handrail, with a square pedestal every `bay` metres.
+## balusters (`radial` segments each), handrail, with a square pedestal
+## every `bay` metres.
 static func balustrade(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h: float = 1.0,
-		bay: float = 4.0) -> void:
+		bay: float = 4.0, radial: int = 8) -> void:
 	var dir := (b - a).normalized()
 	var dl := a.distance_to(b)
 	var basis := Basis(dir, Vector3.UP, dir.cross(Vector3.UP).normalized())
@@ -179,7 +182,7 @@ static func balustrade(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, h:
 		var slot := fmod(t * piers, 1.0)
 		if slot < 0.06 or slot > 0.94:
 			continue
-		lm.lathe(key, a.lerp(b, t) + Vector3(0, h * 0.12, 0), vase, 8)
+		lm.lathe(key, a.lerp(b, t) + Vector3(0, h * 0.12, 0), vase, radial)
 	for i in piers + 1:
 		lm.box(key, a.lerp(b, float(i) / float(piers)) + Vector3(0, h * 0.5, 0),
 			Vector3(w * 1.6, h, w * 1.6), basis)
@@ -200,11 +203,18 @@ static func window(lm: LandmarkMesh, frame: String, glass: String, c: Vector3, n
 		lm.box(frame, mid + right * (w * 0.5 + fw * 0.5) * float(s) - Vector3(0, (h - oh) * 0.5, 0),
 			Vector3(fw, oh, depth), basis)
 	var base_y := c.y - h * 0.5
-	# Sill and its apron.
-	lm.box(frame, Vector3(c.x, base_y - fw * 0.3, c.z) + n * depth * 0.75 + Vector3.ZERO,
-		Vector3(w + fw * 3.0, fw * 0.6, depth * 1.5), basis)
-	lm.box(frame, Vector3(c.x, base_y - fw * 1.2, c.z) + n * depth * 0.35,
-		Vector3(w * 0.7, fw * 1.2, depth * 0.7), basis)
+	# Sill and its apron; on a ground-floor window neither reaches below
+	# the model's base (y = 0).
+	var floor_y := 0.0 if base_y >= 0.0 else -INF
+	var sill_lo := maxf(base_y - fw * 0.6, floor_y)
+	if base_y - sill_lo > 0.02:
+		lm.box(frame, Vector3(c.x, (sill_lo + base_y) * 0.5, c.z) + n * depth * 0.75,
+			Vector3(w + fw * 3.0, base_y - sill_lo, depth * 1.5), basis)
+	var apron_lo := maxf(base_y - fw * 1.8, floor_y)
+	var apron_hi := maxf(base_y - fw * 0.6, apron_lo)
+	if apron_hi - apron_lo > 0.02:
+		lm.box(frame, Vector3(c.x, (apron_lo + apron_hi) * 0.5, c.z) + n * depth * 0.35,
+			Vector3(w * 0.7, apron_hi - apron_lo, depth * 0.7), basis)
 	var top_y := base_y + oh
 	if arched:
 		var ctr := Vector3(c.x, top_y, c.z) + n * depth * 0.5
@@ -299,14 +309,14 @@ static func _wall_rect(lm: LandmarkMesh, wall: String, P: Callable, x: float, y:
 
 ## Moulded round arch over an opening `span` wide whose springing line
 ## is at `c` (centre), on a wall facing `normal`: an archivolt of
-## voussoirs with a projecting keystone.
+## voussoirs (at most `max_segs`) with a projecting keystone.
 static func arch(lm: LandmarkMesh, key: String, c: Vector3, normal: Vector3, span: float,
-		band: float = -1.0, depth: float = 0.3) -> void:
+		band: float = -1.0, depth: float = 0.3, max_segs: int = 25) -> void:
 	var n := normal.normalized()
 	var r := Vector3.UP.cross(n).normalized()
 	var bw := band if band > 0.0 else clampf(span * 0.12, 0.2, 1.5)
 	var rad := span * 0.5 + bw * 0.5
-	var segs := clampi(int(PI * rad / maxf(bw * 0.8, 0.3)), 9, 25)
+	var segs := clampi(int(PI * rad / maxf(bw * 0.8, 0.3)), mini(9, max_segs), max_segs)
 	var basis := Basis(r, Vector3.UP, n)
 	for i in segs:
 		var t0 := PI * float(i) / float(segs)

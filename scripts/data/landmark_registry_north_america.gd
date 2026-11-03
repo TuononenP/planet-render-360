@@ -43,7 +43,7 @@ static func entries() -> Array:
 			"radius_m": 5000.0, "wiki_title": "Hollywood Sign", "height_m": 13.7, "clear_m": 30.0,
 			"kind": "Sign", "aliases": ["hollywood sign", "hollywoodland sign"]},
 		{"type": "hoover_dam", "name": "Hoover Dam", "lat": 36.0161, "lon": -114.7377, "radius_m": 6000.0,
-			"wiki_title": "Hoover Dam", "height_m": 27.0, "clear_m": 60.0, "yaw_deg": 30.0, "kind": "Dam",
+			"wiki_title": "Hoover Dam", "height_m": 27.0, "clear_m": 60.0, "yaw_deg": 30.0, "base_drop_m": 221.0, "kind": "Dam",
 			"aliases": ["hoover dam", "boulder dam"]},
 		{"type": "chateau_frontenac", "name": "Château Frontenac", "lat": 46.8119, "lon": -71.2050,
 			"radius_m": 3500.0, "wiki_title": "Château Frontenac", "height_m": 79.9, "clear_m": 85.0,

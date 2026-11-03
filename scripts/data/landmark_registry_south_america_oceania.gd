@@ -63,6 +63,6 @@ static func entries() -> Array:
 		# the forecourt (Structurae, Wikipedia infobox).
 		{"type": "parliament_house_canberra", "name": "Parliament House, Canberra", "lat": -35.3081,
 			"lon": 149.1245, "radius_m": 6000.0, "wiki_title": "Parliament House, Canberra",
-			"height_m": 107.0, "clear_m": 150.0, "yaw_deg": 38.0, "kind": "Parliament",
+			"height_m": 107.0, "clear_m": 305.0, "yaw_deg": 38.0, "kind": "Parliament",
 			"aliases": ["parliament house, canberra", "australian parliament house", "parliament house canberra"]},
 	]

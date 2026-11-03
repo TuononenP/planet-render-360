@@ -22,7 +22,7 @@ static func entries() -> Array:
 			"kind": "Temple", "aliases": ["konark sun temple", "konark temple", "konarak sun temple",
 				"sun temple konark", "black pagoda konark", "कोणार्क सूर्य मंदिर"]},
 		{"type": "brihadisvara_temple", "name": "Brihadisvara Temple", "lat": 10.7826, "lon": 79.1314, "radius_m": 4000.0,
-			"wiki_title": "Brihadisvara Temple, Thanjavur", "height_m": 66.0, "clear_m": 150.0, "yaw_deg": -20.0,
+			"wiki_title": "Brihadisvara Temple, Thanjavur", "height_m": 66.0, "clear_m": 235.0, "yaw_deg": -20.0,
 			"kind": "Temple", "aliases": ["brihadisvara temple", "brihadeeswarar temple", "brihadeshwara temple",
 				"peruvudaiyar kovil", "thanjavur big temple", "big temple thanjavur", "rajarajeswaram",
 				"பிரகதீஸ்வரர் கோயில்", "बृहदीश्वर मंदिर"]},

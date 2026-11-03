@@ -14,6 +14,8 @@ static func build(model: Node3D, type: String) -> bool:
 		"alcatraz": LandmarkSfAlcatraz.build(model)
 		"bay_bridge_west": LandmarkSfBayBridge.west(model)
 		"bay_bridge_east": LandmarkSfBayBridge.east(model)
+		"sf_city_hall": LandmarkSfCivic.city_hall(model)
+		"palace_of_fine_arts": LandmarkSfPalace.build(model)
 		_:
 			return false
 	return true
