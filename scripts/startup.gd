@@ -1,9 +1,12 @@
 extends Control
 
+# Keep this shader cached before the background loader compiles car models.
+# Loading it for the first time on that thread fails with the Metal renderer.
+const CAR_PAINT_SHADER = preload("res://scripts/generation/car_paint.gdshader")
 const MAIN_SCENE := "res://scenes/main.tscn"
 
 func _ready() -> void:
-	var err := ResourceLoader.load_threaded_request(MAIN_SCENE, "PackedScene", true)
+	var err := ResourceLoader.load_threaded_request(MAIN_SCENE, "PackedScene")
 	if err != OK:
 		push_error("Could not start loading the main scene: %s" % err)
 		set_process(false)
