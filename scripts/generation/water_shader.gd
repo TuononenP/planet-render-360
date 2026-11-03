@@ -48,6 +48,7 @@ uniform vec4 shallow_color : source_color = vec4(0.235, 0.300, 0.250, 1.0);
 uniform vec4 foam_color : source_color = vec4(0.86, 0.88, 0.88, 1.0);
 uniform float units_per_metre = 1.0;
 uniform float wave_amp = 1.0;
+uniform float swell_lift = 1.3;
 uniform float near_rough = 0.05;
 uniform float far_rough = 0.09;
 uniform float spec = 0.34;
@@ -120,7 +121,7 @@ void vertex() {
 		// The DEM has no seabed (ground sits at sea level), so troughs below
 		// the datum would show brown ground through the water: lift the
 		// whole swell so it only ever rises from the datum.
-		d.y += 1.3;
+		d.y += swell_lift;
 		VERTEX += d * damp * units_per_metre;
 	}
 }

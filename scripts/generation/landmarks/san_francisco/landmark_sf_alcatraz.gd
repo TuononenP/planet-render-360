@@ -5,11 +5,13 @@ extends RefCounted
 ## Cellhouse, the 1909 lighthouse on the summit knoll, the dock, the
 ## industries and powerhouse at the north-west end, the water tower and
 ## the burned ruins. Built along +X (bearing 125 degrees, the island's
-## long axis; yaw_deg 35) with y = 0 at the water (`base: water`). The
-## rock is a stack of inset copies of the real OSM shoreline (cliffs to
-## 24 m, plateau at 28 m, summit knoll at 40 m), thinner terraces beside
-## the dock; every building takes its pad height from that stack. The
-## lighthouse tip stands at 66 m.
+## long axis; yaw_deg 35) with y = 0 at sea level (`base: sea`). The
+## rock follows the mapped shoreline, with a continuous cliff slope, a
+## 40 m cellhouse/lighthouse terrace and lower dock/parade ground. The
+## lighthouse is 29 m tall (NPS: 95 feet), its tip at 69 m ASL.
+## Layout: https://www.nps.gov/goga/planyourvisit/upload/Alcatraz-map-Access-508.pdf
+## Heights: https://www.nps.gov/places/000/alcatraz-lighthouse.htm
+## This is an exterior reconstruction, not a surveyed terrain model.
 
 static var ISLAND := PackedVector2Array([
 	Vector2(64.6, -99.1),
@@ -95,16 +97,12 @@ static var ISLAND := PackedVector2Array([
 	Vector2(81.3, -93.1),
 	Vector2(75.4, -93.0)])
 
-const SHORE_TOPS := [3.0, 8.0, 13.0, 18.0, 24.0, 28.0]
-const SHORE_INSET := [0.0, 3.0, 6.0, 9.0, 12.0, 16.0]
-## Terraces beside the dock (x 30..175): the layer k only starts north of
-## this z, so the ground climbs from the pier to the plateau.
-const DOCK_CUT := [-140.0, -97.0, -90.0, -80.0, -68.0, -56.0]
 const KNOLL_C := Vector2(103.0, 3.0)
-const KNOLL_R := [24.0, 19.0, 14.0]
-const KNOLL_TOPS := [33.0, 37.0, 40.0]
 const SUMMIT_M := 40.0
-const LIGHT_M := 26.0
+const LIGHT_M := 29.0
+const SHORE_M := 3.0
+const SURFACE_STEP_M := 5.0
+static var _terraces: Array = []
 const DOCK_POLY := [Vector2(81.4, -95.0), Vector2(81.4, -101.4), Vector2(115.5, -102.1), Vector2(115.6, -113.7),
 	Vector2(164.8, -109.9), Vector2(166.7, -107.5), Vector2(164.1, -95.9)]
 
@@ -113,19 +111,20 @@ static func build(model: Node3D) -> void:
 	lm.use("Wet", LandmarkMaterials.pbr("rock", "#4C4A46", 5.0))
 	lm.use("Rock", LandmarkMaterials.pbr("cliff", "#7B7165", 6.0))
 	lm.use("Ground", LandmarkMaterials.pbr("grass", "#666A43", 4.0))
+	lm.use("Terrain", LandmarkMaterials.pbr("grass", "#666A43", 4.0))
 	lm.use("Yard", LandmarkMaterials.pbr("gravel", "#85816F", 3.0))
-	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#B6B3AA", 3.0))
+	lm.use("Concrete", LandmarkMaterials.pbr("render", "#B6B3AA", 3.0))
 	lm.use("Stucco", LandmarkMaterials.pbr("render", "#CFC3A8", 3.0))
 	lm.use("Roof", LandmarkMaterials.pbr("slate", "#4B4D50", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2C363C"))
 	lm.use("Rust", LandmarkMaterials.paint("#8A4B32", 0.7, 0.35))
 	lm.use("White", LandmarkMaterials.pbr("render", "#ECE8DE", 3.0))
 	lm.use("Light", LandmarkMaterials.lit("#FFE7A8", 1.0))
-	lm.use("Ruin", LandmarkMaterials.pbr("concrete", "#78726A", 3.0))
+	lm.use("Ruin", LandmarkMaterials.pbr("render", "#9B9384", 3.0))
 	lm.use("Steel", LandmarkMaterials.paint("#4A4F52", 0.55, 0.45))
 	lm.use("Asphalt", LandmarkMaterials.pbr("asphalt", "#3E3E3E", 4.0))
-	var g := _rock(lm)
-	var gy := func(p: Vector2) -> float: return _ground(g, p)
+	_rock(lm)
+	var gy := ground_height
 	var B := LandmarkSfAlcatrazBuildings
 	B.cellhouse(lm, gy, Vector2(24.0, 2.1))
 	B.admin(lm, gy, Vector2(71.5, 4.0))
@@ -148,115 +147,139 @@ static func build(model: Node3D) -> void:
 	var dock := PackedVector2Array()
 	for p in DOCK_POLY:
 		dock.append(p)
-	B.dock(lm, dock, SHORE_TOPS[0])
+	B.dock(lm, dock, SHORE_M)
 	_roads(lm, gy)
-	_boulders(lm, g)
-	lm.commit(model)
+	_boulders(lm)
+	for part in lm.commit(model):
+		if part.name == "Terrain":
+			part.set_surface_override_material(0, LandmarkSfAlcatrazSurface.material())
 
-## Rock: shoreline slab, cliff shells, plateau and the summit knoll.
-## Returns {"layers": [[poly...] per level], "knoll": [[poly...] per level]}.
-static func _rock(lm: LandmarkMesh) -> Dictionary:
-	var layers: Array = []
-	var knoll: Array = []
-	for k in SHORE_TOPS.size():
-		var polys := _layer(k)
-		layers.append(polys)
-		var y0 := 0.0 if k == 0 else float(SHORE_TOPS[k - 1]) - 0.3
-		var y1 := float(SHORE_TOPS[k])
-		for p in polys:
-			var poly: PackedVector2Array = p
-			lm.poly_prism("Wet" if k == 0 else "Rock", poly, y0, y1, false)
-			_cap(lm, "Wet" if k == 0 else ("Ground" if k < 5 else "Yard"), poly, y1)
-	for k in KNOLL_R.size():
-		var poly := PackedVector2Array()
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 90 + k
-		for i in 28:
-			var a := TAU * float(i) / 28.0
-			var r: float = float(KNOLL_R[k]) * (1.0 + (rng.randf() - 0.5) * 0.14)
-			poly.append(KNOLL_C + Vector2(cos(a) * r * 1.15, sin(a) * r))
-		knoll.append([poly])
-		var y0 := 28.0 if k == 0 else float(KNOLL_TOPS[k - 1]) - 0.3
-		lm.poly_prism("Rock", poly, y0, float(KNOLL_TOPS[k]), false)
-		_cap(lm, "Ground", poly, float(KNOLL_TOPS[k]))
-	return {"layers": layers, "knoll": knoll}
+## Continuous relief: steep coastal rock, the summit prison terrace,
+## the lower parade ground at the SE tip and the east-side dock climb.
+## Shared with the camera so walking never falls into the DEM underneath.
+static func ground_height(p: Vector2) -> float:
+	if p.x < -262.0 or p.x > 281.0 or p.y < -115.0 or p.y > 92.0:
+		return -1.0
+	if not Geometry2D.is_point_in_polygon(p, ISLAND):
+		return -1.0
+	return _height_inside(p)
 
-## Polygons of one shell: the shoreline inset, roughened a little, and
-## cut off the dock terrace strip above its step.
-static func _layer(k: int) -> Array:
-	var raw: Array = [ISLAND] if float(SHORE_INSET[k]) == 0.0 else Geometry2D.offset_polygon(ISLAND, -float(SHORE_INSET[k]), Geometry2D.JOIN_ROUND)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7 + k
+static func _shore_distance(p: Vector2) -> float:
+	var d := INF
+	for i in ISLAND.size():
+		var q := Geometry2D.get_closest_point_to_segment(p, ISLAND[i], ISLAND[(i + 1) % ISLAND.size()])
+		d = minf(d, p.distance_to(q))
+	return d
+
+static func _height_inside(p: Vector2) -> float:
+	var top := lerpf(16.0, SUMMIT_M, smoothstep(-235.0, -65.0, p.x))
+	top = lerpf(top, 16.0, smoothstep(120.0, 205.0, p.x))
+	if p.x > 30.0 and p.x < 175.0:
+		top = lerpf(SHORE_M, top, smoothstep(-97.0, -30.0, p.y))
+	var shore := _shore_distance(p)
+	var bank := smoothstep(0.0, 20.0, shore)
+	var strata := sin(p.x * 0.19 + sin(p.y * 0.23)) * sin(p.y * 0.37 + p.x * 0.07)
+	var y := maxf(SHORE_M, lerpf(SHORE_M, top, bank) + strata * bank * (1.0 - bank) * 2.0)
+	for pad in _building_terraces():
+		var d: Vector2 = p - (pad[0] as Vector2)
+		var axis: Vector2 = pad[2]
+		var along := absf(d.dot(axis)) - (pad[1] as Vector2).x
+		var across := absf(d.dot(Vector2(-axis.y, axis.x))) - (pad[1] as Vector2).y
+		var blend := smoothstep(0.0, 6.0, maxf(along, across))
+		y = lerpf(float(pad[3]), y, blend)
+	return lerpf(SHORE_M, y, smoothstep(0.0, 3.0, shore))
+
+## Local grading around the buildings: the barracks and gatehouse stand
+## below the summit, rather than on giant foundations reaching up to it.
+## Heights are exterior-model approximations; footprints follow the model.
+static func _building_terraces() -> Array:
+	if not _terraces.is_empty():
+		return _terraces
+	var rows := [
+		[Vector2(38.3, -84.8), Vector2(14, 9.5), 136.0, 8.0],
+		[Vector2(115.2, -68.5), Vector2(36, 9), 135.0, 14.0],
+		[Vector2(20.9, -82.1), Vector2(10, 7.5), 107.0, 10.0],
+		[Vector2(-148.1, -70.4), Vector2(18, 7.5), 130.0, 14.0],
+		[Vector2(-187.5, -57.7), Vector2(21, 13), 78.0, 14.0],
+		[Vector2(-158.3, 6.9), Vector2(46, 12), 148.0, 19.0],
+		[Vector2(-228, 0), Vector2(21, 13), 151.0, 15.0],
+		[Vector2(-61, -85.5), Vector2(17, 8), 123.0, 18.0],
+		[Vector2(124.8, -22.6), Vector2(10, 7.5), 140.0, 37.0],
+		[Vector2(-31.2, -9.2), Vector2(25, 11), 141.0, 40.0],
+		[Vector2(24, 2.1), Vector2(69.5, 16), 137.0, 40.0],
+		[Vector2(71.5, 4), Vector2(19, 10.5), 53.0, 40.0],
+	]
 	var out: Array = []
-	for p in raw:
-		var poly: PackedVector2Array = p
-		if poly.size() < 3:
+	for row in rows:
+		var a := deg_to_rad(float(row[2]) - LandmarkSfAlcatrazBuildings.ISLAND_BEARING)
+		out.append([row[0], row[1], Vector2(cos(a), sin(a)), row[3]])
+	_terraces = out
+	return _terraces
+
+static func _normal(p: Vector2) -> Vector3:
+	var dx := _height_inside(p + Vector2(0.5, 0)) - _height_inside(p - Vector2(0.5, 0))
+	var dz := _height_inside(p + Vector2(0, 0.5)) - _height_inside(p - Vector2(0, 0.5))
+	return Vector3(-dx, 1.0, -dz).normalized()
+
+static func _rock(lm: LandmarkMesh) -> void:
+	lm.poly_prism("Wet", ISLAND, -2.0, SHORE_M, false)
+	var pts := PackedVector2Array()
+	# Densify the actual coastline, then triangulate a fine interior grid.
+	for i in ISLAND.size():
+		var a := ISLAND[i]
+		var b := ISLAND[(i + 1) % ISLAND.size()]
+		var steps := maxi(1, ceili(a.distance_to(b) / SURFACE_STEP_M))
+		for j in steps:
+			pts.append(a.lerp(b, float(j) / float(steps)))
+	for z in range(-110, 91, int(SURFACE_STEP_M)):
+		for x in range(-260, 280, int(SURFACE_STEP_M)):
+			var p := Vector2(x, z)
+			if Geometry2D.is_point_in_polygon(p, ISLAND) and _shore_distance(p) > 1.0:
+				pts.append(p)
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for p in pts:
+		verts.append(Vector3(p.x, _height_inside(p), p.y))
+		normals.append(_normal(p))
+	var idx := Geometry2D.triangulate_delaunay(pts)
+	for i in range(0, idx.size(), 3):
+		var a := idx[i]
+		var b := idx[i + 1]
+		var c := idx[i + 2]
+		var mid := (pts[a] + pts[b] + pts[c]) / 3.0
+		if not Geometry2D.is_point_in_polygon(mid, ISLAND):
 			continue
-		if k > 0:
-			for i in poly.size():
-				poly[i] += Vector2(rng.randf() - 0.5, rng.randf() - 0.5) * 1.6
-		var cut := PackedVector2Array([Vector2(30.0, -160.0), Vector2(175.0, -160.0),
-			Vector2(175.0, float(DOCK_CUT[k])), Vector2(30.0, float(DOCK_CUT[k]))])
-		for q in Geometry2D.clip_polygons(poly, cut):
-			var piece: PackedVector2Array = q
-			if not Geometry2D.is_polygon_clockwise(piece) and piece.size() >= 3:
-				out.append(piece)
-	return out
+		lm.tri("Terrain", verts[a], verts[b], verts[c], normals[a], normals[b], normals[c], pts[a], pts[b], pts[c])
 
-static func _cap(lm: LandmarkMesh, key: String, poly: PackedVector2Array, y: float) -> void:
-	var idx := Geometry2D.triangulate_polygon(poly)
-	for t in range(0, idx.size(), 3):
-		var a := poly[idx[t]]
-		var b := poly[idx[t + 1]]
-		var c := poly[idx[t + 2]]
-		lm.tri(key, Vector3(a.x, y, a.y), Vector3(b.x, y, b.y), Vector3(c.x, y, c.y),
-			Vector3.UP, Vector3.UP, Vector3.UP, a * 0.5, b * 0.5, c * 0.5)
-
-## Height of the ground at an island point (highest level covering it),
-## -1 off the island.
-static func _ground(g: Dictionary, p: Vector2) -> float:
-	for k in range(KNOLL_R.size() - 1, -1, -1):
-		for poly in (g["knoll"] as Array)[k]:
-			if Geometry2D.is_point_in_polygon(p, poly):
-				return float(KNOLL_TOPS[k])
-	var layers: Array = g["layers"]
-	for k in range(layers.size() - 1, -1, -1):
-		for poly in layers[k]:
-			if Geometry2D.is_point_in_polygon(p, poly):
-				return float(SHORE_TOPS[k])
-	return -1.0
-
-## The switchback road from the dock to the cellhouse, each leg a flat
-## graded strip at the highest ground along it.
+## The switchback climb follows the relief in short graded segments.
 static func _roads(lm: LandmarkMesh, gy: Callable) -> void:
 	var pts: Array[Vector2] = [Vector2(120.0, -97.0), Vector2(92.0, -86.0), Vector2(58.0, -74.0),
 		Vector2(44.0, -62.0), Vector2(66.0, -48.0), Vector2(52.0, -30.0), Vector2(70.0, -16.0)]
 	for i in pts.size() - 1:
 		var a := pts[i]
 		var b := pts[i + 1]
-		var top := 0.0
-		for s in 6:
-			top = maxf(top, float(gy.call(a.lerp(b, float(s) / 5.0))))
-		if top <= 0.0:
-			continue
-		var d := b - a
-		var len := d.length()
-		var mid := (a + b) * 0.5
-		var ang := atan2(-d.y, d.x)
-		lm.box("Asphalt", Vector3(mid.x, top - 0.2, mid.y), Vector3(len + 3.0, 0.4, 4.2), Basis(Vector3.UP, ang), 0.0)
-		lm.box("Concrete", Vector3(mid.x, top - 1.8, mid.y), Vector3(len + 2.0, 3.0, 3.6), Basis(Vector3.UP, ang), 0.0)
+		var steps := maxi(1, ceili(a.distance_to(b) / 2.0))
+		var d := (b - a).normalized()
+		var side := Vector3(-d.y, 0, d.x)
+		for j in steps:
+			var p := a.lerp(b, float(j) / float(steps))
+			var q := a.lerp(b, float(j + 1) / float(steps))
+			var p3 := Vector3(p.x, float(gy.call(p)) + 0.18, p.y)
+			var q3 := Vector3(q.x, float(gy.call(q)) + 0.18, q.y)
+			lm.beam("Asphalt", p3, q3, 4.2, 0.2, side)
+			for s in [-1.0, 1.0]:
+				var off := side * float(s) * 2.2 + Vector3.UP * 0.12
+				lm.beam("Concrete", p3 + off, q3 + off, 0.22, 0.3, side)
 
-## Rocks along the cliff ledges, to break the stepped outline.
-static func _boulders(lm: LandmarkMesh, g: Dictionary) -> void:
+## Low outcrops break up the cliff foot without regular shelf rings.
+static func _boulders(lm: LandmarkMesh) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
-	var layers: Array = g["layers"]
-	for k in range(1, 5):
-		for poly in layers[k]:
-			var pl: PackedVector2Array = poly
-			var step := 2 if k < 3 else 3
-			for i in range(0, pl.size(), step):
-				var s := 1.8 + rng.randf() * 2.6
-				var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, (rng.randf() - 0.5) * 0.6)
-				lm.box("Rock", Vector3(pl[i].x, float(SHORE_TOPS[k]) - s * 0.15, pl[i].y),
-					Vector3(s * 1.3, s * 0.9, s), b, 0.0)
+	for i in range(0, ISLAND.size(), 2):
+		var p := ISLAND[i].lerp(Vector2.ZERO, 0.035)
+		var y := ground_height(p)
+		if y < SHORE_M:
+			continue
+		var s := rng.randf_range(1.0, 2.6)
+		var basis := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.3, 0.3))
+		lm.box("Rock", Vector3(p.x, y - s * 0.25, p.y), Vector3(s * 1.6, s, s), basis, 0.15)

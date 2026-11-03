@@ -370,6 +370,7 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 			indices.push_back(edge + j1); indices.push_back(base + j); indices.push_back(base + j1)
 	var fine: Dictionary = drapes[0] if drapes[0] != null else {}
 	var coarse: Dictionary = drapes[1] if drapes[1] != null else {}
+	indices = LandmarkTerrain.cut_indices(data, verts, indices)
 	# Typed locals for drape dict fields: avoid per-vertex Dictionary lookups.
 	var fine_empty: bool = fine.is_empty()
 	var coarse_empty: bool = coarse.is_empty()
@@ -469,6 +470,7 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null, water: 
 				continue
 			indices.push_back(a); indices.push_back(b); indices.push_back(c)
 			indices.push_back(b); indices.push_back(d); indices.push_back(c)
+	indices = LandmarkTerrain.cut_indices(data, verts, indices)
 	return FarSurface.drape_mesh(verts, normals, colors, uvs, uvs, indices,
 		drape.get("texture", null), null, false, data)
 

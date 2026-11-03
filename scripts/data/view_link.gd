@@ -127,7 +127,7 @@ static func _num(kv: Dictionary, key: String) -> bool:
 static func capture(data: LocationData, ground: GroundTruth, rig: CameraRig,
 		with_conditions: bool = false, minutes: float = -1.0, date: Dictionary = {}) -> Dictionary:
 	var state := {"lat": data.latitude, "lon": data.longitude,
-		"eye_m": maxf(rig.position.y - ground.height_at_world(rig.position.x, rig.position.z), 1.0),
+		"eye_m": maxf(rig.position.y - LandmarkTerrain.floor_y(data, ground, Vector2(rig.position.x, rig.position.z)), 1.0),
 		"bearing": fposmod(rad_to_deg(-rig.yaw), 360.0),
 		"pitch": rad_to_deg(rig.pitch), "zoom": rig.zoom_factor}
 	var eye := Vector2(rig.position.x, rig.position.z)

@@ -483,7 +483,14 @@ static func spawn_xz(data: LocationData) -> Vector2:
 	var lp := TerrainBuilder.landmark_world_pos(data)
 	if lp.length() >= FRAME_MIN_M:
 		return Vector2.ZERO
-	return lp - TerrainBuilder.LANDMARK_POS.normalized() * FRAME_READ_M
+	var distance := FRAME_READ_M
+	var entry := LocationData.entry_for_type(data.landmark_type)
+	var height := float(entry.get("height_m", 0.0)) + float(entry.get("base_drop_m", 0.0))
+	if height > 0.0 and height <= 40.0:
+		# A low gate or bridge must remain legible from its opening eye;
+		# the 800 m tower vantage can place it behind an entire hillside.
+		distance = clampf(maxf(height * 2.5, float(entry.get("span_m", 0.0)) * 0.8), LandmarkVisit.MIN_M, FRAME_READ_M)
+	return lp - TerrainBuilder.LANDMARK_POS.normalized() * distance
 
 ## Camera Y over metre position `xz`. A preset's curated eye stands
 ## eye_m over the ground, never below its ASL floor (decks, clifftops).
@@ -493,7 +500,7 @@ static func spawn_xz(data: LocationData) -> Vector2:
 ## `curated` false (Go there) ignores the preset eye.
 static func eye_y(data: LocationData, ground: GroundTruth, xz: Vector2,
 		curated: bool = true) -> float:
-	var y := ground.height_at_world(xz.x, xz.y)
+	var y := LandmarkTerrain.floor_y(data, ground, xz)
 	if curated and not data.view.is_empty():
 		y += float(data.view.get("eye_m", EYE_HEIGHT_M))
 		if data.view.has("asl_m"):
@@ -653,6 +660,10 @@ static func focus_point(data: LocationData, ground: GroundTruth, site: Dictionar
 	if ground != null:
 		y = ground.height_at_world(xz.x, xz.y) if ground.is_inside(xz.x, xz.y) \
 			else TerrainBuilder.site_ground_y(data, ground, xz.x, xz.y)
+		var entry := LocationData.entry_for_type(str(site.get("id", "")).trim_prefix("curated:"))
+		if not entry.is_empty():
+			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
+			y = TerrainBuilder._hero_y(data, ground, xz.x, xz.y, entry, half)
 	if str(site.get("kind", "")) != "Peak":
 		y += maxf(float(site.get("height_m", 0.0)), 30.0) * 0.5
 	return Vector3(xz.x, y, xz.y)

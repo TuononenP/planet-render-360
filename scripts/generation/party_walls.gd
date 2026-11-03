@@ -48,7 +48,7 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 		if not (b is Dictionary) or (accept.is_valid() and not bool(accept.call(b))):
 			continue
 		for m in BuildingMasses.plan(b, ctx):
-			pw.add_mass(m, ground)
+			pw.add_mass(m, ground, float(ctx.get("sea_y", -INF)))
 	for r in data.roads:
 		var pts: Variant = r.get("points", null) if r is Dictionary else r
 		if not (pts is PackedVector2Array):
@@ -68,16 +68,14 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 ## edges face into the courtyard. A raised part (min_m > 0: arcade,
 ## overhang) has no wall from the ground up, so a neighbour must not be
 ## culled against it and is left unregistered.
-func add_mass(m: Dictionary, ground: GroundTruth) -> void:
+func add_mass(m: Dictionary, ground: GroundTruth, sea_y: float = -INF) -> void:
 	if float(m.get("min_m", 0.0)) > 0.0:
 		return
 	var ring: PackedVector2Array = m["ring"]
 	# Same base as BuildingBuilder._extrude_polygon: lowest of the centre
 	# and the ring vertices, so the registered top is the extruded one.
 	var centre: Vector2 = m.get("centre", RingGeometry.centroid(ring))
-	var low := ground.height_at_world(centre.x, centre.y)
-	for p in ring:
-		low = minf(low, ground.height_at_world(p.x, p.y))
+	var low := BuildingBuilder._mass_base(ground, ring, centre, sea_y)
 	var top := low + float(m["wall_m"]) * WorldScale.metres_to_units()
 	_add_ring(ring, str(m["key"]), top, false)
 	for h in m["holes"]:

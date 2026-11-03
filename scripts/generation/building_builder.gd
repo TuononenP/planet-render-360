@@ -150,6 +150,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	impostor.meta = {"lod_layer": "Buildings", "lod_impostor": true}
 	var cap := RenderSettings.max_buildings_for(data.quality_preset)
 	var ctx := _height_context(data)
+	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
 	# The landmark's own OSM footprint (e.g. the cathedral as one beige
 	# box) must not duplicate the procedural landmark model.
 	var site := TerrainBuilder.landmark_site_xz(data)
@@ -190,7 +191,10 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 			if _extrude_masses(root, data, ground, _aabb_footprint(b), ctx):
 				placed += 1
 				continue
-			pos.y = ground.height_at_world(pos.x, pos.z) - 0.6
+			var fallback_ring := _rect_ring(Vector2(pos.x, pos.z), Vector2(b["size_x"], b["size_z"]), 0.0)
+			var footing := BuildingFoundation.sample(ground, fallback_ring, Vector2(pos.x, pos.z), float(ctx["sea_y"]))
+			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) else 0.6)
+			BuildingFoundation.build(root, fallback_ring, [], footing, b)
 			var look := _look_for(b, ctx)
 			var res := _resolve_total(b, b, ctx, {}, look)
 			var legacy: bool = not (b as Dictionary).has("height_source")
@@ -288,8 +292,8 @@ static func _in_open_water(ground: GroundTruth, b: Dictionary) -> bool:
 ## One footprint ring as vertical walls (facade) plus a triangulated
 ## roof cap: rotation, L/T/concave shapes, and party-wall adjacency
 ## survive because the ring is meshed as drawn — nothing is re-squared.
-## The base is the lowest ground under the ring minus a 0.6 m sink,
-## so walls never float on slopes. height_world is the WALL height; a
+## Dry walls sink 0.6 m into the lowest ground. Low waterfront walls
+## stand on a supported floor above wave crests. height_world is the WALL height; a
 ## pitched shape rises roof_h_world above the wall top (T4.2). Returns
 ## false when the ring cannot be triangulated (the caller falls back
 ## to AABB).
@@ -306,14 +310,17 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		idx = RingGeometry.drop_hole_triangles(cap, idx, holes)
 	if idx.size() < 3:
 		return false
-	var base := _mass_base(ground, ring, centre)
+	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)))
+	var base := float(footing["floor"])
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
-	var sink := 0.6 * WorldScale.metres_to_units()
+	var sink := 0.0 if bool(footing["raised"]) else 0.6 * WorldScale.metres_to_units()
 	var top := base + height_world
 	base -= sink
 	if float(mass.get("min_m", 0.0)) > 0.0:
 		base += sink + float(mass["min_m"]) * WorldScale.metres_to_units()
+	else:
+		BuildingFoundation.build(root, ring, holes, footing, b)
 	# Party walls: hidden stretches skipped, firewalls above lower
 	# neighbours, gables (not slopes) and no cornice on shared edges.
 	var cover: Array = []
@@ -366,7 +373,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		var m2u := WorldScale.metres_to_units()
 		var fh_u := float(look["floor_h"]) * m2u
 		var gh_u := fh_u * (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
-		var g_top := minf(ground.height_at_world(centre.x, centre.y) + gh_u,
+		var g_top := minf(base + sink + gh_u,
 			top - fh_u * 0.6)
 		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire)
 		_walls(root, ring, g_top, top, facade, maxf(1.0, v_rep - 1.0), cover, fire)
@@ -390,7 +397,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		roof_h_world = 0.0
 	if not distant and _batch == null and not look.is_empty() \
 			and centre.length() < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
-		var g_y := base if ground_mat == null else minf(ground.height_at_world(centre.x, centre.y)
+		var g_y := base if ground_mat == null else minf(base + sink
 			+ float(look["floor_h"]) * WorldScale.metres_to_units()
 			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
 			top - float(look["floor_h"]) * WorldScale.metres_to_units() * 0.6)
@@ -480,12 +487,11 @@ static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
 
-## Lowest ground under a mass's ring and centre.
-static func _mass_base(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2) -> float:
-	var base := ground.height_at_world(centre.x, centre.y)
-	for p in ring:
-		base = minf(base, ground.height_at_world(p.x, p.y))
-	return base
+## Floor under a mass, clearing visible water for accepted waterfront
+## buildings. The carved seabed is not their occupied floor datum.
+static func _mass_base(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
+		sea_y: float = -INF) -> float:
+	return float(BuildingFoundation.sample(ground, ring, centre, sea_y)["floor"])
 
 ## The roof form's inputs [ring, top, rh, shape, party, gable_front,
 ## holes] for a pitched mass, or [] when it has none. Eave overhang (style
@@ -537,7 +543,7 @@ static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Diction
 			var party := PackedByteArray()
 			if _party != null and md.has("key"):
 				party = PartyWalls.party_flags(_cover_for(ring, str(md["key"])))
-			var job := _roof_job(ring, _mass_base(ground, ring, md["centre"]) + height_world,
+			var job := _roof_job(ring, _mass_base(ground, ring, md["centre"], float(ctx.get("sea_y", -INF))) + height_world,
 				height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
 				md.get("holes", []))
 			if not job.is_empty():

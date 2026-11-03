@@ -53,9 +53,10 @@ static func entries() -> Array:
 		{"type": "himeji_castle", "name": "Himeji Castle", "lat": 34.8394, "lon": 134.6939,
 			"radius_m": 3500.0, "wiki_title": "Himeji Castle", "height_m": 46.4, "clear_m": 70.0,
 			"kind": "Castle", "aliases": ["himeji castle", "himeji-jo", "himeji", "姫路城天守"]},
-		{"type": "itsukushima_torii", "name": "Itsukushima Torii", "lat": 34.2961, "lon": 132.3198,
-			"radius_m": 3000.0, "wiki_title": "Itsukushima Shrine", "height_m": 16.6, "clear_m": 15.0, "yaw_deg": 30.0,
-			"base": "water", "kind": "Torii gate", "aliases": ["itsukushima", "miyajima", "floating torii", "厳島神社大鳥居"]},
+		# Gate footprint (OSM way 555763409), offshore from the shrine complex.
+		{"type": "itsukushima_torii", "name": "Itsukushima Torii", "lat": 34.297297, "lon": 132.318135,
+			"radius_m": 3000.0, "wiki_title": "Itsukushima Shrine", "height_m": 16.6, "clear_m": 15.0, "yaw_deg": 49.65,
+			"base": "sea", "kind": "Torii gate", "aliases": ["itsukushima", "miyajima", "floating torii", "厳島神社大鳥居"]},
 		{"type": "n_seoul_tower", "name": "N Seoul Tower", "lat": 37.5512, "lon": 126.9883,
 			"radius_m": 6000.0, "wiki_title": "N Seoul Tower", "height_m": 236.7, "clear_m": 25.0,
 			"kind": "TV tower", "aliases": ["n seoul tower", "namsan tower", "seoul tower", "남산서울타워"]},

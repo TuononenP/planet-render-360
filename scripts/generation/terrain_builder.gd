@@ -192,9 +192,11 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			if RenderQuality.ultra_desktop(data.quality_preset):
 				LandmarkLights.dress(hero, str(c["type"]))
 				LandmarkShader.upgrade(hero)
-			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, c,
-				float(c.get("clear_m", 40.0)) * 0.5), cz)
+			var entry := LocationData.entry_for_type(str(c["type"]))
+			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
+			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, entry, half), cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
+			LandmarkTerrain.stitch(hero, ground, str(c["type"]))
 			hero.set_meta("lod_layer", "Landmarks")
 			root.add_child(hero)
 			continue
@@ -398,7 +400,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
+	arrays[Mesh.ARRAY_INDEX] = LandmarkTerrain.cut_indices(data, verts, indices)
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var photo: Texture2D = data.satellite_texture
@@ -485,7 +487,7 @@ static func site_ground_y(data: LocationData, ground: GroundTruth,
 	for o in [Vector2.ZERO, Vector2(half, half), Vector2(-half, half),
 			Vector2(half, -half), Vector2(-half, -half)]:
 		var p := Vector2(x, z) + (o as Vector2)
-		if ground.is_inside(p.x, p.y):
+		if ground.is_inside(p.x, p.y) or data.far_heights.size() != data.far_grid_size * data.far_grid_size:
 			lo = minf(lo, ground.height_at_world(p.x, p.y))
 		else:
 			if surf.is_empty():
@@ -505,6 +507,7 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)
 	root.rotation.y = -deg_to_rad(float(entry.get("yaw_deg", 0.0)))
+	LandmarkTerrain.stitch(root, ground, data.landmark_type)
 	root.set_meta("lod_layer", "Landmarks")
 	return root
 
@@ -514,10 +517,17 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
+	if entry.has("base_half_m"):
+		half = float(entry["base_half_m"]) * WorldScale.metres_to_units()
+	if str(entry.get("base", "")) == "absolute":
+		return ground.render_y(float(entry["base_asl_m"]))
 	if str(entry.get("base", "")) == "sea":
 		return ground.render_y(0.0)
 	if str(entry.get("base", "")) == "water":
-		return ground.water_level_at(x, z) if ground.is_inside(x, z) else ground.water_level_m
+		if is_equal_approx(ground.water_level_m, -3.0):
+			return ground.water_level_at(x, z)
+		var fallback := site_ground_y(data, ground, x, z, half)
+		return ground.water_level_at(x, z, fallback) if ground.is_inside(x, z) else fallback
 	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:

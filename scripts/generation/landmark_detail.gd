@@ -294,7 +294,8 @@ static func pierced_face(lm: LandmarkMesh, wall: String, glass: String, origin: 
 			lm.quad(wall, P.call(x1, y, 0.0), P.call(x1, y, depth), P.call(x1, y1, depth), P.call(x1, y1, 0.0), -r)
 			lm.quad(wall, P.call(x, y1, depth), P.call(x, y1, 0.0), P.call(x1, y1, 0.0), P.call(x1, y1, depth), -u)
 			lm.quad(wall, P.call(x, y, 0.0), P.call(x, y, depth), P.call(x1, y, depth), P.call(x1, y, 0.0), u)
-			lm.quad(glass, P.call(x, y, 0.03), P.call(x1, y, 0.03), P.call(x1, y1, 0.03), P.call(x, y1, 0.03), n)
+			if glass != "":
+				lm.quad(glass, P.call(x, y, 0.03), P.call(x1, y, 0.03), P.call(x1, y1, 0.03), P.call(x, y1, 0.03), n)
 	# Returns at the skin's edges.
 	lm.quad(wall, P.call(0.0, 0.0, 0.0), P.call(0.0, 0.0, depth), P.call(0.0, h, depth), P.call(0.0, h, 0.0), -r)
 	lm.quad(wall, P.call(w, 0.0, depth), P.call(w, 0.0, 0.0), P.call(w, h, 0.0), P.call(w, h, depth), r)

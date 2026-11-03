@@ -17,7 +17,7 @@ static func entries() -> Array:
 				"جامع الشيخ زايد"]},
 		{"type": "burj_al_arab", "name": "Burj Al Arab", "lat": 25.1412, "lon": 55.1853,
 			"radius_m": 2500.0, "wiki_title": "Burj Al Arab", "height_m": 321.0, "clear_m": 100.0,
-			"yaw_deg": -40.0, "kind": "Hotel", "aliases": ["burj al arab", "burj al-arab", "برج العرب"]},
+			"yaw_deg": -40.0, "base": "sea", "kind": "Hotel", "aliases": ["burj al arab", "burj al-arab", "برج العرب"]},
 		{"type": "dome_of_the_rock", "icon": true, "name": "Dome of the Rock", "lat": 31.7780, "lon": 35.2354,
 			"radius_m": 2000.0, "wiki_title": "Dome of the Rock", "height_m": 35.3, "clear_m": 60.0,
 			"kind": "Shrine", "aliases": ["dome of the rock", "qubbat al-sakhra", "qubbat as-sakhrah",

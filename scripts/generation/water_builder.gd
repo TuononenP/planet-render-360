@@ -49,7 +49,7 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 	var root := Node3D.new()
 	root.name = "Water"
 	var channels := _channels(data)
-	var coast := _has_coastline(data)
+	var coast := _has_coastline(data) or LandmarkTerrain.has_sea(data)
 	var poly_count := _water_poly_count(data)
 	if poly_count == 0 and channels.is_empty() and not coast:
 		# Expected whenever the place has no mapped water or Overpass was
@@ -57,8 +57,12 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		print("WaterBuilder: no OSM water for %s — rendering dry."
 			% data.place_name)
 		return root
-	var mat := real_water_material(data.quality_preset)
+	var mat := real_water_material(data.quality_preset).duplicate() as ShaderMaterial
 	var wl := ground.water_level_m
+	if ground.shoreline != null and ground.shoreline.ready:
+		mat.set_shader_parameter("swell_lift", 0.0)
+	if coast:
+		_island_sea(root, data, ground, mat)
 	# Clip each water polygon once and reuse: _poly_levels and
 	# _add_polygon_surface previously clipped the same polygon twice via
 	# Geometry2D.intersect_polygons. Cache parts keyed by polygon index.
@@ -79,7 +83,7 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 	if abort != null and abort.requested:
 		return root
 	if coast:
-		_add_sea_plane(root, mat, wl, ground)
+		_add_sea_plane(root, mat, 0.0 if LandmarkTerrain.has_sea(data) else wl, ground)
 	else:
 		_add_datum_plane(root, mat, wl)
 	if abort != null and abort.requested:
@@ -89,6 +93,19 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		return root
 	_shore_aprons(root, data, ground, channels, abort)
 	return root
+
+## Fill distant authored island openings beyond the detailed water grid.
+static func _island_sea(root: Node3D, data: LocationData, ground: GroundTruth,
+		mat: Material) -> void:
+	for site in LandmarkTerrain.islands(data):
+		var at: Vector2 = site[0]
+		if maxf(absf(at.x), absf(at.y)) < WorldScale.detailed_extent_units() * 0.5 - 400.0:
+			continue
+		var sea := PlaneMesh.new()
+		sea.size = Vector2(1500.0, 1000.0) * WorldScale.metres_to_units()
+		var mi := TerrainBuilder._add(root, sea, mat)
+		mi.name = "IslandSea"
+		mi.position = Vector3(at.x, ground.render_y(0.0) - 0.02, at.y)
 
 ## DEPRECATED (§7 V16, T3.4): the synthetic S-curve is deleted — this
 ## always returns empty so the C-owned BuildingBuilder exclusion
@@ -200,7 +217,7 @@ static func _poly_levels(data: LocationData, ground: GroundTruth,
 				maxf(step * 0.75, 1.0), step * 1.5))
 			var pr := _ring_rect(part)
 			r = pr if k == 0 else r.merge(pr)
-		est[i] = _body_estimate(ground, banks, wl)
+		est[i] = [wl, true] if bool(poly.get("tidal", false)) else _body_estimate(ground, banks, wl)
 		boxes[i] = r.grow(step * 2.0)
 	var out := {}
 	for i in est:
@@ -223,6 +240,8 @@ static func _poly_levels(data: LocationData, ground: GroundTruth,
 	for i in est:
 		if abort != null and abort.requested:
 			break
+		if bool((data.land_polygons[i] as Dictionary).get("tidal", false)):
+			continue
 		var rr: Rect2 = (boxes[i] as Rect2).grow(-step * 2.0)
 		if maxf(rr.size.x, rr.size.y) >= step * 2.0:
 			continue
@@ -443,4 +462,3 @@ static func _shore_aprons(root: Node3D, data: LocationData,
 
 static func bridge_ways_over_water(data: LocationData, ground: GroundTruth = null) -> Array:
 	return ShoreApron.bridge_ways_over_water(data, ground)
-

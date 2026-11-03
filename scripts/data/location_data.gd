@@ -383,19 +383,19 @@ static func _core_landmarks() -> Array:
 			"wiki_title": "Stockholm City Hall", "height_m": 106.0, "clear_m": 75.0, "kind": "City hall",
 			"aliases": ["stockholm city hall", "stadshuset"]},
 		# Bridges: built along their axis (span_m long, yaw_deg turning the
-		# model's +X onto it) on the water surface (base: water).
+		# model's +X onto it) at sea level (base: sea).
 		{"type": "golden_gate", "name": "Golden Gate Bridge", "lat": 37.8197, "lon": -122.4786, "radius_m": 8000.0,
 			"wiki_title": "Golden Gate Bridge", "height_m": 227.0, "clear_m": 20.0, "yaw_deg": 85.0,
-			"span_m": 2040.0, "base": "water", "kind": "Bridge", "aliases": ["golden gate bridge"]},
+			"span_m": 2040.0, "base": "sea", "kind": "Bridge", "aliases": ["golden gate bridge"]},
 		{"type": "tower_bridge", "name": "Tower Bridge", "lat": 51.5055, "lon": -0.0754, "radius_m": 5000.0,
 			"wiki_title": "Tower Bridge", "height_m": 65.0, "clear_m": 30.0, "yaw_deg": 95.0,
-			"span_m": 256.0, "base": "water", "kind": "Bridge", "aliases": ["tower bridge"]},
+			"span_m": 256.0, "base": "sea", "kind": "Bridge", "aliases": ["tower bridge"]},
 		{"type": "brooklyn_bridge", "name": "Brooklyn Bridge", "lat": 40.7056, "lon": -73.9964, "radius_m": 5000.0,
 			"wiki_title": "Brooklyn Bridge", "height_m": 84.3, "clear_m": 22.0, "yaw_deg": 46.0,
-			"span_m": 1132.0, "base": "water", "kind": "Bridge", "aliases": ["brooklyn bridge"]},
+			"span_m": 1132.0, "base": "sea", "kind": "Bridge", "aliases": ["brooklyn bridge"]},
 		{"type": "sydney_harbour_bridge", "name": "Sydney Harbour Bridge", "lat": -33.8523, "lon": 151.2106,
 			"radius_m": 5000.0, "wiki_title": "Sydney Harbour Bridge", "height_m": 134.0, "clear_m": 40.0,
-			"yaw_deg": -73.0, "span_m": 1149.0, "base": "water", "kind": "Bridge",
+			"yaw_deg": -73.0, "span_m": 1149.0, "base": "sea", "kind": "Bridge",
 			"aliases": ["sydney harbour bridge", "harbour bridge"]},
 		{"type": "bixby_creek_bridge", "name": "Bixby Creek Bridge", "lat": 36.3714, "lon": -121.9019, "radius_m": 2000.0,
 			"wiki_title": "Bixby Creek Bridge", "height_m": 79.0, "clear_m": 12.0, "yaw_deg": 52.0,
@@ -449,7 +449,8 @@ static func landmark_for(lat: float, lon: float, name: String) -> String:
 ## (the model turned clockwise from its built frame, +X east and −Z
 ## north; default 0), clear_m (cleared grounds, default 68) and kind
 ## (the callout label when it stands beside the primary) and base_drop_m
-## (how far the model hangs below its origin; lifts it off the ground).
+## (a hanging crag's depth), base_half_m (ground-sampling radius),
+## and base_asl_m (base: absolute's fixed datum).
 static func entry_for_type(type: String) -> Dictionary:
 	for entry in landmarks():
 		if str(entry["type"]) == type:

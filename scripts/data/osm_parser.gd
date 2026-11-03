@@ -107,6 +107,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					and el.has("members"):
 				var members: Array = el.get("members", [])
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
+					if str(entry["class"]) == "water":
+						entry["tidal"] = OsmTags.tidal(el_tags)
 					if str(entry["class"]) == "forest":
 						(entry as Dictionary).merge(OsmTags.tree_tags(el_tags))
 					land.append(entry)
@@ -208,6 +210,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			var cls := OsmTags.land_class(el_tags)
 			if cls != "" and geom.size() >= 3:
 				var entry := {"class": cls, "points": poly, "holes": []}
+				if cls == "water":
+					entry["tidal"] = OsmTags.tidal(el_tags)
 				if cls == "forest":
 					entry.merge(OsmTags.tree_tags(el_tags))
 				land.append(entry)

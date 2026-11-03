@@ -20,7 +20,7 @@ static func entries() -> Array:
 			"wiki_title": "Sacré-Cœur, Paris", "height_m": 83.0, "clear_m": 70.0, "kind": "Basilica",
 			"aliases": ["sacré-cœur", "sacre-coeur", "sacré cœur", "sacre coeur", "basilique du sacré-cœur"]},
 		{"type": "mont_saint_michel", "name": "Mont-Saint-Michel", "lat": 48.6361, "lon": -1.5115, "radius_m": 3500.0,
-			"wiki_title": "Mont-Saint-Michel", "height_m": 90.0, "clear_m": 80.0, "kind": "Abbey",
+			"wiki_title": "Mont-Saint-Michel", "height_m": 90.0, "clear_m": 80.0, "base_drop_m": 45.0, "kind": "Abbey",
 			"aliases": ["mont-saint-michel", "mont saint-michel", "mont saint michel"]},
 		{"type": "les_invalides", "name": "Les Invalides", "lat": 48.8553, "lon": 2.3126, "radius_m": 3000.0,
 			"wiki_title": "Les Invalides", "height_m": 107.0, "clear_m": 215.0, "kind": "Monument",
@@ -64,5 +64,6 @@ static func entries() -> Array:
 			"aliases": ["stonehenge"]},
 		{"type": "edinburgh_castle", "icon": true, "name": "Edinburgh Castle", "lat": 55.9486, "lon": -3.1999,
 			"radius_m": 3500.0, "wiki_title": "Edinburgh Castle", "height_m": 26.0, "clear_m": 130.0,
+			"base_drop_m": 60.0, "base_half_m": 160.0,
 			"kind": "Castle", "aliases": ["edinburgh castle", "castle rock, edinburgh"]},
 	]

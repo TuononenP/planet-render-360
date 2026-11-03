@@ -65,6 +65,8 @@ var _buildings: Array = []
 ## global datum). Bodies are levelled from their own banks, the same
 ## rule WaterBuilder uses (10th-percentile dry bank − freeboard).
 var _level: PackedFloat32Array = PackedFloat32Array()
+## Optional finalized shoreline state; null for the legacy surface builder.
+var shoreline = null
 
 ## Bank freeboard (mirrors WaterBuilder._FREEBOARD) and carve depth
 ## below that local surface. v1 carved to the GLOBAL datum
@@ -114,6 +116,13 @@ func _init(data: LocationData) -> void:
 	_half_units = extent_units * 0.5
 	extent_m = _half_units / WorldScale.metres_to_units()
 	water_level_m = data.water_level
+	var has_sea := WaterBuilder._has_coastline(data)
+	for poly in data.land_polygons:
+		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)):
+			has_sea = true
+			break
+	if not is_equal_approx(data.water_level, -3.0) and has_sea:
+		water_level_m = WaterBuilder.SEA_LEVEL_M
 	set_land(data.land_polygons)
 	_buildings = data.buildings
 	_surface.resize(size * size)
@@ -305,7 +314,7 @@ func _carve_polygons() -> void:
 		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
 		if pts.size() < 3:
 			continue
-		water.append([pts, _land_index[k]])
+		water.append([pts, _land_index[k], bool(poly.get("tidal", false))])
 	var size := _size
 	var hu := float(size) / 2.0
 	var levels: Array = []
@@ -326,6 +335,8 @@ func _carve_polygons() -> void:
 ## extent) the lowest pre-carve post inside it stands in for the DEM
 ## water surface.
 func _polygon_level(wpoly: Array, water: Array, cells: Dictionary) -> float:
+	if wpoly.size() > 2 and bool(wpoly[2]):
+		return water_level_m
 	var pts: PackedVector2Array = wpoly[0]
 	var off := _step_units * 1.5
 	var stride := maxf(_step_units * 0.75, 1.0)
@@ -561,9 +572,10 @@ func water_at(x: float, z: float) -> float:
 
 ## Local water surface (render Y) at XZ: the weighted level of the
 ## carved posts around it, else the global datum (water_level_m).
-func water_level_at(x: float, z: float) -> float:
+func water_level_at(x: float, z: float, fallback_level: float = NAN) -> float:
+	var fallback := water_level_m if is_nan(fallback_level) else fallback_level
 	if _size < 2 or _level.size() != _size * _size:
-		return water_level_m
+		return fallback
 	var fx := clampf(x / _step_units + float(_size) * 0.5, 0.0, float(_size - 1))
 	var fz := clampf(z / _step_units + float(_size) * 0.5, 0.0, float(_size - 1))
 	var x0 := mini(int(fx), _size - 2)
@@ -580,7 +592,7 @@ func water_level_at(x: float, z: float) -> float:
 		sum += lv * w
 		wsum += w
 	if wsum <= 0.0:
-		return water_level_m
+		return fallback
 	return maxf(water_level_m, sum / wsum)
 
 ## Land class at XZ: first containing land polygon wins (same order as

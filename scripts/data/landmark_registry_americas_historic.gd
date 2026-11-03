@@ -46,7 +46,8 @@ static func entries() -> Array:
 			"clear_m": 120.0, "yaw_deg": -11.1, "kind": "Capitol",
 			"aliases": ["el capitolio, havana", "el capitolio de la habana", "capitolio de la habana",
 				"capitolio nacional de cuba", "national capitol of cuba", "el capitolio de cuba"]},
+		# Published base contour: cahokiamounds.org/mound/mound-38-monks-mound/.
 		{"type": "monks_mound", "name": "Monks Mound", "lat": 38.6603, "lon": -90.0625,
 			"radius_m": 4000.0, "wiki_title": "Monks Mound", "height_m": 30.0, "clear_m": 170.0,
-			"yaw_deg": 7.0, "kind": "Mound", "aliases": ["monks mound", "cahokia mounds", "cahokia"]},
+			"yaw_deg": 7.0, "base": "absolute", "base_asl_m": 130.0, "kind": "Mound", "aliases": ["monks mound", "cahokia mounds", "cahokia"]},
 	]

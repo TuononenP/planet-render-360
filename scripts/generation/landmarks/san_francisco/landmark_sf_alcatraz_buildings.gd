@@ -16,21 +16,19 @@ static func basis_for(bearing: float) -> Basis:
 	return Basis(Vector3.UP, -deg_to_rad(bearing - ISLAND_BEARING))
 
 ## Foundation under a footprint (centre `c`, `size` x by z): a block from
-## below the lowest corner up to the mean ground, so a building on a
-## terrace edge never floats. Returns the floor height.
+## below the lowest corner to the highest ground under the footprint,
+## so the sloping rock never buries a facade. Returns the floor height.
 static func pad(lm: LandmarkMesh, gy: Callable, c: Vector2, size: Vector2, basis: Basis) -> float:
 	var lo := INF
-	var sum := 0.0
-	var n := 0
-	for o in [Vector2(0, 0), Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+	var top := 3.0
+	for o in [Vector2(0, 0), Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1),
+			Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0)]:
 		var ov: Vector2 = o
 		var q: Vector3 = basis * Vector3(ov.x * size.x * 0.5, 0.0, ov.y * size.y * 0.5)
 		var y: float = gy.call(c + Vector2(q.x, q.z))
 		lo = minf(lo, maxf(y, 0.0))
-		if y > 0.0:
-			sum += y
-			n += 1
-	var base: float = sum / float(n) if n > 0 else 3.0
+		top = maxf(top, y)
+	var base := top
 	var bottom := maxf(lo - 6.0, 0.0)
 	var h := base - bottom
 	if h > 0.1:
@@ -41,11 +39,12 @@ static func pad(lm: LandmarkMesh, gy: Callable, c: Vector2, size: Vector2, basis
 ## face pierced with real window openings (`win` size, first sill, storeys
 ## `storey` apart, one bay per `bay` m).
 static func block(lm: LandmarkMesh, wall: String, c: Vector2, base: float, size: Vector3, basis: Basis,
-		win: Vector2, sill: float, storey: float, bay: float) -> void:
+		win: Vector2, sill: float, storey: float, bay: float, ruined: bool = false) -> void:
 	var mw := size.x - 2.0 * SKIN
 	var md := size.z - 2.0 * SKIN
 	var ctr := Vector3(c.x, base, c.y)
-	lm.box(wall, ctr + Vector3(0, size.y * 0.5, 0), Vector3(mw, size.y, md), basis, 0.0)
+	if not ruined:
+		lm.box(wall, ctr + Vector3(0, size.y * 0.5, 0), Vector3(mw, size.y, md), basis, 0.0)
 	var normals: Array[Vector3] = [Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(-1, 0, 0)]
 	for f in 4:
 		var along_x := f < 2
@@ -56,8 +55,27 @@ static func block(lm: LandmarkMesh, wall: String, c: Vector2, base: float, size:
 		var origin := ctr + n * half - right * fw * 0.5
 		var cols := maxi(1, roundi(fw / bay))
 		var rows := maxi(1, floori((size.y - sill - 0.3) / storey) + 1)
-		LandmarkDetail.pierced_face(lm, wall, "Glass", origin, right, n, fw, size.y, cols, rows, win, sill,
+		LandmarkDetail.pierced_face(lm, wall, "" if ruined else "Glass", origin, right, n, fw, size.y, cols, rows, win, sill,
 			storey, SKIN)
+		if ruined:
+			LandmarkDetail.pierced_face(lm, wall, "", origin + right * fw, -right, -n,
+				fw, size.y, cols, rows, win, sill, storey, 0.0)
+		else:
+			_sashes(lm, origin, right, n, fw, size.y, cols, rows, win, sill, storey)
+
+## Steel sash divisions sit in the openings, behind the concrete reveals.
+static func _sashes(lm: LandmarkMesh, origin: Vector3, right: Vector3, normal: Vector3,
+		w: float, h: float, cols: int, rows: int, win: Vector2, sill: float, storey: float) -> void:
+	var basis := Basis(right, Vector3.UP, -normal)
+	for j in rows:
+		var y := sill + storey * float(j)
+		if y + win.y > h - 0.05:
+			continue
+		for i in cols:
+			var p := origin + right * (w * (float(i) + 0.5) / float(cols)) + Vector3.UP * y + normal * 0.09
+			lm.box("Steel", p + Vector3.UP * win.y * 0.5, Vector3(0.05, win.y, 0.06), basis, 0.0)
+			for k in [1.0, 2.0]:
+				lm.box("Steel", p + Vector3.UP * win.y * float(k) / 3.0, Vector3(win.x, 0.045, 0.06), basis, 0.0)
 
 ## Flat roof slab with a parapet round it, top of the walls at y.
 static func flat_roof(lm: LandmarkMesh, key: String, c: Vector2, y: float, size: Vector2, basis: Basis,
@@ -130,7 +148,8 @@ static func admin(lm: LandmarkMesh, gy: Callable, c: Vector2) -> void:
 static func ruin(lm: LandmarkMesh, gy: Callable, c: Vector2, size: Vector2, bearing: float, h: float) -> void:
 	var basis := basis_for(bearing)
 	var base := pad(lm, gy, c, size, basis)
-	block(lm, "Ruin", c, base, Vector3(size.x, h, size.y), basis, Vector2(1.1, 1.8), 1.0, 3.5, 3.2)
+	block(lm, "Ruin", c, base, Vector3(size.x, h, size.y), basis, Vector2(1.1, 1.8), 1.0, 3.5, 3.2, true)
+	lm.box("Ruin", Vector3(c.x, base + 0.1, c.y), Vector3(size.x, 0.2, size.y), basis, 0.0)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(absf(c.x * 31.0 + c.y * 17.0))
 	for i in 5:

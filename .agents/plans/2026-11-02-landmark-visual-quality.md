@@ -85,6 +85,11 @@ Procedural boxes and turned profiles stay crude for organic forms.
 - [x] **L-7.3** Raise `clear_m` where models now exceed it (Brihadisvara, Canberra Parliament, Kerimäki) — @claude/loose-ends 2026-11-02
   > Measured model radius: Brihadisvara 233 m (clear 150 -> 235), Canberra 304 m (150 -> 305), Kerimäki 31.7 m (clear 47, already enough, unchanged). `landmark_catalog_test` OK.
 
+- [x] **L-7.4** Alcatraz: dry arrival, sea-level placement, terrain/drape clearance and realistic island/building exteriors — 2026-11-03
+  > Follow-up waterfront audit: the original mainland photo exposed submerged ordinary buildings. Building floors, storey splits and party-wall datums now share a floor above the wave crest, with platforms/pilings for accepted overwater footprints; canonical water retains distant island sea fill. See [placement evidence and limits](../../visual-plan/reviews/placement-audit-2026-11-03/README.md).
+  > Live DEM/OSM: island base -48.6 → 0 m ASL; arrival eye -20.6 → 30 m. Continuous shoreline relief, graded terraces, blended PBR cliff/grass/gravel, summit cellhouse, sash windows and open ruin shells (71,425 tris). Shared-workspace `alcatraz_test`, preset views, viewer tools, cache key and class-size checks pass; isolated landmark/catalog (445) tests pass. Six off-screen captures inspected, including a separate mainland build: `visual-plan/reviews/alcatraz-fix-2026-11-03/`.
+
+
 ## 8. Night lighting
 
 - [ ] **L-8.1** Per-landmark lighting presets: Eiffel hourly sparkle, Empire State crown colours, floodlit domes, lit belfries, bridge cable lights
@@ -97,6 +102,7 @@ Procedural boxes and turned profiles stay crude for organic forms.
   > Test now skips the region-set check for `LocationData._regional_extras()` types (built by `LandmarkBuilder`'s own match). `landmark_catalog_test`: LANDMARK CATALOG OK, 425 landmarks.
 - [ ] **L-9.2** Below-ground framing: Hoover Dam, Mont-Saint-Michel, Edinburgh Castle, Monks Mound ramp — @claude/loose-ends 2026-11-02 (partly done)
   > Census of all 425 models: only Hoover Dam (-221 m, crest at y=0), Mont-Saint-Michel (-45), Edinburgh (-60) and eight mosque/ruin sites (<= 3 m) dip below y=0; Monks Mound no longer does. MSM and Edinburgh are crag skirts meant to bury in the slope. Hoover: new registry key `base_drop_m` (221) lifts the model so the toe stands on the lowest ground (`TerrainBuilder._hero_y`, `LandmarkSites`); catalog test checks the key matches the model. Model-only capture (`tools/capture_landmarks.gd --types=hoover_dam`) shows the toe on the ground and the crest 221 m up. **Still not seen on the real DEM** (needs the Hoover coordinates run through the full app flow); tick after that.
+  > 2026-11-03 placement follow-up: real DEM/OSM scenes now captured for all four. Hoover uses the documented 375.5 m ASL crest, Monks Mound the 130 m base contour; crag offsets and DEM replacement agree for primary and secondary visits. Camera focus/height follows those surfaces. Numeric and framing regressions pass; leave this visual gate open because Hoover terrain still intersects the downstream face. [Audit](../../visual-plan/reviews/placement-audit-2026-11-03/README.md).
 - [ ] **L-9.3** Registry questions for the user (open, needs the user's answer; unchanged): Turku Cathedral 101 vs 86 m, Sydney Opera 65 vs 67 m, Uspenski bell tower 22 vs 40 m, Al-Aqsa 35 m (unsourced)
 - [x] **L-9.4** Kit costs: lighter `LandmarkDetail.column`/`arch`/`balustrade` variants with a segment setting; `window` sill must not dip below its base — @claude/loose-ends 2026-11-02
   > `column(radial=20)`, `balustrade(radial=8)`, `arch(max_segs=25)` defaults reproduce the old geometry; `window` clamps sill and apron to y >= 0 on ground-floor windows. No caller switched to lighter settings yet (that belongs with L-5.1). Catalog, landmark, fidelity tests OK.

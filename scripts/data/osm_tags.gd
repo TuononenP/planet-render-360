@@ -455,3 +455,8 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 	if wc == "coastline":
 		width_m = 0.0
 	return {"points": pts, "width_m": width_m, "class": wc}
+
+## Bays and tidal basins share the sea datum rather than an inland bank level.
+static func tidal(tags: Dictionary) -> bool:
+	return str(tags.get("natural", "")) == "bay" or str(tags.get("water", "")) == "sea" \
+		or str(tags.get("tidal", "")) == "yes"
