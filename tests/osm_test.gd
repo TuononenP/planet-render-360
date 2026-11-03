@@ -482,6 +482,7 @@ func _land_checks(failures: Array[String]) -> void:
 		[{"landuse": "orchard"}, "orchard"], [{"natural": "heath"}, "grass"],
 		[{"landuse": "recreation_ground"}, "grass"], [{"natural": "bay"}, "water"],
 		[{"landuse": "basin"}, "water"], [{"natural": "scrub", "water": "pond"}, "water"],
+		[{"leisure": "marina"}, "water"], [{"leisure": "marina", "landuse": "residential"}, "water"],
 		[{"leisure": "pitch", "landuse": "meadow"}, "pitch"],
 		[{"landuse": "forest", "leisure": "nature_reserve"}, "forest"],
 	]

@@ -74,8 +74,10 @@ static func land_class(tags: Dictionary) -> String:
 	var natural := str(tags.get("natural", ""))
 	var landuse := str(tags.get("landuse", ""))
 	var leisure := str(tags.get("leisure", ""))
+	# A marina (Port Hercule) is a basin of water: carving it lets the sea
+	# plane show where the smoothed DEM reads quay height across the harbour.
 	if natural == "water" or natural == "bay" or tags.has("water") \
-			or landuse in ["reservoir", "basin"]:
+			or landuse in ["reservoir", "basin"] or leisure == "marina":
 		return "water"
 	if natural in ["wetland", "mud"]:
 		return "wetland"
