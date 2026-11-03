@@ -10,7 +10,8 @@
 # (stdout and exit code preserved) and handing focus back to whatever
 # app was in front whenever Godot grabs it, which flickers.
 #
-#   --headless, --version, --help, the editor  -> passed through untouched
+#   --headless                                -> shimmed when available
+#   --version, --help, the editor             -> passed through untouched
 #   --script runs (tests, captures)            -> guarded for the whole run
 #   plain app runs                             -> guarded for the first
 #                                                 GODOT_FOCUS_GUARD_SECS (5),
@@ -31,11 +32,15 @@
 REAL=${GODOT_BIN:-/Applications/Godot.app/Contents/MacOS/Godot}
 
 headless=0
+headless_run=0
 editor=0
 scripted=0
 has_mode=0
 args=()
 for a in "$@"; do
+	case "$a" in
+		--headless) headless_run=1 ;;
+	esac
 	case "$a" in
 		--headless|--version|-h|--help|--doctool|--dump-*) headless=1 ;;
 		-e|--editor|-p|--project-manager) editor=1 ;;
@@ -48,6 +53,14 @@ for a in "$@"; do
 	esac
 done
 
+# Headless batch jobs can still initialize macOS application APIs. Apply the
+# same no-activation protection without changing their command-line arguments.
+shim=${GODOT_NOACTIVATE_DYLIB:-$HOME/.local/lib/godot_noactivate.dylib}
+if [ "${GODOT_FOREGROUND:-0}" != 1 ] && [ "$headless_run" = 1 ] && [ -f "$shim" ]; then
+	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
+	exec "$REAL" "$@"
+fi
+
 # An interactive editor launch is yours; --import/--export are batch jobs.
 if [ "${GODOT_FOREGROUND:-0}" = 1 ] || [ "$headless" = 1 ] \
 		|| { [ "$editor" = 1 ] && [ "$scripted" = 0 ]; }; then
@@ -58,7 +71,6 @@ fi
 
 # With the shim there is nothing to guard: Godot never activates. A
 # terminal run is your own and stays unshimmed so it behaves normally.
-shim=${GODOT_NOACTIVATE_DYLIB:-$HOME/.local/lib/godot_noactivate.dylib}
 if [ -f "$shim" ] && { [ "$scripted" = 1 ] || [ ! -t 0 ]; }; then
 	[ "$scripted" = 1 ] && export GODOT_NOACTIVATE_HIDE=1
 	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
