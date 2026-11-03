@@ -238,6 +238,68 @@ static func canvas(hex: String, striped: bool) -> Material:
 	_mats[key] = m
 	return m
 
+## Poster atlas tiles (2 columns × 4 rows of 512 × 256 px).
+const SCREEN_TILES := 8
+const SCREEN_GLOW := 1.1
+
+## The big-screen material: the poster atlas, lit by day and night like an
+## LED wall (an emission of the same picture), never dimmed with the sun.
+static func screen() -> Material:
+	if _mats.has("screen"):
+		return _mats["screen"] as Material
+	var tex := _screen_atlas()
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.roughness = 0.3
+	m.emission_enabled = true
+	m.emission_texture = tex
+	m.emission_energy_multiplier = SCREEN_GLOW
+	_mats["screen"] = m
+	return m
+
+## Eight stylised posters: two saturated colours blended top to bottom, a
+## big face (ellipse of skin tone with a hair cap), a bold headline bar, a
+## few smaller text bars and a round logo, in a black frame.
+static func _screen_atlas() -> ImageTexture:
+	var img := Image.create(1024, 1024, false, Image.FORMAT_RGB8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 109
+	var pal := [Color(0.9, 0.12, 0.2), Color(1.0, 0.8, 0.1), Color(0.1, 0.45, 0.95),
+		Color(0.1, 0.75, 0.45), Color(0.95, 0.35, 0.7), Color(0.98, 0.98, 0.95),
+		Color(0.55, 0.2, 0.85), Color(1.0, 0.5, 0.1)]
+	var skin := [Color(0.95, 0.78, 0.65), Color(0.85, 0.62, 0.48), Color(0.72, 0.5, 0.38)]
+	for tile in SCREEN_TILES:
+		var ox := (tile % 2) * 512
+		var oy := (tile / 2) * 256
+		var c0: Color = pal[tile % pal.size()]
+		var c1: Color = pal[(tile * 3 + 2) % pal.size()]
+		for y in 256:
+			img.fill_rect(Rect2i(ox, oy + y, 512, 1), c0.lerp(c1, float(y) / 255.0))
+		# A face on the left third, as a stack of row spans.
+		var fx := ox + 110 + rng.randi() % 80
+		var skin_c: Color = skin[rng.randi() % skin.size()]
+		for y in range(24, 236):
+			var t := (float(y) - 130.0) / 106.0
+			var half := int(sqrt(maxf(0.0, 1.0 - t * t)) * 78.0)
+			img.fill_rect(Rect2i(fx - half, oy + y, half * 2, 1), skin_c)
+		img.fill_rect(Rect2i(fx - 78, oy + 24, 156, 42), Color(0.08, 0.06, 0.06))  # hair
+		# Headline and text bars on the right.
+		var hx := ox + 280
+		img.fill_rect(Rect2i(hx, oy + 40, 200, 46), Color.WHITE)
+		img.fill_rect(Rect2i(hx, oy + 100, 150 + rng.randi() % 50, 14), Color(0.05, 0.05, 0.08))
+		img.fill_rect(Rect2i(hx, oy + 126, 120 + rng.randi() % 80, 14), Color(0.05, 0.05, 0.08))
+		img.fill_rect(Rect2i(hx, oy + 152, 90 + rng.randi() % 100, 14), Color.WHITE)
+		for y in range(190, 236):
+			var half2 := int(sqrt(maxf(0.0, 1.0 - pow((float(y) - 213.0) / 23.0, 2.0))) * 23.0)
+			img.fill_rect(Rect2i(hx + 40 - half2 + 23, oy + y, half2 * 2, 1), Color(1.0, 0.9, 0.2))
+		# Black frame.
+		img.fill_rect(Rect2i(ox, oy, 512, 4), Color.BLACK)
+		img.fill_rect(Rect2i(ox, oy + 252, 512, 4), Color.BLACK)
+		img.fill_rect(Rect2i(ox, oy, 4, 256), Color.BLACK)
+		img.fill_rect(Rect2i(ox + 508, oy, 4, 256), Color.BLACK)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
 ## Shop sign panel: a saturated colour, lit from dusk (CityLights), unlit
 ## by day.
 static func sign(hex: String) -> Material:

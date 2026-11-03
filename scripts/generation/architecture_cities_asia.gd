@@ -55,7 +55,7 @@ const REGIONS := {
 			"p": [["tiles", 3], ["strip", 2], ["punched", 2]], "wn": "wide", "bay": 2.6,
 			"fr": "#8a8c8e", "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.2,
 			"st": [3, 9], "fix": true, "eq": 0.9, "g": [["signage", 1]], "ev": 0.0,
-			"rv": {"signage": 0.75, "awning": 0.15,
+			"rv": {"signage": 0.75, "screens": 0.7, "awning": 0.15,
 				"awning_colours": ["#2a4a6a", "#8a2a1a", "#e8e4da"]}},
 	},
 	# Low houses: render or dark timber, dark kawara tile roofs, eaves.
@@ -73,7 +73,7 @@ const REGIONS := {
 			"g": [["none", 1], ["shop", 1]], "rv": {"deep_balcony": 0.7}},
 		"commercial": {"w": [["glass", []], ["concrete", ["#d8d6d0"]]], "p": [["curtain", 3], ["strip", 2], ["tiles", 1]],
 			"bay": 3.0, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.8, "st": [15, 50],
-			"fix": true, "eq": 0.9, "g": [["signage", 1], ["shop", 1]], "rv": {"signage": 0.2}},
+			"fix": true, "eq": 0.9, "g": [["signage", 1], ["shop", 1]], "rv": {"signage": 0.2, "screens": 0.65}},
 		"civic": {"w": [["concrete", ["#d8d6d0"]], ["glass", []]], "p": "strip", "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [6, 20], "fix": true, "rv": {}},
 	},
@@ -89,7 +89,7 @@ const REGIONS := {
 		"commercial": {"w": [["concrete", HK_TOWER], ["glass", []]], "p": [["tiles", 2], ["strip", 2]],
 			"wn": "wide", "bay": 2.8, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.4,
 			"st": [8, 25], "fix": true, "eq": 0.8, "g": [["signage", 1]], "gc": HK_SIGNS,
-			"rv": {"signage": 0.8}},
+			"rv": {"signage": 0.8, "screens": 0.5}},
 	},
 	# Tong lau tenements: 4–8 storey, verandahs, shuttered windows,
 	# dense vertical signs over shopfronts.

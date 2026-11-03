@@ -398,7 +398,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade,
 			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
-			"party_flags": party, "shop_lights": RenderQuality.ultra_desktop(preset)
+			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
+			"shop_lights": RenderQuality.ultra_desktop(preset)
 				and centre.length() < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()

@@ -273,7 +273,7 @@ Round ultra-p8, 2026-11-03 (Ultra pass, Phases 5–8):
 | Alps | recognisable | — | (Winter shot.) Snowy peaks and lake right; valley roofs read as dots |
 | Banff | recognisable | ↑ hotel model | Mount Rundle reads as a rounded green hill, no rock faces |
 | Big Sur | recognisable | ↑ camera moved | Hillsides read as smooth grass; no rock faces under the arch, no surf at the beach |
-| Tokyo | stylised | ↑ zebra crossings | No giant screens or crowd; plaza patches still read as lawn; crossings short, not the diagonal scramble |
+| Tokyo | stylised | ↑ zebra crossings, screens | Screens only on some tall fronts, none in the opening frame; no crowd; plaza patches still read as lawn; crossings short, not the diagonal scramble |
 | New York | recognisable | far towers windowed | Water too cyan; backlit sun glare |
 | Stockholm | recognisable | ↑ Riddarholmen spire, cliff eye | Gamla stan reads as low generic blocks; foreground waterfront blocks sit in the frame |
 | Monaco | recognisable | ↑ marina boats | Port Hercule's basin renders as terraced terrain with the photo's sea on it (the sea plane sits at −66 m); boats only where the pontoons stand in real water; vantage lower than the photo |
@@ -287,6 +287,12 @@ Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with t
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
 waterfront road).
+
+Big screens (`StreetFront._screen`, desktop Ultra): a poster panel (up to 18 m wide) above the third storey on
+the longest street front of tall commercial buildings in the `tokyo`, `tokyo_tower` and `hong_kong` styles
+(profile key `screens`, 0.5–0.7), from a procedural 8-poster atlas, lit day and night like an LED wall
+(`street_screens_test`). One shows on a tower in `ultra-p8p-2026-11-03/` (earlier run, south view); the
+nearest buildings to the preset eye roll none, so the opening frame is unchanged.
 
 Westminster Bridge was a flat slab: `RoadBuilder` drew every bridge as a 0.9 m plank with parapets. `BridgeArches`
 (all tiers) now adds piers every ~32 m, arched spandrel openings and a soffit to any deck with 45+ m of water

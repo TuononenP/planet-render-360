@@ -9,6 +9,8 @@ extends RefCounted
 ##   `awning_colours`; striped or plain per building);
 ## - a stone stoop up to the door (`stoop`, brownstones);
 ## - vertical lit signs on the upper floors (`signage`, Tokyo/Hong Kong);
+## - a big poster / video screen high on a tall front (`screens`, Shibuya,
+##   Hong Kong; desktop Ultra only);
 ## - an iron fire escape on the front (`fire_escape`, New York walk-ups);
 ## - a stepped, neck or bell gable rising over the roof on a narrow
 ##   gable-fronted house (`gable`, Amsterdam), with its hoist beam.
@@ -16,6 +18,9 @@ extends RefCounted
 ## ReliefKit, so one building is still one mesh.
 
 const SIGN_COLOURS := ["#d8262e", "#f2c230", "#f4f1e8", "#2a6fd1", "#1f9e5a", "#e2531f"]
+## A screen needs a front this long (m), is at most this wide (m).
+const SCREEN_MIN_LEN_M := 14.0
+const SCREEN_MAX_W_M := 18.0
 const DEFAULT_AWNINGS := ["#7a1f24", "#1f4a34", "#22314f", "#8a6a2a"]
 const SHOP_USES: Array[String] = ["shop", "cafe", "restaurant", "bar", "pub",
 	"fast_food", "bakery", "pharmacy", "bank"]
@@ -51,6 +56,9 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 			stooped = true
 		if ArchitectureStyle._h(seed_v + salt, 82) < float(relief.get("signage", 0.0)):
 			_signs(kit, sp, rows, seed_v + salt)
+		if bool(d.get("screens", false)) and i == longest \
+				and ArchitectureStyle._h(seed_v, 84) < float(relief.get("screens", 0.0)):
+			_screen(kit, sp, rows, seed_v)
 		if not escaped and not raised and i == longest and rows.size() >= 4 \
 				and ArchitectureStyle._h(seed_v, 83) < float(relief.get("fire_escape", 0.0)):
 			_fire_escape(kit, sp, rows)
@@ -135,6 +143,34 @@ static func _signs(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -
 		var hex := str(SIGN_COLOURS[int(ArchitectureStyle._h(seed_v, 88 + k) * SIGN_COLOURS.size()) % SIGN_COLOURS.size()])
 		kit.box(ReliefKit.sign(hex), Vector3(p.x, (y0 + y1) * 0.5, p.y) + az * 0.45 * m, ax, az,
 			Vector3(0.16 * m, y1 - y0, 0.8 * m))
+
+## A big poster or video screen on the stretch: a wide panel above the third
+## storey (Shibuya's QFRONT wall, Hong Kong's shopfront towers), one of the
+## poster atlas's eight tiles, lit like a sign.
+static func _screen(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -> void:
+	var m := WorldScale.metres_to_units()
+	var len := float(sp["len_m"]) * m
+	if rows.size() < 6 or len < SCREEN_MIN_LEN_M * m:
+		return
+	var dir: Vector2 = sp["dir"]
+	var n: Vector2 = sp["n"]
+	var y0 := float(rows[2]["y1"]) + 0.6 * m
+	var top := float(rows[-1]["y1"]) - 1.0 * m
+	var w := minf(len * 0.7, SCREEN_MAX_W_M * m)
+	var h := minf(w * (0.4 + 0.2 * ArchitectureStyle._h(seed_v, 85)), top - y0)
+	if h < 4.0 * m:
+		return
+	w = minf(w, h * 2.4)
+	var t := (len - w) * (0.2 + 0.6 * ArchitectureStyle._h(seed_v, 86)) + w * 0.5
+	var c: Vector2 = (sp["a"] as Vector2) + dir * t + n * 0.14 * m
+	var ax := Vector3(dir.x, 0.0, dir.y) * w * 0.5
+	var ctr := Vector3(c.x, y0 + h * 0.5, c.y)
+	var up := Vector3.UP * h * 0.5
+	var tile := int(ArchitectureStyle._h(seed_v, 87) * float(ReliefKit.SCREEN_TILES)) % ReliefKit.SCREEN_TILES
+	var u0 := float(tile % 2) * 0.5
+	var v_top := float(tile / 2) * 0.25
+	kit.quad(ReliefKit.screen(), ctr - ax - up, ctr + ax - up, ctr + ax + up, ctr - ax + up,
+		Vector3(n.x, 0.0, n.y), Vector2(u0, v_top + 0.25), Vector2(u0 + 0.5, v_top))
 
 ## Fire escape on the middle bays: an iron platform at every upper floor
 ## with railings, and a stair flight between each pair.
