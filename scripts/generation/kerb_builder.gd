@@ -66,8 +66,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> floa
 	var stone := stone_for(data)
 	var set_name := "concrete" if stone == CONCRETE else "stone"
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
-	mi.material_override = MaterialLibrary.pbr_material(set_name,
-		MaterialLibrary._calib_tint(row["mean"], stone), 1.0)
+	mi.material_override = StreetSnow.material(MaterialLibrary.pbr_material(set_name,
+		MaterialLibrary._calib_tint(row["mean"], stone), 1.0) as StandardMaterial3D)
 	root.add_child(mi)
 	return total / m
 

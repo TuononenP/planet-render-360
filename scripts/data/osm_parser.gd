@@ -16,6 +16,8 @@ static func furniture_kind(tags: Dictionary) -> String:
 	match str(tags.get("highway", "")):
 		"traffic_signals": return "signals"
 		"bus_stop": return "bus_stop"
+	if str(tags.get("railway", "")) == "subway_entrance":
+		return "subway_entrance"
 	if str(tags.get("barrier", "")) == "bollard":
 		return "bollard"
 	return ""
@@ -30,14 +32,16 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var barriers: Array = []
 	var railways: Array = []
 	var furniture: Array = []
+	var pois: Array = []
 	var piers: Array = []
+	var shore_structures: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
 			"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture, "piers": piers}
+			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -52,7 +56,28 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			seen[key] = true
 		var raw_tags: Variant = el.get("tags", {})
 		var el_tags: Dictionary = raw_tags if raw_tags is Dictionary else {}
+		var source_id := "%s:%d" % [el.get("type", "way"), int(el.get("id", 0))]
+		var source_starts := [buildings.size(), roads.size(), land.size()]
+		var shore_kind := str(el_tags.get("man_made", ""))
+		if shore_kind != "quay" and str(el_tags.get("barrier", "")) == "retaining_wall":
+			shore_kind = "retaining_wall"
+		if shore_kind != "quay" and shore_kind != "retaining_wall" and str(el_tags.get("embankment", "")) == "yes":
+			shore_kind = "embankment"
+		if shore_kind in ["quay", "retaining_wall", "embankment"] and el.has("geometry"):
+			var shore_points := PackedVector2Array()
+			for node in el["geometry"]:
+				if node is Dictionary and node.has("lat") and node.has("lon"):
+					shore_points.append(WorldScale.xz_from_latlon(float(node["lat"]), float(node["lon"]), c_lat, c_lon))
+			if shore_points.size() >= 2:
+				shore_structures.append({"points": shore_points, "kind": shore_kind,
+					"id": "%s:%d" % [el.get("type", "way"), int(el.get("id", 0))],
+					"material": str(el_tags.get("material", el_tags.get("surface", ""))),
+					"height_m": OsmTags._tag_metres(el_tags.get("height", ""), 0.1, 30.0)})
 		if (el_tags.has("building") or el_tags.has("building:part")) and OsmTags.underground(el_tags):
+			continue
+		# Construction footprints can carry the planned final height. Treating
+		# that as an existing tower invents a skyline years before completion.
+		if str(el_tags.get("building", "")) == "construction" or str(el_tags.get("building:part", "")) == "construction":
 			continue
 		# The is_in country area: tags only, no geometry.
 		if str(el.get("type", "")) == "area":
@@ -61,6 +86,13 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			continue
 		# Point features (lighthouses, towers are often single nodes).
 		if str(el.get("type", "")) == "node" and el.has("lat") and el.has("lon"):
+			for category in ["shop", "amenity", "office", "tourism", "craft", "advertising"]:
+				if el_tags.has(category):
+					var pt := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+					pois.append({"x": pt.x, "z": pt.y, "category": category,
+						"kind": str(el_tags[category]), "name": str(el_tags.get("name", "")),
+						"brand": str(el_tags.get("brand", ""))})
+					break
 			var node_arch := OsmTags.archetype_for(el_tags)
 			if node_arch != "":
 				var np := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
@@ -109,6 +141,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
 					if str(entry["class"]) == "water":
 						entry["tidal"] = OsmTags.tidal(el_tags)
+						entry["still_pool"] = OsmTags.still_pool(el_tags)
 					if str(entry["class"]) == "forest":
 						(entry as Dictionary).merge(OsmTags.tree_tags(el_tags))
 					land.append(entry)
@@ -126,6 +159,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 							"height": 30.0,
 							"size_x": clampf(box.size.x, 6.0, 240.0),
 							"size_z": clampf(box.size.y, 6.0, 240.0)})
+			_stamp_sources([buildings, roads, land], source_starts, source_id)
 			continue
 		if not el.has("geometry"):
 			continue
@@ -194,7 +228,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				"width_m": OsmTags._tag_metres(el_tags.get("width", ""), 0.5, 40.0)})
 		elif el_tags.has("barrier"):
 			barriers.append({"points": poly,
-				"class": str(el_tags.get("barrier", "yes"))})
+				"class": str(el_tags.get("barrier", "yes")),
+				"height_m": OsmTags._tag_metres(el_tags.get("height", ""), 0.1, 30.0),
+				"material": str(el_tags.get("material", "")),
+				"fence_type": str(el_tags.get("fence_type", ""))})
 		else:
 			var arch2 := OsmTags.archetype_for(el_tags)
 			if arch2 != "":
@@ -212,6 +249,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var entry := {"class": cls, "points": poly, "holes": []}
 				if cls == "water":
 					entry["tidal"] = OsmTags.tidal(el_tags)
+					entry["still_pool"] = OsmTags.still_pool(el_tags)
 				if cls == "forest":
 					entry.merge(OsmTags.tree_tags(el_tags))
 				land.append(entry)
@@ -221,19 +259,26 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					var tree := {"x": tp.x, "z": tp.y, "row": true}
 					tree.merge(OsmTags.tree_tags(el_tags))
 					trees.append(tree)
-	RoadWidths.from_sidewalks(roads)
+		_stamp_sources([buildings, roads, land], source_starts, source_id)
+	RoadWidths.from_sidewalks(roads, trees)
 	_nest_parts(buildings, part_ways)
+	BuildingReferences.apply(buildings)
 	_monument_landmarks(buildings, landmarks)
 	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture, "piers": piers}
+		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live
 ## on the relation, so every outer shares them; a landmark archetype is
 ## emitted once, sized from the first outer.
+static func _stamp_sources(collections: Array, starts: Array, source_id: String) -> void:
+	for i in collections.size():
+		for j in range(int(starts[i]), collections[i].size()):
+			collections[i][j]["osm_id"] = source_id
+
 static func _relation_buildings(tags: Dictionary, members: Array, c_lat: float,
 		c_lon: float, buildings: Array, landmarks: Array) -> void:
 	var arch := OsmTags.archetype_for(tags)

@@ -22,35 +22,37 @@ const PARAPET_H_M := 0.9
 const PARAPET_T_M := 0.5
 const UNDERWATER_M := 0.6
 
-static var _stone_mat: StandardMaterial3D
+static var _stone_mats := {}
 
-## Dressed-stone material from the MaterialLibrary "render" set (the
-## brightest fine-grained set: the beige limestone/sandstone photos are
-## dark brown, and tinting them up to #8A8274 rendered near-black
-## walls), calibrated in linear space to the PRD quay colour; world
-## triplanar so a 30 m quay run tiles at real texture scale.
-static func stone_material() -> StandardMaterial3D:
-	if _stone_mat == null:
+## Fine-grained stone calibrated in linear space to the regional kerb
+## colour (granite in Europe, concrete in North America). Cache by
+## colour so building another region cannot recolour an existing quay.
+## World triplanar mapping keeps long walls at real texture scale.
+static func stone_material(data: LocationData = null) -> StandardMaterial3D:
+	var target := KerbBuilder.stone_for(data) if data != null else KerbBuilder.GRANITE
+	var key := target.to_html(false)
+	if not _stone_mats.has(key):
 		var row: Dictionary = MaterialLibrary.PBR_SETS["render"]
 		# Set means are already linear (a second decode read the stone
 		# ~1.6x too bright: pale, textureless quay slabs).
 		var mean: Color = row["mean"]
-		var target := QUAY_STONE.srgb_to_linear()
 		var tint := Color(target.r / maxf(mean.r, 0.01),
 			target.g / maxf(mean.g, 0.01),
 			target.b / maxf(mean.b, 0.01))
 		# Linear tint: pbr_material sRGB-encodes albedo_color (T4.7).
-		_stone_mat = MaterialLibrary.pbr_material("render", tint).duplicate()
-		_stone_mat.uv1_triplanar = true
-		_stone_mat.uv1_world_triplanar = true
-	# ~3 m texture repeat in the current unit scale.
-	var s := 1.0 / (3.0 * WorldScale.metres_to_units())
-	_stone_mat.uv1_scale = Vector3(s, s, s)
-	return _stone_mat
+		var stone := MaterialLibrary.pbr_material("render", tint).duplicate() as StandardMaterial3D
+		stone.uv1_triplanar = true
+		stone.uv1_world_triplanar = true
+		stone.uv1_scale = Vector3.ONE / (3.0 * WorldScale.metres_to_units())
+		_stone_mats[key] = stone
+	return _stone_mats[key]
 
 ## Quays along every water-polygon rim and channel bank (urban banks).
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		channels: Array, wl: float, levels: Dictionary = {}) -> void:
+	if ground.shoreline != null and ground.shoreline.ready:
+		ShoreBankMesh.build(root, ground.shoreline, null, data)
+		return
 	var step := WaterBuilder._post_step(data)
 	var bound := WorldScale.detailed_extent_units() * 0.5
 	# Plain Arrays (reference types): packed arrays in a Dictionary
@@ -93,7 +95,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(st["n"])
 	arrays[Mesh.ARRAY_INDEX] = idx
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	var mi := TerrainBuilder._add(root, mesh, stone_material())
+	var mi := TerrainBuilder._add(root, mesh, stone_material(data))
 	mi.name = "Quays"
 
 ## Quay stations along a ring (water inside, or an island hole with

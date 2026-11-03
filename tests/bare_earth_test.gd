@@ -44,6 +44,18 @@ func _run() -> void:
 	var hill := src[60 * SIZE + 70] - ramp[60 * SIZE + 70]
 	var buildings: Array = [{"x": _post(30, 30).x, "z": _post(30, 30).y,
 		"footprint": _square(_post(30, 30), STEP * 1.6)}]
+	# A canopy bump inside mapped forest far from buildings is removed,
+	# while the same bump outside that polygon remains untouched.
+	var forest_src := ramp.duplicate()
+	forest_src[20 * SIZE + 70] += 12.0
+	forest_src[20 * SIZE + 10] += 12.0
+	var forest_out := forest_src.duplicate()
+	BareEarth.strip(forest_out, SIZE, STEP, half, [], [{"class": "forest",
+		"points": _square(_post(70, 20), STEP * 4.0)}])
+	if forest_out[20 * SIZE + 70] > ramp[20 * SIZE + 70] + 1.0:
+		failures.append("mapped forest canopy away from buildings remains")
+	if forest_out[20 * SIZE + 10] != forest_src[20 * SIZE + 10]:
+		failures.append("unmapped natural relief must remain")
 	var out := src.duplicate()
 	var t0 := Time.get_ticks_msec()
 	BareEarth.strip(out, SIZE, STEP, half, buildings)

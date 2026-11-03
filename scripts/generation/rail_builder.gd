@@ -104,12 +104,14 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		return
 	var m2u := WorldScale.metres_to_units()
 	var surf := RoadBuilder._Surface.new(data, ground)
+	surf.use_native()
+	var road_index := RoadIndex.new(data, m2u)
 	var spans := LandmarkSites.bridge_spans(data)
 	var batches := {}
 	for w in data.railways:
 		if abort != null and abort.requested:
 			return
-		_way(batches, w, surf, spans, m2u)
+		_way(batches, w, surf, spans, m2u, data, road_index)
 	for key in batches:
 		var b: RoadBuilder._Batch = batches[key]
 		if b.indices.is_empty():
@@ -123,7 +125,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		root.add_child(mi)
 
 static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
-		spans: Array, m2u: float) -> void:
+		spans: Array, m2u: float, data: LocationData = null, road_index = null) -> void:
 	if not (w is Dictionary) or bool((w as Dictionary).get("tunnel", false)):
 		return
 	var way: Dictionary = w
@@ -134,6 +136,14 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 	var bed := float(way.get("width_m", 3.3)) * m2u
 	var dense := RoadBuilder._resample(pts, surf.step * 0.34)
 	if bool(way.get("bridge", false)):
+		if data != null and str(way.get("class", "")) == "tram" and _on_road(pts[pts.size() / 2], data, m2u, road_index):
+			# The carriageway bridge owns the slab; the tram adds rails only.
+			var deck := RoadBuilder.deck_profile(dense, surf, m2u, bed * 0.5)
+			if deck.size() == dense.size():
+				for i in deck.size():
+					deck[i] += STREET_RAIL_LIFT_M * m2u
+				_rails(RoadBuilder._batch(batches, "rail"), dense, deck, gauge, 0.0, m2u, RAIL_LAYER)
+			return
 		for piece in LandmarkSites.outside_spans(dense, spans):
 			_bridge(batches, piece, gauge, bed, surf, m2u)
 		return
@@ -144,6 +154,16 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 		for p in run:
 			ys.append(surf.height(p.x, p.y) + lift)
 		if embedded:
+			# Mapped trams default to embedded, including reservations outside
+			# the road. Give those pieces paving or grass under the rails.
+			if data != null:
+				for j in run.size() - 1:
+					var mid: Vector2 = (run[j] + run[j + 1]) * 0.5
+					if not _on_road(mid, data, m2u, road_index):
+						var bed_key := "grass_track" if surf.ground.land_class_at(mid.x, mid.y) == "grass" else "track_bed"
+						RoadBuilder._ribbon(RoadBuilder._batch(batches, bed_key),
+							PackedVector2Array([run[j], run[j + 1]]), gauge + 1.2 * m2u, surf,
+							BED_LIFT_M * m2u, Color(0, 0, 0, 1), {}, BED_LAYER)
 			_rails(RoadBuilder._batch(batches, "rail"), run, ys, gauge, 0.0, m2u, RAIL_LAYER)
 			if bool(way.get("cable", false)):
 				# A concrete track bed in the asphalt, and the cable slot:
@@ -244,6 +264,8 @@ static func _material(key: String) -> Material:
 			bm.set_shader_parameter("pitch", SLEEPER_PITCH_M)
 			bm.set_shader_parameter("inset", SLEEPER_INSET_M)
 			m = bm
+		"grass_track":
+			m = RoadSurface.paved_material("grass", Color(0.20, 0.28, 0.12))
 		"track_bed":
 			# Depth-layered like the road ribbons (a plain PBR deck would
 			# z-fight the asphalt it is set in).
@@ -259,3 +281,49 @@ static func _material(key: String) -> Material:
 			m = RoadBuilder._material(key)
 	_mats[key] = m
 	return m
+
+## Exact local road coverage, indexed once per build for the many tram probes.
+class RoadIndex:
+	var cells := {}
+	var cell_size := 64.0
+
+	func _init(data: LocationData, m2u: float) -> void:
+		cell_size *= m2u
+		for road in data.roads:
+			if not (road is Dictionary) or str(road.get("class", "")) not in StreetProps.LIT \
+					or bool(road.get("area", false)) or bool(road.get("tunnel", false)):
+				continue
+			var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+			var half := float(road.get("width_m", 6.0)) * 0.5 * m2u
+			for i in pts.size() - 1:
+				var a := pts[i]
+				var b := pts[i + 1]
+				var lo := (a.min(b) - Vector2.ONE * half) / cell_size
+				var hi := (a.max(b) + Vector2.ONE * half) / cell_size
+				for x in range(floori(lo.x), floori(hi.x) + 1):
+					for z in range(floori(lo.y), floori(hi.y) + 1):
+						var key := Vector2i(x, z)
+						if not cells.has(key):
+							cells[key] = []
+						(cells[key] as Array).append([a, b, half])
+
+	func contains(p: Vector2) -> bool:
+		var key := Vector2i(floori(p.x / cell_size), floori(p.y / cell_size))
+		for segment in cells.get(key, []):
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])) <= float(segment[2]):
+				return true
+		return false
+
+static func _on_road(p: Vector2, data: LocationData, m2u: float, index = null) -> bool:
+	if index != null:
+		return index.contains(p)
+	for road in data.roads:
+		if not (road is Dictionary) or str(road.get("class", "")) not in StreetProps.LIT \
+				or bool(road.get("area", false)) or bool(road.get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+		var half := float(road.get("width_m", 6.0)) * 0.5 * m2u
+		for i in pts.size() - 1:
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, pts[i], pts[i + 1])) <= half:
+				return true
+	return false

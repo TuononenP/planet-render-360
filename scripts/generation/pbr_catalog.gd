@@ -1,12 +1,13 @@
 class_name PbrCatalog
 extends RefCounted
 
-## Bundled photographic PBR sets: set name → Poly Haven asset id,
+## Bundled PBR sets: set name → source asset id,
 ## linear-space mean albedo (measured at 64²), scalar roughness for the
 ## albedo-only path, and metallic. Paths are
 ## assets/textures/<set>_{diff,nor,rough}.jpg (1k, CC0 — see the
 ## data-source register). Glass is absent upstream (0 catalog hits for
-## "glass"), so it is the one procedural set — see StoreyComposer.compose_glass.
+## "glass"), so it is composed by StoreyComposer.compose_glass. Copper
+## and sheet_metal use ambientCG's CC0 authored PBR maps (source register).
 ## New textures change only this table, never the resolution code.
 static var SETS := {
 	"limestone": {"asset": "beige_wall_001", "mean": Color(0.3404, 0.2623, 0.1878), "rough": 0.88, "metal": 0.0},
@@ -18,6 +19,8 @@ static var SETS := {
 	"slate": {"asset": "grey_roof_tiles_02", "mean": Color(0.1897, 0.1964, 0.1927), "rough": 0.62, "metal": 0.08},
 	"terracotta": {"asset": "clay_roof_tiles", "mean": Color(0.3325, 0.1070, 0.0513), "rough": 0.80, "metal": 0.0},
 	"membrane": {"asset": "bitumen", "mean": Color(0.0433, 0.0375, 0.0347), "rough": 0.95, "metal": 0.0},
+	"copper": {"asset": "Metal058C", "mean": Color(0.27777, 0.47600, 0.40533), "rough": 0.45, "metal": 0.15},
+	"sheet_metal": {"asset": "Metal014", "mean": Color(0.52940, 0.52940, 0.52940), "rough": 0.46, "metal": 0.05},
 	"asphalt": {"asset": "asphalt_01", "mean": Color(0.1002, 0.0798, 0.0619), "rough": 0.97, "metal": 0.0},
 	"pavement": {"asset": "concrete_pavement", "mean": Color(0.2140, 0.1761, 0.1342), "rough": 0.95, "metal": 0.0},
 	"grass": {"asset": "grass_ground", "mean": Color(0.1562, 0.1180, 0.0482), "rough": 0.97, "metal": 0.0},

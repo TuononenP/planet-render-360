@@ -232,10 +232,14 @@ static func normals_from_daily(parsed: Variant) -> Dictionary:
 			warm = m
 		if q_t[m] < q_t[cold]:
 			cold = m
+	var monthly: Array = []
+	for m in 12:
+		monthly.append(t_sum[m] / t_n[m])
 	var precip := 0.0
 	for m in 12:
 		precip += p_sum[m]
 	return {
+		"t_monthly_c": monthly,
 		"t_warm_c": q_t[warm],
 		"t_cold_c": q_t[cold],
 		"precip_mm": precip / n_years,

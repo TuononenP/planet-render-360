@@ -61,6 +61,52 @@ func _faces_on_x(root: Node, x0: float) -> Array:
 func _run() -> void:
 	var failures: Array[String] = []
 	var m2u := WorldScale.metres_to_units()
+	# An untagged part keeps its parent's finish; explicit part tags win.
+	var inherited := _bldg(_rect(0, 0, 10, 10), 2, {"colour": "", "material": ""})
+	var override := _bldg(_rect(10, 0, 20, 10), 2, {"colour": "blue", "material": "brick"})
+	var parent := _bldg(_rect(0, 0, 20, 10), 2,
+		{"colour": "white", "material": "marble", "parts": [inherited, override]})
+	var finish_data := _data()
+	finish_data.buildings = [parent]
+	BuildingMasses.begin_build()
+	var finish_parts := BuildingMasses.plan(parent, BuildingHeights._height_context(finish_data))
+	if finish_parts.size() != 2 or finish_parts[0]["b_eff"].get("colour") != "white" \
+			or finish_parts[0]["b_eff"].get("material") != "marble" \
+			or finish_parts[1]["b_eff"].get("colour") != "blue" \
+			or finish_parts[1]["b_eff"].get("material") != "brick":
+		failures.append("building parts must inherit missing facade tags and retain explicit overrides")
+	BuildingMasses.end_build()
+	# Untagged-part prewar NYC towers may synthesize setbacks on Ultra;
+	# the tagged footprint and total height remain authoritative.
+	var ny := _data()
+	ny.latitude = 40.7075
+	ny.longitude = -74.0095
+	RenderSettings.apply_preset(ny, RenderSettings.Preset.ULTRA)
+	var ny_tower := _bldg(_rect(-30, -25, 30, 25), 30, {"start_year": 1930, "roof_shape": "flat"})
+	ny.buildings = [ny_tower]
+	BuildingMasses.begin_build()
+	var steps := BuildingMasses.plan(ny_tower, BuildingHeights._height_context(ny))
+	if steps.size() != 3:
+		failures.append("an unparted 30-storey prewar NYC tower should have three setback masses")
+	else:
+		var areas := []
+		for step in steps:
+			areas.append(absf(RingGeometry.signed_area(step["ring"])))
+		if not (areas[0] > areas[1] and areas[1] > areas[2]) or float(steps[2]["min_m"]) <= 0.0:
+			failures.append("setback levels should narrow and rise: %s" % [areas])
+		if absf(float(steps[2]["wall_m"]) + float(steps[2]["rh_m"]) - 96.0) > 0.1:
+			failures.append("setbacks must retain the resolved tower height")
+	RenderSettings.apply_preset(ny, RenderSettings.Preset.HIGH)
+	BuildingMasses.begin_build()
+	if BuildingMasses.plan(ny_tower, BuildingHeights._height_context(ny)).size() != 1:
+		failures.append("synthesized tower setbacks are Ultra-only")
+	RenderSettings.apply_preset(ny, RenderSettings.Preset.ULTRA)
+	var tagged := ny_tower.duplicate(true)
+	tagged["parts"] = [_bldg(_rect(-20, -20, 20, 20), 30, {"roof_shape": "flat"})]
+	BuildingMasses.begin_build()
+	if BuildingMasses.plan(tagged, BuildingHeights._height_context(ny)).size() != 1:
+		failures.append("mapped building parts must suppress inferred setbacks")
+	BuildingMasses.end_build()
 
 	# --- Party walls: a 6-level and a 4-level parcel sharing x = 10. ---
 	var data := _data()
@@ -143,6 +189,10 @@ func _run() -> void:
 	if absf(float(plan[0]["wall_m"]) - 6.0 * fh) > 0.01 or float(plan[0]["rh_m"]) <= 0.0:
 		failures.append("6 levels + mansard: wall %.2f (want %.2f), roof %.2f on top"
 			% [plan[0]["wall_m"], 6.0 * fh, plan[0]["rh_m"]])
+	var fractional := BuildingMasses.plan(_bldg(_rect(200, 0, 212, 14), 4, {"levels": 4.5}), ctx)
+	var fractional_fh := float((fractional[0]["look"] as Dictionary)["floor_h"])
+	if absf(float(fractional[0]["wall_m"]) - 4.5 * fractional_fh) > 0.01:
+		failures.append("fractional levels lost in building mass: %s" % fractional[0])
 	var rl := BuildingMasses.plan(_bldg(_rect(30, 0, 42, 14), 6, {"roof_levels": 2}), ctx)
 	if float(rl[0]["rh_m"]) < 2.0 * fh * 0.9:
 		failures.append("roof:levels=2 gave a %.2f m roof" % rl[0]["rh_m"])

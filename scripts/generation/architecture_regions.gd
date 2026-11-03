@@ -118,7 +118,7 @@ const REGIONS := {
 		"house": {"w": [["wood", ["#8c2f22", "#9a3a28", "#e0c070", "#e8e4da", "#c9a24a", "#9aae8a", "#e8d8a8"]]],
 			"p": "clapboard", "bay": 2.9, "fr": "#f4f1ea", "sp": 0.0, "wn": "casement",
 			"r": [["gabled", 6], ["hipped", 1], ["skillion", 1]], "pitch": 0.7,
-			"rf": [["slate", ["#4b5560", "#7a2f2a", "#5d6670", "#556068"]], ["terracotta", ["#9a4a2c"]]],
+			"rf": [["sheet_metal", ["#4b5560", "#7a2f2a", "#5d6670", "#556068"]], ["terracotta", ["#9a4a2c"]]],
 			"fh": 2.8, "st": [1, 2], "ch": 0.7, "dm": 0.05, "ev": 0.5},
 		# Rendered/painted plaster blocks (ochre, yellow, pale green,
 		# red-brown, cream) and brick; punched windows, not ribbons.
@@ -126,7 +126,7 @@ const REGIONS := {
 				["brick", ["#8a4a3c", "#7a4434", "#9a5a48"]]],
 			"p": [["punched", 6], ["balcony", 2], ["strip", 1]], "bay": 2.8, "fr": "#f4f1ea", "sp": 0.0,
 			"r": [["flat", 4], ["gabled", 2], ["hipped", 2]], "pitch": 0.4,
-			"rf": [["membrane", []], ["slate", ["#4b5560", "#5d6670", "#7a2f2a"]]],
+			"rf": [["membrane", []], ["sheet_metal", ["#4b5560", "#5d6670", "#7a2f2a"]]],
 			"st": [3, 6], "ch": 0.15, "eq": 0.4, "g": [["none", 3], ["shop", 1]],
 			"gc": ["#2b3440", "#3a2a28", "#1f3a2c", "#4a4a48"], "rv": {"deep_balcony": 0.3}},
 		"commercial": {"w": [["concrete", ArchitectureData.CONCRETE], ["brick", ["#8a3f30", "#9c4a35"]],
@@ -136,7 +136,7 @@ const REGIONS := {
 			"p": [["punched", 3], ["strip", 1]], "r": [["hipped", 2], ["flat", 2]], "pitch": 0.5},
 		"religious": {"w": [["brick", ["#8a3f30", "#9c4a35"]], ["render", ["#e8e0cc"]]], "pitch": 1.0, "tw": "bell"},
 		"farm": {"w": [["wood", ["#8c2f22", "#8a3a2a", "#e8e4da"]]], "p": "clapboard", "r": [["gabled", 1]],
-			"pitch": 0.6, "rf": [["slate", ["#4b5560", "#7a2f2a"]]]},
+			"pitch": 0.6, "rf": [["sheet_metal", ["#4b5560", "#7a2f2a"]]]},
 	},
 	"mediterranean": {
 		"house": {"w": [["render", ["#efe3c8", "#e6c9a0", "#d9a878", "#f2ede0", "#d8b890", "#c9a070"]]],

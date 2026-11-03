@@ -17,7 +17,7 @@ extends RefCounted
 ##   the low spots, snow settles except in the tyre tracks.
 ##
 ## Vertex data (RoadBuilder): UV = (across, along) in 4 m units, UV2.x
-## the ribbon width in metres, UV2.y its depth layer, COLOR = (lanes / 8,
+## the ribbon width in metres, UV2.y its depth layer, COLOR = ((lanes + 16 for one-way) / 32,
 ## rank / 2, urban kerb flag, distance to the nearest junction / JUNCTION_M).
 
 const JUNCTION_M := 30.0
@@ -141,7 +141,9 @@ void fragment() {
 	float aa = max(fwidth(x), 0.004);
 	float faa = max(fwidth(y), 0.004);
 	vec2 g = wpos.xz;
-	int lanes = int(attr.r * 8.0 + 0.5);
+	int encoded_lanes = int(attr.r * 32.0 + 0.5);
+	bool oneway = encoded_lanes >= 16;
+	int lanes = encoded_lanes % 16;
 	int rank = int(attr.g * 2.0 + 0.5);
 	if (lanes <= 0) {
 		lanes = w >= 5.5 ? 2 : 1;
@@ -187,9 +189,9 @@ void fragment() {
 	float jfade = smoothstep(6.0, 9.0, jd);
 	float dash = band(mod(y, 9.0), 1.5, 1.5, faa);
 	if (rank >= 1 && w >= 5.0) {
-		if (rank >= 2 && w >= 9.0) {
+		if (!oneway && rank >= 2 && w >= 9.0) {
 			centre = band(x, w * 0.5 - 0.14, 0.06, aa) + band(x, w * 0.5 + 0.14, 0.06, aa);
-		} else if (lanes >= 2) {
+		} else if (!oneway && lanes >= 2) {
 			centre = band(x, w * 0.5, 0.06, aa) * dash;
 		}
 		paint += centre;
@@ -198,7 +200,7 @@ void fragment() {
 				break;
 			}
 			float px = w * float(k) / float(lanes);
-			if (abs(px - w * 0.5) > 0.5) {
+			if (oneway || abs(px - w * 0.5) > 0.5) {
 				paint += band(x, px, 0.06, aa) * dash;
 			}
 		}
@@ -404,3 +406,13 @@ static func junction_frac(buckets: Dictionary, p: Vector2) -> float:
 				for q in buckets[k] as PackedVector2Array:
 					best = minf(best, q.distance_to(p))
 	return best / JUNCTION_M
+
+## Countries driving on the left (ISO 3166-1); shared with parked vehicles.
+const LEFT_TRAFFIC := ["GB", "IE", "MT", "CY", "AU", "NZ", "JP", "IN", "PK", "BD", "LK", "NP", "BT",
+	"TH", "MY", "SG", "ID", "BN", "TL", "HK", "MO", "ZA", "NA", "BW", "LS", "SZ", "ZW", "ZM", "MW",
+	"MZ", "TZ", "KE", "UG", "MU", "SC", "MV", "JM", "BB", "BS", "TT", "AG", "DM", "GD", "KN", "LC",
+	"VC", "GY", "SR", "FJ", "PG", "SB", "TO", "WS", "KI", "TV", "NR", "CK", "NU", "IM", "JE", "GG",
+	"BM", "KY", "TC", "VG", "VI", "AI", "MS", "FK", "SH", "IO", "PN"]
+
+static func left_traffic(data: LocationData) -> bool:
+	return data.country.to_upper() in LEFT_TRAFFIC

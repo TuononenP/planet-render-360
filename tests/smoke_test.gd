@@ -6,6 +6,8 @@ extends SceneTree
 
 func _init() -> void:
 	var failures: Array[String] = []
+	CacheStore.history_override = "user://smoke-test-history-%d.json" % OS.get_process_id()
+	PlaceThumb.dir_override = "user://smoke-test-thumbs-%d" % OS.get_process_id()
 
 	# Known places + coordinate formatting
 	if LocationData.known_place(48.8566, 2.3522) != "Paris, France":
@@ -51,6 +53,7 @@ func _init() -> void:
 	if reloaded.entries.is_empty() or str(reloaded.entries[0].get("name")) != "Test Place":
 		failures.append("Cache round-trip failed")
 	store.clear()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(CacheStore.history_override))
 
 	if failures.is_empty():
 		print("SMOKE OK: DEM, terrain, cache, gazetteer")

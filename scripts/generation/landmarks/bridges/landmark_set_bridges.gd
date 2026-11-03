@@ -5,8 +5,12 @@ extends RefCounted
 ## registry type of LandmarkRegistryBridges. Returns false for a type it does
 ## not own so LandmarkBuilder tries the next set.
 
+const Vasterbron = preload("res://scripts/generation/landmarks/bridges/landmark_br_vasterbron.gd")
+
 static func build(model: Node3D, type: String) -> bool:
 	match type:
+		"manhattan_bridge": LandmarkBrManhattan.build(model)
+		"vasterbron": Vasterbron.build(model)
 		"millau_viaduct": LandmarkBrStayed.millau(model)
 		"oresund_bridge": LandmarkBrStayed.oresund(model)
 		"erasmus_bridge": LandmarkBrStayed.erasmus(model)

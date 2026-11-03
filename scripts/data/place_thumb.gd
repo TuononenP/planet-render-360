@@ -9,6 +9,7 @@ extends RefCounted
 ## A place without one shows the stand-in sky and ridge.
 
 const DIR := "user://thumbs"
+const BUNDLED_DIR := "res://assets/preset_thumbs"
 const WIDTH := 320
 const HEIGHT := 200
 const QUALITY := 0.82
@@ -85,6 +86,19 @@ static func load_texture(lat: float, lon: float) -> Texture2D:
 	var tex := ImageTexture.create_from_image(img)
 	_textures[p] = [mtime, tex]
 	return tex
+
+## A preset's picture: the person's own latest snapshot of it, else the
+## one shipped in res://assets/preset_thumbs/<id>.jpg (baked by
+## tools/capture_presets.gd --bake-thumbs), else null.
+static func load_preset(id: String, lat: float, lon: float) -> Texture2D:
+	var own := load_texture(lat, lon)
+	if own != null:
+		return own
+	var p := bundled_path(id)
+	return load(p) as Texture2D if ResourceLoader.exists(p) else null
+
+static func bundled_path(id: String) -> String:
+	return "%s/%s.jpg" % [BUNDLED_DIR, id]
 
 static func remove(lat: float, lon: float) -> void:
 	var p := path(lat, lon)

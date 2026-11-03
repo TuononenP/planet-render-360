@@ -184,6 +184,7 @@ double RibbonDraper::post(int x, int z) const {
 	}
 	const int cx = x < 0 ? 0 : (x > g_size - 1 ? g_size - 1 : x);
 	const int cz = z < 0 ? 0 : (z > g_size - 1 ? g_size - 1 : z);
+	if (shore_posts.size() == surface.size()) return shore_posts[cz * g_size + cx];
 	return surface[cz * g_size + cx];
 }
 
@@ -209,6 +210,7 @@ double RibbonDraper::mesh_tri(double x, double z) const {
 }
 
 double RibbonDraper::height(double x, double z) const {
+	if (shore_sampler.is_valid() && shore_sampler->dry_triangles(x, z) != nullptr) return shore_sampler->height(x, z);
 	if (mesh_size >= 2 && mesh_size != size) {
 		return mx(mesh_tri(x, z), ground_height(x, z));
 	}
@@ -246,6 +248,16 @@ Vector3 RibbonDraper::normal(double x, double z) const {
 
 Array RibbonDraper::ribbon(const PackedVector2Array &pts, double width, double lift, const Color &attr,
 		const PackedFloat64Array &jf, double layer, double m2u, int base) const {
+	return build(pts, width, lift, attr, jf, layer, m2u, base, false);
+}
+
+Array RibbonDraper::area(const PackedVector2Array &triangles, double lift, const Color &attr,
+		double layer, double m2u, int base) const {
+	return build(triangles, 0.0, lift, attr, PackedFloat64Array(), layer, m2u, base, true);
+}
+
+Array RibbonDraper::build(const PackedVector2Array &pts, double width, double lift, const Color &attr,
+		const PackedFloat64Array &jf, double layer, double m2u, int base, bool is_area) const {
 	Out o;
 	const double half = width * 0.5;
 	double along = 0.0;
@@ -301,29 +313,68 @@ Array RibbonDraper::ribbon(const PackedVector2Array &pts, double width, double l
 			pieces = std::move(next);
 		}
 		for (const Poly &pc : pieces) {
-			emit(pc);
+			Vector2 centre;
+			for (const auto &p : pc.pos) centre += p;
+			if (!pc.pos.empty()) centre /= (real_t)pc.pos.size();
+			const auto *triangles = shore_sampler.is_valid() ? shore_sampler->dry_triangles(centre.x, centre.y) : nullptr;
+			if (triangles == nullptr) { emit(pc); continue; }
+			double x0 = INFINITY, z0 = INFINITY, x1 = -INFINITY, z1 = -INFINITY;
+			for (const auto &p : pc.pos) {
+				x0 = mn(x0, p.x); x1 = mx(x1, p.x);
+				z0 = mn(z0, p.y); z1 = mx(z1, p.y);
+			}
+			for (size_t i = 0; i + 2 < triangles->size(); i += 3) {
+				const Vector3 a = (*triangles)[i], b = (*triangles)[i + 1], c = (*triangles)[i + 2];
+				if (mx(a.x, mx(b.x, c.x)) < x0 - 0.0001 || mn(a.x, mn(b.x, c.x)) > x1 + 0.0001 ||
+					mx(a.z, mx(b.z, c.z)) < z0 - 0.0001 || mn(a.z, mn(b.z, c.z)) > z1 + 0.0001) continue;
+				Poly clipped = pc;
+				for (int edge = 0; edge < 3 && clipped.pos.size() >= 3; ++edge) {
+					const Vector3 aa = (*triangles)[i + edge], bb = (*triangles)[i + (edge + 1) % 3];
+					const Vector2 a(aa.x, aa.z), d(bb.x - aa.x, bb.z - aa.z);
+					Poly next;
+					for (size_t j = 0; j < clipped.pos.size(); ++j) {
+						const size_t k = (j + 1) % clipped.pos.size();
+						const double da = d.cross(clipped.pos[j] - a), db = d.cross(clipped.pos[k] - a);
+						if (da >= -0.00001) clipped.add_from(next, (int)j);
+						if ((da < -0.00001 && db > 0.00001) || (da > 0.00001 && db < -0.00001)) clipped.add_lerp(next, (int)j, (int)k, da / (da - db));
+					}
+					clipped = std::move(next);
+				}
+				if (clipped.pos.size() >= 3) emit(clipped);
+			}
 		}
 	};
-	Row prev;
-	for (int64_t i = 0; i < pts.size(); i++) {
-		if (i > 0) {
-			along += (double)pts[i].distance_to(pts[i - 1]);
+	if (is_area) {
+		for (int64_t i = 0; i + 2 < pts.size(); i += 3) {
+			Poly t;
+			for (int j = 0; j < 3; ++j) {
+				const Vector2 p = pts[i + j];
+				t.add(p, p / (real_t)m2u / (real_t)4.0, 1.0, normal(p.x, p.y));
+			}
+			lay(t);
 		}
-		const Vector2 s = side(pts, i) * (real_t)half;
-		const Row row{ pts[i] + s, pts[i] - s, along / m2u / 4.0, jf[i], normal(pts[i].x, pts[i].y) };
-		if (i > 0) {
-			// RoadDrape.quad
-			Poly t0, t1;
-			t0.add(prev.left, Vector2(0.0, prev.v), prev.jf, prev.n);
-			t0.add(prev.right, Vector2(u1, prev.v), prev.jf, prev.n);
-			t0.add(row.left, Vector2(0.0, row.v), row.jf, row.n);
-			t1.add(prev.right, Vector2(u1, prev.v), prev.jf, prev.n);
-			t1.add(row.right, Vector2(u1, row.v), row.jf, row.n);
-			t1.add(row.left, Vector2(0.0, row.v), row.jf, row.n);
-			lay(t0);
-			lay(t1);
+	} else {
+		Row prev;
+		for (int64_t i = 0; i < pts.size(); i++) {
+			if (i > 0) {
+				along += (double)pts[i].distance_to(pts[i - 1]);
+			}
+			const Vector2 s = side(pts, i) * (real_t)half;
+			const Row row{ pts[i] + s, pts[i] - s, along / m2u / 4.0, jf[i], normal(pts[i].x, pts[i].y) };
+			if (i > 0) {
+				// RoadDrape.quad
+				Poly t0, t1;
+				t0.add(prev.left, Vector2(0.0, prev.v), prev.jf, prev.n);
+				t0.add(prev.right, Vector2(u1, prev.v), prev.jf, prev.n);
+				t0.add(row.left, Vector2(0.0, row.v), row.jf, row.n);
+				t1.add(prev.right, Vector2(u1, prev.v), prev.jf, prev.n);
+				t1.add(row.right, Vector2(u1, row.v), row.jf, row.n);
+				t1.add(row.left, Vector2(0.0, row.v), row.jf, row.n);
+				lay(t0);
+				lay(t1);
+			}
+			prev = row;
 		}
-		prev = row;
 	}
 	PackedVector3Array v, n;
 	PackedVector2Array uv, uv2;
@@ -355,12 +406,23 @@ Array RibbonDraper::ribbon(const PackedVector2Array &pts, double width, double l
 	return out;
 }
 
+void RibbonDraper::set_shore_sampler(const Ref<ShoreSampler> &sampler) {
+	shore_sampler = sampler;
+	shore_posts.clear();
+	if (sampler.is_valid()) {
+		const PackedFloat32Array posts = sampler->grid_heights();
+		shore_posts.assign(posts.ptr(), posts.ptr() + posts.size());
+	}
+}
+
 void RibbonDraper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "surface", "g_size", "g_step", "water_level", "size", "step",
 								 "mesh_size", "mesh_step"),
 			&RibbonDraper::setup);
 	ClassDB::bind_method(D_METHOD("height", "x", "z"), &RibbonDraper::height);
 	ClassDB::bind_method(D_METHOD("normal", "x", "z"), &RibbonDraper::normal);
+	ClassDB::bind_method(D_METHOD("set_shore_sampler", "sampler"), &RibbonDraper::set_shore_sampler);
+	ClassDB::bind_method(D_METHOD("area", "triangles", "lift", "attr", "layer", "m2u", "base"), &RibbonDraper::area);
 	ClassDB::bind_method(D_METHOD("ribbon", "pts", "width", "lift", "attr", "jf", "layer", "m2u", "base"),
 			&RibbonDraper::ribbon);
 }

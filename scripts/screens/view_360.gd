@@ -306,7 +306,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
-		var g := ground if ground != null else GroundTruth.new(data)
+		var g := ground if ground != null else GroundTruth.new(data, abort)
 		var w := make_world(data, g, abort)
 		# Packed here, detached and pristine, so the save costs the main
 		# thread nothing before the view shows.
@@ -369,9 +369,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_ground = prebuilt[0]
 		_rebuild_world(prebuilt[1])
 	ViewChrome.show_place(self, data)
-	# Spawn at golden hour (PRD §3.3): the judged condition for every
-	# place, now the place's own (T6.2: the hour the true afternoon sun
-	# sits at the reference elevation). The slider still leaves it.
+	# Spawn at the preset's preferred hour when provided; otherwise use
+	# the place's own afternoon golden hour. The slider still leaves it.
 	ViewConditions.spawn_golden_hour(self)
 	var spawn := spawn_xz(data)
 	_rig.position = Vector3(spawn.x, eye_y(data, _ground, spawn), spawn.y)

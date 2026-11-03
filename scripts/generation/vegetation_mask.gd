@@ -89,6 +89,21 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
 			_add_segment(pts[i], pts[i + 1], core, edge)
+	# Pier polygons and their paths are hard promenade surfaces even when
+	# an overlapping park polygon supplies green cover. Keep mapped trees,
+	# but exclude synthetic tufts and other ground cover.
+	for pier in data.piers:
+		if not (pier is Dictionary):
+			continue
+		var pts: PackedVector2Array = pier.get("points", PackedVector2Array())
+		if pts.size() >= 4 and pts[0].distance_to(pts[pts.size() - 1]) < 0.01:
+			_fill([pts], ROAD_EDGE, 0)
+		elif pts.size() >= 2:
+			var width := float(pier.get("width_m", NAN))
+			if not is_finite(width):
+				width = 2.2
+			for i in pts.size() - 1:
+				_add_segment(pts[i], pts[i + 1], -1.0, maxf(width * 0.5, 1.0) * m2u)
 	# Track on its own bed is kept clear like a carriageway.
 	for rw in data.railways:
 		if not (rw is Dictionary) or bool(rw.get("tunnel", false)) \

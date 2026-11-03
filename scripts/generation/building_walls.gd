@@ -32,18 +32,26 @@ const FIREWALL_BAND_M := 9.0
 
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
-		fire: Material = null, invert: bool = false) -> void:
+		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {}) -> void:
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	# Style facades map UVs in real window bays (and, for tiled patterns,
 	# real storeys) so windows keep their size on any wall; legacy
 	# materials stretch 0..1 over the edge.
-	var uvp := FacadeMaterials.facade_uv(mat)
 	var m2u := WorldScale.metres_to_units()
 	var face := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
+	var per_material := {}
 	var blank := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
 	for i in ring.size():
+		var edge_mat: Material = edge_materials.get(i, mat)
+		var edge_face := face
+		if edge_mat != mat:
+			if not per_material.has(edge_mat):
+				per_material[edge_mat] = [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
+					PackedFloat32Array(), PackedInt32Array()]
+			edge_face = per_material[edge_mat]
+		var uvp := FacadeMaterials.facade_uv(edge_mat)
 		var ea := ring[i]
 		var eb := ring[(i + 1) % ring.size()]
 		if (eb - ea).length() < 0.001:
@@ -67,10 +75,10 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					u1 = 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
 					if uvp.z > 0.0:
 						v0 = v_repeat
-				_quad(face, a, b, base, top, n, Vector2(u1, v0))
+				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0))
 			elif nb_top < top - 0.3 * m2u:
 				var y0 := maxf(base, nb_top)
-				var arr := blank if fire != null else face
+				var arr := blank if fire != null else edge_face
 				# Blank only just above the neighbour: a tower's side rising
 				# well past it has windows (a Manhattan tower, not a row house).
 				var y1 := top
@@ -79,10 +87,12 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					var len_m := (b - a).length() / m2u
 					var u1 := 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
 					var v_up := (v_repeat if uvp.z > 0.0 else 1.0) * (top - y1) / maxf(top - base, 1e-4)
-					_quad(face, a, b, y1, top, n, Vector2(u1, v_up))
+					_quad(edge_face, a, b, y1, top, n, Vector2(u1, v_up))
 				_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
 					(y1 - y0) / m2u / 4.0))
 	_emit(root, face, mat)
+	for edge_mat in per_material:
+		_emit(root, per_material[edge_mat], edge_mat)
 	if fire != null:
 		_emit(root, blank, fire)
 

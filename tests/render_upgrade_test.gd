@@ -202,6 +202,7 @@ func _run() -> void:
 	rd.roads = [
 		{"class": "residential", "width_m": 8.0, "lanes": 2, "points": PackedVector2Array([Vector2(-60, 0), Vector2(0, 0), Vector2(60, 0)])},
 		{"class": "residential", "width_m": 8.0, "lanes": 2, "points": PackedVector2Array([Vector2(0, -60), Vector2(0, 0), Vector2(0, 60)])},
+		{"class": "residential", "width_m": 8.0, "lanes": 2, "oneway": 1, "points": PackedVector2Array([Vector2(-60, 80), Vector2(60, 80)])},
 	]
 	rd.buildings = [{"x": 300.0, "z": 300.0, "size_x": 10.0, "size_z": 10.0, "height": 9.0}]
 	var junc := RoadSurface.junctions(rd)
@@ -210,15 +211,19 @@ func _run() -> void:
 			% [RoadSurface.junction_frac(junc, Vector2(0, 0)), RoadSurface.junction_frac(junc, Vector2(50, 0))])
 	var roads := RoadBuilder.build_roads(rd, GroundTruth.new(rd))
 	var attr_ok := false
+	var oneway_ok := false
 	for c in roads.get_children():
 		if c is MeshInstance3D and (c as MeshInstance3D).material_override is ShaderMaterial:
 			var ra := (c as MeshInstance3D).mesh.surface_get_arrays(0)
 			var rc: PackedColorArray = ra[Mesh.ARRAY_COLOR]
 			var u2: PackedVector2Array = ra[Mesh.ARRAY_TEX_UV2]
-			attr_ok = rc.size() == (ra[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() \
-				and absf(rc[0].r - 0.25) < 0.01 and absf(u2[0].x - 8.0) < 0.01
-	if not attr_ok:
-		failures.append("asphalt ribbons should use RoadSurface with lanes and width per vertex")
+			if rc.size() == (ra[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() and u2.size() == rc.size():
+				for i in rc.size():
+					if absf(u2[i].x - 8.0) < 0.01:
+						attr_ok = attr_ok or absf(rc[i].r - 2.0 / 32.0) < 0.01
+						oneway_ok = oneway_ok or absf(rc[i].r - 18.0 / 32.0) < 0.01
+	if not attr_ok or not oneway_ok:
+		failures.append("asphalt ribbons should carry width, lane count and one-way flag per vertex")
 	roads.free()
 	# Centre line: yellow in the Americas (and Norway), white elsewhere.
 	var mat := RoadSurface.material(Color(0.05, 0.05, 0.05))
@@ -276,7 +281,12 @@ func _run() -> void:
 			pd.roads = [{"class": "pedestrian", "area": true, "points": PackedVector2Array([
 					Vector2(30, -60), Vector2(70, -60), Vector2(70, -20), Vector2(30, -20)])},
 				{"class": "footway", "width_m": 2.0, "points": PackedVector2Array([Vector2(-70, 40), Vector2(-20, 40)])}]
+			pd.piers = [{"points": PackedVector2Array([Vector2(-65, -65), Vector2(-25, -65),
+				Vector2(-25, -25), Vector2(-65, -25), Vector2(-65, -65)])}]
 			var mask2 := VegetationMask.new(pd, pg)
+			if not mask2.blocked(-45.0, -45.0, VegetationMask.ROAD_EDGE) \
+					or mask2.blocked(-45.0, -45.0, VegetationMask.ROAD):
+				failures.append("pier paving must exclude ground cover but allow mapped trees")
 			var on_paving := 0
 			var kept := 0
 			var placed2 := GroundCover.plan(pd, pg, mask2)
@@ -285,7 +295,8 @@ func _run() -> void:
 					var o2: Vector3 = e[0]
 					kept += 1
 					if (o2.x > 29.0 and o2.x < 71.0 and o2.z > -61.0 and o2.z < -19.0) \
-							or (o2.x < -19.0 and absf(o2.z - 40.0) < 1.0):
+							or (o2.x < -19.0 and absf(o2.z - 40.0) < 1.0) \
+							or (o2.x > -65.0 and o2.x < -25.0 and o2.z > -65.0 and o2.z < -25.0):
 						on_paving += 1
 			if on_paving > 0 or kept < 150:
 				failures.append("cover on a square or footpath: %d of %d instances" % [on_paving, kept])

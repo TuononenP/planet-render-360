@@ -26,38 +26,55 @@ const CELL_M := 20.0
 const PROBE_M := 12.0
 
 ## Widens `roads` (attributed road dicts, metres) in place.
-static func from_sidewalks(roads: Array) -> void:
+static func from_sidewalks(roads: Array, trees: Array = []) -> void:
 	var grid := {}
+	var barriers := {}
 	for r in roads:
-		if not (r is Dictionary) or not bool((r as Dictionary).get("kerb_line", false)):
+		if not (r is Dictionary):
 			continue
-		var pts: PackedVector2Array = (r as Dictionary).get("points", PackedVector2Array())
+		var road: Dictionary = r
+		var sidewalk := bool(road.get("kerb_line", false))
+		if not sidewalk and not str(road.get("class", "")) in ["cycleway", "path", "footway"]:
+			continue
+		var target: Dictionary = grid if sidewalk else barriers
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
 		for i in pts.size() - 1:
-			var seg := [pts[i], pts[i + 1]]
+			var seg := [pts[i], pts[i + 1], float(road.get("width_m", 2.0)) * 0.5]
 			for cell in _cells(pts[i], pts[i + 1]):
-				if not grid.has(cell):
-					grid[cell] = []
-				(grid[cell] as Array).append(seg)
+				if not target.has(cell):
+					target[cell] = []
+				(target[cell] as Array).append(seg)
+	for tree in trees:
+		var p := Vector2(float(tree.get("x", 0.0)), float(tree.get("z", 0.0)))
+		for cell in _cells(p, p):
+			if not barriers.has(cell):
+				barriers[cell] = []
+			(barriers[cell] as Array).append([p, p, 1.0])
 	if grid.is_empty():
 		return
 	for r in roads:
 		if not (r is Dictionary):
 			continue
 		var road: Dictionary = r
-		if int(road.get("sidewalk", 0)) != 3 or bool(road.get("width_tagged", false)) \
+		if int(road.get("sidewalk_separate", 0)) == 0 or bool(road.get("width_tagged", false)) \
 				or bool(road.get("area", false)) or bool(road.get("kerb_line", false)):
 			continue
-		var w := measure(road.get("points", PackedVector2Array()), grid)
 		var base := float(road.get("width_m", 0.0))
+		if base >= MAX_M:
+			continue
+		var w := measure(road.get("points", PackedVector2Array()), grid, barriers,
+			int(road.get("sidewalk_separate", 0)), base)
 		if w > base + 0.5:
 			road["width_m"] = minf(w, MAX_M)
 			road["parking_m"] = minf(w, MAX_M) - base
 
 ## Kerb-to-kerb width (m) from the sidewalk lines either side of the
 ## polyline, the median over its probes; 0 when either side has none.
-static func measure(pts: PackedVector2Array, grid: Dictionary) -> float:
+static func measure(pts: PackedVector2Array, grid: Dictionary, barriers: Dictionary = {},
+		sides: int = 3, base: float = 0.0) -> float:
 	var left: Array[float] = []
 	var right: Array[float] = []
+	var caps: Array[float] = []
 	for i in pts.size() - 1:
 		var a := pts[i]
 		var b := pts[i + 1]
@@ -69,8 +86,8 @@ static func measure(pts: PackedVector2Array, grid: Dictionary) -> float:
 		var probes := maxi(1, int(len / PROBE_M))
 		for k in probes:
 			var p := a + dir * len * (float(k) + 0.5) / float(probes)
-			var best_l := INF
-			var best_r := INF
+			var best_l := INF if sides & 1 else base * 0.5 + SIDEWALK_HALF_M
+			var best_r := INF if sides & 2 else base * 0.5 + SIDEWALK_HALF_M
 			for seg in grid.get(_cell(p), []):
 				var s0: Vector2 = seg[0]
 				var s1: Vector2 = seg[1]
@@ -86,14 +103,38 @@ static func measure(pts: PackedVector2Array, grid: Dictionary) -> float:
 					best_l = minf(best_l, off)
 				else:
 					best_r = minf(best_r, -off)
+			var width_cap := INF
+			# Verges and separate cycle tracks keep their ground: never turn
+			# the space between them and the footway into parking asphalt.
+			for seg in barriers.get(_cell(p), []):
+				var a0: Vector2 = seg[0]
+				var a1: Vector2 = seg[1]
+				var tangent := a1 - a0
+				if tangent.length() > 0.5 and absf(tangent.normalized().dot(dir)) < PARALLEL_COS:
+					continue
+				var q := Geometry2D.get_closest_point_to_segment(p, a0, a1) if a0 != a1 else a0
+				if absf((q - p).dot(dir)) > (PROBE_M if a0 == a1 else 3.0):
+					continue
+				var off := (q - p).dot(n)
+				var cap := maxf(base * 0.5, absf(off) - float(seg[2])) + SIDEWALK_HALF_M
+				if (off > 0.0 and off < best_l) or (off < 0.0 and -off < best_r):
+					width_cap = minf(width_cap, 2.0 * (cap - SIDEWALK_HALF_M))
+				if off > 0.0 and best_l < INF:
+					best_l = minf(best_l, cap)
+				elif off < 0.0 and best_r < INF:
+					best_r = minf(best_r, cap)
 			if best_l < INF and best_r < INF:
 				left.append(best_l)
 				right.append(best_r)
+				caps.append(width_cap)
 	if left.is_empty():
 		return 0.0
 	left.sort()
 	right.sort()
-	return left[left.size() / 2] + right[right.size() / 2] - 2.0 * SIDEWALK_HALF_M
+	caps.sort()
+	# Ribbons are centred on the mapped way: an obstacle on just one side
+	# caps both half-widths so asymmetric verges cannot be paved over.
+	return minf(left[left.size() / 2] + right[right.size() / 2] - 2.0 * SIDEWALK_HALF_M, caps[caps.size() / 2])
 
 static func _cell(p: Vector2) -> Vector2i:
 	return Vector2i(floori(p.x / CELL_M), floori(p.y / CELL_M))

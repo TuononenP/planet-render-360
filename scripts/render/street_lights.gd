@@ -23,7 +23,7 @@ const FADE_LENGTH_M := 60.0
 const LANTERN_HEAD := Vector3(0.0, 4.1, 0.0)
 const COBRA_HEAD := Vector3(1.85, 8.0, 0.0)
 ## Spot heads of the regional arm styles (the rest use COBRA_HEAD).
-const HEADS := {"cobra": Vector3(2.6, 8.85, 0.0), "utility": Vector3(1.15, 5.58, 0.0)}
+const HEADS := {"post_top": Vector3(0, 4.4, 0), "nyc_f": Vector3(1.45, 7.0, 0), "nyc_crook": Vector3(1.45, 5.2, 0), "cobra": Vector3(2.6, 8.85, 0.0), "utility": Vector3(1.15, 5.58, 0.0)}
 const SODIUM_REGIONS := ["eastern_europe", "middle_east", "south_asia", "latin_america",
 	"sub_saharan_africa"]
 
@@ -36,12 +36,12 @@ static func colour_for(style: String, region: String) -> Color:
 
 ## Adds the lights for `placed` (StreetProps: style -> lamp transforms)
 ## under one "StreetLights" node of `root`. Returns the number added.
-static func add(root: Node3D, placed: Dictionary, region: String, m2u: float) -> int:
+static func add(root: Node3D, placed: Dictionary, region: String, m2u: float, centre: Vector2 = Vector2.ZERO) -> int:
 	var all: Array = []
 	for style in placed:
 		for xf in (placed[style] as Array):
 			var t: Transform3D = xf
-			all.append([Vector2(t.origin.x, t.origin.z).length_squared(), t, str(style)])
+			all.append([(Vector2(t.origin.x, t.origin.z) - centre).length_squared(), t, str(style)])
 	if all.is_empty():
 		return 0
 	all.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))

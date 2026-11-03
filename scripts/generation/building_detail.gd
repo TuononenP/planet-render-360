@@ -192,6 +192,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		_tower(batch, ring, c, u, lu, lv, top, wall_h, basis, look, wall_mat, roof_mat)
 	# A dome, onion or spire carries no stacks, dormers or roof terraces.
 	if near and shape not in RoofDomes.SHAPES:
+		if shape in ["gabled", "hipped", "mansard"] and bool((look.get("relief", {}) as Dictionary).get("snow_guard", false)):
+			_snow_guard(batch, c, u, v, lu, lv, top, roof_h, shape, basis)
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
 		# Bell-capped stacks are drawn by _chimneys, so a Venetian terrace
 		# skips the plain party-wall stacks.
@@ -207,7 +209,7 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
 			# Desktop Ultra: the city's own rooftop clutter.
 			if ultra:
-				RoofClutter.add(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2, country)
+				RoofClutter.add(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2, country, wall_h / m2u)
 	batch.flush(root)
 
 ## Roof surface height above the eaves at an offset from the centre, by
@@ -389,3 +391,20 @@ static func _tower(batch: Batch, ring: PackedVector2Array, c: Vector2,
 			var sh := wall_h + rise * 1.1
 			batch.add("pyramid", tx.call(base_y + sh * 0.5, side * 2.2, sh, side * 2.2), wall_mat)
 			batch.add("sphere", tx.call(base_y + sh + side * 0.25, side * 0.5, side * 0.5, side * 0.5), _mat("gold"))
+
+## Eave rails stop sliding sheet-roof snow; a narrow ladder follows a slope.
+static func _snow_guard(batch: Batch, c: Vector2, u: Vector2, v: Vector2, lu: float,
+		lv: float, top: float, roof_h: float, shape: String, basis: Basis) -> void:
+	var m := WorldScale.metres_to_units()
+	var metal := _mat("lead")
+	for s in [-1.0, 1.0]:
+		var at: float = lv * 0.88 * s
+		var y := top + _roof_y(shape, 0.0, at, lu, lv, roof_h) + 0.18 * m
+		batch.add("box", _xf(basis, _at(c, u, v, 0.0, at, y), Vector3(lu * 1.8, 0.07 * m, 0.06 * m)), metal)
+		for j in 5:
+			batch.add("box", _xf(basis, _at(c, u, v, lu * (float(j) / 2.0 - 1.0) * 0.85, at, y - 0.1 * m),
+				Vector3(0.05 * m, 0.25 * m, 0.05 * m)), metal)
+	for j in 9:
+		var dv := -lv * 0.9 * float(j) / 8.0
+		var y := top + _roof_y(shape, lu * 0.4, dv, lu, lv, roof_h) + 0.08 * m
+		batch.add("box", _xf(basis, _at(c, u, v, lu * 0.4, dv, y), Vector3(0.55 * m, 0.05 * m, 0.05 * m)), metal)

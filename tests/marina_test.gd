@@ -91,6 +91,23 @@ func _init() -> void:
 	var on_south := blocked.filter(func(b: Array) -> bool: return (b[0] as Vector3).z > 0.0).size()
 	if on_south != 0 or blocked.size() < 4:
 		failures.append("a building should block the south berths only: %d south, %d total" % [on_south, blocked.size()])
+	# A mapped structure can also stand on carved water; it must veto
+	# the boat rather than being bypassed by the water-depth check.
+	var wet_building := LocationData.new()
+	wet_building.grid_size = 49
+	wet_building.heights.resize(49 * 49)
+	wet_building.heights.fill(3.0)
+	wet_building.water_level = 0.5
+	wet_building.land_polygons = [{"class": "water", "tidal": true,
+		"points": PackedVector2Array([Vector2(-1200, 0), Vector2(1200, 0),
+			Vector2(1200, 1200), Vector2(-1200, 1200)])}]
+	wet_building.buildings = dry.buildings
+	var wet_ground := GroundTruth.new(wet_building)
+	var wet_mask := VegetationMask.new(wet_building, wet_ground)
+	if wet_ground.water_at(0.0, 10.0 * m) <= MarinaBuilder.MIN_DEPTH_M * m:
+		failures.append("the obstruction fixture must stand on carved water")
+	if MarinaBuilder._wet(wet_ground, Vector2(0, 10) * m, m, 0.0, wet_mask):
+		failures.append("a building on mapped water must block a berth")
 	# A steep ramp across the berths (quay slope): boats would be buried, none placed.
 	var ramp := LocationData.new()
 	RenderSettings.apply_preset(ramp, RenderSettings.Preset.ULTRA)

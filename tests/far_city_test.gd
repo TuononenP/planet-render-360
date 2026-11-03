@@ -70,7 +70,9 @@ func _run() -> void:
 	var failures: Array[String] = []
 	_settlement_checks(failures)
 	_far_city_checks(failures)
+	_tower_parts_checks(failures)
 	_parse_checks(failures)
+	await _offline_cache_checks(failures)
 	_infill_checks(failures)
 	if failures.is_empty():
 		print("FAR CITY OK: settlement map, real-data far city (no field/forest/water), towers only from OSM, preset-invariant, far bands ranged, absence-only matched infill")
@@ -195,6 +197,43 @@ func _far_city_checks(failures: Array[String]) -> void:
 				failures.append("preset %d far city extent moved %s -> %s" % [p, a, b])
 		r2.free()
 
+func _tower_parts_checks(failures: Array[String]) -> void:
+	var builder := FarCityBuilder.new()
+	var glass := StandardMaterial3D.new()
+	var brick := StandardMaterial3D.new()
+	builder._glass = glass
+	builder._dfs = [brick]
+	if builder._tower_material({"material": "mirror"}, brick, Vector2.ZERO) != glass \
+			or builder._tower_material({"material": "brick"}, glass, Vector2.ZERO) != brick \
+			or builder._tower_material({}, glass, Vector2.ZERO) != glass:
+		failures.append("far tower parts must honour mapped glass and masonry materials")
+	var data := _data()
+	var foot := PackedVector2Array([Vector2(-5040, 1960), Vector2(-4960, 1960),
+		Vector2(-4960, 2040), Vector2(-5040, 2040)])
+	var crown := PackedVector2Array([Vector2(-5010, 1990), Vector2(-4990, 1990),
+		Vector2(-4990, 2010), Vector2(-5010, 2010)])
+	data.far_towers = [{"footprint": foot, "x": -5000.0, "z": 2000.0, "height": 90.0,
+		"kind": "office", "parts": [
+			{"footprint": foot, "height": 60.0},
+			{"footprint": crown, "height": 90.0, "min_height_m": 60.0,
+				"roof_shape": "pyramidal", "roof_height_m": 12.0}]}]
+	var root := Node3D.new()
+	FarCityBuilder.build(root, data, GroundTruth.new(data), null)
+	var verts := _verts(_far_nodes(root))
+	var top := -INF
+	var wide_above_setback := false
+	var roof_slope := false
+	for v in verts:
+		top = maxf(top, v.y)
+		if v.y > 65.0 and absf(v.x + 5000.0) > 15.0:
+			wide_above_setback = true
+		if v.y > 80.0 and v.y < 90.0:
+			roof_slope = true
+	if top < 89.0 or top > 94.0 or wide_above_setback or not roof_slope:
+		failures.append("far parts must preserve a 60 m setback and pyramidal 90 m crown: top %.1f wide %s slope %s" \
+			% [top, wide_above_setback, roof_slope])
+	root.free()
+
 func _parse_checks(failures: Array[String]) -> void:
 	var lat := 48.8566
 	var lon := 2.3522
@@ -208,6 +247,8 @@ func _parse_checks(failures: Array[String]) -> void:
 		{"type": "relation", "id": 2, "tags": {"landuse": "industrial", "type": "multipolygon"},
 			"members": [{"type": "way", "role": "outer", "geometry": sq}]},
 		{"type": "way", "id": 3, "tags": {"building": "office", "height": "187"},
+			"geometry": sq},
+		{"type": "way", "id": 4, "tags": {"building": "construction", "height": "373.7", "opening_date": "2031"},
 			"geometry": sq}]}
 	var out := FarCityFetcher.parse(JSON.stringify(fixture), lat, lon)
 	var lu: Array = out["landuse"]
@@ -220,11 +261,97 @@ func _parse_checks(failures: Array[String]) -> void:
 		failures.append("parse: tower height should be 187, got %s" % str(tw))
 	elif (tw[0]["footprint"] as PackedVector2Array).size() != 4:
 		failures.append("parse: tower footprint should drop the closing node")
+	var detailed: Array = OsmFetcher.parse_features(JSON.stringify(fixture), lat, lon)["buildings"]
+	if detailed.size() != 1 or absf(float(detailed[0]["height"]) - 187.0) > 0.01:
+		failures.append("planned construction height must not appear as a completed building: %s" % str(detailed))
 	if not FarCityFetcher.build_query(lat, lon).contains("around:12000"):
 		failures.append("query should cover the 12 km ring")
+	var query := FarCityFetcher.build_query(lat, lon)
+	if not query.contains('number(t["height"])*0.3048>=50') \
+			or not query.contains('["height"!~"([fF][tT]|\u0027) *$"]'):
+		failures.append("query must convert feet before applying the tower threshold")
+	if not FarCityFetcher.cache_path(lat, lon).contains("farcity12000_q3.json"):
+		failures.append("far-city query change needs a layer-specific cache version")
+	var feet_fixture := {"elements": [
+		{"type": "way", "id": 4, "tags": {"building": "office", "height": "600 ft"}, "geometry": sq},
+		{"type": "way", "id": 5, "tags": {"building": "office", "height": "600'"}, "geometry": sq}]}
+	var feet: Array = FarCityFetcher.parse(JSON.stringify(feet_fixture), lat, lon)["towers"]
+	if feet.size() != 2 or absf(float(feet[0]["height"]) - 182.88) > 0.01 \
+			or absf(float(feet[1]["height"]) - 182.88) > 0.01:
+		failures.append("feet-tagged far towers must retain their height: %s" % str(feet))
+	if not query.contains('relation["building"]') or not query.contains('way["building:part"](around:4000') \
+			or not query.contains('relation["building:part"]["type"="multipolygon"]'):
+		failures.append("far query must include relation outlines and their parts")
+	var ring := [{"lat": lat, "lon": lon + 0.02}, {"lat": lat, "lon": lon + 0.021},
+		{"lat": lat + 0.001, "lon": lon + 0.021}, {"lat": lat + 0.001, "lon": lon + 0.02},
+		{"lat": lat, "lon": lon + 0.02}]
+	var part := [{"lat": lat + 0.0002, "lon": lon + 0.0202}, {"lat": lat + 0.0002, "lon": lon + 0.0208},
+		{"lat": lat + 0.0008, "lon": lon + 0.0208}, {"lat": lat + 0.0008, "lon": lon + 0.0202},
+		{"lat": lat + 0.0002, "lon": lon + 0.0202}]
+	var rich := {"elements": [
+		{"type": "relation", "id": 44, "tags": {"type": "multipolygon", "building": "office", "height": "18"},
+			"members": [{"type": "way", "role": "outer", "geometry": ring}]},
+		{"type": "way", "id": 45, "tags": {"building:part": "yes", "height": "120", "min_height": "90",
+			"roof:shape": "pyramidal", "roof:height": "15"}, "geometry": part}]}
+	var rich_towers: Array = FarCityFetcher.parse(JSON.stringify(rich), lat, lon)["towers"]
+	if rich_towers.size() != 1 or (rich_towers[0].get("parts", []) as Array).size() != 1:
+		failures.append("relation tower must retain its building part: %s" % rich_towers)
+	else:
+		var crown: Dictionary = rich_towers[0]["parts"][0]
+		if crown["roof_shape"] != "pyramidal" or float(crown["roof_height_m"]) != 15.0 or float(crown["min_height_m"]) != 90.0:
+			failures.append("far part must retain roof and lift tags: %s" % crown)
+	if rich_towers.size() == 1 and FarCityFetcher._tower_height(rich_towers[0]) != 120.0:
+		failures.append("a low podium must be ranked by its tall mapped crown")
+	var ranked := FarCityFetcher.select_towers([
+		{"x": 10000.0, "z": 0.0, "height": 70.0}, {"x": 1200.0, "z": 0.0, "height": 100.0},
+		{"x": 2000.0, "z": 0.0, "height": 300.0}], 2)
+	if ranked.size() != 2 or float(ranked[0]["height"]) != 300.0 or float(ranked[1]["height"]) != 100.0:
+		failures.append("tower cap must keep taller nearby candidates independent of input order: %s" % ranked)
 	var empty := FarCityFetcher.parse("", lat, lon)
 	if not (empty["landuse"] as Array).is_empty():
 		failures.append("parse of an absent payload should be empty")
+
+func _offline_cache_checks(failures: Array[String]) -> void:
+	var previous := CacheStore.dir_override
+	CacheStore.dir_override = "user://far-city-test-%d" % OS.get_process_id()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(CacheStore.dir_override))
+	var legacy := FarCityFetcher.legacy_cache_path(48.0, 2.0)
+	var fresh := FarCityFetcher.cache_path(48.0, 2.0)
+	var points := [{"lat": 48.0, "lon": 2.0}, {"lat": 48.0, "lon": 2.001},
+		{"lat": 48.001, "lon": 2.001}, {"lat": 48.001, "lon": 2.0}]
+	var old_payload := {"elements": [{"type": "way", "id": 1,
+		"tags": {"building": "office", "height": "600 ft"}, "geometry": points}]}
+	var new_payload := {"elements": [{"type": "way", "id": 2,
+		"tags": {"building": "office", "height": "200"}, "geometry": points}]}
+	var f := FileAccess.open(legacy, FileAccess.WRITE)
+	f.store_string(JSON.stringify(old_payload))
+	f.close()
+	var fetcher := FarCityFetcher.new()
+	root.add_child(fetcher)
+	fetcher.offline_mode = true
+	var results: Array = []
+	fetcher.finished.connect(func(_land: Array, towers: Array) -> void: results.append(towers))
+	fetcher.fetch(48.0, 2.0)
+	var deadline := Time.get_ticks_msec() + 5000
+	while results.is_empty() and Time.get_ticks_msec() < deadline:
+		await process_frame
+	if results.is_empty() or (results[0] as Array).size() != 1 \
+			or absf(float(results[0][0]["height"]) - 182.88) > 0.01:
+		failures.append("offline fetch must use the older far-city cache")
+	f = FileAccess.open(fresh, FileAccess.WRITE)
+	f.store_string(JSON.stringify(new_payload))
+	f.close()
+	fetcher.fetch(48.0, 2.0)
+	deadline = Time.get_ticks_msec() + 5000
+	while results.size() < 2 and Time.get_ticks_msec() < deadline:
+		await process_frame
+	if results.size() < 2 or (results[1] as Array).size() != 1 \
+			or absf(float(results[1][0]["height"]) - 200.0) > 0.01:
+		failures.append("offline fetch must prefer the current far-city cache")
+	fetcher.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(legacy))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(fresh))
+	CacheStore.dir_override = previous
 
 func _bld(x: float, z: float, h: float) -> Dictionary:
 	return {"x": x, "z": z, "size_x": 14.0, "size_z": 10.0, "height": h,

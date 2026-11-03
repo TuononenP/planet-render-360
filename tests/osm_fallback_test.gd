@@ -73,6 +73,7 @@ var _ok := false
 var _failed_reason := ""
 var _detail := ""
 var _partial := false
+var _pois: Array = []
 
 func _init() -> void:
 	_run()
@@ -84,6 +85,7 @@ func _run() -> void:
 	_nearby_checks(failures)
 	_api_checks(failures)
 	await _fallback_flow_checks(failures)
+	await _poi_failure_checks(failures)
 	if failures.is_empty():
 		print("OSM FALLBACK OK: api url, xml convert, nearby cache, cache fallback order")
 		quit(0)
@@ -220,16 +222,19 @@ func _run_fetch(files: Dictionary) -> void:
 	_failed_reason = ""
 	_detail = ""
 	_partial = false
+	_pois = []
 	var f := OsmFetcher.new()
 	root.add_child(f)
 	await process_frame
 	f.offline_mode = true
-	f.succeeded.connect(func(_b, _r, _l, _lm) -> void: _ok = true)
+	f.succeeded.connect(func(_b, _r, _l, _lm) -> void:
+		_ok = true
+		_pois = f.pois.duplicate())
 	f.failed.connect(func(reason: String) -> void: _failed_reason = reason)
 	f.fallback_used.connect(func(detail: String, partial: bool) -> void:
 		_detail = detail
 		_partial = partial)
-	f.fetch(LAT, LON, 0)
+	f.fetch(LAT, LON, RenderSettings.Preset.HIGH)
 	for i in 600:
 		if _ok or _failed_reason != "":
 			break
@@ -238,6 +243,26 @@ func _run_fetch(files: Dictionary) -> void:
 	CacheStore.dir_override = ""
 
 func _fallback_flow_checks(failures: Array[String]) -> void:
+	var current := CACHED_PAYLOAD.replace('{"elements":[',
+		'{"elements":[{"type":"%s","id":99},' % OsmQuery.QUERY_MARK)
+	var legacy_name := "osm_v2_48857_2352_r1200.json"
+	await _run_fetch({legacy_name: current})
+	var test_dir := "user://osm_fallback_test_cache/"
+	var versioned_name := "osm_v2_48857_2352_r1200_q%d.json" % OsmQuery.QUERY_VERSION
+	if not _ok or not FileAccess.file_exists(test_dir + versioned_name) \
+			or FileAccess.get_file_as_string(test_dir + legacy_name) != current:
+		failures.append("current legacy payload should be copied to its versioned key without replacing the old file")
+	_with_cache_dir({legacy_name: CACHED_PAYLOAD, versioned_name: current})
+	var candidates := OsmNearbyCache.candidates(LAT, LON, OsmFetcher.SAME_PLACE_M)
+	if candidates.size() != 2 or not candidates[0].ends_with(versioned_name):
+		failures.append("same-radius versioned cache should precede an unversioned fallback")
+	CacheStore.dir_override = ""
+	var poi_json := JSON.stringify({"elements": [{"type": "node", "id": 11,
+		"lat": LAT, "lon": LON, "tags": {"shop": "bakery", "name": "Test Bakery"}}]})
+	await _run_fetch({"osm_v2_48857_2352_r800.json": CACHED_PAYLOAD,
+		"osm_v2_48857_2352_poi_q1.json": poi_json})
+	if not _ok or _pois.size() != 1 or str(_pois[0].get("name", "")) != "Test Bakery":
+		failures.append("offline POI cache should merge with detailed data: %s" % [_pois])
 	# Same place cached at a smaller radius: served.
 	await _run_fetch({"osm_v2_48857_2352_r800.json": CACHED_PAYLOAD})
 	if not _ok:
@@ -254,3 +279,26 @@ func _fallback_flow_checks(failures: Array[String]) -> void:
 	await _run_fetch({"osm_v2_48920_2352_r1200.json": CACHED_PAYLOAD})
 	if _ok or not _failed_reason.contains("OSM API"):
 		failures.append("far cache must fail via the OSM API step, got ok=%s reason=%s" % [_ok, _failed_reason])
+
+func _poi_failure_checks(failures: Array[String]) -> void:
+	_with_cache_dir({})
+	var f := OsmFetcher.new()
+	root.add_child(f)
+	await process_frame
+	var result := {"ok": false}
+	f.succeeded.connect(func(_b, _r, _l, _lm) -> void: result["ok"] = true)
+	f._pending_lat = LAT
+	f._pending_lon = LON
+	f._detailed_text = CACHED_PAYLOAD
+	f._detailed_ready = true
+	f._ring_pending = false
+	f._poi_started = true
+	f._poi_pending = true
+	f._on_poi_exhausted("fixture timeout", 1)
+	var deadline := Time.get_ticks_msec() + 5000
+	while not result["ok"] and Time.get_ticks_msec() < deadline:
+		await process_frame
+	if not result["ok"] or not f.pois.is_empty():
+		failures.append("a failed POI request must still finish detailed OSM data")
+	f.queue_free()
+	CacheStore.dir_override = ""

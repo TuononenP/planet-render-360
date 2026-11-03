@@ -150,6 +150,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	impostor.meta = {"lod_layer": "Buildings", "lod_impostor": true}
 	var cap := RenderSettings.max_buildings_for(data.quality_preset)
 	var ctx := _height_context(data)
+	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
 	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
 	# The landmark's own OSM footprint (e.g. the cathedral as one beige
 	# box) must not duplicate the procedural landmark model.
@@ -160,7 +161,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
 		func(b: Dictionary) -> bool:
-			return _accepted(data, b, site, edge) and not _in_open_water(ground, b))
+			return not ShipBuilder.accepts(b) and _accepted(data, b, site, edge) and not _in_open_water(ground, b))
 	if RoofGeometry._native:
 		_prepare_roofs(data, ground, ctx, sorted, site, edge)
 	for b in sorted:
@@ -168,6 +169,9 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
 		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+			continue
+		if ShipBuilder.build(root, b, data, ground):
+			placed += 1
 			continue
 		if placed >= cap and not bool(b.get("mapped_landmark", false)):
 			# T7.3: past the preset cap a real building is never dropped:
@@ -241,6 +245,11 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 		MeshArrays.hold()
 	for m in BuildingMasses.plan(b, ctx):
 		var md := m as Dictionary
+		if RenderQuality.ultra_desktop(data.quality_preset) and NycCrownMaterials.is_civic_fame(b, md):
+			var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
+			NycCrownMaterials.civic_fame(root, md["centre"], float(footing["floor"]) + float(md["min_m"]) * m2u)
+			done = true
+			continue
 		if _extrude_polygon(root, data, ground, md["ring"], float(md["wall_m"]) * m2u,
 				md["centre"], str(md["shape"]), float(md["rh_m"]) * m2u, md["b_eff"], ctx,
 				int(md["storeys"]), md["look"], bool(md["main"]), md):
@@ -363,19 +372,33 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# T4.6: a ground storey of its own (shopfront, signage band, a
 	# chalet's rendered base) under the tiled storeys when the look has one.
 	var ground_mat: Material = null
+	var shop_materials := {}
 	# A raised part (min_height) has no street storey of its own.
 	var raised := float(mass.get("min_m", 0.0)) > 0.0
 	if FacadeMaterials.facade_uv(facade).z > 0.0 and v_rep >= 2.0 and _batch == null and not raised:
 		ground_mat = FacadeMaterials.ground_for_building(b, fidelity, distant, look)
+		var poi_index: PoiFacadeIndex = ctx.get("poi_index", null)
+		if poi_index != null and not distant and fidelity > 1 and not look.is_empty():
+			var shops := poi_index.for_ring(ring)
+			for edge in shops:
+				# A shared look bounds POI materials to the six fascia colours,
+				# rather than multiplying them by every building's wall variant.
+				var shop_look := {"wall_set": "concrete", "ground": "shop", "bay_m": 3.2,
+					"floor_h": 3.3, "ground_colour": PoiFacadeIndex.colour(shops[edge])}
+				var shop_mat := FacadeMaterials.ground_for_building({}, fidelity, false, shop_look)
+				if shop_mat != null:
+					shop_materials[edge] = shop_mat
+			if not shop_materials.is_empty() and ground_mat == null:
+				ground_mat = facade
 	if top - base < 0.05 * WorldScale.metres_to_units():
 		pass  # a part that is only roof (a dome on its drum) has no walls
 	elif ground_mat != null:
 		var m2u := WorldScale.metres_to_units()
 		var fh_u := float(look["floor_h"]) * m2u
-		var gh_u := fh_u * (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
+		var gh_u := fh_u * (1.15 if not shop_materials.is_empty() or str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
 		var g_top := minf(base + sink + gh_u,
 			top - fh_u * 0.6)
-		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire)
+		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire, false, shop_materials)
 		_walls(root, ring, g_top, top, facade, maxf(1.0, v_rep - 1.0), cover, fire)
 	else:
 		_walls(root, ring, base, top, facade, v_rep, cover, fire)
@@ -406,6 +429,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
 			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
+			"wall_lanterns": RenderQuality.ultra_desktop(preset),
 			"shop_lights": RenderQuality.ultra_desktop(preset)
 				and centre.length() < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
 	if with_detail and not distant and _batch == null and not look.is_empty():
@@ -467,8 +491,8 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
-		fire: Material = null, invert: bool = false) -> void:
-	BuildingWalls._walls(root, ring, base, top, mat, v_repeat, cover, fire, invert)
+		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {}) -> void:
+	BuildingWalls._walls(root, ring, base, top, mat, v_repeat, cover, fire, invert, edge_materials)
 
 static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array,
 		top: float, mat: Material, trim: int = 0, cap: PackedVector2Array = PackedVector2Array(),
@@ -487,8 +511,9 @@ static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
 
-## Floor under a mass, clearing visible water for accepted waterfront
-## buildings. The carved seabed is not their occupied floor datum.
+## Floor under a mass, clearing the visible water for accepted
+## waterfront buildings (shrines, boathouses, named pier structures).
+## The carved seabed is not their floor datum.
 static func _mass_base(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
 		sea_y: float = -INF) -> float:
 	return float(BuildingFoundation.sample(ground, ring, centre, sea_y)["floor"])
@@ -534,7 +559,7 @@ static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Diction
 	var m2u := WorldScale.metres_to_units()
 	var jobs: Array = []
 	for b in sorted:
-		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+		if ShipBuilder.accepts(b) or not _accepted(data, b, site, edge) or _in_open_water(ground, b):
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			var md := m as Dictionary

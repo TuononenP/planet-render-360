@@ -211,6 +211,8 @@ static func _ward_buildings(lm: LandmarkMesh) -> void:
 ## centre, pilasters and pediments on the end pavilions — the central
 ## balcony, the attic balustrade, chimney stacks; the garden front's
 ## central bow (west), and the gilded forecourt railings and gates.
+## East front and gates: https://www.royal.uk/royal-residences-buckingham-palace
+## Historic east-front photograph: https://historicengland.org.uk/images-books/photos/item/BL22460/001
 static func buckingham(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D0C8B2", 3.5))
@@ -233,8 +235,12 @@ static func buckingham(model: Node3D) -> void:
 	LandmarkWestKit.blk(lm, "Stone", 60.6, 0, 0, 1.2, 6.0, 108.0)
 	for k in 12:
 		LandmarkWestKit.blk(lm, "Stone", 61.25, 0.5 * float(k), 0, 0.1, 0.12, 108.0)
+	# The rusticated ground-floor skin projects beyond the main wall, so
+	# its windows must sit on that face rather than inside the solid skin.
+	LandmarkWestKit.bay_run(lm, "Stone", "Glass", Vector3(61.22, 0, -52.0), Vector3(61.22, 0, 52.0), e, 23,
+		[1.8], [Vector2(1.6, -3.2)], 0.0)
 	LandmarkWestKit.bay_run(lm, "Stone", "Glass", Vector3(60.0, 0, -52.0), Vector3(60.0, 0, 52.0), e, 23,
-		[1.8, 7.4, 13.4], [Vector2(1.6, -3.2), Vector2(1.8, 3.8), Vector2(1.6, 3.0)], 0.0)
+		[7.4, 13.4], [Vector2(1.8, 3.8), Vector2(1.6, 3.0)], 0.0)
 	for k in 24:
 		var z := -52.0 + 104.0 * float(k) / 23.0
 		if absf(z) > 13.0:
@@ -247,9 +253,14 @@ static func buckingham(model: Node3D) -> void:
 		LandmarkWestKit.blk(lm, "Stone", 61.0, 21.0, sz * 46.0, 4.0, 1.0, 17.0)
 		for pz in [-6.5, -2.2, 2.2, 6.5]:
 			lm.box("Stone", Vector3(62.7, 13.0, sz * 46.0 + pz), Vector3(0.6, 14.0, 1.2))
+		LandmarkWestKit.bay_run(lm, "Stone", "Glass", Vector3(62.55, 0, sz * 46.0 - 6.2),
+			Vector3(62.55, 0, sz * 46.0 + 6.2), e, 3, [1.8, 7.4, 13.4],
+			[Vector2(1.6, -3.2), Vector2(1.8, 3.8), Vector2(1.6, 3.0)])
 		lm.gable("Stone", Vector3(62.0, 22.0, sz * 46.0), 14.0, 2.4, 2.0, Basis(Vector3.UP, PI * 0.5), 0.3, "Stone")
 	# Centre: coupled giant Corinthian columns, balcony, pediment.
 	LandmarkWestKit.blk(lm, "Stone", 62.0, 0, 0, 4.0, 20.0, 26.0)
+	LandmarkWestKit.bay_run(lm, "Stone", "Glass", Vector3(64.05, 0, -10.0), Vector3(64.05, 0, 10.0), e, 5,
+		[1.8, 7.4, 13.4], [Vector2(1.6, -3.2), Vector2(1.8, 3.8), Vector2(1.6, 3.0)])
 	for pz in [-10.5, -4.5, 4.5, 10.5]:
 		for dz in [-0.8, 0.8]:
 			LandmarkDetail.column(lm, "Stone", Vector3(64.6, 6.0, pz + dz), 0.55, 12.4, "corinthian", 0)
@@ -269,6 +280,7 @@ static func buckingham(model: Node3D) -> void:
 		for y in [3.6, 9.4, 15.0]:
 			lm.box("Glass", p + Vector3(0, y, 0) + d * 0.05, Vector3(1.6, 3.0, 0.08), Basis.looking_at(d), 0.0)
 	# Forecourt: railings with gilded tips, piers, the Centre Gate.
+	LandmarkWestKit.blk(lm, "Court", 77.0, 0, 0, 30.0, 0.08, 108.0)
 	LandmarkWestKit.merlons(lm, "Iron", Vector3(92, 0, -62), Vector3(92, 0, 62), 0.4, 0.06, 3.0, 0.06)
 	lm.beam("Iron", Vector3(92, 2.6, -62), Vector3(92, 2.6, 62), 0.12, 0.12)
 	LandmarkWestKit.blk(lm, "Stone", 92.0, 0, 0, 1.2, 1.0, 124.0)

@@ -104,7 +104,8 @@ static func biome(data: LocationData) -> String:
 		return "tropical"
 	if data.centre_elevation_m > treeline_m(data) - 700.0:
 		return "alpine"
-	if c < -3.0 and w < 17.0:
+	var nordic := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country) == "nordic"
+	if (c < -3.0 and w < 17.0) or (nordic and c < -2.0 and w < 18.0):
 		return "boreal"
 	if summer_dry(data) and c > -3.0:
 		return "mediterranean"
@@ -180,17 +181,39 @@ static func water_frozen(data: LocationData) -> bool:
 	if LocationData.clamp_season(data.season) != LocationData.Season.WINTER:
 		return false
 	if has(data):
-		return float(data.climate["t_cold_c"]) <= ICE_C
+		return ice_amount(data) > 0.0
 	return absf(data.latitude) >= 60.0
 
 ## Every global for `data` under live weather `weather_code` (-1 none).
 static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionary:
 	var g := snow_uniforms(data, weather_code)
 	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
-	g["climate_water_ice"] = 1.0 if water_frozen(data) else 0.0
+	g["climate_water_ice"] = ice_amount(data)
 	return g
 
 static func apply_globals(data: LocationData, weather_code: int = -1) -> void:
 	var g := globals_for(data, weather_code)
 	for k in g:
 		RenderingServer.global_shader_parameter_set(k, g[k])
+
+## Freeze potential, with a soft cold-quarter band around ICE_C. It is
+## localised to sheltered shallow water by WaterShader, not the open sea.
+static func ice_amount(data: LocationData) -> float:
+	if LocationData.clamp_season(data.season) != LocationData.Season.WINTER:
+		return 0.0
+	if has(data):
+		return 1.0 - smoothstep(ICE_C - 2.0, ICE_C + 3.0, float(data.climate["t_cold_c"]))
+	return 0.65 if absf(data.latitude) >= 60.0 else 0.0
+
+## Monthly mean when provided by the climate source. CHELSA's quarterly
+## normals otherwise give a smooth seasonal estimate (thermal lag into
+## February/August); no climate keeps the calendar's ordinary seasons.
+static func month_temp_c(data: LocationData, month: int) -> float:
+	var monthly: Array = data.climate.get("t_monthly_c", [])
+	if monthly.size() == 12:
+		return float(monthly[clampi(month, 1, 12) - 1])
+	if not has(data):
+		return INF
+	var cold_month := 2.0 if data.latitude >= 0.0 else 8.0
+	var fraction := (1.0 - cos(TAU * (float(month) - cold_month) / 12.0)) * 0.5
+	return lerpf(float(data.climate["t_cold_c"]), float(data.climate["t_warm_c"]), fraction)

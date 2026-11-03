@@ -24,6 +24,25 @@ const MAX_SPANS := 10
 ## Piers reach this far below the water surface (m).
 const PIER_BELOW_M := 1.5
 
+## Known structures where OSM ways often omit bridge:structure. Explicit
+## tags take precedence; unknown bridges retain a plain deck.
+const KNOWN_STRUCTURES := {"västerbron": "steel_arch", "vasterbron": "steel_arch", "centralbron": "girder"}
+
+static func structure(road: Dictionary) -> String:
+	var tag := str(road.get("bridge_structure", "")).strip_edges().to_lower().replace("-", "_")
+	var material := str(road.get("bridge_material", "")).strip_edges().to_lower()
+	if tag in ["masonry", "masonry_arch", "stone_arch"]:
+		return "masonry"
+	if tag in ["arch", "arch_bridge"]:
+		if material in ["stone", "brick", "masonry"]:
+			return "masonry"
+		return "steel_arch" if material in ["steel", "iron"] else "unknown"
+	if tag in ["steel_arch", "girder", "beam", "suspension", "cable_stayed", "truss"]:
+		return tag
+	if tag != "":
+		return "unknown"
+	return str(KNOWN_STRUCTURES.get(str(road.get("name", "")).strip_edges().to_lower(), "unknown"))
+
 ## Adds the arches under the deck `deck` (one Y per point of `pts`, with
 ## cumulative distances `dist`) into `side`. `half` is the half deck
 ## width and `depth` the slab depth, in world units. Returns the number

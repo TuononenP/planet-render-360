@@ -140,6 +140,7 @@ static func ring_radius_for_preset(preset: int) -> int:
 var _http: HTTPRequest
 var _detailed_req: OverpassRequest
 var _ring_req: OverpassRequest
+var _poi_req: OverpassRequest
 var _ring_grace: Timer
 
 func _ready() -> void:
@@ -155,6 +156,10 @@ func _ready() -> void:
 	add_child(_ring_req)
 	_ring_req.answered.connect(_on_ring_answered)
 	_ring_req.exhausted.connect(_on_ring_exhausted)
+	_poi_req = OverpassRequest.new(15.0)
+	add_child(_poi_req)
+	_poi_req.answered.connect(_on_poi_answered)
+	_poi_req.exhausted.connect(_on_poi_exhausted)
 	_ring_grace = Timer.new()
 	_ring_grace.one_shot = true
 	_ring_grace.wait_time = RING_GRACE_S
@@ -252,8 +257,11 @@ var country := ""
 var railways: Array = []
 ## Street furniture nodes of the last success (OsmParser.furniture_kind).
 var furniture: Array = []
+## Shop, amenity, office, tourism, craft and advertising nodes.
+var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
 var piers: Array = []
+var shore_structures: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -272,6 +280,8 @@ func cancel() -> void:
 		_detailed_req.cancel()
 	if _ring_req != null:
 		_ring_req.cancel()
+	if _poi_req != null:
+		_poi_req.cancel()
 	if _ring_grace != null:
 		_ring_grace.stop()
 
@@ -280,17 +290,20 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join_parse()
 
-func fetch(lat: float, lon: float, preset: int = 2) -> void:
+func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -> void:
 	cancel()
 	# Default preset 2 is RenderSettings.Preset.HIGH (the phone default);
 	# out-of-range presets fall back to it, not to Fast.
 	var p := preset if preset >= 0 and preset <= 3 else 2
+	_poi_enabled = include_pois and p > RenderSettings.Preset.FAST
 	var radius := radius_for_preset(p)
 	var ring := ring_radius_for_preset(p)
 	_pending_lat = lat
 	_pending_lon = lon
 	country = ""
 	railways = []
+	shore_structures = []
+	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
 	# query shape, not the detailed query at a larger radius).
@@ -300,6 +313,10 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	_pending_ring_cache = ""
 	_detailed_text = ""
 	_ring_text = ""
+	_poi_text = ""
+	_poi_started = false
+	_poi_pending = false
+	_poi_cache = CacheStore.osm_poi_path(lat, lon)
 	_detailed_ready = false
 	_ring_pending = false
 	_tried = 1
@@ -317,6 +334,14 @@ func fetch(lat: float, lon: float, preset: int = 2) -> void:
 	# query if a damaged entry parses to no buildings.
 	_detailed_cached = false
 	var dcached := _read_cache(_pending_cache)
+	# Older builds keyed all query revisions to the same filename. Reuse a
+	# matching current payload without another network request, while keeping
+	# the old file intact for offline fallback.
+	if dcached == "":
+		var legacy := _read_cache(CacheStore.osm_legacy_path(lat, lon, radius))
+		if legacy != "" and OsmQuery.is_current(legacy):
+			dcached = legacy
+			_write_cache(_pending_cache, legacy)
 	# A payload from an older query (no railways/squares) goes live once;
 	# _detailed_fallback still serves it if the network fails.
 	if dcached != "" and OsmQuery.is_current(dcached):
@@ -349,6 +374,11 @@ var _detailed_text := ""
 var _detailed_cached := false
 var _detailed_ready := false
 var _ring_text := ""
+var _poi_text := ""
+var _poi_cache := ""
+var _poi_started := false
+var _poi_pending := false
+var _poi_enabled := true
 var _ring_pending := false
 var _parse_task := -1
 var _parse_gen := 0
@@ -380,6 +410,23 @@ static func _payload_has_buildings(text: String, lat: float, lon: float) -> bool
 	var probe := parse_features(text, lat, lon)
 	return not (probe["buildings"] as Array).is_empty()
 
+## A mapped natural shore is useful even when there are no houses.
+## Preserve it on live requests and offline revisits alike.
+static func _has_shore_data(parsed: Dictionary) -> bool:
+	if not (parsed.get("waterways", []) as Array).is_empty() \
+			or not (parsed.get("shore_structures", []) as Array).is_empty():
+		return true
+	for poly in parsed.get("land", []):
+		if str(poly.get("class", "")) == "water":
+			return true
+	return false
+
+static func _mentions_shores(text: String) -> bool:
+	for tag in ["\"water\"", "\"waterway\"", "\"coastline\"", "\"quay\"", "\"retaining_wall\"", "\"embankment\""]:
+		if text.contains(tag):
+			return true
+	return false
+
 ## Cheap stand-in for _payload_has_buildings on payloads that were
 ## validated before they were cached: no parse on the main thread, and
 ## the full parse then happens once, in _finish().
@@ -404,7 +451,7 @@ static func is_retryable(result: int, code: int) -> bool:
 static func next_attempt(attempt: int, retryable: bool) -> int:
 	return attempt + 1 if retryable and attempt + 1 < ENDPOINTS.size() else -1
 
-## One instance returning no buildings is not authoritative: it may lag
+## One instance returning neither buildings nor shore geometry is not authoritative: it may lag
 ## replication or hold a partial extract, so OverpassRequest tries the
 ## next instance (a genuinely empty area just pays a few fast empty
 ## responses). This also covers corrupt payloads, which parse to nothing.
@@ -412,7 +459,8 @@ static func next_attempt(attempt: int, retryable: bool) -> int:
 ## instead of reading this node's state.
 static func _detailed_check(lat: float, lon: float) -> Callable:
 	return func(text: String) -> String:
-		if _payload_has_buildings(text, lat, lon):
+		var parsed := parse_features(text, lat, lon)
+		if not (parsed["buildings"] as Array).is_empty() or _has_shore_data(parsed):
 			return ""
 		return "Overpass " + NO_BUILDINGS
 
@@ -457,8 +505,31 @@ func _on_ring_grace() -> void:
 		_on_ring_exhausted("no answer %d s after the detailed data" % int(RING_GRACE_S), 0)
 
 func _try_finish() -> void:
-	if _detailed_ready and not _ring_pending:
+	if not _detailed_ready or _ring_pending:
+		return
+	if not _poi_started:
+		_poi_started = true
+		_poi_text = _read_cache(_poi_cache) if _poi_enabled else ""
+		if _poi_text != "" and not _payload_usable(_poi_text):
+			_poi_text = ""
+		if _poi_text == "" and _poi_enabled and not offline_mode:
+			_poi_pending = true
+			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
+				_check_ring, endpoint_order(["openstreetmap.fr"]).slice(0, 1))
+			return
+	if not _poi_pending:
 		_finish()
+
+func _on_poi_answered(text: String) -> void:
+	_poi_text = text
+	_write_cache(_poi_cache, text)
+	_poi_pending = false
+	_try_finish()
+
+func _on_poi_exhausted(reason: String, _attempts: int) -> void:
+	print("OsmFetcher: POIs unavailable (%s); using other map data" % reason)
+	_poi_pending = false
+	_try_finish()
 
 ## Detailed phase out of live Overpass options. Register fallback order:
 ## same-place cache (any radius) → OSM API bbox → nearby cache → procedural.
@@ -472,13 +543,13 @@ func _detailed_fallback(reason: String) -> void:
 	_api_reason = reason
 	_request_api()
 
-## Serve the nearest cached payload within max_m that holds buildings,
+## Serve the nearest cached payload within max_m that holds mapped geometry,
 ## and say so: a payload keyed more than SAME_PLACE_M away leaves part of
 ## the view empty ("Nearby"), a closer one is only a stale copy.
 func _use_cached(reason: String, max_m: float) -> bool:
 	for path in OsmNearbyCache.candidates(_pending_lat, _pending_lon, max_m).slice(0, 3):
 		var text := _read_cache(path)
-		if text != "" and _mentions_buildings(text):
+		if text != "" and (_mentions_buildings(text) or _mentions_shores(text)):
 			print("OsmFetcher: %s; using cached %s" % [reason, path.get_file()])
 			var d := OsmNearbyCache.distance_m(path, _pending_lat, _pending_lon)
 			_fallback_partial = d > SAME_PLACE_M
@@ -545,10 +616,11 @@ func _finish() -> void:
 	var gen := _parse_gen
 	var detailed := _detailed_text
 	var ring := _ring_text
+	var poi := _poi_text
 	var lat := _pending_lat
 	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := parse_features(merge_payloads(detailed, ring), lat, lon)
+		var parsed := parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon)
 		_on_parsed.call_deferred(gen, parsed))
 
 func _join_parse() -> void:
@@ -560,8 +632,8 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	_join_parse()
 	if gen != _parse_gen:
 		return
-	if _detailed_cached and (parsed["buildings"] as Array).is_empty():
-		# Damaged cache entry: query live instead (offline: fail).
+	if _detailed_cached and (parsed["buildings"] as Array).is_empty() and not _has_shore_data(parsed):
+		# No usable buildings or shore geometry: retry the damaged entry.
 		push_warning("OsmFetcher: cached payload has no buildings; refetching")
 		_detailed_cached = false
 		_detailed_text = ""
@@ -577,7 +649,9 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	country = str(parsed.get("country", ""))
 	railways = parsed.get("railways", [])
 	furniture = parsed.get("furniture", [])
+	pois = parsed.get("pois", [])
 	piers = parsed.get("piers", [])
+	shore_structures = parsed.get("shore_structures", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

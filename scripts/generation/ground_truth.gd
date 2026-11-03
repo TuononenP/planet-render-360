@@ -59,13 +59,14 @@ var _half_units: float = 0.0
 var _land: Array = []
 var _land_index: Array = []  # PolygonIndex per _land entry, same order
 var _index = null  # GroundIndex, untyped to break load cycle
+var _land_native: Object = null
 var _buildings: Array = []
 ## Local water surface per post (render units) for posts a water body
 ## or channel carved; -INF = no carve (water_level_at falls back to the
 ## global datum). Bodies are levelled from their own banks, the same
 ## rule WaterBuilder uses (10th-percentile dry bank − freeboard).
 var _level: PackedFloat32Array = PackedFloat32Array()
-## Optional finalized shoreline state; null for the legacy surface builder.
+## Finalized before builders start; untyped to avoid a class-load cycle.
 var shoreline = null
 
 ## Bank freeboard (mirrors WaterBuilder._FREEBOARD) and carve depth
@@ -74,8 +75,6 @@ var shoreline = null
 ## Big Sur. Now every carve is a few metres under its own water.
 const FREEBOARD_M := 0.4
 const CARVE_DEPTH_M := 2.0
-## Width of a _water_cells cell, set by _water_cells.
-var _water_cell := 1.0
 ## Height step (metres) at which _blur_pass stops averaging across a
 ## neighbour: DEM noise is well under it, escarpment posts well over.
 const EDGE_SIGMA_M := 3.0
@@ -93,6 +92,13 @@ func set_land(polys: Array) -> void:
 	_rebuild_index()
 
 func _rebuild_index() -> void:
+	_land_native = null
+	if not ShoreGeometry.force_script and not _land_index.is_empty() and ClassDB.class_exists("ShoreDomainIndex"):
+		_land_native = ClassDB.instantiate("ShoreDomainIndex")
+		if _land_native.has_method("setup_polygons"):
+			_land_native.setup_polygons(_land_index, Rect2(Vector2.ONE * -_half_units, Vector2.ONE * _half_units * 2.0))
+		else:
+			_land_native = null
 	if _land.is_empty() and _buildings.is_empty():
 		_index = null
 		return
@@ -106,7 +112,7 @@ func _rebuild_index() -> void:
 ## builders construct it from the data they already receive).
 ## Requires valid data (heights.size() == grid_size²); null leaves an
 ## empty surface for WorldCache to restore a saved one into.
-func _init(data: LocationData) -> void:
+func _init(data: LocationData, abort: BuildAbort = null) -> void:
 	if data == null:
 		return
 	var size := data.grid_size
@@ -188,7 +194,7 @@ func _init(data: LocationData) -> void:
 	# ArcticDEM (≥60°N) is a surface model: strip roofs and tree crowns.
 	if BareEarth.applies(data):
 		BareEarth.strip(_surface, size, _step_units, float(size) / 2.0,
-			data.buildings)
+			data.buildings, data.land_polygons)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	_blur_pass(_surface, tmp, size)
@@ -215,10 +221,11 @@ func _init(data: LocationData) -> void:
 	# carved to the global datum instead).
 	_level.resize(size * size)
 	_level.fill(-INF)
-	_carve_polygons()
-	# T3.4 waterway carve (contract §3; §7 V16 deleted the synthetic
-	# S-curve this replaces): width-aware channels on real centrelines.
-	_carve_waterways(data)
+	var shore_script = load("res://scripts/generation/shoreline_model.gd") as GDScript
+	var sea_level := water_level_m if is_equal_approx(data.water_level, -3.0) else WaterBuilder.SEA_LEVEL_M
+	shoreline = shore_script.new(data, self, sea_level, abort)
+	if abort == null or not abort.requested:
+		shoreline.carve(_surface, _level)
 	# Streets and main roads sit on a smoothed profile (RoadGrading).
 	var ways := data.roads + data.railways
 	RoadGrading.grade(_surface, _level, size, _step_units,
@@ -245,40 +252,19 @@ func _init(data: LocationData) -> void:
 		surface_max = maxf(surface_max, h2)
 	# Build eager spatial index now that _surface/_level are final (read-only thereafter).
 	_rebuild_index()
+	if not shoreline.empty():
+		shoreline.finish(self, abort)
+		if shoreline.ready:
+			if shoreline.sampler != null and shoreline.sampler.has_method("height_range"):
+				var span: Vector2 = shoreline.sampler.height_range()
+				surface_min = minf(surface_min, span.x)
+				surface_max = maxf(surface_max, span.y)
+			else:
+				for patch in shoreline.patches.values():
+					for p in patch["triangles"]:
+						surface_min = minf(surface_min, p.y)
+						surface_max = maxf(surface_max, p.y)
 
-## Width-aware channel carve for OSM waterway lines (T3.4, contract
-## §2.6/§3): posts near a centreline dip toward water_level_m - 0.7
-## with a smoothstep bank profile (the v1 river shape, now on real
-## geometry). Coastline (width 0) is a boundary, not a channel — the
-## sea plane covers it. Per-segment bboxes keep this cheap: posts
-## outside a segment's reach are never visited.
-func _carve_waterways(data: LocationData) -> void:
-	var size := _size
-	if size < 2:
-		return
-	var m2u := WorldScale.metres_to_units()
-	for w in data.waterways:
-		if not (w is Dictionary):
-			continue
-		var half := float((w as Dictionary).get("width_m", 0.0)) * 0.5 * m2u
-		if half <= 0.0:
-			continue
-		var pts: PackedVector2Array = \
-			(w as Dictionary).get("points", PackedVector2Array())
-		if pts.size() < 2:
-			continue
-		var reach := half + 2.5
-		# Local surface per vertex from the pre-carve banks, so a
-		# channel follows its own valley down instead of the datum.
-		var line := _densify(pts, _step_units)
-		var levels := PackedFloat32Array()
-		for i in line.size():
-			levels.append(_channel_level(line, i, half))
-		for s in line.size() - 1:
-			_carve_segment(line[s], line[s + 1], half, reach, size,
-				levels[s], levels[s + 1])
-
-## Polyline with no segment longer than `sp` (vertices kept).
 static func _densify(pts: PackedVector2Array, sp: float) -> PackedVector2Array:
 	var out := PackedVector2Array()
 	for i in pts.size() - 1:
@@ -287,148 +273,6 @@ static func _densify(pts: PackedVector2Array, sp: float) -> PackedVector2Array:
 			out.append(pts[i].lerp(pts[i + 1], float(k) / float(n)))
 	out.append(pts[pts.size() - 1])
 	return out
-
-## Water surface at channel vertex i: the lower pre-carve bank beside
-## it, minus freeboard, never below the global datum.
-func _channel_level(line: PackedVector2Array, i: int, half: float) -> float:
-	var a := line[maxi(i - 1, 0)]
-	var b := line[mini(i + 1, line.size() - 1)]
-	var dir := (b - a).normalized() if a.distance_to(b) > 0.001 else Vector2.RIGHT
-	var off := Vector2(-dir.y, dir.x) * (half + _step_units * 1.5)
-	var p := line[i]
-	var bank := minf(height_at_world(p.x + off.x, p.y + off.y),
-		height_at_world(p.x - off.x, p.y - off.y))
-	return maxf(water_level_m, bank - FREEBOARD_M)
-
-## Bank-levelled polygon carve: each OSM water polygon sits at the 10th
-## percentile of its dry pre-carve bank samples − freeboard (the
-## WaterBuilder rule), and posts inside carve CARVE_DEPTH_M under it.
-func _carve_polygons() -> void:
-	# [points, PolygonIndex] per water polygon; the index is the one
-	# set_land already built (_land is data.land_polygons, same order).
-	var water: Array = []
-	for k in _land.size():
-		var poly: Dictionary = _land[k]
-		if str(poly.get("class", "")) != "water":
-			continue
-		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
-		if pts.size() < 3:
-			continue
-		water.append([pts, _land_index[k], bool(poly.get("tidal", false))])
-	var size := _size
-	var hu := float(size) / 2.0
-	var levels: Array = []
-	var cells := _water_cells(water)
-	for wpoly in water:
-		levels.append(_polygon_level(wpoly, water, cells))
-	# Row scanline over each polygon's indexed edges: a lagoon with a
-	# thousand island holes covers every post, and testing each post
-	# against every vertex never finished (Venice, Stockholm).
-	for k in water.size():
-		var level: float = levels[k]
-		for i in (water[k][1] as PolygonIndex).posts_inside(size, _step_units, hu):
-			_surface[i] = minf(_surface[i], level - CARVE_DEPTH_M)
-			_level[i] = maxf(_level[i], level)
-
-## One polygon's surface from dry bank samples inside the extent (not
-## in any water polygon); with <3 such samples (a lake filling the
-## extent) the lowest pre-carve post inside it stands in for the DEM
-## water surface.
-func _polygon_level(wpoly: Array, water: Array, cells: Dictionary) -> float:
-	if wpoly.size() > 2 and bool(wpoly[2]):
-		return water_level_m
-	var pts: PackedVector2Array = wpoly[0]
-	var off := _step_units * 1.5
-	var stride := maxf(_step_units * 0.75, 1.0)
-	var dry: Array = []
-	var inner := INF
-	for i in pts.size():
-		var a := pts[i]
-		var b := pts[(i + 1) % pts.size()]
-		var seg := a.distance_to(b)
-		if seg < 0.001:
-			continue
-		var dir := (b - a) / seg
-		var n := Vector2(-dir.y, dir.x)
-		var steps := maxi(1, int(seg / stride))
-		for s in steps:
-			var c := a.lerp(b, (float(s) + 0.5) / float(steps))
-			for q in [c + n * off, c - n * off]:
-				var v := q as Vector2
-				if not is_inside(v.x, v.y):
-					continue
-				var h := height_at_world(v.x, v.y)
-				if _in_water(v, water, cells):
-					inner = minf(inner, h)
-				else:
-					dry.append(h)
-	if dry.size() >= 3:
-		dry.sort()
-		return maxf(water_level_m, float(dry[dry.size() / 10]) - FREEBOARD_M)
-	if not is_inf(inner):
-		return maxf(water_level_m, inner)
-	return water_level_m
-
-## Water polygons bucketed by the cells (1/32 of the detailed area) their
-## bounds touch: cell key -> indices into `water`.
-func _water_cells(water: Array) -> Dictionary:
-	_water_cell = maxf(_half_units / 16.0, 0.001)
-	var cells := {}
-	for k in water.size():
-		var box := (water[k][1] as PolygonIndex).bounds()
-		var x1 := floori(box.end.x / _water_cell)
-		var y1 := floori(box.end.y / _water_cell)
-		for cy in range(floori(box.position.y / _water_cell), y1 + 1):
-			for cx in range(floori(box.position.x / _water_cell), x1 + 1):
-				var key := Vector2i(cx, cy)
-				if not cells.has(key):
-					cells[key] = []
-				(cells[key] as Array).append(k)
-	return cells
-
-## True when p lies in any water polygon: only the polygons whose bounds
-## touch its cell can contain it.
-func _in_water(p: Vector2, water: Array, cells: Dictionary) -> bool:
-	for k in cells.get(Vector2i(floori(p.x / _water_cell), floori(p.y / _water_cell)), []):
-		if (water[k][1] as PolygonIndex).contains(p):
-			return true
-	return false
-
-func _carve_segment(a: Vector2, b: Vector2, half: float, reach: float,
-		size: int, la: float, lb: float) -> void:
-	var h := float(size) * 0.5
-	var x0 := clampi(int(floor((minf(a.x, b.x) - reach) / _step_units + h)),
-		0, size - 1)
-	var x1 := clampi(int(ceil((maxf(a.x, b.x) + reach) / _step_units + h)),
-		0, size - 1)
-	var z0 := clampi(int(floor((minf(a.y, b.y) - reach) / _step_units + h)),
-		0, size - 1)
-	var z1 := clampi(int(ceil((maxf(a.y, b.y) + reach) / _step_units + h)),
-		0, size - 1)
-	var inner := maxf(half - 0.5, 0.0)
-	for z in range(z0, z1 + 1):
-		for x in range(x0, x1 + 1):
-			var wx := (float(x) - h) * _step_units
-			var wz := (float(z) - h) * _step_units
-			var p := Vector2(wx, wz)
-			var d := _seg_dist(p, a, b)
-			if d < reach:
-				var ab := b - a
-				var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001),
-					0.0, 1.0)
-				var level := lerpf(la, lb, t)
-				var i := z * size + x
-				var depth := lerpf(level - CARVE_DEPTH_M,
-					_surface[i], smoothstep(inner, reach, d))
-				_surface[i] = minf(_surface[i], depth)
-				if _surface[i] < level:
-					_level[i] = maxf(_level[i], level)
-
-static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
-	var ab := b - a
-	var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001),
-		0.0, 1.0)
-	return (a + ab * t - p).length()
 
 ## Fraction of the heights grid covered by the detailed surface
 ## (T3.1 remap): extent ground span / heights-window ground span.
@@ -541,6 +385,8 @@ static func _clamped_post(src: PackedFloat32Array, size: int, x: int,
 ## applied. Bilinear between grid posts; outside clamps to the
 ## nearest edge, never NaN.
 func height_at_world(x: float, z: float) -> float:
+	if shoreline != null and shoreline.ready:
+		return shoreline.height(Vector2(x, z).clamp(shoreline.bounds.position, shoreline.bounds.end))
 	if _size < 2 or _surface.size() != _size * _size:
 		return water_level_m
 	var fx := clampf(x / _step_units + float(_size) * 0.5, 0.0, float(_size - 1))
@@ -562,18 +408,35 @@ func surface_at_post(x: int, z: int) -> float:
 		return water_level_m
 	var cx := clampi(x, 0, _size - 1)
 	var cz := clampi(z, 0, _size - 1)
+	if shoreline != null and shoreline.ready:
+		return height_at_world((float(cx) - float(_size) * 0.5) * _step_units,
+			(float(cz) - float(_size) * 0.5) * _step_units)
 	return _surface[cz * _size + cx]
 
 ## Water depth in metres at XZ; 0.0 = dry. Covers water-polygon and
 ## waterway channels (carved under their local bank-levelled surface)
 ## and DEM sinks below the global datum.
 func water_at(x: float, z: float) -> float:
+	if shoreline != null and shoreline.empty():
+		return 0.0
+	if shoreline != null and shoreline.ready and shoreline.bounds.has_point(Vector2(x, z)):
+		var body: int = shoreline.domains.at(Vector2(x, z))
+		if body < 0:
+			return 0.0
+		return maxf(0.0, shoreline.domains.level(body, Vector2(x, z)) - height_at_world(x, z))
 	return maxf(0.0, water_level_at(x, z) - height_at_world(x, z))
 
 ## Local water surface (render Y) at XZ: the weighted level of the
 ## carved posts around it, else the global datum (water_level_m).
+## A caller may supply a local fallback in render units when no mapped
+## level exists; observed bank-levelled water always takes precedence.
 func water_level_at(x: float, z: float, fallback_level: float = NAN) -> float:
 	var fallback := water_level_m if is_nan(fallback_level) else fallback_level
+	if shoreline != null and shoreline.ready:
+		var body: int = shoreline.domains.at(Vector2(x, z))
+		if body >= 0:
+			return shoreline.domains.level(body, Vector2(x, z))
+		return fallback
 	if _size < 2 or _level.size() != _size * _size:
 		return fallback
 	var fx := clampf(x / _step_units + float(_size) * 0.5, 0.0, float(_size - 1))
@@ -601,6 +464,9 @@ func water_level_at(x: float, z: float, fallback_level: float = NAN) -> float:
 ## below carries the v1 building circle test exactly.
 func land_class_at(x: float, z: float) -> String:
 	var p := Vector2(x, z)
+	if _land_native != null and absf(x) < _half_units and absf(z) < _half_units:
+		var id: int = _land_native.at(p)
+		return str(_land[id].get("class", "")) if id >= 0 else ""
 	if _index != null:
 		var cands: Array = _index.land_candidates_at(x, z)
 		for idx in cands:

@@ -55,6 +55,12 @@ uniform float spec = 0.34;
 uniform vec2 wind = vec2(0.86, 0.51);
 uniform int water_quality = 2;
 uniform float shore_m = 40.0;
+uniform float brackish = 0.0;
+uniform float temperate_sea = 0.0;
+// Linear RGB absorption values selected per water region.
+uniform vec3 sea_shallow = vec3(0.020, 0.185, 0.190);
+uniform vec3 sea_deep = vec3(0.004, 0.034, 0.088);
+uniform float harbour = 0.0;
 
 // @SNOW
 varying vec3 wpos;
@@ -104,6 +110,14 @@ vec3 gerstner(vec2 p, vec2 dir, float len, float amp, float t) {
 	return vec3(dir.x * amp * 0.6 * cos(ph), amp * sin(ph), dir.y * amp * 0.6 * cos(ph));
 }
 
+// Fast ice holds near banks and in shallow sheltered bays. Openness is
+// the bathymetry proxy where the source DEM has no seabed soundings.
+float local_ice(float sea, float shore_distance, float openness) {
+	float fast = (1.0 - smoothstep(5.0, 35.0, shore_distance))
+		* (1.0 - smoothstep(0.12, 0.7, openness));
+	return climate_water_ice * mix(1.0, fast, sea);
+}
+
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	openv = COLOR.r;
@@ -113,16 +127,15 @@ void vertex() {
 	if (water_quality >= 2 && seav > 0.5) {
 		vec2 pm = wpos.xz / units_per_metre;
 		vec2 wd = normalize(wind);
-		float damp = smoothstep(0.0, 0.6, shorev) * (1.0 - climate_water_ice);
+		float damp = smoothstep(0.0, 0.6, shorev) * (1.0 - local_ice(seav, shorev * shore_m, openv));
 		// Wavelengths of at least ~6 grid cells (the sea grid is 12.5 m):
 		// shorter swell aliased into rows of dashes toward the horizon.
 		vec3 d = gerstner(pm, wd, 118.0, 0.75, TIME)
 			+ gerstner(pm, normalize(wd + vec2(0.4, -0.3)), 74.0, 0.38, TIME * 1.1);
-		// The DEM has no seabed (ground sits at sea level), so troughs below
-		// the datum would show brown ground through the water: lift the
-		// whole swell so it only ever rises from the datum.
+		// Legacy sea grids have no carved bed: lift their troughs above
+		// the DEM. Shoreline meshes have a bed and use zero mean swell.
 		d.y += swell_lift;
-		VERTEX += d * damp * units_per_metre;
+		VERTEX += d * damp * units_per_metre * mix(1.0, 0.2, max(brackish, harbour));
 	}
 }
 
@@ -161,9 +174,10 @@ void fragment() {
 		float ring = sin(clamp(length(fc) - ph * 0.5, -0.05, 0.05) * 62.8) * (1.0 - ph);
 		s += normalize(fc + 1e-4) * ring * 0.08 * climate_wetness * water_wave_weight(pixel_m, 1.0 / 1.6);
 	}
-	s *= wave_amp;
+	s *= wave_amp * mix(1.0, 0.55, brackish);
 	// Frozen water: still, matte, white-grey ice (ClimateModel).
-	s *= 1.0 - climate_water_ice;
+	float ice_cover = local_ice(seav, shorev * shore_m, openv);
+	s *= 1.0 - ice_cover;
 	vec3 n_world = normalize(vec3(-s.x, 1.0, -s.y));
 	// Always the upward normal: water is only ever seen from above,
 	// and its triangles wind either way (cull_disabled).
@@ -172,14 +186,14 @@ void fragment() {
 	vec3 deep_c = deep_color.rgb;
 	vec3 shallow_c = shallow_color.rgb;
 	if (seav > 0.5) {
-		// Open sea: turquoise over the shelf, deep blue beyond (linear).
-		deep_c = vec3(0.004, 0.034, 0.088);
-		shallow_c = vec3(0.020, 0.185, 0.190);
+		// The place supplies the sea body's absorption colour in linear RGB.
+		deep_c = sea_deep;
+		shallow_c = sea_shallow;
 	}
 	vec3 col = mix(shallow_c, deep_c, open_w);
 	// Shore foam: a broken, breathing band along the rim; surf on the sea.
 	float shore = clamp(shorev, 0.0, 1.0) * shore_m;
-	float surf = seav > 0.5 ? 1.0 : 0.35;
+	float surf = seav > 0.5 ? mix(1.0, 0.12, harbour) : 0.35;
 	float band = (1.0 - smoothstep(0.0, mix(2.5, 9.0, surf), shore));
 	float pulse = 0.5 + 0.5 * sin(t * 0.8 - shore * 0.35 + w_noise(pm * 0.05) * 6.0);
 	float brk = smoothstep(0.45, 0.85, w_noise(pf * 0.9 + vec2(t * 0.15, 0.0)) * 0.6
@@ -192,16 +206,16 @@ void fragment() {
 		vec2 q = vec2(dot(pf, fd) * 0.08, dot(pf, vec2(-fd.y, fd.x)) * 0.9);
 		foam += smoothstep(0.72, 0.9, w_noise(q)) * (1.0 - open_w * 0.7) * 0.5 * min(fl, 1.0);
 	}
-	foam *= (1.0 - climate_water_ice) * (1.0 - smoothstep(300.0, 1200.0, dist_m)) * water_wave_weight(pixel_m, 1.0 / 3.1);
+	foam *= (1.0 - ice_cover) * (1.0 - smoothstep(300.0, 1200.0, dist_m)) * water_wave_weight(pixel_m, 1.0 / 3.1);
 	foam = clamp(foam, 0.0, 1.0);
 	col = mix(col, foam_color.rgb, foam);
 	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
-	ALBEDO = mix(col, ice, climate_water_ice);
+	ALBEDO = mix(col, ice, ice_cover);
 	float rough = mix(near_rough, far_rough, smoothstep(60.0, 1500.0, dist_m));
 	rough = mix(rough, 0.45, foam);
 	rough = mix(rough, 0.12, climate_wetness * (1.0 - smoothstep(0.0, 250.0, dist_m)));
-	ROUGHNESS = water_roughness(mix(rough, 0.55, climate_water_ice), n_world);
-	SPECULAR = mix(mix(spec, 0.2, foam), 0.25, climate_water_ice);
+	ROUGHNESS = water_roughness(mix(rough, 0.55, ice_cover), n_world);
+	SPECULAR = mix(mix(spec, 0.2, foam), 0.25, ice_cover);
 	METALLIC = 0.0;
 }
 """

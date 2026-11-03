@@ -26,7 +26,8 @@ func _run() -> void:
 	var kinds := {
 		"bench": {"amenity": "bench"}, "bin": {"amenity": "waste_basket"},
 		"signals": {"highway": "traffic_signals"}, "bus_stop": {"highway": "bus_stop"},
-		"bollard": {"barrier": "bollard"}, "": {"amenity": "cafe"},
+		"bollard": {"barrier": "bollard"}, "subway_entrance": {"railway": "subway_entrance"},
+		"": {"amenity": "cafe"},
 	}
 	for k in kinds:
 		if OsmParser.furniture_kind(kinds[k]) != k:
@@ -57,6 +58,17 @@ func _run() -> void:
 		var got := StreetFurniture.mesh_key(c[2], StreetFurniture.furniture_family(c[0], c[1]))
 		if got != c[3]:
 			failures.append("%s %s should be %s, got %s" % [c[1], c[2], c[3], got])
+	if StreetFurniture.furniture_family("stockholm", "SE") != "nordic_se":
+		failures.append("Sweden should use its Nordic stop kit")
+	var sl := StreetFurniture.spots({"x": 100.0 * m, "z": 1.0 * m, "kind": "bus_stop"}, roads, "nordic_se", m)
+	if sl.is_empty() or str(sl[0][2]) != "stop_sl":
+		failures.append("a Swedish bus stop should use the SL stop sign")
+	if StreetFurniture.furniture_family("north_america", "US", "new_york") != "nyc" \
+			or StreetFurniture.mesh_key("bin", "nyc") != "bin_nyc":
+		failures.append("New York should use its wire-basket furniture kit")
+	var entrance := StreetFurniture.spots({"x": 50.0 * m, "z": 6.0 * m, "kind": "subway_entrance"}, roads, "nyc", m)
+	if entrance.size() != 1 or str(entrance[0][2]) != "subway_entrance":
+		failures.append("a mapped subway entrance should place one stair kiosk")
 	# Fill: bins along lit streets, signals where the two main roads meet.
 	var fill := StreetFurniture.fill(d, roads, "europe", m)
 	var bins := fill.filter(func(it: Dictionary) -> bool: return it["kind"] == "bin").size()
@@ -65,17 +77,36 @@ func _run() -> void:
 		failures.append("fill: %d bins along 800 m of street, %d signals at the crossing" % [bins, sigs])
 	if StreetFurniture.fill(d, roads, "japan", m).any(func(it: Dictionary) -> bool: return it["kind"] == "bin"):
 		failures.append("Japanese streets get no fill bins")
+	# An offset preset eye must dress nearby roads even when they are far from the origin.
+	var offset := _data()
+	offset.latitude = 40.7060
+	offset.longitude = -74.0040
+	offset.view = PresetViews.for_pin(offset.latitude, offset.longitude)
+	var eye := View360.spawn_xz(offset)
+	offset.roads = [{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([eye + Vector2(-100, 0), eye + Vector2(100, 0)])}]
+	var offset_roads := StreetFurniture.RoadIndex.new(offset, m, 425.0 * m, eye)
+	if offset_roads.nearest(eye, 10.0 * m).is_empty() or StreetFurniture.fill(offset, offset_roads, "na", m).is_empty():
+		failures.append("offset eye should index and populate nearby streets")
+	# A coastal railing needs a parallel landward paved path and no mapped barrier.
+	var shore := {"a": Vector2(0, 0), "b": Vector2(10, 0), "land": Vector2(0, 1)}
+	var walk := [[Vector2(0, 5), Vector2(10, 5), 2.0]]
+	var fence := [[Vector2(0, 1), Vector2(10, 1), 0.0]]
+	if not ShoreRailings.eligible(shore, walk, [], 1.0) \
+			or ShoreRailings.eligible(shore, walk, fence, 1.0) \
+			or ShoreRailings.eligible(shore, [[Vector2(5, -5), Vector2(5, 5), 2.0]], [], 1.0) \
+			or ShoreRailings.eligible(shore, [[Vector2(0, -5), Vector2(10, -5), 2.0]], [], 1.0):
+		failures.append("waterfront rail requires a parallel landward path and no mapped barrier")
 	# Every mesh builds; a lit lens glows.
 	for key in ["bench_wood", "bench_stone", "bin_post", "bin_drum", "bin_black", "bollard_black",
-			"bollard_red", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole"]:
+			"bollard_red", "bin_nyc", "subway_entrance", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole", "stop_hsl", "stop_sl"]:
 		var mesh := StreetFurniture.mesh(key)
 		if mesh.get_surface_count() == 0:
 			failures.append("%s should build a mesh" % key)
-		if key.begins_with("signals"):
+		if key.begins_with("signals") or key == "subway_entrance":
 			var glows := false
 			for s in mesh.get_surface_count():
 				var mat := mesh.surface_get_material(s) as StandardMaterial3D
-				glows = glows or (mat.emission_enabled and mat.emission_energy_multiplier > 0.0)
+				glows = glows or (mat != null and mat.emission_enabled and mat.emission_energy_multiplier > 0.0)
 			if not glows:
 				failures.append("%s should have a lit lens" % key)
 	failures.erase(failures[0])

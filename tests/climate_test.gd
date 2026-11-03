@@ -133,9 +133,9 @@ func _model_checks(failures: Array[String]) -> void:
 	var turku: LocationData = by["Turku"]
 	turku.season = LocationData.Season.WINTER
 	banff.season = LocationData.Season.WINTER
-	if ClimateModel.water_frozen(il) or ClimateModel.water_frozen(turku) \
+	if ClimateModel.water_frozen(il) or ClimateModel.ice_amount(turku) <= 0.0 \
 			or not ClimateModel.water_frozen(banff):
-		failures.append("ice: Interlaken / Turku (coldest quarter > -4 °C) open, Banff frozen")
+		failures.append("ice: Interlaken open, Turku partial potential, Banff frozen")
 	for k in ClimateModel.GLOBALS:
 		if not ProjectSettings.has_setting("shader_globals/" + k):
 			failures.append("project.godot must declare shader global %s" % k)

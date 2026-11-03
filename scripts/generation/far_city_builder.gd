@@ -169,19 +169,71 @@ func _towers() -> void:
 		var base := _site(ring, 1e6)
 		if base == INF:
 			continue
-		var h := float(t.get("height", 0.0))
-		var levels := int(t.get("levels", 0))
 		var kind := str(t.get("kind", "yes"))
 		var mat: Material = _dfs[int(_hash(c.x, c.y) * 4.0) % _dfs.size()] \
 			if kind in ["apartments", "residential", "dormitory", "hotel"] else _glass
-		var storeys := levels if levels > 0 else maxi(1, roundi(h / 3.5))
+		mat = _tower_material(t, mat, c)
 		BuildingBuilder._batch = batch
 		BuildingBuilder._batch_key = _key(c.x, c.y)
-		BuildingBuilder._walls(null, ring, base, base + 2.0 + h, mat, float(storeys))
-		BuildingBuilder._roof_cap(null, ring, idx, base + 2.0 + h, _drs[1 % _drs.size()])
+		var parts: Array = t.get("parts", [])
+		if parts.is_empty():
+			_tower_mass(t, ring, base + 2.0, mat)
+		else:
+			# If all parts are lifted, fill the missing lower mass using
+			# the outline. Drawing the full-height outline would hide every
+			# setback and crown mapped by the individual parts.
+			var lowest := INF
+			for part in parts:
+				lowest = minf(lowest, _part_lift(part))
+			if lowest > 0.5 and lowest < INF:
+				var under := {"height": lowest, "levels": roundi(lowest / 3.5)}
+				_tower_mass(under, ring, base + 2.0, mat)
+			for part in parts:
+				var part_ring := BuildingBuilder._clean_ring(part.get("footprint", PackedVector2Array()))
+				if part_ring.size() >= 3:
+					_tower_mass(part, part_ring, base + 2.0, _tower_material(part, mat, c))
 		BuildingBuilder._batch = null
 		_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
 		towers += 1
+
+## A residential tower can have a mapped glass curtain wall, including on
+## individual parts. Honour that evidence instead of inferring brick from use.
+func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> Material:
+	var tag := str(mass.get("material", "")).strip_edges().to_lower()
+	var set_name := str(MaterialLibrary.MATERIAL_TAGS.get(tag, ""))
+	if set_name == "glass":
+		return _glass
+	if set_name in ["brick", "stone", "limestone", "concrete", "render"]:
+		return _dfs[int(_hash(centre.x, centre.y) * 4.0) % _dfs.size()]
+	return fallback
+
+## OSM min_height and min_level are relative to the building's ground.
+static func _part_lift(part: Dictionary) -> float:
+	return maxf(float(part.get("min_height_m", 0.0)), float(part.get("min_level", 0)) * 3.5)
+
+func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: Material) -> void:
+	var total := float(mass.get("height", 0.0))
+	var lift := _part_lift(mass)
+	if total <= lift + 0.1:
+		return
+	var shape := BuildingBuilder._effective_shape(str(mass.get("roof_shape", "")), "flat", false)
+	var roof_h := 0.0 if shape == "flat" else minf(BuildingBuilder._roof_height_m(shape,
+		BuildingHeights._ring_span_m(ring), float(mass.get("roof_height_m", 0.0))), total - lift)
+	var wall_top := base + total - roof_h
+	var levels := int(mass.get("levels", 0))
+	var storeys := levels if levels > 0 else maxi(1, roundi((total - lift - roof_h) / 3.5))
+	if wall_top > base + lift + 0.01:
+		BuildingBuilder._walls(null, ring, base + lift, wall_top, mat, float(storeys))
+	var roof_mat: Material = _drs[1 % _drs.size()]
+	if str(mass.get("roof_material", "")).strip_edges().to_lower() == "copper":
+		roof_mat = FacadeMaterials.roof_for_building(mass, _region, shape,
+			Color(0, 0, 0, 0), MaterialLibrary.fidelity_for_preset(data.quality_preset), true)
+	var holes: Array = mass.get("holes", [])
+	if roof_h <= 0.0 or not BuildingBuilder._roof_form(null, ring, wall_top, roof_h, shape,
+			roof_mat, PackedByteArray(), false, holes):
+		var idx := Geometry2D.triangulate_polygon(ring)
+		if idx.size() >= 3:
+			BuildingBuilder._roof_cap(null, ring, idx, wall_top, roof_mat)
 
 func _fabric() -> void:
 	var apt := ArchitectureStyle.profile(_region, "apartments")

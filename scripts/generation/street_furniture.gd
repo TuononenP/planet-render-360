@@ -31,8 +31,14 @@ const LENS := {"r": Color(1.0, 0.08, 0.03), "g": Color(0.1, 1.0, 0.45)}
 static var _meshes: Dictionary = {}
 
 ## The place's furniture kit: "na", "japan", "uk", "nl" or "europe".
-static func furniture_family(region: String, country: String) -> String:
+static func furniture_family(region: String, country: String, city: String = "") -> String:
+	if city == "new_york":
+		return "nyc"
 	var iso := country.to_upper()
+	if iso == "FI":
+		return "nordic"
+	if iso == "SE":
+		return "nordic_se"
 	if iso in ["US", "CA"] or (iso == "" and region == "north_america"):
 		return "na"
 	if iso in ["JP", "KR", "TW"] or (iso == "" and region == "japan"):
@@ -49,11 +55,11 @@ static func mesh_key(kind: String, family: String) -> String:
 		"bench":
 			return "bench_stone" if family == "japan" else "bench_wood"
 		"bin":
-			return {"na": "bin_drum", "uk": "bin_black"}.get(family, "bin_post")
+			return {"na": "bin_drum", "nyc": "bin_nyc", "uk": "bin_black"}.get(family, "bin_post")
 		"bollard":
 			return "bollard_red" if family == "nl" else "bollard_black"
 		"signals":
-			return {"na": "signals_na", "japan": "signals_jp"}.get(family, "signals_post")
+			return {"na": "signals_na", "nyc": "signals_na", "japan": "signals_jp"}.get(family, "signals_post")
 	return kind
 
 ## Adds the furniture under one "StreetFurniture" node of `root` on
@@ -63,8 +69,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	if not RenderQuality.ultra_desktop(data.quality_preset) or data.buildings.is_empty():
 		return 0
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
-	var family := furniture_family(region, data.country)
-	var roads := RoadIndex.new(data, m2u, (RADIUS_M + SNAP_M) * m2u)
+	var family := furniture_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
+	var centre := View360.spawn_xz(data)
+	var roads := RoadIndex.new(data, m2u, (RADIUS_M + SNAP_M) * m2u, centre)
 	var items: Array = data.street_furniture
 	if items.is_empty():
 		items = fill(data, roads, family, m2u)
@@ -72,8 +79,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var near: Array = []
 	for it in items:
 		var p := Vector2(float(it["x"]), float(it["z"]))
-		if p.length_squared() <= r2:
-			near.append([p.length_squared(), it])
+		if str(it.get("kind", "")) == "subway_entrance" and family != "nyc":
+			continue
+		if (p - centre).length_squared() <= r2:
+			near.append([(p - centre).length_squared(), it])
 	near.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
 	var placed := {}  # mesh key -> Array[Transform3D]
 	var count := 0
@@ -127,12 +136,14 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 	var kerb := half + KERB_OUT_M * m2u
 	var side := 1.0 if (p - c).dot(nrm) >= 0.0 else -1.0
 	match kind:
+		"subway_entrance":
+			return [[p, -nrm * side, key]]
 		"signals":
 			# One state per junction: both poles show the same aspect.
 			var lit := "r" if _hash(p) < 0.5 else "g"
 			return [[c + nrm * kerb, -dir, key + "_" + lit], [c - nrm * kerb, dir, key + "_" + lit]]
 		"bus_stop":
-			var stop := "shelter" if bool(it.get("shelter", false)) else "stop_pole"
+			var stop := "shelter" if bool(it.get("shelter", false)) else ("stop_hsl" if family == "nordic" else ("stop_sl" if family == "nordic_se" else "stop_pole"))
 			return [[c + nrm * side * (kerb + (0.9 if stop == "shelter" else 0.0) * m2u), -nrm * side, stop]]
 	var at := p
 	if (p - c).length() < kerb:
@@ -143,6 +154,7 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: float) -> Array:
 	var out: Array = []
 	var r2 := pow(RADIUS_M * m2u, 2.0)
+	var centre := View360.spawn_xz(data)
 	var majors := {}  # snapped node -> major roads through it
 	for i in data.roads.size():
 		var rd: Variant = data.roads[i]
@@ -152,7 +164,7 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 		var pts: PackedVector2Array = (rd as Dictionary).get("points", PackedVector2Array())
 		if cls in StreetProps.MAJOR:
 			for q in pts:
-				if q.length_squared() <= r2:
+				if (q - centre).length_squared() <= r2:
 					var k := Vector2i(roundi(q.x * 2.0), roundi(q.y * 2.0))
 					if not majors.has(k):
 						majors[k] = {}
@@ -173,7 +185,7 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 				var q := a + dir * t + Vector2(-dir.y, dir.x) * side * w
 				side = -side
 				t += BIN_STEP_M * m2u
-				if q.length_squared() <= r2:
+				if (q - centre).length_squared() <= r2:
 					out.append({"x": q.x, "z": q.y, "kind": "bin"})
 			t -= seg
 	for k in majors:
@@ -215,6 +227,30 @@ static func mesh(key: String) -> ArrayMesh:
 		"bin_drum":
 			TreeMeshLibrary._tube(buf.call("green"), [Vector3(0, 0, 0), Vector3(0, 0.85, 0)], [0.29, 0.31], 12, 1.0, 1.0)
 			TreeMeshLibrary._tube(buf.call("iron"), [Vector3(0, 0.85, 0), Vector3(0, 0.92, 0)], [0.33, 0.2], 12, 1.0, 1.0)
+		"bin_nyc":
+			# Open wire litter basket, rather than a solid drum.
+			for k in 12:
+				var a := TAU * float(k) / 12.0
+				var at := Vector3(cos(a) * 0.29, 0, sin(a) * 0.29)
+				TreeMeshLibrary._tube(buf.call("iron"), [at, at + Vector3(0, 0.83, 0)], [0.015, 0.015], 4, 1.0, 1.0)
+			for y in [0.08, 0.42, 0.82]:
+				for k in 12:
+					var a := TAU * float(k) / 12.0
+					var b := TAU * float(k + 1) / 12.0
+					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(cos(a) * 0.30, y, sin(a) * 0.30),
+						Vector3(cos(b) * 0.30, y, sin(b) * 0.30)], [0.018, 0.018], 4, 1.0, 1.0)
+		"subway_entrance":
+			# The visible stairwell rim, handrails, sign and the two green globes.
+			for k in 6:
+				StreetProps._box(buf.call("concrete"), Vector3(-1.3 + float(k) * 0.48, 0.03 + float(k) * 0.04, 0),
+					Vector3(0.48, 0.08, 2.1))
+			for z in [-1.15, 1.15]:
+				for x in [-1.5, 1.5]:
+					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(x, 0, z), Vector3(x, 1.05, z)], [0.045, 0.045], 6, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("iron"), [Vector3(-1.5, 1.0, z), Vector3(1.5, 1.0, z)], [0.04, 0.04], 6, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("lens_g"), [Vector3(1.5, 1.08, z), Vector3(1.5, 1.22, z),
+					Vector3(1.5, 1.38, z), Vector3(1.5, 1.52, z)], [0.05, 0.16, 0.16, 0.05], 8, 1.0, 1.0)
+			StreetProps._box(buf.call("iron"), Vector3(-1.5, 0.76, 0), Vector3(0.08, 0.34, 2.3))
 		"bin_black":
 			TreeMeshLibrary._tube(buf.call("iron"), [Vector3(0, 0, 0), Vector3(0, 0.95, 0)], [0.26, 0.28], 12, 1.0, 1.0)
 			TreeMeshLibrary._tube(buf.call("gold"), [Vector3(0, 0.78, 0), Vector3(0, 0.84, 0)], [0.285, 0.285], 12, 1.0, 1.0)
@@ -244,12 +280,20 @@ static func mesh(key: String) -> ArrayMesh:
 			for z in [-1.5, 1.5]:
 				StreetProps._box(buf.call("glass"), Vector3(0, 1.3, z), Vector3(1.3, 2.1, 0.02))
 			StreetProps._box(buf.call("galv"), Vector3(-0.45, 0.45, 0), Vector3(0.35, 0.05, 2.0))
-		"stop_pole":
+		"stop_pole", "stop_hsl", "stop_sl":
 			TreeMeshLibrary._tube(buf.call("galv"), [Vector3(0, 0, 0), Vector3(0, 2.7, 0)], [0.04, 0.035], 6, 1.0, 1.0)
-			StreetProps._box(buf.call("sign"), Vector3(0.05, 2.45, 0), Vector3(0.04, 0.45, 0.45))
+			StreetProps._box(buf.call("blue" if key in ["stop_hsl", "stop_sl"] else "sign"), Vector3(0.05, 2.45, 0), Vector3(0.04, 0.55, 0.45))
+			if key == "stop_sl":
+				StreetProps._box(buf.call("sign"), Vector3(0.078, 2.47, 0), Vector3(0.015, 0.16, 0.28))
+			if key == "stop_hsl":
+				StreetProps._box(buf.call("gold"), Vector3(0.078, 2.47, 0), Vector3(0.015, 0.27, 0.3))
+				StreetProps._box(buf.call("blue"), Vector3(0.09, 2.47, 0), Vector3(0.015, 0.1, 0.2))
 	var m := ArrayMesh.new()
 	for mat in surf:
-		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, (surf[mat] as TreeMeshLibrary.Buf).arrays())
+		var arrays := (surf[mat] as TreeMeshLibrary.Buf).arrays()
+		if key in ["stop_hsl", "stop_sl"]:
+			arrays[Mesh.ARRAY_INDEX] = ParkedCars.front_faces(arrays[Mesh.ARRAY_INDEX])
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		m.surface_set_material(m.get_surface_count() - 1, _material(str(mat)))
 	_meshes[key] = m
 	return m
@@ -266,14 +310,14 @@ static func _head(buf: Callable, c: Vector3, horizontal: bool, lit: String) -> v
 		var lens: String = ("lens_" + names[k]) if names[k] == lit else "lens_off"
 		StreetProps._box(buf.call(lens), at, Vector3(0.02, 0.2, 0.2))
 
-static func _material(name: String) -> StandardMaterial3D:
+static func _material(name: String) -> Material:
 	var m := StandardMaterial3D.new()
 	var col: Color = {
 		"wood": Color(0.30, 0.20, 0.12), "iron": Color(0.04, 0.045, 0.045),
 		"concrete": Color(0.48, 0.47, 0.44), "green": Color(0.05, 0.12, 0.07),
 		"gold": Color(0.55, 0.42, 0.12), "oxide": Color(0.22, 0.07, 0.04),
 		"galv": Color(0.46, 0.47, 0.46), "glass": Color(0.6, 0.7, 0.72, 0.25),
-		"sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
+		"blue": Color(0.015, 0.19, 0.5), "sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
 	}.get(name, Color(0.03, 0.03, 0.03))
 	m.albedo_color = col
 	m.vertex_color_use_as_albedo = true
@@ -288,14 +332,14 @@ static func _material(name: String) -> StandardMaterial3D:
 		m.emission_enabled = true
 		m.emission = lc
 		m.emission_energy_multiplier = 3.0
-	return m
+	return StreetSnow.material(m) if name in ["wood", "iron", "concrete", "green", "galv"] else m
 
 ## Road segments near the eye on a coarse grid, for nearest-kerb lookups.
 class RoadIndex:
 	var _cells := {}
 	var _cell := 20.0
 
-	func _init(data: LocationData, m2u: float, reach_u: float) -> void:
+	func _init(data: LocationData, m2u: float, reach_u: float, centre: Vector2 = Vector2.ZERO) -> void:
 		_cell = 20.0 * m2u
 		var r2 := reach_u * reach_u
 		for rd in data.roads:
@@ -311,7 +355,7 @@ class RoadIndex:
 			for i in pts.size() - 1:
 				var a := pts[i]
 				var b := pts[i + 1]
-				if a.length_squared() > r2 and b.length_squared() > r2:
+				if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > r2:
 					continue
 				var lo := Vector2i(floori(minf(a.x, b.x) / _cell), floori(minf(a.y, b.y) / _cell))
 				var hi := Vector2i(floori(maxf(a.x, b.x) / _cell), floori(maxf(a.y, b.y) / _cell))

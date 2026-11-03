@@ -47,6 +47,19 @@ func _run() -> void:
 		"Gwanghwamun Gate": "gwanghwamun",
 		"Fairmont Banff Springs": "banff_springs",
 		"Stockholm City Hall": "stockholm_city_hall",
+		"Stockholm Palace": "royal_palace_stockholm",
+		"Storkyrkan": "storkyrkan",
+		"Katarina kyrka": "katarina_church",
+		"Hedvig Eleonora kyrka": "hedvig_eleonora_church",
+		"Avicii Arena": "ericsson_globe",
+		"Kaknäs Tower": "kaknas_tower",
+		"Vasa Museum": "vasa_museum",
+		"Nordic Museum": "nordic_museum",
+		"Stockholm Public Library": "stockholm_public_library",
+		"Stockholm Concert Hall": "stockholm_concert_hall",
+		"Riksdag Building": "riksdag_building",
+		"Tyska kyrkan": "tyska_kyrkan",
+		"Västerbron": "vasterbron",
 		"Golden Gate Bridge": "golden_gate",
 		"Tower Bridge": "tower_bridge",
 		"Brooklyn Bridge": "brooklyn_bridge",
@@ -80,6 +93,16 @@ func _run() -> void:
 		var got := LocationData.landmark_for(coords.x, coords.y, "")
 		if got != by_place[coords]:
 			failures.append("place %s should give %s, got %s" % [coords, by_place[coords], got])
+	var stockholm_view: Dictionary = PresetViews.ROWS.filter(
+		func(row: Dictionary) -> bool: return str(row.get("id", "")) == "stockholm")[0]
+	var sto_lat := float(stockholm_view["lat"])
+	var sto_lon := float(stockholm_view["lon"])
+	if LocationData.landmark_for(sto_lat, sto_lon, "") != "stockholm_city_hall":
+		failures.append("Stockholm preset should resolve to City Hall")
+	var sto_extras := LocationData.registry_extras(sto_lat, sto_lon, "stockholm_city_hall").map(
+		func(e: Dictionary) -> String: return str(e["type"]))
+	if not sto_extras.has("tyska_kyrkan") or not sto_extras.has("riddarholmen"):
+		failures.append("Stockholm preset extras should include Tyska kyrkan and Riddarholmen, got %s" % [sto_extras])
 	if LocationData.landmark_for(51.1789, -115.5708, "Banff, Canada") != "banff_springs":
 		failures.append("Banff should give the Banff Springs Hotel")
 	# A skyline of several registry icons: New York's primary is One WTC,
@@ -103,7 +126,11 @@ func _run() -> void:
 		"turku_cathedral": 86.0, "helsinki_cathedral": 62.0,
 		"burj_khalifa": 828.0, "one_wtc": 541.3, "empire_state": 443.2, "salute": 60.0,
 		"monte_carlo_casino": 34.0, "gwanghwamun": 19.0, "banff_springs": 59.5,
-		"stockholm_city_hall": 106.0, "golden_gate": 227.0, "tower_bridge": 65.0,
+		"stockholm_city_hall": 106.0, "royal_palace_stockholm": 36.5, "storkyrkan": 63.0,
+		"katarina_church": 72.0, "hedvig_eleonora_church": 59.0, "ericsson_globe": 85.0,
+		"kaknas_tower": 170.0, "vasa_museum": 52.5, "nordic_museum": 81.0,
+		"stockholm_public_library": 31.0, "stockholm_concert_hall": 22.2, "riksdag_building": 35.0,
+		"tyska_kyrkan": 96.0, "vasterbron": 51.2, "golden_gate": 227.0, "tower_bridge": 65.0,
 		"brooklyn_bridge": 84.3, "sydney_harbour_bridge": 134.0, "bixby_creek_bridge": 79.0}
 	for entry in LocationData.landmarks():
 		var type := str(entry["type"])

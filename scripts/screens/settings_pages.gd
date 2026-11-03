@@ -12,6 +12,8 @@ const SOURCES := [
 	["Globe tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
 	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
+	["Land cover", "© ESA WorldCover project 2021 · contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium · CC BY 4.0", "https://esa-worldcover.org/"],
+	["Canopy height", "© Meta and World Resources Institute · source imagery © 2016 Vantor · CC BY 4.0", "https://registry.opendata.aws/dataforgood-fb-forestsv2/"],
 	["Climate", "CHELSA V2.1 (Karger et al.) · CC BY 4.0", "https://chelsa-climate.org/"],
 	["Climate fallback", "ERA5 (Copernicus) via Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Weather", "Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],

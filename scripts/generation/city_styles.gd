@@ -26,6 +26,8 @@ const ZONES := [
 	["rome", "rome", 41.9028, 12.4964, 9.0],
 	["venice", "venice", 45.4375, 12.3358, 3.0],        # old city + Giudecca
 	["stockholm", "stockholm", 59.3293, 18.0686, 6.0],
+	["stockholm", "stockholm", 59.2760, 17.9060, 1.0], # Skärholmen
+	["stockholm", "stockholm", 59.3920, 17.9170, 1.8], # Tensta / Rinkeby
 	["new_york", "new_york", 40.7831, -73.9712, 11.0],  # Manhattan
 	["new_york", "new_york", 40.6800, -73.9600, 7.0],   # inner Brooklyn
 	["new_york", "new_york", 40.7500, -73.8950, 5.5],   # inner Queens
@@ -43,7 +45,8 @@ const ZONES := [
 	["banff", "banff", 51.1784, -115.5708, 3.0],
 	["copenhagen", "copenhagen", 55.6761, 12.5683, 5.0],
 	["oslo", "oslo", 59.9139, 10.7522, 5.0],
-	["helsinki", "helsinki", 60.1699, 24.9384, 5.0],
+	["helsinki", "helsinki", 60.1900, 24.9950, 9.0],
+	["espoo", "espoo", 60.1900, 24.7700, 9.0],
 	["edinburgh", "edinburgh", 55.9533, -3.1883, 5.0],
 	["dublin", "dublin", 53.3498, -6.2603, 5.0],
 	["brussels", "brussels", 50.8503, 4.3517, 5.0],
@@ -102,6 +105,7 @@ const CORES := {
 	"banff": [[51.1770, -115.5710]],                       # Banff Avenue
 	"copenhagen": [[55.6795, 12.5850]],                    # Kongens Nytorv
 	"oslo": [[59.9133, 10.7389]],                          # Karl Johans gate
+	"espoo": [[60.1760, 24.8050], [60.2190, 24.8130], [60.1590, 24.7380], [60.2050, 24.6550]],
 	"helsinki": [[60.1694, 24.9522]],                      # Senate Square
 	"edinburgh": [[55.9500, -3.1880]],                     # the Royal Mile
 	"dublin": [[53.3473, -6.2591]],                        # O'Connell Bridge
@@ -171,7 +175,11 @@ const DISTRICTS := [
 	["new_york", "nyc_brownstone", 40.6840, -73.9420, 1.5, 8.0],  # Bed-Stuy
 	["new_york", "nyc_brownstone", 40.8100, -73.9450, 1.4, 5.0],  # Harlem
 	["new_york", "nyc_glass", 40.7549, -73.9840, 1.3, 6.0],      # Midtown
-	["new_york", "nyc_glass", 40.7075, -74.0113, 0.9, 6.0],      # Downtown
+	["new_york", "nyc_prewar", 40.7075, -74.0095, 0.65, 6.0],   # Financial District
+	["new_york", "nyc_castiron", 40.7223, -74.0000, 0.65, 8.0], # SoHo / Tribeca
+	["new_york", "nyc_loft", 40.7030, -73.9907, 0.42, 8.0],     # DUMBO
+	["new_york", "new_york", 40.7182, -73.9860, 0.85, 7.0],    # Lower East Side
+	["new_york", "nyc_nycha", 40.7148, -73.9828, 0.35, 8.0],  # LES housing towers
 	["chicago", "chicago_greystone", 41.9214, -87.6513, 2.0, 5.0],  # Lincoln Park
 	["chicago", "chicago_tower", 41.8819, -87.6278, 1.3, 10.0],  # the Loop
 	["san_francisco", "sf_victorian", 37.7700, -122.4350, 2.2, 6.0],  # Haight / Alamo Sq
@@ -218,13 +226,47 @@ const DISTRICTS := [
 	["monaco", "monaco_tower", 43.7460, 7.4330, 0.4, 8.0],       # Larvotto
 	["interlaken", "interlaken_hotel", 46.6860, 7.8560, 0.5, 12.0],  # Höheweg
 	["banff", "banff_heritage", 51.1640, -115.5617, 0.4, 20.0],  # Banff Springs
+	["stockholm", "stockholm_medieval", 59.3251, 18.0711, 0.43, 20.0], # Gamla stan
+	["stockholm", "stockholm_medieval", 59.3250, 18.0640, 0.22, 20.0], # Riddarholmen
+	["stockholm", "stockholm_wood", 59.3195, 18.0595, 0.20, 12.0], # Mariaberget
+	["stockholm", "stockholm_wood", 59.3125, 18.0925, 0.25, 12.0], # Vita Bergen
+	["stockholm", "stockholm_stone", 59.3360, 18.0900, 0.85, 10.0], # Östermalm / Strandvägen
+	["stockholm", "stockholm_grace", 59.3435, 18.0370, 0.65, 10.0], # Vasastan
+	["stockholm", "stockholm_funkis", 59.3305, 18.0045, 0.55, 10.0], # Fredhäll
+	["stockholm", "stockholm_funkis", 59.3180, 18.0450, 0.48, 10.0], # Söder Mälarstrand
+	["stockholm", "stockholm_miljon", 59.2760, 17.9060, 1.0, 15.0], # Skärholmen
+	["stockholm", "stockholm_miljon", 59.3945, 17.9025, 0.9, 15.0], # Tensta
+	["stockholm", "stockholm_miljon", 59.3890, 17.9290, 0.8, 15.0], # Rinkeby
+	["stockholm", "stockholm_eco", 59.3030, 18.0950, 0.8, 15.0], # Hammarby Sjöstad
+	["stockholm", "stockholm_eco", 59.3580, 18.1060, 0.7, 15.0], # Norra Djurgårdsstaden
 	["copenhagen", "copenhagen_old", 55.6800, 12.5900, 0.35, 20.0],  # Nyhavn
 	["copenhagen", "copenhagen_modern", 55.6300, 12.5800, 1.2, 20.0],  # Ørestad
 	["oslo", "oslo_wood", 59.9200, 10.7470, 0.2, 30.0],          # Damstredet
 	["oslo", "oslo_modern", 59.9070, 10.7590, 0.5, 20.0],        # Bjørvika
 	["helsinki", "helsinki_empire", 60.1720, 24.9550, 0.5, 8.0],  # Kruununhaka
-	["helsinki", "helsinki_functional", 60.1800, 24.9200, 1.0, 3.0],  # Töölö
-	["helsinki", "helsinki_modern", 60.1870, 24.9770, 0.6, 20.0],  # Kalasatama
+	["helsinki", "helsinki_classicism", 60.1800, 24.9200, 1.0, 5.0],  # Töölö
+	["helsinki", "helsinki_midrise", 60.1870, 24.9770, 0.6, 20.0],  # Kalasatama
+	["helsinki", "helsinki", 60.1670, 24.9700, 0.7, 8.0],  # Katajanokka
+	["helsinki", "helsinki", 60.1580, 24.9400, 0.55, 8.0],  # Eira
+	["helsinki", "helsinki", 60.1580, 24.9500, 0.5, 8.0],  # Ullanlinna
+	["helsinki", "helsinki", 60.1850, 24.9500, 0.65, 8.0],  # Kallio
+	["helsinki", "helsinki", 60.1620, 24.9350, 0.5, 8.0],  # Punavuori
+	["helsinki", "helsinki_classicism", 60.1950, 24.9570, 0.7, 8.0],  # Vallila
+	["helsinki", "helsinki_wood", 60.2140, 24.9470, 0.65, 8.0],  # Käpylä
+	["helsinki", "helsinki_wood", 60.1950, 24.9510, 0.25, 8.0],  # Puu-Vallila
+	["helsinki", "helsinki_suburb", 60.1950, 25.0350, 0.8, 8.0],  # Herttoniemi
+	["helsinki", "helsinki_suburb", 60.2030, 25.0570, 0.7, 8.0],  # Roihuvuori
+	["helsinki", "helsinki_suburb", 60.2060, 24.8720, 0.7, 8.0],  # Munkkivuori
+	["helsinki", "helsinki_element", 60.2100, 25.0830, 0.8, 8.0],  # Itäkeskus
+	["helsinki", "helsinki_element", 60.2370, 25.0830, 1.0, 8.0],  # Kontula
+	["helsinki", "helsinki_element", 60.1800, 24.9620, 0.28, 8.0],  # Merihaka
+	["helsinki", "helsinki_midrise", 60.1550, 24.9200, 0.85, 8.0],  # Jätkäsaari
+	["espoo", "tapiola", 60.1760, 24.8050, 1.0, 8.0],  # Tapiola
+	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
+	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
+	["espoo", "espoo_modern", 60.1590, 24.7380, 1.1, 8.0],  # Matinkylä
+	["espoo", "espoo_modern", 60.1700, 24.8280, 0.7, 8.0],  # Keilaniemi
+	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
 	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands

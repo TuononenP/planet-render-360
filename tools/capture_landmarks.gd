@@ -4,6 +4,7 @@ extends SceneTree
 ## off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_landmarks.gd --position 4000,4000 \
 ##     -- [--types=hoover_dam,eiffel] [--all] [--tag=name] [--plain] [--night]
+##        [--bearings=0,40,130,180] [--elevation=14]
 ##
 ## Builds each landmark as the Ultra desktop path does (LandmarkShader, and
 ## LandmarkLights with --night) on a flat ground disc at y = 0, and shoots
@@ -11,6 +12,7 @@ extends SceneTree
 ## fitted to its size. Output, in visual-plan/captures/<tag>/:
 ##   <type>_sheet.jpg   the four views tiled 2 x 2
 ##   stats.tsv          type, width, depth, height, lowest y, triangles
+##   cameras.tsv        local bearings and camera settings for each view
 ## A registry `base_drop_m` lifts the model as TerrainBuilder._hero_y does.
 ## The ground disc is not the real terrain: heroes stand on the lowest
 ## ground of their site, so use this for the model itself (silhouette,
@@ -28,6 +30,8 @@ var _types: Array = DEFAULT_TYPES
 var _plain := false
 var _night := false
 var _tag := "landmarks"
+var _bearings: Array[float] = []
+var _elevation := ELEVATION_DEG
 
 func _init() -> void:
 	_run()
@@ -46,6 +50,19 @@ func _run() -> void:
 			_plain = true
 		elif a == "--night":
 			_night = true
+		elif a.begins_with("--bearings="):
+			for value in a.substr(11).split(",", false):
+				if value.is_valid_float():
+					_bearings.append(float(value))
+		elif a.begins_with("--elevation=") and a.substr(12).is_valid_float():
+			_elevation = clampf(float(a.substr(12)), -89.0, 89.0)
+	if _bearings.is_empty():
+		for bearing in BEARINGS_DEG:
+			_bearings.append(float(bearing))
+	if _bearings.size() != 4:
+		printerr("CAPTURE ERROR: --bearings requires exactly four numbers")
+		quit(1)
+		return
 	var out := ProjectSettings.globalize_path("res://visual-plan/captures/%s" % _tag)
 	DirAccess.make_dir_recursive_absolute(out)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
@@ -58,6 +75,7 @@ func _run() -> void:
 	vp.add_child(cam)
 	vp.add_child(_environment())
 	var stats := PackedStringArray(["type\twidth_m\tdepth_m\theight_m\tlowest_y_m\ttriangles"])
+	var cameras := PackedStringArray(["type\tview\tbearing_local_deg\televation_deg\tfov_deg\tdistance_m\ttarget_x_m\ttarget_y_m\ttarget_z_m\tground"])
 	for t in _types:
 		var hero := LandmarkBuilder.build(str(t))
 		var box := _extent(hero)
@@ -72,14 +90,19 @@ func _run() -> void:
 		hero.position.y = float(LocationData.entry_for_type(str(t)).get("base_drop_m", 0.0)) * WorldScale.metres_to_units()
 		var sheet := Image.create(VIEW.x * 2, VIEW.y * 2, false, Image.FORMAT_RGB8)
 		var u := WorldScale.metres_to_units()
-		var centre := Vector3(aabb.get_center().x, aabb.size.y * 0.4 + aabb.position.y * 0.0, aabb.get_center().z) * u
-		var dist := maxf(aabb.size.length() * 0.9, 12.0) * u
-		for i in BEARINGS_DEG.size():
-			var b := deg_to_rad(float(BEARINGS_DEG[i]))
-			var el := deg_to_rad(ELEVATION_DEG)
-			cam.near = maxf(dist * 0.01, 0.05)
-			cam.far = dist * 40.0
-			cam.look_at_from_position(centre + Vector3(sin(b) * cos(el), sin(el), cos(b) * cos(el)) * dist, centre)
+		var target_m := aabb.get_center() + Vector3.UP * float(LocationData.entry_for_type(str(t)).get("base_drop_m", 0.0))
+		var centre := target_m * u
+		for i in _bearings.size():
+			var b := deg_to_rad(_bearings[i])
+			var el := deg_to_rad(_elevation)
+			var direction := Vector3(sin(b) * cos(el), sin(el), cos(b) * cos(el))
+			var dist_m := _fit_distance(aabb, direction, cam.fov)
+			var dist := dist_m * u
+			cam.near = 0.05 * u
+			cam.far = (dist_m + aabb.size.length() + 100.0) * u
+			cam.look_at_from_position(centre + direction * dist, centre)
+			cameras.append("%s\t%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\tflat_disc" % [
+				t, i, _bearings[i], _elevation, cam.fov, dist_m, target_m.x, target_m.y, target_m.z])
 			for f in SETTLE_FRAMES if i == 0 else 8:
 				await process_frame
 				RenderingServer.force_draw(false)
@@ -97,8 +120,29 @@ func _run() -> void:
 	var f := FileAccess.open(out.path_join("stats.tsv"), FileAccess.WRITE)
 	f.store_string("\n".join(stats) + "\n")
 	f.close()
+	var camera_file := FileAccess.open(out.path_join("cameras.tsv"), FileAccess.WRITE)
+	camera_file.store_string("\n".join(cameras) + "\n")
+	camera_file.close()
 	print("CAPTURES DONE -> ", out)
 	quit(0)
+
+## Fit all eight corners in perspective, allowing a small margin on each
+## edge. This fits shallow palaces much more closely than a bounding sphere.
+func _fit_distance(box: AABB, direction: Vector3, vertical_fov: float) -> float:
+	var right := Vector3.UP.cross(direction).normalized()
+	var up := direction.cross(right).normalized()
+	var tan_v := tan(deg_to_rad(vertical_fov * 0.5)) / 1.08
+	var tan_h := tan_v * float(VIEW.x) / float(VIEW.y)
+	var half := box.size * 0.5
+	var distance := 12.0
+	for x in [-1.0, 1.0]:
+		for y in [-1.0, 1.0]:
+			for z in [-1.0, 1.0]:
+				var corner := Vector3(half.x * x, half.y * y, half.z * z)
+				var depth := corner.dot(direction)
+				distance = maxf(distance, depth + absf(corner.dot(right)) / tan_h)
+				distance = maxf(distance, depth + absf(corner.dot(up)) / tan_v)
+	return distance
 
 ## [AABB in metres across all parts, triangle count].
 func _extent(hero: Node3D) -> Array:

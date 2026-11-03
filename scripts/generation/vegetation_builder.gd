@@ -48,7 +48,11 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 	_fill_cover(plan, data, ground, mask, ctx, abort)
 	if abort != null and abort.requested:
 		return root
-	var fallback := data.trees.is_empty() and mask.green.is_empty()
+	CanopyVegetation.add(plan, data, ground, mask, ctx, abort)
+	if abort != null and abort.requested:
+		return root
+	var fallback := data.trees.is_empty() and mask.green.is_empty() \
+		and not bool(ctx["canopy_present"])
 	if fallback:
 		_fallback_scatter(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
@@ -57,6 +61,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 	stats["fallback"] = fallback
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
 	stats["cover"] = GroundCover.build(root, data, ground, mask)
+	stats["tree_pits"] = TreePits.build(root, data, ground, mask)
 	stats["ms"] = Time.get_ticks_msec() - t0
 	last_stats = stats
 	root.set_meta("stats", stats)
@@ -77,8 +82,12 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 		# below it does not.
 		"snow": 0.0 if data.season == LocationData.Season.SUMMER else 0.85,
 		"sway": 0.0035 if p == 3 else 0.0,
+		"eye": View360.spawn_xz(data),
 		"full_r": float(FULL_R[p]), "mid_r": float(MID_R[p]),
 		"budget": int(MESH_BUDGET[p]), "noise": noise,
+		"canopy_present": p > RenderSettings.Preset.FAST \
+			and (CanopyVegetation.usable(data.canopy_image, 255) \
+				or CanopyVegetation.usable(data.landcover_image, 0)),
 		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
 		"landmark": TerrainBuilder.landmark_world_pos(data) if data.landmark_type != "none" else Vector2(INF, INF),
 	}
@@ -117,7 +126,10 @@ static func _species_at(x: float, z: float, setting: String, ground: GroundTruth
 		ctx: Dictionary, leaf_type: String = "") -> Array:
 	var noise: FastNoiseLite = ctx["noise"]
 	var u := clampf(0.5 + noise.get_noise_2d(x, z) * 0.9 + (_hash(x, z, 3.1) - 0.5) * 0.45, 0.0, 0.999)
-	var sp := TreeSpecies.pick(TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type), u)
+	var mix := TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type)
+	if str(ctx["biome"]) == "boreal" and ground.land_class_at(x, z) == "rock" and leaf_type != "broadleaved":
+		mix = [["scots_pine", 0.8], ["birch", 0.2]]
+	var sp := TreeSpecies.pick(mix, u)
 	var size := 1.0
 	var asl := ground.asl_y(ground.height_at_world(x, z))
 	var tl: float = ctx["treeline"]
@@ -235,6 +247,8 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 					p = 0.04 * dens_scale
 					setting = "rural"
 				_:
+					if cls == "grass" and bool(ctx.get("canopy_present", false)):
+						continue
 					# Grass: real tree nodes win — a park already mapped
 					# tree by tree gets no synthetic additions.
 					var cells := maxf(float(g["cells"]), 1.0)
@@ -305,11 +319,12 @@ static func _emit(root: Node3D, plan: Dictionary, ctx: Dictionary) -> Dictionary
 	var full_u := float(ctx["full_r"]) * m2u
 	var mid_u := float(ctx["mid_r"]) * m2u
 	var budget: int = ctx["budget"]
+	var eye: Vector2 = ctx.get("eye", Vector2.ZERO)
 	var order: Array = range(pos.size())
 	order.sort_custom(func(a: int, b: int) -> bool:
 		var pa: Vector3 = pos[a]
 		var pb: Vector3 = pos[b]
-		return pa.x * pa.x + pa.z * pa.z < pb.x * pb.x + pb.z * pb.z)
+		return Vector2(pa.x, pa.z).distance_squared_to(eye) < Vector2(pb.x, pb.z).distance_squared_to(eye))
 	var groups := {}
 	var mesh_trees := 0
 	var imp_trees := 0
@@ -317,7 +332,7 @@ static func _emit(root: Node3D, plan: Dictionary, ctx: Dictionary) -> Dictionary
 	var lod_counts := [0, 0, 0]
 	for i in order:
 		var p: Vector3 = pos[i]
-		var d := Vector2(p.x, p.z).length()
+		var d := Vector2(p.x, p.z).distance_to(eye)
 		var lod := 0 if d <= full_u else (1 if d <= mid_u else 2)
 		if lod < 2 and mesh_trees >= budget:
 			lod = 2

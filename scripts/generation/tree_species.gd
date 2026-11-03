@@ -22,6 +22,18 @@ const SPECIES := {
 		"leader": 0.8, "branches": 9, "trunk_r": 0.30, "up": 0.6, "droop": 0.15,
 		"clusters": 62, "card": 3.0, "leaf": "broad", "bark": "furrowed",
 		"tint": "lime", "evergreen": false},
+	"honey_locust": {"gen": "broad", "h": 17.0, "h_var": 0.2, "bole": 0.38, "crown_r": 0.38,
+		"leader": 0.35, "branches": 7, "trunk_r": 0.24, "up": 0.52, "droop": 0.1,
+		"clusters": 40, "card": 2.3, "leaf": "birch", "bark": "furrowed", "tint": "birch", "evergreen": false},
+	"callery_pear": {"gen": "broad", "h": 11.0, "h_var": 0.2, "bole": 0.25, "crown_r": 0.24,
+		"leader": 0.85, "branches": 8, "trunk_r": 0.19, "up": 0.7, "droop": 0.05,
+		"clusters": 48, "card": 2.2, "leaf": "broad", "bark": "furrowed", "tint": "broad", "evergreen": false},
+	"ginkgo": {"gen": "broad", "h": 17.0, "h_var": 0.2, "bole": 0.3, "crown_r": 0.23,
+		"leader": 0.9, "branches": 8, "trunk_r": 0.25, "up": 0.72, "droop": 0.05,
+		"clusters": 45, "card": 2.4, "leaf": "broad", "bark": "furrowed", "tint": "birch", "evergreen": false},
+	"zelkova": {"gen": "broad", "h": 16.0, "h_var": 0.2, "bole": 0.3, "crown_r": 0.4,
+		"leader": 0.4, "branches": 9, "trunk_r": 0.3, "up": 0.6, "droop": 0.05,
+		"clusters": 55, "card": 2.5, "leaf": "broad", "bark": "furrowed", "tint": "broad", "evergreen": false},
 	"oak": {"gen": "broad", "h": 17.0, "h_var": 0.25, "bole": 0.22, "crown_r": 0.42,
 		"leader": 0.25, "branches": 6, "trunk_r": 0.45, "up": 0.35, "droop": 0.05,
 		"clusters": 60, "card": 3.4, "leaf": "broad", "bark": "furrowed",
@@ -30,6 +42,14 @@ const SPECIES := {
 		"leader": 0.95, "branches": 11, "trunk_r": 0.17, "up": 0.65, "droop": 0.55,
 		"clusters": 52, "card": 2.2, "leaf": "birch", "bark": "birch",
 		"tint": "birch", "evergreen": false},
+	"maple": {"gen": "broad", "h": 16.0, "h_var": 0.2, "bole": 0.25, "crown_r": 0.33,
+		"leader": 0.65, "branches": 8, "trunk_r": 0.28, "up": 0.5, "droop": 0.1,
+		"clusters": 58, "card": 2.8, "leaf": "broad", "bark": "furrowed",
+		"tint": "broad", "evergreen": false},
+	"rowan": {"gen": "broad", "h": 9.0, "h_var": 0.2, "bole": 0.22, "crown_r": 0.31,
+		"leader": 0.7, "branches": 7, "trunk_r": 0.16, "up": 0.5, "droop": 0.15,
+		"clusters": 42, "card": 2.0, "leaf": "birch", "bark": "furrowed",
+		"tint": "broad", "evergreen": false},
 	"olive": {"gen": "broad", "h": 7.0, "h_var": 0.2, "bole": 0.28, "crown_r": 0.48,
 		"leader": 0.2, "branches": 5, "trunk_r": 0.28, "up": 0.45, "droop": 0.1,
 		"clusters": 40, "card": 2.2, "leaf": "olive", "bark": "furrowed",
@@ -177,7 +197,7 @@ static func mix(biome: String, setting: String) -> Array:
 			if setting == "forest":
 				return [["spruce", 0.42], ["scots_pine", 0.33], ["birch", 0.25]]
 			if setting == "street":
-				return [["lime", 0.4], ["birch", 0.35], ["plane", 0.1], ["spruce", 0.15]]
+				return [["lime", 0.4], ["birch", 0.3], ["maple", 0.2], ["rowan", 0.1]]
 			return [["birch", 0.4], ["spruce", 0.25], ["scots_pine", 0.2], ["lime", 0.15]]
 		"alpine":
 			if setting == "forest":
@@ -201,8 +221,8 @@ const GENUS := {
 	"castanea": "oak", "carpinus": "oak", "juglans": "oak",
 	"acer": "lime", "aesculus": "lime", "ulmus": "lime", "fraxinus": "lime",
 	"robinia": "lime", "prunus": "lime", "sorbus": "lime", "malus": "lime",
-	"celtis": "lime", "styphnolobium": "lime", "sophora": "lime", "gleditsia": "lime",
-	"pyrus": "lime", "magnolia": "lime", "ginkgo": "lime", "zelkova": "lime",
+	"celtis": "lime", "styphnolobium": "lime", "sophora": "lime", "gleditsia": "honey_locust",
+	"pyrus": "callery_pear", "magnolia": "lime", "ginkgo": "ginkgo", "zelkova": "zelkova",
 	"liquidambar": "oak", "liriodendron": "plane", "paulownia": "plane", "catalpa": "plane",
 	"betula": "birch", "populus": "birch", "salix": "birch", "alnus": "birch",
 	"olea": "olive", "ceratonia": "olive",

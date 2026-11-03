@@ -37,10 +37,14 @@ func _run() -> void:
 		quit(1)
 		return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	for f in DirAccess.get_files_at(WorldCache.DIR):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(WorldCache.DIR + "/" + f))
+	CacheStore.eviction_suppressed = true
+	WorldCache.dir_override = "user://world-cache-test-%d" % OS.get_process_id()
+	RenderSettings.path_override = "user://world-cache-test-settings-%d.json" % OS.get_process_id()
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
+	main.capture_mode = true
+	await process_frame
+	main._store.entries.clear()
 	await create_timer(1.0).timeout
 	# First visit: build, then the background save.
 	var t0 := Time.get_ticks_msec()
@@ -48,7 +52,7 @@ func _run() -> void:
 	var cold := await _wait_view(main, t0)
 	var data: LocationData = main._view._data
 	var first := _summary(main._view._generated)
-	var scene := WorldCache.DIR + "/" + WorldCache.key(data) + ".scn"
+	var scene := WorldCache.base_dir() + "/" + WorldCache.key(data) + ".scn"
 	var t1 := Time.get_ticks_msec()
 	while not FileAccess.file_exists(scene) and Time.get_ticks_msec() - t1 < 600000:
 		await process_frame

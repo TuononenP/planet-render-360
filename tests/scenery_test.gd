@@ -61,6 +61,26 @@ func _run() -> void:
 	var rground := GroundTruth.new(river)
 	var rm := TerrainBuilder._terrain_mesh(river, rground)
 	var verts: PackedVector3Array = rm.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var levels: PackedVector2Array = rm.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2]
+	if levels.size() != verts.size():
+		failures.append("terrain should carry a local water level for every vertex")
+	else:
+		var wet_levels := 0
+		var dry_levels := 0
+		for i in verts.size():
+			var p := verts[i]
+			if absf(p.x) < 400.0 and absf(p.z) < 400.0:
+				wet_levels += 1
+				if absf(levels[i].x - (3.0 - GroundTruth.FREEBOARD_M)) > 0.001:
+					failures.append("terrain should carry the local river level")
+					break
+			elif absf(p.x) > 900.0 and absf(p.z) > 900.0:
+				dry_levels += 1
+				if absf(levels[i].x - river.water_level) > 0.001:
+					failures.append("terrain far from the river should carry the datum")
+					break
+		if wet_levels == 0 or dry_levels == 0:
+			failures.append("fixture should sample both local river and datum levels")
 	var carved := 0
 	for v in verts:
 		if absf(v.x) < 500.0 and absf(v.z) < 500.0:
@@ -338,21 +358,26 @@ static func _scale_fixture(data: LocationData, k: float) -> void:
 func _probe_ground(failures: Array[String], label: String, data: LocationData) -> void:
 	var ground := GroundTruth.new(data)
 	var world := TerrainBuilder.build_world(data, ground)
-	# Terrain mesh: the only 32x32 ArrayMesh (far mesh is empty here).
+	# Shoreline patches add vertices; identify the terrain by its role.
 	var terrain: MeshInstance3D = null
 	for child in world.get_children():
 		if child is MeshInstance3D and (child as MeshInstance3D).mesh is ArrayMesh:
-			var n: int = (child as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size()
-			if n == data.grid_size * data.grid_size:
+			if str(child.name) == "Terrain":
 				terrain = child
 	if terrain == null:
 		failures.append("%s: terrain mesh missing from the world" % label)
 		world.free()
 		return
 	var verts: PackedVector3Array = terrain.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var terrain_indices: PackedInt32Array = terrain.mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX]
 	var worst := 0.0
 	for i in 50:
 		var v: Vector3 = verts[(i * 37 + 11) % verts.size()]
+		if ground.shoreline != null and ground.shoreline.ready:
+			# A vertical bank has a land top and submerged bed at the
+			# same XZ. Interior samples have an unambiguous surface side.
+			var offset := ((i * 37 + 11) % (terrain_indices.size() / 3)) * 3
+			v = (verts[terrain_indices[offset]] + verts[terrain_indices[offset + 1]] + verts[terrain_indices[offset + 2]]) / 3.0
 		worst = maxf(worst, absf(v.y - ground.height_at_world(v.x, v.z)))
 	if worst > 0.05:
 		failures.append("%s: terrain vs ground disagree by %f (bar 0.05)" % [label, worst])

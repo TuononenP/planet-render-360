@@ -113,7 +113,7 @@ func style(x: float, z: float, seed_v: float) -> Dictionary:
 			kind = "house" if area < 250.0 else "apartments"
 		var h := -1.0
 		var src := str(pick.get("height_source", ""))
-		if src == "tag_height" or src == "levels" or src == "":
+		if src in ["tag_height", "levels", "reference", ""]:
 			h = float(pick.get("height", -1.0)) * (0.92 + 0.16 * fmod(seed_v * 7.13, 1.0))
 		return {"kind": kind, "total_m": h}
 	# No real neighbour to match: low houses unless the imagery says dense.

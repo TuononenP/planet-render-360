@@ -58,11 +58,30 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 			% data.place_name)
 		return root
 	var mat := real_water_material(data.quality_preset).duplicate() as ShaderMaterial
+	var sea := WaterSurface.sea_palette(data)
+	mat.set_shader_parameter("brackish", 1.0 if bool(sea["brackish"]) else 0.0)
+	mat.set_shader_parameter("temperate_sea", WaterSurface.temperate_sea(data))
+	mat.set_shader_parameter("sea_shallow", sea["shallow"])
+	mat.set_shader_parameter("sea_deep", sea["deep"])
+	mat.set_shader_parameter("harbour", 1.0 if bool(sea["harbour"]) else 0.0)
+	if bool(sea["harbour"]):
+		mat.set_shader_parameter("wave_amp", 0.55)
+		mat.set_shader_parameter("near_rough", 0.18)
+		mat.set_shader_parameter("far_rough", 0.23)
+		mat.set_shader_parameter("spec", 0.20)
 	var wl := ground.water_level_m
 	if ground.shoreline != null and ground.shoreline.ready:
 		mat.set_shader_parameter("swell_lift", 0.0)
 	if coast:
 		_island_sea(root, data, ground, mat)
+	if ground.shoreline != null and ground.shoreline.ready:
+		# The shoreline model already carves a bed below the sea. Its
+		# swell can oscillate about the measured datum without the legacy
+		# upward offset that flooded low waterfront buildings.
+		ShoreWater.build(root, ground.shoreline, mat, abort)
+		ShoreBankMesh.build(root, ground.shoreline, abort, data)
+		_shore_aprons(root, data, ground, channels, abort)
+		return root
 	# Clip each water polygon once and reuse: _poly_levels and
 	# _add_polygon_surface previously clipped the same polygon twice via
 	# Geometry2D.intersect_polygons. Cache parts keyed by polygon index.
@@ -94,7 +113,8 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 	_shore_aprons(root, data, ground, channels, abort)
 	return root
 
-## Fill distant authored island openings beyond the detailed water grid.
+## The far drape yields to authored islands outside the detailed water
+## grid too. Both water builders must fill the opening underneath them.
 static func _island_sea(root: Node3D, data: LocationData, ground: GroundTruth,
 		mat: Material) -> void:
 	for site in LandmarkTerrain.islands(data):
@@ -190,6 +210,12 @@ static func _body_estimate(ground: GroundTruth, banks: Array, wl: float) -> Arra
 ## pieces meet flush instead of stepping down to the datum.
 static func _poly_levels(data: LocationData, ground: GroundTruth,
 		wl: float, clip_cache: Dictionary = {}, abort: BuildAbort = null) -> Dictionary:
+	if ground.shoreline != null and ground.shoreline.ready:
+		var shared := {}
+		for body in ground.shoreline.domains.bodies:
+			if int(body["source"]) >= 0:
+				shared[int(body["source"])] = float(body["level"])
+		return shared
 	var step := _post_step(data)
 	var est := {}
 	var boxes := {}
@@ -301,11 +327,17 @@ static func _add_polygon_surface(root: Node3D, data: LocationData,
 	var step := _post_step(data)
 	var holes: Array = poly.get("holes", [])
 	var level := body_level + _POLY_LIFT
+	var body_mat := mat
+	if bool(poly.get("still_pool", false)) and mat is ShaderMaterial:
+		body_mat = (mat as ShaderMaterial).duplicate() as ShaderMaterial
+		(body_mat as ShaderMaterial).set_shader_parameter("wave_amp", 0.08)
+		(body_mat as ShaderMaterial).set_shader_parameter("near_rough", 0.08)
+		(body_mat as ShaderMaterial).set_shader_parameter("far_rough", 0.12)
 	var parts: Array = clip_cache.get(cache_key, []) if cache_key >= 0 and clip_cache.has(cache_key) else _clip_water_poly(pts)
 	for part in parts:
 		if abort != null and abort.requested:
 			break
-		WaterSurface.add_polygon(root, part, holes, level, step, mat, abort)
+		WaterSurface.add_polygon(root, part, holes, level, step, body_mat, abort, bool(poly.get("tidal", false)))
 
 ## Water polygon intersected with the detailed extent (past the mesh
 ## the far field owns the water).

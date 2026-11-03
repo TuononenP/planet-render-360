@@ -16,20 +16,22 @@ func _run() -> void:
 	rig.set_coast(-60.0, true)
 	rig.set_weather(45, 100.0)
 	var coastal_fog := rig.environment.fog_density
-	if not rig.marine.visible:
+	if rig.marine.visible != MarineLayer.supported():
 		failures.append("fog at a coastal place should show the marine layer")
 	var mat := rig.marine.material_override as ShaderMaterial
 	var top := float(mat.get_shader_parameter("top_y"))
 	if absf(top - (-60.0 + MarineLayer.TOP_M * rig.units_per_metre)) > 0.01:
 		failures.append("the layer top should stand TOP_M over the sea, got %s" % top)
-	if float(mat.get_shader_parameter("amount")) < 1.0:
+	if MarineLayer.supported() and float(mat.get_shader_parameter("amount")) < 1.0:
 		failures.append("the layer should be fully on in fog")
 	rig.set_coast(-60.0, false)
 	var inland_fog := rig.environment.fog_density
 	if rig.marine.visible:
 		failures.append("an inland place keeps the plain weather fog, no layer")
-	if coastal_fog >= inland_fog * 0.5:
+	if MarineLayer.supported() and coastal_fog >= inland_fog * 0.5:
 		failures.append("the layer carries the fog: the air's fog should thin (%s vs %s)" % [coastal_fog, inland_fog])
+	if not MarineLayer.supported() and absf(coastal_fog - inland_fog) > 0.00001:
+		failures.append("Compatibility must keep ordinary weather fog at the coast")
 	rig.set_coast(-60.0, true)
 	rig.set_weather(0, 10.0)
 	if rig.marine.visible:

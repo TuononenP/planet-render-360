@@ -4,6 +4,8 @@ extends SceneTree
 ## Captures every screen at phone, tablet, and desktop sizes so the
 ## responsive layouts can be compared against the prototype mockups.
 
+var _shot_dir := ""
+
 func _init() -> void:
 	_run()
 
@@ -11,9 +13,8 @@ func _snap(name: String) -> void:
 	await process_frame
 	await process_frame
 	var img := root.get_texture().get_image()
-	var dir := DirAccess.open("user://")
-	dir.make_dir("shots")
-	img.save_png("user://shots/%s.png" % name)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_shot_dir))
+	img.save_png(_shot_dir.path_join("%s.png" % name))
 	print("SHOT ", name, " ", img.get_size())
 
 func _resize(w: int, h: int) -> void:
@@ -63,7 +64,7 @@ func _viewer_tools(main: Node) -> void:
 		var lines := PhotoMode.stamp_lines(view._data.place_name, view._data.latitude,
 			view._data.longitude, UiTheme.clock(view._time_hour), "", HudParts.short_sources(view._data.attribution))
 		var stamped := await PhotoMode.stamped(view, img, lines)
-		stamped.save_png("user://shots/07c-photo-stamped.png")
+		stamped.save_png(_shot_dir.path_join("07c-photo-stamped.png"))
 		print("SHOT 07c-photo-stamped ", stamped.get_size(), " raw ", img.get_size())
 	view._horizon.set_enabled(false)
 	UiPrefs.horizon_labels = false
@@ -71,6 +72,13 @@ func _viewer_tools(main: Node) -> void:
 	ViewChrome.layout(view)
 
 func _run() -> void:
+	var test_id := str(OS.get_process_id())
+	CacheStore.eviction_suppressed = true
+	_shot_dir = "user://shots/screenshot-test-" + test_id
+	CacheStore.history_override = "user://screenshot-test-history-" + test_id + ".json"
+	PlaceThumb.dir_override = "user://screenshot-test-thumbs-" + test_id
+	RenderSettings.path_override = "user://screenshot-test-settings-" + test_id + ".json"
+	WorldCache.dir_override = "user://screenshot-test-worlds-" + test_id
 	# The app starts full screen (display/window/size/mode); this tool
 	# drives window sizes itself, so opt back out to windowed first.
 	# Otherwise the resizes below only resize the viewport inside a
@@ -133,5 +141,6 @@ func _run() -> void:
 	await _snap("04-history-phone")
 	await _resize(1280, 800)
 	await _snap("04b-history-desktop")
-	print("SHOTS DONE -> ", ProjectSettings.globalize_path("user://shots"))
+	print("SHOTS DONE -> ", ProjectSettings.globalize_path(_shot_dir))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(CacheStore.history_override))
 	quit(0)

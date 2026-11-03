@@ -9,6 +9,10 @@
 #include "quad_sink.h"
 #include "ribbon_draper.h"
 #include "roof_kernels.h"
+#include "shore_kernels.h"
+#include "shore_mesh.h"
+#include "shore_patch_kernel.h"
+#include "shore_evidence_kernels.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -32,6 +36,12 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(QuadSink);
 	GDREGISTER_CLASS(RibbonDraper);
 	GDREGISTER_CLASS(RoofKernels);
+	GDREGISTER_CLASS(ShoreKernels);
+	GDREGISTER_CLASS(ShoreMesh);
+	GDREGISTER_CLASS(ShoreSampler);
+	GDREGISTER_CLASS(ShoreDomainIndex);
+	GDREGISTER_CLASS(ShoreEvidenceIndex);
+	GDREGISTER_CLASS(ShorePatchKernel);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

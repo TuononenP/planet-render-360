@@ -26,7 +26,8 @@ const CHINATOWN := ["#b8202a", "#1f5a3a", "#c8a030"]
 
 const BASE := {
 	"new_york": "north_america", "nyc_brownstone": "new_york", "nyc_prewar": "new_york",
-	"nyc_glass": "new_york",
+	"nyc_glass": "new_york", "nyc_castiron": "new_york", "nyc_loft": "new_york",
+	"nyc_nycha": "new_york", "nyc_pencil": "new_york", "nyc_international": "new_york",
 	"chicago": "north_america", "chicago_greystone": "chicago", "chicago_tower": "chicago",
 	"san_francisco": "north_america", "sf_victorian": "san_francisco", "sf_tower": "san_francisco",
 	"sf_stucco": "san_francisco", "sf_prewar": "san_francisco", "sf_chinatown": "san_francisco",
@@ -85,12 +86,51 @@ const REGIONS := {
 		"apartments": {"w": [["glass", []], ["concrete", ["#c8c4bc", "#b8b4ac"]]], "p": [["curtain", 3], ["balcony", 1]],
 			"wn": "wide", "bay": 3.0, "fr": "#3a3d42", "r": [["flat", 1]], "rf": [["membrane", []]],
 			"fh": 3.2, "st": [20, 50], "fix": true, "ch": 0.0, "eq": 0.9,
-			"g": [["shop", 1], ["none", 1]], "ev": 0.0, "rv": {"deep_balcony": 0.15}},
+			"g": [["shop", 1], ["none", 1]], "ev": 0.0, "rv": {"deep_balcony": 0.15, "mullion": true, "string_course": true}},
 		"commercial": {"w": [["glass", []]], "p": "curtain", "bay": 3.0, "r": [["flat", 1]],
 			"rf": [["membrane", []]], "fh": 3.9, "st": [25, 60], "fix": true, "eq": 0.9,
-			"g": [["shop", 1]], "rv": {}},
+			"g": [["shop", 1]], "rv": {"string_course": true, "mullion": true}},
 		"civic": {"w": [["glass", []], ["concrete", ["#c8c4bc"]]], "p": "strip", "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [6, 20], "fix": true, "rv": {}},
+	},
+	# SoHo and Tribeca: iron-framed loft facades, pale painted metal and
+	# tall closely spaced windows under a pronounced bracketed cornice.
+	"nyc_castiron": {
+		"commercial": {"w": [["render", ["#d9d5c9", "#c9c7bd", "#e0dbcf"]]], "p": "ornate", "wn": "wide",
+			"bay": 2.4, "fr": "#ccc9bf", "r": [["flat", 1]], "rf": [["membrane", []]],
+			"fh": 3.8, "st": [4, 7], "fix": true, "g": [["shop", 1]],
+			"rv": {"cornice": 0.9, "string_course": true}},
+		"apartments": {"w": [["render", ["#d9d5c9", "#c9c7bd"]]], "p": "ornate", "wn": "wide",
+			"bay": 2.4, "fr": "#ccc9bf", "r": [["flat", 1]], "rf": [["membrane", []]],
+			"fh": 3.6, "st": [4, 7], "fix": true, "g": [["shop", 1]],
+			"rv": {"cornice": 0.9, "string_course": true}},
+	},
+	# DUMBO's former factories and warehouses: dark brick and large sash bays.
+	"nyc_loft": {
+		"commercial": {"w": [["brick", ["#824b3c", "#98604b", "#a0684f"]]], "p": "punched", "wn": "wide",
+			"bay": 3.0, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.7, "st": [5, 9],
+			"fix": true, "g": [["shop", 1]], "rv": {"cornice": 0.6, "string_course": true, "fire_escape": 0.25}},
+		"apartments": {"w": [["brick", ["#824b3c", "#98604b"]]], "p": "punched", "wn": "wide",
+			"bay": 3.0, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.5, "st": [5, 9],
+			"fix": true, "rv": {"cornice": 0.5, "string_course": true, "fire_escape": 0.3}},
+	},
+	"nyc_nycha": {
+		"apartments": {"w": [["brick", ["#934d3d", "#a05743", "#8a4a3b"]]], "p": "punched", "wn": "sash",
+			"bay": 2.8, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.0,
+			"st": [10, 20], "fix": true, "g": [["none", 1]], "rv": {}},
+	},
+	"nyc_pencil": {
+		"apartments": {"w": [["glass", []]], "p": "curtain", "wn": "wide", "bay": 2.8, "fr": "#a3a39e",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.6, "st": [55, 90], "fix": true,
+			"g": [["none", 1]], "rv": {"string_course": true}},
+		"commercial": {"w": [["glass", []]], "p": "curtain", "bay": 2.8, "fr": "#a3a39e",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.8, "st": [55, 90], "fix": true,
+			"g": [["shop", 1]], "rv": {"string_course": true, "mullion": true}},
+	},
+	"nyc_international": {
+		"commercial": {"w": [["glass", ["#333b40", "#43484a"]]], "p": "curtain", "bay": 3.2,
+			"fr": "#272b2d", "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.8,
+			"st": [20, 45], "fix": true, "g": [["stone", 1]], "rv": {"string_course": true, "mullion": true}},
 	},
 	# Chicago two- and three-flats: common brick, bay fronts, flat roofs
 	# with parapets, back porches.

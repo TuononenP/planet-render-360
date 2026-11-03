@@ -44,7 +44,7 @@ static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
 		seed_v, _area_m2(b), ctx)
 
 ## Per-build context: the style region and settlement density, plus the
-## tagged heights (tag/levels resolved, in a 150 m spatial hash keyed by
+## mapped and reference heights (in a 150 m spatial hash keyed by
 ## building kind) that feed the neighbour estimate — a house is judged
 ## against nearby houses, never against a tagged tower. Inside a city
 ## zone it also carries CityStyles.local_frame: "city", "cores" and
@@ -61,12 +61,14 @@ static func _height_context(data: LocationData) -> Dictionary:
 			continue
 		var bd := b as Dictionary
 		var src := str(bd.get("height_source", ""))
-		if src != "tag_height" and not (src == "levels" and int(bd.get("levels", 0)) > 0):
+		if str(bd.get("kind", "")) in ["ship", "boat", "houseboat"]:
+			continue  # a tagged mast is not a neighbour's building height
+		if src not in ["tag_height", "reference"] and not (src == "levels" and float(bd.get("levels", 0)) > 0.0):
 			continue
 		var kind := ArchitectureStyle.kind_for(bd, density, _area_m2(bd))
 		var h := float(bd.get("height", 0.0))
 		if src == "levels":
-			h = float(int(bd.get("levels", 0))) \
+			h = float(bd.get("levels", 0)) \
 				* float(ArchitectureStyle.profile(region, kind)["fh"])
 		if h <= 0.0:
 			continue
@@ -88,7 +90,7 @@ static func _height_context(data: LocationData) -> Dictionary:
 	return ctx
 
 ## T4.2 height priority (contract §2.4): `height` tag → `building:levels`
-## × the kind's regional floor height → same-kind local estimate →
+## × the kind's regional floor height → source-backed reference → same-kind local estimate →
 ## the kind's regional default (a seeded storey count, never one global
 ## figure). `m` is the mass (part or parent), `b` the parent; parts
 ## without own tags inherit parent_res. Dicts without height_source
@@ -104,17 +106,17 @@ const LOW_RISE_STOREYS := 4.0
 static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		parent_res: Dictionary, look: Dictionary) -> Dictionary:
 	var src := str(m.get("height_source", b.get("height_source", "")))
-	var levels := int(m.get("levels", b.get("levels", 0)))
+	var levels := float(m.get("levels", b.get("levels", 0)))
 	# A part echoes its parent's source when it carries no tags of its
 	# own ("levels" with levels 0 included), so it inherits the
 	# resolved parent mass instead of re-inferring at its centroid.
 	if not parent_res.is_empty() \
-			and src != "tag_height" and not (src == "levels" and levels > 0):
+			and src not in ["tag_height", "reference"] and not (src == "levels" and levels > 0):
 		return {"total_m": float(parent_res["total_m"]),
 			"source": str(parent_res["source"])}
-	if src == "tag_height":
+	if src in ["tag_height", "reference"]:
 		return {"total_m": float(m.get("height", b.get("height", 0.0))),
-			"source": "tag_height"}
+			"source": src}
 	if src == "levels" and levels > 0:
 		return {"total_m": float(levels) * float(look["floor_h"]),
 			"source": "levels"}

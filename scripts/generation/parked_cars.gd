@@ -43,6 +43,9 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var junc := RoadSurface.junctions(data)
+	var obstacles := obstacle_grid(data, m2u)
+	var left_traffic := RoadSurface.left_traffic(data)
+	var nyc := CityStyles.region_at(data.latitude, data.longitude) == "new_york"
 	for r in data.roads:
 		if not (r is Dictionary):
 			continue
@@ -59,7 +62,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 			continue
 		for side in [[1, 1.0], [2, -1.0]]:
 			if sides & int(side[0]) != 0:
-				_kerb(cars, pts, (half - KERB_IN_M) * float(side[1]) * m2u, centre, r2, junc, ground, m2u)
+				_kerb(cars, pts, (half - KERB_IN_M) * float(side[1]) * m2u, centre, r2, junc, ground, m2u,
+				int(road.get("oneway", 0)), left_traffic, obstacles, nyc)
 	cars.sort_custom(func(a: Array, b: Array) -> bool:
 		return float(a[4]) < float(b[4]))
 	return cars.slice(0, MAX_CARS)
@@ -79,7 +83,8 @@ static func sides_of(road: Dictionary) -> int:
 
 ## One kerb: slots along the polyline offset `off` to its left.
 static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vector2, r2: float,
-		junc: Dictionary, ground: GroundTruth, m2u: float) -> void:
+		junc: Dictionary, ground: GroundTruth, m2u: float, oneway: int,
+		left_traffic: bool, obstacles: Dictionary, nyc: bool) -> void:
 	for i in pts.size() - 1:
 		var a := pts[i]
 		var b := pts[i + 1]
@@ -99,10 +104,9 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 				continue
 			var kind := KINDS[int(_hash(p.x, p.y, 2.7) * KINDS.size()) % KINDS.size()]
 			var length := _length_m(kind) * m2u
-			var fw := dir if _hash(p.x, p.y, 3.1) < 0.97 else -dir
-			# Parked with the traffic on its side: a left-kerb car faces back.
-			if off > 0.0:
-				fw = -fw
+			if blocked(p, obstacles, m2u):
+				continue
+			var fw := facing(dir, off, oneway, left_traffic)
 			var front := p + fw * length * 0.4
 			var back := p - fw * length * 0.4
 			var yf := ground.height_at_world(front.x, front.y)
@@ -112,7 +116,7 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var up := side.cross(forward).normalized()
 			var basis := Basis(forward, up, forward.cross(up))
 			var pos := Vector3(p.x, (yf + yb) * 0.5 + 0.04 * m2u, p.y)
-			var colour: Color = PAINT[int(_hash(p.x, p.y, 4.9) * PAINT.size()) % PAINT.size()]
+			var colour := paint_for(p, kind, nyc)
 			cars.append([pos, basis.scaled(Vector3.ONE * m2u), kind, colour, d2])
 
 static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
@@ -123,6 +127,12 @@ static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
 				if q.distance_to(p) < cut:
 					return true
 	return false
+
+## A small deterministic share of New York sedans carry taxi yellow.
+static func paint_for(p: Vector2, kind: String, nyc: bool) -> Color:
+	if nyc and kind == "sedan" and _hash(p.x, p.y, 9.1) < 0.12:
+		return Color(0.95, 0.62, 0.02)
+	return PAINT[int(_hash(p.x, p.y, 4.9) * PAINT.size()) % PAINT.size()]
 
 static func _length_m(kind: String) -> float:
 	match kind:
@@ -389,7 +399,7 @@ static func _face(b: TreeMeshLibrary.Buf, c: Array, centre: Vector3) -> void:
 		n = -n
 	TreeMeshLibrary._card(b, c, [n, n, n, n], [1.0, 1.0, 1.0, 1.0])
 
-static func _material(name: String) -> StandardMaterial3D:
+static func _material(name: String) -> Material:
 	var m := StandardMaterial3D.new()
 	match name:
 		"body":
@@ -420,4 +430,49 @@ static func _material(name: String) -> StandardMaterial3D:
 		"tyre":
 			m.albedo_color = Color(0.03, 0.03, 0.03)
 			m.roughness = 0.9
-	return m
+	return StreetSnow.material(m) if name == "body" else m
+
+## Kerb traffic follows the mapped direction on both sides of a one-way.
+static func facing(dir: Vector2, off: float, oneway: int, left_traffic: bool) -> Vector2:
+	if oneway != 0:
+		return dir * signi(oneway)
+	return dir if (off < 0.0) != left_traffic else -dir
+
+const OBSTACLE_CELL_M := 6.0
+
+static func obstacle_grid(data: LocationData, m2u: float) -> Dictionary:
+	var grid := {}
+	for nodes in [data.trees, data.street_furniture]:
+		for node in nodes:
+			var p := Vector2(float(node.get("x", 0.0)), float(node.get("z", 0.0)))
+			var key := Vector2i(floori(p.x / (OBSTACLE_CELL_M * m2u)), floori(p.y / (OBSTACLE_CELL_M * m2u)))
+			if not grid.has(key):
+				grid[key] = []
+			(grid[key] as Array).append([p, p, 1.5 * m2u])
+	for rail in data.railways:
+		if str(rail.get("class", "")) != "tram" or bool(rail.get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = rail.get("points", PackedVector2Array())
+		for i in pts.size() - 1:
+			var pad := Vector2.ONE * 2.0 * m2u
+			var lo := (pts[i].min(pts[i + 1]) - pad) / (OBSTACLE_CELL_M * m2u)
+			var hi := (pts[i].max(pts[i + 1]) + pad) / (OBSTACLE_CELL_M * m2u)
+			for x in range(floori(lo.x), floori(hi.x) + 1):
+				for z in range(floori(lo.y), floori(hi.y) + 1):
+					var key := Vector2i(x, z)
+					if not grid.has(key):
+						grid[key] = []
+					(grid[key] as Array).append([pts[i], pts[i + 1], (float(rail.get("gauge_m", 1.435)) * 0.5 + 1.0) * m2u])
+	return grid
+
+static func blocked(p: Vector2, grid: Dictionary, m2u: float) -> bool:
+	var key := Vector2i(floori(p.x / (OBSTACLE_CELL_M * m2u)), floori(p.y / (OBSTACLE_CELL_M * m2u)))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for item in grid.get(key + Vector2i(dx, dz), []):
+				var a: Vector2 = item[0]
+				var b: Vector2 = item[1]
+				var q := Geometry2D.get_closest_point_to_segment(p, a, b) if a != b else a
+				if p.distance_to(q) < float(item[2]):
+					return true
+	return false

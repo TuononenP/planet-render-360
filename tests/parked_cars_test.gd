@@ -55,6 +55,18 @@ func _run() -> void:
 	if ParkedCars.sides_of(hyde) != 3 or ParkedCars.sides_of(roads[3]) != 0 \
 			or ParkedCars.sides_of({"parking": 0, "parking_m": 6.0}) != 0:
 		failures.append("parked sides: measured room parks both, no room none, a no-parking tag wins")
+	_width_barriers(failures)
+	_directions_and_obstacles(failures)
+	var yellow := Color(0.95, 0.62, 0.02)
+	var taxi_count := 0
+	for i in 500:
+		var p := Vector2(float(i) * 7.0, 31.0)
+		if ParkedCars.paint_for(p, "sedan", true) == yellow:
+			taxi_count += 1
+		if ParkedCars.paint_for(p, "sedan", false) == yellow:
+			failures.append("taxi paint must stay in New York")
+	if taxi_count < 20 or taxi_count > 100:
+		failures.append("New York should have a modest share of yellow sedans: %d" % taxi_count)
 	# Placement on a slope (5 %, z down the street).
 	var data := _data(0.05)
 	data.roads = roads
@@ -75,7 +87,7 @@ func _run() -> void:
 		var fwd: Vector3 = (c[1] as Basis).x.normalized()
 		pitched = pitched and absf(fwd.y) > 0.03
 	if sides.size() != 2:
-		failures.append("cars should line both kerbs: %s" % sides.keys())
+		failures.append("cars should line both kerbs: %s" % [sides.keys()])
 	if not pitched:
 		failures.append("cars on a 5 % street should pitch with it")
 	# Junctions (a node shared with a cross street) stay clear.
@@ -151,3 +163,53 @@ func _run() -> void:
 		for f in failures:
 			printerr("PARKED CARS FAIL: ", f)
 		quit(1)
+
+func _width_barriers(failures: Array[String]) -> void:
+	var line := _line(Vector2(0, -100), Vector2(0, 100))
+	for kind in ["both", "cycleway", "cycleway_one_side", "tree", "path", "wide"]:
+		var tags := {"highway": "residential", "lanes": "2", "sidewalk": "separate"}
+		if kind == "both":
+			tags["sidewalk"] = "both"
+		if kind == "wide":
+			tags["lanes"] = "10"
+		var road := OsmTags._road_entry(tags, line)
+		var roads: Array = [road]
+		for side in [-1, 1]:
+			roads.append(OsmTags._road_entry({"highway": "footway", "footway": "sidewalk"},
+				_line(Vector2(side * 9, -100), Vector2(side * 9, 100))))
+		if kind in ["cycleway", "cycleway_one_side", "path"]:
+			for side in ([-1] if kind == "cycleway_one_side" else [-1, 1]):
+				roads.append(OsmTags._road_entry({"highway": "cycleway" if kind == "cycleway_one_side" else kind},
+					_line(Vector2(side * 4, -100), Vector2(side * 4, 100))))
+		var trees: Array = []
+		if kind == "tree":
+			for z in range(-100, 101, 4):
+				for side in [-1, 1]:
+					trees.append({"x": side * 4.0, "z": float(z)})
+		RoadWidths.from_sidewalks(roads, trees)
+		var expected := 30.0 if kind == "wide" else 6.0
+		if absf(float(road["width_m"]) - expected) > 0.1:
+			failures.append("%s should preserve %.1f m of lanes, got %s" % [kind, expected, road["width_m"]])
+
+func _directions_and_obstacles(failures: Array[String]) -> void:
+	for value in ["yes", "-1", "no"]:
+		var direction := OsmTags.oneway({"oneway": value})
+		for side in [-1.0, 1.0]:
+			for left in [false, true]:
+				var got := ParkedCars.facing(Vector2.RIGHT, side, direction, left)
+				var expected := float(direction) if direction != 0 else (1.0 if (side < 0.0) != left else -1.0)
+				if got != Vector2.RIGHT * expected:
+					failures.append("traffic direction mismatch for %s / %s / %s" % [value, side, left])
+	var data := _data()
+	data.country = "GB"
+	if not RoadSurface.left_traffic(data):
+		failures.append("GB uses left-hand traffic")
+	data.trees = [{"x": 2.0, "z": 4.0}]
+	data.street_furniture = [{"x": 6.0, "z": 4.0, "kind": "bus_stop"}]
+	data.railways = [{"class": "tram", "points": _line(Vector2(-20, 10), Vector2(20, 10)), "gauge_m": 1.0}]
+	var obstacles := ParkedCars.obstacle_grid(data, 1.0)
+	for p in [Vector2(2, 4), Vector2(6, 4), Vector2(0, 10)]:
+		if not ParkedCars.blocked(p, obstacles, 1.0):
+			failures.append("mapped obstacle did not exclude parking at %s" % p)
+	if ParkedCars.blocked(Vector2(-10, -10), obstacles, 1.0):
+		failures.append("clear parking slot falsely excluded")

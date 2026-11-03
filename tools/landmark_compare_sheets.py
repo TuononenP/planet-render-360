@@ -33,7 +33,11 @@ for p in range(0, len(types), per):
     d = ImageDraw.Draw(page)
     for i, t in enumerate(types[p:p + per]):
         y = i * H
-        r = sorted(glob.glob(f"{refs}/{t}/*.jpg"))
+        files = sorted(glob.glob(f"{refs}/{t}/*.jpg"))
+        # Generated images are useful for exploration, but are not evidence of
+        # a real building's appearance. Prefer an actual reference photograph.
+        photos = [f for f in files if not os.path.basename(f).startswith("ai_")]
+        r = photos or files
         if r:
             im = Image.open(r[0]).convert("RGB"); im.thumbnail((430, H - 16)); page.paste(im, (0, y + 16))
         sheet = Image.open(f"{cap}/{t}_sheet.jpg").convert("RGB")
@@ -43,6 +47,6 @@ for p in range(0, len(types), per):
             page.paste(v, (440 + k * 440, y + 16))
         w, dp, h, lo, tr = stats[t]
         d.text((2, y + 2), f"{t}  {h:.0f} m tall, {max(w, dp):.0f} m wide, {tr // 1000}k tris"
-               + ("" if r else "  [no reference]"), fill="black")
+               + ("  [AI image]" if r and not photos else "" if r else "  [no reference]"), fill="black")
     page.save(f"{out}/page_{p // per:02d}.jpg", quality=84)
 print(f"{len(types)} landmarks -> {out}")

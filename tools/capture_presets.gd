@@ -4,6 +4,8 @@ extends SceneTree
 ## Windowed, off-screen, never on top:
 ##   tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 \
 ##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle] [--season=autumn]
+##        [--landmarks=type,type]  (build registry landmarks through the real app flow)
+##        [--date=YYYY-MM-DD] (explicit solar date, e.g. June white nights)
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##        [--looks="lat,lon,height_m,bearing,pitch;..."]  (candidate eyes, one
@@ -29,8 +31,10 @@ extends SceneTree
 ##   <id>_agx.jpg                opening look with AgX instead of ACES
 ##   audit.json                  per place, every StandardMaterial3D's mean
 ##                               linear albedo, flagged against ALBEDO_RANGES
+## With --bake-thumbs: each preset's vantage also becomes its shipped card
+## picture, res://assets/preset_thumbs/<id>.jpg (PlaceThumb.load_preset).
 ## Reference photos live in visual-plan/refs/<id>/ (see its README).
-## The user's History is restored afterwards; settings are not saved.
+## History and user thumbnails are never written; settings are not saved.
 
 const SIZE := Vector2i(1280, 800)
 const PLACE_TIMEOUT_S := 600.0
@@ -49,8 +53,6 @@ const BANDS := {"upper": [0.0, 0.35], "middle": [0.35, 0.65], "lower": [0.65, 1.
 ## range widened by this fraction.
 const REF_SLACK := 0.15
 const WEATHER_WAIT_S := 20.0
-const HISTORY := "user://history.json"
-const HISTORY_BACKUP := "user://history.capture-backup.json"
 ## Measured mean linear albedo per surface class (the R-1.4 ranges); a
 ## material is classed by the first keyword its cache key contains.
 const ALBEDO_RANGES := {
@@ -62,6 +64,7 @@ const ALBEDO_RANGES := {
 ## Generic controls beside the presets: the old Paris pin every past
 ## baseline used, the old Setagaya Tokyo pin, and places with no preset.
 const CONTROLS := [
+	{"id": "amsterdam", "name": "Amsterdam, Netherlands", "lat": 52.3717, "lon": 4.8897},
 	{"id": "paris_old", "name": "Paris, France", "lat": 48.8566, "lon": 2.3522},
 	{"id": "tokyo_setagaya", "name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503},
 	{"id": "turku", "name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
@@ -72,7 +75,6 @@ const CONTROLS := [
 var _out := ""
 var _stats := {}
 var _audit := {}
-var _had_history := false
 ## The place's own weather answered (or failed): its UTC offset is set.
 var _weather_in := false
 ## WMO weather code every capture forces (--weather=, default clear).
@@ -82,6 +84,7 @@ var _weather_code := 0
 var _season := -1
 ## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
 var _looks: Array = []
+var _date_override: Dictionary = {}
 
 func _init() -> void:
 	_run()
@@ -96,8 +99,16 @@ func _args() -> Dictionary:
 			a["audit"] = true
 	return a
 
-func _places(filter: String) -> Array:
+func _places(filter: String, landmark_types: String = "") -> Array:
 	var all: Array = []
+	if not landmark_types.is_empty():
+		for type in landmark_types.split(",", false):
+			var entry := LocationData.entry_for_type(type)
+			if entry.is_empty():
+				printerr("CAPTURE: unknown landmark type ", type)
+				continue
+			all.append({"id": type, "name": entry["name"], "lat": entry["lat"], "lon": entry["lon"]})
+		return all
 	for row in PresetViews.ROWS:
 		all.append({"id": row["id"], "name": row["name"], "lat": row["lat"], "lon": row["lon"]})
 	all.append_array(CONTROLS)
@@ -111,11 +122,15 @@ func _run() -> void:
 	_out = ProjectSettings.globalize_path("res://").path_join("visual-plan/reviews/%s-%s" % [
 		a["tag"], Time.get_date_string_from_system()])
 	DirAccess.make_dir_recursive_absolute(_out)
-	_backup_history()
+	CacheStore.eviction_suppressed = true
+	RenderSettings.path_override = "user://capture-settings-%d.json" % OS.get_process_id()
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	await process_frame
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
+	main.capture_mode = true
+	# Avoid reopening a saved camera: every capture starts from its preset.
+	main._store.entries.clear()
 	root.size = SIZE
 	await create_timer(0.5).timeout
 	root.size = SIZE  # the first resize can be lost to window creation
@@ -138,14 +153,25 @@ func _run() -> void:
 		if f.size() == 5:
 			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4])])
 	var season_arg := str(a.get("season", ""))
+	_date_override = ViewLink.parse_date(str(a.get("date", "")))
 	var names := ["spring", "summer", "autumn", "winter"]
 	_season = names.find(season_arg) if season_arg in names else (int(season_arg) if season_arg.is_valid_int() else -1)
-	for place in _places(str(a["places"])):
-		await _capture(main, view, place, times, a.has("audit"), float(a.get("settle", SETTLE_S)))
+	var presets := str(a.get("presets", str(a["preset"]))).split(",", false)
+	for preset in presets:
+		main._settings.preset = int(preset)
+		for place in _places(str(a["places"]), str(a.get("landmarks", ""))):
+			var spec: Dictionary = place.duplicate()
+			if a.has("presets"):
+				spec["id"] = str(place["id"]) + "_p" + preset
+			await _capture(main, view, spec, times, a.has("audit"), float(a.get("settle", SETTLE_S)))
+			# Preserve completed results if a later location or the renderer
+			# stalls during a long golden-set run.
+			_write_stats()
+			if a.has("audit"):
+				_write_json("audit.json", _audit)
 	_write_stats()
 	if a.has("audit"):
 		_write_json("audit.json", _audit)
-	_restore_history()
 	print("CAPTURE DONE -> ", _out)
 	quit(0)
 
@@ -175,11 +201,24 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	view._atmos.set_weather(_weather_code, 15.0 if _weather_code == 0 else 100.0)
 	ViewConditions._apply_precip(view, _weather_code)
 	ViewConditions.apply_surface_state(view)
-	ViewConditions.spawn_golden_hour(view)
+	if _date_override.is_empty():
+		ViewConditions.spawn_golden_hour(view)
+	else:
+		await ViewConditions.set_date(view, _date_override)
+		ViewConditions.set_time_minutes(view, PresetViews.opening_hour(view._data.view, view._atmos.golden_hour()) * 60.0)
 	await _settle(settle_s, SETTLE_FRAMES)
 	var rig := view._rig
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
+	if OS.get_cmdline_user_args().has("--bank-only"):
+		rig.set_look(open.x, open.y - 0.3)
+		rig.zoom_factor = 2.0
+		rig.handle_zoom(1.0)
+		await _snap(view, id, "bank")
+		rig.zoom_factor = 1.0
+		rig.handle_zoom(1.0)
+		rig.set_look(open.x, open.y)
+		return
 	if audit:
 		view._viewport.debug_draw = Viewport.DEBUG_DRAW_UNSHADED
 		await _snap(view, id, "unshaded")
@@ -275,13 +314,51 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	img.convert(Image.FORMAT_RGB8)
 	var path := _out.path_join("%s_%s.jpg" % [id, shot])
 	img.save_jpg(path, 0.88)
+	if shot == "vantage" and OS.get_cmdline_user_args().has("--bake-thumbs"):
+		_bake_thumb(img, id)
 	var s := frame_stats(img)
+	var rig := view._rig
+	s["camera"] = {
+		"world_x": rig.position.x, "world_y": rig.position.y, "world_z": rig.position.z,
+		"yaw_rad": rig.yaw, "pitch_rad": rig.pitch, "fov_deg": rig.camera.fov,
+		"centre_lat": view._data.latitude, "centre_lon": view._data.longitude,
+	}
+	var wire_draws := 0
+	for wire in view._world_root.find_children("OverheadWires_*", "MeshInstance3D", true, false):
+		wire_draws += (wire as MeshInstance3D).mesh.get_surface_count()
+	s["wire_draw_calls"] = wire_draws
+	s["wire_draw_budget"] = OverheadWires.MAX_DRAW_CALLS
+	var boat_draws := 0
+	for marina in view._world_root.find_children("Marina", "Node3D", true, false):
+		for node in marina.get_children():
+			if node is MultiMeshInstance3D:
+				boat_draws += node.multimesh.mesh.get_surface_count()
+			elif node is MeshInstance3D:
+				boat_draws += node.mesh.get_surface_count()
+	s["marina_draw_calls"] = boat_draws
+	s["marina_draw_budget"] = MarinaBuilder.MAX_DRAW_CALLS
+	s["season"] = view._data.season
+	s["sun_elevation_deg"] = view._atmos.solar_elevation
+	s["local_hour"] = view._time_hour
 	var refs := _ref_ranges(id)
 	if not refs.is_empty():
 		s["flags"] = _flags(s, refs)
 	_stats["%s_%s" % [id, shot]] = s
 	print("SHOT %s_%s luma %.3f sat %.3f colourful %.3f" % [id, shot,
 		float(s["all"]["luma"]), float(s["all"]["sat"]), float(s["all"]["colourful"])])
+
+## --bake-thumbs: a preset's opening look, card-sized, into the shipped
+## res://assets/preset_thumbs/<id>.jpg its Around the world card shows.
+func _bake_thumb(img: Image, id: String) -> void:
+	if PresetViews.ROWS.filter(func(r: Dictionary) -> bool: return r["id"] == id).is_empty():
+		return
+	var small := PlaceThumb.shrink(img)
+	if small == null:
+		printerr("CAPTURE BAKE %s: blank frame, not written" % id)
+		return
+	var dir := ProjectSettings.globalize_path(PlaceThumb.BUNDLED_DIR)
+	DirAccess.make_dir_recursive_absolute(dir)
+	small.save_jpg(dir.path_join("%s.jpg" % id), PlaceThumb.QUALITY)
 
 ## Mean luma (Rec. 709), mean HSV saturation and Hasler–Süsstrunk
 ## colourfulness (0–1 scale), for the whole frame and per row band.
@@ -348,7 +425,14 @@ func _refs(id: String) -> Array:
 	var out: Array = []
 	if not DirAccess.dir_exists_absolute(dir):
 		return out
-	for f in DirAccess.get_files_at(dir):
+	var files := DirAccess.get_files_at(dir)
+	var has_winter := false
+	for f in files:
+		if f.get_extension().to_lower() in ["jpg", "jpeg", "png"] and f.to_lower().contains("winter"):
+			has_winter = true
+	for f in files:
+		if has_winter and _season >= 0 and f.to_lower().contains("winter") != (_season == LocationData.Season.WINTER):
+			continue
 		if f.get_extension().to_lower() in ["jpg", "jpeg", "png"]:
 			var img := Image.load_from_file(dir.path_join(f))
 			if img != null:
@@ -471,18 +555,3 @@ static func _texture_mean(tex: Texture2D) -> Color:
 			sum = Color(sum.r + p.r, sum.g + p.g, sum.b + p.b)
 			n += 1
 	return Color(sum.r / n, sum.g / n, sum.b / n) if n > 0 else Color.WHITE
-
-## The run must not leave its places in the person's History.
-func _backup_history() -> void:
-	_had_history = FileAccess.file_exists(HISTORY)
-	if _had_history:
-		DirAccess.copy_absolute(ProjectSettings.globalize_path(HISTORY),
-			ProjectSettings.globalize_path(HISTORY_BACKUP))
-
-func _restore_history() -> void:
-	if _had_history:
-		DirAccess.copy_absolute(ProjectSettings.globalize_path(HISTORY_BACKUP),
-			ProjectSettings.globalize_path(HISTORY))
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(HISTORY_BACKUP))
-	elif FileAccess.file_exists(HISTORY):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(HISTORY))

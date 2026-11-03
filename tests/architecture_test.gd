@@ -17,7 +17,7 @@ const CITIES := {
 	"warsaw": [52.2297, 21.0122, "central_europe"], "interlaken": [46.6863, 7.8632, "interlaken"],
 	"banff": [51.1789, -115.5708, "banff"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
 	"whistler": [50.1163, -122.9574, "mountain_lodge"], "zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
-	"helsinki": [60.1699, 24.9384, "helsinki"], "turku": [60.4518, 22.2666, "nordic"],
+	"espoo": [60.1760, 24.8050, "espoo"], "helsinki": [60.1699, 24.9384, "helsinki"], "turku": [60.4518, 22.2666, "nordic"],
 	"stockholm": [59.3293, 18.0686, "stockholm"], "venice": [45.4375, 12.3358, "venice"], "oslo": [59.9139, 10.7522, "oslo"],
 	"reykjavik": [64.1466, -21.9426, "nordic"], "madrid": [40.4168, -3.7038, "madrid"],
 	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "lisbon"],
@@ -54,7 +54,7 @@ const ZONE_CITIES := {
 	"hong_kong": [22.3193, 114.1694], "singapore": [1.3521, 103.8198],
 	"seoul": [37.5728, 126.9769], "dubai": [25.1925, 55.2741], "monaco": [43.7384, 7.4246],
 	"interlaken": [46.6863, 7.8632], "banff": [51.1772, -115.5714],
-	"copenhagen": [55.6761, 12.5683], "oslo": [59.9139, 10.7522], "helsinki": [60.1699, 24.9384],
+	"copenhagen": [55.6761, 12.5683], "oslo": [59.9139, 10.7522], "espoo": [60.1760, 24.8050], "helsinki": [60.1699, 24.9384],
 	"edinburgh": [55.9533, -3.1883], "dublin": [53.3498, -6.2603], "brussels": [50.8503, 4.3517],
 	"st_petersburg": [59.9343, 30.3351], "madrid": [40.4168, -3.7038], "lisbon": [38.7223, -9.1393],
 	"milan": [45.4642, 9.19], "florence": [43.7696, 11.2558], "istanbul": [41.02, 28.98],
@@ -74,10 +74,12 @@ const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"deep_balcony": TYPE_FLOAT, "string_course": TYPE_BOOL, "awning": TYPE_FLOAT,
 	"awning_colours": TYPE_ARRAY, "fire_escape": TYPE_FLOAT, "stoop": TYPE_FLOAT,
 	"signage": TYPE_FLOAT, "screens": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL,
-	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT}
+	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT, "glazed_balcony": TYPE_FLOAT, "turret": TYPE_FLOAT,
+	"granite_plinth": TYPE_BOOL, "snow_guard": TYPE_BOOL, "corner_dome": TYPE_FLOAT, "wall_lantern": TYPE_FLOAT,
+	"mullion": TYPE_BOOL}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
-const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood"]
+const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood", "copper", "sheet_metal"]
 
 func _init() -> void:
 	_run()
@@ -364,6 +366,21 @@ func _resolve_checks(failures: Array[String]) -> void:
 		ArchitectureStyle.resolve({"kind": "house"}, "nordic", "mid", 0.5, 120.0))
 	if (tagged as StandardMaterial3D).albedo_texture == (plain as StandardMaterial3D).albedo_texture:
 		failures.append("building:material=brick must override the Nordic timber wall")
+	var distant_glass := FacadeMaterials.facade_for_building({"material": "mirror"}, "north_america", 72, 3, true)
+	if distant_glass != FacadeMaterials.glass_material(1):
+		failures.append("mapped mirror glass must survive the distant facade path")
+	var historic_look := ArchitectureStyle.resolve({"kind": "commercial"}, "nyc_prewar", "mid", 0.3, 800.0)
+	historic_look["era"] = "nyc_prewar"
+	var historic := {"kind": "commercial", "heritage": true, "material": "limestone"}
+	var historic_distant := FacadeMaterials.facade_for_building(historic, "north_america", 30, 3, true, 0.3, historic_look)
+	var historic_near := FacadeMaterials.facade_for_building(historic, "north_america", 30, 2, false, 0.3, historic_look)
+	if historic_distant != historic_near:
+		failures.append("historic New York tower facades must retain their mapped material at skyline distance")
+	var copper_tags := {"roof_material": "copper", "roof_colour": "#538472"}
+	var near_copper := FacadeMaterials.roof_for_building(copper_tags, "north_america", "pyramidal", Color.TRANSPARENT, 3, false)
+	var distant_copper := FacadeMaterials.roof_for_building(copper_tags, "north_america", "pyramidal", Color.TRANSPARENT, 3, true)
+	if distant_copper != near_copper:
+		failures.append("mapped copper crowns must retain their material at a distance")
 	# Regions read differently: apartments differ in wall/pattern across the world.
 	var combos := {}
 	for region in ["haussmann", "nordic", "middle_east", "japan", "north_america", "eastern_europe",
@@ -434,7 +451,7 @@ func _build_checks(failures: Array[String]) -> void:
 
 	# Real-bay UVs: a 15 m edge on a 3.0 m bay is 5 bays = 1.25 tiles; v = storeys.
 	var d2 := _flat_data(60.17, 24.94)
-	d2.buildings = [_bld("apartments", 0.0, 0.0, 15.0, 15.0, 4)]
+	d2.buildings = [_bld("apartments", 0.0, 0.0, 15.0, 15.0, 4, 0.0, {"start_year": 1940})]
 	var n2 := BuildingBuilder.build_buildings(d2, GroundTruth.new(d2))
 	var uv_ok := false
 	for mi in _walls_of(n2):
@@ -712,6 +729,34 @@ func _era_checks(failures: Array[String]) -> void:
 		failures.append("untagged central Paris should be mostly Haussmann with some variety, got %s" % mix)
 	# Other cities.
 	var nyc := CityStyles.local_frame("new_york", 40.7549, -73.9840)
+	var fidi := CityStyles.local_frame("new_york", 40.7075, -74.0095)
+	if _era("new_york", {"kind": "commercial", "levels": 30, "x": 0.0, "z": 0.0}, fidi) != "nyc_prewar":
+		failures.append("untagged tall FiDi towers should use prewar fabric")
+	if _era("new_york", {"kind": "commercial", "levels": 30, "start_year": 1930}, nyc) != "nyc_prewar":
+		failures.append("dated prewar NYC towers should not become glass")
+	if str(BuildingEra.cues({"architecture": "neo-gothic"}, {}, 400.0)["arch"]) != "neo_gothic":
+		failures.append("hyphenated architecture cues should normalize")
+	var old_roof := {"city": "new_york", "era": "nyc_prewar", "floor_h": 3.2}
+	var glass_roof := {"city": "new_york", "era": "nyc_glass", "floor_h": 3.2}
+	if not RoofClutter.water_tower_allowed(old_roof, 32.0) or RoofClutter.water_tower_allowed(old_roof, 96.0) \
+			or RoofClutter.water_tower_allowed(glass_roof, 32.0) or RoofClutter.water_tower_allowed(old_roof, 12.8):
+		failures.append("NYC wooden water towers should be limited to 6–20 storey older roofs")
+	for case in [
+		[40.7223, -74.0000, {"kind": "commercial", "levels": 6, "start_year": 1890}, "nyc_castiron"],
+		[40.7030, -73.9907, {"kind": "commercial", "levels": 7}, "nyc_loft"],
+		[40.7148, -73.9828, {"kind": "apartments", "levels": 16, "start_year": 1960}, "nyc_nycha"],
+		[40.7549, -73.9840, {"kind": "apartments", "levels": 70, "start_year": 2018}, "nyc_pencil"],
+		[40.7549, -73.9840, {"kind": "commercial", "levels": 30, "start_year": 1960}, "nyc_international"],
+		[40.7182, -73.9860, {"kind": "apartments", "levels": 5}, "new_york"]]:
+		var building: Dictionary = case[2].duplicate()
+		building["x"] = 0.0
+		building["z"] = 0.0
+		var frame := CityStyles.local_frame("new_york", case[0], case[1])
+		var got := _era("new_york", building, frame, 600.0)
+		if got != case[3]:
+			failures.append("NYC district/date should resolve %s, got %s" % [case[3], got])
+	if not bool((ArchitectureStyle.profile("nyc_glass", "commercial")["rv"] as Dictionary).get("mullion", false)):
+		failures.append("NYC glass towers should carry mullion relief")
 	var other := [
 		["new_york", {"kind": "apartments", "levels": 30, "x": 0.0, "z": 0.0}, nyc, "nyc_glass"],
 		["new_york", {"kind": "apartments", "architecture": "art_deco", "levels": 30}, nyc, "nyc_prewar"],
@@ -750,6 +795,15 @@ func _era_checks(failures: Array[String]) -> void:
 			CityStyles.local_frame("san_francisco", 37.7915, -122.4140), "sf_prewar"],
 		["san_francisco", {"kind": "apartments", "levels": 35, "x": 0.0, "z": 0.0},
 			CityStyles.local_frame("san_francisco", 37.7915, -122.4140), "sf_tower"],
+		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_medieval"],
+		["stockholm", {"kind": "apartments", "levels": 8, "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3945, 17.9025), "stockholm_miljon"],
+		["stockholm", {"kind": "house", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3195, 18.0595), "stockholm_wood"],
+		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3360, 18.0900), "stockholm_stone"],
+		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3435, 18.0370), "stockholm_grace"],
+		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3305, 18.0045), "stockholm_funkis"],
+		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3030, 18.0950), "stockholm_eco"],
+		["stockholm", {"kind": "apartments", "start_year": 1972, "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_miljon"],
+		["stockholm", {"kind": "apartments", "architecture": "swedish_grace", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_grace"],
 		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
 		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],
 		["seoul", {"kind": "apartments", "levels": 18}, {}, "seoul"],
@@ -787,6 +841,13 @@ func _era_checks(failures: Array[String]) -> void:
 		var got := _era(str(o[0]), o[1], o[2], 200.0 if str(o[1]["kind"]) == "house" else 600.0)
 		if got != str(o[3]):
 			failures.append("%s era for %s = %s, expected %s" % [o[0], o[1], got, o[3]])
+	var old_town: Array = CityStyles.local_frame("stockholm", 59.3251, 18.0711)["districts"]
+	var road := {"class": "residential", "points": PackedVector2Array([Vector2(-10, 0), Vector2(10, 0)])}
+	if RoadBuilder._district_finish(road, old_town, 1.0) != "sett":
+		failures.append("untagged Gamla stan roads should default to setts")
+	road["surface"] = "asphalt"
+	if RoadBuilder._district_finish(road, old_town, 1.0) != "asphalt":
+		failures.append("a mapped road surface must override the district")
 	# The look carries city / era / relief; relief follows the schema.
 	var look := ArchitectureStyle.resolve({"kind": "apartments", "levels": 6, "x": 0.0, "z": 0.0},
 		"haussmann", "dense", 0.3, 600.0, ctx)

@@ -257,6 +257,7 @@ static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
 
 ## `abort` stops it between rows / items; a stopped result is dropped.
 static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> MeshInstance3D:
+	var shore_started := Time.get_ticks_msec()
 	if ground == null:
 		ground = GroundTruth.new(data)
 	# Mesh density is the preset's LOD knob over the preset-independent
@@ -264,8 +265,26 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	# exactly; coarser meshes sample the same surface bilinearly.
 	var size := mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset),
 		data.grid_size)
+	# Shoreline cells carry canonical constraints at every quality level.
+	# Flat cells away from those constraints are simplified by ShoreLod.
+	var shore: bool = ground.shoreline != null and ground.shoreline.ready
+	if shore:
+		size = data.grid_size
 	var exact := size == data.grid_size
-	var step := WorldScale.detailed_extent_units() / float(size - 1)
+	var step := ground._step_units if shore else WorldScale.detailed_extent_units() / float(size - 1)
+	# Read corrected posts once: neighbouring normals reuse the same
+	# values rather than repeating triangle searches five times per post.
+	var post_heights := PackedFloat32Array()
+	if shore and not ShoreGeometry.force_script and ground.shoreline.sampler != null \
+			and ground.shoreline.sampler.has_method("grid_heights"):
+		post_heights = ground.shoreline.sampler.grid_heights()
+	elif shore:
+		post_heights.resize(size * size)
+		for z in size:
+			if abort != null and abort.requested:
+				return MeshInstance3D.new()
+			for x in size:
+				post_heights[z * size + x] = ground.surface_at_post(x, z)
 	var mn := ground.surface_min
 	var mx := ground.surface_max
 	# True relief in metres (T1.3): the pipeline records source-tile
@@ -281,6 +300,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var uvs := PackedVector2Array()
+	var water_levels := PackedVector2Array()
 	var has_sat := data.satellite_texture != null
 	var tangents := PackedFloat32Array()
 	var fallback: Image = null
@@ -288,7 +308,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	# no-imagery colour bake: a post outside them has no crossings, so
 	# land_color_bboxes skips the full point-in-polygon scan exactly.
 	var land_bboxes := PackedVector2Array()
-	if not has_sat and not data.land_polygons.is_empty():
+	if not has_sat and not shore and not data.land_polygons.is_empty():
 		land_bboxes.resize(data.land_polygons.size() * 2)
 		for i in data.land_polygons.size():
 			var pts: PackedVector2Array = (data.land_polygons[i] as Dictionary).get("points", PackedVector2Array())
@@ -320,16 +340,21 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 		for x in size:
 			var wx := (x - size / 2.0) * step
 			var wz := (z - size / 2.0) * step
-			var h := ground.surface_at_post(x, z) if exact \
+			if shore:
+				var snapped := ShoreGeometry.snap(Vector2(wx, wz))
+				wx = snapped.x
+				wz = snapped.y
+			var h := post_heights[z * size + x] if shore else ground.surface_at_post(x, z) if exact \
 				else ground.height_at_world(wx, wz)
 			verts.append(Vector3(wx, h, wz))
-			var hx0 := ground.surface_at_post(x - 1, z) if exact \
+			water_levels.append(Vector2(ground.water_level_at(wx, wz), 0.0))
+			var hx0 := post_heights[z * size + maxi(0, x - 1)] if shore else ground.surface_at_post(x - 1, z) if exact \
 				else ground.height_at_world(wx - step, wz)
-			var hx1 := ground.surface_at_post(x + 1, z) if exact \
+			var hx1 := post_heights[z * size + mini(size - 1, x + 1)] if shore else ground.surface_at_post(x + 1, z) if exact \
 				else ground.height_at_world(wx + step, wz)
-			var hz0 := ground.surface_at_post(x, z - 1) if exact \
+			var hz0 := post_heights[maxi(0, z - 1) * size + x] if shore else ground.surface_at_post(x, z - 1) if exact \
 				else ground.height_at_world(wx, wz - step)
-			var hz1 := ground.surface_at_post(x, z + 1) if exact \
+			var hz1 := post_heights[mini(size - 1, z + 1) * size + x] if shore else ground.surface_at_post(x, z + 1) if exact \
 				else ground.height_at_world(wx, wz + step)
 			# Normals from the rendered geometry itself: GroundTruth
 			# Y is in render units at the same scale as XZ, so the
@@ -340,28 +365,32 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 			var slope_z := (hz1 - hz0) / (2.0 * step)
 			var normal := Vector3(-slope_x, 1.0, -slope_z).normalized()
 			normals.append(normal)
-			var t := clampf((h - mn) / maxf(mx - mn, 0.001), 0.0, 1.0)
-			var base_color := grass.lerp(dry, clampf(t * 1.4, 0.0, 1.0))
-			if t > 0.72:
-				base_color = dry.lerp(rock, (t - 0.72) / 0.28)
-			var steep := clampf(1.0 - normal.y, 0.0, 1.0) * 3.2
-			base_color = base_color.lerp(rock, clampf(steep, 0.0, 0.75))
-			if relief_m > 60.0 and t > 0.84 and steep < 0.35:
-				base_color = base_color.lerp(Color(0.90, 0.91, 0.92), 0.6)  # alpine tops only
-			elif data.season == LocationData.Season.WINTER \
-					and relief_m > 20.0 and t > 0.50 and steep < 0.40:
-				base_color = base_color.lerp(Color(0.88, 0.89, 0.90), 0.55)  # winter snow line
-			# Settled ground reads as warm pavement, never bleached:
-			# real OSM cities, and any low-relief place in real metres
-			# (its procedural dressing is a town too). Alpine valleys
-			# keep meadow green even where the floor is flat.
-			if urban or data.relief_metres < 120.0:
-				base_color = urban_ground.lerp(grass, _hash(x * 0.7, z * 0.7) * 0.25)
-			var shade := 0.94 + _hash(x * 1.3, z * 1.7) * 0.10
-			# PRD §4.4: never bleached (max luminance 0.85 under the
-			# golden sun) but never the near-black of the old grade.
-			base_color = Color(base_color.r * shade * 0.96,
-				base_color.g * shade * 0.96, base_color.b * shade * 0.96)
+			var base_color := Color(0, 0, 0, 0)
+			if shore and not has_sat:
+				base_color = land_class_color(ground.land_class_at(wx, wz), base_color)
+			if not has_sat and base_color.a < 0.5:
+				var t := clampf((h - mn) / maxf(mx - mn, 0.001), 0.0, 1.0)
+				base_color = grass.lerp(dry, clampf(t * 1.4, 0.0, 1.0))
+				if t > 0.72:
+					base_color = dry.lerp(rock, (t - 0.72) / 0.28)
+				var steep := clampf(1.0 - normal.y, 0.0, 1.0) * 3.2
+				base_color = base_color.lerp(rock, clampf(steep, 0.0, 0.75))
+				if relief_m > 60.0 and t > 0.84 and steep < 0.35:
+					base_color = base_color.lerp(Color(0.90, 0.91, 0.92), 0.6)  # alpine tops only
+				elif data.season == LocationData.Season.WINTER \
+						and relief_m > 20.0 and t > 0.50 and steep < 0.40:
+					base_color = base_color.lerp(Color(0.88, 0.89, 0.90), 0.55)  # winter snow line
+				# Settled ground reads as warm pavement, never bleached:
+				# real OSM cities, and any low-relief place in real metres
+				# (its procedural dressing is a town too). Alpine valleys
+				# keep meadow green even where the floor is flat.
+				if urban or data.relief_metres < 120.0:
+					base_color = urban_ground.lerp(grass, _hash(x * 0.7, z * 0.7) * 0.25)
+				var shade := 0.94 + _hash(x * 1.3, z * 1.7) * 0.10
+				# PRD §4.4: never bleached (max luminance 0.85 under the
+				# golden sun) but never the near-black of the old grade.
+				base_color = Color(base_color.r * shade * 0.96,
+					base_color.g * shade * 0.96, base_color.b * shade * 0.96)
 			# T3.6 (GroundMaterial): COLOR.a = achromatic slope shade
 			# (≤15%, never above 1.0), COLOR.rgb = the far terrain's
 			# own colour here, which the shader fades to in the edge
@@ -381,18 +410,23 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 				# the shader's source_color decode restores it).
 				uvs.append(Vector2(float(x) + 0.5, float(z) + 0.5) / float(size))
 				var lc := base_color
-				if not land_bboxes.is_empty():
+				if shore:
+					lc = base_color
+				elif not land_bboxes.is_empty():
 					lc = land_color_bboxes(Vector2(wx, wz), data.land_polygons, land_bboxes, base_color)
 				else:
 					lc = land_color(Vector2(wx, wz), data.land_polygons, base_color)
 				fallback.set_pixel(x, z, lc.linear_to_srgb())
-	for z in size - 1:
-		for x in size - 1:
-			var a := z * size + x
-			var b := a + 1
-			var c := a + size
-			var d := c + 1
-			indices.append_array([a, b, c, b, d, c])
+	if shore:
+		print("SHORE TERRAIN vertices_ms=", Time.get_ticks_msec() - shore_started)
+	if not shore:
+		for z in size - 1:
+			for x in size - 1:
+				var a := z * size + x
+				var b := a + 1
+				var c := a + size
+				var d := c + 1
+				indices.append_array([a, b, c, b, d, c])
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
@@ -400,7 +434,14 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = LandmarkTerrain.cut_indices(data, verts, indices)
+	arrays[Mesh.ARRAY_TEX_UV2] = water_levels
+	arrays[Mesh.ARRAY_INDEX] = indices
+	if shore:
+		arrays = ShoreSurface.mesh_arrays(ground.shoreline, arrays, data.quality_preset, abort)
+		if arrays.is_empty():
+			return MeshInstance3D.new()
+		print("SHORE TERRAIN arrays_ms=", Time.get_ticks_msec() - shore_started, " vertices=", (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+	arrays[Mesh.ARRAY_INDEX] = LandmarkTerrain.cut_indices(data, arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_INDEX])
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var photo: Texture2D = data.satellite_texture
@@ -413,7 +454,11 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	else:
 		fallback.generate_mipmaps()
 		photo = ImageTexture.create_from_image(fallback)
-	return _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat))
+	var terrain := _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat))
+	terrain.name = "Terrain"
+	if shore:
+		print("SHORE TERRAIN total_ms=", Time.get_ticks_msec() - shore_started)
+	return terrain
 
 ## Moved to FarTerrainBuilder._far_terrain; thin wrapper for
 ## existing callers (tests). build_world uses build_far instead.
@@ -432,6 +477,15 @@ static func land_color(point: Vector2, land: Array, fallback: Color) -> Color:
 				"grass": return Color(0.47, 0.60, 0.37)
 				"field": return Color(0.70, 0.63, 0.43)
 				"urban": return Color(0.64, 0.61, 0.55)
+	return fallback
+
+static func land_class_color(cls: String, fallback: Color) -> Color:
+	match cls:
+		"water": return Color(0.30, 0.50, 0.60)
+		"forest": return Color(0.27, 0.41, 0.25)
+		"grass": return Color(0.47, 0.60, 0.37)
+		"field": return Color(0.70, 0.63, 0.43)
+		"urban": return Color(0.64, 0.61, 0.55)
 	return fallback
 
 ## land_color with each polygon's outer-ring bounds (`bounds`: min at
@@ -511,8 +565,8 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	root.set_meta("lod_layer", "Landmarks")
 	return root
 
-## Base Y of a registry model: the water surface for a bridge standing
-## in water (`base: water`), else the lowest ground under its footprint,
+## Base Y: `absolute` uses base_asl_m, `sea` uses ASL zero, `water` uses
+## mapped water (local DEM when absent), else the lowest footprint ground,
 ## raised by `base_drop_m` for a model hung below its origin (a dam
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,

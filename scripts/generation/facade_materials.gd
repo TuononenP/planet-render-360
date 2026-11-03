@@ -27,6 +27,7 @@ static var _facade_texs: Dictionary = {}
 static var _facade_cache: Dictionary = {}
 static var _family_first: Dictionary = {}
 static var _ground_cache: Dictionary = {}
+static var _ground_overflows := 0
 static var _distant_mats: Dictionary = {}
 static var _distant_roof_mats: Dictionary = {}
 static var _glass_mats: Dictionary = {}
@@ -40,6 +41,7 @@ static func begin_build() -> void:
 	_facade_cache.clear()
 	_family_first.clear()
 	_ground_cache.clear()
+	_ground_overflows = 0
 	_distant_mats.clear()
 	_distant_roof_mats.clear()
 	_roof_mats.clear()
@@ -62,6 +64,7 @@ static func material_instance_count() -> Dictionary:
 		"facade_v1": _facade_mats.size(),
 		"facade_near": _facade_cache.size(),
 		"ground_floor": _ground_cache.size(),
+		"ground_overflows": _ground_overflows,
 		"facade_textures": _facade_texs.size(),
 		"distant_facade": dist_f,
 		"distant_roof": dist_r,
@@ -75,6 +78,12 @@ static func material_instance_count() -> Dictionary:
 	}
 
 static func _calib(set_name: String, target: Color) -> Color:
+	if set_name in ["copper", "sheet_metal"]:
+		# Paint and patina span dark charcoal through pale zinc. Stone's
+		# 0.3 tint floor would turn a black painted sheet light grey.
+		var mean: Color = MaterialLibrary.PBR_SETS[set_name]["mean"]
+		return Color(clampf(target.r / mean.r, 0.02, 4.0),
+			clampf(target.g / mean.g, 0.02, 4.0), clampf(target.b / mean.b, 0.02, 4.0))
 	return MaterialLibrary._calib_tint(
 		(MaterialLibrary.PBR_SETS[set_name] as Dictionary)["mean"], target)
 
@@ -116,6 +125,16 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		fidelity: int, distant: bool, seed_v: float = 0.0,
 		style: Dictionary = {}) -> Material:
 	if distant:
+		# The shared distant palette still has to distinguish a mapped glass
+		# curtain wall from masonry (including glass residential towers).
+		var mapped_set := str(MaterialLibrary.MATERIAL_TAGS.get(str(b.get("material", "")).strip_edges().to_lower(), ""))
+		if mapped_set == "glass":
+			return glass_material(0 if fidelity <= 1 else 1)
+		# Explicitly historic prewar towers keep their stone look at skyline distance.
+		var arch := str(b.get("architecture", "")).to_lower().replace("-", "_")
+		if str(style.get("era", "")) == "nyc_prewar" \
+				and (bool(b.get("heritage", false)) or arch == "art_deco"):
+			return facade_for_building(b, region, storeys, mini(fidelity, 2), false, seed_v, style)
 		var dfs := distant_facades(fidelity, region)
 		return dfs[absi(hash(str(seed_v))) % dfs.size()]
 	if style.is_empty() and not MaterialLibrary.REGION_MATERIALS.has(region):
@@ -139,8 +158,13 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		look_key = _look_key(style) + "|%d" % variant
 	elif not style.is_empty():
 		look_key = "%.1f|%d" % [float(style["bay_m"]), variant]
+	var tint_key := tint.to_html()
+	if str(b.get("material", "")).strip_edges().to_lower() == "marble":
+		# HTML colours clamp HDR calibration channels to 1.0, making
+		# differently coloured pale marbles share the first material.
+		tint_key = "marble:%.3f,%.3f,%.3f" % [tint.r, tint.g, tint.b]
 	var key := "%s|%s|%d|%d|%s|%s" % [set_name, pattern, tex_rows, detail,
-		tint.to_html(), look_key]
+		tint_key, look_key]
 	if _facade_cache.has(key):
 		return _facade_cache[key] as Material
 	var family := set_name + "|" + pattern
@@ -192,9 +216,16 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 		# Mappers' colour names are vivid ("cyan", "lime"); real paint and
 		# render are muted, so cap the saturation before calibrating.
 		var hsv := Color.from_hsv(q.h, minf(q.s, 0.42), q.v)
+		if str(b.get("material", "")).strip_edges().to_lower() == "marble":
+			# The limestone source is warm and dark. Calibrate mapped marble
+			# colours per channel so white marble does not become ochre.
+			var target := hsv * minf(1.0, ArchitectureStyle.WALL_ALBEDO_MAX / maxf(hsv.v, 0.001))
+			var mean: Color = MaterialLibrary.PBR_SETS[set_name]["mean"]
+			return Color(clampf(target.r / mean.r, 0.02, 8.0),
+				clampf(target.g / mean.g, 0.02, 8.0), clampf(target.b / mean.b, 0.02, 8.0))
 		return _keep_chroma(set_name, _calib(set_name, hsv))
 	if set_name == "glass":
-		return Color.WHITE
+		return Color(0.38, 0.42, 0.45) if str(style.get("era", "")) == "nyc_international" else Color.WHITE
 	if painted.a > 0.0 and MaterialLibrary.PBR_SETS.has(set_name):
 		return _keep_chroma(set_name, _calib(set_name, painted))
 	if set_name == "limestone":
@@ -261,6 +292,7 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 	if _ground_cache.has(key):
 		return _ground_cache[key] as Material
 	if _ground_cache.size() >= 48:
+		_ground_overflows += 1
 		return _ground_cache.values()[0] as Material
 	var tkey := "ground|" + key
 	var texs: Dictionary
@@ -288,9 +320,10 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 static func roof_for_building(b: Dictionary, region: String, shape: String,
 		colour_hint: Color, fidelity: int, distant: bool,
 		seed_v: float = 0.0, style: Dictionary = {}) -> Material:
-	if distant:
+	if distant and str(b.get("roof_material", "")).strip_edges().to_lower() != "copper":
 		var drs := distant_roofs(region, fidelity)
 		return drs[absi(hash(str(seed_v))) % drs.size()]
+	var detail := 0 if fidelity <= 1 else 1
 	if not MaterialLibrary.REGION_MATERIALS.has(region):
 		region = "urban"
 	var tag_set: String = MaterialLibrary.ROOF_TAGS.get(
@@ -301,31 +334,33 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 		if tag.a > 0.0 and tag_set != "glass":
 			var q := Color(roundf(tag.r * 12.0) / 12.0,
 				roundf(tag.g * 12.0) / 12.0, roundf(tag.b * 12.0) / 12.0)
-			q = Color.from_hsv(q.h, minf(q.s, 0.42), q.v)  # muted, as for walls
+			q = Color.from_hsv(q.h, minf(q.s, 0.72 if tag_set in ["copper", "sheet_metal"] else 0.42), q.v)
 			tint = _roof_floor(tag_set, _keep_chroma(tag_set, _calib(tag_set, q)))
-		return roof_set_material(tag_set, tint)
+		return roof_set_material(tag_set, tint, detail)
 	var styled := str(style.get("roof_set", ""))
 	# A grey sample on a pitched roof in a terracotta region is shadow, moss
 	# or a panel, not slate: keep the style's tiles (Venice, Rome, ...).
 	var grey_tiles := styled == "terracotta" and shape != "flat" \
 		and _sample_set(colour_hint, shape, styled) != "terracotta"
-	if not grey_tiles and not MaterialLibrary._degenerate_roof_sample(colour_hint):
-		return roof_for_color(colour_hint, _sample_set(colour_hint, shape, styled))
+	var metal_sample := styled in ["copper", "sheet_metal"] and colour_hint.a > 0.0 \
+		and colour_hint.r + colour_hint.g + colour_hint.b >= 0.30
+	if not grey_tiles and (metal_sample or not MaterialLibrary._degenerate_roof_sample(colour_hint)):
+		return roof_for_color(colour_hint, _sample_set(colour_hint, shape, styled), detail)
 	if shape == "flat":
-		var flat_set := styled if styled in ["membrane", "concrete"] else "membrane"
+		var flat_set := styled if styled in ["membrane", "concrete", "copper"] else "membrane"
 		var ftint := roof_base_tint(flat_set)
 		var fpaint: Color = style.get("roof_colour", Color(0, 0, 0, 0))
 		if fpaint.a > 0.0 and flat_set == styled:
 			ftint = _roof_floor(flat_set, _calib(flat_set, fpaint))
-		return roof_set_material(flat_set, ftint)
+		return roof_set_material(flat_set, ftint, detail)
 	if styled != "":
 		var painted: Color = style.get("roof_colour", Color(0, 0, 0, 0))
 		var tint2 := roof_base_tint(styled)
 		if painted.a > 0.0 and MaterialLibrary.PBR_SETS.has(styled):
 			tint2 = _roof_floor(styled, _keep_chroma(styled, _calib(styled, painted)))
-		return roof_set_material(styled, tint2)
+		return roof_set_material(styled, tint2, detail)
 	var reg_set := str((MaterialLibrary.REGION_MATERIALS[region] as Dictionary)["roof"])
-	return roof_set_material(reg_set, roof_base_tint(reg_set))
+	return roof_set_material(reg_set, roof_base_tint(reg_set), detail)
 
 ## Base tint per roof set: slate calibrates to the PRD base; flat
 ## membrane/concrete read as weathered gravel grey (the bundled bitumen
@@ -339,6 +374,10 @@ static func roof_base_tint(set_name: String) -> Color:
 			return _calib("membrane", ArchitectureStyle._lin("#8c8882"))
 		"concrete":
 			return _calib("concrete", ArchitectureStyle._lin("#a9a59c"))
+		"copper":
+			return _calib("copper", ArchitectureStyle._lin("#538472"))
+		"sheet_metal":
+			return _calib("sheet_metal", ArchitectureStyle._lin("#555a60"))
 	return Color.WHITE
 
 ## Lift a roof tint so its mean albedo keeps ROOF_MIN_LUMA (no black
@@ -359,6 +398,8 @@ static func roof_set_material(set_name: String, tint: Color, detail: int = 1) ->
 		return glass_material(1)
 	var m := MaterialLibrary.pbr_material(set_name, tint,
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
+	if set_name in ["copper", "sheet_metal"]:
+		m.normal_enabled = detail >= 1
 	RoofVariety.mark(m)  # RoofSnow overlay + per-building tint
 	return m
 
@@ -366,21 +407,22 @@ static func roof_set_material(set_name: String, tint: Color, detail: int = 1) ->
 ## Red-dominant samples read terracotta, dark greys slate, mid greys flat
 ## membrane; degenerate samples fall back to slate (v1 rule). The tint is
 ## floored so shadowed samples never turn a roof black.
-static func roof_for_color(c: Color, set_name: String = "") -> Material:
-	if MaterialLibrary._degenerate_roof_sample(c):
+static func roof_for_color(c: Color, set_name: String = "", detail: int = 1) -> Material:
+	if MaterialLibrary._degenerate_roof_sample(c) and set_name not in ["copper", "sheet_metal"]:
 		return MaterialLibrary.slate()
 	if set_name == "":
 		set_name = _sample_set(c, "", "")
-	var tint := _roof_floor(set_name,
-		_keep_chroma(set_name, MaterialLibrary._sat_roof_tint(set_name, c)))
+	var sample_tint := _calib(set_name, c.srgb_to_linear()) if set_name in ["copper", "sheet_metal"] \
+		else MaterialLibrary._sat_roof_tint(set_name, c)
+	var tint := _roof_floor(set_name, _keep_chroma(set_name, sample_tint))
 	tint = Color(roundf(tint.r * 12.0) / 12.0, roundf(tint.g * 12.0) / 12.0,
 		roundf(tint.b * 12.0) / 12.0)
-	var key := "%s|%s" % [set_name, tint.to_html()]
+	var key := "%s|%s|%d" % [set_name, tint.to_html(), detail]
 	if _roof_mats.has(key):
 		return _roof_mats[key] as Material
 	if _roof_mats.size() > 28:
 		return MaterialLibrary.slate()
-	var m := roof_set_material(set_name, tint)
+	var m := roof_set_material(set_name, tint, detail)
 	_roof_mats[key] = m
 	return m
 
@@ -390,6 +432,9 @@ static func roof_for_color(c: Color, set_name: String = "") -> Material:
 ## timber shingle (a grey Paris mansard is zinc/slate, not bitumen), and
 ## a flat roof its membrane/concrete. With no style: v1 families.
 static func _sample_set(c: Color, shape: String, styled: String) -> String:
+	# A red painted sheet is still metal; green patina is still copper.
+	if styled == "copper" or (styled == "sheet_metal" and shape != "flat"):
+		return styled
 	if c.r > c.g * 1.12 and c.r > c.b * 1.15:
 		return "terracotta"
 	if styled != "" and shape != "":

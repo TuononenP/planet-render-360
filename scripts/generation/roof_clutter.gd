@@ -36,13 +36,13 @@ static var _mats: Dictionary = {}
 ## `top` the roof deck height; `country` the ISO code ("" unknown).
 static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, top: float, basis: Basis,
-		look: Dictionary, seed_v: float, area_m2: float, country: String = "") -> int:
+		look: Dictionary, seed_v: float, area_m2: float, country: String = "", wall_m: float = 0.0) -> int:
 	if area_m2 < 60.0:
 		return 0
 	var city := str(look.get("city", ""))
 	var region := str(look.get("region", ""))
 	var placed := 0
-	if city == "new_york" and area_m2 > 250.0 and _h(seed_v, 71) < 0.45:
+	if water_tower_allowed(look, wall_m) and area_m2 > 250.0 and _h(seed_v, 71) < 0.45:
 		placed += _water_tower(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 	# A stair or lift overrun crowns nearly every multi-storey flat roof.
 	if area_m2 > 150.0 and _h(seed_v, 70) < 0.8:
@@ -70,6 +70,12 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 		placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 82, top + 2.0 * _m(),
 			"cyl", Vector3(0.08, 4.0, 0.08), "steel")
 	return placed
+
+## Wooden tanks belong on older mid-rise roofs, not glass supertalls.
+static func water_tower_allowed(look: Dictionary, wall_m: float) -> bool:
+	var levels := roundi(wall_m / maxf(float(look.get("floor_h", 3.2)), 1.0))
+	return str(look.get("city", "")) == "new_york" and levels >= 6 and levels <= 20 \
+		and str(look.get("era", "")) in ["new_york", "nyc_brownstone", "nyc_prewar"]
 
 static func _m() -> float:
 	return WorldScale.metres_to_units()

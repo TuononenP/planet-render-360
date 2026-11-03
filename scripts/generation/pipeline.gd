@@ -105,6 +105,13 @@ var _climate_took := 0.0
 ## takes the rest of this wait. Cached revisits read one JSON.
 const CLIMATE_WAIT_S := 25.0
 var _sat: SatelliteFetcher
+var _landcover: LandcoverFetcher
+var _landcover_done := true
+var _landcover_image: Image = null
+var _canopy_image: Image = null
+## The optional rasters overlap other fetches and never extend Imagery
+## beyond this many seconds from the start of a place.
+const LANDCOVER_WAIT_S := 45.0
 var _sat_texture: Texture2D
 var _sat_image: Image
 var _sat_origin := Vector2.ZERO
@@ -125,6 +132,7 @@ var _ground_task := -1
 var _prewarm_task := -1
 var _ground_data: LocationData = null
 var _ground: GroundTruth = null
+var _ground_abort: BuildAbort = null
 
 func _ready() -> void:
 	_fetcher = DemFetcher.new()
@@ -182,6 +190,15 @@ func _ready() -> void:
 		_farcity_landuse = lu
 		_farcity_towers = tw
 		_farcity_done = true)
+	_landcover = LandcoverFetcher.new()
+	add_child(_landcover)
+	_landcover.layer_finished.connect(func(kind: String, image: Image) -> void:
+		if kind == "landcover":
+			_landcover_image = image
+		elif kind == "canopy":
+			_canopy_image = image)
+	_landcover.finished.connect(func(_cover: Image, _canopy: Image) -> void:
+		_landcover_done = true)
 	_sat = SatelliteFetcher.new()
 	add_child(_sat)
 	_sat.succeeded.connect(func(tex: Texture2D, img: Image, origin: Vector2, zoom: int) -> void:
@@ -245,17 +262,25 @@ func _start_ground(data: LocationData) -> void:
 	_join_ground()
 	_ground = null
 	_ground_data = data
-	var build := func() -> void: _ground = GroundTruth.new(data)
+	_ground_abort = BuildAbort.new()
+	var ground_abort := _ground_abort
+	var build := func() -> void:
+		CoastalDem.correct(data)
+		_ground = GroundTruth.new(data, ground_abort)
 	_ground_task = WorkerThreadPool.add_task(build, true, "GroundTruth")
 
 func cancel() -> void:
 	_cancelled = true
+	if _ground_abort != null:
+		_ground_abort.requested = true
 	if _osm != null:
 		_osm.cancel()
 	if _farcity != null:
 		_farcity.cancel()
 	if _climate != null:
 		_climate.cancel()
+	if _landcover != null:
+		_landcover.cancel()
 
 ## `focus`: the landmark the viewer came to see (LandmarkVisit site);
 ## the view aims at it (LocationData.focus). `view`: a saved camera or
@@ -308,7 +333,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_fetch_started_msec = Time.get_ticks_msec()
 	_sat_took = 0.0
 	_climate_took = 0.0
-	_osm.fetch(lat, lon)
+	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
 	_farcity_done = false
 	_farcity_landuse = []
 	_farcity_towers = []
@@ -316,6 +341,11 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_climate_done = false
 	_climate_data = {}
 	_climate.fetch(lat, lon)
+	_landcover_image = null
+	_canopy_image = null
+	_landcover_done = quality_preset <= RenderSettings.Preset.FAST
+	if not _landcover_done:
+		_landcover.fetch(lat, lon)
 	# Satellite drape overlaps the stages too; Fast skips it (the
 	# vertex-colour dressing is its whole point: less data, less time).
 	# Higher presets fetch finer mosaics (T2.2: z16s3 Balanced, z17s7
@@ -373,6 +403,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	for i in STAGES.size():
 		if _credits.has(i):
 			credits.append(str(_credits[i]))
+	if data.landcover_image != null:
+		credits.append("Land cover: © ESA WorldCover project 2021 (contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium)")
+	if data.canopy_image != null:
+		credits.append("Canopy height: © Meta and World Resources Institute (CHMv2 2026; source imagery © 2016 Vantor; accessed %s)" % LandcoverFetcher.accessed_date("canopy", data.latitude, data.longitude))
 	data.attribution = " · ".join(credits)
 
 	# The prewarm must be done before the build thread reads those caches;
@@ -534,6 +568,14 @@ func _await_satellite(data: LocationData) -> void:
 		data.satellite_inner_texture = _inner_texture
 		data.satellite_inner_origin_px = _inner_origin
 		_credits[1] = IMAGERY_CREDIT
+	while not _landcover_done and not _cancelled \
+			and Time.get_ticks_msec() - _fetch_started_msec < int(LANDCOVER_WAIT_S * 1000.0):
+		await get_tree().process_frame
+	if not _landcover_done:
+		_landcover.cancel()
+		_landcover_done = true
+	data.landcover_image = _landcover_image
+	data.canopy_image = _canopy_image
 
 ## Nearest first, except monuments (columns, obelisks) and observation
 ## wheels in range rank first: they are few, and one cut by the cap
@@ -558,7 +600,9 @@ func _await_osm(data: LocationData) -> void:
 		waited += get_process_delta_time()
 	if not _osm_done:
 		_note("map")
-	if not _osm_buildings.is_empty():
+	data.pois = _osm.pois
+	if not _osm_buildings.is_empty() or not _osm_land.is_empty() or not _osm_waterways.is_empty() \
+			or not _osm_roads_v2.is_empty() or not _osm.shore_structures.is_empty():
 		used_osm = true
 		data.buildings = _osm_buildings
 		data.roads = _osm_roads_v2
@@ -570,6 +614,7 @@ func _await_osm(data: LocationData) -> void:
 		data.railways = _osm.railways
 		data.street_furniture = _osm.furniture
 		data.piers = _osm.piers
+		data.shore_structures = _osm.shore_structures
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
 		_credits[2] = "Map data: © OpenStreetMap contributors"
 	else:

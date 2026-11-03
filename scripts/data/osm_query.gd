@@ -22,7 +22,7 @@ const CAP_BUILDINGS := 7000
 ## its own cap, complete, and the ring beyond it fills the rest.
 const CORE_RADIUS_M := 500
 const CAP_BUILDINGS_CORE := 4500
-const CAP_PARTS := 2200
+const CAP_PARTS := 4000
 const CAP_HIGHWAYS := 13000
 const CAP_WATERWAYS := 880
 const CAP_NATURAL := 1600
@@ -35,6 +35,10 @@ const CAP_TREE_NODES := 8000
 ## close (StreetFurniture.RADIUS_M).
 const CAP_FURNITURE := 4000
 const FURNITURE_RADIUS_M := 450
+## A separate, bounded follow-up query keeps POIs from enlarging or
+## delaying the detailed building response on Overpass.
+const POI_RADIUS_M := 800
+const CAP_POIS := 2500
 ## Railway track ways (a city terminus yard is ~400 within 1200 m) and
 ## squares mapped outside the highway statement (place=square,
 ## area:highway, multipolygon squares).
@@ -42,9 +46,13 @@ const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
 ## Marks a response as this query's (an Overpass `make` element): a
 ## cached detailed payload without it predates the current statements
-## (q3 railways and squares, q4 street furniture, q5 piers), so it is refetched
-## (and still served if the network fails).
-const QUERY_MARK := "pr360_q5"
+## (q3 railways and squares, q4 furniture, q5 piers, q6–q7 shore
+## structures, q8 surface parking, q9 eye-centred furniture and more parts,
+## q10 subway entrances, q11 prioritises furniture before expensive layers),
+## so it is refetched (and still served
+## if the network fails).
+const QUERY_VERSION := 11
+const QUERY_MARK := "pr360_q11"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
@@ -86,10 +94,21 @@ const CAP_RING_COASTLINE := 100
 static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 	var head := "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S
 	var core := mini(CORE_RADIUS_M, radius_m / 2)
+	var view := PresetViews.for_pin(lat, lon)
+	var furniture_lat := float(view.get("eye_lat", lat))
+	var furniture_lon := float(view.get("eye_lon", lon))
 	var clauses: Array[String] = [
 		# The mark prints first, so a payload the timeout cut short still
 		# reads as this query's (it is cached either way).
 		"make %s;out;" % QUERY_MARK,
+		# Keep eye-level features ahead of the expensive city-wide layers:
+		# a dense response can exhaust the server before reaching the tail.
+		('(node["amenity"~"^(bench|waste_basket)$"](around:%d,%.6f,%.6f);'
+			+ 'node["highway"~"^(traffic_signals|bus_stop)$"](around:%d,%.6f,%.6f);'
+			+ 'node["barrier"="bollard"](around:%d,%.6f,%.6f);'
+			+ 'node["railway"="subway_entrance"](around:%d,%.6f,%.6f););out %d;')
+			% [FURNITURE_RADIUS_M, furniture_lat, furniture_lon, FURNITURE_RADIUS_M, furniture_lat, furniture_lon,
+				FURNITURE_RADIUS_M, furniture_lat, furniture_lon, FURNITURE_RADIUS_M, furniture_lat, furniture_lon, CAP_FURNITURE],
 		'way["building"](around:%d,%.6f,%.6f);out geom %d;'
 			% [core, lat, lon, CAP_BUILDINGS_CORE],
 		'(way["building"](around:%d,%.6f,%.6f); - way["building"](around:%d,%.6f,%.6f););out geom %d;'
@@ -116,6 +135,9 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			+ 'relation["place"="square"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
 			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon,
 				radius_m, lat, lon, CAP_SQUARES],
+		('(way["amenity"="parking"](around:%d,%.6f,%.6f);'
+			+ 'relation["amenity"="parking"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, CAP_SQUARES],
 		'way["waterway"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_WATERWAYS],
 		'relation["waterway"]["type"="multipolygon"](around:%d,%.6f,%.6f);out geom %d;'
@@ -136,6 +158,10 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_BARRIERS],
 		'way["man_made"~"^(tower|lighthouse|windmill|pier)$"](around:%d,%.6f,%.6f);out geom 150;'
 			% [radius_m, lat, lon],
+		('(way["man_made"~"^(quay|embankment)$"](around:%d,%.6f,%.6f);'
+			+ 'way["barrier"="retaining_wall"](around:%d,%.6f,%.6f);'
+			+ 'way["embankment"="yes"](around:%d,%.6f,%.6f););out geom %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon, CAP_BARRIERS],
 		'node["natural"="tree"](around:%d,%.6f,%.6f);out %d;'
 			% [radius_m, lat, lon, CAP_TREE_NODES],
 		'node["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out 100;'
@@ -144,18 +170,19 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 		# building style follows the real border, not a lat/lon box.
 		'is_in(%.6f,%.6f)->.ci;area.ci["admin_level"="2"]["ISO3166-1"];out tags 4;'
 			% [lat, lon],
-		# Street furniture last: a timeout drops it before anything else.
-		('(node["amenity"~"^(bench|waste_basket)$"](around:%d,%.6f,%.6f);'
-			+ 'node["highway"~"^(traffic_signals|bus_stop)$"](around:%d,%.6f,%.6f);'
-			+ 'node["barrier"="bollard"](around:%d,%.6f,%.6f););out %d;')
-			% [FURNITURE_RADIUS_M, lat, lon, FURNITURE_RADIUS_M, lat, lon,
-				FURNITURE_RADIUS_M, lat, lon, CAP_FURNITURE],
 	]
 	return head + "".join(PackedStringArray(clauses))
 
 ## Whether a cached detailed payload came from the current query.
 static func is_current(text: String) -> bool:
 	return text.contains(QUERY_MARK)
+
+static func build_poi_query(lat: float, lon: float) -> String:
+	var clauses: Array[String] = []
+	for key in ["shop", "amenity", "office", "tourism", "craft", "advertising"]:
+		clauses.append('node["%s"](around:%d,%.6f,%.6f);' % [key, POI_RADIUS_M, lat, lon])
+	return "[out:json][timeout:%d];(" % OVERPASS_TIMEOUT_S \
+		+ "".join(PackedStringArray(clauses)) + ");out %d;" % CAP_POIS
 
 ## Second, low-detail ring query (plan §3.1 Ultra budget): major roads
 ## + waterways + coastline out to ring_m. Best-effort — merged over the

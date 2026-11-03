@@ -154,6 +154,9 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 	var punched := pattern in PUNCHED
 	var french := paris or str(look.get("window", "")) == "french"
 	var courses := paris or bool(relief.get("string_course", false))
+	var mullion := bool(relief.get("mullion", false))
+	var frame: Material = ReliefKit.flat("#444d50", 0.48, 0.65) if mullion else stone
+	var glazed := ArchitectureStyle._h(seed_v, 62) < float(relief.get("glazed_balcony", 0.0))
 	var deep := ArchitectureStyle._h(seed_v, 61) < float(relief.get("deep_balcony", 0.0))
 	var solid := str(look.get("wall_set", "")) == "concrete" or pattern in ["panel", "strip"]
 	for row in rows:
@@ -161,18 +164,22 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 			continue
 		var y0 := float(row["y0"])
 		if courses:
-			kit.box(stone, Vector3(mid.x, y0 + 0.09 * m, mid.y) + az * 0.06 * m, ax, az,
+			kit.box(frame, Vector3(mid.x, y0 + 0.09 * m, mid.y) + az * 0.06 * m, ax, az,
 				Vector3(len, 0.18 * m, 0.12 * m))
 		if row["balcony"]:
 			_balcony(kit, a, dir, n, len, float(row["slab"]), float(row["rail_h"]),
 				0.55 * m if paris else 0.8 * m, stone)
 		for j in bays:
 			var c := a + dir * step * (float(j) + 0.5)
+			if mullion:
+				var edge := a + dir * step * float(j)
+				kit.box(frame, Vector3(edge.x, (y0 + float(row["y1"])) * 0.5, edge.y) + az * 0.05 * m,
+					ax, az, Vector3(0.10 * m, float(row["y1"]) - y0, 0.10 * m))
 			var ww := step * float(row["win_w"])
 			var w0 := float(row["win0"])
 			var hv := ArchitectureStyle._h(seed_v + float(j) * 0.37, 70 + int(row["storey"]))
-			if deep and not row["balcony"]:
-				_deep_balcony(kit, c, ax, az, step * 0.86, y0, stone, solid)
+			if (deep or glazed) and not row["balcony"]:
+				_deep_balcony(kit, c, ax, az, step * 0.86, y0, stone, solid, glazed)
 				continue
 			if punched and not row["balcony"] and pattern != "balcony":
 				kit.box(stone, Vector3(c.x, w0 - 0.04 * m, c.y) + az * 0.07 * m, ax, az,
@@ -211,13 +218,23 @@ static func _balcony(kit: ReliefKit, a: Vector2, dir: Vector2, n: Vector2,
 ## A projecting balcony in one bay at floor level y: slab plus a solid
 ## concrete parapet (modern blocks) or an iron railing.
 static func _deep_balcony(kit: ReliefKit, c: Vector2, ax: Vector3, az: Vector3,
-		w: float, y: float, stone: Material, solid: bool) -> void:
+		w: float, y: float, stone: Material, solid: bool, glazed: bool = false) -> void:
 	var m := WorldScale.metres_to_units()
 	var depth := 1.15 * m
 	var t := 0.18 * m
 	var base := Vector3(c.x, y, c.y)
 	kit.box(stone, base + Vector3.UP * t * 0.5 + az * depth * 0.5, ax, az, Vector3(w, t, depth))
-	if solid:
+	if glazed:
+		var glass := ReliefKit.glass()
+		var frame := ReliefKit.flat("#a3a7a3", 0.4, 0.3)
+		var h := 2.5 * m
+		kit.box(glass, base + Vector3.UP * (t + h * 0.5) + az * depth, ax, az, Vector3(w, h, 0.025 * m))
+		for s in [-1.0, 0.0, 1.0]:
+			kit.box(frame, base + Vector3.UP * (t + h * 0.5) + az * (depth + 0.02 * m) + ax * s * w * 0.48,
+				ax, az, Vector3(0.035 * m, h, 0.04 * m))
+		kit.box(frame, base + Vector3.UP * (t + 1.0 * m) + az * (depth + 0.02 * m), ax, az,
+			Vector3(w, 0.05 * m, 0.04 * m))
+	elif solid:
 		kit.box(stone, base + Vector3.UP * (t + 0.5 * m) + az * (depth - 0.05 * m), ax, az,
 			Vector3(w, 1.0 * m, 0.1 * m))
 		for s in [-1.0, 1.0]:

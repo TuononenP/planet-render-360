@@ -157,10 +157,12 @@ static func to_view(state: Dictionary) -> Dictionary:
 
 ## Season (LocationData.Season) of a calendar date at `lat`: the
 ## meteorological seasons, six months on in the southern hemisphere.
-static func season_for_date(date: Dictionary, lat: float) -> int:
+static func season_for_date(date: Dictionary, lat: float, data: LocationData = null) -> int:
 	var m := int(date.get("month", 6))
 	if lat < 0.0:
 		m = (m + 5) % 12 + 1
+	if m == 3 and data != null and ClimateModel.month_temp_c(data, int(date.get("month", 3))) < 0.0:
+		return LocationData.Season.WINTER
 	if m in [3, 4, 5]:
 		return LocationData.Season.SPRING
 	if m in [6, 7, 8]:

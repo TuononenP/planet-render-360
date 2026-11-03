@@ -51,10 +51,14 @@ uniform int ground_quality = 2;
 // @TERRAIN
 varying vec3 wpos;
 varying vec3 wnrm;
+varying float water_level;
+varying float bank_paving;
 
 void vertex() {
 	wpos = VERTEX;
 	wnrm = NORMAL;
+	water_level = UV2.x;
+	bank_paving = UV2.y;
 	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
 	BINORMAL = normalize(cross(TANGENT, NORMAL));
 }
@@ -130,6 +134,9 @@ void fragment() {
 		ivec2 o = ivec2(k & 1, k >> 1);
 		float bw = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
 		int id = int(texelFetch(class_map, clamp(c0 + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
+		if (bank_paving > 0.5) {
+			id = 3;
+		}
 		// Ids past the palette (an unbound/white class map reads 255)
 		// fall back to unmapped ground; texelFetch past the 32-texel
 		// palette is undefined (Metal returned the red fill).
@@ -144,10 +151,12 @@ void fragment() {
 			hfk += bw * 0.35;
 			pave += bw * (1.0 - veg) * urban_unknown * 0.7;
 		} else {
-			W0 += bw * texelFetch(palette, ivec2(id, 0), 0);
-			W1 += bw * texelFetch(palette, ivec2(id, 3), 0);
+			vec4 p0 = texelFetch(palette, ivec2(id, 0), 0);
 			vec4 p1 = texelFetch(palette, ivec2(id, 1), 0);
 			vec4 p2 = texelFetch(palette, ivec2(id, 2), 0);
+			vec4 p3 = texelFetch(palette, ivec2(id, 3), 0);
+			W0 += bw * p0;
+			W1 += bw * p3;
 			col += bw * srgb_lin(p1.rgb);
 			trust += bw * p1.a;
 			farc += bw * p2.r;
@@ -187,6 +196,11 @@ void fragment() {
 	float l_lf = max(lum(lf), 1e-3);
 	vec3 rock_c = mix(vec3(0.34, 0.32, 0.29), lf * (0.33 / l_lf), 0.5);
 	base = mix(base, rock_c, steep * 0.85);
+	// Exposed granite: feldspar pink-grey with cool, pale lichen patches.
+	float granite = clamp(W0.z + W1.x * 0.45, 0.0, 1.0) * (1.0 - veg);
+	vec3 granite_c = mix(vec3(0.37, 0.32, 0.30), vec3(0.42, 0.43, 0.37),
+		smoothstep(0.48, 0.7, t_noise(g / 1.7)));
+	base = mix(base, granite_c * (0.88 + 0.2 * t_noise(g * 5.0)), granite * 0.55);
 	base = value_clamp(base * mix(1.0, macro, 0.8));
 	// Meadows are never one green: broad patches of lush, deep and
 	// sun-dried grass, and finer mottling near the eye. Multiplies the
@@ -237,6 +251,9 @@ void fragment() {
 	// Cliffs keep their rock detail further out than flat cover.
 	float wf = smoothstep(near_m, far_m, dist_m) * farc * (1.0 - 0.6 * steep);
 	vec3 alb = mix(near_c, mix(base, hf, 0.6), wf);
+	// Natural shore wetness is painted on the canonical dry surface.
+	// Negative bank attributes never replace the adjacent land material.
+	alb *= mix(1.0, 0.7, clamp(-bank_paving, 0.0, 1.0));
 	alb *= COLOR.a;
 	// Edge band: hand off to the far terrain's rendered albedo
 	// (COLOR.rgb = FarTerrainBuilder.far_albedo_at: drape or ramp).

@@ -2,7 +2,7 @@ class_name LandmarkSuspensionBridges
 extends RefCounted
 
 ## The two great suspension bridges in true metres, built along +X with
-## y = 0 at the water (LocationData `base: water`): towers, main cables
+## y = 0 at sea level (LocationData `base: sea`): towers, main cables
 ## sagging between them and down to the anchorages, vertical suspenders
 ## and the stiffened deck. RoadBuilder leaves the OSM deck out of their
 ## span (LandmarkSites.outside_spans), so this deck is the road.

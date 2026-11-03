@@ -62,7 +62,7 @@ static var MATERIAL_TAGS := {
 	"glass": "glass", "mirror": "glass",
 	"wood": "wood", "timber": "wood", "planks": "wood", "thatch": "wood", "timber_framing": "wood",
 	"stone": "stone", "sandstone": "stone", "granite": "stone",
-	"marble": "stone", "masonry": "stone", "ashlar": "stone", "rubble": "stone",
+	"marble": "limestone", "masonry": "stone", "ashlar": "stone", "rubble": "stone",
 	"limestone": "limestone", "chalk": "limestone", "travertine": "limestone",
 	"plaster": "render", "render": "render", "stucco": "render",
 	"metal": "concrete", "steel": "concrete", "aluminium": "concrete",
@@ -77,8 +77,8 @@ static var ROOF_TAGS := {
 	"tile": "terracotta", "tiles": "terracotta", "terracotta": "terracotta", "roof_tiles": "terracotta",
 	"clay": "terracotta", "clay_tile": "terracotta", "ceramic": "terracotta",
 	"concrete": "concrete", "cement": "concrete", "eternit": "slate", "stone": "slate",
-	"metal_sheet": "slate", "metal sheet": "slate", "metal": "slate", "steel": "slate",
-	"zinc": "slate", "copper": "terracotta",
+	"metal_sheet": "sheet_metal", "metal sheet": "sheet_metal", "metal": "sheet_metal", "steel": "sheet_metal",
+	"zinc": "sheet_metal", "copper": "copper",
 	"glass": "glass",
 	"wood": "wood", "shingle": "wood", "shingles": "wood", "thatch": "wood",
 	"gravel": "membrane", "bitumen": "membrane", "felt": "membrane",
@@ -105,6 +105,7 @@ static var REGION_MATERIALS := {
 static var ROOF_UV := {
 	"slate": 8.0, "terracotta": 4.4, "membrane": 3.3,
 	"concrete": 3.3, "wood": 3.3, "glass": 2.0, "grass": 3.0,
+	"sheet_metal": 20.0 / 3.6, "copper": 20.0 / 3.6,
 }
 
 ## Land class → ground PBR set (T2.4 §2.6 classes; water surfaces use
@@ -227,7 +228,7 @@ static func ground_color(land_class: String) -> Color:
 		"sand":
 			return Color(0.76, 0.69, 0.54)
 		"rock":
-			return Color(0.43, 0.42, 0.38)
+			return Color(0.44, 0.41, 0.39)
 		"glacier":
 			return Color(0.82, 0.89, 0.92)
 		"orchard":

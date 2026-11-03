@@ -15,6 +15,34 @@ func _init() -> void:
 	var short_h := short_r.y - short_r.x
 	if long_h < short_h + 2.0:
 		failures.append("a 140 m crossing should reach down to piers: %.1f m vs %.1f m for a 20 m one" % [long_h, short_h])
+	for c in [[{"bridge_structure": "arch", "bridge_material": "stone"}, "masonry"],
+			[{"bridge_structure": "arch", "bridge_material": "steel"}, "steel_arch"],
+			[{"name": "Västerbron"}, "steel_arch"], [{"name": "Centralbron"}, "girder"],
+			[{}, "unknown"], [{"name": "Västerbron", "bridge_structure": "girder"}, "girder"]]:
+		if BridgeArches.structure(c[0]) != c[1]:
+			failures.append("structure for %s should be %s" % [c[0], c[1]])
+	if _deck_vertices(140.0, "masonry") <= _deck_vertices(140.0, "girder") + 100:
+		failures.append("a masonry deck must receive arch geometry that a girder does not")
+	var tags := OsmTags._road_entry({"highway": "primary", "bridge": "yes", "bridge:structure": "arch", "bridge:material": "steel", "name": "Västerbron"}, PackedVector2Array([Vector2.ZERO, Vector2.ONE]))
+	if BridgeArches.structure(tags) != "steel_arch" or tags.get("name") != "Västerbron":
+		failures.append("OSM bridge structure, material and name must reach the builder")
+	var land := _data(20.0, "girder")
+	land.land_polygons = []
+	var ground := GroundTruth.new(land)
+	var surf := RoadBuilder._Surface.new(land, ground)
+	var dry := PackedVector2Array([Vector2(-80, 0), Vector2(-40, 0), Vector2.ZERO, Vector2(40, 0), Vector2(80, 0)])
+	var low := RoadBuilder.deck_profile(dry, surf, 1.0, 7.0, 0)
+	var high := RoadBuilder.deck_profile(dry, surf, 1.0, 7.0, 1)
+	if high.size() != dry.size() or high[2] < surf.height(0, 0) + 5.0 or high[2] <= low[2] + 2.0:
+		failures.append("layer 1 dry viaduct should rise about 5 m over land")
+	var dist := PackedFloat32Array([0, 40, 80, 120, 160])
+	var pier_batch := RoadBuilder._Batch.new()
+	RoadBuilder._land_piers(pier_batch, dry, dist, high, surf, 1.0)
+	if pier_batch.indices.is_empty():
+		failures.append("elevated dry bridge must have supporting piers")
+	var parsed := RoadBuilder._parse({"points": dry, "bridge": true, "layer": 2, "class": "primary"}, 1.0)
+	if int(parsed.get("layer", 0)) != 2:
+		failures.append("OSM layer must reach the road builder")
 	var spans := _spans(140.0)
 	if spans < 3 or spans > 6:
 		failures.append("140 m of water should take ~4 spans, got %d" % spans)
@@ -28,7 +56,7 @@ func _init() -> void:
 			printerr("BRIDGE ARCHES FAIL: ", f)
 		quit(1)
 
-func _data(water_w: float) -> LocationData:
+func _data(water_w: float, structure: String = "masonry") -> LocationData:
 	var d := LocationData.new()
 	RenderSettings.apply_preset(d, RenderSettings.Preset.HIGH)
 	d.heights.resize(d.grid_size * d.grid_size)
@@ -40,13 +68,13 @@ func _data(water_w: float) -> LocationData:
 	var h := water_w * 0.5
 	d.land_polygons = [{"class": "water", "holes": [], "points": PackedVector2Array([
 		Vector2(-h, -300), Vector2(h, -300), Vector2(h, 300), Vector2(-h, 300)])}]
-	d.roads = [{"class": "secondary", "width_m": 14.0, "lanes": 4, "bridge": true,
+	d.roads = [{"class": "secondary", "width_m": 14.0, "lanes": 4, "bridge": true, "bridge_structure": structure,
 		"points": PackedVector2Array([Vector2(-h - 40.0, 0.0), Vector2(h + 40.0, 0.0)])}]
 	return d
 
 ## Vertical range (min Y, max Y) of the "deck" batch on a bridge over `water_w` m of water.
-func _deck_range(water_w: float) -> Vector2:
-	var d := _data(water_w)
+func _deck_range(water_w: float, structure: String = "masonry") -> Vector2:
+	var d := _data(water_w, structure)
 	var roads := RoadBuilder.build_roads(d, GroundTruth.new(d))
 	var lo := INF
 	var hi := -INF
@@ -57,6 +85,16 @@ func _deck_range(water_w: float) -> Vector2:
 				hi = maxf(hi, v.y)
 	roads.free()
 	return Vector2(lo, hi)
+
+func _deck_vertices(water_w: float, structure: String) -> int:
+	var d := _data(water_w, structure)
+	var roads := RoadBuilder.build_roads(d, GroundTruth.new(d))
+	var count := 0
+	for c in roads.get_children():
+		if c is MeshInstance3D and str(c.name) == "Road_deck":
+			count += (c.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	roads.free()
+	return count
 
 func _spans(water_w: float) -> int:
 	var d := _data(water_w)

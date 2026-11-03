@@ -4,13 +4,13 @@ extends RefCounted
 ## On-device history + versioned tile/area cache index (contract §5).
 ## No server, no account: a JSON file in user:// is the history store,
 ## and user://cache holds the fetch payloads. Generated terrain is
-## reproducible from the stored coordinates + seed, so history entries
-## double as cache keys — each entry carries its v2 key set.
+## reproducible from the stored coordinates + quality tier; cache paths
+## are computed when needed so history survives a data-directory move.
 ##
 ## Cache key v2 grammar (all under user://cache/):
 ##   dem_v<V>_<z>_<x>_<y>.png        one Terrarium tile
 ##   sat_v<V>_<z>_<x>_<y>.jpg        one Esri tile
-##   osm_v<V>_<lat_q>_<lon_q>_r<radius_m>.json      one detailed response
+##   osm_v<V>_<lat_q>_<lon_q>_r<radius_m>_q<Q>.json  one detailed response
 ##   osm_v<V>_<lat_q>_<lon_q>_ring<ring_m>.json    one low-detail ring query
 ## <V> is DATA_VERSION below — the single source. Fetchers format keys
 ## through the path helpers here, never inline. The ring key keeps the
@@ -35,6 +35,8 @@ const PATH := "user://history.json"
 const MAX_ENTRIES := 50
 ## Contract §5: the cache data version. Bump to invalidate everything.
 const DATA_VERSION := 2
+## Raster windows have independent versions; leave DATA_VERSION untouched.
+const LANDCOVER_VERSION := 2
 const CACHE_DIR := "user://cache"
 const LRU_FILE := "lru.json"
 ## Share of data_cap() an over-cap cache is trimmed down to.
@@ -55,6 +57,11 @@ static var max_cache_bytes := 2048 * 1024 * 1024
 ## resolve under this directory instead of CACHE_DIR, so eviction and
 ## key tests never touch the real on-device cache.
 static var dir_override := ""
+## Tests can isolate history without discarding the reusable data cache.
+static var history_override := ""
+## Capture and windowed-test runs may reuse downloaded data without
+## evicting the person's cached files as they visit many places.
+static var eviction_suppressed := false
 ## Called on the main thread when the cache dropped places on its own to
 ## stay under the limit (Main offers a bigger one). Not called when the
 ## person lowers the limit themselves (enforce_size_cap(false)).
@@ -106,6 +113,10 @@ static func sat_path(z: int, x: int, y: int) -> String:
 	return "%s/sat_v%d_%d_%d_%d.jpg" % [base_dir(), DATA_VERSION, z, x, y]
 
 static func osm_path(lat: float, lon: float, radius_m: int) -> String:
+	return "%s/osm_v%d_%d_%d_r%d_q%d.json" % [base_dir(), DATA_VERSION,
+		quant(lat), quant(lon), radius_m, OsmQuery.QUERY_VERSION]
+
+static func osm_legacy_path(lat: float, lon: float, radius_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_r%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), radius_m]
 
@@ -118,6 +129,13 @@ static func osm_api_path(lat: float, lon: float, radius_m: int) -> String:
 static func osm_ring_path(lat: float, lon: float, ring_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_ring%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), ring_m]
+
+static func osm_poi_path(lat: float, lon: float) -> String:
+	return "%s/osm_v%d_%d_%d_poi_q1.json" % [base_dir(), DATA_VERSION, quant(lat), quant(lon)]
+
+static func landcover_path(kind: String, lat: float, lon: float) -> String:
+	return "%s/%s_v%d_%d_%d.png" % [base_dir(), kind, LANDCOVER_VERSION,
+		roundi(lat * 1000000.0), roundi(lon * 1000000.0)]
 
 ## Landmark lookups (WikiFetcher): nearby articles per 0.01° cell and
 ## radius, one summary per article, one photo per Commons file. Not a
@@ -151,19 +169,23 @@ static func layer_of(file_name: String) -> String:
 		return "osm"
 	if base.begins_with("climate_v"):
 		return "climate"
+	if base.begins_with("landcover_v") or base.begins_with("canopy_v"):
+		return "landcover"
 	return ""
 
 static func is_v2_name(file_name: String) -> bool:
 	var base := file_name.get_file()
 	var tag := "_v%d_" % DATA_VERSION
 	return base.begins_with("dem" + tag) or base.begins_with("sat" + tag) \
-		or base.begins_with("osm" + tag) or base.begins_with("climate" + tag)
+		or base.begins_with("osm" + tag) or base.begins_with("climate" + tag) \
+		or base.begins_with("landcover_v%d_" % LANDCOVER_VERSION) \
+		or base.begins_with("canopy_v%d_" % LANDCOVER_VERSION)
 
-## Full v2 key set warming/covering a place at a preset (High default,
-## the app default): {"dem": [...], "sat": [...], "osm": [...]}.
+## Current key set warming/covering a place at a preset (High default):
+## {"dem": [...], "sat": [...], "osm": [...], "landcover": [...]}.
 ## DEM keys are preset-independent (grid resamples the same tiles);
 ## satellite zoom/span and the OSM ring follow the preset maps.
-## History entries store this; OfflineDownloader warms exactly it.
+## History computes it on demand; OfflineDownloader warms it.
 static func place_cache_keys(lat: float, lon: float, preset: int = 2) -> Dictionary:
 	var p := clampi(preset, 0, 3)
 	var dem: Array[String] = []
@@ -185,13 +207,19 @@ static func place_cache_keys(lat: float, lon: float, preset: int = 2) -> Diction
 	var ring := OsmFetcher.ring_radius_for_preset(p)
 	if ring > radius:
 		osm.append(osm_ring_path(lat, lon, ring))
-	return {"dem": dem, "sat": sat, "osm": osm}
+	if p > RenderSettings.Preset.FAST:
+		osm.append(osm_poi_path(lat, lon))
+	var landcover: Array[String] = []
+	if p > RenderSettings.Preset.FAST:
+		landcover.append(landcover_path("landcover", lat, lon))
+		landcover.append(landcover_path("canopy", lat, lon))
+	return {"dem": dem, "sat": sat, "osm": osm, "landcover": landcover}
 
 ## Per-layer presence of a key set: {"dem": {"cached": a, "total": b},
 ## ...}. A layer is fully cached when cached == total.
 static func keys_cached_status(keys: Dictionary) -> Dictionary:
 	var out := {}
-	for layer in ["dem", "sat", "osm"]:
+	for layer in ["dem", "sat", "osm", "landcover"]:
 		var total := 0
 		var cached := 0
 		for k in keys.get(layer, []):
@@ -202,7 +230,7 @@ static func keys_cached_status(keys: Dictionary) -> Dictionary:
 	return out
 
 static func keys_fully_cached(keys: Dictionary) -> bool:
-	for layer in ["dem", "sat", "osm"]:
+	for layer in ["dem", "sat", "osm", "landcover"]:
 		for k in keys.get(layer, []):
 			if not FileAccess.file_exists(str(k)):
 				return false
@@ -210,6 +238,8 @@ static func keys_fully_cached(keys: Dictionary) -> bool:
 
 ## The History file: under dir_override in tests, never the real one.
 static func store_path() -> String:
+	if not history_override.is_empty():
+		return history_override
 	return dir_override.path_join("history.json") if dir_override != "" else PATH
 
 func load_store() -> void:
@@ -232,11 +262,10 @@ func save_store() -> void:
 		return
 	f.store_string(JSON.stringify(entries))
 
-## History entry + its v2 key set. cache_keys defaults to the full
-## High-preset key set for the coordinates (the app default; callers
-## that generated at another preset pass place_cache_keys(lat, lon, p)).
+## History entry. The retired cache_keys argument remains for callers
+## using the older signature; keys are now computed from coordinates/tier.
 func add_entry(place_name: String, lat: float, lon: float,
-		cache_keys: Dictionary = {}) -> void:
+		_cache_keys: Dictionary = {}, quality_preset: int = RenderSettings.Preset.HIGH) -> void:
 	var favourite := false
 	var camera := {}
 	for e in entries:
@@ -247,12 +276,10 @@ func add_entry(place_name: String, lat: float, lon: float,
 	entries = entries.filter(func(e: Dictionary) -> bool:
 		return not (abs(float(e.get("lat", 999.0)) - lat) < 0.0001 \
 			and abs(float(e.get("lon", 999.0)) - lon) < 0.0001))
-	var keys := cache_keys if not cache_keys.is_empty() \
-		else place_cache_keys(lat, lon)
 	var entry := {
 		"name": place_name, "lat": lat, "lon": lon,
 		"cached": true, "timestamp": Time.get_unix_time_from_system(),
-		"cache_version": DATA_VERSION, "cache_keys": keys, "favourite": favourite,
+		"quality_preset": RenderSettings.clamp_preset(quality_preset), "favourite": favourite,
 	}
 	if not camera.is_empty():
 		entry["camera"] = camera
@@ -279,9 +306,28 @@ func set_camera(lat: float, lon: float, camera: Dictionary) -> void:
 			return
 
 ## Per-layer presence for a history entry (see keys_cached_status).
-## Entries written before cache v2 carry no keys and report empty.
+## Older entries without a saved tier use the High default.
 func entry_cache_status(entry: Dictionary) -> Dictionary:
-	return keys_cached_status(entry.get("cache_keys", {}))
+	return keys_cached_status(entry_cache_keys(entry))
+
+## Preserve the exact coverage of entries saved before quality_preset was
+## recorded. Rebase filenames so they still work after a data-directory move.
+static func entry_cache_keys(entry: Dictionary) -> Dictionary:
+	var saved: Variant = entry.get("cache_keys", {})
+	if not entry.has("quality_preset") and saved is Dictionary and not saved.is_empty():
+		var keys := {}
+		for layer in saved:
+			if saved[layer] is Array:
+				keys[layer] = []
+				for path in saved[layer]:
+					var name := str(path).get_file()
+					if not name.is_empty() and name != "." and name != "..":
+						keys[layer].append(base_dir().path_join(name))
+		return keys
+	if not entry.has("lat") or not entry.has("lon"):
+		return {}
+	return place_cache_keys(float(entry["lat"]), float(entry["lon"]),
+		int(entry.get("quality_preset", RenderSettings.Preset.HIGH)))
 
 func clear() -> void:
 	for e in entries:
@@ -297,7 +343,7 @@ func set_favourite(entry: Dictionary, on: bool) -> void:
 ## Bytes the entry's cached files take on the device.
 static func entry_bytes(entry: Dictionary) -> int:
 	var total := 0
-	var keys: Dictionary = entry.get("cache_keys", {})
+	var keys := entry_cache_keys(entry)
 	for layer in keys:
 		for k in keys[layer]:
 			total += _file_bytes(str(k))
@@ -307,7 +353,7 @@ static func entry_bytes(entry: Dictionary) -> int:
 ## with a nearby place download again when that place opens) and drops
 ## it from History.
 func remove_place(entry: Dictionary) -> void:
-	var keys: Dictionary = entry.get("cache_keys", {})
+	var keys := entry_cache_keys(entry)
 	for layer in keys:
 		for k in keys[layer]:
 			if FileAccess.file_exists(str(k)):
@@ -561,6 +607,8 @@ static func _scan_dir(dir_path: String, base: String, lru_path: String,
 ## Legacy (non-v2) files go first — they are dead weight no fetcher
 ## reads. The LRU index itself is never evicted.
 static func enforce_size_cap(report_full: bool = true) -> void:
+	if eviction_suppressed:
+		return
 	var worlds_removed := 0
 	if _shares_with_worlds() and WorldCache.total_bytes() > max_cache_bytes / 2:
 		worlds_removed = WorldCache.enforce_budget()

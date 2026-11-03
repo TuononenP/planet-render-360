@@ -101,9 +101,13 @@ const CITY_ERAS := {
 		["venice_modern", ACC, 1946, 2100, MODERN, 0.3, 0.0, 99.0],
 	],
 	"stockholm": [
-		["stockholm", ALL, 1500, 1945, ["swedish_grace", "national_romantic", "neoclassicism",
-			"classicism", "baroque", "renaissance", "art_nouveau", "jugendstil"], 5.0, 0.0, 99.0],
-		["stockholm_modern", ACC, 1946, 2100, MODERN + ["million_programme"], 1.6, 0.0, 99.0],
+		["stockholm_medieval", ALL, 1200, 1799, ["medieval", "gothic", "baroque", "renaissance"], 2.0, 0.0, 3.0, [3, 5]],
+		["stockholm_wood", ["house", "apartments"], 1700, 1919, ["wooden", "vernacular"], 0.5, 0.0, 99.0, [1, 2]],
+		["stockholm_stone", ACC, 1800, 1919, ["national_romantic", "art_nouveau", "jugendstil"], 4.0, 0.0, 5.0, [4, 6]],
+		["stockholm_grace", ACC, 1920, 1932, ["swedish_grace", "nordic_classicism", "classicism", "neoclassicism"], 2.0, 0.0, 8.0, [4, 6]],
+		["stockholm_funkis", ACC, 1933, 1964, ["functionalism", "functionalist", "funkis"], 2.0, 0.0, 99.0, [3, 6]],
+		["stockholm_miljon", ACC, 1965, 1989, ["million_programme", "prefab", "brutalist"], 2.0, 0.0, 99.0, [4, 9]],
+		["stockholm_eco", ACC, 1990, 2100, MODERN, 2.0, 0.0, 99.0, [5, 12]],
 	],
 	"new_york": [
 		["new_york", AC, 1870, 1929, ["tenement", "renaissance_revival",
@@ -113,6 +117,11 @@ const CITY_ERAS := {
 		["nyc_prewar", ACC, 1900, 1945, ["art_deco", "beaux_arts", "gothic_revival",
 			"neo_gothic", "prewar"], 1.0, 0.0, 99.0],
 		["nyc_glass", ACC, 1950, 2100, MODERN, 1.0, 0.0, 99.0],
+		["nyc_castiron", AC, 1840, 1910, ["cast_iron", "castiron"], 1.0, 0.0, 99.0],
+		["nyc_loft", AC, 1850, 1945, ["industrial_loft", "warehouse"], 1.0, 0.0, 99.0],
+		["nyc_nycha", ["apartments"], 1935, 1980, ["nycha"], 1.0, 0.0, 99.0],
+		["nyc_pencil", AC, 2000, 2100, ["supertall", "pencil_tower"], 1.0, 0.0, 99.0],
+		["nyc_international", ["commercial"], 1946, 1980, ["international_style"], 1.0, 0.0, 99.0],
 	],
 	"chicago": [
 		["chicago", HAC, 1880, 1940, ["chicago_school", "two_flat", "prairie_school",
@@ -190,7 +199,7 @@ const CITY_ERAS := {
 	],
 }
 
-static var ERAS: Dictionary = ArchitectureData._merged([CITY_ERAS, ArchitectureCitiesNorth.ERAS,
+static var ERAS: Dictionary = ArchitectureData._merged([CITY_ERAS, ArchitectureCitiesNorth.ERAS, ArchitectureCitiesFinland.ERAS,
 	ArchitectureCitiesSouth.ERAS, ArchitectureCitiesCentral.ERAS, ArchitectureCitiesWorld.ERAS,
 	ArchitectureCitiesNewWorld.ERAS])
 
@@ -209,12 +218,36 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 	if cands.is_empty():
 		return region
 	var c := cues(b, ctx, area_m2)
+	# Empire fabric is local to the old centre; an undated suburban
+	# house or a heritage modernist building must not become Engel ochre.
+	if city == "helsinki" and not _empire(kind, c):
+		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) != "helsinki_empire")
+	if city == "helsinki" and int(c["lv"]) < 10:
+		# A recent date alone does not turn an unheighted shop or sauna
+		# into a skyscraper; retain the contemporary mid-rise fabric.
+		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) != "helsinki_modern")
 	var arch := str(c["arch"])
 	if arch != "":
 		for e in cands:
 			if ((e as Array)[4] as Array).has(arch):
 				return str((e as Array)[0])
 	var year := int(c["year"])
+	# Tall historic New York buildings keep their masonry even when a
+	# broad, overlapping year band would otherwise choose walk-up fabric.
+	if city == "new_york" and int(c["lv"]) >= 10 and (bool(c["heritage"]) or (year > 0 and year < 1945)):
+		for e in cands:
+			if str((e as Array)[0]) == "nyc_prewar":
+				return "nyc_prewar"
+	if city == "new_york":
+		var local := _rules(city, kind, c)
+		var specific := ["nyc_castiron", "nyc_loft", "nyc_nycha", "nyc_pencil", "nyc_international"]
+		if local in specific:
+			for e in cands:
+				if str((e as Array)[0]) == local:
+					return local
+		# These fabrics need a district, slenderness or dated style cue;
+		# overlapping dates alone must not spread them across the city.
+		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) not in specific)
 	if year > 0:
 		var dated: Array = []
 		for e in cands:
@@ -240,7 +273,7 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 ## height / 3.2 m), roof tag, footprint, heritage, distance km (-1 = unknown).
 static func cues(b: Dictionary, ctx: Dictionary, area_m2: float) -> Dictionary:
 	var lv := int(b.get("levels", 0))
-	if lv <= 0 and str(b.get("height_source", "")) == "tag_height":
+	if lv <= 0 and str(b.get("height_source", "")) in ["tag_height", "reference"]:
 		lv = roundi(float(b.get("height", 0.0)) / 3.2)
 	var dist := -1.0
 	var cores: Array = ctx.get("cores", [])
@@ -260,7 +293,7 @@ static func cues(b: Dictionary, ctx: Dictionary, area_m2: float) -> Dictionary:
 			if float(dr[2]) < best and (at - (dr[1] as Vector2)).length() <= float(dr[2]):
 				best = float(dr[2])
 				district = str(dr[0])
-	return {"arch": str(b.get("architecture", "")).strip_edges().to_lower().replace(" ", "_"),
+	return {"arch": str(b.get("architecture", "")).strip_edges().to_lower().replace(" ", "_").replace("-", "_"),
 		"year": int(b.get("start_year", 0)), "lv": lv, "district": district,
 		"roof": str(b.get("roof_shape", "")).strip_edges().to_lower(),
 		"area": area_m2, "heritage": bool(b.get("heritage", false)), "dist": dist}
@@ -356,12 +389,59 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 				return "venice_modern"
 			if old or lv >= 1:
 				return "venice"
+		"helsinki":
+			var district := str(c["district"])
+			if _empire(kind, c):
+				return "helsinki_empire"
+			if kind == "house":
+				return "helsinki_wood" if district == "helsinki_wood" or bool(c["heritage"]) else "helsinki_suburb"
+			if lv >= 10:
+				return "helsinki_modern"
+			if district in ["helsinki_wood", "helsinki_classicism", "helsinki_functional", "helsinki_suburb",
+					"helsinki_element", "helsinki_midrise"]:
+				return district
+			if district == "helsinki" and lv >= 4 and lv <= 7:
+				return "helsinki"
+			if roof == "flat" and lv >= 5 and area >= 500.0 and dist > 2.5:
+				return "helsinki_element"
+			if dist > 3.0:
+				return "helsinki_suburb"
+			return "helsinki" if lv >= 4 else "helsinki_classicism"
+		"espoo":
+			var district := str(c["district"])
+			if kind == "house":
+				return "kauniainen" if district == "kauniainen" or old else "tapiola"
+			if district == "otaniemi":
+				return "otaniemi"
+			if lv >= 12 or district == "espoo_modern":
+				return "espoo_modern"
+			return "tapiola"
 		"stockholm":
-			if lv >= 9 or (roof == "flat" and lv >= 5 and area >= 500.0):
-				return "stockholm_modern"
+			var district := str(c["district"])
+			if kind == "house":
+				return "stockholm_wood"
+			if district in ["stockholm_medieval", "stockholm_stone", "stockholm_grace", "stockholm_funkis", "stockholm_miljon", "stockholm_eco"]:
+				return district
+			if district == "stockholm_wood" and lv <= 2:
+				return district
 			if old:
-				return "stockholm"
+				return "stockholm_stone"
+			return "stockholm_miljon" if lv >= 9 else "stockholm_stone"
 		"new_york":
+			var district := str(c["district"])
+			var year := int(c["year"])
+			if district in ["nyc_castiron", "nyc_loft"] and lv < 10 and (year == 0 or year <= 1945):
+				return district
+			if district == "nyc_nycha" and kind == "apartments" and lv >= 8 and (year == 0 or (year >= 1935 and year <= 1980)):
+				return "nyc_nycha"
+			if lv >= 55 and area > 0.0 and area <= 850.0 and (year == 0 or year >= 2000):
+				return "nyc_pencil"
+			if kind == "commercial" and lv >= 15 and year >= 1946 and year <= 1980:
+				return "nyc_international"
+			if lv >= 10 and (old or district == "nyc_prewar"):
+				return "nyc_prewar"
+			if district == "nyc_brownstone" and (kind == "house" or (lv >= 3 and lv <= 4 and small)):
+				return "nyc_brownstone"
 			if lv >= 20:
 				return "nyc_glass"
 			if lv >= 10:
@@ -478,3 +558,11 @@ static func _banded(city: String, kind: String, c: Dictionary) -> String:
 		if lv >= int(band[0]) and lv <= int(band[1]):
 			return str(row[0])
 	return ""
+
+static func _empire(kind: String, c: Dictionary) -> bool:
+	var year := int(c["year"])
+	var district := str(c["district"])
+	var core := float(c["dist"]) >= 0.0 and float(c["dist"]) <= 1.2
+	if kind == "house" and not bool(c["heritage"]):
+		return false
+	return district == "helsinki_empire" or (core and (bool(c["heritage"]) or (year > 0 and year < 1880)))

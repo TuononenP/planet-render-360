@@ -45,6 +45,11 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 	TerrainTextures.arrays(TerrainTextures.size_for(data.quality_preset))
 	TerrainBuilder._box_mesh()
 	ArchitectureStyle._box_regions()
+	# StreetProps' shared fence textures/materials are read by the vegetation
+	# worker; prepare them before any generation tasks are forked.
+	if not data.barriers.is_empty():
+		StreetProps._fence_material()
+		StreetProps._chainlink_material()
 	var hide := TerrainBuilder.debug_hide_buildings
 	var stages: Array[Stage] = [
 		_stage(BuildAbort.Step.FAR, func() -> Node3D:

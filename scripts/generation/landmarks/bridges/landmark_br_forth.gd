@@ -2,7 +2,7 @@ class_name LandmarkBrForth
 extends RefCounted
 
 ## The Forth Bridge in true metres, along +X (north) with y = 0 at the
-## firth (LocationData `base: water`), 2467 m in all: from the south
+## firth (LocationData `base: sea`), 2467 m in all: from the south
 ## (Queensferry) end the masonry arches, ten 51 m approach spans on
 ## granite piers, the Queensferry cantilever (44 m tower), a 107 m
 ## suspended girder, Inchgarvie (82 m tower), another suspended girder,

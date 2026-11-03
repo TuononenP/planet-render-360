@@ -28,6 +28,7 @@ func _check(ok: bool, what: String) -> void:
 		failures.append(what)
 
 func _rows() -> void:
+	_check(PlaceCard.SKY_FOR.get("Stockholm", -1) == 1, "Stockholm has its selected chip sky")
 	var ids := {}
 	var picks := LocationData.quick_picks()
 	_check(picks.size() == PresetViews.ROWS.size(), "one quick pick per preset row")
@@ -49,6 +50,9 @@ func _rows() -> void:
 				"%s quick pick is its row: %s" % [id, pick])
 
 func _pins() -> void:
+	var ny := PresetViews.for_pin(40.7060, -74.0040)
+	_check(is_equal_approx(PresetViews.opening_hour(ny, 19.0), 8.0), "New York opens in morning light")
+	_check(is_equal_approx(PresetViews.opening_hour({}, 19.0), 19.0), "other places retain golden hour")
 	for row in PresetViews.ROWS:
 		var id := str(row["id"])
 		var lat := float(row["lat"])

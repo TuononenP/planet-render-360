@@ -32,6 +32,14 @@ func _fixture() -> LocationData:
 	]
 	data.roads = [{"points": PackedVector2Array([Vector2(-60, 0), Vector2(60, 0)]), "width_m": 8.0,
 		"class": "residential", "surface": "asphalt", "lanes": 2, "bridge": false, "tunnel": false}]
+	data.pois = [{"x": 0.0, "z": -22.0, "category": "shop", "kind": "bakery", "name": "Test Bakery"}]
+	data.barriers = [
+		{"class": "fence", "points": PackedVector2Array([Vector2(40, 80), Vector2(65, 80)]), "fence_type": "chain_link", "height_m": 2.2},
+		{"class": "fence", "points": PackedVector2Array([Vector2(70, 80), Vector2(95, 80)]), "material": "wood"}]
+	data.landcover_image = Image.create_from_data(2, 2, false, Image.FORMAT_L8,
+		PackedByteArray([50, 10, 10, 50]))
+	data.canopy_image = Image.create_from_data(2, 2, false, Image.FORMAT_L8,
+		PackedByteArray([0, 15, 15, 0]))
 	data.land_polygons = [
 		{"class": "forest", "points": PackedVector2Array([Vector2(-100, -100), Vector2(100, -100),
 			Vector2(100, 100), Vector2(-100, 100)])},

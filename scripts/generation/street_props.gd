@@ -40,16 +40,22 @@ const BARRIERS := {
 
 static var _lamp_meshes: Dictionary = {}
 static var _fence_tex: Texture2D
+static var _chainlink_tex: Texture2D
 static var _mats: Dictionary = {}
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	var bar := _barriers(root, data, ground, ctx)
+	ShoreRailings.build(root, data, ground)
 	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
 	var boats := MarinaBuilder.build(root, data, ground, mask)
+	boats += HarbourFerries.build(root, data, ground, mask)
+	var quay_bollards := QuayDetails.build(root, data, ground)
 	var cars := ParkedCars.build(root, data, ground)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "cars": cars}
+	var wires := OverheadWires.build(root, data, ground)
+	var snowbanks := Snowbanks.build(root, data, ground)
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "wires": wires, "snowbanks": snowbanks}
 
 # --- Lampposts -----------------------------------------------------------
 
@@ -61,8 +67,9 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
-	var family := lamp_family(region, data.country)
-	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": []}
+	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
+	var centre := View360.spawn_xz(data)
+	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": [], "post_top": [], "nyc_f": [], "nyc_crook": []}
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
 	for r in data.roads:
@@ -80,7 +87,10 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			pts = r
 		else:
 			continue
-		if cls not in LIT or pts.size() < 2:
+		var park_path := family == "span" and cls in ["footway", "path"] and r is Dictionary and bool(r.get("lit", false))
+		if (cls not in LIT and not park_path) or pts.size() < 2:
+			continue
+		if family == "span" and RenderQuality.ultra_desktop(data.quality_preset) and cls != "pedestrian" and not park_path:
 			continue
 		var style := lamp_style(family, region, cls)
 		var off := (width_m * 0.5 + 1.1) * m2u
@@ -101,7 +111,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				t += step
 				side = -side
 				var p := c + nrm * off * side
-				if p.length() > r_u or mask.built_fraction(p.x, p.y) < 0.04:
+				if (p - centre).length() > r_u or mask.built_fraction(p.x, p.y) < 0.04:
 					continue
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
@@ -118,7 +128,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
 			carry = t - seg
 	if RenderQuality.ultra_desktop(int(ctx["preset"])):
-		StreetLights.add(root, placed, region, m2u)
+		StreetLights.add(root, placed, region, m2u, centre)
 	var total := 0
 	for style in placed:
 		var xf: Array = placed[style]
@@ -139,8 +149,12 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 
 ## The place's lamp family: "lantern", "heritage", "cobra", "utility" or
 ## "modern" (by ISO country first, then the country region).
-static func lamp_family(region: String, country: String) -> String:
+static func lamp_family(region: String, country: String, city: String = "") -> String:
+	if city == "new_york":
+		return "nyc"
 	var iso := country.to_upper()
+	if iso in ["FI", "SE"]:
+		return "span"
 	if iso in HERITAGE_COUNTRIES:
 		return "heritage"
 	if iso in COBRA_COUNTRIES or (iso == "" and region == "north_america"):
@@ -156,6 +170,10 @@ static func lamp_family(region: String, country: String) -> String:
 static func lamp_style(family: String, region: String, cls: String) -> String:
 	var major := cls in MAJOR
 	match family:
+		"span":
+			return "post_top"
+		"nyc":
+			return "nyc_f" if major else "nyc_crook"
 		"cobra":
 			return "cobra"
 		"lantern":
@@ -186,6 +204,26 @@ static func _lamp_mesh(style: String) -> ArrayMesh:
 		TreeMeshLibrary._tube(glass, [Vector3(0, 3.85, 0), Vector3(0, 4.45, 0)], [0.13, 0.27], 4, 1.0, 1.0)
 		TreeMeshLibrary._tube(metal, [Vector3(0, 4.45, 0), Vector3(0, 4.7, 0)], [0.32, 0.05], 4, 1.0, 1.0)
 		TreeMeshLibrary._tube(metal, [Vector3(0, 4.7, 0), Vector3(0, 4.9, 0)], [0.04, 0.01], 6, 1.0, 1.0)
+	elif style == "post_top":
+		metal_col = Color(0.18, 0.22, 0.19)
+		glass_col = Color(1.0, 0.95, 0.8)
+		TreeMeshLibrary._tube(metal, [Vector3.ZERO, Vector3(0, 4.2, 0)], [0.07, 0.045], 8, 1.0, 1.0)
+		TreeMeshLibrary._tube(glass, [Vector3(0, 4.2, 0), Vector3(0, 4.55, 0)], [0.16, 0.26], 8, 1.0, 1.0)
+		_box(metal, Vector3(0, 4.58, 0), Vector3(0.6, 0.08, 0.6))
+	elif style in ["nyc_f", "nyc_crook"]:
+		# NYC cast-iron Type F and Bishop's crook: tapered dark shaft,
+		# curved arm and a pendant teardrop luminaire.
+		metal_col = Color(0.09, 0.12, 0.11)
+		glass_col = Color(1.0, 0.90, 0.70)
+		var h := 6.8 if style == "nyc_f" else 5.0
+		TreeMeshLibrary._tube(metal, [Vector3(0, -0.2, 0), Vector3(0, 0.6, 0), Vector3(0, h, 0)],
+			[0.18, 0.14, 0.07], 8, 0.8, 1.0)
+		var arm := TreeMeshLibrary._bezier(Vector3(0, h - 0.15, 0), Vector3(0.05, h + 1.05, 0),
+			Vector3(1.45, h + 0.8, 0), 6)
+		TreeMeshLibrary._tube(metal, arm, [0.08, 0.075, 0.07, 0.065, 0.06, 0.055, 0.05], 6, 1.0, 1.0)
+		TreeMeshLibrary._tube(metal, [Vector3(1.45, h + 0.8, 0), Vector3(1.45, h + 0.40, 0)], [0.05, 0.05], 6, 1.0, 1.0)
+		TreeMeshLibrary._tube(glass, [Vector3(1.45, h + 0.4, 0), Vector3(1.45, h + 0.18, 0),
+			Vector3(1.45, h - 0.15, 0)], [0.11, 0.24, 0.08], 8, 1.0, 1.0)
 	elif style == "cobra":
 		# Galvanised tapered pole, an upswept arm, the cobra head tipped up.
 		metal_col = Color(0.50, 0.51, 0.50)
@@ -221,14 +259,20 @@ static func _lamp_mesh(style: String) -> ArrayMesh:
 		_box(metal, Vector3(1.85, 8.2, 0), Vector3(0.75, 0.12, 0.3))
 		_box(glass, Vector3(1.85, 8.12, 0), Vector3(0.62, 0.04, 0.22))
 	var m := ArrayMesh.new()
-	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, metal.arrays())
+	var metal_arrays := metal.arrays()
+	if style == "post_top":
+		metal_arrays[Mesh.ARRAY_INDEX] = ParkedCars.front_faces(metal_arrays[Mesh.ARRAY_INDEX])
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, metal_arrays)
 	var mm := StandardMaterial3D.new()
 	mm.albedo_color = metal_col
 	mm.metallic = 0.55
 	mm.roughness = 0.42
 	mm.vertex_color_use_as_albedo = true
 	m.surface_set_material(0, mm)
-	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, glass.arrays())
+	var glass_arrays := glass.arrays()
+	if style == "post_top":
+		glass_arrays[Mesh.ARRAY_INDEX] = ParkedCars.front_faces(glass_arrays[Mesh.ARRAY_INDEX])
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, glass_arrays)
 	var gm := StandardMaterial3D.new()
 	gm.albedo_color = glass_col
 	gm.emission_enabled = true
@@ -268,6 +312,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		return 0.0
 	var m2u: float = ctx["m2u"]
 	var bufs := {"wall": TreeMeshLibrary.Buf.new(), "fence": TreeMeshLibrary.Buf.new(),
+		"chain_link": TreeMeshLibrary.Buf.new(), "wood_fence": TreeMeshLibrary.Buf.new(),
 		"hedge": TreeMeshLibrary.Buf.new(), "hedge_core": TreeMeshLibrary.Buf.new()}
 	var total_m := 0.0
 	var piece := 3.0 * m2u
@@ -278,7 +323,15 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		if row.is_empty():
 			continue
 		var kind: String = row[0]
-		var hgt := float(row[1]) * m2u
+		if kind == "fence":
+			var material := str((br as Dictionary).get("material", "")).to_lower()
+			var fence_type := str((br as Dictionary).get("fence_type", "")).to_lower()
+			if fence_type in ["chain_link", "chainlink", "wire"]:
+				kind = "chain_link"
+			elif material in ["wood", "timber"] and fence_type in ["", "board", "boards", "close_board", "panel"]:
+				kind = "wood_fence"
+		var tagged_height := float((br as Dictionary).get("height_m", NAN))
+		var hgt := (tagged_height if is_finite(tagged_height) and tagged_height >= 0.1 and tagged_height <= 30.0 else float(row[1])) * m2u
 		var thick := float(row[2]) * m2u
 		var pts: PackedVector2Array = (br as Dictionary).get("points", PackedVector2Array())
 		for i in pts.size() - 1:
@@ -298,8 +351,10 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				match kind:
 					"wall":
 						_wall_piece(bufs["wall"], p0, p1, y0, y1, hgt, thick, 0.3 * m2u, m2u)
-					"fence":
-						_fence_piece(bufs["fence"], p0, p1, y0, y1, hgt, m2u)
+					"fence", "chain_link":
+						_fence_piece(bufs[kind], p0, p1, y0, y1, hgt, m2u)
+					"wood_fence":
+						_wall_piece(bufs[kind], p0, p1, y0, y1, hgt, 0.06 * m2u, 0.0, m2u)
 					"hedge":
 						_wall_piece(bufs["hedge_core"], p0, p1, y0, y1, hgt * 0.9, thick * 0.8, 0.1 * m2u, m2u)
 						_wall_piece(bufs["hedge"], p0, p1, y0, y1, hgt, thick, 0.1 * m2u, m2u)
@@ -311,6 +366,8 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		"wall": MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
 			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0),
 		"fence": _fence_material(),
+		"chain_link": _chainlink_material(),
+		"wood_fence": MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0),
 		"hedge": TreeMeshLibrary.leaf_material("broad", TreeSpecies.tint("oak", mini(season, 2)) * 0.85, 0.0, 0.0, true),
 		"hedge_core": _core_material(),
 	}
@@ -398,4 +455,27 @@ static func _fence_material() -> StandardMaterial3D:
 	m.metallic = 0.0
 	m.roughness = 0.75
 	_mats["fence"] = m
+	return m
+
+## One shared alpha-cut mesh pattern per place, rather than per-barrier materials.
+static func _chainlink_material() -> StandardMaterial3D:
+	if _mats.has("chain_link"):
+		return _mats["chain_link"]
+	if _chainlink_tex == null:
+		var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var wire := Color(0.28, 0.29, 0.28, 1.0)
+		for y in 128:
+			for x in 128:
+				if (x + y) % 16 < 2 or posmod(x - y, 16) < 2:
+					img.set_pixel(x, y, wire)
+		img.generate_mipmaps()
+		_chainlink_tex = ImageTexture.create_from_image(img)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = _chainlink_tex
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.4
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.roughness = 0.8
+	_mats["chain_link"] = m
 	return m

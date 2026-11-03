@@ -8,6 +8,9 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
+	CacheStore.history_override = "user://flow-test-history-%d.json" % OS.get_process_id()
+	PlaceThumb.dir_override = "user://flow-test-thumbs-%d" % OS.get_process_id()
+	RenderSettings.path_override = "user://flow-test-settings-%d.json" % OS.get_process_id()
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	if scene == null:
 		printerr("FLOW FAIL: cannot load main scene")
@@ -49,6 +52,15 @@ func _run() -> void:
 		printerr("FLOW FAIL: no GeneratedWorld in 360 view")
 		quit(1)
 		return
+	var data: LocationData = main._view._data
+	if data.landcover_image != null and not data.attribution.contains("ESA WorldCover"):
+		printerr("FLOW FAIL: WorldCover must be credited when used")
+		quit(1)
+		return
+	if data.canopy_image != null and not data.attribution.contains("Meta and World Resources Institute"):
+		printerr("FLOW FAIL: canopy data must be credited when used")
+		quit(1)
+		return
 	if main._store.entries.is_empty() \
 			or str(main._store.entries[0].get("name")) != "Paris, France":
 		printerr("FLOW FAIL: history not recorded for Paris")
@@ -76,6 +88,8 @@ func _run() -> void:
 		quit(1)
 		return
 	print("FLOW OK: picker -> loading -> 360 view + history for Paris, camera kept on leaving")
-	print("FLOW INFO: used_real_dem=%s used_osm=%s" % [
-		main._pipeline.used_real_dem, main._pipeline.used_osm])
+	print("FLOW INFO: used_real_dem=%s used_osm=%s landcover=%s canopy=%s" % [
+		main._pipeline.used_real_dem, main._pipeline.used_osm,
+		data.landcover_image != null, data.canopy_image != null])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(CacheStore.history_override))
 	quit(0)

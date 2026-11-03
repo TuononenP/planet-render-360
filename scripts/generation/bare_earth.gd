@@ -32,12 +32,28 @@ static func applies(data: LocationData) -> bool:
 ## size posts in source metres, post (x, z) at ((x - half) * step,
 ## (z - half) * step) in world units) in place.
 static func strip(surface: PackedFloat32Array, size: int, step: float,
-		half: float, buildings: Array) -> void:
-	if size < 3 or buildings.is_empty():
+		half: float, buildings: Array, land_polygons: Array = []) -> void:
+	if size < 3 or (buildings.is_empty() and land_polygons.is_empty()):
 		return
 	var built := _footprint_mask(size, step, half, buildings)
 	var mask := _dilate(built, size, 1)
 	var urban := _dilate(built, size, URBAN_REACH)
+	for poly in land_polygons:
+		if str(poly.get("class", "")) not in ["forest", "grass"]:
+			continue
+		var ring: PackedVector2Array = poly.get("points", PackedVector2Array())
+		if ring.size() < 3:
+			continue
+		var holes: Array = poly.get("holes", [])
+		for i in PolygonIndex.new(ring).posts_inside(size, step, half):
+			var p := Vector2(float(i % size) - half, float(i / size) - half) * step
+			var in_hole := false
+			for hole in holes:
+				if Geometry2D.is_point_in_polygon(p, hole):
+					in_hole = true
+					break
+			if not in_hole:
+				urban[i] = 1
 	var opened := _max_filter(_min_filter(surface, size, OPEN_RADIUS),
 		size, OPEN_RADIUS)
 	var holes := PackedInt32Array()

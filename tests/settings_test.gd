@@ -6,6 +6,7 @@ extends SceneTree
 ## applies it, and the FPS governor never exceeds the chosen ceiling.
 
 func _init() -> void:
+	RenderSettings.path_override = "user://settings-test-%d.json" % OS.get_process_id()
 	_run()
 
 func _flat_data(preset_value: int, building_count: int) -> LocationData:
@@ -201,8 +202,8 @@ func _run() -> void:
 		failures.append("settings should report offline cache size")
 	if OfflineDownloader.cache_size_bytes() < 0:
 		failures.append("cache size should be readable")
-	if OfflineDownloader.JOBS != 4:
-		failures.append("offline download should cover DEM, far DEM, OSM, satellite")
+	if OfflineDownloader.JOBS != 5:
+		failures.append("offline download should cover DEM, far DEM, OSM, satellite and land cover")
 	# Categories: phones open one page from the menu and step back to it;
 	# wide windows show the rail beside the chosen page.
 	screen.size = Vector2(390, 844)
@@ -281,6 +282,7 @@ func _run() -> void:
 	if not rig.environment.volumetric_fog_albedo.is_equal_approx(rig.haze_color):
 		failures.append("volumetric fog should take the haze colour")
 	rig.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RenderSettings.path_override))
 
 	if failures.is_empty():
 		print("SETTINGS OK: preset budgets, grid sizing, persistence, governor ceiling, settings screen")

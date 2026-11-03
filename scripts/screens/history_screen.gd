@@ -238,7 +238,7 @@ func _empty_card() -> PanelContainer:
 ## Cache state as a StatusBadge: Cached (good), Partial (caution) or
 ## nothing when no layer is on the device. Returns [word, tone] or [].
 func _cache_state(e: Dictionary) -> Array:
-	var status := CacheStore.keys_cached_status(e.get("cache_keys", {}))
+	var status := CacheStore.keys_cached_status(CacheStore.entry_cache_keys(e))
 	var cached := 0
 	var total := 0
 	for layer in status:

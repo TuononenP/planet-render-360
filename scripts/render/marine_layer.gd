@@ -102,7 +102,7 @@ func set_sea(sea_y: float, units_per_metre: float) -> void:
 
 ## Shown (0..1) in the haze colour; hidden at 0.
 func set_amount(amount: float, colour: Color) -> void:
-	visible = amount > 0.0 and RenderingServer.get_current_rendering_method() != "gl_compatibility"
+	visible = amount > 0.0 and supported()
 	_mat.set_shader_parameter("amount", amount)
 	_mat.set_shader_parameter("fog_col", colour)
 
@@ -116,3 +116,6 @@ func _process(_delta: float) -> void:
 	var half := cam.far * 0.5
 	global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * half), cam.global_position)
 	_mat.set_shader_parameter("far_m", half)
+
+static func supported() -> bool:
+	return RenderingServer.get_current_rendering_method() != "gl_compatibility"

@@ -306,7 +306,7 @@ func set_coast(sea_y: float, coastal: bool) -> void:
 	_apply()
 
 func _marine_on() -> bool:
-	return _coastal and is_foggy()
+	return _coastal and is_foggy() and MarineLayer.supported()
 
 # --- Construction ---
 

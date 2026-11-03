@@ -16,9 +16,18 @@ extends RefCounted
 ##   cream. Placement is a fixed walk with position hashes, so the same
 ##   harbour always gets the same fleet.
 ## One MultiMesh per kind, true-metre meshes, nearest MAX_BOATS kept.
+## Boats under 9 m are runabouts / consoles / RIBs, 9-14 m sport cruisers,
+## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
+## Boats beyond NEAR_M of the eye use a "_far" mesh without rails, rigging
+## and mullions. Cruise liners (QuayMoorings.liners) are committed one by
+## one, outside the MultiMesh budget.
 
 const RADIUS_M := 800.0
 const MAX_BOATS := 700
+## Near + far surfaces of every kind (VesselPrototypes.KINDS) + pontoon.
+const MAX_DRAW_CALLS := 80
+## Boats farther than this from the eye use the reduced "_far" meshes (m).
+const NEAR_M := 250.0
 const MIN_PIER_M := 20.0
 const DECK_W_M := 2.2
 const DECK_UP_M := 0.3
@@ -39,10 +48,9 @@ const SAIL_SHARE := 0.35
 ## The boat meshes are 10 m long; an instance scales them uniformly.
 const MESH_LEN_M := 10.0
 
-static var _meshes: Dictionary = {}
-
-## Boats [position, yaw, scale, kind, colour] and deck ribbons (each an
-## Array of [x, z, water y]) for `data`'s piers, nearest boats first.
+## Boats [position, yaw, scale, kind, colour], deck ribbons (each an
+## Array of [x, z, water y]) for `data`'s piers, nearest boats first, and
+## liners [centre, yaw, length, beam, height, seed].
 static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		mask: VegetationMask = null) -> Dictionary:
 	var boats: Array = []
@@ -50,6 +58,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var taken := {}
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
+	var near2 := pow(NEAR_M * m2u, 2.0)
 	var piers: Array = []
 	for p in data.piers:
 		var pts: PackedVector2Array = (p as Dictionary).get("points", PackedVector2Array())
@@ -85,44 +94,48 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			var widest := 0.0
 			for side: float in [-1.0, 1.0]:
 				var h := _hash(pos.x, pos.y, float(k * 7 + slot) + (0.5 if side > 0.0 else 0.0))
-				var len_m := 7.0 + 22.0 * h * h
+				var len_m := 5.0 + 24.0 * h * h
 				var beam_m := 0.3 * len_m
 				widest = maxf(widest, beam_m)
 				var stern: Vector2 = pos + nrm * side * (DECK_W_M * 0.5 + 0.5) * m2u
 				var out := nrm * side
 				var bow := stern + out * len_m * m2u
-				if not _wet(ground, stern, m2u, y_ref, mask) or not _wet(ground, bow, m2u, y_ref, mask) \
+				if not _wet(ground, stern, m2u, y_ref, mask, true) or not _wet(ground, bow, m2u, y_ref, mask) \
 						or not _wet(ground, stern + out * len_m * 0.5 * m2u, m2u, y_ref, mask):
 					continue
-				if not _claim(taken, stern, out, len_m, beam_m, m2u):
+				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
+				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m, m2u):
 					continue
 				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < SAIL_SHARE
 				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
-				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
-				if is_nan(y):
-					continue
+				var kind := _kind(len_m, sail, _hash(pos.x + 1.7, pos.y, float(slot)))
+				if (stern - centre).length_squared() > near2:
+					kind += "_far"
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
-					len_m / MESH_LEN_M * m2u, "sail" if sail else "motor", col])
+					len_m / MESH_LEN_M * m2u, kind, col])
 			slot += 1
 			t += (widest + GAP_M) * m2u
+	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
+	boats.append_array(QuayMoorings.plan(data, ground, taken, m2u, mask))
 	boats.sort_custom(func(a: Array, b: Array) -> bool:
 		return Vector2((a[0] as Vector3).x - centre.x, (a[0] as Vector3).z - centre.y).length_squared() \
 			< Vector2((b[0] as Vector3).x - centre.x, (b[0] as Vector3).z - centre.y).length_squared())
 	if boats.size() > MAX_BOATS:
 		boats.resize(MAX_BOATS)
-	return {"boats": boats, "decks": decks}
+	return {"boats": boats, "decks": decks, "liners": liners}
 
 ## Adds the pontoons and boats under one "Marina" node of `root`; returns
 ## the number of boats.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask = null) -> int:
-	if not RenderQuality.ultra_desktop(data.quality_preset) or data.piers.is_empty():
+	if not RenderQuality.ultra_desktop(data.quality_preset):
 		return 0
 	var m2u := WorldScale.metres_to_units()
 	var p := plan(data, ground, m2u, mask)
 	var boats: Array = p["boats"]
 	var decks: Array = p["decks"]
-	if boats.is_empty() and decks.is_empty():
+	var liners: Array = p["liners"]
+	if boats.is_empty() and decks.is_empty() and liners.is_empty():
 		return 0
 	var holder := Node3D.new()
 	holder.name = "Marina"
@@ -132,26 +145,39 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		dm.mesh = _deck_mesh(decks, m2u)
 		dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(dm)
-	for kind in ["motor", "sail"]:
-		var list := boats.filter(func(b: Array) -> bool: return b[3] == kind)
-		if list.is_empty():
-			continue
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = mesh(kind)
-		mm.instance_count = list.size()
-		for i in list.size():
-			var b: Array = list[i]
-			mm.set_instance_transform(i, Transform3D(
-				Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0]))
-			mm.set_instance_color(i, b[4])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "Boats_%s" % kind
-		mmi.multimesh = mm
-		holder.add_child(mmi)
+	for base in VesselPrototypes.KINDS:
+		for kind in [base, base + "_far"]:
+			var list := boats.filter(func(b: Array) -> bool: return b[3] == kind)
+			if list.is_empty():
+				continue
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = true
+			mm.mesh = mesh(kind)
+			mm.instance_count = list.size()
+			for i in list.size():
+				var b: Array = list[i]
+				mm.set_instance_transform(i, Transform3D(
+					Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0]))
+				mm.set_instance_color(i, b[4])
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = "Boats_%s" % kind
+			mmi.multimesh = mm
+			if kind.ends_with("_far"):
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			holder.add_child(mmi)
+	for l in liners:
+		var lm := VesselPrototypes.geometry("liner", float(l[2]), float(l[3]), float(l[4]),
+			VesselMaterials.paint(CruiseLinerModel.hull_hex(float(l[5]) * 4.0), true, 0.42, 0.05), true, true, float(l[5]))
+		var parts := lm.commit(holder, "Liner_")
+		VesselPrototypes.snow_parts(parts)
+		for part in parts:
+			part.position = l[0]
+			part.rotation.y = float(l[1])
+			part.scale = Vector3.ONE * m2u
+			part.set_meta("procedural_liner", true)
 	root.add_child(holder)
-	return boats.size()
+	return boats.size() + liners.size()
 
 # --- Placement helpers ---------------------------------------------------
 
@@ -198,15 +224,20 @@ static func _pier_height(pts: PackedVector2Array, ground: GroundTruth) -> float:
 ## A berth point is wet in carved water, else on flat terrain at the
 ## pier's level that no building or road covers.
 static func _wet(ground: GroundTruth, p: Vector2, m2u: float, y_ref: float,
-		mask: VegetationMask) -> bool:
+		mask: VegetationMask, at_pier: bool = false) -> bool:
 	if not ground.is_inside(p.x, p.y):
+		return false
+	# The pier itself is marked ROAD_EDGE for ground-cover exclusion. A
+	# stern directly beside it must not reject its own pontoon verge;
+	# actual buildings and carriageways still veto even carved-water berths.
+	var bits := VegetationMask.BUILDING | VegetationMask.ROAD
+	if not at_pier:
+		bits |= VegetationMask.ROAD_EDGE
+	if mask != null and mask.blocked(p.x, p.y, bits, 0.5):
 		return false
 	if ground.water_at(p.x, p.y) > MIN_DEPTH_M * m2u:
 		return true
-	if absf(ground.height_at_world(p.x, p.y) - y_ref) > FLAT_M * m2u:
-		return false
-	return mask == null or not mask.blocked(p.x, p.y,
-		VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE, 0.5)
+	return absf(ground.height_at_world(p.x, p.y) - y_ref) <= FLAT_M * m2u
 
 static func _cell(p: Vector2, m2u: float) -> Vector2i:
 	return Vector2i(floori(p.x / (CELL_M * m2u)), floori(p.y / (CELL_M * m2u)))
@@ -248,6 +279,14 @@ static func _deck(pts: PackedVector2Array, ground: GroundTruth, m2u: float, take
 		t += 3.0 * m2u
 	return out
 
+## Prototype kind for a berth of `len_m`; `pick` splits the small boats.
+static func _kind(len_m: float, sail: bool, pick: float) -> String:
+	if sail and len_m >= 7.5:
+		return "sail"
+	if len_m < 9.0:
+		return "rib" if pick < 0.4 else "day"
+	return "yacht" if len_m >= 14.0 else "motor"
+
 static func _hash(x: float, z: float, salt: float) -> float:
 	var v := sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453
 	return v - floor(v)
@@ -279,88 +318,12 @@ static func _quad(b: TreeMeshLibrary.Buf, c: Array, out: Vector3) -> void:
 	TreeMeshLibrary._card(b, [c[order[0]], c[order[1]], c[order[2]], c[order[3]]],
 		[out, out, out, out], [1.0, 1.0, 1.0, 1.0])
 
-## A quad between hull stations, its normal pointing away from `centre`.
-static func _hull_quad(b: TreeMeshLibrary.Buf, c: Array, centre: Vector3) -> void:
-	var mid := ((c[0] as Vector3) + (c[1] as Vector3) + (c[2] as Vector3) + (c[3] as Vector3)) * 0.25
-	var n := (((c[1] as Vector3) - (c[0] as Vector3)).cross((c[2] as Vector3) - (c[0] as Vector3))).normalized()
-	_quad(b, c, n if (mid - centre).dot(n) >= 0.0 else -n)
-
-## Lofted hull, stern at x = 0 to the bow at x = 10: half-beam `beam`
-## tapering over the last third, deck height rising toward the bow.
-static func _hull(b: TreeMeshLibrary.Buf, beam: float, taper_from: float) -> void:
-	var xs := [0.0, 2.0, 4.0, 6.0, 7.5, 8.8, 9.6, 10.0]
-	var centre := Vector3(5.0, 0.6, 0.0)
-	var prev: Array = []
-	for i in xs.size():
-		var x: float = xs[i]
-		var tt := clampf((x - taper_from) / (10.0 - taper_from), 0.0, 1.0)
-		var bm := beam * (1.0 - 0.93 * tt * tt)
-		var fh := 1.1 + 0.5 * x / 10.0
-		var st := [Vector3(x, 0.0, -bm), Vector3(x, fh, -bm * 0.96),
-			Vector3(x, fh, bm * 0.96), Vector3(x, 0.0, bm)]
-		if i == 0:
-			_hull_quad(b, st, centre)  # the transom
-		else:
-			for s in 3:
-				_hull_quad(b, [prev[s], prev[s + 1], st[s + 1], st[s]], centre)
-		prev = st
-
 static func mesh(kind: String) -> ArrayMesh:
-	if _meshes.has(kind):
-		return _meshes[kind]
-	var surf := {}
-	var buf := func(mat: String) -> TreeMeshLibrary.Buf:
-		if not surf.has(mat):
-			surf[mat] = TreeMeshLibrary.Buf.new()
-		return surf[mat]
-	if kind == "motor":
-		_hull(buf.call("hull"), 1.5, 6.0)
-		StreetProps._box(buf.call("deck"), Vector3(3.0, 1.3, 0.0), Vector3(5.5, 0.05, 2.7))
-		# Saloon and flybridge: white blocks with a dark glass band.
-		StreetProps._box(buf.call("hull"), Vector3(3.6, 1.85, 0.0), Vector3(4.4, 1.0, 2.5))
-		StreetProps._box(buf.call("glass"), Vector3(3.6, 1.95, 0.0), Vector3(4.42, 0.42, 2.52))
-		StreetProps._box(buf.call("hull"), Vector3(3.4, 2.65, 0.0), Vector3(3.0, 0.7, 2.0))
-		StreetProps._box(buf.call("glass"), Vector3(3.4, 2.7, 0.0), Vector3(3.02, 0.3, 2.02))
-		StreetProps._box(buf.call("hull"), Vector3(3.4, 3.05, 0.0), Vector3(3.2, 0.08, 2.2))
-	else:
-		_hull(buf.call("hull"), 1.15, 5.0)
-		StreetProps._box(buf.call("deck"), Vector3(4.0, 1.3, 0.0), Vector3(7.0, 0.05, 2.0))
-		StreetProps._box(buf.call("hull"), Vector3(4.0, 1.55, 0.0), Vector3(3.2, 0.5, 1.6))
-		StreetProps._box(buf.call("glass"), Vector3(4.0, 1.6, 0.0), Vector3(3.22, 0.18, 1.62))
-		TreeMeshLibrary._tube(buf.call("mast"), [Vector3(4.6, 1.3, 0.0), Vector3(4.6, 14.0, 0.0)], [0.09, 0.04], 6, 1.0, 1.0)
-		StreetProps._box(buf.call("mast"), Vector3(2.7, 2.0, 0.0), Vector3(3.6, 0.07, 0.07))
-		StreetProps._box(buf.call("sail"), Vector3(2.7, 2.3, 0.0), Vector3(3.5, 0.5, 0.35))
-	var m := ArrayMesh.new()
-	for mat in surf:
-		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, (surf[mat] as TreeMeshLibrary.Buf).arrays())
-		m.surface_set_material(m.get_surface_count() - 1, _material(str(mat)))
-	_meshes[kind] = m
-	return m
+	return VesselPrototypes.mesh(kind)
 
 static func _material(name: String) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	match name:
-		"hull":
-			m.albedo_color = Color.WHITE
-			m.vertex_color_use_as_albedo = true  # the instance colour
-			m.roughness = 0.25
-			m.metallic = 0.05
-		"deck":
-			m.albedo_color = Color(0.34, 0.26, 0.17)
-			m.roughness = 0.8
-		"glass":
-			m.albedo_color = Color(0.02, 0.03, 0.04)
-			m.roughness = 0.05
-			m.metallic = 0.4
-		"mast":
-			m.albedo_color = Color(0.6, 0.62, 0.64)
-			m.roughness = 0.35
-			m.metallic = 0.8
-		"sail":
-			m.albedo_color = Color(0.9, 0.9, 0.86)
-			m.roughness = 0.9
-			m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		"pontoon":
-			m.albedo_color = Color(0.36, 0.33, 0.29)
-			m.roughness = 0.85
+	if name == "pontoon":
+		m.albedo_color = Color(0.36, 0.33, 0.29)
+		m.roughness = 0.85
 	return m

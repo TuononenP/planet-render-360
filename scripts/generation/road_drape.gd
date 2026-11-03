@@ -67,7 +67,38 @@ static func _lay(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
 			_cut(pc as _Poly, fam, surf, next)
 		pieces = next
 	for pc in pieces:
-		_emit(b, surf, lift, attr, w2, weld, pc as _Poly)
+		var model: Variant = surf.ground.shoreline
+		var centre := RingGeometry.centroid((pc as _Poly).pos)
+		if model != null and model.ready and model.patches.has(model.cell_at(centre)):
+			var patch: Dictionary = model.patches[model.cell_at(centre)]
+			var triangles: PackedVector3Array = patch["triangles"]
+			for i in range(0, triangles.size(), 3):
+				if int(patch["owners"][i / 3]) >= 0:
+					continue
+				var clipped: _Poly = pc
+				for edge in 3:
+					var a := Vector2(triangles[i + edge].x, triangles[i + edge].z)
+					var bb := triangles[i + (edge + 1) % 3]
+					clipped = _clip_shore(clipped, a, Vector2(bb.x, bb.z))
+					if clipped.pos.size() < 3:
+						break
+				if clipped.pos.size() >= 3:
+					_emit(b, surf, lift, attr, w2, weld, clipped)
+		else:
+			_emit(b, surf, lift, attr, w2, weld, pc as _Poly)
+
+static func _clip_shore(poly: _Poly, a: Vector2, b: Vector2) -> _Poly:
+	var out := _Poly.new()
+	var dir := b - a
+	for i in poly.pos.size():
+		var j := (i + 1) % poly.pos.size()
+		var da := dir.cross(poly.pos[i] - a)
+		var db := dir.cross(poly.pos[j] - a)
+		if da >= -0.00001:
+			poly.add_from(out, i)
+		if (da < -0.00001 and db > 0.00001) or (da > 0.00001 and db < -0.00001):
+			poly.add_lerp(out, i, j, da / (da - db))
+	return out
 
 ## Splits `poly` at every integer line of family `fam` (mesh-cell fx,
 ## fz or fx + fz) it crosses, appending the convex pieces to `out`.

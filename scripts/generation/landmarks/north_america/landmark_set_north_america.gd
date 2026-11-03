@@ -13,6 +13,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"willis_tower": LandmarkNaSkyscrapers.willis_tower(model)
 		"chrysler_building": LandmarkNaSkyscrapers.chrysler_building(model)
 		"transamerica_pyramid": LandmarkNaSkyscrapers.transamerica_pyramid(model)
+		"wtc_oculus": LandmarkNaOculus.build(model)
 		"flatiron_building": LandmarkNaSkyscrapers.flatiron(model)
 		"washington_monument": LandmarkNaMonuments.washington_monument(model)
 		"lincoln_memorial": LandmarkNaMonuments.lincoln_memorial(model)

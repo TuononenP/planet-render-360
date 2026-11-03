@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -8,6 +9,7 @@
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
 #include <vector>
+#include "shore_kernels.h"
 
 namespace godot {
 
@@ -20,6 +22,7 @@ class RibbonDraper : public RefCounted {
 	GDCLASS(RibbonDraper, RefCounted)
 
 	std::vector<float> surface;
+	std::vector<float> shore_posts;
 	int g_size = 0;
 	double g_step = 1.0;
 	double water_level = 0.0;
@@ -27,10 +30,13 @@ class RibbonDraper : public RefCounted {
 	double step = 1.0;
 	int mesh_size = 0;
 	double mesh_step = 1.0;
+	Ref<ShoreSampler> shore_sampler;
 
 	double ground_height(double x, double z) const;
 	double post(int x, int z) const;
 	double mesh_tri(double x, double z) const;
+	Array build(const PackedVector2Array &pts, double width, double lift, const Color &attr,
+			const PackedFloat64Array &jf, double layer, double m2u, int base, bool area) const;
 
 protected:
 	static void _bind_methods();
@@ -43,11 +49,14 @@ public:
 	// _Surface.height / normal
 	double height(double x, double z) const;
 	Vector3 normal(double x, double z) const;
+	void set_shore_sampler(const Ref<ShoreSampler> &sampler);
 	// RoadBuilder._ribbon over `pts` with per-point junction fractions
 	// `jf`: [verts, normals, uvs, colors, uv2s, indices], the indices
 	// starting at `base` (the batch's vertex count).
 	Array ribbon(const PackedVector2Array &pts, double width, double lift, const Color &attr,
 			const PackedFloat64Array &jf, double layer, double m2u, int base) const;
+	Array area(const PackedVector2Array &triangles, double lift, const Color &attr,
+			double layer, double m2u, int base) const;
 };
 
 } // namespace godot

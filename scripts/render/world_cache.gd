@@ -16,27 +16,52 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 134
+const BUILD_VERSION := 170
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
 
 static var _source_hash := ""
 static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
+## Test hook: keep cache eviction checks away from the person's worlds.
+static var dir_override := ""
+
+static func base_dir() -> String:
+	return dir_override if not dir_override.is_empty() else DIR
 
 static func enabled() -> bool:
-	return DisplayServer.get_name() != "headless"
+	return DisplayServer.get_name() != "headless" and OS.get_environment("PR360_DISABLE_WORLD_CACHE") != "1"
 
 static func key(data: LocationData) -> String:
 	var fp := [BUILD_VERSION, data.quality_preset, data.season, data.grid_size,
 		data.heights.size(), data.buildings.size(), data.roads.size(),
 		data.land_polygons.size(), data.waterways.size(), data.trees.size(),
-		data.landmark_type, data.country, str(data.dem_source), str(data.satellite_source),
-		data.far_landuse.size(), data.far_towers.size(), str(data.climate),
+		data.landmark_type, data.has_landmark_site, data.landmark_lat, data.landmark_lon,
+		data.seed_value, data.country, str(data.dem_source), str(data.satellite_source),
+		data.focus.is_empty(), _view_eye(data),
+		hash(var_to_bytes(data.landmark_candidates)),
+		hash(var_to_bytes([data.shore_structures, data.land_polygons, data.waterways, data.buildings, data.roads])),
+		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois])),
+		hash(var_to_bytes(data.far_landuse)), hash(var_to_bytes(data.far_towers)),
+		FarCityFetcher.QUERY_VERSION, str(data.climate),
+		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
+		_image_fingerprint(data.landcover_image), _image_fingerprint(data.canopy_image),
 		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(), _sources()]
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]
+
+## Some world layers (cars, boats, wires and ground cover) are centred on
+## the opening eye. Bearing and pitch do not change their placement.
+static func _view_eye(data: LocationData) -> int:
+	if data.view.is_empty():
+		return 0
+	return hash(var_to_bytes([float(data.view.get("eye_lat", data.view.get("lat", data.latitude))),
+		float(data.view.get("eye_lon", data.view.get("lon", data.longitude)))]))
+
+static func _image_fingerprint(img: Image) -> int:
+	return hash(var_to_bytes([img.get_width(), img.get_height(), img.get_format(), img.get_data()])) \
+		if img != null and not img.is_empty() else 0
 
 static func _sources() -> String:
 	if not OS.is_debug_build():
@@ -59,17 +84,18 @@ static var _prefetched := ""
 ## load_world later asks for the same file it is already loading (or
 ## loaded); a different key just drops it. True when a world was found.
 static func prefetch(lat: float, lon: float, preset: int, season: int) -> bool:
-	if not enabled() or not DirAccess.dir_exists_absolute(DIR):
+	var dir := base_dir()
+	if not enabled() or not DirAccess.dir_exists_absolute(dir):
 		return false
 	var prefix := "world_%d_%d_p%d_s%d_" % [CacheStore.quant(lat), CacheStore.quant(lon),
 		preset, season]
 	var best := ""
 	var best_t := -1
-	for f in DirAccess.get_files_at(DIR):
+	for f in DirAccess.get_files_at(dir):
 		if f.begins_with(prefix) and f.ends_with(".scn") and not f.ends_with(".tmp.scn"):
-			var t := FileAccess.get_modified_time(DIR + "/" + f)
+			var t := FileAccess.get_modified_time(dir + "/" + f)
 			if t > best_t:
-				best = DIR + "/" + f
+				best = dir + "/" + f
 				best_t = t
 	if best == "":
 		return false
@@ -96,7 +122,7 @@ static func _drop_prefetch() -> void:
 
 static func _paths(data: LocationData) -> Dictionary:
 	var k := key(data)
-	return {"scene": "%s/%s.scn" % [DIR, k], "ground": "%s/%s.ground" % [DIR, k]}
+	return {"scene": "%s/%s.scn" % [base_dir(), k], "ground": "%s/%s.ground" % [base_dir(), k]}
 
 ## [ground, world] from the cache, or [] when absent/unreadable. Loads on
 ## a worker thread while `view` keeps drawing; a known `ground` (season
@@ -181,7 +207,7 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var th := Thread.new()
 	threads.append(th)
 	th.start(func() -> Array:
-		DirAccess.make_dir_recursive_absolute(DIR)
+		DirAccess.make_dir_recursive_absolute(p["scene"].get_base_dir())
 		var tmp: String = p["scene"] + ".tmp.scn"
 		var t0 := Time.get_ticks_msec()
 		if ResourceSaver.save(ps, tmp, ResourceSaver.FLAG_COMPRESS) != OK:
@@ -213,7 +239,8 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 		th.wait_to_finish()
 	# On the main thread: CacheStore's LRU state is not thread-safe.
 	_bytes = -1
-	CacheStore.enforce_size_cap()  # trims worlds, then the data's share
+	if dir_override.is_empty():
+		CacheStore.enforce_size_cap()  # trims worlds, then the data's share
 
 ## The world packed for saving, or null (cache off, or pack failed).
 ## Packing walks every node, so build_location runs it on the build
@@ -240,17 +267,30 @@ static func _ground_state(g: GroundTruth) -> Dictionary:
 	var out := {}
 	for k in GROUND_FIELDS:
 		out[k] = g.get(k)
+	out["shoreline"] = g.shoreline.state() if g.shoreline != null and g.shoreline.ready else {}
+	out["shoreline_empty"] = g.shoreline != null and g.shoreline.empty()
 	return out
 
 static func _load_ground(path: String, data: LocationData) -> GroundTruth:
 	var state: Variant = bytes_to_var(FileAccess.get_file_as_bytes(path))
-	if not (state is Dictionary) or not (state as Dictionary).has_all(GROUND_FIELDS):
+	if not (state is Dictionary) or not (state as Dictionary).has_all(GROUND_FIELDS) \
+			or not (state.get("shoreline") is Dictionary):
 		return null
 	var g := GroundTruth.new(null)
 	for k in GROUND_FIELDS:
 		g.set(k, state[k])
-	g.set_land(data.land_polygons)
 	g._buildings = data.buildings
+	g.set_land(data.land_polygons)
+	if not (state["shoreline"] as Dictionary).is_empty():
+		g.shoreline = ShorelineModel.from_state(state["shoreline"])
+		if g.shoreline == null:
+			return null
+	elif bool(state.get("shoreline_empty", false)):
+		# Explicit absence is authoritative too: a cached dry valley must
+		# not revert to the old below-global-datum flooding heuristic.
+		g.shoreline = ShorelineModel.new()
+	else:
+		return null
 	return g
 
 static func _remove(p: Dictionary) -> void:
@@ -279,17 +319,18 @@ static func total_bytes() -> int:
 static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int:
 	if max_bytes < 0:
 		max_bytes = CacheStore.max_cache_bytes / 2
-	if not DirAccess.dir_exists_absolute(DIR):
+	var dir := base_dir()
+	if not DirAccess.dir_exists_absolute(dir):
 		_bytes = 0
 		return 0
 	var entries: Array = []
 	var total := 0
-	for f in DirAccess.get_files_at(DIR):
+	for f in DirAccess.get_files_at(dir):
 		if not f.ends_with(".scn") or f.ends_with(".tmp.scn"):
 			continue
 		var k := f.get_basename()
-		var scene := DIR + "/" + f
-		var ground := DIR + "/" + k + ".ground"
+		var scene := dir + "/" + f
+		var ground := dir + "/" + k + ".ground"
 		var bytes := _size(scene) + _size(ground)
 		total += bytes
 		entries.append({"p": {"scene": scene, "ground": ground}, "bytes": bytes,

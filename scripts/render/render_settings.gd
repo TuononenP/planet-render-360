@@ -13,6 +13,12 @@ extends RefCounted
 enum Preset { FAST, BALANCED, HIGH, ULTRA }
 
 const PATH := "user://settings.json"
+## Tests and automated captures can isolate settings without touching the
+## person's preferences, including the one-time migration on load.
+static var path_override := ""
+
+static func settings_path() -> String:
+	return path_override if not path_override.is_empty() else PATH
 ## Tier names (plan Open Q2, settled in T7.4): the shipping names stay —
 ## they say what the user trades — and each tier shows its PRD fidelity
 ## level (FIDELITY) and §3.1 generation budget in the settings copy.
@@ -175,9 +181,10 @@ func apply_to(data: LocationData) -> void:
 	apply_preset(data, preset)
 
 func load_settings() -> void:
-	if not FileAccess.file_exists(PATH):
+	var path := settings_path()
+	if not FileAccess.file_exists(path):
 		return
-	var f := FileAccess.open(PATH, FileAccess.READ)
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
@@ -199,14 +206,15 @@ func load_settings() -> void:
 ## resets another that this instance never loaded.
 func save_settings(changes: Dictionary) -> void:
 	var saved := {}
-	if FileAccess.file_exists(PATH):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PATH))
+	var path := settings_path()
+	if FileAccess.file_exists(path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 		if parsed is Dictionary:
 			saved = parsed
 	saved.merge(changes, true)
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		push_warning("RenderSettings: cannot write %s" % PATH)
+		push_warning("RenderSettings: cannot write %s" % path)
 		return
 	f.store_string(JSON.stringify(saved))
 

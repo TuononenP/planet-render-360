@@ -64,6 +64,8 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 				img.srgb_to_linear()
 				if set_name == "terracotta":
 					_weather_tiles(img)
+				elif set_name == "sheet_metal":
+					RoofMetalMaps.paint(img)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
@@ -78,6 +80,8 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 			img.fill(Color(0.5, 0.5, 1.0))
 		else:
 			MaterialLibrary.speckle(img, Color(0.5, 0.5, 0.5), 700, 3.1, 0.08)
+	if map_name == "nor" and set_name in ["copper", "sheet_metal"]:
+		img = RoofMetalMaps.normals(img)
 	_mutex.lock()
 	MaterialLibrary._set_images[key] = img
 	_mutex.unlock()

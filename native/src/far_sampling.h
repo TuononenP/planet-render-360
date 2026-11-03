@@ -47,6 +47,7 @@ struct Far {
 	const float *far = nullptr;
 	const float *surface = nullptr;
 	int64_t surface_n = 0;
+	Object *shore_sampler = nullptr;
 	// GroundTruth._half_units / _level (carved water surface per post).
 	double half_units = 0.0;
 	const float *level = nullptr;
@@ -59,6 +60,7 @@ struct Far {
 // The script side packs these (FarSampler.native_params).
 inline Far read_far(const Dictionary &params, const Array &dem_rings) {
 	Far f;
+	if (params.has("shore_sampler")) f.shore_sampler = params["shore_sampler"];
 	f.lat = params["lat"];
 	f.lon = params["lon"];
 	f.m2u = params["m2u"];
@@ -171,6 +173,11 @@ inline double render_y(const Far &f, double m_asl) {
 
 // GroundTruth.height_at_world
 inline double height_at_world(const Far &f, double x, double z) {
+	if (f.shore_sampler != nullptr) {
+		const double lo = -f.size * 0.5 * f.step_units;
+		const double hi = lo + (f.size - 1) * f.step_units;
+		return f.shore_sampler->call("height", Math::clamp(x, lo, hi), Math::clamp(z, lo, hi));
+	}
 	int size = f.size;
 	if (size < 2 || f.surface_n != (int64_t)size * size) {
 		return f.water_level_m;
@@ -199,11 +206,20 @@ inline double mid_dem_height_uv(const Far &f, double x, double z, double u, doub
 	return render_y(f, sea_floor(f, height_m_uv(f, u, v, far_m, fade)));
 }
 
+inline double shore_join(const Far &f, double x, double z, double dem) {
+	const double lo = -f.size * 0.5 * f.step_units, hi = lo + (f.size - 1) * f.step_units;
+	const double outside = std::max({lo - x, x - hi, lo - z, z - hi, 0.0});
+	const double w = Math::smoothstep(0.0, f.blend_u, outside);
+	if (w >= 1.0) return dem;
+	return Math::lerp(height_at_world(f, x, z), dem, w) - INNER_TUCK_M * f.m2u * (1.0 - w);
+}
+
 // FarSampler._blend_height_uv
 inline double blend_height_uv(const Far &f, double x, double z, double u, double v) {
 	double d = Math::max(std::abs(x), std::abs(z));
 	double w = Math::smoothstep(f.s_0, f.s_0 + f.blend_u, d);
 	double dem = mid_dem_height_uv(f, x, z, u, v);
+	if (f.shore_sampler != nullptr) return shore_join(f, x, z, dem);
 	if (w >= 1.0) {
 		return dem;
 	}
@@ -280,6 +296,7 @@ inline double blend_height(const Far &f, double x, double z) {
 	double d = Math::max(std::abs(x), std::abs(z));
 	double w = Math::smoothstep(f.s_0, f.s_0 + f.blend_u, d);
 	double dem = mid_dem_height(f, x, z);
+	if (f.shore_sampler != nullptr) return shore_join(f, x, z, dem);
 	if (w >= 1.0) {
 		return dem;
 	}

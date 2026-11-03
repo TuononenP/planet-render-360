@@ -6,10 +6,18 @@ extends RefCounted
 ## Each bridge is built along +X (span_m long, y = 0 at the water, or at the
 ## valley floor without `base`); yaw_deg = true deck bearing - 90 turns +X
 ## onto it (axis = cos, sin in x east, z south).
-
 ## Sea/tidal sites use base: sea; inland rivers use base: water.
+
 static func entries() -> Array:
 	return [
+		{"type": "manhattan_bridge", "name": "Manhattan Bridge", "lat": 40.7070, "lon": -73.9905,
+			"radius_m": 5000.0, "wiki_title": "Manhattan Bridge", "height_m": 110.0, "clear_m": 24.0,
+			"yaw_deg": 65.0, "span_m": 2140.0, "base": "sea", "kind": "Bridge",
+			"aliases": ["manhattan bridge"]},
+		{"type": "vasterbron", "skyline_priority": 1, "name": "Västerbron", "lat": 59.3244, "lon": 18.0272,
+			"radius_m": 5000.0, "wiki_title": "Västerbron", "height_m": 51.2, "clear_m": 15.0,
+			"yaw_deg": -116.0, "span_m": 602.0, "base": "water", "kind": "Bridge",
+			"aliases": ["västerbron", "vasterbron", "vaster bridge stockholm"]},
 		{"type": "millau_viaduct", "name": "Millau Viaduct", "lat": 44.0775, "lon": 3.0225, "radius_m": 8000.0,
 			"wiki_title": "Millau Viaduct", "height_m": 343.0, "clear_m": 26.0, "yaw_deg": -80.0,
 			"span_m": 2460.0, "kind": "Bridge", "aliases": ["millau viaduct", "viaduc de millau"]},

@@ -33,6 +33,41 @@ const SEA_RAMP_SCALE := 5.0
 const RIVER_FLOW := 0.9
 const STREAM_FLOW := 0.6
 
+## A climate-based visual approximation, not a measurement of water colour.
+## Cold-quarter air temperature distinguishes temperate coasts from tropical
+## ones; latitude supplies a smooth fallback when climate data is missing.
+static func temperate_sea(data: LocationData) -> float:
+	if ClimateModel.has(data):
+		return 1.0 - smoothstep(10.0, 18.0, float(data.climate["t_cold_c"]))
+	return smoothstep(20.0, 35.0, absf(data.latitude))
+
+## Sea absorption in linear RGB. Small geographic boxes select sheltered
+## estuaries; climate supplies the existing temperate/tropical fallback.
+static func sea_palette(data: LocationData) -> Dictionary:
+	var lat := data.latitude
+	var lon := data.longitude
+	var harbour := (lat >= 40.45 and lat <= 40.92 and lon >= -74.27 and lon <= -73.68) \
+		or (lat >= 51.43 and lat <= 51.57 and lon >= -0.25 and lon <= 0.12)
+	var salt := baltic(lat, lon)
+	var warm_shallow := Vector3(0.020, 0.185, 0.190)
+	var cold_shallow := Vector3(0.035, 0.075, 0.070)
+	var warm_deep := Vector3(0.004, 0.034, 0.088)
+	var cold_deep := Vector3(0.018, 0.040, 0.042)
+	var factor := temperate_sea(data)
+	var shallow := warm_shallow.lerp(cold_shallow, factor)
+	var deep := warm_deep.lerp(cold_deep, factor)
+	if salt:
+		shallow = Vector3(0.035, 0.095, 0.065)
+		deep = Vector3(0.012, 0.044, 0.038)
+	elif harbour:
+		shallow = Vector3(0.045, 0.065, 0.050)
+		deep = Vector3(0.020, 0.038, 0.030)
+	return {"shallow": shallow, "deep": deep, "harbour": harbour, "brackish": salt}
+
+## A hard quay reaches deep water quickly; beaches retain the long shelf.
+static func sea_ramp_m(hard_distance: float, shore_distance: float, grid_step: float) -> float:
+	return OPEN_RAMP_M if hard_distance <= shore_distance + grid_step * 1.5 else OPEN_RAMP_M * SEA_RAMP_SCALE
+
 static var _mats: Dictionary = {}
 
 ## Shared water material per tier (WaterShader; swell on High/Ultra);
@@ -84,12 +119,12 @@ static func _commit(root: Node3D, verts: PackedVector3Array,
 ## also replaces the v1 half-post block grid for holed polygons, so
 ## islands keep their real outline.
 static func add_polygon(root: Node3D, part: PackedVector2Array,
-		holes: Array, level: float, step: float, mat: Material, abort: BuildAbort = null) -> void:
+		holes: Array, level: float, step: float, mat: Material, abort: BuildAbort = null, tidal: bool = false) -> void:
 	if part.size() < 3:
 		return
 	var rim_sp := maxf(step * 0.5, 0.5)
 	var grid := maxf(step, 1.0)
-	var ramp := OPEN_RAMP_M * WorldScale.metres_to_units()
+	var ramp := OPEN_RAMP_M * (SEA_RAMP_SCALE if tidal else 1.0) * WorldScale.metres_to_units()
 	var bb := _bbox(part)
 	# A sea or bay clipped to the extent spans km: at the post step that is
 	# ~20k interior points, and Delaunay triangulation of that many never
@@ -153,7 +188,7 @@ static func add_polygon(root: Node3D, part: PackedVector2Array,
 	var colors := PackedColorArray()
 	for i in pts.size():
 		verts.append(Vector3(pts[i].x, level, pts[i].y))
-		colors.append(Color(openness[i], 0.0, shore[i]))
+		colors.append(Color(openness[i], 1.0 if tidal else 0.0, shore[i]))
 	var indices := PackedInt32Array()
 	for t in range(0, tri.size(), 3):
 		var cen := (pts[tri[t]] + pts[tri[t + 1]] + pts[tri[t + 2]]) / 3.0
@@ -344,3 +379,8 @@ static func _bbox(ring: PackedVector2Array) -> Array:
 		bb[2] = maxf(bb[2], p.x)
 		bb[3] = maxf(bb[3], p.y)
 	return bb
+
+## Baltic and its gulfs; excludes the North Sea west of the Danish straits.
+static func baltic(lat: float, lon: float) -> bool:
+	return lat >= 53.5 and lat <= 66.0 and lon >= 10.0 and lon <= 30.5 \
+		and (lon >= 13.0 or lat <= 56.5)

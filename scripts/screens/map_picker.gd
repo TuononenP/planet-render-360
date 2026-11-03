@@ -274,6 +274,9 @@ func _ready() -> void:
 		var qindex := qi
 		card.set_meta("lat", qlat)
 		card.set_meta("lon", qlon)
+		var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"]), qlat, qlon)
+		if qphoto != null:
+			card.set_photo(qphoto)
 		card.pressed.connect(func() -> void:
 			_select_suggestion(qname, qlat, qlon)
 			_set_selected_quick(qindex))

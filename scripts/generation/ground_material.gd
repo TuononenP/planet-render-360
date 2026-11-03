@@ -352,9 +352,16 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			paint.call([PackedVector2Array([a - cap + nrm, b + cap + nrm,
 				b + cap - nrm, a - cap - nrm])], id)
 	# Track on its own bed reads as gravel; street track is the road's.
+	var rail_road_index = null
+	for rw in data.railways:
+		if rw is Dictionary and bool(rw.get("embedded", false)):
+			rail_road_index = RailBuilder.RoadIndex.new(data, m2u)
+			break
 	for rw in data.railways:
 		if not (rw is Dictionary) or bool(rw.get("tunnel", false)) \
-				or bool(rw.get("bridge", false)) or bool(rw.get("embedded", false)):
+				or bool(rw.get("bridge", false)):
+			continue
+		if bool(rw.get("embedded", false)) and str(rw.get("class", "")) != "tram":
 			continue
 		var rp: PackedVector2Array = rw.get("points", PackedVector2Array())
 		var rh := float(rw.get("width_m", 3.3)) * 0.5 * m2u
@@ -363,8 +370,12 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			if rd.length() < 0.001:
 				continue
 			var rn := Vector2(-rd.y, rd.x).normalized() * rh
+			var mid := (rp[i] + rp[i + 1]) * 0.5
+			if bool(rw.get("embedded", false)) and RailBuilder._on_road(mid, data, m2u, rail_road_index):
+				continue
+			var grass := str(rw.get("class", "")) == "tram" and _grass_at(mid, data)
 			paint.call([PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
-				rp[i + 1] - rn, rp[i] - rn])], ID["path"])
+				rp[i + 1] - rn, rp[i] - rn])], ID["grass"] if grass else ID["path"])
 	for b in data.buildings:
 		if not (b is Dictionary):
 			continue
@@ -393,7 +404,36 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
 			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
 				WorldScale.detailed_extent_units(), fills))
+	if data.quality_preset > RenderSettings.Preset.FAST \
+			and data.landcover_image != null and not data.landcover_image.is_empty():
+		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
 	return img
+
+## Fill only unclassified texels. Mapped OSM polygons, roads and building
+## footprints always win; unmapped WorldCover water is left to the existing
+## fallback because this colour map cannot create a water surface.
+static func _worldcover_fallback(target: Image, source: Image, arid: bool) -> Image:
+	var src := source.duplicate() as Image
+	if src.get_format() != Image.FORMAT_L8:
+		src.convert(Image.FORMAT_L8)
+	var sw := src.get_width()
+	var sh := src.get_height()
+	var w := target.get_width()
+	var h := target.get_height()
+	var values := src.get_data()
+	var out := target.get_data()
+	var classes := {10: ID["forest"], 20: ID["grass"], 30: ID["grass"],
+		40: ID["field"], 50: ID["urban"], 60: ID["sand"] if arid else ID["rock"],
+		70: ID["glacier"], 90: ID["wetland"], 95: ID["forest"], 100: ID["rock"]}
+	for y in h:
+		var sy := mini(int((float(y) + 0.5) * sh / h), sh - 1)
+		for x in w:
+			var i := y * w + x
+			if out[i] != 0:
+				continue
+			var sx := mini(int((float(x) + 0.5) * sw / w), sw - 1)
+			out[i] = int(classes.get(int(values[sy * sw + sx]), 0))
+	return Image.create_from_data(w, h, false, Image.FORMAT_R8, out)
 
 ## Paved sidewalk band (urban) `walk_m` wide beside the carriageway on
 ## each side the road's `sidewalk` bits name: without it the strip between
@@ -461,3 +501,9 @@ static func _fill_rings(img: Image, rings: Array, id: int, n: int) -> void:
 			if i1 >= i0:
 				img.fill_rect(Rect2i(i0, j, i1 - i0 + 1, 1), col)
 			k += 2
+
+static func _grass_at(p: Vector2, data: LocationData) -> bool:
+	for poly in data.land_polygons:
+		if str(poly.get("class", "")) == "grass" and Geometry2D.is_point_in_polygon(p, poly.get("points", PackedVector2Array())):
+			return true
+	return false

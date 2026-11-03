@@ -62,6 +62,14 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 		if garage and i == longest:
 			_garage(kit, sp, rows, float(d["ground_y"]), stone, trim, seed_v)
 			stooped = true
+		if bool(relief.get("granite_plinth", false)):
+			FinlandRelief.plinth(kit, sp, rows, seed_v)
+		if i == longest and ArchitectureStyle._h(seed_v, 95) < float(relief.get("turret", 0.0)):
+			FinlandRelief.turret(kit, sp, d, stone)
+		if i == longest and ArchitectureStyle._h(seed_v, 96) < float(relief.get("corner_dome", 0.0)):
+			FinlandRelief.corner_dome(kit, sp, d, stone)
+		if i == longest and has_wall_lantern(d, sp):
+			_wall_lantern(kit, sp, float(d["ground_y"]))
 		if corniced:
 			_cornice(kit, sp, float(d["top"]), trim)
 		if not stooped and not raised and i == longest and ArchitectureStyle._h(seed_v, 81) < float(relief.get("stoop", 0.0)):
@@ -78,6 +86,34 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 			escaped = true
 		if str(relief.get("gable", "")) != "" and bool(d.get("gable_front", false)):
 			_gable(kit, sp, d, str(relief["gable"]))
+
+## A wall lantern is a near, Ultra-only street-front detail. The row
+## supplies the probability, so other cities and mapped modern fabric do
+## not inherit a Gamla stan fixture.
+static func has_wall_lantern(d: Dictionary, sp: Dictionary) -> bool:
+	var relief: Dictionary = (d.get("look", {}) as Dictionary).get("relief", {})
+	return bool(d.get("wall_lanterns", false)) and not bool(d.get("raised", false)) \
+		and float(sp.get("len_m", 0.0)) >= 4.0 \
+		and float(d.get("top", 0.0)) - float(d.get("ground_y", 0.0)) >= 4.5 * WorldScale.metres_to_units() \
+		and ArchitectureStyle._h(float(d.get("seed", 0.0)), 97) < float(relief.get("wall_lantern", 0.0))
+
+## Wrought bracket and a warm glazed lantern project from the exposed
+## street-facing wall; all parts join the building's relief mesh.
+static func _wall_lantern(kit: ReliefKit, sp: Dictionary, ground_y: float) -> void:
+	var m := WorldScale.metres_to_units()
+	var dir: Vector2 = sp["dir"]
+	var normal: Vector2 = sp["n"]
+	var ax := Vector3(dir.x, 0.0, dir.y)
+	var az := Vector3(normal.x, 0.0, normal.y)
+	var at: Vector2 = (sp["a"] + sp["b"]) * 0.5
+	var base := Vector3(at.x, ground_y + 3.65 * m, at.y)
+	var iron := ReliefKit.flat("#303331", 0.6, 0.7)
+	kit.box(iron, base + az * 0.04 * m, ax, az, Vector3(0.18, 0.55, 0.08) * m)
+	kit.box(iron, base + Vector3.UP * 0.15 * m + az * 0.34 * m, ax, az, Vector3(0.07, 0.07, 0.68) * m)
+	var lamp := base + az * 0.66 * m
+	kit.box(ReliefKit.sign("#f2d7a0"), lamp, ax, az, Vector3(0.28, 0.38, 0.28) * m)
+	kit.box(iron, lamp + Vector3.UP * 0.23 * m, ax, az, Vector3(0.38, 0.08, 0.38) * m)
+	kit.box(iron, lamp - Vector3.UP * 0.23 * m, ax, az, Vector3(0.34, 0.08, 0.34) * m)
 
 ## A garage at street level (rolled per building on the look's `garage`
 ## odds): never under a shopfront or on a raised building. FacadeRelief

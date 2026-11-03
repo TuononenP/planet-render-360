@@ -13,7 +13,7 @@ extends RefCounted
 
 ## Candidates per quality preset (FAST, BALANCED, HIGH, ULTRA).
 const MAX_BY_PRESET: Array[int] = [10, 16, 22, 26]
-## Registry icons beside the primary per preset, nearest first: a
+## Registry icons beside the primary per preset, priority then nearest: a
 ## historic centre (Rome, Athens) stands a dozen of them together.
 const MAX_REGISTRY_EXTRAS_BY_PRESET: Array[int] = [6, 12, 18, 22]
 ## Clearance around a registry landmark (its own footprint and grounds)
@@ -28,12 +28,23 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 		clear.append([TerrainBuilder.landmark_site_xz(data),
 			LocationData.entry_for_type(data.landmark_type)])
 	var extras := LocationData.registry_extras(data.latitude, data.longitude, data.landmark_type)
-	# Dense skylines (Rome, Athens, London, Paris): the nearest few only.
+	# Give explicitly important skyline landmarks a slot before distance
+	# applies. Unmarked entries retain their existing nearest-first order.
 	extras.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ap := int(a.get("skyline_priority", 0))
+		var bp := int(b.get("skyline_priority", 0))
+		if ap != bp:
+			return ap > bp
 		return LocationData.distance_m(data.latitude, data.longitude, float(a["lat"]), float(a["lon"])) \
 			< LocationData.distance_m(data.latitude, data.longitude, float(b["lat"]), float(b["lon"])))
 	var preset := clampi(data.quality_preset, 0, MAX_BY_PRESET.size() - 1)
-	for e in extras.slice(0, MAX_REGISTRY_EXTRAS_BY_PRESET[preset]):
+	var registry_limit := MAX_REGISTRY_EXTRAS_BY_PRESET[preset]
+	# A dense primary skyline can use more Ultra slots, but never more
+	# than the preset's total candidate budget.
+	if preset == MAX_BY_PRESET.size() - 1:
+		var primary := LocationData.entry_for_type(data.landmark_type)
+		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, MAX_BY_PRESET[preset])
+	for e in extras.slice(0, registry_limit):
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
 			data.latitude, data.longitude)
@@ -44,6 +55,9 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
+		if entry.has("clear_offsets_m"):
+			var candidate: Dictionary = out.back()
+			candidate["clear_offsets_m"] = entry["clear_offsets_m"]
 		clear.append([p, entry])
 	var cap: int = MAX_BY_PRESET[preset]
 	for c in ranked_osm:
@@ -72,10 +86,20 @@ static func axis(entry: Dictionary) -> Vector2:
 ## its axis for a bridge, else to `at` itself.
 static func span_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
 	var half := float(entry.get("span_m", 0.0)) * 0.5
-	if half <= 0.0:
+	if half <= 0.0 and not entry.has("clear_offsets_m"):
+		return p.distance_to(at)
+	var offsets: Array = entry.get("clear_offsets_m", [])
+	if half <= 0.0 and offsets.is_empty():
 		return p.distance_to(at)
 	var a := axis(entry)
-	return p.distance_to(at + a * clampf((p - at).dot(a), -half, half))
+	var dist := p.distance_to(at + a * clampf((p - at).dot(a), -half, half))
+	# Separate model footprints preserve buildings between the components.
+	var cross := Vector2(-a.y, a.x)
+	for raw in offsets:
+		var offset: Array = raw
+		var subsite := at + a * float(offset[0]) + cross * float(offset[1])
+		dist = minf(dist, p.distance_to(subsite))
+	return dist
 
 ## Registry bridges standing in this world, [site xz, entry] each: the
 ## primary and the registry candidates that carry a span.

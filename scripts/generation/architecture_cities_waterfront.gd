@@ -15,15 +15,17 @@ const VENETIAN_ROOF := ["#8f5b47", "#85503d", "#9b6349", "#7a4b3b", "#a27258"]
 const VENETIAN_SHUTTER := ["#3f5a3a", "#4a5f3e", "#2f4a3a", "#5a3a2a"]
 
 ## Gamla stan plaster and the Östermalm / Södermalm blocks around it.
-const STOCKHOLM_PLASTER := ["#d9a441", "#c8873a", "#b5523b", "#d8c07a", "#e8d9a8", "#a8442f", "#cfa56a", "#e2c9a0"]
+const STOCKHOLM_PLASTER := ["#c7a365", "#bd8d5b", "#a76c59", "#d0bf91", "#ddd3b4", "#985e4e", "#c4a783", "#d8c9ac"]
 const STOCKHOLM_PALE := ["#e8d9a8", "#e2cf98", "#efe6c8", "#d9c28a", "#ead5b0"]
 const COPPER := ["#6f9a86", "#5f8a76", "#7aa592"]
-const STOCKHOLM_ROOF := [["slate", ["#5a4a44", "#4a4a50", "#5d5550"]], ["terracotta", ["#a8482a", "#b5542f", "#9a4a2c"]],
-	["slate", COPPER]]
+const STOCKHOLM_ROOF := [["sheet_metal", ["#403f3e", "#5a5a58", "#854d40"]]]
 
 const BASE := {
 	"venice": "mediterranean", "venice_modern": "venice",
 	"stockholm": "nordic", "stockholm_modern": "stockholm",
+	"stockholm_medieval": "stockholm", "stockholm_wood": "stockholm", "stockholm_stone": "stockholm",
+	"stockholm_grace": "stockholm", "stockholm_funkis": "stockholm", "stockholm_miljon": "stockholm_modern",
+	"stockholm_eco": "stockholm_modern",
 }
 
 const REGIONS := {
@@ -73,7 +75,7 @@ const REGIONS := {
 		"house": {"w": [["render", STOCKHOLM_PLASTER], ["wood", ["#a8442f", "#c8873a", "#d9c28a", "#b5523b"]]],
 			"p": "punched", "wn": "casement", "fr": "#efece4", "sp": 0.0,
 			"r": [["gabled", 3], ["hipped", 1]], "pitch": 0.9,
-			"rf": [["terracotta", ["#a8482a", "#b5542f"]], ["slate", ["#5a4a44", "#4a4a50"]]],
+			"rf": STOCKHOLM_ROOF,
 			"fh": 2.9, "st": [1, 2], "ch": 0.5, "ev": 0.45},
 		"commercial": {"w": [["render", STOCKHOLM_PALE], ["stone", ["#c8c0ae", "#bdb5a2"]], ["glass", []]],
 			"p": [["punched", 3], ["strip", 1]], "wn": "casement", "bay": 3.2,
@@ -82,10 +84,10 @@ const REGIONS := {
 			"rv": {"string_course": true, "awning": 0.2}},
 		"civic": {"w": [["render", STOCKHOLM_PLASTER], ["stone", ["#c8c0ae", "#bdb5a2"]]],
 			"p": "punched", "wn": "casement", "r": [["hipped", 3], ["mansard", 1]], "pitch": 0.65,
-			"rf": [["slate", COPPER], ["slate", ["#5a4a44", "#4a4a50"]]],
+			"rf": [["copper", COPPER], ["sheet_metal", ["#5a4a44", "#4a4a50"]]],
 			"fh": 4.0, "st": [3, 5], "fix": true, "rv": {"string_course": true, "quoins": true}},
 		"religious": {"w": [["stone", ["#c8c0ae", "#d8cfbc"]], ["render", STOCKHOLM_PALE]], "p": "punched",
-			"r": [["gabled", 2]], "pitch": 1.1, "rf": [["slate", COPPER]], "tw": "spire"},
+			"r": [["gabled", 2]], "pitch": 1.1, "rf": [["copper", COPPER]], "tw": "spire"},
 	},	# Post-war blocks on the lagoon edge (Santa Marta, Tronchetto).
 	"venice_modern": {
 		"apartments": {"w": [["render", ["#d8d0bc", "#cfc4a8", "#c8b8a0"]], ["concrete", ArchitectureData.CONCRETE]],
@@ -96,6 +98,48 @@ const REGIONS := {
 			"st": [2, 4], "ch": 0.0, "eq": 0.5, "g": [["shop", 1]]},
 		"civic": {"w": [["concrete", ArchitectureData.CONCRETE], ["render", ISTRIAN]], "p": "strip",
 			"r": [["flat", 2], ["hipped", 1]], "rf": [["membrane", []]], "st": [2, 4]},
+	},
+	# Distinct district fabrics; inherited fields retain the city defaults.
+	"stockholm_medieval": {
+		"apartments": {"w": [["render", STOCKHOLM_PLASTER]], "p": "punched", "bay": 2.5,
+			"r": [["gabled", 4], ["hipped", 1]], "pitch": 1.1, "rf": STOCKHOLM_ROOF,
+			"st": [3, 5], "fix": true, "rv": {"gable": [["step", 2], ["bell", 1]], "string_course": true, "wall_lantern": 0.4}},
+		"commercial": {"w": [["render", STOCKHOLM_PLASTER]], "r": [["gabled", 1]], "pitch": 1.1,
+			"rf": STOCKHOLM_ROOF, "st": [3, 5], "fix": true,
+			"rv": {"gable": [["step", 2], ["bell", 1]], "string_course": true, "wall_lantern": 0.4}},
+	},
+	"stockholm_wood": {
+		"house": {"w": [["wood", ["#8c4739", "#a35e49", "#c1a16c"]]], "p": "clapboard",
+			"r": [["gabled", 1]], "pitch": 0.8, "rf": STOCKHOLM_ROOF, "st": [1, 2], "fix": true},
+		"apartments": {"w": [["wood", ["#8c4739", "#a35e49", "#c1a16c"]]], "p": "clapboard",
+			"r": [["gabled", 1]], "pitch": 0.8, "rf": STOCKHOLM_ROOF, "st": [1, 2], "fix": true},
+	},
+	"stockholm_stone": {
+		"apartments": {"w": [["render", STOCKHOLM_PALE], ["stone", ["#c8c0ae", "#bdb5a2"]]],
+			"p": "ornate", "r": [["hipped", 3], ["mansard", 1]], "rf": STOCKHOLM_ROOF,
+			"st": [4, 6], "fix": true, "g": [["stone", 2], ["shop", 1]],
+			"rv": {"oriel": 0.3, "corner_dome": 0.35, "granite_plinth": true, "string_course": true}},
+	},
+	"stockholm_grace": {
+		"apartments": {"w": [["render", STOCKHOLM_PALE]], "p": "punched", "r": [["hipped", 3], ["gabled", 1]],
+			"pitch": 0.6, "rf": STOCKHOLM_ROOF, "st": [4, 6], "fix": true, "rv": {"string_course": true}},
+	},
+	"stockholm_funkis": {
+		"apartments": {"w": [["render", ["#e6e2d7", "#d9d7ca", "#e5ddcb"]]],
+			"p": [["punched", 2], ["balcony", 1]], "wn": "wide", "r": [["flat", 3], ["hipped", 1]],
+			"rf": [["membrane", []], ["sheet_metal", ["#484a49"]]], "st": [3, 6], "fix": true,
+			"rv": {"deep_balcony": 0.3}},
+	},
+	"stockholm_miljon": {
+		"apartments": {"w": [["concrete", ["#c6c1b7", "#d1cdc3", "#bdbab0"]]], "p": "panel", "wn": "wide",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "st": [4, 9], "fix": true,
+			"rv": {"glazed_balcony": 0.5}},
+	},
+	"stockholm_eco": {
+		"apartments": {"w": [["render", ["#e7e5dc", "#d9d9d2"]], ["wood", ["#af9479"]], ["glass", []]],
+			"p": [["punched", 2], ["balcony", 2]], "wn": "wide", "r": [["flat", 1]],
+			"rf": [["membrane", []]], "st": [5, 8], "fix": true,
+			"rv": {"deep_balcony": 0.6, "glazed_balcony": 0.5}},
 	},
 	# Million Programme slabs and glass offices (Hammarby, Kista, Norrmalm).
 	"stockholm_modern": {

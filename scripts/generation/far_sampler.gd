@@ -23,6 +23,7 @@ static func native_params(data: LocationData, ground: GroundTruth, surf: Diction
 		"water_level_m": ground.water_level_m, "datum_m": ground.datum_m,
 		"y_scale": ground._y_scale, "step_units": ground._step_units, "size": ground._size,
 		"surface": ground._surface, "half_units": ground._half_units, "level": ground._level,
+		"shore_sampler": ground.shoreline.sampler if ground.shoreline != null and ground.shoreline.ready else null,
 	}
 
 ## FarTerrainBuilder._ring_bands' positions from the native kernel;
@@ -114,6 +115,8 @@ static func _blend_height(data: LocationData, ground: GroundTruth,
 	var s_0: float = surf["s_0"]
 	var w := smoothstep(s_0, s_0 + float(surf["blend_u"]), d)
 	var dem := _mid_dem_height(data, ground, float(surf["span_u"]), x, z)
+	if ground.shoreline != null and ground.shoreline.ready:
+		return _shore_join(ground, surf, x, z, dem)
 	if w >= 1.0:
 		return dem  # past the blend band: no ground sample, no lip
 	# Carved water channels (GroundTruth waterway carve) are NOT ground
@@ -136,6 +139,8 @@ static func _blend_height_uv(data: LocationData, ground: GroundTruth,
 	var s_0: float = surf["s_0"]
 	var w := smoothstep(s_0, s_0 + float(surf["blend_u"]), d)
 	var dem := _mid_dem_height_uv(data, ground, float(surf["span_u"]), x, z, u, v)
+	if ground.shoreline != null and ground.shoreline.ready:
+		return _shore_join(ground, surf, x, z, dem)
 	if w >= 1.0:
 		return dem
 	# Carved water channels (GroundTruth waterway carve) are NOT ground
@@ -156,6 +161,17 @@ static func _blend_height_uv(data: LocationData, ground: GroundTruth,
 ## (Venice: ~15k vertices, a thousand island holes) made a plain
 ## per-vertex point-in-polygon walk take minutes. Covers lakes/rivers/sea
 ## inside OSM range; past that the DEM sea rule in _far_water applies.
+## The overlap must stay below the corrected detailed surface. Blend
+## from its actual rectangle boundary, never lift a carved wet overlap
+## back toward uncorrected DEM bank elevations.
+static func _shore_join(ground: GroundTruth, surf: Dictionary, x: float, z: float, dem: float) -> float:
+	var box: Rect2 = ground.shoreline.bounds
+	var outside := maxf(maxf(box.position.x - x, x - box.end.x), maxf(box.position.y - z, z - box.end.y))
+	var w := smoothstep(0.0, float(surf["blend_u"]), maxf(0.0, outside))
+	if w >= 1.0:
+		return dem
+	return lerpf(ground.height_at_world(x, z), dem, w) - FarTerrainBuilder.INNER_TUCK_M * WorldScale.metres_to_units() * (1.0 - w)
+
 static func _water_index(data: LocationData) -> Array:
 	var out: Array = []
 	for poly in data.land_polygons:

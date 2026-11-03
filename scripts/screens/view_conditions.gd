@@ -216,7 +216,8 @@ static func spawn_golden_hour(v: View360) -> void:
 	v._atmos.date = {}
 	v._date = {}
 	date_changed(v)
-	set_time_of_day(v, wrapi(roundi(v._atmos.golden_hour()), 0, 24))
+	var view := v._data.view if v._data != null else {}
+	set_time_minutes(v, PresetViews.opening_hour(view, roundf(v._atmos.golden_hour())) * 60.0)
 	v._spawn_golden = true
 
 # --- Time of day: 24 hourly slots, or live current time ---
@@ -286,7 +287,7 @@ static func set_date(v: View360, date: Dictionary) -> void:
 	date_changed(v)
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
-	var season := ViewLink.season_for_date(date, v._data.latitude)
+	var season := ViewLink.season_for_date(date, v._data.latitude, v._data)
 	if season != v._data.season:
 		await _select_season(v, season)
 

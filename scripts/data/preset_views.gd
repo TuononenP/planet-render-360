@@ -23,6 +23,7 @@ extends RefCounted
 ##   asl_m           optional floor for the camera in metres ASL, for
 ##                   decks and clifftops the smoothed DEM sits below
 ##   bearing, pitch  opening look in degrees (compass bearing; +pitch up)
+##   hour            optional local opening hour; otherwise afternoon golden hour
 ##   clear           optional, default true: View360 lifts the eye until
 ##                   nothing right in front blocks the look; false where
 ##                   the buildings beside the look are the framing
@@ -69,7 +70,7 @@ const ROWS := [
 	# Manhattan, not Brooklyn.
 	{"id": "new_york", "label": "New York", "name": "New York, United States",
 		"lat": 40.7060, "lon": -74.0040, "eye_lat": 40.70265, "eye_lon": -73.99686,
-		"eye_m": 6.0, "bearing": 298.0, "pitch": 3.0},
+		"eye_m": 6.0, "bearing": 298.0, "pitch": 3.0, "hour": 8.0},
 	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
 	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
 	# the path at the waterfront road, so asl_m holds the eye on the cliff.
@@ -114,6 +115,14 @@ const ROWS := [
 	{"id": "san_francisco", "label": "San Francisco", "name": "San Francisco, United States",
 		"lat": 37.8040, "lon": -122.4195, "eye_lat": 37.80195, "eye_lon": -122.41960,
 		"eye_m": 5.0, "bearing": 352.0, "pitch": -5.0, "clear": false},
+	# Harbour edge: Uspenski on the right, Cathedral and Empire fronts left.
+	{"id": "helsinki", "label": "Helsinki", "name": "Helsinki, Finland",
+		"lat": 60.1680, "lon": 24.9530, "eye_lat": 60.1657, "eye_lon": 24.9558,
+		"eye_m": 5.0, "bearing": 5.0, "pitch": 1.0, "zoom": 1.1, "clear": false},
+	# Tapiola pool, toward Keskustorni and the white garden-city slabs.
+	{"id": "espoo", "label": "Espoo", "name": "Espoo, Finland",
+		"lat": 60.1760, "lon": 24.8050, "eye_lat": 60.1780, "eye_lon": 24.8076,
+		"eye_m": 5.0, "bearing": 230.0, "pitch": 2.0, "clear": false},
 ]
 
 ## The row whose origin lies within MATCH_M of (lat, lon), {} for none.
@@ -138,3 +147,7 @@ static func eye_xz(view: Dictionary, c_lat: float, c_lon: float) -> Vector2:
 	if not view.has("eye_lat"):
 		return WorldScale.xz_from_latlon(float(view["lat"]), float(view["lon"]), c_lat, c_lon)
 	return WorldScale.xz_from_latlon(float(view["eye_lat"]), float(view["eye_lon"]), c_lat, c_lon)
+
+## Local opening hour, with the normal golden-hour fallback.
+static func opening_hour(view: Dictionary, golden_hour: float) -> float:
+	return fposmod(float(view.get("hour", golden_hour)), 24.0)

@@ -10,7 +10,7 @@ extends RefCounted
 
 static func _regex() -> RegEx:
 	var rx := RegEx.new()
-	rx.compile("^osm_v%d_(-?\\d+)_(-?\\d+)_(r|api)(\\d+)\\.json$" % CacheStore.DATA_VERSION)
+	rx.compile("^osm_v%d_(-?\\d+)_(-?\\d+)_(r|api)(\\d+)(?:_q(\\d+))?\\.json$" % CacheStore.DATA_VERSION)
 	return rx
 
 ## Metres from the place to the spot a detailed cache file was keyed at,
@@ -40,13 +40,15 @@ static func candidates(lat: float, lon: float, max_m: float) -> Array[String]:
 		var d := _metres(m, lat, lon)
 		if d <= max_m:
 			found.append({"path": "%s/%s" % [CacheStore.base_dir(), f], "d": d,
-				"api": m.get_string(3) == "api", "r": int(m.get_string(4))})
+				"api": m.get_string(3) == "api", "r": int(m.get_string(4)), "q": int(m.get_string(5))})
 	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if not is_equal_approx(a["d"], b["d"]):
 			return a["d"] < b["d"]
 		if a["api"] != b["api"]:
 			return not a["api"]
-		return a["r"] > b["r"])
+		if a["r"] != b["r"]:
+			return a["r"] > b["r"]
+		return a["q"] > b["q"])
 	var out: Array[String] = []
 	for e in found:
 		out.append(e["path"])

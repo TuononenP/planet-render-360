@@ -54,6 +54,8 @@ func _run() -> void:
 	var glass := StreetProps._lamp_mesh("modern").surface_get_material(1) as StandardMaterial3D
 	if glass == null or not glass.has_meta(CityLights.META) or glass.emission_energy_multiplier != 0.0:
 		failures.append("lamp glass should be dark by day and lit with the windows at night")
+	if StreetProps.lamp_family("stockholm", "SE") != "span":
+		failures.append("Swedish streets should use span lamps")
 	# Regional lamp families: by country first, then region.
 	for c in [["haussmann", "FR", "residential", "lantern"], ["haussmann", "FR", "primary", "lantern"],
 			["west_europe_brick", "GB", "residential", "heritage"], ["west_europe_brick", "GB", "primary", "modern"],
@@ -63,7 +65,11 @@ func _run() -> void:
 		var got := StreetProps.lamp_style(StreetProps.lamp_family(c[0], c[1]), c[0], c[2])
 		if got != c[3]:
 			failures.append("%s/%s %s should get %s lamps, got %s" % [c[0], c[1], c[2], c[3], got])
-	for style in ["heritage", "cobra", "utility"]:
+	if StreetProps.lamp_family("north_america", "US", "new_york") != "nyc" \
+			or StreetProps.lamp_style("nyc", "north_america", "primary") != "nyc_f" \
+			or StreetProps.lamp_style("nyc", "north_america", "residential") != "nyc_crook":
+		failures.append("New York should use Type-F and Bishop's crook poles")
+	for style in ["heritage", "cobra", "utility", "nyc_f", "nyc_crook"]:
 		var lm := StreetProps._lamp_mesh(style)
 		var head: Vector3 = StreetLights.HEADS.get(style, StreetLights.LANTERN_HEAD)
 		var gl := lm.surface_get_arrays(1)[Mesh.ARRAY_VERTEX] as PackedVector3Array
@@ -72,6 +78,30 @@ func _run() -> void:
 			gc += v / float(gl.size())
 		if lm.get_surface_count() != 2 or gc.distance_to(head) > 0.6:
 			failures.append("%s lamp glass at %s should sit at its light head %s" % [style, gc, head])
+	var span := {"a": Vector2.ZERO, "b": Vector2(8, 0), "dir": Vector2.RIGHT,
+		"n": Vector2(0, -1), "len_m": 8.0}
+	var detail := {"look": {"relief": {"wall_lantern": 1.0}}, "seed": 0.25,
+		"wall_lanterns": true, "ground_y": 0.0, "top": 8.0 * WorldScale.metres_to_units()}
+	if not StreetFront.has_wall_lantern(detail, span):
+		failures.append("a permitted medieval street facade should receive a bracket lantern")
+	detail["wall_lanterns"] = false
+	if StreetFront.has_wall_lantern(detail, span):
+		failures.append("wall lanterns must be gated off below Ultra")
+	var kit := ReliefKit.new()
+	StreetFront._wall_lantern(kit, span, 0.0)
+	var relief_root := Node3D.new()
+	kit.flush(relief_root, "TestLantern")
+	if relief_root.get_child_count() != 1:
+		failures.append("the bracket lantern should build a merged relief mesh")
+	else:
+		var lm := (relief_root.get_child(0) as MeshInstance3D).mesh
+		var glow := false
+		for i in lm.get_surface_count():
+			var mat := lm.surface_get_material(i)
+			glow = glow or mat.has_meta(CityLights.META)
+		if not glow:
+			failures.append("the wall lantern glass must follow the night glow")
+	relief_root.free()
 	root.free()
 	failures.erase(failures[0])
 	if failures.is_empty():

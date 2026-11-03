@@ -79,7 +79,7 @@ const FIXTURE_V2 := """
   "geometry":[{"lat":48.8600,"lon":2.3500},{"lat":48.8605,"lon":2.3510}]},
  {"type":"node","id":301,"tags":{"natural":"tree"},"lat":48.8566,"lon":2.3522},
  {"type":"node","id":302,"tags":{"natural":"tree"},"lat":48.8575,"lon":2.3535},
- {"type":"way","id":401,"tags":{"barrier":"fence"},
+ {"type":"way","id":401,"tags":{"barrier":"fence","height":"6 ft","material":"metal","fence_type":"chain_link"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8562,"lon":2.3512},{"lat":48.8564,"lon":2.3514}]},
  {"type":"way","id":501,"tags":{"leisure":"garden","name":"Test Garden"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8560,"lon":2.3515},
@@ -186,6 +186,8 @@ func _run() -> void:
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
 	_sidewalk_checks(failures)
+	_height_unit_checks(failures)
+	_poi_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -194,6 +196,35 @@ func _run() -> void:
 		for f in failures:
 			printerr("OSM FAIL: ", f)
 		quit(1)
+
+func _poi_checks(failures: Array[String]) -> void:
+	var point := {"type": "node", "id": 1001, "lat": 48.8567, "lon": 2.3523,
+		"tags": {"shop": "bakery", "name": "Boulangerie", "brand": "Example"}}
+	var screen := {"type": "node", "id": 1002, "lat": 48.8568, "lon": 2.3523,
+		"tags": {"advertising": "screen"}}
+	var parsed := OsmParser.parse_features(JSON.stringify({"elements": [point, point, screen]}), 48.8566, 2.3522)
+	var pois: Array = parsed.get("pois", [])
+	if pois.size() != 2 or pois[0].get("category") != "shop" \
+			or pois[0].get("name") != "Boulangerie" or pois[0].get("brand") != "Example" \
+			or pois[1].get("kind") != "screen" or absf(float(pois[0].get("x", 0.0))) < 1.0:
+		failures.append("POI tags, local position or deduplication lost: %s" % [pois])
+	if not (OsmParser.parse_features('{"elements":[]}', 0.0, 0.0).get("pois", []) as Array).is_empty():
+		failures.append("old payload without POIs must remain empty")
+
+func _height_unit_checks(failures: Array[String]) -> void:
+	for raw in ["100 ft", "100'", "100 FT"]:
+		if not is_equal_approx(OsmTags._tag_metres(raw, 0.5, 1000.0), 30.48):
+			failures.append("feet height not converted: %s" % raw)
+	if not is_nan(OsmTags._tag_metres("4000 ft", 0.5, 1000.0)) \
+			or not is_nan(OsmTags._tag_metres("100 feet extra", 0.5, 1000.0)):
+		failures.append("invalid or out-of-range feet height accepted")
+	var levels := OsmTags._resolve_height({"building:levels": "4.5"})
+	if not is_equal_approx(float(levels["levels"]), 4.5) \
+			or not is_equal_approx(float(levels["height"]), 14.4):
+		failures.append("fractional levels lost: %s" % levels)
+	var tagged := OsmTags._resolve_height({"height": "100 ft", "building:levels": "4.5"})
+	if not is_equal_approx(float(tagged["height"]), 30.48) or tagged["height_source"] != "tag_height":
+		failures.append("feet height must take precedence: %s" % tagged)
 
 ## v1 fixture: back-compat — same buildings/landmarks/land as before,
 ## roads now in the §2.5 attributed shape.
@@ -401,6 +432,9 @@ func _v2_checks(failures: Array[String]) -> void:
 	if barriers.size() != 1 or str(barriers[0]["class"]) != "fence" \
 			or (barriers[0]["points"] as PackedVector2Array).size() != 3:
 		failures.append("fence barrier wrong: %s" % [barriers])
+	elif not is_equal_approx(float(barriers[0]["height_m"]), 1.8288) \
+			or str(barriers[0]["material"]) != "metal" or str(barriers[0]["fence_type"]) != "chain_link":
+		failures.append("fence tags not preserved: %s" % [barriers[0]])
 	# No archetypes in this fixture.
 	if not (result["landmarks"] as Array).is_empty():
 		failures.append("v2 fixture must yield no landmarks: %s" % [result["landmarks"]])
@@ -508,11 +542,20 @@ func _query_checks(failures: Array[String]) -> void:
 	for p in [0, 1, 2, 3]:
 		if OsmFetcher.ring_radius_for_preset(p) != rings[p]:
 			failures.append("preset %d ring radius wrong" % p)
-	# Detailed query: 23 tiered around-clauses (11 T2.3 + 4 T2.4
+	# Detailed query: 28 tiered around-clauses (including shore structures and parking).
 	# multipolygon-relation statements + building relations + the two
 	# landmark-kind selectors of the landmark-parts statement + railways
 	# + the four square selectors), per-layer caps, no v1 cap.
 	var q := OsmFetcher.build_query(48.8566, 2.3522)
+	if OsmQuery.QUERY_MARK != "pr360_q%d" % OsmQuery.QUERY_VERSION \
+			or not CacheStore.osm_path(48.8566, 2.3522, 1200).ends_with("_q%d.json" % OsmQuery.QUERY_VERSION):
+		failures.append("detailed query marker and cache version must agree")
+	var qp := OsmQuery.build_poi_query(48.8566, 2.3522)
+	for category in ["shop", "amenity", "office", "tourism", "craft", "advertising"]:
+		if not qp.contains('node["%s"](around:800,48.856600,2.352200)' % category):
+			failures.append("POI query missing category %s" % category)
+	if qp.contains("%") or not qp.contains("out %d" % OsmQuery.CAP_POIS):
+		failures.append("POI query must be formatted and bounded")
 	for clause in ['way["building"]', 'way["building:part"]', 'way["highway"]',
 			'relation["building"]["type"="multipolygon"]',
 			'way["waterway"]', 'way["natural"]', 'way["landuse"]', 'way["leisure"]',
@@ -533,7 +576,7 @@ func _query_checks(failures: Array[String]) -> void:
 			or not q.contains('relation["building:part"]["type"="multipolygon"]') \
 			or not q.contains("out geom %d" % OsmQuery.CAP_LANDMARK_PARTS):
 		failures.append("query missing the landmark-parts statement")
-	# Regression: 23 around clauses need 23 radius/lat/lon triplets. A
+	# Regression: 28 around clauses need 28 radius/lat/lon triplets. A
 	# short % argument list leaves raw placeholders in the query and
 	# Godot prints "not enough arguments for format string".
 	if q.contains("%"):
@@ -547,11 +590,18 @@ func _query_checks(failures: Array[String]) -> void:
 			or not (with_country["buildings"] as Array).is_empty() \
 			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
 		failures.append("parse must read the is_in area's ISO code and nothing else from it")
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 23:
-		failures.append("expected 23 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 28:
+		failures.append("expected 28 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
+	if not q.contains('node["railway"="subway_entrance"]'):
+		failures.append("detailed furniture query must include subway entrances")
+	if q.find('node["railway"="subway_entrance"]') > q.find('node["natural"="tree"]'):
+		failures.append("eye-level furniture must precede the expensive detailed layers")
+	var ny_query := OsmFetcher.build_query(40.7060, -74.0040)
+	if not ny_query.contains("around:450,40.702650,-73.996860"):
+		failures.append("New York furniture query should be centred on the preset eye")
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 23:
+	if q420.count("420,48.856600,2.352200") != 28:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)
@@ -730,6 +780,12 @@ func _tree_tag_checks(failures: Array[String]) -> void:
 		if TreeSpecies.species_from_tags(sf[0], "dry_coast") != sf[1]:
 			failures.append("%s should model as %s, got %s" % [sf[0], sf[1],
 				TreeSpecies.species_from_tags(sf[0], "dry_coast")])
+	for pair in [["gleditsia", "honey_locust"], ["pyrus", "callery_pear"], ["ginkgo", "ginkgo"], ["zelkova", "zelkova"]]:
+		if TreeSpecies.species_from_tags({"genus": pair[0]}, "temperate") != pair[1] or not TreeSpecies.spec(pair[1]).has("trunk_r"):
+			failures.append("mapped New York tree genus should have its own model: %s" % pair[0])
+		var bufs := TreeMeshLibrary.bufs(str(pair[1]), 0, false)
+		if (bufs[0] as TreeMeshLibrary.Buf).verts.is_empty() or (bufs[1] as TreeMeshLibrary.Buf).verts.is_empty():
+			failures.append("New York tree should generate bark and foliage: %s" % pair[1])
 	for e in TreeSpecies.mix_for_leaf("temperate", "forest", "needleleaved"):
 		if str(e[0]) not in ["spruce", "scots_pine", "stone_pine", "cypress"]:
 			failures.append("a needleleaved forest mix must hold conifers only, got %s" % e[0])
@@ -859,8 +915,8 @@ func _roof_shape_checks(failures: Array[String]) -> void:
 ## OSM material/colour tag maps reach existing PBR sets and CSS names.
 func _material_map_checks(failures: Array[String]) -> void:
 	var roof := {"roof_tiles": "terracotta", "tar_paper": "membrane",
-		"eternit": "slate", "metal_sheet": "slate", "metal sheet": "slate",
-		"stone": "slate", "copper": "terracotta", "zinc": "slate"}
+		"eternit": "slate", "metal_sheet": "sheet_metal", "metal sheet": "sheet_metal",
+		"stone": "slate", "copper": "copper", "zinc": "sheet_metal"}
 	for k in roof:
 		if str(MaterialLibrary.ROOF_TAGS.get(k, "")) != roof[k]:
 			failures.append("ROOF_TAGS[%s] should be %s" % [k, roof[k]])

@@ -63,7 +63,12 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	var masses: Array = b.get("parts", [])
 	var single := masses.is_empty()
 	if single:
-		masses = [b]
+		var stepped := _prewar_setbacks(b, look, parent_res, ctx)
+		if not stepped.is_empty():
+			masses = stepped
+			single = false
+		else:
+			masses = [b]
 	var out := _plan_masses(b, ctx, masses, single, look, parent_res, legacy, parent_shape, fh)
 	if not single:
 		# Judged on the planned lifts, so a part plan() stands on the ground
@@ -80,6 +85,61 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	_plans[ck] = out
 	_mutex.unlock()
 	return out
+
+## On Ultra, unparted prewar New York towers get two modest, seeded-free
+## setbacks. Tagged building parts remain authoritative. Holes and narrow
+## or fragmented insets stay as the mapped single mass.
+static func _prewar_setbacks(b: Dictionary, look: Dictionary, res: Dictionary, ctx: Dictionary) -> Array:
+	if int(ctx.get("fidelity", 0)) < 3 or str(look.get("era", "")) != "nyc_prewar" \
+			or not (b.get("parts", []) as Array).is_empty() or not (b.get("holes", []) as Array).is_empty() \
+			or float(b.get("min_height_m", 0.0)) > 0.0 or int(b.get("min_level", 0)) > 0:
+		return []
+	var h := float(res.get("total_m", 0.0))
+	var levels := int(b.get("levels", 0))
+	if levels <= 0:
+		levels = roundi(h / maxf(float(look.get("floor_h", 3.2)), 1.0))
+	var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
+	if levels < 20 or ring.size() < 3 or h < 55.0:
+		return []
+	var m := WorldScale.metres_to_units()
+	var span := BuildingHeights._ring_span_m(ring)
+	if span < 18.0:
+		return []
+	var inset := clampf(span * 0.075, 1.5, 4.0) * m
+	var mid := _inset_ring(ring, inset)
+	var top := _inset_ring(ring, inset * 2.0)
+	if mid.is_empty() or top.is_empty():
+		return []
+	var cuts := [0.0, h * 0.58, h * 0.80, h]
+	var rings := [ring, mid, top]
+	var out: Array = []
+	for i in 3:
+		var part := b.duplicate()
+		part.erase("parts")
+		part["footprint"] = rings[i]
+		var centre := RingGeometry.centroid(rings[i])
+		part["x"] = centre.x
+		part["z"] = centre.y
+		part["height"] = cuts[i + 1]
+		part["height_source"] = "tag_height"
+		part["min_height_m"] = cuts[i]
+		part["min_level"] = 0
+		part["levels"] = maxi(1, roundi(float(levels) * (cuts[i + 1] - cuts[i]) / h))
+		if i < 2:
+			part["roof_shape"] = "flat"
+			part["roof_height_m"] = 0.0
+			part["roof_levels"] = 0
+		out.append(part)
+	return out
+
+static func _inset_ring(ring: PackedVector2Array, inset: float) -> PackedVector2Array:
+	var pieces := RingGeometry._solid_parts(Geometry2D.offset_polygon(ring, -inset))
+	if pieces.size() != 1:
+		return PackedVector2Array()
+	var result: PackedVector2Array = pieces[0]
+	if result.size() < 3 or absf(RingGeometry.signed_area(result)) < absf(RingGeometry.signed_area(ring)) * 0.2:
+		return PackedVector2Array()
+	return result
 
 ## Plans each of `masses` (the parts, the outline under them, or the
 ## building itself when `single`) as plan() returns them.
@@ -107,11 +167,15 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			storeys = maxi(1, roundi(float(res["total_m"]) / fh))
 		var b_eff := b.duplicate()
 		for k in md:
+			# Parts with no facade tags keep the building's mapped finish.
+			if k in ["colour", "material"] and str(md[k]).strip_edges() == "":
+				continue
 			# An untagged part roof key ("" / 0) inherits the parent's tag.
 			if k in INHERITED_ROOF_KEYS and (str(md[k]) == "" \
 					if md[k] is String else float(md[k]) <= 0.0):
 				continue
 			b_eff[k] = md[k]
+		NycCrownMaterials.apply(b, md, b_eff)
 		var shape := parent_shape
 		# A gable-fronted house (Amsterdam) needs the ridge its street gable
 		# stands on: an untagged hip or mansard on a parcel ring turns gabled.

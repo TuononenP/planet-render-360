@@ -36,6 +36,14 @@ add_library(planet_render SHARED
 	src/quad_sink.h
 	src/ribbon_draper.cpp
 	src/ribbon_draper.h
+	src/shore_kernels.cpp
+	src/shore_kernels.h
+	src/shore_mesh.cpp
+	src/shore_mesh.h
+	src/shore_patch_kernel.cpp
+	src/shore_patch_kernel.h
+	src/shore_evidence_kernels.cpp
+	src/shore_evidence_kernels.h
 	src/parallel.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)

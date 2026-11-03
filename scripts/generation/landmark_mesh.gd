@@ -384,6 +384,20 @@ func disc(key: String, center: Vector3, normal: Vector3, r: float, seg: int = 24
 			Vector2(0.5 + 0.5 * cos(t0), 0.5 + 0.5 * sin(t0)) * r * 2.0,
 			Vector2(0.5 + 0.5 * cos(t1), 0.5 + 0.5 * sin(t1)) * r * 2.0)
 
+## Transfer generated geometry directly when the caller already owns a
+## batch. Committing temporary meshes first forces a GPU upload/readback
+## and generates tangents that the final batch would generate again.
+func append_to_batch(batch: MassBatch, key: String) -> void:
+	for k in _order:
+		var s: Surf = _surfs[k]
+		if s.v.is_empty():
+			continue
+		var indices := PackedInt32Array()
+		indices.resize(s.v.size())
+		for i in indices.size():
+			indices[i] = i
+		batch.add(key, s.mat, s.v, s.n, s.uv, indices)
+
 ## One MeshInstance3D per surface key under `parent`, named
 ## `<prefix><key>`; returns the instances in registration order.
 func commit(parent: Node3D, prefix: String = "") -> Array[MeshInstance3D]:

@@ -33,6 +33,14 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
+	# Per-body colour and pool settings duplicate the material, keeping its shader.
+	var water_probe := MeshInstance3D.new()
+	water_probe.mesh = PlaneMesh.new()
+	water_probe.material_override = WaterBuilder.real_water_material(RenderSettings.Preset.ULTRA).duplicate()
+	assert(_is_water(water_probe), "Water filter must recognise per-body material copies")
+	water_probe.material_override = StandardMaterial3D.new()
+	assert(not _is_water(water_probe), "Water filter must exclude terrain and banks")
+	water_probe.free()
 	var preset := int(OS.get_environment("SCORECARD_PRESET")) if OS.get_environment("SCORECARD_PRESET") != "" else 2
 	var out_dir := OS.get_environment("SCORECARD_OUT")
 	if out_dir == "":
@@ -434,9 +442,14 @@ func _any(_mi: MeshInstance3D) -> bool:
 	return true
 
 func _is_water(mi: MeshInstance3D) -> bool:
-	var wm := WaterBuilder.real_water_material()
-	return mi.material_override == wm \
-		or (mi.mesh.get_surface_count() > 0 and mi.mesh.surface_get_material(0) == wm)
+	var mat := mi.material_override
+	if mat == null and mi.mesh.get_surface_count() > 0:
+		mat = mi.mesh.surface_get_material(0)
+	if not mat is ShaderMaterial:
+		return false
+	var water := mat as ShaderMaterial
+	var quality = water.get_shader_parameter("water_quality")
+	return quality != null and water.shader == WaterBuilder.real_water_material(int(quality)).shader
 
 func _junctions(data: LocationData) -> Array[Vector2]:
 	var seen := {}

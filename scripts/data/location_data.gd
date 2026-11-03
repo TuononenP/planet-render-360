@@ -104,10 +104,12 @@ var landmark_lat: float = 0.0
 var landmark_lon: float = 0.0
 ## Landmark the viewer came to see (LandmarkVisit site), {} for none.
 ## The viewpoint already stands off from it; View360 only aims at it.
-## Camera-only, so it is not part of the WorldCache key.
+## The presence of a focus affects the opening eye and therefore the centre
+## of some generated props; WorldCache keys that presence.
 var focus: Dictionary = {}
 ## Curated opening view (PresetViews row) when the pin is a quick-pick
-## preset's origin, {} otherwise. Camera-only, like focus.
+## preset's origin, {} otherwise. The eye position also centres some generated
+## props and is part of the WorldCache key; bearing and pitch remain camera-only.
 var view: Dictionary = {}
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
@@ -169,9 +171,18 @@ var barriers: Array = []
 ## OSM street furniture nodes {x, z, kind, shelter} near the viewpoint
 ## (OsmParser.furniture_kind); StreetFurniture dresses them on desktop Ultra.
 var street_furniture: Array = []
+## OSM POI nodes {x, z, category, kind, name, brand}; empty on old payloads.
+var pois: Array = []
+## Optional 2400 m, north-up source rasters (L8 bytes). Null means the
+## source was unavailable; OSM and existing imagery fallbacks still apply.
+var landcover_image: Image = null
+var canopy_image: Image = null
 ## OSM man_made=pier ways {points, floating, width_m}: jetties and marina
 ## pontoons (MarinaBuilder moors boats along them on desktop Ultra).
 var piers: Array = []
+## Mapped waterfront edges {points, kind, id, material, height_m}.
+## Empty for old/offline payloads; inferred banks retain their provenance.
+var shore_structures: Array = []
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
@@ -224,6 +235,7 @@ static func known_places() -> Array:
 		{"name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503},
 		{"name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093},
 		{"name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
+		{"name": "Espoo, Finland", "lat": 60.1760, "lon": 24.8050},
 		{"name": "Helsinki, Finland", "lat": 60.1699, "lon": 24.9384},
 		{"name": "Stockholm, Sweden", "lat": 59.3293, "lon": 18.0686},
 		{"name": "Monaco", "lat": 43.7384, "lon": 7.4246},
@@ -287,10 +299,18 @@ static func landmark_name(type: String) -> String:
 	return type.capitalize()
 
 static func known_place(lat: float, lon: float) -> String:
+	var view := PresetViews.for_pin(lat, lon)
+	if not view.is_empty():
+		return str(view["name"])
+	var best := INF
+	var name := UiTheme.coords(lat, lon)
 	for place in known_places():
-		if abs(lat - float(place["lat"])) < 0.4 and abs(lon - float(place["lon"])) < 0.4:
-			return str(place["name"])
-	return UiTheme.coords(lat, lon)
+		if absf(lat - float(place["lat"])) < 0.4 and absf(lon - float(place["lon"])) < 0.4:
+			var distance := WorldScale.xz_from_latlon(float(place["lat"]), float(place["lon"]), lat, lon).length_squared()
+			if distance < best:
+				best = distance
+				name = str(place["name"])
+	return name
 
 ## Curated landmark registry: the places users actually search for by
 ## name. Each entry renders on the fly as a procedural model
@@ -381,6 +401,7 @@ static func _core_landmarks() -> Array:
 			"kind": "Hotel", "aliases": ["banff springs"]},
 		{"type": "stockholm_city_hall", "name": "Stockholm City Hall", "lat": 59.3275, "lon": 18.0543, "radius_m": 4000.0,
 			"wiki_title": "Stockholm City Hall", "height_m": 106.0, "clear_m": 75.0, "kind": "City hall",
+			"ultra_registry_limit": 26,
 			"aliases": ["stockholm city hall", "stadshuset"]},
 		# Bridges: built along their axis (span_m long, yaw_deg turning the
 		# model's +X onto it) at sea level (base: sea).
@@ -448,9 +469,9 @@ static func landmark_for(lat: float, lon: float, name: String) -> String:
 ## Registry entry of `type`, {} when unknown. Optional fields: yaw_deg
 ## (the model turned clockwise from its built frame, +X east and −Z
 ## north; default 0), clear_m (cleared grounds, default 68) and kind
-## (the callout label when it stands beside the primary) and base_drop_m
-## (a hanging crag's depth), base_half_m (ground-sampling radius),
-## and base_asl_m (base: absolute's fixed datum).
+## (the callout label when it stands beside the primary), base_drop_m
+## (a hanging crag's depth; lifts a ground-anchored model), base_half_m
+## (ground-sampling radius), and base_asl_m (base: absolute's fixed datum).
 static func entry_for_type(type: String) -> Dictionary:
 	for entry in landmarks():
 		if str(entry["type"]) == type:

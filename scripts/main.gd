@@ -14,6 +14,9 @@ var _settings_screen: SettingsScreen
 var _settings_from: Control
 var _pipeline: GenerationPipeline
 var _store: CacheStore
+## Automated visual reviews use the real pipeline without changing History
+## or its thumbnails, including when another app instance is open.
+var capture_mode := false
 var _settings: RenderSettings
 var _pending: Vector2 = Vector2(48.8566, 2.3522)
 ## Landmark the pending run faces (LandmarkVisit site), {} for none.
@@ -25,6 +28,7 @@ var _pending_view: Dictionary = {}
 var _thumb_key: Array = []
 var _downloader: OfflineDownloader
 var _download_at := Vector2.ZERO
+var _download_preset := RenderSettings.Preset.HIGH
 ## Bumped per generation and on cancel, so a world still building on
 ## its thread is dropped once superseded.
 var _gen_id := 0
@@ -133,7 +137,7 @@ func _ready() -> void:
 		if ok_count > 0:
 			_store.add_entry(_picker.selected_name if _picker.selected_name != "" \
 				else LocationData.known_place(_download_at.x, _download_at.y),
-				_download_at.x, _download_at.y)
+				_download_at.x, _download_at.y, {}, _download_preset)
 		_picker.set_download_busy(false)
 		_picker.set_download_status(("Saved for offline" if ok_count == total \
 			else "Partly saved (%d/%d)" % [ok_count, total]) \
@@ -143,6 +147,7 @@ func _ready() -> void:
 			return
 		_picker.set_download_busy(true)
 		_download_at = Vector2(lat, lon)
+		_download_preset = _settings.preset
 		_picker.set_download_status("Saving… 0/%d" % OfflineDownloader.JOBS)
 		_downloader.download(lat, lon, _settings.preset))
 	_picker.exit_requested.connect(_request_exit)
@@ -173,6 +178,8 @@ func _ready() -> void:
 	_view.pref_changed.connect(func(key: String, value: Variant) -> void:
 		_settings.set_pref(key, value))
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
+		if capture_mode:
+			return
 		if PlaceThumb.save(image, lat, lon):
 			_thumb_key = _view.look_key()
 		# History rebuilds when it opens; only a visible one needs it now.
@@ -360,7 +367,7 @@ func _refresh_accent() -> void:
 ## Leaving the viewer: History keeps where the person was looking and the
 ## picture of it, so reopening the place restores both.
 func _leave_view() -> void:
-	if _view == null or not _view.visible:
+	if capture_mode or _view == null or not _view.visible:
 		return
 	var state := _view.camera_state()
 	if state.is_empty():
@@ -491,7 +498,8 @@ func _on_generation_finished(data: LocationData) -> void:
 		_release_build()
 	if gen != _gen_id:
 		return
-	_store.add_entry(data.place_name, data.latitude, data.longitude)
+	if not capture_mode:
+		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
 	_view.show_location(data, built)
 	_notice.show_notes(data.data_notes)
 	_show(_view)

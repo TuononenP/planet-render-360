@@ -2,7 +2,7 @@ class_name OfflineDownloader
 extends Node
 
 ## "Download for offline": warms every on-device cache for a place
-## (DEM + far DEM, OSM features, satellite mosaic) without rendering
+## (DEM + far DEM, OSM features, satellite and land-cover rasters) without rendering
 ## it, so opening it later works with networking disabled. The
 ## fetchers already write user://cache under v2 keys; this just drives
 ## them all and reports progress. The warmed set matches
@@ -18,7 +18,7 @@ extends Node
 signal progress(done: int, total: int)
 signal finished(ok_count: int, total: int)
 
-const JOBS := 4  # detailed DEM, far DEM, OSM, satellite
+const JOBS := 5  # detailed DEM, far DEM, OSM, satellite, land-cover rasters
 
 var _done := 0
 var _ok := 0
@@ -59,6 +59,14 @@ func download(lat: float, lon: float, quality_preset: int = 2) -> void:
 		# Fast skips satellite (pipeline parity): count the job done.
 		_job(true)
 		sat.queue_free()
+	if quality_preset > RenderSettings.Preset.FAST:
+		var landcover := LandcoverFetcher.new()
+		add_child(landcover)
+		landcover.finished.connect(func(cover: Image, canopy: Image) -> void:
+			_job(cover != null and canopy != null))
+		landcover.fetch(lat, lon)
+	else:
+		_job(true)
 
 func _job(ok: bool) -> void:
 	if ok:

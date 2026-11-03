@@ -2,7 +2,7 @@ class_name ArchitectureCitiesNorth
 extends RefCounted
 
 ## Northern European city rows (CityStyles zones) and their era rows
-## (BuildingEra): Copenhagen, Oslo, Helsinki, Edinburgh, Dublin,
+## (BuildingEra): Copenhagen, Oslo, Edinburgh, Dublin,
 ## Brussels, St Petersburg. City rows inherit from their country row;
 ## eras from their city. Same key legend as ArchitectureData; `rv` = 3D
 ## relief (replaces the parent's). ERAS rows carry a storey band and a
@@ -24,7 +24,7 @@ const NORDIC_WOOD := ["#c8503a", "#e8d070", "#f2ede0", "#8a3a2a", "#e8c070", "#a
 ## Helsinki: Empire ochre and the grey-green render and granite of Jugend.
 const EMPIRE := ["#e8c878", "#e0b860", "#f0d890", "#e8d0a0"]
 const JUGEND := ["#b8b8a8", "#a8b0a0", "#c8c0a8", "#9aa098", "#d8d0b8", "#b0a890"]
-const SHEET_METAL := [["slate", ["#3a3e44", "#45494e"]], ["slate", ["#5a2a24", "#6a3028"]]]
+const SHEET_METAL := [["sheet_metal", ["#3a3e44", "#45494e"]], ["sheet_metal", ["#5a2a24", "#6a3028"]]]
 ## Edinburgh sandstone: Craigleith blond-grey to darker Old Town rubble.
 const SANDSTONE := ["#b8a888", "#a89878", "#c0b090", "#9a8a70", "#b0a080"]
 const OLD_RUBBLE := ["#8a8070", "#7a7264", "#968c7a"]
@@ -41,8 +41,6 @@ const SOVIET_PANEL := ["#c8c4bc", "#d8d4cc", "#b8b4ac", "#e0d8c8"]
 const BASE := {
 	"copenhagen": "west_europe_brick", "copenhagen_old": "copenhagen", "copenhagen_modern": "copenhagen",
 	"oslo": "nordic", "oslo_wood": "oslo", "oslo_modern": "oslo",
-	"helsinki": "nordic", "helsinki_empire": "helsinki", "helsinki_functional": "helsinki",
-	"helsinki_modern": "helsinki",
 	"edinburgh": "west_europe_brick", "edinburgh_georgian": "edinburgh", "edinburgh_old": "edinburgh",
 	"edinburgh_modern": "edinburgh",
 	"dublin": "west_europe_brick", "dublin_victorian": "dublin", "dublin_modern": "dublin",
@@ -67,15 +65,6 @@ const ERAS := {
 		["oslo", AC, 1860, 1949, ["historicism", "art_nouveau", "jugendstil", "functionalism",
 			"functionalist"], 5.0, 0.0, 99.0, [3, 6]],
 		["oslo_modern", ACC, 1950, 2100, [], 1.0, 0.0, 99.0, [7, 99]],
-	],
-	"helsinki": [
-		["helsinki_empire", ALL, 1810, 1880, ["empire", "neoclassicism", "neoclassical"],
-			1.0, 0.0, 1.2, [1, 4], true],
-		["helsinki", AC, 1881, 1929, ["jugendstil", "art_nouveau", "national_romantic",
-			"national_romanticism", "historicism"], 5.0, 0.0, 4.0, [5, 7]],
-		["helsinki_functional", ACC, 1930, 1989, ["functionalism", "functionalist", "nordic_classicism"],
-			2.5, 1.0, 99.0, [3, 9]],
-		["helsinki_modern", ACC, 1990, 2100, [], 0.8, 0.0, 99.0, [10, 99]],
 	],
 	"edinburgh": [
 		["edinburgh_old", AC, 1400, 1766, ["medieval", "scots_baronial", "vernacular",
@@ -175,51 +164,6 @@ const REGIONS := {
 			"st": [6, 12], "fix": true, "rv": {"deep_balcony": 0.4}},
 		"commercial": {"w": [["glass", []], ["stone", ["#c8c4bc"]]], "p": [["curtain", 2], ["strip", 2]],
 			"r": [["flat", 1]], "rf": [["membrane", []]], "st": [6, 18], "fix": true, "rv": {}},
-	},
-	# Jugend and national romantic blocks (Katajanokka, Eira, Kallio):
-	# grey-green render over a granite base, steep tile or black metal
-	# roofs with towers and dormers, 5–6 storeys.
-	"helsinki": {
-		"apartments": {"w": [["render", JUGEND], ["render", EMPIRE]], "p": [["ornate", 2], ["punched", 2]],
-			"wn": "casement", "bay": 2.6, "fr": "#f4f1ea", "sp": 0.0,
-			"r": [["hipped", 3], ["gabled", 2], ["mansard", 1]], "pitch": 0.9,
-			"rf": SHEET_METAL + [["terracotta", RED_TILE]], "fh": 3.2, "st": [5, 6], "fix": true,
-			"ch": 0.4, "dm": 0.4, "g": [["stone", 2], ["shop", 1]], "ev": 0.2,
-			"rv": {"string_course": true, "balconette": 0.25, "oriel": 0.2}},
-		"commercial": {"w": [["render", JUGEND], ["stone", ["#9a948a", "#a8a090"]]], "p": [["ornate", 2], ["punched", 1]],
-			"wn": "casement", "r": [["hipped", 2], ["flat", 1]], "rf": SHEET_METAL, "st": [4, 7],
-			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true}},
-	},
-	# Engel's Empire centre (Senate Square, Kruununhaka): ochre render,
-	# white pilasters, low hipped black sheet-metal roofs.
-	"helsinki_empire": {
-		"apartments": {"w": [["render", EMPIRE]], "p": "punched", "wn": "casement", "bay": 2.8,
-			"fr": "#f4f1ea", "sp": 0.0, "r": [["hipped", 1]], "pitch": 0.4, "rf": SHEET_METAL,
-			"fh": 3.4, "st": [2, 4], "fix": true, "ch": 0.5, "g": [["none", 1], ["shop", 1]],
-			"rv": {"string_course": true, "quoins": true}},
-		"house": {"w": [["render", EMPIRE], ["wood", ["#e8c878", "#d8b070"]]], "p": "punched", "wn": "casement",
-			"fr": "#f4f1ea", "r": [["hipped", 1]], "pitch": 0.4, "rf": SHEET_METAL, "st": [1, 2],
-			"fix": true, "rv": {"string_course": true}},
-		"civic": {"w": [["render", EMPIRE], ["render", ["#f2ede0"]]], "p": "punched", "wn": "casement",
-			"r": [["hipped", 1]], "pitch": 0.4, "rf": SHEET_METAL, "st": [2, 4], "fix": true,
-			"rv": {"string_course": true, "quoins": true}},
-	},
-	# Töölö classicism and 1930s–70s functionalism: light render or
-	# brick, flat or low roofs, strip windows.
-	"helsinki_functional": {
-		"apartments": {"w": [["render", ["#ece8dc", "#e0d8c0", "#d8d0c0"]], ["brick", ["#9a4a35", "#a86048"]]],
-			"p": [["strip", 2], ["punched", 2], ["balcony", 2]], "wn": "wide", "bay": 3.0,
-			"r": [["flat", 3], ["hipped", 1]], "pitch": 0.4, "rf": [["membrane", []], ["slate", ["#3a3e44"]]],
-			"st": [5, 8], "fix": true, "rv": {"deep_balcony": 0.3}},
-		"commercial": {"w": [["render", ["#ece8dc"]], ["concrete", ["#c8c4bc"]]], "p": "strip",
-			"r": [["flat", 1]], "rf": [["membrane", []]], "st": [3, 8], "fix": true, "rv": {}},
-	},
-	"helsinki_modern": {
-		"apartments": {"w": [["glass", []], ["concrete", ["#d8d4cc"]]], "p": [["balcony", 2], ["curtain", 1]],
-			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [10, 30], "fix": true,
-			"rv": {"deep_balcony": 0.4}},
-		"commercial": {"w": [["glass", []]], "p": "curtain", "r": [["flat", 1]], "rf": [["membrane", []]],
-			"st": [8, 30], "fix": true, "rv": {}},
 	},
 	# Victorian and Edwardian sandstone tenements (Marchmont, Leith):
 	# four storeys, bay windows, slate, chimney stacks along the ridge.

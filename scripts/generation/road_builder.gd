@@ -89,7 +89,8 @@ static func _parse(line: Variant, m2u: float) -> Dictionary:
 		"width_u": maxf(maxf(float(road.get("width_m", 0.0)), CROSSING_MIN_M if crossing else 0.0) * m2u, 0.4),
 		"finish": "crossing" if crossing else _finish(cls, str(road.get("surface", "")).to_lower()),
 		"rank": _rank(cls), "bridge": bool(road.get("bridge", false)),
-		"class": cls, "lanes": int(road.get("lanes", 0))}
+		"bridge_structure": BridgeArches.structure(road), "layer": int(road.get("layer", 0)),
+		"class": cls, "lanes": int(road.get("lanes", 0)), "oneway": int(road.get("oneway", 0))}
 
 static func _rank(cls: String) -> int:
 	match cls:
@@ -114,6 +115,25 @@ static func _finish(cls: String, surface: String) -> String:
 		"track", "bridleway":
 			return "gravel"
 	return "asphalt"
+
+## In historic districts, an unmapped surface defaults to local setts;
+## mapped surfaces, crossings and bridges always retain their own finish.
+static func _district_finish(road: Dictionary, districts: Array, m2u: float) -> String:
+	var cls := str(road.get("class", "unclassified"))
+	var finish := "crossing" if bool(road.get("crossing", false)) else _finish(cls, str(road.get("surface", "")).to_lower())
+	if str(road.get("surface", "")) != "" or bool(road.get("crossing", false)) or bool(road.get("bridge", false)):
+		return finish
+	var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+	if pts.is_empty():
+		return finish
+	var mid := pts[pts.size() / 2]
+	if pts.size() % 2 == 0:
+		mid = (mid + pts[pts.size() / 2 - 1]) * 0.5
+	mid /= m2u
+	for district in districts:
+		if str(district[0]) == "stockholm_medieval" and mid.distance_to(district[1]) <= float(district[2]):
+			return "sett"
+	return finish
 
 static func _material(finish: String) -> Material:
 	if _mats.has(finish):
@@ -195,15 +215,18 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
+	if line is Dictionary and not surf.districts.is_empty():
+		finish = _district_finish(line, surf.districts, m2u)
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, float(r["width_u"]), surf, m2u)
+			_bridge(batches, piece, float(r["width_u"]), surf, m2u, "bridge",
+				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
 		return
 	var lift := float(LIFT_M[int(r["rank"])]) * m2u
 	# RoadSurface attributes: lanes, rank, kerbed urban street.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
-	var attr := Color(clampf(float(r["lanes"]) / 8.0, 0.0, 1.0), float(r["rank"]) / 2.0,
+	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
 		1.0 if urban else 0.0, 1.0)
 	for run in _dry_runs(dense, surf):
 		if abort != null and abort.requested:
@@ -226,6 +249,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 	var attr := Color(0.0, 0.0, 0.0, 1.0)
 	var w2 := Vector2(0.0, AREA_LAYER)
 	var weld := {}
+	var eligible := PackedVector2Array()
 	for t in range(0, idx.size(), 3):
 		var tri := PackedVector2Array([ring[idx[t]], ring[idx[t + 1]], ring[idx[t + 2]]])
 		var c := (tri[0] + tri[1] + tri[2]) / 3.0
@@ -239,7 +263,13 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 				in_hole = true
 				break
 		if not in_hole:
-			RoadDrape.tri(b, surf, lift, attr, w2, weld, tri, m2u)
+			eligible.append_array(tri)
+	if surf.native != null and surf.native.has_method("area") \
+			and (surf.native_shore or not surf.near_shore(eligible, 0.0)):
+		b.append(surf.native.area(eligible, lift, attr, AREA_LAYER, m2u, b.verts.size()))
+	else:
+		for t in range(0, eligible.size(), 3):
+			RoadDrape.tri(b, surf, lift, attr, w2, weld, eligible.slice(t, t + 3), m2u)
 
 ## Height of the drawn terrain at XZ (what a ribbon is laid on), for
 ## tests and other flush-placed props.
@@ -333,7 +363,7 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 	var along := 0.0
 	var m2u := WorldScale.metres_to_units()
 	b.pad()
-	if surf.native != null:
+	if surf.native != null and (surf.native_shore or not surf.near_shore(pts, half)):
 		var jf := PackedFloat64Array()
 		for p in pts:
 			jf.append(RoadSurface.junction_frac(junc, p) if not junc.is_empty() else 1.0)
@@ -376,7 +406,7 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 ## `half` width the flat deck also clears the ground under both edges
 ## (a bank sloping across the way), lifted like a ribbon.
 static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
-		half: float = 0.0) -> PackedFloat32Array:
+		half: float = 0.0, layer: int = 0) -> PackedFloat32Array:
 	var n := pts.size()
 	var total := 0.0
 	var dist := PackedFloat32Array([0.0])
@@ -414,7 +444,18 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 		lift[i] = maxf(lift[i], lift[i + 1] - RAMP_GRADE * (dist[i + 1] - dist[i]))
 	for i in n:
 		deck[i] += lift[i]
+	# A mapped elevated way over land is a viaduct, not a ground ribbon.
+	# Keep the existing bank-to-bank water profile for mixed crossings.
+	if layer > 0 and _land_bridge(pts, surf):
+		for i in n:
+			deck[i] = maxf(deck[i], _deck_floor(pts, i, surf, 0.0, half) + float(layer) * 5.0 * m2u)
 	return deck
+
+static func _land_bridge(pts: PackedVector2Array, surf: _Surface) -> bool:
+	for p in pts:
+		if surf.ground.water_at(p.x, p.y) > 0.0:
+			return false
+	return true
 
 ## Lowest deck height at point i: the drawn ground under its centre and
 ## both edges (`half` out), or over water the water surface plus `slab`
@@ -434,7 +475,7 @@ static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: f
 ## with slab fascias on both sides and parapets; the deck top goes to
 ## the `top_finish` batch (RailBuilder lays ballast there).
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
-		surf: _Surface, m2u: float, top_finish: String = "bridge") -> void:
+		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -443,7 +484,7 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		return
 	pts = inside
 	var n := pts.size()
-	var deck := deck_profile(pts, surf, m2u, width * 0.5)
+	var deck := deck_profile(pts, surf, m2u, width * 0.5, layer)
 	if deck.is_empty():
 		return
 	var dist := PackedFloat32Array([0.0])
@@ -512,9 +553,35 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		else:
 			side.indices.push_back(a); side.indices.push_back(a + 2); side.indices.push_back(a + 1)
 			side.indices.push_back(a + 1); side.indices.push_back(a + 2); side.indices.push_back(a + 3)
+	if layer > 0 and top_finish == "bridge" and _land_bridge(pts, surf):
+		_land_piers(side, pts, dist, deck, surf, m2u)
 	# A long crossing stands on piers under arched spandrels.
-	if top_finish == "bridge":
+	if top_finish == "bridge" and structure == "masonry":
 		BridgeArches.add(side, pts, dist, deck, half, depth, surf.ground, m2u)
+
+## Simple concrete columns beneath land viaducts, spaced along the
+## mapped way. Their tops meet the deck and bottoms follow the terrain.
+static func _land_piers(side: _Batch, pts: PackedVector2Array, dist: PackedFloat32Array,
+		deck: PackedFloat32Array, surf: _Surface, m2u: float) -> void:
+	var next := 15.0 * m2u
+	for i in range(1, pts.size() - 1):
+		if dist[i] < next:
+			continue
+		next = dist[i] + 30.0 * m2u
+		var p := pts[i]
+		var low := surf.height(p.x, p.y) - 0.1 * m2u
+		var high := deck[i] - DECK_DEPTH_M * m2u
+		if high <= low + 0.2 * m2u:
+			continue
+		var d := (pts[i + 1] - pts[i - 1]).normalized()
+		var n := Vector2(-d.y, d.x)
+		var x := d * 1.25 * m2u
+		var z := n * 1.25 * m2u
+		var corners := [p - x - z, p + x - z, p + x + z, p - x + z]
+		for k in 4:
+			var a: Vector2 = corners[k]
+			var b: Vector2 = corners[(k + 1) % 4]
+			_wall(side, a, b, low, low, high, high, ((a + b) * 0.5 - p).normalized())
 
 ## Vertical quad a→b between bottom (ya0, yb0) and top (ya1, yb1),
 ## front face toward `out`.
@@ -595,6 +662,7 @@ class _Batch extends RefCounted:
 ## on what is drawn whichever way the cell is split.
 class _Surface extends RefCounted:
 	var ground: GroundTruth
+	var districts: Array = []
 	var size := 0
 	var step := 1.0
 	## The preset's terrain mesh (TerrainBuilder._terrain_mesh): coarser
@@ -606,19 +674,44 @@ class _Surface extends RefCounted:
 	## RibbonDraper (native/, tools/build_native.sh) set up on this
 	## surface by use_native(), else null: _ribbon lays its ribbons.
 	var native: Object = null
+	var native_shore := false
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
+		var region := CityStyles.region_at(data.latitude, data.longitude)
+		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
 		mesh_size = mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset), size)
+		if ground.shoreline != null and ground.shoreline.ready:
+			mesh_size = size
+			step = ground._step_units
 		mesh_step = WorldScale.detailed_extent_units() / float(maxi(mesh_size - 1, 1))
+		if ground.shoreline != null and ground.shoreline.ready:
+			mesh_step = step
 
 	func use_native() -> void:
 		if ClassDB.class_exists("RibbonDraper"):
 			native = ClassDB.instantiate("RibbonDraper")
 			native.setup(ground._surface, ground._size, ground._step_units, ground.water_level_m,
 				size, step, mesh_size, mesh_step)
+			if ground.shoreline != null and ground.shoreline.ready and ground.shoreline.sampler != null \
+					and native.has_method("set_shore_sampler"):
+				native.set_shore_sampler(ground.shoreline.sampler)
+				native_shore = true
+
+	func near_shore(points: PackedVector2Array, radius: float) -> bool:
+		if ground.shoreline == null or not ground.shoreline.ready:
+			return false
+		var model: ShorelineModel = ground.shoreline
+		for p in points:
+			var lo := model.cell_at(p - Vector2.ONE * radius)
+			var hi := model.cell_at(p + Vector2.ONE * radius)
+			for x in range(lo.x, hi.x + 1):
+				for z in range(lo.y, hi.y + 1):
+					if model.patches.has(Vector2i(x, z)):
+						return true
+		return false
 
 	## True inside the drawn mesh, EDGE_M clear of its edge.
 	func inside(p: Vector2) -> bool:
@@ -627,6 +720,9 @@ class _Surface extends RefCounted:
 		return p.x >= lo and p.x <= hi and p.y >= lo and p.y <= hi
 
 	func height(x: float, z: float) -> float:
+		if ground.shoreline != null and ground.shoreline.ready \
+				and ground.shoreline.patches.has(ground.shoreline.cell_at(Vector2(x, z))):
+			return ground.height_at_world(x, z)
 		if mesh_size >= 2 and mesh_size != size:
 			return maxf(_mesh_tri(x, z), ground.height_at_world(x, z))
 		# Fused bilinear + triangle height sample: read same

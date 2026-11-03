@@ -29,6 +29,10 @@ static func _coastlines(data: LocationData) -> Array:
 ## `abort` stops it between rows / items; a stopped result is dropped.
 static func _shore_aprons(root: Node3D, data: LocationData,
 		ground: GroundTruth, channels: Array, abort: BuildAbort = null) -> void:
+	if ground.shoreline != null and ground.shoreline.ready:
+		# ShoreSurface paints the wet strip on canonical dry triangles.
+		# An extra ribbon could cross a concave shore or float above it.
+		return
 	var step := WaterBuilder._post_step(data)
 	var width := maxf(step * 1.25, 2.0)
 	var stride := maxf(step * 0.75, 1.0)
@@ -101,6 +105,11 @@ static func _apron_append(verts: Array, normals: Array, colors: Array,
 	var cls := ground.land_class_at(outer.x, outer.y)
 	if cls == "water":
 		return -1
+	# A steep rocky bank must not inherit the unmapped sand fallback.
+	var m := WorldScale.metres_to_units()
+	var rise := absf(ground.height_at_world(outer.x, outer.y) - ground.height_at_world(inner.x, inner.y))
+	if cls == "rock" or (cls == "" and rise > maxf(1.5 * m, outer.distance_to(inner) * 0.35)):
+		cls = "rock"
 	var c := WaterBuilder._UNKNOWN_SHORE
 	if MaterialLibrary.has_ground_class(cls):
 		c = MaterialLibrary.ground_color(cls)

@@ -33,6 +33,13 @@ static func entries() -> Array:
 		{"type": "chrysler_building", "name": "Chrysler Building", "lat": 40.7516, "lon": -73.9755,
 			"radius_m": 6000.0, "wiki_title": "Chrysler Building", "height_m": 318.9, "clear_m": 50.0,
 			"yaw_deg": 29.0, "kind": "Skyscraper", "aliases": ["chrysler building"]},
+		# The above-ground station hall; the much larger underground PATH
+		# footprint must not clear neighbouring World Trade Center towers.
+		# Centroid and major axis of OSM way 278033606 (the above-ground hall).
+		{"type": "wtc_oculus", "name": "World Trade Center Oculus", "lat": 40.711545, "lon": -74.011413,
+			"radius_m": 3500.0, "wiki_title": "World Trade Center station (PATH)", "height_m": 29.3,
+			"clear_m": 26.0, "yaw_deg": 39.0, "kind": "Station",
+			"aliases": ["world trade center oculus", "oculus transportation hub"]},
 		{"type": "flatiron_building", "name": "Flatiron Building", "lat": 40.7411, "lon": -73.9897,
 			"radius_m": 4000.0, "wiki_title": "Flatiron Building", "height_m": 87.0, "clear_m": 55.0,
 			"yaw_deg": 29.0, "kind": "Skyscraper", "aliases": ["flatiron building", "fuller building"]},

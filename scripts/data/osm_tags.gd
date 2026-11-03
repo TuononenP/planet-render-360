@@ -107,14 +107,23 @@ static func land_class(tags: Dictionary) -> String:
 		return "urban"
 	return ""
 
-## Metres from a raw OSM tag value ("12", "12m", "12 m", "3.5"):
+## Metres from a raw OSM tag value, including feet ("100 ft", "100'"):
 ## NAN when missing, unparseable, or outside [lo, hi] (callers fall
 ## through to their next source — never a silent 0).
 static func _tag_metres(raw: Variant, lo: float, hi: float) -> float:
-	var s := str(raw).strip_edges().trim_suffix("m").strip_edges()
+	var s := str(raw).strip_edges().to_lower()
+	var factor := 1.0
+	if s.ends_with("ft"):
+		s = s.trim_suffix("ft").strip_edges()
+		factor = 0.3048
+	elif s.ends_with("'"):
+		s = s.trim_suffix("'").strip_edges()
+		factor = 0.3048
+	else:
+		s = s.trim_suffix("m").strip_edges()
 	if not s.is_valid_float():
 		return NAN
-	var v := s.to_float()
+	var v := s.to_float() * factor
 	return v if v >= lo and v <= hi else NAN
 
 ## Clamped int from a raw tag value; 0 when missing/unparseable.
@@ -148,6 +157,7 @@ static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 	var emb := str(tags.get("embedded", "")).strip_edges().to_lower()
 	var embedded := emb in ["yes", "partial"] or (cls == "tram" and emb != "no")
 	return {"points": pts, "class": cls, "gauge_m": gauge, "embedded": embedded,
+		"electrified": str(tags.get("electrified", "")),
 		"cable": cls == "tram" and (str(tags.get("cable_tram", "")).strip_edges().to_lower() in ["cable", "yes"]
 			or str(tags.get("electrified", "")).strip_edges().to_lower() == "no"),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
@@ -171,6 +181,10 @@ static func paved_area_class(tags: Dictionary, is_area: bool = false) -> String:
 		return "pedestrian"
 	if str(tags.get("place", "")) == "square" and not tags.has("building"):
 		return "pedestrian"
+	if str(tags.get("amenity", "")) == "parking" and not tags.has("building") \
+			and str(tags.get("parking", "surface")) in ["", "surface"] \
+			and str(tags.get("surface", "")) not in ["grass", "ground", "dirt", "earth", "sand", "mud"]:
+		return "parking"
 	return ""
 
 ## One paved-area road dict: a filled polygon (`area`, outer ring
@@ -264,7 +278,8 @@ static func waterway_class_width(water_class: String) -> float:
 ## never fires here — the fetcher holds no regional table; T4.2 refines
 ## `default` into regional inference.
 static func _resolve_height(tags: Dictionary, inherit: Dictionary = {}) -> Dictionary:
-	var levels := _tag_int(tags.get("building:levels", 0), 0, 200)
+	var raw_levels := str(tags.get("building:levels", 0)).strip_edges()
+	var levels := clampf(raw_levels.to_float(), 0.0, 200.0) if raw_levels.is_valid_float() else 0.0
 	var h := _tag_metres(tags.get("height", ""), 0.5, 1000.0)
 	if not is_nan(h):
 		return {"height": h, "height_source": "tag_height", "levels": levels}
@@ -312,6 +327,9 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"monument": monument_kind(tags),
 	}
 	entry.merge(_roof_tags(tags))
+	if str(entry["kind"]) in ["ship", "boat", "houseboat"]:
+		entry["vessel_kind"] = str(tags.get("ship:type", tags.get("seamark:ship:type", "motor"))) \
+			.strip_edges().to_lower().replace("-", "_").replace(" ", "_")
 	return entry
 
 ## Roof and vertical-extent keys shared by buildings and their parts:
@@ -389,14 +407,18 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		if parking > 0:
 			width_m += PARKING_LANE_M * float((parking & 1) + (parking >> 1))
 	return {"points": pts, "width_m": width_m, "lanes": lanes,
-		"width_tagged": not is_nan(w), "parking": parking,
+		"width_tagged": not is_nan(w), "parking": parking, "lit": str(tags.get("lit", "")) == "yes",
 		"kerb_line": str(tags.get("footway", "")) == "sidewalk",
 		"surface": str(tags.get("surface", "")),
 		"crossing": is_crossing(tags),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
+		"bridge_structure": str(tags.get("bridge:structure", "")),
+		"bridge_material": str(tags.get("bridge:material", tags.get("material", ""))),
+		"name": str(tags.get("name", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
-		"sidewalk": sidewalk_sides(tags),
+		"sidewalk": sidewalk_sides(tags), "sidewalk_separate": sidewalk_sides(tags, true),
+		"oneway": oneway(tags), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
 		"class": road_class}
 
 ## Width of a parking lane along a kerb (m).
@@ -423,7 +445,16 @@ static func parking_sides(tags: Dictionary) -> int:
 ## `sidewalk` and `sidewalk:both|left|right`. `separate` counts: the
 ## footway is mapped as its own line, but the paving still runs from the
 ## kerb to the building line.
-static func sidewalk_sides(tags: Dictionary) -> int:
+static func sidewalk_sides(tags: Dictionary, separate_only: bool = false) -> int:
+	if separate_only:
+		var separate := 3 if str(tags.get("sidewalk", "")).to_lower() == "separate" else 0
+		for side in [["both", 3], ["left", 1], ["right", 2]]:
+			var value := str(tags.get("sidewalk:" + str(side[0]), "")).strip_edges().to_lower()
+			if value == "separate":
+				separate |= int(side[1])
+			elif value != "":
+				separate &= ~int(side[1])
+		return separate
 	var sides := 0
 	match str(tags.get("sidewalk", "")).strip_edges().to_lower():
 		"both", "yes", "separate":
@@ -456,7 +487,21 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 		width_m = 0.0
 	return {"points": pts, "width_m": width_m, "class": wc}
 
+## Direction along the mapped way: -1 reverse, 0 two-way, 1 forward.
+static func oneway(tags: Dictionary) -> int:
+	var value := str(tags.get("oneway", "")).strip_edges().to_lower()
+	if value == "-1":
+		return -1
+	if value in ["yes", "true", "1"] or (value == "" and str(tags.get("junction", "")) == "roundabout"):
+		return 1
+	return 0
+
 ## Bays and tidal basins share the sea datum rather than an inland bank level.
 static func tidal(tags: Dictionary) -> bool:
 	return str(tags.get("natural", "")) == "bay" or str(tags.get("water", "")) == "sea" \
 		or str(tags.get("tidal", "")) == "yes"
+
+## Shallow ornamental/swimming basins use calm-water shading.
+static func still_pool(tags: Dictionary) -> bool:
+	return str(tags.get("artificial", "")) == "yes" or str(tags.get("leisure", "")) == "swimming_pool" \
+		or str(tags.get("water", "")) == "basin"
