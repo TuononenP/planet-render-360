@@ -1,0 +1,1316 @@
+{
+  "san_francisco": [
+    {
+      "albedo": 0.899,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.89,
+        0.692
+      ],
+      "uses": 656
+    },
+    {
+      "albedo": 0.221,
+      "material": "unnamed",
+      "rgb": [
+        0.214,
+        0.223,
+        0.214
+      ],
+      "uses": 656
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 174
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.003
+      ],
+      "uses": 174
+    },
+    {
+      "albedo": 0.004,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.004,
+        0.004
+      ],
+      "uses": 174
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 174
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 171
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.003
+      ],
+      "uses": 171
+    },
+    {
+      "albedo": 0.004,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.004,
+        0.004
+      ],
+      "uses": 171
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 171
+    },
+    {
+      "albedo": 0.011,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.013,
+        0.006
+      ],
+      "uses": 143
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.004,
+        0.004
+      ],
+      "uses": 143
+    },
+    {
+      "albedo": 0.147,
+      "material": "unnamed",
+      "rgb": [
+        0.174,
+        0.143,
+        0.107
+      ],
+      "uses": 135
+    },
+    {
+      "albedo": 0.103,
+      "material": "roof:membrane|ffffffff",
+      "rgb": [
+        0.116,
+        0.1,
+        0.092
+      ],
+      "uses": 85
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 81
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.003
+      ],
+      "uses": 81
+    },
+    {
+      "albedo": 0.004,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.004,
+        0.004
+      ],
+      "uses": 81
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 81
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 79
+    },
+    {
+      "albedo": 0.004,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.004,
+        0.004
+      ],
+      "uses": 79
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.003
+      ],
+      "uses": 79
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 79
+    },
+    {
+      "albedo": 0.389,
+      "material": "unnamed",
+      "rgb": [
+        0.418,
+        0.395,
+        0.248
+      ],
+      "uses": 70
+    },
+    {
+      "albedo": 0.473,
+      "material": "unnamed",
+      "rgb": [
+        0.525,
+        0.465,
+        0.398
+      ],
+      "uses": 28
+    },
+    {
+      "albedo": 0.558,
+      "material": "roof:slate|ffffffff",
+      "rgb": [
+        0.545,
+        0.564,
+        0.544
+      ],
+      "uses": 24
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.004,
+        0.004
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.185,
+      "material": "unnamed",
+      "rgb": [
+        0.179,
+        0.187,
+        0.179
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.73,
+      "material": "unnamed",
+      "rgb": [
+        0.01,
+        1.0,
+        0.171
+      ],
+      "uses": 22
+    },
+    {
+      "albedo": 0.14,
+      "material": "unnamed",
+      "rgb": [
+        0.18,
+        0.135,
+        0.081
+      ],
+      "uses": 21
+    },
+    {
+      "albedo": 0.351,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.00|1",
+      "rgb": [
+        0.363,
+        0.353,
+        0.298
+      ],
+      "uses": 17
+    },
+    {
+      "albedo": 0.096,
+      "material": "pbr:slate|897970ff|8.00|1",
+      "rgb": [
+        0.104,
+        0.094,
+        0.087
+      ],
+      "uses": 17
+    },
+    {
+      "albedo": 0.098,
+      "material": "unnamed",
+      "rgb": [
+        0.193,
+        0.076,
+        0.034
+      ],
+      "uses": 15
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|1.00|1",
+      "rgb": [
+        0.548,
+        0.455,
+        0.297
+      ],
+      "uses": 15
+    },
+    {
+      "albedo": 0.596,
+      "material": "pbr:render|e9ebe2ff|0.50|1",
+      "rgb": [
+        0.615,
+        0.595,
+        0.553
+      ],
+      "uses": 14
+    },
+    {
+      "albedo": 0.881,
+      "material": "unnamed",
+      "rgb": [
+        0.905,
+        0.88,
+        0.823
+      ],
+      "uses": 14
+    },
+    {
+      "albedo": 0.114,
+      "material": "unnamed",
+      "rgb": [
+        0.078,
+        0.12,
+        0.162
+      ],
+      "uses": 14
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.003,
+        0.004
+      ],
+      "uses": 13
+    },
+    {
+      "albedo": 0.33,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.33,
+        0.296
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.052,
+      "material": "unnamed",
+      "rgb": [
+        0.033,
+        0.055,
+        0.073
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.364,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.367,
+        0.393
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.722,
+      "material": "unnamed",
+      "rgb": [
+        0.745,
+        0.723,
+        0.638
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.234,
+      "class": "brick",
+      "material": "pbr:brick|ffffffff|1.00|1",
+      "rgb": [
+        0.382,
+        0.201,
+        0.12
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.186,
+      "material": "unnamed",
+      "rgb": [
+        0.179,
+        0.187,
+        0.196
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.047,
+      "material": "unnamed",
+      "rgb": [
+        0.068,
+        0.042,
+        0.027
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.027,
+      "material": "unnamed",
+      "rgb": [
+        0.027,
+        0.027,
+        0.025
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.674,
+      "material": "unnamed",
+      "rgb": [
+        0.791,
+        0.658,
+        0.479
+      ],
+      "uses": 12
+    },
+    {
+      "albedo": 0.351,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|1.50|1",
+      "rgb": [
+        0.363,
+        0.353,
+        0.298
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.463,
+      "class": "limestone",
+      "material": "pbr:limestone|ffffffff|0.50|1",
+      "rgb": [
+        0.548,
+        0.455,
+        0.297
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.068,
+      "material": "unnamed",
+      "rgb": [
+        0.109,
+        0.059,
+        0.039
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.667,
+      "material": "unnamed",
+      "rgb": [
+        0.631,
+        0.687,
+        0.578
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.074,
+      "material": "unnamed",
+      "rgb": [
+        0.102,
+        0.068,
+        0.042
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.711,
+      "material": "unnamed",
+      "rgb": [
+        0.839,
+        0.687,
+        0.578
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.006,
+      "material": "unnamed",
+      "rgb": [
+        0.004,
+        0.006,
+        0.013
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.645,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.658,
+        0.716
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.217,
+      "class": "terracotta",
+      "material": "roof:terracotta|ffffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.426,
+        0.167,
+        0.087
+      ],
+      "uses": 11
+    },
+    {
+      "albedo": 0.864,
+      "material": "unnamed",
+      "rgb": [
+        0.888,
+        0.863,
+        0.807
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.185,
+      "material": "unnamed",
+      "rgb": [
+        0.179,
+        0.187,
+        0.179
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.003,
+      "material": "unnamed",
+      "rgb": [
+        0.003,
+        0.004,
+        0.004
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.218,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        0.007,
+        0.002
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.002,
+      "material": "unnamed",
+      "rgb": [
+        0.002,
+        0.002,
+        0.002
+      ],
+      "uses": 10
+    },
+    {
+      "albedo": 0.219,
+      "material": "unnamed",
+      "rgb": [
+        0.195,
+        0.223,
+        0.246
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.014,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.014,
+        0.016
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.135,
+      "material": "unnamed",
+      "rgb": [
+        0.342,
+        0.084,
+        0.033
+      ],
+      "uses": 9
+    },
+    {
+      "albedo": 0.544,
+      "material": "unnamed",
+      "rgb": [
+        0.604,
+        0.538,
+        0.42
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.66,
+      "material": "unnamed",
+      "rgb": [
+        0.687,
+        0.658,
+        0.604
+      ],
+      "uses": 8
+    },
+    {
+      "albedo": 0.065,
+      "material": "unnamed",
+      "rgb": [
+        0.042,
+        0.068,
+        0.102
+      ],
+      "uses": 7
+    },
+    {
+      "albedo": 0.75,
+      "material": "unnamed",
+      "rgb": [
+        0.807,
+        0.745,
+        0.631
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.124,
+      "material": "pbr:slate|98a1b1ff|8.00|1",
+      "rgb": [
+        0.115,
+        0.126,
+        0.138
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.146,
+      "material": "roof:slate|bfbf95ff",
+      "rgb": [
+        0.144,
+        0.149,
+        0.115
+      ],
+      "uses": 6
+    },
+    {
+      "albedo": 0.411,
+      "material": "unnamed",
+      "rgb": [
+        0.43,
+        0.414,
+        0.331
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.036,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.044,
+        0.025
+      ],
+      "uses": 5
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.012,
+        0.016,
+        0.016
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.79,
+      "material": "unnamed",
+      "rgb": [
+        0.848,
+        0.787,
+        0.638
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.194,
+      "material": "roof:slate|ffffbfff",
+      "rgb": [
+        0.192,
+        0.199,
+        0.148
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.082,
+      "material": "roof:slate|6a6a6aff",
+      "rgb": [
+        0.08,
+        0.083,
+        0.082
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.395,
+      "material": "pbr:stone|ffffffff|0.50|1",
+      "rgb": [
+        0.515,
+        0.386,
+        0.132
+      ],
+      "uses": 4
+    },
+    {
+      "albedo": 0.419,
+      "material": "unnamed",
+      "rgb": [
+        0.521,
+        0.399,
+        0.328
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.624,
+      "material": "unnamed",
+      "rgb": [
+        0.871,
+        0.578,
+        0.352
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.166,
+      "class": "terracotta",
+      "material": "roof:terracotta|eaffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.313,
+        0.132,
+        0.072
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.386,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.361,
+        0.068
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.052,
+      "material": "unnamed",
+      "rgb": [
+        0.195,
+        0.014,
+        0.018
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.179,
+      "material": "roof:slate|eaeabfff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.148
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.351,
+      "class": "concrete",
+      "material": "pbr:concrete|ffffffff|0.50|1",
+      "rgb": [
+        0.363,
+        0.353,
+        0.298
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.141,
+      "class": "terracotta",
+      "material": "roof:terracotta|d5ffffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.284,
+        0.106,
+        0.064
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.451,
+      "material": "unnamed",
+      "rgb": [
+        0.807,
+        0.352,
+        0.392
+      ],
+      "uses": 3
+    },
+    {
+      "albedo": 0.415,
+      "material": "unnamed",
+      "rgb": [
+        0.429,
+        0.413,
+        0.391
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.166,
+      "material": "roof:slate|ead5aaff",
+      "rgb": [
+        0.176,
+        0.166,
+        0.132
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.117,
+      "material": "roof:slate|aa9580ff",
+      "rgb": [
+        0.128,
+        0.116,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.115,
+      "class": "terracotta",
+      "material": "roof:terracotta|aad5ffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.227,
+        0.088,
+        0.048
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.678,
+      "material": "unnamed",
+      "rgb": [
+        0.716,
+        0.658,
+        0.761
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.079,
+      "material": "roof:slate|556a6aff",
+      "rgb": [
+        0.064,
+        0.083,
+        0.082
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.177,
+      "material": "roof:slate|eaeaaaff",
+      "rgb": [
+        0.176,
+        0.182,
+        0.132
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.043,
+      "material": "unnamed",
+      "rgb": [
+        0.01,
+        0.042,
+        0.144
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.18,
+      "material": "pbr:slate|d9eaffff|8.00|1",
+      "rgb": [
+        0.164,
+        0.183,
+        0.201
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.21,
+      "material": "roof:slate|ffffd5ff",
+      "rgb": [
+        0.208,
+        0.216,
+        0.165
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.405,
+      "material": "unnamed",
+      "rgb": [
+        0.435,
+        0.403,
+        0.33
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.448,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.392,
+        0.631
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.136,
+      "material": "roof:slate|d5aa80ff",
+      "rgb": [
+        0.16,
+        0.133,
+        0.099
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.242,
+      "material": "roof:slate|ffffeaff",
+      "rgb": [
+        0.24,
+        0.249,
+        0.181
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.165,
+      "material": "roof:slate|d5d5d5ff",
+      "rgb": [
+        0.16,
+        0.166,
+        0.165
+      ],
+      "uses": 2
+    },
+    {
+      "albedo": 0.805,
+      "material": "unnamed",
+      "rgb": [
+        0.991,
+        0.792,
+        0.386
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.287,
+      "material": "unnamed",
+      "rgb": [
+        0.991,
+        0.097,
+        0.093
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.287,
+      "material": "unnamed",
+      "rgb": [
+        0.991,
+        0.097,
+        0.093
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.017,
+        0.016
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.841,
+      "material": "unnamed",
+      "rgb": [
+        0.769,
+        0.847,
+        0.987
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.016,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.017,
+        0.017
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.789,
+      "material": "unnamed",
+      "rgb": [
+        0.88,
+        0.784,
+        0.57
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.017,
+      "material": "unnamed",
+      "rgb": [
+        0.014,
+        0.018,
+        0.018
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.015,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.016,
+        0.016
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.629,
+      "material": "unnamed",
+      "rgb": [
+        0.991,
+        0.566,
+        0.192
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.863,
+      "material": "unnamed",
+      "rgb": [
+        0.863,
+        0.863,
+        0.864
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.224,
+      "material": "unnamed",
+      "rgb": [
+        0.252,
+        0.221,
+        0.172
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 1.0,
+      "material": "unnamed",
+      "rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.205,
+      "material": "unnamed",
+      "rgb": [
+        0.233,
+        0.205,
+        0.126
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.29,
+      "material": "unnamed",
+      "rgb": [
+        0.991,
+        0.101,
+        0.093
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.238,
+      "class": "limestone",
+      "material": "pbr:limestone|c3e9ffff|1.00|1",
+      "outlier": "limestone range 0.45–0.60",
+      "rgb": [
+        0.256,
+        0.236,
+        0.206
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.01,
+      "material": "unnamed",
+      "rgb": [
+        0.009,
+        0.01,
+        0.01
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.013,
+        0.027,
+        0.007
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.023,
+      "material": "unnamed",
+      "rgb": [
+        0.023,
+        0.023,
+        0.023
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.071,
+      "material": "roof:membrane|d5ffffff",
+      "rgb": [
+        0.034,
+        0.081,
+        0.082
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.586,
+      "material": "unnamed",
+      "rgb": [
+        0.712,
+        0.572,
+        0.353
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.45,
+      "material": "unnamed",
+      "rgb": [
+        0.663,
+        0.399,
+        0.33
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.133,
+      "class": "terracotta",
+      "material": "roof:terracotta|d5eaffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.284,
+        0.097,
+        0.052
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.406,
+      "material": "unnamed",
+      "rgb": [
+        0.254,
+        0.434,
+        0.578
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.376,
+      "material": "unnamed",
+      "rgb": [
+        0.578,
+        0.352,
+        0.03
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.127,
+      "class": "terracotta",
+      "material": "roof:terracotta|bfeaffff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.256,
+        0.097,
+        0.052
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.102,
+      "class": "terracotta",
+      "material": "roof:terracotta|95bfeaff",
+      "outlier": "terracotta range 0.25–0.40",
+      "rgb": [
+        0.199,
+        0.079,
+        0.044
+      ],
+      "uses": 1
+    },
+    {
+      "albedo": 0.581,
+      "material": "unnamed",
+      "rgb": [
+        0.479,
+        0.631,
+        0.392
+      ],
+      "uses": 1
+    }
+  ]
+}
