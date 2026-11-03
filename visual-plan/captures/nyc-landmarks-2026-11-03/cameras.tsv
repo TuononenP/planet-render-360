@@ -1,0 +1,9 @@
+type	view	bearing_local_deg	elevation_deg	fov_deg	distance_m	target_x_m	target_y_m	target_z_m	ground
+wtc_oculus	0	0.00	14.00	40.00	126.62	0.00	15.24	0.00	flat_disc
+wtc_oculus	1	40.00	14.00	40.00	127.56	0.00	15.24	0.00	flat_disc
+wtc_oculus	2	130.00	14.00	40.00	133.83	0.00	15.24	0.00	flat_disc
+wtc_oculus	3	180.00	14.00	40.00	126.62	0.00	15.24	0.00	flat_disc
+manhattan_bridge	0	0.00	14.00	40.00	1856.46	-77.68	54.50	0.00	flat_disc
+manhattan_bridge	1	40.00	14.00	40.00	2002.28	-77.68	54.50	0.00	flat_disc
+manhattan_bridge	2	130.00	14.00	40.00	1921.91	-77.68	54.50	0.00	flat_disc
+manhattan_bridge	3	180.00	14.00	40.00	1856.46	-77.68	54.50	0.00	flat_disc

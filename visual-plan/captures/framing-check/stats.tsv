@@ -1,0 +1,6 @@
+type	width_m	depth_m	height_m	lowest_y_m	triangles
+buckingham_palace	159.0	124.0	24.3	0.00	38282
+angkor_wat	227.4	199.4	65.0	0.00	93648
+burj_khalifa	151.9	135.6	828.0	0.00	34104
+cairo_tower	70.0	70.0	187.0	0.00	19332
+hoover_dam	426.5	369.3	27.0	-221.00	10968
