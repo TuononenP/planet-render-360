@@ -1,0 +1,162 @@
+{
+  "amsterdam_p0": {
+    "build_ms": 32633,
+    "static_bytes": 643751856,
+    "static_peak_bytes": 1344105480
+  },
+  "amsterdam_p1": {
+    "build_ms": 35873,
+    "static_bytes": 725291818,
+    "static_peak_bytes": 1488402194
+  },
+  "amsterdam_p2": {
+    "build_ms": 34035,
+    "static_bytes": 812969641,
+    "static_peak_bytes": 1562655553
+  },
+  "amsterdam_p3": {
+    "build_ms": 40422,
+    "static_bytes": 1260976262,
+    "static_peak_bytes": 2539246471
+  },
+  "big_sur_p0": {
+    "build_ms": 1521,
+    "static_bytes": 416387398,
+    "static_peak_bytes": 769117426
+  },
+  "big_sur_p1": {
+    "build_ms": 1707,
+    "static_bytes": 517490728,
+    "static_peak_bytes": 1344105480
+  },
+  "big_sur_p2": {
+    "build_ms": 1987,
+    "static_bytes": 565422161,
+    "static_peak_bytes": 1488402194
+  },
+  "big_sur_p3": {
+    "build_ms": 1865,
+    "static_bytes": 938921376,
+    "static_peak_bytes": 2187677683
+  },
+  "dubai_p0": {
+    "build_ms": 9033,
+    "static_bytes": 467802794,
+    "static_peak_bytes": 769117426
+  },
+  "dubai_p1": {
+    "build_ms": 9432,
+    "static_bytes": 539090713,
+    "static_peak_bytes": 1344105480
+  },
+  "dubai_p2": {
+    "build_ms": 11026,
+    "static_bytes": 584957832,
+    "static_peak_bytes": 1488402194
+  },
+  "dubai_p3": {
+    "build_ms": 10353,
+    "static_bytes": 984102049,
+    "static_peak_bytes": 2187677683
+  },
+  "helsinki_p0": {
+    "build_ms": 31327,
+    "static_bytes": 562620748,
+    "static_peak_bytes": 1344105480
+  },
+  "helsinki_p1": {
+    "build_ms": 32629,
+    "static_bytes": 648730722,
+    "static_peak_bytes": 1488402194
+  },
+  "helsinki_p2": {
+    "build_ms": 33781,
+    "static_bytes": 737168493,
+    "static_peak_bytes": 1562655553
+  },
+  "helsinki_p3": {
+    "build_ms": 34486,
+    "static_bytes": 1135592252,
+    "static_peak_bytes": 2193736062
+  },
+  "monaco_p0": {
+    "build_ms": 2969,
+    "static_bytes": 484004782,
+    "static_peak_bytes": 769117426
+  },
+  "monaco_p1": {
+    "build_ms": 3543,
+    "static_bytes": 570508997,
+    "static_peak_bytes": 1344105480
+  },
+  "monaco_p2": {
+    "build_ms": 4792,
+    "static_bytes": 642811098,
+    "static_peak_bytes": 1488402194
+  },
+  "monaco_p3": {
+    "build_ms": 4899,
+    "static_bytes": 1044964389,
+    "static_peak_bytes": 2187677683
+  },
+  "paris_p0": {
+    "build_ms": 6069,
+    "static_bytes": 516485278,
+    "static_peak_bytes": 769117426
+  },
+  "paris_p1": {
+    "build_ms": 6703,
+    "static_bytes": 638951932,
+    "static_peak_bytes": 1344105480
+  },
+  "paris_p2": {
+    "build_ms": 8390,
+    "static_bytes": 712832389,
+    "static_peak_bytes": 1488402194
+  },
+  "paris_p3": {
+    "build_ms": 10837,
+    "static_bytes": 1101232657,
+    "static_peak_bytes": 2187677683
+  },
+  "stockholm_p0": {
+    "build_ms": 5117,
+    "static_bytes": 496047408,
+    "static_peak_bytes": 769117426
+  },
+  "stockholm_p1": {
+    "build_ms": 5754,
+    "static_bytes": 599481142,
+    "static_peak_bytes": 1344105480
+  },
+  "stockholm_p2": {
+    "build_ms": 7788,
+    "static_bytes": 682206829,
+    "static_peak_bytes": 1488402194
+  },
+  "stockholm_p3": {
+    "build_ms": 7781,
+    "static_bytes": 1087294480,
+    "static_peak_bytes": 2187677683
+  },
+  "venice_p0": {
+    "build_ms": 18434,
+    "static_bytes": 620700168,
+    "static_peak_bytes": 1344105480
+  },
+  "venice_p1": {
+    "build_ms": 24390,
+    "static_bytes": 710633346,
+    "static_peak_bytes": 1488402194
+  },
+  "venice_p2": {
+    "build_ms": 37384,
+    "static_bytes": 783588237,
+    "static_peak_bytes": 1562655553
+  },
+  "venice_p3": {
+    "build_ms": 43974,
+    "static_bytes": 1176848308,
+    "static_peak_bytes": 2193736062
+  }
+}

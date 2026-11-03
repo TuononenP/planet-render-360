@@ -1,0 +1,38 @@
+{
+  "scripts/data/building_references.gd": {
+    "before": null,
+    "after": "b889b383443797e214097a9e364e8f98add78d2587218640e90565fcb1c85f6b"
+  },
+  "scripts/data/osm_parser.gd": {
+    "before": "aa0a82341757c54c3f596a657fd816e4a93c0a816506a4a8d27d48dabcd1aac0",
+    "after": "f5675e1b3546ac47aacefc169e545ffd6d320382299f1677f31df5d9b6ba3876"
+  },
+  "scripts/generation/building_era.gd": {
+    "before": "22abc806af1e745b53c24a05d4c9f02db0ebe0949eecbf5f9aee1ade8d385e9b",
+    "after": "1830b86bfda0a3794266fbaed14cf428bee87bd56bac7cea504a143a668dbe9e"
+  },
+  "scripts/generation/building_heights.gd": {
+    "before": "b5379735ce446f813dd42fcd59c222781669014b6d7a69f90cb0629aaaa1a205",
+    "after": "6c89042f87a0153753987430aac6112174c8027f83cd633bbfb92d1220e0267f"
+  },
+  "scripts/generation/building_masses.gd": {
+    "before": "26b5d5de2c5dd5651727487d20db396a1849240ab1fb0a210d5ccba98eedc033",
+    "after": "244a3e5a72fcb022293bdec2c5c62b540e0b196599cd1fe5228e0ffb3e85df60"
+  },
+  "scripts/generation/facade_materials.gd": {
+    "before": "7e918b7068bd0e336b75410f809be209fe3fe52d684bee6261a178d4ecc4cd58",
+    "after": "9a2b6ca2d7894b96c518c0362a30b7a7a3fe8529d6533df00b271172b208317e"
+  },
+  "scripts/generation/infill_planner.gd": {
+    "before": "f51224e8ef5e65cff4aff9c1f81a1382935624557900812efb775175cc37555c",
+    "after": "86d9f94e3ec924641a2af94ebd08aae95e646d67c53deb4ca12887b94a972a9a"
+  },
+  "scripts/generation/material_library.gd": {
+    "before": "a1e5bd8198442130d03777eeb63f71309c5d5acbb25fd59029c697fbd3478147",
+    "after": "61b7102404815f09e25b69c91e3cc5e164b943078ed250fbb738e02c75dfa42e"
+  },
+  "scripts/render/world_cache.gd": {
+    "before": "d56e4c7f7b599d9dc4a357e57566111a799bb349321d2b54e1c5762a82933c38",
+    "after": "ea9d8699a9a430c03c29fafe85f857ecefffef1fe9ba86b2fb10f71c7cd89ff7"
+  }
+}

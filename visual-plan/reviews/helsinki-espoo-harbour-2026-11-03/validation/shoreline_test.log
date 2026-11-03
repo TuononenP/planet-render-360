@@ -1,0 +1,745 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+SHORE TIMINGS classify=13 patches=53
+SHORELINE bodies=1 edges=1800 patches=150 hard=0 diagnostics=0
+SHORE TIMINGS classify=14 patches=61
+SHORELINE bodies=1 edges=2040 patches=162 hard=0 diagnostics=0
+SHORE TIMINGS classify=19 patches=62
+SHORELINE bodies=1 edges=2040 patches=162 hard=505 diagnostics=0
+SHORE TIMINGS classify=15 patches=61
+SHORELINE bodies=1 edges=2040 patches=162 hard=13 diagnostics=0
+SHORE TIMINGS classify=14 patches=62
+SHORELINE bodies=1 edges=2040 patches=162 hard=0 diagnostics=0
+SHORE TIMINGS classify=14 patches=61
+SHORELINE bodies=1 edges=2040 patches=162 hard=0 diagnostics=0
+SHORE TIMINGS classify=5 patches=35
+SHORELINE bodies=2 edges=649 patches=48 hard=0 diagnostics=0
+SHORE TIMINGS classify=0 patches=1
+SHORELINE bodies=1 edges=4 patches=9 hard=0 diagnostics=0
+SHORE TIMINGS classify=11 patches=55
+SHORELINE bodies=1 edges=1800 patches=150 hard=0 diagnostics=0
+SHORE TIMINGS classify=16 patches=241
+SHORELINE bodies=1 edges=1800 patches=150 hard=0 diagnostics=0
+SHORE TIMINGS classify=3 patches=42
+SHORELINE bodies=1 edges=484 patches=39 hard=0 diagnostics=0
+SHORE TIMINGS classify=3 patches=42
+SHORELINE bodies=1 edges=484 patches=39 hard=0 diagnostics=0
+SHORE TIMINGS classify=5 patches=33
+SHORELINE bodies=2 edges=800 patches=64 hard=0 diagnostics=0
+SHORE TIMINGS classify=5 patches=32
+SHORELINE bodies=2 edges=720 patches=72 hard=0 diagnostics=0
+SHORE TIMINGS classify=19 patches=53
+SHORELINE bodies=1 edges=1800 patches=150 hard=600 diagnostics=0
+SHORE TIMINGS classify=2 patches=14
+SHORELINE bodies=1 edges=320 patches=35 hard=0 diagnostics=0
+SHORE TIMINGS classify=12 patches=52
+SHORELINE bodies=1 edges=1800 patches=150 hard=0 diagnostics=0
+SHORE TERRAIN vertices_ms=6
+SHORE TERRAIN arrays_ms=56 vertices=3126
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/pavement_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/pavement_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/pavement_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/lawn_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/lawn_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/lawn_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/rock_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/rock_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/rock_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/asphalt_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/asphalt_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/asphalt_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/cliff_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/cliff_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/cliff_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/forest_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/forest_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/forest_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/gravel_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/gravel_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/gravel_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/sand_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/sand_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/sand_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/snow_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/snow_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/snow_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+SHORE TERRAIN total_ms=643
+SHORE TERRAIN vertices_ms=6
+SHORE TERRAIN arrays_ms=58 vertices=3570
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/pavement_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/pavement_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/pavement_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/lawn_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/lawn_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/lawn_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/rock_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/rock_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/rock_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/asphalt_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/asphalt_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/asphalt_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/cliff_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/cliff_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/cliff_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/forest_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/forest_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/forest_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/gravel_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/gravel_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/gravel_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/sand_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/sand_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/sand_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/snow_diff.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:86)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/snow_nor.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:87)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+WARNING: Loaded resource as image file, this will not work on export: 'res://assets/textures/2k/snow_rough.jpg'. Instead, import the image file as an Image resource and load it normally as a resource.
+     at: load_from_file (core/io/image.cpp:2780)
+     GDScript backtrace (most recent call first):
+         [0] _set_image (res://scripts/generation/pbr_textures.gd:56)
+         [1] _set_image (res://scripts/generation/material_library.gd:163)
+         [2] _layer (res://scripts/generation/terrain_textures.gd:123)
+         [3] _build (res://scripts/generation/terrain_textures.gd:88)
+         [4] arrays (res://scripts/generation/terrain_textures.gd:60)
+         [5] bind (res://scripts/generation/terrain_glsl.gd:170)
+         [6] build (res://scripts/generation/ground_material.gd:142)
+         [7] _terrain_mesh (res://scripts/generation/terrain_builder.gd:449)
+         [8] _rendered_surface_fixture (res://tests/shoreline_test.gd:247)
+         [9] _run (res://tests/shoreline_test.gd:169)
+SHORE TERRAIN total_ms=2214
+SHORELINE OK: exact coverage, natural and hard banks, evidence, queries, cache, hole fallback

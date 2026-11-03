@@ -1,0 +1,14 @@
+# Stockholm sto-r2 — 2026-11-03
+
+Ultra, clear summer at local golden hour, `--audit`, with four trial eyes; world cache disabled. This capture predates the later landmark-batch and marina-placement edits. Reference photos: `visual-plan/refs/stockholm/`; the summer photo and winter photo differ in season, weather and field of view.
+
+| Area | Reads right | Reads wrong | Next action |
+|---|---|---|---|
+| Waterfront | Mapped af Chapman now has a hull and deck; harbour water is darker. | Riddarholmen still has a pale, angular bare shore and its blocks read as simplified slabs. OSM has buildings on the island, so missing source buildings alone are not the explanation. | Diagnose shoreline and building placement using frozen input; compare after the new landmark models. |
+| Vantage | The offset trial eyes 0/1 reduce the foreground obstruction. | They are 13–19 m north of the mapped footpath and substantially higher than the preset's intended 32 m ASL; they cannot validate an on-path preset. Trial 2 is close to the path but retains a foreground block. | Restore the cliff using defensible terrain evidence or capture a mapped path position at its actual elevation. |
+| Streets | Foreground lamellas from r1 no longer fill the view. | Road and bright grass still occupy much of the opening frame. | Review the cliff and street frontage at the actual path. |
+| Boats | The mapped ship is recognisable as a vessel. | The nearby houseboats and waterfront remain sparse and schematic. | Inspect quay-side placement at street scale. |
+
+Agent pre-rating: recognisable; photographic target and human gate remain open. Vantage luma 0.582, saturation 0.267, colourfulness 0.134; no automatic flags against the expanded, mixed-weather reference set. Wire surfaces: 4/12; marina surfaces: 14/20. Build reported 78.354 s for the parallel build graph, 110 s to the view. No winter r2 capture yet. OSM way 144024295 places the footpath at approximately 59.320731, 18.060419 at the original longitude; trial 1 at 59.32090 is approximately 19 m north of that path.
+
+Frozen-input diagnosis (Stockholm p3 snapshot, before the latest landmark batch): 26 mapped buildings in the inspected island-area bounding box, 22 accepted by the building filter and four rejected near landmark sites; none of those 26 was rejected as open water. Of shoreline segments in a smaller island box, 49 were classified `paving_and_frontage`, 4 `insufficient_dry_samples`, 76 `mapped_access`, and 298 `insufficient_evidence`. The pale bank is therefore at least partly the generic shoreline classifier treating sections as natural, not just absent building input. These counts include both sides of nearby water boundaries and do not establish that every segment should be masonry; verify actual mapped evidence before changing generic inference.

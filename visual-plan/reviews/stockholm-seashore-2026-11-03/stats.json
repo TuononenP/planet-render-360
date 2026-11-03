@@ -1,0 +1,449 @@
+{
+  "stockholm_close1": {
+    "all": {
+      "colourful": 0.101821667061492,
+      "luma": 0.619995191447078,
+      "sat": 0.213023903268777
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 25.0,
+      "pitch_rad": 0.0,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -0.174532920122147
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.111971564447287,
+      "luma": 0.469682709288332,
+      "sat": 0.341038755575702
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.108340620029257,
+      "luma": 0.543219786451946,
+      "sat": 0.214267123704826
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.045100730654031,
+      "luma": 0.836115163601494,
+      "sat": 0.0839434334452382
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_close2": {
+    "all": {
+      "colourful": 0.137774825744159,
+      "luma": 0.336722432151083,
+      "sat": 0.391080800159
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 35.0,
+      "pitch_rad": -0.3,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -0.174532920122147
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.145363716872498,
+      "luma": 0.261246604843791,
+      "sat": 0.430307333508575
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.129259863050136,
+      "luma": 0.33014629087759,
+      "sat": 0.374671210391483
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.120620080379736,
+      "luma": 0.417834951978491,
+      "sat": 0.365919629467267
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_h000": {
+    "all": {
+      "colourful": 0.132439240621141,
+      "luma": 0.56261400379902,
+      "sat": 0.282695552500001
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": 0.0
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.1526407293305,
+      "luma": 0.299542604284325,
+      "sat": 0.458230880323637
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.110836480990147,
+      "luma": 0.56971969029963,
+      "sat": 0.245758466254433
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0714612784015551,
+      "luma": 0.81959481488463,
+      "sat": 0.138820584315425
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_h090": {
+    "all": {
+      "colourful": 0.145348313929131,
+      "luma": 0.375653340104426,
+      "sat": 0.52461117252827
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -1.5707963267949
+    },
+    "flags": [
+      "sat 0.525 outside refs 0.061–0.374"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.137141656182682,
+      "luma": 0.203995046617439,
+      "sat": 0.719112733748322
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.15031457078836,
+      "luma": 0.323434419731896,
+      "sat": 0.539340726464756
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.109224928488347,
+      "luma": 0.592070708196436,
+      "sat": 0.317484279362659
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_h180": {
+    "all": {
+      "colourful": 0.134437053977917,
+      "luma": 0.132236470356228,
+      "sat": 0.570262434112816
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -3.14159265358979
+    },
+    "flags": [
+      "luma 0.132 outside refs 0.356–0.670",
+      "sat 0.570 outside refs 0.061–0.374"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.152713563614927,
+      "luma": 0.170397873073555,
+      "sat": 0.796810573613645
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.120423051528468,
+      "luma": 0.128638163728897,
+      "sat": 0.56247836240875
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.089886776124816,
+      "luma": 0.0971593304623335,
+      "sat": 0.350386356072626
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_h270": {
+    "all": {
+      "colourful": 0.129915166854245,
+      "luma": 0.475505596344656,
+      "sat": 0.350813469125788
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -4.71238898038469
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.151614986618045,
+      "luma": 0.340069167767098,
+      "sat": 0.518679603785632
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.100534528721545,
+      "luma": 0.461244393290472,
+      "sat": 0.336829642655044
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0772412101052438,
+      "luma": 0.623165913254399,
+      "sat": 0.194933471440869
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_look0": {
+    "all": {
+      "colourful": 0.117347209729517,
+      "luma": 0.4428958003516,
+      "sat": 0.405571094321871
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": -164.717254638672,
+      "world_y": -28.2043704986572,
+      "world_z": -99.4860000610352,
+      "yaw_rad": -0.610865238198015
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.0691018121044431,
+      "luma": 0.0921469126558263,
+      "sat": 0.700502591759848
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.116132304827645,
+      "luma": 0.427597516226822,
+      "sat": 0.344899977434082
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0685709838955654,
+      "luma": 0.806757503011455,
+      "sat": 0.162643411359136
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_look1": {
+    "all": {
+      "colourful": 0.141820985252475,
+      "luma": 0.486450006379355,
+      "sat": 0.394906916989255
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": 255.595733642578,
+      "world_y": -28.2043704986572,
+      "world_z": -171.337005615234,
+      "yaw_rad": -6.10865238198015
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.116494780302748,
+      "luma": 0.203727507251739,
+      "sat": 0.698373314383319
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.129267413947935,
+      "luma": 0.434982739648783,
+      "sat": 0.335775611325268
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0744778299948212,
+      "luma": 0.813287305561742,
+      "sat": 0.142124495878593
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_look2": {
+    "all": {
+      "colourful": 0.130599831530245,
+      "luma": 0.525329806017346,
+      "sat": 0.349028174160441
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": -278.315368652344,
+      "world_y": -21.9191093444824,
+      "world_z": -685.348022460938,
+      "yaw_rad": -2.18166156499291
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.140865291526875,
+      "luma": 0.212824791801843,
+      "sat": 0.648145324229336
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.11797831118756,
+      "luma": 0.564307166185661,
+      "sat": 0.220913555131031
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.072621509148206,
+      "luma": 0.804425654374254,
+      "sat": 0.159723554688119
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_look3": {
+    "all": {
+      "colourful": 0.0358633820310545,
+      "luma": 0.0735422616473129,
+      "sat": 0.343933791138584
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": 550.950805664062,
+      "world_y": 1.66389429569244,
+      "world_z": -519.538024902344,
+      "yaw_rad": -3.75245789178781
+    },
+    "flags": [
+      "luma 0.074 outside refs 0.356–0.670"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.0423188577881878,
+      "luma": 0.0969204069485462,
+      "sat": 0.404103701328362
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.0250556199254683,
+      "luma": 0.0493886196236137,
+      "sat": 0.324839593707111
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0262865856978426,
+      "luma": 0.070867238080692,
+      "sat": 0.300130335890073
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  },
+  "stockholm_vantage": {
+    "all": {
+      "colourful": 0.133294666450377,
+      "luma": 0.581859845993488,
+      "sat": 0.264689102086867
+    },
+    "camera": {
+      "centre_lat": 59.3207,
+      "centre_lon": 18.0604,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": 0.0,
+      "world_y": 5.29954528808594,
+      "world_z": 0.0,
+      "yaw_rad": -0.174532920122147
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.14945235490939,
+      "luma": 0.3084160282727,
+      "sat": 0.432284120203096
+    },
+    "marina_draw_budget": 20,
+    "marina_draw_calls": 14,
+    "middle": {
+      "colourful": 0.112833308075769,
+      "luma": 0.633968579871214,
+      "sat": 0.197584788897281
+    },
+    "season": 1,
+    "sun_elevation_deg": 10.3093812195791,
+    "upper": {
+      "colourful": 0.0716428162300143,
+      "luma": 0.810639034676165,
+      "sat": 0.154612066704573
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 12
+  }
+}

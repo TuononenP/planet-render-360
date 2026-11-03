@@ -1,0 +1,13 @@
+# Scorecard — Interlaken — High — 2026-11-03
+- Run: preset High, seed 19900, sample rules v2 2026-10-31, cache data v2, OSM real (3220 buildings, 1610 roads), satellite real, DEM source z14; pipeline 0.5 s, ground+builders 13.3 s
+- (a) DEM: max 4.33 m / mean 0.60 m over 8 land points (bar ≤ 8 m) → PASS
+  - points (x,z m: rendered − z14): (0,0) +0.04; (0,-400) water, carved -11.7 m — excluded; (400,0) -0.12; (0,400) +0.09; (-400,0) +0.04; (0,-800) +0.17; (800,0) -0.01; (0,800) -0.04; (-800,0) -4.33
+- (b) footprints: median IoU 1.000, centroid offset 0.00 m over 10 sampled (bar IoU ≥ 0.75, ≤ 2 m) → PASS
+- (c) heights: median err 0.00 m over 10 tagged buildings (bar ≤ 3 m ≈ 1 storey) → PASS
+  - tagged (source expected→rendered): levels 3.0→5.7 m; levels 25.0→25.0 m; levels 4.9→4.9 m; levels 11.1→11.1 m; tag_height 3.0→3.0 m; levels 11.6→11.6 m; levels 2.8→2.8 m; tag_height 1.0→1.0 m; levels 11.6→13.6 m; tag_height 30.0→30.0 m
+- (d) water: 0/5 shoreline/centreline samples with visible rendered water within 10 m → FAIL
+  - samples: (-1005,101) nearest water inf m; (516,-631) nearest water inf m; (-980,-8) nearest water inf m; (-630,-279) nearest water inf m; (-133,-1118) nearest water inf m
+- (d) roads: 5/5 junctions with a rendered ribbon within 3 m (37 of 1717 junctions are passages under OSM buildings, excluded); max ribbon lift 0.08 m over ground (PRD flush ≤ 0.05 m — recorded, not gated: ribbons include bridges) → PASS
+- (e) landmark: n/a — no registry landmark for this location → N-A
+- (f) human side-by-side rating (signed checklist, T8.3) → NO-REFERENCE — geometry-only scoring
+- AC-14 counters: BLOCKED(headless — fps/draws need a windowed run; see the T7.2 plan note)

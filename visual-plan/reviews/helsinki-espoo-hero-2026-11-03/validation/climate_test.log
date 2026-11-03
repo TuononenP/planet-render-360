@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Condition "err != 1" is true. Returning: -1
+   at: decompress (core/io/compression.cpp:196)
+   GDScript backtrace (most recent call first):
+       [0] decode_row (res://scripts/data/climate_fetcher.gd:312)
+       [1] _decoder_checks (res://tests/climate_test.gd:68)
+       [2] _run (res://tests/climate_test.gd:35)
+       [3] _init (res://tests/climate_test.gd:22)
+CLIMATE OK: strip decoder + predictor, grid cells, snow lines / treeline / biomes / dryness on 6 places, latitude fallback, ERA5 normals

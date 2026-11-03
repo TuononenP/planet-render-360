@@ -1,0 +1,3 @@
+Corrected-filter Turku-only run: exit 1. DEM fails (pre-existing source-plan issue); footprints, heights, water, roads and bearing pass.
+- (a) DEM: max 13.21 m / mean 3.20 m over 9 land points (bar ≤ 3 m) → FAIL
+Full five-location attempt timed out at 240 s before the filter fix; see global-scorecard-full.txt.

@@ -1,0 +1,370 @@
+{
+  "helsinki_close1": {
+    "all": {
+      "colourful": 0.117640105527518,
+      "luma": 0.767023117020403,
+      "sat": 0.143675107652396
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 25.0,
+      "pitch_rad": 0.0174532923847437,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -0.0872664600610733
+    },
+    "flags": [
+      "luma 0.767 outside refs 0.644–0.644"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.089236432547696,
+      "luma": 0.687161641706989,
+      "sat": 0.166889955950372
+    },
+    "middle": {
+      "colourful": 0.13668787814612,
+      "luma": 0.764227990837327,
+      "sat": 0.148980807278526
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0417462331972669,
+      "luma": 0.849536551358215,
+      "sat": 0.113980209569878
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_close2": {
+    "all": {
+      "colourful": 0.173349928312418,
+      "luma": 0.489970720107732,
+      "sat": 0.399817392473567
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 35.0,
+      "pitch_rad": -0.282546707615256,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -0.0872664600610733
+    },
+    "flags": [
+      "luma 0.490 outside refs 0.644–0.644",
+      "sat 0.400 outside refs 0.162–0.162",
+      "colourful 0.173 outside refs 0.110–0.110"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.0840652178261198,
+      "luma": 0.295569002201903,
+      "sat": 0.631804083213541
+    },
+    "middle": {
+      "colourful": 0.0978731952439741,
+      "luma": 0.490046687373406,
+      "sat": 0.378782568581387
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.155940549143723,
+      "luma": 0.683622800546956,
+      "sat": 0.186679555805132
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_h000": {
+    "all": {
+      "colourful": 0.145145380329685,
+      "luma": 0.639913004992425,
+      "sat": 0.28742157018295
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 63.6363639831543,
+      "pitch_rad": -0.06,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": 0.0
+    },
+    "flags": [
+      "sat 0.287 outside refs 0.162–0.162",
+      "colourful 0.145 outside refs 0.110–0.110"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.0976424402371288,
+      "luma": 0.365872364124155,
+      "sat": 0.543715452456833
+    },
+    "middle": {
+      "colourful": 0.13975707291055,
+      "luma": 0.73027656842401,
+      "sat": 0.159854106766494
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0534375527663063,
+      "luma": 0.83662912800591,
+      "sat": 0.140939797303391
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_h090": {
+    "all": {
+      "colourful": 0.12943980929922,
+      "luma": 0.645076057980658,
+      "sat": 0.292850173408478
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 63.6363639831543,
+      "pitch_rad": -0.06,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -1.5707963267949
+    },
+    "flags": [
+      "sat 0.293 outside refs 0.162–0.162",
+      "colourful 0.129 outside refs 0.110–0.110"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.0971210839500917,
+      "luma": 0.353463444010074,
+      "sat": 0.562147195659361
+    },
+    "middle": {
+      "colourful": 0.11188494701388,
+      "luma": 0.762868622257144,
+      "sat": 0.15407165070063
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0568593407837699,
+      "luma": 0.83477896061063,
+      "sat": 0.14302281375564
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_h180": {
+    "all": {
+      "colourful": 0.126041027459381,
+      "luma": 0.687837182542195,
+      "sat": 0.227096240425109
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 63.6363639831543,
+      "pitch_rad": -0.06,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -3.14159265358979
+    },
+    "flags": [
+      "sat 0.227 outside refs 0.162–0.162"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.133648398359217,
+      "luma": 0.423276518172698,
+      "sat": 0.456464660632493
+    },
+    "middle": {
+      "colourful": 0.0971171348408249,
+      "luma": 0.79069481917431,
+      "sat": 0.113839150709968
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0705336902066766,
+      "luma": 0.863457575155751,
+      "sat": 0.095257519939833
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_h270": {
+    "all": {
+      "colourful": 0.111240854682205,
+      "luma": 0.641336233308711,
+      "sat": 0.225606862681906
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 63.6363639831543,
+      "pitch_rad": -0.06,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -4.71238898038469
+    },
+    "flags": [
+      "sat 0.226 outside refs 0.162–0.162"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.103086677148568,
+      "luma": 0.396402819207572,
+      "sat": 0.430612584723379
+    },
+    "middle": {
+      "colourful": 0.0866428574626464,
+      "luma": 0.695684850550521,
+      "sat": 0.116504533749769
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0592850347560328,
+      "luma": 0.84052450394432,
+      "sat": 0.112690486949901
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_vantage": {
+    "all": {
+      "colourful": 0.13880224455377,
+      "luma": 0.675975246544119,
+      "sat": 0.254248961789387
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 63.6363639831543,
+      "pitch_rad": 0.0174532923847437,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -0.0872664600610733
+    },
+    "flags": [
+      "sat 0.254 outside refs 0.162–0.162",
+      "colourful 0.139 outside refs 0.110–0.110"
+    ],
+    "local_hour": 14.75,
+    "lower": {
+      "colourful": 0.108355895175735,
+      "luma": 0.435180119234363,
+      "sat": 0.456961705506081
+    },
+    "middle": {
+      "colourful": 0.121913886724298,
+      "luma": 0.778921447737064,
+      "sat": 0.132600311219443
+    },
+    "season": 3,
+    "sun_elevation_deg": 12.7088840338377,
+    "upper": {
+      "colourful": 0.0557088314823853,
+      "luma": 0.829287963200659,
+      "sat": 0.154505071690837
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_vantage_late": {
+    "all": {
+      "colourful": 0.0550451004429271,
+      "luma": 0.0457887090695527,
+      "sat": 0.589016975809614
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0174532923847437,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -0.0872664600610733
+    },
+    "flags": [
+      "luma 0.046 outside refs 0.644–0.644",
+      "sat 0.589 outside refs 0.162–0.162",
+      "colourful 0.055 outside refs 0.110–0.110"
+    ],
+    "local_hour": 19.1746765136719,
+    "lower": {
+      "colourful": 0.032452760311029,
+      "luma": 0.0142869264592047,
+      "sat": 0.528271407121356
+    },
+    "middle": {
+      "colourful": 0.0707847518509263,
+      "luma": 0.0646316839379661,
+      "sat": 0.508380473563852
+    },
+    "season": 3,
+    "sun_elevation_deg": -15.3157227902312,
+    "upper": {
+      "colourful": 0.0284175388395463,
+      "luma": 0.0614519597926012,
+      "sat": 0.719410691691761
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  },
+  "helsinki_vantage_noon": {
+    "all": {
+      "colourful": 0.134548658604664,
+      "luma": 0.675621321597354,
+      "sat": 0.25939782964021
+    },
+    "camera": {
+      "centre_lat": 60.168,
+      "centre_lon": 24.953,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0174532923847437,
+      "world_x": 155.05583190918,
+      "world_y": -2.42753577232361,
+      "world_z": 254.242004394531,
+      "yaw_rad": -0.0872664600610733
+    },
+    "flags": [
+      "sat 0.259 outside refs 0.162–0.162",
+      "colourful 0.135 outside refs 0.110–0.110"
+    ],
+    "local_hour": 12.5804244995117,
+    "lower": {
+      "colourful": 0.111739910359534,
+      "luma": 0.440334868334296,
+      "sat": 0.453127416262248
+    },
+    "middle": {
+      "colourful": 0.11121997056083,
+      "luma": 0.790997745577855,
+      "sat": 0.125105709332877
+    },
+    "season": 3,
+    "sun_elevation_deg": 17.236199751503,
+    "upper": {
+      "colourful": 0.0656933931177554,
+      "luma": 0.812101609673604,
+      "sat": 0.180390038039092
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 8
+  }
+}

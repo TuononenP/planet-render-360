@@ -7,7 +7,14 @@ committed (`visual-plan/refs/**/*.jpg` is gitignored): re-download from the Comm
 No viewpoint (lat/lon/bearing) is recorded; the camera views in `PROMPTS.md` are for
 AI-made images and for matching capture bearings by eye.
 
-Status (2026-11-03): 406 photos for 386 landmarks, plus AI-made images for 8 more (see each `SOURCE.md`); the 31 still without either are in `MISSING.txt`.
+Local audit (2026-11-03): the current registry has 445 types; 388 have at
+least one local photograph, 24 have at least two local photographs listed in
+their README, and 49 have no local image of either kind. `INVENTORY.tsv` and
+`MISSING.txt` are generated from the registry and local files with
+`godot --headless --path . --script tools/landmark_ref_inventory.gd`.
+Because images are gitignored, these counts reflect this checkout and can
+differ on another machine. A README filename match does not verify the
+subject, licence, camera angle, or suitability for silhouette scoring.
 Every image was looked at before keeping. Two passes: the 37 first-pass landmarks have up to two
 photos each; the rest have the Wikipedia lead image only. Dropped as wrong subject, detail-only,
 interior, tiny or an old engraving: 38 lead images (e.g. `chain_bridge`, `one_wtc`, `sistine_chapel`,

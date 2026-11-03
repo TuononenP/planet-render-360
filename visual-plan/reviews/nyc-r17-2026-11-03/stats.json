@@ -1,0 +1,525 @@
+{
+  "new_york_close1": {
+    "all": {
+      "colourful": 0.122735113338826,
+      "luma": 0.547311058426913,
+      "sat": 0.189615711771762
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 25.0,
+      "pitch_rad": 0.0523598790168762,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.20108127593994
+    },
+    "flags": [
+      "sat 0.190 outside refs 0.065–0.115",
+      "colourful 0.123 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.0479539255356429,
+      "luma": 0.430736735488018,
+      "sat": 0.185405479548877
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.132909604139499,
+      "luma": 0.531679137100553,
+      "sat": 0.20284868850092
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.125708284548049,
+      "luma": 0.67728417107418,
+      "sat": 0.182483392512522
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_close2": {
+    "all": {
+      "colourful": 0.111568997476579,
+      "luma": 0.40525411099176,
+      "sat": 0.303552847147886
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 35.0,
+      "pitch_rad": -0.247640120983124,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.20108127593994
+    },
+    "flags": [
+      "luma 0.405 outside refs 0.567–0.573",
+      "sat 0.304 outside refs 0.065–0.115",
+      "colourful 0.112 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.103088178368453,
+      "luma": 0.293986396096117,
+      "sat": 0.489384388617987
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.0566696535733629,
+      "luma": 0.449747461409328,
+      "sat": 0.212968231495061
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.115046199698295,
+      "luma": 0.478384668386646,
+      "sat": 0.195365261951618
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_h000": {
+    "all": {
+      "colourful": 0.127511180659733,
+      "luma": 0.402058311759724,
+      "sat": 0.375772720320595
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": 0.0
+    },
+    "flags": [
+      "luma 0.402 outside refs 0.567–0.573",
+      "sat 0.376 outside refs 0.065–0.115",
+      "colourful 0.128 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.111913097555899,
+      "luma": 0.21816401360865,
+      "sat": 0.529112977862041
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.116429895768093,
+      "luma": 0.38475967289753,
+      "sat": 0.28038449375588
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.132868022570656,
+      "luma": 0.600780014649846,
+      "sat": 0.304193799834584
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_h090": {
+    "all": {
+      "colourful": 0.108802221544734,
+      "luma": 0.125673882018097,
+      "sat": 0.438197454828878
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -1.5707963267949
+    },
+    "flags": [
+      "luma 0.126 outside refs 0.567–0.573",
+      "sat 0.438 outside refs 0.065–0.115",
+      "colourful 0.109 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.112435684315797,
+      "luma": 0.103026528999117,
+      "sat": 0.767706588030482
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.134600127343869,
+      "luma": 0.201879934662054,
+      "sat": 0.317450897112425
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.0714152090558326,
+      "luma": 0.0830017613422741,
+      "sat": 0.212185371098511
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_h180": {
+    "all": {
+      "colourful": 0.106361050959051,
+      "luma": 0.0963264353395289,
+      "sat": 0.381135937536048
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -3.14159265358979
+    },
+    "flags": [
+      "luma 0.096 outside refs 0.567–0.573",
+      "sat 0.381 outside refs 0.065–0.115",
+      "colourful 0.106 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.133568919557086,
+      "luma": 0.100453572022538,
+      "sat": 0.70359586175661
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.112323706441779,
+      "luma": 0.137970294430741,
+      "sat": 0.266094385804521
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.0607878725956384,
+      "luma": 0.0565045622926378,
+      "sat": 0.157283057656793
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_h270": {
+    "all": {
+      "colourful": 0.123452802332242,
+      "luma": 0.489708884940188,
+      "sat": 0.338202287741748
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -4.71238898038469
+    },
+    "flags": [
+      "sat 0.338 outside refs 0.065–0.115",
+      "colourful 0.123 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.100130590232967,
+      "luma": 0.215777513553038,
+      "sat": 0.547264791529998
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.119855293668513,
+      "luma": 0.522459350249515,
+      "sat": 0.219081390369429
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.121430832225286,
+      "luma": 0.735568428919396,
+      "sat": 0.231243410272657
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_look0": {
+    "all": {
+      "colourful": 0.220793525825835,
+      "luma": 0.683076208029548,
+      "sat": 0.261517076391554
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.139626340159546,
+      "world_x": 126.581871032715,
+      "world_y": 165.144821166992,
+      "world_z": -740.617980957031,
+      "yaw_rad": -5.23598775598299
+    },
+    "flags": [
+      "luma 0.683 outside refs 0.567–0.573",
+      "sat 0.262 outside refs 0.065–0.115",
+      "colourful 0.221 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.224347613461471,
+      "luma": 0.570823101057536,
+      "sat": 0.315942585893567
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.171595234604117,
+      "luma": 0.735719005178828,
+      "sat": 0.190901787719535
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.129068546232026,
+      "luma": 0.750206917444864,
+      "sat": 0.267618957179885
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_look1": {
+    "all": {
+      "colourful": 0.172936755121021,
+      "luma": 0.64044077927803,
+      "sat": 0.221394083876492
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.296705972839036,
+      "world_x": 185.653411865234,
+      "world_y": 97.8339157104492,
+      "world_z": -33.1619987487793,
+      "yaw_rad": -4.74729556542458
+    },
+    "flags": [
+      "sat 0.221 outside refs 0.065–0.115",
+      "colourful 0.173 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.114484494975955,
+      "luma": 0.485601616168165,
+      "sat": 0.180369707775739
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.137026484046347,
+      "luma": 0.706393103700849,
+      "sat": 0.200307526298818
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.148626154730296,
+      "luma": 0.738749378596964,
+      "sat": 0.280492652186642
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_look2": {
+    "all": {
+      "colourful": 0.127715812232745,
+      "luma": 0.522315203091742,
+      "sat": 0.225184959670196
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.0872664625997165,
+      "world_x": -928.267028808594,
+      "world_y": 26.7009925842285,
+      "world_z": 607.969970703125,
+      "yaw_rad": -1.39626340159546
+    },
+    "flags": [
+      "sat 0.225 outside refs 0.065–0.115",
+      "colourful 0.128 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.103473019497612,
+      "luma": 0.437547573249856,
+      "sat": 0.225264331452398
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.126702840404147,
+      "luma": 0.437509240337637,
+      "sat": 0.26189442214823
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.128094490514944,
+      "luma": 0.679773658151373,
+      "sat": 0.1936403343354
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_look3": {
+    "all": {
+      "colourful": 0.117659141210503,
+      "luma": 0.266821177651128,
+      "sat": 0.339597227104663
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0523598775598299,
+      "world_x": 602.529663085938,
+      "world_y": 4.67510795593262,
+      "world_z": 370.308990478516,
+      "yaw_rad": -0.837758040957278
+    },
+    "flags": [
+      "luma 0.267 outside refs 0.567–0.573",
+      "sat 0.340 outside refs 0.065–0.115",
+      "colourful 0.118 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.129594354513279,
+      "luma": 0.229358276809706,
+      "sat": 0.495806965683467
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.0974813458177717,
+      "luma": 0.274875365962817,
+      "sat": 0.217238368789601
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.115834802058225,
+      "luma": 0.297380488511086,
+      "sat": 0.288266509938774
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_vantage": {
+    "all": {
+      "colourful": 0.136508730713041,
+      "luma": 0.562712906590738,
+      "sat": 0.276116712660129
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0523598790168762,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.20108127593994
+    },
+    "flags": [
+      "sat 0.276 outside refs 0.065–0.115",
+      "colourful 0.137 outside refs 0.026–0.039"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.0966179096335244,
+      "luma": 0.342746990629236,
+      "sat": 0.388630653734857
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.125650451961514,
+      "luma": 0.582916889343297,
+      "sat": 0.18233255736729
+    },
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.11834751573378,
+      "luma": 0.765361123049941,
+      "sat": 0.243989190407892
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_vantage_night": {
+    "all": {
+      "colourful": 0.0683378930000131,
+      "luma": 0.0461878063728129,
+      "sat": 0.395759102057272
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0523598790168762,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.20108127593994
+    },
+    "flags": [
+      "luma 0.046 outside refs 0.567–0.573",
+      "sat 0.396 outside refs 0.065–0.115",
+      "colourful 0.068 outside refs 0.026–0.039"
+    ],
+    "local_hour": 20.9317118326823,
+    "lower": {
+      "colourful": 0.00282704900858021,
+      "luma": 0.000368262547616923,
+      "sat": 0.0472575033338589
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 60,
+    "middle": {
+      "colourful": 0.0723838860917545,
+      "luma": 0.0732217123601,
+      "sat": 0.372436478609863
+    },
+    "season": 1,
+    "sun_elevation_deg": -14.3450630456367,
+    "upper": {
+      "colourful": 0.0429225801160564,
+      "luma": 0.0688354307803283,
+      "sat": 0.764251520878413
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  }
+}

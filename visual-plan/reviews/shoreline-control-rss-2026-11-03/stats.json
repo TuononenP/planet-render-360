@@ -1,0 +1,162 @@
+{
+  "amsterdam_p0": {
+    "build_ms": 24394,
+    "static_bytes": 528917224,
+    "static_peak_bytes": 1284291544
+  },
+  "amsterdam_p1": {
+    "build_ms": 25336,
+    "static_bytes": 610545526,
+    "static_peak_bytes": 1435349738
+  },
+  "amsterdam_p2": {
+    "build_ms": 27358,
+    "static_bytes": 698763313,
+    "static_peak_bytes": 1507994611
+  },
+  "amsterdam_p3": {
+    "build_ms": 45484,
+    "static_bytes": 1160695360,
+    "static_peak_bytes": 2512521650
+  },
+  "big_sur_p0": {
+    "build_ms": 922,
+    "static_bytes": 388697816,
+    "static_peak_bytes": 744646688
+  },
+  "big_sur_p1": {
+    "build_ms": 768,
+    "static_bytes": 489079038,
+    "static_peak_bytes": 1284291544
+  },
+  "big_sur_p2": {
+    "build_ms": 781,
+    "static_bytes": 537687595,
+    "static_peak_bytes": 1435349738
+  },
+  "big_sur_p3": {
+    "build_ms": 979,
+    "static_bytes": 909417902,
+    "static_peak_bytes": 2151237197
+  },
+  "dubai_p0": {
+    "build_ms": 8147,
+    "static_bytes": 435917522,
+    "static_peak_bytes": 758262938
+  },
+  "dubai_p1": {
+    "build_ms": 8498,
+    "static_bytes": 506910317,
+    "static_peak_bytes": 1284291544
+  },
+  "dubai_p2": {
+    "build_ms": 8552,
+    "static_bytes": 552697472,
+    "static_peak_bytes": 1435349738
+  },
+  "dubai_p3": {
+    "build_ms": 9207,
+    "static_bytes": 950282637,
+    "static_peak_bytes": 2151237197
+  },
+  "helsinki_p0": {
+    "build_ms": 25702,
+    "static_bytes": 507984032,
+    "static_peak_bytes": 1284291544
+  },
+  "helsinki_p1": {
+    "build_ms": 27454,
+    "static_bytes": 595602698,
+    "static_peak_bytes": 1435349738
+  },
+  "helsinki_p2": {
+    "build_ms": 24425,
+    "static_bytes": 683042141,
+    "static_peak_bytes": 1507994611
+  },
+  "helsinki_p3": {
+    "build_ms": 25314,
+    "static_bytes": 1076845716,
+    "static_peak_bytes": 2151237197
+  },
+  "monaco_p0": {
+    "build_ms": 2013,
+    "static_bytes": 452351204,
+    "static_peak_bytes": 758262938
+  },
+  "monaco_p1": {
+    "build_ms": 2522,
+    "static_bytes": 538940167,
+    "static_peak_bytes": 1284291544
+  },
+  "monaco_p2": {
+    "build_ms": 2582,
+    "static_bytes": 611157068,
+    "static_peak_bytes": 1435349738
+  },
+  "monaco_p3": {
+    "build_ms": 3275,
+    "static_bytes": 1009166269,
+    "static_peak_bytes": 2151237197
+  },
+  "paris_p0": {
+    "build_ms": 5304,
+    "static_bytes": 489054024,
+    "static_peak_bytes": 744646688
+  },
+  "paris_p1": {
+    "build_ms": 5060,
+    "static_bytes": 612399436,
+    "static_peak_bytes": 1284291544
+  },
+  "paris_p2": {
+    "build_ms": 5319,
+    "static_bytes": 687765009,
+    "static_peak_bytes": 1435349738
+  },
+  "paris_p3": {
+    "build_ms": 7748,
+    "static_bytes": 1071914849,
+    "static_peak_bytes": 2151237197
+  },
+  "stockholm_p0": {
+    "build_ms": 24629,
+    "static_bytes": 457641270,
+    "static_peak_bytes": 758262938
+  },
+  "stockholm_p1": {
+    "build_ms": 4466,
+    "static_bytes": 559319000,
+    "static_peak_bytes": 1284291544
+  },
+  "stockholm_p2": {
+    "build_ms": 4288,
+    "static_bytes": 645473279,
+    "static_peak_bytes": 1435349738
+  },
+  "stockholm_p3": {
+    "build_ms": 5555,
+    "static_bytes": 1046749342,
+    "static_peak_bytes": 2151237197
+  },
+  "venice_p0": {
+    "build_ms": 34636,
+    "static_bytes": 493333040,
+    "static_peak_bytes": 1284291544
+  },
+  "venice_p1": {
+    "build_ms": 38378,
+    "static_bytes": 583562962,
+    "static_peak_bytes": 1435349738
+  },
+  "venice_p2": {
+    "build_ms": 37299,
+    "static_bytes": 660070401,
+    "static_peak_bytes": 1507994611
+  },
+  "venice_p3": {
+    "build_ms": 38454,
+    "static_bytes": 1047229156,
+    "static_peak_bytes": 2151237197
+  }
+}

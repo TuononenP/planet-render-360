@@ -1,0 +1,98 @@
+{
+  "provider": "ambientCG",
+  "license": "CC0-1.0",
+  "license_url": "https://docs.ambientcg.com/license/",
+  "retrieved": "2026-11-03",
+  "source_technique": "Both assets are listed as fully procedural by their author, not photographic scans.",
+  "maps": "Colour, OpenGL normal, roughness; unmodified JPEG files renamed to match PbrCatalog. Standing folds added to normals at runtime by RoofMetalMaps.",
+  "files": [
+    {
+      "path": "assets/textures/copper_diff.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_1K-JPG.zip",
+      "sha256": "165551cb833345476418d6a285e7952079c2ccc86ccfd7e60f95f28d97fa4c9b",
+      "bytes": 1586915
+    },
+    {
+      "path": "assets/textures/copper_nor.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_1K-JPG.zip",
+      "sha256": "43fc69d2526324450b7da736b026bb74ce898bafde69d934c435ea3b4c21b506",
+      "bytes": 965287
+    },
+    {
+      "path": "assets/textures/copper_rough.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_1K-JPG.zip",
+      "sha256": "71488324fd932dd7df9e5a026f7395eae96a557c5cfe5841a1ea85ffe141032b",
+      "bytes": 473934
+    },
+    {
+      "path": "assets/textures/2k/copper_diff.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_2K-JPG.zip",
+      "sha256": "be0e8af48979ca04207f1503c6e9292851157229deadb2ad6dfc0df9cbd2a30e",
+      "bytes": 6393911
+    },
+    {
+      "path": "assets/textures/2k/copper_nor.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_2K-JPG.zip",
+      "sha256": "fedf5dc7f8c043ec503a1977ec40e9cc3b9b3474ba892ec7c6c0a9669a00014a",
+      "bytes": 4730733
+    },
+    {
+      "path": "assets/textures/2k/copper_rough.jpg",
+      "asset": "Metal058C",
+      "download": "https://ambientcg.com/get?file=Metal058C_2K-JPG.zip",
+      "sha256": "651592a12ce69ad4e6842d8f0871de11edc43573f4ccfaa23652c053e86bd01d",
+      "bytes": 1805998
+    },
+    {
+      "path": "assets/textures/sheet_metal_diff.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_1K-JPG.zip",
+      "sha256": "7e3d8138568e8becbed0a720f65cc35590abccc69aa136c26cffc125182ab8c1",
+      "bytes": 1305155
+    },
+    {
+      "path": "assets/textures/sheet_metal_nor.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_1K-JPG.zip",
+      "sha256": "072c419d998982c1507537b922ee4400d914f351e7642a4152551e879cbe7b0a",
+      "bytes": 1486162
+    },
+    {
+      "path": "assets/textures/sheet_metal_rough.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_1K-JPG.zip",
+      "sha256": "b3de6cf4c8322393f86b1855f8e270a7671af4e2c3f70a81785ab99a84cd0032",
+      "bytes": 494780
+    },
+    {
+      "path": "assets/textures/2k/sheet_metal_diff.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_2K-JPG.zip",
+      "sha256": "b84c38522fc18ea1501ea50f888fa477dbe8e0a69ce81c1f54f841cf449ccaa6",
+      "bytes": 5588395
+    },
+    {
+      "path": "assets/textures/2k/sheet_metal_nor.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_2K-JPG.zip",
+      "sha256": "1fc3363b9d7b21e21f04d0beb3d5ba0704c5797255144802c925689d833c6378",
+      "bytes": 7463563
+    },
+    {
+      "path": "assets/textures/2k/sheet_metal_rough.jpg",
+      "asset": "Metal014",
+      "download": "https://ambientcg.com/get?file=Metal014_2K-JPG.zip",
+      "sha256": "a7512043a199bedd0e7c06f6947b7eae9c69492ca133a2fe4fb2bd9f292f0245",
+      "bytes": 1913340
+    }
+  ],
+  "processing": {
+    "sheet_albedo": "Linear-space saturation 0 and contrast 0.25 around midgrey; original JPEG remains unchanged.",
+    "normals": "Standing folds composed at runtime, 3.6 m repeat / six pans, capped at 1024 square."
+  }
+}
