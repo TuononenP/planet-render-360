@@ -41,6 +41,7 @@ func _run() -> void:
 	_check_parse(failures)
 	_check_build(failures)
 	_check_underpass(failures)
+	_check_bridge_connections(failures)
 	_check_window(failures)
 	if failures.is_empty():
 		print("RAIL SQUARE PASS")
@@ -138,16 +139,46 @@ func _check_underpass(failures: Array[String]) -> void:
 		{"points": PackedVector2Array([c + Vector2(0, -40) * m2u, c + Vector2(0, 40) * m2u]),
 			"class": "residential", "width_m": 6.0, "bridge": true, "tunnel": false, "layer": 1},
 	]
-	var ground := GroundTruth.new(d)
-	var far := ground.height_at_world(c.x - 200.0 * m2u, c.y)
-	var under := ground.height_at_world(c.x, c.y)
-	var drop := (far - under) / m2u
-	var want := RoadBuilder.DECK_DEPTH_M + Underpasses.CLEAR_ROAD_M
-	if absf(drop - want) > 0.6:
-		failures.append("underpass cut %.2f m, want ~%.2f m" % [drop, want])
-	var bank := ground.height_at_world(c.x, c.y + 40.0 * m2u)
-	if absf(bank - far) > 0.05 * m2u:
-		failures.append("bridge end moved %.2f m" % ((far - bank) / m2u))
+	var native_available := Underpasses._native
+	for native in [false, true] if native_available else [false]:
+		Underpasses._native = native
+		var ground := GroundTruth.new(d)
+		var far := ground.height_at_world(c.x - 200.0 * m2u, c.y)
+		var under := ground.height_at_world(c.x, c.y)
+		var drop := (far - under) / m2u
+		var want := RoadBuilder.DECK_DEPTH_M + Underpasses.CLEAR_ROAD_M
+		if absf(drop - want) > 0.6:
+			failures.append("underpass cut %.2f m, want ~%.2f m (native=%s)" % [drop, want, native])
+		var bank := ground.height_at_world(c.x, c.y + 40.0 * m2u)
+		if absf(bank - far) > 0.05 * m2u:
+			failures.append("bridge end moved %.2f m (native=%s)" % [(far - bank) / m2u, native])
+	Underpasses._native = native_available
+
+## A mapped bridge can end on a footpath, as Bruce's Stairs does in San
+## Francisco. Neither connection should dig a trench along that path.
+func _check_bridge_connections(failures: Array[String]) -> void:
+	var m2u := WorldScale.metres_to_units()
+	var bridge := {"points": PackedVector2Array([Vector2(-40, 0) * m2u, Vector2.ZERO, Vector2(40, 0) * m2u]),
+		"class": "steps", "width_m": 2.0, "bridge": true}
+	var ways := [bridge]
+	for x in [-40.0, 40.0]:
+		ways.append({"points": PackedVector2Array([Vector2(x, -100) * m2u, Vector2(x, 0) * m2u, Vector2(x, 100) * m2u]),
+			"class": "footway", "width_m": 3.0})
+	var native_available := Underpasses._native
+	for native in [false, true] if native_available else [false]:
+		Underpasses._native = native
+		var surface := PackedFloat32Array()
+		surface.resize(129 * 129)
+		surface.fill(10.0)
+		var level := PackedFloat32Array()
+		level.resize(surface.size())
+		level.fill(-INF)
+		Underpasses.carve(surface, level, 129, 10.0 * m2u, ways, m2u)
+		for h in surface:
+			if absf(h - 10.0) > 0.001:
+				failures.append("bridge endpoint connection carved terrain (native=%s)" % native)
+				break
+	Underpasses._native = native_available
 
 func _check_window(failures: Array[String]) -> void:
 	if DemFetcher.window_px(48.8566) != DemFetcher.WINDOW_NEAR_PX \

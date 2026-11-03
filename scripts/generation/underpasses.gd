@@ -19,6 +19,9 @@ const RAMP_GRADE := 0.08
 ## (or a layer mistake), never a cut.
 const MAX_CUT_M := 8.0
 const SAMPLE_M := 4.0
+## A bridge joins the ground at its ends; an intersecting way there is a
+## connection, not a crossing underneath it. Allow for coordinate rounding.
+const END_TOLERANCE_M := 0.5
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 
@@ -87,7 +90,7 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1])
 		var b_layer := _layer(b)
 		if _native:
-			_cross_native(cuts, hits[bi], lower, src, size, step, h_a, h_b, b_len)
+			_cross_native(cuts, hits[bi], lower, src, size, step, h_a, h_b, b_len, m2u)
 			continue
 		var b_box := _box(bp)
 		for k in lower.size():
@@ -104,7 +107,11 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 						bp[i], bp[i + 1], wp[j], wp[j + 1])
 					if hit is Vector2:
 						var p: Vector2 = hit
-						var deck := lerpf(h_a, h_b, (b_arc + bp[i].distance_to(p)) / b_len)
+						var hit_arc := b_arc + bp[i].distance_to(p)
+						if _at_bridge_end(hit_arc, b_len, m2u):
+							w_arc += wp[j].distance_to(wp[j + 1])
+							continue
+						var deck := lerpf(h_a, h_b, hit_arc / b_len)
 						var floor_y := deck - RoadBuilder.DECK_DEPTH_M - clear
 						var cut := RoadGrading._sample(src, size, step, p) - floor_y
 						if cut > 0.0 and cut <= MAX_CUT_M:
@@ -121,8 +128,10 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 ## search records them.
 static func _cross_native(cuts: Dictionary, hits: PackedFloat64Array, lower: Array,
 		src: PackedFloat32Array, size: int, step: float, h_a: float, h_b: float,
-		b_len: float) -> void:
+		b_len: float, m2u: float) -> void:
 	for n in range(0, hits.size(), 5):
+		if _at_bridge_end(hits[n + 1], b_len, m2u):
+			continue
 		var k := int(hits[n])
 		var clear := _clearance(str((lower[k] as Dictionary).get("class", "")))
 		var deck := lerpf(h_a, h_b, hits[n + 1] / b_len)
@@ -132,6 +141,10 @@ static func _cross_native(cuts: Dictionary, hits: PackedFloat64Array, lower: Arr
 			if not cuts.has(k):
 				cuts[k] = []
 			(cuts[k] as Array).append([hits[n + 2], floor_y])
+
+static func _at_bridge_end(arc: float, length: float, m2u: float) -> bool:
+	var tolerance := END_TOLERANCE_M * m2u
+	return arc <= tolerance or arc >= length - tolerance
 
 ## Lowers the posts along one way to its ramped floor profile: weight 1
 ## across the way, easing out by one post (narrow, so a short bridge's
