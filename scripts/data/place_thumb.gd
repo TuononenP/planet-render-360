@@ -95,7 +95,18 @@ static func load_preset(id: String, lat: float, lon: float) -> Texture2D:
 	if own != null:
 		return own
 	var p := bundled_path(id)
-	return load(p) as Texture2D if ResourceLoader.exists(p) else null
+	if ResourceLoader.exists(p):
+		return load(p) as Texture2D
+	# Not imported (the editor never scanned it): read the shipped JPEG as is.
+	var hit: Array = _textures.get(p, [])
+	if not hit.is_empty():
+		return hit[1]
+	var img := Image.load_from_file(p)
+	if img == null or img.is_empty():
+		return null
+	var tex := ImageTexture.create_from_image(img)
+	_textures[p] = [0, tex]
+	return tex
 
 static func bundled_path(id: String) -> String:
 	return "%s/%s.jpg" % [BUNDLED_DIR, id]
