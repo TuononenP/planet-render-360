@@ -87,6 +87,16 @@ func _check_bundled(failures: Array[String]) -> void:
 	var built := VectorTileBuilder.build(decoded, 6.0, MapStyle.colors(), 512.0, [false])
 	if decoded.is_empty() or built.is_empty():
 		failures.append("bundled z6 tile did not decode and build")
+	# The Bahamas at data zoom 6: an ocean polygon with dozens of islands,
+	# some touching the coast or each other. Its islands must survive (the
+	# outline alone is ~1,000 triangles; with the islands cut out, ~5,000).
+	var bahamas := MvtReader.read(VectorTileFetcher.inflate(MapPack.shared(MapPack.OMT).get_tile(6, 18, 27)), MapStyle.wanted(6.0))
+	var sea := VectorTileBuilder.build({"water": bahamas["water"]}, 6.0, MapStyle.colors(), 512.0)
+	var tris := 0
+	for batch in sea["batches"]:
+		tris += (batch["indices"] as PackedInt32Array).size() / 3
+	if tris < 3000:
+		failures.append("the Bahamas lost its islands: %d water triangles" % tris)
 
 func _finish(failures: Array[String]) -> void:
 	if failures.is_empty():

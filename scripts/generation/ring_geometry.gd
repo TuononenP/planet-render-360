@@ -94,7 +94,11 @@ static func half_extent(ring: PackedVector2Array, c: Vector2, axis: Vector2) -> 
 ## holes — can triangulate a courtyard block. Holes run against the
 ## outer's winding. The seam goes to the nearest outer vertex it can
 ## reach without crossing an edge; drop_hole_triangles filters the rest.
-static func bridge_holes(outer: PackedVector2Array, holes: Array) -> PackedVector2Array:
+## `sliver` > 0 moves the second visit of each seam end that far aside, so
+## the seam is a thin sliver and no two ring points coincide: Geometry2D's
+## ear clipping treats a coincident point as inside every ear it touches
+## and can run out of ears beside a coast. 0 keeps the exact doubled seam.
+static func bridge_holes(outer: PackedVector2Array, holes: Array, sliver: float = 0.0) -> PackedVector2Array:
 	var out := PackedVector2Array(outer)
 	var ccw := signed_area(outer) > 0.0
 	var sorted := holes.duplicate()
@@ -111,15 +115,57 @@ static func bridge_holes(outer: PackedVector2Array, holes: Array) -> PackedVecto
 			if hole[i].x > hole[hi].x:
 				hi = i
 		var oi := _visible_vertex(out, hole[hi], sorted)
+		var aside := Vector2.ZERO
+		if sliver > 0.0:
+			var along := (out[oi] - hole[hi]).normalized()
+			aside = Vector2(-along.y, along.x) * sliver
 		var seam := PackedVector2Array()
 		for k in hole.size() + 1:
 			seam.append(hole[(hi + k) % hole.size()])
-		seam.append(out[oi])
+		seam[hole.size()] += aside
+		seam.append(out[oi] + aside)
 		var joined := out.slice(0, oi + 1)
 		joined.append_array(seam)
 		joined.append_array(out.slice(oi + 1))
 		out = joined
 	return out
+
+## The holes of `holes` that cross or touch neither an edge of `outer` nor
+## a larger kept hole. Such a hole (an island generalised into the coast
+## or into its neighbour) cannot be part of any simple ring, and one is
+## enough to stop a triangulation; of two crossing holes the smaller goes.
+static func holes_clear_of(outer: PackedVector2Array, holes: Array) -> Array:
+	var order: Array = holes.duplicate()
+	order.sort_custom(func(a: PackedVector2Array, b: PackedVector2Array) -> bool:
+		return absf(signed_area(a)) > absf(signed_area(b)))
+	var clear: Array = []
+	var boxes: Array[Rect2] = []
+	for h in order:
+		var hole := h as PackedVector2Array
+		var box := aabb(hole).grow(0.5)
+		var tangled := _ring_crosses(hole, box, outer)
+		for i in clear.size():
+			if tangled:
+				break
+			tangled = box.intersects(boxes[i]) and _ring_crosses(hole, box, clear[i])
+		if not tangled:
+			clear.append(hole)
+			boxes.append(box)
+	return clear
+
+## Whether any edge of `hole` (within `box`, its grown bounds) crosses or
+## touches an edge of `ring`.
+static func _ring_crosses(hole: PackedVector2Array, box: Rect2, ring: PackedVector2Array) -> bool:
+	for i in ring.size():
+		var r := ring[i]
+		var t := ring[(i + 1) % ring.size()]
+		if maxf(r.x, t.x) < box.position.x or minf(r.x, t.x) > box.end.x \
+				or maxf(r.y, t.y) < box.position.y or minf(r.y, t.y) > box.end.y:
+			continue
+		for j in hole.size():
+			if Geometry2D.segment_intersects_segment(hole[j], hole[(j + 1) % hole.size()], r, t) != null:
+				return true
+	return false
 
 ## Nearest vertex of `out` whose seam to p crosses no edge of `out` or of
 ## any hole (the nearest vertex outright when none is clear).

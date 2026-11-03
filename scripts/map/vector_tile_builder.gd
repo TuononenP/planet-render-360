@@ -16,6 +16,8 @@ extends RefCounted
 const MIN_HOLE_AREA := 4.0
 ## At most this many holes per polygon, the largest first.
 const MAX_HOLES := 48
+## How far (px) the retry's bridge seam is opened, see RingGeometry.bridge_holes.
+const SEAM_SLIVER := 0.003
 
 ## `cancel` is a one-element Array the owner sets to true to stop early
 ## (the screen is leaving); the result is then {}.
@@ -110,9 +112,16 @@ static func _add_polygon(fills: Dictionary, fill: Array, rings: Array, xf: Trans
 	var idx := PackedInt32Array()
 	if not holes.is_empty():
 		ring = RingGeometry.bridge_holes(outer, holes)
-		idx = Geometry2D.triangulate_polygon(ring)
-		if not idx.is_empty():
-			idx = _drop_hole_triangles(ring, idx, holes)
+		idx = _keyhole_triangles(ring, holes)
+		if idx.is_empty():
+			# Generalised islands that touch the coast, or a seam that doubles
+			# a point, leave the ear clipper no ear, and one bad island would
+			# cost the whole archipelago (the Bahamas at zoom 7). Retry on a
+			# sliver seam without the islands that touch the outline.
+			var clear := RingGeometry.holes_clear_of(outer, holes)
+			if not clear.is_empty():
+				ring = RingGeometry.bridge_holes(outer, clear, SEAM_SLIVER)
+				idx = _keyhole_triangles(ring, clear)
 	if idx.is_empty():
 		# No holes, or the keyhole ring would not triangulate: the outer
 		# ring alone beats losing a whole lake or coastline.
@@ -145,6 +154,14 @@ static func _add_polygon(fills: Dictionary, fill: Array, rings: Array, xf: Trans
 	batch["points"] = points
 	batch["colors"] = cols
 	batch["indices"] = indices
+
+## Triangles of a keyhole ring with the ones inside a hole dropped, or
+## empty when the ring would not triangulate.
+static func _keyhole_triangles(ring: PackedVector2Array, holes: Array) -> PackedInt32Array:
+	var idx := Geometry2D.triangulate_polygon(ring)
+	if idx.is_empty():
+		return idx
+	return _drop_hole_triangles(ring, idx, holes)
 
 ## RingGeometry.drop_hole_triangles with a bounding-box check first, so a
 ## triangle only runs point-in-ring against holes it could be inside.

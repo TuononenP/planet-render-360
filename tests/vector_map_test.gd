@@ -197,11 +197,28 @@ func _run() -> void:
 		failures.append("hillshade ignores bodies that are not PNGs")
 	if VectorMapLayer.data_zoom(15) != 14 or VectorMapLayer.data_zoom(16) != 14:
 		failures.append("data zoom caps at 14 (overzoom past it)")
+	# Tangled islands: one that crosses the outline and the smaller of two
+	# that cross each other are dropped; the rest triangulate on a sliver seam.
+	var square := func(x0: float, y0: float, x1: float, y1: float) -> PackedVector2Array:
+		return PackedVector2Array([Vector2(x0, y0), Vector2(x1, y0), Vector2(x1, y1), Vector2(x0, y1)])
+	var sea: PackedVector2Array = square.call(0, 0, 100, 100)
+	var island_a: PackedVector2Array = square.call(10, 10, 30, 30)
+	var on_coast: PackedVector2Array = square.call(-5, 40, 10, 60)
+	var island_c: PackedVector2Array = square.call(50, 50, 70, 70)
+	var island_d: PackedVector2Array = square.call(60, 60, 85, 85)
+	var islands: Array = [island_a, on_coast, island_c, island_d]
+	var clear := RingGeometry.holes_clear_of(sea, islands)
+	if clear.size() != 2 or not clear.has(island_a) or not clear.has(island_d):
+		failures.append("holes_clear_of should keep the island and the larger of two overlapping ones, got %d" % clear.size())
+	if Geometry2D.triangulate_polygon(RingGeometry.bridge_holes(sea, clear, VectorTileBuilder.SEAM_SLIVER)).is_empty():
+		failures.append("the clear islands should triangulate on a sliver seam")
+	if RingGeometry.bridge_holes(sea, [island_a]) != RingGeometry.bridge_holes(sea, [island_a], 0.0):
+		failures.append("bridge_holes without a sliver must keep the exact doubled seam")
 	_finish(failures)
 
 func _finish(failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("VECTOR_MAP OK: MVT decode, corrupt input, TileJSON, inflate, tile check, style rules, build, line mesh, cover, hillshade")
+		print("VECTOR_MAP OK: MVT decode, corrupt input, TileJSON, inflate, tile check, style rules, build, line mesh, cover, hillshade, tangled islands")
 		quit(0)
 	else:
 		for f in failures:
