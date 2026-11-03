@@ -26,7 +26,8 @@
 ## Verification
 
 - Verify changes by running the relevant tests or build before reporting done.
+- Launch every agent-run Godot process through `tools/godot_bg.sh` (or `~/.local/bin/godot`), including headless tests, imports and exports. Never invoke the `.app` binary directly: even a headless run can activate Godot on macOS. Do not use `GODOT_FOREGROUND=1` for agent runs.
 - Run Godot tests so they don't interrupt the user: always pass `--headless` (no window, no focus steal) and run them with `run_in_background`, then check the result when notified.
 - Only `tests/screenshot_test.gd` and `tests/world_cache_test.gd` need a real window; run them in the background too, and batch them at the end instead of after every change.
 - Screenshot/capture scripts (ad-hoc `godot --path . --script ...` runs, not just `tests/`) also open a window. Never pass `--always-on-top`; run them in the background, batch captures into one run, and add `--position 4000,4000` so the window opens off the user's screen.
-- Launch every windowed Godot run through `tools/godot_bg.sh` (or `godot` when it is installed as `~/.local/bin/godot`), never the `.app` binary directly: Godot activates itself on macOS, and the wrapper hands focus back to the user's editor and adds `--windowed` so the full-screen project setting doesn't take over a Space.
+- The wrapper uses the installed no-activation shim and adds `--windowed` so the full-screen project setting doesn't take over a Space. If the shim is missing, build and sign it as described in `tools/godot_noactivate.m` before launching Godot; the wrapper's fallback can still steal focus briefly.
