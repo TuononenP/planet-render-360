@@ -15,7 +15,8 @@ extends RefCounted
 ## * Cars: sedans, hatchbacks, wagons, SUVs and vans with shaped bodywork,
 ##   glazing and wheels; paint mostly white, black, grey and
 ##   silver, some colour. Placement hashes positions, so a street always
-##   parks the same cars. One MultiMesh per kind.
+##   parks the same cars. MultiMeshes group nearby cars by kind; distant
+##   groups use simpler meshes.
 
 const RADIUS_M := 320.0
 const MAX_CARS := 1500
@@ -32,6 +33,9 @@ const PAINT := [Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84), Color(0.03, 0.
 	Color(0.20, 0.04, 0.04), Color(0.04, 0.08, 0.20), Color(0.42, 0.40, 0.34)]
 
 static var _meshes: Dictionary = {}
+const CarModels = preload("res://scripts/generation/car_models.gd")
+const CELL_M := 40.0
+const DETAIL_M := 110.0
 
 ## Cars [position, basis, kind, colour] for `data`'s streets, nearest first.
 static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
@@ -143,25 +147,44 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		return 0
 	var holder := Node3D.new()
 	holder.name = "ParkedCars"
-	for kind in ["sedan", "hatch", "wagon", "suv", "van"]:
-		var list := cars.filter(func(c: Array) -> bool: return c[2] == kind)
-		if list.is_empty():
-			continue
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = mesh(kind)
-		mm.instance_count = list.size()
-		for i in list.size():
-			var c: Array = list[i]
-			mm.set_instance_transform(i, Transform3D(c[1], c[0]))
-			mm.set_instance_color(i, c[3])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "Cars_%s" % kind
-		mmi.multimesh = mm
-		holder.add_child(mmi)
+	var cells := {}
+	var cell_size := CELL_M * WorldScale.metres_to_units()
+	for car in cars:
+		var p: Vector3 = car[0]
+		var key := Vector3i(floori(p.x / cell_size), floori(p.z / cell_size), 0)
+		var group_key := "%s_%d_%d" % [car[2], key.x, key.y]
+		if not cells.has(group_key):
+			cells[group_key] = []
+		cells[group_key].append(car)
+	for group_key in cells:
+		var list: Array = cells[group_key]
+		var kind: String = list[0][2]
+		var detail := CarModels.mesh(kind)
+		if detail == null:
+			_add_batch(holder, list, mesh(kind), str(group_key), 0.0, 0.0)
+		else:
+			_add_batch(holder, list, detail, str(group_key) + "_near", 0.0, DETAIL_M)
+			_add_batch(holder, list, mesh(kind), str(group_key) + "_far", DETAIL_M, 0.0)
 	root.add_child(holder)
 	return cars.size()
+
+static func _add_batch(holder: Node3D, cars: Array, car_mesh: ArrayMesh, batch_name: String,
+		begin_m: float, end_m: float) -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = car_mesh
+	mm.instance_count = cars.size()
+	for i in cars.size():
+		var c: Array = cars[i]
+		mm.set_instance_transform(i, Transform3D(c[1], c[0]))
+		mm.set_instance_color(i, c[3])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Cars_" + batch_name
+	mmi.multimesh = mm
+	mmi.visibility_range_begin = begin_m * WorldScale.metres_to_units()
+	mmi.visibility_range_end = end_m * WorldScale.metres_to_units()
+	holder.add_child(mmi)
 
 ## A car along +X, centred on its footprint, wheels on y = 0 (metres).
 static func mesh(kind: String) -> ArrayMesh:
@@ -180,18 +203,17 @@ static func mesh(kind: String) -> ArrayMesh:
 	var body_h := 1.1 if kind == "van" else (0.80 if kind == "suv" else 0.72)
 	var cabin_h := 0.75 if kind == "van" else (0.68 if kind == "suv" else 0.55)
 	var cabin_l := length * (0.48 if kind == "sedan" else (0.58 if kind == "hatch" else 0.68))
-	var cabin_x := -length * (0.06 if kind == "sedan" else 0.1)
+	var cabin_x := -length * 0.06 if kind == "sedan" else 0.0
 	if kind == "van":
-		cabin_l = length * 0.78
-		cabin_x = -length * 0.08
+		cabin_l = length * 0.70
 	# Lower body, then the glasshouse: raked windscreen and rear window,
 	# tumblehome sides (all glazed) under a painted roof. A box cabin read
 	# as a white crate at street distance.
 	_body(buf.call("body"), length, wide, sill, body_h)
 	var y0 := sill + body_h
 	var y1 := y0 + cabin_h
-	var rake_f := cabin_h * (0.35 if kind == "van" else 1.1)
-	var rake_b := cabin_h * (0.15 if kind in ["van", "suv", "hatch", "wagon"] else 0.7)
+	var rake_f := cabin_h * (0.55 if kind == "van" else 1.35)
+	var rake_b := cabin_h * (0.30 if kind in ["van", "suv", "hatch", "wagon"] else 1.0)
 	var xb := cabin_x - cabin_l * 0.5
 	var xf := cabin_x + cabin_l * 0.5
 	var zb := wide * 0.46
@@ -211,35 +233,51 @@ static func mesh(kind: String) -> ArrayMesh:
 		for corner in corners:
 			glass.append((corner as Vector3).lerp(face_mid, 0.12) + normal * 0.006)
 		_face(buf.call("glass"), glass, mid)
-	_face(buf.call("body"), [hi[0], hi[1], hi[2], hi[3]], mid)
+	# Crown the roof and round its edges instead of a flat rectangular slab.
+	var roof_back := xb + rake_b + 0.12
+	var roof_front := xf - rake_f - 0.12
+	var crown_y := y1 + cabin_h * 0.10
+	var roof := [Vector3(roof_back, crown_y, -zt * 0.75), Vector3(roof_front, crown_y, -zt * 0.75),
+		Vector3(roof_front, crown_y, zt * 0.75), Vector3(roof_back, crown_y, zt * 0.75)]
+	for k in 4:
+		_face(buf.call("body"), [hi[k], hi[(k + 1) % 4], roof[(k + 1) % 4], roof[k]], mid)
+	_face(buf.call("body"), roof, mid)
 	# Painted centre pillars break up the side glass.
 	for edge in [0, 2]:
 		var a: Vector3 = lo[edge]
 		var b: Vector3 = lo[(edge + 1) % 4]
 		var c: Vector3 = hi[(edge + 1) % 4]
 		var d: Vector3 = hi[edge]
-		var offset := Vector3(0, 0, -0.006 if edge == 0 else 0.006)
-		_face(buf.call("body"), [a.lerp(b, 0.48) + offset, a.lerp(b, 0.52) + offset,
-			d.lerp(c, 0.52) + offset, d.lerp(c, 0.48) + offset], mid)
+		var offset := Vector3(0, 0.012, -0.025 if edge == 0 else 0.025)
+		_face(buf.call("trim"), [a.lerp(b, 0.48) + offset, a.lerp(b, 0.515) + offset,
+			d.lerp(c, 0.515) + offset, d.lerp(c, 0.48) + offset], mid)
 	for z in [-1.0, 1.0]:
 		StreetProps._box(buf.call("trim"), Vector3(xf - cabin_l * 0.12, y0 + 0.09, z * (wide * 0.5 + 0.045)),
 			Vector3(0.20, 0.10, 0.18))
-	for z in [-wide * 0.34, wide * 0.34]:
-		StreetProps._box(buf.call("headlight"), Vector3(length * 0.5 - 0.01, sill + body_h * 0.55, z),
-			Vector3(0.045, 0.12, wide * 0.18))
-		StreetProps._box(buf.call("taillight"), Vector3(-length * 0.5 + 0.01, sill + body_h * 0.60, z),
-			Vector3(0.045, 0.14, wide * 0.16))
+		# Door handles and side skirt give scale to the otherwise plain flank.
+		for x in [-length * 0.17, length * 0.13]:
+			StreetProps._box(buf.call("trim"), Vector3(x, sill + body_h * 0.73, z * (wide * 0.5 + 0.005)),
+				Vector3(0.16, 0.025, 0.018))
+	for z in [-wide * 0.27, wide * 0.27]:
+		StreetProps._box(buf.call("headlight"), Vector3(length * 0.5 + 0.002, sill + body_h * 0.49, z),
+			Vector3(0.012, 0.085, wide * 0.20))
+		StreetProps._box(buf.call("taillight"), Vector3(-length * 0.5 - 0.002, sill + body_h * 0.49, z),
+			Vector3(0.012, 0.10, wide * 0.20))
 	StreetProps._box(buf.call("trim"), Vector3(length * 0.5 + 0.012, sill + body_h * 0.32, 0),
 		Vector3(0.035, 0.14, wide * 0.48))
 	# Bumpers and the dark sill between the wheels.
-	StreetProps._box(buf.call("trim"), Vector3(0.0, sill + 0.08, 0.0), Vector3(length + 0.06, 0.16, wide + 0.02))
+	StreetProps._box(buf.call("trim"), Vector3(0.0, sill + 0.045, 0.0), Vector3(length * 0.88, 0.09, wide * 0.96))
 	var wr := 0.33 if kind != "hatch" else 0.31
 	for x in [length * 0.32, -length * 0.32]:
 		for z in [wide * 0.5 - 0.04, -wide * 0.5 + 0.04]:
+			_wheel_arch(buf.call("trim"), Vector3(x, wr, signf(z) * (wide * 0.5 + 0.006)), wr * 1.19, signf(z))
 			TreeMeshLibrary._tube(buf.call("tyre"), [Vector3(x, wr, z - 0.11), Vector3(x, wr, z + 0.11)],
-				[wr, wr], 12, 1.0, 1.0)
+				[wr, wr], 20, 1.0, 1.0)
 			_wheel_face(buf.call("tyre"), Vector3(x, wr, z + signf(z) * 0.112), wr, signf(z))
-			_wheel_face(buf.call("hub"), Vector3(x, wr, z + signf(z) * 0.115), wr * 0.55, signf(z))
+			var hub := Vector3(x, wr, z + signf(z) * 0.115)
+			_wheel_face(buf.call("hub"), hub, wr * 0.62, signf(z))
+			_wheel_face(buf.call("trim"), hub + Vector3(0, 0, signf(z) * 0.002), wr * 0.48, signf(z))
+			_wheel_spokes(buf.call("hub"), hub + Vector3(0, 0, signf(z) * 0.004), wr * 0.48, signf(z))
 	var m := ArrayMesh.new()
 	for mat in surf:
 		var arrays := (surf[mat] as TreeMeshLibrary.Buf).arrays()
@@ -252,7 +290,8 @@ static func mesh(kind: String) -> ArrayMesh:
 ## Bevelled cross sections taper the nose, tail and shoulders.
 static func _body(b: TreeMeshLibrary.Buf, length: float, wide: float, sill: float, height: float) -> void:
 	var rings: Array = []
-	for row in [[-0.5, 0.88, 0.80], [-0.42, 1.0, 1.0], [0.36, 1.0, 1.0], [0.5, 0.86, 0.72]]:
+	for row in [[-0.5, 0.79, 0.66], [-0.47, 0.91, 0.87], [-0.36, 1.0, 1.0],
+			[0.28, 1.0, 1.0], [0.43, 0.94, 0.87], [0.5, 0.80, 0.62]]:
 		var x: float = length * row[0]
 		var w: float = wide * 0.5 * row[1]
 		var top: float = sill + height * row[2]
@@ -263,20 +302,56 @@ static func _body(b: TreeMeshLibrary.Buf, length: float, wide: float, sill: floa
 	var centre := Vector3(0, sill + height * 0.5, 0)
 	for i in rings.size() - 1:
 		for j in 8:
-			_face(b, [rings[i][j], rings[i + 1][j], rings[i + 1][(j + 1) % 8], rings[i][(j + 1) % 8]], centre)
+			var corners := [rings[i][j], rings[i + 1][j], rings[i + 1][(j + 1) % 8], rings[i][(j + 1) % 8]]
+			_smooth_body_face(b, corners, centre, length, height, wide)
 	for i in [0, rings.size() - 1]:
 		var ring: Array = rings[i]
 		var cap := Vector3((ring[0] as Vector3).x, sill + height * 0.4, 0)
 		for j in 8:
 			_face(b, [cap, ring[j], ring[(j + 1) % 8], cap], centre)
 
+static func _smooth_body_face(b: TreeMeshLibrary.Buf, corners: Array, centre: Vector3,
+		length: float, height: float, wide: float) -> void:
+	var normal: Vector3 = (corners[1] - corners[0]).cross(corners[2] - corners[0]).normalized()
+	var mid: Vector3 = (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25
+	if normal.dot(mid - centre) < 0.0:
+		corners.reverse()
+		normal = -normal
+	var normals: Array = []
+	for point in corners:
+		var p: Vector3 = point
+		var end := clampf((absf(p.x) / length - 0.32) / 0.18, 0.0, 1.0)
+		var rounded := Vector3(signf(p.x) * end * 0.7, (p.y - centre.y) / height * 1.3,
+			p.z / wide * 1.5).normalized()
+		normals.append((normal * 0.35 + rounded * 0.65).normalized())
+	TreeMeshLibrary._card(b, corners, normals, [1.0, 1.0, 1.0, 1.0])
+
 static func _wheel_face(b: TreeMeshLibrary.Buf, centre: Vector3, radius: float, side: float) -> void:
-	for i in 12:
-		var a := TAU * float(i) / 12.0
-		var c := TAU * float(i + 1) / 12.0
+	for i in 20:
+		var a := TAU * float(i) / 20.0
+		var c := TAU * float(i + 1) / 20.0
 		var p := centre + Vector3(cos(a) * radius, sin(a) * radius, 0)
 		var q := centre + Vector3(cos(c) * radius, sin(c) * radius, 0)
 		_face(b, [centre, p, q, centre], centre - Vector3(0, 0, side))
+
+static func _wheel_arch(b: TreeMeshLibrary.Buf, centre: Vector3, radius: float, side: float) -> void:
+	for i in 10:
+		var a := PI * float(i) / 10.0
+		var c := PI * float(i + 1) / 10.0
+		var p := Vector3(cos(a), sin(a), 0)
+		var q := Vector3(cos(c), sin(c), 0)
+		_face(b, [centre + p * radius, centre + q * radius, centre + q * (radius + 0.035),
+			centre + p * (radius + 0.035)], centre - Vector3(0, 0, side))
+
+static func _wheel_spokes(b: TreeMeshLibrary.Buf, centre: Vector3, radius: float, side: float) -> void:
+	for i in 5:
+		var a := TAU * float(i) / 5.0
+		var dir := Vector3(cos(a), sin(a), 0)
+		var across := Vector3(-dir.y, dir.x, 0) * radius * 0.12
+		_face(b, [centre + dir * radius * 0.16 - across, centre + dir * radius - across * 0.55,
+			centre + dir * radius + across * 0.55, centre + dir * radius * 0.16 + across],
+			centre - Vector3(0, 0, side))
+	_wheel_face(b, centre, radius * 0.22, side)
 
 ## The box, card and tube helpers wind their triangles counter-clockwise
 ## about the outward normal, which Godot culls as back faces (a car read

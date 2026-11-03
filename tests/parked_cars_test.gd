@@ -60,6 +60,8 @@ func _run() -> void:
 	data.roads = roads
 	var ground := GroundTruth.new(data)
 	var cars := ParkedCars.plan(data, ground, WorldScale.metres_to_units())
+	if cars != ParkedCars.plan(data, ground, WorldScale.metres_to_units()):
+		failures.append("parking, vehicle types and colors must be deterministic")
 	if cars.size() < 40:
 		failures.append("300 m of Hyde St should park both kerbs: %d cars" % cars.size())
 	var sides := {}

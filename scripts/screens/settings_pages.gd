@@ -19,6 +19,7 @@ const SOURCES := [
 	["Landmark details", "Wikipedia · CC BY-SA 4.0", "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"],
 	["Landmark photos", "Wikimedia Commons · credited on each photo", "https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia"],
 	["Textures", "Poly Haven · CC0", "https://polyhaven.com/license"],
+	["Parked car models", "Generic passenger car pack · Comrade1280 · CC BY 4.0 · modified", "https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5"],
 ]
 const LICENCES := [
 	["Instrument Serif and Instrument Sans", "SIL Open Font License", "https://openfontlicense.org/"],
