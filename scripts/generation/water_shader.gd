@@ -21,9 +21,27 @@ extends RefCounted
 ## Vertex data: COLOR.r openness (0 at the rim → 1 OPEN_RAMP_M out),
 ## COLOR.g 1 on sea surfaces (swell, surf), COLOR.b shore distance /
 ## SHORE_M (0..1), UV2 the flow direction × speed (m/s) on rivers.
+## Shared with FarSurface so the near and far water filter at the same
+## screen footprint, including grazing views where distance is insufficient.
+const FILTER_GLSL := """
+float water_wave_weight(float pixel_m, float scale_m) {
+	// Fade from eight to two pixels per feature, before it aliases.
+	return 1.0 - smoothstep(0.125, 0.5, pixel_m / scale_m);
+}
+
+float water_roughness(float rough, vec3 normal_world) {
+	// Broaden glints where neighbouring pixels have different normals.
+	vec3 dx = dFdx(normal_world);
+	vec3 dy = dFdy(normal_world);
+	float variance = max(dot(dx, dx), dot(dy, dy));
+	return sqrt(clamp(rough * rough + variance, 0.0, 1.0));
+}
+"""
+
 const CODE := """
 shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque, specular_schlick_ggx;
+""" + FILTER_GLSL + """
 
 uniform vec4 deep_color : source_color = vec4(0.150, 0.262, 0.250, 1.0);
 uniform vec4 shallow_color : source_color = vec4(0.235, 0.300, 0.250, 1.0);
@@ -72,10 +90,10 @@ vec2 noise_grad(vec2 x) {
 }
 
 // Slope of one travelling sine wave (deep-water dispersion).
-vec2 wave_slope(vec2 p, vec2 dir, float len, float steep, float t) {
+vec2 wave_slope(vec2 p, vec2 dir, float len, float steep, float t, float pixel_m) {
 	float k = 6.2831853 / len;
 	float ph = dot(dir, p) * k - t * sqrt(9.81 * k);
-	return dir * (steep * cos(ph));
+	return dir * (steep * cos(ph)) * water_wave_weight(pixel_m, len);
 }
 
 // Gerstner swell: (dx, dy, dz) displacement in metres.
@@ -109,6 +127,7 @@ void vertex() {
 
 void fragment() {
 	vec2 pm = wpos.xz / units_per_metre;
+	float pixel_m = max(length(dFdx(pm)), length(dFdy(pm)));
 	float dist_m = length(wpos - CAMERA_POSITION_WORLD) / units_per_metre;
 	float t = TIME;
 	vec2 wd = normalize(wind);
@@ -118,20 +137,20 @@ void fragment() {
 	vec2 chop = vec2(0.0);
 	// Low sine steepness: alone they band into visible stripes; the
 	// value-noise octaves break them into irregular chop.
-	chop += wave_slope(pf, normalize(vec2(0.86, 0.51)), 3.7, 0.032, t);
-	chop += wave_slope(pf, normalize(vec2(-0.42, 0.91)), 2.3, 0.026, t);
-	chop += wave_slope(pf, normalize(vec2(0.97, -0.24)), 1.3, 0.020, t);
-	chop += wave_slope(pf, normalize(vec2(-0.71, -0.70)), 0.8, 0.016, t);
-	chop += noise_grad(pf * 0.55 + wd * t * 0.18) * 0.070;
-	chop += noise_grad(pf * 1.9 - wd.yx * t * 0.29) * 0.040;
+	chop += wave_slope(pf, normalize(vec2(0.86, 0.51)), 3.7, 0.032, t, pixel_m);
+	chop += wave_slope(pf, normalize(vec2(-0.42, 0.91)), 2.3, 0.026, t, pixel_m);
+	chop += wave_slope(pf, normalize(vec2(0.97, -0.24)), 1.3, 0.020, t, pixel_m);
+	chop += wave_slope(pf, normalize(vec2(-0.71, -0.70)), 0.8, 0.016, t, pixel_m);
+	chop += noise_grad(pf * 0.55 + wd * t * 0.18) * 0.070 * water_wave_weight(pixel_m, 1.0 / 0.55);
+	chop += noise_grad(pf * 1.9 - wd.yx * t * 0.29) * 0.040 * water_wave_weight(pixel_m, 1.0 / 1.9);
 	// Metre chop fades with distance (it would shimmer); wind waves and
 	// swell keep the far surface broken into reflection streaks.
 	vec2 s = chop / (1.0 + dist_m / 70.0);
-	vec2 wv = noise_grad(pf / 9.0 + wd * t * 0.06) * 0.11
-		+ noise_grad(pf / 4.3 - wd * t * 0.09) * 0.06;
+	vec2 wv = noise_grad(pf / 9.0 + wd * t * 0.06) * 0.11 * water_wave_weight(pixel_m, 9.0)
+		+ noise_grad(pf / 4.3 - wd * t * 0.09) * 0.06 * water_wave_weight(pixel_m, 4.3);
 	s += wv * (0.45 + 0.55 * smoothstep(40.0, 400.0, dist_m));
 	if (seav > 0.5) {
-		s += wave_slope(pm, wd, 46.0, 0.048, t) + wave_slope(pm, normalize(wd + vec2(0.4, -0.3)), 27.0, 0.042, t * 1.1);
+		s += wave_slope(pm, wd, 46.0, 0.048, t, pixel_m) + wave_slope(pm, normalize(wd + vec2(0.4, -0.3)), 27.0, 0.042, t * 1.1, pixel_m);
 	}
 	// Live rain: rings of rough pocks over the whole surface.
 	if (climate_wetness > 0.0 && dist_m < 250.0) {
@@ -139,7 +158,7 @@ void fragment() {
 		vec2 fc = fract(pm * 1.6) - 0.5;
 		float ph = fract(t * 0.9 + w_hash(cell));
 		float ring = sin(clamp(length(fc) - ph * 0.5, -0.05, 0.05) * 62.8) * (1.0 - ph);
-		s += normalize(fc + 1e-4) * ring * 0.08 * climate_wetness;
+		s += normalize(fc + 1e-4) * ring * 0.08 * climate_wetness * water_wave_weight(pixel_m, 1.0 / 1.6);
 	}
 	s *= wave_amp;
 	// Frozen water: still, matte, white-grey ice (ClimateModel).
@@ -172,7 +191,7 @@ void fragment() {
 		vec2 q = vec2(dot(pf, fd) * 0.08, dot(pf, vec2(-fd.y, fd.x)) * 0.9);
 		foam += smoothstep(0.72, 0.9, w_noise(q)) * (1.0 - open_w * 0.7) * 0.5 * min(fl, 1.0);
 	}
-	foam *= (1.0 - climate_water_ice) * (1.0 - smoothstep(300.0, 1200.0, dist_m));
+	foam *= (1.0 - climate_water_ice) * (1.0 - smoothstep(300.0, 1200.0, dist_m)) * water_wave_weight(pixel_m, 1.0 / 3.1);
 	foam = clamp(foam, 0.0, 1.0);
 	col = mix(col, foam_color.rgb, foam);
 	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
@@ -180,7 +199,7 @@ void fragment() {
 	float rough = mix(near_rough, far_rough, smoothstep(60.0, 1500.0, dist_m));
 	rough = mix(rough, 0.45, foam);
 	rough = mix(rough, 0.12, climate_wetness * (1.0 - smoothstep(0.0, 250.0, dist_m)));
-	ROUGHNESS = mix(rough, 0.55, climate_water_ice);
+	ROUGHNESS = water_roughness(mix(rough, 0.55, climate_water_ice), n_world);
 	SPECULAR = mix(mix(spec, 0.2, foam), 0.25, climate_water_ice);
 	METALLIC = 0.0;
 }

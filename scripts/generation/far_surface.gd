@@ -222,6 +222,7 @@ uniform float imagery_gain = 1.6;  // FarSurface.IMAGERY_GAIN
 uniform int far_quality = 2;
 // @SNOW
 // @TERRAIN
+// @WATER_FILTER
 varying vec3 wpos;
 varying vec3 wnrm;
 void vertex() {
@@ -237,6 +238,7 @@ void fragment() {
 	vec4 dg = vec4(dFdx(wpos.xz), dFdy(wpos.xz));
 	vec3 dpx = dFdx(wpos);
 	vec3 dpy = dFdy(wpos);
+	float water_pixel_m = max(length(dpx.xz), length(dpy.xz));
 	vec3 c = COLOR.rgb;
 	float wc = has_coarse * edge_w(UV2);
 	if (wc > 0.0) { c = mix(c, texture(coarse_tex, UV2).rgb * imagery_gain, wc); }
@@ -265,7 +267,11 @@ void fragment() {
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf));
 	}
 	if (water > 0.01) {
-		vec2 wg = t_relief(wpos.xz + vec2(TIME * 0.6, TIME * 0.25), max(25.0, dist * 0.004), 2);
+		float wave_scale = max(25.0, dist * 0.004);
+		vec2 wg = t_relief(wpos.xz + vec2(TIME * 0.6, TIME * 0.25), wave_scale, 2);
+		// The second relief octave is 2.1x finer. Distance alone misses
+		// the large pixel footprint when looking across a flat bay.
+		wg *= water_wave_weight(water_pixel_m, wave_scale / 2.1);
 		nw = normalize(mix(nw, normalize(vec3(-wg.x * 4.0, 1.0, -wg.y * 4.0)), water));
 		c = mix(c, c * 0.55 + vec3(0.012, 0.026, 0.03), water);
 	}
@@ -304,7 +310,8 @@ void fragment() {
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
 	BINORMAL = normalize((VIEW_MATRIX * vec4(cross(tw, nw), 0.0)).xyz);
 	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), sc);
-	ROUGHNESS = mix(mix(0.96, 0.82, steep), mix(0.08, 0.5, climate_water_ice), water);
+	float water_rough = water_roughness(mix(0.08, 0.5, climate_water_ice), nw);
+	ROUGHNESS = mix(mix(0.96, 0.82, steep), water_rough, water);
 	SPECULAR = mix(mix(0.2, 0.3, steep), 0.34, water);
 }
 """
@@ -316,7 +323,8 @@ static var _shader: Shader
 static func drape_material(fine: Texture2D, coarse: Texture2D,
 		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
 	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-		.replace("// @TERRAIN", TerrainGlsl.CODE)
+		.replace("// @TERRAIN", TerrainGlsl.CODE) \
+		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL)
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = code
