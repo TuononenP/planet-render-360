@@ -72,6 +72,8 @@ var _level: PackedFloat32Array = PackedFloat32Array()
 ## Big Sur. Now every carve is a few metres under its own water.
 const FREEBOARD_M := 0.4
 const CARVE_DEPTH_M := 2.0
+## Width of a _water_cells cell, set by _water_cells.
+var _water_cell := 1.0
 ## Height step (metres) at which _blur_pass stops averaging across a
 ## neighbour: DEM noise is well under it, escarpment posts well over.
 const EDGE_SIGMA_M := 3.0
@@ -307,8 +309,9 @@ func _carve_polygons() -> void:
 	var size := _size
 	var hu := float(size) / 2.0
 	var levels: Array = []
+	var cells := _water_cells(water)
 	for wpoly in water:
-		levels.append(_polygon_level(wpoly, water))
+		levels.append(_polygon_level(wpoly, water, cells))
 	# Row scanline over each polygon's indexed edges: a lagoon with a
 	# thousand island holes covers every post, and testing each post
 	# against every vertex never finished (Venice, Stockholm).
@@ -322,7 +325,7 @@ func _carve_polygons() -> void:
 ## in any water polygon); with <3 such samples (a lake filling the
 ## extent) the lowest pre-carve post inside it stands in for the DEM
 ## water surface.
-func _polygon_level(wpoly: Array, water: Array) -> float:
+func _polygon_level(wpoly: Array, water: Array, cells: Dictionary) -> float:
 	var pts: PackedVector2Array = wpoly[0]
 	var off := _step_units * 1.5
 	var stride := maxf(_step_units * 0.75, 1.0)
@@ -344,7 +347,7 @@ func _polygon_level(wpoly: Array, water: Array) -> float:
 				if not is_inside(v.x, v.y):
 					continue
 				var h := height_at_world(v.x, v.y)
-				if _in_water(v, water):
+				if _in_water(v, water, cells):
 					inner = minf(inner, h)
 				else:
 					dry.append(h)
@@ -355,9 +358,28 @@ func _polygon_level(wpoly: Array, water: Array) -> float:
 		return maxf(water_level_m, inner)
 	return water_level_m
 
-static func _in_water(p: Vector2, water: Array) -> bool:
-	for w in water:
-		if (w[1] as PolygonIndex).contains(p):
+## Water polygons bucketed by the cells (1/32 of the detailed area) their
+## bounds touch: cell key -> indices into `water`.
+func _water_cells(water: Array) -> Dictionary:
+	_water_cell = maxf(_half_units / 16.0, 0.001)
+	var cells := {}
+	for k in water.size():
+		var box := (water[k][1] as PolygonIndex).bounds()
+		var x1 := floori(box.end.x / _water_cell)
+		var y1 := floori(box.end.y / _water_cell)
+		for cy in range(floori(box.position.y / _water_cell), y1 + 1):
+			for cx in range(floori(box.position.x / _water_cell), x1 + 1):
+				var key := Vector2i(cx, cy)
+				if not cells.has(key):
+					cells[key] = []
+				(cells[key] as Array).append(k)
+	return cells
+
+## True when p lies in any water polygon: only the polygons whose bounds
+## touch its cell can contain it.
+func _in_water(p: Vector2, water: Array, cells: Dictionary) -> bool:
+	for k in cells.get(Vector2i(floori(p.x / _water_cell), floori(p.y / _water_cell)), []):
+		if (water[k][1] as PolygonIndex).contains(p):
 			return true
 	return false
 

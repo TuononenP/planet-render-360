@@ -19,6 +19,8 @@ const RAMP_GRADE := 0.08
 ## (or a layer mistake), never a cut.
 const MAX_CUT_M := 8.0
 const SAMPLE_M := 4.0
+## Native GroundKernels (native/, tools/build_native.sh) when loaded.
+static var _native := ClassDB.class_exists("GroundKernels")
 
 ## Cuts `surface` (size × size posts, `step` units apart, source metres
 ## in Y) under every bridge crossing in `ways` (road or railway dicts:
@@ -49,8 +51,9 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	# margin covers segment_intersects_segment's tolerance, so the hits
 	# (and their order) are the same.
 	var boxes: Array[Rect2] = []
-	for w in lower:
-		boxes.append(_box((w as Dictionary)["points"]))
+	if not _native:
+		for w in lower:
+			boxes.append(_box((w as Dictionary)["points"]))
 	# Per lower way: [arc position, floor height] of each crossing.
 	var cuts := {}
 	# Posts carrying a bridge end stay put: the deck sits on its banks.
@@ -60,7 +63,22 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var ends: PackedVector2Array = b["points"]
 		for e in [ends[0], ends[ends.size() - 1]]:
 			keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
-	for b in bridges:
+	# Every crossing at once on every core, then evaluated bridge by bridge.
+	var hits: Array = []
+	if _native:
+		var b_pts: Array = []
+		var b_lay := PackedInt32Array()
+		for b in bridges:
+			b_pts.append(b["points"])
+			b_lay.append(_layer(b))
+		var w_pts: Array = []
+		var w_lay := PackedInt32Array()
+		for w in lower:
+			w_pts.append((w as Dictionary)["points"])
+			w_lay.append(_layer(w))
+		hits = ClassDB.class_call_static("GroundKernels", "underpass_hits", b_pts, w_pts, b_lay, w_lay)
+	for bi in bridges.size():
+		var b: Dictionary = bridges[bi]
 		var bp: PackedVector2Array = b["points"]
 		var b_len := _length(bp)
 		if b_len <= 0.0:
@@ -68,6 +86,9 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var h_a := RoadGrading._sample(src, size, step, bp[0])
 		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1])
 		var b_layer := _layer(b)
+		if _native:
+			_cross_native(cuts, hits[bi], lower, src, size, step, h_a, h_b, b_len)
+			continue
 		var b_box := _box(bp)
 		for k in lower.size():
 			var w: Dictionary = lower[k]
@@ -94,6 +115,23 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 				b_arc += bp[i].distance_to(bp[i + 1])
 	for k in cuts:
 		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u)
+
+## One bridge's crossings from GroundKernels.underpass_hits (way index,
+## arc along the bridge and the way, hit x and z), as the script's own
+## search records them.
+static func _cross_native(cuts: Dictionary, hits: PackedFloat64Array, lower: Array,
+		src: PackedFloat32Array, size: int, step: float, h_a: float, h_b: float,
+		b_len: float) -> void:
+	for n in range(0, hits.size(), 5):
+		var k := int(hits[n])
+		var clear := _clearance(str((lower[k] as Dictionary).get("class", "")))
+		var deck := lerpf(h_a, h_b, hits[n + 1] / b_len)
+		var floor_y := deck - RoadBuilder.DECK_DEPTH_M - clear
+		var cut := RoadGrading._sample(src, size, step, Vector2(hits[n + 3], hits[n + 4])) - floor_y
+		if cut > 0.0 and cut <= MAX_CUT_M:
+			if not cuts.has(k):
+				cuts[k] = []
+			(cuts[k] as Array).append([hits[n + 2], floor_y])
 
 ## Lowers the posts along one way to its ramped floor profile: weight 1
 ## across the way, easing out by one post (narrow, so a short bridge's

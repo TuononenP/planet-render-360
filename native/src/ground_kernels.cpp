@@ -1,13 +1,16 @@
 #include "ground_kernels.h"
 
 #include "parallel.h"
+#include "segments.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <vector>
 
 namespace godot {
@@ -91,9 +94,96 @@ PackedByteArray GroundKernels::fill_rings(int n, double extent, const Array &fil
 	return out;
 }
 
+namespace {
+
+struct Box {
+	double x0, z0, x1, z1;
+};
+
+Box box_of(const PackedVector2Array &pts) {
+	Box b{ INFINITY, INFINITY, -INFINITY, -INFINITY };
+	for (int64_t i = 0; i < pts.size(); i++) {
+		b.x0 = Math::min(b.x0, (double)pts[i].x);
+		b.z0 = Math::min(b.z0, (double)pts[i].y);
+		b.x1 = Math::max(b.x1, (double)pts[i].x);
+		b.z1 = Math::max(b.z1, (double)pts[i].y);
+	}
+	return b;
+}
+
+} // namespace
+
+Array GroundKernels::underpass_hits(const Array &bridges, const Array &ways,
+		const PackedInt32Array &b_layers, const PackedInt32Array &w_layers) {
+	const int nb = (int)bridges.size();
+	const int nw = (int)ways.size();
+	std::vector<PackedVector2Array> bp((size_t)nb), wp((size_t)nw);
+	std::vector<Box> bb((size_t)nb), wb((size_t)nw);
+	for (int i = 0; i < nb; i++) {
+		bp[i] = bridges[i];
+		bb[i] = box_of(bp[i]);
+	}
+	for (int k = 0; k < nw; k++) {
+		wp[k] = ways[k];
+		wb[k] = box_of(wp[k]);
+	}
+	std::vector<std::vector<double>> hits((size_t)nb);
+	parallel_for(nb, [&](int b) {
+		const PackedVector2Array &bpts = bp[b];
+		// A margin well past the intersection test's tolerance, so a box
+		// miss is never a hit.
+		const Box &q = bb[b];
+		double b_arc = 0.0;
+		std::vector<double> arc((size_t)bpts.size());
+		for (int64_t i = 0; i + 1 < bpts.size(); i++) {
+			arc[i] = b_arc;
+			b_arc += (double)bpts[i].distance_to(bpts[i + 1]);
+		}
+		for (int k = 0; k < nw; k++) {
+			if (w_layers[k] >= b_layers[b]) {
+				continue;
+			}
+			const Box &w = wb[k];
+			if (q.x1 + 1.0 < w.x0 || w.x1 + 1.0 < q.x0 || q.z1 + 1.0 < w.z0 || w.z1 + 1.0 < q.z0) {
+				continue;
+			}
+			const PackedVector2Array &wpts = wp[k];
+			for (int64_t i = 0; i + 1 < bpts.size(); i++) {
+				double w_arc = 0.0;
+				for (int64_t j = 0; j + 1 < wpts.size(); j++) {
+					Vector2 p;
+					if (segments_cross(bpts[i], bpts[i + 1], wpts[j], wpts[j + 1], p)) {
+						std::vector<double> &h = hits[b];
+						h.push_back((double)k);
+						h.push_back(arc[i] + (double)bpts[i].distance_to(p));
+						h.push_back(w_arc + (double)wpts[j].distance_to(p));
+						h.push_back((double)p.x);
+						h.push_back((double)p.y);
+					}
+					w_arc += (double)wpts[j].distance_to(wpts[j + 1]);
+				}
+			}
+		}
+	});
+	Array out;
+	out.resize(nb);
+	for (int b = 0; b < nb; b++) {
+		PackedFloat64Array a;
+		a.resize((int64_t)hits[b].size());
+		if (!hits[b].empty()) {
+			std::memcpy(a.ptrw(), hits[b].data(), hits[b].size() * sizeof(double));
+		}
+		out[b] = a;
+	}
+	return out;
+}
+
 void GroundKernels::_bind_methods() {
 	ClassDB::bind_static_method("GroundKernels", D_METHOD("fill_rings", "n", "extent", "fills"),
 			&GroundKernels::fill_rings);
+	ClassDB::bind_static_method("GroundKernels",
+			D_METHOD("underpass_hits", "bridges", "ways", "b_layers", "w_layers"),
+			&GroundKernels::underpass_hits);
 }
 
 } // namespace godot
