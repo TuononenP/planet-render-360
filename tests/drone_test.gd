@@ -144,6 +144,29 @@ func _flight() -> void:
 		"the hint says how to fly: " + ViewChrome.hint_text(view))
 	_check(view._drone.sticks.visible == DroneSticks.wanted(), "the sticks show on touch screens only")
 	_check(OS.has_feature("mobile") or not DroneSticks.wanted(), "a desktop flies by keyboard")
+	# Exercise the same held-key path used on desktop, not just the touch sticks.
+	view._rig.set_look(0.0, 0.0)
+	for code in [KEY_W, KEY_S, KEY_A, KEY_D, KEY_E, KEY_Q]:
+		var before := view._rig.position
+		var key_event := InputEventKey.new()
+		key_event.keycode = code
+		key_event.pressed = true
+		Input.parse_input_event(key_event)
+		Input.flush_buffered_events()
+		for i in 30:
+			view._drone.process(view, 1.0 / 30.0)
+		var release := InputEventKey.new()
+		release.keycode = code
+		release.pressed = false
+		Input.parse_input_event(release)
+		Input.flush_buffered_events()
+		var change := view._rig.position - before
+		var moved := (change.z < -1.0 if code == KEY_W else change.z > 1.0) if code in [KEY_W, KEY_S] \
+			else ((change.x < -1.0 if code == KEY_A else change.x > 1.0) if code in [KEY_A, KEY_D] \
+			else (change.y > 1.0 if code == KEY_E else change.y < -1.0))
+		_check(moved, "drone responds to key %s: %s" % [code, change])
+		for i in 120:
+			view._drone.process(view, 1.0 / 30.0)
 
 	# Reflections: a short hop keeps the last capture, a long one retakes it.
 	var dt := 1.0 / 30.0

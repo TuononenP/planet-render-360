@@ -69,10 +69,11 @@ fi
 
 [ "$has_mode" = 0 ] && args=(--windowed "${args[@]}")
 
-# With the shim there is nothing to guard: Godot never activates. A
-# terminal run is your own and stays unshimmed so it behaves normally.
-if [ -f "$shim" ] && { [ "$scripted" = 1 ] || [ ! -t 0 ]; }; then
-	[ "$scripted" = 1 ] && export GODOT_NOACTIVATE_HIDE=1
+# Scripted runs stay in the background for their whole lifetime. A normal
+# app run must not load the shim: it also prevents the user from focusing
+# the window after the initial guard has expired.
+if [ -f "$shim" ] && [ "$scripted" = 1 ]; then
+	export GODOT_NOACTIVATE_HIDE=1
 	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
 	exec "$REAL" "${args[@]}"
 fi

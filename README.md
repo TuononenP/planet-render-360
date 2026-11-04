@@ -2,6 +2,8 @@
 
 > Render any point on the map as a 3D, 360-degree view.
 
+![Planet Render 360 view of Helsinki, with landmark labels and time controls](docs/helsinki-screenshot.png)
+
 ## Summary
 
 Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point on Earth via map tap, place search, or coordinates and generates an accurate on-device 360° 3D view of that location. It fetches real-world data from only free public sources — AWS Terrain Tiles for elevation, Esri World Imagery for satellite draping, OpenStreetMap via Overpass for buildings and roads, CHELSA for climate, Open-Meteo for weather, OpenFreeMap vector tiles and Nominatim for the map and search, and Wikipedia with Wikimedia Commons for landmark details — unified behind a shared `LocationData` contract. A staged, cancellable pipeline builds a true-metre world of far-terrain rings, DEM terrain, water and shore, extruded buildings with regional roofs and facades, recognizable landmarks, roads, and climate-driven vegetation. Rendering uses a drag-to-look 360° camera with LOD rings, a quality governor, NOAA true solar positioning, and seasonal sky and weather dressing, backed by history and built-world caching for fast revisits. Visuals aim to stay as close to reality as possible while rendering smoothly on mobile, with a polished loading flow that keeps waits to a few minutes at most.
