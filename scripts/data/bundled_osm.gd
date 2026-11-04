@@ -5,6 +5,66 @@ extends RefCounted
 ## [latitude, longitude, layer, query version, OSM timestamp, inflated bytes, SHA-256].
 ## Missing layers deliberately use the ordinary network/cache fallback.
 const ENTRIES := {
+	"tokyo_far": [35.6595, 139.7005, "far", 3, "2026-11-03T21:24:23", 11510215, "d8dccef7a1f99659f416d67fe1ef6d72c84c243bdbcfdb78c37e5f80736c769a"],
+	"tokyo_detailed": [35.6595, 139.7005, "detailed_extract", 12, "2026-11-03T21:24:23", 5074058, "9fda3f1dbbdc8210f99cfc88be149cc1a59216f0f3abe7fea6bf7ce68215971a"],
+	"tokyo_ring1600": [35.6595, 139.7005, "ring1600", 1, "2026-11-03T21:24:23", 348939, "63505648aeb8f2a7d15c4c290cc9544af4f83e8f840e1181534c0f46e80c4a03"],
+	"tokyo_ring2500": [35.6595, 139.7005, "ring2500", 1, "2026-11-03T21:24:23", 602576, "fabbe5fc00b9fb98ca202f48dd628b574c23fb6a6442ebd50a1f8043150c4a36"],
+	"tokyo_poi": [35.6595, 139.7005, "poi", 1, "2026-11-03T21:24:23", 752591, "7b706a50c11f55ca4cb93c032380b81f5ff8de4eab2f5c7c04c568a4b09439b6"],
+	"london_detailed": [51.5018, -0.1196, "detailed", 12, "2026-11-02T21:21:26", 14993747, "fbcb23019c17d6d96914db44428ccdb80bd9866800e8eb071e71ce7d7fd15f89"],
+	"london_ring1600": [51.5018, -0.1196, "ring1600", 1, "2026-11-02T21:21:26", 774838, "665dfd7c004c9ac39b244e739d1450c870adc86c9e574434961420186b5126e8"],
+	"london_ring2500": [51.5018, -0.1196, "ring2500", 1, "2026-11-02T21:21:26", 819172, "6c6f1e92a52d88489118fec735d75ff4174465dc6fb55c5319963aa630480c8d"],
+	"london_poi": [51.5018, -0.1196, "poi", 1, "2026-11-02T21:21:26", 363400, "52d1c7339855ef2247d4378e3adcc64b6a91aab2abcf44b91cfc1c97627c30d2"],
+	"london_far": [51.5018, -0.1196, "far", 3, "2026-10-31T00:00:00", 18047901, "ce66485b804e5a98fc538f21f0317bfbdb24729b5726c6c8493975b4d5f473ea"],
+	"dubai_detailed": [25.1925, 55.2741, "detailed_extract", 12, "2026-11-03T21:24:23", 1936910, "47dd8ffd3bc0852c52391bb02045f77e0829d3a5627f2b1370f8e95d0202de6d"],
+	"dubai_ring1600": [25.1925, 55.2741, "ring1600", 1, "2026-11-03T21:24:23", 441304, "beafd1d38965a750d11fc8f13e070d145913fcd225b9607663a52a1fd4a9d573"],
+	"dubai_ring2500": [25.1925, 55.2741, "ring2500", 1, "2026-11-03T21:24:23", 575869, "dfd63379e17e7a73fa514f98951d2729e2b2c0207c81160ab377be35e90085e2"],
+	"dubai_poi": [25.1925, 55.2741, "poi", 1, "2026-11-03T21:24:23", 102741, "555e250ccf2ed4c079d60fff758af48bcaf0c62f31f8aae3ba1e68442e3fc42a"],
+	"dubai_far": [25.1925, 55.2741, "far", 3, "2026-11-03T21:24:23", 3172689, "cfb9058bf55c4e832e5816a64c2d4842402db787ad31eb9c60227f5bd939ed14"],
+	"banff_detailed": [51.1720, -115.5640, "detailed_extract", 12, "2026-11-02T21:21:26", 1885275, "db8474155a8e83a8f81fd0147b3f6cb96049c9fdd42f913062ac645a2794853c"],
+	"banff_ring1600": [51.1720, -115.5640, "ring1600", 1, "2026-11-02T21:21:26", 116200, "312f5b9a2b3e1b1acba8f4c58d97787461c84a5673ea02720ae5e784cf99d4de"],
+	"banff_ring2500": [51.1720, -115.5640, "ring2500", 1, "2026-11-02T21:21:26", 170191, "5b71d3f7e58bd9d5892f4e7fe6cd3e442770abd48c2c98b242cddf5b9bf954c1"],
+	"banff_poi": [51.1720, -115.5640, "poi", 1, "2026-11-02T21:21:26", 74267, "749c4c1dd60a4af7824f0729fbd0e8664baf664a23c0bfbc56caaf2164e50027"],
+	"banff_far": [51.1720, -115.5640, "far", 3, "2026-11-02T21:21:26", 79382, "372bc36eb586296bbbd2443079c3cbf621190ec2bf5e03cc74f65468256dbbc9"],
+	"big_sur_detailed": [36.3740, -121.9022, "detailed_extract", 12, "2026-11-03T00:45:53", 269124, "c4191c3049e74e170375dec22cf7e950681519f94fbd8dd548495e78e96ce226"],
+	"big_sur_ring1600": [36.3740, -121.9022, "ring1600", 1, "2026-11-03T00:45:53", 51634, "de7870899c8c3b4a179379df7bb2b07b0697541dac9ed3eaf43961372f39b33a"],
+	"big_sur_ring2500": [36.3740, -121.9022, "ring2500", 1, "2026-11-03T00:45:53", 68686, "806b3a13bfa0bbd381885b4ab69326763fe091e1071810eff6de81cdaf7d5296"],
+	"big_sur_poi": [36.3740, -121.9022, "poi", 1, "2026-11-03T00:45:53", 1512, "509f627b095d9a0acb90eacfd9137e2a2960f04832d812dbb59611e0e30ec13d"],
+	"big_sur_far": [36.3740, -121.9022, "far", 3, "2026-11-03T00:45:53", 10353, "a7897620dd7ad0e1aaa4678bdb8f7f3de50b369372ed8ca40a406797a0ccec27"],
+	"seoul_detailed": [37.5728, 126.9769, "detailed_extract", 12, "2026-10-31T00:00:00", 4808914, "9c06ea1601e292042ec53158186edd27c6e355586aace2540df998abdd7feff8"],
+	"seoul_ring1600": [37.5728, 126.9769, "ring1600", 1, "2026-10-31T00:00:00", 227498, "dee9b2703f69f5cf2556326a4158fd36728975d26603a75ef77608e4cae65c25"],
+	"seoul_ring2500": [37.5728, 126.9769, "ring2500", 1, "2026-10-31T00:00:00", 436692, "3cde3c99675ba1a84eb4af397af10a5d09f5387800ab184066cee811f67967be"],
+	"seoul_poi": [37.5728, 126.9769, "poi", 1, "2026-10-31T00:00:00", 451934, "8a271233ab5710075d1c46a144098748ee8bb56444c1ccb46d99488d420fb20e"],
+	"seoul_far": [37.5728, 126.9769, "far", 3, "2026-10-31T00:00:00", 11629013, "c546588c1b1ddcf479ad6e19903bd7faf7db50dcc96417868fa3cdef5d8a06de"],
+	"alps_detailed": [46.6900, 7.8580, "detailed", 12, "2026-11-02T21:21:26", 5325085, "f5b1947b982775759f232002696cccc38295394eea4ddf43f5e7c121215dee91"],
+	"alps_ring1600": [46.6900, 7.8580, "ring1600", 1, "2026-11-02T21:21:26", 147804, "dd76d0d395ff1b23a83fb49eea5fd5e7de1290a4cb48c82f49f40bea3edef8b8"],
+	"alps_ring2500": [46.6900, 7.8580, "ring2500", 1, "2026-11-02T21:21:26", 359107, "2204a3ad46f45489f81564abb6a213c29d74b93de8572e614ac5de2d6f6abec7"],
+	"alps_poi": [46.6900, 7.8580, "poi", 1, "2026-11-02T21:21:26", 121242, "c369a95e32870f4bee16f4364fac00b7f006e691ace919a265905c69fa0a9c17"],
+	"alps_far": [46.6900, 7.8580, "far", 3, "2026-11-02T21:21:26", 839192, "6aaec834d737b937cc44ae616fd92fa6310a1a73b8415304677cb9aaf7185ace"],
+	"rome_detailed": [41.8916, 12.4916, "detailed", 12, "2026-11-02T21:21:26", 13599823, "623485a1103a4a3dff1c8b8de73e62a8153f2ab6d819b2ea25c07fce23867b63"],
+	"rome_ring1600": [41.8916, 12.4916, "ring1600", 1, "2026-11-02T21:21:26", 699976, "a5dad8200190e8478ce563d75798441e5c18325b60cd7064ec9466addf24f5e1"],
+	"rome_ring2500": [41.8916, 12.4916, "ring2500", 1, "2026-11-02T21:21:26", 814867, "b4ad2aea51ee0a25cc2fe39d8d8bce676ea56ac486230fdcb482c35827b8fdcc"],
+	"rome_poi": [41.8916, 12.4916, "poi", 1, "2026-11-02T21:21:26", 295890, "420d836609c15c0f5dc45ab2baffe82ad9302631352f4f1415baf9d241e1dfca"],
+	"rome_far": [41.8916, 12.4916, "far", 3, "2026-11-02T21:21:26", 12009509, "5a09b4eac178ba2a5fcb327279f6bd55ca044690fc67744bb7129d91579177f3"],
+	"venice_detailed": [45.4318, 12.3290, "detailed", 12, "2026-11-02T21:21:26", 17199702, "e9a72fed9febdeeaa99c6f283d4be017ad13fac6277d2a9d09467eb96328a752"],
+	"venice_ring1600": [45.4318, 12.3290, "ring1600", 1, "2026-11-02T21:21:26", 164699, "a14de708226d2b96bee68a4d9af482b66d555aa9ef7983bb675e05ff040ab8a0"],
+	"venice_ring2500": [45.4318, 12.3290, "ring2500", 1, "2026-11-02T21:21:26", 179158, "3e3cd1d0927eeaa74686023ab7b8aebdee9caac8e74ca59d79d3eea41c1d66ba"],
+	"venice_poi": [45.4318, 12.3290, "poi", 1, "2026-11-02T21:21:26", 387209, "c958ab4baa69afab8fcb3825972706b9048c4ee6e7e799f04f71589c588f06a4"],
+	"venice_far": [45.4318, 12.3290, "far", 3, "2026-11-02T21:21:26", 3542326, "9919c1fe0bec551a2ec0195d1f6112c4f4c2edfdb81dc64741f2e43ea04fce3c"],
+	"paris_detailed": [48.8622, 2.2887, "detailed", 12, "2026-11-04T15:35:21", 15300207, "b9c04cc24210b5f0d69811c5680eb3d4e716520536dde73d2b18c50b87df166a"],
+	"paris_ring1600": [48.8622, 2.2887, "ring1600", 1, "2026-11-02T21:21:26", 685203, "8657941859a356789f5e7cbf37bec9dfb35a11533f6c8aa10ddda05025171901"],
+	"paris_ring2500": [48.8622, 2.2887, "ring2500", 1, "2026-11-02T21:21:26", 1016449, "1c1de19f6cecad09ef7cafd01b04d92a574833ddcec8e9a8b9e672d998aa15db"],
+	"paris_poi": [48.8622, 2.2887, "poi", 1, "2026-11-02T21:21:26", 474367, "a84539e0eeae6bcc9a6dce08960e5433ea7af0f06183c3c54099585f42a77db3"],
+	"paris_far": [48.8622, 2.2887, "far", 3, "2026-11-04T16:59:38", 22812297, "43a6ceaba79c8f00fa4a067247a7874f5eed21b6d58629cce2c1ec216cf8b577"],
+	"monaco_detailed": [43.7310, 7.4209, "detailed", 12, "2026-11-04T13:15:14", 5275707, "d02caed83d5f4310855a25e764ca20648e0dece79c860f582c92a4adad5e046b"],
+	"monaco_ring1600": [43.7310, 7.4209, "ring1600", 1, "2026-11-02T21:21:26", 466090, "111f1095355d6e15937a9a8b3685850246524fd64afdedc40235edec1ca38705"],
+	"monaco_ring2500": [43.7310, 7.4209, "ring2500", 1, "2026-11-04T13:14:21", 706988, "91643b2b1566052b6bbf4819ebd0b5e84126b3d0cc7614ded925f2c443d4bffe"],
+	"monaco_poi": [43.7310, 7.4209, "poi", 1, "2026-11-02T21:21:26", 239987, "b3068a8335d58161f03dfae554a586da8242c4d76097be4d5837f15de2163b7f"],
+	"monaco_far": [43.7310, 7.4209, "far", 3, "2026-11-02T21:21:26", 1877168, "b85208bd3abda1ede1fa50c96b81e5df9662c65388f29d844f217d2f2ebf1e33"],
+	"espoo_detailed": [60.1760, 24.8050, "detailed", 12, "2026-11-02T21:21:26", 6958463, "fc0fd842d1536429595a37823667f60d85d71759fc0326ad88806c5e4ba18107"],
+	"espoo_ring1600": [60.1760, 24.8050, "ring1600", 1, "2026-11-02T21:21:26", 648258, "e787924a0a8bfc35dedbcc61f6ae06b84fb5481e430da680cb5d7f86b0e77627"],
+	"espoo_ring2500": [60.1760, 24.8050, "ring2500", 1, "2026-11-02T21:21:26", 1053409, "2d6f817e5b44611611ee6c5354cacf7e794344f66ca6813d73ffc537b5180e96"],
+	"espoo_poi": [60.1760, 24.8050, "poi", 1, "2026-11-02T21:21:26", 196569, "b180bfa46bb8bb2f8220d22f3c25c0203f6f4444a64954126bb3767600f3a595"],
+	"espoo_far": [60.1760, 24.8050, "far", 3, "2026-11-02T21:21:26", 18865438, "5b6845e2ff905522c8b79455e7e1e83cebdfcf13a775567529488f75e31970f6"],
 	"san_francisco_far": [37.8040, -122.4195, "far", 3, "2026-11-02T21:21:26", 3389888, "76bd4a396b4f0ee9570354e7c8c94ca185bc750655e65af98f9b8a51bc45f66c"],
 	"new_york_far": [40.7060, -74.0040, "far", 3, "2026-10-31T00:00:00", 20182951, "34411c39c87edab6b073f175b5bb959ee17d207758993ba2080aa7ac3e52142a"],
 	"new_york_ring1600": [40.7060, -74.0040, "ring1600", 1, "2026-10-31T00:00:00", 527912, "b88cbaaf630dd9a68176988de26a301f67f1683c69a9feadfd3c82c83b47fa50"],
@@ -36,8 +96,9 @@ static func entry_for(lat: float, lon: float, layer: String, version: int) -> St
 		# Preset coordinates pass through Vector2 (32-bit components) before
 		# reaching the fetchers. Compare in that representation so the same
 		# preset still matches after the round trip, without matching nearby pins.
+		var layer_matches: bool = layer == entry[2] or (layer == "detailed" and entry[2] == "detailed_extract")
 		if Vector2(lat, lon) == Vector2(float(entry[0]), float(entry[1])) \
-				and layer == entry[2] and version == entry[3]:
+				and layer_matches and version == entry[3]:
 			return key
 	return ""
 
@@ -81,6 +142,8 @@ static func read(key: String) -> String:
 		return ""
 	if ENTRIES[key][2] == "detailed" and (not OsmQuery.is_current(text) or not OsmFetcher._mentions_buildings(text)):
 		return ""
+	if ENTRIES[key][2] == "detailed_extract" and not OsmFetcher._mentions_buildings(text) and not OsmFetcher._mentions_shores(text):
+		return ""
 	return text
 
 ## Detached from the pipeline so finishing the world cannot cancel a refresh.
@@ -104,7 +167,7 @@ static func refresh(tree: SceneTree, key: String, path: String, body: String,
 	var checked := func(text: String) -> String:
 		if not _response_is_newer(text, key):
 			return "response is older than the bundled snapshot"
-		if ENTRIES[key][2] == "detailed" and not OsmQuery.is_current(text):
+		if ENTRIES[key][2] in ["detailed", "detailed_extract"] and not OsmQuery.is_current(text):
 			return "response has an incompatible query version"
 		return str(validate.call(text))
 	req.run(body, checked, endpoints.slice(0, 1))
