@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+OsmFetcher: OSM not cached (offline mode); using cached osm_v2_60146_24987_r1200_q11.json
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 65, "assemble_ms": 63, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 648.4, "precip_warm_mm": 199.7, "snow_days": 163.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.04999999999995, "t_warm_c": 15.45 } { "ms": 1, "cached": true }
+COAST DEM registration: bias=16.87 m
+SHORE TIMINGS classify=187 patches=269
+SHORELINE bodies=47 edges=17653 patches=6702 hard=290 diagnostics=0
+Far-city fetch over budget; far city from imagery only
+FAR-TERRAIN built in 958 ms (rings=3 drapes=3 bands=2)
+SHORE TERRAIN vertices_ms=994
+SHORE TERRAIN arrays_ms=1265 vertices=139760
+SHORE TERRAIN total_ms=1386
+SUOMENLINNA fortress: 42752 triangles / 8 material batches
+FAR-CITY built in 26 ms (blocks=7037 towers=0 tris=97954 meshes=101 source=drape)
+BUILDINGS census { "real": 250, "impostors": 0, "infill": 0, "far_blocks": 7037, "far_towers": 0, "far_tris": 97954 } (settlement=drape)
+BUILD timings {Distant terrain=981, Ground & water=1386, Buildings=3660, Roads & landmarks=3147, Vegetation=2149} total=3664 parallel
+CAPTURE suomenlinna built in 34 s
+SHOT suomenlinna_vantage luma 0.630 sat 0.296 colourful 0.129
+SHOT suomenlinna_h000 luma 0.620 sat 0.291 colourful 0.123
+SHOT suomenlinna_h090 luma 0.601 sat 0.332 colourful 0.135
+SHOT suomenlinna_h180 luma 0.632 sat 0.293 colourful 0.109
+SHOT suomenlinna_h270 luma 0.684 sat 0.184 colourful 0.102
+SHOT suomenlinna_close1 luma 0.695 sat 0.195 colourful 0.129
+SHOT suomenlinna_close2 luma 0.414 sat 0.474 colourful 0.169
+SHOT suomenlinna_vantage_noon luma 0.672 sat 0.316 colourful 0.173
+SHOT suomenlinna_look0 luma 0.511 sat 0.360 colourful 0.154
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/suomenlinna-water-routes-2026-11-04
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 82 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

@@ -1,0 +1,6 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+WaterBuilder: no OSM water for Unknown place — rendering dry.
+SHORE TIMINGS classify=1 patches=4
+SHORELINE bodies=1 edges=204 patches=21 hard=0 diagnostics=0
+NAVIGATION WATERWAYS OK: routes do not carve or render; real channels retained

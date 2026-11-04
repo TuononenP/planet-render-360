@@ -261,8 +261,8 @@ static func waterway_class_width(water_class: String) -> float:
 			return 12.0
 		"canal":
 			return 10.0
-		"fairway":
-			return 20.0
+		"fairway", "link":
+			return 0.0  # Navigation routes do not define physical water channels.
 		"stream":
 			return 3.0
 		"ditch", "drain":
@@ -492,9 +492,14 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 	var w := _tag_metres(tags.get("width", ""), 0.5, 500.0)
 	if not is_nan(w):
 		width_m = w
-	if wc == "coastline":
+	if wc == "coastline" or navigation_waterway(wc):
 		width_m = 0.0
 	return {"points": pts, "width_m": width_m, "class": wc}
+
+## Navigable routes across existing water must not carve or shade their
+## own channels, even when a cached feature carries a positive width.
+static func navigation_waterway(water_class: String) -> bool:
+	return water_class in ["fairway", "link"]
 
 ## Direction along the mapped way: -1 reverse, 0 two-way, 1 forward.
 static func oneway(tags: Dictionary) -> int:

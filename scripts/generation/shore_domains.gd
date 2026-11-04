@@ -26,6 +26,8 @@ func _init(data: LocationData = null, box: Rect2 = Rect2(), abort: BuildAbort = 
 	for w in data.waterways:
 		if abort != null and abort.requested:
 			return
+		if OsmTags.navigation_waterway(str(w.get("class", ""))):
+			continue
 		var line: PackedVector2Array = w.get("points", PackedVector2Array())
 		var width := float(w.get("width_m", 0.0)) * WorldScale.metres_to_units()
 		if line.size() < 2 or width <= 0.0:

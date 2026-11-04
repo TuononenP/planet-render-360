@@ -151,7 +151,7 @@ static func real_water_material(preset: int = RenderSettings.Preset.HIGH) -> Sha
 static func _channels(data: LocationData) -> Array:
 	var out: Array = []
 	for w in data.waterways:
-		if not (w is Dictionary):
+		if not (w is Dictionary) or OsmTags.navigation_waterway(str(w.get("class", ""))):
 			continue
 		var pts: PackedVector2Array = w.get("points", PackedVector2Array())
 		if float(w.get("width_m", 0.0)) > 0.0 and pts.size() >= 2:
