@@ -124,6 +124,7 @@ The audit of 2026-11-03 found:
 ### C-7: Street life — @codex/nyc 2026-11-03
 - [x] Yellow cabs: a taxi share in New York's `ParkedCars` paint, or a `taxi` kind with a roof sign.
 - [x] Subway entrances: fetch `railway=subway_entrance`; a stair kiosk with green globe lamps.
+- [x] Separate mapped entrance inspection: r32/r33 show High Street node `219785432` on dry pavement, with diffused split globes and railing infill. A descending terrain opening remains a photographic limitation.
 - [x] NYC lamp family (Type-F / Bishop's crook) and NYC furniture kit (G-7).
 - [x] Tree species rows: honey locust (Gleditsia), callery pear (Pyrus), ginkgo, zelkova, London plane; GENUS mapping;
       tree pits.
@@ -137,7 +138,7 @@ One background agent batch in a scratch copy, deleted afterwards.
 ### C-9: Hero loop
 - [x] Capture rounds `nyc-rN` against the refs; review README and scorecard §9 line each round.
 - [ ] Photographic on Ultra: human gate remains pending; the current pre-rating is recognisable.
-- [ ] Complete-data Ultra cold load ≤150 s: the isolated 53 s run had HTTP 403 fallbacks and cannot pass this gate.
+- [ ] Complete-data Ultra cold load ≤150 s: r31 opened in 90 s with complete detailed/far responses, but the optional ring and POIs failed; the strict all-layer gate remains open.
 
 ## Critical files
 
@@ -216,6 +217,8 @@ No commits or pushes. Concurrent vessel and Suomenlinna work was preserved.
 | C-8 | Crown/material tests, r26/r28/r30 crown looks, Oculus street view, ferry gallery | Crown ornament follows mapped rings/heights; 70 Pine lantern, Civic Fame and copper crowns retained. Oculus glazing replaces solid side panels. Concurrent ferry model reviewed without overwriting it. Fine landmark fidelity remains subject to the human review. |
 | C-8 composition | r22 looks5–10 and `preset_views_test` | Bearings 293–298 compared. 295° is the nearest to 298° giving both subjects at least 2° of margin at 1280×800; 08:00 retained. |
 | C-9 | r21–r28, Fast/High captures, full-data cached run and isolated cold run | Cached opening 14 s, generation 7.840 s, far city 530 ms / 276,362 triangles. Photographic quality and complete-data cold timing remain open. |
+| C-9 follow-up | [r31 cold capture](../../visual-plan/reviews/nyc-r31-cold-2026-11-04/README.md), mirror probes and retry tests | Removed whitelist-only OSM-FR; 403 advances mirrors, 400 still stops. Empty-cache Ultra opened in 90 s with complete detailed/far responses; generation 8.176 s, far network/parse 73.792 s. Ring and POIs failed, so all-layer timing remains open. |
+| C-7 follow-up | r32/r33 High Street close views, complete local q12 audit and street-furniture test | Mapped node `219785432` is visibly placed on dry pavement. Split white/green globes reduce bloom and railing infill is present. Missing-view evidence is resolved; true terrain excavation for descending stairs remains a photographic limitation. |
 
 The 27 focused/regression checks pass, as do windowed cache and screenshot checks.
 The broad live scorecard run timed out at 180 s; its focused Turku rerun reproduces the

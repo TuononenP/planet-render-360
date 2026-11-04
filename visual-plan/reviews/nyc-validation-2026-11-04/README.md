@@ -45,6 +45,48 @@ The isolated empty-cache run opened in 53 s but received HTTP 403 responses for 
 1. Photographic quality and the final human rating.
 2. Complete-data cold load within 150 s under healthy source availability.
 3. A verified golden-hour Commons photograph specifically from Pier 1. Existing morning, night and street sources remain attributed; the DUMBO golden-hour image is not relabelled as Pier 1.
-4. An acceptable close in-world subway entrance inspection. The live mapped York Street node is confirmed, but the two fallback capture attempts are rejected as visual evidence.
 
 Reproduce normal captures with `tools/godot_bg.sh --path . --script tools/capture_presets.gd --position 4000,4000 -- --tag=nyc-review --preset=3 --places=new_york --refs=morning`. Omit `--refs=morning` and add `--weather=3` for overcast. `--cold-cache` isolates data caches; `--pin=lat,lon` supports separate mapped-site inspections. Run these in the background.
+
+## Post-commit continuation
+
+The hero implementation was committed as `d0d4846`. Live native probes
+then identified OSM-FR's whitelist-only HTTP 403 response. It was removed
+from the public fallback list; a 403 from another mirror now advances to
+the next endpoint. A malformed query (400) still stops. The POI request
+retains one 15 s attempt on VK Maps. [Probe evidence](probe-fr.log) and
+[successful mapped-node response](probe-mail.log) are retained.
+
+[r31](../nyc-r31-cold-2026-11-04/README.md) opened from empty caches in
+90 s, with complete detailed and far responses, 8.176 s generation and
+73.792 s far-city network/parse time. Ring and POIs failed, so the strict
+all-layer cold-load criterion remains open. The skyline is retained and
+the pre-rating remains recognisable. Retry tests exercise 403 → partial
+HTTP 200 → complete HTTP 200, malformed-query termination, and exhaustion;
+parser, offline fallback and far-city regression checks pass.
+
+[r32](../nyc-r32-high-street-2026-11-04/README.md) and
+[r33](../nyc-r33-high-street-2026-11-04/README.md) supply three separate
+close views of mapped High Street entrance node `219785432`, using a
+complete local detailed response. r33 reduces globe bloom, uses white/green
+diffusers and adds railing infill. Street-furniture checks pass. The
+missing-view gate is closed; raised treads without a terrain excavation
+remain an explicit photographic limitation. These local frames do not
+validate the missing far-city data or POIs.
+
+Final validation: the five focused parser/retry/fallback/far-city/furniture
+checks pass, as do class-size and whitespace checks. The repeated
+[world-cache check](final-world_cache.log) passes: first opening 168.698 s,
+cached opening 108.468 s, cache hit 12 ms; repeated live map failures account
+for much of both openings. These Paris timings are not the NY cold target.
+
+The screenshot harness now fails when generation exceeds its wait instead
+of labelling loading frames as viewer captures. It dismisses first-launch
+onboarding in its isolated test session and accepts `--offline-osm` for
+cached-map UI verification. The initial online sequence was stopped after
+invalid viewer shots; the first offline sequence was rejected because of
+the onboarding overlay. The corrected rerun exits 0, produces 16 verified
+PNGs, and visually shows the Paris, Interlaken and Eiffel viewers. Offline
+data notices and reduced geometry are expected; this is a UI regression
+check, not a full-data fidelity acceptance. [Final results](final-windowed.json)
+retain the output directory, inspected frames and rejected-attempt logs.

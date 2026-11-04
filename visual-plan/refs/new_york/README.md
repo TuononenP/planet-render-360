@@ -23,6 +23,14 @@ Additional reference sources, downloaded to `context/` and kept separate from th
 
 A verified morning golden-hour Pier 1 reference is still needed.
 
+Linked sunrise context: [Lower Manhattan during sunrise, VOJTa Herout](https://www.photohound.co/spot/lower-manhattan-panorama-from-pier-1-1001535),
+the fourth photograph in PhotoHound's Pier 1 gallery. The photographer's
+caption establishes sunrise and the gallery establishes the viewpoint;
+EXIF date/time and a reusable licence are not supplied on the public page.
+Keep it as an attributed visual reference, outside the downloaded Commons
+comparison sets and their statistics. The precise golden-hour Commons gate
+remains open.
+
 - `near-dumbo-golden-morning.jpg`: [Brooklyn Bridge and One World Trade Center, morning light](https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge_and_One_World_Trade_Center,_morning_light_(20887439332).jpg), John Cunniff, CC BY 2.0; photographed about 30 minutes after sunrise from Brooklyn Bridge Park near DUMBO (not Pier 1).
 
 ## Condition-matched comparisons — 2026-11-04

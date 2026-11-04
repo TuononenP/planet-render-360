@@ -3,6 +3,7 @@ extends SceneTree
 ## Windowed only: godot --script tests/screenshot_test.gd
 ## Captures every screen at phone, tablet, and desktop sizes so the
 ## responsive layouts can be compared against the prototype mockups.
+## Add -- --offline-osm to exercise existing map caches during an outage.
 
 var _shot_dir := ""
 
@@ -22,11 +23,15 @@ func _resize(w: int, h: int) -> void:
 	await process_frame
 	await process_frame
 
-func _wait_view(main: Node, timeout_sec: float) -> void:
+func _wait_view(main: Node, timeout_sec: float) -> bool:
 	var start := Time.get_ticks_msec()
-	while not main._view.visible \
+	while (main._generating or not main._view.visible) \
 			and Time.get_ticks_msec() - start < int(timeout_sec * 1000.0):
 		await process_frame
+	if main._generating or not main._view.visible:
+		printerr("SCREENSHOT FAIL: no completed viewer after %s s" % timeout_sec)
+		return false
+	return true
 
 ## Names the Overpass query would return around Interlaken, injected so the
 ## shots need no request; the mini-map's tiles and the view's own data still
@@ -87,6 +92,14 @@ func _run() -> void:
 	await process_frame
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
+	# Isolated empty history triggers first-launch onboarding. These shots
+	# target the picker and viewer underneath it, without saving user prefs.
+	for child in main.get_children():
+		if child is OnboardingScreen:
+			child.queue_free()
+	if OS.get_cmdline_user_args().has("--offline-osm"):
+		main._pipeline._osm.offline_mode = true
+		main._pipeline._farcity.offline_mode = true
 	await _resize(390, 844)
 	await create_timer(0.5).timeout
 	await _resize(390, 844)  # first resize can be lost to window creation
@@ -109,7 +122,9 @@ func _run() -> void:
 	await _snap("02-loading-phone")
 	await _resize(1280, 800)
 	await _snap("02b-loading-desktop")
-	await _wait_view(main, 60.0)
+	if not await _wait_view(main, 60.0):
+		quit(1)
+		return
 	await create_timer(0.5).timeout
 	await _resize(390, 844)
 	await _snap("03-view360-phone")
@@ -118,7 +133,9 @@ func _run() -> void:
 	# Second golden location: alpine terrain at golden hour.
 	main._view.set_time_of_day(17)
 	main._start_generation(46.6863, 7.8632)
-	await _wait_view(main, 60.0)
+	if not await _wait_view(main, 60.0):
+		quit(1)
+		return
 	main._view.set_time_of_day(17)
 	main._view._rig.set_look(-1.57, -0.04)  # face the Brienz valley ranges
 	await create_timer(0.5).timeout
@@ -129,7 +146,9 @@ func _run() -> void:
 	await _viewer_tools(main)
 	# Landmark viewpoint: the Eiffel Tower at its real coordinates.
 	main._start_generation(48.8584, 2.2945)
-	await _wait_view(main, 60.0)
+	if not await _wait_view(main, 60.0):
+		quit(1)
+		return
 	main._view.set_time_of_day(17)
 	await create_timer(0.5).timeout
 	await _resize(1280, 800)

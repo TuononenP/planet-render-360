@@ -591,3 +591,17 @@ parts. Storeys now follow the part's occupied height, and glazed parts shed inhe
 [The r30 close view](../visual-plan/reviews/nyc-r30-lantern-2026-11-04/new_york_look0.jpg) resolves
 70 Pine's glass lantern; focused crown, building-fabric and architecture tests pass. Overall rating
 remains recognisable; this does not close the photographic or cold-network gates.
+
+[r31 isolated cold capture](../visual-plan/reviews/nyc-r31-cold-2026-11-04/README.md):
+after removing the whitelist-only mirror, complete detailed/far responses
+produced the opening in 90 s. Generation took 8.176 s; far-city network/parse
+took 73.792 s. The optional ring and POIs failed, keeping the strict all-layer
+cold-load gate open. The skyline remains recognisable; photographic quality
+and human approval remain pending.
+
+[r32/r33 High Street inspection](../visual-plan/reviews/nyc-r33-high-street-2026-11-04/README.md):
+three close views show mapped entrance node `219785432` on dry pavement.
+Diffused white/green globes and vertical railing infill improve the kit;
+street-furniture checks pass. The separate subway-view requirement is now
+evidenced. A true descending terrain opening remains unimplemented; this
+does not improve the overall provisional grade beyond recognisable.

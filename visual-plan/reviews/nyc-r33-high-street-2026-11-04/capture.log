@@ -1,0 +1,33 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 75, "assemble_ms": 105, "tiles": 124, "cached": 124, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 1198.3, "precip_warm_mm": 326.2, "snow_days": 55.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": 1.15000000000003, "t_warm_c": 23.35 } { "ms": 1, "cached": true }
+OsmFetcher: POIs unavailable (Overpass failed (result=13 code=0)); using other map data
+SHORE TIMINGS classify=137 patches=146
+SHORELINE bodies=15 edges=11919 patches=4481 hard=150 diagnostics=0
+Far-city fetch over budget; far city from imagery only
+FAR-TERRAIN built in 1766 ms (rings=3 drapes=3 bands=2)
+SHORE TERRAIN vertices_ms=1855
+SHORE TERRAIN arrays_ms=2157 vertices=103723
+SHORE TERRAIN total_ms=2264
+FAR-CITY built in 55 ms (blocks=23922 towers=0 tris=239220 meshes=127 source=drape)
+BUILDINGS census { "real": 2295, "impostors": 0, "infill": 0, "far_blocks": 23922, "far_towers": 0, "far_tris": 239220 } (settlement=drape)
+BUILD timings {Distant terrain=1780, Ground & water=2264, Buildings=5118, Roads & landmarks=2873, Vegetation=4289} total=5137 parallel
+CAPTURE nyc_high_street built in 52 s
+SHOT nyc_high_street_vantage luma 0.611 sat 0.148 colourful 0.102
+SHOT nyc_high_street_h000 luma 0.548 sat 0.195 colourful 0.103
+SHOT nyc_high_street_h090 luma 0.550 sat 0.340 colourful 0.144
+SHOT nyc_high_street_h180 luma 0.502 sat 0.282 colourful 0.120
+SHOT nyc_high_street_h270 luma 0.611 sat 0.132 colourful 0.078
+SHOT nyc_high_street_close1 luma 0.643 sat 0.114 colourful 0.075
+SHOT nyc_high_street_close2 luma 0.338 sat 0.175 colourful 0.070
+SHOT nyc_high_street_look0 luma 0.306 sat 0.461 colourful 0.143
+SHOT nyc_high_street_look1 luma 0.376 sat 0.258 colourful 0.103
+SHOT nyc_high_street_look2 luma 0.340 sat 0.347 colourful 0.129
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-r33-high-street-2026-11-04
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 89 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

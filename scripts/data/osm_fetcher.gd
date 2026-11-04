@@ -25,8 +25,8 @@ signal fallback_used(detail: String, partial: bool)
 ## return zero buildings outside their extract. The main instance
 ## is not repeated: z.overpass-api.de (same operator, separate pool)
 ## answered a live probe (2026-10-31) while the main one timed out. The
-## OSM-FR instance (global data, free fair-use) answered while the main
-## one reported "at capacity" (HTTP 502), so it is the first fallback.
+## OSM-FR instance now refuses unlisted clients (HTTP 403, live probe
+## 2026-11-04), so it is no longer a public fallback.
 ## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
 ## answering nothing, not even a one-node query, so it is tried last.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
@@ -35,7 +35,6 @@ signal fallback_used(detail: String, partial: bool)
 const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
-	"https://overpass.openstreetmap.fr/api/interpreter",
 	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 	"https://z.overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
@@ -60,7 +59,7 @@ static func endpoint_order(first: Array[String]) -> Array[String]:
 ## starting both on the main instance took two of its per-IP slots and
 ## could queue the detailed query behind the app's own garnish.
 static func ring_endpoints() -> Array[String]:
-	return endpoint_order(["openstreetmap.fr", "mail.ru"])
+	return endpoint_order(["mail.ru"])
 
 ## Seconds the best-effort ring may still run once the detailed data is
 ## ready; past this the fetch finishes with the detailed data alone.
@@ -444,11 +443,12 @@ static func _payload_usable(text: String) -> bool:
 
 ## Transient failures are worth another instance: any transport
 ## error (timeout, cannot connect, ...) or a 429/5xx from an
-## overloaded server. A 4xx means the query itself is rejected.
+## overloaded server. A 403 is an instance's access policy, so try a
+## different public mirror; malformed queries (400) still stop.
 static func is_retryable(result: int, code: int) -> bool:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		return true
-	return code in [429, 500, 502, 503, 504]
+	return code in [403, 429, 500, 502, 503, 504]
 
 ## Next attempt index for a failed attempt, or -1 to give up.
 static func next_attempt(attempt: int, retryable: bool) -> int:
@@ -521,7 +521,7 @@ func _try_finish() -> void:
 		if _poi_text == "" and _poi_enabled and not offline_mode:
 			_poi_pending = true
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
-				_check_ring, endpoint_order(["openstreetmap.fr"]).slice(0, 1))
+				_check_ring, endpoint_order(["mail.ru"]).slice(0, 1))
 			return
 	if not _poi_pending:
 		_finish()

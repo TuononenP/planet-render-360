@@ -1,0 +1,27 @@
+{
+  "osm_v2_40706_-74004_r1200_q12.json": {
+    "bytes": 16752051,
+    "remark": "",
+    "elements": 22883,
+    "types": {
+      "pr360_q12": 1,
+      "node": 6859,
+      "way": 15807,
+      "relation": 215,
+      "area": 1
+    },
+    "base_timestamp": "2026-11-04T07:06:05Z",
+    "sha256": "f68cf2bf6bf8d67b6c15ae06159271bc8b5de54b9c47a8d1342030b288869a88"
+  },
+  "osm_v2_40706_-74004_farcity12000_q3.json": {
+    "bytes": 36898090,
+    "remark": "",
+    "elements": 34651,
+    "types": {
+      "way": 34475,
+      "relation": 176
+    },
+    "base_timestamp": "2026-11-04T07:06:05Z",
+    "sha256": "d1dc50eaf6a843c3aaad09d89a9e5e697705860e8ae696bcce2e284ceb66a5ca"
+  }
+}

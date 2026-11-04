@@ -1,0 +1,142 @@
+{
+  "world_cache": {
+    "exit_code": 0,
+    "first_open_ms": 168698,
+    "cached_open_ms": 108468,
+    "cache_hit_ms": 12
+  },
+  "screenshot": {
+    "exit_code": 0,
+    "mode": "--offline-osm; world cache disabled",
+    "output_dir": "/Users/petri.tuononen/Library/Application Support/Planet Render 360/shots/screenshot-test-59933",
+    "images": [
+      {
+        "file": "01-picker-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "01b-picker-tablet.png",
+        "size": [
+          834,
+          1112
+        ]
+      },
+      {
+        "file": "01c-picker-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "01d-picker-predictions.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "02-loading-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "02b-loading-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "03-view360-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "03b-view360-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "04-history-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "04b-history-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "05-view360-interlaken-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "05b-view360-interlaken-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "06-view360-eiffel-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "07-viewer-tools-desktop.png",
+        "size": [
+          1280,
+          800
+        ]
+      },
+      {
+        "file": "07b-viewer-tools-phone.png",
+        "size": [
+          390,
+          844
+        ]
+      },
+      {
+        "file": "07c-photo-stamped.png",
+        "size": [
+          390,
+          844
+        ]
+      }
+    ],
+    "visually_inspected": [
+      "03b-view360-desktop.png",
+      "05b-view360-interlaken-desktop.png",
+      "06-view360-eiffel-desktop.png"
+    ]
+  },
+  "rejected_attempts": [
+    {
+      "log": "final-screenshot.log",
+      "reason": "network timeout; loading frames were labelled as viewer captures; run terminated"
+    },
+    {
+      "log": "final-screenshot-offline.log",
+      "reason": "onboarding overlay obscured viewer; harness corrected and rerun"
+    }
+  ]
+}

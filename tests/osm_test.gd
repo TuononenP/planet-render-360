@@ -661,11 +661,13 @@ func _busy_checks(failures: Array[String]) -> void:
 	if ring.size() != OsmFetcher.ENDPOINTS.size() or ring[0] == OsmFetcher.ENDPOINTS[0]:
 		failures.append("ring query must cover every endpoint and start on a mirror: %s" % [ring])
 	var far := FarCityFetcher.endpoints()
-	if far.size() != 4 or not far[0].contains("openstreetmap.fr") \
-			or not far[1].contains("private.coffee") \
-			or far[2] != "https://overpass-api.de/api/interpreter" \
-			or not far[3].contains("mail.ru"):
+	if far.size() != 4 or not far[0].contains("private.coffee") \
+			or far[1] != "https://overpass-api.de/api/interpreter" \
+			or not far[2].contains("mail.ru") \
+			or not far[3].contains("z.overpass-api.de"):
 		failures.append("far-city endpoints wrong: %s" % [far])
+	if HorizonFetcher.endpoints() != far:
+		failures.append("horizon labels should use the available far-city mirrors")
 
 func _chain_checks(failures: Array[String]) -> void:
 	# Transient Overpass failures (client timeout, 502 from an

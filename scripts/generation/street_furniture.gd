@@ -248,8 +248,14 @@ static func mesh(key: String) -> ArrayMesh:
 				for x in [-1.5, 1.5]:
 					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(x, 0, z), Vector3(x, 1.05, z)], [0.045, 0.045], 6, 1.0, 1.0)
 				TreeMeshLibrary._tube(buf.call("iron"), [Vector3(-1.5, 1.0, z), Vector3(1.5, 1.0, z)], [0.04, 0.04], 6, 1.0, 1.0)
-				TreeMeshLibrary._tube(buf.call("lens_g"), [Vector3(1.5, 1.08, z), Vector3(1.5, 1.22, z),
-					Vector3(1.5, 1.38, z), Vector3(1.5, 1.52, z)], [0.05, 0.16, 0.16, 0.05], 8, 1.0, 1.0)
+				for k in range(1, 20):
+					var x := -1.5 + float(k) * 0.15
+					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(x, 0.1, z), Vector3(x, 1.0, z)], [0.012, 0.012], 4, 1.0, 1.0)
+				# Split white/green globe; a lamp diffuser is less emissive than a traffic lens.
+				TreeMeshLibrary._tube(buf.call("globe_white"), [Vector3(1.5, 1.12, z), Vector3(1.5, 1.16, z),
+					Vector3(1.5, 1.22, z), Vector3(1.5, 1.30, z)], [0.0, 0.113, 0.161, 0.18], 12, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("globe_green"), [Vector3(1.5, 1.30, z), Vector3(1.5, 1.38, z),
+					Vector3(1.5, 1.44, z), Vector3(1.5, 1.48, z)], [0.18, 0.161, 0.113, 0.0], 12, 1.0, 1.0)
 			StreetProps._box(buf.call("iron"), Vector3(-1.5, 0.76, 0), Vector3(0.08, 0.34, 2.3))
 		"bin_black":
 			TreeMeshLibrary._tube(buf.call("iron"), [Vector3(0, 0, 0), Vector3(0, 0.95, 0)], [0.26, 0.28], 12, 1.0, 1.0)
@@ -332,6 +338,11 @@ static func _material(name: String) -> Material:
 		m.emission_enabled = true
 		m.emission = lc
 		m.emission_energy_multiplier = 3.0
+	if name.begins_with("globe_"):
+		m.albedo_color = Color(0.035, 0.32, 0.09) if name == "globe_green" else Color(0.75, 0.77, 0.72)
+		m.emission_enabled = true
+		m.emission = m.albedo_color
+		m.emission_energy_multiplier = 0.25
 	return StreetSnow.material(m) if name in ["wood", "iron", "concrete", "green", "galv"] else m
 
 ## Road segments near the eye on a coarse grid, for nearest-kerb lookups.

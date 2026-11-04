@@ -1,0 +1,33 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+request start 0
+result/code: 0 / 200
+headers: ["Date: Wed, 04 Nov 2026 07:05:13 GMT", "Content-Type: application/json", "Transfer-Encoding: chunked", "Connection: keep-alive", "Access-Control-Allow-Origin: *", "Access-Control-Allow-Credentials: true", "Access-Control-Allow-Headers: Authorization, Content-Type, X-Maps-Platform, X-Maps-Access-Token", "Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT", "Content-Encoding: gzip", "Server: nginx/portaladmins"]
+body: {
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.4 2390de5a",
+  "osm3s": {
+    "timestamp_osm_base": "2026-11-04T07:04:04Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 3134691329,
+  "lat": 40.7013505,
+  "lon": -73.9866522,
+  "tags": {
+    "description": "all F,<F> trains",
+    "level": "0",
+    "network": "NYC Subway",
+    "network:wikidata": "Q7733",
+    "operator": "New York City Transit Authority",
+    "operator:wikidata": "Q1325591",
+    "railway": "subway_entrance",
+    "wheelchair": "no"
+  }
+}
+
+  ]
+}

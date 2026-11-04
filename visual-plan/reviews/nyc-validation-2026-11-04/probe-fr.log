@@ -1,0 +1,6 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+request start 0
+result/code: 0 / 403
+headers: ["Server: nginx/1.22.1", "Date: Wed, 04 Nov 2026 07:02:57 GMT", "Content-Type: application/octet-stream", "Content-Length: 53", "Connection: keep-alive"]
+body: This service is only available to white-listed usages

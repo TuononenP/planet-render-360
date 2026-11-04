@@ -1,0 +1,31 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+CLIMATE: { "t_monthly_c": [-1.09612903225806, -0.45921985815603, 4.07677419354839, 10.4573333333333, 15.5941935483871, 21.2823333333333, 24.0616129032258, 23.8083870967742, 19.893, 13.1677419354839, 8.09066666666666, 1.79225806451613], "t_warm_c": 23.0507777777778, "t_cold_c": 0.07896972470068, "precip_mm": 1131.88, "precip_warm_mm": 307.92, "snow_days": 50.5, "source": "ERA5 2001–2010 via Open-Meteo (Copernicus, CC BY 4.0)" } { "ms": 15832, "cached": false, "vars": 3, "fallback": true }
+LANDCOVER fetch: { "landcover": { "ms": 7255, "available": true }, "canopy": { "ms": 18115, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 22346, "assemble_ms": 113, "tiles": 121, "cached": 0, "failed": 0 } rings=3 drapes=3
+WARNING: OsmFetcher: ring query failed (no answer 10 s after the detailed data); detailed data only
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _on_ring_exhausted (res://scripts/data/osm_fetcher.gd:497)
+         [1] _on_ring_grace (res://scripts/data/osm_fetcher.gd:511)
+OsmFetcher: POIs unavailable (Overpass failed (result=0 code=502)); using other map data
+FAR-CITY fetch: { "ms": 73792, "bytes": 36895549, "cached": false, "partial": false, "landuse": 1173, "towers": 3000 }
+SHORE TIMINGS classify=168 patches=160
+SHORELINE bodies=35 edges=9995 patches=3913 hard=385 diagnostics=1
+FAR-TERRAIN built in 2096 ms (rings=3 drapes=3 bands=2)
+SHORE TERRAIN vertices_ms=2189
+SHORE TERRAIN arrays_ms=2564 vertices=104135
+SHORE TERRAIN total_ms=2713
+HARBOUR-FERRY berth=(-674.7, 712.4) axis=(0.50, 0.87)
+FAR-CITY built in 549 ms (blocks=17214 towers=1983 tris=276362 meshes=302 source=drape+osm)
+BUILDINGS census { "real": 1786, "impostors": 0, "infill": 0, "far_blocks": 17214, "far_towers": 1983, "far_tris": 276362 } (settlement=drape+osm)
+BUILD timings {Distant terrain=2111, Ground & water=2713, Buildings=8154, Roads & landmarks=3560, Vegetation=5976} total=8176 parallel
+CAPTURE new_york built in 90 s
+SHOT new_york_vantage luma 0.564 sat 0.274 colourful 0.127
+SHOT new_york_bank luma 0.403 sat 0.298 colourful 0.111
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-r31-cold-2026-11-04
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 99 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

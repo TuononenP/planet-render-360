@@ -40,7 +40,7 @@ func _ready() -> void:
 ## Mirror-first, like the far-city query, so it never queues behind the
 ## detailed one on the main instance.
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["private.coffee", "openstreetmap.fr",
+	return OsmFetcher.endpoint_order(["private.coffee",
 		"//overpass-api.de", "mail.ru"]).slice(0, 4)
 
 func is_busy() -> bool:

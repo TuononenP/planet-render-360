@@ -219,6 +219,16 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   `lz4.`, `overpass.osm.jp` timed out; `overpass.openstreetmap.fr` HTTP 200
   in 2.3 s; `z.overpass-api.de` HTTP 200 in 17.7 s (now the fifth endpoint,
   replacing the repeated main instance).
+- Overpass availability probe (2026-11-04, York Street node `3134691329`,
+  native Godot HTTPRequest): OSM-FR returned HTTP 403 with a whitelist-only
+  policy; removed from the public endpoint list. Main returned HTTP 502
+  at capacity; VK Maps returned HTTP 200 with the mapped entrance;
+  private.coffee timed out at 45 s. A 403 now advances to another public
+  mirror, while malformed queries (400) still stop. POIs retain their
+  single 15 s attempt, now on VK Maps. Historical probes above describe
+  availability at their recorded dates, not a current guarantee. The
+  [OSM public-instance register](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances)
+  lists VK Maps and private.coffee as global public services.
 - OSM API fallback (same date): `GET https://api.openstreetmap.org/api/0.6/map?bbox=`
   → HTTP 200, 12 MB XML in 17 s for a 1.7 × 1.8 km box (no key; ODbL, same
   attribution). The API caps a request at 50 000 nodes (HTTP 400), so

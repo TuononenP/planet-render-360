@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+SHOT 01-picker-phone (390, 844)
+SHOT 01d-picker-predictions (390, 844)
+SHOT 01b-picker-tablet (834, 1112)
+SHOT 01c-picker-desktop (1280, 800)
+LANDCOVER fetch: { "landcover": { "ms": 1, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 97, "assemble_ms": 137, "tiles": 140, "cached": 140, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 658.8, "precip_warm_mm": 165.4, "snow_days": 0.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": 4.35000000000002, "t_warm_c": 18.55 } { "ms": 0, "cached": true }
+SHOT 02-loading-phone (390, 844)
+SHOT 02b-loading-desktop (1280, 800)
+SHOT 03-view360-phone (390, 844)
+SHOT 03b-view360-desktop (1280, 800)
+Generation already in progress; ignoring start

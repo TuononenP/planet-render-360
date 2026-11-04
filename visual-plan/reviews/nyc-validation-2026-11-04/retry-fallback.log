@@ -1,0 +1,7 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+OsmFetcher: OSM not cached (offline mode); using cached osm_v2_48857_2352_r800.json
+OsmFetcher: OSM not cached (offline mode); using cached osm_v2_48857_2352_r800.json
+OsmFetcher: OSM not cached (offline mode); OSM API skipped (offline mode); using cached osm_v2_48860_2352_r1200.json
+OsmFetcher: POIs unavailable (fixture timeout); using other map data
+OSM FALLBACK OK: api url, xml convert, nearby cache, cache fallback order

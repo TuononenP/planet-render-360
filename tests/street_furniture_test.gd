@@ -109,6 +109,17 @@ func _run() -> void:
 				glows = glows or (mat != null and mat.emission_enabled and mat.emission_energy_multiplier > 0.0)
 			if not glows:
 				failures.append("%s should have a lit lens" % key)
+	# Stair globes are diffused lamps, rather than the saturated traffic lenses.
+	var subway := StreetFurniture.mesh("subway_entrance")
+	var globes := 0
+	for s in subway.get_surface_count():
+		var mat := subway.surface_get_material(s) as StandardMaterial3D
+		if mat != null and mat.emission_enabled:
+			globes += 1
+			if mat.emission_energy_multiplier > 0.5:
+				failures.append("subway globe emission should retain its diffuser colour in daylight")
+	if globes != 2:
+		failures.append("subway globes should have separate white and green hemispheres")
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("STREET FURNITURE OK: OSM kinds, kerb placement, regional kit, sparse fill, meshes")
