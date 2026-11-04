@@ -39,6 +39,19 @@ static func bark_albedo(kind: String) -> Texture2D:
 static func bark_normal(kind: String) -> Texture2D:
 	return _cached("bark_" + kind + "_n", func() -> Image: return paint_bark(kind, 0.5)[1], false)
 
+## Imported (export-safe) image for `path`, or null when the asset is
+## missing; lossless import, so the pixels match the source PNG.
+static func load_image(path: String) -> Image:
+	if not ResourceLoader.exists(path):
+		return null
+	var tex := ResourceLoader.load(path) as Texture2D
+	if tex == null:
+		return null
+	var img := tex.get_image()
+	if img != null and img.is_compressed():
+		img.decompress()
+	return img
+
 static func _cached(name: String, painter: Callable, alpha_cut: bool) -> Texture2D:
 	_mutex.lock()
 	if _textures.has(name):
@@ -46,10 +59,7 @@ static func _cached(name: String, painter: Callable, alpha_cut: bool) -> Texture
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
-	var img: Image = null
-	var path := DIR + name + ".png"
-	if FileAccess.file_exists(path):
-		img = Image.load_from_file(path)
+	var img := load_image(DIR + name + ".png")
 	if img == null or img.is_empty():
 		img = painter.call()
 	if img.get_format() != Image.FORMAT_RGBA8:

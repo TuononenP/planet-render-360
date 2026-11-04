@@ -31,7 +31,7 @@ extends SceneTree
 ##   <id>_agx.jpg                opening look with AgX instead of ACES
 ##   audit.json                  per place, every StandardMaterial3D's mean
 ##                               linear albedo, flagged against ALBEDO_RANGES
-## With --bake-thumbs: each preset's vantage also becomes its shipped card
+## With --bake-thumbs (use --times=noon): each preset's noon vantage becomes its shipped card
 ## picture, res://assets/preset_thumbs/<id>.jpg (PlaceThumb.load_preset).
 ## Reference photos live in visual-plan/refs/<id>/ (see its README).
 ## History and user thumbnails are never written; settings are not saved.
@@ -314,7 +314,7 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	img.convert(Image.FORMAT_RGB8)
 	var path := _out.path_join("%s_%s.jpg" % [id, shot])
 	img.save_jpg(path, 0.88)
-	if shot == "vantage" and OS.get_cmdline_user_args().has("--bake-thumbs"):
+	if shot == "vantage_noon" and OS.get_cmdline_user_args().has("--bake-thumbs"):
 		_bake_thumb(img, id)
 	var s := frame_stats(img)
 	var rig := view._rig
@@ -347,7 +347,7 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	print("SHOT %s_%s luma %.3f sat %.3f colourful %.3f" % [id, shot,
 		float(s["all"]["luma"]), float(s["all"]["sat"]), float(s["all"]["colourful"])])
 
-## --bake-thumbs: a preset's opening look, card-sized, into the shipped
+## --bake-thumbs: a preset's opening look at noon, card-sized, into the shipped
 ## res://assets/preset_thumbs/<id>.jpg its Around the world card shows.
 func _bake_thumb(img: Image, id: String) -> void:
 	if PresetViews.ROWS.filter(func(r: Dictionary) -> bool: return r["id"] == id).is_empty():

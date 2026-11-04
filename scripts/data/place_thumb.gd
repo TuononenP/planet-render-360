@@ -87,13 +87,11 @@ static func load_texture(lat: float, lon: float) -> Texture2D:
 	_textures[p] = [mtime, tex]
 	return tex
 
-## A preset's picture: the person's own latest snapshot of it, else the
-## one shipped in res://assets/preset_thumbs/<id>.jpg (baked by
-## tools/capture_presets.gd --bake-thumbs), else null.
-static func load_preset(id: String, lat: float, lon: float) -> Texture2D:
-	var own := load_texture(lat, lon)
-	if own != null:
-		return own
+## A preset's picture: the daytime render shipped in
+## res://assets/preset_thumbs/<id>.jpg (baked by tools/capture_presets.gd
+## --bake-thumbs), null when it has none. Never the person's own snapshot,
+## so the shelf stays one consistent daylight set.
+static func load_preset(id: String) -> Texture2D:
 	var p := bundled_path(id)
 	if ResourceLoader.exists(p):
 		return load(p) as Texture2D

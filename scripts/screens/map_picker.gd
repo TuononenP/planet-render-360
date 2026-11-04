@@ -274,7 +274,7 @@ func _ready() -> void:
 		var qindex := qi
 		card.set_meta("lat", qlat)
 		card.set_meta("lon", qlon)
-		var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"]), qlat, qlon)
+		var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"]))
 		if qphoto != null:
 			card.set_photo(qphoto)
 		card.pressed.connect(func() -> void:

@@ -66,12 +66,6 @@ static func refresh_recent(p: MapPicker) -> void:
 	p._first_note.visible = first
 	for i in p._quick_chips.size():
 		p._quick_chips[i].visible = not first or i < 3
-		# A snapshot taken since the picker was built replaces the shipped one.
-		var chip := p._quick_chips[i] as PlaceCard
-		var photo := PlaceThumb.load_preset(str(PresetViews.ROWS[i]["id"]),
-			float(chip.get_meta("lat")), float(chip.get_meta("lon")))
-		if photo != null:
-			chip.set_photo(photo)
 	apply_offline(p)
 
 ## Offline: say so once, badge the field, dim what cannot open.

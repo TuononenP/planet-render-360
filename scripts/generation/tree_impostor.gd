@@ -24,10 +24,7 @@ static func texture(sp: String, bare: bool) -> Texture2D:
 	var key := file_name(sp, bare)
 	if _tex.has(key):
 		return _tex[key]
-	var img: Image = null
-	var path := FoliageTextures.DIR + key
-	if FileAccess.file_exists(path):
-		img = Image.load_from_file(path)
+	var img := FoliageTextures.load_image(FoliageTextures.DIR + key)
 	if img == null or img.is_empty():
 		img = paint(sp, bare, 0.25)
 	img.convert(Image.FORMAT_RGBA8)
