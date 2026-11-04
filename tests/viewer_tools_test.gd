@@ -569,6 +569,19 @@ func _view_wiring() -> void:
 	await create_timer(ViewWalk.GLIDE_MAX_S + 0.5).timeout
 	_check(absf(view._rig.position.z - (here.y - 40.0)) < 0.5, "and arrives: %s" % view._rig.position)
 	_check(not view._walk.walk_to(view, Vector2(0, 5000)), "5 km is past the built area")
+	_check(view._walk.walk_to(view, here + Vector2(0, -20)), "a click can start a glide")
+	var walk_key := InputEventKey.new()
+	walk_key.keycode = KEY_W
+	walk_key.pressed = true
+	Input.parse_input_event(walk_key)
+	Input.flush_buffered_events()
+	view._walk.process_keys(view, 0.1)
+	_check(not view._visit_tween.is_running(), "walking interrupts a click-to-walk glide")
+	var walk_release := InputEventKey.new()
+	walk_release.keycode = KEY_W
+	Input.parse_input_event(walk_release)
+	Input.flush_buffered_events()
+	view._walk.process_keys(view, 0.01)
 
 	# Photo with no picture (headless): a plain message, no crash.
 	ViewTools.photo(view)
@@ -586,6 +599,41 @@ func _view_wiring() -> void:
 	PhotoMode._write(Image.create(4, 4, false, Image.FORMAT_RGB8), ok_path,
 		func(path: String, failed: bool) -> void: saved.append([path, failed]))
 	_check(saved == [[ok_path, false]] and FileAccess.file_exists(ok_path), "a written photo reports its path")
+
+	# A restored camera beyond the walking circle can walk back inside.
+	view._rig.position = Vector3(0, view._rig.position.y, -View360.IN_PLACE_M - 10.0)
+	view._rig.set_look(0.0, 0.0)
+	var back_key := InputEventKey.new()
+	back_key.keycode = KEY_S
+	back_key.pressed = true
+	Input.parse_input_event(back_key)
+	Input.flush_buffered_events()
+	view._walk.process_keys(view, 0.5)
+	_check(view._rig.position.z > -View360.IN_PLACE_M - 10.0, "walk back toward the boundary from outside")
+	var back_release := InputEventKey.new()
+	back_release.keycode = KEY_S
+	Input.parse_input_event(back_release)
+	Input.flush_buffered_events()
+	view._walk.process_keys(view, 0.01)
+
+	# At the edge, holding an outward direction must not suppress climbing.
+	view._rig.position = Vector3(0, View360.eye_y(data, view._ground, Vector2(0, -View360.IN_PLACE_M), false),
+		-View360.IN_PLACE_M)
+	for code in [KEY_W, KEY_E]:
+		var ev := InputEventKey.new()
+		ev.keycode = code
+		ev.pressed = true
+		Input.parse_input_event(ev)
+	Input.flush_buffered_events()
+	var before_climb := view._rig.position.y
+	view._walk.process_keys(view, 0.5)
+	_check(view._rig.position.y > before_climb + 1.0, "climb while walking against the edge")
+	for code in [KEY_W, KEY_E]:
+		var ev := InputEventKey.new()
+		ev.keycode = code
+		Input.parse_input_event(ev)
+	Input.flush_buffered_events()
+	view._walk.process_keys(view, 0.01)
 
 	# The letter keys are not the view's while a text field has the keyboard.
 	_check(ViewWalk.keys_free(view), "bare keys walk")

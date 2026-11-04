@@ -192,11 +192,15 @@ func process_keys(v: View360, delta: float) -> void:
 	_lift = lifted(_lift, rise, delta, run)
 	var next := here + dir * speed * delta
 	if not View360.can_move_in_place(next, v._ground):
-		# Slide along the edge instead of stopping dead.
-		next = here + dir.slide(next.normalized()) * speed * delta \
-			if next.length() > 0.0 else here
-		if not View360.can_move_in_place(next, v._ground):
-			return
+		# A camera outside the walking circle must still be able to return.
+		if here.length() > View360.IN_PLACE_M:
+			if next.length() >= here.length():
+				next = here
+		else:
+			# Slide along the edge; a blocked step must not block climbing.
+			var slid := (here + dir.slide(next.normalized()) * speed * delta) \
+				.limit_length(View360.IN_PLACE_M) if next.length() > 0.0 else here
+			next = slid if View360.can_move_in_place(slid, v._ground) else here
 	_eye_clock -= delta
 	if not _moving or _eye_clock <= 0.0:
 		_eye_clock = EYE_EVERY_S

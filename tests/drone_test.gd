@@ -239,6 +239,19 @@ func _flight() -> void:
 	xz = Vector2(view._rig.position.x, view._rig.position.z)
 	_check(xz.length() > View360.IN_PLACE_M and xz.length() <= ViewDrone.EDGE_M + 0.01,
 		"the drone roams past the walking area, up to its edge: %s" % xz.length())
+	var reverse := InputEventKey.new()
+	reverse.keycode = KEY_S
+	reverse.pressed = true
+	Input.parse_input_event(reverse)
+	Input.flush_buffered_events()
+	for i in 60:
+		view._drone.process(view, dt)
+	var reversed := Vector2(view._rig.position.x, view._rig.position.z)
+	_check(reversed.length() < xz.length() - 5.0, "the keyboard flies back from the edge: %s -> %s" % [xz, reversed])
+	var release_reverse := InputEventKey.new()
+	release_reverse.keycode = KEY_S
+	Input.parse_input_event(release_reverse)
+	Input.flush_buffered_events()
 
 	# Phone, controls sheet open and the sticks showing: everything stays
 	# on screen, the wells clear of each other and of the drone button.
