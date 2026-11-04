@@ -356,9 +356,15 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 				BundledOsm.refresh(get_tree(), snapshot, _pending_cache, _pending_body,
 					_detailed_check(lat, lon), ENDPOINTS)
 	if want_ring:
-		_ring_text = _read_cache(_pending_ring_cache)
-		if not offline_mode and OverpassRequest.payload_error(_ring_text) != "":
+		var ring_key := BundledOsm.entry_for(lat, lon, "ring%d" % ring, OsmQuery.RING_VERSION)
+		_ring_text = _read_cache(_pending_ring_cache) if BundledOsm.cache_is_newer(_pending_ring_cache, ring_key) else ""
+		if _ring_text != "" and not _payload_usable(_ring_text):
 			_ring_text = ""
+		if _ring_text == "":
+			_ring_text = BundledOsm.read(ring_key)
+			if _ring_text != "" and not offline_mode:
+				BundledOsm.refresh(get_tree(), ring_key, _pending_ring_cache,
+					"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
 	if offline_mode:
 		if _detailed_text != "":
 			_detailed_done()
@@ -524,9 +530,16 @@ func _try_finish() -> void:
 		return
 	if not _poi_started:
 		_poi_started = true
-		_poi_text = _read_cache(_poi_cache) if _poi_enabled else ""
+		var poi_key := BundledOsm.entry_for(_pending_lat, _pending_lon, "poi", OsmQuery.POI_VERSION)
+		_poi_text = _read_cache(_poi_cache) if _poi_enabled and BundledOsm.cache_is_newer(_poi_cache, poi_key) else ""
 		if _poi_text != "" and not _payload_usable(_poi_text):
 			_poi_text = ""
+		if _poi_enabled and _poi_text == "":
+			_poi_text = BundledOsm.read(poi_key)
+			if _poi_text != "" and not offline_mode:
+				BundledOsm.refresh(get_tree(), poi_key, _poi_cache,
+					"data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
+					_check_ring, endpoint_order(["mail.ru"]))
 		if _poi_text == "" and _poi_enabled and not offline_mode:
 			_poi_pending = true
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),

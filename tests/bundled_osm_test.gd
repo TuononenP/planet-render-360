@@ -18,6 +18,14 @@ func _run() -> void:
 		[37.8040, -122.4195, "detailed", 12],
 		[60.1680, 24.9530, "far", 3],
 		[59.3207, 18.0604, "far", 3],
+		[60.1680, 24.9530, "detailed", 12],
+		[59.3207, 18.0604, "detailed", 12],
+		[60.1680, 24.9530, "ring1600", 1],
+		[60.1680, 24.9530, "ring2500", 1],
+		[60.1680, 24.9530, "poi", 1],
+		[59.3207, 18.0604, "ring1600", 1],
+		[59.3207, 18.0604, "ring2500", 1],
+		[59.3207, 18.0604, "poi", 1],
 	]
 	for row in rows:
 		var key := BundledOsm.entry_for(row[0], row[1], row[2], row[3])
@@ -27,7 +35,7 @@ func _run() -> void:
 		if row[2] == "detailed":
 			var parsed := OsmFetcher.parse_features(text, row[0], row[1])
 			check((parsed.buildings as Array).size() > 100, "%s should contain buildings" % key)
-		else:
+		elif row[2] == "far":
 			var parsed := FarCityFetcher.parse(text, row[0], row[1])
 			check((parsed.get("towers", []) as Array).size() > 0, "%s should contain towers" % key)
 		check(BundledOsm.entry_for(row[0], row[1], row[2], row[3] + 1) == "", "wrong version must not match")
@@ -53,7 +61,7 @@ func _fetch_checks() -> void:
 	check(BundledOsm.cache_is_newer(cache, key), "newer valid cache must win")
 	DirAccess.remove_absolute(cache)
 	await _refresh_check(cache, key)
-	for row in [[40.7060, -74.0040], [37.8040, -122.4195]]:
+	for row in [[40.7060, -74.0040], [37.8040, -122.4195], [60.1680, 24.9530], [59.3207, 18.0604]]:
 		finished = false
 		count = 0
 		var osm := OsmFetcher.new()
@@ -63,11 +71,16 @@ func _fetch_checks() -> void:
 			count = buildings.size()
 			finished = true)
 		osm.failed.connect(func(_reason: String) -> void: finished = true)
-		osm.fetch(row[0], row[1], 0)
+		var is_europe: bool = row[0] > 50.0
+		osm.fetch(row[0], row[1], 2 if is_europe else 0)
+		if is_europe:
+			check(osm._ring_text != "", "offline fetch must load the bundled ring")
 		var deadline := Time.get_ticks_msec() + 30000
 		while not finished and Time.get_ticks_msec() < deadline:
 			await process_frame
 		check(finished and count > 100, "offline detailed fetch must use snapshot")
+		if is_europe:
+			check(osm._poi_text != "" and osm.pois.size() > 0, "offline fetch must load bundled POIs")
 		osm.queue_free()
 	for row in [[60.1680, 24.9530], [59.3207, 18.0604]]:
 		finished = false

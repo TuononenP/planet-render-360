@@ -5,6 +5,14 @@ extends RefCounted
 ## [latitude, longitude, layer, query version, OSM timestamp, inflated bytes, SHA-256].
 ## Missing layers deliberately use the ordinary network/cache fallback.
 const ENTRIES := {
+	"helsinki_detailed": [60.1680, 24.9530, "detailed", 12, "2026-11-02T21:21:26", 14473370, "7fa53acf219303c800828119507e2fb6b2a0e5f65112cc3eb4e39aad8ad9101f"],
+	"helsinki_ring1600": [60.1680, 24.9530, "ring1600", 1, "2026-11-02T21:21:26", 1047377, "015deaba1adf3f6b9bc568f8f99ffc00d2265b11a1557bd2769bd034ce3e5190"],
+	"helsinki_ring2500": [60.1680, 24.9530, "ring2500", 1, "2026-11-02T21:21:26", 1351289, "948ccfa8b96d664562e9dba0d196f44a7ea092ae6bdbe8b37229618920b643ff"],
+	"helsinki_poi": [60.1680, 24.9530, "poi", 1, "2026-11-02T21:21:26", 841295, "03c3ba96cf189dea3a06e7fcd753bb29f6725a5d4049dc1213eff98409d3436f"],
+	"stockholm_detailed": [59.3207, 18.0604, "detailed", 12, "2026-11-02T21:21:26", 12094326, "825145148ea4a0051c7cb4395c1d11591d9bd447f365d44128ca33384c823664"],
+	"stockholm_ring1600": [59.3207, 18.0604, "ring1600", 1, "2026-11-02T21:21:26", 586043, "a9edd795ac812dc252419252abeb97b4d13ee4ccba74addd6d037be6c0d98867"],
+	"stockholm_ring2500": [59.3207, 18.0604, "ring2500", 1, "2026-11-02T21:21:26", 786911, "8a756def7d95094c8a2ec55d550419d8ce4c4eb85868a2d5805602091af59224"],
+	"stockholm_poi": [59.3207, 18.0604, "poi", 1, "2026-11-02T21:21:26", 433030, "e7f768f8f5ded0ad3cdd4d4e189483f67466c98f0d2bfbc9a253a966e9d33b53"],
 	"new_york_detailed": [40.7060, -74.0040, "detailed", 12, "2026-11-04T13:18:25", 16752176, "961c08765d6877fd1aa6e511b6872b6db02b8c8990f5d712f296483380b0828e"],
 	"san_francisco_detailed": [37.8040, -122.4195, "detailed", 12, "2026-11-04T13:16:20", 10341950, "10b158204da607694e7eea89616211d3c72251f3e2e04c63bfcd35bb749fb253"],
 	"helsinki_far": [60.1680, 24.9530, "far", 3, "2026-11-04T14:47:51", 19509450, "0a4b68952ddcd3ed19d697480431bcc5d41defcfdbbf1d393beb06b259774777"],
