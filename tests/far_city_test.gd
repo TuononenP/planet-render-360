@@ -100,6 +100,13 @@ func _settlement_checks(failures: Array[String]) -> void:
 		{"class": "residential", "points": PackedVector2Array([Vector2(2500, 2000),
 			Vector2(3500, 2000), Vector2(3500, 3000), Vector2(2500, 3000)]), "holes": []}]
 	var m2 := SettlementMap.build(data)
+	if SettlementMap._native:
+		SettlementMap._native = false
+		var script_map := SettlementMap.build(data)
+		SettlementMap._native = true
+		if m2.score != script_map.score or m2.cls != script_map.cls \
+				or m2.blocked != script_map.blocked or m2.source != script_map.source:
+			failures.append("native settlement sampling differs from the script map")
 	if m2.class_at(0.0, 2500.0) != SettlementMap.Cls.INDUSTRIAL or m2.score_at(0.0, 2500.0) < 0.5:
 		failures.append("industrial landuse should mark the field built/industrial")
 	if m2.score_at(3000.0, 2500.0) > 0.0:

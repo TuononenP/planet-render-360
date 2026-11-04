@@ -33,6 +33,11 @@ const OSM_SCORE := {"residential": 0.5, "commercial": 0.75,
 enum Cls { NONE, RESIDENTIAL, COMMERCIAL, INDUSTRIAL }
 const DRAPE_ONLY := 0.55
 
+## Older or absent native libraries keep the equivalent script sampler.
+static var _native := ClassDB.class_exists("CityKernels") \
+	and ClassDB.class_has_method("CityKernels", "settlement_features") \
+	and ClassDB.class_has_method("CityKernels", "settlement_finish")
+
 var n := 0
 var half := 0
 var score := PackedFloat32Array()
@@ -53,8 +58,11 @@ static func build(data: LocationData) -> SettlementMap:
 	for d in data.far_drapes:
 		if d is Dictionary and (d as Dictionary).get("image", null) is Image:
 			has_drape = true
+	var started := Time.get_ticks_msec()
 	if has_drape:
 		m._from_drapes(data)
+	var drapes_ms := Time.get_ticks_msec() - started
+	started = Time.get_ticks_msec()
 	var has_osm := not data.far_landuse.is_empty()
 	if has_osm:
 		var in_osm := m._from_landuse(data)
@@ -66,6 +74,8 @@ static func build(data: LocationData) -> SettlementMap:
 				m.score[k] *= DRAPE_ONLY
 	m.source = ("drape" if has_drape else "") \
 		+ ("+osm" if has_drape and has_osm else ("osm" if has_osm else ""))
+	print("SETTLEMENT timings ms imagery=", drapes_ms, " landuse=", Time.get_ticks_msec() - started,
+		" native=", _native)
 	return m
 
 func index(i: int, j: int) -> int:
@@ -228,76 +238,101 @@ func _from_drapes(data: LocationData) -> void:
 	drape_of.resize(n * n)
 	var has_feat := PackedByteArray()
 	has_feat.resize(n * n)
-	for j in n:
-		var zf := zs[j]
-		for i in n:
-			var xf := xs[i]
-			if xf * xf + zf * zf > r2:
+	var features := {}
+	if _native:
+		features = ClassDB.class_call_static("CityKernels", "settlement_features", infos, n, half)
+		l_vals = features["l"]
+		g_vals = features["g"]
+		std_vals = features["std"]
+		br_vals = features["br"]
+		drape_of = features["drape"]
+		has_feat = features["present"]
+		for k in n * n:
+			if has_feat[k] == 0:
 				continue
-			var found_di := -1
-			var fl := 0.0
-			var fg := 0.0
-			var fstd := 0.0
-			var fbr := 0.0
-			for info in infos:
-				var cuv: float = (info["col_uv"] as PackedFloat32Array)[i]
-				if cuv <= 0.0 or cuv >= 1.0:
+			var di := int(drape_of[k])
+			if not ls.has(di):
+				ls[di] = []
+				gs[di] = []
+			(ls[di] as Array).append(l_vals[k])
+			(gs[di] as Array).append(g_vals[k])
+	else:
+		for j in n:
+			var zf := zs[j]
+			for i in n:
+				var xf := xs[i]
+				if xf * xf + zf * zf > r2:
 					continue
-				var ruv: float = (info["row_uv"] as PackedFloat32Array)[j]
-				if ruv <= 0.0 or ruv >= 1.0:
+				var found_di := -1
+				var fl := 0.0
+				var fg := 0.0
+				var fstd := 0.0
+				var fbr := 0.0
+				for info in infos:
+					var cuv: float = (info["col_uv"] as PackedFloat32Array)[i]
+					if cuv <= 0.0 or cuv >= 1.0:
+						continue
+					var ruv: float = (info["row_uv"] as PackedFloat32Array)[j]
+					if ruv <= 0.0 or ruv >= 1.0:
+						continue
+					var w2: int = info["w"]
+					var h2: int = info["h"]
+					var step2: float = info["step"]
+					var buf2: PackedByteArray = info["buf"]
+					if buf2.is_empty():
+						continue
+					var px0 := cuv * float(w2) - step2 * 2.0
+					var pz0 := ruv * float(h2) - step2 * 2.0
+					var sl := 0.0
+					var sl2 := 0.0
+					var sg := 0.0
+					var sbr := 0.0
+					for sj in SAMPLES:
+						var pz := clampi(int(pz0 + step2 * float(sj)), 0, h2 - 1)
+						for si in SAMPLES:
+							var px := clampi(int(px0 + step2 * float(si)), 0, w2 - 1)
+							var o := (pz * w2 + px) * 3
+							var rcol := float(buf2[o]) / 255.0
+							var gcol := float(buf2[o + 1]) / 255.0
+							var bcol := float(buf2[o + 2]) / 255.0
+							var lcol := 0.299 * rcol + 0.587 * gcol + 0.114 * bcol
+							sl += lcol
+							sl2 += lcol * lcol
+							sg += gcol - (rcol + bcol) * 0.5
+							sbr += bcol - rcol
+					var k2 := float(SAMPLES * SAMPLES)
+					var mean2 := sl / k2
+					fl = mean2
+					fg = sg / k2
+					fstd = sqrt(maxf(sl2 / k2 - mean2 * mean2, 0.0))
+					fbr = sbr / k2
+					found_di = int(info["di"])
+					break
+				if found_di < 0:
 					continue
-				var w2: int = info["w"]
-				var h2: int = info["h"]
-				var step2: float = info["step"]
-				var buf2: PackedByteArray = info["buf"]
-				if buf2.is_empty():
-					continue
-				var px0 := cuv * float(w2) - step2 * 2.0
-				var pz0 := ruv * float(h2) - step2 * 2.0
-				var sl := 0.0
-				var sl2 := 0.0
-				var sg := 0.0
-				var sbr := 0.0
-				for sj in SAMPLES:
-					var pz := clampi(int(pz0 + step2 * float(sj)), 0, h2 - 1)
-					for si in SAMPLES:
-						var px := clampi(int(px0 + step2 * float(si)), 0, w2 - 1)
-						var o := (pz * w2 + px) * 3
-						var rcol := float(buf2[o]) / 255.0
-						var gcol := float(buf2[o + 1]) / 255.0
-						var bcol := float(buf2[o + 2]) / 255.0
-						var lcol := 0.299 * rcol + 0.587 * gcol + 0.114 * bcol
-						sl += lcol
-						sl2 += lcol * lcol
-						sg += gcol - (rcol + bcol) * 0.5
-						sbr += bcol - rcol
-				var k2 := float(SAMPLES * SAMPLES)
-				var mean2 := sl / k2
-				fl = mean2
-				fg = sg / k2
-				fstd = sqrt(maxf(sl2 / k2 - mean2 * mean2, 0.0))
-				fbr = sbr / k2
-				found_di = int(info["di"])
-				break
-			if found_di < 0:
-				continue
-			var kidx := j * n + i
-			l_vals[kidx] = fl
-			g_vals[kidx] = fg
-			std_vals[kidx] = fstd
-			br_vals[kidx] = fbr
-			drape_of[kidx] = found_di
-			has_feat[kidx] = 1
-			if not ls.has(found_di):
-				ls[found_di] = []
-				gs[found_di] = []
-			(ls[found_di] as Array).append(fl)
-			(gs[found_di] as Array).append(fg)
+				var kidx := j * n + i
+				l_vals[kidx] = fl
+				g_vals[kidx] = fg
+				std_vals[kidx] = fstd
+				br_vals[kidx] = fbr
+				drape_of[kidx] = found_di
+				has_feat[kidx] = 1
+				if not ls.has(found_di):
+					ls[found_di] = []
+					gs[found_di] = []
+				(ls[found_di] as Array).append(fl)
+				(gs[found_di] as Array).append(fg)
 	var l0 := {}
 	var g0 := {}
 	for di in ls:
 		l0[di] = _median(ls[di])
 		g0[di] = _median(gs[di])
+	if _native:
+		var result: Dictionary = ClassDB.class_call_static("CityKernels", "settlement_finish", features, l0, g0, n)
+		score = result["score"]
+		blocked = result["blocked"]
+		cls = result["cls"]
+		return
 	var raw := PackedFloat32Array()
 	raw.resize(n * n)
 	for k in n * n:

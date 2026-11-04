@@ -61,23 +61,33 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	ShopLights.begin_build()
 	var root := Node3D.new()
 	root.name = "Buildings"
+	var timings := {}
+	var t0 := Time.get_ticks_msec()
 	var smap := SettlementMap.build(data)
+	timings["settlement"] = Time.get_ticks_msec() - t0
 	if not data.buildings.is_empty():
-		_real_buildings(root, data, ground, abort)
+		_real_buildings(root, data, ground, abort, timings)
 		if abort != null and abort.requested:
 			ShopLights.discard()
 			return root
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
+	t0 = Time.get_ticks_msec()
 	_buildings(root, data, ground, smap, abort)
+	timings["infill"] = Time.get_ticks_msec() - t0
 	if abort != null and abort.requested:
 		ShopLights.discard()
 		return root
+	t0 = Time.get_ticks_msec()
 	FarCityBuilder.build(root, data, ground, smap)
+	timings["far_city"] = Time.get_ticks_msec() - t0
+	t0 = Time.get_ticks_msec()
 	ShopLights.add(root)
 	if FacadeShader.enabled(data.quality_preset):
 		FacadeShader.upgrade(root)
 	FacadeTextures.end_build()
+	timings["finishing"] = Time.get_ticks_msec() - t0
+	print("BUILDINGS timings ms ", timings)
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
 	return root
 
@@ -139,7 +149,9 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
-static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
+static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort,
+		timings: Dictionary) -> void:
+	var t0 := Time.get_ticks_msec()
 	var sorted := data.buildings.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
@@ -164,8 +176,12 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	_party = PartyWalls.build(data, ground, ctx,
 		func(b: Dictionary) -> bool:
 			return not ShipBuilder.accepts(b) and _accepted(data, b, site, edge) and not _in_open_water(ground, b))
+	timings["shared_walls_setup"] = Time.get_ticks_msec() - t0
+	t0 = Time.get_ticks_msec()
 	if RoofGeometry._native:
 		_prepare_roofs(data, ground, ctx, sorted, site, edge)
+	timings["roof_setup"] = Time.get_ticks_msec() - t0
+	t0 = Time.get_ticks_msec()
 	for b in sorted:
 		if abort != null and abort.requested:
 			break
@@ -223,6 +239,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 				wall_w, TerrainBuilder._hash(pos.x, pos.z), data, shape,
 				rh_m * WorldScale.metres_to_units(), b)
 		placed += 1
+	timings["mapped"] = Time.get_ticks_msec() - t0
+	t0 = Time.get_ticks_msec()
 	last_stats["real"] = placed
 	_party = null
 	_roofs.clear()
@@ -232,6 +250,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	if ctx.has("fortress_mesh"):
 		SuomenlinnaFortress.add_walls(ctx["fortress_mesh"], data, ground)
 		SuomenlinnaFortress.finish(ctx["fortress_mesh"], root, data.quality_preset)
+	timings["batching"] = Time.get_ticks_msec() - t0
 	if aabb_fallbacks > 0:
 		push_warning("BuildingBuilder: %d of %d real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle)."
 			% [aabb_fallbacks, placed])

@@ -8,6 +8,7 @@
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
@@ -16,6 +17,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <string>
@@ -609,9 +611,115 @@ Dictionary CityKernels::fabric(const Dictionary &city, const Dictionary &far_par
 	return out;
 }
 
+Dictionary CityKernels::settlement_features(const Array &infos, int n, int half) {
+	struct Drape {
+		int id, width, height;
+		double step;
+		PackedFloat32Array col, row;
+		PackedByteArray bytes;
+	};
+	std::vector<Drape> drapes;
+	for (int k = 0; k < infos.size(); ++k) {
+		Dictionary d = infos[k];
+		drapes.push_back({int(d["di"]), int(d["w"]), int(d["h"]), double(d["step"]),
+				d["col_uv"], d["row_uv"], d["buf"]});
+	}
+	PackedFloat64Array ls, gs, stds, brs;
+	PackedByteArray ids, present;
+	const int count = n * n;
+	ls.resize(count); gs.resize(count); stds.resize(count); brs.resize(count);
+	ids.resize(count); present.resize(count);
+	for (int j = 0; j < n; ++j) {
+		const double z = (double(j - half) + 0.5) * CELL_M;
+		for (int i = 0; i < n; ++i) {
+			const double x = (double(i - half) + 0.5) * CELL_M;
+			if (x * x + z * z > RADIUS_M * RADIUS_M) continue;
+			for (const Drape &d : drapes) {
+				const double u = d.col[i], v = d.row[j];
+				if (u <= 0.0 || u >= 1.0 || v <= 0.0 || v >= 1.0 || d.bytes.is_empty()) continue;
+				const double px0 = u * double(d.width) - d.step * 2.0;
+				const double pz0 = v * double(d.height) - d.step * 2.0;
+				double sl = 0.0, sl2 = 0.0, sg = 0.0, sbr = 0.0;
+				for (int sj = 0; sj < 5; ++sj) {
+					const int pz = std::max(0, std::min(int(pz0 + d.step * double(sj)), d.height - 1));
+					for (int si = 0; si < 5; ++si) {
+						const int px = std::max(0, std::min(int(px0 + d.step * double(si)), d.width - 1));
+						const int o = (pz * d.width + px) * 3;
+						const double r = double(d.bytes[o]) / 255.0, g = double(d.bytes[o + 1]) / 255.0;
+						const double b = double(d.bytes[o + 2]) / 255.0;
+						const double l = 0.299 * r + 0.587 * g + 0.114 * b;
+						sl += l; sl2 += l * l; sg += g - (r + b) * 0.5; sbr += b - r;
+					}
+				}
+				const int index = j * n + i;
+				const double mean = sl / 25.0;
+				ls.set(index, mean); gs.set(index, sg / 25.0);
+				stds.set(index, std::sqrt(std::max(sl2 / 25.0 - mean * mean, 0.0)));
+				brs.set(index, sbr / 25.0); ids.set(index, d.id); present.set(index, 1);
+				break;
+			}
+		}
+	}
+	Dictionary out;
+	out["l"] = ls; out["g"] = gs; out["std"] = stds; out["br"] = brs;
+	out["drape"] = ids; out["present"] = present;
+	return out;
+}
+
+Dictionary CityKernels::settlement_finish(const Dictionary &features, const Dictionary &l0,
+		const Dictionary &g0, int n) {
+	PackedFloat64Array ls = features["l"], gs = features["g"], stds = features["std"], brs = features["br"];
+	PackedByteArray ids = features["drape"], present = features["present"];
+	PackedFloat32Array raw, score;
+	PackedByteArray blocked, cls;
+	const int count = n * n;
+	raw.resize(count); score.resize(count); blocked.resize(count); cls.resize(count);
+	for (int k = 0; k < count; ++k) {
+		if (!present[k]) continue;
+		const int di = ids[k];
+		const double l = ls[k], g = gs[k], lmed = l0[di], gmed = g0[di];
+		int cover = 0;
+		if (brs[k] > 0.06) cover = 2;
+		else if (g > gmed + 0.025) cover = 1;
+		else if (l < 0.7 * lmed && g < gmed + 0.01) cover = 2;
+		blocked.set(k, cover);
+		if (cover == 0) {
+			const double not_green = std::clamp((gmed + 0.02 - g) / 0.03, 0.0, 1.0);
+			const double not_dark = std::clamp((l - 0.75 * lmed) / std::max(0.25 * lmed, 0.01), 0.0, 1.0);
+			const double busy = std::clamp((stds[k] - 0.06) / 0.06, 0.0, 1.0);
+			raw.set(k, not_green * not_dark * busy);
+		}
+	}
+	for (int j = 0; j < n; ++j) {
+		for (int i = 0; i < n; ++i) {
+			const int k = j * n + i;
+			if (blocked[k]) continue;
+			double sum = 0.0, weight = 0.0;
+			for (int dj = -1; dj <= 1; ++dj) {
+				for (int di = -1; di <= 1; ++di) {
+					const int ii = i + di, jj = j + dj;
+					if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue;
+					const double wt = di == 0 && dj == 0 ? 4.0 : 1.0;
+					sum += double(raw[jj * n + ii]) * wt;
+					weight += wt;
+				}
+			}
+			score.set(k, sum / weight);
+			if (score[k] > 0.0) cls.set(k, RESIDENTIAL);
+		}
+	}
+	Dictionary out;
+	out["score"] = score; out["blocked"] = blocked; out["cls"] = cls;
+	return out;
+}
+
 void CityKernels::_bind_methods() {
 	ClassDB::bind_static_method("CityKernels", D_METHOD("fabric", "city", "far", "dem_rings"),
 			&CityKernels::fabric);
+	ClassDB::bind_static_method("CityKernels", D_METHOD("settlement_features", "infos", "n", "half"),
+			&CityKernels::settlement_features);
+	ClassDB::bind_static_method("CityKernels", D_METHOD("settlement_finish", "features", "l0", "g0", "n"),
+			&CityKernels::settlement_finish);
 }
 
 } // namespace godot
