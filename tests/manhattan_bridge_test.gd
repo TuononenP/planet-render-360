@@ -16,6 +16,23 @@ func _init() -> void:
 			or bounds.end.y > 115.0 or bounds.size.z < 45.0:
 		errors.append("Manhattan Bridge bounds do not include towers and portal: %s" % bounds)
 	model.free()
+	var lm := LandmarkMesh.new()
+	lm.use("Masonry", StandardMaterial3D.new())
+	LandmarkBrManhattan._portal(lm)
+	var floor_y := LandmarkBrManhattan._deck_y(LandmarkBrManhattan.PORTAL_X) + 0.6
+	var vertices: PackedVector3Array = lm._surfs["Masonry"].v
+	for sample in [[0.0, 3.0, false], [0.0, 12.4, true], [6.5, 5.0, true]]:
+		var origin := Vector3(LandmarkBrManhattan.PORTAL_X - 10.0, floor_y + float(sample[1]), float(sample[0]))
+		var hit := false
+		for i in range(0, vertices.size(), 3):
+			if Geometry3D.ray_intersects_triangle(origin, Vector3.RIGHT,
+					vertices[i], vertices[i + 1], vertices[i + 2]) != null:
+				hit = true
+				break
+		if hit != bool(sample[2]):
+			errors.append("portal must have an open roadway and solid crown/pylons: %s" % [sample])
+	if LandmarkBrManhattan._half_width(LandmarkBrManhattan.PORTAL_X) * 2.0 >= LandmarkBrManhattan.OPENING_WIDTH:
+		errors.append("central approach must fit through the stone entrance")
 	var spans := [[Vector2.ZERO, entry]]
 	var axis := LandmarkSites.axis(entry)
 	var points := PackedVector2Array([axis * -1250.0, axis * -1150.0, axis * -1000.0,

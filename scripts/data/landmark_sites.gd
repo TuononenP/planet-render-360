@@ -107,11 +107,12 @@ static func bridge_spans(data: LocationData) -> Array:
 	var out: Array = []
 	if data.landmark_type != "none":
 		var e := LocationData.entry_for_type(data.landmark_type)
-		if float(e.get("span_m", 0.0)) > 0.0:
+		if str(e.get("kind", "")) == "Bridge" and float(e.get("span_m", 0.0)) > 0.0:
 			out.append([TerrainBuilder.landmark_site_xz(data), e])
 	for c in data.landmark_candidates:
 		var cd := c as Dictionary
-		if cd.has("type") and float(cd.get("span_m", 0.0)) > 0.0:
+		var entry := LocationData.entry_for_type(str(cd.get("type", "")))
+		if str(entry.get("kind", cd.get("archetype", ""))) == "Bridge" and float(cd.get("span_m", 0.0)) > 0.0:
 			out.append([Vector2(float(cd["x"]), float(cd["z"])), cd])
 	return out
 

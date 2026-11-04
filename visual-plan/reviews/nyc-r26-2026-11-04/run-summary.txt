@@ -1,0 +1,30 @@
+LANDCOVER fetch: { "landcover": { "ms": 1, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 86, "assemble_ms": 110, "tiles": 121, "cached": 121, "failed": 0 } rings=3 drapes=3
+FAR-CITY fetch: { "ms": 2754, "bytes": 36895520, "cached": true, "landuse": 1173, "towers": 3000 }
+FAR-CITY built in 567 ms (blocks=17214 towers=1983 tris=276362 meshes=302 source=drape+osm)
+BUILDINGS census { "real": 1782, "impostors": 0, "infill": 0, "far_blocks": 17214, "far_towers": 1983, "far_tris": 276362 } (settlement=drape+osm)
+BUILD timings {Distant terrain=2070, Ground & water=2594, Buildings=7854, Roads & landmarks=3265, Vegetation=6914} total=7879 parallel
+CAPTURE new_york built in 14 s
+SHOT new_york_vantage luma 0.563 sat 0.278 colourful 0.129
+SHOT new_york_unshaded luma 0.516 sat 0.219 colourful 0.122
+SHOT new_york_agx luma 0.492 sat 0.264 colourful 0.122
+SHOT new_york_h000 luma 0.402 sat 0.376 colourful 0.123
+SHOT new_york_h090 luma 0.127 sat 0.439 colourful 0.110
+SHOT new_york_h180 luma 0.097 sat 0.380 colourful 0.107
+SHOT new_york_h270 luma 0.490 sat 0.339 colourful 0.118
+SHOT new_york_close1 luma 0.551 sat 0.179 colourful 0.114
+SHOT new_york_close2 luma 0.404 sat 0.302 colourful 0.110
+SHOT new_york_vantage_noon luma 0.643 sat 0.215 colourful 0.144
+SHOT new_york_vantage_night luma 0.048 sat 0.385 colourful 0.068
+SHOT new_york_look0 luma 0.656 sat 0.190 colourful 0.138
+SHOT new_york_look1 luma 0.634 sat 0.234 colourful 0.134
+SHOT new_york_look2 luma 0.720 sat 0.210 colourful 0.175
+SHOT new_york_look3 luma 0.633 sat 0.214 colourful 0.122
+SHOT new_york_look4 luma 0.634 sat 0.175 colourful 0.123
+SHOT new_york_look5 luma 0.436 sat 0.224 colourful 0.111
+SHOT new_york_look6 luma 0.578 sat 0.395 colourful 0.250
+SHOT new_york_look7 luma 0.573 sat 0.253 colourful 0.159
+SHOT new_york_look8 luma 0.704 sat 0.279 colourful 0.232
+SHOT new_york_look9 luma 0.689 sat 0.247 colourful 0.173
+SHOT new_york_look10 luma 0.442 sat 0.364 colourful 0.115
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-r26-2026-11-04

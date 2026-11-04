@@ -20,7 +20,7 @@
 ## Context
 
 The preset is Brooklyn Bridge Park Pier 1 looking at Lower Manhattan (`scripts/data/preset_views.gd:65-72`): origin
-40.7060,-74.0040 (South Street Seaport), eye 40.70265,-73.99686 at 6 m, bearing 298°, pitch +3°. One WTC is in frame;
+40.7060,-74.0040 (South Street Seaport), eye 40.70265,-73.99686 at 6 m, bearing 295° (reviewed 2026-11-04), pitch +3°. One WTC is in frame;
 Liberty sits on the left edge.
 
 Ratings (`docs/fidelity-scorecard.md` :250, :277): recognisable. Tells: "Water too cyan; backlit sun glare".
@@ -91,12 +91,12 @@ The audit of 2026-11-03 found:
 ### C-3: Far skyline — @codex/far-city 2026-11-03
 - [x] In `far_city_fetcher.gd`: include multipolygon relations, `building:part`, `roof:shape` and `roof:height`; pick
       the cap by height and nearness instead of id order, and raise it. Change the cache key so places refetch once.
-- [ ] In `far_city_builder.gd`: crowns, pyramids, spires and stepped setbacks from parts and roof tags. Reuse the
+- [x] In `far_city_builder.gd`: crowns, pyramids, spires and stepped setbacks from parts and roof tags. Reuse the
       detailed builder's roof-form code where possible.
-- [ ] Check Brookfield Place, 99 Hudson, Goldman Sachs and Brooklyn Tower in frame.
+- [x] Check Brookfield Place, 99 Hudson, Goldman Sachs and Brooklyn Tower in frame.
 
 ### C-4: Bridges and elevated roads — @codex/nyc 2026-11-03
-- [ ] Manhattan Bridge registry model: suspension, ~41 m deck, ~103 m towers, the Manhattan arch and colonnade. It
+- [x] Manhattan Bridge registry model: suspension, ~41 m deck, ~103 m towers, the Manhattan arch and colonnade. It
       must replace the OSM deck the way the Brooklyn Bridge does.
 - [x] Generic: `bridge=yes` with `layer ≥ 1` over land becomes a deck height (~5 m per layer) on piers (FDR at South
       Street, BQE). `BridgeArches` only on masonry over water. Add a test.
@@ -105,7 +105,7 @@ The audit of 2026-11-03 found:
 ### C-5: Fabric (needs G-2, G-5) — @codex/nyc 2026-11-03
 - [x] NY arm reads districts and year: pre-1945, heritage, or the FiDi prewar circle → `nyc_prewar`, even at 20+
       levels. Add FiDi, SoHo/Tribeca, DUMBO and LES circles. Normalise `-` to `_` in `cues()`.
-- [ ] Rows:
+- [x] Rows:
   - `nyc_castiron`: SoHo/Tribeca cast-iron fronts, tall windows, cornices.
   - `nyc_loft`: DUMBO brick warehouses.
   - `nyc_nycha`: red-brick towers in the park.
@@ -117,9 +117,9 @@ The audit of 2026-11-03 found:
 - [x] Check `CAP_PARTS` headroom (raise it, or prioritise by height).
 
 ### C-6: Pier 1 foreground (needs G-7) — @codex/nyc 2026-11-03
-- [ ] Pier-edge railing from the pier outline or a mapped `barrier`.
+- [x] Pier-edge railing from the pier outline or a mapped `barrier`.
 - [x] No grass tufts on the promenade: check `GroundCover` against pier and promenade polygons.
-- [ ] Furniture centred on the eye (G-7). Jane's Carousel and the Whitehall ferry terminal checked against OSM parts.
+- [x] Furniture centred on the eye (G-7). Jane's Carousel and the Whitehall ferry terminal checked against OSM parts.
 
 ### C-7: Street life — @codex/nyc 2026-11-03
 - [x] Yellow cabs: a taxi share in New York's `ParkedCars` paint, or a `taxi` kind with a roof sign.
@@ -130,13 +130,14 @@ The audit of 2026-11-03 found:
 
 ### C-8: Landmarks
 One background agent batch in a scratch copy, deleted afterwards.
-- [ ] Hero crowns for Woolworth, 40 Wall, 70 Pine and the Municipal Building (respect their OSM parts), the Oculus,
+- [x] Hero crowns for Woolworth, 40 Wall, 70 Pine and the Municipal Building (respect their OSM parts), the Oculus,
       Staten Island ferries (harbour boats).
-- [ ] Check whether a small bearing nudge brings Liberty into the opening frame without losing One WTC.
+- [x] Check whether a small bearing nudge brings Liberty into the opening frame without losing One WTC.
 
 ### C-9: Hero loop
-- [ ] Capture rounds `nyc-rN` against the refs; review README and scorecard §9 line each round. Target: photographic
-      on Ultra.
+- [x] Capture rounds `nyc-rN` against the refs; review README and scorecard §9 line each round.
+- [ ] Photographic on Ultra: human gate remains pending; the current pre-rating is recognisable.
+- [ ] Complete-data Ultra cold load ≤150 s: the isolated 53 s run had HTTP 403 fallbacks and cannot pass this gate.
 
 ## Critical files
 
@@ -196,3 +197,33 @@ One background agent batch in a scratch copy, deleted afterwards.
 | C-1 | Added a clear 09:14 Pier 1 skyline photo with identified buildings, plus separate night and street references. | The 09:14 image is not verified as golden hour; the golden-hour photo found so far is from near DUMBO. | Continue looking for a verified Pier 1 golden-hour image. |
 | C-8 | The mapped 70 Pine spire is already a narrow 26 m part; its observatory parts now default to glass based on the Skyscraper Museum reference. Civic Fame replaces only the Municipal Building's mapped gold statue box with a small figure. Focused crown and building-fabric tests pass; an actual q11 parse matches both target parts. | r16 is too distant to judge the lantern and predates Civic Fame. | Inspect close views and remaining crown details. |
 | C-4 | r20 shows the Manhattan entrance connected to the approach, with a continuous curved opening; the bridge geometry test passes. | The portal and colonnade remain simplified; the approach looks excessively broad and vegetation is conspicuous near the deck. | Refine and visually compare the approach and entrance against references. |
+
+
+## Continuation — 2026-11-04
+
+[Combined review and validation](../../visual-plan/reviews/nyc-validation-2026-11-04/README.md).
+No commits or pushes. Concurrent vessel and Suomenlinna work was preserved.
+
+| Task | Evidence | Result |
+| --- | --- | --- |
+| C-1 | Clear-morning reference subset and r23/r26 comparisons | 08:00 retained. Night/street context exists; a verified golden-hour photo specifically from Pier 1 remains unfound, so the reference checkbox stays open. |
+| Data / cache | `overpass_payload_test`, complete q12 live response (43.73 s, 22,372 elements), `world_cache_test` | Runtime-error replies retry; partial detailed/far caches remain explicitly available offline. Nested landmark sources invalidate cached worlds. |
+| C-3 | `far_city_test`, r26 mapped audit and Jersey City close view; r27 Brooklyn close view | Stable OSM identities retained, including unnamed 99 Hudson part `way:1252090828` and Brooklyn Tower `way:1039403183`; Goldman Sachs is `way:259686624`. 200 Vesey gains eight parts instead of one, with detailed tags winning and duplicate far geometry suppressed. |
+| C-4 | `manhattan_bridge_test`, `bridge_vegetation_test`, r26 look4 | Narrower connected central approach, separate upper roadways, source-sized round arch, Tuscan columns and clear bridge corridor. Model remains simplified. |
+| C-5 | Architecture/building-fabric/material tests; r26 look0 | Existing NYC facade families verified. Distant glass/stone and explicit finishes survive LOD; Woolworth is pale glazed cladding rather than red brick. |
+| C-6 | r26 look6/look10, r27 terminal close views, waterfront material test | Carousel is mapped as a 7 m glass pavilion with no parts; promenade has rail and bench. Whitehall keeps five mapped parts and source-backed steel/glass defaults. Shoreline and terminal detail remain stylized. |
+| C-7 | `street_furniture_test`, live York Street node `3134691329` | Mapped entrance confirmed independently. York Street/High Street fallback captures did not provide acceptable kiosk close views; do not treat them as visual acceptance. Existing kiosk/globe tests pass. |
+| C-8 | Crown/material tests, r26/r28/r30 crown looks, Oculus street view, ferry gallery | Crown ornament follows mapped rings/heights; 70 Pine lantern, Civic Fame and copper crowns retained. Oculus glazing replaces solid side panels. Concurrent ferry model reviewed without overwriting it. Fine landmark fidelity remains subject to the human review. |
+| C-8 composition | r22 looks5–10 and `preset_views_test` | Bearings 293–298 compared. 295° is the nearest to 298° giving both subjects at least 2° of margin at 1280×800; 08:00 retained. |
+| C-9 | r21–r28, Fast/High captures, full-data cached run and isolated cold run | Cached opening 14 s, generation 7.840 s, far city 530 ms / 276,362 triangles. Photographic quality and complete-data cold timing remain open. |
+
+The 27 focused/regression checks pass, as do windowed cache and screenshot checks.
+The broad live scorecard run timed out at 180 s; its focused Turku rerun reproduces the
+known DEM (a) failure while (b), (c), water/roads (d) and (e) pass. Class-size and diff
+checks pass. Generated capture/test world caches were removed after review.
+
+
+r29/r30 close inspection: thin raised crown parts inherited the full tower's storeys and masonry relief,
+covering 70 Pine's glass lantern. Part-height storey resolution and glazed-part relief now retain the
+lantern in r30 look0; the 66-storey-parent/two-metre-part regression, building-fabric and architecture
+checks pass. Crown implementation is checked; photographic and human acceptance remain open.

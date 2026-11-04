@@ -38,6 +38,18 @@ var _attempt := 0
 var _token := 0
 var _validate_task := -1
 
+## A later statement can fail after Overpass has printed valid geometry.
+## HTTP 200 must not turn that partial reply into a complete cached map.
+static func payload_error(text: String) -> String:
+	if not text.contains('"remark"'):
+		return ""
+	var parsed: Variant = JSON.parse_string(text)
+	if parsed is Dictionary:
+		var remark := str(parsed.get("remark", "")).strip_edges()
+		if remark != "":
+			return "Overpass incomplete response: " + remark
+	return ""
+
 ## attempt_timeout bounds one attempt end to end (HTTPRequest.timeout).
 func _init(attempt_timeout: float = 60.0) -> void:
 	_http = HTTPRequest.new()
@@ -113,7 +125,9 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 	var validate := _validate
 	_validate_task = WorkerThreadPool.add_task(func() -> void:
 		var text := body.get_string_from_utf8()
-		var why: String = validate.call(text)
+		var why := payload_error(text)
+		if why == "":
+			why = validate.call(text)
 		_on_validated.call_deferred(token, text, why))
 
 func _on_validated(token: int, text: String, why: String) -> void:

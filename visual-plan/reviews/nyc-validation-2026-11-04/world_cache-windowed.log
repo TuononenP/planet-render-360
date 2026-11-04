@@ -1,0 +1,44 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 100, "assemble_ms": 139, "tiles": 140, "cached": 140, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 658.8, "precip_warm_mm": 165.4, "snow_days": 0.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": 4.35000000000002, "t_warm_c": 18.55 } { "ms": 0, "cached": true }
+FarCityFetcher: Overpass failed (result=0 code=403); using older far-city cache
+OsmFetcher: Overpass failed (result=0 code=403); using cached osm_v2_48857_2352_r1200_q11.json
+FAR-CITY fetch: { "ms": 1588, "bytes": 5078992, "cached": true, "landuse": 1129, "towers": 728 }
+SHORE TIMINGS classify=75 patches=183
+SHORELINE bodies=89 edges=6742 patches=3617 hard=0 diagnostics=0
+SHORE TERRAIN vertices_ms=769
+FAR-TERRAIN built in 822 ms (rings=3 drapes=3 bands=2)
+SHORE TERRAIN arrays_ms=1029 vertices=135922
+SHORE TERRAIN total_ms=1184
+WARNING: BuildingBuilder: 3 of 6871 real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle).
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _real_buildings (res://scripts/generation/building_builder.gd:236)
+         [1] build_buildings (res://scripts/generation/building_builder.gd:66)
+         [2] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:62)
+         [3] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:82)
+FAR-CITY built in 338 ms (blocks=33024 towers=724 tris=505358 meshes=226 source=drape+osm)
+BUILDINGS census { "real": 6871, "impostors": 0, "infill": 0, "far_blocks": 33024, "far_towers": 724, "far_tris": 505358 } (settlement=drape+osm)
+BUILD timings {Distant terrain=841, Ground & water=1184, Buildings=9146, Roads & landmarks=2933, Vegetation=1271} total=9170 parallel
+WORLD CACHE saved world_48857_2352_p3_s1_2224f616.scn in 37236 ms
+WORLD CACHE saved after 36608 ms in background
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 96, "assemble_ms": 140, "tiles": 140, "cached": 140, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 658.8, "precip_warm_mm": 165.4, "snow_days": 0.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": 4.35000000000002, "t_warm_c": 18.55 } { "ms": 0, "cached": true }
+FarCityFetcher: Overpass failed (result=0 code=403); using older far-city cache
+OsmFetcher: Overpass failed (result=0 code=403); using cached osm_v2_48857_2352_r1200_q11.json
+FAR-CITY fetch: { "ms": 1458, "bytes": 5078992, "cached": true, "landuse": 1129, "towers": 728 }
+SHORE TIMINGS classify=79 patches=190
+SHORELINE bodies=89 edges=6742 patches=3617 hard=0 diagnostics=0
+WORLD CACHE hit world_48857_2352_p3_s1_2224f616.scn in 199 ms
+WORLD CACHE cold 59081 ms, cached revisit 4714 ms
+SHORE TIMINGS classify=71 patches=174
+SHORELINE bodies=89 edges=6742 patches=3617 hard=0 diagnostics=0
+WORLD CACHE OK: background save, identical cached world + ground, faster revisit, budget eviction
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 82 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

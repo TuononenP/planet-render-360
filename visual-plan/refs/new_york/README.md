@@ -24,3 +24,18 @@ Additional reference sources, downloaded to `context/` and kept separate from th
 A verified morning golden-hour Pier 1 reference is still needed.
 
 - `near-dumbo-golden-morning.jpg`: [Brooklyn Bridge and One World Trade Center, morning light](https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge_and_One_World_Trade_Center,_morning_light_(20887439332).jpg), John Cunniff, CC BY 2.0; photographed about 30 minutes after sunrise from Brooklyn Bridge Park near DUMBO (not Pier 1).
+
+## Condition-matched comparisons — 2026-11-04
+
+`morning/01_pier1-0914.jpg` is a downscaled copy of Jakub Hałun's
+`context/pier1-0914.jpg` above (CC BY 4.0). Use
+`capture_presets.gd --refs=morning` for the clear 08:00 opening. Its
+colourfulness is 0.178; this single clear-morning reference is a diagnostic,
+not a statistical acceptance interval. Its autumn date and 09:14 time differ
+from the default clear-summer capture.
+
+The two root photos remain the overcast set; use `--weather=3` without
+`--refs=morning` for that comparison. Keep night, street, and golden-hour
+context images outside both sets. The new source search did not establish a
+golden-hour photograph taken specifically on Pier 1, so that requirement
+remains open; the DUMBO photo is not relabelled as Pier 1.

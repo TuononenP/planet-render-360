@@ -65,6 +65,7 @@ static var MATERIAL_TAGS := {
 	"marble": "limestone", "masonry": "stone", "ashlar": "stone", "rubble": "stone",
 	"limestone": "limestone", "chalk": "limestone", "travertine": "limestone",
 	"plaster": "render", "render": "render", "stucco": "render",
+	"glazed_terracotta": "render",
 	"metal": "concrete", "steel": "concrete", "aluminium": "concrete",
 	"tin": "concrete", "metal_plates": "concrete", "iron": "concrete",
 	"tile": "terracotta", "tiles": "terracotta", "ceramic": "terracotta",

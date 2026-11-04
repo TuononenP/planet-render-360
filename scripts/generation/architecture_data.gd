@@ -188,6 +188,7 @@ const KIND_TAGS := {
 
 ## `use` hints (amenity / shop / office / tourism ...) for `building=yes`.
 const USE_TAGS := {
+	"ferry_terminal": "civic",
 	"place_of_worship": "religious", "school": "civic", "kindergarten": "civic",
 	"college": "civic", "university": "civic", "hospital": "civic",
 	"clinic": "civic", "townhall": "civic", "library": "civic",

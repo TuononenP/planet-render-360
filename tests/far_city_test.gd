@@ -204,7 +204,7 @@ func _tower_parts_checks(failures: Array[String]) -> void:
 	builder._glass = glass
 	builder._dfs = [brick]
 	if builder._tower_material({"material": "mirror"}, brick, Vector2.ZERO) != glass \
-			or builder._tower_material({"material": "brick"}, glass, Vector2.ZERO) != brick \
+			or str(builder._tower_material({"material": "brick"}, glass, Vector2.ZERO).get_meta("facade_set", "")) != "brick" \
 			or builder._tower_material({}, glass, Vector2.ZERO) != glass:
 		failures.append("far tower parts must honour mapped glass and masonry materials")
 	var data := _data()
@@ -261,6 +261,15 @@ func _parse_checks(failures: Array[String]) -> void:
 		failures.append("parse: tower height should be 187, got %s" % str(tw))
 	elif (tw[0]["footprint"] as PackedVector2Array).size() != 4:
 		failures.append("parse: tower footprint should drop the closing node")
+	elif str(tw[0].get("osm_id", "")) != "way:3":
+		failures.append("far tower identity must match the detailed parser's integer OSM id")
+	var near := [{"osm_id": "way:3", "parts": [{"osm_id": "way:4", "material": "stone"}]}]
+	var far := [{"osm_id": "way:3", "parts": [{"osm_id": "way:4", "material": "glass"},
+		{"osm_id": "way:5", "height": 250.0}]}]
+	var complete := FarCityFetcher.complete_buildings(near, far)
+	if complete[0]["parts"].size() != 2 or complete[0]["parts"][0]["material"] != "stone" \
+			or near[0]["parts"].size() != 1:
+		failures.append("edge towers must gain missing far parts without replacing detailed tags or mutating the input")
 	var detailed: Array = OsmFetcher.parse_features(JSON.stringify(fixture), lat, lon)["buildings"]
 	if detailed.size() != 1 or absf(float(detailed[0]["height"]) - 187.0) > 0.01:
 		failures.append("planned construction height must not appear as a completed building: %s" % str(detailed))

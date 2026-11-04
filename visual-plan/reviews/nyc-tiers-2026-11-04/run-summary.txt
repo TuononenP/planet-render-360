@@ -1,0 +1,18 @@
+FAR-FIELD fetch: { "fetch_ms": 47, "assemble_ms": 101, "tiles": 40, "cached": 40, "failed": 0 } rings=3 drapes=0
+FAR-CITY fetch: { "ms": 2944, "bytes": 36895520, "cached": true, "landuse": 1173, "towers": 3000 }
+FAR-CITY built in 838 ms (blocks=4118 towers=1983 tris=145490 meshes=244 source=osm)
+BUILDINGS census { "real": 601, "impostors": 1242, "infill": 0, "far_blocks": 4118, "far_towers": 1983, "far_tris": 145490 } (settlement=osm)
+BUILD timings {Distant terrain=1177, Ground & water=2136, Buildings=4115, Roads & landmarks=2263, Vegetation=2354} total=4129 parallel
+CAPTURE new_york_p0 built in 9 s
+SHOT new_york_p0_vantage luma 0.612 sat 0.196 colourful 0.130
+SHOT new_york_p0_bank luma 0.455 sat 0.184 colourful 0.096
+LANDCOVER fetch: { "landcover": { "ms": 1, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 85, "assemble_ms": 114, "tiles": 121, "cached": 121, "failed": 0 } rings=3 drapes=3
+FAR-CITY fetch: { "ms": 2788, "bytes": 36895520, "cached": true, "landuse": 1173, "towers": 3000 }
+FAR-CITY built in 578 ms (blocks=17214 towers=1983 tris=276362 meshes=253 source=drape+osm)
+BUILDINGS census { "real": 1803, "impostors": 0, "infill": 0, "far_blocks": 17214, "far_towers": 1983, "far_tris": 276362 } (settlement=drape+osm)
+BUILD timings {Distant terrain=1864, Ground & water=2559, Buildings=4772, Roads & landmarks=2423, Vegetation=2800} total=4780 parallel
+CAPTURE new_york_p2 built in 11 s
+SHOT new_york_p2_vantage luma 0.566 sat 0.268 colourful 0.128
+SHOT new_york_p2_bank luma 0.394 sat 0.289 colourful 0.105
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-tiers-2026-11-04

@@ -1,0 +1,25 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+LANDCOVER fetch: { "landcover": { "ms": 1, "available": true }, "canopy": { "ms": 4, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 63, "assemble_ms": 64, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3
+CLIMATE: { "precip_mm": 753.7, "precip_warm_mm": 235.4, "snow_days": 160.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -3.94999999999999, "t_warm_c": 15.65 } { "ms": 0, "cached": true }
+WARNING: OsmFetcher: ring query failed (Overpass failed (result=0 code=403)); detailed data only
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _on_ring_exhausted (res://scripts/data/osm_fetcher.gd:497)
+         [1] _fail (res://scripts/data/overpass_request.gd:114)
+         [2] _on_done (res://scripts/data/overpass_request.gd:120)
+OsmFetcher: Overpass failed (result=0 code=403); using cached osm_v2_60452_22267_r1200_q11.json
+OsmFetcher: POIs unavailable (Overpass failed (result=0 code=403)); using other map data
+FAR-CITY fetch: { "ms": 636, "bytes": 16416625, "cached": true, "partial": false, "landuse": 6064, "towers": 25 }
+SHORE TIMINGS classify=194 patches=136
+SHORE TIMINGS classify=194 patches=136
+SHORELINE bodies=26 edges=4072 patches=3032 hard=2115 diagnostics=0
+SHORELINE bodies=26 edges=4072 patches=3032 hard=2115 diagnostics=0
+FAR-CITY built in 41 ms (blocks=9503 towers=11 tris=118369 meshes=136 source=drape+osm)
+BUILDINGS census { "real": 2500, "impostors": 195, "infill": 0, "far_blocks": 9503, "far_towers": 11, "far_tris": 118369 } (settlement=drape+osm)
+SCORECARD report visual-plan/reviews/nyc-validation-2026-11-04/scorecard/scorecard-turku-high.md
+SCORECARD Turku: a:FAIL b:PASS c:PASS d-water:PASS d-roads:PASS e:PASS
+SCORECARD FAIL: see the reports (FAIL / BLOCKED rows)
+WARNING: 20 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

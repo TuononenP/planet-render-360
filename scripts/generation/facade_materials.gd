@@ -44,6 +44,7 @@ static func begin_build() -> void:
 	_ground_overflows = 0
 	_distant_mats.clear()
 	_distant_roof_mats.clear()
+	_glass_mats.clear()
 	_roof_mats.clear()
 	BuildingTrim._mats.clear()
 	FacadeComposer.clear_cache()
@@ -128,14 +129,13 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		# The shared distant palette still has to distinguish a mapped glass
 		# curtain wall from masonry (including glass residential towers).
 		var mapped_set := str(MaterialLibrary.MATERIAL_TAGS.get(str(b.get("material", "")).strip_edges().to_lower(), ""))
-		if mapped_set == "glass":
+		if mapped_set == "glass" or (mapped_set == "" and str(style.get("wall_set", "")) == "glass"):
 			return glass_material(0 if fidelity <= 1 else 1)
-		# Explicitly historic prewar towers keep their stone look at skyline distance.
-		var arch := str(b.get("architecture", "")).to_lower().replace("-", "_")
-		if str(style.get("era", "")) == "nyc_prewar" \
-				and (bool(b.get("heritage", false)) or arch == "art_deco"):
+		# A mapped finish and a resolved prewar tower must not turn into
+		# the region's generic apartment brick at the fidelity boundary.
+		if mapped_set != "" or str(style.get("era", "")) == "nyc_prewar":
 			return facade_for_building(b, region, storeys, mini(fidelity, 2), false, seed_v, style)
-		var dfs := distant_facades(fidelity, region)
+		var dfs := distant_facades(fidelity, str(style.get("era", region)))
 		return dfs[absi(hash(str(seed_v))) % dfs.size()]
 	if style.is_empty() and not MaterialLibrary.REGION_MATERIALS.has(region):
 		region = "urban"

@@ -1,0 +1,19 @@
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 3, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 87, "assemble_ms": 110, "tiles": 121, "cached": 121, "failed": 0 } rings=3 drapes=3
+FAR-CITY fetch: { "ms": 2687, "bytes": 36895520, "cached": true, "partial": false, "landuse": 1173, "towers": 3000 }
+FAR-CITY built in 569 ms (blocks=17214 towers=1983 tris=276362 meshes=302 source=drape+osm)
+BUILDINGS census { "real": 1782, "impostors": 0, "infill": 0, "far_blocks": 17214, "far_towers": 1983, "far_tris": 276362 } (settlement=drape+osm)
+BUILD timings {Distant terrain=1976, Ground & water=2503, Buildings=7878, Roads & landmarks=3205, Vegetation=6808} total=7905 parallel
+CAPTURE new_york built in 14 s
+SHOT new_york_vantage luma 0.563 sat 0.277 colourful 0.129
+SHOT new_york_h000 luma 0.402 sat 0.375 colourful 0.122
+SHOT new_york_h090 luma 0.127 sat 0.438 colourful 0.109
+SHOT new_york_h180 luma 0.098 sat 0.384 colourful 0.107
+SHOT new_york_h270 luma 0.491 sat 0.334 colourful 0.119
+SHOT new_york_close1 luma 0.551 sat 0.184 colourful 0.115
+SHOT new_york_close2 luma 0.404 sat 0.296 colourful 0.111
+SHOT new_york_look0 luma 0.673 sat 0.214 colourful 0.156
+SHOT new_york_look1 luma 0.705 sat 0.194 colourful 0.145
+SHOT new_york_look2 luma 0.592 sat 0.235 colourful 0.141
+SHOT new_york_look3 luma 0.687 sat 0.171 colourful 0.138
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-r30-lantern-2026-11-04

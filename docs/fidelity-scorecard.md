@@ -559,3 +559,35 @@ windowed world-cache test passed the cold/revisit comparison, and the windowed
 screenshot test completed. The class-size check passed at 806/1000 lines for
 the largest script. Re-run the relevant checks against the final workspace
 and final native libraries before considering the implementation accepted.
+
+
+### New York continuation, 2026-11-04
+
+Provisional rating: **recognisable** on Ultra; photographic target not met and human gate pending.
+Opening retained at 08:00 and moved from 298° to 295° after six bearing comparisons.
+[Combined review, tests and remaining gates](../visual-plan/reviews/nyc-validation-2026-11-04/README.md).
+
+| Round | Conditions | Review / remaining tell |
+| --- | --- | --- |
+| r21 | Clear summer, 08:00 | Baseline from partial detailed data; generic orange towers. |
+| r22 | Clear summer, 08:00 | Complete detailed data, distant facade correction and refined Manhattan entrance; approach and Oculus still under review. |
+| r23 | Clear summer, 08:00 | Glazed Oculus sides and bridge vegetation clearance; clear-morning reference subset avoids treating overcast saturation as the opening target. |
+| r24 | Overcast summer, 08:00 | Colourfulness 0.0665 against overcast refs 0.026–0.039; photographic target still unmet. |
+| r25 | Clear summer, 08:00 | Exact-ID edge-part completion and duplicate far-building suppression; 200 Vesey retains eight parts. |
+| r26 | Clear summer, 08:00 | Pale Woolworth cladding, mapped crown ornament, street Oculus and Pier 1 rail/bench checked. Vantage colourfulness 0.1290 vs clear-morning photo 0.1780; single-photo range is diagnostic. |
+| r27 | Clear summer, 08:00 | Whitehall steel/glass defaults and separate Brooklyn Tower look; shoreline and terminal remain simplified. |
+| r28 | Clear summer, 08:00 | Targeted crown inspection. Fine landmark and skyline fidelity remain below the photographic goal. |
+
+Healthy cached opening 14 s, parallel generation 7.840 s, far city 530 ms / 276,362 triangles.
+The isolated 53 s cold opening had HTTP 403 fallbacks and missing far towers, so it cannot certify
+complete-data cold loading within 150 s. A complete live detailed response separately took 43.73 s.
+Fast/High captures and both windowed cache/screenshot checks pass; the focused Turku scorecard
+retains its previously recorded DEM (a) failure. A verified golden-hour Pier 1 Commons photo and
+an acceptable in-world subway entrance close-up remain open.
+
+
+r29/r30 crown detail follow-up: close views exposed a full-tower storey count on raised one-metre
+parts. Storeys now follow the part's occupied height, and glazed parts shed inherited masonry relief.
+[The r30 close view](../visual-plan/reviews/nyc-r30-lantern-2026-11-04/new_york_look0.jpg) resolves
+70 Pine's glass lantern; focused crown, building-fabric and architecture tests pass. Overall rating
+remains recognisable; this does not close the photographic or cold-network gates.

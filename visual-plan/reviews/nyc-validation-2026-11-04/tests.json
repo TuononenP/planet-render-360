@@ -1,0 +1,136 @@
+{
+  "overpass_payload": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.82
+  },
+  "nyc_skyline_materials": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.72
+  },
+  "manhattan_bridge": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.26
+  },
+  "bridge_vegetation": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.45
+  },
+  "nyc_crown_materials": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.04
+  },
+  "nyc_oculus": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 7.63
+  },
+  "harbour_ferries": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.43
+  },
+  "osm": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 9.91
+  },
+  "osm_fallback": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.49
+  },
+  "architecture": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 6.05
+  },
+  "building_fabric": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.75
+  },
+  "preset_views": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.67
+  },
+  "parked_cars": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.44
+  },
+  "scenery": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 6.85
+  },
+  "street_furniture": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.95
+  },
+  "street_lights": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.0
+  },
+  "landmark_catalog": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 78.57
+  },
+  "landmark": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 45.69
+  },
+  "landmark_fidelity": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 6.08
+  },
+  "bridge_arches": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.89
+  },
+  "fidelity_scorecard": {
+    "passed": false,
+    "timeout": 180
+  },
+  "coastal_water": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.58
+  },
+  "shoreline": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.56
+  },
+  "tree_eye_lod": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.46
+  },
+  "tree_pits": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 4.99
+  },
+  "render_upgrade": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 5.36
+  },
+  "far_city": {
+    "exit": 0,
+    "passed": true,
+    "seconds": 8.76
+  }
+}

@@ -1,0 +1,14 @@
+FarCityFetcher: Overpass failed (result=0 code=403); far city from imagery only
+WARNING: OsmFetcher: ring query failed (Overpass failed (result=0 code=403)); detailed data only
+DEM z14 mosaic incomplete (8/9 tiles), falling back to z12 mid tile
+LANDCOVER fetch: { "landcover": { "ms": 4901, "available": true }, "canopy": { "ms": 18291, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 20026, "assemble_ms": 113, "tiles": 121, "cached": 0, "failed": 0 } rings=3 drapes=3
+OsmFetcher: POIs unavailable (Overpass failed (result=0 code=403)); using other map data
+FAR-CITY fetch: { "ms": 871, "bytes": 0, "cached": false, "landuse": 0, "towers": 0 }
+FAR-CITY built in 48 ms (blocks=22716 towers=0 tris=227160 meshes=125 source=drape)
+BUILDINGS census { "real": 281, "impostors": 0, "infill": 0, "far_blocks": 22716, "far_towers": 0, "far_tris": 227160 } (settlement=drape)
+BUILD timings {Distant terrain=1823, Ground & water=2300, Buildings=5410, Roads & landmarks=2784, Vegetation=3025} total=5423 parallel
+CAPTURE new_york built in 53 s
+SHOT new_york_vantage luma 0.712 sat 0.353 colourful 0.269
+SHOT new_york_bank luma 0.654 sat 0.481 colourful 0.213
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-cold-retry-2026-11-04

@@ -162,9 +162,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			else BuildingHeights._resolve_total(md, b, ctx, parent_res, look)
 		# T4.3: storeys drive the window rows (tagged levels, else the
 		# resolved total over the regional floor height).
-		var storeys := int(md.get("levels", b.get("levels", 0)))
-		if storeys <= 0:
-			storeys = maxi(1, roundi(float(res["total_m"]) / fh))
+		var min_m := _lift_m(md, fh)
 		var b_eff := b.duplicate()
 		for k in md:
 			# Parts with no facade tags keep the building's mapped finish.
@@ -176,6 +174,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 				continue
 			b_eff[k] = md[k]
 		NycCrownMaterials.apply(b, md, b_eff)
+		NycWaterfrontMaterials.apply(b, md, b_eff)
 		var shape := parent_shape
 		# A gable-fronted house (Amsterdam) needs the ridge its street gable
 		# stands on: an untagged hip or mansard on a parcel ring turns gabled.
@@ -206,12 +205,16 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			wall = total - rh
 		if legacy:
 			wall = clampf(wall, 7.2, 76.0)
-		var min_m := _lift_m(md, fh)
 		# A part that is only roof (a dome on its drum: min_height at the
 		# drum top, the rest roof:height) keeps its lift; any other min
 		# above the top is a tagging slip, not a floating box.
 		if min_m > wall - 1.0 and not (rh > 0.0 and min_m <= wall + 0.01):
 			min_m = 0.0
+		var storeys := int(md.get("levels", b.get("levels", 0) if single else 0))
+		if storeys > 0 and min_m > 0.0:
+			storeys = maxi(1, storeys - int(md.get("min_level", 0)))
+		if storeys <= 0:
+			storeys = maxi(1, roundi((float(res["total_m"]) - min_m) / fh))
 		# Untagged arch and ramp parts of a mapped building=bridge (the Rialto)
 		# are stone: left to the infill mix, the sloped parts drew an
 		# outbuilding's orange plank roof.
@@ -253,13 +256,22 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 					holes.append(hr)
 		var cx := float(md.get("x", 0.0))
 		var cz := float(md.get("z", 0.0))
+		var part_look := look
+		if MaterialLibrary.MATERIAL_TAGS.get(str(b_eff.get("material", "")), "") == "glass" \
+				and (str(look.get("wall_set", "")) != "glass" or (min_m > 0.0 and wall - min_m < fh)):
+			# A glazed lantern/atrium on a masonry building needs glazing
+			# relief, not the parent's stone sills and string courses.
+			part_look = look.duplicate()
+			part_look["wall_set"] = "glass"
+			part_look["pattern"] = "curtain"
+			part_look["relief"] = {"mullion": true}
 		out.append({"ring": ring, "holes": holes, "centre": Vector2(cx, cz),
 			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
 			# A mapped landmark's parts are its towers and domes: no made-up
 			# tower, stacks or dormers on any of them.
 			"main": mi == main_mass and not bool(b.get("mapped_landmark", false)),
-			"look": look})
+			"look": part_look})
 	return out
 
 ## The outline as a mass from the ground to the lowest part when every

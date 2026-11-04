@@ -52,6 +52,15 @@ func _rows() -> void:
 func _pins() -> void:
 	var ny := PresetViews.for_pin(40.7060, -74.0040)
 	_check(is_equal_approx(PresetViews.opening_hour(ny, 19.0), 8.0), "New York opens in morning light")
+	_check(is_equal_approx(float(ny["bearing"]), 295.0), "New York retains the reviewed Pier 1 composition")
+	var half_fov := rad_to_deg(atan(tan(deg_to_rad(35.0)) * 1.6))
+	var eye := PresetViews.eye_xz(ny, 40.7060, -74.0040)
+	for type in ["statue_liberty", "one_wtc"]:
+		var entry := LocationData.entry_for_type(type)
+		var offset := WorldScale.xz_from_latlon(entry["lat"], entry["lon"], 40.7060, -74.0040) - eye
+		var bearing := rad_to_deg(atan2(offset.x, -offset.y))
+		_check(half_fov - absf(wrapf(bearing - float(ny["bearing"]), -180.0, 180.0)) >= 2.0,
+			"%s has at least a two-degree margin in the desktop opening" % type)
 	_check(is_equal_approx(PresetViews.opening_hour({}, 19.0), 19.0), "other places retain golden hour")
 	for row in PresetViews.ROWS:
 		var id := str(row["id"])

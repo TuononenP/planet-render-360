@@ -254,6 +254,10 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 				md["centre"], str(md["shape"]), float(md["rh_m"]) * m2u, md["b_eff"], ctx,
 				int(md["storeys"]), md["look"], bool(md["main"]), md):
 			done = true
+			if RenderQuality.ultra_desktop(data.quality_preset) and _batch == null \
+					and str(b.get("osm_id", "")) in ["way:75363809", "way:278042253", "way:278069587"]:
+				var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
+				NycCrownMaterials.crown_details(root, b, md, float(footing["floor"]))
 	if done and _batch == null:
 		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 	if _batch == null:

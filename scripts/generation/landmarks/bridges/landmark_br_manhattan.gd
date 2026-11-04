@@ -14,6 +14,12 @@ const END := 1070.0
 const DECK := 41.0
 const TOWER := 103.0
 const HALF_WIDTH := 18.0
+const PORTAL_X := -1030.0
+## LPC designation LP-0899: opening 36 ft wide by 40 ft high;
+## Tuscan columns 31 ft, colonnade 38 ft overall.
+## https://s-media.nyc.gov/agencies/lpc/lp/0899.pdf
+const OPENING_WIDTH := 10.9728
+const OPENING_HEIGHT := 12.192
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -31,7 +37,12 @@ static func build(model: Node3D) -> void:
 
 static func _deck_y(x: float) -> float:
 	var d := absf(x)
-	return DECK if d <= ANCHOR else lerpf(DECK, 8.0, clampf((d - ANCHOR) / (END - ANCHOR), 0.0, 1.0))
+	return DECK if d <= ANCHOR else lerpf(DECK, 3.0, clampf((d - ANCHOR) / (END - ANCHOR), 0.0, 1.0))
+
+## The central lower roadway narrows at the city approaches. The upper
+## roadways pass beside the entrance, rather than through its pylons.
+static func _half_width(x: float) -> float:
+	return lerpf(HALF_WIDTH, 5.0, smoothstep(ANCHOR, absf(PORTAL_X), absf(x)))
 
 static func _tower(lm: LandmarkMesh, x: float) -> void:
 	lm.box("Masonry", Vector3(x, 5.0, 0), Vector3(20.0, 10.0, 48.0))
@@ -59,13 +70,18 @@ static func _deck(lm: LandmarkMesh) -> void:
 		var b := lerpf(-END, END, float(i + 1) / n)
 		var y0 := _deck_y(a)
 		var y1 := _deck_y(b)
-		lm.beam("Deck", Vector3(a, y0, 0), Vector3(b, y1, 0), HALF_WIDTH * 2.0, 1.2, Vector3(0, 0, 1))
+		lm.beam("Deck", Vector3(a, y0, 0), Vector3(b, y1, 0), (_half_width(a) + _half_width(b)), 1.2, Vector3(0, 0, 1))
 		for side in [-1.0, 1.0]:
-			var z: float = float(side) * 17.0
-			lm.beam("Steel", Vector3(a, y0 - 7.0, z), Vector3(b, y1 - 7.0, z), 0.8, 0.8)
-			lm.beam("Steel", Vector3(a, y0 + 1.0, z), Vector3(b, y1 + 1.0, z), 0.8, 0.8)
-			lm.beam("Steel", Vector3(a, y0 - 7.0, z), Vector3(b, y1 + 1.0, z), 0.55, 0.55)
-			lm.beam("Steel", Vector3(a, y0 + 1.0, z), Vector3(b, y1 - 7.0, z), 0.55, 0.55)
+			var z0: float = float(side) * (_half_width(a) - 1.0)
+			var z1: float = float(side) * (_half_width(b) - 1.0)
+			lm.beam("Steel", Vector3(a, y0 - 7.0, z0), Vector3(b, y1 - 7.0, z1), 0.8, 0.8)
+			lm.beam("Steel", Vector3(a, y0 + 1.0, z0), Vector3(b, y1 + 1.0, z1), 0.8, 0.8)
+			lm.beam("Steel", Vector3(a, y0 - 7.0, z0), Vector3(b, y1 + 1.0, z1), 0.55, 0.55)
+			lm.beam("Steel", Vector3(a, y0 + 1.0, z0), Vector3(b, y1 - 7.0, z1), 0.55, 0.55)
+			if absf(a) > ANCHOR:
+				var outer_z: float = float(side) * 16.0
+				lm.beam("Deck", Vector3(a, y0 + 5.0, outer_z), Vector3(b, y1 + 5.0, outer_z),
+					6.0, 0.8, Vector3(0, 0, 1))
 		if i % 8 == 0 and absf(a) > ANCHOR + 18.0:
 			lm.box("Masonry", Vector3(a, y0 * 0.5 - 3.5, 0), Vector3(4.0, maxf(y0 - 7.0, 1.0), 24.0))
 
@@ -93,25 +109,49 @@ static func _cables(lm: LandmarkMesh) -> void:
 ## Carrère and Hastings' Manhattan entrance: a high stone arch and the
 ## curved colonnades at the city end of the approach.
 static func _portal(lm: LandmarkMesh) -> void:
-	var x := -1030.0
+	var floor_y := _deck_y(PORTAL_X) + 0.6
+	var radius := OPENING_WIDTH * 0.5
+	var spring := floor_y + OPENING_HEIGHT - radius
+	var top := floor_y + 18.0
 	for side in [-1.0, 1.0]:
-		var z: float = float(side) * 14.0
-		lm.box("Masonry", Vector3(x, 10.0, z), Vector3(10.0, 20.0, 9.0))
-		lm.box("Masonry", Vector3(x, 21.0, z), Vector3(11.0, 2.0, 10.0))
-	# The portal has a curved opening, not a rectangular lintel.
-	LandmarkCoreBBridgeKit.pointed_arch(lm, "Masonry", x, 10.0, 0.0, 19.0, 9.5, 11.0)
-	lm.box("Masonry", Vector3(x, 21.25, 0), Vector3(10.0, 1.5, 19.0))
-	for face in [-1.0, 1.0]:
-		LandmarkDetail.arch(lm, "Masonry", Vector3(x + float(face) * 5.05, 11.0, 0),
-			Vector3(float(face), 0, 0), 19.0, 1.0, 0.3)
-	lm.box("Masonry", Vector3(x, 25.0, 0), Vector3(11.0, 6.0, 38.0))
+		var z: float = float(side) * (radius + 3.0)
+		lm.box("Masonry", Vector3(PORTAL_X, floor_y + 9.0, z), Vector3(8.0, 18.0, 6.0))
+		for face in [-1.0, 1.0]:
+			var xx: float = PORTAL_X + float(face) * 4.15
+			lm.box("Masonry", Vector3(xx, floor_y + 6.5, z), Vector3(0.3, 10.0, 2.0))
+			lm.frustum("Masonry", Vector3(xx, floor_y + 11.5, z), 0.9, 0.22, 4.0, 4)
+	# A semicircular barrel, with solid spandrels up to the attic. The
+	# front and back share the same arc, leaving no cracks above it.
+	for i in 24:
+		var a := PI * float(i) / 24.0
+		var b := PI * float(i + 1) / 24.0
+		var z0 := cos(a) * radius
+		var z1 := cos(b) * radius
+		var y0 := spring + sin(a) * radius
+		var y1 := spring + sin(b) * radius
+		for face in [-1.0, 1.0]:
+			var xx: float = PORTAL_X + float(face) * 4.0
+			lm.quad("Masonry", Vector3(xx, y0, z0), Vector3(xx, y1, z1),
+				Vector3(xx, top, z1), Vector3(xx, top, z0), Vector3(float(face), 0, 0))
+		lm.quad("Masonry", Vector3(PORTAL_X - 4, y0, z0), Vector3(PORTAL_X + 4, y0, z0),
+			Vector3(PORTAL_X + 4, y1, z1), Vector3(PORTAL_X - 4, y1, z1),
+			Vector3(0, -sin((a + b) * 0.5), -cos((a + b) * 0.5)))
+	lm.box("Masonry", Vector3(PORTAL_X, top + 1.5, 0), Vector3(8.0, 3.0, OPENING_WIDTH + 12.0))
+	for y in [top - 0.3, top + 0.3, top + 2.8]:
+		lm.box("Masonry", Vector3(PORTAL_X, y, 0), Vector3(8.8, 0.4, OPENING_WIDTH + 13.0))
 	for side in [-1.0, 1.0]:
 		for i in 9:
 			var t := float(i) / 8.0
-			var z: float = float(side) * (20.0 + 48.0 * t)
-			var cx := x + 18.0 * sin(t * PI * 0.5)
-			lm.box("Masonry", Vector3(cx, 6.0, z), Vector3(2.0, 12.0, 2.0))
+			var z: float = float(side) * (15.0 + 48.0 * t)
+			var cx := PORTAL_X + 18.0 * sin(t * PI * 0.5)
+			var base := Vector3(cx, floor_y, z)
+			lm.box("Masonry", base + Vector3(0, 0.6, 0), Vector3(2.4, 1.2, 2.4))
+			LandmarkDetail.column(lm, "Masonry", base + Vector3(0, 1.2, 0), 0.65, 9.4488, "tuscan", 0, 10)
 			if i > 0:
 				var prev := float(i - 1) / 8.0
-				lm.beam("Masonry", Vector3(x + 18.0 * sin(prev * PI * 0.5), 12.3,
-					float(side) * (20.0 + 48.0 * prev)), Vector3(cx, 12.3, z), 2.5, 1.2)
+				var start := Vector3(PORTAL_X + 18.0 * sin(prev * PI * 0.5), floor_y + 10.95,
+					float(side) * (15.0 + 48.0 * prev))
+				var end := Vector3(cx, floor_y + 10.95, z)
+				lm.beam("Masonry", start, end, 2.6, 1.25)
+				LandmarkDetail.balustrade(lm, "Masonry", start + Vector3.UP * 0.625,
+					end + Vector3.UP * 0.625, 0.8, 1.2)

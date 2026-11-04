@@ -655,6 +655,7 @@ func _await_far_city(data: LocationData) -> void:
 		return
 	data.far_landuse = _farcity_landuse
 	data.far_towers = _farcity_towers
+	data.buildings = FarCityFetcher.complete_buildings(data.buildings, data.far_towers)
 	print("FAR-CITY fetch: %s" % str(_farcity.timings))
 
 func _build_dem(data: LocationData) -> void:

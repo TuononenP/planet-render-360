@@ -47,6 +47,7 @@ var _t0 := 0
 var _parse_task := -1
 ## Bumped per fetch and cancel: a parse finishing late is dropped.
 var _gen := 0
+var _partial := false
 
 func _ready() -> void:
 	_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
@@ -123,8 +124,9 @@ func fetch(lat: float, lon: float) -> void:
 	_t0 = Time.get_ticks_msec()
 	_cache = cache_path(lat, lon)
 	_busy = true
+	_partial = false
 	var cached := OsmFetcher._read_cache(_cache)
-	if cached != "":
+	if cached != "" and OverpassRequest.payload_error(cached) == "":
 		_parse_off_thread(cached, true)
 		return
 	_request()
@@ -144,30 +146,33 @@ func _on_answered(text: String) -> void:
 ## Older payloads are usable offline, but never prevent a live refresh of
 ## the new query when the network is available.
 func _fallback(reason: String) -> void:
-	for old_path in [cache_path(_lat, _lon).replace("_q%d.json" % QUERY_VERSION, "_q%d.json" % (QUERY_VERSION - 1)),
+	for old_path in [cache_path(_lat, _lon), cache_path(_lat, _lon).replace("_q%d.json" % QUERY_VERSION, "_q%d.json" % (QUERY_VERSION - 1)),
 			legacy_cache_path(_lat, _lon)]:
 		var old := OsmFetcher._read_cache(old_path)
-		if old != "" and _usable(old):
-			print("FarCityFetcher: %s; using older far-city cache" % reason)
-			_parse_off_thread(old, true)
+		var payload: Variant = JSON.parse_string(old) if old != "" else null
+		if payload is Dictionary and payload.get("elements", null) is Array:
+			_partial = str(payload.get("remark", "")).strip_edges() != ""
+			print("FarCityFetcher: %s; using %sfar-city cache" % [reason, "partial " if _partial else "older "])
+			_parse_off_thread(old, true, true)
 			return
 	print("FarCityFetcher: %s; far city from imagery only" % reason)
 	_emit(0, false, parse("", _lat, _lon))
 
 static func _usable(text: String) -> bool:
 	var parsed: Variant = JSON.parse_string(text)
-	return parsed is Dictionary and (parsed as Dictionary).get("elements", null) is Array
+	return parsed is Dictionary and (parsed as Dictionary).get("elements", null) is Array \
+		and str(parsed.get("remark", "")).strip_edges() == ""
 
 ## A city's payload (~10 MB) takes ~0.3 s to check and parse: on a
 ## worker, so the loading screen keeps drawing. A cached payload that is
 ## not usable comes back empty and the network is asked instead.
-func _parse_off_thread(text: String, cached: bool) -> void:
+func _parse_off_thread(text: String, cached: bool, fallback: bool = false) -> void:
 	_join_parse()
 	var gen := _gen
 	var lat := _lat
 	var lon := _lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := parse(text, lat, lon) if not cached or _usable(text) else {}
+		var parsed := parse(text, lat, lon) if fallback or not cached or _usable(text) else {}
 		_on_parsed.call_deferred(gen, text.length(), cached, parsed))
 
 func _join_parse() -> void:
@@ -188,7 +193,7 @@ func _on_parsed(gen: int, bytes: int, cached: bool, parsed: Dictionary) -> void:
 
 func _emit(bytes: int, cached: bool, parsed: Dictionary) -> void:
 	timings = {"ms": Time.get_ticks_msec() - _t0, "bytes": bytes,
-		"cached": cached, "landuse": (parsed["landuse"] as Array).size(),
+		"cached": cached, "partial": _partial, "landuse": (parsed["landuse"] as Array).size(),
 		"towers": (parsed["towers"] as Array).size()}
 	_busy = false
 	finished.emit(parsed["landuse"], parsed["towers"])
@@ -206,7 +211,7 @@ static func parse(text: String, c_lat: float, c_lon: float) -> Dictionary:
 	for el in (parsed as Dictionary).get("elements", []):
 		if not (el is Dictionary):
 			continue
-		var key := str(el.get("type", "")) + ":" + str(el.get("id", ""))
+		var key := "%s:%d" % [el.get("type", ""), int(el.get("id", 0))]
 		if seen.has(key):
 			continue
 		seen[key] = true
@@ -221,9 +226,10 @@ static func parse(text: String, c_lat: float, c_lon: float) -> Dictionary:
 			var holes: Array = ring_data[1]
 			var box := RingGeometry.aabb(pts)
 			if tags.has("building:part") and not tags.has("building"):
-				part_ways.append({"tags": tags, "points": pts, "aabb": box, "holes": holes})
+				part_ways.append({"tags": tags, "points": pts, "aabb": box, "holes": holes, "osm_id": key})
 			elif tags.has("building"):
 				var tower := OsmTags._building_entry(tags, pts, box)
+				tower["osm_id"] = key
 				tower["holes"] = holes
 				towers.append(tower)
 			elif lu != "":
@@ -280,6 +286,35 @@ static func _tower_height(tower: Dictionary) -> float:
 		h = maxf(h, float((part as Dictionary).get("height", 0.0)))
 	return h
 
+## A detailed query can intersect a podium while clipping its tower parts
+## outside the radius. Fill those parts from the wider query by OSM id;
+## the detailed copy wins for every part both sources contain.
+static func complete_buildings(buildings: Array, towers: Array) -> Array:
+	var by_id := {}
+	for tower in towers:
+		var id := str(tower.get("osm_id", ""))
+		if id != "":
+			by_id[id] = tower
+	var out: Array = []
+	for building in buildings:
+		var id := str(building.get("osm_id", ""))
+		if not by_id.has(id):
+			out.append(building)
+			continue
+		var parts: Array = building.get("parts", []).duplicate()
+		var seen := {}
+		for part in parts:
+			seen[str(part.get("osm_id", ""))] = true
+		for part in by_id[id].get("parts", []):
+			var part_id := str(part.get("osm_id", ""))
+			if part_id != "" and not seen.has(part_id):
+				parts.append(part)
+				seen[part_id] = true
+		var complete: Dictionary = building.duplicate()
+		complete["parts"] = parts
+		out.append(complete)
+	return out
+
 ## Spatial bins bound parent lookup in dense skylines, unlike comparing
 ## every part with every tower in the 12 km disc.
 static func _nest_parts(towers: Array, parts: Array) -> void:
@@ -312,6 +347,7 @@ static func _nest_parts(towers: Array, parts: Array) -> void:
 		if best >= 0:
 			var parent: Dictionary = towers[best]
 			var entry := OsmTags._building_entry(p["tags"], pts, box)
+			entry["osm_id"] = p.get("osm_id", "")
 			if str(entry["height_source"]) == "default":
 				entry["height"] = parent["height"]
 				entry["height_source"] = parent["height_source"]
@@ -319,6 +355,7 @@ static func _nest_parts(towers: Array, parts: Array) -> void:
 			(parent["parts"] as Array).append(entry)
 		else:
 			var orphan := OsmTags._building_entry(p["tags"], pts, box)
+			orphan["osm_id"] = p.get("osm_id", "")
 			if float(orphan["height"]) >= TOWER_MIN_M:
 				orphan["min_height_m"] = 0.0
 				orphan["min_level"] = 0

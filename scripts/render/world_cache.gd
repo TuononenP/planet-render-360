@@ -16,7 +16,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 172
+const BUILD_VERSION := 176
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -69,11 +69,20 @@ static func _sources() -> String:
 	if _source_hash == "":
 		var acc := ""
 		for d in SOURCE_DIRS:
-			for f in DirAccess.get_files_at(d):
-				if f.ends_with(".gd"):
-					acc += str(hash(FileAccess.get_file_as_string(d + "/" + f)))
+			for f in _source_files(d):
+				acc += f + ":" + str(hash(FileAccess.get_file_as_string(f)))
 		_source_hash = str(hash(acc))
 	return _source_hash
+
+static func _source_files(dir: String) -> Array[String]:
+	var files: Array[String] = []
+	for file in DirAccess.get_files_at(dir):
+		if file.ends_with(".gd"):
+			files.append(dir.path_join(file))
+	for child in DirAccess.get_directories_at(dir):
+		files.append_array(_source_files(dir.path_join(child)))
+	files.sort()
+	return files
 
 ## Scene path a threaded load was started for ahead of time ("" none).
 static var _prefetched := ""

@@ -175,7 +175,7 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 
 ## Whether a cached detailed payload came from the current query.
 static func is_current(text: String) -> bool:
-	return text.contains(QUERY_MARK)
+	return text.contains(QUERY_MARK) and OverpassRequest.payload_error(text) == ""
 
 static func build_poi_query(lat: float, lon: float) -> String:
 	var clauses: Array[String] = []

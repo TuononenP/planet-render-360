@@ -6,6 +6,9 @@ extends SceneTree
 ##     -- [--tag=name] [--preset=0..3] [--places=id,id] [--times=golden,noon,night,late,roofs,sparkle] [--season=autumn]
 ##        [--landmarks=type,type]  (build registry landmarks through the real app flow)
 ##        [--date=YYYY-MM-DD] (explicit solar date, e.g. June white nights)
+##        [--refs=morning] (reference subfolder, e.g. matching clear morning photos)
+##        [--cold-cache] (isolated empty data cache for a real cold-load measurement)
+##        [--pin=lat,lon] (one custom location; --places supplies its output id)
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##        [--looks="lat,lon,height_m,bearing,pitch;..."]  (candidate eyes, one
@@ -85,6 +88,7 @@ var _season := -1
 ## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
 var _looks: Array = []
 var _date_override: Dictionary = {}
+var _reference_set := ""
 
 func _init() -> void:
 	_run()
@@ -97,10 +101,19 @@ func _args() -> Dictionary:
 			a[kv[0]] = kv[1]
 		elif arg == "--audit":
 			a["audit"] = true
+		elif arg == "--cold-cache":
+			a["cold_cache"] = true
 	return a
 
-func _places(filter: String, landmark_types: String = "") -> Array:
+func _places(filter: String, landmark_types: String = "", pin: String = "") -> Array:
 	var all: Array = []
+	if pin != "":
+		var coords := pin.split(",")
+		if coords.size() != 2 or not coords[0].is_valid_float() or not coords[1].is_valid_float():
+			push_error("CAPTURE: --pin requires latitude,longitude")
+			return []
+		return [{"id": filter if filter != "" else "pin", "name": "Custom location",
+			"lat": float(coords[0]), "lon": float(coords[1])}]
 	if not landmark_types.is_empty():
 		for type in landmark_types.split(",", false):
 			var entry := LocationData.entry_for_type(type)
@@ -119,10 +132,17 @@ func _places(filter: String, landmark_types: String = "") -> Array:
 
 func _run() -> void:
 	var a := _args()
+	_reference_set = str(a.get("refs", ""))
 	_out = ProjectSettings.globalize_path("res://").path_join("visual-plan/reviews/%s-%s" % [
 		a["tag"], Time.get_date_string_from_system()])
 	DirAccess.make_dir_recursive_absolute(_out)
 	CacheStore.eviction_suppressed = true
+	if a.has("cold_cache"):
+		CacheStore.dir_override = "user://capture-cold-%d" % OS.get_process_id()
+		WorldCache.dir_override = CacheStore.dir_override.path_join("worlds")
+		DirAccess.make_dir_recursive_absolute(CacheStore.base_dir())
+		_write_json("cold-cache.json", {"cache_dir": ProjectSettings.globalize_path(CacheStore.base_dir()),
+			"world_cache_dir": ProjectSettings.globalize_path(WorldCache.base_dir())})
 	RenderSettings.path_override = "user://capture-settings-%d.json" % OS.get_process_id()
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	await process_frame
@@ -159,7 +179,7 @@ func _run() -> void:
 	var presets := str(a.get("presets", str(a["preset"]))).split(",", false)
 	for preset in presets:
 		main._settings.preset = int(preset)
-		for place in _places(str(a["places"]), str(a.get("landmarks", ""))):
+		for place in _places(str(a["places"]), str(a.get("landmarks", "")), str(a.get("pin", ""))):
 			var spec: Dictionary = place.duplicate()
 			if a.has("presets"):
 				spec["id"] = str(place["id"]) + "_p" + preset
@@ -340,6 +360,7 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	s["season"] = view._data.season
 	s["sun_elevation_deg"] = view._atmos.solar_elevation
 	s["local_hour"] = view._time_hour
+	s["reference_set"] = _reference_set if _reference_set != "" else "default"
 	var refs := _ref_ranges(id)
 	if not refs.is_empty():
 		s["flags"] = _flags(s, refs)
@@ -422,6 +443,8 @@ func _flags(s: Dictionary, refs: Dictionary) -> Array:
 
 func _refs(id: String) -> Array:
 	var dir := ProjectSettings.globalize_path("res://").path_join("visual-plan/refs/%s" % id)
+	if _reference_set != "":
+		dir = dir.path_join(_reference_set)
 	var out: Array = []
 	if not DirAccess.dir_exists_absolute(dir):
 		return out

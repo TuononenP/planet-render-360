@@ -89,6 +89,16 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
 			_add_segment(pts[i], pts[i + 1], core, edge)
+	# Bespoke bridges replace their mapped decks. Keep the same registered
+	# corridor clear for trees, including where the removed deck was wider
+	# than an individual OSM carriageway or train track.
+	for bridge in LandmarkSites.bridge_spans(data):
+		var at: Vector2 = bridge[0]
+		var entry: Dictionary = bridge[1]
+		var axis := LandmarkSites.axis(entry)
+		var reach := float(entry["span_m"]) * 0.5 * m2u
+		var width := LandmarkSites.clear_m(entry) * m2u
+		_add_segment(at - axis * reach, at + axis * reach, width, width)
 	# Pier polygons and their paths are hard promenade surfaces even when
 	# an overlapping park polygon supplies green cover. Keep mapped trees,
 	# but exclude synthetic tufts and other ground cover.

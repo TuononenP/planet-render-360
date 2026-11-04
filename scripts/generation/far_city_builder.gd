@@ -78,6 +78,9 @@ var _glass: Material
 var _h_edge := -1.0
 var _landmarks: Array[Vector2] = []
 var _tower_cells := {}
+var _height_ctx := {}
+var _fidelity := 2
+var _detailed_ids := {}
 
 func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	data = d
@@ -91,7 +94,9 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 		_surf = FarTerrainBuilder._surface(d)
 	_sea = not is_equal_approx(g.water_level_m, -3.0)
 	_region = ArchitectureStyle.region_for(d.latitude, d.longitude, d.country)
+	_height_ctx = BuildingHeights._height_context(d)
 	var fidelity := MaterialLibrary.fidelity_for_preset(d.quality_preset)
+	_fidelity = fidelity
 	_dfs = FacadeMaterials.distant_facades(fidelity, _region)
 	_drs = FacadeMaterials.distant_roofs(_region, fidelity)
 	_glass = FacadeMaterials.glass_material(0 if fidelity <= 1 else 1)
@@ -106,6 +111,10 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	for bd in d.buildings:
 		if not (bd is Dictionary):
 			continue
+		var id := str(bd.get("osm_id", ""))
+		if id != "" and absf(float(bd.get("x", INF))) <= g.extent_m \
+				and absf(float(bd.get("z", INF))) <= g.extent_m:
+			_detailed_ids[id] = true
 		var r := Vector2(float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).length()
 		if r >= 700.0 and str(bd.get("height_source", "")) in ["tag_height", "levels"]:
 			hs.append(float(bd.get("height", 0.0)))
@@ -158,6 +167,8 @@ func _towers() -> void:
 		if not (t is Dictionary):
 			continue
 		var c := Vector2(float(t.get("x", 0.0)), float(t.get("z", 0.0)))
+		if _detailed_ids.has(str(t.get("osm_id", ""))):
+			continue
 		if c.length() < R_IN or c.length() > SettlementMap.RADIUS_M:
 			continue  # inside the extent the real building is already built
 		var ring := BuildingBuilder._clean_ring(t.get("footprint", PackedVector2Array()))
@@ -172,7 +183,9 @@ func _towers() -> void:
 		var kind := str(t.get("kind", "yes"))
 		var mat: Material = _dfs[int(_hash(c.x, c.y) * 4.0) % _dfs.size()] \
 			if kind in ["apartments", "residential", "dormitory", "hotel"] else _glass
-		mat = _tower_material(t, mat, c)
+		var tower_effective: Dictionary = t.duplicate()
+		NycCrownMaterials.apply(t, t, tower_effective)
+		mat = _tower_material(tower_effective, mat, c)
 		BuildingBuilder._batch = batch
 		BuildingBuilder._batch_key = _key(c.x, c.y)
 		var parts: Array = t.get("parts", [])
@@ -191,7 +204,13 @@ func _towers() -> void:
 			for part in parts:
 				var part_ring := BuildingBuilder._clean_ring(part.get("footprint", PackedVector2Array()))
 				if part_ring.size() >= 3:
-					_tower_mass(part, part_ring, base + 2.0, _tower_material(part, mat, c))
+					var effective: Dictionary = tower_effective.duplicate()
+					for key in part:
+						if key in ["material", "colour", "roof_material", "roof_shape"] and str(part[key]) == "":
+							continue
+						effective[key] = part[key]
+					NycCrownMaterials.apply(t, part, effective)
+					_tower_mass(effective, part_ring, base + 2.0, _tower_material(effective, mat, c))
 		BuildingBuilder._batch = null
 		_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
 		towers += 1
@@ -204,7 +223,14 @@ func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> M
 	if set_name == "glass":
 		return _glass
 	if set_name in ["brick", "stone", "limestone", "concrete", "render"]:
-		return _dfs[int(_hash(centre.x, centre.y) * 4.0) % _dfs.size()]
+		return FacadeMaterials.facade_for_building(mass, _region,
+			maxi(1, int(mass.get("levels", 0))), _fidelity,
+			true, _hash(centre.x, centre.y))
+	if str(_height_ctx.get("city", "")) == "new_york":
+		var look := BuildingHeights._look_for(mass, _height_ctx)
+		return FacadeMaterials.facade_for_building(mass, _region,
+			maxi(1, int(mass.get("levels", 0))), _fidelity,
+			true, _hash(centre.x, centre.y), look)
 	return fallback
 
 ## OSM min_height and min_level are relative to the building's ground.

@@ -349,6 +349,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 		_detailed_cached = true
 	if want_ring:
 		_ring_text = _read_cache(_pending_ring_cache)
+		if not offline_mode and OverpassRequest.payload_error(_ring_text) != "":
+			_ring_text = ""
 	if offline_mode:
 		if _detailed_text != "":
 			_detailed_done()
@@ -437,7 +439,8 @@ static func _mentions_buildings(text: String) -> bool:
 ## (empty is fine — the ring carries majors only, never buildings).
 static func _payload_usable(text: String) -> bool:
 	var parsed: Variant = JSON.parse_string(text)
-	return parsed is Dictionary and parsed.get("elements", null) is Array
+	return parsed is Dictionary and parsed.get("elements", null) is Array \
+		and str(parsed.get("remark", "")).strip_edges() == ""
 
 ## Transient failures are worth another instance: any transport
 ## error (timeout, cannot connect, ...) or a 429/5xx from an
@@ -459,6 +462,9 @@ static func next_attempt(attempt: int, retryable: bool) -> int:
 ## instead of reading this node's state.
 static func _detailed_check(lat: float, lon: float) -> Callable:
 	return func(text: String) -> String:
+		var error := OverpassRequest.payload_error(text)
+		if error != "":
+			return error
 		var parsed := parse_features(text, lat, lon)
 		if not (parsed["buildings"] as Array).is_empty() or _has_shore_data(parsed):
 			return ""
@@ -552,9 +558,10 @@ func _use_cached(reason: String, max_m: float) -> bool:
 		if text != "" and (_mentions_buildings(text) or _mentions_shores(text)):
 			print("OsmFetcher: %s; using cached %s" % [reason, path.get_file()])
 			var d := OsmNearbyCache.distance_m(path, _pending_lat, _pending_lon)
-			_fallback_partial = d > SAME_PLACE_M
+			var incomplete := OverpassRequest.payload_error(text) != ""
+			_fallback_partial = d > SAME_PLACE_M or incomplete
 			_fallback_detail = "Nearby · %d m" % snappedi(int(d), 10) \
-				if _fallback_partial else "Offline copy"
+				if d > SAME_PLACE_M else ("Partial offline copy" if incomplete else "Offline copy")
 			_detailed_text = text
 			_detailed_cached = false
 			_detailed_done()

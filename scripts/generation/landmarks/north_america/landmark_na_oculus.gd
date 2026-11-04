@@ -5,7 +5,8 @@ extends RefCounted
 ## hall is about 107 m long, 35 m wide, and 29 m high. Its glass shell and
 ## white structural ribs follow the elliptical footprint; the ribs extend
 ## beyond the shell as the distinctive upturned wings.
-## Dimensions: https://www.archdaily.com/783965/
+## Steel ribs, glazing and dimensions:
+## https://calatrava.com/projects/world-trade-center-transportation-hub-new-york.html
 const HALF_LENGTH := 53.5
 const HALF_WIDTH := 17.5
 const HEIGHT := 29.3
@@ -15,7 +16,6 @@ const SECTIONS := 10
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Glass", LandmarkMaterials.glass("#A8BCC3"))
-	lm.use("Panels", LandmarkMaterials.paint("#DADDDC", 0.78, 0.0))
 	lm.use("Ribs", LandmarkMaterials.paint("#E5E7E4", 0.5, 0.0))
 	lm.use("Base", LandmarkMaterials.pbr("concrete", "#BFC0BA", 4.0))
 	# Fine tessellation preserves the curved glazing between ribs.
@@ -25,13 +25,12 @@ static func build(model: Node3D) -> void:
 		for j in SECTIONS:
 			var t0 := -1.0 + 2.0 * j / SECTIONS
 			var t1 := -1.0 + 2.0 * (j + 1) / SECTIONS
-			var surface := "Glass" if absf((t0 + t1) * 0.5) < 0.11 else "Panels"
-			lm.quad(surface, _shell(x0, t0), _shell(x1, t0), _shell(x1, t1), _shell(x0, t1),
+			lm.quad("Glass", _shell(x0, t0), _shell(x1, t0), _shell(x1, t1), _shell(x0, t1),
 				Vector3(0, 1, (t0 + t1) * 0.5).normalized())
 		for side in [-1.0, 1.0]:
 			var a := _shell(x0, side)
 			var b := _shell(x1, side)
-			lm.quad("Panels", Vector3(a.x, 1.0, a.z), Vector3(b.x, 1.0, b.z), b, a,
+			lm.quad("Glass", Vector3(a.x, 1.0, a.z * 0.5), Vector3(b.x, 1.0, b.z * 0.5), b, a,
 				Vector3(0, 0, side))
 	# The main ridge and each pair of projecting white ribs.
 	for i in RIBS:
@@ -46,6 +45,7 @@ static func build(model: Node3D) -> void:
 				var b := _shell(x, side * float(j + 1) / (SECTIONS / 2))
 				lm.beam("Ribs", a, b, 0.72, 0.72)
 			var edge := _shell(x, side)
+			lm.beam("Ribs", Vector3(x, 1.0, edge.z * 0.5), edge, 0.72, 0.72)
 			var f := _ellipse(x)
 			var tip := edge + Vector3(0, 0.3 * f, side * 6.0 * f)
 			lm.beam("Ribs", edge, tip, 0.8, 0.8)
