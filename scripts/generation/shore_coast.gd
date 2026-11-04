@@ -47,6 +47,7 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 	# independently and unioning them can flood a peninsula or an island.
 	var events: Array = []
 	var paths: Array = []
+	var incomplete := false
 	for chain in chains:
 		if chain.size() < 2:
 			continue
@@ -57,7 +58,13 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 			events.append({"p": chain[0], "dir": (chain[1] - chain[0]).normalized(), "t": _perimeter(chain[0], box)})
 			events.append({"p": chain[-1], "dir": (chain[-1] - chain[-2]).normalized(), "t": _perimeter(chain[-1], box)})
 		else:
+			incomplete = true
 			diagnostics.append({"kind": "open_coastline", "start": chain[0], "end": chain[-1]})
+	# A missing mainland fragment makes even apparently closed sea rings
+	# ambiguous. Keep mapped water polygons, but do not invent a coast
+	# domain until all coastline runs in the extent can be resolved.
+	if incomplete:
+		return []
 	events.sort_custom(func(a, b) -> bool: return a["t"] < b["t"])
 	for i in events.size():
 		var event: Dictionary = events[i]
@@ -100,6 +107,9 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 				outers.append(ring)
 			else:
 				islands.append(ring)
+	# Closed islands alone imply an all-sea extent only when no coastline
+	# is missing. A partial extract can also contain an unfinished mainland;
+	# filling the rectangle in that case floods the entire city.
 	if outers.is_empty() and not islands.is_empty():
 		outers.append(_rectangle(box))
 	var result: Array = []

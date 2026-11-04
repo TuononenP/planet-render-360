@@ -148,6 +148,24 @@ func _run() -> void:
 		wet_right = wet_right or index.contains(Vector2(60, 0))
 	_check(not wet_centre and wet_left and wet_right, "shared coast topology must preserve a peninsula")
 	_check(coast_diagnostics.is_empty(), "valid peninsula should have closed coast domains")
+	# A partial OSM extract may include closed islands and a mainland
+	# coastline that ends inside the extent. It cannot establish open sea
+	# across the entire extent.
+	var island_ring := PackedVector2Array([Vector2(-10, -10), Vector2(-10, 10), Vector2(10, 10), Vector2(10, -10), Vector2(-10, -10)])
+	var partial_diagnostics: Array = []
+	var partial := ShoreCoast.domains([
+		{"class": "coastline", "points": island_ring},
+		{"class": "coastline", "points": PackedVector2Array([Vector2(-50, -100), Vector2(-50, 0)])}],
+		Rect2(-100, -100, 200, 200), partial_diagnostics)
+	_check(partial.is_empty() and not partial_diagnostics.is_empty(), "incomplete mainland must not turn closed islands into an extent-wide sea")
+	var partial_with_outer := ShoreCoast.domains([
+		{"class": "coastline", "points": island_ring},
+		{"class": "coastline", "points": PackedVector2Array([Vector2(40, -100), Vector2(40, 100)])},
+		{"class": "coastline", "points": PackedVector2Array([Vector2(-50, -100), Vector2(-50, 0)])}],
+		Rect2(-100, -100, 200, 200), [])
+	_check(partial_with_outer.is_empty(), "incomplete mainland must also veto otherwise closed sea domains")
+	var complete := ShoreCoast.domains([{"class": "coastline", "points": island_ring}], Rect2(-100, -100, 200, 200), [])
+	_check(complete.size() == 1 and (PolygonIndex.new(complete[0]["points"], complete[0]["holes"]) as PolygonIndex).contains(Vector2(50, 50)), "complete island-only coast should retain surrounding sea")
 	var cancelled := BuildAbort.new()
 	cancelled.requested = true
 	var stopped := GroundTruth.new(_data(), cancelled)
