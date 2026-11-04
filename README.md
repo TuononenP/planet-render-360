@@ -169,11 +169,13 @@ behind the same `LocationData` contract.
 
 ```text
 planet-render-360/
-├── project.godot              Godot 4.7 project (Forward+, 390×844 mobile-first frame)
+├── project.godot              Godot 4.7 project (Forward+ / Mobile, 390×844 mobile-first frame)
 ├── export_presets.cfg         macOS / iOS / Android export presets
 ├── scenes/
-│   └── main.tscn              Single root scene → scripts/main.gd
-├── scripts/                   All app code (GDScript, ≤1000 lines per class)
+│   ├── startup.tscn           Entry scene → scripts/startup.gd; splash while the main scene loads
+│   └── main.tscn              App root scene → scripts/main.gd
+├── scripts/                   GDScript app code (≤1000 lines per class)
+│   ├── startup.gd             Splash screen and threaded main-scene loading
 │   ├── main.gd                Screen manager: Onboarding → MapPicker → Loading → View360 (+ History, Settings)
 │   ├── user_dir_migration.gd  First launch from the app's own user directory: brings the old data across
 │   ├── ui_theme.gd            Design-system tokens and theme (Night / Day)
@@ -186,24 +188,32 @@ planet-render-360/
 │   ├── data/                  Fetch layer: one fetcher per free public source
 │   │   ├── location_data.gd       LocationData — the contract between fetch, generation and render
 │   │   ├── dem_fetcher.gd         AWS Terrain Tiles (Terrarium) elevation mosaics
+│   │   ├── coastal_dem.gd         Sea-level correction measured from OSM coastlines
 │   │   ├── far_field_fetcher.gd   Far DEM rings + imagery drapes past the detailed extent
 │   │   ├── satellite_fetcher.gd   Esri World Imagery terrain drape
 │   │   ├── osm_*.gd, overpass_request.gd
 │   │   │                          Overpass query, fetch, parse, tags + ring geometry; OSM API and nearby-cache fallbacks
 │   │   ├── far_city_fetcher.gd    One aggregated Overpass call for the far city ring
 │   │   ├── climate_fetcher.gd     CHELSA V2.1 climatologies via ranged GeoTIFF reads
+│   │   ├── landcover_fetcher.gd, landcover_source.gd
+│   │   │                          ESA WorldCover land classes + Meta canopy-height windows
+│   │   ├── cog_fetcher.gd, cog_reader.gd
+│   │   │                          Bounded HTTP-range reads and Cloud Optimized GeoTIFF decoding
 │   │   ├── weather_fetcher.gd     Open-Meteo current weather
 │   │   ├── search_fetcher.gd      Nominatim place search
 │   │   ├── vector_tile_fetcher.gd OpenFreeMap vector tiles + Terrarium hillshade for the map
 │   │   ├── tile_fetcher.gd, tile_connection.gd
 │   │   │                          OSM raster tiles (globe, picker fallback) over kept-alive connections
+│   │   ├── map_pack.gd            Bundled map-tile packs for offline coverage
 │   │   ├── wiki_fetcher.gd, wiki_parse.gd
 │   │   │                          Wikipedia + Commons landmark markers, summaries and photos
-│   │   ├── landmark_*.gd          Which landmarks a place builds, how well-mapped ones draw, where to stand to see one
+│   │   ├── landmark_*.gd          Regional registries, landmark sites, OSM fidelity and visit viewpoints
+│   │   ├── building_references.gd, road_widths.gd, suomenlinna_site.gd
+│   │   │                          Building reference dimensions, shared road widths and fortress-site data
 │   │   ├── preset_views.gd        Curated opening view for each quick-pick place
 │   │   ├── horizon_fetcher.gd     One Overpass call for the named peaks, towns and lakes (horizon labels)
 │   │   ├── view_link.gd           Shareable view links + the camera state History keeps per place
-│   │   ├── place_thumb.gd         The History / Recents picture of a place
+│   │   ├── place_thumb.gd         History / Recents pictures and bundled preset thumbnails
 │   │   ├── cache_store.gd         History + versioned, LRU-capped tile/area cache
 │   │   └── offline_downloader.gd  "Download for offline" cache warmer
 │   ├── map/                   Vector map in the design system Map style: MVT decode, style rules,
@@ -212,6 +222,8 @@ planet-render-360/
 │   │   ├── pipeline.gd            Staged, cancellable fetch pipeline: elevation, imagery, buildings & landmarks, weather
 │   │   ├── world_scale.gd         Unit conversions + render origin
 │   │   ├── ground_truth.gd        One height / water / land-cover surface per place
+│   │   ├── dem_registration.gd, dem_conversion.gd, bare_earth.gd, finland_relief.gd
+│   │   │                          DEM alignment, conversion and surface-model relief correction
 │   │   ├── ground_index.gd, polygon_index.gd
 │   │   │                          Fast land-class, building and point-in-polygon lookups
 │   │   ├── terrain_builder.gd     Assembles the world: far → terrain → water → buildings → roads → landmarks → vegetation
@@ -222,17 +234,29 @@ planet-render-360/
 │   │   │                          Far terrain rings and the far city, only where the place is built up
 │   │   ├── building_*.gd, roof_*.gd, facade_*.gd, storey_composer.gd, architecture_*.gd
 │   │   │                          OSM building extrusion, regional style, roofs and facades
-│   │   ├── road_*.gd, street_*.gd, water_*.gd, quay_builder.gd, shore_apron.gd
-│   │   ├── tree_*.gd, vegetation_*.gd, foliage_textures.gd, climate_model.gd
-│   │   ├── landmark_*.gd          Registry landmarks (Eiffel, Colosseum, Sagrada…) + OSM archetypes
-│   │   └── material_library.gd, pbr_textures.gd, ground_*.gd, mesh_arrays.gd, mass_batch.gd
+│   │   ├── road_*.gd, street_*.gd, rail_builder.gd, kerb_builder.gd, bridge_arches.gd
+│   │   │                          Roads, markings, rails, kerbs, bridges and street furniture
+│   │   ├── shoreline_model.gd, shore_*.gd, water_*.gd, quay_*.gd
+│   │   │                          Shared shoreline geometry, water ownership, banks, quays and moorings
+│   │   ├── tree_*.gd, vegetation_*.gd, canopy_vegetation.gd, foliage_textures.gd, climate_model.gd
+│   │   ├── parked_cars.gd, car_models.gd, car_paint.gdshader
+│   │   │                          Parked vehicle placement, imported models and paint shader
+│   │   ├── ship_builder.gd, marina_builder.gd, harbour_ferries.gd, vessel_*.gd, *_model.gd
+│   │   │                          Procedural vessels, marinas and harbour ferries
+│   │   ├── landmark_*.gd, suomenlinna_*.gd
+│   │   │                          Landmark builders, shared geometry, materials and OSM archetypes
+│   │   ├── landmarks/            Landmark sets split by region, city and type (Finland, Stockholm,
+│   │   │                          San Francisco, bridges, historic sites and more)
+│   │   └── material_library.gd, pbr_*.gd, ground_*.gd, terrain_*.gd, mesh_arrays.gd, mass_batch.gd
 │   ├── render/                Runtime rendering
 │   │   ├── camera_rig.gd          Drag-to-look 360° camera
 │   │   ├── atmosphere_rig.gd      Sun, sky, haze, clouds, weather
-│   │   ├── sky_palette.gd, sky_shader.gd, weather_look.gd, lightning_rig.gd
-│   │   │                          Sky grade and dome shader, weather light, thunderstorm lightning
+│   │   ├── sky_palette.gd, sky_shader.gd, weather_look.gd, lightning_rig.gd, marine_layer.gd
+│   │   │                          Sky grade and dome shader, weather light, lightning and coastal fog
 │   │   ├── post_grade.gd, city_lights.gd, roof_snow.gd
 │   │   │                          Tonemap and grade, lit windows at night, snow on roofs
+│   │   ├── street_lights.gd, shop_lights.gd, landmark_lights.gd
+│   │   │                          Night lighting for streets, shopfronts and landmarks
 │   │   ├── solar_position.gd      NOAA true solar position
 │   │   ├── lod_ring.gd            Static LOD rings via visibility ranges
 │   │   ├── quality_governor.gd    FPS-driven render-scale / shadow steps
@@ -241,19 +265,33 @@ planet-render-360/
 │   │   └── world_cache.gd         Built-world cache for fast revisits
 │   └── screens/               UI screens (onboarding, map home with globe and landmark markers, loading,
 │                              360 view, history, settings); the viewer's tools: view_tools, photo_mode,
-│                              time_lapse, date_picker, horizon_labels, mini_map, view_walk, landmark_list
-├── assets/                    Runtime assets: eiffel.glb, CC0 Poly Haven PBR sets, foliage atlases,
-│                              brand logos, Lucide icons, fonts
+│                              time_lapse, date_picker, horizon_labels, mini_map, view_walk, view_drone,
+│                              drone_sticks, landmark_list
+├── native/                    Optional C++17 GDExtension kernels (GDScript fallbacks when unbuilt)
+│   ├── CMakeLists.txt         Native build configuration
+│   ├── src/                   Terrain, city, roof, mesh, shoreline, triangulation and MVT kernels
+│   ├── godot-cpp/             Godot C++ bindings (Git submodule)
+│   └── bin/                   Generated libraries and .gdextension manifest (tools/build_native.sh)
+├── assets/                    Runtime assets
+│   ├── eiffel.glb             Eiffel Tower model
+│   ├── brand/, icons/, fonts/  Brand artwork, Lucide icons and typefaces
+│   ├── map/                   Bundled map-tile packs (Git LFS)
+│   ├── preset_thumbs/         Curated place thumbnails
+│   ├── textures/              CC0 Poly Haven PBR sets (2k/) and foliage atlases (foliage/)
+│   └── vehicles/              Imported car models, textures and attribution
 ├── assets_src/blender/        Blender sources (offline only, never shipped)
-├── tests/                     Headless Godot test scripts (see Development above)
-├── tools/                     check_class_size.sh, godot_bg.sh, build_macos.sh, build_ios.sh,
-│                              build_ios_release.sh, build_docs_pdf.js, build_bench.gd (world-build
-│                              bench), capture_presets.gd (golden-set captures), foliage texture generator
-├── .github/workflows/         On-demand release build (macOS .dmg, iOS TestFlight)
+├── tests/                     Godot regression scripts and offline fixtures/ (mostly headless;
+│                              screenshot_test.gd and world_cache_test.gd need a window)
+├── tools/                     Release, native and map-pack builds; Godot background launcher and
+│                              no-activation shim; class-size checks, benchmarks, captures, landmark
+│                              audits, comparison sheets, foliage generation and documentation PDF build
+├── .github/
+│   ├── actions/               Godot setup for macOS and Linux CI runners
+│   └── workflows/             On-demand macOS .dmg, iOS TestFlight / .ipa and Android .apk builds
 ├── docs/                      Data-source register, world-model contract, fidelity scorecard,
-│                              architecture styles, technical documentation PDF
-├── .agents/plans/             Architecture, fidelity, city-realism and build-speed plans
-├── visual-plan/               PRD, review captures and scorecards
+│                              architecture styles, landmark sources, technical documentation and images
+├── .agents/plans/             Architecture, fidelity, city realism, build speed, shoreline and city-hero plans
+├── visual-plan/               PRD, reference photos, baseline / best snapshots, captures and review scorecards
 └── generated_images/          Logo explorations, prototypes and screenshots
 ```
 
