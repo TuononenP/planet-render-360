@@ -26,9 +26,10 @@ var _pending_view: Dictionary = {}
 ## The view's look (View360.look_key) when its History picture was last
 ## taken: leaving an unchanged view skips the read-back and the encode.
 var _thumb_key: Array = []
-var _downloader: OfflineDownloader
-var _download_at := Vector2.ZERO
-var _download_preset := RenderSettings.Preset.HIGH
+## True while Save for offline runs the generation and world build
+## without showing the place, so a later Explore loads the finished world.
+var _saving := false
+var _save_progress := SaveProgress.new()
 ## Bumped per generation and on cancel, so a world still building on
 ## its thread is dropped once superseded.
 var _gen_id := 0
@@ -55,6 +56,10 @@ var generation_timeout_s := GENERATION_TIMEOUT_S  # tests shorten it
 ## Longest quitting waits for the view's build and cache-save threads
 ## (a large city's save takes over ten seconds) before quitting anyway.
 const QUIT_WAIT_S := 30.0
+const SAVING := "Saving… %d%%"
+const SAVE_DONE := "Saved for offline"
+const SAVE_PARTLY := "Partly saved"
+const SAVE_FAILED := "Couldn't save. Try again"
 const CLOSING_TITLE := "Saving this place for next time"
 const CLOSING_MESSAGE := "Closing as soon as it's saved."
 var _quitting := false
@@ -93,7 +98,11 @@ func _ready() -> void:
 	add_child(_pipeline)
 	_pipeline.stage_changed.connect(
 		func(i: int, label: String, state: String) -> void:
-			_loading.set_stage(i, label, state))
+			_loading.set_stage(i, label, state)
+			# The pipeline reports its overall fraction only at the end; a
+			# save follows its rows finishing instead.
+			if _saving and state == "done":
+				_save_progress.rows_done += 1)
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.stage_progress.connect(func(i: int, done: int, total: int) -> void:
@@ -107,18 +116,15 @@ func _ready() -> void:
 	_pipeline.stage_data.connect(func(i: int, d: LocationData) -> void: _loading.show_stage_data(i, d))
 	_pipeline.cancelled.connect(func() -> void:
 		_set_generating(false)
+		if _saving:
+			_end_save(SAVE_FAILED)
 		_show(_picker))
 
 	_picker = MapPicker.new()
 	_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_picker.render_requested.connect(func(lat: float, lon: float) -> void:
-		# A selected landmark is seen from its standoff, not stood on.
-		var site := _picker.selected_landmark
-		if site.is_empty():
-			_start_generation(lat, lon)
-			return
-		var at := LandmarkVisit.viewpoint(site, LandmarkVisit.default_bearing(lat))
-		_start_generation(at.x, at.y, site))
+		var target := _explore_target(lat, lon)
+		_start_generation(target["at"].x, target["at"].y, target["site"]))
 	# A pasted "Copy view link": that exact view, whoever's it was.
 	_picker.view_link_requested.connect(func(state: Dictionary) -> void:
 		_picker.selected_name = ""
@@ -129,27 +135,11 @@ func _ready() -> void:
 	_picker.settings_requested.connect(func() -> void:
 		_settings_from = _picker
 		_show(_settings_screen))
-	_downloader = OfflineDownloader.new()
-	add_child(_downloader)
-	_downloader.progress.connect(func(done: int, total: int) -> void:
-		_picker.set_download_status("Saving… %d/%d" % [done, total]))
-	_downloader.finished.connect(func(ok_count: int, total: int) -> void:
-		if ok_count > 0:
-			_store.add_entry(_picker.selected_name if _picker.selected_name != "" \
-				else LocationData.known_place(_download_at.x, _download_at.y),
-				_download_at.x, _download_at.y, {}, _download_preset)
-		_picker.set_download_busy(false)
-		_picker.set_download_status(("Saved for offline" if ok_count == total \
-			else "Partly saved (%d/%d)" % [ok_count, total]) \
-			if ok_count > 0 else "Couldn't save. Try again"))
+	# Save for offline runs the same generation and world build as
+	# Explore, so the place it leaves behind opens without either.
 	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
-		if _downloader.is_running():
-			return
-		_picker.set_download_busy(true)
-		_download_at = Vector2(lat, lon)
-		_download_preset = _settings.preset
-		_picker.set_download_status("Saving… 0/%d" % OfflineDownloader.JOBS)
-		_downloader.download(lat, lon, _settings.preset))
+		var target := _explore_target(lat, lon)
+		_start_generation(target["at"].x, target["at"].y, target["site"], {}, true))
 	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
 	_picker.bind_store(_store)
@@ -412,8 +402,18 @@ func _set_generating(busy: bool) -> void:
 	_generating = busy
 	_picker.set_render_busy(busy)
 
+## Where Explore goes for the picker's pin: a selected landmark is seen
+## from its standoff, not stood on. {"at": Vector2(lat, lon), "site": {}}.
+func _explore_target(lat: float, lon: float) -> Dictionary:
+	var site := _picker.selected_landmark
+	if site.is_empty():
+		return {"at": Vector2(lat, lon), "site": {}}
+	return {"at": LandmarkVisit.viewpoint(site, LandmarkVisit.default_bearing(lat)), "site": site}
+
+## `save_only`: Save for offline. Runs the same pipeline and world build
+## but keeps the picker up and stops at the saved world.
 func _start_generation(lat: float, lon: float, focus: Dictionary = {},
-		view: Dictionary = {}) -> void:
+		view: Dictionary = {}, save_only := false) -> void:
 	if _generating:
 		print("Generation already in progress; ignoring start")
 		return
@@ -422,6 +422,9 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 		var camera := _store.camera_for(lat, lon)
 		if not camera.is_empty():
 			view = ViewLink.to_view(camera)
+	_saving = save_only
+	_save_progress = SaveProgress.new()
+	_save_progress.rows = GenerationPipeline.STAGES.size()
 	_set_generating(true)
 	_gen_id += 1
 	var gen := _gen_id
@@ -436,7 +439,11 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 		display_name = LocationData.known_place(lat, lon)
 	_loading.begin(display_name, lat, lon, _settings.preset)
 	_notice.clear()
-	_show(_loading)
+	if save_only:
+		_picker.set_download_busy(true)
+		_follow_save(gen)
+	else:
+		_show(_loading)
 	# run() starts every fetcher synchronously (cached satellite tiles
 	# decode inline), which would freeze the picker on screen. Let the
 	# loading screen draw first.
@@ -444,6 +451,8 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 	await get_tree().process_frame
 	if gen != _gen_id:
 		_set_generating(false)
+		if _saving:
+			_end_save(SAVE_FAILED)
 		_show(_picker)
 		return
 	_pipeline.run(lat, lon, display_name if not focus.is_empty() else _picker.selected_name,
@@ -460,7 +469,10 @@ func _arm_timeout(gen: int) -> void:
 	_gen_id += 1
 	_pipeline.cancel()
 	_show(_picker)
-	_picker.set_render_status(TIMEOUT_MESSAGE)
+	if _saving:
+		_end_save(SAVE_FAILED)
+	else:
+		_picker.set_render_status(TIMEOUT_MESSAGE)
 	if _building_world:
 		_abort_build()
 
@@ -483,7 +495,54 @@ func _release_build() -> void:
 	_building_world = false
 	_set_generating(false)
 
+## Save for offline, second half: the world is built and written to the
+## world cache exactly as Explore would, then dropped unseen.
+func _save_world(data: LocationData) -> void:
+	var gen := _gen_id
+	var abort := BuildAbort.new()
+	_building_world = true
+	_build_abort = abort
+	_save_progress.phase = SaveProgress.Phase.BUILD
+	var ground: GroundTruth = await _pipeline.ground_for(data)
+	var ok := true
+	# Headless runs have no world cache; an already saved world is not rebuilt.
+	if WorldCache.enabled() and not WorldCache.has_world(data):
+		var built := await _view.build_location(data, ground, abort, true)
+		ok = not built.is_empty()
+		if ok and built.size() > 1 and built[1] is Node3D:
+			(built[1] as Node3D).free()
+	if _build_abort == abort:
+		_release_build()
+	if gen != _gen_id:
+		return
+	if ok:
+		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
+	_end_save((SAVE_DONE if _pipeline.degraded.is_empty() else SAVE_PARTLY) if ok else SAVE_FAILED)
+
+## Keeps the bar and the line under the Save button current until the
+## save ends.
+func _follow_save(gen: int) -> void:
+	var dt := 0.1
+	while _saving and gen == _gen_id:
+		if _build_abort != null:
+			_save_progress.build_step = _build_abort.step
+			if _build_abort.saving:
+				_save_progress.phase = SaveProgress.Phase.WRITE
+		_save_progress.tick(dt)
+		_picker.set_download_status(SAVING % _save_progress.percent())
+		_picker.set_download_progress(_save_progress.shown, _save_progress.phase_text())
+		await get_tree().create_timer(dt).timeout
+
+func _end_save(text: String) -> void:
+	_saving = false
+	_picker.set_download_progress(-1.0)
+	_picker.set_download_busy(false)
+	_picker.set_download_status(text)
+
 func _on_generation_finished(data: LocationData) -> void:
+	if _saving:
+		_save_world(data)
+		return
 	var gen := _gen_id
 	var abort := BuildAbort.new()
 	_loading.set_building(abort)

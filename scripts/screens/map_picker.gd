@@ -60,6 +60,8 @@ var _settings_btn: Button
 var _download_btn: Button
 var _exit_btn: Button
 var _download_status: Label
+var _download_bar: ProgressBar
+var _download_phase: Label
 ## Last Explore outcome (a timeout); separate from the download line so
 ## neither overwrites the other.
 var _render_status: Label
@@ -334,6 +336,15 @@ func _ready() -> void:
 	_download_status = UiTheme.text("", "body-s", UiTheme.MUTED)
 	_download_status.visible = false
 	_action_col.add_child(_download_status)
+	_download_bar = ProgressBar.new()
+	_download_bar.show_percentage = false
+	_download_bar.custom_minimum_size = Vector2(0, 4)
+	_download_bar.visible = false
+	_action_col.add_child(_download_bar)
+	_download_phase = UiTheme.text("", "body-s", UiTheme.MUTED)
+	_download_phase.visible = false
+	_action_col.add_child(_download_phase)
+	MapChrome.style_download_bar(self)
 	_render_status = UiTheme.text("", "body-s", UiTheme.MUTED)
 	_render_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_render_status.visible = false
@@ -452,6 +463,11 @@ func _set_selected_quick(index: int) -> void:
 
 func set_download_status(text: String) -> void:
 	MapHome.set_save_label(self, text)
+
+## A bar and the step under the Save button while it works; a negative
+## `fraction` takes both away.
+func set_download_progress(fraction: float, phase: String = "") -> void:
+	MapChrome.set_download_progress(self, fraction, phase)
 
 ## `finishing`: a cancelled scene is still winding down, so say so.
 func set_render_status(text: String) -> void:

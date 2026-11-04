@@ -297,9 +297,10 @@ static func make_world(data: LocationData, ground: GroundTruth,
 ## seconds on dense cities; run on the main thread it froze the loading
 ## screen (macOS beachball), so the caller's screen keeps drawing here.
 ## Pass the result to show_location. A known `ground` is reused.
+## `wait_save` returns only once the world is written to the cache.
 ## Returns [] when `abort` was requested (timeout / cancel).
 func build_location(data: LocationData, ground: GroundTruth = null,
-		abort: BuildAbort = null) -> Array:
+		abort: BuildAbort = null, wait_save := false) -> Array:
 	var cached := await WorldCache.load_world(self, _threads, data, ground)
 	if not cached.is_empty():
 		return cached
@@ -322,7 +323,12 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return []
-	WorldCache.save_async(self, _threads, data, built, packed)
+	if wait_save:
+		if abort != null:
+			abort.saving = true
+		await WorldCache.save_async(self, _threads, data, built, packed)
+	else:
+		WorldCache.save_async(self, _threads, data, built, packed)
 	return built
 
 ## A build or cache thread is still running: freeing the view now

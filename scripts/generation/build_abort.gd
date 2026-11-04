@@ -24,6 +24,9 @@ const STEPS: Array[Dictionary] = [
 ]
 
 var requested := false
+## The built world is being written to the world cache (set by
+## View360.build_location when the caller waits for the save).
+var saving := false
 ## The phase the build thread is in (a Step); read by the main thread.
 var step := 0
 ## Per-step wall-clock ms (filled by the build). Key = Step int.

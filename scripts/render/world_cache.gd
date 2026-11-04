@@ -133,6 +133,13 @@ static func _paths(data: LocationData) -> Dictionary:
 	var k := key(data)
 	return {"scene": "%s/%s.scn" % [base_dir(), k], "ground": "%s/%s.ground" % [base_dir(), k]}
 
+## Whether a world for exactly this data is already saved.
+static func has_world(data: LocationData) -> bool:
+	if not enabled():
+		return false
+	var p := _paths(data)
+	return FileAccess.file_exists(p["scene"]) and FileAccess.file_exists(p["ground"])
+
 ## [ground, world] from the cache, or [] when absent/unreadable. Loads on
 ## a worker thread while `view` keeps drawing; a known `ground` (season
 ## rebuild) is reused instead of the saved one. The world is instanced

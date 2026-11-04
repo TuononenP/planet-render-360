@@ -53,7 +53,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	style_cached_chip(p._cached_chip)
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
-			p._quality_label, p._download_status, p._render_status]:
+			p._quality_label, p._download_status, p._download_phase, p._render_status]:
 		section.add_theme_color_override("font_color", UiTheme.MUTED)
 	UiTheme.apply_field(p._search, true)
 	p._suggest_panel.add_theme_stylebox_override("panel", _suggest_style(p))
@@ -64,6 +64,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._side.add_theme_stylebox_override("panel", _side_style(p))
 	UiTheme.apply_primary(p._render_btn)
 	UiTheme.apply_ghost(p._download_btn)
+	style_download_bar(p)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	for bar in [p._side_explore, p._sheet_explore]:
 		UiTheme.apply_primary(bar)
@@ -94,6 +95,24 @@ static func set_download_status(p: MapPicker, text: String) -> void:
 	if p._download_status != null:
 		p._download_status.text = text
 		p._download_status.visible = text != ""
+
+## The save bar, in the loading screen's accent bar on a quiet track.
+static func style_download_bar(p: MapPicker) -> void:
+	var track := UiTheme.style(UiTheme.LINE, UiTheme.RADIUS_PILL)
+	track.set_content_margin_all(0)
+	var fill := UiTheme.style(UiTheme.TEAL, UiTheme.RADIUS_PILL)
+	fill.set_content_margin_all(0)
+	p._download_bar.add_theme_stylebox_override("background", track)
+	p._download_bar.add_theme_stylebox_override("fill", fill)
+
+static func set_download_progress(p: MapPicker, fraction: float, phase: String) -> void:
+	if p._download_bar == null:
+		return
+	p._download_bar.visible = fraction >= 0.0
+	p._download_phase.visible = fraction >= 0.0 and phase != ""
+	if fraction >= 0.0:
+		p._download_bar.value = fraction * 100.0
+		p._download_phase.text = phase
 
 ## Explore outcome under the buttons (a timed-out place), on its own
 ## line so download progress never overwrites it, or it the progress.
