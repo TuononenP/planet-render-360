@@ -605,3 +605,9 @@ Diffused white/green globes and vertical railing infill improve the kit;
 street-furniture checks pass. The separate subway-view requirement is now
 evidenced. A true descending terrain opening remains unimplemented; this
 does not improve the overall provisional grade beyond recognisable.
+
+r34/r35 continuation: an isolated cold opening took 103 s, with 5.945 s
+generation, but missed far-city geometry and POIs. The subway globes now
+meet their support posts; a true descending stairwell remains open. A
+licensed 06:39 golden-hour skyline photo at nearby Fulton Ferry Landing is
+documented as context; it does not establish the requested Pier 1 reference.

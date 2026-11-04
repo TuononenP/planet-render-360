@@ -1,0 +1,89 @@
+{
+  "new_york_bank": {
+    "all": {
+      "colourful": 0.111585043400744,
+      "luma": 0.403107464584431,
+      "sat": 0.296813760519085
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 35.0,
+      "pitch_rad": -0.247640120983124,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.14872121810913
+    },
+    "flags": [
+      "luma 0.403 outside refs 0.505–0.505",
+      "colourful 0.112 outside refs 0.178–0.178"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.103259274951333,
+      "luma": 0.286102959049632,
+      "sat": 0.470760876695745
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 42,
+    "middle": {
+      "colourful": 0.0485227920131929,
+      "luma": 0.452571508493697,
+      "sat": 0.215597873225724
+    },
+    "reference_set": "morning",
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.112497278750348,
+      "luma": 0.477714218197028,
+      "sat": 0.192480262022495
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "new_york_vantage": {
+    "all": {
+      "colourful": 0.126550676564803,
+      "luma": 0.565105307198046,
+      "sat": 0.27231285201942
+    },
+    "camera": {
+      "centre_lat": 40.706,
+      "centre_lon": -74.004,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0523598790168762,
+      "world_x": 602.529663085938,
+      "world_y": 4.70099258422852,
+      "world_z": 370.308990478516,
+      "yaw_rad": -5.14872121810913
+    },
+    "flags": [
+      "colourful 0.127 outside refs 0.178–0.178"
+    ],
+    "local_hour": 8.0,
+    "lower": {
+      "colourful": 0.0952254652067323,
+      "luma": 0.336474148449345,
+      "sat": 0.391147838762736
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 42,
+    "middle": {
+      "colourful": 0.113526757093773,
+      "luma": 0.595300248959856,
+      "sat": 0.17769669442314
+    },
+    "reference_set": "morning",
+    "season": 1,
+    "sun_elevation_deg": 35.8708246904821,
+    "upper": {
+      "colourful": 0.114539174835349,
+      "luma": 0.767855087293653,
+      "sat": 0.234577428930104
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  }
+}

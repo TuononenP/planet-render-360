@@ -90,3 +90,12 @@ PNGs, and visually shows the Paris, Interlaken and Eiffel viewers. Offline
 data notices and reduced geometry are expected; this is a UI regression
 check, not a full-data fidelity acceptance. [Final results](final-windowed.json)
 retain the output directory, inspected frames and rejected-attempt logs.
+
+Continuation: [r34 cold run](../nyc-r34-cold-2026-11-04/README.md) opened
+in 103 s, generation 5.945 s, but far-city data arrived after the rendering
+budget and POIs timed out; the all-layer cold gate remains open. A licensed
+06:39 [golden-hour context photo](../../refs/new_york/README.md) was found at
+Fulton Ferry Landing near Pier 1; its exact Pier 1 location and clear-morning
+conditions are not established. [r35](../nyc-r35-high-street-2026-11-04/README.md)
+connects the subway globes to their posts, verified in a close view and by
+the furniture test. An excavated stairwell remains unimplemented.

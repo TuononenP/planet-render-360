@@ -246,7 +246,8 @@ static func mesh(key: String) -> ArrayMesh:
 					Vector3(0.48, 0.08, 2.1))
 			for z in [-1.15, 1.15]:
 				for x in [-1.5, 1.5]:
-					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(x, 0, z), Vector3(x, 1.05, z)], [0.045, 0.045], 6, 1.0, 1.0)
+					var post_top := 1.13 if x > 0.0 else 1.05
+					TreeMeshLibrary._tube(buf.call("iron"), [Vector3(x, 0, z), Vector3(x, post_top, z)], [0.045, 0.045], 6, 1.0, 1.0)
 				TreeMeshLibrary._tube(buf.call("iron"), [Vector3(-1.5, 1.0, z), Vector3(1.5, 1.0, z)], [0.04, 0.04], 6, 1.0, 1.0)
 				for k in range(1, 20):
 					var x := -1.5 + float(k) * 0.15

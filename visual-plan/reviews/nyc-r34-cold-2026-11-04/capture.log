@@ -1,0 +1,26 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M3 Max (Apple9)
+
+CLIMATE: { "t_warm_c": 23.35, "precip_mm": 1190.6, "snow_days": 59.0, "t_cold_c": 1.05000000000001, "precip_warm_mm": 324.1, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 9027, "cached": false, "vars": 5 }
+FAR-FIELD fetch: { "fetch_ms": 20236, "assemble_ms": 121, "tiles": 121, "cached": 0, "failed": 0 } rings=3 drapes=3
+LANDCOVER fetch: { "landcover": { "ms": 5948, "available": true }, "canopy": { "ms": 24384, "available": true } }
+OsmFetcher: POIs unavailable (Overpass failed (result=13 code=0)); using other map data
+SHORE TIMINGS classify=175 patches=168
+SHORELINE bodies=37 edges=10656 patches=4313 hard=385 diagnostics=1
+Far-city fetch over budget; far city from imagery only
+FAR-TERRAIN built in 2054 ms (rings=3 drapes=3 bands=2)
+SHORE TERRAIN vertices_ms=2180
+SHORE TERRAIN arrays_ms=2525 vertices=107799
+SHORE TERRAIN total_ms=2639
+HARBOUR-FERRY berth=(-674.7, 712.4) axis=(0.50, 0.87)
+FAR-CITY built in 52 ms (blocks=22768 towers=0 tris=227680 meshes=125 source=drape)
+BUILDINGS census { "real": 1786, "impostors": 0, "infill": 0, "far_blocks": 22768, "far_towers": 0, "far_tris": 227680 } (settlement=drape)
+BUILD timings {Distant terrain=2062, Ground & water=2639, Buildings=5935, Roads & landmarks=3247, Vegetation=5376} total=5945 parallel
+CAPTURE new_york built in 103 s
+SHOT new_york_vantage luma 0.565 sat 0.272 colourful 0.127
+SHOT new_york_bank luma 0.403 sat 0.297 colourful 0.112
+CAPTURE DONE -> /Users/petri.tuononen/GithubProjects/planet-render-360/visual-plan/reviews/nyc-r34-cold-2026-11-04
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 96 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

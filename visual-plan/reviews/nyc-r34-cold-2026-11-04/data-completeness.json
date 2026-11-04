@@ -1,0 +1,23 @@
+{
+  "osm_v2_40706_-74004_ring1600.json": {
+    "bytes": 810093,
+    "elements": 730,
+    "remark": "",
+    "timestamp_osm_base": "2026-11-04T08:01:20Z",
+    "sha256": "47e9281f6e1b82fcd523f2d54bee9d377e11bd0976ee3f7284a273daf053ce01"
+  },
+  "osm_v2_40706_-74004_r1200_q12.json": {
+    "bytes": 16751212,
+    "elements": 22883,
+    "remark": "",
+    "timestamp_osm_base": "2026-11-04T08:01:20Z",
+    "sha256": "3e12c41cbb7ce79db0b19f20c2162d56cba5d4c2b4af1c9798da953d8c74bcd4"
+  },
+  "osm_v2_40706_-74004_farcity12000_q3.json": {
+    "bytes": 36898090,
+    "elements": 34651,
+    "remark": "",
+    "timestamp_osm_base": "2026-11-04T08:02:19Z",
+    "sha256": "e5f652c37baac1122d61c8e52f90affc3d6dfae944f6c9940b803bbf0c808821"
+  }
+}

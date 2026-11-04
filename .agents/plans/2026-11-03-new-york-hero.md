@@ -219,6 +219,7 @@ No commits or pushes. Concurrent vessel and Suomenlinna work was preserved.
 | C-9 | r21–r28, Fast/High captures, full-data cached run and isolated cold run | Cached opening 14 s, generation 7.840 s, far city 530 ms / 276,362 triangles. Photographic quality and complete-data cold timing remain open. |
 | C-9 follow-up | [r31 cold capture](../../visual-plan/reviews/nyc-r31-cold-2026-11-04/README.md), mirror probes and retry tests | Removed whitelist-only OSM-FR; 403 advances mirrors, 400 still stops. Empty-cache Ultra opened in 90 s with complete detailed/far responses; generation 8.176 s, far network/parse 73.792 s. Ring and POIs failed, so all-layer timing remains open. |
 | C-7 follow-up | r32/r33 High Street close views, complete local q12 audit and street-furniture test | Mapped node `219785432` is visibly placed on dry pavement. Split white/green globes reduce bloom and railing infill is present. Missing-view evidence is resolved; true terrain excavation for descending stairs remains a photographic limitation. |
+| Continuation | r34 cold run, r35 High Street close view and [reference notes](../../visual-plan/refs/new_york/README.md) | r34 opened in 103 s but far towers missed the build and POIs timed out. r35 connects globe lamps to their posts. A 06:39 golden-hour skyline photo is attributed to Fulton Ferry Landing near Pier 1; a verified Pier 1 photo remains open. |
 
 The 27 focused/regression checks pass, as do windowed cache and screenshot checks.
 The broad live scorecard run timed out at 180 s; its focused Turku rerun reproduces the
