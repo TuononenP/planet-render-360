@@ -332,13 +332,15 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	# full parse on the main thread); _on_parsed falls back to the live
 	# query if a damaged entry parses to no buildings.
 	_detailed_cached = false
-	var dcached := _read_cache(_pending_cache)
+	var snapshot := BundledOsm.entry_for(lat, lon, "detailed", OsmQuery.QUERY_VERSION)
+	var dcached := _read_cache(_pending_cache) if BundledOsm.cache_is_newer(_pending_cache, snapshot) else ""
 	# Older builds keyed all query revisions to the same filename. Reuse a
 	# matching current payload without another network request, while keeping
 	# the old file intact for offline fallback.
 	if dcached == "":
 		var legacy := _read_cache(CacheStore.osm_legacy_path(lat, lon, radius))
-		if legacy != "" and OsmQuery.is_current(legacy):
+		if legacy != "" and OsmQuery.is_current(legacy) and BundledOsm.cache_is_newer(
+				CacheStore.osm_legacy_path(lat, lon, radius), snapshot):
 			dcached = legacy
 			_write_cache(_pending_cache, legacy)
 	# A payload from an older query (no railways/squares) goes live once;
@@ -346,6 +348,13 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	if dcached != "" and OsmQuery.is_current(dcached):
 		_detailed_text = dcached
 		_detailed_cached = true
+	if _detailed_text == "":
+		_detailed_text = BundledOsm.read(snapshot)
+		if _detailed_text != "":
+			_detailed_cached = true
+			if not offline_mode:
+				BundledOsm.refresh(get_tree(), snapshot, _pending_cache, _pending_body,
+					_detailed_check(lat, lon), ENDPOINTS)
 	if want_ring:
 		_ring_text = _read_cache(_pending_ring_cache)
 		if not offline_mode and OverpassRequest.payload_error(_ring_text) != "":

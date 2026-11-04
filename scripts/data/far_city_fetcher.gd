@@ -125,9 +125,17 @@ func fetch(lat: float, lon: float) -> void:
 	_cache = cache_path(lat, lon)
 	_busy = true
 	_partial = false
-	var cached := OsmFetcher._read_cache(_cache)
+	var snapshot := BundledOsm.entry_for(lat, lon, "far", QUERY_VERSION)
+	var cached := OsmFetcher._read_cache(_cache) if BundledOsm.cache_is_newer(_cache, snapshot) else ""
 	if cached != "" and OverpassRequest.payload_error(cached) == "":
 		_parse_off_thread(cached, true)
+		return
+	var bundled := BundledOsm.read(snapshot)
+	if bundled != "":
+		if not offline_mode:
+			BundledOsm.refresh(get_tree(), snapshot, _cache, "data=" + build_query(lat, lon).uri_encode(),
+				func(text: String) -> String: return "" if _usable(text) else "unusable payload", endpoints())
+		_parse_off_thread(bundled, true)
 		return
 	_request()
 
