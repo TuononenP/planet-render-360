@@ -26,10 +26,21 @@ func _run() -> void:
 		[59.3207, 18.0604, "ring1600", 1],
 		[59.3207, 18.0604, "ring2500", 1],
 		[59.3207, 18.0604, "poi", 1],
+		[40.7060, -74.0040, "far", 3],
+		[37.8040, -122.4195, "far", 3],
+		[40.7060, -74.0040, "ring1600", 1],
+		[40.7060, -74.0040, "ring2500", 1],
+		[40.7060, -74.0040, "poi", 1],
+		[37.8040, -122.4195, "ring1600", 1],
+		[37.8040, -122.4195, "ring2500", 1],
+		[37.8040, -122.4195, "poi", 1],
 	]
 	for row in rows:
 		var key := BundledOsm.entry_for(row[0], row[1], row[2], row[3])
 		check(key != "", "preset snapshot must match")
+		var rounded := Vector2(row[0], row[1])
+		check(BundledOsm.entry_for(rounded.x, rounded.y, row[2], row[3]) == key,
+			"preset snapshot must match coordinates passed through Vector2")
 		var text := BundledOsm.read(key)
 		check(text != "", "%s should load" % key)
 		if row[2] == "detailed":
@@ -49,6 +60,7 @@ func _fetch_checks() -> void:
 	var dir := "user://bundled_osm_test"
 	DirAccess.make_dir_recursive_absolute(dir)
 	CacheStore.dir_override = dir
+	CacheStore.eviction_suppressed = true
 	var cache := CacheStore.osm_path(40.7060, -74.0040, 1200)
 	var key := BundledOsm.entry_for(40.7060, -74.0040, "detailed", OsmQuery.QUERY_VERSION)
 	var file := FileAccess.open(cache, FileAccess.WRITE)
@@ -71,18 +83,16 @@ func _fetch_checks() -> void:
 			count = buildings.size()
 			finished = true)
 		osm.failed.connect(func(_reason: String) -> void: finished = true)
-		var is_europe: bool = row[0] > 50.0
-		osm.fetch(row[0], row[1], 2 if is_europe else 0)
-		if is_europe:
-			check(osm._ring_text != "", "offline fetch must load the bundled ring")
+		var origin := Vector2(row[0], row[1])
+		osm.fetch(origin.x, origin.y, 2)
+		check(osm._ring_text != "", "offline fetch must load the bundled ring")
 		var deadline := Time.get_ticks_msec() + 30000
 		while not finished and Time.get_ticks_msec() < deadline:
 			await process_frame
 		check(finished and count > 100, "offline detailed fetch must use snapshot")
-		if is_europe:
-			check(osm._poi_text != "" and osm.pois.size() > 0, "offline fetch must load bundled POIs")
+		check(osm._poi_text != "" and osm.pois.size() > 0, "offline fetch must load bundled POIs")
 		osm.queue_free()
-	for row in [[60.1680, 24.9530], [59.3207, 18.0604]]:
+	for row in [[60.1680, 24.9530], [59.3207, 18.0604], [40.7060, -74.0040], [37.8040, -122.4195]]:
 		finished = false
 		count = 0
 		var far := FarCityFetcher.new()
@@ -91,13 +101,16 @@ func _fetch_checks() -> void:
 		far.finished.connect(func(_landuse: Array, towers: Array) -> void:
 			count = towers.size()
 			finished = true)
-		far.fetch(row[0], row[1])
+		var origin := Vector2(row[0], row[1])
+		far.fetch(origin.x, origin.y)
 		var deadline := Time.get_ticks_msec() + 30000
 		while not finished and Time.get_ticks_msec() < deadline:
 			await process_frame
 		check(finished and count > 0, "offline far-city fetch must use snapshot")
 		far.queue_free()
+	CacheStore.finish()
 	CacheStore.dir_override = ""
+	CacheStore.eviction_suppressed = false
 	DirAccess.remove_absolute(dir)
 
 func _refresh_check(path: String, key: String) -> void:

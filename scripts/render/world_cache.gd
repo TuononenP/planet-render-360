@@ -23,6 +23,8 @@ const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res:/
 
 static var _source_hash := ""
 static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
+## Only one worker may write a given scene and its ground file at a time.
+static var _save_threads: Dictionary = {}
 ## Test hook: keep cache eviction checks away from the person's worlds.
 static var dir_override := ""
 
@@ -211,18 +213,27 @@ static func pump_budget_us(frame_us: int) -> int:
 		return HURRY_US
 	return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, PUMP_MAX_US)
 
+static func _save_in_progress(path: String) -> bool:
+	var previous: Variant = _save_threads.get(path)
+	if previous is Thread and previous.is_alive():
+		return true
+	_save_threads.erase(path)
+	return false
+
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
 		packed: PackedScene = null) -> void:
 	if not enabled() or built.size() < 2 or not (built[1] is Node3D):
 		return
+	var p := _paths(data)
+	if _save_in_progress(p["scene"]):
+		return
 	var ps := packed if packed != null else pack(built[1])
 	if ps == null:
 		return
-	var p := _paths(data)
 	var ground_bytes := var_to_bytes(_ground_state(built[0] as GroundTruth))
 	var th := Thread.new()
 	threads.append(th)
-	th.start(func() -> Array:
+	var err := th.start(func() -> Array:
 		DirAccess.make_dir_recursive_absolute(p["scene"].get_base_dir())
 		var tmp: String = p["scene"] + ".tmp.scn"
 		var t0 := Time.get_ticks_msec()
@@ -238,6 +249,11 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 			ProjectSettings.globalize_path(p["scene"]))
 		print("WORLD CACHE saved %s in %d ms" % [p["scene"].get_file(), Time.get_ticks_msec() - t0])
 		return [])
+	if err != OK:
+		threads.erase(th)
+		push_warning("WorldCache: could not start save thread: %s" % err)
+		return
+	_save_threads[p["scene"]] = th
 	var tree := view.get_tree()
 	var last_us := [Time.get_ticks_usec()]
 	var pump := func() -> void:
@@ -253,6 +269,8 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	if threads.has(th):
 		threads.erase(th)
 		th.wait_to_finish()
+	if _save_threads.get(p["scene"]) == th:
+		_save_threads.erase(p["scene"])
 	# On the main thread: CacheStore's LRU state is not thread-safe.
 	_bytes = -1
 	if dir_override.is_empty():

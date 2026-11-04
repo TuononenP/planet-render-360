@@ -53,11 +53,12 @@ func _run() -> void:
 	var far := FarCityFetcher.new()
 	root.add_child(far)
 	far.offline_mode = true
-	var far_path := FarCityFetcher.cache_path(40.706, -74.004)
+	var far_lat := 40.7061 # Nearby coordinate has no bundled preset snapshot.
+	var far_path := FarCityFetcher.cache_path(far_lat, -74.004)
 	OsmFetcher._write_cache(far_path, partial)
 	var finished: Array = []
 	far.finished.connect(func(_land: Array, towers: Array) -> void: finished.append(towers))
-	far.fetch(40.706, -74.004)
+	far.fetch(far_lat, -74.004)
 	var start := Time.get_ticks_msec()
 	while finished.is_empty() and Time.get_ticks_msec() - start < 3000:
 		await process_frame

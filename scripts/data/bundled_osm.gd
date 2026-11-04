@@ -5,6 +5,14 @@ extends RefCounted
 ## [latitude, longitude, layer, query version, OSM timestamp, inflated bytes, SHA-256].
 ## Missing layers deliberately use the ordinary network/cache fallback.
 const ENTRIES := {
+	"san_francisco_far": [37.8040, -122.4195, "far", 3, "2026-11-02T21:21:26", 3389888, "76bd4a396b4f0ee9570354e7c8c94ca185bc750655e65af98f9b8a51bc45f66c"],
+	"new_york_far": [40.7060, -74.0040, "far", 3, "2026-10-31T00:00:00", 20182951, "34411c39c87edab6b073f175b5bb959ee17d207758993ba2080aa7ac3e52142a"],
+	"new_york_ring1600": [40.7060, -74.0040, "ring1600", 1, "2026-10-31T00:00:00", 527912, "b88cbaaf630dd9a68176988de26a301f67f1683c69a9feadfd3c82c83b47fa50"],
+	"new_york_ring2500": [40.7060, -74.0040, "ring2500", 1, "2026-10-31T00:00:00", 630149, "fc2740b00ad16629d0f04b69d552ea042875f94866671a5ec180f23f76dac3a2"],
+	"new_york_poi": [40.7060, -74.0040, "poi", 1, "2026-10-31T00:00:00", 452828, "f10d05bb8cce6f9b47485be68802ce883710c12b47e96fc3610aff15de0d4963"],
+	"san_francisco_ring1600": [37.8040, -122.4195, "ring1600", 1, "2026-10-31T00:00:00", 290353, "3450e4b284d7a4b201c8d4f796cb8bf523bd1e7f2e02604e579672d35e3b2c92"],
+	"san_francisco_ring2500": [37.8040, -122.4195, "ring2500", 1, "2026-10-31T00:00:00", 520242, "8e72644d2c2feafd058d1840c914bcb50e4a757b06c2729dccf26075d7bf171f"],
+	"san_francisco_poi": [37.8040, -122.4195, "poi", 1, "2026-10-31T00:00:00", 142554, "6029a520ba637a8a6e7fbf81d119a086e56d7594fa040434fc74c2f3157281c3"],
 	"helsinki_detailed": [60.1680, 24.9530, "detailed", 12, "2026-11-02T21:21:26", 14473370, "7fa53acf219303c800828119507e2fb6b2a0e5f65112cc3eb4e39aad8ad9101f"],
 	"helsinki_ring1600": [60.1680, 24.9530, "ring1600", 1, "2026-11-02T21:21:26", 1047377, "015deaba1adf3f6b9bc568f8f99ffc00d2265b11a1557bd2769bd034ce3e5190"],
 	"helsinki_ring2500": [60.1680, 24.9530, "ring2500", 1, "2026-11-02T21:21:26", 1351289, "948ccfa8b96d664562e9dba0d196f44a7ea092ae6bdbe8b37229618920b643ff"],
@@ -25,7 +33,10 @@ static var _refreshing: Dictionary = {}
 static func entry_for(lat: float, lon: float, layer: String, version: int) -> String:
 	for key in ENTRIES:
 		var entry: Array = ENTRIES[key]
-		if absf(lat - float(entry[0])) < 0.0000001 and absf(lon - float(entry[1])) < 0.0000001 \
+		# Preset coordinates pass through Vector2 (32-bit components) before
+		# reaching the fetchers. Compare in that representation so the same
+		# preset still matches after the round trip, without matching nearby pins.
+		if Vector2(lat, lon) == Vector2(float(entry[0]), float(entry[1])) \
 				and layer == entry[2] and version == entry[3]:
 			return key
 	return ""

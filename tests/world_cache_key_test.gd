@@ -87,6 +87,19 @@ func _run() -> void:
 			or not str(paths["ground"]).begins_with(WorldCache.dir_override + "/"):
 		failures.append("test cache override must contain both files")
 	WorldCache.dir_override = ""
+	# A second save for the same key must not share a temporary file.
+	var gate := Semaphore.new()
+	var writer := Thread.new()
+	writer.start(func() -> void: gate.wait())
+	WorldCache._save_threads[paths["scene"]] = writer
+	if not WorldCache._save_in_progress(paths["scene"]):
+		failures.append("an active save must block another save for the same scene")
+	if WorldCache._save_in_progress(str(paths["scene"]) + ".other"):
+		failures.append("a save for another scene must remain independent")
+	gate.post()
+	writer.wait_to_finish()
+	if WorldCache._save_in_progress(paths["scene"]):
+		failures.append("a completed save must not block a later save")
 	# Save pump: a slow frame gets a bigger slice, a quit takes the most.
 	if WorldCache.pump_budget_us(7000) != WorldCache.PUMP_US:
 		failures.append("a fast frame should keep the base pump slice")
