@@ -13,20 +13,24 @@ const DOWNLOAD_END := 0.3
 const BUILD_END := 0.85
 ## Share of the gap to the end of the current step closed per second.
 const DRIFT := 0.1
+## Catch up to completed work smoothly, rather than jumping between phases.
+const CATCH_UP := 0.6
 
 var phase := Phase.DOWNLOAD
 ## Download rows finished, of `rows`.
 var rows_done := 0
 var rows := 1
+## Fraction of the imagery row completed while it is still downloading.
+var imagery_fraction := 0.0
 ## BuildAbort.Step the build is in.
 var build_step := 0
 var shown := 0.0
 
-## The least the bar shows for where the work is.
+## The completed share of the work; the display catches up to it smoothly.
 func floor_at() -> float:
 	match phase:
 		Phase.DOWNLOAD:
-			return DOWNLOAD_END * float(rows_done) / rows
+			return DOWNLOAD_END * minf(float(rows_done) + imagery_fraction, float(rows)) / rows
 		Phase.BUILD:
 			return DOWNLOAD_END + (BUILD_END - DOWNLOAD_END) * BuildAbort.fraction_before(build_step)
 	return BUILD_END
@@ -41,8 +45,10 @@ func ceiling_at() -> float:
 	return 1.0
 
 func tick(dt: float) -> void:
-	shown = maxf(shown, floor_at())
-	shown += (ceiling_at() - shown) * clampf(DRIFT * dt, 0.0, 1.0)
+	var target := floor_at()
+	if shown < target:
+		shown += (target - shown) * clampf(CATCH_UP * dt, 0.0, 1.0)
+	shown += maxf(ceiling_at() - shown, 0.0) * clampf(DRIFT * dt, 0.0, 1.0)
 
 ## Never 100: that is the save ending, which the outcome message says.
 func percent() -> int:

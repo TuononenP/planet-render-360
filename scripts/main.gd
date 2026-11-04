@@ -102,11 +102,15 @@ func _ready() -> void:
 			# The pipeline reports its overall fraction only at the end; a
 			# save follows its rows finishing instead.
 			if _saving and state == "done":
-				_save_progress.rows_done += 1)
+				_save_progress.rows_done += 1
+				if i == 1:
+					_save_progress.imagery_fraction = 0.0)
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.stage_progress.connect(func(i: int, done: int, total: int) -> void:
-		_loading.set_stage_progress(i, done, total))
+		_loading.set_stage_progress(i, done, total)
+		if _saving and i == 1 and total > 0:
+			_save_progress.imagery_fraction = clampf(float(done) / total, 0.0, 1.0))
 	_pipeline.stage_took.connect(func(i: int, seconds: float) -> void:
 		_loading.set_stage_took(i, seconds))
 	_pipeline.finished.connect(_on_generation_finished)

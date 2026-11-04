@@ -16,14 +16,19 @@ func _init() -> void:
 		last = p.shown
 	if p.shown <= 0.0 or p.shown >= SaveProgress.DOWNLOAD_END / 4.0:
 		failures.append("a stalled first row should drift inside its slice, got %.3f" % p.shown)
+	p.imagery_fraction = 0.5
+	var tile_floor := SaveProgress.DOWNLOAD_END * 0.5 / 4.0
+	if not is_equal_approx(p.floor_at(), tile_floor):
+		failures.append("imagery tiles should contribute to download progress")
+	p.imagery_fraction = 0.0
 	p.rows_done = 4
 	p.phase = SaveProgress.Phase.BUILD
 	p.build_step = BuildAbort.Step.BUILDINGS
 	p.tick(0.1)
 	var floor_b := SaveProgress.DOWNLOAD_END + (SaveProgress.BUILD_END - SaveProgress.DOWNLOAD_END) \
 		* BuildAbort.fraction_before(BuildAbort.Step.BUILDINGS)
-	if p.shown < floor_b:
-		failures.append("the build should lift the bar to its step, got %.3f < %.3f" % [p.shown, floor_b])
+	if p.shown <= last or p.shown >= floor_b:
+		failures.append("the build should catch up smoothly to its step, got %.3f" % p.shown)
 	for i in 600:
 		p.tick(0.1)
 	var ceil_b := SaveProgress.DOWNLOAD_END + (SaveProgress.BUILD_END - SaveProgress.DOWNLOAD_END) \

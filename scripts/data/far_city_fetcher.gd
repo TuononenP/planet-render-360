@@ -65,7 +65,7 @@ func _notification(what: int) -> void:
 ## four attempts. Named by host so reordering
 ## OsmFetcher.ENDPOINTS cannot change them.
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["private.coffee",
+	return OsmFetcher.endpoint_order(["z.overpass-api.de",
 		"//overpass-api.de", "mail.ru"]).slice(0, 4)
 
 func is_busy() -> bool:

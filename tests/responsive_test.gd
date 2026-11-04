@@ -244,6 +244,12 @@ func _run() -> void:
 			FileAccess.open(str(k), FileAccess.WRITE).store_string("x")
 			written.append(str(k))
 	MapChrome.refresh_cached(picker)
+	if picker._cached_chip.visible:
+		_fail(failures, "a place missing land cover must not wear the Cached badge")
+	for k in cache_keys["landcover"]:
+		FileAccess.open(str(k), FileAccess.WRITE).store_string("x")
+		written.append(str(k))
+	MapChrome.refresh_cached(picker)
 	if not picker._cached_chip.visible:
 		_fail(failures, "a fully cached place should wear the Cached badge")
 	for k in written:
