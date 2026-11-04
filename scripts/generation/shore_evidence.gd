@@ -12,6 +12,8 @@ func _init(data: LocationData = null) -> void:
 	if data == null:
 		return
 	for b in data.buildings:
+		if SuomenlinnaSite.fortress(b):
+			continue  # Grass-covered defenses are not urban waterfront frontage.
 		var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
 		if ring.size() < 3:
 			var at := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))

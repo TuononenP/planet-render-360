@@ -10,6 +10,7 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
 	var seen := {}
+	var defenses := SuomenlinnaSite.rings(data.buildings) if data != null else []
 	for segment in model.segments:
 		if abort != null and abort.requested:
 			return
@@ -17,6 +18,8 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 			continue
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
+		if SuomenlinnaFortress.owns_bank(a, b, defenses):
+			continue
 		var key := [a, b] if a.x < b.x or (a.x == b.x and a.y < b.y) else [b, a]
 		var hash_key := str(key)
 		if seen.has(hash_key):

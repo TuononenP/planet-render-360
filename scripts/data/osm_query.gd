@@ -48,11 +48,11 @@ const CAP_SQUARES := 400
 ## cached detailed payload without it predates the current statements
 ## (q3 railways and squares, q4 furniture, q5 piers, q6–q7 shore
 ## structures, q8 surface parking, q9 eye-centred furniture and more parts,
-## q10 subway entrances, q11 prioritises furniture before expensive layers),
+## q10 subway entrances, q11 furniture first, q12 Suomenlinna defenses),
 ## so it is refetched (and still served
 ## if the network fails).
-const QUERY_VERSION := 11
-const QUERY_MARK := "pr360_q11"
+const QUERY_VERSION := 12
+const QUERY_MARK := "pr360_q12"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
 ## shared cap bounds the byte-heavy tail while covering dense cities.
@@ -171,7 +171,7 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 		'is_in(%.6f,%.6f)->.ci;area.ci["admin_level"="2"]["ISO3166-1"];out tags 4;'
 			% [lat, lon],
 	]
-	return head + "".join(PackedStringArray(clauses))
+	return head + "".join(PackedStringArray(clauses)) + SuomenlinnaSite.query(lat, lon, radius_m)
 
 ## Whether a cached detailed payload came from the current query.
 static func is_current(text: String) -> bool:

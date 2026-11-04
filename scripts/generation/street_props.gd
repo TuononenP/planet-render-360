@@ -319,6 +319,8 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
+		if bool(br.get("fortress_wall", false)):
+			continue  # SuomenlinnaFortress owns this mapped defense.
 		var row: Array = BARRIERS.get(str((br as Dictionary).get("class", "")), [])
 		if row.is_empty():
 			continue

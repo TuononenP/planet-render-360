@@ -327,10 +327,19 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"monument": monument_kind(tags),
 	}
 	entry.merge(_roof_tags(tags))
+	entry.merge(fortification_tags(tags))
 	if str(entry["kind"]) in ["ship", "boat", "houseboat"]:
 		entry["vessel_kind"] = str(tags.get("ship:type", tags.get("seamark:ship:type", "motor"))) \
 			.strip_edges().to_lower().replace("-", "_").replace(" ", "_")
 	return entry
+
+## Preserve defensive construction independently of a building's present use.
+static func fortification_tags(tags: Dictionary) -> Dictionary:
+	var out := {}
+	for key in ["defensive_works", "bunker_type", "casemate"]:
+		if tags.has(key):
+			out[key] = str(tags[key])
+	return out
 
 ## Roof and vertical-extent keys shared by buildings and their parts:
 ## roof shape/colour/material as raw strings, metres and level counts

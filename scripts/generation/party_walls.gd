@@ -48,6 +48,8 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 		if not (b is Dictionary) or (accept.is_valid() and not bool(accept.call(b))):
 			continue
 		for m in BuildingMasses.plan(b, ctx):
+			if SuomenlinnaSite.fortress(m["b_eff"]):
+				continue
 			pw.add_mass(m, ground, float(ctx.get("sea_y", -INF)))
 	for r in data.roads:
 		var pts: Variant = r.get("points", null) if r is Dictionary else r

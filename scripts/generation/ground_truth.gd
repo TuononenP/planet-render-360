@@ -216,6 +216,7 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 			var swap := _surface
 			_surface = buf
 			buf = swap
+	SuomenlinnaSite.grade_gate(_surface, size, _step_units, data.buildings, data.latitude, data.longitude)
 	# Water polygons carve below their own bank-levelled surface, or
 	# the channel terrain covers the water entirely (v1 _heights, which
 	# carved to the global datum instead).

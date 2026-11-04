@@ -83,7 +83,7 @@ static func entries() -> Array:
 			"kind": "Monument", "aliases": ["sibelius monument", "sibelius-monumentti", "sibeliusmonumentet",
 				"sibelius park monument"]},
 		{"type": "suomenlinna_fortress", "name": "Suomenlinna Fortress", "lat": 60.14786, "lon": 24.98637,
-			"radius_m": 4500.0, "wiki_title": "Suomenlinna", "height_m": 42.0, "clear_m": 90.0,
+			"radius_m": 4500.0, "wiki_title": "Suomenlinna", "height_m": 42.0, "clear_m": 27.0,
 			"yaw_deg": -62.0, "kind": "Fortress", "aliases": ["suomenlinna fortress", "suomenlinna", "sveaborg",
 				"suomenlinnan kirkko", "king's gate, suomenlinna"]},
 		{"type": "helsinki_olympic_stadium", "name": "Helsinki Olympic Stadium", "lat": 60.18700, "lon": 24.92725,

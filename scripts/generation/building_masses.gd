@@ -173,6 +173,8 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 					if md[k] is String else float(md[k]) <= 0.0):
 				continue
 			b_eff[k] = md[k]
+		if bool(md.get("suomenlinna", false)):
+			b_eff["fortress_form"] = str(md.get("fortress_form", ""))
 		NycCrownMaterials.apply(b, md, b_eff)
 		NycWaterfrontMaterials.apply(b, md, b_eff)
 		var shape := parent_shape

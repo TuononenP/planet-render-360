@@ -40,8 +40,9 @@ static func _area_m2(b: Dictionary) -> float:
 ## ctx's city frame (cores / districts) feeds BuildingEra's distance cue.
 static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
 	var seed_v := TerrainBuilder._hash(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
-	return ArchitectureStyle.resolve(b, str(ctx["region"]), str(ctx["density"]),
-		seed_v, _area_m2(b), ctx)
+	var area := _area_m2(b)
+	var look := ArchitectureStyle.resolve(b, str(ctx["region"]), str(ctx["density"]), seed_v, area, ctx)
+	return SuomenlinnaSite.look(b, look, area)
 
 ## Per-build context: the style region and settlement density, plus the
 ## mapped and reference heights (in a 150 m spatial hash keyed by
@@ -127,6 +128,8 @@ static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		if levels > 0:
 			return {"total_m": float(levels) * float(look["floor_h"]),
 				"source": "levels"}
+	if bool(b.get("suomenlinna", false)):
+		return {"total_m": float(look["default_h"]), "source": "default"}
 	var est := _inferred_total(float(m.get("x", b.get("x", 0.0))),
 		float(m.get("z", b.get("z", 0.0))), ctx, look)
 	# A mall, shed or garage among towers is not a tower: the same-kind

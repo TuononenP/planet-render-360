@@ -2,8 +2,8 @@ class_name LandmarkFhHelsinkiMonuments
 extends RefCounted
 
 ## Four Finnish monuments in true metres: the Sibelius Monument (steel
-## organ pipes), the Suomenlinna sea fortress (church with its light
-## tower, rampart and King's Gate), the Helsinki Olympic Stadium with its
+## organ pipes), Suomenlinna church with its lighthouse tower, and
+## the Helsinki Olympic Stadium with its
 ## 72.71 m tower and the Hanko water tower.
 
 const FhU = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_util.gd")
@@ -75,20 +75,15 @@ static func sibelius(model: Node3D) -> void:
 
 # --- Suomenlinna ------------------------------------------------------
 
-## The sea fortress of Suomenlinna in one frame, origin at the church
-## (registry yaw -62, the church axis turned onto the map): the church
-## of 1854 with its 42 m central tower carrying the light of 1929, four
-## corner turrets, west porch and east apse, plus a stretch of granite
-## rampart with an earth bank, a bastion and the King's Gate. The gate and
-## rampart stand compressed beside the church (the real gate is ~900 m
-## south on Kustaanmiekka).
+## Present-day Suomenlinna church at its real site. The fortifications
+## and King's Gate are rendered from their mapped island footprints by
+## SuomenlinnaFortress, rather than compressed beside the church.
 static func suomenlinna(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Plaster", LandmarkMaterials.pbr("render", "#E6DDB8", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#F1ECDA", 2.5))
 	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#6E8F7C", 2.0, 0.5, 0.3))
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#7A7872", 4.0))
-	lm.use("Grass", LandmarkMaterials.pbr("grass", "#6D7A4A", 4.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2A3236"))
 	lm.use("Lamp", LandmarkMaterials.lit("#FFE9B8", 0.9))
 	# Church body 23 x 23 m on a granite plinth, low copper hip roof.
@@ -102,14 +97,13 @@ static func suomenlinna(model: Node3D) -> void:
 		var off := 11.75
 		for k in [-1.0, 1.0]:
 			FhU.opening(lm, "Glass", Vector3(0, 3.2, -0.1) + out * off + r * Vector3(k * 4.6, 0, 0), out, 2.0, 5.6)
-	# Four corner turrets, 4 x 4 m, under small copper spires.
+	# The four former onion-dome bases were lowered during the Lutheran
+	# conversion; only the central lighthouse tower rises above the roof.
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
 			var tc := Vector3(sx * 9.6, 0.0, sz * 9.6 - 0.1)
-			FhU.blk(lm, "Plaster", tc.x, 11.2, tc.z, 4.2, 6.6, 4.2)
-			FhU.blk(lm, "Trim", tc.x, 17.6, tc.z, 4.8, 0.5, 4.8)
-			FhU.hip(lm, "Copper", Vector3(tc.x, 18.1, tc.z), 4.6, 4.6, 4.4)
-			FhU.opening(lm, "Glass", Vector3(tc.x, 12.4, tc.z + sz * 2.12), Vector3(0, 0, sz), 1.0, 3.2)
+			FhU.blk(lm, "Plaster", tc.x, 10.8, tc.z, 4.2, 2.0, 4.2)
+			FhU.hip(lm, "Copper", Vector3(tc.x, 12.8, tc.z), 4.6, 4.6, 0.5)
 	# West porch and east apse.
 	FhU.blk(lm, "Plaster", -14.0, 1.0, 0.0, 6.0, 9.0, 9.0)
 	FhU.ridge_x(lm, "Copper", "Plaster", Vector3(-14.0, 10.0, 0.0), 6.0, 9.0, 3.2, 0.4)
@@ -160,23 +154,6 @@ static func suomenlinna(model: Node3D) -> void:
 				lm.beam("Granite", prev + Vector3(0, 1.2, 0), mid, 0.06, 0.06)
 				lm.beam("Granite", mid, cb + Vector3(0, 1.2, 0), 0.06, 0.06)
 			prev = cb
-	# Rampart: granite wall with merlons, earth bank behind, bastion at the end.
-	FhU.blk(lm, "Granite", 22.5, 0.0, 38.0, 85.0, 8.0, 5.0)
-	FhU.blk(lm, "Granite", 22.5, 8.0, 38.0, 86.0, 0.6, 5.8)
-	FhU.merlons(lm, "Granite", Vector3(-20.0, 8.6, 40.2), Vector3(65.0, 8.6, 40.2), 3.0, 1.6, 1.2, 1.0)
-	FhU.wedge(lm, "Grass", "Grass", -20.0, 65.0, 26.0, 35.5, 0.0, 0.5, 8.0)
-	lm.frustum("Granite", Vector3(62.0, 0.0, 42.0), 13.6, 11.5, 8.6, 5, 0.3)
-	lm.frustum("Grass", Vector3(62.0, 8.6, 42.0), 10.0, 9.6, 0.4, 5, 0.3)
-	# King's Gate: central block with its arched passage, wings and flagpole.
-	FhU.blk(lm, "Granite", 8.0, 0.0, 37.0, 13.0, 11.0, 8.0)
-	FhU.blk(lm, "Trim", 8.0, 11.0, 37.0, 14.0, 0.7, 9.0)
-	FhU.hip(lm, "Copper", Vector3(8.0, 11.7, 37.0), 13.6, 8.6, 3.0, 0.3)
-	FhU.opening(lm, "Glass", Vector3(8.0, 0.0, 41.05), Vector3(0, 0, 1), 4.2, 6.6)
-	FhU.opening(lm, "Glass", Vector3(8.0, 0.0, 32.95), Vector3(0, 0, -1), 4.2, 6.6)
-	for s in [-1.0, 1.0]:
-		FhU.blk(lm, "Granite", 8.0 + s * 9.0, 0.0, 37.0, 5.0, 8.0, 7.0)
-		FhU.blk(lm, "Trim", 8.0 + s * 9.0, 8.0, 37.0, 5.6, 0.5, 7.6)
-	lm.box("Trim", Vector3(8.0, 17.0, 37.0), Vector3(0.18, 5.0, 0.18))
 	lm.commit(model)
 
 # --- Helsinki Olympic Stadium -------------------------------------------

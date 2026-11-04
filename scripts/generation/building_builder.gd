@@ -151,6 +151,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var cap := RenderSettings.max_buildings_for(data.quality_preset)
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
+	if data.buildings.any(func(b: Dictionary) -> bool: return bool(b.get("suomenlinna", false))):
+		ctx["fortress_mesh"] = SuomenlinnaFortress.accumulator()
 	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
 	# The landmark's own OSM footprint (e.g. the cathedral as one beige
 	# box) must not duplicate the procedural landmark model.
@@ -227,6 +229,9 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	_covers.clear()
 	BuildingMasses.end_build()
 	impostor.commit(root, "Impostor")
+	if ctx.has("fortress_mesh"):
+		SuomenlinnaFortress.add_walls(ctx["fortress_mesh"], data, ground)
+		SuomenlinnaFortress.finish(ctx["fortress_mesh"], root, data.quality_preset)
 	if aabb_fallbacks > 0:
 		push_warning("BuildingBuilder: %d of %d real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle)."
 			% [aabb_fallbacks, placed])
@@ -245,6 +250,9 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 		MeshArrays.hold()
 	for m in BuildingMasses.plan(b, ctx):
 		var md := m as Dictionary
+		if ctx.has("fortress_mesh") and SuomenlinnaFortress.build_mass(ctx["fortress_mesh"], md, data, ground):
+			done = true
+			continue
 		if RenderQuality.ultra_desktop(data.quality_preset) and NycCrownMaterials.is_civic_fame(b, md):
 			var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
 			NycCrownMaterials.civic_fame(root, md["centre"], float(footing["floor"]) + float(md["min_m"]) * m2u)
@@ -567,6 +575,8 @@ static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Diction
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			var md := m as Dictionary
+			if SuomenlinnaSite.fortress(md["b_eff"]):
+				continue
 			var ring: PackedVector2Array = md["ring"]
 			var height_world := float(md["wall_m"]) * m2u
 			var party := PackedByteArray()

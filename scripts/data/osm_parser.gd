@@ -118,7 +118,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
 			if str(el_tags.get("type", "")) == "multipolygon" \
-					and el.has("members") and el_tags.has("building"):
+					and el.has("members") and (el_tags.has("building") or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
 				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
 					buildings, landmarks)
 			elif str(el_tags.get("type", "")) == "multipolygon" \
@@ -127,7 +127,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				# each outer nests like a part way, carrying its inners.
 				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
 					var pr: PackedVector2Array = r["outer"]
-					part_ways.append({"tags": el_tags, "points": pr,
+					part_ways.append({"tags": el_tags, "points": pr, "osm_id": source_id,
 						"aabb": OsmGeometry._ring_aabb(pr), "holes": r["holes"]})
 			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members") and OsmTags.paved_area_class(el_tags, true) != "":
@@ -200,7 +200,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				_framed_landmark(lmk, poly, entry["height_source"] != "default")
 				landmarks.append(lmk)
 		elif el_tags.has("building:part"):
-			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb})
+			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb, "osm_id": source_id})
 		elif el_tags.has("highway"):
 			# A closed highway area (a square) is filled, not outlined.
 			var sq := OsmTags.paved_area_class(el_tags)
@@ -228,10 +228,14 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				"width_m": OsmTags._tag_metres(el_tags.get("width", ""), 0.5, 40.0)})
 		elif el_tags.has("barrier"):
 			barriers.append({"points": poly,
+				"osm_id": source_id,
 				"class": str(el_tags.get("barrier", "yes")),
 				"height_m": OsmTags._tag_metres(el_tags.get("height", ""), 0.1, 30.0),
 				"material": str(el_tags.get("material", "")),
 				"fence_type": str(el_tags.get("fence_type", ""))})
+			(barriers.back() as Dictionary).merge(OsmTags.fortification_tags(el_tags))
+		elif el_tags.has("defensive_works") and OsmGeometry._is_closed(poly) and poly.size() >= 4:
+			buildings.append(OsmTags._building_entry(el_tags, poly, aabb))
 		else:
 			var arch2 := OsmTags.archetype_for(el_tags)
 			if arch2 != "":
@@ -263,6 +267,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	RoadWidths.from_sidewalks(roads, trees)
 	_nest_parts(buildings, part_ways)
 	BuildingReferences.apply(buildings)
+	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
 	_monument_landmarks(buildings, landmarks)
 	LandmarkFidelity.mark(buildings, landmarks)
 	return {"buildings": buildings, "roads": roads, "land": land,
@@ -403,6 +408,7 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 			var orphan := OsmTags._building_entry(tags, pts, paabb)
 			orphan["holes"] = pw.get("holes", [])
 			orphan["orphan_part"] = true
+			orphan["osm_id"] = str(pw.get("osm_id", ""))
 			buildings.append(orphan)
 			boxes.append(paabb)
 			continue
@@ -422,6 +428,11 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 		}
 		# Parts carry their own roof (domes, towers, stepped wings).
 		part.merge(OsmTags._roof_tags(tags))
+		part.merge(OsmTags.fortification_tags(tags))
+		part["osm_id"] = str(pw.get("osm_id", ""))
+		for key in ["name", "building", "amenity", "tourism"]:
+			if tags.has(key):
+				part[{"building": "kind", "amenity": "use", "tourism": "use"}.get(key, key)] = str(tags[key])
 		(parent["parts"] as Array).append(part)
 	_ground_orphans(buildings)
 
