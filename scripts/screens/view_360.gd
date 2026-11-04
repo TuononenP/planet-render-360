@@ -779,6 +779,15 @@ func _gui_input(event: InputEvent) -> void:
 
 ## Any input while the view is up brings the HUD back (ViewChrome.wake).
 func _input(event: InputEvent) -> void:
+	if OS.has_environment("PR360_TRACE_MOVEMENT") and event is InputEventKey and event.pressed \
+			and not event.echo and event.keycode in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_E, KEY_Q]:
+		var owner := get_viewport().gui_get_focus_owner()
+		print("MOVEMENT TRACE key=", event.keycode, " physical=", event.physical_keycode,
+			" held=", Input.is_key_pressed(event.keycode), " free=", ViewWalk.keys_free(self),
+			" focus=", owner, " ctrl=", Input.is_key_pressed(KEY_CTRL),
+			" alt=", Input.is_key_pressed(KEY_ALT), " meta=", Input.is_key_pressed(KEY_META),
+			" visible=", is_visible_in_tree(), " drone=", _drone.on,
+			" position=", _rig.position if _rig != null else "no rig")
 	if is_visible_in_tree() and (event is InputEventMouseMotion or event is InputEventMouseButton \
 			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
 		ViewChrome.wake(self)
