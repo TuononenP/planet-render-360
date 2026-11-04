@@ -22,6 +22,8 @@ func _init() -> void:
 		_check(p.z>0 and absf(sin(float(boat[1])))<0.001, "Quay boats must lie parallel on the wet side")
 		_check(str(boat[3]) in ["steam","houseboat","yacht"], "Quay-side fleet must use steamer, houseboat or yacht silhouettes")
 		_check(g.water_at(p.x,p.z)>0.3, "A berth must be in mapped water")
+	_check(QuayMoorings._liner_deep(1.9999998, 1.0), "Rounding at the two-metre depth must not reject a berth")
+	_check(not QuayMoorings._liner_deep(1.99, 1.0), "Water measurably below the depth requirement must reject a berth")
 	var liners: Array = first["liners"]
 	_check(liners.size() == 1, "A long straight tidal quay should berth one cruise liner, got %d" % liners.size())
 	for l in liners:
@@ -31,6 +33,33 @@ func _init() -> void:
 		for boat in boats:
 			var bp: Vector3 = boat[0]
 			_check(Vector2(bp.x - lp.x, bp.z - lp.z).length() > float(l[2]) * 0.5 * 0.5, "Small craft must not overlap the liner")
+	_check(not liners.is_empty() and liners[0][6] == "liner", "A sea quay without a terminal gets a liner")
+	d.pois = [{"kind": "ferry_terminal", "x": -200.0, "z": -20.0}]
+	var ferry_plan: Array = MarinaBuilder.plan(d, g, 1.0)["liners"]
+	_check(ferry_plan.size() == 1 and ferry_plan[0][6] == "ferry", "A nearby terminal selects a passenger ferry")
+	_check(ferry_plan == MarinaBuilder.plan(d, g, 1.0)["liners"], "Ferry berths must be deterministic")
+	d.shore_structures = [
+		{"kind":"quay", "points":PackedVector2Array([Vector2(-450,0), Vector2(-220,0)])},
+		{"kind":"quay", "points":PackedVector2Array([Vector2(-215,0), Vector2(50,0)])}]
+	_check((MarinaBuilder.plan(d, g, 1.0)["liners"] as Array).size() == 1, "Aligned quay fragments should join into a berth")
+	d.shore_structures = [{"kind":"quay","points":PackedVector2Array([Vector2(-450,0),Vector2(50,0)])}]
+	if not ferry_plan.is_empty():
+		var fp: Vector3 = ferry_plan[0][0]
+		d.buildings = [{"kind":"ship", "x":fp.x, "z":fp.z, "size_x":200.0, "size_z":25.0}]
+		_check((MarinaBuilder.plan(d, g, 1.0)["liners"] as Array).is_empty(), "Mapped vessels must prevent duplicate large ships")
+		d.buildings = [{"name": "Staten Island Ferry Whitehall Terminal", "use": "ferry_terminal", "x": fp.x, "z": fp.z}]
+		_check(QuayMoorings._mapped_ship_near(d, Vector2(fp.x, fp.z), 200.0, 1.0), "Existing Staten Island ferry scenery keeps its own berth")
+		d.buildings = []
+	d.pois = []
+	var coast := PackedVector2Array([Vector2(-450,0), Vector2(50,0)])
+	d.shore_structures = []
+	d.waterways = [{"class": "coastline", "points": coast}]
+	_check(QuayMoorings._quay_lines(d, 1.0).is_empty(), "Natural coast without a terminal must not become a berth")
+	d.pois = [{"kind": "ferry_terminal", "x": -200.0, "z": -20.0}]
+	_check(not QuayMoorings._quay_lines(d, 1.0).is_empty(), "Terminal shoreline supplies berths when no quay is mapped")
+	d.waterways = []
+	d.pois = []
+	d.shore_structures = [{"kind":"quay","points":coast}]
 	var again: Array = MarinaBuilder.plan(d,g,1.0)["boats"]
 	_check(again==boats, "Same map must produce the same berths")
 	var root := Node3D.new()

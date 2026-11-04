@@ -295,8 +295,10 @@ houseboats and large yachts within the marina's 800 m eye radius. These berths
 require mapped water, a dry bank, hull clearance and shared boat occupancy;
 natural shores and ornamental pools are excluded. Long (170 m+), straight
 mapped quays on tidal water with a clear fairway also berth up to two procedural
-cruise liners (140-300 m, `QuayMoorings.liners`, up to 1200 m from the eye,
-never beside lake water). Vessels are lofted hulls (`HullLoft`) with per-type
+large vessels (140-300 m, `QuayMoorings.liners`, up to 1200 m from the eye,
+never beside lake water). Nearby mapped passenger terminals select a ferry
+silhouette and also allow suitable terminal-adjacent shorelines when a quay is
+not mapped; aligned quay fragments can be joined. Mapped ships take precedence. Vessels are lofted hulls (`HullLoft`) with per-type
 models: `CruiseLinerModel`, `PassengerVesselModel` (classic coastal ship,
 houseboat, tall ship), `MotorYachtModel` (flybridge, sport, runabout, RIB,
 console) and `SailYachtModel`, sharing `VesselMaterials`/`VesselKit`. Marina

@@ -75,6 +75,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		if _length(pts) < MIN_PIER_M * m2u:
 			continue
 		decks.append(_deck(pts, ground, m2u, taken))
+	# Reserve large berths before filling the harbour with small craft.
+	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
 	var k := 0
 	for p in piers:
 		var pts: PackedVector2Array = (p as Dictionary)["points"]
@@ -122,7 +124,6 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 					len_m / MESH_LEN_M * m2u, kind, col])
 			slot += 1
 			t += (widest + GAP_M) * m2u
-	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
 	boats.append_array(QuayMoorings.plan(data, ground, taken, m2u, mask))
 	boats.sort_custom(func(a: Array, b: Array) -> bool:
 		return Vector2((a[0] as Vector3).x - centre.x, (a[0] as Vector3).z - centre.y).length_squared() \
@@ -174,8 +175,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			holder.add_child(mmi)
 	for l in liners:
+		var ferry: bool = l.size() > 6 and l[6] == "ferry"
+		var hull := "#f0eee8" if ferry else CruiseLinerModel.hull_hex(float(l[5]) * 4.0)
 		var lm := VesselPrototypes.geometry("liner", float(l[2]), float(l[3]), float(l[4]),
-			VesselMaterials.paint(CruiseLinerModel.hull_hex(float(l[5]) * 4.0), true, 0.42, 0.05), true, true, float(l[5]))
+			VesselMaterials.paint(hull, true, 0.42, 0.05), true, true, float(l[5]), "ferry" if ferry else "")
 		var parts := lm.commit(holder, "Liner_")
 		VesselPrototypes.snow_parts(parts)
 		for part in parts:
@@ -183,6 +186,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 			part.rotation.y = float(l[1])
 			part.scale = Vector3.ONE * m2u
 			part.set_meta("procedural_liner", true)
+			part.set_meta("vessel_model", "ferry" if ferry else "liner")
 	root.add_child(holder)
 	return boats.size() + liners.size()
 

@@ -25,6 +25,7 @@ static func geometry(model: String, length: float, beam: float, h: float, hull: 
 		"maps": maps, "seed": seed_value, "ultra": detail and MaterialLibrary.hi_res}
 	match model:
 		"liner":
+			p["ferry"] = variant == "ferry"
 			CruiseLinerModel.build(lm, p)
 		"houseboat", "tall_ship":
 			p["variant"] = model

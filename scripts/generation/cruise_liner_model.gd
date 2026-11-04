@@ -43,6 +43,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	var y0 := hull_h + 0.02
 	var front0 := length * 0.27
 	var aft0 := -length * 0.44
+	var ferry: bool = p.get("ferry", false)
 	var deck_tops: Array[float] = []
 	var fronts: Array[float] = []
 	var afts: Array[float] = []
@@ -50,7 +51,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	for i in n:
 		var front := front0 - float(i) * length * 0.006
 		var aft := aft0
-		if i >= int(n * 0.55):
+		if not ferry and i >= int(n * 0.55):
 			aft = aft0 + float(i - int(n * 0.55) + 1) * length * 0.04
 		var w := beam * (0.975 if i == 0 else (0.86 if i == 1 else 0.95))
 		if i >= n - 2:
@@ -75,7 +76,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 			if i >= 1:
 				VesselKit.windows(lm, afts[i] + 1.5, fronts[i] - 1.0, w * 0.5, yb + dh * 0.28, yb + dh * 0.78, 0.0)
 			lm.box("White", Vector3(cx, yb + dh - 0.04, 0), Vector3(l + 0.3, 0.08, w + 0.3), Basis(), 0.0)
-		if detail and i >= 2 and i < n - 2:
+		if detail and not ferry and i >= 2 and i < n - 2:
 			for side in [-1.0, 1.0]:
 				var z: float = float(side) * (w * 0.5 + 0.1)
 				HullLoft.tube(lm, "Steel", [Vector3(afts[i] + 1.5, yb + dh * 0.4, z),
@@ -124,7 +125,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 		Vector3(fronts[bi] + 0.02, bridge_y + dh * 0.82, -widths[bi] * 0.5), Vector3.RIGHT)
 	# Aft terraces carry the pool deck.
 	var pool_i := int(n * 0.55)
-	if pool_i < n:
+	if not ferry and pool_i < n:
 		var pool_y: float = deck_tops[pool_i - 1] + 0.05
 		var pool_length := maxf(0.5, minf(length * 0.07, afts[pool_i] - afts[pool_i - 1] - 1.0))
 		lm.box("Pool", Vector3((afts[pool_i] + afts[pool_i - 1]) * 0.5, pool_y + 0.03, 0), Vector3(pool_length, 0.06, beam * 0.3), Basis(), 0.0)
