@@ -35,6 +35,7 @@ mono_crash.*.json
 
 # Build output (exports live outside the repo; never commit them)
 build/
+/output/
 *.app/
 DerivedData/
 
