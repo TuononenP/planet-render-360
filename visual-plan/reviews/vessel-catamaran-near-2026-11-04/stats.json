@@ -1,0 +1,609 @@
+{
+  "monaco_catamaran_deck_0": {
+    "all": {
+      "colourful": 0.154464753961087,
+      "luma": 0.554483728115836,
+      "sat": 0.279394426993007
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.668124024993365,
+      "world_x": -133.377578735352,
+      "world_y": -42.2324600219727,
+      "world_z": 109.067825317383,
+      "yaw_rad": 0.380506377112365
+    },
+    "flags": [
+      "luma 0.554 outside refs 0.290–0.419"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.165344791842851,
+      "luma": 0.468413778793313,
+      "sat": 0.350491366001611
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.151016506294368,
+      "luma": 0.639393218206512,
+      "sat": 0.230130474585721
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.140889277823244,
+      "luma": 0.567774114503541,
+      "sat": 0.250523732904876
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_catamaran_deck_1": {
+    "all": {
+      "colourful": 0.152747098870653,
+      "luma": 0.549644536280017,
+      "sat": 0.273213648048633
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.668124024993365,
+      "world_x": 43.0674514770508,
+      "world_y": -42.3301620483398,
+      "world_z": 135.913482666016,
+      "yaw_rad": 0.380506377112365
+    },
+    "flags": [
+      "luma 0.550 outside refs 0.290–0.419"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.118834548801063,
+      "luma": 0.418238692790543,
+      "sat": 0.424354605707235
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.126717356257305,
+      "luma": 0.600816543821237,
+      "sat": 0.204488518275974
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.121898160010824,
+      "luma": 0.637188659019849,
+      "sat": 0.180979944480817
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_catamaran_deck_2": {
+    "all": {
+      "colourful": 0.133551825500238,
+      "luma": 0.629795852880302,
+      "sat": 0.198997550790611
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.668124024993365,
+      "world_x": 61.2208290100098,
+      "world_y": -43.8245697021484,
+      "world_z": 231.01823425293,
+      "yaw_rad": 0.380506377112365
+    },
+    "flags": [
+      "luma 0.630 outside refs 0.290–0.419",
+      "sat 0.199 outside refs 0.274–0.300"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.118330070553325,
+      "luma": 0.716484063938598,
+      "sat": 0.165233729495395
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.152049926530956,
+      "luma": 0.581546488912613,
+      "sat": 0.234769259466733
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.130519270425968,
+      "luma": 0.584464239508677,
+      "sat": 0.202099907506292
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_close1": {
+    "all": {
+      "colourful": 0.098700411474355,
+      "luma": 0.397092057092505,
+      "sat": 0.22176683866031
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 25.0,
+      "pitch_rad": 0.0,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -0.436332315206528
+    },
+    "flags": [
+      "sat 0.222 outside refs 0.274–0.300"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.112049505460801,
+      "luma": 0.280185320538502,
+      "sat": 0.348773162083084
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.117020709097755,
+      "luma": 0.358843885053817,
+      "sat": 0.202349733461714
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.0527795540494359,
+      "luma": 0.546782941108242,
+      "sat": 0.111403748264898
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_close2": {
+    "all": {
+      "colourful": 0.147985967189297,
+      "luma": 0.218424440219582,
+      "sat": 0.480241255079255
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 35.0,
+      "pitch_rad": -0.3,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -0.436332315206528
+    },
+    "flags": [
+      "luma 0.218 outside refs 0.290–0.419",
+      "sat 0.480 outside refs 0.274–0.300"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.117413263797534,
+      "luma": 0.175780896188737,
+      "sat": 0.518339101730135
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.192745855914915,
+      "luma": 0.154443534910097,
+      "sat": 0.668144296177255
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.119195666835514,
+      "luma": 0.315908760230004,
+      "sat": 0.281083658915806
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_h000": {
+    "all": {
+      "colourful": 0.105017020273086,
+      "luma": 0.382980346316738,
+      "sat": 0.291065186790572
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": 0.0
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.127833515494111,
+      "luma": 0.215185395493853,
+      "sat": 0.471158057033666
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.0978851564934655,
+      "luma": 0.283826041319564,
+      "sat": 0.308788594490455
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.042706177422674,
+      "luma": 0.635764701422941,
+      "sat": 0.0957808242333096
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_h090": {
+    "all": {
+      "colourful": 0.185635701940173,
+      "luma": 0.514631362390619,
+      "sat": 0.270809454318919
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -1.5707963267949
+    },
+    "flags": [
+      "luma 0.515 outside refs 0.290–0.419",
+      "colourful 0.186 outside refs 0.102–0.141"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.233101355031975,
+      "luma": 0.329047315030764,
+      "sat": 0.462071037137843
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.177414065469905,
+      "luma": 0.555553309140378,
+      "sat": 0.262492849843073
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.0198864330532581,
+      "luma": 0.665139455393428,
+      "sat": 0.0866763896221287
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_h180": {
+    "all": {
+      "colourful": 0.13413427186971,
+      "luma": 0.516275763253478,
+      "sat": 0.233815253892844
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -3.14159265358979
+    },
+    "flags": [
+      "luma 0.516 outside refs 0.290–0.419"
+    ],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.196151087302405,
+      "luma": 0.311486173524272,
+      "sat": 0.43431058051483
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.121945324878456,
+      "luma": 0.587782778695079,
+      "sat": 0.170224558011478
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.0198052461160673,
+      "luma": 0.659773625461176,
+      "sat": 0.0878262380263172
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_h270": {
+    "all": {
+      "colourful": 0.0935767328532206,
+      "luma": 0.393000803460649,
+      "sat": 0.259221441241804
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.06,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -4.71238898038469
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.0997590918235119,
+      "luma": 0.229684255360746,
+      "sat": 0.398515995935004
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.104938484153632,
+      "luma": 0.319628991580121,
+      "sat": 0.267676885717892
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.0662163501759645,
+      "luma": 0.619207476029563,
+      "sat": 0.112679362711963
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vantage": {
+    "all": {
+      "colourful": 0.126835304862327,
+      "luma": 0.424275087314669,
+      "sat": 0.285293305134089
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -0.436332315206528
+    },
+    "flags": [],
+    "local_hour": 19.0,
+    "lower": {
+      "colourful": 0.175020199450194,
+      "luma": 0.209874238467608,
+      "sat": 0.548922014326453
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.0919982370477026,
+      "luma": 0.41221133339608,
+      "sat": 0.20440855119191
+    },
+    "season": 1,
+    "sun_elevation_deg": 11.2282178695222,
+    "upper": {
+      "colourful": 0.0325662625591797,
+      "luma": 0.649016296663312,
+      "sat": 0.0909943850350223
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vantage_noon": {
+    "all": {
+      "colourful": 0.153749277358147,
+      "luma": 0.676503545187054,
+      "sat": 0.225539378239125
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": 0.0,
+      "world_x": 0.0,
+      "world_y": 34.0214614868164,
+      "world_z": 0.0,
+      "yaw_rad": -0.436332315206528
+    },
+    "flags": [
+      "luma 0.677 outside refs 0.290–0.419",
+      "sat 0.226 outside refs 0.274–0.300"
+    ],
+    "local_hour": 12.5356796264648,
+    "lower": {
+      "colourful": 0.188899360530531,
+      "luma": 0.529212104300831,
+      "sat": 0.416637220467787
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.146750363726172,
+      "luma": 0.702247175152419,
+      "sat": 0.187696692794182
+    },
+    "season": 1,
+    "sun_elevation_deg": 69.7070706906792,
+    "upper": {
+      "colourful": 0.049712970023947,
+      "luma": 0.801729017531663,
+      "sat": 0.0668781235347055
+    },
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vessel_0": {
+    "all": {
+      "colourful": 0.167128568843626,
+      "luma": 0.529543027538373,
+      "sat": 0.311835417891366
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.343580813933906,
+      "world_x": -126.386993408203,
+      "world_y": -37.9630165100098,
+      "world_z": 120.681732177734,
+      "yaw_rad": 0.463647609000806
+    },
+    "flags": [
+      "luma 0.530 outside refs 0.290–0.419",
+      "colourful 0.167 outside refs 0.102–0.141"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.160549916326338,
+      "luma": 0.47650663017428,
+      "sat": 0.345884574968025
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.137288633033992,
+      "luma": 0.584953730274132,
+      "sat": 0.23494234877834
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.162203294074711,
+      "luma": 0.535084536843216,
+      "sat": 0.343694605768696
+    },
+    "vessel_source": "Boats_catamaran",
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vessel_1": {
+    "all": {
+      "colourful": 0.153245679984874,
+      "luma": 0.546780325985623,
+      "sat": 0.265733160457568
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.343580813933906,
+      "world_x": 49.8123931884766,
+      "world_y": -37.8036727905273,
+      "world_z": 147.048370361328,
+      "yaw_rad": 0.463647609000806
+    },
+    "flags": [
+      "luma 0.547 outside refs 0.290–0.419"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.134543157133865,
+      "luma": 0.451833409606225,
+      "sat": 0.357027584646822
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.11874552910927,
+      "luma": 0.630137829865957,
+      "sat": 0.176740178360258
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.132561252709402,
+      "luma": 0.570277953324822,
+      "sat": 0.250718435208887
+    },
+    "vessel_source": "Boats_catamaran",
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vessel_2": {
+    "all": {
+      "colourful": 0.1518633653726,
+      "luma": 0.599456868269692,
+      "sat": 0.233924752034118
+    },
+    "camera": {
+      "centre_lat": 43.731,
+      "centre_lon": 7.4209,
+      "fov_deg": 70.0,
+      "pitch_rad": -0.343580813933906,
+      "world_x": 67.2051620483398,
+      "world_y": -39.5567398071289,
+      "world_z": 240.924652099609,
+      "yaw_rad": 0.463647609000806
+    },
+    "flags": [
+      "luma 0.599 outside refs 0.290–0.419"
+    ],
+    "local_hour": 12.0,
+    "lower": {
+      "colourful": 0.149686345993468,
+      "luma": 0.615778808536561,
+      "sat": 0.239631663260214
+    },
+    "marina_draw_budget": 80,
+    "marina_draw_calls": 74,
+    "middle": {
+      "colourful": 0.135886098993043,
+      "luma": 0.577318954877704,
+      "sat": 0.21951056194445
+    },
+    "season": 1,
+    "sun_elevation_deg": 68.6583237408379,
+    "upper": {
+      "colourful": 0.144473288223643,
+      "luma": 0.602110282338913,
+      "sat": 0.240572860884892
+    },
+    "vessel_source": "Boats_catamaran",
+    "wire_draw_budget": 12,
+    "wire_draw_calls": 0
+  },
+  "monaco_vessel_candidates": 40,
+  "monaco_vessel_inventory": {
+    "Boats_catamaran": 5,
+    "Boats_catamaran_far": 5,
+    "Boats_day": 19,
+    "Boats_day_far": 81,
+    "Boats_houseboat": 1,
+    "Boats_motor": 18,
+    "Boats_motor_far": 53,
+    "Boats_rib": 30,
+    "Boats_rib_far": 48,
+    "Boats_sail": 14,
+    "Boats_sail_far": 67,
+    "Boats_steam": 6,
+    "Boats_yacht": 16,
+    "Boats_yacht_far": 77
+  }
+}

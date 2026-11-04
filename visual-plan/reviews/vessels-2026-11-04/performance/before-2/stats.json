@@ -1,0 +1,137 @@
+{
+	"fleet_build_us": 234,
+	"fleet_cpu_ms": 0.198633332219389,
+	"fleet_frame_ms": 8.32606666666667,
+	"fleet_gpu_ms": 0.0,
+	"fleet_surfaces": 99,
+	"models": {
+		"console": {
+			"build_us": 1216,
+			"far": 432,
+			"near": 776
+		},
+		"ferry": {
+			"build_us": 83172,
+			"far": 1620,
+			"near": 1620
+		},
+		"flybridge": {
+			"build_us": 1765,
+			"far": 390,
+			"near": 1250
+		},
+		"houseboat": {
+			"build_us": 956,
+			"far": 274,
+			"near": 646
+		},
+		"liner": {
+			"build_us": 443986,
+			"far": 936,
+			"near": 14584
+		},
+		"passenger": {
+			"build_us": 5260,
+			"far": 636,
+			"near": 3824
+		},
+		"rib": {
+			"build_us": 1783,
+			"far": 720,
+			"near": 1244
+		},
+		"runabout": {
+			"build_us": 1165,
+			"far": 404,
+			"near": 748
+		},
+		"sail_yacht": {
+			"build_us": 1961,
+			"far": 480,
+			"near": 1432
+		},
+		"sport": {
+			"build_us": 1310,
+			"far": 332,
+			"near": 872
+		},
+		"tall_ship": {
+			"build_us": 2900,
+			"far": 638,
+			"near": 2302
+		}
+	},
+	"prototypes": {
+		"day": {
+			"build_us": 4679,
+			"surfaces": 6,
+			"triangles": 812
+		},
+		"day_far": {
+			"build_us": 3176,
+			"surfaces": 5,
+			"triangles": 404
+		},
+		"houseboat": {
+			"build_us": 4545,
+			"surfaces": 8,
+			"triangles": 598
+		},
+		"houseboat_far": {
+			"build_us": 3611,
+			"surfaces": 7,
+			"triangles": 274
+		},
+		"motor": {
+			"build_us": 18011,
+			"surfaces": 7,
+			"triangles": 840
+		},
+		"motor_far": {
+			"build_us": 8581,
+			"surfaces": 7,
+			"triangles": 332
+		},
+		"rib": {
+			"build_us": 5764,
+			"surfaces": 6,
+			"triangles": 1308
+		},
+		"rib_far": {
+			"build_us": 4642,
+			"surfaces": 6,
+			"triangles": 720
+		},
+		"sail": {
+			"build_us": 7748,
+			"surfaces": 8,
+			"triangles": 1336
+		},
+		"sail_far": {
+			"build_us": 4536,
+			"surfaces": 8,
+			"triangles": 480
+		},
+		"steam": {
+			"build_us": 6555,
+			"surfaces": 9,
+			"triangles": 1120
+		},
+		"steam_far": {
+			"build_us": 4294,
+			"surfaces": 8,
+			"triangles": 556
+		},
+		"yacht": {
+			"build_us": 7345,
+			"surfaces": 7,
+			"triangles": 898
+		},
+		"yacht_far": {
+			"build_us": 5215,
+			"surfaces": 7,
+			"triangles": 390
+		}
+	},
+	"renderer": "forward_plus"
+}

@@ -18,6 +18,7 @@ extends RefCounted
 ## One MultiMesh per kind, true-metre meshes, nearest MAX_BOATS kept.
 ## Boats under 9 m are runabouts / consoles / RIBs, 9-14 m sport cruisers,
 ## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
+## Coastal Mediterranean marinas also berth 10–22 m cruising catamarans.
 ## Boats beyond NEAR_M of the eye use a "_far" mesh without rails, rigging
 ## and mullions. Cruise liners (QuayMoorings.liners) are committed one by
 ## one, outside the MultiMesh budget.
@@ -59,6 +60,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var near2 := pow(NEAR_M * m2u, 2.0)
+	var cats := mediterranean(data)
 	var piers: Array = []
 	for p in data.piers:
 		var pts: PackedVector2Array = (p as Dictionary).get("points", PackedVector2Array())
@@ -95,7 +97,12 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			for side: float in [-1.0, 1.0]:
 				var h := _hash(pos.x, pos.y, float(k * 7 + slot) + (0.5 if side > 0.0 else 0.0))
 				var len_m := 5.0 + 24.0 * h * h
-				var beam_m := 0.3 * len_m
+				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < SAIL_SHARE
+				var pick := _hash(pos.x + 1.7, pos.y, float(slot))
+				var kind := _kind(len_m, sail, pick)
+				if cats and sail and len_m >= 10.0 and len_m <= 22.0 and pick < 0.35:
+					kind = "catamaran"
+				var beam_m := (CatamaranModel.BERTH_BEAM_SHARE if kind == "catamaran" else 0.3) * len_m
 				widest = maxf(widest, beam_m)
 				var stern: Vector2 = pos + nrm * side * (DECK_W_M * 0.5 + 0.5) * m2u
 				var out := nrm * side
@@ -103,12 +110,12 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				if not _wet(ground, stern, m2u, y_ref, mask, true) or not _wet(ground, bow, m2u, y_ref, mask) \
 						or not _wet(ground, stern + out * len_m * 0.5 * m2u, m2u, y_ref, mask):
 					continue
-				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
-				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m, m2u):
+				if kind == "catamaran" and not _wide_wet(ground, stern, out, len_m, beam_m, m2u, y_ref, mask):
 					continue
-				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < SAIL_SHARE
+				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
+				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m + (CELL_M * 2.0 if kind == "catamaran" else 0.0), m2u):
+					continue
 				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
-				var kind := _kind(len_m, sail, _hash(pos.x + 1.7, pos.y, float(slot)))
 				if (stern - centre).length_squared() > near2:
 					kind += "_far"
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
@@ -278,6 +285,32 @@ static func _deck(pts: PackedVector2Array, ground: GroundTruth, m2u: float, take
 			w += 0.45
 		t += 3.0 * m2u
 	return out
+
+## Mediterranean scenery requires coastal evidence, excluding inland lakes
+## and the Atlantic coast west/north of the Strait of Gibraltar.
+static func mediterranean(data: LocationData) -> bool:
+	if data.latitude < 30.0 or data.latitude > 46.0 or data.longitude < -5.6 or data.longitude > 36.5:
+		return false
+	if data.longitude < 0.0 and data.latitude > 42.0:
+		return false
+	if data.country in ["BG", "RO", "UA", "RU", "GE"]:
+		return false
+	if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data):
+		return true
+	for poly in data.land_polygons:
+		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)):
+			return true
+	return false
+
+static func _wide_wet(ground: GroundTruth, stern: Vector2, out: Vector2, length: float, beam: float,
+		m2u: float, y_ref: float, mask: VegetationMask) -> bool:
+	var cross := Vector2(-out.y, out.x)
+	for along in [0.08, 0.5, 0.95]:
+		for side in [-0.5, 0.5]:
+			var p := stern + (out * length * float(along) + cross * beam * float(side)) * m2u
+			if not _wet(ground, p, m2u, y_ref, mask):
+				return false
+	return true
 
 ## Prototype kind for a berth of `len_m`; `pick` splits the small boats.
 static func _kind(len_m: float, sail: bool, pick: float) -> String:

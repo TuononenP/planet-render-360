@@ -9,7 +9,7 @@ static var _cache := {}
 static var _mutex := Mutex.new()
 
 const PAINTS := {
-	"white": ["#e9e7df", 0.42, 0.04], "cream": ["#d8d2bd", 0.5, 0.04],
+	"white": ["#e9e7df", 0.27, 0.0], "cream": ["#d8d2bd", 0.5, 0.04],
 	"steel": ["#c3c8ca", 0.28, 0.85], "dark": ["#26292c", 0.5, 0.1],
 	"black": ["#15171a", 0.55, 0.1], "orange": ["#e0651c", 0.5, 0.05],
 	"grey_deck": ["#7e8885", 0.7, 0.05], "pool": ["#2f8fb0", 0.12, 0.0],
@@ -29,16 +29,21 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 	var m: StandardMaterial3D
 	match name:
 		"glass":
-			m = LandmarkMaterials.glass("#22343f")
+			m = StandardMaterial3D.new()
+			m.albedo_color = Color("#263d4a")
+			m.roughness = 0.13
+			m.metallic = 0.18
+			m.clearcoat_enabled = true
+			m.clearcoat = 0.7
 		"teak":
 			m = StandardMaterial3D.new()
-			m.albedo_texture = MaterialLibrary._set_tex("wood", "diff")
-			m.albedo_color = LandmarkMaterials.tint("wood", "#8a7860")
-			m.uv1_scale = Vector3.ONE * 0.5
+			m.albedo_texture = _teak()
+			m.uv1_scale = Vector3(1.0, 0.5, 1.0)
 			m.roughness = 0.8
 			if maps:
 				m.normal_texture = MaterialLibrary._set_tex("wood", "nor")
 				m.normal_enabled = true
+				m.normal_scale = 0.2
 			RoofVariety.mark(m)
 		"canvas":
 			m = StandardMaterial3D.new()
@@ -52,15 +57,42 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 			m.vertex_color_use_as_albedo = true
 			m.roughness = 0.28
 			m.metallic = 0.05
+			m.clearcoat_enabled = true
+			m.clearcoat = 0.6
 		_:
 			var spec: Array = PAINTS.get(name, PAINTS["white"])
 			m = paint(str(spec[0]), maps, float(spec[1]), float(spec[2]))
+			if name in ["white", "cream", "steel", "tube", "antifoul", "dark", "black", "pool"]:
+				m = m.duplicate()
+				m.albedo_texture = null
+				m.albedo_color = Color(str(spec[0]))
+				m.normal_enabled = false
+				m.normal_texture = null
+			if name in ["white", "cream"]:
+				m.clearcoat_enabled = true
+				m.clearcoat = 0.6
 			if name in ["white", "cream", "grey_deck"]:
 				RoofVariety.mark(m)
 	_mutex.lock()
 	_cache[key] = m
 	_mutex.unlock()
 	return m
+
+## A metre-wide tile of eight narrow boards, with caulk and subtle grain.
+## Architectural wood textures have boards much too broad for a boat deck.
+static func _teak() -> Texture2D:
+	var img := Image.create(128, 256, true, Image.FORMAT_RGB8)
+	for x in 128:
+		var board := x / 16
+		var tint := 0.94 + 0.08 * sin(float(board) * 13.7)
+		for y in 256:
+			var grain := sin(float(x) * 8.7 + sin(float(y) * 0.07) * 0.3) * 0.025
+			var c := Color("#9c8361") * (tint + grain)
+			if x % 16 == 0 or (y + board * 53) % 256 == 0:
+				c = Color("#51493c")
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 ## Painted sheet metal in `hex` (uncached; callers cache by colour).
 static func paint(hex: String, maps: bool = true, rough: float = 0.5, metal: float = 0.05) -> StandardMaterial3D:
@@ -72,14 +104,14 @@ static func paint(hex: String, maps: bool = true, rough: float = 0.5, metal: flo
 		return hit
 	_mutex.unlock()
 	var m := StandardMaterial3D.new()
-	m.albedo_texture = MaterialLibrary._set_tex("sheet_metal", "diff")
-	m.albedo_color = FacadeMaterials._calib("sheet_metal", MaterialLibrary.parse_colour_tag(hex)).linear_to_srgb()
-	m.uv1_scale = Vector3.ONE * 0.25
+	m.albedo_color = MaterialLibrary.parse_colour_tag(hex)
+	m.uv1_scale = Vector3.ONE * 2.0
 	m.roughness = rough
 	m.metallic = metal
 	if maps:
 		m.normal_texture = MaterialLibrary._set_tex("sheet_metal", "nor")
 		m.normal_enabled = true
+		m.normal_scale = 0.08
 	_mutex.lock()
 	_cache[key] = m
 	_mutex.unlock()

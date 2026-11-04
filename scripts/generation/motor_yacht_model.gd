@@ -23,9 +23,19 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 		"entry": 0.42, "bow_pow": 1.7, "stern_w": 0.9, "flare": 0.16, "deadrise": 1.0,
 		"bow_rise": length * 0.025, "stem_rake": length * 0.05, "stern_rake": length * 0.03,
 		"keel_lift": 0.7, "lod": 0 if detail else 1}
+	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, p.get("maps", true), p["hull"], VesselMaterials.get_mat("antifoul", p.get("maps", true)))
 	var keys := {"hull": "Hull", "boot": "Dark" if not small else "Hull", "bottom": "Bottom", "deck": "White" if small else "Deck"}
+	if detail:
+		spec["cockpit"] = Rect2(-length * 0.39, 0, length * (0.65 if small else 0.1), float(spec["beam"]) * (0.31 if small else 0.3))
+		spec["cockpit_y"] = float(spec["freeboard"]) * (0.35 if small else 0.55)
 	HullLoft.loft(lm, spec, keys)
+	if detail:
+		if small:
+			MotorVesselDetails.open_boat(lm, spec, variant)
+		else:
+			MotorVesselDetails.cruiser(lm, spec, variant)
+		return
 	if small:
 		_open_boat(lm, spec, variant, detail)
 	else:

@@ -1,0 +1,23 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+SHORE TIMINGS classify=7 patches=1
+SHORELINE bodies=1 edges=60 patches=35 hard=0 diagnostics=0
+FAR-TERRAIN built in 0 ms (rings=0 drapes=0 bands=0)
+SHORE TERRAIN vertices_ms=394
+SHORE TERRAIN arrays_ms=502 vertices=63235
+SHORE TERRAIN total_ms=708
+BUILDINGS census { "real": 2, "impostors": 0, "infill": 0, "far_blocks": 0, "far_towers": 0 } (settlement=)
+BUILD timings {Distant terrain=2, Ground & water=946, Buildings=471, Roads & landmarks=136, Vegetation=1010} total=2565 serial
+FAR-TERRAIN built in 0 ms (rings=0 drapes=0 bands=0)
+BUILDINGS census { "real": 2, "impostors": 0, "infill": 0, "far_blocks": 0, "far_towers": 0 } (settlement=)
+SHORE TERRAIN vertices_ms=570
+SHORE TERRAIN arrays_ms=697 vertices=63235
+SHORE TERRAIN total_ms=886
+BUILD timings {Distant terrain=5, Ground & water=886, Buildings=19, Roads & landmarks=35, Vegetation=657} total=886 parallel
+FAR-TERRAIN built in 0 ms (rings=0 drapes=0 bands=0)
+BUILDINGS census { "real": 2, "impostors": 0, "infill": 0, "far_blocks": 0, "far_towers": 0 } (settlement=)
+SHORE TERRAIN vertices_ms=576
+SHORE TERRAIN arrays_ms=704 vertices=63235
+SHORE TERRAIN total_ms=888
+BUILD timings {Distant terrain=5, Ground & water=888, Buildings=18, Roads & landmarks=35, Vegetation=664} total=888 parallel
+PARALLEL BUILD OK: 102 top-level children identical to the serial build

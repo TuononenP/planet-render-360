@@ -54,24 +54,4 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 	return 0
 
 static func model() -> LandmarkMesh:
-	var lm := LandmarkMesh.new()
-	lm.use("Orange", LandmarkMaterials.paint("#DF631A", 0.65, 0.0))
-	lm.use("Dark", LandmarkMaterials.paint("#29383C", 0.55, 0.0))
-	lm.use("White", LandmarkMaterials.paint("#E7E4D8", 0.65, 0.0))
-	# Double-ended hull and three orange passenger decks.
-	lm.box("Orange", Vector3(0, 1.4, 0), Vector3(LENGTH_M, 4.0, BEAM_M))
-	for level in 3:
-		var y := 3.7 + float(level) * 3.0
-		var length := LENGTH_M - 15.0 - float(level) * 6.0
-		var width := BEAM_M - 3.0 - float(level) * 0.7
-		lm.box("Orange", Vector3(0, y + 1.35, 0), Vector3(length, 2.7, width))
-		for side in [-1.0, 1.0]:
-			for i in 18:
-				var x := -length * 0.46 + length * 0.92 * (float(i) + 0.5) / 18.0
-				lm.box("Dark", Vector3(x, y + 1.5, side * (width * 0.5 + 0.02)),
-					Vector3(length / 18.0 * 0.66, 1.25, 0.04))
-		lm.box("White", Vector3(0, y + 2.73, 0), Vector3(length + 0.4, 0.16, width + 0.4))
-	for end in [-1.0, 1.0]:
-		lm.box("White", Vector3(end * 25.0, 13.7, 0), Vector3(10.0, 2.5, 9.0))
-		lm.box("Dark", Vector3(end * 30.03, 14.0, 0), Vector3(0.06, 1.0, 7.5))
-	return lm
+	return FerryVesselModel.build()

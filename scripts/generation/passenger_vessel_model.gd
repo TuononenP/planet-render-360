@@ -29,6 +29,7 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 		"entry": 0.27, "bow_pow": 1.8, "stern_w": 0.62, "flare": 0.07, "deadrise": 0.0,
 		"bow_rise": fb * 0.55, "stern_rise": fb * 0.15, "stem_rake": length * 0.03,
 		"stern_rake": length * 0.012, "keel_lift": 0.9, "lod": 0 if detail else 1}
+	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
 	lm.use("Boot", VesselMaterials.get_mat("red", maps))
 	lm.use("Funnel", VesselMaterials.paint(str(p.get("funnel", FUNNELS[int(length) % FUNNELS.size()])), maps, 0.5, 0.05))
@@ -62,31 +63,44 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 			for k in 2:
 				VesselKit.lifeboat(lm, Vector3(top_x + (float(k) - 0.5) * (boat_len + 1.0) - length * 0.04,
 					low_roof + 0.12, float(s) * (upper_half + boat_len * 0.16 + 0.08)), boat_len)
+				for offset in [-0.3, 0.3]:
+					VesselForms.davit(lm, Vector3(top_x + (float(k) - 0.5) * (boat_len + 1.0) - length * 0.04 + boat_len * float(offset),
+						low_roof, float(s) * (upper_half + 0.04)), boat_len * 0.28, float(s) * boat_len * 0.16)
 	# Wheelhouse on the forward end of the top tier, kept under the mast top.
 	var wh_h := minf(minf(floor_h * 0.95, 2.4), h - roof_y - 0.25)
 	var wh_x := top_x + top_l * 0.5 - length * 0.07
 	var wh_w := top_w * 0.82
 	var wh_l := length * 0.09
 	if wh_h > 0.5:
-		lm.box("White", Vector3(wh_x, roof_y + wh_h * 0.5, 0), Vector3(wh_l, wh_h, wh_w), Basis(), 0.02)
-		lm.quad("Glass", Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.3, -wh_w * 0.46),
-			Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.3, wh_w * 0.46),
-			Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, wh_w * 0.46),
-			Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, -wh_w * 0.46), Vector3.RIGHT)
-		VesselKit.windows(lm, wh_x - wh_l * 0.4, wh_x + wh_l * 0.4, wh_w * 0.5, roof_y + wh_h * 0.3, roof_y + wh_h * 0.85, 0.0)
-		lm.box("White", Vector3(wh_x, roof_y + wh_h + 0.05, 0), Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), Basis(), 0.0)
+		if detail:
+			VesselForms.cabin(lm, wh_x, wh_l, wh_w, roof_y, wh_h, 0.8, "White", 0.3)
+			VesselForms.slab(lm, "White", Vector3(wh_x - wh_h * 0.08, roof_y + wh_h + 0.05, 0),
+				Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), minf(wh_w * 0.12, wh_h * 0.4))
+		else:
+			lm.box("White", Vector3(wh_x, roof_y + wh_h * 0.5, 0), Vector3(wh_l, wh_h, wh_w), Basis(), 0.02)
+			lm.quad("Glass", Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.3, -wh_w * 0.46),
+				Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.3, wh_w * 0.46),
+				Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, wh_w * 0.46),
+				Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, -wh_w * 0.46), Vector3.RIGHT)
+			VesselKit.windows(lm, wh_x - wh_l * 0.4, wh_x + wh_l * 0.4, wh_w * 0.5, roof_y + wh_h * 0.3, roof_y + wh_h * 0.85, 0.0)
+			lm.box("White", Vector3(wh_x, roof_y + wh_h + 0.05, 0), Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), Basis(), 0.0)
 	else:
 		wh_h = 0.0
 	# Funnel aft of the wheelhouse and two pole masts.
 	var fr := clampf(beam * 0.11, 0.35, 1.5)
 	var funnel_top := h * 0.97
 	var f_base := Vector3(wh_x - wh_l * 0.5 - fr * 1.9 - length * 0.03, roof_y, 0)
-	VesselKit.funnel(lm, f_base, maxf(funnel_top - roof_y, 0.8), fr, 1.55)
+	VesselKit.funnel(lm, f_base, maxf(funnel_top - roof_y, 0.8), fr, 1.55, "Funnel", "Black", detail)
 	var fore := Vector3(length * 0.3, HullLoft.sheer(spec, length * 0.3), 0)
 	var main := Vector3(-length * 0.32, HullLoft.sheer(spec, -length * 0.32), 0)
-	VesselKit.mast(lm, "Black", fore, maxf(h - fore.y, 1.0), maxf(beam * 0.02, 0.07))
-	VesselKit.mast(lm, "Black", main, maxf(h * 0.78 - main.y, 1.0), maxf(beam * 0.018, 0.06))
+	VesselKit.mast(lm, "Black", fore, maxf(h - fore.y, 1.0), maxf(beam * 0.02, 0.07), detail)
+	VesselKit.mast(lm, "Black", main, maxf(h * 0.78 - main.y, 1.0), maxf(beam * 0.018, 0.06), detail)
 	if detail:
+		VesselForms.fittings(lm, spec)
+		if bool(p.get("ultra", false)):
+			VesselEquipment.deck(lm, spec)
+			VesselEquipment.door(lm, Vector3(house_x - tier_len * 0.5, fb + 0.03, 0), minf(floor_h * 0.9, 1.9), minf(tier_w * 0.2, 0.9))
+			VesselEquipment.ladder(lm, Vector3(house_x - tier_len * 0.5 - 0.12, fb, tier_w * 0.35), floor_h + 0.08, minf(0.65, beam * 0.16))
 		lm.beam("Black", fore + Vector3(0, h * 0.8 - fore.y, 0), Vector3(length * 0.46, HullLoft.sheer(spec, length * 0.46), 0), 0.04)
 		lm.beam("Black", fore + Vector3(0, h * 0.8 - fore.y, 0), Vector3(wh_x, roof_y + wh_h, 0), 0.04)
 		lm.box("Black", fore + Vector3(0, h * 0.62 - fore.y, 0), Vector3(0.1, 0.1, beam * 0.55), Basis(), 0.0)
@@ -100,7 +114,10 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 			var py := fb * 0.52
 			var pz := HullLoft.side_z(spec, x, py)
 			for s in [-1.0, 1.0]:
-				lm.disc("Black", Vector3(x, py, float(s) * (pz + 0.01)), Vector3(0, 0, float(s)), clampf(fb * 0.11, 0.1, 0.25), 8)
+				if bool(p.get("ultra", false)):
+					VesselEquipment.porthole(lm, Vector3(x, py, float(s) * (pz + 0.02)), Vector3(0, 0, float(s)), clampf(fb * 0.11, 0.1, 0.25))
+				else:
+					lm.disc("Black", Vector3(x, py, float(s) * (pz + 0.01)), Vector3(0, 0, float(s)), clampf(fb * 0.11, 0.1, 0.25), 16)
 
 static func _houseboat(lm: LandmarkMesh, p: Dictionary) -> void:
 	var length: float = p["length"]
@@ -111,6 +128,7 @@ static func _houseboat(lm: LandmarkMesh, p: Dictionary) -> void:
 	var spec := {"length": length, "beam": beam, "freeboard": fb, "draft": minf(beam * 0.12, 0.8),
 		"entry": 0.12, "bow_pow": 3.0, "stern_w": 0.95, "flare": 0.0, "deadrise": 0.0,
 		"bow_rise": fb * 0.15, "keel_lift": 0.3, "lod": 0 if p.get("detail", true) else 1}
+	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
 	lm.use("Roof", VesselMaterials.get_mat("grey_deck", maps))
 	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "Deck"})
@@ -118,9 +136,19 @@ static func _houseboat(lm: LandmarkMesh, p: Dictionary) -> void:
 	var wall := maxf(h - fb - beam * 0.14, 1.4)
 	var l := length * 0.68
 	var w := beam * 0.8
-	lm.box("White", Vector3(-length * 0.04, y + wall * 0.5, 0), Vector3(l, wall, w), Basis(), 0.03)
-	VesselKit.windows(lm, -length * 0.04 - l * 0.5 + 0.4, -length * 0.04 + l * 0.5 - 0.4, w * 0.5, y + wall * 0.3, y + wall * 0.8, 1.6 if p.get("detail", true) else 0.0)
-	lm.gable("Roof", Vector3(-length * 0.04, y + wall, 0), w, l, beam * 0.14, Basis(Vector3.UP, PI * 0.5), 0.25)
+	if p.get("detail", true):
+		VesselForms.cabin(lm, -length * 0.04, l, w, y, wall, 1.6, "White", 0.0)
+		lm.gable("Roof", Vector3(-length * 0.04, y + wall, 0), w, l, beam * 0.14, Basis(Vector3.UP, PI * 0.5), 0.25, "White")
+		VesselForms.fittings(lm, spec)
+		if bool(p.get("ultra", false)):
+			VesselEquipment.deck(lm, spec)
+			VesselEquipment.door(lm, Vector3(-length * 0.04 - l * 0.5, y, 0), wall * 0.8, w * 0.22)
+			VesselEquipment.ladder(lm, Vector3(-length * 0.04 - l * 0.5 - 0.1, y, w * 0.3), wall, minf(0.6, w * 0.2))
+		lm.box("Dark", Vector3(-length * 0.04 - l * 0.5 - 0.012, y + wall * 0.38, 0), Vector3(0.03, wall * 0.76, w * 0.2), Basis(), 0.0)
+	else:
+		lm.box("White", Vector3(-length * 0.04, y + wall * 0.5, 0), Vector3(l, wall, w), Basis(), 0.03)
+		VesselKit.windows(lm, -length * 0.04 - l * 0.5 + 0.4, -length * 0.04 + l * 0.5 - 0.4, w * 0.5, y + wall * 0.3, y + wall * 0.8, 1.6 if p.get("detail", true) else 0.0)
+		lm.gable("Roof", Vector3(-length * 0.04, y + wall, 0), w, l, beam * 0.14, Basis(Vector3.UP, PI * 0.5), 0.25)
 	if p.get("detail", true):
 		VesselKit.guard(lm, spec, length * 0.32, length * 0.46, 0.9, 1.0)
 		lm.box("Dark", Vector3(-length * 0.18, y + wall + beam * 0.16, w * 0.15), Vector3(0.28, beam * 0.1, 0.28), Basis(), 0.0)
@@ -136,6 +164,7 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 		"entry": 0.3, "bow_pow": 1.7, "stern_w": 0.7, "flare": 0.1, "deadrise": 0.0,
 		"bow_rise": fb * 0.6, "stern_rise": fb * 0.4, "stem_rake": length * 0.05,
 		"stern_rake": length * 0.01, "keel_lift": 0.9, "lod": 0 if detail else 1}
+	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
 	lm.use("Sail", VesselMaterials.get_mat("canvas", maps))
 	lm.use("Boot", VesselMaterials.get_mat("red", maps))
@@ -148,7 +177,21 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 		var mx: float = length * float(masts[i])
 		var mh: float = h * (0.82 if i == 1 else 0.7) if i < 2 else h * 0.55
 		var mr := maxf(beam * 0.025, 0.1)
-		VesselKit.mast(lm, "Steel", Vector3(mx, deck_y, 0), mh, mr)
+		VesselKit.mast(lm, "Steel", Vector3(mx, deck_y, 0), mh, mr, detail)
+		if detail:
+			for side in [-1.0, 1.0]:
+				for offset in [-0.055, 0.055]:
+					HullLoft.tube(lm, "Steel", [Vector3(mx, deck_y + mh * 0.85, 0),
+						Vector3(mx + length * float(offset), HullLoft.sheer(spec, mx), float(side) * beam * 0.42)], 0.018, 4)
+			if bool(p.get("ultra", false)):
+				for side in [-1.0, 1.0]:
+					var a := Vector3(mx - length * 0.055, deck_y, float(side) * beam * 0.42)
+					var b := Vector3(mx + length * 0.055, deck_y, float(side) * beam * 0.42)
+					var top := Vector3(mx, deck_y + mh * 0.85, 0)
+					for rung in 20:
+						var t := (float(rung) + 0.5) / 24.0
+						HullLoft.tube(lm, "Dark", [a.lerp(top, t), b.lerp(top, t)], 0.012, 4)
+				VesselEquipment.line(lm, Vector3(mx, deck_y + mh * 0.75, 0), Vector3(length * 0.43, deck_y, 0), length * 0.01)
 		# Yards across the mast, each with a furled sail along it.
 		var yards := 3 if i < 2 else 1
 		for k in yards:
@@ -158,5 +201,10 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 			if i < 2:
 				lm.beam("Sail", Vector3(mx + mr + 0.1, yy - mr, -span * 0.46), Vector3(mx + mr + 0.1, yy - mr, span * 0.46), maxf(beam * 0.05, 0.2))
 	if detail:
+		VesselForms.fittings(lm, spec)
+		if bool(p.get("ultra", false)):
+			VesselEquipment.deck(lm, spec)
+			for x in [-0.12, 0.15]:
+				VesselForms.hatch(lm, Vector3(length * float(x), deck_y + 0.06, 0), length * 0.08, beam * 0.32)
 		lm.beam("Steel", Vector3(length * 0.4, fb + beam * 0.05, 0), Vector3(length * 0.5, fb + beam * 0.2, 0), 0.12)
 		VesselKit.guard(lm, spec, -length * 0.46, length * 0.46, 1.0, 1.2, 0.04)
