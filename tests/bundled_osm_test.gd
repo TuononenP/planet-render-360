@@ -13,6 +13,24 @@ func check(condition: bool, message: String) -> void:
 		failures += 1
 
 func _run() -> void:
+	var valid_entry := [10.0, 20.0, "far", 3, "2026-11-03T00:00:00", 12, "a".repeat(64)]
+	check(BundledOsm._valid_manifest_row(valid_entry), "valid capital manifest row must be accepted")
+	check(not BundledOsm._valid_manifest_row([10.0, 20.0]), "short manifest row must be rejected")
+	var invalid := valid_entry.duplicate()
+	invalid[0] = "bad latitude"
+	check(not BundledOsm._valid_manifest_row(invalid), "invalid coordinates must be rejected")
+	invalid = valid_entry.duplicate()
+	invalid[2] = "unknown"
+	check(not BundledOsm._valid_manifest_row(invalid), "unknown layer must be rejected")
+	invalid = valid_entry.duplicate()
+	invalid[4] = ""
+	check(not BundledOsm._valid_manifest_row(invalid), "missing source timestamp must be rejected")
+	invalid = valid_entry.duplicate()
+	invalid[6] = "x".repeat(64)
+	check(not BundledOsm._valid_manifest_row(invalid), "invalid hash must be rejected")
+	invalid = valid_entry.duplicate()
+	invalid[5] = BundledOsm.MAX_BYTES + 1
+	check(not BundledOsm._valid_manifest_row(invalid), "oversized payload must be rejected")
 	var rows := [
 		[40.7060, -74.0040, "detailed", 12],
 		[37.8040, -122.4195, "detailed", 12],

@@ -29,6 +29,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Provide intuitive controls alongside a world map for selecting locations: a turning globe, a vector map with search (/, ⌘F or Ctrl+F), featured places, and landmark markers that open a Wikipedia summary and, where one exists, a free Commons photo. The selected place shows its elevation, local time and weather; Enter explores it.
 - Keep a history of recently viewed places, with favourites.
 - Cache built worlds and fetched areas for faster repeat views, and download a place for offline use.
+- Search and select capital cities and territories from the bundled GeoNames catalog. The original featured places and some capitals include bundled OSM snapshots. Other capital data needs a network connection to fetch it or to save it for offline use.
 - Make the rendered 3D 360-degree view the main focus once loaded.
 - Support full-screen mode with intuitive view controls.
 - History and Recents show the view as you left it, and reopening a place restores where you were looking.
@@ -36,6 +37,61 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
 - Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, cache size, and render quality (Fast / Balanced / High / Ultra).
+
+To refresh the capital catalog, download `countryInfo.txt` and `cities1000.zip`
+from [GeoNames](https://download.geonames.org/export/dump/) and run
+`python3 tools/generate_capitals.py countryInfo.txt cities1000.zip scripts/data/capital_catalog.gd`. GeoNames
+data is licensed under CC BY 4.0. Saving a place offline also prepares its
+detailed, surrounding, far-city and POI OSM layers; a partial save is reported
+if any layer cannot be downloaded or retained in the cache. The app retries
+failed data during the save when time permits; select the partial-save control
+to try again later using the data already cached.
+
+Capital OSM snapshots can be prepared from GeoFabrik extracts with
+`tools/export_capital_points.gd`, `tools/plan_capital_extracts.py`, and
+`tools/bundle_capital_region.py`. The planner requires Shapely and checks
+that the source region covers a padded area around each viewpoint; the
+bundler requires osmium-tool and pyosmium. It checks the source replication
+timestamp and rejects incomplete or invalid layers. For example:
+
+```sh
+tools/godot_bg.sh --headless --path . --script tools/export_capital_points.gd -- /tmp/capital-points.json
+curl -fsSL https://download.geofabrik.de/index-v1.json -o /tmp/geofabrik-index.json
+python3 tools/plan_capital_extracts.py /tmp/capital-points.json /tmp/geofabrik-index.json /tmp/capital-plan.json
+# Download the region PBF named in the plan, then:
+python3 tools/bundle_capital_region.py /tmp/capital-plan.json REGION /path/to/region.osm.pbf
+tools/godot_bg.sh --headless --path . --script tests/capital_snapshot_test.gd
+```
+
+Where one GeoFabrik region would be a country- or continent-sized download,
+`tools/bundle_capital_union.py` merges synchronized neighbouring regions, and
+`tools/bundle_capital_external.py` prepares BBBike city extracts, OpenStreetMap
+France extract pairs, OSM map API responses for small islands, and GeoFabrik
+extracts with one supplementary OSM relation. For example:
+
+```sh
+python3 tools/bundle_capital_external.py /tmp/capital-plan.json capital_no_14991273_19074609 --workdir /tmp/capital-sources bbbike Oslo
+python3 tools/bundle_capital_external.py /tmp/capital-plan.json capital_pm_13677914_12382270 --workdir /tmp/capital-sources \
+  osmfr --extract north-america/saint_pierre_et_miquelon --extract north-america/canada/newfoundland_and_labrador
+```
+
+The source used for each capital is recorded in its provenance entry. Pass
+`--include-bundled` to the planner to refresh capitals that already have snapshots.
+
+The capital audit requires every preset by default. During an incremental
+regeneration, pass `-- --allow-missing` to validate only the snapshots already
+prepared.
+
+Snapshots are only published after all five layers validate. Provenance and
+query versions are recorded in `assets/osm_snapshots/capital_provenance.json`;
+the catalog audit lists locations that still need snapshots.
+For a batch, add `--continental` to the planner and use
+`python3 tools/bundle_capital_plan.py /tmp/capital-plan.json --workdir /tmp/capital-sources`.
+The continental sources total tens of gigabytes; the batch checks for free
+space, processes one source at a time, safely resumes an unchanged interrupted
+download with bounded-range retries, verifies the published source checksum,
+and removes its own completed downloads. `--batch-size 2` extracts two views
+per scan to reduce processing time, at the cost of additional memory.
 
 ## Platforms
 

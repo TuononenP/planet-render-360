@@ -5,6 +5,11 @@ extends RefCounted
 ## [latitude, longitude, layer, query version, OSM timestamp, inflated bytes, SHA-256].
 ## Missing layers deliberately use the ordinary network/cache fallback.
 const ENTRIES := {
+	"berlin_detailed": [52.52437, 13.41053, "detailed", 12, "2026-11-02T21:21:26", 13533591, "3f0a06470629b5001a2113139bd48603ef2154e228edcc780838e129f5c9691e"],
+	"berlin_ring1600": [52.52437, 13.41053, "ring1600", 1, "2026-11-02T21:21:26", 1120001, "8000d466f17a85d1cc42910eea335eea0ea50d51bef0d780131aba55f9c41403"],
+	"berlin_ring2500": [52.52437, 13.41053, "ring2500", 1, "2026-11-02T21:21:26", 1153547, "624e92d7c212d04ff634288907a233bfb4639986e447bb5bac5285f8d96afb49"],
+	"berlin_poi": [52.52437, 13.41053, "poi", 1, "2026-11-02T21:21:26", 1039539, "24899f6cc0d0864a1b762401fc2f19a198564f0935b8793f1cdf5179f38c9964"],
+	"berlin_far": [52.52437, 13.41053, "far", 3, "2026-11-02T21:21:26", 28269591, "3a312f39b6d764d9500d8bd3a6c6a88cb938154706f47728782e4f4a6334318d"],
 	"tokyo_far": [35.6595, 139.7005, "far", 3, "2026-11-03T21:24:23", 11510215, "d8dccef7a1f99659f416d67fe1ef6d72c84c243bdbcfdb78c37e5f80736c769a"],
 	"tokyo_detailed": [35.6595, 139.7005, "detailed_extract", 12, "2026-11-03T21:24:23", 5074058, "9fda3f1dbbdc8210f99cfc88be149cc1a59216f0f3abe7fea6bf7ce68215971a"],
 	"tokyo_ring1600": [35.6595, 139.7005, "ring1600", 1, "2026-11-03T21:24:23", 348939, "63505648aeb8f2a7d15c4c290cc9544af4f83e8f840e1181534c0f46e80c4a03"],
@@ -87,18 +92,55 @@ const ENTRIES := {
 	"stockholm_far": [59.3207, 18.0604, "far", 3, "2026-11-04T14:07:04", 14767350, "e8bc59790a3c35798a19cb6149e3d50e9baa744c453e43118bd7591f5b56be26"],
 }
 const DIRECTORY := "res://assets/osm_snapshots/"
+const CAPITAL_MANIFEST := DIRECTORY + "capital_manifest.json"
 const MAX_BYTES := 32 * 1024 * 1024
 static var _refreshing: Dictionary = {}
+static var _all_entries: Dictionary = {}
+## Vector2(lat, lon) -> snapshot keys at that point, in table order, so a
+## lookup does not scan the ~1,300 rows.
+static var _by_point: Dictionary = {}
+
+static func _entries() -> Dictionary:
+	if _all_entries.is_empty():
+		_all_entries = ENTRIES.duplicate()
+		_by_point.clear()
+		var f := FileAccess.open(CAPITAL_MANIFEST, FileAccess.READ)
+		if f != null:
+			var manifest: Variant = JSON.parse_string(f.get_as_text())
+			if manifest is Dictionary:
+				for key in manifest:
+					var row: Variant = manifest[key]
+					if str(key).is_valid_identifier() and not _all_entries.has(key) and _valid_manifest_row(row):
+						_all_entries[key] = row
+		for key in _all_entries:
+			var entry: Array = _all_entries[key]
+			# Preset coordinates pass through Vector2 (32-bit components) before
+			# reaching the fetchers. Index in that representation so the same
+			# preset still matches after the round trip, without matching nearby pins.
+			var point := Vector2(float(entry[0]), float(entry[1]))
+			if not _by_point.has(point):
+				_by_point[point] = []
+			(_by_point[point] as Array).append(key)
+	return _all_entries
+
+static func _valid_manifest_row(row: Variant) -> bool:
+	if not row is Array or row.size() != 7:
+		return false
+	if not (row[0] is float or row[0] is int) or not (row[1] is float or row[1] is int):
+		return false
+	return absf(float(row[0])) <= 90 and absf(float(row[1])) <= 180 \
+		and row[2] is String and row[2] in ["detailed", "detailed_extract", "ring1600", "ring2500", "poi", "far"] \
+		and (row[3] is float or row[3] is int) and row[4] is String \
+		and str(row[4]).length() == 19 and Time.get_unix_time_from_datetime_string(row[4]) > 0 \
+		and (row[5] is float or row[5] is int) and int(row[5]) > 0 and int(row[5]) <= MAX_BYTES \
+		and row[6] is String and str(row[6]).length() == 64 and str(row[6]).is_valid_hex_number(false)
 
 static func entry_for(lat: float, lon: float, layer: String, version: int) -> String:
-	for key in ENTRIES:
-		var entry: Array = ENTRIES[key]
-		# Preset coordinates pass through Vector2 (32-bit components) before
-		# reaching the fetchers. Compare in that representation so the same
-		# preset still matches after the round trip, without matching nearby pins.
+	var entries := _entries()
+	for key in _by_point.get(Vector2(lat, lon), []):
+		var entry: Array = entries[key]
 		var layer_matches: bool = layer == entry[2] or (layer == "detailed" and entry[2] == "detailed_extract")
-		if Vector2(lat, lon) == Vector2(float(entry[0]), float(entry[1])) \
-				and layer_matches and version == entry[3]:
+		if layer_matches and version == entry[3]:
 			return key
 	return ""
 
@@ -123,26 +165,27 @@ static func _response_is_newer(text: String, key: String) -> bool:
 	if not metadata is Dictionary:
 		return false
 	var stamp := str(metadata.get("timestamp_osm_base", "")).trim_suffix("Z")
-	return stamp != "" and stamp >= str(ENTRIES[key][4])
+	return stamp != "" and stamp >= str(_entries()[key][4])
 
 static func read(key: String) -> String:
-	if not ENTRIES.has(key):
+	var entries := _entries()
+	if not entries.has(key):
 		return ""
 	var path := DIRECTORY + key + ".json.gz"
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return ""
 	var raw := file.get_buffer(file.get_length()).decompress_dynamic(MAX_BYTES, FileAccess.COMPRESSION_GZIP)
-	if raw.size() != int(ENTRIES[key][5]):
+	if raw.size() != int(entries[key][5]):
 		return ""
 	var text := raw.get_string_from_utf8()
-	if text.sha256_text() != ENTRIES[key][6]:
+	if text.sha256_text() != entries[key][6]:
 		return ""
 	if not OsmFetcher._payload_usable(text):
 		return ""
-	if ENTRIES[key][2] == "detailed" and (not OsmQuery.is_current(text) or not OsmFetcher._mentions_buildings(text)):
+	if entries[key][2] == "detailed" and (not OsmQuery.is_current(text) or not OsmFetcher._mentions_buildings(text)):
 		return ""
-	if ENTRIES[key][2] == "detailed_extract" and not OsmFetcher._mentions_buildings(text) and not OsmFetcher._mentions_shores(text):
+	if entries[key][2] == "detailed_extract" and not OsmFetcher._mentions_buildings(text) and not OsmFetcher._mentions_shores(text):
 		return ""
 	return text
 
@@ -167,7 +210,7 @@ static func refresh(tree: SceneTree, key: String, path: String, body: String,
 	var checked := func(text: String) -> String:
 		if not _response_is_newer(text, key):
 			return "response is older than the bundled snapshot"
-		if ENTRIES[key][2] in ["detailed", "detailed_extract"] and not OsmQuery.is_current(text):
+		if _entries()[key][2] in ["detailed", "detailed_extract"] and not OsmQuery.is_current(text):
 			return "response has an incompatible query version"
 		return str(validate.call(text))
 	req.run(body, checked, endpoints.slice(0, 1))

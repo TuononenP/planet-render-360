@@ -78,3 +78,6 @@ visual-plan/refs/**/*.jpg
 # Native build kernels: built by tools/build_native.sh
 native/build/
 native/bin/
+
+# Python bytecode from tools/ and tests/
+__pycache__/

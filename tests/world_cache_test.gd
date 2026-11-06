@@ -7,6 +7,34 @@ extends SceneTree
 ## load the same world (same nodes, meshes and bounds) from the cache,
 ## faster than the build, and the budget must evict oldest-first.
 
+class FailedWriteView extends View360:
+	var builds := 0
+	func _ready() -> void:
+		pass
+	func build_location(_data: LocationData, _ground: GroundTruth = null,
+			_abort: BuildAbort = null, _wait_save := false) -> Array:
+		# A world built successfully, but the cache write produced no files.
+		builds += 1
+		return [null, Node3D.new()]
+
+class SaveTestPipeline extends GenerationPipeline:
+	func _ready() -> void:
+		pass
+	func ground_for(_data: LocationData) -> GroundTruth:
+		return null
+
+class SaveTestMain extends "res://scripts/main.gd":
+	var outcome := ""
+	func _ready() -> void:
+		pass
+	func _release_build() -> void:
+		_build_abort = null
+		_building_world = false
+	func _end_save(message: String) -> void:
+		outcome = message
+	func _save_missing_data(_data: LocationData) -> bool:
+		return false
+
 func _init() -> void:
 	_run()
 
@@ -31,6 +59,9 @@ func _summary(world: Node) -> Dictionary:
 	return {"nodes": nodes, "meshes": meshes, "box": box}
 
 func _run() -> void:
+	if OS.get_cmdline_user_args().has("--save-failure-only"):
+		await _save_failure()
+		return
 	var failures: Array[String] = []
 	if not WorldCache.enabled():
 		printerr("WORLD CACHE FAIL: run windowed (the cache is off headless)")
@@ -90,3 +121,39 @@ func _run() -> void:
 		for f in failures:
 			printerr("WORLD CACHE FAIL: ", f)
 		quit(1)
+
+func _save_failure() -> void:
+	var cache_enabled := WorldCache.enabled()
+	var id := str(OS.get_process_id())
+	WorldCache.dir_override = "user://world-save-failure-" + id
+	CacheStore.history_override = "user://world-save-failure-history-" + id + ".json"
+	var main := SaveTestMain.new()
+	root.add_child(main)
+	var view := FailedWriteView.new()
+	main.add_child(view)
+	main._view = view
+	var pipeline := SaveTestPipeline.new()
+	main.add_child(pipeline)
+	main._pipeline = pipeline
+	main._store = CacheStore.new()
+	var data := LocationData.new()
+	data.latitude = 40.7060
+	data.longitude = -74.0040
+	data.place_name = "New York, United States"
+	main._generation_deadline_ms = 0
+	await main._save_world(data)
+	var outcome := main.outcome
+	# Without a world cache (headless) there is nothing to write or verify.
+	var expected := main.SAVE_WORLD_FAILED if cache_enabled else main.SAVE_DONE
+	var builds := view.builds
+	main.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(CacheStore.history_override)
+	WorldCache.dir_override = ""
+	CacheStore.history_override = ""
+	if outcome != expected or builds != int(cache_enabled):
+		printerr("WORLD SAVE FAILURE TEST: unexpected outcome ", outcome)
+		quit(1)
+	else:
+		print("WORLD SAVE FAILURE OK: built world without cache files is not reported as saved")
+		quit(0)

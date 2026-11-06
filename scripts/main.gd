@@ -30,6 +30,17 @@ var _thumb_key: Array = []
 ## without showing the place, so a later Explore loads the finished world.
 var _saving := false
 var _save_progress := SaveProgress.new()
+var _save_osm_pack: OfflineOsmPack
+var _save_osm_complete := true
+var _save_retry_data: LocationData
+var _save_retry_degraded: Array[String] = []
+var _save_degraded: Array[String] = []
+var _save_retry_done := false
+var _save_retry_in_progress := false
+const SAVE_OSM_BUDGET_S := 60.0
+const SAVE_BUILD_RESERVE_S := 60.0
+const SAVE_RETRY_RESERVE_S := 180.0
+var _generation_deadline_ms := 0
 ## Bumped per generation and on cancel, so a world still building on
 ## its thread is dropped once superseded.
 var _gen_id := 0
@@ -58,8 +69,9 @@ var generation_timeout_s := GENERATION_TIMEOUT_S  # tests shorten it
 const QUIT_WAIT_S := 30.0
 const SAVING := "Saving… %d%%"
 const SAVE_DONE := "Saved for offline"
-const SAVE_PARTLY := "Partly saved"
+const SAVE_PARTLY := "Partly saved · retry"
 const SAVE_FAILED := "Couldn't save. Try again"
+const SAVE_WORLD_FAILED := "Couldn't save the view · retry"
 const CLOSING_TITLE := "Saving this place for next time"
 const CLOSING_MESSAGE := "Closing as soon as it's saved."
 var _quitting := false
@@ -101,7 +113,7 @@ func _ready() -> void:
 			_loading.set_stage(i, label, state)
 			# The pipeline reports its overall fraction only at the end; a
 			# save follows its rows finishing instead.
-			if _saving and state == "done":
+			if _saving and not _save_retry_in_progress and state == "done":
 				_save_progress.rows_done += 1
 				if i == 1:
 					_save_progress.imagery_fraction = 0.0)
@@ -109,7 +121,7 @@ func _ready() -> void:
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.stage_progress.connect(func(i: int, done: int, total: int) -> void:
 		_loading.set_stage_progress(i, done, total)
-		if _saving and i == 1 and total > 0:
+		if _saving and not _save_retry_in_progress and i == 1 and total > 0:
 			_save_progress.imagery_fraction = clampf(float(done) / total, 0.0, 1.0))
 	_pipeline.stage_took.connect(func(i: int, seconds: float) -> void:
 		_loading.set_stage_took(i, seconds))
@@ -255,6 +267,8 @@ func _request_exit() -> void:
 	if _quitting:
 		return
 	_quitting = true
+	if _save_osm_pack != null:
+		_save_osm_pack.cancel()
 	WorldCache.hurry = true
 	_leave_view()
 	if _build_abort != null:
@@ -427,11 +441,18 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 		if not camera.is_empty():
 			view = ViewLink.to_view(camera)
 	_saving = save_only
+	_save_osm_complete = true
+	_save_retry_data = null
+	_save_retry_degraded.clear()
+	_save_degraded.clear()
+	_save_retry_done = false
+	_save_retry_in_progress = false
 	_save_progress = SaveProgress.new()
-	_save_progress.rows = GenerationPipeline.STAGES.size()
+	_save_progress.rows = GenerationPipeline.STAGES.size() + int(save_only)
 	_set_generating(true)
 	_gen_id += 1
 	var gen := _gen_id
+	_generation_deadline_ms = Time.get_ticks_msec() + int(generation_timeout_s * 1000.0)
 	_arm_timeout(gen)
 	_picker.set_render_status("")
 	_pending = Vector2(lat, lon)
@@ -471,6 +492,8 @@ func _arm_timeout(gen: int) -> void:
 		return
 	print("Generation timed out after %d s" % int(generation_timeout_s))
 	_gen_id += 1
+	if _save_osm_pack != null:
+		_save_osm_pack.cancel()
 	_pipeline.cancel()
 	_show(_picker)
 	if _saving:
@@ -503,25 +526,58 @@ func _release_build() -> void:
 ## world cache exactly as Explore would, then dropped unseen.
 func _save_world(data: LocationData) -> void:
 	var gen := _gen_id
+	var pack := OfflineOsmPack.new()
+	_save_osm_pack = pack
+	add_child(pack)
+	pack.start(data.latitude, data.longitude)
+	var deadline := mini(Time.get_ticks_msec() + int(SAVE_OSM_BUDGET_S * 1000.0),
+		_generation_deadline_ms - int(SAVE_BUILD_RESERVE_S * 1000.0))
+	while pack.is_running() and gen == _gen_id and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+	pack.cancel()
+	if gen != _gen_id:
+		pack.queue_free()
+		if _save_osm_pack == pack:
+			_save_osm_pack = null
+		# Cancelled while downloading: no build is running to release the
+		# busy state, and the pipeline has already finished (no `cancelled`).
+		_set_generating(false)
+		if _saving:
+			_end_save(SAVE_FAILED)
+		_show(_picker)
+		return
+	_save_progress.rows_done += 1
 	var abort := BuildAbort.new()
 	_building_world = true
 	_build_abort = abort
 	_save_progress.phase = SaveProgress.Phase.BUILD
 	var ground: GroundTruth = await _pipeline.ground_for(data)
 	var ok := true
+	var world_saved := not WorldCache.enabled() or WorldCache.has_world(data)
 	# Headless runs have no world cache; an already saved world is not rebuilt.
-	if WorldCache.enabled() and not WorldCache.has_world(data):
+	if WorldCache.enabled() and not world_saved:
 		var built := await _view.build_location(data, ground, abort, true)
 		ok = not built.is_empty()
 		if ok and built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
+		world_saved = WorldCache.has_world(data)
 	if _build_abort == abort:
 		_release_build()
+	_save_osm_complete = pack.missing_layers().is_empty()
+	pack.queue_free()
+	if _save_osm_pack == pack:
+		_save_osm_pack = null
 	if gen != _gen_id:
 		return
 	if ok:
 		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
-	_end_save((SAVE_DONE if _pipeline.degraded.is_empty() else SAVE_PARTLY) if ok else SAVE_FAILED)
+	if not ok:
+		_end_save(SAVE_FAILED)
+	elif not world_saved:
+		_end_save(SAVE_WORLD_FAILED)
+	else:
+		_end_save(SAVE_DONE if _save_degraded.is_empty() and _save_osm_complete \
+			and not _save_missing_data(data) else SAVE_PARTLY)
 
 ## Keeps the bar and the line under the Save button current until the
 ## save ends.
@@ -533,18 +589,52 @@ func _follow_save(gen: int) -> void:
 			if _build_abort.saving:
 				_save_progress.phase = SaveProgress.Phase.WRITE
 		_save_progress.tick(dt)
-		_picker.set_download_status(SAVING % _save_progress.percent())
+		var label := "Retrying… %d%%" if _save_retry_in_progress else SAVING
+		_picker.set_download_status(label % _save_progress.percent())
 		_picker.set_download_progress(_save_progress.shown, _save_progress.phase_text())
 		await get_tree().create_timer(dt).timeout
 
 func _end_save(text: String) -> void:
 	_saving = false
+	_save_retry_data = null
+	_save_retry_in_progress = false
 	_picker.set_download_progress(-1.0)
 	_picker.set_download_busy(false)
 	_picker.set_download_status(text)
 
+func _retry_save_pipeline(gen: int) -> void:
+	if gen != _gen_id or not _saving or _save_retry_data == null:
+		return
+	var data := _save_retry_data
+	_pipeline.run(data.latitude, data.longitude, data.place_name, data.quality_preset,
+		_pending_focus, _pending_view)
+
+## The pipeline can use a lower-resolution fallback without marking a layer
+## degraded. Retry missing requested tiles too, while reusing the cached ones.
+func _save_missing_data(data: LocationData) -> bool:
+	var keys := CacheStore.place_cache_keys(data.latitude, data.longitude, data.quality_preset)
+	for layer in ["dem", "sat", "landcover"]:
+		for path in keys.get(layer, []):
+			if not FileAccess.file_exists(str(path)):
+				return true
+	return false
+
 func _on_generation_finished(data: LocationData) -> void:
 	if _saving:
+		if not _save_retry_done and (not _pipeline.degraded.is_empty() or _save_missing_data(data)) \
+				and Time.get_ticks_msec() + int(SAVE_RETRY_RESERVE_S * 1000.0) < _generation_deadline_ms:
+			_save_retry_done = true
+			_save_retry_in_progress = true
+			_save_retry_data = data
+			_save_retry_degraded = _pipeline.degraded.duplicate()
+			_retry_save_pipeline.call_deferred(_gen_id)
+			return
+		_save_retry_in_progress = false
+		_save_degraded = _pipeline.degraded.duplicate()
+		if _save_retry_data != null and _save_retry_degraded.size() < _save_degraded.size():
+			data = _save_retry_data
+			_save_degraded = _save_retry_degraded.duplicate()
+		_save_retry_data = null
 		_save_world(data)
 		return
 	var gen := _gen_id
