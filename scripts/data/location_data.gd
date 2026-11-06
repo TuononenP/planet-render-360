@@ -255,6 +255,14 @@ static func known_places() -> Array:
 		{"name": "Kyoto, Japan", "lat": 35.0116, "lon": 135.7681},
 		{"name": "Agra, India", "lat": 27.1751, "lon": 78.0421},
 	]
+	# National capitals and territories are searchable without a network.
+	var known_names := {}
+	for place in places:
+		known_names[str(place["name"]).to_lower()] = true
+	for place in CapitalCatalog.additional_places():
+		if not known_names.has(str(place["name"]).to_lower()):
+			places.append(place)
+			known_names[str(place["name"]).to_lower()] = true
 	# A preset city resolves to its curated origin, so searching "Tokyo"
 	# opens the same view as its quick pick.
 	for place in places:
@@ -272,6 +280,12 @@ static func quick_picks() -> Array:
 	var out: Array = []
 	for row in PresetViews.ROWS:
 		out.append([str(row["label"]), str(row["name"]), float(row["lat"]), float(row["lon"])])
+	var by_name := {}
+	for place in known_places():
+		by_name[str(place["name"]).to_lower()] = place
+	for place in CapitalCatalog.additional_places():
+		var selected: Dictionary = by_name.get(str(place["name"]).to_lower(), place)
+		out.append([place["label"], place["name"], selected["lat"], selected["lon"]])
 	return out
 
 static func suggestions_for(query: String) -> Array:

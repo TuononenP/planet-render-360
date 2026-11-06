@@ -35,6 +35,9 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Map packs and OSM snapshots are Git LFS objects.
+          lfs: true
 
       - name: Compute build number
         run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))" >> "$GITHUB_ENV"

@@ -18,11 +18,14 @@ import osmium
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("pbf", type=Path)
-parser.add_argument("city", choices=("new_york", "san_francisco", "seoul", "tokyo", "dubai", "banff", "big_sur", "london"))
+parser.add_argument("city", help="preset identifier or output identifier for --point")
 parser.add_argument("timestamp", help="source replication timestamp in UTC")
 parser.add_argument("output", type=Path)
 parser.add_argument("--near-only", action="store_true", help="omit far city for a smaller complete extract")
 parser.add_argument("--detailed", action="store_true", help="also prepare extract-derived detailed data")
+parser.add_argument("--point", nargs=2, type=float, metavar=("LAT", "LON"),
+                    help="origin of an additional location")
+parser.add_argument("--country", help="ISO 3166-1 alpha-2 code for --point")
 parser.add_argument("--coverage", nargs=4, type=float, required=True, metavar=("WEST", "SOUTH", "EAST", "NORTH"),
                     help="bounds of the source extract before conversion")
 args = parser.parse_args()
@@ -34,7 +37,16 @@ locations = {"new_york": (40.7060, -74.0040, "US", 40.70265, -73.99686),
              "dubai": (25.1925, 55.2741, "AE", 25.19787, 55.28278),
              "banff": (51.1720, -115.5640, "CA", 51.1676, -115.5596),
              "big_sur": (36.3740, -121.9022, "US", 36.3735, -121.9012)}
-lat, lon, country, eye_lat, eye_lon = locations[args.city]
+if args.point is not None:
+    if not args.country or not re.fullmatch(r"[A-Z]{2}", args.country):
+        parser.error("--point requires --country with an uppercase ISO 3166-1 alpha-2 code")
+    lat, lon = args.point
+    country = args.country
+    eye_lat, eye_lon = lat, lon
+elif args.city in locations:
+    lat, lon, country, eye_lat, eye_lon = locations[args.city]
+else:
+    parser.error("unknown preset; provide --point and --country")
 lat_scale = 111195.0
 lon_scale = lat_scale * math.cos(math.radians(lat))
 radius = 2500 if args.near_only else 12000
