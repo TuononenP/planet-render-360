@@ -1,0 +1,5530 @@
+{
+  "capital_ad_13250779_18152109": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:36:42+00:00",
+    "coordinates": [
+      42.50779,
+      1.52109
+    ],
+    "country": "AD",
+    "coverage": [
+      1.3447436065390925,
+      42.37779,
+      1.6974363934609076,
+      42.63779
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/andorra-latest.osm.pbf + https://download.geofabrik.de/europe/spain/cataluna-latest.osm.pbf + https://download.geofabrik.de/europe/france/midi-pyrenees-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ae_11445118_23439696": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:19:50+00:00",
+    "coordinates": [
+      24.45118,
+      54.39696
+    ],
+    "country": "AE",
+    "coverage": [
+      54.254152178895225,
+      24.321180000000002,
+      54.539767821104775,
+      24.58118
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_af_12452813_24917233": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:57:28+00:00",
+    "coordinates": [
+      34.52813,
+      69.17233
+    ],
+    "country": "AF",
+    "coverage": [
+      69.01453390281466,
+      34.398129999999995,
+      69.33012609718534,
+      34.65813
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/afghanistan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ag_10712096_11815671": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:03:12+00:00",
+    "coordinates": [
+      17.12096,
+      -61.84329
+    ],
+    "country": "AG",
+    "coverage": [
+      -61.97931802980867,
+      16.99096,
+      -61.70726197019134,
+      17.25096
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ai_10821704_11694217": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:04:28+00:00",
+    "coordinates": [
+      18.21704,
+      -63.05783
+    ],
+    "country": "AI",
+    "coverage": [
+      -63.19468951958146,
+      18.087040000000002,
+      -62.920970480418546,
+      18.34704
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_al_13132744_19981866": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:14:24+00:00",
+    "coordinates": [
+      41.32744,
+      19.81866
+    ],
+    "country": "AL",
+    "coverage": [
+      19.64554547429869,
+      41.19744,
+      19.991774525701313,
+      41.457440000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/albania-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_am_13017765_22451260": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:36:30+00:00",
+    "coordinates": [
+      40.17765,
+      44.5126
+    ],
+    "country": "AM",
+    "coverage": [
+      44.3424535663909,
+      40.04765,
+      44.6827464336091,
+      40.30765
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/armenia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ao_8116318_19323432": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:57:35+00:00",
+    "coordinates": [
+      -8.83682,
+      13.23432
+    ],
+    "country": "AO",
+    "coverage": [
+      13.102758345275769,
+      -8.96682,
+      13.365881654724232,
+      -8.706819999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ar_5538685_12162277": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:14:11+00:00",
+    "coordinates": [
+      -34.61315,
+      -58.37723
+    ],
+    "country": "AR",
+    "coverage": [
+      -58.535187532203054,
+      -34.74315,
+      -58.21927246779694,
+      -34.483149999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_as_7572194_929750": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:53:16+00:00",
+    "coordinates": [
+      -14.27806,
+      -170.7025
+    ],
+    "country": "AS",
+    "coverage": [
+      -170.83664366528876,
+      -14.40806,
+      -170.5683563347112,
+      -14.14806
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_at_13820820_19637380": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:52:50+00:00",
+    "coordinates": [
+      48.2082,
+      16.3738
+    ],
+    "country": "AT",
+    "coverage": [
+      16.178729513172563,
+      48.078199999999995,
+      16.568870486827436,
+      48.3382
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/austria-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_au_5471654_32912807": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:52:27+00:00",
+    "coordinates": [
+      -35.28346,
+      149.12807
+    ],
+    "country": "AU",
+    "coverage": [
+      148.96881567686842,
+      -35.41346,
+      149.2873243231316,
+      -35.153459999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_aw_10252398_10997297": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:51:15+00:00",
+    "coordinates": [
+      12.52398,
+      -70.02703
+    ],
+    "country": "AW",
+    "coverage": [
+      -70.16019870469633,
+      12.393979999999999,
+      -69.89386129530367,
+      12.65398
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ax_15009726_19993481": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:42:01+00:00",
+    "coordinates": [
+      60.09726,
+      19.93481
+    ],
+    "country": "AX",
+    "coverage": [
+      19.674042925455453,
+      59.967259999999996,
+      20.195577074544545,
+      60.22726
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/finland-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_az_13037767_22989201": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:26:04+00:00",
+    "coordinates": [
+      40.37767,
+      49.89201
+    ],
+    "country": "AZ",
+    "coverage": [
+      49.721359484529714,
+      40.24767,
+      50.062660515470284,
+      40.507670000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/azerbaijan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ba_13384864_19835644": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:32:35+00:00",
+    "coordinates": [
+      43.84864,
+      18.35644
+    ],
+    "country": "BA",
+    "coverage": [
+      18.17617796818216,
+      43.71864,
+      18.53670203181784,
+      43.978640000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/bosnia-herzegovina-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bb_10310732_12037979": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:41:01+00:00",
+    "coordinates": [
+      13.10732,
+      -59.62021
+    ],
+    "country": "BB",
+    "coverage": [
+      -59.753687488639144,
+      12.977319999999999,
+      -59.486732511360856,
+      13.23732
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bd_11371040_27040744": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:12:14+00:00",
+    "coordinates": [
+      23.7104,
+      90.40744
+    ],
+    "country": "BD",
+    "coverage": [
+      90.2654549913226,
+      23.5804,
+      90.54942500867739,
+      23.8404
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/bangladesh-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_be_14085045_18434878": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:49:24+00:00",
+    "coordinates": [
+      50.85045,
+      4.34878
+    ],
+    "country": "BE",
+    "coverage": [
+      4.142870950293859,
+      50.72045,
+      4.55468904970614,
+      50.980450000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/belgium-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bf_10236566_17846612": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:18:06+00:00",
+    "coordinates": [
+      12.36566,
+      -1.53388
+    ],
+    "country": "BF",
+    "coverage": [
+      -1.666967523587197,
+      12.23566,
+      -1.4007924764128028,
+      12.49566
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bg_13269751_20332415": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:39:33+00:00",
+    "coordinates": [
+      42.69751,
+      23.32415
+    ],
+    "country": "BG",
+    "coverage": [
+      23.147265790786484,
+      42.56751,
+      23.501034209213515,
+      42.827510000000004
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/bulgaria-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bh_11622787_23058565": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:24:01+00:00",
+    "coordinates": [
+      26.22787,
+      50.58565
+    ],
+    "country": "BH",
+    "coverage": [
+      50.44072949246385,
+      26.09787,
+      50.73057050753615,
+      26.35787
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bi_8657292_20992463": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:37:11+00:00",
+    "coordinates": [
+      -3.42708,
+      29.92463
+    ],
+    "country": "BI",
+    "coverage": [
+      29.7943971027063,
+      -3.55708,
+      30.054862897293702,
+      -3.2970800000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bj_9649646_18260359": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:18:45+00:00",
+    "coordinates": [
+      6.49646,
+      2.60359
+    ],
+    "country": "BJ",
+    "coverage": [
+      2.472749855544981,
+      6.36646,
+      2.734430144455019,
+      6.62646
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bl_10789618_11715022": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:44:50+00:00",
+    "coordinates": [
+      17.89618,
+      -62.84978
+    ],
+    "country": "BL",
+    "coverage": [
+      -62.986389883744565,
+      17.766180000000002,
+      -62.71317011625544,
+      18.02618
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bm_12229490_11521697": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:33:08+00:00",
+    "coordinates": [
+      32.2949,
+      -64.78303
+    ],
+    "country": "BM",
+    "coverage": [
+      -64.9368198442801,
+      32.164899999999996,
+      -64.6292401557199,
+      32.4249
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/united-kingdom/bermuda-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bn_9489035_29494006": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:15:30+00:00",
+    "coordinates": [
+      4.89035,
+      114.94006
+    ],
+    "country": "BN",
+    "coverage": [
+      114.80958502782829,
+      4.76035,
+      115.07053497217171,
+      5.02035
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bo_7096668_11473726": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:32:27+00:00",
+    "coordinates": [
+      -19.03332,
+      -65.26274
+    ],
+    "country": "BO",
+    "coverage": [
+      -65.40025824867475,
+      -19.16332,
+      -65.12522175132524,
+      -18.90332
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bo_7350000_11185000": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:17:20+00:00",
+    "coordinates": [
+      -16.5,
+      -68.15
+    ],
+    "country": "BO",
+    "coverage": [
+      -68.28558335865696,
+      -16.63,
+      -68.01441664134305,
+      -16.37
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_br_7420601_13211720": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:13:57+00:00",
+    "coordinates": [
+      -15.79399,
+      -47.8828
+    ],
+    "country": "BR",
+    "coverage": [
+      -48.01790051052045,
+      -15.923990000000002,
+      -47.74769948947956,
+      -15.66399
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america/brazil/centro-oeste-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bs_11505823_10265694": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:50:15+00:00",
+    "coordinates": [
+      25.05823,
+      -77.34306
+    ],
+    "country": "BS",
+    "coverage": [
+      -77.48656721319982,
+      24.92823,
+      -77.19955278680017,
+      25.188229999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_bt_11746609_26964191": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:13:21+00:00",
+    "coordinates": [
+      27.46609,
+      89.64191
+    ],
+    "country": "BT",
+    "coverage": [
+      89.49539546134845,
+      27.336090000000002,
+      89.78842453865154,
+      27.59609
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/bhutan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bw_6534549_20590859": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:36:29+00:00",
+    "coordinates": [
+      -24.65451,
+      25.90859
+    ],
+    "country": "BW",
+    "coverage": [
+      25.765550467093117,
+      -24.784509999999997,
+      26.051629532906883,
+      -24.52451
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_by_14390019_20756653": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:57:27+00:00",
+    "coordinates": [
+      53.90019,
+      27.56653
+    ],
+    "country": "BY",
+    "coverage": [
+      27.345889479125116,
+      53.77019,
+      27.787170520874884,
+      54.030190000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/belarus-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_bz_10725376_9123599": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:39:50+00:00",
+    "coordinates": [
+      17.25376,
+      -88.76401
+    ],
+    "country": "BZ",
+    "coverage": [
+      -88.90013558573979,
+      17.12376,
+      -88.62788441426021,
+      17.38376
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ca_13541117_10430188": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:22:25+00:00",
+    "coordinates": [
+      45.41117,
+      -75.69812
+    ],
+    "country": "CA",
+    "coverage": [
+      -75.86,
+      45.299,
+      -75.536,
+      45.525
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Ottawa/Ottawa.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Ottawa/Ottawa.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_cc_7784319_27682251": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:55:58+00:00",
+    "coordinates": [
+      -12.15681,
+      96.82251
+    ],
+    "country": "CC",
+    "coverage": [
+      96.68952786428095,
+      -12.286810000000001,
+      96.95549213571904,
+      -12.02681
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cd_8567242_19531357": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:52:23+00:00",
+    "coordinates": [
+      -4.32758,
+      15.31357
+    ],
+    "country": "CD",
+    "coverage": [
+      15.18319830065102,
+      -4.45758,
+      15.443941699348981,
+      -4.19758
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cf_9436351_19858359": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:34:45+00:00",
+    "coordinates": [
+      4.36351,
+      18.58359
+    ],
+    "country": "CF",
+    "coverage": [
+      18.45321208790291,
+      4.23351,
+      18.713967912097093,
+      4.49351
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/central-african-republic-latest.osm.pbf + https://download.geofabrik.de/africa/congo-democratic-republic-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cg_8573387_19528318": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:26:10+00:00",
+    "coordinates": [
+      -4.26613,
+      15.28318
+    ],
+    "country": "CG",
+    "coverage": [
+      15.152818805950526,
+      -4.39613,
+      15.413541194049474,
+      -4.1361300000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ch_13694809_18744744": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:25:21+00:00",
+    "coordinates": [
+      46.94809,
+      7.44744
+    ],
+    "country": "CH",
+    "coverage": [
+      7.257008644409895,
+      46.81809,
+      7.637871355590105,
+      47.07809
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ci_9682055_17472326": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:54:59+00:00",
+    "coordinates": [
+      6.82055,
+      -5.27674
+    ],
+    "country": "CI",
+    "coverage": [
+      -5.407666570367982,
+      6.69055,
+      -5.145813429632018,
+      6.95055
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ck_6879250_2022454": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:32:32+00:00",
+    "coordinates": [
+      -21.2075,
+      -159.77546
+    ],
+    "country": "CK",
+    "coverage": [
+      -159.9149036157517,
+      -21.3375,
+      -159.6360163842483,
+      -21.0775
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/cook-islands-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_cl_5654306_10935173": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:26:04+00:00",
+    "coordinates": [
+      -33.45694,
+      -70.64827
+    ],
+    "country": "CL",
+    "coverage": [
+      -70.80408917709657,
+      -33.586940000000006,
+      -70.49245082290342,
+      -33.32694
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cm_9386667_19151667": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:57:47+00:00",
+    "coordinates": [
+      3.86667,
+      11.51667
+    ],
+    "country": "CM",
+    "coverage": [
+      11.386373402697469,
+      3.73667,
+      11.64696659730253,
+      3.99667
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cn_12990420_29640740": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:20:10+00:00",
+    "coordinates": [
+      39.9042,
+      116.4074
+    ],
+    "country": "CN",
+    "coverage": [
+      116.23793457469108,
+      39.7742,
+      116.57686542530891,
+      40.034200000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/china/beijing-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_co_9460971_10591825": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:09:52+00:00",
+    "coordinates": [
+      4.60971,
+      -74.08175
+    ],
+    "country": "CO",
+    "coverage": [
+      -74.21217187921155,
+      4.47971,
+      -73.95132812078845,
+      4.73971
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cr_9993388_9591511": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:57:47+00:00",
+    "coordinates": [
+      9.93388,
+      -84.08489
+    ],
+    "country": "CR",
+    "coverage": [
+      -84.2168686919591,
+      9.80388,
+      -83.9529113080409,
+      10.063880000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cu_11313302_9761696": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:46:08+00:00",
+    "coordinates": [
+      23.13302,
+      -82.38304
+    ],
+    "country": "CU",
+    "coverage": [
+      -82.52440654331602,
+      23.00302,
+      -82.24167345668397,
+      23.263019999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cv_10493152_15648746": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05",
+    "coordinates": [
+      14.93152,
+      -23.51254
+    ],
+    "country": "CV",
+    "coverage": [
+      -23.647082911753945,
+      14.80152,
+      -23.377997088246058,
+      15.061520000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/cape-verde-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_cw_10212246_11111359": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:05:29+00:00",
+    "coordinates": [
+      12.12246,
+      -68.88641
+    ],
+    "country": "CW",
+    "coverage": [
+      -69.01937498745738,
+      11.99246,
+      -68.75344501254261,
+      12.252460000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cx_7957828_28567912": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:52:33+00:00",
+    "coordinates": [
+      -10.42172,
+      105.67912
+    ],
+    "country": "CX",
+    "coverage": [
+      105.54693941261345,
+      -10.551720000000001,
+      105.81130058738654,
+      -10.29172
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_cy_12517284_21335397": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:09:40+00:00",
+    "coordinates": [
+      35.17284,
+      33.35397
+    ],
+    "country": "CY",
+    "coverage": [
+      33.1949326513194,
+      35.04284,
+      33.513007348680595,
+      35.30284
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/cyprus-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_cz_14007550_19441780": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:46:35+00:00",
+    "coordinates": [
+      50.0755,
+      14.4178
+    ],
+    "country": "CZ",
+    "coverage": [
+      14.215237622410259,
+      49.945499999999996,
+      14.62036237758974,
+      50.2055
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/czech-republic/stredocesky-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_dj_10158901_22314503": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:32:09+00:00",
+    "coordinates": [
+      11.58901,
+      43.14503
+    ],
+    "country": "DJ",
+    "coverage": [
+      43.01232464212266,
+      11.45901,
+      43.27773535787734,
+      11.71901
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_dk_14567594_19256553": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:23:53+00:00",
+    "coordinates": [
+      55.67594,
+      12.56553
+    ],
+    "country": "DK",
+    "coverage": [
+      12.334981590778474,
+      55.545939999999995,
+      12.796078409221527,
+      55.80594
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/denmark-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_dm_10530174_11861192": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:57:12+00:00",
+    "coordinates": [
+      15.30174,
+      -61.38808
+    ],
+    "country": "DM",
+    "coverage": [
+      -61.52285795890007,
+      15.17174,
+      -61.253302041099936,
+      15.431740000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_do_10847186_11010768": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:01:35+00:00",
+    "coordinates": [
+      18.47186,
+      -69.89232
+    ],
+    "country": "DO",
+    "coverage": [
+      -70.02938149303709,
+      18.34186,
+      -69.7552585069629,
+      18.60186
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_dz_12673225_18308746": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:17:17+00:00",
+    "coordinates": [
+      36.73225,
+      3.08746
+    ],
+    "country": "DZ",
+    "coverage": [
+      2.925251798922554,
+      36.60225,
+      3.249668201077446,
+      36.86225
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ec_8977015_10147505": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:07+00:00",
+    "coordinates": [
+      -0.22985,
+      -78.52495
+    ],
+    "country": "EC",
+    "coverage": [
+      -78.65495104606825,
+      -0.35985,
+      -78.39494895393176,
+      -0.09985
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ee_14943696_20475353": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:44:52+00:00",
+    "coordinates": [
+      59.43696,
+      24.75353
+    ],
+    "country": "EE",
+    "coverage": [
+      24.49786911129168,
+      59.30696,
+      25.00919088870832,
+      59.56696
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/estonia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_eg_12004440_21123570": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:28:12+00:00",
+    "coordinates": [
+      30.0444,
+      31.2357
+    ],
+    "country": "EG",
+    "coverage": [
+      31.085521694574584,
+      29.9144,
+      31.38587830542542,
+      30.1744
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_eh_11714180_16681203": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:33:42+00:00",
+    "coordinates": [
+      27.1418,
+      -13.18797
+    ],
+    "country": "EH",
+    "coverage": [
+      -13.334057075762777,
+      27.0118,
+      -13.041882924237223,
+      27.2718
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_er_10533805_21893184": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:19:11+00:00",
+    "coordinates": [
+      15.33805,
+      38.93184
+    ],
+    "country": "ER",
+    "coverage": [
+      38.79703864091437,
+      15.20805,
+      39.06664135908563,
+      15.468050000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_es_13041650_17629744": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:18:37+00:00",
+    "coordinates": [
+      40.4165,
+      -3.70256
+    ],
+    "country": "ES",
+    "coverage": [
+      -3.873308961105532,
+      40.2865,
+      -3.5318110388944683,
+      40.5465
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/spain/madrid-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_et_9902497_21874689": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:15:54+00:00",
+    "coordinates": [
+      9.02497,
+      38.74689
+    ],
+    "country": "ET",
+    "coverage": [
+      38.61526043537497,
+      8.894969999999999,
+      38.87851956462503,
+      9.15497
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_fj_7186317_35842531": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:37:27+00:00",
+    "coordinates": [
+      -18.13683,
+      178.42531
+    ],
+    "country": "FJ",
+    "coverage": [
+      178.2885133732761,
+      -18.26683,
+      178.5621066267239,
+      -18.00683
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/fiji-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_fk_3830618_12214299": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:30:48+00:00",
+    "coordinates": [
+      -51.69382,
+      -57.85701
+    ],
+    "country": "FK",
+    "coverage": [
+      -58.066733533085646,
+      -51.823820000000005,
+      -57.64728646691436,
+      -51.56382
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_fm_9692477_33816109": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:36:09+00:00",
+    "coordinates": [
+      6.92477,
+      158.16109
+    ],
+    "country": "FM",
+    "coverage": [
+      158.0301347220839,
+      6.79477,
+      158.29204527791612,
+      7.0547699999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/micronesia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_fo_15200973_17322836": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:11:42+00:00",
+    "coordinates": [
+      62.00973,
+      -6.77164
+    ],
+    "country": "FO",
+    "coverage": [
+      -7.048635553353735,
+      61.879729999999995,
+      -6.494644446646264,
+      62.13973
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/faroe-islands-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ga_9039241_18945356": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:52:58+00:00",
+    "coordinates": [
+      0.39241,
+      9.45356
+    ],
+    "country": "GA",
+    "coverage": [
+      9.323556951004997,
+      0.26241,
+      9.583563048995002,
+      0.52241
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gd_10205288_11824774": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:02:24+00:00",
+    "coordinates": [
+      12.05288,
+      -61.75226
+    ],
+    "country": "GD",
+    "coverage": [
+      -61.88519041154742,
+      11.92288,
+      -61.61932958845258,
+      12.18288
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ge_13169143_22483412": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:28:46+00:00",
+    "coordinates": [
+      41.69143,
+      44.83412
+    ],
+    "country": "GE",
+    "coverage": [
+      44.6600294133694,
+      41.561429999999994,
+      45.0082105866306,
+      41.82143
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/georgia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gf_9493810_12766545": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:15:37+00:00",
+    "coordinates": [
+      4.9381,
+      -52.33455
+    ],
+    "country": "GF",
+    "coverage": [
+      -52.46503432176512,
+      4.8081000000000005,
+      -52.20406567823488,
+      5.0681
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gg_13945981_17746473": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:20:25+00:00",
+    "coordinates": [
+      49.45981,
+      -2.53527
+    ],
+    "country": "GG",
+    "coverage": [
+      -2.735275762127689,
+      49.329809999999995,
+      -2.335264237872311,
+      49.58981
+    ],
+    "geometry_supplement": "OSM relation 12913145 full, fetched 2026-11-05; latest object timestamp 2026-11-02T10:06:27Z; merged without multiple object versions",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/guernsey-jersey-latest.osm.pbf + https://api.openstreetmap.org/api/0.6/relation/12913145/full",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gh_9555602_17980310": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:14:56+00:00",
+    "coordinates": [
+      5.55602,
+      -0.1969
+    ],
+    "country": "GH",
+    "coverage": [
+      -0.3275136213559437,
+      5.42602,
+      -0.06628637864405629,
+      5.68602
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gi_12614474_17464743": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:25:51+00:00",
+    "coordinates": [
+      36.14474,
+      -5.35257
+    ],
+    "country": "GI",
+    "coverage": [
+      -5.513554819419248,
+      36.014739999999996,
+      -5.191585180580752,
+      36.27474
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/spain/andalucia-latest.osm.pbf + https://download.geofabrik.de/africa/morocco-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gl_15418347_12827843": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:33:55+00:00",
+    "coordinates": [
+      64.18347,
+      -51.72157
+    ],
+    "country": "GL",
+    "coverage": [
+      -52.02008375111006,
+      64.05347,
+      -51.42305624888994,
+      64.31347
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/north-america/greenland-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gm_10345274_16342197": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:23:22+00:00",
+    "coordinates": [
+      13.45274,
+      -16.57803
+    ],
+    "country": "GM",
+    "coverage": [
+      -16.711697550841514,
+      13.32274,
+      -16.444362449158483,
+      13.582740000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gn_9953795_16632271": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:30:37+00:00",
+    "coordinates": [
+      9.53795,
+      -13.67729
+    ],
+    "country": "GN",
+    "coverage": [
+      -13.809112302879072,
+      9.40795,
+      -13.545467697120927,
+      9.667950000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gp_10599714_11826786": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:23:16+00:00",
+    "coordinates": [
+      15.99714,
+      -61.73214
+    ],
+    "country": "GP",
+    "coverage": [
+      -61.86737699114258,
+      15.86714,
+      -61.596903008857424,
+      16.12714
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/france/guadeloupe-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gq_9159250_19082361": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:29:44+00:00",
+    "coordinates": [
+      1.5925,
+      10.82361
+    ],
+    "country": "GQ",
+    "coverage": [
+      10.69355976958241,
+      1.4625,
+      10.95366023041759,
+      1.7225000000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gr_12798380_20372750": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:54:54+00:00",
+    "coordinates": [
+      37.9838,
+      23.7275
+    ],
+    "country": "GR",
+    "coverage": [
+      23.562564060341725,
+      37.8538,
+      23.892435939658274,
+      38.113800000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/greece-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_gs_3571889_14349080": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:16:27+00:00",
+    "coordinates": [
+      -54.28111,
+      -36.5092
+    ],
+    "country": "GS",
+    "coverage": [
+      -36.73187559825,
+      -54.41111,
+      -36.28652440175,
+      -54.151109999999996
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gt_10464072_8948673": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:44:10+00:00",
+    "coordinates": [
+      14.64072,
+      -90.51327
+    ],
+    "country": "GT",
+    "coverage": [
+      -90.64763278920445,
+      14.51072,
+      -90.37890721079556,
+      14.77072
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gu_10347567_32474886": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:52:50+00:00",
+    "coordinates": [
+      13.47567,
+      144.74886
+    ],
+    "country": "GU",
+    "coverage": [
+      144.6151796410434,
+      13.345669999999998,
+      144.88254035895662,
+      13.60567
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gw_10186357_16440233": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:23:35+00:00",
+    "coordinates": [
+      11.86357,
+      -15.59767
+    ],
+    "country": "GW",
+    "coverage": [
+      -15.730507421027664,
+      11.733569999999999,
+      -15.464832578972338,
+      11.99357
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_gy_9680448_12184473": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:16:18+00:00",
+    "coordinates": [
+      6.80448,
+      -58.15527
+    ],
+    "country": "GY",
+    "coverage": [
+      -58.28619218352612,
+      6.67448,
+      -58.024347816473885,
+      6.93448
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_hk_11227832_29417469": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:31:16+00:00",
+    "coordinates": [
+      22.27832,
+      114.17469
+    ],
+    "country": "HK",
+    "coverage": [
+      114.03420310776927,
+      22.148320000000002,
+      114.31517689223072,
+      22.40832
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/china/hong-kong-latest.osm.pbf + https://download.geofabrik.de/asia/china/guangdong-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_hn_10408180_9279319": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:03:46+00:00",
+    "coordinates": [
+      14.0818,
+      -87.20681
+    ],
+    "country": "HN",
+    "coverage": [
+      -87.34083761692028,
+      13.951799999999999,
+      -87.07278238307973,
+      14.2118
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_hr_13581444_19597798": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:51:37+00:00",
+    "coordinates": [
+      45.81444,
+      15.97798
+    ],
+    "country": "HR",
+    "coverage": [
+      15.791462195833091,
+      45.684439999999995,
+      16.16449780416691,
+      45.94444
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/croatia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ht_10854349_10766119": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:55:01+00:00",
+    "coordinates": [
+      18.54349,
+      -72.33881
+    ],
+    "country": "HT",
+    "coverage": [
+      -72.47592886396549,
+      18.41349,
+      -72.2016911360345,
+      18.673489999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_hu_13749835_19904045": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:16:58+00:00",
+    "coordinates": [
+      47.49835,
+      19.04045
+    ],
+    "country": "HU",
+    "coverage": [
+      18.84803170685251,
+      47.36835,
+      19.23286829314749,
+      47.628350000000005
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Budapest/Budapest.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Budapest/Budapest.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_id_8378538_28684513": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:25:09+00:00",
+    "coordinates": [
+      -6.21462,
+      106.84513
+    ],
+    "country": "ID",
+    "coverage": [
+      106.7143615225289,
+      -6.34462,
+      106.97589847747109,
+      -6.08462
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/indonesia/java-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ie_14333306_17375111": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:03:27+00:00",
+    "coordinates": [
+      53.33306,
+      -6.24889
+    ],
+    "country": "IE",
+    "coverage": [
+      -6.466586218015271,
+      53.20306,
+      -6.031193781984729,
+      53.463060000000006
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Dublin/Dublin.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Dublin/Dublin.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_il_12176904_21521633": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:01:54+00:00",
+    "coordinates": [
+      31.76904,
+      35.21633
+    ],
+    "country": "IL",
+    "coverage": [
+      35.06342072068114,
+      31.63904,
+      35.36923927931886,
+      31.89904
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_im_14415000_17551667": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:11:13+00:00",
+    "coordinates": [
+      54.15,
+      -4.48333
+    ],
+    "country": "IM",
+    "coverage": [
+      -4.705299806935531,
+      54.019999999999996,
+      -4.261360193064468,
+      54.28
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/isle-of-man-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_in_11862137_25721480": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:55:10+00:00",
+    "coordinates": [
+      28.62137,
+      77.2148
+    ],
+    "country": "IN",
+    "coverage": [
+      76.98,
+      28.44,
+      77.5,
+      28.74
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/NewDelhi/NewDelhi.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/NewDelhi/NewDelhi.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_io_8273771_25237676": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:17:24+00:00",
+    "coordinates": [
+      -7.26229,
+      72.37676
+    ],
+    "country": "IO",
+    "coverage": [
+      72.2457087,
+      -7.39229,
+      72.5078113,
+      -7.13229
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=72.24570868763949,-7.39229,72.50781131236052,-7.13229",
+    "source_timestamp": "2026-11-05T06:17:01Z",
+    "source_timestamp_kind": "HTTP response Date (live OSM map API; not a replication timestamp)"
+  },
+  "capital_iq_12334058_22440088": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:48:11+00:00",
+    "coordinates": [
+      33.34058,
+      44.40088
+    ],
+    "country": "IQ",
+    "coverage": [
+      44.24526933238076,
+      33.21058,
+      44.556490667619244,
+      33.470580000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/iraq-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ir_12569439_23142151": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:13:02+00:00",
+    "coordinates": [
+      35.69439,
+      51.42151
+    ],
+    "country": "IR",
+    "coverage": [
+      51.26143920620473,
+      35.564389999999996,
+      51.58158079379527,
+      35.82439
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/iran-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_is_15414660_15805740": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:49:12+00:00",
+    "coordinates": [
+      64.1466,
+      -21.9426
+    ],
+    "country": "IS",
+    "coverage": [
+      -22.240717266164435,
+      64.01660000000001,
+      -21.644482733835563,
+      64.2766
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/iceland-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_je_13918804_17789509": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:20:06+00:00",
+    "coordinates": [
+      49.18804,
+      -2.10491
+    ],
+    "country": "JE",
+    "coverage": [
+      -2.3038149194964044,
+      49.05804,
+      -1.9060050805035953,
+      49.31804
+    ],
+    "geometry_supplement": "OSM relation 12913145 full, fetched 2026-11-05; latest object timestamp 2026-11-02T10:06:27Z; merged without multiple object versions",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/guernsey-jersey-latest.osm.pbf + https://api.openstreetmap.org/api/0.6/relation/12913145/full",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_jm_10799702_10320642": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:47:32+00:00",
+    "coordinates": [
+      17.99702,
+      -76.79358
+    ],
+    "country": "JM",
+    "coverage": [
+      -76.930267779403,
+      17.86702,
+      -76.65689222059702,
+      18.127019999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_jo_12195522_21594503": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:18:19+00:00",
+    "coordinates": [
+      31.95522,
+      35.94503
+    ],
+    "country": "JO",
+    "coverage": [
+      35.791811588329004,
+      31.82522,
+      36.098248411671,
+      32.08522
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/jordan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ke_8871667_21681667": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:11:28+00:00",
+    "coordinates": [
+      -1.28333,
+      36.81667
+    ],
+    "country": "KE",
+    "coverage": [
+      36.68663738363359,
+      -1.4133300000000002,
+      36.946702616366416,
+      -1.15333
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_kg_13287000_25459000": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:42:57+00:00",
+    "coordinates": [
+      42.87,
+      74.59
+    ],
+    "country": "KG",
+    "coverage": [
+      74.41262227066727,
+      42.739999999999995,
+      74.76737772933274,
+      43.0
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/kyrgyzstan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_kh_10155600_28492820": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:23:27+00:00",
+    "coordinates": [
+      11.556,
+      104.9282
+    ],
+    "country": "KH",
+    "coverage": [
+      104.79551029712272,
+      11.425999999999998,
+      105.06088970287729,
+      11.686
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/cambodia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ki_9132780_35297696": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:35:57+00:00",
+    "coordinates": [
+      1.3278,
+      172.97696
+    ],
+    "country": "KI",
+    "coverage": [
+      172.8469250835072,
+      1.1978,
+      173.1069949164928,
+      1.4578000000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/kiribati-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_km_7829784_22325506": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:08:29+00:00",
+    "coordinates": [
+      -11.70216,
+      43.25506
+    ],
+    "country": "KM",
+    "coverage": [
+      43.12230061815701,
+      -11.83216,
+      43.38781938184299,
+      -11.572159999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_kn_10729550_11727501": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:39:39+00:00",
+    "coordinates": [
+      17.2955,
+      -62.72499
+    ],
+    "country": "KN",
+    "coverage": [
+      -62.861146428322876,
+      17.1655,
+      -62.58883357167712,
+      17.4255
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_kp_12903385_30575432": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:52:10+00:00",
+    "coordinates": [
+      39.03385,
+      125.75432
+    ],
+    "country": "KP",
+    "coverage": [
+      125.58696116016674,
+      38.90385,
+      125.92167883983328,
+      39.163850000000004
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/north-korea-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_kw_11936700_22797429": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:41+00:00",
+    "coordinates": [
+      29.367,
+      47.97429
+    ],
+    "country": "KW",
+    "coverage": [
+      47.82512128401244,
+      29.237000000000002,
+      48.12345871598757,
+      29.497
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ky_10928660_9862564": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:43:34+00:00",
+    "coordinates": [
+      19.2866,
+      -81.37436
+    ],
+    "country": "KY",
+    "coverage": [
+      -81.51208963145137,
+      19.1566,
+      -81.23663036854862,
+      19.4166
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_kz_14118010_25144598": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:11:10+00:00",
+    "coordinates": [
+      51.1801,
+      71.44598
+    ],
+    "country": "KZ",
+    "coverage": [
+      71.23860195285422,
+      51.0501,
+      71.65335804714579,
+      51.310100000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/kazakhstan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_la_10796667_28260000": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:37+00:00",
+    "coordinates": [
+      17.96667,
+      102.6
+    ],
+    "country": "LA",
+    "coverage": [
+      102.46333571887422,
+      17.83667,
+      102.73666428112577,
+      18.09667
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/laos-latest.osm.pbf + https://download.geofabrik.de/asia/thailand-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lb_12389332_21550157": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:33:12+00:00",
+    "coordinates": [
+      33.89332,
+      35.50157
+    ],
+    "country": "LB",
+    "coverage": [
+      35.34495808074168,
+      33.76332,
+      35.658181919258325,
+      34.023320000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/lebanon-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lc_10400960_11900976": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:22:41+00:00",
+    "coordinates": [
+      14.0096,
+      -60.99024
+    ],
+    "country": "LC",
+    "coverage": [
+      -61.124225370976305,
+      13.8796,
+      -60.856254629023695,
+      14.139600000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_li_13714151_18952154": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:49:35+00:00",
+    "coordinates": [
+      47.14151,
+      9.52154
+    ],
+    "country": "LI",
+    "coverage": [
+      9.330416923902856,
+      47.011509999999994,
+      9.712663076097144,
+      47.27151
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf + https://download.geofabrik.de/europe/switzerland-latest.osm.pbf + https://download.geofabrik.de/europe/austria-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lk_9688297_25990708": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:06:16+00:00",
+    "coordinates": [
+      6.88297,
+      79.90708
+    ],
+    "country": "LK",
+    "coverage": [
+      79.77613628950303,
+      6.75297,
+      80.03802371049696,
+      7.01297
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/sri-lanka-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lr_9632036_16919395": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:25:09+00:00",
+    "coordinates": [
+      6.32036,
+      -10.80605
+    ],
+    "country": "LR",
+    "coverage": [
+      -10.936844985166868,
+      6.19036,
+      -10.675255014833134,
+      6.45036
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/liberia-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ls_6068333_20748333": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:04:11+00:00",
+    "coordinates": [
+      -29.31667,
+      27.48333
+    ],
+    "country": "LS",
+    "coverage": [
+      27.334234924213394,
+      -29.446669999999997,
+      27.632425075786603,
+      -29.18667
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_lt_14468916_20527980": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:58:07+00:00",
+    "coordinates": [
+      54.68916,
+      25.2798
+    ],
+    "country": "LT",
+    "coverage": [
+      25.054891183186133,
+      54.55916,
+      25.50470881681387,
+      54.819160000000004
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/lithuania-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lu_13960982_18613268": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:26:07+00:00",
+    "coordinates": [
+      49.60982,
+      6.13268
+    ],
+    "country": "LU",
+    "coverage": [
+      5.932059425153436,
+      49.47982,
+      6.333300574846564,
+      49.73982
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf + https://download.geofabrik.de/europe/france/lorraine-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_lv_14694600_20410589": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:47:40+00:00",
+    "coordinates": [
+      56.946,
+      24.10589
+    ],
+    "country": "LV",
+    "coverage": [
+      23.8675456009457,
+      56.815999999999995,
+      24.344234399054297,
+      57.076
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/latvia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ly_12288743_19318733": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:27:02+00:00",
+    "coordinates": [
+      32.88743,
+      13.18733
+    ],
+    "country": "LY",
+    "coverage": [
+      13.03251999544207,
+      32.75743,
+      13.342140004557928,
+      33.017430000000004
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ma_12401325_17316745": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:20:40+00:00",
+    "coordinates": [
+      34.01325,
+      -6.83255
+    ],
+    "country": "MA",
+    "coverage": [
+      -6.989382800942094,
+      33.88325,
+      -6.675717199057907,
+      34.14325
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_md_13700902_20885938": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:23:21+00:00",
+    "coordinates": [
+      47.00902,
+      28.85938
+    ],
+    "country": "MD",
+    "coverage": [
+      28.66873151792073,
+      46.87902,
+      29.050028482079274,
+      47.13902
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/moldova-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_me_13244124_19926309": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:09:34+00:00",
+    "coordinates": [
+      42.44124,
+      19.26309
+    ],
+    "country": "ME",
+    "coverage": [
+      19.086931030811574,
+      42.31124,
+      19.439248969188423,
+      42.57124
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/montenegro-latest.osm.pbf + https://download.geofabrik.de/europe/albania-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mf_10806819_11691698": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:49:30+00:00",
+    "coordinates": [
+      18.06819,
+      -63.08302
+    ],
+    "country": "MF",
+    "coverage": [
+      -63.219763064516044,
+      17.938190000000002,
+      -62.94627693548395,
+      18.19819
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mg_7108632_22753613": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:18:54+00:00",
+    "coordinates": [
+      -18.91368,
+      47.53613
+    ],
+    "country": "MG",
+    "coverage": [
+      47.39871044227772,
+      -19.04368,
+      47.67354955772228,
+      -18.78368
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mh_9708971_35138027": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:35:48+00:00",
+    "coordinates": [
+      7.08971,
+      171.38027
+    ],
+    "country": "MH",
+    "coverage": [
+      171.2492683773148,
+      6.95971,
+      171.5112716226852,
+      7.21971
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/marshall-islands-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mk_13199646_20143141": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:18:13+00:00",
+    "coordinates": [
+      41.99646,
+      21.43141
+    ],
+    "country": "MK",
+    "coverage": [
+      21.256487475959116,
+      41.86646,
+      21.606332524040884,
+      42.12646
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/macedonia-latest.osm.pbf + https://download.geofabrik.de/europe/kosovo-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ml_10260915_17202478": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:21:40+00:00",
+    "coordinates": [
+      12.60915,
+      -7.97522
+    ],
+    "country": "ML",
+    "coverage": [
+      -8.108432838899857,
+      12.479149999999999,
+      -7.842007161100143,
+      12.73915
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mm_10974500_27612972": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:37:55+00:00",
+    "coordinates": [
+      19.745,
+      96.12972
+    ],
+    "country": "MM",
+    "coverage": [
+      95.99159926023043,
+      19.615000000000002,
+      96.26784073976958,
+      19.875
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/myanmar-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mn_13790771_28688324": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:40:12+00:00",
+    "coordinates": [
+      47.90771,
+      106.88324
+    ],
+    "country": "MN",
+    "coverage": [
+      106.68930473437594,
+      47.77771,
+      107.07717526562406,
+      48.037710000000004
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/mongolia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mo_11220056_29354611": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:09:31+00:00",
+    "coordinates": [
+      22.20056,
+      113.54611
+    ],
+    "country": "MO",
+    "coverage": [
+      113.40570104796802,
+      22.07056,
+      113.68651895203197,
+      22.33056
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/china/guangdong-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mp_10521233_32575450": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:54:26+00:00",
+    "coordinates": [
+      15.21233,
+      145.7545
+    ],
+    "country": "MP",
+    "coverage": [
+      145.61977939669563,
+      15.082329999999999,
+      145.88922060330438,
+      15.34233
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mq_10460365_11892582": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:25:01+00:00",
+    "coordinates": [
+      14.60365,
+      -61.07418
+    ],
+    "country": "MQ",
+    "coverage": [
+      -61.20852011111702,
+      14.47365,
+      -60.93983988888298,
+      14.73365
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/france/martinique-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mr_10808581_16402150": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:15:47+00:00",
+    "coordinates": [
+      18.08581,
+      -15.9785
+    ],
+    "country": "MR",
+    "coverage": [
+      -16.11525679129647,
+      17.95581,
+      -15.841743208703528,
+      18.215809999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ms_10670555_11778708": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:53:19+00:00",
+    "coordinates": [
+      16.70555,
+      -62.21292
+    ],
+    "country": "MS",
+    "coverage": [
+      -62.348648466772886,
+      16.57555,
+      -62.07719153322711,
+      16.835549999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mt_12589968_19451480": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:22:36+00:00",
+    "coordinates": [
+      35.89968,
+      14.5148
+    ],
+    "country": "MT",
+    "coverage": [
+      14.354315071898013,
+      35.769679999999994,
+      14.675284928101986,
+      36.02968
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/malta-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mu_6983806_23749889": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:10:32+00:00",
+    "coordinates": [
+      -20.16194,
+      57.49889
+    ],
+    "country": "MU",
+    "coverage": [
+      57.36040387311288,
+      -20.29194,
+      57.637376126887126,
+      -20.031940000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/mauritius-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mv_9417521_25350916": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:17:26+00:00",
+    "coordinates": [
+      4.17521,
+      73.50916
+    ],
+    "country": "MV",
+    "coverage": [
+      73.37881407124232,
+      4.04521,
+      73.63950592875767,
+      4.30521
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/maldives-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mw_7603308_21378725": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:55:11+00:00",
+    "coordinates": [
+      -13.96692,
+      33.78725
+    ],
+    "country": "MW",
+    "coverage": [
+      33.653289489572046,
+      -14.09692,
+      33.921210510427954,
+      -13.83692
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_mx_10942847_8087234": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:32:59+00:00",
+    "coordinates": [
+      19.42847,
+      -99.12766
+    ],
+    "country": "MX",
+    "coverage": [
+      -99.2655094959974,
+      19.29847,
+      -98.9898105040026,
+      19.55847
+    ],
+    "coverage_sources": [
+      "https://download.openstreetmap.fr/polygons/north-america/mexico/mexico_city.poly",
+      "https://download.openstreetmap.fr/polygons/north-america/mexico/state_of_mexico.poly"
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "replication_alignment": {
+      "from_sequence": 7358939,
+      "source": "https://download.openstreetmap.fr/replication/north-america/mexico/mexico_city/minute/007/358/940.osc.gz",
+      "to_sequence": 7358940
+    },
+    "source": "https://download.openstreetmap.fr/extracts/north-america/mexico/mexico_city-latest.osm.pbf + https://download.openstreetmap.fr/extracts/north-america/mexico/state_of_mexico-latest.osm.pbf",
+    "source_timestamp": "2026-11-05T00:53:24Z"
+  },
+  "capital_my_9314120_28168653": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:17:25+00:00",
+    "coordinates": [
+      3.1412,
+      101.68653
+    ],
+    "country": "MY",
+    "coverage": [
+      101.55633438439652,
+      3.0112,
+      101.81672561560349,
+      3.2712
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_mz_6403447_21258322": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:03:07+00:00",
+    "coordinates": [
+      -25.96553,
+      32.58322
+    ],
+    "country": "MZ",
+    "coverage": [
+      32.43862414992901,
+      -26.09553,
+      32.72781585007098,
+      -25.835530000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_na_6744059_19708323": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:54:37+00:00",
+    "coordinates": [
+      -22.55941,
+      17.08323
+    ],
+    "country": "NA",
+    "coverage": [
+      16.942458477196883,
+      -22.68941,
+      17.224001522803118,
+      -22.42941
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_nc_6772593_34644884": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:38:25+00:00",
+    "coordinates": [
+      -22.27407,
+      166.44884
+    ],
+    "country": "NC",
+    "coverage": [
+      166.30835737653922,
+      -22.404069999999997,
+      166.58932262346076,
+      -22.14407
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/new-caledonia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ne_10351366_18210980": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:14:46+00:00",
+    "coordinates": [
+      13.51366,
+      2.1098
+    ],
+    "country": "NE",
+    "coverage": [
+      1.9760983682564002,
+      13.383659999999999,
+      2.2435016317436,
+      13.64366
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_nf_6094541_34796628": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:52:57+00:00",
+    "coordinates": [
+      -29.05459,
+      167.96628
+    ],
+    "country": "NF",
+    "coverage": [
+      167.81756536273852,
+      -29.18459,
+      168.1149946372615,
+      -28.924590000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ng_9905785_18749508": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:13:29+00:00",
+    "coordinates": [
+      9.05785,
+      7.49508
+    ],
+    "country": "NG",
+    "coverage": [
+      7.363438414890777,
+      8.92785,
+      7.626721585109222,
+      9.187850000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ni_10213282_9374960": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:48:39+00:00",
+    "coordinates": [
+      12.13282,
+      -86.2504
+    ],
+    "country": "NI",
+    "coverage": [
+      -86.38337015389386,
+      12.00282,
+      -86.11742984610613,
+      12.262820000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_nl_14237403_18488969": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:51:40+00:00",
+    "coordinates": [
+      52.37403,
+      4.88969
+    ],
+    "country": "NL",
+    "coverage": [
+      4.676751257577617,
+      52.244029999999995,
+      5.102628742422382,
+      52.50403
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Amsterdam/Amsterdam.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Amsterdam/Amsterdam.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_no_14991273_19074609": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:03:15+00:00",
+    "coordinates": [
+      59.91273,
+      10.74609
+    ],
+    "country": "NO",
+    "coverage": [
+      10.4,
+      59.75,
+      11.1,
+      60.04
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Oslo/Oslo.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Oslo/Oslo.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_np_11770169_26532060": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:27:04+00:00",
+    "coordinates": [
+      27.70169,
+      85.3206
+    ],
+    "country": "NP",
+    "coverage": [
+      85.17377037591234,
+      27.57169,
+      85.46742962408766,
+      27.83169
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/nepal-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_nr_8944915_34692520": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:32:16+00:00",
+    "coordinates": [
+      -0.55085,
+      166.9252
+    ],
+    "country": "NR",
+    "coverage": [
+      166.79519399170115,
+      -0.68085,
+      167.05520600829882,
+      -0.42084999999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/nauru-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_nu_7094706_1008043": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:32:22+00:00",
+    "coordinates": [
+      -19.05294,
+      -169.91957
+    ],
+    "country": "NU",
+    "coverage": [
+      -170.05710450398328,
+      -19.18294,
+      -169.7820354960167,
+      -18.92294
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/niue-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_nz_4871336_35477557": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:55:52+00:00",
+    "coordinates": [
+      -41.28664,
+      174.77557
+    ],
+    "country": "NZ",
+    "coverage": [
+      174.6025637660054,
+      -41.41664,
+      174.94857623399457,
+      -41.156639999999996
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_om_11358413_23840778": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:25:16+00:00",
+    "coordinates": [
+      23.58413,
+      58.40778
+    ],
+    "country": "OM",
+    "coverage": [
+      58.26593194001618,
+      23.45413,
+      58.549628059983824,
+      23.714129999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_pa_9899360_10048027": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:51:51+00:00",
+    "coordinates": [
+      8.9936,
+      -79.51973
+    ],
+    "country": "PA",
+    "coverage": [
+      -79.65134813862338,
+      8.8636,
+      -79.38811186137661,
+      9.123600000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_pe_7795682_10297176": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:18:32+00:00",
+    "coordinates": [
+      -12.04318,
+      -77.02824
+    ],
+    "country": "PE",
+    "coverage": [
+      -77.16116560838893,
+      -12.17318,
+      -76.89531439161107,
+      -11.913179999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_pf_7246530_3043157": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:53:43+00:00",
+    "coordinates": [
+      -17.5347,
+      -149.56843
+    ],
+    "country": "PF",
+    "coverage": [
+      -149.7047648449767,
+      -17.6647,
+      -149.43209515502332,
+      -17.404700000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_pg_8052277_32715089": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:54:14+00:00",
+    "coordinates": [
+      -9.47723,
+      147.15089
+    ],
+    "country": "PG",
+    "coverage": [
+      147.01909109192144,
+      -9.607230000000001,
+      147.28268890807857,
+      -9.34723
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ph_10460420_30098220": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:29:58+00:00",
+    "coordinates": [
+      14.6042,
+      120.9822
+    ],
+    "country": "PH",
+    "coverage": [
+      120.84785955287975,
+      14.4742,
+      121.11654044712026,
+      14.734200000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/philippines-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_pk_12372148_25304329": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:08:56+00:00",
+    "coordinates": [
+      33.72148,
+      73.04329
+    ],
+    "country": "PK",
+    "coverage": [
+      72.88699229431701,
+      33.59148,
+      73.19958770568299,
+      33.85148
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/pakistan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_pl_14222977_20101178": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:13:19+00:00",
+    "coordinates": [
+      52.22977,
+      21.01178
+    ],
+    "country": "PL",
+    "coverage": [
+      20.79953386100811,
+      52.09977,
+      21.224026138991892,
+      52.359770000000005
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Warsaw/Warsaw.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Warsaw/Warsaw.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_pm_13677914_12382270": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:36:58+00:00",
+    "coordinates": [
+      46.77914,
+      -56.1773
+    ],
+    "country": "PM",
+    "coverage": [
+      -56.36713299448471,
+      46.64914,
+      -55.98746700551529,
+      46.90914
+    ],
+    "coverage_sources": [
+      "https://download.openstreetmap.fr/polygons/north-america/saint_pierre_et_miquelon.poly",
+      "https://download.openstreetmap.fr/polygons/north-america/canada/newfoundland_and_labrador.poly"
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "replication_alignment": {
+      "from_sequence": 7358926,
+      "source": "https://download.openstreetmap.fr/replication/north-america/saint_pierre_et_miquelon/minute/007/358/",
+      "to_sequence": 7358943
+    },
+    "source": "https://download.openstreetmap.fr/extracts/north-america/saint_pierre_et_miquelon-latest.osm.pbf + https://download.openstreetmap.fr/extracts/north-america/canada/newfoundland_and_labrador-latest.osm.pbf",
+    "source_timestamp": "2026-11-05T00:56:28Z"
+  },
+  "capital_pn_6493403_4989853": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:32:25+00:00",
+    "coordinates": [
+      -25.06597,
+      -130.10147
+    ],
+    "country": "PN",
+    "coverage": [
+      -130.24498627900007,
+      -25.19597,
+      -129.95795372099994,
+      -24.93597
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/pitcairn-islands-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_pr_10846633_11389428": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:00:10+00:00",
+    "coordinates": [
+      18.46633,
+      -66.10572
+    ],
+    "country": "PR",
+    "coverage": [
+      -66.24277707477208,
+      18.33633,
+      -65.96866292522793,
+      18.59633
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ps_12178336_21523388": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:00:49+00:00",
+    "coordinates": [
+      31.78336,
+      35.23388
+    ],
+    "country": "PS",
+    "coverage": [
+      35.08094704540539,
+      31.65336,
+      35.38681295459461,
+      31.913359999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_pt_12872509_17085020": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:07:04+00:00",
+    "coordinates": [
+      38.72509,
+      -9.1498
+    ],
+    "country": "PT",
+    "coverage": [
+      -9.316433225340242,
+      38.59509,
+      -8.98316677465976,
+      38.855090000000004
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Lisbon/Lisbon.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Lisbon/Lisbon.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_pw_9750077_31462380": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:20:53+00:00",
+    "coordinates": [
+      7.50077,
+      134.6238
+    ],
+    "country": "PW",
+    "coverage": [
+      134.49267800312086,
+      7.37077,
+      134.75492199687912,
+      7.63077
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/palau-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_py_6471354_12235300": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:08:27+00:00",
+    "coordinates": [
+      -25.28646,
+      -57.647
+    ],
+    "country": "PY",
+    "coverage": [
+      -57.7907761224514,
+      -25.41646,
+      -57.5032238775486,
+      -25.156460000000003
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_qa_11528545_23153096": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:21:09+00:00",
+    "coordinates": [
+      25.28545,
+      51.53096
+    ],
+    "country": "QA",
+    "coverage": [
+      51.387185074817545,
+      25.155450000000002,
+      51.674734925182456,
+      25.41545
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_re_6911769_23545040": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:36+00:00",
+    "coordinates": [
+      -20.88231,
+      55.4504
+    ],
+    "country": "RE",
+    "coverage": [
+      55.311260566807135,
+      -21.01231,
+      55.58953943319287,
+      -20.75231
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ro_13443225_20610626": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:22+00:00",
+    "coordinates": [
+      44.43225,
+      26.10626
+    ],
+    "country": "RO",
+    "coverage": [
+      25.924207249677814,
+      44.30225,
+      26.288312750322184,
+      44.562250000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/romania-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_rs_13480401_20046513": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:04:50+00:00",
+    "coordinates": [
+      44.80401,
+      20.46513
+    ],
+    "country": "RS",
+    "coverage": [
+      20.28190790619683,
+      44.674009999999996,
+      20.648352093803165,
+      44.93401
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/serbia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ru_14575390_21762080": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:57:09+00:00",
+    "coordinates": [
+      55.7539,
+      37.6208
+    ],
+    "country": "RU",
+    "coverage": [
+      37.38979101014466,
+      55.6239,
+      37.85180898985534,
+      55.883900000000004
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/Moscow/Moscow.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/Moscow/Moscow.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_rw_8805005_21005885": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05",
+    "coordinates": [
+      -1.94995,
+      30.05885
+    ],
+    "country": "RW",
+    "coverage": [
+      29.928774677507484,
+      -2.07995,
+      30.188925322492516,
+      -1.81995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/rwanda-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sa_11468773_22672185": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:26:04+00:00",
+    "coordinates": [
+      24.68773,
+      46.72185
+    ],
+    "country": "SA",
+    "coverage": [
+      46.5787723672344,
+      24.55773,
+      46.86492763276561,
+      24.817729999999997
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sb_8056667_33995000": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:37:46+00:00",
+    "coordinates": [
+      -9.43333,
+      159.95
+    ],
+    "country": "SB",
+    "coverage": [
+      159.81821790880335,
+      -9.56333,
+      160.08178209119663,
+      -9.303329999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/solomon-islands-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sc_8537999_23545501": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:17:22+00:00",
+    "coordinates": [
+      -4.62001,
+      55.45501
+    ],
+    "country": "SC",
+    "coverage": [
+      55.32458622825018,
+      -4.75001,
+      55.58543377174982,
+      -4.49001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/seychelles-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sd_10555177_21253241": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:49:07+00:00",
+    "coordinates": [
+      15.55177,
+      32.53241
+    ],
+    "country": "SD",
+    "coverage": [
+      32.39746964394491,
+      15.421769999999999,
+      32.66735035605509,
+      15.68177
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sg_9128967_28385007": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:49:07+00:00",
+    "coordinates": [
+      1.28967,
+      103.85007
+    ],
+    "country": "SG",
+    "coverage": [
+      103.72003706050185,
+      1.1596700000000002,
+      103.98010293949815,
+      1.41967
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf + https://download.geofabrik.de/asia/indonesia/sumatra-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sh_7407512_17428184": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:38:39+00:00",
+    "coordinates": [
+      -15.92488,
+      -5.71816
+    ],
+    "country": "SH",
+    "coverage": [
+      -5.8533482189396615,
+      -16.05488,
+      -5.582971781060339,
+      -15.79488
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_si_13605108_19450513": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:16:06+00:00",
+    "coordinates": [
+      46.05108,
+      14.50513
+    ],
+    "country": "SI",
+    "coverage": [
+      14.31781464778005,
+      45.921079999999996,
+      14.692445352219949,
+      46.18108
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/slovenia-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sj_16822334_19564689": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:10:15+00:00",
+    "coordinates": [
+      78.22334,
+      15.64689
+    ],
+    "country": "SJ",
+    "coverage": [
+      15.009938847602784,
+      78.09334,
+      16.283841152397216,
+      78.35333999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/norway/svalbard-janmayen-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sk_13814816_19710674": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:03:18+00:00",
+    "coordinates": [
+      48.14816,
+      17.10674
+    ],
+    "country": "SK",
+    "coverage": [
+      16.9118978284324,
+      48.018159999999995,
+      17.301582171567595,
+      48.27816
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/slovakia-latest.osm.pbf + https://download.geofabrik.de/europe/austria-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sl_9848714_16676440": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:35:40+00:00",
+    "coordinates": [
+      8.48714,
+      -13.2356
+    ],
+    "country": "SL",
+    "coverage": [
+      -13.367039390906719,
+      8.35714,
+      -13.104160609093281,
+      8.617140000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sm_13393667_19244639": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:36:16+00:00",
+    "coordinates": [
+      43.93667,
+      12.44639
+    ],
+    "country": "SM",
+    "coverage": [
+      12.265861317763822,
+      43.80667,
+      12.626918682236177,
+      44.06667
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/italy-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sn_10469370_16255594": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:31:37+00:00",
+    "coordinates": [
+      14.6937,
+      -17.44406
+    ],
+    "country": "SN",
+    "coverage": [
+      -17.578455311428037,
+      14.563699999999999,
+      -17.309664688571964,
+      14.8237
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_so_9203711_22534375": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:06:53+00:00",
+    "coordinates": [
+      2.03711,
+      45.34375
+    ],
+    "country": "SO",
+    "coverage": [
+      45.21366778977093,
+      1.9071100000000003,
+      45.47383221022907,
+      2.16711
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sr_9582476_12482961": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:28:23+00:00",
+    "coordinates": [
+      5.82476,
+      -55.17039
+    ],
+    "country": "SR",
+    "coverage": [
+      -55.30106468054842,
+      5.6947600000000005,
+      -55.039715319451574,
+      5.95476
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america/suriname-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ss_9485165_21158247": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:40:58+00:00",
+    "coordinates": [
+      4.85165,
+      31.58247
+    ],
+    "country": "SS",
+    "coverage": [
+      31.452002537943905,
+      4.72165,
+      31.712937462056097,
+      4.98165
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_st_9033756_18672990": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:22:42+00:00",
+    "coordinates": [
+      0.33756,
+      6.7299
+    ],
+    "country": "ST",
+    "coverage": [
+      6.599897743806575,
+      0.20756000000000002,
+      6.859902256193425,
+      0.46756000000000003
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sv_10368935_9081282": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:00:38+00:00",
+    "coordinates": [
+      13.68935,
+      -89.18718
+    ],
+    "country": "SV",
+    "coverage": [
+      -89.32098086427769,
+      13.559349999999998,
+      -89.05337913572231,
+      13.81935
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sx_10802600_11695418": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:52:41+00:00",
+    "coordinates": [
+      18.026,
+      -63.04582
+    ],
+    "country": "SX",
+    "coverage": [
+      -63.182530260317435,
+      17.896,
+      -62.90910973968256,
+      18.156
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sy_12351020_21629128": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:46:04+00:00",
+    "coordinates": [
+      33.5102,
+      36.29128
+    ],
+    "country": "SY",
+    "coverage": [
+      36.13536498323617,
+      33.380199999999995,
+      36.44719501676383,
+      33.6402
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/syria-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_sz_6355372_21120838": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:24:13+00:00",
+    "coordinates": [
+      -26.44628,
+      31.20838
+    ],
+    "country": "SZ",
+    "coverage": [
+      31.06318575945903,
+      -26.57628,
+      31.353574240540965,
+      -26.316280000000003
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/swaziland-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_sz_6368333_21113333": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:05:05+00:00",
+    "coordinates": [
+      -26.31667,
+      31.13333
+    ],
+    "country": "SZ",
+    "coverage": [
+      30.988298578339567,
+      -26.446669999999997,
+      31.278361421660435,
+      -26.18667
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_tc_11146122_10885812": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:42:54+00:00",
+    "coordinates": [
+      21.46122,
+      -71.14188
+    ],
+    "country": "TC",
+    "coverage": [
+      -71.28156500130962,
+      21.331220000000002,
+      -71.00219499869038,
+      21.59122
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_td_10210672_19504440": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:13:17+00:00",
+    "coordinates": [
+      12.10672,
+      15.0444
+    ],
+    "country": "TD",
+    "coverage": [
+      14.911442852848444,
+      11.976719999999998,
+      15.177357147151556,
+      12.23672
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_tf_4065084_25021937": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:53:53+00:00",
+    "coordinates": [
+      -49.34916,
+      70.21937
+    ],
+    "country": "TF",
+    "coverage": [
+      70.01981445064,
+      -49.47916,
+      70.41892554936,
+      -49.219159999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_tg_9612874_18122154": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:57:12+00:00",
+    "coordinates": [
+      6.12874,
+      1.22154
+    ],
+    "country": "TG",
+    "coverage": [
+      1.0907927160130784,
+      5.99874,
+      1.3522872839869218,
+      6.2587399999999995
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_th_10375398_28050144": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:59:28+00:00",
+    "coordinates": [
+      13.75398,
+      100.50144
+    ],
+    "country": "TH",
+    "coverage": [
+      100.36760227784228,
+      13.62398,
+      100.63527772215772,
+      13.883980000000001
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/thailand-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tj_12857670_24878543": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:23:34+00:00",
+    "coordinates": [
+      38.5767,
+      68.78543
+    ],
+    "country": "TJ",
+    "coverage": [
+      68.61914155761872,
+      38.4467,
+      68.95171844238129,
+      38.706700000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/tajikistan-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_tl_8144139_30557361": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:12:18+00:00",
+    "coordinates": [
+      -8.55861,
+      125.57361
+    ],
+    "country": "TL",
+    "coverage": [
+      125.44214603651596,
+      -8.68861,
+      125.70507396348404,
+      -8.428609999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/east-timor-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tm_12795000_23838333": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:17:10+00:00",
+    "coordinates": [
+      37.95,
+      58.38333
+    ],
+    "country": "TM",
+    "coverage": [
+      58.21846997087436,
+      37.82,
+      58.54819002912564,
+      38.080000000000005
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tn_12680021_19018578": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-06T04:29:28+00:00",
+    "coordinates": [
+      36.80021,
+      10.18578
+    ],
+    "country": "TN",
+    "coverage": [
+      10.02342797887639,
+      36.67021,
+      10.34813202112361,
+      36.93021
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa/tunisia-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_to_6886317_479886": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:25:37+00:00",
+    "coordinates": [
+      -21.13683,
+      -175.20114
+    ],
+    "country": "TO",
+    "coverage": [
+      -175.3405170160228,
+      -21.26683,
+      -175.06176298397722,
+      -21.00683
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/tonga-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tr_12991987_21285427": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:35:15+00:00",
+    "coordinates": [
+      39.91987,
+      32.85427
+    ],
+    "country": "TR",
+    "coverage": [
+      32.684765801082996,
+      39.78987,
+      33.023774198917,
+      40.049870000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/turkey-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tt_10066668_11848111": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:55:49+00:00",
+    "coordinates": [
+      10.66668,
+      -61.51889
+    ],
+    "country": "TT",
+    "coverage": [
+      -61.651175819102015,
+      10.536679999999999,
+      -61.38660418089798,
+      10.79668
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_tv_8147575_35919417": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:32:36+00:00",
+    "coordinates": [
+      -8.52425,
+      179.19417
+    ],
+    "country": "TV",
+    "coverage": [
+      179.0627178767326,
+      -8.654250000000001,
+      179.32562212326744,
+      -8.39425
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/tuvalu-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tw_11505306_30152639": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:56:59+00:00",
+    "coordinates": [
+      25.05306,
+      121.52639
+    ],
+    "country": "TW",
+    "coverage": [
+      121.3828888402832,
+      24.92306,
+      121.66989115971681,
+      25.183059999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/taiwan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_tz_8382779_21573947": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:33:34+00:00",
+    "coordinates": [
+      -6.17221,
+      35.73947
+    ],
+    "country": "TZ",
+    "coverage": [
+      35.60871202605177,
+      -6.30221,
+      35.870227973948225,
+      -6.04221
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ua_14045466_21052380": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:47:19+00:00",
+    "coordinates": [
+      50.45466,
+      30.5238
+    ],
+    "country": "UA",
+    "coverage": [
+      30.319618562851083,
+      50.324659999999994,
+      30.72798143714892,
+      50.58466
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/ukraine-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ug_9031628_21258219": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:45:35+00:00",
+    "coordinates": [
+      0.31628,
+      32.58219
+    ],
+    "country": "UG",
+    "coverage": [
+      32.45218801930746,
+      0.18628,
+      32.71219198069254,
+      0.44628
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_us_12889511_10296363": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T05:21:13+00:00",
+    "coordinates": [
+      38.89511,
+      -77.03637
+    ],
+    "country": "US",
+    "coverage": [
+      -77.181,
+      38.783,
+      -76.891,
+      39.008
+    ],
+    "coverage_source": "https://download.bbbike.org/osm/bbbike/WashingtonDC/WashingtonDC.poly",
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.bbbike.org/osm/bbbike/WashingtonDC/WashingtonDC.osm.pbf",
+    "source_timestamp": "2026-10-31T00:00:00Z"
+  },
+  "capital_uy_5509672_12381184": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:19:15+00:00",
+    "coordinates": [
+      -34.90328,
+      -56.18816
+    ],
+    "country": "UY",
+    "coverage": [
+      -56.34667355817669,
+      -35.033280000000005,
+      -56.02964644182332,
+      -34.77328
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_uz_13126465_24921627": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:36:48+00:00",
+    "coordinates": [
+      41.26465,
+      69.21627
+    ],
+    "country": "UZ",
+    "coverage": [
+      69.04332203952481,
+      41.13465,
+      69.38921796047518,
+      41.394650000000006
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/uzbekistan-latest.osm.pbf + https://download.geofabrik.de/asia/kazakhstan-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_va_13190268_19245414": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:03:03+00:00",
+    "coordinates": [
+      41.90268,
+      12.45414
+    ],
+    "country": "VA",
+    "coverage": [
+      12.279474623715165,
+      41.772679999999994,
+      12.628805376284836,
+      42.03268
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/italy/centro-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_vc_10315527_11877258": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:48:19+00:00",
+    "coordinates": [
+      13.15527,
+      -61.22742
+    ],
+    "country": "VC",
+    "coverage": [
+      -61.36092355016163,
+      13.025269999999999,
+      -61.093916449838375,
+      13.28527
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ve_10048801_11312081": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:15:19+00:00",
+    "coordinates": [
+      10.48801,
+      -66.87919
+    ],
+    "country": "VE",
+    "coverage": [
+      -67.01139880973547,
+      10.358009999999998,
+      -66.74698119026452,
+      10.61801
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/south-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_vg_10842693_11537921": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:56:30+00:00",
+    "coordinates": [
+      18.42693,
+      -64.62079
+    ],
+    "country": "VG",
+    "coverage": [
+      -64.75781564081441,
+      18.29693,
+      -64.48376435918559,
+      18.556929999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_vi_10834190_11506930": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:42:32+00:00",
+    "coordinates": [
+      18.3419,
+      -64.9307
+    ],
+    "country": "VI",
+    "coverage": [
+      -65.06765807223017,
+      18.2119,
+      -64.79374192776983,
+      18.471899999999998
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/central-america-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_vn_11102450_28584117": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T08:05:17+00:00",
+    "coordinates": [
+      21.0245,
+      105.84117
+    ],
+    "country": "VN",
+    "coverage": [
+      105.70189827769535,
+      20.8945,
+      105.98044172230466,
+      21.1545
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/vietnam-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_vu_7226352_34831366": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:25:58+00:00",
+    "coordinates": [
+      -17.73648,
+      168.31366
+    ],
+    "country": "VU",
+    "coverage": [
+      168.17717243361852,
+      -17.86648,
+      168.45014756638147,
+      -17.60648
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/vanuatu-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_wf_7671837_382547": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:53:04+00:00",
+    "coordinates": [
+      -13.28163,
+      -176.17453
+    ],
+    "country": "WF",
+    "coverage": [
+      -176.3081027257138,
+      -13.41163,
+      -176.0409572742862,
+      -13.151629999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_ws_7616667_823334": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T04:25:16+00:00",
+    "coordinates": [
+      -13.83333,
+      -171.76666
+    ],
+    "country": "WS",
+    "coverage": [
+      -171.9005432355388,
+      -13.963330000000001,
+      -171.6327767644612,
+      -13.70333
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/australia-oceania/samoa-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_xk_13267272_20116688": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:12:27+00:00",
+    "coordinates": [
+      42.67272,
+      21.16688
+    ],
+    "country": "XK",
+    "coverage": [
+      20.990066361583477,
+      42.542719999999996,
+      21.34369363841652,
+      42.80272
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/europe/kosovo-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_ye_10535452_22420646": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:24:22+00:00",
+    "coordinates": [
+      15.35452,
+      44.20646
+    ],
+    "country": "YE",
+    "coverage": [
+      44.07164800619938,
+      15.22452,
+      44.34127199380062,
+      15.484520000000002
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/asia/yemen-latest.osm.pbf",
+    "source_timestamp": "2026-11-03T21:24:23Z"
+  },
+  "capital_yt_7721766_22522878": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:00:54+00:00",
+    "coordinates": [
+      -12.78234,
+      45.22878
+    ],
+    "country": "YT",
+    "coverage": [
+      45.09547641658131,
+      -12.91234,
+      45.36208358341869,
+      -12.652339999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_za_5607510_19842410": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:29:10+00:00",
+    "coordinates": [
+      -33.9249,
+      18.4241
+    ],
+    "country": "ZA",
+    "coverage": [
+      18.26743004504799,
+      -34.0549,
+      18.580769954952007,
+      -33.7949
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_za_6087893_20621400": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:24:19+00:00",
+    "coordinates": [
+      -29.12107,
+      26.214
+    ],
+    "country": "ZA",
+    "coverage": [
+      26.06518933806152,
+      -29.25107,
+      26.36281066193848,
+      -28.99107
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_za_6425514_20818783": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T07:20:15+00:00",
+    "coordinates": [
+      -25.74486,
+      28.18783
+    ],
+    "country": "ZA",
+    "coverage": [
+      28.043503776332365,
+      -25.874859999999998,
+      28.33215622366764,
+      -25.61486
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_zm_7459331_20828713": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:59:55+00:00",
+    "coordinates": [
+      -15.40669,
+      28.28713
+    ],
+    "country": "ZM",
+    "coverage": [
+      28.15228423527763,
+      -15.53669,
+      28.421975764722372,
+      -15.276689999999999
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  },
+  "capital_zw_7217228_21105337": {
+    "attribution": "© OpenStreetMap contributors, ODbL",
+    "captured_at": "2026-11-05T06:38:02+00:00",
+    "coordinates": [
+      -17.82772,
+      31.05337
+    ],
+    "country": "ZW",
+    "coverage": [
+      30.916812707870594,
+      -17.95772,
+      31.189927292129408,
+      -17.69772
+    ],
+    "query_versions": {
+      "detailed_extract": 12,
+      "far": 3,
+      "poi": 1,
+      "ring": 1
+    },
+    "source": "https://download.geofabrik.de/africa-latest.osm.pbf",
+    "source_timestamp": "2026-11-04T21:21:03Z"
+  }
+}
