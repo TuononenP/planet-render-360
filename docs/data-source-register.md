@@ -22,9 +22,64 @@ an unverified source never blocks the app.
 | Land cover (raster, realism v3 R-2.2) | ESA WorldCover 10 m v200 (2021) | `https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_<N or S><lat3><E or W><lon3>_Map.tif` (3° tiles named by their SW corner) — **HTTP range requests** (`Accept-Ranges: bytes`, verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:4326, 36000 × 36000 uint8 classes (10 tree, 20 shrub, 30 grass, 40 crop, 50 built, 60 bare, 70 snow/ice, 80 water, 90 wetland, 95 mangrove, 100 moss), Deflate, no predictor, 1024² tiles, overviews ×2 to 1125². Per place: IFD + tile tables (~16 KB) + ≤ 2×2 tiles for the ±1200 m window, one overview window for the far rings | CC BY 4.0 — “© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium”; credited in-app | Yes — spike 2026-11-01: HEAD 200, range GET 206, header parsed (Paris tile N48E000, 74 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | OSM land cover + today's photo-greenness heuristic (current behaviour) | **near-field fetch and ground fallback wired 2026-11-03** (`CogReader`, `CogFetcher`, `LandcoverFetcher`); far-ring coverage remains open |
 | Tree canopy height (raster, realism v3 R-2.2) | Meta / WRI High Resolution Canopy Height Maps v2 (DINOv3 global, ml3) | `https://dataforgood-fb-data.s3.amazonaws.com/forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif` (zoom-10 Bing quadkey, computable from lat/lon; index `tiles.geojson` alongside) — **HTTP range requests** (verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:3857, 32768 × 32768 uint8 canopy height (m), Deflate, no predictor, 512² tiles (mean ~28 KB); IFD1 is a 1-bit mask, overviews 16384…2048. Per place: header + tile tables (~33 KB) + ~3×3 tiles of the 8192² overview (~3 m/px) for the ±1200 m window | CC BY 4.0 — “Canopy height: © Meta and World Resources Institute (High Resolution Canopy Height Maps)”; credited in-app | Yes — spike 2026-11-01: range GET 206, all IFDs parsed (Paris tile `1202200110`, 179 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | WorldCover tree class, then OSM trees + park groves (current behaviour) | **near-field fetch and canopy placement wired 2026-11-03** (`LandcoverFetcher`, `CanopyVegetation`); far-tree coverage remains open |
 | Place search | Nominatim (OSMF) | `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=…` | JSON | ODbL; © OpenStreetMap contributors | Yes — usage policy reviewed (2026-10-27): user-triggered search only, **no autocomplete**, ≤1 req/s (single in-flight request), identifying User-Agent, results cached on device. Endpoint is one switchable constant, as the policy requires. The project owner deliberately adopts this service under these restrictions. | Yes — no key/account | bundled MVP gazetteer (paris/interlaken/banff) + raw coordinates | **verified policy, wired in `SearchFetcher`** |
+| Capital locations | GeoNames countryInfo and cities1000 | https://download.geonames.org/export/dump/ | Country/territory names, capital names and point coordinates | GeoNames, CC BY 4.0; credited in Settings → Data sources | Bundled catalog; no runtime request | Yes | Existing place search | Generated from downloads on 2026-11-04; supplemented with identified multi-capital locations; eight points that lie 2–5 km off-centre use the OSM place node instead (see the capital snapshot notes below). The catalog is a navigational index and does not itself contain offline map data. |
 | Landmark markers + details | Wikipedia (GeoSearch + REST page summary) and Wikimedia Commons (lead photo) | Nearby: `https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggscoord=LAT\|LON&ggsradius=≤10000&ggslimit=500&ggsprimary=primary&prop=info\|description\|coordinates`; details: `https://{lang}.wikipedia.org/api/rest_v1/page/summary/{Title}`; photo: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:X&prop=imageinfo&iiprop=url\|extmetadata&iiurlwidth=640` then the returned `thumburl` on `thumb.wikimedia.org` | JSON; photo JPEG/PNG/WebP. GeoSearch's coordinate `type` is almost always empty, so `WikiParse` keeps pages whose short description names a physical place (word allowlist/denylist) and ranks them by article `length` | Article text CC BY-SA 4.0 — "Text from Wikipedia · CC BY-SA 4.0" under every extract, plus a Data sources row. Photos only when the file is on Commons (`/wikipedia/commons/`; `/wikipedia/en/` uploads are often non-free logos — the Eiffel Tower's lead image is one), credited per photo with its Artist + LicenseShortName from `extmetadata` | Yes — verified 2026-11-01: GeoSearch 500 pages in 1.7–2.7 s (Paris, Zermatt, Turku; Matterhorn / Eiffel Tower / Turku Cathedral rank top), summary HTTP 200 (`Matterhorn`, `Eiffel_Tower`), imageinfo 200 with credit, `thumburl` 200 `image/jpeg` 145 KB. Note: thumbnails at non-standard widths (e.g. `640px-`) now return HTTP 400 — always use the `thumburl` the API returns | Yes — no key/account. Wikimedia etiquette: identifying User-Agent with contact URL (`WikiFetcher.USER_AGENT`), one request in flight per channel, nearby lookups only after the map settles (0.01° cell + 1 km radius steps), every answer cached on device (`wiki_*` keys, LRU) | no article → card shows name, kind and readouts with "No article found for this place."; offline → cached answers, else "You're offline. Details open when you're back online."; nearby failure → curated registry markers only | **verified, wired in `WikiFetcher` / `WikiParse` (2026-11-01)**. Rejected: Wikidata SPARQL ranked by sitelinks (31 s for Paris, returns languages/events/regions) |
 | Weather (optional) | Open-Meteo | `https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…&current=temperature_2m,weather_code,cloud_cover` | JSON | Open-Meteo terms; weather data CC-BY — attribution in register/app credits | Yes — verified HTTP 200 live (Paris 16.4 °C, overcast) 2026-10-27 | Yes — no key/account | omit weather label/dressing | **verified, wired in `WeatherFetcher`** |
 | PBR textures (buildings/roads/terrain, Phase 4) | Poly Haven textures | Browse/search API `https://api.polyhaven.com/assets?t=textures`, per-asset files `https://api.polyhaven.com/files/{id}`, downloads `https://dl.polyhaven.org/file/ph-assets/Textures/…` — **build-time bundling into `assets/` (T4.3), not a runtime fetch** | Full PBR sets per asset: Diffuse/Albedo + nor_gl (OpenGL normal) + Rough (+ AO, Displacement, arm) in jpg/png/exr at 1k/2k/4k/8k | **CC0 1.0 Universal (public domain)** per `https://polyhaven.com/license`: any purpose incl. commercial, redistribution incl. in sold products; **attribution not required** (courtesy credit "Textures: Poly Haven (CC0)" recommended in app credits) | N/A (bundled at build time) — but verified reachable without key anyway (2026-10-28): asset list HTTP 200 (869 textures), `/files/aerial_beach_01` HTTP 200, 2k diffuse download HTTP 200 `image/jpeg` 457,152 bytes, real 2048×2048 JPEG | Yes — no key/account for API or downloads; no published rate limit — download each chosen set once at build time, commit to `assets/` with `.import`, never hot-link from the device | procedural textures (current `_speckle`/`_facades`/`_slate` path) if a set is missing | **verified, gate passed for T4.3 — nothing rejected (no proxy/account/key needed)** |
+
+Berlin's bundled OSM layers were captured from the Europe regional Overpass
+instance on 2026-11-05, using OSM data dated 2026-11-02T21:21:26Z. The
+far-city query was run as six independent output statements against that same
+data timestamp and combined in query order after checking each response for
+errors. Snapshot versions, sizes and hashes are recorded in `BundledOsm`;
+`tools/prepare_osm_snapshot.py` validates and compresses each response.
+
+Additional capital snapshots prepared from regional OSM extracts, including
+GeoFabrik and BBBike, are listed in
+`assets/osm_snapshots/capital_provenance.json`, including source and capture
+dates, source coverage, coordinates, query versions and OSM attribution.
+`capital_manifest.json` records the corresponding sizes and hashes. The
+preparation rejects extracts with missing referenced geometry; a failed
+conversion does not register its layers.
+Ten capitals use BBBike city extracts because the smallest GeoFabrik region
+covering their view is a whole country or continent: Amsterdam, Budapest,
+Dublin, Lisbon, Moscow, New Delhi, Oslo, Ottawa, Warsaw and Washington. Each
+BBBike boundary polygon (`coverage_source` in the provenance file) was checked
+to cover the 12 km view, and each download matched BBBike's published MD5.
+Their source timestamp, 2026-10-31T00:00:00Z, is the
+`osmosis_replication_timestamp` in BBBike's PBF header: BBBike cuts its city
+extracts from the planet at midnight UTC and published these on 2026-10-31.
+It is the real data cut, not a placeholder.
+Mexico City and Saint-Pierre use pairs of OpenStreetMap France extracts. Their
+source polygons were checked as a union against the padded view bounds, and
+the older extract was advanced with its regional replication changes to the
+other extract's sequence before merging. The recorded replication ranges and
+boundary URLs allow the same checks to be repeated; merges with multiple
+object versions or missing referenced geometry must not be bundled.
+Diego Garcia uses a bounded response from the OpenStreetMap map API; its
+source timestamp is the HTTP response date, since that API does not expose a
+replication timestamp. The same missing-geometry checks apply to this extract.
+Jersey and Guernsey supplement their regional extract with the complete OSM
+relation for the Gulf of Saint-Malo. Every supplementary object predates the
+regional replication timestamp, and the merge has no conflicting versions.
+`tools/bundle_capital_external.py` reproduces these four source types
+(`bbbike`, `osmfr`, `osmapi` and `relation`) with the same checks; capitals on
+a GeoFabrik border use `tools/bundle_capital_union.py`.
+
+Eight GeoNames points lie 2–5 km from the city centre, so the 1.2 km detailed
+view and 800 m POI layer missed the city: Bangui, Brasília, Castries, Dushanbe,
+Lobamba, Monrovia, Paramaribo and Tunis. `generate_capitals.py`
+moves them to the OSM place node (looked up through Nominatim on 2026-11-06;
+© OpenStreetMap contributors, ODbL), and their snapshots were prepared at the
+corrected points. Nay Pyi Taw keeps its GeoNames point: OSM's place node lies
+in the sparsely built ministry zone, where the view had fewer buildings and POIs.
+Bangui uses a synchronized GeoFabrik union of the Central
+African Republic and DR Congo, because the river border is inside the view.
+Some capitals still have few or no POIs because the place itself is small,
+unbuilt or abandoned, not because the origin is off-centre: Ngerulmud,
+Ciudad de la Paz (under construction), Plymouth (abandoned after the 1995–97
+eruptions), Grytviken, Yaren and Adamstown. Each of their origins
+is within about 1 km of the OSM place node.
 
 ## Bundled PBR sets — T4.3 (2026-10-28)
 

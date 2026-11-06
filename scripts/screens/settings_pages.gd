@@ -18,6 +18,7 @@ const SOURCES := [
 	["Climate fallback", "ERA5 (Copernicus) via Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Weather", "Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Place search", "Nominatim · ODbL", "https://operations.osmfoundation.org/policies/nominatim/"],
+	["Capital locations", "GeoNames · CC BY 4.0", "https://www.geonames.org/about.html"],
 	["Landmark details", "Wikipedia · CC BY-SA 4.0", "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"],
 	["Landmark photos", "Wikimedia Commons · credited on each photo", "https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia"],
 	["Textures", "Poly Haven · CC0", "https://polyhaven.com/license"],

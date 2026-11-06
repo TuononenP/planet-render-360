@@ -31,7 +31,8 @@ func _rows() -> void:
 	_check(PlaceCard.SKY_FOR.get("Stockholm", -1) == 1, "Stockholm has its selected chip sky")
 	var ids := {}
 	var picks := LocationData.quick_picks()
-	_check(picks.size() == PresetViews.ROWS.size(), "one quick pick per preset row")
+	_check(picks.size() == PresetViews.ROWS.size() + CapitalCatalog.additional_places().size(),
+		"quick picks include the curated views and additional capitals")
 	for i in PresetViews.ROWS.size():
 		var row: Dictionary = PresetViews.ROWS[i]
 		var id := str(row["id"])
