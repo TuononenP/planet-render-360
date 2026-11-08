@@ -18,7 +18,6 @@ extends RefCounted
 ## CARD (glass-strong).
 
 const FONT_SANS := "res://assets/fonts/InstrumentSans-Variable.ttf"
-const FONT_SERIF := "res://assets/fonts/InstrumentSerif-Regular.ttf"
 const FONT_MONO := "res://assets/fonts/IBMPlexMono-Regular.ttf"
 const FONT_MONO_MEDIUM := "res://assets/fonts/IBMPlexMono-Medium.ttf"
 
@@ -180,9 +179,9 @@ static func sans(weight: int = 400) -> Font:
 		_font_cache[key] = f
 	return _font_cache[key]
 
-## Instrument Serif: place names and arrival moments only.
+## Instrument Sans semibold: place names and arrival moments only.
 static func display() -> Font:
-	return _font(FONT_SERIF)
+	return sans(600)
 
 ## IBM Plex Mono with tabular figures: coordinates, elevation, time.
 static func data(medium: bool = false) -> Font:
@@ -244,7 +243,7 @@ const DURATION := {"instant": 0.09, "quick": 0.16, "standard": 0.24,
 	"gentle": 0.38, "slow": 0.6, "descent": 2.4}
 
 ## The type scale by token name: [family, size, weight]. Family is
-## "display" (Instrument Serif), "sans" (Instrument Sans) or "mono"
+## "display" (Instrument Sans semibold), "sans" (Instrument Sans) or "mono"
 ## (IBM Plex Mono, tabular figures).
 const TYPE := {
 	"display-xl": ["display", 48, 400], "display-l": ["display", 36, 400],
@@ -373,10 +372,15 @@ static func relative_time(unix: float, now: float = -1.0) -> String:
 	var date := "%d %s" % [d["day"], MONTHS[int(d["month"]) - 1]]
 	return date if d["year"] == today["year"] else "%s %d" % [date, d["year"]]
 
-## Place names and arrival titles in Instrument Serif.
+## Place names and arrival titles in Instrument Sans. The display sizes were
+## set for the condensed serif this replaced; the sans is wider, so they are
+## scaled down to keep the same line lengths.
+const DISPLAY_FACE_SCALE := 0.85
+
 static func display_label(text: String, size: int, color: Color = INK) -> Label:
 	var l := label(text, size, color)
-	l.add_theme_font_size_override("font_size", roundi(size * minf(text_scale, DISPLAY_SCALE_CAP)))
+	l.add_theme_font_size_override("font_size",
+		roundi(size * DISPLAY_FACE_SCALE * minf(text_scale, DISPLAY_SCALE_CAP)))
 	l.add_theme_font_override("font", display())
 	return l
 
