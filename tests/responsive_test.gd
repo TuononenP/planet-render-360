@@ -119,6 +119,26 @@ func _run() -> void:
 	await process_frame
 	if picker.effective_layout() != Responsive.Layout.COMPACT:
 		_fail(failures, "picker at 390pt should be COMPACT, got %d" % picker.effective_layout())
+	# Quality is a four-step bar above Explore: the tier is visible without a menu.
+	var bar: SegmentedControl = picker._quality_bar
+	if bar == null or bar.item_count != RenderSettings.PRESET_NAMES.size():
+		_fail(failures, "the quality bar should have one segment per tier")
+	else:
+		picker.set_quality_preset(RenderSettings.Preset.ULTRA)
+		if bar.selected != RenderSettings.Preset.ULTRA or picker._quality_hint.text != RenderSettings.tier_hint(3):
+			_fail(failures, "the quality bar should show the chosen tier and what it trades")
+		var got: Array[int] = []
+		picker.quality_selected.connect(func(t: int) -> void: got.append(t))
+		bar._buttons[0].pressed.emit()
+		if got != [0] or bar.selected != 0:
+			_fail(failures, "tapping a segment should pick that tier, got %s" % str(got))
+		picker._render_btn.disabled = true
+		MapChrome._lock_quality_menu(picker)
+		if not bar._buttons[1].disabled:
+			_fail(failures, "the quality bar should lock while Explore is busy")
+		picker._render_btn.disabled = false
+		MapChrome._lock_quality_menu(picker)
+		picker.set_quality_preset(RenderSettings.Preset.HIGH)
 	if picker._quick_chips.size() != PresetViews.ROWS.size():
 		_fail(failures, "the shelf should start with the featured places, got %d" % picker._quick_chips.size())
 	if picker._canvas == null or picker._canvas.size.y < 240.0:
@@ -208,7 +228,7 @@ func _run() -> void:
 			await process_frame
 			if tokyo_chip.button_pressed:
 				_fail(failures, "manual map pick should clear the Tokyo selection")
-	await _check_explore_bar(failures, picker, Vector2(1280, 520), "side panel")
+	await _check_explore_bar(failures, picker, Vector2(1280, 600), "side panel")
 	await _check_explore_bar(failures, picker, Vector2(390, 560), "phone sheet")
 	picker.size = Vector2(1280, 800)
 	picker._on_resized()

@@ -49,6 +49,12 @@ func _init(labels: Array = [], icons: Array = [], glass: bool = false) -> void:
 		_buttons.append(b)
 	restyle()
 
+## Locks every segment while something that depends on the choice runs.
+func set_disabled(on: bool) -> void:
+	for b in _buttons:
+		b.disabled = on
+	modulate.a = 0.5 if on else 1.0
+
 func select(index: int) -> void:
 	selected = index
 	restyle()

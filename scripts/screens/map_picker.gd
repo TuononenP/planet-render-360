@@ -68,7 +68,10 @@ var _download_phase: Label
 ## neither overwrites the other.
 var _render_status: Label
 var _tip: Label
-var _quality_label: Label
+var _quality_hint: Label
+var _quality_title: Label
+var _quality_bar: SegmentedControl
+var _quality_box: VBoxContainer
 var _quality := 2  # RenderSettings.Preset of the footer label (cache keys follow it)
 var _cached_chip: HBoxContainer
 var _quick_box: VBoxContainer
@@ -80,7 +83,6 @@ var _bg: ColorRect
 var _quick_label: Label
 var _selected_label: Label
 var _render_btn: Button
-var _quality_btn: MenuButton
 var _zoom_out_btn: Button
 var _zoom_in_btn: Button
 var _quick_chips: Array[Button] = []
@@ -312,6 +314,7 @@ func _ready() -> void:
 	_info_col.add_child(_weather_chip)
 	_weather_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	MapLandmarkHome.build(self)
+	MapChrome.build_quality_bar(self, _action_col)
 	_btn_row = BoxContainer.new()
 	_btn_row.add_theme_constant_override("separation", 8)
 	_action_col.add_child(_btn_row)
@@ -323,7 +326,6 @@ func _ready() -> void:
 	explore_row.add_theme_constant_override("separation", 6)
 	_btn_row.add_child(explore_row)
 	explore_row.add_child(_render_btn)
-	MapChrome.build_quality_menu(self, explore_row)
 	_download_btn = UiTheme.ghost_button("Save for offline")
 	_download_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiIcon.apply(_download_btn, "hard-drive", 20)
@@ -352,9 +354,6 @@ func _ready() -> void:
 	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_footer.add_child(_tip)
-	_quality_label = UiTheme.text("High", "body-s", UiTheme.MUTED)
-	_quality_label.size_flags_vertical = Control.SIZE_SHRINK_END
-	_footer.add_child(_quality_label)
 
 	# Bottom sheet (compact / medium) and side panel (expanded).
 	_sheet = PanelContainer.new()

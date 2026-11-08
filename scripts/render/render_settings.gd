@@ -35,6 +35,19 @@ const FIDELITY: Array[int] = [1, 2, 2, 3]
 const FIRST_BUILD: Array[String] = ["≤20 s", "≤45 s", "≤75 s", "~1–2 min"]
 const REVISIT: Array[String] = ["≤3 s", "≤5 s", "≤5 s", "≤8 s"]
 
+## What each tier trades, in plain words, under the picker's quality bar.
+## Tiers change wait time and detail, never which real places exist.
+const TIER_HINTS: Array[String] = [
+	"Quickest to open, lightest on battery",
+	"Good detail at a moderate wait",
+	"Sharper textures and shadows",
+	"The most detail, the longest wait",
+]
+
+static func tier_hint(value: int) -> String:
+	var tier := clamp_preset(value)
+	return "%s · first build %s" % [TIER_HINTS[tier], FIRST_BUILD[tier]]
+
 var preset: int = default_preset()
 ## Appearance: accent swatch index (Glacier 0 is the default), whether
 ## Auto lets the sun pick it, and the layout override (0 Auto,

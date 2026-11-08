@@ -54,7 +54,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
 	UiTheme.apply_quiet(p._quick_more)
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
-			p._quality_label, p._download_status, p._download_phase, p._render_status]:
+			p._quality_title, p._quality_hint, p._download_status, p._download_phase, p._render_status]:
 		section.add_theme_color_override("font_color", UiTheme.MUTED)
 	UiTheme.apply_field(p._search, true)
 	p._suggest_panel.add_theme_stylebox_override("panel", _suggest_style(p))
@@ -65,7 +65,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._side.add_theme_stylebox_override("panel", _side_style(p))
 	UiTheme.apply_primary(p._render_btn)
 	UiTheme.apply_ghost(p._download_btn)
-	style_quality_menu(p)
+	style_quality_bar(p)
 	style_download_bar(p)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	for bar in [p._side_explore, p._sheet_explore]:
@@ -183,11 +183,11 @@ static func set_render_busy(p: MapPicker, busy: bool, finishing: bool) -> void:
 		MapHome.queue_explore_bar(p)
 	_lock_quality_menu(p)
 
-## The quality dropdown follows Explore and Save: changing the tier while
+## The quality bar follows Explore and Save: changing the tier while
 ## a build or download runs would mix tiers within one run.
 static func _lock_quality_menu(p: MapPicker) -> void:
-	if p._quality_btn != null:
-		p._quality_btn.disabled = p._render_btn.disabled or p._download_btn.disabled
+	if p._quality_bar != null:
+		p._quality_bar.set_disabled(p._render_btn.disabled or p._download_btn.disabled)
 
 ## Locks Save for offline while a download runs; a second press would
 ## otherwise retarget the pending history entry.
@@ -198,57 +198,45 @@ static func set_download_busy(p: MapPicker, busy: bool) -> void:
 	if not busy:
 		refresh_cached(p)  # a finished download makes the place cached
 
-const QUALITY_ICON_WIDTH := 56  # icon-only width on phones, as the Save icon
+## Render quality: a four-step bar above Explore with a plain-words line
+## under it, so the tier is always visible (phones included) and changes
+## in one tap. Explore stays the only primary action.
+static func build_quality_bar(p: MapPicker, parent: Control) -> void:
+	var box := VBoxContainer.new()
+	p._quality_box = box
+	box.add_theme_constant_override("separation", 6)
+	p._quality_title = UiTheme.section_label("Render quality")
+	box.add_child(p._quality_title)
+	p._quality_bar = SegmentedControl.new(RenderSettings.PRESET_NAMES)
+	p._quality_bar.set_font_size(13)
+	p._quality_bar.tooltip_text = "Render quality"
+	p._quality_bar.item_selected.connect(func(i: int) -> void: p.quality_selected.emit(i))
+	box.add_child(p._quality_bar)
+	p._quality_hint = UiTheme.text("", "body-s", UiTheme.MUTED)
+	p._quality_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(p._quality_hint)
+	parent.add_child(box)
+	_mark_quality(p)
 
-## The quality dropdown beside Explore: gauge icon plus the tier name,
-## icon alone on phones.
-static func build_quality_menu(p: MapPicker, row: Control) -> void:
-	var b := MenuButton.new()
-	b.custom_minimum_size = Vector2(0, 56)  # size-control-l, as Explore
-	b.add_theme_font_size_override("font_size", 16)
-	b.add_theme_font_override("font", UiTheme.sans(600))
-	b.tooltip_text = "Render quality"
-	var popup := b.get_popup()
-	for i in RenderSettings.PRESET_NAMES.size():
-		popup.add_radio_check_item(RenderSettings.PRESET_NAMES[i], i)
-	popup.id_pressed.connect(func(id: int) -> void: p.quality_selected.emit(id))
-	p._quality_btn = b
-	row.add_child(b)
-	style_quality_menu(p)
-	_mark_quality_menu(p)
+static func style_quality_bar(p: MapPicker) -> void:
+	if p._quality_bar != null:
+		p._quality_bar.restyle()
 
-static func style_quality_menu(p: MapPicker) -> void:
-	var b := p._quality_btn
-	UiTheme.apply_primary(b)
-	UiTheme.apply_popup(b.get_popup())
-	UiIcon.apply(b, "gauge", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+## Selects the current tier and words what it trades.
+static func _mark_quality(p: MapPicker) -> void:
+	if p._quality_bar == null:
+		return
+	p._quality_bar.select(p._quality)
+	p._quality_hint.text = RenderSettings.tier_hint(p._quality)
 
-## Checks the current tier in the dropdown and fits its label.
-static func _mark_quality_menu(p: MapPicker) -> void:
-	var popup := p._quality_btn.get_popup()
-	for i in popup.item_count:
-		popup.set_item_checked(i, popup.get_item_id(i) == p._quality)
-	_fit_quality_btn(p)
-
-## Shows the chosen preset in the footer and on the settings button's
-## tooltip, so the current quality is visible before opening the menu.
+## Shows the chosen preset in the bar and on the settings button's
+## tooltip, so the current quality is visible without opening anything.
 static func set_quality_preset(p: MapPicker, preset_value: int) -> void:
 	p._quality = preset_value
 	refresh_cached(p)
-	if p._quality_btn != null:
-		_mark_quality_menu(p)
-	if p._quality_label != null:
-		p._quality_label.text = "Quality · %s" % RenderSettings.preset_name(preset_value)
+	_mark_quality(p)
 	if p._settings_btn != null:
 		p._settings_btn.tooltip_text = "Settings — %s quality" % RenderSettings.preset_name(preset_value)
-
-## Icon plus the tier name on roomy layouts; icon alone on phones.
-static func _fit_quality_btn(p: MapPicker) -> void:
-	var compact := p._current_layout == Responsive.Layout.COMPACT
-	p._quality_btn.text = "" if compact else RenderSettings.preset_name(p._quality)
-	p._quality_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact \
-		else HORIZONTAL_ALIGNMENT_LEFT
-	p._quality_btn.custom_minimum_size.x = QUALITY_ICON_WIDTH if compact else 0
 
 static func effective_layout(p: MapPicker) -> int:
 	return p._current_layout
@@ -286,9 +274,16 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 	# Buttons: Explore + a full-width Save below in the panel and on
 	# tablets; on phones Save is an icon beside Explore.
 	p._btn_row.vertical = not compact
+	# Above Explore where there is room; below it on phones, so the sheet's
+	# peek still shows the primary action.
+	if p._quality_box != null:
+		var row := p._btn_row.get_index()
+		var at := p._quality_box.get_index()
+		if compact and at < row:
+			p._action_col.move_child(p._quality_box, row)
+		elif not compact and at > row:
+			p._action_col.move_child(p._quality_box, row)
 	p._download_btn.text = "" if compact else SAVE
-	if p._quality_btn != null:
-		_fit_quality_btn(p)
 	p._download_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact \
 		else HORIZONTAL_ALIGNMENT_LEFT
 	p._download_btn.size_flags_horizontal = Control.SIZE_SHRINK_END if compact \
