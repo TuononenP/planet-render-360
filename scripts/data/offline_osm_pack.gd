@@ -13,6 +13,12 @@ var _missing: Array[String] = []
 var _index := 0
 var _running := false
 var _retry_round := 0
+## Once the first two mirrors have failed a layer, later layers start on the
+## other two, so one silent pair cannot use up the whole save budget.
+var _primary_failed := false
+## Bumped by start and cancel, so a verification still running stops there.
+var _run_id := 0
+var _verify_task := -1
 
 func _ready() -> void:
 	_request = request_override if request_override != null else OverpassRequest.new(ATTEMPT_TIMEOUT)
@@ -20,11 +26,22 @@ func _ready() -> void:
 	_request.answered.connect(_answered)
 	_request.exhausted.connect(_exhausted)
 
+## The validation task must not outlive the node it reports back to.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_verify()
+
+func _join_verify() -> void:
+	if _verify_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_verify_task)
+		_verify_task = -1
+
 func is_running() -> bool:
 	return _running
 
 func cancel() -> void:
 	_running = false
+	_run_id += 1
 	if _request != null:
 		_request.cancel()
 
@@ -34,6 +51,7 @@ func start(lat: float, lon: float) -> void:
 	_missing.clear()
 	_index = 0
 	_retry_round = 0
+	_primary_failed = false
 	_jobs = [
 		_job("detailed", OsmQuery.QUERY_VERSION, CacheStore.osm_path(lat, lon, 1200),
 			OsmQuery.build_query(lat, lon, 1200), OsmFetcher._detailed_check(lat, lon)),
@@ -74,12 +92,13 @@ static func _stamp(path: String) -> String:
 
 ## Validation decompresses, hashes and parses up to tens of megabytes, so a
 ## layer is fully checked once: a bundled snapshot never changes, and a cache
-## file is rechecked only when its fingerprint changes.
-func _available(job: Dictionary) -> bool:
+## file is rechecked only when its fingerprint changes. Safe on a worker: it
+## must not call CacheStore.note_read, whose index is main-thread only.
+static func _available(job: Dictionary) -> bool:
 	var stamp := _stamp(job["path"])
 	if stamp != "" and job.get("verified_stamp", "") == stamp:
 		return true
-	if stamp != "" and _check(job, OsmFetcher._read_cache(job["path"])):
+	if stamp != "" and _check(job, FileAccess.get_file_as_string(job["path"])):
 		job["verified_stamp"] = stamp
 		return true
 	if job.get("bundled_ok", false):
@@ -89,7 +108,23 @@ func _available(job: Dictionary) -> bool:
 		return true
 	return false
 
+## _available on a worker thread, keeping frames running during the save.
+func _verified(job: Dictionary) -> bool:
+	_join_verify()
+	var box := {}
+	var task := WorkerThreadPool.add_task(func() -> void: box["ok"] = _available(job))
+	_verify_task = task
+	while _verify_task == task and not WorkerThreadPool.is_task_completed(task):
+		await get_tree().process_frame
+	if _verify_task == task:
+		_join_verify()
+	# A saved layer counts as used, so it is not the first to be evicted.
+	if job.get("verified_stamp", "") != "":
+		CacheStore.note_read(job["path"])
+	return bool(box.get("ok", false))
+
 func missing_layers() -> Array[String]:
+	_join_verify()
 	var missing: Array[String] = []
 	for job in _jobs:
 		if not _available(job):
@@ -99,7 +134,13 @@ func missing_layers() -> Array[String]:
 func _next() -> void:
 	if not _running:
 		return
-	while _index < _jobs.size() and _available(_jobs[_index]):
+	var run := _run_id
+	while _index < _jobs.size():
+		var usable: bool = await _verified(_jobs[_index])
+		if run != _run_id:
+			return
+		if not usable:
+			break
 		_index += 1
 	if _index >= _jobs.size():
 		# Cache eviction can occur while fetching later layers.
@@ -115,7 +156,8 @@ func _next() -> void:
 	var job := _jobs[_index]
 	var validate := func(text: String) -> String:
 		return "" if _check(job, text) else "Invalid or incomplete OSM response"
-	var endpoints := OsmFetcher.ENDPOINTS.slice(0, 2) if _retry_round == 0 else OsmFetcher.ENDPOINTS.slice(2, 4)
+	var alternates := _retry_round > 0 or _primary_failed
+	var endpoints := OsmFetcher.ENDPOINTS.slice(2, 4) if alternates else OsmFetcher.ENDPOINTS.slice(0, 2)
 	_request.run("data=" + str(job["query"]).uri_encode(), validate, endpoints)
 
 func _answered(text: String) -> void:
@@ -123,6 +165,8 @@ func _answered(text: String) -> void:
 		return
 	var job := _jobs[_index]
 	OsmFetcher._write_cache(job["path"], text)
+	# OverpassRequest has just validated this text on a worker.
+	job["verified_stamp"] = _stamp(job["path"])
 	_index += 1
 	_next.call_deferred()
 
@@ -130,5 +174,6 @@ func _exhausted(_reason: String, _attempts: int) -> void:
 	if not _running:
 		return
 	_missing.append(str(_jobs[_index]["layer"]))
+	_primary_failed = true
 	_index += 1
 	_next.call_deferred()

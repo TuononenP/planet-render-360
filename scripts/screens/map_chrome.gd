@@ -52,6 +52,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._region_label.add_theme_color_override("font_color", UiTheme.MUTED)
 	style_cached_chip(p._cached_chip)
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
+	UiTheme.apply_quiet(p._quick_more)
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
 			p._quality_label, p._download_status, p._download_phase, p._render_status]:
 		section.add_theme_color_override("font_color", UiTheme.MUTED)
@@ -64,6 +65,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._side.add_theme_stylebox_override("panel", _side_style(p))
 	UiTheme.apply_primary(p._render_btn)
 	UiTheme.apply_ghost(p._download_btn)
+	style_quality_menu(p)
 	style_download_bar(p)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	for bar in [p._side_explore, p._sheet_explore]:
@@ -81,6 +83,14 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._canvas.refresh_style()
 	UiTheme.apply_scroll(p._quick_scroll)
 	_set_selected_quick(p, p._selected_quick)
+
+## Grid in the panel, one sideways row in the sheet; the shelf can grow.
+static func fit_quick_cards(p: MapPicker) -> void:
+	var expanded := p._current_layout == Responsive.Layout.EXPANDED
+	p._quick_grid.columns = 3 if expanded else maxi(1, p._quick_chips.size())
+	for card in p._quick_chips:
+		card.custom_minimum_size.x = 0.0 if expanded else float(RAIL_CARD_W)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
 
 ## Mark one place card as the active place (accent ring, pressed) and
 ## clear the rest. -1 clears all: the place no longer comes from a card.
@@ -171,24 +181,74 @@ static func set_render_busy(p: MapPicker, busy: bool, finishing: bool) -> void:
 		p._render_btn.disabled = busy
 		p._render_btn.text = FINISHING if busy and finishing else EXPLORE
 		MapHome.queue_explore_bar(p)
+	_lock_quality_menu(p)
+
+## The quality dropdown follows Explore and Save: changing the tier while
+## a build or download runs would mix tiers within one run.
+static func _lock_quality_menu(p: MapPicker) -> void:
+	if p._quality_btn != null:
+		p._quality_btn.disabled = p._render_btn.disabled or p._download_btn.disabled
 
 ## Locks Save for offline while a download runs; a second press would
 ## otherwise retarget the pending history entry.
 static func set_download_busy(p: MapPicker, busy: bool) -> void:
 	if p._download_btn != null:
 		p._download_btn.disabled = busy
+	_lock_quality_menu(p)
 	if not busy:
 		refresh_cached(p)  # a finished download makes the place cached
+
+const QUALITY_ICON_WIDTH := 56  # icon-only width on phones, as the Save icon
+
+## The quality dropdown beside Explore: gauge icon plus the tier name,
+## icon alone on phones.
+static func build_quality_menu(p: MapPicker, row: Control) -> void:
+	var b := MenuButton.new()
+	b.custom_minimum_size = Vector2(0, 56)  # size-control-l, as Explore
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_font_override("font", UiTheme.sans(600))
+	b.tooltip_text = "Render quality"
+	var popup := b.get_popup()
+	for i in RenderSettings.PRESET_NAMES.size():
+		popup.add_radio_check_item(RenderSettings.PRESET_NAMES[i], i)
+	popup.id_pressed.connect(func(id: int) -> void: p.quality_selected.emit(id))
+	p._quality_btn = b
+	row.add_child(b)
+	style_quality_menu(p)
+	_mark_quality_menu(p)
+
+static func style_quality_menu(p: MapPicker) -> void:
+	var b := p._quality_btn
+	UiTheme.apply_primary(b)
+	UiTheme.apply_popup(b.get_popup())
+	UiIcon.apply(b, "gauge", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
+
+## Checks the current tier in the dropdown and fits its label.
+static func _mark_quality_menu(p: MapPicker) -> void:
+	var popup := p._quality_btn.get_popup()
+	for i in popup.item_count:
+		popup.set_item_checked(i, popup.get_item_id(i) == p._quality)
+	_fit_quality_btn(p)
 
 ## Shows the chosen preset in the footer and on the settings button's
 ## tooltip, so the current quality is visible before opening the menu.
 static func set_quality_preset(p: MapPicker, preset_value: int) -> void:
 	p._quality = preset_value
 	refresh_cached(p)
+	if p._quality_btn != null:
+		_mark_quality_menu(p)
 	if p._quality_label != null:
 		p._quality_label.text = "Quality · %s" % RenderSettings.preset_name(preset_value)
 	if p._settings_btn != null:
 		p._settings_btn.tooltip_text = "Settings — %s quality" % RenderSettings.preset_name(preset_value)
+
+## Icon plus the tier name on roomy layouts; icon alone on phones.
+static func _fit_quality_btn(p: MapPicker) -> void:
+	var compact := p._current_layout == Responsive.Layout.COMPACT
+	p._quality_btn.text = "" if compact else RenderSettings.preset_name(p._quality)
+	p._quality_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact \
+		else HORIZONTAL_ALIGNMENT_LEFT
+	p._quality_btn.custom_minimum_size.x = QUALITY_ICON_WIDTH if compact else 0
 
 static func effective_layout(p: MapPicker) -> int:
 	return p._current_layout
@@ -227,24 +287,23 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 	# tablets; on phones Save is an icon beside Explore.
 	p._btn_row.vertical = not compact
 	p._download_btn.text = "" if compact else SAVE
+	if p._quality_btn != null:
+		_fit_quality_btn(p)
 	p._download_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact \
 		else HORIZONTAL_ALIGNMENT_LEFT
 	p._download_btn.size_flags_horizontal = Control.SIZE_SHRINK_END if compact \
 		else Control.SIZE_EXPAND_FILL
 	p._download_btn.custom_minimum_size = Vector2(56, 56) if compact else Vector2(0, 48)
 	# Around the world: a sideways rail in the sheet, a grid in the panel.
-	p._quick_grid.columns = 3 if expanded else maxi(1, p._quick_chips.size())
+	fit_quick_cards(p)
 	p._quick_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if expanded \
 		else ScrollContainer.SCROLL_MODE_AUTO
 	# The panel grid shows whole cards; the side panel itself scrolls
 	# (an inner scroll area cut the last row in half above the footer).
 	p._quick_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	p._quick_scroll.custom_minimum_size = Vector2.ZERO if expanded else Vector2(0, 104)
+	p._quick_scroll.custom_minimum_size = Vector2.ZERO if expanded else Vector2(0, PlaceCard.height_for(56, true) + 10)
 	p._quick_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
 	p._quick_box.size_flags_vertical = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
-	for card in p._quick_chips:
-		card.custom_minimum_size.x = 0.0 if expanded else float(RAIL_CARD_W)
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
 	if expanded:
 		p._stack.visible = false
 		p._split.visible = true

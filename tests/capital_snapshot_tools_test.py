@@ -115,7 +115,8 @@ if shapely is None:
     print('SKIPPED .poly and replication checks: shapely is not installed')
 else:
     from shapely.geometry import box
-    from bundle_capital_external import sequence_path
+    import bundle_capital_external as external
+    from bundle_capital_external import rectangular, sequence_path
     poly = parse_poly('city\n1\n 0 0\n 10 0\n 10 10\n 0 10\nEND\n!2\n 4 4\n 6 4\n 6 6\n 4 6\nEND\nEND\n')
     assert poly.covers(box(1, 1, 3, 3)) and not poly.covers(box(4.5, 4.5, 5.5, 5.5))
     for broken in ('city\n1\n 0 0\n 1 0\nEND\nEND\n', 'city\n1\n 0 0\n 1 0\n 1 1\n'):
@@ -125,5 +126,27 @@ else:
         except ValueError:
             pass
     assert sequence_path(7358940) == '007/358/940' and sequence_path(5) == '000/000/005'
+    assert rectangular(parse_poly('r\n1\n 0 0\n 4 0\n 4 2\n 0 2\nEND\nEND\n'))
+    assert not rectangular(parse_poly('l\n1\n 0 0\n 4 0\n 4 2\n 2 2\n 2 4\n 0 4\nEND\nEND\n'))
+    # An interrupted download resumes only when the source is unchanged.
+    signature = {'url': 'u', 'size': 10, 'etag': 'a', 'last_modified': ''}
+    calls = []
+    external.remote_signature = lambda _url: dict(signature)
+    external.download = lambda _url, target, _size: (calls.append(target), target.write_bytes(b'0123456789'))
+    with tempfile.TemporaryDirectory() as directory:
+        partial = Path(directory) / 'x.osm.pbf'
+        checksum = hashlib.md5(b'0123456789').hexdigest()
+        partial.write_bytes(b'012')
+        try:
+            external.download_verified('u', partial, checksum)
+            raise AssertionError('a partial file without a matching marker must not resume')
+        except SystemExit:
+            pass
+        assert not calls
+        (Path(directory) / 'x.osm.pbf.source.json').write_text(json.dumps(signature))
+        external.download_verified('u', partial, checksum)
+        assert len(calls) == 1 and partial.read_bytes() == b'0123456789'
+        external.download_verified('u', partial, checksum)
+        assert len(calls) == 1
 print('CAPITAL SNAPSHOT TOOLS OK: valid, corrupt, stale, missing, range retry, batch failures, '
       'provenance and source polygons')

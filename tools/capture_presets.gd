@@ -36,6 +36,10 @@ extends SceneTree
 ##                               linear albedo, flagged against ALBEDO_RANGES
 ## With --bake-thumbs (use --times=noon): each preset's noon vantage becomes its shipped card
 ## picture, res://assets/preset_thumbs/<id>.jpg (PlaceThumb.load_preset).
+## With --capital-thumbs: every catalog capital without a picture is built and its noon
+## opening look becomes res://assets/capital_thumbs/<quantised lat>_<lon>.jpg
+## (PlaceThumb.load_capital). Nothing else is captured; --places=quantlat_quantlon,... limits it,
+## --limit=N stops after N pictures, --shard=i/n takes every n-th place (run n instances), --redo replaces existing ones. Re-run to retry skipped places.
 ## Reference photos live in visual-plan/refs/<id>/ (see its README).
 ## History and user thumbnails are never written; settings are not saved.
 
@@ -103,7 +107,28 @@ func _args() -> Dictionary:
 			a["audit"] = true
 		elif arg == "--cold-cache":
 			a["cold_cache"] = true
+		elif arg == "--capital-thumbs":
+			a["capital_thumbs"] = true
+		elif arg == "--redo":
+			a["redo"] = true
 	return a
+
+## Capitals still without a shipped picture, as capture places.
+func _capital_places(filter: String, redo: bool) -> Array:
+	var want := filter.split(",", false)
+	var out: Array = []
+	var picks := LocationData.quick_picks()
+	for i in range(PresetViews.ROWS.size(), picks.size()):
+		var pick: Array = picks[i]
+		var lat := float(pick[2])
+		var lon := float(pick[3])
+		var key := "%d_%d" % [CacheStore.quant(lat), CacheStore.quant(lon)]
+		if not want.is_empty() and not want.has(key):
+			continue
+		if not redo and FileAccess.file_exists(ProjectSettings.globalize_path(PlaceThumb.capital_path(lat, lon))):
+			continue
+		out.append({"id": "cap_" + key, "name": str(pick[1]), "lat": lat, "lon": lon})
+	return out
 
 func _places(filter: String, landmark_types: String = "", pin: String = "") -> Array:
 	var all: Array = []
@@ -179,7 +204,21 @@ func _run() -> void:
 	var presets := str(a.get("presets", str(a["preset"]))).split(",", false)
 	for preset in presets:
 		main._settings.preset = int(preset)
-		for place in _places(str(a["places"]), str(a.get("landmarks", "")), str(a.get("pin", ""))):
+		var todo: Array = _capital_places(str(a["places"]), a.has("redo")) if a.has("capital_thumbs") \
+			else _places(str(a["places"]), str(a.get("landmarks", "")), str(a.get("pin", "")))
+		# --shard=i/n: this instance takes every n-th place, so several can run at once.
+		if a.has("shard"):
+			var parts := str(a["shard"]).split("/")
+			var mine: Array = []
+			for k in todo.size():
+				if k % int(parts[1]) == int(parts[0]):
+					mine.append(todo[k])
+			todo = mine
+		if a.has("limit"):
+			todo = todo.slice(0, int(a["limit"]))
+		if a.has("capital_thumbs"):
+			print("CAPITAL THUMBS: %d to capture" % todo.size())
+		for place in todo:
 			var spec: Dictionary = place.duplicate()
 			if a.has("presets"):
 				spec["id"] = str(place["id"]) + "_p" + preset
@@ -227,6 +266,13 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await ViewConditions.set_date(view, _date_override)
 		ViewConditions.set_time_minutes(view, PresetViews.opening_hour(view._data.view, view._atmos.golden_hour()) * 60.0)
 	await _settle(settle_s, SETTLE_FRAMES)
+	if OS.get_cmdline_user_args().has("--capital-thumbs"):
+		ViewConditions.jump_to(view, "noon")
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
+		await process_frame
+		RenderingServer.force_draw(false)
+		_bake_capital(view._viewport.get_texture().get_image(), float(place["lat"]), float(place["lon"]), id)
+		return
 	var rig := view._rig
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
@@ -380,6 +426,17 @@ func _bake_thumb(img: Image, id: String) -> void:
 	var dir := ProjectSettings.globalize_path(PlaceThumb.BUNDLED_DIR)
 	DirAccess.make_dir_recursive_absolute(dir)
 	small.save_jpg(dir.path_join("%s.jpg" % id), PlaceThumb.QUALITY)
+
+## --capital-thumbs: the noon opening look, card-sized, as the capital's picture.
+func _bake_capital(img: Image, lat: float, lon: float, id: String) -> void:
+	var small := PlaceThumb.shrink(img)
+	if small == null:
+		printerr("CAPTURE BAKE %s: blank frame, not written" % id)
+		return
+	var path := ProjectSettings.globalize_path(PlaceThumb.capital_path(lat, lon))
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	small.save_jpg(path, PlaceThumb.QUALITY)
+	print("CAPITAL THUMB %s -> %s" % [id, path.get_file()])
 
 ## Mean luma (Rec. 709), mean HSV saturation and Hasler–Süsstrunk
 ## colourfulness (0–1 scale), for the whole frame and per row band.

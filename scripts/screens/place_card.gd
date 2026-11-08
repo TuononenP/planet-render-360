@@ -3,7 +3,7 @@ extends Button
 
 ## Small place card (design system: PlaceCard size="s") for the map
 ## home's "Around the world" grid: a sky-and-ridge thumbnail over the
-## place name in Instrument Serif. A toggle: the selected place gets an
+## place name in Instrument Sans. A toggle: the selected place gets an
 ## accent ring (the pressed style). The thumbnail is a stand-in until a
 ## place has its own picture (set_photo), picked from the name so it
 ## stays stable.
@@ -27,15 +27,25 @@ const SKY_FOR := {"Paris": 3, "Alps": 4, "Banff": 1, "Big Sur": 2, "Tokyo": 0,
 	"New York": 3, "Stockholm": 1, "Monaco": 2, "Dubai": 2, "London": 0,
 	"Rome": 3, "Venice": 1, "Seoul": 0, "San Francisco": 3, "Helsinki": 3, "Espoo": 2}
 
+## Height of the optional country line under the name.
+const SUBTITLE_H := 22
+
 var _name: Label
+var _sub: Label
 var _art: Control
 
-static func make(place_name: String, thumb_height: int = 56) -> PlaceCard:
+## Card height for a thumbnail height, with or without the country line.
+static func height_for(thumb_height: int, with_subtitle: bool) -> int:
+	return thumb_height + 38 + (SUBTITLE_H if with_subtitle else 0)
+
+## `subtitle`: the country or region under the name (body-s, ink-muted);
+## null leaves the card a single line.
+static func make(place_name: String, thumb_height: int = 56, subtitle: Variant = null) -> PlaceCard:
 	var c := PlaceCard.new()
 	c.toggle_mode = true
 	c.focus_mode = Control.FOCUS_ALL
 	c.tooltip_text = place_name
-	c.custom_minimum_size = Vector2(0, thumb_height + 38)
+	c.custom_minimum_size = Vector2(0, height_for(thumb_height, subtitle != null))
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var col := VBoxContainer.new()
 	col.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -46,7 +56,9 @@ static func make(place_name: String, thumb_height: int = 56) -> PlaceCard:
 	c._art.sky = SKIES[int(SKY_FOR.get(place_name, abs(place_name.hash()) % SKIES.size()))]
 	c._art.custom_minimum_size = Vector2(0, thumb_height)
 	col.add_child(c._art)
-	c._name = UiTheme.display_label(place_name, 18)
+	# Instrument Sans semibold (the design system's headline style): cleaner and
+	# more modern than the serif on a small card, and it keeps long names readable.
+	c._name = UiTheme.label(place_name, 16, UiTheme.INK, true)
 	c._name.clip_text = true
 	c._name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	c._name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -57,7 +69,24 @@ static func make(place_name: String, thumb_height: int = 56) -> PlaceCard:
 	pad.add_theme_constant_override("margin_right", 10)
 	pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pad.add_child(c._name)
+	if subtitle != null:
+		# The name keeps the room it had; the country line sits under it.
+		c._name.size_flags_vertical = Control.SIZE_SHRINK_END
+		c._name.custom_minimum_size.y = 24
+		c._sub = UiTheme.label(str(subtitle), 14, UiTheme.MUTED)
+		c._sub.clip_text = true
+		c._sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		c._sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		c._sub.custom_minimum_size.y = SUBTITLE_H - 2
+		var lines := VBoxContainer.new()
+		lines.add_theme_constant_override("separation", 0)
+		lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lines.add_child(c._name)
+		lines.add_child(c._sub)
+		pad.add_child(lines)
+		pad.add_theme_constant_override("margin_bottom", 4)
+	else:
+		pad.add_child(c._name)
 	col.add_child(pad)
 	c.restyle()
 	return c
@@ -86,6 +115,8 @@ func restyle() -> void:
 	add_theme_stylebox_override("focus", focus)
 	if _name != null:
 		_name.add_theme_color_override("font_color", UiTheme.INK)
+	if _sub != null:
+		_sub.add_theme_color_override("font_color", UiTheme.MUTED)
 
 ## Sky gradient with its top corners rounded to the card, two ridges
 ## and a snow cap; drawn from the design system's Scene stand-in.

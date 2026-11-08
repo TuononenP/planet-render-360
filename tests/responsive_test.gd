@@ -119,6 +119,8 @@ func _run() -> void:
 	await process_frame
 	if picker.effective_layout() != Responsive.Layout.COMPACT:
 		_fail(failures, "picker at 390pt should be COMPACT, got %d" % picker.effective_layout())
+	if picker._quick_chips.size() != PresetViews.ROWS.size():
+		_fail(failures, "the shelf should start with the featured places, got %d" % picker._quick_chips.size())
 	if picker._canvas == null or picker._canvas.size.y < 240.0:
 		_fail(failures, "compact map should fill leftover height, got %s" % str(picker._canvas.size))
 	# Night Atlas: the map is full-bleed and the sheet is anchored to
@@ -302,6 +304,9 @@ func _run() -> void:
 		picker.refresh_theme()
 		await process_frame
 	settings.queue_free()
+	picker._show_all_capitals()
+	if picker._quick_chips.size() != LocationData.quick_picks().size() or picker._quick_more.visible:
+		_fail(failures, "Show all capitals should add every capital and then hide")
 	picker.queue_free()
 
 	# History grid follows the window width

@@ -31,7 +31,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from shapely.geometry import box
-from capital_snapshot_io import annotate_provenance, download, parse_poly
+from capital_snapshot_io import annotate_provenance, download, merge_checked, parse_poly
 
 root = Path(__file__).resolve().parent.parent
 BBBIKE = 'https://download.bbbike.org/osm/bbbike/'
@@ -48,12 +48,17 @@ def fetch(url, path):
     return path
 
 
-def remote_size(url):
+def remote_signature(url):
+    """Size and revision of a source, to tell a resumable partial from a stale one."""
     headers = subprocess.check_output(['curl', '-fsSIL', '--max-time', '60', url], text=True)
-    lengths = re.findall(r'^content-length:\s*(\d+)', headers, flags=re.I | re.M)
+    final = [part for part in re.split(r'\r?\n\r?\n', headers) if part.strip()][-1]
+    lengths = re.findall(r'^content-length:\s*(\d+)', final, flags=re.I | re.M)
     if not lengths:
         raise SystemExit('source did not provide a download size: ' + url)
-    return int(lengths[-1])
+    etags = re.findall(r'^etag:\s*([^\r\n]+)', final, flags=re.I | re.M)
+    modified = re.findall(r'^last-modified:\s*([^\r\n]+)', final, flags=re.I | re.M)
+    return {'url': url, 'size': int(lengths[-1]), 'etag': etags[-1].strip() if etags else '',
+            'last_modified': modified[-1].strip() if modified else ''}
 
 
 def md5_of(path):
@@ -64,13 +69,19 @@ def md5_of(path):
     return digest.hexdigest()
 
 
-def download_verified(url, path, md5=None):
-    size = remote_size(url)
-    if path.exists() and path.stat().st_size != size:
-        raise SystemExit(f'unexpected existing file size: {path}')
-    if not path.exists():
+def download_verified(url, path, md5):
+    signature = remote_signature(url)
+    size = signature['size']
+    marker = path.with_name(path.name + '.source.json')
+    existing = path.stat().st_size if path.exists() else None
+    recorded = json.loads(marker.read_text(encoding='utf-8')) if marker.exists() else {}
+    if existing is not None and existing != size:
+        if existing > size or recorded != signature or not (signature['etag'] or signature['last_modified']):
+            raise SystemExit(f'cannot safely resume an unrecognized or changed source: {path}')
+    if existing is None or existing < size:
+        marker.write_text(json.dumps(signature), encoding='utf-8')
         download(url, path, size)
-    if md5 is not None and md5_of(path) != md5.lower():
+    if md5_of(path) != md5.lower():
         raise SystemExit('source checksum mismatch: ' + url)
     return path
 
@@ -86,12 +97,9 @@ def view_box(place, metres=12000.0):
     return box(place['lon'] - dx, place['lat'] - dy, place['lon'] + dx, place['lat'] + dy)
 
 
-def merge_checked(files, output):
-    subprocess.run(['osmium', 'merge', '-o', str(output), *map(str, files)], check=True)
-    multiple = subprocess.check_output(['osmium', 'fileinfo', '-e', '-g', 'data.multiple_versions',
-                                        str(output)], text=True).strip()
-    if multiple != 'no':
-        raise SystemExit('merged source has multiple object versions')
+def rectangular(polygon):
+    """True when a polygon's bounding box claims no area outside it."""
+    return polygon.equals(box(*polygon.bounds))
 
 
 def prepare(place, pbf, stamp, source, coverage, temp):
@@ -118,6 +126,9 @@ def bbbike(place, args, temp):
     polygon = parse_poly(fetch(poly_url, temp / 'source.poly').read_text(encoding='utf-8'))
     if not polygon.covers(view_box(place)):
         raise SystemExit('BBBike boundary does not cover the view')
+    # Its bounds are recorded as the verified coverage of the source.
+    if not rectangular(polygon):
+        raise SystemExit('BBBike boundary is not rectangular, so its bounds would overstate coverage')
     checksums = fetch(base + 'CHECKSUM.txt', temp / 'CHECKSUM.txt').read_text(encoding='utf-8')
     md5 = next((line.split()[0] for line in checksums.splitlines()
                 if line.endswith(' ' + args.city + '.osm.pbf')), None)
@@ -161,7 +172,7 @@ def osmfr(place, args, temp):
     behind = target - min(s['sequence'] for s in sources)
     if behind > MAX_ALIGNMENT_DIFFS:
         raise SystemExit(f'extracts are {behind} minutely diffs apart; retry when both have updated')
-    alignment = None
+    alignments = []
     files = []
     for s in sources:
         if s['sequence'] == target:
@@ -178,7 +189,7 @@ def osmfr(place, args, temp):
                         '--output-header', f'osmosis_replication_sequence_number={target}',
                         '--output-header', f'osmosis_replication_timestamp={stamp}'], check=True)
         files.append(advanced)
-        alignment = {'source': s['base'] + '/', 'from_sequence': s['sequence'], 'to_sequence': target}
+        alignments.append({'source': s['base'] + '/', 'from_sequence': s['sequence'], 'to_sequence': target})
     stamps = {header(f).get('osmosis_replication_timestamp', '') for f in files}
     if len(stamps) != 1 or '' in stamps:
         raise SystemExit('sources did not align to one replication timestamp: ' + ', '.join(sorted(stamps)))
@@ -186,8 +197,8 @@ def osmfr(place, args, temp):
     merge_checked(files, merged)
     prepare(place, merged, stamps.pop(), ' + '.join(s['url'] for s in sources), place['coverage'], temp)
     extra = {'coverage_sources': [s['poly'] for s in sources]}
-    if alignment:
-        extra['replication_alignment'] = alignment
+    if alignments:
+        extra['replication_alignment'] = alignments[0] if len(alignments) == 1 else alignments
     return extra
 
 

@@ -46,6 +46,15 @@ def complete(place, manifest, assets: Path, provenance):
             return False
     return True
 
+def merge_checked(files, output):
+    """Merge synchronized extracts, rejecting conflicting object versions."""
+    subprocess.run(['osmium', 'merge', '-o', str(output), *map(str, files)], check=True)
+    multiple = subprocess.check_output(['osmium', 'fileinfo', '-e', '-g', 'data.multiple_versions',
+                                        str(output)], text=True).strip()
+    if multiple != 'no':
+        raise SystemExit('merged source has multiple object versions')
+
+
 def parse_poly(text):
     """Shapely geometry of an Osmosis .poly file; '!' sections are holes."""
     from shapely.geometry import Polygon
