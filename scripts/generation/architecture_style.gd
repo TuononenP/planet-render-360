@@ -274,7 +274,9 @@ static func resolve(b: Dictionary, region: String, density: String,
 			hi = maxi(lo, hi - 2)
 	var storeys := lo + int(_h(seed_v, 5) * float(hi - lo + 1))
 	var fh := float(p["fh"])
-	var rise := 0.0 if shape == "flat" else clampf(2.4 * float(p["pitch"]), 1.2, 4.0)
+	# Each roof is a little steeper or flatter than its neighbour's (+-10%).
+	var pitch := float(p["pitch"]) * (0.9 + 0.2 * _h(seed_v, 41))
+	var rise := 0.0 if shape == "flat" else clampf(2.4 * pitch, 1.2, 4.0)
 	return {
 		"region": region, "kind": kind, "city": city, "era": era,
 		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, mt, 2),
@@ -282,7 +284,7 @@ static func resolve(b: Dictionary, region: String, density: String,
 		"pattern": pattern, "bay_m": float(p["bay"]),
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
-		"roof_shape": shape, "pitch": float(p["pitch"]),
+		"roof_shape": shape, "pitch": pitch,
 		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, mt, 6),
 		"floor_h": fh, "storeys": storeys, "default_h": float(storeys) * fh + rise,
 		"chimney": float(p["ch"]), "dormer": float(p.get("dm", 0.0)),

@@ -203,9 +203,12 @@ static func _wall_target(m: Material, b: Dictionary, style: Dictionary, seed_v: 
 	return c
 
 ## The tint a distant roof wants from the shared roof material `m`: its
-## `roof:colour` tag, else its style's paint, calibrated as distant_roofs
-## calibrates the shared tints. Alpha 0 when the roof set is not the shared one.
-static func _roof_target(m: Material, b: Dictionary, style: Dictionary) -> Color:
+## `roof:colour` tag, else the colour sampled from the satellite mosaic
+## (`hint`, alpha 0 when none or when it is vegetation or shadow), else its
+## style's paint, calibrated as distant_roofs calibrates the shared tints.
+## Alpha 0 when the roof set is not the shared one.
+static func _roof_target(m: Material, b: Dictionary, style: Dictionary,
+		hint: Color = Color(0, 0, 0, 0)) -> Color:
 	if style.is_empty() or m == null:
 		return Color(0, 0, 0, 0)
 	var set_name := str(style.get("roof_set", ""))
@@ -215,6 +218,8 @@ static func _roof_target(m: Material, b: Dictionary, style: Dictionary) -> Color
 	var tag := MaterialLibrary.parse_colour_tag(str(b.get("roof_colour", "")))
 	if tag.a > 0.0:
 		paint = Color.from_hsv(tag.h, minf(tag.s, 0.42), tag.v)
+	elif hint.a > 0.0 and not MaterialLibrary._degenerate_roof_sample(hint):
+		paint = hint.srgb_to_linear()
 	if paint.a <= 0.0:
 		return Color(0, 0, 0, 0)
 	var c := _roof_floor(set_name, _keep_chroma(set_name, _calib(set_name, paint)))
@@ -253,8 +258,9 @@ static func wall_residual(m: Material, b: Dictionary, style: Dictionary, seed_v:
 	return residual(m, want) if want.a > 0.0 else Color.WHITE
 
 ## Residual of a distant building's roof `m` against its own target tint.
-static func roof_residual(m: Material, b: Dictionary, style: Dictionary) -> Color:
-	var want := _roof_target(m, b, style)
+static func roof_residual(m: Material, b: Dictionary, style: Dictionary,
+		hint: Color = Color(0, 0, 0, 0)) -> Color:
+	var want := _roof_target(m, b, style, hint)
 	return residual(m, want) if want.a > 0.0 else Color.WHITE
 
 static func _wall_set(b: Dictionary, style: Dictionary, region: String) -> String:
@@ -399,7 +405,7 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 		seed_v: float = 0.0, style: Dictionary = {}) -> Material:
 	if distant and str(b.get("roof_material", "")).strip_edges().to_lower() != "copper":
 		var drs := distant_roofs(region, fidelity)
-		var want := _roof_target(drs[0] as Material, b, style)
+		var want := _roof_target(drs[0] as Material, b, style, colour_hint)
 		if want.a > 0.0 and drs[0] is StandardMaterial3D:
 			return drs[_nearest(drs, want)]
 		return drs[absi(hash(str(seed_v))) % drs.size()]

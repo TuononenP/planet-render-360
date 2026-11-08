@@ -298,6 +298,11 @@ static func cues(b: Dictionary, ctx: Dictionary, area_m2: float) -> Dictionary:
 		"roof": str(b.get("roof_shape", "")).strip_edges().to_lower(),
 		"area": area_m2, "heritage": bool(b.get("heritage", false)), "dist": dist}
 
+## Block size (m) and the share of untagged buildings whose era follows
+## their block rather than their own seed.
+const BLOCK_M := 64.0
+const BLOCK_SHARE := 0.6
+
 ## Last resort: seeded pick over the eras' weights, scaled by the
 ## distance band and any district the building stands in.
 static func _weighted(cands: Array, c: Dictionary, ctx: Dictionary, b: Dictionary,
@@ -317,7 +322,14 @@ static func _weighted(cands: Array, c: Dictionary, ctx: Dictionary, b: Dictionar
 				if str(dr[0]) == str(row[0]) and (pos - (dr[1] as Vector2)).length() <= float(dr[2]):
 					w *= float(dr[3])
 		pairs.append([str(row[0]), w])
-	return ArchitectureStyle._pick_weighted(pairs, seed_v, 21)
+	# A block is built and renovated together: most of the time the pick is
+	# seeded by the 64 m block the building stands in, so neighbours share an
+	# era (the rest keep their own seed, so a block is not a clone).
+	var pick_seed := seed_v
+	if b.has("x") and ArchitectureStyle._h(seed_v, 22.0) < BLOCK_SHARE:
+		pick_seed = TerrainBuilder._hash(floorf(pos.x / BLOCK_M) * 3.7 + 0.5,
+			floorf(pos.y / BLOCK_M) * 1.9 + 0.5)
+	return ArchitectureStyle._pick_weighted(pairs, pick_seed, 21)
 
 ## Structural rules per city ("" = undecided). Only levels, roof tag,
 ## footprint, heritage and distance — the year and arch tag are read
