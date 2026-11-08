@@ -1,0 +1,42 @@
+# Publishes site/ (the privacy policy, the project page and config.json) to
+# GitHub Pages. One-time setup: Settings → Pages → Source: GitHub Actions.
+# The app reads config.json at launch (see docs/remote-config.md), so a push
+# to main that changes site/ changes what installed apps use.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: [site/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check config.json is valid JSON
+        run: python3 -m json.tool site/config.json > /dev/null
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

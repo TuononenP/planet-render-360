@@ -1,0 +1,45 @@
+# Headless tests and the class-size budget on every pull request and push
+# to main. Tests that need a window or live network services are skipped
+# by tools/run_tests.sh.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Map packs and OSM snapshots are Git LFS objects.
+          lfs: true
+
+      - name: Class size budget
+        run: tools/check_class_size.sh
+
+      - uses: ./.github/actions/setup-godot-linux
+
+      - name: Headless tests
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/test-logs
+        run: tools/run_tests.sh
+
+      - name: Keep the logs of failing tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: ${{ runner.temp }}/test-logs
+          if-no-files-found: ignore

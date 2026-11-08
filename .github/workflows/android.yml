@@ -2,8 +2,9 @@
 # Signing material lives in the `release` environment's secrets (see README,
 # "Building releases"); nothing secret is committed to this public repo.
 # The .apk is for sideloading/direct distribution: Google Play requires
-# an .aab, which this workflow does not produce. Without a release
-# keystore the .apk is debug-signed instead of release-signed.
+# an .aab, which this workflow does not produce. A release build without
+# the keystore secrets fails; the debug build type is signed with a
+# throwaway debug key.
 name: Android
 
 on:
@@ -87,6 +88,9 @@ jobs:
               echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore"
               echo "ANDROID_KEYSTORE_USER=$ANDROID_KEY_ALIAS"
             } >> "$GITHUB_ENV"
+          elif [ "${{ inputs.build_type }}" = "release" ]; then
+            echo "::error::A release build needs the ANDROID_KEYSTORE_* secrets in the release environment. Choose the debug build type for a sideload-only .apk."
+            exit 1
           else
             keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" \
               -storepass android -keypass android -alias androiddebugkey \

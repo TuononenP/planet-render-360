@@ -1,0 +1,175 @@
+/* Planet Render 360 design system tokens (scripts/ui_theme.gd): Night is the
+   default and the reference, Day follows the system setting. Glacier accent. */
+:root {
+  --sky-100: #0b1019;
+  --sky-200: #121925;
+  --sky-300: #1b2433;
+  --line: rgba(237, 241, 246, 0.10);
+  --line-strong: #6a7584;
+  --ink: #edf1f6;
+  --ink-muted: #a4aebd;
+  --accent: #8cc8ff;
+  --on-accent: #07101a;
+  --focus: #f4f7fb;
+  --radius-m: 14px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --sky-100: #f2f4f7;
+    --sky-200: #ffffff;
+    --sky-300: #e3e8ee;
+    --line: rgba(13, 20, 32, 0.10);
+    --line-strong: #7a8494;
+    --ink: #0d1420;
+    --ink-muted: #465163;
+    --accent: #1d5fa8;
+    --on-accent: #ffffff;
+    --focus: #0d1420;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--sky-100);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4) var(--space-12);
+}
+
+@media (min-width: 40rem) {
+  .page { padding-left: var(--space-6); padding-right: var(--space-6); }
+}
+
+.brand { display: block; margin-bottom: var(--space-8); }
+.brand img { display: block; width: 15rem; max-width: 70%; height: auto; }
+.brand .on-light { display: none; }
+
+@media (prefers-color-scheme: light) {
+  .brand .on-dark { display: none; }
+  .brand .on-light { display: block; }
+}
+
+h1 {
+  margin: 0 0 var(--space-3);
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+h2 {
+  margin: var(--space-12) 0 var(--space-3);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+p, ul { margin: 0 0 var(--space-4); }
+ul { padding-left: 1.25rem; }
+li { margin-bottom: var(--space-2); }
+
+.lede { font-size: 1.1875rem; color: var(--ink-muted); }
+
+.meta {
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+
+a { color: var(--accent); text-underline-offset: 0.15em; }
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.links a.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--sky-200);
+}
+
+table { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: 0.9375rem; }
+
+th, td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+tr:last-child td { border-bottom: 0; }
+
+th {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+td:first-child { font-weight: 600; }
+
+code, .host { font-family: var(--mono); font-size: 0.875em; overflow-wrap: anywhere; }
+
+footer {
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
