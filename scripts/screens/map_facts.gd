@@ -2,7 +2,7 @@ class_name MapFacts
 extends RefCounted
 
 ## The selected place's real data on the map home (design system MapHome:
-## Readouts for elevation and local time, weather as a HudChip). One
+## Readouts for elevation, local time and weather). One
 ## Open-Meteo request per selection, after a short pause so panning and
 ## typing send nothing; it carries the point's elevation, its UTC offset
 ## and current weather. Until real values arrive the same slots hold
@@ -11,6 +11,7 @@ extends RefCounted
 ## the picker in its offline state. Operates on the picker via `p`.
 
 const PAUSE_S := 0.6
+const FACTS_SIZE := 20
 
 static func build(p: MapPicker) -> void:
 	p._facts_fetcher = WeatherFetcher.new()
@@ -33,17 +34,23 @@ static func build(p: MapPicker) -> void:
 	clock.timeout.connect(func() -> void: _refresh_clock(p))
 	p.add_child(clock)
 
-	p._facts_box = HBoxContainer.new()
-	p._facts_box.add_theme_constant_override("separation", 24)
+	# One strip under the coordinates: elevation, local time and weather
+	# side by side (the flow wraps the last one only if the panel is too
+	# narrow), set apart from the coordinates by a clear gap.
+	p._facts_box = MarginContainer.new()
+	p._facts_box.add_theme_constant_override("margin_top", 14)
 	p._facts_box.visible = false
-	p._elev_readout = Readout.new("Elevation", true)
-	p._facts_box.add_child(p._elev_readout)
-	p._time_readout = Readout.new("Local time", true)
-	p._facts_box.add_child(p._time_readout)
-	var chip := HudParts.hud_chip()
-	p._weather_chip = chip[0]
-	p._weather_parts = chip
-	p._weather_chip.visible = false
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 14)
+	flow.add_theme_constant_override("v_separation", 12)
+	p._facts_box.add_child(flow)
+	p._elev_readout = Readout.new("Elevation", true, FACTS_SIZE)
+	flow.add_child(p._elev_readout)
+	p._time_readout = Readout.new("Local time", true, FACTS_SIZE)
+	flow.add_child(p._time_readout)
+	p._weather_readout = Readout.new("Weather", true, FACTS_SIZE)
+	p._weather_readout.visible = false
+	flow.add_child(p._weather_readout)
 
 ## A new point: swap the old values for placeholders and ask again after
 ## the pause.
@@ -61,17 +68,14 @@ static func show_placeholders(p: MapPicker) -> void:
 	p._time_readout.visible = true
 	p._time_readout.set_pending()
 	p._facts_box.visible = true
-	var parts: Array = p._weather_parts
-	(parts[1] as TextureRect).texture = UiIcon.texture("cloud", 18)
-	(parts[2] as Label).text = "— °C"
-	(parts[3] as Label).text = "Weather"
-	for i in [2, 3]:
-		(parts[i] as Label).add_theme_color_override("font_color", UiTheme.MUTED)
-	p._weather_chip.visible = true
+	p._weather_readout.set_label("Weather")
+	p._weather_readout.set_icon("cloud")
+	p._weather_readout.set_pending()
+	p._weather_readout.visible = true
 
 static func hide_facts(p: MapPicker) -> void:
 	p._facts_box.visible = false
-	p._weather_chip.visible = false
+	p._weather_readout.visible = false
 	p._facts_offset_s = -1
 
 static func _on_facts(p: MapPicker, temp_c: float, label: String, code: int) -> void:
@@ -84,13 +88,10 @@ static func _on_facts(p: MapPicker, temp_c: float, label: String, code: int) -> 
 	p._time_readout.visible = f.has_utc_offset
 	_refresh_clock(p)
 	p._facts_box.visible = f.has_elevation or f.has_utc_offset
-	var parts: Array = p._weather_parts
-	(parts[1] as TextureRect).texture = UiIcon.texture(HudParts.weather_icon(code), 18)
-	(parts[2] as Label).text = "%d °C" % roundi(temp_c)
-	(parts[3] as Label).text = label
-	for i in [2, 3]:
-		(parts[i] as Label).add_theme_color_override("font_color", UiTheme.INK)
-	p._weather_chip.visible = true
+	p._weather_readout.set_label(label)
+	p._weather_readout.set_icon(HudParts.weather_icon(code))
+	p._weather_readout.set_value("%d °C" % roundi(temp_c))
+	p._weather_readout.visible = true
 
 static func _refresh_clock(p: MapPicker) -> void:
 	if p._facts_offset_s == -1 or p._time_readout == null:

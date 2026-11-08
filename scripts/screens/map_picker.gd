@@ -110,11 +110,10 @@ var _search_busy_tween: Tween
 # home states (MapHome).
 var _facts_fetcher: WeatherFetcher
 var _facts_timer: Timer
-var _facts_box: HBoxContainer
+var _facts_box: MarginContainer
 var _elev_readout: Readout
 var _time_readout: Readout
-var _weather_chip: PanelContainer
-var _weather_parts: Array = []
+var _weather_readout: Readout
 var _facts_offset_s := -1
 var _mode_btn: Button
 var _coord_mode := false
@@ -311,8 +310,6 @@ func _ready() -> void:
 	coords_col.add_child(_coord_label)
 	MapFacts.build(self)
 	_info_col.add_child(_facts_box)
-	_info_col.add_child(_weather_chip)
-	_weather_chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	MapLandmarkHome.build(self)
 	MapChrome.build_quality_bar(self, _action_col)
 	_btn_row = BoxContainer.new()
