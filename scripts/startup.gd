@@ -11,7 +11,6 @@ const ORBIT = preload("res://assets/brand/splash-orbit.png")
 
 var _elapsed := 0.0
 var _sans: FontVariation
-var _progress := 0.0
 
 func _ready() -> void:
 	_sans = FontVariation.new()
@@ -24,8 +23,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_elapsed += delta
-	var progress: Array = []
-	match ResourceLoader.load_threaded_get_status(MAIN_SCENE, progress):
+	match ResourceLoader.load_threaded_get_status(MAIN_SCENE):
 		ResourceLoader.THREAD_LOAD_LOADED:
 			set_process(false)
 			var scene := ResourceLoader.load_threaded_get(MAIN_SCENE) as PackedScene
@@ -34,8 +32,6 @@ func _process(delta: float) -> void:
 		ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 			set_process(false)
 			push_error("Could not load the main scene")
-	if not progress.is_empty():
-		_progress = progress[0]
 	queue_redraw()
 
 func _draw() -> void:
@@ -72,7 +68,3 @@ func _draw() -> void:
 	draw_string(_sans, Vector2(x, title_y), "Planet Render", HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color("edf1f6"))
 	draw_string(MONO, Vector2(x + name_w + gap, title_y), "360", HORIZONTAL_ALIGNMENT_LEFT, -1, num_size, Color("edf1f6"))
 	draw_string(MONO, Vector2(0, title_y + 29.0), "THE WORLD, FROM HERE", HORIZONTAL_ALIGNMENT_CENTER, w, 11, Color("edf1f6"))
-	var bar_width := minf(150.0, w * 0.38)
-	var start := Vector2((w - bar_width) * 0.5, h * 0.88)
-	draw_line(start, start + Vector2(bar_width, 0), Color(0.93, 0.95, 0.97, 0.28), 2.0)
-	draw_line(start, start + Vector2(bar_width * clampf(_progress, 0.0, 1.0), 0), Color("f0b06a"), 2.0)
