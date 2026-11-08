@@ -14,6 +14,9 @@ func _init() -> void:
 	_distant_checks(failures)
 	_built_block_checks(failures)
 	_roof_angle_checks(failures)
+	_pitch_checks(failures)
+	_block_era_checks(failures)
+	_roof_hint_checks(failures)
 	if failures.is_empty():
 		print("BUILDING VARIETY OK")
 		quit(0)
@@ -291,6 +294,93 @@ func _roof_angle_checks(failures: Array[String]) -> void:
 		failures.append("an explicit roof:height must beat roof:angle (want 5.0, got %.2f)" % float(rise[-1.0]))
 	if absf(float(rise[0.0]) - want20) < 0.01 and absf(float(rise[0.0]) - want45) < 0.01:
 		failures.append("an untagged angle should keep the regional pitch")
+
+## Each roof's pitch is its row's +-10%, stable per seed, and the regional
+## mean holds.
+func _pitch_checks(failures: Array[String]) -> void:
+	var base := float(ArchitectureStyle.profile("haussmann", "apartments")["pitch"])
+	var lo := INF
+	var hi := -INF
+	var sum := 0.0
+	for i in 300:
+		var sv := fmod(float(i) * 0.61803 + 0.02, 1.0)
+		var b := {"kind": "apartments", "levels": 6}
+		var look := ArchitectureStyle.resolve(b, "haussmann", "urban", sv, 400.0, {})
+		var again := ArchitectureStyle.resolve(b, "haussmann", "urban", sv, 400.0, {})
+		if float(look["pitch"]) != float(again["pitch"]):
+			failures.append("pitch is not stable per seed")
+			return
+		lo = minf(lo, float(look["pitch"]) / base)
+		hi = maxf(hi, float(look["pitch"]) / base)
+		sum += float(look["pitch"]) / base
+	if lo < 0.899 or hi > 1.101 or hi - lo < 0.15 or absf(sum / 300.0 - 1.0) > 0.03:
+		failures.append("pitch should spread +-10%% around the row (%.3f..%.3f, mean %.3f)"
+			% [lo, hi, sum / 300.0])
+
+## Untagged buildings in one 64 m block tend to share an era: the block's
+## most common era covers most of it (random picks over several eras would not).
+func _block_era_checks(failures: Array[String]) -> void:
+	var region := "warsaw"
+	var ctx := CityStyles.local_frame(region, 52.2297, 21.0122)
+	ctx["looks"] = 2
+	var covered := 0
+	var total := 0
+	for bx in 12:
+		for bz in 3:
+			var counts := {}
+			var n := 0
+			for k in 18:
+				var x := (float(bx) * 64.0 + 4.0 + float(k % 6) * 9.0) - 400.0
+				var z := (float(bz) * 64.0 + 4.0 + float(k / 6) * 15.0) - 100.0
+				var sv := TerrainBuilder._hash(x, z)
+				var b := {"kind": "apartments", "x": x, "z": z, "levels": 0}
+				var look := ArchitectureStyle.resolve(b, region, "dense", sv, 350.0, ctx)
+				counts[str(look["era"])] = int(counts.get(str(look["era"]), 0)) + 1
+				n += 1
+			var best := 0
+			for e in counts:
+				best = maxi(best, int(counts[e]))
+			covered += best
+			total += n
+	var share := float(covered) / float(total)
+	if share < 0.6:
+		failures.append("a block's most common era covers only %.0f%% of its buildings" % [share * 100.0])
+
+## A satellite roof colour reaches a distant building's roof residual: a
+## terracotta sample and a grey one pull the shared roof differently, within
+## the allowed range; a green (vegetation) sample is ignored.
+func _roof_hint_checks(failures: Array[String]) -> void:
+	FacadeMaterials.begin_build()
+	var region := "rome"
+	var found := false
+	for i in 120:
+		var sv := fmod(float(i) * 0.37 + 0.11, 1.0)
+		var b := {"kind": "apartments", "levels": 5}
+		var ctx := CityStyles.local_frame(region, 41.9028, 12.4964)
+		ctx["looks"] = 2
+		var style := ArchitectureStyle.resolve(b, region, "urban", sv, 400.0, ctx)
+		var terra := Color(0.62, 0.30, 0.20)
+		var grey := Color(0.42, 0.42, 0.44)
+		var m := FacadeMaterials.roof_for_building(b, region, "gabled", terra, 2, true, sv, style)
+		if str(m.get_meta("roof_set", "")) != str(style["roof_set"]):
+			continue
+		found = true
+		var r_t := FacadeMaterials.roof_residual(m, b, style, terra)
+		var r_g := FacadeMaterials.roof_residual(m, b, style, grey)
+		var r_green := FacadeMaterials.roof_residual(m, b, style, Color(0.2, 0.5, 0.2))
+		var r_none := FacadeMaterials.roof_residual(m, b, style)
+		if r_t.is_equal_approx(r_g):
+			failures.append("terracotta and grey satellite roofs gave the same residual")
+		for c in [r_t, r_g]:
+			var col := c as Color
+			if minf(col.r, minf(col.g, col.b)) < FacadeMaterials.RESIDUAL_MIN - 0.001 \
+					or maxf(col.r, maxf(col.g, col.b)) > 1.001:
+				failures.append("a roof residual left [%.2f, 1]: %s" % [FacadeMaterials.RESIDUAL_MIN, col])
+		if not r_green.is_equal_approx(r_none):
+			failures.append("a vegetation-green satellite sample must be ignored")
+		break
+	if not found:
+		failures.append("no Rome look in the sample had shared roofs of its own set")
 
 ## A shared material's tint after its residual (linear).
 func _effective(m: Material, residual: Color) -> Color:

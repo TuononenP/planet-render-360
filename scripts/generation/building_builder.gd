@@ -396,13 +396,13 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		and centre.length() / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
-	# Roof sampling spans the ring's AABB — skip for distant where never read.
+	# Roof sampling spans the ring's AABB. A distant building reads it too: its
+	# roof colour (a residual on the shared roofs) then follows the imagery.
 	var hint := Color(0, 0, 0, 0)
-	if not distant:
-		var bb := RingGeometry.aabb(ring)
-		hint = MaterialLibrary.sampled_roof_color(data,
-			centre.x, centre.y, bb.size.x, bb.size.y,
-			Callable(TerrainBuilder, "satellite_uv"))
+	var bb := RingGeometry.aabb(ring)
+	hint = MaterialLibrary.sampled_roof_color(data,
+		centre.x, centre.y, bb.size.x, bb.size.y,
+		Callable(TerrainBuilder, "satellite_uv"))
 	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
 		hint, fidelity, distant, seed_v, look)
 	if bool(b.get("mapped_landmark", false)) and not distant:
@@ -412,7 +412,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# RoofVariety.tint through the build context).
 	if distant and with_detail:
 		var wall_vt := FacadeMaterials.wall_residual(facade, b, look, seed_v)
-		var roof_vt := FacadeMaterials.roof_residual(roof_mat, b, look)
+		var roof_vt := FacadeMaterials.roof_residual(roof_mat, b, look, hint)
 		if _batch != null:
 			_batch.wall_vt = wall_vt
 			_batch.roof_vt = roof_vt
