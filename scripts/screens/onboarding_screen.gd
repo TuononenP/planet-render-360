@@ -33,9 +33,10 @@ func _ready() -> void:
 	add_child(_globe)
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 24)
 	add_child(margin)
+	var fit_margin := func() -> void: Responsive.apply_safe_margins(margin, self, [24, 24, 24, 24])
+	fit_margin.call()
+	resized.connect(fit_margin)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 12)
 	margin.add_child(col)

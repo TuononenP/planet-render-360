@@ -84,9 +84,23 @@ const CACHE_FULL_MESSAGE := "Places you opened longest ago were removed and will
 var _cache_offer_mb := 0
 var _cache_offer_shown := false
 
+const SAFE_POLL_S := 0.25
+var _safe_seen: Array[float] = []
+
+## A half turn keeps the window's size, so no resize says the notch moved
+## to the other side: each screen is told to lay out again when it does.
+func _check_safe_area() -> void:
+	var safe := Responsive.safe_insets(self)
+	if safe == _safe_seen:
+		return
+	_safe_seen = safe
+	for child in get_children():
+		if child is Control:
+			(child as Control).resized.emit()
+
 func _fit_content_scale() -> void:
 	var win := get_window()
-	win.content_scale_factor = Responsive.content_scale_factor(Vector2(win.size))
+	win.content_scale_factor = Responsive.content_scale_factor(Vector2(win.size), Responsive.points_scale())
 
 func _ready() -> void:
 	# Before anything reads user://: bring the data across from Godot's
@@ -105,6 +119,13 @@ func _ready() -> void:
 	theme = UiTheme.base_theme()
 	get_window().size_changed.connect(_fit_content_scale)
 	_fit_content_scale()
+	_safe_seen = Responsive.safe_insets(self)
+	if OS.has_feature("mobile"):
+		var safe_poll := Timer.new()
+		safe_poll.wait_time = SAFE_POLL_S
+		safe_poll.autostart = true
+		safe_poll.timeout.connect(_check_safe_area)
+		add_child(safe_poll)
 	# The window's close button and the app menu's Quit come through
 	# _request_exit too, so a world still saving is waited for there.
 	get_tree().auto_accept_quit = false

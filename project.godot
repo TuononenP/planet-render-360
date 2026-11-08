@@ -42,7 +42,9 @@ window/size/mode=3
 ; phones). Wide enough for the expanded responsive layout.
 window/size/window_width_override=1180
 window/size/window_height_override=820
-window/handheld/orientation="portrait"
+; 6 = Sensor: phones and tablets follow the device through every rotation.
+; The setting is an integer; a string here reads as 0, landscape only.
+window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 

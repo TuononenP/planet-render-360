@@ -496,7 +496,10 @@ static func apply_option(b: OptionButton) -> void:
 	b.add_theme_stylebox_override("pressed", style(TEAL_SOFT, RADIUS_M, TEAL))
 	b.add_theme_stylebox_override("focus", _focus_ring(RADIUS_M))
 	b.add_theme_stylebox_override("disabled", style(FIELD, RADIUS_M, LINE))
-	var popup := b.get_popup()
+	apply_popup(b.get_popup())
+
+## Skin a dropdown's PopupMenu (see apply_option).
+static func apply_popup(popup: PopupMenu) -> void:
 	popup.add_theme_font_size_override("font_size", 15)
 	popup.add_theme_color_override("font_color", INK)
 	popup.add_theme_color_override("font_hover_color", ON_ACCENT)

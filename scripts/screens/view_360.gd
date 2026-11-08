@@ -50,6 +50,7 @@ var _sheet_grip: Button
 var _sheet_tab: Button
 var _zoom_stack: VBoxContainer
 var _sheet: PanelContainer
+var _sheet_scroll: ScrollContainer
 var _sun_arc: SunArc
 var _time_label: Label
 var _fullscreen_btn: Button

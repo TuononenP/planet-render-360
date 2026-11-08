@@ -42,6 +42,8 @@ const CATEGORIES := [
 const RAIL_W := 300
 const RAIL_W_MEDIUM := 248
 const PAGE_MAX_W := 680
+const PAGE_MIN_W := 332  # the widest control row's own minimum
+const SEG_W := 300.0  # a row's segmented choice, where the page has room
 
 var _settings: RenderSettings
 var _preset_btns: Array[Button] = []
@@ -394,8 +396,14 @@ func _on_resized() -> void:
 	_laid_out = true
 	_rail.visible = not _compact
 	_top.visible = _compact
-	var rail_w := RAIL_W if layout == Responsive.Layout.EXPANDED else RAIL_W_MEDIUM
-	_rail.custom_minimum_size.x = rail_w
+	var safe := Responsive.safe_insets(self)
+	# A phone on its side lays out as Expanded but has no room for the wide rail.
+	var rail_w := RAIL_W if layout == Responsive.Layout.EXPANDED and size.x >= Responsive.EXPANDED_MIN \
+		else RAIL_W_MEDIUM
+	_rail.custom_minimum_size.x = rail_w + safe[0]
+	_rail_margin.add_theme_constant_override("margin_left", 16 + int(safe[0]))
+	_rail_margin.add_theme_constant_override("margin_top", 24 + int(safe[1]))
+	_rail_margin.add_theme_constant_override("margin_bottom", 24 + int(safe[3]))
 	# Short windows give the foot line's room to the category rows.
 	_rail_foot.visible = size.y >= 860.0
 	var pad := 16
@@ -406,16 +414,23 @@ func _on_resized() -> void:
 	elif layout == Responsive.Layout.MEDIUM:
 		pad = 32
 		top = 40
-	var avail := size.x - (0.0 if _compact else float(rail_w))
-	_page_margin.add_theme_constant_override("margin_left", pad)
-	_page_margin.add_theme_constant_override("margin_right", maxi(pad, int(avail) - PAGE_MAX_W - pad))
-	_page_margin.add_theme_constant_override("margin_top", top)
-	_page_margin.add_theme_constant_override("margin_bottom", pad)
+	var avail := size.x - safe[0] - safe[2] - (0.0 if _compact else float(rail_w))
+	if avail - 2.0 * pad < PAGE_MIN_W:
+		pad = 16  # a tight two-pane window gives its gutters to the page
+	_page_margin.add_theme_constant_override("margin_left", pad + (int(safe[0]) if _compact else 0))
+	_page_margin.add_theme_constant_override("margin_right", maxi(pad, int(avail) - PAGE_MAX_W - pad) + int(safe[2]))
+	_page_margin.add_theme_constant_override("margin_top", top + (0 if _compact else int(safe[1])))
+	_page_margin.add_theme_constant_override("margin_bottom", pad + int(safe[3]))
 	var edge := Responsive.page_padding(Responsive.Layout.COMPACT)
-	for side in ["left", "right", "bottom"]:
-		_top.add_theme_constant_override("margin_" + side, edge)
-	_top.add_theme_constant_override("margin_top", edge + 8)
+	_top.add_theme_constant_override("margin_left", edge + int(safe[0]))
+	_top.add_theme_constant_override("margin_right", edge + int(safe[2]))
+	_top.add_theme_constant_override("margin_bottom", edge)
+	_top.add_theme_constant_override("margin_top", edge + 8 + int(safe[1]))
 	var page_w := minf(avail - 2.0 * pad, PAGE_MAX_W)
+	# The rows' choices keep their width until the page is too narrow for it.
+	for seg: Variant in [_theme_seg, _text_seg] + _unit_segs.values():
+		if seg != null:
+			(seg as SegmentedControl).custom_minimum_size.x = minf(SEG_W, page_w - 32.0)
 	if _grid != null:
 		_grid.columns = 2 if page_w >= 520.0 else 1
 	if _specs_grid != null:
