@@ -33,6 +33,8 @@ extends RefCounted
 
 const PATH := "user://history.json"
 const MAX_ENTRIES := 50
+## Layout of history.json: {"version", "entries"}. Version 0 was a bare array.
+const HISTORY_VERSION := 1
 ## Contract §5: the cache data version. Bump to invalidate everything.
 const DATA_VERSION := 2
 ## Raster windows have independent versions; leave DATA_VERSION untouched.
@@ -250,17 +252,22 @@ func load_store() -> void:
 	if f == null:
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	if parsed is Array:
-		for item in parsed:
-			if item is Dictionary:
-				entries.append(item)
+	f.close()
+	# Files written before HISTORY_VERSION are a bare array of entries.
+	var items: Variant = parsed.get("entries") if parsed is Dictionary else parsed
+	if not items is Array:
+		# Unreadable: keep a copy, because the next save replaces the file.
+		if AtomicFile.keep_backup(store_path()):
+			push_warning("CacheStore: %s is unreadable, kept as %s.bak" % [store_path(), store_path()])
+		return
+	for item in items:
+		if item is Dictionary:
+			entries.append(item)
 
 func save_store() -> void:
-	var f := FileAccess.open(store_path(), FileAccess.WRITE)
-	if f == null:
+	if not AtomicFile.write_text(store_path(),
+			JSON.stringify({"version": HISTORY_VERSION, "entries": entries})):
 		push_warning("CacheStore: cannot write %s" % store_path())
-		return
-	f.store_string(JSON.stringify(entries))
 
 ## History entry. The retired cache_keys argument remains for callers
 ## using the older signature; keys are now computed from coordinates/tier.

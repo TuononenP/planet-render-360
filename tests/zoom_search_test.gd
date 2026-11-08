@@ -193,10 +193,8 @@ func _run() -> void:
 	var ordered := SearchFetcher.parse_results(mixed)
 	if ordered.size() != 2 or str(ordered[0].get("name", "")) != "Paris, Ile-de-France":
 		failures.append("parse_results should list cities first, got %s" % str(ordered))
-	if str(SearchFetcher.parse_results(mixed, true)[0].get("name", "")) != "Paris Hotel, Paris":
-		failures.append("an address query should keep the server's order")
 	var house := "[{\"display_name\":\"5, Mannerheimintie, Kluuvi, Helsinki, Finland\",\"addresstype\":\"place\",\"lat\":\"60.17\",\"lon\":\"24.94\",\"address\":{\"house_number\":\"5\",\"road\":\"Mannerheimintie\",\"city\":\"Helsinki\"}}]"
-	if str(SearchFetcher.parse_results(house, true)[0].get("name", "")) != "Mannerheimintie 5, Helsinki":
+	if str(SearchFetcher.parse_results(house)[0].get("name", "")) != "Mannerheimintie 5, Helsinki":
 		failures.append("a house result should name street, number and city")
 	var settlement := "[{\"name\":\"Helsinki\",\"display_name\":\"Helsinki, Helsingin seutukunta, Uusimaa, Suomi / Finland\",\"addresstype\":\"city\",\"lat\":\"60.17\",\"lon\":\"24.94\",\"address\":{\"city\":\"Helsinki\",\"country\":\"Suomi / Finland\"}}]"
 	if str(SearchFetcher.parse_results(settlement)[0].get("name", "")) != "Helsinki, Finland":
@@ -252,18 +250,38 @@ func _run() -> void:
 	await process_frame
 	if picker._suggest_list.get_child_count() != 5:
 		failures.append("5 distinct rows should show past duplicates, got %d" % picker._suggest_list.get_child_count())
-	# The spinner waits BUSY_DELAY after typing, and goes when the answer lands.
+	# Typing sends nothing to the network (Nominatim forbids autocomplete):
+	# no searcher is created, no spinner shows, and the only row offers the
+	# online search, which runs when it is tapped or Enter is pressed.
 	picker._search.text = "xyzzy"
 	picker._on_search_text_changed("xyzzy")
+	await create_timer(MapSearch.BUSY_DELAY + 0.1).timeout
+	if picker._searcher != null:
+		failures.append("typing should not create the online searcher")
 	if picker._search_busy.visible:
-		failures.append("spinner should not show the instant text is typed")
+		failures.append("typing should not show the search spinner")
+	if picker._suggest_list.get_child_count() != 1 \
+			or (picker._suggest_list.get_child(0) as Button).text != MapSearch.SEARCH_ONLINE % "xyzzy":
+		failures.append("a name with no local match should offer only the online search row")
+	# The online row stays last and outside the cap of 5 local rows.
+	var capped: Array = []
+	for i in 6:
+		capped.append({"name": "Place %d, Nowhere" % i, "lat": 1.0, "lon": 1.0})
+	capped.append({"name": MapSearch.SEARCH_ONLINE % "place", "search": "place"})
+	MapSearch.show_suggestions(picker, capped)
+	await process_frame
+	if picker._suggest_list.get_child_count() != 6 \
+			or (picker._suggest_list.get_child(5) as Button).text != MapSearch.SEARCH_ONLINE % "place":
+		failures.append("5 local rows and the online row should show, online last")
+	# A submitted search shows the spinner after the pause; its answer hides it.
+	MapSearch.ensure_searcher(picker)
+	picker._search_busy_timer.start(MapSearch.BUSY_DELAY)
 	await create_timer(MapSearch.BUSY_DELAY + 0.1).timeout
 	if not picker._search_busy.visible:
-		failures.append("spinner should show after the typing pause")
-	MapSearch.ensure_searcher(picker)
-	picker._searcher.suggestions_ready.emit("xyzzy", [])
+		failures.append("spinner should show while a submitted search is pending")
+	picker._searcher.failed.emit(SearchFetcher.NO_MATCH % "xyzzy")
 	if picker._search_busy.visible:
-		failures.append("spinner should hide when suggestions arrive")
+		failures.append("spinner should hide when the search answers")
 	picker.queue_free()
 
 	# --- Panels over the map: wheel and pinch in a sheet gap zoom the map under it ---

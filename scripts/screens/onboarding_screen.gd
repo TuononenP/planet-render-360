@@ -11,7 +11,7 @@ signal finished
 const PAGES := [
 	["Any point on Earth.", "Pick a place and we'll build it around you from real terrain, imagery and weather."],
 	["Look around.", "Drag to turn. Scrub the sun to move through the day and the seasons."],
-	["Your atlas remembers.", "Places you visit are saved for instant return, even offline."],
+	["Your atlas remembers.", "Places you visit stay on this device for a quick return. Choose Save for offline to keep one for when you have no connection."],
 ]
 
 var _page := 0

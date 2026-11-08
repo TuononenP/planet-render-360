@@ -148,7 +148,7 @@ func _url(job: Dictionary) -> String:
 	var t: Vector2i = job["tile"]
 	if job["kind"] == "dem":
 		return DemFetcher.URL_TEMPLATE % [job["zoom"], t.x, t.y]
-	return SatelliteFetcher.URL_TEMPLATE % [job["zoom"], t.y, t.x]
+	return SatelliteFetcher.url_template() % [job["zoom"], t.y, t.x]
 
 func _load(job: Dictionary) -> void:
 	var path := _path(job)

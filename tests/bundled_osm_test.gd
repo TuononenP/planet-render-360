@@ -61,6 +61,10 @@ func _run() -> void:
 			"preset snapshot must match coordinates passed through Vector2")
 		var text := BundledOsm.read(key)
 		check(text != "", "%s should load" % key)
+		# The header shortcut must agree with the full parse on real payloads.
+		check(BundledOsm.header_stamp(text) != "", "%s should have its timestamp in the header" % key)
+		check(BundledOsm._response_is_newer(text, key) == BundledOsm._response_is_newer_parsed(text, key),
+			"%s: header and full-parse freshness should agree" % key)
 		if row[2] == "detailed":
 			var parsed := OsmFetcher.parse_features(text, row[0], row[1])
 			check((parsed.buildings as Array).size() > 100, "%s should contain buildings" % key)
@@ -70,9 +74,27 @@ func _run() -> void:
 		check(BundledOsm.entry_for(row[0], row[1], row[2], row[3] + 1) == "", "wrong version must not match")
 		check(BundledOsm.entry_for(row[0] + 0.0002, row[1], row[2], row[3]) == "", "nearby point must not match")
 	check(BundledOsm.read("missing") == "", "missing snapshot must be ignored")
+	_header_checks()
 	await _fetch_checks()
 	print("bundled_osm_test: %d failure(s)" % failures)
 	quit(1 if failures else 0)
+
+func _header_checks() -> void:
+	var key := BundledOsm.entry_for(40.7060, -74.0040, "detailed", OsmQuery.QUERY_VERSION)
+	var newer := '{"version":0.6,"osm3s":{"timestamp_osm_base":"2030-01-01T00:00:00Z"},"elements":[]}'
+	var older := '{"version":0.6,"osm3s":{"timestamp_osm_base":"2020-01-01T00:00:00Z"},"elements":[]}'
+	check(BundledOsm.header_stamp(newer) == "2030-01-01T00:00:00", "header stamp should drop the Z")
+	check(BundledOsm._response_is_newer(newer, key), "a newer header should win")
+	check(not BundledOsm._response_is_newer(older, key), "an older header should not")
+	# Not a normal response: these take the full parse, and must still be refused.
+	var remark := '{"osm3s":{"timestamp_osm_base":"2030-01-01T00:00:00Z"},"elements":[],"remark":"runtime error"}'
+	check(not BundledOsm._response_is_newer(remark, key), "a response with a remark must not win")
+	var no_elements := '{"osm3s":{"timestamp_osm_base":"2030-01-01T00:00:00Z"}}'
+	check(not BundledOsm._response_is_newer(no_elements, key), "a response without elements must not win")
+	check(BundledOsm.header_stamp("{}") == "" and BundledOsm.header_stamp("") == "", "no header, no stamp")
+	check(BundledOsm.header_stamp('{"osm3s":{"timestamp_osm_base"') == "", "a cut-off header gives no stamp")
+	var late := '{"elements":[],"osm3s":{"timestamp_osm_base":"2030-01-01T00:00:00Z"}}'
+	check(BundledOsm._response_is_newer(late, key), "a timestamp after the elements still counts, via the full parse")
 
 func _fetch_checks() -> void:
 	var dir := "user://bundled_osm_test"
@@ -103,10 +125,10 @@ func _fetch_checks() -> void:
 		osm.failed.connect(func(_reason: String) -> void: finished = true)
 		var origin := Vector2(row[0], row[1])
 		osm.fetch(origin.x, origin.y, 2)
-		check(osm._ring_text != "", "offline fetch must load the bundled ring")
 		var deadline := Time.get_ticks_msec() + 30000
 		while not finished and Time.get_ticks_msec() < deadline:
 			await process_frame
+		check(osm._ring_text != "", "offline fetch must load the bundled ring")
 		check(finished and count > 100, "offline detailed fetch must use snapshot")
 		check(osm._poi_text != "" and osm.pois.size() > 0, "offline fetch must load bundled POIs")
 		osm.queue_free()

@@ -29,13 +29,14 @@ signal fallback_used(detail: String, partial: bool)
 ## 2026-11-04), so it is no longer a public fallback.
 ## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
 ## answering nothing, not even a one-node query, so it is tried last.
+## No Russian-operated instance belongs here (see HostPolicy); the
+## Russian-hosted mirror that used to be listed was removed for that reason.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
 ## The reason both tiers give for a valid but empty answer (open sea,
 ## wilderness); DataNotes.osm_outage matches on it.
 const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
-	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 	"https://z.overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
 ]
@@ -45,21 +46,26 @@ const ENDPOINTS: Array[String] = [
 ## name hosts instead of indexing, so reordering ENDPOINTS cannot
 ## silently change another query's mirrors.
 static func endpoint_order(first: Array[String]) -> Array[String]:
+	var all := active_endpoints()
 	var out: Array[String] = []
 	for host in first:
-		for ep in ENDPOINTS:
+		for ep in all:
 			if ep.contains(host) and not out.has(ep):
 				out.append(ep)
-	for ep in ENDPOINTS:
+	for ep in all:
 		if not out.has(ep):
 			out.append(ep)
 	return out
+
+## The instances in use: ENDPOINTS unless RemoteConfig replaces them.
+static func active_endpoints() -> Array[String]:
+	return RemoteConfig.value("overpass_endpoints", ENDPOINTS)
 
 ## The ring runs alongside the detailed query, so it starts on a mirror:
 ## starting both on the main instance took two of its per-IP slots and
 ## could queue the detailed query behind the app's own garnish.
 static func ring_endpoints() -> Array[String]:
-	return endpoint_order(["mail.ru"])
+	return endpoint_order(["z.overpass-api.de"])
 
 ## Seconds the best-effort ring may still run once the detailed data is
 ## ready; past this the fetch finishes with the detailed data alone.
@@ -81,7 +87,7 @@ const ATTEMPT_TIMEOUT := 60.0
 ## Plus one OSM API attempt, and a second's worth of each step down to a
 ## smaller box (OsmApiFallback.STEP_DOWN_CODES) so a late result lands.
 static func retry_budget_seconds() -> float:
-	return 2.0 * (float(ENDPOINTS.size()) * ATTEMPT_TIMEOUT + 5.0) \
+	return 2.0 * (float(active_endpoints().size()) * ATTEMPT_TIMEOUT + 5.0) \
 		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
 
 const CACHE_DIR := "user://cache"
@@ -289,8 +295,20 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join_parse()
 
+## Bundled snapshots load on workers; created on first use.
+var _snapshots: SnapshotReader
+
+func _reader() -> SnapshotReader:
+	if _snapshots == null:
+		_snapshots = SnapshotReader.new()
+		add_child(_snapshots)
+	return _snapshots
+
 func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -> void:
 	cancel()
+	# Reading a snapshot suspends this function; a newer fetch (or cancel)
+	# bumps _parse_gen and this one stops where it is.
+	var gen := _parse_gen
 	# Default preset 2 is RenderSettings.Preset.HIGH (the phone default);
 	# out-of-range presets fall back to it, not to Fast.
 	var p := preset if preset >= 0 and preset <= 3 else 2
@@ -349,19 +367,23 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 		_detailed_text = dcached
 		_detailed_cached = true
 	if _detailed_text == "":
-		_detailed_text = BundledOsm.read(snapshot)
+		_detailed_text = await _reader().read(snapshot)
+		if gen != _parse_gen:
+			return
 		if _detailed_text != "":
 			_detailed_cached = true
 			if not offline_mode:
 				BundledOsm.refresh(get_tree(), snapshot, _pending_cache, _pending_body,
-					_detailed_check(lat, lon), ENDPOINTS)
+					_detailed_check(lat, lon), active_endpoints())
 	if want_ring:
 		var ring_key := BundledOsm.entry_for(lat, lon, "ring%d" % ring, OsmQuery.RING_VERSION)
 		_ring_text = _read_cache(_pending_ring_cache) if BundledOsm.cache_is_newer(_pending_ring_cache, ring_key) else ""
 		if _ring_text != "" and not _payload_usable(_ring_text):
 			_ring_text = ""
 		if _ring_text == "":
-			_ring_text = BundledOsm.read(ring_key)
+			_ring_text = await _reader().read(ring_key)
+			if gen != _parse_gen:
+				return
 			if _ring_text != "" and not offline_mode:
 				BundledOsm.refresh(get_tree(), ring_key, _pending_ring_cache,
 					"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
@@ -379,7 +401,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	if _detailed_text != "":
 		_detailed_done()
 	else:
-		_detailed_req.run(_pending_body, _detailed_check(lat, lon), ENDPOINTS)
+		_detailed_req.run(_pending_body, _detailed_check(lat, lon), active_endpoints())
 
 var _pending_lat := 0.0
 var _pending_lon := 0.0
@@ -413,11 +435,11 @@ static func _read_cache(path: String) -> String:
 	CacheStore.note_read(path)
 	return f.get_as_text()
 
-static func _write_cache(path: String, text: String) -> void:
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(text)
-		CacheStore.note_written(path)
+static func _write_cache(path: String, text: String) -> bool:
+	if not AtomicFile.write_text(path, text):
+		return false
+	CacheStore.note_written(path)
+	return true
 
 ## A cached/live detailed payload is usable when it parses to a
 ## non-empty building set (the cached path pays one extra parse here;
@@ -458,16 +480,17 @@ static func _payload_usable(text: String) -> bool:
 
 ## Transient failures are worth another instance: any transport
 ## error (timeout, cannot connect, ...) or a 429/5xx from an
-## overloaded server. A 403 is an instance's access policy, so try a
-## different public mirror; malformed queries (400) still stop.
+## overloaded server. A 403 is an instance's access policy, and a 406 is
+## Overpass's rate limit, so try a different public mirror; malformed
+## queries (400) still stop.
 static func is_retryable(result: int, code: int) -> bool:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		return true
-	return code in [403, 429, 500, 502, 503, 504]
+	return code in [403, 406, 429, 500, 502, 503, 504]
 
 ## Next attempt index for a failed attempt, or -1 to give up.
 static func next_attempt(attempt: int, retryable: bool) -> int:
-	return attempt + 1 if retryable and attempt + 1 < ENDPOINTS.size() else -1
+	return attempt + 1 if retryable and attempt + 1 < active_endpoints().size() else -1
 
 ## One instance returning neither buildings nor shore geometry is not authoritative: it may lag
 ## replication or hold a partial extract, so OverpassRequest tries the
@@ -535,15 +558,22 @@ func _try_finish() -> void:
 		if _poi_text != "" and not _payload_usable(_poi_text):
 			_poi_text = ""
 		if _poi_enabled and _poi_text == "":
-			_poi_text = BundledOsm.read(poi_key)
+			# Reading the snapshot counts as the POI step still pending, so
+			# another caller of _try_finish cannot finish without it.
+			_poi_pending = true
+			var gen := _parse_gen
+			_poi_text = await _reader().read(poi_key)
+			if gen != _parse_gen:
+				return
+			_poi_pending = false
 			if _poi_text != "" and not offline_mode:
 				BundledOsm.refresh(get_tree(), poi_key, _poi_cache,
 					"data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
-					_check_ring, endpoint_order(["mail.ru"]))
+					_check_ring, ring_endpoints())
 		if _poi_text == "" and _poi_enabled and not offline_mode:
 			_poi_pending = true
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
-				_check_ring, endpoint_order(["mail.ru"]).slice(0, 1))
+				_check_ring, ring_endpoints().slice(0, 1))
 			return
 	if not _poi_pending:
 		_finish()
@@ -671,7 +701,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 			_detailed_fallback("OSM cache unusable (offline mode)")
 		else:
 			_detailed_req.run(_pending_body, _detailed_check(_pending_lat, _pending_lon),
-				ENDPOINTS)
+				active_endpoints())
 		return
 	if _fallback_detail != "":
 		fallback_used.emit(_fallback_detail, _fallback_partial)

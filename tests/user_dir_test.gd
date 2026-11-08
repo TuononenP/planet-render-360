@@ -38,8 +38,8 @@ func _init() -> void:
 	OS.delay_msec(1100)  # a strictly newer mtime for the new index
 	_write(to.path_join("cache/lru.json"), "new index")
 	UserDirMigration.migrate(from, to)
-	var history: Variant = JSON.parse_string(_read(to.path_join("history.json")))
-	var names: Array = (history as Array).map(func(e: Dictionary) -> String: return str(e["name"])) if history is Array else []
+	var history: Variant = _history_entries(to.path_join("history.json"))
+	var names: Array = (history as Array).map(func(e: Dictionary) -> String: return str(e["name"]))
 	_check(names == ["Paris", "Oslo", "Rome"], "History merges by place, newest first: %s" % [names])
 	if names.size() == 3:
 		var paris: Dictionary = (history as Array)[0]
@@ -58,6 +58,26 @@ func _init() -> void:
 	_check(UserDirMigration.migrate(from, to) == 0, "a second run has nothing to move")
 	_check(UserDirMigration.migrate(root.path_join("missing"), to) == 0, "no old directory: nothing to do")
 	_check(UserDirMigration.migrate(to, to + "/") == 0, "the same directory is never moved into itself")
+	# A current history file is {"version", "entries"}, not a bare array.
+	var from2 := root.path_join("old2")
+	var to2 := root.path_join("new2")
+	_write(from2.path_join("history.json"), JSON.stringify([{"name": "Rome", "lat": 41.8916, "lon": 12.4916, "timestamp": 90.0}]))
+	_write(to2.path_join("history.json"), JSON.stringify({"version": 1, "entries": [{"name": "Oslo", "lat": 59.91, "lon": 10.75, "timestamp": 150.0}]}))
+	UserDirMigration.migrate(from2, to2)
+	# A corrupt old history merges as empty but is kept as a copy, not deleted unseen.
+	var from3 := root.path_join("old3")
+	var to3 := root.path_join("new3")
+	_write(from3.path_join("history.json"), '[{"name": "Rome", "lat": 41.9')
+	_write(to3.path_join("history.json"), JSON.stringify({"version": 1, "entries": [{"name": "Oslo", "lat": 59.91, "lon": 10.75, "timestamp": 150.0}]}))
+	UserDirMigration.migrate(from3, to3)
+	_check(_history_entries(to3.path_join("history.json")).size() == 1, "the readable history survives a corrupt partner")
+	_check(_read(to3.path_join("history.json.from-old.bak")).begins_with('[{"name": "Rome"'), "the corrupt old history is kept as a copy")
+	var merged: Variant = _history_entries(to2.path_join("history.json"))
+	var merged_names: Array = (merged as Array).map(func(e: Dictionary) -> String: return str(e["name"]))
+	var raw: Variant = JSON.parse_string(_read(to2.path_join("history.json")))
+	_check(raw is Dictionary and int(raw.get("version", 0)) == CacheStore.HISTORY_VERSION, "the merge writes the current layout")
+	_check(not DirAccess.dir_exists_absolute(from2) or not FileAccess.file_exists(from2.path_join("history.json")), "the old history goes once merged")
+	_check(merged_names == ["Oslo", "Rome"], "a versioned history keeps its places when merged: %s" % [merged_names])
 	_check(UserDirMigration.legacy_dir().contains("app_userdata") \
 		and UserDirMigration.legacy_dir().ends_with(str(ProjectSettings.get_setting("application/config/name"))),
 		"the old directory is Godot's app_userdata one: " + UserDirMigration.legacy_dir())
@@ -69,6 +89,11 @@ func _init() -> void:
 		for f in failures:
 			printerr("USER DIR FAIL: ", f)
 		quit(1)
+
+func _history_entries(path: String) -> Array:
+	var parsed: Variant = JSON.parse_string(_read(path))
+	var items: Variant = parsed.get("entries") if parsed is Dictionary else parsed
+	return items if items is Array else []
 
 func _check(ok: bool, what: String) -> void:
 	if not ok:

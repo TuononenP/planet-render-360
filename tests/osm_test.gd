@@ -661,10 +661,9 @@ func _busy_checks(failures: Array[String]) -> void:
 	if ring.size() != OsmFetcher.ENDPOINTS.size() or ring[0] == OsmFetcher.ENDPOINTS[0]:
 		failures.append("ring query must cover every endpoint and start on a mirror: %s" % [ring])
 	var far := FarCityFetcher.endpoints()
-	if far.size() != 4 or not far[0].contains("z.overpass-api.de") \
+	if far.size() != 3 or not far[0].contains("z.overpass-api.de") \
 			or far[1] != "https://overpass-api.de/api/interpreter" \
-			or not far[2].contains("mail.ru") \
-			or not far[3].contains("private.coffee"):
+			or not far[2].contains("private.coffee"):
 		failures.append("far-city endpoints wrong: %s" % [far])
 	if HorizonFetcher.endpoints() != far:
 		failures.append("horizon labels should use the available far-city mirrors")

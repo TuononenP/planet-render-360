@@ -25,6 +25,15 @@ const FIRST_BYTE_TIMEOUT := 35.0
 const _WAITING: Array[int] = [HTTPClient.STATUS_RESOLVING,
 	HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_CONNECTED,
 	HTTPClient.STATUS_REQUESTING]
+## The Overpass usage guidance asks clients that get HTTP 429 or 406 to
+## pause 30 s before sending that instance anything else. A longer
+## Retry-After is honoured up to MAX_COOLDOWN_S.
+const RATE_LIMIT_CODES: Array[int] = [406, 429]
+const DEFAULT_COOLDOWN_S := 30.0
+const MAX_COOLDOWN_S := 300.0
+## endpoint -> Time.get_ticks_msec() it is left alone until. Shared by
+## every request, so one throttled answer also holds back later queries.
+static var _cooldown_until: Dictionary = {}
 
 var _http: HTTPRequest
 ## Child node, so a pending first-byte check is freed with this request.
@@ -49,6 +58,36 @@ static func payload_error(text: String) -> String:
 		if remark != "":
 			return "Overpass incomplete response: " + remark
 	return ""
+
+## Seconds to leave an instance alone after a rate-limit answer: its
+## Retry-After in seconds when that is longer than the default (an
+## HTTP-date, or no header, gives the default).
+static func cooldown_seconds(headers: PackedStringArray) -> float:
+	for header in headers:
+		var parts := header.split(":", true, 1)
+		if parts.size() == 2 and parts[0].strip_edges().to_lower() == "retry-after":
+			var value := parts[1].strip_edges()
+			if value.is_valid_float():
+				return clampf(value.to_float(), DEFAULT_COOLDOWN_S, MAX_COOLDOWN_S)
+	return DEFAULT_COOLDOWN_S
+
+static func start_cooldown(endpoint: String, seconds: float,
+		now_msec: int = Time.get_ticks_msec()) -> void:
+	_cooldown_until[endpoint] = now_msec + int(seconds * 1000.0)
+
+static func is_cooling(endpoint: String, now_msec: int = Time.get_ticks_msec()) -> bool:
+	return int(_cooldown_until.get(endpoint, 0)) > now_msec
+
+## Seconds until the first of `endpoints` takes requests again; 0 when one
+## already does.
+static func cooldown_left(endpoints: Array[String], now_msec: int = Time.get_ticks_msec()) -> float:
+	var soonest := INF
+	for endpoint in endpoints:
+		soonest = minf(soonest, maxf(float(int(_cooldown_until.get(endpoint, 0)) - now_msec) / 1000.0, 0.0))
+	return 0.0 if is_inf(soonest) else soonest
+
+static func clear_cooldowns() -> void:
+	_cooldown_until.clear()
 
 ## attempt_timeout bounds one attempt end to end (HTTPRequest.timeout).
 func _init(attempt_timeout: float = 60.0) -> void:
@@ -90,6 +129,17 @@ func cancel() -> void:
 
 func _start() -> void:
 	_token += 1
+	while _attempt < _endpoints.size() and is_cooling(_endpoints[_attempt]):
+		_attempt += 1
+	if _attempt >= _endpoints.size():
+		# Every instance asked us to wait. Report it later, so callers that
+		# connect their signals after run() still hear about it.
+		var token := _token
+		var attempts := _attempt
+		(func() -> void:
+			if token == _token:
+				exhausted.emit("Overpass is rate limiting requests", attempts)).call_deferred()
+		return
 	var err := _http.request(_endpoints[_attempt],
 		["Content-Type: application/x-www-form-urlencoded",
 			"User-Agent: " + Brand.USER_AGENT],
@@ -113,9 +163,11 @@ func _fail(reason: String, retryable: bool) -> void:
 	else:
 		exhausted.emit(reason, _attempt + 1)
 
-func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+func _on_done(result: int, code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
 	_watchdog.stop()
 	_token += 1
+	if result == HTTPRequest.RESULT_SUCCESS and code in RATE_LIMIT_CODES:
+		start_cooldown(_endpoints[_attempt], cooldown_seconds(headers))
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_fail("Overpass failed (result=%d code=%d)" % [result, code],
 			OsmFetcher.is_retryable(result, code))

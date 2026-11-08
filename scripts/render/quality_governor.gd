@@ -4,8 +4,22 @@ extends Node
 ## FPS-driven quality steps for the 360 view. Mobile budgets win:
 ## below 28 fps step down (render scale, then shadows off), above
 ## 55 fps step back up. Emits the current step for the HUD pill.
+##
+## A step down is held: the step it left is not tried again until a hold
+## has passed (HOLD_S, doubling with each further step down, up to
+## HOLD_MAX_S), and stepping up needs UP_WINDOWS healthy windows in a row.
+## Without that, a scene that runs at 20 fps on one step and 60 on the
+## next flips between them every few seconds, with the render scale
+## visibly pumping.
 
 signal quality_changed(step_name: String, fps: float)
+
+const WINDOW_S := 2.0
+const DOWN_FPS := 28.0
+const UP_FPS := 55.0
+const UP_WINDOWS := 2
+const HOLD_S := 10.0
+const HOLD_MAX_S := 160.0
 
 ## Render scale per step lives in RenderSettings.render_scale_for, so
 ## the settings screen's summary and the governor cannot drift apart.
@@ -31,27 +45,49 @@ func set_preset(preset_value: int) -> void:
 	# screen, or a freshly opened place) applies straight away, in
 	# both directions. FPS adaptation still steps down from here.
 	step = ceiling_step
+	_hold_until = 0.0
+	_hold_s = HOLD_S
+	_healthy = 0
 	_apply()
+
+## The step to be on after a window of `window_s` seconds that averaged
+## `fps`. Pure state-machine: _process feeds it, tests drive it directly.
+func adapt(fps: float, window_s: float = WINDOW_S) -> int:
+	_clock += window_s
+	if fps < DOWN_FPS:
+		_healthy = 0
+		if step > 0:
+			_hold_until = _clock + _hold_s
+			_hold_s = minf(_hold_s * 2.0, HOLD_MAX_S)
+			return step - 1
+	elif fps > UP_FPS:
+		_healthy += 1
+		if _healthy >= UP_WINDOWS and _clock >= _hold_until and step < ceiling_step:
+			_healthy = 0
+			return step + 1
+	else:
+		_healthy = 0
+	return step
 
 var _frames := 0
 var _elapsed := 0.0
 var current_fps := 60.0
+var _clock := 0.0
+var _hold_until := 0.0
+var _hold_s := HOLD_S
+var _healthy := 0
 
 func _process(delta: float) -> void:
 	if viewport == null:
 		return
 	_frames += 1
 	_elapsed += delta
-	if _elapsed < 2.0:
+	if _elapsed < WINDOW_S:
 		return
 	current_fps = _frames / _elapsed
+	var new_step := adapt(current_fps, _elapsed)
 	_frames = 0
 	_elapsed = 0.0
-	var new_step := step
-	if current_fps < 28.0:
-		new_step = maxi(step - 1, 0)
-	elif current_fps > 55.0:
-		new_step = mini(step + 1, ceiling_step)
 	if new_step != step:
 		step = new_step
 		_apply()

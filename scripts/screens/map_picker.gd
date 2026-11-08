@@ -54,7 +54,6 @@ var _search: LineEdit
 var _search_box: VBoxContainer
 var _suggest_panel: PanelContainer
 var _suggest_list: VBoxContainer
-var _suggest_timer: Timer
 var _map_wrap: Control
 var _zoom_rail: PanelContainer
 var _history_btn: Button
@@ -252,11 +251,6 @@ func _ready() -> void:
 	_suggest_list.add_theme_constant_override("separation", 2)
 	_suggest_panel.add_child(_suggest_list)
 	_search_box.add_child(_suggest_panel)
-	_suggest_timer = Timer.new()
-	_suggest_timer.one_shot = true
-	_suggest_timer.wait_time = 0.45
-	_suggest_timer.timeout.connect(_request_remote_suggestions)
-	add_child(_suggest_timer)
 
 	# Around the world: one tap to a wow place, no typing first run.
 	# A shelf of small cards: a sideways rail on phones and tablets,
@@ -525,9 +519,6 @@ func _update_explore_bar() -> void:
 
 func _on_search_text_changed(text: String) -> void:
 	MapSearch.on_text_changed(self, text)
-
-func _request_remote_suggestions() -> void:
-	MapSearch.request_remote(self)
 
 func _hide_suggestions() -> void:
 	MapSearch.hide_suggestions(self)
