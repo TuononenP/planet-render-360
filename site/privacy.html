@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Planet Render 360</title>
+<meta name="description" content="What Planet Render 360 keeps on your device, which public services it contacts, and what they receive.">
+<link rel="icon" href="pr360-mark-dark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="page">
+  <a class="brand" href="./" aria-label="Planet Render 360">
+    <img class="on-dark" src="pr360-wordmark-dark.svg" alt="Planet Render 360" width="901" height="200">
+    <img class="on-light" src="pr360-wordmark-light.svg" alt="" width="901" height="200">
+  </a>
+
+  <h1>Privacy</h1>
+  <p class="meta">Updated 8 Nov 2026</p>
+
+  <p class="lede">Planet Render 360 has no account, no advertising and no analytics. It does not ask for your location. What you look at stays on your device.</p>
+  <p>To build a place, the app asks public data services for the map, terrain, imagery and weather around it. Those services see your IP address and the place you asked for. The developer receives none of this.</p>
+
+  <h2>What stays on your device</h2>
+  <ul>
+    <li>Recent places, favourites and the camera position you left each place at.</li>
+    <li>Your settings, such as theme, units and quality.</li>
+    <li>Downloaded map, terrain, imagery and building data, and scenes the app has already built, so places open faster next time.</li>
+    <li>Photos you save. They go to your Pictures folder, the app’s own photos folder, or the place you choose on a computer.</li>
+  </ul>
+  <p>The app reads the motion sensor to turn the view when you use gyro look-around. It does not store or send those readings.</p>
+
+  <h2>What leaves your device</h2>
+  <p>The app contacts only the services below, and only to answer something you did. Each one also sees your IP address and the app’s name, <code>planet-render-360</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">Service</th><th scope="col">What it receives</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OpenStreetMap place search<br><span class="host">nominatim.openstreetmap.org</span></td>
+          <td>The text you search for, only when you submit it. Typing alone sends nothing.</td>
+        </tr>
+        <tr>
+          <td>OpenStreetMap map tiles<br><span class="host">tile.openstreetmap.org</span></td>
+          <td>The tiles for the part of the globe you are viewing.</td>
+        </tr>
+        <tr>
+          <td>OpenFreeMap vector tiles<br><span class="host">tiles.openfreemap.org</span></td>
+          <td>The tiles for the part of the map you are viewing.</td>
+        </tr>
+        <tr>
+          <td>Overpass API servers, for buildings, roads and shores<br><span class="host">overpass-api.de, z.overpass-api.de, overpass.private.coffee</span><br><span class="host">api.openstreetmap.org</span></td>
+          <td>The area around the place you open. If one server does not answer, the app asks the next, so any of them may receive it. Different parties run them. The app never uses servers in Russia.</td>
+        </tr>
+        <tr>
+          <td>Esri imagery<br><span class="host">server.arcgisonline.com</span></td>
+          <td>The satellite image tiles for the place you open.</td>
+        </tr>
+        <tr>
+          <td>AWS Terrain Tiles<br><span class="host">s3.amazonaws.com</span></td>
+          <td>The elevation tiles for the place you open.</td>
+        </tr>
+        <tr>
+          <td>Land cover and tree height<br><span class="host">esa-worldcover.s3.eu-central-1.amazonaws.com, dataforgood-fb-data.s3.amazonaws.com</span></td>
+          <td>The data tiles for the place you open.</td>
+        </tr>
+        <tr>
+          <td>CHELSA climate<br><span class="host">os.zhdk.cloud.switch.ch</span></td>
+          <td>A request for the climate data that covers the place you open.</td>
+        </tr>
+        <tr>
+          <td>Open-Meteo weather<br><span class="host">api.open-meteo.com, archive-api.open-meteo.com</span></td>
+          <td>The coordinates of the place you open, to 4 decimals.</td>
+        </tr>
+        <tr>
+          <td>Wikipedia and Wikimedia Commons<br><span class="host">wikipedia.org, commons.wikimedia.org</span></td>
+          <td>The landmark’s name or article, when you open its details.</td>
+        </tr>
+        <tr>
+          <td>This project’s pages<br><span class="host">tuononenp.github.io</span></td>
+          <td>A request for a small settings file at launch. It lists service addresses so they can change without an app update. GitHub hosts it and sees your IP address.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Each service keeps its own records under its own policy. See the <a href="https://osmfoundation.org/wiki/Privacy_Policy">OpenStreetMap Foundation</a>, <a href="https://www.esri.com/en-us/legal/privacy">Esri</a>, <a href="https://aws.amazon.com/privacy/">Amazon Web Services</a>, <a href="https://open-meteo.com/en/terms">Open-Meteo</a>, <a href="https://foundation.wikimedia.org/wiki/Policy:Privacy_policy">Wikimedia Foundation</a> and <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a> policies. For the other servers, check the operator’s own site.</p>
+
+  <h2>What the app does not do</h2>
+  <ul>
+    <li>No accounts, sign-in or profiles.</li>
+    <li>No advertising, analytics, crash reporting or tracking identifiers.</li>
+    <li>No access to your location, contacts, camera, microphone or photo library.</li>
+    <li>No sale or sharing of data. The developer runs no server for the app.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Remove places from History, or clear them all.</li>
+    <li>Clear the downloaded data under Settings → Storage.</li>
+    <li>Save a place for offline, then use the app with no connection and no requests.</li>
+    <li>Uninstall the app to remove everything it stored. Photos you saved stay where you put them.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The app is not aimed at children, and it collects no personal information from anyone.</p>
+
+  <h2>Changes</h2>
+  <p>If this changes, the date above changes with it. The page’s history is public in the <a href="https://github.com/TuononenP/planet-render-360/commits/main/site/privacy.html">project repository</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Questions go to the <a href="https://github.com/TuononenP/planet-render-360/issues">issue tracker</a>. The app is published by Petri Tuononen.</p>
+
+  <footer>
+    <p><a href="./">Planet Render 360</a></p>
+  </footer>
+</main>
+</body>
+</html>

@@ -17,6 +17,10 @@
 - Always try to follow the Planet Render 360 design system: https://claude.ai/artifact/HR5RqAmnw7rfRyHWozGGFT
 - Use its tokens, typography, iconography, glass recipes, voice and data formatting for any UI or visual change; read its `project/README.md` first.
 
+## Data sources
+
+- Never contact a Russian-operated service or a Russian domain (`.ru`, `.su`, `.рф`, mail.ru, Yandex, VK and the like), as a mirror, endpoint or anything else, built in or through `site/config.json`. `HostPolicy` defines the rule and `tests/host_policy_test.gd` enforces it.
+
 ## Code size
 
 - Keep every class (one GDScript file under `scripts/`) at or under 1000 lines.

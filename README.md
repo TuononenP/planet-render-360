@@ -121,7 +121,7 @@ environment and are never committed:
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | App Store Connect API key (Admin role): iOS automatic signing, TestFlight upload, macOS notarization |
 | `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Name (TEAMID)` |
 | `MACOS_CERT_P12_BASE64`, `MACOS_CERT_PASSWORD` | the Developer ID certificate exported as `.p12` (`base64 -i cert.p12`) |
-| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | Android release keystore (`base64 -i release.keystore`); without them the `.apk` is debug-signed. Either way it is sideload/direct distribution only — Google Play requires an `.aab`, which the workflow does not produce |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | Android release keystore (`base64 -i release.keystore`); without them a `release` run fails, and only the `debug` build type (a throwaway debug key) can be built. The `.apk` is sideload/direct distribution only — Google Play requires an `.aab`, which the workflow does not produce |
 
 The first TestFlight upload also needs an App Store Connect app record for
 `com.planetrender360.app`. The same scripts run locally:
@@ -184,7 +184,7 @@ godot --headless --script tests/build_guard_test.gd # no second world build whil
 godot --headless --script tests/loading_building_test.gd # "Building the scene" progress after the fetch
 godot --headless --script tests/responsive_test.gd # breakpoints + layout switching
 godot --headless --script tests/settings_test.gd # render-quality presets, persistence, FPS ceiling
-godot --headless --script tests/zoom_search_test.gd # map/360 zoom, search predictions, time of day
+godot --headless --script tests/zoom_search_test.gd # map/360 zoom, on-device search predictions, time of day
 godot --headless --script tests/accent_sun_test.gd # Auto accent follows the sun
 godot --headless --script tests/sky_test.gd      # sky per season, time of day and weather
 godot --headless --script tests/solar_test.gd    # true sun position vs ephemeris
@@ -204,9 +204,17 @@ godot --headless --script tests/lod_test.gd     # LOD rings keep every object in
 godot --headless --script tests/render_upgrade_test.gd # grade, lit windows at night, wall tints
 godot --headless --script tests/parallel_build_test.gd # parallel world build matches the serial one
 godot --headless --script tests/fidelity_scorecard_test.gd # golden locations vs source data (live when uncached)
+godot --headless --script tests/atomic_file_test.gd # atomic writes; an unreadable history.json is kept as .bak
+godot --headless --script tests/overpass_rate_limit_test.gd # 429/406 pause an Overpass instance for 30 s or Retry-After
+godot --headless --script tests/remote_config_test.gd # service-address overrides: validation, defaults, cache
+godot --headless --script tests/store_readiness_test.gd # privacy policy names every host, licence texts ship, config.json is inert
+godot --headless --script tests/satellite_decode_test.gd # cached satellite tiles decode on workers: placement, damaged file, freed mid-decode
+godot --headless --script tests/snapshot_reader_test.gd # bundled snapshots load on workers: concurrent reads, cancel, replace, freed mid-read
+godot --headless --script tests/quality_governor_test.gd # FPS governor holds after a step down; first preset follows the GPU
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
 godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)
 tools/check_class_size.sh                       # every class under scripts/ at or under 1000 lines
+tools/run_tests.sh [name ...]                   # all headless tests (skips windowed and live-network ones); also runs on every pull request
 ```
 
 On macOS, launch windowed runs through `tools/godot_bg.sh` (same arguments as
@@ -345,7 +353,10 @@ planet-render-360/
 │                              audits, comparison sheets, foliage generation and documentation PDF build
 ├── .github/
 │   ├── actions/               Godot setup for macOS and Linux CI runners
-│   └── workflows/             On-demand macOS .dmg, iOS TestFlight / .ipa and Android .apk builds
+│   └── workflows/             Tests on every pull request, GitHub Pages, and on-demand macOS .dmg,
+│                              iOS TestFlight / .ipa and Android .apk builds
+├── site/                      Project page, privacy policy and config.json, published to GitHub Pages
+├── licenses/                  Font and icon licence texts shipped inside the app
 ├── docs/                      Data-source register, world-model contract, fidelity scorecard,
 │                              architecture styles, landmark sources, technical documentation and images
 ├── .agents/plans/             Architecture, fidelity, city realism, build speed, shoreline and city-hero plans
@@ -363,7 +374,10 @@ planet-render-360/
 - [Data-source register](docs/data-source-register.md) — every external source, licence and fallback.
 - [Fidelity scorecard](docs/fidelity-scorecard.md) — checks that prove the contract holds.
 - [Architecture styles](docs/architecture-styles.md) — regional building styles.
+- [Remote config](docs/remote-config.md) — switching service addresses without an app update.
+- [Store readiness](docs/store-readiness.md) — what the app stores need, draft declarations and open decisions.
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details. Bundled data,
+fonts, icons, textures and models keep their own licences: see [NOTICE.md](NOTICE.md).

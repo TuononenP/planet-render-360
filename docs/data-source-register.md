@@ -21,7 +21,7 @@ an unverified source never blocks the app.
 | Climate (fallback) | Open-Meteo Historical Weather API — ERA5 / ERA5-Land daily, 2001–2010 (`temperature_2m_mean`, `precipitation_sum`) | `https://archive-api.open-meteo.com/v1/archive?latitude=…&longitude=…&start_date=2001-01-01&end_date=2010-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=GMT` | JSON, ~3650 days; ~25 km reanalysis downscaled to the point's elevation by Open-Meteo. Monthly means → warmest / coldest 3-month means, annual and warmest-quarter precipitation; snow days ≈ days with a mean ≤ 0 °C | CC BY 4.0 — Open-Meteo; contains modified Copernicus Climate Change Service information; credited in-app ("Climate: ERA5 (Copernicus) via Open-Meteo") | Yes — ~18 KB gzipped, ~1.5–3 s; weighs ~50 Open-Meteo calls, so only used when CHELSA fails or runs past 14 s; cached per place like CHELSA | Yes — no key/account | latitude rules (ClimateModel) | **wired 2026-11-01 (`ClimateFetcher._fetch_fallback`)** — within 1 °C of CHELSA on Paris / Interlaken / Banff / Turku / Cairo, ~3.5 °C warm at Big Sur (coastal cell) |
 | Land cover (raster, realism v3 R-2.2) | ESA WorldCover 10 m v200 (2021) | `https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_<N or S><lat3><E or W><lon3>_Map.tif` (3° tiles named by their SW corner) — **HTTP range requests** (`Accept-Ranges: bytes`, verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:4326, 36000 × 36000 uint8 classes (10 tree, 20 shrub, 30 grass, 40 crop, 50 built, 60 bare, 70 snow/ice, 80 water, 90 wetland, 95 mangrove, 100 moss), Deflate, no predictor, 1024² tiles, overviews ×2 to 1125². Per place: IFD + tile tables (~16 KB) + ≤ 2×2 tiles for the ±1200 m window, one overview window for the far rings | CC BY 4.0 — “© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium”; credited in-app | Yes — spike 2026-11-01: HEAD 200, range GET 206, header parsed (Paris tile N48E000, 74 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | OSM land cover + today's photo-greenness heuristic (current behaviour) | **near-field fetch and ground fallback wired 2026-11-03** (`CogReader`, `CogFetcher`, `LandcoverFetcher`); far-ring coverage remains open |
 | Tree canopy height (raster, realism v3 R-2.2) | Meta / WRI High Resolution Canopy Height Maps v2 (DINOv3 global, ml3) | `https://dataforgood-fb-data.s3.amazonaws.com/forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif` (zoom-10 Bing quadkey, computable from lat/lon; index `tiles.geojson` alongside) — **HTTP range requests** (verified 206, anonymous) | Cloud-optimised GeoTIFF, EPSG:3857, 32768 × 32768 uint8 canopy height (m), Deflate, no predictor, 512² tiles (mean ~28 KB); IFD1 is a 1-bit mask, overviews 16384…2048. Per place: header + tile tables (~33 KB) + ~3×3 tiles of the 8192² overview (~3 m/px) for the ±1200 m window | CC BY 4.0 — “Canopy height: © Meta and World Resources Institute (High Resolution Canopy Height Maps)”; credited in-app | Yes — spike 2026-11-01: range GET 206, all IFDs parsed (Paris tile `1202200110`, 179 MB file, never downloaded whole) | Yes — public AWS Open Data bucket, no key/account | WorldCover tree class, then OSM trees + park groves (current behaviour) | **near-field fetch and canopy placement wired 2026-11-03** (`LandcoverFetcher`, `CanopyVegetation`); far-tree coverage remains open |
-| Place search | Nominatim (OSMF) | `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=…` | JSON | ODbL; © OpenStreetMap contributors | Yes — usage policy reviewed (2026-10-27): user-triggered search only, **no autocomplete**, ≤1 req/s (single in-flight request), identifying User-Agent, results cached on device. Endpoint is one switchable constant, as the policy requires. The project owner deliberately adopts this service under these restrictions. | Yes — no key/account | bundled MVP gazetteer (paris/interlaken/banff) + raw coordinates | **verified policy, wired in `SearchFetcher`** |
+| Place search | Nominatim (OSMF) | `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=…` | JSON | ODbL; © OpenStreetMap contributors | Yes — usage policy reviewed (2026-10-27): user-triggered search only, **no autocomplete**, ≤1 req/s (single in-flight request), identifying User-Agent, results cached on device. Endpoint is a constant that `RemoteConfig` (`nominatim_endpoint`) can replace without an app update, as the policy requires. Reviewed again 2026-11-08: the search request now fires only on submit; the debounced as-you-type predictions are removed. The project owner deliberately adopts this service under these restrictions. | Yes — no key/account | bundled MVP gazetteer (paris/interlaken/banff) + raw coordinates | **verified policy, wired in `SearchFetcher`** |
 | Capital locations | GeoNames countryInfo and cities1000 | https://download.geonames.org/export/dump/ | Country/territory names, capital names and point coordinates | GeoNames, CC BY 4.0; credited in Settings → Data sources | Bundled catalog; no runtime request | Yes | Existing place search | Generated from downloads on 2026-11-04; supplemented with identified multi-capital locations; eight points that lie 2–5 km off-centre use the OSM place node instead (see the capital snapshot notes below). The catalog is a navigational index and does not itself contain offline map data. |
 | Landmark markers + details | Wikipedia (GeoSearch + REST page summary) and Wikimedia Commons (lead photo) | Nearby: `https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggscoord=LAT\|LON&ggsradius=≤10000&ggslimit=500&ggsprimary=primary&prop=info\|description\|coordinates`; details: `https://{lang}.wikipedia.org/api/rest_v1/page/summary/{Title}`; photo: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:X&prop=imageinfo&iiprop=url\|extmetadata&iiurlwidth=640` then the returned `thumburl` on `thumb.wikimedia.org` | JSON; photo JPEG/PNG/WebP. GeoSearch's coordinate `type` is almost always empty, so `WikiParse` keeps pages whose short description names a physical place (word allowlist/denylist) and ranks them by article `length` | Article text CC BY-SA 4.0 — "Text from Wikipedia · CC BY-SA 4.0" under every extract, plus a Data sources row. Photos only when the file is on Commons (`/wikipedia/commons/`; `/wikipedia/en/` uploads are often non-free logos — the Eiffel Tower's lead image is one), credited per photo with its Artist + LicenseShortName from `extmetadata` | Yes — verified 2026-11-01: GeoSearch 500 pages in 1.7–2.7 s (Paris, Zermatt, Turku; Matterhorn / Eiffel Tower / Turku Cathedral rank top), summary HTTP 200 (`Matterhorn`, `Eiffel_Tower`), imageinfo 200 with credit, `thumburl` 200 `image/jpeg` 145 KB. Note: thumbnails at non-standard widths (e.g. `640px-`) now return HTTP 400 — always use the `thumburl` the API returns | Yes — no key/account. Wikimedia etiquette: identifying User-Agent with contact URL (`WikiFetcher.USER_AGENT`), one request in flight per channel, nearby lookups only after the map settles (0.01° cell + 1 km radius steps), every answer cached on device (`wiki_*` keys, LRU) | no article → card shows name, kind and readouts with "No article found for this place."; offline → cached answers, else "You're offline. Details open when you're back online."; nearby failure → curated registry markers only | **verified, wired in `WikiFetcher` / `WikiParse` (2026-11-01)**. Rejected: Wikidata SPARQL ranked by sitelinks (31 s for Paris, returns languages/events/regions) |
 | Weather (optional) | Open-Meteo | `https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…&current=temperature_2m,weather_code,cloud_cover` | JSON | Open-Meteo terms; weather data CC-BY — attribution in register/app credits | Yes — verified HTTP 200 live (Paris 16.4 °C, overcast) 2026-10-27 | Yes — no key/account | omit weather label/dressing | **verified, wired in `WeatherFetcher`** |
@@ -240,6 +240,9 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
    them. Cached areas must keep working offline.
 4. A fetcher normalises into `LocationData` (height grid, water level,
    landmark candidates). Generation code never parses raw provider payloads.
+5. No source, mirror or endpoint may be a Russian-operated service or a
+   Russian domain (`HostPolicy`; `tests/host_policy_test.gd` scans the
+   project for them).
 
 ## Verified evidence (2026-10-27)
 
@@ -252,8 +255,15 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   ~100 km, converted with the detailed grid's centre/scale in the pipeline.
 - Attribution source: https://raw.githubusercontent.com/tilezen/joerd/master/docs/attribution.md
 - OSM raster tiles also probed (`tile.openstreetmap.org` → HTTP 200,
-  `Access-Control-Allow-Origin: *`), but tile-usage policy for production
-  apps is **not yet reviewed** — map tiles remain an open row above.
+  `Access-Control-Allow-Origin: *`). Tile usage policy reviewed 2026-11-08:
+  viewport-driven viewing is allowed with the exact `tile.openstreetmap.org`
+  URL, visible attribution, a distinct User-Agent and caching of at least 7
+  days (or honouring cache headers). "Offline use is not permitted" on that
+  server. Save for offline does not touch it: it re-runs the normal
+  generation with the download flag (Overpass layers, elevation, imagery),
+  and `TileFetcher` requests only tiles that are being displayed (globe,
+  mini-map, picker map). No numeric rate limit; the Foundation may block
+  without notice.
 - Overpass probe (Paris, 300 m): HTTP 200, 27 buildings + 53 roads with
   names and `building:levels`. Later probes returned HTTP 502 under load —
   hence the fetcher's 30 s timeout, aggressive on-device cache, and
@@ -265,12 +275,12 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   fine for buildings). Added as the first fallback in `OsmFetcher.ENDPOINTS`
   because the main instance answered the full 800 m query with HTTP 502
   "at capacity" during the same session (the retry chain is therefore 5
-  attempts: main, OSM-FR, maps.mail.ru, private.coffee, and — since
+  attempts: main, OSM-FR, a Russian-hosted mirror (removed 2026-11-08), private.coffee, and — since
   2026-10-31 — z.overpass-api.de in place of a second main attempt).
   `overpass.kumi.systems`, `z.`/`lz4.overpass-api.de` timed out from the
   probing host and are not wired.
 - Overpass outage probe (2026-10-31, Interlaken, 150 m building query, 20 s
-  budget): `overpass-api.de`, `maps.mail.ru`, `private.coffee`, `kumi`,
+  budget): `overpass-api.de`, the Russian-hosted mirror, `private.coffee`, `kumi`,
   `lz4.`, `overpass.osm.jp` timed out; `overpass.openstreetmap.fr` HTTP 200
   in 2.3 s; `z.overpass-api.de` HTTP 200 in 17.7 s (now the fifth endpoint,
   replacing the repeated main instance).
@@ -324,8 +334,14 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   required, redistribution allowed. Verdict: build-time bundle, not runtime.
 - Rejections: none — every Phase 2/Phase 4 need is servable without a
   proxy, account, or key. The only licence caveat is Esri's
-  noncommercial-only free grant (fine for this free app; re-check before any
-  paid release).
+  noncommercial-only free grant. Reviewed again 2026-11-08 for a free
+  app-store release: free of charge with no income fits "noncommercial"
+  (§2.2), but Esri "reserves the right to determine" what qualifies, §2.3(a)
+  limits access to "a standard web browser or Esri products", and §2.3(e)
+  bans harvesting. Get Esri's written confirmation (including the on-device
+  tile cache) before release, and keep an alternative source ready:
+  `satellite_url_template` in `RemoteConfig` swaps the address without an
+  update. Any paid, ad-funded or in-app-purchase release needs a licence.
 
 ### Phase 2 fetch-change traceability (T0.4 validation)
 
