@@ -12,7 +12,13 @@ const MARK_LIGHT := "res://assets/brand/pr360-mark-light.svg"
 const WORDMARK_LIGHT := "res://assets/brand/pr360-wordmark-light.svg"
 
 ## Sent as the User-Agent header on every external API request.
-const USER_AGENT := "planet-render-360"
+const USER_AGENT := "planet-render-360 (https://github.com/TuononenP/planet-render-360)"
+
+## The project's pages (see site/): the privacy policy, and the file of
+## service addresses RemoteConfig reads so they can change without an update.
+const SITE_URL := "https://tuononenp.github.io/planet-render-360/"
+const PRIVACY_URL := SITE_URL + "privacy.html"
+const CONFIG_URL := SITE_URL + "config.json"
 
 ## The variant for the current ground: -dark files on Night grounds,
 ## -light on Day (the logo's colours are fixed, never the accent).

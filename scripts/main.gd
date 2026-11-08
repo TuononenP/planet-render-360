@@ -106,6 +106,12 @@ func _ready() -> void:
 	# Before anything reads user://: bring the data across from Godot's
 	# default user directory the first time the app runs from its own.
 	UserDirMigration.run()
+	# Temp files of writes a kill cut short: gone before the cache is indexed.
+	AtomicFile.sweep_stale("user://")
+	AtomicFile.sweep_stale(CacheStore.base_dir())
+	# Service addresses from the last fetch; the refresh below updates them
+	# for the next launch and for requests not yet made.
+	RemoteConfig.load_cached()
 	CacheStore.preload_index()
 	_store = CacheStore.new()
 	_store.load_store()
@@ -131,6 +137,9 @@ func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
+	var remote_config := RemoteConfig.new()
+	add_child(remote_config)
+	remote_config.refresh()
 	_pipeline.stage_changed.connect(
 		func(i: int, label: String, state: String) -> void:
 			_loading.set_stage(i, label, state)

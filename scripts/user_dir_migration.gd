@@ -95,6 +95,12 @@ const HISTORY := "history.json"
 ## keeping a favourite star and a saved camera from either. Newest first,
 ## at most CacheStore.MAX_ENTRIES. Returns 1 when the old file was merged.
 static func _merge_history(from_path: String, target: String) -> int:
+	# An unreadable side would merge as empty and then be replaced or
+	# deleted: keep a copy of it first, beside the history that lives on.
+	if not _parses(from_path):
+		DirAccess.copy_absolute(from_path, target + ".from-old.bak")
+	if not _parses(target):
+		AtomicFile.keep_backup(target)
 	var old_entries := _entries(from_path)
 	var new_entries := _entries(target)
 	var by_place := {}
@@ -115,19 +121,29 @@ static func _merge_history(from_path: String, target: String) -> int:
 	merged.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return float(a.get("timestamp", 0.0)) > float(b.get("timestamp", 0.0)))
 	merged = merged.slice(0, CacheStore.MAX_ENTRIES)
-	var f := FileAccess.open(target, FileAccess.WRITE)
-	if f == null:
+	# The current layout, written whole: the old file goes only once it is safe.
+	if not AtomicFile.write_text(target, JSON.stringify({"version": CacheStore.HISTORY_VERSION, "entries": merged})):
 		return 0
-	f.store_string(JSON.stringify(merged))
-	f.close()
 	DirAccess.remove_absolute(from_path)
 	return 1
+
+## Whether a history file holds a readable list of entries (an empty file
+## holds nothing worth keeping).
+static func _parses(path: String) -> bool:
+	var text := FileAccess.get_file_as_string(path)
+	if text.is_empty():
+		return true
+	var parsed: Variant = JSON.parse_string(text)
+	var items: Variant = parsed.get("entries") if parsed is Dictionary else parsed
+	return items is Array
 
 static func _entries(path: String) -> Array:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var out: Array = []
-	if parsed is Array:
-		for e in parsed:
+	# CacheStore's layout is {"version", "entries"}; older files a bare array.
+	var items: Variant = parsed.get("entries") if parsed is Dictionary else parsed
+	if items is Array:
+		for e in items:
 			if e is Dictionary:
 				out.append(e)
 	return out

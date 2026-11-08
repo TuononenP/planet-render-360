@@ -73,9 +73,25 @@ const PREF_DEFAULTS := {
 const PRESET_VERSION := 1
 
 ## Fresh-install preset: Ultra on desktop (Forward+, where its extras
-## live), High on phones.
+## live) unless the GPU is known to be weak, High on phones.
 static func default_preset() -> int:
-	return Preset.ULTRA if OS.has_feature("pc") else Preset.HIGH
+	return preset_for_adapter(OS.has_feature("pc"), RenderingServer.get_video_adapter_type(),
+		RenderingServer.get_video_adapter_name())
+
+## Ultra needs a fast GPU. A desktop starts on High when it reports a
+## software, virtual or non-Apple integrated GPU (Apple's integrated GPUs
+## are fast enough). An adapter that reports nothing useful, such as the
+## headless dummy renderer, keeps Ultra: a tier is not taken away without
+## evidence. This is only the first choice; Settings changes it.
+static func preset_for_adapter(pc: bool, adapter_type: int, adapter_name: String) -> int:
+	if not pc:
+		return Preset.HIGH
+	match adapter_type:
+		RenderingDevice.DEVICE_TYPE_CPU, RenderingDevice.DEVICE_TYPE_VIRTUAL_GPU:
+			return Preset.HIGH
+		RenderingDevice.DEVICE_TYPE_INTEGRATED_GPU:
+			return Preset.ULTRA if adapter_name.begins_with("Apple") else Preset.HIGH
+	return Preset.ULTRA
 
 static func clamp_preset(value: int) -> int:
 	return clampi(value, Preset.FAST, Preset.ULTRA)
@@ -225,11 +241,8 @@ func save_settings(changes: Dictionary) -> void:
 		if parsed is Dictionary:
 			saved = parsed
 	saved.merge(changes, true)
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
+	if not AtomicFile.write_text(path, JSON.stringify(saved)):
 		push_warning("RenderSettings: cannot write %s" % path)
-		return
-	f.store_string(JSON.stringify(saved))
 
 func set_preset(value: int) -> void:
 	preset = clamp_preset(value)

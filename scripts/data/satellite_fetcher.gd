@@ -59,6 +59,14 @@ var _emitted := false
 ## their tile in the cache but must not settle tiles of this one: they
 ## would count it complete early and report it incomplete.
 var _generation := 0
+## Cached tiles decode on the worker pool (a 225-tile Ultra mosaic took
+## ~0.5 s on the main thread, several times that on a phone). One group per
+## mosaic; its images are handed to _tile_done on the main thread.
+var _stitch_task := -1
+var _decode_group := -1
+var _decode_gen := 0
+var _decode_tiles: Array[Vector2i] = []
+var _decode_images: Array[Image] = []
 ## Contract §2.3 source record, set on every success: {zoom, span,
 ## tile_count, metres_per_px, source_zoom, source_span}. source_* differ
 ## from requested after a lower-zoom fallback. Cleared at fetch start.
@@ -68,12 +76,19 @@ var satellite_source: Dictionary = {}
 var offline_mode := false
 
 func _ready() -> void:
+	# Polling is only needed while a decode runs; a fetch started before the
+	# node was ready already has one.
+	set_process(_decode_group >= 0)
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 	for i in POOL_SIZE:
 		var http := HTTPRequest.new()
 		http.timeout = TILE_TIMEOUT
 		add_child(http)
 		_pool.append(http)
+
+## The tile address in use: URL_TEMPLATE unless RemoteConfig replaces it.
+static func url_template() -> String:
+	return RemoteConfig.value("satellite_url_template", URL_TEMPLATE)
 
 ## Web-mercator metres per pixel at a latitude/zoom (z16 ≈ 2.39 m/px at
 ## the equator, ≈ 1.57 at Paris; z17 halves that, z18 quarters it).
@@ -114,7 +129,14 @@ func fetch(lat: float, lon: float, zoom: int = 16, span: int = 3) -> void:
 	satellite_source = {}
 	_start_mosaic(zoom, span)
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_decode()
+		_join_stitch()
+
 func _start_mosaic(zoom: int, span: int) -> void:
+	_join_decode()
+	_join_stitch()
 	_zoom = zoom
 	_span = span
 	_centre_tile = DemFetcher.tile_xy(_pending_lat, _pending_lon, zoom)
@@ -123,8 +145,67 @@ func _start_mosaic(zoom: int, span: int) -> void:
 	_remaining = _tiles.size()
 	_emitted = false
 	_generation += 1
+	var gen := _generation
+	var cached: Array[Vector2i] = []
 	for t in _tiles:
-		_load_tile(t, _generation)
+		if FileAccess.file_exists(_cache_path(t)):
+			cached.append(t)
+		else:
+			_load_tile(t, gen)
+	# A mosaic that settled inside the loop (offline, every tile missing)
+	# may already have started its lower-zoom fallback.
+	if gen == _generation:
+		_decode_cached(cached, gen)
+
+## Decodes the cached tiles in parallel; _process collects them.
+func _decode_cached(cached: Array[Vector2i], gen: int) -> void:
+	if cached.is_empty():
+		return
+	var images: Array[Image] = []
+	var paths := PackedStringArray()
+	for t in cached:
+		images.append(Image.new())
+		paths.append(_cache_path(t))
+	_decode_tiles = cached
+	_decode_images = images
+	_decode_gen = gen
+	_decode_group = WorkerThreadPool.add_group_task(
+		func(i: int) -> void: images[i].load(paths[i]), cached.size(), -1, false, "Decode satellite tiles")
+	set_process(true)
+
+func _process(_delta: float) -> void:
+	if _decode_group < 0:
+		set_process(false)
+	elif WorkerThreadPool.is_group_task_completed(_decode_group):
+		_finish_decode()
+
+func _finish_decode() -> void:
+	var tiles := _decode_tiles
+	var images := _decode_images
+	var gen := _decode_gen
+	_join_decode()
+	for i in tiles.size():
+		if gen != _generation:
+			return  # superseded while decoding; the files stay cached
+		if images[i].is_empty():
+			_load_tile(tiles[i], gen)  # damaged file: the network path
+		else:
+			CacheStore.note_read(_cache_path(tiles[i]))
+			_tile_done(tiles[i], images[i])
+
+func _join_stitch() -> void:
+	if _stitch_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_stitch_task)
+		_stitch_task = -1
+
+## Waits for a decode in flight and forgets it. Cheap when none is running.
+func _join_decode() -> void:
+	if _decode_group >= 0:
+		WorkerThreadPool.wait_for_group_task_completion(_decode_group)
+		_decode_group = -1
+	_decode_tiles = []
+	_decode_images = []
+	set_process(false)
 
 ## Tiles in the current (or last) mosaic; the pipeline sizes its wait
 ## budget from this. 0 before the first fetch.
@@ -172,7 +253,7 @@ func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
 		elif gen == _generation:
 			_tile_done(t, null)
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
-	var url := URL_TEMPLATE % [_zoom, t.y, t.x]
+	var url := url_template() % [_zoom, t.y, t.x]
 	var err := http.request(url, ["User-Agent: %s" % USER_AGENT])
 	if err != OK:
 		http.request_completed.disconnect(done)
@@ -205,19 +286,32 @@ func _stitch() -> void:
 			return
 		failed.emit("Satellite imagery unavailable")
 		return
+	# Blitting 225 tiles and building the mipmaps of a 3840 px mosaic took
+	# ~60 ms on the main thread; the worker does it and only the texture
+	# upload is left here. The images are this mosaic's own: a newer one
+	# joins this task before it clears them.
+	var gen := _generation
+	var tiles := _tiles.duplicate()
+	var images := _images.duplicate()
 	var size := TILE_PX * _span
+	var top_left := _centre_tile - Vector2i.ONE * (_span / 2)
+	_stitch_task = WorkerThreadPool.add_task(func() -> void:
+		var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
+		mosaic.fill(Color(0.32, 0.36, 0.28))
+		for t: Vector2i in tiles:
+			if images.has(t):
+				var src: Image = images[t]
+				if src.get_format() != Image.FORMAT_RGB8:
+					src.convert(Image.FORMAT_RGB8)
+				mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), (t - top_left) * TILE_PX)
+		mosaic.generate_mipmaps()
+		_stitched.call_deferred(gen, mosaic))
+
+func _stitched(gen: int, mosaic: Image) -> void:
+	_join_stitch()
+	if gen != _generation:
+		return  # a newer mosaic replaced this one while it was built
 	var half := _span / 2
-	var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
-	mosaic.fill(Color(0.32, 0.36, 0.28))
-	for t in _tiles:
-		if _images.has(t):
-			var src: Image = _images[t]
-			if src.get_format() != Image.FORMAT_RGB8:
-				src.convert(Image.FORMAT_RGB8)
-			var dst := Vector2i((t.x - (_centre_tile.x - half)) * TILE_PX,
-				(t.y - (_centre_tile.y - half)) * TILE_PX)
-			mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), dst)
-	mosaic.generate_mipmaps()
 	SPAN = _span
 	var origin := Vector2((_centre_tile.x - half) * TILE_PX, (_centre_tile.y - half) * TILE_PX)
 	satellite_source = {

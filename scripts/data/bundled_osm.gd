@@ -156,7 +156,35 @@ static func cache_is_newer(path: String, key: String) -> bool:
 		return false
 	return _response_is_newer(file.get_as_text(), key)
 
+## Overpass puts osm3s (with the timestamp) ahead of the elements, so the
+## timestamp sits within the first few hundred characters.
+const HEADER_CHARS := 4096
+
+## Whether `text` is a complete response at least as new as the snapshot.
+## A normal response (timestamp in its header, an elements list, no remark)
+## is judged from its text without parsing, because a cached city is
+## 5-30 MB and a full parse cost ~0.3 s on the main thread. Anything else
+## takes the full parse.
 static func _response_is_newer(text: String, key: String) -> bool:
+	var stamp := header_stamp(text)
+	if stamp != "" and text.contains('"elements"') and not text.contains('"remark"'):
+		return stamp >= str(_entries()[key][4])
+	return _response_is_newer_parsed(text, key)
+
+## The osm3s timestamp from the head of a response, "" when it is not there.
+static func header_stamp(text: String) -> String:
+	var head := text.substr(0, HEADER_CHARS)
+	var at := head.find('"timestamp_osm_base"')
+	if at < 0:
+		return ""
+	var colon := head.find(":", at)
+	var open := head.find('"', colon + 1) if colon >= 0 else -1
+	var close := head.find('"', open + 1) if open >= 0 else -1
+	if close < 0:
+		return ""
+	return head.substr(open + 1, close - open - 1).trim_suffix("Z")
+
+static func _response_is_newer_parsed(text: String, key: String) -> bool:
 	var data: Variant = JSON.parse_string(text)
 	if not data is Dictionary or not data.get("elements", null) is Array \
 			or str(data.get("remark", "")).strip_edges() != "":
@@ -181,7 +209,11 @@ static func read(key: String) -> String:
 	var text := raw.get_string_from_utf8()
 	if text.sha256_text() != entries[key][6]:
 		return ""
-	if not OsmFetcher._payload_usable(text):
+	# The snapshot tool (tools/prepare_osm_snapshot.py) refuses a payload with
+	# a remark or without elements, and the manifest pins this exact text by
+	# length and SHA-256, so it is not parsed again here: that parse cost
+	# 0.2-0.4 s on the main thread, and the fetchers parse it on a worker.
+	if OverpassRequest.payload_error(text) != "" or not text.contains('"elements"'):
 		return ""
 	if entries[key][2] == "detailed" and (not OsmQuery.is_current(text) or not OsmFetcher._mentions_buildings(text)):
 		return ""

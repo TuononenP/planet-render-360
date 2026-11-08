@@ -66,7 +66,7 @@ func _notification(what: int) -> void:
 ## OsmFetcher.ENDPOINTS cannot change them.
 static func endpoints() -> Array[String]:
 	return OsmFetcher.endpoint_order(["z.overpass-api.de",
-		"//overpass-api.de", "mail.ru"]).slice(0, 4)
+		"//overpass-api.de", "private.coffee"]).slice(0, 4)
 
 func is_busy() -> bool:
 	return _busy
@@ -117,8 +117,18 @@ func cancel() -> void:
 		_req.cancel()
 	_busy = false
 
+## Bundled snapshots load on a worker; created on first use.
+var _snapshots: SnapshotReader
+
+func _reader() -> SnapshotReader:
+	if _snapshots == null:
+		_snapshots = SnapshotReader.new()
+		add_child(_snapshots)
+	return _snapshots
+
 func fetch(lat: float, lon: float) -> void:
 	cancel()
+	var gen := _gen
 	_lat = lat
 	_lon = lon
 	_t0 = Time.get_ticks_msec()
@@ -130,12 +140,14 @@ func fetch(lat: float, lon: float) -> void:
 	if cached != "" and OverpassRequest.payload_error(cached) == "":
 		_parse_off_thread(cached, true)
 		return
-	var bundled := BundledOsm.read(snapshot)
+	var bundled := await _reader().read(snapshot)
+	if gen != _gen:
+		return
 	if bundled != "":
 		if not offline_mode:
 			BundledOsm.refresh(get_tree(), snapshot, _cache, "data=" + build_query(lat, lon).uri_encode(),
 				func(text: String) -> String: return "" if _usable(text) else "unusable payload", endpoints())
-		_parse_off_thread(bundled, true)
+		_parse_off_thread(bundled, true, false, true)
 		return
 	_request()
 
@@ -173,14 +185,16 @@ static func _usable(text: String) -> bool:
 
 ## A city's payload (~10 MB) takes ~0.3 s to check and parse: on a
 ## worker, so the loading screen keeps drawing. A cached payload that is
-## not usable comes back empty and the network is asked instead.
-func _parse_off_thread(text: String, cached: bool, fallback: bool = false) -> void:
+## not usable comes back empty and the network is asked instead. A
+## `trusted` payload (a bundled snapshot, pinned by length and SHA-256 and
+## checked when it was made) is not checked again.
+func _parse_off_thread(text: String, cached: bool, fallback: bool = false, trusted: bool = false) -> void:
 	_join_parse()
 	var gen := _gen
 	var lat := _lat
 	var lon := _lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := parse(text, lat, lon) if fallback or not cached or _usable(text) else {}
+		var parsed := parse(text, lat, lon) if fallback or trusted or not cached or _usable(text) else {}
 		_on_parsed.call_deferred(gen, text.length(), cached, parsed))
 
 func _join_parse() -> void:

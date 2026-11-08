@@ -29,6 +29,8 @@ const LICENCES := [
 	["IBM Plex Mono", "SIL Open Font License", "https://openfontlicense.org/"],
 	["Lucide icons", "ISC License", "https://lucide.dev/license"],
 ]
+const LICENCE_DIR := "res://licenses/"
+const LICENCE_FILES := ["instrument-sans-OFL.txt", "ibm-plex-mono-OFL.txt", "lucide-LICENSE.txt"]
 const TEXT_SCALES := [0.85, 1.0, 1.3, 1.5, 2.0]
 ## One short line per preset card; the fidelity and first build sit
 ## beside it as dots and a number.
@@ -413,18 +415,34 @@ static func about(s: SettingsScreen) -> VBoxContainer:
 	SettingsRows.add(group, SettingsRows.row("Planet Render 360",
 		UiTheme.data_label(s.version_text(), 15, UiTheme.MUTED),
 		"Built with Godot Engine %s" % engine.get("string", "")))
+	SettingsRows.add(group, SettingsRows.link("Privacy policy",
+		"What stays on this device and what leaves it", Brand.PRIVACY_URL))
 	for lic in LICENCES:
 		SettingsRows.add(group, SettingsRows.link(lic[0], lic[1], lic[2]))
-	var lic_pad := MarginContainer.new()
-	var godot_row := SettingsRows.toggle("Godot Engine", false, func(on: bool) -> void:
-		lic_pad.visible = on, "MIT License · show the licence text")
-	SettingsRows.add(group, godot_row)
-	var licence := UiTheme.text(Engine.get_license_text(), "caption", UiTheme.MUTED)
-	licence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lic_pad.visible = false
-	for side in ["left", "right", "top", "bottom"]:
-		lic_pad.add_theme_constant_override("margin_" + side, 16)
-	lic_pad.add_child(licence)
-	SettingsRows.add(group, lic_pad)
+	_licence_toggle(group, "Fonts and icons", "OFL and ISC · show the licence texts",
+		_font_licence_text())
+	_licence_toggle(group, "Godot Engine", "MIT License · show the licence text",
+		Engine.get_license_text())
 	_section(page, "", group)
 	return page
+
+## The licence texts shipped in licenses/ (the OFL asks for its text and
+## copyright to travel with the fonts), one after another.
+static func _font_licence_text() -> String:
+	var parts: Array[String] = []
+	for file in LICENCE_FILES:
+		parts.append(FileAccess.get_file_as_string(LICENCE_DIR + file).strip_edges())
+	return "\n\n\n".join(parts)
+
+## A row that shows or hides a block of licence text under it.
+static func _licence_toggle(group: PanelContainer, label: String, description: String, text: String) -> void:
+	var pad := MarginContainer.new()
+	SettingsRows.add(group, SettingsRows.toggle(label, false, func(on: bool) -> void:
+		pad.visible = on, description))
+	var body := UiTheme.text(text, "caption", UiTheme.MUTED)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pad.visible = false
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 16)
+	pad.add_child(body)
+	SettingsRows.add(group, pad)

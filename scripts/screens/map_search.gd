@@ -3,17 +3,19 @@ extends RefCounted
 
 ## Search and predictions for MapPicker, split out of it like MapChrome:
 ## stateless statics that operate on the picker's controls via `p`.
-## Instant on-device predictions first; remote ones refine the list
-## after a debounce pause, so typing does not hit the network per key.
-## "46.5, 7.9" typed or pasted selects that point directly, in either
+## Typing is answered from the on-device gazetteer only: Nominatim's usage
+## policy forbids autocomplete against the public service, so the network
+## is used only when a search is submitted (Enter, or the "Search online"
+## row). "46.5, 7.9" typed or pasted selects that point directly, in either
 ## mode; the hash toggle switches the field to coordinate entry (mono,
 ## no predictions). A search with no match shows the design system's
-## no-results state with "Use coordinates". While remote predictions are
-## pending, a spinner appears in the field after BUSY_DELAY so the list
-## is known to be coming.
+## no-results state with "Use coordinates". While a submitted search is
+## pending, a spinner appears in the field after BUSY_DELAY.
 
-## Typing this long without an answer shows the spinner.
+## A submitted search this long without an answer shows the spinner.
 const BUSY_DELAY := 0.3
+## The row that sends the typed text to the online place search.
+const SEARCH_ONLINE := "Search online for \"%s\""
 
 static func ensure_searcher(p: MapPicker) -> void:
 	if p._searcher != null:
@@ -33,17 +35,10 @@ static func ensure_searcher(p: MapPicker) -> void:
 			p.set_offline(true)
 		else:
 			show_no_results(p, p._search.text.strip_edges()))
-	p._searcher.suggestions_ready.connect(func(query: String, results: Array) -> void:
-		if query != p._search.text.strip_edges().to_lower():
-			return  # stale response for text the user has already changed
-		set_busy(p, false)
-		if not results.is_empty():
-			show_suggestions(p, results))
 
 static func on_text_changed(p: MapPicker, text: String) -> void:
 	var cleaned := text.strip_edges()
 	if ViewLink.looks_like_link(cleaned):
-		p._suggest_timer.stop()
 		var state := ViewLink.parse(cleaned)
 		if state.is_empty():
 			show_no_results(p, cleaned)
@@ -52,19 +47,17 @@ static func on_text_changed(p: MapPicker, text: String) -> void:
 				"lon": state["lon"], "view": state}])
 		return
 	if looks_like_coordinates(cleaned):
-		p._suggest_timer.stop()
 		hide_suggestions(p)
 		var ll := parse_coordinates(cleaned)
 		p._on_picked(ll.x, ll.y)
 		return
 	if cleaned.length() < 2 or p._coord_mode:
-		p._suggest_timer.stop()
 		hide_suggestions(p)
 		return
-	show_suggestions(p, LocationData.suggestions_for(cleaned))
-	p._suggest_timer.start()
-	set_busy(p, false)
-	p._search_busy_timer.start(BUSY_DELAY)
+	# The last row sends the typed text to Nominatim, the same as Enter.
+	var rows := LocationData.suggestions_for(cleaned)
+	rows.append({"name": SEARCH_ONLINE % cleaned, "search": cleaned})
+	show_suggestions(p, rows)
 
 ## "Shared view · 48.8622° N  2.2887° E": the row a pasted link becomes.
 static func link_label(state: Dictionary) -> String:
@@ -82,13 +75,6 @@ static func parse_coordinates(text: String) -> Vector2:
 	var parts := text.split(",")
 	return Vector2(clampf(parts[0].strip_edges().to_float(), -90.0, 90.0),
 		clampf(parts[1].strip_edges().to_float(), -180.0, 180.0))
-
-static func request_remote(p: MapPicker) -> void:
-	var cleaned := p._search.text.strip_edges()
-	if cleaned.length() < 2 or looks_like_coordinates(cleaned):
-		return
-	ensure_searcher(p)
-	p._searcher.suggest(cleaned)
 
 ## Suggestion rows share the OptionButton lesson: explicit hover /
 ## pressed text colours, or the label goes near-invisible on hover.
@@ -113,12 +99,19 @@ static func show_suggestions(p: MapPicker, results: Array) -> void:
 	# A place can come back twice (city node and boundary) under one label.
 	var seen := {}
 	var shown: Array = []
+	var online: Dictionary = {}
 	for item in results:
+		if item.has("search"):
+			online = item  # always shown last, outside the 5-row cap
+			continue
 		var key := str(item.get("name", "")).to_lower()
 		if not seen.has(key):
 			seen[key] = true
 			shown.append(item)
-	for item in shown.slice(0, 5):
+	shown = shown.slice(0, 5)
+	if not online.is_empty():
+		shown.append(online)
+	for item in shown:
 		var place := str(item.get("name", ""))
 		var lat := float(item.get("lat", 0.0))
 		var lon := float(item.get("lon", 0.0))
@@ -128,7 +121,11 @@ static func show_suggestions(p: MapPicker, results: Array) -> void:
 		row.custom_minimum_size = Vector2(0, 48)
 		row.add_theme_font_size_override("font_size", 15)
 		style_row(row)
-		if item.has("view"):
+		if item.has("search"):
+			var typed := str(item["search"])
+			UiIcon.apply(row, "search", 18, UiTheme.MUTED, UiTheme.ON_ACCENT)
+			row.pressed.connect(func() -> void: submit(p, typed))
+		elif item.has("view"):
 			var state: Dictionary = item["view"]
 			row.pressed.connect(func() -> void: open_link(p, state))
 		else:
@@ -247,7 +244,6 @@ static func set_busy(p: MapPicker, on: bool) -> void:
 
 static func select(p: MapPicker, place: String, lat: float, lon: float) -> void:
 	hide_suggestions(p)
-	p._suggest_timer.stop()
 	p._search.set_block_signals(true)
 	p._search.text = place
 	p._search.set_block_signals(false)
@@ -279,4 +275,6 @@ static func submit(p: MapPicker, text: String) -> void:
 			select(p, str(place["name"]), float(place["lat"]), float(place["lon"]))
 			return
 	ensure_searcher(p)
+	hide_suggestions(p)
+	p._search_busy_timer.start(BUSY_DELAY)
 	p._searcher.search(cleaned)

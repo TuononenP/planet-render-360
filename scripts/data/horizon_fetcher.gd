@@ -41,7 +41,7 @@ func _ready() -> void:
 ## detailed one on the main instance.
 static func endpoints() -> Array[String]:
 	return OsmFetcher.endpoint_order(["z.overpass-api.de",
-		"//overpass-api.de", "mail.ru"]).slice(0, 4)
+		"//overpass-api.de", "private.coffee"]).slice(0, 4)
 
 func is_busy() -> bool:
 	return _busy

@@ -6,6 +6,12 @@ extends Node
 signal finished(complete: bool, missing: Array)
 
 const ATTEMPT_TIMEOUT := 40.0
+## Mirror pairs by name, so reordering OsmFetcher.ENDPOINTS cannot change them.
+## With three public instances left the pairs share z.overpass-api.de.
+const PRIMARY_HOSTS: Array[String] = ["//overpass-api.de", "z.overpass-api.de"]
+const ALTERNATE_HOSTS: Array[String] = ["private.coffee", "z.overpass-api.de"]
+## A cooldown this short is waited out; a longer one lets the layer fail.
+const COOLDOWN_WAIT_S := 60.0
 var request_override: OverpassRequest  # test transport
 var _request: OverpassRequest
 var _jobs: Array[Dictionary] = []
@@ -157,16 +163,26 @@ func _next() -> void:
 	var validate := func(text: String) -> String:
 		return "" if _check(job, text) else "Invalid or incomplete OSM response"
 	var alternates := _retry_round > 0 or _primary_failed
-	var endpoints := OsmFetcher.ENDPOINTS.slice(2, 4) if alternates else OsmFetcher.ENDPOINTS.slice(0, 2)
+	var endpoints := OsmFetcher.endpoint_order(ALTERNATE_HOSTS if alternates else PRIMARY_HOSTS).slice(0, 2)
+	# With both mirrors asking for a pause, failing now would burn every
+	# remaining layer and the retry round within a second.
+	var pause := OverpassRequest.cooldown_left(endpoints)
+	if pause > 0.0 and pause <= COOLDOWN_WAIT_S:
+		await get_tree().create_timer(pause + 0.1).timeout
+		if run != _run_id:
+			return
 	_request.run("data=" + str(job["query"]).uri_encode(), validate, endpoints)
 
 func _answered(text: String) -> void:
 	if not _running:
 		return
 	var job := _jobs[_index]
-	OsmFetcher._write_cache(job["path"], text)
-	# OverpassRequest has just validated this text on a worker.
-	job["verified_stamp"] = _stamp(job["path"])
+	# OverpassRequest has just validated this text on a worker. If the write
+	# failed, whatever older file is still there has not been validated.
+	if OsmFetcher._write_cache(job["path"], text):
+		job["verified_stamp"] = _stamp(job["path"])
+	else:
+		job.erase("verified_stamp")
 	_index += 1
 	_next.call_deferred()
 
