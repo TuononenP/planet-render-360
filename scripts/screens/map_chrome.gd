@@ -52,7 +52,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._region_label.add_theme_color_override("font_color", UiTheme.MUTED)
 	style_cached_chip(p._cached_chip)
 	p._coord_label.add_theme_color_override("font_color", UiTheme.INK)
-	UiTheme.apply_quiet(p._quick_more)
+	p._continent_filter.restyle()
 	for section in [p._quick_label, p._selected_label, p._coords_label, p._tip,
 			p._quality_title, p._quality_hint, p._download_status, p._download_phase, p._render_status]:
 		section.add_theme_color_override("font_color", UiTheme.MUTED)
@@ -87,7 +87,12 @@ static func _apply_theme(p: MapPicker) -> void:
 ## Grid in the panel, one sideways row in the sheet; the shelf can grow.
 static func fit_quick_cards(p: MapPicker) -> void:
 	var expanded := p._current_layout == Responsive.Layout.EXPANDED
-	p._quick_grid.columns = 3 if expanded else maxi(1, p._quick_chips.size())
+	p._continent_filter.set_wrapped(expanded)
+	# Hidden cards take no cell, but a one-row rail counts them as columns.
+	var shown := 0
+	for card in p._quick_chips:
+		shown += 1 if card.visible else 0
+	p._quick_grid.columns = 3 if expanded else maxi(1, shown)
 	for card in p._quick_chips:
 		card.custom_minimum_size.x = 0.0 if expanded else float(RAIL_CARD_W)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expanded else Control.SIZE_SHRINK_BEGIN
@@ -96,8 +101,8 @@ static func fit_quick_cards(p: MapPicker) -> void:
 ## clear the rest. -1 clears all: the place no longer comes from a card.
 static func _set_selected_quick(p: MapPicker, index: int) -> void:
 	p._selected_quick = index
-	for i in p._quick_chips.size():
-		p._quick_chips[i].set_pressed_no_signal(i == index)
+	for card in p._quick_chips:
+		card.set_pressed_no_signal(int(card.get_meta("quick_index")) == index)
 
 ## Offline-download feedback under the buttons (progress, then the
 ## outcome), so the button row keeps its shape in every layout.
