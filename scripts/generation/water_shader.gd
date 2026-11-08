@@ -14,7 +14,8 @@ extends RefCounted
 ## - shore foam: an animated broken band along shorelines, banks and
 ##   beaches (COLOR.b = shore distance), stronger on the sea;
 ## - absorption: shallow water warmer/greener, open water deeper teal;
-## - rain rings: live rain roughens and pocks the surface.
+## - rain rings: jittered drop rings, as many as the rain is hard, and
+##   hard rain raises the sea and breaks it into whitecaps.
 ## Opaque on every tier (SSR still refines the probe reflection on
 ## Forward+), so the shoreline softness comes from colour and foam.
 ##
@@ -37,6 +38,10 @@ float water_roughness(float rough, vec3 normal_world) {
 	return sqrt(clamp(rough * rough + variance, 0.0, 1.0));
 }
 """
+
+## Wind direction for waves, whitecaps and the rain that leans with it:
+## water_surface.gd feeds it to the `wind` uniform, Precipitation reads it.
+const WIND := Vector2(0.86, 0.51)
 
 const CODE := """
 shader_type spatial;
@@ -132,9 +137,11 @@ void vertex() {
 		// shorter swell aliased into rows of dashes toward the horizon.
 		vec3 d = gerstner(pm, wd, 118.0, 0.75, TIME)
 			+ gerstner(pm, normalize(wd + vec2(0.4, -0.3)), 74.0, 0.38, TIME * 1.1);
+		float storm = 1.0 + 0.4 * climate_rain;
+		d *= storm;
 		// Legacy sea grids have no carved bed: lift their troughs above
 		// the DEM. Shoreline meshes have a bed and use zero mean swell.
-		d.y += swell_lift;
+		d.y += swell_lift * storm;
 		VERTEX += d * damp * units_per_metre * mix(1.0, 0.2, max(brackish, harbour));
 	}
 }
@@ -166,14 +173,15 @@ void fragment() {
 	if (seav > 0.5) {
 		s += wave_slope(pm, wd, 46.0, 0.048, t, pixel_m) + wave_slope(pm, normalize(wd + vec2(0.4, -0.3)), 27.0, 0.042, t * 1.1, pixel_m);
 	}
-	// Live rain: rings of rough pocks over the whole surface.
-	if (climate_wetness > 0.0 && dist_m < 250.0) {
-		vec2 cell = floor(pm * 1.6);
-		vec2 fc = fract(pm * 1.6) - 0.5;
-		float ph = fract(t * 0.9 + w_hash(cell));
-		float ring = sin(clamp(length(fc) - ph * 0.5, -0.05, 0.05) * 62.8) * (1.0 - ph);
-		s += normalize(fc + 1e-4) * ring * 0.08 * climate_wetness * water_wave_weight(pixel_m, 1.0 / 1.6);
+	// Live rain: drop rings near by. Wind comes with it, so it also
+	// raises the whole wave field.
+	if (climate_rain > 0.0) {
+		// Near rings, wider ones that survive a coarser pixel, and past
+		// both a fine stipple, so drizzle still marks the water from a quay.
+		s += (rain_ripples(pm, t, pixel_m) + rain_ripples(pm * 0.3, t * 0.8, pixel_m * 0.3) * 0.5) * 0.16;
+		s += noise_grad(pm * 2.2 + vec2(t * 1.1, -t * 0.8)) * 0.045 * sqrt(climate_rain) * water_wave_weight(pixel_m, 0.45);
 	}
+	s *= 1.0 + 0.5 * climate_rain;
 	s *= wave_amp * mix(1.0, 0.55, brackish);
 	// Frozen water: still, matte, white-grey ice (ClimateModel).
 	float ice_cover = local_ice(seav, shorev * shore_m, openv);
@@ -198,7 +206,13 @@ void fragment() {
 	float pulse = 0.5 + 0.5 * sin(t * 0.8 - shore * 0.35 + w_noise(pm * 0.05) * 6.0);
 	float brk = smoothstep(0.45, 0.85, w_noise(pf * 0.9 + vec2(t * 0.15, 0.0)) * 0.6
 		+ w_noise(pf * 3.1 - t * 0.2) * 0.4);
-	float foam = band * mix(0.55, 1.0, pulse) * brk * surf;
+	// Foam is lace, not blobs: thin connected filaments on warped noise.
+	float lace = 0.0;
+	if (band > 0.0 || climate_rain > 0.3) {
+		vec2 warp = vec2(w_noise(pf * 0.7 + t * 0.05), w_noise(pf * 0.7 + 9.1 - t * 0.04)) * 1.2;
+		lace = smoothstep(0.62, 0.92, 1.0 - abs(2.0 * w_noise((pf + warp) * 2.6) - 1.0));
+	}
+	float foam = band * mix(0.55, 1.0, pulse) * mix(brk, brk * lace, 0.65) * surf;
 	// Current streaks: foam lines drawn out along the flow near banks.
 	float fl = length(flowv);
 	if (fl > 0.01) {
@@ -207,13 +221,24 @@ void fragment() {
 		foam += smoothstep(0.72, 0.9, w_noise(q)) * (1.0 - open_w * 0.7) * 0.5 * min(fl, 1.0);
 	}
 	foam *= (1.0 - ice_cover) * (1.0 - smoothstep(300.0, 1200.0, dist_m)) * water_wave_weight(pixel_m, 1.0 / 3.1);
+	// Whitecaps: rain's wind breaks the crests of open water, drawn out
+	// downwind. Metres wide, so they outlast the fine foam with distance.
+	if (climate_rain > 0.3 && open_w > 0.05) {
+		vec2 cq = vec2(dot(pf, wd) * 0.05, dot(pf, wd.yx * vec2(-1.0, 1.0)) * 0.13) + wd * t * 0.05;
+		float crest = w_noise(cq) * 0.7 + w_noise(cq * 2.7 + t * 0.07) * 0.3;
+		float caps = smoothstep(0.76 - 0.1 * climate_rain, 0.86, crest)
+			* mix(0.5, 1.0, lace) * smoothstep(0.3, 0.8, climate_rain) * open_w;
+		foam += caps * (1.0 - ice_cover) * water_wave_weight(pixel_m, 2.0) * mix(0.5, 1.0, seav);
+	}
 	foam = clamp(foam, 0.0, 1.0);
+	// Light through the thin tops of the waves: a faint green on slopes.
+	col += vec3(0.010, 0.034, 0.028) * smoothstep(0.02, 0.14, length(s)) * (1.0 - ice_cover);
 	col = mix(col, foam_color.rgb, foam);
 	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
 	ALBEDO = mix(col, ice, ice_cover);
 	float rough = mix(near_rough, far_rough, smoothstep(60.0, 1500.0, dist_m));
 	rough = mix(rough, 0.45, foam);
-	rough = mix(rough, 0.12, climate_wetness * (1.0 - smoothstep(0.0, 250.0, dist_m)));
+	rough = mix(rough, 0.12, sqrt(climate_rain) * (1.0 - smoothstep(150.0, 900.0, dist_m)));
 	ROUGHNESS = water_roughness(mix(rough, 0.55, ice_cover), n_world);
 	SPECULAR = mix(mix(spec, 0.2, foam), 0.25, ice_cover);
 	METALLIC = 0.0;

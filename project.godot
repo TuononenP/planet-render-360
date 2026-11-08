@@ -81,6 +81,14 @@ climate_wetness={
 "type": "float",
 "value": 0.0
 }
+climate_snow_glint={
+"type": "float",
+"value": 0.0
+}
+climate_rain={
+"type": "float",
+"value": 0.0
+}
 climate_water_ice={
 "type": "float",
 "value": 0.0

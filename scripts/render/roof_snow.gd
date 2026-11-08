@@ -18,20 +18,31 @@ render_mode blend_mix, depth_draw_never, cull_back;
 // @SNOW
 varying vec3 wpos;
 varying float wny;
+varying vec3 wnrm;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	wny = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
+	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	wny = wnrm.y;
 	// A few centimetres proud of the roof so the pass never z-fights.
 	VERTEX += NORMAL * 0.03;
 }
 void fragment() {
-	float a = snow_line(wpos) * smoothstep(0.30, 0.60, wny);
+	float px = max(fwidth(wpos.x), fwidth(wpos.z));
+	float n = mix(snow_noise(wpos.xz / 2.3) * 0.7 + snow_noise(wpos.xz / 0.7) * 0.3, 0.5, smoothstep(0.4, 2.5, px));
+	// Roofs are never one clean sheet: it thins where the roof's own
+	// warmth and the wind get at it, without opening holes.
+	float a = snow_line(wpos) * smoothstep(0.30, 0.60, wny) * mix(0.86, 1.0, smoothstep(0.15, 0.4, n));
 	if (a < 0.01) {
 		discard;
 	}
-	ALBEDO = snow_col;
-	ALPHA = a * 0.95;
-	ROUGHNESS = 0.8;
+	ALBEDO = snow_col * (0.92 + 0.12 * n);
+	ALPHA = a * 0.97;
+	float near_px = 1.0 - smoothstep(0.4, 2.5, px);
+	vec2 dr = near_px > 0.0 ? snow_drift(wpos.xz) * near_px : vec2(0.0);
+	// Drift bends the roof's own normal, so a gable keeps its lit side.
+	vec3 nw = normalize(normalize(wnrm) - vec3(dr.x, 0.0, dr.y) * 0.2);
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+	ROUGHNESS = 0.85;
 	SPECULAR = 0.3;
 }
 """

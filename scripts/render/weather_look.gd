@@ -72,13 +72,18 @@ static func fog_per_m(look: Dictionary, haze_per_m: float) -> float:
 	var vis := float(look.get("visibility_m", 0.0))
 	return maxf(haze_per_m, 3.0 / vis) if vis > 0.0 else haze_per_m
 
-## Rain / snow particle dressing by intensity: emitted share of the
-## particle budget, fall acceleration, quad size and alpha.
+## Rain / snow dressing by intensity (Precipitation): emitted share of
+## the particle budget, terminal fall speed (m/s), how far the wind leans
+## it, quad size (m), alpha and the far veils' alpha. Streak length is
+## the distance a drop falls in a 1/18 s glimpse.
 static func particle_params(look: Dictionary) -> Dictionary:
 	var inten := float(look.get("intensity", 0.0))
 	if str(look.get("precip", "none")) == "snow":
-		return {"amount_ratio": lerpf(0.3, 1.0, inten), "gravity": lerpf(-2.5, -4.5, inten),
-			"size": Vector2.ONE * lerpf(0.10, 0.18, inten), "alpha": lerpf(0.65, 0.85, inten)}
-	return {"amount_ratio": lerpf(0.25, 1.0, inten), "gravity": lerpf(-18.0, -26.0, inten),
-		"size": Vector2(lerpf(0.03, 0.06, inten), lerpf(0.35, 0.65, inten)),
-		"alpha": lerpf(0.30, 0.55, inten)}
+		return {"amount_ratio": lerpf(0.35, 1.0, inten), "speed": lerpf(0.9, 1.5, inten),
+			"slant": lerpf(0.15, 0.45, inten), "size": Vector2.ONE * lerpf(0.016, 0.032, inten),
+			"alpha": lerpf(0.7, 0.92, inten), "veil": lerpf(0.10, 0.34, inten)}
+	var speed := lerpf(3.5, 9.0, inten)
+	return {"amount_ratio": lerpf(0.3, 1.0, inten), "speed": speed,
+		"slant": lerpf(0.05, 0.28, inten),
+		"size": Vector2(lerpf(0.003, 0.007, inten), speed / 18.0),
+		"alpha": lerpf(0.28, 0.5, inten), "veil": lerpf(0.03, 0.13, inten)}

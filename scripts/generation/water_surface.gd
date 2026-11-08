@@ -85,6 +85,7 @@ static func material(preset: int = RenderSettings.Preset.HIGH) -> ShaderMaterial
 		_mats[preset] = m
 	var mat: ShaderMaterial = _mats[preset]
 	mat.set_shader_parameter("units_per_metre", WorldScale.metres_to_units())
+	mat.set_shader_parameter("wind", WaterShader.WIND)
 	return mat
 
 static func _commit(root: Node3D, verts: PackedVector3Array,

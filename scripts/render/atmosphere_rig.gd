@@ -563,6 +563,11 @@ func _apply() -> void:
 	RenderingServer.global_shader_parameter_set("cloud_shadow_cover", 0.0 if night else cover * (1.0 - overcast))
 	RenderingServer.global_shader_parameter_set("cloud_shadow_stretch", float(s["stretch"]))
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
+	# Snow sparkles only under a direct sun (ClimateModel.SNOW_GLSL).
+	# The weather look's shadow opacity carries precipitation and fog, which
+	# thicken the deck whatever the reported cover says.
+	var direct := smoothstep(0.55, 1.0, float(look["shadow_opacity"]))
+	RenderingServer.global_shader_parameter_set("climate_snow_glint", 0.0 if night else (1.0 - overcast) * direct)
 	environment.fog_light_color = haze_color.darkened(0.3 * darken)
 	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
 	# A marine layer carries the fog itself; the air above it stays hazy.

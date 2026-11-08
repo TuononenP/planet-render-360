@@ -258,6 +258,7 @@ func set_quality_preset(preset_value: int) -> void:
 	_quality_preset = RenderSettings.clamp_preset(preset_value)
 	if _atmos != null:
 		_atmos.set_quality(_quality_preset)
+	Precipitation.set_quality(_precip, _quality_preset)
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
 	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
