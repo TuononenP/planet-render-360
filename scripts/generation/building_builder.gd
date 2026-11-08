@@ -264,10 +264,25 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 	var first := root.get_child_count()
 	var m2u := WorldScale.metres_to_units()
 	var done := false
+	var masses := BuildingMasses.plan(b, ctx)
+	# The building's paint weight (its main mass's look) and its place's tone
+	# feed the vertex tint; a distant building's residual (_extrude_polygon)
+	# starts from none.
+	var chroma := 0.0
+	if not masses.is_empty():
+		chroma = float(((masses[0] as Dictionary).get("look", {}) as Dictionary).get("vt", 0.0))
+	var tone := float(ctx.get("tone", 0.0))
+	ctx["wall_vt"] = Color.WHITE
+	ctx["roof_vt"] = Color.WHITE
+	if _batch != null:
+		_batch.chroma = chroma
+		_batch.tone = tone
+		_batch.wall_vt = Color.WHITE
+		_batch.roof_vt = Color.WHITE
 	# Its meshes upload once, tinted (RoofVariety), not twice.
 	if _batch == null:
 		MeshArrays.hold()
-	for m in BuildingMasses.plan(b, ctx):
+	for m in masses:
 		var md := m as Dictionary
 		if ctx.has("fortress_mesh") and SuomenlinnaFortress.build_mass(ctx["fortress_mesh"], md, data, ground):
 			done = true
@@ -286,7 +301,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 				var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
 				NycCrownMaterials.crown_details(root, b, md, float(footing["floor"]))
 	if done and _batch == null:
-		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)))
+		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)),
+			chroma, tone, ctx["wall_vt"], ctx["roof_vt"])
 	if _batch == null:
 		MeshArrays.release()
 	return done
@@ -391,6 +407,18 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		hint, fidelity, distant, seed_v, look)
 	if bool(b.get("mapped_landmark", false)) and not distant:
 		roof_mat = HeroLook.roof(b, roof_mat)
+	# A distant building keeps its own colour on the shared materials: the
+	# residual against them rides in its vertex tint (an impostor's batch, or
+	# RoofVariety.tint through the build context).
+	if distant and with_detail:
+		var wall_vt := FacadeMaterials.wall_residual(facade, b, look, seed_v)
+		var roof_vt := FacadeMaterials.roof_residual(roof_mat, b, look)
+		if _batch != null:
+			_batch.wall_vt = wall_vt
+			_batch.roof_vt = roof_vt
+		else:
+			ctx["wall_vt"] = wall_vt
+			ctx["roof_vt"] = roof_vt
 	# Tile repeats follow the real storey count, kept within ~30% of the
 	# style's floor height so a roof carved out of the total never squashes
 	# the windows (a mansard eats most of an attic floor).

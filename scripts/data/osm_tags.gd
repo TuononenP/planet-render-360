@@ -307,8 +307,8 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"size_z": clampf(aabb.size.y, 12.0, 136.0),
 		"height": res["height"], "height_source": res["height_source"],
 		"levels": res["levels"],
-		"colour": str(tags.get("building:colour", "")),
-		"material": str(tags.get("building:material", tags.get("material", ""))),
+		"colour": wall_colour(tags),
+		"material": wall_material(tags),
 		"parts": [],
 		"name": str(tags.get("name", "")),
 		# Type tags ArchitectureStyle keys off: the raw `building` value
@@ -341,8 +341,32 @@ static func fortification_tags(tags: Dictionary) -> Dictionary:
 			out[key] = str(tags[key])
 	return out
 
+## A building's wall colour: `building:colour`, else the facade's own
+## (`building:facade:colour`). "" when neither is mapped.
+static func wall_colour(tags: Dictionary) -> String:
+	var c := str(tags.get("building:colour", "")).strip_edges()
+	return c if c != "" else str(tags.get("building:facade:colour", "")).strip_edges()
+
+## A building's wall material: `building:material`, `material`, the facade's
+## own (`building:facade:material`), else its cladding (`building:cladding`).
+## "" when none is mapped.
+static func wall_material(tags: Dictionary) -> String:
+	for key in ["building:material", "material", "building:facade:material", "building:cladding"]:
+		var m := str(tags.get(key, "")).strip_edges()
+		if m != "":
+			return m
+	return ""
+
+## `roof:angle` in degrees ("35", "35°", "35 deg"); 0 when absent or outside 5-75.
+static func _roof_angle(raw: Variant) -> float:
+	var s := str(raw).strip_edges().to_lower().replace("°", "").replace("deg", "").strip_edges()
+	if not s.is_valid_float():
+		return 0.0
+	var a := s.to_float()
+	return a if a >= 5.0 and a <= 75.0 else 0.0
+
 ## Roof and vertical-extent keys shared by buildings and their parts:
-## roof shape/colour/material as raw strings, metres and level counts
+## roof shape/colour/material as raw strings, metres, degrees and level counts
 ## as numbers (0 when absent or out of range).
 static func _roof_tags(tags: Dictionary) -> Dictionary:
 	var roof_h := _tag_metres(tags.get("roof:height", ""), 0.5, 100.0)
@@ -351,6 +375,7 @@ static func _roof_tags(tags: Dictionary) -> Dictionary:
 		"roof_shape": str(tags.get("roof:shape", "")),
 		"roof_colour": str(tags.get("roof:colour", "")),
 		"roof_material": str(tags.get("roof:material", "")),
+		"roof_angle": _roof_angle(tags.get("roof:angle", "")),
 		"roof_height_m": 0.0 if is_nan(roof_h) else roof_h,
 		"roof_levels": _tag_int(tags.get("roof:levels", 0), 0, 10),
 		"min_height_m": 0.0 if is_nan(min_h) else min_h,

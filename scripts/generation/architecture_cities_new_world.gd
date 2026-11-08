@@ -46,6 +46,9 @@ const TERRACE := ["#e8e0d0", "#d8c8b0", "#c8d0c8", "#9c4a35", "#e8d0b8", "#d0c0a
 const MELB_BRICK := ["#9c4a35", "#7a5a48", "#c8b088", "#8a3f30"]
 const BLUESTONE := ["#5a5e62", "#4e5256", "#666a6e"]
 const CORRUGATED := [["slate", ["#8a8e90", "#7a7e80", "#6a3a2e"]]]
+## Havana: sun-faded pastel stucco (pink, mint, yellow, sky, coral, cream).
+const HAVANA := ["#e8b8c0", "#a8d8c8", "#e8d080", "#a8c8e0", "#f0d8b0", "#e8a890", "#c8d8a8"]
+const SOVIET_PANEL_CU := ["#c8c4bc", "#d8d4cc", "#b8b4ac"]
 
 const BASE := {
 	"toronto": "north_america", "toronto_victorian": "toronto", "toronto_tower": "toronto",
@@ -59,6 +62,7 @@ const BASE := {
 	"buenos_aires": "latin_america", "ba_chorizo": "buenos_aires", "ba_tower": "buenos_aires",
 	"sydney": "australia", "sydney_terrace": "sydney", "sydney_tower": "sydney",
 	"melbourne": "australia", "melbourne_terrace": "melbourne", "melbourne_tower": "melbourne",
+	"havana": "latin_america", "havana_colonial": "havana", "havana_soviet": "havana",
 }
 
 ## [era, kinds, from, to, building:architecture, weight, km from, km to,
@@ -133,6 +137,14 @@ const ERAS := {
 		["melbourne", HAC, 1915, 1989, ["inter_war", "art_deco", "edwardian", "functionalism"],
 			3.0, 0.0, 99.0, [1, 8]],
 		["melbourne_tower", ACC, 1960, 2100, [], 1.5, 0.0, 99.0, [9, 99]],
+	],
+	"havana": [
+		["havana_colonial", ALL, 1519, 1899, ["spanish_colonial", "colonial", "baroque",
+			"neoclassicism", "cuban_baroque"], 1.5, 0.0, 2.0, [1, 3], true],
+		["havana", HAC, 1900, 1959, ["art_deco", "eclectic", "neoclassicism", "modernism",
+			"art_nouveau", "beaux_arts"], 5.0, 0.0, 99.0, [2, 6]],
+		["havana_soviet", APT, 1960, 1991, ["soviet_modernism", "prefab", "microbrigada",
+			"socialist_modernism"], 2.0, 4.0, 99.0, [5, 12]],
 	],
 }
 
@@ -451,5 +463,39 @@ const REGIONS := {
 			"fh": 4.0, "st": [15, 60], "fix": true, "rv": {}},
 		"apartments": {"w": [["glass", []], ["concrete", ["#d8d4cc"]]], "p": [["curtain", 2], ["balcony", 2]],
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [15, 60], "fix": true, "rv": {}},
+	},
+	# Vedado, Centro and the Malecón: two- to five-storey pastel stucco,
+	# deep balconies and arcaded ground floors, flat roofs behind a parapet.
+	"havana": {
+		"apartments": {"w": [["render", HAVANA]], "p": [["balcony", 3], ["punched", 2]], "wn": "casement", "bay": 3.0,
+			"fr": "#f4f1ea", "r": [["flat", 5], ["gabled", 1]], "pitch": 0.3, "rf": [["membrane", []], ["terracotta", TERRA]],
+			"fh": 3.8, "st": [2, 5], "fix": true, "g": [["shop", 1], ["none", 1]],
+			"rv": {"deep_balcony": 0.5, "string_course": true}},
+		"house": {"w": [["render", HAVANA]], "p": "punched", "wn": "casement", "bay": 3.0, "fr": "#f4f1ea",
+			"r": [["flat", 3], ["hipped", 2]], "pitch": 0.5, "rf": [["terracotta", TERRA]], "fh": 3.8,
+			"st": [1, 2], "fix": true, "rv": {"string_course": true}},
+		"commercial": {"w": [["render", HAVANA]], "p": [["ornate", 1], ["punched", 1]], "wn": "casement",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 4.2, "st": [2, 4], "fix": true,
+			"g": [["shop", 1]], "rv": {"deep_balcony": 0.3, "string_course": true}},
+	},
+	# Habana Vieja: colonial houses and palaces round the old squares, tall
+	# ceilings, flat roofs and red clay tile, wide shuttered windows.
+	"havana_colonial": {
+		"apartments": {"w": [["render", HAVANA]], "p": "punched", "wn": "casement", "bay": 3.2, "fr": "#f4f1ea",
+			"sh": "#3f5a3a", "sp": 0.4, "r": [["flat", 3], ["hipped", 2]], "pitch": 0.7, "rf": [["terracotta", TERRA]],
+			"fh": 4.2, "st": [2, 3], "fix": true, "g": [["shop", 1], ["none", 1]],
+			"rv": {"string_course": true, "awning": 0.4}},
+		"house": {"w": [["render", HAVANA]], "p": "punched", "wn": "casement", "bay": 3.2, "fr": "#f4f1ea",
+			"sh": "#3f5a3a", "sp": 0.4, "r": [["flat", 3], ["hipped", 2]], "pitch": 0.7, "rf": [["terracotta", TERRA]],
+			"fh": 4.2, "st": [1, 2], "fix": true, "rv": {"string_course": true}},
+		"civic": {"w": [["render", ["#e8d8b0", "#efe6d2"]], ["limestone", ["#e0d8c4"]]], "p": "ornate",
+			"wn": "casement", "bay": 3.4, "r": [["flat", 2], ["hipped", 1]], "rf": [["terracotta", TERRA]],
+			"fh": 4.8, "st": [2, 3], "fix": true, "rv": {"string_course": true, "quoins": true}},
+	},
+	# Alamar and the Soviet-built estates: five- to twelve-storey prefab slabs.
+	"havana_soviet": {
+		"apartments": {"w": [["concrete", SOVIET_PANEL_CU]], "p": [["panel", 3], ["balcony", 1]], "wn": "wide",
+			"bay": 3.0, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 2.8, "st": [5, 12], "fix": true,
+			"g": [["none", 1]], "rv": {"deep_balcony": 0.3}},
 	},
 }

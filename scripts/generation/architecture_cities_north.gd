@@ -37,6 +37,15 @@ const BRUSSELS_BRICK := ["#9a4a35", "#7a3a2c", "#a85a40"]
 ## St Petersburg stucco: yellow, ochre, pink, mint, blue, with white trim.
 const PETERSBURG := ["#e8c860", "#e0a870", "#e8b8a8", "#b8d0b0", "#a8c0d8", "#f0d890", "#d8a080"]
 const SOVIET_PANEL := ["#c8c4bc", "#d8d4cc", "#b8b4ac", "#e0d8c8"]
+## Moscow: merchant-house ochre, peach and sage; Stalinist sand and buff
+## stone; the white silicate brick of the khrushchyovki.
+const MOSCOW := ["#e8d090", "#e8c8a0", "#efe6d2", "#d8d0c0", "#c8d0b8", "#e0b890"]
+const STALINKA := ["#e8d8b0", "#e0c898", "#d8c8a8", "#efe6d2", "#d0b890"]
+const SILICATE := ["#e0dcd0", "#d8d4c8", "#c8c0b0"]
+## Reykjavik: painted corrugated-iron and clapboard (red, blue, green,
+## yellow, white) over the grey and cream render of the post-war blocks.
+const ICELAND_IRON := ["#c8503a", "#e8e0d0", "#3a5a8a", "#4a7a5a", "#e8c860", "#f2ede0", "#8a3a2a"]
+const ICELAND_ROOF := [["sheet_metal", ["#a83a2a", "#2f4f8a", "#3f6f4a", "#5a5e62"]]]
 
 const BASE := {
 	"copenhagen": "west_europe_brick", "copenhagen_old": "copenhagen", "copenhagen_modern": "copenhagen",
@@ -47,6 +56,9 @@ const BASE := {
 	"brussels": "west_europe_brick", "brussels_old": "brussels", "brussels_modern": "brussels",
 	"st_petersburg": "eastern_europe", "spb_imperial": "st_petersburg", "spb_soviet": "st_petersburg",
 	"spb_modern": "st_petersburg",
+	"moscow": "eastern_europe", "moscow_stalinka": "moscow", "moscow_panel": "moscow",
+	"moscow_city": "moscow",
+	"reykjavik": "nordic", "reykjavik_iron": "reykjavik", "reykjavik_modern": "reykjavik",
 }
 
 ## [era, kinds, from, to, building:architecture, weight, km from, km to,
@@ -97,6 +109,21 @@ const ERAS := {
 		["spb_soviet", APT, 1950, 1991, ["socialist_modernism", "khrushchyovka", "brezhnevka",
 			"stalinist", "prefab", "panel"], 2.0, 4.0, 99.0, [8, 18]],
 		["spb_modern", ACC, 1992, 2100, [], 0.6, 0.0, 99.0, [19, 99]],
+	],
+	"moscow": [
+		["moscow", HAC, 1700, 1934, ["classicism", "empire", "eclectic", "historicism", "art_nouveau",
+			"style_moderne", "constructivism", "merchant"], 3.0, 0.0, 99.0, [3, 6]],
+		["moscow_stalinka", ACC, 1935, 1960, ["stalinist", "stalinist_neoclassicism",
+			"socialist_realism", "stalinka"], 3.0, 0.5, 12.0, [7, 12]],
+		["moscow_panel", APT, 1956, 1995, ["khrushchyovka", "brezhnevka", "panel", "prefab",
+			"socialist_modernism", "brutalism"], 6.0, 3.5, 99.0, [5, 16]],
+		["moscow_city", ACC, 1996, 2100, [], 1.5, 0.0, 99.0, [16, 99]],
+	],
+	"reykjavik": [
+		["reykjavik_iron", ["house", "apartments", "commercial"], 1880, 1939, ["corrugated_iron",
+			"vernacular", "timber"], 3.0, 0.0, 2.5, [1, 3], true],
+		["reykjavik", HAC, 1940, 1999, [], 5.0, 0.0, 99.0, [2, 5]],
+		["reykjavik_modern", ACC, 2000, 2100, [], 1.0, 0.0, 99.0, [4, 12]],
 	],
 }
 
@@ -308,5 +335,73 @@ const REGIONS := {
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [15, 25], "fix": true, "rv": {}},
 		"commercial": {"w": [["glass", []]], "p": "curtain", "r": [["flat", 1]], "rf": [["membrane", []]],
 			"st": [10, 40], "fix": true, "rv": {}},
+	},
+	# Tverskoy and the Garden Ring: merchant tenements and mansions of three
+	# to six storeys, ochre and peach stucco (some brick), hipped and gabled
+	# roofs in painted green, red and grey sheet metal.
+	"moscow": {
+		"apartments": {"w": [["render", MOSCOW], ["brick", ["#9a5040", "#8a4a3a"]]], "p": [["punched", 3], ["ornate", 1]],
+			"wn": "casement", "bay": 2.6, "fr": "#f4f1ea", "sp": 0.0, "r": [["hipped", 2], ["gabled", 2]],
+			"pitch": 0.5, "rf": [["slate", ["#5a6066", "#4a6a5a", "#6a3a30"]]], "fh": 3.5, "st": [4, 6],
+			"fix": true, "ch": 0.3, "dm": 0.1, "g": [["shop", 1], ["none", 1]], "ev": 0.2,
+			"rv": {"string_course": true, "balconette": 0.2}},
+		"commercial": {"w": [["render", MOSCOW]], "p": [["ornate", 2], ["punched", 1]], "wn": "casement",
+			"r": [["hipped", 1], ["gabled", 1]], "pitch": 0.5, "rf": [["slate", ["#5a6066", "#4a6a5a"]]], "st": [3, 6],
+			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true}},
+	},
+	# The Stalinist "wedding cake" blocks and their ring-road neighbours:
+	# seven to twelve storeys of sand and buff stone-faced render, ornate
+	# fronts, tall hipped roofs in grey-green sheet metal.
+	"moscow_stalinka": {
+		"apartments": {"w": [["render", STALINKA], ["limestone", ["#d8ccb0", "#e0d4b8"]]],
+			"p": [["ornate", 3], ["punched", 2]], "wn": "casement", "bay": 2.8, "fr": "#f4f1ea",
+			"r": [["hipped", 3], ["flat", 1]], "pitch": 0.35, "rf": [["slate", ["#6a7a6a", "#5a6066"]]],
+			"fh": 3.6, "st": [7, 12], "fix": true, "g": [["stone", 1], ["shop", 1]],
+			"rv": {"string_course": true, "quoins": true}},
+		"commercial": {"w": [["limestone", ["#d8ccb0", "#e0d4b8"]]], "p": "ornate", "wn": "casement",
+			"r": [["hipped", 1]], "pitch": 0.35, "rf": [["slate", ["#6a7a6a"]]], "fh": 4.0, "st": [6, 10],
+			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true, "quoins": true}},
+	},
+	# Khrushchyovki and brezhnevki: five-storey silicate brick and the
+	# nine- to sixteen-storey panel slabs, flat roofs.
+	"moscow_panel": {
+		"apartments": {"w": [["concrete", SOVIET_PANEL], ["brick", SILICATE]], "p": [["panel", 3], ["balcony", 1]],
+			"wn": "wide", "bay": 3.0, "r": [["flat", 3], ["gabled", 1]], "pitch": 0.3, "rf": [["membrane", []]],
+			"fh": 2.8, "st": [5, 16], "fix": true, "g": [["none", 1]], "rv": {"deep_balcony": 0.2}},
+	},
+	"moscow_city": {
+		"commercial": {"w": [["glass", []]], "p": "curtain", "r": [["flat", 1]], "rf": [["membrane", []]],
+			"fh": 4.0, "st": [20, 60], "fix": true, "rv": {}},
+		"apartments": {"w": [["glass", []], ["concrete", ["#d8d4cc"]]], "p": [["curtain", 2], ["balcony", 2]],
+			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [16, 50], "fix": true, "rv": {}},
+	},
+	# Painted corrugated-iron and clapboard houses of the old town, one to
+	# three storeys, steep gabled roofs in red, blue and green sheet metal.
+	"reykjavik_iron": {
+		"house": {"w": [["wood", ICELAND_IRON]], "p": "clapboard", "wn": "casement", "bay": 2.4, "fr": "#f4f1ea",
+			"r": [["gabled", 4], ["hipped", 1]], "pitch": 1.0, "rf": ICELAND_ROOF, "fh": 3.0, "st": [1, 3],
+			"fix": true, "ch": 0.3, "dm": 0.1, "rv": {}},
+		"apartments": {"w": [["wood", ICELAND_IRON]], "p": "clapboard", "wn": "casement", "bay": 2.4,
+			"fr": "#f4f1ea", "r": [["gabled", 4], ["hipped", 1]], "pitch": 1.0, "rf": ICELAND_ROOF, "fh": 3.0,
+			"st": [2, 3], "fix": true, "g": [["none", 1], ["shop", 1]], "rv": {}},
+		"commercial": {"w": [["wood", ICELAND_IRON]], "p": "clapboard", "wn": "casement", "bay": 2.4,
+			"r": [["gabled", 3], ["hipped", 1]], "pitch": 1.0, "rf": ICELAND_ROOF, "st": [2, 3], "fix": true,
+			"g": [["shop", 1]], "rv": {}},
+	},
+	# The post-war city: grey and cream rendered concrete houses and blocks
+	# of two to five storeys, flat and low gabled roofs in coloured sheet metal.
+	"reykjavik": {
+		"house": {"w": [["render", ["#e8e0d0", "#d8d0c0", "#c8d0d0", "#e8d8c0"]]], "p": [["punched", 3], ["strip", 1]],
+			"wn": "casement", "bay": 2.8, "fr": "#f4f1ea", "r": [["flat", 2], ["gabled", 2]], "pitch": 0.5,
+			"rf": ICELAND_ROOF, "fh": 2.9, "st": [1, 2], "fix": true, "rv": {}},
+		"apartments": {"w": [["render", ["#e8e0d0", "#d8d0c0", "#c8d0d0"]], ["concrete", ["#c8c4bc"]]],
+			"p": [["punched", 3], ["strip", 1]], "wn": "wide", "bay": 3.0, "r": [["flat", 2], ["gabled", 1]],
+			"pitch": 0.5, "rf": ICELAND_ROOF, "fh": 2.9, "st": [3, 5], "fix": true, "rv": {"deep_balcony": 0.2}},
+	},
+	"reykjavik_modern": {
+		"commercial": {"w": [["glass", []], ["concrete", ["#c8c4bc"]]], "p": [["curtain", 2], ["strip", 1]],
+			"r": [["flat", 1]], "rf": [["membrane", []]], "st": [4, 12], "fix": true, "rv": {}},
+		"apartments": {"w": [["render", ["#ece8dc", "#d8d4cc"]], ["glass", []]], "p": [["balcony", 2], ["strip", 1]],
+			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [4, 10], "fix": true, "rv": {"deep_balcony": 0.3}},
 	},
 }

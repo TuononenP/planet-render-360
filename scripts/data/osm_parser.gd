@@ -422,8 +422,8 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 			"size_z": clampf(paabb.size.y, 12.0, 136.0),
 			"height": res["height"], "height_source": res["height_source"],
 			"levels": res["levels"],
-			"colour": str(tags.get("building:colour", "")),
-			"material": str(tags.get("building:material", tags.get("material", ""))),
+			"colour": OsmTags.wall_colour(tags),
+			"material": OsmTags.wall_material(tags),
 			"holes": pw.get("holes", []),
 		}
 		# Parts carry their own roof (domes, towers, stepped wings).

@@ -893,6 +893,30 @@ func _building_tag_checks(failures: Array[String]) -> void:
 	for tags in [{"heritage": "no"}, {"historic": "memorial"}]:
 		if bool(OsmTags._building_entry(tags, ring, box)["heritage"]):
 			failures.append("heritage should read false for %s" % [tags])
+	# Wall colour and material: the building's own tag wins, then the facade's,
+	# then (material only) the cladding. A part reads them the same way.
+	for row in [
+			[{"building:colour": "#aa8844"}, "#aa8844", ""],
+			[{"building:facade:colour": "yellow"}, "yellow", ""],
+			[{"building:colour": "red", "building:facade:colour": "yellow"}, "red", ""],
+			[{"building:material": "brick", "material": "stone"}, "", "brick"],
+			[{"material": "stone", "building:facade:material": "wood"}, "", "stone"],
+			[{"building:facade:material": "wood", "building:cladding": "metal"}, "", "wood"],
+			[{"building:cladding": "vinyl"}, "", "vinyl"],
+			[{"building": "yes"}, "", ""]]:
+		var w := OsmTags._building_entry(row[0], ring, box)
+		if str(w["colour"]) != row[1] or str(w["material"]) != row[2]:
+			failures.append("wall colour/material for %s should be %s/%s, got %s/%s"
+				% [row[0], row[1], row[2], w["colour"], w["material"]])
+	for alias in ["siding", "vinyl", "weatherboard", "clapboard"]:
+		if str(MaterialLibrary.MATERIAL_TAGS.get(alias, "")) != "wood":
+			failures.append("MATERIAL_TAGS[%s] should be wood" % alias)
+	# roof:angle in degrees, 5-75; anything else is absent.
+	for row in [["35", 35.0], ["35°", 35.0], ["35 deg", 35.0], ["22.5", 22.5],
+			["", 0.0], ["steep", 0.0], ["3", 0.0], ["80", 0.0]]:
+		var ang := float(OsmTags._building_entry({"roof:angle": row[0]}, ring, box)["roof_angle"])
+		if absf(ang - float(row[1])) > 0.001:
+			failures.append("roof:angle '%s' should read %.1f, got %.1f" % [row[0], row[1], ang])
 
 ## roof:shape → canonical modelled shape.
 func _roof_shape_checks(failures: Array[String]) -> void:

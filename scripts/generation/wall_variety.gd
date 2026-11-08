@@ -26,11 +26,46 @@ static func mark(m: BaseMaterial3D) -> void:
 static func is_wall(m: Material) -> bool:
 	return m != null and m.has_meta("wall")
 
-## Tint for the building at x/z; stable per building, mean ≈ 1.
-static func tint_for(x: float, z: float) -> Color:
+## Paint families a building's own colour is drawn from (per-channel
+## multipliers over the look's wall tint). None exceeds 1: vertex colours
+## are 8-bit, so a brighter multiplier would clamp anyway. Cream, ochre,
+## blush, sage and mist are the render and plaster colours real streets
+## mix; "clean" leaves the look's own tint.
+const FAMILIES: Array[Color] = [
+	Color(1.00, 1.00, 1.00), Color(1.00, 0.95, 0.80), Color(1.00, 0.84, 0.58),
+	Color(1.00, 0.84, 0.80), Color(0.84, 0.95, 0.80), Color(0.82, 0.90, 1.00)]
+
+## Tint for the building at x/z; stable per building, mean ≈ 1. `chroma`
+## (0..1, ArchitectureStyle.chroma_of the wall set) adds that building's
+## paint family on top, `tone` (0..1, ArchitectureStyle.tone_for the place)
+## rotates which families the place favours, so a city leans cream and sage
+## where its neighbour leans ochre and blush. chroma 0 is the plain tint
+## (the far city's native kernel reproduces exactly that).
+static func tint_for(x: float, z: float, chroma: float = 0.0, tone: float = 0.0) -> Color:
 	var l := 1.0 + (TerrainBuilder._hash(x * 0.53 + 17.0, z * 0.29) * 2.0 - 1.0) * SPREAD
 	var w := (TerrainBuilder._hash(z * 0.61 + 3.0, x * 1.13) * 2.0 - 1.0) * WARMTH
-	return Color(l * (1.0 + w), l, l * (1.0 - w))
+	var base := Color(l * (1.0 + w), l, l * (1.0 - w))
+	if chroma <= 0.0:
+		return base
+	var fam := Color.WHITE.lerp(FAMILIES[_family(x, z, tone)], minf(chroma, 1.0))
+	return Color(minf(base.r * fam.r, 1.0), minf(base.g * fam.g, 1.0), minf(base.b * fam.b, 1.0))
+
+## The paint family at x/z: a seeded pick weighted by how close each family
+## sits to the place's `tone` on a circle (every family stays possible).
+static func _family(x: float, z: float, tone: float) -> int:
+	var n := FAMILIES.size()
+	var weights := PackedFloat32Array()
+	var total := 0.0
+	for i in n:
+		var k := maxf(0.25, 1.0 + 1.1 * cos(TAU * (float(i) / float(n) - tone)))
+		weights.append(k)
+		total += k
+	var t := TerrainBuilder._hash(x * 0.83 + 29.0, z * 0.47 + 7.0) * total
+	for i in n:
+		t -= weights[i]
+		if t < 0.0:
+			return i
+	return 0
 
 ## Per-vertex colours of one wall surface: `c` shaded by height above the
 ## surface's lowest vertex.

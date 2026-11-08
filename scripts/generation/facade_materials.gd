@@ -136,6 +136,9 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		if mapped_set != "" or str(style.get("era", "")) == "nyc_prewar":
 			return facade_for_building(b, region, storeys, mini(fidelity, 2), false, seed_v, style)
 		var dfs := distant_facades(fidelity, str(style.get("era", region)))
+		var want := _wall_target(dfs[0] as Material, b, style, seed_v)
+		if want.a > 0.0 and dfs[0] is StandardMaterial3D:
+			return dfs[_nearest(dfs, want)]
 		return dfs[absi(hash(str(seed_v))) % dfs.size()]
 	if style.is_empty() and not MaterialLibrary.REGION_MATERIALS.has(region):
 		region = "urban"
@@ -179,6 +182,80 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 	if not _family_first.has(family):
 		_family_first[family] = m
 	return m
+
+# --- Distant residuals ---
+
+## Darkest per-channel residual a distant building may carry (vertex colours
+## cannot brighten, and a wider reach would turn the shared photo muddy).
+const RESIDUAL_MIN := 0.7
+
+## The tint a distant building wants from the shared wall material `m`: its
+## `building:colour` tag, else its style's paint. Alpha 0 when it has no
+## style or its set is not the shared one (glass, a mapped material).
+static func _wall_target(m: Material, b: Dictionary, style: Dictionary, seed_v: float) -> Color:
+	if style.is_empty() or m == null:
+		return Color(0, 0, 0, 0)
+	var set_name := str(style.get("wall_set", ""))
+	if set_name == "" or str(m.get_meta("facade_set", "")) != set_name:
+		return Color(0, 0, 0, 0)
+	var c := _wall_tint(b, style, set_name, seed_v)
+	c.a = 1.0
+	return c
+
+## The tint a distant roof wants from the shared roof material `m`: its
+## `roof:colour` tag, else its style's paint, calibrated as distant_roofs
+## calibrates the shared tints. Alpha 0 when the roof set is not the shared one.
+static func _roof_target(m: Material, b: Dictionary, style: Dictionary) -> Color:
+	if style.is_empty() or m == null:
+		return Color(0, 0, 0, 0)
+	var set_name := str(style.get("roof_set", ""))
+	if set_name == "" or str(m.get_meta("roof_set", "")) != set_name or set_name == "glass":
+		return Color(0, 0, 0, 0)
+	var paint: Color = style.get("roof_colour", Color(0, 0, 0, 0))
+	var tag := MaterialLibrary.parse_colour_tag(str(b.get("roof_colour", "")))
+	if tag.a > 0.0:
+		paint = Color.from_hsv(tag.h, minf(tag.s, 0.42), tag.v)
+	if paint.a <= 0.0:
+		return Color(0, 0, 0, 0)
+	var c := _roof_floor(set_name, _keep_chroma(set_name, _calib(set_name, paint)))
+	c.a = 1.0
+	return c
+
+## Per-channel residual that takes shared material `m`'s tint toward
+## `target`, within [RESIDUAL_MIN, 1] (white for a material without a tint).
+static func residual(m: Material, target: Color) -> Color:
+	if not (m is StandardMaterial3D):
+		return Color.WHITE
+	var base := (m as StandardMaterial3D).albedo_color.srgb_to_linear()
+	return Color(clampf(target.r / maxf(base.r, 0.02), RESIDUAL_MIN, 1.0),
+		clampf(target.g / maxf(base.g, 0.02), RESIDUAL_MIN, 1.0),
+		clampf(target.b / maxf(base.b, 0.02), RESIDUAL_MIN, 1.0))
+
+## Index of the shared material that, scaled by its residual, lands nearest
+## `target`: a darker shared tint can be matched, a lighter one cannot.
+static func _nearest(mats: Array, target: Color) -> int:
+	var best := 0
+	var best_d := INF
+	for i in mats.size():
+		var base := ((mats[i] as StandardMaterial3D).albedo_color).srgb_to_linear()
+		var r := residual(mats[i] as Material, target)
+		var d := Vector3(base.r * r.r - target.r, base.g * r.g - target.g,
+			base.b * r.b - target.b).length_squared()
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+## Residual of a distant building's wall `m` against its own target tint
+## (BuildingBuilder multiplies it into the building's vertex tint).
+static func wall_residual(m: Material, b: Dictionary, style: Dictionary, seed_v: float) -> Color:
+	var want := _wall_target(m, b, style, seed_v)
+	return residual(m, want) if want.a > 0.0 else Color.WHITE
+
+## Residual of a distant building's roof `m` against its own target tint.
+static func roof_residual(m: Material, b: Dictionary, style: Dictionary) -> Color:
+	var want := _roof_target(m, b, style)
+	return residual(m, want) if want.a > 0.0 else Color.WHITE
 
 static func _wall_set(b: Dictionary, style: Dictionary, region: String) -> String:
 	var mat_tag := str(b.get("material", "")).strip_edges().to_lower()
@@ -322,6 +399,9 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 		seed_v: float = 0.0, style: Dictionary = {}) -> Material:
 	if distant and str(b.get("roof_material", "")).strip_edges().to_lower() != "copper":
 		var drs := distant_roofs(region, fidelity)
+		var want := _roof_target(drs[0] as Material, b, style)
+		if want.a > 0.0 and drs[0] is StandardMaterial3D:
+			return drs[_nearest(drs, want)]
 		return drs[absi(hash(str(seed_v))) % drs.size()]
 	var detail := 0 if fidelity <= 1 else 1
 	if not MaterialLibrary.REGION_MATERIALS.has(region):
@@ -401,6 +481,7 @@ static func roof_set_material(set_name: String, tint: Color, detail: int = 1) ->
 	if set_name in ["copper", "sheet_metal"]:
 		m.normal_enabled = detail >= 1
 	RoofVariety.mark(m)  # RoofSnow overlay + per-building tint
+	m.set_meta("roof_set", set_name)  # a distant roof's residual needs the set
 	return m
 
 ## Satellite sample → roof set + tint through a bounded quantized cache.

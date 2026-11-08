@@ -13,6 +13,14 @@ var _groups := {}
 var meta := {}
 var cast_shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 var triangles := 0
+## The building being added (BuildingBuilder sets them per impostor):
+## ArchitectureStyle's paint weight and the place's tone, and the residual
+## against its shared material. Zero / white (the far city's batch, whose
+## native kernel tints without them) is the plain seeded tint.
+var chroma := 0.0
+var tone := 0.0
+var wall_vt := Color.WHITE
+var roof_vt := Color.WHITE
 
 func _group(key: String, mat: Material) -> Dictionary:
 	var k := "%s|%d" % [key, mat.get_instance_id() if mat != null else 0]
@@ -158,11 +166,11 @@ func commit(root: Node3D, prefix: String, extra_meta: Callable = Callable()) -> 
 	return n
 
 ## Wall / roof tint for a mass at `p` (white for other materials).
-static func _tint(mat: Material, p: Vector3) -> Color:
+func _tint(mat: Material, p: Vector3) -> Color:
 	if WallVariety.is_wall(mat):
-		return WallVariety.tint_for(p.x, p.z)
+		return WallVariety.tint_for(p.x, p.z, chroma, tone) * wall_vt
 	if RoofVariety.is_roof(mat):
-		return RoofVariety.tint_for(p.x, p.z)
+		return RoofVariety.tint_for(p.x, p.z, chroma * RoofVariety.ROOF_CHROMA, tone) * roof_vt
 	return Color.WHITE
 
 ## Native MassKernels (native/, tools/build_native.sh) when loaded.
