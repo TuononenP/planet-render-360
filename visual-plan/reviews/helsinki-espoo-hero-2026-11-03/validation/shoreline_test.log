@@ -1,8 +1,0 @@
-Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
-
-SHORELINE bodies=1 edges=1800 patches=150 hard=0 diagnostics=0
-SHORELINE bodies=1 edges=2040 patches=162 hard=0 diagnostics=0
-SHORELINE bodies=1 edges=2040 patches=162 hard=505 diagnostics=0
-SHORELINE bodies=1 edges=2040 patches=162 hard=13 diagnostics=0
-SHORELINE bodies=1 edges=2040 patches=162 hard=0 diagnostics=0
-SHORELINE OK: exact coverage, natural and hard banks, evidence, queries, cache, hole fallback

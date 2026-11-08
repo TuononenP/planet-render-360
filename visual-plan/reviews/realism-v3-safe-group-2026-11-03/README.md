@@ -1,9 +1,0 @@
-# Realism v3: interrupted protected capture, 2026-11-03
-
-Ultra, summer, clear weather; golden-hour headings and close-ups plus noon and night opening views. Capture used the real app flow, disabled the world cache and suppressed data-cache eviction, history writes and thumbnail writes. The history file's SHA-256 matched the pre-run value. The worktree changed while this run was in progress, so this is not a frozen-build comparison.
-
-Fifteen preset image sets completed. Espoo built, but Metal repeatedly logged `timeout waiting for fence` before its first frame; the run was stopped. The six generic controls were not reached. The original `stats.json` would have been written at the end and was therefore lost. `recovered_stats.json` was calculated from the saved JPEGs using the capture tool's row bands, sampling and reference-range rules; JPEG compression makes values approximate and camera, solar and draw-call metadata cannot be recovered. The capture tool now writes statistics after each completed location.
-
-A provisional visual rating per preset appears in `docs/fidelity-scorecard.md`, round `realism-v3-safe-group`. It is not a human rating. Diagnostic flags on opening frames include overly bright/saturated/colourful New York, dark and oversaturated Venice, bright London/Dubai/Helsinki, and insufficient colourfulness in Tokyo, Seoul and the Alps. Exposure and time of day differ between captures and references; these statistics do not measure recognition.
-
-Capture times in the log include fetching from existing caches and are not cold-build measurements: Paris 50 s, Alps 65 s, Banff 27 s, Big Sur 25 s, Tokyo 42 s, New York 61 s, Stockholm 39 s, Monaco 66 s, Dubai 47 s, London 55 s, Rome 90 s, Venice 65 s, Seoul 75 s, San Francisco 12 s, Helsinki 79 s, Espoo 69 s before the renderer stall. They are not FPS or mobile-budget measurements.
