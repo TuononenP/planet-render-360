@@ -10,6 +10,8 @@ extends Control
 signal render_requested(lat: float, lon: float)
 signal history_requested
 signal settings_requested
+## A render quality was picked from the dropdown beside Explore.
+signal quality_selected(preset: int)
 signal download_requested(lat: float, lon: float)
 signal exit_requested
 ## A pasted view link was opened: its ViewLink state (main renders it).
@@ -78,9 +80,12 @@ var _bg: ColorRect
 var _quick_label: Label
 var _selected_label: Label
 var _render_btn: Button
+var _quality_btn: MenuButton
 var _zoom_out_btn: Button
 var _zoom_in_btn: Button
 var _quick_chips: Array[Button] = []
+var _quick_places: Array = []
+var _quick_more: Button
 var _selected_quick := -1
 var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
@@ -266,25 +271,12 @@ func _ready() -> void:
 	_quick_grid.add_theme_constant_override("h_separation", 8)
 	_quick_grid.add_theme_constant_override("v_separation", 8)
 	_quick_scroll.add_child(_quick_grid)
-	var quicks: Array = LocationData.quick_picks()
-	for qi in quicks.size():
-		var quick: Array = quicks[qi]
-		var card := PlaceCard.make(str(quick[0]))
-		var qname := str(quick[1])
-		var qlat := float(quick[2])
-		var qlon := float(quick[3])
-		var qindex := qi
-		card.set_meta("lat", qlat)
-		card.set_meta("lon", qlon)
-		if qi < PresetViews.ROWS.size():
-			var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"]))
-			if qphoto != null:
-				card.set_photo(qphoto)
-		card.pressed.connect(func() -> void:
-			_select_suggestion(qname, qlat, qlon)
-			_set_selected_quick(qindex))
-		_quick_chips.append(card)
-		_quick_grid.add_child(card)
+	_quick_places = LocationData.quick_picks()
+	_add_quick_cards(0, PresetViews.ROWS.size())
+	_quick_more = UiTheme.quiet_button("Show all capitals")
+	_quick_more.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_quick_more.pressed.connect(_show_all_capitals)
+	_quick_box.add_child(_quick_more)
 	# Paris is the starting place, so its card starts out selected.
 	_set_selected_quick(0)
 
@@ -327,7 +319,11 @@ func _ready() -> void:
 	_render_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiIcon.apply(_render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
 	_render_btn.pressed.connect(func() -> void: render_requested.emit(_lat, _lon))
-	_btn_row.add_child(_render_btn)
+	var explore_row := HBoxContainer.new()
+	explore_row.add_theme_constant_override("separation", 6)
+	_btn_row.add_child(explore_row)
+	explore_row.add_child(_render_btn)
+	MapChrome.build_quality_menu(self, explore_row)
 	_download_btn = UiTheme.ghost_button("Save for offline")
 	_download_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiIcon.apply(_download_btn, "hard-drive", 20)
@@ -458,6 +454,37 @@ func set_layout_override(index: int) -> void:
 func refresh_theme() -> void:
 	MapChrome._apply_theme(self)
 	MapSearch.set_coord_mode(self, _coord_mode)
+
+func _add_quick_cards(from: int, to: int) -> void:
+	for qi in range(from, to):
+		var quick: Array = _quick_places[qi]
+		var qname := str(quick[1])
+		# "Paris, France" -> the country under the name; a single-word name
+		# (Monaco) is its own country and keeps an empty line.
+		var card := PlaceCard.make(str(quick[0]), 56, UiTheme.split_place(qname)[1])
+		var qlat := float(quick[2])
+		var qlon := float(quick[3])
+		var qindex := qi
+		card.set_meta("lat", qlat)
+		card.set_meta("lon", qlon)
+		var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"])) \
+			if qi < PresetViews.ROWS.size() else PlaceThumb.load_capital(qlat, qlon)
+		if qphoto != null:
+			card.set_photo(qphoto)
+		card.pressed.connect(func() -> void:
+			_select_suggestion(qname, qlat, qlon)
+			_set_selected_quick(qindex))
+		_quick_chips.append(card)
+		_quick_grid.add_child(card)
+
+## The capitals join the shelf only on request: all of them would be built at
+## startup and push the panel's footer thousands of pixels down.
+func _show_all_capitals() -> void:
+	_quick_more.visible = false
+	_add_quick_cards(_quick_chips.size(), _quick_places.size())
+	MapChrome.fit_quick_cards(self)
+	_set_selected_quick(_selected_quick)
+	MapHome.apply_offline(self)
 
 func _set_selected_quick(index: int) -> void:
 	MapChrome._set_selected_quick(self, index)

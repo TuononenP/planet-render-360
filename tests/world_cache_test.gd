@@ -34,6 +34,10 @@ class SaveTestMain extends "res://scripts/main.gd":
 		outcome = message
 	func _save_missing_data(_data: LocationData) -> bool:
 		return false
+	func _set_generating(_on: bool) -> void:
+		pass
+	func _show(_screen: Control) -> void:
+		pass
 
 func _init() -> void:
 	_run()
@@ -146,6 +150,15 @@ func _save_failure() -> void:
 	# Without a world cache (headless) there is nothing to write or verify.
 	var expected := main.SAVE_WORLD_FAILED if cache_enabled else main.SAVE_DONE
 	var builds := view.builds
+	var recorded: int = main._store.entries.size()
+	# Quitting during the OSM stage must not start a world build.
+	var quit_expected := main.SAVE_FAILED
+	main._quitting = true
+	main._saving = true
+	main.outcome = ""
+	await main._save_world(data)
+	var quit_outcome := main.outcome
+	var quit_builds := view.builds - builds
 	main.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(CacheStore.history_override)
@@ -153,6 +166,12 @@ func _save_failure() -> void:
 	CacheStore.history_override = ""
 	if outcome != expected or builds != int(cache_enabled):
 		printerr("WORLD SAVE FAILURE TEST: unexpected outcome ", outcome)
+		quit(1)
+	elif recorded != int(not cache_enabled):
+		printerr("WORLD SAVE FAILURE TEST: a world reported as not saved reached History")
+		quit(1)
+	elif quit_outcome != quit_expected or quit_builds != 0:
+		printerr("WORLD SAVE FAILURE TEST: quitting during the OSM stage still built: ", quit_outcome)
 		quit(1)
 	else:
 		print("WORLD SAVE FAILURE OK: built world without cache files is not reported as saved")

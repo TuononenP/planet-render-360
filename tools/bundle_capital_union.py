@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from shapely.geometry import box, shape
 from shapely.ops import unary_union
+from capital_snapshot_io import merge_checked
 
 root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
@@ -54,10 +55,7 @@ stamp = timestamps.pop()
 with tempfile.TemporaryDirectory(prefix='pr360-union-') as tmp:
     merged = Path(tmp) / 'merged.osm.pbf'
     cropped = Path(tmp) / 'cropped.osm.pbf'
-    subprocess.run(['osmium', 'merge', '-o', str(merged), *files], check=True)
-    multiple = subprocess.check_output(['osmium', 'fileinfo', '-e', '-g', 'data.multiple_versions', str(merged)], text=True).strip()
-    if multiple != 'no':
-        raise SystemExit('merged source has multiple object versions')
+    merge_checked(files, merged)
     subprocess.run(['osmium', 'extract', '--strategy', 'smart', '--set-bounds',
                     '--bbox', ','.join(str(x) for x in place['coverage']),
                     '-o', str(cropped), str(merged)], check=True)

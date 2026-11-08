@@ -37,7 +37,9 @@ var _save_retry_degraded: Array[String] = []
 var _save_degraded: Array[String] = []
 var _save_retry_done := false
 var _save_retry_in_progress := false
-const SAVE_OSM_BUDGET_S := 60.0
+## Room for one layer to fail on both silent first mirrors (2 x
+## OverpassRequest.FIRST_BYTE_TIMEOUT) and the others to arrive from the rest.
+const SAVE_OSM_BUDGET_S := 150.0
 const SAVE_BUILD_RESERVE_S := 60.0
 const SAVE_RETRY_RESERVE_S := 180.0
 var _generation_deadline_ms := 0
@@ -160,6 +162,10 @@ func _ready() -> void:
 	add_child(_picker)
 	_picker.bind_store(_store)
 	_picker.set_quality_preset(_settings.preset)
+	_picker.quality_selected.connect(func(p: int) -> void:
+		_settings.set_preset(p)
+		_apply_preset(_settings.preset)
+		_settings_screen.bind_settings(_settings))
 	_picker.set_layout_override(_settings.layout)
 
 	_loading = LoadingScreen.new()
@@ -231,9 +237,7 @@ func _ready() -> void:
 	_settings_screen.units_changed.connect(func() -> void: _picker.refresh_units())
 	_settings_screen.layout_changed.connect(func(i: int) -> void:
 		_picker.set_layout_override(i))
-	_settings_screen.preset_changed.connect(func(p: int) -> void:
-		_picker.set_quality_preset(p)
-		_view.set_quality_preset(p))
+	_settings_screen.preset_changed.connect(_apply_preset)
 	add_child(_settings_screen)
 
 	_show(_picker)
@@ -402,6 +406,11 @@ func _retry_view() -> Dictionary:
 	view.merge(ViewLink.to_view(camera), true)
 	return view
 
+## Push a saved render preset to the picker and the 360 view.
+func _apply_preset(p: int) -> void:
+	_picker.set_quality_preset(p)
+	_view.set_quality_preset(p)
+
 func _show(screen: Control) -> void:
 	if screen != _view:
 		_leave_view()
@@ -532,15 +541,15 @@ func _save_world(data: LocationData) -> void:
 	pack.start(data.latitude, data.longitude)
 	var deadline := mini(Time.get_ticks_msec() + int(SAVE_OSM_BUDGET_S * 1000.0),
 		_generation_deadline_ms - int(SAVE_BUILD_RESERVE_S * 1000.0))
-	while pack.is_running() and gen == _gen_id and Time.get_ticks_msec() < deadline:
+	while pack.is_running() and gen == _gen_id and not _quitting and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
 	pack.cancel()
-	if gen != _gen_id:
+	if gen != _gen_id or _quitting:
 		pack.queue_free()
 		if _save_osm_pack == pack:
 			_save_osm_pack = null
-		# Cancelled while downloading: no build is running to release the
-		# busy state, and the pipeline has already finished (no `cancelled`).
+		# Cancelled or quitting while downloading: no build is running to
+		# release the busy state, and the pipeline has already finished.
 		_set_generating(false)
 		if _saving:
 			_end_save(SAVE_FAILED)
@@ -563,13 +572,14 @@ func _save_world(data: LocationData) -> void:
 		world_saved = WorldCache.has_world(data)
 	if _build_abort == abort:
 		_release_build()
-	_save_osm_complete = pack.missing_layers().is_empty()
+	if gen == _gen_id:
+		_save_osm_complete = pack.missing_layers().is_empty()
 	pack.queue_free()
 	if _save_osm_pack == pack:
 		_save_osm_pack = null
 	if gen != _gen_id:
 		return
-	if ok:
+	if ok and world_saved:
 		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
 	if not ok:
 		_end_save(SAVE_FAILED)
@@ -603,7 +613,7 @@ func _end_save(text: String) -> void:
 	_picker.set_download_status(text)
 
 func _retry_save_pipeline(gen: int) -> void:
-	if gen != _gen_id or not _saving or _save_retry_data == null:
+	if _quitting or gen != _gen_id or not _saving or _save_retry_data == null:
 		return
 	var data := _save_retry_data
 	_pipeline.run(data.latitude, data.longitude, data.place_name, data.quality_preset,
@@ -611,9 +621,11 @@ func _retry_save_pipeline(gen: int) -> void:
 
 ## The pipeline can use a lower-resolution fallback without marking a layer
 ## degraded. Retry missing requested tiles too, while reusing the cached ones.
+## Land cover is optional: places without a source tile never get a file, and
+## the world falls back to OSM land cover, so its absence is not a partial save.
 func _save_missing_data(data: LocationData) -> bool:
 	var keys := CacheStore.place_cache_keys(data.latitude, data.longitude, data.quality_preset)
-	for layer in ["dem", "sat", "landcover"]:
+	for layer in ["dem", "sat"]:
 		for path in keys.get(layer, []):
 			if not FileAccess.file_exists(str(path)):
 				return true

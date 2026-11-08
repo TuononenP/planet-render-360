@@ -82,6 +82,8 @@ func _case(replies: Array[String], expected: bool, errors: Array[String], expect
 		errors.append("expected %d requests, got %d" % [expected_requests, fake.requests])
 	if expected_requests == 6 and (fake.bodies[2] != fake.bodies[5] or fake.endpoint_sets[0] == fake.endpoint_sets[5]):
 		errors.append("retry should target only the failed layer using alternate endpoints")
+	if expected_requests == 6 and fake.endpoint_sets[3] != fake.endpoint_sets[5]:
+		errors.append("layers after a failure should start on the alternate endpoints")
 	if not expected and not result.is_empty() and not result[0][1].has("ring2500"):
 		errors.append("failed layer not reported")
 	if not expected:

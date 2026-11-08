@@ -27,6 +27,14 @@ func _init() -> void:
 	var picks := LocationData.quick_picks()
 	if picks.size() != PresetViews.ROWS.size() + CapitalCatalog.additional_places().size():
 		errors.append("capital quick picks are missing")
+	# Every capital card has its own picture, found by its catalog point.
+	var without: Array[String] = []
+	for i in range(PresetViews.ROWS.size(), picks.size()):
+		var pick: Array = picks[i]
+		if PlaceThumb.load_capital(float(pick[2]), float(pick[3])) == null:
+			without.append(str(pick[1]))
+	if not without.is_empty() and not OS.get_cmdline_user_args().has("--allow-missing"):
+		errors.append("capitals without a picture (%d): %s" % [without.size(), ", ".join(without.slice(0, 10))])
 	var places := {}
 	for place in LocationData.known_places():
 		places[str(place["name"]).to_lower()] = place
