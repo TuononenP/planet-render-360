@@ -63,14 +63,14 @@ func _init() -> void:
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(gap)
-	_now_btn = Button.new()
+	_now_btn = TouchButton.new()
 	_now_btn.text = "Now"
 	_now_btn.tooltip_text = "Follow the place's live clock"
 	_now_btn.custom_minimum_size = Vector2(0, 32)
 	_now_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_now_btn.pressed.connect(func() -> void: now_requested.emit())
 	head.add_child(_now_btn)
-	_speed_btn = Button.new()
+	_speed_btn = TouchButton.new()
 	_speed_btn.text = "1×"
 	_speed_btn.tooltip_text = "Time-lapse speed"
 	_speed_btn.custom_minimum_size = Vector2(0, 32)
@@ -95,7 +95,7 @@ func _init() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	add_child(row)
-	day_btn = Button.new()
+	day_btn = TouchButton.new()
 	day_btn.custom_minimum_size = Vector2(0, 32)
 	day_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	day_btn.tooltip_text = "Pick a day or season"
