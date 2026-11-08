@@ -64,9 +64,15 @@ static func heights(p: MapPicker) -> Array[float]:
 	var h := p.size.y
 	var natural := p._sheet_body.get_combined_minimum_size().y + 24.0 \
 		+ p._sheet.get_theme_stylebox("panel").get_minimum_size().y
+	# A short phone's peek still reaches past Explore, if not much further.
+	var through_explore := 0.0
+	if p._btn_row.is_inside_tree() and p._sheet.is_inside_tree():
+		through_explore = p._btn_row.get_global_rect().end.y - p._sheet.get_global_rect().position.y \
+			+ p._sheet_scroll.scroll_vertical + 16.0
+	var peek_max := maxf(h * HALF, minf(through_explore, h * 0.62))
 	var peek := clampf(24.0 + p._sheet.get_theme_stylebox("panel").get_minimum_size().y \
-		+ p._sheet_cols.get_combined_minimum_size().y, PEEK_MIN, h * HALF)
-	var half := clampf(minf(h * HALF, natural), peek, h * HALF)
+		+ p._sheet_cols.get_combined_minimum_size().y, PEEK_MIN, peek_max)
+	var half := clampf(minf(h * HALF, natural), peek, maxf(h * HALF, peek))
 	var full := clampf(minf(h * FULL, natural), half, h * FULL)
 	return [peek, half, full]
 

@@ -26,6 +26,8 @@ var _title: Label
 var _count_label: Label
 var _view_seg: SegmentedControl
 var _grid_mode := true
+var _touch := OS.has_feature("mobile")
+var _stale_cards := false  # built for another layout; rebuilt when next shown
 var _current_layout: int = Responsive.Layout.COMPACT
 var _col: VBoxContainer
 var _clear_btn: Button
@@ -36,6 +38,9 @@ var _toast_label: Label
 var _toast_tween: Tween
 
 func _ready() -> void:
+	visibility_changed.connect(func() -> void:
+		if visible and _stale_cards:
+			refresh())
 	var bg := ColorRect.new()
 	bg.color = UiTheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -147,12 +152,17 @@ func _on_resized() -> void:
 	if _title == null:
 		return
 	var layout := Responsive.layout_for_width(size.x)
+	# Cards are built for one layout (thumbnail size, actions): a rotation
+	# across the phone breakpoint rebuilds them.
+	if (layout == Responsive.Layout.COMPACT) != (_current_layout == Responsive.Layout.COMPACT) \
+			and _store != null:
+		if is_visible_in_tree():
+			call_deferred("refresh")
+		else:
+			_stale_cards = true
 	_current_layout = layout
 	var pad := Responsive.page_padding(layout)
-	_margin.add_theme_constant_override("margin_left", pad)
-	_margin.add_theme_constant_override("margin_right", pad)
-	_margin.add_theme_constant_override("margin_top", pad + 8)
-	_margin.add_theme_constant_override("margin_bottom", pad)
+	Responsive.apply_safe_margins(_margin, self, [pad, pad + 8, pad, pad])
 	if _list != null:
 		var empty := _store == null or _store.entries.is_empty()
 		_list.columns = Responsive.history_columns(layout) if _grid_mode and not empty else 1
@@ -166,6 +176,7 @@ func bind_store(store: CacheStore) -> void:
 func refresh() -> void:
 	if _list == null:
 		return
+	_stale_cards = false
 	for child in _list.get_children():
 		child.queue_free()
 	for child in _col.get_children():
@@ -313,9 +324,9 @@ func _thumb(place: String, height: float, e: Dictionary = {}) -> Control:
 	thumb.add_child(glyph)
 	return thumb
 
-## Star toggle (accent when pinned) and, on hover, Remove from cache
-## (left out of phone cards: no hover there, and no room beside the name;
-## swipe a list row or use the context menu).
+## Star toggle (accent when pinned) and Remove from cache: on hover with a
+## mouse, always showing on a touch screen's tablet cards. Left out of phone
+## cards (no room beside the name) and touch list rows: swipe a row instead.
 func _actions(e: Dictionary, on_hover: Control, with_trash: bool = true) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -335,10 +346,11 @@ func _actions(e: Dictionary, on_hover: Control, with_trash: bool = true) -> HBox
 	UiIcon.apply(trash, "trash-2", 20, UiTheme.SIGNAL_ERROR, UiTheme.SIGNAL_ERROR)
 	_flat(trash)
 	trash.pressed.connect(func() -> void: _remove(e))
-	trash.modulate.a = 0.0
-	on_hover.mouse_entered.connect(func() -> void: trash.modulate.a = 1.0)
-	on_hover.mouse_exited.connect(func() -> void: trash.modulate.a = 0.0)
-	trash.focus_entered.connect(func() -> void: trash.modulate.a = 1.0)
+	if not _touch:
+		trash.modulate.a = 0.0
+		on_hover.mouse_entered.connect(func() -> void: trash.modulate.a = 1.0)
+		on_hover.mouse_exited.connect(func() -> void: trash.modulate.a = 0.0)
+		trash.focus_entered.connect(func() -> void: trash.modulate.a = 1.0)
 	row.add_child(trash)
 	return row
 
@@ -384,7 +396,8 @@ func _card(e: Dictionary) -> Button:
 		region.clip_text = true
 		region.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		names.add_child(region)
-	head.add_child(_actions(e, card, _current_layout != Responsive.Layout.COMPACT))
+	# A phone on its side has the tablet's columns, not the room beside the name.
+	head.add_child(_actions(e, card, _current_layout != Responsive.Layout.COMPACT and not (_touch and size.y < 500.0)))
 	col.add_child(_badges(e))
 	_fit(card, col, 0.0)
 	return card
@@ -421,7 +434,7 @@ func _row(e: Dictionary) -> Button:
 		region.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		texts.add_child(region)
 	texts.add_child(_badges(e))
-	var acts := _actions(e, row)
+	var acts := _actions(e, row, not _touch)  # a touch list row removes by swipe
 	acts.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(acts)
 	_fit(row, r, 76.0)

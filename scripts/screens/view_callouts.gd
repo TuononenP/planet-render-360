@@ -27,6 +27,7 @@ var _data: LocationData
 var _ground: GroundTruth
 var _sites: Array = []  # LandmarkVisit site + {pos: Vector3}
 var _since := {}  # id -> seconds inside the cone
+const SHEET_HYSTERESIS := 24.0
 var _dismissed := {}  # id -> true until it leaves the cone
 var _cards := {}  # id -> PanelContainer
 var _anchors := {}  # id -> screen point
@@ -144,6 +145,14 @@ func dismiss() -> bool:
 	queue_redraw()
 	return true
 
+## A landmark behind the controls sheet waits until it is in view: no card,
+## no slot among the shown ones, no announcement. A card already up stays
+## until its point is well inside, so panning along the edge doesn't flicker.
+func _behind_sheet(cam: Camera3D, s: Dictionary) -> bool:
+	var grow := -SHEET_HYSTERESIS if _cards.has(s.get("id", "")) else 0.0
+	return _view._sheet.is_visible_in_tree() \
+		and _view._sheet.get_global_rect().grow(grow).has_point(global_position + cam.unproject_position(s["pos"]))
+
 func _process(delta: float) -> void:
 	if not is_visible_in_tree() or _sites.is_empty() or _view._rig == null:
 		return
@@ -159,7 +168,7 @@ func _process(delta: float) -> void:
 		var id: String = s["id"]
 		if ang <= CONE_DEG:
 			_since[id] = float(_since.get(id, 0.0)) + delta
-			if float(_since[id]) >= DWELL_S and not _dismissed.has(id):
+			if float(_since[id]) >= DWELL_S and not _dismissed.has(id) and not _behind_sheet(cam, s):
 				inside.append([ang, s, to.length()])
 		else:
 			_since.erase(id)

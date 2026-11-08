@@ -35,17 +35,39 @@ static func layout_for_size(s: Vector2) -> Layout:
 ## canvas_items/expand fits the 390x844 portrait frame, so a short
 ## landscape window (a phone on its side, a wide desktop strip) drew
 ## every control at under half size; there points stay at least 1:1.
-static func content_scale_factor(win: Vector2) -> float:
+## Phones and tablets pass their pixels per point (`points`): one logical
+## unit is then exactly one device point, so an iPad gets its real width
+## (and the tablet layout) and 16pt type is 16pt on every screen.
+static func content_scale_factor(win: Vector2, points: float = 0.0) -> float:
 	if win.x <= 0.0 or win.y <= 0.0:
 		return 1.0
 	var fit := minf(win.x / 390.0, win.y / 844.0)
+	if points > 0.0:
+		return points / fit
 	var landscape := minf(1.0, minf(win.x / 844.0, win.y / 390.0))
 	return maxf(fit, landscape) / fit
+
+## Device pixels per point on phones and tablets, 0 on desktop (which
+## keeps fitting the design frame).
+static func points_scale() -> float:
+	if not OS.has_feature("mobile"):
+		return 0.0
+	return points_for(OS.has_feature("android"), DisplayServer.screen_get_scale(), DisplayServer.screen_get_dpi())
+
+## Android caps screen_get_scale() by the display's size, so a phone would
+## lay out as a tablet; its true density is the dpi over 160 per point.
+static func points_for(android: bool, scale: float, dpi: int) -> float:
+	return float(dpi) / 160.0 if android and dpi > 0 else scale
+
+## Stands in for the device's insets in tests and captures.
+static var safe_override: Array[float] = []
 
 ## Safe-area insets (notch, Dynamic Island, home indicator) in the
 ## control's own units, as [left, top, right, bottom]. Desktop windows
 ## have none.
 static func safe_insets(c: Control) -> Array[float]:
+	if not safe_override.is_empty():
+		return safe_override
 	if not OS.has_feature("mobile") or not c.is_inside_tree():
 		return [0.0, 0.0, 0.0, 0.0]
 	var win := Vector2(DisplayServer.window_get_size())
@@ -55,6 +77,13 @@ static func safe_insets(c: Control) -> Array[float]:
 	var k := c.get_viewport_rect().size / win
 	return [safe.position.x * k.x, safe.position.y * k.y,
 		maxf(win.x - safe.end.x, 0.0) * k.x, maxf(win.y - safe.end.y, 0.0) * k.y]
+
+## Sets a container's margins, given as [left, top, right, bottom], plus
+## the safe area on each side.
+static func apply_safe_margins(m: MarginContainer, c: Control, margins: Array) -> void:
+	var safe := safe_insets(c)
+	for i in 4:
+		m.add_theme_constant_override("margin_" + ["left", "top", "right", "bottom"][i], int(margins[i]) + int(safe[i]))
 
 static func layout_name(layout: Layout) -> String:
 	match layout:

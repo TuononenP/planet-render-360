@@ -265,11 +265,7 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 	p._brand_pill.visible = not compact
 	p._name_label.add_theme_font_size_override("font_size", 36 if expanded else 28)
 	var pad := Responsive.page_padding(layout)
-	var safe := Responsive.safe_insets(p)
-	p._overlay.add_theme_constant_override("margin_left", pad + int(safe[0]))
-	p._overlay.add_theme_constant_override("margin_right", pad + int(safe[2]))
-	p._overlay.add_theme_constant_override("margin_top", pad + int(safe[1]))
-	p._overlay.add_theme_constant_override("margin_bottom", pad + int(safe[3]))
+	Responsive.apply_safe_margins(p._overlay, p, [pad, pad, pad, pad])
 	p._nav.add_theme_stylebox_override("panel", _nav_style(p))
 	# Buttons: Explore + a full-width Save below in the panel and on
 	# tablets; on phones Save is an icon beside Explore.

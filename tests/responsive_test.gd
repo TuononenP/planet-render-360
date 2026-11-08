@@ -34,7 +34,7 @@ func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2
 	var expanded := picker.effective_layout() == Responsive.Layout.EXPANDED
 	var scroll: ScrollContainer = picker._side_scroll if expanded else picker._sheet_scroll
 	var bar: Button = picker._side_explore if expanded else picker._sheet_explore
-	if bar.visible:
+	if bar.is_visible_in_tree():
 		_fail(failures, "%s: the Explore bar should hide while Explore is in view" % label)
 	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
 	for i in 3:
@@ -42,7 +42,7 @@ func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2
 	if _centre_in(picker._render_btn, scroll):
 		_fail(failures, "%s: test window should be short enough to scroll Explore away" % label)
 		return
-	if not bar.visible:
+	if not bar.is_visible_in_tree():
 		_fail(failures, "%s: the Explore bar should show while Explore is scrolled away" % label)
 	var card := picker._quick_grid.get_child(4) as Button  # Tokyo, on the shelf
 	scroll.ensure_control_visible(card)
@@ -54,7 +54,7 @@ func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2
 		await process_frame
 	if scroll.scroll_vertical != kept or not _centre_in(card, scroll):
 		_fail(failures, "%s: a shelf pick should keep the picked card in view" % label)
-	if not bar.visible or bar.text != "Explore Tokyo in 360°":
+	if not bar.is_visible_in_tree() or bar.text != "Explore Tokyo in 360°":
 		_fail(failures, "%s: the bar should offer the picked place, got '%s'" % [label, bar.text])
 	var got: Array[float] = []
 	var on_render := func(lat: float, _lon: float) -> void: got.append(lat)
@@ -66,7 +66,7 @@ func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2
 	scroll.scroll_vertical = 0
 	for i in 3:
 		await process_frame
-	if bar.visible:
+	if bar.is_visible_in_tree():
 		_fail(failures, "%s: the bar should hide once Explore scrolls back into view" % label)
 
 func _run() -> void:
@@ -98,6 +98,36 @@ func _run() -> void:
 		_fail(failures, "history columns should be 2/3/4 by layout")
 	if Responsive.page_padding(Responsive.Layout.COMPACT) >= Responsive.page_padding(Responsive.Layout.EXPANDED):
 		_fail(failures, "padding should grow with layout")
+
+	# Phones and tablets rotate freely (an integer: 6 is Sensor).
+	var orientation: Variant = ProjectSettings.get_setting("display/window/handheld/orientation")
+	if typeof(orientation) != TYPE_INT or int(orientation) != DisplayServer.SCREEN_SENSOR:
+		_fail(failures, "handheld orientation should be the Sensor integer, got %s" % str(orientation))
+	# Real devices (pixels, pixels per point): one logical unit is one point,
+	# whatever the design frame fits to.
+	for device: Array in [[Vector2(750, 1334), 2.0, Vector2(375, 667), Responsive.Layout.COMPACT],
+			[Vector2(1170, 2532), 3.0, Vector2(390, 844), Responsive.Layout.COMPACT],
+			[Vector2(2532, 1170), 3.0, Vector2(844, 390), Responsive.Layout.EXPANDED],
+			[Vector2(1488, 2266), 2.0, Vector2(744, 1133), Responsive.Layout.MEDIUM],
+			[Vector2(1640, 2360), 2.0, Vector2(820, 1180), Responsive.Layout.MEDIUM],
+			[Vector2(2360, 1640), 2.0, Vector2(1180, 820), Responsive.Layout.EXPANDED],
+			# Android: Godot reports a capped 1.35 here; the 480 dpi is the truth.
+			[Vector2(1080, 2400), Responsive.points_for(true, 1.35, 480), Vector2(360, 800), Responsive.Layout.COMPACT],
+			[Vector2(1170, 2532), Responsive.points_for(false, 3.0, 460), Vector2(390, 844), Responsive.Layout.COMPACT]]:
+		var win: Vector2 = device[0]
+		var fit := minf(win.x / 390.0, win.y / 844.0)
+		var logical := win / (fit * Responsive.content_scale_factor(win, device[1]))
+		if not logical.is_equal_approx(device[2]):
+			_fail(failures, "%s at %sx should be %s points, got %s" % [str(win), str(device[1]), str(device[2]), str(logical)])
+		if Responsive.layout_for_size(logical) != device[3]:
+			_fail(failures, "%s should take layout %d" % [str(logical), device[3]])
+	# A control shorter than size-touch still takes taps just outside it.
+	var touch := TouchButton.new()
+	touch.size = Vector2(60, 32)
+	if not touch._has_point(Vector2(30, -5)) or not touch._has_point(Vector2(30, 37)) \
+			or touch._has_point(Vector2(30, -7)):
+		_fail(failures, "TouchButton should grow its hit area to 44pt")
+	touch.free()
 
 	# Readable floors at the 390pt design frame
 	var field := UiTheme.field("x")
@@ -323,6 +353,27 @@ func _run() -> void:
 		settings._accent_btns[0].pressed.emit()  # restore Aurora for later checks
 		picker.refresh_theme()
 		await process_frame
+	# Two panes never overflow, down to a small phone on its side.
+	settings.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	for fit_size in [Vector2(360, 800), Vector2(390, 844), Vector2(633, 844), Vector2(667, 375), Vector2(844, 390), Vector2(820, 1180)]:
+		settings.size = fit_size
+		settings._on_resized()
+		for group: Array in SettingsScreen.CATEGORIES:
+			for category: Array in group[1]:
+				settings.open_category(str(category[0]))
+				await process_frame
+				await process_frame
+				var needs: float = settings._page_margin.get_combined_minimum_size().x \
+					+ (0.0 if settings._compact else settings._rail.get_combined_minimum_size().x)
+				if needs > fit_size.x:
+					_fail(failures, "Settings %s should fit %s, needs %.0f" % [category[0], str(fit_size), needs])
+	Responsive.safe_override = [59.0, 0.0, 59.0, 21.0]
+	settings.size = Vector2(844, 390)
+	settings._on_resized()
+	if settings._rail.custom_minimum_size.x != float(SettingsScreen.RAIL_W_MEDIUM) + 59.0 \
+			or settings._page_margin.get_theme_constant("margin_right") < 59:
+		_fail(failures, "Settings should keep clear of the notch on a phone on its side")
+	Responsive.safe_override = []
 	settings.queue_free()
 	picker._show_all_capitals()
 	if picker._quick_chips.size() != LocationData.quick_picks().size() or picker._quick_more.visible:
@@ -353,6 +404,57 @@ func _run() -> void:
 	await process_frame
 	if history._list.columns != 4:
 		_fail(failures, "history at 1280pt should be 4 columns")
+	# Touch: tablet cards show Remove, list rows and a phone on its side leave
+	# it out (nothing hides on hover, so nothing invisible can be tapped).
+	var has_trash := func(root_node: Node) -> bool:
+		for b in root_node.find_children("*", "Button", true, false):
+			if (b as Button).tooltip_text == "Remove from cache" and (b as Button).modulate.a > 0.5:
+				return true
+		return false
+	var trash_count := func(root_node: Node) -> int:
+		return root_node.find_children("*", "Button", true, false).filter(
+			func(b: Node) -> bool: return (b as Button).tooltip_text == "Remove from cache").size()
+	var place: Dictionary = store.entries[0]
+	history._touch = true
+	history.size = Vector2(834, 1112)
+	history._on_resized()
+	var tablet_card: Button = history._card(place)
+	if not has_trash.call(tablet_card):
+		_fail(failures, "a tablet's touch card should show Remove from cache")
+	tablet_card.free()
+	var touch_row: Button = history._row(place)
+	if trash_count.call(touch_row) != 0:
+		_fail(failures, "a touch list row should remove by swipe, with no button")
+	touch_row.free()
+	history.size = Vector2(844, 390)
+	history._on_resized()
+	var side_card: Button = history._card(place)
+	if trash_count.call(side_card) != 0:
+		_fail(failures, "a phone on its side has no room for Remove on its cards")
+	side_card.free()
+	history._touch = false
+	# Hidden, a rotation only marks the cards; they rebuild when shown.
+	history.size = Vector2(390, 844)
+	history._on_resized()
+	await process_frame
+	history.visible = false
+	history.size = Vector2(834, 1112)
+	history._on_resized()
+	if not history._stale_cards:
+		_fail(failures, "a hidden History should wait to rebuild its cards")
+	history.visible = true
+	if history._stale_cards:
+		_fail(failures, "History should rebuild its cards when shown")
+	Responsive.safe_override = [0.0, 59.0, 0.0, 34.0]
+	history.size = Vector2(390, 844)
+	history._on_resized()
+	if history._margin.get_theme_constant("margin_top") != 16 + 8 + 59 \
+			or history._margin.get_theme_constant("margin_bottom") != 16 + 34:
+		_fail(failures, "History should keep clear of the notch and home indicator")
+	Responsive.safe_override = []
+	history.size = Vector2(1280, 800)
+	history._on_resized()
+	await process_frame
 	history.toast("Still finishing the last scene.")
 	if not history._toast.visible or history._toast_label.text != "Still finishing the last scene.":
 		_fail(failures, "history toast should show its message")
@@ -384,7 +486,8 @@ func _run() -> void:
 	# heights: every stage row and Cancel stay on screen (the preview
 	# shrinks first). Regression: the card used to overflow ~630pt
 	# windows and clip its lower half.
-	for fit_size in [Vector2(390, 844), Vector2(1280, 800), Vector2(1024, 630), Vector2(390, 667)]:
+	for fit_size in [Vector2(390, 844), Vector2(1280, 800), Vector2(1024, 630), Vector2(390, 667),
+			Vector2(375, 667), Vector2(667, 375), Vector2(844, 390)]:
 		loading.size = fit_size
 		loading._on_resized()
 		# The preview fit converges over a few deferred passes.
@@ -422,6 +525,19 @@ func _run() -> void:
 	await process_frame
 	if main._picker.effective_layout() != Responsive.Layout.COMPACT:
 		_fail(failures, "main at 390pt should be COMPACT, got %d" % main._picker.effective_layout())
+	# A half turn keeps the window size: only the safe-area check sees the
+	# notch change sides.
+	Responsive.safe_override = [59.0, 0.0, 0.0, 21.0]
+	main._check_safe_area()
+	if main._picker._overlay.get_theme_constant("margin_left") != 16 + 59:
+		_fail(failures, "screens should relayout when the notch appears on the left")
+	Responsive.safe_override = [0.0, 0.0, 59.0, 21.0]
+	main._check_safe_area()
+	if main._picker._overlay.get_theme_constant("margin_left") != 16 \
+			or main._picker._overlay.get_theme_constant("margin_right") != 16 + 59:
+		_fail(failures, "screens should relayout when the notch moves to the other side")
+	Responsive.safe_override = []
+	main._check_safe_area()
 	main.queue_free()
 	# queue_free is deferred; let it run before quitting.
 	await process_frame

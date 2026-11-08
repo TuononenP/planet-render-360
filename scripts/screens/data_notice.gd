@@ -144,7 +144,7 @@ func _layout() -> void:
 	var pad := Responsive.page_padding(Responsive.layout_for_width(size.x))
 	var w := clampf(size.x - pad * 2.0, 280.0, float(CARD_W))
 	_card.custom_minimum_size.x = w
-	_card.position = Vector2(roundf((size.x - w) / 2.0), pad + TOP_BAR_H)
+	_card.position = Vector2(roundf((size.x - w) / 2.0), pad + TOP_BAR_H + Responsive.safe_insets(self)[1])
 	# Wrapped labels learn their height only once the width is known.
 	_card.reset_size()
 	_card.size.x = w

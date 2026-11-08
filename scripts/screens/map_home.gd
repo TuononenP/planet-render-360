@@ -226,9 +226,9 @@ static func build_explore_bars(p: MapPicker) -> void:
 	side_body.add_child(p._side_scroll)
 	p._side.add_child(side_body)
 	p._side_explore = _explore_bar(p)
-	side_body.add_child(p._side_explore)
+	side_body.add_child(p._side_explore.get_parent())
 	p._sheet_explore = _explore_bar(p)
-	p._sheet_scroll.get_parent().add_child(p._sheet_explore)
+	p._sheet_scroll.get_parent().add_child(p._sheet_explore.get_parent())
 	for scroll: ScrollContainer in [p._side_scroll, p._sheet_scroll]:
 		var bar := scroll.get_v_scroll_bar()
 		bar.value_changed.connect(func(_v: float) -> void: queue_explore_bar(p))
@@ -239,8 +239,13 @@ static func _explore_bar(p: MapPicker) -> Button:
 	var b := UiTheme.primary_button(MapChrome.EXPLORE)
 	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	UiIcon.apply(b, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
-	b.visible = false
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.pressed.connect(func() -> void: p.render_requested.emit(p._lat, p._lon))
+	# The bar's row is what shows and hides.
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.visible = false
+	row.add_child(b)
 	return b
 
 static func queue_explore_bar(p: MapPicker) -> void:
@@ -253,7 +258,7 @@ static func update_explore_bar(p: MapPicker) -> void:
 		text = "Explore %s in 360°" % p._name_label.text
 	for bar: Button in [p._side_explore, p._sheet_explore]:
 		var scroll: ScrollContainer = p._side_scroll if bar == p._side_explore else p._sheet_scroll
-		bar.visible = _explore_hidden(p, scroll)
+		bar.get_parent().visible = _explore_hidden(p, scroll)
 		bar.text = text
 		bar.disabled = p._render_btn.disabled
 

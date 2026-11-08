@@ -159,6 +159,7 @@ static func flash(v: View360) -> void:
 	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	f.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v._hud.add_child(f)
+	f.position = -v._hud.position  # full-bleed: the HUD layer starts inside the safe area
 	v._hud.move_child(f, 0)
 	var tw := v.create_tween()
 	tw.tween_property(f, "color:a", 0.0, 0.3)
@@ -215,4 +216,4 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 			v._minimap.visible = false
 	# Toast: above the controls on phones, bottom-right of the free area otherwise.
 	if v._toast.visible:
-		v._toast.place(v.size, pad, sheet.position.y if v._sheet.visible else h - pad - attr_h, phone)
+		v._toast.place(Vector2(w, h), pad, sheet.position.y if v._sheet.visible else h - pad - attr_h, phone)

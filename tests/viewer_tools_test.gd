@@ -388,6 +388,38 @@ func _view_wiring() -> void:
 	view.show_location(data)
 	await process_frame
 	await process_frame
+	# A phone on its side: the ring keeps clear of the inspector, which
+	# scrolls (and only then clips); a landmark behind it waits.
+	for phone_size: Vector2 in [Vector2(667, 375), Vector2(844, 390)]:
+		view.size = phone_size
+		ViewChrome.layout(view)
+		var ring := Rect2(view._compass.position, Vector2(CompassDial.RING, CompassDial.RING))
+		_check(not ring.intersects(Rect2(view._sheet.position, view._sheet.size)),
+			"the compass clears the inspector at %s" % phone_size)
+		_check(view._sheet_scroll.clip_contents, "a tight inspector scrolls and clips at %s" % phone_size)
+	var eye := view._rig.camera
+	var sheet_mid := view._sheet.get_global_rect().get_center()
+	_check(view._callouts._behind_sheet(eye, {"pos": eye.project_position(sheet_mid, 50.0)}),
+		"a landmark behind the inspector waits")
+	_check(not view._callouts._behind_sheet(eye, {"pos": eye.project_position(Vector2(100, 200), 50.0)}),
+		"a landmark in the open shows")
+	# Near the panel's edge: a new card waits, one already up stays.
+	var near_edge := {"id": "edge", "pos": eye.project_position(view._sheet.get_global_rect().position + Vector2(10, 40), 50.0)}
+	_check(view._callouts._behind_sheet(eye, near_edge), "a new landmark at the panel's edge waits")
+	var held := Control.new()
+	view._callouts._cards["edge"] = held
+	_check(not view._callouts._behind_sheet(eye, near_edge), "a card already up stays at the panel's edge")
+	view._callouts._cards.erase("edge")
+	held.free()
+	var minimap_was := UiPrefs.minimap
+	UiPrefs.minimap = true
+	ViewChrome.layout(view)
+	_check(view._minimap.visible and not Rect2(view._hint.position, view._hint.size).intersects(view._minimap.get_rect()),
+		"the hint keeps off the mini-map on a phone on its side")
+	UiPrefs.minimap = minimap_was
+	view.size = Vector2(1280, 800)
+	ViewChrome.layout(view)
+	_check(not view._sheet_scroll.clip_contents, "a roomy inspector doesn't clip focus rings")
 	_check(absf(rad_to_deg(-view._rig.yaw) - 200.0) < 0.01 or absf(fposmod(rad_to_deg(-view._rig.yaw), 360.0) - 200.0) < 0.01,
 		"the saved bearing is restored: %s" % rad_to_deg(-view._rig.yaw))
 	_check(absf(rad_to_deg(view._rig.pitch) + 6.0) < 0.01, "a pitch below the horizon is kept: %s" % rad_to_deg(view._rig.pitch))

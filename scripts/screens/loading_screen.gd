@@ -246,20 +246,21 @@ func _on_resized() -> void:
 	# Two columns on wide windows and short landscape ones.
 	_two_col = size.x >= 900.0 or (size.x > size.y and size.y < 600.0)
 	_flow.vertical = not _two_col
-	_flow.add_theme_constant_override("separation", 64 if _two_col else 16)
+	# A phone on its side spends its margins on the stage card.
+	var tight := _two_col and size.y < 500.0
+	_flow.add_theme_constant_override("separation", 24 if tight else (64 if _two_col else 16))
 	var gutter := 16 if phone else 24
-	_margin.add_theme_constant_override("margin_left", 48 if _two_col else gutter)
-	_margin.add_theme_constant_override("margin_right", 72 if _two_col else gutter)
-	_margin.add_theme_constant_override("margin_top", 64 if _two_col else 60)
-	_margin.add_theme_constant_override("margin_bottom", 32 if _two_col else gutter)
-	_brand.position = Vector2(gutter, 16 if phone else 24)
+	var safe := Responsive.safe_insets(self)
+	var margins := [24, 16, 24, 12] if tight else ([48, 64, 72, 32] if _two_col else [gutter, 60, gutter, gutter])
+	Responsive.apply_safe_margins(_margin, self, margins)
+	_brand.position = Vector2(gutter + safe[0], (16 if phone else 24) + safe[1])
 	_brand.size = _brand.custom_minimum_size
 	_side.custom_minimum_size = Vector2(376 if _two_col else 0, 0)
 	_side.size_flags_vertical = Control.SIZE_SHRINK_CENTER if _two_col else Control.SIZE_EXPAND_FILL
 	_side.alignment = BoxContainer.ALIGNMENT_CENTER if _two_col else BoxContainer.ALIGNMENT_BEGIN
 	_hero.size_flags_vertical = Control.SIZE_SHRINK_CENTER if _two_col else Control.SIZE_SHRINK_BEGIN
-	_title.add_theme_font_size_override("font_size", 36 if phone else 48)
-	_eta_label.visible = true
+	_title.add_theme_font_size_override("font_size", 36 if phone or tight else 48)
+	_eta_label.visible = size.y >= 440.0  # the stage rows and Cancel come first
 	_push.visible = not _two_col
 	_fit_lens()
 	if not _fit_queued and size.y > 0.0:

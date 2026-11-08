@@ -136,9 +136,16 @@ static func build(v: View360) -> void:
 	v._sheet.add_theme_stylebox_override("panel", HudStyle.panel(UiTheme.RADIUS_L, 16, 16))
 	UiTheme.add_sheen(v._sheet, UiTheme.RADIUS_L)
 	v._fade.add_child(v._sheet)
+	# Scrolls only when the inspector is taller than the window (_fit_inspector).
+	v._sheet_scroll = ScrollContainer.new()
+	v._sheet_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v._sheet_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	UiTheme.apply_scroll(v._sheet_scroll)
+	v._sheet.add_child(v._sheet_scroll)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 12)
-	v._sheet.add_child(col)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v._sheet_scroll.add_child(col)
 	# Phones and tablets: the grabber on top hides the sheet; on desktop the
 	# arc's chevron does. The round tab brings it back.
 	v._sheet_grip = Button.new()
@@ -396,8 +403,8 @@ static func arrive(v: View360) -> void:
 	v._hud.add_child(title)
 	title.reset_size()
 	title.pivot_offset = Vector2.ZERO
-	title.position = (v.size - title.size) / 2.0
-	var target := v._place_box.global_position - v.global_position + Vector2(16, 2)
+	title.position = (v.size - title.size) / 2.0 - v._hud.position
+	var target := v._place_box.global_position - v._hud.global_position + Vector2(16, 2)
 	var shrink := 19.0 / 48.0
 	var land := v.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	land.tween_interval(TITLE_HOLD_S)
@@ -428,7 +435,8 @@ static func _show_hint(v: View360) -> void:
 
 static func hint_text(v: View360) -> String:
 	if not v._drone.on:
-		return "Drag to look around · Pinch or scroll to zoom"
+		return "Drag to look around · Pinch to zoom" if OS.has_feature("mobile") \
+			else "Drag to look around · Pinch or scroll to zoom"
 	if DroneSticks.wanted():
 		return "Left stick flies · Right stick turns and climbs"
 	return "W A S D to fly · E and Q to climb · Shift to speed up"
@@ -630,10 +638,11 @@ static func layout(v: View360) -> void:
 	# Desktop, and a phone on its side: the controls split to the right.
 	var inspector := lay == Responsive.Layout.EXPANDED
 	var inset := float(HudParts.SIZE_TOUCH - HudParts.SIZE_HUD) / 2.0
-	# Safe areas: nothing under the notch or the home indicator.
-	w -= safe[2]
-	h -= safe[3]
-	pad += maxf(safe[0], safe[1])
+	# Safe areas: nothing under the notch or the home indicator. The HUD
+	# layer starts inside them, so everything below measures from its edges.
+	_inset_hud(v, Vector2(safe[0], safe[1]))
+	w -= safe[0] + safe[2]
+	h -= safe[1] + safe[3]
 	v._exit_btn.position = Vector2(pad - inset, pad - inset)
 	v._exit_btn.size = Vector2(HudParts.SIZE_TOUCH, HudParts.SIZE_TOUCH)
 
@@ -663,7 +672,13 @@ static func layout(v: View360) -> void:
 	else:
 		if v._compass.get_parent() != v._fade:
 			v._compass.reparent(v._fade)
-		v._compass.position = Vector2(roundf((w - CompassDial.RING) / 2.0), pad - 4.0)
+		# Centred, unless the top-right chips (or, on a phone on its side,
+		# the inspector tucked under them) reach that far.
+		var ring_limit := v._top_right.position.x
+		if inspector and h < 500.0 and v._inspector_open:
+			ring_limit = minf(ring_limit, w - pad - float(INSPECTOR_W))
+		v._compass.position = Vector2(minf(roundf((w - CompassDial.RING) / 2.0),
+			ring_limit - 8.0 - CompassDial.RING), pad - 4.0)
 		room = minf(room, v._compass.position.x - 8.0 - pill_left)
 	v._place_pill.custom_minimum_size.x = 0.0
 	var font := v._place_pill.get_theme_font("font")
@@ -688,7 +703,7 @@ static func layout(v: View360) -> void:
 	# Bar or inspector.
 	var bar_w: float = float(INSPECTOR_W) if inspector \
 		else (w - pad * 2.0 if phone else minf(float(BAR_MAX), w - pad * 2.0))
-	v._sun_arc.set_arc_height(56.0 if h < 500.0 else (72.0 if h < 760.0 else 96.0))
+	v._sun_arc.set_arc_height(56.0 if h < 500.0 else (72.0 if h < 760.0 or phone else 96.0))
 	v._sun_arc.set_compact(bar_w < 380.0 or h < 500.0)
 	# The inspector hides by the arc's chevron, the sheet by its grabber.
 	v._sun_arc.set_collapsible(inspector)
@@ -696,11 +711,14 @@ static func layout(v: View360) -> void:
 	v._sheet.visible = v._inspector_open
 	v._sheet_tab.visible = not v._inspector_open
 	UiIcon.apply(v._sheet_tab, "chevron-left" if inspector else "chevron-up", 22, UiTheme.INK, UiTheme.INK)
+	# A phone on its side tucks the inspector under the chips, not the ring.
+	var inspector_top := pad + (float(HudParts.SIZE_HUD) if h < 500.0 else float(CompassDial.RING)) + 8.0
+	_fit_inspector(v, inspector, h - pad - attr_h - 8.0 - inspector_top)
 	v._sheet.custom_minimum_size = Vector2(bar_w, 0)
 	v._sheet.reset_size()
 	var sheet_h := v._sheet.get_combined_minimum_size().y
 	if inspector:
-		var top := pad + CompassDial.RING + 8.0
+		var top := inspector_top
 		v._sheet.position = Vector2(w - pad - bar_w, top)
 	else:
 		v._sheet.position = Vector2(roundf((w - bar_w) / 2.0), h - pad - attr_h - 8.0 - sheet_h)
@@ -728,6 +746,52 @@ static func layout(v: View360) -> void:
 	if v._drone.panel.visible:
 		hint_bottom = v._drone.panel.position.y - 8.0
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
+	_clear_hint(v, inspector, pad)
+
+## A wide hint on a narrow screen slides left, clear of the button stack
+## and the inspector.
+static func _clear_hint(v: View360, inspector: bool, pad: float) -> void:
+	var hint := Rect2(v._hint.position, v._hint.size)
+	var blockers: Array[Rect2] = [Rect2(v._zoom_stack.position, v._zoom_stack.size)]
+	if inspector and v._sheet.visible:
+		blockers.append(Rect2(v._sheet.position, v._sheet.size))
+	var limit := INF
+	var hit := false
+	for b in blockers:
+		hit = hit or hint.intersects(b)
+		limit = minf(limit, b.position.x)
+	if hit:
+		v._hint.position.x = maxf(pad, minf(hint.position.x, limit - 8.0 - hint.size.x))
+	# No room beside the mini-map on a short screen: above it instead.
+	if v._minimap != null and v._minimap.visible \
+			and Rect2(v._hint.position, v._hint.size).intersects(v._minimap.get_rect()):
+		v._hint.position.y = v._minimap.position.y - 8.0 - hint.size.y
+
+## The inspector scrolls inside `room` when it is taller than that.
+static func _fit_inspector(v: View360, inspector: bool, room: float) -> void:
+	var scroll := v._sheet_scroll
+	var inner := room - v._sheet.get_theme_stylebox("panel").get_minimum_size().y
+	var tight := inspector and (scroll.get_child(0) as Control).get_combined_minimum_size().y > inner
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if tight \
+		else ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size.y = inner if tight else 0.0
+	# Clipping would cut the focus rings of full-width controls.
+	scroll.clip_contents = tight
+
+## Move the HUD layer inside the safe area; what must stay full-bleed
+## (the edge scrims, things pinned to the scene) moves back out of it.
+static func _inset_hud(v: View360, at: Vector2) -> void:
+	v._hud.position = at
+	v._callouts.position = -at
+	for i in v._scrims.size():
+		var scrim := v._scrims[i] as Control
+		var edge := 0.0 if i == 0 else -160.0  # top scrim first, then bottom
+		scrim.offset_left = -at.x
+		scrim.offset_right = -at.x
+		scrim.offset_top = edge - at.y
+		scrim.offset_bottom = edge + 160.0 - at.y
+	if v._horizon != null:
+		v._horizon.position = -at
 
 ## Drone sticks above the controls bar, its round tab and the
 ## attribution, the right well short of the zoom stack (and the
@@ -766,7 +830,7 @@ static func _place_zoom_stack(v: View360, phone: bool, inspector: bool, pad: flo
 	var zs := v._zoom_stack.get_combined_minimum_size()
 	v._zoom_stack.size = zs
 	var at := Vector2(w - pad - zs.x + inset, h - pad - zs.y + inset)
-	if phone:
+	if phone or Rect2(at, zs).intersects(Rect2(v._attribution.position, v._attribution.size)):
 		at.y = h - pad - attr_h - 8.0 - zs.y + inset
 	var sheet := Rect2(v._sheet.position, v._sheet.size).grow(8.0)
 	if v._sheet.visible and Rect2(at, zs).intersects(sheet):
