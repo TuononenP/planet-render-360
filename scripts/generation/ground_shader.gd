@@ -284,21 +284,44 @@ void fragment() {
 	// Seasonal climate snow over the (summer) imagery, after the edge
 	// hand-off so near and far carry the same line (ClimateModel); it
 	// slides off cliffs (relief normal) and takes its own texture.
+	float pixel_m = max(length(dg.xy), length(dg.zw));
 	float sc = snow_cover(wpos, nw.y);
 	vec4 sa = vec4(0.0);
 	vec4 sn = vec4(0.5, 0.5, 1.0, 0.7);
+	float glint = 0.0;
 	if (sc > 0.01) {
 		det_sample(8, g, dg, vary, sa, sn);
-		alb = mix(alb, snow_col * clamp(sa.rgb / det_mean[8], vec3(0.75), vec3(1.2)), sc);
+		// Wind relief, hollows a touch bluer (they see sky, not sun),
+		// and ice crystals that catch a direct sun.
+		float near_snow = 1.0 - smoothstep(150.0, 700.0, dist_m);
+		vec3 hollow = vec3(1.0);
+		if (near_snow > 0.0 && ground_quality >= 1) {
+			vec2 dr = snow_drift(g);
+			nw = normalize(nw - vec3(dr.x, 0.0, dr.y) * 0.22 * sc * near_snow);
+			float shade = smoothstep(0.3, 0.7, snow_noise(g / 5.5));
+			hollow = mix(mix(vec3(0.86, 0.92, 1.0), vec3(1.0), shade), vec3(1.0), 1.0 - near_snow);
+		}
+		// The layer gives snow its grain; it must not tint or scar it.
+		alb = mix(alb, snow_col * hollow * clamp(lum(sa.rgb / det_mean[8]), 0.9, 1.08), sc);
+		sn.rgb = mix(vec3(0.5, 0.5, 1.0), sn.rgb, 0.45);
+		if (ground_quality >= 2) {
+			vec4 facet = snow_facet(g, pixel_m);
+			glint = facet.w * sc;
+			nw = normalize(mix(nw, facet.xyz, glint));
+		}
 	}
 	// Live rain: wet ground darkens and turns glossy (not under snow).
 	float wet = climate_wetness * (1.0 - sc);
-	alb *= mix(1.0, 0.72, wet);
-	// Puddles in the low spots of flat paving (squares, pavements), as on
-	// the roads (RoadSurface): street and shop light mirrors in them.
-	float puddle = smoothstep(0.6, 0.7, t_noise(g / 3.5) * 0.7 + t_noise(g / 11.0) * 0.3)
-		* wet * pave * (1.0 - steep) * (1.0 - wf);
-	alb = mix(alb, alb * 0.55, puddle);
+	alb *= mix(1.0, 0.76, wet);
+	// Water in the low spots of flat paving (squares, pavements), as on
+	// the roads (RoadSurface): small, scattered and ringed by damp.
+	vec2 mask = puddle_mask(puddle_low(g, pixel_m)) * wet * pave * (1.0 - steep) * (1.0 - wf);
+	float puddle = mask.x;
+	alb = puddle_albedo(alb, mask);
+	vec2 ripple = vec2(0.0);
+	if (puddle > 0.01) {
+		ripple = rain_ripples(g, TIME, pixel_m) * 0.25;
+	}
 	ALBEDO = value_clamp(alb);
 	// Lighting normal: relief-bent world normal into view space.
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
@@ -306,14 +329,14 @@ void fragment() {
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
 	BINORMAL = normalize((VIEW_MATRIX * vec4(cross(tw, nw), 0.0)).xyz);
 	vec3 nmap = mix(nm.rgb, sn.rgb, sc);
-	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), max(max(wf, edge), puddle));
+	NORMAL_MAP = mix(nmap, vec3(0.5 + ripple.x, 0.5 + ripple.y, 1.0), max(max(wf, edge), max(puddle, glint)));
 	NORMAL_MAP_DEPTH = 0.9;
 	AO = contact;
 	AO_LIGHT_AFFECT = 0.2;
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
-	ROUGHNESS = mix(mix(r, 0.22, wet * 0.85), 0.03, puddle);
-	SPECULAR = mix(0.28, 0.5, wet);
+	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.1, glint);
+	SPECULAR = mix(mix(0.28, 0.5, wet), 1.0, glint);
 }
 """

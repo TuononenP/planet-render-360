@@ -78,7 +78,7 @@ void fragment() {
 	float rough = texture(rough_tex, UV).r;
 	float wet = climate_wetness;
 	col *= mix(1.0, 0.75, wet);
-	rough = mix(rough, 0.18, wet);
+	rough = mix(rough, 0.3, wet);
 	float sc = snow_cover(wpos, 1.0);
 	ALBEDO = mix(col, snow_col, sc * 0.9);
 	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), sc);
@@ -224,18 +224,32 @@ void fragment() {
 	col = mix(col, mix(paint_col, centre_col, yel), paint);
 	rough = mix(rough, 0.6, paint);
 	nm = mix(nm, vec3(0.5, 0.5, 1.0), paint * 0.7);
-	// Rain: darker, glossy, puddles in the low spots.
+	// Rain: darker with a soft sheen. Water lies in the low spots and
+	// along the kerbs, never as one sheet, and rain rings it.
 	float wet = climate_wetness;
-	float puddle = smoothstep(0.6, 0.7, r_noise(g / 3.5) * 0.7 + r_noise(g / 11.0) * 0.3) * wet;
-	col *= mix(1.0, 0.72, wet);
-	col = mix(col, col * 0.55, puddle);
-	rough = mix(rough, 0.2, wet * 0.85);
-	rough = mix(rough, 0.03, puddle);
-	nm = mix(nm, vec3(0.5, 0.5, 1.0), puddle);
-	// Snow settles except where the tyres run.
-	float sc = snow_cover(wpos, 1.0) * (1.0 - 0.75 * track);
-	col = mix(col, snow_col, sc * 0.9);
-	rough = mix(rough, 0.7, sc);
+	float pixel_m = length(fwidth(g));
+	// The gutter beside a kerb collects the most; never the kerb itself.
+	float gutter = (attr.b > 0.5 && rank >= 1) ? smoothstep(0.24, 0.4, min(x, w - x)) * (1.0 - smoothstep(0.6, 1.8, min(x, w - x))) : 0.0;
+	vec2 mask = puddle_mask(puddle_low(g, pixel_m) + 0.18 * gutter) * wet * (1.0 - kerb);
+	float puddle = mask.x;
+	col = puddle_albedo(col * mix(1.0, 0.76, wet), mask);
+	rough = puddle_roughness(rough, wet, mask);
+	nm = mix(nm, vec3(0.5, 0.5, 1.0), max(mask.y * 0.4, puddle));
+	if (puddle > 0.01 && near > 0.0) {
+		nm.xy += rain_ripples(g, TIME, pixel_m) * 0.25 * puddle;
+	}
+	// Snow packs on the carriageway. Tyres grind it to grey slush that
+	// wanders with the traffic instead of ruling straight lines.
+	float sc = snow_cover(wpos, 1.0);
+	if (sc > 0.0) {
+		float wander = (r_noise(vec2(x * 0.4, y / 16.0)) - 0.5) * 0.7;
+		float tk = (abs(xl + wander) - 0.85) / 0.34;
+		float grind = 0.7 * exp(-tk * tk) * (rank >= 1 ? 1.0 : 0.3)
+			* (0.55 + 0.45 * smoothstep(0.3, 0.7, r_noise(g * 1.6) * 0.6 + r_noise(g * 5.0) * 0.4));
+		vec3 slush = vec3(0.46, 0.47, 0.49) * (0.85 + 0.3 * r_noise(g / 1.3));
+		col = mix(col, mix(snow_col, slush, grind), sc * 0.95);
+		rough = mix(rough, mix(0.7, 0.42, grind), sc);
+	}
 	ALBEDO = col;
 	ROUGHNESS = clamp(rough, 0.02, 1.0);
 	NORMAL_MAP = mix(nm, vec3(0.5, 0.5, 1.0), sc);

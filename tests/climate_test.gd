@@ -122,10 +122,28 @@ func _model_checks(failures: Array[String]) -> void:
 	banff.season = LocationData.Season.SPRING
 	if ClimateModel.snow_uniforms(banff, 73)["climate_snow_y"] > 0.0:
 		failures.append("falling snow at Banff should settle at the viewpoint")
+	# Where it settles, the viewpoint's streets are fully under it (the
+	# line's full band, with its wobble, ends below the ground there).
+	var settled := ClimateModel.snow_uniforms(banff, 73)
+	if float(settled["climate_snow_y"]) + float(settled["climate_snow_band"]) * 1.8 > -30.0:
+		failures.append("settled snow must fully cover the viewpoint: %s" % settled)
+	# The line and band have no step anywhere as the place's line moves.
+	for k in range(-500, 200):
+		var a := ClimateModel.settled_line(float(k))
+		var b := ClimateModel.settled_line(float(k) + 1.0)
+		if absf(a.x - b.x) > 4.0 or absf(a.y - b.y) > 4.0:
+			failures.append("snow line jumps at %d m: %s -> %s" % [k, a, b])
+			break
+	if ClimateModel.settled_line(50.0) != Vector2(50.0, ClimateModel.SNOW_BAND_M):
+		failures.append("a line above the viewpoint keeps the climate's own band")
 	il.season = LocationData.Season.WINTER
 	var u := ClimateModel.snow_uniforms(il)
 	if u["climate_snow_on"] != 1.0 or absf(float(u["climate_snow_y"]) - (sl_w - 568.0)) > 0.01:
 		failures.append("winter snow uniforms: %s" % u)
+	if float(ClimateModel.globals_for(il, 65)["climate_rain"]) <= float(ClimateModel.globals_for(il, 51)["climate_rain"]) \
+			or ClimateModel.globals_for(il, 0)["climate_rain"] != 0.0 \
+			or ClimateModel.globals_for(il, 73)["climate_rain"] != 0.0:
+		failures.append("climate_rain should follow rain intensity only")
 	# Rain wets the ground; still water freezes only in cold winters.
 	if ClimateModel.globals_for(il, 63)["climate_wetness"] != 1.0 \
 			or ClimateModel.globals_for(il, 0)["climate_wetness"] != 0.0:

@@ -130,7 +130,8 @@ static func grass_tint(data: LocationData, season: int) -> Color:
 ##    summer the climate snow above the snow line is painted over them
 ##    (in summer the imagery shows the real glaciers); trees load snow
 ##    by their own height against the same line;
-##  - wetness: rain/drizzle darkens and glosses the ground;
+##  - wetness: rain/drizzle darkens and glosses the ground; rain (0..1)
+##    is how hard it falls: ripples, puddle reach, a rougher sea;
 ##  - ice: still water freezes in cold-winter climates.
 ## Spliced into shaders at "// @SNOW".
 const SNOW_GLSL := """
@@ -138,6 +139,8 @@ global uniform float climate_snow_on;
 global uniform float climate_snow_y;
 global uniform float climate_snow_band;
 global uniform float climate_wetness;
+global uniform float climate_rain;
+global uniform float climate_snow_glint;
 global uniform float climate_water_ice;
 uniform vec3 snow_col : source_color = vec3(0.90, 0.92, 0.95);
 float snow_line(vec3 p) {
@@ -148,18 +151,129 @@ float snow_line(vec3 p) {
 	return climate_snow_on * smoothstep(climate_snow_y - climate_snow_band,
 		climate_snow_y + climate_snow_band, h);
 }
+float snow_hash(vec2 p) {
+	vec3 q = fract(vec3(p.xyx) * 0.1031);
+	q += dot(q, q.yzx + 33.33);
+	return fract((q.x + q.y) * q.z);
+}
+float snow_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(snow_hash(i), snow_hash(i + vec2(1.0, 0.0)), u.x),
+		mix(snow_hash(i + vec2(0.0, 1.0)), snow_hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+// Metre-scale mottling where snow thins (0..1).
+float snow_patch(vec2 p) {
+	return snow_noise(p / 7.0) * 0.5 + snow_noise(p / 1.9) * 0.35 + snow_noise(p / 0.55) * 0.15;
+}
+// How low the ground lies, for where rain collects. Each octave settles
+// to its mean before the pixel footprint can alias it into shimmer.
+float puddle_low(vec2 g, float pixel_m) {
+	float fine = mix(snow_noise(g / 1.8), 0.5, smoothstep(0.3, 1.5, pixel_m));
+	float broad = mix(snow_noise(g / 5.5), 0.5, smoothstep(1.5, 6.0, pixel_m));
+	return fine * 0.65 + broad * 0.35;
+}
+// Where rain lies, from puddle_low: x standing water, y its damp rim.
+vec2 puddle_mask(float low) {
+	float th = 0.74 - 0.05 * climate_rain;
+	return vec2(smoothstep(th, th + 0.06, low), smoothstep(th - 0.11, th, low));
+}
+vec3 puddle_albedo(vec3 c, vec2 mask) {
+	vec3 damp = mix(c, c * 0.84, mask.y);
+	return mix(damp, damp * 0.55, mask.x);
+}
+float puddle_roughness(float r, float wet, vec2 mask) {
+	r = mix(r, 0.32, wet * 0.85);
+	r = mix(r, 0.16, mask.y * 0.6);
+	return mix(r, 0.03, mask.x);
+}
+// Fragment only. Thin snow lies in patches with real edges, instead of
+// greying the whole ground; a full cover closes every gap.
 float snow_cover(vec3 p, float ny) {
-	return snow_line(p) * smoothstep(0.45, 0.72, ny);
+	// Derivatives first: every pixel of a quad must reach them.
+	float px = max(fwidth(p.x), fwidth(p.z));
+	float line = snow_line(p);
+	if (line <= 0.0) { return 0.0; }
+	float n = mix(snow_patch(p.xz), 0.5, smoothstep(0.8, 5.0, px));
+	return smoothstep(n - 0.12, n + 0.12, line * 1.3) * smoothstep(0.45, 0.72, ny);
+}
+// Snow cover at a point with no derivatives, for vertex shaders: where
+// lying snow buries low plants, whole instances at a time.
+float snow_bury(vec3 p) {
+	float line = snow_line(p);
+	if (line <= 0.0) { return 0.0; }
+	float n = snow_patch(p.xz);
+	return smoothstep(n - 0.12, n + 0.12, line * 1.3);
+}
+// Slope of the wind-sculpted surface, for the lighting normal.
+vec2 snow_drift(vec2 p) {
+	float e = 0.35;
+	float a = snow_noise(p / 5.5) + 0.45 * snow_noise(p / 1.6);
+	float x = snow_noise((p + vec2(e, 0.0)) / 5.5) + 0.45 * snow_noise((p + vec2(e, 0.0)) / 1.6);
+	float z = snow_noise((p + vec2(0.0, e)) / 5.5) + 0.45 * snow_noise((p + vec2(0.0, e)) / 1.6);
+	return vec2(x - a, z - a) / e;
+}
+// Ice crystals: rare cells whose tilted facet can throw the sun back.
+// xyz facet normal (world), w strength; fades before a pixel can span
+// several cells and strobe. Only under a direct sun: a cloud deck has
+// nothing sharp to reflect.
+vec4 snow_facet(vec2 p, float pixel_m) {
+	float vis = climate_snow_glint * (1.0 - smoothstep(0.012, 0.045, pixel_m));
+	if (vis <= 0.0) { return vec4(0.0, 1.0, 0.0, 0.0); }
+	vec2 id = floor(p * 40.0);
+	if (snow_hash(id) < 0.985) { return vec4(0.0, 1.0, 0.0, 0.0); }
+	vec3 f = vec3(snow_hash(id + 3.1) - 0.5, 0.42, snow_hash(id + 7.7) - 0.5);
+	return vec4(normalize(f), vis);
+}
+// Slope of rain rings on still water at metre coordinates: jittered
+// cells at three scales, so no grid shows; rain sets how many are live.
+// Rings are centimetres wide: gone before a pixel can alias them.
+vec2 rain_ripples(vec2 m, float t, float pixel_m) {
+	vec2 s = vec2(0.0);
+	float vis = 1.0 - smoothstep(0.012, 0.05, pixel_m);
+	if (climate_rain <= 0.0 || vis <= 0.0) { return s; }
+	for (int l = 0; l < 3; l++) {
+		float fl = float(l);
+		vec2 p = m * (1.7 + fl * 0.9) + fl * vec2(7.3, 3.1);
+		vec2 id = floor(p);
+		float h = snow_hash(id + fl);
+		if (h > 0.2 + 0.8 * climate_rain) { continue; }
+		vec2 c = fract(p) - 0.5 - (vec2(snow_hash(id + 11.3), snow_hash(id + 5.7)) - 0.5) * 0.3;
+		float age = fract(t * (0.75 + h * 0.6) + h * 9.0);
+		float r = length(c);
+		float front = r - age * 0.34;
+		float fade = (1.0 - age) * (1.0 - age);
+		s += c / max(r, 1e-3) * sin(front * 45.0) * exp(-front * front * 300.0) * fade;
+	}
+	return s * vis;
 }
 """
 
 const GLOBALS := ["climate_snow_on", "climate_snow_y", "climate_snow_band",
-	"climate_wetness", "climate_water_ice"]
+	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice"]
 ## Open-Meteo WMO codes: falling snow / rain (incl. showers, storms).
 const SNOWING := [71, 73, 75, 77, 85, 86]
 const RAINING := [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
 ## Coldest-quarter mean (°C) below which still water freezes over.
 const ICE_C := -4.0
+## A viewpoint well under the snow line has white streets: a soft 150 m
+## band centred on it left them at 55-65% cover, grey rather than white.
+## Over SNOWY_RAMP_M under the line, the line eases to SNOWY_LINE_M and
+## its band to SNOWY_BAND_M. A line already further down than
+## SNOWY_DEEP_M covers the viewpoint anyway and keeps its soft band.
+const SNOW_BAND_M := 150.0
+const SNOWY_RAMP_M := 120.0
+const SNOWY_LINE_M := -150.0
+const SNOWY_BAND_M := 60.0
+const SNOWY_DEEP_M := Vector2(150.0, 350.0)
+
+## [line, band] in metres for a snow line `line_m` from the viewpoint
+## (negative: the viewpoint is above it, under snow). Continuous in line_m.
+static func settled_line(line_m: float) -> Vector2:
+	var under := clampf(-line_m / SNOWY_RAMP_M, 0.0, 1.0)
+	var narrow := under * (1.0 - smoothstep(SNOWY_DEEP_M.x, SNOWY_DEEP_M.y, -line_m))
+	return Vector2(lerpf(line_m, minf(line_m, SNOWY_LINE_M), under), lerpf(SNOW_BAND_M, SNOWY_BAND_M, narrow))
 
 ## Snow parameters: snow line in render Y (the viewpoint elevation is
 ## Y = 0, GroundTruth's datum). Falling snow at a place cold enough to
@@ -169,11 +283,12 @@ static func snow_uniforms(data: LocationData, weather_code: int = -1) -> Diction
 	var s := LocationData.clamp_season(data.season)
 	var m2u := WorldScale.metres_to_units()
 	var on := 0.0 if s == LocationData.Season.SUMMER else 1.0
-	var line := (snowline_m(data, s) - data.centre_elevation_m) * m2u
+	var line_m := snowline_m(data, s) - data.centre_elevation_m
 	if weather_code in SNOWING and (not has(data) or season_temp_c(data, s) <= 2.0):
 		on = 1.0
-		line = minf(line, -30.0 * m2u)
-	return {"climate_snow_on": on, "climate_snow_y": line, "climate_snow_band": 150.0 * m2u}
+		line_m = minf(line_m, -SNOWY_RAMP_M)
+	var settled := settled_line(line_m) if on > 0.0 else Vector2(line_m, SNOW_BAND_M)
+	return {"climate_snow_on": on, "climate_snow_y": settled.x * m2u, "climate_snow_band": settled.y * m2u}
 
 ## Whether still water is frozen this season: winter where the coldest
 ## quarter averages ≤ ICE_C (CHELSA), else winter above 60° latitude.
@@ -188,6 +303,7 @@ static func water_frozen(data: LocationData) -> bool:
 static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionary:
 	var g := snow_uniforms(data, weather_code)
 	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
+	g["climate_rain"] = float(WeatherLook.for_code(weather_code, 100.0)["intensity"]) if weather_code in RAINING else 0.0
 	g["climate_water_ice"] = ice_amount(data)
 	return g
 

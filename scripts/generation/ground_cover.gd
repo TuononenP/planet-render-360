@@ -29,10 +29,14 @@ shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque, diffuse_burley;
 uniform sampler2D tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform float sway = 0.12;
+// 1 = low enough for lying snow to bury (tufts, flowers), 0 = shrubs.
+uniform float buried_by_snow = 1.0;
 // @SNOW
 varying vec3 wpos;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	// Snow buries a tuft by degrees: it sinks, it never pops at an edge.
+	VERTEX.y *= 1.0 - 0.95 * buried_by_snow * snow_bury(MODEL_MATRIX[3].xyz);
 	// Wind: tops sway, bases stay planted; a slow gust front travels.
 	float h = clamp(VERTEX.y, 0.0, 1.0);
 	float gust = sin(wpos.x * 0.07 + wpos.z * 0.05 - TIME * 1.3) * 0.5 + 0.5;
@@ -204,6 +208,7 @@ static func _material(kind: String, season: int) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	m.set_shader_parameter("tex", ImageTexture.create_from_image(_paint(kind, season)))
+	m.set_shader_parameter("buried_by_snow", 0.0 if kind == "shrub" else 1.0)
 	m.set_shader_parameter("sway", 0.05 if kind == "shrub" else 0.12)
 	_mats[key] = m
 	return m

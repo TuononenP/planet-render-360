@@ -47,59 +47,22 @@ static func _select_season(v: View360, index: int) -> void:
 ## Rain/snow dressing from the live weather code: one particle system
 ## around the camera, off unless the place is actually precipitating.
 static func _build_precip(v: View360) -> void:
-	v._precip = GPUParticles3D.new()
-	v._precip.amount = 900
-	v._precip.lifetime = 1.6
-	v._precip.emitting = false
-	v._precip.visible = false
-	var mat := ParticleProcessMaterial.new()
-	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	mat.emission_box_extents = Vector3(28, 16, 28)
-	mat.direction = Vector3(0, -1, 0)
-	mat.spread = 6.0
-	mat.gravity = Vector3(0, -22, 0)
-	mat.initial_velocity_min = 4.0
-	mat.initial_velocity_max = 7.0
-	v._precip.process_material = mat
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.05, 0.5)
-	var qm := StandardMaterial3D.new()
-	qm.albedo_color = Color(0.75, 0.85, 0.95, 0.55)
-	qm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	qm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	quad.material = qm
-	v._precip.draw_pass_1 = quad
-	v._rig.add_child(v._precip)
-	v._precip.position = Vector3(0, 10, 0)
+	v._precip = Precipitation.build(v._rig, v._quality_preset)
 
 ## Density, size and fall speed follow the intensity (WeatherLook):
 ## drizzle is a sparse fine mist, a downpour dense long streaks.
 static func _apply_precip(v: View360, code: int) -> void:
 	if v._precip == null:
 		return
-	var look := WeatherLook.for_code(code, v._atmos.cloud_cover if v._atmos != null else 100.0)
-	var kind := str(look["precip"])
-	v._precip.visible = kind != "none"
-	v._precip.emitting = kind != "none"
-	if kind == "none":
-		return
-	var pp := WeatherLook.particle_params(look)
-	v._precip.amount_ratio = float(pp["amount_ratio"])
-	(v._precip.process_material as ParticleProcessMaterial).gravity = Vector3(0, float(pp["gravity"]), 0)
-	(v._precip.draw_pass_1 as QuadMesh).size = pp["size"]
-	v._precip.set_meta("precip_base", Color(0.95, 0.96, 1.0, float(pp["alpha"])) if kind == "snow"
-		else Color(0.75, 0.85, 0.95, float(pp["alpha"])))
+	Precipitation.apply(v._precip, WeatherLook.for_code(code, v._atmos.cloud_cover if v._atmos != null else 100.0))
 	_precip_tint(v)
 
-## Unshaded particles take the scene's light level, so night rain is a
-## faint shimmer, not glowing streaks.
+## Rain and snow take the sky's own light, so night rain is a faint
+## shimmer, not glowing streaks.
 static func _precip_tint(v: View360) -> void:
-	if v._precip == null or v._atmos == null or not v._precip.has_meta("precip_base"):
+	if v._precip == null or v._atmos == null:
 		return
-	var base: Color = v._precip.get_meta("precip_base")
-	var light := lerpf(0.12, 1.0, clampf(v._atmos.sun.light_energy / 1.5, 0.0, 1.0))
-	var qm := (v._precip.draw_pass_1 as QuadMesh).material as StandardMaterial3D
-	qm.albedo_color = Color(base.r * light, base.g * light, base.b * light, base.a)
+	Precipitation.set_light(v._precip, v._atmos.sky_horizon_color, str(v._atmos.weather_look["precip"]) == "snow")
 
 ## The place's live weather arrived: kept, and shown unless a preset is
 ## picked in the Conditions sheet (then only its clock is taken).
@@ -185,6 +148,8 @@ static func apply_surface_state(v: View360) -> void:
 		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
 		RoofSnow.apply(v._generated, float(ClimateModel.globals_for(v._data, code)["climate_snow_on"]) > 0.0)
 		_city_lights(v)
+	# The city glow above has just moved the sky these take their light from.
+	_precip_tint(v)
 
 ## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
 ## darker albedo. Dry values are kept on the shared material, so the
