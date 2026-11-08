@@ -623,14 +623,17 @@ func _view_wiring() -> void:
 
 	# A photo that cannot be written says so; a cancelled dialog says nothing.
 	var saved: Array = []
-	PhotoMode._write(Image.create(4, 4, false, Image.FORMAT_RGB8), "/nonexistent-dir-pr360/x.png",
-		func(path: String, failed: bool) -> void: saved.append([path, failed]))
+	var record := func(path: String, failed: bool) -> void: saved.append([path, failed])
+	PhotoMode.dir_override = "/nonexistent-dir-pr360"
+	PhotoMode.save(Image.create(4, 4, false, Image.FORMAT_RGB8), "x.png", record)
 	_check(saved == [["", true]], "a failed write is reported as a failure: %s" % [saved])
 	saved.clear()
-	var ok_path := ProjectSettings.globalize_path(CACHE).path_join("photo.png")
-	PhotoMode._write(Image.create(4, 4, false, Image.FORMAT_RGB8), ok_path,
-		func(path: String, failed: bool) -> void: saved.append([path, failed]))
+	var photo_dir := ProjectSettings.globalize_path(CACHE)
+	PhotoMode.dir_override = photo_dir
+	PhotoMode.save(Image.create(4, 4, false, Image.FORMAT_RGB8), "photo.png", record)
+	var ok_path := photo_dir.path_join("photo.png")
 	_check(saved == [[ok_path, false]] and FileAccess.file_exists(ok_path), "a written photo reports its path")
+	PhotoMode.dir_override = ""
 
 	# A restored camera beyond the walking circle can walk back inside.
 	view._rig.position = Vector3(0, view._rig.position.y, -View360.IN_PLACE_M - 10.0)
