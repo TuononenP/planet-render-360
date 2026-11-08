@@ -78,6 +78,11 @@ const ZONES := [
 	["buenos_aires", "buenos_aires", -34.6037, -58.3816, 9.0],
 	["sydney", "sydney", -33.8688, 151.2093, 7.0],
 	["melbourne", "melbourne", -37.8136, 144.9631, 6.0],
+	["warsaw", "warsaw", 52.2297, 21.0122, 9.0],
+	["moscow", "moscow", 55.7558, 37.6173, 15.0],
+	["havana", "havana", 23.1136, -82.3666, 10.0],
+	["delhi", "delhi", 28.6139, 77.2090, 14.0],
+	["reykjavik", "reykjavik", 64.1466, -21.9426, 6.0],
 ]
 
 ## Cores the era rules measure distance from (historic centre or CBD,
@@ -138,6 +143,11 @@ const CORES := {
 	"buenos_aires": [[-34.6083, -58.3712]],                # Plaza de Mayo
 	"sydney": [[-33.8650, 151.2094]],                      # the CBD
 	"melbourne": [[-37.8136, 144.9631]],                   # the CBD
+	"warsaw": [[52.2478, 21.0148]],                        # Castle Square
+	"moscow": [[55.7539, 37.6208]],                        # Red Square
+	"havana": [[23.1370, -82.3510]],                       # Plaza Vieja
+	"delhi": [[28.6328, 77.2197], [28.6562, 77.2300]],     # Connaught Place, Chandni Chowk
+	"reykjavik": [[64.1470, -21.9400]],                    # Austurstræti
 }
 
 ## Named districts with a dominant sub-style: [city, era, lat, lon,
@@ -330,6 +340,16 @@ const DISTRICTS := [
 	["sydney", "sydney_terrace", -33.8860, 151.2110, 0.7, 10.0],  # Surry Hills
 	["melbourne", "melbourne_tower", -37.8136, 144.9631, 1.0, 20.0],  # the CBD
 	["melbourne", "melbourne_terrace", -37.7990, 144.9780, 1.0, 15.0],  # Fitzroy, Carlton
+	["warsaw", "warsaw_oldtown", 52.2497, 21.0122, 0.6, 8.0],        # Old Town Market Square
+	["warsaw", "warsaw_socialist", 52.2190, 21.0190, 0.9, 8.0],      # MDM, Marszałkowska
+	["warsaw", "warsaw_modern", 52.2330, 20.9850, 1.3, 10.0],        # Wola business district
+	["moscow", "moscow_city", 55.7490, 37.5390, 1.0, 20.0],          # Moscow-City
+	["moscow", "moscow_stalinka", 55.7600, 37.6000, 1.5, 6.0],       # Garden Ring
+	["havana", "havana_colonial", 23.1370, -82.3500, 0.9, 12.0],     # Habana Vieja
+	["havana", "havana_soviet", 23.1650, -82.2800, 1.5, 15.0],       # Alamar
+	["delhi", "delhi_lutyens", 28.6143, 77.2000, 3.0, 20.0],         # Lutyens' Delhi
+	["delhi", "delhi_old", 28.6562, 77.2300, 1.5, 20.0],             # Shahjahanabad
+	["reykjavik", "reykjavik_iron", 64.1450, -21.9350, 1.0, 12.0],   # the old town
 ]
 
 ## The zone row containing (lat, lon), or [] outside every city.

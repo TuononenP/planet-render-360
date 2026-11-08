@@ -61,6 +61,7 @@ static var MATERIAL_TAGS := {
 	"concrete": "concrete", "cement": "concrete", "cement_block": "concrete", "concrete/glass": "concrete",
 	"glass": "glass", "mirror": "glass",
 	"wood": "wood", "timber": "wood", "planks": "wood", "thatch": "wood", "timber_framing": "wood",
+	"siding": "wood", "vinyl": "wood", "weatherboard": "wood", "clapboard": "wood",
 	"stone": "stone", "sandstone": "stone", "granite": "stone",
 	"marble": "limestone", "masonry": "stone", "ashlar": "stone", "rubble": "stone",
 	"limestone": "limestone", "chalk": "limestone", "travertine": "limestone",

@@ -67,12 +67,26 @@ outranks the map):
    3D relief (`rv`).
 5. **Resolve** — `ArchitectureStyle.resolve(b, region, density, seed, area,
    ctx)` picks one look per building from its position hash (stable across
-   runs), so a street is not a row of clones. Inside a city zone every
-   material pick (wall set + tint, shutter, pattern, variant, fascia, roof
-   finish) is coupled to one of `LOOKS` (2) seeds per era/kind so a city's
-   eras stay inside the per-place material budget (lod_test T7.2); roof
-   shape, storeys and relief keep the full per-building seed, and
-   WallVariety's vertex tint keeps neighbours apart.
+   runs), so a street is not a row of clones. Inside a city zone the
+   texture-bearing picks (wall set, shutter, pattern, variant, fascia) are
+   coupled to one of `LOOKS` (2) seeds per era/kind so a city's eras stay
+   inside the per-place material budget (lod_test T7.2). The wall and roof
+   palette tints follow a separate, wider count (`TINTS` 4, `ULTRA_TINTS` 6;
+   a tint is only an albedo colour on a shared texture, so it costs a
+   material, not a texture), chosen by `ArchitectureStyle.tiers_for`:
+   Fast and anything off Forward+ (phones) keep 2. Roof shape, storeys and
+   relief keep the full per-building seed. On top of the material, every
+   building carries a vertex tint: `WallVariety` / `RoofVariety` add its own
+   paint family (cream, ochre, blush, sage, mist; `ArchitectureStyle.CHROMA`
+   weights it by wall set, so render is repainted freely and limestone and
+   brick barely) leaned by a per-place `tone`, and a distant building's
+   residual against its shared material (`FacadeMaterials.wall_residual`)
+   keeps its own `building:colour` / style colour at no extra material. The
+   far city's native kernel keeps the plain two-argument tint.
+   `NeighbourEvidence` lets an untagged building borrow the colour,
+   material, roof finish and `start_date` of a tagged neighbour of the same
+   kind within 40 m (never named, protected, religious, civic, industrial or
+   farm buildings, and never over a building's own tags).
 6. **Real data wins** — `building:material`, `building:colour`, `roof:*`,
    `height`, `building:levels`, `roof:height`, `religion`/`denomination` and
    the satellite roof sample are applied on top of (and replace) the style.
@@ -117,6 +131,11 @@ outranks the map):
 | Prague (`prague`, historicist and Art Nouveau blocks, steep red tile with towers) | `prague_old` pre-1850, Staré Město / Malá Strana (Baroque pastel, bell gables); `prague_panel` 1955–1995 beyond 3.5 km |
 | Budapest (`budapest`, eclectic bérházak: grey and ochre render, 4–6 storeys) | `budapest_castle` 1686–1849, 1–3 levels (Baroque houses); `budapest_panel` 1955–1995 beyond 3.5 km |
 | Munich (`munich`, Gründerzeit and Jugendstil, pastel render, steep red tile) | `munich_altstadt` pre-1860 (gabled burgher houses); `munich_modern` ≥7 levels |
+| Warsaw (`warsaw`, Śródmieście kamienice: ochre and grey render, flat or low roofs) | `warsaw_oldtown` Old Town (rebuilt pastel gabled houses, red tile); `warsaw_socialist` 1945–1990 (MDM blocks, prefab slabs); `warsaw_modern` ≥12 levels, Wola |
+| Moscow (`moscow`, merchant tenements: ochre and peach stucco, painted sheet-metal roofs) | `moscow_stalinka` 1935–1960 (7–12 storey sand-stone blocks, tall hipped roofs); `moscow_panel` 1956–1995 beyond 3.5 km (silicate brick and panel slabs); `moscow_city` ≥16 levels |
+| Havana (`havana`, pastel stucco, deep balconies, flat roofs) | `havana_colonial` pre-1900, Habana Vieja (tall ceilings, clay tile); `havana_soviet` 1960–1991 (prefab slabs, Alamar) |
+| New Delhi (`delhi`, pale render and concrete flats with deep balconies and water tanks) | `delhi_lutyens` 1911–1947 (cream stucco and red sandstone, domes); `delhi_old` pre-1911, Shahjahanabad (aged render and sandstone, jharokha balconies) |
+| Reykjavik (`reykjavik`, rendered concrete, coloured sheet-metal roofs) | `reykjavik_iron` 1880–1939, the old town (painted corrugated iron and clapboard, steep gables); `reykjavik_modern` ≥2000 |
 | Kyoto (`kyoto`, height-capped beige and brown mid-rise) | `kyoto_machiya` 1–2 levels / heritage, Gion / Higashiyama / Nishijin (timber lattice, kawara, deep eaves) |
 | Shanghai (`shanghai`, 12–30 storey tiled residential towers) | `shanghai_shikumen` 2–3 levels / heritage (grey brick banded red); `shanghai_bund` 1900–1949 (stone banks); `shanghai_walkup` 4–8 levels; `shanghai_tower` ≥10-level commercial, Lujiazui |
 | Beijing (`beijing`, 1990s+ tiled residential compounds) | `beijing_hutong` 1 level / heritage, Nanluoguxiang / Shichahai / Qianmen (grey brick, curved grey tile); `beijing_brick` 1950–1989, 3–6 levels; `beijing_tower` CBD |
@@ -221,11 +240,13 @@ finish, alpha-cut wrought iron, canvas per colour, lit signs).
 - New classes name no other project class in signatures, and the pure ring
   helpers live in the leaf class `RingGeometry` (no `BuildingDetail` ↔
   `BuildingBuilder` cycle; see the plan's 2026-10-28 render-check row).
-- Known limits: boxes are coarse near borders; cities outside the 12 zones
+- Known limits: boxes are coarse near borders; cities outside the city zones
   fall to their single country region; era cues are only as good as OSM's
   `start_date` / `building:architecture` coverage (untagged buildings take
   the distance / district weighted pick); within a city a place shows at
-  most `LOOKS` palette tints per era (material budget); photographic sets are not regional (a "wood" wall is
+  most `TINTS` palette tints per era (`LOOKS` on Fast and phones; material
+  budget), and a row's second wall material is picked from only `LOOKS`
+  hashed seeds, so it can fail to appear at all; photographic sets are not regional (a "wood" wall is
   one plank photo, tinted; terracotta is one high-contrast clay photo); no
   per-building facade bake yet (plan T7.x); eave undersides are open
   (one-sided roof faces); party gables apply only to parcel-like rings

@@ -23,17 +23,34 @@ static func mark(m: BaseMaterial3D) -> void:
 static func is_roof(m: Material) -> bool:
 	return m != null and m.has_meta("roof")
 
+## Share of a wall's chroma a roof takes: roofs are slate, tile and metal,
+## and only their warmth and a lichen / zinc axis move.
+const ROOF_CHROMA := 0.5
+## ± green / red shift of a chromatic roof (lichen and moss against rust).
+const MOSS := 0.06
+
 ## Tint for the building at x/z (internal units); stable per building.
-static func tint_for(x: float, z: float) -> Color:
+## `chroma` (0..1) widens the warm/cool spread and adds the moss axis, `tone`
+## (0..1, the place's) biases it warm or cool. chroma 0 is the plain tint
+## (the far city's native kernel reproduces exactly that).
+static func tint_for(x: float, z: float, chroma: float = 0.0, tone: float = 0.0) -> Color:
 	var l := 1.0 + (TerrainBuilder._hash(x * 0.37 + 5.0, z * 0.91) * 2.0 - 1.0) * SPREAD
 	var w := (TerrainBuilder._hash(z * 1.7 + 11.0, x * 0.23) * 2.0 - 1.0) * WARMTH
-	return Color(l * (1.0 + w), l, l * (1.0 - w))
+	if chroma <= 0.0:
+		return Color(l * (1.0 + w), l, l * (1.0 - w))
+	w = w * (1.0 + 2.0 * chroma) + (tone - 0.5) * 0.06 * chroma
+	var g := (TerrainBuilder._hash(x * 0.61 + 23.0, z * 1.31 + 2.0) * 2.0 - 1.0) * MOSS * chroma
+	return Color(l * (1.0 + w), l * (1.0 + g), l * (1.0 - w))
 
 ## Tints the roof surfaces of `root`'s children from index `first` on (one
 ## building's meshes) with the building's colour, and its wall surfaces
-## with WallVariety's.
-static func tint(root: Node, first: int, x: float, z: float) -> void:
-	var c := tint_for(x, z)
+## with WallVariety's. `chroma` / `tone` are the building's paint weight and
+## its place's tone; `wall_vt` / `roof_vt` multiply the tints (a distant
+## building's residual against its shared material, FacadeMaterials).
+static func tint(root: Node, first: int, x: float, z: float, chroma: float = 0.0,
+		tone: float = 0.0, wall_vt: Color = Color.WHITE, roof_vt: Color = Color.WHITE) -> void:
+	var c := tint_for(x, z, chroma * ROOF_CHROMA, tone) * roof_vt
+	var wall_c := WallVariety.tint_for(x, z, chroma, tone) * wall_vt
 	for k in range(first, root.get_child_count()):
 		var mi := root.get_child(k) as MeshInstance3D
 		if mi == null or not (mi.mesh is ArrayMesh):
@@ -45,8 +62,7 @@ static func tint(root: Node, first: int, x: float, z: float) -> void:
 				else _surface_material(mesh, s)
 			hit = hit or is_roof(sm) or WallVariety.is_wall(sm)
 		if hit:
-			mi.mesh = _recoloured(mesh, mi.material_override, c,
-				WallVariety.tint_for(x, z))
+			mi.mesh = _recoloured(mesh, mi.material_override, c, wall_c)
 
 ## `mesh` rebuilt with colour `c` on its roof surfaces, from its kept
 ## arrays (no server read-back on the build thread).

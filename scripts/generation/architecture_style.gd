@@ -26,8 +26,42 @@ const LOOKS := 2
 ## Desktop Ultra's look count (build context "looks"): more variety per
 ## era and kind for the price of a few more shared materials.
 const ULTRA_LOOKS := 5
+## Wall / roof palette tints per era and kind on Forward+ (build context
+## "tints"). A tint is only an albedo colour on a shared texture, so it costs
+## a material, not a texture: more of them than LOOKS gives a street more
+## colours without more window vocabularies. Fast and phones keep LOOKS.
+const TINTS := 4
+const ULTRA_TINTS := 6
+## How strongly a wall set takes a per-building paint family (WallVariety
+## chroma): render and plaster are repainted freely, photographic brick and
+## stone keep most of their own colour, glass and metal none. Limestone is
+## cut stone, not paint: Paris and Vienna fronts stay cream and beige, so it
+## takes only a trace.
+const CHROMA := {"render": 1.0, "wood": 0.8, "stone": 0.6,
+	"concrete": 0.5, "terracotta": 0.45, "brick": 0.4, "limestone": 0.25,
+	"glass": 0.15}
 ## Brightest linear luminance a wall/roof tint may reach.
 const WALL_ALBEDO_MAX := 0.72
+
+## Looks and tints (x, y) per era and kind for a preset: Fast and anything
+## off Forward+ (phones) keep the shared two; Balanced and High add tints;
+## desktop Ultra widens both.
+static func tiers_for(preset: int, forward_plus: bool = RenderQuality.is_forward_plus()) -> Vector2i:
+	var p := RenderSettings.clamp_preset(preset)
+	if not forward_plus or p == RenderSettings.Preset.FAST:
+		return Vector2i(LOOKS, LOOKS)
+	if p == RenderSettings.Preset.ULTRA:
+		return Vector2i(ULTRA_LOOKS, ULTRA_TINTS)
+	return Vector2i(LOOKS, TINTS)
+
+## Paint weight 0..1 of a wall set (see CHROMA).
+static func chroma_of(wall_set: String) -> float:
+	return float(CHROMA.get(wall_set, 0.0))
+
+## The place's tone 0..1: which paint families a city leans to
+## (WallVariety.tint_for), steady within about 14 km.
+static func tone_for(lat: float, lon: float) -> float:
+	return TerrainBuilder._hash(snappedf(lat, 0.125) * 7.31 + 1.7, snappedf(lon, 0.125) * 3.77 + 4.1)
 
 static var _profile_cache: Dictionary = {}
 static var _mutex := Mutex.new()
@@ -209,9 +243,14 @@ static func resolve(b: Dictionary, region: String, density: String,
 	var p := profile(era, kind)
 	var city := city_of(region)
 	var ms := seed_v
+	var mt := seed_v
 	if city != "":
 		var looks := float(ctx.get("looks", LOOKS))
 		ms = (floorf(_h(seed_v, 31) * looks) + 0.5) / looks * 0.913 + 0.041
+		mt = ms
+		var tints := float(ctx.get("tints", looks))
+		if tints > looks:
+			mt = (floorf(_h(seed_v, 32) * tints) + 0.5) / tints * 0.913 + 0.041
 	var wall: Array = _pick(p["w"] as Array, ms, 1)
 	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)
@@ -238,12 +277,13 @@ static func resolve(b: Dictionary, region: String, density: String,
 	var rise := 0.0 if shape == "flat" else clampf(2.4 * float(p["pitch"]), 1.2, 4.0)
 	return {
 		"region": region, "kind": kind, "city": city, "era": era,
-		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, ms, 2),
+		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, mt, 2),
+		"vt": chroma_of(str(wall[0])),
 		"pattern": pattern, "bay_m": float(p["bay"]),
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
 		"roof_shape": shape, "pitch": float(p["pitch"]),
-		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, ms, 6),
+		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, mt, 6),
 		"floor_h": fh, "storeys": storeys, "default_h": float(storeys) * fh + rise,
 		"chimney": float(p["ch"]), "dormer": float(p.get("dm", 0.0)),
 		"equip": float(p.get("eq", 0.0)),

@@ -26,6 +26,11 @@ const PANEL := ["#c8c4bc", "#d8d4cc", "#b8b4ac"]
 const BUDAPEST := ["#c8c0b0", "#d8c8a8", "#b8b0a0", "#e0d0b0", "#c8b898", "#a8a090"]
 ## Munich: pastel Altstadt render; ochre and white Schwabing Jugend.
 const MUNICH := ["#f0e8d8", "#e8d8b0", "#e8c8b0", "#d8e0d0", "#efe6d2", "#e8d0a0"]
+## Warsaw: the kamienice's ochre, grey and sage render; the rebuilt Old
+## Town's peach, yellow and rose.
+const WARSAW := ["#e8d0a0", "#d8d0c0", "#c8d0c0", "#e0c8b0", "#efe6d2", "#c8c0b0"]
+const WARSAW_OLD := ["#e8b8a0", "#e8d090", "#c8d8c0", "#d8c0a8", "#e0b8a8", "#f0e0c0"]
+const WARSAW_BRICK := ["#a8603f", "#9a5a3a", "#b8704a"]
 
 const BASE := {
 	"vienna": "central_europe", "vienna_baroque": "vienna", "vienna_gemeindebau": "vienna",
@@ -33,6 +38,8 @@ const BASE := {
 	"prague": "central_europe", "prague_old": "prague", "prague_panel": "prague",
 	"budapest": "central_europe", "budapest_castle": "budapest", "budapest_panel": "budapest",
 	"munich": "central_europe", "munich_altstadt": "munich", "munich_modern": "munich",
+	"warsaw": "central_europe", "warsaw_oldtown": "warsaw", "warsaw_socialist": "warsaw",
+	"warsaw_modern": "warsaw",
 }
 
 ## [era, kinds, from, to, building:architecture, weight, km from, km to,
@@ -69,6 +76,15 @@ const ERAS := {
 		["munich", HAC, 1860, 1960, ["historicism", "jugendstil", "art_nouveau", "gruenderzeit",
 			"gründerzeit", "reconstruction"], 5.0, 0.0, 99.0, [3, 6]],
 		["munich_modern", ACC, 1961, 2100, [], 1.0, 0.0, 99.0, [7, 99]],
+	],
+	"warsaw": [
+		["warsaw_oldtown", ALL, 1300, 1944, ["gothic", "baroque", "renaissance", "classicism",
+			"reconstruction"], 1.5, 0.0, 1.2, [3, 5], true],
+		["warsaw", HAC, 1860, 1944, ["historicism", "eclectic", "art_nouveau", "modernism",
+			"functionalism", "art_deco"], 5.0, 0.0, 99.0, [4, 6]],
+		["warsaw_socialist", APT, 1945, 1990, ["socialist_realism", "socialist_modernism",
+			"stalinist", "panelowiec", "prefab", "brutalism"], 3.0, 1.5, 99.0, [8, 12]],
+		["warsaw_modern", ACC, 1991, 2100, [], 1.0, 0.0, 99.0, [12, 99]],
 	],
 }
 
@@ -198,5 +214,45 @@ const REGIONS := {
 			"rf": [["membrane", []], ["terracotta", RED_TILE]], "st": [6, 12], "fix": true, "rv": {"deep_balcony": 0.5}},
 		"commercial": {"w": [["glass", []], ["concrete", ["#c8c4bc"]]], "p": [["curtain", 2], ["strip", 2]],
 			"r": [["flat", 1]], "rf": [["membrane", []]], "st": [5, 25], "fix": true, "rv": {}},
+	},
+	# Śródmieście's kamienice: five or six storeys of ochre, grey and sage
+	# render (some brick), flat or low-pitched tar and sheet-metal roofs,
+	# shops below, small balconies.
+	"warsaw": {
+		"apartments": {"w": [["render", WARSAW], ["brick", WARSAW_BRICK]], "p": [["punched", 3], ["balcony", 1]],
+			"wn": "casement", "bay": 2.8, "fr": "#f4f1ea", "sp": 0.0, "rl": 0.2,
+			"r": [["flat", 3], ["gabled", 2]], "pitch": 0.4, "rf": SHEET + [["membrane", []]], "fh": 3.4,
+			"st": [5, 6], "fix": true, "ch": 0.2, "dm": 0.1, "g": [["shop", 1], ["none", 1]],
+			"rv": {"string_course": true, "balconette": 0.3}},
+		"commercial": {"w": [["render", WARSAW], ["stone", ["#b8a888", "#a89878"]]], "p": [["punched", 2], ["ornate", 1]],
+			"wn": "casement", "r": [["flat", 2], ["hipped", 1]], "pitch": 0.4, "rf": SHEET + [["membrane", []]],
+			"st": [4, 6], "fix": true, "g": [["shop", 1]], "rv": {"string_course": true}},
+	},
+	# The Old Town, rebuilt after 1945 on its old plots: pastel gabled
+	# burgher houses, steep red tile with dormers.
+	"warsaw_oldtown": {
+		"apartments": {"w": [["render", WARSAW_OLD]], "p": "punched", "wn": "casement", "bay": 2.4, "fr": "#f4f1ea",
+			"r": [["gabled", 3], ["hipped", 2]], "pitch": 1.0, "rf": [["terracotta", RED_TILE]], "fh": 3.2,
+			"st": [3, 5], "fix": true, "dm": 0.6, "g": [["shop", 1], ["none", 1]], "rv": {"string_course": true}},
+		"commercial": {"w": [["render", WARSAW_OLD]], "p": "punched", "wn": "casement", "bay": 2.4,
+			"r": [["gabled", 2], ["hipped", 1]], "pitch": 1.0, "rf": [["terracotta", RED_TILE]], "st": [3, 5],
+			"fix": true, "dm": 0.5, "g": [["shop", 1]], "rv": {"string_course": true}},
+		"house": {"w": [["render", WARSAW_OLD]], "p": "punched", "wn": "casement", "bay": 2.4, "fr": "#f4f1ea",
+			"r": [["gabled", 2], ["hipped", 1]], "pitch": 1.0, "rf": [["terracotta", RED_TILE]], "st": [2, 4],
+			"fix": true, "dm": 0.5, "rv": {}},
+	},
+	# Stalinist MDM blocks and the prefab estates (panelowce): grey panel
+	# slabs of eight to twelve storeys, flat membrane roofs.
+	"warsaw_socialist": {
+		"apartments": {"w": [["concrete", PANEL], ["render", ["#e0d4b8", "#d8c8a8"]]],
+			"p": [["panel", 3], ["balcony", 2], ["ornate", 1]], "wn": "wide", "bay": 3.0, "r": [["flat", 1]],
+			"rf": [["membrane", []]], "fh": 2.8, "st": [8, 12], "fix": true, "g": [["none", 1]],
+			"rv": {"deep_balcony": 0.2}},
+	},
+	"warsaw_modern": {
+		"commercial": {"w": [["glass", []]], "p": "curtain", "r": [["flat", 1]], "rf": [["membrane", []]],
+			"st": [12, 45], "fix": true, "rv": {}},
+		"apartments": {"w": [["glass", []], ["concrete", ["#d8d4cc"]]], "p": [["curtain", 2], ["balcony", 2]],
+			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [12, 35], "fix": true, "rv": {}},
 	},
 }

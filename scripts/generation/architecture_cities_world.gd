@@ -45,6 +45,12 @@ const CAIRO_STONE := ["#c8b48e", "#b8a480", "#d8c4a0"]
 ## Cape Town: Bo-Kaap brights, Victorian whites and pastels.
 const BO_KAAP := ["#e83a6a", "#38a8d8", "#e8d040", "#58b858", "#e87a2a", "#a858c8", "#f0f0e8"]
 const CAPE := ["#f2efe8", "#e8e0d0", "#e0d0b8", "#d8e0d8", "#e8d8c8"]
+## Delhi: Lutyens cream stucco over red sandstone; Old Delhi's aged render;
+## the modern city's pale render and concrete.
+const LUTYENS := ["#efe6d2", "#e8dcc0", "#f2ede0", "#e0d4b8", "#d8c8a8"]
+const RED_SANDSTONE := ["#a8503a", "#9a4a35", "#b8603f"]
+const OLD_DELHI := ["#c8b898", "#b8a888", "#a89878", "#d8c8a8", "#e0d0b0", "#b08868"]
+const NEW_DELHI := ["#e8dcc8", "#d8ccb8", "#e0d4c0", "#c8c0b0", "#b8b0a0"]
 
 const BASE := {
 	"kyoto": "japan", "kyoto_machiya": "kyoto",
@@ -56,6 +62,7 @@ const BASE := {
 	"mumbai": "south_asia", "mumbai_gothic": "mumbai", "mumbai_deco": "mumbai", "mumbai_tower": "mumbai",
 	"cairo": "middle_east", "cairo_khedival": "cairo", "cairo_islamic": "cairo", "cairo_tower": "cairo",
 	"cape_town": "sub_saharan_africa", "cape_town_bokaap": "cape_town", "cape_town_modern": "cape_town",
+	"delhi": "south_asia", "delhi_lutyens": "delhi", "delhi_old": "delhi",
 }
 
 ## [era, kinds, from, to, building:architecture, weight, km from, km to,
@@ -110,6 +117,12 @@ const ERAS := {
 		["cape_town", HAC, 1840, 1959, ["victorian", "edwardian", "georgian", "cape_dutch"],
 			5.0, 0.0, 99.0, [1, 3]],
 		["cape_town_modern", ACC, 1960, 2100, [], 1.5, 0.0, 99.0, [4, 99]],
+	],
+	"delhi": [
+		["delhi_lutyens", ["house", "apartments", "civic"], 1911, 1947, ["lutyens", "indo_saracenic",
+			"colonial", "neoclassicism", "art_deco"], 2.0, 0.0, 99.0, [1, 3], true],
+		["delhi_old", HAC, 1600, 1910, ["mughal", "haveli", "vernacular"], 1.5, 0.0, 99.0, [2, 4], true],
+		["delhi", HAC, 1948, 2100, [], 5.0, 0.0, 99.0, [3, 10]],
 	],
 }
 
@@ -355,6 +368,46 @@ const REGIONS := {
 		"apartments": {"w": [["concrete", ["#e8e4dc"]], ["glass", []]], "p": [["balcony", 3], ["strip", 1]],
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [5, 15], "fix": true,
 			"rv": {"deep_balcony": 0.5}},
+	},
+	# The modern city's colonies and flats: three to ten storeys of pale
+	# render and concrete, deep balconies, flat roofs with water tanks.
+	"delhi": {
+		"apartments": {"w": [["render", NEW_DELHI], ["concrete", ["#d8d4cc"]]], "p": [["balcony", 3], ["punched", 2]],
+			"wn": "wide", "bay": 3.0, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.1, "st": [3, 10],
+			"fix": true, "eq": 0.5, "g": [["shop", 1], ["none", 1]], "rv": {"deep_balcony": 0.4}},
+		"house": {"w": [["render", NEW_DELHI]], "p": [["punched", 3], ["balcony", 1]], "wn": "casement", "bay": 3.0,
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.1, "st": [2, 3], "fix": true, "eq": 0.4,
+			"rv": {"deep_balcony": 0.3}},
+		"commercial": {"w": [["render", NEW_DELHI], ["glass", []]], "p": [["strip", 2], ["curtain", 1]],
+			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [3, 12], "fix": true,
+			"g": [["shop", 1]], "rv": {}},
+	},
+	# Lutyens' Delhi: cream stucco and red sandstone bungalows, offices and
+	# ministries of one to three storeys, deep verandas, flat roofs and domes.
+	"delhi_lutyens": {
+		"house": {"w": [["render", LUTYENS], ["stone", RED_SANDSTONE]], "p": "punched", "wn": "casement", "bay": 3.4,
+			"fr": "#f4f1ea", "r": [["flat", 2], ["hipped", 2]], "pitch": 0.3, "rf": [["terracotta", ["#a8482a", "#9a4a2c"]], ["membrane", []]],
+			"fh": 4.5, "st": [1, 2], "fix": true, "rv": {"string_course": true, "deep_balcony": 0.2}},
+		"apartments": {"w": [["render", LUTYENS]], "p": [["ornate", 1], ["punched", 2]], "wn": "casement", "bay": 3.2,
+			"fr": "#f4f1ea", "r": [["flat", 3], ["hipped", 1]], "pitch": 0.3, "rf": [["membrane", []]],
+			"fh": 4.0, "st": [3, 5], "fix": true, "rv": {"string_course": true}},
+		"civic": {"w": [["stone", RED_SANDSTONE], ["limestone", ["#e8dcc0", "#efe6d2"]]], "p": "ornate", "wn": "casement",
+			"bay": 3.6, "r": [["flat", 3], ["dome", 1]], "rf": [["concrete", []]], "fh": 5.0, "st": [2, 4],
+			"fix": true, "rv": {"string_course": true, "quoins": true}},
+	},
+	# Shahjahanabad: dense three- and four-storey havelis and shops of aged
+	# render and red sandstone, jharokha balconies, flat roofs.
+	"delhi_old": {
+		"apartments": {"w": [["render", OLD_DELHI], ["stone", RED_SANDSTONE]], "p": [["ornate", 2], ["punched", 3]],
+			"wn": "casement", "bay": 2.4, "fr": "#d8d0c0", "r": [["flat", 1]], "rf": [["membrane", []]],
+			"fh": 3.2, "st": [3, 4], "fix": true, "g": [["shop", 1]],
+			"rv": {"deep_balcony": 0.6, "oriel": 0.4, "string_course": true}},
+		"house": {"w": [["render", OLD_DELHI], ["stone", RED_SANDSTONE]], "p": [["ornate", 1], ["punched", 2]],
+			"wn": "casement", "bay": 2.4, "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.2, "st": [2, 4],
+			"fix": true, "rv": {"deep_balcony": 0.5, "oriel": 0.4}},
+		"commercial": {"w": [["render", OLD_DELHI]], "p": [["ornate", 1], ["punched", 2]], "wn": "casement",
+			"bay": 2.4, "r": [["flat", 1]], "rf": [["membrane", []]], "st": [2, 4], "fix": true,
+			"g": [["shop", 1]], "rv": {"deep_balcony": 0.5, "oriel": 0.3}},
 	},
 }
 

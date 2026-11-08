@@ -54,6 +54,9 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
+	# An untagged building borrows a tagged neighbour's finish and date
+	# before its look resolves (NeighbourEvidence), so a block is built alike.
+	b = NeighbourEvidence.with_peers(b, ctx)
 	var look := BuildingHeights._look_for(b, ctx)
 	var parent_res := BuildingHeights._resolve_total(b, b, ctx, {}, look)
 	var legacy := not b.has("height_source")
@@ -198,6 +201,14 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 		var roof_levels := int(b_eff.get("roof_levels", 0))
 		if roof_tag <= 0.0 and roof_levels > 0 and shape != "flat":
 			roof_tag = float(roof_levels) * fh * 0.95
+		# A mapped `roof:angle` fixes the pitch of a ridged roof: it rises
+		# tan(angle) over half the span (the span the roof height is built on).
+		var angle := float(b.get("roof_angle", 0.0))
+		if not single and float(md.get("roof_angle", 0.0)) > 0.0:
+			angle = float(md["roof_angle"])
+		if roof_tag <= 0.0 and angle > 0.0 and shape in ["gabled", "hipped", "half-hipped", "pyramidal"]:
+			var span := BuildingHeights._ring_span_m(ring)
+			roof_tag = clampf(tan(deg_to_rad(angle)) * span * 0.5, 0.8, maxf(span * 0.9, 0.8))
 		var total := float(res["total_m"])
 		var rh := BuildingHeights._roof_height_m(shape, BuildingHeights._ring_span_m(ring),
 			roof_tag, float(look["pitch"]))
