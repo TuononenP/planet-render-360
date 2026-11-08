@@ -4,16 +4,18 @@ extends RefCounted
 ## The Colosseum in true metres: a 189 x 156 m ellipse, 48 m high, laid out
 ## from the OSM outline of the ruin (relation 1834818): the long axis runs
 ## 107.5 deg from north, and the surviving outer wall is the NORTH half,
-## parametric angles 2-168 deg from the east end of the long axis (bays 1-36
-## of 80). It keeps all four storeys over the middle 24 bays — three
-## travertine arcades of 80 round-headed bays, each arch under a moulded
-## archivolt springing from impost blocks, framed by engaged half-columns
-## (Tuscan, Ionic and Corinthian, with their capitals) and a three-part
-## entablature per storey — under the attic with its Corinthian pilasters,
+## parametric angles 2-168 deg from the east end of the long axis. It keeps
+## all four storeys between two cut faces (11.5 and 168.2 deg, 34 bays) —
+## three travertine arcades of 80 round-headed bays, each arch under a
+## moulded archivolt and keystone springing from impost blocks, framed by
+## engaged half-columns (Tuscan, Ionic and Corinthian, with their capitals)
+## and a three-part entablature per storey, the upper two with a waist-high
+## sill across each opening — under the attic with its Corinthian pilasters,
 ## small windows in alternate bays and three corbels per bay that carried the
-## velarium masts. At both ends the wall breaks off in a ragged fracture: the
-## storeys step down over six bays, the cut shows the concrete core with
-## rubble on top, and a sloping brick wedge (the 1807 and 1820s buttresses)
+## velarium masts. At both ends the wall breaks off: the cut shows the
+## concrete core with rubble on top, two lower storeys continue beyond it and
+## a sloping brick wedge (Stern's 1807 buttress in the east, 13 m deep;
+## Valadier's of 1826 in the west, a thinner hooked plan, both as mapped)
 ## shores up the full-height end. To the south the lower inner ring — a
 ## closed 163 x 125 m ellipse, 13 m inside the outer wall — stands exposed,
 ## three arcades high and ragged along its crown. Inside, the ruined cavea of
@@ -33,9 +35,23 @@ const IB := 62.5
 ## (bay 0 points to the east end of the long axis, indices run through
 ## north at negative Z to the west end at bay 40).
 const INTACT_FROM := 1
-const INTACT_TO := 37
-## Bays in from each end where the wall reaches its full four storeys.
-const FULL_AT := 6
+const INTACT_TO := 39
+## Boundary indices where the full-height wall starts (east) and ends (west):
+## OSM puts its cut faces at parametric 11.5 and 168.2 deg. Bays outside
+## them, to INTACT_FROM / INTACT_TO, are the two-storey footing of the
+## buttress wedges.
+const EAST_FACE := 3
+const WEST_FACE := 37
+## Footprint of the west (Valadier, 1826) buttress as mapped in OSM, as
+## [share of the outer ellipse, parametric angle in deg]: the cut face, the
+## hooked inner edge, then back along the outer face.
+const WEST_PLAN := [[0.982, 168.2], [0.937, 168.2], [0.902, 168.4], [0.899, 172.3],
+	[0.897, 176.1], [0.852, 176.6], [0.982, 176.6], [0.982, 172.3]]
+## Surviving entrance numbers on the north ground storey (OSM / the park:
+## XXIII to LIV), carved 34 cm high; bays NUM_FROM.. take 23, 24, ...
+const NUM_FROM := 4
+const NUM_FIRST := 23
+const NUM_COUNT := 32
 ## Local +X is the long axis: 107.5 deg from north (OSM), so -17.5 about Y.
 const YAW_DEG := -17.5
 
@@ -94,22 +110,16 @@ static func _ikey(i: int, t: int) -> String:
 	return "InnerRingDark" if _h(float(i), 21.0 + float(t)) > 0.65 else "InnerRing"
 
 ## How many storeys the outer ring keeps at bay i (4 = full height): full
-## across the middle, then a ragged step-down at each end. The three bays
-## before the full-height face stand two storeys high: the buttress wedge
-## rests on them.
+## between the two cut faces, and two storeys (the wedges' footing) for the
+## bays beyond them.
 static func _outer_storeys(i: int) -> int:
 	if i < INTACT_FROM or i >= INTACT_TO:
 		return 0
-	var edge := mini(i - INTACT_FROM, INTACT_TO - 1 - i)
-	if edge >= FULL_AT:
+	if i >= EAST_FACE and i < WEST_FACE:
 		return 4
-	if edge >= FULL_AT - 3:
-		return 2
-	if edge >= 2:
-		return 2
-	if edge == 1:
+	if i == INTACT_FROM:
 		return 2 if _h(float(i), 5.0) > 0.4 else 1
-	return 1
+	return 2
 
 static func _outer_ring(lm: LandmarkMesh) -> void:
 	for i in BAYS:
@@ -129,6 +139,8 @@ static func _outer_ring(lm: LandmarkMesh) -> void:
 			var yf := ty.y - 0.6
 			lm.quad("Shadow", p0 + Vector3(0, yf, 0), p1 + Vector3(0, yf, 0),
 				q1 + Vector3(0, yf, 0), q0 + Vector3(0, yf, 0), Vector3.DOWN)
+			if t == 0 and i >= NUM_FROM and i < NUM_FROM + NUM_COUNT:
+				_numeral(lm, p0, p1, NUM_FIRST + i - NUM_FROM)
 		# Two travertine steps round the foot of the standing wall.
 		var o0 := _out_at(p0, A, B)
 		var o1 := _out_at(p1, A, B)
@@ -142,8 +154,8 @@ static func _outer_ring(lm: LandmarkMesh) -> void:
 			# The broken top: rubble over the concrete core of the last storey.
 			_rubble(lm, A, B, i, _tier_y(keep - 1).y, 5.0, 31.0)
 	_breaks(lm)
-	_buttress(lm, true)
-	_buttress(lm, false)
+	_buttress(lm)
+	_west_buttress(lm)
 
 ## A lump of core masonry on top of a broken wall at bay i of ring (a, b).
 static func _rubble(lm: LandmarkMesh, a: float, b: float, i: int, y: float,
@@ -185,19 +197,19 @@ static func _tri(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, c: Vecto
 	lm.tri(key, a, b, c, n, n, n, Vector2(a.x + a.z, a.y), Vector2(b.x + b.z, b.y),
 		Vector2(c.x + c.z, c.y))
 
-## The sloping brick wedge that shores up the full-height end of the wall
-## (Stern 1807, Valadier 1820s): it stands on the two-storey bays beside the
-## full-height face, as wide as the wall is deep, and falls from the attic
-## line to the roof of the second storey over 14.5 m.
-static func _buttress(lm: LandmarkMesh, east: bool) -> void:
-	var face_i := INTACT_FROM + FULL_AT if east else INTACT_TO - FULL_AT
-	var step := -1.0 if east else 1.0
+## The sloping brick wedge at the east end of the full-height wall (Stern,
+## 1807): it stands on the two-storey bays beside the cut face, as wide as the
+## wall is deep (13 m, to the inner ring), and falls from the attic line to the
+## roof of the second storey over two bays.
+static func _buttress(lm: LandmarkMesh) -> void:
+	var face_i := EAST_FACE
 	var pe := _pt(A + 0.4, B + 0.4, float(face_i))
 	var qe := _pt(IA + 1.0, IB + 1.0, float(face_i))
-	var tw := (_pt(A + 0.4, B + 0.4, float(face_i) + step) - pe).normalized()
+	var pn := _pt(A + 0.4, B + 0.4, float(face_i) - 1.0)
+	var tw := (pn - pe).normalized()
 	var yb: float = TIERS[1][1]
 	var yt := 45.0
-	var reach := 14.5
+	var reach := pe.distance_to(pn) * 2.0
 	var up := Vector3.UP
 	var pe1 := pe + tw * reach
 	var qe1 := qe + tw * reach
@@ -216,6 +228,86 @@ static func _buttress(lm: LandmarkMesh, east: bool) -> void:
 		var c := (pe + qe) * 0.5 + tw * (reach * f) + up * (lerpf(yt, yb, f) + 0.35)
 		lm.box("BrickDark", c, Vector3(pe.distance_to(qe) * (0.5 + 0.12 * float(k % 2)), 0.7, 1.6),
 			_along(qe, pe), 0.0)
+
+## The west buttress (Valadier, 1826) on the mapped footprint (WEST_PLAN): a
+## thinner wedge with a hooked inner edge, its top falling from the attic line
+## at the cut face to the second storey's roof at the far end. The plan is
+## turned 1.7 deg so its cut face meets the end of the full-height bay.
+static func _west_buttress(lm: LandmarkMesh) -> void:
+	var shift := 168.2 - 4.5 * float(WEST_FACE)
+	var poly := PackedVector2Array()
+	var heights := PackedFloat32Array()
+	var yb: float = TIERS[1][1]
+	for r in WEST_PLAN:
+		var t_deg: float = float(r[1]) - shift
+		var p := _pt(A * float(r[0]), B * float(r[0]), t_deg / 4.5)
+		poly.append(Vector2(p.x, p.z))
+		heights.append(lerpf(45.0, yb, clampf((float(r[1]) - 168.2) / 8.4, 0.0, 1.0)))
+	var area := 0.0
+	for i in poly.size():
+		var a := poly[i]
+		var b := poly[(i + 1) % poly.size()]
+		area += a.x * b.y - b.x * a.y
+	# Sides: a quad per edge up to the sloping top.
+	for i in poly.size():
+		var j := (i + 1) % poly.size()
+		var e := poly[j] - poly[i]
+		var n := Vector3(e.y, 0, -e.x).normalized() * (1.0 if area > 0.0 else -1.0)
+		lm.quad("Brick", Vector3(poly[i].x, yb, poly[i].y), Vector3(poly[j].x, yb, poly[j].y),
+			Vector3(poly[j].x, heights[j], poly[j].y), Vector3(poly[i].x, heights[i], poly[i].y), n)
+	# Sloping top, triangulated from the plan with each corner at its height.
+	var idx := Geometry2D.triangulate_polygon(poly)
+	for k in range(0, idx.size(), 3):
+		var v: Array[Vector3] = []
+		for m in 3:
+			var q := poly[idx[k + m]]
+			v.append(Vector3(q.x, heights[idx[k + m]], q.y))
+		var n := (v[1] - v[0]).cross(v[2] - v[0]).normalized()
+		if n.y < 0.0:
+			n = -n
+		_tri(lm, "Brick", v[0], v[1], v[2], n)
+	# Dark cap along the cut-face crest.
+	var c0 := Vector3(poly[0].x, heights[0], poly[0].y)
+	var c1 := Vector3(poly[2].x, heights[2], poly[2].y)
+	lm.box("BrickDark", (c0 + c1) * 0.5 + Vector3(0, 0.6, 0),
+		Vector3(c0.distance_to(c1) * 0.95, 1.2, 2.2), _along(c0, c1), 0.0)
+
+## Roman numeral `n` carved 34 cm high on the frieze above a ground-storey
+## arch, centred on the bay (the surviving entrances are numbered XXIII-LIV).
+static func _numeral(lm: LandmarkMesh, p0: Vector3, p1: Vector3, n: int) -> void:
+	var text := ""
+	var rest := n
+	for pair in [[50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]]:
+		while rest >= int(pair[0]):
+			text += str(pair[1])
+			rest -= int(pair[0])
+	var mid := (p0 + p1) * 0.5
+	var out := _out_at(mid, A, B)
+	var dir := (p1 - p0).normalized()
+	var h := 0.34
+	var adv := 0.34
+	var x := -adv * float(text.length()) * 0.5
+	for ch in text:
+		for seg in _glyph(ch):
+			var a: Vector2 = seg[0]
+			var b: Vector2 = seg[1]
+			var pa := mid + out * 0.1 + dir * (x + a.x * 0.24) + Vector3(0, 8.55 + a.y * h, 0)
+			var pb := mid + out * 0.1 + dir * (x + b.x * 0.24) + Vector3(0, 8.55 + b.y * h, 0)
+			lm.beam("TravertineDark", pa, pb, 0.05, 0.04, out)
+		x += adv
+
+## Stroke segments of a Roman numeral glyph in a unit box (x right, y up).
+static func _glyph(ch: String) -> Array:
+	match ch:
+		"I":
+			return [[Vector2(0.5, 0), Vector2(0.5, 1)]]
+		"V":
+			return [[Vector2(0, 1), Vector2(0.5, 0)], [Vector2(1, 1), Vector2(0.5, 0)]]
+		"X":
+			return [[Vector2(0, 1), Vector2(1, 0)], [Vector2(0, 0), Vector2(1, 1)]]
+		"L":
+			return [[Vector2(0, 1), Vector2(0, 0)], [Vector2(0, 0), Vector2(1, 0)]]
+	return []
 
 ## Engaged half-column at each pier (base, shaft, the tier's capital),
 ## the impost blocks and moulded archivolt of the bay's arch, and the
@@ -288,6 +380,12 @@ static func _order(lm: LandmarkMesh, p0: Vector3, p1: Vector3, y0: float, y1: fl
 		var q := c + dir * cos(t) * (ow * 0.5 + 0.25) + Vector3(0, spring + sin(t) * (r + 0.25), 0)
 		lm.beam(tk, prev, q, 0.45, 0.3, out)
 		prev = q
+	# Keystone at the crown, and above the ground storey a waist-high sill
+	# across the opening (the upper arches are windows, not doorways).
+	lm.box(tk, c + out * 0.1 + Vector3(0, spring + r + 0.3, 0), Vector3(0.7, 1.0, 0.55), face, 0.0)
+	if tier > 0:
+		lm.box(tk, (p0 + p1) * 0.5 + out * 0.2 + Vector3(0, y0 + 0.55, 0),
+			Vector3(ow + 0.4, 1.1, 0.5), _along(p0, p1), 0.0)
 	# Entablature: architrave, frieze, cornice (projecting, moulded).
 	var e0 := p0 + Vector3(0, y1 - ent, 0)
 	var e1 := p1 + Vector3(0, y1 - ent, 0)
