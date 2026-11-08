@@ -86,7 +86,15 @@ var _zoom_out_btn: Button
 var _zoom_in_btn: Button
 var _quick_chips: Array[Button] = []
 var _quick_places: Array = []
-var _quick_more: Button
+## Continent key of each quick pick, by its index in _quick_places.
+var _quick_continents: Array[String] = []
+## Built cards by quick-pick index: a continent's cards are built when it is
+## first opened, so the shelf can hold them in any order.
+var _quick_by_index := {}
+var _continent_filter: ContinentFilter
+var _shelf_key := CapitalContinents.FEATURED
+## Bumped on every shelf change so a build that was left behind stops.
+var _shelf_build := 0
 var _selected_quick := -1
 var _forced_layout := -1  # -1 = Auto, else Responsive.Layout value
 var _current_layout: int = Responsive.Layout.COMPACT
@@ -258,6 +266,9 @@ func _ready() -> void:
 	_quick_box = _vbox(8)
 	_quick_label = UiTheme.section_label("Around the world")
 	_quick_box.add_child(_quick_label)
+	_continent_filter = ContinentFilter.new()
+	_continent_filter.selected.connect(_set_shelf)
+	_quick_box.add_child(_continent_filter)
 	_quick_scroll = ScrollContainer.new()
 	_quick_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	UiTheme.apply_scroll(_quick_scroll)
@@ -267,11 +278,11 @@ func _ready() -> void:
 	_quick_grid.add_theme_constant_override("v_separation", 8)
 	_quick_scroll.add_child(_quick_grid)
 	_quick_places = LocationData.quick_picks()
-	_add_quick_cards(0, PresetViews.ROWS.size())
-	_quick_more = UiTheme.quiet_button("Show all capitals")
-	_quick_more.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	_quick_more.pressed.connect(_show_all_capitals)
-	_quick_box.add_child(_quick_more)
+	for place in _quick_places:
+		_quick_continents.append(CapitalContinents.of_place(str(place[1])))
+	_continent_filter.set_available(_quick_continents)
+	for qi in PresetViews.ROWS.size():
+		_add_quick_card(qi)
 	# Paris is the starting place, so its card starts out selected.
 	_set_selected_quick(0)
 
@@ -445,36 +456,95 @@ func refresh_theme() -> void:
 	MapChrome._apply_theme(self)
 	MapSearch.set_coord_mode(self, _coord_mode)
 
-func _add_quick_cards(from: int, to: int) -> void:
-	for qi in range(from, to):
-		var quick: Array = _quick_places[qi]
-		var qname := str(quick[1])
-		# "Paris, France" -> the country under the name; a single-word name
-		# (Monaco) is its own country and keeps an empty line.
-		var card := PlaceCard.make(str(quick[0]), 56, UiTheme.split_place(qname)[1])
-		var qlat := float(quick[2])
-		var qlon := float(quick[3])
-		var qindex := qi
-		card.set_meta("lat", qlat)
-		card.set_meta("lon", qlon)
-		var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"])) \
-			if qi < PresetViews.ROWS.size() else PlaceThumb.load_capital(qlat, qlon)
-		if qphoto != null:
-			card.set_photo(qphoto)
-		card.pressed.connect(func() -> void:
-			_select_suggestion(qname, qlat, qlon)
-			_set_selected_quick(qindex))
-		_quick_chips.append(card)
-		_quick_grid.add_child(card)
+func _add_quick_card(qi: int) -> void:
+	var quick: Array = _quick_places[qi]
+	var qname := str(quick[1])
+	# "Paris, France" -> the country under the name; a single-word name
+	# (Monaco) is its own country and keeps an empty line.
+	var card := PlaceCard.make(str(quick[0]), 56, UiTheme.split_place(qname)[1])
+	var qlat := float(quick[2])
+	var qlon := float(quick[3])
+	card.set_meta("lat", qlat)
+	card.set_meta("lon", qlon)
+	card.set_meta("quick_index", qi)
+	var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"])) \
+		if qi < PresetViews.ROWS.size() else PlaceThumb.load_capital(qlat, qlon)
+	if qphoto != null:
+		card.set_photo(qphoto)
+	card.pressed.connect(func() -> void:
+		_select_suggestion(qname, qlat, qlon)
+		_set_selected_quick(qi))
+	_quick_chips.append(card)
+	_quick_by_index[qi] = card
+	_quick_grid.add_child(card)
 
-## The capitals join the shelf only on request: all of them would be built at
-## startup and push the panel's footer thousands of pixels down.
-func _show_all_capitals() -> void:
-	_quick_more.visible = false
-	_add_quick_cards(_quick_chips.size(), _quick_places.size())
-	MapChrome.fit_quick_cards(self)
+## Cards built per frame when a continent opens.
+const CARDS_PER_FRAME := 12
+
+## The quick picks a shelf holds, in order: Featured keeps the curated order,
+## a continent lists its places A to Z by card name.
+func _shelf_indices(key: String) -> Array[int]:
+	var out: Array[int] = []
+	for qi in _quick_places.size():
+		var in_shelf := qi < PresetViews.ROWS.size() if key == CapitalContinents.FEATURED \
+			else _quick_continents[qi] == key
+		if in_shelf:
+			out.append(qi)
+	if key != CapitalContinents.FEATURED:
+		out.sort_custom(func(a: int, b: int) -> bool:
+			return str(_quick_places[a][0]).naturalnocasecmp_to(str(_quick_places[b][0])) < 0)
+	return out
+
+## Show one shelf: the curated places or a continent. Only the cards of that
+## shelf are built, a few a frame (all the capitals at once would freeze a
+## phone and push the panel's footer thousands of pixels down).
+func _set_shelf(key: String) -> void:
+	_shelf_key = key
+	_continent_filter.select(key)
+	_quick_scroll.scroll_horizontal = 0
+	_shelf_build += 1
+	var build := _shelf_build
+	_apply_shelf()
+	var built := 0
+	for qi in _shelf_indices(key):
+		if _quick_by_index.has(qi):
+			continue
+		_add_quick_card(qi)
+		built += 1
+		if built % CARDS_PER_FRAME == 0:
+			_settle_shelf()
+			await get_tree().process_frame
+			if not is_inside_tree() or build != _shelf_build:
+				return
+	_settle_shelf()
+
+func _settle_shelf() -> void:
+	_apply_shelf()
 	_set_selected_quick(_selected_quick)
 	MapHome.apply_offline(self)
+
+## Show the cards of the open shelf and name it. First launch keeps to three
+## featured places and no filter.
+func _apply_shelf() -> void:
+	var first := _first_note != null and _first_note.visible
+	var featured := _shelf_key == CapitalContinents.FEATURED
+	var shelf := _shelf_indices(_shelf_key)
+	for card in _quick_chips:
+		var qi := int(card.get_meta("quick_index"))
+		card.visible = qi < 3 if first else qi in shelf
+	# Cards are built as a shelf opens, so put the built ones in shelf order.
+	var at := 0
+	for qi in shelf:
+		if _quick_by_index.has(qi):
+			_quick_grid.move_child(_quick_by_index[qi], at)
+			at += 1
+	_continent_filter.visible = not first
+	var title := "Around the world"
+	if not featured and not first:
+		title = "%s · %d %s" % [CapitalContinents.label_of(_shelf_key), shelf.size(),
+			"place" if shelf.size() == 1 else "places"]
+	_quick_label.text = title.to_upper()
+	MapChrome.fit_quick_cards(self)
 
 func _set_selected_quick(index: int) -> void:
 	MapChrome._set_selected_quick(self, index)

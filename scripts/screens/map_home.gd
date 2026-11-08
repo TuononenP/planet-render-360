@@ -64,9 +64,7 @@ static func refresh_recent(p: MapPicker) -> void:
 	# First launch: three featured places and one line of copy.
 	var first := entries.is_empty()
 	p._first_note.visible = first
-	for i in p._quick_chips.size():
-		p._quick_chips[i].visible = not first or i < 3
-	p._quick_more.visible = not first and p._quick_chips.size() < p._quick_places.size()
+	p._apply_shelf()
 	apply_offline(p)
 
 ## Offline: say so once, badge the field, dim what cannot open.

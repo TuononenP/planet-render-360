@@ -375,9 +375,53 @@ func _run() -> void:
 		_fail(failures, "Settings should keep clear of the notch on a phone on its side")
 	Responsive.safe_override = []
 	settings.queue_free()
-	picker._show_all_capitals()
-	if picker._quick_chips.size() != LocationData.quick_picks().size() or picker._quick_more.visible:
-		_fail(failures, "Show all capitals should add every capital and then hide")
+	# Each continent opens its own shelf: only its cards show, selection follows.
+	# First launch keeps three cards and no filter, so check that, then a returning user.
+	picker._first_note.visible = true
+	picker._apply_shelf()
+	if picker._continent_filter.visible:
+		_fail(failures, "First launch should not show the continent filter")
+	picker._first_note.visible = false
+	picker._apply_shelf()
+	if not picker._continent_filter.visible:
+		_fail(failures, "A returning user should see the continent filter")
+	for width in [390.0, 1280.0]:
+		picker.size = Vector2(width, 844)
+		picker._on_resized()
+		for filter in CapitalContinents.FILTERS:
+			var key := str(filter[0])
+			if key == CapitalContinents.FEATURED:
+				continue
+			await picker._set_shelf(key)
+			var want := picker._shelf_indices(key).size()
+			var shown := 0
+			for card in picker._quick_chips:
+				var in_shelf: bool = picker._quick_continents[int(card.get_meta("quick_index"))] == key
+				if card.visible != in_shelf:
+					_fail(failures, "%s shelf at %d: %s visibility is wrong" % [key, int(width), card.get_meta("quick_index")])
+					break
+				shown += 1 if card.visible else 0
+			if shown != want or want == 0:
+				_fail(failures, "%s shelf at %d should show %d cards, shows %d" % [key, int(width), want, shown])
+			# A to Z by card name, in the order the grid lays them out.
+			var names: Array[String] = []
+			for card in picker._quick_grid.get_children():
+				if card.visible:
+					names.append(str(picker._quick_places[int(card.get_meta("quick_index"))][0]))
+			for i in range(1, names.size()):
+				if names[i - 1].naturalnocasecmp_to(names[i]) > 0:
+					_fail(failures, "%s shelf at %d should run A to Z: %s before %s" % [key, int(width), names[i - 1], names[i]])
+					break
+			if picker._continent_filter.key != key:
+				_fail(failures, "The %s chip should be selected" % key)
+		await picker._set_shelf(CapitalContinents.FEATURED)
+		var featured := 0
+		for card in picker._quick_chips:
+			featured += 1 if card.visible else 0
+		if featured != PresetViews.ROWS.size():
+			_fail(failures, "Featured should show the %d curated places, shows %d" % [PresetViews.ROWS.size(), featured])
+	if picker._quick_chips.size() != LocationData.quick_picks().size():
+		_fail(failures, "Opening every continent should build every quick pick once")
 	picker.queue_free()
 
 	# History grid follows the window width

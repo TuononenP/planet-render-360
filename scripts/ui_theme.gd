@@ -514,10 +514,10 @@ static func apply_popup(popup: PopupMenu) -> void:
 	popup.add_theme_stylebox_override("hover", style(TEAL, RADIUS_S))
 	popup.add_theme_stylebox_override("separator", style(LINE, 0))
 
-static func _chip_style(bg: Color, border: Color) -> StyleBoxFlat:
+static func _chip_style(bg: Color, border: Color, pad_x: int = 8) -> StyleBoxFlat:
 	var s := style(bg, RADIUS_PILL, border)
-	s.content_margin_left = 8
-	s.content_margin_right = 8
+	s.content_margin_left = pad_x
+	s.content_margin_right = pad_x
 	s.content_margin_top = 8
 	s.content_margin_bottom = 8
 	return s
@@ -525,19 +525,20 @@ static func _chip_style(bg: Color, border: Color) -> StyleBoxFlat:
 ## Re-skin a quick-pick chip. The selected chip gets the accent fill
 ## with dark text in every state, so the active place stays obvious
 ## after the tap (chips are toggle buttons; see chip_button).
-static func apply_chip(b: Button, selected: bool = false) -> void:
+## `pad_x` widens the sides for a chip that is a word, not a place name.
+static func apply_chip(b: Button, selected: bool = false, pad_x: int = 8) -> void:
 	if selected:
 		_set_font_colors(b, ON_ACCENT)
-		b.add_theme_stylebox_override("normal", _chip_style(TEAL, TEAL))
-		b.add_theme_stylebox_override("hover", _chip_style(TEAL.lightened(0.15), TEAL))
-		b.add_theme_stylebox_override("pressed", _chip_style(TEAL, TEAL))
-		b.add_theme_stylebox_override("focus", _chip_style(TEAL, FOCUS))
+		b.add_theme_stylebox_override("normal", _chip_style(TEAL, TEAL, pad_x))
+		b.add_theme_stylebox_override("hover", _chip_style(TEAL.lightened(0.15), TEAL, pad_x))
+		b.add_theme_stylebox_override("pressed", _chip_style(TEAL, TEAL, pad_x))
+		b.add_theme_stylebox_override("focus", _chip_style(TEAL, FOCUS, pad_x))
 	else:
 		_set_font_colors(b, INK)
-		b.add_theme_stylebox_override("normal", _chip_style(GLASS_FILL, LINE_STRONG))
-		b.add_theme_stylebox_override("hover", _chip_style(TEAL_SOFT, TEAL))
-		b.add_theme_stylebox_override("pressed", _chip_style(TEAL_SOFT, TEAL))
-		b.add_theme_stylebox_override("focus", _chip_style(GLASS_FILL, TEAL))
+		b.add_theme_stylebox_override("normal", _chip_style(GLASS_FILL, LINE_STRONG, pad_x))
+		b.add_theme_stylebox_override("hover", _chip_style(TEAL_SOFT, TEAL, pad_x))
+		b.add_theme_stylebox_override("pressed", _chip_style(TEAL_SOFT, TEAL, pad_x))
+		b.add_theme_stylebox_override("focus", _chip_style(GLASS_FILL, TEAL, pad_x))
 
 ## One-tap place chip for the picker's quick picks. Toggle mode lets
 ## the tapped chip stay pressed as the visible selection.
