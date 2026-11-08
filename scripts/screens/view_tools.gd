@@ -13,6 +13,7 @@ const CHIPS := [["labels", "tag", "Labels", "Name peaks, towns and lakes (N)"],
 	["map", "map", "Mini-map", "Mini-map (M)"],
 	["nearby", "landmark", "Nearby", "Nearby landmarks (L)"]]
 const ACTIONS := [["photo", "camera", "Save photo", "Save a photo (P)"],
+	["panorama", "rotate-3d", "Save 360°", "Save a 360° photo to look around in (O)"],
 	["link", "link", "Copy link", "Copy a link to this view (C)"]]
 const DATE_TIP := "Pick a day, season or weather"
 const MAP_GAP := 12.0
@@ -66,6 +67,8 @@ static func _action(v: View360, key: String) -> void:
 			toggle_date(v)
 		"photo":
 			photo(v)
+		"panorama":
+			panorama(v)
 		"link":
 			copy_link(v)
 		"labels":
@@ -149,6 +152,50 @@ static func photo(v: View360) -> void:
 			say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
 		elif path != "":
 			say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
+
+## The whole sphere around the eye as one picture (see PanoramaCapture): six
+## faces rendered off-screen, so the view itself does not move. Takes a few
+## seconds, during which the toast says so.
+static func panorama(v: View360) -> void:
+	if v._data == null or v._photo_busy:
+		return
+	var cam := v._viewport.get_camera_3d()
+	if cam == null or DisplayServer.get_name() == "headless":
+		say(v, "Couldn't take the 360° photo", "The scene isn't drawn yet. Try again in a moment.", "error")
+		return
+	v._photo_busy = true
+	say(v, "Taking a 360° photo", "This takes a few seconds.")
+	var data := v._data
+	var local := ViewConditions.place_now(v)
+	var lines: Array[String] = []
+	if UiPrefs.photo_stamp:
+		lines = PhotoMode.stamp_lines(data.place_name, data.latitude, data.longitude,
+			UiTheme.clock(v._time_hour), ViewConditions.date_text(v._date),
+			HudParts.short_sources(data.attribution))
+	var heading := PanoramaCapture.heading_deg(cam)
+	# The six faces are drawn one after another: with the view's processing
+	# off, the time-lapse, drone, walking, quality governor and streaming
+	# hold still, so every face sees the same sun, shadows and geometry.
+	var mode := v.process_mode
+	v.process_mode = Node.PROCESS_MODE_DISABLED
+	var img := await PanoramaCapture.capture(v._viewport, cam, v._quality_preset, PanoramaCapture.face_px(), lines)
+	if not is_instance_valid(v):
+		return
+	v.process_mode = mode
+	if img == null:
+		v._photo_busy = false
+		say(v, "Couldn't take the 360° photo", "The scene didn't draw. Try again.", "error")
+		return
+	var bytes := PanoramaCapture.encode(img, heading)
+	PhotoMode.save_bytes(bytes, PanoramaCapture.file_name(data.place_name, local), "jpg", "JPEG image",
+		"Save 360° photo", func(path: String, failed: bool) -> void:
+			if not is_instance_valid(v):
+				return
+			v._photo_busy = false
+			if failed:
+				say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+			elif path != "":
+				say(v, "360° photo saved", path.get_file() if path.begins_with("user://") else path))
 
 ## A brief white flash over the scene, like a shutter (none under Reduce motion).
 static func flash(v: View360) -> void:

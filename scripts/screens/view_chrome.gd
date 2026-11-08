@@ -187,8 +187,9 @@ static func build(v: View360) -> void:
 	chips.add_theme_constant_override("h_separation", 6)
 	chips.add_theme_constant_override("v_separation", 0)
 	show_col.add_child(chips)
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 8)
+	var actions := HFlowContainer.new()  # wraps on the narrowest phones
+	actions.add_theme_constant_override("h_separation", 8)
+	actions.add_theme_constant_override("v_separation", 8)
 	col.add_child(actions)
 
 	# Drone, gyro (mobile) and zoom on the scene's edge: scroll, pinch and = / -
@@ -592,13 +593,15 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
 			toggle_nearby(v, true)
-		KEY_P, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G:
+		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G:
 			# One press, bare: Cmd/Ctrl+C and the like belong to the system.
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
 			match key.keycode:
 				KEY_P:
 					ViewTools.photo(v)
+				KEY_O:
+					ViewTools.panorama(v)
 				KEY_C:
 					ViewTools.copy_link(v)
 				KEY_N:

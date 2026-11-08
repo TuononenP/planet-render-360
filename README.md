@@ -33,7 +33,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - Make the rendered 3D 360-degree view the main focus once loaded.
 - Support full-screen mode with intuitive view controls.
 - History and Recents show the view as you left it, and reopening a place restores where you were looking.
-- In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; fly a drone over the whole detailed area (G: W A S D fly with momentum, E / Q climb up to 500 m over the ground, Shift speeds up, on-screen sticks on touch screens); play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P) or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
+- In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; fly a drone over the whole detailed area (G: W A S D fly with momentum, E / Q climb up to 500 m over the ground, Shift speeds up, on-screen sticks on touch screens); play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P), save a 360° photo you can look around in (O; a JPEG with panorama metadata, for photo viewers and social sites), or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
 - Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, cache size, and render quality (Fast / Balanced / High / Ultra).
@@ -209,9 +209,11 @@ godot --headless --script tests/overpass_rate_limit_test.gd # 429/406 pause an O
 godot --headless --script tests/remote_config_test.gd # service-address overrides: validation, defaults, cache
 godot --headless --script tests/store_readiness_test.gd # privacy policy names every host, licence texts ship, config.json is inert
 godot --headless --script tests/satellite_decode_test.gd # cached satellite tiles decode on workers: placement, damaged file, freed mid-decode
+godot --headless --script tests/panorama_test.gd # 360° photo: file name, GPano metadata, JPEG segment, face geometry
 godot --headless --script tests/snapshot_reader_test.gd # bundled snapshots load on workers: concurrent reads, cancel, replace, freed mid-read
 godot --headless --script tests/quality_governor_test.gd # FPS governor holds after a step down; first preset follows the GPU
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
+godot --script tests/panorama_render_test.gd     # 360° photo projection: six coloured walls land where the viewer sees them (windowed)
 godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)
 tools/check_class_size.sh                       # every class under scripts/ at or under 1000 lines
 tools/run_tests.sh [name ...]                   # all headless tests (skips windowed and live-network ones); also runs on every pull request
@@ -331,7 +333,7 @@ planet-render-360/
 │   │   └── world_cache.gd         Built-world cache for fast revisits
 │   └── screens/               UI screens (onboarding, map home with globe and landmark markers, loading,
 │                              360 view, history, settings); the viewer's tools: view_tools, photo_mode,
-│                              time_lapse, date_picker, horizon_labels, mini_map, view_walk, view_drone,
+│                              panorama_capture, time_lapse, date_picker, horizon_labels, mini_map, view_walk, view_drone,
 │                              drone_sticks, landmark_list
 ├── native/                    Optional C++17 GDExtension kernels (GDScript fallbacks when unbuilt)
 │   ├── CMakeLists.txt         Native build configuration

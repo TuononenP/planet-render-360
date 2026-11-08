@@ -12,6 +12,8 @@ extends RefCounted
 ## saves instead of sharing.
 
 const DIR_FALLBACK := "user://photos"
+## Test hook: when non-empty, saves with no dialog go here instead.
+static var dir_override := ""
 const PREFIX := "planet-render-360"
 const DRAW_WAIT_MS := 2000
 
@@ -56,6 +58,8 @@ static func stamp_unit(h: int) -> float:
 
 ## Where photos go with no save dialog.
 static func fallback_dir() -> String:
+	if dir_override != "":
+		return dir_override
 	var pictures := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
 	if pictures != "" and DirAccess.dir_exists_absolute(pictures):
 		return pictures
@@ -134,24 +138,55 @@ static func stamped(host: Node, photo: Image, lines: Array[String]) -> Image:
 ## with failed false when the person cancelled, failed true when the write
 ## did not succeed (no space, a read-only folder).
 static func save(img: Image, file: String, done: Callable) -> void:
-	if not OS.has_feature("mobile") and DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
-		var err := DisplayServer.file_dialog_show("Save photo", fallback_dir(), file, false,
-			DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, PackedStringArray(["*.png ; PNG image"]),
+	_save(file, "png", "PNG image", "Save photo",
+		func(path: String) -> bool: return img.save_png(path) == OK, done)
+
+## The same for a finished file's bytes (a 360° JPEG with its metadata);
+## `extension` is "jpg", `kind` the dialog's filter name.
+static func save_bytes(bytes: PackedByteArray, file: String, extension: String, kind: String,
+		title: String, done: Callable) -> void:
+	_save(file, extension, kind, title, func(path: String) -> bool: return _write_bytes(bytes, path), done)
+
+## The extensions a typed name may carry for `extension` ("jpg" also
+## accepts "jpeg"); any other name gets `extension` appended.
+static func accepted_extensions(extension: String) -> Array[String]:
+	var out: Array[String] = [extension]
+	if extension == "jpg":
+		out.append("jpeg")
+	return out
+
+static func _save(file: String, extension: String, kind: String, title: String,
+		write: Callable, done: Callable) -> void:
+	var accepted := accepted_extensions(extension)
+	if dir_override == "" and not OS.has_feature("mobile") \
+			and DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		var filter := ", ".join(accepted.map(func(e: String) -> String: return "*." + e))
+		var err := DisplayServer.file_dialog_show(title, fallback_dir(), file, false,
+			DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, PackedStringArray(["%s ; %s" % [filter, kind]]),
 			func(ok: bool, paths: PackedStringArray, _filter: int) -> void:
 				if not ok or paths.is_empty():
 					done.call("", false)
 					return
 				var path := paths[0]
-				if path.get_extension().to_lower() != "png":
-					path += ".png"
-				_write(img, path, done))
+				if not path.get_extension().to_lower() in accepted:
+					path += "." + extension
+				_report(write, path, done))
 		if err == OK:
 			return
 	var dir := fallback_dir()
 	DirAccess.make_dir_recursive_absolute(dir)
-	_write(img, dir.path_join(file), done)
+	_report(write, dir.path_join(file), done)
 
-## Writes the PNG and reports it to `done(path, failed)`.
-static func _write(img: Image, path: String, done: Callable) -> void:
-	var ok := img.save_png(path) == OK
+## Runs the write and reports it to `done(path, failed)`.
+static func _report(write: Callable, path: String, done: Callable) -> void:
+	var ok: bool = write.call(path)
 	done.call(path if ok else "", not ok)
+
+static func _write_bytes(bytes: PackedByteArray, path: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_buffer(bytes)
+	var ok := f.get_error() == OK
+	f.close()
+	return ok

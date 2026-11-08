@@ -24,7 +24,7 @@ LOGS=${TEST_LOG_DIR:-$(mktemp -d)}
 mkdir -p "$LOGS"
 
 # Window needed: the headless dummy renderer cannot draw.
-WINDOWED="screenshot_test world_cache_test"
+WINDOWED="screenshot_test world_cache_test panorama_render_test"
 # Live services: results depend on the network and on rate limits.
 NETWORK="dem_test fidelity_scorecard_test preset_snapshot_test"
 SKIP=" $WINDOWED $NETWORK "
