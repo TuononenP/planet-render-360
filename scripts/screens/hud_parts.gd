@@ -134,8 +134,8 @@ static func outline_button(icon_name: String, label: String) -> Button:
 	UiIcon.apply(b, icon_name, 18, UiTheme.INK, UiTheme.INK)
 	return b
 
-## PlacePill: HUD glass, size-hud tall, at most 280 wide; the name in
-## Instrument Serif truncates, the coordinates sit under it in mono.
+## PlacePill: HUD glass, size-hud tall, at most 280 wide; the name
+## truncates, the coordinates sit under it in mono.
 ## Returns [pill, name_label, coords_label].
 static func place_pill() -> Array:
 	var pill := PanelContainer.new()

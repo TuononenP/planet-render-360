@@ -4,15 +4,19 @@ extends Control
 # Loading it for the first time on that thread fails with the Metal renderer.
 const CAR_PAINT_SHADER = preload("res://scripts/generation/car_paint.gdshader")
 const MAIN_SCENE := "res://scenes/main.tscn"
-const SERIF = preload("res://assets/fonts/InstrumentSerif-Regular.ttf")
+const SANS_FILE = preload("res://assets/fonts/InstrumentSans-Variable.ttf")
 const MONO = preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
 const MARK = preload("res://assets/brand/pr360-mark-dark.svg")
 const ORBIT = preload("res://assets/brand/splash-orbit.png")
 
 var _elapsed := 0.0
+var _sans: FontVariation
 var _progress := 0.0
 
 func _ready() -> void:
+	_sans = FontVariation.new()
+	_sans.base_font = SANS_FILE
+	_sans.variation_opentype = {"wght": 600}
 	var err := ResourceLoader.load_threaded_request(MAIN_SCENE, "PackedScene")
 	if err != OK:
 		push_error("Could not start loading the main scene: %s" % err)
@@ -52,7 +56,21 @@ func _draw() -> void:
 	draw_texture_rect(MARK, Rect2(Vector2((w - mark_size) * 0.5, h * 0.075), Vector2.ONE * mark_size), false)
 	var title_size := int(clampf(unit * 0.105, 34.0, 62.0))
 	var title_y := h * 0.28
-	draw_string(SERIF, Vector2(0, title_y), "Planet Render 360", HORIZONTAL_ALIGNMENT_CENTER, w, title_size, Color("edf1f6"))
+	# "Planet Render" in Instrument Sans, "360" in Plex Mono, as in the lockup;
+	# shrunk to fit narrow screens.
+	var name_w := _sans.get_string_size("Planet Render", HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
+	var gap := title_size * 0.28
+	var num_size := int(title_size * 0.8)
+	var num_w := MONO.get_string_size("360", HORIZONTAL_ALIGNMENT_LEFT, -1, num_size).x
+	var fit := minf(1.0, w * 0.9 / (name_w + gap + num_w))
+	title_size = int(title_size * fit)
+	num_size = int(num_size * fit)
+	name_w *= fit
+	num_w *= fit
+	gap *= fit
+	var x := (w - (name_w + gap + num_w)) * 0.5
+	draw_string(_sans, Vector2(x, title_y), "Planet Render", HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color("edf1f6"))
+	draw_string(MONO, Vector2(x + name_w + gap, title_y), "360", HORIZONTAL_ALIGNMENT_LEFT, -1, num_size, Color("edf1f6"))
 	draw_string(MONO, Vector2(0, title_y + 29.0), "THE WORLD, FROM HERE", HORIZONTAL_ALIGNMENT_CENTER, w, 11, Color("edf1f6"))
 	var bar_width := minf(150.0, w * 0.38)
 	var start := Vector2((w - bar_width) * 0.5, h * 0.88)

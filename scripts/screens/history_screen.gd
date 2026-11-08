@@ -5,7 +5,7 @@ extends Control
 ## rendered as PlaceCard size="m" in a grid (2 columns on phones, 3–4 on
 ## wider windows) or as list rows, switched with a List/Grid control in
 ## the title row. Each shows its thumbnail (the view as you left it, a
-## stand-in until it has one), the name in Instrument Serif, the region, when you were there ("Today, 09:12"),
+## stand-in until it has one), the name in Instrument Sans, the region, when you were there ("Today, 09:12"),
 ## its real cache state and size. Favourites pin to the top in their own
 ## section. Tap opens the place; the star pins it. In the list, swipe
 ## right to favourite and left to remove from cache; on desktop the same

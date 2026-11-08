@@ -25,7 +25,7 @@ const SOURCES := [
 	["Parked car models", "Generic passenger car pack · Comrade1280 · CC BY 4.0 · modified", "https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5"],
 ]
 const LICENCES := [
-	["Instrument Serif and Instrument Sans", "SIL Open Font License", "https://openfontlicense.org/"],
+	["Instrument Sans", "SIL Open Font License", "https://openfontlicense.org/"],
 	["IBM Plex Mono", "SIL Open Font License", "https://openfontlicense.org/"],
 	["Lucide icons", "ISC License", "https://lucide.dev/license"],
 ]

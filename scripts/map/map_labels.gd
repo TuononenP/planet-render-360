@@ -4,7 +4,7 @@ extends Control
 ## The vector map's top layer: the 15° graticule at continental zooms, then
 ## every label, placed in priority order with collision culling across
 ## tiles. Faces follow the design system Map style: Instrument Sans for
-## places and streets, Instrument Serif (slanted) for water, IBM Plex Mono
+## places and streets, Instrument Sans (slanted) for water, IBM Plex Mono
 ## for peak elevations, each over a map-label-halo outline.
 
 const HALO := 4
@@ -45,9 +45,9 @@ func _font(kind: String) -> Font:
 		"city", "peak", "landmark":
 			f = _sans(500, 0)
 		"water", "river":
-			# Hydrography in slanted serif: x_axis.y is the slant FreeType reads.
+			# Hydrography in slanted sans: x_axis.y is the slant FreeType reads.
 			var v := FontVariation.new()
-			v.base_font = UiTheme.display()
+			v.base_font = UiTheme.sans_file()
 			v.variation_transform = Transform2D(Vector2(1.0, 0.2), Vector2(0.0, 1.0), Vector2.ZERO)
 			v.spacing_glyph = 1
 			f = v
