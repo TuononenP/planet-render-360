@@ -1,5 +1,0 @@
-Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
-
-PARKED CARS OK: parking tags, kerb widths from sidewalks, both kerbs, slope pitch, junctions clear, Ultra only
-WARNING: 1 ObjectDB instance was leaked at exit (run with `--verbose` for details).
-   at: cleanup (core/object/object.cpp:2536)

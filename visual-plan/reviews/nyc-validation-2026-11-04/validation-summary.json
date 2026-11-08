@@ -1,8 +1,0 @@
-{
-  "focused_regression_passes": 27,
-  "windowed_passes": 2,
-  "scorecard_full_batch": "180 s timeout",
-  "scorecard_turku": "a FAIL; b/c/d-water/d-roads/e PASS",
-  "class_size": "806/1000 maximum",
-  "diff_check": "pass"
-}
