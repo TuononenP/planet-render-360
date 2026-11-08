@@ -302,6 +302,18 @@ func _run() -> void:
 	panels._side.gui_input.emit(magnify)
 	if pcanvas.zoom_level != pz2 + 1:
 		failures.append("trackpad pinch over the side panel should zoom in (now %d)" % pcanvas.zoom_level)
+	# Scroll down first: the pinches above may have left the map at max zoom.
+	var swipe := InputEventPanGesture.new()
+	swipe.delta = Vector2(0, 4)
+	swipe.position = Vector2(100, 200)
+	var pz3 := pcanvas.zoom_level
+	pcanvas._gui_input(swipe)
+	if pcanvas.zoom_level != pz3 - 1:
+		failures.append("trackpad scroll down on the map should zoom out (now %d)" % pcanvas.zoom_level)
+	swipe.delta = Vector2(0, -4)
+	pcanvas._gui_input(swipe)
+	if pcanvas.zoom_level != pz3:
+		failures.append("trackpad scroll up on the map should zoom in (now %d)" % pcanvas.zoom_level)
 	panels.queue_free()
 
 	# --- A scroll area with room to scroll keeps the wheel; a full one passes it on ---

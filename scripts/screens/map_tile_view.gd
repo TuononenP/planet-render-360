@@ -27,6 +27,8 @@ signal zoom_past_min
 const MIN_ZOOM := 4
 const MAX_ZOOM := 15
 const TAP_MAX_PX := 14.0
+## Summed trackpad scroll that counts as one zoom step.
+const SCROLL_ZOOM_NOTCH := 3.0
 ## Zoom levels between the coarse preview and full detail.
 const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
@@ -140,6 +142,7 @@ var _mouse_moved := 0.0
 var _last_tap_msec := 0
 var _last_tap_pos := Vector2.ZERO
 var _magnify_accum := 1.0
+var _scroll_accum := 0.0
 var _panel_touches: Dictionary = {}  # touch index -> canvas position, for pinches on a panel
 var _panel_pinch_base := 0.0
 
@@ -384,6 +387,10 @@ func _gui_input(event: InputEvent) -> void:
 		var mg := event as InputEventMagnifyGesture
 		magnify(mg.factor, mg.position)
 		accept_event()
+	elif event is InputEventPanGesture:
+		var pg := event as InputEventPanGesture
+		scroll_zoom(pg.delta.y, pg.position)
+		accept_event()
 	elif event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
@@ -481,6 +488,18 @@ func magnify(factor: float, at: Vector2) -> void:
 		_magnify_accum = 1.0
 		zoom_at(at, -1)
 
+## A trackpad two-finger scroll arrives as a stream of small pan-gesture
+## deltas, not wheel clicks: sum them and zoom a step per notch. Scrolling
+## up (negative y) zooms in, like the wheel.
+func scroll_zoom(delta_y: float, at: Vector2) -> void:
+	_scroll_accum += delta_y
+	if _scroll_accum <= -SCROLL_ZOOM_NOTCH:
+		_scroll_accum = 0.0
+		zoom_at(at, 1)
+	elif _scroll_accum >= SCROLL_ZOOM_NOTCH:
+		_scroll_accum = 0.0
+		zoom_at(at, -1)
+
 ## Zoom input from a glass panel or scroll area laid over the map (the
 ## sheet, the side panel and the lists in them): the wheel, a trackpad
 ## pinch and a two-finger pinch zoom the map under it, while the panel
@@ -498,6 +517,10 @@ func panel_zoom_input(event: InputEvent, from: Control) -> void:
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
 		magnify(mg.factor, _from_panel(from, mg.position))
+	elif event is InputEventPanGesture:
+		if not _can_scroll(from):
+			var pg := event as InputEventPanGesture
+			scroll_zoom(pg.delta.y, _from_panel(from, pg.position))
 	elif event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
