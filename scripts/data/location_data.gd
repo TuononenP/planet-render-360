@@ -375,7 +375,7 @@ static func _core_landmarks() -> Array:
 		{"type": "big_ben", "name": "Big Ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
 			"wiki_title": "Big Ben", "height_m": 96.0,
 			"aliases": ["big ben", "elizabeth tower"]},
-		{"type": "colosseum", "name": "Colosseum", "lat": 41.8902, "lon": 12.4922, "radius_m": 6000.0,
+		{"type": "colosseum", "name": "Colosseum", "lat": 41.89019, "lon": 12.49231, "radius_m": 6000.0,
 			"wiki_title": "Colosseum", "height_m": 48.0,
 			"aliases": ["colosseum", "colosseo", "coliseum"]},
 		{"type": "sagrada", "name": "Sagrada Família", "lat": 41.4036, "lon": 2.1744, "radius_m": 5000.0,
