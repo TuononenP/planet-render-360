@@ -105,8 +105,10 @@ func restyle() -> void:
 		b.custom_minimum_size.y = 52 if stacked else 42
 		var seg := UiTheme.style(UiTheme.TEAL if on else Color.TRANSPARENT,
 			UiTheme.RADIUS_S if stacked else UiTheme.RADIUS_PILL)
-		seg.content_margin_left = 4 if stacked else 12
-		seg.content_margin_right = 4 if stacked else 12
+		# Five options fit a small phone's row only with tighter segments.
+		var side := 4 if stacked else (8 if _buttons.size() >= 5 else 12)
+		seg.content_margin_left = side
+		seg.content_margin_right = side
 		if stacked:
 			seg.content_margin_top = 6
 			seg.content_margin_bottom = 6
