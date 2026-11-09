@@ -54,7 +54,10 @@ static func _hero() -> PanelContainer:
 	var text := VBoxContainer.new()
 	text.add_theme_constant_override("separation", 8)
 	col.add_child(SettingsPages._pad(text, 20, 20))
-	text.add_child(UiTheme.text("What you look at stays with you.", "title"))
+	var title := UiTheme.text("What you look at stays with you.", "title")
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.custom_minimum_size = Vector2(60, 0)
+	text.add_child(title)
 	text.add_child(_wrapped(PrivacyData.LEDE, 15, UiTheme.INK))
 	text.add_child(_wrapped(PrivacyData.BODY, 14, UiTheme.MUTED))
 	text.add_child(UiTheme.data_label("Updated %s" % PrivacyData.UPDATED, 13, UiTheme.FAINT))

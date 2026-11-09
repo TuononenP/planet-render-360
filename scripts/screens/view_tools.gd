@@ -204,9 +204,10 @@ static func flash(v: View360) -> void:
 	var f := ColorRect.new()
 	f.color = Color(1, 1, 1, 0.7)
 	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	f.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v._hud.add_child(f)
-	f.position = -v._hud.position  # full-bleed: the HUD layer starts inside the safe area
+	# Full-bleed: the HUD layer sits inside the safe area on every side.
+	f.position = -v._hud.position
+	f.size = v.size
 	v._hud.move_child(f, 0)
 	var tw := v.create_tween()
 	tw.tween_property(f, "color:a", 0.0, 0.3)
