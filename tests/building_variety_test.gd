@@ -19,6 +19,7 @@ func _init() -> void:
 	_elevation_checks(failures)
 	_country_era_checks(failures)
 	_roof_axis_checks(failures)
+	_foot_shade_checks(failures)
 	_flat_roof_checks(failures)
 	_block_era_checks(failures)
 	_roof_hint_checks(failures)
@@ -359,6 +360,36 @@ func _roof_axis_checks(failures: Array[String]) -> void:
 			failures.append("default ridge should run along X, spread %s" % [spread])
 		if int(case[1]) == 1 and not (spread.y > 8.0 and spread.x < 1.0):
 			failures.append("a ridge turned to Z should spread along Z, got %s" % [spread])
+	# roof:direction is the way a skillion falls, on all four bearings: the
+	# high eave is on the opposite side (x east, z south).
+	for case in [[0.0, Vector2(0, 1)], [90.0, Vector2(-1, 0)], [180.0, Vector2(0, -1)], [270.0, Vector2(1, 0)]]:
+		var axis := RoofForms.axis_from_tags({"roof_dir": float(case[0])}, ring)
+		var skill := RoofGeometry.form_mesh(ring, 10.0, 3.0, "skillion", PackedByteArray(), false, [], axis)
+		var gable := RoofGeometry.form_mesh(ring, 10.0, 3.0, "gabled", PackedByteArray(), false, [], axis)
+		if skill == null or gable == null:
+			failures.append("no tagged roof built for bearing %s" % [case[0]])
+			continue
+		var high := Vector2.ZERO
+		for v: Vector3 in skill.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			if v.y > 12.9:
+				high += Vector2(v.x, v.z)
+		if high.dot(case[1] as Vector2) <= 0.0:
+			failures.append("skillion falling at %s should be high toward %s, got %s" % [case[0], case[1], high])
+		for n: Vector3 in gable.surface_get_arrays(0)[Mesh.ARRAY_NORMAL]:
+			if n.y < -0.01:
+				failures.append("gabled roof at bearing %s faces down" % [case[0]])
+				break
+
+## Storey bands are separate surfaces: the foot shade starts once, at the
+## building's lowest wall, so an attic band is not shaded as if at the ground.
+func _foot_shade_checks(failures: Array[String]) -> void:
+	var attic := PackedVector3Array([Vector3(0, 20, 0), Vector3(0, 23, 0)])
+	var shared := WallVariety.colours(attic, Color.WHITE, 0.0)
+	if not is_equal_approx(shared[0].r, 1.0):
+		failures.append("an attic 20 m up should be past the foot shade, got %s" % [shared[0].r])
+	var own := WallVariety.colours(attic, Color.WHITE)
+	if not is_equal_approx(own[0].r, WallVariety.FOOT_SHADE):
+		failures.append("without a building foot a surface shades from its own base, got %s" % [own[0].r])
 
 ## Each roof's pitch is its row's +-10%, stable per seed, and the regional
 ## mean holds.

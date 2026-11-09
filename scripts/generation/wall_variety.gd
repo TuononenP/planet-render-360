@@ -67,12 +67,13 @@ static func _family(x: float, z: float, tone: float) -> int:
 			return i
 	return 0
 
-## Per-vertex colours of one wall surface: `c` shaded by height above the
-## surface's lowest vertex.
-static func colours(verts: PackedVector3Array, c: Color) -> PackedColorArray:
-	var y0 := INF
-	for v in verts:
-		y0 = minf(y0, v.y)
+## Per-vertex colours of one wall surface: `c` shaded by height above
+## `foot`, the building's lowest wall vertex (INF: this surface's own).
+static func colours(verts: PackedVector3Array, c: Color, foot: float = INF) -> PackedColorArray:
+	var y0 := foot
+	if is_inf(y0):
+		for v in verts:
+			y0 = minf(y0, v.y)
 	var fade := FADE_M * WorldScale.metres_to_units()
 	var cols := PackedColorArray()
 	cols.resize(verts.size())

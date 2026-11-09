@@ -73,10 +73,6 @@ static func axis_from_tags(b: Dictionary, ring: PackedVector2Array) -> Vector2:
 	elif str(b.get("roof_orient", "")) == "across":
 		var u := RingGeometry.dominant_axis(ring)
 		axis = Vector2(-u.y, u.x)
-	if axis == Vector2.ZERO:
-		return axis
-	if axis.x < -0.000001 or (absf(axis.x) <= 0.000001 and axis.y < 0.0):
-		axis = -axis
 	return axis
 
 ## The ridge direction ridged() uses: the ring's long side, or along the

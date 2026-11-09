@@ -102,10 +102,10 @@ static var REGION_MATERIALS := {
 
 ## Roof texture repeat: the ring-cap/apex UVs span 0.05/m, so a scale of
 ## 8 tiles the 1k slate every 2.5 m (≈23 cm courses); terracotta barrels
-## read at ~4.5 m, felt/concrete at ~6 m. BoxMesh-capped AABB fallbacks
-## (0..1 UVs) tile denser — accepted on that logged path.
+## read at ~4.5 m, felt at ~4 m, concrete at ~6 m. BoxMesh-capped AABB
+## fallbacks (0..1 UVs) tile denser — accepted on that logged path.
 static var ROOF_UV := {
-	"slate": 8.0, "terracotta": 4.4, "membrane": 3.3,
+	"slate": 8.0, "terracotta": 4.4, "membrane": 5.0,
 	"concrete": 3.3, "wood": 3.3, "glass": 2.0, "grass": 3.0,
 	"sheet_metal": 20.0 / 3.6, "copper": 20.0 / 3.6,
 }

@@ -149,13 +149,21 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
+## Squared distance from `b` to the nearer of the camera and the view's
+## subject at the map centre.
+static func _view_d2(b: Dictionary, eye: Vector2) -> float:
+	var p := Vector2(float(b["x"]), float(b["z"]))
+	return minf(p.length_squared(), p.distance_squared_to(eye))
+
 static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort,
 		timings: Dictionary) -> void:
 	var t0 := Time.get_ticks_msec()
+	# A curated view can stand a kilometre from the middle of its extent, and
+	# look back at it: the building cap keeps what is near either one.
+	var eye := View360.spawn_xz(data)
 	var sorted := data.buildings.duplicate()
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
-			< (float(b["x"]) ** 2 + float(b["z"]) ** 2))
+		return _view_d2(a, eye) < _view_d2(b, eye))
 	var placed := 0
 	var aabb_fallbacks := 0
 	var impostor := MassBatch.new()
@@ -163,6 +171,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var cap := RenderSettings.max_buildings_for(data.quality_preset)
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
+	ctx["eye"] = eye
 	if data.buildings.any(func(b: Dictionary) -> bool: return bool(b.get("suomenlinna", false))):
 		ctx["fortress_mesh"] = SuomenlinnaFortress.accumulator()
 	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
@@ -394,9 +403,12 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var region := str(ctx.get("region", "generic"))
 	var fidelity := int(ctx.get("fidelity", 2))
 	var seed_v := TerrainBuilder._hash(centre.x, centre.y)
+	# Geometry detail follows the camera (eye_d). Full materials also stay on
+	# the view's subject at the map centre, which a far eye looks back at.
+	var eye_d := centre.distance_to(ctx.get("eye", Vector2.ZERO) as Vector2)
 	# A mapped landmark keeps full detail at any distance: it is the skyline.
 	var distant := _batch != null or (not bool(b.get("mapped_landmark", false)) \
-		and centre.length() / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
+		and minf(eye_d, centre.length()) / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
 	# Roof sampling spans the ring's AABB. A distant building reads it too: its
@@ -479,7 +491,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
-		centre.length() / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
+		eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
 	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
@@ -492,7 +504,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		shape = "flat"
 		roof_h_world = 0.0
 	if not distant and _batch == null and not look.is_empty() \
-			and centre.length() < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
+			and eye_d < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(base + sink
 			+ float(look["floor_h"]) * WorldScale.metres_to_units()
 			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
@@ -504,11 +516,11 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
 			"wall_lanterns": RenderQuality.ultra_desktop(preset),
 			"shop_lights": RenderQuality.ultra_desktop(preset)
-				and centre.length() < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
+				and eye_d < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,
-			look, facade, roof_mat, seed_v, centre.length() < BuildingDetail.near_radius(preset),
+			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset),
 			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "")
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church
 		# towers are skyline and stay in every ring.

@@ -118,11 +118,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
 			if str(el_tags.get("type", "")) == "multipolygon" \
-					and el.has("members") and (el_tags.has("building") or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
+					and el.has("members") and (OsmApiFallback.names_building(el_tags) or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
 				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
 					buildings, landmarks)
 			elif str(el_tags.get("type", "")) == "multipolygon" \
-					and el.has("members") and el_tags.has("building:part"):
+					and el.has("members") and str(el_tags.get("building:part", "no")) != "no":
 				# A part with holes (a cloister court, a ring of chapels):
 				# each outer nests like a part way, carrying its inners.
 				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
@@ -186,7 +186,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			max_z = maxf(max_z, p.y)
 		var poly := PackedVector2Array(pts)
 		var aabb := Rect2(min_x, min_z, max_x - min_x, max_z - min_z)
-		if el_tags.has("building"):
+		if OsmApiFallback.names_building(el_tags):
 			var entry := OsmTags._building_entry(el_tags, poly, aabb)
 			buildings.append(entry)
 			var arch := OsmTags.archetype_for(el_tags)
@@ -199,7 +199,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"size_x": entry["size_x"], "size_z": entry["size_z"]}
 				_framed_landmark(lmk, poly, entry["height_source"] != "default")
 				landmarks.append(lmk)
-		elif el_tags.has("building:part"):
+		elif str(el_tags.get("building:part", "no")) != "no":
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb, "osm_id": source_id})
 		elif el_tags.has("highway"):
 			# A closed highway area (a square) is filled, not outlined.

@@ -161,6 +161,8 @@ static func _material_from(texs: Dictionary, set_name: String, detail: int,
 		m.metallic = float((MaterialLibrary.PBR_SETS[set_name] as Dictionary)["metal"])
 	if detail >= 1 and texs["normal"] != null:
 		m.normal_texture = texs["normal"] as Texture2D
+		m.normal_enabled = true
+		m.normal_scale = PbrTextures.PHOTO_NORMAL_SCALE
 		m.roughness_texture = texs["rough"] as Texture2D
 		m.roughness = 1.0
 	else:

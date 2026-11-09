@@ -5,6 +5,9 @@ extends RefCounted
 ## MaterialLibrary: set images, weather tiling, calibration tints
 ## and cached PBR materials. Set tables and caches stay in
 ## MaterialLibrary (single source); this class is the loader.
+## Strength of a photo set's normal map on walls and roofs: softened to keep
+## specular shimmer down at Balanced, which has no MSAA.
+const PHOTO_NORMAL_SCALE := 0.7
 static var _mutex := Mutex.new()
 ## Set when _pbr_mats went past its 64 cap (see pbr_material).
 static var cap_reached := false
@@ -66,6 +69,10 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 					_weather_tiles(img)
 				elif set_name == "sheet_metal":
 					RoofMetalMaps.paint(img)
+				elif set_name == "membrane":
+					_destripe(img)
+			elif map_name == "nor" and set_name == "membrane":
+				_destripe_normal(img)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
@@ -106,6 +113,51 @@ static func _weather_tiles(img: Image) -> void:
 				clampf(to.r * (1.0 + k * (c.r / fr.r - 1.0)), 0.0, 1.0),
 				clampf(to.g * (1.0 + k * (c.g / fr.g - 1.0)), 0.0, 1.0),
 				clampf(to.b * (1.0 + k * (c.b / fr.b - 1.0)), 0.0, 1.0)))
+
+## Takes the roll bands out of the linear bitumen photo (three per tile, most
+## of its contrast, and a flat roof's tint amplifies them): each row is scaled
+## to the image mean, per channel, so the grain and the set's mean both stay.
+static func _destripe(img: Image) -> void:
+	if img.get_width() > 512:
+		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	var w := img.get_width()
+	var h := img.get_height()
+	var rows := PackedColorArray()
+	rows.resize(h)
+	var mean := Color(0, 0, 0, 0)
+	for y in h:
+		var sum := Color(0, 0, 0, 0)
+		for x in w:
+			sum += img.get_pixel(x, y)
+		rows[y] = sum / float(w)
+		mean += rows[y] / float(h)
+	for y in h:
+		var gain := Color(mean.r / maxf(rows[y].r, 0.0001), mean.g / maxf(rows[y].g, 0.0001),
+			mean.b / maxf(rows[y].b, 0.0001))
+		for x in w:
+			var c := img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(c.r * gain.r, c.g * gain.g, c.b * gain.b))
+
+## The same bands in the bitumen normal map: they tilt whole rows (green only),
+## and would return as relief once a roof's normal map is on.
+static func _destripe_normal(img: Image) -> void:
+	if img.get_width() > 512:
+		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	var w := img.get_width()
+	var h := img.get_height()
+	var rows := PackedFloat32Array()
+	rows.resize(h)
+	var mean := 0.0
+	for y in h:
+		var sum := 0.0
+		for x in w:
+			sum += img.get_pixel(x, y).g
+		rows[y] = sum / float(w)
+		mean += rows[y] / float(h)
+	for y in h:
+		for x in w:
+			var c := img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(c.r, clampf(c.g + mean - rows[y], 0.0, 1.0), c.b))
 
 ## Runtime texture of one set map for StandardMaterial3D (pbr_material),
 ## mipmapped (T4.7: without mips the tiled roofs and road ribbons alias

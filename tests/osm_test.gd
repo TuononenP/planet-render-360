@@ -1010,6 +1010,14 @@ func _underground_checks(failures: Array[String]) -> void:
 		func(b: Dictionary) -> String: return str(b.get("name", "")))
 	if names != ["Over"]:
 		failures.append("parser should skip the underground building, got %s" % [names])
+	# building=no and building:part=no name things that are not buildings.
+	var not_built: Array = OsmFetcher.parse_features(JSON.stringify({"elements": [
+		{"type": "way", "id": 3, "tags": {"building": "no", "name": "Not"},
+			"geometry": _box_geom(48.8566, 2.3522, 0.0002, 0.0003)},
+		{"type": "way", "id": 4, "tags": {"building:part": "no", "height": "9"},
+			"geometry": _box_geom(48.8570, 2.3522, 0.0002, 0.0003)}]}), 48.8566, 2.3522)["buildings"]
+	if not not_built.is_empty():
+		failures.append("building=no and building:part=no must not build, got %s" % [not_built.size()])
 
 func _box_geom(lat: float, lon: float, dlat: float, dlon: float) -> Array:
 	return [{"lat": lat, "lon": lon}, {"lat": lat + dlat, "lon": lon},
