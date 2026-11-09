@@ -215,8 +215,10 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 				continue
 			var fallback_ring := _rect_ring(Vector2(pos.x, pos.z), Vector2(b["size_x"], b["size_z"]), 0.0)
 			var footing := BuildingFoundation.sample(ground, fallback_ring, Vector2(pos.x, pos.z), float(ctx["sea_y"]))
-			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) else 0.6)
+			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) \
+				else BuildingFoundation.SINK_M * WorldScale.metres_to_units())
 			BuildingFoundation.build(root, fallback_ring, [], footing, b)
+			BuildingFoundation.plinth(root, fallback_ring, [], footing, ground)
 			var look := _look_for(b, ctx)
 			var res := _resolve_total(b, b, ctx, {}, look)
 			var legacy: bool = not (b as Dictionary).has("height_source")
@@ -370,13 +372,14 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var base := float(footing["floor"])
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
-	var sink := 0.0 if bool(footing["raised"]) else 0.6 * WorldScale.metres_to_units()
+	var sink := 0.0 if bool(footing["raised"]) else BuildingFoundation.SINK_M * WorldScale.metres_to_units()
 	var top := base + height_world
 	base -= sink
 	if float(mass.get("min_m", 0.0)) > 0.0:
 		base += sink + float(mass["min_m"]) * WorldScale.metres_to_units()
 	else:
 		BuildingFoundation.build(root, ring, holes, footing, b)
+		BuildingFoundation.plinth(root, ring, holes, footing, ground)
 	# Party walls: hidden stretches skipped, firewalls above lower
 	# neighbours, gables (not slopes) and no cornice on shared edges.
 	var cover: Array = []

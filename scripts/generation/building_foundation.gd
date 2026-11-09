@@ -11,6 +11,16 @@ const POST_SPACING_M := 4.0
 ## Low pier relief can be DEM interpolation across its water boundary.
 ## A steep bank must not lift the whole waterfront building to its top.
 const SLAB_RELIEF_M := 4.0
+## Walls sink this far below the lowest ground (no floating on slopes).
+const SINK_M := 0.6
+## On a slope the floor rises toward the uphill ground, at most this far
+## above the lowest footprint ground; a plinth fills the downhill gap, so
+## the uphill walls are not buried in the hill.
+const PLINTH_MAX_M := 2.5
+const PLINTH_MIN_M := 0.3
+## An edge needs a skirt only where its ground lies this far under the floor.
+const EDGE_GAP_M := 0.15
+static var _plinth_mat: Material
 
 static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
 		sea_y: float = -INF) -> Dictionary:
@@ -30,8 +40,52 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	var floor_y := water + freeboard * WorldScale.metres_to_units() if raised else low
 	if raised and high - low <= SLAB_RELIEF_M * WorldScale.metres_to_units():
 		floor_y = maxf(floor_y, high)
-	return {"floor": floor_y,
+	var plinth := 0.0
+	if not raised:
+		var m := WorldScale.metres_to_units()
+		var lift := minf(high - low, PLINTH_MAX_M * m)
+		if lift >= PLINTH_MIN_M * m:
+			floor_y = low + lift
+			plinth = lift
+	return {"floor": floor_y, "low": low, "plinth": plinth,
 		"water": water, "raised": raised}
+
+## Concrete foundation wall from each edge's lowest ground up to the
+## walls' own base, on the downhill edges of a building raised onto a
+## slope. Uphill and level edges are buried and get none.
+static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
+		footing: Dictionary, ground: GroundTruth) -> void:
+	if float(footing.get("plinth", 0.0)) <= 0.0:
+		return
+	var m := WorldScale.metres_to_units()
+	var y1 := float(footing["floor"]) - SINK_M * m
+	if _plinth_mat == null:
+		_plinth_mat = MaterialLibrary.pbr_material("concrete", Color(0.62, 0.60, 0.57), 0.5)
+	var face := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
+		PackedFloat32Array(), PackedInt32Array()]
+	var rings: Array = [ring]
+	rings.append_array(holes)
+	for r in rings.size():
+		var edge_ring: PackedVector2Array = rings[r]
+		var ccw := RingGeometry.signed_area(edge_ring) > 0.0
+		for i in edge_ring.size():
+			var a := edge_ring[i]
+			var b := edge_ring[(i + 1) % edge_ring.size()]
+			var d := b - a
+			if d.length() < 0.001:
+				continue
+			var edge_low := minf(ground.height_at_world(a.x, a.y),
+				minf(ground.height_at_world(b.x, b.y),
+				ground.height_at_world((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)))
+			if float(footing["floor"]) - edge_low < EDGE_GAP_M * m:
+				continue
+			var y0 := edge_low - SINK_M * m
+			var n := Vector2(d.y, -d.x).normalized() if ccw else Vector2(-d.y, d.x).normalized()
+			if r > 0:
+				n = -n
+			BuildingWalls._quad(face, a, b, y0, y1, n,
+				Vector2(d.length() / m / 4.0, (y1 - y0) / m / 4.0))
+	BuildingWalls._emit(root, face, _plinth_mat)
 
 static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 		footing: Dictionary, building: Dictionary) -> void:
