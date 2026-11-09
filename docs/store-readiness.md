@@ -9,7 +9,7 @@ current wording in App Store Connect and the Play Console before submitting.
 
 | Item | State |
 | --- | --- |
-| Privacy policy | `site/privacy.html`, published by `.github/workflows/pages.yml`. Linked from Settings → About (`Brand.PRIVACY_URL`). **Turn on Pages first:** repository Settings → Pages → Source: GitHub Actions. |
+| Privacy policy | `site/privacy.html`, published by `.github/workflows/pages.yml`. Linked from Settings → About (`Brand.PRIVACY_URL`). The same policy is built into the app under Settings → Privacy (`PrivacyData`), so it reads offline; `tests/privacy_page_test.gd` keeps the two in step. **Turn on Pages first:** repository Settings → Pages → Source: GitHub Actions. |
 | Service addresses switchable without an update | Done. See `docs/remote-config.md`. |
 | Place search follows the Nominatim policy | Done. Typing sends nothing; the request goes out on submit. |
 | Licence notices | `NOTICE.md`, `licenses/` (shipped in every export and shown in Settings → About). |

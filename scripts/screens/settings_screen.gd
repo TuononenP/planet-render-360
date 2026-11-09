@@ -1,7 +1,7 @@
 class_name SettingsScreen
 extends Control
 
-## Settings (design system Screens → SettingsScreen): eight categories
+## Settings (design system Screens → SettingsScreen): nine categories
 ## shown one at a time. Tablet and desktop windows get two panes, a
 ## category rail on sky-200 beside the chosen page; phones get a menu of
 ## category rows that opens one page at a time. Every category row
@@ -37,6 +37,7 @@ const CATEGORIES := [
 	["Data", [
 		["storage", "hard-drive", "Storage", "Places you open are kept on this device, so they open instantly next time, even offline."],
 		["sources", "layers", "Data sources", "Where the map, terrain, imagery and weather come from. Each opens its licence."],
+		["privacy", "shield-check", "Privacy", "What stays on this device, what leaves it, and who receives it."],
 		["about", "info", "About", "Planet Render 360 and the open work it is built on."]]],
 ]
 const RAIL_W := 300
@@ -148,7 +149,8 @@ func _ready() -> void:
 	for pair in [["appearance", SettingsPages.appearance], ["access", SettingsPages.accessibility],
 			["quality", SettingsPages.quality], ["units", SettingsPages.units],
 			["photos", SettingsPages.photos], ["storage", SettingsPages.storage],
-			["sources", SettingsPages.sources], ["about", SettingsPages.about]]:
+			["sources", SettingsPages.sources], ["privacy", PrivacyPage.build],
+			["about", SettingsPages.about]]:
 		var build: Callable = pair[1]
 		var page: Control = build.call(self)
 		_pages[pair[0]] = page
@@ -530,6 +532,8 @@ func summary_for(id: String) -> String:
 			return "%s of %s" % [UiTheme.cache_size(_cache_bytes), UiTheme.cache_size(limit * 1048576)]
 		"sources":
 			return "%d sources and licences" % SettingsPages.SOURCES.size()
+		"privacy":
+			return PrivacyData.summary()
 		"about":
 			var v := version_text()
 			return v if v == "Development build" else "Version %s" % v

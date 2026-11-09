@@ -208,6 +208,7 @@ godot --headless --script tests/atomic_file_test.gd # atomic writes; an unreadab
 godot --headless --script tests/overpass_rate_limit_test.gd # 429/406 pause an Overpass instance for 30 s or Retry-After
 godot --headless --script tests/remote_config_test.gd # service-address overrides: validation, defaults, cache
 godot --headless --script tests/store_readiness_test.gd # privacy policy names every host, licence texts ship, config.json is inert
+godot --headless --script tests/privacy_page_test.gd # Settings → Privacy says what site/privacy.html says, and builds
 godot --headless --script tests/satellite_decode_test.gd # cached satellite tiles decode on workers: placement, damaged file, freed mid-decode
 godot --headless --script tests/panorama_test.gd # 360° photo: file name, GPano metadata, JPEG segment, face geometry
 godot --headless --script tests/snapshot_reader_test.gd # bundled snapshots load on workers: concurrent reads, cancel, replace, freed mid-read
