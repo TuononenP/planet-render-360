@@ -104,7 +104,10 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 		for k in FacadeMaterials._facade_texs:
 			if str(k).begins_with(set_name + "|" + (pattern + "|" if tiled else "")):
 				return FacadeMaterials._facade_texs[k] as Dictionary
-		return facade_texs("limestone", 6, 1)
+		# The fallback itself may exceed the cap by this one entry; refusing
+		# it would recurse forever in a city with no limestone cached yet.
+		if key != "limestone|6|1|0":
+			return facade_texs("limestone", 6, 1)
 	var loader := Callable(MaterialLibrary, "_set_image")
 	var d: Dictionary
 	if tiled:
