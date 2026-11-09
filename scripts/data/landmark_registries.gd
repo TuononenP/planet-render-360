@@ -26,7 +26,8 @@ static func entries() -> Array:
 			LandmarkRegistrySwedenStockholm.entries(),
 			LandmarkRegistrySanFrancisco.entries(),
 			LandmarkRegistryAngkorThom.entries(), LandmarkRegistryAngkorBaray.entries(),
-			LandmarkRegistryAngkorEast.entries(), LandmarkRegistryAngkorOuter.entries()]:
+			LandmarkRegistryAngkorEast.entries(), LandmarkRegistryAngkorOuter.entries(),
+				LandmarkRegistryBridgeSpecs.entries()]:
 		all.append_array(batch)
 	return all
 
@@ -49,4 +50,5 @@ static func sets() -> Array[Callable]:
 		LandmarkSetSwedenStockholm.build,
 		LandmarkSetSanFrancisco.build,
 		LandmarkSetAngkorThom.build, LandmarkSetAngkorBaray.build,
-		LandmarkSetAngkorEast.build, LandmarkSetAngkorOuter.build]
+		LandmarkSetAngkorEast.build, LandmarkSetAngkorOuter.build,
+		LandmarkSetBridgeSpecs.build]
