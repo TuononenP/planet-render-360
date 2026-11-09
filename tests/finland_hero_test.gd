@@ -113,6 +113,12 @@ func _climate() -> void:
 	for name in ["maple", "rowan"]:
 		_check(TreeSpecies.spec(name).has("trunk_r"), "complete %s tree row" % name)
 
+## Whether a lone street with `tags` in `country` gets overhead wire.
+func _street_wired(data: LocationData, ground: GroundTruth, country: String, tags: Dictionary) -> bool:
+	data.country = country
+	data.roads = [OsmTags._road_entry(tags, PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
+	return not OverheadWires.plan(data, ground).is_empty()
+
 func _wires_and_snow() -> void:
 	var data := _data()
 	data.railways = [OsmTags._rail_entry({"railway": "tram", "electrified": "contact_line"},
@@ -129,6 +135,9 @@ func _wires_and_snow() -> void:
 	data.railways[0]["electrified"] = "no"
 	_check(OverheadWires.plan(data, ground).is_empty(), "non-electrified track has no wire")
 	data.railways = []
+	_check(_street_wired(data, ground, "US", {"highway": "residential", "trolley_wire": "yes"}),
+		"trolleybus streets have overhead wire outside Finland and Sweden")
+	_check(not _street_wired(data, ground, "US", {"highway": "residential"}), "plain US streets have no overhead wire")
 	data.roads = [OsmTags._road_entry({"highway": "residential", "width": "8"},
 		PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
 	data.country = "SE"
