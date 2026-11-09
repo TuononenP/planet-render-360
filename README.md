@@ -189,6 +189,15 @@ godot --headless --script tests/exit_tile_test.gd # exit button + stale-tile can
 godot --headless --script tests/search_test.gd  # place-search parser
 godot --headless --script tests/weather_test.gd # weather parser
 godot --headless --script tests/dem_test.gd     # live DEM decode (network once)
+godot --headless --script tests/helsinki_dem_test.gd # Helsinki's keyless 1 m city DTM (WCS) decode and merge
+godot --headless --script tests/host_policy_test.gd # no Russian-operated host in code, config or catalogues
+godot --headless --script tests/bundled_osm_test.gd # bundled snapshots: queries, checksums, layers
+godot --headless --script tests/capital_catalog_test.gd # GeoNames capital catalogue
+godot --headless --script tests/capital_snapshot_test.gd # capital snapshot audit (-- --allow-missing while incomplete)
+python3 -I tests/capital_snapshot_tools_test.py # capital snapshot planner and bundler tools
+godot --headless --script tests/bridge_specs_test.gd # every capital bridge row: schema, sources, confidence
+godot --headless --script tests/building_variety_test.gd # paint families, tints, proportions, neighbour evidence
+godot --headless --script tests/road_markings_test.gd # road markings, crossings, stop lines and aprons
 godot --headless --script tests/flow_test.gd    # picker -> loading -> 360 flow
 godot --headless --script tests/data_notes_test.gd # degraded-data notices: loading line, card, badge
 godot --headless --script tests/generation_timeout_test.gd # a place that takes too long returns to the picker
@@ -275,6 +284,14 @@ planet-render-360/
 │   │   ├── osm_*.gd, overpass_request.gd
 │   │   │                          Overpass query, fetch, parse, tags + ring geometry; OSM API and nearby-cache fallbacks
 │   │   ├── far_city_fetcher.gd    One aggregated Overpass call for the far city ring
+│   │   ├── bundled_osm.gd, snapshot_reader.gd, offline_osm_pack.gd
+│   │   │                          Bundled OSM snapshots (assets/osm_snapshots): queries, integrity, threaded reads, offline packs
+│   │   ├── capital_catalog.gd, capital_continents.gd
+│   │   │                          Generated GeoNames capital/territory catalogue and its continent grouping
+│   │   ├── remote_config.gd, host_policy.gd
+│   │   │                          Validated service-address overrides (site/config.json) and the no-Russian-host rule
+│   │   ├── ground_model*.gd, ground_tiff.gd, helsinki_dem*.gd, national_grids.gd
+│   │   │                          Surface-model fetch and decode, Helsinki's keyless 1 m DTM, national grid projections
 │   │   ├── climate_fetcher.gd     CHELSA V2.1 climatologies via ranged GeoTIFF reads
 │   │   ├── landcover_fetcher.gd, landcover_source.gd
 │   │   │                          ESA WorldCover land classes + Meta canopy-height windows
@@ -289,6 +306,7 @@ planet-render-360/
 │   │   ├── wiki_fetcher.gd, wiki_parse.gd
 │   │   │                          Wikipedia + Commons landmark markers, summaries and photos
 │   │   ├── landmark_*.gd          Regional registries, landmark sites, OSM fidelity and visit viewpoints
+│   │   ├── bridges/               Capital bridge tables (bridge_specs_*.gd by region) and the BridgeSpec schema
 │   │   ├── building_references.gd, road_widths.gd, suomenlinna_site.gd
 │   │   │                          Building reference dimensions, shared road widths and fortress-site data
 │   │   ├── preset_views.gd        Curated opening view for each quick-pick place
@@ -314,7 +332,9 @@ planet-render-360/
 │   │   ├── far_*.gd, settlement_map.gd, infill_planner.gd
 │   │   │                          Far terrain rings and the far city, only where the place is built up
 │   │   ├── building_*.gd, roof_*.gd, facade_*.gd, storey_composer.gd, architecture_*.gd
-│   │   │                          OSM building extrusion, regional style, roofs and facades
+│   │   │                          OSM building extrusion, regional style, roofs and facades; city and country-era style tables
+│   │   ├── tower_massing.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
+│   │   │                          Tower setbacks, evidence from neighbouring buildings, paint families, party walls
 │   │   ├── road_*.gd, street_*.gd, rail_builder.gd, kerb_builder.gd, bridge_arches.gd
 │   │   │                          Roads, markings, rails, kerbs, bridges and street furniture
 │   │   ├── shoreline_model.gd, shore_*.gd, water_*.gd, quay_*.gd
@@ -355,17 +375,21 @@ planet-render-360/
 │   └── bin/                   Generated libraries and .gdextension manifest (tools/build_native.sh)
 ├── assets/                    Runtime assets
 │   ├── eiffel.glb             Eiffel Tower model
+│   ├── osm_snapshots/         Bundled gzip OpenStreetMap layers for the featured places and capitals
+│   │                          (ODbL; provenance in capital_provenance.json and its README)
+│   ├── capital_thumbs/        Capital place thumbnails
 │   ├── brand/, icons/, fonts/  Brand artwork, Lucide icons and typefaces
 │   ├── map/                   Bundled map-tile packs (Git LFS)
 │   ├── preset_thumbs/         Curated place thumbnails
 │   ├── textures/              CC0 Poly Haven PBR sets (2k/) and foliage atlases (foliage/)
 │   └── vehicles/              Imported car models, textures and attribution
 ├── assets_src/blender/        Blender sources (offline only, never shipped)
-├── tests/                     Godot regression scripts and offline fixtures/ (mostly headless;
-│                              screenshot_test.gd and world_cache_test.gd need a window)
+├── tests/                     About 150 regression scripts and offline fixtures/ (mostly headless;
+│                              screenshot_test.gd, panorama_render_test.gd and world_cache_test.gd need a window)
 ├── tools/                     Release, native and map-pack builds; Godot background launcher and
-│                              no-activation shim; class-size checks, benchmarks, captures, landmark
-│                              audits, comparison sheets, foliage generation and documentation PDF build
+│                              no-activation shim; test and class-size runners; capital catalogue and
+│                              OSM snapshot planners and bundlers (Python); bridge candidates, benchmarks,
+│                              captures, landmark audits, comparison sheets, foliage generation and documentation PDF build
 ├── .github/
 │   ├── actions/               Godot setup for macOS and Linux CI runners
 │   └── workflows/             Tests on every pull request, GitHub Pages, and on-demand macOS .dmg,
