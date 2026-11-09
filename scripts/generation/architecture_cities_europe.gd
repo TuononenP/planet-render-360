@@ -147,7 +147,7 @@ const REGIONS := {
 			"rv": {"gable": [["neck", 3], ["bell", 3], ["step", 2], ["", 2]], "stoop": 0.4,
 				"oriel": 0.05, "string_course": false}},
 		"apartments": {"w": [["brick", DUTCH], ["render", ["#f2eee4", "#e8e4da"]]], "p": "punched",
-			"wn": "sash", "bay": 2.2, "fr": "#f4f1ea", "sp": 0.1, "sh": "#1f3a2c",
+			"wn": ["sash", "casement"], "bay": 2.2, "fr": "#f4f1ea", "sp": 0.1, "sh": "#1f3a2c",
 			"r": [["gabled", 5], ["hipped", 1]], "pitch": 1.4,
 			"rf": [["slate", ["#4a4f55", "#3f4448"]], ["terracotta", ["#8a3f30"]]],
 			"fh": 3.2, "st": [3, 5], "fix": true, "ch": 0.4, "dm": 0.2,
@@ -194,7 +194,7 @@ const REGIONS := {
 	# stucco surrounds, Erker and balconies, Berliner Dach.
 	"berlin": {
 		"apartments": {"w": [["render", BERLIN]], "p": [["ornate", 4], ["punched", 1], ["balcony", 1]],
-			"wn": "casement", "bay": 2.5, "fr": "#f1ede4", "sp": 0.0,
+			"wn": ["casement", "french"], "bay": 2.5, "fr": "#f1ede4", "sp": 0.0,
 			"r": [["mansard", 2], ["flat", 2], ["hipped", 1]], "pitch": 0.8,
 			"rf": [["slate", ["#55606a", "#4f5760"]], ["membrane", []], ["terracotta", ["#8a3f30"]]],
 			"fh": 3.4, "st": [4, 5], "fix": true, "ch": 0.8, "dm": 0.4, "eq": 0.0,

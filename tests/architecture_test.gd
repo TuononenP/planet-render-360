@@ -304,8 +304,10 @@ func _profile_checks(failures: Array[String]) -> void:
 			for pattern in patterns:
 				if pattern != "haussmann" and not FacadeComposer.is_tiled(pattern):
 					failures.append("%s/%s unknown pattern %s" % [region, kind, pattern])
-			if not FacadeComposer.WINDOWS.has(str(p.get("wn", "casement"))):
-				failures.append("%s/%s unknown window %s" % [region, kind, p.get("wn")])
+			var wn: Variant = p.get("wn", "casement")
+			for w in (wn as Array if wn is Array else [wn]):
+				if not FacadeComposer.WINDOWS.has(str(w)):
+					failures.append("%s/%s unknown window %s" % [region, kind, w])
 			for g in (p.get("g", []) as Array):
 				if not ["none", "shop", "signage", "render", "stone"].has(str((g as Array)[0])):
 					failures.append("%s/%s unknown ground %s" % [region, kind, (g as Array)[0]])
@@ -859,7 +861,8 @@ func _era_checks(failures: Array[String]) -> void:
 	elif float((look["relief"] as Dictionary).get("balconette", 0.0)) < 0.5 \
 			or not bool((look["relief"] as Dictionary).get("string_course", false)):
 		failures.append("Haussmann relief needs balconettes and a string course, got %s" % look["relief"])
-	var plain := ArchitectureStyle.resolve({"kind": "apartments"}, "nordic", "mid", 0.3, 600.0)
+	# Houses have no period rows (ArchitectureCountryEras), so they keep the country row.
+	var plain := ArchitectureStyle.resolve({"kind": "house"}, "nordic", "mid", 0.3, 120.0)
 	if plain.get("city") != "" or plain.get("era") != "nordic" or not (plain.get("relief") is Dictionary):
 		failures.append("country looks carry city '' / era = region / a relief dict")
 	var gables := {}

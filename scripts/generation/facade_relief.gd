@@ -52,7 +52,8 @@ static func add(root: Node3D, d: Dictionary) -> void:
 	var garage := StreetFront.has_garage(d)
 	for sp in spans:
 		sp["street"] = party != null and party.faces_street(sp["a"], sp["b"], sp["n"])
-		sp["bays"] = 0 if float(sp["len_m"]) < uvp.x * 0.5 else maxi(1, roundi(float(sp["len_m"]) / uvp.x))
+		var bay := uvp.x * float(look.get("bay_scale", 1.0))  # as BuildingWalls._walls
+		sp["bays"] = 0 if float(sp["len_m"]) < bay * 0.5 else maxi(1, roundi(float(sp["len_m"]) / bay))
 		_storeys(kit, sp, rows, look, relief, stone, float(d["seed"]), uvp.z == 0.0)
 		if sp["street"] and ArchitectureStyle._h(float(d["seed"]) + float(sp["edge"]) * 0.53, 64) \
 				< float(relief.get("oriel", 0.0)):
@@ -123,16 +124,23 @@ static func storey_rows(d: Dictionary, uvp: Vector3) -> Array:
 	var box := FacadePatterns.window_box(str(look.get("pattern", "")),
 		str(look.get("window", "casement")))
 	var cell := float(FacadeComposer.CELL)
-	var rh := (top - y0) / float(n)
+	var bands: Dictionary = d.get("bands", {})
+	var piano := bool(bands.get("piano", false))
+	var attic := bool(bands.get("attic", false))
+	var unit := BuildingWalls.band_unit(y0, top, n, bands)
 	var rows_b: Array = relief.get("balcony_rows", [])
+	var yt := y0
 	for j in n:
-		var yt := y0 + rh * float(j + 1)
+		var rh := unit * (BuildingWalls.PIANO_STRETCH if piano and j == 0 else 1.0)
+		yt += rh
 		var storey := j + (1 if banded else 0)
-		var w1 := yt - float(box.z) / cell * rh
-		var w0 := w1 - float(box.y) / cell * rh
+		# The attic band is drawn with the small window (BuildingWalls.attic_look).
+		var bx := FacadeComposer._window_box("small") if attic and j == n - 1 else box
+		var w1 := yt - float(bx.z) / cell * rh
+		var w0 := w1 - float(bx.y) / cell * rh
 		out.append({"y0": yt - rh, "y1": yt, "storey": storey,
 			"ground": storey == 0, "win0": w0, "win1": w1,
-			"win_w": float(box.x) / cell, "balcony": storey > 0 and rows_b.has(storey),
+			"win_w": float(bx.x) / cell, "balcony": storey > 0 and rows_b.has(storey) and not (attic and j == n - 1),
 			"balconette": false, "slab": w0 + 0.05 * WorldScale.metres_to_units(),
 			"rail_h": 1.0 * WorldScale.metres_to_units()})
 	return out

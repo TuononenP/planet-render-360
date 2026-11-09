@@ -452,6 +452,16 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 					shop_materials[edge] = shop_mat
 			if not shop_materials.is_empty() and ground_mat == null:
 				ground_mat = facade
+	var bay_scale := float(look.get("bay_scale", 1.0))
+	var upper := maxi(1, int(v_rep) - (1 if ground_mat != null else 0))
+	var bands := {"piano": false, "attic": false}
+	var attic_mat: Material = null
+	if not distant and _batch == null and fidelity >= 2 and not raised and not look.is_empty() \
+			and FacadeMaterials.facade_uv(facade).z > 0.0:
+		bands = BuildingWalls.band_plan(look, seed_v, upper, cover, top)
+		if bool(bands["attic"]):
+			attic_mat = FacadeMaterials.facade_for_building(b, region, storeys, fidelity, false,
+				seed_v, BuildingWalls.attic_look(look))
 	if top - base < 0.05 * WorldScale.metres_to_units():
 		pass  # a part that is only roof (a dome on its drum) has no walls
 	elif ground_mat != null:
@@ -460,13 +470,13 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		var gh_u := fh_u * (1.15 if not shop_materials.is_empty() or str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
 		var g_top := minf(base + sink + gh_u,
 			top - fh_u * 0.6)
-		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire, false, shop_materials)
-		_walls(root, ring, g_top, top, facade, maxf(1.0, v_rep - 1.0), cover, fire)
+		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire, false, shop_materials, bay_scale)
+		BuildingWalls.upper_walls(root, ring, g_top, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	else:
-		_walls(root, ring, base, top, facade, v_rep, cover, fire)
+		BuildingWalls.upper_walls(root, ring, base, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	for h in holes:
 		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null else []
-		_walls(root, h, base, top, facade, v_rep, hc, fire, true)
+		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
 		centre.length() / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
@@ -488,7 +498,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
 			top - float(look["floor_h"]) * WorldScale.metres_to_units() * 0.6)
 		FacadeRelief.add(root, {"ring": ring, "cover": cover, "base": base, "g_top": g_y,
-			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade,
+			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade, "bands": bands,
 			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
 			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
@@ -554,8 +564,9 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
-		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {}) -> void:
-	BuildingWalls._walls(root, ring, base, top, mat, v_repeat, cover, fire, invert, edge_materials)
+		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {},
+		bay_scale: float = 1.0) -> void:
+	BuildingWalls._walls(root, ring, base, top, mat, v_repeat, cover, fire, invert, edge_materials, bay_scale)
 
 static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array,
 		top: float, mat: Material, trim: int = 0, cap: PackedVector2Array = PackedVector2Array(),

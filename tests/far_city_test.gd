@@ -186,6 +186,7 @@ func _run() -> void:
 	_tower_parts_checks(failures)
 	_paint_parity_checks(failures)
 	_geometry_parity_checks(failures)
+	_district_checks(failures)
 	_parse_checks(failures)
 	await _offline_cache_checks(failures)
 	_infill_checks(failures)
@@ -196,6 +197,24 @@ func _run() -> void:
 		for f in failures:
 			printerr("FAR CITY FAIL: ", f)
 		quit(1)
+
+## Every district character occurs, and older patches lean toward the centre.
+func _district_checks(failures: Array[String]) -> void:
+	var seen := {}
+	var inner := [0, 0]
+	var outer := [0, 0]
+	for iz in range(-20, 20):
+		for ix in range(-20, 20):
+			var c := Vector2((float(ix) + 0.5) * FarCityBuilder.DISTRICT_M, (float(iz) + 0.5) * FarCityBuilder.DISTRICT_M)
+			var district := FarCityBuilder._district(c)
+			seen[district] = true
+			var ring: Array = inner if c.length() < 4000.0 else outer
+			ring[0] = int(ring[0]) + (1 if district < 0 else 0)
+			ring[1] = int(ring[1]) + 1
+	if seen.size() != 3:
+		failures.append("far districts should be older, mixed and newer, got %s" % seen.keys())
+	if float(inner[0]) / float(inner[1]) <= float(outer[0]) / float(outer[1]):
+		failures.append("older far districts should lean to the centre: inner %s outer %s" % [inner, outer])
 
 func _settlement_checks(failures: Array[String]) -> void:
 	var data := _data()

@@ -39,6 +39,8 @@ const LANDMARK_CLEAR_M := 120.0
 const PAIR_MIN_M := 28.0
 const PAIR_GAP_M := 5.0
 const PAIR_SHARE := 0.35
+## Patch size of a district's character (_district; CityKernels matches).
+const DISTRICT_M := 600.0
 ## Native CityKernels when loaded.
 static var _native := ClassDB.class_exists("CityKernels")
 
@@ -391,6 +393,21 @@ func _paint() -> Vector2:
 	return Vector2(float(p.get("vt", ArchitectureStyle.chroma_of(set_name))),
 		ArchitectureStyle.tone_for(data.latitude, data.longitude))
 
+## A patch's character, so the fabric is not one even texture: -1 older (the
+## lower storeys of the range, pitched where the region pitches), 1 newer
+## (the upper storeys, flat where it builds flat), 0 mixed. Older patches
+## lean toward the centre.
+static func _district(c: Vector2) -> int:
+	var px := floorf(c.x / DISTRICT_M)
+	var pz := floorf(c.y / DISTRICT_M)
+	var cx := (px + 0.5) * DISTRICT_M
+	var cz := (pz + 0.5) * DISTRICT_M
+	var old_share := lerpf(0.5, 0.15, smoothstep(R_IN, SettlementMap.RADIUS_M, sqrt(cx * cx + cz * cz)))
+	var pick := _hash(px, pz, 23.0)
+	if pick < old_share:
+		return -1
+	return 1 if pick > 0.65 else 0
+
 ## One block mass: walls tiled per bay/storey + a regional roof form.
 func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 		kind: String) -> void:
@@ -405,6 +422,13 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 	if kind == "apartments" and smap.score_at(c.x, c.y) > 0.65:
 		lo += 1
 		hi = int(ceil(float(hi) * 1.3))
+	var district := _district(c) if kind in ["apartments", "commercial"] else 0
+	if district != 0:
+		var mid := int(float(lo + hi) * 0.5)
+		if district < 0:
+			hi = mid
+		else:
+			lo = mid
 	var storeys := lo + int(seed_v * float(hi - lo + 1))
 	var fh := float(prof["fh"])
 	var wall := float(storeys) * fh
@@ -413,8 +437,12 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 		wall = lerpf(near_h, wall, smoothstep(R_IN, 4000.0, d))
 		storeys = maxi(1, roundi(wall / fh))
 	var shape := ArchitectureStyle._pick_weighted(prof["r"] as Array, seed_v, 3)
+	if (district < 0 and shape == "flat") or (district > 0 and shape != "flat"):
+		shape = ArchitectureStyle._pick_weighted(prof["r"] as Array, seed_v, 29)
 	var span := minf(size.x, size.y)
-	var rh := BuildingBuilder._roof_height_m(shape, span, 0.0, float(prof.get("pitch", 1.0)))
+	# Each roof a little steeper or flatter than its neighbour's (+-10%).
+	var pitch := float(prof.get("pitch", 1.0)) * (0.9 + 0.2 * _hash(c.x, c.y, 41.0))
+	var rh := BuildingBuilder._roof_height_m(shape, span, 0.0, pitch)
 	if shape != "flat":
 		wall = maxf(wall - rh * 0.5, fh)
 	var top := base + 2.0 + wall

@@ -29,10 +29,74 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 ## Height (m) of blank firewall above a lower neighbour before the
 ## windowed facade resumes on a wall that rises well past it.
 const FIREWALL_BAND_M := 9.0
+## A masonry front's elevation: the first upper storey of a decorated front
+## stands taller (the piano nobile), and about half of the punched masonry
+## fronts end in a plainer top storey with small windows (the attic).
+const PIANO_STRETCH := 1.18
+const ATTIC_SHARE := 0.5
+const PIANO_PATTERNS: Array[String] = ["ornate", "brownstone"]
+const ATTIC_PATTERNS: Array[String] = ["punched", "ornate", "brownstone"]
+const BAND_WALL_SETS: Array[String] = ["brick", "stone", "limestone", "render", "terracotta"]
+
+## Which elevation bands a building's upper storeys take: {piano, attic}.
+## Needs three upper storeys, and every stretch either open or wholly hidden:
+## a band above a lower neighbour would turn into firewall (see _walls).
+static func band_plan(look: Dictionary, seed_v: float, upper_storeys: int,
+		cover: Array, top: float) -> Dictionary:
+	var pattern := str(look.get("pattern", ""))
+	var out := {"piano": false, "attic": false}
+	if upper_storeys < 3 or not str(look.get("wall_set", "")) in BAND_WALL_SETS:
+		return out
+	var clear := top - 0.3 * WorldScale.metres_to_units()
+	for pieces: Array in cover:
+		for pc: Array in pieces:
+			if not is_inf(float(pc[2])) and float(pc[2]) < clear:
+				return out
+	out["piano"] = pattern in PIANO_PATTERNS
+	out["attic"] = pattern in ATTIC_PATTERNS and str(look.get("window", "")) != "small" \
+		and ArchitectureStyle._h(seed_v, 67) < ATTIC_SHARE
+	return out
+
+## The attic storey's look: small plain windows, no shutters, rails or
+## variants, so it adds one texture per wall set, frame and bay at most.
+static func attic_look(look: Dictionary) -> Dictionary:
+	var out := look.duplicate()
+	out["pattern"] = "punched"
+	out["window"] = "small"
+	out["shutter"] = Color.BLACK
+	out["shutter_p"] = 0.0
+	out["rails"] = 0.0
+	out["variant"] = 0
+	return out
+
+## Storey height of the upper stack in world units: `top - y0` shared over `n`
+## storeys, the first stretched when the plan has a piano nobile.
+static func band_unit(y0: float, top: float, n: int, plan: Dictionary) -> float:
+	return (top - y0) / (float(n) + (PIANO_STRETCH - 1.0 if bool(plan.get("piano", false)) else 0.0))
+
+## The upper storeys y0..top as the plan's bands, `attic` on the top storey.
+static func upper_walls(root: Node3D, ring: PackedVector2Array, y0: float, top: float,
+		facade: Material, attic: Material, n: int, plan: Dictionary, cover: Array,
+		fire: Material, bay_scale: float) -> void:
+	var unit := band_unit(y0, top, n, plan)
+	var y := y0
+	var rest := n
+	if bool(plan.get("piano", false)):
+		_walls(root, ring, y, y + unit * PIANO_STRETCH, facade, 1.0, cover, fire, false, {}, bay_scale)
+		y += unit * PIANO_STRETCH
+		rest -= 1
+	var y_top := top
+	if bool(plan.get("attic", false)) and attic != null:
+		y_top = top - unit
+		_walls(root, ring, y_top, top, attic, 1.0, cover, fire, false, {}, bay_scale)
+		rest -= 1
+	if rest > 0:
+		_walls(root, ring, y, y_top, facade, float(rest), cover, fire, false, {}, bay_scale)
 
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
-		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {}) -> void:
+		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {},
+		bay_scale: float = 1.0) -> void:
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	# Style facades map UVs in real window bays (and, for tiled patterns,
 	# real storeys) so windows keep their size on any wall; legacy
@@ -52,6 +116,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					PackedFloat32Array(), PackedInt32Array()]
 			edge_face = per_material[edge_mat]
 		var uvp := FacadeMaterials.facade_uv(edge_mat)
+		var bay := uvp.x * bay_scale
 		var ea := ring[i]
 		var eb := ring[(i + 1) % ring.size()]
 		if (eb - ea).length() < 0.001:
@@ -72,7 +137,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					var len_m := (b - a).length() / m2u
 					# An edge under half a bay shows only the blank margin left
 					# of the first window (a pillar must not become a zebra).
-					u1 = 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
+					u1 = 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
 					if uvp.z > 0.0:
 						v0 = v_repeat
 				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0))
@@ -85,7 +150,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 				if fire != null and uvp.x > 0.0 and top - y0 > FIREWALL_BAND_M * m2u * 1.5:
 					y1 = y0 + FIREWALL_BAND_M * m2u
 					var len_m := (b - a).length() / m2u
-					var u1 := 0.03 if len_m < uvp.x * 0.5 else maxf(1.0, roundf(len_m / uvp.x)) / uvp.y
+					var u1 := 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
 					var v_up := (v_repeat if uvp.z > 0.0 else 1.0) * (top - y1) / maxf(top - base, 1e-4)
 					_quad(edge_face, a, b, y1, top, n, Vector2(u1, v_up))
 				_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,

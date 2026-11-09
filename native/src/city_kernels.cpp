@@ -426,6 +426,21 @@ void pitched_roof(Row &row, int oct, int band, int mat, const Vector2 *ring, dou
 	row.adds.push_back(std::move(a));
 }
 
+// FarCityBuilder._district
+int district_of(const Vector2 &ctr) {
+	constexpr double DISTRICT_M = 600.0;
+	double px = std::floor((double)ctr.x / DISTRICT_M);
+	double pz = std::floor((double)ctr.y / DISTRICT_M);
+	double cx = (px + 0.5) * DISTRICT_M;
+	double cz = (pz + 0.5) * DISTRICT_M;
+	double old_share = Math::lerp(0.5, 0.15, Math::smoothstep(R_IN, RADIUS_M, std::sqrt(cx * cx + cz * cz)));
+	double pick = city_hash(px, pz, 23.0);
+	if (pick < old_share) {
+		return -1;
+	}
+	return pick > 0.65 ? 1 : 0;
+}
+
 // FarCityBuilder._mass
 void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, double yaw,
 		const Profile &prof, double d, const std::string &kind) {
@@ -452,6 +467,15 @@ void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, doub
 			hi = (int)std::ceil((double)hi * 1.3);
 		}
 	}
+	int district = (kind == "apartments" || kind == "commercial") ? district_of(ctr) : 0;
+	if (district != 0) {
+		int mid = (int)((double)(lo + hi) * 0.5);
+		if (district < 0) {
+			hi = mid;
+		} else {
+			lo = mid;
+		}
+	}
 	int storeys = lo + (int)(seed_v * (double)(hi - lo + 1));
 	double fh = prof.fh;
 	double wall = (double)storeys * fh;
@@ -461,8 +485,12 @@ void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, doub
 		storeys = Math::max(1, (int)std::round(wall / fh));
 	}
 	std::string shape = pick_weighted(prof.roofs, seed_v, 3);
+	if ((district < 0 && shape == "flat") || (district > 0 && shape != "flat")) {
+		shape = pick_weighted(prof.roofs, seed_v, 29);
+	}
 	double span = Math::min((double)size.x, (double)size.y);
-	double rh = roof_height_m(shape, span, prof.pitch);
+	double pitch = prof.pitch * (0.9 + 0.2 * city_hash(ctr.x, ctr.y, 41.0));
+	double rh = roof_height_m(shape, span, pitch);
 	if (shape != "flat") {
 		wall = Math::max(wall - rh * 0.5, fh);
 	}

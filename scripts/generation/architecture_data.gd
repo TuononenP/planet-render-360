@@ -157,7 +157,7 @@ static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, 
 	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
 	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesNorth.BASE, ArchitectureCitiesFinland.BASE,
 	ArchitectureCitiesSouth.BASE, ArchitectureCitiesCentral.BASE, ArchitectureCitiesWorld.BASE,
-	ArchitectureCitiesNewWorld.BASE])
+	ArchitectureCitiesNewWorld.BASE, ArchitectureCountryEras.BASE])
 
 ## OSM `building=*` values that name a kind outright. `yes`, `residential`
 ## and friends are decided by levels / footprint / density instead.
@@ -309,7 +309,7 @@ static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, Architect
 	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
 	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesFinland.REGIONS, ArchitectureCitiesSouth.REGIONS,
 	ArchitectureCitiesCentral.REGIONS, ArchitectureCitiesWorld.REGIONS,
-	ArchitectureCitiesNewWorld.REGIONS])
+	ArchitectureCitiesNewWorld.REGIONS, ArchitectureCountryEras.REGIONS])
 
 static func _merged(tables: Array) -> Dictionary:
 	var out := {}

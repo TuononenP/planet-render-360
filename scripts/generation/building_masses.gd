@@ -66,7 +66,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	var masses: Array = b.get("parts", [])
 	var single := masses.is_empty()
 	if single:
-		var stepped := _prewar_setbacks(b, look, parent_res, ctx)
+		var stepped := TowerMassing.stack(b, look, parent_res, ctx, parent_shape)
 		if not stepped.is_empty():
 			masses = stepped
 			single = false
@@ -89,52 +89,6 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	_mutex.unlock()
 	return out
 
-## On Ultra, unparted prewar New York towers get two modest, seeded-free
-## setbacks. Tagged building parts remain authoritative. Holes and narrow
-## or fragmented insets stay as the mapped single mass.
-static func _prewar_setbacks(b: Dictionary, look: Dictionary, res: Dictionary, ctx: Dictionary) -> Array:
-	if int(ctx.get("fidelity", 0)) < 3 or str(look.get("era", "")) != "nyc_prewar" \
-			or not (b.get("parts", []) as Array).is_empty() or not (b.get("holes", []) as Array).is_empty() \
-			or float(b.get("min_height_m", 0.0)) > 0.0 or int(b.get("min_level", 0)) > 0:
-		return []
-	var h := float(res.get("total_m", 0.0))
-	var levels := int(b.get("levels", 0))
-	if levels <= 0:
-		levels = roundi(h / maxf(float(look.get("floor_h", 3.2)), 1.0))
-	var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
-	if levels < 20 or ring.size() < 3 or h < 55.0:
-		return []
-	var m := WorldScale.metres_to_units()
-	var span := BuildingHeights._ring_span_m(ring)
-	if span < 18.0:
-		return []
-	var inset := clampf(span * 0.075, 1.5, 4.0) * m
-	var mid := _inset_ring(ring, inset)
-	var top := _inset_ring(ring, inset * 2.0)
-	if mid.is_empty() or top.is_empty():
-		return []
-	var cuts := [0.0, h * 0.58, h * 0.80, h]
-	var rings := [ring, mid, top]
-	var out: Array = []
-	for i in 3:
-		var part := b.duplicate()
-		part.erase("parts")
-		part["footprint"] = rings[i]
-		var centre := RingGeometry.centroid(rings[i])
-		part["x"] = centre.x
-		part["z"] = centre.y
-		part["height"] = cuts[i + 1]
-		part["height_source"] = "tag_height"
-		part["min_height_m"] = cuts[i]
-		part["min_level"] = 0
-		part["levels"] = maxi(1, roundi(float(levels) * (cuts[i + 1] - cuts[i]) / h))
-		if i < 2:
-			part["roof_shape"] = "flat"
-			part["roof_height_m"] = 0.0
-			part["roof_levels"] = 0
-		out.append(part)
-	return out
-
 static func _inset_ring(ring: PackedVector2Array, inset: float) -> PackedVector2Array:
 	var pieces := RingGeometry._solid_parts(Geometry2D.offset_polygon(ring, -inset))
 	if pieces.size() != 1:
@@ -150,7 +104,10 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 		look: Dictionary, parent_res: Dictionary, legacy: bool, parent_shape: String,
 		fh: float) -> Array:
 	var out: Array = []
-	var main_mass := _largest(masses)
+	# A generated tower's roofline detail belongs on its top, not on the
+	# base the upper tiers stand on (TowerMassing).
+	var main_mass := masses.size() - 1 if masses.back() is Dictionary \
+		and bool((masses.back() as Dictionary).get("stack_top", false)) else _largest(masses)
 	for mi in masses.size():
 		if not (masses[mi] is Dictionary):
 			continue
