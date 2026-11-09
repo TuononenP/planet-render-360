@@ -15,6 +15,8 @@ static var SETS := {
 	"render": {"asset": "white_stucco", "mean": Color(0.6796, 0.6514, 0.6305), "rough": 0.94, "metal": 0.0},
 	"brick": {"asset": "brick_wall_001", "mean": Color(0.1358, 0.0737, 0.0484), "rough": 0.90, "metal": 0.0},
 	"concrete": {"asset": "concrete", "mean": Color(0.1715, 0.1470, 0.1060), "rough": 0.92, "metal": 0.0},
+	# The same photo with its board bands removed (PbrTextures), for roofs.
+	"roof_concrete": {"asset": "concrete", "mean": Color(0.1715, 0.1470, 0.1060), "rough": 0.92, "metal": 0.0},
 	"wood": {"asset": "brown_planks_03", "mean": Color(0.1521, 0.1309, 0.1047), "rough": 0.85, "metal": 0.0},
 	"slate": {"asset": "grey_roof_tiles_02", "mean": Color(0.1897, 0.1964, 0.1927), "rough": 0.62, "metal": 0.08},
 	"terracotta": {"asset": "clay_roof_tiles", "mean": Color(0.3325, 0.1070, 0.0513), "rough": 0.80, "metal": 0.0},

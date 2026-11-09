@@ -118,7 +118,16 @@ func _membrane(absent: Color) -> void:
 		_check(not far.normal_enabled, set_name + " on Fast stays albedo-only")
 	var green := Color("#5f8f72").srgb_to_linear()
 	var painted := _roof({}, "flat", absent, {"roof_set": "concrete", "roof_colour": green})
-	_check(painted.albedo_texture == MaterialLibrary._set_tex("concrete", "diff"), "Flat concrete must stay concrete")
+	_check(painted.albedo_texture == MaterialLibrary._set_tex("roof_concrete", "diff"), "Flat concrete must stay concrete")
+	var turned := MaterialLibrary._set_image("roof_concrete", "diff", false).duplicate() as Image
+	turned.rotate_90(CLOCKWISE)
+	var board := _row_spread(turned, 0)
+	var plain: Color = MaterialLibrary.PBR_SETS["concrete"]["mean"]
+	_check(board.y / board.x < 0.03, "Roof concrete must lose its board bands, spread %s" % board.y)
+	_check(absf(board.x - plain.r) < 0.015, "Destriping must keep the concrete mean, got %s" % board.x)
+	var wall := MaterialLibrary._set_image("concrete", "diff", false).duplicate() as Image
+	wall.rotate_90(CLOCKWISE)
+	_check(_row_spread(wall, 0).y > board.y * 3.0, "Walls and landmarks keep the plain concrete photo")
 	var mean: Color = MaterialLibrary.PBR_SETS["concrete"]["mean"] * painted.albedo_color.srgb_to_linear()
 	_check(mean.g > mean.r * 1.2, "A painted flat concrete roof must keep its paint")
 

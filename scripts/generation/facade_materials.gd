@@ -482,7 +482,10 @@ static func _roof_floor(set_name: String, tint: Color) -> Color:
 static func roof_set_material(set_name: String, tint: Color, detail: int = 1) -> Material:
 	if set_name == "glass":
 		return glass_material(1)
-	var m := MaterialLibrary.pbr_material(set_name, tint,
+	# Roofs take a concrete without the photo's board bands; walls and
+	# landmarks keep the plain set.
+	var photo := "roof_concrete" if set_name == "concrete" else set_name
+	var m := MaterialLibrary.pbr_material(photo, tint,
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
 	if set_name in ["copper", "sheet_metal"]:
 		m.normal_enabled = detail >= 1

@@ -40,7 +40,7 @@ static func begin_stages() -> void:
 ## Path of one set map: the 2K file on desktop Ultra builds
 ## (MaterialLibrary.hi_res) when it is bundled, else the 1K one.
 static func map_path(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> String:
-	var file := set_name + "_" + map_name + ".jpg"
+	var file := ("concrete" if set_name == "roof_concrete" else set_name) + "_" + map_name + ".jpg"
 	if hi_res and ResourceLoader.exists(MaterialLibrary.TEXTURE_DIR + "2k/" + file):
 		return MaterialLibrary.TEXTURE_DIR + "2k/" + file
 	return MaterialLibrary.TEXTURE_DIR + file
@@ -71,8 +71,16 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 					RoofMetalMaps.paint(img)
 				elif set_name == "membrane":
 					_destripe(img)
+				elif set_name == "roof_concrete":  # its bands run down the columns
+					img.rotate_90(CLOCKWISE)
+					_destripe(img)
+					img.rotate_90(COUNTERCLOCKWISE)
 			elif map_name == "nor" and set_name == "membrane":
-				_destripe_normal(img)
+				_destripe_normal(img, 1)
+			elif map_name == "nor" and set_name == "roof_concrete":
+				img.rotate_90(CLOCKWISE)
+				_destripe_normal(img, 0)
+				img.rotate_90(COUNTERCLOCKWISE)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
@@ -138,9 +146,9 @@ static func _destripe(img: Image) -> void:
 			var c := img.get_pixel(x, y)
 			img.set_pixel(x, y, Color(c.r * gain.r, c.g * gain.g, c.b * gain.b))
 
-## The same bands in the bitumen normal map: they tilt whole rows (green only),
+## The same bands in a normal map: they tilt whole rows (one channel, `ch`),
 ## and would return as relief once a roof's normal map is on.
-static func _destripe_normal(img: Image) -> void:
+static func _destripe_normal(img: Image, ch: int) -> void:
 	if img.get_width() > 512:
 		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
 	var w := img.get_width()
@@ -151,13 +159,14 @@ static func _destripe_normal(img: Image) -> void:
 	for y in h:
 		var sum := 0.0
 		for x in w:
-			sum += img.get_pixel(x, y).g
+			sum += img.get_pixel(x, y)[ch]
 		rows[y] = sum / float(w)
 		mean += rows[y] / float(h)
 	for y in h:
 		for x in w:
 			var c := img.get_pixel(x, y)
-			img.set_pixel(x, y, Color(c.r, clampf(c.g + mean - rows[y], 0.0, 1.0), c.b))
+			c[ch] = clampf(c[ch] + mean - rows[y], 0.0, 1.0)
+			img.set_pixel(x, y, c)
 
 ## Runtime texture of one set map for StandardMaterial3D (pbr_material),
 ## mipmapped (T4.7: without mips the tiled roofs and road ribbons alias
