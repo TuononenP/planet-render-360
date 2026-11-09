@@ -49,9 +49,10 @@ static func deck(top: float, trim: int) -> float:
 
 ## Party edges (PartyWalls) get no cornice: the street front runs on into
 ## the neighbour's. Parapets stay on them (a firewall parapet is real, and
-## the sunk deck needs its inner face there).
+## the sunk deck needs its inner face there). `wall_set` dresses a cornice
+## in the wall's own stone.
 static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
-		party: PackedByteArray = PackedByteArray()) -> void:
+		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
 	if trim == NONE or ring.size() < 3 or BuildingBuilder._batch != null:
 		return
 	var m := WorldScale.metres_to_units()
@@ -114,7 +115,7 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 	arrays[Mesh.ARRAY_TANGENT] = MassBatch.tangents(verts, normals, uvs, idx)
 	arrays[Mesh.ARRAY_INDEX] = idx
 	# Arrays kept: LodRing merges these on the build thread.
-	TerrainBuilder._add(root, MeshArrays.mesh(arrays), _material(trim))
+	TerrainBuilder._add(root, MeshArrays.mesh(arrays), _material(trim, wall_set))
 
 ## Quad a-b-c-d wound so its Godot front face points along `n`; UVs in
 ## metres / 2 along the edge and up the face.
@@ -158,15 +159,13 @@ static func _offset(ring: PackedVector2Array, d: float, ccw: Variant = null) -> 
 		out.append(ring[i] + off)
 	return out
 
-static func _material(trim: int) -> Material:
-	if _mats.has(trim):
-		return _mats[trim]
-	var m: Material
-	if trim == CORNICE:
-		m = MaterialLibrary.pbr_material("limestone",
-			FacadeMaterials._calib("limestone", MaterialLibrary.PRD_LIMESTONE * 0.92), 1.0)
-	else:
-		m = MaterialLibrary.pbr_material("concrete",
-			FacadeMaterials._calib("concrete", Color(0.36, 0.35, 0.33)), 1.0)
-	_mats[trim] = m
-	return m
+## Cornices take the relief stone of the wall's finish. Parapets, and anything
+## on a concrete wall, are grey render: the concrete photo's board bands read
+## as streaks along a coping.
+static func _material(trim: int, wall_set: String) -> Material:
+	if trim == CORNICE and wall_set != "concrete":
+		return ReliefKit.stone(wall_set, Color(0, 0, 0, 0))
+	if not _mats.has(PARAPET):
+		_mats[PARAPET] = MaterialLibrary.pbr_material("render",
+			FacadeMaterials._calib("render", Color(0.36, 0.35, 0.33)), 1.0)
+	return _mats[PARAPET]

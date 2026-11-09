@@ -240,3 +240,26 @@ static func firewall(look: Dictionary) -> Material:
 	WallVariety.mark(m)
 	_fire_mats[set_name] = m
 	return m
+
+## Plain wall of a gable end: the brick firewall on brick, else one white
+## render that takes the building's wall colour from gable_tint.
+static func gable(look: Dictionary) -> Material:
+	if str(look.get("wall_set", "")) == "brick":
+		return firewall(look)
+	if not _fire_mats.has("gable"):
+		var m := (MaterialLibrary.pbr_material("render", Color.WHITE) as StandardMaterial3D).duplicate() as StandardMaterial3D
+		WallVariety.mark(m)
+		_fire_mats["gable"] = m
+	return _fire_mats["gable"] as Material
+
+## Vertex tint that brings gable()'s white render to the look's wall colour
+## (linear; vertex colours cannot go past 1).
+static func gable_tint(look: Dictionary) -> Color:
+	var set_name := str(look.get("wall_set", ""))
+	if set_name == "brick":
+		return Color.WHITE
+	var c: Color = look.get("wall_colour", Color(0, 0, 0, 0))
+	if c.a <= 0.0:
+		c = ReliefKit.STONE_TARGETS.get(set_name, ReliefKit.STONE_TARGETS["limestone"])
+	var mean: Color = (MaterialLibrary.PBR_SETS["render"] as Dictionary)["mean"]
+	return Color(minf(c.r / mean.r, 1.0), minf(c.g / mean.g, 1.0), minf(c.b / mean.b, 1.0))

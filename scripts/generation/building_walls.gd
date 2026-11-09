@@ -229,10 +229,10 @@ static func _emit(root: Node3D, arr: Array, mat: Material) -> void:
 static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 		idx: PackedInt32Array, top: float, mat: Material, trim: int = 0,
 		cap: PackedVector2Array = PackedVector2Array(),
-		party: PackedByteArray = PackedByteArray()) -> void:
+		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
 	# Cornice / parapet relief at the wall top (BuildingTrim, near only);
 	# a parapet sinks the deck behind it.
-	BuildingTrim.add(root, ring, top, trim, party)
+	BuildingTrim.add(root, ring, top, trim, party, wall_set)
 	top = BuildingTrim.deck(top, trim)
 	if not cap.is_empty():
 		ring = cap

@@ -13,6 +13,8 @@ extends RefCounted
 ## ± lightness and ± warm/cool shift of a roof's tint.
 const SPREAD := 0.18
 const WARMTH := 0.05
+## Mesh meta: a colour multiplied into its wall surfaces' tint.
+const WALL_TINT := "wall_tint"
 
 ## Tags `m` as a roof material: RoofSnow overlays it while snow lies, and
 ## it multiplies the per-building vertex tint into its albedo. A photo set's
@@ -108,7 +110,9 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			cols.fill(c)
 			arrays[Mesh.ARRAY_COLOR] = cols
 		elif WallVariety.is_wall(active):
-			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c, foot)
+			# A gable end carries its wall's paint on a shared white render.
+			var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
+			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		if mat != null:
 			out.surface_set_material(s, mat)

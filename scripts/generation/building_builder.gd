@@ -491,13 +491,17 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
-		eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
+		eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party,
+		str(look.get("wall_set", "")))
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
 	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
 	if not job.is_empty():
+		# Near ordinary buildings: a gable end is wall, not a triangle of tile.
+		var gable_look := look if not distant and _batch == null \
+			and not bool(b.get("mapped_landmark", false)) else {}
 		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6],
-			RoofForms.axis_from_tags(b, ring))
+			RoofForms.axis_from_tags(b, ring), gable_look)
 	if not roofed:
 		# No pitched roof built (flat, or no form fits): dormers, stacks and
 		# gables must not stand on a roof that is not there.
@@ -582,15 +586,23 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 
 static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array,
 		top: float, mat: Material, trim: int = 0, cap: PackedVector2Array = PackedVector2Array(),
-		party: PackedByteArray = PackedByteArray()) -> void:
-	BuildingWalls._roof_cap(root, ring, idx, top, mat, trim, cap, party)
+		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
+	BuildingWalls._roof_cap(root, ring, idx, top, mat, trim, cap, party, wall_set)
 
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
-		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO) -> bool:
+		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO,
+		gable_look: Dictionary = {}) -> bool:
 	var key := [ring, top, rh, shape, party, gable_front, holes] if not _roofs.is_empty() else []
 	var mesh := RoofGeometry.mesh_of(_roofs[key]) if axis == Vector2.ZERO and _roofs.has(key) \
 		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes, axis)
+	if mesh != null and not gable_look.is_empty() and shape in RoofGeometry.GABLED:
+		var gables := RoofGeometry.split_gables(mesh, ring, party)
+		if gables[0] != null:
+			(gables[0] as ArrayMesh).set_meta(RoofVariety.WALL_TINT, PartyWalls.gable_tint(gable_look))
+			TerrainBuilder._add(root, gables[0], PartyWalls.gable(gable_look))
+		if gables[1] != null:
+			TerrainBuilder._add(root, gables[1], PartyWalls.firewall(gable_look))
 	if mesh != null and _batch != null:
 		_batch.add_mesh(_batch_key, mat, mesh)
 	elif mesh != null:

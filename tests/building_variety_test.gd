@@ -20,6 +20,7 @@ func _init() -> void:
 	_country_era_checks(failures)
 	_roof_axis_checks(failures)
 	_foot_shade_checks(failures)
+	_gable_checks(failures)
 	_flat_roof_checks(failures)
 	_block_era_checks(failures)
 	_roof_hint_checks(failures)
@@ -379,6 +380,56 @@ func _roof_axis_checks(failures: Array[String]) -> void:
 			if n.y < -0.01:
 				failures.append("gabled roof at bearing %s faces down" % [case[0]])
 				break
+
+## A gabled roof's upright ends leave its slopes for a wall material (UVs in
+## the wall's scale); a hipped roof has none, and the triangles all survive.
+func _gable_checks(failures: Array[String]) -> void:
+	var ring := PackedVector2Array([Vector2(-15, -6), Vector2(15, -6), Vector2(15, 6), Vector2(-15, 6)])
+	var roof := RoofGeometry.form_mesh(ring, 10.0, 3.0, "gabled")
+	var before := roof.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size() as int
+	var parts := RoofGeometry.split_gables(roof)
+	if parts[0] == null or parts[1] != null:
+		failures.append("a detached gabled roof should have exposed gable walls only")
+		return
+	var ends: PackedVector3Array = (parts[0] as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+	var slopes: PackedVector3Array = roof.surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+	if ends.size() + slopes.size() != before or ends.is_empty():
+		failures.append("gable split lost triangles: %d + %d of %d" % [ends.size(), slopes.size(), before])
+	for n in ends:
+		if absf(n.y) >= RoofGeometry.GABLE_MAX_Y:
+			failures.append("a gable wall leans too far: %s" % [n])
+			break
+	for n in slopes:
+		if absf(n.y) < RoofGeometry.GABLE_MAX_Y:
+			failures.append("a roof slope kept an upright face: %s" % [n])
+			break
+	var tall := RoofGeometry.form_mesh(ring, 10.0, 3.0, "hipped")
+	if RoofGeometry.split_gables(tall) != [null, null]:
+		failures.append("a hipped roof has no gable walls")
+	# A gable over a party edge stays bare, like the firewall under it; the
+	# far end is exposed. Edge 1 is the +X end.
+	var flags := PackedByteArray([0, 1, 0, 0])
+	var terrace := RoofGeometry.form_mesh(ring, 10.0, 3.0, "gabled", flags)
+	var split := RoofGeometry.split_gables(terrace, ring, flags)
+	if split[0] == null or split[1] == null:
+		failures.append("a terrace roof should split exposed and party gables, got %s" % [split])
+	else:
+		for n: Vector3 in (split[1] as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_NORMAL]:
+			if n.x <= 0.0:
+				failures.append("a party gable should face the party edge, got %s" % [n])
+				break
+	# A painted wall's gable takes its colour, on one shared material; brick
+	# keeps the brick firewall and no tint.
+	var blue := {"wall_set": "wood", "wall_colour": Color(0.03, 0.06, 0.30)}
+	var yellow := {"wall_set": "render", "wall_colour": Color(0.60, 0.45, 0.12)}
+	var blue_tint := PartyWalls.gable_tint(blue)
+	if not (blue_tint.b > blue_tint.g and blue_tint.g > blue_tint.r) or PartyWalls.gable_tint(yellow).r <= PartyWalls.gable_tint(yellow).b:
+		failures.append("gable tint should follow the wall colour, got %s" % [blue_tint])
+	if PartyWalls.gable(blue) != PartyWalls.gable(yellow):
+		failures.append("painted gables must share one material")
+	var brick := {"wall_set": "brick"}
+	if PartyWalls.gable(brick) != PartyWalls.firewall(brick) or PartyWalls.gable_tint(brick) != Color.WHITE:
+		failures.append("brick gables keep the brick firewall, untinted")
 
 ## Storey bands are separate surfaces: the foot shade starts once, at the
 ## building's lowest wall, so an attic band is not shaded as if at the ground.
