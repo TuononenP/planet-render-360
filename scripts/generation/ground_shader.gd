@@ -21,6 +21,11 @@ uniform sampler2D photo : source_color, filter_linear_mipmap_anisotropic, repeat
 uniform sampler2D class_map : filter_nearest, repeat_disable;
 uniform sampler2D palette : filter_nearest, repeat_disable;
 uniform float class_n = 1024.0;
+// The fine class map around the viewpoint (GroundMaterial.near_class_map):
+// near_rect = centre x, centre z, half side, hand-over band; near_n 0 = none.
+uniform sampler2D near_class : filter_nearest, repeat_disable;
+uniform float near_n = 0.0;
+uniform vec4 near_rect = vec4(0.0);
 uniform int max_id = 16;
 uniform float extent_u = 220.0;
 uniform float u2m = 1.0;
@@ -96,6 +101,38 @@ float paving(vec2 g) {
 	return 1.0 + big + vis * (jit + joint);
 }
 
+// One class-map tap's share of the ground's material weights.
+void class_tap(int id, float bw, float veg, inout vec4 W0, inout vec4 W1, inout vec3 col,
+		inout float trust, inout float farc, inout float rough, inout float hfk, inout float pave) {
+	// Ids past the palette (an unbound/white class map reads 255)
+	// fall back to unmapped ground; texelFetch past the 32-texel
+	// palette is undefined (Metal returned the red fill).
+	if (id == 0 || id > max_id) {
+		float wild = (1.0 - veg) * (1.0 - urban_unknown);
+		W0 += bw * vec4((1.0 - veg) * urban_unknown, veg * 0.7, wild * 0.5, 0.0);
+		W1 += bw * vec4(0.0, veg * 0.3, wild * 0.5, 0.0);
+		col += bw * mix(unknown_bare, unknown_veg, veg);
+		trust += bw * unknown_trust;
+		farc += bw;
+		rough += bw * 0.96;
+		hfk += bw * 0.35;
+		pave += bw * (1.0 - veg) * urban_unknown * 0.7;
+	} else {
+		vec4 p0 = texelFetch(palette, ivec2(id, 0), 0);
+		vec4 p1 = texelFetch(palette, ivec2(id, 1), 0);
+		vec4 p2 = texelFetch(palette, ivec2(id, 2), 0);
+		vec4 p3 = texelFetch(palette, ivec2(id, 3), 0);
+		W0 += bw * p0;
+		W1 += bw * p3;
+		col += bw * srgb_lin(p1.rgb);
+		trust += bw * p1.a;
+		farc += bw * p2.r;
+		rough += bw * p2.g;
+		hfk += bw * p2.b;
+		pave += bw * p2.a;
+	}
+}
+
 void fragment() {
 	float dist_m = length(VERTEX) * u2m;
 	vec3 lf = t_dehaze(textureLod(photo, UV, lf_lod).rgb * photo_gain);
@@ -130,39 +167,45 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
-	for (int k = 0; k < 4; k++) {
-		ivec2 o = ivec2(k & 1, k >> 1);
-		float bw = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
-		int id = int(texelFetch(class_map, clamp(c0 + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
-		if (bank_paving > 0.5) {
-			id = 3;
+	// Around the viewpoint the fine map decides. Its borders wander a
+	// little, as grass overgrowing a path edge does, and unmapped texels
+	// leave their share to the extent map below.
+	float coarse = 1.0;
+	if (near_n > 0.5) {
+		vec2 ed = abs(wpos.xz - near_rect.xy);
+		float nw = 1.0 - smoothstep(near_rect.z - near_rect.w, near_rect.z, max(ed.x, ed.y));
+		coarse = 1.0 - nw;
+		if (nw > 0.0) {
+			vec2 warp = (vec2(t_noise(g * 0.9 + 3.1), t_noise(g * 0.9 + 11.7)) - 0.5) * 0.7
+				+ (vec2(t_noise(g * 3.7 + 5.3), t_noise(g * 3.7 + 19.1)) - 0.5) * 0.18;
+			vec2 nuv = ((wpos.xz + warp / u2m - near_rect.xy) / (2.0 * near_rect.z) + 0.5) * near_n - 0.5;
+			vec2 nf = fract(nuv);
+			ivec2 n0 = ivec2(floor(nuv));
+			ivec2 nmax = ivec2(int(near_n) - 1);
+			for (int k = 0; k < 4; k++) {
+				ivec2 o = ivec2(k & 1, k >> 1);
+				float bw = nw * (o.x == 1 ? nf.x : 1.0 - nf.x) * (o.y == 1 ? nf.y : 1.0 - nf.y);
+				int id = int(texelFetch(near_class, clamp(n0 + o, ivec2(0), nmax), 0).r * 255.0 + 0.5);
+				if (bank_paving > 0.5) {
+					id = 3;
+				}
+				if (id == 0) {
+					coarse += bw;
+				} else {
+					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
+				}
+			}
 		}
-		// Ids past the palette (an unbound/white class map reads 255)
-		// fall back to unmapped ground; texelFetch past the 32-texel
-		// palette is undefined (Metal returned the red fill).
-		if (id == 0 || id > max_id) {
-			float wild = (1.0 - veg) * (1.0 - urban_unknown);
-			W0 += bw * vec4((1.0 - veg) * urban_unknown, veg * 0.7, wild * 0.5, 0.0);
-			W1 += bw * vec4(0.0, veg * 0.3, wild * 0.5, 0.0);
-			col += bw * mix(unknown_bare, unknown_veg, veg);
-			trust += bw * unknown_trust;
-			farc += bw;
-			rough += bw * 0.96;
-			hfk += bw * 0.35;
-			pave += bw * (1.0 - veg) * urban_unknown * 0.7;
-		} else {
-			vec4 p0 = texelFetch(palette, ivec2(id, 0), 0);
-			vec4 p1 = texelFetch(palette, ivec2(id, 1), 0);
-			vec4 p2 = texelFetch(palette, ivec2(id, 2), 0);
-			vec4 p3 = texelFetch(palette, ivec2(id, 3), 0);
-			W0 += bw * p0;
-			W1 += bw * p3;
-			col += bw * srgb_lin(p1.rgb);
-			trust += bw * p1.a;
-			farc += bw * p2.r;
-			rough += bw * p2.g;
-			hfk += bw * p2.b;
-			pave += bw * p2.a;
+	}
+	if (coarse > 0.0005) {
+		for (int k = 0; k < 4; k++) {
+			ivec2 o = ivec2(k & 1, k >> 1);
+			float bw = coarse * (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
+			int id = int(texelFetch(class_map, clamp(c0 + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
+			if (bank_paving > 0.5) {
+				id = 3;
+			}
+			class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 		}
 	}
 	// Crag relief: noise gradients bend the lighting normal on steep and

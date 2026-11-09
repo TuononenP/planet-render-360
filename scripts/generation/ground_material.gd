@@ -38,6 +38,13 @@ extends RefCounted
 const CLASS_TEXELS := 1024
 ## Half a class texel (2.34 m): how far road paint stops inside its ribbon.
 const ROAD_INSET_M := 1.2
+## The near class map: its square's side around the viewpoint, the band at
+## its edge that hands over to the extent map, and texels per preset (Fast
+## .. Ultra). 4096 over 1200 m is 0.29 m a texel, 8x the extent map.
+const NEAR_WINDOW_M := 1200.0
+const NEAR_FADE_M := 60.0
+const NEAR_TEXELS: Array[int] = [0, 2048, 4096, 4096]
+const NEAR_TEXELS_MOBILE := 2048
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 ## Metres at which the full photo starts / finishes taking over.
@@ -101,6 +108,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
+	_bind_near(m, data, m2u)
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)
 	m.set_shader_parameter("near_m", NEAR_M)
@@ -144,6 +152,20 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	TerrainGlsl.bind(m, data.quality_preset)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
 	return m
+
+## Binds the near class map around the viewpoint, if this tier has one.
+static func _bind_near(m: ShaderMaterial, data: LocationData, m2u: float) -> void:
+	var n := near_texels(data.quality_preset)
+	var centre := View360.spawn_xz(data)
+	var size_u := NEAR_WINDOW_M * m2u
+	var t0 := Time.get_ticks_msec()
+	var near := near_class_map(data, n, centre, size_u)
+	if near == null:
+		return
+	m.set_shader_parameter("near_class", ImageTexture.create_from_image(near))
+	m.set_shader_parameter("near_n", float(n))
+	m.set_shader_parameter("near_rect", Vector4(centre.x, centre.y, size_u * 0.5, NEAR_FADE_M * m2u))
+	print("NEAR-CLASS %d texels in %d ms" % [n, Time.get_ticks_msec() - t0])
 
 ## Main-photo UV → inner-mosaic UV as (scale u, scale v, offset u,
 ## offset v). Exact, not fitted: a global pixel at the inner zoom is the
@@ -300,6 +322,66 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			fills.append([id, rings])
 		else:
 			_fill_rings(img, rings, id, n)
+	_paint_classes(data, paint, ROAD_INSET_M)
+	if _native and not fills.is_empty():
+		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
+			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
+				WorldScale.detailed_extent_units(), _fill_bytes(fills)))
+	if data.quality_preset > RenderSettings.Preset.FAST \
+			and data.landcover_image != null and not data.landcover_image.is_empty():
+		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
+	return img
+
+## Texels per side of the near class map for `preset`; 0 for none.
+static func near_texels(preset: int) -> int:
+	var n: int = NEAR_TEXELS[RenderSettings.clamp_preset(preset)]
+	return mini(n, NEAR_TEXELS_MOBILE) if OS.has_feature("mobile") else n
+
+## The class map again, finely, over a square of `size_u` around `centre`:
+## the land-cover borders the eye actually sees up close. Unmapped ground
+## stays 0, and the shader takes the extent map's answer there (WorldCover
+## included). Null without the native rasteriser, which this size needs.
+static func near_class_map(data: LocationData, n: int, centre: Vector2, size_u: float) -> Image:
+	if not _native or n <= 0:
+		return null
+	var fills: Array = []
+	var inset_m := 0.5 * size_u / WorldScale.metres_to_units() / float(n)
+	_paint_classes(data, func(rings: Array, id: int) -> void: fills.append([id, rings]), inset_m)
+	var to_window := Transform2D(0.0, -centre)
+	var half := size_u * 0.5
+	var kept: Array = []
+	for f: Array in fills:
+		var moved: Array = []
+		var lo := Vector2(INF, INF)
+		var hi := Vector2(-INF, -INF)
+		for ring: PackedVector2Array in f[1]:
+			var r: PackedVector2Array = to_window * ring
+			moved.append(r)
+			for p in r:
+				lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.y))
+				hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.y))
+		# By bounds: a road or park can cross the window with no corner in it.
+		if lo.x <= half and hi.x >= -half and lo.y <= half and hi.y >= -half:
+			kept.append([f[0], moved])
+	if kept.is_empty():
+		return Image.create(n, n, false, Image.FORMAT_R8)
+	return Image.create_from_data(n, n, false, Image.FORMAT_R8,
+		ClassDB.class_call_static("GroundKernels", "fill_rings", n, size_u, _fill_bytes(kept)))
+
+## Replaces each fill's class id with the texel byte fill_rect would write.
+static func _fill_bytes(fills: Array) -> Array:
+	var probe := Image.create(1, 1, false, Image.FORMAT_R8)
+	var bytes := {}
+	for f: Array in fills:
+		var id: int = f[0]
+		if not bytes.has(id):
+			probe.fill(Color(float(id) / 255.0, 0, 0))
+			bytes[id] = probe.get_data()[0]
+		f[0] = bytes[id]
+	return fills
+
+## Calls `paint`(rings, id) for everything on the ground, in paint order.
+static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: float) -> void:
 	var polys: Array = data.land_polygons
 	for k in range(polys.size() - 1, -1, -1):
 		var poly = polys[k]
@@ -345,7 +427,7 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 		# The ribbon covers the carriageway. Its ground paint stays inside,
 		# so the texel blend never shows as a grey rim along the kerb.
 		if id == ID["road"]:
-			width = maxf(width - ROAD_INSET_M * 2.0 * m2u, width * 0.4)
+			width = maxf(width - road_inset_m * 2.0 * m2u, width * 0.4)
 		for i in pts.size() - 1:
 			var a := pts[i]
 			var b := pts[i + 1]
@@ -354,9 +436,13 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				continue
 			var dir := d.normalized()
 			var nrm := Vector2(-dir.y, dir.x) * width * 0.5
+			# Bends close over the joint; the ends of a way stop where its
+			# ribbon does, or the paint shows as a patch past a dead end.
 			var cap := dir * width * 0.5
-			paint.call([PackedVector2Array([a - cap + nrm, b + cap + nrm,
-				b + cap - nrm, a - cap - nrm])], id)
+			var cap_a := Vector2.ZERO if i == 0 else cap
+			var cap_b := Vector2.ZERO if i == pts.size() - 2 else cap
+			paint.call([PackedVector2Array([a - cap_a + nrm, b + cap_b + nrm,
+				b + cap_b - nrm, a - cap_a - nrm])], id)
 	# Track on its own bed reads as gravel; street track is the road's.
 	var rail_road_index = null
 	for rw in data.railways:
@@ -397,23 +483,6 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				paint.call([PackedVector2Array([Vector2(bx - hx, bz - hz),
 					Vector2(bx + hx, bz - hz), Vector2(bx + hx, bz + hz),
 					Vector2(bx - hx, bz + hz)])], ID["building"])
-	if _native and not fills.is_empty():
-		# Each class id's texel byte as fill_rect writes it.
-		var probe := Image.create(1, 1, false, Image.FORMAT_R8)
-		var bytes := {}
-		for f: Array in fills:
-			var id: int = f[0]
-			if not bytes.has(id):
-				probe.fill(Color(float(id) / 255.0, 0, 0))
-				bytes[id] = probe.get_data()[0]
-			f[0] = bytes[id]
-		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
-			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
-				WorldScale.detailed_extent_units(), fills))
-	if data.quality_preset > RenderSettings.Preset.FAST \
-			and data.landcover_image != null and not data.landcover_image.is_empty():
-		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
-	return img
 
 ## Fill only unclassified texels. Mapped OSM polygons, roads and building
 ## footprints always win; unmapped WorldCover water is left to the existing
