@@ -40,6 +40,31 @@ const SIGNAL := {"crossing": "traffic_signals"}
 func _plan(d: LocationData) -> RoadMarkings.Plan:
 	return RoadMarkings.plan(d, GroundTruth.new(d))
 
+## A built-up Japanese four-way, with a signalled ring of crossings or none.
+func _lamp_place(ring: bool) -> LocationData:
+	var d := _place("JP")
+	d.roads = _four_way()
+	if ring:
+		for c in [[-15, -15, 15, -15], [15, -15, 15, 15], [15, 15, -15, 15], [-15, 15, -15, -15]]:
+			d.roads.append(_crossing(Vector2(c[0], c[1]), Vector2(c[2], c[3]), SIGNAL))
+	for x in range(-80, 81, 20):
+		for z in range(-80, 81, 20):
+			if absi(x) >= 20 and absi(z) >= 20:
+				d.buildings.append({"x": float(x), "z": float(z), "size_x": 8.0, "size_z": 8.0, "height": 9.0})
+	return d
+
+## Lamp count per style that StreetProps places on `d`.
+func _lamps(d: LocationData) -> Dictionary:
+	var ground := GroundTruth.new(d)
+	var root := Node3D.new()
+	StreetProps._lampposts(root, d, ground, VegetationMask.new(d, ground), {"m2u": 1.0, "preset": 3})
+	var out := {}
+	for c in root.get_children():
+		if c is MultiMeshInstance3D:
+			out[str(c.name).trim_prefix("Prop_lamp_")] = (c as MultiMeshInstance3D).multimesh.instance_count
+	root.free()
+	return out
+
 func _check(ok: bool, what: String) -> void:
 	if not ok:
 		failures.append(what)
@@ -172,6 +197,13 @@ func _run() -> void:
 	d.street_furniture = [{"x": 25.0, "z": 0.0, "kind": "signals", "shelter": false}]
 	p = _plan(d)
 	_check(p.stops.size() == 1 and absf(((p.stops[0][0] + p.stops[0][1]) * 0.5).x - 25.0) < 0.5, "a signal node marks one arriving stop line")
+	# Lamps: none on a junction surface; signals swap the utility pole.
+	var plain := _lamps(_lamp_place(false))
+	var ringed := _lamps(_lamp_place(true))
+	_check(plain.get("utility", 0) > 0 and plain.get("modern", 0) == 0, "back streets keep utility poles: %s" % [plain])
+	_check(ringed.get("modern", 0) > 0 and ringed.get("utility", 0) > 0, "only streets near signals change lamp: %s" % [ringed])
+	_check(ringed.get("modern", 0) + ringed.get("utility", 0) <= plain.get("utility", 0) - 4,
+		"no lamp on the junction surface: %s vs %s" % [ringed, plain])
 	# Everything lays into real meshes.
 	d = _place("JP")
 	d.roads = _four_way()
