@@ -2,20 +2,19 @@ class_name LandmarkWestminster
 extends RefCounted
 
 ## Elizabeth Tower ("Big Ben", 96 m) with the Palace of Westminster in
-## true metres: the 12 m square Anston-limestone shaft with Perpendicular
-## Gothic panelling (tiers of paired lancets between blind tracery
-## panels, clasping corner buttresses, string courses), four 7 m opal
-## clock dials at 55 m in gilt square surrounds with iron tracery and
+## true metres, on the palace's own axis (the registry yaw of 6.2 deg
+## turns the model onto it): the 12 m square Anston-limestone shaft with
+## Perpendicular Gothic panelling (tiers of paired lancets between blind
+## tracery panels, clasping corner buttresses, string courses), four 7 m
+## opal clock dials at 55 m in gilt square surrounds with iron tracery and
 ## the DOMINE SALVAM FAC REGINAM band, the gabled clock stage with
 ## crocketed corner pinnacles, the arcaded belfry, and the steep
 ## cast-iron spire with two tiers of lucarnes, the Ayrton Light lantern,
-## spirelet, orb and cross. The palace's 265 m river front runs south
-## (+Z) — a grid of mullioned windows between pinnacled turret shafts,
-## a panelled parapet and projecting pavilions — to the 98.5 m Victoria
-## Tower (Sovereign's Entrance, corner turrets, flagstaff), with the
-## octagonal Central Tower (91 m) between and Westminster Hall (73 m,
-## 1097, Richard II's hammer-beam roof) on New Palace Yard to the west.
-## River (Thames) is east (+X).
+## spirelet, orb and cross. The tower stands at the palace's north-west
+## corner; the ranges (LandmarkWestminsterRanges) and the Hall, Central
+## Tower and Victoria Tower (LandmarkWestminsterTowers) are placed from
+## the OpenStreetMap parts of the palace (LandmarkWestminsterPlan).
+## +Z runs south along the river front, the Thames lies east (+X).
 
 const SHAFT_TOP := 50.0
 const DIAL_Y := 55.0
@@ -33,11 +32,8 @@ static func build(model: Node3D) -> void:
 	lm.use("Dial", LandmarkMaterials.lit("#F2EEDF", 0.35))
 	lm.use("Windows", LandmarkMaterials.glass("#252C30"))
 	_elizabeth(lm)
-	_river_front(lm)
-	_inner(lm)
-	_hall(lm)
-	_central_tower(lm)
-	_victoria(lm)
+	LandmarkWestminsterRanges.build(lm)
+	LandmarkWestminsterTowers.build(lm)
 	lm.commit(model)
 
 static func _face_basis(side: int) -> Basis:
@@ -190,186 +186,3 @@ static func _belfry_spire(lm: LandmarkMesh, w: float) -> void:
 		Vector2(0.38, 0.35), Vector2(0.3, 0.58), Vector2(0.0, 0.7)]), 10)
 	lm.box("Gilt", Vector3(0, TOP - 0.75, 0), Vector3(0.12, 1.5, 0.12), Basis(), 0.0)
 	lm.box("Gilt", Vector3(0, TOP - 0.5, 0), Vector3(0.7, 0.12, 0.12), Basis(), 0.0)
-
-## River front: 252 m of Perpendicular Gothic, 24 m to the parapet —
-## a grid of real window openings (mullion and transom in each), a
-## pinnacled turret shaft at every bay, five projecting pavilions, the
-## panelled parapet, and the slate roof with chimney stacks.
-static func _river_front(lm: LandmarkMesh) -> void:
-	var z0 := 10.0
-	var z1 := 262.0
-	var h := 24.0
-	var fx := 14.0
-	lm.box("Palace", Vector3(4.0, h * 0.5, (z0 + z1) * 0.5), Vector3(20.0, h, z1 - z0))
-	lm.box("Palace", Vector3(fx + 0.6, 0.8, (z0 + z1) * 0.5), Vector3(1.2, 1.6, z1 - z0))
-	lm.gable("Roof", Vector3(4.0, h, (z0 + z1) * 0.5), 18.0, z1 - z0, 7.0, Basis(), 0.2)
-	var bays := 44
-	var win := Vector2(2.4, 4.2)
-	var storey := 6.8
-	var sill := 2.4
-	LandmarkDetail.pierced_face(lm, "Palace", "Windows", Vector3(fx, 0.0, z1), Vector3.FORWARD, Vector3.RIGHT,
-		z1 - z0, h, bays, 3, win, sill, storey, 0.5)
-	var pitch := (z1 - z0) / float(bays)
-	for i in bays:
-		var z := z1 - pitch * (float(i) + 0.5)
-		for row in 3:
-			var y := sill + storey * float(row)
-			lm.box("Palace", Vector3(fx + 0.25, y + win.y * 0.5, z), Vector3(0.2, win.y, 0.16), Basis(), 0.0)
-			lm.box("Palace", Vector3(fx + 0.25, y + win.y * 0.62, z), Vector3(0.2, 0.16, win.x), Basis(), 0.0)
-			# Carved panel under each window.
-			lm.box("Palace", Vector3(fx + 0.55, y - 0.9, z), Vector3(0.1, 1.0, win.x * 0.9), Basis(), 0.0)
-	for i in bays + 1:
-		var z := z0 + pitch * float(i)
-		lm.frustum("Palace", Vector3(fx + 0.6, 0, z), 0.55, 0.5, h + 2.0, 8, PI / 8.0)
-		LandmarkCoreAGothic.pinnacle(lm, "Palace", Vector3(fx + 0.6, h + 2.0, z), 0.45, 4.2, false)
-	LandmarkCoreAGothic.parapet(lm, "Palace", Vector3(fx + 0.2, h, z0), Vector3(fx + 0.2, h, z1), Vector3.RIGHT,
-		1.4, 0.5, pitch)
-	# Projecting pavilions (the Speaker's and Lord Chancellor's houses at
-	# the ends, three between), a storey taller under pyramid roofs.
-	for zc in [16.0, 81.0, 136.0, 196.0, 256.0]:
-		var zz: float = zc
-		lm.box("Palace", Vector3(fx + 1.5, (h + 5.0) * 0.5, zz), Vector3(3.0, h + 5.0, 12.0))
-		lm.spire("Roof", Vector3(fx - 3.0, h + 5.0, zz), 6.0, 8.0, 0.6)
-		for k in 3:
-			LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", Vector3(fx + 3.0, 4.0 + 7.2 * float(k), zz),
-				Vector3.RIGHT, 3.2, 5.2, 0.35, 1, 0.75)
-		for kv in [-1.0, 1.0]:
-			var p := Vector3(fx + 3.0, 0, zz + float(kv) * 6.0)
-			lm.frustum("Palace", p, 0.9, 0.8, h + 6.0, 8, PI / 8.0)
-			LandmarkCoreAGothic.pinnacle(lm, "Palace", p + Vector3(0, h + 6.0, 0), 0.7, 6.0)
-	# Ridge cresting and chimney stacks on the roof.
-	lm.box("Iron", Vector3(4.0, h + 7.4, (z0 + z1) * 0.5), Vector3(0.15, 0.8, z1 - z0), Basis(), 0.0)
-	for k in 13:
-		var z := z0 + 12.0 + float(k) * 19.0
-		for sx in [-1.0, 1.0]:
-			var p := Vector3(4.0 + float(sx) * 4.5, h + 3.5, z)
-			lm.box("Palace", p + Vector3(0, 2.5, 0), Vector3(1.4, 5.0, 2.6))
-			lm.box("Palace", p + Vector3(0, 5.2, 0), Vector3(1.7, 0.4, 2.9), Basis(), 0.0)
-			for kk in 3:
-				lm.frustum("Roof", p + Vector3(0, 5.4, -0.8 + 0.8 * float(kk)), 0.22, 0.2, 0.9, 6)
-
-## The inner ranges round the courts (lower, set back) and the west
-## street front of the Lords' side, with mullioned windows and turrets.
-static func _inner(lm: LandmarkMesh) -> void:
-	lm.box("Palace", Vector3(-28.0, 10.0, 130.0), Vector3(44.0, 20.0, 200.0))
-	lm.gable("Roof", Vector3(-28.0, 20.0, 130.0), 42.0, 200.0, 9.0, Basis(), 0.2)
-	# West range from Westminster Hall's south end to the Victoria Tower.
-	var z0 := 101.0
-	var z1 := 236.0
-	var h := 22.0
-	lm.box("Palace", Vector3(-60.0, h * 0.5, (z0 + z1) * 0.5), Vector3(20.0, h, z1 - z0))
-	lm.gable("Roof", Vector3(-60.0, h, (z0 + z1) * 0.5), 18.0, z1 - z0, 6.5, Basis(), 0.2)
-	var bays := 22
-	LandmarkDetail.pierced_face(lm, "Palace", "Windows", Vector3(-70.0, 0.0, z0), Vector3.BACK, Vector3.LEFT,
-		z1 - z0, h, bays, 3, Vector2(2.4, 4.0), 2.4, 6.4, 0.45)
-	var pitch := (z1 - z0) / float(bays)
-	for i in bays + 1:
-		var z := z0 + pitch * float(i)
-		lm.frustum("Palace", Vector3(-70.6, 0, z), 0.5, 0.45, h + 2.0, 8, PI / 8.0)
-		LandmarkCoreAGothic.pinnacle(lm, "Palace", Vector3(-70.6, h + 2.0, z), 0.4, 3.6, false)
-	LandmarkCoreAGothic.parapet(lm, "Palace", Vector3(-70.2, h, z0), Vector3(-70.2, h, z1), Vector3.LEFT,
-		1.3, 0.5, pitch)
-	# End faces of the court ranges.
-	for i in 6:
-		var x := -46.0 + float(i) * 6.6
-		for row in 2:
-			LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", Vector3(x, 3.0 + float(row) * 8.0, 30.0),
-				Vector3.FORWARD, 2.4, 4.6, 0.3, 1, 0.75, false)
-
-## Westminster Hall: 73 x 20.7 m, buttressed walls under the great
-## lead-grey roof with its louvre lantern; the north front on New Palace
-## Yard has the great window between two square towers.
-static func _hall(lm: LandmarkMesh) -> void:
-	var cx := -60.5
-	var z0 := 28.0
-	var z1 := 101.0
-	var wall := 14.0
-	var zc := (z0 + z1) * 0.5
-	lm.box("Palace", Vector3(cx, wall * 0.5, zc), Vector3(20.7, wall, z1 - z0))
-	lm.gable("Roof", Vector3(cx, wall, zc), 20.7, z1 - z0, 14.0, Basis(), 0.5, "Palace")
-	for sx in [-1.0, 1.0]:
-		var out := Vector3(float(sx), 0, 0)
-		for k in 9:
-			var z := z0 + 4.0 + float(k) * 8.1
-			LandmarkCoreAGothic.buttress(lm, "Palace", Vector3(cx + float(sx) * 10.35, 0, z), out, 1.4, 1.8, 12.0, 2)
-			if k < 8:
-				LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", Vector3(cx + float(sx) * 10.35, 6.0, z + 4.05),
-					out, 2.0, 5.5, 0.3, 1, 0.8)
-	# Louvre lantern on the ridge.
-	lm.frustum("Roof", Vector3(cx, wall + 13.0, zc), 2.0, 2.0, 3.5, 6)
-	lm.lathe("Roof", Vector3(cx, wall + 16.5, zc), PackedVector2Array([Vector2(2.4, 0), Vector2(0.1, 4.0)]), 6)
-	# North front: great window and the twin towers.
-	LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", Vector3(cx, 8.0, z0), Vector3.FORWARD, 9.0, 14.0, 0.6, 4, 0.8)
-	LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", Vector3(cx, 0.4, z0), Vector3.FORWARD, 4.6, 6.4, 0.6, 1, 0.75)
-	for sx in [-1.0, 1.0]:
-		var p := Vector3(cx + float(sx) * 9.0, 0, z0 + 2.0)
-		lm.box("Palace", p + Vector3(0, 13.0, 0), Vector3(5.0, 26.0, 5.0))
-		LandmarkCoreAGothic.parapet(lm, "Palace", p + Vector3(-2.5, 26.0, -2.5), p + Vector3(2.5, 26.0, -2.5),
-			Vector3.FORWARD, 1.2, 0.4, 2.5)
-		for kv in [-1.0, 1.0]:
-			LandmarkCoreAGothic.pinnacle(lm, "Palace", p + Vector3(float(kv) * 2.3, 26.0, -2.3), 0.45, 4.0)
-		for k in 3:
-			LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", p + Vector3(0, 4.0 + 7.0 * float(k), -2.5),
-				Vector3.FORWARD, 1.2, 3.6, 0.25, 1, 0.75, false)
-
-## Central Tower: octagonal lantern over the Central Lobby (91 m), its
-## two-light lancets, pinnacles round the spire's foot, the spire.
-static func _central_tower(lm: LandmarkMesh) -> void:
-	var ct := Vector3(-30.0, 0, 128.0)
-	lm.frustum("Palace", ct + Vector3(0, 20.0, 0), 9.0, 9.0, 34.0, 8, PI / 8.0)
-	var apo := 9.0 * cos(PI / 8.0)
-	for k in 8:
-		var a := TAU * float(k) / 8.0
-		var d := Vector3(cos(a), 0, sin(a))
-		LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", ct + d * apo + Vector3(0, 36.0, 0), d, 2.6, 11.0, 0.35, 2)
-		LandmarkCoreAGothic.lancet(lm, "Palace", "Palace", ct + d * apo + Vector3(0, 24.0, 0), d, 2.6, 8.0, 0.25, 1,
-			0.8, false)
-		var ca := a + PI / 8.0
-		var cp := ct + Vector3(cos(ca), 0, sin(ca)) * 9.0
-		LandmarkCoreAGothic.pinnacle(lm, "Palace", cp + Vector3(0, 54.0, 0), 0.7, 7.0)
-	lm.lathe("Roof", ct + Vector3(0, 54.0, 0), PackedVector2Array([Vector2(9.2, 0), Vector2(6.0, 9.0),
-		Vector2(1.6, 30.0), Vector2(0.15, 37.0)]), 8, 1.0, 1.0, PI / 8.0, false)
-	for k in 8:
-		var a := PI / 8.0 + TAU * float(k) / 8.0
-		var d := Vector3(cos(a), 0, sin(a))
-		lm.beam("Palace", ct + d * 9.2 + Vector3(0, 54.0, 0), ct + d * 6.0 + Vector3(0, 63.0, 0), 0.4, 0.3)
-		lm.beam("Palace", ct + d * 6.0 + Vector3(0, 63.0, 0), ct + d * 1.6 + Vector3(0, 84.0, 0), 0.3, 0.25)
-
-## Victoria Tower: 23 m square, the Sovereign's Entrance arch, tiers of
-## blind tracery, the tall belfry-stage lancets, the panelled parapet,
-## octagonal corner turrets with gilt-capped pinnacles, the flagstaff to
-## 98.5 m.
-static func _victoria(lm: LandmarkMesh) -> void:
-	var vt := Vector3(-40.0, 0, 250.0)
-	var vh := 85.0
-	var w := 23.0
-	lm.box("Palace", vt + Vector3(0, vh * 0.5, 0), Vector3(w, vh, w))
-	lm.box("Palace", vt + Vector3(0, 1.0, 0), Vector3(w + 1.0, 2.0, w + 1.0))
-	for side in 4:
-		var rot := _face_basis(side)
-		var out := rot * Vector3(0, 0, 1)
-		var face := vt + out * w * 0.5
-		for k in 3:
-			LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", face + rot * Vector3(-6.0 + 6.0 * float(k), 58.0, 0),
-				out, 3.2, 17.0, 0.5, 2, 0.85)
-		for tier in 2:
-			for k in 5:
-				LandmarkCoreAGothic.lancet(lm, "Palace", "Palace",
-					face + rot * Vector3(-7.6 + 3.8 * float(k), 26.0 + 14.0 * float(tier), 0), out, 2.4, 10.0, 0.3, 1,
-					0.85, false)
-		for y in [22.0, 38.0, 54.0, 77.0]:
-			lm.box("Palace", face + Vector3(0, y, 0) + out * 0.2, Vector3(w - 3.0, 0.5, 0.4), rot, 0.0)
-		LandmarkCoreAGothic.parapet(lm, "Palace", vt + rot * Vector3(-w * 0.5 + 2.0, vh, w * 0.5),
-			vt + rot * Vector3(w * 0.5 - 2.0, vh, w * 0.5), out, 2.0, 0.6, 3.8, 3.5)
-	# Sovereign's Entrance (south face) and the archway through.
-	LandmarkCoreAGothic.lancet(lm, "Palace", "Windows", vt + Vector3(0, 0.5, w * 0.5), Vector3.BACK, 10.0, 15.0,
-		1.2, 1, 0.8, true, 1.0)
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			var p := vt + Vector3(float(sx) * 11.0, 0, float(sz) * 11.0)
-			lm.frustum("Palace", p, 2.0, 2.0, vh + 4.0, 8, PI / 8.0)
-			for y in [22.0, 54.0]:
-				lm.frustum("Palace", p + Vector3(0, y, 0), 2.2, 2.2, 0.5, 8, PI / 8.0)
-			lm.frustum("Palace", p + Vector3(0, vh + 4.0, 0), 2.3, 2.3, 0.6, 8, PI / 8.0)
-			lm.spire("Gilt", p + Vector3(0, vh + 4.6, 0), 1.6, 8.9, 0.0, 8)
-	lm.frustum("Iron", vt + Vector3(0, vh, 0), 0.35, 0.2, 13.5, 6)
