@@ -65,13 +65,13 @@ func _init() -> void:
 	if selected.size() > LandmarkSites.MAX_BY_PRESET[3]:
 		failures.append("Stockholm Ultra selection exceeds the registry budget")
 	data.quality_preset = 2
-	if LandmarkSites.select(data, []).size() > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[2]:
+	if _icons(LandmarkSites.select(data, [])) > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[2]:
 		failures.append("Stockholm's extra Ultra slots should not affect High")
 	data.latitude = 48.8566
 	data.longitude = 2.3522
 	data.landmark_type = "eiffel"
 	data.quality_preset = 3
-	if LandmarkSites.select(data, []).size() > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[3]:
+	if _icons(LandmarkSites.select(data, [])) > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[3]:
 		failures.append("Other Ultra presets should retain the normal registry budget")
 	if failures.is_empty():
 		print("STOCKHOLM HERO LANDMARKS OK")
@@ -80,3 +80,8 @@ func _init() -> void:
 		for failure in failures:
 			push_error(failure)
 		quit(1)
+
+## Registry candidates that are landmarks, not capital bridges (those fill the
+## room the icons leave, see LandmarkSites.MAX_BRIDGES_BY_PRESET).
+func _icons(selected: Array) -> int:
+	return selected.filter(func(c: Dictionary) -> bool: return not str(c["type"]).begins_with("br_")).size()

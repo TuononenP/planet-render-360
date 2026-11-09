@@ -16,6 +16,10 @@ const MAX_BY_PRESET: Array[int] = [10, 16, 22, 26]
 ## Registry icons beside the primary per preset, priority then nearest: a
 ## historic centre (Rome, Athens) stands a dozen of them together.
 const MAX_REGISTRY_EXTRAS_BY_PRESET: Array[int] = [6, 12, 18, 22]
+## Capital bridges (secondary `kind: "Bridge"` entries, see BridgeSpec) per
+## preset, after the extras: they never take an icon's slot, only room left
+## under MAX_BY_PRESET.
+const MAX_BRIDGES_BY_PRESET: Array[int] = [2, 4, 6, 8]
 ## Clearance around a registry landmark (its own footprint and grounds)
 ## and around an OSM archetype, metres.
 const REGISTRY_CLEAR_M := 68.0
@@ -44,7 +48,11 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 	if preset == MAX_BY_PRESET.size() - 1:
 		var primary := LocationData.entry_for_type(data.landmark_type)
 		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, MAX_BY_PRESET[preset])
-	for e in extras.slice(0, registry_limit):
+	var icons: Array = extras.filter(func(e: Dictionary) -> bool: return not _is_capital_bridge(e)).slice(0, registry_limit)
+	# Bridges fill only the room the icons leave under the preset's candidate cap.
+	var bridges := _nearest_bridges(data, extras,
+		mini(MAX_BRIDGES_BY_PRESET[preset], maxi(MAX_BY_PRESET[preset] - icons.size(), 0)))
+	for e in icons + bridges:
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
 			data.latitude, data.longitude)
@@ -72,6 +80,28 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 		if not taken:
 			out.append(c)
 	return out
+
+## A capital bridge: a secondary bridge entry (BridgeSpec.to_entry).
+static func _is_capital_bridge(entry: Dictionary) -> bool:
+	return bool(entry.get("secondary", false)) and str(entry.get("kind", "")) == "Bridge"
+
+## The capital bridges among `extras` to build: the most important tier
+## first, then those whose span passes nearest the view centre, at most
+## `limit`. The viewpoint need not be at a bridge's centre, so the distance
+## is to the span itself.
+static func _nearest_bridges(data: LocationData, extras: Array, limit: int) -> Array:
+	var found: Array = extras.filter(func(e: Dictionary) -> bool: return _is_capital_bridge(e))
+	var view := Vector2.ZERO
+	var dist := func(e: Dictionary) -> float:
+		var at := WorldScale.xz_from_latlon(float(e["lat"]), float(e["lon"]), data.latitude, data.longitude)
+		return span_dist(view, at, e)
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var at := int(a.get("tier", 2))
+		var bt := int(b.get("tier", 2))
+		if at != bt:
+			return at < bt
+		return dist.call(a) < dist.call(b))
+	return found.slice(0, limit)
 
 ## A registry entry's clearance (its `clear_m`, else REGISTRY_CLEAR_M).
 static func clear_m(entry: Dictionary) -> float:

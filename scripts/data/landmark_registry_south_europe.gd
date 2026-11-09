@@ -48,7 +48,7 @@ static func entries() -> Array:
 			"radius_m": 2500.0, "wiki_title": "Castel Sant'Angelo", "height_m": 48.0, "kind": "Castle",
 			"clear_m": 80.0,
 			"aliases": ["castel sant'angelo", "castel sant’angelo", "castel sant angelo",
-				"mausoleum of hadrian", "ponte sant'angelo"]},
+				"mausoleum of hadrian"]},
 		{"type": "trevi_fountain", "name": "Trevi Fountain", "lat": 41.90093, "lon": 12.48331,
 			"radius_m": 1500.0, "wiki_title": "Trevi Fountain", "height_m": 26.3, "kind": "Fountain",
 			"clear_m": 40.0,

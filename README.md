@@ -93,6 +93,18 @@ download with bounded-range retries, verifies the published source checksum,
 and removes its own completed downloads. `--batch-size 2` extracts two views
 per scan to reduce processing time, at the cost of additional memory.
 
+### Capital bridges
+
+The major bridges of the capitals are rows in `scripts/data/bridges/bridge_specs_*.gd`
+(schema and rules in `scripts/data/bridges/bridge_spec.gd`): real span, width,
+deck height, tower or arch height and bearing, each with its source and a
+confidence. `BridgeParam` builds a model from a row, and `LandmarkSites` shows
+the nearest few per quality preset beside the city's own landmarks. A row
+below confidence 2 stays in the table but is not built, so the mapped deck is
+drawn instead of a guess. `python3 -I tools/bridge_candidates.py <snapshot>`
+measures the named bridges in a bundled snapshot (centre, bearing, length) to
+seed new rows; `tests/bridge_specs_test.gd` checks every row.
+
 ## Platforms
 
 Initial development targets **macOS** for easier development and testing, followed by **iOS** and **Android**.

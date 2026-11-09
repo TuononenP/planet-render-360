@@ -346,6 +346,10 @@ static func landmarks() -> Array:
 		all.append_array(_regional_extras())
 		_core_count = _core_landmarks().size()
 		_all_landmarks = all
+		_by_type.clear()
+		for entry in all:
+			if not _by_type.has(str(entry["type"])):
+				_by_type[str(entry["type"])] = entry
 	return _all_landmarks
 
 ## Regional-tier entries with their models in the core landmark classes:
@@ -360,6 +364,7 @@ static func _regional_extras() -> Array:
 
 ## Built once: the lookups below loop the registry on every call.
 static var _all_landmarks: Array = []
+static var _by_type: Dictionary = {}
 static var _core_count := 0
 
 static func _core_landmarks() -> Array:
@@ -457,6 +462,11 @@ static func landmark_entry(lat: float, lon: float, name: String) -> Dictionary:
 	var named: Dictionary = {}
 	var named_len := 0
 	for entry in landmarks():
+		# A secondary entry (a capital bridge) answers its name only near its
+		# own site: "Pont Neuf" searched in Toulouse is not Paris's.
+		if entry.get("secondary", false) \
+				and distance_m(lat, lon, float(entry["lat"]), float(entry["lon"])) > float(entry["radius_m"]):
+			continue
 		for alias in entry["aliases"]:
 			# The longest alias wins: "louvre pyramid" over "pyramid".
 			if str(alias).length() > named_len and lowered.contains(str(alias)):
@@ -470,6 +480,8 @@ static func landmark_entry(lat: float, lon: float, name: String) -> Dictionary:
 	# Zappeion); nearest within a tier.
 	var all := landmarks()
 	var regional := all.slice(_core_count)
+	# A secondary entry (a capital bridge) is never a city's primary icon.
+	regional = regional.filter(func(e: Dictionary) -> bool: return not e.get("secondary", false))
 	var icons := regional.filter(func(e: Dictionary) -> bool: return bool(e.get("icon", false)))
 	for tier in [all.slice(0, _core_count), icons, regional]:
 		var best: Dictionary = {}
@@ -494,10 +506,8 @@ static func landmark_for(lat: float, lon: float, name: String) -> String:
 ## (a hanging crag's depth; lifts a ground-anchored model), base_half_m
 ## (ground-sampling radius), and base_asl_m (base: absolute's fixed datum).
 static func entry_for_type(type: String) -> Dictionary:
-	for entry in landmarks():
-		if str(entry["type"]) == type:
-			return entry
-	return {}
+	landmarks()
+	return _by_type.get(type, {})
 
 ## Every other registry landmark whose radius covers the viewpoint: the
 ## second and third icons of a skyline (LandmarkSites builds them as
