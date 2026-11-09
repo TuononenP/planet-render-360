@@ -905,13 +905,12 @@ static func _rect_mass_yrange(world: Node3D, xz: Vector2, size: Vector2) -> Vect
 		return Vector2(INF, INF)
 	return out
 
-## Extrusion base: lowest ground under the rectangle (centre + corners)
-## sunk 0.6.
+## Extrusion base: the footing floor under the rectangle (the lowest
+## ground, raised onto a plinth on a slope) sunk 0.6.
 static func _rect_base(ground: GroundTruth, xz: Vector2, size: Vector2) -> float:
-	var base := ground.height_at_world(xz.x, xz.y)
-	for p in BuildingBuilder._rect_ring(xz, size, 0.0):
-		base = minf(base, ground.height_at_world(p.x, p.y))
-	return base - 0.6
+	var footing := BuildingFoundation.sample(ground, BuildingBuilder._rect_ring(xz, size, 0.0), xz)
+	return float(footing["floor"]) - (0.0 if bool(footing["raised"]) \
+		else BuildingFoundation.SINK_M * WorldScale.metres_to_units())
 
 ## An extruded ring must not ALSO place an AABB box (no doubled mass).
 func _check_no_fallback_box(failures: Array[String], world: Node3D,
