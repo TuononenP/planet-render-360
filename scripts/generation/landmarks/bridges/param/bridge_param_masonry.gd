@@ -35,6 +35,7 @@ static func build(lm: LandmarkMesh, row: Dictionary) -> void:
 				Vector2(xs[i], z0 + s * nose), Vector2(xs[i] + pier_w * 0.5, z0)]), 0.0, spring + 0.5)
 	var h := BridgeParam.half_length(row)
 	lm.box("Deck", Vector3(0, clear + 0.04, 0), Vector3(2.0 * h, 0.08, width - 1.4), Basis(), 0.0)
+	BridgeParam.markings(lm, -h, h, clear + 0.08, width - 1.4)
 	BridgeParam.parapets(lm, "Stone", -h, h, clear, width)
 	# String course under the parapet on both faces.
 	for s in [-1.0, 1.0]:
