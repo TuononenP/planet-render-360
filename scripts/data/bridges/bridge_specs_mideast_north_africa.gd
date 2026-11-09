@@ -137,7 +137,7 @@ static func rows() -> Array:
 				"so the stayed chain (pylons 376 m apart, mid 33.93904) is shifted ~130 m north of the first- " +
 				"pass centre; Bouregreg river crosses the way 220 m from its north end"},
 		{"id": "br_tunis_rades_la_goulette_bridge", "cc": "TN", "name": "Rades-La Goulette Bridge", "wiki": "Radès–La Goulette bridge",
-			"aliases": ["rades la goulette bridge", "pont de rades la goulette"], "lat": 36.8074, "lon": 10.26079,
+			"aliases": ["rades la goulette bridge", "pont de rades la goulette"], "lat": 36.80767, "lon": 10.260759,
 			"bearing": 174.8, "st": "extradosed", "spans": [70.0, 120.0, 70.0], "width": 23.5, "clear": 20.0,
 			"tower": 45.0, "towers": [1, 2], "material": "concrete", "base": "water", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (70+120+70 m, 23.5 m wide, deck 20 m, towers 45 m, 2009), OSM bearing/centre; " +
@@ -147,5 +147,7 @@ static func rows() -> Array:
 				"clearance over the La Goulette canal; techno-science: deck 20 m above sea level held by two " +
 				"towers 45 m high; OSM way 177034410 (978 m viaduct, N to S, brg 174.9) crosses the La " +
 				"Goulette canal water polygon between 365 and 555 m from its north end, so the 260 m " +
-				"extradosed chain centre moved ~30 m north of the way centre to 36.8074,10.26079"},
+				"extradosed chain centre moved ~30 m north of the way centre to 36.8074,10.26079 | placement: " +
+				"centre moved -30 m along the deck onto the middle of the mapped water crossing (offset " +
+				"measured in the bundled OSM snapshot)"},
 	]

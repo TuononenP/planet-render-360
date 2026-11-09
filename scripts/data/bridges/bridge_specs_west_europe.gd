@@ -28,14 +28,16 @@ static func rows() -> Array:
 				"~1.5, centre 51.5098,-0.1044 (matches); en Wikipedia 923 ft, 105 ft wide, 5 wrought-iron " +
 				"arches"},
 		{"id": "br_london_london_bridge", "cc": "GB", "name": "London Bridge", "wiki": "London Bridge",
-			"aliases": ["london bridge thames", "london bridge 1973"], "lat": 51.50763, "lon": -0.08791,
+			"aliases": ["london bridge thames", "london bridge 1973"], "lat": 51.507947, "lon": -0.087793,
 			"bearing": 193.0, "st": "girder", "spans": [79.2, 103.6, 79.2], "width": 32.0, "clear": 10.0,
 			"material": "concrete", "base": "sea", "tier": 2, "conf": 2,
 			"src": "en Wikipedia infobox (1973 prestressed box girder, main span 104 m, 269 m, 32 m wide; " +
 				"coordinate within 55 m of OSM), OSM way 8599345 bearing; side spans assumed equal, deck " +
 				"height estimated (8.9 m headroom at HW) | verified: ICE project page and Grace's Guide: 3 " +
 				"spans 260/340/260 ft (79.2/103.6/79.2 m), en Wikipedia main span 104 m, 32 m wide; OSM ways " +
-				"849624791/3709270 bearing 192.5 and centre 51.5078,-0.0879 re-measured"},
+				"849624791/3709270 bearing 192.5 and centre 51.5078,-0.0879 re-measured | placement: centre " +
+				"moved -36 m along the deck onto the middle of the mapped water crossing (offset measured in " +
+				"the bundled OSM snapshot)"},
 		{"id": "br_london_lambeth_bridge", "cc": "GB", "name": "Lambeth Bridge", "wiki": "Lambeth Bridge",
 			"aliases": ["lambeth bridge london"], "lat": 51.49455, "lon": -0.12301, "bearing": 279.6, "st": "arch_deck",
 			"spans": [38.1, 45.4, 50.3, 45.4, 38.1], "width": 18.3, "clear": 8.5, "rise": 3.5, "material": "steel",
@@ -46,14 +48,15 @@ static func rows() -> Array:
 				"38.1/45.4/50.3/45.4/38.1 m; OSM ways 201619353 etc: deck 239 m centre 51.49452,-0.12302 " +
 				"bearing 279.4 (matches); Grace's Guide width"},
 		{"id": "br_london_vauxhall_bridge", "cc": "GB", "name": "Vauxhall Bridge", "wiki": "Vauxhall Bridge",
-			"aliases": ["vauxhall bridge london"], "lat": 51.48777, "lon": -0.12744, "bearing": 306.0,
+			"aliases": ["vauxhall bridge london"], "lat": 51.487605, "lon": -0.127078, "bearing": 306.0,
 			"st": "arch_deck", "spans": [43.2, 47.9, 49.5, 47.9, 43.2], "width": 24.4, "clear": 10.5, "rise": 4.0,
 			"material": "steel", "base": "sea", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (5 steel arches, 80 ft wide, 809 ft), search snippet (clear spans " +
 				"39.6/43.9/45.4/43.9/39.6 m, 231.6 m with piers): spans scaled to that total; OSM bearing; " +
 				"rise and clear estimated | verified: OSM way 749336136 (trunk, 263 m incl. approach) bearing " +
 				"306.1, centre within 36 m of the row (Wikipedia coordinate 51.4875,-0.1275 agrees); en " +
-				"Wikipedia 5 steel arches 80 ft wide"},
+				"Wikipedia 5 steel arches 80 ft wide | placement: centre moved -31 m along the deck onto the " +
+				"middle of the mapped water crossing (offset measured in the bundled OSM snapshot)"},
 		{"id": "br_london_chelsea_bridge", "cc": "GB", "name": "Chelsea Bridge", "wiki": "Chelsea Bridge",
 			"aliases": ["chelsea bridge london"], "lat": 51.48453, "lon": -0.14983, "bearing": 352.0, "st": "susp",
 			"spans": [52.4, 107.3, 52.4], "width": 25.0, "clear": 10.5, "tower": 31.0, "material": "steel",

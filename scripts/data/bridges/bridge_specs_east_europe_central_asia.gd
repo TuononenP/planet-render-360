@@ -33,7 +33,7 @@ static func rows() -> Array:
 		{"id": "br_kyiv_pivnichnyi_bridge", "cc": "UA", "name": "Pivnichnyi Bridge", "wiki": "Pivnichnyi Bridge",
 
 			"aliases": ["північний міст", "moskovskyi bridge", "moscow bridge kyiv", "north bridge kyiv", "московський міст"],
-			"lat": 50.49065, "lon": 30.53593, "bearing": 64.5, "st": "stayed",
+			"lat": 50.490779, "lon": 30.536351, "bearing": 64.5, "st": "stayed",
 			"spans": [42.0, 63.0, 63.0, 63.0, 63.0, 63.63, 300.0, 84.51], "width": 31.4, "clear": 20.0, "tower": 119.0,
 			"towers": [7], "pylon": "portal", "material": "steel", "base": "water", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (cable-stayed 1976, A-pylon 119 m on Trukhaniv Island, 816 m Dnipro section, " +
@@ -46,7 +46,8 @@ static func rows() -> Array:
 				"84.51-300-63.63-4x63-42; OSM way 23145427 (West to East, 50.48912,30.53090 -> " +
 				"50.49218,30.54096, ~790 m, brg 64.5, centre 50.49065,30.53593) ends at the Trukhaniv west " +
 				"shore, so the pylon is at the EAST end of the 300 m span and the list runs east to west; " +
-				"order reversed to west to east"},
+				"order reversed to west to east | placement: centre moved +33 m along the deck onto the " +
+				"middle of the mapped water crossing (offset measured in the bundled OSM snapshot)"},
 		{"id": "br_kyiv_pivdennyi_bridge", "cc": "UA", "name": "Pivdennyi Bridge", "wiki": "Pivdennyi Bridge (Kyiv)",
 			"aliases": ["південний міст", "south bridge kyiv", "southern bridge kyiv"], "lat": 50.39481, "lon": 30.5888,
 			"bearing": 94.6, "st": "stayed",
