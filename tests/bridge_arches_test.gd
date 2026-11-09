@@ -35,6 +35,18 @@ func _init() -> void:
 	var high := RoadBuilder.deck_profile(dry, surf, 1.0, 7.0, 1)
 	if high.size() != dry.size() or high[2] < surf.height(0, 0) + 5.0 or high[2] <= low[2] + 2.0:
 		failures.append("layer 1 dry viaduct should rise about 5 m over land")
+	# An elevated bridge meets the ground at both ends, however short: a 21 m
+	# footbridge peaks below the full 5 m, a long road viaduct reaches it.
+	var foot := RoadBuilder._resample(PackedVector2Array([Vector2(0, 0), Vector2(21, 0)]), 2.0)
+	var foot_deck := RoadBuilder.deck_profile(foot, surf, 1.0, 1.0, 1)
+	var road_deck := RoadBuilder.deck_profile(dry, surf, 1.0, 7.0, 1)
+	var ground_y := surf.height(0, 0)
+	for d in [foot_deck, road_deck]:
+		if d[0] > ground_y + 0.5 or d[d.size() - 1] > ground_y + 0.5:
+			failures.append("an elevated bridge must start and end at the ground, ends at %.1f / %.1f m over it" % [d[0] - ground_y, d[d.size() - 1] - ground_y])
+	var foot_peak := foot_deck[foot_deck.size() / 2] - ground_y
+	if foot_peak < 2.0 or foot_peak > 5.0 or foot_deck[1] <= foot_deck[0]:
+		failures.append("a short footbridge should ramp up toward its middle, peak %.1f m" % foot_peak)
 	var dist := PackedFloat32Array([0, 40, 80, 120, 160])
 	var pier_batch := RoadBuilder._Batch.new()
 	RoadBuilder._land_piers(pier_batch, dry, dist, high, surf, 1.0)

@@ -37,6 +37,10 @@ const BRIDGE_GRADE := 0.05
 const BRIDGE_RISE_M := 3.0
 ## Steepest ramp easing a deck lifted clear of the water.
 const RAMP_GRADE := 0.08
+## Ramp of an elevated land bridge up from its ends: a road's grade, and
+## a path's (stairs and ramps; up to PATH_WIDTH_M wide).
+const PATH_RAMP_GRADE := 0.35
+const PATH_WIDTH_M := 4.0
 ## Margin inside the drawn terrain mesh's edge the roads are clipped to
 ## (metres). The mesh is not centred: its last post row stops one post
 ## short of the extent's +X / +Z edge, and past it only the far terrain
@@ -446,9 +450,17 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 		deck[i] += lift[i]
 	# A mapped elevated way over land is a viaduct, not a ground ribbon.
 	# Keep the existing bank-to-bank water profile for mixed crossings.
+	# It climbs from the ground at both ends at a ramp grade (steeper
+	# for a path, which takes steps) up to the layer's clearance, so a
+	# short bridge peaks lower instead of hovering flat at both ends.
 	if layer > 0 and _land_bridge(pts, surf):
+		var grade := PATH_RAMP_GRADE if half * 2.0 <= PATH_WIDTH_M * m2u else RAMP_GRADE
+		var end0 := deck[0]
+		var end1 := deck[n - 1]
 		for i in n:
-			deck[i] = maxf(deck[i], _deck_floor(pts, i, surf, 0.0, half) + float(layer) * 5.0 * m2u)
+			var ramp := minf(end0 + grade * dist[i], end1 + grade * (total - dist[i]))
+			var high := _deck_floor(pts, i, surf, 0.0, half) + float(layer) * 5.0 * m2u
+			deck[i] = maxf(deck[i], minf(high, ramp))
 	return deck
 
 static func _land_bridge(pts: PackedVector2Array, surf: _Surface) -> bool:
