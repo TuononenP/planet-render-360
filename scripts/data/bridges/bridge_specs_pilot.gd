@@ -100,15 +100,17 @@ static func rows() -> Array:
 				"115/104.5/94.5 ft in one old source vs Grace's Guide 96-120 ft; the symmetric 96/108/114/120 " +
 				"ft split is not confirmed and pier thickness is not published"},
 		{"id": "br_london_waterloo_bridge", "cc": "GB", "name": "Waterloo Bridge", "wiki": "Waterloo Bridge",
-			"aliases": ["waterloo bridge london", "ladies bridge"], "lat": 51.508, "lon": -0.1164, "bearing": 331.0,
-			"st": "girder", "spans": [72.0, 75.0, 75.0, 75.0, 72.0], "width": 24.0, "clear": 9.0,
+			"aliases": ["waterloo bridge london", "ladies bridge"], "lat": 51.508546, "lon": -0.116883,
+			"bearing": 331.0, "st": "girder", "spans": [72.0, 75.0, 75.0, 75.0, 72.0], "width": 24.0, "clear": 9.0,
 			"material": "concrete", "base": "sea", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (1230 ft, 80 ft wide), search snippets (c20society/waymarking/hagerty: 3x75 + " +
 				"2x72 m, 24 m), OSM bearing; clear estimated | verified: Historic England listing (via " +
 				"Waymarking): five spans, 'three spans of 75m between two of 72m', 24 m wide, reinforced " +
 				"concrete box girders continuous over the two outer pairs; en Wikipedia (1230 ft incl. " +
 				"approaches, 80 ft wide, main span 233 ft); OSM ways 200596577/948685545 (brg 330.5-331.0), " +
-				"river chain mid ~51.5079,-0.1163 within 15 m of row; clear 9 m estimated"},
+				"river chain mid ~51.5079,-0.1163 within 15 m of row; clear 9 m estimated | placement: centre " +
+				"moved +69 m along the deck onto the middle of the mapped water crossing (offset measured in " +
+				"the bundled OSM snapshot)"},
 		{"id": "br_london_millennium_bridge", "cc": "GB", "name": "Millennium Bridge", "wiki": "Millennium Bridge, London",
 			"aliases": ["london millennium footbridge", "wobbly bridge", "millennium footbridge"], "lat": 51.5096,
 			"lon": -0.0986, "bearing": 182.3, "st": "lateral", "spans": [81.0, 144.0, 108.0], "width": 4.0,
