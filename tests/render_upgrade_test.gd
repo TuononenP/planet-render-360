@@ -209,6 +209,24 @@ func _run() -> void:
 	if RoadSurface.junction_frac(junc, Vector2(0, 0)) > 0.01 or RoadSurface.junction_frac(junc, Vector2(50, 0)) < 0.99:
 		failures.append("the shared node should be a junction (%.2f at it, %.2f 50 m away)"
 			% [RoadSurface.junction_frac(junc, Vector2(0, 0)), RoadSurface.junction_frac(junc, Vector2(50, 0))])
+	# Paint junctions: carriageways that really branch, not footways or way splits.
+	var jd := _flat(RenderSettings.Preset.HIGH)
+	jd.roads = [
+		{"class": "tertiary", "width_m": 8.0, "points": PackedVector2Array([Vector2(-60, 0), Vector2(0, 0)])},
+		{"class": "tertiary", "width_m": 8.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(60, 0)])},
+		{"class": "footway", "width_m": 2.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(0, 30)])},
+		{"class": "footway", "width_m": 2.0, "points": PackedVector2Array([Vector2(60, 0), Vector2(60, 30)])},
+		{"class": "tertiary", "width_m": 8.0, "points": PackedVector2Array([Vector2(60, 0), Vector2(120, 0)])},
+		{"class": "tertiary", "width_m": 8.0, "points": PackedVector2Array([Vector2(120, -40), Vector2(120, 0), Vector2(120, 40)])},
+	]
+	var paint := RoadSurface.carriageway_junctions(jd)
+	var all_nodes := RoadSurface.junctions(jd)
+	if RoadSurface.junction_frac(all_nodes, Vector2(0, 0)) > 0.01:
+		failures.append("junctions() must keep footway nodes (kerbs and parked cars depend on them)")
+	if RoadSurface.junction_frac(paint, Vector2(0, 0)) < 0.99:
+		failures.append("a way split with a footway is no paint junction (%.2f)" % RoadSurface.junction_frac(paint, Vector2(0, 0)))
+	if RoadSurface.junction_frac(paint, Vector2(120, 0)) > 0.01:
+		failures.append("a real three-way node is a paint junction")
 	var roads := RoadBuilder.build_roads(rd, GroundTruth.new(rd))
 	var attr_ok := false
 	var oneway_ok := false

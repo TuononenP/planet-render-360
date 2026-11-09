@@ -20,9 +20,13 @@ extends RefCounted
 ## are still accepted as {width 1.7 units, class unclassified}.
 ## TerrainBuilder.build_world adopts the children flat.
 
-## Ribbon lift above the surface in metres, by draw rank (paths under
-## streets under main roads, so crossings do not z-fight): ≤ 0.05 m.
-const LIFT_M := [0.03, 0.04, 0.05]
+## Ribbon lift above the surface in metres rises with the depth layer
+## (lift_for_layer), so the two can never disagree: at street-level eye
+## heights a 1 cm lift outweighs the depth bias, and a crossing lifted
+## less than the road it lies on vanished under it.
+const LIFT_MIN_M := 0.03
+const LIFT_MAX_M := 0.05
+const LIFT_TOP_LAYER := 7.7
 ## Paved areas (squares) lie under every ribbon, paths included.
 const AREA_LIFT_M := 0.02
 const AREA_LAYER := 0.5
@@ -148,8 +152,10 @@ static func _material(finish: String) -> Material:
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear())
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
-		"crossing":
-			m = RoadSurface.crossing_material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
+		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":
+			var kind := "solid" if finish == "marking" else ("zebra" if finish == "crossing" else finish.trim_prefix("crossing_"))
+			m = RoadSurface.crossing_material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear(),
+				float(RoadSurface.CROSSING_KINDS[kind]))
 		_:
 			m = RoadSurface.material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 	_mats[finish] = m
@@ -167,7 +173,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	surf.use_native()
-	var junc := RoadSurface.junctions(data)
+	var plan := RoadMarkings.plan(data, ground)
+	var junc := plan.junctions
 	var steps := RoadSurface.depth_steps(data)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
@@ -181,7 +188,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
-			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort)
+			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}))
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
 	WorkerThreadPool.wait_for_group_task_completion(group)
@@ -189,6 +196,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	for own in parts:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
+	RoadMarkings.lay(plan, batches, surf, m2u)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -206,10 +214,13 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 ## One road element (at depth `step`, RoadSurface.depth_steps) into
 ## `batches`: draped ribbons on dry land, decks on its bridge spans.
 static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, surf: _Surface,
-		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort) -> void:
+		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort, marking: Dictionary = {}) -> void:
 	var r := _parse(line, m2u)
 	if r.is_empty():
 		return
+	if not marking.is_empty():
+		r["finish"] = marking["finish"]
+		r["width_u"] = float(marking["width_m"]) * m2u
 	var pts: PackedVector2Array = r["points"]
 	if pts.size() < 2:
 		return
@@ -219,14 +230,15 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
-	if line is Dictionary and not surf.districts.is_empty():
+	if line is Dictionary and not surf.districts.is_empty() and marking.is_empty():
 		finish = _district_finish(line, surf.districts, m2u)
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
 			_bridge(batches, piece, float(r["width_u"]), surf, m2u, "bridge",
 				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
 		return
-	var lift := float(LIFT_M[int(r["rank"])]) * m2u
+	var layer := depth_layer(int(r["rank"]), finish, step)
+	var lift := lift_for_layer(layer) * m2u
 	# RoadSurface attributes: lanes, rank, kerbed urban street.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
@@ -236,14 +248,14 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		if abort != null and abort.requested:
 			break
 		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
-			surf, lift, attr, junc, depth_layer(int(r["rank"]), finish, step))
+			surf, lift, attr, junc, layer)
 
 ## Paved area (a square) filled flat on the drawn terrain: the outer
 ## ring ear-clipped, triangles over its holes, open water or past the
 ## drawn mesh dropped, the rest cut and laid like ribbon pieces under
 ## every ribbon (AREA_LAYER). An outline ribbon only drew its edge.
 static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surface,
-		lift: float, m2u: float) -> void:
+		lift: float, m2u: float, layer: float = AREA_LAYER) -> void:
 	if ring.size() < 3:
 		return
 	var idx := Geometry2D.triangulate_polygon(ring)
@@ -251,7 +263,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 		return
 	b.pad()
 	var attr := Color(0.0, 0.0, 0.0, 1.0)
-	var w2 := Vector2(0.0, AREA_LAYER)
+	var w2 := Vector2(0.0, layer)
 	var weld := {}
 	var eligible := PackedVector2Array()
 	for t in range(0, idx.size(), 3):
@@ -270,7 +282,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 			eligible.append_array(tri)
 	if surf.native != null and surf.native.has_method("area") \
 			and (surf.native_shore or not surf.near_shore(eligible, 0.0)):
-		b.append(surf.native.area(eligible, lift, attr, AREA_LAYER, m2u, b.verts.size()))
+		b.append(surf.native.area(eligible, lift, attr, layer, m2u, b.verts.size()))
 	else:
 		for t in range(0, eligible.size(), 3):
 			RoadDrape.tri(b, surf, lift, attr, w2, weld, eligible.slice(t, t + 3), m2u)
@@ -287,9 +299,13 @@ static func surface_height(data: LocationData, ground: GroundTruth, x: float,
 ## streets meeting at a junction never tie. A 1-5 cm lift alone is below
 ## the depth buffer's resolution a few hundred metres out, so they flickered.
 static func depth_layer(rank: int, finish: String, step: int) -> float:
-	if finish == "crossing":
+	if finish.begins_with("crossing"):
 		return CROSSING_LAYER + float(step) * 0.11  # above every carriageway
 	return 1.0 + float(rank) * 2.0 + (1.0 if finish == "asphalt" else 0.0) + float(step) * 0.11
+
+## Lift above the surface (m) for a depth layer.
+static func lift_for_layer(layer: float) -> float:
+	return lerpf(LIFT_MIN_M, LIFT_MAX_M, clampf((layer - 1.0) / (LIFT_TOP_LAYER - 1.0), 0.0, 1.0))
 
 static func _batch(batches: Dictionary, finish: String) -> _Batch:
 	if not batches.has(finish):

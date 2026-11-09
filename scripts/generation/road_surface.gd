@@ -100,8 +100,8 @@ uniform vec3 paint_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 centre_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
 uniform float junction_m = 30.0;
-// 1 on a marked crossing's ribbon: zebra bars along its whole length.
-uniform float zebra_all = 0.0;
+// Paint over a whole crossing ribbon (RoadSurface.CROSSING_KINDS): 0 none.
+uniform float crossing_kind = 0.0;
 // @SNOW
 varying vec3 wpos;
 varying vec4 attr;
@@ -171,12 +171,13 @@ void fragment() {
 	float track = exp(-pow((abs(xl) - 0.85) / 0.3, 2.0)) * (rank >= 1 ? 1.0 : 0.3);
 	col *= 1.0 - 0.08 * track;
 	rough -= 0.10 * track;
-	// Kerb stone and gutter on urban streets.
+	// Kerb stone and gutter on urban streets, open across junction mouths.
 	float kerb = 0.0;
+	float jfade = smoothstep(2.5, 5.0, jd);
 	if (attr.b > 0.5 && rank >= 1) {
 		float ex = min(x, w - x);
-		kerb = 1.0 - smoothstep(0.24 - aa, 0.24 + aa, ex);
-		float gut = band(ex, 0.42, 0.18, aa);
+		kerb = (1.0 - smoothstep(0.24 - aa, 0.24 + aa, ex)) * jfade;
+		float gut = band(ex, 0.42, 0.18, aa) * jfade;
 		col = mix(col, col * 0.7, gut);
 		col = mix(col, kerb_col * (0.9 + 0.2 * r_noise(g * 1.3)), kerb);
 		// Bevelled kerb edge: the normal tips toward the carriageway.
@@ -186,7 +187,6 @@ void fragment() {
 	// Markings.
 	float paint = 0.0;
 	float centre = 0.0;
-	float jfade = smoothstep(6.0, 9.0, jd);
 	float dash = band(mod(y, 9.0), 1.5, 1.5, faa);
 	if (rank >= 1 && w >= 5.0) {
 		if (!oneway && rank >= 2 && w >= 9.0) {
@@ -209,14 +209,23 @@ void fragment() {
 			paint += band(x, inset, 0.07, aa) + band(x, w - inset, 0.07, aa);
 		}
 		paint *= jfade;
-		if (attr.b > 0.5) {
-			// Zebra crossing a few metres before the junction.
-			float zb = band(jd, 5.0, 1.6, faa) * band(mod(x, 1.0), 0.25, 0.25, aa);
-			paint += zb * step(0.6, x) * step(x, w - 0.6);
-		}
 	}
-	if (zebra_all > 0.5) {
-		paint = band(mod(x, 1.0), 0.25, 0.25, aa) * step(0.25, x) * step(x, w - 0.25);
+	if (crossing_kind > 0.5) {
+		// Bars span the ribbon and repeat along the walking line (y);
+		// rails run along its two edges.
+		float bars = band(mod(y, 1.0), 0.5, 0.25, faa) * step(0.25, x) * step(x, w - 0.25);
+		float rails = band(x, 0.15, 0.15, aa) + band(x, w - 0.15, 0.15, aa);
+		if (crossing_kind < 1.5) {
+			paint = bars;
+		} else if (crossing_kind < 2.5) {
+			paint = bars * step(0.45, x) * step(x, w - 0.45) + rails;
+		} else if (crossing_kind < 3.5) {
+			paint = rails;
+		} else if (crossing_kind < 4.5) {
+			paint = rails * band(mod(y, 1.0), 0.5, 0.25, faa);
+		} else {
+			paint = 1.0;
+		}
 	}
 	paint = clamp(paint, 0.0, 1.0) * (1.0 - kerb);
 	paint *= 0.55 + 0.45 * smoothstep(0.25, 0.6, r_noise(g * 2.3));
@@ -292,12 +301,24 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("kerb_col", _kerb)
 	return _mat
 
-## The asphalt material with zebra bars over the whole ribbon: RoadBuilder's
-## "crossing" finish (marked crossing ways, drawn over the carriageways).
-static func crossing_material(target: Color) -> ShaderMaterial:
+## The asphalt material painted over the whole ribbon in `kind`
+## (CROSSING_KINDS): RoadBuilder's "crossing*" and "marking" finishes.
+static func crossing_material(target: Color, kind: float = CROSSING_KINDS["zebra"]) -> ShaderMaterial:
 	var m := material(target).duplicate() as ShaderMaterial
-	m.set_shader_parameter("zebra_all", 1.0)
+	m.set_shader_parameter("crossing_kind", kind)
 	return m
+
+## RoadBuilder finish of a crossing's style; "auto" takes the country's
+## usual paint for a signalled crossing, zebra otherwise.
+static func crossing_finish(style: String, signalled: bool, data: LocationData) -> String:
+	var resolved := style
+	if resolved == "auto":
+		resolved = "zebra"
+		if signalled and data.country.to_upper() == "DE":
+			resolved = "dashes"
+		elif signalled and data.country.to_upper() in ["US", "CA"]:
+			resolved = "lines"
+	return "crossing" if resolved == "zebra" else "crossing_" + resolved
 
 ## True where the place paints its centre line yellow.
 static func yellow_centre(data: LocationData) -> bool:
@@ -350,6 +371,8 @@ static func _points(line: Variant) -> PackedVector2Array:
 
 ## Depth steps a road can take inside its rank and finish (RoadBuilder.depth_layer).
 const DEPTH_STEPS := 8
+## crossing_kind of each painted finish (the shader's branches).
+const CROSSING_KINDS := {"zebra": 1.0, "ladder": 2.0, "lines": 3.0, "dashes": 4.0, "solid": 5.0}
 
 ## Depth step per road (0 .. DEPTH_STEPS - 1): greedy, in road order, so
 ## roads that share a node (meet at a junction) take different steps and
@@ -385,8 +408,60 @@ static func depth_steps(data: LocationData) -> PackedByteArray:
 		steps[i] = s
 	return steps
 
+## A road cars drive on as far as junction paint is concerned: not paths,
+## crossings or areas, not driveways, not underground.
+static func is_carriageway(line: Variant) -> bool:
+	if line is PackedVector2Array:
+		return true
+	if not (line is Dictionary):
+		return false
+	var r: Dictionary = line
+	if str(r.get("crossing_style", "")) != "" or bool(r.get("area", false)) or bool(r.get("tunnel", false)):
+		return false
+	var cls := str(r.get("class", "unclassified"))
+	return cls != "service" and RoadBuilder._rank(cls) >= 1
+
+static func node_key(p: Vector2) -> Vector2i:
+	return Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))
+
+## Nodes where carriageways really meet: {node_key: true} with branch
+## degree of at least 3 (a way through counts 2, a way ending 1) from at
+## least two ways, so a way merely split in two is no junction.
+static func carriageway_nodes(data: LocationData) -> Dictionary:
+	var degree := {}
+	var ways := {}
+	var last := {}
+	for i in data.roads.size():
+		if not is_carriageway(data.roads[i]):
+			continue
+		var pts := _points(data.roads[i])
+		for j in pts.size():
+			var k := node_key(pts[j])
+			degree[k] = int(degree.get(k, 0)) + (1 if j == 0 or j == pts.size() - 1 else 2)
+			if int(last.get(k, -1)) != i:
+				last[k] = i
+				ways[k] = int(ways.get(k, 0)) + 1
+	var out := {}
+	for k: Vector2i in degree:
+		if int(degree[k]) >= 3 and int(ways[k]) >= 2:
+			out[k] = true
+	return out
+
+## carriageway_nodes bucketed like junctions, for lane and kerb paint.
+static func carriageway_junctions(data: LocationData) -> Dictionary:
+	var out := {}
+	for k: Vector2i in carriageway_nodes(data):
+		var p := Vector2(k) / NODE_SNAP
+		var cell := Vector2i(floori(p.x / JUNCTION_M), floori(p.y / JUNCTION_M))
+		var arr: PackedVector2Array = out.get(cell, PackedVector2Array())
+		arr.append(p)
+		out[cell] = arr
+	return out
+
 ## Junction nodes of the road network, bucketed by JUNCTION_M cells:
 ## coordinates (snapped to 1 / NODE_SNAP m) shared by two or more ways.
+## Includes footways and crossings on purpose: kerbs are cut and cars
+## kept clear at those too. Lane paint uses carriageway_junctions.
 static func junctions(data: LocationData) -> Dictionary:
 	var owner := {}
 	var count := {}
