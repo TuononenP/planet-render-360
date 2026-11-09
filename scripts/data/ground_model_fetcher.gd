@@ -123,10 +123,21 @@ static func stac_url(lat: float, lon: float) -> String:
 func _in_thread(work: Callable) -> Variant:
 	var box := [null]
 	var task := WorkerThreadPool.add_task(func() -> void: box[0] = work.call(), false, "GroundModel")
+	_tasks.append(task)
 	while not WorkerThreadPool.is_task_completed(task):
 		await get_tree().process_frame
 	WorkerThreadPool.wait_for_task_completion(task)
+	_tasks.erase(task)
 	return box[0]
+
+## Tasks still running; they must not outlive the node.
+var _tasks: Array[int] = []
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for task in _tasks:
+			WorkerThreadPool.wait_for_task_completion(task)
+		_tasks.clear()
 
 static func _bil_raster(bytes: PackedByteArray, w: Dictionary) -> Dictionary:
 	if w.is_empty():
