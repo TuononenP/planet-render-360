@@ -223,6 +223,15 @@ uniform int far_quality = 2;
 // @SNOW
 // @TERRAIN
 // @WATER_FILTER
+global uniform float valley_haze_y;
+global uniform vec3 valley_haze_col;
+// DEM normals (FarDemNormals): one ring through each drape's UVs.
+uniform sampler2D dem_fine : filter_linear_mipmap_anisotropic, repeat_disable;
+uniform sampler2D dem_coarse : filter_linear_mipmap_anisotropic, repeat_disable;
+uniform vec4 dem_fine_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform vec4 dem_coarse_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform float has_dem_fine = 0.0;
+uniform float has_dem_coarse = 0.0;
 varying vec3 wpos;
 varying vec3 wnrm;
 void vertex() {
@@ -234,6 +243,10 @@ float edge_w(vec2 uv) {
 	return smoothstep(0.0, 0.015, min(d.x, d.y));
 }
 float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+vec3 dem_normal(sampler2D tex, vec2 uv) {
+	vec2 rg = texture(tex, uv).rg * 2.0 - 1.0;
+	return vec3(rg.x, sqrt(max(1.0 - dot(rg, rg), 0.0)), rg.y);
+}
 void fragment() {
 	vec4 dg = vec4(dFdx(wpos.xz), dFdy(wpos.xz));
 	vec3 dpx = dFdx(wpos);
@@ -262,9 +275,26 @@ void fragment() {
 	// shimmers.
 	float fade = 1.0 - smoothstep(9000.0, 26000.0, dist);
 	float steep0 = smoothstep(0.93, 0.6, nw.y);
+	// Real ridges and gullies from the DEM where a ring covers this ground.
+	// They replace the noise below rather than stack on it, and stay short of
+	// full strength: the imagery already carries its own baked shading.
+	vec3 dem_n = nw;
+	float dem_w = 0.0;
+	if (has_dem_coarse > 0.0) {
+		vec2 duv = UV2 * dem_coarse_map.xy + dem_coarse_map.zw;
+		dem_w = edge_w(duv);
+		dem_n = dem_normal(dem_coarse, duv);
+	}
+	if (has_dem_fine > 0.0) {
+		vec2 duv = UV * dem_fine_map.xy + dem_fine_map.zw;
+		float w = edge_w(duv);
+		dem_n = normalize(mix(dem_n, dem_normal(dem_fine, duv), w));
+		dem_w = max(dem_w, w);
+	}
+	nw = normalize(mix(nw, dem_n, dem_w * 0.7 * (1.0 - water)));
 	if (fade > 0.01) {
 		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
-		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf));
+		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf) * (1.0 - 0.85 * dem_w));
 	}
 	if (water > 0.01) {
 		float wave_scale = max(25.0, dist * 0.004);
@@ -299,11 +329,24 @@ void fragment() {
 		c *= mix(1.0, clamp(r, 0.55, 1.6), dfade * 0.65 * (1.0 - water));
 		nmap = mix(nmap, n.rgb, dfade * 0.8 * (1.0 - water));
 	}
+	// Past that, bare rock keeps a coarser version of the same structure.
+	float rock_fade = far_quality >= 2 ? (1.0 - dfade) * (1.0 - smoothstep(7500.0, 15000.0, dist)) : 0.0;
+	if (rock_fade > 0.01 && steep > 0.4 && vegf < 0.5) {
+		vec4 a;
+		vec4 n;
+		det_side(4, wpos / 60.0, dpx / 60.0, dpy / 60.0, nw, a, n);
+		c *= mix(1.0, clamp(lum(a.rgb) / max(lum(det_mean[4]), 1e-3), 0.6, 1.5), rock_fade * 0.6 * (1.0 - water));
+	}
 	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
 	c = mix(c, snow_col, sc);
 	// Cloud shadows sweeping the far slopes (the near field is lit by the
 	// real shadow map only, so they fade in past the detailed ground).
 	c *= 1.0 - 0.5 * t_cloud_shadow(wpos) * smoothstep(1200.0, 2600.0, dist);
+	// Valleys hold more air than the ridges above them, so ridges stand
+	// apart in layers. Far terrain only: the detailed ground and the city
+	// stay clear whatever their height.
+	float valley_air = smoothstep(1500.0, 14000.0, dist) * (1.0 - smoothstep(0.0, 900.0, wpos.y - valley_haze_y));
+	c = mix(c, valley_haze_col * 0.85, valley_air * 0.42 * (1.0 - water));
 	ALBEDO = min(c, vec3(albedo_cap));
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
@@ -343,6 +386,7 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		mat.set_shader_parameter("fine_tex", fine)
 	if coarse != null:
 		mat.set_shader_parameter("coarse_tex", coarse)
+	FarDemNormals.bind(mat, data, fine, coarse)
 	return mat
 
 ## Linear albedo of the finest drape covering metre XZ, gained and

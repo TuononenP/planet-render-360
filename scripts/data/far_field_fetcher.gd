@@ -52,6 +52,7 @@ var _layers: Array = []  # [{kind, zoom, rect, tiles, images, reach_m}]
 var _remaining := 0
 var _busy := false
 var _with_drapes := true
+var _lat := 0.0
 var _t0 := 0
 var _cached := 0
 var _failed := 0
@@ -112,6 +113,7 @@ static func cache_keys(lat: float, lon: float, with_drapes: bool = true) -> Dict
 func fetch(lat: float, lon: float, with_drapes: bool = true) -> void:
 	_busy = true
 	_with_drapes = with_drapes
+	_lat = lat
 	_t0 = Time.get_ticks_msec()
 	_cached = 0
 	_failed = 0
@@ -222,6 +224,10 @@ func _finish() -> void:
 			rings.append(_assemble_dem(layer))
 		else:
 			drapes.append(_assemble_drape(layer))
+	var t2 := Time.get_ticks_msec()
+	var despiked := DemDespike.clean_rings(rings, _lat)
+	if despiked > 0:
+		print("Far-field DEM: %d spike pixels replaced in %d ms" % [despiked, Time.get_ticks_msec() - t2])
 	timings = {"fetch_ms": fetch_ms, "assemble_ms": Time.get_ticks_msec() - t1,
 		"tiles": _queue.size(), "cached": _cached, "failed": _failed}
 	_busy = false

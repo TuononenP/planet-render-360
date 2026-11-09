@@ -109,6 +109,14 @@ cloud_sun_dir={
 "type": "vec3",
 "value": Vector3(0, 1, 0)
 }
+valley_haze_y={
+"type": "float",
+"value": 0.0
+}
+valley_haze_col={
+"type": "vec3",
+"value": Vector3(0.7, 0.75, 0.8)
+}
 
 [gui]
 

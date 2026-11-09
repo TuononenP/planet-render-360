@@ -569,6 +569,9 @@ func _apply() -> void:
 	var direct := smoothstep(0.55, 1.0, float(look["shadow_opacity"]))
 	RenderingServer.global_shader_parameter_set("climate_snow_glint", 0.0 if night else (1.0 - overcast) * direct)
 	environment.fog_light_color = haze_color.darkened(0.3 * darken)
+	# Far valleys fill with the same air (FarSurface).
+	var valley_air := environment.fog_light_color.srgb_to_linear()
+	RenderingServer.global_shader_parameter_set("valley_haze_col", Vector3(valley_air.r, valley_air.g, valley_air.b))
 	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
 	# A marine layer carries the fog itself; the air above it stays hazy.
 	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)

@@ -251,7 +251,7 @@ vec2 rain_ripples(vec2 m, float t, float pixel_m) {
 """
 
 const GLOBALS := ["climate_snow_on", "climate_snow_y", "climate_snow_band",
-	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice"]
+	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice", "valley_haze_y"]
 ## Open-Meteo WMO codes: falling snow / rain (incl. showers, storms).
 const SNOWING := [71, 73, 75, 77, 85, 86]
 const RAINING := [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
@@ -305,7 +305,17 @@ static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionar
 	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
 	g["climate_rain"] = float(WeatherLook.for_code(weather_code, 100.0)["intensity"]) if weather_code in RAINING else 0.0
 	g["climate_water_ice"] = ice_amount(data)
+	g["valley_haze_y"] = valley_y(data)
 	return g
+
+## Valley floor around the viewpoint in render Y (the viewpoint is Y = 0): a
+## low percentile of the ground, so one deep gully does not set it.
+static func valley_y(data: LocationData) -> float:
+	if data.heights.is_empty():
+		return 0.0
+	var sorted := data.heights.duplicate()
+	sorted.sort()
+	return (sorted[sorted.size() / 20] - data.centre_elevation_m) * WorldScale.metres_to_units()
 
 static func apply_globals(data: LocationData, weather_code: int = -1) -> void:
 	var g := globals_for(data, weather_code)
