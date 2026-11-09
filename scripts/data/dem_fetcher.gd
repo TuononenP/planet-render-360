@@ -228,6 +228,8 @@ func _load_mosaic_tile(t: Vector2i) -> void:
 			if img.load_png_from_buffer(body) == OK:
 				_mosaic_tile_done(t, img)
 				return
+		if result == HTTPRequest.RESULT_SUCCESS and code == 404:
+			CacheStore.note_absent(path)
 		_mosaic_tile_done(t, null)
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
 	var url := URL_TEMPLATE % [ZOOM_NEAR, t.x, t.y]
@@ -318,11 +320,13 @@ func _fetch_at_zoom(lat: float, lon: float, grid: int) -> void:
 		failed.emit("HTTP request failed to start: %s" % err)
 
 func _on_request_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		failed.emit("DEM download failed (result=%d code=%d)" % [result, code])
-		return
 	var tile := tile_xy(_pending_lat, _pending_lon, _zoom)
 	var cache_path := CacheStore.dem_path(_zoom, tile.x, tile.y)
+	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
+		if result == HTTPRequest.RESULT_SUCCESS and code == 404:
+			CacheStore.note_absent(cache_path)
+		failed.emit("DEM download failed (result=%d code=%d)" % [result, code])
+		return
 	var f := FileAccess.open(cache_path, FileAccess.WRITE)
 	if f != null:
 		f.store_buffer(body)
