@@ -11,6 +11,7 @@ const SOURCES := [
 	["Map tiles", "OpenFreeMap © OpenMapTiles · MIT", "https://openfreemap.org/"],
 	["Globe tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
 	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
+	["Elevation, Helsinki", "© City of Helsinki, Elevation model 2021 · CC BY 4.0", "https://hri.fi/data/en/dataset/helsingin-korkeusmalli"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
 	["Land cover", "© ESA WorldCover project 2021 · contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium · CC BY 4.0", "https://esa-worldcover.org/"],
 	["Canopy height", "© Meta and World Resources Institute · source imagery © 2016 Vantor · CC BY 4.0", "https://registry.opendata.aws/dataforgood-fb-forestsv2/"],
