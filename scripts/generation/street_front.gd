@@ -62,9 +62,11 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 		if garage and i == longest:
 			_garage(kit, sp, rows, float(d["ground_y"]), stone, trim, seed_v)
 			stooped = true
-		if bool(relief.get("granite_plinth", false)):
+		# A lifted part stands on another part: no plinth at its foot.
+		if bool(relief.get("granite_plinth", false)) and not raised:
 			FinlandRelief.plinth(kit, sp, rows, seed_v)
-		if i == longest and ArchitectureStyle._h(seed_v, 95) < float(relief.get("turret", 0.0)):
+		if i == longest and ArchitectureStyle._h(seed_v, 95) < float(relief.get("turret", 0.0)) \
+				and FinlandRelief.turret_fits(d):
 			FinlandRelief.turret(kit, sp, d, stone)
 		if i == longest and ArchitectureStyle._h(seed_v, 96) < float(relief.get("corner_dome", 0.0)):
 			FinlandRelief.corner_dome(kit, sp, d, stone)

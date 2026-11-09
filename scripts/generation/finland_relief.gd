@@ -24,6 +24,19 @@ static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -
 				+ az * (0.06 + ArchitectureStyle._h(seed_v + j, 94 + row) * 0.04) * m,
 				ax, az, Vector3(width - 0.025 * m, rh - 0.02 * m, 0.18 * m))
 
+## Last construction year a Jugend / national-romantic corner turret fits.
+const TURRET_LAST_YEAR := 1930
+
+## True when a corner turret suits mass `d`: not a lifted part (its top is
+## another part's floor, not a roofline) and not a building mapped as built
+## after the style ended (Aalto's 1961 Enso-Gutzeit block is a flat marble
+## cube). An undated building keeps the regional odds.
+static func turret_fits(d: Dictionary) -> bool:
+	if bool(d.get("raised", false)):
+		return false
+	var year := int((d.get("b", {}) as Dictionary).get("start_year", 0))
+	return year <= 0 or year < TURRET_LAST_YEAR
+
 static func turret(kit: ReliefKit, sp: Dictionary, d: Dictionary, stone: Material) -> void:
 	if not bool(sp["first"]) or float(sp["len_m"]) < 8.0:
 		return
