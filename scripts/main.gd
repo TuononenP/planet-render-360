@@ -653,11 +653,12 @@ func _retry_save_pipeline(gen: int) -> void:
 ## degraded. Retry missing requested tiles too, while reusing the cached ones.
 ## Land cover is optional: places without a source tile never get a file, and
 ## the world falls back to OSM land cover, so its absence is not a partial save.
+## Neither is a tile its source answered 404 for: retrying cannot fetch it.
 func _save_missing_data(data: LocationData) -> bool:
 	var keys := CacheStore.place_cache_keys(data.latitude, data.longitude, data.quality_preset)
 	for layer in ["dem", "sat"]:
 		for path in keys.get(layer, []):
-			if not FileAccess.file_exists(str(path)):
+			if not FileAccess.file_exists(str(path)) and not CacheStore.is_absent(str(path)):
 				return true
 	return false
 

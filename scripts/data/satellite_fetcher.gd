@@ -246,7 +246,11 @@ func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
 			if img.load_jpg_from_buffer(body) == OK:
 				_tile_done(t, img)
 				return
-		if attempt < 1:
+		# A tile the source does not have is not a blip: no retry.
+		var missing := result == HTTPRequest.RESULT_SUCCESS and code == 404
+		if missing:
+			CacheStore.note_absent(path)
+		if attempt < 1 and not missing:
 			# One retry: a single transient blip must not fail a
 			# 169-tile Ultra mosaic (or force a full lower-zoom refetch).
 			get_tree().create_timer(0.5).timeout.connect(func() -> void: _load_tile(t, gen, attempt + 1))
