@@ -34,6 +34,11 @@ const THIN_FAR := 0.55
 const MAX_SLOPE := 0.3
 const STREET_M := 12.0
 const LANDMARK_CLEAR_M := 120.0
+## An apartment lot wider than PAIR_MIN_M holds two narrower buildings,
+## PAIR_GAP_M apart, in PAIR_SHARE of its lots.
+const PAIR_MIN_M := 28.0
+const PAIR_GAP_M := 5.0
+const PAIR_SHARE := 0.35
 ## Native CityKernels when loaded.
 static var _native := ClassDB.class_exists("CityKernels")
 
@@ -319,8 +324,22 @@ func _fabric() -> void:
 					else:
 						var fill := 0.75 if kind == "industrial" else 1.0
 						var side := (lot - STREET_M) * fill
-						_mass(lc, Vector2(side * lerpf(0.8, 1.0, _hash(lc.x, lc.y, 2.0)),
-							side * lerpf(0.75, 1.0, _hash(lc.x, lc.y, 4.0))), yaw, prof, d, kind)
+						# Footprints differ in size and sit off-centre in
+						# their lot; some apartment lots hold a pair.
+						var size := Vector2(side * lerpf(0.55, 1.0, _hash(lc.x, lc.y, 2.0)),
+							side * lerpf(0.5, 1.0, _hash(lc.x, lc.y, 4.0)))
+						var slack := Vector2(side, side) - size
+						var at := lc + Vector2((_hash(lc.x, lc.y, 13.0) - 0.5) * slack.x,
+							(_hash(lc.x, lc.y, 17.0) - 0.5) * slack.y).rotated(yaw)
+						if kind == "apartments" and size.x > PAIR_MIN_M \
+								and _hash(lc.x, lc.y, 19.0) < PAIR_SHARE:
+							var w := (size.x - PAIR_GAP_M) * 0.5
+							for pi in 2:
+								var off := (float(pi) - 0.5) * (w + PAIR_GAP_M)
+								_mass(at + Vector2(off, 0.0).rotated(yaw),
+									Vector2(w, size.y), yaw, prof, d, kind)
+						else:
+							_mass(at, size, yaw, prof, d, kind)
 
 ## _fabric in native code (CityKernels, tools/build_native.sh): the same
 ## masses into the same batches. False without the library.
@@ -390,7 +409,7 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 	var fh := float(prof["fh"])
 	var wall := float(storeys) * fh
 	if _h_edge > 0.0 and kind == "apartments":
-		var near_h := _h_edge * (0.85 + 0.3 * seed_v)
+		var near_h := _h_edge * (0.65 + 0.7 * seed_v)
 		wall = lerpf(near_h, wall, smoothstep(R_IN, 4000.0, d))
 		storeys = maxi(1, roundi(wall / fh))
 	var shape := ArchitectureStyle._pick_weighted(prof["r"] as Array, seed_v, 3)

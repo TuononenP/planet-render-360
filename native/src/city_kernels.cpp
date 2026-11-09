@@ -40,6 +40,10 @@ constexpr double THIN_FAR = 0.55;
 constexpr double MAX_SLOPE = 0.3;
 constexpr double STREET_M = 12.0;
 constexpr double LANDMARK_CLEAR_M = 120.0;
+// FarCityBuilder.PAIR_*: an apartment lot wider than PAIR_MIN_M holds two buildings.
+constexpr double PAIR_MIN_M = 28.0;
+constexpr double PAIR_GAP_M = 5.0;
+constexpr double PAIR_SHARE = 0.35;
 // SettlementMap.
 constexpr double CELL_M = 100.0;
 constexpr double RADIUS_M = 12000.0;
@@ -452,7 +456,7 @@ void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, doub
 	double fh = prof.fh;
 	double wall = (double)storeys * fh;
 	if (c.h_edge > 0.0 && kind == "apartments") {
-		double near_h = c.h_edge * (0.85 + 0.3 * seed_v);
+		double near_h = c.h_edge * (0.65 + 0.7 * seed_v);
 		wall = Math::lerp(near_h, wall, Math::smoothstep(R_IN, 4000.0, d));
 		storeys = Math::max(1, (int)std::round(wall / fh));
 	}
@@ -547,10 +551,23 @@ void fabric_row(const City &c, int j, Row &row) {
 				} else {
 					double fill = kind == "industrial" ? 0.75 : 1.0;
 					double side = (lot - STREET_M) * fill;
-					mass(c, row, lc,
-							Vector2(side * Math::lerp(0.8, 1.0, city_hash(lc.x, lc.y, 2.0)),
-									side * Math::lerp(0.75, 1.0, city_hash(lc.x, lc.y, 4.0))),
-							yaw, *prof, d, kind);
+					// Footprints differ in size and sit off-centre in their
+					// lot; some apartment lots hold a pair.
+					Vector2 size(side * Math::lerp(0.55, 1.0, city_hash(lc.x, lc.y, 2.0)),
+							side * Math::lerp(0.5, 1.0, city_hash(lc.x, lc.y, 4.0)));
+					Vector2 slack = Vector2(side, side) - size;
+					Vector2 at = lc + Vector2((city_hash(lc.x, lc.y, 13.0) - 0.5) * slack.x,
+											  (city_hash(lc.x, lc.y, 17.0) - 0.5) * slack.y)
+											  .rotated(yaw);
+					if (kind == "apartments" && size.x > PAIR_MIN_M && city_hash(lc.x, lc.y, 19.0) < PAIR_SHARE) {
+						double w = (size.x - PAIR_GAP_M) * 0.5;
+						for (int pi = 0; pi < 2; pi++) {
+							double off = ((double)pi - 0.5) * (w + PAIR_GAP_M);
+							mass(c, row, at + Vector2(off, 0.0).rotated(yaw), Vector2(w, size.y), yaw, *prof, d, kind);
+						}
+					} else {
+						mass(c, row, at, size, yaw, *prof, d, kind);
+					}
 				}
 			}
 		}

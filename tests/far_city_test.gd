@@ -89,6 +89,14 @@ func _paint_parity_checks(failures: Array[String]) -> void:
 ## The vertex colours of every far-city mesh (in build order), built on the
 ## native path or the script path.
 func _far_colours(data: LocationData, smap: SettlementMap, native: bool) -> Array:
+	var out: Array = []
+	for arr in _far_arrays(data, smap, native):
+		if arr[Mesh.ARRAY_COLOR] != null:
+			out.append(arr[Mesh.ARRAY_COLOR])
+	return out
+
+## The surface arrays of every far-city mesh (in build order).
+func _far_arrays(data: LocationData, smap: SettlementMap, native: bool) -> Array:
 	var was := FarCityBuilder._native
 	FarCityBuilder._native = native and was
 	var root := Node3D.new()
@@ -99,11 +107,63 @@ func _far_colours(data: LocationData, smap: SettlementMap, native: bool) -> Arra
 		var mesh := (n as MeshInstance3D).mesh
 		if mesh == null or mesh.get_surface_count() == 0:
 			continue
-		var arr := MeshArrays.surface(mesh, 0)
-		if arr[Mesh.ARRAY_COLOR] != null:
-			out.append(arr[Mesh.ARRAY_COLOR])
+		out.append(MeshArrays.surface(mesh, 0))
 	root.free()
 	return out
+
+## Mapped buildings in the outer extent band (700 m+) set the far fabric's
+## edge height (FarCityBuilder._h_edge), which the near apartments blend from.
+func _with_edge_buildings(data: LocationData, height_m: float) -> void:
+	for i in 12:
+		var a := TAU * float(i) / 12.0
+		data.buildings.append({"x": cos(a) * 900.0, "z": sin(a) * 900.0, "height": height_m,
+			"height_source": "levels", "kind": "apartments"})
+
+func _top_y(arrays: Array) -> float:
+	var top := -INF
+	for arr in arrays:
+		for v in (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+			top = maxf(top, v.y)
+	return top
+
+## The far fabric's lot pairing (PAIR_*), footprint offsets and the near-edge
+## height blend are written twice, in FarCityBuilder and in the native
+## CityKernels. The same fixture, with and without mapped edge buildings
+## (which switch the blend on), must build the same meshes with the same
+## vertices on both paths; and the blend must really move the skyline.
+func _geometry_parity_checks(failures: Array[String]) -> void:
+	var plain := _data()
+	var plain_smap := SettlementMap.build(plain)
+	var edged := _data()
+	_with_edge_buildings(edged, 45.0)
+	var edged_smap := SettlementMap.build(edged)
+	var script_plain := _far_arrays(plain, plain_smap, false)
+	var script_edged := _far_arrays(edged, edged_smap, false)
+	if script_plain.is_empty() or script_edged.is_empty():
+		failures.append("geometry parity: the script far city built no meshes")
+		return
+	if absf(_top_y(script_plain) - _top_y(script_edged)) < 0.5:
+		failures.append("geometry parity: mapped edge buildings did not change the far skyline (the near-edge blend is not exercised)")
+	if not FarCityBuilder._native:
+		return  # no native library here: the script path is the only one
+	for case in [["no edge", plain, plain_smap, script_plain], ["edge 45 m", edged, edged_smap, script_edged]]:
+		var native := _far_arrays(case[1], case[2], true)
+		var script: Array = case[3]
+		if native.size() != script.size():
+			failures.append("geometry parity (%s): native built %d meshes, script %d" % [case[0], native.size(), script.size()])
+			continue
+		var worst := 0.0
+		for i in script.size():
+			var a: PackedVector3Array = script[i][Mesh.ARRAY_VERTEX]
+			var b: PackedVector3Array = native[i][Mesh.ARRAY_VERTEX]
+			if a.size() != b.size():
+				failures.append("geometry parity (%s): mesh %d has %d script vertices, %d native" % [case[0], i, a.size(), b.size()])
+				worst = 0.0
+				break
+			for k in a.size():
+				worst = maxf(worst, a[k].distance_to(b[k]))
+		if worst > 0.05:
+			failures.append("geometry parity (%s): native and script vertices differ by %.3f m" % [case[0], worst])
 
 func _far_nodes(root: Node) -> Array:
 	var out: Array = []
@@ -125,6 +185,7 @@ func _run() -> void:
 	_far_city_checks(failures)
 	_tower_parts_checks(failures)
 	_paint_parity_checks(failures)
+	_geometry_parity_checks(failures)
 	_parse_checks(failures)
 	await _offline_cache_checks(failures)
 	_infill_checks(failures)
