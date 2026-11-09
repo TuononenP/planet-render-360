@@ -15,6 +15,8 @@ func _init() -> void:
 	_built_block_checks(failures)
 	_roof_angle_checks(failures)
 	_pitch_checks(failures)
+	_roof_axis_checks(failures)
+	_flat_roof_checks(failures)
 	_block_era_checks(failures)
 	_roof_hint_checks(failures)
 	if failures.is_empty():
@@ -294,6 +296,66 @@ func _roof_angle_checks(failures: Array[String]) -> void:
 		failures.append("an explicit roof:height must beat roof:angle (want 5.0, got %.2f)" % float(rise[-1.0]))
 	if absf(float(rise[0.0]) - want20) < 0.01 and absf(float(rise[0.0]) - want45) < 0.01:
 		failures.append("an untagged angle should keep the regional pitch")
+
+## A bare-membrane flat roof is no longer one photo colour: Tokyo's roofs span
+## several greys; a row naming its own roof colours keeps them; Tokyo's walls
+## take less paint than the default render.
+func _flat_roof_checks(failures: Array[String]) -> void:
+	var region := "tokyo"
+	var roofs := {}
+	var walls := {}
+	for i in 300:
+		var sv := fmod(float(i) * 0.61803 + 0.02, 1.0)
+		var b := {"kind": "apartments", "levels": 6}
+		var look := ArchitectureStyle.resolve(b, region, "dense", sv, 400.0, {"looks": 2, "tints": 6})
+		if str(look["roof_set"]) == "membrane":
+			var rc := look["roof_colour"] as Color
+			if rc.a <= 0.0:
+				failures.append("a bare membrane roof must get a palette colour")
+				return
+			roofs["%.2f|%.2f|%.2f" % [rc.r, rc.g, rc.b]] = true
+		if str(look["wall_set"]) == "render":
+			walls["%.2f" % float(look["vt"])] = true
+	if roofs.size() < 4:
+		failures.append("Tokyo flat roofs show only %d colours" % roofs.size())
+	if not walls.has("0.30"):
+		failures.append("Tokyo render walls should take a paint weight of 0.3 (got %s)" % [walls.keys()])
+	var slate := ArchitectureStyle.resolve({"kind": "apartments", "levels": 6}, "haussmann", "urban", 0.31, 400.0, {})
+	if str(slate["roof_set"]) == "membrane" and (slate["roof_colour"] as Color).a <= 0.0:
+		failures.append("Paris-style membrane roofs also take the flat-roof palette")
+
+## A mapped roof:direction / roof:orientation turns a gabled ridge: the
+## ridge runs across the slope bearing, and "across" turns it a quarter.
+func _roof_axis_checks(failures: Array[String]) -> void:
+	# A 30 x 12 footprint: its own long axis is X.
+	var ring := PackedVector2Array([Vector2(-15, -6), Vector2(15, -6), Vector2(15, 6), Vector2(-15, 6)])
+	if RoofForms.axis_from_tags({}, ring) != Vector2.ZERO:
+		failures.append("untagged roofs must keep the footprint's own axis")
+	var east := RoofForms.axis_from_tags({"roof_dir": 90.0}, ring)
+	var north := RoofForms.axis_from_tags({"roof_dir": 0.0}, ring)
+	var across := RoofForms.axis_from_tags({"roof_orient": "across"}, ring)
+	if absf(absf(east.y) - 1.0) > 0.001 or absf(absf(north.x) - 1.0) > 0.001 or absf(absf(across.y) - 1.0) > 0.001:
+		failures.append("roof axes wrong: east-sloping %s, north-sloping %s, across %s" % [east, north, across])
+	# The built ridge follows it: the highest vertices spread along the axis.
+	for case in [[Vector2.ZERO, 0], [Vector2(0, 1), 1]]:
+		var mesh := RoofGeometry.form_mesh(ring, 10.0, 3.0, "gabled", PackedByteArray(), false, [],
+			case[0] as Vector2)
+		if mesh == null:
+			failures.append("no gabled roof built for axis %s" % [case[0]])
+			continue
+		var arr := mesh.surface_get_arrays(0)
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var lo := Vector2(INF, INF)
+		var hi := Vector2(-INF, -INF)
+		for v in verts:
+			if v.y > 12.9:
+				lo = lo.min(Vector2(v.x, v.z))
+				hi = hi.max(Vector2(v.x, v.z))
+		var spread := hi - lo
+		if int(case[1]) == 0 and not (spread.x > 20.0 and spread.y < 1.0):
+			failures.append("default ridge should run along X, spread %s" % [spread])
+		if int(case[1]) == 1 and not (spread.y > 8.0 and spread.x < 1.0):
+			failures.append("a ridge turned to Z should spread along Z, got %s" % [spread])
 
 ## Each roof's pitch is its row's +-10%, stable per seed, and the regional
 ## mean holds.

@@ -18,7 +18,7 @@ extends RefCounted
 ## Part roof keys that fall back to the parent's when the part leaves
 ## them untagged (OsmTags._roof_tags writes "" / 0 for absent tags).
 const INHERITED_ROOF_KEYS: Array[String] = ["roof_shape", "roof_colour",
-	"roof_material", "roof_height_m", "roof_levels"]
+	"roof_material", "roof_height_m", "roof_levels", "roof_dir", "roof_orient"]
 
 static var _plans: Dictionary = {}
 static var _mutex := Mutex.new()

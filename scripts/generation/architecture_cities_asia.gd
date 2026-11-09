@@ -7,7 +7,8 @@ extends RefCounted
 ## city. Same key legend as ArchitectureData; `rv` = 3D relief (replaces
 ## the parent's).
 
-const TOKYO_FRONT := ["#e4e2dc", "#d8d6d0", "#cfccc4", "#e6e0d2", "#c8c0b0", "#b8b4ac"]
+const TOKYO_FRONT := ["#e4e2dc", "#d8d6d0", "#cfccc4", "#e6e0d2", "#c8c0b0", "#b8b4ac",
+	"#a89580", "#8e8174", "#9aa3a9", "#b09a82"]  # the last four: tile-clad and blue-grey blocks
 ## Dark kawara (fired clay) roof tiles; the roof floor keeps them off black.
 const KAWARA := ["#3a3e44", "#454a52", "#2f343a"]
 const HK_TOWER := ["#e8e0d0", "#d8d0c0", "#e0d8c8", "#c8d0d8", "#e8d8c8", "#d0c8b8"]
@@ -47,14 +48,14 @@ const REGIONS := {
 		"apartments": {"w": [["render", TOKYO_FRONT], ["concrete", ["#c8c4bc", "#bdb8ac"]]],
 			"p": [["balcony", 3], ["tiles", 3], ["punched", 2], ["strip", 1]], "wn": "wide",
 			"bay": 2.6, "fr": "#9a9c9e", "sp": 0.0, "r": [["flat", 1]], "rf": [["membrane", []]],
-			"fh": 3.0, "st": [3, 8], "fix": true, "ch": 0.0, "eq": 0.85,
+			"fh": 3.0, "st": [3, 8], "fix": true, "ch": 0.0, "eq": 0.85, "vt": 0.3,
 			"g": [["signage", 2], ["none", 2]], "ev": 0.0,
 			"rv": {"signage": 0.45, "deep_balcony": 0.45, "awning": 0.1,
 				"awning_colours": ["#2a4a6a", "#8a2a1a", "#e8e4da"]}},
 		"commercial": {"w": [["render", TOKYO_FRONT], ["concrete", ["#c8c4bc"]], ["glass", []]],
 			"p": [["tiles", 3], ["strip", 2], ["punched", 2]], "wn": "wide", "bay": 2.6,
 			"fr": "#8a8c8e", "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.2,
-			"st": [3, 9], "fix": true, "eq": 0.9, "g": [["signage", 1]], "ev": 0.0,
+			"st": [3, 9], "fix": true, "eq": 0.9, "g": [["signage", 1]], "ev": 0.0, "vt": 0.3,
 			"rv": {"signage": 0.75, "screens": 0.7, "awning": 0.15,
 				"awning_colours": ["#2a4a6a", "#8a2a1a", "#e8e4da"]}},
 	},

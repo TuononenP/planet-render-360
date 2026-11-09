@@ -471,7 +471,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var roofed := false
 	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
 	if not job.is_empty():
-		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6])
+		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6],
+			RoofForms.axis_from_tags(b, ring))
 	if not roofed:
 		# No pitched roof built (flat, or no form fits): dormers, stacks and
 		# gables must not stand on a roof that is not there.
@@ -560,10 +561,10 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Ar
 
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
-		gable_front: bool = false, holes: Array = []) -> bool:
+		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO) -> bool:
 	var key := [ring, top, rh, shape, party, gable_front, holes] if not _roofs.is_empty() else []
-	var mesh := RoofGeometry.mesh_of(_roofs[key]) if _roofs.has(key) \
-		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes)
+	var mesh := RoofGeometry.mesh_of(_roofs[key]) if axis == Vector2.ZERO and _roofs.has(key) \
+		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes, axis)
 	if mesh != null and _batch != null:
 		_batch.add_mesh(_batch_key, mat, mesh)
 	elif mesh != null:
@@ -625,6 +626,8 @@ static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Diction
 			if SuomenlinnaSite.fortress(md["b_eff"]):
 				continue
 			var ring: PackedVector2Array = md["ring"]
+			if RoofForms.axis_from_tags(md["b_eff"], ring) != Vector2.ZERO:
+				continue  # an axis of its own: the GDScript roof path builds it
 			var height_world := float(md["wall_m"]) * m2u
 			var party := PackedByteArray()
 			if _party != null and md.has("key"):

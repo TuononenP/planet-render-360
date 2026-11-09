@@ -51,6 +51,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	b._setup(data, ground, smap)
 	b._towers()
 	if smap != null and not smap.is_empty() and not b._native_fabric():
+		# The fabric blocks carry the region's paint families (the kernel does the
+		# same from the city dictionary); the towers stay as built.
+		b.batch.chroma = b._paint().x
+		b.batch.tone = b._paint().y
 		b._fabric()
 	var batch := b.batch
 	stats = {"far_blocks": b.blocks, "far_towers": b.towers,
@@ -348,7 +352,7 @@ func _native_fabric() -> bool:
 		"com": ArchitectureStyle.profile(_region, "commercial"),
 		"landmarks": PackedVector2Array(_landmarks),
 		"n_dfs": _dfs.size(), "n_drs": _drs.size(), "facade_uv": fuv, "tint": tint,
-		"canon": canon,
+		"canon": canon, "chroma": _paint().x, "tone": _paint().y,
 	}
 	var out: Dictionary = ClassDB.class_call_static("CityKernels", "fabric", city,
 		FarSampler.native_params(data, ground, _surf), data.dem_rings)
@@ -356,6 +360,17 @@ func _native_fabric() -> bool:
 		batch.add_group(g[0], mats[g[1]], g[2], g[3], g[4], g[5], g[6])
 	blocks += int(out["blocks"])
 	return true
+
+## The far blocks' paint weight and the place's tone (x, y): the region's
+## apartment fabric takes paint families as a near building of that wall set
+## does (ArchitectureStyle.CHROMA, or the row's own "vt"), leaned by the same
+## per-place tone. Impostors and the far city must agree, so a skyline does not
+## change character where one hands over to the other.
+func _paint() -> Vector2:
+	var p := ArchitectureStyle.profile(_region, "apartments")
+	var set_name := str(_dfs[0].get_meta("facade_set", "")) if not _dfs.is_empty() else ""
+	return Vector2(float(p.get("vt", ArchitectureStyle.chroma_of(set_name))),
+		ArchitectureStyle.tone_for(data.latitude, data.longitude))
 
 ## One block mass: walls tiled per bay/storey + a regional roof form.
 func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,

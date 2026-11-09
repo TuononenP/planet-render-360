@@ -52,6 +52,59 @@ func _data(preset: int = 2) -> LocationData:
 		"texture": null, "image": img, "reach_m": 9500.0}]
 	return data
 
+## The far blocks carry paint families (FarCityBuilder._paint) and the native
+## kernel must tint them exactly as the script path does: the same mesh count
+## and the same per-vertex colours, and the colours must really vary.
+func _paint_parity_checks(failures: Array[String]) -> void:
+	var data := _data()
+	var smap := SettlementMap.build(data)
+	var script_cols := _far_colours(data, smap, false)
+	if script_cols.is_empty():
+		failures.append("paint parity: the script far city built no coloured meshes")
+		return
+	var distinct := {}
+	for cols in script_cols:
+		for c in (cols as PackedColorArray):
+			distinct["%.2f|%.2f|%.2f" % [c.r, c.g, c.b]] = true
+	if distinct.size() < 12:
+		failures.append("paint parity: far block colours barely vary (%d distinct)" % distinct.size())
+	if not FarCityBuilder._native:
+		return  # no native library here: the script path is the only one
+	var native_cols := _far_colours(data, smap, true)
+	if native_cols.size() != script_cols.size():
+		failures.append("paint parity: native built %d meshes, script %d" % [native_cols.size(), script_cols.size()])
+		return
+	var worst := 0.0
+	for i in script_cols.size():
+		var a: PackedColorArray = script_cols[i]
+		var b: PackedColorArray = native_cols[i]
+		if a.size() != b.size():
+			failures.append("paint parity: mesh %d has %d script colours, %d native" % [i, a.size(), b.size()])
+			return
+		for k in a.size():
+			worst = maxf(worst, maxf(absf(a[k].r - b[k].r), maxf(absf(a[k].g - b[k].g), absf(a[k].b - b[k].b))))
+	if worst > 0.01:
+		failures.append("paint parity: native and script far-block colours differ by %.3f" % worst)
+
+## The vertex colours of every far-city mesh (in build order), built on the
+## native path or the script path.
+func _far_colours(data: LocationData, smap: SettlementMap, native: bool) -> Array:
+	var was := FarCityBuilder._native
+	FarCityBuilder._native = native and was
+	var root := Node3D.new()
+	FarCityBuilder.build(root, data, GroundTruth.new(data), smap)
+	FarCityBuilder._native = was
+	var out: Array = []
+	for n in _far_nodes(root):
+		var mesh := (n as MeshInstance3D).mesh
+		if mesh == null or mesh.get_surface_count() == 0:
+			continue
+		var arr := MeshArrays.surface(mesh, 0)
+		if arr[Mesh.ARRAY_COLOR] != null:
+			out.append(arr[Mesh.ARRAY_COLOR])
+	root.free()
+	return out
+
 func _far_nodes(root: Node) -> Array:
 	var out: Array = []
 	for c in root.get_children():
@@ -71,6 +124,7 @@ func _run() -> void:
 	_settlement_checks(failures)
 	_far_city_checks(failures)
 	_tower_parts_checks(failures)
+	_paint_parity_checks(failures)
 	_parse_checks(failures)
 	await _offline_cache_checks(failures)
 	_infill_checks(failures)

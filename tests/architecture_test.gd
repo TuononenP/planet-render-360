@@ -896,7 +896,10 @@ func _city_distinct_checks(failures: Array[String]) -> void:
 			var b := {"kind": kinds[i % kinds.size()], "x": (sv * 9000.0 - 4500.0),
 				"z": fmod(sv * 7333.0, 6000.0) - 3000.0, "levels": [0, 0, 3, 5, 6, 8, 12][i % 7]}
 			var r := ArchitectureStyle.resolve(b, region, "dense", sv, 350.0, ctx)
-			var key := "%s/%s/%s" % [r["wall_set"], r["pattern"], r["roof_shape"]]
+			# Colour is part of a city's look (Dublin's red-orange brick, London's
+			# yellow stock): the census keys on it as well as on set and pattern.
+			var key := "%s/%s/%s/%s" % [r["wall_set"], r["pattern"], r["roof_shape"],
+				(r["wall_colour"] as Color).to_html(false)]
 			census[key] = int(census.get(key, 0)) + 1
 		var top: Array = census.keys()
 		top.sort_custom(func(a, b): return census[a] > census[b])

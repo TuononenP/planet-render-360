@@ -57,10 +57,13 @@ static func _shift_ring(ring: PackedVector2Array, d: float,
 ## `holes` (courtyards) take a chamfered roof sloping to both eaves.
 static func form_mesh(ring: PackedVector2Array, top: float,
 		rh: float, shape: String, party: PackedByteArray = PackedByteArray(),
-		gable_front: bool = false, holes: Array = []) -> ArrayMesh:
+		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO) -> ArrayMesh:
 	if rh <= 0.01 or ring.size() < 3:
 		return null
-	if _native:
+	# A roof with an axis of its own (mapped roof:direction / orientation) is
+	# rare: it takes this GDScript path, the native kernel only knows the
+	# footprint's long side.
+	if _native and axis == Vector2.ZERO:
 		return _native_mesh(ring, top, rh, shape, party, gable_front, holes)
 	var pitched := shape in RoofForms.RIDGED or shape == "pyramidal"
 	var inset := pitched and (not holes.is_empty() or needs_inset(ring) or ring.size() > 8)
@@ -70,7 +73,7 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	# Ridge along the footprint's own long side, so a block rotated 30°
 	# to its street keeps its roof aligned with it (axis-aligned
 	# footprints reduce to the old AABB axis).
-	var u := RingGeometry.dominant_axis(ring)
+	var u := axis if axis != Vector2.ZERO else RingGeometry.dominant_axis(ring)
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
@@ -85,7 +88,7 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 	elif not RoofForms.boxy(ring):
 		party = PackedByteArray()  # party gables only on parcel-like rings
 	if shape in RoofForms.RIDGED:
-		if not RoofForms.ridged(ring, c, top, rh, shape, party, gable_front, verts, normals, uvs):
+		if not RoofForms.ridged(ring, c, top, rh, shape, party, gable_front, verts, normals, uvs, axis):
 			apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		shape = ""
 	match shape:
@@ -95,10 +98,10 @@ static func form_mesh(ring: PackedVector2Array, top: float,
 			if not RoofDomes.faces(ring, c, top, rh, shape, verts, normals, uvs):
 				apex_faces(ring, c, top, rh, verts, normals, uvs, shape != "cone", u)
 		"skillion":
-			RoofForms.skillion(ring, c, top, rh, party, verts, normals, uvs)
+			RoofForms.skillion(ring, c, top, rh, party, verts, normals, uvs, axis)
 		"round":
-			if not RoofForms.barrel(ring, c, top, rh, verts, normals, uvs) \
-					and not RoofForms.ridged(ring, c, top, rh, "gabled", party, gable_front, verts, normals, uvs):
+			if not RoofForms.barrel(ring, c, top, rh, verts, normals, uvs, axis) \
+					and not RoofForms.ridged(ring, c, top, rh, "gabled", party, gable_front, verts, normals, uvs, axis):
 				apex_faces(ring, c, top, rh, verts, normals, uvs, false, u)
 		"":
 			pass

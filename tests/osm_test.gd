@@ -182,6 +182,7 @@ func _run() -> void:
 	_building_relation_checks(failures)
 	_building_tag_checks(failures)
 	_roof_shape_checks(failures)
+	_roof_axis_tag_checks(failures)
 	_material_map_checks(failures)
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
@@ -917,6 +918,20 @@ func _building_tag_checks(failures: Array[String]) -> void:
 		var ang := float(OsmTags._building_entry({"roof:angle": row[0]}, ring, box)["roof_angle"])
 		if absf(ang - float(row[1])) > 0.001:
 			failures.append("roof:angle '%s' should read %.1f, got %.1f" % [row[0], row[1], ang])
+
+## roof:direction (degrees or compass point) and roof:orientation parse; the
+## rest read as absent.
+func _roof_axis_tag_checks(failures: Array[String]) -> void:
+	var ring := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(20, 20), Vector2(0, 20)])
+	var box := Rect2(0, 0, 20, 20)
+	for row in [["90", 90.0], ["270°", 270.0], ["NE", 45.0], ["wnw", 292.5], ["365", 5.0],
+			["", -1.0], ["sideways", -1.0]]:
+		var got := float(OsmTags._building_entry({"roof:direction": row[0]}, ring, box)["roof_dir"])
+		if absf(got - float(row[1])) > 0.001:
+			failures.append("roof:direction '%s' should read %.1f, got %.1f" % [row[0], row[1], got])
+	var o := OsmTags._building_entry({"roof:orientation": " Across "}, ring, box)
+	if str(o["roof_orient"]) != "across":
+		failures.append("roof:orientation should read across, got '%s'" % o["roof_orient"])
 
 ## roof:shape → canonical modelled shape.
 func _roof_shape_checks(failures: Array[String]) -> void:

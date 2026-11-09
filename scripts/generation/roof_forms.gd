@@ -31,8 +31,8 @@ const BARREL_SEGMENTS := 8
 static func ridged(ring: PackedVector2Array, c: Vector2, top: float, rh: float,
 		shape: String, party: PackedByteArray, gable_front: bool,
 		verts: PackedVector3Array, normals: PackedVector3Array,
-		uvs: PackedVector2Array) -> bool:
-	var u := ridge_axis(ring, party, gable_front)
+		uvs: PackedVector2Array, axis: Vector2 = Vector2.ZERO) -> bool:
+	var u := axis if axis != Vector2.ZERO else ridge_axis(ring, party, gable_front)
 	var has_party := party.size() == ring.size() and party.has(1)
 	var v := Vector2(-u.y, u.x)
 	var lo := INF
@@ -60,6 +60,24 @@ static func ridged(ring: PackedVector2Array, c: Vector2, top: float, rh: float,
 	else:
 		_one_pitch(ring, c, u, r1, r2, top, rh, verts, normals, uvs)
 	return true
+
+## The ridge direction a building's own tags ask for, or Vector2.ZERO to keep
+## the footprint's: `roof:direction` is the way the roof slopes down (compass
+## bearing), so the ridge runs across it; `roof:orientation=across` turns the
+## ridge across the long side. Footprint coordinates are x east, y south.
+static func axis_from_tags(b: Dictionary, ring: PackedVector2Array) -> Vector2:
+	var axis := Vector2.ZERO
+	var bearing := float(b.get("roof_dir", -1.0))
+	if bearing >= 0.0:
+		axis = Vector2(cos(deg_to_rad(bearing)), sin(deg_to_rad(bearing)))
+	elif str(b.get("roof_orient", "")) == "across":
+		var u := RingGeometry.dominant_axis(ring)
+		axis = Vector2(-u.y, u.x)
+	if axis == Vector2.ZERO:
+		return axis
+	if axis.x < -0.000001 or (absf(axis.x) <= 0.000001 and axis.y < 0.0):
+		axis = -axis
+	return axis
 
 ## The ridge direction ridged() uses: the ring's long side, or along the
 ## party walls (across them when `gable_front`) on a terrace parcel.
@@ -179,8 +197,8 @@ static func _two_pitch(ring: PackedVector2Array, c: Vector2, u: Vector2,
 ## party wall when there is one), with the side infills under it.
 static func skillion(ring: PackedVector2Array, c: Vector2, top: float, rh: float,
 		party: PackedByteArray, verts: PackedVector3Array, normals: PackedVector3Array,
-		uvs: PackedVector2Array) -> void:
-	var u := RingGeometry.dominant_axis(ring)
+		uvs: PackedVector2Array, axis: Vector2 = Vector2.ZERO) -> void:
+	var u := axis if axis != Vector2.ZERO else RingGeometry.dominant_axis(ring)
 	var v := Vector2(-u.y, u.x)
 	if party.size() == ring.size() and party.has(1):
 		v = _party_axis(ring, party)
@@ -212,10 +230,11 @@ static func skillion(ring: PackedVector2Array, c: Vector2, top: float, rh: float
 ## fall back to gabled): arc strips across the short span plus the two
 ## arched end faces.
 static func barrel(ring: PackedVector2Array, c: Vector2, top: float, rh: float,
-		verts: PackedVector3Array, normals: PackedVector3Array, uvs: PackedVector2Array) -> bool:
+		verts: PackedVector3Array, normals: PackedVector3Array, uvs: PackedVector2Array,
+		axis: Vector2 = Vector2.ZERO) -> bool:
 	if ring.size() != 4:
 		return false
-	var u := RingGeometry.dominant_axis(ring)
+	var u := axis if axis != Vector2.ZERO else RingGeometry.dominant_axis(ring)
 	var v := Vector2(-u.y, u.x)
 	var lu := RingGeometry.half_extent(ring, c, u)
 	var lv := RingGeometry.half_extent(ring, c, v)
