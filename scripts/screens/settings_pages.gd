@@ -1,7 +1,7 @@
 class_name SettingsPages
 extends RefCounted
 
-## The eight Settings pages (design system Screens → SettingsScreen):
+## The Settings pages (design system Screens → SettingsScreen; Privacy is PrivacyPage):
 ## each builder returns one category's page, wires its controls to the
 ## SettingsScreen `s` that owns them, and keeps the handles `s` needs to
 ## refresh and re-skin them. SettingsScreen shows one page at a time.
@@ -416,7 +416,7 @@ static func about(s: SettingsScreen) -> VBoxContainer:
 		UiTheme.data_label(s.version_text(), 15, UiTheme.MUTED),
 		"Built with Godot Engine %s" % engine.get("string", "")))
 	SettingsRows.add(group, SettingsRows.link("Privacy policy",
-		"What stays on this device and what leaves it", Brand.PRIVACY_URL))
+		"The public page for the policy under Settings → Privacy", Brand.PRIVACY_URL))
 	for lic in LICENCES:
 		SettingsRows.add(group, SettingsRows.link(lic[0], lic[1], lic[2]))
 	_licence_toggle(group, "Fonts and icons", "OFL and ISC · show the licence texts",
