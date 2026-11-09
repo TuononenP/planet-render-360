@@ -24,6 +24,14 @@ func _init() -> void:
 	if roundi(actual.get_pixel(3, 0).r * 255.0) != int(GroundMaterial.ID["urban"]):
 		failures.append("class map did not consume available WorldCover")
 	_check_near_map(failures)
+	if TerrainTextures.LAYERS[3] != "soil" or not MaterialLibrary.PBR_SETS.has("soil"):
+		failures.append("the soil set should be terrain layer 3")
+	if TerrainTextures.LAYERS.size() != TerrainTextures.TILE_M.size():
+		failures.append("each terrain layer needs a tile size")
+	# Road ground must not draw the soil layer now in the old asphalt slot.
+	var pal := GroundMaterial.palette()
+	if pal.get_pixel(int(GroundMaterial.ID["road"]), 0).a != 0.0:
+		failures.append("road ground should not weight the soil layer")
 	if failures.is_empty():
 		print("LANDCOVER GROUND OK: classes, OSM precedence, water and climate fallback")
 		quit(0)

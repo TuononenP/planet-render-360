@@ -33,6 +33,7 @@ static var SETS := {
 	"forest": {"asset": "forest_leaves_02", "mean": Color(0.2789, 0.1666, 0.0465), "rough": 0.97, "metal": 0.0},
 	"lawn": {"asset": "leafy_grass", "mean": Color(0.3113, 0.2295, 0.1011), "rough": 0.96, "metal": 0.0},
 	"gravel": {"asset": "gravel_floor", "mean": Color(0.3627, 0.2382, 0.1302), "rough": 0.95, "metal": 0.0},
+	"soil": {"asset": "dirt_floor", "mean": Color(0.4714, 0.2610, 0.1271), "rough": 0.96, "metal": 0.0},
 	"sand": {"asset": "coast_sand_01", "mean": Color(0.2236, 0.1706, 0.1067), "rough": 0.96, "metal": 0.0},
 	"snow": {"asset": "snow_02", "mean": Color(0.3786, 0.3782, 0.3883), "rough": 0.7, "metal": 0.0},
 }

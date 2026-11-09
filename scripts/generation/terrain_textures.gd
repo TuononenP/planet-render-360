@@ -13,9 +13,9 @@ extends RefCounted
 ## the 2K sets (assets/textures/2k/), block-compressed (BC1 albedo, BC3
 ## normal + roughness) so the pair stays ≈60 MB instead of ≈400 MB.
 
-const LAYERS := ["pavement", "lawn", "rock", "asphalt", "cliff", "forest", "gravel", "sand", "snow"]
+const LAYERS := ["pavement", "lawn", "rock", "soil", "cliff", "forest", "gravel", "sand", "snow"]
 ## Metres one texture repeat spans on the ground, per layer.
-const TILE_M := [3.0, 2.6, 4.0, 4.0, 9.0, 3.2, 2.4, 4.0, 5.0]
+const TILE_M := [3.0, 2.6, 4.0, 3.5, 9.0, 3.2, 2.4, 4.0, 5.0]
 const SNOW := 8
 
 static var _arrays: Dictionary = {}

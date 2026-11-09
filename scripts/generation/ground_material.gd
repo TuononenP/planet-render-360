@@ -151,7 +151,13 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
 	TerrainGlsl.bind(m, data.quality_preset)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
+	m.set_shader_parameter("micro_detail", 1.0 if micro_detail(data.quality_preset) else 0.0)
 	return m
+
+## A second, finer sample of the ground's main layer close to the eye:
+## desktop High and Ultra only (one more fetch across the whole ground).
+static func micro_detail(preset: int) -> bool:
+	return not OS.has_feature("mobile") and RenderSettings.clamp_preset(preset) >= RenderSettings.Preset.HIGH
 
 ## Binds the near class map around the viewpoint, if this tier has one.
 static func _bind_near(m: ShaderMaterial, data: LocationData, m2u: float) -> void:
@@ -279,7 +285,7 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 	var none := Color(0, 0, 0, 0)
 	var rows := {
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
-		"road": [Color(0, 0, 0, 1), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
+		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
 		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
 		"forest": [Color(0, 0.25, 0, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6, Color(0, 0.75, 0, 0)],

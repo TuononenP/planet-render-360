@@ -150,6 +150,11 @@ JPEG before bundling. `TerrainTextures` builds desktop Ultra's terrain arrays
 from them at 2048 px, block-compressed (BC1 albedo, BC3 normal + roughness).
 Only `grass` (the building-ground set, not a terrain layer) stays 1k.
 
+Soil layer (2026-11-10): `soil` (`dirt_floor`, packed earth for worn verges)
+at 1k and 2k from the same CDN, CC0 1.0, 6 files ≈13 MB, verified 1024² and
+2048² JPEGs. It takes the terrain array slot asphalt held, so the layer count
+and phone memory do not grow: roads draw their own ribbons and never used it.
+
 ## Foliage, bark and tree-impostor textures — T5.1 (2026-10-28)
 
 Own procedural work, no third-party pixels: **CC0 1.0** (dedicated by

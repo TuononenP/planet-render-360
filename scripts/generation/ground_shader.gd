@@ -51,6 +51,8 @@ uniform vec3 unknown_veg : source_color = vec3(0.35, 0.48, 0.24);
 uniform float veg_lo = 0.03;
 uniform float veg_hi = 0.12;
 uniform int ground_quality = 2;
+// 1 = a finer sample of the main layer close to the eye (micro_detail).
+uniform float micro_detail = 0.0;
 
 // @SNOW
 // @TERRAIN
@@ -195,6 +197,28 @@ void fragment() {
 					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 				}
 			}
+			// Grass beside anything hard is trodden to bare earth, in
+			// patches: a kerb, a path or a wall looks for it within about a metre.
+			float lawn = W0.y;
+			if (lawn > 0.3 && dist_m < 350.0) {
+				float texel_m = 2.0 * near_rect.z * u2m / near_n;
+				ivec2 cc0 = ivec2(floor(nuv + 0.5));
+				float hard = 0.0;
+				for (int k = 0; k < 8; k++) {
+					float ang = float(k) * 0.7853982;
+					float rad = (k % 2 == 0 ? 0.55 : 1.15) / texel_m;
+					ivec2 o = ivec2(round(vec2(cos(ang), sin(ang)) * rad));
+					int nid = int(texelFetch(near_class, clamp(cc0 + o, ivec2(0), nmax), 0).r * 255.0 + 0.5);
+					hard += (nid == 1 || nid == 2 || nid == 3 || nid == 16) ? 1.0 : 0.0;
+				}
+				float worn = clamp(hard / 3.0, 0.0, 1.0)
+					* smoothstep(0.3, 0.7, t_noise(g * 1.1) * 0.7 + t_noise(g * 4.3 + 9.0) * 0.3)
+					* (1.0 - smoothstep(150.0, 350.0, dist_m)) * nw * 0.85;
+				W0.w += W0.y * worn;
+				W0.y *= 1.0 - worn;
+				col = mix(col, vec3(0.22, 0.17, 0.12), worn * clamp(lawn, 0.0, 1.0));
+				trust *= 1.0 - 0.6 * worn;
+			}
 		}
 	}
 	if (coarse > 0.0005) {
@@ -257,6 +281,14 @@ void fragment() {
 		vec3 tone = mix(lush, dried, smoothstep(0.32, 0.72, m_big));
 		tone *= 0.88 + 0.24 * mix(0.5, m_fine, 1.0 - smoothstep(120.0, 600.0, dist_m));
 		base *= mix(vec3(1.0), tone, meadow * 0.85);
+		// Sunlit turf is a deep, slightly grey green, never poster green.
+		float turf = lum(base);
+		base = mix(base, vec3(turf), 0.18 * meadow) * mix(1.0, 0.93, meadow);
+		// A lawn is never a plane: slow swells catch the light.
+		if (ground_quality >= 1 && dist_m < 260.0) {
+			vec2 swell = t_relief(g, 7.0, 2);
+			nw = normalize(nw - vec3(swell.x, 0.0, swell.y) * 0.35 * meadow * (1.0 - smoothstep(120.0, 260.0, dist_m)));
+		}
 	}
 	// Photographic layers by weight, each normalised by its mean so the
 	// class colour sets the value and the texture only adds structure.
@@ -265,9 +297,15 @@ void fragment() {
 	vec3 det = vec3(0.0);
 	vec4 nm = vec4(0.0);
 	float wt = 0.0;
+	int main_layer = -1;
+	float main_w = 0.0;
 	for (int i = 0; i < 8; i++) {
 		if (w[i] < 0.02) {
 			continue;
+		}
+		if (w[i] > main_w) {
+			main_w = w[i];
+			main_layer = i;
 		}
 		vec4 a;
 		vec4 n;
@@ -282,6 +320,16 @@ void fragment() {
 	}
 	det = clamp(det / max(wt, 1e-3), vec3(0.3), vec3(2.0));
 	nm /= max(wt, 1e-3);
+	// Close to the eye one repeat of a layer is too coarse: the main layer
+	// again at about a quarter the size gives the surface its fine grain.
+	if (micro_detail > 0.5 && dist_m < 90.0 && main_layer >= 0) {
+		float mf = (1.0 - smoothstep(30.0, 90.0, dist_m)) * main_w;
+		vec4 ma;
+		vec4 mn;
+		det_sample(main_layer, g * 3.7, dg * 3.7, false, ma, mn);
+		det *= mix(vec3(1.0), clamp(ma.rgb / det_mean[main_layer], vec3(0.6), vec3(1.5)), 0.3 * mf);
+		nm.rg += (mn.rg - vec2(0.5)) * 0.6 * mf;
+	}
 	// Strata on cliffs: bands of stone by height, wobbling along the face.
 	float strata = t_noise(vec2(pm.y / 2.3 + t_noise(g / 60.0) * 3.0, 0.5));
 	det *= 1.0 + (strata - 0.5) * 0.3 * steep;
