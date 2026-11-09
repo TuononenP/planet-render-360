@@ -47,19 +47,28 @@
   > DEFERRED: not visible as a tell from the Hyde St frames (row houses step down; ground floors show); shared building code.
 
 ### Phase 4 — landmarks
-- [ ] **SF-4.1** Wire the SF batch into `landmark_test` + preset pin; landmark captures
+- [x] **SF-4.1** Wire the SF batch into `landmark_test` + preset pin; landmark captures — @claude/sf-hero 2026-11-08
+  > DONE: `landmark_test` pins the 9 SF names and true-metre heights, and the San Francisco preset's extras (Coit, Alcatraz,
+  > Salesforce). Captures already in `visual-plan/captures/{sf_towers,sf_tall,sf_alcatraz,sf_bridge,sf-civic}/`. landmark,
+  > landmark_placement, landmark_fidelity tests OK.
 - [x] **SF-4.2** SF City Hall, Palace of Fine Arts — @claude/sf-hero 2026-11-03
   > DONE: `LandmarkSfCivic.city_hall` (granite wings, Polk St portico, colonnaded drum, ribbed dome, lantern; 93.7 m,
   > yaw −9) and `LandmarkSfPalace.build` (rotunda, curved peristyles, exhibition hall; 49.4 m, yaw −99, span 270 m),
   > positions from OSM; refs in `visual-plan/refs/landmarks/{sf_city_hall,palace_of_fine_arts}/`. landmark_catalog
   > (445), landmark, landmark_fidelity tests OK. Sheets: `visual-plan/captures/sf-civic/`.
-- [ ] **SF-4.3** Golden Gate `yaw_deg` check (deck bearing ~352°)
+- [x] **SF-4.3** Golden Gate `yaw_deg` check (deck bearing ~352°) — @claude/sf-hero 2026-11-08
+  > DONE: deck runs 354.8° (anchorages 37.8106,-122.4770 → 37.8324,-122.4795). The axis is (cos yaw, sin yaw) in (x, z), so 85°
+  > was the right line but put the model's −X south pier (with its fender) at the north end; now 265°. BUILD_VERSION 182.
 
 ### Phase 5 — streets and transit
 - [x] **SF-5.1** Cable cars: `cable_tram=cable` draws a concrete bed and the cable slot — @claude/sf-hero 2026-11-03
   > DONE: `OsmTags._rail_entry` `cable`, `RailBuilder` track bed (paved road material, layer 7.0) + slot rails 30 mm apart;
   > osm_test, rail_square_test OK. The NA 1435 mm default is not needed: SF's trams carry `gauge`.
-- [ ] **SF-5.2** Overhead wires (Ultra) along `electrified=contact_line` trams and trolleybus wires
+- [~] **SF-5.2** Overhead wires (Ultra) along `electrified=contact_line` trams and trolleybus wires — @claude/sf-hero 2026-11-08
+  > PARTIAL (tag-driven; most SF cross streets lack `trolley_wire=yes` in OSM, so they stay bare — a fallback would need route
+  > relations or a Muni layer): `OverheadWires` (built for Finland) already wires `contact_line` rails and `trolley_wire=yes` roads in any country,
+  > Ultra desktop only, ≤12 draw calls; `finland_hero_test` now pins the trolleybus case (and a plain US street stays bare).
+  > Cross streets stay bare where OSM lacks `trolley_wire` on the way (data gap, see Findings).
 - [x] **SF-5.3** Parked cars along kerbs (Ultra desktop, MultiMesh) — @claude/sf-hero 2026-11-03
   > DONE: `RoadWidths` (kerb-to-kerb width from footway=sidewalk lines either side; Hyde 6 → ~12 m), parking tags
   > (`OsmTags.parking_sides`, a tagged lane widens the road), `ParkedCars` (sedans/hatches/SUVs/vans with a raked glasshouse,
@@ -90,6 +99,8 @@
 
 ### Phase 9 — hero loop
 - [ ] **SF-9.1** Capture rounds to "photographic" on Ultra; scorecard §9 lines
+  > OPEN: last round sf-r6 is "recognisable". Needs interactive Ultra capture rounds and a visual judgement (street trees via
+  > canopy R-2.4, Alcatraz drape, ground-floor variety); not closable from headless runs.
 
 ## Findings
 
@@ -98,7 +109,7 @@
 | Street | Paved sidewalks, measured 12 m street, cable beds and slots, parked cars | No street trees (4 mapped) | Canopy raster (R-2.4) |
 | Fabric | Pastel Edwardians, painted bays, cornices, garages | Flat-lit tiled walls, one repeated shop band | Ground-floor variety (entries) |
 | Bay | Water, Angel Island, fog layer | Alcatraz a green lump (far drape over the model's rock) | Cut the far drape under `base: water` landmarks (landmark plan) |
-| Wires | — | No trolleybus wires on cross streets | SF-5.2 |
+| Wires | Contact-line trams and `trolley_wire=yes` streets are wired (Ultra) | Cross streets without the OSM tag stay bare | Data gap; tag-driven by design |
 
 ## Data notes
 

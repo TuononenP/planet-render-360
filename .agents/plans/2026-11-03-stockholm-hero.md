@@ -89,13 +89,15 @@ The audit of 2026-11-03 (latest capture `visual-plan/reviews/ultra-p8j-2026-11-0
 - [x] Add 3 Commons CC/PD photos to `visual-plan/refs/stockholm/` (README rows): summer clear from the vantage (make it
       `01_`), a Gamla stan street (Västerlånggatan), Strandvägen with steamboats.
 - [x] `PlaceCard.SKY_FOR["Stockholm"]`; pin it in `preset_views_test`. — Existing sky value pinned; headless test passed.
-- [ ] Baseline `sto-r1` (Ultra, golden hour; `--audit`; plus `--season=winter` against the snow ref) and a review
-      README. Fill in the findings table.
+- [x] Baseline `sto-r1` (Ultra, golden hour; `--audit`; plus `--season=winter` against the snow ref) and a review
+      README. Fill in the findings table. — `visual-plan/reviews/sto-r1-2026-11-03/` (+ winter); post-fabric, not a
+      clean baseline. Findings table below filled from sto-r4.
 
 ### B-2: Stockholm fabric (needs G-2) — @codex/stockholm-fabric 2026-11-03
-- [ ] Stockholm arm in `BuildingEra._rules`, reading districts and year; storey bands on the eras. The weighted
-      fallback must not put slabs in old districts.
-- [ ] Rows in `architecture_cities_waterfront.gd`, split into `architecture_cities_stockholm.gd` if it nears 1000 lines:
+Done 2026-11-08: `architecture_test` passes (66 regions); skyline reads as Stockholm in sto-r4 (recognisable).
+- [x] Stockholm arm in `BuildingEra._rules`, reading districts and year; storey bands on the eras. The weighted
+      fallback must not put slabs in old districts. — `building_era.gd:104` onward.
+- [x] Rows in `architecture_cities_waterfront.gd`, split into `architecture_cities_stockholm.gd` if it nears 1000 lines:
   - `stockholm_medieval`: Gamla stan and Riddarholmen narrow plots, steep pitch, step and bell `gable`, ochre, rust and
     yellow plaster, sheet-metal or copper roofs.
   - `stockholm_wood`: Mariaberget and Vita Bergen cottages, falu red and ochre timber.
@@ -105,42 +107,55 @@ The audit of 2026-11-03 (latest capture `visual-plan/reviews/ultra-p8j-2026-11-0
   - `stockholm_funkis`: Fredhäll and Söder Mälarstrand white and pale lamellas.
   - `stockholm_miljon`: Skärholmen, Tensta, Rinkeby slabs, precast `panel`.
   - `stockholm_eco`: Hammarby Sjöstad and Norra Djurgårdsstaden white render, timber and glass, big balconies.
-- [ ] Districts in `city_styles.gd` for each row. Pin cases in `architecture_test`.
-- [ ] Tone the `STOCKHOLM_PLASTER` palette toward the refs.
-- [ ] Use G-5 sheet metal as the pitched-roof default (black, grey, falu red), copper on civic buildings and towers.
+- [x] Districts in `city_styles.gd` for each row. Pin cases in `architecture_test`. — `city_styles.gd:229`.
+- [x] Tone the `STOCKHOLM_PLASTER` palette toward the refs.
+- [x] Use G-5 sheet metal as the pitched-roof default (black, grey, falu red), copper on civic buildings and towers.
+      — `roof_metals_test` passes.
 
 ### B-3: The vantage frame
-- [ ] Riddarholmen: find why it reads as green patches (land class, quay apron or missing buildings) and fix that
-      generically.
+- [x] Riddarholmen: find why it reads as green patches (land class, quay apron or missing buildings) and fix that
+      generically. — Patches are gone in sto-r4 (buildings and the church spire read); the mapped paving evidence
+      change fixed the shoreline class. The island bank is still pale and angular (see B-8).
 - [ ] Foreground lamellas: restore the Mariaberget cliff lip (DEM smoothing at `asl_m` sites), or step the eye to the
-      cliff edge with `--looks`. Update the `PresetViews` row comment with the OSM check.
+      cliff edge with `--looks`. Update the `PresetViews` row comment with the OSM check. — Open. The lamellas no
+      longer dominate, but the foreground is now the mapped road and grass instead of a cliff edge. On-path trial eyes
+      (sto-r2, sto-r3) lose City Hall or leave the mapped footway. Needs a terrain/eye check; preset unchanged.
 
 ### B-4: Water, quays, boats (needs G-4, G-6) — @codex/stockholm-waterfront 2026-11-03
-- [ ] Baltic water colour from the G-4 table.
-- [ ] Granite quays with bollards and mooring rings (`QuayBuilder` stone from `KerbBuilder.stone_for`).
-- [ ] Boats moored along quays: Strandvägen steamboats, Riddarholmen hotel ships, Söder Mälarstrand houseboats.
-- [ ] af Chapman and other `building=ship|boat` drawn as a ship mesh.
+- [x] Baltic water colour from the G-4 table. — `WaterSurface.baltic` (`water_surface.gd:384`).
+- [x] Granite quays with bollards and mooring rings (`QuayBuilder` stone from `KerbBuilder.stone_for`).
+      — `quay_moorings_test` passes (bollards, wet side, tier and draw budget).
+- [x] Boats moored along quays: Strandvägen steamboats, Riddarholmen hotel ships, Söder Mälarstrand houseboats.
+      — Shared quay-mooring builder; a moored ship shows at Riddarholmen in sto-r4. The named Strandvägen and
+      Söder Mälarstrand locations were not checked up close.
+- [x] af Chapman and other `building=ship|boat` drawn as a ship mesh. — `ship_builder_test` passes.
 
 ### B-5: Bridges — @codex/stockholm-bridge 2026-11-03
-- [ ] Per-bridge structure in `BridgeArches`: steel arch, girder or masonry, from `bridge:structure` or a small
-      registry. Only masonry gets the 32 m stone arches.
-- [ ] Västerbron landmark (twin ~204 m steel arches).
+- [x] Per-bridge structure in `BridgeArches`: steel arch, girder or masonry, from `bridge:structure` or a small
+      registry. Only masonry gets the 32 m stone arches. — `bridge_arches_test` passes.
+- [x] Västerbron landmark (twin ~204 m steel arches). — Registered and modelled; `landmark_test` passes.
 
 ### B-6: Landmarks
 Run as one background agent batch in a scratch copy, deleted afterwards (memory `landmark-agent-batch-workflow`).
-- [ ] Tyska kyrkan, Riddarhuset, the Wrangel and Bonde palaces, Klara and Sofia churches, Hötorgsskraporna,
+- [x] Tyska kyrkan, Riddarhuset, the Wrangel and Bonde palaces, Klara and Sofia churches, Hötorgsskraporna,
       Katarinahissen, Gröna Lund, Kastellet, Nationalmuseum, the Royal Opera, Grand Hôtel, Söder Torn.
-- [ ] Pin the existing 11 Stockholm entries and the preset pin in `tests/landmark_test.gd`.
+      — `landmark_catalog_test` (504 entries), `landmark_test`, `landmark_fidelity_test` pass.
+- [x] Pin the existing 11 Stockholm entries and the preset pin in `tests/landmark_test.gd`.
 
 ### B-7: Streets (needs G-3, G-7) — @codex/stockholm-streets 2026-11-03
-- [ ] Span-wire lamps over Stockholm streets; wall-bracket lanterns in the medieval district.
-- [ ] Granite setts on Gamla stan streets: a `sett` finish default for untagged roads in the medieval district.
-- [ ] Catenary on Spårväg City and the Djurgården line (`electrified=contact_line`).
-- [ ] Nordic furniture kit (SL stops, bins).
+- [x] Span-wire lamps over Stockholm streets; wall-bracket lanterns in the medieval district. — `street_lights_test`,
+      `facade_relief_test` pass.
+- [x] Granite setts on Gamla stan streets: a `sett` finish default for untagged roads in the medieval district.
+- [x] Catenary on Spårväg City and the Djurgården line (`electrified=contact_line`). — Wire budget 4/12 on Ultra.
+- [x] Nordic furniture kit (SL stops, bins). — `street_furniture_test` passes (`nordic_se` kit).
 
 ### B-8: Hero loop
-- [ ] Capture rounds `sto-rN` against the refs (summer, plus a winter round against the snow photo).
-- [ ] Review README and scorecard §9 line per round. Target: photographic on Ultra.
+- [x] Capture rounds `sto-rN` against the refs (summer, plus a winter round against the snow photo). — sto-r1 to
+      sto-r4 (winter for r1 and r3).
+- [x] Review README and scorecard §9 line per round. — READMEs per round; scorecard rounds r1 to r4.
+- [ ] Target: photographic on Ultra. — Open. Agent pre-rating is still recognisable, and the human gate is pending.
+      Remaining gaps: the pale angular island bank, the road and grass foreground (B-3), and an isolated cold time
+      to view (206 s under load vs the 150 s target; the build graph itself took 58 s).
 
 ## Critical files
 
@@ -177,6 +192,9 @@ Run as one background agent batch in a scratch copy, deleted afterwards (memory 
 
 | Area | Reads right | Reads wrong | Proposed change |
 |---|---|---|---|
+| Skyline | City Hall, the Riddarholmen spire and the moored ship identify the location. | Island blocks, shore and bridge approaches are simplified and angular; the bank is pale. | Inspect the island geometry and shore at close range. |
+| Vantage | The intended City Hall and island are in frame. | Road, grass and trees fill the foreground instead of a cliff edge. | Terrain/eye check on the mapped footway, then recapture. |
+| Performance | Wires 4/12, marina 14/20 draw calls. | Time to view 206 s under load (target 150 s). | Isolated cold timing. |
 
 
 ## Work in progress — @codex/stockholm 2026-11-03
@@ -197,4 +215,16 @@ Run as one background agent batch in a scratch copy, deleted afterwards (memory 
 - `sto-r3` summer and winter captures are reviewed; the island bank and foreground road remain visibly wrong, and on-path eye trials do not yet retain the full intended view. The photographic target remains open. Disk space recovered to approximately 1.9 GiB, but concurrent builds still require care.
 - B-6 continuation: the requested Stockholm landmarks are modelled, including a grouped Gröna Lund skyline with approximate coaster profile; final integrated visual review remains open. Generic separated-footprint clearance keeps buildings between the rides.
 - Generic shoreline inference now recognizes mapped `unhewn_cobblestone`, `bricks` and `concrete:plates` as paving; native and script evidence tests pass. `sto-r4` remains recognisable rather than photographic, and its 206 s time to view exceeds the 150 s target under concurrent load. See its review for the remaining issues.
-- End-test attempt: `screenshot_test` passed. `world_cache_test` failed its identical-world check: the cold visit had far-city OSM data (724 towers), while the revisit rebuilt without it (0 towers), yielding 2,617 versus 2,566 nodes. The cache revisit and input stability need investigation before the end check can pass.
+- End-test attempt (2026-11-03): `screenshot_test` passed. `world_cache_test` failed its identical-world check: the cold visit had far-city OSM data (724 towers), while the revisit rebuilt without it (0 towers), yielding 2,617 versus 2,566 nodes.
+
+## Status — 2026-11-08
+
+Everything that can be verified automatically is done and ticked above. Final check on the clean tree (branch `bundle-capital-osm-snapshots`):
+- Headless, all pass: `architecture_test`, `osm_test`, `preset_views_test`, `landmark_catalog_test`, `landmark_test`, `landmark_fidelity_test`, `scenery_test`, `street_lights_test`, `street_furniture_test`, `rail_square_test`, `facade_relief_test`, `quay_moorings_test`, `ship_builder_test`, `marina_test`, `bridge_arches_test`, `roof_metals_test`; `tools/check_class_size.sh` OK (largest 859/1000).
+- Windowed, both pass: `world_cache_test` (cold 30.6 s, cached revisit 5.7 s, identical world) and `screenshot_test`. The 2026-11-03 `world_cache_test` failure did not recur on a quiet tree. It tests Paris, not Stockholm, so it was most likely concurrent sessions changing the far-city OSM data mid-run.
+
+Still open (needs a human or a new capture round, not more code):
+- B-3 foreground: the cliff-edge framing at Monteliusvägen.
+- B-8: the "photographic" rating and the human gate. Pre-rating stays recognisable.
+- An isolated cold time-to-view measurement against the 150 s target.
+- Close-up checks of the named Strandvägen and Söder Mälarstrand boat locations.

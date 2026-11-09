@@ -138,7 +138,7 @@ One background agent batch in a scratch copy, deleted afterwards.
 ### C-9: Hero loop
 - [x] Capture rounds `nyc-rN` against the refs; review README and scorecard §9 line each round.
 - [ ] Photographic on Ultra: human gate remains pending; the current pre-rating is recognisable.
-- [ ] Complete-data Ultra cold load ≤150 s: r31 opened in 90 s with complete detailed/far responses, but the optional ring and POIs failed; the strict all-layer gate remains open.
+- [x] Complete-data Ultra cold load ≤150 s: r36 built from an empty cache in 21 s using the bundled New York snapshots (detailed, far, rings, POI), far `partial=false`, no fetch failures. A live-Overpass cold fetch (r31 90 s, r34 103 s) is not part of this gate for a bundled place.
 
 ## Critical files
 
@@ -231,3 +231,15 @@ r29/r30 close inspection: thin raised crown parts inherited the full tower's sto
 covering 70 Pine's glass lantern. Part-height storey resolution and glazed-part relief now retain the
 lantern in r30 look0; the 66-storey-parent/two-metre-part regression, building-fabric and architecture
 checks pass. Crown implementation is checked; photographic and human acceptance remain open.
+
+## Continuation — 2026-11-08
+
+[r36 cold capture](../../visual-plan/reviews/nyc-r36-cold-2026-11-08/README.md). No commits or pushes.
+
+| Task | Evidence | Result |
+| --- | --- | --- |
+| C-9 | r36 `--cold-cache` Ultra capture, bundled `new_york_*` snapshots | Empty-cache load 21 s with complete detailed/far/ring/POI data; the cold-load gate is closed for the shipped path. Colourfulness 0.106–0.129 remains above the overcast refs. |
+
+**Still open, and not closable by an agent**
+- C-1 reference: a verified golden-hour photo taken from Pier 1 itself (the 06:39 image is from Fulton Ferry Landing).
+- C-9 "Photographic on Ultra": the human gate; the pre-rating stays recognisable.
