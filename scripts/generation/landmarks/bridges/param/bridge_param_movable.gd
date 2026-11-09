@@ -56,6 +56,7 @@ static func pontoon(lm: LandmarkMesh, row: Dictionary) -> void:
 	var width := float(row["width"])
 	var clear := float(row["clear"])
 	BridgeParam.slab(lm, -h, h, clear, width)
+	BridgeParam.markings(lm, -h, h, clear, width)
 	BridgeParam.rails(lm, "Steel", -h, h, clear, width)
 	# One pontoon per span, a little shorter than its bay so the joints show.
 	for i in xs.size() - 1:

@@ -93,6 +93,7 @@ static func haunched(lm: LandmarkMesh, row: Dictionary) -> void:
 	var pier_d := minf(float(row.get("pier_depth", clampf(widest / 16.0, 1.5, 12.0))), room)
 	var mid_d := minf(float(row.get("mid_depth", clampf(widest / 40.0, 1.2, 4.0))), pier_d)
 	BridgeParam.slab(lm, -h, h, clear, width)
+	BridgeParam.markings(lm, -h, h, clear, width)
 	BridgeParam.rails(lm, "Steel", -h, h, clear, width)
 	var seg := 12
 	for i in xs.size() - 1:

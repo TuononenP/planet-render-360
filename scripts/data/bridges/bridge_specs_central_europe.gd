@@ -322,14 +322,15 @@ static func rows() -> Array:
 				"tram on the deck; OSM stair nodes at the arch group ends (lon 14.4581 and 14.4610, ~207 m) " +
 				"-> group centred at lon 14.45958; way 128964803 bearing 88.6; deck height and rise estimated"},
 		{"id": "br_prague_vyton_rail_bridge", "cc": "CZ", "name": "Výtoň Railway Bridge", "aliases": ["výtoň railway bridge", "vyton railway bridge", "vyšehrad railway bridge"],
-			"lat": 50.067, "lon": 14.41366, "bearing": 255.5, "st": "truss", "spans": [72.0, 72.0, 72.0], "width": 8.1,
-			"clear": 7.0, "rise": 10.0, "material": "steel", "base": "water", "tier": 3, "conf": 2,
+			"lat": 50.066964, "lon": 14.413443, "bearing": 255.5, "st": "truss", "spans": [72.0, 72.0, 72.0],
+			"width": 8.1, "clear": 7.0, "rise": 10.0, "material": "steel", "base": "water", "tier": 3, "conf": 2,
 			"src": "cs Wikipedia (1901 steel parabolic truss girders 3 x 72 m, 261 m with stone approach " +
 				"arches), OSM ways 158905793/1327958388 bearing; width and deck height guessed | verified: cs " +
 				"Wikipedia 'Vysehradsky zeleznicni most': 1900-01 rebuild with three parabolic truss girders " +
 				"each 72 m (560 t each), two new stone piers in the river, width 8.1 m (two tracks), 261.05 m " +
 				"with the stone viaduct arches; OSM way 158905793 (truss, 241 m) centre 50.0670,14.41366 " +
-				"bearing 255.5 re-measured; truss height and deck height estimated"},
+				"bearing 255.5 re-measured; truss height and deck height estimated | placement: centre moved " +
+				"+16 m along the deck (water crossing says +21 m, mapped deck extent +11 m)"},
 		{"id": "br_budapest_arpad_bridge", "cc": "HU", "name": "Árpád Bridge", "aliases": ["árpád híd", "arpad hid"],
 			"lat": 47.5378, "lon": 19.0526, "bearing": 109.5, "st": "girder",
 			"spans": [103.0, 102.0, 103.0, 102.0, 103.0, 102.0, 103.0, 102.0, 103.0], "width": 35.4, "clear": 10.0,
