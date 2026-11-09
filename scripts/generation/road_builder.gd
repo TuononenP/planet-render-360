@@ -209,6 +209,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 			_batch(batches, finish).join(own[finish])
 	RoadMarkings.lay(plan, batches, surf, m2u, data)
 	RoadPaint.lay(batches, data, surf, junc, seeds, m2u)
+	RoadGlyphs.lay(batches, data, surf, m2u, plan)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():

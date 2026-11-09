@@ -496,7 +496,8 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"sidewalk": sidewalk_sides(tags), "sidewalk_separate": sidewalk_sides(tags, true),
-		"oneway": oneway(tags), "cycle_lane": cycle_lane_sides(tags), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
+		"oneway": oneway(tags), "cycle_lane": cycle_lane_sides(tags),
+		"turn_forward": turn_lanes(tags, "forward"), "turn_backward": turn_lanes(tags, "backward"), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
 		"class": road_class}
 
 ## Width of a parking lane along a kerb (m).
@@ -518,6 +519,29 @@ static func parking_sides(tags: Dictionary) -> int:
 			elif v in PARKING_NO:
 				sides = maxi(sides, 0) & ~int(side[1])
 	return sides
+
+## The turns painted on each lane in `direction` ("forward" or "backward"),
+## left to right in the direction of travel: [["left"], ["through", "right"]].
+## A plain `turn:lanes` means forward. Merges and `none` paint nothing.
+static func turn_lanes(tags: Dictionary, direction: String) -> Array:
+	var value := str(tags.get("turn:lanes:" + direction, "")).strip_edges().to_lower()
+	if value == "" and direction == "forward":
+		value = str(tags.get("turn:lanes", "")).strip_edges().to_lower()
+	var out: Array = []
+	if value == "":
+		return out
+	for lane in value.split("|"):
+		var turns: Array = []
+		for raw in lane.split(";"):
+			var t := raw.strip_edges()
+			if t in ["left", "slight_left", "sharp_left"] and not turns.has("left"):
+				turns.append("left")
+			elif t in ["right", "slight_right", "sharp_right"] and not turns.has("right"):
+				turns.append("right")
+			elif t == "through" and not turns.has("through"):
+				turns.append("through")
+		out.append(turns)
+	return out
 
 ## Sides of a road with a painted bike lane, as bits (1 left, 2 right)
 ## from `cycleway` and `cycleway:both|left|right`. A bare `cycleway=lane`
