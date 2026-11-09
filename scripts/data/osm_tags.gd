@@ -435,19 +435,42 @@ static func _building_use(tags: Dictionary) -> String:
 			return str(tags[key])
 	return ""
 
-## A marked pedestrian/cycle crossing way (footway=crossing,
-## cycleway=crossing, highway=crossing): RoadBuilder paints it with zebra
-## bars over the carriageway it crosses.
+## A painted pedestrian/cycle crossing way (footway=crossing,
+## cycleway=crossing, highway=crossing, not tagged unmarked): RoadBuilder
+## paints it over the carriageway it crosses.
 static func is_crossing(tags: Dictionary) -> bool:
-	return str(tags.get("footway", "")) == "crossing" or str(tags.get("cycleway", "")) == "crossing" \
-		or str(tags.get("highway", "")) == "crossing"
+	return crossing_style(tags) not in ["", "none"]
+
+## Paint of a crossing way: "" when it is no crossing, "none" unpainted
+## (unmarked, a plain coloured surface, or not at grade), a named style
+## (zebra, ladder, lines, dashes), or "auto" when mapped as painted with
+## no style given (RoadSurface.crossing_finish picks the country's).
+static func crossing_style(tags: Dictionary) -> String:
+	if str(tags.get("footway", "")) != "crossing" and str(tags.get("cycleway", "")) != "crossing" \
+			and str(tags.get("highway", "")) != "crossing":
+		return ""
+	var crossing := str(tags.get("crossing", ""))
+	var marks := str(tags.get("crossing:markings", ""))
+	if crossing in ["bridge", "underpass"] or marks == "no" \
+			or (marks == "" and crossing in ["unmarked", "no", "informal"]):
+		return "none"
+	# First token: zebra:bicolour, zebra;dots, zebra,_dots, ladder:skewed.
+	var first := marks.get_slice(";", 0).get_slice(":", 0).get_slice(",", 0)
+	match first:
+		"zebra", "ladder", "lines", "dashes":
+			return first
+		"dots":
+			return "dashes"
+		"surface", "pictograms":
+			return "none"
+	return "auto"
 
 ## One contract-§2.5 attributed road dict.
 static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var road_class := str(tags.get("highway", "unclassified"))
 	var lanes := _tag_int(tags.get("lanes", 0), 0, 20)
 	var width_m := road_class_width(road_class)
-	var w := _tag_metres(tags.get("width", ""), 0.5, 100.0)
+	var w := _tag_metres(tags.get("width", tags.get("est_width", "")), 0.5, 100.0)
 	var parking := parking_sides(tags)
 	if not is_nan(w):
 		width_m = w
@@ -462,6 +485,10 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"kerb_line": str(tags.get("footway", "")) == "sidewalk",
 		"surface": str(tags.get("surface", "")),
 		"crossing": is_crossing(tags),
+		"crossing_style": crossing_style(tags),
+		"crossing_signal": str(tags.get("crossing", "")) in ["traffic_signals", "pedestrian_signals"] \
+			or _tag_truthy(tags.get("crossing:signals", "")),
+		"crossing_scramble": _tag_truthy(tags.get("crossing:scramble", "")),
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"bridge_structure": str(tags.get("bridge:structure", "")),
 		"bridge_material": str(tags.get("bridge:material", tags.get("material", ""))),
