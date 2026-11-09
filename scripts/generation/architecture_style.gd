@@ -40,6 +40,11 @@ const ULTRA_TINTS := 6
 const CHROMA := {"render": 1.0, "wood": 0.8, "stone": 0.6,
 	"concrete": 0.5, "terracotta": 0.45, "brick": 0.4, "limestone": 0.25,
 	"glass": 0.15}
+## Flat roofs whose row names no colour (a bare membrane): the greys, blue-greys
+## and green-greys real roofscapes show, instead of one photo colour everywhere.
+const FLAT_ROOFS := ["#7e8388", "#6a6f75", "#8f9296", "#74827a", "#9a948a", "#5f6469"]
+## Share of buildings in a city that take a row's first (main) wall finish.
+const MAIN_SHARE := 0.65
 ## Brightest linear luminance a wall/roof tint may reach.
 const WALL_ALBEDO_MAX := 0.72
 
@@ -251,7 +256,7 @@ static func resolve(b: Dictionary, region: String, density: String,
 		var tints := float(ctx.get("tints", looks))
 		if tints > looks:
 			mt = (floorf(_h(seed_v, 32) * tints) + 0.5) / tints * 0.913 + 0.041
-	var wall: Array = _pick(p["w"] as Array, ms, 1)
+	var wall: Array = _pick_wall(p["w"] as Array, seed_v, ms, city != "")
 	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)
 	var pattern := _pattern_of(p, ms, 13)
@@ -280,12 +285,12 @@ static func resolve(b: Dictionary, region: String, density: String,
 	return {
 		"region": region, "kind": kind, "city": city, "era": era,
 		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, mt, 2),
-		"vt": chroma_of(str(wall[0])),
+		"vt": float(p.get("vt", chroma_of(str(wall[0])))),
 		"pattern": pattern, "bay_m": float(p["bay"]),
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
 		"roof_shape": shape, "pitch": pitch,
-		"roof_set": str(roof[0]), "roof_colour": _tint(roof[1] as Array, mt, 6),
+		"roof_set": str(roof[0]), "roof_colour": _tint(_roof_palette(roof), mt, 6),
 		"floor_h": fh, "storeys": storeys, "default_h": float(storeys) * fh + rise,
 		"chimney": float(p["ch"]), "dormer": float(p.get("dm", 0.0)),
 		"equip": float(p.get("eq", 0.0)),
@@ -296,6 +301,24 @@ static func resolve(b: Dictionary, region: String, density: String,
 		"variant": int(_h(ms, 14) * float(VARIANTS)) % VARIANTS,
 		"relief": _relief(p, seed_v),
 	}
+
+## The wall finish of one building. Inside a city the look seeds are few,
+## so picking the wall from them left a row's second finish unused whenever
+## both seeds landed on the first; pick it per building instead: the row's
+## first (main) finish takes MAIN_SHARE and the others split the rest.
+static func _pick_wall(walls: Array, seed_v: float, ms: float, in_city: bool) -> Array:
+	if not in_city or walls.size() < 2:
+		return _pick(walls, ms, 1) as Array
+	var r := _h(seed_v, 33)
+	if r < MAIN_SHARE:
+		return walls[0] as Array
+	var rest := walls.size() - 1
+	return walls[1 + mini(int((r - MAIN_SHARE) / (1.0 - MAIN_SHARE) * float(rest)), rest - 1)] as Array
+
+## A roof finish's palette: its own, or FLAT_ROOFS for a bare membrane.
+static func _roof_palette(roof: Array) -> Array:
+	var pal: Array = roof[1] as Array
+	return FLAT_ROOFS if pal.is_empty() and str(roof[0]) == "membrane" else pal
 
 ## A hex colour key that may also be a palette (one pick per building).
 static func _hex(v: Variant, seed_v: float, salt: int) -> String:
@@ -376,8 +399,8 @@ static func distant_look(region: String) -> Dictionary:
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], 0.5, 17)),
 		"shutter_p": float(p["sp"]), "window": str(p.get("wn", "casement")),
 		"rails": float(p.get("rl", 0.0)), "variant": 0,
-		"roof_set": str(roof[0]), "roof_colours": [_tint(roof[1] as Array, 0.4, 10),
-			_tint(roof[1] as Array, 2.1, 10)]}
+		"roof_set": str(roof[0]), "roof_colours": [_tint(_roof_palette(roof), 0.4, 10),
+			_tint(_roof_palette(roof), 2.1, 10)]}
 
 ## The distant blocks' single pattern: the heaviest-weighted one.
 static func _distant_pattern(p: Dictionary, wall_set: String) -> String:

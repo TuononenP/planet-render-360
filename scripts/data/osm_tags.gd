@@ -365,6 +365,21 @@ static func _roof_angle(raw: Variant) -> float:
 	var a := s.to_float()
 	return a if a >= 5.0 and a <= 75.0 else 0.0
 
+## Compass points of `roof:direction`, as bearings in degrees.
+const COMPASS := {"n": 0.0, "nne": 22.5, "ne": 45.0, "ene": 67.5, "e": 90.0, "ese": 112.5,
+	"se": 135.0, "sse": 157.5, "s": 180.0, "ssw": 202.5, "sw": 225.0, "wsw": 247.5,
+	"w": 270.0, "wnw": 292.5, "nw": 315.0, "nnw": 337.5}
+
+## `roof:direction` as a bearing in degrees (0-360, the way the roof slopes
+## down): a number or a compass point ("NE"); -1 when absent or unreadable.
+static func _roof_dir(raw: Variant) -> float:
+	var s := str(raw).strip_edges().to_lower().replace("°", "")
+	if COMPASS.has(s):
+		return float(COMPASS[s])
+	if s.is_valid_float():
+		return fposmod(s.to_float(), 360.0)
+	return -1.0
+
 ## Roof and vertical-extent keys shared by buildings and their parts:
 ## roof shape/colour/material as raw strings, metres, degrees and level counts
 ## as numbers (0 when absent or out of range).
@@ -376,6 +391,8 @@ static func _roof_tags(tags: Dictionary) -> Dictionary:
 		"roof_colour": str(tags.get("roof:colour", "")),
 		"roof_material": str(tags.get("roof:material", "")),
 		"roof_angle": _roof_angle(tags.get("roof:angle", "")),
+		"roof_dir": _roof_dir(tags.get("roof:direction", "")),
+		"roof_orient": str(tags.get("roof:orientation", "")).strip_edges().to_lower(),
 		"roof_height_m": 0.0 if is_nan(roof_h) else roof_h,
 		"roof_levels": _tag_int(tags.get("roof:levels", 0), 0, 10),
 		"min_height_m": 0.0 if is_nan(min_h) else min_h,

@@ -68,6 +68,10 @@ struct City {
 	int n_dfs = 0, n_drs = 0;
 	std::vector<Vector3> facade_uv; // per facade
 	std::vector<uint8_t> tint; // per material (facades then roofs)
+	// WallVariety paint weight and per-place tone for the far blocks
+	// (FarCityBuilder._paint); 0 keeps the plain tint.
+	double chroma = 0.0;
+	double tone = 0.0;
 	// First index of the same Material object: MassBatch groups by
 	// material identity, and the distant sets repeat materials.
 	std::vector<int> canon;
@@ -124,19 +128,63 @@ double roof_height_m(const std::string &shape, double span_m, double pitch) {
 	return 0.0;
 }
 
-// WallVariety.tint_for / RoofVariety.tint_for (TerrainBuilder._hash).
-Color tint_for(int kind, const Vector3 &p) {
+// WallVariety.FAMILIES: per-channel paint multipliers (cream, ochre, blush, sage, mist).
+static const float PAINT_FAMILIES[6][3] = {
+	{ 1.00f, 1.00f, 1.00f }, { 1.00f, 0.95f, 0.80f }, { 1.00f, 0.84f, 0.58f },
+	{ 1.00f, 0.84f, 0.80f }, { 0.84f, 0.95f, 0.80f }, { 0.82f, 0.90f, 1.00f }
+};
+
+// WallVariety._family: a seeded pick weighted by how close each family sits
+// to the place's tone on a circle.
+int paint_family(double x, double z, double tone) {
+	const int n = 6;
+	float weights[n];
+	float total = 0.0f;
+	for (int i = 0; i < n; i++) {
+		float k = (float)Math::max(0.25, 1.0 + 1.1 * std::cos(6.283185307179586 * ((double)i / (double)n - tone)));
+		weights[i] = k;
+		total += k;
+	}
+	double t = hash(x * 0.83 + 29.0, z * 0.47 + 7.0) * (double)total;
+	for (int i = 0; i < n; i++) {
+		t -= (double)weights[i];
+		if (t < 0.0) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+// WallVariety.tint_for / RoofVariety.tint_for (TerrainBuilder._hash). `chroma`
+// is the wall's paint weight (a roof gets RoofVariety.ROOF_CHROMA of it, passed
+// in by the caller); 0 is the plain seeded tint.
+Color tint_for(int kind, const Vector3 &p, double chroma, double tone) {
 	double x = p.x;
 	double z = p.z;
 	if (kind == TINT_WALL) {
 		double l = 1.0 + (hash(x * 0.53 + 17.0, z * 0.29) * 2.0 - 1.0) * 0.14;
 		double w = (hash(z * 0.61 + 3.0, x * 1.13) * 2.0 - 1.0) * 0.04;
-		return Color(l * (1.0 + w), l, l * (1.0 - w));
+		double r = l * (1.0 + w);
+		double g = l;
+		double b = l * (1.0 - w);
+		if (chroma <= 0.0) {
+			return Color(r, g, b);
+		}
+		const float *f = PAINT_FAMILIES[paint_family(x, z, tone)];
+		double k = Math::min(chroma, 1.0);
+		return Color(Math::min(r * (1.0 + ((double)f[0] - 1.0) * k), 1.0),
+				Math::min(g * (1.0 + ((double)f[1] - 1.0) * k), 1.0),
+				Math::min(b * (1.0 + ((double)f[2] - 1.0) * k), 1.0));
 	}
 	if (kind == TINT_ROOF) {
 		double l = 1.0 + (hash(x * 0.37 + 5.0, z * 0.91) * 2.0 - 1.0) * 0.18;
 		double w = (hash(z * 1.7 + 11.0, x * 0.23) * 2.0 - 1.0) * 0.05;
-		return Color(l * (1.0 + w), l, l * (1.0 - w));
+		if (chroma <= 0.0) {
+			return Color(l * (1.0 + w), l, l * (1.0 - w));
+		}
+		w = w * (1.0 + 2.0 * chroma) + (tone - 0.5) * 0.06 * chroma;
+		double m = (hash(x * 0.61 + 23.0, z * 1.31 + 2.0) * 2.0 - 1.0) * 0.06 * chroma;
+		return Color(l * (1.0 + w), l * (1.0 + m), l * (1.0 - w));
 	}
 	return Color(1, 1, 1, 1);
 }
@@ -543,6 +591,8 @@ Dictionary CityKernels::fabric(const Dictionary &city, const Dictionary &far_par
 	for (int64_t k = 0; k < fuv.size(); k++) {
 		c.facade_uv.push_back(fuv[k]);
 	}
+	c.chroma = (double)city.get("chroma", 0.0);
+	c.tone = (double)city.get("tone", 0.0);
 	PackedByteArray tint = city["tint"];
 	for (int64_t k = 0; k < tint.size(); k++) {
 		c.tint.push_back(tint[k]);
@@ -579,7 +629,9 @@ Dictionary CityKernels::fabric(const Dictionary &city, const Dictionary &far_par
 			}
 			Group &g = groups[it->second];
 			int32_t base = (int32_t)g.v.size();
-			Color t = tint_for(c.tint[a.mat], a.v[0]);
+			// A roof takes half the wall's paint weight (RoofVariety.ROOF_CHROMA).
+			double chroma = c.tint[a.mat] == TINT_ROOF ? c.chroma * 0.5 : c.chroma;
+			Color t = tint_for(c.tint[a.mat], a.v[0], chroma, c.tone);
 			for (size_t q = 0; q < a.v.size(); q++) {
 				g.v.push_back(a.v[q]);
 				g.n.push_back(a.n[q]);
