@@ -59,6 +59,10 @@ var _fetcher: DemFetcher
 var _dem_heights: PackedFloat32Array = PackedFloat32Array()
 var _dem_done := false
 var _far_fetcher: DemFetcher
+var _ground_fetcher: HelsinkiDemFetcher
+var _model_fetcher: GroundModelFetcher
+var _ground_raster: Dictionary = {}
+var _ground_done := false
 var _far_heights_m: PackedFloat32Array = PackedFloat32Array()
 var _far_done := false
 ## T3.7 far-field DEM rings + imagery drapes (FarFieldFetcher), started
@@ -143,6 +147,16 @@ func _ready() -> void:
 	_fetcher.failed.connect(func(reason: String) -> void:
 		print("DEM fetch failed, using procedural fallback: %s" % reason)
 		_dem_done = true)
+	_ground_fetcher = HelsinkiDemFetcher.new()
+	add_child(_ground_fetcher)
+	_ground_fetcher.finished.connect(func(raster: Dictionary) -> void:
+		_ground_raster = raster
+		_ground_done = true)
+	_model_fetcher = GroundModelFetcher.new()
+	add_child(_model_fetcher)
+	_model_fetcher.finished.connect(func(raster: Dictionary) -> void:
+		_ground_raster = raster
+		_ground_done = true)
 	_far_fetcher = DemFetcher.new()
 	add_child(_far_fetcher)
 	_far_fetcher.succeeded.connect(func(h: PackedFloat32Array, _g: int) -> void:
@@ -266,6 +280,8 @@ func _start_ground(data: LocationData) -> void:
 	var ground_abort := _ground_abort
 	var build := func() -> void:
 		CoastalDem.correct(data)
+		HelsinkiDem.apply(data)
+		GroundModel.apply(data)
 		_ground = GroundTruth.new(data, ground_abort)
 	_ground_task = WorkerThreadPool.add_task(build, true, "GroundTruth")
 
@@ -471,11 +487,43 @@ func _fetch_dem(data: LocationData) -> void:
 		data.water_level = conv["water_level"]
 		_dem_centre_m = conv["centre_elevation_m"]
 		_dem_vscale = conv["legacy_vscale"]
+		await _fetch_ground_model(data)
 	else:
 		data.dem_source = {"source_zoom": 0, "procedural": true}
 		_note("elevation")
 		_build_dem(data)
 	await _apply_far(data)
+
+## Where a bare-earth elevation model covers the place it replaces the
+## Terrarium heights: the City of Helsinki's (HelsinkiDem), or a national
+## one (GroundModel: Japan, France, the Netherlands). The raster waits on
+## `data` until the ground build applies it, and dem_source records it
+## for the world key.
+func _fetch_ground_model(data: LocationData) -> void:
+	data.ground_model = {}
+	if legacy_squash:
+		return
+	var helsinki := HelsinkiDem.covers(data.latitude, data.longitude)
+	var national := "" if helsinki else GroundModel.source_for(data.latitude, data.longitude)
+	if not helsinki and national.is_empty():
+		return
+	_ground_done = false
+	_ground_raster = {}
+	if helsinki:
+		_ground_fetcher.fetch(data.latitude, data.longitude)
+	else:
+		_model_fetcher.fetch(national, data.latitude, data.longitude)
+	var waited := 0.0
+	var limit := HelsinkiDemFetcher.TIMEOUT_S if helsinki else GroundModelFetcher.timeout_for(national)
+	while not _ground_done and waited < limit and not _cancelled:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	if _ground_raster.is_empty():
+		_note("elevation")
+		return
+	data.ground_model = _ground_raster
+	data.dem_source["ground_model"] = "helsinki_2021_1m" if helsinki else national
+	_credits[0] = HelsinkiDem.CREDIT if helsinki else GroundModel.SOURCES[national]
 
 func _apply_far(data: LocationData) -> void:
 	var waited := 0.0
