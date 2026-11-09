@@ -1,9 +1,0 @@
-type	width_m	depth_m	height_m	lowest_y_m	triangles
-eiffel	130.0	130.0	330.0	0.00	71940
-statue_liberty	102.7	103.7	93.0	0.00	13504
-hoover_dam	426.5	369.3	27.0	-221.00	10968
-edinburgh_castle	323.1	207.4	26.0	-60.00	34806
-mont_saint_michel	154.2	145.6	90.4	-45.00	40900
-stockholm_city_hall	120.1	91.5	106.0	-0.00	26042
-tower_bridge	259.7	64.0	65.4	0.00	43228
-sydney_opera	119.0	210.5	67.3	0.00	60928

@@ -1,5 +1,0 @@
-type	view	bearing_local_deg	elevation_deg	fov_deg	distance_m	target_x_m	target_y_m	target_z_m	ground
-wtc_oculus	0	0.00	14.00	40.00	126.22	0.00	15.22	0.00	flat_disc
-wtc_oculus	1	40.00	14.00	40.00	127.06	0.00	15.22	0.00	flat_disc
-wtc_oculus	2	130.00	14.00	40.00	133.37	0.00	15.22	0.00	flat_disc
-wtc_oculus	3	180.00	14.00	40.00	126.22	0.00	15.22	0.00	flat_disc
