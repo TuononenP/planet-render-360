@@ -75,6 +75,34 @@ func _run() -> void:
 			raised += 1
 	if raised > 0:
 		failures.append("%d posts raised" % raised)
+	# An unmapped steep-sided roof near a mapped building goes; a smooth
+	# 14 m cone just as near stays (its slope is 1–2 m per post).
+	var fine := 9.41
+	var near_b := Vector2((30.0 - half) * fine, (30.0 - half) * fine)
+	var roof_buildings: Array = [{"x": near_b.x, "z": near_b.y, "footprint": _square(near_b, fine * 1.6)}]
+	var roofs := ramp.duplicate()
+	for z in range(38, 44):
+		for x in range(44, 50):
+			roofs[z * SIZE + x] += 15.0
+	var cone_c := Vector2(40.0, 52.0)
+	for z in SIZE:
+		for x in SIZE:
+			var cd := (Vector2(float(x), float(z)) - cone_c).length() * fine
+			roofs[z * SIZE + x] += 14.0 * maxf(0.0, 1.0 - cd / 94.0)
+	var cone_peak := roofs[52 * SIZE + 40] - ramp[52 * SIZE + 40]
+	var roofs_out := roofs.duplicate()
+	BareEarth.strip(roofs_out, SIZE, fine, half, roof_buildings)
+	var roof_left := roofs_out[40 * SIZE + 46] - ramp[40 * SIZE + 46]
+	if roof_left > 1.5:
+		failures.append("unmapped roof left %.2f m above the ramp" % roof_left)
+	var cone_left := roofs_out[52 * SIZE + 40] - ramp[52 * SIZE + 40]
+	if absf(cone_left - cone_peak) > 0.5:
+		failures.append("smooth cone near buildings changed %.2f → %.2f m" % [cone_peak, cone_left])
+	var far_roof := roofs.duplicate()
+	BareEarth.strip(far_roof, SIZE, fine, half, [{"x": (90.0 - half) * fine, "z": (90.0 - half) * fine,
+		"footprint": _square(Vector2((90.0 - half) * fine, (90.0 - half) * fine), fine * 1.6)}])
+	if absf(far_roof[40 * SIZE + 46] - roofs[40 * SIZE + 46]) > 0.01:
+		failures.append("a bump with no mapped building near was filtered")
 	# Full-size cost: a 256 grid with a dense block pattern.
 	var big := 256
 	var bstep := 2400.0 / float(big - 1)
@@ -96,15 +124,52 @@ func _run() -> void:
 		worst = maxf(worst, h - 20.0)
 	if worst > 1.0:
 		failures.append("dense 256 grid kept a %.2f m block" % worst)
-	# applies(): ArcticDEM latitudes only, real geo data only.
+	# lower_canopy: a district of 10 m blocks, 25 % covered, 20 m tall, sits
+	# 5 m of mean height on the posts: the surface drops CANOPY_K of that
+	# inside the district, and stays put where there are no buildings.
+	var csize := 80
+	var cstep := 10.0
+	var chalf := float(csize) / 2.0
+	var canopy := PackedFloat32Array()
+	canopy.resize(csize * csize)
+	canopy.fill(100.0)
+	var blocks: Array = []
+	for bz in range(24, 56, 2):
+		for bx in range(24, 56, 2):
+			var at := Vector2(float(bx) - chalf, float(bz) - chalf) * cstep
+			blocks.append({"x": at.x, "z": at.y, "height": 20.0, "footprint": _square(at, 5.0)})
+	BareEarth.lower_canopy(canopy, csize, cstep, chalf, blocks)
+	var inside := 100.0 - canopy[40 * csize + 40]
+	if absf(inside - BareEarth.CANOPY_K * 5.0) > 0.4:
+		failures.append("canopy lowered the district by %.2f m, expected %.2f" % [inside, BareEarth.CANOPY_K * 5.0])
+	if canopy[2 * csize + 2] != 100.0:
+		failures.append("canopy lowered an empty corner to %.2f" % canopy[2 * csize + 2])
+	var capped := PackedFloat32Array()
+	capped.resize(csize * csize)
+	capped.fill(100.0)
+	var towers: Array = []
+	for bz in range(0, csize):
+		for bx in range(0, csize):
+			towers.append({"x": (float(bx) - chalf) * cstep, "z": (float(bz) - chalf) * cstep,
+				"height": 300.0, "footprint": _square(Vector2((float(bx) - chalf) * cstep, (float(bz) - chalf) * cstep), 5.0)})
+	BareEarth.lower_canopy(capped, csize, cstep, chalf, towers)
+	if absf((100.0 - capped[40 * csize + 40]) - BareEarth.CANOPY_MAX_M) > 0.01:
+		failures.append("canopy ignored its cap: %.2f m" % (100.0 - capped[40 * csize + 40]))
+	# applies(): real geo data on a surface-model DEM (ArcticDEM and the
+	# SRTM / EU-DEM class tiles), not the US lidar tiles.
 	var d := LocationData.new()
 	d.dem_source = {"source_zoom": DemFetcher.ZOOM_NEAR}
 	d.latitude = 60.1699
 	if not BareEarth.applies(d):
 		failures.append("applies() false at Helsinki")
 	d.latitude = 48.8566
+	d.longitude = 2.3522
+	if not BareEarth.applies(d):
+		failures.append("applies() false at Paris")
+	d.latitude = 40.7128
+	d.longitude = -74.006
 	if BareEarth.applies(d):
-		failures.append("applies() true at Paris")
+		failures.append("applies() true on the New York lidar tiles")
 	_check_aprons(failures)
 	print("BareEarth: %d ms (96 grid), %d ms (256 dense)" % [ms, big_ms])
 	if failures.is_empty():

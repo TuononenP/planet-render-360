@@ -13,7 +13,7 @@ const MAX_BIAS_M := 60.0
 static func correct(data: LocationData) -> float:
 	if data.dem_source.has("coast_bias_m"):
 		return float(data.dem_source["coast_bias_m"])
-	if not BareEarth.applies(data) or is_equal_approx(data.water_level, -3.0):
+	if not BareEarth.surface_model(data) or is_equal_approx(data.water_level, -3.0):
 		return 0.0
 	var bias := estimate(data)
 	if bias == 0.0:

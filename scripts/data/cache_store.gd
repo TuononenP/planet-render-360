@@ -75,6 +75,10 @@ var entries: Array[Dictionary] = []
 
 static var _lru: Dictionary = {}  # relpath -> {"bytes": int, "atime": float}
 static var _lru_loaded := false
+## 404 answers per tile path this session. One may be a server hiccup; a
+## second, on the save's own retry, means the source does not have it.
+static var _absent: Dictionary = {}
+const ABSENT_AFTER := 2
 static var _lru_pending := ""  # index path a coalesced save is queued for
 static var _tracked_bytes := -1  # -1 = unknown, summed from the index on next use
 ## A scan has counted the whole directory this session (map tiles too).
@@ -182,6 +186,14 @@ static func is_v2_name(file_name: String) -> bool:
 		or base.begins_with("osm" + tag) or base.begins_with("climate" + tag) \
 		or base.begins_with("landcover_v%d_" % LANDCOVER_VERSION) \
 		or base.begins_with("canopy_v%d_" % LANDCOVER_VERSION)
+
+## Records a 404 for a tile; a save stops counting it missing once the
+## source has said so twice.
+static func note_absent(path: String) -> void:
+	_absent[path] = int(_absent.get(path, 0)) + 1
+
+static func is_absent(path: String) -> bool:
+	return int(_absent.get(path, 0)) >= ABSENT_AFTER
 
 ## Current key set warming/covering a place at a preset (High default):
 ## {"dem": [...], "sat": [...], "osm": [...], "landcover": [...]}.

@@ -59,6 +59,10 @@ var far_centre_frac: Vector2 = Vector2(0.5, 0.5)  # viewpoint inside far tile
 ## source_zoom}, or {source_zoom: 0, procedural: true} when the procedural
 ## fallback built the grid (contract §2.2). Scorecard (F) reads this.
 var dem_source: Dictionary = {}
+## A bare-earth elevation raster that replaces `heights` (HelsinkiDem.apply)
+## inside its coverage; {} elsewhere. Transient: only dem_source["ground_model"]
+## is part of the world key.
+var ground_model: Dictionary = {}
 ## v2 (T3.7): far-field DEM rings for FarTerrainBuilder, finest first
 ## (contract §2.2) — {zoom, origin_px: Vector2 (global px at zoom of the
 ## window's top-left pixel corner), width, height, heights:
