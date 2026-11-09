@@ -74,6 +74,8 @@ class Plan extends RefCounted:
 	var inferred: Array = []
 	var stops: Array = []
 	var junctions := {}
+	## Ends of signalled crossings and signal nodes (StreetProps lamps).
+	var signals := PackedVector2Array()
 	## Debug and test counters.
 	var scrambles := 0
 
@@ -629,6 +631,8 @@ static func _stop_lines(out: Plan, data: LocationData, chains: Array, car_grid: 
 		for seg: Array in chain["segs"]:
 			_grid_add(signal_grid, seg[0], seg[1], seg, m)
 			_contacts(best, seg[0], seg[1], car_grid, data, m)
+			out.signals.append(seg[0])
+			out.signals.append(seg[1])
 		for i: int in best:
 			var hit: Dictionary = best[i]
 			var line: Variant = data.roads[i]
@@ -642,6 +646,7 @@ static func _stop_lines(out: Plan, data: LocationData, chains: Array, car_grid: 
 		if not (raw is Dictionary) or str((raw as Dictionary).get("kind", "")) != "signals":
 			continue
 		var p := Vector2(float((raw as Dictionary).get("x", 0.0)), float((raw as Dictionary).get("z", 0.0)))
+		out.signals.append(p)
 		var clear := true
 		for seg: Array in _grid_near(signal_grid, p, SIGNAL_CLEAR_M * m, m):
 			if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= SIGNAL_CLEAR_M * m:

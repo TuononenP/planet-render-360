@@ -4,11 +4,12 @@ extends RefCounted
 ## Street furniture + linear barriers (T5.1/T7.2, PRD §3.4 props).
 ## * Lampposts: only along real OSM carriageways in built-up blocks
 ##   (lit streets), every 25 m alternating sides on the verge, never in
-##   a footprint / carriageway / water. Regional style: cast-iron lantern
+##   a footprint / carriageway / junction surface / water. Regional style:
+##   cast-iron lantern
 ##   (Paris + historic European cores), black heritage post (British and
 ##   Irish side streets), galvanised cobra-head (North America), concrete
-##   utility pole with a bracket lamp (Japanese and Korean side streets)
-##   or modern arm luminaire. Instanced
+##   utility pole with a bracket lamp (Japanese and Korean side streets,
+##   clear of signalled junctions) or modern arm luminaire. Instanced
 ##   (MultiMesh per style). Radius per preset: Fast none, Balanced
 ##   120 m, High 220 m, Ultra 600 m.
 ## * Barriers: real OSM barrier=wall/city_wall/retaining_wall (stone
@@ -19,6 +20,8 @@ extends RefCounted
 ##   (desktop Ultra).
 
 const LAMP_SPACING_M := 25.0
+## A signal this near makes a utility-pole street a main-road lamp's.
+const SIGNAL_LAMP_M := 40.0
 const PROP_R := [0.0, 120.0, 220.0, 600.0]
 const LIT := ["primary", "secondary", "tertiary", "residential", "unclassified",
 	"living_street", "pedestrian", "trunk", "primary_link", "secondary_link",
@@ -72,6 +75,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": [], "post_top": [], "nyc_f": [], "nyc_crook": []}
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
+	var sites := _lamp_sites(data, ground, m2u)
 	for r in data.roads:
 		var pts: PackedVector2Array
 		var cls := "residential"
@@ -116,15 +120,18 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
 					continue
+				if _on_apron(sites["aprons"], p, m2u):
+					continue
 				var ok := Vector2i(int(floor(p.x / occ_cell)), int(floor(p.y / occ_cell)))
 				if occupied.has(ok):
 					continue
 				occupied[ok] = true
+				var lamp := "modern" if style == "utility" and _signal_near(sites["signals"], p, m2u) else style
 				var toward := -nrm * side
 				var yaw := atan2(-toward.y, toward.x)
-				var h := 0.75 if style == "modern_s" or (style == "cobra" and cls not in MAJOR) else 1.0
+				var h := 0.75 if lamp == "modern_s" or (lamp == "cobra" and cls not in MAJOR) else 1.0
 				var basis := Basis(Vector3.UP, yaw).scaled(Vector3(m2u, m2u * h, m2u))
-				(placed[style] as Array).append(Transform3D(basis,
+				(placed[lamp] as Array).append(Transform3D(basis,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
 			carry = t - seg
 	if RenderQuality.ultra_desktop(int(ctx["preset"])):
@@ -146,6 +153,34 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		root.add_child(mmi)
 		total += xf.size()
 	return total
+
+## Lookup grids from the road plan: the junction surfaces no lamp stands
+## on, and the signals whose streets take the main-road lamp.
+static func _lamp_sites(data: LocationData, ground: GroundTruth, m2u: float) -> Dictionary:
+	var plan := RoadMarkings.plan(data, ground)
+	var aprons := {}
+	for ring: PackedVector2Array in plan.aprons:
+		var box := Rect2(ring[0], Vector2.ZERO)
+		for q in ring:
+			box = box.expand(q)
+		RoadMarkings._grid_add(aprons, box.position, box.end, ring, m2u)
+	var signals := {}
+	for q in plan.signals:
+		RoadMarkings._grid_add(signals, q, q, q, m2u)
+	return {"aprons": aprons, "signals": signals}
+
+static func _on_apron(aprons: Dictionary, p: Vector2, m2u: float) -> bool:
+	for ring: PackedVector2Array in RoadMarkings._grid_near(aprons, p, 0.0, m2u):
+		if Geometry2D.is_point_in_polygon(p, ring):
+			return true
+	return false
+
+static func _signal_near(signals: Dictionary, p: Vector2, m2u: float) -> bool:
+	var reach := SIGNAL_LAMP_M * m2u
+	for q: Vector2 in RoadMarkings._grid_near(signals, p, reach, m2u):
+		if q.distance_to(p) <= reach:
+			return true
+	return false
 
 ## The place's lamp family: "lantern", "heritage", "cobra", "utility" or
 ## "modern" (by ISO country first, then the country region).
