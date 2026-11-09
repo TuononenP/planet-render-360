@@ -430,9 +430,11 @@ static func _core_landmarks() -> Array:
 			"ultra_registry_limit": 26,
 			"aliases": ["stockholm city hall", "stadshuset"]},
 		# Bridges: built along their axis (span_m long, yaw_deg turning the
-		# model's +X onto it) at sea level (base: sea).
+		# model's +X onto it) at sea level (base: sea). yaw_deg is the true
+		# bearing of +X minus 90: Golden Gate's deck runs 355 deg, +X points
+		# north (265) so the model's -X south pier stands at the south end.
 		{"type": "golden_gate", "name": "Golden Gate Bridge", "lat": 37.8197, "lon": -122.4786, "radius_m": 8000.0,
-			"wiki_title": "Golden Gate Bridge", "height_m": 227.0, "clear_m": 20.0, "yaw_deg": 85.0,
+			"wiki_title": "Golden Gate Bridge", "height_m": 227.0, "clear_m": 20.0, "yaw_deg": 265.0,
 			"span_m": 2040.0, "base": "sea", "kind": "Bridge", "aliases": ["golden gate bridge"]},
 		{"type": "tower_bridge", "name": "Tower Bridge", "lat": 51.5055, "lon": -0.0754, "radius_m": 5000.0,
 			"wiki_title": "Tower Bridge", "height_m": 65.0, "clear_m": 30.0, "yaw_deg": 95.0,

@@ -61,6 +61,13 @@ func _run() -> void:
 		"Tyska kyrkan": "tyska_kyrkan",
 		"Västerbron": "vasterbron",
 		"Golden Gate Bridge": "golden_gate",
+		"Salesforce Tower": "salesforce_tower",
+		"Coit Tower": "coit_tower",
+		"San Francisco Ferry Building": "ferry_building",
+		"Alcatraz Island": "alcatraz",
+		"Sutro Tower": "sutro_tower",
+		"San Francisco City Hall": "sf_city_hall",
+		"Palace of Fine Arts": "palace_of_fine_arts",
 		"Tower Bridge": "tower_bridge",
 		"Brooklyn Bridge": "brooklyn_bridge",
 		"Sydney Harbour Bridge": "sydney_harbour_bridge",
@@ -93,6 +100,11 @@ func _run() -> void:
 		var got := LocationData.landmark_for(coords.x, coords.y, "")
 		if got != by_place[coords]:
 			failures.append("place %s should give %s, got %s" % [coords, by_place[coords], got])
+	# Golden Gate's deck runs ~355 deg: the model's +X must point north (-z) so its
+	# -X south pier (with the fender) stands at the south end.
+	var gg_axis := LandmarkSites.axis(LocationData.entry_for_type("golden_gate"))
+	if gg_axis.y > -0.99 or absf(gg_axis.x) > 0.15:
+		failures.append("Golden Gate's +X axis should point north along the 355 deg deck, got %s" % [gg_axis])
 	var stockholm_view: Dictionary = PresetViews.ROWS.filter(
 		func(row: Dictionary) -> bool: return str(row.get("id", "")) == "stockholm")[0]
 	var sto_lat := float(stockholm_view["lat"])
@@ -103,6 +115,21 @@ func _run() -> void:
 		func(e: Dictionary) -> String: return str(e["type"]))
 	if not sto_extras.has("tyska_kyrkan") or not sto_extras.has("riddarholmen"):
 		failures.append("Stockholm preset extras should include Tyska kyrkan and Riddarholmen, got %s" % [sto_extras])
+	var sf_rows: Array = PresetViews.ROWS.filter(
+		func(row: Dictionary) -> bool: return str(row.get("id", "")) == "san_francisco")
+	if sf_rows.is_empty():
+		failures.append("PresetViews has no san_francisco row")
+	else:
+		var sf_lat := float((sf_rows[0] as Dictionary)["lat"])
+		var sf_lon := float((sf_rows[0] as Dictionary)["lon"])
+		var sf_primary := LocationData.landmark_for(sf_lat, sf_lon, "")
+		if sf_primary != "golden_gate":
+			failures.append("San Francisco preset primary should be golden_gate, got %s" % sf_primary)
+		var sf_extras := LocationData.registry_extras(sf_lat, sf_lon, sf_primary).map(
+			func(e: Dictionary) -> String: return str(e["type"]))
+		for t in ["coit_tower", "alcatraz", "salesforce_tower"]:
+			if not sf_extras.has(t):
+				failures.append("San Francisco preset extras should include %s, got %s" % [t, sf_extras])
 	if LocationData.landmark_for(51.1789, -115.5708, "Banff, Canada") != "banff_springs":
 		failures.append("Banff should give the Banff Springs Hotel")
 	# A skyline of several registry icons: New York's primary is One WTC,
@@ -131,7 +158,9 @@ func _run() -> void:
 		"kaknas_tower": 170.0, "vasa_museum": 52.5, "nordic_museum": 81.0,
 		"stockholm_public_library": 31.0, "stockholm_concert_hall": 22.2, "riksdag_building": 35.0,
 		"tyska_kyrkan": 96.0, "vasterbron": 51.2, "golden_gate": 227.0, "tower_bridge": 65.0,
-		"brooklyn_bridge": 84.3, "sydney_harbour_bridge": 134.0, "bixby_creek_bridge": 79.0}
+		"brooklyn_bridge": 84.3, "sydney_harbour_bridge": 134.0, "bixby_creek_bridge": 79.0,
+		"salesforce_tower": 326.0, "coit_tower": 64.0, "ferry_building": 75.0, "alcatraz": 69.0,
+		"sutro_tower": 298.0, "sf_city_hall": 93.7, "palace_of_fine_arts": 49.4}
 	for entry in LocationData.landmarks():
 		var type := str(entry["type"])
 		var model := LandmarkBuilder.build(type)
