@@ -69,8 +69,28 @@ func _check(ok: bool, what: String) -> void:
 	if not ok:
 		failures.append(what)
 
+## Wear seeds: a split street ages as one, a side street on its own, and
+## the order of the road list changes nothing.
+func _check_wear_seeds() -> void:
+	var west := _road(Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0))
+	var east := _road(Vector2(0, 0), Vector2(50, 0), Vector2(100, 0))
+	var side := _road(Vector2(0, 0), Vector2(0, 50), Vector2(0, 100))
+	var d := _place()
+	d.roads = [west, east, side]
+	var seeds := RoadSurface.wear_seeds(d)
+	_check(is_equal_approx(seeds[0], seeds[1]), "a street split into two ways keeps one wear seed")
+	_check(not is_equal_approx(seeds[0], seeds[2]), "a side street gets its own wear seed")
+	d.roads = [side, east, west]
+	var again := RoadSurface.wear_seeds(d)
+	_check(is_equal_approx(again[2], seeds[0]) and is_equal_approx(again[0], seeds[2]),
+		"wear seeds do not depend on the road order")
+	_check(RoadSurface.wear_attr(true, 0.0) >= 0.5 and RoadSurface.wear_attr(true, 1.0) < 1.0,
+		"an urban ribbon stays in the upper half of COLOR.b at any seed")
+	_check(RoadSurface.wear_attr(false, 1.0) < 0.5, "a rural ribbon stays in the lower half of COLOR.b at any seed")
+
 func _run() -> void:
 	failures.clear()
+	_check_wear_seeds()
 	# Apron and inferred zebras at a plain four-way.
 	var d := _place()
 	d.roads = _four_way()

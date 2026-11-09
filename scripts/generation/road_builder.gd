@@ -176,6 +176,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var plan := RoadMarkings.plan(data, ground)
 	var junc := plan.junctions
 	var steps := RoadSurface.depth_steps(data)
+	var seeds := RoadSurface.wear_seeds(data)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
 	# Fixed chunks of the road list, built at once and joined in order:
@@ -188,7 +189,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
-			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}))
+			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}), seeds[i])
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
 	WorkerThreadPool.wait_for_group_task_completion(group)
@@ -214,7 +215,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 ## One road element (at depth `step`, RoadSurface.depth_steps) into
 ## `batches`: draped ribbons on dry land, decks on its bridge spans.
 static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, surf: _Surface,
-		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort, marking: Dictionary = {}) -> void:
+		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort, marking: Dictionary = {},
+		wear_seed: float = 0.5) -> void:
 	var r := _parse(line, m2u)
 	if r.is_empty():
 		return
@@ -239,11 +241,11 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
 	var lift := lift_for_layer(layer) * m2u
-	# RoadSurface attributes: lanes, rank, kerbed urban street.
+	# RoadSurface attributes: lanes, rank, kerbed urban street + wear seed.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
 	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
-		1.0 if urban else 0.0, 1.0)
+		RoadSurface.wear_attr(urban, wear_seed), 1.0)
 	for run in _dry_runs(dense, surf):
 		if abort != null and abort.requested:
 			break

@@ -18,7 +18,8 @@ extends RefCounted
 ##
 ## Vertex data (RoadBuilder): UV = (across, along) in 4 m units, UV2.x
 ## the ribbon width in metres, UV2.y its depth layer, COLOR = ((lanes + 16 for one-way) / 32,
-## rank / 2, urban kerb flag, distance to the nearest junction / JUNCTION_M).
+## rank / 2, wear_attr (urban kerb flag + chain wear seed), distance to
+## the nearest junction / JUNCTION_M).
 
 const JUNCTION_M := 30.0
 ## Junction nodes are matched on a 0.5 m grid (OSM shares node coords).
@@ -100,6 +101,8 @@ uniform vec3 paint_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 centre_col = vec3(0.70, 0.69, 0.65);
 uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
 uniform float junction_m = 30.0;
+// Range (m) at which fine cracking has faded out, by preset (DETAIL_M).
+uniform float detail_m = 220.0;
 // Paint over a whole crossing ribbon (RoadSurface.CROSSING_KINDS): 0 none.
 uniform float crossing_kind = 0.0;
 // @SNOW
@@ -128,9 +131,136 @@ float r_noise(vec2 p) {
 		mix(r_hash(i + vec2(0.0, 1.0)), r_hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-// Anti-aliased band |x - c| < hw.
+// Exact coverage of |x - c| < hw over a pixel `aa` wide: a line filling a
+// quarter of a pixel reads a quarter as strong, at any range.
 float band(float x, float c, float hw, float aa) {
-	return 1.0 - smoothstep(hw - aa, hw + aa, abs(x - c));
+	float h = max(aa * 0.5, 1e-4);
+	return clamp((min(x + h, c + hw) - max(x - h, c - hw)) / (2.0 * h), 0.0, 1.0);
+}
+
+float run_integral(float t, float period, float on) {
+	return floor(t / period) * on + min(mod(t, period), on);
+}
+
+// Exact coverage of a repeating run [0, on) over a pixel `aa` wide: dashes
+// and bars settle to their duty cycle with distance instead of shimmering.
+float runs(float t, float period, float on, float aa) {
+	float h = max(aa * 0.5, 1e-4);
+	return clamp((run_integral(t + h, period, on) - run_integral(t - h, period, on)) / (2.0 * h), 0.0, 1.0);
+}
+
+// Merges one road-aligned repair into o = (fill, sealant rim, tone).
+// d is its signed distance; the outline is roughened, as a hand-cut edge is.
+void add_repair(inout vec3 o, float d, float tone, float rim, float x, float y, float a) {
+	d += (r_noise(vec2(x, y) * 2.3 + 9.1) - 0.5) * 0.07;
+	float fill = 1.0 - smoothstep(-a, a, d);
+	o.x = max(o.x, fill);
+	o.y = max(o.y, rim * band(d, 0.0, 0.035, a));
+	o.z = mix(o.z, tone, fill);
+}
+
+// Repairs follow the road, as real ones do. One candidate per cell along
+// it: a resurfaced lane, a utility trench, a cut across half the road, a
+// small patch. Older chains (age) carry more of them.
+vec3 road_repairs(float x, float y, float w, float lw, int lanes, float age, float s, float a) {
+	vec3 o = vec3(0.0, 0.0, 1.0);
+	float cell = floor(y / 97.0);
+	if (r_hash(vec2(cell, s + 11.0)) < 0.25) {
+		float hy = mix(18.0, 44.0, r_hash(vec2(cell, s + 12.0)));
+		float cy = (cell + 0.5) * 97.0 + (r_hash(vec2(cell, s + 13.0)) - 0.5) * (95.0 - 2.0 * hy);
+		float cx = (floor(r_hash(vec2(cell, s + 14.0)) * float(lanes)) + 0.5) * lw;
+		float tone = r_hash(vec2(cell, s + 15.0)) < 0.5 ? 0.93 : 1.05;
+		add_repair(o, max(abs(x - cx) - lw * 0.5, abs(y - cy) - hy), tone, 0.0, x, y, a);
+	}
+	cell = floor(y / 61.0);
+	if (r_hash(vec2(cell, s + 1.0)) < 0.18 + 0.22 * age) {
+		float hy = mix(8.0, 26.0, r_hash(vec2(cell, s + 2.0)));
+		float cy = (cell + 0.5) * 61.0 + (r_hash(vec2(cell, s + 3.0)) - 0.5) * (59.0 - 2.0 * hy);
+		float cx = mix(0.7, w - 0.7, r_hash(vec2(cell, s + 4.0)));
+		float hx = mix(0.25, 0.55, r_hash(vec2(cell, s + 5.0)));
+		float tone = mix(0.80, 0.93, r_hash(vec2(cell, s + 6.0)));
+		add_repair(o, max(abs(x - cx) - hx, abs(y - cy) - hy), tone, 1.0, x, y, a);
+	}
+	cell = floor(y / 43.0);
+	if (r_hash(vec2(cell, s + 21.0)) < 0.10 + 0.16 * age) {
+		float hy = mix(0.3, 0.6, r_hash(vec2(cell, s + 22.0)));
+		float cy = (cell + 0.5) * 43.0 + (r_hash(vec2(cell, s + 23.0)) - 0.5) * 38.0;
+		float cx = r_hash(vec2(cell, s + 24.0)) < 0.5 ? w * 0.25 : w * 0.75;
+		add_repair(o, max(abs(x - cx) - w * 0.25 - 0.1, abs(y - cy) - hy), 0.86, 1.0, x, y, a);
+	}
+	cell = floor(y / 13.0);
+	if (r_hash(vec2(cell, s + 31.0)) < 0.06 + 0.16 * age) {
+		float hy = mix(0.6, 2.6, r_hash(vec2(cell, s + 32.0)));
+		float cy = (cell + 0.5) * 13.0 + (r_hash(vec2(cell, s + 33.0)) - 0.5) * (12.0 - 2.0 * hy);
+		float cx = (floor(r_hash(vec2(cell, s + 34.0)) * float(lanes)) + 0.5) * lw;
+		float hx = min(0.35 * lw, mix(0.6, 1.6, r_hash(vec2(cell, s + 35.0))));
+		float tone = mix(0.80, 0.95, r_hash(vec2(cell, s + 36.0)));
+		add_repair(o, max(abs(x - cx) - hx, abs(y - cy) - hy), tone, 1.0, x, y, a);
+	}
+	return o;
+}
+
+// Distance from the second-nearest to the nearest cell point: small on
+// the borders between cells, which is where fatigue cracks run.
+float crack_cells(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	for (int v = -1; v <= 1; v++) {
+		for (int u = -1; u <= 1; u++) {
+			vec2 o = vec2(float(u), float(v));
+			vec2 c = i + o;
+			float d = length(o + vec2(r_hash(c + 0.7), r_hash(c + 13.1)) - f);
+			if (d < f1) {
+				f2 = f1;
+				f1 = d;
+			} else if (d < f2) {
+				f2 = d;
+			}
+		}
+	}
+	return f2 - f1;
+}
+
+// Fatigue ("alligator") cracking over `region`, in metres p.
+float cell_cracks(vec2 p, float region, float a) {
+	if (region < 0.02) {
+		return 0.0;
+	}
+	vec2 warp = vec2(r_noise(p * 0.7), r_noise(p * 0.7 + 7.0)) * 0.5;
+	// The line thins with its pixel footprint instead of widening into a
+	// dark net at range.
+	float line_w = 0.06;
+	float px = a / 0.42;
+	return region * (line_w / (line_w + px)) * (1.0 - smoothstep(0.0, line_w + px, crack_cells(p / 0.42 + warp)));
+}
+
+// Road-aligned cracks: x hairline coverage, y sealed (tar-filled)
+// coverage. Long ones wander along lane joints and the road edges;
+// thermal ones cross part of the road every so often.
+vec2 road_cracks(float x, float y, float w, float lw, int lanes, float age, float s, float aa, float faa) {
+	float last = float(lanes);
+	float k = clamp(floor(x / lw + 0.5), 0.0, last);
+	float inset = k < 0.5 ? 0.3 : (k > last - 0.5 ? -0.3 : 0.0);
+	float wob = (r_noise(vec2(y / 7.3, k + s)) - 0.5) * 0.8 + (r_noise(vec2(y / 1.1, k * 2.0 + s)) - 0.5) * 0.13;
+	float line = x - k * lw - inset - wob;
+	float on = smoothstep(0.62 - 0.14 * age, 0.74 - 0.14 * age, r_noise(vec2(y / 23.0, k * 3.1 + s * 0.7)));
+	vec2 c = vec2(0.0);
+	if (r_hash(vec2(floor(y / 31.0), k + s + 41.0)) < 0.35) {
+		c.y = on * band(line, 0.0, 0.035, aa);
+	} else {
+		c.x = on * band(line, 0.0, 0.010 + 0.006 * r_noise(vec2(y * 1.7, s)), aa);
+	}
+	float cell = floor(y / 17.0);
+	if (r_hash(vec2(cell, s + 51.0)) < 0.18 + 0.4 * age) {
+		float cy = (cell + 0.5) * 17.0 + (r_hash(vec2(cell, s + 52.0)) - 0.5) * 9.0;
+		float bend = (r_noise(vec2(x / 2.3, cell + s)) - 0.5) * 0.9 + (r_noise(vec2(x / 0.7, cell)) - 0.5) * 0.1;
+		float cx = mix(0.0, w, r_hash(vec2(cell, s + 53.0)));
+		float reach = mix(0.35, 0.7, r_hash(vec2(cell, s + 54.0))) * w;
+		c.x = max(c.x, band(y - bend, cy, 0.012, faa) * band(x, cx, reach, aa));
+	}
+	return c;
 }
 
 void fragment() {
@@ -156,25 +286,63 @@ void fragment() {
 	vec3 col = tint * mix(a1, a2, bl);
 	float rough = mix(texture(rough_tex, g / 4.0).r, texture(rough_tex, g / 9.3).r, bl);
 	vec3 nm = mix(texture(nor_tex, g / 4.0).rgb, vec3(0.5, 0.5, 1.0), bl * 0.5);
-	// Age: blotches, repaired rectangles, cracks.
-	col *= 0.88 + 0.24 * r_noise(g / 21.0);
-	vec2 pc = floor(g / vec2(5.5, 3.5));
-	float patch = step(0.97, r_hash(pc + 4.7)) * smoothstep(2.5, 5.0, jd);
-	col *= mix(1.0, 0.9, patch);
-	float near = 1.0 - smoothstep(60.0, 220.0, length(VERTEX));
-	float crack = 1.0 - smoothstep(0.0, 0.025 + aa * 0.4, abs(r_noise(g / 2.7) - 0.5));
-	crack *= smoothstep(0.55, 0.8, r_noise(g / 17.0 + 3.0)) * near;
-	col *= 1.0 - 0.35 * crack;
-	// Tyre tracks: two polished, darker bands per lane.
+	// Age: slow blotches and a finer mottling of binder and aggregate.
+	col *= 0.90 + 0.20 * r_noise(g / 21.0);
+	col *= 0.96 + 0.08 * r_noise(g / 2.7 + 5.1);
+	// Wear reads along a road, so it needs across/along coordinates:
+	// crossing ribbons run across the traffic and aprons have no width.
+	// The chain's seed changes how much wear it has, not its colour, so
+	// ways that meet still match.
+	bool urban = attr.b >= 0.5;
+	bool lane_coords = width_m >= 2.0 && crossing_kind < 0.5;
+	float age = lane_coords ? clamp((urban ? attr.b - 0.5 : attr.b) / 0.45, 0.0, 1.0) : r_noise(g / 40.0);
+	float s = age * 97.0;
+	float jfade = smoothstep(2.5, 5.0, jd);
 	float lw = w / float(lanes);
 	float xl = mod(x, lw) - lw * 0.5;
-	float track = exp(-pow((abs(xl) - 0.85) / 0.3, 2.0)) * (rank >= 1 ? 1.0 : 0.3);
-	col *= 1.0 - 0.08 * track;
-	rough -= 0.10 * track;
+	float near = 1.0 - smoothstep(detail_m * 0.27, detail_m, length(VERTEX));
+	float crack = 0.0;
+	float sealed = 0.0;
+	if (lane_coords) {
+		// Tyre tracks: two polished bands per lane that wander with the traffic.
+		float lane_id = floor(x / lw);
+		float wander = (r_noise(vec2(lane_id * 3.7 + s, y / 23.0)) - 0.5) * 0.28;
+		float polish = 0.55 + 0.45 * r_noise(vec2(lane_id + s, y / 31.0));
+		float tk = (abs(xl + wander) - 0.85) / 0.32;
+		float track = exp(-tk * tk) * (rank >= 1 ? polish : 0.3 * polish) * jfade;
+		col *= 1.0 - 0.08 * track;
+		rough -= 0.10 * track;
+		// Oil drips down the middle of a lane, thickest where cars queue.
+		if (rank >= 1) {
+			float ox = xl / 0.42;
+			float oil = exp(-ox * ox) * smoothstep(0.35, 0.75, r_noise(vec2(x * 0.9, y / 3.4 + s)));
+			col *= 1.0 - (0.05 + 0.09 * (1.0 - smoothstep(6.0, 28.0, jd))) * oil;
+			rough -= 0.06 * oil;
+			// The paving joint between lanes.
+			if (lanes >= 2) {
+				float joint = clamp(floor(x / lw + 0.5), 1.0, float(lanes) - 1.0) * lw;
+				float jw = (r_noise(vec2(y / 13.0, s)) - 0.5) * 0.1;
+				col *= 1.0 - 0.07 * band(x + jw, joint, 0.02, aa) * jfade;
+			}
+		}
+		vec3 rep = road_repairs(x, y, w, lw, lanes, age, s, max(aa, faa));
+		col *= mix(1.0, rep.z, rep.x * jfade);
+		col *= 1.0 - 0.38 * rep.y * jfade;
+		rough += 0.05 * rep.x * jfade;
+		if (near > 0.0) {
+			vec2 cr = road_cracks(x, y, w, lw, lanes, age, s, aa, faa);
+			crack = cr.x;
+			sealed = cr.y;
+			crack = max(crack, cell_cracks(vec2(x, y), clamp(track * smoothstep(0.6, 0.76, r_noise(g / 9.0 + s)) * age * 1.4, 0.0, 1.0), max(aa, faa)));
+		}
+	} else if (near > 0.0) {
+		crack = cell_cracks(g, smoothstep(0.74, 0.9, r_noise(g / 11.0)) * 0.35, max(aa, faa));
+	}
+	col *= 1.0 - (0.5 * crack + 0.4 * sealed) * near;
+	rough -= 0.15 * sealed * near;
 	// Kerb stone and gutter on urban streets, open across junction mouths.
 	float kerb = 0.0;
-	float jfade = smoothstep(2.5, 5.0, jd);
-	if (attr.b > 0.5 && rank >= 1) {
+	if (urban && rank >= 1) {
 		float ex = min(x, w - x);
 		kerb = (1.0 - smoothstep(0.24 - aa, 0.24 + aa, ex)) * jfade;
 		float gut = band(ex, 0.42, 0.18, aa) * jfade;
@@ -187,7 +355,7 @@ void fragment() {
 	// Markings.
 	float paint = 0.0;
 	float centre = 0.0;
-	float dash = band(mod(y, 9.0), 1.5, 1.5, faa);
+	float dash = runs(y, 9.0, 3.0, faa);
 	if (rank >= 1 && w >= 5.0) {
 		if (!oneway && rank >= 2 && w >= 9.0) {
 			centre = band(x, w * 0.5 - 0.14, 0.06, aa) + band(x, w * 0.5 + 0.14, 0.06, aa);
@@ -205,7 +373,7 @@ void fragment() {
 			}
 		}
 		if (rank >= 2) {
-			float inset = attr.b > 0.5 ? 0.65 : 0.35;
+			float inset = urban ? 0.65 : 0.35;
 			paint += band(x, inset, 0.07, aa) + band(x, w - inset, 0.07, aa);
 		}
 		paint *= jfade;
@@ -213,16 +381,16 @@ void fragment() {
 	if (crossing_kind > 0.5) {
 		// Bars span the ribbon and repeat along the walking line (y);
 		// rails run along its two edges.
-		float bars = band(mod(y, 1.0), 0.5, 0.25, faa) * step(0.25, x) * step(x, w - 0.25);
+		float bars = runs(y - 0.25, 1.0, 0.5, faa) * band(x, w * 0.5, w * 0.5 - 0.25, aa);
 		float rails = band(x, 0.15, 0.15, aa) + band(x, w - 0.15, 0.15, aa);
 		if (crossing_kind < 1.5) {
 			paint = bars;
 		} else if (crossing_kind < 2.5) {
-			paint = bars * step(0.45, x) * step(x, w - 0.45) + rails;
+			paint = bars * band(x, w * 0.5, w * 0.5 - 0.45, aa) + rails;
 		} else if (crossing_kind < 3.5) {
 			paint = rails;
 		} else if (crossing_kind < 4.5) {
-			paint = rails * band(mod(y, 1.0), 0.5, 0.25, faa);
+			paint = rails * runs(y - 0.25, 1.0, 0.5, faa);
 		} else {
 			paint = 1.0;
 		}
@@ -238,7 +406,7 @@ void fragment() {
 	float wet = climate_wetness;
 	float pixel_m = length(fwidth(g));
 	// The gutter beside a kerb collects the most; never the kerb itself.
-	float gutter = (attr.b > 0.5 && rank >= 1) ? smoothstep(0.24, 0.4, min(x, w - x)) * (1.0 - smoothstep(0.6, 1.8, min(x, w - x))) : 0.0;
+	float gutter = (urban && rank >= 1) ? smoothstep(0.24, 0.4, min(x, w - x)) * (1.0 - smoothstep(0.6, 1.8, min(x, w - x))) : 0.0;
 	vec2 mask = puddle_mask(puddle_low(g, pixel_m) + 0.18 * gutter) * wet * (1.0 - kerb);
 	float puddle = mask.x;
 	col = puddle_albedo(col * mix(1.0, 0.76, wet), mask);
@@ -279,6 +447,9 @@ static var _mat: ShaderMaterial
 static var _centre := Color(0.70, 0.69, 0.65)
 ## Painted kerb band: granite or concrete by region (KerbBuilder.stone_for).
 static var _kerb := Color(0.36, 0.35, 0.33)
+## Crack range (m) per preset: Fast, Balanced, High, Ultra.
+const DETAIL_M := [90.0, 130.0, 180.0, 220.0]
+static var _detail_m := 220.0
 static var _paved_shader: Shader
 static var _texs: Dictionary = {}
 
@@ -299,6 +470,7 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
 	_mat.set_shader_parameter("centre_col", _centre)
 	_mat.set_shader_parameter("kerb_col", _kerb)
+	_mat.set_shader_parameter("detail_m", _detail_m)
 	return _mat
 
 ## The asphalt material painted over the whole ribbon in `kind`
@@ -326,14 +498,16 @@ static func yellow_centre(data: LocationData) -> bool:
 		return YELLOW_CENTRE.has(data.country.to_upper())
 	return data.longitude > -170.0 and data.longitude < -30.0
 
-## Sets the centre-line and kerb colours for `data`'s place (RoadBuilder,
-## per build).
+## Sets the centre-line and kerb colours and the crack range for `data`'s
+## place (RoadBuilder, per build).
 static func set_place(data: LocationData) -> void:
 	_centre = YELLOW if yellow_centre(data) else Color(0.70, 0.69, 0.65)
 	_kerb = KerbBuilder.stone_for(data)
+	_detail_m = float(DETAIL_M[RenderSettings.clamp_preset(data.quality_preset)])
 	if _mat != null:
 		_mat.set_shader_parameter("centre_col", _centre)
 		_mat.set_shader_parameter("kerb_col", _kerb)
+		_mat.set_shader_parameter("detail_m", _detail_m)
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish).
@@ -407,6 +581,54 @@ static func depth_steps(data: LocationData) -> PackedByteArray:
 				break
 		steps[i] = s
 	return steps
+
+## COLOR.b of a ribbon: the urban kerb flag in the top half (0.5 and up),
+## the chain's wear seed (0..1) scaled into the rest.
+static func wear_attr(urban: bool, seed_01: float) -> float:
+	return (0.5 if urban else 0.0) + clampf(seed_01, 0.0, 1.0) * 0.45
+
+## A wear seed (0..1) per road. OSM splits a street into many ways, so ways
+## that run on in line at a shared end form one chain with one seed, and
+## the street ages as a whole. Taken from the chain's lowest end node, so
+## it does not depend on the order of the road list.
+static func wear_seeds(data: LocationData) -> PackedFloat32Array:
+	var n := data.roads.size()
+	var parent := PackedInt32Array()
+	parent.resize(n)
+	var ends := {}
+	for i in n:
+		parent[i] = i
+		if not is_carriageway(data.roads[i]):
+			continue
+		var pts := _points(data.roads[i])
+		if pts.size() < 2:
+			continue
+		for k: Vector2i in [node_key(pts[0]), node_key(pts[pts.size() - 1])]:
+			var ids: PackedInt32Array = ends.get(k, PackedInt32Array())
+			ids.append(i)
+			ends[k] = ids
+	for k: Vector2i in ends:
+		var ids: PackedInt32Array = ends[k]
+		for a in ids.size():
+			for b in range(a + 1, ids.size()):
+				if RoadMarkings._in_line(_points(data.roads[ids[a]]), _points(data.roads[ids[b]]), k):
+					parent[RoadMarkings._find(parent, ids[a])] = RoadMarkings._find(parent, ids[b])
+	var lowest := {}
+	for i in n:
+		var pts := _points(data.roads[i])
+		if pts.is_empty():
+			continue
+		var root := RoadMarkings._find(parent, i)
+		for k: Vector2i in [node_key(pts[0]), node_key(pts[pts.size() - 1])]:
+			if not lowest.has(root) or k < (lowest[root] as Vector2i):
+				lowest[root] = k
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		var root := RoadMarkings._find(parent, i)
+		if lowest.has(root):
+			out[i] = float(hash(lowest[root]) & 0xFFFF) / 65535.0
+	return out
 
 ## A road cars drive on as far as junction paint is concerned: not paths,
 ## crossings or areas, not driveways, not underground.
