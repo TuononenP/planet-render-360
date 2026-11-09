@@ -6,6 +6,10 @@ extends SceneTree
 ## Gulf tanks, Greek solar heaters, skylights elsewhere), the same roof
 ## always gets the same pieces, and lower tiers get none.
 
+## A 10-storey pre-war New York roof, the kind that carries a water tower.
+const WALL_M := 32.0
+const NEW_YORK := {"city": "new_york", "region": "north_america", "era": "nyc_prewar"}
+
 func _init() -> void:
 	_run()
 
@@ -19,7 +23,7 @@ func _mats_for(look: Dictionary, seed_v: float, country: String = "") -> Diction
 	var ring := _ring(12.0)
 	var basis := Basis()
 	RoofClutter.add(batch, ring, Vector2.ZERO, Vector2.RIGHT, Vector2(0, 1), 12.0, 12.0,
-		30.0, basis, look, seed_v, 576.0, country)
+		30.0, basis, look, seed_v, 576.0, country, WALL_M)
 	var out := {}
 	for k in RoofClutter._mats:
 		if batch.surfaces.has(RoofClutter._mats[k]):
@@ -32,7 +36,7 @@ func _stays_on_roof(look: Dictionary, seed_v: float, country: String = "") -> bo
 	var batch := BuildingDetail.Batch.new()
 	var ring := PackedVector2Array([Vector2(-12.5, -3), Vector2(12.5, -3), Vector2(12.5, 3), Vector2(-12.5, 3)])
 	RoofClutter.add(batch, ring, Vector2.ZERO, Vector2.RIGHT, Vector2(0, 1), 12.5, 3.0,
-		30.0, Basis(), look, seed_v, 300.0, country)
+		30.0, Basis(), look, seed_v, 300.0, country, WALL_M)
 	for mat in batch.surfaces:
 		for p in (batch.surfaces[mat][0] as PackedVector3Array):
 			if absf(p.x) > 12.5 + 0.3 or absf(p.z) > 3.0 + 0.3:
@@ -47,7 +51,7 @@ func _any(seeds: int, look: Dictionary, key: String, country: String = "") -> bo
 
 func _run() -> void:
 	var failures: Array[String] = ["sentinel: the run did not finish (script error?)"]
-	if not _any(20, {"city": "new_york", "region": "north_america"}, "cedar"):
+	if not _any(20, NEW_YORK, "cedar"):
 		failures.append("New York roofs should carry wooden water towers")
 	if not _any(5, {"city": "tokyo", "region": "japan"}, "ac"):
 		failures.append("Tokyo roofs should carry AC condensers")
@@ -63,7 +67,7 @@ func _run() -> void:
 	if not _any(5, {"city": "", "region": "middle_east"}, "solar", "IL") \
 			or _any(20, {"city": "", "region": "middle_east"}, "dish", "IL"):
 		failures.append("Israeli roofs should carry solar water heaters, not the region's tanks")
-	for look: Dictionary in [{"city": "new_york", "region": "north_america"}, {"city": "tokyo", "region": "japan"},
+	for look: Dictionary in [NEW_YORK, {"city": "tokyo", "region": "japan"},
 			{"city": "dubai", "region": "middle_east"}, {"city": "", "region": "central_europe"}]:
 		for i in 40:
 			if not _stays_on_roof(look, float(i) * 0.113 + 0.02, "GR" if i % 2 == 0 else ""):
