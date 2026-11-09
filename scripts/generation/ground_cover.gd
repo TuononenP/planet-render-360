@@ -6,22 +6,32 @@ extends RefCounted
 ## (alpha-scissored, swaying in the wind). Lawns and meadows were a
 ## flat texture under the trees; from 30 m up the tufts break them into
 ## the dappled, tufted surface a real park or alpine meadow shows, and
-## shrubs give hedgerows and park edges their mass.
+## shrubs give hedgerows and park edges their mass. Cover takes its colour
+## from the ground photo under its root, so it belongs to the lawn it
+## stands on, and shrinks away with distance from the eye.
 ##
 ## Placement: jittered grid over the green polygons VegetationMask
 ## rasterised (grass, cemetery, orchard; forest gets ferny shrubs),
 ## never on buildings, water, carriageways and their verges, mapped
 ## squares or footpaths (ROAD_EDGE: a square mapped over a grass polygon,
 ## like the Trocadéro terrace, is paving), inside a radius per tier
-## (Fast none). Colours follow the season's grass palette and the
-## climate's dry-summer tint, ±12% per instance. Instances fade out
-## toward the radius so the edge never shows.
+## (Fast none). On desktop it reaches on for walking, and also grows on
+## unmapped ground the photo shows as green. Chunks keep the far ones
+## out of the frame.
 
 ## Radius (m) and grid spacing (m) per preset: Fast, Balanced, High, Ultra.
 const RADIUS_M := [0.0, 90.0, 170.0, 260.0]
 const SPACING_M := [0.0, 3.2, 2.6, 2.1]
+## Desktop only: how much further than the view radius cover is laid, so a
+## walk finds it.
+const WALK_EXTRA_M := [0.0, 0.0, 200.0, 240.0]
+## Side of a chunk, and the green index (excess green) unmapped ground needs.
+const CHUNK_M := 128.0
+const PHOTO_GREEN := 0.07
+## Cover keeps this far from hard edges: the strip GroundShader wears to earth.
+const EDGE_CLEAR_M := 1.1
 const KINDS := ["tuft", "flower", "shrub"]
-const CLASSES := {"grass": [0.86, 0.125, 0.015], "cemetery": [0.85, 0.05, 0.10],
+const CLASSES := {"grass": [0.95, 0.035, 0.015], "cemetery": [0.85, 0.05, 0.10],
 	"orchard": [0.80, 0.12, 0.08], "forest": [0.45, 0.0, 0.55], "wetland": [0.9, 0.05, 0.05]}
 
 const SHADER := """
@@ -31,9 +41,13 @@ uniform sampler2D tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform float sway = 0.12;
 // 1 = low enough for lying snow to bury (tufts, flowers), 0 = shrubs.
 uniform float buried_by_snow = 1.0;
+// Distance from the eye at which this kind has shrunk away.
+uniform float fade_m = 260.0;
 // @SNOW
 varying vec3 wpos;
 void vertex() {
+	float eye = length(MODEL_MATRIX[3].xyz - CAMERA_POSITION_WORLD);
+	VERTEX *= 1.0 - smoothstep(fade_m * 0.7, fade_m, eye);
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	// Snow buries a tuft by degrees: it sinks, it never pops at an edge.
 	VERTEX.y *= 1.0 - 0.95 * buried_by_snow * snow_bury(MODEL_MATRIX[3].xyz);
@@ -57,7 +71,7 @@ void fragment() {
 	float sc = snow_cover(wpos, 1.0);
 	ALBEDO = mix(c, snow_col, sc * 0.8);
 	// Thin leaves glow when lit from behind.
-	BACKLIGHT = c * 0.6;
+	BACKLIGHT = c * 0.3;
 	ROUGHNESS = 0.85;
 	SPECULAR = 0.25;
 	AO = mix(0.8, 1.0, 1.0 - UV.y);
@@ -65,54 +79,122 @@ void fragment() {
 }
 """
 
+## A tuft's value against the palette: near the lawn it stands on (at 1.2
+## the blades were about three times its brightness and read as clip art).
+const TUFT_VALUE := 0.8
+const TURF_GREY := 0.18
 static var _mats: Dictionary = {}
 
-## Adds the cover MultiMeshes to `root`; returns the instance count.
+## Adds the cover MultiMeshes to `root` in chunks; returns the instance count.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask) -> int:
 	var p := RenderSettings.clamp_preset(data.quality_preset)
 	var radius := float(RADIUS_M[p]) * WorldScale.metres_to_units()
+	var chunk := CHUNK_M * WorldScale.metres_to_units()
 	var per := plan(data, ground, mask)
 	var total := 0
-	for kind in KINDS:
+	for kind: String in KINDS:
 		var list: Array = per.get(kind, [])
-		if list.is_empty():
-			continue
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = _card(kind)
-		mm.instance_count = list.size()
-		for n in list.size():
-			var e: Array = list[n]
-			var b := Basis(Vector3.UP, float(e[2])).scaled(Vector3.ONE * float(e[1]))
-			mm.set_instance_transform(n, Transform3D(b, e[0]))
-			mm.set_instance_color(n, e[3])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "GroundCover_" + kind
-		mmi.multimesh = mm
-		mmi.material_override = _material(kind, data.season)
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if kind == "shrub" and p >= 3 \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mmi.visibility_range_end = radius * 1.05
-		mmi.set_meta("lod_layer", "Vegetation")
-		root.add_child(mmi)
+		var cells := {}
+		for e: Array in list:
+			var o: Vector3 = e[0]
+			var c := Vector2i(floori(o.x / chunk), floori(o.z / chunk))
+			if not cells.has(c):
+				cells[c] = []
+			(cells[c] as Array).append(e)
+		var fade := fade_for(kind, radius)
+		for c: Vector2i in cells:
+			root.add_child(_chunk(kind, cells[c], c, chunk, data.season, fade))
 		total += list.size()
 	return total
+
+## The distance (units) at which `kind` has shrunk away for a view radius.
+static func fade_for(kind: String, radius: float) -> float:
+	return radius * (0.5 if kind == "tuft" else 1.0)
+
+static func _chunk(kind: String, list: Array, cell: Vector2i, chunk: float, season: int, fade: float) -> MultiMeshInstance3D:
+	var first: Vector3 = (list[0] as Array)[0]
+	var origin := Vector3((float(cell.x) + 0.5) * chunk, first.y, (float(cell.y) + 0.5) * chunk)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = _card(kind)
+	mm.instance_count = list.size()
+	for n in list.size():
+		var e: Array = list[n]
+		var b := Basis(Vector3.UP, float(e[2])).scaled(Vector3.ONE * float(e[1]))
+		mm.set_instance_transform(n, Transform3D(b, (e[0] as Vector3) - origin))
+		mm.set_instance_color(n, e[3])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "GroundCover_%s_%d_%d" % [kind, cell.x, cell.y]
+	mmi.position = origin
+	mmi.multimesh = mm
+	mmi.material_override = _material(kind, season, fade)
+	# Only low shrubs close to the eye would show a shadow; none is drawn.
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.visibility_range_end = fade + chunk
+	mmi.set_meta("lod_layer", "GroundCover")
+	mmi.set_meta("cover_end", fade + chunk)
+	return mmi
+
+## Whether this device lays the walking reach, near scatter and photo cover.
+static func _desktop() -> bool:
+	return not OS.has_feature("mobile")
+
+## Linear photo colour under world (x, z); alpha 0 when there is none.
+static func _photo_at(data: LocationData, x: float, z: float) -> Color:
+	var img := data.satellite_image
+	if img == null or img.is_empty() or img.is_compressed():
+		return Color(0, 0, 0, 0)
+	var uv := TerrainBuilder.satellite_uv(data, x, z)
+	if uv.x < 0.0 or uv.y < 0.0 or uv.x >= 1.0 or uv.y >= 1.0:
+		return Color(0, 0, 0, 0)
+	var c := img.get_pixel(int(uv.x * float(img.get_width())), int(uv.y * float(img.get_height()))).srgb_to_linear()
+	return Color(c.r, c.g, c.b, 1.0)
+
+## The palette colour at its own brightness, taking most of its hue from
+## the ground photo under the root.
+static func rooted(base: Color, photo: Color) -> Color:
+	if photo.a <= 0.0:
+		return base
+	var lb := base.r * 0.2126 + base.g * 0.7152 + base.b * 0.0722
+	var lp := maxf(photo.r * 0.2126 + photo.g * 0.7152 + photo.b * 0.0722, 0.005)
+	return base.lerp(Color(photo.r * lb / lp, photo.g * lb / lp, photo.b * lb / lp), 0.6)
+
+## The lawn's calm green (GroundShader takes the same share of grey out).
+static func _turf(c: Color) -> Color:
+	var l := c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
+	return c.lerp(Color(l, l, l), TURF_GREY)
+
+## Excess-green index of a linear colour.
+static func green_index(c: Color) -> float:
+	return (2.0 * c.g - c.r - c.b) / maxf(c.r + c.g + c.b, 0.001)
 
 ## Placements per kind: [position, scale, yaw, colour] lists.
 static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) -> Dictionary:
 	var p := RenderSettings.clamp_preset(data.quality_preset)
-	var radius := float(RADIUS_M[p]) * WorldScale.metres_to_units()
-	if radius <= 0.0 or mask.green.is_empty():
+	var m := WorldScale.metres_to_units()
+	var radius := float(RADIUS_M[p]) * m
+	if radius <= 0.0:
 		return {}
-	var sp := float(SPACING_M[p]) * WorldScale.metres_to_units()
-	var centre := View360.spawn_xz(data)
-	var grass := _grass_colour(data)
+	var desktop := _desktop()
+	var photo_cover := desktop and p >= RenderSettings.Preset.HIGH and data.satellite_image != null
+	if mask.green.is_empty() and not photo_cover:
+		return {}
 	var per: Dictionary = {}
 	for k in KINDS:
 		per[k] = []
-	var steps := int(ceil(radius / sp))
+	var extra := float(WALK_EXTRA_M[p]) * m if desktop else 0.0
+	var reach := radius + extra
+	_scatter(per, data, ground, mask, reach, extra > 0.0, float(SPACING_M[p]) * m, photo_cover)
+	return per
+
+## One jittered grid of placements out to `reach`.
+static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, mask: VegetationMask, reach: float,
+		full_reach: bool, sp: float, photo_cover: bool) -> void:
+	var centre := View360.spawn_xz(data)
+	var grass := _grass_colour(data)
+	var steps := int(ceil(reach / sp))
 	for j in range(-steps, steps + 1):
 		for i in range(-steps, steps + 1):
 			var h1 := _hash(float(i), float(j), 1.0)
@@ -120,15 +202,22 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 			var x := centre.x + (float(i) + h1 - 0.5) * sp
 			var z := centre.y + (float(j) + h2 - 0.5) * sp
 			var d := Vector2(x - centre.x, z - centre.y).length()
-			if d > radius:
+			if d > reach:
 				continue
-			var id := mask.cover_at(x, z)
-			if id < 0:
-				continue
-			var cls := str((mask.green[id] as Dictionary).get("class", ""))
+			var id := mask.cover_at(x, z) if not mask.green.is_empty() else -1
+			var cls := "grass"
+			var photo := Color(0, 0, 0, 0)
+			if id >= 0:
+				cls = str((mask.green[id] as Dictionary).get("class", ""))
+			else:
+				if not photo_cover:
+					continue
+				photo = _photo_at(data, x, z)
+				if photo.a <= 0.0 or green_index(photo) < PHOTO_GREEN:
+					continue
 			if not CLASSES.has(cls) or mask.blocked(x, z,
 					VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE
-					| VegetationMask.WATER, 0.6):
+					| VegetationMask.WATER, EDGE_CLEAR_M * WorldScale.metres_to_units()):
 				continue
 			var w: Array = CLASSES[cls]
 			var h3 := _hash(float(i), float(j), 3.0)
@@ -137,26 +226,26 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 				kind = "shrub"
 			elif h3 > float(w[0]):
 				kind = "flower"
-			# Thin out toward the radius; shrubs stay sparser.
-			# Tufts only near by: from 30 m up, farther ones are specks.
-			var r_kind := radius * (0.5 if kind == "tuft" else 1.0)
+			# With no walking reach, tufts stop halfway: past that they are specks.
+			var r_kind := reach * (0.5 if kind == "tuft" and not full_reach else 1.0)
 			if d > r_kind:
 				continue
-			var keep := 1.0 - smoothstep(r_kind * 0.7, r_kind, d)
-			if _hash(float(i), float(j), 4.0) > keep or (kind == "shrub" and _hash(float(i), float(j), 5.0) > 0.5):
+			var keep := 1.0 - smoothstep(r_kind * 0.85, r_kind, d)
+			if _hash(float(i), float(j), 4.0) > keep \
+					or (kind == "shrub" and _hash(float(i), float(j), 5.0) > 0.5):
 				continue
-			var s := (0.7 + 0.6 * _hash(float(i), float(j), 6.0)) * (0.6 + 0.4 * keep)
+			var s := 0.7 + 0.6 * _hash(float(i), float(j), 6.0)
 			var v := 0.88 + 0.24 * _hash(float(i), float(j), 7.0)
-			# Near the (dehazed, darkened) lawn's own value: the blades
-			# darken toward the base in the texture.
-			var col := Color(grass.r * v, grass.g * v * (0.95 + 0.1 * h1), grass.b * v) * 1.2
+			if photo.a <= 0.0 and photo_cover:
+				photo = _photo_at(data, x, z)
+			var root := rooted(grass, photo)
+			var col := _turf(Color(root.r * v, root.g * v * (0.95 + 0.1 * h1), root.b * v)) * TUFT_VALUE
 			if kind == "flower":
 				col = Color(v, v, v)
 			elif kind == "shrub":
-				col = Color(grass.r * v * 0.7, grass.g * v * 0.8, grass.b * v * 0.6)
+				col = Color(root.r * v * 0.7, root.g * v * 0.8, root.b * v * 0.6)
 			(per[kind] as Array).append([Vector3(x, ground.height_at_world(x, z), z),
 				s, _hash(float(i), float(j), 8.0) * TAU, col])
-	return per
 
 static func _grass_colour(data: LocationData) -> Color:
 	var dry := ClimateModel.grass_tint(data, data.season)
@@ -199,8 +288,8 @@ static func _card(kind: String) -> ArrayMesh:
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return m
 
-static func _material(kind: String, season: int) -> ShaderMaterial:
-	var key := "%s|%d" % [kind, season]
+static func _material(kind: String, season: int, fade: float) -> ShaderMaterial:
+	var key := "%s|%d|%.1f" % [kind, season, fade]
 	if _mats.has(key):
 		return _mats[key]
 	var sh := Shader.new()
@@ -210,6 +299,7 @@ static func _material(kind: String, season: int) -> ShaderMaterial:
 	m.set_shader_parameter("tex", ImageTexture.create_from_image(_paint(kind, season)))
 	m.set_shader_parameter("buried_by_snow", 0.0 if kind == "shrub" else 1.0)
 	m.set_shader_parameter("sway", 0.05 if kind == "shrub" else 0.12)
+	m.set_shader_parameter("fade_m", fade)
 	_mats[key] = m
 	return m
 

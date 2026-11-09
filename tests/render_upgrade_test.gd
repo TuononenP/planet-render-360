@@ -313,7 +313,7 @@ func _run() -> void:
 					var o2: Vector3 = e[0]
 					kept += 1
 					if (o2.x > 29.0 and o2.x < 71.0 and o2.z > -61.0 and o2.z < -19.0) \
-							or (o2.x < -19.0 and absf(o2.z - 40.0) < 1.0) \
+							or (o2.x > -71.0 and o2.x < -19.0 and absf(o2.z - 40.0) < 1.0) \
 							or (o2.x > -65.0 and o2.x < -25.0 and o2.z > -65.0 and o2.z < -25.0):
 						on_paving += 1
 			if on_paving > 0 or kept < 150:

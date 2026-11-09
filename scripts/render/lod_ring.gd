@@ -159,6 +159,8 @@ static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 	var end := 0.0
 	if layer == "Buildings" and bool(gi.get_meta("lod_detail", false)):
 		end = detail_m(preset)
+	elif layer == "GroundCover":
+		end = float(gi.get_meta("cover_end", 0.0))
 	elif layer == "Vegetation":
 		var size := gi.get_aabb().size
 		if maxf(size.x, size.z) <= MAX_RANGED_SIZE_M:
