@@ -47,6 +47,12 @@ const FLAT_ROOFS := ["#7e8388", "#6a6f75", "#8f9296", "#74827a", "#9a948a", "#5f
 const MAIN_SHARE := 0.65
 ## Brightest linear luminance a wall/roof tint may reach.
 const WALL_ALBEDO_MAX := 0.72
+## Per-building spread of the row's window bay and storey height (a share of
+## each, either way), so neighbours do not share one rhythm. Bays stay out of
+## the material key: the row's bay_m names the material, look "bay_scale" only
+## changes how many bays an edge is divided into.
+const BAY_JITTER := 0.12
+const FLOOR_JITTER := 0.05
 
 ## Looks and tints (x, y) per era and kind for a preset: Fast and anything
 ## off Forward+ (phones) keep the shared two; Balanced and High add tints;
@@ -249,14 +255,17 @@ static func resolve(b: Dictionary, region: String, density: String,
 	var city := city_of(region)
 	var ms := seed_v
 	var mt := seed_v
-	if city != "":
+	# A country's period rows share the few looks a city has, for the same
+	# reason: every period multiplies the place's materials otherwise.
+	var zoned := city != "" or era != region
+	if zoned:
 		var looks := float(ctx.get("looks", LOOKS))
 		ms = (floorf(_h(seed_v, 31) * looks) + 0.5) / looks * 0.913 + 0.041
 		mt = ms
 		var tints := float(ctx.get("tints", looks))
 		if tints > looks:
 			mt = (floorf(_h(seed_v, 32) * tints) + 0.5) / tints * 0.913 + 0.041
-	var wall: Array = _pick_wall(p["w"] as Array, seed_v, ms, city != "")
+	var wall: Array = _pick_wall(p["w"] as Array, seed_v, ms, zoned)
 	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)
 	var pattern := _pattern_of(p, ms, 13)
@@ -278,7 +287,10 @@ static func resolve(b: Dictionary, region: String, density: String,
 			lo = maxi(1, lo - 1)
 			hi = maxi(lo, hi - 2)
 	var storeys := lo + int(_h(seed_v, 5) * float(hi - lo + 1))
-	var fh := float(p["fh"])
+	# The Paris whole-facade composer lays out its own bays and storeys.
+	var tiled := FacadeComposer.is_tiled(pattern)
+	var fh := float(p["fh"]) * (_jitter(seed_v, 43, FLOOR_JITTER) if tiled else 1.0)
+	var bay_scale := _jitter(seed_v, 44, BAY_JITTER) if tiled else 1.0
 	# Each roof is a little steeper or flatter than its neighbour's (+-10%).
 	var pitch := float(p["pitch"]) * (0.9 + 0.2 * _h(seed_v, 41))
 	var rise := 0.0 if shape == "flat" else clampf(2.4 * pitch, 1.2, 4.0)
@@ -286,7 +298,7 @@ static func resolve(b: Dictionary, region: String, density: String,
 		"region": region, "kind": kind, "city": city, "era": era,
 		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, mt, 2),
 		"vt": float(p.get("vt", chroma_of(str(wall[0])))),
-		"pattern": pattern, "bay_m": float(p["bay"]),
+		"pattern": pattern, "bay_m": float(p["bay"]), "bay_scale": bay_scale,
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
 		"roof_shape": shape, "pitch": pitch,
@@ -295,12 +307,24 @@ static func resolve(b: Dictionary, region: String, density: String,
 		"chimney": float(p["ch"]), "dormer": float(p.get("dm", 0.0)),
 		"equip": float(p.get("eq", 0.0)),
 		"tower": _tower(p, b),
-		"window": str(p.get("wn", "casement")), "rails": float(p.get("rl", 0.0)),
+		"window": _window_of(p.get("wn", "casement"), ms), "rails": float(p.get("rl", 0.0)),
 		"ground": ground, "ground_colour": _tint(p.get("gc", []) as Array, ms, 15),
 		"eave": float(p.get("ev", 0.3)),
 		"variant": int(_h(ms, 14) * float(VARIANTS)) % VARIANTS,
 		"relief": _relief(p, seed_v),
 	}
+
+## A factor within +-amount of 1, steady per building and salt.
+static func _jitter(seed_v: float, salt: int, amount: float) -> float:
+	return 1.0 + amount * (2.0 * _h(seed_v, salt) - 1.0)
+
+## A row's window type, or one of its palette spread evenly over the look
+## seed: a hashed pick from a city's few looks could land on one entry.
+static func _window_of(wn: Variant, ms: float) -> String:
+	if wn is Array:
+		var pal := wn as Array
+		return str(pal[mini(int(ms * float(pal.size())), pal.size() - 1)])
+	return str(wn)
 
 ## The wall finish of one building. Inside a city the look seeds are few,
 ## so picking the wall from them left a row's second finish unused whenever
@@ -397,7 +421,7 @@ static func distant_look(region: String) -> Dictionary:
 	return {"wall_set": str(wall[0]), "tints": tints,
 		"pattern": _distant_pattern(p, str(wall[0])), "bay_m": float(p["bay"]),
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], 0.5, 17)),
-		"shutter_p": float(p["sp"]), "window": str(p.get("wn", "casement")),
+		"shutter_p": float(p["sp"]), "window": _window_of(p.get("wn", "casement"), 0.0),
 		"rails": float(p.get("rl", 0.0)), "variant": 0,
 		"roof_set": str(roof[0]), "roof_colours": [_tint(_roof_palette(roof), 0.4, 10),
 			_tint(_roof_palette(roof), 2.1, 10)]}

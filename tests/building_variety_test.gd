@@ -15,6 +15,9 @@ func _init() -> void:
 	_built_block_checks(failures)
 	_roof_angle_checks(failures)
 	_pitch_checks(failures)
+	_proportion_checks(failures)
+	_elevation_checks(failures)
+	_country_era_checks(failures)
 	_roof_axis_checks(failures)
 	_flat_roof_checks(failures)
 	_block_era_checks(failures)
@@ -378,6 +381,130 @@ func _pitch_checks(failures: Array[String]) -> void:
 	if lo < 0.899 or hi > 1.101 or hi - lo < 0.15 or absf(sum / 300.0 - 1.0) > 0.03:
 		failures.append("pitch should spread +-10%% around the row (%.3f..%.3f, mean %.3f)"
 			% [lo, hi, sum / 300.0])
+
+## Bays and storeys spread per building around the row on tiled patterns while
+## bay_m (which names the material) stays the row's; a row's window palette
+## shows every type even on the two-look tier; the Paris composer is untouched.
+func _proportion_checks(failures: Array[String]) -> void:
+	var b := {"kind": "apartments", "levels": 5}
+	for looks: int in [ArchitectureStyle.LOOKS, ArchitectureStyle.ULTRA_LOOKS]:
+		var scale_lo := INF
+		var scale_hi := -INF
+		var floor_lo := INF
+		var floor_hi := -INF
+		var windows := {}
+		for i in 400:
+			var sv := fmod(float(i) * 0.61803 + 0.02, 1.0)
+			var look := ArchitectureStyle.resolve(b, "berlin", "urban", sv, 400.0, {"looks": looks})
+			if str(look["era"]) != "berlin" or not FacadeComposer.is_tiled(str(look["pattern"])):
+				continue
+			var row := ArchitectureStyle.profile("berlin", "apartments")
+			if float(look["bay_m"]) != float(row["bay"]):
+				failures.append("bay_m must stay the row's so materials do not multiply")
+				return
+			scale_lo = minf(scale_lo, float(look["bay_scale"]))
+			scale_hi = maxf(scale_hi, float(look["bay_scale"]))
+			var ratio := float(look["floor_h"]) / float(row["fh"])
+			floor_lo = minf(floor_lo, ratio)
+			floor_hi = maxf(floor_hi, ratio)
+			windows[str(look["window"])] = true
+		if scale_lo < 0.879 or scale_hi > 1.121 or scale_hi - scale_lo < 0.15:
+			failures.append("bay_scale should spread +-12%% (%.3f..%.3f)" % [scale_lo, scale_hi])
+		if floor_lo < 0.949 or floor_hi > 1.051 or floor_hi - floor_lo < 0.06:
+			failures.append("floor_h should spread +-5%% (%.3f..%.3f)" % [floor_lo, floor_hi])
+		if not (windows.has("casement") and windows.has("french")):
+			failures.append("Berlin's window palette collapsed at %d looks: %s" % [looks, windows.keys()])
+	var paris := ArchitectureStyle.resolve(b, "paris", "urban", 0.37, 400.0, {})
+	if str(paris["pattern"]) == "haussmann" and float(paris["bay_scale"]) != 1.0:
+		failures.append("the Paris whole-facade composer must keep its bays")
+
+## Decorated masonry gets a taller first upper storey and, on about half of
+## fronts, a small-windowed attic; curtain walls, short fronts and fronts above
+## a lower neighbour stay plain; relief storeys follow the bands.
+func _elevation_checks(failures: Array[String]) -> void:
+	var ornate := {"pattern": "ornate", "wall_set": "render", "window": "casement"}
+	var attics := 0
+	for i in 400:
+		var plan := BuildingWalls.band_plan(ornate, fmod(float(i) * 0.61803 + 0.02, 1.0), 5, [], 10.0)
+		if not bool(plan["piano"]):
+			failures.append("an ornate masonry front should have a piano nobile")
+			return
+		attics += 1 if bool(plan["attic"]) else 0
+	if attics < 140 or attics > 260:
+		failures.append("about half of fronts should have an attic, got %d/400" % attics)
+	var plain := [
+		BuildingWalls.band_plan({"pattern": "curtain", "wall_set": "glass"}, 0.3, 8, [], 10.0),
+		BuildingWalls.band_plan(ornate, 0.3, 2, [], 10.0),
+		BuildingWalls.band_plan(ornate, 0.3, 5, [[[0.0, 1.0, 2.0]]], 10.0),
+	]
+	for plan: Dictionary in plain:
+		if bool(plan["piano"]) or bool(plan["attic"]):
+			failures.append("this front should take no bands: %s" % plan)
+	var hidden := BuildingWalls.band_plan(ornate, 0.3, 5, [[[0.0, 1.0, 12.0], [0.0, 1.0, INF]]], 10.0)
+	if not bool(hidden["piano"]):
+		failures.append("a wall hidden by a taller neighbour should keep its bands")
+	var attic := BuildingWalls.attic_look({"pattern": "ornate", "window": "sash", "variant": 2, "rails": 0.6})
+	if str(attic["window"]) != "small" or int(attic["variant"]) != 0 or float(attic["rails"]) != 0.0:
+		failures.append("the attic look must be small, plain and variant-free: %s" % attic)
+	var look := {"pattern": "punched", "window": "casement", "relief": {}}
+	var rows := FacadeRelief.storey_rows({"look": look, "base": 0.0, "top": 10.0, "g_top": 0.0,
+		"v_rep": 4.0, "storeys": 4, "bands": {"piano": true, "attic": true}}, Vector3(3.0, 4.0, 1.0))
+	var r0: Dictionary = rows[0]
+	var r1: Dictionary = rows[1]
+	var r3: Dictionary = rows[3]
+	var unit := 10.0 / (4.0 + BuildingWalls.PIANO_STRETCH - 1.0)
+	if absf(float(r0["y1"]) - float(r0["y0"]) - unit * BuildingWalls.PIANO_STRETCH) > 0.001 \
+			or absf(float(r3["y1"]) - 10.0) > 0.001 or absf(float(r1["y0"]) - float(r0["y1"])) > 0.001:
+		failures.append("relief storeys must stack on the bands: %s" % [rows])
+	if float(r3["win1"]) - float(r3["win0"]) >= float(r1["win1"]) - float(r1["win0"]):
+		failures.append("the attic's windows should be shorter than the storeys below")
+
+## Outside city zones: real cues pick a country's period, kinds and regions
+## without a table stay on the country row, and untagged neighbourhoods mostly
+## share a period while the town as a whole shows several.
+func _country_era_checks(failures: Array[String]) -> void:
+	var r := "central_europe"
+	var cases := [[{"start_year": 1880}, "central_europe_old"], [{"start_year": 1930}, r],
+		[{"start_year": 1970}, "central_europe_postwar"], [{"start_year": 2015}, "central_europe_new"],
+		[{"levels": 14}, "central_europe_new"], [{"heritage": true, "levels": 4}, "central_europe_old"],
+		[{"architecture": "brutalist"}, "central_europe_postwar"]]
+	for row: Array in cases:
+		var got := BuildingEra.refine(r, "apartments", row[0] as Dictionary, {}, 0.4, 400.0)
+		if got != str(row[1]):
+			failures.append("%s should be %s, got %s" % [row[0], row[1], got])
+	if BuildingEra.refine(r, "house", {"start_year": 1880}, {}, 0.4, 100.0) != r:
+		failures.append("houses should keep the country row")
+	if BuildingEra.refine("alpine", "apartments", {"start_year": 1880}, {}, 0.4, 400.0) != "alpine":
+		failures.append("a region without a period table should come back unchanged")
+	for region: String in ArchitectureCountryEras.ERAS:
+		for e: Array in (ArchitectureCountryEras.ERAS[region] as Array):
+			var key := str(e[0])
+			if not ArchitectureData.REGIONS.has(key) \
+					or (key != region and ArchitectureStyle.country_region(key) != region):
+				failures.append("period %s must be a row inheriting from %s" % [key, region])
+	var m := WorldScale.metres_to_units()
+	var seen := {}
+	var agree := 0.0
+	var cells := 0
+	for cx in 12:
+		for cz in 12:
+			var counts := {}
+			for i in 20:
+				var sv := fmod(float(i + cx * 31 + cz * 17) * 0.61803 + 0.02, 1.0)
+				var b := {"x": ((float(cx) + 0.5) * ArchitectureCountryEras.CELL_M + float(i) * 3.0 - 30.0) * m,
+					"z": ((float(cz) + 0.5) * ArchitectureCountryEras.CELL_M + 20.0) * m}
+				var era := BuildingEra.refine(r, "apartments", b, {}, sv, 400.0)
+				counts[era] = int(counts.get(era, 0)) + 1
+				seen[era] = true
+			agree += float(counts.values().max()) / 20.0
+			cells += 1
+	if seen.size() < 3:
+		failures.append("a town should show several periods, got %s" % [seen.keys()])
+	if agree / float(cells) < 0.55:
+		failures.append("a neighbourhood should mostly share a period (%.2f)" % (agree / float(cells)))
+	var old := ArchitectureStyle.resolve({"kind": "apartments", "levels": 4, "start_year": 1880}, r, "urban", 0.3, 400.0, {})
+	if str(old["era"]) != "central_europe_old" or not (str(old["pattern"]) in ["ornate", "punched"]):
+		failures.append("an 1880 block should take the old row: %s" % old)
 
 ## Untagged buildings in one 64 m block tend to share an era: the block's
 ## most common era covers most of it (random picks over several eras would not).

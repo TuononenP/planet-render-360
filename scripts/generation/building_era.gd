@@ -17,8 +17,9 @@ extends RefCounted
 ##      for San Francisco, the most local district circle it stands in;
 ##   4. seeded pick over ERAS weights, x0.12 outside an era's distance
 ##      band, x district multiplier inside a CityStyles district.
-## Regions that are not a city's come back unchanged. Documented in
-## docs/architecture-styles.md.
+## Outside a city zone a country region's periods (ArchitectureCountryEras)
+## are picked the same way; other regions come back unchanged. Documented
+## in docs/architecture-styles.md.
 
 const APT := ["apartments"]
 const AC := ["apartments", "commercial"]
@@ -210,7 +211,7 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		seed_v: float, area_m2: float) -> String:
 	var city := CityStyles.city_of_region(region)
 	if city == "" or not ERAS.has(city):
-		return region
+		return _country(region, kind, b, ctx, seed_v, area_m2)
 	var cands: Array = []
 	for e in (ERAS[city] as Array):
 		if ((e as Array)[1] as Array).has(kind):
@@ -306,7 +307,7 @@ const BLOCK_SHARE := 0.6
 ## Last resort: seeded pick over the eras' weights, scaled by the
 ## distance band and any district the building stands in.
 static func _weighted(cands: Array, c: Dictionary, ctx: Dictionary, b: Dictionary,
-		seed_v: float) -> String:
+		seed_v: float, cell_m: float = BLOCK_M) -> String:
 	var dist := float(c["dist"])
 	var pos := Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0))) \
 		/ WorldScale.metres_to_units()
@@ -327,9 +328,36 @@ static func _weighted(cands: Array, c: Dictionary, ctx: Dictionary, b: Dictionar
 	# era (the rest keep their own seed, so a block is not a clone).
 	var pick_seed := seed_v
 	if b.has("x") and ArchitectureStyle._h(seed_v, 22.0) < BLOCK_SHARE:
-		pick_seed = TerrainBuilder._hash(floorf(pos.x / BLOCK_M) * 3.7 + 0.5,
-			floorf(pos.y / BLOCK_M) * 1.9 + 0.5)
+		pick_seed = TerrainBuilder._hash(floorf(pos.x / cell_m) * 3.7 + 0.5,
+			floorf(pos.y / cell_m) * 1.9 + 0.5)
 	return ArchitectureStyle._pick_weighted(pairs, pick_seed, 21)
+
+## A country region's period for one building: a named style, then the
+## start_date, then what its height and heritage say; else the neighbourhood's
+## seeded pick. Rows run oldest to newest (ArchitectureCountryEras.ERAS).
+static func _country(region: String, kind: String, b: Dictionary, ctx: Dictionary,
+		seed_v: float, area_m2: float) -> String:
+	var cands: Array = (ArchitectureCountryEras.ERAS.get(region, []) as Array).filter(
+		func(e: Array) -> bool: return (e[1] as Array).has(kind))
+	if cands.is_empty():
+		return region
+	var c := cues(b, ctx, area_m2)
+	var arch := str(c["arch"])
+	var year := int(c["year"])
+	for e: Array in cands:
+		if arch != "" and (e[4] as Array).has(arch):
+			return str(e[0])
+	for e: Array in cands:
+		if year > 0 and year >= int(e[2]) and year <= int(e[3]):
+			return str(e[0])
+	var lv := int(c["lv"])
+	if lv >= 11:
+		return str((cands.back() as Array)[0])
+	if bool(c["heritage"]) and lv <= 6:
+		return str((cands.front() as Array)[0])
+	if str(c["roof"]) == "flat" and lv >= 5 and ArchitectureData.REGIONS.has(region + "_postwar"):
+		return region + "_postwar"
+	return _weighted(cands, c, ctx, b, seed_v, ArchitectureCountryEras.CELL_M)
 
 ## Structural rules per city ("" = undecided). Only levels, roof tag,
 ## footprint, heritage and distance — the year and arch tag are read

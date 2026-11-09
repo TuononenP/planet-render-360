@@ -94,12 +94,44 @@ func _run() -> void:
 			areas.append(absf(RingGeometry.signed_area(step["ring"])))
 		if not (areas[0] > areas[1] and areas[1] > areas[2]) or float(steps[2]["min_m"]) <= 0.0:
 			failures.append("setback levels should narrow and rise: %s" % [areas])
-		if absf(float(steps[2]["wall_m"]) + float(steps[2]["rh_m"]) - 96.0) > 0.1:
+		if absf(float(steps[2]["wall_m"]) + float(steps[2]["rh_m"]) - 30.0 * float((steps[2]["look"] as Dictionary)["floor_h"])) > 0.1:
 			failures.append("setbacks must retain the resolved tower height")
 	RenderSettings.apply_preset(ny, RenderSettings.Preset.HIGH)
 	BuildingMasses.begin_build()
+	if BuildingMasses.plan(ny_tower, BuildingHeights._height_context(ny)).size() != 3:
+		failures.append("High should keep the inferred tower setbacks")
+	RenderSettings.apply_preset(ny, RenderSettings.Preset.FAST)
+	BuildingMasses.begin_build()
 	if BuildingMasses.plan(ny_tower, BuildingHeights._height_context(ny)).size() != 1:
-		failures.append("synthesized tower setbacks are Ultra-only")
+		failures.append("Fast should not infer tower setbacks")
+	# Modern towers mix one mass with a base and an inset top; the top keeps
+	# the full height and carries the roofline detail.
+	RenderSettings.apply_preset(ny, RenderSettings.Preset.HIGH)
+	var mass_counts := {}
+	for i in 24:
+		var cx := 200.0 * float(i)
+		var modern := _bldg(_rect(cx - 30, -30, cx + 30, 30), 40,
+			{"kind": "commercial", "start_year": 2010, "roof_shape": "flat"})
+		BuildingMasses.begin_build()
+		var modern_plan := BuildingMasses.plan(modern, BuildingHeights._height_context(ny))
+		mass_counts[modern_plan.size()] = int(mass_counts.get(modern_plan.size(), 0)) + 1
+		if modern_plan.size() == 2:
+			var low := modern_plan[0] as Dictionary
+			var high := modern_plan[1] as Dictionary
+			if absf(RingGeometry.signed_area(high["ring"])) >= absf(RingGeometry.signed_area(low["ring"])) \
+					or float(high["min_m"]) <= 0.0 or bool(low["main"]) or not bool(high["main"]) \
+					or absf(float(high["wall_m"]) - 40.0 * float((high["look"] as Dictionary)["floor_h"])) > 0.1:
+				failures.append("a modern tower's top should be inset, lifted, full height and main")
+	if not (mass_counts.has(1) and mass_counts.has(2)):
+		failures.append("modern towers should mix plain and stacked forms, got %s" % mass_counts)
+	var landmark := ny_tower.duplicate(true)
+	landmark["mapped_landmark"] = true
+	var house := ny_tower.duplicate(true)
+	house["kind"] = "house"
+	for kept: Dictionary in [landmark, house]:
+		BuildingMasses.begin_build()
+		if BuildingMasses.plan(kept, BuildingHeights._height_context(ny)).size() != 1:
+			failures.append("landmarks and houses must stay one mass, got kind %s" % kept["kind"])
 	RenderSettings.apply_preset(ny, RenderSettings.Preset.ULTRA)
 	var tagged := ny_tower.duplicate(true)
 	tagged["parts"] = [_bldg(_rect(-20, -20, 20, 20), 30, {"roof_shape": "flat"})]
