@@ -247,6 +247,13 @@ vec3 dem_normal(sampler2D tex, vec2 uv) {
 	vec2 rg = texture(tex, uv).rg * 2.0 - 1.0;
 	return vec3(rg.x, sqrt(max(1.0 - dot(rg, rg), 0.0)), rg.y);
 }
+// Value noise on the three axis planes, weighted by the slope: projected
+// straight down it smears into streaks on a mountainside.
+float canopy_noise(vec3 p, vec3 n, float scale) {
+	vec3 w = pow(abs(n), vec3(4.0));
+	w /= w.x + w.y + w.z;
+	return w.y * t_noise(p.xz / scale) + w.x * t_noise(p.zy / scale + 3.1) + w.z * t_noise(p.xy / scale + 7.7);
+}
 void fragment() {
 	vec4 dg = vec4(dFdx(wpos.xz), dFdy(wpos.xz));
 	vec3 dpx = dFdx(wpos);
@@ -336,6 +343,18 @@ void fragment() {
 		vec4 n;
 		det_side(4, wpos / 60.0, dpx / 60.0, dpy / 60.0, nw, a, n);
 		c *= mix(1.0, clamp(lum(a.rgb) / max(lum(det_mean[4]), 1e-3), 0.6, 1.5), rock_fade * 0.6 * (1.0 - water));
+	}
+	// Forest past the real trees: the photo is a soft green wash here, so
+	// dark leafy ground gets crowns (clumps growing with distance so they
+	// never shimmer) and lighter and darker stands.
+	float forest = vegf * smoothstep(0.22, 0.08, lum(c)) * (1.0 - water)
+		* (far_quality >= 1 ? 1.0 - smoothstep(6000.0, 14000.0, dist) : 0.0);
+	if (forest > 0.01) {
+		float crown_m = max(9.0, dist * 0.003);
+		float crowns = canopy_noise(wpos, wnrm, crown_m);
+		float fine_crowns = canopy_noise(wpos + vec3(5.3, 1.7, 3.9), wnrm, crown_m * 0.47);
+		float stands = canopy_noise(wpos + vec3(2.1, 8.4, 6.2), wnrm, 160.0);
+		c *= mix(1.0, (0.58 + 0.56 * crowns + 0.3 * fine_crowns) * (0.82 + 0.36 * stands), forest * 0.85);
 	}
 	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
 	c = mix(c, snow_col, sc);

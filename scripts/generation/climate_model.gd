@@ -308,14 +308,9 @@ static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionar
 	g["valley_haze_y"] = valley_y(data)
 	return g
 
-## Valley floor around the viewpoint in render Y (the viewpoint is Y = 0): a
-## low percentile of the ground, so one deep gully does not set it.
+## Valley floor around the viewpoint in render Y (the viewpoint is Y = 0).
 static func valley_y(data: LocationData) -> float:
-	if data.heights.is_empty():
-		return 0.0
-	var sorted := data.heights.duplicate()
-	sorted.sort()
-	return (sorted[sorted.size() / 20] - data.centre_elevation_m) * WorldScale.metres_to_units()
+	return (DemStats.valley_asl_m(data) - data.centre_elevation_m) * WorldScale.metres_to_units()
 
 static func apply_globals(data: LocationData, weather_code: int = -1) -> void:
 	var g := globals_for(data, weather_code)
