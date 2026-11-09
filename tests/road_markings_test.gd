@@ -88,9 +88,94 @@ func _check_wear_seeds() -> void:
 		"an urban ribbon stays in the upper half of COLOR.b at any seed")
 	_check(RoadSurface.wear_attr(false, 1.0) < 0.5, "a rural ribbon stays in the lower half of COLOR.b at any seed")
 
+## An apron follows its kerbs and takes the finish of the roads it joins.
+func _check_apron_shape() -> void:
+	var d := _place()
+	d.roads = _four_way()
+	var p := _plan(d)
+	_check(p.aprons.size() == 1 and p.apron_arms.size() == 1, "one apron with its arms")
+	if p.aprons.size() != 1:
+		return
+	var ring: PackedVector2Array = p.aprons[0]
+	_check(Geometry2D.is_point_in_polygon(Vector2(4.5, 4.5), ring), "the kerb corner curves into the junction's corner")
+	_check(not Geometry2D.is_point_in_polygon(Vector2(6.2, 6.2), ring), "the pavement keeps its corner: an apron is not a hull")
+	var paved := _road(Vector2(-100, 0), Vector2(0, 0), Vector2(100, 0))
+	paved["surface"] = "paving_stones"
+	var paved2 := paved.duplicate()
+	paved2["points"] = PackedVector2Array([Vector2(0, -100), Vector2(0, 0), Vector2(0, 100)])
+	var side := _road(Vector2(0, 0), Vector2(70, 70), Vector2(100, 100))
+	d.roads = [paved, paved2, side]
+	var surf := RoadBuilder._Surface.new(d, GroundTruth.new(d))
+	_check(RoadMarkings.apron_finish([[0, 8.0], [1, 8.0], [2, 4.0]], d, surf, 1.0) == "sett",
+		"an apron among paved streets is paved")
+	_check(RoadMarkings.apron_finish([[0, 2.0], [2, 8.0]], d, surf, 1.0) == "asphalt",
+		"the wider road sets the apron's finish")
+
+## The paint layer's lane layout, dash chains, crossing clips and styles.
+func _check_paint() -> void:
+	var plain := RoadPaint.lane_lines(6.0, 2, false, 1, true, 0.12)
+	_check(plain.size() == 1 and is_equal_approx(float(plain[0]["x"]), 0.0) and bool(plain[0]["centre"]),
+		"a plain two-lane street has one centre line")
+	var parked := RoadPaint.lane_lines(8.2, 2, false, 1, true, 0.12, Vector2(0.0, 2.2))
+	var centre := 0.0
+	for l: Dictionary in parked:
+		if bool(l["centre"]):
+			centre = float(l["x"])
+	_check(is_equal_approx(centre, 1.1), "parking on the right moves the centre line left: %.2f" % centre)
+	var edge := parked.filter(func(l: Dictionary) -> bool: return not bool(l["centre"]) and bool(l["solid"]))
+	_check(edge.size() == 1 and is_equal_approx(float(edge[0]["x"]), -1.9), "a line marks off the parking lane")
+	var squeezed := RoadPaint.lane_lines(6.0, 2, false, 1, true, 0.12, Vector2(2.2, 2.2))
+	_check(squeezed.size() == 1 and is_equal_approx(float(squeezed[0]["x"]), 0.0), "lanes keep the road when strips leave no room")
+	_check(RoadPaint.lane_lines(4.0, 1, false, 1, true, 0.12).is_empty(), "a narrow lane gets no lines")
+	var bike := RoadPaint.lane_lines(9.0, 2, false, 1, true, 0.12, Vector2.ZERO, 2)
+	_check(bike.any(func(l: Dictionary) -> bool: return bool(l["solid"]) and is_equal_approx(float(l["x"]), -3.0)),
+		"a bike lane is marked off its 1.5 m from the right kerb")
+	_check(OsmTags.cycle_lane_sides({"cycleway:right": "lane"}) == 2, "cycleway:right=lane is the right side")
+	_check(OsmTags.cycle_lane_sides({"cycleway": "lane"}) == 3, "cycleway=lane on a two-way road is both sides")
+	_check(OsmTags.cycle_lane_sides({"cycleway": "lane", "oneway": "yes"}) == 2, "cycleway=lane on a one-way road is one side")
+	_check(RoadPaint.style_for("US", "urban") == [3.05, 9.14, 0.125], "US dashes follow the MUTCD")
+	_check(RoadPaint.style_for("AT", "motorway")[1] == 12.0, "Austrian motorway gaps are 12 m")
+	_check(RoadPaint.style_for("XX", "urban") == RoadPaint.STYLES[""]["urban"], "an unlisted country uses the default")
+	# A street split in two is one chain; a side street is its own.
+	var d := _place()
+	var a := _road(Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0))
+	var b := _road(Vector2(0, 0), Vector2(50, 0), Vector2(100, 0))
+	var side := _road(Vector2(0, 0), Vector2(0, 50), Vector2(0, 100))
+	var wider := _road(Vector2(100, 0), Vector2(150, 0), Vector2(200, 0))
+	wider["width_m"] = 12.0
+	d.roads = [a, b, side, wider]
+	var chains := RoadPaint.line_chains(d, PackedInt32Array([0, 1, 2, 3]))
+	_check(chains.size() == 3, "split ways join; a turn or a new layout starts a chain, got %d" % chains.size())
+	_check(chains.any(func(c: Array) -> bool: return c == [0, 1]), "the split street runs head to tail")
+	# A crossing's paint stops at the kerb.
+	var grid := {}
+	RoadMarkings._grid_add(grid, Vector2(-100, 0), Vector2(100, 0), [Vector2(-100, 0), Vector2(100, 0), 4.5], 1.0)
+	var runs := RoadMarkings.on_road_runs(PackedVector2Array([Vector2(0, -20), Vector2(0, 20)]), grid, {}, 1.0)
+	_check(runs.size() == 1, "one stretch of a crossing is over the road, got %d" % runs.size())
+	if runs.size() == 1:
+		var run: PackedVector2Array = runs[0]
+		_check(absf(run[0].y) <= 5.0 and absf(run[run.size() - 1].y) <= 5.0, "a crossing's paint stays on the carriageway")
+	_check(RoadMarkings.on_road_runs(PackedVector2Array([Vector2(0, 20), Vector2(0, 40)]), grid, {}, 1.0).is_empty(),
+		"a way wholly on the pavement paints nothing")
+
+## A bent crossing is laid in straight pieces; a stop line gives way to paint.
+func _check_crossing_shape() -> void:
+	var nearly := PackedVector2Array([Vector2(0, 0), Vector2(5, 0.4), Vector2(10, 0)])
+	_check(RoadMarkings.straight_pieces(nearly, 1.0).size() == 1, "a nearly straight crossing stays one piece")
+	var bent := PackedVector2Array([Vector2(0, 0), Vector2(5, 0), Vector2(5, 5)])
+	var pieces := RoadMarkings.straight_pieces(bent, 1.0)
+	_check(pieces.size() == 2, "a crossing turning a corner is two pieces, got %d" % pieces.size())
+	var grid := {}
+	RoadMarkings._grid_add(grid, Vector2(-10, 0), Vector2(10, 0), [Vector2(-10, 0), Vector2(10, 0), 2.0], 1.0)
+	var clear := RoadMarkings.on_road_runs(PackedVector2Array([Vector2(0, -10), Vector2(0, 10)]), grid, {}, 1.0, false)
+	_check(clear.size() == 2, "a line through a crossing keeps both sides of it, got %d" % clear.size())
+
 func _run() -> void:
 	failures.clear()
+	_check_crossing_shape()
 	_check_wear_seeds()
+	_check_apron_shape()
+	_check_paint()
 	# Apron and inferred zebras at a plain four-way.
 	var d := _place()
 	d.roads = _four_way()

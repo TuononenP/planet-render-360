@@ -143,6 +143,15 @@ static func _district_finish(road: Dictionary, districts: Array, m2u: float) -> 
 			return "sett"
 	return finish
 
+## The surface finish `line` is laid with, its district's included.
+static func finish_of(line: Variant, surf: _Surface, m2u: float) -> String:
+	var r := _parse(line, m2u)
+	if r.is_empty():
+		return "asphalt"
+	if line is Dictionary and not surf.districts.is_empty():
+		return _district_finish(line, surf.districts, m2u)
+	return str(r["finish"])
+
 static func _material(finish: String) -> Material:
 	if _mats.has(finish):
 		return _mats[finish] as Material
@@ -154,8 +163,9 @@ static func _material(finish: String) -> Material:
 			m = _pbr("concrete", FINISH_HEX["deck"])
 		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":
 			var kind := "solid" if finish == "marking" else ("zebra" if finish == "crossing" else finish.trim_prefix("crossing_"))
-			m = RoadSurface.crossing_material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear(),
-				float(RoadSurface.CROSSING_KINDS[kind]))
+			m = RoadPaint.crossing_material(float(RoadSurface.CROSSING_KINDS[kind]))
+		"paint":
+			m = RoadPaint.material()
 		_:
 			m = RoadSurface.material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 	_mats[finish] = m
@@ -197,7 +207,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	for own in parts:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
-	RoadMarkings.lay(plan, batches, surf, m2u)
+	RoadMarkings.lay(plan, batches, surf, m2u, data)
+	RoadPaint.lay(batches, data, surf, junc, seeds, m2u)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -219,6 +230,15 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		wear_seed: float = 0.5) -> void:
 	var r := _parse(line, m2u)
 	if r.is_empty():
+		return
+	if marking.has("runs"):
+		# A crossing paints only where it is over the road.
+		var whole := marking.duplicate()
+		whole.erase("runs")
+		for piece: PackedVector2Array in marking["runs"]:
+			var part: Dictionary = (line as Dictionary).duplicate()
+			part["points"] = piece
+			_road(batches, part, step, m2u, surf, ground, junc, spans, abort, whole, wear_seed)
 		return
 	if not marking.is_empty():
 		r["finish"] = marking["finish"]

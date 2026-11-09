@@ -496,7 +496,7 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"sidewalk": sidewalk_sides(tags), "sidewalk_separate": sidewalk_sides(tags, true),
-		"oneway": oneway(tags), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
+		"oneway": oneway(tags), "cycle_lane": cycle_lane_sides(tags), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
 		"class": road_class}
 
 ## Width of a parking lane along a kerb (m).
@@ -517,6 +517,21 @@ static func parking_sides(tags: Dictionary) -> int:
 				sides = maxi(sides, 0) | int(side[1])
 			elif v in PARKING_NO:
 				sides = maxi(sides, 0) & ~int(side[1])
+	return sides
+
+## Sides of a road with a painted bike lane, as bits (1 left, 2 right)
+## from `cycleway` and `cycleway:both|left|right`. A bare `cycleway=lane`
+## on a one-way street is one lane, on its right unless tagged otherwise.
+static func cycle_lane_sides(tags: Dictionary) -> int:
+	var sides := 0
+	if str(tags.get("cycleway", "")).strip_edges().to_lower() == "lane":
+		sides = 2 if oneway(tags) != 0 else 3
+	for side in [["both", 3], ["left", 1], ["right", 2]]:
+		var v := str(tags.get("cycleway:" + str(side[0]), "")).strip_edges().to_lower()
+		if v == "lane":
+			sides |= int(side[1])
+		elif v != "":
+			sides &= ~int(side[1])
 	return sides
 
 ## Sides of a road with a sidewalk, as bits (1 left, 2 right) from

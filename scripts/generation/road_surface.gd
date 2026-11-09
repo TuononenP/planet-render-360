@@ -2,15 +2,9 @@ class_name RoadSurface
 extends RefCounted
 
 ## The asphalt look for RoadBuilder: one ShaderMaterial that paints a
-## road from its own coordinates instead of separate marking meshes
-## (which were Ultra-only and ignored lanes and junctions):
-## - markings on every tier: dashed centre line (yellow in the Americas,
-##   Norway and Finland), a double solid line on
-##   wide main roads, lane dividers from the OSM lane count, edge lines
-##   on main roads, zebra crossings on urban streets near junctions;
-##   paint stops short of junctions and wears in patches;
-## - wear: the asphalt photo without visible repetition, darker polished
-##   tyre tracks per lane, crack lines, repaired patches, age blotches;
+## road's surface from its own coordinates (RoadPaint lays the markings):
+## - wear: the asphalt photo without visible repetition, polished tyre
+##   tracks per lane, cracks and repairs along the road, age blotches;
 ## - kerb and gutter along urban streets (a pale stone band with a
 ##   bevelled edge and a dark gutter beside it);
 ## - live weather: rain darkens and glosses the surface with puddles in
@@ -88,37 +82,8 @@ void fragment() {
 }
 """
 
-const CODE := """
-shader_type spatial;
-render_mode cull_back, diffuse_burley, specular_schlick_ggx;
-
-uniform sampler2D alb_tex : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D nor_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D rough_tex : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform vec3 tint = vec3(1.0);
-uniform vec3 paint_col = vec3(0.70, 0.69, 0.65);
-// The line between opposing traffic: white, or yellow (YELLOW_CENTRE).
-uniform vec3 centre_col = vec3(0.70, 0.69, 0.65);
-uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
-uniform float junction_m = 30.0;
-// Range (m) at which fine cracking has faded out, by preset (DETAIL_M).
-uniform float detail_m = 220.0;
-// Paint over a whole crossing ribbon (RoadSurface.CROSSING_KINDS): 0 none.
-uniform float crossing_kind = 0.0;
-// @SNOW
-varying vec3 wpos;
-varying vec4 attr;
-varying float width_m;
-
-void vertex() {
-	wpos = VERTEX;
-	attr = COLOR;
-	width_m = UV2.x;
-	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
-	BINORMAL = normalize(cross(TANGENT, NORMAL));
-// @DEPTH
-}
-
+## Noise and exact-coverage line filters, shared with RoadPaint.
+const LINE_GLSL := """
 float r_hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -148,6 +113,35 @@ float runs(float t, float period, float on, float aa) {
 	float h = max(aa * 0.5, 1e-4);
 	return clamp((run_integral(t + h, period, on) - run_integral(t - h, period, on)) / (2.0 * h), 0.0, 1.0);
 }
+"""
+
+const CODE := """
+shader_type spatial;
+render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+
+uniform sampler2D alb_tex : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D nor_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D rough_tex : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec3 tint = vec3(1.0);
+uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
+uniform float junction_m = 30.0;
+// Range (m) at which fine cracking has faded out, by preset (DETAIL_M).
+uniform float detail_m = 220.0;
+// @SNOW
+varying vec3 wpos;
+varying vec4 attr;
+varying float width_m;
+
+void vertex() {
+	wpos = VERTEX;
+	attr = COLOR;
+	width_m = UV2.x;
+	TANGENT = normalize(vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x);
+	BINORMAL = normalize(cross(TANGENT, NORMAL));
+// @DEPTH
+}
+
+// @LINE_MATH
 
 // Merges one road-aligned repair into o = (fill, sealant rim, tone).
 // d is its signed distance; the outline is roughened, as a hand-cut edge is.
@@ -289,12 +283,12 @@ void fragment() {
 	// Age: slow blotches and a finer mottling of binder and aggregate.
 	col *= 0.90 + 0.20 * r_noise(g / 21.0);
 	col *= 0.96 + 0.08 * r_noise(g / 2.7 + 5.1);
-	// Wear reads along a road, so it needs across/along coordinates:
-	// crossing ribbons run across the traffic and aprons have no width.
+	// Wear reads along a road, so it needs across/along coordinates, and
+	// aprons have no width.
 	// The chain's seed changes how much wear it has, not its colour, so
 	// ways that meet still match.
 	bool urban = attr.b >= 0.5;
-	bool lane_coords = width_m >= 2.0 && crossing_kind < 0.5;
+	bool lane_coords = width_m >= 2.0;
 	float age = lane_coords ? clamp((urban ? attr.b - 0.5 : attr.b) / 0.45, 0.0, 1.0) : r_noise(g / 40.0);
 	float s = age * 97.0;
 	float jfade = smoothstep(2.5, 5.0, jd);
@@ -352,55 +346,6 @@ void fragment() {
 		float edge = band(ex, 0.24, 0.05, aa);
 		nm = mix(nm, vec3(x < w * 0.5 ? 0.25 : 0.75, 0.5, 0.9), edge);
 	}
-	// Markings.
-	float paint = 0.0;
-	float centre = 0.0;
-	float dash = runs(y, 9.0, 3.0, faa);
-	if (rank >= 1 && w >= 5.0) {
-		if (!oneway && rank >= 2 && w >= 9.0) {
-			centre = band(x, w * 0.5 - 0.14, 0.06, aa) + band(x, w * 0.5 + 0.14, 0.06, aa);
-		} else if (!oneway && lanes >= 2) {
-			centre = band(x, w * 0.5, 0.06, aa) * dash;
-		}
-		paint += centre;
-		for (int k = 1; k < 8; k++) {
-			if (k >= lanes) {
-				break;
-			}
-			float px = w * float(k) / float(lanes);
-			if (oneway || abs(px - w * 0.5) > 0.5) {
-				paint += band(x, px, 0.06, aa) * dash;
-			}
-		}
-		if (rank >= 2) {
-			float inset = urban ? 0.65 : 0.35;
-			paint += band(x, inset, 0.07, aa) + band(x, w - inset, 0.07, aa);
-		}
-		paint *= jfade;
-	}
-	if (crossing_kind > 0.5) {
-		// Bars span the ribbon and repeat along the walking line (y);
-		// rails run along its two edges.
-		float bars = runs(y - 0.25, 1.0, 0.5, faa) * band(x, w * 0.5, w * 0.5 - 0.25, aa);
-		float rails = band(x, 0.15, 0.15, aa) + band(x, w - 0.15, 0.15, aa);
-		if (crossing_kind < 1.5) {
-			paint = bars;
-		} else if (crossing_kind < 2.5) {
-			paint = bars * band(x, w * 0.5, w * 0.5 - 0.45, aa) + rails;
-		} else if (crossing_kind < 3.5) {
-			paint = rails;
-		} else if (crossing_kind < 4.5) {
-			paint = rails * runs(y - 0.25, 1.0, 0.5, faa);
-		} else {
-			paint = 1.0;
-		}
-	}
-	paint = clamp(paint, 0.0, 1.0) * (1.0 - kerb);
-	paint *= 0.55 + 0.45 * smoothstep(0.25, 0.6, r_noise(g * 2.3));
-	float yel = clamp(centre * jfade / max(paint, 0.001), 0.0, 1.0) * step(0.001, paint);
-	col = mix(col, mix(paint_col, centre_col, yel), paint);
-	rough = mix(rough, 0.6, paint);
-	nm = mix(nm, vec3(0.5, 0.5, 1.0), paint * 0.7);
 	// Rain: darker with a soft sheen. Water lies in the low spots and
 	// along the kerbs, never as one sheet, and rain rings it.
 	float wet = climate_wetness;
@@ -444,7 +389,6 @@ const YELLOW_CENTRE := ["US", "CA", "MX", "GT", "BZ", "HN", "SV", "NI", "CR", "P
 const YELLOW := Color(0.62, 0.40, 0.05)
 
 static var _mat: ShaderMaterial
-static var _centre := Color(0.70, 0.69, 0.65)
 ## Painted kerb band: granite or concrete by region (KerbBuilder.stone_for).
 static var _kerb := Color(0.36, 0.35, 0.33)
 ## Crack range (m) per preset: Fast, Balanced, High, Ultra.
@@ -458,7 +402,8 @@ static func material(target: Color) -> ShaderMaterial:
 	if _mat != null:
 		return _mat
 	var sh := Shader.new()
-	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL).replace("// @DEPTH", DEPTH_GLSL)
+	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL).replace("// @DEPTH", DEPTH_GLSL) \
+		.replace("// @LINE_MATH", LINE_GLSL)
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	var mean: Color = (MaterialLibrary.PBR_SETS["asphalt"] as Dictionary)["mean"]
@@ -468,17 +413,9 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("nor_tex", _tex("nor"))
 	_mat.set_shader_parameter("rough_tex", _tex("rough"))
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
-	_mat.set_shader_parameter("centre_col", _centre)
 	_mat.set_shader_parameter("kerb_col", _kerb)
 	_mat.set_shader_parameter("detail_m", _detail_m)
 	return _mat
-
-## The asphalt material painted over the whole ribbon in `kind`
-## (CROSSING_KINDS): RoadBuilder's "crossing*" and "marking" finishes.
-static func crossing_material(target: Color, kind: float = CROSSING_KINDS["zebra"]) -> ShaderMaterial:
-	var m := material(target).duplicate() as ShaderMaterial
-	m.set_shader_parameter("crossing_kind", kind)
-	return m
 
 ## RoadBuilder finish of a crossing's style; "auto" takes the country's
 ## usual paint for a signalled crossing, zebra otherwise.
@@ -498,14 +435,13 @@ static func yellow_centre(data: LocationData) -> bool:
 		return YELLOW_CENTRE.has(data.country.to_upper())
 	return data.longitude > -170.0 and data.longitude < -30.0
 
-## Sets the centre-line and kerb colours and the crack range for `data`'s
-## place (RoadBuilder, per build).
+## Sets the kerb colour, the crack range and the paint's style for
+## `data`'s place (RoadBuilder, per build).
 static func set_place(data: LocationData) -> void:
-	_centre = YELLOW if yellow_centre(data) else Color(0.70, 0.69, 0.65)
+	RoadPaint.set_place(data)
 	_kerb = KerbBuilder.stone_for(data)
 	_detail_m = float(DETAIL_M[RenderSettings.clamp_preset(data.quality_preset)])
 	if _mat != null:
-		_mat.set_shader_parameter("centre_col", _centre)
 		_mat.set_shader_parameter("kerb_col", _kerb)
 		_mat.set_shader_parameter("detail_m", _detail_m)
 

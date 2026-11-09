@@ -36,6 +36,8 @@ extends RefCounted
 ## Heights stay GroundTruth's; this class only colours.
 
 const CLASS_TEXELS := 1024
+## Half a class texel (2.34 m): how far road paint stops inside its ribbon.
+const ROAD_INSET_M := 1.2
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 ## Metres at which the full photo starts / finishes taking over.
@@ -255,7 +257,7 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 	var none := Color(0, 0, 0, 0)
 	var rows := {
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
-		"road": [Color(0, 0, 0, 1), Color(0.40, 0.39, 0.37), 0.0, 0.25, 0.95, 0.45, none],
+		"road": [Color(0, 0, 0, 1), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
 		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
 		"forest": [Color(0, 0.25, 0, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6, Color(0, 0.75, 0, 0)],
@@ -340,6 +342,10 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				id = ID["path"]
 		elif line is PackedVector2Array:
 			pts = line
+		# The ribbon covers the carriageway. Its ground paint stays inside,
+		# so the texel blend never shows as a grey rim along the kerb.
+		if id == ID["road"]:
+			width = maxf(width - ROAD_INSET_M * 2.0 * m2u, width * 0.4)
 		for i in pts.size() - 1:
 			var a := pts[i]
 			var b := pts[i + 1]

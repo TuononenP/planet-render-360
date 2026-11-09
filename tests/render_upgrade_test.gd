@@ -244,7 +244,7 @@ func _run() -> void:
 		failures.append("asphalt ribbons should carry width, lane count and one-way flag per vertex")
 	roads.free()
 	# Centre line: yellow in the Americas (and Norway), white elsewhere.
-	var mat := RoadSurface.material(Color(0.05, 0.05, 0.05))
+	var mat := RoadPaint.material()
 	for c in [["US", 0.0, true], ["NO", 0.0, true], ["FR", -74.0, false], ["", -74.0, true], ["", 2.35, false]]:
 		var cd := _flat(RenderSettings.Preset.HIGH)
 		cd.country = c[0]
