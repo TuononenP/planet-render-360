@@ -13,6 +13,10 @@ extends RefCounted
 ## ± lightness and ± warm/cool shift of a roof's tint.
 const SPREAD := 0.18
 const WARMTH := 0.05
+## Share of a pitched roof's colour left at its eaves, and the least rise (m)
+## that counts as pitched.
+const EAVE_SHADE := 0.86
+const WEATHER_MIN_RISE_M := 0.5
 ## Mesh meta: a colour multiplied into its wall surfaces' tint.
 const WALL_TINT := "wall_tint"
 
@@ -105,10 +109,7 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 		var arrays: Array = (src[s] as Array).duplicate()
 		var active := over if over != null else mat
 		if is_roof(active):
-			var cols := PackedColorArray()
-			cols.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
-			cols.fill(c)
-			arrays[Mesh.ARRAY_COLOR] = cols
+			arrays[Mesh.ARRAY_COLOR] = weathered(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_NORMAL], c)
 		elif WallVariety.is_wall(active):
 			# A gable end carries its wall's paint on a shared white render.
 			var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
@@ -118,6 +119,28 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			out.surface_set_material(s, mat)
 		MeshArrays.keep_surface(out, arrays)
 	return out
+
+## Per-vertex colours of one roof surface: `c`, on a pitched surface darkened
+## toward the eaves (run-off and dirt) and, where it faces north, leaning to
+## moss. Only ever darkens: vertex colours stop at 1. Flat surfaces stay `c`.
+static func weathered(verts: PackedVector3Array, normals: PackedVector3Array, c: Color) -> PackedColorArray:
+	var y0 := INF
+	var y1 := -INF
+	for v in verts:
+		y0 = minf(y0, v.y)
+		y1 = maxf(y1, v.y)
+	var cols := PackedColorArray()
+	cols.resize(verts.size())
+	var rise := y1 - y0
+	if rise < WEATHER_MIN_RISE_M * WorldScale.metres_to_units():
+		cols.fill(c)
+		return cols
+	for i in verts.size():
+		var k := lerpf(EAVE_SHADE, 1.0, (verts[i].y - y0) / rise)
+		var north := clampf(-normals[i].z, 0.0, 1.0)
+		cols[i] = Color(c.r * k * (1.0 - 0.09 * north), c.g * k * (1.0 - 0.02 * north),
+			c.b * k * (1.0 - 0.11 * north))
+	return cols
 
 ## Surface `s`'s material; none on a held mesh (MeshArrays.mesh sets none).
 static func _surface_material(mesh: ArrayMesh, s: int) -> Material:

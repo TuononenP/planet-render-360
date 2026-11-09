@@ -104,7 +104,7 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	if FacadePatterns.has(pattern):
 		FacadePatterns.prepass(pattern, base, nor, W, pv)
 	alb = FacadePaint.layer(base)
-	var emit := FacadePaint.emit_layer(base) if detail >= 1 and not glass else null
+	var emit := FacadePaint.emit_layer(base) if detail >= 1 else null
 	for bay in BAYS:
 		var ox := bay * CELL
 		var hv := _hash(float(bay) * 9.3 + float(pattern.length()) + variant * 4.1, 3.7)
@@ -132,7 +132,10 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 					FacadePaint.pane(emit, Rect2i(ox + 57, 44, 17, 26), hv)
 			"curtain":
 				_curtain(alb, nor, rgh, ox, hv)
-				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63), hv)
+				# One bay per look always lights: with four bays, some looks'
+				# hashes all miss the lit share and the tower would stay dark.
+				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63),
+					0.6 + hv * 0.4 if bay == int(variant) % BAYS else hv)
 			_:
 				FacadePatterns.bay(pattern, alb, nor, rgh, emit, base, ox, bay, hv, pv)
 	# Ultra: recessed panes (a curtain wall is flush glass).
@@ -141,7 +144,7 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	if glass:
 		# Curtain glass has no wall photo to tint: one flat layer.
 		base.blend_rect(alb, Rect2i(0, 0, W, CELL), Vector2i.ZERO)
-		return FacadePaint.finish(base, null, null, nor, rgh, depth_fn)
+		return FacadePaint.finish(base, null, emit, nor, rgh, depth_fn)
 	return FacadePaint.finish(base, alb, emit, nor, rgh, depth_fn)
 
 ## Dirt washed down from each sill (base layer, so it takes the tint).

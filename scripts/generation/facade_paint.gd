@@ -94,6 +94,9 @@ static func finish(base: Image, paint: Image, emit: Image, nor: Image, rgh: Imag
 	var d := {"albedo": ImageTexture.create_from_image(base), "normal": null, "rough": null}
 	if paint != null:
 		paint.linear_to_srgb()
+		# Clear texels take their neighbours' colour first: mips average
+		# them in, which washed the windows out of distant facades.
+		paint.fix_alpha_edges()
 		paint.generate_mipmaps()
 		d["paint"] = ImageTexture.create_from_image(paint)
 	if emit != null:

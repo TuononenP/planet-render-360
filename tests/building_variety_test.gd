@@ -21,6 +21,8 @@ func _init() -> void:
 	_roof_axis_checks(failures)
 	_foot_shade_checks(failures)
 	_gable_checks(failures)
+	_weathering_checks(failures)
+	_glass_night_checks(failures)
 	_flat_roof_checks(failures)
 	_block_era_checks(failures)
 	_roof_hint_checks(failures)
@@ -380,6 +382,31 @@ func _roof_axis_checks(failures: Array[String]) -> void:
 			if n.y < -0.01:
 				failures.append("gabled roof at bearing %s faces down" % [case[0]])
 				break
+
+## Pitched roofs darken toward the eaves and lean to moss facing north; flat
+## ones keep their one colour, and nothing passes the building's tint.
+func _weathering_checks(failures: Array[String]) -> void:
+	var c := Color(0.8, 0.8, 0.8)
+	var verts := PackedVector3Array([Vector3(0, 10, 0), Vector3(0, 13, 0)])
+	var south := RoofVariety.weathered(verts, PackedVector3Array([Vector3(0, 0.7, 0.7), Vector3(0, 0.7, 0.7)]), c)
+	var north := RoofVariety.weathered(verts, PackedVector3Array([Vector3(0, 0.7, -0.7), Vector3(0, 0.7, -0.7)]), c)
+	if not (south[0].g < south[1].g and is_equal_approx(south[1].g, c.g)):
+		failures.append("eaves should darken up to the ridge: %s" % [south])
+	if not (north[1].r < south[1].r and north[1].g > north[1].r):
+		failures.append("a north slope should lean to moss: %s" % [north])
+	var flat := RoofVariety.weathered(PackedVector3Array([Vector3(0, 10, 0), Vector3(5, 10, 0)]),
+		PackedVector3Array([Vector3.UP, Vector3.UP]), c)
+	if flat[0] != c or flat[1] != c:
+		failures.append("a flat roof keeps its colour: %s" % [flat])
+
+## Curtain glass lights at night from Balanced up; Fast stays albedo-only.
+func _glass_night_checks(failures: Array[String]) -> void:
+	FacadeMaterials.begin_build()
+	var lit := FacadeMaterials.glass_material(1)
+	if not lit.emission_enabled or not lit.has_meta(CityLights.META):
+		failures.append("curtain glass should carry a lit-pane map")
+	if FacadeMaterials.glass_material(0).emission_enabled:
+		failures.append("Fast glass should stay albedo-only")
 
 ## A gabled roof's upright ends leave its slopes for a wall material (UVs in
 ## the wall's scale); a hipped roof has none, and the triangles all survive.

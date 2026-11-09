@@ -172,7 +172,7 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		wall_h: float, shape: String, roof_h: float, look: Dictionary,
 		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool,
 		party: PackedByteArray = PackedByteArray(), gable_front: bool = false,
-		ultra: bool = false, country: String = "") -> void:
+		ultra: bool = false, country: String = "", clutter: bool = false) -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
 	if not near and not religious:
 		return
@@ -207,8 +207,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		_altana(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if shape == "flat":
 			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
-			# Desktop Ultra: the city's own rooftop clutter.
-			if ultra:
+			# The city's own rooftop clutter, on the desktop tiers.
+			if ultra or clutter:
 				RoofClutter.add(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2, country, wall_h / m2u)
 	batch.flush(root)
 

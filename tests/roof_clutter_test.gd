@@ -91,6 +91,18 @@ func _run() -> void:
 				failures.append("lower tiers should get no rooftop clutter")
 				break
 	root.free()
+	# The clutter flag (Forward+ High and up) adds it without Ultra.
+	var high := Node3D.new()
+	BuildingDetail.add(high, _ring(12.0), 30.0, 30.0, "flat", 0.0, look, null, null, 0.3, true,
+		PackedByteArray(), false, false, "JP", true)
+	var cluttered := false
+	for c in high.get_children():
+		var mesh := (c as MeshInstance3D).mesh
+		for s in mesh.get_surface_count():
+			cluttered = cluttered or RoofClutter._mats.values().has(mesh.surface_get_material(s))
+	if not cluttered:
+		failures.append("High should get rooftop clutter through the clutter flag")
+	high.free()
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("ROOF CLUTTER OK: regional mixes (NYC towers, Asian condensers, Gulf tanks, Greek heaters, skylights, overruns), stable, Ultra only")
