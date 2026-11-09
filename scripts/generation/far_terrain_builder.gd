@@ -57,7 +57,7 @@ const INNER_TUCK_M := 0.15
 ## loops grow geometrically with radial step = RADIAL_ASPECT x the
 ## tangential step, so cells stay near-square from 400 m to 30 km.
 ## A LOD knob only — heights come from the same DEM at every preset.
-const RING_SEGS: Array[int] = [96, 128, 192, 256]
+const RING_SEGS: Array[int] = [96, 128, 256, 320]
 const RADIAL_ASPECT := 1.5
 ## Outer-edge skirt drop as a fraction of the ring radius (hides the
 ## ring/z8 interpolation crack; invisible at 30 km).

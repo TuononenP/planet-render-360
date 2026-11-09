@@ -213,17 +213,19 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 		var m := _measure(poly, tris)
 		var expect := _expected_height(b, ctx)
 		if m["top"] > -INF:
-			# OSM height is from the lowest ground at the footprint
-			# (the builder's wall base, before its 0.6 m sink).
+			# A tagged height is from the lowest ground at the footprint
+			# (the builder's wall base, before its 0.6 m sink). Levels count
+			# from the floor, which stands on a plinth on a slope.
 			var base := INF
 			for q in poly:
 				base = minf(base, ground.height_at_world(q.x, q.y))
-			var got := float(m["top"]) - base
+			var lift := _floor_lift(b, ctx, data, ground, base)
+			var got := float(m["top"]) - base - lift
 			errs.append(absf(got - expect))
-			per_c.append("%s %.1f→%.1f m" % [str(b.get("height_source", "")), expect, got])
+			per_c.append("%s %s %.1f→%.1f m (floor +%.1f%s)" % [_row_id(b), str(b.get("height_source", "")), expect, got, lift, _parts_note(b)])
 		else:
 			errs.append(expect)  # fail-closed: nothing rendered
-			per_c.append("%s %.1f→none" % [str(b.get("height_source", "")), expect])
+			per_c.append("%s %s %.1f→none%s (%s)" % [_row_id(b), str(b.get("height_source", "")), expect, _parts_note(b), _absent_note(b, ctx, data, ground)])
 	var iou := _median(ious)
 	var off := _median(offsets)
 	var urban := bool(loc["urban"])
@@ -276,6 +278,9 @@ func _roof_triangles(built: Node3D, sample: Array) -> Array:
 	var out: Array = []
 	for c in built.get_children():
 		if not (c is MeshInstance3D) or str(c.get_meta("lod_layer", "Buildings")) != "Buildings":
+			continue
+		# Chimneys and rooftop plant stand above the height a tag describes.
+		if bool(c.get_meta("lod_detail", false)):
 			continue
 		var mi := c as MeshInstance3D
 		for s in mi.mesh.get_surface_count():
@@ -361,11 +366,42 @@ func _expected_height(b: Dictionary, ctx: Dictionary) -> float:
 		# are separate), so the rendered top is the storeys plus the roof
 		# the builder stands on them (BuildingMasses: roof:height /
 		# roof:levels when tagged, else the shape's rise).
-		var look := BuildingHeights._look_for(b, ctx)
 		var plan := BuildingMasses.plan(b, ctx)
+		# The planned look: it carries NeighbourEvidence, BuildingHeights' does not.
+		var look: Dictionary = plan[0]["look"] if not plan.is_empty() else BuildingHeights._look_for(b, ctx)
 		var rh := float(plan[0]["rh_m"]) if not plan.is_empty() and (b.get("parts", []) as Array).is_empty() else 0.0
 		return float(b["levels"]) * float(look["floor_h"]) + rh
 	return 0.0
+
+## How far a levels-tagged building's floor stands above `low`, its lowest
+## ground (BuildingFoundation raises floors on slopes). 0 for a tagged height.
+func _floor_lift(b: Dictionary, ctx: Dictionary, data: LocationData, ground: GroundTruth, low: float) -> float:
+	if str(b.get("height_source", "")) != "levels":
+		return 0.0
+	var plan := BuildingMasses.plan(b, ctx)
+	if plan.is_empty():
+		return 0.0
+	var sea_y := ground.render_y(WaterBuilder.SEA_LEVEL_M) \
+		if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
+	return maxf(float(BuildingFoundation.sample(ground, plan[0]["ring"], plan[0]["centre"], sea_y)["floor"]) - low, 0.0)
+
+## Why a sampled building has no rendered roof over its footprint.
+func _absent_note(b: Dictionary, ctx: Dictionary, data: LocationData, ground: GroundTruth) -> String:
+	var edge := WorldScale.detailed_extent_units() * 0.5 * 0.98
+	if not BuildingBuilder._accepted(data, b, TerrainBuilder.landmark_site_xz(data), edge):
+		return "landmark site or outside the extent"
+	if BuildingBuilder._in_open_water(ground, b):
+		return "in open water"
+	if BuildingMasses.plan(b, ctx).is_empty():
+		return "no masses planned"
+	return "planned but no roof over the footprint, kind %s" % str(b.get("kind", "?"))
+
+func _row_id(b: Dictionary) -> String:
+	return str(b.get("osm_id", "?"))
+
+func _parts_note(b: Dictionary) -> String:
+	var parts := (b.get("parts", []) as Array).size()
+	return ", %d parts" % parts if parts > 0 else ""
 
 # --- (d) water + roads ---
 

@@ -576,6 +576,7 @@ func _apply() -> void:
 	# A marine layer carries the fog itself; the air above it stays hazy.
 	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)
 	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
+	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
 	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
 	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms

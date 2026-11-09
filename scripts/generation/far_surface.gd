@@ -225,6 +225,7 @@ uniform int far_quality = 2;
 // @WATER_FILTER
 global uniform float valley_haze_y;
 global uniform vec3 valley_haze_col;
+global uniform float far_fog_density;
 // DEM normals (FarDemNormals): one ring through each drape's UVs.
 uniform sampler2D dem_fine : filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D dem_coarse : filter_linear_mipmap_anisotropic, repeat_disable;
@@ -298,7 +299,7 @@ void fragment() {
 		dem_n = normalize(mix(dem_n, dem_normal(dem_fine, duv), w));
 		dem_w = max(dem_w, w);
 	}
-	nw = normalize(mix(nw, dem_n, dem_w * 0.7 * (1.0 - water)));
+	nw = normalize(mix(nw, dem_n, dem_w * mix(0.7, 0.92, smoothstep(5000.0, 16000.0, dist)) * (1.0 - water)));
 	if (fade > 0.01) {
 		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf) * (1.0 - 0.85 * dem_w));
@@ -375,6 +376,14 @@ void fragment() {
 	float water_rough = water_roughness(mix(0.08, 0.5, climate_water_ice), nw);
 	ROUGHNESS = mix(mix(0.96, 0.82, steep), water_rough, water);
 	SPECULAR = mix(mix(0.2, 0.3, steep), 0.34, water);
+	// Haze thins with height: integrated along the view ray, not the scene
+	// fog's uniform air, so high peaks keep their rock and snow contrast.
+	// Level with the valley floor it equals the scene fog.
+	float h0 = max(CAMERA_POSITION_WORLD.y - valley_haze_y, 0.0);
+	float h1 = max(wpos.y - valley_haze_y, 0.0);
+	float rise = h1 - h0;
+	float air = abs(rise) < 1.0 ? exp(-h0 / 2500.0) : 2500.0 / rise * (exp(-h0 / 2500.0) - exp(-h1 / 2500.0));
+	FOG = vec4(valley_haze_col, 1.0 - exp(-far_fog_density * dist * air));
 }
 """
 static var _shader: Shader

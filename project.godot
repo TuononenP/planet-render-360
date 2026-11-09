@@ -117,6 +117,10 @@ valley_haze_col={
 "type": "vec3",
 "value": Vector3(0.7, 0.75, 0.8)
 }
+far_fog_density={
+"type": "float",
+"value": 4.5e-05
+}
 
 [gui]
 
