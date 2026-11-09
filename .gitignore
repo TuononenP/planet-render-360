@@ -75,6 +75,7 @@ generated_images/.tbh-generated-images.lock
 # Capture output (screenshots, stats, logs): local only; durable results go in docs/
 visual-plan/reviews/
 visual-plan/refs/**/*.jpg
+visual-plan/captures/
 # Native build kernels: built by tools/build_native.sh
 native/build/
 native/bin/
