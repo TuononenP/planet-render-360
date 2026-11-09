@@ -159,8 +159,8 @@ void fragment() {
 	// Age: blotches, repaired rectangles, cracks.
 	col *= 0.88 + 0.24 * r_noise(g / 21.0);
 	vec2 pc = floor(g / vec2(5.5, 3.5));
-	float patch = step(0.9, r_hash(pc + 4.7));
-	col *= mix(1.0, 0.78, patch);
+	float patch = step(0.97, r_hash(pc + 4.7)) * smoothstep(2.5, 5.0, jd);
+	col *= mix(1.0, 0.9, patch);
 	float near = 1.0 - smoothstep(60.0, 220.0, length(VERTEX));
 	float crack = 1.0 - smoothstep(0.0, 0.025 + aa * 0.4, abs(r_noise(g / 2.7) - 0.5));
 	crack *= smoothstep(0.55, 0.8, r_noise(g / 17.0 + 3.0)) * near;

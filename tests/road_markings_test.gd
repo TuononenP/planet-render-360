@@ -130,6 +130,18 @@ func _run() -> void:
 	_check(str(p.by_road[2]["finish"]).begins_with("crossing"), "a crossing over a road is painted")
 	_check(not str(p.by_road[3]["finish"]).begins_with("crossing"), "a pavement link is not painted")
 	_check(str(p.by_road[4]["finish"]).begins_with("crossing"), "tagged markings are painted wherever they are mapped")
+	# A short stub beside a band stays unpainted; a cycle crossing keeps its width.
+	d = _place()
+	d.roads = _four_way()
+	d.roads.append(_crossing(Vector2(30, -6), Vector2(30, 6), {"crossing:markings": "zebra"}))
+	d.roads.append(_crossing(Vector2(31.5, 7), Vector2(31.5, 9), {"crossing:markings": "zebra"}))
+	var bike := OsmTags._road_entry({"highway": "cycleway", "cycleway": "crossing", "crossing:markings": "dashes"},
+		PackedVector2Array([Vector2(50, -6), Vector2(50, 6)]))
+	d.roads.append(bike)
+	p = _plan(d)
+	_check(str(p.by_road[2]["finish"]).begins_with("crossing"), "the band stays painted")
+	_check(not str(p.by_road[3]["finish"]).begins_with("crossing"), "a stub beside a band is not painted")
+	_check(float(p.by_road[4]["width_m"]) < RoadBuilder.CROSSING_MIN_M, "a cycle crossing keeps its own width: %s" % p.by_road[4])
 	# Stop lines: arriving traffic on its own driving side, right or left.
 	for row in [["FR", -1.0], ["JP", 1.0]]:
 		d = _place(str(row[0]))

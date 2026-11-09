@@ -46,6 +46,10 @@ const ON_ROAD_PAD_M := 0.5
 const ON_ROAD_STEP_M := 2.0
 ## The widest road's half width: how far a sample looks for a road.
 const ON_ROAD_REACH_M := 24.0
+## A chain this short beside a longer one is a stub of that crossing
+## (a split across a cycle lane): painting it doubles the band.
+const STUB_M := 3.0
+const STUB_NEAR_M := 3.0
 const MAPPED_NEAR_M := 12.0
 const INFERRED_DEPTH_M := 3.2
 const INFERRED_MIN_WIDTH_M := 5.0
@@ -108,7 +112,7 @@ static func plan(data: LocationData, ground: GroundTruth) -> Plan:
 		arr.append(centre)
 		centres[cell] = arr
 		_lay_out_cluster(out, c, chains, buildings, ground, marked_grid, m)
-	_assign_crossings(out, data, chains)
+	_assign_crossings(out, data, chains, m)
 	_stop_lines(out, data, chains, car_grid, centres, m)
 	return out
 
@@ -184,9 +188,29 @@ static func _pavement_links(out: Plan, data: LocationData, m: float) -> Dictiona
 		var pts := RoadSurface._points(line)
 		if pts.size() >= 2 and _on_road_share(pts, grid, m) < MIN_ON_ROAD:
 			links[i] = true
-			out.by_road[i] = {"finish": RoadBuilder._finish(str(road.get("class", "")), str(road.get("surface", "")).to_lower()),
-				"width_m": float(road.get("width_m", 0.0))}
+			_paint_plain(out, i, road)
 	return links
+
+static func _paint_plain(out: Plan, i: int, road: Dictionary) -> void:
+	out.by_road[i] = {"finish": RoadBuilder._finish(str(road.get("class", "")), str(road.get("surface", "")).to_lower()),
+		"width_m": float(road.get("width_m", 0.0))}
+
+## Indices of the chains that are only stubs of a longer neighbour.
+static func _stubs(chains: Array, m: float) -> Dictionary:
+	var grid := {}
+	for c in chains.size():
+		var chain: Dictionary = chains[c]
+		if float(chain["length"]) >= STUB_M * m:
+			for seg: Array in chain["segs"]:
+				_grid_add(grid, seg[0], seg[1], [seg[0], seg[1]], m)
+	var out := {}
+	for c in chains.size():
+		var chain: Dictionary = chains[c]
+		if float(chain["length"]) < STUB_M * m:
+			var p: Vector2 = (chain["segs"] as Array)[0][0]
+			if _mapped_near(grid, p, STUB_NEAR_M * m, m):
+				out[c] = true
+	return out
 
 static func _on_road_share(pts: PackedVector2Array, grid: Dictionary, m: float) -> float:
 	var total := 0
@@ -564,16 +588,26 @@ static func _mapped_near(grid: Dictionary, p: Vector2, r: float, m: float) -> bo
 	return false
 
 ## Finish and width of each mapped crossing way.
-static func _assign_crossings(out: Plan, data: LocationData, chains: Array) -> void:
-	for chain: Dictionary in chains:
+static func _assign_crossings(out: Plan, data: LocationData, chains: Array, m: float) -> void:
+	var stubs := _stubs(chains, m)
+	for c in chains.size():
+		var chain: Dictionary = chains[c]
+		if stubs.has(c):
+			for i in (chain["roads"] as PackedInt32Array):
+				_paint_plain(out, i, data.roads[i])
+			continue
 		var tagged := 0.0
+		var cycle := true
 		for i in (chain["roads"] as PackedInt32Array):
 			var road: Dictionary = data.roads[i]
 			if bool(road.get("width_tagged", false)):
 				tagged = maxf(tagged, float(road.get("width_m", 0.0)))
+			cycle = cycle and str(road.get("class", "")) == "cycleway"
 		var w := RoadBuilder.CROSSING_MIN_M
 		if tagged >= RoadBuilder.CROSSING_MIN_M:
 			w = tagged
+		elif cycle:
+			w = maxf(tagged, float((data.roads[(chain["roads"] as PackedInt32Array)[0]] as Dictionary).get("width_m", w)))
 		elif bool(chain.get("scramble_cluster", false)) or bool(chain["scramble"]):
 			w = SCRAMBLE_WIDTH_M
 		elif bool(chain["signal"]):
