@@ -59,6 +59,12 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	var floor_y := water + freeboard * WorldScale.metres_to_units() if raised else low
 	if raised and high - low <= SLAB_RELIEF_M * WorldScale.metres_to_units():
 		floor_y = maxf(floor_y, high)
+	elif raised:
+		# A waterfront building climbing a steep bank: its deck clears the
+		# water and its floor still rises toward the uphill ground, as a
+		# dry hillside building's does, so the bank does not bury it.
+		floor_y = maxf(floor_y, minf(high - BURY_MAX_M * WorldScale.metres_to_units(),
+			floor_y + PLINTH_TALL_M * WorldScale.metres_to_units()))
 	var plinth := 0.0
 	if not raised:
 		var m := WorldScale.metres_to_units()
@@ -69,7 +75,7 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 		if lift >= PLINTH_MIN_M * m:
 			floor_y = low + lift
 			plinth = lift
-	return {"floor": floor_y, "low": low, "plinth": plinth,
+	return {"floor": floor_y, "low": low, "high": high, "plinth": plinth,
 		"water": water, "raised": raised}
 
 ## Concrete foundation wall from each edge's lowest ground up to the

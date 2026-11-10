@@ -287,7 +287,7 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 	var first := root.get_child_count()
 	var m2u := WorldScale.metres_to_units()
 	var done := false
-	var masses := BuildingMasses.plan(b, ctx)
+	var masses := BuildingTerraces.split(BuildingMasses.plan(b, ctx), ground, float(ctx.get("sea_y", -INF)))
 	# The building's paint weight (its main mass's look) and its place's tone
 	# feed the vertex tint; a distant building's residual (_extrude_polygon)
 	# starts from none.
