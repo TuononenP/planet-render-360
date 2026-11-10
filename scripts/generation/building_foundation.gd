@@ -13,11 +13,23 @@ const POST_SPACING_M := 4.0
 const SLAB_RELIEF_M := 4.0
 ## Walls sink this far below the lowest ground (no floating on slopes).
 const SINK_M := 0.6
-## On a slope the floor rises toward the uphill ground, at most this far
-## above the lowest footprint ground; a plinth fills the downhill gap, so
-## the uphill walls are not buried in the hill.
+## On a slope the floor rises to the uphill ground while that is within
+## PLINTH_MAX_M of the lowest footprint ground; a plinth fills the
+## downhill gap. On steeper ground the floor keeps rising, so the hill
+## never stands more than BURY_MAX_M up the uphill wall (under a window
+## sill, a step down to a door), until the plinth is PLINTH_TALL_M: the
+## basement or garage storey a house on a hill shows the street below.
 const PLINTH_MAX_M := 2.5
 const PLINTH_MIN_M := 0.3
+const BURY_MAX_M := 0.5
+const PLINTH_TALL_M := 6.0
+## The least wall a building keeps above its floor once a plinth has come
+## out of its tagged height.
+const MIN_BODY_M := 2.6
+## The ground is read this often along each wall: a crown or a hollow
+## between two corners counts.
+const EDGE_STEP_M := 4.0
+const EDGE_SAMPLES_MAX := 24
 ## An edge needs a skirt only where its ground lies this far under the floor.
 const EDGE_GAP_M := 0.15
 static var _plinth_mat: Material
@@ -27,11 +39,17 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	var low := ground.height_at_world(centre.x, centre.y)
 	var high := low
 	var water := maxf(sea_y, ground.water_level_at(centre.x, centre.y, -INF))
-	for p in ring:
-		var h := ground.height_at_world(p.x, p.y)
-		low = minf(low, h)
-		high = maxf(high, h)
+	var step := EDGE_STEP_M * WorldScale.metres_to_units()
+	for i in ring.size():
+		var p := ring[i]
+		var q := ring[(i + 1) % ring.size()]
 		water = maxf(water, ground.water_level_at(p.x, p.y, -INF))
+		var n := clampi(ceili(p.distance_to(q) / step), 1, EDGE_SAMPLES_MAX)
+		for k in n:
+			var at := p.lerp(q, float(k) / float(n))
+			var h := ground.height_at_world(at.x, at.y)
+			low = minf(low, h)
+			high = maxf(high, h)
 	var freeboard := FREEBOARD_M
 	# Legacy sea grids retain a 1.3 m upward swell offset.
 	if ground.shoreline == null or not ground.shoreline.ready:
@@ -43,7 +61,10 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	var plinth := 0.0
 	if not raised:
 		var m := WorldScale.metres_to_units()
-		var lift := minf(high - low, PLINTH_MAX_M * m)
+		var relief := high - low
+		var lift := minf(relief, PLINTH_MAX_M * m)
+		if relief > PLINTH_MAX_M * m:
+			lift = clampf(relief - BURY_MAX_M * m, PLINTH_MAX_M * m, PLINTH_TALL_M * m)
 		if lift >= PLINTH_MIN_M * m:
 			floor_y = low + lift
 			plinth = lift

@@ -307,6 +307,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 		MeshArrays.hold()
 	for m in masses:
 		var md := m as Dictionary
+		if float(md.get("min_m", 0.0)) > 0.0:
+			md["seat"] = _seat_under(masses, md["centre"], ground, ctx)
 		if ctx.has("fortress_mesh") and SuomenlinnaFortress.build_mass(ctx["fortress_mesh"], md, data, ground):
 			done = true
 			continue
@@ -396,13 +398,18 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
 	var sink := 0.0 if bool(footing["raised"]) else BuildingFoundation.SINK_M * WorldScale.metres_to_units()
-	# A tagged height runs from the lowest ground, so a plinth comes out of
-	# it. Levels count from the floor and stand on top.
-	var tagged := str(b.get("height_source", "")) == "tag_height"
-	var top := base + height_world - (float(footing["plinth"]) if tagged else 0.0)
+	var top := _standing_top(footing, height_world, b)
 	base -= sink
 	if float(mass.get("min_m", 0.0)) > 0.0:
-		base += sink + float(mass["min_m"]) * WorldScale.metres_to_units()
+		# A raised part (a setback, a crown) stands on the mass under it:
+		# that mass's floor, less whatever its plinth took out of its
+		# height. Seated on its own ring it hung in the air above a tower
+		# on a slope.
+		var seat: Array = mass.get("seat", [])
+		var floor_y := float(seat[0]) if not seat.is_empty() else base + sink
+		var shift := float(seat[1]) if not seat.is_empty() else 0.0
+		base = floor_y + float(mass["min_m"]) * WorldScale.metres_to_units() - shift
+		top = floor_y + height_world - shift
 	else:
 		BuildingFoundation.build(root, ring, holes, footing, b)
 		BuildingFoundation.plinth(root, ring, holes, footing, ground)
@@ -636,6 +643,39 @@ static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 	elif mesh != null:
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
+
+## Top of a mass standing on `footing`. A tagged height runs from the
+## lowest ground, so the plinth comes out of it, though never most of the
+## building: a tall plinth on a steep site is a storey of its own, and a
+## low building still shows a storey above its floor. Levels count from
+## the floor and stand on top.
+static func _standing_top(footing: Dictionary, height_world: float, b: Dictionary) -> float:
+	var m := WorldScale.metres_to_units()
+	var floor_y := float(footing["floor"])
+	if str(b.get("height_source", "")) != "tag_height":
+		return floor_y + height_world
+	var out_of_height := minf(float(footing["plinth"]), maxf(BuildingFoundation.PLINTH_MAX_M * m, height_world * 0.35))
+	return maxf(floor_y + height_world - out_of_height, floor_y + minf(height_world, BuildingFoundation.MIN_BODY_M * m))
+
+## [floor, height lost to the plinth] of the standing mass of `masses`
+## that a raised mass at `centre` rests on: the one whose ring holds it,
+## else the first. Empty when nothing stands on the ground.
+static func _seat_under(masses: Array, centre: Vector2, ground: GroundTruth, ctx: Dictionary) -> Array:
+	var m2u := WorldScale.metres_to_units()
+	var best: Array = []
+	for m in masses:
+		var md := m as Dictionary
+		if float(md.get("min_m", 0.0)) > 0.0:
+			continue
+		var inside := Geometry2D.is_point_in_polygon(centre, md["ring"])
+		if not best.is_empty() and not inside:
+			continue
+		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
+		var height_world := float(md["wall_m"]) * m2u
+		best = [float(footing["floor"]), float(footing["floor"]) + height_world - _standing_top(footing, height_world, md["b_eff"])]
+		if inside:
+			break
+	return best
 
 ## Floor under a mass, clearing the visible water for accepted
 ## waterfront buildings (shrines, boathouses, named pier structures).
