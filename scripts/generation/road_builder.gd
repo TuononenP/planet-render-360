@@ -196,6 +196,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var plan := RoadMarkings.plan(data, ground)
 	var junc := plan.junctions
 	surf.aprons = RoadMarkings._apron_grid(plan.aprons, m2u)
+	for ring: PackedVector2Array in plan.aprons:
+		surf.apron_rings.append([ring, RingGeometry.aabb(ring)])
 	var steps := RoadSurface.depth_steps(data)
 	var seeds := RoadSurface.wear_seeds(data)
 	# A registry bridge's model carries its own deck over its span.
@@ -282,7 +284,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		if abort != null and abort.requested:
 			break
 		var pieces: Array = [run]
-		if int(r["rank"]) == 0 and marking.is_empty() and not surf.aprons.is_empty():
+		if int(r["rank"]) == 0 and not finish.begins_with("crossing") and not surf.aprons.is_empty():
 			pieces = RoadCrossingClip.on_road_runs(run, {}, surf.aprons, m2u, false)
 		for piece: PackedVector2Array in pieces:
 			_ribbon(_batch(batches, finish), _straighten(piece, surf.step), float(r["width_u"]),
@@ -296,28 +298,48 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 		lift: float, m2u: float, layer: float = AREA_LAYER) -> void:
 	if ring.size() < 3:
 		return
-	var idx := Geometry2D.triangulate_polygon(ring)
-	if idx.is_empty():
+	# A junction's apron comes out of a paved area (a square whose corner
+	# reaches into the junction): the carriageway is the apron's, and the
+	# square's thin triangles showed through it as pale streaks. Aprons
+	# and glyphs are laid through here too, on their own layers.
+	var pieces: Array = [ring]
+	if layer == AREA_LAYER and not surf.apron_rings.is_empty():
+		holes = holes.duplicate()
+		var box := RingGeometry.aabb(ring)
+		for apron: Array in surf.apron_rings:
+			if not box.intersects(apron[1]):
+				continue
+			var next: Array = []
+			for piece: PackedVector2Array in pieces:
+				for cut: PackedVector2Array in Geometry2D.clip_polygons(piece, apron[0]):
+					if Geometry2D.is_polygon_clockwise(cut):
+						holes.append(cut)
+					else:
+						next.append(cut)
+			pieces = next
+	var eligible := PackedVector2Array()
+	for piece: PackedVector2Array in pieces:
+		var idx := Geometry2D.triangulate_polygon(piece)
+		for t in range(0, idx.size(), 3):
+			var tri := PackedVector2Array([piece[idx[t]], piece[idx[t + 1]], piece[idx[t + 2]]])
+			var c := (tri[0] + tri[1] + tri[2]) / 3.0
+			if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
+				continue
+			if surf.ground.water_at(c.x, c.y) > 0.0:
+				continue
+			var in_hole := false
+			for h in holes:
+				if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
+					in_hole = true
+					break
+			if not in_hole:
+				eligible.append_array(tri)
+	if eligible.is_empty():
 		return
 	b.pad()
 	var attr := Color(0.0, 0.0, 0.0, 1.0)
 	var w2 := Vector2(0.0, layer)
 	var weld := {}
-	var eligible := PackedVector2Array()
-	for t in range(0, idx.size(), 3):
-		var tri := PackedVector2Array([ring[idx[t]], ring[idx[t + 1]], ring[idx[t + 2]]])
-		var c := (tri[0] + tri[1] + tri[2]) / 3.0
-		if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
-			continue
-		if surf.ground.water_at(c.x, c.y) > 0.0:
-			continue
-		var in_hole := false
-		for h in holes:
-			if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
-				in_hole = true
-				break
-		if not in_hole:
-			eligible.append_array(tri)
 	if surf.native != null and surf.native.has_method("area") \
 			and (surf.native_shore or not surf.near_shore(eligible, 0.0)):
 		b.append(surf.native.area(eligible, lift, attr, layer, m2u, b.verts.size()))
@@ -742,9 +764,12 @@ class _Surface extends RefCounted:
 	var native: Object = null
 	var native_shore := false
 	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
-	## stops at their edge, as at a kerb. Laid on into the junction it
-	## poked through the apron wherever their two drapes disagree.
+	## (and the plain paving of a crossing's stub) stops at their edge, as
+	## at a kerb. Laid on into the junction it poked through the apron
+	## wherever their two drapes disagree.
 	var aprons: Dictionary = {}
+	## The same aprons as [ring, bounds]: they are cut out of paved areas.
+	var apron_rings: Array = []
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g

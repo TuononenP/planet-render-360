@@ -283,8 +283,27 @@ func _check_cuts() -> void:
 	_check(p.aprons.is_empty() and p.discs.size() == 1, "a denied apron leaves a disc: %s" % [p.discs])
 	_check(RoadPaintCut.inside(RoadPaintCut.zones(p, 1.0), Vector2(4, 0), 1.0), "lines stop at a junction with no apron")
 
+## A line painted round a mapped curve is eased, not kinked at each chord.
+func _check_rounded() -> void:
+	var bend := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(25, 1.6), Vector2(29, 4.6), Vector2(40, 18)])
+	var eased := RoadPaint.rounded(bend, 1.0)
+	_check(eased[0] == bend[0] and eased[eased.size() - 1] == bend[bend.size() - 1], "easing keeps a line's ends")
+	var sharpest := 0.0
+	var off := 0.0
+	for i in range(1, eased.size() - 1):
+		sharpest = maxf(sharpest, absf((eased[i] - eased[i - 1]).angle_to(eased[i + 1] - eased[i])))
+		var near := INF
+		for k in bend.size() - 1:
+			near = minf(near, Geometry2D.get_closest_point_to_segment(eased[i], bend[k], bend[k + 1]).distance_to(eased[i]))
+		off = maxf(off, near)
+	_check(sharpest < deg_to_rad(8.0), "an eased bend turns under 8 degrees a corner, got %.1f" % rad_to_deg(sharpest))
+	_check(off < 0.5, "an eased line stays by the mapped one, strayed %.2f m" % off)
+	var straight := PackedVector2Array([Vector2(0, 0), Vector2(10, 0.1), Vector2(30, 0)])
+	_check(RoadPaint.rounded(straight, 1.0) == straight, "a straight street is left as mapped")
+
 func _run() -> void:
 	failures.clear()
+	_check_rounded()
 	_check_crossing_shape()
 	_check_wear_seeds()
 	_check_apron_shape()

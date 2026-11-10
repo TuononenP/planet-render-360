@@ -153,6 +153,10 @@ const PATTERN := {"urban": 1, "rural": 2, "motorway": 3}
 const YELLOW_BIT := 4
 ## Depth steps stay inside the crossing band, above every carriageway.
 const LAYER := 6.9
+## Easing of a painted line's bends (rounded).
+const ROUND_M := 2.0
+const ROUND_MIN_DEG := 3.0
+const ROUND_PASSES := 3
 
 ## Dashes [on m, off m, line width m] by country and road kind, from
 ## published standards. Countries without a verified source use "". Unverified
@@ -548,7 +552,7 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 			float(style[2]), Vector2(_median(rows, 2), _median(rows, 3)), cycle, opts)
 		if lines.is_empty():
 			continue
-		var dense := RoadBuilder._resample(pts, surf.step * 0.34)
+		var dense := RoadBuilder._resample(rounded(pts, m2u), surf.step * 0.34)
 		for run: PackedVector2Array in RoadBuilder._dry_runs(dense, surf):
 			for piece: PackedVector2Array in RoadPaintCut.keep(run, cuts, m2u):
 				var straight := RoadBuilder._straighten(piece, surf.step)
@@ -558,6 +562,29 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 						code |= YELLOW_BIT
 					var attr := Color(float(l["half"]) / HALF_MAX_M, float(code) / 15.0, seeds[lead], 1.0)
 					_strip(batches, straight, float(l["x"]) * m2u, attr, surf, lift)
+
+## `pts` with its bends eased into short arcs: a mapped curve is a few
+## straight chords, and a line painted along them kinks at every corner,
+## a dash across one bending like a hook. Each pass cuts a bend sharper
+## than ROUND_MIN_DEG back by up to ROUND_M (less on a short chord) and
+## halves it; the line stays within half a metre of the mapped one.
+static func rounded(pts: PackedVector2Array, m2u: float) -> PackedVector2Array:
+	var out := pts
+	for pass_i in ROUND_PASSES:
+		var reach := ROUND_M * m2u / float(1 << pass_i)
+		var next := PackedVector2Array([out[0]])
+		for i in range(1, out.size() - 1):
+			var a := out[i - 1]
+			var b := out[i]
+			var c := out[i + 1]
+			if absf((b - a).angle_to(c - b)) < deg_to_rad(ROUND_MIN_DEG):
+				next.append(b)
+				continue
+			next.append(b.move_toward(a, minf(reach, a.distance_to(b) * 0.45)))
+			next.append(b.move_toward(c, minf(reach, c.distance_to(b) * 0.45)))
+		next.append(out[out.size() - 1])
+		out = next
+	return out
 
 ## One line's carrier, `offset` to the left of the polyline's travel.
 static func _strip(batches: Dictionary, pts: PackedVector2Array, offset: float, attr: Color,
