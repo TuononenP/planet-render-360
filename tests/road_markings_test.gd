@@ -136,6 +136,17 @@ func _check_paint() -> void:
 		"an unlaned US town street has a double centre line and nothing else: %s" % [hyde])
 	var inferred_main := RoadPaint.lane_lines(14.0, 2, false, 2, true, 0.12, Vector2(2.5, 2.5), 0, {"inferred_parking": true})
 	_check(not inferred_main.any(func(l: Dictionary) -> bool: return not bool(l["centre"])), "inferred parking is never marked off")
+	_check(not RoadPaint.lane_lines(12.0, 2, false, 2, true, 0.12, Vector2.ZERO, 0, {"class": "primary"}).any(
+		func(l: Dictionary) -> bool: return not bool(l["centre"])), "a kerbed main street in town has no edge lines")
+	_check(RoadPaint.lane_lines(12.0, 2, false, 2, false, 0.12, Vector2.ZERO, 0, {"class": "primary"}).filter(
+		func(l: Dictionary) -> bool: return bool(l["solid"]) and not bool(l["centre"])).size() == 2, "an open main road has both edge lines")
+	_check(RoadPaint.lane_lines(12.0, 2, true, 2, true, 0.12, Vector2.ZERO, 0, {"class": "motorway"}).filter(
+		func(l: Dictionary) -> bool: return bool(l["solid"])).size() == 2, "a motorway keeps its edge lines in town")
+	var houses := _place()
+	houses.buildings = [{"x": 20.0, "z": 18.0, "size_x": 10.0, "size_z": 10.0, "height": 9.0}]
+	var house_grid := RoadMarkings._building_grid(houses, 1.0)
+	_check(RoadPaint.built_up(PackedVector2Array([Vector2(-40, 0), Vector2(40, 0)]), house_grid, 1.0), "a street past a house is in town")
+	_check(not RoadPaint.built_up(PackedVector2Array([Vector2(-40, 200), Vector2(40, 200)]), house_grid, 1.0), "a road in open country is not")
 	_check(RoadPaint.lane_lines(8.0, 0, false, 1, true, 0.12, Vector2.ZERO, 0, {"class": "residential"}).is_empty(),
 		"a side street with no lanes tagged has no lines")
 	_check(RoadPaint.lane_lines(8.0, 2, false, 1, true, 0.12, Vector2.ZERO, 0, {"class": "residential"}).size() == 1,

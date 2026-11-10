@@ -145,6 +145,8 @@ const ONEWAY_LANE_M := 3.3
 const RAIL_CLEAR_M := 0.45
 const RAIL_PARALLEL_COS := 0.94
 const RAIL_ALONG_M := 3.0
+## A building this near a street puts it in town.
+const BUILT_UP_M := 30.0
 ## Pattern ids in line_code's low two bits, and its yellow bit.
 const SOLID := 0
 const PATTERN := {"urban": 1, "rural": 2, "motorway": 3}
@@ -285,10 +287,12 @@ static func lane_lines(w: float, lanes: int, oneway: bool, rank: int, urban: boo
 			out.append({"x": x, "half": half, "solid": false, "centre": false})
 	var inset := 0.65 if urban else 0.35
 	var marked_parking := rank >= 2 and not bool(opts.get("inferred_parking", false))
+	# A kerb is a town street's edge; only open roads and motorways paint one.
+	var edged := rank >= 2 and (not urban or kind_of(str(opts.get("class", "")), urban) == "motorway")
 	for side: Array in [[left, parking.x, cycle_l, 1.0], [right, parking.y, cycle_r, -1.0]]:
 		if float(side[2]) > 0.0 or (float(side[1]) > 0.0 and marked_parking):
 			out.append({"x": float(side[0]), "half": half + EDGE_EXTRA_M, "solid": true, "centre": false})
-		elif float(side[1]) <= 0.0 and rank >= 2:
+		elif float(side[1]) <= 0.0 and edged:
 			out.append({"x": float(side[0]) - float(side[3]) * inset, "half": half + EDGE_EXTRA_M, "solid": true, "centre": false})
 	var rails: Array = opts.get("rails", [])
 	if rails.is_empty():
@@ -325,6 +329,25 @@ static func layout_opts(road: Dictionary, flip: bool, data: LocationData) -> Dic
 static func in_town(road: Dictionary) -> bool:
 	return int(road.get("sidewalk", 0)) != 0 or int(road.get("sidewalk_separate", 0)) != 0 \
 		or float(road.get("parking_m", 0.0)) > 0.0
+
+## True when a building stands within BUILT_UP_M of the quarter points
+## of `pts`: a street between houses is in town whether or not anyone
+## mapped the land use or its sidewalks. `grid` is RoadMarkings'
+## building grid.
+static func built_up(pts: PackedVector2Array, grid: Dictionary, m2u: float) -> bool:
+	if grid.is_empty() or pts.size() < 2:
+		return false
+	var total := 0.0
+	for i in pts.size() - 1:
+		total += pts[i].distance_to(pts[i + 1])
+	var reach := BUILT_UP_M * m2u
+	for frac: float in [0.25, 0.5, 0.75]:
+		var p: Vector2 = RoadMarkings._point_at(pts, total * frac)[0]
+		for ring: PackedVector2Array in RoadMarkings._grid_near(grid, p, reach, m2u):
+			for k in ring.size():
+				if Geometry2D.get_closest_point_to_segment(p, ring[k], ring[(k + 1) % ring.size()]).distance_to(p) <= reach:
+					return true
+	return false
 
 ## Roads that take line paint: asphalt carriageways on the ground.
 static func _paintable(line: Variant, surf: RoadBuilder._Surface, m2u: float) -> bool:
@@ -486,6 +509,7 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 	var lift := RoadBuilder.lift_for_layer(LAYER) * m2u
 	var cuts := RoadPaintCut.zones(plan, m2u)
 	var rails := _rail_grid(data, m2u)
+	var buildings := RoadMarkings._building_grid(data, m2u)
 	for chain: Array in line_chains(data, ids):
 		var lead_flip := int(chain[0]) < 0
 		var lead := ~int(chain[0]) if lead_flip else int(chain[0])
@@ -510,7 +534,8 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 			pts.append_array(part.slice(0 if pts.is_empty() else 1))
 		var mid := pts[pts.size() / 2]
 		var road_dict: Dictionary = line if line is Dictionary else {}
-		var urban := int(r["rank"]) >= 1 and (surf.ground.land_class_at(mid.x, mid.y) == "urban" or in_town(road_dict))
+		var urban := int(r["rank"]) >= 1 and (surf.ground.land_class_at(mid.x, mid.y) == "urban" or in_town(road_dict)
+			or built_up(pts, buildings, m2u))
 		var kind := kind_of(str(r["class"]), urban)
 		var style := style_for(data.country, kind)
 		var w := _median(rows, 1)
