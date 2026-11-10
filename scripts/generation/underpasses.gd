@@ -15,6 +15,14 @@ const CLEAR_PATH_M := 2.5
 const CLEAR_RAIL_M := 5.5
 ## Grade the cut ramps back to the ground at, along the lower way.
 const RAMP_GRADE := 0.08
+## A railway climbs back far more gently, so a track under several
+## bridges stays down between them: at the road grade it dipped and rose
+## at every one, and a station yard under its viaducts was a washboard.
+const RAMP_GRADE_RAIL := 0.025
+## Ground left standing between two cut ways (the strip between two
+## tracks) comes down with them when it stands this far above both.
+const RIDGE_M := 0.5
+const RIDGE_PASSES := 3
 ## A crossing needing more than this is a valley the data already has
 ## (or a layer mistake), never a cut.
 const MAX_CUT_M := 8.0
@@ -60,12 +68,22 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	# Per lower way: [arc position, floor height] of each crossing.
 	var cuts := {}
 	# Posts carrying a bridge end stay put: the deck sits on its banks.
+	# A viaduct is mapped as many bridge ways end to end, and a joint
+	# between two of them is in mid-air, not a bank: kept, each one left
+	# a pillar of uncut ground standing among the tracks below.
 	var keep := {}
 	var hs := float(size) * 0.5
+	var joints := {}
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
 		for e in [ends[0], ends[ends.size() - 1]]:
-			keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
+			var node := Vector2i(roundi(e.x * 100.0 / m2u), roundi(e.y * 100.0 / m2u))
+			joints[node] = int(joints.get(node, 0)) + 1
+	for b in bridges:
+		var ends: PackedVector2Array = b["points"]
+		for e in [ends[0], ends[ends.size() - 1]]:
+			if int(joints[Vector2i(roundi(e.x * 100.0 / m2u), roundi(e.y * 100.0 / m2u))]) == 1:
+				keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
 	# Every crossing at once on every core, then evaluated bridge by bridge.
 	var hits: Array = []
 	if _native:
@@ -120,8 +138,43 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 							(cuts[k] as Array).append([w_arc + wp[j].distance_to(p), floor_y])
 					w_arc += wp[j].distance_to(wp[j + 1])
 				b_arc += bp[i].distance_to(bp[i + 1])
+	var touched := {}
 	for k in cuts:
-		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u)
+		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u, touched)
+	_level_ridges(surface, level, size, keep, touched)
+
+## Lowers a post left standing between cut posts on opposite sides of it
+## to the higher of the two: parallel ways each cut their own trench and
+## left a ridge between them.
+static func _level_ridges(surface: PackedFloat32Array, level: PackedFloat32Array, size: int,
+		keep: Dictionary, touched: Dictionary) -> void:
+	var pairs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]
+	for _pass in RIDGE_PASSES:
+		var lowered := {}
+		var seen := {}
+		for t: Vector2i in touched:
+			for dz in range(-1, 2):
+				for dx in range(-1, 2):
+					var c := t + Vector2i(dx, dz)
+					if seen.has(c) or touched.has(c) or keep.has(c) \
+							or c.x < 1 or c.y < 1 or c.x >= size - 1 or c.y >= size - 1:
+						continue
+					seen[c] = true
+					var idx := c.y * size + c.x
+					if not is_inf(level[idx]):
+						continue
+					var cap := INF
+					for d: Vector2i in pairs:
+						if touched.has(c + d) and touched.has(c - d):
+							cap = minf(cap, maxf(surface[(c.y + d.y) * size + c.x + d.x],
+								surface[(c.y - d.y) * size + c.x - d.x]))
+					if surface[idx] > cap + RIDGE_M:
+						lowered[c] = cap
+		if lowered.is_empty():
+			return
+		for c: Vector2i in lowered:
+			surface[c.y * size + c.x] = lowered[c]
+			touched[c] = true
 
 ## One bridge's crossings from GroundKernels.underpass_hits (way index,
 ## arc along the bridge and the way, hit x and z), as the script's own
@@ -151,7 +204,8 @@ static func _at_bridge_end(arc: float, length: float, m2u: float) -> bool:
 ## ends stay clear of the cut).
 static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 		size: int, step: float, way: Dictionary, crossings: Array, keep: Dictionary,
-		m2u: float) -> void:
+		m2u: float, touched: Dictionary = {}) -> void:
+	var grade := RAMP_GRADE_RAIL if _clearance(str(way.get("class", ""))) == CLEAR_RAIL_M else RAMP_GRADE
 	var half := maxf(float(way.get("width_m", 0.0)), 3.0) * 0.5 * m2u
 	var inner := half
 	var reach := half + step
@@ -163,7 +217,7 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 			s += line[i].distance_to(line[i - 1])
 		var cap := INF
 		for c in crossings:
-			cap = minf(cap, float(c[1]) + RAMP_GRADE * absf(s - float(c[0])) / m2u)
+			cap = minf(cap, float(c[1]) + grade * absf(s - float(c[0])) / m2u)
 		if is_inf(cap):
 			continue
 		var p := line[i]
@@ -182,6 +236,8 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 					continue
 				var wgt := 1.0 - smoothstep(inner, reach, d)
 				surface[idx] = minf(surface[idx], lerpf(surface[idx], cap, wgt))
+				if wgt >= 0.5:
+					touched[Vector2i(x, z)] = true
 
 ## OSM layer, a bridge without one counting as 1 (above the ground ways).
 static func _layer(w: Dictionary) -> int:
