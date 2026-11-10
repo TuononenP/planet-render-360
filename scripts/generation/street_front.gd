@@ -54,6 +54,11 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 		if not sp["street"]:
 			continue
 		var salt := float(i) * 1.37
+		if rows[0]["ground"] and not raised and FacadeMaterials.facade_uv(d.get("facade")).z > 0.0:
+			var kind := "shop" if sp.has("shop_bays") else str(look.get("ground", ""))
+			if kind in ["shop", "signage"]:
+				_shopfront(kit, sp, float(d["ground_y"]), float(rows[0]["y1"]), kind,
+					0 if sp.has("shop_bays") else int(look.get("variant", 0)) % FacadeComposer.BAYS, trim)
 		if shops and rows[0]["ground"] and not raised:
 			_awnings(kit, sp, rows[0], relief, seed_v, salt)
 			# Desktop Ultra near the eye: the lit shop spills onto the pavement.
@@ -127,6 +132,57 @@ static func has_garage(d: Dictionary) -> bool:
 			or str(b.get("use", "")) in SHOP_USES:
 		return false
 	return ArchitectureStyle._h(float(d["seed"]), 90) < float((look.get("relief", {}) as Dictionary).get("garage", 0.0))
+
+## Frames proud of a painted shop bay, in the bay's own layout: [x0, x1, y0,
+## y1, depth] in metres, x across the bay and y up from the pavement. The
+## StoreyComposer shop paint is 128 px a bay and storey; a sign `sign_px` tall
+## starts 10 px down. Frames only: glass here would hide the lit panes.
+static func shopfront_pieces(step_m: float, height_m: float, door: bool, sign_px: int) -> Array:
+	var c := float(FacadeComposer.CELL)
+	var sx := step_m / c
+	var sy := height_m / c
+	var out: Array = []
+	var piece := func(x0: float, x1: float, py0: float, py1: float, depth: float) -> void:
+		out.append([x0 * sx, x1 * sx, (c - py1) * sy, (c - py0) * sy, depth])
+	var gy := float(12 + sign_px)
+	piece.call(4.0, c - 4.0, 8.0, 10.0, 0.12)  # the fascia's cornice
+	piece.call(4.0, c - 4.0, gy - 2.0, gy, 0.06)  # and its bottom edge
+	if door:
+		piece.call(40.0, 44.0, gy, c, 0.07)
+		piece.call(84.0, 88.0, gy, c, 0.07)
+		piece.call(63.0, 65.0, gy, c, 0.05)
+	else:
+		piece.call(6.0, 9.0, gy, c - 6.0, 0.07)
+		piece.call(c - 9.0, c - 6.0, gy, c - 6.0, 0.07)
+		piece.call(63.0, 65.0, gy, c - 12.0, 0.05)
+		piece.call(6.0, c - 6.0, c - 12.0, c, 0.08)  # stall riser
+	return out
+
+## Shopfront frames along a street span, on the bays the wall painted: the
+## door is painted in bay `door`, repeating every BAYS.
+static func _shopfront(kit: ReliefKit, sp: Dictionary, ground_y: float, g_top: float,
+		kind: String, door: int, trim: Material) -> void:
+	var m := WorldScale.metres_to_units()
+	var bays := int(sp.get("shop_bays", sp["bays"]))
+	if bays <= 0:
+		return
+	var step := float(sp["len_m"]) / float(bays)
+	var height := (g_top - ground_y) / m
+	if step < 1.8 or height < 2.6:
+		return
+	var dir: Vector2 = sp["dir"]
+	var n: Vector2 = sp["n"]
+	var ax := Vector3(dir.x, 0.0, dir.y)
+	var az := Vector3(n.x, 0.0, n.y)
+	var sign_px := 30 if kind == "signage" else 16
+	for j in bays:
+		var left := (sp["a"] as Vector2) + dir * step * float(j) * m
+		for piece: Array in shopfront_pieces(step, height, j % FacadeComposer.BAYS == door, sign_px):
+			var cx := (float(piece[0]) + float(piece[1])) * 0.5 * m
+			var cy := (float(piece[2]) + float(piece[3])) * 0.5 * m
+			var depth := float(piece[4]) * m
+			kit.box(trim, Vector3(left.x, ground_y + cy, left.y) + ax * cx + az * depth * 0.5, ax, az,
+				Vector3((float(piece[1]) - float(piece[0])) * m, (float(piece[3]) - float(piece[2])) * m, depth))
 
 const GARAGE_DOORS := ["#f2efe8", "#d8d4cc", "#5a4a3a", "#7a8288", "#e8e0d0", "#3a4a5a"]
 ## Riser and tread of the entry stair (m).

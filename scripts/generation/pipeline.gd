@@ -654,7 +654,7 @@ func _await_osm(data: LocationData) -> void:
 		used_osm = true
 		data.buildings = _osm_buildings
 		data.roads = _osm_roads_v2
-		data.land_polygons = _osm_land
+		data.land_polygons = OsmGeometry.land_by_priority(_osm_land)
 		data.waterways = _osm_waterways
 		data.trees = _osm_trees
 		data.barriers = _osm_barriers

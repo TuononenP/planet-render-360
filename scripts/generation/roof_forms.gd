@@ -254,3 +254,39 @@ static func barrel(ring: PackedVector2Array, c: Vector2, top: float, rh: float,
 		prev_a = a3
 		prev_b = b3
 	return true
+
+## A many-cornered gabled house (9+ corners: jogs, bay nodes, collinear
+## splits) kept only an inset hip-like roof. Its gable ring: corners that
+## sit within GABLE_TOL_M of the line through their neighbours drop out, one
+## at a time, least first; the result is grown by the farthest dropped
+## corner outside it, so the roof covers the walls (a slight eave) and never
+## leaves a slit. Empty unless the result is parcel-like (boxy): a ridge
+## over an irregular ring shears into shards.
+const GABLE_TOL_M := 0.35
+
+static func gable_ring(ring: PackedVector2Array) -> PackedVector2Array:
+	var tol := GABLE_TOL_M * WorldScale.metres_to_units()
+	var r := ring.duplicate()
+	while r.size() > 4:
+		var best := -1
+		var best_d := tol
+		for i in r.size():
+			var a := r[(i - 1 + r.size()) % r.size()]
+			var b := r[(i + 1) % r.size()]
+			var d := r[i].distance_to(Geometry2D.get_closest_point_to_segment(r[i], a, b))
+			if d < best_d:
+				best_d = d
+				best = i
+		if best < 0:
+			break
+		r.remove_at(best)
+	if r.size() < 4 or not boxy(r) or absf(RingGeometry.signed_area(r)) < absf(RingGeometry.signed_area(ring)) * 0.8:
+		return PackedVector2Array()
+	var out := 0.0
+	for p in ring:
+		if not Geometry2D.is_point_in_polygon(p, r):
+			var near := INF
+			for i in r.size():
+				near = minf(near, p.distance_to(Geometry2D.get_closest_point_to_segment(p, r[i], r[(i + 1) % r.size()])))
+			out = maxf(out, near)
+	return RoofGeometry.offset_ring(r, out + 0.02 * WorldScale.metres_to_units()) if out > 0.0 else r

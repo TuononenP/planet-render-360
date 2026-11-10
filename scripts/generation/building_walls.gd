@@ -155,6 +155,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	var per_material := {}
 	var blank := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
+	var curve := curve_bays(ring, cover, FacadeMaterials.facade_uv(mat).x * bay_scale, edge_materials)
 	for i in ring.size():
 		var edge_mat: Material = edge_materials.get(i, mat)
 		var edge_face := face
@@ -180,6 +181,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 			var nb_top := float(pc[2])
 			# A neighbour that stops below this wall (a raised tier) does not touch it.
 			if is_inf(nb_top) or nb_top <= base:
+				var u0 := 0.0
 				var u1 := 1.0
 				var v0 := 1.0
 				if uvp.x > 0.0:
@@ -187,9 +189,12 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					# An edge under half a bay shows only the blank margin left
 					# of the first window (a pillar must not become a zebra).
 					u1 = 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
+					if curve.has(i):
+						u0 = (curve[i] as Vector2).x / uvp.y
+						u1 = (curve[i] as Vector2).y / uvp.y
 					if uvp.z > 0.0:
 						v0 = v_repeat
-				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0))
+				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0), u0)
 			elif nb_top < top - 0.3 * m2u:
 				var y0 := maxf(base, nb_top)
 				var arr := blank if fire != null else edge_face
@@ -215,10 +220,81 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	if fire != null:
 		_emit(root, blank, fire)
 
+## Curved walls: OSM draws a curve as many short edges, and each began its
+## windows afresh, squeezed, stretched or left blank. A run of CURVE_MIN_EDGES
+## or more short, open edges, each turning under CURVE_TURN_DEG, shares one
+## bay count spread along it by length. {edge: Vector2(u0, u1)} in bays;
+## `skip` edges (another material's) stay out. FacadeRelief leaves these
+## edges plain, since it lays relief on whole bays.
+const CURVE_TURN_DEG := 25.0
+const CURVE_EDGE_BAYS := 1.5
+const CURVE_MIN_EDGES := 3
+
+static func curve_bays(ring: PackedVector2Array, cover: Array, bay_m: float,
+		skip: Dictionary = {}) -> Dictionary:
+	var out := {}
+	var n := ring.size()
+	if bay_m <= 0.0 or n < CURVE_MIN_EDGES:
+		return out
+	var m2u := WorldScale.metres_to_units()
+	var ok := PackedByteArray()
+	ok.resize(n)
+	for i in n:
+		var len_m := ring[i].distance_to(ring[(i + 1) % n]) / m2u
+		var pieces: Array = cover[i] if i < cover.size() else [[0.0, 1.0, PartyWalls.OPEN]]
+		ok[i] = 1 if len_m > 0.001 and len_m < bay_m * CURVE_EDGE_BAYS and not skip.has(i) \
+			and pieces.size() == 1 and is_inf(float(pieces[0][2])) else 0
+	# link[i]: edge i runs on smoothly into edge i + 1.
+	var link := PackedByteArray()
+	link.resize(n)
+	var cos_max := cos(deg_to_rad(CURVE_TURN_DEG))
+	for i in n:
+		var j := (i + 1) % n
+		if ok[i] == 1 and ok[j] == 1:
+			var d0 := (ring[j] - ring[i]).normalized()
+			var d1 := (ring[(j + 1) % n] - ring[j]).normalized()
+			link[i] = 1 if d0.dot(d1) > cos_max else 0
+	# Start just after a break so no run wraps past edge 0; a ring that is
+	# one curve all round (a round tower) starts at 0.
+	var start := 0
+	for i in n:
+		if link[(i - 1 + n) % n] == 0:
+			start = i
+			break
+	var run: Array[int] = []
+	for k in n + 1:
+		var i := (start + k) % n
+		if k < n and ok[i] == 1 and (run.is_empty() or link[run[-1]] == 1):
+			run.append(i)
+			continue
+		_spread_run(out, ring, run, bay_m)
+		run = []
+		if k < n and ok[i] == 1:
+			run.append(i)
+	return out
+
+static func _spread_run(out: Dictionary, ring: PackedVector2Array, run: Array[int], bay_m: float) -> void:
+	if run.size() < CURVE_MIN_EDGES:
+		return
+	var m2u := WorldScale.metres_to_units()
+	var n := ring.size()
+	var total := 0.0
+	for i in run:
+		total += ring[i].distance_to(ring[(i + 1) % n]) / m2u
+	var bays := FacadeRelief.bay_count(total, bay_m)
+	if bays == 0:
+		return
+	var s := 0.0
+	for i in run:
+		var len_m := ring[i].distance_to(ring[(i + 1) % n]) / m2u
+		out[i] = Vector2(bays * s / total, bays * (s + len_m) / total)
+		s += len_m
+
 ## One wall quad a→b from y0 to y1 facing n into `arr` [verts, normals,
-## uvs, tangents, indices]; `uv` is the far corner (u at b, v at the base).
+## uvs, tangents, indices]; `uv` is the far corner (u at b, v at the base),
+## `u0` the u at a.
 static func _quad(arr: Array, a: Vector2, b: Vector2, y0: float, y1: float,
-		n: Vector2, uv: Vector2) -> void:
+		n: Vector2, uv: Vector2, u0: float = 0.0) -> void:
 	var verts: PackedVector3Array = arr[0]
 	var normals: PackedVector3Array = arr[1]
 	var uvs: PackedVector2Array = arr[2]
@@ -244,8 +320,8 @@ static func _quad(arr: Array, a: Vector2, b: Vector2, y0: float, y1: float,
 		normals.append(n3)
 		if use_tangents:
 			tangents.push_back(t3.x); tangents.push_back(t3.y); tangents.push_back(t3.z); tangents.push_back(w)
-	uvs.push_back(Vector2(0, uv.y)); uvs.push_back(Vector2(uv.x, uv.y))
-	uvs.push_back(Vector2(uv.x, 0)); uvs.push_back(Vector2(0, 0))
+	uvs.push_back(Vector2(u0, uv.y)); uvs.push_back(Vector2(uv.x, uv.y))
+	uvs.push_back(Vector2(uv.x, 0)); uvs.push_back(Vector2(u0, 0))
 	# Forward order faces (e.y, -e.x): with s < 0 that is the
 	# outward normal already, else the reversed order is emitted.
 	var s := e.x * n.y - e.y * n.x

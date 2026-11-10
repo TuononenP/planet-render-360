@@ -25,9 +25,17 @@ const MAIN_MIN_SHARE := 0.12
 static var _plans: Dictionary = {}
 static var _mutex := Mutex.new()
 
+## Buildings whose mapped parts leave over a tenth of the outline uncovered,
+## and that ground in m²: it stands unbuilt. Logged per build (BuildingBuilder)
+## before deciding whether to fill it.
+static var partial_outlines := 0
+static var partial_lost_m2 := 0.0
+
 static func begin_build() -> void:
 	_mutex.lock()
 	_plans.clear()
+	partial_outlines = 0
+	partial_lost_m2 = 0.0
 	_mutex.unlock()
 
 ## Releases the plans (each holds a copy of its building's tags) once the
@@ -67,6 +75,8 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	var fh := float(look["floor_h"])
 	var masses: Array = b.get("parts", [])
 	var single := masses.is_empty()
+	if not single:
+		_note_partial(b)
 	if single:
 		var stepped := TowerMassing.stack(b, look, parent_res, ctx, parent_shape)
 		if not stepped.is_empty():
@@ -90,6 +100,28 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	_plans[ck] = out
 	_mutex.unlock()
 	return out
+
+## Counts `b` in partial_outlines when its parts cover under 90% of it.
+static func _note_partial(b: Dictionary) -> void:
+	var fp: Variant = b.get("footprint", null)
+	if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+		return
+	var outline := fp as PackedVector2Array
+	var total := absf(RingGeometry.signed_area(outline))
+	if total <= 0.0:
+		return
+	var covered := 0.0
+	for p in b.get("parts", []):
+		var pf: Variant = (p as Dictionary).get("footprint", null)
+		if pf is PackedVector2Array and (pf as PackedVector2Array).size() >= 3:
+			for piece in Geometry2D.intersect_polygons(outline, pf):
+				covered += absf(RingGeometry.signed_area(piece))
+	if covered < total * 0.9:
+		var m2 := WorldScale.metres_to_units() * WorldScale.metres_to_units()
+		_mutex.lock()
+		partial_outlines += 1
+		partial_lost_m2 += (total - minf(covered, total)) / m2
+		_mutex.unlock()
 
 static func _inset_ring(ring: PackedVector2Array, inset: float) -> PackedVector2Array:
 	var pieces := RingGeometry._solid_parts(Geometry2D.offset_polygon(ring, -inset))

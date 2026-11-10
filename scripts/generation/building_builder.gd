@@ -85,10 +85,17 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	ShopLights.add(root)
 	if FacadeShader.enabled(data.quality_preset):
 		FacadeShader.upgrade(root)
+	elif FacadeLiteShader.enabled(data.quality_preset):
+		FacadeLiteShader.upgrade(root)
 	FacadeTextures.end_build()
 	timings["finishing"] = Time.get_ticks_msec() - t0
 	print("BUILDINGS timings ms ", timings)
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
+	if failed_parts > 0:
+		print("BUILDINGS %d masses failed to build" % failed_parts)
+	if BuildingMasses.partial_outlines > 0:
+		print("BUILDINGS %d outlines under 90%% covered by their parts, %.0f m² unbuilt"
+			% [BuildingMasses.partial_outlines, BuildingMasses.partial_lost_m2])
 	return root
 
 static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
@@ -155,8 +162,13 @@ static func _view_d2(b: Dictionary, eye: Vector2) -> float:
 	var p := Vector2(float(b["x"]), float(b["z"]))
 	return minf(p.length_squared(), p.distance_squared_to(eye))
 
+## Masses that failed to extrude in the last build (a sibling can still
+## stand, so the logged fallback does not see them).
+static var failed_parts := 0
+
 static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort,
 		timings: Dictionary) -> void:
+	failed_parts = 0
 	var t0 := Time.get_ticks_msec()
 	# A curated view can stand a kilometre from the middle of its extent, and
 	# look back at it: the building cap keeps what is near either one.
@@ -311,6 +323,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 					and str(b.get("osm_id", "")) in ["way:75363809", "way:278042253", "way:278069587"]:
 				var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
 				NycCrownMaterials.crown_details(root, b, md, float(footing["floor"]))
+		else:
+			failed_parts += 1
 	if done and _batch == null:
 		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)),
 			chroma, tone, ctx["wall_vt"], ctx["roof_vt"])
@@ -382,7 +396,10 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
 	var sink := 0.0 if bool(footing["raised"]) else BuildingFoundation.SINK_M * WorldScale.metres_to_units()
-	var top := base + height_world
+	# A tagged height runs from the lowest ground, so a plinth comes out of
+	# it. Levels count from the floor and stand on top.
+	var tagged := str(b.get("height_source", "")) == "tag_height"
+	var top := base + height_world - (float(footing["plinth"]) if tagged else 0.0)
 	base -= sink
 	if float(mass.get("min_m", 0.0)) > 0.0:
 		base += sink + float(mass["min_m"]) * WorldScale.metres_to_units()
@@ -521,11 +538,11 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			and eye_d < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(base + sink
 			+ float(look["floor_h"]) * WorldScale.metres_to_units()
-			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
+			* (1.15 if not shop_materials.is_empty() or str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
 			top - float(look["floor_h"]) * WorldScale.metres_to_units() * 0.6)
 		FacadeRelief.add(root, {"ring": ring, "cover": cover, "base": base, "g_top": g_y,
 			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade, "bands": bands,
-			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
+			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink, "shop_edges": shop_materials,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
 			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
 			"wall_lanterns": RenderQuality.ultra_desktop(preset),
@@ -637,6 +654,13 @@ static func _roof_job(ring: PackedVector2Array, top: float, height_world: float,
 		holes: Array) -> Array:
 	if shape == "flat" or roof_h_world <= 0.01:
 		return []
+	# A detached gabled house of 9+ corners roofs its simplified ring
+	# (RoofForms.gable_ring): true gables, not an inset hip.
+	if shape == "gabled" and ring.size() > 8 and holes.is_empty() and not party.has(1):
+		var gable := RoofForms.gable_ring(ring)
+		if not gable.is_empty():
+			ring = gable
+			party = PackedByteArray()
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var eave_u := float(look.get("eave", 0.0)) * WorldScale.metres_to_units()
 	if eave_u > 0.0 and shape in ["gabled", "hipped", "pyramidal"] \

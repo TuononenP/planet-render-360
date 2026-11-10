@@ -178,3 +178,31 @@ static func _ring_aabb(ring: PackedVector2Array) -> Rect2:
 		max_p.x = maxf(max_p.x, p.x)
 		max_p.y = maxf(max_p.y, p.y)
 	return Rect2(min_p, max_p - min_p)
+
+## Land polygons in priority order: water first, then the smallest first.
+## Ground paint and GroundTruth.land_class_at both let the earliest entry
+## win where polygons overlap, so a park inside a city-wide residential
+## landuse reads as park (it painted paving under the park's trees), and a
+## pond in a park stays water. Stable within equal keys.
+static func land_by_priority(polys: Array) -> Array:
+	var keyed: Array = []
+	for i in polys.size():
+		var poly: Variant = polys[i]
+		var area := INF
+		var water := false
+		if poly is Dictionary:
+			var pts: Variant = (poly as Dictionary).get("points", null)
+			if pts is PackedVector2Array and (pts as PackedVector2Array).size() >= 3:
+				area = absf(RingGeometry.signed_area(pts))
+			water = str((poly as Dictionary).get("class", "")) == "water"
+		keyed.append([0 if water else 1, area, i, poly])
+	keyed.sort_custom(func(a: Array, b: Array) -> bool:
+		if a[0] != b[0]:
+			return a[0] < b[0]
+		if a[1] != b[1]:
+			return a[1] < b[1]
+		return a[2] < b[2])
+	var out: Array = []
+	for k in keyed:
+		out.append(k[3])
+	return out

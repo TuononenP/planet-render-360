@@ -49,11 +49,19 @@ static func add(root: Node3D, d: Dictionary) -> void:
 		look.get("wall_colour", Color(0, 0, 0, 0)))
 	var party: PartyWalls = d.get("party")
 	var spans := exposed_spans(d["ring"], d["cover"])
+	# Curved walls carry bays across edges (BuildingWalls.curve_bays): no relief there.
+	var curve := BuildingWalls.curve_bays(d["ring"], d["cover"], uvp.x * float(look.get("bay_scale", 1.0)))
+	if not curve.is_empty():
+		spans = spans.filter(func(sp: Dictionary) -> bool: return not curve.has(int(sp["edge"])))
 	var garage := StreetFront.has_garage(d)
+	var shop_edges: Dictionary = d.get("shop_edges", {})
 	for sp in spans:
 		sp["street"] = party != null and party.faces_street(sp["a"], sp["b"], sp["n"])
-		var bay := uvp.x * float(look.get("bay_scale", 1.0))  # as BuildingWalls._walls
-		sp["bays"] = 0 if float(sp["len_m"]) < bay * 0.5 else maxi(1, roundi(float(sp["len_m"]) / bay))
+		var scale := float(look.get("bay_scale", 1.0))
+		sp["bays"] = bay_count(float(sp["len_m"]), uvp.x * scale)  # as BuildingWalls._walls
+		# A mapped shop's edge paints its ground storey to its own bay.
+		if shop_edges.has(int(sp["edge"])):
+			sp["shop_bays"] = bay_count(float(sp["len_m"]), FacadeMaterials.facade_uv(shop_edges[int(sp["edge"])]).x * scale)
 		_storeys(kit, sp, rows, look, relief, stone, float(d["seed"]), uvp.z == 0.0)
 		if sp["street"] and ArchitectureStyle._h(float(d["seed"]) + float(sp["edge"]) * 0.53, 64) \
 				< float(relief.get("oriel", 0.0)):
@@ -61,6 +69,10 @@ static func add(root: Node3D, d: Dictionary) -> void:
 				trim_for(look, stone), str(look.get("ground", "")) == "" and not garage)
 	StreetFront.add(kit, spans, rows, d, stone)
 	kit.flush(root, "Relief")
+
+## Bays a wall `len_m` long fits at `bay` metres: none when under half a bay.
+static func bay_count(len_m: float, bay: float) -> int:
+	return 0 if len_m < bay * 0.5 else maxi(1, roundi(len_m / bay))
 
 ## Exposed stretches of the ring's edges: [{a, b, n, dir, len_m, first,
 ## last}] (first/last: the stretch starts/ends at a ring corner).
