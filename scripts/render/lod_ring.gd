@@ -147,6 +147,10 @@ static func _shadow(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
+	# A builder that switches its own near and far meshes (ParkedCars)
+	# keeps the ranges it set.
+	if gi.has_meta("lod_own"):
+		return
 	if layer == "FarCity":
 		# A whole band in or out (its AABB centre is no distance): a
 		# 1 m range end hides it, 0 shows it.

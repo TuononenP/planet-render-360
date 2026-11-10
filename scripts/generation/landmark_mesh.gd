@@ -423,6 +423,30 @@ func commit(parent: Node3D, prefix: String = "") -> Array[MeshInstance3D]:
 		out.append(mi)
 	return out
 
+## One ArrayMesh with a surface per key, for instanced fleets (a
+## MultiMesh draws a single mesh). Skips the tangents when no surface
+## is normal mapped.
+func to_array_mesh(tangents: bool = true) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for k in _order:
+		var s: Surf = _surfs[k]
+		if s.v.is_empty():
+			continue
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = s.v
+		arrays[Mesh.ARRAY_NORMAL] = s.n
+		arrays[Mesh.ARRAY_TEX_UV] = s.uv
+		if tangents:
+			var st := SurfaceTool.new()
+			st.create_from_arrays(arrays, Mesh.PRIMITIVE_TRIANGLES)
+			st.generate_tangents()
+			arrays = st.commit_to_arrays()
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		out.surface_set_name(out.get_surface_count() - 1, k)
+		out.surface_set_material(out.get_surface_count() - 1, s.mat)
+	return out
+
 ## Smooth (Catmull-Rom) lookup in a (key, value) table sorted by key;
 ## clamps outside the table. Used for tower taper profiles.
 static func profile_at(table: PackedVector2Array, k: float) -> float:

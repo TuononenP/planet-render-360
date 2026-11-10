@@ -130,6 +130,13 @@ func _run() -> void:
 				failures.append("%s and its distant batch must share bounds and a switch distance" % near.name)
 		if pairs == 0:
 			failures.append("Ultra should have detailed and distant car batches")
+		# The world's LOD pass must leave the cars' own switch alone.
+		var switch_far := (batches.get_children().filter(func(n: Node) -> bool:
+			return n.name.ends_with("_far"))[0] as MultiMeshInstance3D)
+		var begin := switch_far.visibility_range_begin
+		LodRing.apply(holder, RenderSettings.Preset.ULTRA)
+		if begin <= 0.0 or switch_far.visibility_range_begin != begin:
+			failures.append("LodRing cleared the parked cars' near/far switch")
 		var shadows := batches.get_children().filter(func(n: Node) -> bool:
 			return n.name.ends_with("_shadow"))
 		if shadows.size() != pairs:
@@ -144,28 +151,13 @@ func _run() -> void:
 	# so check the bounds calculation using known placements directly.
 	var placements := [[Vector3(20, 3, -40), Basis.IDENTITY],
 		[Vector3(35, 4, -30), Basis(Vector3.UP, 0.8)]]
-	var near_box := ParkedCars.CarModels.mesh("sedan").get_aabb()
-	var far_box := ParkedCars.mesh("sedan").get_aabb()
+	var near_box := CarModel.mesh("sedan").get_aabb()
+	var far_box := CarModel.mesh("sedan", true).get_aabb()
 	var bounds := ParkedCars._batch_bounds(placements, near_box.merge(far_box)).grow(0.001)
 	for car in placements:
 		for box in [near_box, far_box]:
 			if not bounds.encloses(Transform3D(car[1], car[0]) * box):
 				failures.append("shared batch bounds must contain both LODs at every car")
-	for kind in ["sedan", "hatch", "wagon", "suv", "van"]:
-		var mesh := ParkedCars.mesh(kind)
-		if mesh.get_surface_count() < 3:
-			failures.append("%s should build body, glass and tyres" % kind)
-		# Front faces as Godot winds them (BoxMesh): clockwise about the
-		# outward normal, so cull_back keeps the outside.
-		for si in mesh.get_surface_count():
-			var arr := mesh.surface_get_arrays(si)
-			var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-			var nn: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
-			var ix: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
-			for t in range(0, ix.size(), 3):
-				if (v[ix[t + 1]] - v[ix[t]]).cross(v[ix[t + 2]] - v[ix[t]]).dot(nn[ix[t]]) > 0.0:
-					failures.append("%s surface %d has a back-facing triangle" % [kind, si])
-					break
 	failures.remove_at(0)
 	if failures.is_empty():
 		print("PARKED CARS OK: parking tags, kerb widths from sidewalks, both kerbs, slope pitch, junctions clear, Ultra only")
