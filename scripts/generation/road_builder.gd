@@ -65,6 +65,11 @@ const CHUNKS := 4
 ## carriageways (rank 2 asphalt tops out at layer ~6.8).
 const CROSSING_MIN_M := 4.0
 const CROSSING_LAYER := 6.9
+## A crossing's band or a stop line is laid as its own wide ribbon, flat
+## between its edges, over road ribbons flat between theirs: where the
+## ground curves the road stood a centimetre or two proud of the paint
+## and bit a ragged notch out of it. Bands lie this much higher.
+const BAND_LIFT_M := 0.04
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -262,7 +267,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
-	var lift := lift_for_layer(layer) * m2u
+	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u
 	# RoadSurface attributes: lanes, rank, kerbed urban street + wear seed.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"

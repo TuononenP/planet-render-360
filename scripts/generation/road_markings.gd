@@ -174,7 +174,7 @@ static func _across(batches: Dictionary, finish: String, pts: PackedVector2Array
 	var dense := RoadBuilder._resample(pts, surf.step * 0.34)
 	for run: PackedVector2Array in RoadBuilder._dry_runs(dense, surf):
 		RoadBuilder._ribbon(RoadBuilder._batch(batches, finish), RoadBuilder._straighten(run, surf.step),
-			width, surf, RoadBuilder.lift_for_layer(layer) * m2u, Color(0.0, 0.0, 0.0, 1.0), {}, layer)
+			width, surf, (RoadBuilder.lift_for_layer(layer) + RoadBuilder.BAND_LIFT_M) * m2u, Color(0.0, 0.0, 0.0, 1.0), {}, layer)
 
 static func _elevated(line: Variant) -> bool:
 	if not (line is Dictionary):
