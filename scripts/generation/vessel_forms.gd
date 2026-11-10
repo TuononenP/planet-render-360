@@ -46,7 +46,7 @@ static func _cap(lm: LandmarkMesh, key: String, ring: PackedVector3Array, top: b
 ## A rounded deckhouse with a raked front. Glazing is part of the skin,
 ## so there is no opaque box behind the windscreen or floating glass.
 static func cabin(lm: LandmarkMesh, cx: float, length: float, width: float, y: float, height: float,
-		pitch: float = 0.0, wall: String = "White", rake: float = 0.25) -> void:
+		pitch: float = 0.0, wall: String = "White", rake: float = 0.25, glass: String = "Glass") -> void:
 	var rows: Array = []
 	var radius := minf(width * 0.14, height * 0.45)
 	for f in [0.0, 0.28, 0.8, 1.0]:
@@ -57,7 +57,7 @@ static func cabin(lm: LandmarkMesh, cx: float, length: float, width: float, y: f
 		ring.append(ring[0])
 		rows.append(ring)
 	for band in 3:
-		lm.grid("Glass" if band == 1 else wall, [rows[band], rows[band + 1]], Vector3(cx, y + height * 0.5, 0), true)
+		lm.grid(glass if band == 1 else wall, [rows[band], rows[band + 1]], Vector3(cx, y + height * 0.5, 0), true)
 	if pitch > 0.0:
 		var base: PackedVector3Array = rows[1]
 		var top: PackedVector3Array = rows[2]

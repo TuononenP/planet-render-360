@@ -119,6 +119,8 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			b = swap
 		var dir := (b - a).normalized()
 		var ferry := _near_terminal(data, (a + b) * 0.5, m)
+		if not ferry and CargoBerths.port_run(data, a, b, m):
+			continue  # cargo quays berth cargo ships (CargoBerths)
 		var length := minf(200.0 if ferry else 230.0, run_m - 30.0)
 		if length < LINER_MIN_M:
 			continue
@@ -140,8 +142,9 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			if not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
 				continue
 			out.append([Vector3(c.x, ground.water_level_at(c.x, c.y), c.y), atan2(-bow_dir.y, bow_dir.x),
-				length, beam, clampf(length * (0.16 if ferry else 0.2), 22.0, 65.0),
-				0.0, "ferry" if ferry else "liner"])
+				length, beam, clampf(length * 0.21 if ferry else length * 0.2, 22.0, 65.0),
+				fposmod(c.x * 0.0131 + c.y * 0.0077, 1.0), "ferry" if ferry else "liner",
+				berth_info(ground, a, b, at, berth, beam, m)])
 			break
 		if out.size() >= MAX_LINERS:
 			return out
@@ -306,6 +309,20 @@ static func _liner_berth(ground: GroundTruth, mask: VegetationMask, at: Vector2,
 		if deep:
 			return {"centre": c, "side": sign_n}
 	return {}
+
+## Where the quay is in the berthed ship's own frame (metres, +X bow,
+## +Z = the berth normal): "quay_z" the quay edge, "quay_top" its height
+## over the water, "along" the run's ends in ship x. ShipMooring reads it.
+static func berth_info(ground: GroundTruth, a: Vector2, b: Vector2, at: Vector2, berth: Dictionary,
+		beam: float, m: float) -> Dictionary:
+	var c: Vector2 = berth["centre"]
+	var side: float = berth["side"]
+	var dir := (b - a).normalized()
+	var land := at - Vector2(-dir.y, dir.x) * side * 3.0 * m
+	var water := ground.water_level_at(c.x, c.y)
+	var top := (ground.height_at_world(land.x, land.y) - water) / m
+	return {"quay_z": -side * (beam * 0.5 + 2.0), "quay_top": clampf(top, 0.8, 6.0),
+		"along": Vector2((a - c).dot(dir) / m, (b - c).dot(dir) / m)}
 
 ## The carved sea floor is often 2 m deep; interpolated floats can fall
 ## microscopically below that value, so allow a millimetre of rounding.

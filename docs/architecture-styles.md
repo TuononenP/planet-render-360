@@ -319,15 +319,31 @@ mapped quays on tidal water with a clear fairway also berth up to two procedural
 large vessels (140-300 m, `QuayMoorings.liners`, up to 1200 m from the eye,
 never beside lake water). Nearby mapped passenger terminals select a ferry
 silhouette and also allow suitable terminal-adjacent shorelines when a quay is
-not mapped; aligned quay fragments can be joined. Mapped ships take precedence. Vessels are lofted hulls (`HullLoft`) with per-type
-models: `CruiseLinerModel`, `PassengerVesselModel` (classic coastal ship,
-houseboat, tall ship), `MotorYachtModel` (flybridge, sport, runabout, RIB,
-console) and `SailYachtModel`, sharing `VesselMaterials`/`VesselKit`. Marina
+not mapped; aligned quay fragments can be joined. Mapped ships take precedence.
+Quay runs fronting port land (`CargoBerths`: industrial land tagged
+`industrial=port|shipyard|container_terminal` or `harbour=yes`, or warehouses
+and industrial buildings covering 35% of the footprint within 200 m, 20% on
+plain industrial land) berth up to three cargo ships instead of liners;
+terminals keep their ferries first. `LargeShips` commits liners, cruise ferries
+and cargo ships, detailed within 650 m of the eye, and `ShipMooring` adds
+lines to quay bitts, fenders and a gangway or accommodation ladder.
+Vessels are lofted hulls (`HullLoft`) with per-type models: `CruiseLinerModel`
+and `CruiseFerryModel` (sharing `LinerSuperstructure`: lifeboat recess,
+balcony decks, bridge wings, funnel, radar mast), `CargoShipModel` with
+`CargoDeckGear` (container, bulk, tanker, general), `PassengerVesselModel`
+(classic coastal ship, houseboat, tall ship), `MotorYachtModel` (flybridge,
+sport, runabout, RIB, console) and `SailYachtModel`, sharing
+`VesselMaterials`/`VesselKit`. Large steel ships use `ShipPaint` (weathered hull
+plating, waterline grime, rust streaks, draught marks, matte enamel),
+`ShipHullKit` hull details and `ShipLights` (lit cabins, navigation and deck
+lights on the CityLights night cycle); yachts keep their gelcoat. Marina
 boats are MultiMesh prototypes (`VesselPrototypes`); those beyond 250 m use
 reduced `_far` meshes without rails, rigging and mullions, and the combined
 marina surface budget is `MarinaBuilder.MAX_DRAW_CALLS`. Mapped
-`building=ship|boat|houseboat` features pick a model by type and length (>= 100 m
-is a liner, sailing types a yacht or tall ship, other `boat` features a yacht or
+`building=ship|boat|houseboat` features pick a model by type and length
+(container, bulk, cargo and tanker `ship:type` families from 40 m are cargo
+ships, ro-ro and ferry types from 100 m cruise ferries, other ships from 100 m
+liners, sailing types a yacht or tall ship, other `boat` features a yacht or
 day boat, anything else a coastal passenger ship) at every tier; those
 individual building-layer meshes are outside the marina budget. Untagged vessels
 use a generic hull colour and height. Snow covers decks/roofs in mapped meshes,

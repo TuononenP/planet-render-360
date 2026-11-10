@@ -256,6 +256,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					entry["still_pool"] = OsmTags.still_pool(el_tags)
 				if cls == "forest":
 					entry.merge(OsmTags.tree_tags(el_tags))
+				if cls == "urban" and OsmTags.harbour_use(el_tags) != "":
+					entry["harbour_use"] = OsmTags.harbour_use(el_tags)
 				land.append(entry)
 			elif str(el_tags.get("natural", "")) == "tree_row":
 				# A mapped row of trees: one tree every TREE_ROW_M along it.

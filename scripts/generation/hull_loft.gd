@@ -25,6 +25,7 @@ extends RefCounted
 ##   cockpit            optional Rect2: x range / half-width of an open well
 ##   cockpit_y          sole height above water
 ##   double_ended       mirror the entry shape at the stern
+##   boot_m             boot-top stripe height above the waterline (m)
 const TIP := 0.03
 const STATIONS_HI := [0.0, 0.02, 0.06, 0.12, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.78, 0.85, 0.9, 0.94, 0.97, 1.0]
 const STATIONS_LO := [0.0, 0.06, 0.2, 0.4, 0.6, 0.78, 0.9, 0.97, 1.0]
@@ -96,7 +97,7 @@ static func section(spec: Dictionary, t: float) -> Array:
 	var z_wl := hb * (1.0 - flare)
 	var ky := keel_y(spec, t)
 	var dead := _f(spec, "deadrise", 0.0)
-	var boot := minf(0.04 * length + 0.05, sh * 0.25)
+	var boot := _f(spec, "boot_m", minf(0.04 * length + 0.05, sh * 0.25))
 	var rake := 0.0
 	var e := _f(spec, "entry", 0.3)
 	if t > 1.0 - e:
@@ -199,21 +200,25 @@ static func loft(lm: LandmarkMesh, spec: Dictionary, keys: Dictionary, origin: V
 	c /= float(first.size())
 	for i in first.size() - 1:
 		lm.tri(str(keys.get("hull", "Hull")), c, first[i + 1], first[i], Vector3.LEFT, Vector3.LEFT,
-			Vector3.LEFT, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+			Vector3.LEFT, _xy(c), _xy(first[i + 1]), _xy(first[i]))
 	if near:
 		lm.tri(str(keys.get("hull", "Hull")), c, first[first.size() - 1], first[0], Vector3.LEFT, Vector3.LEFT,
-			Vector3.LEFT, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+			Vector3.LEFT, _xy(c), _xy(first[first.size() - 1]), _xy(first[0]))
 		var last: PackedVector3Array = rows[rows.size() - 1]
 		var stem := Vector3.ZERO
 		for p in last:
 			stem += p
 		stem /= float(last.size())
 		lm.tri(str(keys.get("hull", "Hull")), stem, last[last.size() - 1], last[0], Vector3.RIGHT, Vector3.RIGHT,
-			Vector3.RIGHT, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+			Vector3.RIGHT, _xy(stem), _xy(last[last.size() - 1]), _xy(last[0]))
 		for i in last.size() - 1:
 			lm.tri(str(keys.get("hull", "Hull")), stem, last[i], last[i + 1], Vector3.RIGHT, Vector3.RIGHT,
-				Vector3.RIGHT, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+				Vector3.RIGHT, _xy(stem), _xy(last[i]), _xy(last[i + 1]))
 	return {"sheer": [port, star], "stations": rows}
+
+## Side-on (x, y) metre UVs, as the hull skin uses (ShipPaint maps them).
+static func _xy(p: Vector3) -> Vector2:
+	return Vector2(p.x, p.y)
 
 ## Dense samples follow an elliptical bilge instead of two planar panels.
 static func _round_section(points: Array, samples: int) -> Array:

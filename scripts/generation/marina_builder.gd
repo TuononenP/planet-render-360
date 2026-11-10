@@ -20,8 +20,9 @@ extends RefCounted
 ## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
 ## Coastal Mediterranean marinas also berth 10–22 m cruising catamarans.
 ## Boats beyond NEAR_M of the eye use a "_far" mesh without rails, rigging
-## and mullions. Cruise liners (QuayMoorings.liners) are committed one by
-## one, outside the MultiMesh budget.
+## and mullions. Large ships (cruise liners and ferries from
+## QuayMoorings.liners, cargo ships from CargoBerths) are committed one by
+## one by LargeShips, outside the MultiMesh budget.
 
 const RADIUS_M := 800.0
 const MAX_BOATS := 700
@@ -51,7 +52,7 @@ const MESH_LEN_M := 10.0
 
 ## Boats [position, yaw, scale, kind, colour], deck ribbons (each an
 ## Array of [x, z, water y]) for `data`'s piers, nearest boats first, and
-## liners [centre, yaw, length, beam, height, seed].
+## large ships (LargeShips entries: liners, ferries, then cargo ships).
 static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		mask: VegetationMask = null) -> Dictionary:
 	var boats: Array = []
@@ -77,6 +78,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		decks.append(_deck(pts, ground, m2u, taken))
 	# Reserve large berths before filling the harbour with small craft.
 	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
+	liners.append_array(CargoBerths.plan(data, ground, taken, m2u, mask, liners))
 	var k := 0
 	for p in piers:
 		var pts: PackedVector2Array = (p as Dictionary)["points"]
@@ -174,19 +176,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 			if kind.ends_with("_far"):
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			holder.add_child(mmi)
-	for l in liners:
-		var ferry: bool = l.size() > 6 and l[6] == "ferry"
-		var hull := "#f0eee8" if ferry else CruiseLinerModel.hull_hex(float(l[5]) * 4.0)
-		var lm := VesselPrototypes.geometry("liner", float(l[2]), float(l[3]), float(l[4]),
-			VesselMaterials.paint(hull, true, 0.42, 0.05), true, true, float(l[5]), "ferry" if ferry else "")
-		var parts := lm.commit(holder, "Liner_")
-		VesselPrototypes.snow_parts(parts)
-		for part in parts:
-			part.position = l[0]
-			part.rotation.y = float(l[1])
-			part.scale = Vector3.ONE * m2u
-			part.set_meta("procedural_liner", true)
-			part.set_meta("vessel_model", "ferry" if ferry else "liner")
+	LargeShips.commit(holder, liners, View360.spawn_xz(data), m2u)
 	root.add_child(holder)
 	return boats.size() + liners.size()
 

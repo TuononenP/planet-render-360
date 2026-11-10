@@ -10,7 +10,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	ViewConditions.set_time_minutes(view, 12.0 * 60.0)
 	var candidates: Array = []
 	for part in view._world_root.find_children("*", "MeshInstance3D", true, false):
-		if part.name in ["MappedShip_Hull", "HarbourFerry_Orange", "Liner_Hull"]:
+		if part.name in ["MappedShip_Hull", "HarbourFerry_Hull", "Liner_Hull", "CruiseFerry_Hull", "Cargo_Hull"]:
 			candidates.append([part.global_transform * part.mesh.get_aabb(), str(part.name)])
 	var inventory := {}
 	for fleet in view._world_root.find_children("Boats_*", "MultiMeshInstance3D", true, false):

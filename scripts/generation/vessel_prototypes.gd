@@ -16,8 +16,10 @@ static var _meshes := {}
 static func base_kind(kind: String) -> String:
 	return kind.trim_suffix("_far")
 
-## The LandmarkMesh for a model at true size. `model` is one of liner,
-## passenger, houseboat, tall_ship, motor_yacht, runabout, sail_yacht.
+## The LandmarkMesh for a model at true size. `model` is one of liner
+## (variant "ferry" is a cruise ferry), cruise_ferry, cargo (variant
+## container, bulk, tanker or general), passenger,
+## houseboat, tall_ship, motor_yacht, runabout, sail_yacht.
 static func geometry(model: String, length: float, beam: float, h: float, hull: Material,
 		detail: bool, maps: bool, seed_value: float = 0.0, variant: String = "") -> LandmarkMesh:
 	var lm := LandmarkMesh.new()
@@ -25,8 +27,15 @@ static func geometry(model: String, length: float, beam: float, h: float, hull: 
 		"maps": maps, "seed": seed_value, "ultra": detail and MaterialLibrary.hi_res}
 	match model:
 		"liner":
-			p["ferry"] = variant == "ferry"
-			CruiseLinerModel.build(lm, p)
+			if variant == "ferry":
+				CruiseFerryModel.build(lm, p)
+			else:
+				CruiseLinerModel.build(lm, p)
+		"cruise_ferry":
+			CruiseFerryModel.build(lm, p)
+		"cargo":
+			p["variant"] = variant
+			CargoShipModel.build(lm, p)
 		"houseboat", "tall_ship":
 			p["variant"] = model
 			PassengerVesselModel.build(lm, p)
@@ -70,6 +79,10 @@ static func mesh(kind: String) -> ArrayMesh:
 	var shift := LEN_M * 0.5 if base in STERN_ORIGIN else 0.0
 	var grouped := {}
 	for part in lm.commit(holder):
+		# Lamps are too small to matter on instanced fleets and would
+		# each cost a draw call per prototype.
+		if str(part.name).begins_with("Nav") or part.name == "Lamp":
+			continue
 		var arrays := part.mesh.surface_get_arrays(0)
 		if shift != 0.0:
 			var v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -77,13 +90,15 @@ static func mesh(kind: String) -> ArrayMesh:
 				v[i] += Vector3(shift, 0, 0)
 			arrays[Mesh.ARRAY_VERTEX] = v
 		var material := part.mesh.surface_get_material(0)
+		if base == "steam" and part.name == "Glass":
+			material = ShipLights.cabin_glass(0)  # one lit glass surface
 		if not detail:
 			# Distant fittings share a compact palette. Painted topsides keep
 			# their own material so instance colour never tints glass or decks.
 			if part.name in ["White", "Deck", "DeckSteel", "Sail", "Canvas", "Roof"]:
 				material = VesselMaterials.get_mat("white")
-			elif part.name not in ["Hull", "Glass"]:
-				material = VesselMaterials.get_mat("glass")
+			elif part.name not in ["Hull", "Glass"] and not str(part.name).begins_with("Cabin"):
+				material = ShipLights.cabin_glass(0) if base == "steam" else VesselMaterials.get_mat("glass")
 		elif part.name in ["Bottom", "Black"]:
 			material = VesselMaterials.get_mat("dark")
 		elif base in ["day", "rib"] and part.name == "Deck":

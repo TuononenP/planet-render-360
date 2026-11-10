@@ -107,6 +107,18 @@ static func land_class(tags: Dictionary) -> String:
 		return "urban"
 	return ""
 
+## Harbour use of industrial land behind a quay (CargoBerths): "port"
+## when tagged as a port, shipyard, container terminal or harbour,
+## "industrial" otherwise, "" for other land. landuse=port itself stays
+## out of the land cover (it would invite infill or shadow other cover).
+static func harbour_use(tags: Dictionary) -> String:
+	if str(tags.get("landuse", "")) != "industrial":
+		return ""
+	if str(tags.get("harbour", "")) == "yes" \
+			or str(tags.get("industrial", "")) in ["port", "shipyard", "container_terminal"]:
+		return "port"
+	return "industrial"
+
 ## Metres from a raw OSM tag value, including feet ("100 ft", "100'"):
 ## NAN when missing, unparseable, or outside [lo, hi] (callers fall
 ## through to their next source — never a silent 0).

@@ -532,6 +532,16 @@ func _land_checks(failures: Array[String]) -> void:
 			{"leisure": "sports_centre"}, {"natural": "tree"}]:
 		if OsmFetcher.land_class(tags) != "":
 			failures.append("land_class(%s) should stay unmapped" % [tags])
+	# Harbour use of industrial land behind quays (CargoBerths).
+	for row in [[{"landuse": "industrial", "industrial": "port"}, "port"],
+			[{"landuse": "industrial", "industrial": "container_terminal"}, "port"],
+			[{"landuse": "industrial", "harbour": "yes"}, "port"],
+			[{"landuse": "industrial"}, "industrial"], [{"landuse": "port"}, ""],
+			[{"landuse": "commercial"}, ""]]:
+		if OsmTags.harbour_use(row[0]) != row[1]:
+			failures.append("harbour_use(%s) should be %s" % [row[0], row[1]])
+	if OsmFetcher.land_class({"landuse": "port"}) != "":
+		failures.append("landuse=port must stay out of the land cover")
 
 func _query_checks(failures: Array[String]) -> void:
 	# Preset maps: the detailed query reaches the 1200 m half-extent on

@@ -98,6 +98,10 @@ static func _parse(line: Variant, m2u: float) -> Dictionary:
 	if bool(road.get("tunnel", false)):
 		return {}
 	var cls := str(road.get("class", "unclassified"))
+	# A footway mapped below ground (a station concourse, a subway under
+	# the street) with no tunnel tag is still not on the surface.
+	if int(road.get("layer", 0)) < 0 and _rank(cls) == 0 and not bool(road.get("crossing", false)):
+		return {}
 	var crossing := bool(road.get("crossing", false))
 	return {"points": road.get("points", PackedVector2Array()),
 		"width_u": maxf(maxf(float(road.get("width_m", 0.0)), CROSSING_MIN_M if crossing else 0.0) * m2u, 0.4),

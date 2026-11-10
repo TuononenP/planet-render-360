@@ -76,6 +76,13 @@ func _init() -> void:
 	_check(ShipBuilder.model_for({"kind":"boat","vessel_kind":"motor"}, 6.0) == "runabout", "A 6 m boat is a day boat")
 	_check(ShipBuilder.model_for({"kind":"ship","vessel_kind":"sailing"}, 12.0) == "sail_yacht", "A sailing 12 m vessel is a yacht")
 	_check(ShipBuilder.model_for({"kind":"ship","vessel_kind":"tall_ship"}, 60.0) == "tall_ship", "A sailing 60 m vessel is a tall ship")
+	for row in [["container_ship", "container"], ["bulk_carrier", "bulk"], ["general_cargo", "general"], ["oil_tanker", "tanker"]]:
+		var cargo := {"kind":"ship", "vessel_kind": row[0]}
+		_check(ShipBuilder.model_for(cargo, 180.0) == "cargo" and ShipBuilder.variant_for(cargo) == row[1],
+			"A mapped %s is a %s cargo ship" % row)
+	_check(ShipBuilder.model_for({"kind":"ship","vessel_kind":"ro_pax"}, 180.0) == "cruise_ferry", "A mapped ro-pax is a cruise ferry")
+	_check(ShipBuilder.model_for({"kind":"ship","vessel_kind":"ferry"}, 60.0) == "passenger", "A short ferry stays a passenger ship")
+	_check(ShipBuilder.variant_for(b) == "", "Untyped vessels are no cargo ships")
 	var town := LocationData.new()
 	var mast := b.duplicate()
 	mast["height"] = 120.0
