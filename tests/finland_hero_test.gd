@@ -153,6 +153,7 @@ func _wires_and_snow() -> void:
 	_check(Snowbanks.build(node, data, ground) == 0, "summer has no snowbanks")
 	node.free()
 	_check((ParkedCars._material("body") as ShaderMaterial).shader.code.contains("snow_cover"), "snow on car roofs")
+	_check(CarPaint.shader().code.contains("snow_cover"), "snow on near car roofs")
 	_check((StreetFurniture._material("wood") as ShaderMaterial).shader.code.contains("snow_cover"), "snow on benches")
 	_check(StreetProps.lamp_family("nordic", "FI") == "span", "Finnish span lamps")
 	_check(StreetFurniture.furniture_family("nordic", "FI") == "nordic", "Nordic furniture")

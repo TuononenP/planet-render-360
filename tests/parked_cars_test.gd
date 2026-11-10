@@ -81,7 +81,9 @@ func _run() -> void:
 	for c in cars:
 		var p: Vector3 = c[0]
 		sides[signf(p.x)] = true
-		if absf(absf(p.x) - (6.0 - ParkedCars.KERB_IN_M)) > 0.05 or absf(p.x - 40.0) < 5.0:
+		# KERB_JITTER_M of sideways play, nothing more.
+		if absf(absf(p.x) - (6.0 - ParkedCars.KERB_IN_M)) > ParkedCars.KERB_JITTER_M + 0.02 \
+				or absf(p.x - 40.0) < 5.0:
 			failures.append("a car off Hyde's kerbs at %s" % p)
 			break
 		var fwd: Vector3 = (c[1] as Basis).x.normalized()
@@ -128,6 +130,15 @@ func _run() -> void:
 				failures.append("%s and its distant batch must share bounds and a switch distance" % near.name)
 		if pairs == 0:
 			failures.append("Ultra should have detailed and distant car batches")
+		var shadows := batches.get_children().filter(func(n: Node) -> bool:
+			return n.name.ends_with("_shadow"))
+		if shadows.size() != pairs:
+			failures.append("every car group should have a contact shadow batch: %d of %d" % [shadows.size(), pairs])
+		for node in batches.get_children():
+			var mm := (node as MultiMeshInstance3D).multimesh
+			if not mm.use_custom_data:
+				failures.append("%s should carry the paint finish" % node.name)
+				break
 	holder.free()
 	# The headless renderer does not retain MultiMesh instance transforms,
 	# so check the bounds calculation using known placements directly.

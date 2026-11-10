@@ -1,8 +1,5 @@
 extends Control
 
-# Keep this shader cached before the background loader compiles car models.
-# Loading it for the first time on that thread fails with the Metal renderer.
-const CAR_PAINT_SHADER = preload("res://scripts/generation/car_paint.gdshader")
 const MAIN_SCENE := "res://scenes/main.tscn"
 const SANS_FILE = preload("res://assets/fonts/InstrumentSans-Variable.ttf")
 const MONO = preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
@@ -13,6 +10,9 @@ var _elapsed := 0.0
 var _sans: FontVariation
 
 func _ready() -> void:
+	# Build the car paint shader here, before the background loader builds
+	# car models: a first compile on that thread fails with Metal.
+	CarPaint.shader()
 	_sans = FontVariation.new()
 	_sans.base_font = SANS_FILE
 	_sans.variation_opentype = {"wght": 600}

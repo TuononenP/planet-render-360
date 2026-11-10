@@ -17,11 +17,14 @@ func _init() -> void:
 		if car.get_surface_count() != 4:
 			failures.append("%s must have body, glass, lights and wheels" % kind)
 		else:
-			if not car.surface_get_material(0) is ShaderMaterial:
-				failures.append("%s paint must use instance color" % kind)
+			if not car.surface_get_material(0) is ShaderMaterial \
+					or (car.surface_get_material(0) as ShaderMaterial).shader != CarPaint.shader():
+				failures.append("%s paint must use instance color (CarPaint)" % kind)
 			for i in range(1, 4):
 				if not car.surface_get_material(i) is StandardMaterial3D:
 					failures.append("%s non-paint surface %d must not use paint color" % [kind, i])
+				else:
+					_check_finish(kind, car.surface_get_material(i) as StandardMaterial3D, failures)
 		if Models.mesh(kind) != car:
 			failures.append("%s should share its mesh" % kind)
 		_check_body_texture(kind, failures)
@@ -36,6 +39,14 @@ func _init() -> void:
 		for failure in failures:
 			printerr("CAR MODELS FAIL: ", failure)
 		quit(1)
+
+## Glass mirrors at a grazing look; rims are metal where the wheel map is bright.
+func _check_finish(kind: String, m: StandardMaterial3D, failures: Array[String]) -> void:
+	if m.albedo_texture == null and m.roughness > 0.06:
+		failures.append("%s glass should be smooth enough to mirror the street" % kind)
+	elif m.albedo_texture != null and m.albedo_texture.resource_path.ends_with("wheel.jpg") \
+			and m.metallic_texture == null:
+		failures.append("%s wheel rims should read metal from the wheel map" % kind)
 
 func _check_body_texture(kind: String, failures: Array[String]) -> void:
 	var path := "res://assets/vehicles/%s_body.png" % kind

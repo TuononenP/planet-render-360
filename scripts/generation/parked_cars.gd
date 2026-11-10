@@ -14,9 +14,12 @@ extends RefCounted
 ##   the street.
 ## * Cars: sedans, hatchbacks, wagons, SUVs and vans with shaped bodywork,
 ##   glazing and wheels; paint mostly white, black, grey and
-##   silver, some colour. Placement hashes positions, so a street always
-##   parks the same cars. MultiMeshes group nearby cars by kind; distant
-##   groups use simpler meshes.
+##   silver, some colour; most coloured and grey paints are metallic, and
+##   each car carries some road grime (CarPaint). Placement hashes
+##   positions, so a street always parks the same cars, each a little off
+##   square to the kerb. MultiMeshes group nearby cars by kind; distant
+##   groups use simpler meshes, and a soft contact shadow sits under every
+##   car.
 
 const RADIUS_M := 320.0
 const MAX_CARS := 1500
@@ -28,16 +31,22 @@ const OCCUPIED := 0.78
 ## Car centreline inside the kerb (m).
 const KERB_IN_M := 1.15
 const KINDS: Array[String] = ["sedan", "sedan", "hatch", "hatch", "wagon", "suv", "suv", "van"]
-const PAINT := [Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84), Color(0.03, 0.03, 0.035),
-	Color(0.03, 0.03, 0.035), Color(0.30, 0.31, 0.32), Color(0.55, 0.56, 0.57), Color(0.55, 0.56, 0.57),
-	Color(0.20, 0.04, 0.04), Color(0.04, 0.08, 0.20), Color(0.42, 0.40, 0.34)]
+## Roughly the fleet's shares: white, black, grey and silver lead.
+const PAINT := [Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84),
+	Color(0.03, 0.03, 0.035), Color(0.03, 0.03, 0.035), Color(0.30, 0.31, 0.32), Color(0.30, 0.31, 0.32),
+	Color(0.55, 0.56, 0.57), Color(0.55, 0.56, 0.57), Color(0.20, 0.04, 0.04), Color(0.04, 0.08, 0.20),
+	Color(0.42, 0.40, 0.34)]
+## Off-square parking: yaw (degrees) and sideways play (m) either way.
+const YAW_JITTER_DEG := 1.2
+const KERB_JITTER_M := 0.1
 
 static var _meshes: Dictionary = {}
 const CarModels = preload("res://scripts/generation/car_models.gd")
 const CELL_M := 40.0
 const DETAIL_M := 110.0
 
-## Cars [position, basis, kind, colour] for `data`'s streets, nearest first.
+## Cars [position, basis, kind, colour, distance², finish] for `data`'s
+## streets, nearest first; finish is the CarPaint instance data.
 static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	var cars: Array = []
 	var centre := View360.spawn_xz(data)
@@ -106,18 +115,21 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var length := _length_m(kind) * m2u
 			if blocked(p, obstacles, m2u):
 				continue
-			var fw := facing(dir, off, oneway, left_traffic)
-			var front := p + fw * length * 0.4
-			var back := p - fw * length * 0.4
+			var fw := facing(dir, off, oneway, left_traffic).rotated(
+				deg_to_rad(YAW_JITTER_DEG) * (_hash(p.x, p.y, 6.1) * 2.0 - 1.0))
+			var q := p + left * KERB_JITTER_M * m2u * (_hash(p.x, p.y, 7.3) * 2.0 - 1.0)
+			var front := q + fw * length * 0.4
+			var back := q - fw * length * 0.4
 			var yf := ground.height_at_world(front.x, front.y)
 			var yb := ground.height_at_world(back.x, back.y)
 			var forward := Vector3(fw.x * length * 0.8, yf - yb, fw.y * length * 0.8).normalized()
 			var side := forward.cross(Vector3.UP).normalized()
 			var up := side.cross(forward).normalized()
 			var basis := Basis(forward, up, forward.cross(up))
-			var pos := Vector3(p.x, (yf + yb) * 0.5 + 0.04 * m2u, p.y)
+			var pos := Vector3(q.x, (yf + yb) * 0.5 + 0.04 * m2u, q.y)
 			var colour := paint_for(p, kind, nyc)
-			cars.append([pos, basis.scaled(Vector3.ONE * m2u), kind, colour, d2])
+			cars.append([pos, basis.scaled(Vector3.ONE * m2u), kind, colour, d2,
+				finish_for(p, colour, nyc)])
 
 static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
 	var cell := Vector2i(floori(p.x / RoadSurface.JUNCTION_M), floori(p.y / RoadSurface.JUNCTION_M))
@@ -133,6 +145,18 @@ static func paint_for(p: Vector2, kind: String, nyc: bool) -> Color:
 	if nyc and kind == "sedan" and _hash(p.x, p.y, 9.1) < 0.12:
 		return Color(0.95, 0.62, 0.02)
 	return PAINT[int(_hash(p.x, p.y, 4.9) * PAINT.size()) % PAINT.size()]
+
+## CarPaint instance data: r metallic (0/1), g grime. Most grey and
+## coloured paints are metallic, few whites and blacks; cabs are solid.
+static func finish_for(p: Vector2, colour: Color, nyc: bool) -> Color:
+	var solid_shade := colour.v > 0.8 or colour.v < 0.05
+	var taxi := nyc and colour == Color(0.95, 0.62, 0.02)
+	var share := 0.0 if taxi else (0.15 if solid_shade else 0.7)
+	var metallic := 1.0 if _hash(p.x, p.y, 5.3) < share else 0.0
+	return Color(metallic, 0.1 + 0.5 * _hash(p.x, p.y, 8.2), 0.0, 0.0)
+
+static func _width_m(kind: String) -> float:
+	return 1.95 if kind == "van" else (1.85 if kind == "suv" else 1.78)
 
 static func _length_m(kind: String) -> float:
 	match kind:
@@ -181,25 +205,30 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 			var bounds := _batch_bounds(list, detail.get_aabb().merge(distant.get_aabb()))
 			near.custom_aabb = bounds
 			far.custom_aabb = bounds
+		_add_batch(holder, list, shadow_mesh(kind), str(group_key) + "_shadow", 0.0, 0.0)
 	root.add_child(holder)
 	return cars.size()
 
-static func _add_batch(holder: Node3D, cars: Array, car_mesh: ArrayMesh, batch_name: String,
+static func _add_batch(holder: Node3D, cars: Array, car_mesh: Mesh, batch_name: String,
 		begin_m: float, end_m: float) -> MultiMesh:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
+	mm.use_custom_data = true
 	mm.mesh = car_mesh
 	mm.instance_count = cars.size()
 	for i in cars.size():
 		var c: Array = cars[i]
 		mm.set_instance_transform(i, Transform3D(c[1], c[0]))
 		mm.set_instance_color(i, c[3])
+		mm.set_instance_custom_data(i, c[5])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Cars_" + batch_name
 	mmi.multimesh = mm
 	mmi.visibility_range_begin = begin_m * WorldScale.metres_to_units()
 	mmi.visibility_range_end = end_m * WorldScale.metres_to_units()
+	if car_mesh is PlaneMesh:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	holder.add_child(mmi)
 	return mm
 
@@ -211,6 +240,18 @@ static func _batch_bounds(cars: Array, local_bounds: AABB) -> AABB:
 		bounds = car_bounds if i == 0 else bounds.merge(car_bounds)
 	return bounds
 
+## The contact shadow under a `kind` car: a ground quad a little past its
+## footprint, just above the road (metres, like mesh()).
+static func shadow_mesh(kind: String) -> PlaneMesh:
+	var key := kind + "_shadow"
+	if not _meshes.has(key):
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(_length_m(kind) * 1.12, _width_m(kind) * 1.2)
+		plane.center_offset = Vector3(0.0, -0.02, 0.0)
+		plane.material = CarPaint.shadow_material()
+		_meshes[key] = plane
+	return _meshes[key]
+
 ## A car along +X, centred on its footprint, wheels on y = 0 (metres).
 static func mesh(kind: String) -> ArrayMesh:
 	if _meshes.has(kind):
@@ -221,7 +262,7 @@ static func mesh(kind: String) -> ArrayMesh:
 			surf[mat] = TreeMeshLibrary.Buf.new()
 		return surf[mat]
 	var length := _length_m(kind)
-	var wide := 1.95 if kind == "van" else (1.85 if kind == "suv" else 1.78)
+	var wide := _width_m(kind)
 	# The body's skirt hides the top of the wheels (a sill at the axle
 	# height read as a table on legs).
 	var sill := 0.3 if kind in ["suv", "van"] else 0.24
@@ -409,11 +450,11 @@ static func _material(name: String) -> Material:
 			m.vertex_color_use_as_albedo = true  # the instance colour
 			m.roughness = 0.38
 		"glass":
-			# Tinted glass: dark, with a soft, weak sky reflection so the
-			# window band still reads at a grazing look.
-			m.albedo_color = Color(0.075, 0.105, 0.13)
-			m.roughness = 0.18
-			m.metallic_specular = 0.25
+			# Tinted glass: dark face on, a sharp sky mirror at a grazing
+			# look (as CarModels).
+			m.albedo_color = Color(0.03, 0.04, 0.05)
+			m.roughness = 0.04
+			m.metallic_specular = 0.6
 		"trim":
 			m.albedo_color = Color(0.05, 0.05, 0.05)
 			m.roughness = 0.6
@@ -429,7 +470,7 @@ static func _material(name: String) -> Material:
 			m.roughness = 0.4
 		"tyre":
 			m.albedo_color = Color(0.03, 0.03, 0.03)
-			m.roughness = 0.9
+			m.roughness = 0.95
 	return StreetSnow.material(m) if name == "body" else m
 
 ## Kerb traffic follows the mapped direction on both sides of a one-way.
