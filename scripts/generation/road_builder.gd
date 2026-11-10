@@ -195,6 +195,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	surf.use_native()
 	var plan := RoadMarkings.plan(data, ground)
 	var junc := plan.junctions
+	surf.aprons = RoadMarkings._apron_grid(plan.aprons, m2u)
 	var steps := RoadSurface.depth_steps(data)
 	var seeds := RoadSurface.wear_seeds(data)
 	# A registry bridge's model carries its own deck over its span.
@@ -280,8 +281,12 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	for run in _dry_runs(dense, surf):
 		if abort != null and abort.requested:
 			break
-		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
-			surf, lift, attr, junc, layer)
+		var pieces: Array = [run]
+		if int(r["rank"]) == 0 and marking.is_empty() and not surf.aprons.is_empty():
+			pieces = RoadCrossingClip.on_road_runs(run, {}, surf.aprons, m2u, false)
+		for piece: PackedVector2Array in pieces:
+			_ribbon(_batch(batches, finish), _straighten(piece, surf.step), float(r["width_u"]),
+				surf, lift, attr, junc, layer)
 
 ## Paved area (a square) filled flat on the drawn terrain: the outer
 ## ring ear-clipped, triangles over its holes, open water or past the
@@ -736,6 +741,10 @@ class _Surface extends RefCounted:
 	## surface by use_native(), else null: _ribbon lays its ribbons.
 	var native: Object = null
 	var native_shore := false
+	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
+	## stops at their edge, as at a kerb. Laid on into the junction it
+	## poked through the apron wherever their two drapes disagree.
+	var aprons: Dictionary = {}
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
