@@ -100,6 +100,8 @@ var _photo_busy := false
 var _date: Dictionary = {}
 var _lapse := TimeLapse.new()
 var _walk := ViewWalk.new()
+var _near_window: NearGroundWindow
+var _near_world := 0
 var _drone := ViewDrone.new()
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
@@ -804,6 +806,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
+	_tick_near_ground()
 	if _lapse.playing and is_visible_in_tree():
 		ViewConditions.lapse_tick(self, delta)
 	if _drone.on:
@@ -815,6 +818,19 @@ func _process(delta: float) -> void:
 		if g.length() > 0.01:
 			_rig.set_look(_rig.yaw + g.y * delta, _rig.pitch + g.x * delta)
 			_on_look_changed()
+
+## Keeps the fine land-cover map under the eye (NearGroundWindow), and
+## starts a new window whenever the world has been replaced.
+func _tick_near_ground() -> void:
+	var world := _generated.get_instance_id() if is_instance_valid(_generated) else 0
+	if world != _near_world:
+		if _near_window != null:
+			_near_window.stop()
+		_near_world = world
+		_near_window = NearGroundWindow.attach(_generated, _data) if world != 0 else null
+	if _near_window != null and _rig != null and _ground != null:
+		var eye := Vector2(_rig.position.x, _rig.position.z)
+		_near_window.tick(eye, _rig.position.y - _ground.height_at_world(eye.x, eye.y))
 
 func _touch_distance() -> float:
 	if _touches.size() < 2:

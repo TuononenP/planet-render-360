@@ -32,6 +32,8 @@ const MIN_LANE_M := 2.2
 const BIKE_EVERY_M := 45.0
 const BIKE_END_CLEAR_M := 16.0
 const BIKE_SIDE_INSET_M := 0.75
+const WHEEL_SEGMENTS := 14
+const GLYPH_LIFT_M := 0.06
 
 ## The polygons of an arrow for a lane's `turns` (OsmTags.turn_lanes);
 ## empty for a lane with nothing painted on it.
@@ -64,25 +66,28 @@ static func _branch(s: float) -> PackedVector2Array:
 		Vector2(s * BRANCH_NECK_M, b - HEAD_HALF_M), Vector2(s * BRANCH_REACH_M, b),
 		Vector2(s * BRANCH_NECK_M, b + HEAD_HALF_M), Vector2(s * BRANCH_NECK_M, b + hw), Vector2(s * hw, b + hw)])
 
-## A bicycle seen from the side, front toward along +: [ring, hole] pairs,
-## the hole empty for a solid part.
+## A bicycle seen from the side, front toward along +, as polygons. A wheel
+## is a ring of small quads: triangulating around a hole shreds a thin ring.
 static func bike_parts() -> Array:
 	var out: Array = []
 	for along: float in [-0.55, 0.55]:
-		out.append([_circle(Vector2(0.0, along), 0.3), _circle(Vector2(0.0, along), 0.22)])
+		out.append_array(_ring(Vector2(0.0, along), 0.3, 0.22))
 	var seat := Vector2(0.28, -0.12)
 	var bars := Vector2(0.32, 0.4)
 	var crank := Vector2(0.0, 0.0)
 	for bar: Array in [[Vector2(0.0, -0.55), seat], [seat, bars], [bars, Vector2(0.0, 0.55)],
 			[Vector2(0.0, -0.55), crank], [crank, seat], [crank, bars]]:
-		out.append([_bar(bar[0], bar[1], 0.035), PackedVector2Array()])
+		out.append(_bar(bar[0], bar[1], 0.035))
 	return out
 
-static func _circle(c: Vector2, r: float) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for k in 14:
-		var a := TAU * float(k) / 14.0
-		out.append(c + Vector2(cos(a), sin(a)) * r)
+static func _ring(c: Vector2, outer: float, inner: float) -> Array:
+	var out: Array = []
+	for k in WHEEL_SEGMENTS:
+		var a0 := TAU * float(k) / float(WHEEL_SEGMENTS)
+		var a1 := TAU * float(k + 1) / float(WHEEL_SEGMENTS)
+		var d0 := Vector2(cos(a0), sin(a0))
+		var d1 := Vector2(cos(a1), sin(a1))
+		out.append(PackedVector2Array([c + d0 * outer, c + d1 * outer, c + d1 * inner, c + d0 * inner]))
 	return out
 
 static func _bar(a: Vector2, b: Vector2, hw: float) -> PackedVector2Array:
@@ -130,7 +135,9 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 	var nodes := RoadSurface.carriageway_nodes(data)
 	var painted := _paint_grid(plan, m2u)
 	var lht := RoadSurface.left_traffic(data)
-	var lift := RoadBuilder.lift_for_layer(RoadPaint.LAYER) * m2u
+	# A glyph spans the ribbon's width, and the ground under it can stand
+	# a little above the flat ribbon: lift it clear.
+	var lift := (RoadBuilder.lift_for_layer(RoadPaint.LAYER) + GLYPH_LIFT_M) * m2u
 	var count := 0
 	for line: Variant in data.roads:
 		if not RoadPaint._paintable(line, surf, m2u) or not (line is Dictionary):
@@ -219,7 +226,7 @@ static func _approach(batches: Dictionary, pts: PackedVector2Array, lanes: Array
 				continue
 			var parts := arrow_parts(lanes[k])
 			for part: PackedVector2Array in parts:
-				_place(batches, part, PackedVector2Array(), at[0], at[1], offset, surf, lift, m2u)
+				_place(batches, part, at[0], at[1], offset, surf, lift, m2u)
 			count += 1 if not parts.is_empty() else 0
 	return count
 
@@ -240,19 +247,16 @@ static func _bikes(batches: Dictionary, pts: PackedVector2Array, road: Dictionar
 		if not at.is_empty():
 			for side: Array in [[1, -(w * 0.5 - strips.x - BIKE_SIDE_INSET_M)], [2, w * 0.5 - strips.y - BIKE_SIDE_INSET_M]]:
 				if sides & int(side[0]):
-					for part: Array in bike_parts():
-						_place(batches, part[0], part[1], at[0], at[1], float(side[1]), surf, lift, m2u)
+					for part: PackedVector2Array in bike_parts():
+						_place(batches, part, at[0], at[1], float(side[1]), surf, lift, m2u)
 					count += 1
 		along += BIKE_EVERY_M * m2u
 	return count
 
 ## Lays one polygon of a glyph whose tail is `offset` across from `origin`.
-static func _place(batches: Dictionary, ring: PackedVector2Array, hole: PackedVector2Array, origin: Vector2, travel: Vector2,
+static func _place(batches: Dictionary, ring: PackedVector2Array, origin: Vector2, travel: Vector2,
 		offset: float, surf: RoadBuilder._Surface, lift: float, m2u: float) -> void:
-	var holes: Array = []
-	if not hole.is_empty():
-		holes.append(_world(hole, origin, travel, offset, m2u))
-	RoadBuilder._area(RoadBuilder._batch(batches, "marking"), _world(ring, origin, travel, offset, m2u), holes, surf,
+	RoadBuilder._area(RoadBuilder._batch(batches, "marking"), _world(ring, origin, travel, offset, m2u), [], surf,
 		lift, m2u, RoadPaint.LAYER)
 
 ## A glyph polygon in world XZ.

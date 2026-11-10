@@ -309,7 +309,8 @@ void fragment() {
 		}
 		vec4 a;
 		vec4 n;
-		if (i == 4 && ground_quality >= 2 && steep > 0.05) {
+		// Rock and cliff layers wrap steep faces (biplanar), so they do not streak.
+		if ((i == 4 || i == 2) && ground_quality >= 2 && steep > 0.05) {
 			det_side(4, pm, dpx, dpy, nw, a, n);
 		} else {
 			det_sample(i, g, dg, vary, a, n);

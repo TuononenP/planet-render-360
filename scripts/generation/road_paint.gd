@@ -115,6 +115,14 @@ void fragment() {
 	ALPHA = clamp(paint, 0.0, 1.0) * kept * (1.0 - sc);
 	ROUGHNESS = mix(0.6, 0.25, wet);
 	SPECULAR = 0.4;
+	// Thermoplastic stands a little proud of the road: its edges catch the
+	// light up close. The coverage's own gradient is the slope.
+	if (detail > 0.0) {
+		vec3 sx = dFdx(VERTEX);
+		vec3 sy = dFdy(VERTEX);
+		vec3 slope = dFdx(paint) * sx / max(dot(sx, sx), 1e-8) + dFdy(paint) * sy / max(dot(sy, sy), 1e-8);
+		NORMAL = normalize(NORMAL - slope * 0.02 * detail);
+	}
 }
 """
 
@@ -211,7 +219,9 @@ static func parking_strips(road: Dictionary) -> Vector2:
 		return Vector2(OsmTags.PARKING_LANE_M if sides & 1 else 0.0, OsmTags.PARKING_LANE_M if sides & 2 else 0.0)
 	var extra := float(road.get("parking_m", 0.0))
 	if sides < 0 and extra > 0.0:
-		return Vector2(extra * 0.5, extra * 0.5)
+		# This room is inferred: a mapped bike lane keeps its kerb instead.
+		var cycle := int(road.get("cycle_lane", 0))
+		return Vector2(0.0 if cycle & 1 else extra * 0.5, 0.0 if cycle & 2 else extra * 0.5)
 	return Vector2.ZERO
 
 ## The painted lines of a road `w` metres wide. Each is {x: offset from the

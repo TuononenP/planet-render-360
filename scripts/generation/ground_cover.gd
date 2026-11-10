@@ -28,6 +28,9 @@ const WALK_EXTRA_M := [0.0, 0.0, 200.0, 240.0]
 ## Side of a chunk, and the green index (excess green) unmapped ground needs.
 const CHUNK_M := 128.0
 const PHOTO_GREEN := 0.07
+const PHOTO_MIN_LUM := 0.06
+const PHOTO_NEIGHBOUR_M := 4.0
+const PHOTO_NEIGHBOURS := 3
 ## Cover keeps this far from hard edges: the strip GroundShader wears to earth.
 const EDGE_CLEAR_M := 1.1
 const KINDS := ["tuft", "flower", "shrub"]
@@ -166,6 +169,23 @@ static func _turf(c: Color) -> Color:
 	var l := c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
 	return c.lerp(Color(l, l, l), TURF_GREY)
 
+## Whether a linear photo colour is really vegetation. On dark ground the
+## index is noise (shadowed asphalt can read as green), so it needs light too.
+static func photo_green(c: Color) -> bool:
+	if c.a <= 0.0:
+		return false
+	return green_index(c) >= PHOTO_GREEN and c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722 >= PHOTO_MIN_LUM
+
+## Whether the ground around (x, z) is green too: one green photo pixel
+## can be a tree top or a stray tint over asphalt, a lawn is green all round.
+static func _green_around(data: LocationData, x: float, z: float) -> bool:
+	var r := PHOTO_NEIGHBOUR_M * WorldScale.metres_to_units()
+	var green := 0
+	for o: Vector2 in [Vector2(r, 0.0), Vector2(-r, 0.0), Vector2(0.0, r), Vector2(0.0, -r)]:
+		if photo_green(_photo_at(data, x + o.x, z + o.y)):
+			green += 1
+	return green >= PHOTO_NEIGHBOURS
+
 ## Excess-green index of a linear colour.
 static func green_index(c: Color) -> float:
 	return (2.0 * c.g - c.r - c.b) / maxf(c.r + c.g + c.b, 0.001)
@@ -213,7 +233,8 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				if not photo_cover:
 					continue
 				photo = _photo_at(data, x, z)
-				if photo.a <= 0.0 or green_index(photo) < PHOTO_GREEN:
+				if not photo_green(photo) or ground.land_class_at(x, z) == "urban" \
+						or not _green_around(data, x, z):
 					continue
 			if not CLASSES.has(cls) or mask.blocked(x, z,
 					VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE

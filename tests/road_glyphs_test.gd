@@ -96,4 +96,10 @@ func _run() -> void:
 	d.roads = [_road(Vector2(-100, 200), Vector2(100, 200), 0, 10.0)]
 	_check(int(_lay(d)[0]) == 0, "no mapped lane, no bicycle")
 	var parts := RoadGlyphs.bike_parts()
-	_check(parts.size() == 8, "a bicycle is two wheels and six bars, got %d" % parts.size())
+	_check(parts.size() == 2 * RoadGlyphs.WHEEL_SEGMENTS + 6, "a bicycle is two rings of quads and six bars, got %d" % parts.size())
+	for part: PackedVector2Array in parts:
+		_check(not Geometry2D.triangulate_polygon(part).is_empty(), "every bicycle part triangulates")
+	# Room inferred for parking does not push a bike lane off the kerb.
+	_check(RoadPaint.parking_strips({"parking_m": 6.0, "cycle_lane": 2}) == Vector2(3.0, 0.0), "the bike lane keeps its kerb")
+	_check(RoadPaint.parking_strips({"parking_m": 6.0}) == Vector2(3.0, 3.0), "with no bike lane the room stays parking")
+	_check(RoadPaint.parking_strips({"parking": 2, "cycle_lane": 2}) == Vector2(0.0, OsmTags.PARKING_LANE_M), "tagged parking stays where it is tagged")
