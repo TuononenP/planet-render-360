@@ -344,6 +344,12 @@ func stop() -> void:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 
+## A carpet dropped with a bake in progress still joins its task.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+
 ## Ground heights (units) on a HEIGHT_TEXELS grid of `span` around the
 ## box's centre; static, so a running job holds nothing of a gone carpet.
 static func _bake(ground: GroundTruth, box: Dictionary, span: float) -> void:
