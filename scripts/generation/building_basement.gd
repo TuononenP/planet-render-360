@@ -5,12 +5,11 @@ extends RefCounted
 ## hill lifts a building's floor by more than a basement window's height,
 ## the plinth is a storey of its own: small lights along the downhill
 ## wall, a garage or cellar door where the ground is level enough, and on
-## the tallest walls a second row of windows above.
+## the tallest walls a row of windows for each further storey.
 
 ## Visible wall (floor line down to the ground) needed for each opening.
 const WINDOW_MIN_M := 1.9
 const DOOR_MIN_M := 2.8
-const UPPER_MIN_M := 4.2
 ## Openings sit in slots this far apart, this far in from the corners.
 const SLOT_M := 3.4
 const INSET_M := 1.0
@@ -26,6 +25,8 @@ const LIGHT_H_M := 0.8
 const LIGHT_SILL_M := 0.9
 const UPPER_H_M := 1.0
 const UPPER_SILL_M := 2.8
+const UPPER_TOP_GAP_M := 0.4
+const STOREY_M := 3.2
 ## Surround around an opening, and how far each layer stands off the wall.
 const SURROUND_M := 0.12
 const FRAME_OFFSET_M := 0.02
@@ -92,9 +93,11 @@ static func dress(root: Node3D, ring: PackedVector2Array, footing: Dictionary,
 			else:
 				var sill := mid + LIGHT_SILL_M * m
 				_opening(frames, panes, c, dir, n, LIGHT_W_M, sill, sill + LIGHT_H_M * m, true)
-			if wall_m >= UPPER_MIN_M:
-				var up := mid + UPPER_SILL_M * m
-				_opening(frames, panes, c, dir, n, LIGHT_W_M, up, up + UPPER_H_M * m, true)
+			# A row of windows for every further storey the wall stands.
+			var up := UPPER_SILL_M
+			while (y1 - mid) / m >= up + UPPER_H_M + UPPER_TOP_GAP_M:
+				_opening(frames, panes, c, dir, n, LIGHT_W_M, mid + up * m, mid + (up + UPPER_H_M) * m, true)
+				up += STOREY_M
 	BuildingWalls._emit(root, frames, _mat("frame", Color("#76726b"), 0.8))
 	BuildingWalls._emit(root, panes, _mat("glass", Color("#1d2a33"), 0.15))
 	for k in DOOR_COLOURS.size():

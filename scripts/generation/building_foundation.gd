@@ -18,11 +18,12 @@ const SINK_M := 0.6
 ## downhill gap. On steeper ground the floor keeps rising, so the hill
 ## never stands more than BURY_MAX_M up the uphill wall (under a window
 ## sill, a step down to a door), until the plinth is PLINTH_TALL_M: the
-## basement or garage storey a house on a hill shows the street below.
+## basement or garage storeys a house on a hill shows the street below
+## (BuildingBasement gives them doors and windows).
 const PLINTH_MAX_M := 2.5
 const PLINTH_MIN_M := 0.3
 const BURY_MAX_M := 0.5
-const PLINTH_TALL_M := 6.0
+const PLINTH_TALL_M := 10.0
 ## The least wall a building keeps above its floor once a plinth has come
 ## out of its tagged height.
 const MIN_BODY_M := 2.6
