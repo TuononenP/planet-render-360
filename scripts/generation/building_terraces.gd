@@ -24,6 +24,13 @@ const NO_GAIN := 0.7
 ## carries it to BuildingFoundation.sample.
 const CLIFF_TALL_M := 36.0
 const PLINTH_KEY := "plinth_tall_m"
+## Terrace floors stand on multiples of SNAP_M (half a storey), so two
+## side by side are level or a clear step apart, never a sliver of wall;
+## and every terrace takes its looks from the whole building's centre
+## (SEED_KEY), not its own, so the building stays one colour.
+const SNAP_M := 1.6
+const SNAP_KEY := "floor_snap_m"
+const SEED_KEY := "seed_at"
 ## A terrace runs at most this far up the slope where the footprint is
 ## long enough to need more steps than its relief alone asks for.
 const STEP_RUN_M := 25.0
@@ -51,14 +58,14 @@ static func _on_cliff(md: Dictionary, ground: GroundTruth, sea_y: float) -> Dict
 		return md
 	var m := WorldScale.metres_to_units()
 	var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], sea_y)
-	if bool(footing["raised"]) or float(footing["high"]) - float(footing["floor"]) <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
+	if float(footing["high"]) - float(footing["floor"]) <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
 		return md
 	var out := md.duplicate()
 	out[PLINTH_KEY] = CLIFF_TALL_M
 	return out
 
 ## The terraces of `md`, or none when a plinth seats it (or it is a raised
-## part, a waterfront building or too small to cut). A terrace still too
+## part or too small to cut). A terrace still too
 ## steep (the hill curves under a big block) is cut again across its own
 ## slope, `depth` more times. A courtyard stays a hole in the terraces
 ## around it.
@@ -72,9 +79,7 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 		return []
 	var footing := BuildingFoundation.sample(ground, ring, md["centre"], sea_y)
 	var buried := float(footing["high"]) - float(footing["floor"])
-	# A block on the water's edge stays whole: cut up, its seafront was a
-	# jumble of decks at different heights.
-	if bool(footing["raised"]) or buried <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
+	if buried <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
 		return []
 	var uphill := _uphill(ring, ground)
 	if not parent.is_empty() and buried > float(parent[1]) * NO_GAIN:
@@ -124,6 +129,8 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 			step["shape"] = "flat"
 			step["rh_m"] = 0.0
 			step["terrace"] = k
+			step[SNAP_KEY] = SNAP_M
+			step[SEED_KEY] = md.get(SEED_KEY, md["centre"])
 			var finer := terraces(step, ground, sea_y, depth - 1, [side, buried]) if depth > 0 else []
 			if finer.is_empty():
 				out.append(step)

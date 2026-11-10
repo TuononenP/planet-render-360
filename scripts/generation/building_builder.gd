@@ -394,7 +394,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	if idx.size() < 3:
 		return false
 	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)),
-		float(mass.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)))
+		float(mass.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
+		float(mass.get(BuildingTerraces.SNAP_KEY, 0.0)))
 	var base := float(footing["floor"])
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
@@ -430,7 +431,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# rows; past the fidelity radius the ≤6 distant set is shared.
 	var region := str(ctx.get("region", "generic"))
 	var fidelity := int(ctx.get("fidelity", 2))
-	var seed_v := TerrainBuilder._hash(centre.x, centre.y)
+	var seed_at: Vector2 = mass.get(BuildingTerraces.SEED_KEY, centre)
+	var seed_v := TerrainBuilder._hash(seed_at.x, seed_at.y)
 	# Geometry detail follows the camera (eye_d). Full materials also stay on
 	# the view's subject at the map centre, which a far eye looks back at.
 	var eye_d := centre.distance_to(ctx.get("eye", Vector2.ZERO) as Vector2)
@@ -675,7 +677,8 @@ static func _seat_under(masses: Array, centre: Vector2, ground: GroundTruth, ctx
 		if not best.is_empty() and not inside:
 			continue
 		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)),
-			float(md.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)))
+			float(md.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
+			float(md.get(BuildingTerraces.SNAP_KEY, 0.0)))
 		var height_world := float(md["wall_m"]) * m2u
 		best = [float(footing["floor"]), float(footing["floor"]) + height_world - _standing_top(footing, height_world, md["b_eff"])]
 		if inside:

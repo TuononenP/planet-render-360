@@ -25,7 +25,7 @@ const SINK_M := 0.6
 ## (BuildingBasement gives them doors and windows).
 const PLINTH_MAX_M := 2.5
 const PLINTH_MIN_M := 0.3
-const BURY_MAX_M := 0.5
+const BURY_MAX_M := 0.3
 const PLINTH_TALL_M := 10.0
 ## The least wall a building keeps above its floor once a plinth has come
 ## out of its tagged height.
@@ -39,9 +39,11 @@ const EDGE_GAP_M := 0.15
 static var _plinth_mat: Material
 
 ## `tall_m` is the tallest plinth it may stand on (BuildingTerraces
-## raises it for a piece on a cliff no terrace can step up).
+## raises it for a piece on a cliff no terrace can step up), and a
+## `snap_m` above zero lifts the floor to the next multiple of it, so the
+## terraces of one building stand level or a clear step apart.
 static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
-		sea_y: float = -INF, tall_m: float = PLINTH_TALL_M) -> Dictionary:
+		sea_y: float = -INF, tall_m: float = PLINTH_TALL_M, snap_m: float = 0.0) -> Dictionary:
 	var low := ground.height_at_world(centre.x, centre.y)
 	var high := low
 	var water := maxf(sea_y, ground.water_level_at(centre.x, centre.y, -INF))
@@ -80,6 +82,11 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 		if lift >= PLINTH_MIN_M * m:
 			floor_y = low + lift
 			plinth = lift
+	if snap_m > 0.0:
+		var snapped := ceilf(floor_y / (snap_m * WorldScale.metres_to_units())) * snap_m * WorldScale.metres_to_units()
+		if plinth > 0.0:
+			plinth += snapped - floor_y
+		floor_y = snapped
 	return {"floor": floor_y, "low": low, "high": high, "plinth": plinth,
 		"water": water, "raised": raised}
 
