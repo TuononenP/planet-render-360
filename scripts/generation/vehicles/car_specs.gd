@@ -1,7 +1,7 @@
 class_name CarSpecs
 extends RefCounted
 
-## Body specs for the procedural cars (VehicleKit.body), in metres with
+## Body specs for the procedural cars and the city bus (VehicleKit.body), in metres with
 ## +X forward and the origin under the middle of the car. Each kind is a
 ## handful of proportions (BASE plus its own row); spec() expands them
 ## into the profile tables the loft reads. Generic shapes, no real model.
@@ -13,7 +13,11 @@ const BASE := {
 	# Glasshouse: rear window foot and head, windscreen head and foot.
 	"gh": [-1.72, -1.02, 0.22, 1.02], "drop_f": 0.06, "drop_r": 0.07,
 	"tumble": 0.2, "rear_pillar": 0.5, "rear_glass": true, "extra_pillar": false,
-	"clad": 0.0, "valance": 0.1, "spokes": 5,
+	"clad": 0.0, "valance": 0.1, "spokes": 5, "tail_glass": false, "sign": false,
+	# Window pillars this far apart along the side glass (0: per door).
+	"pillar_step": 0.0,
+	# Two-tone: the paint above this height takes livery_col (taxis).
+	"livery_y": 100.0, "livery_col": Color.WHITE,
 	"lamp_f": Vector2(0.6, 0.86), "lamp_r": Vector2(0.56, 0.84), "grille": Vector2(0.14, 0.48),
 }
 
@@ -33,6 +37,40 @@ const KINDS := {
 		"bonnet_h": 1.1, "nose_h": 0.88, "wheel_r": 0.34, "front_oh": 0.95, "wb": 3.1,
 		"gh": [-2.62, -2.56, 1.05, 1.72], "drop_f": 0.04, "drop_r": 0.02, "tumble": 0.08,
 		"rear_glass": false, "lamp_f": Vector2(0.52, 0.7), "lamp_r": Vector2(0.3, 0.75)},
+	# A crew cab ahead of a covered load bed.
+	"pickup": {"len": 5.35, "wid": 1.95, "h": 1.84, "clear": 0.24, "belt_h": 1.14, "tail_h": 1.16,
+		"bonnet_h": 1.16, "nose_h": 1.0, "wheel_r": 0.39, "tyre_w": 0.26, "front_oh": 0.95, "wb": 3.3,
+		"gh": [-0.62, -0.5, 0.72, 1.38], "drop_f": 0.04, "drop_r": 0.03, "tumble": 0.12,
+		"rear_pillar": 0.2, "clad": 0.12, "spokes": 6, "lamp_f": Vector2(0.6, 0.8),
+		"lamp_r": Vector2(0.45, 0.85)},
+	# Tall, short and narrow: the Japanese light car.
+	"kei": {"len": 3.4, "wid": 1.48, "h": 1.72, "clear": 0.15, "belt_h": 0.96, "tail_h": 0.98,
+		"bonnet_h": 1.0, "nose_h": 0.86, "wheel_r": 0.275, "tyre_w": 0.165, "front_oh": 0.62, "wb": 2.46,
+		"gh": [-1.82, -1.76, 0.72, 1.24], "drop_f": 0.04, "drop_r": 0.02, "tumble": 0.07,
+		"rear_pillar": 0.34, "tail_glass": true, "lamp_f": Vector2(0.56, 0.8), "lamp_r": Vector2(0.3, 0.6)},
+	"minivan": {"len": 4.85, "wid": 1.9, "h": 1.76, "clear": 0.17, "belt_h": 1.0, "tail_h": 1.02,
+		"bonnet_h": 1.03, "nose_h": 0.86, "wheel_r": 0.335, "front_oh": 0.95, "wb": 3.0,
+		"gh": [-2.56, -2.5, 0.85, 1.68], "drop_f": 0.05, "drop_r": 0.02, "tumble": 0.12,
+		"rear_pillar": 0.5, "extra_pillar": true, "tail_glass": true,
+		"lamp_f": Vector2(0.58, 0.8), "lamp_r": Vector2(0.4, 0.8)},
+	"compact_suv": {"len": 4.3, "wid": 1.8, "h": 1.6, "clear": 0.2, "belt_h": 1.0, "tail_h": 1.04,
+		"bonnet_h": 1.0, "nose_h": 0.85, "wheel_r": 0.345, "tyre_w": 0.225, "front_oh": 0.86, "wb": 2.6,
+		"gh": [-2.03, -1.76, 0.28, 0.96], "tumble": 0.17, "rear_pillar": 0.3, "clad": 0.14,
+		"lamp_f": Vector2(0.64, 0.86), "lamp_r": Vector2(0.6, 0.88)},
+	# The tall, upright London cab.
+	"cab_london": {"len": 4.6, "wid": 1.86, "h": 1.84, "clear": 0.17, "belt_h": 1.02, "tail_h": 1.04,
+		"bonnet_h": 1.04, "nose_h": 0.92, "wheel_r": 0.33, "front_oh": 0.78, "wb": 2.9,
+		"gh": [-2.12, -1.88, 0.5, 1.2], "drop_f": 0.04, "drop_r": 0.04, "tumble": 0.1,
+		"rear_pillar": 0.5, "sign": true, "lamp_f": Vector2(0.6, 0.84), "lamp_r": Vector2(0.45, 0.8)},
+	# A twelve-metre city bus: a glazed box on a low floor.
+	"bus": {"len": 12.0, "wid": 2.55, "h": 3.05, "clear": 0.3, "belt_h": 1.1, "tail_h": 1.1,
+		"bonnet_h": 1.1, "nose_h": 1.05, "wheel_r": 0.48, "tyre_w": 0.3, "front_oh": 2.7, "wb": 5.9,
+		"gh": [-6.2, -6.14, 5.55, 5.86], "drop_f": 0.05, "drop_r": 0.02, "tumble": 0.03,
+		"rear_pillar": 0.9, "tail_glass": true, "pillar_step": 1.45, "spokes": 8,
+		"lamp_f": Vector2(0.3, 0.44), "lamp_r": Vector2(0.3, 0.6), "grille": Vector2(0.06, 0.2)},
+	# Saloon cabs: a roof sign, and where the city has one, a roof colour.
+	"taxi": {"sign": true},
+	"taxi_lisbon": {"sign": true, "livery_y": 1.0, "livery_col": Color(0.0, 0.42, 0.36)},
 }
 
 static var _specs := {}
@@ -88,6 +126,7 @@ static func _expand(p: Dictionary) -> Dictionary:
 		Vector2(-half + 0.3, float(p["tail_h"])), Vector2(gh[2], belt_h), Vector2(gh[3], float(p["bonnet_h"])),
 		Vector2((gh[3] + half) * 0.5, lerpf(float(p["bonnet_h"]), float(p["nose_h"]), 0.42)),
 		Vector2(half - 0.18, float(p["nose_h"])), Vector2(half, float(p["nose_h"]) - 0.07)])
+	belt.sort()
 	s["belt"] = belt
 	var crown := PackedVector2Array([Vector2(-half, 0.03), Vector2(gh[3], 0.06), Vector2(half, 0.04)])
 	s["crown"] = crown
@@ -112,6 +151,13 @@ static func _expand(p: Dictionary) -> Dictionary:
 	var pillars: Array[Vector2] = []
 	if bool(p["rear_glass"]):
 		pillars.append(Vector2(door_b - 0.05, door_b + 0.05))
+	var step := float(p["pillar_step"])
+	if step > 0.0:
+		pillars.clear()
+		var px := glass_r + step
+		while px < gh[3] - 0.6:
+			pillars.append(Vector2(px - 0.05, px + 0.05))
+			px += step
 	if bool(p["extra_pillar"]):
 		pillars.append(Vector2(door_r - 0.2, door_r - 0.1))
 	s["pillars"] = pillars

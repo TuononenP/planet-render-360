@@ -17,7 +17,7 @@ func _init() -> void:
 		for car: ArrayMesh in [near, far]:
 			var box := car.get_aabb()
 			if absf(box.size.x - float(s["len"])) > 0.06 or absf(box.position.y) > 0.01 \
-					or absf(box.size.y - float(s["h"])) > 0.08 or box.size.z < float(s["wid"]) - 0.12 \
+					or box.size.y < float(s["h"]) - 0.08 or box.size.y > float(s["h"]) + 0.14 or box.size.z < float(s["wid"]) - 0.12 \
 					or box.size.z > float(s["wid"]) + 0.4 or absf(box.get_center().x) > 0.05:
 				failures.append("%s bounds are not a grounded, +X car of its spec: %s" % [kind, box])
 			var names := {}

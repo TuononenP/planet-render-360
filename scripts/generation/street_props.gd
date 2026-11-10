@@ -56,9 +56,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	boats += HarbourFerries.build(root, data, ground, mask)
 	var quay_bollards := QuayDetails.build(root, data, ground)
 	var cars := ParkedCars.build(root, data, ground)
+	var trams := TransitVehicles.build(root, data, ground)
 	var wires := OverheadWires.build(root, data, ground)
 	var snowbanks := Snowbanks.build(root, data, ground)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "wires": wires, "snowbanks": snowbanks}
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "wires": wires, "snowbanks": snowbanks}
 
 # --- Lampposts -----------------------------------------------------------
 

@@ -187,6 +187,7 @@ func _run() -> void:
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
 	_sidewalk_checks(failures)
+	_stop_checks(failures)
 	_height_unit_checks(failures)
 	_poi_checks(failures)
 
@@ -601,8 +602,8 @@ func _query_checks(failures: Array[String]) -> void:
 			or not (with_country["buildings"] as Array).is_empty() \
 			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
 		failures.append("parse must read the is_in area's ISO code and nothing else from it")
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 28:
-		failures.append("expected 28 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 31:
+		failures.append("expected 31 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
 	if not q.contains('node["railway"="subway_entrance"]'):
 		failures.append("detailed furniture query must include subway entrances")
@@ -612,7 +613,7 @@ func _query_checks(failures: Array[String]) -> void:
 	if not ny_query.contains("around:450,40.702650,-73.996860"):
 		failures.append("New York furniture query should be centred on the preset eye")
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 28:
+	if q420.count("420,48.856600,2.352200") != 31:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)
@@ -1079,3 +1080,32 @@ func _sidewalk_checks(failures: Array[String]) -> void:
 	if not bool(OsmTags._rail_entry({"railway": "tram", "gauge": "1067", "electrified": "no"},
 			PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])).get("cable", false)):
 		failures.append("a non-electrified street tram (Hyde St's track) is a cable car")
+
+## Tram and bus stop nodes (TransitVehicles): asked for over the whole
+## radius, parsed to {x, z, name}; a bus stop stays street furniture too.
+func _stop_checks(failures: Array[String]) -> void:
+	var q := OsmFetcher.build_query(48.8566, 2.3522)
+	for clause in ['node["railway"="tram_stop"]', 'node["public_transport"="stop_position"]["tram"="yes"]',
+			'node["highway"="bus_stop"](around:%d,' % OsmFetcher.DETAILED_RADIUS_M]:
+		if not q.contains(clause):
+			failures.append("the detailed query must ask for %s" % clause)
+	var parsed := OsmFetcher.parse_features("""{"elements":[
+		{"type":"node","id":1,"lat":48.8570,"lon":2.3522,"tags":{"railway":"tram_stop","name":"Quai"}},
+		{"type":"node","id":2,"lat":48.8566,"lon":2.3530,"tags":{"public_transport":"stop_position","tram":"yes"}},
+		{"type":"node","id":3,"lat":48.8566,"lon":2.3540,"tags":{"public_transport":"stop_position","bus":"yes"}},
+		{"type":"node","id":4,"lat":48.8560,"lon":2.3522,"tags":{"highway":"bus_stop","name":"Pont","shelter":"yes"}}
+	]}""", 48.8566, 2.3522)
+	var trams: Array = parsed.get("tram_stops", [])
+	var buses: Array = parsed.get("bus_stops", [])
+	if trams.size() != 2 or buses.size() != 1 or (parsed["furniture"] as Array).size() != 1:
+		failures.append("stops: expected 2 tram, 1 bus (also furniture), got %s / %s" % [trams, buses])
+		return
+	var quai: Dictionary = trams[0]
+	var pont: Dictionary = buses[0]
+	if str(quai["name"]) != "Quai" or absf(float(quai["x"])) > 0.5 or absf(float(quai["z"]) + 44.5) > 1.0 \
+			or str(pont["name"]) != "Pont" or float(pont["z"]) < 60.0 or str(trams[1]["name"]) != "":
+		failures.append("stops carry their place and name: %s %s" % [quai, pont])
+	var old := OsmFetcher.parse_features("{}", 0.0, 0.0)
+	if not (old.get("tram_stops", [0]) as Array).is_empty() or not LocationData.new().tram_stops.is_empty() \
+			or not LocationData.new().bus_stops.is_empty():
+		failures.append("payloads without stops give empty stop lists")

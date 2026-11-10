@@ -18,7 +18,7 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	var s := CarSpecs.spec(kind)
 	var lm := LandmarkMesh.new()
 	lm.use("Paint", paint(kind))
-	for key in ["Glass", "Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate"]:
+	for key in ["Glass", "Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign"]:
 		lm.use(key, material(key))
 	VehicleKit.body(lm, s, far)
 	var r := float(s["wheel_r"])
@@ -33,7 +33,7 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	_meshes[id] = out
 	return out
 
-## Mirrors, door handles, number plates and the roof aerial.
+## Mirrors, door handles, number plates, a cab's roof sign and the aerial.
 static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 	var half := float(s["len"]) * 0.5
 	var gh: PackedFloat32Array = s["gh"]
@@ -53,6 +53,10 @@ static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 		var top := VehicleKit.soft(s["belt"], end * half, 0.1)
 		var y := lerpf(fl, top, 0.3 if end > 0.0 else 0.5)
 		lm.box("Plate", Vector3(end * (half - 0.004), y, 0.0), Vector3(0.02, 0.11, 0.5), Basis(), 0.0)
+	if bool(s["sign"]):
+		var sx := lerpf(gh[1], gh[2], 0.7)
+		lm.box("Sign", Vector3(sx, VehicleKit.soft(s["roof"], sx, 0.07) + 0.06, 0.0),
+			Vector3(0.14, 0.12, 0.34), Basis(), 0.02)
 	var roof_x := lerpf(gh[1], gh[2], 0.08)
 	VehicleKit.blob(lm, "Trim", Vector3(roof_x, VehicleKit.soft(s["roof"], roof_x, 0.07) + 0.02, 0.0),
 		Vector3(0.09, 0.035, 0.03), 4, 8)
@@ -85,6 +89,8 @@ static func paint(kind: String) -> ShaderMaterial:
 	m.set_shader_parameter("seam_side_n", side.size())
 	m.set_shader_parameter("seam_top", top)
 	m.set_shader_parameter("seam_top_n", top.size())
+	m.set_shader_parameter("livery_y", float(s["livery_y"]))
+	m.set_shader_parameter("livery_col", s["livery_col"])
 	_materials[id] = m
 	return m
 
@@ -127,5 +133,8 @@ static func material(key: String) -> StandardMaterial3D:
 		"Plate":
 			m.albedo_color = Color(0.8, 0.8, 0.78)
 			m.roughness = 0.5
+		"Sign":
+			m.albedo_color = Color(0.9, 0.78, 0.25)
+			m.roughness = 0.35
 	_materials[key] = m
 	return m

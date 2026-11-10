@@ -340,7 +340,8 @@ planet-render-360/
 │   │   ├── shoreline_model.gd, shore_*.gd, water_*.gd, quay_*.gd
 │   │   │                          Shared shoreline geometry, water ownership, banks, quays and moorings
 │   │   ├── tree_*.gd, vegetation_*.gd, canopy_vegetation.gd, foliage_textures.gd, climate_model.gd
-│   │   ├── parked_cars.gd, car_paint.gd, vehicles/ (VehicleKit, CarSpecs, CarModel)
+│   │   ├── parked_cars.gd, car_paint.gd, vehicles/ (VehicleKit, CarSpecs, CarModel, CarFleet,
+│   │   │                          TramSpecs, TramModel, TramRoute, TransitVehicles)
 │   │   │                          Parked vehicle placement, imported models and paint shader
 │   │   ├── ship_builder.gd, marina_builder.gd, harbour_ferries.gd, vessel_*.gd, *_model.gd
 │   │   │                          Procedural vessels, marinas and harbour ferries
@@ -382,7 +383,6 @@ planet-render-360/
 │   ├── map/                   Bundled map-tile packs (Git LFS)
 │   ├── preset_thumbs/         Curated place thumbnails
 │   ├── textures/              CC0 Poly Haven PBR sets (2k/) and foliage atlases (foliage/)
-│   └── vehicles/              Imported car models, textures and attribution
 ├── assets_src/blender/        Blender sources (offline only, never shipped)
 ├── tests/                     About 150 regression scripts and offline fixtures/ (mostly headless;
 │                              screenshot_test.gd, panorama_render_test.gd and world_cache_test.gd need a window)

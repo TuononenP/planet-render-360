@@ -57,16 +57,6 @@ func _run() -> void:
 		failures.append("parked sides: measured room parks both, no room none, a no-parking tag wins")
 	_width_barriers(failures)
 	_directions_and_obstacles(failures)
-	var yellow := Color(0.95, 0.62, 0.02)
-	var taxi_count := 0
-	for i in 500:
-		var p := Vector2(float(i) * 7.0, 31.0)
-		if ParkedCars.paint_for(p, "sedan", true) == yellow:
-			taxi_count += 1
-		if ParkedCars.paint_for(p, "sedan", false) == yellow:
-			failures.append("taxi paint must stay in New York")
-	if taxi_count < 20 or taxi_count > 100:
-		failures.append("New York should have a modest share of yellow sedans: %d" % taxi_count)
 	# Placement on a slope (5 %, z down the street).
 	var data := _data(0.05)
 	data.roads = roads

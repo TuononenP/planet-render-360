@@ -44,6 +44,10 @@ const CAP_POIS := 2500
 ## area:highway, multipolygon squares).
 const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
+## Tram and bus stop nodes over the whole detailed radius
+## (TransitVehicles stands trams at them). Payloads cached or bundled
+## before this statement simply carry none; no query version bump.
+const CAP_STOPS := 1500
 ## Marks a response as this query's (an Overpass `make` element): a
 ## cached detailed payload without it predates the current statements
 ## (q3 railways and squares, q4 furniture, q5 piers, q6–q7 shore
@@ -132,6 +136,10 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 		# the server timeout, which drops the statements printed last.
 		('way["railway"~"^(%s)$"](around:%d,%.6f,%.6f);out geom %d;')
 			% ["|".join(PackedStringArray(OsmTags.RAIL_CLASSES)), radius_m, lat, lon, CAP_RAILWAYS],
+		('(node["railway"="tram_stop"](around:%d,%.6f,%.6f);'
+			+ 'node["public_transport"="stop_position"]["tram"="yes"](around:%d,%.6f,%.6f);'
+			+ 'node["highway"="bus_stop"](around:%d,%.6f,%.6f););out %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon, CAP_STOPS],
 		('(way["area:highway"="pedestrian"](around:%d,%.6f,%.6f);'
 			+ 'way["place"="square"](around:%d,%.6f,%.6f);'
 			+ 'relation["highway"]["type"="multipolygon"](around:%d,%.6f,%.6f);'

@@ -8,6 +8,7 @@ extends RefCounted
 ## * Shut lines: door, bonnet and boot gaps are drawn, not modelled: the
 ##   body's material lists them as segments in the car's own frame (side
 ##   view x/y, plan x/|z|), a few millimetres wide and antialiased.
+## * Livery: a cab's roof colour, above the material's livery_y.
 ## * Finish: a sharp clear coat over every paint; metallic paints
 ##   (instance custom .x) add a strong metal base with a faint flake,
 ##   kept short of fully metallic (that mirrored the sky like a glass case).
@@ -22,6 +23,8 @@ uniform vec4 seam_side[8];
 uniform int seam_side_n = 0;
 uniform vec4 seam_top[8];
 uniform int seam_top_n = 0;
+uniform float livery_y = 100.0;
+uniform vec3 livery_col : source_color = vec3(1.0);
 varying vec4 instance_paint;
 varying vec4 finish;
 varying vec3 body_pos;
@@ -56,7 +59,7 @@ void fragment() {
 		}
 	}
 	float seam = clamp((0.004 - d) / px + 0.5, 0.0, 1.0) * clamp(0.012 / px, 0.0, 1.0);
-	vec3 col = instance_paint.rgb * (1.0 - 0.85 * seam);
+	vec3 col = (body_pos.y > livery_y ? livery_col : instance_paint.rgb) * (1.0 - 0.85 * seam);
 	// Flake: a roughness wobble per millimetre, faded before it can shimmer.
 	vec3 cell = floor(body_pos * 1500.0);
 	float flake = (snow_hash(cell.xz + cell.y * 17.0) - 0.5) * (1.0 - smoothstep(0.5, 1.5, px * 1500.0));

@@ -661,6 +661,8 @@ func _await_osm(data: LocationData) -> void:
 		data.country = _osm.country
 		data.railways = _osm.railways
 		data.street_furniture = _osm.furniture
+		data.tram_stops = _osm.tram_stops
+		data.bus_stops = _osm.bus_stops
 		data.piers = _osm.piers
 		data.shore_structures = _osm.shore_structures
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))

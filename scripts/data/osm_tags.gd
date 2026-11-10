@@ -169,6 +169,16 @@ static func rail_class(tags: Dictionary) -> String:
 	var cls := str(tags.get("railway", ""))
 	return cls if cls in RAIL_CLASSES else ""
 
+## Transit stop kind of a node: "tram" (railway=tram_stop, or a
+## stop_position with tram=yes), "bus" (highway=bus_stop) or "".
+static func stop_kind(tags: Dictionary) -> String:
+	if str(tags.get("railway", "")) == "tram_stop" or (str(tags.get("public_transport", "")) == "stop_position"
+			and str(tags.get("tram", "")) == "yes"):
+		return "tram"
+	if str(tags.get("highway", "")) == "bus_stop":
+		return "bus"
+	return ""
+
 ## One railway dict: the gauge (mm tag, else 1000 mm tram / 1435 mm),
 ## whether the track is set in a street (trams unless embedded=no, or
 ## embedded=yes), whether a cable runs in a slot between the rails

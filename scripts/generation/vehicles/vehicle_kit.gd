@@ -257,7 +257,8 @@ static func _stations(s: Dictionary, far: bool) -> PackedFloat32Array:
 			continue
 		if out.is_empty() or x - out[out.size() - 1] > 0.0035:
 			out.append(x)
-	var step := 0.55 if far else 0.16
+	# A bus's long flat flanks need few stations.
+	var step := (0.55 if far else 0.16) * (2.0 if half_l > 3.5 else 1.0)
 	var keyed := out.duplicate()
 	var fill := x_r + step
 	while fill < x_f:
@@ -443,6 +444,9 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 		ROLE_MOULD:
 			return "Trim"
 		ROLE_SIDE_GLASS:
+			# An upright tail carries its window in the rear face.
+			if em < -0.1 and bool(s["tail_glass"]):
+				return "Glass"
 			var sg: Vector2 = s["side_glass"]
 			if em != 0.0 or xm < sg.x or xm > sg.y:
 				return "Paint"

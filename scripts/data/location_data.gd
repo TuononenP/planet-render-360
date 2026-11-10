@@ -191,6 +191,12 @@ var shore_structures: Array = []
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
 var railways: Array = []
+## OSM tram stops (railway=tram_stop, tram stop positions) and bus stops
+## (highway=bus_stop): {x, z, name} in current internal units. Empty for
+## payloads cached or bundled before the query asked for them;
+## TransitVehicles then spaces its trams along the track alone.
+var tram_stops: Array = []
+var bus_stops: Array = []
 ## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
 ## past the detailed extent — {class: residential|commercial|industrial|
 ## retail, points: PackedVector2Array, holes: Array} in metre XZ, from

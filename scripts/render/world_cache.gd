@@ -16,7 +16,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 234
+const BUILD_VERSION := 235
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -43,7 +43,8 @@ static func key(data: LocationData) -> String:
 		data.focus.is_empty(), _view_eye(data),
 		hash(var_to_bytes(data.landmark_candidates)),
 		hash(var_to_bytes([data.shore_structures, data.land_polygons, data.waterways, data.buildings, data.roads])),
-		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois])),
+		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
+			data.tram_stops, data.bus_stops])),
 		hash(var_to_bytes(data.far_landuse)), hash(var_to_bytes(data.far_towers)),
 		FarCityFetcher.QUERY_VERSION, str(data.climate),
 		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,

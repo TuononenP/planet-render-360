@@ -32,6 +32,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var barriers: Array = []
 	var railways: Array = []
 	var furniture: Array = []
+	var tram_stops: Array = []
+	var bus_stops: Array = []
 	var pois: Array = []
 	var piers: Array = []
 	var shore_structures: Array = []
@@ -41,7 +43,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
 			"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
+			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
+			"tram_stops": tram_stops, "bus_stops": bus_stops}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -112,6 +115,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var fp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
 				furniture.append({"x": fp.x, "z": fp.y, "kind": fk,
 					"shelter": str(el_tags.get("shelter", "")) == "yes"})
+			var stop := OsmTags.stop_kind(el_tags)
+			if stop != "":
+				var sp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				(tram_stops if stop == "tram" else bus_stops).append({"x": sp.x, "z": sp.y,
+					"name": str(el_tags.get("name", ""))})
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
@@ -277,7 +285,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers, "country": country, "railways": railways,
-		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
+		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
+		"tram_stops": tram_stops, "bus_stops": bus_stops}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

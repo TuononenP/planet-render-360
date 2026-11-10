@@ -10,12 +10,12 @@ extends RefCounted
 ##   `parking_m`: one lane's room parks the right side, two both).
 ## * How: a slot every SLOT_M along the kerb, CUT_M clear of every
 ##   junction (corners and crossings stay open), OCCUPIED of them taken;
-##   each car sits on the ground under its own wheels, so it pitches with
-##   the street.
-## * Cars: sedans, hatchbacks, wagons, SUVs and vans modelled from their
-##   specs (CarModel); paint mostly white, black, grey and
-##   silver, some colour; most coloured and grey paints are metallic, and
-##   each car carries some road grime (CarPaint). Placement hashes
+##   each car sits on the ground under its own wheels, so it pitches and
+##   leans with the street.
+## * Cars: the place's fleet (CarFleet: body kinds, paint shares, the
+##   local taxi), each kind modelled from its spec (CarModel); most
+##   coloured and grey paints are metallic, and each car carries some
+##   road grime (CarPaint) and is a little longer or taller than the next. Placement hashes
 ##   positions, so a street always parks the same cars, each a little off
 ##   square to the kerb. MultiMeshes group nearby cars by kind; distant
 ##   groups use simpler meshes, and a soft contact shadow sits under every
@@ -30,15 +30,12 @@ const CUT_M := 9.0
 const OCCUPIED := 0.78
 ## Car centreline inside the kerb (m).
 const KERB_IN_M := 1.15
-const KINDS: Array[String] = ["sedan", "sedan", "hatch", "hatch", "wagon", "suv", "suv", "van"]
-## Roughly the fleet's shares: white, black, grey and silver lead.
-const PAINT := [Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84), Color(0.85, 0.85, 0.84),
-	Color(0.03, 0.03, 0.035), Color(0.03, 0.03, 0.035), Color(0.30, 0.31, 0.32), Color(0.30, 0.31, 0.32),
-	Color(0.55, 0.56, 0.57), Color(0.55, 0.56, 0.57), Color(0.20, 0.04, 0.04), Color(0.04, 0.08, 0.20),
-	Color(0.42, 0.40, 0.34)]
 ## Off-square parking: yaw (degrees) and sideways play (m) either way.
 const YAW_JITTER_DEG := 1.2
 const KERB_JITTER_M := 0.1
+## No two cars of a kind are quite one size: length and height either way.
+const LENGTH_JITTER := 0.03
+const HEIGHT_JITTER := 0.02
 
 static var _meshes: Dictionary = {}
 const CELL_M := 40.0
@@ -52,8 +49,11 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var junc := RoadSurface.junctions(data)
 	var obstacles := obstacle_grid(data, m2u)
+	# Standing trams and buses hold their kerb.
+	for item: Array in TransitVehicles.footprints(data, ground, m2u):
+		_add_obstacle(obstacles, item[0], item[1], float(item[2]), m2u)
 	var left_traffic := RoadSurface.left_traffic(data)
-	var nyc := CityStyles.region_at(data.latitude, data.longitude) == "new_york"
+	var fleet := CarFleet.profile(data)
 	for r in data.roads:
 		if not (r is Dictionary):
 			continue
@@ -71,7 +71,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 		for side in [[1, 1.0], [2, -1.0]]:
 			if sides & int(side[0]) != 0:
 				_kerb(cars, pts, (half - KERB_IN_M) * float(side[1]) * m2u, centre, r2, junc, ground, m2u,
-				int(road.get("oneway", 0)), left_traffic, obstacles, nyc)
+				int(road.get("oneway", 0)), left_traffic, obstacles, fleet)
 	cars.sort_custom(func(a: Array, b: Array) -> bool:
 		return float(a[4]) < float(b[4]))
 	return cars.slice(0, MAX_CARS)
@@ -92,7 +92,7 @@ static func sides_of(road: Dictionary) -> int:
 ## One kerb: slots along the polyline offset `off` to its left.
 static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vector2, r2: float,
 		junc: Dictionary, ground: GroundTruth, m2u: float, oneway: int,
-		left_traffic: bool, obstacles: Dictionary, nyc: bool) -> void:
+		left_traffic: bool, obstacles: Dictionary, fleet: Dictionary) -> void:
 	for i in pts.size() - 1:
 		var a := pts[i]
 		var b := pts[i + 1]
@@ -110,7 +110,8 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 				continue
 			if _hash(p.x, p.y, 1.3) > OCCUPIED:
 				continue
-			var kind := KINDS[int(_hash(p.x, p.y, 2.7) * KINDS.size()) % KINDS.size()]
+			var car: Array = CarFleet.pick(fleet, p)
+			var kind: String = car[0]
 			var length := _length_m(kind) * m2u
 			if blocked(p, obstacles, m2u):
 				continue
@@ -122,13 +123,19 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var yf := ground.height_at_world(front.x, front.y)
 			var yb := ground.height_at_world(back.x, back.y)
 			var forward := Vector3(fw.x * length * 0.8, yf - yb, fw.y * length * 0.8).normalized()
-			var side := forward.cross(Vector3.UP).normalized()
-			var up := side.cross(forward).normalized()
+			# Lean with the camber too: on a street that falls away to one
+			# side a level car hung its downhill wheels in the air.
+			var across := Vector2(-fw.y, fw.x) * 0.8 * m2u
+			var lean := Vector3(across.x * 2.0, ground.height_at_world(q.x + across.x, q.y + across.y)
+				- ground.height_at_world(q.x - across.x, q.y - across.y), across.y * 2.0).normalized()
+			var up := lean.cross(forward).normalized()
+			if up.y < 0.0:
+				up = -up
 			var basis := Basis(forward, up, forward.cross(up))
 			var pos := Vector3(q.x, (yf + yb) * 0.5 + 0.04 * m2u, q.y)
-			var colour := paint_for(p, kind, nyc)
-			cars.append([pos, basis.scaled(Vector3.ONE * m2u), kind, colour, d2,
-				finish_for(p, colour, nyc)])
+			var size := Vector3(1.0 + LENGTH_JITTER * (_hash(p.x, p.y, 3.4) * 2.0 - 1.0),
+				1.0 + HEIGHT_JITTER * (_hash(p.x, p.y, 3.9) * 2.0 - 1.0), 1.0)
+			cars.append([pos, basis * Basis.from_scale(size * m2u), kind, car[1], d2, car[2]])
 
 static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
 	var cell := Vector2i(floori(p.x / RoadSurface.JUNCTION_M), floori(p.y / RoadSurface.JUNCTION_M))
@@ -138,21 +145,6 @@ static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
 				if q.distance_to(p) < cut:
 					return true
 	return false
-
-## A small deterministic share of New York sedans carry taxi yellow.
-static func paint_for(p: Vector2, kind: String, nyc: bool) -> Color:
-	if nyc and kind == "sedan" and _hash(p.x, p.y, 9.1) < 0.12:
-		return Color(0.95, 0.62, 0.02)
-	return PAINT[int(_hash(p.x, p.y, 4.9) * PAINT.size()) % PAINT.size()]
-
-## CarPaint instance data: r metallic (0/1), g grime. Most grey and
-## coloured paints are metallic, few whites and blacks; cabs are solid.
-static func finish_for(p: Vector2, colour: Color, nyc: bool) -> Color:
-	var solid_shade := colour.v > 0.8 or colour.v < 0.05
-	var taxi := nyc and colour == Color(0.95, 0.62, 0.02)
-	var share := 0.0 if taxi else (0.25 if solid_shade else 0.85)
-	var metallic := 1.0 if _hash(p.x, p.y, 5.3) < share else 0.0
-	return Color(metallic, 0.2 + 0.65 * _hash(p.x, p.y, 8.2), 0.0, 0.0)
 
 static func _width_m(kind: String) -> float:
 	return CarSpecs.width_m(kind)
@@ -286,6 +278,18 @@ static func obstacle_grid(data: LocationData, m2u: float) -> Dictionary:
 						grid[key] = []
 					(grid[key] as Array).append([pts[i], pts[i + 1], (float(rail.get("gauge_m", 1.435)) * 0.5 + 1.0) * m2u])
 	return grid
+
+## A segment obstacle a-b of `radius` (world units) into `grid`.
+static func _add_obstacle(grid: Dictionary, a: Vector2, b: Vector2, radius: float, m2u: float) -> void:
+	var cell := OBSTACLE_CELL_M * m2u
+	var lo := (a.min(b) - Vector2.ONE * radius) / cell
+	var hi := (a.max(b) + Vector2.ONE * radius) / cell
+	for x in range(floori(lo.x), floori(hi.x) + 1):
+		for z in range(floori(lo.y), floori(hi.y) + 1):
+			var key := Vector2i(x, z)
+			if not grid.has(key):
+				grid[key] = []
+			(grid[key] as Array).append([a, b, radius])
 
 static func blocked(p: Vector2, grid: Dictionary, m2u: float) -> bool:
 	var key := Vector2i(floori(p.x / (OBSTACLE_CELL_M * m2u)), floori(p.y / (OBSTACLE_CELL_M * m2u)))

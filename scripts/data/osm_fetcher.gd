@@ -262,6 +262,10 @@ var country := ""
 var railways: Array = []
 ## Street furniture nodes of the last success (OsmParser.furniture_kind).
 var furniture: Array = []
+## Tram and bus stop nodes {x, z, name} of the last success (empty for
+## payloads cached before the query asked for them).
+var tram_stops: Array = []
+var bus_stops: Array = []
 ## Shop, amenity, office, tourism, craft and advertising nodes.
 var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
@@ -319,6 +323,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_pending_lon = lon
 	country = ""
 	railways = []
+	tram_stops = []
+	bus_stops = []
 	shore_structures = []
 	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
@@ -708,6 +714,8 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	country = str(parsed.get("country", ""))
 	railways = parsed.get("railways", [])
 	furniture = parsed.get("furniture", [])
+	tram_stops = parsed.get("tram_stops", [])
+	bus_stops = parsed.get("bus_stops", [])
 	pois = parsed.get("pois", [])
 	piers = parsed.get("piers", [])
 	shore_structures = parsed.get("shore_structures", [])
