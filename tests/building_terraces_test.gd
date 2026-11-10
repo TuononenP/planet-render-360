@@ -19,6 +19,9 @@ func _ground(slope_m_per_post: float) -> GroundTruth:
 	d.water_level = -3.0
 	return GroundTruth.new(d)
 
+func _square_at(c: Vector2, r: float) -> PackedVector2Array:
+	return PackedVector2Array([c + Vector2(-r, -r), c + Vector2(r, -r), c + Vector2(r, r), c + Vector2(-r, r)])
+
 func _mass(ring: PackedVector2Array) -> Dictionary:
 	var c := Vector2.ZERO
 	for p in ring:
@@ -71,6 +74,22 @@ func _run() -> void:
 	var want := area - absf(RingGeometry.signed_area(yard))
 	if absf(court_area - want) > want * 0.02:
 		failures.append("courtyard terraces cover %.0f of %.0f m²" % [court_area / (m * m), want / (m * m)])
+	# A sheer drop under a small footprint: no cut steps up it, so the
+	# piece keeps its floor at the top on a taller plinth.
+	var wall := LocationData.new()
+	wall.grid_size = 64
+	wall.heights.resize(64 * 64)
+	for z in 64:
+		for x in 64:
+			wall.heights[z * 64 + x] = 20.0 if x < 32 else 36.0
+	wall.water_level = -3.0
+	var drop := GroundTruth.new(wall)
+	for step: Dictionary in BuildingTerraces.split([_mass(_square_at(Vector2.ZERO, 6.0 * m))], drop, -INF):
+		var seat := BuildingFoundation.sample(drop, step["ring"], step["centre"], -INF,
+			float(step.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)))
+		var left := (float(seat["high"]) - float(seat["floor"])) / m
+		if left > BuildingFoundation.BURY_MAX_M + 0.05:
+			failures.append("a piece across a %.0f m drop is buried %.2f m" % [(float(seat["high"]) - float(seat["low"])) / m, left])
 	if failures.is_empty():
 		print("building_terraces_test passed")
 		quit(0)

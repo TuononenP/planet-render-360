@@ -11,6 +11,9 @@ const POST_SPACING_M := 4.0
 ## Low pier relief can be DEM interpolation across its water boundary.
 ## A steep bank must not lift the whole waterfront building to its top.
 const SLAB_RELIEF_M := 4.0
+## A waterfront building on a steeper bank stands this far above the
+## water at most, to keep its landward ground floor out of the bank.
+const BANK_TALL_M := 16.0
 ## Walls sink this far below the lowest ground (no floating on slopes).
 const SINK_M := 0.6
 ## On a slope the floor rises to the uphill ground while that is within
@@ -35,8 +38,10 @@ const EDGE_SAMPLES_MAX := 24
 const EDGE_GAP_M := 0.15
 static var _plinth_mat: Material
 
+## `tall_m` is the tallest plinth it may stand on (BuildingTerraces
+## raises it for a piece on a cliff no terrace can step up).
 static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
-		sea_y: float = -INF) -> Dictionary:
+		sea_y: float = -INF, tall_m: float = PLINTH_TALL_M) -> Dictionary:
 	var low := ground.height_at_world(centre.x, centre.y)
 	var high := low
 	var water := maxf(sea_y, ground.water_level_at(centre.x, centre.y, -INF))
@@ -64,14 +69,14 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 		# water and its floor still rises toward the uphill ground, as a
 		# dry hillside building's does, so the bank does not bury it.
 		floor_y = maxf(floor_y, minf(high - BURY_MAX_M * WorldScale.metres_to_units(),
-			floor_y + PLINTH_TALL_M * WorldScale.metres_to_units()))
+			floor_y + maxf(tall_m, BANK_TALL_M) * WorldScale.metres_to_units()))
 	var plinth := 0.0
 	if not raised:
 		var m := WorldScale.metres_to_units()
 		var relief := high - low
 		var lift := minf(relief, PLINTH_MAX_M * m)
 		if relief > PLINTH_MAX_M * m:
-			lift = clampf(relief - BURY_MAX_M * m, PLINTH_MAX_M * m, PLINTH_TALL_M * m)
+			lift = clampf(relief - BURY_MAX_M * m, PLINTH_MAX_M * m, tall_m * m)
 		if lift >= PLINTH_MIN_M * m:
 			floor_y = low + lift
 			plinth = lift

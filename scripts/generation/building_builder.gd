@@ -393,7 +393,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		idx = RingGeometry.drop_hole_triangles(cap, idx, holes)
 	if idx.size() < 3:
 		return false
-	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)))
+	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)),
+		float(mass.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)))
 	var base := float(footing["floor"])
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
@@ -673,7 +674,8 @@ static func _seat_under(masses: Array, centre: Vector2, ground: GroundTruth, ctx
 		var inside := Geometry2D.is_point_in_polygon(centre, md["ring"])
 		if not best.is_empty() and not inside:
 			continue
-		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
+		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)),
+			float(md.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)))
 		var height_world := float(md["wall_m"]) * m2u
 		best = [float(footing["floor"]), float(footing["floor"]) + height_world - _standing_top(footing, height_world, md["b_eff"])]
 		if inside:

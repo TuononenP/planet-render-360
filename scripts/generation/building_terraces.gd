@@ -18,11 +18,16 @@ const MIN_AREA_M2 := 4.0
 const SPLIT_MIN_AREA_M2 := 30.0
 ## Times a terrace still too steep is cut again, and the share of its
 ## parent's buried height above which the parent's cut did not help.
-const DEPTH := 3
+const DEPTH := 2
 const NO_GAIN := 0.7
+## The plinth a piece across a cliff may stand on, and the mass key that
+## carries it to BuildingFoundation.sample.
+const CLIFF_TALL_M := 36.0
+const PLINTH_KEY := "plinth_tall_m"
 ## A terrace runs at most this far up the slope where the footprint is
 ## long enough to need more steps than its relief alone asks for.
 const STEP_RUN_M := 25.0
+const STEP_MIN_RUN_M := 8.0
 
 ## `masses` (BuildingMasses.plan) with each standing mass on too steep a
 ## site replaced by its terraces.
@@ -32,9 +37,24 @@ static func split(masses: Array, ground: GroundTruth, sea_y: float) -> Array:
 		var md := mass as Dictionary
 		var steps := terraces(md, ground, sea_y)
 		if steps.is_empty():
-			out.append(md)
-		else:
-			out.append_array(steps)
+			steps = [md]
+		for step: Dictionary in steps:
+			out.append(_on_cliff(step, ground, sea_y))
+	return out
+
+## `md`, with a taller plinth allowed (PLINTH_KEY) when it stands across
+## a drop no cut can step up: a retaining wall or a rock face under it.
+## The building then shows the drop's height in storeys on its low side,
+## as one built against a cliff does, and keeps its floor at the top.
+static func _on_cliff(md: Dictionary, ground: GroundTruth, sea_y: float) -> Dictionary:
+	if float(md.get("min_m", 0.0)) > 0.0:
+		return md
+	var m := WorldScale.metres_to_units()
+	var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], sea_y)
+	if bool(footing["raised"]) or float(footing["high"]) - float(footing["floor"]) <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
+		return md
+	var out := md.duplicate()
+	out[PLINTH_KEY] = CLIFF_TALL_M
 	return out
 
 ## The terraces of `md`, or none when a plinth seats it (or it is a raised
@@ -52,8 +72,8 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 		return []
 	var footing := BuildingFoundation.sample(ground, ring, md["centre"], sea_y)
 	var buried := float(footing["high"]) - float(footing["floor"])
-	# The ground under a building on the water's edge is the carved bed
-	# and a guessed bank: no slope to step up.
+	# A block on the water's edge stays whole: cut up, its seafront was a
+	# jumble of decks at different heights.
 	if bool(footing["raised"]) or buried <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
 		return []
 	var uphill := _uphill(ring, ground)
@@ -77,6 +97,10 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 		s1 = maxf(s1, p.dot(side))
 	var span := buried + BuildingFoundation.PLINTH_TALL_M * m
 	var steps := clampi(maxi(ceili(span / (STEP_RELIEF_M * m)), ceili((t1 - t0) / (STEP_RUN_M * m))), 2, STEPS_MAX)
+	# No terrace shallower than a room: a steeper site is a cliff (_on_cliff).
+	steps = mini(steps, floori((t1 - t0) / (STEP_MIN_RUN_M * m)))
+	if steps < 2:
+		return []
 	var pad := 1.0 * m
 	var holes: Array = md.get("holes", [])
 	var out: Array = []
