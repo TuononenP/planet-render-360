@@ -143,6 +143,13 @@ static func climate_params(data: LocationData) -> Dictionary:
 		forest = forest.lerp(meadow, 0.35 if arid else 0.15)
 	return {"tl": tl, "sl": sl, "forest": forest, "meadow": meadow, "dry_a": dry.a, "arid": arid}
 
+## The far shader's aspect inputs for `data`'s place: which way the sun
+## stands, and the treeline's height in world units (the frame the snow
+## line uses: metres above the place's centre).
+static func aspect_params(data: LocationData) -> Dictionary:
+	return {"sun_side": 1.0 if data.latitude >= 0.0 else -1.0,
+		"treeline_y": (ClimateModel.treeline_m(data) - data.centre_elevation_m) * WorldScale.metres_to_units()}
+
 ## Mountain colour ramp for terrain with no imagery (returned LINEAR,
 ## from sRGB picks — the v1 ramp fed sRGB values as linear and washed
 ## to cream). Forest/meadow below the treeline, alpine grass then rock
@@ -226,6 +233,10 @@ uniform int far_quality = 2;
 global uniform float valley_haze_y;
 global uniform vec3 valley_haze_col;
 global uniform float far_fog_density;
+// +1 where the sun stands in the south, -1 in the southern hemisphere.
+uniform float sun_side = 1.0;
+// Height of the treeline in world units (aspect_params); far above by default.
+uniform float treeline_y = 100000.0;
 // DEM normals (FarDemNormals): one ring through each drape's UVs.
 uniform sampler2D dem_fine : filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D dem_coarse : filter_linear_mipmap_anisotropic, repeat_disable;
@@ -315,9 +326,14 @@ void fragment() {
 	}
 	// Steep faces read as rock: the photo's value, mostly its own hue
 	// pulled toward neutral stone.
-	float steep = smoothstep(0.8, 0.55, nw.y);
+	// The sun-facing side of a slope dries out: rock shows sooner and trees
+	// climb higher there. Above the treeline the green thins toward stone.
+	float sunward = dot(normalize(nw.xz + vec2(1e-4)), vec2(0.0, sun_side)) * smoothstep(0.98, 0.8, nw.y);
+	float tree_y = treeline_y + sunward * 120.0;
+	float above_trees = smoothstep(tree_y - 100.0, tree_y + 400.0, wpos.y) * (1.0 - water);
+	float steep = smoothstep(0.8 + 0.05 * sunward, 0.55 + 0.05 * sunward, nw.y);
 	float l = lum(c);
-	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), steep * 0.55 * (1.0 - 0.8 * vegf));
+	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), max(steep * 0.55 * (1.0 - 0.8 * vegf * (1.0 - above_trees)), above_trees * 0.35));
 	vec3 nmap = vec3(0.5, 0.5, 1.0);
 	float dfade = far_quality >= 2 ? 1.0 - smoothstep(2500.0, 7500.0, dist) : 0.0;
 	if (dfade > 0.01) {
@@ -408,6 +424,10 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 	var preset := data.quality_preset if data != null else RenderSettings.Preset.HIGH
 	TerrainGlsl.bind(mat, preset)
 	mat.set_shader_parameter("far_quality", RenderSettings.clamp_preset(preset))
+	if data != null:
+		var aspect := aspect_params(data)
+		mat.set_shader_parameter("sun_side", aspect["sun_side"])
+		mat.set_shader_parameter("treeline_y", aspect["treeline_y"])
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:
