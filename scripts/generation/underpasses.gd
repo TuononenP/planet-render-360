@@ -209,6 +209,13 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 	var half := maxf(float(way.get("width_m", 0.0)), 3.0) * 0.5 * m2u
 	var inner := half
 	var reach := half + step
+	if grade == RAMP_GRADE_RAIL:
+		# A track is narrower than the posts are apart: cut only across its
+		# own width, the posts along it came down by different amounts as
+		# it passed nearer or farther, and it rode metre-high bumps. Cut
+		# fully to half a post out, as RoadGrading stamps its profile.
+		inner = half + step * 0.5
+		reach = half + step * 1.5
 	var hs := float(size) * 0.5
 	var line := GroundTruth._densify(way["points"], SAMPLE_M * m2u)
 	var s := 0.0
