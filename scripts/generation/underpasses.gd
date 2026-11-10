@@ -22,6 +22,8 @@ const RAMP_GRADE_RAIL := 0.025
 ## Ground left standing between two cut ways (the strip between two
 ## tracks) comes down with them when it stands this far above both.
 const RIDGE_M := 0.5
+## Height per layer a viaduct's deck stands at a joint (deck_profile).
+const JOINT_UP_M := 5.0
 const RIDGE_PASSES := 3
 ## A crossing needing more than this is a valley the data already has
 ## (or a layer mistake), never a cut.
@@ -77,12 +79,11 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
 		for e in [ends[0], ends[ends.size() - 1]]:
-			var node := Vector2i(roundi(e.x * 100.0 / m2u), roundi(e.y * 100.0 / m2u))
-			joints[node] = int(joints.get(node, 0)) + 1
+			joints[_node(e, m2u)] = int(joints.get(_node(e, m2u), 0)) + 1
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
 		for e in [ends[0], ends[ends.size() - 1]]:
-			if int(joints[Vector2i(roundi(e.x * 100.0 / m2u), roundi(e.y * 100.0 / m2u))]) == 1:
+			if int(joints[_node(e, m2u)]) == 1:
 				keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
 	# Every crossing at once on every core, then evaluated bridge by bridge.
 	var hits: Array = []
@@ -104,8 +105,15 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var b_len := _length(bp)
 		if b_len <= 0.0:
 			continue
-		var h_a := RoadGrading._sample(src, size, step, bp[0])
-		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1])
+		# The deck as RoadBuilder.deck_profile draws it: on its bank at a true
+		# end, and held a storey up per layer at a joint with the next bridge
+		# way. Taken at ground level there, the cut dug every way under a
+		# viaduct down by the height the deck already stands above it.
+		var up := float(int(b.get("layer", 0))) * JOINT_UP_M
+		var h_a := RoadGrading._sample(src, size, step, bp[0]) \
+			+ (up if int(joints[_node(bp[0], m2u)]) >= 2 else 0.0)
+		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1]) \
+			+ (up if int(joints[_node(bp[bp.size() - 1], m2u)]) >= 2 else 0.0)
 		var b_layer := _layer(b)
 		if _native:
 			_cross_native(cuts, hits[bi], lower, src, size, step, h_a, h_b, b_len, m2u)
@@ -245,6 +253,10 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 				surface[idx] = minf(surface[idx], lerpf(surface[idx], cap, wgt))
 				if wgt >= 0.5:
 					touched[Vector2i(x, z)] = true
+
+## A way's end as a centimetre grid node, to match ends that meet.
+static func _node(p: Vector2, m2u: float) -> Vector2i:
+	return Vector2i(roundi(p.x * 100.0 / m2u), roundi(p.y * 100.0 / m2u))
 
 ## OSM layer, a bridge without one counting as 1 (above the ground ways).
 static func _layer(w: Dictionary) -> int:
