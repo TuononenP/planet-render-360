@@ -32,8 +32,8 @@ const PLINTH_TALL_M := 10.0
 const MIN_BODY_M := 2.6
 ## The ground is read this often along each wall: a crown or a hollow
 ## between two corners counts.
-const EDGE_STEP_M := 4.0
-const EDGE_SAMPLES_MAX := 24
+const EDGE_STEP_M := 2.0
+const EDGE_SAMPLES_MAX := 48
 ## An edge needs a skirt only where its ground lies this far under the floor.
 const EDGE_GAP_M := 0.15
 static var _plinth_mat: Material
