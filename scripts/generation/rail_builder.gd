@@ -280,7 +280,8 @@ static func _material(key: String) -> Material:
 			# z-fight the asphalt it is set in).
 			m = RoadSurface.paved_material("pavement", Color.html(TRACK_BED_HEX).srgb_to_linear())
 		"cable_bed":
-			m = RoadSurface.paved_material("pavement", Color.html(CABLE_BED_HEX).srgb_to_linear())
+			# Poured concrete: paving slabs read as a footway down the middle of the street.
+			m = RoadSurface.paved_material("concrete", Color.html(CABLE_BED_HEX).srgb_to_linear())
 		"rail":
 			var rsh := Shader.new()
 			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL)

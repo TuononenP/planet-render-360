@@ -413,7 +413,7 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("nor_tex", _tex("nor"))
 	_mat.set_shader_parameter("rough_tex", _tex("rough"))
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
-	_mat.set_shader_parameter("kerb_col", _kerb)
+	_mat.set_shader_parameter("kerb_col", Vector3(_kerb.r, _kerb.g, _kerb.b))
 	_mat.set_shader_parameter("detail_m", _detail_m)
 	return _mat
 
@@ -447,7 +447,7 @@ static func set_place(data: LocationData) -> void:
 	_kerb = KerbBuilder.stone_for(data)
 	_detail_m = float(DETAIL_M[RenderSettings.clamp_preset(data.quality_preset)])
 	if _mat != null:
-		_mat.set_shader_parameter("kerb_col", _kerb)
+		_mat.set_shader_parameter("kerb_col", Vector3(_kerb.r, _kerb.g, _kerb.b))
 		_mat.set_shader_parameter("detail_m", _detail_m)
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
