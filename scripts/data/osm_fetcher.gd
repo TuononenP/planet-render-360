@@ -266,6 +266,10 @@ var furniture: Array = []
 ## payloads cached before the query asked for them).
 var tram_stops: Array = []
 var bus_stops: Array = []
+## Railway platform outlines {points} and mainline station nodes
+## {x, z, name} of the last success (empty for older payloads).
+var rail_platforms: Array = []
+var rail_stations: Array = []
 ## Shop, amenity, office, tourism, craft and advertising nodes.
 var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
@@ -325,6 +329,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	railways = []
 	tram_stops = []
 	bus_stops = []
+	rail_platforms = []
+	rail_stations = []
 	shore_structures = []
 	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
@@ -716,6 +722,8 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	furniture = parsed.get("furniture", [])
 	tram_stops = parsed.get("tram_stops", [])
 	bus_stops = parsed.get("bus_stops", [])
+	rail_platforms = parsed.get("rail_platforms", [])
+	rail_stations = parsed.get("rail_stations", [])
 	pois = parsed.get("pois", [])
 	piers = parsed.get("piers", [])
 	shore_structures = parsed.get("shore_structures", [])

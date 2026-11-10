@@ -34,12 +34,15 @@ static func mesh(kind: String, id: String, livery: String, tail: bool = false, f
 	var key := "%s|%s|%s|%d|%d" % [kind, id, livery, int(tail), int(far)]
 	if _meshes.has(key):
 		return _meshes[key]
-	var k: Dictionary = TramSpecs.KIND[kind]
-	var sec := TramSpecs.section(kind, id)
-	var liv := TramSpecs.livery(livery)
+	# A train (TrainSpecs) is built as a tram is, from the same vocabulary.
+	var rail := TrainSpecs.KIND.has(kind)
+	var k: Dictionary = TrainSpecs.KIND[kind] if rail else TramSpecs.KIND[kind]
+	var sec := TrainSpecs.section(kind, id) if rail else TramSpecs.section(kind, id)
+	var liv := TrainSpecs.livery(livery) if rail else TramSpecs.livery(livery)
 	var lm := LandmarkMesh.new()
-	for role: String in ["lower", "band", "upper", "pillar", "inner"]:
-		lm.use(_ckey(liv[role]), paint(liv[role]))
+	for role: String in ["lower", "band", "upper", "pillar", "inner", "door", "cab"]:
+		if liv.has(role):
+			lm.use(_ckey(liv[role]), paint(liv[role]))
 	lm.use("Roof", roof(liv["roof"]))
 	for name: String in ["Glass", "Dark", "Metal", "HeadLamp", "TailLamp", "Board"]:
 		lm.use(name, material(name))
@@ -206,8 +209,14 @@ static func _body(lm: LandmarkMesh, k: Dictionary, sec: Dictionary, liv: Diction
 			# Half of the bellows to the next section.
 			var top := float(prof[prof.size() - 1][0])
 			var low := float(prof[0][0]) + 0.08
+			var across := w * 1.84
+			if k.has("gangway"):
+				# A train's gangway: narrower than the car, from the floor up.
+				var gangway: Vector2 = k["gangway"]
+				across = gangway.x
+				top = low + gangway.y + 0.2
 			lm.box("Dark", Vector3(float(end[1]) + dir * float(k["gap"]) * 0.27, (top + low) * 0.5 - 0.1, 0.0),
-				Vector3(float(k["gap"]) * 0.56, top - low - 0.2, w * 1.84), Basis(), 0.0)
+				Vector3(float(k["gap"]) * 0.56, top - low - 0.2, across), Basis(), 0.0)
 		elif str(nose.get("lamps", "")) == "single":
 			var at := Vector3(float(end[1]), belt - 0.42, 0.0)
 			var lens := "TailLamp" if tail else str(end[3])
@@ -222,6 +231,13 @@ static func _key(role: String, t: String, k: float, nose: Dictionary, liv: Dicti
 	if t == "cap":
 		return "Dark"
 	var on_nose := t == "nf" or t == "nr"
+	# A train's painted door leaf (glazed at window height only) and the
+	# one colour of its cab end.
+	if t == "D" and liv.has("door") and role in ["lower", "lamp", "band", "upper"]:
+		return _ckey(liv["door"])
+	if on_nose and liv.has("cab") and role in ["lower", "band", "upper"]:
+		if not (role == "upper" and board_strip and bool(nose.get("board", false)) and k < 0.62):
+			return _ckey(liv["cab"])
 	match role:
 		"under", "skirt":
 			return "Dark"
@@ -231,7 +247,7 @@ static func _key(role: String, t: String, k: float, nose: Dictionary, liv: Dicti
 			if on_nose:
 				if role == "lamp" and str(nose.get("lamps", "")) in ["pair", "tail"] and k > 0.6 and k < 0.8:
 					return "TailLamp" if str(nose["lamps"]) == "tail" else lamp
-				return _ckey(liv["lower" if role == "lamp" else role])
+				return _ckey(liv.get("cab", liv["lower" if role == "lamp" else role]))
 			match t:
 				"D":
 					return "Glass"
@@ -324,6 +340,10 @@ static func _running_gear(lm: LandmarkMesh, k: Dictionary, sec: Dictionary, liv:
 		return
 	var axle := float(sec.get("axle", 0.9))
 	var floor_y := float(sec["prof"][0][0])
+	# A train's underfloor equipment cases, between the bogies.
+	for b: Array in sec.get("under", []):
+		lm.box("Dark", Vector3(float(b[0]), (floor_y + 0.3) * 0.5 + 0.02, 0.0),
+			Vector3(float(b[1]), floor_y - 0.3, w * 1.72), Basis(), 0.0)
 	for x: float in sec.get("bogies", []):
 		_frame(lm, x, 2.0 * (axle + r) + 0.1, gauge, r, far)
 		for ax: float in [x - axle, x + axle]:

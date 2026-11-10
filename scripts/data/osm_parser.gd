@@ -34,6 +34,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var furniture: Array = []
 	var tram_stops: Array = []
 	var bus_stops: Array = []
+	var rail_platforms: Array = []
+	var rail_stations: Array = []
 	var pois: Array = []
 	var piers: Array = []
 	var shore_structures: Array = []
@@ -44,7 +46,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
 			"barriers": barriers, "country": country, "railways": railways,
 			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
-			"tram_stops": tram_stops, "bus_stops": bus_stops}
+			"tram_stops": tram_stops, "bus_stops": bus_stops,
+			"rail_platforms": rail_platforms, "rail_stations": rail_stations}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -120,6 +123,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var sp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
 				(tram_stops if stop == "tram" else bus_stops).append({"x": sp.x, "z": sp.y,
 					"name": str(el_tags.get("name", ""))})
+			if OsmTags.rail_station(el_tags):
+				var rp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				rail_stations.append({"x": rp.x, "z": rp.y, "name": str(el_tags.get("name", ""))})
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
@@ -194,6 +200,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			max_z = maxf(max_z, p.y)
 		var poly := PackedVector2Array(pts)
 		var aabb := Rect2(min_x, min_z, max_x - min_x, max_z - min_z)
+		# A platform is noted for StationTrains whatever else it is drawn as.
+		if OsmTags.rail_platform(el_tags):
+			rail_platforms.append({"points": poly})
 		if OsmApiFallback.names_building(el_tags):
 			var entry := OsmTags._building_entry(el_tags, poly, aabb)
 			buildings.append(entry)
@@ -286,7 +295,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers, "country": country, "railways": railways,
 		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
-		"tram_stops": tram_stops, "bus_stops": bus_stops}
+		"tram_stops": tram_stops, "bus_stops": bus_stops,
+		"rail_platforms": rail_platforms, "rail_stations": rail_stations}
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

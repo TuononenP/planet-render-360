@@ -602,8 +602,8 @@ func _query_checks(failures: Array[String]) -> void:
 			or not (with_country["buildings"] as Array).is_empty() \
 			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
 		failures.append("parse must read the is_in area's ISO code and nothing else from it")
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 31:
-		failures.append("expected 31 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 34:
+		failures.append("expected 34 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
 	if not q.contains('node["railway"="subway_entrance"]'):
 		failures.append("detailed furniture query must include subway entrances")
@@ -613,7 +613,7 @@ func _query_checks(failures: Array[String]) -> void:
 	if not ny_query.contains("around:450,40.702650,-73.996860"):
 		failures.append("New York furniture query should be centred on the preset eye")
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 31:
+	if q420.count("420,48.856600,2.352200") != 34:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)
@@ -1109,3 +1109,24 @@ func _stop_checks(failures: Array[String]) -> void:
 	if not (old.get("tram_stops", [0]) as Array).is_empty() or not LocationData.new().tram_stops.is_empty() \
 			or not LocationData.new().bus_stops.is_empty():
 		failures.append("payloads without stops give empty stop lists")
+	# Railway platforms and mainline stations (StationTrains).
+	for clause in ['way["railway"="platform"]', 'way["public_transport"="platform"]["train"="yes"]',
+			'node["railway"~"^(station|halt)$"]']:
+		if not q.contains(clause):
+			failures.append("the detailed query must ask for %s" % clause)
+	var rail := OsmFetcher.parse_features("""{"elements":[
+		{"type":"way","id":10,"tags":{"railway":"platform"},"geometry":[{"lat":48.8570,"lon":2.3522},{"lat":48.8580,"lon":2.3522}]},
+		{"type":"way","id":11,"tags":{"public_transport":"platform","train":"yes"},"geometry":[{"lat":48.8570,"lon":2.3530},{"lat":48.8580,"lon":2.3530}]},
+		{"type":"way","id":12,"tags":{"public_transport":"platform","bus":"yes"},"geometry":[{"lat":48.8570,"lon":2.3540},{"lat":48.8580,"lon":2.3540}]},
+		{"type":"way","id":13,"tags":{"railway":"platform","location":"underground"},"geometry":[{"lat":48.8570,"lon":2.3550},{"lat":48.8580,"lon":2.3550}]},
+		{"type":"node","id":14,"lat":48.8575,"lon":2.3522,"tags":{"railway":"station","name":"Gare"}},
+		{"type":"node","id":15,"lat":48.8575,"lon":2.3530,"tags":{"railway":"station","station":"subway"}}
+	]}""", 48.8566, 2.3522)
+	var platforms: Array = rail.get("rail_platforms", [])
+	var stations: Array = rail.get("rail_stations", [])
+	if platforms.size() != 2 or (platforms[0]["points"] as PackedVector2Array).size() != 2 or stations.size() != 1 \
+			or str(stations[0]["name"]) != "Gare" or not (rail["railways"] as Array).is_empty():
+		failures.append("platforms: expected 2 open-air train platforms and 1 mainline station, got %s / %s" % [platforms, stations])
+	if not (old.get("rail_platforms", [0]) as Array).is_empty() or not (old.get("rail_stations", [0]) as Array).is_empty() \
+			or not LocationData.new().rail_platforms.is_empty() or not LocationData.new().rail_stations.is_empty():
+		failures.append("payloads without platforms give empty platform and station lists")

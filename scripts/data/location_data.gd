@@ -197,6 +197,13 @@ var railways: Array = []
 ## TransitVehicles then spaces its trams along the track alone.
 var tram_stops: Array = []
 var bus_stops: Array = []
+## OSM railway platforms (railway=platform, train platforms):
+## {points} outlines or centre lines in current internal units, and
+## mainline station nodes {x, z, name}. Empty for payloads cached or
+## bundled before the query asked for them; StationTrains then finds
+## termini from the track's dead ends alone.
+var rail_platforms: Array = []
+var rail_stations: Array = []
 ## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
 ## past the detailed extent — {class: residential|commercial|industrial|
 ## retail, points: PackedVector2Array, holes: Array} in metre XZ, from

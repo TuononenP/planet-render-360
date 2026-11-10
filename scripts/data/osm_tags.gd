@@ -179,12 +179,30 @@ static func stop_kind(tags: Dictionary) -> String:
 		return "bus"
 	return ""
 
+## Whether a way is a railway platform StationTrains may stand a train
+## at: railway=platform, or a public transport platform for trains. One
+## under ground has no open track beside it.
+static func rail_platform(tags: Dictionary) -> bool:
+	if underground(tags) or _tag_truthy(tags.get("tunnel", "")) or _tag_truthy(tags.get("indoor", "")):
+		return false
+	return str(tags.get("railway", "")) == "platform" or (str(tags.get("public_transport", "")) == "platform"
+		and str(tags.get("train", "")) == "yes")
+
+## Whether a node is a mainline railway station (railway=station or
+## halt; a metro's or a light railway's is not).
+static func rail_station(tags: Dictionary) -> bool:
+	return str(tags.get("railway", "")) in ["station", "halt"] \
+		and not str(tags.get("station", "")) in ["subway", "light_rail", "monorail", "funicular"] \
+		and str(tags.get("subway", "")) != "yes"
+
 ## One railway dict: the gauge (mm tag, else 1000 mm tram / 1435 mm),
 ## whether the track is set in a street (trams unless embedded=no, or
 ## embedded=yes), whether a cable runs in a slot between the rails
 ## (`cable_tram=cable`, or a street tram with `electrified=no`: San
 ## Francisco maps most of its cable-car track only so) and the bed width
-## (ballast shoulders past the rails).
+## (ballast shoulders past the rails). Track under a roof (`covered`) is
+## left undrawn like a tunnel's, and marked: a station's shed is no
+## tunnel to StationTrains.
 static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var cls := rail_class(tags)
 	var gauge_mm := _tag_int(str(tags.get("gauge", "")).split(";")[0], 0, 3000)
@@ -200,6 +218,8 @@ static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")) or underground(tags)
 			or _tag_truthy(tags.get("covered", "")),
+		"covered": _tag_truthy(tags.get("covered", "")) and not _tag_truthy(tags.get("tunnel", ""))
+			and not underground(tags),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"width_m": gauge + (0.3 if embedded else 1.9)}
 

@@ -32,6 +32,9 @@ var points := PackedVector2Array()
 var cum := PackedFloat32Array()
 ## The rail dict (OsmTags._rail_entry) of the segment after each point.
 var ways: Array = []
+## Rail-head height at each point where the track is not laid on the
+## ground (a bridge deck), NAN elsewhere; empty when none is.
+var heights := PackedFloat32Array()
 var length_m := 0.0
 var _m2u := 1.0
 var _ground: GroundTruth
@@ -115,6 +118,25 @@ static func chains(data: LocationData, ground: GroundTruth, m2u: float,
 		return a.length_m > b.length_m)
 	return out
 
+## A route over the explicit line `line` (world XZ), `rails` holding the
+## rail dict of the segment after each point: for a caller that walks
+## the track itself (StationTrains, from a buffer stop back to the first
+## switch) instead of joining whole ways. `ys` gives the rail-head
+## height at the points on a bridge deck (NAN on the ground).
+static func of(line: PackedVector2Array, rails: Array, ground: GroundTruth, m2u: float,
+		ys: PackedFloat32Array = PackedFloat32Array()) -> TramRoute:
+	var route := TramRoute.new()
+	route._m2u = m2u
+	route._ground = ground
+	route.points = line
+	route.ways = rails
+	route.heights = ys
+	route.cum.append(0.0)
+	for k in range(1, line.size()):
+		route.cum.append(route.cum[k - 1] + line[k].distance_to(line[k - 1]))
+	route.length_m = route.cum[route.cum.size() - 1] / m2u
+	return route
+
 ## Ends of the tunnel ways `carries` accepts (world XZ units): where
 ## track dives under.
 static func mouths(data: LocationData, carries: Callable = Callable()) -> PackedVector2Array:
@@ -197,6 +219,12 @@ static func rail_lift_m(rail: Dictionary) -> float:
 ## Point on the rail heads at `s` metres, world space.
 func point_at(s: float) -> Vector3:
 	var p := xz_at(s)
+	if not heights.is_empty():
+		var u := clampf(s * _m2u, 0.0, cum[cum.size() - 1])
+		var i := _segment(u)
+		if not is_nan(heights[i]) and not is_nan(heights[i + 1]):
+			var span := cum[i + 1] - cum[i]
+			return Vector3(p.x, lerpf(heights[i], heights[i + 1], (u - cum[i]) / span if span > 0.0 else 0.0), p.y)
 	var y := _ground.height_at_world(p.x, p.y) if _ground != null else 0.0
 	return Vector3(p.x, y + rail_lift_m(way_at(s)) * _m2u, p.y)
 

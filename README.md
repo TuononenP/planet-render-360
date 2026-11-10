@@ -341,7 +341,8 @@ planet-render-360/
 │   │   │                          Shared shoreline geometry, water ownership, banks, quays and moorings
 │   │   ├── tree_*.gd, vegetation_*.gd, canopy_vegetation.gd, foliage_textures.gd, climate_model.gd
 │   │   ├── parked_cars.gd, car_paint.gd, vehicles/ (VehicleKit, CarSpecs, CarModel, CarFleet,
-│   │   │                          TramSpecs, TramModel, TramRoute, TransitVehicles)
+│   │   │                          TramSpecs, TramModel, TramRoute, TransitVehicles,
+│   │   │                          TrainSpecs, StationTrains)
 │   │   │                          Parked vehicle placement, imported models and paint shader
 │   │   ├── ship_builder.gd, marina_builder.gd, harbour_ferries.gd, vessel_*.gd, *_model.gd
 │   │   │                          Procedural vessels, marinas and harbour ferries
