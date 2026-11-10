@@ -39,6 +39,11 @@ const CABLE_BED_LAYER := 6.85
 const CABLE_BED_HEX := "#7f7b74"
 const CABLE_RAIL_CLEAR_M := 0.02
 const TRACK_BED_HEX := "#a39d92"
+## Bridge tracks this close side by side (centre to centre) share one
+## deck edge: no parapet stands between them.
+const BESIDE_M := 7.0
+const BESIDE_MIN_M := 0.3
+const BESIDE_CELL_M := 8.0
 
 ## Ballast bed: speckled stone, concrete sleepers across it (UV.y along
 ## in 4 m units, UV2.x the bed width in metres), anti-aliased into their
@@ -115,10 +120,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var road_index := RoadIndex.new(data, m2u)
 	var spans := LandmarkSites.bridge_spans(data)
 	var batches := {}
+	var beside := deck_index(data.railways, m2u)
 	for w in data.railways:
 		if abort != null and abort.requested:
 			return
-		_way(batches, w, surf, spans, m2u, data, road_index)
+		_way(batches, w, surf, spans, m2u, data, road_index, beside)
 	for key in batches:
 		var b: RoadBuilder._Batch = batches[key]
 		if b.indices.is_empty():
@@ -132,7 +138,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		root.add_child(mi)
 
 static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
-		spans: Array, m2u: float, data: LocationData = null, road_index = null) -> void:
+		spans: Array, m2u: float, data: LocationData = null, road_index = null, beside: Dictionary = {}) -> void:
 	if not (w is Dictionary) or bool((w as Dictionary).get("tunnel", false)):
 		return
 	var way: Dictionary = w
@@ -152,7 +158,7 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 				_rails(RoadBuilder._batch(batches, "rail"), dense, deck, gauge, 0.0, m2u, RAIL_LAYER)
 			return
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, gauge, bed, surf, m2u)
+			_bridge(batches, piece, gauge, bed, surf, m2u, beside)
 		return
 	var embedded := bool(way.get("embedded", false))
 	for run in RoadBuilder._dry_runs(dense, surf):
@@ -188,10 +194,47 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			_rails(RoadBuilder._batch(batches, "rail"), run, ys, gauge,
 				RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
 
+## Points along every bridge track, by BESIDE_CELL_M cell: a station's
+## viaduct is mapped a bridge way per track, and each drawn with its own
+## parapets stood a wall between every pair of tracks.
+static func deck_index(railways: Array, m2u: float) -> Dictionary:
+	var index := {}
+	for w in railways:
+		if not (w is Dictionary) or not bool((w as Dictionary).get("bridge", false)) \
+				or bool((w as Dictionary).get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		for p in RoadBuilder._resample(pts, 2.0 * m2u):
+			var cell := Vector2i((p / (BESIDE_CELL_M * m2u)).floor())
+			if not index.has(cell):
+				index[cell] = PackedVector2Array()
+			var cell_pts: PackedVector2Array = index[cell]
+			cell_pts.append(p)
+			index[cell] = cell_pts
+	return index
+
+## Whether another bridge track runs within BESIDE_M of `mid` on the
+## side `out` points to (unit; `along` the track there).
+static func deck_beside(index: Dictionary, mid: Vector2, out: Vector2, m2u: float) -> bool:
+	var along := Vector2(out.y, -out.x)
+	var cell := Vector2i((mid / (BESIDE_CELL_M * m2u)).floor())
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var cell_pts: PackedVector2Array = index.get(cell + Vector2i(dx, dz), PackedVector2Array())
+			for q in cell_pts:
+				var v := q - mid
+				var side := v.dot(out)
+				if side > BESIDE_MIN_M * m2u and side < BESIDE_M * m2u and absf(v.dot(along)) < 3.0 * m2u:
+					return true
+	return false
+
 ## Deck (RoadBuilder's slab, fascias and parapets) with a ballast top,
-## and the rails on it.
+## and the rails on it. An edge another bridge track runs beside
+## (`beside`, deck_index) carries no parapet.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
-		bed: float, surf: RoadBuilder._Surface, m2u: float) -> void:
+		bed: float, surf: RoadBuilder._Surface, m2u: float, beside: Dictionary = {}) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -201,7 +244,17 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 	var top := RoadBuilder._batch(batches, "rail_deck")
 	top.pad()
 	var k0 := top.verts.size()
-	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck")
+	var open: Array = []
+	if not beside.is_empty():
+		var left := PackedByteArray()
+		var right := PackedByteArray()
+		for i in inside.size() - 1:
+			var mid := (inside[i] + inside[i + 1]) * 0.5
+			var out := RoadBuilder._side(inside, i).normalized()
+			left.append(1 if deck_beside(beside, mid, out, m2u) else 0)
+			right.append(1 if deck_beside(beside, mid, -out, m2u) else 0)
+		open = [left, right]
+	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck", "unknown", 0, open)
 	top.pad()
 	for i in range(k0, top.verts.size()):
 		top.uv2s[i] = Vector2(bed / m2u, BED_LAYER)

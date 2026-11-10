@@ -602,9 +602,12 @@ static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: f
 
 ## Bridge deck on a real `bridge=yes` way (profile from deck_profile),
 ## with slab fascias on both sides and parapets; the deck top goes to
-## the `top_finish` batch (RailBuilder lays ballast there).
+## the `top_finish` batch (RailBuilder lays ballast there). `open`
+## names the edges with no parapet, a byte per segment for the left and
+## for the right side: another deck runs alongside there.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
-		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0) -> void:
+		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0,
+		open: Array = []) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -649,6 +652,9 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 			var ob := pts[i + 1] + sb
 			var ia := oa - sa.normalized() * thick
 			var ib := ob - sb.normalized() * thick
+			if not open.is_empty() and (open[0 if sgn > 0.0 else 1] as PackedByteArray)[i] != 0:
+				_wall(side, oa, ob, deck[i] - depth, deck[i + 1] - depth, deck[i], deck[i + 1], sa.normalized())
+				continue
 			_wall(side, oa, ob, deck[i] - depth, deck[i + 1] - depth, deck[i] + para,
 				deck[i + 1] + para, sa.normalized())
 			_wall(side, ia, ib, deck[i], deck[i + 1], deck[i] + para, deck[i + 1] + para,
