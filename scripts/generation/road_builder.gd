@@ -67,9 +67,11 @@ const CROSSING_MIN_M := 4.0
 const CROSSING_LAYER := 6.9
 ## A crossing's band or a stop line is laid as its own wide ribbon, flat
 ## between its edges, over road ribbons flat between theirs: where the
-## ground curves the road stood a centimetre or two proud of the paint
-## and bit a ragged notch out of it. Bands lie this much higher.
-const BAND_LIFT_M := 0.04
+## ground curves the road stood proud of the paint and bit a ragged notch
+## out of it, centimetres on a gentle street and more across a steep
+## one. Bands lie this much higher, with a row every BAND_ROW_M.
+const BAND_LIFT_M := 0.1
+const BAND_ROW_M := 1.0
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -287,8 +289,8 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		if int(r["rank"]) == 0 and not finish.begins_with("crossing") and not surf.aprons.is_empty():
 			pieces = RoadCrossingClip.on_road_runs(run, {}, surf.aprons, m2u, false)
 		for piece: PackedVector2Array in pieces:
-			_ribbon(_batch(batches, finish), _straighten(piece, surf.step), float(r["width_u"]),
-				surf, lift, attr, junc, layer)
+			_ribbon(_batch(batches, finish), band_rows(piece, m2u) if finish.begins_with("crossing") \
+				else _straighten(piece, surf.step), float(r["width_u"]), surf, lift, attr, junc, layer)
 
 ## Paved area (a square) filled flat on the drawn terrain: the outer
 ## ring ear-clipped, triangles over its holes, open water or past the
@@ -383,6 +385,14 @@ static func _resample(pts: PackedVector2Array, max_len: float) -> PackedVector2A
 		for k in range(1, n + 1):
 			out.append(a.lerp(b, float(k) / float(n)))
 	return out
+
+## The rows of a crossing band or stop line: every BAND_ROW_M. The
+## ground a ribbon is laid on swells between its grid posts on a steep,
+## twisted cell, and only a ribbon with rows on the swell rides it; a
+## band left with a row at each end cut under the street it crosses, and
+## the street hid its stripes (Lombard Street's brow at Hyde).
+static func band_rows(pts: PackedVector2Array, m2u: float) -> PackedVector2Array:
+	return _resample(pts, BAND_ROW_M * m2u)
 
 ## Drops the resampled points that sit on a straight stretch, keeping
 ## rows at most `max_len` apart: RoadDrape cuts each quad along the
