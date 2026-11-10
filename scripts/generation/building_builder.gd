@@ -436,6 +436,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# A mapped landmark keeps full detail at any distance: it is the skyline.
 	var distant := _batch != null or (not bool(b.get("mapped_landmark", false)) \
 		and minf(eye_d, centre.length()) / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
+	# A plinth a storey tall gets that storey's doors and windows, near only.
+	if with_detail and not distant and float(mass.get("min_m", 0.0)) <= 0.0:
+		BuildingBasement.dress(root, ring, footing, ground, party)
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
 	# Roof sampling spans the ring's AABB. A distant building reads it too: its
