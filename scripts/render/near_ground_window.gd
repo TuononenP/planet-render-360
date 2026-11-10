@@ -88,6 +88,12 @@ func stop() -> void:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 
+## A window dropped with a map in progress still joins its task.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+
 ## Static, so a running job holds nothing of a window that has gone away.
 static func _draw(raster: Callable, data: LocationData, n: int, box: Dictionary, size_u: float) -> void:
 	box["image"] = raster.call(data, n, box["centre"], size_u)

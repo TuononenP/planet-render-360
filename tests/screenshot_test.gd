@@ -5,6 +5,9 @@ extends SceneTree
 ## responsive layouts can be compared against the prototype mockups.
 ## Add -- --offline-osm to exercise existing map caches during an outage.
 
+## A cold build of a dense city takes about a minute on a loaded machine.
+const VIEW_TIMEOUT_S := 180.0
+
 var _shot_dir := ""
 
 func _init() -> void:
@@ -122,7 +125,7 @@ func _run() -> void:
 	await _snap("02-loading-phone")
 	await _resize(1280, 800)
 	await _snap("02b-loading-desktop")
-	if not await _wait_view(main, 60.0):
+	if not await _wait_view(main, VIEW_TIMEOUT_S):
 		quit(1)
 		return
 	await create_timer(0.5).timeout
@@ -133,7 +136,7 @@ func _run() -> void:
 	# Second golden location: alpine terrain at golden hour.
 	main._view.set_time_of_day(17)
 	main._start_generation(46.6863, 7.8632)
-	if not await _wait_view(main, 60.0):
+	if not await _wait_view(main, VIEW_TIMEOUT_S):
 		quit(1)
 		return
 	main._view.set_time_of_day(17)
@@ -146,7 +149,7 @@ func _run() -> void:
 	await _viewer_tools(main)
 	# Landmark viewpoint: the Eiffel Tower at its real coordinates.
 	main._start_generation(48.8584, 2.2945)
-	if not await _wait_view(main, 60.0):
+	if not await _wait_view(main, VIEW_TIMEOUT_S):
 		quit(1)
 		return
 	main._view.set_time_of_day(17)

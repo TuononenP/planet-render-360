@@ -564,7 +564,7 @@ and final native libraries before considering the implementation accepted.
 ### New York towers, 2026-11-10
 
 Provisional agent rating: **recognisable** on Ultra, with towers no longer flat prisms; the human gate stays open.
-Reviews: `visual-plan/reviews/nyc-p0-2026-11-10/` (before), `nyc-final-cold-2026-11-10/` (after), and `nyc-p7b-2026-11-10/` for Midtown.
+Reviews: `visual-plan/reviews/nyc-p0-2026-11-10/` (before) and `nyc-signoff-2026-11-10/` (after, from the committed tree), with `before_after.jpg` for the sign-off. The Midtown "before" there is a pinned camera, since the preset did not exist yet.
 
 | Change | Result |
 | --- | --- |

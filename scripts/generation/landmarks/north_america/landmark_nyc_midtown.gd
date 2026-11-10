@@ -13,7 +13,7 @@ static func _chamfer(w: float, d: float, c: float) -> PackedVector2Array:
 
 ## One Vanderbilt (2020): glass tapering on chamfered corners to a spire.
 static func one_vanderbilt(model: Node3D) -> void:
-	var kit := SkyKit.tower("clear_fin", 3.0, 4.2, [[0.0, 30.0, 65.3, 60.3]], "#b4a68e")
+	var kit := SkyKit.tower("pale_terracotta", 3.0, 4.2, [[0.0, 30.0, 65.3, 60.3]], "#b4a68e")
 	var low := _chamfer(62.0, 57.0, 9.0)
 	var mid := _chamfer(48.0, 44.0, 8.0)
 	var high := _chamfer(28.0, 25.0, 6.0)

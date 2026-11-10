@@ -106,8 +106,12 @@ static func _glass_of(year: int, h: float) -> String:
 		return "lowe_blue"
 	if year >= 1975:
 		return "silver_reflective"
+	# Postwar glass: the 1950s aluminium-and-green grid, then the darker
+	# bronze and black glass of the 1960s-70s alongside it.
+	if year >= 1960:
+		return "intl_bronze" if h < 0.5 else "intl_aluminium"
 	if year > 0:
-		return "intl_bronze"
+		return "intl_aluminium"
 	if h < 0.35:
 		return "lowe_blue"
 	if h < 0.6:

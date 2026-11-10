@@ -32,7 +32,9 @@ func _selection() -> void:
 	var glass := _look("nyc_glass", "glass")
 	var prewar := _look("nyc_prewar", "limestone")
 	_expect({"material": "metal", "levels": 70}, glass, 1200.0, "silver_reflective", "mapped metal")
-	_expect({"material": "glass", "start_year": 1958}, glass, 1200.0, "intl_bronze", "1958 glass")
+	_expect({"material": "glass", "start_year": 1958}, glass, 1200.0, "intl_aluminium", "1958 glass")
+	if NycTowerLooks._glass_of(1968, 0.2) != "intl_bronze" or NycTowerLooks._glass_of(1968, 0.8) != "intl_aluminium":
+		failures.append("1960s glass splits between bronze and the aluminium grid")
 	_expect({"material": "glass", "start_year": 1980}, glass, 1200.0, "silver_reflective", "1980 glass")
 	_expect({"material": "glass", "start_year": 2005}, glass, 1200.0, "lowe_blue", "2005 glass")
 	_expect({"material": "glass", "start_year": 2018}, glass, 1200.0, "clear_fin", "2018 glass")
