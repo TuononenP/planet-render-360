@@ -541,13 +541,44 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 	# short bridge peaks lower instead of hovering flat at both ends.
 	if layer > 0 and _land_bridge(pts, surf):
 		var grade := PATH_RAMP_GRADE if half * 2.0 <= PATH_WIDTH_M * m2u else RAMP_GRADE
-		var end0 := deck[0]
-		var end1 := deck[n - 1]
+		# An end that joins another bridge way is a joint in mid-air, not a
+		# bank: the deck stays up there. Ramped to the ground at every joint,
+		# a viaduct mapped in pieces rose and fell piece by piece.
+		var up := float(layer) * 5.0 * m2u
+		var joint0 := surf.bridge_joint(pts[0])
+		var joint1 := surf.bridge_joint(pts[n - 1])
+		var end0 := surf.height(pts[0].x, pts[0].y) + up if joint0 else deck[0]
+		var end1 := surf.height(pts[n - 1].x, pts[n - 1].y) + up if joint1 else deck[n - 1]
 		for i in n:
-			var ramp := minf(end0 + grade * dist[i], end1 + grade * (total - dist[i]))
-			var high := _deck_floor(pts, i, surf, 0.0, half) + float(layer) * 5.0 * m2u
+			var ramp := minf(INF if joint0 else end0 + grade * dist[i],
+				INF if joint1 else end1 + grade * (total - dist[i]))
+			var high := _deck_floor(pts, i, surf, 0.0, half) + up
 			deck[i] = maxf(deck[i], minf(high, ramp))
+		deck[0] = maxf(deck[0], end0)
+		deck[n - 1] = maxf(deck[n - 1], end1)
+		_straighten_deck(deck, dist)
 	return deck
+
+## Raises `deck` to the straight lines over its high points (its upper
+## hull along `dist`): a deck is a girder, and one that followed every
+## rise and hollow of the ground under it was a wavy ribbon on piers.
+static func _straighten_deck(deck: PackedFloat32Array, dist: PackedFloat32Array) -> void:
+	var hull := PackedInt32Array()
+	for i in deck.size():
+		while hull.size() >= 2:
+			var a := hull[hull.size() - 2]
+			var b := hull[hull.size() - 1]
+			# Drop b when it lies on or under the line a-i.
+			if (deck[b] - deck[a]) * (dist[i] - dist[a]) <= (deck[i] - deck[a]) * (dist[b] - dist[a]):
+				hull.remove_at(hull.size() - 1)
+			else:
+				break
+		hull.append(i)
+	for k in hull.size() - 1:
+		var a := hull[k]
+		var b := hull[k + 1]
+		for i in range(a + 1, b):
+			deck[i] = lerpf(deck[a], deck[b], (dist[i] - dist[a]) / maxf(dist[b] - dist[a], 0.00001))
 
 static func _land_bridge(pts: PackedVector2Array, surf: _Surface) -> bool:
 	for p in pts:
@@ -773,6 +804,17 @@ class _Surface extends RefCounted:
 	## surface by use_native(), else null: _ribbon lays its ribbons.
 	var native: Object = null
 	var native_shore := false
+	## Ends of bridge ways by node, and how many bridge ways end there.
+	var _bridge_ends := {}
+
+	static func _node(p: Vector2) -> Vector2i:
+		var m := WorldScale.metres_to_units()
+		return Vector2i(roundi(p.x * 100.0 / m), roundi(p.y * 100.0 / m))
+
+	## True where two bridge ways meet end to end: a joint of one viaduct.
+	func bridge_joint(p: Vector2) -> bool:
+		return int(_bridge_ends.get(_node(p), 0)) >= 2
+
 	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
 	## (and the plain paving of a crossing's stub) stops at their edge, as
 	## at a kerb. Laid on into the junction it poked through the apron
@@ -783,6 +825,12 @@ class _Surface extends RefCounted:
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
+		for w: Variant in data.roads + data.railways:
+			if w is Dictionary and bool((w as Dictionary).get("bridge", false)):
+				var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+				if ends.size() >= 2:
+					for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
+						_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
 		size = data.grid_size
