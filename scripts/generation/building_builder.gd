@@ -397,7 +397,10 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	if _party != null and mass.has("key"):
 		cover = _cover_for(ring, str(mass["key"]), true)
 		party = PartyWalls.party_flags(cover)
-		fire = PartyWalls.firewall(look)
+		# A mapped part stands against its own building's lower parts, which
+		# leave windows above them, not a blank lot-line wall.
+		if not bool(mass.get("own_parts", false)):
+			fire = PartyWalls.firewall(look)
 	# T4.3: tags → satellite → regional resolution with real storey
 	# rows; past the fidelity radius the ≤6 distant set is shared.
 	var region := str(ctx.get("region", "generic"))
@@ -439,10 +442,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# the windows (a mansard eats most of an attic floor).
 	var v_rep := float(maxi(storeys, 1))
 	if not look.is_empty():
-		var wall_m := height_world / WorldScale.metres_to_units()
-		var fh := float(look["floor_h"])
-		v_rep = roundf(clampf(v_rep, maxf(1.0, wall_m / (fh * 1.35)),
-			maxf(1.0, wall_m / (fh * 0.75))))
+		# height_world is the wall's absolute top: a raised part counts its own.
+		var wall_m := height_world / WorldScale.metres_to_units() - float(mass.get("min_m", 0.0))
+		v_rep = BuildingWalls.storey_repeats(wall_m, storeys, float(look["floor_h"]))
 	# T4.6: a ground storey of its own (shopfront, signage band, a
 	# chalet's rendered base) under the tiled storeys when the look has one.
 	var ground_mat: Material = null
@@ -474,6 +476,11 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		if bool(bands["attic"]):
 			attic_mat = FacadeMaterials.facade_for_building(b, region, storeys, fidelity, false,
 				seed_v, BuildingWalls.attic_look(look))
+	if fidelity >= 2 and look.has("tower_look") and FacadeMaterials.facade_uv(facade).z > 0.0:
+		var mech := BuildingWalls.mech_floors(upper, seed_v, with_detail)
+		if not mech.is_empty():
+			bands["mech"] = mech
+			bands["louvre"] = FacadeTextures.louvre(1, str(look["wall_set"]) == "glass")
 	if top - base < 0.05 * WorldScale.metres_to_units():
 		pass  # a part that is only roof (a dome on its drum) has no walls
 	elif ground_mat != null:
@@ -507,6 +514,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		# gables must not stand on a roof that is not there.
 		shape = "flat"
 		roof_h_world = 0.0
+	if with_detail and fidelity >= 2 and shape == "flat" and look.has("tower_look"):
+		TowerTop.add(root, ring, top, height_world / WorldScale.metres_to_units(), seed_v,
+			FacadeTextures.louvre(1, str(look["wall_set"]) == "glass"), roof_mat)
 	if not distant and _batch == null and not look.is_empty() \
 			and eye_d < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(base + sink

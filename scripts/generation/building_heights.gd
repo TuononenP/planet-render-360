@@ -42,7 +42,7 @@ static func _look_for(b: Dictionary, ctx: Dictionary) -> Dictionary:
 	var seed_v := TerrainBuilder._hash(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 	var area := _area_m2(b)
 	var look := ArchitectureStyle.resolve(b, str(ctx["region"]), str(ctx["density"]), seed_v, area, ctx)
-	return SuomenlinnaSite.look(b, look, area)
+	return SuomenlinnaSite.look(b, TowerLooks.apply(b, NycTowerLooks.apply(b, look, area, seed_v), seed_v), area)
 
 ## Per-build context: the style region and settlement density, plus the
 ## mapped and reference heights (in a 150 m spatial hash keyed by

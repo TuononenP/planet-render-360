@@ -30,7 +30,7 @@ const MULLION := Color(0.36, 0.375, 0.39)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
-	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse"]
+	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse", "pier", "louvre"]
 const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small", "gothic"]
 ## Photo repeats per bay cell: brick courses and boards must read at
 ## real size, so those bases tile 2x2 inside each bay.
@@ -131,7 +131,10 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 				if bay % 2 == 0 and hv <= 0.7:
 					FacadePaint.pane(emit, Rect2i(ox + 57, 44, 17, 26), hv)
 			"curtain":
-				_curtain(alb, nor, rgh, ox, hv)
+				if FacadeCurtainKit.has(str(look.get("curtain", ""))):
+					FacadeCurtainKit.draw(str(look["curtain"]), alb, nor, rgh, ox, hv)
+				else:
+					_curtain(alb, nor, rgh, ox, hv)
 				# One bay per look always lights: with four bays, some looks'
 				# hashes all miss the lit share and the tower would stay dark.
 				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63),

@@ -104,9 +104,13 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 	var out := mesh if held else ArrayMesh.new()
 	if held:
 		out.set_meta(MeshArrays.META, [])
+	var kept := 0
 	for s in src.size():
 		var mat := _surface_material(mesh, s)
 		var arrays: Array = (src[s] as Array).duplicate()
+		# An empty surface has nothing to colour and cannot be uploaded.
+		if (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+			continue
 		var active := over if over != null else mat
 		if is_roof(active):
 			arrays[Mesh.ARRAY_COLOR] = weathered(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_NORMAL], c)
@@ -116,7 +120,8 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		if mat != null:
-			out.surface_set_material(s, mat)
+			out.surface_set_material(kept, mat)
+		kept += 1
 		MeshArrays.keep_surface(out, arrays)
 	return out
 

@@ -25,7 +25,7 @@ func _places() -> Array:
 func _run() -> void:
 	var errors: Array[String] = []
 	var countries := {"paris": "FR", "alps": "CH", "banff": "CA", "big_sur": "US",
-		"tokyo": "JP", "new_york": "US", "stockholm": "SE", "monaco": "MC",
+		"tokyo": "JP", "new_york": "US", "new_york_midtown": "US", "stockholm": "SE", "monaco": "MC",
 		"dubai": "AE", "london": "GB", "rome": "IT", "venice": "IT",
 		"seoul": "KR", "san_francisco": "US", "helsinki": "FI", "espoo": "FI"}
 	var places := _places()

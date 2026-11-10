@@ -77,6 +77,33 @@ static func glass_material(detail: int = 1) -> StandardMaterial3D:
 	FacadeMaterials._glass_mats[detail] = m
 	return m
 
+## The shared curtain wall of distant and far glass towers: the same tiled
+## bay-and-storey mapping as a near one, so its panes keep their real size.
+## One per glazing type (`look["curtain"]`), so the count stays fixed.
+static func curtain_distant(detail: int = 1, look: Dictionary = {}) -> StandardMaterial3D:
+	detail = clampi(detail, 0, 1)
+	var id := str(look.get("curtain", ""))
+	var key := "curtain|%d|%s" % [detail, id]
+	if FacadeMaterials._glass_mats.has(key):
+		return FacadeMaterials._glass_mats[key] as StandardMaterial3D
+	var m := _facade_material_for("glass", 0, detail, Color.WHITE, "curtain",
+		{"bay_m": 3.0, "floor_h": 3.8, "curtain": id})
+	FacadeMaterials._glass_mats[key] = m
+	return m
+
+## A tower's plant floors: dark metal slats on glass, stone-coloured on
+## masonry. Two shared materials per detail level.
+static func louvre(detail: int, on_glass: bool) -> StandardMaterial3D:
+	detail = clampi(detail, 0, 1)
+	var key := "louvre|%d|%s" % [detail, on_glass]
+	if FacadeMaterials._glass_mats.has(key):
+		return FacadeMaterials._glass_mats[key] as StandardMaterial3D
+	var m := _facade_material_for("concrete", 0, detail,
+		Color(0.50, 0.52, 0.54) if on_glass else Color(0.66, 0.62, 0.55), "louvre",
+		{"bay_m": 3.0, "floor_h": 3.8})
+	FacadeMaterials._glass_mats[key] = m
+	return m
+
 # --- Texture composition + material assembly ---
 
 ## Composed facade textures for one set + pattern + rows + tier detail,

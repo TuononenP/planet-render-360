@@ -19,6 +19,8 @@ extends RefCounted
 ## them untagged (OsmTags._roof_tags writes "" / 0 for absent tags).
 const INHERITED_ROOF_KEYS: Array[String] = ["roof_shape", "roof_colour",
 	"roof_material", "roof_height_m", "roof_levels", "roof_dir", "roof_orient"]
+## A part this share of the largest can carry a tower's roofline.
+const MAIN_MIN_SHARE := 0.12
 
 static var _plans: Dictionary = {}
 static var _mutex := Mutex.new()
@@ -107,7 +109,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 	# A generated tower's roofline detail belongs on its top, not on the
 	# base the upper tiers stand on (TowerMassing).
 	var main_mass := masses.size() - 1 if masses.back() is Dictionary \
-		and bool((masses.back() as Dictionary).get("stack_top", false)) else _largest(masses)
+		and bool((masses.back() as Dictionary).get("stack_top", false)) else _tower_main(masses, look)
 	for mi in masses.size():
 		if not (masses[mi] is Dictionary):
 			continue
@@ -238,6 +240,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 		out.append({"ring": ring, "holes": holes, "centre": Vector2(cx, cz),
 			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
+			"own_parts": not (b.get("parts", []) as Array).is_empty(),
 			# A mapped landmark's parts are its towers and domes: no made-up
 			# tower, stacks or dormers on any of them.
 			"main": mi == main_mass and not bool(b.get("mapped_landmark", false)),
@@ -296,6 +299,26 @@ static func _capped(masses: Array, mi: int, ring: PackedVector2Array, fh: float)
 
 ## Index of the largest footprint: roofline detail goes on it only (a
 ## church of five parts has one tower, not five).
+## The mass that carries the roofline: a mapped tower's tallest substantial
+## part (its largest is often the podium), else the largest.
+static func _tower_main(masses: Array, look: Dictionary) -> int:
+	var largest := _largest(masses)
+	if not (str(look.get("kind", "")) in TowerMassing.KINDS) or not (masses[largest] is Dictionary):
+		return largest
+	var lot := absf(RingGeometry.signed_area((masses[largest] as Dictionary).get("footprint", PackedVector2Array())))
+	var best := largest
+	var tallest := float((masses[largest] as Dictionary).get("height", 0.0))
+	for i in masses.size():
+		if not (masses[i] is Dictionary):
+			continue
+		var fp: Variant = (masses[i] as Dictionary).get("footprint", null)
+		if fp is PackedVector2Array and (fp as PackedVector2Array).size() >= 3 \
+				and absf(RingGeometry.signed_area(fp as PackedVector2Array)) >= lot * MAIN_MIN_SHARE \
+				and float((masses[i] as Dictionary).get("height", 0.0)) > tallest:
+			tallest = float((masses[i] as Dictionary).get("height", 0.0))
+			best = i
+	return best
+
 static func _largest(masses: Array) -> int:
 	var best := 0
 	var best_area := -1.0

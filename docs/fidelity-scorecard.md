@@ -561,6 +561,22 @@ the largest script. Re-run the relevant checks against the final workspace
 and final native libraries before considering the implementation accepted.
 
 
+### New York towers, 2026-11-10
+
+Provisional agent rating: **recognisable** on Ultra, with towers no longer flat prisms; the human gate stays open.
+Reviews: `visual-plan/reviews/nyc-p0-2026-11-10/` (before), `nyc-final-cold-2026-11-10/` (after), and `nyc-p7b-2026-11-10/` for Midtown.
+
+| Change | Result |
+| --- | --- |
+| Window scale | Raised parts count their own storeys; distant and far glass tile by real bay and storey. |
+| Blank walls | Curtain walls and a building's own lower parts no longer leave blank firewall bands. |
+| Tower types | `NycTowerLooks` picks one of nine finishes; `TowerLooks` gives other cities a regional glazing mix. |
+| Massing and tops | 1916 setback profile, plant floors, penthouses and parapets scaled to height. |
+| Icons | 22 new `SkyKit` towers; Empire State about 70k to 12.4k triangles. |
+| Cold load | Ultra New York build 9.2 s before, 9.5 s after. |
+
+Midtown is bundled (five `new_york_midtown_*` layers, about 7 MB gzipped) and opens offline. `BundledOsm.MAX_BYTES` rose from 32 to 48 MB for its 39 MB far layer.
+
 ### New York continuation, 2026-11-04
 
 Provisional rating: **recognisable** on Ultra; photographic target not met and human gate pending.

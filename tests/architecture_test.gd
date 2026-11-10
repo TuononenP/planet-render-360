@@ -194,7 +194,7 @@ func _region_checks(failures: Array[String]) -> void:
 	# city's style zone, so its view reads as that city.
 	for row in PresetViews.ROWS:
 		var city := CityStyles.city_of_region(CityStyles.region_at(float(row["lat"]), float(row["lon"])))
-		var want: String = str({"alps": "interlaken", "big_sur": ""}.get(str(row["id"]), str(row["id"])))
+		var want: String = str({"alps": "interlaken", "big_sur": "", "new_york_midtown": "new_york"}.get(str(row["id"]), str(row["id"])))
 		if city != want:
 			failures.append("quick pick %s stands in city zone '%s', expected '%s'" % [row["id"], city, want])
 	if ArchitectureStyle.region_for(48.8566, 2.3522, "FR") != "haussmann" \
@@ -372,7 +372,7 @@ func _resolve_checks(failures: Array[String]) -> void:
 	if (tagged as StandardMaterial3D).albedo_texture == (plain as StandardMaterial3D).albedo_texture:
 		failures.append("building:material=brick must override the Nordic timber wall")
 	var distant_glass := FacadeMaterials.facade_for_building({"material": "mirror"}, "north_america", 72, 3, true)
-	if distant_glass != FacadeMaterials.glass_material(1):
+	if distant_glass != FacadeTextures.curtain_distant(1):
 		failures.append("mapped mirror glass must survive the distant facade path")
 	var historic_look := ArchitectureStyle.resolve({"kind": "commercial"}, "nyc_prewar", "mid", 0.3, 800.0)
 	historic_look["era"] = "nyc_prewar"

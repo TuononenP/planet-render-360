@@ -126,14 +126,16 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		fidelity: int, distant: bool, seed_v: float = 0.0,
 		style: Dictionary = {}) -> Material:
 	if distant:
+		if style.has("curtain"):
+			return FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1, style)
 		# The shared distant palette still has to distinguish a mapped glass
 		# curtain wall from masonry (including glass residential towers).
 		var mapped_set := str(MaterialLibrary.MATERIAL_TAGS.get(str(b.get("material", "")).strip_edges().to_lower(), ""))
 		if mapped_set == "glass" or (mapped_set == "" and str(style.get("wall_set", "")) == "glass"):
-			return glass_material(0 if fidelity <= 1 else 1)
+			return FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1)
 		# A mapped finish and a resolved prewar tower must not turn into
 		# the region's generic apartment brick at the fidelity boundary.
-		if mapped_set != "" or str(style.get("era", "")) == "nyc_prewar":
+		if mapped_set != "" or str(style.get("era", "")).begins_with("nyc_"):
 			return facade_for_building(b, region, storeys, mini(fidelity, 2), false, seed_v, style)
 		var dfs := distant_facades(fidelity, str(style.get("era", region)))
 		var want := _wall_target(dfs[0] as Material, b, style, seed_v)
@@ -146,6 +148,8 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 	var pattern := _pattern(b, style, set_name)
 	if set_name == "glass":
 		pattern = "curtain"
+	elif pattern == "curtain":
+		pattern = "panel"  # a mapped solid finish cannot be a curtain wall
 	var rows := 6
 	if storeys > 0:
 		rows = clampi(storeys, 1, 8)
@@ -264,6 +268,8 @@ static func roof_residual(m: Material, b: Dictionary, style: Dictionary,
 	return residual(m, want) if want.a > 0.0 else Color.WHITE
 
 static func _wall_set(b: Dictionary, style: Dictionary, region: String) -> String:
+	if style.has("tower_look"):
+		return str(style["wall_set"])  # already read the mapped material
 	var mat_tag := str(b.get("material", "")).strip_edges().to_lower()
 	var set_name: String = MaterialLibrary.MATERIAL_TAGS.get(mat_tag, "")
 	if set_name != "":
@@ -308,7 +314,8 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 				clampf(target.g / mean.g, 0.02, 8.0), clampf(target.b / mean.b, 0.02, 8.0))
 		return _keep_chroma(set_name, _calib(set_name, hsv))
 	if set_name == "glass":
-		return Color(0.38, 0.42, 0.45) if str(style.get("era", "")) == "nyc_international" else Color.WHITE
+		return Color(0.38, 0.42, 0.45) if str(style.get("era", "")) == "nyc_international" \
+			and not style.has("curtain") else Color.WHITE
 	if painted.a > 0.0 and MaterialLibrary.PBR_SETS.has(set_name):
 		return _keep_chroma(set_name, _calib(set_name, painted))
 	if set_name == "limestone":
@@ -332,13 +339,14 @@ static func _keep_chroma(set_name: String, tint: Color) -> Color:
 ## Texture-identity part of a tiled look (frame/shutter colours, window
 ## vocabulary, balconette share, bay).
 static func _look_key(look: Dictionary) -> String:
-	return "%s|%s|%.1f|%s|%.1f|%.1f" % [
+	var key := "%s|%s|%.1f|%s|%.1f|%.1f" % [
 		(look.get("frame", Color.WHITE) as Color).to_html(false),
 		(look.get("shutter", Color.BLACK) as Color).to_html(false),
 		snappedf(float(look.get("shutter_p", 0.0)), 0.1),
 		str(look.get("window", "casement")),
 		snappedf(float(look.get("rails", 0.0)), 0.1),
 		float(look.get("bay_m", 3.2))]
+	return key + "|" + str(look["curtain"]) if look.has("curtain") else key
 
 ## Ground-storey material for a building whose look has a ground
 ## treatment (shopfront, signage band, rendered chalet base, rusticated

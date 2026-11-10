@@ -71,6 +71,11 @@ const ROWS := [
 	{"id": "new_york", "label": "New York", "name": "New York, United States",
 		"lat": 40.7060, "lon": -74.0040, "eye_lat": 40.70265, "eye_lon": -73.99686,
 		"eye_m": 6.0, "bearing": 295.0, "pitch": 3.0, "hour": 8.0},
+	# Top of the Rock's south deck, down Midtown to the Empire State (~207°)
+	# with Chrysler to the left; the extent covers the towers it faces.
+	{"id": "new_york_midtown", "label": "Midtown", "name": "Midtown Manhattan, United States",
+		"lat": 40.7535, "lon": -73.9825, "eye_lat": 40.7588, "eye_lon": -73.9795,
+		"eye_m": 6.0, "asl_m": 262.0, "bearing": 195.0, "pitch": -7.0, "hour": 9.0},
 	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
 	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
 	# the path at the waterfront road, so asl_m holds the eye on the cliff.

@@ -86,6 +86,11 @@ const ENTRIES := {
 	"stockholm_ring1600": [59.3207, 18.0604, "ring1600", 1, "2026-11-02T21:21:26", 586043, "a9edd795ac812dc252419252abeb97b4d13ee4ccba74addd6d037be6c0d98867"],
 	"stockholm_ring2500": [59.3207, 18.0604, "ring2500", 1, "2026-11-02T21:21:26", 786911, "8a756def7d95094c8a2ec55d550419d8ce4c4eb85868a2d5805602091af59224"],
 	"stockholm_poi": [59.3207, 18.0604, "poi", 1, "2026-11-02T21:21:26", 433030, "e7f768f8f5ded0ad3cdd4d4e189483f67466c98f0d2bfbc9a253a966e9d33b53"],
+	"new_york_midtown_detailed": [40.7535, -73.9825, "detailed", 12, "2026-07-28T02:16:18", 14314437, "c6dccea141c93857855f909036e5c44b18a6e1b49f4aa3f1a355c2894ca442a1"],
+	"new_york_midtown_ring1600": [40.7535, -73.9825, "ring1600", 1, "2026-07-24T11:04:51", 765885, "d8efcfda2272dba7166b2527d2ba2fade3fcd554f887fd0064d2b2b859b47625"],
+	"new_york_midtown_ring2500": [40.7535, -73.9825, "ring2500", 1, "2026-05-31T22:37:44", 876470, "35b44ad45c40e1bb294d2c06326d0ce6cd2fe479b82e555e108a8d1aed0ce222"],
+	"new_york_midtown_poi": [40.7535, -73.9825, "poi", 1, "2026-07-15T15:22:01", 919211, "bc43b0b8d7f97f2b904650849542747d1d60b9630efa59849170f1c6a13cd243"],
+	"new_york_midtown_far": [40.7535, -73.9825, "far", 3, "2026-07-24T11:04:51", 40463913, "fe1f3021208431254cd880548be972aab6028f19222f62323218812c68935ede"],
 	"new_york_detailed": [40.7060, -74.0040, "detailed", 12, "2026-11-04T13:18:25", 16752176, "961c08765d6877fd1aa6e511b6872b6db02b8c8990f5d712f296483380b0828e"],
 	"san_francisco_detailed": [37.8040, -122.4195, "detailed", 12, "2026-11-04T13:16:20", 10341950, "10b158204da607694e7eea89616211d3c72251f3e2e04c63bfcd35bb749fb253"],
 	"helsinki_far": [60.1680, 24.9530, "far", 3, "2026-11-04T14:47:51", 19509450, "0a4b68952ddcd3ed19d697480431bcc5d41defcfdbbf1d393beb06b259774777"],
@@ -93,7 +98,8 @@ const ENTRIES := {
 }
 const DIRECTORY := "res://assets/osm_snapshots/"
 const CAPITAL_MANIFEST := DIRECTORY + "capital_manifest.json"
-const MAX_BYTES := 32 * 1024 * 1024
+## Midtown's 12 km far layer is ~39 MB of JSON (4.6 MB gzipped).
+const MAX_BYTES := 48 * 1024 * 1024
 static var _refreshing: Dictionary = {}
 static var _all_entries: Dictionary = {}
 ## Vector2(lat, lon) -> snapshot keys at that point, in table order, so a

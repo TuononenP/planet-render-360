@@ -333,7 +333,7 @@ planet-render-360/
 │   │   │                          Far terrain rings and the far city, only where the place is built up
 │   │   ├── building_*.gd, roof_*.gd, facade_*.gd, storey_composer.gd, architecture_*.gd
 │   │   │                          OSM building extrusion, regional style, roofs and facades; city and country-era style tables
-│   │   ├── tower_massing.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
+│   │   ├── tower_massing.gd, tower_top.gd, tower_looks.gd, nyc_tower_looks.gd, facade_curtain_kit.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
 │   │   │                          Tower setbacks, evidence from neighbouring buildings, paint families, party walls
 │   │   ├── road_*.gd, street_*.gd, rail_builder.gd, kerb_builder.gd, bridge_arches.gd
 │   │   │                          Roads, markings, rails, kerbs, bridges and street furniture

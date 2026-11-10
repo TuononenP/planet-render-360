@@ -37,7 +37,7 @@ instance on 2026-11-05, using OSM data dated 2026-11-02T21:21:26Z. The
 far-city query was run as six independent output statements against that same
 data timestamp and combined in query order after checking each response for
 errors. Snapshot versions, sizes and hashes are recorded in `BundledOsm`;
-`tools/prepare_osm_snapshot.py` validates and compresses each response.
+`tools/prepare_osm_snapshot.py` validates and compresses each response. The Midtown preset (`new_york_midtown_*`, origin 40.7535,-73.9825) was fetched on 2026-11-10 from overpass.private.coffee with the app's own queries; only the server `[timeout:]` was raised to 240 s for the detailed and far layers, which the dense extent exceeded at 30 s. That mirror's source timestamps (May-July 2026) are older than the fetch date.
 
 Additional capital snapshots prepared from regional OSM extracts, including
 GeoFabrik and BBBike, are listed in

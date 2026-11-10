@@ -344,6 +344,7 @@ func _tower_parts_checks(failures: Array[String]) -> void:
 	var brick := StandardMaterial3D.new()
 	builder._glass = glass
 	builder._dfs = [brick]
+	builder._height_ctx = BuildingHeights._height_context(_data())
 	if builder._tower_material({"material": "mirror"}, brick, Vector2.ZERO) != glass \
 			or str(builder._tower_material({"material": "brick"}, glass, Vector2.ZERO).get_meta("facade_set", "")) != "brick" \
 			or builder._tower_material({}, glass, Vector2.ZERO) != glass:

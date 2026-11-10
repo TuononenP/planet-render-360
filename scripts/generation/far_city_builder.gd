@@ -88,6 +88,11 @@ var _drs: Array = []
 var _glass: Material
 var _h_edge := -1.0
 var _landmarks: Array[Vector2] = []
+## A registry landmark's (x, z, clear radius), for the far towers: a fixed
+## radius would punch holes in Midtown around its many icons.
+var _tower_clear: Array[Vector3] = []
+## The far skyline's shape is the same on every preset (far_city_test).
+const FAR_MASSING_FIDELITY := 3
 var _tower_cells := {}
 var _height_ctx := {}
 var _fidelity := 2
@@ -110,11 +115,14 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	_fidelity = fidelity
 	_dfs = FacadeMaterials.distant_facades(fidelity, _region)
 	_drs = FacadeMaterials.distant_roofs(_region, fidelity)
-	_glass = FacadeMaterials.glass_material(0 if fidelity <= 1 else 1)
+	_glass = FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1)
 	if d.landmark_type != "none":
 		_landmarks.append(TerrainBuilder.landmark_world_pos(d))
+		_tower_clear.append(Vector3(_landmarks[0].x, _landmarks[0].y, LANDMARK_CLEAR_M))
 	for c in d.landmark_candidates:
 		_landmarks.append(Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0))))
+		_tower_clear.append(Vector3(float(c.get("x", 0.0)), float(c.get("z", 0.0)),
+			LandmarkSites.clear_m(LocationData.entry_for_type(str(c["type"]))) if c.has("type") else LANDMARK_CLEAR_M))
 	# Real buildings' median height in the outer extent band: the far
 	# fabric starts at what the street actually is, then eases to the
 	# regional profile with distance.
@@ -147,6 +155,12 @@ func _key(x: float, z: float) -> String:
 		band += 1
 	var oct := posmod(floori((atan2(z, x) + PI) / (TAU / 8.0)), 8)
 	return "%d,%d" % [oct, band]
+
+func _on_tower_site(x: float, z: float) -> bool:
+	for p in _tower_clear:
+		if Vector2(p.x, p.y).distance_to(Vector2(x, z)) < p.z:
+			return true
+	return false
 
 func _near_landmark(x: float, z: float) -> bool:
 	for p in _landmarks:
@@ -183,7 +197,7 @@ func _towers() -> void:
 		if c.length() < R_IN or c.length() > SettlementMap.RADIUS_M:
 			continue  # inside the extent the real building is already built
 		var ring := BuildingBuilder._clean_ring(t.get("footprint", PackedVector2Array()))
-		if ring.size() < 3 or _near_landmark(c.x, c.y):
+		if ring.size() < 3 or _on_tower_site(c.x, c.y):
 			continue
 		var idx := Geometry2D.triangulate_polygon(ring)
 		if idx.size() < 3:
@@ -200,8 +214,14 @@ func _towers() -> void:
 		BuildingBuilder._batch = batch
 		BuildingBuilder._batch_key = _key(c.x, c.y)
 		var parts: Array = t.get("parts", [])
-		if parts.is_empty():
+		var stepped := _stepped(tower_effective, ring) if parts.is_empty() else []
+		if not stepped.is_empty():
+			for part in stepped:
+				_tower_mass(part, part["footprint"], base + 2.0, mat)
+			_penthouse(stepped[-1], stepped[-1]["footprint"], base + 2.0)
+		elif parts.is_empty():
 			_tower_mass(t, ring, base + 2.0, mat)
+			_penthouse(t, ring, base + 2.0)
 		else:
 			# If all parts are lifted, fill the missing lower mass using
 			# the outline. Drawing the full-height outline would hide every
@@ -226,6 +246,24 @@ func _towers() -> void:
 		_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
 		towers += 1
 
+## A New York tower's generated setbacks, the same forms as the detailed
+## extent, or [] for one mass.
+func _stepped(t: Dictionary, ring: PackedVector2Array) -> Array:
+	var b := t.duplicate()
+	b["footprint"] = ring
+	b["height_source"] = "tag_height"
+	var shape := BuildingBuilder._effective_shape(str(b.get("roof_shape", "")), "flat", false)
+	return TowerMassing.stack(b, BuildingHeights._look_for(b, _height_ctx),
+		{"total_m": float(b.get("height", 0.0))}, {"fidelity": FAR_MASSING_FIDELITY}, shape)
+
+## A New York far tower's plant box, so its top is not cut flat.
+func _penthouse(mass: Dictionary, ring: PackedVector2Array, base: float) -> void:
+	if BuildingBuilder._effective_shape(str(mass.get("roof_shape", "")), "flat", false) != "flat":
+		return
+	var total := float(mass.get("height", 0.0))
+	TowerTop.penthouse(null, ring, base + total, total, _hash(ring[0].x, ring[0].y),
+		FacadeTextures.louvre(1, true), _drs[1 % _drs.size()])
+
 ## A residential tower can have a mapped glass curtain wall, including on
 ## individual parts. Honour that evidence instead of inferring brick from use.
 func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> Material:
@@ -233,15 +271,19 @@ func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> M
 	var set_name := str(MaterialLibrary.MATERIAL_TAGS.get(tag, ""))
 	if set_name == "glass":
 		return _glass
-	if set_name in ["brick", "stone", "limestone", "concrete", "render"]:
-		return FacadeMaterials.facade_for_building(mass, _region,
-			maxi(1, int(mass.get("levels", 0))), _fidelity,
-			true, _hash(centre.x, centre.y))
-	if str(_height_ctx.get("city", "")) == "new_york":
+	# A resolved look gives mapped masonry its real bays and storeys; without
+	# one it would stretch the Paris front over the whole tower.
+	if set_name in ["brick", "stone", "limestone", "concrete", "render"] \
+			or str(_height_ctx.get("city", "")) == "new_york":
 		var look := BuildingHeights._look_for(mass, _height_ctx)
 		return FacadeMaterials.facade_for_building(mass, _region,
 			maxi(1, int(mass.get("levels", 0))), _fidelity,
 			true, _hash(centre.x, centre.y), look)
+	# A tall glazed tower takes its region's glazing, not the one shared glass.
+	if not _height_ctx.is_empty():
+		var tower_look := BuildingHeights._look_for(mass, _height_ctx)
+		if tower_look.has("curtain"):
+			return FacadeTextures.curtain_distant(0 if _fidelity <= 1 else 1, tower_look)
 	return fallback
 
 ## OSM min_height and min_level are relative to the building's ground.
@@ -260,7 +302,19 @@ func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: M
 	var levels := int(mass.get("levels", 0))
 	var storeys := levels if levels > 0 else maxi(1, roundi((total - lift - roof_h) / 3.5))
 	if wall_top > base + lift + 0.01:
-		BuildingBuilder._walls(null, ring, base + lift, wall_top, mat, float(storeys))
+		var repeats := float(storeys)
+		if FacadeMaterials.facade_uv(mat).z > 0.0:
+			repeats = BuildingWalls.storey_repeats((wall_top - base - lift) / WorldScale.metres_to_units(),
+				storeys, float(mat.get_meta("facade_floor_m", 3.5)))
+		var plan := {}
+		if FacadeMaterials.facade_uv(mat).z > 0.0:
+			var mech := BuildingWalls.mech_floors(int(repeats), _hash(ring[0].x, ring[0].y), false)
+			if not mech.is_empty():
+				plan = {"mech": mech, "louvre": FacadeTextures.louvre(1, str(mat.get_meta("facade_set", "")) == "glass")}
+		if plan.is_empty():
+			BuildingBuilder._walls(null, ring, base + lift, wall_top, mat, repeats)
+		else:
+			BuildingWalls.upper_walls(null, ring, base + lift, wall_top, mat, null, int(repeats), plan, [], null, 1.0)
 	var roof_mat: Material = _drs[1 % _drs.size()]
 	if str(mass.get("roof_material", "")).strip_edges().to_lower() == "copper":
 		roof_mat = FacadeMaterials.roof_for_building(mass, _region, shape,

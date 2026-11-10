@@ -243,3 +243,17 @@ checks pass. Crown implementation is checked; photographic and human acceptance 
 **Still open, and not closable by an agent**
 - C-1 reference: a verified golden-hour photo taken from Pier 1 itself (the 06:39 image is from Fulton Ferry Landing).
 - C-9 "Photographic on Ultra": the human gate; the pre-rating stays recognisable.
+
+## Continuation — 2026-11-10: skyscraper realism
+
+No commits or pushes. Scorecard round: "New York towers, 2026-11-10".
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Window scale, blank walls | `tower_facade_uv_test`; `nyc-p0` against `nyc-final-cold` | Passed. |
+| Tower looks, setbacks, plant floors, tops | `nyc_tower_looks_test`, `building_fabric_test` | Passed. |
+| 22 new icons, Empire State, One WTC, Chrysler on `SkyKit` | `landmark_catalog_test`, `nyc_skyscraper_sites_test`, `visual-plan/captures/sky-nyc/` | Passed; each model is under 15k triangles. Flatiron keeps its real window openings. |
+| Midtown preset | `preset_views_test`, `bundled_osm_test`, `preset_snapshot_test` (257 presets, five layers each), offline `--cold-cache` capture `midtown-bundled-2026-11-10` | Passed. Bundled all five layers; `MAX_BYTES` raised to 48 MB for the 39 MB far layer. |
+| Other cities | `TowerLooks`, `style-1-2026-11-10` | Regional glazing mixes, plant floors and tops. |
+
+Still open: the human photographic gate.

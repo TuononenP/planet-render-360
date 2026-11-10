@@ -32,7 +32,9 @@ static func one_wtc(model: Node3D) -> void:
 	# Granite plaza plinth (the memorial plaza level).
 	lm.box("Base", Vector3(0, 0.3, 0), Vector3(WTC_HALF * 2.0 + 16.0, 0.6, WTC_HALF * 2.0 + 16.0))
 	_wtc_podium(lm)
-	_wtc_tower(lm)
+	var kit := SkyKit.new(lm)
+	kit.wall("Facade", "clear_fin", 3.04, WTC_FLOOR_M)
+	_wtc_tower(kit)
 	_wtc_spire(lm)
 	lm.commit(model)
 
@@ -79,9 +81,10 @@ static func _wtc_podium(lm: LandmarkMesh) -> void:
 
 ## Tower loft: base ring alternates square corners and edge midpoints;
 ## at the top each corner has drawn in to the midpoint of the turned
-## square's edge while the midpoints stay put. Floor spandrels and
-## vertical mullions are laid on each triangular face.
-static func _wtc_tower(lm: LandmarkMesh) -> void:
+## square's edge while the midpoints stay put. Each triangular face wears
+## the kit's vertical-fin glass at real mullion and storey spacing.
+static func _wtc_tower(kit: SkyKit) -> void:
+	var lm := kit.lm
 	var y0 := WTC_PODIUM_M
 	var y1 := WTC_ROOF_M
 	var bottom: Array[Vector3] = []
@@ -103,26 +106,9 @@ static func _wtc_tower(lm: LandmarkMesh) -> void:
 		var b_mid := bottom[j] if i % 2 == 0 else bottom[i]
 		var t_corner := top[i] if i % 2 == 0 else top[j]
 		var t_mid := top[j] if i % 2 == 0 else top[i]
-		_flat_tri(lm, "Glass", b_corner, b_mid, t_mid)
-		_flat_tri(lm, "Glass", b_corner, t_mid, t_corner)
-		_face_mullions(lm, b_corner, b_mid, t_mid, true)
-		_face_mullions(lm, t_corner, t_mid, b_corner, false)
-	# Floor spandrel lines: a thin steel ring round the section per floor.
-	var y := y0 + WTC_FLOOR_M
-	while y < y1 - 2.0:
-		var t := (y - y0) / (y1 - y0)
-		var ring: Array[Vector3] = []
-		for i in 8:
-			ring.append(bottom[i].lerp(top[i], t))
-		for i in 8:
-			var a := ring[i]
-			var b := ring[(i + 1) % 8]
-			var mid := (a + b) * 0.5
-			var out := Vector3(mid.x, 0, mid.z).normalized()
-			var ax := (b - a).normalized()
-			lm.box("Steel", mid + out * 0.08, Vector3(a.distance_to(b) + 0.2, 0.32, 0.18),
-				Basis(ax, Vector3.UP, ax.cross(Vector3.UP).normalized()), 0.0)
-		y += WTC_FLOOR_M
+		var across := Vector3(b_mid.x - b_corner.x, 0.0, b_mid.z - b_corner.z).normalized()
+		kit.wall_tri("Facade", b_corner, b_mid, t_mid, b_corner, across, y1)
+		kit.wall_tri("Facade", b_corner, t_mid, t_corner, b_corner, across, y1)
 	# Glass parapet on the turned square, its steel frame, and the roof.
 	var cap := PackedVector2Array()
 	for p in top:
@@ -137,31 +123,6 @@ static func _wtc_tower(lm: LandmarkMesh) -> void:
 		lm.box("Steel", (a + b) * 0.5 + Vector3(0, 4.6, 0), Vector3(a.distance_to(b) + 0.4, 0.4, 0.6), bas, 0.0)
 		for k in 15:
 			lm.box("Steel", a.lerp(b, k / 14.0) + Vector3(0, 2.4, 0), Vector3(0.25, 4.2, 0.5), bas, 0.0)
-
-## Vertical mullions on one half-face, a right triangle: a-b the
-## level edge, c the third corner, and the face's vertical through b
-## (b-c, `axis_at_b`) or through a (a-c). Every WTC_MULLION_M along a-b
-## a member runs up the face parallel to that axis to the sloping edge.
-static func _face_mullions(lm: LandmarkMesh, a: Vector3, b: Vector3, c: Vector3, axis_at_b: bool) -> void:
-	var n := (b - a).cross(c - a).normalized()
-	var mid := (a + b + c) / 3.0
-	if n.dot(Vector3(mid.x, 0.0, mid.z)) < 0.0:
-		n = -n
-	var count := int(a.distance_to(b) / WTC_MULLION_M)
-	for k in range(1, count):
-		var t := float(k) / count
-		var p := a.lerp(b, t)
-		var q := a.lerp(c, t) if axis_at_b else c.lerp(b, t)
-		lm.beam("Steel", p + n * 0.12, q + n * 0.12, 0.22, 0.2, b - a)
-
-static func _flat_tri(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, c: Vector3) -> void:
-	var n := (b - a).cross(c - a).normalized()
-	var mid := (a + b + c) / 3.0
-	if n.dot(Vector3(mid.x, 0.0, mid.z)) < 0.0:
-		n = -n
-	var u := (b - a).normalized()
-	lm.tri(key, a, b, c, n, n, n, Vector2(0, -a.y), Vector2((b - a).dot(u), -b.y),
-		Vector2((c - a).dot(u), -c.y))
 
 ## Roof plant and the spire: the circular communications ring (about
 ## 20 m across) on its plinth, eight raking struts to the mast, then the
@@ -229,6 +190,8 @@ static func empire_state(model: Node3D) -> void:
 	lm.use("Limestone", LandmarkMaterials.pbr("limestone", "#CFC6B4", 3.0))
 	lm.use("Spandrel", LandmarkMaterials.paint("#9EA3A6", 0.4, 0.7))
 	lm.use("Windows", LandmarkMaterials.glass("#2E3A40"))
+	var kit := SkyKit.new(lm)
+	kit.wall("Facade", "limestone_pier", 4.6, ESB_FLOOR_M)
 	lm.use("Mast", LandmarkMaterials.paint("#B9B5AA", 0.45, 0.55))
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#6E6A66", 2.5))
 	# [y0, y1, length (X), depth (Z), corner notch] stacked masses.
@@ -236,7 +199,7 @@ static func empire_state(model: Node3D) -> void:
 		[84.0, 99.0, 92.0, 48.0, 3.0], [99.0, 118.0, 76.0, 44.0, 3.0], [118.0, 280.0, 58.0, 40.0, 4.0],
 		[280.0, 314.0, 46.0, 34.0, 3.0], [314.0, 330.0, 36.0, 28.0, 2.0]]
 	for m in masses:
-		_esb_mass(lm, float(m[0]), float(m[1]), float(m[2]), float(m[3]), float(m[4]))
+		_esb_mass(kit, float(m[0]), float(m[1]), float(m[2]), float(m[3]), float(m[4]))
 	_esb_base(lm)
 	# 86th-floor deck: parapet with its pierced balustrade and the
 	# observatory walls under the mast.
@@ -251,25 +214,16 @@ static func empire_state(model: Node3D) -> void:
 	_esb_mast(lm)
 	lm.commit(model)
 
-## One setback mass: a dark core (window glass), limestone piers about
-## 1.5 m wide every bay standing 0.4 m proud with the cast aluminium
-## spandrel per floor between them, wide corner piers, a coping and,
-## where `notch` > 0, re-entrant corners.
-static func _esb_mass(lm: LandmarkMesh, y0: float, y1: float, lx: float, lz: float, notch: float) -> void:
+## One setback mass: facade quads whose tiles line up with limestone piers
+## about 1.5 m wide every bay standing 0.4 m proud, wide corner piers, a
+## coping and, where `notch` > 0, re-entrant corners.
+static func _esb_mass(kit: SkyKit, y0: float, y1: float, lx: float, lz: float, notch: float) -> void:
+	var lm := kit.lm
 	var h := y1 - y0
 	var yc := (y0 + y1) * 0.5
-	if notch > 0.0:
-		lm.box("Windows", Vector3(0, yc, 0), Vector3(lx - 0.8 - notch * 2.0, h, lz - 0.8))
-		lm.box("Windows", Vector3(0, yc, 0), Vector3(lx - 0.8, h, lz - 0.8 - notch * 2.0))
-	else:
-		lm.box("Windows", Vector3(0, yc, 0), Vector3(lx - 0.8, h, lz - 0.8))
 	lm.box("Limestone", Vector3(0, y1 + 0.5, 0), Vector3(lx - notch * 2.0 + 0.4, 1.0, lz + 0.4))
 	if notch > 0.0:
 		lm.box("Limestone", Vector3(0, y1 + 0.5, 0), Vector3(lx + 0.4, 1.0, lz - notch * 2.0 + 0.4))
-	if h < 12.0:
-		return
-	var floors := maxi(1, roundi(h / ESB_FLOOR_M))
-	var fh := h / floors
 	for face in [[lx, lz, Basis()], [lz, lx, Basis(Vector3.UP, PI * 0.5)]]:
 		var span := float(face[0])
 		var depth := float(face[1])
@@ -286,6 +240,9 @@ static func _esb_mass(lm: LandmarkMesh, y0: float, y1: float, lx: float, lz: flo
 			var bays := maxi(1, roundi((xb - xa) / 4.6))
 			var pitch := (xb - xa) / bays
 			for s in [-1.0, 1.0]:
+				var a3 := r * Vector3(xa, 0, s * (zf - 0.4))
+				var b3 := r * Vector3(xb, 0, s * (zf - 0.4))
+				kit.face("Facade", Vector2(a3.x, a3.z), Vector2(b3.x, b3.z), y0, y1, r * Vector3(0, 0, s), bays)
 				for k in bays + 1:
 					var x := xa + pitch * k
 					var pw := 2.2 if k == 0 or k == bays else 1.5
@@ -293,11 +250,6 @@ static func _esb_mass(lm: LandmarkMesh, y0: float, y1: float, lx: float, lz: flo
 					# Chrome-nickel trim up the pier edges.
 					if k > 0 and k < bays:
 						lm.box("Spandrel", r * Vector3(x, yc, s * (zf + 0.2)), Vector3(0.2, h, 0.06), r, 0.0)
-				for k in bays:
-					var x := xa + pitch * (k + 0.5)
-					for f in floors:
-						lm.box("Spandrel", r * Vector3(x, y0 + fh * f + 0.55, s * (zf - 0.35)),
-							Vector3(pitch - 1.5, 1.1, 0.1), r, 0.0)
 
 ## Ground floors: dark granite plinth, shopfronts and the Fifth Avenue
 ## (+X) entrance, three storeys high under its metal-framed transom.

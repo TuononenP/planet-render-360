@@ -433,11 +433,16 @@ static func _distant_pattern(p: Dictionary, wall_set: String) -> String:
 	if v is Array:
 		var best := -1.0
 		for pr in (v as Array):
+			# A curtain wall is glass: a solid wall takes the next pattern.
+			if str((pr as Array)[0]) == "curtain" and wall_set != "glass":
+				continue
 			if float((pr as Array)[1]) > best:
 				best = float((pr as Array)[1])
 				out = str((pr as Array)[0])
 	if wall_set == "wood" and out in ["strip", "balcony", "tiles"]:
 		out = "clapboard"
+	if out == "curtain" and wall_set != "glass":
+		out = "panel"
 	return out
 
 ## Kind for a procedural infill building (OSM silent): the region's mix

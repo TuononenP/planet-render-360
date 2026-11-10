@@ -288,6 +288,12 @@ void fragment() {
 	back = mix(back, 0.5, far_room);
 	lamp_k = mix(lamp_k, 0.65, far_room);
 	drape = mix(drape, clamp(1.0 - 2.0 * open_half + blind * 0.5, 0.0, 1.0) * 0.6, far_room);
+	// From ~33 px a pane to ~8 px, curtains settle to the building's average:
+	// a tenfold albedo range picked per window reads as a checkerboard.
+	float pane_mean = smoothstep(0.03, 0.12, max(length(gx * cells), length(gy * cells))) * 0.85;
+	drape = mix(drape, 0.3, pane_mean);
+	fabric = mix(fabric, vec3(0.76, 0.71, 0.64), pane_mean);
+	room = mix(room, vec3(0.525, 0.505, 0.46), pane_mean);
 	float day_k = mix(0.07, DAY_ROOM_NEAR, curtain_wall ? 0.0 : near_glass);
 	float day_room = day_k * mix(1.0, 0.35, back) * (1.0 - night);
 	vec3 inside = room * mix(day_room, lamp_k * mix(1.0, 0.55, back) * lit, night);
@@ -302,11 +308,13 @@ void fragment() {
 	float fresnel = GLASS_F0 + (1.0 - GLASS_F0) * pow(1.0 - clamp(vts.z, 0.0, 1.0), 5.0);
 	glass_e *= mix(vec3(1.0), GLASS_TINT * (1.0 - fresnel), near_glass);
 
-	vec3 glass_alb = curtain_wall ? base * 0.8
+	// A curtain wall's floors differ a little: no two batches of glass match.
+	vec3 glass_alb = curtain_wall ? base * 0.8 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
 		: mix(mix(vec3(0.015), fabric * 0.18, drape), vec3(GLASS_ALBEDO), near_glass);
 	ALBEDO = mix(wall, glass_alb, pane);
 	// Below ~0.12 the indirect reflections render as salt-and-pepper noise.
-	ROUGHNESS = mix(rough, mix(0.12, 0.18, h12(vec2(seed, 29.0))), pane);
+	// Sub-pixel panes share one value: picked per pane they alias to speckle.
+	ROUGHNESS = mix(rough, mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean)), pane);
 	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
 	SPECULAR = mix(0.5, 0.65, pane);
 	EMISSION = glass_e * pane;
@@ -317,7 +325,7 @@ void fragment() {
 	nxy *= min(1.0, 0.92 / max(length(nxy), 1e-4));
 	nm.xy = nxy * 0.5 + 0.5;
 	// About 0.3 degrees of tilt per pane.
-	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012;
+	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012 * (1.0 - pane_mean);
 	NORMAL_MAP = mix(nm, vec3(0.5 + tilt, 1.0), pane);
 }
 """

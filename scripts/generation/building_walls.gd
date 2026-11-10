@@ -29,6 +29,8 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 ## Height (m) of blank firewall above a lower neighbour before the
 ## windowed facade resumes on a wall that rises well past it.
 const FIREWALL_BAND_M := 9.0
+## Towers shorter than this have no plant floors in their shaft.
+const MECH_MIN_STOREYS := 30
 ## A masonry front's elevation: the first upper storey of a decorated front
 ## stands taller (the piano nobile), and about half of the punched masonry
 ## fronts end in a plainer top storey with small windows (the attic).
@@ -74,10 +76,56 @@ static func attic_look(look: Dictionary) -> Dictionary:
 static func band_unit(y0: float, top: float, n: int, plan: Dictionary) -> float:
 	return (top - y0) / (float(n) + (PIANO_STRETCH - 1.0 if bool(plan.get("piano", false)) else 0.0))
 
+## A tower's plant floors among its `n` upper storeys, ascending: one every
+## 20-30 storeys, and the top two when this mass carries the roofline.
+## [] below MECH_MIN_STOREYS.
+static func mech_floors(n: int, seed_v: float, roofline: bool) -> Array:
+	if n < MECH_MIN_STOREYS:
+		return []
+	var out: Array = []
+	var gap := 20 + int(ArchitectureStyle._h(seed_v, 61) * 11.0)
+	var f := gap
+	while f < n - 6:
+		out.append(f)
+		f += gap
+	if roofline:
+		out.append(n - 2)
+		out.append(n - 1)
+	return out
+
+## y0..top as runs of `facade` split by single `louvre` storeys at `mech`.
+static func _plant_run(root: Node3D, ring: PackedVector2Array, y0: float, top: float,
+		facade: Material, louvre: Material, n: int, mech: Array, cover: Array,
+		fire: Material, bay_scale: float) -> void:
+	var unit := (top - y0) / float(n)
+	var start := 0
+	for f in mech:
+		var floor_i := int(f)
+		if floor_i > start:
+			_walls(root, ring, y0 + float(start) * unit, y0 + float(floor_i) * unit, facade,
+				float(floor_i - start), cover, fire, false, {}, bay_scale)
+		_walls(root, ring, y0 + float(floor_i) * unit, y0 + float(floor_i + 1) * unit, louvre,
+			1.0, cover, fire, false, {}, bay_scale)
+		start = floor_i + 1
+	if start < n:
+		_walls(root, ring, y0 + float(start) * unit, top, facade, float(n - start),
+			cover, fire, false, {}, bay_scale)
+
+## Tile repeats up a wall of `wall_m` metres: the storey count, kept within
+## ~30% of the style's floor height so a roof carved out of the total or a
+## parent's storeys on a thin part never squash the windows.
+static func storey_repeats(wall_m: float, storeys: int, floor_h: float) -> float:
+	return roundf(clampf(float(maxi(storeys, 1)), maxf(1.0, wall_m / (floor_h * 1.35)),
+		maxf(1.0, wall_m / (floor_h * 0.75))))
+
 ## The upper storeys y0..top as the plan's bands, `attic` on the top storey.
 static func upper_walls(root: Node3D, ring: PackedVector2Array, y0: float, top: float,
 		facade: Material, attic: Material, n: int, plan: Dictionary, cover: Array,
 		fire: Material, bay_scale: float) -> void:
+	var mech: Array = plan.get("mech", [])
+	if not mech.is_empty():
+		_plant_run(root, ring, y0, top, facade, plan["louvre"], n, mech, cover, fire, bay_scale)
+		return
 	var unit := band_unit(y0, top, n, plan)
 	var y := y0
 	var rest := n
@@ -130,7 +178,8 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 			var a := ea.lerp(eb, float(pc[0]))
 			var b := ea.lerp(eb, float(pc[1]))
 			var nb_top := float(pc[2])
-			if is_inf(nb_top):
+			# A neighbour that stops below this wall (a raised tier) does not touch it.
+			if is_inf(nb_top) or nb_top <= base:
 				var u1 := 1.0
 				var v0 := 1.0
 				if uvp.x > 0.0:
@@ -146,15 +195,20 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 				var arr := blank if fire != null else edge_face
 				# Blank only just above the neighbour: a tower's side rising
 				# well past it has windows (a Manhattan tower, not a row house).
+				# A curtain wall, or a wall given no firewall, has no blank band.
+				var no_band := fire == null or str(edge_mat.get_meta("facade_set", "")) == "glass"
 				var y1 := top
-				if fire != null and uvp.x > 0.0 and top - y0 > FIREWALL_BAND_M * m2u * 1.5:
-					y1 = y0 + FIREWALL_BAND_M * m2u
+				if no_band or top - y0 > FIREWALL_BAND_M * m2u * 1.5:
+					y1 = y0 if no_band else y0 + FIREWALL_BAND_M * m2u
 					var len_m := (b - a).length() / m2u
-					var u1 := 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
+					var u1 := 1.0
+					if uvp.x > 0.0:
+						u1 = 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
 					var v_up := (v_repeat if uvp.z > 0.0 else 1.0) * (top - y1) / maxf(top - base, 1e-4)
 					_quad(edge_face, a, b, y1, top, n, Vector2(u1, v_up))
-				_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
-					(y1 - y0) / m2u / 4.0))
+				if y1 > y0:
+					_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
+						(y1 - y0) / m2u / 4.0))
 	_emit(root, face, mat)
 	for edge_mat in per_material:
 		_emit(root, per_material[edge_mat], edge_mat)
