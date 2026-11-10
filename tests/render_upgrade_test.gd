@@ -250,8 +250,8 @@ func _run() -> void:
 		cd.country = c[0]
 		cd.longitude = c[1]
 		RoadSurface.set_place(cd)
-		var cc: Color = mat.get_shader_parameter("centre_col")
-		if (cc.b < cc.r * 0.3) != bool(c[2]):
+		var cc: Vector3 = mat.get_shader_parameter("centre_col")
+		if (cc.z < cc.x * 0.3) != bool(c[2]):
 			failures.append("centre line for country '%s' at lon %.1f: %s" % [c[0], c[1], cc])
 	RoadSurface.set_place(_flat(RenderSettings.Preset.HIGH))
 	# A bay clipped to the extent (long collinear edges, regular interior

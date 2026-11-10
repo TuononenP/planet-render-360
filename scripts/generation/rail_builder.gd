@@ -27,10 +27,17 @@ const SLEEPER_HEX := "#8c8984"
 const STEEL_HEX := "#77736f"
 ## Gap between the slot rails over a cable car's cable (m), and the
 ## concrete bed the cable-car track is set in: its width past the rails
-## (m) and depth layer (over every carriageway, under the rails).
+## (m) and depth layer: over every carriageway (rank 2 asphalt tops out
+## near 6.8), under the road paint (RoadPaint.LAYER) and the rails. Its
+## lift follows its layer, as a road ribbon's does: lower than the
+## asphalt it is set in, it showed through only in patches.
 const CABLE_SLOT_M := 0.03
 const CABLE_BED_M := 1.2
-const CABLE_BED_LAYER := 7.0
+const CABLE_BED_LAYER := 6.85
+## Worn concrete, a shade lighter than the asphalt beside it; the rails
+## stand this far over the bed so its drape never swallows them.
+const CABLE_BED_HEX := "#7f7b74"
+const CABLE_RAIL_CLEAR_M := 0.02
 const TRACK_BED_HEX := "#a39d92"
 
 ## Ballast bed: speckled stone, concrete sleepers across it (UV.y along
@@ -151,6 +158,8 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 	for run in RoadBuilder._dry_runs(dense, surf):
 		var ys := PackedFloat32Array()
 		var lift := (STREET_RAIL_LIFT_M if embedded else BED_LIFT_M + RAIL_HEIGHT_M) * m2u
+		if embedded and bool(way.get("cable", false)):
+			lift = (RoadBuilder.lift_for_layer(CABLE_BED_LAYER) + CABLE_RAIL_CLEAR_M) * m2u
 		for p in run:
 			ys.append(surf.height(p.x, p.y) + lift)
 		if embedded:
@@ -168,9 +177,9 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			if bool(way.get("cable", false)):
 				# A concrete track bed in the asphalt, and the cable slot:
 				# two steel slot rails either side of a gap.
-				RoadBuilder._ribbon(RoadBuilder._batch(batches, "track_bed"),
+				RoadBuilder._ribbon(RoadBuilder._batch(batches, "cable_bed"),
 					RoadBuilder._straighten(run, surf.step), gauge + CABLE_BED_M * m2u, surf,
-					STREET_RAIL_LIFT_M * 0.6 * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
+					RoadBuilder.lift_for_layer(CABLE_BED_LAYER) * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
 				_rails(RoadBuilder._batch(batches, "rail"), run, ys, CABLE_SLOT_M * m2u, 0.0, m2u, RAIL_LAYER)
 		else:
 			RoadBuilder._ribbon(RoadBuilder._batch(batches, "ballast"),
@@ -270,6 +279,8 @@ static func _material(key: String) -> Material:
 			# Depth-layered like the road ribbons (a plain PBR deck would
 			# z-fight the asphalt it is set in).
 			m = RoadSurface.paved_material("pavement", Color.html(TRACK_BED_HEX).srgb_to_linear())
+		"cable_bed":
+			m = RoadSurface.paved_material("pavement", Color.html(CABLE_BED_HEX).srgb_to_linear())
 		"rail":
 			var rsh := Shader.new()
 			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL)

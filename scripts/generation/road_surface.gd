@@ -435,6 +435,11 @@ static func yellow_centre(data: LocationData) -> bool:
 		return YELLOW_CENTRE.has(data.country.to_upper())
 	return data.longitude > -170.0 and data.longitude < -30.0
 
+## True where a town street's centre line is a solid double line (the
+## MUTCD's no-passing marking and its Latin American kin), not dashes.
+static func double_centre(data: LocationData) -> bool:
+	return yellow_centre(data) and not data.country.to_upper() in ["NO", "FI"]
+
 ## Sets the kerb colour, the crack range and the paint's style for
 ## `data`'s place (RoadBuilder, per build).
 static func set_place(data: LocationData) -> void:
@@ -566,6 +571,10 @@ static func wear_seeds(data: LocationData) -> PackedFloat32Array:
 			out[i] = float(hash(lowest[root]) & 0xFFFF) / 65535.0
 	return out
 
+## `highway` values that are no road traffic uses: planned or being
+## built, a stop's platform, a race track.
+const NOT_ROADS := ["proposed", "construction", "platform", "raceway", "rest_area", "services", "elevator"]
+
 ## A road cars drive on as far as junction paint is concerned: not paths,
 ## crossings or areas, not driveways, not underground.
 static func is_carriageway(line: Variant) -> bool:
@@ -577,7 +586,7 @@ static func is_carriageway(line: Variant) -> bool:
 	if str(r.get("crossing_style", "")) != "" or bool(r.get("area", false)) or bool(r.get("tunnel", false)):
 		return false
 	var cls := str(r.get("class", "unclassified"))
-	return cls != "service" and RoadBuilder._rank(cls) >= 1
+	return cls != "service" and not cls in NOT_ROADS and RoadBuilder._rank(cls) >= 1
 
 static func node_key(p: Vector2) -> Vector2i:
 	return Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))

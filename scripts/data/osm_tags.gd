@@ -497,6 +497,9 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"sidewalk": sidewalk_sides(tags), "sidewalk_separate": sidewalk_sides(tags, true),
 		"oneway": oneway(tags), "cycle_lane": cycle_lane_sides(tags),
+		"lanes_forward": _tag_int(tags.get("lanes:forward", 0), 0, 20),
+		"lanes_backward": _tag_int(tags.get("lanes:backward", 0), 0, 20),
+		"unmarked": str(tags.get("lane_markings", "")).strip_edges().to_lower() == "no",
 		"turn_forward": turn_lanes(tags, "forward"), "turn_backward": turn_lanes(tags, "backward"), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
 		"class": road_class}
 

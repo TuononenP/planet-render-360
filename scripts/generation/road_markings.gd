@@ -10,8 +10,8 @@ extends RefCounted
 ## * Mapped crossings: their paint style (tags, else the country's habit)
 ##   and width. Mappers split one crossing into pieces, so width is
 ##   decided per collinear chain.
-## * Inferred crossings: a zebra just beyond the apron on urban arms with
-##   no mapped crossing near.
+## * Inferred crossings: one just beyond the apron on the urban arms of a
+##   junction with a main road, where no crossing is mapped near.
 ## * Scramble crossings: a ring of signalled crossings with one running
 ##   through the junction's centre (or crossing:scramble=yes) paints wide.
 ## * Stop lines: across the lanes arriving at a signalled crossing or a
@@ -51,9 +51,6 @@ const CHAIN_COS := 0.966
 const MIN_ON_ROAD := 0.15
 const ON_ROAD_PAD_M := 0.5
 const ON_ROAD_STEP_M := 2.0
-## Sampling along a crossing to find its on-road runs, and the shortest kept.
-const CLIP_STEP_M := 1.0
-const MIN_RUN_M := 1.0
 ## A crossing way straying further than this from straight is cut at the bend.
 const BEND_TOL_M := 1.0
 ## The widest road's half width: how far a sample looks for a road.
@@ -88,6 +85,10 @@ class Plan extends RefCounted:
 	var inferred: Array = []
 	var stops: Array = []
 	var junctions := {}
+	## Where lane paint stops (RoadPaintCut): the junction areas as rings,
+	## and [centre, radius] around the nodes of a junction left without one.
+	var clear: Array = []
+	var discs: Array = []
 	## Ends of signalled crossings and signal nodes (StreetProps lamps).
 	var signals := PackedVector2Array()
 	## Debug and test counters.
@@ -129,9 +130,14 @@ static func plan(data: LocationData, ground: GroundTruth) -> Plan:
 		arr.append(centre)
 		centres[cell] = arr
 		_lay_out_cluster(out, c, chains, buildings, ground, marked_grid, m)
-	_assign_crossings(out, data, chains, road_grid, m)
-	_stop_lines(out, data, chains, car_grid, centres, m)
-	out.stops = _clear_of_crossings(out, m)
+	var stubs := _stubs(chains, m)
+	_assign_crossings(out, data, chains, stubs, road_grid, m)
+	RoadCrossingClip.dedupe(out.by_road, m)
+	_stop_lines(out, data, chains, stubs, car_grid, centres, m)
+	# A bar inside the junction box stops nobody.
+	var boxes := RoadPaintCut.zones(out, m, true)
+	out.stops = _clear_of_crossings(out, m).filter(func(s: PackedVector2Array) -> bool:
+		return not RoadPaintCut.inside(boxes, (s[0] + s[s.size() - 1]) * 0.5, m))
 	return out
 
 ## Adds the plan to `batches`, the finished RoadBuilder ribbons alongside.
@@ -141,8 +147,9 @@ static func lay(p: Plan, batches: Dictionary, surf: RoadBuilder._Surface, m2u: f
 		var finish := apron_finish(p.apron_arms[i], data, surf, m2u)
 		RoadBuilder._area(RoadBuilder._batch(batches, finish), ring, [], surf,
 			RoadBuilder.lift_for_layer(APRON_LAYER) * m2u, m2u, APRON_LAYER)
+	var inferred := RoadSurface.crossing_finish("auto", false, data)
 	for c: PackedVector2Array in p.inferred:
-		_across(batches, "crossing", c, INFERRED_DEPTH_M * m2u, surf, m2u)
+		_across(batches, inferred, c, INFERRED_DEPTH_M * m2u, surf, m2u)
 	for s: PackedVector2Array in p.stops:
 		_across(batches, "marking", s, STOP_DEPTH_M * m2u, surf, m2u)
 
@@ -219,15 +226,16 @@ static func _pavement_links(out: Plan, data: LocationData, grid: Dictionary, m: 
 			_paint_plain(out, i, road)
 	return links
 
-## Drivable road segments bucketed: [a, b, half width + pad].
+## Drivable road segments bucketed: [a, b, half width, service road?].
 static func _road_grid(data: LocationData, m: float) -> Dictionary:
 	var grid := {}
 	for line: Variant in data.roads:
 		if _drivable(line):
 			var pts := RoadSurface._points(line)
-			var half := _width(line, m) * 0.5 + ON_ROAD_PAD_M * m
+			var half := _width(line, m) * 0.5
+			var service := not RoadSurface.is_carriageway(line)
 			for j in pts.size() - 1:
-				_grid_add(grid, pts[j], pts[j + 1], [pts[j], pts[j + 1], half], m)
+				_grid_add(grid, pts[j], pts[j + 1], [pts[j], pts[j + 1], half, service], m)
 	return grid
 
 ## Aprons bucketed by the cells of their bounds.
@@ -250,52 +258,6 @@ static func _apron_grid(aprons: Array, m: float) -> Dictionary:
 				(grid[k] as Array).append(ring)
 	return grid
 
-## The stretches of `pts` over a carriageway or apron: a crossing's paint
-## stops at the kerb, though the mapped way often runs on across the pavement.
-static func on_road_runs(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary, m: float, keep_on: bool = true) -> Array:
-	var out: Array = []
-	var cur := PackedVector2Array()
-	var size := CELL_M * m
-	for j in pts.size() - 1:
-		var seg_len := pts[j].distance_to(pts[j + 1])
-		var near := _grid_near(grid, (pts[j] + pts[j + 1]) * 0.5, ON_ROAD_REACH_M * m + seg_len * 0.5, m)
-		var n := maxi(1, ceili(seg_len / (CLIP_STEP_M * m)))
-		for k in n + (1 if j == pts.size() - 2 else 0):
-			var p := pts[j].lerp(pts[j + 1], float(k) / float(n))
-			var on := false
-			for seg: Array in near:
-				if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]):
-					on = true
-					break
-			if not on:
-				for ring: PackedVector2Array in aprons.get(_cell(p, size), []):
-					if Geometry2D.is_point_in_polygon(p, ring):
-						on = true
-						break
-			if on == keep_on:
-				cur.append(p)
-			else:
-				_end_run(out, cur, m)
-				cur = PackedVector2Array()
-	_end_run(out, cur, m)
-	return out
-
-## `run` cut at its bends into straight two-point pieces: a crossing's
-## bands fan out and fold if its ribbon has to turn a corner.
-static func straight_pieces(run: PackedVector2Array, tolerance: float) -> Array:
-	var a := run[0]
-	var b := run[run.size() - 1]
-	var worst := -1
-	var far := tolerance
-	for i in range(1, run.size() - 1):
-		var d := Geometry2D.get_closest_point_to_segment(run[i], a, b).distance_to(run[i])
-		if d > far:
-			far = d
-			worst = i
-	if worst < 0:
-		return [PackedVector2Array([a, b])]
-	return straight_pieces(run.slice(0, worst + 1), tolerance) + straight_pieces(run.slice(worst), tolerance)
-
 ## Stop lines cut back where a crossing's paint already lies: the two
 ## overlap on a scramble's diagonals.
 static func _clear_of_crossings(out: Plan, m: float) -> Array:
@@ -307,13 +269,9 @@ static func _clear_of_crossings(out: Plan, m: float) -> Array:
 				[run[0], run[run.size() - 1], float(entry["width_m"]) * m * 0.5], m)
 	var kept: Array = []
 	for stop: PackedVector2Array in out.stops:
-		for piece: PackedVector2Array in on_road_runs(stop, grid, {}, m, false):
+		for piece: PackedVector2Array in RoadCrossingClip.on_road_runs(stop, grid, {}, m, false):
 			kept.append(PackedVector2Array([piece[0], piece[piece.size() - 1]]))
 	return kept
-
-static func _end_run(out: Array, run: PackedVector2Array, m: float) -> void:
-	if run.size() >= 2 and run[0].distance_to(run[run.size() - 1]) >= MIN_RUN_M * m:
-		out.append(run)
 
 static func _paint_plain(out: Plan, i: int, road: Dictionary) -> void:
 	out.by_road[i] = {"finish": RoadBuilder._finish(str(road.get("class", "")), str(road.get("surface", "")).to_lower()),
@@ -345,7 +303,7 @@ static func _on_road_share(pts: PackedVector2Array, grid: Dictionary, m: float) 
 			var p := pts[j].lerp(pts[j + 1], (float(k) + 0.5) / float(n))
 			total += 1
 			for seg: Array in _grid_near(grid, p, ON_ROAD_REACH_M * m, m):
-				if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]):
+				if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]) + ON_ROAD_PAD_M * m:
 					hits += 1
 					break
 	return float(hits) / float(maxi(total, 1))
@@ -548,6 +506,12 @@ static func _lay_out_cluster(out: Plan, c: Dictionary, chains: Array, buildings:
 	var clear := Geometry2D.convex_hull(with_ring) if with_ring.size() != edge.size() else hull
 	if not clear.is_empty():
 		_paint_points(out.junctions, clear, m)
+		out.clear.append(clear)
+	else:
+		# No apron could be laid (a building or water at its edge): the
+		# lines still stop short of where the streets meet.
+		for p in c["points"] as PackedVector2Array:
+			out.discs.append([p, setback + INFERRED_GAP_M * m])
 	var tagged := false
 	for chain: Dictionary in ring["ring"] + ring["diagonals"]:
 		tagged = tagged or bool(chain["scramble"])
@@ -749,15 +713,23 @@ static func _paint_points(buckets: Dictionary, hull: PackedVector2Array, m: floa
 		arr.append(p)
 		buckets[cell] = arr
 
-## A zebra just beyond the apron on each urban arm with none mapped near.
+## A crossing just beyond the apron on each urban arm with none mapped
+## near. Side streets meeting side streets are left bare, as they are in
+## most cities, and nobody walks across a motorway.
 static func _infer_crossings(out: Plan, arms: Array, centre: Vector2, setback: float, ground: GroundTruth,
 		mapped: Dictionary, m: float) -> void:
 	var depth := INFERRED_DEPTH_M * m
 	var dist := setback + depth * 0.5 + INFERRED_GAP_M * m
 	var near_r := MAPPED_NEAR_M * m
+	var main := false
+	for a: Dictionary in arms:
+		main = main or RoadBuilder._rank(_class(a["line"])) >= 2
+	if not main:
+		return
 	for a: Dictionary in arms:
 		var width: float = a["width"]
-		if width < INFERRED_MIN_WIDTH_M * m or float(a["length"]) < dist + depth:
+		if width < INFERRED_MIN_WIDTH_M * m or float(a["length"]) < dist + depth \
+				or RoadPaint.kind_of(_class(a["line"]), true) == "motorway":
 			continue
 		var at: Array = _along(a["pts"], a["j"], a["dir"], dist)
 		var p: Vector2 = at[0]
@@ -770,6 +742,9 @@ static func _infer_crossings(out: Plan, arms: Array, centre: Vector2, setback: f
 		var side := Vector2(t.y, -t.x) * (width * 0.5 - KERB_CLEAR_M * m)
 		out.inferred.append(PackedVector2Array([p + side, p - side]))
 
+static func _class(line: Variant) -> String:
+	return str((line as Dictionary).get("class", "unclassified")) if line is Dictionary else "unclassified"
+
 static func _mapped_near(grid: Dictionary, p: Vector2, r: float, m: float) -> bool:
 	for seg: Array in _grid_near(grid, p, r, m):
 		if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= r:
@@ -777,8 +752,8 @@ static func _mapped_near(grid: Dictionary, p: Vector2, r: float, m: float) -> bo
 	return false
 
 ## Finish and width of each mapped crossing way.
-static func _assign_crossings(out: Plan, data: LocationData, chains: Array, road_grid: Dictionary, m: float) -> void:
-	var stubs := _stubs(chains, m)
+static func _assign_crossings(out: Plan, data: LocationData, chains: Array, stubs: Dictionary,
+		road_grid: Dictionary, m: float) -> void:
 	var aprons := _apron_grid(out.aprons, m)
 	for c in chains.size():
 		var chain: Dictionary = chains[c]
@@ -806,20 +781,17 @@ static func _assign_crossings(out: Plan, data: LocationData, chains: Array, road
 			var road: Dictionary = data.roads[i]
 			out.by_road[i] = {"finish": RoadSurface.crossing_finish(str(road.get("crossing_style", "auto")),
 				bool(road.get("crossing_signal", false)), data), "width_m": w,
-				"runs": _crossing_pieces(RoadSurface._points(road), road_grid, aprons, m)}
-
-static func _crossing_pieces(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary, m: float) -> Array:
-	var out: Array = []
-	for run: PackedVector2Array in on_road_runs(pts, grid, aprons, m):
-		out.append_array(straight_pieces(run, BEND_TOL_M * m))
-	return out
+				"runs": RoadCrossingClip.pieces(RoadSurface._points(road), road_grid, aprons, m)}
 
 ## Stop lines for signalled crossings and lone signal nodes.
-static func _stop_lines(out: Plan, data: LocationData, chains: Array, car_grid: Dictionary, centres: Dictionary, m: float) -> void:
+static func _stop_lines(out: Plan, data: LocationData, chains: Array, stubs: Dictionary, car_grid: Dictionary,
+		centres: Dictionary, m: float) -> void:
 	var left_traffic := RoadSurface.left_traffic(data)
 	var signal_grid := {}
-	for chain: Dictionary in chains:
-		if not bool(chain["signal"]):
+	for c in chains.size():
+		var chain: Dictionary = chains[c]
+		# A stub is part of its longer neighbour's crossing: that one draws the bar.
+		if not bool(chain["signal"]) or stubs.has(c):
 			continue
 		var half := float((out.by_road[(chain["roads"] as PackedInt32Array)[0]] as Dictionary)["width_m"]) * m * 0.5
 		var best := {}
@@ -885,6 +857,8 @@ static func _arrivals(out: Plan, line: Variant, pts: PackedVector2Array, seg: in
 	if need_junction and (not centre.is_finite() or centre.distance_to(at) <= JUNCTION_SKIP_M * m):
 		return
 	var hw := _width(line, m) * 0.5 - KERB_CLEAR_M * m
+	# Parked cars keep their strip: the bar spans the lanes only.
+	var strips := (RoadPaint.parking_strips(line) if line is Dictionary else Vector2.ZERO) * m
 	var arc := at.distance_to(pts[seg])
 	for k in seg:
 		arc += pts[k].distance_to(pts[k + 1])
@@ -904,11 +878,14 @@ static func _arrivals(out: Plan, line: Variant, pts: PackedVector2Array, seg: in
 		var q: Vector2 = pose[0]
 		var d: Vector2 = (pose[1] as Vector2) * float(travel_dir)
 		var left := Vector2(d.y, -d.x)
+		var room := strips if travel_dir > 0 else Vector2(strips.y, strips.x)
 		if oneway != 0:
-			out.stops.append(PackedVector2Array([q + left * hw, q - left * hw]))
+			out.stops.append(PackedVector2Array([q + left * maxf(hw - room.x, 0.0), q - left * maxf(hw - room.y, 0.0)]))
 		else:
 			var side := left if left_traffic else -left
-			out.stops.append(PackedVector2Array([q + side * 0.15 * m, q + side * hw]))
+			var reach := hw - (room.x if left_traffic else room.y)
+			if reach > 1.0 * m:
+				out.stops.append(PackedVector2Array([q + side * 0.15 * m, q + side * reach]))
 
 ## Point and forward tangent at arc length `dist`.
 static func _point_at(pts: PackedVector2Array, dist: float) -> Array:

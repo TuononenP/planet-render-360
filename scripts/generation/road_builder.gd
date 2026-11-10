@@ -14,9 +14,10 @@ extends RefCounted
 ## ways become decks with fascia sides and parapets, gently arched bank to
 ## bank (grade and rise capped); non-bridge segments over water
 ## are dropped (no shards in the river); tunnels are skipped. Asphalt
-## is RoadSurface's shader: lane markings, crossings, kerbs, wear and
-## weather on every tier, from the per-vertex lanes / rank / urban flag
-## / junction distance written here. v1 bare centrelines
+## is RoadSurface's shader: kerbs, wear and weather on every tier, from
+## the per-vertex rank / urban flag / junction distance written here.
+## Lines, crossings, stop lines and symbols are a paint layer of their
+## own over it (RoadMarkings, RoadPaint, RoadGlyphs). v1 bare centrelines
 ## are still accepted as {width 1.7 units, class unclassified}.
 ## TerrainBuilder.build_world adopts the children flat.
 
@@ -208,7 +209,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
 	RoadMarkings.lay(plan, batches, surf, m2u, data)
-	RoadPaint.lay(batches, data, surf, junc, seeds, m2u)
+	RoadPaint.lay(batches, data, surf, plan, seeds, m2u)
 	RoadGlyphs.lay(batches, data, surf, m2u, plan)
 	for finish in batches:
 		var b: _Batch = batches[finish]

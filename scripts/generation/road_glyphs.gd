@@ -97,15 +97,18 @@ static func _bar(a: Vector2, b: Vector2, hw: float) -> PackedVector2Array:
 ## Offset (right of travel positive) of lane `k` of `count`, counted from
 ## the left, on a road `w` wide. A two-way road's lanes in this direction
 ## take the half its traffic drives on; `strips` is (left, right of travel)
-## kept clear by parking. NAN when the lanes would be too narrow to mark.
-static func lane_offset(w: float, k: int, count: int, oneway: bool, left_traffic: bool, strips: Vector2 = Vector2.ZERO) -> float:
+## kept clear by parking, `centre` where opposing traffic meets (the
+## painted centre line's offset, RoadPaint.lane_lines). NAN when the lanes
+## would be too narrow to mark.
+static func lane_offset(w: float, k: int, count: int, oneway: bool, left_traffic: bool, strips: Vector2 = Vector2.ZERO,
+		centre: float = 0.0) -> float:
 	var lo := -w * 0.5 + strips.x
 	var hi := w * 0.5 - strips.y
 	if not oneway:
 		if left_traffic:
-			hi = minf(hi, 0.0)
+			hi = minf(hi, centre)
 		else:
-			lo = maxf(lo, 0.0)
+			lo = maxf(lo, centre)
 	var lane := (hi - lo) / float(maxi(count, 1))
 	if lane < MIN_LANE_M:
 		return NAN
@@ -151,13 +154,31 @@ static func lay(batches: Dictionary, data: LocationData, surf: RoadBuilder._Surf
 		var strips := RoadPaint.parking_strips(road)
 		if oneway < 0:
 			strips = Vector2(strips.y, strips.x)
-		count += _approach(batches, travel, road.get("turn_forward", []), road, oneway != 0, lht, strips, nodes, surf, lift, m2u, painted)
+		# Where the painted centre line lies, to the right of the way's direction.
+		var centre := -centre_offset(road, data)
+		count += _approach(batches, travel, road.get("turn_forward", []), road, oneway != 0, lht, strips, nodes, surf, lift, m2u, painted,
+			centre, int(road.get("lanes_forward", 0)))
 		if oneway == 0:
 			var back := pts.duplicate()
 			back.reverse()
-			count += _approach(batches, back, road.get("turn_backward", []), road, false, lht, Vector2(strips.y, strips.x), nodes, surf, lift, m2u, painted)
-		count += _bikes(batches, pts, road, surf, lift, m2u)
+			count += _approach(batches, back, road.get("turn_backward", []), road, false, lht, Vector2(strips.y, strips.x), nodes, surf, lift, m2u, painted,
+				-centre, int(road.get("lanes_backward", 0)))
+		count += _bikes(batches, pts, road, surf, lift, m2u, lht)
 	return count
+
+## Offset (m, left of the way's direction) of `road`'s painted centre line:
+## arrows sit in the lanes the lines mark out. 0 on a road without one.
+static func centre_offset(road: Dictionary, data: LocationData) -> float:
+	var rank := RoadBuilder._rank(str(road.get("class", "")))
+	var sum := 0.0
+	var count := 0
+	for l: Dictionary in RoadPaint.lane_lines(float(road.get("width_m", 0.0)), int(road.get("lanes", 0)),
+			int(road.get("oneway", 0)) != 0, rank, true, 0.12, RoadPaint.parking_strips(road),
+			int(road.get("cycle_lane", 0)), RoadPaint.layout_opts(road, false, data)):
+		if bool(l["centre"]):
+			sum += float(l["x"])
+			count += 1
+	return sum / float(count) if count > 0 else 0.0
 
 ## Crossing and stop-line paint bucketed: [a, b, half depth].
 static func _paint_grid(plan: RoadMarkings.Plan, m2u: float) -> Dictionary:
@@ -208,10 +229,16 @@ static func arrow_backs(pts: PackedVector2Array, painted: Dictionary, m2u: float
 		back += SEARCH_STEP_M * m2u
 	return out
 
-## The arrows of one direction of travel along `pts`, into a junction at its end.
+## The arrows of one direction of travel along `pts`, into a junction at
+## its end. `centre` is the centre line's offset to the right of travel;
+## `tagged` the lanes the road counts this way (0 unknown): arrows for a
+## different count would sit across the painted lines, so none are drawn.
 static func _approach(batches: Dictionary, pts: PackedVector2Array, lanes: Array, road: Dictionary, oneway: bool, lht: bool,
-		strips: Vector2, nodes: Dictionary, surf: RoadBuilder._Surface, lift: float, m2u: float, painted: Dictionary) -> int:
+		strips: Vector2, nodes: Dictionary, surf: RoadBuilder._Surface, lift: float, m2u: float, painted: Dictionary,
+		centre: float = 0.0, tagged: int = 0) -> int:
 	if lanes.is_empty() or not nodes.has(RoadSurface.node_key(pts[pts.size() - 1])):
+		return 0
+	if not oneway and tagged > 0 and tagged != lanes.size():
 		return 0
 	var backs := arrow_backs(pts, painted, m2u)
 	var w := float(road.get("width_m", 0.0))
@@ -221,7 +248,7 @@ static func _approach(batches: Dictionary, pts: PackedVector2Array, lanes: Array
 		if at.is_empty():
 			continue
 		for k in lanes.size():
-			var offset := lane_offset(w, k, lanes.size(), oneway, lht, strips)
+			var offset := lane_offset(w, k, lanes.size(), oneway, lht, strips, centre)
 			if is_nan(offset):
 				continue
 			var parts := arrow_parts(lanes[k])
@@ -230,13 +257,14 @@ static func _approach(batches: Dictionary, pts: PackedVector2Array, lanes: Array
 			count += 1 if not parts.is_empty() else 0
 	return count
 
-## Bicycles down each mapped bike lane, along the way's own direction.
-static func _bikes(batches: Dictionary, pts: PackedVector2Array, road: Dictionary, surf: RoadBuilder._Surface, lift: float, m2u: float) -> int:
+## Bicycles down each mapped bike lane, each facing the way its side of
+## the road travels.
+static func _bikes(batches: Dictionary, pts: PackedVector2Array, road: Dictionary, surf: RoadBuilder._Surface, lift: float, m2u: float,
+		lht: bool = false) -> int:
 	var sides := int(road.get("cycle_lane", 0))
 	if sides == 0:
 		return 0
-	var reversed := pts.duplicate()
-	reversed.reverse()
+	var twoway := int(road.get("oneway", 0)) == 0
 	var w := float(road.get("width_m", 0.0))
 	var strips := RoadPaint.parking_strips(road)
 	var length := _length(pts)
@@ -247,8 +275,11 @@ static func _bikes(batches: Dictionary, pts: PackedVector2Array, road: Dictionar
 		if not at.is_empty():
 			for side: Array in [[1, -(w * 0.5 - strips.x - BIKE_SIDE_INSET_M)], [2, w * 0.5 - strips.y - BIKE_SIDE_INSET_M]]:
 				if sides & int(side[0]):
+					# On a two-way road the side across from the driving side runs back.
+					var back := twoway and (int(side[0]) == 1) != lht
 					for part: PackedVector2Array in bike_parts():
-						_place(batches, part, at[0], at[1], float(side[1]), surf, lift, m2u)
+						_place(batches, part, at[0], -(at[1] as Vector2) if back else at[1],
+							-float(side[1]) if back else float(side[1]), surf, lift, m2u)
 					count += 1
 		along += BIKE_EVERY_M * m2u
 	return count
