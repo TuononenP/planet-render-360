@@ -135,8 +135,10 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			var rings: Array = [poly.get("points", PackedVector2Array())]
 			for hole in poly.get("holes", []):
 				rings.append(hole)
+			var sward := str(poly.get("sward", ""))
 			green.append({"class": cls, "points": rings[0], "cells": 0, "real_trees": 0,
-				"leaf_type": str(poly.get("leaf_type", ""))})
+				"leaf_type": str(poly.get("leaf_type", "")),
+				"sward": sward if sward != "" else sward_of(cls)})
 			green[green.size() - 1]["cells"] = _fill(rings, 0, green.size())
 	for poly in data.land_polygons:
 		if str(poly.get("class", "")) == "water":
@@ -178,6 +180,12 @@ func blocked(x: float, z: float, mask: int, margin_m: float = 0.0) -> bool:
 			if bits[zz * n + xx] & mask:
 				return true
 	return false
+
+## How a green class is kept when its tags do not say: lawns, parks and
+## cemeteries are mown (the safe guess in a city); wetland, forest floor
+## and orchard grass stand wild.
+static func sward_of(cls: String) -> String:
+	return "mown" if cls in ["grass", "cemetery", ""] else "wild"
 
 ## Green polygon id (index into `green`) at XZ, or -1.
 func cover_at(x: float, z: float) -> int:

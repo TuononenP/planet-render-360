@@ -128,7 +128,10 @@ static func _relation_land(tags: Dictionary, members: Array,
 			return []
 	var entries: Array = []
 	for r in _relation_rings(members, c_lat, c_lon):
-		entries.append({"class": cls, "points": r["outer"], "holes": r["holes"]})
+		var entry := {"class": cls, "points": r["outer"], "holes": r["holes"]}
+		if cls == "grass":
+			entry["sward"] = OsmTags.sward(tags)
+		entries.append(entry)
 	return entries
 
 ## Stitched rings of one multipolygon relation as [{outer, holes}]:

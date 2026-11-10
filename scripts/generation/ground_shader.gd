@@ -26,7 +26,7 @@ uniform float class_n = 1024.0;
 uniform sampler2D near_class : filter_nearest, repeat_disable;
 uniform float near_n = 0.0;
 uniform vec4 near_rect = vec4(0.0);
-uniform int max_id = 16;
+uniform int max_id = 17;
 uniform float extent_u = 220.0;
 uniform float u2m = 1.0;
 uniform float near_m = 140.0;
@@ -53,6 +53,9 @@ uniform float veg_hi = 0.12;
 uniform int ground_quality = 2;
 // 1 = a finer sample of the main layer close to the eye (micro_detail).
 uniform float micro_detail = 0.0;
+// Mowing direction of this place's lawns (radians from +x): stripes run
+// along it and alternate light and dark with the view.
+uniform float stripe_angle = 0.6;
 
 // @SNOW
 // @TERRAIN
@@ -169,6 +172,8 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
+	// Share of unmown meadow (class 17) among the taps.
+	float wildw = 0.0;
 	// Around the viewpoint the fine map decides. Its borders wander a
 	// little, as grass overgrowing a path edge does, and unmapped texels
 	// leave their share to the extent map below.
@@ -195,6 +200,7 @@ void fragment() {
 					coarse += bw;
 				} else {
 					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
+					wildw += id == 17 ? bw : 0.0;
 				}
 			}
 			// Grass beside anything hard is trodden to bare earth, in
@@ -230,6 +236,7 @@ void fragment() {
 				id = 3;
 			}
 			class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
+			wildw += id == 17 ? bw : 0.0;
 		}
 	}
 	// Crag relief: noise gradients bend the lighting normal on steep and
@@ -278,9 +285,37 @@ void fragment() {
 		float m_fine = t_noise(g / 5.1 + 11.0) * 0.6 + t_noise(g / 1.7 + 3.0) * 0.4;
 		vec3 lush = vec3(0.50, 0.64, 0.36);
 		vec3 dried = vec3(0.78, 0.68, 0.34);
-		vec3 tone = mix(lush, dried, smoothstep(0.32, 0.72, m_big));
-		tone *= 0.88 + 0.24 * mix(0.5, m_fine, 1.0 - smoothstep(120.0, 600.0, dist_m));
+		float wild = clamp(wildw, 0.0, 1.0);
+		// Unmown meadow dries in bigger, bolder patches than a watered lawn.
+		vec3 tone = mix(lush, dried, smoothstep(mix(0.32, 0.22, wild), mix(0.72, 0.62, wild), m_big));
+		float near_fine = 1.0 - smoothstep(120.0, 600.0, dist_m);
+		tone *= 0.88 + mix(0.24, 0.34, wild) * mix(0.5, m_fine, near_fine);
+		// Close by, grass is blades, not felt: streaky light and dark grain
+		// (and in a meadow the odd pale seed head) at the scale of a tuft.
+		if (ground_quality >= 1 && dist_m < 45.0) {
+			float near_b = 1.0 - smoothstep(18.0, 45.0, dist_m);
+			float grain = t_noise(g * vec2(6.3, 2.1) + 31.0) * 0.6 + t_noise(g * 13.0 + 7.0) * 0.4;
+			tone *= 1.0 + (grain - 0.5) * 0.22 * near_b;
+			float seed = smoothstep(0.80, 0.9, t_noise(g * 2.7 + 41.0)) * wild * near_b;
+			tone = mix(tone, dried * 1.15, seed * 0.35);
+		}
 		base *= mix(vec3(1.0), tone, meadow * 0.85);
+		// Mown lawns carry the mower's stripes: blades leaning away from
+		// the eye show their lit sides, those leaning toward it their
+		// shadowed bases, so the bands swap as the view turns.
+		float mown = meadow * (1.0 - wild) * (1.0 - smoothstep(90.0, 170.0, dist_m));
+		if (ground_quality >= 1 && mown > 0.01) {
+			vec2 sd = vec2(cos(stripe_angle), sin(stripe_angle));
+			float sc_m = dot(g, vec2(-sd.y, sd.x)) / 1.3;
+			float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(sc_m));
+			float band = smoothstep(-0.12, 0.12, sin(sc_m * 3.14159265)) * 2.0 - 1.0;
+			vec2 to_eye = normalize(CAMERA_POSITION_WORLD.xz - wpos.xz + vec2(1e-4));
+			base *= 1.0 + 0.075 * band * dot(sd, to_eye) * mown * aa;
+		}
+		// Seen low, a sward shows blade sides: paler and a touch silvery.
+		float ndv = clamp(dot(normalize(CAMERA_POSITION_WORLD - wpos), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+		float graze = pow(1.0 - ndv, 3.0) * meadow * (1.0 - steep);
+		base = mix(base, vec3(lum(base)) * 1.12, 0.16 * graze);
 		// Sunlit turf is a deep, slightly grey green, never poster green.
 		float turf = lum(base);
 		base = mix(base, vec3(turf), 0.18 * meadow) * mix(1.0, 0.93, meadow);

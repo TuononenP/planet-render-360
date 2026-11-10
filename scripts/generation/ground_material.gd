@@ -66,7 +66,7 @@ const ID := {
 	"": 0, "building": 1, "road": 2, "urban": 3, "grass": 4,
 	"forest": 5, "field": 6, "orchard": 7, "cemetery": 8, "pitch": 9,
 	"wetland": 10, "sand": 11, "rock": 12, "quarry": 13, "glacier": 14,
-	"water": 15, "path": 16,
+	"water": 15, "path": 16, "meadow": 17,
 }
 
 ## Paved sidewalk width beside a road whose `sidewalk` tag names a side
@@ -111,6 +111,8 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	_bind_near(m, data, m2u)
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)
+	# One mowing direction per place, so neighbouring lawns agree.
+	m.set_shader_parameter("stripe_angle", fposmod(data.latitude * 37.1 + data.longitude * 53.7, PI))
 	m.set_shader_parameter("near_m", NEAR_M)
 	m.set_shader_parameter("far_m", FAR_M)
 	m.set_shader_parameter("lum_floor", LUM_FLOOR)
@@ -288,6 +290,10 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
 		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
+		# Unmown meadow: the lawn layer with some forest-floor litter, a
+		# little drier and more photo-led than a mown lawn.
+		"meadow": [Color(0, 0.8, 0, 0), grass.lerp(Color(0.55, 0.52, 0.30), 0.22), 0.55, 1.0, 0.97, 0.6,
+			Color(0, 0.2, 0, 0)],
 		"forest": [Color(0, 0.25, 0, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6, Color(0, 0.75, 0, 0)],
 		"field": [Color(0, 0.6, 0.2, 0), MaterialLibrary.ground_color("field"), 0.6, 1.0, 0.97, 0.6, Color(0, 0, 0.2, 0)],
 		"orchard": [Color(0, 0.8, 0, 0), MaterialLibrary.ground_color("orchard"), 0.5, 1.0, 0.97, 0.55, Color(0, 0.2, 0, 0)],
@@ -394,6 +400,8 @@ static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: fl
 		if not (poly is Dictionary):
 			continue
 		var cls := str((poly as Dictionary).get("class", ""))
+		if cls == "grass" and str((poly as Dictionary).get("sward", "")) == "wild":
+			cls = "meadow"
 		if not ID.has(cls):
 			continue
 		var rings: Array = [(poly as Dictionary).get("points", PackedVector2Array())]
@@ -503,7 +511,7 @@ static func _worldcover_fallback(target: Image, source: Image, arid: bool) -> Im
 	var h := target.get_height()
 	var values := src.get_data()
 	var out := target.get_data()
-	var classes := {10: ID["forest"], 20: ID["grass"], 30: ID["grass"],
+	var classes := {10: ID["forest"], 20: ID["meadow"], 30: ID["meadow"],
 		40: ID["field"], 50: ID["urban"], 60: ID["sand"] if arid else ID["rock"],
 		70: ID["glacier"], 90: ID["wetland"], 95: ID["forest"], 100: ID["rock"]}
 	for y in h:

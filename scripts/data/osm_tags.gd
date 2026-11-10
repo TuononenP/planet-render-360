@@ -119,6 +119,21 @@ static func harbour_use(tags: Dictionary) -> String:
 		return "port"
 	return "industrial"
 
+## How a green area is kept: "mown" for parks, gardens, lawns, pitches,
+## golf courses, village greens and cemeteries, "wild" for meadows,
+## grassland, heath and scrub, "" when the tags do not say.
+static func sward(tags: Dictionary) -> String:
+	var natural := str(tags.get("natural", ""))
+	var landuse := str(tags.get("landuse", ""))
+	var leisure := str(tags.get("leisure", ""))
+	if leisure in ["park", "garden", "pitch", "golf_course", "common"] \
+			or landuse in ["grass", "recreation_ground", "village_green", "cemetery"] \
+			or str(tags.get("amenity", "")) == "grave_yard":
+		return "mown"
+	if landuse == "meadow" or natural in ["grassland", "heath", "scrub"]:
+		return "wild"
+	return ""
+
 ## Metres from a raw OSM tag value, including feet ("100 ft", "100'"):
 ## NAN when missing, unparseable, or outside [lo, hi] (callers fall
 ## through to their next source — never a silent 0).

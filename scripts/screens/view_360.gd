@@ -101,6 +101,7 @@ var _date: Dictionary = {}
 var _lapse := TimeLapse.new()
 var _walk := ViewWalk.new()
 var _near_window: NearGroundWindow
+var _carpet: GrassCarpet
 var _near_world := 0
 var _drone := ViewDrone.new()
 var _precip: GPUParticles3D
@@ -828,9 +829,16 @@ func _tick_near_ground() -> void:
 			_near_window.stop()
 		_near_world = world
 		_near_window = NearGroundWindow.attach(_generated, _data) if world != 0 else null
-	if _near_window != null and _rig != null and _ground != null:
+		if _carpet != null:
+			_carpet.stop()
+		_carpet = GrassCarpet.attach(_generated, _ground) if world != 0 else null
+	if _rig != null and _ground != null and (_near_window != null or _carpet != null):
 		var eye := Vector2(_rig.position.x, _rig.position.z)
-		_near_window.tick(eye, _rig.position.y - _ground.height_at_world(eye.x, eye.y))
+		var agl := _rig.position.y - _ground.height_at_world(eye.x, eye.y)
+		if _near_window != null:
+			_near_window.tick(eye, agl)
+		if _carpet != null:
+			_carpet.tick(_rig.position, agl)
 
 func _touch_distance() -> float:
 	if _touches.size() < 2:

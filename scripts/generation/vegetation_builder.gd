@@ -61,6 +61,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 	stats["fallback"] = fallback
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
 	stats["cover"] = GroundCover.build(root, data, ground, mask)
+	stats["carpet"] = GrassCarpet.build(root, data) != null
 	stats["tree_pits"] = TreePits.build(root, data, ground, mask)
 	stats["ms"] = Time.get_ticks_msec() - t0
 	last_stats = stats
