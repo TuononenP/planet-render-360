@@ -12,8 +12,17 @@ extends RefCounted
 const STEP_RELIEF_M := 8.0
 ## Most terraces a footprint is cut into.
 const STEPS_MAX := 6
-## A strip piece smaller than this (m²) is a sliver of the outline.
+## A strip piece smaller than this (m²) is a sliver of the outline, and
+## a footprint smaller than SPLIT_MIN_AREA_M2 is left whole.
 const MIN_AREA_M2 := 4.0
+const SPLIT_MIN_AREA_M2 := 30.0
+## Times a terrace still too steep is cut again, and the share of its
+## parent's buried height above which the parent's cut did not help.
+const DEPTH := 3
+const NO_GAIN := 0.7
+## A terrace runs at most this far up the slope where the footprint is
+## long enough to need more steps than its relief alone asks for.
+const STEP_RUN_M := 25.0
 
 ## `masses` (BuildingMasses.plan) with each standing mass on too steep a
 ## site replaced by its terraces.
@@ -29,23 +38,33 @@ static func split(masses: Array, ground: GroundTruth, sea_y: float) -> Array:
 	return out
 
 ## The terraces of `md`, or none when a plinth seats it (or it is a raised
-## part, a courtyard block or a waterfront building). A terrace still too
+## part, a waterfront building or too small to cut). A terrace still too
 ## steep (the hill curves under a big block) is cut again across its own
-## slope, `depth` more times.
-static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: int = 1) -> Array:
-	if float(md.get("min_m", 0.0)) > 0.0 or not (md.get("holes", []) as Array).is_empty():
+## slope, `depth` more times. A courtyard stays a hole in the terraces
+## around it.
+static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: int = DEPTH,
+		parent: Array = []) -> Array:
+	if float(md.get("min_m", 0.0)) > 0.0:
 		return []
 	var ring: PackedVector2Array = md["ring"]
-	if ring.size() < 3:
-		return []
 	var m := WorldScale.metres_to_units()
+	if ring.size() < 3 or absf(RingGeometry.signed_area(ring)) < SPLIT_MIN_AREA_M2 * m * m:
+		return []
 	var footing := BuildingFoundation.sample(ground, ring, md["centre"], sea_y)
-	var relief := float(footing["high"]) - float(footing["low"])
-	if bool(footing["raised"]) or relief <= (BuildingFoundation.PLINTH_TALL_M + BuildingFoundation.BURY_MAX_M) * m:
+	var buried := float(footing["high"]) - float(footing["floor"])
+	# The ground under a building on the water's edge is the carved bed
+	# and a guessed bank: no slope to step up.
+	if bool(footing["raised"]) or buried <= (BuildingFoundation.BURY_MAX_M + 0.05) * m:
 		return []
 	var uphill := _uphill(ring, ground)
-	if uphill == Vector2.ZERO:
-		return []
+	if not parent.is_empty() and buried > float(parent[1]) * NO_GAIN:
+		# The cut that made this strip took little off its relief: the hill
+		# runs along it (a spur, a curving street), so cut it the other way.
+		uphill = parent[0]
+	elif uphill == Vector2.ZERO:
+		# A crown or a hollow has no one slope: cut across the long side.
+		var box := RingGeometry.aabb(ring)
+		uphill = Vector2.RIGHT if box.size.x >= box.size.y else Vector2.DOWN
 	var t0 := INF
 	var t1 := -INF
 	var s0 := INF
@@ -56,19 +75,23 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 		t1 = maxf(t1, p.dot(uphill))
 		s0 = minf(s0, p.dot(side))
 		s1 = maxf(s1, p.dot(side))
-	var steps := clampi(ceili(relief / (STEP_RELIEF_M * m)), 2, STEPS_MAX)
+	var span := buried + BuildingFoundation.PLINTH_TALL_M * m
+	var steps := clampi(maxi(ceili(span / (STEP_RELIEF_M * m)), ceili((t1 - t0) / (STEP_RUN_M * m))), 2, STEPS_MAX)
 	var pad := 1.0 * m
+	var holes: Array = md.get("holes", [])
 	var out: Array = []
 	for k in steps:
 		var a := lerpf(t0, t1, float(k) / float(steps)) - (pad if k == 0 else 0.0)
 		var b := lerpf(t0, t1, float(k + 1) / float(steps)) + (pad if k == steps - 1 else 0.0)
 		var strip := PackedVector2Array([uphill * a + side * (s0 - pad), uphill * b + side * (s0 - pad),
 			uphill * b + side * (s1 + pad), uphill * a + side * (s1 + pad)])
-		for piece: PackedVector2Array in Geometry2D.intersect_polygons(ring, strip):
+		for cut: Array in _without_holes(Geometry2D.intersect_polygons(ring, strip), holes):
+			var piece: PackedVector2Array = cut[0]
 			if absf(RingGeometry.signed_area(piece)) < MIN_AREA_M2 * m * m:
 				continue
 			var step := md.duplicate()
 			step["ring"] = piece
+			step["holes"] = cut[1]
 			step["centre"] = _centroid(piece)
 			# Its own walls all round: the neighbours' shared walls were
 			# found against the whole footprint, and a stepped block has a
@@ -77,11 +100,35 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 			step["shape"] = "flat"
 			step["rh_m"] = 0.0
 			step["terrace"] = k
-			var finer := terraces(step, ground, sea_y, depth - 1) if depth > 0 else []
+			var finer := terraces(step, ground, sea_y, depth - 1, [side, buried]) if depth > 0 else []
 			if finer.is_empty():
 				out.append(step)
 			else:
 				out.append_array(finer)
+	return out
+
+## `pieces` less the courtyards `holes`, as [ring, holes inside it]: a
+## courtyard a piece surrounds stays its hole, one on its edge is cut out.
+static func _without_holes(pieces: Array, holes: Array) -> Array:
+	var out: Array = []
+	for piece: PackedVector2Array in pieces:
+		if Geometry2D.is_polygon_clockwise(piece):
+			continue
+		var rings: Array = [piece]
+		var inner: Array = []
+		for hole: PackedVector2Array in holes:
+			var next: Array = []
+			for ring: PackedVector2Array in rings:
+				var cut := Geometry2D.clip_polygons(ring, hole)
+				if cut.any(func(c: PackedVector2Array) -> bool: return Geometry2D.is_polygon_clockwise(c)):
+					next.append(ring)
+					inner.append(hole)
+				else:
+					next.append_array(cut)
+			rings = next
+		for ring: PackedVector2Array in rings:
+			out.append([ring, inner.filter(func(h: PackedVector2Array) -> bool:
+				return Geometry2D.is_point_in_polygon(h[0], ring))])
 	return out
 
 ## Unit direction up the slope under `ring`: the least-squares plane of

@@ -521,7 +521,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	else:
 		BuildingWalls.upper_walls(root, ring, base, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	for h in holes:
-		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null else []
+		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null and mass.has("key") else []
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,

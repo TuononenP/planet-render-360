@@ -3,8 +3,8 @@ extends SceneTree
 ## BuildingTerraces (offline): godot --headless --script tests/building_terraces_test.gd
 ## A footprint on ground steeper than a plinth can take is cut across the
 ## slope into terraces that cover it, each seating with its uphill wall
-## buried no deeper than BURY_MAX_M. Gentle ground, raised parts and
-## courtyard blocks are left whole.
+## buried no deeper than BURY_MAX_M, a courtyard staying open. Gentle
+## ground and raised parts are left whole.
 
 func _init() -> void:
 	_run()
@@ -59,10 +59,18 @@ func _run() -> void:
 	raised["min_m"] = 6.0
 	if not BuildingTerraces.terraces(raised, cliff, -INF).is_empty():
 		failures.append("a raised part was terraced")
+	# A courtyard block is terraced around its courtyard.
 	var court := _mass(ring)
-	court["holes"] = [PackedVector2Array([Vector2(-10, -10) * m, Vector2(-5, -10) * m, Vector2(-5, -5) * m])]
-	if not BuildingTerraces.terraces(court, cliff, -INF).is_empty():
-		failures.append("a courtyard block was terraced")
+	var yard := PackedVector2Array([Vector2(-11, -11) * m, Vector2(-5, -11) * m, Vector2(-5, 11) * m, Vector2(-11, 11) * m])
+	court["holes"] = [yard]
+	var court_area := 0.0
+	for step: Dictionary in BuildingTerraces.terraces(court, cliff, -INF):
+		court_area += absf(RingGeometry.signed_area(step["ring"]))
+		for hole: PackedVector2Array in step["holes"]:
+			court_area -= absf(RingGeometry.signed_area(hole))
+	var want := area - absf(RingGeometry.signed_area(yard))
+	if absf(court_area - want) > want * 0.02:
+		failures.append("courtyard terraces cover %.0f of %.0f m²" % [court_area / (m * m), want / (m * m)])
 	if failures.is_empty():
 		print("building_terraces_test passed")
 		quit(0)
