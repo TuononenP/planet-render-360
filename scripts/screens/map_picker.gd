@@ -155,12 +155,17 @@ func _passive(node: Control) -> Control:
 
 ## The glass panels and the scroll areas in them pass zoom input to the map
 ## under them (MapTileView.panel_zoom_input); their taps stay with them.
-func _wire_zoom(node: Control) -> void:
+## With `scroll_zooms` off (the side panel) the wheel and trackpad scroll
+## stay with the panel; only pinches reach the map.
+func _wire_zoom(node: Control, scroll_zooms := true) -> void:
 	if node is PanelContainer or node is ScrollContainer:
-		node.gui_input.connect(_canvas.panel_zoom_input.bind(node))
+		node.gui_input.connect(func(event: InputEvent) -> void:
+			if not scroll_zooms and (event is InputEventMouseButton or event is InputEventPanGesture):
+				return
+			_canvas.panel_zoom_input(event, node))
 	for child in node.get_children():
 		if child is Control:
-			_wire_zoom(child as Control)
+			_wire_zoom(child as Control, scroll_zooms)
 
 func _vbox(sep: int, flags: int = Control.SIZE_FILL) -> VBoxContainer:
 	var v := VBoxContainer.new()
@@ -399,7 +404,7 @@ func _ready() -> void:
 	_quick_box.add_child(_first_note)
 	_quick_box.move_child(_first_note, 2)
 	_wire_zoom(_sheet)
-	_wire_zoom(_side)
+	_wire_zoom(_side, false)
 	resized.connect(_on_resized)
 	for node in [_sheet, _side, _top_col]:
 		node.resized.connect(_queue_focus_update)

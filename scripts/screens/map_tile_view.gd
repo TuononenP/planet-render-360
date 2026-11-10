@@ -207,21 +207,20 @@ func zoom_in() -> void:
 func zoom_out() -> void:
 	zoom_at(_focus(), -1)
 
-## Zoom by whole tile steps, keeping the place under `at` under `at`.
+## Zoom by whole tile steps around the centre; `at` is unused so the picked coordinates stay.
 func zoom_at(at: Vector2, steps: int) -> void:
 	var new_zoom := clampi(zoom_level + steps, MIN_ZOOM, MAX_ZOOM)
 	if new_zoom == zoom_level:
 		if steps < 0 and zoom_level == MIN_ZOOM:
 			zoom_past_min.emit()
 		return
-	var anchor := TileFetcher.lat_lon_from_pixel(
-		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - _focus()),
-		zoom_level)
-	var anchor_px := TileFetcher.global_pixel(anchor.x, anchor.y, new_zoom)
+	# The centre (the picked coordinates) stays put: zooming only rescales
+	# the map around it, so scrolling never changes the readout.
 	zoom_level = new_zoom
-	_set_centre_from_pixel(anchor_px - (at - _focus()))
 	refresh_tiles()
-	picked.emit(centre_lat, centre_lon)
+	queue_redraw()
+	if _marker != null:
+		_marker.queue_redraw()
 
 func pan_by_pixels(delta: Vector2) -> void:
 	# Dragging right should pull the map right: the centre moves the
