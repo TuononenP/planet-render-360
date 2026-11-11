@@ -4,8 +4,7 @@ extends SceneTree
 ## VehicleMover: trams planned and built as the world has them are found
 ## by name and driven along their track: a step moves them, they stand at
 ## their stops and turn at the run's end, never close on the train ahead
-## or run into a tunnel mouth, and reduced motion leaves them where
-## they stand.
+## or run into a tunnel mouth, and keep running under reduced motion.
 
 func _init() -> void:
 	_run()
@@ -106,12 +105,13 @@ func _run() -> void:
 		if again.position_of(i) != other.position_of(i):
 			failures.append("two movers stepped alike must agree")
 			break
-	# Reduced motion freezes.
+	# Reduced motion (camera flights, UI springs) leaves the traffic running.
 	UiPrefs.reduce_motion = true
 	var before := again.position_of(0)
-	again.tick(5.0, Vector2.ZERO)
-	if again.position_of(0) != before:
-		failures.append("reduced motion leaves trains where they stand")
+	for step in 600:
+		again.tick(0.1, Vector2.ZERO)
+	if again.position_of(0) == before:
+		failures.append("reduced motion should leave the trams running")
 	UiPrefs.reduce_motion = false
 	# A world without the nodes is left alone.
 	if VehicleMover.attach(Node3D.new(), data, ground) != null:
@@ -122,7 +122,7 @@ func _finish(failures: Array[String], world: Node) -> void:
 	world.free()
 	failures.remove_at(0)
 	if failures.is_empty():
-		print("VEHICLE MOVER OK: trams move along their track, stay in their run, clear of tunnels and each other, deterministic, frozen by reduced motion")
+		print("VEHICLE MOVER OK: trams move along their track, stay in their run, clear of tunnels and each other, deterministic, running under reduced motion")
 		quit(0)
 	else:
 		for f in failures:

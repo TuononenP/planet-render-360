@@ -12,7 +12,9 @@ extends RefCounted
 ## of the data. A terminus train keeps standing at its buffers.
 ##
 ## Time is the sum of the deltas given to tick(), so a test or a capture
-## steps it exactly; reduced motion leaves every train where it stands.
+## steps it exactly. Traffic is the world going about its day, like the
+## clouds' drift: reduced motion (camera flights and UI springs) leaves
+## it running.
 
 const CRUISE_MS := 8.0
 const TRAIN_CRUISE_MS := 10.0
@@ -70,7 +72,7 @@ func run_of(i: int) -> Array:
 ## Moves every train on by `delta` seconds; `eye` is the camera (world
 ## XZ), which sets how often far trains are posed.
 func tick(delta: float, eye: Vector2) -> void:
-	if UiPrefs.reduce_motion or _trains.is_empty():
+	if _trains.is_empty():
 		return
 	var left := maxf(delta, 0.0)
 	while left > 0.0:
