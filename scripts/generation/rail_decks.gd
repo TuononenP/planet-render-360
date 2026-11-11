@@ -18,7 +18,10 @@ const PASSES := 48
 ## Tracks this far apart still share a level: a viaduct's tracks stand
 ## in groups with a strip between them, wider than the gap a parapet is
 ## left out over (RailBuilder.BESIDE_M).
-const LEVEL_M := 12.0
+const LEVEL_M := 32.0
+## Where a neighbouring track's deck is a gap away from this one's
+## (centre to centre): nearer than this they touch, so nothing fills.
+const FILL_MIN_M := 4.0
 
 var _m2u := 1.0
 var _pts := PackedVector2Array()
@@ -98,6 +101,27 @@ func _beside(p: Vector2, dir: Vector2) -> PackedInt32Array:
 						and absf(v.dot(dir)) < ALONG_M * _m2u:
 					out.append(j)
 	return out
+
+## The nearest track across from `p` on its left (`dir` the heading,
+## the side RoadBuilder._side points to), FILL_MIN_M to LEVEL_M away:
+## {"at" (its point), "h" (its deck height)}, or {} when none is.
+func across(p: Vector2, dir: Vector2) -> Dictionary:
+	var out := Vector2(-dir.y, dir.x)
+	var best := LEVEL_M * _m2u
+	var found := -1
+	var cell := _cell(p)
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var ids: PackedInt32Array = _cells.get(cell + Vector2i(dx, dz), PackedInt32Array())
+			for j in ids:
+				var v := _pts[j] - p
+				var side := v.dot(out)
+				if side > FILL_MIN_M * _m2u and side < best and absf(v.dot(dir)) < ALONG_M * _m2u:
+					best = side
+					found = j
+	if found < 0:
+		return {}
+	return {"at": _pts[found], "h": _hs[found]}
 
 ## `deck` (RoadBuilder.deck_profile along `pts`) raised to the level of
 ## the tracks alongside, eased in and out at a ramp's grade where a

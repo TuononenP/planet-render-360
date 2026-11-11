@@ -610,7 +610,9 @@ static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: f
 ## deck among others (RailBuilder): "open" names the edges with no
 ## parapet, a byte per segment for the left and for the right side
 ## (another deck runs alongside there); "deck" gives the heights in
-## place of the profile, and "low" the fascias' foot under them.
+## place of the profile, "low" the fascias' foot under them, "side" the
+## batch the fascias, parapets and underside go to (default "deck") and
+## "metric_v" a fascia texture tiled by its height in metres.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0,
 		fit: Dictionary = {}) -> void:
@@ -633,7 +635,8 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 	for i in range(1, n):
 		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
 	var top := _batch(batches, top_finish)
-	var side := _batch(batches, "deck")
+	var side := _batch(batches, str(fit.get("side", "deck")))
+	var metric := bool(fit.get("metric_v", false))
 	var half := width * 0.5
 	var k0 := top.verts.size()
 	for i in n:
@@ -665,9 +668,11 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 			var foot_a := low[i] if low.size() == n else deck[i] - depth
 			var foot_b := low[i + 1] if low.size() == n else deck[i + 1] - depth
 			if not open.is_empty() and (open[0 if sgn > 0.0 else 1] as PackedByteArray)[i] != 0:
-				_wall(side, oa, ob, foot_a, foot_b, deck[i], deck[i + 1], sa.normalized())
+				# A hair under the deck, so it never shows along a slab laid beside it.
+				_wall(side, oa, ob, foot_a, foot_b, deck[i] - 0.02 * m2u, deck[i + 1] - 0.02 * m2u,
+					sa.normalized(), metric)
 				continue
-			_wall(side, oa, ob, foot_a, foot_b, deck[i] + para, deck[i + 1] + para, sa.normalized())
+			_wall(side, oa, ob, foot_a, foot_b, deck[i] + para, deck[i + 1] + para, sa.normalized(), metric)
 			_wall(side, ia, ib, deck[i], deck[i + 1], deck[i] + para, deck[i + 1] + para,
 				-sa.normalized())
 			var k := side.verts.size()
@@ -731,8 +736,10 @@ static func _land_piers(side: _Batch, pts: PackedVector2Array, dist: PackedFloat
 
 ## Vertical quad a→b between bottom (ya0, yb0) and top (ya1, yb1),
 ## front face toward `out`.
+## `metric_v` runs the texture's V in metres of wall height, not once
+## over the whole wall.
 static func _wall(b: _Batch, a: Vector2, c: Vector2, ya0: float, yc0: float,
-		ya1: float, yc1: float, out: Vector2) -> void:
+		ya1: float, yc1: float, out: Vector2, metric_v: bool = false) -> void:
 	var k := b.verts.size()
 	b.verts.push_back(Vector3(a.x, ya0, a.y)); b.verts.push_back(Vector3(c.x, yc0, c.y))
 	b.verts.push_back(Vector3(c.x, yc1, c.y)); b.verts.push_back(Vector3(a.x, ya1, a.y))
@@ -740,7 +747,9 @@ static func _wall(b: _Batch, a: Vector2, c: Vector2, ya0: float, yc0: float,
 	for q in 4:
 		b.normals.append(n3)
 	var len_u := a.distance_to(c)
-	b.uvs.push_back(Vector2(0, 1)); b.uvs.push_back(Vector2(len_u, 1))
+	var va := maxf(ya1 - ya0, 0.0) if metric_v else 1.0
+	var vc := maxf(yc1 - yc0, 0.0) if metric_v else 1.0
+	b.uvs.push_back(Vector2(0, va)); b.uvs.push_back(Vector2(len_u, vc))
 	b.uvs.push_back(Vector2(len_u, 0)); b.uvs.push_back(Vector2(0, 0))
 	var front := (b.verts[k + 2] - b.verts[k]).cross(b.verts[k + 1] - b.verts[k])
 	if front.dot(n3) >= 0.0:

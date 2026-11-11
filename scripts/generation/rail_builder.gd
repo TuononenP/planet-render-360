@@ -41,9 +41,11 @@ const CABLE_RAIL_CLEAR_M := 0.02
 const TRACK_BED_HEX := "#a39d92"
 ## Bridge tracks this close side by side (centre to centre) share one
 ## deck edge: no parapet stands between them.
-const BESIDE_M := 12.0
+const BESIDE_M := 32.0
 const BESIDE_MIN_M := 0.3
-const BESIDE_CELL_M := 8.0
+## A viaduct's fascias: soot-darkened London stock brick.
+const VIADUCT_BRICK_HEX := "#4a3b33"
+const BESIDE_CELL_M := 32.0
 
 ## Ballast bed: speckled stone, concrete sleepers across it (UV.y along
 ## in 4 m units, UV2.x the bed width in metres), anti-aliased into their
@@ -135,7 +137,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Rail_" + str(key)
 		mi.mesh = b.mesh()
 		mi.material_override = _material(str(key))
-		if str(key) != "deck":
+		if not str(key) in ["deck", "deck_brick"]:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
@@ -249,7 +251,7 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5, 0, false)
 	if deck.size() != inside.size():
 		return
-	var fit := {"deck": deck}
+	var fit := {"deck": deck, "side": "deck_brick", "metric_v": true}
 	if beside.has("decks"):
 		# Level with the tracks alongside; the fascia still reaches down to
 		# where the deck stood on its own.
@@ -257,7 +259,8 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 		for d in deck:
 			low.append(d - RoadBuilder.DECK_DEPTH_M * m2u)
 		deck = (beside["decks"] as RailDecks).level(inside, deck)
-		fit = {"deck": deck, "low": low}
+		fit["deck"] = deck
+		fit["low"] = low
 	if not beside.is_empty():
 		var left := PackedByteArray()
 		var right := PackedByteArray()
@@ -271,11 +274,56 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 	top.pad()
 	for i in range(k0, top.verts.size()):
 		top.uv2s[i] = Vector2(bed / m2u, BED_LAYER)
+	if beside.has("decks"):
+		_fill(top, inside, deck, bed, beside["decks"], m2u)
 	var ys := PackedFloat32Array()
 	for d in deck:
 		ys.append(d + RAIL_HEIGHT_M * m2u)
 	_rails(RoadBuilder._batch(batches, "rail"), inside, ys, gauge,
 		RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
+
+## The slab between a viaduct's track groups: along `pts` (deck heights
+## `deck`), where a track `decks.across` stands FILL_MIN_M to LEVEL_M off
+## to the left, a ballast strip from this deck's left edge to that
+## track's near edge, on the deck level. One track of each pair fills (the
+## left one sees its neighbour on its left, the other sees none there),
+## so no gap is laid twice. Both ends of a segment must have a neighbour
+## and the one level, or the strip is left out (a viaduct's ends).
+static func _fill(top: RoadBuilder._Batch, pts: PackedVector2Array, deck: PackedFloat32Array,
+		bed: float, decks: RailDecks, m2u: float) -> void:
+	var half := bed * 0.5
+	var rows: Array = []
+	for i in pts.size():
+		var dir := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)]).normalized()
+		var hit := decks.across(pts[i], dir)
+		if hit.is_empty() or absf(float(hit["h"]) - deck[i]) > 0.05 * m2u:
+			rows.append([])
+			continue
+		var out := Vector2(-dir.y, dir.x)
+		var near_edge: Vector2 = pts[i] + out * half
+		var far_edge: Vector2 = (hit["at"] as Vector2) - out * half
+		rows.append([near_edge, far_edge])
+	var along := 0.0
+	for i in pts.size() - 1:
+		var seg := pts[i].distance_to(pts[i + 1])
+		var a: Array = rows[i]
+		var b: Array = rows[i + 1]
+		if not a.is_empty() and not b.is_empty():
+			var k := top.verts.size()
+			var span_a: float = (a[0] as Vector2).distance_to(a[1])
+			var span_b: float = (b[0] as Vector2).distance_to(b[1])
+			if span_a > 0.2 * m2u and span_b > 0.2 * m2u:
+				var ends := [[a[0], deck[i], 0.0, span_a, along], [a[1], deck[i], span_a, span_a, along],
+					[b[0], deck[i + 1], 0.0, span_b, along + seg], [b[1], deck[i + 1], span_b, span_b, along + seg]]
+				for e: Array in ends:
+					var q: Vector2 = e[0]
+					top.verts.append(Vector3(q.x, float(e[1]), q.y))
+					top.normals.append(Vector3.UP)
+					top.uvs.append(Vector2(float(e[2]) / m2u / 4.0, float(e[4]) / m2u / 4.0))
+					top.colors.append(Color(0, 0.5, 0, 1))
+					top.uv2s.append(Vector2(float(e[3]) / m2u, BED_LAYER))
+				RoadBuilder._quad_up(top, k, k + 1, k + 2, k + 3)
+		along += seg
 
 ## Two rails `gauge` apart along `line`, head tops at `ys`: a flat head
 ## strip, plus side walls `height` deep for rails standing on a bed.
@@ -352,6 +400,8 @@ static func _material(key: String) -> Material:
 			rm.shader = rsh
 			rm.set_shader_parameter("steel", Color.html(STEEL_HEX))
 			m = rm
+		"deck_brick":
+			m = RoadBuilder._pbr("brick", VIADUCT_BRICK_HEX)
 		_:
 			m = RoadBuilder._material(key)
 	_mats[key] = m
