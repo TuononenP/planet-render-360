@@ -258,7 +258,11 @@ Finnish fabric uses `ArchitectureCitiesFinland`: Helsinki's Empire centre, Jugen
 1920s classicism, wooden Käpylä/Vallila, forest-suburb lamellas, 1965–89 precast panels,
 and contemporary courtyard blocks. Espoo uses Tapiola modernism, Otaniemi brick/copper,
 modern centres and Kauniainen villas. The east-centred Helsinki zone precedes Espoo: Munkkivuori stays Helsinki while
-Tapiola and Otaniemi lie outside its radius; eastern Helsinki remains covered.
+Tapiola and Otaniemi lie outside its radius; eastern Helsinki remains covered. A small Espoo zone row precedes Helsinki at
+Keilaniemi so the whole tip stays Espoo, where a 0.75 km `espoo_modern` district now allows
+light stone and strip-window offices beside curtain walls. Lauttasaari is a 1.5 km
+`helsinki_functional` district (1940s–50s lamellas such as Aropaltio's and Ervi's) with
+Vattuniemi as a nested `helsinki_midrise` district.
 
 Relief keys: `danji_number`, `sign_bands`, `sign_stack` (probabilities, `AsiaFronts`) paint a danji slab's block number on its narrow ends, put a sign board across each lower storey of a street front, and run a vertical sign column up the full front. `glazed_balcony` (probability) builds a deep balcony with glass fronts and
 vertical aluminium mullions; `turret` (probability) adds one steep-roofed corner tower

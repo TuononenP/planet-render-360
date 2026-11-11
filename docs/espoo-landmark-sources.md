@@ -29,3 +29,29 @@ as estimates above need visual calibration against the final terrain captures.
 
 Validation: `tests/espoo_hero_landmarks_test.gd` checks registry heights, clearance,
 finite vertices, 1k–150k triangles, merged material parts and textured materials.
+
+## Keilaniemi and Tapiola centre (2026-11-12)
+
+Outlines are OSM ways retrieved through Overpass on 2026-11-12, simplified
+to 0.5–1 m and stored about each registry point in
+`LandmarkFhWestFootprints` (registry: `LandmarkRegistryWestMetro`).
+OSM contributors, [ODbL](https://www.openstreetmap.org/copyright).
+
+| Type | Position / footprint | Geometry and confidence |
+| --- | --- | --- |
+| `finago_tower` | Way [24474639](https://www.openstreetmap.org/way/24474639), 60.174882, 24.830781; slab about 38 × 60 m with projecting ends. | CJN 1976, 83.6 m, 20 storeys (Wikipedia fi/en). White Sipoo limestone piers and blue-tinted glass are documented; pier rhythm (1.6 m) and the solid plant storey are photo estimates. |
+| `kone_building` | Way [8057422](https://www.openstreetmap.org/way/8057422), 60.172155, 24.828705; 28 × 36 m four-sided plan. | 2001, OSM `height=72.6 m`, 16 levels (Finnish list of tallest buildings: 73.0 m, 18 floors). Glass colour, mullion and band rhythm are estimates. |
+| `keilalampi` | Way [1025465177](https://www.openstreetmap.org/way/1025465177), 60.174005, 24.829972; 89 × 95 m. | CJN 1994 extension ("Valovirta"): three storeys, steel frame, cone-shaped glass roof (Wikipedia fi/en). 13 m eaves and the 13 m-radius, 22.4 m-high cone are estimates. |
+| `espoo_cultural_centre` | Way [41728416](https://www.openstreetmap.org/way/41728416), 60.177892, 24.804577; 77 × 128 m. | Sipinen 1989, Tapiolasali (800) and Louhisali (300). Light cladding, 13 m foyer wings and the 21 m hall block are estimates; sources give no facade or height data. |
+| `mantytorni` | Way [129693784](https://www.openstreetmap.org/way/129693784), 60.179173, 24.811752. | Ervi 1954, 11 storeys, 31 m, slip-formed concrete, a French balcony per flat (Wikipedia fi). White colour is an estimate. |
+| `tapiola_hip_flask_houses` | Ways [129693702](https://www.openstreetmap.org/way/129693702) (entry, 60.175407, 24.795376), 129693693, 129693699, 129693710. | Revell 1959–61, four 9-storey hexagonal blocks about 30 m (Wikipedia fi/en); horizontal Mineriitti cladding, window bands, teak grids and top-storey canopies are documented; OSM `building:colour=white`. |
+
+The 1965 Tapiola swimming hall is not modelled: the old hall was demolished
+by August 2025 (Wikipedia fi) although OSM still maps way 8057439. The
+Keilaniemi residential towers ("Espoon Skyline", way 1394571373) are still
+`construction` and Keilaniemen Portti's OSM outline (way 1394235254) is not a
+usable footprint, so neither is modelled.
+
+Validation: `tests/west_metro_coverage_test.gd` checks heights, outline
+clearance (every point 6 m inside), spill, neighbour clearance, extras and
+the Keilaniemi zone/district.

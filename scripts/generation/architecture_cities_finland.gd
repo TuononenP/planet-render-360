@@ -139,7 +139,8 @@ const REGIONS := {
 			"rv": {"glazed_balcony": 0.3}},
 	},
 	"espoo_modern": {
-		"commercial": {"w": [["glass", []], ["render", WHITE]], "p": "curtain", "r": [["flat", 1]],
+		"commercial": {"w": [["glass", []], ["render", WHITE], ["stone", ["#d8d4c8", "#c9c5ba"]]],
+			"p": [["curtain", 2], ["strip", 1]], "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [8, 22], "fix": true, "rv": {}},
 		"apartments": {"w": [["render", WHITE], ["brick", ["#b67b57"]]], "p": [["panel", 1], ["punched", 2]],
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [6, 16], "fix": true,

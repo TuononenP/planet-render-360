@@ -45,6 +45,7 @@ const ZONES := [
 	["banff", "banff", 51.1784, -115.5708, 3.0],
 	["copenhagen", "copenhagen", 55.6761, 12.5683, 5.0],
 	["oslo", "oslo", 59.9139, 10.7522, 5.0],
+	["espoo", "espoo", 60.1755, 24.8310, 1.0],          # Keilaniemi, before Helsinki's rim
 	["helsinki", "helsinki", 60.1900, 24.9950, 9.0],
 	["espoo", "espoo", 60.1900, 24.7700, 9.0],
 	["edinburgh", "edinburgh", 55.9533, -3.1883, 5.0],
@@ -305,8 +306,10 @@ const DISTRICTS := [
 	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
 	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
 	["espoo", "espoo_modern", 60.1590, 24.7380, 1.1, 8.0],  # Matinkylä
-	["espoo", "espoo_modern", 60.1700, 24.8280, 0.7, 8.0],  # Keilaniemi
+	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
+	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
+	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
 	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands

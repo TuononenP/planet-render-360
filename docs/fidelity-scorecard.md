@@ -418,6 +418,16 @@ Helsinki/Espoo Mint and Enso refinement, 2026-11-03:
 | Espoo, summer | recognisable | Fresh control after facade changes | Coarse pool banks and repetitive surrounding masses |
 | Espoo, winter | recognisable | Fresh control at 8.69° sun | Winter brightness and pool edge differ from reference |
 
+Keilaniemi, Tapiola and Lauttasaari, 2026-11-12 (landmark search views, summer noon, 21 June):
+- Captures: `visual-plan/reviews/west-metro-2026-11-12/` and the Finago recolour in `west-metro-r2-2026-11-12/`.
+- Agent pre-ratings; human gate pending. Eight OSM-outline landmarks (`LandmarkRegistryWestMetro`), a Keilaniemi Espoo zone row and Lauttasaari/Vattuniemi districts; sources in docs/espoo-landmark-sources.md and docs/helsinki-landmark-sources.md.
+
+| view | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Keilaniemi (Finago Tower) | recognisable | Finago Tower's white piers and KONE's dark glass at OSM heights on the shore; Keilalampi glass cone | Opening eye stands in shore forest, towers small in frame; Life Science Center and Portti stay generic |
+| Tapiola (Cultural Centre) | recognisable | Cultural Centre wings and hall block beside Keskustorni and the pool; Mäntytorni and hip-flask houses | Cultural Centre cladding and hall heights are estimates; the demolished swimming hall still extrudes from OSM |
+| Lauttasaari (church) | recognisable from above | 61 m bell tower marks the island; 1950s functionalist district fabric | Ground opening lands in trees; church halls and manor colours are estimates |
+
 Round sto-r1, 2026-11-03 (Stockholm hero work in progress):
 - Captures: `visual-plan/reviews/sto-r1-2026-11-03/` and `sto-r1-winter-2026-11-03/`, Ultra, clear golden hour. The images predate the Tyska kyrkan and street/bridge changes.
 - Agent pre-rating: recognisable; human gate pending. Foreground road and waterfront blocks obscure the cliff view, the island shoreline is too bare, and moored ships are absent. See the review README for capture limitations.

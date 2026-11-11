@@ -65,3 +65,18 @@ an oversized generic block beside the wheel. The radius is now 105 m.
 building geometry (© OpenStreetMap contributors, ODbL); the Helsinki test
 checks placement, orientation, removal of that duplicate venue, generic
 wheel suppression and clearance from retained neighbouring buildings.
+
+Lauttasaari (2026-11-12): `lauttasaari_church` follows the church complex
+outline, way [8597256](https://www.openstreetmap.org/way/8597256) (entry
+60.158735,24.869437, simplified to 1 m), with the bell tower at way
+[404164145](https://www.openstreetmap.org/way/404164145) (OSM `height=61`,
+1957; Swedish Wikipedia: about 61 m, crowned by a cross) 7.8 m east and
+4.8 m north of the entry in the churchyard. Marja and Keijo Petäjä, 1958,
+cast-in-place concrete (Finnish Wikipedia); hall height (8.5 m), strip
+glazing and the tower's sound openings are estimates. `lauttasaari_manor`
+follows way [29993853](https://www.openstreetmap.org/way/29993853) (60.159028,
+24.879080; 1837 Empire main building, two storeys, OSM `roof:shape=hipped`);
+the pale ochre render and grey roof are estimates. The demolished (2015)
+water tower is not modelled. Outlines live in `LandmarkFhWestFootprints`,
+entries in `LandmarkRegistryWestMetro`.
+

@@ -173,4 +173,5 @@ static func entries() -> Array:
 		{"type": "suomenlinna_jetty_barracks", "name": "Suomenlinna Jetty Barracks", "lat": 60.148833, "lon": 24.985140,
 			"radius_m": 4500.0, "wiki_title": "Suomenlinna", "height_m": 14.0, "clear_m": 34.0,
 			"kind": "Barracks", "aliases": ["suomenlinna jetty barracks", "rantakasarmi suomenlinna", "jetty barracks helsinki"]},
-	] + LandmarkRegistryHelsinkiHero.entries() + LandmarkRegistryEspooHero.entries()
+	] + LandmarkRegistryHelsinkiHero.entries() + LandmarkRegistryEspooHero.entries() \
+		+ LandmarkRegistryWestMetro.entries()
