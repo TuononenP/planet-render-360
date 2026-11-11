@@ -19,8 +19,8 @@ extends RefCounted
 ## Boats under 9 m are runabouts / consoles / RIBs, 9-14 m sport cruisers,
 ## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
 ## Coastal Mediterranean marinas also berth 10–22 m cruising catamarans.
-## Boats beyond NEAR_M of the eye use a "_far" mesh without rails, rigging
-## and mullions. Large ships (cruise liners and ferries from
+## Boats are batched per BATCH_M cell; each cell swaps to a "_far" mesh
+## without rails, rigging and mullions beyond NEAR_M of the camera. Large ships (cruise liners and ferries from
 ## QuayMoorings.liners, cargo ships from CargoBerths) are committed one by
 ## one by LargeShips, outside the MultiMesh budget.
 
@@ -28,8 +28,10 @@ const RADIUS_M := 800.0
 const MAX_BOATS := 700
 ## Near + far surfaces of every kind (VesselPrototypes.KINDS) + pontoon.
 const MAX_DRAW_CALLS := 80
-## Boats farther than this from the eye use the reduced "_far" meshes (m).
+## Boats farther than this from the camera use the reduced "_far" meshes (m).
 const NEAR_M := 250.0
+## Side of the square cells boats are batched in for the near/far switch (m).
+const BATCH_M := 120.0
 const MIN_PIER_M := 20.0
 const DECK_W_M := 2.2
 const DECK_UP_M := 0.3
@@ -60,7 +62,6 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var taken := {}
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
-	var near2 := pow(NEAR_M * m2u, 2.0)
 	var cats := mediterranean(data)
 	var piers: Array = []
 	for p in data.piers:
@@ -120,8 +121,6 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m + (CELL_M * 2.0 if kind == "catamaran" else 0.0), m2u):
 					continue
 				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
-				if (stern - centre).length_squared() > near2:
-					kind += "_far"
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
 					len_m / MESH_LEN_M * m2u, kind, col])
 			slot += 1
@@ -155,30 +154,59 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		dm.mesh = _deck_mesh(decks, m2u)
 		dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(dm)
-	for base in VesselPrototypes.KINDS:
-		for kind in [base, base + "_far"]:
-			var list := boats.filter(func(b: Array) -> bool: return b[3] == kind)
-			if list.is_empty():
-				continue
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.use_colors = true
-			mm.mesh = mesh(kind)
-			mm.instance_count = list.size()
-			for i in list.size():
-				var b: Array = list[i]
-				mm.set_instance_transform(i, Transform3D(
-					Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0]))
-				mm.set_instance_color(i, b[4])
-			var mmi := MultiMeshInstance3D.new()
-			mmi.name = "Boats_%s" % kind
-			mmi.multimesh = mm
-			if kind.ends_with("_far"):
-				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			holder.add_child(mmi)
+	var cells := {}
+	var cell := BATCH_M * m2u
+	for b in boats:
+		var at: Vector3 = b[0]
+		var key := "%s_%d_%d" % [b[3], floori(at.x / cell), floori(at.z / cell)]
+		if not cells.has(key):
+			cells[key] = []
+		cells[key].append(b)
+	for key in cells:
+		var list: Array = cells[key]
+		var near_mesh := mesh(list[0][3])
+		var far_mesh := mesh(list[0][3] + "_far")
+		# Visibility ranges measure from the AABB centre; shared bounds keep
+		# the near and far batches switching at the same distance.
+		var bounds := _batch_bounds(list, near_mesh.get_aabb().merge(far_mesh.get_aabb()))
+		_add_batch(holder, list, near_mesh, "Boats_%s" % key, 0.0, NEAR_M * m2u, bounds)
+		var far := _add_batch(holder, list, far_mesh, "Boats_%s_far" % key, NEAR_M * m2u, 0.0, bounds)
+		far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	LargeShips.commit(holder, liners, View360.spawn_xz(data), m2u)
 	root.add_child(holder)
 	return boats.size() + liners.size()
+
+static func _add_batch(holder: Node3D, list: Array, boat_mesh: Mesh, batch_name: String,
+		begin: float, end: float, bounds: AABB) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = boat_mesh
+	mm.instance_count = list.size()
+	for i in list.size():
+		var b: Array = list[i]
+		mm.set_instance_transform(i, _transform(b))
+		mm.set_instance_color(i, b[4])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = batch_name
+	mmi.multimesh = mm
+	mmi.custom_aabb = bounds
+	# LodRing would clear the ranges and draw both meshes at every distance.
+	mmi.set_meta("lod_own", true)
+	mmi.visibility_range_begin = begin
+	mmi.visibility_range_end = end
+	holder.add_child(mmi)
+	return mmi
+
+static func _transform(b: Array) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0])
+
+static func _batch_bounds(list: Array, local_bounds: AABB) -> AABB:
+	var bounds := AABB()
+	for i in list.size():
+		var box: AABB = _transform(list[i]) * local_bounds
+		bounds = box if i == 0 else bounds.merge(box)
+	return bounds
 
 # --- Placement helpers ---------------------------------------------------
 
