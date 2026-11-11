@@ -178,6 +178,13 @@ func _selection(failures: Array[String]) -> void:
 		failures.append("the pick is a pure function")
 	if not TrainSpecs.pick("helsinki", "FI", tram, 0.5).is_empty() or not TramSpecs.pick("helsinki", "FI", wired, 0.5).is_empty():
 		failures.append("trains keep to heavy rail and trams off it")
+	# Berlin's S-Bahn: light rail on a third rail is a train (red and ochre,
+	# no pantograph); light rail under the wire stays a tram line.
+	var sbahn := OsmTags._rail_entry({"railway": "light_rail", "electrified": "rail"}, PackedVector2Array(line))
+	var wired_light := OsmTags._rail_entry({"railway": "light_rail", "electrified": "contact_line"}, PackedVector2Array(line))
+	var ber := TrainSpecs.pick("berlin", "DE", sbahn, 0.5)
+	if str(ber.get("livery", "")) != "berlin_sbahn" or bool(ber["panto"]) or not TrainSpecs.pick("", "DE", wired_light, 0.5).is_empty():
+		failures.append("Berlin's S-Bahn stands red and ochre units; wired light rail carries none: %s" % ber)
 	var generic := TrainSpecs.livery(str(TrainSpecs.pick("", "DE", wired, 0.5)["livery"]))
 	if generic["lower"] != TrainSpecs.WHITE or not (generic["band"] as Color) in TramSpecs.GENERIC_BANDS:
 		failures.append("the generic train is white with a palette band")

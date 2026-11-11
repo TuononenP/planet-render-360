@@ -43,6 +43,9 @@ const LIVERIES := {
 	"london_white": {"lower": Color(0.07, 0.2, 0.5), "band": WHITE, "upper": WHITE,
 		"door": Color(0.07, 0.2, 0.5), "cab": YELLOW, "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE,
 		"gauge": 1.435},
+	# Berlin's S-Bahn: deep red below the windows, ochre above.
+	"berlin_sbahn": {"lower": Color(0.55, 0.08, 0.07), "band": Color(0.55, 0.08, 0.07), "upper": Color(0.86, 0.62, 0.16),
+		"door": Color(0.55, 0.08, 0.07), "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
 }
 const LONDON_LIVERIES: Array[String] = ["london_blue", "london_grey", "london_white"]
 ## Share of Helsinki's trains that are the long-distance unit.
@@ -91,7 +94,10 @@ const KIND := {
 
 ## Whether passenger trains run on `rail`: mapped heavy rail.
 static func carries(rail: Dictionary) -> bool:
-	return str(rail.get("class", "")) == "rail"
+	var cls := str(rail.get("class", ""))
+	# Berlin's (and Hamburg's) S-Bahn is mapped light_rail, on a third
+	# rail; a light railway that is a tram line is wired overhead.
+	return cls == "rail" or (cls == "light_rail" and str(rail.get("electrified", "")).strip_edges().to_lower() == "rail")
 
 ## Whether `rail` is wired overhead: a train on it raises a pantograph.
 ## Third-rail track ("rail", London's southern lines) and unwired track
@@ -116,6 +122,8 @@ static func pick(region: String, country: String, rail: Dictionary, h: float) ->
 	if region == "london":
 		var i := mini(int(h * LONDON_LIVERIES.size()), LONDON_LIVERIES.size() - 1)
 		return {"kind": "emu_uk", "livery": LONDON_LIVERIES[i], "cars": 4, "panto": false}
+	if region == "berlin" and str(rail.get("class", "")) == "light_rail":
+		return {"kind": "emu", "livery": "berlin_sbahn", "cars": 4, "panto": false}
 	if country.to_upper() == "FI":
 		return {"kind": "intercity" if h < 0.5 else "emu", "livery": "finland_long", "cars": cars, "panto": wired}
 	if country.to_upper() == "GB":
