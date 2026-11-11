@@ -130,10 +130,10 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	for bd in d.buildings:
 		if not (bd is Dictionary):
 			continue
-		var id := str(bd.get("osm_id", ""))
-		if id != "" and absf(float(bd.get("x", INF))) <= g.extent_m \
-				and absf(float(bd.get("z", INF))) <= g.extent_m:
-			_detailed_ids[id] = true
+		if absf(float(bd.get("x", INF))) <= g.extent_m and absf(float(bd.get("z", INF))) <= g.extent_m:
+			# A merged way+relation copy answers to both ids.
+			for id in OsmParser.ids_of(bd):
+				_detailed_ids[id] = true
 		var r := Vector2(float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).length()
 		if r >= 700.0 and str(bd.get("height_source", "")) in ["tag_height", "levels"]:
 			hs.append(float(bd.get("height", 0.0)))

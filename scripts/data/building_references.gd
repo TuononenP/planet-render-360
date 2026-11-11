@@ -21,7 +21,11 @@ static func apply(buildings: Array) -> void:
 	for b in buildings:
 		if not (b is Dictionary):
 			continue
-		var row: Dictionary = ROWS.get(str(b.get("osm_id", "")), {})
+		var row: Dictionary = {}
+		for id in OsmParser.ids_of(b):
+			row = ROWS.get(id, {})
+			if not row.is_empty():
+				break
 		if row.is_empty() or not (b.get("parts", []) as Array).is_empty():
 			continue
 		var fields: Array = []

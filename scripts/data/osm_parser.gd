@@ -290,6 +290,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					trees.append(tree)
 		_stamp_sources([buildings, roads, land], source_starts, source_id)
 	RoadWidths.from_sidewalks(roads, trees)
+	_drop_duplicate_buildings(buildings)
+	_drop_duplicate_parts(part_ways)
 	_nest_parts(buildings, part_ways)
 	BuildingReferences.apply(buildings)
 	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
@@ -402,6 +404,112 @@ static func _monument_landmarks(buildings: Array, landmarks: Array) -> void:
 		landmarks.append({"x": at.x, "z": at.y, "archetype": kind,
 			"name": str(b.get("name", "")), "height": h,
 			"size_x": 24.0, "size_z": 24.0, "monument": true})
+
+## Order-free identity of a ring: its vertices (closing duplicate
+## dropped) rounded to a centimetre and sorted.
+static func ring_signature(ring: PackedVector2Array) -> String:
+	var n := ring.size()
+	if n > 1 and ring[0].distance_to(ring[n - 1]) < 0.01:
+		n -= 1
+	var keys := PackedStringArray()
+	for i in n:
+		keys.append("%.2f,%.2f" % [ring[i].x, ring[i].y])
+	keys.sort()
+	return ",".join(keys)
+
+## One outline mapped as two buildings (a tagged way and the building
+## relation using it as its outer, or two relations on one outer way)
+## built both: their walls and roofs coincided and z-fought under two
+## facades. One stays, the copy that says most (courtyards, a mapped
+## height, a name), else the first; it takes what only the other mapped
+## and lists the other's id in `alias_ids` (id-keyed lookups: far-city
+## tower suppression, reference rows). Outlines that stand at different
+## floors (a roof canopy or a bridge building over another) are not
+## copies.
+static func _drop_duplicate_buildings(buildings: Array) -> void:
+	var at := {}
+	var drop := {}
+	for i in buildings.size():
+		var b: Dictionary = buildings[i]
+		var fp: Variant = b.get("footprint", null)
+		if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+			continue
+		var sig := "%s|%s|%s|%s" % [ring_signature(fp), str(b.get("min_height_m", 0.0)),
+			str(b.get("min_level", 0)), str(b.get("kind", "")) == "roof"]
+		if not at.has(sig):
+			at[sig] = i
+			continue
+		var j: int = at[sig]
+		var keep: Dictionary = buildings[j]
+		var lose := b
+		if _building_detail(b) > _building_detail(buildings[j]):
+			keep = b
+			lose = buildings[j]
+			drop[j] = true
+			at[sig] = i
+		else:
+			drop[i] = true
+		_absorb(keep, lose)
+	if drop.is_empty():
+		return
+	var kept: Array = []
+	for i in buildings.size():
+		if not drop.has(i):
+			kept.append(buildings[i])
+	buildings.assign(kept)
+
+## `keep` takes from the copy `lose` the courtyards, mapped height and
+## name it lacks, and its id(s) as aliases.
+static func _absorb(keep: Dictionary, lose: Dictionary) -> void:
+	if (keep.get("holes", []) as Array).is_empty() and not (lose.get("holes", []) as Array).is_empty():
+		keep["holes"] = lose["holes"]
+	if str(keep.get("height_source", "default")) == "default" \
+			and str(lose.get("height_source", "default")) != "default":
+		for k in ["height", "height_source", "levels"]:
+			keep[k] = lose[k]
+	if str(keep.get("name", "")) == "" and str(lose.get("name", "")) != "":
+		keep["name"] = lose["name"]
+	var aliases: Array = keep.get("alias_ids", [])
+	if str(lose.get("osm_id", "")) != "":
+		aliases.append(str(lose["osm_id"]))
+	aliases.append_array(lose.get("alias_ids", []))
+	if not aliases.is_empty():
+		keep["alias_ids"] = aliases
+
+## The ids `b` was mapped under: its own and any merged copy's.
+static func ids_of(b: Dictionary) -> Array:
+	var out: Array = []
+	if str(b.get("osm_id", "")) != "":
+		out.append(str(b["osm_id"]))
+	out.append_array(b.get("alias_ids", []))
+	return out
+
+static func _building_detail(b: Dictionary) -> int:
+	return (4 if not (b.get("holes", []) as Array).is_empty() else 0) \
+		+ (2 if str(b.get("height_source", "default")) != "default" else 0) \
+		+ (1 if str(b.get("name", "")) != "" else 0)
+
+## The same building:part mapped twice (same rings, same tags) drew two
+## coincident masses; only the first is kept. Parts that differ in any
+## tag (height, finish) or in their courtyards are distinct masses
+## (PartyWalls lets the taller keep a shared wall).
+static func _drop_duplicate_parts(part_ways: Array) -> void:
+	var seen := {}
+	var kept: Array = []
+	for pw in part_ways:
+		var tags: Dictionary = pw["tags"]
+		var sig := ring_signature(pw["points"])
+		for h in pw.get("holes", []):
+			sig += "|h" + ring_signature(h)
+		var keys := tags.keys()
+		keys.sort()
+		for k in keys:
+			sig += "|%s=%s" % [k, tags[k]]
+		if seen.has(sig):
+			continue
+		seen[sig] = true
+		kept.append(pw)
+	part_ways.assign(kept)
 
 ## Nest building:part ways into their parents by centroid containment
 ## (smallest containing footprint wins; AABB pre-filter keeps the

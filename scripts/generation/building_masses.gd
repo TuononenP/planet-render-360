@@ -45,6 +45,62 @@ static func end_build() -> void:
 	_plans.clear()
 	_mutex.unlock()
 
+## A raised part standing inside a lower part whose top is above the
+## raised part's floor (min_level × the style's floor height under a
+## tagged height) drew that band twice: inside the lower part, but on a
+## shared edge in the same plane as its wall, the two facades z-fought.
+## Such a part now starts at the lower part's wall top.
+static func _seat_lifts(out: Array) -> void:
+	var grow := 0.05 * WorldScale.metres_to_units()
+	for x in out:
+		var xm := x as Dictionary
+		var lift := float(xm["min_m"])
+		if lift <= 0.0:
+			continue
+		var seat := lift
+		var xbox := RingGeometry.aabb(xm["ring"])
+		for y in out:
+			var ym := y as Dictionary
+			var top := float(ym["wall_m"])
+			if float(ym["min_m"]) > 0.0 or top <= seat + 0.05 or top > float(xm["wall_m"]) - 0.5 \
+					or not RingGeometry.aabb(ym["ring"]).grow(grow).encloses(xbox) \
+					or not _within(xm["ring"], ym["ring"]) or _in_hole(xm["centre"], ym["holes"]):
+				continue
+			seat = top
+		if seat > lift:
+			var storeys := int(xm["storeys"])
+			var wall := float(xm["wall_m"])
+			xm["storeys"] = maxi(1, roundi(float(storeys) * (wall - seat) / (wall - lift)))
+			xm["min_m"] = seat
+
+static func _in_hole(p: Vector2, holes: Array) -> bool:
+	for h in holes:
+		if Geometry2D.is_point_in_polygon(p, h as PackedVector2Array):
+			return true
+	return false
+
+## True when every vertex of `inner` lies inside `outer` or on its edge.
+static func _within(inner: PackedVector2Array, outer: PackedVector2Array) -> bool:
+	var tol := 0.05 * WorldScale.metres_to_units()
+	for p in inner:
+		if Geometry2D.is_point_in_polygon(p, outer):
+			continue
+		var on := false
+		for i in outer.size():
+			var q := Geometry2D.get_closest_point_to_segment(p, outer[i], outer[(i + 1) % outer.size()])
+			if q.distance_to(p) <= tol:
+				on = true
+				break
+		if not on:
+			return false
+	return true
+
+## "@<osm id>" of `b` ("" without one), telling apart two buildings
+## mapped on one outline.
+static func _src_tag(b: Dictionary) -> String:
+	var src := str(b.get("osm_id", ""))
+	return "" if src.is_empty() else "@" + src
+
 ## Stable identity of a mass: its centroid (internal units).
 static func key_of(x: float, z: float) -> String:
 	return "%.2f,%.2f" % [x, z]
@@ -58,6 +114,10 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	if fp0 is PackedVector2Array and not (fp0 as PackedVector2Array).is_empty():
 		var f := fp0 as PackedVector2Array
 		ck += "|%d|%s" % [f.size(), key_of(f[0].x, f[0].y)]
+	# Buildings OSM stacks on one outline (a roof canopy over a building,
+	# which OsmParser keeps apart) must neither share a plan nor a mass key:
+	# PartyWalls would read the two as one mass.
+	ck += _src_tag(b)
 	_mutex.lock()
 	if _plans.has(ck):
 		var cached: Array = _plans[ck] as Array
@@ -92,6 +152,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		if not base.is_empty():
 			out = _plan_masses(b, ctx, [base] + masses, false, look, parent_res, legacy,
 				parent_shape, fh)
+		_seat_lifts(out)
 	_mutex.lock()
 	if _plans.has(ck):
 		var raced: Array = _plans[ck] as Array
@@ -270,7 +331,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			part_look["pattern"] = "curtain"
 			part_look["relief"] = {"mullion": true}
 		out.append({"ring": ring, "holes": holes, "centre": Vector2(cx, cz),
-			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
+			"key": key_of(cx, cz) + "#%d" % mi + _src_tag(b), "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
 			"own_parts": not (b.get("parts", []) as Array).is_empty(),
 			# A mapped landmark's parts are its towers and domes: no made-up

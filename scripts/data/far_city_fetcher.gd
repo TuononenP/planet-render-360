@@ -319,8 +319,12 @@ static func complete_buildings(buildings: Array, towers: Array) -> Array:
 			by_id[id] = tower
 	var out: Array = []
 	for building in buildings:
-		var id := str(building.get("osm_id", ""))
-		if not by_id.has(id):
+		var id := ""
+		for alias in OsmParser.ids_of(building):
+			if by_id.has(alias):
+				id = alias
+				break
+		if id == "":
 			out.append(building)
 			continue
 		var parts: Array = building.get("parts", []).duplicate()

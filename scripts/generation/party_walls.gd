@@ -28,9 +28,18 @@ const STREET_M := 9.0
 const CELL_M := 32.0
 ## Exposed piece marker in a partition (no neighbour).
 const OPEN := -INF
+## Widest gap between two same-facing walls still read as one wall drawn
+## twice (m): overlapping OSM masses (parts of one building standing on
+## the ground side by side, a way and a relation of one building) share
+## nodes, so their walls coincide and z-fight under two facades.
+const SAME_TOL_M := 0.05
 
 var _edges := {}
 var _edges_added := 0
+## Each registered mass's wall top and registration order: of two masses
+## drawing the same wall, the taller (else the first) keeps it.
+var _tops := {}
+var _order := {}
 var _roads := {}
 ## Native PartyIndex (native/, tools/build_native.sh) holding the same
 ## grid when the library is loaded; null runs the script's own.
@@ -87,6 +96,9 @@ func _add_ring(ring: PackedVector2Array, key: String, top: float, hole: bool) ->
 	if _idx != null:
 		_idx.add_ring(ring, key, top, hole)
 		return
+	if not _order.has(key):
+		_order[key] = _order.size()
+	_tops[key] = maxf(float(_tops.get(key, -INF)), top)
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	for i in ring.size():
 		var a := ring[i]
@@ -136,6 +148,9 @@ func partition(a: Vector2, b: Vector2, n: Vector2, key: String) -> Array:
 	if len2 < 0.0001:
 		return [[0.0, 1.0, OPEN]]
 	var tol := TOL_M * m
+	var same_tol := SAME_TOL_M * m
+	var own_top := float(_tops.get(key, INF))
+	var own_order := int(_order.get(key, -1))
 	var spans: Array = []
 	var seen := {}
 	var c := CELL_M * m
@@ -148,20 +163,41 @@ func partition(a: Vector2, b: Vector2, n: Vector2, key: String) -> Array:
 					continue
 				seen[rid] = true
 				var on: Vector2 = rec[4]
-				if on.dot(n) > -PARALLEL:
-					continue
+				var rec_top := float(rec[3])
 				var p0: Vector2 = rec[0]
 				var p1: Vector2 = rec[1]
-				if absf((p0 - a).dot(n)) > tol or absf((p1 - a).dot(n)) > tol:
+				if on.dot(n) >= PARALLEL:
+					# The same wall drawn by another mass: hidden here when
+					# that mass stands at least as tall (a tie goes to the
+					# first registered), so only one copy is drawn.
+					if absf((p0 - a).dot(n)) > same_tol or absf((p1 - a).dot(n)) > same_tol \
+							or not _same_wall_owner(float(rec[3]), str(rec[2]), own_top, own_order, same_tol):
+						continue
+					# A tie hides the whole wall, even a few cm taller.
+					rec_top = maxf(float(rec[3]), own_top)
+				elif on.dot(n) > -PARALLEL:
+					continue
+				elif absf((p0 - a).dot(n)) > tol or absf((p1 - a).dot(n)) > tol:
 					continue
 				var t0 := clampf((p0 - a).dot(e) / len2, 0.0, 1.0)
 				var t1 := clampf((p1 - a).dot(e) / len2, 0.0, 1.0)
 				if absf(t1 - t0) * sqrt(len2) < MIN_COVER_M * m:
 					continue
-				spans.append([minf(t0, t1), maxf(t0, t1), float(rec[3])])
+				spans.append([minf(t0, t1), maxf(t0, t1), rec_top])
 	if spans.is_empty():
 		return [[0.0, 1.0, OPEN]]
 	return _pieces(spans, sqrt(len2) / m)
+
+## True when the registered mass `other_key` (wall top `other_top`) keeps
+## a wall it shares, same facing, with a mass of `own_top` / `own_order`.
+## An unregistered mass (own_order < 0: raised part) keeps its walls.
+func _same_wall_owner(other_top: float, other_key: String, own_top: float,
+		own_order: int, tol: float) -> bool:
+	if own_order < 0:
+		return false
+	if other_top > own_top + tol:
+		return true
+	return other_top >= own_top - tol and int(_order.get(other_key, own_order)) < own_order
 
 ## Elementary pieces over 0..1 from overlapping covers (highest top wins),
 ## with exposed slivers under GAP_M between covers closed.
