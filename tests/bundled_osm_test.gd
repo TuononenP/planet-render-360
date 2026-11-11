@@ -78,9 +78,42 @@ func _run() -> void:
 		check(BundledOsm.entry_for(row[0] + 0.0002, row[1], row[2], row[3]) == "", "nearby point must not match")
 	check(BundledOsm.read("missing") == "", "missing snapshot must be ignored")
 	_header_checks()
+	_preset_checks()
 	await _fetch_checks()
 	print("bundled_osm_test: %d failure(s)" % failures)
 	quit(1 if failures else 0)
+
+## Every bundled place (preset or capital) is covered without Overpass and
+## ships its horizon labels; a pin elsewhere is not covered.
+func _preset_checks() -> void:
+	var entries := BundledOsm._entries()
+	var places := 0
+	for key in entries:
+		var row: Array = entries[key]
+		if not str(key).ends_with("_detailed"):
+			continue
+		places += 1
+		var lat := float(row[0])
+		var lon := float(row[1])
+		check(BundledOsm.covers(lat, lon), "%s should be covered by bundled layers" % key)
+		var horizon := BundledOsm.entry_for(lat, lon, "horizon", HorizonFetcher.QUERY_VERSION)
+		check(horizon != "" and BundledOsm.read(horizon) != "", "%s should ship a readable horizon layer" % key)
+	check(places > 250, "expected every preset and capital, found %d" % places)
+	check(not BundledOsm.covers(60.1700, 24.9400), "a pin off the preset origin is not covered")
+	var helsinki := BundledOsm.read(BundledOsm.entry_for(60.1680, 24.9530, "horizon", HorizonFetcher.QUERY_VERSION))
+	var sites := HorizonFetcher.parse(helsinki)
+	check(sites.size() > 100, "Helsinki horizon should name over 100 places, got %d" % sites.size())
+	check(sites.any(func(s: Dictionary) -> bool: return s["name"] == "Espoo"), "Helsinki horizon should name Espoo")
+	var horizon_row := [10.0, 20.0, "horizon", 1, "2026-11-03T00:00:00", 12, "a".repeat(64)]
+	check(BundledOsm._valid_manifest_row(horizon_row), "horizon manifest row must be accepted")
+	# The tool copies these by hand; a drift would rebuild a layer the app
+	# no longer matches, and presets would query Overpass again.
+	var tool := FileAccess.get_file_as_string("res://tools/prepare_horizon_layer.py")
+	for pair in [["QUERY_VERSION", HorizonFetcher.QUERY_VERSION], ["RADIUS_PEAK_M", HorizonFetcher.RADIUS_PEAK_M],
+			["RADIUS_TOWN_M", HorizonFetcher.RADIUS_TOWN_M], ["RADIUS_LAKE_M", HorizonFetcher.RADIUS_LAKE_M],
+			["CAP", HorizonFetcher.CAP]]:
+		check(tool.contains("\n%s = %d " % pair), "prepare_horizon_layer.py %s should be %d" % pair)
+	check(tool.contains('\nURL = "%s"' % PostpassFallback.URL), "prepare_horizon_layer.py URL should be PostpassFallback.URL")
 
 func _header_checks() -> void:
 	var key := BundledOsm.entry_for(40.7060, -74.0040, "detailed", OsmQuery.QUERY_VERSION)
@@ -115,7 +148,6 @@ func _fetch_checks() -> void:
 	file = null
 	check(BundledOsm.cache_is_newer(cache, key), "newer valid cache must win")
 	DirAccess.remove_absolute(cache)
-	await _refresh_check(cache, key)
 	for row in [[40.7060, -74.0040], [37.8040, -122.4195], [60.1680, 24.9530], [59.3207, 18.0604]]:
 		finished = false
 		count = 0
@@ -155,35 +187,3 @@ func _fetch_checks() -> void:
 	CacheStore.dir_override = ""
 	CacheStore.eviction_suppressed = false
 	DirAccess.remove_absolute(dir)
-
-func _refresh_check(path: String, key: String) -> void:
-	var server := TCPServer.new()
-	var error := server.listen(0, "127.0.0.1")
-	check(error == OK, "refresh test server must start")
-	if error != OK:
-		return
-	var endpoint: Array[String] = ["http://127.0.0.1:%d/" % server.get_local_port()]
-	var payload := '{"elements":[{"type":"pr360_q12"}],"osm3s":{"timestamp_osm_base":"2030-01-01T00:00:00Z"}}'
-	for success in [true, false]:
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(path)
-		BundledOsm.refresh(self, key, path, "data=test", func(_text: String) -> String: return "", endpoint)
-		var deadline := Time.get_ticks_msec() + 5000
-		var peer: StreamPeerTCP
-		while not server.is_connection_available() and Time.get_ticks_msec() < deadline:
-			await process_frame
-		if server.is_connection_available():
-			peer = server.take_connection()
-			while peer.get_available_bytes() == 0 and Time.get_ticks_msec() < deadline:
-				peer.poll()
-				await process_frame
-			var status := "200 OK" if success else "503 Service Unavailable"
-			var body := payload if success else "unavailable"
-			peer.put_data(("HTTP/1.1 %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s" % [status, body.to_utf8_buffer().size(), body]).to_utf8_buffer())
-		while BundledOsm._refreshing.has(key) and Time.get_ticks_msec() < deadline:
-			await process_frame
-		check(not BundledOsm._refreshing.has(key), "refresh must finish")
-		check(FileAccess.file_exists(path) == success, "only successful refreshes should write cache")
-	server.stop()
-	if FileAccess.file_exists(path):
-		DirAccess.remove_absolute(path)

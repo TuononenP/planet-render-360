@@ -42,7 +42,7 @@ func _test_privacy_hosts() -> void:
 	urls.append_array([SearchFetcher.ENDPOINT, SatelliteFetcher.URL_TEMPLATE,
 		WeatherFetcher.URL_TEMPLATE, ClimateFetcher.BASE, ClimateFetcher.FALLBACK_URL,
 		DemFetcher.URL_TEMPLATE, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
-		OsmApiFallback.URL, "https://" + VectorTileFetcher.VECTOR_HOST,
+		OsmApiFallback.URL, PostpassFallback.URL, "https://" + VectorTileFetcher.VECTOR_HOST,
 		"https://" + TileConnection.HOST, Brand.CONFIG_URL,
 		"https://en.wikipedia.org/", "https://commons.wikimedia.org/"])
 	for url in urls:

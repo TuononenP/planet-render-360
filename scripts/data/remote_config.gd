@@ -9,6 +9,7 @@ extends Node
 ##   {"version": 1,
 ##    "nominatim_endpoint": "https://…/search",
 ##    "overpass_endpoints": ["https://…/api/interpreter", …],
+##    "postpass_endpoint": "https://…/api/interpreter",
 ##    "satellite_url_template": "https://…/tile/%d/%d/%d"}
 ##
 ## Every key is optional, and a value that fails its check is ignored, so
@@ -28,7 +29,8 @@ const CACHE_FILE := "remote_config.json"
 const MAX_URL_LENGTH := 512
 const MAX_OVERPASS_ENDPOINTS := 8
 ## Keys the file may set. Anything else is ignored.
-const KEYS := ["nominatim_endpoint", "overpass_endpoints", "satellite_url_template"]
+const KEYS := ["nominatim_endpoint", "overpass_endpoints", "postpass_endpoint",
+	"satellite_url_template"]
 
 ## Test hook: when non-empty, the cache lives here instead of user://.
 static var cache_path_override := ""
@@ -70,6 +72,9 @@ static func sanitize(raw: Variant) -> Variant:
 		# One mirror listed again would be retried as if it were several.
 		if urls.size() == (overpass as Array).size() and distinct.size() == urls.size():
 			out["overpass_endpoints"] = urls
+	var postpass: Variant = raw.get("postpass_endpoint")
+	if is_https_url(postpass):
+		out["postpass_endpoint"] = str(postpass)
 	var template: Variant = raw.get("satellite_url_template")
 	if is_https_url(template) and is_tile_template(str(template)):
 		out["satellite_url_template"] = str(template)

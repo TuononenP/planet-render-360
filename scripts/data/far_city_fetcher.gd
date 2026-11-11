@@ -153,9 +153,6 @@ func fetch(lat: float, lon: float) -> void:
 	if gen != _gen:
 		return
 	if bundled != "":
-		if not offline_mode:
-			BundledOsm.refresh(get_tree(), snapshot, _cache, "data=" + build_query(lat, lon).uri_encode(),
-				func(text: String) -> String: return "" if _usable(text) else "unusable payload", endpoints())
 		_parse_off_thread(bundled, true, false, true)
 		return
 	_request()

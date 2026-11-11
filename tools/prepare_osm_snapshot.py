@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi", "transit"))
+parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi", "transit", "horizon"))
 parser.add_argument("source", type=Path, help="current-query cache JSON")
 parser.add_argument("destination", type=Path, help="snapshot .json.gz")
 parser.add_argument("--allow-sparse", action="store_true", help="accept empty optional layers in a verified rural extract")
@@ -46,6 +46,11 @@ elif args.layer == "far":
 elif args.layer == "ring":
     if not args.allow_sparse and not any("highway" in el.get("tags", {}) and el.get("geometry") for el in elements):
         raise SystemExit("ring highway geometry missing")
+elif args.layer == "horizon":
+    # Optional labels: an empty list (open sea) is valid, a nameless or unplaced row is not.
+    for el in elements:
+        if not el.get("tags", {}).get("name") or not ("lat" in el or "center" in el):
+            raise SystemExit("horizon row without a name or a position")
 elif args.layer == "transit":
     stop_tags = (("railway", "tram_stop"), ("highway", "bus_stop"), ("railway", "station"), ("railway", "halt"),
                  ("railway", "platform"), ("public_transport", "stop_position"), ("public_transport", "platform"))

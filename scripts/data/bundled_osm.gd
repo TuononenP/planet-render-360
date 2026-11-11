@@ -7,6 +7,12 @@ extends RefCounted
 ## The "transit" layer (tools/prepare_transit_layer.py) adds the tram and bus
 ## stops, station nodes and train platforms the detailed snapshots lack; it is
 ## merged in only when a snapshot stands in for the live detailed answer.
+## Snapshots are never refreshed from Overpass in the background: a preset
+## shows the bundled data until the bundle itself is rebuilt, so opening one
+## sends no map queries. Device caches newer than a snapshot (from older
+## builds, which did refresh) are still used.
+## The "horizon" layer (tools/prepare_horizon_layer.py) holds the skyline
+## labels of every preset and capital; its rows live in HORIZON_MANIFEST.
 const ENTRIES := {
 	"berlin_detailed": [52.52437, 13.41053, "detailed", 12, "2026-11-02T21:21:26", 13533591, "3f0a06470629b5001a2113139bd48603ef2154e228edcc780838e129f5c9691e"],
 	"berlin_ring1600": [52.52437, 13.41053, "ring1600", 1, "2026-11-02T21:21:26", 1120001, "8000d466f17a85d1cc42910eea335eea0ea50d51bef0d780131aba55f9c41403"],
@@ -119,9 +125,9 @@ const ENTRIES := {
 }
 const DIRECTORY := "res://assets/osm_snapshots/"
 const CAPITAL_MANIFEST := DIRECTORY + "capital_manifest.json"
+const HORIZON_MANIFEST := DIRECTORY + "horizon_manifest.json"
 ## Midtown's 12 km far layer is ~39 MB of JSON (4.6 MB gzipped).
 const MAX_BYTES := 48 * 1024 * 1024
-static var _refreshing: Dictionary = {}
 static var _all_entries: Dictionary = {}
 ## Vector2(lat, lon) -> snapshot keys at that point, in table order, so a
 ## lookup does not scan the ~1,300 rows.
@@ -131,8 +137,10 @@ static func _entries() -> Dictionary:
 	if _all_entries.is_empty():
 		_all_entries = ENTRIES.duplicate()
 		_by_point.clear()
-		var f := FileAccess.open(CAPITAL_MANIFEST, FileAccess.READ)
-		if f != null:
+		for path in [CAPITAL_MANIFEST, HORIZON_MANIFEST]:
+			var f := FileAccess.open(path, FileAccess.READ)
+			if f == null:
+				continue
 			var manifest: Variant = JSON.parse_string(f.get_as_text())
 			if manifest is Dictionary:
 				for key in manifest:
@@ -156,7 +164,7 @@ static func _valid_manifest_row(row: Variant) -> bool:
 	if not (row[0] is float or row[0] is int) or not (row[1] is float or row[1] is int):
 		return false
 	return absf(float(row[0])) <= 90 and absf(float(row[1])) <= 180 \
-		and row[2] is String and row[2] in ["detailed", "detailed_extract", "ring1600", "ring2500", "poi", "far", "transit"] \
+		and row[2] is String and row[2] in ["detailed", "detailed_extract", "ring1600", "ring2500", "poi", "far", "transit", "horizon"] \
 		and (row[3] is float or row[3] is int) and row[4] is String \
 		and str(row[4]).length() == 19 and Time.get_unix_time_from_datetime_string(row[4]) > 0 \
 		and (row[5] is float or row[5] is int) and int(row[5]) > 0 and int(row[5]) <= MAX_BYTES \
@@ -170,6 +178,17 @@ static func entry_for(lat: float, lon: float, layer: String, version: int) -> St
 		if layer_matches and version == entry[3]:
 			return key
 	return ""
+
+## Whether the place is a bundled preset: its detailed, ring, POI and
+## far-city layers all ship with the app, so a load needs no Overpass query
+## and no status check of the Overpass servers.
+static func covers(lat: float, lon: float) -> bool:
+	for layer in [["detailed", OsmQuery.QUERY_VERSION], ["ring1600", OsmQuery.RING_VERSION],
+			["ring2500", OsmQuery.RING_VERSION], ["poi", OsmQuery.POI_VERSION],
+			["far", FarCityFetcher.QUERY_VERSION]]:
+		if entry_for(lat, lon, layer[0], layer[1]) == "":
+			return false
+	return true
 
 ## An older device cache must not hide the snapshot. A missing snapshot
 ## never disqualifies an otherwise usable cache.
@@ -247,29 +266,3 @@ static func read(key: String) -> String:
 	if entries[key][2] == "detailed_extract" and not OsmFetcher._mentions_buildings(text) and not OsmFetcher._mentions_shores(text):
 		return ""
 	return text
-
-## Detached from the pipeline so finishing the world cannot cancel a refresh.
-## At most one request per snapshot is in flight and only validated data is saved.
-static func refresh(tree: SceneTree, key: String, path: String, body: String,
-		validate: Callable, endpoints: Array[String]) -> void:
-	if tree == null or key == "" or _refreshing.has(key):
-		return
-	_refreshing[key] = true
-	var req := OverpassRequest.new(60.0)
-	var started := int(Time.get_unix_time_from_system())
-	tree.root.add_child(req)
-	req.answered.connect(func(text: String) -> void:
-		if not FileAccess.file_exists(path) or FileAccess.get_modified_time(path) <= started:
-			OsmFetcher._write_cache(path, text)
-		_refreshing.erase(key)
-		req.queue_free())
-	req.exhausted.connect(func(_reason: String, _attempts: int) -> void:
-		_refreshing.erase(key)
-		req.queue_free())
-	var checked := func(text: String) -> String:
-		if not _response_is_newer(text, key):
-			return "response is older than the bundled snapshot"
-		if _entries()[key][2] in ["detailed", "detailed_extract"] and not OsmQuery.is_current(text):
-			return "response has an incompatible query version"
-		return str(validate.call(text))
-	req.run(body, checked, endpoints.slice(0, 1))

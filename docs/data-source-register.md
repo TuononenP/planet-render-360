@@ -39,6 +39,19 @@ data timestamp and combined in query order after checking each response for
 errors. Snapshot versions, sizes and hashes are recorded in `BundledOsm`;
 `tools/prepare_osm_snapshot.py` validates and compresses each response. The Midtown preset (`new_york_midtown_*`, origin 40.7535,-73.9825) was fetched on 2026-11-10 from overpass.private.coffee with the app's own queries; only the server `[timeout:]` was raised to 240 s for the detailed and far layers, which the dense extent exceeded at 30 s. That mirror's source timestamps (May-July 2026) are older than the fetch date.
 
+Since 2026-11-11 the bundled layers are not refreshed from Overpass in the
+background: opening a preset or capital sends no map query and skips the
+Overpass status check (`BundledOsm.covers`). Fresher data arrives when the
+bundle is rebuilt. Before that, every open of a preset ran the full detailed,
+ring, POI and far-city queries in the background until one answer newer than
+the snapshot was cached. The horizon labels layer is bundled too
+(`assets/osm_snapshots/*_horizon.json.gz`, rows in `horizon_manifest.json`),
+built by `tools/prepare_horizon_layer.py` from Postpass with the same
+selection, radii, 1500-row cap and output order as `HorizonFetcher.build_query`,
+keeping only the tags the labels read (`name`, `natural`, `place`, `water`,
+`ele`). A lake's position is the centre of its bounding box, as Overpass
+`out center` gives it.
+
 Additional capital snapshots prepared from regional OSM extracts, including
 GeoFabrik and BBBike, are listed in
 `assets/osm_snapshots/capital_provenance.json`, including source and capture
@@ -312,9 +325,36 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   coordinates) so `OsmParser` is unchanged. Live in-engine run (Interlaken,
   Overpass bypassed): 1200 m → 400, stepped to 800 m, 2225 buildings /
   988 roads in 6.7 s, cached under the `r800` key.
+- Postpass fallback (2026-11-11): `POST https://postpass.geofabrik.de/api/interpreter`
+  (FOSSGIS / Geofabrik; a PostGIS copy of the whole planet a few minutes
+  behind OSM, a separate server and operator from overpass-api.de; no key;
+  ODbL, same attribution). It answers GeoJSON, uncompressed. Live probe
+  (Helsinki, 1200 m): the building query took 0.5 s and returned all 1595
+  buildings in the bundled snapshot's box, plus 281 in the box corners the
+  snapshot's circle leaves out, with the same `building:levels`, `roof:*` and
+  `height` tags. The app's detailed query (`PostpassFallback.build_body`,
+  1200 m circle) answered in 1.6 s with 8.3 MB: 20 437 features, 1587 of them buildings. The old
+  `/api/0.2/interpreter` path redirects (308); a bad query answers 400 with
+  plain text. `PostpassFallback` mirrors the detailed query in one SQL query:
+  the same layers in the same circle, street furniture within 450 m of the
+  eye, each group capped like its Overpass statements (nearest first rather
+  than in id order), point-mapped towers, Suomenlinna's `defensive_works`, and
+  the country the place stands in (an `admin_level=2` boundary containing it,
+  returned as tags only, like Overpass `is_in`). With these caps the answer took
+  2.2 s and 8.1 MB in Helsinki (country FI) and 2.4 s and 8.1 MB in Midtown
+  Manhattan (4076 buildings, country US). The GeoJSON is converted to Overpass
+  `out geom` JSON. An answer with no buildings but mapped shores (water,
+  waterways, quays) is kept, as Overpass's own check keeps it, and the OSM API
+  fallback now keeps such answers too. osm2pgsql drops a relation's `type` tag, so area relations
+  are rebuilt as multipolygons with one closed member per ring, and route
+  relations are left out. Payloads are cached under the OSM API key
+  (`api1200`), so Overpass is asked again on the next load. `RemoteConfig`
+  `postpass_endpoint` can replace the address. The ohsome API
+  (`api.ohsome.org`) was probed on the same day as an alternative: its
+  metadata answered, but `/v1/elements/geometry` returned HTTP 403.
 - Detailed-phase fallback order in `OsmFetcher`: one Overpass instance →
-  cached payload at the same place (any radius, ≤150 m) → OSM API bbox →
-  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
+  cached payload at the same place (any radius, ≤150 m) → Postpass → OSM API
+  bbox → cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
 - Single attempt (2026-11-11): the main instance failed TLS handshakes
   (`result=5`), `private.coffee` accepted connections but sent nothing, and
   `z.overpass-api.de` refused connections, so walking the list only delayed
@@ -392,7 +432,7 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
 | T2.2 satellite z17/18/16 | Satellite imagery | same endpoint, z17+z18 probed live |
 | T3.7 far-field DEM rings (~25 m/px z12 to 9.5 km, ~100 m/px z10 to 33 km) + far imagery drapes (~12/50/200 m/px, z13/z11/z9 at mid-latitudes, to 9.5/33/60 km) — `FarFieldFetcher` | Elevation (DEM) + Satellite imagery | same endpoints and cache keys (`dem_v2_*`, `sat_v2_*`), zoom picked per latitude by target m/px; ~32 DEM + ≤~100 low-zoom imagery tiles per cold place, cached per tile, bounded pool of 8; same Esri credit string (pipeline adds it when only far drapes landed); incomplete layer → dropped → coarser ring / z8 grid / colour ramp |
 | T5.4 far-city ring query (built-up `landuse` ways + multipolygons and `building` with height ≥ 50 m / levels ≥ 15, `around:12000`) — `FarCityFetcher` | Land cover + Buildings | same Overpass endpoints (main instance, one attempt; `building:part` only within 100 m of the tall outlines), one request per place, `[timeout:30]`, identifying UA, cached as `osm_v2_<lat>_<lon>_farcity12000_q2.json` (osm layer); older unversioned entries are offline/failure fallback. Historical query measured live 2026-10-28: Paris 5.1 MB / 22 s (1129 landuse, 730 towers), Interlaken 0.8 MB / 7 s, Big Sur 13 KB / 7 s; failure → empty → imagery-only far city |
-| Horizon labels query (named `natural=peak` to 45 km, `place=city|town|village` to 30 km, lake/reservoir `natural=water` to 20 km, `out tags center 1500`) — `HorizonFetcher` | Names for the skyline (peaks, towns, lakes: name, `ele`, position; no geometry) | same Overpass endpoints, main instance, one attempt, one request per place, `[timeout:30]`, identifying UA, issued only when the person turns horizon labels on, cached as `osm_v2_<lat>_<lon>_horizon45000.json` (osm layer); failure → empty → no labels; credit is the viewer's existing © OpenStreetMap contributors attribution |
+| Horizon labels query (named `natural=peak` to 45 km, `place=city|town|village` to 30 km, lake/reservoir `natural=water` to 20 km, `out tags center 1500`) — `HorizonFetcher` | Names for the skyline (peaks, towns, lakes: name, `ele`, position; no geometry) | same Overpass endpoints, main instance, one attempt, one request per place, `[timeout:30]`, identifying UA, issued only when the person turns horizon labels on, cached as `osm_v2_<lat>_<lon>_horizon45000.json` (osm layer); presets and capitals use the bundled horizon layer instead and never send it; failure → empty → no labels; credit is the viewer's existing © OpenStreetMap contributors attribution |
 | T2.3 OSM footprints + rich tags + wider radius | Buildings + roads | same endpoint, tags confirmed live |
 | T2.4 land-cover classes + waterways + relations | Land cover | same endpoint, parse-only change |
 | T4.3 PBR sets by class/region (Phase 4, gated here) | PBR textures | Poly Haven CC0, API+CDN probed live |

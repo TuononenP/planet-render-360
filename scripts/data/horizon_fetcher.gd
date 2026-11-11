@@ -9,7 +9,9 @@ extends Node
 ##  - place=city|town|village with a name, to RADIUS_TOWN_M;
 ##  - natural=water lake / reservoir with a name, to RADIUS_LAKE_M.
 ## Absence is graceful: a failed or uncached fetch emits an empty list
-## and the view simply has no labels.
+## and the view simply has no labels. Presets and capitals ship this layer
+## (BundledOsm "horizon" rows, tools/prepare_horizon_layer.py), so they
+## never ask Overpass for it.
 
 signal finished(sites: Array)
 signal failed
@@ -19,6 +21,8 @@ const RADIUS_TOWN_M := 30000
 const RADIUS_LAKE_M := 20000
 const CAP := 1500
 const ATTEMPT_TIMEOUT := 40.0
+## Version of build_query's selection; a bundled layer matches only this one.
+const QUERY_VERSION := 1
 
 var offline_mode := false
 
@@ -70,9 +74,18 @@ func fetch(lat: float, lon: float) -> void:
 	_lon = lon
 	_cache = cache_path(lat, lon)
 	_busy = true
-	var cached := OsmFetcher._read_cache(_cache)
+	# A device copy counts only when it is newer than the bundled layer, as
+	# for the other bundled layers, so an old or sparse answer cannot hide it.
+	var key := BundledOsm.entry_for(lat, lon, "horizon", QUERY_VERSION)
+	var cached := OsmFetcher._read_cache(_cache) if BundledOsm.cache_is_newer(_cache, key) else ""
 	if cached != "" and _usable(cached):
 		_emit(cached)
+		return
+	# At most ~185 kB inflated (alps_horizon at the 1500-row cap): small
+	# enough to inflate and hash here instead of through SnapshotReader.
+	var bundled := BundledOsm.read(key)
+	if bundled != "":
+		_emit(bundled)
 		return
 	if offline_mode:
 		_emit("")
