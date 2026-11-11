@@ -133,6 +133,21 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		total += list.size()
 	return total
 
+## How far (m) the eye may move from where cover was laid before the
+## view runs short of it: the walking reach laid beyond the view radius.
+static func spare_m(preset: int) -> float:
+	return float(WALK_EXTRA_M[RenderSettings.clamp_preset(preset)]) if _desktop() else 0.0
+
+## Lays the cover of a (detached) world afresh around the eye `data`
+## opens at, replacing the chunks laid around another eye (a cached world
+## reopened at a later camera). Returns the instance count.
+static func recentre(world: Node3D, data: LocationData, ground: GroundTruth) -> int:
+	for c in world.get_children():
+		if c.get_meta("lod_layer", "") == "GroundCover":
+			world.remove_child(c)
+			c.free()
+	return build(world, data, ground, VegetationMask.new(data, ground))
+
 ## The distance (units) at which `kind` has shrunk away for a view radius.
 static func fade_for(kind: String, radius: float) -> float:
 	return radius * (0.5 if kind == "tuft" or kind == "seedhead" else 1.0)

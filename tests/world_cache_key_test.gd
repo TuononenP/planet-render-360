@@ -113,18 +113,33 @@ func _run() -> void:
 	var moved := built.distance_to(View360.spawn_xz(eye))
 	if absf(moved - 237.0) > 10.0:
 		failures.append("Helsinki reopen eye should stand ~237 m from the preset eye, got %.0f" % moved)
-	if moved > WorldCache.eye_reuse_m(RenderSettings.Preset.ULTRA, true):
-		failures.append("a desktop Ultra reopen ~237 m away must reuse the world")
-	if moved <= WorldCache.eye_reuse_m(RenderSettings.Preset.BALANCED, true):
-		failures.append("a Balanced reopen ~237 m away must rebuild")
-	if moved <= WorldCache.eye_reuse_m(RenderSettings.Preset.ULTRA, false):
-		failures.append("a mobile reopen ~237 m away must rebuild")
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~237 m from the built eye must reuse the world")
+	# A reopen reaches as far as a walk inside the open world, on every
+	# preset and platform: ~400 m reuses, ~650 m rebuilds.
 	for p in range(4):
-		for desktop in [true, false]:
-			if WorldCache.eye_reuse_m(p, desktop) >= 600.0:
-				failures.append("an eye 600 m away must never reuse a world")
-			if WorldCache.eye_reuse_m(p, desktop) < WorldCache.EYE_REUSE_MIN_M:
-				failures.append("the reuse radius must not fall below its minimum")
+		eye.quality_preset = p
+		if not WorldCache.eye_fits(built, eye):
+			failures.append("preset %d should reuse a world ~237 m away" % p)
+	eye.quality_preset = RenderSettings.Preset.ULTRA
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657 + 650.0 / 111320.0, "eye_lon": 24.9558}
+	if WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~650 m from the built eye must rebuild")
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657 + 400.0 / 111320.0, "eye_lon": 24.9558}
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~400 m from the built eye must reuse the world")
+	# Measured from the scene centre too: past the walk circle (and past
+	# where the world's own eye stood) the detailed extent runs out.
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.168 - 900.0 / 111320.0, "eye_lon": 24.953}
+	var out := View360.spawn_xz(eye).normalized()
+	if WorldCache.eye_fits(out * 400.0, eye):
+		failures.append("a reopen 900 m from the centre must rebuild a world built 400 m out")
+	if not WorldCache.eye_fits(out * 950.0, eye):
+		failures.append("an off-centre preset eye may reopen as far out as it was built")
+	# Debug fingerprint: fetch-only data sources are skipped, and nothing a
+	# build runs may use one (else editing it could leave a stale world on
+	# screen): not the builders, not the data helpers they call.
+	_check_skipped_sources(failures)
 	if WorldCache._state_fits({}, eye):
 		failures.append("an entry without a recorded eye (old format) must rebuild")
 	# Save pump: a slow frame gets a bigger slice, a quit takes the most.
@@ -145,3 +160,48 @@ func _run() -> void:
 		for f in failures:
 			printerr("WORLD CACHE KEY FAIL: ", f)
 		quit(1)
+
+## Data scripts the builders name that run before a build (fetching what
+## LocationData carries), not inside it: they may use skipped sources.
+const FETCH_TIME := ["cache_store.gd", "far_city_fetcher.gd", "ground_model_fetcher.gd",
+	"osm_fetcher.gd", "satellite_fetcher.gd", "tile_fetcher.gd"]
+
+## Source text with comments dropped, so a doc mention is not a use.
+func _code(path: String) -> String:
+	var out := PackedStringArray()
+	for line in FileAccess.get_file_as_string(path).split("\n"):
+		var hash_at := line.find("#")
+		out.append(line if hash_at < 0 else line.substr(0, hash_at))
+	return "\n".join(out)
+
+func _class_of(path: String) -> String:
+	var m := RegEx.create_from_string("(?m)^class_name\\s+(\\w+)").search(
+		FileAccess.get_file_as_string(path))
+	return "" if m == null else m.get_string(1)
+
+func _check_skipped_sources(failures: Array[String]) -> void:
+	var build_files: Array[String] = []
+	for d in ["res://scripts/generation", "res://scripts/render"]:
+		build_files.append_array(WorldCache._source_files(d))
+	var build_src := ""
+	for f in build_files:
+		build_src += _code(f) + "\n"
+	# Data helpers a build runs: the fingerprinted data files the builders name.
+	for f in WorldCache._source_files("res://scripts/data"):
+		var c := _class_of(f)
+		if f.get_file() in FETCH_TIME or c == "":
+			continue
+		if RegEx.create_from_string("\\b%s\\b" % c).search(build_src) != null:
+			build_files.append(f)
+	for f in WorldCache.SOURCE_SKIP:
+		if not FileAccess.file_exists(f):
+			failures.append("skipped source %s no longer exists" % f)
+			continue
+		var c := _class_of(f)
+		var uses := RegEx.create_from_string("\\b%s\\b" % c) if c != "" else null
+		for b in build_files:
+			if b == "res://scripts/render/world_cache.gd":
+				continue  # lists the skipped files; runs none of them
+			var code := _code(b)
+			if code.contains(f.get_file()) or (uses != null and uses.search(code) != null):
+				failures.append("%s uses skipped source %s: keep it in the fingerprint" % [b, f])

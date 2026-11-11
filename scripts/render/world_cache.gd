@@ -13,8 +13,9 @@ extends RefCounted
 ## LocationData the world was built from + BUILD_VERSION. The opening eye
 ## is not in the key: near layers (cars, boats, wires, ground cover) are
 ## centred on it, so the entry records the eye it was built around and a
-## reopen reuses it while its eye stays within eye_reuse_m (a reopen at
-## the last camera, a walk away from the first). Farther, it rebuilds. Bump
+## reopen reuses it while its eye could have been walked to (eye_fits), so
+## reopening at the last camera looks as if the person had walked there.
+## Farther, it rebuilds. Bump
 ## BUILD_VERSION whenever a generation builder changes its output; debug
 ## builds also hash the generator sources, so a stale world can never be
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
@@ -24,6 +25,18 @@ const BUILD_VERSION := 238
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
+## Files in SOURCE_DIRS that only carry bytes (connections, requests),
+## serve the map/search/weather/thumbnail screens, or manage downloads,
+## and never run inside a world build, so editing them must not throw
+## every cached world away (world_cache_key_test guards that no builder
+## names them). Code that decodes data a world is built from stays in.
+const SOURCE_SKIP := ["res://scripts/data/tile_connection.gd",
+	"res://scripts/data/vector_tile_fetcher.gd", "res://scripts/data/overpass_request.gd",
+	"res://scripts/data/search_fetcher.gd", "res://scripts/data/weather_fetcher.gd",
+	"res://scripts/data/wiki_fetcher.gd", "res://scripts/data/wiki_parse.gd",
+	"res://scripts/data/host_policy.gd", "res://scripts/data/remote_config.gd",
+	"res://scripts/data/offline_downloader.gd", "res://scripts/data/place_thumb.gd",
+	"res://scripts/data/map_pack.gd", "res://scripts/data/horizon_fetcher.gd"]
 
 static var _source_hash := ""
 static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
@@ -58,23 +71,18 @@ static func key(data: LocationData) -> String:
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]
 
-## Least distance (m) a reopen eye may stand from a cached world's eye.
-const EYE_REUSE_MIN_M := 60.0
-
-## How far (m) a reopen eye may stand from the eye a cached world was
-## built around: as far as desktop ground cover was laid beyond its view
-## radius for walking (GroundCover.WALK_EXTRA_M), so the reopened view
-## still sees full cover; at least EYE_REUSE_MIN_M.
-static func eye_reuse_m(preset: int, desktop: bool) -> float:
-	var p := clampi(RenderSettings.clamp_preset(preset), 0, GroundCover.WALK_EXTRA_M.size() - 1)
-	var extra := float(GroundCover.WALK_EXTRA_M[p]) if desktop else 0.0
-	return maxf(EYE_REUSE_MIN_M, extra)
-
 ## Whether a world built around `built_eye` (metres from the world origin)
-## can be shown for `data`, whose eye stands at View360.spawn_xz(data).
+## can be shown for `data`, whose eye stands at View360.spawn_xz(data):
+## when a walk could have taken the camera there. That is within
+## View360.IN_PLACE_M of the built eye, and no farther from the scene
+## centre than a walk may go (can_move_in_place), or than the built eye
+## itself stood (an off-centre preset eye). Near layers (cover, props)
+## thin out towards that edge just as on a walk, which costs far less
+## than a full rebuild.
 static func eye_fits(built_eye: Vector2, data: LocationData) -> bool:
-	return built_eye.distance_to(View360.spawn_xz(data)) \
-		<= eye_reuse_m(data.quality_preset, GroundCover._desktop())
+	var eye := View360.spawn_xz(data)
+	return built_eye.distance_to(eye) <= View360.IN_PLACE_M \
+		and eye.length() <= maxf(View360.IN_PLACE_M, built_eye.length())
 
 ## The saved ground state at `path`, or {} when absent or unreadable.
 static func _read_ground_state(path: String) -> Dictionary:
@@ -105,7 +113,7 @@ static func _sources() -> String:
 static func _source_files(dir: String) -> Array[String]:
 	var files: Array[String] = []
 	for file in DirAccess.get_files_at(dir):
-		if file.ends_with(".gd"):
+		if file.ends_with(".gd") and not dir.path_join(file) in SOURCE_SKIP:
 			files.append(dir.path_join(file))
 	for child in DirAccess.get_directories_at(dir):
 		files.append_array(_source_files(dir.path_join(child)))
@@ -210,9 +218,19 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 		push_warning("WorldCache: unreadable entry %s; rebuilding" % p["scene"])
 		_remove(p)
 		return []
+	# Past the walking reach its cover was laid with, the reopen eye would
+	# stand on bare ground: lay the cover again around it (seconds, not a
+	# rebuild). Props stay where they were, as after a walk.
+	var recover := eye_m > GroundCover.spare_m(data.quality_preset)
 	var th := Thread.new()
 	threads.append(th)
-	th.start(func() -> Node3D: return ps.instantiate() as Node3D)
+	th.start(func() -> Node3D:
+		var w := ps.instantiate() as Node3D
+		if w != null and recover:
+			var t := Time.get_ticks_msec()
+			GroundCover.recentre(w, data, g)
+			print("WORLD CACHE cover re-laid around the reopen eye in %d ms" % (Time.get_ticks_msec() - t))
+		return w)
 	while th.is_alive():
 		await view.get_tree().process_frame
 	threads.erase(th)

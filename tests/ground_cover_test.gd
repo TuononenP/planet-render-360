@@ -80,6 +80,30 @@ func _run() -> void:
 	var first := root.get_child(0) as GeometryInstance3D
 	LodRing.apply(root, RenderSettings.Preset.ULTRA)
 	_check(is_equal_approx(first.visibility_range_end, float(first.get_meta("cover_end"))), "LodRing keeps the chunk's own range")
+	# A cached world reopened 450 m on: its cover is laid again around the
+	# new eye, and nothing but the cover is touched.
+	var keep := Node3D.new()
+	root.add_child(keep)
+	d.view = {"lat": d.latitude, "lon": d.longitude, "eye_lat": d.latitude + 450.0 / 111320.0,
+		"eye_lon": d.longitude}
+	var eye := View360.spawn_xz(d)
+	_check(eye.distance_to(centre) > 400.0, "the reopen eye stands ~450 m on: %.0f" % eye.distance_to(centre))
+	var relaid := GroundCover.recentre(root, d, g)
+	_check(relaid > 0 and keep.get_parent() == root, "cover is re-laid and other layers stay")
+	# Every chunk lies within the new eye's reach, some past the old one's.
+	var reach := float(GroundCover.RADIUS_M[RenderSettings.Preset.ULTRA] \
+		+ GroundCover.WALK_EXTRA_M[RenderSettings.Preset.ULTRA]) + GroundCover.CHUNK_M
+	var beyond_old := 0
+	var stray := 0
+	for c in root.get_children():
+		if c.get_meta("lod_layer", "") != "GroundCover":
+			continue
+		var at := Vector2((c as Node3D).position.x, (c as Node3D).position.z)
+		stray += 1 if at.distance_to(eye) > reach else 0
+		beyond_old += 1 if at.distance_to(centre) > reach else 0
+	_check(stray == 0 and beyond_old > 0,
+		"re-laid cover centres on the new eye: %d stray, %d past the old reach" % [stray, beyond_old])
+	_check(GroundCover.spare_m(RenderSettings.Preset.FAST) == 0.0, "Fast lays no walking reach")
 	root.free()
 	# Photo-green ground grows cover with no mapped polygon; bare ground none.
 	var wild := _park(RenderSettings.Preset.ULTRA)
