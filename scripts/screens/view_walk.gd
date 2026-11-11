@@ -128,8 +128,11 @@ func cancel_tap() -> void:
 	_tap_seq += 1
 	_tap_ms = -1
 
-## Walk to the ground under screen point `pos`.
+## Walk to the ground under screen point `pos`, unless the tap landed
+## on a landmark: then it toggles that landmark's callout instead.
 func tap(v: View360, pos: Vector2) -> void:
+	if v._callouts != null and v._callouts.toggle_at(_to_viewport(v, pos)):
+		return
 	var cam := v._rig.camera
 	if cam == null or v._ground == null:
 		return

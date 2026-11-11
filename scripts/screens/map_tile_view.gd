@@ -342,6 +342,7 @@ func _tap(at: Vector2) -> void:
 	var site := landmarks.hit_at(at) if landmarks != null else {}
 	if not site.is_empty():
 		_last_tap_msec = 0  # a marker tap never starts a double tap
+		landmarks.toggle_chip(site)  # the name chip follows the click
 		landmark_picked.emit(site)
 	elif _is_double_tap(at):
 		zoom_at(at, 1)
