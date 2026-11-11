@@ -103,6 +103,7 @@ var _walk := ViewWalk.new()
 var _near_window: NearGroundWindow
 var _carpet: GrassCarpet
 var _near_world := 0
+var _mover: VehicleMover
 var _drone := ViewDrone.new()
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
@@ -808,6 +809,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
 	_tick_near_ground()
+	if _mover != null and _rig != null and is_visible_in_tree():
+		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))
 	if _lapse.playing and is_visible_in_tree():
 		ViewConditions.lapse_tick(self, delta)
 	if _drone.on:
@@ -832,6 +835,9 @@ func _tick_near_ground() -> void:
 		if _carpet != null:
 			_carpet.stop()
 		_carpet = GrassCarpet.attach(_generated, _ground, _data) if world != 0 else null
+		if _mover != null:
+			_mover.stop()
+		_mover = VehicleMover.attach(_generated, _data, _ground) if world != 0 else null
 	if _rig != null and _ground != null and (_near_window != null or _carpet != null):
 		var eye := Vector2(_rig.position.x, _rig.position.z)
 		var agl := _rig.position.y - _ground.height_at_world(eye.x, eye.y)
