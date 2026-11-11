@@ -196,12 +196,13 @@ func _ready() -> void:
 		_marker.queue_redraw())
 	refresh_tiles()
 
-func set_lat_lon(lat: float, lon: float) -> void:
+## `warm` (a searched or listed place, not a tap or drag) also fetches every
+## other zoom here in the background, so zooming in on it is quick.
+func set_lat_lon(lat: float, lon: float, warm: bool = false) -> void:
 	centre_lat = lat
 	centre_lon = lon
 	refresh_tiles()
-	if _vector != null:
-		# Behind the visible tiles: every other zoom here, so zooming is quick.
+	if warm and _vector != null:
 		_vector.prefetch_around(lat, lon)
 	queue_redraw()
 	if _pin != null:

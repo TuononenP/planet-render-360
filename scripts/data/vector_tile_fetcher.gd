@@ -36,6 +36,8 @@ const TILEJSON_KEY := Vector3i(-1, -1, -1)
 const TILEJSON_RETRY_MS := 30000
 
 var kind := Kind.VECTOR
+## Where tiles are cached; tests point it at a scratch folder.
+var cache_dir := CACHE_DIR
 ## Bundled tiles, looked up before the disk cache.
 var pack: MapPack
 
@@ -54,7 +56,7 @@ func _init(tile_kind: Kind = Kind.VECTOR) -> void:
 	pack = MapPack.shared(MapPack.OMT if kind == Kind.VECTOR else MapPack.DEM)
 
 func _ready() -> void:
-	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
+	DirAccess.make_dir_recursive_absolute(cache_dir)
 	for i in CONNECTIONS:
 		var conn := TileConnection.new()
 		conn.host = VECTOR_HOST if kind == Kind.VECTOR else DEM_HOST
@@ -72,13 +74,13 @@ func max_zoom() -> int:
 
 func cache_path(z: int, x: int, y: int) -> String:
 	if kind == Kind.VECTOR:
-		return "%s/omt_%d_%d_%d.pbf" % [CACHE_DIR, z, x, y]
-	return "%s/dem_%d_%d_%d.png" % [CACHE_DIR, z, x, y]
+		return "%s/omt_%d_%d_%d.pbf" % [cache_dir, z, x, y]
+	return "%s/dem_%d_%d_%d.png" % [cache_dir, z, x, y]
 
 ## Marker for a vector tile the server answered as empty (open sea), so
 ## neither the view nor the warm-up asks for it again.
 func sea_path(z: int, x: int, y: int) -> String:
-	return "%s/omt_%d_%d_%d.sea" % [CACHE_DIR, z, x, y]
+	return "%s/omt_%d_%d_%d.sea" % [cache_dir, z, x, y]
 
 ## The dated tile path from a TileJSON body, as a printf template, or ""
 ## when the body has no usable tiles URL. Static so tests can pin it.
@@ -124,10 +126,11 @@ func request_tile(z: int, x: int, y: int) -> void:
 	if FileAccess.file_exists(path):
 		var body := FileAccess.get_file_as_bytes(path)
 		if not body.is_empty():
-			CacheStore.note_read(path)
+			CacheStore.note_read(path, -1.0, body.size())
 			tile_ready.emit(z, x, y, body)
 			return
 	if kind == Kind.VECTOR and FileAccess.file_exists(sea_path(z, x, y)):
+		CacheStore.note_read(sea_path(z, x, y), -1.0, 0)
 		tile_ready.emit(z, x, y, PackedByteArray())
 		return
 	_pending[key] = true
@@ -216,6 +219,16 @@ func _pump() -> void:
 			if not conn.busy and not _queue.is_empty():
 				var t: Vector3i = _queue.pop_front()
 				conn.start(t, _path_for(t), _headers())
+		# Still waiting view tiles take the warm-up's connections: its tiles
+		# go back to the front of its queue and start again later.
+		for conn in _pool:
+			if _queue.is_empty():
+				break
+			if conn.busy and _prefetch_only.has(conn.tile):
+				_prefetch.push_front(conn.tile)
+				conn.cancel()
+				var t: Vector3i = _queue.pop_front()
+				conn.start(t, _path_for(t), _headers())
 		var warming := 0
 		for conn in _pool:
 			if conn.busy and _prefetch_only.has(conn.tile):
@@ -251,7 +264,7 @@ func _process(_delta: float) -> void:
 		if t == TILEJSON_KEY:
 			_on_tilejson(bool(res[0]) and int(res[1]) == 200, res[2])
 		else:
-			_done(t, bool(res[0]), int(res[1]), res[2])
+			_done(t, bool(res[0]), int(res[1]), res[2], int(res[3]) if res.size() > 3 else -1)
 	_pump()
 
 func _on_tilejson(ok: bool, body: PackedByteArray) -> void:
@@ -282,7 +295,9 @@ static func looks_like_tile(tile_kind: Kind, body: PackedByteArray) -> bool:
 		return body[0] == 0x89 and body[1] == 0x50  # PNG
 	return (body[0] == 0x1f and body[1] == 0x8b) or body[0] == 0x1a  # gzip, or an MVT layer
 
-func _done(t: Vector3i, ok: bool, code: int, body: PackedByteArray) -> void:
+## `declared` is the response's Content-Length (-1 when none was sent): a
+## body shorter than it was cut off, and is neither cached nor shown.
+func _done(t: Vector3i, ok: bool, code: int, body: PackedByteArray, declared: int = -1) -> void:
 	_pending.erase(t)
 	var warm_up := _prefetch_only.has(t)
 	_prefetch_only.erase(t)
@@ -298,12 +313,16 @@ func _done(t: Vector3i, ok: bool, code: int, body: PackedByteArray) -> void:
 		else:
 			_queue.push_front(t)
 		return
-	if ok and (code == 204 or (code == 200 and body.is_empty())) and kind == Kind.VECTOR:
-		_store(sea_path(t.x, t.y, t.z), PackedByteArray())
+	if ok and (code == 204 or (code == 200 and body.is_empty() and declared <= 0)) and kind == Kind.VECTOR:
+		# Open sea. Remembered only when the server said so outright (204 or
+		# Content-Length 0): an empty body alone may be a dropped download.
+		if code == 204 or declared == 0:
+			_store(sea_path(t.x, t.y, t.z), PackedByteArray())
 		if not warm_up:
-			tile_ready.emit(t.x, t.y, t.z, PackedByteArray())  # an empty tile: open sea
+			tile_ready.emit(t.x, t.y, t.z, PackedByteArray())
 		return
-	var valid := ok and code == 200 and looks_like_tile(kind, body)
+	var complete := declared < 0 or body.size() == declared
+	var valid := ok and code == 200 and complete and looks_like_tile(kind, body)
 	if valid:
 		_store(cache_path(t.x, t.y, t.z), body)
 	if warm_up:

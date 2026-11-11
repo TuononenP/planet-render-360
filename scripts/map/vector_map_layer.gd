@@ -51,6 +51,11 @@ var _layout_shift := Vector2.ZERO
 var _layout_zoom := -1
 ## Shared with worker builds; set on the way out so they stop early.
 var _cancel: Array = [false]
+## Off for test and capture runs (started with --script; the app never
+## is), so they never bulk-download tiles around the places they pick.
+static var warm_up_enabled := not OS.get_cmdline_args().has("--script")
+## A place picked before the view had a size, warmed once it has one.
+var _warm_at: Variant = null
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -123,10 +128,13 @@ static func prefetch_plan(lat: float, lon: float, view_size: Vector2, focus: Vec
 				zooms.append(z)
 	var vector: Array[Vector3i] = []
 	var dem: Array[Vector3i] = []
-	var seen: Dictionary = {}
-	var seen_dem: Dictionary = {}
-	var current_d := data_zoom(current_zoom)
+	# Picker zooms past the data's deepest share its tiles: plan each once
+	# (the current one is the view's job).
+	var planned: Array[int] = [data_zoom(current_zoom)]
 	for zoom in zooms:
+		if planned.has(data_zoom(zoom)):
+			continue
+		planned.append(data_zoom(zoom))
 		var origin := TileFetcher.global_pixel(lat, lon, zoom) - focus
 		var span := view_size
 		if absi(zoom - current_zoom) > PREFETCH_FULL_STEPS:
@@ -134,23 +142,22 @@ static func prefetch_plan(lat: float, lon: float, view_size: Vector2, focus: Vec
 			origin = TileFetcher.global_pixel(lat, lon, zoom) - span / 2.0
 		for t in tiles_for(origin, span, zoom, 0.0):
 			var tile: Vector3i = t
-			if tile.x != current_d and not seen.has(tile):
-				seen[tile] = true
-				vector.append(tile)
-			if tile.x <= MapStyle.SHADE_MAX_ZOOM and tile.x != current_d and not seen_dem.has(tile):
-				seen_dem[tile] = true
+			vector.append(tile)
+			if tile.x <= MapStyle.SHADE_MAX_ZOOM:
 				dem.append(tile)
 	return {"vector": vector, "dem": dem}
 
 ## Warm the disk cache around a newly picked place for every zoom, behind
 ## the visible tiles, so zooming there later does not wait on the network.
 func prefetch_around(lat: float, lon: float) -> void:
-	if view == null or _omt == null:
+	if view == null or _omt == null or not warm_up_enabled:
 		return
 	_omt.clear_prefetch()
 	_dem.clear_prefetch()
 	if view.size.x < 1.0 or view.size.y < 1.0:
-		return  # not laid out yet: no view to plan from
+		_warm_at = Vector2(lat, lon)  # not laid out yet: refresh() warms it
+		return
+	_warm_at = null
 	var plan := prefetch_plan(lat, lon, view.size, view.focus_point(), view.zoom_level)
 	for t in plan["vector"]:
 		_omt.prefetch_tile(t.x, t.y, t.z)
@@ -187,6 +194,10 @@ func refresh() -> void:
 	_dem.discard_queued_except(tiles if shade else [])
 	_prune()
 	_sync(true)
+	# After the view's own tiles, so they are queued first.
+	if _warm_at != null and view.size.x >= 1.0 and view.size.y >= 1.0:
+		var at: Vector2 = _warm_at
+		prefetch_around(at.x, at.y)
 
 func _on_tile(z: int, x: int, y: int, body: PackedByteArray) -> void:
 	var tile := Vector3i(z, x, y)

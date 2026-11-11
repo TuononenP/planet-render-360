@@ -254,7 +254,7 @@ func _run() -> void:
 			if (quick_row.get_child(0) as Button).button_pressed:
 				_fail(failures, "only the tapped place card should stay pressed")
 			# A manual map pick clears the selection.
-			picker._on_picked(48.8566, 2.3522)
+			picker._on_picked(48.8566, 2.3522, false)
 			await process_frame
 			if tokyo_chip.button_pressed:
 				_fail(failures, "manual map pick should clear the Tokyo selection")

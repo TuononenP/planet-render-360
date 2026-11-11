@@ -185,7 +185,8 @@ func _ready() -> void:
 	add_child(_map_wrap)
 	_canvas = MapTileView.new()
 	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_canvas.picked.connect(_on_picked)
+	# A tap or drag on the map is not a new destination: no zoom warm-up.
+	_canvas.picked.connect(func(la: float, lo: float) -> void: _on_picked(la, lo, false))
 	_map_wrap.add_child(_canvas)
 	_zoom_in_btn = UiIcon.button("plus", "Zoom in")
 	_zoom_in_btn.pressed.connect(func() -> void:
@@ -607,7 +608,7 @@ func _on_search(text: String) -> void:
 func _ensure_searcher() -> void:
 	MapSearch.ensure_searcher(self)
 
-func _on_picked(lat: float, lon: float) -> void:
+func _on_picked(lat: float, lon: float, warm: bool = true) -> void:
 	_hide_suggestions()
 	set_download_status("")  # a search or save message was about the last place
 	set_render_status("")
@@ -619,7 +620,7 @@ func _on_picked(lat: float, lon: float) -> void:
 	# Keep the map centred on the choice: search and quick picks arrive
 	# without a map tap, so without this the pin stayed on the old place.
 	if _canvas != null:
-		_canvas.set_lat_lon(lat, lon)
+		_canvas.set_lat_lon(lat, lon, warm)
 	if _globe != null:
 		_globe.pin = Vector2(lat, lon)
 		_globe.queue_redraw()

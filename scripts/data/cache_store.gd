@@ -533,13 +533,14 @@ static func _file_bytes(path: String) -> int:
 	var f := FileAccess.open(path, FileAccess.READ)
 	return int(f.get_length()) if f != null else 0
 
-## Record a cache hit. atime_override is a test hook (default: now).
-static func note_read(path: String, atime_override: float = -1.0) -> void:
+## Record a cache hit. atime_override is a test hook (default: now);
+## `bytes` spares reopening a file the caller has just read.
+static func note_read(path: String, atime_override: float = -1.0, bytes: int = -1) -> void:
 	_ensure_lru()
 	var now := Time.get_unix_time_from_system() \
 		if atime_override < 0.0 else atime_override
 	var rel := _rel(path)
-	_lru[rel] = {"bytes": _file_bytes(path), "atime": now}
+	_lru[rel] = {"bytes": bytes if bytes >= 0 else _file_bytes(path), "atime": now}
 	_touch(rel)
 	_queue_lru_save()
 

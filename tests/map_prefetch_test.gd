@@ -44,11 +44,20 @@ func _run() -> void:
 	var far_planned := vector.filter(func(t: Vector3i) -> bool: return t.x == far_d).size()
 	if far_planned == 0 or far_planned > far_full:
 		failures.append("far zooms should warm part of the view, got %d of %d" % [far_planned, far_full])
-	var small :=VectorMapLayer.prefetch_plan(60.17, 24.94, Vector2(300, 300), Vector2(150, 150), current)
+	var small := VectorMapLayer.prefetch_plan(60.17, 24.94, Vector2(300, 300), Vector2(150, 150), current)
 	if (small["vector"] as Array).size() >= vector.size():
 		failures.append("a smaller view should warm fewer tiles")
 
+	if VectorMapLayer.warm_up_enabled:
+		failures.append("--script runs (tests, captures) must not warm the map cache")
+	# A scratch cache, so tiles already on this machine cannot skew the queues.
+	var scratch := "user://map_prefetch_test"
+	_remove_dir(scratch)
+	DirAccess.make_dir_recursive_absolute(scratch)
+	CacheStore.dir_override = scratch
+	CacheStore.eviction_suppressed = true
 	var f := VectorTileFetcher.new(VectorTileFetcher.Kind.VECTOR)
+	f.cache_dir = scratch
 	f.prefetch_tile(14, 0, 0)
 	f.prefetch_tile(14, 1, 0)
 	if f._prefetch.size() != 2 or f._queue.size() != 0:
@@ -69,11 +78,57 @@ func _run() -> void:
 		if f._prefetch.has(Vector3i(0, 0, 0)):
 			failures.append("bundled tiles must not be downloaded")
 	f.free()
+
+	# Open sea is remembered only when the server says so outright.
+	var g := VectorTileFetcher.new(VectorTileFetcher.Kind.VECTOR)
+	g.cache_dir = scratch
+	g._done(Vector3i(14, 2, 0), true, 200, PackedByteArray(), -1)
+	if FileAccess.file_exists(g.sea_path(14, 2, 0)):
+		failures.append("an empty body without Content-Length may be a dropped download, not sea")
+	g._done(Vector3i(14, 3, 0), true, 204, PackedByteArray(), -1)
+	if not FileAccess.file_exists(g.sea_path(14, 3, 0)) or not g._cached(14, 3, 0):
+		failures.append("a 204 should leave a sea marker the warm-up counts as cached")
+	g._done(Vector3i(14, 4, 0), true, 200, PackedByteArray([0x1f, 0x8b, 0, 0]), 900)
+	if FileAccess.file_exists(g.cache_path(14, 4, 0)):
+		failures.append("a body shorter than its Content-Length must not be cached")
+	g._done(Vector3i(14, 5, 0), true, 200, PackedByteArray([0x1f, 0x8b, 0, 0]), 4)
+	if not g._cached(14, 5, 0):
+		failures.append("a complete tile should be cached")
+
+	# A waiting view tile takes a warm-up connection. Connections are only
+	# started, never polled, so nothing is sent.
+	g._tiles_path = "/planet/test/%d/%d/%d.pbf"
+	g._tilejson_state = 2
+	for i in VectorTileFetcher.PREFETCH_CONNECTIONS:
+		g._pool.append(TileConnection.new())
+	g.prefetch_tile(14, 6, 0)
+	g.prefetch_tile(14, 7, 0)
+	g.prefetch_tile(14, 8, 0)
+	if not g._pool.all(func(c: TileConnection) -> bool: return c.busy):
+		failures.append("the warm-up should fill its connections")
+	g.request_tile(14, 9, 0)
+	if not g._pool.any(func(c: TileConnection) -> bool: return c.busy and c.tile == Vector3i(14, 9, 0)):
+		failures.append("a view tile should take a warm-up connection when none is free")
+	if g._prefetch.size() != 2 or not g._pending.has(g._prefetch[0]):
+		failures.append("the displaced warm-up tile should wait at the front of its queue")
+	for c in g._pool:
+		c.close()
+	g.free()
+	CacheStore.dir_override = ""
+	_remove_dir(scratch)
 	_finish(failures)
+
+func _remove_dir(path: String) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	for name in dir.get_files():
+		dir.remove(name)
+	DirAccess.remove_absolute(path)
 
 func _finish(failures: Array[String]) -> void:
 	if failures.is_empty():
-		print("MAP_PREFETCH OK: plan per zoom, nearest first, DEM cap, own queue, promote, clear")
+		print("MAP_PREFETCH OK: plan per zoom, nearest first, DEM cap, own queue, promote, clear, sea markers, cut-off bodies, view preempts")
 		quit(0)
 	else:
 		for f in failures:
