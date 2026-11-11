@@ -7,6 +7,7 @@ class ReplySequence extends OverpassRequest:
 	var visited: Array[String] = []
 	func _start() -> void:
 		_token += 1
+		_sent += 1
 		visited.append(_endpoints[_attempt])
 		var reply: Array = replies[_attempt]
 		_on_done.call_deferred(HTTPRequest.RESULT_SUCCESS, int(reply[0]),

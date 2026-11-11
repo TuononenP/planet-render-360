@@ -11,9 +11,11 @@ extends Node
 ## By default only one instance is used (max_attempts): the mirrors have
 ## been no more reliable than the main instance (2026-11-11: TLS handshake
 ## failures on the main one, silence or refused connections on the rest),
-## so walking the list only delayed the cache and OSM API fallbacks. An
-## instance that is paused (a rate limit, or an outage another query just
-## hit) uses up that attempt without a request being sent.
+## so walking the list only delayed the cache and OSM API fallbacks. A
+## paused instance (a rate limit, an outage another query just hit, or a
+## failed status check) is skipped without a request; a later instance in
+## the list is used only when OverpassProbe confirmed it answering. While a
+## status check runs, run() waits for it.
 
 signal answered(text: String)
 signal exhausted(reason: String, attempts: int)
@@ -53,6 +55,13 @@ const OUTAGE_CODES: Array[int] = [500, 502, 503, 504]
 static var _cooldown_until: Dictionary = {}
 ## endpoint -> why it is paused, for the reason a skipped query reports.
 static var _cooldown_why: Dictionary = {}
+## endpoint -> Time.get_ticks_msec() until which OverpassProbe's answer
+## stands. Only a confirmed instance is used in place of a paused one.
+static var _confirmed_until: Dictionary = {}
+## endpoints whose current pause came from a status check. Only those are
+## lifted by a good status answer: the status page loading proves nothing
+## about /api/interpreter after a real query failed there.
+static var _cooldown_probe: Dictionary = {}
 
 var _http: HTTPRequest
 ## Child node, so a pending first-byte check is freed with this request.
@@ -61,13 +70,17 @@ var _endpoints: Array[String] = []
 var _body := ""
 var _validate: Callable
 var _attempt := 0
-## Instances used, paused ones included, before giving up (see the class
-## note). The offline pack, which saves layers in bulk, raises it to walk
-## its own mirror pair.
+## Requests sent before giving up (see the class note). The offline pack,
+## which saves layers in bulk, raises it to walk its own mirror pair; with
+## more than one allowed, a later instance needs no confirmation.
 var max_attempts := 1
+var _sent := 0
 ## Seconds an instance may take to start answering; callers holding an
 ## older copy lower it to FALLBACK_FIRST_BYTE_S.
 var first_byte_timeout := FIRST_BYTE_TIMEOUT
+## When the current request was sent: the watchdog checks the wall clock,
+## as its timer counts frame time and a stalled frame would fire it early.
+var _sent_msec := 0
 ## Bumped on every start, completion and cancel: a stale watchdog or
 ## validation result must never act on a later attempt.
 var _token := 0
@@ -98,10 +111,30 @@ static func cooldown_seconds(headers: PackedStringArray) -> float:
 	return DEFAULT_COOLDOWN_S
 
 static func start_cooldown(endpoint: String, seconds: float,
-		now_msec: int = Time.get_ticks_msec(), why: String = "rate limited") -> void:
-	_cooldown_until[endpoint] = maxi(int(_cooldown_until.get(endpoint, 0)),
-		now_msec + int(seconds * 1000.0))
-	_cooldown_why[endpoint] = why
+		now_msec: int = Time.get_ticks_msec(), why: String = "rate limited",
+		from_probe: bool = false) -> void:
+	var until := now_msec + int(seconds * 1000.0)
+	# The pause that ends later decides where the pause came from.
+	if until >= int(_cooldown_until.get(endpoint, 0)) or not is_cooling(endpoint, now_msec):
+		_cooldown_probe[endpoint] = from_probe
+		_cooldown_until[endpoint] = until
+		_cooldown_why[endpoint] = why
+	_confirmed_until.erase(endpoint)
+
+## OverpassProbe found `endpoint` answering with a free slot: lift a pause a
+## status check set, and let queries use it in place of a paused instance.
+## A pause a real query set stands, and the instance is not confirmed.
+static func confirm(endpoint: String, now_msec: int = Time.get_ticks_msec()) -> void:
+	if is_cooling(endpoint, now_msec):
+		if not bool(_cooldown_probe.get(endpoint, false)):
+			return
+	_cooldown_until.erase(endpoint)
+	_cooldown_why.erase(endpoint)
+	_cooldown_probe.erase(endpoint)
+	_confirmed_until[endpoint] = now_msec + int(OverpassProbe.REUSE_S * 1000.0)
+
+static func is_confirmed(endpoint: String, now_msec: int = Time.get_ticks_msec()) -> bool:
+	return int(_confirmed_until.get(endpoint, 0)) > now_msec
 
 static func is_cooling(endpoint: String, now_msec: int = Time.get_ticks_msec()) -> bool:
 	return int(_cooldown_until.get(endpoint, 0)) > now_msec
@@ -117,6 +150,8 @@ static func cooldown_left(endpoints: Array[String], now_msec: int = Time.get_tic
 static func clear_cooldowns() -> void:
 	_cooldown_until.clear()
 	_cooldown_why.clear()
+	_confirmed_until.clear()
+	_cooldown_probe.clear()
 
 ## "overpass-api.de" for an interpreter URL, for log lines.
 static func host_of(url: String) -> String:
@@ -142,16 +177,24 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join_validate()
 
-## Start `body` (a url-encoded data= form) on endpoints[0]. validate(text)
-## returns "" to accept a 200 payload, or the reason to try the next
-## instance instead. It runs on a worker thread (payloads are megabytes),
-## so it must not touch scene state.
+## Start `body` (a url-encoded data= form) on the first usable instance of
+## `endpoints`, after a status check in flight (OverpassProbe) has finished.
+## validate(text) returns "" to accept a 200 payload, or the reason to
+## give up on it. It runs on a worker thread (payloads are megabytes), so
+## it must not touch scene state.
 func run(body: String, validate: Callable, endpoints: Array[String]) -> void:
 	cancel()
 	_body = body
 	_validate = validate
 	_endpoints = endpoints
 	_attempt = 0
+	_sent = 0
+	var token := _token
+	var probe := OverpassProbe.waiting()
+	if probe != null:
+		await probe.settled
+		if token != _token:
+			return
 	_start()
 
 ## cancel_request() emits no request_completed, so nothing stale is
@@ -161,27 +204,32 @@ func cancel() -> void:
 	_watchdog.stop()
 	_http.cancel_request()
 
-## Instances this request may use.
-func _limit() -> int:
-	return mini(_endpoints.size(), maxi(max_attempts, 1))
+## Whether the instance at `index` may take this request: not paused, and
+## either first in the list, confirmed by the status check, or reached by a
+## request allowed more than one send.
+func _usable(index: int) -> bool:
+	var endpoint := _endpoints[index]
+	return not is_cooling(endpoint) and (index == 0 or max_attempts > 1 or is_confirmed(endpoint))
 
 func _start() -> void:
 	_token += 1
 	var paused := ""
-	while _attempt < _limit() and is_cooling(_endpoints[_attempt]):
-		paused = "Overpass %s paused (%s)" % [host_of(_endpoints[_attempt]),
-			str(_cooldown_why.get(_endpoints[_attempt], "rate limited"))]
+	while _attempt < _endpoints.size() and not _usable(_attempt):
+		if is_cooling(_endpoints[_attempt]) and paused == "":
+			paused = "Overpass %s paused (%s)" % [host_of(_endpoints[_attempt]),
+				str(_cooldown_why.get(_endpoints[_attempt], "rate limited"))]
 		_attempt += 1
-	if _attempt >= _limit():
-		# Every instance it may use is paused. Report it later, so callers
-		# that connect their signals after run() still hear about it.
+	if _attempt >= _endpoints.size():
+		# No instance may take it. Report it later, so callers that
+		# connect their signals after run() still hear about it.
 		var token := _token
 		var attempts := _attempt
-		var reason := paused if paused != "" else "Overpass has no instances"
+		var reason := paused if paused != "" else "Overpass has no usable instance"
 		(func() -> void:
 			if token == _token:
 				exhausted.emit(reason, attempts)).call_deferred()
 		return
+	_sent += 1
 	var err := _http.request(_endpoints[_attempt],
 		["Content-Type: application/x-www-form-urlencoded",
 			"User-Agent: " + Brand.USER_AGENT],
@@ -189,10 +237,15 @@ func _start() -> void:
 	if err != OK:
 		_fail("Overpass request failed to start: %s" % err, true)
 		return
+	_sent_msec = Time.get_ticks_msec()
 	if is_inside_tree():
 		_watchdog.start(first_byte_timeout)
 
 func _on_watchdog() -> void:
+	var left := first_byte_timeout - (Time.get_ticks_msec() - _sent_msec) / 1000.0
+	if left > 0.0:
+		_watchdog.start(left)
+		return
 	if _http.get_http_client_status() in _WAITING:
 		_http.cancel_request()
 		var reason := "Overpass %s sent no response in %d s" % [
@@ -204,7 +257,7 @@ func _on_watchdog() -> void:
 
 func _fail(reason: String, retryable: bool) -> void:
 	_watchdog.stop()
-	if retryable and _attempt + 1 < _limit():
+	if retryable and _sent < max_attempts and _attempt + 1 < _endpoints.size():
 		_attempt += 1
 		_start()
 	else:

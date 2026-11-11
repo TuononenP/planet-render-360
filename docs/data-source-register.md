@@ -327,6 +327,22 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   10 s for the first byte instead of 15 s (35 s before 2026-11-11). A place where Overpass and the OSM
   API both return no buildings over the full 1200 m is marked
   (`osm_v2_<lat>_<lon>_empty_q<N>.json`) and not asked again for 7 days.
+  Status check (2026-11-11): when a 3D load starts, `OverpassProbe` asks
+  every instance for `/api/status` (no query runs, no query slot is used;
+  4 s timeout, one check per 60 s). An instance with a free slot, or no
+  rate limit, is confirmed for 60 s and any pause on it lifted; one whose
+  next slot is N s away is waited out when N is up to 10 s (the queries are
+  held back N s, nothing is paused) and paused exactly N s when it is longer;
+  one that fails or answers anything else is paused 90 s. A good status
+  answer lifts only a pause an earlier status check set, never one a real
+  query caused (a 504 on `/api/interpreter`). The load's Overpass queries wait
+  until the first instance has answered, or every instance has answered or
+  timed out, and use the first instance that is not paused; a mirror is used
+  only when the check confirmed it. The 4 s and the query's 15 s first-byte
+  wait are measured on the wall clock, as Godot's timers count frame time and
+  a stalled loading frame timed both instances out in 0 ms. With neither answering (the main
+  instance refused connections and private.coffee was silent while this
+  was written) the load goes straight to the cache and OSM API.
   The far-city query asks for `building:part` only within 100 m of the tall
   outlines (`around.near`/`around.wide`) instead of every part in the 12 km
   disc; its cache key is unchanged, as older payloads are a superset.

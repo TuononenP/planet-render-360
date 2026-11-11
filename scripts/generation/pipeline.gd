@@ -79,6 +79,9 @@ var _dem_vscale := 0.1
 var used_osm := false
 var degraded: Array[String] = []
 var _osm: OsmFetcher
+## Asks the Overpass instances for their status as a load starts; the
+## load's Overpass queries wait for it (OverpassRequest.run).
+var _overpass_probe: OverpassProbe
 var _osm_buildings: Array = []
 ## Closure W2: the unfrozen OSM payload — §2.5 attributed road dicts plus
 ## the §2.6 extras — lands on LocationData in _await_osm. The v1 bare
@@ -173,6 +176,8 @@ func _ready() -> void:
 		_farfield_done = true)
 	_osm = OsmFetcher.new()
 	add_child(_osm)
+	_overpass_probe = OverpassProbe.new()
+	add_child(_overpass_probe)
 	_osm.succeeded.connect(func(b: Array, _r: Array, l: Array, lm: Array) -> void:
 		_osm_buildings = b
 		_osm_land = l
@@ -293,6 +298,9 @@ func cancel() -> void:
 		_osm.cancel()
 	if _farcity != null:
 		_farcity.cancel()
+	# After the fetchers, so the queries it releases are already cancelled.
+	if _overpass_probe != null:
+		_overpass_probe.cancel()
 	if _climate != null:
 		_climate.cancel()
 	if _landcover != null:
@@ -349,6 +357,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_fetch_started_msec = Time.get_ticks_msec()
 	_sat_took = 0.0
 	_climate_took = 0.0
+	# Before any Overpass query: they wait for it and use only an instance
+	# that answered, or go straight to their fallbacks when none did.
+	if not _osm.offline_mode:
+		_overpass_probe.start(OsmFetcher.active_endpoints())
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
 	_farcity_done = false
 	_farcity_landuse = []
