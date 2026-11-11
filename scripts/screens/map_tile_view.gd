@@ -194,6 +194,9 @@ func set_lat_lon(lat: float, lon: float) -> void:
 	centre_lat = lat
 	centre_lon = lon
 	refresh_tiles()
+	if _vector != null:
+		# Behind the visible tiles: every other zoom here, so zooming is quick.
+		_vector.prefetch_around(lat, lon)
 	queue_redraw()
 	if _pin != null:
 		_pin.ping()

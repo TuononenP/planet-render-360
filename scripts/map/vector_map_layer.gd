@@ -24,6 +24,8 @@ const MARGIN_PX := 256.0
 ## A failed tile is not asked for again for this long.
 const RETRY_MS := 30000
 const EARTH_CIRCUMFERENCE_M := 40075016.686
+## Zoom steps either side of the current one warmed over the whole view.
+const PREFETCH_FULL_STEPS := 2
 
 var view: MapTileView
 
@@ -106,6 +108,54 @@ static func tiles_for(origin: Vector2, view_size: Vector2, zoom: int, margin: fl
 			tiles.append(Vector3i(d, x, y))
 	var centre := Vector2i((origin + view_size / 2.0) / tile_px)
 	return MapTileView.centre_out_order(tiles, centre)
+
+## Tiles to warm around (lat, lon) for every other picker zoom, nearest
+## zoom to `current_zoom` first: {"vector": [Vector3i], "dem": [Vector3i]},
+## each covering just the view. Zooms more than PREFETCH_FULL_STEPS away
+## warm only the middle half of the view around the pin (the part a zoom
+## shows first), which keeps the dense deep zooms from costing tens of MB
+## per pick. Static and pure so tests can pin it.
+static func prefetch_plan(lat: float, lon: float, view_size: Vector2, focus: Vector2, current_zoom: int) -> Dictionary:
+	var zooms: Array[int] = []
+	for step in range(1, MapTileView.MAX_ZOOM - MapTileView.MIN_ZOOM + 1):
+		for z in [current_zoom + step, current_zoom - step]:
+			if z >= MapTileView.MIN_ZOOM and z <= MapTileView.MAX_ZOOM:
+				zooms.append(z)
+	var vector: Array[Vector3i] = []
+	var dem: Array[Vector3i] = []
+	var seen: Dictionary = {}
+	var seen_dem: Dictionary = {}
+	var current_d := data_zoom(current_zoom)
+	for zoom in zooms:
+		var origin := TileFetcher.global_pixel(lat, lon, zoom) - focus
+		var span := view_size
+		if absi(zoom - current_zoom) > PREFETCH_FULL_STEPS:
+			span = view_size / 2.0
+			origin = TileFetcher.global_pixel(lat, lon, zoom) - span / 2.0
+		for t in tiles_for(origin, span, zoom, 0.0):
+			var tile: Vector3i = t
+			if tile.x != current_d and not seen.has(tile):
+				seen[tile] = true
+				vector.append(tile)
+			if tile.x <= MapStyle.SHADE_MAX_ZOOM and tile.x != current_d and not seen_dem.has(tile):
+				seen_dem[tile] = true
+				dem.append(tile)
+	return {"vector": vector, "dem": dem}
+
+## Warm the disk cache around a newly picked place for every zoom, behind
+## the visible tiles, so zooming there later does not wait on the network.
+func prefetch_around(lat: float, lon: float) -> void:
+	if view == null or _omt == null:
+		return
+	_omt.clear_prefetch()
+	_dem.clear_prefetch()
+	if view.size.x < 1.0 or view.size.y < 1.0:
+		return  # not laid out yet: no view to plan from
+	var plan := prefetch_plan(lat, lon, view.size, view.focus_point(), view.zoom_level)
+	for t in plan["vector"]:
+		_omt.prefetch_tile(t.x, t.y, t.z)
+	for t in plan["dem"]:
+		_dem.prefetch_tile(t.x, t.y, t.z)
 
 ## Ask for everything the view needs; called by MapTileView.refresh_tiles.
 func refresh() -> void:
