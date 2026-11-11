@@ -264,12 +264,12 @@ static func footprints(data: LocationData, ground: GroundTruth, m2u: float) -> A
 
 static var _bus_meshes := {}
 
-## The bus mesh, its windows lit at night like a tram's.
+## The bus mesh, its windows and destination sign lit at night like a tram's.
 static func bus_mesh(far: bool) -> ArrayMesh:
 	if not _bus_meshes.has(far):
 		var m := CarModel.mesh("bus", far).duplicate() as ArrayMesh
 		for i in m.get_surface_count():
-			if m.surface_get_name(i) in ["Glass", "HeadLamp", "TailLamp"]:
+			if m.surface_get_name(i) in ["Glass", "HeadLamp", "TailLamp", "Board"]:
 				m.surface_set_material(i, TramModel.material(m.surface_get_name(i)))
 		_bus_meshes[far] = m
 	return _bus_meshes[far]

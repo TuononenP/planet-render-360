@@ -114,10 +114,24 @@ static func _tri(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, c: Vecto
 		nb: Vector3, nc: Vector3, ua: Vector2, ub: Vector2, uc: Vector2, mirror: bool) -> void:
 	if (b - a).cross(c - a).length_squared() < 1e-13:
 		return
+	if mirror:
+		# A sliver lying in the centre plane is edge on from every side.
+		if absf(a.z) < 1e-5 and absf(b.z) < 1e-5 and absf(c.z) < 1e-5:
+			return
+		# On the centreline the two halves share a normal, or the crown
+		# reads as a ridge.
+		na = _on_centre(a, na)
+		nb = _on_centre(b, nb)
+		nc = _on_centre(c, nc)
 	lm.tri(key, a, b, c, na, nb, nc, ua, ub, uc)
 	if mirror:
 		var m := Vector3(1, 1, -1)
 		lm.tri(key, a * m, b * m, c * m, na * m, nb * m, nc * m, ua, ub, uc)
+
+static func _on_centre(p: Vector3, n: Vector3) -> Vector3:
+	if absf(p.z) > 1e-5 or absf(n.z) > 0.9:
+		return n
+	return Vector3(n.x, n.y, 0.0).normalized()
 
 ## Rounded lump (mirror housings, aerials): a superellipsoid of half
 ## sizes `half` at `centre`.
@@ -248,6 +262,8 @@ static func _stations(s: Dictionary, far: bool) -> PackedFloat32Array:
 	for x in gh:
 		must.append(x)
 	must.append(lerpf(gh[1], gh[2], 0.45))  # the roof's peak
+	if float(s["board_x"]) > gh[2]:
+		must.append(float(s["board_x"]))
 	for x: float in (s["cuts_far"] if far else s["cuts"]):
 		must.append(x)
 	must.sort()
@@ -363,13 +379,13 @@ static func _section(s: Dictionary, x: float, ts: PackedFloat32Array, vs: Packed
 	return [pts, ao]
 
 ## Lofts the body of spec `s` into `lm`: keys Paint, Glass, Trim, Rubber,
-## HeadLamp, TailLamp.
+## HeadLamp, TailLamp and (a bus's destination sign) Board.
 static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
 	var xs := _stations(s, far)
 	var ts := _side_ts(s, far)
 	var vs := PackedFloat32Array([0.0, 1.0]) if far else PackedFloat32Array([0.0, 0.07, 0.36, 0.65, 0.93, 1.0])
-	var wr := PackedFloat32Array([1.0]) if far else PackedFloat32Array([0.1, 0.4, 0.7, 1.0])
-	var ends := PackedFloat32Array([0.5, 0.0]) if far else PackedFloat32Array([0.86, 0.68, 0.45, 0.2, 0.0])
+	var wr := PackedFloat32Array([0.5, 1.0]) if far else PackedFloat32Array([0.1, 0.4, 0.7, 1.0])
+	var ends := PackedFloat32Array([0.72, 0.4, 0.0]) if far else PackedFloat32Array([0.86, 0.68, 0.45, 0.2, 0.0])
 	# Column roles, by the quad between points c and c + 1.
 	var role := PackedInt32Array()
 	var tmid := PackedFloat32Array()
@@ -386,7 +402,8 @@ static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
 		var rail := not far and i == vs.size() - 2
 		role.append(ROLE_MOULD if mould else (ROLE_PAINT if rail else ROLE_SIDE_GLASS))
 	if far:
-		role.append(ROLE_ROOF)
+		for i in wr.size():
+			role.append(ROLE_ROOF)
 	else:
 		role.append(ROLE_PAINT)  # roof rail and screen pillar
 		for i in wr.size() - 1:
@@ -423,15 +440,34 @@ static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
 
 ## The end section drawn in to `k` of its width and bowed out by
 ## `bulge` (signed along x), less toward the top so the face leans back.
+## A low deck (bonnet, boot) keeps its crown: each point drawn in takes
+## the deck's height where it lands, so the face rises to the crowned edge
+## instead of the crown folding into a ridge at the centreline.
 static func _shrunk(pts: PackedVector3Array, k: float, x: float, bulge: float, under: int,
 		side_n: int) -> PackedVector3Array:
 	var out := PackedVector3Array()
 	var y_lo := pts[under].y
 	var y_hi := pts[under + side_n - 1].y
-	for p in pts:
+	var d0 := under + side_n
+	var deck := pts[pts.size() - 1].y - pts[d0].y < 0.2
+	for i in pts.size():
+		var p := pts[i]
 		var hf := clampf((p.y - y_lo) / maxf(y_hi - y_lo, 0.01), 0.0, 1.0)
-		out.append(Vector3(x + bulge * (1.0 - k * k) * (1.0 - 0.35 * hf * hf), p.y, p.z * k))
+		var y := _deck_y(pts, d0, p.z * k) if deck and i >= d0 else p.y
+		out.append(Vector3(x + bulge * (1.0 - k * k) * (1.0 - 0.35 * hf * hf), y, p.z * k))
 	return out
+
+## Height of the section's deck (points from `d0` on, running in to the
+## centreline) at `z` across.
+static func _deck_y(pts: PackedVector3Array, d0: int, z: float) -> float:
+	if z >= pts[d0].z:
+		return pts[d0].y
+	for j in range(d0, pts.size() - 1):
+		var a := pts[j]
+		var b := pts[j + 1]
+		if z >= b.z and a.z - b.z > 1e-5:
+			return lerpf(b.y, a.y, (z - b.z) / (a.z - b.z))
+	return pts[pts.size() - 1].y
 
 ## A point on an end face of the body: `end` is +1 at the nose and -1 at
 ## the tail, `k` the share of the half width across (signed; 0 on the
@@ -472,6 +508,14 @@ static func roof_at(s: Dictionary, x: float, z: float) -> float:
 	var zt := gb - (float(s["tumble"]) + 0.02) * frac
 	return hside + (top - hside) * (1.0 - pow(minf(absf(z) / zt, 1.0), 2.0))
 
+## roof_at() as the near loft draws it: straight between its stations, so
+## what lies on the glass touches it.
+static func roof_on_mesh(s: Dictionary, x: float, z: float) -> float:
+	var xs := _stations(s, false)
+	var i := clampi(xs.bsearch(x), 1, xs.size() - 1)
+	var t := clampf((x - xs[i - 1]) / maxf(xs[i] - xs[i - 1], 0.0001), 0.0, 1.0)
+	return lerpf(roof_at(s, xs[i - 1], z), roof_at(s, xs[i], z), t)
+
 ## Material key of a body quad: `t` up the side, `xm` its station, `em`
 ## its depth into the front (+) or rear (-) face (0 on the flanks).
 static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: float, x_f: float) -> String:
@@ -495,6 +539,8 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 			return "Glass"
 		ROLE_ROOF:
 			var gh: PackedFloat32Array = s["gh"]
+			if em == 0.0 and xm > gh[2] and xm < float(s["board_x"]):
+				return "Board"
 			if em == 0.0 and ((xm > gh[2] and xm < gh[3]) or (xm > gh[0] and xm < gh[1])):
 				return "Glass"
 			return "Paint"

@@ -19,6 +19,14 @@ const BASE := {
 	# Two-tone: the paint above this height takes livery_col (taxis).
 	"livery_y": 100.0, "livery_col": Color.WHITE,
 	"lamp_f": Vector2(0.6, 0.86), "lamp_r": Vector2(0.56, 0.84), "grille": Vector2(0.14, 0.48),
+	# Head lamps: how deep into the nose they reach (share of the end rings)
+	# and where their bezel's inner edge falls (share of the half width).
+	"lamp_in": 0.3, "lamp_k": 0.68,
+	# The front plate's height on the nose (share of the face).
+	"plate_t": 0.3,
+	# A bus's destination sign: this deep a band across the windscreen's
+	# head (metres; 0: none), and a centre pillar splitting the screen.
+	"board": 0.0, "split": false,
 }
 
 const KINDS := {
@@ -64,10 +72,11 @@ const KINDS := {
 		"rear_pillar": 0.5, "sign": true, "lamp_f": Vector2(0.6, 0.84), "lamp_r": Vector2(0.45, 0.8)},
 	# A twelve-metre city bus: a glazed box on a low floor.
 	"bus": {"len": 12.0, "wid": 2.55, "h": 3.05, "clear": 0.3, "belt_h": 1.1, "tail_h": 1.1,
-		"bonnet_h": 1.1, "nose_h": 1.05, "wheel_r": 0.48, "tyre_w": 0.3, "front_oh": 2.7, "wb": 5.9,
+		"bonnet_h": 1.3, "nose_h": 1.28, "wheel_r": 0.48, "tyre_w": 0.3, "front_oh": 2.7, "wb": 5.9,
 		"gh": [-6.2, -6.14, 5.55, 5.86], "drop_f": 0.05, "drop_r": 0.02, "tumble": 0.03,
 		"rear_pillar": 0.9, "tail_glass": true, "pillar_step": 1.45, "spokes": 8,
-		"lamp_f": Vector2(0.34, 0.58), "lamp_r": Vector2(0.3, 0.6), "grille": Vector2(0.12, 0.22)},
+		"lamp_f": Vector2(0.3, 0.74), "lamp_r": Vector2(0.3, 0.6), "grille": Vector2(0.12, 0.22),
+		"lamp_in": 0.5, "lamp_k": 0.45, "valance": 0.26, "plate_t": 0.13, "board": 0.34, "split": true},
 	# Saloon cabs: a roof sign, and where the city has one, a roof colour.
 	"taxi": {"sign": true},
 	"taxi_lisbon": {"sign": true, "livery_y": 1.0, "livery_col": Color(0.0, 0.42, 0.36)},
@@ -119,7 +128,6 @@ static func _expand(p: Dictionary) -> Dictionary:
 	s["glass_crown"] = 0.09
 	s["lamp_wrap"] = 0.2
 	s["lamp_wrap_f"] = 0.1
-	s["lamp_in"] = 0.3
 	s["lamp_in_r"] = 0.5
 	s["floor"] = PackedVector2Array([Vector2(-half, clear + 0.17), Vector2(axle_r - 0.4, clear + 0.03),
 		Vector2(axle_r, clear), Vector2(axle_f, clear), Vector2(axle_f + 0.4, clear + 0.03),
@@ -142,6 +150,13 @@ static func _expand(p: Dictionary) -> Dictionary:
 	s["roof"] = PackedVector2Array([Vector2(gh[0], deck_r), Vector2(gh[1], h - float(p["drop_r"])),
 		Vector2(lerpf(gh[1], gh[2], 0.45), h), Vector2(gh[2], h - float(p["drop_f"])), Vector2(gh[3], deck_f)])
 	s["gh_full"] = h - 0.05 - belt_h
+	# The sign band's foot: where the screen has fallen `board` from its head.
+	var bx := gh[2]
+	if float(p["board"]) > 0.0:
+		var head := VehicleKit.soft(s["roof"], gh[2], 0.07)
+		while bx < gh[3] and VehicleKit.soft(s["roof"], bx, 0.07) > head - float(p["board"]):
+			bx += 0.002
+	s["board_x"] = bx
 	# Doors: the front cut behind the front arch, the rear ahead of the
 	# rear arch, the centre pillar between.
 	var door_f := axle_f - arch - 0.1

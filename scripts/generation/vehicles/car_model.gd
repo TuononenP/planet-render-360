@@ -8,9 +8,9 @@ extends RefCounted
 ## every other surface is a shared material. A car faces +X, centred on
 ## its footprint, wheels on y = 0 (metres).
 
-## Where the lamp's inner edge falls across the end face (share of the half
-## width, the ring VehicleKit.body lofts), nose and tail.
-const LAMP_K_F := 0.68
+## Where the tail lamp's inner edge falls across the end face (share of the
+## half width, the ring VehicleKit.body lofts; the head lamp's is the spec's
+## lamp_k).
 const LAMP_K_R := 0.45
 ## The bumper lip's reach, and the slats' pitch in the drawn openings (metres).
 const LIP_M := 0.022
@@ -26,7 +26,7 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	var s := CarSpecs.spec(kind)
 	var lm := LandmarkMesh.new()
 	lm.use("Paint", paint(kind))
-	for key in ["Glass", "Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber"]:
+	for key in ["Glass", "Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board"]:
 		lm.use(key, material(key))
 	VehicleKit.body(lm, s, far)
 	var r := float(s["wheel_r"])
@@ -63,6 +63,8 @@ static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 		lm.box("Sign", Vector3(sx, VehicleKit.soft(s["roof"], sx, 0.07) + 0.06, 0.0),
 			Vector3(0.14, 0.12, 0.34), Basis(), 0.02)
 	_wipers(lm, s)
+	if bool(s["split"]):
+		_split(lm, s)
 	if bool(s["rails"]):
 		_rails(lm, s)
 	var roof_x := lerpf(gh[1], gh[2], 0.08)
@@ -74,25 +76,30 @@ static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 ## a few centimetres proud of the body.
 static func _end_face(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 	var front := end > 0.0
-	var tp := 0.3 if front else 0.5
+	var tp := float(s["plate_t"]) if front else 0.5
 	var pf := VehicleKit.end_frame(s, end, 0.0, tp)
 	var pp := VehicleKit.end_at(s, end, 0.0, tp)
 	lm.box("Trim", pp + pf.x * 0.001, Vector3(0.016, 0.135, 0.545), pf, 0.0)
 	lm.box("Plate", pp + pf.x * 0.004, Vector3(0.02, 0.11, 0.52), pf, 0.0)
 	var lamp: Vector2 = s["lamp_f"] if front else s["lamp_r"]
 	var tm := (lamp.x + lamp.y) * 0.5
+	# Lamp fittings grow with a tall lamp (a bus's clusters).
+	var ls := clampf((VehicleKit.end_at(s, end, 0.0, lamp.y).y - VehicleKit.end_at(s, end, 0.0, lamp.x).y) / 0.1,
+		1.0, 2.2)
+	var wide := float(s["lamp_k"]) < 0.6
 	for side: float in [1.0, -1.0]:
 		if front:
-			# A projector: a dark ring round a bright lens, an indicator beyond.
-			var k := side * 0.8
-			var f := VehicleKit.end_frame(s, end, k, tm)
-			var p := VehicleKit.end_at(s, end, k, tm)
-			lm.disc("Trim", p + f.x * 0.004, f.x, 0.034, 14)
-			lm.disc("HeadLamp", p + f.x * 0.008, f.x, 0.02, 12)
+			# Projectors: a dark ring round a bright lens, an indicator beyond.
+			for kp: float in ([0.6, 0.8] if wide else [0.8]):
+				var k := side * kp
+				var f := VehicleKit.end_frame(s, end, k, tm)
+				var p := VehicleKit.end_at(s, end, k, tm)
+				lm.disc("Trim", p + f.x * 0.004, f.x, 0.034 * ls, 14)
+				lm.disc("HeadLamp", p + f.x * 0.008, f.x, 0.02 * ls, 12)
 			var ki := side * 0.92
 			var fi := VehicleKit.end_frame(s, end, ki, lerpf(lamp.x, lamp.y, 0.25))
 			lm.box("Amber", VehicleKit.end_at(s, end, ki, lerpf(lamp.x, lamp.y, 0.25)) + fi.x * 0.004,
-				Vector3(0.012, 0.03, 0.07), fi, 0.0)
+				Vector3(0.012, 0.03 * ls, 0.07), fi, 0.0)
 		else:
 			var ki := side * 0.82
 			var ty := lerpf(lamp.x, lamp.y, 0.25)
@@ -137,14 +144,56 @@ static func _lip(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 		rows.append(pts)
 	VehicleKit.skin(lm, rows, func(_r: int, _c: int) -> String: return "Trim", [], true, end > 0.0)
 
-## Two wiper blades parked along the foot of the windscreen.
+## Two wipers parked along the foot of the windscreen: a satin blade lying
+## on the glass a few centimetres up it, and a dark arm beside it from a
+## pivot on the scuttle. Sized to the screen's width (a bus's are long).
 static func _wipers(lm: LandmarkMesh, s: Dictionary) -> void:
 	var gh: PackedFloat32Array = s["gh"]
-	var x := gh[3] - 0.13
+	var w := VehicleKit.half_width(s, gh[3])
+	var gb := minf(w * VehicleKit.lin(s["bulge"], 1.0) - 0.03 - float(s["shelf"]), w * VehicleKit.lin(s["gh_w"], gh[3]))
+	var f := clampf(gb / 0.77, 1.0, 1.6)
+	# The blade rides where the screen has risen a few centimetres off its foot.
+	var foot := VehicleKit.roof_on_mesh(s, gh[3], gb * 0.4)
+	var xb := gh[3]
+	while xb > gh[2] and VehicleKit.roof_on_mesh(s, xb, gb * 0.4) - foot < 0.045 * f:
+		xb -= 0.005
+	var xa := xb
+	while xa > gh[2] and VehicleKit.roof_on_mesh(s, xa, gb * 0.4) - foot < 0.08 * f:
+		xa -= 0.005
 	for side: float in [1.0, -1.0]:
-		var a := Vector3(x, VehicleKit.roof_at(s, x, 0.06) + 0.006, side * 0.06)
-		var b := Vector3(x - 0.01, VehicleKit.roof_at(s, x, 0.62) + 0.006, side * 0.62)
-		lm.beam("Trim", a, b, 0.014, 0.008, Vector3.UP)
+		var blade: Array[Vector3] = []
+		for k in 5:
+			blade.append(_on_glass(s, xb, side * gb * lerpf(0.08, 0.8, float(k) / 4.0), 0.011 * f))
+		for k in 4:
+			var n := _glass_n(s, xb, blade[k].z)
+			lm.beam("Rim", blade[k], blade[k + 1], 0.022 * f, 0.014 * f, n, k == 0 or k == 3)
+		var pivot := _on_glass(s, gh[3] + 0.03, side * gb * 0.84, 0.012 * f)
+		var mid := _on_glass(s, xa, side * gb * 0.42, 0.008 * f)
+		var tip := _on_glass(s, xa, side * gb * 0.12, 0.008 * f)
+		lm.beam("Trim", pivot, mid, 0.016 * f, 0.012 * f, _glass_n(s, xa, mid.z), true)
+		lm.beam("Trim", mid, tip, 0.012 * f, 0.01 * f, _glass_n(s, xa, tip.z), true)
+		lm.disc("Trim", pivot, _glass_n(s, gh[3] + 0.03, pivot.z), 0.022 * f, 8)
+
+## A point `lift` off the near loft's glass at (`x`, `z`).
+static func _on_glass(s: Dictionary, x: float, z: float, lift: float) -> Vector3:
+	return Vector3(x, VehicleKit.roof_on_mesh(s, x, z), z) + _glass_n(s, x, z) * lift
+
+## The glass's normal at (`x`, `z`), from roof_on_mesh().
+static func _glass_n(s: Dictionary, x: float, z: float) -> Vector3:
+	var e := 0.01
+	var dx := (VehicleKit.roof_on_mesh(s, x + e, z) - VehicleKit.roof_on_mesh(s, x - e, z)) / (2.0 * e)
+	var dz := (VehicleKit.roof_on_mesh(s, x, z + e) - VehicleKit.roof_on_mesh(s, x, z - e)) / (2.0 * e)
+	return Vector3(-dx, 1.0, -dz).normalized()
+
+## A bus's centre pillar down the windscreen, from the sign band to the foot.
+static func _split(lm: LandmarkMesh, s: Dictionary) -> void:
+	var gh: PackedFloat32Array = s["gh"]
+	var x0 := float(s["board_x"])
+	var pts: Array[Vector3] = []
+	for k in 6:
+		pts.append(_on_glass(s, lerpf(x0, gh[3], float(k) / 5.0), 0.0, 0.012))
+	for k in 5:
+		lm.beam("Trim", pts[k], pts[k + 1], 0.07, 0.024, Vector3(0, 0, 1), k == 0 or k == 4)
 
 ## Roof rails along a wagon's or SUV's roof.
 static func _rails(lm: LandmarkMesh, s: Dictionary) -> void:
@@ -207,7 +256,7 @@ static func _face(s: Dictionary) -> PackedVector4Array:
 		var front := end > 0.0
 		var lamp: Vector2 = s["lamp_f"] if front else s["lamp_r"]
 		var span := lamp.y - lamp.x
-		var lk := LAMP_K_F if front else LAMP_K_R
+		var lk := float(s["lamp_k"]) if front else LAMP_K_R
 		var y0 := VehicleKit.end_at(s, end, 0.0, lamp.x).y
 		var y1 := VehicleKit.end_at(s, end, 0.0, lamp.y).y
 		var lm_t := (lamp.x + lamp.y) * 0.5
@@ -227,7 +276,7 @@ static func _face(s: Dictionary) -> PackedVector4Array:
 				VehicleKit.end_at(s, end, 0.0, 0.93).y, VehicleKit.end_at(s, end, 0.8, 0.93).z, 0.0)
 		out.append(grille)
 		out.append(intake)
-		out.append(Vector4(VehicleKit.end_at(s, end, 0.0, 0.3 if front else 0.5).y, 0.0725, 0.285, 0.0))
+		out.append(Vector4(VehicleKit.end_at(s, end, 0.0, float(s["plate_t"]) if front else 0.5).y, 0.0725, 0.285, 0.0))
 		out.append(lines)
 	return out
 
@@ -280,5 +329,9 @@ static func material(key: String) -> StandardMaterial3D:
 		"Sign":
 			m.albedo_color = Color(0.9, 0.78, 0.25)
 			m.roughness = 0.35
+		"Board":
+			# A bus's destination sign, dark by day (TransitVehicles lights it).
+			m.albedo_color = Color(0.025, 0.025, 0.025)
+			m.roughness = 0.55
 	_materials[key] = m
 	return m
