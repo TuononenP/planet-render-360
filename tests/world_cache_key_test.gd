@@ -86,6 +86,7 @@ func _run() -> void:
 	if not str(paths["scene"]).begins_with(WorldCache.dir_override + "/") \
 			or not str(paths["ground"]).begins_with(WorldCache.dir_override + "/"):
 		failures.append("test cache override must contain both files")
+	_check_deps(failures)
 	WorldCache.dir_override = ""
 	# A second save for the same key must not share a temporary file.
 	var gate := Semaphore.new()
@@ -205,3 +206,33 @@ func _check_skipped_sources(failures: Array[String]) -> void:
 			var code := _code(b)
 			if code.contains(f.get_file()) or (uses != null and uses.search(code) != null):
 				failures.append("%s uses skipped source %s: keep it in the fingerprint" % [b, f])
+
+## A saved world naming a shared texture that a newer tag deleted can
+## never load: deps_present() must say so before a threaded load is tried.
+func _check_deps(failures: Array[String]) -> void:
+	var dir := WorldCache.dir_override
+	DirAccess.make_dir_recursive_absolute(dir)
+	var dep_path := dir + "/dep_test.res"
+	var scene_path := dir + "/world_deps_test.scn"
+	var mesh := BoxMesh.new()
+	if ResourceSaver.save(mesh, dep_path) != OK:
+		failures.append("could not write the dependency fixture")
+		return
+	mesh.take_over_path(dep_path)
+	var root := Node3D.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	root.add_child(mi)
+	mi.owner = root
+	var ps := PackedScene.new()
+	if ps.pack(root) != OK or ResourceSaver.save(ps, scene_path) != OK:
+		failures.append("could not write the world fixture")
+		root.free()
+		return
+	root.free()
+	if not WorldCache.deps_present(scene_path):
+		failures.append("a world whose dependencies exist must count as loadable")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(dep_path))
+	if WorldCache.deps_present(scene_path):
+		failures.append("a world naming a deleted user:// file must not count as loadable")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(scene_path))

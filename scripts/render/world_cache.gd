@@ -146,6 +146,9 @@ static func prefetch(lat: float, lon: float, preset: int, season: int) -> bool:
 		return false
 	if best == _prefetched or best in _dropped:
 		return true
+	if not deps_present(best):
+		_remove({"scene": best, "ground": best.get_basename() + ".ground"})
+		return false
 	_drop_prefetch()
 	if ResourceLoader.load_threaded_request(best, "PackedScene", true,
 			ResourceLoader.CACHE_MODE_IGNORE) == OK:
@@ -183,6 +186,17 @@ static func _drop_prefetch() -> void:
 			ResourceLoader.load_threaded_get(path)
 			_dropped.erase(path)
 
+## Whether every user:// file the saved world at `path` names still
+## exists. Shared textures of an older SharedTexture tag are deleted, and
+## a world that names them can never load again (it would only print a
+## failed open for each one); reads the file's header, not the world.
+static func deps_present(path: String) -> bool:
+	for dep in ResourceLoader.get_dependencies(path):
+		var file := dep.get_slice("::", dep.get_slice_count("::") - 1)
+		if file.begins_with("user://") and not FileAccess.file_exists(file):
+			return false
+	return true
+
 static func _paths(data: LocationData) -> Dictionary:
 	var k := key(data)
 	return {"scene": "%s/%s.scn" % [base_dir(), k], "ground": "%s/%s.ground" % [base_dir(), k]}
@@ -207,6 +221,10 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 	var p := _paths(data)
 	if not FileAccess.file_exists(p["scene"]) or not FileAccess.file_exists(p["ground"]):
 		_drop_prefetch()
+		return []
+	if _prefetched != p["scene"] and not p["scene"] in _dropped and not deps_present(p["scene"]):
+		_drop_prefetch()
+		_remove(p)
 		return []
 	var t0 := Time.get_ticks_msec()
 	var state := _read_ground_state(p["ground"])
