@@ -4,7 +4,9 @@ extends RefCounted
 ## Street furniture + linear barriers (T5.1/T7.2, PRD §3.4 props).
 ## * Lampposts: only along real OSM carriageways in built-up blocks
 ##   (lit streets), every 25 m alternating sides on the verge, never in
-##   a footprint / carriageway / junction surface / water. Regional style:
+##   a footprint / carriageway / junction surface / water, nor along a
+##   paved square's outline. Finland's lit park paths add lamps only
+##   where they cross green cover. Regional style:
 ##   cast-iron lantern
 ##   (Paris + historic European cores), black heritage post (British and
 ##   Irish side streets), galvanised cobra-head (North America), concrete
@@ -105,7 +107,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		var width_m := 6.0
 		if r is Dictionary:
 			var rd: Dictionary = r
-			if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)):
+			# A paved square's outline is no street to line with lamps.
+			if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)) or bool(rd.get("area", false)):
 				continue
 			pts = rd.get("points", PackedVector2Array())
 			cls = str(rd.get("class", "residential"))
@@ -114,7 +117,10 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			pts = r
 		else:
 			continue
-		var park_path := family == "span" and cls in ["footway", "path"] and r is Dictionary and bool(r.get("lit", false))
+		# Lit park paths only: Helsinki tags its sidewalks, crossings and
+		# square footways lit too, and those take no lamps of their own.
+		var park_path := family == "span" and cls in ["footway", "path"] and r is Dictionary and bool(r.get("lit", false)) \
+				and not bool(r.get("kerb_line", false)) and not bool(r.get("crossing", false))
 		if (cls not in LIT and not park_path) or pts.size() < 2:
 			continue
 		if family == "span" and RenderQuality.ultra_desktop(data.quality_preset) and cls != "pedestrian" and not park_path:
@@ -139,6 +145,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				side = -side
 				var p := c + nrm * off * side
 				if (p - centre).length() > r_u or mask.built_fraction(p.x, p.y) < 0.04:
+					continue
+				if park_path and mask.cover_at(p.x, p.y) < 0:
 					continue
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:

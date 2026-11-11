@@ -454,6 +454,20 @@ func _run() -> void:
 	_check(ringed.get("modern", 0) > 0 and ringed.get("utility", 0) > 0, "only streets near signals change lamp: %s" % [ringed])
 	_check(ringed.get("modern", 0) + ringed.get("utility", 0) <= plain.get("utility", 0) - 4,
 		"no lamp on the junction surface: %s vs %s" % [ringed, plain])
+	# Finnish lit footways: a park path takes lamps, a sidewalk, a square's
+	# footway and a paved square's outline do not.
+	d = _lamp_place(false)
+	d.country = "FI"
+	var path := PackedVector2Array([Vector2(-70, 50), Vector2(70, 50)])
+	d.roads = [OsmTags._road_entry({"highway": "footway", "lit": "yes"}, path)]
+	_check(_lamps(d).get("post_top", 0) == 0, "a lit footway off green cover has no lamps")
+	d.roads.append(OsmTags._road_entry({"highway": "footway", "footway": "sidewalk", "lit": "yes"}, path))
+	d.roads.append(OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-60, 30), Vector2(60, 30), Vector2(60, 70), Vector2(-60, 70)]), []))
+	_check(_lamps(d).get("post_top", 0) == 0, "no lamps along sidewalks or a square's outline")
+	d.land_polygons.append({"class": "grass", "points": PackedVector2Array([Vector2(-80, 40),
+		Vector2(80, 40), Vector2(80, 60), Vector2(-80, 60)]), "holes": []})
+	_check(_lamps(d).get("post_top", 0) > 0, "a lit park path has lamps")
 	# Everything lays into real meshes.
 	d = _place("JP")
 	d.roads = _four_way()
