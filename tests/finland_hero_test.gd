@@ -129,6 +129,21 @@ func _wires_and_snow() -> void:
 	_check(int(stats["spans"]) > 0 and int(stats["poles"]) > 0, "electrified tram has wires and fallback poles")
 	_check(int(stats["draw_calls"]) <= OverheadWires.MAX_DRAW_CALLS, "wire draw-call budget")
 	node.free()
+	# A double track 3.5 m apart, the second one long straight segment:
+	# no free pole stands in either bed.
+	data.railways.append(OsmTags._rail_entry({"railway": "tram", "electrified": "contact_line"},
+		PackedVector2Array([Vector2(-1500, 3.5), Vector2(1500, 3.5)])))
+	var m := WorldScale.metres_to_units()
+	var clear := true
+	for span in OverheadWires.plan(data, ground):
+		for support in span["supports"]:
+			var x: float = (support[0] as Vector3).x / m
+			var z: float = (support[0] as Vector3).z / m
+			if not support[1] and ((absf(z) < OverheadWires.TRACK_CLEAR_M and absf(x) <= 80.0)
+					or absf(z - 3.5) < OverheadWires.TRACK_CLEAR_M):
+				clear = false
+	_check(clear, "span poles stay off a parallel track's bed")
+	data.railways.resize(1)
 	data.quality_preset = RenderSettings.Preset.HIGH
 	_check(OverheadWires.plan(data, ground).is_empty(), "wires Ultra only")
 	data.quality_preset = RenderSettings.Preset.ULTRA
@@ -138,6 +153,12 @@ func _wires_and_snow() -> void:
 	_check(_street_wired(data, ground, "US", {"highway": "residential", "trolley_wire": "yes"}),
 		"trolleybus streets have overhead wire outside Finland and Sweden")
 	_check(not _street_wired(data, ground, "US", {"highway": "residential"}), "plain US streets have no overhead wire")
+	data.country = "FI"
+	data.buildings = [{"x": 0.0, "z": 20.0, "height": 12.0}]
+	data.roads = [OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-60, 0), Vector2(60, 0), Vector2(60, 40), Vector2(-60, 40)]), [])]
+	_check(OverheadWires.plan(data, ground).is_empty(), "a paved square's outline has no span lamps")
+	data.buildings = []
 	data.roads = [OsmTags._road_entry({"highway": "residential", "width": "8"},
 		PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
 	data.country = "SE"

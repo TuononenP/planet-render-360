@@ -9,6 +9,11 @@ const SPACING_M := 30.0
 const CONTACT_M := 5.7
 const MAX_SPANS := 400
 const MAX_DRAW_CALLS := 12
+## A pole keeps this clear of any other wired track's centreline, and
+## one already standing this close carries the new span too.
+const TRACK_CLEAR_M := 2.6
+const POLE_MERGE_M := 9.0
+const _CELL_M := 20.0
 
 static func plan(data: LocationData, ground: GroundTruth) -> Array:
 	if not RenderQuality.ultra_desktop(data.quality_preset):
@@ -21,11 +26,15 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		if str(rail.get("electrified", "")) == "contact_line" and not bool(rail.get("tunnel", false)):
 			lines.append([rail, true, false])
 	for road in data.roads:
-		if not (road is Dictionary) or bool(road.get("tunnel", false)) or bool(road.get("bridge", false)):
+		# A paved square's outline is no street to hang lamps across.
+		if not (road is Dictionary) or bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) \
+				or bool(road.get("area", false)):
 			continue
 		var hung := data.country.to_upper() in ["FI", "SE"] and str(road.get("class", "")) in StreetProps.LIT
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
+	var tracks := _track_grid(lines, m)
+	var poles := {}
 	for entry in lines:
 		var way: Dictionary = entry[0]
 		var pts: PackedVector2Array = way.get("points", PackedVector2Array())
@@ -47,6 +56,8 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 				var p: Vector2 = a + n * half * float(side)
 				var anchor := _anchor(p, data, 12.0 * m)
 				var at: Vector2 = anchor[0]
+				if not anchor[1]:
+					at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
 				var y := ground.height_at_world(at.x, at.y)
 				supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(anchor[1]), y])
 			spans.append({"a": a, "b": b, "supports": supports, "contact": bool(entry[1]),
@@ -55,6 +66,76 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 			if spans.size() >= MAX_SPANS:
 				return spans
 	return spans
+
+## Segments of the wired tracks bucketed by cell, so a pole can stay off
+## a neighbouring track bed (a terminus loop holds a dozen ways).
+static func _track_grid(lines: Array, m: float) -> Dictionary:
+	var grid := {}
+	var cell := _CELL_M * m
+	for entry in lines:
+		if not bool(entry[1]):
+			continue
+		var pts: PackedVector2Array = (entry[0] as Dictionary).get("points", PackedVector2Array())
+		for i in pts.size() - 1:
+			# Every cell a long straight run passes through, walked at half
+			# a cell; _on_track's 3×3 search covers the clearance.
+			var steps := ceili(pts[i].distance_to(pts[i + 1]) / (cell * 0.5))
+			var seen := {}
+			for k in steps + 1:
+				var q := pts[i].lerp(pts[i + 1], float(k) / float(maxi(steps, 1)))
+				var key := Vector2i(floori(q.x / cell), floori(q.y / cell))
+				if seen.has(key):
+					continue
+				seen[key] = true
+				if not grid.has(key):
+					grid[key] = []
+				(grid[key] as Array).append([pts[i], pts[i + 1]])
+	return grid
+
+static func _on_track(p: Vector2, grid: Dictionary, m: float) -> bool:
+	var cell := _CELL_M * m
+	var c := Vector2i(floori(p.x / cell), floori(p.y / cell))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for seg in grid.get(Vector2i(c.x + dx, c.y + dz), []):
+				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < TRACK_CLEAR_M * m:
+					return true
+	return false
+
+## A free-standing pole: shared with one already near and at least this
+## span's own reach (`half`) out from the line through `a` (never one in
+## its carriageway), else stepped outward (`out`) to the first spot off
+## every wired track's bed, then recorded in the `poles` cell buckets.
+static func _pole_spot(p: Vector2, a: Vector2, out: Vector2, half: float,
+		grid: Dictionary, poles: Dictionary, m: float) -> Vector2:
+	var shared := _near_pole(p, a, out, half, poles, m)
+	if shared.x != INF:
+		return shared
+	var at := p
+	for step in 13:
+		at = p + out * float(step) * m
+		if not _on_track(at, grid, m):
+			break
+	shared = _near_pole(at, a, out, half, poles, m)
+	if shared.x != INF:
+		return shared
+	var key := Vector2i(floori(at.x / (_CELL_M * m)), floori(at.y / (_CELL_M * m)))
+	if not poles.has(key):
+		poles[key] = []
+	(poles[key] as Array).append(at)
+	return at
+
+## A recorded pole within POLE_MERGE_M of `p` standing `half` (less a
+## metre) or more out along `out` from `a`; (INF, INF) when none.
+static func _near_pole(p: Vector2, a: Vector2, out: Vector2, half: float,
+		poles: Dictionary, m: float) -> Vector2:
+	var c := Vector2i(floori(p.x / (_CELL_M * m)), floori(p.y / (_CELL_M * m)))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for q in poles.get(Vector2i(c.x + dx, c.y + dz), []):
+				if p.distance_to(q) < POLE_MERGE_M * m and (q - a).dot(out) >= half - 1.0 * m:
+					return q
+	return Vector2(INF, INF)
 
 static func _built(p: Vector2, data: LocationData, radius: float) -> bool:
 	for b in data.buildings:

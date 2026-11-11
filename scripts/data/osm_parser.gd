@@ -221,7 +221,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		elif el_tags.has("highway"):
 			# A closed highway area (a square) is filled, not outlined.
 			var sq := OsmTags.paved_area_class(el_tags)
-			if sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
+			if OsmTags.buried_highway(el_tags):
+				pass  # A road tunnel, metro passage or indoor corridor.
+			elif sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
 				roads.append(OsmTags._area_entry(el_tags, sq, poly, []))
 			elif sq == "" or not OsmGeometry._is_closed(poly):
 				roads.append(OsmTags._road_entry(el_tags, poly))
@@ -232,7 +234,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			roads.append(OsmTags._area_entry(el_tags,
 				OsmTags.paved_area_class(el_tags), poly, []))
 		elif el_tags.has("waterway"):
-			if str(el_tags.get("waterway", "")) == "riverbank" \
+			if OsmTags.buried_waterway(el_tags):
+				pass  # A culverted drain or piped brook runs under the street.
+			elif str(el_tags.get("waterway", "")) == "riverbank" \
 					and OsmGeometry._is_closed(poly):
 				land.append({"class": "water", "points": poly, "holes": []})
 			else:

@@ -664,6 +664,23 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 		width_m = 0.0
 	return {"points": pts, "width_m": width_m, "class": wc}
 
+## A waterway under ground (tunnel=culvert/yes, location=underground,
+## covered=yes): Helsinki maps its storm drains this way, and drawing
+## them would lay water across squares and carve the street.
+static func buried_waterway(tags: Dictionary) -> bool:
+	return _tag_truthy(tags.get("tunnel", "")) or underground(tags) \
+		or _tag_truthy(tags.get("covered", ""))
+
+## A highway no one sees from the street: a tunnel (building passages
+## and culverts too), one at location=underground or indoors, or a
+## corridor. Helsinki maps hundreds of service tunnels and metro
+## passages. A negative `level` alone is kept: open ramps and sunken
+## underpass approaches carry it too.
+static func buried_highway(tags: Dictionary) -> bool:
+	return _tag_truthy(tags.get("tunnel", "")) \
+		or str(tags.get("location", "")).strip_edges() == "underground" \
+		or _tag_truthy(tags.get("indoor", "")) or str(tags.get("highway", "")) == "corridor"
+
 ## Navigable routes across existing water must not carve or shade their
 ## own channels, even when a cached feature carries a positive width.
 static func navigation_waterway(water_class: String) -> bool:

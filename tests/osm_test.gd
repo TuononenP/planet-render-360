@@ -66,12 +66,22 @@ const FIXTURE_V2 := """
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8565,"lon":2.3525},{"lat":48.8570,"lon":2.3540}]},
  {"type":"way","id":101,"tags":{"highway":"residential","width":"7","lanes":"2","surface":"sett","bridge":"yes","layer":"1","name":"Rue Test"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8565,"lon":2.3525},{"lat":48.8570,"lon":2.3540}]},
- {"type":"way","id":102,"tags":{"highway":"primary","lanes":"4","tunnel":"yes"},
+ {"type":"way","id":102,"tags":{"highway":"primary","lanes":"4","tunnel":"no"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":104,"tags":{"highway":"primary","tunnel":"yes"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":105,"tags":{"highway":"corridor"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":106,"tags":{"highway":"service","tunnel":"building_passage"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":107,"tags":{"highway":"footway","indoor":"yes"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
  {"type":"way","id":103,"tags":{"highway":"footway"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8561,"lon":2.3511}]},
  {"type":"way","id":201,"tags":{"waterway":"river","name":"Test River"},
   "geometry":[{"lat":48.8558,"lon":2.3515},{"lat":48.8563,"lon":2.3530},{"lat":48.8568,"lon":2.3545}]},
+ {"type":"way","id":204,"tags":{"waterway":"drain","tunnel":"yes","layer":"-1"},
+  "geometry":[{"lat":48.8559,"lon":2.3516},{"lat":48.8564,"lon":2.3531}]},
  {"type":"way","id":202,"tags":{"waterway":"riverbank"},
   "geometry":[{"lat":48.8550,"lon":2.3510},{"lat":48.8550,"lon":2.3515},{"lat":48.8555,"lon":2.3515},
               {"lat":48.8555,"lon":2.3510},{"lat":48.8550,"lon":2.3510}]},
@@ -383,7 +393,8 @@ func _v2_checks(failures: Array[String]) -> void:
 			orphan_ok = true
 	if not orphan_ok:
 		failures.append("orphan part must be promoted to a building")
-	# Attributed roads (§2.5): width tag → lanes×3 → class default.
+	# Attributed roads (§2.5): width tag → lanes×3 → class default; the
+	# tunnel, corridor, building passage and indoor footway are dropped.
 	var roads: Array = result["roads"]
 	if roads.size() != 3:
 		failures.append("expected 3 roads (id-duplicate merged), got %d" % roads.size())
@@ -397,17 +408,21 @@ func _v2_checks(failures: Array[String]) -> void:
 			failures.append("R1 attributes wrong: %s" % r1)
 		var r2: Dictionary = roads[1]
 		if absf(float(r2["width_m"]) - 12.0) > 0.01 \
-				or not bool(r2["tunnel"]) or bool(r2["bridge"]):
-			failures.append("R2 should be lanes×3 with a tunnel: %s" % r2)
+				or bool(r2["tunnel"]) or bool(r2["bridge"]):
+			failures.append("R2 should be lanes×3 at grade: %s" % r2)
 		if absf(float(roads[2]["width_m"]) - 2.0) > 0.01 \
 				or str(roads[2]["class"]) != "footway":
 			failures.append("R3 should be class-default footway: %s" % roads[2])
+	if OsmTags.buried_highway({"highway": "service", "level": "-1"}) \
+			or not OsmTags.buried_highway({"highway": "footway", "location": "underground"}):
+		failures.append("an open level=-1 ramp stays; an underground footway goes")
 	# V1 downgrade for the pipeline/RoadBuilder (deleted T4.4).
 	var v1 := OsmFetcher.roads_to_v1(roads)
 	if v1.size() != 3 or not (v1[0] is PackedVector2Array) \
 			or (v1[0] as PackedVector2Array).size() != 3:
 		failures.append("roads_to_v1 must yield bare centrelines: %s" % [v1])
-	# Waterways (§2.6): river line + coastline; riverbank → land water.
+	# Waterways (§2.6): river line + coastline; riverbank → land water;
+	# the culverted drain stays under ground.
 	var waters: Array = result["waterways"]
 	if waters.size() != 2:
 		failures.append("expected 2 waterways, got %d" % waters.size())
