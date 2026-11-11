@@ -28,7 +28,10 @@ signal fallback_used(detail: String, partial: bool)
 ## OSM-FR instance now refuses unlisted clients (HTTP 403, live probe
 ## 2026-11-04), so it is no longer a public fallback.
 ## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
-## answering nothing, not even a one-node query, so it is tried last.
+## answering nothing, not even a one-node query; on 2026-11-11 it still
+## accepted connections but sent nothing for 40 s. Since 2026-11-11
+## z.overpass-api.de refuses connections (port 443 and 80, live probe),
+## so it is tried last, and every query starts on the main instance.
 ## No Russian-operated instance belongs here (see HostPolicy); the
 ## Russian-hosted mirror that used to be listed was removed for that reason.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
@@ -37,8 +40,8 @@ signal fallback_used(detail: String, partial: bool)
 const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
-	"https://z.overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
+	"https://z.overpass-api.de/api/interpreter",
 ]
 
 ## ENDPOINTS with the instances whose URL contains one of `first` moved
@@ -61,11 +64,12 @@ static func endpoint_order(first: Array[String]) -> Array[String]:
 static func active_endpoints() -> Array[String]:
 	return RemoteConfig.value("overpass_endpoints", ENDPOINTS)
 
-## The ring runs alongside the detailed query, so it starts on a mirror:
-## starting both on the main instance took two of its per-IP slots and
-## could queue the detailed query behind the app's own garnish.
+## The ring runs alongside the detailed query. It used to start on a
+## mirror to keep the main instance's per-IP slots for the detailed
+## query, but no mirror answers (2026-11-11), so it starts on the main
+## instance too (a 429 there: OverpassRequest.RATE_LIMIT_CODES).
 static func ring_endpoints() -> Array[String]:
-	return endpoint_order(["z.overpass-api.de"])
+	return endpoint_order(["//overpass-api.de"])
 
 ## Seconds the best-effort ring may still run once the detailed data is
 ## ready; past this the fetch finishes with the detailed data alone.

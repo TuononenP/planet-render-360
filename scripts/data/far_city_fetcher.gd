@@ -61,12 +61,12 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join_parse()
 
-## A mirror first (the detailed query starts on the main instance),
-## four attempts. Named by host so reordering
+## The main instance first, as no mirror answers (2026-11-11, see
+## OsmFetcher.ENDPOINTS); four attempts. Named by host so reordering
 ## OsmFetcher.ENDPOINTS cannot change them.
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["z.overpass-api.de",
-		"//overpass-api.de", "private.coffee"]).slice(0, 4)
+	return OsmFetcher.endpoint_order(["//overpass-api.de",
+		"private.coffee", "z.overpass-api.de"]).slice(0, 4)
 
 func is_busy() -> bool:
 	return _busy

@@ -37,11 +37,11 @@ func _ready() -> void:
 		_emit("")
 		failed.emit())
 
-## Mirror-first, like the far-city query, so it never queues behind the
-## detailed one on the main instance.
+## Main instance first, like the far-city query: no mirror answers
+## (2026-11-11, see OsmFetcher.ENDPOINTS).
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["z.overpass-api.de",
-		"//overpass-api.de", "private.coffee"]).slice(0, 4)
+	return OsmFetcher.endpoint_order(["//overpass-api.de",
+		"private.coffee", "z.overpass-api.de"]).slice(0, 4)
 
 func is_busy() -> bool:
 	return _busy

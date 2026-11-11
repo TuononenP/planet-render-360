@@ -667,15 +667,17 @@ func _busy_checks(failures: Array[String]) -> void:
 		if http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
 			failures.append("cancel() must stop the in-flight Overpass request")
 	busy.free()
-	# Concurrent queries start on different instances, and the far-city
-	# order names hosts, so reordering ENDPOINTS cannot change it.
+	# Every query starts on the main instance (the mirrors do not answer),
+	# and the far-city order names hosts, so reordering ENDPOINTS cannot
+	# change it.
 	var ring := OsmFetcher.ring_endpoints()
-	if ring.size() != OsmFetcher.ENDPOINTS.size() or ring[0] == OsmFetcher.ENDPOINTS[0]:
-		failures.append("ring query must cover every endpoint and start on a mirror: %s" % [ring])
+	if ring.size() != OsmFetcher.ENDPOINTS.size() \
+			or ring[0] != "https://overpass-api.de/api/interpreter":
+		failures.append("ring query must cover every endpoint and start on the main instance: %s" % [ring])
 	var far := FarCityFetcher.endpoints()
-	if far.size() != 3 or not far[0].contains("z.overpass-api.de") \
-			or far[1] != "https://overpass-api.de/api/interpreter" \
-			or not far[2].contains("private.coffee"):
+	if far.size() != 3 or far[0] != "https://overpass-api.de/api/interpreter" \
+			or not far[1].contains("private.coffee") \
+			or not far[2].contains("z.overpass-api.de"):
 		failures.append("far-city endpoints wrong: %s" % [far])
 	if HorizonFetcher.endpoints() != far:
 		failures.append("horizon labels should use the available far-city mirrors")

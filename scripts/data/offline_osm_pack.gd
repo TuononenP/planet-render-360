@@ -7,9 +7,10 @@ signal finished(complete: bool, missing: Array)
 
 const ATTEMPT_TIMEOUT := 40.0
 ## Mirror pairs by name, so reordering OsmFetcher.ENDPOINTS cannot change them.
-## With three public instances left the pairs share z.overpass-api.de.
-const PRIMARY_HOSTS: Array[String] = ["//overpass-api.de", "z.overpass-api.de"]
-const ALTERNATE_HOSTS: Array[String] = ["private.coffee", "z.overpass-api.de"]
+## z.overpass-api.de refuses connections (2026-11-11), so the pairs leave
+## it out and each starts on a different instance.
+const PRIMARY_HOSTS: Array[String] = ["//overpass-api.de", "private.coffee"]
+const ALTERNATE_HOSTS: Array[String] = ["private.coffee", "//overpass-api.de"]
 ## A cooldown this short is waited out; a longer one lets the layer fail.
 const COOLDOWN_WAIT_S := 60.0
 var request_override: OverpassRequest  # test transport
