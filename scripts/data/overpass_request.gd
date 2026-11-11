@@ -14,10 +14,14 @@ extends Node
 ## so walking the list only delayed the cache and OSM API fallbacks. A
 ## paused instance (a rate limit, an outage another query just hit, or a
 ## failed status check) is skipped without a request; a later instance in
-## the list is used only when OverpassProbe confirmed it answering. While a
+## the list is used only when OverpassProbe confirmed it answering, and a
+## failed query moves on to such a confirmed instance even past
+## max_attempts: it answered seconds ago, so trying it costs little. While a
 ## status check runs, run() waits for it.
 
 signal answered(text: String)
+## `attempts` is the number of requests actually sent (0 when every
+## instance was paused), not the instances looked at.
 signal exhausted(reason: String, attempts: int)
 
 ## An instance that has not started answering after this many seconds is
@@ -153,6 +157,15 @@ static func clear_cooldowns() -> void:
 	_confirmed_until.clear()
 	_cooldown_probe.clear()
 
+## `endpoints` without repeats, in order: a list from the remote config
+## cannot hold one twice, but a repeat must never skew a count.
+static func unique(endpoints: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for endpoint in endpoints:
+		if not out.has(endpoint):
+			out.append(endpoint)
+	return out
+
 ## "overpass-api.de" for an interpreter URL, for log lines.
 static func host_of(url: String) -> String:
 	var rest := url.split("://", true, 1)
@@ -186,7 +199,7 @@ func run(body: String, validate: Callable, endpoints: Array[String]) -> void:
 	cancel()
 	_body = body
 	_validate = validate
-	_endpoints = endpoints
+	_endpoints = unique(endpoints)
 	_attempt = 0
 	_sent = 0
 	var token := _token
@@ -223,7 +236,7 @@ func _start() -> void:
 		# No instance may take it. Report it later, so callers that
 		# connect their signals after run() still hear about it.
 		var token := _token
-		var attempts := _attempt
+		var attempts := _sent
 		var reason := paused if paused != "" else "Overpass has no usable instance"
 		(func() -> void:
 			if token == _token:
@@ -255,13 +268,21 @@ func _on_watchdog() -> void:
 			start_cooldown(_endpoints[_attempt], OUTAGE_PAUSE_S, Time.get_ticks_msec(), reason)
 		_fail(reason, true)
 
+## A later instance the status check confirmed and that is not paused now.
+func _next_confirmed() -> bool:
+	for i in range(_attempt + 1, _endpoints.size()):
+		if is_confirmed(_endpoints[i]) and not is_cooling(_endpoints[i]):
+			return true
+	return false
+
 func _fail(reason: String, retryable: bool) -> void:
 	_watchdog.stop()
-	if retryable and _sent < max_attempts and _attempt + 1 < _endpoints.size():
+	if retryable and _attempt + 1 < _endpoints.size() \
+			and (_sent < max_attempts or _next_confirmed()):
 		_attempt += 1
 		_start()
 	else:
-		exhausted.emit(reason, _attempt + 1)
+		exhausted.emit(reason, _sent)
 
 func _on_done(result: int, code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
 	_watchdog.stop()

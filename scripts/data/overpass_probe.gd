@@ -106,6 +106,7 @@ static func reset() -> void:
 ## Check `endpoints` unless a check finished within REUSE_S or one is
 ## already running.
 func start(endpoints: Array[String]) -> void:
+	endpoints = OverpassRequest.unique(endpoints)
 	if active != null or endpoints.is_empty():
 		return
 	var now := Time.get_ticks_msec()

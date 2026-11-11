@@ -113,6 +113,9 @@ func _table() -> void:
 	OverpassRequest.clear_cooldowns()
 
 func _choice() -> void:
+	var twice: Array[String] = [MAIN, MIRROR, MAIN]
+	if OverpassRequest.unique(twice) != [MAIN, MIRROR]:
+		_failures.append("a repeated instance should be asked once, in order")
 	var req := OverpassRequest.new()
 	var endpoints: Array[String] = [MAIN, MIRROR]
 	req._endpoints = endpoints

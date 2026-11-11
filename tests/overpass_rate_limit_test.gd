@@ -128,8 +128,9 @@ func _test_paused_first() -> void:
 	var sent := req._http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED
 	await process_frame
 	await process_frame
-	# free.test was never confirmed by a status check, so it is not used either.
-	if sent or not str(seen["reason"]).contains("down.test paused") or int(seen["attempts"]) != 2:
+	# free.test was never confirmed by a status check, so it is not used either,
+	# and no request went out at all.
+	if sent or not str(seen["reason"]).contains("down.test paused") or int(seen["attempts"]) != 0:
 		_failures.append("a paused first instance should go to the fallback without a request: %s" % [seen])
 	req.free()
 
