@@ -11,9 +11,9 @@ extends Node
 ##    clusters (LocationData.far_towers) — La Défense appears west of
 ##    Paris because OSM maps it, never because a rule guessed it.
 ## Absence is graceful: a failed/uncached fetch emits empty arrays and
-## SettlementMap falls back to the far imagery drapes alone. Endpoints
-## start at a mirror (endpoints()) so the call never queues behind the
-## detailed OsmFetcher request on the main instance.
+## SettlementMap falls back to the far imagery drapes alone. Building
+## parts are asked for only around the tall outlines (PARTS_REACH_M), not
+## across the whole disc.
 
 signal finished(landuse: Array, towers: Array)
 
@@ -29,6 +29,13 @@ const CAP_NEAR_TOWERS := 6000
 const CAP_NEAR_PARTS := 8000
 const CAP_TOWER_PARTS := 12000
 const NEAR_RADIUS_M := 4000
+## Parts are fetched only this close to a tall outline or part, where
+## _nest_parts can place them; parts elsewhere in the disc were dropped
+## after a 12 km download. Measured to the outline (`around.set`), so it
+## also reaches parts in the middle of a podium up to ~200 m across.
+## No QUERY_VERSION bump: a cached payload that holds every part is a
+## superset and parses the same.
+const PARTS_REACH_M := 100
 ## Bump only this layer when the tower selector changes.
 const QUERY_VERSION := 3
 const ATTEMPT_TIMEOUT := 45.0
@@ -62,11 +69,10 @@ func _notification(what: int) -> void:
 		_join_parse()
 
 ## The main instance first, as no mirror answers (2026-11-11, see
-## OsmFetcher.ENDPOINTS); four attempts. Named by host so reordering
+## OsmFetcher.ENDPOINTS). Named by host so reordering
 ## OsmFetcher.ENDPOINTS cannot change them.
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["//overpass-api.de",
-		"private.coffee", "z.overpass-api.de"]).slice(0, 4)
+	return OsmFetcher.endpoint_order(["//overpass-api.de", "private.coffee"])
 
 func is_busy() -> bool:
 	return _busy
@@ -106,10 +112,13 @@ static func build_query(lat: float, lon: float, radius_m: int = RADIUS_M) -> Str
 			% [LANDUSE, around, CAP_RELATIONS] \
 		+ '(%s)->.near; .near out geom %d;' % [_tower_selectors(near), CAP_NEAR_TOWERS] \
 		+ '(%s)->.wide; .wide out geom %d;' % [_tower_selectors(around), CAP_TOWER_CANDIDATES] \
-		+ '(way["building:part"]%s;relation["building:part"]["type"="multipolygon"]%s;);out geom %d;' \
-			% [near, near, CAP_NEAR_PARTS] \
-		+ '(way["building:part"]%s;relation["building:part"]["type"="multipolygon"]%s;);out geom %d;' \
-			% [around, around, CAP_TOWER_PARTS]
+		+ _parts_of(".near", CAP_NEAR_PARTS) + _parts_of(".wide", CAP_TOWER_PARTS)
+
+## Building parts within PARTS_REACH_M of the tall set `set_name`.
+static func _parts_of(set_name: String, cap: int) -> String:
+	var reach := "(around%s:%d)" % [set_name, PARTS_REACH_M]
+	return '(way["building:part"]%s;relation["building:part"]["type"="multipolygon"]%s;);out geom %d;' \
+		% [reach, reach, cap]
 
 func cancel() -> void:
 	_gen += 1
@@ -155,6 +164,13 @@ func _request() -> void:
 	if offline_mode:
 		_fallback("offline")
 		return
+	# An older or partial copy (see _fallback) is served rather than
+	# waiting the full first-byte time on a queued instance.
+	var has_copy := false
+	for old_path in _fallback_paths(_lat, _lon):
+		has_copy = has_copy or FileAccess.file_exists(old_path)
+	_req.first_byte_timeout = OverpassRequest.FALLBACK_FIRST_BYTE_S if has_copy \
+		else OverpassRequest.FIRST_BYTE_TIMEOUT
 	_req.run("data=" + build_query(_lat, _lon).uri_encode(),
 		func(text: String) -> String: return "" if _usable(text) else "unusable payload",
 		endpoints())
@@ -166,8 +182,7 @@ func _on_answered(text: String) -> void:
 ## Older payloads are usable offline, but never prevent a live refresh of
 ## the new query when the network is available.
 func _fallback(reason: String) -> void:
-	for old_path in [cache_path(_lat, _lon), cache_path(_lat, _lon).replace("_q%d.json" % QUERY_VERSION, "_q%d.json" % (QUERY_VERSION - 1)),
-			legacy_cache_path(_lat, _lon)]:
+	for old_path in _fallback_paths(_lat, _lon):
 		var old := OsmFetcher._read_cache(old_path)
 		var payload: Variant = JSON.parse_string(old) if old != "" else null
 		if payload is Dictionary and payload.get("elements", null) is Array:
@@ -177,6 +192,10 @@ func _fallback(reason: String) -> void:
 			return
 	print("FarCityFetcher: %s; far city from imagery only" % reason)
 	_emit(0, false, parse("", _lat, _lon))
+
+static func _fallback_paths(lat: float, lon: float) -> Array[String]:
+	return [cache_path(lat, lon), cache_path(lat, lon).replace("_q%d.json" % QUERY_VERSION,
+		"_q%d.json" % (QUERY_VERSION - 1)), legacy_cache_path(lat, lon)]
 
 static func _usable(text: String) -> bool:
 	var parsed: Variant = JSON.parse_string(text)

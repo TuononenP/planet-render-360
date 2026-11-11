@@ -29,6 +29,7 @@ var _verify_task := -1
 
 func _ready() -> void:
 	_request = request_override if request_override != null else OverpassRequest.new(ATTEMPT_TIMEOUT)
+	_request.max_attempts = 2
 	add_child(_request)
 	_request.answered.connect(_answered)
 	_request.exhausted.connect(_exhausted)

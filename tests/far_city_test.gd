@@ -430,9 +430,11 @@ func _parse_checks(failures: Array[String]) -> void:
 	if feet.size() != 2 or absf(float(feet[0]["height"]) - 182.88) > 0.01 \
 			or absf(float(feet[1]["height"]) - 182.88) > 0.01:
 		failures.append("feet-tagged far towers must retain their height: %s" % str(feet))
-	if not query.contains('relation["building"]') or not query.contains('way["building:part"](around:4000') \
-			or not query.contains('relation["building:part"]["type"="multipolygon"]'):
+	if not query.contains('relation["building"]') or not query.contains('way["building:part"](around.near:100)') \
+			or not query.contains('relation["building:part"]["type"="multipolygon"](around.wide:100)'):
 		failures.append("far query must include relation outlines and their parts")
+	if query.contains('way["building:part"](around:') or query.contains('relation["building:part"]["type"="multipolygon"](around:'):
+		failures.append("far query must ask for parts only around the tall outlines, not across the disc")
 	var ring := [{"lat": lat, "lon": lon + 0.02}, {"lat": lat, "lon": lon + 0.021},
 		{"lat": lat + 0.001, "lon": lon + 0.021}, {"lat": lat + 0.001, "lon": lon + 0.02},
 		{"lat": lat, "lon": lon + 0.02}]

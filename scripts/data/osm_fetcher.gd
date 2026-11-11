@@ -18,20 +18,19 @@ signal failed(reason: String)
 ## view is left without map data.
 signal fallback_used(detail: String, partial: bool)
 
-## Overpass endpoints, tried in order. The main instance regularly
-## times out (result=13) or returns 502 when overloaded; a transient
-## failure must not lose the whole fetch. Only full-planet instances
-## belong here — regional ones (osm.ch, maprva.org, ...) silently
-## return zero buildings outside their extract. The main instance
-## is not repeated: z.overpass-api.de (same operator, separate pool)
-## answered a live probe (2026-10-31) while the main one timed out. The
-## OSM-FR instance now refuses unlisted clients (HTTP 403, live probe
-## 2026-11-04), so it is no longer a public fallback.
-## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
+## Overpass endpoints. Each live query uses one instance, the first that
+## is not paused (OverpassRequest.max_attempts): a failure goes straight
+## to the cache and OSM API fallbacks instead of waiting on mirrors that
+## rarely answer. private.coffee is only reached while the main instance
+## is paused and a caller allows a second instance (the offline pack).
+## Only full-planet instances belong here — regional ones (osm.ch,
+## maprva.org, ...) silently return zero buildings outside their extract.
+## The OSM-FR instance refuses unlisted clients (HTTP 403, live probe
+## 2026-11-04). A probe (2026-10-31, Helsinki 1200 m) had private.coffee
 ## answering nothing, not even a one-node query; on 2026-11-11 it still
-## accepted connections but sent nothing for 40 s. Since 2026-11-11
-## z.overpass-api.de refuses connections (port 443 and 80, live probe),
-## so it is tried last, and every query starts on the main instance.
+## accepted connections but sent nothing for 40 s. z.overpass-api.de
+## refuses connections since 2026-11-11 (port 443 and 80, live probe) and
+## was removed.
 ## No Russian-operated instance belongs here (see HostPolicy); the
 ## Russian-hosted mirror that used to be listed was removed for that reason.
 ## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
@@ -41,7 +40,6 @@ const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
-	"https://z.overpass-api.de/api/interpreter",
 ]
 
 ## ENDPOINTS with the instances whose URL contains one of `first` moved
@@ -84,15 +82,24 @@ const ATTEMPT_TIMEOUT := 60.0
 
 ## Worst-case seconds for both fetch phases (detailed and the
 ## best-effort ring, now concurrent, so this is a generous bound): one
-## attempt timeout per endpoint per phase, plus slack each. Callers
-## waiting on succeeded/failed must wait at least this long or a late
-## rescue is dropped. Typical is far lower (a fast 502 moves on in ~1 s,
-## a silent mirror in OverpassRequest.FIRST_BYTE_TIMEOUT).
+## attempt timeout per phase (each query uses one instance), plus slack
+## each. Callers waiting on succeeded/failed must wait at least this long
+## or a late rescue is dropped. Typical is far lower (a failure falls back
+## at once, a silent instance after OverpassRequest.FIRST_BYTE_TIMEOUT).
 ## Plus one OSM API attempt, and a second's worth of each step down to a
 ## smaller box (OsmApiFallback.STEP_DOWN_CODES) so a late result lands.
 static func retry_budget_seconds() -> float:
-	return 2.0 * (float(active_endpoints().size()) * ATTEMPT_TIMEOUT + 5.0) \
+	return 2.0 * (ATTEMPT_TIMEOUT + 5.0) \
 		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
+
+## How long a place where Overpass and the OSM API both found nothing is
+## not asked again (CacheStore.osm_empty_path).
+const EMPTY_TTL_S := 7 * 24 * 3600
+
+static func _known_empty(lat: float, lon: float) -> bool:
+	var path := CacheStore.osm_empty_path(lat, lon)
+	return FileAccess.file_exists(path) \
+		and Time.get_unix_time_from_system() - FileAccess.get_modified_time(path) < EMPTY_TTL_S
 
 const CACHE_DIR := "user://cache"
 
@@ -413,14 +420,23 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 		else:
 			_detailed_fallback("OSM not cached (offline mode)")
 		return
+	var known_empty := _detailed_text == "" and _known_empty(lat, lon)
 	# Both phases go live at once; _try_finish waits for the pair.
-	if want_ring and _ring_text == "":
+	if want_ring and _ring_text == "" and not known_empty:
 		_ring_pending = true
 		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
 			_check_ring, ring_endpoints())
 	if _detailed_text != "":
 		_detailed_done()
+	elif known_empty:
+		print("OsmFetcher: no buildings here on the last check; not asking Overpass again")
+		_api_failed(NO_BUILDINGS, "Overpass " + NO_BUILDINGS)
 	else:
+		# With an older copy of this place on hand, a queued instance is
+		# not worth the full first-byte wait.
+		_detailed_req.first_byte_timeout = OverpassRequest.FALLBACK_FIRST_BYTE_S \
+			if not OsmNearbyCache.candidates(lat, lon, SAME_PLACE_M).is_empty() \
+			else OverpassRequest.FIRST_BYTE_TIMEOUT
 		_detailed_req.run(_pending_body, _detailed_check(lat, lon), active_endpoints())
 
 var _pending_lat := 0.0
@@ -511,14 +527,11 @@ static func is_retryable(result: int, code: int) -> bool:
 		return true
 	return code in [403, 406, 429, 500, 502, 503, 504]
 
-## Next attempt index for a failed attempt, or -1 to give up.
-static func next_attempt(attempt: int, retryable: bool) -> int:
-	return attempt + 1 if retryable and attempt + 1 < active_endpoints().size() else -1
-
 ## One instance returning neither buildings nor shore geometry is not authoritative: it may lag
-## replication or hold a partial extract, so OverpassRequest tries the
-## next instance (a genuinely empty area just pays a few fast empty
-## responses). This also covers corrupt payloads, which parse to nothing.
+## replication or hold a partial extract, so the payload is rejected and
+## the OSM API asked instead; when that finds nothing too, the place is
+## marked empty (CacheStore.osm_empty_path). This also covers corrupt
+## payloads, which parse to nothing.
 ## Runs on OverpassRequest's worker thread, so it captures the centre
 ## instead of reading this node's state.
 static func _detailed_check(lat: float, lon: float) -> Callable:
@@ -675,6 +688,11 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 	if gen != _parse_gen:
 		return
 	if int(converted["buildings"]) == 0:
+		# Both sources agree over the whole view: remember it, so the next
+		# load does not ask either again (a smaller box proves nothing).
+		if _api_reason == "Overpass " + NO_BUILDINGS \
+				and OsmApiFallback.RADII_M[_api_tier] >= DETAILED_RADIUS_M:
+			_write_cache(CacheStore.osm_empty_path(_pending_lat, _pending_lon), '{"elements":[]}')
 		_api_failed(NO_BUILDINGS, _api_reason)
 		return
 	_detailed_text = converted["json"]

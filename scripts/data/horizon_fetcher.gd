@@ -40,8 +40,7 @@ func _ready() -> void:
 ## Main instance first, like the far-city query: no mirror answers
 ## (2026-11-11, see OsmFetcher.ENDPOINTS).
 static func endpoints() -> Array[String]:
-	return OsmFetcher.endpoint_order(["//overpass-api.de",
-		"private.coffee", "z.overpass-api.de"]).slice(0, 4)
+	return OsmFetcher.endpoint_order(["//overpass-api.de", "private.coffee"])
 
 func is_busy() -> bool:
 	return _busy

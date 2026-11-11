@@ -98,11 +98,13 @@ credits are in Settings → About.
 2. **Overpass reliability without the Russian mirror.** The app never uses a
    Russian-operated service or domain (`HostPolicy`, enforced by
    `tests/host_policy_test.gd` and by `RemoteConfig`). The `maps.mail.ru`
-   mirror is removed, which leaves `overpass-api.de`, `z.overpass-api.de`
-   and `overpass.private.coffee`. A probe on 8 Nov 2026 found the main
+   mirror is removed, and `z.overpass-api.de` (refusing connections since
+   11 Nov 2026) too, which leaves `overpass-api.de` and
+   `overpass.private.coffee`. A probe on 8 Nov 2026 found the main
    instance and `lz4.` reporting "at capacity", `z.` refusing connections,
-   and `private.coffee` and `kumi` timing out. When all fail, the app falls
-   back to the OSM API area download, then to bundled snapshots. Any new
+   and `private.coffee` and `kumi` timing out. Each live query now uses one
+   instance; when it fails, the app falls back to the cached copy, the OSM
+   API area download, then to bundled snapshots. Any new
    mirror needs a probe and a check that it covers the whole planet.
 3. **Overpass capacity.** The public instance guidance is about 10,000
    queries a day across all users, and far less for regular use. Bundled

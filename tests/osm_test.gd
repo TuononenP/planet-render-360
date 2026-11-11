@@ -690,36 +690,30 @@ func _busy_checks(failures: Array[String]) -> void:
 			or ring[0] != "https://overpass-api.de/api/interpreter":
 		failures.append("ring query must cover every endpoint and start on the main instance: %s" % [ring])
 	var far := FarCityFetcher.endpoints()
-	if far.size() != 3 or far[0] != "https://overpass-api.de/api/interpreter" \
-			or not far[1].contains("private.coffee") \
-			or not far[2].contains("z.overpass-api.de"):
+	if far.size() != 2 or far[0] != "https://overpass-api.de/api/interpreter" \
+			or not far[1].contains("private.coffee"):
 		failures.append("far-city endpoints wrong: %s" % [far])
 	if HorizonFetcher.endpoints() != far:
 		failures.append("horizon labels should use the available far-city mirrors")
 
 func _chain_checks(failures: Array[String]) -> void:
-	# Transient Overpass failures (client timeout, 502 from an
-	# overloaded instance) must fall through to another endpoint;
-	# a client error such as 400 must not.
-	if OsmFetcher.ENDPOINTS.size() < 2:
-		failures.append("expected fallback Overpass endpoints")
-	# Distinct instances, not just a repeat of the first: when the
-	# main instance answers 502 (overloaded) a same-instance retry
-	# rarely rescues the fetch, so at least 3 distinct hosts are needed.
+	# A second, distinct instance stays listed for a caller that may use
+	# two (the offline pack) while the main one is paused.
 	var distinct: Dictionary = {}
 	for ep in OsmFetcher.ENDPOINTS:
 		distinct[ep] = true
-	if distinct.size() < 3:
-		failures.append("expected >=3 distinct Overpass endpoints, got %d" % distinct.size())
-	# The pipeline's OSM wait must outlast both phases (detailed, then
-	# the best-effort ring: one ATTEMPT_TIMEOUT per endpoint per phase),
+	if distinct.size() < 2 or distinct.size() != OsmFetcher.ENDPOINTS.size():
+		failures.append("expected >=2 distinct Overpass endpoints: %s" % [OsmFetcher.ENDPOINTS])
+	if OsmFetcher.ENDPOINTS.any(func(ep: String) -> bool: return ep.contains("z.overpass-api.de")):
+		failures.append("z.overpass-api.de refuses connections and must not be listed")
+	# The pipeline's OSM wait must outlast both phases (detailed and the
+	# best-effort ring: each query uses one instance, one ATTEMPT_TIMEOUT),
 	# or a late rescue is dropped. Bounded above too: slack beyond one
 	# extra attempt per phase is dead wait.
-	var n := float(OsmFetcher.ENDPOINTS.size())
 	var t := OsmFetcher.ATTEMPT_TIMEOUT
-	if OsmFetcher.retry_budget_seconds() < 2.0 * n * t:
-		failures.append("retry budget %ss must cover 2 phases × %d attempts" % [OsmFetcher.retry_budget_seconds(), OsmFetcher.ENDPOINTS.size()])
-	if OsmFetcher.retry_budget_seconds() >= 2.0 * (n + 1.0) * t:
+	if OsmFetcher.retry_budget_seconds() < 2.0 * t:
+		failures.append("retry budget %ss must cover 2 phases × 1 attempt" % OsmFetcher.retry_budget_seconds())
+	if OsmFetcher.retry_budget_seconds() >= 4.0 * t:
 		failures.append("retry budget %ss has more than one attempt of slack per phase" % OsmFetcher.retry_budget_seconds())
 	# _ready must wire the same constant into the HTTP timeout.
 	var fetcher := OsmFetcher.new()
@@ -727,16 +721,7 @@ func _chain_checks(failures: Array[String]) -> void:
 	if fetcher._http == null or fetcher._http.timeout != OsmFetcher.ATTEMPT_TIMEOUT:
 		failures.append("HTTP timeout should be ATTEMPT_TIMEOUT (%s), got %s" % [OsmFetcher.ATTEMPT_TIMEOUT, fetcher._http.timeout if fetcher._http != null else -1])
 	fetcher.free()
-	# Retry chain: a retryable failure (including a 200 with no
-	# buildings from one instance) advances; the last attempt or a
-	# non-retryable failure gives up.
-	var last := OsmFetcher.ENDPOINTS.size() - 1
-	if OsmFetcher.next_attempt(0, true) != 1:
-		failures.append("retryable failure on attempt 0 should advance to 1")
-	if OsmFetcher.next_attempt(last, true) != -1:
-		failures.append("retryable failure on the last attempt should give up")
-	if OsmFetcher.next_attempt(0, false) != -1:
-		failures.append("non-retryable failure should give up immediately")
+	# Which failures a caller allowing several instances moves on from.
 	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_TIMEOUT, 0):
 		failures.append("timeout (result=13 code=0) must be retryable")
 	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 502):

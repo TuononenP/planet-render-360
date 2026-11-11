@@ -132,6 +132,13 @@ static func osm_api_path(lat: float, lon: float, radius_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_api%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), radius_m]
 
+## Marker that Overpass and the OSM API both found nothing here (open sea,
+## wilderness), so the next load within OsmFetcher.EMPTY_TTL_S does not
+## ask either again. Not a detailed payload: OsmNearbyCache skips it.
+static func osm_empty_path(lat: float, lon: float) -> String:
+	return "%s/osm_v%d_%d_%d_empty_q%d.json" % [base_dir(), DATA_VERSION,
+		quant(lat), quant(lon), OsmQuery.QUERY_VERSION]
+
 static func osm_ring_path(lat: float, lon: float, ring_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_ring%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), ring_m]

@@ -86,9 +86,12 @@ func _retry_checks(complete: String, partial: String, errors: Array[String]) -> 
 		{"replies": [[403, "white-listed usages only"], [200, partial], [200, complete]],
 			"attempts": 3, "accepted": true},
 		{"replies": [[400, "invalid query"], [200, complete]], "attempts": 1, "accepted": false},
-		{"replies": [[403, "denied"], [403, "denied"]], "attempts": 2, "accepted": false}]:
+		{"replies": [[403, "denied"], [403, "denied"]], "attempts": 2, "accepted": false},
+		{"replies": [[502, "busy"], [200, complete]], "attempts": 1, "accepted": false,
+			"max_attempts": 1}]:
 		var request := ReplySequence.new()
 		request.replies = test["replies"]
+		request.max_attempts = int(test.get("max_attempts", 3))
 		root.add_child(request)
 		var accepted: Array[String] = []
 		var exhausted: Array[int] = []
@@ -111,3 +114,4 @@ func _retry_checks(complete: String, partial: String, errors: Array[String]) -> 
 			errors.append("invalid queries and exhausted mirrors must fail with the correct attempt count")
 		request.queue_free()
 		await process_frame
+		OverpassRequest.clear_cooldowns()
