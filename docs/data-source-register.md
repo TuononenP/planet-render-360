@@ -320,11 +320,11 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   `z.overpass-api.de` refused connections, so walking the list only delayed
   the fallbacks. Every live query now uses one instance
   (`OverpassRequest.max_attempts`, 2 for the offline pack) and
-  `z.overpass-api.de` is removed. A network failure, a 5xx or a 35 s silence
+  `z.overpass-api.de` is removed. A network failure, a 5xx or a 15 s silence
   pauses that instance for 90 s (`OverpassRequest.OUTAGE_PAUSE_S`), so the
   other queries of the same load and a quick reload go straight to their
   fallbacks instead of repeating it. A caller holding an older copy waits
-  12 s for the first byte instead of 35 s. A place where Overpass and the OSM
+  10 s for the first byte instead of 15 s (35 s before 2026-11-11). A place where Overpass and the OSM
   API both return no buildings over the full 1200 m is marked
   (`osm_v2_<lat>_<lon>_empty_q<N>.json`) and not asked again for 7 days.
   The far-city query asks for `building:part` only within 100 m of the tall

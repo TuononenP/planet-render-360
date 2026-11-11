@@ -18,18 +18,19 @@ extends Node
 signal answered(text: String)
 signal exhausted(reason: String, attempts: int)
 
-## A mirror that has not started answering after this many seconds is
-## abandoned for the next one. Live probe (2026-10-31, Helsinki 1200 m
+## An instance that has not started answering after this many seconds is
+## abandoned for the fallbacks. Live probe (2026-10-31, Helsinki 1200 m
 ## detailed query): healthy instances started in 1–8 s, a queued one in
 ## 32 s, and a dead one never — which used to cost the full attempt
-## timeout. 35 s lets that queued-but-healthy instance answer. A slow
-## body that has started is left to finish; only the attempt timeout
-## bounds it.
-const FIRST_BYTE_TIMEOUT := 35.0
+## timeout. 15 s leaves a healthy instance room; one queued longer than
+## that is not worth the wait now that the cache and OSM API follow at
+## once (it was 35 s until 2026-11-11). A slow body that has started is
+## left to finish; only the attempt timeout bounds it.
+const FIRST_BYTE_TIMEOUT := 15.0
 ## First-byte wait for a caller that already holds an older copy of the
-## answer (first_byte_timeout): past the 1–8 s a healthy instance takes,
-## the copy is served instead of waiting on a queue.
-const FALLBACK_FIRST_BYTE_S := 12.0
+## answer (first_byte_timeout): just past the 1–8 s a healthy instance
+## takes, the copy is served instead of waiting on a queue.
+const FALLBACK_FIRST_BYTE_S := 10.0
 ## Still waiting for the server to start answering (CONNECTED covers the
 ## moment between connecting and sending the request, and redirect hops).
 const _WAITING: Array[int] = [HTTPClient.STATUS_RESOLVING,
