@@ -114,7 +114,9 @@ func _run() -> void:
 	for c in g._pool:
 		c.close()
 	g.free()
+	CacheStore.finish()
 	CacheStore.dir_override = ""
+	CacheStore.eviction_suppressed = false
 	_remove_dir(scratch)
 	_finish(failures)
 
