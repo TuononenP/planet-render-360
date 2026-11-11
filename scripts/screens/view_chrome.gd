@@ -261,7 +261,7 @@ static func _build_drone(v: View360) -> void:
 	panel.visible = false
 	v._drone.panel = panel
 	v._fade.add_child(panel)
-	v._drone.sticks = DroneSticks.new(v._drone)
+	v._drone.sticks = DroneSticks.new(v._drone, v._walk)
 	v._drone.sticks.visible = false
 	v._hud.add_child(v._drone.sticks)
 
@@ -392,11 +392,14 @@ static func arrive(v: View360) -> void:
 	v._fade.modulate.a = 0.0
 	if UiPrefs.reduce_motion:
 		v._fade.modulate.a = 1.0
+		_show_hint(v)
 		return
 	var eye := v._rig.position
 	v._rig.position = eye + Vector3(0, DESCENT_RISE_M, 0)
 	var fly := v.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	fly.tween_property(v._rig, "position", eye, DESCENT_S)
+	# A drone that starts the view waits for the descent, as for a glide.
+	v._visit_tween = fly
 	var title := UiTheme.display_label(v._place_pill.text, 48)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.45))
@@ -415,6 +418,8 @@ static func arrive(v: View360) -> void:
 	land.set_parallel(false)
 	land.tween_callback(title.queue_free)
 	land.tween_callback(func() -> void: wake(v))
+	# The hint's time starts once the HUD shows it, not while the world built.
+	land.tween_callback(func() -> void: _show_hint(v))
 
 # --- Hint, heading, idle ---
 
@@ -436,8 +441,9 @@ static func _show_hint(v: View360) -> void:
 
 static func hint_text(v: View360) -> String:
 	if not v._drone.on:
-		return "Drag to look around · Pinch to zoom" if OS.has_feature("mobile") \
-			else "Drag to look around · Pinch or scroll to zoom"
+		if DroneSticks.wanted():
+			return "Left stick walks · Right stick turns"
+		return "W A S D to walk · Drag to look · Shift to run"
 	if DroneSticks.wanted():
 		return "Left stick flies · Right stick turns and climbs"
 	return "W A S D to fly · E and Q to climb · Shift to speed up"
@@ -747,9 +753,7 @@ static func layout(v: View360) -> void:
 	var hint_bottom := v._sheet.position.y - 12.0 if not inspector else h - pad - attr_h - 12.0
 	if v._sheet_tab.visible and not inspector:
 		hint_bottom = tab_y - 8.0
-	_place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
-	if v._drone.panel.visible:
-		hint_bottom = v._drone.panel.position.y - 8.0
+	hint_bottom = _place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
 	_clear_hint(v, inspector, pad)
 
@@ -798,14 +802,14 @@ static func _inset_hud(v: View360, at: Vector2) -> void:
 	if v._horizon != null:
 		v._horizon.position = -at
 
-## Drone sticks above the controls bar, its round tab and the
+## Touch sticks (flying or walking) above the controls bar, its round tab and the
 ## attribution, the right well short of the zoom stack (and the
 ## inspector beside it); a sheet in the bar's place (landmark, date)
 ## puts them away until it closes. The readout is centred at `bottom`,
-## or above the wells while they show.
+## or above the wells while they show. Returns where the hint's bottom goes.
 static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: float, w: float,
-		h: float, attr_h: float, bottom: float, tab_y: float) -> void:
-	var show := v._drone.on and DroneSticks.wanted() and not bar_taken
+		h: float, attr_h: float, bottom: float, tab_y: float) -> float:
+	var show := DroneSticks.wanted() and not bar_taken
 	if v._drone.sticks.visible and not show:
 		v._drone.sticks.reset()  # a held thumb lets go
 	v._drone.sticks.visible = show
@@ -822,6 +826,8 @@ static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: floa
 		var ps := v._drone.panel.get_combined_minimum_size()
 		v._drone.panel.size = ps
 		v._drone.panel.position = Vector2(roundf((w - ps.x) / 2.0), bottom - ps.y)
+		bottom = v._drone.panel.position.y - 8.0
+	return bottom
 
 ## The zoom stack (and gyro): bottom-right on the scene's edge; beside
 ## the inspector, or above the controls sheet, where it would meet them.

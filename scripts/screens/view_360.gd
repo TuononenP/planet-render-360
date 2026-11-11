@@ -106,6 +106,9 @@ var _carpet: GrassCarpet
 var _near_world := 0
 var _mover: VehicleMover
 var _drone := ViewDrone.new()
+## A place opens in drone mode (the app sets this; tests and captures
+## open on foot).
+var start_flying := false
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -437,6 +440,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
 	_restore_conditions(data)
+	if start_flying:
+		_drone.enter(self)
 	if _landmark_panel != null:
 		_landmark_panel.close()
 	if _horizon != null:

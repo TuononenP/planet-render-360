@@ -27,6 +27,8 @@ const BOB_M := 0.3
 const BOB_HZ := 0.35
 ## Camera roll (radians) at full sideways speed.
 const BANK_MAX := 0.06
+## Steepest look (radians, up or down) a landing keeps.
+const LAND_PITCH := 0.3
 ## Right stick turn rate, radians per second.
 const YAW_RATE := 1.2
 ## The roof floor is re-measured this often, under the drone and where
@@ -141,6 +143,8 @@ func enter(v: View360) -> void:
 	if v._visit_tween != null:
 		v._visit_tween.kill()
 	v._walk.cancel_tap()
+	v._walk.stick_move = Vector2.ZERO
+	v._walk.stick_aux = Vector2.ZERO
 	_vel = Vector2.ZERO
 	_clock = 0.0
 	_floor_clock = 0.0
@@ -153,8 +157,8 @@ func enter(v: View360) -> void:
 	sync_hud(v)
 	_update_readout(v)
 
-## Lands: back inside the walking area at a height walking keeps
-## (`glide_home`), or where it is when a new scene replaces this one.
+## Lands: back on foot inside the walking area, on the open ground
+## nearest the drone (`glide_home`), or where it is when a new scene replaces this one.
 func exit(v: View360, glide_home: bool = true) -> void:
 	on = false
 	stick_move = Vector2.ZERO
@@ -170,14 +174,17 @@ func exit(v: View360, glide_home: bool = true) -> void:
 	var xz := here
 	if not View360.can_move_in_place(xz, v._ground):
 		xz = xz.limit_length(View360.IN_PLACE_M - 1.0)
-	var eye := View360.eye_y(v._data, v._ground, xz, false)
-	var to := Vector3(xz.x, eye + clampf(v._rig.position.y - eye, 0.0, ViewWalk.LIFT_MAX_M), xz.y)
+	# On foot, on open ground: never inside a building.
+	var to := v._walk.landing(v, xz)
 	if to.distance_to(v._rig.position) < 0.5:
 		v._atmos.set_probe_origin(v._rig.position)
 		return
-	ViewWalk.glide(v, to, v._rig.yaw, v._rig.pitch, ViewWalk.glide_seconds(to.distance_to(v._rig.position)))
+	# A walker looks about, not down from a drone's height.
+	ViewWalk.glide(v, to, v._rig.yaw, clampf(v._rig.pitch, -LAND_PITCH, LAND_PITCH),
+		ViewWalk.glide_seconds(to.distance_to(v._rig.position)))
 
-## Shows the button's state, the readout and (touch screens) the sticks.
+## Shows the button's state, the readout and (touch screens) the sticks,
+## which fly while the drone is up and walk once it lands.
 func sync_hud(v: View360) -> void:
 	if button != null:
 		HudParts.apply_icon_button(button, on)
@@ -186,7 +193,8 @@ func sync_hud(v: View360) -> void:
 		panel.visible = on
 	if sticks != null:
 		# Shown by ViewChrome.layout, which also keeps them off sheets.
-		sticks.visible = on and DroneSticks.wanted()
+		sticks.visible = DroneSticks.wanted()
+		sticks.set_flying(on)
 		sticks.reset()
 	# The hint's new text first, so the layout centres it.
 	ViewChrome._show_hint(v)
