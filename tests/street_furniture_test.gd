@@ -90,6 +90,13 @@ func _run() -> void:
 	split.roads.append({"class": "secondary", "width_m": 8.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(0, 200)])})
 	if StreetFurniture.fill(split, split_roads, "europe", m).filter(func(it: Dictionary) -> bool: return it["kind"] == "signals").size() != 1:
 		failures.append("fill: signals where a main road meets a T")
+	(split.roads[1] as Dictionary)["bridge"] = true
+	if StreetFurniture.fill(split, split_roads, "europe", m).filter(func(it: Dictionary) -> bool: return it["kind"] == "signals").size() != 1:
+		failures.append("fill: a T at a bridge head keeps its signals")
+	var promenade := OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(0, 3), Vector2(10, 3), Vector2(10, 20), Vector2(0, 20)]), [])
+	if ShoreRailings._index([promenade], Vector2.ZERO, 1.0, false).is_empty():
+		failures.append("a waterfront square's edge is a walk a railing can follow")
 	split.roads = [OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
 		PackedVector2Array([Vector2(-150, -150), Vector2(150, -150), Vector2(150, 150), Vector2(-150, 150)]), [])]
 	if not StreetFurniture.fill(split, split_roads, "europe", m).is_empty():

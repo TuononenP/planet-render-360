@@ -79,9 +79,7 @@ static func _index(rows: Array, centre: Vector2, m: float, barriers: bool) -> Di
 	var cell := CELL_M * m
 	var reach := (RADIUS_M + 30.0) * m
 	for row in rows:
-		# A paved square's outline is no promenade to rail.
-		if not (row is Dictionary) or bool(row.get("tunnel", false)) or bool(row.get("bridge", false)) \
-				or bool(row.get("area", false)):
+		if not (row is Dictionary) or bool(row.get("tunnel", false)) or bool(row.get("bridge", false)):
 			continue
 		var cls := str(row.get("class", ""))
 		if barriers:

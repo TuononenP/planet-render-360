@@ -31,8 +31,8 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 				or bool(road.get("area", false)):
 			continue
 		# Pedestrian streets keep their lampposts (StreetProps) instead.
-		var hung := data.country.to_upper() in ["FI", "SE"] and str(road.get("class", "")) in StreetProps.LIT \
-				and str(road.get("class", "")) != "pedestrian"
+		var cls := str(road.get("class", ""))
+		var hung := data.country.to_upper() in ["FI", "SE"] and cls in StreetProps.LIT and cls != "pedestrian"
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
 	var tracks := _track_grid(lines, m)

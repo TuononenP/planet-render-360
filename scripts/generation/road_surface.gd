@@ -627,21 +627,31 @@ static func carriageway_junctions(data: LocationData) -> Dictionary:
 	return out
 
 ## Junction nodes of the road network, bucketed by JUNCTION_M cells:
-## coordinates (snapped to 1 / NODE_SNAP m) shared by two or more ways.
+## coordinates (snapped to 1 / NODE_SNAP m) shared by two or more ways
+## that branch there (three or more arms), not a way merely split in two.
 ## Includes footways and crossings on purpose: kerbs are cut and cars
 ## kept clear at those too. Lane paint uses carriageway_junctions.
 static func junctions(data: LocationData) -> Dictionary:
 	var owner := {}
 	var count := {}
+	var dirs := {}
 	for i in data.roads.size():
-		for p in _points(data.roads[i]):
+		var pts := _points(data.roads[i])
+		for j in pts.size():
+			var p := pts[j]
 			var k := Vector2i(roundi(p.x * NODE_SNAP), roundi(p.y * NODE_SNAP))
 			if owner.get(k, -1) != i:
 				count[k] = int(count.get(k, 0)) + 1
 				owner[k] = i
+			if not dirs.has(k):
+				dirs[k] = []
+			if j > 0:
+				(dirs[k] as Array).append((pts[j - 1] - p).normalized())
+			if j < pts.size() - 1:
+				(dirs[k] as Array).append((pts[j + 1] - p).normalized())
 	var out := {}
 	for k in count:
-		if int(count[k]) < 2:
+		if int(count[k]) < 2 or arms(dirs[k]) < 3:
 			continue
 		var p := Vector2(k) / NODE_SNAP
 		var cell := Vector2i(floori(p.x / JUNCTION_M), floori(p.y / JUNCTION_M))
@@ -651,6 +661,18 @@ static func junctions(data: LocationData) -> Dictionary:
 		arr.append(p)
 		out[cell] = arr
 	return out
+
+## Distinct arms among the unit directions ways leave a node in: two
+## within 30° are one arm (a dual carriageway's halves), so a street split
+## into two ways has two arms and a crossroads four.
+static func arms(dirs: Array) -> int:
+	var found: Array[Vector2] = []
+	for d: Vector2 in dirs:
+		if d.length_squared() < 0.5:
+			continue
+		if not found.any(func(a: Vector2) -> bool: return a.dot(d) > 0.866):
+			found.append(d)
+	return found.size()
 
 ## Distance to the nearest junction over JUNCTION_M (capped at 1).
 static func junction_frac(buckets: Dictionary, p: Vector2) -> float:

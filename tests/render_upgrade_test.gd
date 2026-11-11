@@ -223,6 +223,9 @@ func _run() -> void:
 	var all_nodes := RoadSurface.junctions(jd)
 	if RoadSurface.junction_frac(all_nodes, Vector2(0, 0)) > 0.01:
 		failures.append("junctions() must keep footway nodes (kerbs and parked cars depend on them)")
+	jd.roads.resize(2)
+	if RoadSurface.junction_frac(RoadSurface.junctions(jd), Vector2(0, 0)) < 0.99:
+		failures.append("a street merely split into two ways is no junction for kerbs and parked cars")
 	if RoadSurface.junction_frac(paint, Vector2(0, 0)) < 0.99:
 		failures.append("a way split with a footway is no paint junction (%.2f)" % RoadSurface.junction_frac(paint, Vector2(0, 0)))
 	if RoadSurface.junction_frac(paint, Vector2(120, 0)) > 0.01:

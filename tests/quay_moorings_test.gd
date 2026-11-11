@@ -94,6 +94,16 @@ func _init() -> void:
 	var shed_root := Node3D.new()
 	_check(QuayDetails.build(shed_root, d, g, shed_mask) == 0, "No quay bollard inside a quayside building")
 	shed_root.free()
+	var kept_roads := d.roads
+	d.roads = [{"class": "primary", "width_m": 12.0, "bridge": true, "points": PackedVector2Array([Vector2(-200, -60), Vector2(-200, 60)])}]
+	var bridge_mask := VegetationMask.new(d, g)
+	d.roads = kept_roads
+	var bridge_root := Node3D.new()
+	var open_root := Node3D.new()
+	_check(QuayDetails.build(bridge_root, d, g, bridge_mask) == QuayDetails.build(open_root, d, g),
+		"A bridge over the quay keeps the bollards beside it")
+	bridge_root.free()
+	open_root.free()
 	root.free()
 	var ring_root := Node3D.new()
 	var ring_mesh := LandmarkMesh.new()

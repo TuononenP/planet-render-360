@@ -3,7 +3,7 @@ extends RefCounted
 
 ## One merged casting mesh on the dry top of finalized hard banks.
 ## Keep harbour fittings off natural shores and ornamental pools, and
-## out of quayside buildings and carriageways when a mask is given.
+## out of quayside buildings when a mask is given.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask = null) -> int:
 	if not RenderQuality.ultra_desktop(data.quality_preset) or ground.shoreline == null or not ground.shoreline.ready:
 		return 0
@@ -28,9 +28,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 		if top - water < 0.3 or top - water > 5.0:
 			continue
 		var at: Vector2 = p + (segment["land"] as Vector2) * 0.8
-		# Not inside a warehouse built on the quay wall, nor in a quayside
-		# carriageway.
-		if mask != null and mask.blocked(at.x, at.y, VegetationMask.BUILDING | VegetationMask.ROAD, 0.0):
+		# Not inside a warehouse built on the quay wall. (The mask's road bit
+		# also covers bridge decks over the quay, so it is no test here.)
+		if mask != null and mask.blocked(at.x, at.y, VegetationMask.BUILDING, 0.0):
 			continue
 		var pos := Vector3(at.x, top, at.y)
 		lm.box("Iron", pos + Vector3.UP * 0.04, Vector3(0.48, 0.08, 0.48), Basis(), 0.025)
