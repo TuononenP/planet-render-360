@@ -8,6 +8,10 @@ extends RefCounted
 ## * Shut lines: door, bonnet and boot gaps are drawn, not modelled: the
 ##   body's material lists them as segments in the car's own frame (side
 ##   view x/y, plan x/|z|), a few millimetres wide and antialiased.
+## * End faces: the grille and intake slats, the lamp bezels, the plate
+##   recess and the bumper and bonnet lines are drawn the same way, from
+##   the car's `face` rows (front 0-4, rear 5-9; see CarModel), so the
+##   far mesh has them too.
 ## * Livery: a cab's roof colour, above the material's livery_y.
 ## * Finish: a sharp clear coat over every paint; metallic paints
 ##   (instance custom .x) add a strong metal base with a faint flake,
@@ -23,6 +27,7 @@ uniform vec4 seam_side[8];
 uniform int seam_side_n = 0;
 uniform vec4 seam_top[8];
 uniform int seam_top_n = 0;
+uniform vec4 face[10];
 uniform float livery_y = 100.0;
 uniform vec3 livery_col : source_color = vec3(1.0);
 varying vec4 instance_paint;
@@ -38,6 +43,21 @@ void vertex() {
 	body_n = NORMAL;
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnormal = normalize(MODEL_NORMAL_MATRIX * NORMAL);
+}
+float cov(float d, float px) {
+	return clamp(0.5 - d / px, 0.0, 1.0);
+}
+// Rounded box: distance to its edge, metres, negative inside.
+float sd_box(vec2 p, vec2 c, vec2 h, float r) {
+	vec2 q = abs(p - c) - h + r;
+	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+// Slats `pitch` apart from y0: the share of a pixel on a slat, evened out
+// where they are finer than the screen can show.
+float slats(float y, float y0, float pitch, float duty, float px) {
+	float v = (y - y0) / pitch;
+	float line = cov((abs(fract(v) - 0.5) - 0.5 * duty) * pitch, px);
+	return mix(duty, line, clamp(pitch / px * 0.25 - 0.5, 0.0, 1.0));
 }
 float seam_d(vec2 p, vec4 s) {
 	vec2 ab = s.zw - s.xy;
@@ -58,8 +78,47 @@ void fragment() {
 			d = min(d, seam_d(vec2(body_pos.x, abs(body_pos.z)), seam_top[i]));
 		}
 	}
+	// End faces: dark openings with slats, bezels, plate recess, and split lines.
+	float opening = 0.0;
+	float slat = 0.0;
+	float mesh_bars = 0.0;
+	if (abs(body_n.x) > 0.5) {
+		int o = body_n.x > 0.0 ? 0 : 5;
+		vec2 q = vec2(abs(body_pos.z), body_pos.y);
+		vec4 lamp = face[o];
+		vec4 grille = face[o + 1];
+		vec4 intake = face[o + 2];
+		vec4 plate = face[o + 3];
+		vec4 lines = face[o + 4];
+		vec2 lc = vec2(lamp.x + lamp.w, lamp.y + lamp.z) * 0.5;
+		vec2 lh = vec2(lamp.w - lamp.x, lamp.z - lamp.y) * 0.5;
+		opening = max(opening, cov(sd_box(q, lc, lh, 0.02) - 0.012, px));
+		if (grille.x > 0.0) {
+			vec2 gc = vec2(0.0, (grille.y + grille.z) * 0.5);
+			vec2 gh = vec2(grille.x, (grille.z - grille.y) * 0.5);
+			float g = cov(sd_box(q, gc, gh, 0.012), px);
+			opening = max(opening, g);
+			slat = max(slat, g * slats(q.y, grille.y, (grille.z - grille.y) / grille.w, 0.4, px));
+		}
+		if (intake.x > 0.0) {
+			vec2 ic = vec2(0.0, (intake.y + intake.z) * 0.5);
+			vec2 ih = vec2(intake.x, (intake.z - intake.y) * 0.5);
+			float g = cov(sd_box(q, ic, ih, 0.02), px);
+			opening = max(opening, g);
+			float cell = (intake.z - intake.y) / intake.w;
+			mesh_bars = g * max(slats(q.y, intake.y, cell, 0.22, px),
+				slats(q.x, 0.0, cell * 1.3, 0.16, px));
+		}
+		opening = max(opening, cov(sd_box(q, vec2(0.0, plate.x), plate.zy, 0.012), px));
+		d = min(d, abs(q.y - lines.x));
+		if (q.x < lines.z) {
+			d = min(d, abs(q.y - lines.y));
+		}
+	}
 	float seam = clamp((0.004 - d) / px + 0.5, 0.0, 1.0) * clamp(0.012 / px, 0.0, 1.0);
 	vec3 col = (body_pos.y > livery_y ? livery_col : instance_paint.rgb) * (1.0 - 0.85 * seam);
+	col = mix(col, vec3(0.012, 0.012, 0.014), opening);
+	col = mix(col, vec3(0.2, 0.21, 0.22), max(slat, mesh_bars * 0.5));
 	// Flake: a roughness wobble per millimetre, faded before it can shimmer.
 	vec3 cell = floor(body_pos * 1500.0);
 	float flake = (snow_hash(cell.xz + cell.y * 17.0) - 0.5) * (1.0 - smoothstep(0.5, 1.5, px * 1500.0));
@@ -73,11 +132,11 @@ void fragment() {
 	rough = mix(rough, 0.78, grime);
 	float snow = snow_cover(wpos, normalize(wnormal).y);
 	ALBEDO = mix(col, snow_col, snow);
-	ROUGHNESS = mix(rough, 0.86, snow);
-	METALLIC = 0.7 * metal * (1.0 - snow);
+	ROUGHNESS = mix(mix(rough, 0.45, opening), 0.86, snow);
+	METALLIC = mix(0.7 * metal, 0.8, max(slat, mesh_bars)) * (1.0 - snow);
 	SPECULAR = 0.65;
 	AO = mix(1.0, clamp(UV.x, 0.0, 1.0), 0.8) * (1.0 - 0.6 * seam);
-	CLEARCOAT = (1.0 - grime * 0.85) * (1.0 - snow) * (1.0 - seam);
+	CLEARCOAT = (1.0 - grime * 0.85) * (1.0 - snow) * (1.0 - seam) * (1.0 - opening);
 	CLEARCOAT_ROUGHNESS = 0.02 + grime * 0.4;
 }
 """

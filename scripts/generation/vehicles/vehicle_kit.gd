@@ -433,6 +433,45 @@ static func _shrunk(pts: PackedVector3Array, k: float, x: float, bulge: float, u
 		out.append(Vector3(x + bulge * (1.0 - k * k) * (1.0 - 0.35 * hf * hf), p.y, p.z * k))
 	return out
 
+## A point on an end face of the body: `end` is +1 at the nose and -1 at
+## the tail, `k` the share of the half width across (signed; 0 on the
+## centreline, 1 at the flank) and `t` the share of the face height (0 the
+## floor, 1 the belt). It follows the rings body() lofts.
+static func end_at(s: Dictionary, end: float, k: float, t: float) -> Vector3:
+	var bulge := float(s["bulge_f"]) if end > 0.0 else float(s["bulge_r"])
+	var xs := end * (float(s["len"]) * 0.5 - bulge)
+	var w := half_width(s, xs) * lin(s["bulge"], t)
+	var x := xs + end * bulge * (1.0 - k * k) * (1.0 - 0.35 * t * t)
+	return Vector3(x, lerpf(soft(s["floor"], xs, 0.06), soft(s["belt"], xs, 0.1), t), k * w)
+
+## The face at end_at(): x out of it, y up, z across.
+static func end_frame(s: Dictionary, end: float, k: float, t: float) -> Basis:
+	var dz := end_at(s, end, k + 0.03, t) - end_at(s, end, k - 0.03, t)
+	var dy := end_at(s, end, k, t + 0.03) - end_at(s, end, k, t - 0.03)
+	var n := dz.cross(dy).normalized()
+	if n.x * end < 0.0:
+		n = -n
+	var up := (Vector3.UP - n * n.dot(Vector3.UP)).normalized()
+	return Basis(n, up, n.cross(up))
+
+## Height of the glasshouse top at (`x`, `z`): the roof, or the crowned
+## deck under a windscreen, as _section() lofts it (centre span only).
+static func roof_at(s: Dictionary, x: float, z: float) -> float:
+	var gh: PackedFloat32Array = s["gh"]
+	var belt := soft(s["belt"], x, 0.1)
+	var w := half_width(s, x)
+	var wd := w * lin(s["bulge"], 1.0) - 0.03
+	var gb := minf(wd - float(s["shelf"]), w * lin(s["gh_w"], x))
+	var crown := lin(s["crown"], x)
+	var y0 := belt + 0.012 + crown * (1.0 - pow(gb / wd, 2.0))
+	var top := maxf(belt + 0.012 + crown, soft(s["roof"], x, 0.07))
+	var glassy := maxf(smoothstep(gh[2], gh[2] + 0.3, x), 1.0 - smoothstep(gh[1] - 0.3, gh[1], x))
+	var rc := lerpf(float(s["roof_crown"]), float(s["glass_crown"]), glassy)
+	var hside := maxf(y0, top - rc)
+	var frac := clampf((hside - y0) / float(s["gh_full"]), 0.0, 1.0)
+	var zt := gb - (float(s["tumble"]) + 0.02) * frac
+	return hside + (top - hside) * (1.0 - pow(minf(absf(z) / zt, 1.0), 2.0))
+
 ## Material key of a body quad: `t` up the side, `xm` its station, `em`
 ## its depth into the front (+) or rear (-) face (0 on the flanks).
 static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: float, x_f: float) -> String:
@@ -459,18 +498,16 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 			if em == 0.0 and ((xm > gh[2] and xm < gh[3]) or (xm > gh[0] and xm < gh[1])):
 				return "Glass"
 			return "Paint"
-	var front := em > 0.0 or xm > x_f - float(s["lamp_wrap"])
+	var front := em > 0.0 or xm > x_f - float(s["lamp_wrap_f"])
 	var rear := em < 0.0 or xm < x_r + float(s["lamp_wrap"])
 	if front:
+		# Between the lamps the paint carries the drawn grille (CarPaint).
 		var lamp: Vector2 = s["lamp_f"]
-		var grille: Vector2 = s["grille"]
-		if t > lamp.x and t < lamp.y:
-			return "HeadLamp" if em < float(s["lamp_in"]) else "Trim"
-		if em > 0.25 and t > grille.x and t < grille.y:
-			return "Trim"
+		if t > lamp.x and t < lamp.y and em < float(s["lamp_in"]):
+			return "HeadLamp"
 	if rear:
 		var lamp: Vector2 = s["lamp_r"]
-		if t > lamp.x and t < lamp.y and -em < float(s["lamp_in"]):
+		if t > lamp.x and t < lamp.y and -em < float(s["lamp_in_r"]):
 			return "TailLamp"
 	if (em != 0.0 or xm > x_f - 0.3 or xm < x_r + 0.3) and t < float(s["valance"]):
 		return "Trim"

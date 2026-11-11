@@ -40,9 +40,17 @@ func _init() -> void:
 			var paint := names.get("Paint") as ShaderMaterial
 			if paint == null or paint.shader != CarPaint.shader():
 				failures.append("%s paint must use the instance colour (CarPaint)" % kind)
+			var face: Variant = paint.get_shader_parameter("face") if paint != null else null
+			if not face is PackedVector4Array or (face as PackedVector4Array).size() != 10:
+				failures.append("%s paint should carry its end-face rows" % kind)
+			# Near only: indicators and an exhaust tip stand off the faces.
+			for key in ["Amber", "Chrome"]:
+				if names.has(key) != (car == near):
+					failures.append("%s %s surface should exist on the near mesh only" % [kind, key])
 			var glass := names.get("Glass") as StandardMaterial3D
 			if glass == null or glass.roughness > 0.06:
 				failures.append("%s glass should be smooth enough to mirror the street" % kind)
+		print("CAR MODEL %s triangles: near %d, far %d" % [kind, counts[0], counts[1]])
 		if counts[0] > 12000 or counts[1] > 1600 or counts[1] * 4 > counts[0]:
 			failures.append("%s triangle budget: near %d, far %d" % [kind, counts[0], counts[1]])
 	if failures.is_empty():
