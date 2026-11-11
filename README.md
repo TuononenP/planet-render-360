@@ -335,7 +335,7 @@ planet-render-360/
 │   │   │                          OSM building extrusion, regional style, roofs and facades; city and country-era style tables
 │   │   ├── tower_massing.gd, tower_top.gd, tower_looks.gd, nyc_tower_looks.gd, facade_curtain_kit.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
 │   │   │                          Tower setbacks, evidence from neighbouring buildings, paint families, party walls
-│   │   ├── road_*.gd, street_*.gd, rail_builder.gd, kerb_builder.gd, bridge_arches.gd
+│   │   ├── road_*.gd, street_*.gd, rail_builder.gd, rail_decks.gd, kerb_builder.gd, bridge_arches.gd
 │   │   │                          Roads, markings, rails, kerbs, bridges and street furniture
 │   │   ├── shoreline_model.gd, shore_*.gd, water_*.gd, quay_*.gd
 │   │   │                          Shared shoreline geometry, water ownership, banks, quays and moorings

@@ -494,9 +494,11 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 ## never dips into the water: an end the river carve reaches is lifted
 ## to the water, and every wet point keeps the slab above it. With a
 ## `half` width the flat deck also clears the ground under both edges
-## (a bank sloping across the way), lifted like a ribbon.
+## (a bank sloping across the way), lifted like a ribbon. Without
+## `arch` a deck over land alone runs straight from bank to bank: a
+## railway's track does not hump over every bridge way it is mapped in.
 static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
-		half: float = 0.0, layer: int = 0) -> PackedFloat32Array:
+		half: float = 0.0, layer: int = 0, arch: bool = true) -> PackedFloat32Array:
 	var n := pts.size()
 	var total := 0.0
 	var dist := PackedFloat32Array([0.0])
@@ -520,14 +522,16 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 		# water there; the middle two-thirds set the rise.
 		need = maxf(need, (floor_y + clear - lerpf(h0, h1, t)) / maxf(sin(PI * t), 0.5))
 	var rise := clampf(need, 0.0, minf(BRIDGE_GRADE * total / PI, BRIDGE_RISE_M * m2u))
+	if not arch and _land_bridge(pts, surf):
+		rise = 0.0
 	# Lift over the arch where the slab would touch the water, eased out
 	# at RAMP_GRADE both ways so it reads as a ramp, not a step.
 	var lift := PackedFloat32Array()
 	for i in n:
 		var t := dist[i] / total
-		var arch := lerpf(h0, h1, t) + 0.05 * m2u + rise * sin(PI * t)
-		deck.append(arch)
-		lift.append(maxf(_deck_floor(pts, i, surf, slab, half) + 0.05 * m2u - arch, 0.0))
+		var arched := lerpf(h0, h1, t) + 0.05 * m2u + rise * sin(PI * t)
+		deck.append(arched)
+		lift.append(maxf(_deck_floor(pts, i, surf, slab, half) + 0.05 * m2u - arched, 0.0))
 	for i in range(1, n):
 		lift[i] = maxf(lift[i], lift[i - 1] - RAMP_GRADE * (dist[i] - dist[i - 1]))
 	for i in range(n - 2, -1, -1):
@@ -602,12 +606,14 @@ static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: f
 
 ## Bridge deck on a real `bridge=yes` way (profile from deck_profile),
 ## with slab fascias on both sides and parapets; the deck top goes to
-## the `top_finish` batch (RailBuilder lays ballast there). `open`
-## names the edges with no parapet, a byte per segment for the left and
-## for the right side: another deck runs alongside there.
+## the `top_finish` batch (RailBuilder lays ballast there). `fit` is a
+## deck among others (RailBuilder): "open" names the edges with no
+## parapet, a byte per segment for the left and for the right side
+## (another deck runs alongside there); "deck" gives the heights in
+## place of the profile, and "low" the fascias' foot under them.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0,
-		open: Array = []) -> void:
+		fit: Dictionary = {}) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -616,9 +622,13 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		return
 	pts = inside
 	var n := pts.size()
-	var deck := deck_profile(pts, surf, m2u, width * 0.5, layer)
+	var deck: PackedFloat32Array = fit.get("deck", PackedFloat32Array())
+	if deck.size() != n:
+		deck = deck_profile(pts, surf, m2u, width * 0.5, layer)
 	if deck.is_empty():
 		return
+	var open: Array = fit.get("open", [])
+	var low: PackedFloat32Array = fit.get("low", PackedFloat32Array())
 	var dist := PackedFloat32Array([0.0])
 	for i in range(1, n):
 		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
@@ -652,11 +662,12 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 			var ob := pts[i + 1] + sb
 			var ia := oa - sa.normalized() * thick
 			var ib := ob - sb.normalized() * thick
+			var foot_a := low[i] if low.size() == n else deck[i] - depth
+			var foot_b := low[i + 1] if low.size() == n else deck[i + 1] - depth
 			if not open.is_empty() and (open[0 if sgn > 0.0 else 1] as PackedByteArray)[i] != 0:
-				_wall(side, oa, ob, deck[i] - depth, deck[i + 1] - depth, deck[i], deck[i + 1], sa.normalized())
+				_wall(side, oa, ob, foot_a, foot_b, deck[i], deck[i + 1], sa.normalized())
 				continue
-			_wall(side, oa, ob, deck[i] - depth, deck[i + 1] - depth, deck[i] + para,
-				deck[i + 1] + para, sa.normalized())
+			_wall(side, oa, ob, foot_a, foot_b, deck[i] + para, deck[i + 1] + para, sa.normalized())
 			_wall(side, ia, ib, deck[i], deck[i + 1], deck[i] + para, deck[i + 1] + para,
 				-sa.normalized())
 			var k := side.verts.size()

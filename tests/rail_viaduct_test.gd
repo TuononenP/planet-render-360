@@ -3,7 +3,8 @@ extends SceneTree
 ## Headless: godot --headless --script tests/rail_viaduct_test.gd
 ## A viaduct mapped a bridge way per track: no parapet stands between
 ## two tracks side by side, the outer edges keep theirs, and a track on
-## its own keeps both.
+## its own keeps both. Tracks side by side share one deck level
+## (RailDecks).
 
 func _init() -> void:
 	_run()
@@ -43,9 +44,31 @@ func _run() -> void:
 		failures.append("tracks apart keep every parapet: %d / %d" % [lone, apart])
 	if joined >= apart:
 		failures.append("tracks side by side must drop the parapets between them: %d / %d" % [joined, apart])
+	# Ground falling across the viaduct: the tracks share the higher level.
+	var n := data.grid_size
+	for z in n:
+		for x in n:
+			data.heights[z * n + x] = 5.0 + 0.2 * float(z)
+	var surf := RoadBuilder._Surface.new(data, GroundTruth.new(data))
+	var tracks: Array = [_track(0.0), _track(4.0), _track(40.0)]
+	data.railways = tracks
+	var decks := RailDecks.of(data, surf, 1.0)
+	var tops: Array[float] = []
+	var raws: Array[float] = []
+	for t: Dictionary in tracks:
+		var pts := RoadBuilder._resample(t["points"], 1.5)
+		var raw := RoadBuilder.deck_profile(pts, surf, 1.0, 1.65, 0, false)
+		raws.append(raw[pts.size() / 2])
+		tops.append(decks.level(pts, raw)[pts.size() / 2])
+	if absf(raws[0] - raws[1]) < 0.02:
+		failures.append("the test ground should step the two decks apart: %s" % [raws])
+	if absf(tops[0] - tops[1]) > 0.002 or absf(tops[0] - maxf(raws[0], raws[1])) > 0.002:
+		failures.append("tracks side by side must share the higher deck level: %s from %s" % [tops, raws])
+	if absf(tops[2] - raws[2]) > 0.0001:
+		failures.append("a track on its own keeps its profile: %s from %s" % [tops[2], raws[2]])
 	failures.remove_at(0)
 	if failures.is_empty():
-		print("RAIL VIADUCT OK: no parapet between tracks side by side, outer edges and lone tracks keep theirs")
+		print("RAIL VIADUCT OK: no parapet between tracks side by side, outer edges and lone tracks keep theirs, one level across")
 		quit(0)
 	else:
 		for f in failures:

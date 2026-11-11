@@ -363,10 +363,12 @@ func _viaduct(failures: Array[String]) -> void:
 		# Tracks 0 and 5 are mapped in two pieces; the others in one.
 		if roundi(a.x / 5.0) in [0, 5]:
 			continue
-		# The deck of the way under the train, as RailBuilder lays it.
+		# The deck of the way under the train, as RailBuilder lays it: level
+		# with the tracks beside it.
 		var way := PackedVector2Array([Vector2(a.x, 0), Vector2(a.x, -100), Vector2(a.x, -200)])
 		var dense := RoadBuilder._resample(way, surf.step * 0.34)
-		var deck := RoadBuilder.deck_profile(dense, surf, m2u, 1.435 * 0.5 + 0.95)
+		var deck := RailDecks.of(data, surf, m2u).level(dense,
+			RoadBuilder.deck_profile(dense, surf, m2u, 1.435 * 0.5 + 0.95, 0, false))
 		for pose: Transform3D in t["poses"]:
 			var best := 0
 			for k in dense.size():

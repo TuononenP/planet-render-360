@@ -41,7 +41,7 @@ const CABLE_RAIL_CLEAR_M := 0.02
 const TRACK_BED_HEX := "#a39d92"
 ## Bridge tracks this close side by side (centre to centre) share one
 ## deck edge: no parapet stands between them.
-const BESIDE_M := 7.0
+const BESIDE_M := 12.0
 const BESIDE_MIN_M := 0.3
 const BESIDE_CELL_M := 8.0
 
@@ -121,6 +121,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var spans := LandmarkSites.bridge_spans(data)
 	var batches := {}
 	var beside := deck_index(data.railways, m2u)
+	if not beside.is_empty():
+		beside["decks"] = RailDecks.of(data, surf, m2u)
 	for w in data.railways:
 		if abort != null and abort.requested:
 			return
@@ -244,7 +246,18 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 	var top := RoadBuilder._batch(batches, "rail_deck")
 	top.pad()
 	var k0 := top.verts.size()
-	var open: Array = []
+	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5, 0, false)
+	if deck.size() != inside.size():
+		return
+	var fit := {"deck": deck}
+	if beside.has("decks"):
+		# Level with the tracks alongside; the fascia still reaches down to
+		# where the deck stood on its own.
+		var low := PackedFloat32Array()
+		for d in deck:
+			low.append(d - RoadBuilder.DECK_DEPTH_M * m2u)
+		deck = (beside["decks"] as RailDecks).level(inside, deck)
+		fit = {"deck": deck, "low": low}
 	if not beside.is_empty():
 		var left := PackedByteArray()
 		var right := PackedByteArray()
@@ -253,14 +266,11 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 			var out := RoadBuilder._side(inside, i).normalized()
 			left.append(1 if deck_beside(beside, mid, out, m2u) else 0)
 			right.append(1 if deck_beside(beside, mid, -out, m2u) else 0)
-		open = [left, right]
-	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck", "unknown", 0, open)
+		fit["open"] = [left, right]
+	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck", "unknown", 0, fit)
 	top.pad()
 	for i in range(k0, top.verts.size()):
 		top.uv2s[i] = Vector2(bed / m2u, BED_LAYER)
-	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5)
-	if deck.size() != inside.size():
-		return
 	var ys := PackedFloat32Array()
 	for d in deck:
 		ys.append(d + RAIL_HEIGHT_M * m2u)

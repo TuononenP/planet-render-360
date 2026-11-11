@@ -88,6 +88,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	var ctx := {}
 	if not termini.is_empty() and ground != null:
 		ctx = {"surf": RoadBuilder._Surface.new(data, ground), "spans": LandmarkSites.bridge_spans(data)}
+		ctx["decks"] = RailDecks.of(data, ctx["surf"], m2u)
 	for fan: Array in termini:
 		for end: Dictionary in fan:
 			var run := _run(all, grid, tol, int(end["way"]), bool(end["tail"]), ground, m2u, ctx)
@@ -262,7 +263,8 @@ static func _shut(rail: Dictionary) -> bool:
 ## The points of bridge way `rail` as RailBuilder lays its deck, and
 ## the rail-head height at each: [points, heights], or [] where the deck
 ## is not one unbroken piece (the data's edge, a landmark bridge's span).
-static func _deck(rail: Dictionary, surf: RoadBuilder._Surface, spans: Array, m2u: float) -> Array:
+static func _deck(rail: Dictionary, surf: RoadBuilder._Surface, spans: Array, m2u: float,
+		decks: RailDecks = null) -> Array:
 	var dense := RoadBuilder._resample(rail["points"], surf.step * 0.34)
 	var pieces := LandmarkSites.outside_spans(dense, spans)
 	if pieces.size() != 1 or (pieces[0] as PackedVector2Array).size() != dense.size():
@@ -270,9 +272,11 @@ static func _deck(rail: Dictionary, surf: RoadBuilder._Surface, spans: Array, m2
 	for p in dense:
 		if not surf.inside(p):
 			return []
-	var deck := RoadBuilder.deck_profile(dense, surf, m2u, float(rail.get("width_m", 3.3)) * m2u * 0.5)
+	var deck := RoadBuilder.deck_profile(dense, surf, m2u, float(rail.get("width_m", 3.3)) * m2u * 0.5, 0, false)
 	if deck.size() != dense.size():
 		return []
+	if decks != null:
+		deck = decks.level(dense, deck)
 	for i in deck.size():
 		deck[i] += RailBuilder.RAIL_HEIGHT_M * m2u
 	return [dense, deck]
@@ -307,7 +311,7 @@ static func _run(rails: Array, grid: Dictionary, tol: float, way: int, tail: boo
 		if bool(rail.get("bridge", false)) and not roofed:
 			if ctx.is_empty():
 				break
-			var laid := _deck(rail, ctx["surf"], ctx["spans"], m2u)
+			var laid := _deck(rail, ctx["surf"], ctx["spans"], m2u, ctx.get("decks"))
 			if laid.is_empty():
 				break
 			pts = laid[0]
