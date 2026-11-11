@@ -571,10 +571,19 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 ## mapped water (local DEM when absent), else the lowest footprint ground,
 ## raised by `base_drop_m` for a model hung below its origin (a dam
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
+## `base_at_m` [x, z] instead reads the ground at that one model-local
+## point (a terrace's y = 0 at the foot of its stair, not on its hill).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
 	if entry.has("base_half_m"):
 		half = float(entry["base_half_m"]) * WorldScale.metres_to_units()
+	if entry.has("base_at_m"):
+		var at: Array = entry["base_at_m"]
+		var off := Vector3(float(at[0]), 0.0, float(at[1])).rotated(Vector3.UP,
+			-deg_to_rad(float(entry.get("yaw_deg", 0.0)))) * WorldScale.metres_to_units()
+		x += off.x
+		z += off.z
+		half = 0.0
 	if str(entry.get("base", "")) == "absolute":
 		return ground.render_y(float(entry["base_asl_m"]))
 	if str(entry.get("base", "")) == "sea":

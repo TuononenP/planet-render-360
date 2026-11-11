@@ -387,7 +387,7 @@ static func _core_landmarks() -> Array:
 			"wiki_title": "Turku Cathedral", "height_m": 101.0,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
 		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
-			"wiki_title": "Helsinki Cathedral", "height_m": 62.0,
+			"wiki_title": "Helsinki Cathedral", "height_m": 62.0, "base_at_m": [0.0, 70.0],
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
 		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
 			"wiki_title": "Eiffel Tower", "height_m": 330.0,

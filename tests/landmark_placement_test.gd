@@ -180,6 +180,28 @@ func _run() -> void:
 			mound.free()
 		primary.free()
 		extra.free()
+	# `base_at_m` anchors the model at one local point (Helsinki Cathedral:
+	# the square at its stair's foot, downhill of the terrace), not the
+	# lowest footprint corner.
+	var hd := _data("helsinki_cathedral", 10.0, -10.0)
+	for z in 49:
+		for x in 49:
+			hd.heights[z * 49 + x] += 30.0 - float(z)
+	var hg := GroundTruth.new(hd)
+	var he := LocationData.entry_for_type("helsinki_cathedral")
+	var at: Array = he["base_at_m"]
+	var anchor := hg.height_at_world(float(at[0]), float(at[1])) - 0.3
+	var cathedral := TerrainBuilder._landmark(hd, hg)
+	_check(absf(cathedral.position.y - anchor) < 0.01, "Helsinki Cathedral must stand on the ground at its stair's foot")
+	_check(cathedral.position.y < TerrainBuilder.site_ground_y(hd, hg, 0, 0, 20.0) - 0.3 - 0.5,
+		"the stair-foot anchor must sit below the hilltop footprint minimum on rising ground")
+	var hx := Node3D.new()
+	hd.landmark_candidates = [{"type": "helsinki_cathedral", "x": 0.0, "z": 0.0}]
+	TerrainBuilder._landmark_candidates(hx, hd, hg)
+	_check(hx.get_child_count() == 1 and absf((hx.get_child(0) as Node3D).position.y - anchor) < 0.01,
+		"a secondary Helsinki Cathedral must use the same stair-foot anchor")
+	cathedral.free()
+	hx.free()
 	# Only covered terrain may disappear; surrounding ground must remain.
 	for type in LandmarkTerrain.RELIEFS:
 		var d := _data(type, 110.0, 20.0)
