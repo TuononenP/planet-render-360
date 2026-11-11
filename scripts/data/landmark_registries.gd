@@ -24,7 +24,7 @@ static func entries() -> Array:
 			LandmarkRegistryAmericasHistoric.entries(),
 			LandmarkRegistryFinlandHelsinki.entries(), LandmarkRegistryFinlandRegions.entries(),
 			LandmarkRegistrySwedenStockholm.entries(),
-			LandmarkRegistrySanFrancisco.entries(),
+			LandmarkRegistrySanFrancisco.entries(), LandmarkRegistryTokyoSeoul.entries(),
 			LandmarkRegistryAngkorThom.entries(), LandmarkRegistryAngkorBaray.entries(),
 			LandmarkRegistryAngkorEast.entries(), LandmarkRegistryAngkorOuter.entries(),
 				LandmarkRegistryBridgeSpecs.entries()]:
@@ -48,7 +48,7 @@ static func sets() -> Array[Callable]:
 		LandmarkSetAmericasHistoric.build,
 		LandmarkSetFinlandHelsinki.build, LandmarkSetFinlandRegions.build,
 		LandmarkSetSwedenStockholm.build,
-		LandmarkSetSanFrancisco.build,
+		LandmarkSetSanFrancisco.build, LandmarkSetTokyoSeoul.build,
 		LandmarkSetAngkorThom.build, LandmarkSetAngkorBaray.build,
 		LandmarkSetAngkorEast.build, LandmarkSetAngkorOuter.build,
 		LandmarkSetBridgeSpecs.build]

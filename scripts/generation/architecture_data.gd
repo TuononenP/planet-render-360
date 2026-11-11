@@ -32,7 +32,8 @@ extends RefCounted
 ##         garage (0..1 odds of a street-level garage door with the entry
 ##         stair beside it), cornice (0..1 odds of a bracketed cornice
 ##         along a flat-roofed street front), glazed_balcony (0..1 glass-front
-##         balcony stacks), turret (0..1 corner towers), corner_dome (0..1 copper domes), wall_lantern (0..1 odds), granite_plinth (bool
+##         balcony stacks), danji_number / sign_bands / sign_stack (0..1 odds;
+##         AsiaFronts: slab-end block numbers, per-storey sign boards, full-height sign column), turret (0..1 corner towers), corner_dome (0..1 copper domes), wall_lantern (0..1 odds), granite_plinth (bool
 ##         rusticated granite base), snow_guard (bool eave rails/roof ladders)
 
 ## Ordered first-match boxes [region, south, west, north, east, (ISO codes)].
@@ -155,7 +156,7 @@ const COUNTRY_BASE := {
 }
 static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, ArchitectureParis.BASE,
 	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
-	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesNorth.BASE, ArchitectureCitiesFinland.BASE,
+	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesEastAsia.BASE, ArchitectureCitiesNorth.BASE, ArchitectureCitiesFinland.BASE,
 	ArchitectureCitiesSouth.BASE, ArchitectureCitiesCentral.BASE, ArchitectureCitiesWorld.BASE,
 	ArchitectureCitiesNewWorld.BASE, ArchitectureCountryEras.BASE])
 
@@ -307,7 +308,7 @@ const GENERIC := {
 static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, ArchitectureMountain.REGIONS,
 	ArchitectureParis.REGIONS, ArchitectureCitiesEurope.REGIONS,
 	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
-	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesFinland.REGIONS, ArchitectureCitiesSouth.REGIONS,
+	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesEastAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesFinland.REGIONS, ArchitectureCitiesSouth.REGIONS,
 	ArchitectureCitiesCentral.REGIONS, ArchitectureCitiesWorld.REGIONS,
 	ArchitectureCitiesNewWorld.REGIONS, ArchitectureCountryEras.REGIONS])
 

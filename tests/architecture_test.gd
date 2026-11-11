@@ -79,7 +79,7 @@ const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"signage": TYPE_FLOAT, "screens": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL,
 	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT, "glazed_balcony": TYPE_FLOAT, "turret": TYPE_FLOAT,
 	"granite_plinth": TYPE_BOOL, "snow_guard": TYPE_BOOL, "corner_dome": TYPE_FLOAT, "wall_lantern": TYPE_FLOAT,
-	"mullion": TYPE_BOOL}
+	"mullion": TYPE_BOOL, "danji_number": TYPE_FLOAT, "sign_bands": TYPE_FLOAT, "sign_stack": TYPE_FLOAT}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
 const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood", "copper", "sheet_metal"]
@@ -773,8 +773,22 @@ func _era_checks(failures: Array[String]) -> void:
 		["berlin", {"kind": "apartments", "start_year": 1975}, {}, "berlin_plattenbau"],
 		["berlin", {"kind": "apartments", "levels": 5}, {}, "berlin"],
 		["amsterdam", {"kind": "house", "levels": 4}, {}, "amsterdam"],
-		["tokyo", {"kind": "house", "levels": 2}, {}, "tokyo_house"],
+		["tokyo", {"kind": "house", "levels": 2, "heritage": true}, {}, "tokyo_house"],
+		["tokyo", {"kind": "house", "levels": 2, "roof_shape": "flat"}, {}, "tokyo_house_modern"],
+		["tokyo", {"kind": "house", "start_year": 1998}, {}, "tokyo_house_modern"],
 		["tokyo", {"kind": "commercial", "levels": 25}, {}, "tokyo_tower"],
+		["tokyo", {"kind": "apartments", "levels": 2}, {}, "tokyo_mokuchin"],
+		["tokyo", {"kind": "apartments", "levels": 9}, {}, "tokyo_mansion"],
+		["tokyo", {"kind": "apartments", "architecture": "zakkyo"}, {}, "tokyo_zakkyo"],
+		# By district: Center Gai mixed towers, Ebisu mansions, Shibuya east towers.
+		["tokyo", {"kind": "apartments", "levels": 7, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("tokyo", 35.6608, 139.6985), "tokyo_zakkyo"],
+		["tokyo", {"kind": "apartments", "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("tokyo", 35.6608, 139.6985), "tokyo_zakkyo"],
+		["tokyo", {"kind": "apartments", "levels": 6, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("tokyo", 35.6467, 139.7101), "tokyo_mansion"],
+		["tokyo", {"kind": "commercial", "levels": 30, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("tokyo", 35.6585, 139.7030), "tokyo_tower"],
 		["hong_kong", {"kind": "apartments", "levels": 32}, {}, "hong_kong"],
 		["hong_kong", {"kind": "apartments", "levels": 6}, {}, "hk_tenement"],
 		["singapore", {"kind": "commercial", "levels": 3}, {}, "sg_shophouse"],
@@ -811,7 +825,26 @@ func _era_checks(failures: Array[String]) -> void:
 		["stockholm", {"kind": "apartments", "architecture": "swedish_grace", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_grace"],
 		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
 		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],
-		["seoul", {"kind": "apartments", "levels": 18}, {}, "seoul"],
+		["seoul", {"kind": "apartments", "levels": 18}, {}, "seoul_danji"],
+		["seoul", {"kind": "apartments", "levels": 10}, {}, "seoul"],
+		["seoul", {"kind": "apartments", "levels": 45}, {}, "seoul_tower"],
+		["seoul", {"kind": "apartments", "architecture": "danji"}, {}, "seoul_danji"],
+		["seoul", {"kind": "commercial", "architecture": "officetel"}, {}, "seoul_officetel"],
+		# Untyped tall blocks by Gwanghwamun are offices; a named 동 block is a danji.
+		["seoul", {"kind": "yes", "levels": 16, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5728, 126.9750), "seoul_tower"],
+		["seoul", {"kind": "yes", "levels": 16, "name": "104동", "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5728, 126.9750), "seoul_danji"],
+		["seoul", {"kind": "apartments", "levels": 18, "name": "용비어천가 오피스텔"}, {}, "seoul_officetel"],
+		# By district: Jamsil danji, Myeongdong shops, Gangnam officetels, Bukchon hanok.
+		["seoul", {"kind": "apartments", "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5110, 127.0850), "seoul_danji"],
+		["seoul", {"kind": "commercial", "levels": 5, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5636, 126.9850), "seoul_shopping"],
+		["seoul", {"kind": "commercial", "levels": 20, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.4900, 127.0300), "seoul_officetel"],
+		["seoul", {"kind": "house", "levels": 1, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5826, 126.9837), "seoul_hanok"],
 		["seoul", {"kind": "apartments", "levels": 4}, {}, "seoul_villa"],
 		["seoul", {"kind": "house", "heritage": true}, {}, "seoul_hanok"],
 		["seoul", {"kind": "commercial", "levels": 30}, {}, "seoul_tower"],
@@ -846,6 +879,17 @@ func _era_checks(failures: Array[String]) -> void:
 		var got := _era(str(o[0]), o[1], o[2], 200.0 if str(o[1]["kind"]) == "house" else 600.0)
 		if got != str(o[3]):
 			failures.append("%s era for %s = %s, expected %s" % [o[0], o[1], got, o[3]])
+	# ArchitectureCitiesEastAsia keeps its own copies (BuildingEra reads its ERAS).
+	if ArchitectureCitiesEastAsia.MODERN != BuildingEra.MODERN or ArchitectureCitiesEastAsia.APT != BuildingEra.APT \
+			or ArchitectureCitiesEastAsia.AC != BuildingEra.AC or ArchitectureCitiesEastAsia.ACC != BuildingEra.ACC \
+			or ArchitectureCitiesEastAsia.HAC != BuildingEra.HAC:
+		failures.append("ArchitectureCitiesEastAsia's kind lists and MODERN must match BuildingEra's")
+	var ginza := CityStyles.local_frame("tokyo", 35.6717, 139.7650)
+	if _era("tokyo", {"kind": "apartments", "levels": 2, "x": 0.0, "z": 0.0}, ginza) != "tokyo":
+		failures.append("a two-storey block in Ginza should not be a wooden rental flat")
+	var gai := CityStyles.local_frame("tokyo", 35.6608, 139.6985)
+	if _era("tokyo", {"kind": "apartments", "levels": 8, "x": 0.0, "z": 0.0}, gai, 3000.0) != "tokyo":
+		failures.append("a Center Gai mall block should keep the general Tokyo fabric, not zakkyo")
 	var old_town: Array = CityStyles.local_frame("stockholm", 59.3251, 18.0711)["districts"]
 	var road := {"class": "residential", "points": PackedVector2Array([Vector2(-10, 0), Vector2(10, 0)])}
 	if RoadBuilder._district_finish(road, old_town, 1.0) != "sett":

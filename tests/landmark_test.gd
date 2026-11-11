@@ -68,6 +68,13 @@ func _run() -> void:
 		"Sutro Tower": "sutro_tower",
 		"San Francisco City Hall": "sf_city_hall",
 		"Palace of Fine Arts": "palace_of_fine_arts",
+		"Shibuya Scramble Square": "shibuya_scramble_square",
+		"Shibuya Hikarie": "shibuya_hikarie",
+		"Shibuya 109": "shibuya_109",
+		"QFRONT": "qfront",
+		"Statue of King Sejong": "king_sejong_statue",
+		"Statue of Admiral Yi Sun-sin": "yi_sun_sin_statue",
+		"Geunjeongjeon": "geunjeongjeon",
 		"Tower Bridge": "tower_bridge",
 		"Brooklyn Bridge": "brooklyn_bridge",
 		"Sydney Harbour Bridge": "sydney_harbour_bridge",
@@ -160,7 +167,10 @@ func _run() -> void:
 		"tyska_kyrkan": 96.0, "vasterbron": 51.2, "golden_gate": 227.0, "tower_bridge": 65.0,
 		"brooklyn_bridge": 84.3, "sydney_harbour_bridge": 134.0, "bixby_creek_bridge": 79.0,
 		"salesforce_tower": 326.0, "coit_tower": 64.0, "ferry_building": 75.0, "alcatraz": 69.0,
-		"sutro_tower": 298.0, "sf_city_hall": 93.7, "palace_of_fine_arts": 49.4}
+		"sutro_tower": 298.0, "sf_city_hall": 93.7, "palace_of_fine_arts": 49.4,
+		"shibuya_scramble_square": 229.7, "shibuya_hikarie": 182.5, "shibuya_stream": 180.0, "shibuya_109": 33.6,
+		"qfront": 45.9, "king_sejong_statue": 10.4, "yi_sun_sin_statue": 17.0, "gyeongbokgung_walls": 4.0,
+		"heungnyemun": 15.0, "geunjeongjeon": 27.8}
 	for entry in LocationData.landmarks():
 		var type := str(entry["type"])
 		var model := LandmarkBuilder.build(type)

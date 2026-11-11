@@ -52,6 +52,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
 	var timings := {}
 	var t := Time.get_ticks_msec()
+	# Planned before the lamps: a side-street lamp gives way only where a
+	# utility pole really stands (the poles stop at their radius and cap).
+	var pole_plan := UtilityPoles.plan(data, ground)
+	ctx = ctx.duplicate()
+	ctx["pole_grid"] = UtilityPoles.pole_grid(pole_plan)
+	t = _lap(timings, "pole_plan", t)
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	t = _lap(timings, "lamps", t)
 	var bar := _barriers(root, data, ground, ctx)
@@ -74,10 +80,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "trains", t)
 	var wires := OverheadWires.build(root, data, ground)
 	t = _lap(timings, "wires", t)
+	var poles := UtilityPoles.build(root, data, ground, pole_plan)
+	t = _lap(timings, "utility_poles", t)
 	var snowbanks := Snowbanks.build(root, data, ground)
 	t = _lap(timings, "snowbanks", t)
 	print("PROPS timings ms ", timings)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "snowbanks": snowbanks}
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks}
 
 ## Records the ms since `t` under `key`; returns the time now.
 static func _lap(timings: Dictionary, key: String, t: int) -> int:
@@ -101,6 +109,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
 	var sites := _lamp_sites(data, ground, m2u)
+	var pole_grid: Dictionary = ctx.get("pole_grid", {})
 	for r in data.roads:
 		var pts: PackedVector2Array
 		var cls := "residential"
@@ -152,6 +161,9 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
 					continue
 				if _on_apron(sites["aprons"], p, m2u):
+					continue
+				# A utility pole (with its own bracket lamp) already stands here.
+				if style == "utility" and UtilityPoles.near_pole(pole_grid, p):
 					continue
 				var ok := Vector2i(int(floor(p.x / occ_cell)), int(floor(p.y / occ_cell)))
 				if occupied.has(ok):

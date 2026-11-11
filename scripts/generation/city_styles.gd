@@ -210,6 +210,21 @@ const DISTRICTS := [
 	["tokyo", "tokyo_tower", 35.6896, 139.6995, 0.9, 20.0],      # Shinjuku
 	["tokyo", "tokyo_tower", 35.6812, 139.7671, 0.8, 20.0],      # Marunouchi
 	["tokyo", "tokyo_tower", 35.6605, 139.7292, 0.5, 10.0],      # Roppongi
+	["tokyo", "tokyo_tower", 35.6585, 139.7030, 0.3, 10.0],      # Shibuya station east (Hikarie, Stream)
+	["tokyo", "tokyo_zakkyo", 35.6608, 139.6985, 0.35, 15.0],    # Center Gai, Udagawacho
+	["tokyo", "tokyo_zakkyo", 35.6575, 139.6965, 0.3, 12.0],     # Dogenzaka
+	["tokyo", "tokyo_zakkyo", 35.6945, 139.7030, 0.4, 20.0],     # Kabukicho
+	["tokyo", "tokyo_zakkyo", 35.6717, 139.7650, 0.5, 10.0],     # Ginza
+	["tokyo", "tokyo_zakkyo", 35.6984, 139.7731, 0.4, 15.0],     # Akihabara
+	["tokyo", "tokyo_zakkyo", 35.7300, 139.7135, 0.4, 10.0],     # Ikebukuro east
+	["tokyo", "tokyo_mansion", 35.6467, 139.7101, 0.8, 8.0],     # Ebisu
+	["tokyo", "tokyo_mansion", 35.6340, 139.7160, 0.8, 8.0],     # Meguro
+	["tokyo", "tokyo_mansion", 35.6700, 139.7100, 0.6, 6.0],     # Jingumae, Aoyama
+	["tokyo", "tokyo_mokuchin", 35.7076, 139.6638, 1.5, 6.0],    # Nakano
+	["tokyo", "tokyo_house", 35.6460, 139.6530, 3.0, 8.0],       # Setagaya
+	["tokyo", "tokyo_house_modern", 35.6460, 139.6530, 3.0, 8.0],
+	["tokyo", "tokyo_house", 35.6995, 139.6366, 2.5, 8.0],       # Suginami
+	["tokyo", "tokyo_house_modern", 35.6995, 139.6366, 2.5, 8.0],
 	["hong_kong", "hk_tenement", 22.3300, 114.1620, 1.2, 6.0],   # Sham Shui Po
 	["hong_kong", "hk_tenement", 22.3190, 114.1700, 0.8, 4.0],   # Mong Kok
 	["hong_kong", "hk_office", 22.2830, 114.1585, 0.8, 20.0],    # Central
@@ -224,6 +239,21 @@ const DISTRICTS := [
 	["seoul", "seoul_tower", 37.5250, 126.9250, 1.0, 20.0],      # Yeouido
 	["seoul", "seoul_tower", 37.5030, 127.0400, 1.2, 15.0],      # Teheran-ro
 	["seoul", "seoul_tower", 37.5680, 126.9800, 0.7, 8.0],       # Jongno CBD
+	["seoul", "seoul_shopping", 37.5715, 126.9880, 0.45, 10.0],  # Jongno 2–3-ga, Insadong
+	["seoul", "seoul_shopping", 37.5636, 126.9850, 0.4, 20.0],   # Myeongdong
+	["seoul", "seoul_shopping", 37.5560, 126.9230, 0.6, 15.0],   # Hongdae
+	["seoul", "seoul_shopping", 37.5598, 126.9425, 0.4, 10.0],   # Sinchon
+	["seoul", "seoul_shopping", 37.4980, 127.0276, 0.4, 10.0],   # Gangnam station
+	["seoul", "seoul_officetel", 37.4950, 127.0280, 0.9, 8.0],   # Gangnam, Seocho
+	["seoul", "seoul_officetel", 37.5440, 126.9510, 0.5, 8.0],   # Gongdeok, Mapo
+	["seoul", "seoul_danji", 37.5110, 127.0850, 1.2, 20.0],      # Jamsil
+	["seoul", "seoul_danji", 37.5290, 127.0300, 0.7, 20.0],      # Apgujeong
+	["seoul", "seoul_danji", 37.5050, 126.9950, 0.9, 20.0],      # Banpo
+	["seoul", "seoul_danji", 37.5200, 126.9700, 0.6, 15.0],      # Ichon
+	["seoul", "seoul_danji", 37.5300, 126.8750, 1.2, 20.0],      # Mokdong
+	["seoul", "seoul_danji", 37.6550, 127.0650, 1.8, 20.0],      # Nowon, Sanggye
+	["seoul", "seoul_villa", 37.5600, 126.9100, 1.0, 10.0],      # Mangwon, Yeonnam
+	["seoul", "seoul_villa", 37.5400, 126.8450, 1.2, 10.0],      # Hwagok
 	["dubai", "dubai_tower", 25.2100, 55.2750, 1.5, 20.0],       # Sheikh Zayed Road
 	["dubai", "dubai_tower", 25.1950, 55.2780, 1.0, 20.0],       # Downtown
 	["dubai", "dubai_tower", 25.1860, 55.2650, 1.0, 15.0],       # Business Bay

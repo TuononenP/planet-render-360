@@ -68,6 +68,7 @@ static func add(root: Node3D, d: Dictionary) -> void:
 			_oriels(kit, sp, rows, oriel_paint(d.get("b", {}), look, stone),
 				trim_for(look, stone), str(look.get("ground", "")) == "" and not garage)
 	StreetFront.add(kit, spans, rows, d, stone)
+	AsiaFronts.add(kit, spans, rows, d)
 	kit.flush(root, "Relief")
 
 ## Bays a wall `len_m` long fits at `bay` metres: none when under half a bay.

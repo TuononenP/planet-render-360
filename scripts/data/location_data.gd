@@ -433,7 +433,7 @@ static func _core_landmarks() -> Array:
 		{"type": "monte_carlo_casino", "name": "Monte Carlo Casino", "lat": 43.7393, "lon": 7.4283, "radius_m": 2500.0,
 			"wiki_title": "Monte Carlo Casino", "height_m": 34.0, "clear_m": 60.0, "yaw_deg": -30.0,
 			"kind": "Casino", "aliases": ["monte carlo casino", "casino de monte-carlo", "casino de monte carlo"]},
-		{"type": "gwanghwamun", "name": "Gwanghwamun", "lat": 37.5760, "lon": 126.9769, "radius_m": 3000.0,
+		{"type": "gwanghwamun", "name": "Gwanghwamun", "lat": 37.575928, "lon": 126.976817, "radius_m": 3000.0,
 			"wiki_title": "Gwanghwamun", "height_m": 19.0, "clear_m": 30.0, "kind": "Palace gate",
 			"aliases": ["gwanghwamun", "광화문"]},
 		{"type": "banff_springs", "name": "Banff Springs Hotel", "lat": 51.1643, "lon": -115.5618, "radius_m": 3000.0,

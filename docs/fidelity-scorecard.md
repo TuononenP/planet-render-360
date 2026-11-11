@@ -312,6 +312,22 @@ San Francisco's fabric now comes from the following, each with its test:
 
 The generic parts apply wherever their data occurs.
 
+Round ts-r3, 2026-11-11 (Tokyo and Seoul hero pass, `.agents/plans/2026-11-11-tokyo-seoul-hero.md`):
+- Captures: `visual-plan/reviews/tokyo-seoul-r3-2026-11-11/` (local golden hour, noon and night, clear summer;
+  r2 in `tokyo-seoul-r2-2026-11-11/` also has the roof views).
+- Rater: Claude (agent pre-rating).
+
+| preset | grade | change since ultra-p8 | biggest remaining tell |
+|---|---|---|---|
+| Tokyo | recognisable | ↑ zakkyo sign columns and boards, QFRONT poster screen, Scramble Square / Hikarie / Stream / 109 models, utility poles and cables | No crowd; the eye stands on a bare station roof deck; neighbours of QFRONT carry no screens |
+| Seoul | recognisable | ↑ Gyeongbokgung behind the gate, Sejong and Yi statues, officetels and towers by tag | Gate still small at 240 m; square paving reads uniform grey; the core gate stands about 10 m off its OSM outline |
+
+Tokyo's and Seoul's fabric now comes from the following, each with its test:
+- Data rows, district circles and per-city rules (`ArchitectureCitiesEastAsia`; architecture_test).
+- Slab-end block numbers, per-storey sign boards and full-height sign columns (`AsiaFronts`; asia_fronts_test).
+- Concrete utility poles and cables on JP and KR side streets (`UtilityPoles`; utility_poles_test).
+- The `tokyo_seoul` landmark batch (tokyo_seoul_landmarks_test).
+
 Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with the new
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
