@@ -20,6 +20,21 @@ const LINER_EYE_CLEAR_M := 40.0
 const LINER_TURN_RAD := 0.12
 const LINER_DEVIATION_M := 6.0
 
+## One harbour plan's shared lookups: [data, its ferry terminals, its
+## joined quay lines (null until asked for), m]. The terminal test runs
+## for every vertex of every coastline and water polygon, twice (liners,
+## then cargo berths), and each one scanned every building and POI:
+## 2.4 s of a Paris build with no ship to berth. Other data, and calls
+## outside a plan, find their own.
+static var _scope: Array = []
+
+## Brackets MarinaBuilder.plan for `data`.
+static func begin_plan(data: LocationData, m: float) -> void:
+	_scope = [data, _terminals(data), null, m]
+
+static func end_plan() -> void:
+	_scope = []
+
 static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 		m: float, mask: VegetationMask = null) -> Array:
 	var lines: Array = []
@@ -153,6 +168,16 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 ## Join nearby quay fragments before looking for straight berths. A gap is
 ## allowed only when the joined polyline still passes the straightness test.
 static func _quay_lines(data: LocationData, m: float) -> Array:
+	var scope := _scope
+	var scoped: bool = scope.size() == 4 and is_same(scope[0], data) and scope[3] == m
+	if scoped and scope[2] != null:
+		return scope[2]
+	var lines := _join_quay_lines(data, m)
+	if scoped:
+		scope[2] = lines
+	return lines
+
+static func _join_quay_lines(data: LocationData, m: float) -> Array:
 	var lines: Array = []
 	for structure in data.shore_structures:
 		if str(structure.get("kind", "")) == "quay":
@@ -230,15 +255,26 @@ static func _mapped_quay_at(data: LocationData, at: Vector2, m: float) -> bool:
 	return false
 
 static func _terminal_distance(data: LocationData, at: Vector2) -> float:
+	var scope := _scope
+	var terminals: PackedVector2Array = scope[1] if scope.size() == 4 and is_same(scope[0], data) \
+		else _terminals(data)
 	var distance := INF
+	for t in terminals:
+		distance = minf(distance, at.distance_to(t))
+	return distance
+
+## Where `data`'s ferry terminals stand (buildings, then POIs), less the
+## ones that keep ferry scenery of their own (HarbourFerries).
+static func _terminals(data: LocationData) -> PackedVector2Array:
+	var out := PackedVector2Array()
 	for b in data.buildings:
 		if b is Dictionary and str(b.get("use", "")) == "ferry_terminal" and not HarbourFerries.terminal(b):
-			distance = minf(distance, at.distance_to(Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))))
+			out.append(Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0))))
 	for p in data.pois:
 		if p is Dictionary and str(p.get("kind", "")) == "ferry_terminal" \
 				and not str(p.get("name", "")).to_lower().contains("staten island ferry"):
-			distance = minf(distance, at.distance_to(Vector2(float(p.get("x", 0.0)), float(p.get("z", 0.0)))))
-	return distance
+			out.append(Vector2(float(p.get("x", 0.0)), float(p.get("z", 0.0))))
+	return out
 
 static func _near_terminal(data: LocationData, at: Vector2, m: float) -> bool:
 	return _terminal_distance(data, at) < 400.0 * m

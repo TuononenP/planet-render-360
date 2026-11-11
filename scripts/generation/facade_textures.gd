@@ -157,15 +157,61 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 ## only what that build used, which its world references anyway.
 static var _store := {}
 static var _store_used := {}
+## Milliseconds the last build spent composing (BUILDINGS timings).
+static var compose_ms := 0
 
 static func composed(inputs: Array, make: Callable) -> Dictionary:
 	var k := var_to_str(inputs)
 	_store_used[k] = true
 	if _store.has(k):
 		return _store[k] as Dictionary
+	var t0 := Time.get_ticks_msec()
 	var d: Dictionary = make.call()
+	compose_ms += Time.get_ticks_msec() - t0
 	_store[k] = d
 	return d
+
+## The exact composer inputs the last build used (BuildPrewarm remembers
+## them for the next session's first build).
+static func recipes() -> PackedStringArray:
+	return PackedStringArray(_store.keys())
+
+## Composes `keys` (from recipes()) that are not held yet, on every core,
+## with `loader` reading the PBR maps at the coming build's size. Call
+## while no build runs: nothing else may touch the store meanwhile.
+static func prewarm(keys: PackedStringArray, loader: Callable) -> void:
+	var todo: Array = []
+	for k in keys:
+		var inputs: Variant = str_to_var(k)
+		if inputs is Array and not _store.has(k) and _recipe(inputs, loader).is_valid():
+			todo.append([k, inputs])
+	if todo.is_empty():
+		return
+	var made: Array = []
+	made.resize(todo.size())
+	var group := WorkerThreadPool.add_group_task(func(i: int) -> void:
+		made[i] = _recipe(todo[i][1], loader).call(), todo.size(), -1, true, "FacadePrewarm")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	for i in todo.size():
+		if made[i] is Dictionary:
+			_store[todo[i][0]] = made[i]
+
+## The composer call behind one composed() entry, or an invalid Callable
+## for inputs this version does not know.
+static func _recipe(inputs: Array, loader: Callable) -> Callable:
+	var kind := str(inputs[0]) if not inputs.is_empty() else ""
+	if kind == "tile" and inputs.size() == 5 and inputs[4] is Dictionary:
+		return func() -> Dictionary: return FacadeComposer.compose_tile(str(inputs[1]), str(inputs[2]),
+			int(inputs[3]), inputs[4], loader)
+	if kind == "glass" and inputs.size() == 2:
+		return func() -> Dictionary: return StoreyComposer.compose_glass(int(inputs[1]))
+	if kind == "storeys" and inputs.size() == 5:
+		return func() -> Dictionary: return StoreyComposer.compose_haussmann(str(inputs[1]), int(inputs[2]),
+			int(inputs[3]), loader, int(inputs[4]))
+	if kind == "ground" and inputs.size() == 6 and inputs[4] is Dictionary and inputs[5] is Color:
+		return func() -> Dictionary: return StoreyComposer.compose_ground(str(inputs[1]), str(inputs[2]),
+			int(inputs[3]), inputs[4], inputs[5], loader)
+	return Callable()
 
 static func end_build() -> void:
 	for k in _store.keys():

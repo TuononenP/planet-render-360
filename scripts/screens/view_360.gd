@@ -294,10 +294,13 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 static func make_world(data: LocationData, ground: GroundTruth,
 		abort: BuildAbort = null) -> Node3D:
 	var world := TerrainBuilder.build_world(data, ground, abort)
-	# T7.1: merge building masses per material/cell (preset-independent).
+	_merge(world, abort)
+	return world
+
+## T7.1: merge building masses per material/cell (preset-independent).
+static func _merge(world: Node3D, abort: BuildAbort) -> void:
 	BuildAbort.mark(abort, BuildAbort.Step.MERGE)
 	LodRing.merge_buildings(world)
-	return world
 
 ## Builds [ground, world] for `data` on a worker thread. The build takes
 ## seconds on dense cities; run on the main thread it froze the loading
@@ -312,14 +315,30 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		return cached
 	var thread := Thread.new()
 	_threads.append(thread)
+	var finishing := [false]
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data, abort)
-		var w := make_world(data, g, abort)
+		var w := TerrainBuilder.build_world(data, g, abort)
+		finishing[0] = true
+		_merge(w, abort)
 		# Packed here, detached and pristine, so the save costs the main
 		# thread nothing before the view shows.
 		var stopped := abort != null and abort.requested
+		if not stopped:
+			BuildPrewarm.remember()
 		return [g, w, null if stopped else WorldCache.pack(w)])
+	# The merge and the pack ask the rendering server about every mesh
+	# node, and each answer to a worker thread waits for the main thread's
+	# next flush: one node a frame, so ~3000 nodes took 26 s at 120 fps
+	# (Paris on Ultra). The main thread answers them here instead, in the
+	# share of each frame a cache save gets (WorldCache.pump_budget_us).
+	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
+		var t := Time.get_ticks_usec()
+		var budget := WorldCache.pump_budget_us(t - last_us)
+		while finishing[0] and thread.is_alive() and Time.get_ticks_usec() - t < budget:
+			RenderingServer.force_sync()
+		last_us = t
 		await get_tree().process_frame
 	_threads.erase(thread)
 	var built: Array = thread.wait_to_finish()

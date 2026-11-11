@@ -350,10 +350,11 @@ static func photo_texture(set_name: String, map_name: String) -> Texture2D:
 	_photo_mutex.unlock()
 	if cached != null:
 		return cached
-	var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
-	img.convert(Image.FORMAT_RGBA8)
-	img.generate_mipmaps()
-	var tex := ImageTexture.create_from_image(img)
+	var tex := SharedTexture.keep("photo_" + key.replace(":", "_"), func() -> Texture2D:
+		var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
+		img.convert(Image.FORMAT_RGBA8)
+		img.generate_mipmaps()
+		return ImageTexture.create_from_image(img))
 	_photo_mutex.lock()
 	_photos[key] = tex
 	_photo_mutex.unlock()

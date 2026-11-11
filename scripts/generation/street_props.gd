@@ -48,19 +48,40 @@ static var _mats: Dictionary = {}
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
+	var timings := {}
+	var t := Time.get_ticks_msec()
 	var lamps := _lampposts(root, data, ground, mask, ctx)
+	t = _lap(timings, "lamps", t)
 	var bar := _barriers(root, data, ground, ctx)
+	t = _lap(timings, "barriers", t)
 	ShoreRailings.build(root, data, ground)
+	t = _lap(timings, "shore_railings", t)
 	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
+	t = _lap(timings, "furniture", t)
 	var boats := MarinaBuilder.build(root, data, ground, mask)
+	t = _lap(timings, "marina", t)
 	boats += HarbourFerries.build(root, data, ground, mask)
+	t = _lap(timings, "ferries", t)
 	var quay_bollards := QuayDetails.build(root, data, ground)
+	t = _lap(timings, "quay", t)
 	var cars := ParkedCars.build(root, data, ground)
+	t = _lap(timings, "cars", t)
 	var trams := TransitVehicles.build(root, data, ground)
+	t = _lap(timings, "trams", t)
 	var trains := StationTrains.build(root, data, ground)
+	t = _lap(timings, "trains", t)
 	var wires := OverheadWires.build(root, data, ground)
+	t = _lap(timings, "wires", t)
 	var snowbanks := Snowbanks.build(root, data, ground)
+	t = _lap(timings, "snowbanks", t)
+	print("PROPS timings ms ", timings)
 	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "snowbanks": snowbanks}
+
+## Records the ms since `t` under `key`; returns the time now.
+static func _lap(timings: Dictionary, key: String, t: int) -> int:
+	var now := Time.get_ticks_msec()
+	timings[key] = now - t
+	return now
 
 # --- Lampposts -----------------------------------------------------------
 

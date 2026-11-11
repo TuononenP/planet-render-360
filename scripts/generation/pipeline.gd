@@ -408,6 +408,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	for i in STAGES.size():
 		_run_stage(i, data)
 	while _stages_left > 0:
+		WorldCache.pump_prefetch()  # the cached world loads meanwhile
 		await get_tree().process_frame
 	if _cancelled:
 		cancelled.emit()
@@ -428,6 +429,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	# The prewarm must be done before the build thread reads those caches;
 	# waited frame by frame (its TerrainTextures save needs main flushes).
 	while _prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(_prewarm_task):
+		WorldCache.pump_prefetch()
 		await get_tree().process_frame
 	_join_prewarm()
 	if _cancelled:

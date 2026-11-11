@@ -34,6 +34,8 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
 	var tracks := _track_grid(lines, m)
+	var centres := _centre_grid(data, 35.0 * m)
+	var rings := _ring_grid(data, 12.0 * m)
 	var poles := {}
 	for entry in lines:
 		var way: Dictionary = entry[0]
@@ -47,14 +49,14 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 			var mid := (a + b) * 0.5
 			if mid.distance_to(centre) > RADIUS_M * m or a.distance_to(b) < 2.0 * m:
 				continue
-			if bool(entry[2]) and not _built(mid, data, 35.0 * m):
+			if bool(entry[2]) and not _built(mid, centres, 35.0 * m):
 				continue
 			var n := Vector2((b - a).y, -(b - a).x).normalized()
 			var half := maxf(4.0, float(way.get("width_m", 6.0)) * 0.5 + 1.0) * m
 			var supports: Array = []
 			for side in [-1.0, 1.0]:
 				var p: Vector2 = a + n * half * float(side)
-				var anchor := _anchor(p, data, 12.0 * m)
+				var anchor := _anchor(p, data, rings, 12.0 * m)
 				var at: Vector2 = anchor[0]
 				if not anchor[1]:
 					at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
@@ -137,21 +139,60 @@ static func _near_pole(p: Vector2, a: Vector2, out: Vector2, half: float,
 					return q
 	return Vector2(INF, INF)
 
-static func _built(p: Vector2, data: LocationData, radius: float) -> bool:
+## Building centres bucketed in `radius` cells: a span asks whether any
+## stands within `radius` of it, and scanning every building for each of
+## 400 spans took over a second in Helsinki.
+static func _centre_grid(data: LocationData, radius: float) -> Dictionary:
+	var grid := {}
 	for b in data.buildings:
-		if p.distance_to(Vector2(float(b.get("x", 0)), float(b.get("z", 0)))) < radius:
-			return true
+		var c := Vector2(float(b.get("x", 0)), float(b.get("z", 0)))
+		var cell := Vector2i(floori(c.x / radius), floori(c.y / radius))
+		if not grid.has(cell):
+			grid[cell] = []
+		(grid[cell] as Array).append(c)
+	return grid
+
+static func _built(p: Vector2, centres: Dictionary, radius: float) -> bool:
+	var c := Vector2i(floori(p.x / radius), floori(p.y / radius))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for q: Vector2 in centres.get(Vector2i(c.x + dx, c.y + dz), []):
+				if p.distance_to(q) < radius:
+					return true
 	return false
 
+## Indices into data.buildings (ascending) by `radius` cell, for every
+## cell a footprint's bounds grown by `radius` touch: a point's cell then
+## lists every building with wall within `radius` of it.
+static func _ring_grid(data: LocationData, radius: float) -> Dictionary:
+	var grid := {}
+	for i in data.buildings.size():
+		var ring: PackedVector2Array = data.buildings[i].get("footprint", PackedVector2Array())
+		if ring.is_empty():
+			continue
+		var lo := ring[0]
+		var hi := ring[0]
+		for q in ring:
+			lo = lo.min(q)
+			hi = hi.max(q)
+		for cx in range(floori((lo.x - radius) / radius), floori((hi.x + radius) / radius) + 1):
+			for cz in range(floori((lo.y - radius) / radius), floori((hi.y + radius) / radius) + 1):
+				var cell := Vector2i(cx, cz)
+				if not grid.has(cell):
+					grid[cell] = []
+				(grid[cell] as Array).append(i)
+	return grid
+
 ## Facade attachment nearest to the nominal pole; no building means pole.
-static func _anchor(p: Vector2, data: LocationData, radius: float) -> Array:
+static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: float) -> Array:
 	var best := radius
 	var at := p
 	var found := false
-	for b in data.buildings:
+	for i: int in rings.get(Vector2i(floori(p.x / radius), floori(p.y / radius)), []):
+		var b: Dictionary = data.buildings[i]
 		var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
-		for i in ring.size():
-			var q := Geometry2D.get_closest_point_to_segment(p, ring[i], ring[(i + 1) % ring.size()])
+		for j in ring.size():
+			var q := Geometry2D.get_closest_point_to_segment(p, ring[j], ring[(j + 1) % ring.size()])
 			if p.distance_to(q) < best and float(b.get("height", 0.0)) >= CONTACT_M + 1.0:
 				best = p.distance_to(q)
 				at = q

@@ -152,6 +152,24 @@ static func prefetch(lat: float, lon: float, preset: int, season: int) -> bool:
 		_prefetched = best
 	return true
 
+## Main-thread microseconds a frame gives a loading world. Each mesh the
+## loader thread creates waits for the main thread's next flush, so a
+## cached Ultra world (~2850 meshes) took one frame per mesh to load:
+## 24 s at 120 fps for Paris, 3 s with this share of each frame.
+const LOAD_PUMP_US := 8000
+
+## Call once a frame while `path` loads on its thread.
+static func pump_load(path: String) -> void:
+	var t := Time.get_ticks_usec()
+	while Time.get_ticks_usec() - t < LOAD_PUMP_US and ResourceLoader.load_threaded_get_status(path) \
+			== ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		RenderingServer.force_sync()
+
+## Call once a frame while a prefetch may be loading (the pipeline's wait).
+static func pump_prefetch() -> void:
+	if _prefetched != "":
+		pump_load(_prefetched)
+
 ## Unused prefetches still loading; collected once done, so their
 ## scenes are released without blocking the main thread on them.
 static var _dropped: Array[String] = []
@@ -211,6 +229,7 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 				ResourceLoader.CACHE_MODE_IGNORE) != OK:
 			return []
 	while ResourceLoader.load_threaded_get_status(p["scene"]) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		pump_load(p["scene"])
 		await view.get_tree().process_frame
 	var ps := ResourceLoader.load_threaded_get(p["scene"]) as PackedScene
 	var g := ground if ground != null else _ground_from_state(state, data)
@@ -295,6 +314,7 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 		DirAccess.make_dir_recursive_absolute(p["scene"].get_base_dir())
 		var tmp: String = p["scene"] + ".tmp.scn"
 		var t0 := Time.get_ticks_msec()
+		SharedTexture.flush()  # the scene then names them, not holds them
 		if ResourceSaver.save(ps, tmp, ResourceSaver.FLAG_COMPRESS) != OK:
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
 			return []

@@ -89,6 +89,8 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 		FacadeLiteShader.upgrade(root)
 	FacadeTextures.end_build()
 	timings["finishing"] = Time.get_ticks_msec() - t0
+	timings["facade_compose"] = FacadeTextures.compose_ms  # inside the others
+	FacadeTextures.compose_ms = 0
 	print("BUILDINGS timings ms ", timings)
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
 	if failed_parts > 0:

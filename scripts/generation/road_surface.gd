@@ -473,10 +473,11 @@ static func _tex(map_name: String) -> Texture2D:
 	var key := map_name + (":2k" if MaterialLibrary.hi_res else "")
 	if _texs.has(key):
 		return _texs[key]
-	var img := (MaterialLibrary._set_image("asphalt", map_name) as Image).duplicate() as Image
-	if not img.has_mipmaps():
-		img.generate_mipmaps(map_name == "nor")
-	_texs[key] = ImageTexture.create_from_image(img)
+	_texs[key] = SharedTexture.keep("road_" + key.replace(":", "_"), func() -> Texture2D:
+		var img := (MaterialLibrary._set_image("asphalt", map_name) as Image).duplicate() as Image
+		if not img.has_mipmaps():
+			img.generate_mipmaps(map_name == "nor")
+		return ImageTexture.create_from_image(img))
 	return _texs[key]
 
 static func _points(line: Variant) -> PackedVector2Array:

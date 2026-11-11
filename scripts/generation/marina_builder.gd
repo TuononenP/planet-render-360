@@ -81,8 +81,10 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			continue
 		decks.append(_deck(pts, ground, m2u, taken))
 	# Reserve large berths before filling the harbour with small craft.
+	QuayMoorings.begin_plan(data, m2u)
 	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
 	liners.append_array(CargoBerths.plan(data, ground, taken, m2u, mask, liners))
+	QuayMoorings.end_plan()
 	var k := 0
 	for p in piers:
 		var pts: PackedVector2Array = (p as Dictionary)["points"]

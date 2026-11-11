@@ -9,8 +9,17 @@ extends RefCounted
 ## specular shimmer down at Balanced, which has no MSAA.
 const PHOTO_NORMAL_SCALE := 0.7
 static var _mutex := Mutex.new()
-## Set when _pbr_mats went past its 64 cap (see pbr_material).
+## Set when _pbr_mats went past its cap (see pbr_material).
 static var cap_reached := false
+## Most distinct PBR materials (set + tint + repeat) one build keeps.
+## Desktop Ultra adds props with finishes of their own (boats, cars,
+## street furniture): Helsinki asked for 65, and that one material past
+## 64 made the whole world build twice.
+const CAP := 64
+const CAP_ULTRA := 128
+
+static func cap() -> int:
+	return CAP_ULTRA if MaterialLibrary.hi_res else CAP
 ## Parallel build stages (WorldBuildGraph), per pool thread: the cache a
 ## stage sees and its rank in the serial stage order. Keys round tint and
 ## repeat, so two stages can ask one key with slightly different values;
@@ -176,20 +185,21 @@ static func _destripe_normal(img: Image, ch: int) -> void:
 ## linearised image decoded it twice (dark, over-contrasted roofs and
 ## near-black asphalt). The cached Image stays linear and mip-free for
 ## the CPU composers and the GroundMaterial shader (raw samplers).
-static func _set_tex(set_name: String, map_name: String) -> Texture2D:
-	var key := "t:" + set_name + ":" + map_name + (":2k" if map_path(set_name, map_name).contains("/2k/") else "")
+static func _set_tex(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> Texture2D:
+	var key := "t:" + set_name + ":" + map_name + (":2k" if map_path(set_name, map_name, hi_res).contains("/2k/") else "")
 	_mutex.lock()
 	if MaterialLibrary._set_texs.has(key):
 		var cached_t: Texture2D = MaterialLibrary._set_texs[key] as Texture2D
 		_mutex.unlock()
 		return cached_t
 	_mutex.unlock()
-	var img := (_set_image(set_name, map_name) as Image).duplicate() as Image
-	if map_name == "diff":
-		img.linear_to_srgb()
-	if not img.has_mipmaps():
-		img.generate_mipmaps()
-	var t := ImageTexture.create_from_image(img)
+	var t := SharedTexture.keep("pbr_" + key.substr(2).replace(":", "_"), func() -> Texture2D:
+		var img := (_set_image(set_name, map_name, hi_res) as Image).duplicate() as Image
+		if map_name == "diff":
+			img.linear_to_srgb()
+		if not img.has_mipmaps():
+			img.generate_mipmaps()
+		return ImageTexture.create_from_image(img))
 	_mutex.lock()
 	MaterialLibrary._set_texs[key] = t
 	_mutex.unlock()
@@ -210,8 +220,8 @@ static func _calib_tint(mean: Color, target: Color) -> Color:
 ## it is stored encoded (T4.7 — passing the linear tint raw squared it:
 ## near-black navy asphalt and slate, blown-out bright tints).
 ## Locked: the parallel world build reaches it from several tasks. The
-## 64 cap and its fallbacks follow insertion order, which only a serial
-## build fixes, so cap_reached records any build that went past 64
+## cap and its fallbacks follow insertion order, which only a serial
+## build fixes, so cap_reached records any build that went past cap()
 ## distinct keys and WorldBuildGraph then rebuilds serially.
 static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 		uv_scale: float = 1.0, detail: int = 1) -> StandardMaterial3D:
@@ -228,7 +238,7 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 			_rank_of[cached.get_instance_id()] = rank
 		_mutex.unlock()
 		return cached
-	if mats.size() >= 64:
+	if mats.size() >= cap():
 		if is_same(mats, MaterialLibrary._pbr_mats):
 			cap_reached = true
 		# Full: reuse one of the same set (a brick chimney must not come
@@ -262,7 +272,7 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 			_rank_of[other.get_instance_id()] = rank
 		m = other
 	else:
-		if mats.size() >= 64 and is_same(mats, MaterialLibrary._pbr_mats):
+		if mats.size() >= cap() and is_same(mats, MaterialLibrary._pbr_mats):
 			cap_reached = true  # two stages raced past the cap
 		mats[key] = m
 		if rank >= 0:

@@ -58,13 +58,23 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 		if abort != null and abort.requested:
 			return root
 	mask.mark_trees(plan["pos"])
+	var timings := {"plan": Time.get_ticks_msec() - t0}
+	var t := Time.get_ticks_msec()
 	var stats := _emit(root, plan, ctx)
+	timings["trees"] = Time.get_ticks_msec() - t
 	stats["fallback"] = fallback
+	t = Time.get_ticks_msec()
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
+	timings["props"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
 	stats["cover"] = GroundCover.build(root, data, ground, mask)
+	timings["cover"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
 	stats["carpet"] = GrassCarpet.build(root, data) != null
 	stats["tree_pits"] = TreePits.build(root, data, ground, mask)
+	timings["carpet_pits"] = Time.get_ticks_msec() - t
 	stats["ms"] = Time.get_ticks_msec() - t0
+	print("VEGETATION timings ms ", timings)
 	last_stats = stats
 	root.set_meta("stats", stats)
 	return root
