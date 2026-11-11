@@ -163,15 +163,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		return 0
 	var holder := Node3D.new()
 	holder.name = "ParkedCars"
-	var cells := {}
-	var cell_size := CELL_M * WorldScale.metres_to_units()
-	for car in cars:
-		var p: Vector3 = car[0]
-		var key := Vector3i(floori(p.x / cell_size), floori(p.z / cell_size), 0)
-		var group_key := "%s_%d_%d" % [car[2], key.x, key.y]
-		if not cells.has(group_key):
-			cells[group_key] = []
-		cells[group_key].append(car)
+	var cells := CellBatches.group(cars, CELL_M * WorldScale.metres_to_units(),
+		func(car: Array) -> Vector3: return car[0], func(car: Array) -> String: return car[2])
 	for group_key in cells:
 		var list: Array = cells[group_key]
 		var kind: String = list[0][2]
@@ -204,22 +197,15 @@ static func _add_batch(holder: Node3D, cars: Array, car_mesh: Mesh, batch_name: 
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Cars_" + batch_name
 	mmi.multimesh = mm
-	# LodRing would clear the ranges and draw both meshes at every distance.
-	mmi.set_meta("lod_own", true)
-	mmi.visibility_range_begin = begin_m * WorldScale.metres_to_units()
-	mmi.visibility_range_end = end_m * WorldScale.metres_to_units()
+	CellBatches.ranged(mmi, begin_m * WorldScale.metres_to_units(), end_m * WorldScale.metres_to_units())
 	if car_mesh is PlaneMesh:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	holder.add_child(mmi)
 	return mm
 
+## Shared near/far bounds of `cars` ([basis, origin, ...]) placing `local_bounds`.
 static func _batch_bounds(cars: Array, local_bounds: AABB) -> AABB:
-	var bounds := AABB()
-	for i in cars.size():
-		var c: Array = cars[i]
-		var car_bounds: AABB = Transform3D(c[1], c[0]) * local_bounds
-		bounds = car_bounds if i == 0 else bounds.merge(car_bounds)
-	return bounds
+	return CellBatches.bounds(cars.map(func(c: Array) -> Transform3D: return Transform3D(c[1], c[0])), local_bounds)
 
 ## The contact shadow under a `kind` car: a ground quad a little past its
 ## footprint, just over the road (metres, like the car).

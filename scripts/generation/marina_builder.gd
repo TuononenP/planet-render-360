@@ -19,18 +19,21 @@ extends RefCounted
 ## Boats under 9 m are runabouts / consoles / RIBs, 9-14 m sport cruisers,
 ## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
 ## Coastal Mediterranean marinas also berth 10–22 m cruising catamarans.
-## Boats are batched per BATCH_M cell; each cell swaps to a "_far" mesh
-## without rails, rigging and mullions beyond NEAR_M of the camera. Large ships (cruise liners and ferries from
+## Boats are batched per BATCH_M cell (coarser when that would break
+## MAX_DRAW_CALLS); each cell swaps to a "_far" mesh without rails,
+## rigging and mullions beyond NEAR_M of the camera. Large ships (cruise liners and ferries from
 ## QuayMoorings.liners, cargo ships from CargoBerths) are committed one by
 ## one by LargeShips, outside the MultiMesh budget.
 
 const RADIUS_M := 800.0
 const MAX_BOATS := 700
-## Near + far surfaces of every kind (VesselPrototypes.KINDS) + pontoon.
+## Near + far surfaces of every boat batch + pontoon. One batch per kind
+## (VesselPrototypes.KINDS) always fits; finer cells only while they do.
 const MAX_DRAW_CALLS := 80
 ## Boats farther than this from the camera use the reduced "_far" meshes (m).
 const NEAR_M := 250.0
-## Side of the square cells boats are batched in for the near/far switch (m).
+## Side of the square cells boats are batched in for the near/far switch
+## (m); doubled, then dropped to one batch per kind, to fit MAX_DRAW_CALLS.
 const BATCH_M := 120.0
 const MIN_PIER_M := 20.0
 const DECK_W_M := 2.2
@@ -154,21 +157,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		dm.mesh = _deck_mesh(decks, m2u)
 		dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(dm)
-	var cells := {}
-	var cell := BATCH_M * m2u
-	for b in boats:
-		var at: Vector3 = b[0]
-		var key := "%s_%d_%d" % [b[3], floori(at.x / cell), floori(at.z / cell)]
-		if not cells.has(key):
-			cells[key] = []
-		cells[key].append(b)
+	var cells := _cells(boats, MAX_DRAW_CALLS - (0 if decks.is_empty() else 1), m2u)
 	for key in cells:
 		var list: Array = cells[key]
 		var near_mesh := mesh(list[0][3])
 		var far_mesh := mesh(list[0][3] + "_far")
-		# Visibility ranges measure from the AABB centre; shared bounds keep
-		# the near and far batches switching at the same distance.
-		var bounds := _batch_bounds(list, near_mesh.get_aabb().merge(far_mesh.get_aabb()))
+		var bounds := CellBatches.bounds(list.map(func(b: Array) -> Transform3D: return _transform(b)), near_mesh.get_aabb().merge(far_mesh.get_aabb()))
 		_add_batch(holder, list, near_mesh, "Boats_%s" % key, 0.0, NEAR_M * m2u, bounds)
 		var far := _add_batch(holder, list, far_mesh, "Boats_%s_far" % key, NEAR_M * m2u, 0.0, bounds)
 		far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -191,22 +185,29 @@ static func _add_batch(holder: Node3D, list: Array, boat_mesh: Mesh, batch_name:
 	mmi.name = batch_name
 	mmi.multimesh = mm
 	mmi.custom_aabb = bounds
-	# LodRing would clear the ranges and draw both meshes at every distance.
-	mmi.set_meta("lod_own", true)
-	mmi.visibility_range_begin = begin
-	mmi.visibility_range_end = end
+	CellBatches.ranged(mmi, begin, end)
 	holder.add_child(mmi)
 	return mmi
 
 static func _transform(b: Array) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0])
 
-static func _batch_bounds(list: Array, local_bounds: AABB) -> AABB:
-	var bounds := AABB()
-	for i in list.size():
-		var box: AABB = _transform(list[i]) * local_bounds
-		bounds = box if i == 0 else bounds.merge(box)
-	return bounds
+## Boats bucketed by kind and BATCH_M cell, the cell doubled while the
+## near + far surfaces of all buckets exceed `budget`, down to one bucket
+## per kind (which always fits).
+static func _cells(boats: Array, budget: int, m2u: float) -> Dictionary:
+	var at_of := func(b: Array) -> Vector3: return b[0]
+	var kind_of := func(b: Array) -> String: return b[3]
+	var cells := {}
+	for cell in [BATCH_M, BATCH_M * 2.0, BATCH_M * 4.0, BATCH_M * 8.0, INF]:
+		cells = CellBatches.group(boats, float(cell) * m2u, at_of, kind_of)
+		var calls := 0
+		for key in cells:
+			var kind: String = cells[key][0][3]
+			calls += mesh(kind).get_surface_count() + mesh(kind + "_far").get_surface_count()
+		if calls <= budget:
+			break
+	return cells
 
 # --- Placement helpers ---------------------------------------------------
 

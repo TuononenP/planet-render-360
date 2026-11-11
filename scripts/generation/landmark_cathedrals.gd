@@ -216,16 +216,18 @@ static func helsinki(model: Node3D) -> void:
 	var found := 4.0
 	lm.box("Stairs", Vector3(0, (plat - found) * 0.5, 0), Vector3(78.0, plat + found, 78.0))
 	lm.box("Stairs", Vector3(0, plat + 0.3, 0), Vector3(78.6, 0.6, 78.6))
-	# Monumental stair: a 2 m landing, then 49 risers of 0.2 m over 30 m
-	# (z 41..71), 64 m wide, between cheeks. Each step sits on a 1 m
-	# footing so the square's slope never opens under it.
-	lm.box("Stairs", Vector3(0, (plat - 1.0) * 0.5, 40.0), Vector3(64.0, plat + 1.0, 2.0), Basis(), 0.0)
+	# Monumental stair: a 2 m landing flush with the terrace paving, then
+	# 49 risers of about 0.21 m over 30 m (z 41..71), 64 m wide, between
+	# cheeks. Every step stands on the same `found` footing as the walls,
+	# so the square's slope never opens under it.
+	var deck := plat + 0.6
+	lm.box("Stairs", Vector3(0, (deck - found) * 0.5, 40.0), Vector3(64.0, deck + found, 2.0), Basis(), 0.0)
 	var risers := 49
 	var tread := 30.0 / float(risers)
 	for k in risers:
 		var z := 41.0 + float(k) * tread
-		var h := plat * (1.0 - float(k + 1) / float(risers + 1))
-		lm.box("Stairs", Vector3(0, (h - 1.0) * 0.5, z + tread * 0.5), Vector3(64.0, h + 1.0, tread), Basis(), 0.0)
+		var h := deck * (1.0 - float(k + 1) / float(risers + 1))
+		lm.box("Stairs", Vector3(0, (h - found) * 0.5, z + tread * 0.5), Vector3(64.0, h + found, tread), Basis(), 0.0)
 	for sx in [-1.0, 1.0]:
 		lm.box("Stairs", Vector3(sx * 33.0, (plat + 0.6 - found) * 0.5, 55.0), Vector3(2.0, plat + 0.6 + found, 32.0))
 	var arm_l := 54.0
