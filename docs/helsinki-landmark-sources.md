@@ -29,6 +29,25 @@ mapped Kamppi chapel footprint centres near 60.16945,24.93592 (the owner’s pub
 11.5 m model height is retained; OSM's 12.13 m tag differs).
 
 
+Kalasatama, malls and Suomenlinna composite (2026-11-11): OSM map API
+footprints give Majakka (way 1076677105, height 134 m, 35 levels) at
+60.187531,24.979657, Loisto (way 1075173606, 124 m) at 60.187331,24.980888,
+Lumo One (120 m) at 60.187716,24.978914, Visio (way 1020243045, 98 m) at
+60.186869,24.977701 and Horisontti (way 1164189703, 109 m) at
+60.187586,24.978137; Redi podium (way 1449865954) centres 60.186915,24.979314.
+Mall centres from OSM: Mall of Tripla 60.198376,24.930295 (relation 19097175),
+Itis 60.212044,25.082692 (way 6188896), Iso Omena 60.161240,24.738512
+(way 8034765), Sello 60.217948,24.812562 (way 36813140), Jumbo
+60.291594,24.965678 (way 5052826). Mall model heights are roof heights of
+the mall block, not surveyed totals. Suomenlinna components are separate
+models: King's Gate at the mapped gate point 60.139581,24.989941 (see
+SuomenlinnaSite), dry dock at 60.144900,24.984800 and Jetty Barracks
+(Rantakasarmi, way 117426266) at 60.148833,24.985140; bastion fabric
+between them remains with the mapped-OSM SuomenlinnaFortress system.
+Kappeli gained its Esplanade terrace (steps, lamps, kerb) and Allas its
+pool lane ropes and boardwalk benches from owner photographs; both stay
+within their registered heights and clearances.
+
 SkyWheel overlap follow-up (2026-11-03): way 457949936's four unique
 footprint corners centre at 60.1667282,24.9594489, with its long axis
 approximately north–south (`yaw_deg=-90.4`). The wheel now follows that
