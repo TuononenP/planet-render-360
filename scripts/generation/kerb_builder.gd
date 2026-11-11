@@ -44,7 +44,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> floa
 		var rd: Dictionary = line
 		if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)) or bool(rd.get("area", false)):
 			continue
-		if str(rd.get("class", "")) not in StreetProps.LIT:
+		# Pedestrian and living streets are paved flush, wall to wall.
+		if str(rd.get("class", "")) not in StreetProps.LIT or str(rd.get("class", "")) in ["pedestrian", "living_street"]:
 			continue
 		var pts: PackedVector2Array = rd.get("points", PackedVector2Array())
 		if pts.size() < 2:

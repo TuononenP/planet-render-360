@@ -82,7 +82,7 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	FarCityBuilder.build(root, data, ground, smap)
 	timings["far_city"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
-	ShopLights.add(root)
+	ShopLights.add(root, View360.spawn_xz(data))
 	if FacadeShader.enabled(data.quality_preset):
 		FacadeShader.upgrade(root)
 	elif FacadeLiteShader.enabled(data.quality_preset):

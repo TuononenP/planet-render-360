@@ -51,9 +51,9 @@ static func note(a: Vector2, dir: Vector2, n: Vector2, len_m: float, floor_y: fl
 	_points.append_array(pts)
 	_mutex.unlock()
 
-## Adds the nearest MAX_LIGHTS noted points under one "ShopLights" node of
-## `root` and forgets them. Returns the number added.
-static func add(root: Node3D) -> int:
+## Adds the MAX_LIGHTS noted points nearest the eye at `centre` under one
+## "ShopLights" node of `root` and forgets them. Returns the number added.
+static func add(root: Node3D, centre: Vector2 = Vector2.ZERO) -> int:
 	_mutex.lock()
 	var pts := _points
 	_points = PackedVector3Array()
@@ -62,7 +62,7 @@ static func add(root: Node3D) -> int:
 		return 0
 	var order: Array = []
 	for i in pts.size():
-		order.append([Vector2(pts[i].x, pts[i].z).length_squared(), i])
+		order.append([(Vector2(pts[i].x, pts[i].z) - centre).length_squared(), i])
 	order.sort_custom(func(x: Array, y: Array) -> bool: return float(x[0]) < float(y[0]))
 	var m := WorldScale.metres_to_units()
 	var holder := Node3D.new()

@@ -30,13 +30,18 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		if not (road is Dictionary) or bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) \
 				or bool(road.get("area", false)):
 			continue
-		var hung := data.country.to_upper() in ["FI", "SE"] and str(road.get("class", "")) in StreetProps.LIT
+		# Pedestrian streets keep their lampposts (StreetProps) instead.
+		var hung := data.country.to_upper() in ["FI", "SE"] and str(road.get("class", "")) in StreetProps.LIT \
+				and str(road.get("class", "")) != "pedestrian"
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
 	var tracks := _track_grid(lines, m)
 	var centres := _centre_grid(data, 35.0 * m)
 	var rings := _ring_grid(data, 12.0 * m)
 	var poles := {}
+	# Every candidate span first, nearest the eye first, so the cap drops
+	# the far ones rather than whichever ways the data lists last.
+	var candidates: Array = []
 	for entry in lines:
 		var way: Dictionary = entry[0]
 		var pts: PackedVector2Array = way.get("points", PackedVector2Array())
@@ -51,22 +56,29 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 				continue
 			if bool(entry[2]) and not _built(mid, centres, 35.0 * m):
 				continue
-			var n := Vector2((b - a).y, -(b - a).x).normalized()
-			var half := maxf(4.0, float(way.get("width_m", 6.0)) * 0.5 + 1.0) * m
-			var supports: Array = []
-			for side in [-1.0, 1.0]:
-				var p: Vector2 = a + n * half * float(side)
-				var anchor := _anchor(p, data, rings, 12.0 * m)
-				var at: Vector2 = anchor[0]
-				if not anchor[1]:
-					at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
-				var y := ground.height_at_world(at.x, at.y)
-				supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(anchor[1]), y])
-			spans.append({"a": a, "b": b, "supports": supports, "contact": bool(entry[1]),
-				"lamp": bool(entry[2]), "ya": ground.height_at_world(a.x, a.y) + CONTACT_M * m,
-				"yb": ground.height_at_world(b.x, b.y) + CONTACT_M * m})
-			if spans.size() >= MAX_SPANS:
-				return spans
+			candidates.append([mid.distance_squared_to(centre), a, b, entry])
+	candidates.sort_custom(func(x: Array, y: Array) -> bool: return float(x[0]) < float(y[0]))
+	for c in candidates:
+		var a: Vector2 = c[1]
+		var b: Vector2 = c[2]
+		var entry: Array = c[3]
+		var way: Dictionary = entry[0]
+		var n := Vector2((b - a).y, -(b - a).x).normalized()
+		var half := maxf(4.0, float(way.get("width_m", 6.0)) * 0.5 + 1.0) * m
+		var supports: Array = []
+		for side in [-1.0, 1.0]:
+			var p: Vector2 = a + n * half * float(side)
+			var anchor := _anchor(p, data, rings, 12.0 * m)
+			var at: Vector2 = anchor[0]
+			if not anchor[1]:
+				at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
+			var y := ground.height_at_world(at.x, at.y)
+			supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(anchor[1]), y])
+		spans.append({"a": a, "b": b, "supports": supports, "contact": bool(entry[1]),
+			"lamp": bool(entry[2]), "ya": ground.height_at_world(a.x, a.y) + CONTACT_M * m,
+			"yb": ground.height_at_world(b.x, b.y) + CONTACT_M * m})
+		if spans.size() >= MAX_SPANS:
+			break
 	return spans
 
 ## Segments of the wired tracks bucketed by cell, so a pole can stay off

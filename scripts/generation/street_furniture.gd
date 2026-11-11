@@ -155,20 +155,26 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 	var out: Array = []
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var centre := View360.spawn_xz(data)
-	var majors := {}  # snapped node -> major roads through it
+	var majors := {}  # snapped node -> directions major roads leave it in
 	for i in data.roads.size():
 		var rd: Variant = data.roads[i]
-		if not (rd is Dictionary) or bool((rd as Dictionary).get("tunnel", false)):
+		# A paved square's outline is no street; a bridge has no kerb below.
+		if not (rd is Dictionary) or bool((rd as Dictionary).get("tunnel", false)) \
+				or bool((rd as Dictionary).get("area", false)) or bool((rd as Dictionary).get("bridge", false)):
 			continue
 		var cls := str((rd as Dictionary).get("class", ""))
 		var pts: PackedVector2Array = (rd as Dictionary).get("points", PackedVector2Array())
 		if cls in StreetProps.MAJOR:
-			for q in pts:
+			for j in pts.size():
+				var q := pts[j]
 				if (q - centre).length_squared() <= r2:
 					var k := Vector2i(roundi(q.x * 2.0), roundi(q.y * 2.0))
 					if not majors.has(k):
-						majors[k] = {}
-					(majors[k] as Dictionary)[i] = true
+						majors[k] = []
+					if j > 0:
+						(majors[k] as Array).append((pts[j - 1] - q).normalized())
+					if j < pts.size() - 1:
+						(majors[k] as Array).append((pts[j + 1] - q).normalized())
 		if family == "japan" or cls not in StreetProps.LIT or pts.size() < 2:
 			continue
 		# A bin every BIN_STEP_M, alternating kerbs.
@@ -189,9 +195,21 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 					out.append({"x": q.x, "z": q.y, "kind": "bin"})
 			t -= seg
 	for k in majors:
-		if (majors[k] as Dictionary).size() >= 2:
+		if junction_arms(majors[k]) >= 3:
 			out.append({"x": float(k.x) / 2.0, "z": float(k.y) / 2.0, "kind": "signals"})
 	return out
+
+## Distinct arms among the unit directions roads leave a node in: two
+## within 30° are one arm (a dual carriageway's halves), so a street split
+## into two ways has two arms and a crossroads four.
+static func junction_arms(dirs: Array) -> int:
+	var arms: Array[Vector2] = []
+	for d: Vector2 in dirs:
+		if d.length_squared() < 0.5:
+			continue
+		if not arms.any(func(a: Vector2) -> bool: return a.dot(d) > 0.866):
+			arms.append(d)
+	return arms.size()
 
 static func _yaw(facing: Vector2) -> float:
 	return atan2(-facing.y, facing.x)

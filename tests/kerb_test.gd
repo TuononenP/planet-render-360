@@ -64,6 +64,13 @@ func _run() -> void:
 	us.country = "US"
 	if KerbBuilder.stone_for(us) != KerbBuilder.CONCRETE or KerbBuilder.stone_for(d) != KerbBuilder.GRANITE:
 		failures.append("concrete kerbs in North America, granite in Europe")
+	var flush := _data(RenderSettings.Preset.ULTRA)
+	for r: Dictionary in flush.roads:
+		r["class"] = "pedestrian"
+	var flush_root := Node3D.new()
+	if KerbBuilder.build(flush_root, flush, GroundTruth.new(flush)) != 0.0:
+		failures.append("pedestrian streets are paved flush, no kerb")
+	flush_root.free()
 	var high := Node3D.new()
 	if KerbBuilder.build(high, _data(RenderSettings.Preset.HIGH), ground) != 0.0:
 		failures.append("raised kerbs are desktop Ultra only")

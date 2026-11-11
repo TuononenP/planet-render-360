@@ -86,6 +86,14 @@ func _init() -> void:
 	_check(int(surfaces.call(MarinaBuilder._cells(spread, MarinaBuilder.MAX_DRAW_CALLS - 1, 1.0)))
 		<= MarinaBuilder.MAX_DRAW_CALLS - 1, "Boat batches must coarsen to meet the draw budget")
 	_check(QuayDetails.build(root,d,g)>0, "Final hard quay should get mooring bollards")
+	var kept := d.buildings
+	d.buildings = [{"x": -200.0, "z": 0.0, "height": 8.0, "footprint": PackedVector2Array([Vector2(-470, -30),
+		Vector2(70, -30), Vector2(70, 30), Vector2(-470, 30)])}]
+	var shed_mask := VegetationMask.new(d, g)
+	d.buildings = kept
+	var shed_root := Node3D.new()
+	_check(QuayDetails.build(shed_root, d, g, shed_mask) == 0, "No quay bollard inside a quayside building")
+	shed_root.free()
 	root.free()
 	var ring_root := Node3D.new()
 	var ring_mesh := LandmarkMesh.new()

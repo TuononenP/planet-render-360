@@ -77,6 +77,23 @@ func _run() -> void:
 		failures.append("fill: %d bins along 800 m of street, %d signals at the crossing" % [bins, sigs])
 	if StreetFurniture.fill(d, roads, "japan", m).any(func(it: Dictionary) -> bool: return it["kind"] == "bin"):
 		failures.append("Japanese streets get no fill bins")
+	# A main road split into two ways is no junction; a T is one. A paved
+	# square's outline takes no bins.
+	var split := _data()
+	split.roads = [
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([Vector2(-200, 0), Vector2(0, 0)])},
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(200, 5)])},
+	]
+	var split_roads := StreetFurniture.RoadIndex.new(split, m, 425.0 * m, Vector2.ZERO)
+	if StreetFurniture.fill(split, split_roads, "europe", m).any(func(it: Dictionary) -> bool: return it["kind"] == "signals"):
+		failures.append("fill: no signals where a main road is merely split into two ways")
+	split.roads.append({"class": "secondary", "width_m": 8.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(0, 200)])})
+	if StreetFurniture.fill(split, split_roads, "europe", m).filter(func(it: Dictionary) -> bool: return it["kind"] == "signals").size() != 1:
+		failures.append("fill: signals where a main road meets a T")
+	split.roads = [OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-150, -150), Vector2(150, -150), Vector2(150, 150), Vector2(-150, 150)]), [])]
+	if not StreetFurniture.fill(split, split_roads, "europe", m).is_empty():
+		failures.append("fill: no bins along a paved square's outline")
 	# An offset preset eye must dress nearby roads even when they are far from the origin.
 	var offset := _data()
 	offset.latitude = 40.7060

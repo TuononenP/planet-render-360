@@ -164,6 +164,22 @@ func _wires_and_snow() -> void:
 	data.country = "SE"
 	data.buildings = [{"x": 0.0, "z": 20.0, "height": 12.0}]
 	_check(OverheadWires.plan(data, ground).any(func(span: Dictionary) -> bool: return bool(span["lamp"])), "Swedish urban roads have span lamps")
+	data.roads = [OsmTags._road_entry({"highway": "pedestrian"}, PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
+	_check(OverheadWires.plan(data, ground).is_empty(), "pedestrian streets keep lampposts, no span lamps")
+	# The span cap keeps the spans nearest the eye, whatever the way order.
+	data.country = "US"
+	data.roads = []
+	for k in 16:
+		data.roads.append(OsmTags._road_entry({"highway": "residential", "trolley_wire": "yes"},
+			PackedVector2Array([Vector2(-500, 300 + k * 10), Vector2(500, 300 + k * 10)])))
+	data.roads.append(OsmTags._road_entry({"highway": "residential", "trolley_wire": "yes"},
+		PackedVector2Array([Vector2(-60, 0), Vector2(60, 0)])))
+	var capped := OverheadWires.plan(data, ground)
+	var m_u := WorldScale.metres_to_units()
+	_check(capped.size() == OverheadWires.MAX_SPANS and capped.any(func(span: Dictionary) -> bool:
+		return absf((span["a"] as Vector2).y / m_u) < 1.0), "the span cap keeps the spans nearest the eye")
+	data.roads = [OsmTags._road_entry({"highway": "residential", "width": "8"},
+		PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
 	data.country = "FI"
 	data.season = LocationData.Season.WINTER
 	node = Node3D.new()
