@@ -32,8 +32,8 @@ const TUNNEL_CLEAR_M := 30.0
 const MAX_TRAINS := 30
 const DETAIL_M := 200.0
 const BUS_SNAP_M := 20.0
-const BUS_OCCUPIED := 0.35
-const BUS_RADIUS_M := 500.0
+const BUS_OCCUPIED := 0.5
+const BUS_RADIUS_M := 800.0
 const MAX_BUSES := 20
 const BUS_CLEAR_M := 14.0
 ## Bus centreline inside the kerb (m).

@@ -63,6 +63,9 @@ const QUERY_VERSION := 12
 ## Independent snapshot versions; bump when the corresponding query changes.
 const RING_VERSION := 1
 const POI_VERSION := 1
+## The bundled transit layer's stop and platform statements (the same ones
+## build_query makes), fetched by tools/prepare_transit_layer.py.
+const TRANSIT_VERSION := 1
 const QUERY_MARK := "pr360_q12"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one

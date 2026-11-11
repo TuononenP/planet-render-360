@@ -4,6 +4,9 @@ extends RefCounted
 ## Immutable Overpass snapshots for exact preset origins. Each entry is
 ## [latitude, longitude, layer, query version, OSM timestamp, inflated bytes, SHA-256].
 ## Missing layers deliberately use the ordinary network/cache fallback.
+## The "transit" layer (tools/prepare_transit_layer.py) adds the tram and bus
+## stops, station nodes and train platforms the detailed snapshots lack; it is
+## merged in only when a snapshot stands in for the live detailed answer.
 const ENTRIES := {
 	"berlin_detailed": [52.52437, 13.41053, "detailed", 12, "2026-11-02T21:21:26", 13533591, "3f0a06470629b5001a2113139bd48603ef2154e228edcc780838e129f5c9691e"],
 	"berlin_ring1600": [52.52437, 13.41053, "ring1600", 1, "2026-11-02T21:21:26", 1120001, "8000d466f17a85d1cc42910eea335eea0ea50d51bef0d780131aba55f9c41403"],
@@ -95,6 +98,24 @@ const ENTRIES := {
 	"san_francisco_detailed": [37.8040, -122.4195, "detailed", 12, "2026-11-04T13:16:20", 10341950, "10b158204da607694e7eea89616211d3c72251f3e2e04c63bfcd35bb749fb253"],
 	"helsinki_far": [60.1680, 24.9530, "far", 3, "2026-11-04T14:47:51", 19509450, "0a4b68952ddcd3ed19d697480431bcc5d41defcfdbbf1d393beb06b259774777"],
 	"stockholm_far": [59.3207, 18.0604, "far", 3, "2026-11-04T14:07:04", 14767350, "e8bc59790a3c35798a19cb6149e3d50e9baa744c453e43118bd7591f5b56be26"],
+	"helsinki_transit": [60.1680, 24.9530, "transit", 1, "2026-11-11T00:49:59", 109550, "0b2d181a7433846513560a70ac894fdb877779673610ea4532adc95090d4dcd7"],
+	"berlin_transit": [52.5244, 13.4105, "transit", 1, "2026-11-11T00:50:42", 79266, "95b767bf449ef0454d746048ff5a94beaced2918c11559a0b9cecc2d9b45c3fb"],
+	"tokyo_transit": [35.6595, 139.7005, "transit", 1, "2026-11-11T00:51:14", 78671, "7dbd16effff6ab1cc6458c4a8f42b08f6911792f7cbf5ffc32db3035633bc374"],
+	"london_transit": [51.5018, -0.1196, "transit", 1, "2026-11-11T00:51:49", 132692, "ef6569d479f79e97bd4e82f1e97cfb12ba7947aee624dcf67b37e1ef2f52eaef"],
+	"dubai_transit": [25.1925, 55.2741, "transit", 1, "2026-11-11T00:52:18", 13060, "9d6d6c894478905ca8420a9b76ff696daac756999fc53951c6dc0161c5546a2c"],
+	"banff_transit": [51.1720, -115.5640, "transit", 1, "2026-11-11T00:52:46", 12179, "81055156f408aca9781729af4c6458d396fa78c2156d3519f7f8a66f747219b2"],
+	"big_sur_transit": [36.3740, -121.9022, "transit", 1, "2026-11-11T00:53:12", 829, "7083739c0cfe34a3b2d15be27eb94b301210b702bc22b415c4e08777fb684928"],
+	"seoul_transit": [37.5728, 126.9769, "transit", 1, "2026-11-11T00:53:45", 74826, "bfbcfd33c2afeac44263d90a32dcda1b0281300165eb633ab063d0022af7882f"],
+	"alps_transit": [46.6900, 7.8580, "transit", 1, "2026-11-11T00:54:16", 13657, "62d943c4f23ef21845bd307277730a46e0640876fbe4de4d4e1a40d7fa3d8166"],
+	"rome_transit": [41.8916, 12.4916, "transit", 1, "2026-11-11T00:54:53", 57469, "eccaf0d84ea3fe875f9f75b773c07899e6443fc948da6422bdc69871b0831673"],
+	"venice_transit": [45.4318, 12.3290, "transit", 1, "2026-11-11T00:55:28", 3643, "b5449b478163398ae7630a58451492b136a1b88bc5e86c35341d863937477472"],
+	"paris_transit": [48.8622, 2.2887, "transit", 1, "2026-11-11T01:12:05", 80479, "24e9bad8a1f310fea94353f3998b67ab092b897714869b7d26c7ea8b29aa3cde"],
+	"monaco_transit": [43.7310, 7.4209, "transit", 1, "2026-11-11T01:13:29", 35085, "3b076d247b8002df05c800d7276dae3163dd06565d050d4b13d44db89ddf6c0f"],
+	"espoo_transit": [60.1760, 24.8050, "transit", 1, "2026-11-11T01:14:56", 36696, "e8c707b085bc30e95d0e8db94761a46d5efc811b9545879747f7dd4a0fbe0a99"],
+	"stockholm_transit": [59.3207, 18.0604, "transit", 1, "2026-11-11T01:16:23", 56032, "5f70917268e075f0c95054b000f5fb6b62612e4ea11ad72abd4f886300122ae4"],
+	"new_york_midtown_transit": [40.7535, -73.9825, "transit", 1, "2026-11-11T01:17:52", 150360, "39464fdd46af842605fcb855487f45c961aa182937a2ec1b07f4be666d1b465a"],
+	"new_york_transit": [40.7060, -74.0040, "transit", 1, "2026-11-11T01:19:20", 90081, "794a56efe4e4eebb8ac1cc4a79ba62202ce107e586008eea83824015ba8be1ca"],
+	"san_francisco_transit": [37.8040, -122.4195, "transit", 1, "2026-11-11T01:20:47", 93633, "f1fb8a2f0fac8f22c5ce01d10f4938edf5400f5399a96825695a0ddf6ee975b1"],
 }
 const DIRECTORY := "res://assets/osm_snapshots/"
 const CAPITAL_MANIFEST := DIRECTORY + "capital_manifest.json"
@@ -135,7 +156,7 @@ static func _valid_manifest_row(row: Variant) -> bool:
 	if not (row[0] is float or row[0] is int) or not (row[1] is float or row[1] is int):
 		return false
 	return absf(float(row[0])) <= 90 and absf(float(row[1])) <= 180 \
-		and row[2] is String and row[2] in ["detailed", "detailed_extract", "ring1600", "ring2500", "poi", "far"] \
+		and row[2] is String and row[2] in ["detailed", "detailed_extract", "ring1600", "ring2500", "poi", "far", "transit"] \
 		and (row[3] is float or row[3] is int) and row[4] is String \
 		and str(row[4]).length() == 19 and Time.get_unix_time_from_datetime_string(row[4]) > 0 \
 		and (row[5] is float or row[5] is int) and int(row[5]) > 0 and int(row[5]) <= MAX_BYTES \

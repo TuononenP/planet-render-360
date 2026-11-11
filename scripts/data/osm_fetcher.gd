@@ -346,6 +346,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_pending_ring_cache = ""
 	_detailed_text = ""
 	_ring_text = ""
+	_transit_text = ""
 	_poi_text = ""
 	_poi_started = false
 	_poi_pending = false
@@ -388,6 +389,9 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 			return
 		if _detailed_text != "":
 			_detailed_cached = true
+			_transit_text = await _reader().read(BundledOsm.entry_for(lat, lon, "transit", OsmQuery.TRANSIT_VERSION))
+			if gen != _parse_gen:
+				return
 			if not offline_mode:
 				BundledOsm.refresh(get_tree(), snapshot, _pending_cache, _pending_body,
 					_detailed_check(lat, lon), active_endpoints())
@@ -428,6 +432,9 @@ var _detailed_text := ""
 var _detailed_cached := false
 var _detailed_ready := false
 var _ring_text := ""
+## The bundled transit layer, read only when a bundled snapshot stands in for
+## the detailed answer (a live answer already carries these stops).
+var _transit_text := ""
 var _poi_text := ""
 var _poi_cache := ""
 var _poi_started := false
@@ -692,6 +699,10 @@ func _finish() -> void:
 	var detailed := _detailed_text
 	var ring := _ring_text
 	var poi := _poi_text
+	# Small next to the city, so joined with the POIs rather than re-parsing
+	# the merged city once more.
+	if _transit_text != "":
+		poi = merge_payloads(poi, _transit_text)
 	var lat := _pending_lat
 	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:

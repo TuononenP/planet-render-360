@@ -16,6 +16,9 @@ func _run() -> void:
 	var valid_entry := [10.0, 20.0, "far", 3, "2026-11-03T00:00:00", 12, "a".repeat(64)]
 	check(BundledOsm._valid_manifest_row(valid_entry), "valid capital manifest row must be accepted")
 	check(not BundledOsm._valid_manifest_row([10.0, 20.0]), "short manifest row must be rejected")
+	var transit_entry := valid_entry.duplicate()
+	transit_entry[2] = "transit"
+	check(BundledOsm._valid_manifest_row(transit_entry), "transit manifest row must be accepted")
 	var invalid := valid_entry.duplicate()
 	invalid[0] = "bad latitude"
 	check(not BundledOsm._valid_manifest_row(invalid), "invalid coordinates must be rejected")

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi"))
+parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi", "transit"))
 parser.add_argument("source", type=Path, help="current-query cache JSON")
 parser.add_argument("destination", type=Path, help="snapshot .json.gz")
 parser.add_argument("--allow-sparse", action="store_true", help="accept empty optional layers in a verified rural extract")
@@ -46,6 +46,11 @@ elif args.layer == "far":
 elif args.layer == "ring":
     if not args.allow_sparse and not any("highway" in el.get("tags", {}) and el.get("geometry") for el in elements):
         raise SystemExit("ring highway geometry missing")
+elif args.layer == "transit":
+    stop_tags = (("railway", "tram_stop"), ("highway", "bus_stop"), ("railway", "station"), ("railway", "halt"),
+                 ("railway", "platform"), ("public_transport", "stop_position"), ("public_transport", "platform"))
+    if not args.allow_sparse and not any(any(el.get("tags", {}).get(k) == v for k, v in stop_tags) for el in elements):
+        raise SystemExit("no transit stops, stations or platforms")
 elif args.layer == "poi" and not args.allow_sparse and not any(any(k in el.get("tags", {}) for k in ("shop", "amenity", "office", "tourism", "craft", "advertising")) for el in elements):
     raise SystemExit("POI tags missing")
 args.destination.parent.mkdir(parents=True, exist_ok=True)
