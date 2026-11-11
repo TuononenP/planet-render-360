@@ -27,8 +27,12 @@ signal zoom_past_min
 const MIN_ZOOM := 4
 const MAX_ZOOM := 15
 const TAP_MAX_PX := 14.0
-## Summed trackpad scroll that counts as one zoom step.
-const SCROLL_ZOOM_NOTCH := 3.0
+## Summed trackpad / smooth-mouse scroll that counts as one zoom step.
+const SCROLL_ZOOM_NOTCH := 1.0
+## A pause in scroll events this long ends a gesture. Within one gesture,
+## same-direction scroll after a step is dropped, so a flick and its
+## momentum tail step once instead of trickling steps in after it stops.
+const SCROLL_ZOOM_GAP_MS := 220
 ## Zoom levels between the coarse preview and full detail.
 const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
@@ -143,6 +147,8 @@ var _last_tap_msec := 0
 var _last_tap_pos := Vector2.ZERO
 var _magnify_accum := 1.0
 var _scroll_accum := 0.0
+var _scroll_last_msec := -SCROLL_ZOOM_GAP_MS
+var _scroll_step_dir := 0.0  # direction this gesture already stepped, 0 if none
 var _panel_touches: Dictionary = {}  # touch index -> canvas position, for pinches on a panel
 var _panel_pinch_base := 0.0
 
@@ -494,13 +500,28 @@ func magnify(factor: float, at: Vector2) -> void:
 ## deltas, not wheel clicks: sum them and zoom a step per notch. Scrolling
 ## up (negative y) zooms in, like the wheel.
 func scroll_zoom(delta_y: float, at: Vector2) -> void:
+	scroll_zoom_at_time(delta_y, at, Time.get_ticks_msec())
+
+## scroll_zoom with the event time given, so tests need no real clock.
+func scroll_zoom_at_time(delta_y: float, at: Vector2, now: int) -> void:
+	if delta_y == 0.0:
+		return  # a sideways scroll says nothing about zoom
+	var dir := signf(delta_y)
+	var gap := now - _scroll_last_msec
+	_scroll_last_msec = now
+	if gap >= SCROLL_ZOOM_GAP_MS:
+		# A fresh gesture: nothing left over from an earlier one counts.
+		_scroll_accum = 0.0
+		_scroll_step_dir = 0.0
+	elif dir == _scroll_step_dir:
+		return  # the flick that already stepped, or its momentum
+	if dir != signf(_scroll_accum):
+		_scroll_accum = 0.0  # a reversal is deliberate and starts afresh
 	_scroll_accum += delta_y
-	if _scroll_accum <= -SCROLL_ZOOM_NOTCH:
+	if absf(_scroll_accum) >= SCROLL_ZOOM_NOTCH:
 		_scroll_accum = 0.0
-		zoom_at(at, 1)
-	elif _scroll_accum >= SCROLL_ZOOM_NOTCH:
-		_scroll_accum = 0.0
-		zoom_at(at, -1)
+		_scroll_step_dir = dir
+		zoom_at(at, 1 if dir < 0.0 else -1)
 
 ## Zoom input from a glass panel or scroll area laid over the map (the
 ## sheet, the side panel and the lists in them): the wheel, a trackpad

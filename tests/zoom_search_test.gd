@@ -33,6 +33,49 @@ func _run() -> void:
 	if map.zoom_level != z0 - 1:
 		failures.append("map wheel-down should zoom out (now %d)" % map.zoom_level)
 
+	# --- Map: a smooth scroll (pan gesture) steps once per gesture, momentum included ---
+	var zs := map.zoom_level
+	var here := Vector2(195, 250)
+	var t := 100000
+	var swipe_up := InputEventPanGesture.new()
+	swipe_up.delta = Vector2(0, -1.2)
+	swipe_up.position = here
+	map._gui_input(swipe_up)  # the real-clock path zooms too
+	if map.zoom_level != zs + 1:
+		failures.append("a scroll up should zoom in (was %d, now %d)" % [zs, map.zoom_level])
+	map.zoom_level = zs
+	# A flick and a momentum tail far longer than the gap, events 50 ms apart.
+	for i in 30:
+		map.scroll_zoom_at_time(-0.4, here, t + i * 50)
+	if map.zoom_level != zs + 1:
+		failures.append("a flick with momentum should zoom in one step (was %d, now %d)" % [zs, map.zoom_level])
+	t += 30 * 50
+	# A pause ends the gesture: the same direction steps again.
+	t += MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(-1.2, here, t)
+	if map.zoom_level != zs + 2:
+		failures.append("after a pause a scroll up should zoom in again (now %d)" % map.zoom_level)
+	# Within a gesture a reversal steps at once.
+	t += 50
+	map.scroll_zoom_at_time(1.2, here, t)
+	if map.zoom_level != zs + 1:
+		failures.append("a reversal should zoom straight back out (now %d)" % map.zoom_level)
+	# Sideways scroll neither steps nor wipes progress.
+	t += MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(-0.6, here, t)
+	map.scroll_zoom_at_time(0.0, here, t + 20)
+	map.scroll_zoom_at_time(-0.6, here, t + 40)
+	if map.zoom_level != zs + 2:
+		failures.append("a sideways event should not wipe scroll progress (now %d)" % map.zoom_level)
+	# Leftover scroll from an earlier gesture does not carry over.
+	t += 40 + MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(0.9, here, t)
+	t += 5000
+	map.scroll_zoom_at_time(0.2, here, t)
+	if map.zoom_level != zs + 2:
+		failures.append("a later brush should not tip leftover scroll into a step (now %d)" % map.zoom_level)
+	map.zoom_level = zs  # where the pinch check below expects it
+
 	# --- Map: pinch (two touches moving apart) zooms in ---
 	var t0 := InputEventScreenTouch.new()
 	t0.index = 0
