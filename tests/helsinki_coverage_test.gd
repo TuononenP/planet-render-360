@@ -44,11 +44,15 @@ func _init() -> void:
 		for i in 8:
 			var p := bounds.get_endpoint(i)
 			radius = maxf(radius, Vector2(p.x, p.z).length())
-		# A lone clearance circle must cover compact models; long malls and
-		# the Redi podium spread clearance over subsite offsets instead.
-		if entry.has("clear_offsets_m"):
-			if (entry["clear_offsets_m"] as Array).is_empty():
-				failures.append(type + " clear_offsets_m must not be empty")
+		# A lone clearance circle must cover compact models; the malls and
+		# the Redi podium follow their OSM outlines, so clearance subsites
+		# must reach every point 6 m inside the outline, and the model must
+		# not spill past it.
+		var outline := LandmarkFhMallFootprints.outline(type)
+		if not outline.is_empty():
+			_check_outline(failures, type, entry, outline, bounds)
+		elif entry.has("clear_offsets_m"):
+			failures.append(type + " has clear_offsets_m but no outline to check them against")
 		elif radius > float(entry.get("clear_m", 0.0)) + 1.0:
 			failures.append("%s radius %.1f exceeds clear_m %s" % [type, radius, entry.get("clear_m")])
 		if type == "redi_shopping_centre" and LandmarkBuilder.parts(root).size() < 6:
@@ -82,6 +86,11 @@ func _init() -> void:
 	for want in ["suomenlinna_kings_gate", "suomenlinna_dry_dock", "suomenlinna_jetty_barracks"]:
 		if not suo.has(want):
 			failures.append("Suomenlinna composite extras missing " + want)
+	# Redi deck pavilion and roof plant stand on the lawn, off the towers.
+	var lawn := LandmarkFhMallFootprints.offset(LandmarkFhMallFootprints.outline("redi_shopping_centre"), -12.0)
+	for item in [[Vector2(-52.0, -30.0), Vector2(21.0, 12.0)], [Vector2(60.0, -20.0), Vector2(22.0, 16.0)]]:
+		if not LandmarkFhMalls._deck_fits(lawn, item[0], item[1]):
+			failures.append("Redi deck item at %s leaves the lawn or meets a tower" % item[0])
 	if failures.is_empty():
 		print("HELSINKI COVERAGE OK: %d new bespoke landmarks" % NEW_TYPES.size())
 		quit(0)
@@ -89,3 +98,33 @@ func _init() -> void:
 		for f in failures:
 			printerr("HELSINKI COVERAGE FAIL: ", f)
 		quit(1)
+
+## Outline-built model: a closed, triangulable outline, clearance that
+## reaches every point 6 m inside it, and a model within 6 m of it.
+func _check_outline(failures: Array[String], type: String, entry: Dictionary,
+		outline: PackedVector2Array, bounds: AABB) -> void:
+	if Geometry2D.triangulate_polygon(outline).is_empty():
+		failures.append(type + " outline does not triangulate")
+		return
+	var inner := LandmarkFhMallFootprints.offset(outline, -6.0)
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	for p in outline:
+		lo = lo.min(p)
+		hi = hi.max(p)
+	var missed := 0
+	var x := lo.x
+	while x <= hi.x:
+		var z := lo.y
+		while z <= hi.y:
+			var p := Vector2(x, z)
+			if Geometry2D.is_point_in_polygon(p, inner) \
+					and LandmarkSites.span_dist(p, Vector2.ZERO, entry) >= LandmarkSites.clear_m(entry):
+				missed += 1
+			z += 4.0
+		x += 4.0
+	if missed > 0:
+		failures.append("%s: %d points inside the outline escape clearance" % [type, missed])
+	if bounds.position.x < lo.x - 6.0 or bounds.end.x > hi.x + 6.0 \
+			or bounds.position.z < lo.y - 6.0 or bounds.end.z > hi.y + 6.0:
+		failures.append("%s model %s spills past its outline %s..%s" % [type, bounds, lo, hi])

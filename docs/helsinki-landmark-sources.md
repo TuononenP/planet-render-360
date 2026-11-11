@@ -39,7 +39,14 @@ Mall centres from OSM: Mall of Tripla 60.198376,24.930295 (relation 19097175),
 Itis 60.212044,25.082692 (way 6188896), Iso Omena 60.161240,24.738512
 (way 8034765), Sello 60.217948,24.812562 (way 36813140), Jumbo
 60.291594,24.965678 (way 5052826). Mall model heights are roof heights of
-the mall block, not surveyed totals. Suomenlinna components are separate
+the mall block, not surveyed totals. The mall models and the Redi podium
+are extruded from these OSM outlines (Redi from its landuse=retail lot,
+way 1449865954), Douglas-Peucker simplified to 2.5 m and stored about the
+registry point in LandmarkFhMallFootprints; their outlines measure about
+Tripla 337 × 154 m, Itis 541 × 138 m, Iso Omena 359 × 158 m, Sello
+162 × 158 m, Jumbo 334 × 261 m and Redi 189 × 185 m. Clearance is a set of
+40 m subsites inside each outline that reaches every point 6 m inside it
+and stays within about 24 m of the outline. Suomenlinna components are separate
 models: King's Gate at the mapped gate point 60.139581,24.989941 (see
 SuomenlinnaSite), dry dock at 60.144900,24.984800 and Jetty Barracks
 (Rantakasarmi, way 117426266) at 60.148833,24.985140; bastion fabric
