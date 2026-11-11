@@ -831,7 +831,7 @@ func _tick_near_ground() -> void:
 		_near_window = NearGroundWindow.attach(_generated, _data) if world != 0 else null
 		if _carpet != null:
 			_carpet.stop()
-		_carpet = GrassCarpet.attach(_generated, _ground) if world != 0 else null
+		_carpet = GrassCarpet.attach(_generated, _ground, _data) if world != 0 else null
 	if _rig != null and _ground != null and (_near_window != null or _carpet != null):
 		var eye := Vector2(_rig.position.x, _rig.position.z)
 		var agl := _rig.position.y - _ground.height_at_world(eye.x, eye.y)

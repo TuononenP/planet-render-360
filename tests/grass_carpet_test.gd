@@ -124,4 +124,15 @@ func _run() -> void:
 		ok = ok and absf(himg.get_pixel(t.x, t.y).r - g.height_at_world(wx, wz)) < 0.01
 	_check(ok and himg.get_format() == Image.FORMAT_RF, "heights are baked at the texel centres the shader reads")
 	_check(GrassCarpet.attach(root, g) == null, "no terrain, no carpet driver")
+	# The carpet only shows where grass lies within reach.
+	var span_u := GrassCarpet.HEIGHT_SPAN_M * WorldScale.metres_to_units()
+	_check(GrassCarpet.grass_near(GroundTruth.new(ultra), null, Vector2.ZERO, span_u * 0.5), "a park keeps its carpet")
+	var paved := _green(RenderSettings.Preset.ULTRA, "mown")
+	paved.land_polygons = [{"class": "urban", "points": (ultra.land_polygons[0] as Dictionary)["points"], "holes": []}]
+	_check(not GrassCarpet.grass_near(GroundTruth.new(paved), null, Vector2.ZERO, span_u * 0.5), "a paved square hides it")
+	var wc := Image.create(8, 8, false, Image.FORMAT_L8)
+	wc.fill(Color(30.0 / 255.0, 0, 0))
+	var bare := _green(RenderSettings.Preset.ULTRA, "mown")
+	bare.land_polygons = []
+	_check(GrassCarpet.grass_near(GroundTruth.new(bare), wc, Vector2.ZERO, span_u * 0.5), "unmapped WorldCover grassland keeps it")
 	root.free()

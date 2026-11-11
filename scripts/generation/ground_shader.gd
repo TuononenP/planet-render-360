@@ -312,10 +312,15 @@ void fragment() {
 			vec2 to_eye = normalize(CAMERA_POSITION_WORLD.xz - wpos.xz + vec2(1e-4));
 			base *= 1.0 + 0.075 * band * dot(sd, to_eye) * mown * aa;
 		}
-		// Seen low, a sward shows blade sides: paler and a touch silvery.
+		// Seen low, mown turf shows blade sides: paler and a touch silvery.
+		// Standing meadow hides its soil behind shaded blades instead: it
+		// deepens toward the horizon, as the blade carpet under the eye
+		// does, so the carpet's rim does not read as a lawn's edge.
 		float ndv = clamp(dot(normalize(CAMERA_POSITION_WORLD - wpos), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
 		float graze = pow(1.0 - ndv, 3.0) * meadow * (1.0 - steep);
-		base = mix(base, vec3(lum(base)) * 1.12, 0.16 * graze);
+		base = mix(base, vec3(lum(base)) * 1.12, 0.16 * graze * (1.0 - wild));
+		float stand = pow(1.0 - ndv, 1.5) * meadow * wild * (1.0 - steep);
+		base = mix(base, base * vec3(0.6, 0.7, 0.48), 0.85 * stand);
 		// Sunlit turf is a deep, slightly grey green, never poster green.
 		float turf = lum(base);
 		base = mix(base, vec3(turf), 0.18 * meadow) * mix(1.0, 0.93, meadow);

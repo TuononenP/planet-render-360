@@ -28,6 +28,10 @@ const HEIGHT_REFRESH_M := 10.0
 ## Land-cover ids (GroundMaterial.ID) the carpet grows on, and the hard
 ## ones it keeps clear of.
 const MOWN_IDS := [4, 8]
+## Land classes the carpet can grow on, and the probes (a side) that look
+## for them around the eye.
+const GRASS_CLASSES := ["grass", "cemetery", "wetland"]
+const GRASS_PROBES := 13
 const WILD_IDS := [10, 17]
 
 const SHADER := """
@@ -187,6 +191,8 @@ var _terrain: ShaderMaterial
 var _ground: GroundTruth
 var _tex: ImageTexture
 var _spacing := 0.3
+var _cover: Image
+var _grass := true
 var _h_centre := Vector2(INF, INF)
 var _task := -1
 var _box := {}
@@ -292,7 +298,7 @@ static func clump_mesh() -> ArrayMesh:
 
 ## A driver for the carpet under `root`, fed by its terrain's land-cover
 ## map; null when the world has no carpet or no fine map.
-static func attach(root: Node, ground: GroundTruth) -> GrassCarpet:
+static func attach(root: Node, ground: GroundTruth, data: LocationData = null) -> GrassCarpet:
 	if root == null or ground == null:
 		return null
 	var mmi := root.find_child("GrassCarpet", true, false) as MultiMeshInstance3D
@@ -309,6 +315,7 @@ static func attach(root: Node, ground: GroundTruth) -> GrassCarpet:
 	c._mat = mmi.material_override as ShaderMaterial
 	c._terrain = tm
 	c._ground = ground
+	c._cover = data.landcover_image if data != null else null
 	c._spacing = float(mmi.get_meta("spacing_u", 0.3))
 	c._mat.set_shader_parameter("near_class", tm.get_shader_parameter("near_class"))
 	c._mat.set_shader_parameter("near_n", float(n_value))
@@ -318,12 +325,14 @@ static func attach(root: Node, ground: GroundTruth) -> GrassCarpet:
 	return c
 
 ## Once a frame: follows the eye, bakes heights when it has moved on, and
-## hides the carpet from high up. `agl_u` is the eye's height over the ground.
+## hides the carpet from high up or where no grass lies within reach (its
+## clumps would all collapse, yet still cost their vertices).
+## `agl_u` is the eye's height over the ground.
 func tick(eye: Vector3, agl_u: float) -> void:
 	if not is_instance_valid(_mmi):
 		return
 	var m2u := WorldScale.metres_to_units()
-	_mmi.visible = agl_u < NearGroundWindow.MAX_AGL_M * m2u and _tex != null
+	_mmi.visible = agl_u < NearGroundWindow.MAX_AGL_M * m2u and _tex != null and _grass
 	_mmi.global_position = Vector3(roundf(eye.x / _spacing) * _spacing, 0.0, roundf(eye.z / _spacing) * _spacing)
 	# The window moves the shared map in place; only its rect changes.
 	_mat.set_shader_parameter("near_rect", _terrain.get_shader_parameter("near_rect"))
@@ -336,7 +345,7 @@ func tick(eye: Vector3, agl_u: float) -> void:
 	var e := Vector2(eye.x, eye.z)
 	if e.distance_to(_h_centre) > HEIGHT_REFRESH_M * m2u:
 		_box = {"centre": e}
-		_task = WorkerThreadPool.add_task(_bake.bind(_ground, _box, HEIGHT_SPAN_M * m2u), false, "GrassCarpet")
+		_task = WorkerThreadPool.add_task(_bake.bind(_ground, _cover, _box, HEIGHT_SPAN_M * m2u), false, "GrassCarpet")
 
 ## Waits for a bake in progress (the world is about to go).
 func stop() -> void:
@@ -352,8 +361,31 @@ func _notification(what: int) -> void:
 
 ## Ground heights (units) on a HEIGHT_TEXELS grid of `span` around the
 ## box's centre; static, so a running job holds nothing of a gone carpet.
-static func _bake(ground: GroundTruth, box: Dictionary, span: float) -> void:
+static func _bake(ground: GroundTruth, cover: Image, box: Dictionary, span: float) -> void:
 	box["image"] = height_image(ground, box["centre"], span)
+	box["grass"] = grass_near(ground, cover, box["centre"], span * 0.5)
+
+## Whether lawn or meadow lies within `reach` (units) of `centre`: mapped
+## green polygons, or WorldCover grassland and shrubland (`cover`, the
+## extent's land-cover codes) where nothing is mapped, as the ground's
+## class map paints them. A GRASS_PROBES² grid of samples.
+static func grass_near(ground: GroundTruth, cover: Image, centre: Vector2, reach: float) -> bool:
+	var ext := WorldScale.detailed_extent_units()
+	var can_cover := cover != null and not cover.is_empty() and not cover.is_compressed()
+	for j in GRASS_PROBES:
+		for i in GRASS_PROBES:
+			var p := centre + (Vector2(float(i), float(j)) / float(GRASS_PROBES - 1) - Vector2(0.5, 0.5)) * 2.0 * reach
+			var cls := ground.land_class_at(p.x, p.y)
+			if cls in GRASS_CLASSES:
+				return true
+			if cls == "" and can_cover:
+				var u := p / ext + Vector2(0.5, 0.5)
+				if u.x >= 0.0 and u.y >= 0.0 and u.x < 1.0 and u.y < 1.0:
+					var code := roundi(cover.get_pixel(int(u.x * float(cover.get_width())),
+						int(u.y * float(cover.get_height()))).r * 255.0)
+					if code == 20 or code == 30:
+						return true
+	return false
 
 ## Texel centres at centre + ((i + 0.5) / N - 0.5) * span, as the shader reads them.
 static func height_image(ground: GroundTruth, centre: Vector2, span: float) -> Image:
@@ -376,4 +408,5 @@ func _apply() -> void:
 	else:
 		_tex.update(img)
 	_h_centre = _box["centre"]
+	_grass = bool(_box.get("grass", true))
 	_mat.set_shader_parameter("h_rect", Vector4(_h_centre.x, _h_centre.y, HEIGHT_SPAN_M * WorldScale.metres_to_units() * 0.5, 1.0))

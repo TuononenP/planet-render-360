@@ -46,6 +46,8 @@ const EDGE_H := Vector2(0.8, 1.3)
 const WILD_H := Vector2(0.9, 1.9)
 ## Share of a summer or autumn meadow's tufts that carry seed heads.
 const SEEDHEAD_SHARE := 0.3
+## Extra tufts per grid cell in a wild meadow.
+const WILD_EXTRA := 2
 const CLASSES := {"grass": [0.95, 0.035, 0.015], "cemetery": [0.85, 0.05, 0.10],
 	"orchard": [0.80, 0.12, 0.08], "forest": [0.45, 0.0, 0.55], "wetland": [0.9, 0.05, 0.05]}
 
@@ -337,6 +339,18 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				col = Color(root.r * v * 0.7, root.g * v * 0.8, root.b * v * 0.6)
 			(per[kind] as Array).append([Vector3(x, ground.height_at_world(x, z), z),
 				s, _hash(float(i), float(j), 8.0) * TAU, col, hs])
+			# A meadow stands thick: two more tufts in the cell carry the
+			# blade carpet's standing grass on past its rim.
+			if wild and short:
+				for k in WILD_EXTRA:
+					var ex := x + (_hash(float(i), float(j), 20.0 + k) - 0.5) * sp
+					var ez := z + (_hash(float(i), float(j), 30.0 + k) - 0.5) * sp
+					if mask.blocked(ex, ez, VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE
+							| VegetationMask.WATER, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+						continue
+					var eh := lerpf(hr.x, hr.y, _hash(float(i), float(j), 40.0 + k))
+					(per[kind] as Array).append([Vector3(ex, ground.height_at_world(ex, ez), ez),
+						s * (0.8 + 0.4 * _hash(float(i), float(j), 50.0 + k)), _hash(float(i), float(j), 60.0 + k) * TAU, col, eh])
 
 static func _grass_colour(data: LocationData) -> Color:
 	var dry := ClimateModel.grass_tint(data, data.season)
