@@ -314,6 +314,7 @@ const DISTRICTS := [
 	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
 	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
 	["espoo", "espoo_modern", 60.1590, 24.7380, 1.1, 8.0],  # Matinkylä
+	["espoo", "espoo_modern", 60.1700, 24.7650, 0.6, 8.0],  # Niittykumpu metro centre
 	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile

@@ -165,3 +165,13 @@ static func sello(model: Node3D) -> void:
 
 static func jumbo(model: Node3D) -> void:
 	_mall(model, "jumbo_shopping_centre", 18.0, "#A39A90", "#54626A")
+
+## Niittykumpu's Niitty mall: the three-level metro-centre podium the
+## Niittyhuippu and Niittytori towers rise from (LandmarkFhNiittykumpu).
+static func niitty(model: Node3D) -> void:
+	_mall(model, "niitty_shopping_centre", 14.0, "#D8D6CF", "#8C5A44")
+	# Its own vertical facade fins over the shared mall block.
+	var lm := LandmarkMesh.new()
+	lm.use("Fin", LandmarkMaterials.pbr("concrete", "#8C5A44", 2.0))
+	LandmarkFhWestFootprints.ribs(lm, "Fin", F.outline("niitty_shopping_centre"), 4.5, 11.5, 3.0, 0.3, 0.5)
+	lm.commit(model, "Niitty_fins_")

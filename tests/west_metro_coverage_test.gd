@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Keilaniemi, Tapiola and Lauttasaari: bespoke registry landmarks at
+## Keilaniemi, Tapiola, Lauttasaari and Niittykumpu: bespoke registry landmarks at
 ## their documented heights, built on their OSM outlines, searchable by
 ## name, with clearance that covers every footprint but does not swallow a
 ## neighbouring landmark, and the areas' zone and district fabric.
@@ -8,7 +8,11 @@ const TYPES := {
 	"finago_tower": 83.6, "kone_building": 72.6, "keilalampi": 22.4,
 	"espoo_cultural_centre": 21.0, "mantytorni": 31.0, "tapiola_hip_flask_houses": 30.0,
 	"lauttasaari_church": 61.0, "lauttasaari_manor": 12.5,
+	"niittyhuippu": 90.0, "niittytori_tower": 38.0, "niitty_shopping_centre": 14.0,
+	"niittytaival_tower": 50.5, "olari_church": 13.0,
 }
+## Towers that stand on another model's podium: its clearance covers them.
+const STANDS_ON := {"niittyhuippu": "niitty_shopping_centre", "niittytori_tower": "niitty_shopping_centre"}
 
 func _init() -> void:
 	var failures: Array[String] = []
@@ -113,7 +117,7 @@ func _check_neighbours(failures: Array[String]) -> void:
 		var a := LocationData.entry_for_type(type)
 		for other in LocationData.landmarks():
 			var b: Dictionary = other
-			if str(b["type"]) == type:
+			if str(b["type"]) == type or STANDS_ON.get(str(b["type"]), "") == type:
 				continue
 			var d := LocationData.distance_m(float(a["lat"]), float(a["lon"]), float(b["lat"]), float(b["lon"]))
 			if d > 400.0:
@@ -126,7 +130,8 @@ func _check_neighbours(failures: Array[String]) -> void:
 func _check_extras(failures: Array[String]) -> void:
 	for row in [["finago_tower", ["kone_building", "keilalampi"]],
 			["espoo_cultural_centre", ["tapiola_central_tower", "mantytorni", "tapiola_hip_flask_houses", "tapiola_church"]],
-			["lauttasaari_church", ["lauttasaari_manor"]]]:
+			["lauttasaari_church", ["lauttasaari_manor"]],
+			["niittyhuippu", ["niittytori_tower", "niitty_shopping_centre", "niittytaival_tower", "olari_church"]]]:
 		var e := LocationData.entry_for_type(str(row[0]))
 		var got := LocationData.registry_extras(float(e["lat"]), float(e["lon"]), str(row[0])).map(
 			func(x: Dictionary) -> String: return str(x["type"]))
@@ -139,7 +144,8 @@ func _check_extras(failures: Array[String]) -> void:
 func _check_fabric(failures: Array[String]) -> void:
 	for row in [[60.1749, 24.8308, "espoo", "espoo_modern"], [60.1765, 24.8360, "espoo", "espoo_modern"],
 			[60.1722, 24.8287, "espoo", "espoo_modern"], [60.1587, 24.8694, "helsinki", "helsinki_functional"],
-			[60.1640, 24.8820, "helsinki", "helsinki_functional"], [60.1525, 24.8580, "helsinki", "helsinki_midrise"]]:
+			[60.1640, 24.8820, "helsinki", "helsinki_functional"], [60.1525, 24.8580, "helsinki", "helsinki_midrise"],
+			[60.1700, 24.7640, "espoo", "espoo_modern"], [60.1688, 24.7590, "espoo", "espoo_modern"]]:
 		var region := CityStyles.region_at(row[0], row[1])
 		if region != row[2]:
 			failures.append("zone at %s, %s is %s want %s" % [row[0], row[1], region, row[2]])

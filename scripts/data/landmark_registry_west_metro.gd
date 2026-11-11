@@ -1,7 +1,7 @@
 class_name LandmarkRegistryWestMetro
 extends RefCounted
 
-## Keilaniemi, Tapiola-centre and Lauttasaari landmarks, extruded from
+## Keilaniemi, Tapiola-centre, Lauttasaari and Niittykumpu landmarks, extruded from
 ## OSM outlines (LandmarkFhWestFootprints). Entry lat/lon is the outline
 ## origin; outline-built models clear their footprint through
 ## clear_offsets_m ([x east, z south] about the entry, yaw 0). Sources:
@@ -39,4 +39,21 @@ static func entries() -> Array:
 		{"type": "lauttasaari_manor", "name": "Lauttasaari Manor", "lat": 60.159028, "lon": 24.879080,
 			"radius_m": 3500.0, "wiki_title": "Lauttasaari Manor", "height_m": 12.5, "clear_m": 19.0,
 			"kind": "Manor", "aliases": ["lauttasaari manor", "lauttasaaren kartano", "drumsö gård"]},
+		{"type": "niittyhuippu", "skyline_priority": 1, "name": "Niittyhuippu", "lat": 60.170240, "lon": 24.764026,
+			"radius_m": 6000.0, "wiki_title": "Niittykumpu", "height_m": 90.0, "clear_m": 26.0,
+			"kind": "Tower", "aliases": ["niittyhuippu", "niittyhuippu tower", "niittykumpu tower", "ängskullen torn"]},
+		{"type": "niittytori_tower", "name": "Niittytori Tower", "lat": 60.170501, "lon": 24.762190,
+			"radius_m": 4000.0, "wiki_title": "Niittykumpu", "height_m": 38.0, "clear_m": 25.0,
+			"kind": "Tower", "aliases": ["niittytori tower", "niittytori", "niittytorni"]},
+		{"type": "niitty_shopping_centre", "name": "Niitty Shopping Centre", "lat": 60.170331, "lon": 24.763399,
+			"radius_m": 4000.0, "wiki_title": "Niittykumpu metro station", "height_m": 14.0, "clear_m": 30.0,
+			"clear_offsets_m": [[40.6, 34.5], [-47.4, -21.5], [12.6, -13.5], [44.6, 46.5], [-39.4, -33.5], [24.6, -5.5]],
+			"kind": "Shopping centre", "aliases": ["niitty shopping centre", "kauppakeskus niitty", "niittykummun metrokeskus",
+				"niittykumpu metro centre"]},
+		{"type": "niittytaival_tower", "name": "Niittytaival Tower", "lat": 60.170304, "lon": 24.772865,
+			"radius_m": 3500.0, "wiki_title": "Niittykumpu", "height_m": 50.5, "clear_m": 24.0,
+			"kind": "Tower", "aliases": ["niittytaival tower", "niittytaival 5", "niittykumpu dark tower"]},
+		{"type": "olari_church", "name": "Olari Church", "lat": 60.172126, "lon": 24.759892,
+			"radius_m": 4500.0, "wiki_title": "Olari Church", "height_m": 13.0, "clear_m": 31.0,
+			"kind": "Church", "aliases": ["olari church", "olarin kirkko", "olars kyrka"]},
 	]

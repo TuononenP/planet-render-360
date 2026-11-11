@@ -55,3 +55,19 @@ usable footprint, so neither is modelled.
 Validation: `tests/west_metro_coverage_test.gd` checks heights, outline
 clearance (every point 6 m inside), spill, neighbour clearance, extras and
 the Keilaniemi zone/district.
+
+## Niittykumpu metro centre (2026-11-12)
+
+Outlines are OSM ways retrieved through Overpass on 2026-11-12, stored in
+`LandmarkFhWestFootprints` (the mall's in `LandmarkFhMallFootprints`).
+
+| Type | Position / footprint | Geometry and confidence |
+| --- | --- | --- |
+| `niittyhuippu` | Way [403119916](https://www.openstreetmap.org/way/403119916), 60.170240, 24.764026; 43 × 32 m octagon. | SRV 2017, 24 storeys, residents' roof terrace; Finnish Wikipedia gives 90 m (also its list of tallest buildings), OSM `height=78 m`; the model uses 90 m. OSM gives `building:colour=white` and `roof:shape=butterfly`. It stands over the Niitty mall. Balcony and window bands are estimates. |
+| `niittytori_tower` | Way [426363234](https://www.openstreetmap.org/way/426363234), 60.170501, 24.762190. | 12 storeys (Wikipedia fi, OSM), white (OSM). Height 38 m is an estimate. |
+| `niitty_shopping_centre` | Way [408574589](https://www.openstreetmap.org/way/408574589), 60.170331, 24.763399; 165 × 119 m. | Metro-centre mall, 3 levels (OSM), opened 2017 over the station. Height 14 m and facade colours are estimates; built by the shared `LandmarkFhMalls` mall block. |
+| `niittytaival_tower` | Way [791678773](https://www.openstreetmap.org/way/791678773), 60.170304, 24.772865. | 16 storeys, completed 2020, OSM `building:colour=#2e211b`; glazed balconies on both long faces (listings: "lasitettu parveke"), whose ~1.3 m deep stacks the OSM outline traces as the proud middle runs; 16th-floor sauna and lounge with terraces (listing). Height 50.5 m, bay count, window and balcony detail are estimates. |
+| `olari_church` | Way [46707972](https://www.openstreetmap.org/way/46707972), 60.172126, 24.759892. | Käpy and Simo Paavilainen 1981, red brick (Wikipedia fi, OSM); brick pilasters and full-height very narrow windows on the Merituulentie front, plan wrapping a mound round a small courtyard. Heights (9.5 m walls, 13 m hall block) are estimates. |
+
+The 8–10-storey 2015–23 blocks round the station follow the new 0.6 km
+`espoo_modern` Niittykumpu district.

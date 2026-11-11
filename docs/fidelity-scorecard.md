@@ -428,6 +428,15 @@ Keilaniemi, Tapiola and Lauttasaari, 2026-11-12 (landmark search views, summer n
 | Tapiola (Cultural Centre) | recognisable | Cultural Centre wings and hall block beside Keskustorni and the pool; Mäntytorni and hip-flask houses | Cultural Centre cladding and hall heights are estimates; the demolished swimming hall still extrudes from OSM |
 | Lauttasaari (church) | recognisable from above | 61 m bell tower marks the island; 1950s functionalist district fabric | Ground opening lands in trees; church halls and manor colours are estimates |
 
+Niittykumpu, 2026-11-12 (landmark search views, summer noon, 21 June):
+- Captures: `visual-plan/reviews/niittykumpu-2026-11-12/` and the lighter tower bands in `niittykumpu-r2-2026-11-12/`.
+- Agent pre-ratings; human gate pending. Five OSM-outline landmarks and a 0.6 km `espoo_modern` metro-centre district; sources in docs/espoo-landmark-sources.md.
+
+| view | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Niittykumpu (Niittyhuippu) | recognisable | 90 m white Niittyhuippu and Niittytori rise from the Niitty mall podium; dark Niittytaival tower; modern blocks round the station | Opening eye stands on the Länsiväylä ramps with the tower distant; tower balcony and facade detail are estimates |
+| Olari (church) | recognisable from above | Red-brick Olari Church with pilasters and slit windows beside the metro-centre towers | Opening eye stands over a neighbouring roof; heights estimated |
+
 Round sto-r1, 2026-11-03 (Stockholm hero work in progress):
 - Captures: `visual-plan/reviews/sto-r1-2026-11-03/` and `sto-r1-winter-2026-11-03/`, Ultra, clear golden hour. The images predate the Tyska kyrkan and street/bridge changes.
 - Agent pre-rating: recognisable; human gate pending. Foreground road and waterfront blocks obscure the cliff view, the island shoreline is too bare, and moored ships are absent. See the review README for capture limitations.

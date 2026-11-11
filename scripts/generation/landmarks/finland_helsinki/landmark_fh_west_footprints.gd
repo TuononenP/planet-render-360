@@ -1,7 +1,7 @@
 class_name LandmarkFhWestFootprints
 extends RefCounted
 
-## Outlines of the Keilaniemi, Tapiola and Lauttasaari landmarks from
+## Outlines of the Keilaniemi, Tapiola, Lauttasaari and Niittykumpu landmarks from
 ## OpenStreetMap (2026-11-12; ways in docs/espoo-landmark-sources.md and
 ## docs/helsinki-landmark-sources.md), Douglas-Peucker simplified to
 ## 0.5–1 m. Flat x, z pairs in metres about the registry entry's lat/lon:
@@ -34,6 +34,15 @@ const OUTLINES := {
 		19.2, 43.0, -41.0, 30.6, -25.1, -45.5, -9.8, -42.7, -8.8, -47.9, 14.2, -43.2, 13.0, -37.6,
 		23.5, -35.5, 20.0, -18.9, -17.2, -26.6, -25.3, 12.1, -12.2, 14.8, -9.9, 4.1, 26.7, 12.4],
 	"lauttasaari_manor": [5.0, -16.8, 15.9, -7.4, 1.6, 8.9, 0.3, 7.8, -1.9, 10.3, -9.7, 3.6, -7.5, 1.1, -9.3, -0.5],
+	"niittyhuippu": [-19.0, -3.3, -14.0, 5.8, -11.6, 4.5, -6.4, 13.9, 23.8, -2.6, 17.7, -13.8, 11.5, -10.4, 7.5, -17.7],
+	"niittytori_tower": [7.5, 14.5, 15.9, -16.7, 4.1, -15.6, 3.4, -12.9, -9.0, -16.4, -16.4, 10.2, -4.1, 13.7, -3.5, 11.6],
+	"niittytaival_tower": [
+		-2.5, -11.3, -1.4, -10.4, -0.5, -11.4, 17.8, 4.0, 16.9, 5.1, 19.8, 7.4, 4.6, 21.5, 1.7, 18.2,
+		0.8, 19.1, -16.8, -0.2, -15.9, -1.0, -20.3, -5.8, -7.3, -9.8, -6.1, -8.4],
+	"olari_church": [
+		-29.1, -1.5, -19.3, -2.5, -19.3, -6.3, -7.9, -6.8, -7.6, -4.7, 1.4, -5.1, 1.3, -8.0, 10.1, -11.6,
+		10.7, -10.7, 17.5, -13.0, 18.9, -8.8, 17.6, -8.5, 20.0, -4.1, 24.9, -4.4, 25.6, 8.9, 26.5, 12.0,
+		8.0, 20.1, 6.9, 17.8, -20.3, 19.1, -20.9, 11.6, -26.8, 11.8, -27.5, 3.0, -28.8, 3.0],
 }
 
 ## Revell's four hip-flask houses about the entry (OSM way 129693702):
@@ -53,6 +62,8 @@ static func outlines(type: String) -> Array[PackedVector2Array]:
 			out.append(_poly(flat))
 	elif OUTLINES.has(type):
 		out.append(_poly(OUTLINES[type]))
+	elif not F.outline(type).is_empty():
+		out.append(F.outline(type))
 	return out
 
 static func outline(type: String) -> PackedVector2Array:
@@ -174,3 +185,44 @@ static func _face(lm: LandmarkMesh, key: String, pts: Array, centre: Vector2, y:
 		lm.quad(key, p0, p1, p2, pts[3], n)
 	else:
 		lm.tri(key, p0, p1, p2, n, n, n, z, Vector2(p0.distance_to(p1), 0), Vector2(0, 1))
+
+## Butterfly roof over `poly`: two planes falling from its ends (along X)
+## `rise` metres above y0 to a valley at the middle of its X extent, with
+## the walls filled up to the planes.
+static func butterfly(lm: LandmarkMesh, key: String, poly: PackedVector2Array, y0: float, rise: float) -> void:
+	var lo := INF
+	var hi := -INF
+	var zlo := INF
+	var zhi := -INF
+	for p in poly:
+		lo = minf(lo, p.x)
+		hi = maxf(hi, p.x)
+		zlo = minf(zlo, p.y)
+		zhi = maxf(zhi, p.y)
+	var mid := (lo + hi) * 0.5
+	var half := maxf((hi - lo) * 0.5, 0.1)
+	for side: float in [-1.0, 1.0]:
+		var x0 := mid if side > 0.0 else lo - 1.0
+		var x1 := hi + 1.0 if side > 0.0 else mid
+		var rect := PackedVector2Array([Vector2(x0, zlo - 1.0), Vector2(x1, zlo - 1.0),
+			Vector2(x1, zhi + 1.0), Vector2(x0, zhi + 1.0)])
+		for piece in Geometry2D.intersect_polygons(poly, rect):
+			var idx := Geometry2D.triangulate_polygon(piece)
+			var n := Vector3(-side * rise / half, 1.0, 0.0).normalized()
+			for t in range(0, idx.size(), 3):
+				var v: Array[Vector3] = []
+				for k in 3:
+					var q := piece[idx[t + k]]
+					v.append(Vector3(q.x, _valley_y(q.x, y0, rise, mid, half), q.y))
+				lm.tri(key, v[0], v[1], v[2], n, n, n, Vector2(v[0].x, v[0].z), Vector2(v[1].x, v[1].z), Vector2(v[2].x, v[2].z))
+			for i in piece.size():
+				var a := piece[i]
+				var b := piece[(i + 1) % piece.size()]
+				if absf(a.x - mid) < 0.01 and absf(b.x - mid) < 0.01:
+					continue
+				var out := outward(piece, a, b)
+				lm.quad(key, Vector3(a.x, y0, a.y), Vector3(b.x, y0, b.y),
+					Vector3(b.x, _valley_y(b.x, y0, rise, mid, half), b.y), Vector3(a.x, _valley_y(a.x, y0, rise, mid, half), a.y), Vector3(out.x, 0.0, out.y))
+
+static func _valley_y(x: float, y0: float, rise: float, mid: float, half: float) -> float:
+	return y0 + rise * absf(x - mid) / half
