@@ -35,6 +35,10 @@ func set_labels(candidates: Array, graticule: Array) -> void:
 func placed_count() -> int:
 	return _placed.size()
 
+## The placed labels, in priority order (screen positions at layout time).
+func placed_labels() -> Array:
+	return _placed.map(func(p: Array) -> Dictionary: return p[0])
+
 func _font(kind: String) -> Font:
 	if _fonts.has(kind):
 		return _fonts[kind]
