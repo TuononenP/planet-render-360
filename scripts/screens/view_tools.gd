@@ -41,6 +41,8 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._minimap = MiniMap.new(v)
 	v._minimap.open_requested.connect(func() -> void: v.back_requested.emit())
 	v._hud.add_child(v._minimap)
+	v._fps = FpsCounter.new()
+	v._hud.add_child(v._fps)
 	v._date_picker = DatePicker.new()
 	v._date_picker.date_picked.connect(func(date: Dictionary) -> void:
 		ViewConditions.set_date(v, date))
@@ -59,6 +61,7 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._hud.add_child(v._toast)
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
 	v._minimap.visible = UiPrefs.minimap
+	v._fps.visible = UiPrefs.fps_counter
 	sync(v)
 
 static func _action(v: View360, key: String) -> void:
@@ -230,6 +233,12 @@ static func toggle_minimap(v: View360) -> void:
 	sync(v)
 	ViewChrome.layout(v)
 
+static func toggle_fps(v: View360) -> void:
+	UiPrefs.fps_counter = not UiPrefs.fps_counter
+	v._fps.visible = UiPrefs.fps_counter
+	v.pref_changed.emit("fps_counter", UiPrefs.fps_counter)
+	ViewChrome.layout(v)
+
 # --- Layout ---
 
 ## Places the date sheet, the mini-map and the toast. `sheet` is the
@@ -239,6 +248,15 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._minimap == null:
 		return  # still being built
 	var phone := lay == Responsive.Layout.COMPACT
+	# FPS counter: right-aligned under the top-right chips; on a short
+	# wide window the inspector tucks in there, so it sits under the back
+	# button instead.
+	v._fps.reset_size()
+	if inspector and h < 500.0:
+		v._fps.position = Vector2(pad, v._exit_btn.position.y + v._exit_btn.size.y + 8.0)
+	else:
+		v._fps.position = Vector2(v._top_right.position.x + v._top_right.size.x - v._fps.size.x,
+			v._top_right.position.y + v._top_right.size.y + 8.0)
 	# Mini-map: bottom-left above the attribution, over the bar where the
 	# two meet; the landmark sheet takes that edge while it is open.
 	var panel_open: bool = v._landmark_panel != null and v._landmark_panel.is_open()

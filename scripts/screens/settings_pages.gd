@@ -226,6 +226,13 @@ static func quality(s: SettingsScreen) -> VBoxContainer:
 	s._specs_title = UiTheme.section_label("")
 	sect.add_child(_inset(s._specs_title))
 	sect.move_child(sect.get_child(sect.get_child_count() - 1), 0)
+	var fps_group := SettingsRows.group()
+	var fps := SettingsRows.toggle("FPS counter", false,
+		func(on: bool) -> void: s._on_viewer_pref("fps_counter", on),
+		"Shows the frame rate in the corner of the 360° view (J).")
+	s._toggles["fps_counter"] = fps
+	SettingsRows.add(fps_group, fps)
+	_section(page, "", fps_group)
 	return page
 
 ## The accent disc behind the chosen card's check.

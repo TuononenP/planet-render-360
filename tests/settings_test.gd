@@ -282,6 +282,12 @@ func _run() -> void:
 	if not rig.environment.volumetric_fog_albedo.is_equal_approx(rig.haze_color):
 		failures.append("volumetric fog should take the haze colour")
 	rig.free()
+	var fps_prefs := RenderSettings.new()
+	if fps_prefs.pref("fps_counter") != false:
+		failures.append("the FPS counter should default to off")
+	fps_prefs.set_pref("fps_counter", true)
+	if fps_prefs.pref("fps_counter") != true:
+		failures.append("the FPS counter pref should round-trip")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(RenderSettings.path_override))
 
 	if failures.is_empty():

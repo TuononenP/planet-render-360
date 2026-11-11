@@ -417,6 +417,25 @@ func _view_wiring() -> void:
 	_check(view._minimap.visible and not Rect2(view._hint.position, view._hint.size).intersects(view._minimap.get_rect()),
 		"the hint keeps off the mini-map on a phone on its side")
 	UiPrefs.minimap = minimap_was
+	var fps_was := UiPrefs.fps_counter
+	UiPrefs.fps_counter = false
+	var fps_events := []
+	view.pref_changed.connect(func(k: String, val: Variant) -> void: fps_events.append([k, val]))
+	ViewTools.toggle_fps(view)
+	_check(UiPrefs.fps_counter and view._fps.visible and fps_events == [["fps_counter", true]],
+		"the FPS counter switches on and reports the pref")
+	_check(not view._fps.get_rect().intersects(view._top_right.get_rect()), "the FPS counter sits clear of the top-right chips")
+	_check(view._fps.is_processing(), "the FPS counter processes while shown")
+	var side_size := view.size
+	view.size = Vector2(844, 390)
+	ViewChrome.layout(view)
+	_check(not view._fps.get_rect().intersects(view._sheet.get_rect()) and not view._fps.get_rect().intersects(view._top_right.get_rect()),
+		"the FPS counter keeps off the inspector on a phone on its side")
+	view.size = side_size
+	ViewChrome.layout(view)
+	ViewTools.toggle_fps(view)
+	_check(not UiPrefs.fps_counter and not view._fps.visible and not view._fps.is_processing(), "and off again, idle")
+	UiPrefs.fps_counter = fps_was
 	view.size = Vector2(1280, 800)
 	ViewChrome.layout(view)
 	_check(not view._sheet_scroll.clip_contents, "a roomy inspector doesn't clip focus rings")

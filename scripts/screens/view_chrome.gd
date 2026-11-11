@@ -593,7 +593,7 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
 			toggle_nearby(v, true)
-		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G:
+		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G, KEY_J:
 			# One press, bare: Cmd/Ctrl+C and the like belong to the system.
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
@@ -610,6 +610,8 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 					ViewTools.toggle_minimap(v)
 				KEY_G:
 					toggle_drone(v)
+				KEY_J:
+					ViewTools.toggle_fps(v)
 				_:
 					ViewConditions.toggle_lapse(v)
 		KEY_ESCAPE:

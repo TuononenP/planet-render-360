@@ -491,7 +491,8 @@ func _refresh_appearance() -> void:
 		for key in _toggles:
 			var on := {"reduce_motion": UiPrefs.reduce_motion, "solid_panels": UiPrefs.solid_panels,
 				"high_contrast": UiPrefs.high_contrast,
-				"photo_stamp": UiPrefs.photo_stamp}.get(key, false) as bool
+				"photo_stamp": UiPrefs.photo_stamp,
+				"fps_counter": UiPrefs.fps_counter}.get(key, false) as bool
 			(_toggles[key] as Button).set_pressed_no_signal(on)
 			(_toggles[key] as Button).queue_redraw()
 	SettingsPages.show_unit_samples(self)

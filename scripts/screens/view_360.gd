@@ -92,6 +92,7 @@ var _season_btn: SegmentedControl
 var _tool_btns: Dictionary = {}
 var _horizon: HorizonLabels
 var _minimap: MiniMap
+var _fps: FpsCounter
 var _date_picker: DatePicker
 var _toast: Toast
 var _photo_busy := false
@@ -817,7 +818,7 @@ func _input(event: InputEvent) -> void:
 			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
 		ViewChrome.wake(self)
 
-## Viewer keys (arrows, +/−, [ ], 1–4, G, H, F, I, L, Esc for callouts).
+## Viewer keys (arrows, +/−, [ ], 1–4, G, H, F, I, J, L, Esc for callouts).
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or not is_visible_in_tree():

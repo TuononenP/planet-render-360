@@ -67,6 +67,7 @@ const PREF_DEFAULTS := {
 	"cache_full_asked_mb": 0,  # the limit a full cache last offered to raise
 	"onboarded": false,
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
+	"fps_counter": false,
 }
 
 ## Bumped when the desktop default changes; older files migrate once.
