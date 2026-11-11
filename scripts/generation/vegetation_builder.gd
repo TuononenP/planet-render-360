@@ -57,6 +57,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 		_fallback_scatter(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root
+	mask.mark_trees(plan["pos"])
 	var stats := _emit(root, plan, ctx)
 	stats["fallback"] = fallback
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)

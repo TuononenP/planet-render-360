@@ -76,6 +76,22 @@ func _run() -> void:
 	_check(hw > 1.0, "meadow tufts stand tall: %.2f" % hw)
 	_check((p_wild.get("seedhead", []) as Array).size() > 50, "a summer meadow carries seed heads")
 	_check((p_mown.get("seedhead", []) as Array).is_empty(), "a mown lawn has none")
+	# The mower leaves the grass standing round a trunk.
+	var treed := _green(RenderSettings.Preset.HIGH, "mown")
+	var tg := GroundTruth.new(treed)
+	var tmask := VegetationMask.new(treed, tg)
+	var m2u := WorldScale.metres_to_units()
+	var trunks: Array = []
+	for k in 40:
+		trunks.append(Vector3((float(k % 8) - 3.5) * 9.0 * m2u, 0.0, (float(k / 8) - 2.0) * 9.0 * m2u))
+	tmask.mark_trees(trunks)
+	var by_trunk := [0.0, 0.0, 0.0, 0.0]
+	for e: Array in (GroundCover.plan(treed, tg, tmask).get("tuft", []) as Array):
+		var near := tmask.blocked((e[0] as Vector3).x, (e[0] as Vector3).z, VegetationMask.TREE, GroundCover.TRUNK_TALL_M)
+		by_trunk[0 if near else 2] += float(e[4])
+		by_trunk[1 if near else 3] += 1.0
+	_check(by_trunk[1] > 0.0 and by_trunk[0] / by_trunk[1] > 1.3 * by_trunk[2] / maxf(by_trunk[3], 1.0),
+		"tufts round a trunk stand taller: %s" % [by_trunk])
 	var winter := _plan(_green(RenderSettings.Preset.HIGH, "wild", LocationData.Season.WINTER))
 	_check((winter.get("seedhead", []) as Array).is_empty(), "no seed heads in winter")
 	# Cards and paint.

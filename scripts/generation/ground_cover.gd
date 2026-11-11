@@ -39,6 +39,8 @@ const EDGE_CLEAR_M := 1.1
 const KINDS := ["tuft", "seedhead", "flower", "shrub"]
 ## Unmown grass is left standing this far (m) from walls and water.
 const EDGE_TALL_M := 3.0
+## Round a trunk the mower cannot reach either: the grass stands taller.
+const TRUNK_TALL_M := 1.5
 ## Height scale ranges of a tuft card (0.45 m): mown lawn, its uncut
 ## edges, and wild meadow.
 const MOWN_H := Vector2(0.3, 0.55)
@@ -320,7 +322,8 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 			var hr := MOWN_H
 			if wild:
 				hr = WILD_H
-			elif short and mask.blocked(x, z, VegetationMask.BUILDING | VegetationMask.WATER, EDGE_TALL_M):
+			elif short and (mask.blocked(x, z, VegetationMask.BUILDING | VegetationMask.WATER, EDGE_TALL_M)
+					or mask.blocked(x, z, VegetationMask.TREE, TRUNK_TALL_M)):
 				hr = EDGE_H
 			var hs := 1.0
 			if short:

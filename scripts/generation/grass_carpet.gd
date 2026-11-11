@@ -45,6 +45,7 @@ uniform sampler2D heights : filter_linear, repeat_disable;
 uniform vec4 h_rect = vec4(0.0);
 uniform float spacing_u = 0.3;
 uniform float radius_u = 24.0;
+uniform float blade_count = 14.0;
 uniform float u2m = 1.0;
 // Linear already (GroundCover's tuft colour): no source_color hint.
 uniform vec3 lawn = vec3(0.17, 0.27, 0.07);
@@ -95,18 +96,26 @@ void vertex() {
 	// columns onto their neighbour's cell and the meadow grew in rows.
 	vec2 cell = floor(o.xz / spacing_u);
 	vec2 root = (cell + vec2(h21(cell, 1.0), h21(cell, 2.0)) - 0.5) * spacing_u;
-	int id = near_n > 0.5 && h_rect.w > 0.5 ? class_at(root) : 0;
-	bool mown = id == 4 || id == 8;
-	bool wild = id == 10 || id == 17;
 	float m = 1.0 / u2m;
-	// Keep clear of paving, roads, walls and water: ~1 m, as the ground wears.
-	float r1 = 0.9 * m;
-	bool clear = !hard(class_at(root + vec2(r1, 0.0))) && !hard(class_at(root - vec2(r1, 0.0)))
-		&& !hard(class_at(root + vec2(0.0, r1))) && !hard(class_at(root - vec2(0.0, r1)));
 	float d = length(root - CAMERA_POSITION_WORLD.xz);
 	float fade = 1.0 - smoothstep(radius_u * 0.4, radius_u, d);
 	float pick = h21(cell, 3.0);
-	if (!(mown || wild) || !clear || pick > fade) {
+	// Past mid-radius a clump keeps fewer, wider blades: there a blade is
+	// a pixel or two, so under half as many cover the ground as well.
+	float thin = smoothstep(radius_u * 0.3, radius_u * 0.55, d);
+	bool dropped = UV.y >= blade_count * mix(1.0, 0.43, thin);
+	// Clumps behind the eye are never seen: skip them before any lookup.
+	vec3 fwd = -INV_VIEW_MATRIX[2].xyz;
+	bool behind = dot(vec3(root.x, CAMERA_POSITION_WORLD.y, root.y) - CAMERA_POSITION_WORLD, fwd) < -1.5 * m;
+	bool live = !(pick > fade || dropped || behind);
+	int id = live && near_n > 0.5 && h_rect.w > 0.5 ? class_at(root) : 0;
+	bool mown = id == 4 || id == 8;
+	bool wild = id == 10 || id == 17;
+	// Keep clear of paving, roads, walls and water: ~1 m, as the ground wears.
+	float r1 = 0.9 * m;
+	bool clear = (mown || wild) && !hard(class_at(root + vec2(r1, 0.0))) && !hard(class_at(root - vec2(r1, 0.0)))
+		&& !hard(class_at(root + vec2(0.0, r1))) && !hard(class_at(root - vec2(0.0, r1)));
+	if (!clear) {
 		VERTEX = o;
 		tint = vec3(0.0);
 		tipv = 0.0;
@@ -122,7 +131,7 @@ void vertex() {
 		float widen = 1.0 + d * u2m / 9.0;
 		float yaw = h21(cell, 6.0) * 6.2831853;
 		mat2 rot = mat2(vec2(cos(yaw), sin(yaw)), vec2(-sin(yaw), cos(yaw)));
-		vec2 side = rot * UV2 * foot * widen;
+		vec2 side = rot * UV2 * foot * widen * mix(1.0, 1.6, thin);
 		// Roots spread over the clump's footprint; the lean scales with
 		// the blade's height, so short turf stands up.
 		vec2 lean = (COLOR.rg - 0.5) * 2.0;
@@ -241,6 +250,7 @@ static func material(data: LocationData, spacing_u: float, radius_u: float) -> S
 	m.shader = sh
 	m.set_shader_parameter("spacing_u", spacing_u)
 	m.set_shader_parameter("radius_u", radius_u)
+	m.set_shader_parameter("blade_count", float(BLADES))
 	m.set_shader_parameter("u2m", 1.0 / WorldScale.metres_to_units())
 	m.set_shader_parameter("lawn", lawn_colour(data))
 	return m

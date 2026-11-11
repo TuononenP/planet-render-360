@@ -12,6 +12,7 @@ const BUILDING := 1
 const ROAD := 2        ## carriageway (width_m / 2)
 const WATER := 4
 const ROAD_EDGE := 8   ## carriageway + verge margin
+const TREE := 16       ## a planted trunk (set by mark_trees after planting)
 const CELL_M := 1.5
 const FOOT_CLASSES: Array[String] = ["footway", "path", "steps", "cycleway", "pedestrian",
 	"track", "bridleway", "platform", "corridor", "bus_stop", "elevator", "sidewalk"]
@@ -180,6 +181,14 @@ func blocked(x: float, z: float, mask: int, margin_m: float = 0.0) -> bool:
 			if bits[zz * n + xx] & mask:
 				return true
 	return false
+
+## Marks the cell under each trunk (Vector3 XZ, units) with TREE, so
+## later cover can tell where the mower cannot reach.
+func mark_trees(pos: Array) -> void:
+	for p: Vector3 in pos:
+		var i := index_of(p.x, p.z)
+		if i >= 0:
+			bits[i] |= TREE
 
 ## How a green class is kept when its tags do not say: lawns, parks and
 ## cemeteries are mown (the safe guess in a city); wetland, forest floor
