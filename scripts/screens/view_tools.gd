@@ -39,7 +39,6 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._hud.add_child(v._horizon)
 	v._hud.move_child(v._horizon, v._fade.get_index())
 	v._minimap = MiniMap.new(v)
-	v._minimap.open_requested.connect(func() -> void: v.back_requested.emit())
 	v._hud.add_child(v._minimap)
 	v._fps = FpsCounter.new()
 	v._hud.add_child(v._fps)
