@@ -10,7 +10,11 @@ extends RefCounted
 ## out every DEM/OSM/satellite tile.
 ##
 ## Key: place (quantized lat/lon) + preset + season + a fingerprint of the
-## LocationData the world was built from + BUILD_VERSION. Bump
+## LocationData the world was built from + BUILD_VERSION. The opening eye
+## is not in the key: near layers (cars, boats, wires, ground cover) are
+## centred on it, so the entry records the eye it was built around and a
+## reopen reuses it while its eye stays within eye_reuse_m (a reopen at
+## the last camera, a walk away from the first). Farther, it rebuilds. Bump
 ## BUILD_VERSION whenever a generation builder changes its output; debug
 ## builds also hash the generator sources, so a stale world can never be
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
@@ -40,7 +44,7 @@ static func key(data: LocationData) -> String:
 		data.land_polygons.size(), data.waterways.size(), data.trees.size(),
 		data.landmark_type, data.has_landmark_site, data.landmark_lat, data.landmark_lon,
 		data.seed_value, data.country, str(data.dem_source), str(data.satellite_source),
-		data.focus.is_empty(), _view_eye(data),
+		data.focus.is_empty(),
 		hash(var_to_bytes(data.landmark_candidates)),
 		hash(var_to_bytes([data.shore_structures, data.land_polygons, data.waterways, data.buildings, data.roads])),
 		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
@@ -54,13 +58,34 @@ static func key(data: LocationData) -> String:
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]
 
-## Some world layers (cars, boats, wires and ground cover) are centred on
-## the opening eye. Bearing and pitch do not change their placement.
-static func _view_eye(data: LocationData) -> int:
-	if data.view.is_empty():
-		return 0
-	return hash(var_to_bytes([float(data.view.get("eye_lat", data.view.get("lat", data.latitude))),
-		float(data.view.get("eye_lon", data.view.get("lon", data.longitude)))]))
+## Least distance (m) a reopen eye may stand from a cached world's eye.
+const EYE_REUSE_MIN_M := 60.0
+
+## How far (m) a reopen eye may stand from the eye a cached world was
+## built around: as far as desktop ground cover was laid beyond its view
+## radius for walking (GroundCover.WALK_EXTRA_M), so the reopened view
+## still sees full cover; at least EYE_REUSE_MIN_M.
+static func eye_reuse_m(preset: int, desktop: bool) -> float:
+	var p := clampi(RenderSettings.clamp_preset(preset), 0, GroundCover.WALK_EXTRA_M.size() - 1)
+	var extra := float(GroundCover.WALK_EXTRA_M[p]) if desktop else 0.0
+	return maxf(EYE_REUSE_MIN_M, extra)
+
+## Whether a world built around `built_eye` (metres from the world origin)
+## can be shown for `data`, whose eye stands at View360.spawn_xz(data).
+static func eye_fits(built_eye: Vector2, data: LocationData) -> bool:
+	return built_eye.distance_to(View360.spawn_xz(data)) \
+		<= eye_reuse_m(data.quality_preset, GroundCover._desktop())
+
+## The saved ground state at `path`, or {} when absent or unreadable.
+static func _read_ground_state(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var state: Variant = bytes_to_var(FileAccess.get_file_as_bytes(path))
+	return state if state is Dictionary else {}
+
+## Whether a saved ground state records an eye this data can reuse.
+static func _state_fits(state: Dictionary, data: LocationData) -> bool:
+	return state.get("eye") is Vector2 and eye_fits(state["eye"], data)
 
 static func _image_fingerprint(img: Image) -> int:
 	return hash(var_to_bytes([img.get_width(), img.get_height(), img.get_format(), img.get_data()])) \
@@ -136,12 +161,13 @@ static func _paths(data: LocationData) -> Dictionary:
 	var k := key(data)
 	return {"scene": "%s/%s.scn" % [base_dir(), k], "ground": "%s/%s.ground" % [base_dir(), k]}
 
-## Whether a world for exactly this data is already saved.
+## Whether a world for this data, built near its eye, is already saved.
 static func has_world(data: LocationData) -> bool:
 	if not enabled():
 		return false
 	var p := _paths(data)
-	return FileAccess.file_exists(p["scene"]) and FileAccess.file_exists(p["ground"])
+	return FileAccess.file_exists(p["scene"]) \
+		and _state_fits(_read_ground_state(p["ground"]), data)
 
 ## [ground, world] from the cache, or [] when absent/unreadable. Loads on
 ## a worker thread while `view` keeps drawing; a known `ground` (season
@@ -157,6 +183,15 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 		_drop_prefetch()
 		return []
 	var t0 := Time.get_ticks_msec()
+	var state := _read_ground_state(p["ground"])
+	var eye_m := View360.spawn_xz(data).distance_to(state.get("eye", Vector2.INF)) \
+		if state.get("eye") is Vector2 else INF
+	if not _state_fits(state, data):
+		# Its near layers stand around another eye: rebuild here instead.
+		print("WORLD CACHE eye miss %s (eye %s m from build)" % [p["scene"].get_file(),
+			"?" if is_inf(eye_m) else str(roundi(eye_m))])
+		_drop_prefetch()
+		return []
 	if _prefetched == p["scene"]:
 		_prefetched = ""  # already loading: collect it below
 	elif p["scene"] in _dropped:
@@ -170,7 +205,7 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 	while ResourceLoader.load_threaded_get_status(p["scene"]) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
 		await view.get_tree().process_frame
 	var ps := ResourceLoader.load_threaded_get(p["scene"]) as PackedScene
-	var g := ground if ground != null else _load_ground(p["ground"], data)
+	var g := ground if ground != null else _ground_from_state(state, data)
 	if ps == null or g == null:
 		push_warning("WorldCache: unreadable entry %s; rebuilding" % p["scene"])
 		_remove(p)
@@ -186,7 +221,8 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 		_remove(p)
 		return []
 	_touch(p)
-	print("WORLD CACHE hit %s in %d ms" % [p["scene"].get_file(), Time.get_ticks_msec() - t0])
+	print("WORLD CACHE hit %s (eye %d m from build) in %d ms" % [p["scene"].get_file(),
+		roundi(eye_m), Time.get_ticks_msec() - t0])
 	return [g, world]
 
 ## Saves a freshly built [ground, world] in the background. The scene is
@@ -231,7 +267,10 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var ps := packed if packed != null else pack(built[1])
 	if ps == null:
 		return
-	var ground_bytes := var_to_bytes(_ground_state(built[0] as GroundTruth))
+	var state := _ground_state(built[0] as GroundTruth)
+	# The eye the near layers were centred on (see eye_fits).
+	state["eye"] = View360.spawn_xz(data)
+	var ground_bytes := var_to_bytes(state)
 	var th := Thread.new()
 	threads.append(th)
 	var err := th.start(func() -> Array:
@@ -307,9 +346,10 @@ static func _ground_state(g: GroundTruth) -> Dictionary:
 	return out
 
 static func _load_ground(path: String, data: LocationData) -> GroundTruth:
-	var state: Variant = bytes_to_var(FileAccess.get_file_as_bytes(path))
-	if not (state is Dictionary) or not (state as Dictionary).has_all(GROUND_FIELDS) \
-			or not (state.get("shoreline") is Dictionary):
+	return _ground_from_state(_read_ground_state(path), data)
+
+static func _ground_from_state(state: Dictionary, data: LocationData) -> GroundTruth:
+	if not state.has_all(GROUND_FIELDS) or not (state.get("shoreline") is Dictionary):
 		return null
 	var g := GroundTruth.new(null)
 	for k in GROUND_FIELDS:

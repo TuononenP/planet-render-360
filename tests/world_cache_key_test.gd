@@ -61,8 +61,8 @@ func _run() -> void:
 	bare.seed_value = good.seed_value
 	good.view = {"eye_lat": 48.85, "eye_lon": 2.35, "bearing": 0.0}
 	bare.view = {"eye_lat": 48.86, "eye_lon": 2.35, "bearing": 0.0}
-	if WorldCache.key(good) == WorldCache.key(bare):
-		failures.append("different placement centres must not share a world")
+	if WorldCache.key(good) != WorldCache.key(bare):
+		failures.append("the opening eye must not change the world key (the entry records it)")
 	bare.view = good.view.duplicate()
 	bare.view["bearing"] = 90.0
 	if WorldCache.key(good) != WorldCache.key(bare):
@@ -100,6 +100,33 @@ func _run() -> void:
 	writer.wait_to_finish()
 	if WorldCache._save_in_progress(paths["scene"]):
 		failures.append("a completed save must not block a later save")
+	# A cached world is reused while the eye stays near the one it was built around.
+	var eye := _data()
+	eye.latitude = 60.168
+	eye.longitude = 24.953
+	eye.quality_preset = RenderSettings.Preset.ULTRA
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657, "eye_lon": 24.9558}
+	var built := View360.spawn_xz(eye)
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("the eye a world was built around must reuse it")
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.167408, "eye_lon": 24.953232}
+	var moved := built.distance_to(View360.spawn_xz(eye))
+	if absf(moved - 237.0) > 10.0:
+		failures.append("Helsinki reopen eye should stand ~237 m from the preset eye, got %.0f" % moved)
+	if moved > WorldCache.eye_reuse_m(RenderSettings.Preset.ULTRA, true):
+		failures.append("a desktop Ultra reopen ~237 m away must reuse the world")
+	if moved <= WorldCache.eye_reuse_m(RenderSettings.Preset.BALANCED, true):
+		failures.append("a Balanced reopen ~237 m away must rebuild")
+	if moved <= WorldCache.eye_reuse_m(RenderSettings.Preset.ULTRA, false):
+		failures.append("a mobile reopen ~237 m away must rebuild")
+	for p in range(4):
+		for desktop in [true, false]:
+			if WorldCache.eye_reuse_m(p, desktop) >= 600.0:
+				failures.append("an eye 600 m away must never reuse a world")
+			if WorldCache.eye_reuse_m(p, desktop) < WorldCache.EYE_REUSE_MIN_M:
+				failures.append("the reuse radius must not fall below its minimum")
+	if WorldCache._state_fits({}, eye):
+		failures.append("an entry without a recorded eye (old format) must rebuild")
 	# Save pump: a slow frame gets a bigger slice, a quit takes the most.
 	if WorldCache.pump_budget_us(7000) != WorldCache.PUMP_US:
 		failures.append("a fast frame should keep the base pump slice")
