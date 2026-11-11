@@ -19,6 +19,11 @@ func _ground(slope_m_per_post: float) -> GroundTruth:
 	d.water_level = -3.0
 	return GroundTruth.new(d)
 
+func _material(mi: MeshInstance3D) -> Material:
+	if mi.material_override != null:
+		return mi.material_override
+	return mi.mesh.surface_get_material(0)
+
 func _square(c: Vector2, r: float) -> PackedVector2Array:
 	return PackedVector2Array([c + Vector2(-r, -r), c + Vector2(r, -r),
 		c + Vector2(r, r), c + Vector2(-r, r)])
@@ -67,15 +72,44 @@ func _run() -> void:
 		failures.append("flat ground under a long building got a plinth")
 	var root := Node3D.new()
 	BuildingFoundation.plinth(root, ring, [], s, steep)
-	var meshes := root.find_children("*", "MeshInstance3D", true, false)
-	if meshes.size() != 1:
-		failures.append("plinth built %d meshes, expected 1" % meshes.size())
+	var body: MeshInstance3D = null
+	var coping: MeshInstance3D = null
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		var mat := _material(mi as MeshInstance3D)
+		if mat == PlinthStyle.body_material():
+			body = mi
+		elif mat == PlinthStyle.coping_material():
+			coping = mi
+	var y1 := float(s["floor"]) - BuildingFoundation.SINK_M * m
+	if body == null:
+		failures.append("plinth built no granite body mesh")
 	else:
-		var box := (meshes[0] as MeshInstance3D).mesh.get_aabb()
+		var box := body.mesh.get_aabb()
 		var y0 := float(s["low"]) - BuildingFoundation.SINK_M * m
-		var y1 := float(s["floor"]) - BuildingFoundation.SINK_M * m
 		if absf(box.position.y - y0) > 0.01 or absf(box.end.y - y1) > 0.01:
 			failures.append("plinth spans %.2f..%.2f, expected %.2f..%.2f" % [box.position.y, box.end.y, y0, y1])
+	# This plinth shows under 0.6 m of wall: plain granite, no coping.
+	if coping != null:
+		failures.append("a shallow plinth got a coping course")
+	# A taller plinth carries a granite coping proud of the wall at its top.
+	var hill := _ground(6.0)
+	var hs := BuildingFoundation.sample(hill, ring, Vector2.ZERO)
+	var hroot := Node3D.new()
+	BuildingFoundation.plinth(hroot, ring, [], hs, hill)
+	coping = null
+	for mi in hroot.find_children("*", "MeshInstance3D", true, false):
+		if _material(mi as MeshInstance3D) == PlinthStyle.coping_material():
+			coping = mi
+	var hy1 := float(hs["floor"]) - BuildingFoundation.SINK_M * m
+	if coping == null:
+		failures.append("a tall plinth got no granite coping: %s" % [hs])
+	else:
+		var cbox := coping.mesh.get_aabb()
+		if absf(cbox.end.y - hy1) > 0.01 or absf(cbox.position.y - (hy1 - PlinthStyle.COPING_DEPTH_M * m)) > 0.01:
+			failures.append("coping spans %.2f..%.2f, expected the top %.2f m under %.2f" % [cbox.position.y, cbox.end.y, PlinthStyle.COPING_DEPTH_M, hy1])
+		if cbox.position.x > -10.0 * m - PlinthStyle.COPING_PROUD_M * m * 0.5:
+			failures.append("coping does not stand proud of the downhill wall: x %.2f" % cbox.position.x)
+	hroot.free()
 	root.free()
 	var none := Node3D.new()
 	BuildingFoundation.plinth(none, ring, [], f, flat)

@@ -568,7 +568,9 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	return root
 
 ## Base Y: `absolute` uses base_asl_m, `sea` uses ASL zero, `water` uses
-## mapped water (local DEM when absent), else the lowest footprint ground,
+## mapped water (local DEM when absent), else the lowest footprint ground
+## (the median ground along the outline for a model extruded from its
+## OSM footprint, see LandmarkTerrain.outline_base_y),
 ## raised by `base_drop_m` for a model hung below its origin (a dam
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
 ## `base_at_m` [x, z] instead reads the ground at that one model-local
@@ -593,6 +595,9 @@ static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 			return ground.water_level_at(x, z)
 		var fallback := site_ground_y(data, ground, x, z, half)
 		return ground.water_level_at(x, z, fallback) if ground.is_inside(x, z) else fallback
+	if not entry.has("base_at_m") and not LandmarkTerrain.outline(str(entry.get("type", ""))).is_empty():
+		return LandmarkTerrain.outline_base_y(data, ground, Vector2(x, z), entry) - 0.3 \
+			+ float(entry.get("base_drop_m", 0.0))
 	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:

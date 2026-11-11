@@ -202,6 +202,42 @@ func _run() -> void:
 		"a secondary Helsinki Cathedral must use the same stair-foot anchor")
 	cathedral.free()
 	hx.free()
+	# A mall extruded from its OSM outline sits at the median ground along
+	# that outline, and on a slope a plinth carries its walls down to the
+	# terrain at the downhill end instead of leaving them floating.
+	var md := _data("itis_shopping_centre", 10.0, -10.0)
+	for z in 49:
+		for x in 49:
+			md.heights[z * 49 + x] += 4.0 * float(x)
+	var mg := GroundTruth.new(md)
+	var lows: Array[float] = []
+	for p in LandmarkTerrain.outline("itis_shopping_centre"):
+		lows.append(mg.height_at_world(p.x, p.y))
+	lows.sort()
+	var mall := TerrainBuilder._landmark(md, mg)
+	_check(mall.position.y > lows[0] + 5.0 and mall.position.y < lows[-1] - 5.0,
+		"a sloped mall must sit between its outline's lowest and highest ground, got %.1f in %.1f..%.1f" % [mall.position.y, lows[0], lows[-1]])
+	var plinth := mall.get_node_or_null("Model/Plinth") as MeshInstance3D
+	_check(plinth != null, "a sloped mall needs a plinth down to the downhill terrain")
+	if plinth != null:
+		var bottom := (mall.transform * (mall.get_node("Model") as Node3D).transform * plinth.mesh.get_aabb()).position.y
+		_check(absf(bottom - (lows[0] - 0.3)) < 1.0,
+			"the plinth must reach the lowest outline ground, got %.1f want %.1f" % [bottom, lows[0] - 0.3])
+		var plinth_mat := plinth.mesh.surface_get_material(0) as StandardMaterial3D
+		_check(plinth_mat != null and str(plinth_mat.get_meta(LandmarkShader.META, "")) == PlinthStyle.BODY_SET,
+			"the plinth must be the shared granite socle, not the mall's wall finish")
+	_check(mall.has_node("Model/Coping"), "a deep plinth needs a granite coping course")
+	var mx := Node3D.new()
+	md.landmark_candidates = [{"type": "itis_shopping_centre", "x": 0.0, "z": 0.0}]
+	TerrainBuilder._landmark_candidates(mx, md, mg)
+	_check(mx.get_child_count() == 1 and absf((mx.get_child(0) as Node3D).position.y - mall.position.y) < 0.01,
+		"a secondary mall must use the same outline seat")
+	mall.free()
+	mx.free()
+	var flat := TerrainBuilder._landmark(_data("itis_shopping_centre", 10.0, -10.0),
+		GroundTruth.new(_data("itis_shopping_centre", 10.0, -10.0)))
+	_check(not flat.has_node("Model/Plinth"), "a mall on flat ground needs no plinth")
+	flat.free()
 	# Only covered terrain may disappear; surrounding ground must remain.
 	for type in LandmarkTerrain.RELIEFS:
 		var d := _data(type, 110.0, 20.0)

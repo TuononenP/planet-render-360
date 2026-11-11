@@ -36,7 +36,6 @@ const EDGE_STEP_M := 2.0
 const EDGE_SAMPLES_MAX := 48
 ## An edge needs a skirt only where its ground lies this far under the floor.
 const EDGE_GAP_M := 0.15
-static var _plinth_mat: Material
 
 ## `tall_m` is the tallest plinth it may stand on (BuildingTerraces
 ## raises it for a piece on a cliff no terrace can step up), and a
@@ -90,24 +89,26 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	return {"floor": floor_y, "low": low, "high": high, "plinth": plinth,
 		"water": water, "raised": raised}
 
-## Concrete foundation wall from each edge's lowest ground up to the
+## Granite foundation wall from each edge's lowest ground up to the
 ## walls' own base, on the downhill edges of a building raised onto a
-## slope. Uphill and level edges are buried and get none.
+## slope, under a dressed coping where it stands tall enough to show one
+## (PlinthStyle). Uphill and level edges are buried and get none.
 static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 		footing: Dictionary, ground: GroundTruth) -> void:
 	if float(footing.get("plinth", 0.0)) <= 0.0:
 		return
 	var m := WorldScale.metres_to_units()
 	var y1 := float(footing["floor"]) - SINK_M * m
-	if _plinth_mat == null:
-		_plinth_mat = MaterialLibrary.pbr_material("concrete", Color(0.62, 0.60, 0.57), 0.5)
 	var face := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
+		PackedFloat32Array(), PackedInt32Array()]
+	var coping := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
 	var rings: Array = [ring]
 	rings.append_array(holes)
 	for r in rings.size():
 		var edge_ring: PackedVector2Array = rings[r]
 		var ccw := RingGeometry.signed_area(edge_ring) > 0.0
+		var miters := PlinthStyle.miters(edge_ring, (1.0 if ccw else -1.0) * (-1.0 if r > 0 else 1.0))
 		for i in edge_ring.size():
 			var a := edge_ring[i]
 			var b := edge_ring[(i + 1) % edge_ring.size()]
@@ -125,7 +126,10 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 				n = -n
 			BuildingWalls._quad(face, a, b, y0, y1, n,
 				Vector2(d.length() / m / 4.0, (y1 - y0) / m / 4.0))
-	BuildingWalls._emit(root, face, _plinth_mat)
+			if y1 - edge_low >= PlinthStyle.COPING_MIN_M * m:
+				PlinthStyle.coping(coping, a, b, miters[i], miters[(i + 1) % edge_ring.size()], n, y1)
+	BuildingWalls._emit(root, face, PlinthStyle.body_material())
+	BuildingWalls._emit(root, coping, PlinthStyle.coping_material())
 
 static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 		footing: Dictionary, building: Dictionary) -> void:
