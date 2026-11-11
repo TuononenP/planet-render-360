@@ -200,6 +200,7 @@ func _run() -> void:
 	_stop_checks(failures)
 	_height_unit_checks(failures)
 	_poi_checks(failures)
+	_riverbank_relation_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -222,6 +223,73 @@ func _poi_checks(failures: Array[String]) -> void:
 		failures.append("POI tags, local position or deduplication lost: %s" % [pois])
 	if not (OsmParser.parse_features('{"elements":[]}', 0.0, 0.0).get("pois", []) as Array).is_empty():
 		failures.append("old payload without POIs must remain empty")
+
+## Partial riverbank multipolygon (the Eiffel flood): the Seine relation
+## arrived with 2 of 8 outers, one bank each way. The banks must rejoin
+## into one closed water ring — never emit as open chains whose implicit
+## closing chord floods the city. A lone unpairable bank must drop.
+func _riverbank_relation_checks(failures: Array[String]) -> void:
+	var bank_a := [{"lat": 48.8566, "lon": 2.3500}, {"lat": 48.8566, "lon": 2.3509},
+		{"lat": 48.8566, "lon": 2.3519}, {"lat": 48.8566, "lon": 2.3528}]
+	var bank_b := [{"lat": 48.8565, "lon": 2.3528}, {"lat": 48.8565, "lon": 2.3519},
+		{"lat": 48.8565, "lon": 2.3509}, {"lat": 48.8565, "lon": 2.3500}]
+	var rel := {"type": "relation", "id": 2191006,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "river", "name": "Test Seine"},
+		"members": [
+			{"type": "way", "ref": 101, "role": "outer", "geometry": bank_a},
+			{"type": "way", "ref": 102, "role": "outer", "geometry": bank_b},
+			{"type": "way", "ref": 103, "role": "outer"},
+			{"type": "way", "ref": 104, "role": "outer", "geometry": []}]}
+	var waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [rel]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			waters.append(entry)
+	if waters.size() != 1:
+		failures.append("partial riverbank must rejoin into one water ring, got %d" % waters.size())
+		return
+	var pts: PackedVector2Array = waters[0]["points"]
+	if pts.size() < 6 or not OsmGeometry._is_closed(pts):
+		failures.append("rejoined riverbank must be a closed ring, got %d posts" % pts.size())
+		return
+	var bb := OsmGeometry._ring_aabb(pts)
+	if bb.size.x > 300.0 or bb.size.y > 300.0:
+		failures.append("rejoined riverbank spans %s, expected the ~200 m reach" % bb.size)
+	var lone := {"type": "relation", "id": 2191007,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "river", "name": "Lone Bank"},
+		"members": [{"type": "way", "ref": 201, "role": "outer", "geometry": bank_a}]}
+	var lone_waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [lone]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			lone_waters.append(entry)
+	if not lone_waters.is_empty():
+		failures.append("a lone 200 m bank must drop, not close across the city")
+	# A nearly-closed ring (dust gap) still emits: the old degrade path
+	# survives for joints under DUST_M, only kilometre chords drop.
+	var dusty := {"type": "relation", "id": 2191008,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "pond", "name": "Dusty Pond"},
+		"members": [{"type": "way", "ref": 301, "role": "outer", "geometry": [
+			{"lat": 48.8566, "lon": 2.3500}, {"lat": 48.8566, "lon": 2.3503},
+			{"lat": 48.8564, "lon": 2.3503}, {"lat": 48.8566, "lon": 2.350007}]}]}
+	var dusty_waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [dusty]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			dusty_waters.append(entry)
+	if dusty_waters.size() != 1 \
+			or not OsmGeometry._is_closed(dusty_waters[0]["points"] as PackedVector2Array):
+		failures.append("a ring with a dust gap must still emit closed, got %d" % dusty_waters.size())
+	# A lone curved bank (a meander, 400 m across its 630 m arc) must not
+	# close across the bend; a lake missing 15% of its shore still closes.
+	var meander := PackedVector2Array()
+	for k in 33:
+		meander.append(Vector2.from_angle(PI * float(k) / 32.0) * 200.0)
+	if not OsmGeometry._join_rings([meander]).is_empty():
+		failures.append("a lone meander bank must drop, not flood the land inside the bend")
+	var lake := PackedVector2Array()
+	for k in 52:
+		lake.append(Vector2.from_angle(TAU * 0.85 * float(k) / 51.0) * 200.0)
+	var lakes := OsmGeometry._join_rings([lake])
+	if lakes.size() != 1 or not OsmGeometry._is_closed(lakes[0] as PackedVector2Array):
+		failures.append("a lake missing a stretch of shore must still close, got %d rings" % lakes.size())
 
 func _height_unit_checks(failures: Array[String]) -> void:
 	for raw in ["100 ft", "100'", "100 FT"]:

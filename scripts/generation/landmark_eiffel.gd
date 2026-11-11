@@ -7,8 +7,10 @@ extends RefCounted
 ## the arcaded first-floor frieze (57.6 m), the second floor (115.7 m),
 ## the third-floor cabin and campanile (276 m) and the antenna mast to
 ## 330 m. Every member is a merged lattice bar (one surface per part),
-## matte bronze-brown paint #6B4A2F ("Eiffel Tower brown"), so the
-## tower reads as open lace — never stacked cylinders or solid cones.
+## dark iron-brown paint #4A3A30 (PRD §4.1, metallic 0.6, roughness
+## 0.55), so the tower reads as open lace — never stacked cylinders
+## or solid cones — and stays dark iron under the golden sun instead
+## of copper-orange.
 ## Piers point at the compass (north/east/south/west pillars), faces
 ## square to the Champ de Mars (bearing 134.4°).
 
@@ -38,7 +40,7 @@ static func inner(y: float) -> float:
 	return maxf(LandmarkMesh.profile_at(INNER, y), 0.0)
 
 static func build(model: Node3D) -> void:
-	var iron := LandmarkMaterials.paint("#6B4A2F", 0.72, 0.2)
+	var iron := LandmarkMaterials.paint("#4A3A30", 0.55, 0.6)
 	var deck := LandmarkMaterials.paint("#58402A", 0.8, 0.15)
 	var lm := LandmarkMesh.new()
 	for k in ["PierN", "PierE", "PierS", "PierW", "Arches", "Upper", "Top"]:

@@ -4,6 +4,13 @@ extends SceneTree
 ## Captures every screen at phone, tablet, and desktop sizes so the
 ## responsive layouts can be compared against the prototype mockups.
 ## Add -- --offline-osm to exercise existing map caches during an outage.
+## Add -- --golden-yaws for the 3D acceptance loop: each 360 view is
+## reset to its spawn golden hour + Clear weather, then captured at
+## the spawn look and 4 absolute yaws, so runs compare against each
+## other instead of the live clock and weather.
+## Add -- --tier-sweep instead for Phase 6: the Eiffel and Paris views,
+## each once per preset and staged identically, to judge tier
+## separation (AC-12).
 
 ## A cold build of a dense city takes about a minute on a loaded machine.
 const VIEW_TIMEOUT_S := 180.0
@@ -79,6 +86,53 @@ func _viewer_tools(main: Node) -> void:
 	UiPrefs.minimap = false
 	ViewChrome.layout(view)
 
+## Deterministic 3D capture: the app's own spawn golden hour (undoing
+## any earlier set_time_of_day in this run) + Clear weather (index 1),
+## settled, HUD hidden for clean judging frames, then the spawn look
+## and 4 absolute yaws at desktop size. The HUD is restored after so
+## later steps (viewer tools, history) capture normally.
+func _stage_look(main: Node) -> void:
+	var view: View360 = main._view
+	ViewConditions.spawn_golden_hour(view)
+	ViewConditions.pick_weather(view, 1)
+	await create_timer(1.5).timeout
+	await _resize(1280, 800)
+
+func _golden_yaws(main: Node, tag: String) -> void:
+	var view: View360 = main._view
+	await _stage_look(main)
+	view._hud.visible = false
+	await _snap("%s-spawn" % tag)
+	for i in 4:
+		view._rig.set_look(float(i) * PI * 0.5, -0.08)
+		await create_timer(0.5).timeout
+		await _snap("%s-yaw%d" % [tag, i * 90])
+	view._hud.visible = true
+
+## Tier separation (Phase 6): a view rebuilt at each preset (the world
+## cache is preset-keyed, so each tier builds fresh), staged
+## identically, spawn look only. Side-by-side the tiers must differ
+## only in the tier columns (AC-12). Two subjects: the Eiffel landmark
+## view, and the Paris-centre view. (The Paris subject was added hoping
+## its bundled OSM far layer would show Fast's true face in an
+## Overpass outage; empirically the fetchers prefer the user cache, so
+## Fast still needs live data for its far field — see the plan.)
+func _tier_sweep(main: Node, lat: float, lon: float, tag: String) -> void:
+	for p in 4:
+		main._settings.set_preset(p)
+		main._apply_preset(p)
+		main._start_generation(lat, lon)
+		if not await _wait_view(main, VIEW_TIMEOUT_S):
+			return
+		await _stage_look(main)
+		main._view._hud.visible = false
+		await _snap("%s-tier-%s-spawn" % [tag, RenderSettings.PRESET_NAMES[p].to_lower()])
+		main._view._hud.visible = true
+
+func _maybe_golden_yaws(main: Node, tag: String) -> void:
+	if OS.get_cmdline_user_args().has("--golden-yaws"):
+		await _golden_yaws(main, tag)
+
 func _run() -> void:
 	var test_id := str(OS.get_process_id())
 	CacheStore.eviction_suppressed = true
@@ -103,6 +157,13 @@ func _run() -> void:
 	if OS.get_cmdline_user_args().has("--offline-osm"):
 		main._pipeline._osm.offline_mode = true
 		main._pipeline._farcity.offline_mode = true
+	if OS.get_cmdline_user_args().has("--tier-sweep"):
+		await _tier_sweep(main, 48.8584, 2.2945, "08")
+		await _tier_sweep(main, 48.8566, 2.3522, "09")
+		print("SHOTS DONE -> ", ProjectSettings.globalize_path(_shot_dir))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(CacheStore.history_override))
+		quit(0)
+		return
 	await _resize(390, 844)
 	await create_timer(0.5).timeout
 	await _resize(390, 844)  # first resize can be lost to window creation
@@ -133,6 +194,7 @@ func _run() -> void:
 	await _snap("03-view360-phone")
 	await _resize(1280, 800)
 	await _snap("03b-view360-desktop")
+	await _maybe_golden_yaws(main, "03c-paris")
 	# Second golden location: alpine terrain at golden hour.
 	main._view.set_time_of_day(17)
 	main._start_generation(46.6863, 7.8632)
@@ -146,6 +208,7 @@ func _run() -> void:
 	await _snap("05-view360-interlaken-phone")
 	await _resize(1280, 800)
 	await _snap("05b-view360-interlaken-desktop")
+	await _maybe_golden_yaws(main, "05c-interlaken")
 	await _viewer_tools(main)
 	# Landmark viewpoint: the Eiffel Tower at its real coordinates.
 	main._start_generation(48.8584, 2.2945)
@@ -156,6 +219,7 @@ func _run() -> void:
 	await create_timer(0.5).timeout
 	await _resize(1280, 800)
 	await _snap("06-view360-eiffel-desktop")
+	await _maybe_golden_yaws(main, "06b-eiffel")
 	# History at phone and desktop (Paris was just recorded by the flow).
 	await _resize(390, 844)
 	main._history.refresh()
