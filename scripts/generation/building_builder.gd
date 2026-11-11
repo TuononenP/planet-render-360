@@ -240,7 +240,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 			var footing := BuildingFoundation.sample(ground, fallback_ring, Vector2(pos.x, pos.z), float(ctx["sea_y"]))
 			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) \
 				else BuildingFoundation.SINK_M * WorldScale.metres_to_units())
-			BuildingFoundation.build(root, fallback_ring, [], footing, b)
+			BuildingFoundation.build(root, fallback_ring, [], footing, b, ground)
 			BuildingFoundation.plinth(root, fallback_ring, [], footing, ground)
 			var look := _look_for(b, ctx)
 			var res := _resolve_total(b, b, ctx, {}, look)
@@ -415,7 +415,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		base = floor_y + float(mass["min_m"]) * WorldScale.metres_to_units() - shift
 		top = floor_y + height_world - shift
 	else:
-		BuildingFoundation.build(root, ring, holes, footing, b)
+		BuildingFoundation.build(root, ring, holes, footing, b, ground)
 		BuildingFoundation.plinth(root, ring, holes, footing, ground)
 	# Party walls: hidden stretches skipped, firewalls above lower
 	# neighbours, gables (not slopes) and no cornice on shared edges.

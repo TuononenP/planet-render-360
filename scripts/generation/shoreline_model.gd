@@ -47,6 +47,13 @@ func empty() -> bool:
 func dry_height(x: float, z: float) -> float:
 	return _grid_height(dry, Vector2(x, z))
 
+## Corrected dry surface: pre-carve height inside water, the final
+## surface elsewhere (roads and grading included), in render units.
+func land_height(x: float, z: float) -> float:
+	if land.is_empty():
+		return dry_height(x, z)
+	return _grid_height(land, Vector2(x, z))
+
 func _grid_height(values: PackedFloat32Array, p: Vector2) -> float:
 	if size < 2 or values.is_empty():
 		return 0.0

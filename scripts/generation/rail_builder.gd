@@ -162,7 +162,7 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 				_rails(RoadBuilder._batch(batches, "rail"), dense, deck, gauge, 0.0, m2u, RAIL_LAYER)
 			return
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, gauge, bed, surf, m2u, beside)
+			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), gauge, bed, surf, m2u, beside)
 		return
 	var embedded := bool(way.get("embedded", false))
 	for run in RoadBuilder._dry_runs(dense, surf):

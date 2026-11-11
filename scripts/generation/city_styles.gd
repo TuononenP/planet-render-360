@@ -234,6 +234,12 @@ const DISTRICTS := [
 	["singapore", "sg_shophouse", 1.3066, 103.8518, 0.6, 20.0],  # Little India
 	["singapore", "sg_shophouse", 1.3120, 103.9010, 0.8, 10.0],  # Joo Chiat
 	["singapore", "sg_tower", 1.2840, 103.8510, 1.0, 20.0],      # CBD
+	["seoul", "seoul_palace", 37.5783, 126.9770, 0.25, 40.0],    # Gyeongbokgung, Heungnyemun to Gyeonghoeru
+	["seoul", "seoul_palace", 37.5815, 126.9770, 0.22, 40.0],    # Gyeongbokgung, north courts
+	["seoul", "seoul_palace", 37.5794, 126.9910, 0.3, 40.0],     # Changdeokgung
+	["seoul", "seoul_palace", 37.5788, 126.9950, 0.25, 40.0],    # Changgyeonggung
+	["seoul", "seoul_palace", 37.5744, 126.9941, 0.2, 40.0],     # Jongmyo
+	["seoul", "seoul_palace", 37.5658, 126.9751, 0.12, 40.0],    # Deoksugung
 	["seoul", "seoul_hanok", 37.5826, 126.9837, 0.6, 40.0],      # Bukchon
 	["seoul", "seoul_hanok", 37.5744, 126.9897, 0.2, 40.0],      # Ikseon-dong
 	["seoul", "seoul_hanok", 37.5790, 126.9700, 0.5, 12.0],      # Seochon
@@ -302,14 +308,14 @@ const DISTRICTS := [
 	["helsinki", "helsinki_element", 60.2370, 25.0830, 1.0, 8.0],  # Kontula
 	["helsinki", "helsinki_element", 60.1800, 24.9620, 0.28, 8.0],  # Merihaka
 	["helsinki", "helsinki_midrise", 60.1550, 24.9200, 0.85, 8.0],  # Jätkäsaari
+	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
+	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
 	["espoo", "tapiola", 60.1760, 24.8050, 1.0, 8.0],  # Tapiola
 	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
 	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
 	["espoo", "espoo_modern", 60.1590, 24.7380, 1.1, 8.0],  # Matinkylä
 	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
-	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
-	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
 	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands

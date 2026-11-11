@@ -836,6 +836,12 @@ func _era_checks(failures: Array[String]) -> void:
 		["seoul", {"kind": "yes", "levels": 16, "name": "104동", "x": 0.0, "z": 0.0},
 			CityStyles.local_frame("seoul", 37.5728, 126.9750), "seoul_danji"],
 		["seoul", {"kind": "apartments", "levels": 18, "name": "용비어천가 오피스텔"}, {}, "seoul_officetel"],
+		# Gyeongbokgung: a heritage corridor wing and an untagged guard post are palace halls.
+		["seoul", {"kind": "yes", "heritage": true, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5772, 126.9775), "seoul_palace"],
+		["seoul", {"kind": "yes", "levels": 1, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5762, 126.9772), "seoul_palace"],
+		["seoul", {"kind": "commercial", "levels": 1, "heritage": true}, {}, "seoul_palace"],
 		# By district: Jamsil danji, Myeongdong shops, Gangnam officetels, Bukchon hanok.
 		["seoul", {"kind": "apartments", "x": 0.0, "z": 0.0},
 			CityStyles.local_frame("seoul", 37.5110, 127.0850), "seoul_danji"],
@@ -890,6 +896,19 @@ func _era_checks(failures: Array[String]) -> void:
 	var gai := CityStyles.local_frame("tokyo", 35.6608, 139.6985)
 	if _era("tokyo", {"kind": "apartments", "levels": 8, "x": 0.0, "z": 0.0}, gai, 3000.0) != "tokyo":
 		failures.append("a Center Gai mall block should keep the general Tokyo fabric, not zakkyo")
+	# Palace circles: houses by the walls stay hanok; churches, museums and
+	# flat-roofed blocks are not palace halls.
+	if _era("seoul", {"kind": "house", "levels": 1, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5794, 126.9890), 200.0) != "seoul_hanok":
+		failures.append("a house inside the Changdeokgung circle should be a hanok, not a palace hall")
+	if _era("seoul", {"kind": "church", "levels": 1, "heritage": true}, {}) == "seoul_palace":
+		failures.append("a heritage church in Seoul must not become a palace hall")
+	var deoksu := CityStyles.local_frame("seoul", 37.5658, 126.9751)
+	if _era("seoul", {"kind": "yes", "levels": 2, "name": "국립고궁박물관", "x": 0.0, "z": 0.0}, deoksu) == "seoul_palace":
+		failures.append("the National Palace Museum must not become a palace hall")
+	if _era("seoul", {"kind": "yes", "levels": 1, "roof_shape": "flat", "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("seoul", 37.5762, 126.9772)) == "seoul_palace":
+		failures.append("a flat-roofed block in Gyeongbokgung must not become a palace hall")
 	var old_town: Array = CityStyles.local_frame("stockholm", 59.3251, 18.0711)["districts"]
 	var road := {"class": "residential", "points": PackedVector2Array([Vector2(-10, 0), Vector2(10, 0)])}
 	if RoadBuilder._district_finish(road, old_town, 1.0) != "sett":

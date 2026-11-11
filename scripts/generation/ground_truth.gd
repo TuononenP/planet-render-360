@@ -405,6 +405,16 @@ func height_at_world(x: float, z: float) -> float:
 		_surface[(z0 + 1) * _size + x0 + 1], tx)
 	return lerpf(a, b, tz)
 
+## Dry ground at world XZ, in render units: what a footprint stands on
+## before water carving. Inside a water domain this is the pre-carve
+## bank height, never the carved bed; elsewhere it is the final surface.
+## Builders that seat objects on land (foundations) read this, while
+## height_at_world remains the rendered (possibly wet) surface.
+func dry_height_at_world(x: float, z: float) -> float:
+	if shoreline != null and shoreline.ready:
+		return shoreline.land_height(x, z)
+	return height_at_world(x, z)
+
 ## Exact grid-post read (clamped indices) for mesh construction: the
 ## terrain mesh and far-apron edge match the built surface bit-for-bit.
 func surface_at_post(x: int, z: int) -> float:

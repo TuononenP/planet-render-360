@@ -78,15 +78,18 @@ static func dress(root: Node3D, ring: PackedVector2Array, footing: Dictionary,
 		for s in count:
 			var c := a + dir * ((first + float(s) * SLOT_M) * m)
 			var reach := dir * (DOOR_W_M * 0.5 * m)
-			var low := minf(ground.height_at_world(c.x, c.y),
-				minf(ground.height_at_world(c.x - reach.x, c.y - reach.y),
-				ground.height_at_world(c.x + reach.x, c.y + reach.y)))
-			var high := maxf(ground.height_at_world(c.x - reach.x, c.y - reach.y),
-				ground.height_at_world(c.x + reach.x, c.y + reach.y))
+			# No door or window opens onto the water a quay edge stands in.
+			if ground.water_at(c.x, c.y) > 0.0:
+				continue
+			var low := minf(ground.dry_height_at_world(c.x, c.y),
+				minf(ground.dry_height_at_world(c.x - reach.x, c.y - reach.y),
+				ground.dry_height_at_world(c.x + reach.x, c.y + reach.y)))
+			var high := maxf(ground.dry_height_at_world(c.x - reach.x, c.y - reach.y),
+				ground.dry_height_at_world(c.x + reach.x, c.y + reach.y))
 			var wall_m := (y1 - low) / m
 			if wall_m < WINDOW_MIN_M:
 				continue
-			var mid := ground.height_at_world(c.x, c.y)
+			var mid := ground.dry_height_at_world(c.x, c.y)
 			var colour := int(TerrainBuilder._hash(c.x * 3.3, c.y * 1.9) * float(DOOR_COLOURS.size())) % DOOR_COLOURS.size()
 			if doors_here and (s + door_phase) % DOOR_EVERY == 0 and wall_m >= DOOR_MIN_M and (high - low) / m <= DOOR_SLOPE_M:
 				_opening(frames, doors[colour], c, dir, n, DOOR_W_M, low, low + DOOR_H_M * m, false)

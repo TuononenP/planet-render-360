@@ -32,10 +32,18 @@ const SHOP_FRONTS := ["#d8d6d0", "#c8c4bc", "#b8b4ac", "#e4e0d8", "#a8a49c"]
 ## Largest footprint (m²) a zakkyo district building counts as one.
 const ZAKKYO_MAX_M2 := 900.0
 
+## One profile for every palace kind (rows "seoul_palace").
+const PALACE_HALL := {"w": [["render", ["#efebe2", "#e8e2d6"]], ["wood", ["#8e2b20", "#7a2a1e"]]],
+	"p": "punched", "wn": "small", "bay": 3.0, "fr": "#8e2b20", "sp": 0.0,
+	"r": [["hipped", 3], ["gabled", 1]], "pitch": 0.75, "rf": [["slate", ["#4a4e54", "#55595e", "#3f444a"]]],
+	"fh": 4.5, "st": [1, 1], "fix": true, "ch": 0.0, "dm": 0.0, "eq": 0.0, "g": [["stone", 1]],
+	"ev": 1.4, "rv": {}}
+
 const BASE := {
 	"tokyo_zakkyo": "tokyo", "tokyo_mansion": "tokyo", "tokyo_house_modern": "tokyo_house",
 	"tokyo_mokuchin": "tokyo",
 	"seoul_danji": "seoul", "seoul_shopping": "seoul", "seoul_officetel": "seoul",
+	"seoul_palace": "seoul_hanok",
 }
 
 const REGIONS := {
@@ -106,6 +114,15 @@ const REGIONS := {
 			"st": [4, 8], "fix": true, "eq": 0.8, "g": [["signage", 3], ["shop", 1]], "gc": SEOUL_SIGNS,
 			"ev": 0.0, "rv": {"sign_bands": 0.8, "signage": 0.5}},
 	},
+	# Palace halls, gates and roofed corridors (Gyeongbokgung, Changdeokgung,
+	# Changgyeonggung, Deoksugung, Jongmyo): red-lacquered posts and white
+	# infill on a granite base, deep eaves, grey giwa hipped roofs. Every
+	# kind, because the long corridor wings come through as large "yes"
+	# footprints that would otherwise read as apartment blocks.
+	"seoul_palace": {
+		"house": PALACE_HALL, "apartments": PALACE_HALL, "commercial": PALACE_HALL,
+		"civic": PALACE_HALL, "religious": PALACE_HALL,
+	},
 	# Officetels and mixed towers: glass with stone or metal bands.
 	"seoul_officetel": {
 		"apartments": {"w": [["glass", []], ["stone", ["#c8c4bc", "#b8b0a4"]], ["concrete", DANJI]],
@@ -151,6 +168,8 @@ const ERAS := {
 		["seoul_shopping", AC, 1970, 2100, ["commercial_street"], 1.0, 0.0, 99.0],
 		["seoul_officetel", AC, 1995, 2100, ["officetel"], 0.6, 0.0, 99.0],
 		["seoul_tower", ACC, 1985, 2100, MODERN, 1.0, 0.0, 99.0],
+		["seoul_palace", ["house", "apartments", "commercial", "civic", "religious"], 1300, 1960,
+			["palace", "joseon_palace"], 0.0, 0.0, 99.0],
 	],
 }
 
@@ -195,6 +214,11 @@ static func seoul_rule(kind: String, c: Dictionary) -> String:
 	var lv := int(c["lv"])
 	var district := str(c["district"])
 	var old := bool(c["heritage"])
+	# Inside a palace's walls a low building is a hall, gate or corridor,
+	# as is a heritage-tagged one elsewhere, unless it is plainly not
+	# (_palace_hall); a house in or by the walls is a hanok.
+	if lv <= 2 and (district == "seoul_palace" or old) and _palace_hall(kind, c):
+		return "seoul_palace"
 	# Officetels say so in their name ("광화문시대 오피스텔").
 	if str(c.get("name", "")).contains("오피스텔") and kind in ["apartments", "commercial"] and lv != 1:
 		return "seoul_officetel"
@@ -214,7 +238,7 @@ static func seoul_rule(kind: String, c: Dictionary) -> String:
 		return "seoul_danji" if lv >= 12 else "seoul"
 	if lv >= 20 or (kind != "apartments" and lv >= 10):
 		return "seoul_officetel" if district == "seoul_officetel" else "seoul_tower"
-	if kind == "house" and (old or (district == "seoul_hanok" and lv <= 1)):
+	if kind == "house" and (old or (district in ["seoul_hanok", "seoul_palace"] and lv <= 1)):
 		return "seoul_hanok"
 	if district == "seoul_shopping" and kind in ["commercial", "apartments"] and lv <= 9:
 		return "seoul_shopping"
@@ -223,6 +247,32 @@ static func seoul_rule(kind: String, c: Dictionary) -> String:
 	if lv >= 2 and lv <= 6:
 		return "seoul_villa"
 	return ""
+
+## Words in a name that rule out a giwa palace hall: museum, gallery,
+## church, cathedral, and 석조 (stone-built, Deoksugung's Seokjojeon).
+const NOT_PALACE_NAMES := ["박물관", "미술관", "교회", "성당", "석조"]
+## Architecture tags a palace hall may carry.
+const PALACE_ARCH := ["", "hanok", "traditional", "joseon", "korean", "palace", "joseon_palace"]
+## Largest footprint (m²) a palace hall has (Geunjeongjeon is ~1,000 m²).
+const PALACE_MAX_M2 := 2500.0
+
+## Whether a low Seoul building in a palace circle (or heritage-tagged)
+## can be a palace hall: not a house (a hanok), a church, a flat-roofed
+## or modern-architecture block, a large museum footprint, or a name
+## that says it is one of those.
+static func _palace_hall(kind: String, c: Dictionary) -> bool:
+	# A shrine or temple (Jongmyo's halls) is giwa-roofed too; a church is not.
+	if kind == "house" or str(c.get("tag", "")) in ["church", "cathedral", "chapel"]:
+		return false
+	if str(c.get("roof", "")) == "flat" or str(c.get("arch", "")) not in PALACE_ARCH:
+		return false
+	if float(c.get("area", 0.0)) > PALACE_MAX_M2:
+		return false
+	var name := str(c.get("name", ""))
+	for word in NOT_PALACE_NAMES:
+		if name.contains(word):
+			return false
+	return true
 
 ## The building's own OSM tag names it residential.
 static func _residential(c: Dictionary) -> bool:

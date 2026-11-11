@@ -218,6 +218,13 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		for e in cands:
 			if ((e as Array)[4] as Array).has(arch):
 				return str((e as Array)[0])
+	# A Seoul palace hall comes from the walls' circles or a heritage
+	# hall (ArchitectureCitiesEastAsia.seoul_rule), never by elimination:
+	# a church, whose kind only the palace row lists, keeps the city fabric.
+	if city == "seoul" and _rules(city, kind, c) != "seoul_palace":
+		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) != "seoul_palace")
+		if cands.is_empty():
+			return region
 	var year := int(c["year"])
 	# Tall historic New York buildings keep their masonry even when a
 	# broad, overlapping year band would otherwise choose walk-up fabric.

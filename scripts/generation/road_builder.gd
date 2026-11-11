@@ -272,7 +272,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		finish = _district_finish(line, surf.districts, m2u)
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, float(r["width_u"]), surf, m2u, "bridge",
+			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u, "bridge",
 				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
@@ -549,8 +549,8 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 		# bank: the deck stays up there. Ramped to the ground at every joint,
 		# a viaduct mapped in pieces rose and fell piece by piece.
 		var up := float(layer) * 5.0 * m2u
-		var joint0 := surf.bridge_joint(pts[0])
-		var joint1 := surf.bridge_joint(pts[n - 1])
+		var joint0 := surf.bridge_joint(pts[0], (pts[0] - pts[1]).normalized())
+		var joint1 := surf.bridge_joint(pts[n - 1], (pts[n - 1] - pts[n - 2]).normalized())
 		var end0 := surf.height(pts[0].x, pts[0].y) + up if joint0 else deck[0]
 		var end1 := surf.height(pts[n - 1].x, pts[n - 1].y) + up if joint1 else deck[n - 1]
 		for i in n:
@@ -832,14 +832,20 @@ class _Surface extends RefCounted:
 	var native_shore := false
 	## Ends of bridge ways by node, and how many bridge ways end there.
 	var _bridge_ends := {}
+	## Non-bridge ways by vertex node ([points, index]): approaches.
+	var _way_nodes := {}
+	## Bridge way end points: a joint may sit metres off the node.
+	var _bridge_end_pts := PackedVector2Array()
+	var _bridge_lines: Array = []  ## Bridge polylines (beside-joints).
+	var _pier_lines: Array = []  ## Pier polylines (landings).
 
 	static func _node(p: Vector2) -> Vector2i:
 		var m := WorldScale.metres_to_units()
 		return Vector2i(roundi(p.x * 100.0 / m), roundi(p.y * 100.0 / m))
 
-	## True where two bridge ways meet end to end: a joint of one viaduct.
-	func bridge_joint(p: Vector2) -> bool:
-		return int(_bridge_ends.get(_node(p), 0)) >= 2
+	## True where two bridge ways meet (BridgeLandings.joint).
+	func bridge_joint(p: Vector2, outward: Vector2 = Vector2.ZERO) -> bool:
+		return BridgeLandings.joint(self, p, outward)
 
 	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
 	## (and the plain paving of a crossing's stub) stops at their edge, as
@@ -851,12 +857,28 @@ class _Surface extends RefCounted:
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
+		for pier in data.piers:
+			if pier is Dictionary:
+				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
 		for w: Variant in data.roads + data.railways:
-			if w is Dictionary and bool((w as Dictionary).get("bridge", false)):
-				var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
-				if ends.size() >= 2:
-					for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
-						_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
+			if not (w is Dictionary):
+				continue
+			var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+			if ends.size() < 2:
+				continue
+			if bool((w as Dictionary).get("bridge", false)):
+				_bridge_lines.append(ends)
+				for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
+					_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
+					_bridge_end_pts.append(e)
+			elif not bool((w as Dictionary).get("tunnel", false)) \
+					and not bool((w as Dictionary).get("area", false)):
+				for vi in ends.size():
+					var node := _node(ends[vi])
+					if not _way_nodes.has(node):
+						_way_nodes[node] = []
+					(_way_nodes[node] as Array).append([ends, vi])
+
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
 		size = data.grid_size

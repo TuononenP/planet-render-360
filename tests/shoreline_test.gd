@@ -27,6 +27,8 @@ func _run() -> void:
 	_check(ground.water_at(10, 0) >= 1.99, "mapped water should cover its bed at a sub-post shoreline")
 	_check(is_zero_approx(ground.water_at(-1, 0)), "mapped dry side should not flood through interpolation")
 	_check(ground.height_at_world(0.1, 0) <= ground.water_level_at(0.1, 0) - 1.99, "no exposed ramp inside water")
+	_check(absf(ground.dry_height_at_world(10, 0) - 3.0) < 0.05, "dry height inside water should be the pre-carve bank, not the bed")
+	_check(absf(ground.dry_height_at_world(-10, 0) - 3.0) < 0.05, "dry height on land should match the final surface")
 	_check(ground.shoreline.hard_count() == 0, "unmapped rural bank should remain natural")
 	for diagnostic in ground.shoreline.diagnostics:
 		_check(str(diagnostic["kind"]) != "patch_failure", "natural patch must cover its complete cell")

@@ -28,6 +28,21 @@ func _square(c: Vector2, r: float) -> PackedVector2Array:
 	return PackedVector2Array([c + Vector2(-r, -r), c + Vector2(r, -r),
 		c + Vector2(r, r), c + Vector2(-r, r)])
 
+func _quay_ground(slope: float) -> GroundTruth:
+	var d := LocationData.new()
+	d.grid_size = 256
+	d.heights.resize(256 * 256)
+	var step := 2400.0 / 255.0
+	for z in 256:
+		for x in 256:
+			var wx := (float(x) - 128.0) * step
+			d.heights[z * 256 + x] = 3.0 + slope * maxf(wx, 0.0)
+	d.centre_elevation_m = 3.0
+	d.water_level = 0.5
+	d.land_polygons = [{"class": "water", "tidal": true, "points": PackedVector2Array([
+		Vector2(-1200, -1200), Vector2(-5, -1200), Vector2(-5, 1200), Vector2(-1200, 1200)]), "holes": []}]
+	return GroundTruth.new(d)
+
 func _run() -> void:
 	var failures: Array[String] = []
 	var m := WorldScale.metres_to_units()
@@ -116,6 +131,95 @@ func _run() -> void:
 	if none.get_child_count() != 0:
 		failures.append("flat ground built a plinth mesh")
 	none.free()
+	# Quayside straddle: the water polygon clips the west edge, the centre
+	# and east side stand on dry quay. The carved bed is not the ground:
+	# the building seats dry, with no piles.
+	var quay := _quay_ground(0.0)
+	var qring := _square(Vector2.ZERO, 12.0 * m)
+	qring = PackedVector2Array([Vector2(-12, -8) * m, Vector2(12, -8) * m,
+		Vector2(12, 8) * m, Vector2(-12, 8) * m])
+	var qf := BuildingFoundation.sample(quay, qring, Vector2.ZERO,
+		quay.render_y(WaterBuilder.SEA_LEVEL_M))
+	if bool(qf["raised"]):
+		failures.append("quayside building on dry centre was raised on piles: %s" % [qf])
+	if absf(float(qf["floor"]) - float(qf["low"])) > 0.01:
+		failures.append("flat quay floor %.2f should seat at dry low %.2f" % [float(qf["floor"]), float(qf["low"])])
+	var qroot := Node3D.new()
+	BuildingFoundation.build(qroot, qring, [], qf, {"kind": "residential"}, quay)
+	if qroot.get_child_count() != 0:
+		failures.append("dry-seated quay building built a water foundation (%d children)" % qroot.get_child_count())
+	qroot.free()
+	# Same straddle on a bank rising inland: a solid plinth, not stilts.
+	var bank := _quay_ground(0.2)
+	var bf := BuildingFoundation.sample(bank, qring, Vector2.ZERO,
+		bank.render_y(WaterBuilder.SEA_LEVEL_M))
+	if bool(bf["raised"]) or float(bf["plinth"]) <= 0.0:
+		failures.append("bank straddle should seat dry on a plinth: %s" % [bf])
+	var broot := Node3D.new()
+	BuildingFoundation.build(broot, qring, [], bf, {"kind": "residential"}, bank)
+	BuildingFoundation.plinth(broot, qring, [], bf, bank)
+	var pile_nodes := 0
+	for child in broot.find_children("*", "MeshInstance3D", true, false):
+		if bool(child.get_meta("water_foundation", false)):
+			pile_nodes += 1
+	if pile_nodes != 0:
+		failures.append("bank straddle built %d pile meshes instead of a plinth" % pile_nodes)
+	if broot.find_children("*", "MeshInstance3D", true, false).is_empty():
+		failures.append("bank straddle built no plinth wall")
+	broot.free()
+	# A footprint wholly over water keeps its deck and piles.
+	var pring := PackedVector2Array([Vector2(-112, -8) * m, Vector2(-88, -8) * m,
+		Vector2(-88, 8) * m, Vector2(-112, 8) * m])
+	var pf := BuildingFoundation.sample(quay, pring, Vector2(-100, 0) * m,
+		quay.render_y(WaterBuilder.SEA_LEVEL_M))
+	if not bool(pf["raised"]):
+		failures.append("building wholly over water should stay raised: %s" % [pf])
+	var proot := Node3D.new()
+	BuildingFoundation.build(proot, pring, [], pf, {"kind": "boathouse"}, quay)
+	if proot.get_child_count() == 0:
+		failures.append("over-water building built no deck/piles")
+	proot.free()
+	# Mixed raised: centre over water, east edge on dry quay. Piles only
+	# on the wet stretch, none standing on the dry east ground.
+	var mring := PackedVector2Array([Vector2(-26, -8) * m, Vector2(-2, -8) * m,
+		Vector2(-2, 8) * m, Vector2(-26, 8) * m])
+	var mf := BuildingFoundation.sample(quay, mring, Vector2(-14, 0) * m,
+		quay.render_y(WaterBuilder.SEA_LEVEL_M))
+	if not bool(mf["raised"]):
+		failures.append("centre-wet straddle should stay raised: %s" % [mf])
+	var mroot := Node3D.new()
+	BuildingFoundation.build(mroot, mring, [], mf, {"kind": "retail"}, quay)
+	if not mroot.has_node("WaterFoundationPiles"):
+		failures.append("mixed raised building built no piles")
+	else:
+		var pile_mesh := (mroot.get_node("WaterFoundationPiles") as MeshInstance3D).mesh
+		var max_x := -INF
+		for v in pile_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			max_x = maxf(max_x, v.x)
+		if max_x > -4.0 * m:
+			failures.append("piles stand on dry quay ground (max pile x %.2f)" % max_x)
+	mroot.free()
+	# Low dry pier: no wet stretch, but the freeboard lifts the floor off
+	# the dry ground, so the deck still needs its piles.
+	var ld := LocationData.new()
+	ld.grid_size = 49
+	ld.heights.resize(49 * 49)
+	ld.heights.fill(0.67)
+	ld.centre_elevation_m = 80.0
+	ld.water_level = 0.5
+	ld.land_polygons = [{"class": "water", "tidal": true, "points": PackedVector2Array([
+		Vector2(100, 100), Vector2(200, 100), Vector2(200, 200), Vector2(100, 200)]), "holes": []}]
+	var low_ground := GroundTruth.new(ld)
+	var lring := _square(Vector2.ZERO, 5.0 * m)
+	var lf := BuildingFoundation.sample(low_ground, lring, Vector2.ZERO,
+		low_ground.render_y(WaterBuilder.SEA_LEVEL_M))
+	if not bool(lf["raised"]):
+		failures.append("low dry pier should stay raised: %s" % [lf])
+	var lroot := Node3D.new()
+	BuildingFoundation.build(lroot, lring, [], lf, {"kind": "retail"}, low_ground)
+	if not lroot.has_node("WaterFoundationPiles"):
+		failures.append("low dry pier built a deck without piles (floating deck)")
+	lroot.free()
 	if failures.is_empty():
 		print("BUILDING FOUNDATION PASS")
 		quit(0)
