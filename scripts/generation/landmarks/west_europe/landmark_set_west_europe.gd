@@ -21,6 +21,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"st_pauls": LandmarkLondonHeritage.st_pauls(model)
 		"tower_of_london": LandmarkLondonPalaces.tower_of_london(model)
 		"buckingham_palace": LandmarkLondonPalaces.buckingham(model)
+		"waterloo_station": LandmarkWaterloo.waterloo(model)
 		"westminster_abbey": LandmarkLondonHeritage.westminster_abbey(model)
 		"mont_saint_michel": LandmarkWestEarly.mont_saint_michel(model)
 		"stonehenge": LandmarkWestEarly.stonehenge(model)

@@ -60,6 +60,18 @@ static func entries() -> Array:
 		{"type": "st_mary_axe", "name": "30 St Mary Axe", "lat": 51.5145, "lon": -0.0803, "radius_m": 6000.0,
 			"wiki_title": "30 St Mary Axe", "height_m": 180.0, "clear_m": 50.0, "kind": "Skyscraper",
 			"aliases": ["30 st mary axe", "st mary axe", "the gherkin", "swiss re tower"]},
+		# The model stands on its mapped plan (OSM way 4245075) in its own
+		# frame, so the site is the plan's origin, not the Victory Arch; the
+		# clearance is a grid of circles over the 300 x 430 m footprint.
+		{"type": "waterloo_station", "name": "London Waterloo station", "lat": 51.5031, "lon": -0.1132,
+			"radius_m": 3000.0, "wiki_title": "London Waterloo station", "height_m": 27.0, "clear_m": 42.0,
+			"clear_offsets_m": [[-98.0, 54.0], [-62.0, -18.0], [-62.0, 18.0], [-62.0, 54.0], [-62.0, 90.0],
+				[-26.0, -18.0], [-26.0, 18.0], [-26.0, 54.0], [-26.0, 90.0], [10.0, -18.0], [10.0, 18.0],
+				[10.0, 54.0], [10.0, 90.0], [10.0, 126.0], [46.0, -18.0], [46.0, 18.0], [46.0, 54.0],
+				[46.0, 90.0], [82.0, 18.0], [82.0, 54.0], [-45.0, -55.0], [20.0, -50.0], [70.0, -25.0],
+				[115.0, 25.0]],
+			"kind": "Railway station", "aliases": ["london waterloo station", "london waterloo", "waterloo station",
+				"waterloo railway station", "victory arch, waterloo"]},
 		{"type": "stonehenge", "name": "Stonehenge", "lat": 51.1789, "lon": -1.8262, "radius_m": 1500.0,
 			"wiki_title": "Stonehenge", "height_m": 7.3, "clear_m": 60.0, "kind": "Monument",
 			"aliases": ["stonehenge"]},
