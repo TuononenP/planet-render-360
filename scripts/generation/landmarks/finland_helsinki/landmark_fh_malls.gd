@@ -11,12 +11,26 @@ extends RefCounted
 const U = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_util.gd")
 const F = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_mall_footprints.gd")
 
-## Kalasatama tower shafts standing in the Redi lot (centre x, z and
-## size, metres about the Redi entry): deck furniture keeps clear of them.
-const REDI_TOWERS: Array[Rect2] = [
-	Rect2(19.0 - 12.5, -68.0 - 14.0, 25.0, 28.0), Rect2(87.0 - 13.5, -46.0 - 12.5, 27.0, 25.0),
-	Rect2(-22.0 - 12.0, -89.0 - 12.0, 24.0, 24.0), Rect2(-65.0 - 16.0, -74.0 - 15.5, 32.0, 31.0),
-	Rect2(-89.0 - 16.0, 5.0 - 17.0, 32.0, 34.0)]
+## Kalasatama tower shafts standing in the Redi lot: [centre, size] in
+## metres about the Redi entry, derived from the registry entries so a
+## moved tower moves its deck clearance with it (the builder's own
+## footprint sizes, LandmarkFhKalasatama).
+const REDI_TOWER_SIZES := {"majakka": Vector2(25.0, 28.0), "loisto": Vector2(27.0, 25.0),
+	"lumo_one": Vector2(24.0, 24.0), "horisontti": Vector2(32.0, 31.0), "visio": Vector2(32.0, 34.0)}
+
+static func _redi_towers() -> Array:
+	var base := LocationData.entry_for_type("redi_shopping_centre")
+	var out: Array = []
+	if base.is_empty():
+		return out
+	for type in REDI_TOWER_SIZES:
+		var e := LocationData.entry_for_type(type)
+		if e.is_empty():
+			continue
+		var east := (float(e["lon"]) - float(base["lon"])) * 111320.0 * cos(deg_to_rad(float(base["lat"])))
+		var north := (float(e["lat"]) - float(base["lat"])) * 110540.0
+		out.append([Vector2(east, -north), REDI_TOWER_SIZES[type]])
+	return out
 
 static func _mall(model: Node3D, type: String, h: float, wall: String, accent: String) -> void:
 	var lm := LandmarkMesh.new()
@@ -118,12 +132,19 @@ static func redi(model: Node3D) -> void:
 	for x in [-44.0, 0.0, 44.0]:
 		if _deck_fits(lawn, Vector2(x, 10.0), Vector2(3.4, 0.9)):
 			U.blk(lm, "Wood", x, 16.85, 10.0, 3.4, 0.5, 0.9)
-	# Park walkways from the lawn centre to the Majakka and Lumo One
-	# shafts, with rails and posts standing on the deck.
-	for w in [[19.0, -54.0], [-22.0, -77.0]]:
-		var x := float(w[0])
+	# Park walkways from the lawn centre to the two north tower shafts
+	# (Majakka and Lumo One, whichever the registry places there), with
+	# rails and posts standing on the deck.
+	var walk_targets: Array = []
+	for t in _redi_towers():
+		var centre: Vector2 = t[0]
+		if centre.y < -40.0 and absf(centre.x) < 40.0:
+			walk_targets.append(t)
+	walk_targets.sort_custom(func(a: Array, b: Array) -> bool: return (a[0] as Vector2).x < (b[0] as Vector2).x)
+	for target in walk_targets:
+		var x := (target[0] as Vector2).x
 		var z0 := -16.0
-		var z1 := float(w[1])
+		var z1 := (target[0] as Vector2).y + (target[1] as Vector2).y * 0.5
 		var mid := (z0 + z1) * 0.5
 		var length := z0 - z1
 		U.blk(lm, "Trim", x, 16.95, mid, 4.2, 0.25, length)
@@ -146,8 +167,9 @@ static func _deck_fits(lawn: PackedVector2Array, c: Vector2, size: Vector2) -> b
 	if not F.rect_inside(lawn, c, size):
 		return false
 	var item := Rect2(c - size * 0.5, size).grow(3.0)
-	for t in REDI_TOWERS:
-		if item.intersects(t):
+	for t in _redi_towers():
+		var shaft := Rect2((t[0] as Vector2) - (t[1] as Vector2) * 0.5, t[1])
+		if item.intersects(shaft):
 			return false
 	return true
 

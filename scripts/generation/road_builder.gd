@@ -553,10 +553,21 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 		var joint1 := surf.bridge_joint(pts[n - 1], (pts[n - 1] - pts[n - 2]).normalized())
 		var end0 := surf.height(pts[0].x, pts[0].y) + up if joint0 else deck[0]
 		var end1 := surf.height(pts[n - 1].x, pts[n - 1].y) + up if joint1 else deck[n - 1]
+		# An end on a landmark roof starts there, joint or not: the
+		# mapped park/concourse network leaves the roof at its edge.
+		var roof0 := surf.landmark_roof_y(pts[0])
+		var roof1 := surf.landmark_roof_y(pts[n - 1])
+		if roof0 > -INF:
+			end0 = roof0
+		if roof1 > -INF:
+			end1 = roof1
 		for i in n:
-			var ramp := minf(INF if joint0 else end0 + grade * dist[i],
-				INF if joint1 else end1 + grade * (total - dist[i]))
+			var ramp := minf(INF if joint0 and roof0 <= -INF else end0 + grade * dist[i],
+				INF if joint1 and roof1 <= -INF else end1 + grade * (total - dist[i]))
 			var high := _deck_floor(pts, i, surf, 0.0, half) + up
+			var roof_y := surf.landmark_roof_y(pts[i])
+			if roof_y > -INF:
+				high = roof_y + 0.05 * m2u
 			deck[i] = maxf(deck[i], minf(high, ramp))
 		deck[0] = maxf(deck[0], end0)
 		deck[n - 1] = maxf(deck[n - 1], end1)
@@ -841,6 +852,7 @@ class _Surface extends RefCounted:
 	var _bridge_lines: Array = []  ## Bridge polylines (beside-joints).
 	var road_bridges: RoadBridgeDecks.Index = null  ## Road bridge ways sharing structures.
 	var _pier_lines: Array = []  ## Pier polylines (landings).
+	var roof_sites: Array = []  ## Registry landmark roofs (LandmarkRoofs).
 
 	static func _node(p: Vector2) -> Vector2i:
 		var m := WorldScale.metres_to_units()
@@ -849,6 +861,9 @@ class _Surface extends RefCounted:
 	## True where two bridge ways meet (BridgeLandings.joint).
 	func bridge_joint(p: Vector2, outward: Vector2 = Vector2.ZERO) -> bool:
 		return BridgeLandings.joint(self, p, outward)
+
+	func landmark_roof_y(p: Vector2) -> float:  ## Roof Y covering `p`.
+		return LandmarkRoofs.roof_y(roof_sites, p, height)
 
 	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
 	## (and the plain paving of a crossing's stub) stops at their edge, as
@@ -864,6 +879,7 @@ class _Surface extends RefCounted:
 			if pier is Dictionary:
 				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
 		road_bridges = RoadBridgeDecks.Index.new(data.roads)
+		roof_sites = LandmarkRoofs.collect(data)
 		for w: Variant in data.roads + data.railways:
 			if not (w is Dictionary):
 				continue

@@ -111,9 +111,9 @@ static func entries() -> Array:
 		{"type": "horisontti", "name": "Horisontti", "lat": 60.187586, "lon": 24.978137,
 			"radius_m": 6000.0, "wiki_title": "Horisontti", "height_m": 109.0, "clear_m": 30.0,
 			"kind": "Tower", "aliases": ["horisontti", "horisontti kalasatama", "horisontti tower"]},
-		{"type": "visio", "name": "Visio", "lat": 60.186869, "lon": 24.977701,
+		{"type": "visio", "name": "Visio, Kalasatama", "lat": 60.186869, "lon": 24.977701,
 			"radius_m": 6000.0, "wiki_title": "Redi (shopping centre)", "height_m": 98.0, "clear_m": 30.0,
-			"kind": "Tower", "aliases": ["visio", "visio kalasatama", "kalasataman visio"]},
+			"kind": "Tower", "aliases": ["visio, kalasatama", "visio kalasatama", "kalasataman visio"]},
 		{"type": "redi_shopping_centre", "name": "Redi Shopping Centre", "lat": 60.186915, "lon": 24.979314,
 			"radius_m": 4500.0, "wiki_title": "Redi (shopping centre)", "height_m": 20.0, "clear_m": 40.0,
 			"clear_offsets_m": [
