@@ -152,6 +152,16 @@ func _run() -> void:
 	_check(store.entries.size() == 2, "storage clear should keep B in History")
 	screen.queue_free()
 	await process_frame
+	# History badges come from one report per refresh, not per-card sizing.
+	var history := HistoryScreen.new()
+	root.add_child(history)
+	history.bind_store(store)
+	await process_frame
+	_check(history._badge_bytes.size() == 2, "history should size both places from one report, got %d" % history._badge_bytes.size())
+	_check(int(history._badge_bytes.get("%s_%s" % [b.lat, b.lon], -1)) == CacheStore.entry_bytes(b),
+		"history badge size should match entry_bytes for B")
+	history.queue_free()
+	await process_frame
 	# Busy: a world save in flight for B refuses both verbs, drops nothing.
 	_write(b_only)
 	var fake_save := Thread.new()
@@ -174,6 +184,16 @@ func _run() -> void:
 	_check(not FileAccess.file_exists(b_world), "remove should delete B world")
 	_check(not FileAccess.file_exists(PlaceThumb.path(b.lat, b.lon)), "remove should delete B thumbnail")
 	_check(store.entries.size() == 1, "remove should drop the entry")
+
+	# An empty worlds listing is cached too: a file appearing later is
+	# only picked up after a recount invalidates the cache.
+	WorldCache.dir_override = root_dir + "/worlds-empty"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(WorldCache.base_dir()))
+	_check(WorldCache.bytes_for_place(1.0, 2.0) == 0, "empty worlds should size 0")
+	_write(WorldCache.base_dir() + "/world_%d_%d_p2_s0_abcdef01.scn" % [CacheStore.quant(1.0), CacheStore.quant(2.0)], 48)
+	_check(WorldCache.bytes_for_place(1.0, 2.0) == 0, "empty listing should stay cached until a recount")
+	WorldCache.enforce_budget()
+	_check(WorldCache.bytes_for_place(1.0, 2.0) == 48, "recount should pick up the new world")
 
 	CacheStore.reset_lru()
 	CacheStore.dir_override = ""

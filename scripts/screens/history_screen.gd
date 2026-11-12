@@ -21,6 +21,9 @@ const TINTS := ["1a2350", "b8607e", "7fb8e6", "f0b06a"]  # horizon-* stops
 var _list: GridContainer
 var _fav_grid: GridContainer
 var _store: CacheStore
+## Per-place sizes for the badges, built once per refresh from
+## CacheStore.place_cache_report instead of sizing every card alone.
+var _badge_bytes: Dictionary = {}  # "lat_lon" -> bytes
 var _margin: MarginContainer
 var _title: Label
 var _count_label: Label
@@ -192,6 +195,9 @@ func refresh() -> void:
 		_list.columns = 1
 		_list.add_child(_empty_card())
 		return
+	_badge_bytes = {}
+	for row in CacheStore.place_cache_report(entries).get("rows", []):
+		_badge_bytes[_place_key(row)] = int(row["bytes"])
 	_on_resized()
 	var favourites: Array = entries.filter(func(e: Dictionary) -> bool: return bool(e.get("favourite", false)))
 	var others: Array = entries.filter(func(e: Dictionary) -> bool: return not bool(e.get("favourite", false)))
@@ -246,6 +252,10 @@ func _empty_card() -> PanelContainer:
 
 # --- Cards and rows ---
 
+## Key into _badge_bytes for an entry (or a report row, same fields).
+func _place_key(e: Dictionary) -> String:
+	return "%s_%s" % [float(e.get("lat", 0.0)), float(e.get("lon", 0.0))]
+
 ## Cache state as a StatusBadge: Cached (good), Partial (caution) or
 ## nothing when no layer is on the device. Returns [word, tone] or [].
 func _cache_state(e: Dictionary) -> Array:
@@ -272,7 +282,9 @@ func _badges(e: Dictionary) -> HFlowContainer:
 	var state := _cache_state(e)
 	if not state.is_empty():
 		row.add_child(_badge(state[0], state[1], "hard-drive"))
-		var bytes := CacheStore.entry_bytes(e)
+		var bytes := int(_badge_bytes.get(_place_key(e), -1))
+		if bytes < 0:
+			bytes = CacheStore.entry_bytes(e)  # a card built outside refresh()
 		if bytes > 0:
 			var sz := UiTheme.data_label(UiTheme.cache_size(bytes), 13, UiTheme.MUTED, true)
 			sz.mouse_filter = Control.MOUSE_FILTER_IGNORE

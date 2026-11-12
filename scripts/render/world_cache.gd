@@ -44,11 +44,13 @@ static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
 ## wherever _bytes is (see _invalidate_bytes).
 static var _by_place_cache: Dictionary = {}
 static var _by_place_dir := ""
+static var _by_place_valid := false  # an empty result is a valid result
 
 static func _invalidate_bytes() -> void:
 	_bytes = -1
 	_by_place_cache = {}
 	_by_place_dir = ""
+	_by_place_valid = false
 ## Only one worker may write a given scene and its ground file at a time.
 static var _save_threads: Dictionary = {}
 ## Test hook: keep cache eviction checks away from the person's worlds.
@@ -459,7 +461,7 @@ static func bytes_for_place(lat: float, lon: float) -> int:
 ## lookups (History badges) do not relist the directory for every place.
 static func bytes_by_place() -> Dictionary:
 	var dir := base_dir()
-	if _by_place_dir == dir and not _by_place_cache.is_empty():
+	if _by_place_valid and _by_place_dir == dir:
 		return _by_place_cache
 	var out := {}
 	if DirAccess.dir_exists_absolute(dir):
@@ -473,6 +475,7 @@ static func bytes_by_place() -> Dictionary:
 			out[pk] = int(out.get(pk, 0)) + _size(dir + "/" + f)
 	_by_place_cache = out
 	_by_place_dir = dir
+	_by_place_valid = true
 	return out
 
 ## Deletes one place's built worlds. Returns {"files", "bytes"}.
@@ -524,6 +527,7 @@ static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int
 		_bytes = 0
 		_by_place_cache = {}
 		_by_place_dir = ""
+		_by_place_valid = false
 		return 0
 	var entries: Array = []
 	var total := 0
@@ -550,6 +554,7 @@ static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int
 	_bytes = total
 	_by_place_cache = {}
 	_by_place_dir = ""
+	_by_place_valid = false
 	return removed
 
 static func _size(path: String) -> int:
