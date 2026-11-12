@@ -113,7 +113,8 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var car: Array = CarFleet.pick(fleet, p)
 			var kind: String = car[0]
 			var length := _length_m(kind) * m2u
-			if blocked(p, obstacles, m2u):
+			# A causeway or quay road the map does not call a bridge.
+			if blocked(p, obstacles, m2u) or ground.water_at(p.x, p.y) > 0.0:
 				continue
 			var fw := facing(dir, off, oneway, left_traffic).rotated(
 				deg_to_rad(YAW_JITTER_DEG) * (_hash(p.x, p.y, 6.1) * 2.0 - 1.0))

@@ -68,6 +68,10 @@ var _buildings: Array = []
 var _level: PackedFloat32Array = PackedFloat32Array()
 ## Finalized before builders start; untyped to avoid a class-load cycle.
 var shoreline = null
+## The painted ground (GroundSurface), built on first ask; the lock lets
+## the terrain and vegetation stages share one build.
+var _painted: GroundSurface = null
+var _painted_lock := Mutex.new()
 
 ## Bank freeboard (mirrors WaterBuilder._FREEBOARD) and carve depth
 ## below that local surface. v1 carved to the GLOBAL datum
@@ -78,6 +82,15 @@ const CARVE_DEPTH_M := 2.0
 ## Height step (metres) at which _blur_pass stops averaging across a
 ## neighbour: DEM noise is well under it, escarpment posts well over.
 const EDGE_SIGMA_M := 3.0
+
+## What the terrain shader paints over the extent, built once from `data`
+## (the place this ground was made from) and shared by every stage.
+func surface(data: LocationData) -> GroundSurface:
+	_painted_lock.lock()
+	if _painted == null:
+		_painted = GroundSurface.new(GroundMaterial.class_map(data))
+	_painted_lock.unlock()
+	return _painted
 
 ## Land polygons plus their edge-banded indices (land_class_at runs per
 ## tree / building / probe, and a lagoon polygon has tens of thousands

@@ -105,6 +105,68 @@ func _run() -> void:
 		"re-laid cover centres on the new eye: %d stray, %d past the old reach" % [stray, beyond_old])
 	_check(GroundCover.spare_m(RenderSettings.Preset.FAST) == 0.0, "Fast lays no walking reach")
 	root.free()
+	# A park lawn mapped across a street: neither the carriageway nor its
+	# sidewalk strip (the ground paints it as paving) grows any cover.
+	var street := _park(RenderSettings.Preset.ULTRA)
+	var sc := View360.spawn_xz(street)
+	var u := WorldScale.metres_to_units()
+	street.roads = [{"class": "residential", "width_m": 8.0, "sidewalk": 3,
+		"points": PackedVector2Array([Vector2(sc.x - 400.0 * u, sc.y), Vector2(sc.x + 400.0 * u, sc.y)])}]
+	var strip := 0
+	var on_grass := 0
+	var walk_m := GroundMaterial.SIDEWALK_CITY_M if not CityStyles.zone_at(street.latitude, street.longitude).is_empty() \
+		else GroundMaterial.SIDEWALK_M
+	var strip_m := 4.0 + walk_m
+	var lanes := _plan(street)
+	for kind: String in lanes:
+		for e: Array in lanes[kind]:
+			if absf((e[0] as Vector3).x - sc.x) > 380.0 * u:
+				continue
+			var dz := absf((e[0] as Vector3).z - sc.y) / u
+			strip += 1 if dz < strip_m else 0
+			on_grass += 1
+	_check(on_grass > 500 and strip == 0, "no cover on a street's sidewalk: %d of %d" % [strip, on_grass])
+	# A sidewalk on one side only leaves the other side to the lawn. Bit 1 is
+	# the left of travel: east-bound, north (z < 0).
+	(street.roads[0] as Dictionary)["sidewalk"] = 1
+	var lawn_side := 0
+	var walk_side := 0
+	var one_side := _plan(street)
+	for kind: String in one_side:
+		for e: Array in one_side[kind]:
+			var at := e[0] as Vector3
+			if absf(at.x - sc.x) > 380.0 * u:
+				continue
+			var dz := (at.z - sc.y) / u
+			lawn_side += 1 if dz > 6.5 and dz < strip_m else 0
+			walk_side += 1 if dz < 0.0 and dz > -strip_m else 0
+	_check(lawn_side > 20 and walk_side == 0,
+		"the side with no sidewalk keeps its lawn: %d on it, %d on the walk" % [lawn_side, walk_side])
+	# A pitch and a paved square inside the park: painted as such, so no
+	# tuft grows on either (the park round them keeps its lawn).
+	var sports := _park(RenderSettings.Preset.ULTRA)
+	var sp_c := View360.spawn_xz(sports)
+	var pitch := PackedVector2Array([sp_c + Vector2(20, 20) * u, sp_c + Vector2(80, 20) * u,
+		sp_c + Vector2(80, 60) * u, sp_c + Vector2(20, 60) * u])
+	var square := PackedVector2Array([sp_c + Vector2(-80, 20) * u, sp_c + Vector2(-20, 20) * u,
+		sp_c + Vector2(-20, 60) * u, sp_c + Vector2(-80, 60) * u])
+	sports.land_polygons = [{"class": "pitch", "points": pitch, "holes": []},
+		{"class": "urban", "points": square, "holes": []}] + sports.land_polygons
+	var on_pitch := 0
+	var on_square := 0
+	var on_park := 0
+	var laid := _plan(sports)
+	for kind: String in laid:
+		for e: Array in laid[kind]:
+			var at := Vector2((e[0] as Vector3).x, (e[0] as Vector3).z) - sp_c
+			if at.y > 22.0 * u and at.y < 58.0 * u and at.x > 22.0 * u and at.x < 78.0 * u:
+				on_pitch += 1
+			elif at.y > 22.0 * u and at.y < 58.0 * u and at.x > -78.0 * u and at.x < -22.0 * u:
+				on_square += 1
+			else:
+				on_park += 1
+	_check(on_pitch == 0 and on_square == 0 and on_park > 500,
+		"no tufts on a pitch or square in a park: %d, %d (park %d)" % [on_pitch, on_square, on_park])
 	# Photo-green ground grows cover with no mapped polygon; bare ground none.
 	var wild := _park(RenderSettings.Preset.ULTRA)
 	wild.land_polygons = []

@@ -54,7 +54,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var t := Time.get_ticks_msec()
 	# Planned before the lamps: a side-street lamp gives way only where a
 	# utility pole really stands (the poles stop at their radius and cap).
-	var pole_plan := UtilityPoles.plan(data, ground)
+	var pole_plan := UtilityPoles.plan(data, ground, mask)
 	ctx = ctx.duplicate()
 	ctx["pole_grid"] = UtilityPoles.pole_grid(pole_plan)
 	t = _lap(timings, "pole_plan", t)

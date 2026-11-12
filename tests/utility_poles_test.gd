@@ -163,6 +163,19 @@ func _run() -> void:
 		if not (UtilityPoles.plan(data, ground)["poles"] as Array).is_empty():
 			failures.append("no poles along %s (tunnel %s, bridge %s)" % [road.get("class"),
 				road.get("tunnel"), road.get("bridge")])
+	# A second way running alongside: no pole stands in either carriageway.
+	var beside := _road({"highway": "residential"}, Vector2(-150, 5) * m, Vector2(150, 5) * m)
+	var below := _road({"highway": "residential"}, Vector2(-150, -5) * m, Vector2(150, -5) * m)
+	data.roads = [street, beside, below]
+	var lanes := UtilityPoles.plan(data, ground, VegetationMask.new(data, ground))["poles"] as Array
+	for p: Dictionary in lanes:
+		var q := Vector2((p["pos"] as Vector3).x, (p["pos"] as Vector3).z)
+		for road: Dictionary in data.roads:
+			var pts: PackedVector2Array = road["points"]
+			var lane_half := float(road.get("width_m", 6.0)) * 0.5 * m
+			if q.distance_to(Geometry2D.get_closest_point_to_segment(q, pts[0], pts[1])) < lane_half:
+				failures.append("a pole in a neighbouring way's lanes at %s" % q)
+				break
 	failures.remove_at(0)
 	if failures.is_empty():
 		print("UTILITY POLES TEST: PASS")

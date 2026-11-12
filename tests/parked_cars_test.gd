@@ -137,6 +137,19 @@ func _run() -> void:
 				failures.append("%s should carry the paint finish" % node.name)
 				break
 	holder.free()
+	# A causeway the map does not call a bridge parks no car on the water.
+	var causeway := OsmTags._road_entry({"highway": "residential", "lanes": "2", "parking:both": "lane"},
+		_line(Vector2(-100, 0), Vector2(100, 0)))
+	var dry := _data()
+	dry.roads = [causeway]
+	var wet := _data()
+	wet.roads = [causeway]
+	wet.land_polygons = [{"class": "water", "points": PackedVector2Array([Vector2(-150, -40),
+		Vector2(150, -40), Vector2(150, 40), Vector2(-150, 40)])}]
+	var dry_cars := ParkedCars.plan(dry, GroundTruth.new(dry), 1.0).size()
+	var wet_cars := ParkedCars.plan(wet, GroundTruth.new(wet), 1.0).size()
+	if dry_cars == 0 or wet_cars != 0:
+		failures.append("cars park on the dry street but not over water: %d dry, %d wet" % [dry_cars, wet_cars])
 	# The headless renderer does not retain MultiMesh instance transforms,
 	# so check the bounds calculation using known placements directly.
 	var placements := [[Vector3(20, 3, -40), Basis.IDENTITY],

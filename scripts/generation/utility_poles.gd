@@ -60,7 +60,9 @@ static func carries(road: Variant) -> bool:
 ## (m), arms, transformer, lamp, road, d2, drop ([from, to] or [])}],
 ## "spans": [{a, b (pole indices, consecutive on one street), cables
 ## ([[from, to], ...] attachment points)}]}.
-static func plan(data: LocationData, ground: GroundTruth) -> Dictionary:
+## `mask` (StreetProps') keeps poles out of every carriageway and track,
+## not only clear of their own street's junctions.
+static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask = null) -> Dictionary:
 	var out := {"poles": [], "spans": []}
 	if not enabled(data) or data.roads.is_empty():
 		return out
@@ -76,7 +78,7 @@ static func plan(data: LocationData, ground: GroundTruth) -> Dictionary:
 		var road: Variant = data.roads[ri]
 		if not carries(road):
 			continue
-		var line := _stations(road, ri, data, ground, centre, r2, junc, obstacles, rings, m)
+		var line := _stations(road, ri, data, ground, centre, r2, junc, obstacles, rings, m, mask)
 		for p: Dictionary in line:
 			d2s.append(float(p["d2"]))
 		lines.append(line)
@@ -136,7 +138,7 @@ static func near_pole(grid: Dictionary, p: Vector2) -> bool:
 ## One street's poles in order along it.
 static func _stations(road: Dictionary, ri: int, data: LocationData, ground: GroundTruth,
 		centre: Vector2, r2: float, junc: Dictionary, obstacles: Dictionary, rings: Dictionary,
-		m: float) -> Array:
+		m: float, mask: VegetationMask = null) -> Array:
 	var pts: PackedVector2Array = road["points"]
 	var cls := str(road.get("class", ""))
 	var half := float(road.get("width_m", OsmTags.road_class_width(cls))) * 0.5
@@ -167,7 +169,7 @@ static func _stations(road: Dictionary, ri: int, data: LocationData, ground: Gro
 			for shift: float in [0.0, 4.0, -4.0, 8.0, -8.0]:
 				var tt := clampf(t + shift * m, 0.0, seg)
 				var p := a + dir * tt + nrm * off
-				if _free(p, ground, junc, obstacles, rings, data, m):
+				if _free(p, ground, junc, obstacles, rings, data, m, mask):
 					spot = p
 					break
 			t += step
@@ -186,10 +188,12 @@ static func _stations(road: Dictionary, ri: int, data: LocationData, ground: Gro
 	return line
 
 static func _free(p: Vector2, ground: GroundTruth, junc: Dictionary, obstacles: Dictionary,
-		rings: Dictionary, data: LocationData, m: float) -> bool:
+		rings: Dictionary, data: LocationData, m: float, mask: VegetationMask = null) -> bool:
 	if ParkedCars._near_junction(p, junc, JUNCTION_CUT_M * m) or ParkedCars.blocked(p, obstacles, m):
 		return false
 	if ground.water_at(p.x, p.y) > 0.0:
+		return false
+	if mask != null and mask.blocked(p.x, p.y, VegetationMask.ROAD, 0.0):
 		return false
 	var cell := _BUILD_CELL_M * m
 	for bi: int in rings.get(Vector2i(floori(p.x / cell), floori(p.y / cell)), []):

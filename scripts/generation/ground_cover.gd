@@ -36,6 +36,11 @@ const PHOTO_NEIGHBOUR_M := 4.0
 const PHOTO_NEIGHBOURS := 3
 ## Cover keeps this far from hard edges: the strip GroundShader wears to earth.
 const EDGE_CLEAR_M := 1.1
+## Green read only from the photo keeps this far from any mapped way: over
+## a junction or plaza it is a tree crown or a stray tint, not a lawn.
+const PHOTO_ROAD_CLEAR_M := 5.0
+const HARD_BITS := VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE \
+	| VegetationMask.WATER | VegetationMask.PAVED | VegetationMask.PAINTED
 const KINDS := ["tuft", "seedhead", "flower", "shrub"]
 ## Unmown grass is left standing this far (m) from walls and water.
 const EDGE_TALL_M := 3.0
@@ -289,9 +294,9 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 					continue
 				# Unmapped green among houses is a garden; out of town, a meadow.
 				sward = "mown" if mask.built_fraction(x, z) > 0.04 else "wild"
-			if not CLASSES.has(cls) or mask.blocked(x, z,
-					VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE
-					| VegetationMask.WATER, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+			if not CLASSES.has(cls) or mask.blocked(x, z, HARD_BITS, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+				continue
+			if id < 0 and mask.blocked(x, z, VegetationMask.ROAD_EDGE, PHOTO_ROAD_CLEAR_M * WorldScale.metres_to_units()):
 				continue
 			if sward == "":
 				sward = VegetationMask.sward_of(cls)
@@ -348,8 +353,10 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				for k in WILD_EXTRA:
 					var ex := x + (_hash(float(i), float(j), 20.0 + k) - 0.5) * sp
 					var ez := z + (_hash(float(i), float(j), 30.0 + k) - 0.5) * sp
-					if mask.blocked(ex, ez, VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.ROAD_EDGE
-							| VegetationMask.WATER, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+					if mask.blocked(ex, ez, HARD_BITS, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+						continue
+					if id < 0 and mask.blocked(ex, ez, VegetationMask.ROAD_EDGE,
+							PHOTO_ROAD_CLEAR_M * WorldScale.metres_to_units()):
 						continue
 					var eh := lerpf(hr.x, hr.y, _hash(float(i), float(j), 40.0 + k))
 					(per[kind] as Array).append([Vector3(ex, ground.height_at_world(ex, ez), ez),

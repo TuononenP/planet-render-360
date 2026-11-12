@@ -93,9 +93,10 @@ const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3}
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with
 ## no imagery, the procedural colour image TerrainBuilder bakes over
 ## the extent (vertex UV = extent UV). `photo_rect` is the photo-UV
-## box of the detailed extent (gain statistics only).
+## box of the detailed extent (gain statistics only). `cmap` is the class
+## map when the caller already has it (GroundTruth.surface), else built here.
 static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
-		has_sat: bool) -> ShaderMaterial:
+		has_sat: bool, cmap: Image = null) -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE)
@@ -103,7 +104,8 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()
 	m.set_shader_parameter("photo", photo)
-	var cmap := class_map(data)
+	if cmap == null:
+		cmap = class_map(data)
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))

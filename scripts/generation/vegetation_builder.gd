@@ -108,6 +108,13 @@ static func _hash(x: float, z: float, salt: float) -> float:
 	var v := sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453
 	return v - floor(v)
 
+## No tree stands this close (m) to the landmark.
+const LANDMARK_CLEAR_M := 48.0
+## What a tree no map or raster put there keeps off: footprints, roads and
+## their verges, water, sidewalks, and ground painted as paving or a pitch.
+const SYNTHETIC_BITS := VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER \
+	| VegetationMask.PAVED | VegetationMask.PAINTED
+
 ## Ground ok for a trunk at XZ (units): extent, water, exclusion bits.
 static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMask,
 		bits: int, margin_m: float, ctx: Dictionary) -> bool:
@@ -118,7 +125,7 @@ static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMa
 		ctx["rej_water"] = int(ctx.get("rej_water", 0)) + 1
 		return false
 	var lm: Vector2 = ctx["landmark"]
-	if Vector2(x, z).distance_to(lm) < 48.0 * float(ctx["m2u"]):
+	if Vector2(x, z).distance_to(lm) < LANDMARK_CLEAR_M * float(ctx["m2u"]):
 		return false
 	return true
 
@@ -277,8 +284,7 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 					spread = 1.0
 			if _hash(x, z, 9.0) > p:
 				continue
-			if not _site_ok(x, z, ground, mask, VegetationMask.BUILDING
-					| VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx):
+			if not _site_ok(x, z, ground, mask, SYNTHETIC_BITS, 0.8, ctx):
 				continue
 			if ground.slope_at(x, z) > 1.25:
 				continue
@@ -310,8 +316,7 @@ static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: Grou
 		var dist := rng.randf_range(60.0 * m2u, r_max)
 		var x := cos(ang) * dist
 		var z := sin(ang) * dist
-		if not _site_ok(x, z, ground, mask, VegetationMask.BUILDING
-				| VegetationMask.ROAD_EDGE | VegetationMask.WATER, 1.0, ctx):
+		if not _site_ok(x, z, ground, mask, SYNTHETIC_BITS, 1.0, ctx):
 			continue
 		if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
 			continue

@@ -24,6 +24,15 @@ func _init() -> void:
 	if TreePits.build(root, data, ground, mask) != 1 or root.get_node_or_null("TreePits") == null:
 		failures.append("the mapped sidewalk pit should render")
 	root.free()
+	# Inside the landmark's keep-out no tree was planted: no pit either.
+	data.landmark_type = "test"
+	data.has_landmark_site = true
+	data.landmark_lat = data.latitude
+	data.landmark_lon = data.longitude
+	if not TreePits.plan(data, mask, 1.0, ground).is_empty():
+		failures.append("no pit for a tree in the landmark's keep-out")
+	data.landmark_type = "none"
+	data.has_landmark_site = false
 	RenderSettings.apply_preset(data, RenderSettings.Preset.HIGH)
 	if not TreePits.plan(data, mask, 1.0).is_empty():
 		failures.append("tree pits are Ultra-only")

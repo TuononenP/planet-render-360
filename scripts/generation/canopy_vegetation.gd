@@ -88,7 +88,8 @@ static func add(plan: Dictionary, data: LocationData, ground: GroundTruth,
 					continue
 				if _near_mapped_tree(buckets, Vector2(x, z)) \
 						or not VegetationBuilder._site_ok(x, z, ground, mask,
-							VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx):
+							VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx) \
+						or (mask.surface != null and mask.surface.hard_at(x, z, 0.0, GroundSurface.NO_TREES)):
 					continue
 				if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
 					continue

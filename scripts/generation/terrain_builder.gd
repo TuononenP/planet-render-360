@@ -455,7 +455,8 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	else:
 		fallback.generate_mipmaps()
 		photo = ImageTexture.create_from_image(fallback)
-	var terrain := _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat))
+	var terrain := _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat,
+		ground.surface(data).image))
 	terrain.name = "Terrain"
 	if shore:
 		print("SHORE TERRAIN total_ms=", Time.get_ticks_msec() - shore_started)

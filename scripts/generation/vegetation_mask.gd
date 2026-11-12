@@ -13,6 +13,8 @@ const ROAD := 2        ## carriageway (width_m / 2)
 const WATER := 4
 const ROAD_EDGE := 8   ## carriageway + verge margin
 const TREE := 16       ## a planted trunk (set by mark_trees after planting)
+const PAVED := 32      ## a mapped way's sidewalk strip, as the ground paints it
+const PAINTED := 64    ## ground the shader paints unplantable (GroundSurface.NO_PLANTING)
 const CELL_M := 1.5
 const FOOT_CLASSES: Array[String] = ["footway", "path", "steps", "cycleway", "pedestrian",
 	"track", "bridleway", "platform", "corridor", "bus_stop", "elevator", "sidewalk"]
@@ -26,12 +28,16 @@ var cover := PackedInt32Array()
 ## Green polygons in cover-id order (id = index + 1):
 ## {class, points, holes, cells, real_trees}.
 var green: Array = []
+## The painted ground (GroundSurface); null without a GroundTruth.
+var surface: GroundSurface = null
 ## Build-time ms per layer (diagnostics for captures/tests).
 var timings: Dictionary = {}
 var _seg_a := PackedVector2Array()
 var _seg_b := PackedVector2Array()
 var _seg_core := PackedFloat32Array()
 var _seg_edge := PackedFloat32Array()
+var _seg_paved := PackedFloat32Array()
+var _seg_sides := PackedByteArray()
 var _buckets := {}
 var _bucket := 24.0
 var _built_blocks := PackedInt32Array()
@@ -48,6 +54,8 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 	cover.resize(n * n)
 	_nb = int(ceil(float(n) / float(_block)))
 	_built_blocks.resize(_nb * _nb)
+	if ground != null:
+		surface = ground.surface(data)
 	var t0 := Time.get_ticks_msec()
 	for b in data.buildings:
 		if not (b is Dictionary):
@@ -64,10 +72,14 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 				Vector2(bx + hx, bz + hz), Vector2(bx - hx, bz + hz)])], BUILDING, 0)
 	timings["buildings"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
+	var walk_m := GroundMaterial.SIDEWALK_CITY_M if not CityStyles.zone_at(data.latitude, data.longitude).is_empty() \
+		else GroundMaterial.SIDEWALK_M
 	for r in data.roads:
 		var pts: PackedVector2Array
 		var width_m := 6.0
 		var foot := false
+		var paved := -1.0
+		var sides := 0
 		if r is Dictionary:
 			if bool((r as Dictionary).get("tunnel", false)):
 				continue
@@ -80,6 +92,9 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			pts = (r as Dictionary).get("points", PackedVector2Array())
 			width_m = float((r as Dictionary).get("width_m", 6.0))
 			foot = str((r as Dictionary).get("class", "")) in FOOT_CLASSES
+			sides = int((r as Dictionary).get("sidewalk", 0)) & 3
+			if sides != 0 and not bool((r as Dictionary).get("bridge", false)):
+				paved = (maxf(width_m, 0.4) * 0.5 + walk_m) * m2u
 		elif r is PackedVector2Array:
 			pts = r
 		else:
@@ -89,7 +104,7 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			# lamps stand on them, only synthetic planting avoids them.
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
-			_add_segment(pts[i], pts[i + 1], core, edge)
+			_add_segment(pts[i], pts[i + 1], core, edge, paved, sides)
 	# Bespoke bridges replace their mapped decks. Keep the same registered
 	# corridor clear for trees, including where the removed deck was wider
 	# than an individual OSM carriageway or train track.
@@ -174,6 +189,10 @@ func blocked(x: float, z: float, mask: int, margin_m: float = 0.0) -> bool:
 	if mask & ROAD and _near_road(x, z, true, m):
 		return true
 	if mask & ROAD_EDGE and _near_road(x, z, false, m):
+		return true
+	if mask & PAVED and _near_paved(x, z, m):
+		return true
+	if mask & PAINTED and surface != null and surface.hard_at(x, z, m, GroundSurface.NO_PLANTING):
 		return true
 	for dz in range(-r, r + 1):
 		var zz := cz + dz
@@ -293,19 +312,22 @@ func _fill(rings: Array, bit: int, cov: int) -> int:
 ## Road segments go into a 24 m spatial hash instead of the raster:
 ## stamping every cell of ~250 km of Paris ways cost ~1 s in GDScript,
 ## while candidate queries are only tens of thousands.
-func _add_segment(a: Vector2, b: Vector2, core: float, edge: float) -> void:
-	if (absf(a.x) > half + edge and absf(b.x) > half + edge and signf(a.x) == signf(b.x)) \
-			or (absf(a.y) > half + edge and absf(b.y) > half + edge and signf(a.y) == signf(b.y)):
+func _add_segment(a: Vector2, b: Vector2, core: float, edge: float, paved: float = -1.0, sides: int = 0) -> void:
+	var reach := maxf(edge, paved)
+	if (absf(a.x) > half + reach and absf(b.x) > half + reach and signf(a.x) == signf(b.x)) \
+			or (absf(a.y) > half + reach and absf(b.y) > half + reach and signf(a.y) == signf(b.y)):
 		return
 	var si := _seg_a.size()
 	_seg_a.append(a)
 	_seg_b.append(b)
 	_seg_core.append(core)
 	_seg_edge.append(edge)
-	var bx0 := int(floor((minf(a.x, b.x) - edge) / _bucket))
-	var bx1 := int(floor((maxf(a.x, b.x) + edge) / _bucket))
-	var bz0 := int(floor((minf(a.y, b.y) - edge) / _bucket))
-	var bz1 := int(floor((maxf(a.y, b.y) + edge) / _bucket))
+	_seg_paved.append(paved)
+	_seg_sides.append(sides)
+	var bx0 := int(floor((minf(a.x, b.x) - reach) / _bucket))
+	var bx1 := int(floor((maxf(a.x, b.x) + reach) / _bucket))
+	var bz0 := int(floor((minf(a.y, b.y) - reach) / _bucket))
+	var bz1 := int(floor((maxf(a.y, b.y) + reach) / _bucket))
 	for bz in range(bz0, bz1 + 1):
 		for bx in range(bx0, bx1 + 1):
 			var key := Vector2i(bx, bz)
@@ -329,5 +351,29 @@ func _near_road(x: float, z: float, want_core: bool, margin: float) -> bool:
 		var ab := _seg_b[si] - a
 		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
 		if (a + ab * t).distance_squared_to(p) <= lim * lim:
+			return true
+	return false
+
+## Whether XZ lies on a sidewalk strip (plus `margin` units): on a side the
+## way's `sidewalk` bits name, as GroundMaterial paints it (bit 1 the left
+## of travel, bit 2 the right).
+func _near_paved(x: float, z: float, margin: float) -> bool:
+	var key := Vector2i(int(floor(x / _bucket)), int(floor(z / _bucket)))
+	if not _buckets.has(key):
+		return false
+	var p := Vector2(x, z)
+	for si in _buckets[key]:
+		var lim: float = _seg_paved[si]
+		if lim < 0.0:
+			continue
+		lim += margin
+		var a := _seg_a[si]
+		var ab := _seg_b[si] - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
+		if (a + ab * t).distance_squared_to(p) > lim * lim:
+			continue
+		# x east, z south: the left of travel is (dir.y, -dir.x).
+		var left := ab.y * (p.x - a.x) - ab.x * (p.y - a.y) > 0.0
+		if _seg_sides[si] & (1 if left else 2) != 0:
 			return true
 	return false

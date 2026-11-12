@@ -154,6 +154,26 @@ func _run() -> void:
 		failures.append("subway globes should have separate white and green hemispheres")
 	if iron_top < globe_bottom:
 		failures.append("subway lamps must be supported by the entrance posts")
+	# A signal at the crossing: its poles stand at the corners, never in the
+	# crossing road's lanes; a bench beside a bridge is not put under it.
+	var crossing := _data()
+	var cg_heights := PackedFloat32Array()
+	cg_heights.resize(crossing.grid_size * crossing.grid_size)
+	cg_heights.fill(3.0)
+	crossing.heights = cg_heights
+	crossing.water_level = -3.0
+	var cmask := VegetationMask.new(crossing, GroundTruth.new(crossing))
+	var croads := StreetFurniture.RoadIndex.new(crossing, m, 400.0 * m)
+	for spot: Array in StreetFurniture.spots({"x": 0.0, "z": 0.0, "kind": "signals"}, croads, "europe", m):
+		var at := StreetFurniture._clear_of_lanes(spot[0], spot[1], true, cmask, m)
+		if at.x == INF or cmask.blocked(at.x, at.y, VegetationMask.ROAD, 0.0) \
+				or at.distance_to(spot[0]) > float(StreetFurniture.SLIDE_M) * m:
+			failures.append("a crossing's signal pole should slide clear of the lanes: %s -> %s" % [spot[0], at])
+	crossing.roads.append({"class": "primary", "width_m": 10.0, "bridge": true,
+		"points": PackedVector2Array([Vector2(-150, 100) * m, Vector2(150, 100) * m])})
+	croads = StreetFurniture.RoadIndex.new(crossing, m, 400.0 * m)
+	if not StreetFurniture.spots({"x": 60.0 * m, "z": 104.0 * m, "kind": "bench"}, croads, "europe", m).is_empty():
+		failures.append("a bench on a bridge should not stand on the ground under it")
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("STREET FURNITURE OK: OSM kinds, kerb placement, regional kit, sparse fill, meshes")
