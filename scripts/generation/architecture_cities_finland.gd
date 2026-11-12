@@ -51,10 +51,10 @@ const REGIONS := {
 			"r": [["hipped", 3], ["gabled", 2], ["mansard", 1]], "pitch": 1.15,
 			"rf": SHEET_METAL + [["terracotta", RED_TILE]], "fh": 3.2, "st": [5, 6], "fix": true,
 			"ch": 0.4, "dm": 0.4, "g": [["stone", 2], ["shop", 1]], "ev": 0.2,
-			"rv": {"string_course": true, "balconette": 0.25, "oriel": 0.2, "granite_plinth": true, "turret": 0.35, "snow_guard": true}},
+			"rv": {"string_course": true, "balconette": 0.25, "oriel": 0.2, "granite_plinth": true, "turret": 0.35}},
 		"commercial": {"w": [["render", JUGEND], ["stone", ["#9a948a", "#a8a090"]]], "p": [["ornate", 2], ["punched", 1]],
 			"wn": "casement", "r": [["hipped", 2], ["flat", 1]], "rf": SHEET_METAL, "st": [4, 7],
-			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true, "granite_plinth": true, "turret": 0.2, "snow_guard": true}},
+			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true, "granite_plinth": true, "turret": 0.2}},
 	},
 	"helsinki_empire": {
 		"apartments": {"w": [["render", EMPIRE]], "p": "punched", "wn": "casement", "bay": 2.8,
@@ -86,22 +86,22 @@ const REGIONS := {
 	"helsinki_classicism": {
 		"apartments": {"w": [["render", PASTEL]], "p": "punched", "wn": "casement", "bay": 2.7,
 			"fr": "#eee9dc", "r": [["hipped", 3], ["gabled", 1]], "pitch": 0.65, "rf": SHEET_METAL,
-			"st": [4, 6], "fix": true, "rv": {"string_course": true, "granite_plinth": true, "snow_guard": true}},
+			"st": [4, 6], "fix": true, "rv": {"string_course": true, "granite_plinth": true}},
 	},
 	"helsinki_wood": {
 		"house": {"w": [["wood", NORDIC_WOOD]], "p": "clapboard", "wn": "casement", "bay": 2.6,
 			"fr": "#f2ede0", "r": [["gabled", 3], ["hipped", 1]], "pitch": 0.75, "rf": SHEET_METAL,
-			"st": [1, 2], "fix": true, "rv": {"snow_guard": true}},
+			"st": [1, 2], "fix": true, "rv": {}},
 		"apartments": {"w": [["wood", NORDIC_WOOD]], "p": "clapboard", "wn": "casement",
-			"r": [["gabled", 1]], "rf": SHEET_METAL, "st": [2, 2], "fix": true, "rv": {"snow_guard": true}},
+			"r": [["gabled", 1]], "rf": SHEET_METAL, "st": [2, 2], "fix": true, "rv": {}},
 	},
 	"helsinki_suburb": {
 		"apartments": {"w": [["render", WHITE]], "p": [["punched", 3], ["balcony", 1]], "wn": "wide",
 			"r": [["gabled", 3], ["hipped", 1]], "pitch": 0.35, "rf": SHEET_METAL,
-			"st": [3, 4], "fix": true, "rv": {"glazed_balcony": 0.35, "snow_guard": true}},
+			"st": [3, 4], "fix": true, "rv": {"glazed_balcony": 0.35}},
 		"house": {"w": [["render", WHITE], ["wood", NORDIC_WOOD]], "p": "punched", "wn": "casement",
 			"r": [["gabled", 1]], "pitch": 0.7, "rf": SHEET_METAL, "st": [1, 2], "fix": true,
-			"rv": {"snow_guard": true}},
+			"rv": {}},
 	},
 	"helsinki_element": {
 		"apartments": {"w": [["concrete", PANEL]], "p": "panel", "wn": "wide", "bay": 3.6,
@@ -123,7 +123,7 @@ const REGIONS := {
 			"rv": {"glazed_balcony": 0.55}},
 		"house": {"w": [["wood", ["#e8d6ae", "#eee9df", "#b6c0b2"]], ["render", WHITE]], "p": "punched",
 			"r": [["gabled", 2], ["flat", 1]], "pitch": 0.45, "rf": SHEET_METAL, "st": [1, 2], "fix": true,
-			"rv": {"snow_guard": true}},
+			"rv": {}},
 	},
 	"tapiola": {
 		"apartments": {"w": [["render", ["#efeee6", "#e1dfd3"]], ["concrete", WHITE]],
@@ -149,6 +149,6 @@ const REGIONS := {
 	"kauniainen": {
 		"house": {"w": [["wood", NORDIC_WOOD], ["render", PASTEL]], "p": "punched", "wn": "casement",
 			"r": [["hipped", 2], ["gabled", 2]], "pitch": 0.8, "rf": SHEET_METAL, "st": [1, 2],
-			"fix": true, "rv": {"granite_plinth": true, "snow_guard": true}},
+			"fix": true, "rv": {"granite_plinth": true}},
 	},
 }

@@ -267,8 +267,7 @@ Vattuniemi as a nested `helsinki_midrise` district.
 Relief keys: `danji_number`, `sign_bands`, `sign_stack` (probabilities, `AsiaFronts`) paint a danji slab's block number on its narrow ends, put a sign board across each lower storey of a street front, and run a vertical sign column up the full front. `glazed_balcony` (probability) builds a deep balcony with glass fronts and
 vertical aluminium mullions; `turret` (probability) adds one steep-roofed corner tower
 on an exposed street front; `granite_plinth` (boolean) adds rough grey/pink granite
-courses at the base; `snow_guard` (boolean) adds eave rails and roof-ladder rungs on
-pitched roofs. They share the existing facade/roof detail distance and quality gates.
+courses at the base. They share the existing facade/roof detail distance and quality gates.
 
 Street and seasonal context for the Finland hero pass: separately mapped sidewalks
 can widen a carriageway only up to mapped tree/cycle/path verges; an ordinary

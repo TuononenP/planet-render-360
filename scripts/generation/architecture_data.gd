@@ -34,7 +34,7 @@ extends RefCounted
 ##         along a flat-roofed street front), glazed_balcony (0..1 glass-front
 ##         balcony stacks), danji_number / sign_bands / sign_stack (0..1 odds;
 ##         AsiaFronts: slab-end block numbers, per-storey sign boards, full-height sign column), turret (0..1 corner towers), corner_dome (0..1 copper domes), wall_lantern (0..1 odds), granite_plinth (bool
-##         rusticated granite base), snow_guard (bool eave rails/roof ladders)
+##         rusticated granite base)
 
 ## Ordered first-match boxes [region, south, west, north, east, (ISO codes)].
 ## Coarse by design — borders are approximate, and neighbouring regions

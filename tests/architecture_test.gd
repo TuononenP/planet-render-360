@@ -78,7 +78,7 @@ const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"awning_colours": TYPE_ARRAY, "fire_escape": TYPE_FLOAT, "stoop": TYPE_FLOAT,
 	"signage": TYPE_FLOAT, "screens": TYPE_FLOAT, "oriel": TYPE_FLOAT, "gable": TYPE_STRING, "quoins": TYPE_BOOL,
 	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT, "glazed_balcony": TYPE_FLOAT, "turret": TYPE_FLOAT,
-	"granite_plinth": TYPE_BOOL, "snow_guard": TYPE_BOOL, "corner_dome": TYPE_FLOAT, "wall_lantern": TYPE_FLOAT,
+	"granite_plinth": TYPE_BOOL, "corner_dome": TYPE_FLOAT, "wall_lantern": TYPE_FLOAT,
 	"mullion": TYPE_BOOL, "danji_number": TYPE_FLOAT, "sign_bands": TYPE_FLOAT, "sign_stack": TYPE_FLOAT}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
