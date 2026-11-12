@@ -330,6 +330,31 @@ static func landmark_name(type: String) -> String:
 			return str(entry.get("name", type.capitalize()))
 	return type.capitalize()
 
+## The canonical place a named selection starts from: {"name", "lat",
+## "lon"} at the place's preset coordinates (its PresetViews origin for
+## a curated city, else its gazetteer point), so picking Helsinki starts
+## at the same point however it was found. A geocoder spelling with a
+## regional suffix ("Helsinki, Uusimaa", "Paris, Ile-de-France") resolves
+## to the gazetteer name when its point lies within 50 km of it; a
+## same-named place farther away, a street address and any other name
+## with no gazetteer entry keep the point they were given.
+static func canonical_place(place_name: String, lat: float, lon: float) -> Dictionary:
+	var want := place_name.strip_edges().to_lower()
+	for place in known_places():
+		if str(place["name"]).to_lower() == want:
+			return {"name": str(place["name"]), "lat": float(place["lat"]), "lon": float(place["lon"])}
+	var city := want.split(",")[0].strip_edges()
+	var found: Dictionary = {}
+	for place in known_places():
+		if str(place["name"]).to_lower().split(",")[0].strip_edges() == city:
+			if not found.is_empty():
+				return {"name": place_name, "lat": lat, "lon": lon}  # ambiguous name
+			found = place
+	if not found.is_empty() and WorldScale.xz_from_latlon(
+			float(found["lat"]), float(found["lon"]), lat, lon).length() <= 50000.0:
+		return {"name": str(found["name"]), "lat": float(found["lat"]), "lon": float(found["lon"])}
+	return {"name": place_name, "lat": lat, "lon": lon}
+
 static func known_place(lat: float, lon: float) -> String:
 	var view := PresetViews.for_pin(lat, lon)
 	if not view.is_empty():

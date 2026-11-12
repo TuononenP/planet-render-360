@@ -271,6 +271,28 @@ func _run() -> void:
 			failures.append("tapping a prediction should select Paris (lat=%f name=%s)" % [picker._lat, picker.selected_name])
 		if picker._suggest_panel.visible:
 			failures.append("prediction panel should hide after selection")
+	# Selecting a named city always starts from its preset coordinates,
+	# however the geocoder spelled or centred it; a street address and
+	# typed coordinates keep the point they were given.
+	MapSearch.select(picker, "Helsinki, Finland", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001:
+		failures.append("selecting Helsinki should start at its preset (60.1680, 24.9530), got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Helsinki, Uusimaa", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001 \
+			or picker.selected_name != "Helsinki, Finland":
+		failures.append("a regional spelling of Helsinki should resolve to the preset, got (%f, %f, %s)" % [picker._lat, picker._lon, picker.selected_name])
+	MapSearch.select(picker, "Paris, Ile-de-France", 48.8566, 2.3522)
+	if absf(picker._lat - 48.8622) > 0.0001 or absf(picker._lon - 2.2887) > 0.0001:
+		failures.append("selecting Paris should start at its preset (48.8622, 2.2887), got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Paris, Texas", 33.6609, -95.5555)
+	if absf(picker._lat - 33.6609) > 0.0001 or absf(picker._lon + 95.5555) > 0.0001:
+		failures.append("a distant same-name town should keep its own point, got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Mannerheimintie 5, Helsinki", 60.1700, 24.9400)
+	if absf(picker._lat - 60.1700) > 0.0001 or absf(picker._lon - 24.9400) > 0.0001:
+		failures.append("a street address should keep its own point, got (%f, %f)" % [picker._lat, picker._lon])
+	picker._on_search_text_changed("60.1700, 24.9400")
+	if absf(picker._lat - 60.1700) > 0.0001 or absf(picker._lon - 24.9400) > 0.0001:
+		failures.append("typed coordinates should start exactly there, got (%f, %f)" % [picker._lat, picker._lon])
 	# A place the server returns twice under one label shows as one row.
 	MapSearch.show_suggestions(picker, [
 		{"name": "Phnom Penh, Cambodia", "lat": 11.56, "lon": 104.93},
@@ -325,6 +347,10 @@ func _run() -> void:
 	picker._searcher.failed.emit(SearchFetcher.NO_MATCH % "xyzzy")
 	if picker._search_busy.visible:
 		failures.append("spinner should hide when the search answers")
+	# An online answer for a known city starts at its preset, too.
+	picker._searcher.succeeded.emit("Helsinki, Uusimaa", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001:
+		failures.append("an online Helsinki result should start at its preset, got (%f, %f)" % [picker._lat, picker._lon])
 	picker.queue_free()
 
 	# --- Panels over the map: wheel and pinch in a sheet gap zoom the map under it ---

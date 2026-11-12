@@ -17,10 +17,10 @@ signal exit_requested
 ## A pasted view link was opened: its ViewLink state (main renders it).
 signal view_link_requested(state: Dictionary)
 
-# Paris is the starting place (its quick pick starts selected), so the
-# first Explore opens on its curated view.
-var _lat := float(PresetViews.ROWS[0]["lat"])
-var _lon := float(PresetViews.ROWS[0]["lon"])
+# Helsinki is the starting place (its quick pick starts selected), so
+# the first Explore opens on its curated view.
+var _lat := float(PresetViews.default_row()["lat"])
+var _lon := float(PresetViews.default_row()["lon"])
 var _canvas: MapTileView
 var _coord_label: Label
 var _name_label: Label
@@ -188,6 +188,7 @@ func _ready() -> void:
 	# A tap or drag on the map is not a new destination: no zoom warm-up.
 	_canvas.picked.connect(func(la: float, lo: float) -> void: _on_picked(la, lo, false))
 	_map_wrap.add_child(_canvas)
+	_canvas.set_lat_lon(_lat, _lon)
 	_zoom_in_btn = UiIcon.button("plus", "Zoom in")
 	_zoom_in_btn.pressed.connect(func() -> void:
 		if MapHome.globe_shown(self):
@@ -289,8 +290,8 @@ func _ready() -> void:
 	_continent_filter.set_available(_quick_continents)
 	for qi in PresetViews.ROWS.size():
 		_add_quick_card(qi)
-	# Paris is the starting place, so its card starts out selected.
-	_set_selected_quick(0)
+	# Helsinki is the starting place, so its card starts out selected.
+	_set_selected_quick(PresetViews.default_index())
 
 	# Selected place: info column (name, coordinates) and action column
 	# (Explore, offline). Side by side on tablets.
@@ -303,10 +304,10 @@ func _ready() -> void:
 	_sheet_cols.add_child(_action_col)
 	_selected_label = UiTheme.section_label("Selected place")
 	_info_col.add_child(_selected_label)
-	_name_label = UiTheme.display_label("Paris", 36)
+	_name_label = UiTheme.display_label("Helsinki", 36)
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_info_col.add_child(_name_label)
-	_region_label = UiTheme.label("France", 14, UiTheme.MUTED)
+	_region_label = UiTheme.label("Finland", 14, UiTheme.MUTED)
 	_info_col.add_child(_region_label)
 	_cached_chip = MapChrome.make_cached_chip()
 	_info_col.add_child(_cached_chip)

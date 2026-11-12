@@ -34,6 +34,9 @@ extends RefCounted
 ## A pin this close to a row's origin opens with that row's view.
 const MATCH_M := 15.0
 
+## The place selected when the app starts.
+const DEFAULT_ID := "helsinki"
+
 const ROWS := [
 	# Palais de Chaillot esplanade, on the axis to the Eiffel Tower
 	# (~600 m, bearing 135°); the tower opens just left of centre.
@@ -129,6 +132,17 @@ const ROWS := [
 		"lat": 60.1760, "lon": 24.8050, "eye_lat": 60.1780, "eye_lon": 24.8076,
 		"eye_m": 5.0, "bearing": 230.0, "pitch": 2.0, "clear": false},
 ]
+
+## Index of the starting place in ROWS (and in LocationData.quick_picks()).
+static func default_index() -> int:
+	for i in ROWS.size():
+		if str(ROWS[i]["id"]) == DEFAULT_ID:
+			return i
+	return 0
+
+## The starting place's row.
+static func default_row() -> Dictionary:
+	return ROWS[default_index()]
 
 ## The row whose origin lies within MATCH_M of (lat, lon), {} for none.
 static func for_pin(lat: float, lon: float) -> Dictionary:
