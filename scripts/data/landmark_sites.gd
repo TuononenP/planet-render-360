@@ -63,9 +63,10 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
-		if entry.has("clear_offsets_m"):
-			var candidate: Dictionary = out.back()
-			candidate["clear_offsets_m"] = entry["clear_offsets_m"]
+		for key in ["clear_offsets_m", "clear_path_m"]:
+			if entry.has(key):
+				var candidate: Dictionary = out.back()
+				candidate[key] = entry[key]
 		clear.append([p, entry])
 	var cap: int = MAX_BY_PRESET[preset]
 	for c in ranked_osm:
@@ -112,9 +113,16 @@ static func axis(entry: Dictionary) -> Vector2:
 	var y := deg_to_rad(float(entry.get("yaw_deg", 0.0)))
 	return Vector2(cos(y), sin(y))
 
-## Distance from `p` to a site at `at`: to the segment `span_m` long along
-## its axis for a bridge, else to `at` itself.
+## Distance from `p` to a site at `at`: to its `clear_path_m` polyline
+## (a curved bridge), to the segment `span_m` long along its axis for a
+## straight bridge, else to `at` itself.
 static func span_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
+	if entry.has("clear_path_m"):
+		var path := path_points(at, entry)
+		var best := INF
+		for i in path.size() - 1:
+			best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, path[i], path[i + 1])))
+		return best
 	var half := float(entry.get("span_m", 0.0)) * 0.5
 	if half <= 0.0 and not entry.has("clear_offsets_m"):
 		return p.distance_to(at)
@@ -130,6 +138,17 @@ static func span_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
 		var subsite := at + a * float(offset[0]) + cross * float(offset[1])
 		dist = minf(dist, p.distance_to(subsite))
 	return dist
+
+## A site's `clear_path_m` ([along, across] metres in the model frame,
+## like clear_offsets_m) placed at `at`; empty without one.
+static func path_points(at: Vector2, entry: Dictionary) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var a := axis(entry)
+	var cross := Vector2(-a.y, a.x)
+	for raw in entry.get("clear_path_m", []):
+		var q: Array = raw
+		out.append(at + (a * float(q[0]) + cross * float(q[1])) * WorldScale.metres_to_units())
+	return out
 
 ## Registry bridges standing in this world, [site xz, entry] each: the
 ## primary and the registry candidates that carry a span.

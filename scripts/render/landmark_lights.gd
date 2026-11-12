@@ -10,7 +10,9 @@ extends RefCounted
 ## - everything else: SPOTS ground-mounted spots around the base, aimed
 ##   up the faces, warm white, shadowless; a long landmark (a palace
 ##   front, a bridge) gets them spaced down both long sides instead, one
-##   every SIDE_STEP_M, so its end towers are lit too.
+##   every SIDE_STEP_M, so its end towers are lit too. A model whose
+##   box says nothing of where it stands (a curved bridge) places its own
+##   spots instead (FLOOD_META on its Model node).
 ## Both follow the night through CityLights.apply (the spots carry
 ## StreetLights.META, the glow materials CityLights.META). Every hero's
 ## own lamps (its "Lamp" part: bridge necklaces, lanterns, beacons) go
@@ -20,6 +22,9 @@ extends RefCounted
 ## SPARKLE_MIN minutes of every night hour, as the real one does.
 
 const SPOTS := 4
+## Model-node meta: [[lamp, aim, cone angle in degrees, energy share], ...]
+## in model metres, replacing the spots placed round the bounds.
+const FLOOD_META := "flood_spots"
 ## Footprints longer than ELONGATED × their width line their long sides.
 const ELONGATED := 2.0
 const SIDE_STEP_M := 45.0
@@ -96,7 +101,13 @@ static func dress(hero: Node3D, type: String) -> int:
 	var long_x := box.size.x >= box.size.z
 	var long_len := maxf(box.size.x, box.size.z)
 	var short_half := minf(box.size.x, box.size.z) * 0.5
-	if long_len > ELONGATED * short_half * 2.0:
+	var model := hero.get_node_or_null("Model") as Node3D
+	if model != null and model.has_meta(FLOOD_META):
+		for raw in model.get_meta(FLOOD_META):
+			var own: Array = raw
+			lamps.append([model.transform * (own[0] as Vector3), model.transform * (own[1] as Vector3), 0.0,
+				float(own[3]), float(own[2])])
+	elif long_len > ELONGATED * short_half * 2.0:
 		var along := Vector3.RIGHT if long_x else Vector3.BACK
 		var across := Vector3.BACK if long_x else Vector3.RIGHT
 		var per_side := clampi(int(ceil(long_len / (SIDE_STEP_M * m))), 2, MAX_PER_SIDE)
@@ -126,6 +137,8 @@ static func dress(hero: Node3D, type: String) -> int:
 		# Wide, soft-edged cones that overlap their neighbours: an even
 		# wash, not a row of rings.
 		spot.spot_angle = clampf(rad_to_deg(atan2(maxf(box.size.y * 0.55, float(lamp[2]) * 1.6), dist)), 25.0, 75.0)
+		if (lamp as Array).size() > 4:
+			spot.spot_angle = float(lamp[4])
 		spot.spot_angle_attenuation = 2.5
 		spot.spot_attenuation = 0.35
 		spot.light_color = COLOUR

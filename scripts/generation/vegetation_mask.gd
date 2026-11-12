@@ -99,6 +99,11 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 		var axis := LandmarkSites.axis(entry)
 		var reach := float(entry["span_m"]) * 0.5 * m2u
 		var width := LandmarkSites.clear_m(entry) * m2u
+		var path := LandmarkSites.path_points(at, entry)
+		if path.size() >= 2:
+			for i in path.size() - 1:
+				_add_segment(path[i], path[i + 1], width, width)
+			continue
 		_add_segment(at - axis * reach, at + axis * reach, width, width)
 	# Pier polygons and their paths are hard promenade surfaces even when
 	# an overlapping park polygon supplies green cover. Keep mapped trees,
