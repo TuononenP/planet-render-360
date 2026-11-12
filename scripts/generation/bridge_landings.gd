@@ -50,6 +50,63 @@ static func approach_from(surf: RoadBuilder._Surface, p: Vector2, dir: Vector2) 
 			best = away
 	return best
 
+## Cell size of the bridge end / segment index below (metres).
+const CELL_M := 32.0
+## How far beside another deck an end can sit and still be its joint.
+const JOINT_BESIDE_M := 18.0
+
+static var _idx_surf: RoadBuilder._Surface
+static var _idx_ends := {}
+static var _idx_segs := {}
+static var _idx_mutex := Mutex.new()
+
+## [end cells, segment cells] for `surf`'s bridge ways, built once per
+## surface: joint and end checks otherwise scan every bridge line and
+## end point for every bridge end (Venice has 851 bridge ways, and the
+## road chunks ask in parallel, hence the mutex). Segments are filed
+## under every cell their JOINT_BESIDE_M-grown span touches, so one
+## cell lookup at `p` finds everything that could be beside it.
+static func _index(surf: RoadBuilder._Surface) -> Array:
+	_idx_mutex.lock()
+	if _idx_surf == surf:
+		var hit := [_idx_ends, _idx_segs]
+		_idx_mutex.unlock()
+		return hit
+	_idx_mutex.unlock()
+	var m2u := WorldScale.metres_to_units()
+	var cell := CELL_M * m2u
+	var ends := {}
+	for q in surf._bridge_end_pts:
+		var key := Vector2i(floori(q.x / cell), floori(q.y / cell))
+		if not ends.has(key):
+			ends[key] = []
+		(ends[key] as Array).append(q)
+	var segs := {}
+	var grow := JOINT_BESIDE_M * m2u
+	for li in surf._bridge_lines.size():
+		var pts: PackedVector2Array = surf._bridge_lines[li]
+		for i in range(1, pts.size()):
+			var a := pts[i - 1]
+			var b := pts[i]
+			var lo: Vector2 = a.min(b) - Vector2.ONE * grow
+			var hi: Vector2 = a.max(b) + Vector2.ONE * grow
+			for cx in range(floori(lo.x / cell), floori(hi.x / cell) + 1):
+				for cz in range(floori(lo.y / cell), floori(hi.y / cell) + 1):
+					var key := Vector2i(cx, cz)
+					if not segs.has(key):
+						segs[key] = []
+					(segs[key] as Array).append([li, a, b])
+	_idx_mutex.lock()
+	_idx_surf = surf
+	_idx_ends = ends
+	_idx_segs = segs
+	_idx_mutex.unlock()
+	return [ends, segs]
+
+static func _cell_of(p: Vector2) -> Vector2i:
+	var cell := CELL_M * WorldScale.metres_to_units()
+	return Vector2i(floori(p.x / cell), floori(p.y / cell))
+
 ## True where two bridge ways meet: shared node, decks touching end
 ## to end, or an end heading (`outward`) into another deck's side (a
 ## T). A deck running alongside (twin carriageways, a rail bridge
@@ -58,27 +115,29 @@ static func joint(surf: RoadBuilder._Surface, p: Vector2, outward: Vector2 = Vec
 	if int(surf._bridge_ends.get(RoadBuilder._Surface._node(p), 0)) >= 2:
 		return true
 	var m2u := WorldScale.metres_to_units()
+	var segs: Dictionary = _index(surf)[1]
+	var per_line := {}
+	for raw in segs.get(_cell_of(p), []):
+		var seg: Array = raw
+		var a: Vector2 = seg[1]
+		var ab: Vector2 = seg[2] - a
+		var t := (p - a).dot(ab) / maxf(ab.length_squared(), 1e-9)
+		var q := a + ab * clampf(t, 0.0, 1.0)
+		var d := p.distance_to(q)
+		var li: int = seg[0]
+		if not per_line.has(li) or d < float((per_line[li] as Array)[0]):
+			per_line[li] = [d, t > 0.001 and t < 0.999, q]
 	var on_lines := 0
-	for raw in surf._bridge_lines:
-		var pts: PackedVector2Array = raw
-		var dist := INF
-		var beside := false
-		var near := p
-		for i in range(1, pts.size()):
-			var a := pts[i - 1]
-			var ab := pts[i] - a
-			var t := (p - a).dot(ab) / maxf(ab.length_squared(), 1e-9)
-			var q := a + ab * clampf(t, 0.0, 1.0)
-			var d := p.distance_to(q)
-			if d < dist:
-				dist = d
-				near = q
-				beside = t > 0.001 and t < 0.999
+	for li in per_line:
+		var hit: Array = per_line[li]
+		var dist := float(hit[0])
+		var beside := bool(hit[1])
+		var near: Vector2 = hit[2]
 		if dist <= 0.05 * m2u:
 			on_lines += 1
 		elif not beside and dist <= 2.0 * m2u:
 			return true
-		elif beside and (dist <= 0.5 * m2u or (dist < 18.0 * m2u and outward != Vector2.ZERO
+		elif beside and (dist <= 0.5 * m2u or (dist < JOINT_BESIDE_M * m2u and outward != Vector2.ZERO
 				and (near - p).normalized().dot(outward) > 0.7)):
 			return true
 	return on_lines >= 2
@@ -87,9 +146,13 @@ static func joint(surf: RoadBuilder._Surface, p: Vector2, outward: Vector2 = Vec
 static func bridge_end_at(surf: RoadBuilder._Surface, p: Vector2) -> bool:
 	if int(surf._bridge_ends.get(RoadBuilder._Surface._node(p), 0)) >= 1:
 		return true
-	for q in surf._bridge_end_pts:
-		if q.distance_to(p) < 2.0 * WorldScale.metres_to_units():
-			return true
+	var ends: Dictionary = _index(surf)[0]
+	var at := _cell_of(p)
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for q in ends.get(at + Vector2i(dx, dz), []):
+				if (q as Vector2).distance_to(p) < 2.0 * WorldScale.metres_to_units():
+					return true
 	return false
 
 static func landed(piece: PackedVector2Array, whole: PackedVector2Array,

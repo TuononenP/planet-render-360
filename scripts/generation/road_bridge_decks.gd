@@ -38,6 +38,7 @@ class Index extends RefCounted:
 	var _grid := {}  ## Cell -> PackedInt32Array of line index, segment index pairs.
 	var _cell := 1.0
 	var _profiles := {}  ## Line index -> [dense points, deck heights].
+	var _profile_mutex := Mutex.new()  ## Road chunks profile in parallel.
 
 	func _init(roads: Array = []) -> void:
 		var m := WorldScale.metres_to_units()
@@ -86,12 +87,21 @@ class Index extends RefCounted:
 	## Line `li`'s dense points and deck heights, profiled with its own
 	## width and layer (computed once per world).
 	func profile(li: int, surf: RoadBuilder._Surface, m2u: float) -> Array:
+		_profile_mutex.lock()
+		var hit: Array = _profiles.get(li, [])
+		_profile_mutex.unlock()
+		if not hit.is_empty():
+			return hit
+		var line: Dictionary = lines[li]
+		var dense := RoadBuilder._resample(line["points"], surf.step * 0.34)
+		var made: Array = [dense, RoadBuilder.deck_profile(dense, surf, m2u,
+			RoadBridgeDecks.grade_half(float(line["half"]), str(line["cls"]), m2u), int(line["layer"]))]
+		_profile_mutex.lock()
 		if not _profiles.has(li):
-			var line: Dictionary = lines[li]
-			var dense := RoadBuilder._resample(line["points"], surf.step * 0.34)
-			_profiles[li] = [dense, RoadBuilder.deck_profile(dense, surf, m2u,
-				RoadBridgeDecks.grade_half(float(line["half"]), str(line["cls"]), m2u), int(line["layer"]))]
-		return _profiles[li]
+			_profiles[li] = made
+		hit = _profiles[li]
+		_profile_mutex.unlock()
+		return hit
 
 ## Builds a road bridge way: RoadBuilder._bridge levelled with and open
 ## toward parallel neighbours, then the deck strips filling the gap to
