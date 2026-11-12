@@ -123,8 +123,14 @@ static func merge_buildings(root: Node3D) -> int:
 ## Layers are the builders' subtree names (meta lod_layer on children
 ## adopted flat, else the world child's own name: FarTerrain, Water).
 static func apply(root: Node, preset: int) -> void:
-	for c in root.get_children():
-		_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
+	for i in root.get_child_count():
+		apply_child(root, i, preset)
+
+## Ranges one top-level subtree of `root` (child `index`): the pieces
+## apply() is made of, for callers spreading the walk over frames.
+static func apply_child(root: Node, index: int, preset: int) -> void:
+	var c := root.get_child(index)
+	_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
 
 ## One vegetation node added after the build (TreeLodWindow swaps).
 static func apply_vegetation(gi: GeometryInstance3D, preset: int) -> void:

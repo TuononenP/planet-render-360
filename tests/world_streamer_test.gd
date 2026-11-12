@@ -213,5 +213,109 @@ func _movement_and_swap() -> void:
 	view._streamer.invalidate("test")
 	_check(view._streamer.generation > gen and view._data == data2,
 		"invalidate after the swap leaves the live world alone")
+	await _swap_continuity(view, data2, after_xz)
 	view.queue_free()
 	await process_frame
+
+func _first_geo(node: Node) -> GeometryInstance3D:
+	if node is GeometryInstance3D:
+		return node as GeometryInstance3D
+	for c in node.get_children():
+		var hit := _first_geo(c)
+		if hit != null:
+			return hit
+	return null
+
+## Swap continuity: drone momentum, streamer velocity and pre-ranged LOD
+## survive a centre swap; walking never steps backward across one.
+func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
+	# Drone at cruise, then swap to a centre ahead of it (as the
+	# streamer would pick): the camera lands inside the new detailed
+	# ground, not past its edge.
+	view._drone.enter(view)
+	view._rig.position = Vector3(at.x,
+		view._ground.height_at_world(at.x, at.y) + 30.0, at.y)
+	view._rig.set_look(0.0, 0.0)
+	view._drone.stick_move = Vector2(0, -1)
+	for i in 120:
+		view._drone.process(view, 1.0 / 30.0)
+	var vel_before: Vector2 = view._drone._vel
+	_check(vel_before.length() > 20.0,
+		"drone reaches cruise before the continuity swap: %.1f" % vel_before.length())
+	view._streamer._vel = Vector2(0, -20)
+	var ahead := WorldScale.latlon_from_xz(0.0, -900.0, data2.latitude, data2.longitude)
+	var data3 := _flat(ahead.x, ahead.y, "Testville Far North")
+	var ground3 := GroundTruth.new(data3)
+	var world3 := View360.make_world(data3, ground3)
+	# Range the waiting world in slices, as tick does, and prove a
+	# sentinel range then survives the swap (no re-range on its frame).
+	view._streamer.begin_ranging(world3, view._quality_preset)
+	_check(not view._streamer._ready_ranged, "ranging starts unfinished")
+	view._streamer._pump_ranging(2)
+	_check(view._streamer._range_cursor == 2, "ranging advances a slice at a time")
+	while not view._streamer._ready_ranged:
+		view._streamer._pump_ranging()
+	_check(view._streamer._ranged_world == world3, "the ranged world is the named one")
+	var geo := _first_geo(world3)
+	_check(geo != null, "the built world has geometry to range")
+	if geo != null:
+		geo.visibility_range_end = 12345.0
+	var here := Vector2(view._rig.position.x, view._rig.position.z)
+	var agl_before := view._rig.position.y - view._ground.height_at_world(here.x, here.y)
+	view.apply_streamed_world(data3, [ground3, world3])
+	_check(view._drone._vel.length() >= vel_before.length() * 0.9,
+		"the swap keeps drone momentum: %.1f -> %.1f"
+			% [vel_before.length(), view._drone._vel.length()])
+	_check(not view._drone._resync, "the swap leaves no resync pending in flight")
+	var after := Vector2(view._rig.position.x, view._rig.position.z)
+	var agl_after := view._rig.position.y - view._ground.height_at_world(after.x, after.y)
+	_check(absf(agl_after - agl_before) < 1.5,
+		"the swap keeps the drone's height over ground: %.1f -> %.1f" % [agl_before, agl_after])
+	_check(absf(view._drone._agl - clampf(agl_before, ViewDrone.AGL_MIN_M, ViewDrone.AGL_MAX_M)) < 1.5,
+		"the swap re-derives the drone's target height: %.1f" % view._drone._agl)
+	_check(view._streamer._vel == Vector2(0, -20),
+		"the swap keeps the streamer's velocity estimate: %s" % view._streamer._vel)
+	_check(not view._streamer._ready_ranged, "the swap consumes the pre-ranged flag")
+	if geo != null:
+		_check(absf(geo.visibility_range_end - 12345.0) < 0.01,
+			"a pre-ranged world is not re-ranged on the swap frame: %.1f"
+				% geo.visibility_range_end)
+	var frame_from := Vector2(view._rig.position.x, view._rig.position.z)
+	view._drone.process(view, 1.0 / 30.0)
+	var frame_to := Vector2(view._rig.position.x, view._rig.position.z)
+	_check(frame_from.distance_to(frame_to) > vel_before.length() / 30.0 * 0.5,
+		"the first post-swap drone frame advances at speed: %.2f m"
+			% frame_from.distance_to(frame_to))
+	view._drone.stick_move = Vector2.ZERO
+	view._drone.exit(view, false)
+
+	# Walk north through a swap to the previous centre (data2, south
+	# of where the walker now stands): latitude never goes backward.
+	view._rig.position = Vector3(0,
+		ViewWalk.foot_y(view._data, view._ground, Vector2(0, -590)), -590)
+	view._rig.set_look(0.0, 0.0)
+	var north_key := InputEventKey.new()
+	north_key.keycode = KEY_W
+	north_key.pressed = true
+	Input.parse_input_event(north_key)
+	Input.flush_buffered_events()
+	var prev_lat := -1.0
+	var worst_step := 0.0
+	for i in 80:
+		if i == 40:
+			var ground4 := GroundTruth.new(data2)
+			var world4 := View360.make_world(data2, ground4)
+			view.apply_streamed_world(data2, [ground4, world4])
+		view._walk.process_keys(view, 1.0 / 30.0)
+		var p := Vector2(view._rig.position.x, view._rig.position.z)
+		var ll := WorldScale.latlon_from_xz(p.x, p.y,
+			view._data.latitude, view._data.longitude)
+		if prev_lat > -1.0:
+			worst_step = minf(worst_step, ll.x - prev_lat)
+		prev_lat = ll.x
+	var release_north := InputEventKey.new()
+	release_north.keycode = KEY_W
+	Input.parse_input_event(release_north)
+	Input.flush_buffered_events()
+	_check(worst_step > -0.000001,
+		"walking never steps backward across a swap (worst lat step %g)" % worst_step)

@@ -281,7 +281,7 @@ func set_quality_preset(preset_value: int) -> void:
 ## Replace the generated world in place. The old world is tracked by
 ## reference: same-named siblings get auto-renamed by the engine, so
 ## the previous name-based cleanup leaked a world per place visited.
-func _rebuild_world(prebuilt: Node3D = null) -> void:
+func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 	if _data == null or _world_root == null:
 		return
 	if _generated != null and is_instance_valid(_generated):
@@ -293,8 +293,10 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 		if _ground == null:
 			_ground = GroundTruth.new(_data)
 		_generated = make_world(_data, _ground)
-	# Range the near/mid rings for the current preset.
-	LodRing.apply(_generated, _quality_preset)
+	# Range the near/mid rings for the current preset (a streamed world
+	# arrives already ranged: the streamer ranges it while it waits).
+	if not pre_ranged or prebuilt == null:
+		LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
 	ViewConditions.apply_surface_state(self)  # climate snow, rain, ice
 

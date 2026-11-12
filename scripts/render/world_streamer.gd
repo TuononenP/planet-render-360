@@ -212,6 +212,14 @@ func swap_stale(pos: Vector2) -> bool:
 var _pipeline: GenerationPipeline
 var _abort: BuildAbort
 var _ready: Array = []
+## The ready world is ranged subtree by subtree while it waits (see
+## _pump_ranging), so the swap frame need not re-range it. The flag
+## only counts for the world node it names.
+var _ready_ranged := false
+var _ranged_world: Node3D
+var _range_world: Node3D
+var _range_cursor := 0
+var _range_preset := -1
 var _ready_data: LocationData
 var _last_pos := Vector2.INF
 var _vel := Vector2.ZERO
@@ -228,6 +236,41 @@ func _drop_ready() -> void:
 		(_ready[1] as Node3D).free()
 	_ready = []
 	_ready_data = null
+	_ready_ranged = false
+	_ranged_world = null
+	_range_world = null
+	_range_cursor = 0
+
+## Starts ranging `world` a subtree at a time (LodRing.apply_child per
+## tick in _pump_ranging); a world with no children is already ranged.
+func begin_ranging(world: Node3D, preset: int) -> void:
+	_range_world = world
+	_ranged_world = null
+	_range_cursor = 0
+	_range_preset = preset
+	_ready_ranged = world == null or world.get_child_count() == 0
+	if _ready_ranged:
+		_ranged_world = world
+		_range_world = null
+
+## Ranges up to `slices` more subtrees of the pending world; on the
+## last one the world becomes the ranged one.
+func _pump_ranging(slices: int = 2) -> void:
+	if _range_world == null or _ready_ranged:
+		return
+	var stop := mini(_range_world.get_child_count(), _range_cursor + slices)
+	while _range_cursor < stop:
+		LodRing.apply_child(_range_world, _range_cursor, _range_preset)
+		_range_cursor += 1
+	if _range_cursor >= _range_world.get_child_count():
+		_ranged_world = _range_world
+		_range_world = null
+		_ready_ranged = true
+
+## Ranges whatever is left of the pending world at once (a swap that
+## arrived before the slices did).
+func _finish_ranging() -> void:
+	_pump_ranging(1 << 30)
 
 func _cancel_pending() -> void:
 	_drop_ready()
@@ -260,6 +303,11 @@ func shutdown() -> void:
 ## ground, look and mode untouched, the old world leaves the tree in
 ## the same frame (View360._rebuild_world removes it before adding).
 func apply_swap(v: View360, data: LocationData, built: Array) -> void:
+	var ranged: bool = _ready_ranged and built.size() > 1 and built[1] == _ranged_world
+	_ready_ranged = false
+	_ranged_world = null
+	_range_world = null
+	_range_cursor = 0
 	if data == null or built.size() < 2 or v._data == null or v._rig == null:
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
@@ -282,10 +330,17 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 		data.latitude, data.longitude)
 	v._data = data
 	v._ground = built[0]
-	v._rebuild_world(built[1])
+	v._rebuild_world(built[1], ranged)
 	var y := v._ground.height_at_world(new_xz.x, new_xz.y) + agl
 	if not v._drone.on:
-		y = ViewWalk.foot_y(data, v._ground, new_xz)
+		# Keep the walker's height when the new centre's floor agrees
+		# with it (ViewWalk lerps the small rest while moving); snap
+		# when it does not — a set-down from flight, an authored
+		# island or quay floor — so the eye is right even standing
+		# still, where no lerp runs.
+		var foot := ViewWalk.foot_y(data, v._ground, new_xz)
+		if absf(foot - y) > 0.5:
+			y = foot
 	v._rig.position = Vector3(new_xz.x, y, new_xz.y)
 	v._atmos.ground_at = func(x: float, z: float) -> float: return v._ground.height_at_world(x, z)
 	v._atmos.set_place(data.latitude, data.longitude)
@@ -302,13 +357,23 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 	v._drone._spans_for = null
 	v._drone._near_at = Vector2.INF
 	v._drone._near.clear()
-	v._drone._resync = true
+	if v._drone.on:
+		# Momentum is frame-relative and survives the recentre: only
+		# the height-over-ground and floor caches are re-derived. A
+		# resync left pending by a glide the swap just killed must
+		# not eat the first frame's momentum either.
+		v._drone._resync = false
+		v._drone._agl = clampf(agl, ViewDrone.AGL_MIN_M, ViewDrone.AGL_MAX_M)
+	else:
+		v._drone._resync = true
 	v._drone._floor_clock = 0.0
 	v._drone._floor_here = -INF
 	v._drone._floor_target = -INF
 	ViewChrome.show_place(v, data)
+	var vel := _vel
 	arm(data.latitude, data.longitude, data.season, data.quality_preset)
 	note_spawn(new_xz)
+	_vel = vel
 
 ## Per-frame: track velocity, swap a ready centre in (or drop it when
 ## the camera turned back), and start the next centre early enough that
@@ -332,7 +397,9 @@ func tick(v: View360, delta: float) -> void:
 	if state == State.READY:
 		if v._season_building:
 			return  # hold: the season rebuild owns _data until it lands
+		_pump_ranging()
 		if swap_wanted(pos):
+			_finish_ranging()
 			var data := _ready_data
 			var built := _ready
 			_ready = []
@@ -404,5 +471,9 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return
+	# Range the LOD rings while the world waits to swap in, a few
+	# subtrees per tick, so neither this frame nor the swap frame
+	# pays for the whole walk.
+	begin_ranging(built[1] as Node3D, v._quality_preset)
 	_ready = built
 	_ready_data = data
