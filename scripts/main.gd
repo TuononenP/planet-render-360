@@ -77,12 +77,6 @@ const SAVE_WORLD_FAILED := "Couldn't save the view · retry"
 const CLOSING_TITLE := "Saving this place for next time"
 const CLOSING_MESSAGE := "Closing as soon as it's saved."
 var _quitting := false
-const CACHE_FULL_TITLE := "Storage full"
-const CACHE_FULL_MESSAGE := "Places you opened longest ago were removed and will rebuild next time."
-## The bigger size limit a full cache offers (MB), 0 when none; shown
-## once, as soon as the map or the viewer is on screen.
-var _cache_offer_mb := 0
-var _cache_offer_shown := false
 
 const SAFE_POLL_S := 0.25
 var _safe_seen: Array[float] = []
@@ -257,6 +251,7 @@ func _ready() -> void:
 	_settings_screen = SettingsScreen.new()
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_settings_screen.bind_settings(_settings)
+	_settings_screen.bind_store(_store)
 	_settings_screen.back_requested.connect(func() -> void:
 		_show(_settings_from if _settings_from != null else _picker))
 	AccentSun.refresh = _refresh_accent
@@ -286,11 +281,6 @@ func _ready() -> void:
 		SettingsScreen.reopen = false
 		_settings_from = _picker
 		_show(_settings_screen)
-	CacheStore.on_full = _on_cache_full
-	for toast: Toast in [_picker._toast, _view._toast]:
-		if toast != null:
-			toast.action_pressed.connect(_on_toast_action.bind(toast))
-
 ## Quit the app. Full screen hides the OS window controls, so the
 ## picker Exit button and these keys are the way out on desktop.
 ## A world still saving to the cache (or building) is waited for with
@@ -328,50 +318,6 @@ func _say_closing() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_request_exit()
-
-## The cache dropped places to stay under its limit: offer twice the
-## limit, once per limit (asked again only after it changes), when the
-## disk has room for the extra at least twice over.
-func _on_cache_full() -> void:
-	var limit := int(_settings.pref("cache_limit_mb"))
-	if _cache_offer_mb > 0 or int(_settings.pref("cache_full_asked_mb")) == limit:
-		return
-	var bigger := mini(limit * 2, CacheStore.MAX_LIMIT_MB)
-	var dir := DirAccess.open("user://")
-	if bigger <= limit or dir == null \
-			or dir.get_space_left() < (bigger - limit) * 1048576 * 2:
-		return
-	_cache_offer_mb = bigger
-	_offer_cache_room()
-
-## Shown on the map or in the viewer; during loading it waits for _show.
-func _offer_cache_room() -> void:
-	var toast: Toast = _view._toast if _view.visible else _picker._toast if _picker.visible else null
-	if _cache_offer_mb <= 0 or _cache_offer_shown or toast == null:
-		return
-	_cache_offer_shown = true
-	_settings.set_pref("cache_full_asked_mb", int(_settings.pref("cache_limit_mb")))
-	toast.show_message(CACHE_FULL_TITLE, CACHE_FULL_MESSAGE, "caution",
-		"Raise to %s" % UiTheme.cache_size(_cache_offer_mb * 1048576))
-	_place_toast(toast)
-
-func _on_toast_action(toast: Toast) -> void:
-	if toast.title_text() != CACHE_FULL_TITLE or _cache_offer_mb <= 0:
-		return
-	var mb := _cache_offer_mb
-	_cache_offer_mb = 0
-	_settings.set_pref("cache_limit_mb", mb)
-	UiPrefs.apply(_settings)
-	# After the action's own dismiss, so the confirmation is not faded out.
-	await get_tree().process_frame
-	toast.show_message("Size limit raised to %s" % UiTheme.cache_size(mb * 1048576), "", "good")
-	_place_toast(toast)
-
-func _place_toast(toast: Toast) -> void:
-	if toast == _view._toast:
-		ViewChrome.layout(_view)
-	else:
-		MapHome.place_toast(_picker)
 
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
 ## History and Settings return to the map, a Settings page on phones
@@ -448,8 +394,6 @@ func _show(screen: Control) -> void:
 		s.visible = s == screen
 	if screen == _picker:
 		_picker.refresh_recent()
-	if screen == _picker or screen == _view:
-		_offer_cache_room()
 	_notice.set_on_screen(screen == _view)
 	if screen != _view:
 		var at := _picker.selected_point()

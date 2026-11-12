@@ -519,9 +519,14 @@ func _remove(e: Dictionary) -> void:
 	if _store == null or e.is_empty():
 		return
 	var name_text: String = UiTheme.split_place(str(e.get("name", "")))[0]
-	_store.remove_place(e)
+	var bytes := CacheStore.entry_bytes(e)
+	var res := _store.remove_place(e)
+	if bool(res.get("busy", false)):
+		toast("%s is still being saved. Try again in a moment." % name_text)
+		return
 	refresh()
-	toast("%s removed from cache" % name_text)
+	toast("%s removed from cache · %s freed" % [name_text, UiTheme.cache_size(bytes)]
+		if bytes > 0 else "%s removed from cache" % name_text)
 
 func _confirm_clear() -> void:
 	SettingsRows.confirm(self, "Clear all cache?",

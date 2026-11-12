@@ -22,6 +22,7 @@ func _check(ok: bool, what: String) -> void:
 func _run() -> void:
 	CacheStore.dir_override = CACHE
 	PlaceThumb.dir_override = CACHE + "/thumbs"
+	WorldCache.dir_override = CACHE + "/worlds"
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_view_link()
 	_seasons()
@@ -39,6 +40,7 @@ func _run() -> void:
 	_clean(CACHE)
 	CacheStore.dir_override = ""
 	PlaceThumb.dir_override = ""
+	WorldCache.dir_override = ""
 	if failures.is_empty():
 		print("VIEWER TOOLS OK: links, camera per place, thumbnails, photo, time-lapse, calendar, horizon labels, mini-map, walking, HUD wiring")
 		quit(0)

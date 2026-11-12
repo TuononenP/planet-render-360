@@ -26,7 +26,6 @@ static func apply(s: RenderSettings) -> void:
 	UiTheme.units_imperial = bool(s.pref("imperial"))
 	UiTheme.units_dms = bool(s.pref("dms"))
 	UiTheme.units_12h = bool(s.pref("clock_12h"))
-	CacheStore.max_cache_bytes = int(s.pref("cache_limit_mb")) * 1024 * 1024
 	reduce_motion = _or_os(s.pref("reduce_motion"), "accessibility_should_reduce_animation")
 	solid_panels = _or_os(s.pref("solid_panels"), "accessibility_should_reduce_transparency")
 	high_contrast = _or_os(s.pref("high_contrast"), "accessibility_should_increase_contrast")

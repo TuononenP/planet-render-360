@@ -227,6 +227,13 @@ func _run() -> void:
 	await _snap("04-history-phone")
 	await _resize(1280, 800)
 	await _snap("04b-history-desktop")
+	# Settings → Storage: the per-place cache list (no size limit).
+	await _resize(390, 844)
+	main._show(main._settings_screen)
+	main._settings_screen.open_category("storage")
+	await _snap("07-settings-storage-phone")
+	await _resize(1280, 800)
+	await _snap("07b-settings-storage-desktop")
 	print("SHOTS DONE -> ", ProjectSettings.globalize_path(_shot_dir))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(CacheStore.history_override))
 	quit(0)

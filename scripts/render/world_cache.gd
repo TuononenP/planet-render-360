@@ -5,9 +5,9 @@ extends RefCounted
 ## its GroundTruth instead of rebuilding them (Paris High: ~31 s of build
 ## → ~1.5 s threaded load on the capture machine). The first visit pays a
 ## background save after the view opens. Worlds live apart from the data
-## cache (user://worlds, oldest-first eviction) but share the settings size
-## limit: they keep at most half of it, so a ~200 MB world can never push
-## out every DEM/OSM/satellite tile.
+## cache (user://worlds). There is no size limit and nothing evicts them
+## automatically; the person clears them per place or all at once.
+## enforce_budget() remains only as an explicit utility for tests.
 ##
 ## Key: place (quantized lat/lon) + preset + season + a fingerprint of the
 ## LocationData the world was built from + BUILD_VERSION. The opening eye
@@ -40,6 +40,15 @@ const SOURCE_SKIP := ["res://scripts/data/tile_connection.gd",
 
 static var _source_hash := ""
 static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()
+## bytes_by_place() cache, valid only for _by_place_dir; dropped
+## wherever _bytes is (see _invalidate_bytes).
+static var _by_place_cache: Dictionary = {}
+static var _by_place_dir := ""
+
+static func _invalidate_bytes() -> void:
+	_bytes = -1
+	_by_place_cache = {}
+	_by_place_dir = ""
 ## Only one worker may write a given scene and its ground file at a time.
 static var _save_threads: Dictionary = {}
 ## Test hook: keep cache eviction checks away from the person's worlds.
@@ -368,9 +377,9 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	if _save_threads.get(p["scene"]) == th:
 		_save_threads.erase(p["scene"])
 	# On the main thread: CacheStore's LRU state is not thread-safe.
-	_bytes = -1
+	_invalidate_bytes()
 	if dir_override.is_empty():
-		CacheStore.enforce_size_cap()  # trims worlds, then the data's share
+		CacheStore.reconcile_index()
 
 ## The world packed for saving, or null (cache off, or pack failed).
 ## Packing walks every node, so build_location runs it on the build
@@ -425,7 +434,7 @@ static func _ground_from_state(state: Dictionary, data: LocationData) -> GroundT
 	return g
 
 static func _remove(p: Dictionary) -> void:
-	_bytes = -1
+	_invalidate_bytes()
 	for k in p:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(p[k]))
 
@@ -437,22 +446,84 @@ static func _touch(p: Dictionary) -> void:
 		f.seek(0)
 		f.store_8(b)  # same byte back: refreshes the mtime only
 
+## Filename prefix of every world saved for a place (any preset/season).
+static func place_prefix(lat: float, lon: float) -> String:
+	return "world_%d_%d_" % [CacheStore.quant(lat), CacheStore.quant(lon)]
+
+## Bytes of one place's built worlds (.scn + .ground + stray .tmp.scn).
+static func bytes_for_place(lat: float, lon: float) -> int:
+	return int(bytes_by_place().get("%d_%d" % [CacheStore.quant(lat), CacheStore.quant(lon)], 0))
+
+## One directory listing: "lat_q_lon_q" -> bytes of that place's worlds.
+## Cached until the next save/remove invalidates it, so per-entry size
+## lookups (History badges) do not relist the directory for every place.
+static func bytes_by_place() -> Dictionary:
+	var dir := base_dir()
+	if _by_place_dir == dir and not _by_place_cache.is_empty():
+		return _by_place_cache
+	var out := {}
+	if DirAccess.dir_exists_absolute(dir):
+		for f in DirAccess.get_files_at(dir):
+			if not f.begins_with("world_"):
+				continue
+			var parts := f.split("_")
+			if parts.size() < 3:
+				continue
+			var pk := parts[1] + "_" + parts[2]
+			out[pk] = int(out.get(pk, 0)) + _size(dir + "/" + f)
+	_by_place_cache = out
+	_by_place_dir = dir
+	return out
+
+## Deletes one place's built worlds. Returns {"files", "bytes"}.
+static func remove_for_place(lat: float, lon: float) -> Dictionary:
+	var res := {"files": 0, "bytes": 0}
+	var dir := base_dir()
+	if not DirAccess.dir_exists_absolute(dir):
+		return res
+	var prefix := place_prefix(lat, lon)
+	if _prefetched.begins_with(dir + "/" + prefix):
+		_drop_prefetch()
+	for f in DirAccess.get_files_at(dir):
+		if f.begins_with(prefix):
+			var path := dir + "/" + f
+			res["bytes"] = int(res["bytes"]) + _size(path)
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+			res["files"] = int(res["files"]) + 1
+	if int(res["files"]) > 0:
+		_invalidate_bytes()
+	return res
+
+## A world for this place is being saved or prefetched right now, so its
+## files must not be deleted from under the writer/loader.
+static func is_place_busy(lat: float, lon: float) -> bool:
+	var prefix := place_prefix(lat, lon)
+	if _prefetched != "" and _prefetched.get_file().begins_with(prefix):
+		return true
+	for path in _save_threads.keys():
+		if str(path).get_file().begins_with(prefix) and _save_in_progress(str(path)):
+			return true
+	return false
+
 ## Bytes the built worlds hold (cached; rescanned after a change).
 static func total_bytes() -> int:
 	if _bytes < 0:
 		enforce_budget(1 << 62)
 	return _bytes
 
-## Evicts the least recently used worlds until the directory fits
-## max_bytes (default: half the settings size limit). `keep_newest`
-## spares the most recent world (the one just saved or opened) even when
-## it alone is over the share, so a big place is not rebuilt every visit.
+## Explicit-only utility (tests, recounts): evicts the least recently
+## used worlds until the directory fits max_bytes. With the default
+## max_bytes it only recounts and evicts nothing — no caller applies a
+## budget automatically any more. `keep_newest` spares the most recent
+## world even when it alone is over an explicit max_bytes.
 static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int:
 	if max_bytes < 0:
-		max_bytes = CacheStore.max_cache_bytes / 2
+		max_bytes = 1 << 62
 	var dir := base_dir()
 	if not DirAccess.dir_exists_absolute(dir):
 		_bytes = 0
+		_by_place_cache = {}
+		_by_place_dir = ""
 		return 0
 	var entries: Array = []
 	var total := 0
@@ -477,6 +548,8 @@ static func enforce_budget(max_bytes: int = -1, keep_newest: bool = true) -> int
 		total -= int(e["bytes"])
 		removed += 1
 	_bytes = total
+	_by_place_cache = {}
+	_by_place_dir = ""
 	return removed
 
 static func _size(path: String) -> int:

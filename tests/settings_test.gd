@@ -204,10 +204,19 @@ func _run() -> void:
 	if QualityGovernor.step_label(2, 2) != "High" or not QualityGovernor.step_label(2, 0).begins_with("High · 65% res"):
 		failures.append("governor label should be the tier plus any reduction: %s / %s"
 			% [QualityGovernor.step_label(2, 2), QualityGovernor.step_label(2, 0)])
-	# Offline storage management: size is readable, label reports it.
-	if screen._usage == null or not (screen.summary_for("storage").contains(" MB of ")
-			or screen.summary_for("storage").contains(" GB of ")):
-		failures.append("settings should report offline cache size")
+	# Offline storage management: size is readable with no limit framing,
+	# and the Storage places list shows one row per saved place.
+	if screen._usage == null or screen.summary_for("storage").contains(" of "):
+		failures.append("settings should report cache size without a limit: %s" % screen.summary_for("storage"))
+	var place_store := CacheStore.new()
+	place_store.entries = [{"name": "Test Place, Somewhere", "lat": 1.0, "lon": 2.0,
+		"quality_preset": 2, "timestamp": now}]
+	screen.bind_store(place_store)
+	await process_frame
+	if screen._place_rows.size() != 1 or screen._place_clear_btns.size() != 1:
+		failures.append("storage should list one row per saved place, got %d" % screen._place_rows.size())
+	elif not screen._place_clear_btns[0].disabled:
+		failures.append("a place holding 0 bytes should not offer Clear")
 	if OfflineDownloader.cache_size_bytes() < 0:
 		failures.append("cache size should be readable")
 	if OfflineDownloader.JOBS != 5:
