@@ -71,7 +71,7 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 		var centre_dry := ground.dry_height_at_world(centre.x, centre.y)
 		dry_low = minf(dry_low, centre_dry)
 		dry_high = maxf(dry_high, centre_dry)
-	var water := maxf(sea_y, ground.water_level_at(centre.x, centre.y, -INF))
+	var water := maxf(sea_y, centre_level)
 	var step := EDGE_STEP_M * m
 	for i in ring.size():
 		var p := ring[i]

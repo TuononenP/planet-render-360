@@ -166,6 +166,12 @@ func _run() -> void:
 		failures.append("bank straddle built %d pile meshes instead of a plinth" % pile_nodes)
 	if broot.find_children("*", "MeshInstance3D", true, false).is_empty():
 		failures.append("bank straddle built no plinth wall")
+	var plinth_min := INF
+	for child in broot.find_children("*", "MeshInstance3D", true, false):
+		plinth_min = minf(plinth_min, (child as MeshInstance3D).mesh.get_aabb().position.y)
+	var bed := bank.height_at_world(-12.0 * m, 0.0)
+	if absf(plinth_min - (bed - BuildingFoundation.SINK_M * m)) > 0.05:
+		failures.append("quayside plinth bottom %.2f should reach the carved bed %.2f" % [plinth_min, bed])
 	broot.free()
 	# A footprint wholly over water keeps its deck and piles.
 	var pring := PackedVector2Array([Vector2(-112, -8) * m, Vector2(-88, -8) * m,
@@ -220,6 +226,19 @@ func _run() -> void:
 	if not lroot.has_node("WaterFoundationPiles"):
 		failures.append("low dry pier built a deck without piles (floating deck)")
 	lroot.free()
+	# Pile depth cap: a bad deep ground sample must not grow a pile
+	# hundreds of metres under the water.
+	var droot := Node3D.new()
+	BuildingFoundation.build(droot, _square(Vector2.ZERO, 5.0 * m), [],
+		{"raised": true, "floor": 45.0 * m, "water": 40.0 * m, "plinth": 0.0},
+		{"kind": "retail"}, flat)
+	if not droot.has_node("WaterFoundationPiles"):
+		failures.append("deep-water footing built no piles")
+	else:
+		var deep_min := (droot.get_node("WaterFoundationPiles") as MeshInstance3D).mesh.get_aabb().position.y
+		if absf(deep_min - (40.0 - BuildingFoundation.PILE_DEPTH_M) * m) > 0.05:
+			failures.append("pile bottom %.2f should stop %.1f m under the water" % [deep_min, BuildingFoundation.PILE_DEPTH_M])
+	droot.free()
 	if failures.is_empty():
 		print("BUILDING FOUNDATION PASS")
 		quit(0)
