@@ -94,19 +94,29 @@ static func extend(s: BridgeStructures.Structure, index: RoadBridgeDecks.Index, 
 		var dense: PackedVector2Array = e[3]
 		var tail := PackedVector2Array()
 		var run := 0.0
+		var reach := 0.0
 		for k in range(1, dense.size()):
 			run += dense[k].distance_to(dense[k - 1])
 			# Never under the ground (a rise the slab would cut through).
 			if run > want + 0.01 * m2u or surf.height(dense[k].x, dense[k].y) > level + TAIL_TOL_M * m2u:
 				break
 			tail.append(dense[k])
+			reach = run
 		if tail.is_empty():
 			continue
 		var line: Dictionary = index.lines[int(e[0])]
 		var half := float(line["half"]) + BridgeStructures.EDGE_BEAM_M * m2u
 		var slab := PackedVector2Array([e[2]])
 		slab.append_array(tail)
-		for poly: PackedVector2Array in Geometry2D.offset_polyline(slab, half, Geometry2D.JOIN_MITER, Geometry2D.END_BUTT):
+		var polys: Array = Geometry2D.offset_polyline(slab, half, Geometry2D.JOIN_MITER, Geometry2D.END_BUTT)
+		# The outline's end edge runs on with it: an outline wider than
+		# the roads (shoulders, a carriageway and its link) stepped in to
+		# the slab, and a parapet stood across the step over the dip.
+		var end_edge := _end_edge(s.span, e[2], (dense[1] - dense[0]).normalized(), m2u)
+		if not end_edge.is_empty():
+			var dir := (dense[1] - dense[0]).normalized() * reach
+			polys.append(PackedVector2Array([end_edge[0], end_edge[1], end_edge[1] + dir, end_edge[0] + dir]))
+		for poly: PackedVector2Array in polys:
 			s.ring = _merged(s.ring, poly)
 			grown = true
 		if int(e[1]) == 0:
@@ -116,7 +126,28 @@ static func extend(s: BridgeStructures.Structure, index: RoadBridgeDecks.Index, 
 		(tails[e[0]] as Array)[int(e[1])] = tail
 	s.tails = tails
 	if grown:
+		s.ring = _closed(s.ring, SLIT_M * 0.5 * m2u)
 		s.bounds = RingGeometry.aabb(s.ring)
+
+## Slits narrower than this between two slabs side by side close, metres.
+const SLIT_M := 2.0
+
+## `ring` with its slits narrower than 2 `r` closed (grown by `r` and
+## shrunk back): a carriageway's and its link's slabs left a gap between
+## them, and parapets stood along both its sides on the deck.
+static func _closed(ring: PackedVector2Array, r: float) -> PackedVector2Array:
+	for grown_ring: PackedVector2Array in Geometry2D.offset_polygon(ring, r, Geometry2D.JOIN_MITER):
+		# The clipper's outer rings run counter-clockwise, its holes clockwise.
+		if Geometry2D.is_polygon_clockwise(grown_ring):
+			continue
+		var best := PackedVector2Array()
+		for back: PackedVector2Array in Geometry2D.offset_polygon(grown_ring, -r, Geometry2D.JOIN_MITER):
+			if not Geometry2D.is_polygon_clockwise(back) \
+					and absf(BridgeStructures.Plan._area(back)) > absf(BridgeStructures.Plan._area(best)):
+				best = back
+		if best.size() >= 3 and absf(BridgeStructures.Plan._area(best)) >= absf(BridgeStructures.Plan._area(ring)) * 0.99:
+			return best
+	return ring
 
 ## How far along `dense` (an approach, from the bridge end) the ground comes
 ## back up to within TAIL_TOL_M of the deck `level`, where it dipped more
@@ -144,6 +175,26 @@ static func _needed(level: float, dense: PackedVector2Array, surf: RoadBuilder._
 		if h >= level - TAIL_TOL_M * m2u:
 			return run if dive >= TAIL_MIN_DIVE_M * m2u else 0.0
 	return 0.0
+
+## Longest outline end edge an approach slab carries on, metres.
+const END_EDGE_MAX_M := 40.0
+
+## The edge of outline `span` nearest the member end `p` that its approach
+## (heading `dir`) leaves through, roughly square to it; [] when none.
+static func _end_edge(span: PackedVector2Array, p: Vector2, dir: Vector2, m2u: float) -> Array:
+	var best := INF
+	var found: Array = []
+	for i in span.size():
+		var a := span[i]
+		var b := span[(i + 1) % span.size()]
+		var len := a.distance_to(b)
+		if len < 0.5 * m2u or len > END_EDGE_MAX_M * m2u or absf((b - a).normalized().dot(dir)) > 0.5:
+			continue
+		var d := Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p)
+		if d < best:
+			best = d
+			found = [a, b]
+	return found if best <= 3.0 * m2u else []
 
 ## The larger outer ring of `ring` merged with `poly` (`ring` itself when
 ## they do not join).

@@ -475,17 +475,18 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	return total_m
 
 ## Grid (ROAD_CELL_M cells) of linear road ways' segments as
-## [a, b, half width]: barriers stop where they meet one.
+## [a, b, half width]: barriers stop where they meet one. `on_ground`
+## leaves out bridges (the roads a pier must not stand on).
 const ROAD_CELL_M := 32.0
 
-static func _road_grid(data: LocationData, m2u: float) -> Dictionary:
+static func _road_grid(data: LocationData, m2u: float, on_ground := false) -> Dictionary:
 	var grid := {}
 	var cell := ROAD_CELL_M * m2u
 	for w: Variant in data.roads:
 		if not (w is Dictionary):
 			continue
 		var d: Dictionary = w
-		if bool(d.get("area", false)) or bool(d.get("tunnel", false)):
+		if bool(d.get("area", false)) or bool(d.get("tunnel", false)) or (on_ground and bool(d.get("bridge", false))):
 			continue
 		var pts: PackedVector2Array = d.get("points", PackedVector2Array())
 		var half := float(d.get("width_m", 4.0)) * 0.5 * m2u

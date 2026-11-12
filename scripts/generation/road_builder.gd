@@ -203,6 +203,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var steps := RoadSurface.depth_steps(data)
 	var seeds := RoadSurface.wear_seeds(data)
 	surf.wear_seeds = seeds
+	surf.ground_roads = StreetProps._road_grid(data, m2u, true)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
 	# Bridge structures are levelled once, before the chunks read them.
@@ -226,6 +227,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	for own in parts:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
+	RoadTapers.lay(batches, data, surf, m2u)
 	BridgeStructures.build(batches, surf, m2u)
 	RoadMarkings.lay(plan, batches, surf, m2u, data)
 	RoadPaint.lay(batches, data, surf, plan, seeds, m2u)
@@ -623,6 +625,8 @@ class _Surface extends RefCounted:
 	## a bridge deck is laid and painted like the road it carries.
 	var place: LocationData = null
 	var wear_seeds := PackedFloat32Array()
+	## Roads on the ground (StreetProps._road_grid): no pier stands on one.
+	var ground_roads := {}
 
 	static func _node(p: Vector2) -> Vector2i:
 		var m := WorldScale.metres_to_units()

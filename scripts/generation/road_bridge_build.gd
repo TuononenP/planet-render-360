@@ -255,8 +255,12 @@ static func _land_piers(side: RoadBuilder._Batch, pts: PackedVector2Array, dist:
 	for i in range(1, pts.size() - 1):
 		if dist[i] < next:
 			continue
-		next = dist[i] + 30.0 * m2u
 		var p := pts[i]
+		# Not on a road passing under: the column moves on along the deck
+		# to the first clear spot (it stood in the lane of the way below).
+		if _on_road_below(p, surf, m2u):
+			continue
+		next = dist[i] + 30.0 * m2u
 		if surf.ground.water_at(p.x, p.y) > 0.0:
 			continue  # No column stands in the ditch or brook under it.
 		var low := surf.height(p.x, p.y) - 0.1 * m2u
@@ -272,6 +276,19 @@ static func _land_piers(side: RoadBuilder._Batch, pts: PackedVector2Array, dist:
 			var a: Vector2 = corners[k]
 			var b: Vector2 = corners[(k + 1) % 4]
 			RoadBuilder._wall(side, a, b, low, low, high, high, ((a + b) * 0.5 - p).normalized())
+
+## True where a pier at `p` (2.5 m square, with a metre to spare) would
+## stand on a road on the ground.
+static func _on_road_below(p: Vector2, surf: RoadBuilder._Surface, m2u: float) -> bool:
+	if surf.ground_roads.is_empty():
+		return false
+	var r := (1.25 + PIER_CLEAR_M) * m2u
+	for q: Vector2 in [p, p + Vector2(r, r), p + Vector2(r, -r), p + Vector2(-r, r), p + Vector2(-r, -r)]:
+		if StreetProps._on_road(q, surf.ground_roads, m2u):
+			return true
+	return false
+
+const PIER_CLEAR_M := 1.0
 
 ## A footbridge railing from `a` to `b` standing on the deck at `ya` /
 ## `yb`: posts every RAILING_POST_M, a top rail and a middle rail, thin
