@@ -116,7 +116,7 @@ outranks the map):
 | Banff (`banff`, Banff Avenue: log, river rock and Rundle stone fronts, steep metal gables) | `banff_heritage` 1885–1949 or heritage (Rundle stone, verdigris copper roofs, dormers); `banff_house` (clapboard cottages) |
 | Copenhagen (`copenhagen`, brick and rendered 5-storey blocks, dormered red tile) | `copenhagen_old` pre-1860, Nyhavn (painted plaster townhouses, steep tile); `copenhagen_modern` ≥7 levels, Ørestad |
 | Oslo (`oslo`, bygårder: 4–5 storey render and brick, hipped slate) | `oslo_wood` 1–2 levels / heritage, Damstredet (painted clapboard); `oslo_modern` ≥7 levels, Bjørvika |
-| Helsinki (`helsinki`, Jugend: grey-green render on granite, steep tile / black metal, 5–7 storeys) | `helsinki_empire` 1810–1880, Kruununhaka (ochre render, white pilasters, low black roofs); `helsinki_functional` 1930–1989, Töölö (light render, flat); `helsinki_modern` ≥10 levels, Kalasatama |
+| Helsinki (`helsinki`, Jugend: grey-green render on granite, steep tile / black metal, 5–7 storeys) | `helsinki_empire` 1700–1880, Kruununhaka (ochre render, white pilasters, low black roofs); `helsinki_classicism` 1920–1934, Töölö, Vallila, Torkkelinmäki (pastel render, hipped); `helsinki_functional` 1935–1964, Lauttasaari, Munkkiniemen puistotie (light render or brick, flat); `helsinki_midrise` ≥1990, Kalasatama, Sompasaari, Jätkäsaari, Ruoholahti, Katajanokanranta; `helsinki_villa` houses on Kuusisaari, Lehtisaari and in Vanha Munkkiniemi; `helsinki_modern` ≥10 levels |
 | Edinburgh (`edinburgh`, sandstone tenements, slate, chimney rows) | `edinburgh_old` pre-1767, 6–12 levels, Royal Mile (rubble, crow-step gables); `edinburgh_georgian` 1767–1850, New Town (ashlar terraces); `edinburgh_modern` |
 | Dublin (`dublin`, Georgian red brick, 4 storeys over a basement, parapet slate) | `dublin_victorian` 1–2 level brick cottages; `dublin_modern` ≥6 levels, Docklands |
 | Brussels (`brussels`, maisons de maître: pale render or brick on bluestone, French windows, slate mansards) | `brussels_old` pre-1860, Grand-Place (stone guild houses, step / bell gables); `brussels_modern` ≥6 levels, European Quarter |
@@ -263,6 +263,20 @@ Keilaniemi so the whole tip stays Espoo, where a 0.75 km `espoo_modern` district
 light stone and strip-window offices beside curtain walls. Lauttasaari is a 1.5 km
 `helsinki_functional` district (1940s–50s lamellas such as Aropaltio's and Ervi's) with
 Vattuniemi as a nested `helsinki_midrise` district.
+
+Inner-Helsinki districts follow OSM `start_date` clusters (2026-11-12). Katajanokka is split:
+its 1901–13 Jugend west (Luotsikatu, Kauppiaankatu) is a 0.33 km `helsinki` circle and
+Katajanokanranta's 1976–83 housing a 0.45 km `helsinki_midrise` one. Kallio keeps its Jugend
+circle with Torkkelinmäki's 1920s blocks nested as `helsinki_classicism`. Jätkäsaari is
+re-centred on its built quarters, and Ruoholahti (1990s brick) and Sompasaari get their own
+`helsinki_midrise` circles; before, Ruoholahti fell back to Jugend or pastel render and
+Sompasaari sat just outside Kalasatama. Munkkiniemen puistotie's 1935–54 blocks are
+`helsinki_functional`. Vanha Munkkiniemi, Kuusisaari and Lehtisaari are `helsinki_villa`
+districts: houses there take the villa profile (pastel or white render or timber, hipped
+tile or metal roofs or flat modernist ones, granite plinths, one or two storeys), and their
+apartment blocks fall to `helsinki_suburb` as before. A viewpoint on Lehtisaari or
+Kuusisaari is in the Helsinki zone, so Otaniemi's generic buildings seen from there use
+Helsinki's rules; its bespoke landmarks are unaffected.
 
 Relief keys: `danji_number`, `sign_bands`, `sign_stack` (probabilities, `AsiaFronts`) paint a danji slab's block number on its narrow ends, put a sign board across each lower storey of a street front, and run a vertical sign column up the full front. `glazed_balcony` (probability) builds a deep balcony with glass fronts and
 vertical aluminium mullions; `turret` (probability) adds one steep-roofed corner tower

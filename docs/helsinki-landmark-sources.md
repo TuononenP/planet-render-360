@@ -80,3 +80,103 @@ the pale ochre render and grey roof are estimates. The demolished (2015)
 water tower is not modelled. Outlines live in `LandmarkFhWestFootprints`,
 entries in `LandmarkRegistryWestMetro`.
 
+
+Inner-Helsinki districts (2026-11-12). Outlines were read through the OSM API
+(api.openstreetmap.org map extracts; the Overpass instances were not answering) and
+simplified to 0.4–1 m. They live in `LandmarkFhInnerFootprints` (Katajanokka, Kallio,
+Jätkäsaari, Ruoholahti) or `LandmarkFhWestFootprints` (Munkkiniemi, Kuusisaari), with
+entries in `LandmarkRegistryInnerHelsinki` and `LandmarkRegistryWestMetro`. Facade
+colours and the massing below come from the Wikimedia Commons lead photographs of each
+building's Wikipedia article. Heights marked "estimate" have no OSM or Wikipedia source.
+
+- Katajanokka:
+  - `enso_gutzeit_hq`: way [23192809](https://www.openstreetmap.org/way/23192809)
+    (Alvar Aalto, 1961–62, six storeys, white Carrara marble, flat roof).
+    - The fi.wikipedia article describes the square windows, the blank south-east face
+      left for an extension, the recess toward Uspenski and the granite plinth.
+    - The 24 m height and the set-back glazed top floor under a thin roof slab are
+      estimated from the photograph.
+    - This model replaces the generic block the 2026-11-03 rounds saw in front of Uspenski.
+  - `merikasarmi`: way [23446530](https://www.openstreetmap.org/way/23446530), the
+    Foreign Ministry's main wing of Engel's barracks (1816–38).
+    - The ochre render, white column porticos, grey hipped roofs and chimneys are from
+      the photograph.
+    - The three storeys, 12.6 m eaves and 18 m chimney tops are estimates.
+    - The 1838 wing and the 1980s extension stay generic.
+  - `katajanokka_terminal`: way [23192841](https://www.openstreetmap.org/way/23192841).
+    - The dark brick upper storeys over a pillared glazed ground floor are from the
+      photograph.
+    - OSM says two levels; the photograph shows three, and the 14 m height is an estimate.
+  - Katajanokka Casino and Hotel Katajanokka (the former prison) stay generic.
+- Kallio:
+  - `kallio_library`: way [20010806](https://www.openstreetmap.org/way/20010806)
+    (Karl Hård af Segerstad, 1912; OSM three levels).
+    - The red brick, light stone quoins, red tiled mansard and chimneys are from the
+      photograph.
+    - The 19 m height is an estimate.
+  - `kallio_virastotalo`: way [140493078](https://www.openstreetmap.org/way/140493078)
+    (Kaija and Heikki Siren, 1965).
+    - The fi.wikipedia article gives the 11-storey north–south tower among lower
+      east–west wings; it is the outline's 20.6 × 78 m north–south arm.
+    - OSM gives `building:colour=whitesmoke` and tiles.
+    - The 40 m tower and 14.4 m wings are estimates.
+  - `linnanmaki`: the Vuoristorata's mapped centreline, way
+    [12118154](https://www.openstreetmap.org/way/12118154).
+    - The coaster dates from 1951; en.wikipedia gives 24 m and 960 m of track. The
+      height profile along the line is an estimate.
+    - It also includes three towers with OSM heights:
+      - Kingi: way [988146105](https://www.openstreetmap.org/way/988146105), 75 m.
+      - Raketti: way [988146107](https://www.openstreetmap.org/way/988146107), 60 m.
+      - Panoraama: way [988146106](https://www.openstreetmap.org/way/988146106), 53 m.
+    - Clearance follows the coaster line and the three towers. The 1876 Vesilinna
+      water tower, about 30 m from the line, stays.
+- Jätkäsaari and Ruoholahti:
+  - `clarion_hotel`: way [441505566](https://www.openstreetmap.org/way/441505566), with
+    tower parts [458878736](https://www.openstreetmap.org/way/458878736) and
+    [458878737](https://www.openstreetmap.org/way/458878737) (2016, 16 floors, 78 m).
+    - The photograph shows the chequered grey towers, the glass atrium, the V-shaped
+      pilotis and the sky bar.
+    - The second tower's 66 m roof is estimated from the same photograph.
+  - `west_terminal_2`: way [457955056](https://www.openstreetmap.org/way/457955056)
+    (2017).
+    - The glass hall under a white roof is simplified, and the 18 m height is an estimate.
+  - `cable_factory`: way [14829369](https://www.openstreetmap.org/way/14829369)
+    (Kaapelitehdas; OSM five levels).
+    - The pale grey brick, red-brick top band of small windows and grey roof boxes are
+      from the photograph.
+    - The 22.4 m eaves and 28 m roof boxes are estimates.
+  - `salmisaari_power_plant`, entered at the Salmisaari A boiler house, way
+    [14829857](https://www.openstreetmap.org/way/14829857) (1953):
+    - The boiler house has an 11-level part ([445475459](https://www.openstreetmap.org/way/445475459),
+      modelled 42 m) and a 9-level part ([445475464](https://www.openstreetmap.org/way/445475464), 34 m).
+    - The brick chimney is way [349596089](https://www.openstreetmap.org/way/349596089),
+      114 m, `building:colour=#907777`.
+    - The 150 m chimney is way [349596091](https://www.openstreetmap.org/way/349596091).
+    - The two Lämpöakku heat-storage tanks are ways [349596073](https://www.openstreetmap.org/way/349596073)
+      and [349596077](https://www.openstreetmap.org/way/349596077), 32 m (estimate).
+    - Before, the chimneys rendered as generic 114 m and 150 m buildings.
+  - Bunkkeri (way [89606822](https://www.openstreetmap.org/way/89606822)) is tagged
+    `demolished:building`, `end_date=2025-09`, and is not modelled.
+- Munkkiniemi and Kuusisaari:
+  - `aalto_house`: way [27634542](https://www.openstreetmap.org/way/27634542)
+    (Riihitie 20, 1936; OSM `ref:whc=1752-007`).
+    - The whitewashed brick under a dark timber-clad upper volume is from the photograph.
+    - The 8 m height is an estimate.
+  - `studio_aalto`: way [27705480](https://www.openstreetmap.org/way/27705480)
+    (Tiilimäki 20, 1955).
+    - The white brick and the clerestory over the long outer wing are from the photograph.
+    - The 7.4 m height is an estimate.
+  - `didrichsen_art_museum`: way [31984997](https://www.openstreetmap.org/way/31984997)
+    (Viljo Revell).
+    - The glass between red-brick piers, pale fascia and stone terrace wall are from the
+      photograph.
+    - The 8.4 m height is an estimate.
+  - `villa_gyllenberg`: way [97299146](https://www.openstreetmap.org/way/97299146).
+    - The ochre render and red tiled hipped roof are from the photograph.
+    - The 10 m height is an estimate. The modern gallery wing is folded into the outline.
+  - Hotel Kalastajatorppa is not modelled: the mapped conference building (way
+    [25824306](https://www.openstreetmap.org/way/25824306)) could not be matched to the
+    photographed hotel wing.
+  - Munkkiniemi Manor has no named OSM building.
+  - Lehtisaari and Sompasaari are district fabric only. Sompasaari's skyline element, the
+    Kruunuvuorensilta, is its own bridge model.

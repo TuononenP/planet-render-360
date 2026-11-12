@@ -114,6 +114,14 @@ static func entries() -> Array:
 		{"type": "visio", "name": "Visio, Kalasatama", "lat": 60.186869, "lon": 24.977701,
 			"radius_m": 6000.0, "wiki_title": "Redi (shopping centre)", "height_m": 98.0, "clear_m": 30.0,
 			"kind": "Tower", "aliases": ["visio, kalasatama", "visio kalasatama", "kalasataman visio"]},
+		# Built along its mapped curve at yaw 0: `clear_path_m` (not the
+		# straight `span_m`) is the corridor its model replaces.
+		{"type": "kruunuvuorensilta", "name": "Kruunuvuorensilta", "lat": 60.1736, "lon": 25.0022,
+			"radius_m": 6000.0, "wiki_title": "Crown Bridges", "height_m": 135.0, "clear_m": 15.0,
+			"yaw_deg": 0.0, "span_m": 1195.0, "base": "sea", "kind": "Bridge",
+			"clear_path_m": KruunuvuorensiltaLine.clear_path(),
+			"aliases": ["kruunuvuorensilta", "kruunuvuori bridge", "crown bridge helsinki", "kronbergsbron",
+				"kruunusillat"]},
 		{"type": "redi_shopping_centre", "name": "Redi Shopping Centre", "lat": 60.186915, "lon": 24.979314,
 			"radius_m": 4500.0, "wiki_title": "Redi (shopping centre)", "height_m": 20.0, "clear_m": 40.0,
 			"clear_offsets_m": [
@@ -174,4 +182,4 @@ static func entries() -> Array:
 			"radius_m": 4500.0, "wiki_title": "Suomenlinna", "height_m": 14.0, "clear_m": 34.0,
 			"kind": "Barracks", "aliases": ["suomenlinna jetty barracks", "rantakasarmi suomenlinna", "jetty barracks helsinki"]},
 	] + LandmarkRegistryHelsinkiHero.entries() + LandmarkRegistryEspooHero.entries() \
-		+ LandmarkRegistryWestMetro.entries()
+		+ LandmarkRegistryWestMetro.entries() + LandmarkRegistryInnerHelsinki.entries()

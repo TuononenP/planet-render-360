@@ -72,3 +72,45 @@ Outlines are OSM ways retrieved through Overpass on 2026-11-12, stored in
 
 The 8–10-storey 2015–23 blocks round the station follow the new 0.6 km
 `espoo_modern` Niittykumpu district.
+
+Otaniemi (2026-11-12). Outlines were read through the OSM API and simplified to 0.7 m,
+in `LandmarkFhWestFootprints`, with entries in `LandmarkRegistryWestMetro`.
+
+- `vare`: way [941553968](https://www.openstreetmap.org/way/941553968) (Verstas
+  Architects, completed 2018).
+  - fi.wikipedia gives the metro-centre street level and three teaching floors.
+  - The red-brown brick piers, slot windows and glass roof pavilions are from the
+    Korkeakouluaukio photograph on Commons.
+  - The 19 m eaves and 21.5 m pavilions are estimates.
+  - The School of Business beside it (way [941553966](https://www.openstreetmap.org/way/941553966))
+    stays generic.
+- `harald_herlin_learning_centre`: way [4252948](https://www.openstreetmap.org/way/4252948)
+  (Alvar Aalto's university library, 1970; OSM two levels).
+  - The red brick, window bands and copper-clad roof lights follow the Otaniemi campus
+    palette; no article photograph was available.
+  - The 9.5 m eaves and 11.5 m roof lights are estimates.
+
+Aalto's campus beyond the main building (2026-11-12). Wikidata lists three Alvar Aalto
+works in Otaniemi: the main building (already `aalto_university_main`), Otahalli and the
+water tower. Dipoli is by Reima Pietilä and Raili Paatelainen (OSM `architect`), and the
+chapel is by Kaija and Heikki Siren.
+
+- `otaniemi_water_tower`: way [26608571](https://www.openstreetmap.org/way/26608571)
+  and its building:parts (Aalto, 1971).
+  - Twelve blade columns 0–34 m, the twelve-sided tank 34–57 m and a 1 m roof, so 58 m.
+  - A central shaft to 35 m and a seven-storey, 28 m free-form office (part
+    [1574135819](https://www.openstreetmap.org/way/1574135819)).
+  - fi.wikipedia gives 52 m and en.wikipedia 45 m; the model follows the OSM parts.
+  - Board-marked natural concrete is from fi.wikipedia and the Commons photograph.
+- `otahalli`: way [4259272](https://www.openstreetmap.org/way/4259272) (Aalto, 1952,
+  built for the Helsinki Olympics; OSM four levels).
+  - The white hall with its clerestory band over three-storey wings is from the photograph.
+  - The hall rectangle inside the outline, the 10.5 m wings and the 16.5 m ridge are
+    estimates.
+  - The 1971 Aalto annexe (way [131232174](https://www.openstreetmap.org/way/131232174))
+    stays generic.
+- `otaniemi_power_plant`: way [24408439](https://www.openstreetmap.org/way/24408439)
+  (brick).
+  - The steel chimney is way [26314304](https://www.openstreetmap.org/way/26314304),
+    75 m, `material=metal`. It used to render as a generic 75 m box.
+  - The 14 m hall height is an estimate; no source credits the plant to Aalto.

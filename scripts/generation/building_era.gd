@@ -427,6 +427,8 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			var district := str(c["district"])
 			if _empire(kind, c):
 				return "helsinki_empire"
+			if kind == "house" and district == "helsinki_villa":
+				return "helsinki_villa"
 			if kind == "house":
 				return "helsinki_wood" if district == "helsinki_wood" or bool(c["heritage"]) else "helsinki_suburb"
 			if lv >= 10:

@@ -185,6 +185,16 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 	var glazed := ArchitectureStyle._h(seed_v, 62) < float(relief.get("glazed_balcony", 0.0))
 	var deep := ArchitectureStyle._h(seed_v, 61) < float(relief.get("deep_balcony", 0.0))
 	var solid := str(look.get("wall_set", "")) == "concrete" or pattern in ["panel", "strip"]
+	# Glazed balconies stack in some bay columns of each face (seeded by the
+	# face, so the faces of one block differ), never in a face's end bays
+	# (2 m boxes there met the next face's at an inside corner), and a
+	# glazed face of three or more bays always carries at least one stack.
+	var stacks := PackedByteArray()
+	for j in bays:
+		var pick := ArchitectureStyle._h(seed_v + float(j) * 1.37 + mid.x * 0.013 + mid.y * 0.017, 63)
+		stacks.append(1 if glazed and j > 0 and j < bays - 1 and pick < GLAZED_COLUMN_SHARE else 0)
+	if glazed and bays >= 3 and not stacks.has(1):
+		stacks[bays / 2] = 1
 	for row in rows:
 		if row["ground"]:
 			continue
@@ -206,7 +216,7 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 			var hv := ArchitectureStyle._h(seed_v + float(j) * 0.37, 70 + int(row["storey"]))
 			# Glazed balconies stack in some bay columns, not across the whole
 			# front: the other bays keep their windows.
-			var glazed_here := glazed and ArchitectureStyle._h(seed_v + float(j) * 1.37, 63) < GLAZED_COLUMN_SHARE
+			var glazed_here := stacks[j] != 0
 			# A stretch's end bays stay flat: 2 m boxes there met the next
 			# face's at an inside corner, or a neighbour's wall.
 			var end_bay := j == 0 or j == bays - 1

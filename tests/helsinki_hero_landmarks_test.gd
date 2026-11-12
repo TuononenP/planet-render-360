@@ -105,9 +105,19 @@ func _skywheel_placement(failures: Array[String]) -> void:
 			if BuildingBuilder._accepted(d, venue["buildings"][0], Vector2.ZERO, 1176.0):
 				failures.append("Allas must replace its eastern venue building beside SkyWheel")
 		elif int(el["id"]) == 23192809:
+			# The office is the bespoke enso_gutzeit_hq model: Allas's clearance
+			# must not reach it, and Enso's own clearance replaces it.
 			var office := OsmParser.parse_features(JSON.stringify({"elements": [el]}), d.latitude, d.longitude)
-			if not BuildingBuilder._accepted(d, office["buildings"][0], Vector2.ZERO, 1176.0):
-				failures.append("Allas clearance must retain the neighbouring Enso-Gutzeit office")
+			var b: Dictionary = office["buildings"][0]
+			var p := Vector2(float(b["x"]), float(b["z"]))
+			for c in selected:
+				var cd: Dictionary = c
+				var inside := LandmarkSites.span_dist(p, Vector2(float(cd["x"]), float(cd["z"])), cd) \
+					< LandmarkSites.clear_m(cd)
+				if str(cd.get("type", "")) == "allas_sea_pool" and inside:
+					failures.append("Allas clearance must not reach the neighbouring Enso-Gutzeit office")
+				if str(cd.get("type", "")) == "enso_gutzeit_hq" and not inside:
+					failures.append("the bespoke Enso-Gutzeit model must replace its mapped office")
 	var retained := 0
 	var cleared := 0
 	for b in d.buildings:

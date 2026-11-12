@@ -1,7 +1,8 @@
 class_name LandmarkRegistryWestMetro
 extends RefCounted
 
-## Keilaniemi, Tapiola-centre, Lauttasaari and Niittykumpu landmarks, extruded from
+## Keilaniemi, Tapiola-centre, Lauttasaari, Niittykumpu, Munkkiniemi, Kuusisaari
+## and Otaniemi landmarks, extruded from
 ## OSM outlines (LandmarkFhWestFootprints). Entry lat/lon is the outline
 ## origin; outline-built models clear their footprint through
 ## clear_offsets_m ([x east, z south] about the entry, yaw 0). Sources:
@@ -56,4 +57,48 @@ static func entries() -> Array:
 		{"type": "olari_church", "name": "Olari Church", "lat": 60.172126, "lon": 24.759892,
 			"radius_m": 4500.0, "wiki_title": "Olari Church", "height_m": 13.0, "clear_m": 31.0,
 			"kind": "Church", "aliases": ["olari church", "olarin kirkko", "olars kyrka"]},
+		{"type": "aalto_house", "name": "Aalto House", "lat": 60.196731, "lon": 24.876389,
+			"radius_m": 2000.0, "wiki_title": "Villa Aalto", "height_m": 8.0, "clear_m": 11.0,
+			"kind": "House museum", "aliases": ["aalto house", "villa aalto", "alvar aalto's home",
+				"alvar aallon kotitalo", "aallon kotitalo", "riihitie 20"]},
+		{"type": "studio_aalto", "name": "Studio Aalto", "lat": 60.198187, "lon": 24.869493,
+			"radius_m": 2000.0, "wiki_title": "Studio Aalto", "height_m": 7.4, "clear_m": 12.0,
+			"kind": "Studio", "aliases": ["studio aalto", "alvar aalto studio", "alvar aallon ateljee",
+				"aalto atelier", "tiilimäki 20"]},
+		{"type": "didrichsen_art_museum", "name": "Didrichsen Art Museum", "lat": 60.185289, "lon": 24.856504,
+			"radius_m": 2500.0, "wiki_title": "Didrichsen Art Museum", "height_m": 8.4, "clear_m": 18.0,
+			"kind": "Art museum", "aliases": ["didrichsen art museum", "didrichsenin taidemuseo",
+				"didrichsens konstmuseum", "didrichsen museum"]},
+		{"type": "villa_gyllenberg", "name": "Villa Gyllenberg", "lat": 60.184157, "lon": 24.852147,
+			"radius_m": 2500.0, "wiki_title": "Kuusisaari", "height_m": 10.0, "clear_m": 16.0,
+			"clear_offsets_m": [[3.0, -5.0]],
+			"kind": "Art museum", "aliases": ["villa gyllenberg", "gyllenbergin huvila", "gyllenbergs villa"]},
+		{"type": "vare", "name": "Väre", "lat": 60.185590, "lon": 24.824930,
+			"radius_m": 3000.0, "wiki_title": "Väre (building)", "height_m": 21.5, "clear_m": 16.0,
+			"clear_offsets_m": [[30.0, 7.0], [-28.0, 5.0], [-8.0, -23.0], [10.0, 27.0], [16.0, -15.0],
+				[-16.0, 23.0], [-28.0, -11.0], [40.0, 3.0], [28.0, 29.0], [-4.0, -35.0], [18.0, 17.0],
+				[-30.0, 9.0]],
+			"kind": "University", "aliases": ["väre", "vare", "väre building", "aalto university väre",
+				"aalto school of arts, design and architecture"]},
+		{"type": "harald_herlin_learning_centre", "name": "Harald Herlin Learning Centre",
+			"lat": 60.184742, "lon": 24.827772, "radius_m": 2500.0, "wiki_title": "Aalto University",
+			"height_m": 11.5, "clear_m": 14.0,
+			"clear_offsets_m": [[-19.0, -14.0], [23.0, 14.0], [-11.0, 4.0], [-11.0, -22.0], [37.0, 26.0],
+				[3.0, 6.0]],
+			"kind": "Library", "aliases": ["harald herlin learning centre", "harald herlin -oppimiskeskus",
+				"aalto university library", "otaniemi library", "teknillisen korkeakoulun kirjasto"]},
+		{"type": "otaniemi_water_tower", "name": "Otaniemi Water Tower", "lat": 60.181197, "lon": 24.819880,
+			"radius_m": 5000.0, "wiki_title": "Otaniemi water tower", "height_m": 58.0, "clear_m": 21.0,
+			"kind": "Water tower", "aliases": ["otaniemi water tower", "otaniemen vesitorni", "otnäs vattentorn",
+				"aalto water tower"]},
+		{"type": "otahalli", "name": "Otahalli", "lat": 60.184254, "lon": 24.835059,
+			"radius_m": 2500.0, "wiki_title": "Otaniemi", "height_m": 16.5, "clear_m": 16.0,
+			"clear_offsets_m": [[-18.0, -20.0], [-18.0, 18.0], [22.0, 10.0], [22.0, -18.0], [16.0, 26.0],
+				[-30.0, 0.0], [4.0, -16.0], [-26.0, -30.0], [-2.0, 20.0], [-24.0, 20.0], [30.0, 0.0]],
+			"kind": "Sports hall", "aliases": ["otahalli", "otaniemi sports hall", "otnäshallen"]},
+		{"type": "otaniemi_power_plant", "name": "Otaniemi Power Plant", "lat": 60.188016, "lon": 24.827967,
+			"radius_m": 4000.0, "wiki_title": "Otaniemi", "height_m": 75.0, "clear_m": 14.0,
+			"clear_offsets_m": [[-27.4, -39.2], [8.0, -9.0], [0.0, 5.0]],
+			"kind": "Power station", "aliases": ["otaniemi power plant", "otaniemen voimalaitos",
+				"otaniemi chimney", "otnäs kraftverk"]},
 	]

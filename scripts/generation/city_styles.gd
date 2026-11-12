@@ -293,10 +293,13 @@ const DISTRICTS := [
 	["helsinki", "helsinki_empire", 60.1720, 24.9550, 0.5, 8.0],  # Kruununhaka
 	["helsinki", "helsinki_classicism", 60.1800, 24.9200, 1.0, 5.0],  # Töölö
 	["helsinki", "helsinki_midrise", 60.1870, 24.9770, 0.6, 20.0],  # Kalasatama
-	["helsinki", "helsinki", 60.1670, 24.9700, 0.7, 8.0],  # Katajanokka
+	["helsinki", "helsinki_midrise", 60.1830, 24.9870, 0.4, 8.0],  # Sompasaari
+	["helsinki", "helsinki", 60.1673, 24.9640, 0.33, 8.0],  # Katajanokka, Jugend west
+	["helsinki", "helsinki_midrise", 60.1668, 24.9750, 0.45, 8.0],  # Katajanokanranta, 1976–83
 	["helsinki", "helsinki", 60.1580, 24.9400, 0.55, 8.0],  # Eira
 	["helsinki", "helsinki", 60.1580, 24.9500, 0.5, 8.0],  # Ullanlinna
 	["helsinki", "helsinki", 60.1850, 24.9500, 0.65, 8.0],  # Kallio
+	["helsinki", "helsinki_classicism", 60.1853, 24.9548, 0.2, 8.0],  # Torkkelinmäki, 1920s
 	["helsinki", "helsinki", 60.1620, 24.9350, 0.5, 8.0],  # Punavuori
 	["helsinki", "helsinki_classicism", 60.1950, 24.9570, 0.7, 8.0],  # Vallila
 	["helsinki", "helsinki_wood", 60.2140, 24.9470, 0.65, 8.0],  # Käpylä
@@ -304,10 +307,15 @@ const DISTRICTS := [
 	["helsinki", "helsinki_suburb", 60.1950, 25.0350, 0.8, 8.0],  # Herttoniemi
 	["helsinki", "helsinki_suburb", 60.2030, 25.0570, 0.7, 8.0],  # Roihuvuori
 	["helsinki", "helsinki_suburb", 60.2060, 24.8720, 0.7, 8.0],  # Munkkivuori
+	["helsinki", "helsinki_functional", 60.1975, 24.8765, 0.5, 8.0],  # Munkkiniemen puistotie, 1935–54
+	["helsinki", "helsinki_villa", 60.1935, 24.8670, 0.4, 8.0],  # Vanha Munkkiniemi villas
+	["helsinki", "helsinki_villa", 60.1865, 24.8580, 0.5, 8.0],  # Kuusisaari
+	["helsinki", "helsinki_villa", 60.1818, 24.8505, 0.45, 8.0],  # Lehtisaari
 	["helsinki", "helsinki_element", 60.2100, 25.0830, 0.8, 8.0],  # Itäkeskus
 	["helsinki", "helsinki_element", 60.2370, 25.0830, 1.0, 8.0],  # Kontula
 	["helsinki", "helsinki_element", 60.1800, 24.9620, 0.28, 8.0],  # Merihaka
-	["helsinki", "helsinki_midrise", 60.1550, 24.9200, 0.85, 8.0],  # Jätkäsaari
+	["helsinki", "helsinki_midrise", 60.1565, 24.9130, 0.75, 8.0],  # Jätkäsaari
+	["helsinki", "helsinki_midrise", 60.1625, 24.9110, 0.5, 8.0],  # Ruoholahti, 1990s brick
 	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
 	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
 	["espoo", "tapiola", 60.1760, 24.8050, 1.0, 8.0],  # Tapiola

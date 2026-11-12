@@ -46,7 +46,8 @@ func _eras() -> void:
 	for row in [["house", "", "helsinki_suburb"], ["house", "helsinki_wood", "helsinki_wood"],
 			["apartments", "helsinki_classicism", "helsinki_classicism"],
 			["apartments", "helsinki", "helsinki"], ["apartments", "helsinki_midrise", "helsinki_midrise"],
-			["apartments", "helsinki_element", "helsinki_element"]]:
+			["apartments", "helsinki_element", "helsinki_element"],
+			["house", "helsinki_villa", "helsinki_villa"], ["apartments", "helsinki_villa", "helsinki_suburb"]]:
 		var cues := base.duplicate()
 		cues["district"] = row[1]
 		_check(BuildingEra._rules("helsinki", row[0], cues) == row[2], "Helsinki era %s" % [row])

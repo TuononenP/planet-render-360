@@ -1,6 +1,7 @@
 extends SceneTree
 
-## Keilaniemi, Tapiola, Lauttasaari and Niittykumpu: bespoke registry landmarks at
+## Keilaniemi, Tapiola, Lauttasaari, Niittykumpu, Munkkiniemi, Kuusisaari and
+## Otaniemi: bespoke registry landmarks at
 ## their documented heights, built on their OSM outlines, searchable by
 ## name, with clearance that covers every footprint but does not swallow a
 ## neighbouring landmark, and the areas' zone and district fabric.
@@ -10,6 +11,9 @@ const TYPES := {
 	"lauttasaari_church": 61.0, "lauttasaari_manor": 12.5,
 	"niittyhuippu": 90.0, "niittytori_tower": 38.0, "niitty_shopping_centre": 14.0,
 	"niittytaival_tower": 50.5, "olari_church": 13.0,
+	"aalto_house": 8.0, "studio_aalto": 7.4, "didrichsen_art_museum": 8.4, "villa_gyllenberg": 10.0,
+	"vare": 21.5, "harald_herlin_learning_centre": 11.5,
+	"otaniemi_water_tower": 58.0, "otahalli": 16.5, "otaniemi_power_plant": 75.0,
 }
 ## Towers that stand on another model's podium: its clearance covers them.
 const STANDS_ON := {"niittyhuippu": "niitty_shopping_centre", "niittytori_tower": "niitty_shopping_centre"}
@@ -131,7 +135,10 @@ func _check_extras(failures: Array[String]) -> void:
 	for row in [["finago_tower", ["kone_building", "keilalampi"]],
 			["espoo_cultural_centre", ["tapiola_central_tower", "mantytorni", "tapiola_hip_flask_houses", "tapiola_church"]],
 			["lauttasaari_church", ["lauttasaari_manor"]],
-			["niittyhuippu", ["niittytori_tower", "niitty_shopping_centre", "niittytaival_tower", "olari_church"]]]:
+			["niittyhuippu", ["niittytori_tower", "niitty_shopping_centre", "niittytaival_tower", "olari_church"]],
+			["aalto_house", ["studio_aalto", "didrichsen_art_museum", "villa_gyllenberg"]],
+			["vare", ["harald_herlin_learning_centre", "aalto_university_main", "dipoli", "otaniemi_chapel",
+				"otaniemi_water_tower", "otahalli", "otaniemi_power_plant"]]]:
 		var e := LocationData.entry_for_type(str(row[0]))
 		var got := LocationData.registry_extras(float(e["lat"]), float(e["lon"]), str(row[0])).map(
 			func(x: Dictionary) -> String: return str(x["type"]))
@@ -140,12 +147,17 @@ func _check_extras(failures: Array[String]) -> void:
 				failures.append("%s extras missing %s" % [row[0], want])
 
 ## Keilaniemi resolves to Espoo across its whole tip; Lauttasaari and
-## Vattuniemi carry their own Helsinki districts.
+## Vattuniemi carry their own Helsinki districts, Munkkiniemen puistotie
+## its functionalist blocks, Vanha Munkkiniemi, Kuusisaari and Lehtisaari
+## their villas, and Otaniemi stays Espoo's brick campus.
 func _check_fabric(failures: Array[String]) -> void:
 	for row in [[60.1749, 24.8308, "espoo", "espoo_modern"], [60.1765, 24.8360, "espoo", "espoo_modern"],
 			[60.1722, 24.8287, "espoo", "espoo_modern"], [60.1587, 24.8694, "helsinki", "helsinki_functional"],
 			[60.1640, 24.8820, "helsinki", "helsinki_functional"], [60.1525, 24.8580, "helsinki", "helsinki_midrise"],
-			[60.1700, 24.7640, "espoo", "espoo_modern"], [60.1688, 24.7590, "espoo", "espoo_modern"]]:
+			[60.1700, 24.7640, "espoo", "espoo_modern"], [60.1688, 24.7590, "espoo", "espoo_modern"],
+			[60.1980, 24.8770, "helsinki", "helsinki_functional"], [60.1935, 24.8670, "helsinki", "helsinki_villa"],
+			[60.1865, 24.8580, "helsinki", "helsinki_villa"], [60.1818, 24.8505, "helsinki", "helsinki_villa"],
+			[60.1856, 24.8249, "espoo", "otaniemi"]]:
 		var region := CityStyles.region_at(row[0], row[1])
 		if region != row[2]:
 			failures.append("zone at %s, %s is %s want %s" % [row[0], row[1], region, row[2]])

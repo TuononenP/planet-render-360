@@ -437,6 +437,18 @@ Niittykumpu, 2026-11-12 (landmark search views, summer noon, 21 June):
 | Niittykumpu (Niittyhuippu) | recognisable | 90 m white Niittyhuippu and Niittytori rise from the Niitty mall podium; dark Niittytaival tower; modern blocks round the station | Opening eye stands on the Länsiväylä ramps with the tower distant; tower balcony and facade detail are estimates |
 | Olari (church) | recognisable from above | Red-brick Olari Church with pilasters and slit windows beside the metro-centre towers | Opening eye stands over a neighbouring roof; heights estimated |
 
+Inner Helsinki and the western islands, 2026-11-12 (model sheets, four bearings, flat ground):
+- Captures: `visual-plan/reviews/helsinki-areas-2026-11-12/` (model sheets from `tools/capture_landmarks.gd`, not in-world landmark views).
+- Agent pre-ratings; human gate pending; in-world views not yet captured. 19 OSM-outline landmarks (`LandmarkRegistryInnerHelsinki`, `LandmarkRegistryWestMetro`), split Katajanokka, Torkkelinmäki, Ruoholahti, Sompasaari and Munkkiniemen puistotie districts, and a new `helsinki_villa` era for Vanha Munkkiniemi, Kuusisaari and Lehtisaari; sources in docs/helsinki-landmark-sources.md and docs/espoo-landmark-sources.md.
+
+| area | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Katajanokka | recognisable (model) | Aalto's white marble Enso HQ replaces the generic block in front of Uspenski; Merikasarmi's ochre Empire wings and porticos; brick ferry terminal | Casino and the prison hotel stay generic; Merikasarmi storey heights estimated |
+| Kallio | recognisable (model) | Linnanmäki's timber coaster and Kingi, Raketti and Panoraama towers replace generic 53–75 m boxes; Kallio Library; Siren office slab | Coaster track profile estimated; Taiga coaster not modelled |
+| Jätkäsaari / Ruoholahti | recognisable (model) | Clarion's chequered towers; the Salmisaari chimneys (114 m, 150 m) replace generic tall boxes; the Cable Factory | Second Clarion tower height estimated from a photograph; West Terminal 2 roof simplified |
+| Munkkiniemi / Kuusisaari / Lehtisaari | recognisable at close range (model) | Aalto House, Studio Aalto, Didrichsen, Villa Gyllenberg; villa and functionalist district fabric | Small low buildings among trees; Kalastajatorppa and the manor not modelled |
+| Otaniemi | recognisable (model) | Aalto's campus: the 1971 water tower (twelve-sided tank on blade columns), Otahalli and his library beside the existing main building, Dipoli and chapel; Väre; the power plant's 75 m chimney replaces a generic box | School of Business and the 1971 Otahalli annexe stay generic; Herlin had no reference photograph |
+
 Round sto-r1, 2026-11-03 (Stockholm hero work in progress):
 - Captures: `visual-plan/reviews/sto-r1-2026-11-03/` and `sto-r1-winter-2026-11-03/`, Ultra, clear golden hour. The images predate the Tyska kyrkan and street/bridge changes.
 - Agent pre-rating: recognisable; human gate pending. Foreground road and waterfront blocks obscure the cliff view, the island shoreline is too bare, and moored ships are absent. See the review README for capture limitations.

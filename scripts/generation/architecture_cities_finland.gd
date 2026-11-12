@@ -20,7 +20,7 @@ const BASE := {
 	"helsinki": "nordic", "helsinki_empire": "helsinki", "helsinki_functional": "helsinki",
 	"helsinki_modern": "helsinki", "helsinki_classicism": "helsinki", "helsinki_wood": "helsinki",
 	"helsinki_suburb": "helsinki", "helsinki_element": "helsinki", "helsinki_midrise": "helsinki",
-	"espoo": "nordic", "tapiola": "espoo", "otaniemi": "espoo", "espoo_modern": "espoo",
+	"helsinki_villa": "helsinki", "espoo": "nordic", "tapiola": "espoo", "otaniemi": "espoo", "espoo_modern": "espoo",
 	"kauniainen": "espoo",
 }
 
@@ -35,6 +35,7 @@ const ERAS := {
 		["helsinki_element", ACC, 1965, 1989, ["prefab", "element", "brutalist"], 3.0, 2.0, 99.0],
 		["helsinki_midrise", ALL, 1990, 2100, ["contemporary"], 2.0, 1.0, 99.0],
 		["helsinki_modern", ACC, 1990, 2100, ["skyscraper", "high-tech"], 0.5, 0.0, 99.0],
+		["helsinki_villa", ["house"], 1900, 1975, ["villa"], 0.5, 4.0, 99.0],
 	],
 	"espoo": [
 		["tapiola", ALL, 1950, 1989, ["modernism", "functionalism", "garden_city"], 5.0, 0.0, 99.0],
@@ -116,6 +117,14 @@ const REGIONS := {
 		"apartments": {"w": [["brick", ["#965640", "#ba8a68"]], ["render", WHITE], ["concrete", PANEL]],
 			"p": [["punched", 2], ["panel", 1]], "wn": "wide", "bay": 3.2, "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [6, 8], "fix": true, "rv": {"glazed_balcony": 0.65}},
+	},
+	# Kuusisaari and Lehtisaari: large-lot villas of the 1910s–60s, pale
+	# render or timber, hipped tile or metal roofs, or flat modernist ones.
+	"helsinki_villa": {
+		"house": {"w": [["render", PASTEL], ["render", WHITE], ["wood", NORDIC_WOOD]], "p": "punched",
+			"wn": "casement", "bay": 3.0, "fr": "#f2ede0", "r": [["hipped", 3], ["flat", 2], ["gabled", 1]],
+			"pitch": 0.55, "rf": SHEET_METAL + [["terracotta", RED_TILE]], "st": [1, 2], "fix": true,
+			"rv": {"granite_plinth": true}},
 	},
 	"espoo": {
 		"apartments": {"w": [["render", WHITE], ["concrete", WHITE]], "p": "punched", "wn": "wide",

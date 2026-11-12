@@ -1,7 +1,8 @@
 class_name LandmarkFhWestFootprints
 extends RefCounted
 
-## Outlines of the Keilaniemi, Tapiola, Lauttasaari and Niittykumpu landmarks from
+## Outlines of the Keilaniemi, Tapiola, Lauttasaari, Niittykumpu, Munkkiniemi,
+## Kuusisaari and Otaniemi landmarks from
 ## OpenStreetMap (2026-11-12; ways in docs/espoo-landmark-sources.md and
 ## docs/helsinki-landmark-sources.md), Douglas-Peucker simplified to
 ## 0.5–1 m. Flat x, z pairs in metres about the registry entry's lat/lon:
@@ -43,7 +44,48 @@ const OUTLINES := {
 		-29.1, -1.5, -19.3, -2.5, -19.3, -6.3, -7.9, -6.8, -7.6, -4.7, 1.4, -5.1, 1.3, -8.0, 10.1, -11.6,
 		10.7, -10.7, 17.5, -13.0, 18.9, -8.8, 17.6, -8.5, 20.0, -4.1, 24.9, -4.4, 25.6, 8.9, 26.5, 12.0,
 		8.0, 20.1, 6.9, 17.8, -20.3, 19.1, -20.9, 11.6, -26.8, 11.8, -27.5, 3.0, -28.8, 3.0],
+	"aalto_house": [-3.8, -10.0, 12.9, -0.7, 8.5, 7.0, 0.8, 2.7, -2.7, 8.9, -11.7, 3.9],
+	"studio_aalto": [
+		-16.2, 8.2, -3.7, -13.8, 19.0, 4.3, 9.8, 12.5, 10.0, 7.2, 9.0, 4.2, 6.0, 0.3, -0.7, -3.6,
+		-8.6, 8.3, -7.6, 9.8, -11.2, 11.7],
+	"didrichsen_art_museum": [
+		-24.4, 2.3, -17.2, -3.1, -18.6, -5.0, 0.6, -19.5, 6.5, -11.8, 8.6, -13.3, 19.2, 0.6, 16.1, 2.9,
+		19.6, 7.5, -1.1, 23.1, -5.5, 17.2, 7.6, 7.3, -0.8, -3.2, -18.4, 9.8],
+	"villa_gyllenberg": [
+		3.3, 4.3, 9.5, -0.5, 10.2, 0.5, 14.8, -3.0, 15.7, -1.8, 20.9, -5.8, 14.7, -13.8, 16.4, -15.1,
+		8.9, -24.7, -3.2, -15.4, -2.1, -12.8, -3.0, -8.8, -7.0, -5.0, -8.0, -6.0, -17.3, 2.7, -16.2, 3.9,
+		-18.7, 6.3, -10.6, 14.8, -15.1, 19.0, -9.6, 24.7, -8.7, 23.8, -6.4, 26.1, 4.2, 16.1, -2.2, 9.5],
+	"vare": [
+		-3.2, 40.6, -28.5, 32.4, -36.2, 27.7, -54.3, 7.9, -45.6, 0.0, -47.3, -2.9, -44.0, -14.6, -23.3, -34.2,
+		-22.5, -36.8, -49.8, -46.4, -52.5, -48.9, -46.0, -56.8, 7.3, -40.2, 14.6, -35.1, 34.3, -15.3,
+		61.4, -6.6, 57.6, 5.2, 48.0, 20.0, 34.3, 32.4, 27.3, 50.4],
+	"harald_herlin_learning_centre": [
+		-20.3, -44.3, 53.0, 32.3, 48.2, 36.7, 46.8, 35.1, 43.2, 38.4, 42.2, 37.4, 39.0, 40.1, 36.5, 37.4,
+		35.6, 38.1, 11.7, 13.2, 1.6, 17.4, 4.4, 24.6, -2.6, 27.7, -17.1, 13.7, -17.9, 14.2, -39.1, -7.8,
+		-30.4, -11.6, -31.2, -13.0, -32.1, -12.7, -36.6, -20.1, -28.2, -32.3, -26.5, -31.3, -25.9, -32.2,
+		-25.8, -34.0],
+	"otaniemi_water_tower": [
+		0.3, 18.3, 9.4, 15.8, 16.1, 9.1, 18.5, -0.3, 15.8, -9.6, 9.1, -16.1, -0.2, -18.4, -9.6, -15.7,
+		-15.9, -9.5, -18.5, -0.3, -15.9, 9.4, -9.3, 15.8],
+	"otahalli": [
+		8.9, -25.7, 8.7, -38.8, 35.3, -39.2, 35.5, -22.6, 40.2, -22.6, 41.1, 19.4, 36.6, 19.5, 36.8, 38.1,
+		26.8, 38.3, 26.9, 48.9, 23.3, 48.9, 23.4, 50.4, 17.3, 50.5, 17.2, 46.7, 6.3, 46.8, 6.0, 24.0,
+		3.8, 24.1, 3.8, 27.2, -0.6, 27.2, -0.4, 38.9, -37.1, 39.4, -38.2, -50.0, -28.1, -50.1, -28.1, -46.7,
+		-19.3, -46.8, -19.2, -42.7, -15.5, -42.8, -15.5, -39.0, -1.9, -39.4, -1.8, -34.6, 2.6, -34.7,
+		2.8, -29.7, 6.7, -29.7, 6.8, -25.8],
+	"otaniemi_power_plant": [
+		-0.4, -25.4, 23.0, -10.7, -0.1, 25.7, -8.4, 20.5, -10.6, 23.8, -18.5, 18.9, -11.3, 7.5, -18.1, 3.2,
+		-15.8, -0.3, -20.0, -2.9, -15.1, -10.6, -11.3, -8.2],
 }
+
+## Otaniemi water tower about its entry (OSM way 26608571): the free-form
+## seven-storey office under the tank (building:part 1574135819).
+const WATER_TOWER_OFFICE := [
+	-5.4, -14.3, -5.4, -16.9, -4.1, -17.3, -2.8, -14.7, -0.2, -14.6, 7.3, -12.3, 12.8, -7.4, 15.0, -0.1,
+	11.3, 1.3, 12.7, 7.1, 7.4, 12.5, 0.2, 14.6, -4.9, 7.5, -14.7, -0.2, -12.4, -7.6]
+## The power plant's 75 m chimney (way 26314304) about the plant entry.
+const PLANT_CHIMNEY := Vector2(-27.4, -39.2)
+const PLANT_CHIMNEY_R := 2.1
 
 ## Revell's four hip-flask houses about the entry (OSM way 129693702):
 ## ways 129693702, 129693693, 129693699 and 129693710.
@@ -60,6 +102,12 @@ static func outlines(type: String) -> Array[PackedVector2Array]:
 	if type == "tapiola_hip_flask_houses":
 		for flat in FLASKS:
 			out.append(_poly(flat))
+	elif type == "otaniemi_power_plant":
+		out.append(_poly(OUTLINES[type]))
+		var ring := PackedVector2Array()
+		for k in 12:
+			ring.append(PLANT_CHIMNEY + Vector2.from_angle(TAU * float(k) / 12.0) * PLANT_CHIMNEY_R)
+		out.append(ring)
 	elif OUTLINES.has(type):
 		out.append(_poly(OUTLINES[type]))
 	elif not F.outline(type).is_empty():
