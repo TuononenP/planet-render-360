@@ -2,7 +2,8 @@ class_name LandmarkFhWestFootprints
 extends RefCounted
 
 ## Outlines of the Keilaniemi, Tapiola, Lauttasaari, Niittykumpu, Munkkiniemi,
-## Kuusisaari and Otaniemi landmarks from
+## Kuusisaari and Otaniemi landmarks (with the Aalto University metro
+## station's Tietotie entrance) from
 ## OpenStreetMap (2026-11-12; ways in docs/espoo-landmark-sources.md and
 ## docs/helsinki-landmark-sources.md), Douglas-Peucker simplified to
 ## 0.5–1 m. Flat x, z pairs in metres about the registry entry's lat/lon:
@@ -59,6 +60,8 @@ const OUTLINES := {
 		-3.2, 40.6, -28.5, 32.4, -36.2, 27.7, -54.3, 7.9, -45.6, 0.0, -47.3, -2.9, -44.0, -14.6, -23.3, -34.2,
 		-22.5, -36.8, -49.8, -46.4, -52.5, -48.9, -46.0, -56.8, 7.3, -40.2, 14.6, -35.1, 34.3, -15.3,
 		61.4, -6.6, 57.6, 5.2, 48.0, 20.0, 34.3, 32.4, 27.3, 50.4],
+	# Aalto University metro station's Tietotie entrance pavilion (way 408595707).
+	"aalto_university_metro_station": [-20.1, 8.1, -17.8, 11.2, -14.1, 15.8, -0.3, 3.5, 3.6, 9.1, 17.9, -1.5, 8.0, -16.3],
 	"harald_herlin_learning_centre": [
 		-20.3, -44.3, 53.0, 32.3, 48.2, 36.7, 46.8, 35.1, 43.2, 38.4, 42.2, 37.4, 39.0, 40.1, 36.5, 37.4,
 		35.6, 38.1, 11.7, 13.2, 1.6, 17.4, 4.4, 24.6, -2.6, 27.7, -17.1, 13.7, -17.9, 14.2, -39.1, -7.8,
@@ -83,6 +86,19 @@ const OUTLINES := {
 const WATER_TOWER_OFFICE := [
 	-5.4, -14.3, -5.4, -16.9, -4.1, -17.3, -2.8, -14.7, -0.2, -14.6, 7.3, -12.3, 12.8, -7.4, 15.0, -0.1,
 	11.3, 1.3, 12.7, 7.1, 7.4, 12.5, 0.2, 14.6, -4.9, 7.5, -14.7, -0.2, -12.4, -7.6]
+## The Väre block about Väre's entry (OSM building relation 12696772):
+## Väre (way 941553968, OUTLINES), the School of Business (way 941553966)
+## and the A Bloc mall (way 941553969), built together by LandmarkFhVare.
+const SCHOOL_OF_BUSINESS := [
+	-100.9, -55.9, -114.8, -70.7, -123.9, -53.8, -124.6, -51.5, -126.7, -45.0, -102.5, -37.5, -100.4, -36.8,
+	-97.0, -34.3, -78.0, -13.9, -72.1, -10.5, -47.3, -2.9, -44.3, -12.7, -44.2, -13.2, -44.1, -14.0, -44.0, -14.6,
+	-33.2, -24.7, -53.6, -44.9, -59.8, -48.8, -85.0, -56.5, -87.9, -58.5, -98.6, -56.3]
+const A_BLOC := [
+	27.3, 50.4, 2.7, 42.5, -3.2, 40.6, -28.5, 32.4, -31.3, 36.6, -40.4, 45.3, -21.3, 65.2, -25.3, 69.0,
+	-31.3, 74.7, -11.3, 95.6, -7.2, 98.2, -3.0, 99.8, 14.1, 105.4, 16.2, 107.3, 33.9, 126.2, 41.4, 119.4,
+	46.6, 110.8, 48.4, 107.9, 50.1, 104.7, 64.9, 109.5, 67.9, 110.6, 72.7, 112.1, 76.8, 99.8, 54.2, 92.3,
+	48.4, 90.2, 46.6, 89.6, 43.1, 86.1, 22.3, 64.9, 20.8, 63.3]
+
 ## The power plant's 75 m chimney (way 26314304) about the plant entry.
 const PLANT_CHIMNEY := Vector2(-27.4, -39.2)
 const PLANT_CHIMNEY_R := 2.1
@@ -108,6 +124,10 @@ static func outlines(type: String) -> Array[PackedVector2Array]:
 		for k in 12:
 			ring.append(PLANT_CHIMNEY + Vector2.from_angle(TAU * float(k) / 12.0) * PLANT_CHIMNEY_R)
 		out.append(ring)
+	elif type == "vare":
+		out.append(_poly(OUTLINES[type]))
+		out.append(_poly(SCHOOL_OF_BUSINESS))
+		out.append(_poly(A_BLOC))
 	elif OUTLINES.has(type):
 		out.append(_poly(OUTLINES[type]))
 	elif not F.outline(type).is_empty():

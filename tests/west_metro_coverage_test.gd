@@ -12,7 +12,7 @@ const TYPES := {
 	"niittyhuippu": 90.0, "niittytori_tower": 38.0, "niitty_shopping_centre": 14.0,
 	"niittytaival_tower": 50.5, "olari_church": 13.0,
 	"aalto_house": 8.0, "studio_aalto": 7.4, "didrichsen_art_museum": 8.4, "villa_gyllenberg": 10.0,
-	"vare": 21.5, "harald_herlin_learning_centre": 11.5,
+	"vare": 21.5, "harald_herlin_learning_centre": 11.5, "aalto_university_metro_station": 7.5,
 	"otaniemi_water_tower": 58.0, "otahalli": 16.5, "otaniemi_power_plant": 75.0,
 }
 ## Towers that stand on another model's podium: its clearance covers them.
@@ -138,7 +138,7 @@ func _check_extras(failures: Array[String]) -> void:
 			["niittyhuippu", ["niittytori_tower", "niitty_shopping_centre", "niittytaival_tower", "olari_church"]],
 			["aalto_house", ["studio_aalto", "didrichsen_art_museum", "villa_gyllenberg"]],
 			["vare", ["harald_herlin_learning_centre", "aalto_university_main", "dipoli", "otaniemi_chapel",
-				"otaniemi_water_tower", "otahalli", "otaniemi_power_plant"]]]:
+				"otaniemi_water_tower", "otahalli", "otaniemi_power_plant", "aalto_university_metro_station"]]]:
 		var e := LocationData.entry_for_type(str(row[0]))
 		var got := LocationData.registry_extras(float(e["lat"]), float(e["lon"]), str(row[0])).map(
 			func(x: Dictionary) -> String: return str(x["type"]))

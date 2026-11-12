@@ -1,10 +1,10 @@
 class_name LandmarkFhHelsinkiModern
 extends RefCounted
 
-## Four modern buildings in true metres: Kiasma (Steven Holl, curved
+## Three modern buildings in true metres: Kiasma (Steven Holl, curved
 ## aluminium-and-glass volumes), the Oodi library (ALA, timber belly under
-## a steel arch), Dipoli (Reima and Raili Pietilä, copper lobes on boulders)
-## and the Heureka science centre. Footprints are the OpenStreetMap
+## a steel arch) and the Heureka science centre (Dipoli has its own
+## LandmarkFhDipoli). Footprints are the OpenStreetMap
 ## outlines in the model frame the registry yaw turns onto the map.
 
 const FhU = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_util.gd")
@@ -245,86 +245,6 @@ static func oodi(model: Node3D) -> void:
 		var p := bk[i].lerp(fr[i], 0.5)
 		var y := _oodi_sill(p.x) + 5.4 + 0.45 * (0.7 + 0.3 * sin(0.09 * p.x)) + 0.15
 		lm.box("Sky", Vector3(p.x, y, p.y), Vector3(4.2, 0.4, 2.2), Basis(Vector3.UP, 0.12), 0.0)
-	lm.commit(model)
-
-# --- Dipoli ----------------------------------------------------------------
-
-## Reima and Raili Pietilä's Dipoli (1966), origin at the OSM footprint
-## centre (registry yaw 17), parts after the OSM 3D outline: the main
-## hall block whose copper-clad roof climbs from boulder-and-concrete
-## walls to 10 m, the 6 m west wing, the low south-east wings, the 6 m
-## block of long rooflit bays (glazed skillion ridges) to the south-west,
-## and the copper roof lanterns rising to 11 m.
-static func dipoli(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("cliff", "#8A8478", 4.0))
-	lm.use("Wood", LandmarkMaterials.pbr("wood", "#8E6B47", 3.0))
-	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#7A8A70", 2.5, 0.5, 0.45))
-	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#A3A19B", 3.0))
-	lm.use("Glass", LandmarkMaterials.glass("#2A3236"))
-	var main := PackedVector2Array([Vector2(11.3, -5.5), Vector2(14.3, -7.6), Vector2(20.1, -7.4),
-		Vector2(29.2, -8.8), Vector2(38.9, -9.1), Vector2(44.9, -11.7), Vector2(41.5, -6.3), Vector2(39.8, -3.5),
-		Vector2(39.1, 2.5), Vector2(41.6, 9.9), Vector2(34.5, 10.6), Vector2(32.7, 13.8), Vector2(26.6, 18.5),
-		Vector2(24.6, 26.8), Vector2(20.5, 35.5), Vector2(21.4, 44.9), Vector2(16.8, 43.3), Vector2(12.7, 43.2),
-		Vector2(7.4, 46.5), Vector2(4.4, 49.7), Vector2(1.7, 35.7), Vector2(-3.5, 27.3), Vector2(-8.3, 26.6),
-		Vector2(-11.7, 26.8), Vector2(-17.3, 28.1), Vector2(-18.2, 25.5), Vector2(-23.8, 31.5), Vector2(-25.0, 37.3),
-		Vector2(-25.3, 41.2), Vector2(-30.3, 41.0), Vector2(-32.6, 43.3), Vector2(-37.0, 38.6), Vector2(-43.3, 35.0),
-		Vector2(-46.6, 35.0), Vector2(-45.1, 22.7), Vector2(-47.7, 9.8), Vector2(-36.7, 15.6), Vector2(-31.0, 16.8),
-		Vector2(-25.4, 16.7), Vector2(-21.8, 16.5), Vector2(-17.4, 14.3), Vector2(-14.2, 12.7), Vector2(-11.9, 11.5),
-		Vector2(-7.0, 9.3), Vector2(-4.2, 6.6), Vector2(-0.9, 3.4), Vector2(0.9, 1.1), Vector2(3.2, -1.9),
-		Vector2(5.9, -0.1), Vector2(9.2, -0.2), Vector2(11.4, -3.1)])
-	var west := PackedVector2Array([Vector2(-21.3, -7.2), Vector2(-21.8, 16.5), Vector2(-25.4, 16.7),
-		Vector2(-31.0, 16.8), Vector2(-36.7, 15.6), Vector2(-39.0, 9.0), Vector2(-40.4, 9.0), Vector2(-39.1, 6.4),
-		Vector2(-36.1, 5.7), Vector2(-36.1, -3.4), Vector2(-34.4, -3.4), Vector2(-34.4, -14.3), Vector2(-32.0, -14.3),
-		Vector2(-32.0, -15.8), Vector2(-46.0, -15.8), Vector2(-46.0, -18.5), Vector2(-47.3, -18.5),
-		Vector2(-47.3, -29.4), Vector2(-32.9, -26.6), Vector2(-21.4, -26.6)])
-	var se := PackedVector2Array([Vector2(2.3, -37.0), Vector2(7.1, -39.9), Vector2(7.1, -22.0), Vector2(11.6, -21.9),
-		Vector2(15.0, -22.1), Vector2(18.3, -25.3), Vector2(23.8, -19.7), Vector2(24.2, -17.7), Vector2(22.5, -15.6),
-		Vector2(18.7, -12.0), Vector2(14.1, -11.9), Vector2(12.7, -8.4), Vector2(11.3, -5.5), Vector2(11.4, -3.1),
-		Vector2(9.2, -0.2), Vector2(5.9, -0.1), Vector2(3.2, -1.9)])
-	var east := PackedVector2Array([Vector2(17.0, -26.5), Vector2(30.1, -40.0), Vector2(31.7, -37.9),
-		Vector2(31.5, -34.6), Vector2(33.8, -30.8), Vector2(37.1, -25.0), Vector2(41.4, -20.7), Vector2(36.7, -16.1),
-		Vector2(34.8, -14.2), Vector2(30.9, -13.4), Vector2(31.4, -8.0), Vector2(21.3, -8.4), Vector2(14.3, -7.6),
-		Vector2(12.7, -8.4), Vector2(14.1, -11.9), Vector2(18.7, -12.0), Vector2(22.5, -15.6), Vector2(24.2, -17.7)])
-	# Each block: boulder-studded base, timber-and-glass band, copper roof.
-	for blk in [[main, 3.2, 4.4, 9.4, 0.42], [west, 2.6, 3.6, 6.0, 0.7], [se, 2.2, 3.2, 5.0, 0.75],
-			[east, 2.4, 3.4, 6.0, 0.72]]:
-		var poly: PackedVector2Array = blk[0]
-		var y0: float = blk[1]
-		var y1: float = blk[2]
-		lm.poly_prism("Stone", poly, 0.0, y0)
-		lm.poly_prism("Wood", poly, y0, y1, false)
-		for i in poly.size():
-			var a := poly[i]
-			var b := poly[(i + 1) % poly.size()]
-			if a.distance_to(b) > 4.0:
-				var o := FhP.edge_out(poly, i)
-				var a3 := Vector3(a.x, 0, a.y)
-				var b3 := Vector3(b.x, 0, b.y)
-				FhU.openings(lm, "Glass", a3, b3, o, y0 + 0.15, maxi(int(a.distance_to(b) / 3.0), 1), 1.6,
-					y1 - y0 - 0.35, false, 0.03)
-				FhP.ribs(lm, "Wood", a3, b3, o, y0, y1, 1.2, 0.14, 0.1)
-				# Boulders set proud of the wall foot.
-				for k in maxi(int(a.distance_to(b) / 2.6), 1):
-					var p := a3.lerp(b3, (float(k) + 0.5) / maxf(float(int(a.distance_to(b) / 2.6)), 1.0))
-					lm.lathe("Stone", p + o * 0.3, FhU.ball(0.45 + 0.25 * sin(float(k) * 2.3 + float(i))), 7, 1.3, 1.0,
-						float(k))
-		FhP.slope_roof(lm, "Copper", poly, FhP.centre(poly), float(blk[4]), y1, float(blk[3]))
-	# The rooflit block to the south-west: long bays under glazed ridges.
-	var sw := PackedVector2Array([Vector2(-21.5, -37.0), Vector2(3.2, -37.0), Vector2(3.2, 1.1),
-		Vector2(-17.4, 14.3), Vector2(-21.5, 14.3)])
-	lm.poly_prism("Concrete", sw, 0.0, 5.5)
-	for r in [[-20.15, 2.7, 6.0], [-12.9, 2.6, 12.0], [-5.25, 2.1, 8.0], [1.7, 3.0, 0.5]]:
-		var x: float = r[0]
-		var hw: float = float(r[1]) * 0.5
-		FhU.wedge(lm, "Glass", "Copper", x - hw, x + hw, -36.6, float(r[2]), 5.5, 0.5, 1.0)
-	FhU.wedge(lm, "Copper", "Copper", -21.8, -17.4, -7.2, 14.3, 5.5, 2.5, 2.5)
-	# Copper roof lanterns and their glazed sides.
-	for q in [[8.75, 10.0, 5.9, 4.6, 11.0], [19.15, 10.35, 5.9, 7.5, 11.0], [26.55, 9.45, 4.3, 5.1, 11.0],
-			[31.7, -2.25, 3.4, 2.7, 10.5], [15.25, -15.7, 2.5, 2.4, 6.5], [25.9, -16.15, 3.0, 2.3, 6.5]]:
-		var top: float = q[4]
-		FhU.blk(lm, "Copper", float(q[0]), top - 2.2, float(q[1]), float(q[2]), 2.2, float(q[3]))
-		FhU.blk(lm, "Glass", float(q[0]), top - 1.8, float(q[1]), float(q[2]) + 0.1, 1.0, float(q[3]) + 0.1)
 	lm.commit(model)
 
 # --- Heureka ---------------------------------------------------------------

@@ -79,21 +79,75 @@ in `LandmarkFhWestFootprints`, with entries in `LandmarkRegistryWestMetro`.
 - `vare`: way [941553968](https://www.openstreetmap.org/way/941553968) (Verstas
   Architects, completed 2018).
   - fi.wikipedia gives the metro-centre street level and three teaching floors.
-  - The red-brown brick piers, slot windows and glass roof pavilions are from the
-    Korkeakouluaukio photograph on Commons.
-  - The 19 m eaves and 21.5 m pavilions are estimates.
-  - The School of Business beside it (way [941553966](https://www.openstreetmap.org/way/941553966))
-    stays generic.
+  - Built by `LandmarkFhVare`, the model covers the whole Väre block of OSM building
+    relation [12696772](https://www.openstreetmap.org/relation/12696772): Väre, the School
+    of Business (way [941553966](https://www.openstreetmap.org/way/941553966)) and the A Bloc
+    mall (way [941553969](https://www.openstreetmap.org/way/941553969)), the last two as extra
+    outlines cleared through extra `clear_offsets_m`.
+  - Typology from Street View panoramas of the east, north and bus-loop fronts (2019–2026,
+    supplied by the user) and the Commons photographs "A-Bloc in February 2025", "A-Bloc on
+    a rainy afternoon in May 2024", "A-Bloc and Väre in February 2025" and "Aalto University
+    School of Business entrance at Väre", matched to the OSM parts:
+    - Parts tagged three levels (Väre L, E, K, J, G, M, R, Q; School of Business T, V, Y;
+      A Bloc N and way 815467161): two storeys of red-brown brick with a close rhythm of tall
+      slot windows under a two-storey box of silver glass with aluminium mullions.
+    - Block-sized parts with no level tag (F, O, P, U) and A Bloc's way 815467162: taller
+      all-brick blocks with rows of slots over a glazed or perforated-metal ground storey; the
+      A Bloc block has the band of vertical brick louvres seen from the square.
+    - The School of Business atrium (X), A Bloc's mall hall (way 522627432) and its link (way
+      815467164): dark curtain walls in black frames; the mall hall's face to
+      Korkeakouluaukio carries the yellow graphic and metro entrance A (node
+      [4050038154](https://www.openstreetmap.org/node/4050038154)) under a black canopy with
+      the red station sign and the metro sign pole.
+    - A Bloc's block A on the square (way 815467163): brick piers under a band of silver glass.
+    - The station's entrance hall (way [402618641](https://www.openstreetmap.org/way/402618641)):
+      glass under a deep black canopy with a warm perforated soffit, the red sign over the
+      Otaniementie door (node 5026528602), as in "Entrance to Aalto University metro station".
+    - The two-storey parts between the blocks (ways 522627431, 941553970, 522627430):
+      recessed, dark-framed glass.
+    - The one-storey glass part S under a black metal roof, and the black metal skillion
+      (way [941553972](https://www.openstreetmap.org/way/941553972)) as the stepped wedge
+      climbing onto it.
+  - Which untagged parts are tall brick blocks or dark halls, the 9 m brick base, 17.5 m glass
+    tops, 20–21.5 m tall blocks, 19 m School of Business atrium, 11.5 m mall hall, 10 m
+    connectors, the perforated ground storeys and the yellow graphic's shapes are estimates.
+- `aalto_university_metro_station`: the Tietotie entrance pavilion, way
+  [408595707](https://www.openstreetmap.org/way/408595707) (`building=transportation`, one
+  level; entrance B, node [4104851062](https://www.openstreetmap.org/node/4104851062)), entry at
+  its outline centroid. The station itself is underground (Länsimetro, 2017).
+  - Granite plinth, full-height glazing in black frames, the black standing-seam back wall and
+    steep folded roof and the large glazed diamond across a corner are from the Commons
+    photograph "Aalto University metro station entrance by the VTT building in Otaniemi (Jan 2017)".
+  - The 4.4 m eaves, 7.5 m crown, the corner chosen for the diamond and its size are estimates.
+
 - `harald_herlin_learning_centre`: way [4252948](https://www.openstreetmap.org/way/4252948)
   (Alvar Aalto's university library, 1970; OSM two levels).
-  - The red brick, window bands and copper-clad roof lights follow the Otaniemi campus
-    palette; no article photograph was available.
+  - The red brick on a black granite course, two long window bands with slim mullions and
+    the entrance canopy on blue-green tiled columns are from the Commons photographs
+    "Otaniemi campus library" and "Backside of the library of the Helsinki University of
+    Technology".
+  - The canopy stands on the south front at the OSM main entrance (node
+    [301814925](https://www.openstreetmap.org/node/301814925)); its 6.4 m depth and four
+    columns are estimates.
   - The 9.5 m eaves and 11.5 m roof lights are estimates.
 
 Aalto's campus beyond the main building (2026-11-12). Wikidata lists three Alvar Aalto
 works in Otaniemi: the main building (already `aalto_university_main`), Otahalli and the
 water tower. Dipoli is by Reima Pietilä and Raili Paatelainen (OSM `architect`), and the
 chapel is by Kaija and Heikki Siren.
+
+- `dipoli`: way [4252954](https://www.openstreetmap.org/way/4252954) and its
+  building:parts 1573787789–816 (heights 4–11 m, the lanterns `building:material=copper`),
+  in `LandmarkFhDipoli`; Reima Pietilä and Raili Paatelainen, 1966, Aalto University's
+  main building since its 2017 renovation.
+  - The tall dark weathered-copper fascias of horizontal boards leaning out over the glass,
+    the warm timber soffits, the timber-framed glazing with dark-stained panels, the heaps of
+    pink-red granite boulders against the walls and the steel pinecone at the Käpyovi
+    entrance (OSM node [1433646676](https://www.openstreetmap.org/node/1433646676)) are from
+    Commons photographs ("Dipoli building, Aalto University", "Dipoli11", "Dipoli,1",
+    "Dipoli September 2025").
+  - Glass heights (2.6–5.2 m), fascia heights, the fascia lean and the boulder layout are
+    estimates.
 
 - `otaniemi_water_tower`: way [26608571](https://www.openstreetmap.org/way/26608571)
   and its building:parts (Aalto, 1971).

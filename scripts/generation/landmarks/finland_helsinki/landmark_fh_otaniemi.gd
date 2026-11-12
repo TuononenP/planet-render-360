@@ -2,9 +2,7 @@ class_name LandmarkFhOtaniemi
 extends RefCounted
 
 ## Otaniemi, true metres, extruded from OpenStreetMap outlines
-## (LandmarkFhWestFootprints): Väre (Verstas, 2018), red-brown brick
-## volumes of vertical piers and slot windows over the glazed metro-centre
-## street level, glass pavilions on the roof; and Alvar Aalto's former
+## (LandmarkFhWestFootprints; the Väre block is LandmarkFhVare): Alvar Aalto's former
 ## university library (1970), now the Harald Herlin Learning Centre, red
 ## brick with long window bands under copper-clad roof lights. Aalto's
 ## other campus works: the water tower (1971), a twelve-sided board-marked
@@ -17,8 +15,9 @@ extends RefCounted
 const F = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_mall_footprints.gd")
 const W = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_west_footprints.gd")
 
-const VARE_M := 21.5
 const HERLIN_M := 11.5
+## The run of the library's south front holding its main entrance.
+const HERLIN_DOOR := [Vector2(11.7, 13.2), Vector2(1.6, 17.4)]
 const WATER_TOWER_M := 58.0
 ## Bottom and rim of the tank (OSM building:part min_height and height).
 const TANK_Y0 := 34.0
@@ -26,46 +25,52 @@ const TANK_Y1 := 57.0
 const OTAHALLI_M := 16.5
 const PLANT_M := 75.0
 
-static func vare(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Glass", LandmarkMaterials.glass("#2F3E46"))
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#8A4433", 3.0))
-	lm.use("Roof", LandmarkMaterials.paint("#4F5253", 0.8))
-	lm.use("Metal", LandmarkMaterials.paint("#7E8487", 0.5, 0.4))
-	var poly := W.outline("vare")
-	var street := 5.0
-	var eave := 19.0
-	lm.poly_prism("Glass", F.offset(poly, -0.6), 0.0, street)
-	W.ribs(lm, "Brick", F.offset(poly, -0.6), 0.0, street, 7.0, 0.9, 0.6)
-	lm.poly_prism("Brick", poly, street, eave)
-	W.edge_windows(lm, "Glass", poly, street + 1.0, 3, 4.4, 1.3, 0.55, 3.4)
-	W.ribs(lm, "Brick", poly, street, eave, 2.6, 0.4, 0.25)
-	lm.poly_prism("Roof", F.offset(poly, -0.3), eave, eave + 0.1)
-	var pavilion := F.offset(poly, -16.0)
-	if pavilion.size() < 3:
-		pavilion = F.offset(poly, -10.0)
-	lm.poly_prism("Glass", pavilion, eave, VARE_M - 0.2)
-	W.ribs(lm, "Metal", pavilion, eave, VARE_M - 0.2, 1.8, 0.1, 0.12)
-	lm.poly_prism("Metal", F.offset(pavilion, 0.3), VARE_M - 0.2, VARE_M)
-	lm.commit(model, "Vare_")
-
+## Aalto's library: red brick on a black granite course, two long window
+## bands with slim dark mullions, a dark metal fascia and the copper-clad roof
+## lights; the glazed main entrance (OSM node 301814925) under a white
+## canopy on slim columns clad in blue-green ceramic tiles.
 static func herlin(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#94442F", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2E383C"))
 	lm.use("Copper", LandmarkMaterials.paint("#5C8A77", 0.55, 0.5))
 	lm.use("Roof", LandmarkMaterials.paint("#4F5253", 0.8))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#2F3130", 3.0))
+	lm.use("Frame", LandmarkMaterials.paint("#3A3F3E"))
+	lm.use("White", LandmarkMaterials.pbr("render", "#E8E6E0", 2.5))
+	lm.use("Tile", LandmarkMaterials.pbr("concrete", "#4F7F7A", 1.5, 0.35, 0.1))
 	var poly := W.outline("harald_herlin_learning_centre")
 	var eave := 9.5
 	lm.poly_prism("Brick", poly, 0.0, eave)
-	W.ribbons(lm, "Glass", poly, 1.0, 1.6, 2, 4.2)
-	W.ribs(lm, "Brick", poly, 0.0, eave, 3.0, 0.45, 0.2)
-	lm.poly_prism("Brick", F.offset(poly, 0.15), eave - 0.4, eave, false)
+	lm.poly_prism("Granite", F.offset(poly, 0.06), 0.0, 0.8, false)
+	W.ribbons(lm, "Glass", poly, 1.2, 2.0, 2, 4.2)
+	W.ribbons(lm, "Frame", poly, 1.1, 0.12, 2, 4.2, 0.12)
+	W.ribbons(lm, "Frame", poly, 3.2, 0.1, 2, 4.2, 0.1)
+	W.ribs(lm, "Frame", poly, 1.2, 3.2, 1.5, 0.1, 0.1)
+	W.ribs(lm, "Frame", poly, 5.4, 7.4, 1.5, 0.1, 0.1)
+	lm.poly_prism("Frame", F.offset(poly, 0.12), eave - 0.5, eave + 0.15, false)
 	lm.poly_prism("Roof", F.offset(poly, -0.2), eave, eave + 0.1)
 	var lights := F.offset(poly, -8.0)
 	lm.poly_prism("Copper", lights, eave, HERLIN_M)
 	W.ribbons(lm, "Glass", lights, eave + 0.5, 1.0, 1, 1.0)
+	_herlin_entrance(lm, poly)
 	lm.commit(model, "Harald_herlin_")
+
+static func _herlin_entrance(lm: LandmarkMesh, poly: PackedVector2Array) -> void:
+	var a: Vector2 = HERLIN_DOOR[0]
+	var b: Vector2 = HERLIN_DOOR[1]
+	var along := (b - a).normalized()
+	var out := W.outward(poly, a, b)
+	var mid := (a + b) * 0.5
+	var basis := Basis(Vector3.UP, atan2(-along.y, along.x))
+	var door := mid + out * 0.15
+	lm.box("Glass", Vector3(door.x, 1.5, door.y), Vector3(6.0, 3.0, 0.1), basis, 0.0)
+	var slab := mid + out * 3.2
+	lm.box("White", Vector3(slab.x, 3.7, slab.y), Vector3(a.distance_to(b) + 2.0, 0.5, 6.4), basis)
+	lm.box("Roof", Vector3(slab.x, 3.97, slab.y), Vector3(a.distance_to(b) + 1.8, 0.04, 6.2), basis, 0.0)
+	for k in 4:
+		var c := mid + out * 5.8 + along * lerpf(-4.8, 4.8, float(k) / 3.0)
+		lm.frustum("Tile", Vector3(c.x, 0.0, c.y), 0.2, 0.2, 3.45, 12)
 
 static func water_tower(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
