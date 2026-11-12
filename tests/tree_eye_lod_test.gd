@@ -11,7 +11,7 @@ func _init() -> void:
 		"snow": 0.0, "sway": 0.0, "biome": "temperate"}
 	VegetationBuilder._emit(root, plan, ctx)
 	var found := false
-	for node in root.get_children():
+	for node in root.find_children("VegTrees_*", "MultiMeshInstance3D", true, false):
 		if str(node.name).contains("_lod0_"):
 			var origins: PackedVector3Array = node.get_meta("origins")
 			found = origins.size() == 1 and origins[0] == Vector3(700, 0, 0)

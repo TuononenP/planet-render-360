@@ -126,6 +126,11 @@ static func apply(root: Node, preset: int) -> void:
 	for c in root.get_children():
 		_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
 
+## One vegetation node added after the build (TreeLodWindow swaps).
+static func apply_vegetation(gi: GeometryInstance3D, preset: int) -> void:
+	_range(gi, preset, "Vegetation")
+	_shadow(gi, preset, "Vegetation")
+
 static func _apply(node: Node, preset: int, layer: String) -> void:
 	var l := str(node.get_meta("lod_layer", layer))
 	if node is GeometryInstance3D:

@@ -321,92 +321,24 @@ static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: Grou
 # --- Instancing ----------------------------------------------------------
 
 ## LOD by distance (budget-demoted farthest-first), then one MultiMesh
-## per species/LOD/sector. Returns counts for tests/captures.
+## per species/LOD/sector, under one TreeLod.SET_NAME node that keeps
+## the LOD-independent state so TreeLodWindow can re-centre the rings on
+## the camera at runtime. Returns counts for tests/captures.
 static func _emit(root: Node3D, plan: Dictionary, ctx: Dictionary) -> Dictionary:
-	var pos: Array = plan["pos"]
-	var sps: Array = plan["sp"]
-	var scl: Array = plan["scale"]
 	var real: Array = plan["real"]
-	var m2u: float = ctx["m2u"]
-	var full_u := float(ctx["full_r"]) * m2u
-	var mid_u := float(ctx["mid_r"]) * m2u
-	var budget: int = ctx["budget"]
-	var eye: Vector2 = ctx.get("eye", Vector2.ZERO)
-	var order: Array = range(pos.size())
-	order.sort_custom(func(a: int, b: int) -> bool:
-		var pa: Vector3 = pos[a]
-		var pb: Vector3 = pos[b]
-		return Vector2(pa.x, pa.z).distance_squared_to(eye) < Vector2(pb.x, pb.z).distance_squared_to(eye))
-	var groups := {}
-	var mesh_trees := 0
-	var imp_trees := 0
-	var dropped := 0
-	var lod_counts := [0, 0, 0]
-	for i in order:
-		var p: Vector3 = pos[i]
-		var d := Vector2(p.x, p.z).distance_to(eye)
-		var lod := 0 if d <= full_u else (1 if d <= mid_u else 2)
-		if lod < 2 and mesh_trees >= budget:
-			lod = 2
-		if lod == 2 and imp_trees >= budget * IMPOSTOR_FACTOR:
-			dropped += 1
-			continue
-		if lod < 2:
-			mesh_trees += 1
-		else:
-			imp_trees += 1
-		lod_counts[lod] += 1
-		var sector := int(floor((atan2(p.z, p.x) + PI) / TAU * float(SECTORS))) % SECTORS
-		var key := "%s|%d|%d" % [str(sps[i]), lod, sector]
-		if not groups.has(key):
-			groups[key] = []
-		(groups[key] as Array).append(i)
-	var season: int = ctx["season"]
-	var nodes := 0
-	for key in groups:
-		var parts: PackedStringArray = (key as String).split("|")
-		var sp := parts[0]
-		var lod := int(parts[1])
-		var ids: Array = groups[key]
-		var spec := TreeSpecies.spec(sp)
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = TreeMeshLibrary.mesh(sp, lod, season, float(ctx["snow"]), float(ctx["sway"]))
-		mm.instance_count = ids.size()
-		var origins := PackedVector3Array()
-		for k in ids.size():
-			var i: int = ids[k]
-			var p: Vector3 = pos[i]
-			var h1 := _hash(p.x, p.z, 11.0)
-			var h2 := _hash(p.x, p.z, 12.0)
-			var h3 := _hash(p.x, p.z, 13.0)
-			var hv := float(spec.get("h_var", 0.2))
-			var sc: Vector2 = scl[i]
-			var sy := sc.x * (1.0 + (h1 - 0.5) * 2.0 * hv)
-			var sxz := sy * sc.y * (0.9 + h2 * 0.2)
-			var basis := Basis(Vector3.UP, h3 * TAU)
-			var tilt_axis := Vector3(cos(h1 * 9.0), 0, sin(h1 * 9.0))
-			basis = Basis(tilt_axis, (h2 - 0.5) * 0.06) * basis
-			basis = basis.scaled(Vector3(sxz, sy, sxz) * m2u)
-			mm.set_instance_transform(k, Transform3D(basis, p))
-			origins.append(p)
-			mm.set_instance_color(k, _instance_tint(sp, season, h1, h2, h3))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "VegTrees_%s_lod%d_s%s" % [sp, lod, parts[2]]
-		# Trunk-base origins for tests/captures (headless MultiMesh
-		# storage is a dummy that keeps no transforms).
-		mmi.set_meta("origins", origins)
-		if lod == 2:
-			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(mmi)
-		nodes += 1
+	var st := TreeLod.state(plan, ctx)
+	var a := TreeLod.assign(st, ctx.get("eye", Vector2.ZERO))
+	var tree_set := Node3D.new()
+	tree_set.name = TreeLod.SET_NAME
+	tree_set.set_meta("tree_lod", st)
+	root.add_child(tree_set)
+	var nodes := TreeLod.emit(tree_set, st, a)
+	var lod_counts: Array = a["lod"]
 	var real_n := 0
 	for r in real:
 		real_n += int(r)
 	return {"trees": lod_counts[0] + lod_counts[1] + lod_counts[2], "real": real_n,
-		"lod": lod_counts, "dropped": dropped, "nodes": nodes,
+		"lod": lod_counts, "dropped": a["dropped"], "nodes": nodes,
 		"biome": ctx["biome"], "spacing": ctx.get("forest_spacing", []),
 		"rejected": [ctx.get("rej_mask", 0), ctx.get("rej_water", 0)]}
 

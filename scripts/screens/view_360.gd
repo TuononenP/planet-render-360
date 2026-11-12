@@ -104,6 +104,8 @@ var _walk := ViewWalk.new()
 var _near_window: NearGroundWindow
 var _carpet: GrassCarpet
 var _near_world := 0
+## Tree LOD rings that follow the camera (TreeLodWindow).
+var _tree_lod: TreeLodWindow
 var _mover: VehicleMover
 var _drone := ViewDrone.new()
 ## Endless walk & fly (WorldStreamer): Main enables it for the live app;
@@ -376,6 +378,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if _streamer != null:
 			_streamer.shutdown()
+		if _tree_lod != null:
+			_tree_lod.stop()
 		for t in _threads:
 			while t.is_alive():
 				RenderingServer.force_sync()
@@ -887,8 +891,9 @@ func _process(delta: float) -> void:
 			_rig.set_look(_rig.yaw + g.y * delta, _rig.pitch + g.x * delta)
 			_on_look_changed()
 
-## Keeps the fine land-cover map under the eye (NearGroundWindow), and
-## starts a new window whenever the world has been replaced.
+## Keeps the fine land-cover map under the eye (NearGroundWindow) and the
+## tree LOD rings on it (TreeLodWindow), and starts new windows whenever
+## the world has been replaced.
 func _tick_near_ground() -> void:
 	var world := _generated.get_instance_id() if is_instance_valid(_generated) else 0
 	if world != _near_world:
@@ -902,6 +907,11 @@ func _tick_near_ground() -> void:
 		if _mover != null:
 			_mover.stop()
 		_mover = VehicleMover.attach(_generated, _data, _ground) if world != 0 else null
+		if _tree_lod != null:
+			_tree_lod.stop()
+		_tree_lod = TreeLodWindow.attach(_generated) if world != 0 else null
+	if _tree_lod != null and _rig != null:
+		_tree_lod.tick(Vector2(_rig.position.x, _rig.position.z), _quality_preset)
 	if _rig != null and _ground != null and (_near_window != null or _carpet != null):
 		var eye := Vector2(_rig.position.x, _rig.position.z)
 		var agl := _rig.position.y - _ground.height_at_world(eye.x, eye.y)

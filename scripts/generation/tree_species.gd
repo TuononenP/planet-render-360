@@ -40,7 +40,7 @@ const SPECIES := {
 		"tint": "oak", "evergreen": false},
 	"birch": {"gen": "broad", "h": 16.0, "h_var": 0.25, "bole": 0.25, "crown_r": 0.19,
 		"leader": 0.95, "branches": 11, "trunk_r": 0.17, "up": 0.65, "droop": 0.55,
-		"clusters": 52, "card": 2.2, "leaf": "birch", "bark": "birch",
+		"clusters": 80, "card": 2.0, "leaf": "birch", "bark": "birch",
 		"tint": "birch", "evergreen": false},
 	"maple": {"gen": "broad", "h": 16.0, "h_var": 0.2, "bole": 0.25, "crown_r": 0.33,
 		"leader": 0.65, "branches": 8, "trunk_r": 0.28, "up": 0.5, "droop": 0.1,
