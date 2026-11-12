@@ -359,4 +359,4 @@ func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
 	Input.parse_input_event(release_north)
 	Input.flush_buffered_events()
 	_check(worst_step > -0.000001,
-		"walking never steps backward across a swap (worst lat step %g)" % worst_step)
+		"walking never steps backward across a swap (worst lat step %.7f)" % worst_step)
