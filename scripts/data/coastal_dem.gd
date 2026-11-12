@@ -15,7 +15,15 @@ static func correct(data: LocationData) -> float:
 		return float(data.dem_source["coast_bias_m"])
 	if not BareEarth.surface_model(data) or is_equal_approx(data.water_level, -3.0):
 		return 0.0
-	var bias := estimate(data)
+	var samples := _coast_samples(data)
+	var bias := _bias_of(samples)
+	var method := "OSM open-sea median; IQR <= 2 m"
+	if samples.size() < MIN_SAMPLES:
+		# No usable coastline in the detailed square (a recentre inland):
+		# the far water mask still knows where the sea is. A coastline whose
+		# samples were rejected (spread, range) is not second-guessed.
+		bias = estimate_from_mask(data)
+		method = "water-mask open-sea median; IQR <= 2 m"
 	if bias == 0.0:
 		return 0.0
 	for i in data.heights.size():
@@ -31,11 +39,15 @@ static func correct(data: LocationData) -> float:
 			heights[i] -= bias
 		ring["heights"] = heights
 	data.dem_source["coast_bias_m"] = bias
-	data.dem_source["coast_bias_method"] = "OSM open-sea median; IQR <= 2 m"
+	data.dem_source["coast_bias_method"] = method
 	print("COAST DEM registration: bias=%.2f m" % bias)
 	return bias
 
 static func estimate(data: LocationData) -> float:
+	return _bias_of(_coast_samples(data))
+
+## Heights on the open-water side of the OSM coastlines in reach.
+static func _coast_samples(data: LocationData) -> Array[float]:
 	var m := WorldScale.metres_to_units()
 	var segments: Array = []
 	for way in data.waterways:
@@ -61,6 +73,11 @@ static func estimate(data: LocationData) -> float:
 				var h := _sample(data, p)
 				if is_finite(h):
 					samples.append(h)
+	return samples
+
+## The coherent bias the samples agree on, or 0 when too few, too spread
+## or out of range.
+static func _bias_of(samples: Array[float]) -> float:
 	if samples.size() < MIN_SAMPLES:
 		return 0.0
 	samples.sort()
@@ -69,6 +86,55 @@ static func estimate(data: LocationData) -> float:
 	if spread > MAX_SPREAD_M or median < MIN_BIAS_M or median > MAX_BIAS_M:
 		return 0.0
 	return snappedf(median, 0.01)
+
+## Pixels of a fine ring (zoom 11+, the source the bias lives in) at
+## least this far inside the mask's open sea count; within this radius.
+const MASK_SHORE_M := 150.0
+const MASK_RADIUS_M := 4000.0
+const MASK_MAX_SAMPLES := 4000
+
+## The same coherent sea bias, measured on the far water mask's open sea
+## (FarWaterMask.OCEAN) in the finest DEM ring instead of along OSM
+## coastlines in the detailed square.
+static func estimate_from_mask(data: LocationData) -> float:
+	var mask := data.far_water_mask
+	if mask.is_empty():
+		return 0.0
+	var ring: Dictionary = {}
+	for r: Dictionary in data.dem_rings:
+		if int(r.get("zoom", 0)) >= 11:
+			ring = r
+			break
+	if ring.is_empty():
+		return 0.0
+	var zoom := int(ring["zoom"])
+	var w := int(ring["width"])
+	var h := int(ring["height"])
+	var heights: PackedFloat32Array = ring["heights"]
+	var origin: Vector2 = ring["origin_px"]
+	var world := float(1 << zoom) * 256.0
+	var mpp := DemFetcher.metres_per_px(data.latitude, zoom)
+	var centre := TileFetcher.global_pixel(data.latitude, data.longitude, zoom)
+	var radius_px := MASK_RADIUS_M / mpp
+	var shore_uv := MASK_SHORE_M / mpp / world
+	var stride := maxi(1, int(ceil(sqrt(float(w * h) / float(MASK_MAX_SAMPLES)))))
+	var samples: Array[float] = []
+	for y in range(0, h, stride):
+		for x in range(0, w, stride):
+			var p := origin + Vector2(x + 0.5, y + 0.5)
+			if p.distance_to(centre) > radius_px:
+				continue
+			var u := p.x / world
+			var v := p.y / world
+			var open := true
+			for d: Vector2 in [Vector2.ZERO, Vector2(shore_uv, 0), Vector2(-shore_uv, 0),
+					Vector2(0, shore_uv), Vector2(0, -shore_uv)]:
+				if FarWaterMask.sample_uv(mask, u + d.x, v + d.y) != FarWaterMask.OCEAN:
+					open = false
+					break
+			if open and is_finite(heights[y * w + x]):
+				samples.append(heights[y * w + x])
+	return _bias_of(samples)
 
 static func _open_water(p: Vector2, segments: Array, minimum: float) -> bool:
 	var best := INF

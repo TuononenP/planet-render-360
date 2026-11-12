@@ -48,6 +48,9 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 	var events: Array = []
 	var paths: Array = []
 	var incomplete := false
+	var snap := BORDER_SNAP_M * WorldScale.metres_to_units()
+	for k in chains.size():
+		chains[k] = _snap_ends(chains[k], box, snap)
 	for chain in chains:
 		if chain.size() < 2:
 			continue
@@ -136,6 +139,42 @@ static func _border_path(a: Vector2, b: Vector2, box: Rect2) -> PackedVector2Arr
 static func _rectangle(box: Rect2) -> PackedVector2Array:
 	return PackedVector2Array([box.position, Vector2(box.end.x, box.position.y), box.end,
 		Vector2(box.position.x, box.end.y)])
+
+## Open coastline ends this close to the extent's edge are carried straight
+## onto it. The OSM query box and the shoreline box differ by metres (11.6 m
+## east of Lauttasaari), so a run clipped by the query stopped just short of
+## the edge, read as an open coastline, and the whole near sea was dropped.
+const BORDER_SNAP_M := 40.0
+
+static func _snap_ends(chain: PackedVector2Array, box: Rect2, snap: float) -> PackedVector2Array:
+	if chain.size() < 2 or chain[0].distance_to(chain[-1]) < 0.02:
+		return chain
+	var out := chain
+	if not _on_border(out[0], box):
+		var p := _to_border(out[0], box, snap)
+		if p != out[0]:
+			out.insert(0, p)
+	if not _on_border(out[-1], box):
+		var p := _to_border(out[-1], box, snap)
+		if p != out[-1]:
+			out.append(p)
+	return out
+
+## The nearest point on the box edge when within `snap`, else `p`.
+static func _to_border(p: Vector2, box: Rect2, snap: float) -> Vector2:
+	var options := [
+		[p.x - box.position.x, Vector2(box.position.x, p.y)],
+		[box.end.x - p.x, Vector2(box.end.x, p.y)],
+		[p.y - box.position.y, Vector2(p.x, box.position.y)],
+		[box.end.y - p.y, Vector2(p.x, box.end.y)],
+	]
+	var best: Array = options[0]
+	for o: Array in options:
+		if float(o[0]) < float(best[0]):
+			best = o
+	if float(best[0]) < 0.0 or float(best[0]) > snap:
+		return p
+	return best[1]
 
 static func _on_border(p: Vector2, box: Rect2) -> bool:
 	return absf(p.x - box.position.x) < 0.02 or absf(p.x - box.end.x) < 0.02 \

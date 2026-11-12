@@ -578,8 +578,9 @@ func _apply_far_field(data: LocationData) -> void:
 		return
 	data.dem_rings = _farfield_rings
 	data.far_drapes = _farfield_drapes
-	print("FAR-FIELD fetch: %s rings=%d drapes=%d" % [str(_farfield.timings),
-		data.dem_rings.size(), data.far_drapes.size()])
+	data.far_water_mask = _farfield.water_mask
+	print("FAR-FIELD fetch: %s rings=%d drapes=%d water=%s" % [str(_farfield.timings),
+		data.dem_rings.size(), data.far_drapes.size(), not data.far_water_mask.is_empty()])
 
 func _build_far_procedural(data: LocationData) -> void:
 	# Offline backdrop: same noise family as _build_dem, wider and

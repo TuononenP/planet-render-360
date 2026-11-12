@@ -73,6 +73,9 @@ var dem_rings: Array = []
 ## {zoom, origin_px: Vector2, size_px: Vector2i, texture: Texture2D,
 ## reach_m}. Empty = colour-ramp fallback on the far rings.
 var far_drapes: Array = []
+## Water over the far rings (FarWaterMask: sea and lakes from OpenMapTiles),
+## {} = none: the rings fall back to OSM polygons and the sea-level rule.
+var far_water_mask: Dictionary = {}
 ## Satellite mosaic draped on the detailed terrain (SatelliteFetcher).
 ## Null means "no imagery": vertex colours dress the terrain instead.
 var satellite_texture: Texture2D

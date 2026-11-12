@@ -244,6 +244,10 @@ uniform vec4 dem_fine_map = vec4(1.0, 1.0, 0.0, 0.0);
 uniform vec4 dem_coarse_map = vec4(1.0, 1.0, 0.0, 0.0);
 uniform float has_dem_fine = 0.0;
 uniform float has_dem_coarse = 0.0;
+// FarWaterMask through the drape UVs: 1 = via UV, 2 = via UV2, 0 = none.
+uniform sampler2D water_mask : filter_linear_mipmap, repeat_disable;
+uniform vec4 water_mask_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform float has_water_mask = 0.0;
 varying vec3 wpos;
 varying vec3 wnrm;
 void vertex() {
@@ -287,6 +291,14 @@ void fragment() {
 	// Far lakes and sea (FarSurface.ramp_color alpha 0): a glossy surface
 	// with wind waves instead of matte ground, matching the near water.
 	float water = clamp(1.0 - COLOR.a, 0.0, 1.0);
+	// The water mask (FarWaterMask) decides where it covers: crisp shores
+	// between ring vertices 30-300 m apart. Lakes are 0.5, sea 1.0.
+	if (has_water_mask > 0.5) {
+		vec2 muv = (has_water_mask > 1.5 ? UV2 : UV) * water_mask_map.xy + water_mask_map.zw;
+		if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) {
+			water = smoothstep(0.18, 0.42, texture(water_mask, muv).r);
+		}
+	}
 	// Ridges and gullies in the light: the ring mesh is 30-70 m between
 	// vertices, so mountainsides were smooth domes under a painted
 	// photo. Noise gradients bend the lighting normal (strongest on steep
@@ -435,6 +447,7 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 	if coarse != null:
 		mat.set_shader_parameter("coarse_tex", coarse)
 	FarDemNormals.bind(mat, data, fine, coarse)
+	FarWaterMask.bind(mat, data, fine, coarse)
 	return mat
 
 ## Linear albedo of the finest drape covering metre XZ, gained and

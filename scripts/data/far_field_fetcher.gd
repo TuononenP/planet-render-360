@@ -41,8 +41,13 @@ const USER_AGENT := Brand.USER_AGENT
 ## read outside it at the exact reach.
 const MARGIN_PX := 4
 
+## Seconds the water mask may take before the far field lands without it.
+const WATER_TIMEOUT_S := 15.0
+
 ## Test hook: serve the on-device cache only (cache miss = layer absent).
 var offline_mode := false
+## FarWaterMask of the last fetch; {} when its tiles were not all there.
+var water_mask: Dictionary = {}
 ## {fetch_ms, assemble_ms, tiles, cached, failed} of the last fetch.
 var timings: Dictionary = {}
 
@@ -56,6 +61,12 @@ var _lat := 0.0
 var _t0 := 0
 var _cached := 0
 var _failed := 0
+var _water: VectorTileFetcher
+var _water_gen := 0
+var _water_zoom := 0
+var _water_tiles: Array[Vector2i] = []
+var _water_bodies: Dictionary = {}
+var _water_left := 0
 
 func _ready() -> void:
 	for i in POOL_SIZE:
@@ -63,6 +74,11 @@ func _ready() -> void:
 		http.timeout = TILE_TIMEOUT
 		add_child(http)
 		_pool.append(http)
+	_water = VectorTileFetcher.new(VectorTileFetcher.Kind.VECTOR)
+	add_child(_water)
+	_water.tile_ready.connect(_on_water_tile)
+	_water.tile_failed.connect(func(z: int, x: int, y: int) -> void:
+		_on_water_tile(z, x, y, PackedByteArray(), false))
 
 func is_busy() -> bool:
 	return _busy
@@ -119,17 +135,65 @@ func fetch(lat: float, lon: float, with_drapes: bool = true) -> void:
 	_failed = 0
 	_layers.clear()
 	_queue.clear()
+	water_mask = {}
 	for spec in DEM_LAYERS:
 		_add_layer("dem", zoom_for(lat, spec["target_mpp"], 15), lat, lon, spec["reach_m"])
 	if with_drapes:
 		for spec in DRAPE_LAYERS:
 			_add_layer("sat", zoom_for(lat, spec["target_mpp"], 18), lat, lon, spec["reach_m"])
-	_remaining = _queue.size()
-	if _remaining == 0:
-		_finish()
-		return
+	_remaining = _queue.size() + 1  # + the water mask
 	for job in _queue.duplicate():
 		_load(job)
+	_fetch_water(lat, lon)
+
+## The water mask's vector tiles, through the vector map's fetcher and
+## cache. Counts as one job: done when every tile answered, one failed,
+## or WATER_TIMEOUT_S passed.
+func _fetch_water(lat: float, lon: float) -> void:
+	_water_gen += 1
+	var gen := _water_gen
+	_water_zoom = FarWaterMask.zoom_for(lat)
+	_water_tiles = FarWaterMask.tiles_for(lat, lon, _water_zoom)
+	_water_bodies = {}
+	_water_left = _water_tiles.size()
+	if _water_left == 0:
+		_water_done()
+		return
+	if is_inside_tree():
+		get_tree().create_timer(WATER_TIMEOUT_S).timeout.connect(func() -> void:
+			if gen == _water_gen and _water_left > 0:
+				print("Far water mask: timed out (%d/%d tiles)" % [_water_bodies.size(), _water_tiles.size()])
+				_water_left = 0
+				_water_done())
+	for t in _water_tiles.duplicate():
+		if gen != _water_gen or _water_left <= 0:
+			return
+		if offline_mode and not _water._cached(_water_zoom, t.x, t.y):
+			_on_water_tile(_water_zoom, t.x, t.y, PackedByteArray(), false)
+		else:
+			_water.request_tile(_water_zoom, t.x, t.y)
+
+func _on_water_tile(z: int, x: int, y: int, body: PackedByteArray, ok: bool = true) -> void:
+	var t := Vector2i(x, y)
+	if _water_left <= 0 or z != _water_zoom or not _water_tiles.has(t) or _water_bodies.has(t):
+		return
+	# An empty body is open sea only when the server said so outright (the
+	# fetcher then leaves a sea marker); otherwise it may be a dropped
+	# download, and a whole tile of invented sea is worse than no mask.
+	if not ok or (body.is_empty() and not FileAccess.file_exists(_water.sea_path(z, x, y))):
+		_water_left = 0
+		_water_done()
+		return
+	_water_bodies[t] = body
+	_water_left -= 1
+	if _water_left == 0:
+		_water_done()
+
+func _water_done() -> void:
+	_water_gen += 1
+	_remaining -= 1
+	if _remaining <= 0:
+		_finish()
 
 func _add_layer(kind: String, zoom: int, lat: float, lon: float, reach_m: float) -> void:
 	var rect := window_px(lat, lon, zoom, reach_m)
@@ -226,8 +290,13 @@ func _finish() -> void:
 			drapes.append(_assemble_drape(layer))
 	var t2 := Time.get_ticks_msec()
 	var despiked := DemDespike.clean_rings(rings, _lat)
+	var t3 := Time.get_ticks_msec()
 	if despiked > 0:
-		print("Far-field DEM: %d spike pixels replaced in %d ms" % [despiked, Time.get_ticks_msec() - t2])
+		print("Far-field DEM: %d spike pixels replaced in %d ms" % [despiked, t3 - t2])
+	water_mask = FarWaterMask.build(_water_zoom, _water_tiles, _water_bodies)
+	_water_bodies = {}
+	print("Far water mask: %s in %d ms" % ["%d tiles z%d" % [_water_tiles.size(), _water_zoom]
+		if not water_mask.is_empty() else "absent", Time.get_ticks_msec() - t3])
 	timings = {"fetch_ms": fetch_ms, "assemble_ms": Time.get_ticks_msec() - t1,
 		"tiles": _queue.size(), "cached": _cached, "failed": _failed}
 	_busy = false

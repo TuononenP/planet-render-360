@@ -166,6 +166,19 @@ func _run() -> void:
 		{"class": "coastline", "points": PackedVector2Array([Vector2(-50, -100), Vector2(-50, 0)])}],
 		Rect2(-100, -100, 200, 200), [])
 	_check(partial_with_outer.is_empty(), "incomplete mainland must also veto otherwise closed sea domains")
+	# A run the OSM query clipped a few metres short of the extent edge still
+	# closes (Lauttasaari: 11.6 m short dropped the whole near sea).
+	var short_diagnostics: Array = []
+	var short := ShoreCoast.domains([
+		{"class": "coastline", "points": PackedVector2Array([Vector2(20, -100), Vector2(20, 100 - 11.6 * WorldScale.metres_to_units())])}],
+		Rect2(-100, -100, 200, 200), short_diagnostics)
+	var short_wet := false
+	var short_dry := true
+	for coast in short:
+		var index := PolygonIndex.new(coast["points"], coast["holes"])
+		short_wet = short_wet or index.contains(Vector2(-50, 0))
+		short_dry = short_dry and not index.contains(Vector2(60, 0))
+	_check(short_diagnostics.is_empty() and short_wet and short_dry, "a coastline ending just short of the edge must still close its sea")
 	var complete := ShoreCoast.domains([{"class": "coastline", "points": island_ring}], Rect2(-100, -100, 200, 200), [])
 	_check(complete.size() == 1 and (PolygonIndex.new(complete[0]["points"], complete[0]["holes"]) as PolygonIndex).contains(Vector2(50, 50)), "complete island-only coast should retain surrounding sea")
 	var cancelled := BuildAbort.new()

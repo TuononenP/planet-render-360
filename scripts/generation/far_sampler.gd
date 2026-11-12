@@ -24,6 +24,7 @@ static func native_params(data: LocationData, ground: GroundTruth, surf: Diction
 		"y_scale": ground._y_scale, "step_units": ground._step_units, "size": ground._size,
 		"surface": ground._surface, "half_units": ground._half_units, "level": ground._level,
 		"shore_sampler": ground.shoreline.sampler if ground.shoreline != null and ground.shoreline.ready else null,
+		"water_mask": FarWaterMask.native_params(data.far_water_mask),
 	}
 
 ## FarTerrainBuilder._ring_bands' positions from the native kernel;
@@ -36,7 +37,7 @@ static func native_ring_positions(data: LocationData, ground: GroundTruth,
 		PackedFloat64Array(radii), segs, native_params(data, ground, surf), data.dem_rings)
 
 ## Its [normals, colors] from the native kernel; empty without it.
-static func native_ring_colors(pos: PackedVector3Array, loops: int, per: int,
+static func native_ring_colors(data: LocationData, pos: PackedVector3Array, loops: int, per: int,
 		climate: Dictionary, ground: GroundTruth, water: Array, wbounds: Rect2) -> Array:
 	if not _native:
 		return []
@@ -45,6 +46,8 @@ static func native_ring_colors(pos: PackedVector3Array, loops: int, per: int,
 		"forest": climate["forest"], "meadow": climate["meadow"],
 		"water_level_m": ground.water_level_m, "datum_m": ground.datum_m,
 		"y_scale": ground._y_scale, "wbounds": wbounds,
+		"lat": data.latitude, "lon": data.longitude, "m2u": WorldScale.metres_to_units(),
+		"water_mask": FarWaterMask.native_params(data.far_water_mask),
 	}
 	return ClassDB.class_call_static("FarKernels", "ring_colors", pos, loops, per,
 		params, water)
@@ -71,11 +74,15 @@ static func _sample_far_dem(data: LocationData, u: float, v: float) -> float:
 ## meets the far mesh. No rings (procedural / offline / legacy squash)
 ## -> the z8 grid alone, as in T3.3.
 static func _mid_dem_height(data: LocationData, ground: GroundTruth, span_u: float, x: float, z: float) -> float:
+	var m2u := WorldScale.metres_to_units()
+	if not data.far_water_mask.is_empty():
+		var muv := FarSurface.merc_uv(data, x / m2u, z / m2u)
+		if _open_sea(ground, data, muv.x, muv.y):
+			return ground.render_y(0.0)
 	var uv := _tile_uv(data, span_u, x, z)
 	var far_m := _sample_far_dem(data, uv.x, uv.y)
 	if data.dem_rings.is_empty():
 		return ground.render_y(_sea_floor(ground, far_m))
-	var m2u := WorldScale.metres_to_units()
 	var d_m := maxf(absf(x), absf(z)) / m2u
 	var fade := 1.0 - smoothstep(FarTerrainBuilder.OUTER_RADIUS_M * FarTerrainBuilder.OUTER_FADE, FarTerrainBuilder.OUTER_RADIUS_M, d_m)
 	return ground.render_y(_sea_floor(ground,
@@ -83,6 +90,8 @@ static func _mid_dem_height(data: LocationData, ground: GroundTruth, span_u: flo
 
 ## UV-cached variant: caller computed U/V once per vertex for ring sampling.
 static func _mid_dem_height_uv(data: LocationData, ground: GroundTruth, span_u: float, x: float, z: float, u: float, v: float) -> float:
+	if _open_sea(ground, data, u, v):
+		return ground.render_y(0.0)
 	var uv := _tile_uv(data, span_u, x, z)
 	var far_m := _sample_far_dem(data, uv.x, uv.y)
 	if data.dem_rings.is_empty():
@@ -92,6 +101,15 @@ static func _mid_dem_height_uv(data: LocationData, ground: GroundTruth, span_u: 
 	var fade := 1.0 - smoothstep(FarTerrainBuilder.OUTER_RADIUS_M * FarTerrainBuilder.OUTER_FADE, FarTerrainBuilder.OUTER_RADIUS_M, d_m)
 	return ground.render_y(_sea_floor(ground,
 		FarSurface.height_m_uv(data, u, v, far_m, fade)))
+
+## Open sea on the water mask lies at sea level, whatever the DEM says:
+## surface-model tiles hold a northern sea 17-35 m up, a green plateau
+## where the far rings should show water. Lakes keep their DEM level.
+## Legacy-squash data (the -3.0 sentinel) is left alone.
+static func _open_sea(ground: GroundTruth, data: LocationData, u: float, v: float) -> bool:
+	if data.far_water_mask.is_empty() or is_equal_approx(ground.water_level_m, -3.0):
+		return false
+	return FarWaterMask.sample_uv(data.far_water_mask, u, v) == FarWaterMask.OCEAN
 
 ## Terrarium encodes ocean BATHYMETRY (Big Sur's shelf reads -2400 m):
 ## past the detailed sea plane the far surface IS the sea, so heights
@@ -221,9 +239,13 @@ static func _water_index_from_ground(ground) -> Array:
 ## and marks the water datum exactly -3.0 — where it still applies.
 ## T3.4 (real water bodies) replaces this whole heuristic.
 
-static func _far_water(h: float, water_level_m: float, in_osm: bool) -> bool:
+## `mask`: the FarWaterMask byte there; where it covers the point it
+## decides alone (low land is not sea, raised DSM sea is not land).
+static func _far_water(h: float, water_level_m: float, in_osm: bool, mask: int = FarWaterMask.NONE) -> bool:
 	if in_osm:
 		return true
+	if mask != FarWaterMask.NONE:
+		return mask != FarWaterMask.LAND
 	if water_level_m == -3.0:
 		return h < water_level_m + 1.0
 	return h < FarTerrainBuilder.SEA_LEVEL_M
@@ -284,10 +306,10 @@ static func _water_bounds(index: Array) -> Rect2:
 	return r
 
 static func _is_wet(ground: GroundTruth, h_render: float, p: Vector2,
-		index: Array, bounds: Rect2) -> bool:
+		index: Array, bounds: Rect2, mask: int = FarWaterMask.NONE) -> bool:
 	var in_osm := _in_osm_water(p, index, bounds)
 	return _far_water(ground.asl_y(h_render),
-		ground.asl_y(ground.water_level_m), in_osm)
+		ground.asl_y(ground.water_level_m), in_osm, mask)
 
 ## Drape pair (fine, coarse) for a band whose outer radius is reach_m:
 ## fine = the finest drape fully covering it (else the finest at all),

@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 252
+const BUILD_VERSION := 253
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -77,7 +77,9 @@ static func key(data: LocationData) -> String:
 		FarCityFetcher.QUERY_VERSION, str(data.climate),
 		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
 		_image_fingerprint(data.landcover_image), _image_fingerprint(data.canopy_image),
-		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(), _sources()]
+		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(),
+		str([data.far_water_mask.get("zoom", 0), data.far_water_mask.get("origin_px", Vector2.ZERO),
+			hash(data.far_water_mask.get("bytes", PackedByteArray()))]), _sources()]
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]

@@ -8,6 +8,7 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/rect2.hpp>
@@ -37,6 +38,51 @@ struct Ring {
 	PackedFloat32Array heights;
 };
 
+// FarWaterMask: LAND / INLAND / OCEAN bytes over a Mercator window.
+constexpr int MASK_NONE = -1;
+constexpr int MASK_LAND = 0;
+constexpr int MASK_OCEAN = 255;
+
+struct WaterMask {
+	int n = 0;
+	double world = 0.0; // global px across the world at the mask zoom
+	Vector2 origin, size;
+	PackedByteArray bytes;
+
+	// FarWaterMask.sample_uv
+	int sample_uv(double u, double v) const {
+		if (n <= 0) {
+			return MASK_NONE;
+		}
+		double tx = (u * world - (double)origin.x) / (double)size.x;
+		double ty = (v * world - (double)origin.y) / (double)size.y;
+		if (tx < 0.0 || ty < 0.0 || tx >= 1.0 || ty >= 1.0) {
+			return MASK_NONE;
+		}
+		int ix = Math::min((int)(tx * n), n - 1);
+		int iy = Math::min((int)(ty * n), n - 1);
+		return bytes.ptr()[(int64_t)iy * n + ix];
+	}
+};
+
+// FarWaterMask.native_params; empty dictionary = no mask.
+inline WaterMask read_mask(const Dictionary &d) {
+	WaterMask m;
+	if (d.is_empty()) {
+		return m;
+	}
+	m.bytes = d["bytes"];
+	int n = d["n"];
+	if (m.bytes.size() != (int64_t)n * n) {
+		return m;
+	}
+	m.n = n;
+	m.world = (double)(1 << (int)d["zoom"]) * 256.0;
+	m.origin = d["origin_px"];
+	m.size = d["size_px"];
+	return m;
+}
+
 struct Far {
 	double lat, lon, m2u;
 	double fcx, fcy; // far_centre_frac, float32 widened
@@ -53,6 +99,7 @@ struct Far {
 	const float *level = nullptr;
 	int64_t level_n = 0;
 	std::vector<Ring> rings;
+	WaterMask mask;
 	// Keep the arrays alive while the pointers are used.
 	PackedFloat32Array far_keep, surface_keep, level_keep;
 };
@@ -86,6 +133,7 @@ inline Far read_far(const Dictionary &params, const Array &dem_rings) {
 	f.surface_n = f.surface_keep.size();
 	f.level = f.level_keep.ptr();
 	f.level_n = f.level_keep.size();
+	f.mask = read_mask(params.get("water_mask", Dictionary()));
 	for (int64_t k = 0; k < dem_rings.size(); k++) {
 		Dictionary d = dem_rings[k];
 		Ring r;
@@ -171,6 +219,14 @@ inline double render_y(const Far &f, double m_asl) {
 	return (m_asl - f.datum_m) * f.y_scale;
 }
 
+// FarSampler._open_sea
+inline bool open_sea(const Far &f, double u, double v) {
+	if (f.mask.n <= 0 || Math::is_equal_approx(f.water_level_m, -3.0)) {
+		return false;
+	}
+	return f.mask.sample_uv(u, v) == MASK_OCEAN;
+}
+
 // GroundTruth.height_at_world
 inline double height_at_world(const Far &f, double x, double z) {
 	if (f.shore_sampler != nullptr) {
@@ -198,6 +254,9 @@ inline double height_at_world(const Far &f, double x, double z) {
 inline double mid_dem_height_uv(const Far &f, double x, double z, double u, double v) {
 	Vector2 uv(f.fcx + x / f.span_u, f.fcy + z / f.span_u);
 	double far_m = sample_far_dem(f, uv.x, uv.y);
+	if (open_sea(f, u, v)) {
+		return render_y(f, 0.0);
+	}
 	if (f.rings.empty()) {
 		return render_y(f, sea_floor(f, far_m));
 	}
@@ -283,6 +342,12 @@ inline double height_m(const Far &f, double xm, double zm, double fallback_m, do
 inline double mid_dem_height(const Far &f, double x, double z) {
 	Vector2 uv(f.fcx + x / f.span_u, f.fcy + z / f.span_u);
 	double far_m = sample_far_dem(f, uv.x, uv.y);
+	if (f.mask.n > 0) {
+		Vector2 muv = merc_uv(f, x / f.m2u, z / f.m2u);
+		if (open_sea(f, muv.x, muv.y)) {
+			return render_y(f, 0.0);
+		}
+	}
 	if (f.rings.empty()) {
 		return render_y(f, sea_floor(f, far_m));
 	}
