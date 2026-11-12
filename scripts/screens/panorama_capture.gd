@@ -341,3 +341,17 @@ static func _wait_draws(host: Viewport, frames: int, deadline: int) -> bool:
 ## The finished picture as JPEG bytes carrying the panorama metadata.
 static func encode(img: Image, heading_deg: float) -> PackedByteArray:
 	return with_xmp(img.save_jpg_to_buffer(JPEG_QUALITY), xmp(img.get_width(), img.get_height(), heading_deg))
+
+## `encode` on a worker thread, a frame at a time: encoding a full-size
+## picture (8192×4096 on desktop) is the one long stretch of pure CPU
+## work in the save, and on the main thread it freezes the app (the
+## macOS beachball). `img` is only read by the worker; the caller must
+## not modify it meanwhile.
+static func encode_async(img: Image, heading_deg: float, tree: SceneTree) -> PackedByteArray:
+	var box: Array = [PackedByteArray()]
+	var task := WorkerThreadPool.add_task(func() -> void: box[0] = encode(img, heading_deg),
+		false, "PanoramaEncode")
+	while not WorkerThreadPool.is_task_completed(task):
+		await tree.process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	return box[0]

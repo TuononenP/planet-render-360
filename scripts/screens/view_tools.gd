@@ -148,12 +148,24 @@ static func photo(v: View360) -> void:
 			UiTheme.clock(v._time_hour), ViewConditions.date_text(v._date),
 			HudParts.short_sources(data.attribution))
 		img = await PhotoMode.stamped(v, img, lines)
-	PhotoMode.save(img, PhotoMode.file_name(data.place_name, local), func(path: String, failed: bool) -> void:
+		if not is_instance_valid(v):
+			return
+	var bytes := await PhotoMode.encode_png_async(img, v.get_tree())
+	if not is_instance_valid(v):
+		return
+	if bytes.is_empty():
 		v._photo_busy = false
-		if failed:
-			say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
-		elif path != "":
-			say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
+		say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
+		return
+	PhotoMode.save_bytes(bytes, PhotoMode.file_name(data.place_name, local), "png", "PNG image",
+		"Save photo", func(path: String, failed: bool) -> void:
+			if not is_instance_valid(v):
+				return
+			v._photo_busy = false
+			if failed:
+				say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
+			elif path != "":
+				say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
 
 ## The whole sphere around the eye as one picture (see PanoramaCapture): six
 ## faces rendered off-screen, so the view itself does not move. Takes a few
@@ -188,7 +200,13 @@ static func panorama(v: View360) -> void:
 		v._photo_busy = false
 		say(v, "Couldn't take the 360° photo", "The scene didn't draw. Try again.", "error")
 		return
-	var bytes := PanoramaCapture.encode(img, heading)
+	var bytes := await PanoramaCapture.encode_async(img, heading, v.get_tree())
+	if not is_instance_valid(v):
+		return
+	if bytes.is_empty():
+		v._photo_busy = false
+		say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+		return
 	PhotoMode.save_bytes(bytes, PanoramaCapture.file_name(data.place_name, local), "jpg", "JPEG image",
 		"Save 360° photo", func(path: String, failed: bool) -> void:
 			if not is_instance_valid(v):

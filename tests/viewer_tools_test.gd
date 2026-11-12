@@ -28,7 +28,9 @@ func _run() -> void:
 	_seasons()
 	_store_camera()
 	_thumbs()
+	await _thumb_save_async()
 	_photo_names()
+	await _photo_encode_async()
 	_time_lapse()
 	_calendar()
 	_horizon_data()
@@ -176,6 +178,46 @@ func _thumbs() -> void:
 	PlaceThumb.save(wide, 12.0, 34.0)
 	store.remove_place(store.entries[0])
 	_check(not PlaceThumb.exists(12.0, 34.0), "remove_place deletes the picture")
+
+func _thumb_save_async() -> void:
+	# Saving a thumbnail must not block the main thread (it froze leaving
+	# the view): frames keep running while the shrink + JPEG write runs.
+	var wide := Image.create(1600, 600, false, Image.FORMAT_RGBA8)
+	wide.fill(Color(0.3, 0.4, 0.9))
+	var frames := [0]
+	var on_frame := func() -> void: frames[0] += 1
+	process_frame.connect(on_frame)
+	var ok: bool = await PlaceThumb.save_async(wide, 11.0, 22.0, self)
+	process_frame.disconnect(on_frame)
+	_check(ok and PlaceThumb.exists(11.0, 22.0), "async thumbnail should be saved")
+	var tmp_left: Array = []
+	for f in DirAccess.get_files_at(PlaceThumb.path(11.0, 22.0).get_base_dir()):
+		if f.contains(".tmp-"):
+			tmp_left.append(f)
+	_check(tmp_left.is_empty(), "the atomic thumbnail write should leave no temporary file: %s" % [tmp_left])
+	_check(frames[0] >= 1, "thumbnail save should let frames run while it works")
+	var black := Image.create(800, 500, false, Image.FORMAT_RGBA8)
+	black.fill(Color.BLACK)
+	_check(not await PlaceThumb.save_async(black, 5.0, 6.0, self) and not PlaceThumb.exists(5.0, 6.0),
+		"an async save of a blank frame still saves nothing")
+	PlaceThumb.remove(11.0, 22.0)
+
+func _photo_encode_async() -> void:
+	# Encoding a photo must not block the main thread (it froze Save
+	# photo): frames keep running, and the bytes are a decodable PNG.
+	var img := Image.create(512, 256, false, Image.FORMAT_RGB8)
+	for i in 16:
+		img.fill_rect(Rect2i(i * 32, 0, 32, 256), Color(float(i % 8) / 7.0, float(i / 4) / 3.0, 0.5))
+	var frames := [0]
+	var on_frame := func() -> void: frames[0] += 1
+	process_frame.connect(on_frame)
+	var bytes: PackedByteArray = await PhotoMode.encode_png_async(img, self)
+	process_frame.disconnect(on_frame)
+	_check(frames[0] >= 1, "photo encode should let frames run while it encodes")
+	_check(bytes == img.save_png_to_buffer(), "async photo encode should match save_png_to_buffer")
+	var back := Image.new()
+	_check(back.load_png_from_buffer(bytes) == OK and back.get_size() == Vector2i(512, 256),
+		"async photo bytes should decode at the image size")
 
 # --- Photo ---
 

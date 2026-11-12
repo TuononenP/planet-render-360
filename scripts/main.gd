@@ -216,11 +216,7 @@ func _ready() -> void:
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
 		if capture_mode:
 			return
-		if PlaceThumb.save(image, lat, lon):
-			_thumb_key = _view.look_key()
-		# History rebuilds when it opens; only a visible one needs it now.
-		if _history.visible:
-			_history.refresh())
+		_store_thumb(image, lat, lon, _view.look_key(), true))
 	# Go there, beyond the built area: a new scene at the landmark's standoff.
 	_view.visit_requested.connect(func(site: Dictionary, lat: float, lon: float) -> void:
 		if not _generating:
@@ -364,8 +360,25 @@ func _leave_view() -> void:
 	# The picture costs a full-size read-back and an encode: only when the
 	# view changed since the last one.
 	var key := _view.look_key()
-	if key != _thumb_key and PlaceThumb.save(_view.snapshot(), float(state["lat"]), float(state["lon"])):
+	if key != _thumb_key:
+		_store_thumb(_view.snapshot(), float(state["lat"]), float(state["lon"]), key, false)
+
+## Writes the History picture on a worker, so leaving the view never
+## waits on the shrink and the encode. `key` is claimed at once, so the
+## view's snapshot timer and leaving cannot save the same look twice; a
+## failed write gives it back for the next try. Runs unawaited: the
+## callers (leaving, quitting) do not wait for the picture.
+func _store_thumb(image: Image, lat: float, lon: float, key: Array, refresh_history: bool) -> void:
+	if image == null or image.is_empty():
+		return
+	if not key.is_empty():
 		_thumb_key = key
+	var ok := await PlaceThumb.save_async(image, lat, lon, get_tree())
+	if not ok and not key.is_empty() and _thumb_key == key:
+		_thumb_key = []
+	# History rebuilds when it opens; only a visible one needs it now.
+	if refresh_history and _history != null and _history.visible:
+		_history.refresh()
 
 ## What Try again reopens: the camera the person was last at (saved on
 ## leaving), keeping the time, season and date a shared link carried. A

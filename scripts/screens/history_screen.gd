@@ -24,6 +24,7 @@ var _store: CacheStore
 ## Per-place sizes for the badges, built once per refresh from
 ## CacheStore.place_cache_report instead of sizing every card alone.
 var _badge_bytes: Dictionary = {}  # "lat_lon" -> bytes
+var _index_waiting := false  # a refresh is owed when the cache index lands
 var _margin: MarginContainer
 var _title: Label
 var _count_label: Label
@@ -176,6 +177,18 @@ func bind_store(store: CacheStore) -> void:
 	_store = store
 	refresh()
 
+## Builds without badges while the cache index is still loading (its
+## report would join the parse on the main thread), then refreshes
+## again when it lands.
+func _await_index() -> void:
+	if _index_waiting:
+		return
+	_index_waiting = true
+	CacheStore.ensure_index_async(func() -> void:
+		_index_waiting = false
+		if is_instance_valid(self):
+			refresh())
+
 func refresh() -> void:
 	if _list == null:
 		return
@@ -196,8 +209,11 @@ func refresh() -> void:
 		_list.add_child(_empty_card())
 		return
 	_badge_bytes = {}
-	for row in CacheStore.place_cache_report(entries).get("rows", []):
-		_badge_bytes[_place_key(row)] = int(row["bytes"])
+	if CacheStore.index_ready():
+		for row in CacheStore.place_cache_report(entries).get("rows", []):
+			_badge_bytes[_place_key(row)] = int(row["bytes"])
+	else:
+		_await_index()
 	_on_resized()
 	var favourites: Array = entries.filter(func(e: Dictionary) -> bool: return bool(e.get("favourite", false)))
 	var others: Array = entries.filter(func(e: Dictionary) -> bool: return not bool(e.get("favourite", false)))

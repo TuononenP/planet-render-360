@@ -195,6 +195,45 @@ func _run() -> void:
 	WorldCache.enforce_budget()
 	_check(WorldCache.bytes_for_place(1.0, 2.0) == 48, "recount should pick up the new world")
 
+	# First open while the cache index is still loading: History and
+	# Settings must not join the parse on the main thread. They build
+	# without sizes, then refresh themselves when the index lands.
+	CacheStore.reset_lru()
+	_write(CacheStore.base_dir() + "/dem_v2_1_2_3.png", 64)
+	var lru_file := FileAccess.open(CacheStore._lru_path(), FileAccess.WRITE)
+	lru_file.store_string(JSON.stringify({"dem_v2_1_2_3.png": {"bytes": 64, "atime": 1.0}}))
+	lru_file.close()
+	_check(not CacheStore.index_ready(), "index should start unloaded after a reset")
+	var fired := [false]
+	CacheStore.ensure_index_async(func() -> void: fired[0] = true)
+	_check(not fired[0], "the index waiter should not fire synchronously")
+	var history2 := HistoryScreen.new()
+	root.add_child(history2)
+	history2.bind_store(store)
+	history2.refresh()
+	_check(history2._badge_bytes.is_empty(), "history should build without badges while the index loads")
+	var settings2 := SettingsScreen.new()
+	root.add_child(settings2)
+	settings2.bind_store(store)
+	settings2._refresh_storage()
+	_check(settings2._place_rows.is_empty(), "settings should build without place rows while the index loads")
+	var waited := 0
+	while not fired[0] and waited < 200:
+		await process_frame
+		waited += 1
+	_check(fired[0] and CacheStore.index_ready(), "the index waiter should fire once the index lands")
+	_check(int((CacheStore._lru.get("dem_v2_1_2_3.png", {}) as Dictionary).get("bytes", 0)) == 64,
+		"the loaded index should hold the written row")
+	await process_frame
+	await process_frame
+	_check(history2._badge_bytes.size() == store.entries.size(),
+		"history should refresh its badges when the index lands, got %d" % history2._badge_bytes.size())
+	_check(settings2._place_rows.size() == store.entries.size(),
+		"settings should refresh its place rows when the index lands, got %d" % settings2._place_rows.size())
+	history2.queue_free()
+	settings2.queue_free()
+	await process_frame
+
 	CacheStore.reset_lru()
 	CacheStore.dir_override = ""
 	CacheStore.history_override = ""

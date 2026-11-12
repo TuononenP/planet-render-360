@@ -59,6 +59,7 @@ var _store: CacheStore
 var _places_group: PanelContainer
 var _places_note: Label
 var _place_rows: Array = []  # CacheStore.place_cache_report rows on show
+var _index_waiting := false  # a storage refresh is owed when the cache index lands
 var _place_clear_btns: Array[Button] = []
 var _grid: GridContainer
 var _accent_btns: Array[Button] = []
@@ -738,6 +739,17 @@ func _refresh() -> void:
 ## runs when Settings is shown and after the cache changes, not on
 ## every refresh. With a bound store it also rebuilds the places list.
 func _refresh_storage() -> void:
+	if not CacheStore.index_ready():
+		# Build with the last known size and refresh when the index
+		# lands: the report below would join its parse on the main thread.
+		if not _index_waiting:
+			_index_waiting = true
+			CacheStore.ensure_index_async(func() -> void:
+				_index_waiting = false
+				if is_instance_valid(self):
+					_refresh_storage())
+		_show_storage()
+		return
 	if _store != null and _places_group != null:
 		_refresh_places()  # sets _cache_bytes from the report total
 	else:

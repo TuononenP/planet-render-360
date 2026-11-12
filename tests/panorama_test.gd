@@ -21,6 +21,7 @@ func _run() -> void:
 	_test_extensions()
 	_test_settle()
 	_test_save()
+	await _test_encode_async()
 	if _failures.is_empty():
 		print("PANORAMA OK: file name, GPano metadata, JPEG insertion, face geometry")
 		quit(0)
@@ -101,6 +102,26 @@ func _test_jpeg() -> void:
 		_failures.append("bytes that are not a JPEG should be returned as they are")
 	if PanoramaCapture.with_xmp(plain, "x".repeat(70000)) != plain:
 		_failures.append("a packet too big for one segment should be left out")
+
+func _test_encode_async() -> void:
+	# Encoding a full-size panorama must not block the main thread (on
+	# macOS a block of a second or more shows the beachball): frames keep
+	# being processed while it runs, and the bytes match encode().
+	var img := Image.create(1024, 512, false, Image.FORMAT_RGB8)
+	for i in 32:
+		img.fill_rect(Rect2i(i * 32, 0, 32, 512), Color(float(i % 8) / 7.0, float(i / 8) / 3.0, float(i % 5) / 4.0))
+	var frames := [0]
+	var on_frame := func() -> void: frames[0] += 1
+	process_frame.connect(on_frame)
+	var bytes: PackedByteArray = await PanoramaCapture.encode_async(img, 10.0, self)
+	process_frame.disconnect(on_frame)
+	if frames[0] < 1:
+		_failures.append("encode_async should let frames run while it encodes")
+	if bytes != PanoramaCapture.encode(img, 10.0):
+		_failures.append("encode_async should return the same bytes as encode")
+	var back := Image.new()
+	if back.load_jpg_from_buffer(bytes) != OK or back.get_size() != Vector2i(1024, 512):
+		_failures.append("encode_async bytes should decode at the image size")
 
 func _test_heading() -> void:
 	# Compass heading of the centre, 0 north (-Z), clockwise: the same as

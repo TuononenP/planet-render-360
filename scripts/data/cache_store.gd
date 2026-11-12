@@ -75,6 +75,7 @@ static var _tracked_bytes := -1  # -1 = unknown, summed from the index on next u
 static var _reconciled := false
 static var _load_task := -1
 static var _loaded: Variant = null  # the index preload_index parsed
+static var _index_waiters: Array[Callable] = []  # called when the preload lands
 static var _save_task := -1
 static var _save_armed := false
 static var _scan_task := -1
@@ -545,6 +546,29 @@ static func preload_index() -> void:
 static func _index_loaded() -> void:
 	if _load_task >= 0 and not _lru_loaded:
 		_ensure_lru()
+	var waiters := _index_waiters
+	_index_waiters = []
+	for w in waiters:
+		w.call()
+
+## Whether the index is in memory. Screens that only need sizes check
+## this before place_cache_report, whose _ensure_lru would otherwise
+## join the preload parse on the main thread (see ensure_index_async).
+static func index_ready() -> bool:
+	return _lru_loaded
+
+## Calls `done` when the index is in memory, without ever joining the
+## preload on the main thread: at once when it already is, else when
+## preload_index's deferred completion lands. For a screen opening in
+## the first moments after launch, which builds without sizes and
+## refreshes itself from `done`.
+static func ensure_index_async(done: Callable) -> void:
+	if _lru_loaded:
+		done.call()
+		return
+	if not _index_waiters.has(done):
+		_index_waiters.append(done)
+	preload_index()
 
 ## The index, loaded: waits for preload_index's task if it is still
 ## parsing, else reads it here.
@@ -652,6 +676,7 @@ static func reset_lru() -> void:
 	_lru_loaded = false
 	_loaded = null
 	_load_task = -1
+	_index_waiters.clear()
 	_lru_pending = ""
 	_tracked_bytes = -1
 	_reconciled = false
