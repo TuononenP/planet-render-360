@@ -272,8 +272,8 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		finish = _district_finish(line, surf.districts, m2u)
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u, "bridge",
-				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
+			RoadBridgeDecks.build(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u,
+				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")))
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
 	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u
@@ -539,11 +539,11 @@ static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
 	for i in n:
 		deck[i] += lift[i]
 	# A mapped elevated way over land is a viaduct, not a ground ribbon.
-	# Keep the existing bank-to-bank water profile for mixed crossings.
+	# A mostly-water crossing keeps its bank-to-bank water profile.
 	# It climbs from the ground at both ends at a ramp grade (steeper
 	# for a path, which takes steps) up to the layer's clearance, so a
 	# short bridge peaks lower instead of hovering flat at both ends.
-	if layer > 0 and _land_bridge(pts, surf):
+	if layer > 0 and RoadBridgeDecks.mostly_land(pts, surf):
 		var grade := PATH_RAMP_GRADE if half * 2.0 <= PATH_WIDTH_M * m2u else RAMP_GRADE
 		# An end that joins another bridge way is a joint in mid-air, not a
 		# bank: the deck stays up there. Ramped to the ground at every joint,
@@ -704,7 +704,7 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 		else:
 			side.indices.push_back(a); side.indices.push_back(a + 2); side.indices.push_back(a + 1)
 			side.indices.push_back(a + 1); side.indices.push_back(a + 2); side.indices.push_back(a + 3)
-	if layer > 0 and top_finish == "bridge" and _land_bridge(pts, surf):
+	if layer > 0 and top_finish == "bridge" and RoadBridgeDecks.mostly_land(pts, surf):
 		_land_piers(side, pts, dist, deck, surf, m2u)
 	# A long crossing stands on piers under arched spandrels.
 	if top_finish == "bridge" and structure == "masonry":
@@ -720,6 +720,8 @@ static func _land_piers(side: _Batch, pts: PackedVector2Array, dist: PackedFloat
 			continue
 		next = dist[i] + 30.0 * m2u
 		var p := pts[i]
+		if surf.ground.water_at(p.x, p.y) > 0.0:
+			continue  # No column stands in the ditch or brook under it.
 		var low := surf.height(p.x, p.y) - 0.1 * m2u
 		var high := deck[i] - DECK_DEPTH_M * m2u
 		if high <= low + 0.2 * m2u:
@@ -837,6 +839,7 @@ class _Surface extends RefCounted:
 	## Bridge way end points: a joint may sit metres off the node.
 	var _bridge_end_pts := PackedVector2Array()
 	var _bridge_lines: Array = []  ## Bridge polylines (beside-joints).
+	var road_bridges: RoadBridgeDecks.Index = null  ## Road bridge ways sharing structures.
 	var _pier_lines: Array = []  ## Pier polylines (landings).
 
 	static func _node(p: Vector2) -> Vector2i:
@@ -860,6 +863,7 @@ class _Surface extends RefCounted:
 		for pier in data.piers:
 			if pier is Dictionary:
 				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
+		road_bridges = RoadBridgeDecks.Index.new(data.roads)
 		for w: Variant in data.roads + data.railways:
 			if not (w is Dictionary):
 				continue

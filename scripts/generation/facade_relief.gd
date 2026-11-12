@@ -21,6 +21,11 @@ extends RefCounted
 ## building; distance-gated like BuildingTrim (the same on every tier,
 ## AC-12, except desktop Ultra, which builds it out to its detail ring).
 
+## Share of a glazed-balcony block's bay columns that carry the stacks.
+const GLAZED_COLUMN_SHARE := 0.5
+## How far a projecting balcony (glazed, parapet or railing) stands out from
+## the wall, metres: a Nordic balcony is usually about 2 m deep.
+const DEEP_BALCONY_M := 2.0
 ## Relief only within this distance of the viewpoint (m).
 const RADIUS_M := 300.0
 ## Desktop Ultra's relief ring (m), inside LodRing.DETAIL_M's 700 m.
@@ -199,8 +204,15 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 			var ww := step * float(row["win_w"])
 			var w0 := float(row["win0"])
 			var hv := ArchitectureStyle._h(seed_v + float(j) * 0.37, 70 + int(row["storey"]))
-			if (deep or glazed) and not row["balcony"]:
-				_deep_balcony(kit, c, ax, az, step * 0.86, y0, stone, solid, glazed)
+			# Glazed balconies stack in some bay columns, not across the whole
+			# front: the other bays keep their windows.
+			var glazed_here := glazed and ArchitectureStyle._h(seed_v + float(j) * 1.37, 63) < GLAZED_COLUMN_SHARE
+			# A stretch's end bays stay flat: 2 m boxes there met the next
+			# face's at an inside corner, or a neighbour's wall.
+			var end_bay := j == 0 or j == bays - 1
+			if (deep or glazed_here) and not row["balcony"] and not end_bay:
+				_deep_balcony(kit, c, ax, az, step if glazed_here else step * 0.86, y0, stone, solid, glazed_here,
+					float(row["y1"]) - y0)
 				continue
 			if punched and not row["balcony"] and pattern != "balcony":
 				kit.box(stone, Vector3(c.x, w0 - 0.04 * m, c.y) + az * 0.07 * m, ax, az,
@@ -237,19 +249,29 @@ static func _balcony(kit: ReliefKit, a: Vector2, dir: Vector2, n: Vector2,
 	kit.rail(f1, Vector3(a.x, slab, a.y) + ax * (len - 0.05 * m), h, ax)
 
 ## A projecting balcony in one bay at floor level y: slab plus a solid
-## concrete parapet (modern blocks) or an iron railing.
+## concrete parapet (modern blocks) or an iron railing. A glazed one is a
+## closed box the full bay wide and storey `storey_h` tall: glass from its
+## slab to a thin cap under the next floor's slab, between solid side
+## walls, so the window painted on the wall behind cannot show beside or
+## above the glass.
 static func _deep_balcony(kit: ReliefKit, c: Vector2, ax: Vector3, az: Vector3,
-		w: float, y: float, stone: Material, solid: bool, glazed: bool = false) -> void:
+		w: float, y: float, stone: Material, solid: bool, glazed: bool = false,
+		storey_h: float = 0.0) -> void:
 	var m := WorldScale.metres_to_units()
-	var depth := 1.15 * m
+	var depth := DEEP_BALCONY_M * m
 	var t := 0.18 * m
 	var base := Vector3(c.x, y, c.y)
 	kit.box(stone, base + Vector3.UP * t * 0.5 + az * depth * 0.5, ax, az, Vector3(w, t, depth))
 	if glazed:
 		var glass := ReliefKit.glass()
 		var frame := ReliefKit.flat("#a3a7a3", 0.4, 0.3)
-		var h := 2.5 * m
+		var cap := 0.08 * m
+		var h := (storey_h - t - cap) if storey_h > t + cap + 1.0 * m else 2.5 * m
 		kit.box(glass, base + Vector3.UP * (t + h * 0.5) + az * depth, ax, az, Vector3(w, h, 0.025 * m))
+		kit.box(stone, base + Vector3.UP * (t + h + cap * 0.5) + az * depth * 0.5, ax, az, Vector3(w, cap, depth))
+		for s in [-1.0, 1.0]:
+			kit.box(stone, base + Vector3.UP * (t + h * 0.5) + az * depth * 0.5 + ax * s * (w * 0.5 - 0.05 * m),
+				ax, az, Vector3(0.1 * m, h, depth))
 		for s in [-1.0, 0.0, 1.0]:
 			kit.box(frame, base + Vector3.UP * (t + h * 0.5) + az * (depth + 0.02 * m) + ax * s * w * 0.48,
 				ax, az, Vector3(0.035 * m, h, 0.04 * m))

@@ -81,6 +81,18 @@ func _relief() -> void:
 	_check(mesh.get_surface_count() >= 4, "granite, tower roof, balcony glass and frames")
 	_check(mesh.get_aabb().end.y >= 26.4, "turret rises above eaves")
 	root_node.free()
+	# A glazed balcony closes its bay: slab to the next floor, full bay wide,
+	# so the window painted on the wall behind cannot show round it.
+	var box_kit := ReliefKit.new()
+	var m := WorldScale.metres_to_units()
+	FacadeRelief._deep_balcony(box_kit, Vector2.ZERO, Vector3.RIGHT, Vector3.BACK, 3.0 * m, 0.0, stone, true, true, 3.0 * m)
+	var box_root := Node3D.new()
+	box_kit.flush(box_root, "GlazedBox")
+	var box := (box_root.get_child(0) as MeshInstance3D).mesh.get_aabb()
+	_check(absf(box.end.y - 3.0 * m) < 0.05 * m, "glazed balcony reaches the next floor (%.2f)" % (box.end.y / m))
+	_check(box.size.x >= 2.99 * m, "glazed balcony spans its bay (%.2f)" % (box.size.x / m))
+	_check(box.size.z >= 1.95 * m and box.size.z <= 2.2 * m, "balcony stands ~2 m out (%.2f)" % (box.size.z / m))
+	box_root.free()
 	var dome_kit := ReliefKit.new()
 	FinlandRelief.corner_dome(dome_kit, sp, {"top": 20.0}, stone)
 	var dome_root := Node3D.new()

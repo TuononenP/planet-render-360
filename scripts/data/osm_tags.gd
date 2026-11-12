@@ -671,6 +671,15 @@ static func buried_waterway(tags: Dictionary) -> bool:
 	return _tag_truthy(tags.get("tunnel", "")) or underground(tags) \
 		or _tag_truthy(tags.get("covered", ""))
 
+## A highway that is not built (proposed, planned, also as
+## highway=construction + construction=proposed) or no longer there
+## (abandoned, disused, razed, demolished): mapped, but nothing to draw.
+static func unbuilt_highway(tags: Dictionary) -> bool:
+	var h := str(tags.get("highway", ""))
+	if h == "construction":
+		return str(tags.get("construction", "")) in ["proposed", "planned"]
+	return h in ["proposed", "planned", "abandoned", "disused", "razed", "demolished"]
+
 ## A highway no one sees from the street: a tunnel (building passages
 ## and culverts too), one at location=underground or indoors, or a
 ## corridor. Helsinki maps hundreds of service tunnels and metro
