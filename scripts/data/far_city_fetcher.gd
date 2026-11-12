@@ -386,6 +386,19 @@ static func _nest_parts(towers: Array, parts: Array) -> void:
 			if area < best_area and OsmFetcher._point_in_ring(centre, fp):
 				best = i
 				best_area = area
+		# As OsmParser._nest_parts: a centroid in a U's notch or on the hall
+		# in a ring's courtyard goes to the tower covering most of the part.
+		var holes: Array = p["holes"]
+		var own := OsmParser.part_area(pts, holes)
+		best = OsmParser.settle_parent(towers, best, pts, holes, own, func() -> Array:
+			var near := {}
+			for x in range(floori(box.position.x / cell_m), floori(box.end.x / cell_m) + 1):
+				for z in range(floori(box.position.y / cell_m), floori(box.end.y / cell_m) + 1):
+					for i in cells.get(Vector2i(x, z), []):
+						near[i] = true
+			var candidates := near.keys()
+			candidates.sort()
+			return candidates)
 		if best >= 0:
 			var parent: Dictionary = towers[best]
 			var entry := OsmTags._building_entry(p["tags"], pts, box)

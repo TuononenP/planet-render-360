@@ -314,6 +314,17 @@ static func _ring_area_abs(poly: PackedVector2Array) -> float:
 		area2 += a.x * b.y - b.x * a.y
 	return absf(area2) * 0.5
 
+## Area (internal units²) two rings share; the clipper's clockwise
+## outputs are holes in the shared area. Two simple rings never make one,
+## but a ring-shaped part mapped as one self-touching way does: its
+## courtyard comes back as a clockwise piece (tests/duplicate_masses_test).
+static func overlap_area(a: PackedVector2Array, b: PackedVector2Array) -> float:
+	var total := 0.0
+	for piece in Geometry2D.intersect_polygons(a, b):
+		var p: PackedVector2Array = piece
+		total += (-1.0 if Geometry2D.is_polygon_clockwise(p) else 1.0) * _ring_area_abs(p)
+	return absf(total)
+
 static func _ring_perimeter(poly: PackedVector2Array) -> float:
 	var total := 0.0
 	for i in poly.size():

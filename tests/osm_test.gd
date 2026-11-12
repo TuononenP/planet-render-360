@@ -1106,12 +1106,13 @@ func _box_geom(lat: float, lon: float, dlat: float, dlon: float) -> Array:
 
 ## building:part outside every building: a big lifted part with nothing
 ## under it stands on the ground (no floating slab); one standing on
-## another part, or a small skybridge, keeps its lift.
+## another part starts at that part's top; a small skybridge keeps its lift.
 func _orphan_part_checks(failures: Array[String]) -> void:
 	var text := JSON.stringify({"elements": [
 		{"type": "way", "id": 1, "tags": {"building:part": "yes", "min_height": "60", "height": "90", "name": "Slab"},
 			"geometry": _box_geom(48.8566, 2.3522, 0.00027, 0.00041)},
-		# Upper first: listed after Base it would nest in it as a part.
+		# Upper stands wholly inside Base, its floor below Base's top: an
+		# orphan never nests in another, so Upper starts on Base's roof.
 		{"type": "way", "id": 3, "tags": {"building:part": "yes", "min_height": "40", "height": "80", "name": "Upper"},
 			"geometry": _box_geom(48.85825, 2.3524, 0.00015, 0.00030)},
 		{"type": "way", "id": 2, "tags": {"building:part": "yes", "height": "45", "name": "Base"},
@@ -1122,8 +1123,10 @@ func _orphan_part_checks(failures: Array[String]) -> void:
 	var lift := func(n: String) -> float: return float(_by_name(bs, n).get("min_height_m", -1.0))
 	if lift.call("Slab") != 0.0:
 		failures.append("an unsupported lifted orphan part should stand on the ground, lift %s" % lift.call("Slab"))
-	if lift.call("Upper") != 40.0:
-		failures.append("an orphan part on another part keeps its lift, got %s" % lift.call("Upper"))
+	if lift.call("Upper") != 45.0:
+		failures.append("an orphan part on another part starts at its top, got %s" % lift.call("Upper"))
+	if not (_by_name(bs, "Base")["parts"] as Array).is_empty():
+		failures.append("an orphan part must not take another as its part")
 	if lift.call("Bridge") != 20.0:
 		failures.append("a small lifted part (skybridge) keeps its lift, got %s" % lift.call("Bridge"))
 
