@@ -60,6 +60,9 @@ var pending_latlon := Vector2.ZERO
 var pending_target_xz := Vector2.ZERO
 var last_error := ""
 var retry_at_msec := 0
+## Set when a build in flight was abandoned for a turn (should_redirect);
+## cleared when a build finishes or fails, or a centre is armed.
+var redirected := false
 
 # --- Pure rules ---
 
@@ -152,6 +155,7 @@ func arm(lat: float, lon: float, season: int, preset: int) -> void:
 	state = State.IDLE
 	last_error = ""
 	pending_target_xz = Vector2.ZERO
+	redirected = false
 
 ## Starts watching a generation for the centre at `latlon` (XZ target in
 ## the current frame). Returns its generation number.
@@ -168,6 +172,7 @@ func mark_ready(gen: int) -> bool:
 	if gen != generation or state != State.FETCHING:
 		return false
 	state = State.READY
+	redirected = false
 	return true
 
 ## Generation `gen` failed: degrade (far ground stays walkable) and arm
@@ -177,6 +182,7 @@ func mark_failed(gen: int, error: String) -> void:
 		return
 	state = State.DEGRADED
 	last_error = error
+	redirected = false
 	retry_at_msec = Time.get_ticks_msec() + int(RETRY_S * 1000.0)
 
 ## Drops any pending or ready world (direction reversed, season or
@@ -211,12 +217,18 @@ func swap_stale(pos: Vector2) -> bool:
 ## Whether the camera at `pos` is past the live detailed edge and outside
 ## the ready centre's square too. Unless it is nearer than the live one
 ## (swap_wanted, checked first), that centre would wait forever: drop it
-## so the next tick builds one where the camera went. A build in flight
-## is left to finish, so turning while out there cannot restart it
-## endlessly.
+## so the next tick builds one where the camera went.
 func pending_misses(pos: Vector2) -> bool:
-	if state != State.READY:
-		return false
+	return state == State.READY and _off_both_squares(pos)
+
+## Whether the build in flight should be abandoned for one aimed where
+## the camera went: it is past the live edge and outside the pending
+## square. Only once per finished build (`redirected`), so turning out
+## there costs at most one restart and can never starve every build.
+func should_redirect(pos: Vector2) -> bool:
+	return state == State.FETCHING and not redirected and _off_both_squares(pos)
+
+func _off_both_squares(pos: Vector2) -> bool:
 	return not inside_detailed(pos) and not inside_detailed(pos - pending_target_xz)
 
 # --- Live driving (View360 delegates here, so View360 stays lean) ---
@@ -422,6 +434,18 @@ func tick(v: View360, delta: float) -> void:
 			_cancel_pending()
 			invalidate("camera turned back")
 			return
+	var look := Vector2(-sin(v._rig.yaw), -cos(v._rig.yaw))
+	if should_redirect(pos):
+		# Turned away mid-build: aim the build where the camera went now,
+		# not after the stale one lands. The notice already shown stands.
+		var told := _notified_gen == generation
+		_cancel_pending()
+		invalidate("camera turned away mid-build")
+		_start_generation(v, pos, look)
+		redirected = true
+		if told:
+			_notified_gen = generation
+		return
 	if state == State.FETCHING or state == State.READY:
 		if not inside_detailed(pos) and _notified_gen != generation:
 			_notified_gen = generation
@@ -430,7 +454,6 @@ func tick(v: View360, delta: float) -> void:
 		return
 	if state == State.DEGRADED and Time.get_ticks_msec() < retry_at_msec:
 		return
-	var look := Vector2(-sin(v._rig.yaw), -cos(v._rig.yaw))
 	if needs_recentre(pos, _vel, look):
 		_start_generation(v, pos, look)
 
