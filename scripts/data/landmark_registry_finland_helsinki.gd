@@ -24,7 +24,7 @@ static func entries() -> Array:
 			"yaw_deg": -115.0, "kind": "Museum", "aliases": ["national museum of finland", "kansallismuseo",
 				"finlands nationalmuseum"]},
 		{"type": "parliament_house_helsinki", "name": "Parliament House, Helsinki", "lat": 60.17258, "lon": 24.93294,
-			"radius_m": 5000.0, "wiki_title": "Parliament House, Helsinki", "height_m": 25.0, "clear_m": 62.0,
+			"radius_m": 5000.0, "wiki_title": "Parliament House, Helsinki", "height_m": 35.0, "clear_m": 76.0,
 			"yaw_deg": 73.0, "kind": "Parliament", "aliases": ["parliament house, helsinki", "eduskuntatalo",
 				"finnish parliament house", "riksdagshuset helsingfors"]},
 		{"type": "presidential_palace_helsinki", "name": "Presidential Palace, Helsinki", "lat": 60.16842, "lon": 24.95654,

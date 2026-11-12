@@ -59,7 +59,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"st_johns_church_helsinki": LandmarkFhHelsinkiChurches.stjohns(model)
 		"kallio_church": LandmarkFhHelsinkiChurches.kallio(model)
 		"national_museum_of_finland": LandmarkFhHelsinkiCivic.natmuseum(model)
-		"parliament_house_helsinki": LandmarkFhHelsinkiCivic.parliament(model)
+		"parliament_house_helsinki": LandmarkFhParliament.build(model)
 		"presidential_palace_helsinki": LandmarkFhHelsinkiCivic.presidential(model)
 		"ateneum": LandmarkFhHelsinkiCivic.ateneum(model)
 		"finlandia_hall": LandmarkFhHelsinkiHalls.finlandia(model)
