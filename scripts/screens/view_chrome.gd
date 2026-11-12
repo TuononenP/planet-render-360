@@ -429,13 +429,20 @@ static func arrive(v: View360) -> void:
 # --- Hint, heading, idle ---
 
 static func _dismiss_hint(v: View360) -> void:
-	if v._hint == null or not v._hint.visible or v._hint.modulate.a < 1.0:
+	if v._hint == null:
+		return
+	if not v._hint.visible:
+		v._hint.set_meta("wanted", false)  # crowded out (_clear_hint): stays down
+		return
+	if v._hint.modulate.a < 1.0:
 		return
 	if v._hint.has_meta("dismiss") and (v._hint.get_meta("dismiss") as Tween).is_valid():
 		return  # Already fading.
 	var tw := v.create_tween()
 	tw.tween_property(v._hint, "modulate:a", 0.0, 0.5)
-	tw.tween_callback(v._hint.hide)
+	tw.tween_callback(func() -> void:
+		v._hint.hide()
+		v._hint.set_meta("wanted", false))
 	v._hint.set_meta("dismiss", tw)
 
 static func _show_hint(v: View360) -> void:
@@ -446,7 +453,8 @@ static func _show_hint(v: View360) -> void:
 		(v._hint.get_meta("dismiss") as Tween).kill()
 	(v._hint.find_child("Text", true, false) as Label).text = hint_text(v)
 	v._hint.modulate.a = 1.0
-	v._hint.show()
+	v._hint.set_meta("wanted", true)
+	v._hint.visible = not v._hint.get_meta("crowded", false)
 	if v._hint_timer.is_inside_tree():
 		v._hint_timer.start()
 
@@ -765,7 +773,6 @@ static func layout(v: View360) -> void:
 
 	ViewTools.layout(v, lay, inspector, pad, w, h, attr_h, Rect2(v._sheet.position, v._sheet.size))
 	_place_zoom_stack(v, phone, inspector, pad, inset, w, h, attr_h)
-	ViewTools.place_toast(v, phone, inspector, pad, w, h, attr_h)
 
 	v._hint.reset_size()
 	# A sheet in the bar's place (the landmark sheet, the date sheet) covers
@@ -783,6 +790,8 @@ static func layout(v: View360) -> void:
 	hint_bottom = _place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
 	_clear_hint(v, inspector, pad)
+	# Last: the round tab and the drone sticks have their places now.
+	ViewTools.place_toast(v, phone, inspector, pad, w, h, attr_h)
 
 ## A wide hint on a narrow screen slides left, clear of the button stack
 ## and the inspector.
@@ -804,13 +813,15 @@ static func _clear_hint(v: View360, inspector: bool, pad: float) -> void:
 		v._hint.position.y = v._minimap.position.y - 8.0 - hint.size.y
 	# A short phone has no room left under the pill and the badge: the
 	# hint gives way rather than cover them (the controls show the way).
+	# It comes back once they leave room, unless it was dismissed meanwhile.
 	var hint_now := Rect2(v._hint.position, v._hint.size)
-	if hint_now.position.y < v._top.get_rect().end.y:
-		v._hint.visible = false
+	var crowded := hint_now.position.y < v._top.get_rect().end.y
 	for c: Control in [v._top, v._stream_badge, v._fps, v._exit_btn, v._zoom_stack]:
 		if c.visible and hint_now.intersects(c.get_rect()):
-			v._hint.visible = false
+			crowded = true
 			break
+	v._hint.set_meta("crowded", crowded)
+	v._hint.visible = not crowded and v._hint.get_meta("wanted", true)
 
 ## The inspector scrolls inside `room` when it is taller than that.
 static func _fit_inspector(v: View360, room: float) -> void:

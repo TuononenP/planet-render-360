@@ -356,12 +356,13 @@ static func place_toast(v: View360, phone: bool, inspector: bool, pad: float,
 	var floats: Array[Control] = [v._zoom_stack, v._sheet_tab, v._minimap]
 	var bar := v._sheet.get_rect()
 	if phone or (not inspector and v._sheet.visible and bar.end.y > h - pad - 96.0 - attr_h):
-		# Above the bar and the floating buttons while that leaves room
-		# under the top cluster; else over the bar, never off the top.
+		# Above the bar and the floating buttons (and the touch sticks)
+		# while that leaves room under the top cluster; else over the
+		# bar, never off the top.
 		var top_clear := v._top.get_rect().end.y + 8.0
 		var bottom := bar.position.y if v._sheet.visible else h - pad - attr_h
 		var above := bottom
-		for c in floats:
+		for c in floats + [v._drone.sticks]:
 			if c.visible:
 				above = minf(above, c.position.y + 4.0)  # place() keeps 12 clear
 		var toast_h := maxf(v._toast.get_combined_minimum_size().y, 56.0)

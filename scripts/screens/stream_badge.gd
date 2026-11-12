@@ -93,8 +93,10 @@ func follow(s: WorldStreamer, dt: float) -> bool:
 		_ready_shown = false
 		_model.build_step = s.build_step()
 		_model.tick(dt)
-		if _since >= SHOW_DELAY_S:
+		# Still up (a new build right after "ready"): the text follows at once.
+		if visible or _since >= SHOW_DELAY_S:
 			_show_progress(s)
+		if _since >= SHOW_DELAY_S:
 			_appear()
 	elif s.state == WorldStreamer.State.READY and visible and _model == s.progress:
 		if not _ready_shown:

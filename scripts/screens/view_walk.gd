@@ -498,7 +498,7 @@ func process_keys(v: View360, delta: float) -> void:
 	var next := here + dir * speed * delta
 	if v._streamer.enabled:
 		# Endless: any ground inside the stream limit, capped (visibly,
-		# via the streamer notice) only past the detailed edge.
+		# via the way-ahead badge) only past the detailed edge.
 		var step_vec := WorldStreamer.capped_velocity(dir * speed, here) * delta
 		next = here + step_vec
 		if not v.stream_enterable(next):
