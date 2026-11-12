@@ -273,7 +273,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
 			RoadBridgeDecks.build(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u,
-				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")))
+				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")), r)
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
 	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u

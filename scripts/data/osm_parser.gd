@@ -225,6 +225,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				pass  # A road tunnel, metro passage or indoor corridor.
 			elif OsmTags.unbuilt_highway(el_tags):
 				pass  # A proposed or demolished road: nothing stands there.
+			elif sq != "" and OsmTags._tag_truthy(el_tags.get("bridge", "")):
+				pass  # A deck area: the bridge's own ways (or its model) carry it, not the ground.
 			elif sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
 				roads.append(OsmTags._area_entry(el_tags, sq, poly, []))
 			elif sq == "" or not OsmGeometry._is_closed(poly):

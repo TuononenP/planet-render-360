@@ -30,6 +30,26 @@ const SAME_WIDTH_M := 0.25
 ## is a road and ramps at the road grade however narrow (a one-lane
 ## carriageway of a dual road is no footpath).
 const PATH_CLASSES: Array[String] = ["footway", "path", "cycleway", "steps", "pedestrian", "bridleway", "corridor"]
+## Deck-to-deck clearance where a way passes under another bridge way
+## (headroom plus the upper deck's depth), metres: over a footway or
+## cycleway, and over a road.
+const CLEAR_PATH_M := 3.4
+const CLEAR_ROAD_M := 5.4
+## Least the upper deck rises above a lower way that cannot dip further:
+## enough to hide its parapet under the upper slab (parapet, deck depth
+## and a little air), metres; a full-headroom hump on a short bridge piece
+## read worse than a tight underpass.
+const HIDE_M := 2.0
+## How far beyond the upper deck's edge a way passing under it leaves its
+## parapets off and keeps dipping, metres.
+const UNDER_MARGIN_M := 4.0
+## A footway or cycleway deck under another bridge is thin: it may sit
+## this close above the water, metres.
+const PATH_WATER_M := 0.5
+## Ways crossing at more than this angle (|cos| below it) cross, not run beside.
+const CROSS_DOT := 0.5
+## How far along a group a lead way's deck still sets a member's level, metres.
+const GROUP_REACH_M := 30.0
 
 ## Road bridge ways of one world: [points, half width, layer] each, a
 ## grid of their segments, and their deck profiles once computed.
@@ -39,6 +59,10 @@ class Index extends RefCounted:
 	var _cell := 1.0
 	var _profiles := {}  ## Line index -> [dense points, deck heights].
 	var _profile_mutex := Mutex.new()  ## Road chunks profile in parallel.
+	var _by_ends := {}  ## [first, last] point -> line indices (a way's own line).
+	var _roots := PackedInt32Array()  ## Line -> its structure group's root, once grouped.
+	var _members := {}  ## Group root -> PackedInt32Array of its lines.
+	var _group_mutex := Mutex.new()
 
 	func _init(roads: Array = []) -> void:
 		var m := WorldScale.metres_to_units()
@@ -55,6 +79,10 @@ class Index extends RefCounted:
 			var li := lines.size()
 			lines.append({"points": pts, "half": float(d.get("width_m", 6.0)) * 0.5 * m,
 				"layer": int(d.get("layer", 0)), "cls": str(d.get("class", ""))})
+			var ends := Vector4(pts[0].x, pts[0].y, pts[pts.size() - 1].x, pts[pts.size() - 1].y)
+			var same: PackedInt32Array = _by_ends.get(ends, PackedInt32Array())
+			same.append(li)
+			_by_ends[ends] = same
 			for j in range(1, pts.size()):
 				var lo := pts[j - 1].min(pts[j])
 				var hi := pts[j - 1].max(pts[j])
@@ -84,6 +112,64 @@ class Index extends RefCounted:
 						out.append(cell[k + 1])
 		return out
 
+	## The index of the way mapped as `own`, or -1.
+	func line_of(own: PackedVector2Array) -> int:
+		if own.size() < 2:
+			return -1
+		# Two ways can share both end nodes: compare the whole line.
+		for li in (_by_ends.get(Vector4(own[0].x, own[0].y, own[own.size() - 1].x, own[own.size() - 1].y),
+				PackedInt32Array()) as PackedInt32Array):
+			if (lines[li]["points"] as PackedVector2Array) == own:
+				return li
+		return -1
+
+	## The lines of `li`'s structure group: road bridge ways chained side by
+	## side (A beside B beside C), grouped once per world.
+	func members_of(li: int, surf: RoadBuilder._Surface, m2u: float) -> PackedInt32Array:
+		_group_mutex.lock()
+		if _roots.is_empty():
+			_group(surf, m2u)
+		var out: PackedInt32Array = _members.get(_roots[li], PackedInt32Array([li]))
+		_group_mutex.unlock()
+		return out
+
+	func _group(surf: RoadBuilder._Surface, m2u: float) -> void:
+		var parent := PackedInt32Array()
+		for li in lines.size():
+			parent.append(li)
+		for li in lines.size():
+			var line: Dictionary = lines[li]
+			var own: PackedVector2Array = line["points"]
+			var pts := RoadBuilder._resample(own, 8.0 * m2u)
+			for i in pts.size():
+				var j := mini(i, pts.size() - 2)
+				var along := (pts[j + 1] - pts[j]).normalized()
+				var left := Vector2(-along.y, along.x)
+				var hits := RoadBridgeDecks._hits(surf, pts[i], along, left, float(line["half"]), m2u, own) \
+					+ RoadBridgeDecks._hits(surf, pts[i], along, -left, float(line["half"]), m2u, own)
+				for hit: Array in hits:
+					# Ways stacked on different layers are separate structures.
+					if int(lines[int(hit[0])]["layer"]) != int(line["layer"]):
+						continue
+					var a := _root(parent, li)
+					var b := _root(parent, int(hit[0]))
+					if a != b:
+						parent[maxi(a, b)] = mini(a, b)
+		_roots.resize(lines.size())
+		for li in lines.size():
+			_roots[li] = _root(parent, li)
+			var members: PackedInt32Array = _members.get(_roots[li], PackedInt32Array())
+			members.append(li)
+			_members[_roots[li]] = members
+
+	## Group root of `li`, halving the path on the way (a long chain of ways
+	## side by side stays near-linear to group).
+	static func _root(parent: PackedInt32Array, li: int) -> int:
+		while parent[li] != li:
+			parent[li] = parent[parent[li]]
+			li = parent[li]
+		return li
+
 	## Line `li`'s dense points and deck heights, profiled with its own
 	## width and layer (computed once per world).
 	func profile(li: int, surf: RoadBuilder._Surface, m2u: float) -> Array:
@@ -103,12 +189,15 @@ class Index extends RefCounted:
 		_profile_mutex.unlock()
 		return hit
 
-## Builds a road bridge way: RoadBuilder._bridge levelled with and open
-## toward parallel neighbours, then the deck strips filling the gap to
-## them. `own` is the way's mapped points (so it never pairs with itself).
+## Builds a road bridge way: RoadBuilder._bridge at its structure's level,
+## under or over the bridge ways it crosses, open toward parallel
+## neighbours and toward a deck it runs onto, then the deck strips
+## filling the gap to its neighbours. `own` is the way's mapped points (so
+## it never pairs with itself), `cls` its road class, `road` its parsed
+## entry (lanes, one-way, rank: the deck top carries the road's markings).
 static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: RoadBuilder._Surface, m2u: float, structure: String, layer: int,
-		own: PackedVector2Array = PackedVector2Array(), cls: String = "") -> void:
+		own: PackedVector2Array = PackedVector2Array(), cls: String = "", road: Dictionary = {}) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -116,22 +205,94 @@ static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 	if inside.size() < 2:
 		return
 	var half := width * 0.5
-	var sides := beside(inside, half, surf, m2u, own)
-	if sides.is_empty():
+	if surf.road_bridges == null:
 		RoadBuilder._bridge(batches, inside, width, surf, m2u, "bridge", structure, layer)
 		return
-	var deck := levelled(inside, half, layer, surf, m2u, own, cls)
+	var sides := beside(inside, half, surf, m2u, own)
+	var on: Array = []  # An Array: a packed one would come back as a copy.
+	var deck := levelled(inside, half, layer, surf, m2u, own, cls, on)
 	if deck.size() != inside.size():
 		return
 	var open := []
+	var any_open := false
 	for s in 2:
 		var flags := PackedByteArray()
-		for d: float in (sides["d"][s] as PackedFloat32Array):
-			flags.append(1 if d > 0.0 else 0)
+		for i in inside.size() - 1:
+			var beside_here := not sides.is_empty() and (sides["d"][s] as PackedFloat32Array)[i] > 0.0
+			var onto := int(on[i]) != 0 and int(on[i + 1]) != 0
+			flags.append(1 if beside_here or onto else 0)
+			any_open = any_open or beside_here or onto
 		open.append(flags)
-	RoadBuilder._bridge(batches, inside, width, surf, m2u, "bridge", structure, layer,
-		{"deck": deck, "open": open})
-	_fill(RoadBuilder._batch(batches, "bridge"), inside, deck, half, sides, m2u)
+	var fit := {"deck": deck}
+	if any_open:
+		fit["open"] = open
+	var top := RoadBuilder._batch(batches, "bridge")
+	top.pad()
+	var k0 := top.verts.size()
+	RoadBuilder._bridge(batches, inside, width, surf, m2u, "bridge", structure, layer, fit)
+	_mark(top, k0, width, m2u, road)
+	_paint(batches, inside, deck, width, surf, m2u, road)
+	if not sides.is_empty():
+		_fill(RoadBuilder._batch(batches, "bridge"), inside, deck, half, sides, m2u)
+
+## Gives the deck top's vertices from `k0` on the road's surface attributes
+## (RoadSurface: lanes and one-way in COLOR.r, rank in COLOR.g, the width
+## in metres in UV2.x), so its lanes and edge lines run on across the
+## bridge. A bare deck (width 0, no lanes) read as a dark sunken slab
+## between the marked carriageways on either side.
+static func _mark(top: RoadBuilder._Batch, k0: int, width: float, m2u: float, road: Dictionary) -> void:
+	top.pad()
+	if road.is_empty():
+		return
+	var lanes := clampf(float(road.get("lanes", 0)), 0.0, 8.0) + (16.0 if int(road.get("oneway", 0)) != 0 else 0.0)
+	var attr := Color(lanes / 32.0, float(road.get("rank", 0)) / 2.0, RoadSurface.wear_attr(false, 0.3), 1.0)
+	for i in range(k0, top.verts.size()):
+		top.colors[i] = attr
+		top.uv2s[i] = Vector2(width / m2u, 0.0)
+
+## Lane, centre and edge lines painted on the deck at its own height:
+## RoadPaint lays them draped on the terrain and leaves bridges out, so a
+## marked carriageway lost its lines for the length of every bridge and
+## the bare deck read as a sunken slab between them. The same layout
+## (RoadPaint.lane_lines), carrier strips and paint material as on land.
+static func _paint(batches: Dictionary, pts: PackedVector2Array, deck: PackedFloat32Array, width: float,
+		surf: RoadBuilder._Surface, m2u: float, road: Dictionary) -> void:
+	if road.is_empty() or int(road.get("rank", 0)) < 1:
+		return
+	var cls := str(road.get("class", ""))
+	var mid := pts[pts.size() / 2]
+	var urban := surf.ground.land_class_at(mid.x, mid.y) == "urban"
+	var kind := RoadPaint.kind_of(cls, urban)
+	var style := RoadPaint.style_for("", kind)  # Line width; the dashes are the material's, per place.
+	var lines := RoadPaint.lane_lines(width / m2u, int(road.get("lanes", 0)), int(road.get("oneway", 0)) != 0,
+		int(road.get("rank", 0)), urban, float(style[2]), Vector2.ZERO, 0, {"class": cls})
+	if lines.is_empty():
+		return
+	var b := RoadBuilder._batch(batches, "paint")
+	var hc := RoadPaint.CARRIER_M * 0.5 * m2u
+	var lift := 0.03 * m2u
+	for l: Dictionary in lines:
+		var code := RoadPaint.SOLID if bool(l["solid"]) else int(RoadPaint.PATTERN[kind])
+		var attr := Color(float(l["half"]) / RoadPaint.HALF_MAX_M, float(code) / 15.0, 0.3, 1.0)
+		b.pad()
+		var k0 := b.verts.size()
+		var along := 0.0
+		for i in pts.size():
+			if i > 0:
+				along += pts[i].distance_to(pts[i - 1])
+			var side := RoadBuilder._side(pts, i)
+			# RoadBuilder._side points right of travel; lines are offset left.
+			var c := pts[i] - side * float(l["x"]) * m2u
+			var sl := side.normalized() * hc
+			for e: Vector2 in [c + sl, c - sl]:
+				b.verts.append(Vector3(e.x, deck[i] + lift, e.y))
+				b.normals.append(Vector3.UP)
+				b.colors.append(attr)
+				b.uv2s.append(Vector2(RoadPaint.CARRIER_M, RoadPaint.LAYER))
+			b.uvs.append(Vector2(0.0, along / m2u / 4.0))
+			b.uvs.append(Vector2(RoadPaint.CARRIER_M / 4.0, along / m2u / 4.0))
+		for i in pts.size() - 1:
+			RoadBuilder._quad_up(b, k0 + i * 2, k0 + i * 2 + 1, k0 + i * 2 + 2, k0 + i * 2 + 3)
 
 ## Per segment and side, the nearest parallel road bridge way beside this
 ## one: {"d": [left, right] centreline distances (0 where none), "half":
@@ -201,21 +362,88 @@ static func _hits(surf: RoadBuilder._Surface, p: Vector2, along: Vector2, dir: V
 			found[li] = [li, q, d, other_half]
 	return found.values()
 
-## The way's deck profile set to its structure's level: wherever parallel
-## road bridge ways stand beside it, the deck of the widest of them (its
-## own when it is the widest; the highest of equally wide ones), so all
-## ways of one overpass meet. A narrow way does not lift a road to a
-## footpath's steep ramps. The rest of the deck eases in and out of the
-## levelled stretch at the ramp grade instead of stepping.
+## The way's deck profile set to its structure's level, then passed under
+## or over the bridge ways it crosses on another layer. The level is the
+## deck of the widest way of its group (ways chained side by side), its
+## own when it is the widest, the highest of equally wide ones, wherever
+## such a way runs within GROUP_REACH_M: all ways of one overpass meet, and
+## a narrow way does not lift a road to a footpath's steep ramps. Points
+## the level or a crossing sets are eased into at the ramp grade. `on`, if
+## given, is filled with 1 where the way runs onto a wider same-layer deck
+## it crosses (no parapet there).
 static func levelled(pts: PackedVector2Array, half: float, layer: int, surf: RoadBuilder._Surface,
-		m2u: float, own: PackedVector2Array = PackedVector2Array(), cls: String = "") -> PackedFloat32Array:
+		m2u: float, own: PackedVector2Array = PackedVector2Array(), cls: String = "",
+		on: Array = []) -> PackedFloat32Array:
 	var deck := RoadBuilder.deck_profile(pts, surf, m2u, grade_half(half, cls, m2u), layer)
 	var n := pts.size()
+	on.resize(n)
+	on.fill(0)
 	if deck.size() != n or n < 2 or surf.road_bridges == null:
 		return deck
 	var index: Index = surf.road_bridges
 	var fixed := PackedByteArray()
 	fixed.resize(n)
+	var own_li := index.line_of(own)
+	if own_li >= 0:
+		_level_group(deck, pts, fixed, half, own_li, index, surf, m2u)
+	else:
+		_level_beside(deck, pts, fixed, half, index, surf, m2u, own)
+	# Once levelled, the way is part of a road structure: its free ends
+	# ease in at the road grade, not a footway's steep one.
+	var ease_half := grade_half(half, cls, m2u)
+	if fixed.has(1):
+		ease_half = maxf(ease_half, (RoadBuilder.PATH_WIDTH_M * 0.5 + 0.05) * m2u)
+	_ease(deck, pts, fixed, ease_half, m2u)
+	# Crossings come after the level: the points a crossing sets are the
+	# anchors the rest of the deck (levelled points too) eases toward.
+	var crossed := PackedByteArray()
+	crossed.resize(n)
+	_cross(deck, pts, crossed, on, half, layer, cls, own_li, index, surf, m2u)
+	_ease(deck, pts, crossed, ease_half, m2u)
+	return deck
+
+## Group level: the highest of the widest member ways' decks (each at its
+## dense point nearest, within GROUP_REACH_M and not past its ends), this
+## way's own among them when it is one of the widest.
+static func _level_group(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: PackedByteArray,
+		half: float, own_li: int, index: Index, surf: RoadBuilder._Surface, m2u: float) -> void:
+	var members := index.members_of(own_li, surf, m2u)
+	if members.size() < 2:
+		return
+	var widest := half
+	for li in members:
+		widest = maxf(widest, float(index.lines[li]["half"]))
+	var lead: Array = []
+	# Every member, the widest included, reads the same cached profiles,
+	# so they all land on exactly one level.
+	for li in members:
+		if float(index.lines[li]["half"]) >= widest - SAME_WIDTH_M * m2u:
+			lead.append(index.profile(li, surf, m2u))
+	var reach := GROUP_REACH_M * m2u
+	for i in pts.size():
+		var level := -INF
+		var near_any := false
+		for prof: Array in lead:
+			var dense: PackedVector2Array = prof[0]
+			var heights: PackedFloat32Array = prof[1]
+			if heights.size() != dense.size() or dense.is_empty():
+				continue
+			var k := _closest(dense, pts[i])
+			# Only where the lead runs beside this point: past its ends (a
+			# landing tail, a ramp turning away) the way keeps its own deck.
+			if k == 0 or k == dense.size() - 1 or dense[k].distance_to(pts[i]) > reach:
+				continue
+			near_any = true
+			level = maxf(level, heights[k])
+		if near_any and level > -INF:
+			deck[i] = level
+			fixed[i] = 1
+
+## Per-point level from the ways beside each point (a way not in the
+## index, e.g. one a test builds without its mapped points).
+static func _level_beside(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: PackedByteArray,
+		half: float, index: Index, surf: RoadBuilder._Surface, m2u: float, own: PackedVector2Array) -> void:
+	var n := pts.size()
 	for i in n:
 		var j := mini(i, n - 2)
 		var along := (pts[j + 1] - pts[j]).normalized()
@@ -235,19 +463,94 @@ static func levelled(pts: PackedVector2Array, half: float, layer: int, surf: Roa
 			var heights: PackedFloat32Array = prof[1]
 			if heights.size() != dense.size() or dense.is_empty():
 				continue
-			var q: Vector2 = hit[1]
-			var k := 0
-			for c in dense.size():
-				if dense[c].distance_squared_to(q) < dense[k].distance_squared_to(q):
-					k = c
-			level = maxf(level, heights[k])
+			level = maxf(level, heights[_closest(dense, hit[1])])
 		if level > -INF:
 			deck[i] = level
 			fixed[i] = 1
-	# Once levelled, the way is part of a road structure: its free ends
-	# ease in at the road grade, not a footway's steep one.
-	_ease(deck, pts, fixed, maxf(grade_half(half, cls, m2u), (RoadBuilder.PATH_WIDTH_M * 0.5 + 0.05) * m2u), m2u)
-	return deck
+
+## Crossings with other road bridge ways. On another layer the lower way
+## passes under the upper with CLEAR_PATH_M / CLEAR_ROAD_M to spare: it
+## dips, and where water or ground keeps it up the upper rises (both ways
+## of a crossing reach the same answer); under the upper deck and
+## UNDER_MARGIN_M beyond it the lower way leaves its parapets off (`on`).
+## On the same layer a narrower way running onto a wider deck takes that
+## deck's height there and leaves its parapets off too.
+static func _cross(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: PackedByteArray,
+		on: Array, half: float, layer: int, cls: String, own_li: int, index: Index,
+		surf: RoadBuilder._Surface, m2u: float) -> void:
+	var n := pts.size()
+	var own_path := cls in PATH_CLASSES
+	for i in n:
+		var j := mini(i, n - 2)
+		var along := (pts[j + 1] - pts[j]).normalized()
+		var segs := index.near(pts[i], half + 20.0 * m2u)
+		for k in range(0, segs.size(), 2):
+			var li := segs[k]
+			if li == own_li:
+				continue
+			var line: Dictionary = index.lines[li]
+			var lp: PackedVector2Array = line["points"]
+			var a := lp[segs[k + 1] - 1]
+			var ab := lp[segs[k + 1]] - a
+			var len2 := ab.length_squared()
+			if len2 < 1e-9 or absf(ab.dot(along)) > CROSS_DOT * sqrt(len2):
+				continue
+			var q := a + ab * clampf((pts[i] - a).dot(ab) / len2, 0.0, 1.0)
+			var other_half := float(line["half"])
+			var other_layer := int(line["layer"])
+			# A way passing under reaches UNDER_MARGIN_M beyond the upper deck:
+			# its parapets stop short of it there, and it dips across the margin.
+			var reach := half + other_half + (UNDER_MARGIN_M * m2u if other_layer > layer else 0.0)
+			if q.distance_to(pts[i]) > reach:
+				continue
+			var prof := index.profile(li, surf, m2u)
+			var dense: PackedVector2Array = prof[0]
+			var heights: PackedFloat32Array = prof[1]
+			if heights.size() != dense.size() or dense.is_empty():
+				continue
+			var other := heights[_closest(dense, q)]
+			if other_layer == layer:
+				if other_half > half + SAME_WIDTH_M * m2u and pts[i].distance_to(q) <= other_half:
+					deck[i] = other
+					fixed[i] = 1
+					on[i] = 1
+			elif other_layer > layer:
+				# This way is the lower one: it dips under, down to its floor.
+				var clear := (CLEAR_PATH_M if own_path else CLEAR_ROAD_M) * m2u
+				var floor_y := _floor_at(pts[i], surf, m2u, own_path)
+				var target := maxf(other - clear, floor_y)
+				# Under a low bridge a path has a railing, not a parapet wall
+				# standing at the upper road's level across its lanes.
+				on[i] = 1
+				if deck[i] > target:
+					deck[i] = target
+					fixed[i] = 1
+			else:
+				# This way is the upper one: it rises only where the lower way
+				# cannot dip far enough, and then just enough to hide it.
+				var lower_path := str(line["cls"]) in PATH_CLASSES
+				var clear := (CLEAR_PATH_M if lower_path else CLEAR_ROAD_M) * m2u
+				var need := _floor_at(q, surf, m2u, lower_path) + HIDE_M * m2u
+				if other > deck[i] - clear and deck[i] < need:
+					deck[i] = need
+					fixed[i] = 1
+
+## Lowest a deck can stand at `p`: the ground, or over water its surface
+## plus the slab and a little air (as RoadBuilder._deck_floor); a thin
+## path deck (`path`) may sit PATH_WATER_M over the water.
+static func _floor_at(p: Vector2, surf: RoadBuilder._Surface, m2u: float, path: bool = false) -> float:
+	var h := surf.height(p.x, p.y)
+	if surf.ground.water_at(p.x, p.y) > 0.0:
+		var air := PATH_WATER_M if path else RoadBuilder.DECK_DEPTH_M + 0.5
+		h = maxf(h, surf.ground.water_level_at(p.x, p.y) + air * m2u)
+	return h
+
+static func _closest(dense: PackedVector2Array, q: Vector2) -> int:
+	var k := 0
+	for c in dense.size():
+		if dense[c].distance_squared_to(q) < dense[k].distance_squared_to(q):
+			k = c
+	return k
 
 ## The half width a deck is profiled with: a road class never ramps at
 ## the footway grade (RoadBuilder picks that by width alone).

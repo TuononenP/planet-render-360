@@ -394,6 +394,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		"hedge": TreeMeshLibrary.Buf.new(), "hedge_core": TreeMeshLibrary.Buf.new()}
 	var total_m := 0.0
 	var piece := 3.0 * m2u
+	var roads := _road_grid(data, m2u)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
@@ -424,6 +425,10 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				var p1 := a.lerp(b, float(k + 1) / float(nseg))
 				if not ground.is_inside(p0.x, p0.y) or ground.water_at(p0.x, p0.y) > 0.0 \
 						or ground.water_at(p1.x, p1.y) > 0.0:
+					continue
+				# A wall mapped across a road runs under its bridge or stops at
+				# its edge: drawn on the terrain it stood across the lanes.
+				if _on_road((p0 + p1) * 0.5, roads, m2u):
 					continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)
@@ -463,6 +468,43 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Prop_barrier_%s" % kind
 		root.add_child(mi)
 	return total_m
+
+## Grid (ROAD_CELL_M cells) of linear road ways' segments as
+## [a, b, half width]: barriers stop where they meet one.
+const ROAD_CELL_M := 32.0
+
+static func _road_grid(data: LocationData, m2u: float) -> Dictionary:
+	var grid := {}
+	var cell := ROAD_CELL_M * m2u
+	for w: Variant in data.roads:
+		if not (w is Dictionary):
+			continue
+		var d: Dictionary = w
+		if bool(d.get("area", false)) or bool(d.get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = d.get("points", PackedVector2Array())
+		var half := float(d.get("width_m", 4.0)) * 0.5 * m2u
+		for j in range(1, pts.size()):
+			var lo := pts[j - 1].min(pts[j]) - Vector2(half, half)
+			var hi := pts[j - 1].max(pts[j]) + Vector2(half, half)
+			for cx in range(floori(lo.x / cell), floori(hi.x / cell) + 1):
+				for cz in range(floori(lo.y / cell), floori(hi.y / cell) + 1):
+					var key := Vector2i(cx, cz)
+					if not grid.has(key):
+						grid[key] = []
+					(grid[key] as Array).append([pts[j - 1], pts[j], half])
+	return grid
+
+## True where `p` lies on a road way's carriageway (within its half width).
+static func _on_road(p: Vector2, grid: Dictionary, m2u: float) -> bool:
+	var cell := ROAD_CELL_M * m2u
+	for seg: Array in (grid.get(Vector2i(floori(p.x / cell), floori(p.y / cell)), []) as Array):
+		var a: Vector2 = seg[0]
+		var ab: Vector2 = (seg[1] as Vector2) - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 1e-9), 0.0, 1.0)
+		if p.distance_to(a + ab * t) < float(seg[2]):
+			return true
+	return false
 
 ## Draped box piece a→b: two sides + top (+ end caps), UVs in metres/2.
 static func _wall_piece(b: TreeMeshLibrary.Buf, p0: Vector2, p1: Vector2, y0: float,
