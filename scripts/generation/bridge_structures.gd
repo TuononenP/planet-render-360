@@ -475,7 +475,7 @@ static func _first_dry(line: PackedVector2Array, surf: RoadBuilder._Surface, rea
 ## its whole width.
 static func _abutment_fit(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder._Surface, m2u: float) -> void:
 	var opens := _openings(s, index, surf, m2u)
-	var lift := 0.05 * m2u
+	var lift := 0.02 * m2u
 	for e in s.ring.size():
 		var a := s.ring[e]
 		var b := s.ring[(e + 1) % s.ring.size()]

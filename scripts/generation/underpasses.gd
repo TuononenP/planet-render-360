@@ -32,8 +32,11 @@ const SAMPLE_M := 4.0
 ## A bridge joins the ground at its ends; an intersecting way there is a
 ## connection, not a crossing underneath it. Allow for coordinate rounding.
 const END_TOLERANCE_M := 0.5
-## Ground kept uncut behind a bridge end, along its approach, metres.
-const ABUTMENT_M := 10.0
+## The ground at a bridge end is raised back (_fill_abutments) where the
+## cut left it more than FILL_MIN_M down, by at most FILL_MAX_M over the
+## uncut ground (source metres).
+const FILL_MIN_M := 0.05
+const FILL_MAX_M := 1.5
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 
@@ -71,7 +74,7 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 			boxes.append(_box((w as Dictionary)["points"]))
 	# Per lower way: [arc position, floor height] of each crossing.
 	var cuts := {}
-	# Posts carrying a bridge end stay put: the deck sits on its banks.
+	# Posts beyond a bridge end stay put: the deck sits on its banks.
 	# A viaduct is mapped as many bridge ways end to end, and a joint
 	# between two of them is in mid-air, not a bank: kept, each one left
 	# a pillar of uncut ground standing among the tracks below.
@@ -84,24 +87,21 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 			joints[_node(e, m2u)] = int(joints.get(_node(e, m2u), 0)) + 1
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
-		for e in [ends[0], ends[ends.size() - 1]]:
-			if int(joints[_node(e, m2u)]) == 1:
-				keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
-				# And the abutment behind it, across the deck's width: the cut
-				# for the way below spread under the approach, and the road
-				# dipped where it met its bridge.
-				var from: Vector2 = ends[1] if e == ends[0] else ends[ends.size() - 2]
-				var out: Vector2 = ((e as Vector2) - from).normalized()
-				var side := Vector2(-out.y, out.x)
-				var half := maxf(float(b.get("width_m", 0.0)), 3.0) * 0.5 * m2u + step * 0.5
-				var back := ABUTMENT_M * m2u
-				var reach := maxf(half, back)
-				for x in range(floori((e.x - reach) / step + hs), ceili((e.x + reach) / step + hs) + 1):
-					for z in range(floori((e.y - reach) / step + hs), ceili((e.y + reach) / step + hs) + 1):
-						var d: Vector2 = Vector2((float(x) - hs) * step, (float(z) - hs) * step) - (e as Vector2)
-						# From one post inside the span: the end's height is read between posts.
-						if d.dot(out) >= -step and d.dot(out) <= back and absf(d.dot(side)) <= half:
-							keep[Vector2i(x, z)] = true
+		for end_i: int in [0, ends.size() - 1]:
+			var e := ends[end_i]
+			if int(joints[_node(e, m2u)]) != 1:
+				continue
+			# The posts around the end that lie outside the span. The post
+			# nearest the end can lie 4 m inside it, beside a way passing
+			# under: kept, it stood as an uncut mound under the deck.
+			var out := (e - (ends[1] if end_i == 0 else ends[ends.size() - 2])).normalized()
+			var x0 := floori(e.x / step + hs)
+			var z0 := floori(e.y / step + hs)
+			for dz in 2:
+				for dx in 2:
+					var post := Vector2((float(x0 + dx) - hs) * step, (float(z0 + dz) - hs) * step)
+					if (post - e).dot(out) >= 0.0:
+						keep[Vector2i(x0 + dx, z0 + dz)] = true
 	# Every crossing at once on every core, then evaluated bridge by bridge.
 	var hits: Array = []
 	if _native:
@@ -167,6 +167,62 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	for k in cuts:
 		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u, touched)
 	_level_ridges(surface, level, size, keep, touched)
+	_fill_abutments(surface, src, level, size, step, bridges, joints, m2u)
+
+## The ground at each true bridge end (not a joint with another bridge),
+## put back where the cut for a way beside it pulled it down. The posts
+## are 9 m apart: a way passing under the span 13 m from its end cut the
+## post nearest the end, and the ground read between that post and the next
+## one outside dipped by up to 1.5 m right at the abutment, so the approach
+## road sank into the cut it never entered. Only posts outside the span are
+## raised, by at most FILL_MAX_M over the uncut ground, so that the ground
+## along the end's width reads as it did before the cut; the cut itself,
+## under the span, stays as deep as it was.
+static func _fill_abutments(surface: PackedFloat32Array, src: PackedFloat32Array, level: PackedFloat32Array,
+		size: int, step: float, bridges: Array, joints: Dictionary, m2u: float) -> void:
+	var hs := float(size) * 0.5
+	for b: Dictionary in bridges:
+		var ends: PackedVector2Array = b["points"]
+		var half := maxf(float(b.get("width_m", 0.0)), 3.0) * 0.5 * m2u
+		for end_i: int in [0, ends.size() - 1]:
+			var e := ends[end_i]
+			if int(joints[_node(e, m2u)]) != 1:
+				continue
+			var out := (e - (ends[1] if end_i == 0 else ends[ends.size() - 2])).normalized()
+			var side := Vector2(-out.y, out.x)
+			var n := maxi(2, ceili(2.0 * half / (step * 0.5)))
+			for pass_i in 2:
+				var raise := {}
+				for k in n + 1:
+					var p := e + side * lerpf(-half, half, float(k) / float(n))
+					var gap := RoadGrading._sample(src, size, step, p) - RoadGrading._sample(surface, size, step, p)
+					if gap < FILL_MIN_M:
+						continue
+					var fx := clampf(p.x / step + hs, 0.0, float(size - 1))
+					var fz := clampf(p.y / step + hs, 0.0, float(size - 1))
+					var x0 := mini(int(fx), size - 2)
+					var z0 := mini(int(fz), size - 2)
+					var tx := fx - float(x0)
+					var tz := fz - float(z0)
+					var posts: Array = []
+					var wsum := 0.0
+					for dz in 2:
+						for dx in 2:
+							var x := x0 + dx
+							var z := z0 + dz
+							var post := Vector2((float(x) - hs) * step, (float(z) - hs) * step)
+							if (post - e).dot(out) >= 0.0 and is_inf(level[z * size + x]):
+								var w := (tx if dx == 1 else 1.0 - tx) * (tz if dz == 1 else 1.0 - tz)
+								posts.append([Vector2i(x, z), w])
+								wsum += w
+					if wsum < 0.15:
+						continue
+					for post: Array in posts:
+						var c: Vector2i = post[0]
+						raise[c] = maxf(float(raise.get(c, 0.0)), gap / wsum)
+				for c: Vector2i in raise:
+					var idx := c.y * size + c.x
+					surface[idx] = minf(surface[idx] + float(raise[c]), src[idx] + FILL_MAX_M)
 
 ## Lowers a post left standing between cut posts on opposite sides of it
 ## to the higher of the two: parallel ways each cut their own trench and
@@ -232,15 +288,13 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 		m2u: float, touched: Dictionary = {}) -> void:
 	var grade := RAMP_GRADE_RAIL if _clearance(str(way.get("class", ""))) == CLEAR_RAIL_M else RAMP_GRADE
 	var half := maxf(float(way.get("width_m", 0.0)), 3.0) * 0.5 * m2u
-	var inner := half
-	var reach := half + step
-	if grade == RAMP_GRADE_RAIL:
-		# A track is narrower than the posts are apart: cut only across its
-		# own width, the posts along it came down by different amounts as
-		# it passed nearer or farther, and it rode metre-high bumps. Cut
-		# fully to half a post out, as RoadGrading stamps its profile.
-		inner = half + step * 0.5
-		reach = half + step * 1.5
+	# A way is narrower than the posts are apart (9 m): the posts along it
+	# came down by different amounts as it passed nearer or farther, and it
+	# rode metre-high bumps (a road dipped and rose again within a few
+	# metres under its overpass). Cut fully to half a post out, as
+	# RoadGrading stamps its profile.
+	var inner := half + step * 0.5
+	var reach := half + step * 1.5
 	var hs := float(size) * 0.5
 	var line := GroundTruth._densify(way["points"], SAMPLE_M * m2u)
 	var s := 0.0

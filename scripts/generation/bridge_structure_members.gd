@@ -31,6 +31,16 @@ static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictio
 	var grow := BridgeStructures.ON_M * m2u
 	for i in n:
 		on[i] = 1 if s.contains(dense[i], grow) else 0
+	# The road's chain wear seed, and its kerb flag: as its approaches carry them.
+	var ri := int(line.get("ri", -1))
+	var seed := surf.wear_seeds[ri] if ri >= 0 and ri < surf.wear_seeds.size() else RoadBridgeDecks.DEFAULT_SEED
+	var urban := RoadBridgeDecks.urban_at(dense, surf, road)
+	# The slab's own height at any point of the ribbon and its paint, across
+	# the width: the abutment ends carry a cross slope (BridgeStructures.
+	# Structure.surface_at), which a flat strip at the centreline's height
+	# buried on one side and floated on the other.
+	var rise := func(k: int, p: Vector2) -> float:
+		return s.surface_at(p) if on[k] != 0 else deck[k]
 	# A footway or cycleway keeps its paving on the deck (asphalt there
 	# read as a different road starting at the abutment).
 	var finish := RoadBuilder.finish_of(line.get("road", {}), surf, m2u)
@@ -51,8 +61,8 @@ static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictio
 		if on[i] != 0:
 			top.pad()
 			var k0 := top.verts.size()
-			_ribbon(top, run, run_deck, width, lift, m2u)
-			RoadBridgeDecks._mark(top, k0, width, m2u, road)
+			_ribbon(top, run, run_deck, width, lift, m2u, s)
+			RoadBridgeDecks._mark(top, k0, width, m2u, road, seed, urban)
 			for k in range(k0, top.verts.size()):
 				top.uv2s[k].y = BridgeStructures.RIBBON_LAYER
 			if s.layer > 0 and RoadBridgeDecks.mostly_land(run, surf):
@@ -63,9 +73,9 @@ static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictio
 			var k1 := deck_top.verts.size()
 			RoadBridgeBuild._bridge(batches, run, width, surf, m2u, "bridge", s.kind, s.layer,
 				{"deck": run_deck, "railing": str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES})
-			RoadBridgeDecks._mark(deck_top, k1, width, m2u, road)
+			RoadBridgeDecks._mark(deck_top, k1, width, m2u, road, seed, urban)
 		i = j + 1
-	RoadBridgeDecks._paint(batches, dense, deck, width, surf, m2u, road)
+	RoadBridgeDecks._paint(batches, dense, deck, width, surf, m2u, road, seed, line.get("road", {}), rise)
 
 ## Deck heights along `pts`: the structure's deck top on its outline, the
 ## way's own profile past it, eased into the level at the ramp grade.
@@ -83,10 +93,11 @@ static func heights(s: BridgeStructures.Structure, pts: PackedVector2Array, line
 	RoadBridgeDecks._ease(deck, pts, fixed, maxf(float(line["half"]), s.half), m2u)
 	return deck
 
-## Flat asphalt strip `width` wide along `pts` at `deck` + `lift`, its UVs
-## as RoadBridgeBuild._bridge lays a deck top.
+## Asphalt strip `width` wide along `pts`, `lift` over the structure's deck
+## top at each edge vertex (flat across the width where the slab is), its
+## UVs as RoadBridgeBuild._bridge lays a deck top.
 static func _ribbon(top: RoadBuilder._Batch, pts: PackedVector2Array, deck: PackedFloat32Array,
-		width: float, lift: float, m2u: float) -> void:
+		width: float, lift: float, m2u: float, s: BridgeStructures.Structure) -> void:
 	var half := width * 0.5
 	var k0 := top.verts.size()
 	var along := 0.0
@@ -95,7 +106,7 @@ static func _ribbon(top: RoadBuilder._Batch, pts: PackedVector2Array, deck: Pack
 			along += pts[i].distance_to(pts[i - 1])
 		var sd := RoadBuilder._side(pts, i) * half
 		for e: Vector2 in [pts[i] + sd, pts[i] - sd]:
-			top.verts.append(Vector3(e.x, deck[i] + lift, e.y))
+			top.verts.append(Vector3(e.x, s.surface_at(e) + lift, e.y))
 			top.normals.append(Vector3.UP)
 		top.uvs.append(Vector2(0.0, along / m2u / 4.0))
 		top.uvs.append(Vector2(width / m2u / 4.0, along / m2u / 4.0))

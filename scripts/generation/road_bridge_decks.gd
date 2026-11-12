@@ -14,6 +14,8 @@ extends RefCounted
 ## Also decides when an elevated way crossing a little water (a ditch or
 ## brook under an overpass) keeps its layer's clearance and piers.
 
+## Wear seed of a deck whose road has none to match.
+const DEFAULT_SEED := 0.3
 ## Widest gap between this deck's edge and a parallel neighbour's edge
 ## that still counts as one structure, metres.
 const BESIDE_GAP_M := 8.0
@@ -70,7 +72,8 @@ class Index extends RefCounted:
 	func _init(roads: Array = []) -> void:
 		var m := WorldScale.metres_to_units()
 		_cell = CELL_M * m
-		for w: Variant in roads:
+		for ri in roads.size():
+			var w: Variant = roads[ri]
 			if not (w is Dictionary):
 				continue
 			var d: Dictionary = w
@@ -81,7 +84,7 @@ class Index extends RefCounted:
 				continue
 			var li := lines.size()
 			lines.append({"points": pts, "half": float(d.get("width_m", 6.0)) * 0.5 * m,
-				"layer": int(d.get("layer", 0)), "cls": str(d.get("class", "")), "road": d})
+				"layer": int(d.get("layer", 0)), "cls": str(d.get("class", "")), "road": d, "ri": ri})
 			var ends := Vector4(pts[0].x, pts[0].y, pts[pts.size() - 1].x, pts[pts.size() - 1].y)
 			var same: PackedInt32Array = _by_ends.get(ends, PackedInt32Array())
 			same.append(li)
@@ -207,7 +210,8 @@ class Index extends RefCounted:
 ## entry (lanes, one-way, rank: the deck top carries the road's markings).
 static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 		surf: RoadBuilder._Surface, m2u: float, structure: String, layer: int,
-		own: PackedVector2Array = PackedVector2Array(), cls: String = "", road: Dictionary = {}) -> void:
+		own: PackedVector2Array = PackedVector2Array(), cls: String = "", road: Dictionary = {},
+		wear_seed: float = DEFAULT_SEED) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -232,7 +236,7 @@ static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 	# there it stood up through the deck above.
 	var buried := _no_room(inside, deck, half, layer, surf, m2u)
 	if not buried.has(1):
-		_lay(batches, inside, deck, on, sides, width, surf, m2u, structure, layer, road)
+		_lay(batches, inside, deck, on, sides, width, surf, m2u, structure, layer, road, wear_seed)
 		return
 	var n := inside.size()
 	var i := 0
@@ -249,7 +253,7 @@ static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 				part = {"d": [(sides["d"][0] as PackedFloat32Array).slice(i, j), (sides["d"][1] as PackedFloat32Array).slice(i, j)],
 					"half": [(sides["half"][0] as PackedFloat32Array).slice(i, j), (sides["half"][1] as PackedFloat32Array).slice(i, j)]}
 			_lay(batches, inside.slice(i, j + 1), deck.slice(i, j + 1), on.slice(i, j + 1), part, width, surf, m2u,
-				structure, layer, road)
+				structure, layer, road, wear_seed)
 		i = j + 1
 
 ## 1 where the way passes under a bridge structure with less than the
@@ -272,7 +276,7 @@ static func _no_room(pts: PackedVector2Array, deck: PackedFloat32Array, half: fl
 ## lane attributes, paint and the strips filling the gaps beside it.
 static func _lay(batches: Dictionary, inside: PackedVector2Array, deck: PackedFloat32Array, on: Array,
 		sides: Dictionary, width: float, surf: RoadBuilder._Surface, m2u: float, structure: String,
-		layer: int, road: Dictionary) -> void:
+		layer: int, road: Dictionary, wear_seed: float = DEFAULT_SEED) -> void:
 	var half := width * 0.5
 	var open := []
 	var any_open := false
@@ -291,22 +295,34 @@ static func _lay(batches: Dictionary, inside: PackedVector2Array, deck: PackedFl
 	top.pad()
 	var k0 := top.verts.size()
 	RoadBuilder._bridge(batches, inside, width, surf, m2u, "bridge", structure, layer, fit)
-	_mark(top, k0, width, m2u, road)
-	_paint(batches, inside, deck, width, surf, m2u, road)
+	_mark(top, k0, width, m2u, road, wear_seed, urban_at(inside, surf, road))
+	_paint(batches, inside, deck, width, surf, m2u, road, wear_seed)
 	if not sides.is_empty():
 		_fill(RoadBuilder._batch(batches, "bridge"), inside, deck, half, sides, m2u)
+
+## True where RoadBuilder lays the road as an urban street (a kerb band):
+## ranked roads over land the land-use map calls urban.
+static func urban_at(pts: PackedVector2Array, surf: RoadBuilder._Surface, road: Dictionary) -> bool:
+	if pts.is_empty() or int(road.get("rank", 0)) < 1:
+		return false
+	var mid := pts[pts.size() / 2]
+	return surf.ground.land_class_at(mid.x, mid.y) == "urban"
 
 ## Gives the deck top's vertices from `k0` on the road's surface attributes
 ## (RoadSurface: lanes and one-way in COLOR.r, rank in COLOR.g, the width
 ## in metres in UV2.x), so its lanes and edge lines run on across the
 ## bridge. A bare deck (width 0, no lanes) read as a dark sunken slab
 ## between the marked carriageways on either side.
-static func _mark(top: RoadBuilder._Batch, k0: int, width: float, m2u: float, road: Dictionary) -> void:
+static func _mark(top: RoadBuilder._Batch, k0: int, width: float, m2u: float, road: Dictionary,
+		wear_seed: float = DEFAULT_SEED, urban: bool = false) -> void:
 	top.pad()
 	if road.is_empty():
 		return
 	var lanes := clampf(float(road.get("lanes", 0)), 0.0, 8.0) + (16.0 if int(road.get("oneway", 0)) != 0 else 0.0)
-	var attr := Color(lanes / 32.0, float(road.get("rank", 0)) / 2.0, RoadSurface.wear_attr(false, 0.3), 1.0)
+	# The road's own chain wear and kerb flag, as its approach ribbons carry
+	# them (RoadBuilder._road): a deck of another tone read as a patch laid
+	# over the road.
+	var attr := Color(lanes / 32.0, float(road.get("rank", 0)) / 2.0, RoadSurface.wear_attr(urban, wear_seed), 1.0)
 	for i in range(k0, top.verts.size()):
 		top.colors[i] = attr
 		top.uv2s[i] = Vector2(width / m2u, 0.0)
@@ -317,16 +333,21 @@ static func _mark(top: RoadBuilder._Batch, k0: int, width: float, m2u: float, ro
 ## the bare deck read as a sunken slab between them. The same layout
 ## (RoadPaint.lane_lines), carrier strips and paint material as on land.
 static func _paint(batches: Dictionary, pts: PackedVector2Array, deck: PackedFloat32Array, width: float,
-		surf: RoadBuilder._Surface, m2u: float, road: Dictionary) -> void:
+		surf: RoadBuilder._Surface, m2u: float, road: Dictionary, wear_seed: float = DEFAULT_SEED,
+		raw: Dictionary = {}, rise: Callable = Callable()) -> void:
 	if road.is_empty() or int(road.get("rank", 0)) < 1:
 		return
 	var cls := str(road.get("class", ""))
-	var mid := pts[pts.size() / 2]
-	var urban := surf.ground.land_class_at(mid.x, mid.y) == "urban"
+	var urban := urban_at(pts, surf, road) or (not raw.is_empty() and RoadPaint.in_town(raw))
 	var kind := RoadPaint.kind_of(cls, urban)
-	var style := RoadPaint.style_for("", kind)  # Line width; the dashes are the material's, per place.
+	# The place's own paint, as its approach lines are laid (RoadPaint.lay):
+	# line width, a yellow centre line, lanes per direction.
+	var place: LocationData = surf.place
+	var style := RoadPaint.style_for(place.country if place != null else "", kind)
+	var opts := RoadPaint.layout_opts(raw, false, place) if place != null and not raw.is_empty() else {"class": cls}
+	var yellow := place != null and RoadSurface.yellow_centre(place)
 	var lines := RoadPaint.lane_lines(width / m2u, int(road.get("lanes", 0)), int(road.get("oneway", 0)) != 0,
-		int(road.get("rank", 0)), urban, float(style[2]), Vector2.ZERO, 0, {"class": cls})
+		int(road.get("rank", 0)), urban, float(style[2]), Vector2.ZERO, 0, opts)
 	if lines.is_empty():
 		return
 	var b := RoadBuilder._batch(batches, "paint")
@@ -334,7 +355,9 @@ static func _paint(batches: Dictionary, pts: PackedVector2Array, deck: PackedFlo
 	var lift := 0.03 * m2u
 	for l: Dictionary in lines:
 		var code := RoadPaint.SOLID if bool(l["solid"]) else int(RoadPaint.PATTERN[kind])
-		var attr := Color(float(l["half"]) / RoadPaint.HALF_MAX_M, float(code) / 15.0, 0.3, 1.0)
+		if bool(l["centre"]) and yellow:
+			code |= RoadPaint.YELLOW_BIT
+		var attr := Color(float(l["half"]) / RoadPaint.HALF_MAX_M, float(code) / 15.0, wear_seed, 1.0)
 		b.pad()
 		var k0 := b.verts.size()
 		var along := 0.0
@@ -346,7 +369,9 @@ static func _paint(batches: Dictionary, pts: PackedVector2Array, deck: PackedFlo
 			var c := pts[i] - side * float(l["x"]) * m2u
 			var sl := side.normalized() * hc
 			for e: Vector2 in [c + sl, c - sl]:
-				b.verts.append(Vector3(e.x, deck[i] + lift, e.y))
+				# Over the deck's cross slope where it has one (_abutment_fit).
+				var y: float = float(rise.call(i, e)) if rise.is_valid() else deck[i]
+				b.verts.append(Vector3(e.x, y + lift, e.y))
 				b.normals.append(Vector3.UP)
 				b.colors.append(attr)
 				b.uv2s.append(Vector2(RoadPaint.CARRIER_M, RoadPaint.LAYER))

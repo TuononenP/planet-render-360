@@ -202,6 +202,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		surf.apron_rings.append([ring, RingGeometry.aabb(ring)])
 	var steps := RoadSurface.depth_steps(data)
 	var seeds := RoadSurface.wear_seeds(data)
+	surf.wear_seeds = seeds
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
 	# Bridge structures are levelled once, before the chunks read them.
@@ -277,7 +278,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
 			RoadBridgeDecks.build(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u,
-				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")), r)
+				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")), r, wear_seed)
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
 	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u
@@ -618,6 +619,10 @@ class _Surface extends RefCounted:
 	var road_bridges: RoadBridgeDecks.Index = null  ## Road bridge ways sharing structures.
 	var _pier_lines: Array = []  ## Pier polylines (landings).
 	var roof_sites: Array = []  ## Registry landmark roofs (LandmarkRoofs).
+	## The place and the roads' chain wear seeds (RoadSurface.wear_seeds), so
+	## a bridge deck is laid and painted like the road it carries.
+	var place: LocationData = null
+	var wear_seeds := PackedFloat32Array()
 
 	static func _node(p: Vector2) -> Vector2i:
 		var m := WorldScale.metres_to_units()
@@ -640,6 +645,7 @@ class _Surface extends RefCounted:
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
+		place = data
 		for pier in data.piers:
 			if pier is Dictionary:
 				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
