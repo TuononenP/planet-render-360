@@ -160,6 +160,17 @@ func _init() -> void:
 	var top_sp := rig._street_probes[0]
 	if absf(top_sp.origin_offset.y) > top_sp.size.y * 0.5:
 		failures.append("a high eye should keep each street capture inside its box")
+	# The view probe: a high eye captures where it is; a walker's eye
+	# captures VIEW_CAPTURE_AGL_M over its ground, above trees and walls.
+	if not rig.probe.origin_offset.is_zero_approx():
+		failures.append("a high eye should capture the view probe where it is: %s" % rig.probe.origin_offset)
+	rig.set_probe_origin(Vector3(10.0, 1.0 + 1.7, 0.0) * um)
+	var view_capture := rig.probe.position.y + rig.probe.origin_offset.y
+	if absf(view_capture - (1.0 + AtmosphereRig.VIEW_CAPTURE_AGL_M) * um) > 0.01 * um:
+		failures.append("a walker's view probe should capture %.0f m over the ground, at %f" % [
+			AtmosphereRig.VIEW_CAPTURE_AGL_M, view_capture / um])
+	if not is_equal_approx(rig.probe.position.y, 2.7 * um):
+		failures.append("the view probe's box should stay centred on the eye")
 	rig.ground_at = Callable()
 	rig._set_street_probes(false)
 	if not rig._street_probes.is_empty():

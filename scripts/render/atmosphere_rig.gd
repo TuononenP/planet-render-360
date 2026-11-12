@@ -186,9 +186,14 @@ func _process(delta: float) -> void:
 # --- State API ---
 
 ## Centre of the reflection capture: the viewpoint (camera rig) — call
-## once a place is shown; the probe re-renders there.
+## once a place is shown; the probe re-renders there. The view probe
+## captures from at least VIEW_CAPTURE_AGL_M over the ground: taken at a
+## walker's eye among trees and walls, its horizon was that near wall,
+## and sea, glass and copper reflected it, dark, until the next capture.
 func set_probe_origin(pos: Vector3) -> void:
 	probe.position = pos
+	var lift := _ground_y(pos.x, pos.z, pos.y) + VIEW_CAPTURE_AGL_M * units_per_metre - pos.y
+	probe.origin_offset = Vector3(0.0, maxf(lift, 0.0), 0.0)
 	_place_street_probes()
 	lightning.centre = pos
 	_refresh_probe()
@@ -362,6 +367,9 @@ func _build_environment() -> void:
 var probe: ReflectionProbe
 var _probe_due := 0.0
 const PROBE_DEBOUNCE_S := 0.4
+## Lowest capture height of the view probe over the ground: over the
+## trees and low roofs, so its horizon is the far scenery and sky.
+const VIEW_CAPTURE_AGL_M := 30.0
 
 func _build_probe() -> void:
 	probe = ReflectionProbe.new()
