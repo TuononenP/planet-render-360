@@ -7,12 +7,33 @@ extends RefCounted
 ## edges the fascia, the parapets (railings beside a footway or cycleway)
 ## and, under an open end, the abutment wall down to the ground.
 
+## A road across a deck edge goes on from it when it lies within this of
+## the deck's height, metres.
+const ROAD_LEVEL_M := 1.0
 ## A deck edge carries a parapet where the ground BESIDE_M out from it
 ## lies more than DROP_M under the deck, metres.
 const BESIDE_M := 1.0
 const DROP_M := 0.6
 ## How far a deck's edge beam stands out past its parapet, metres.
 const EDGE_BEAM_LIP_M := 0.12
+
+## True where `p` lies on a road (StreetProps._road_grid) running across the
+## edge direction `dir` (within ~45 degrees of square to it) at about the
+## deck's height `y`: not a way passing under the bridge.
+static func _across_road(p: Vector2, dir: Vector2, roads: Dictionary, m2u: float,
+		surf: RoadBuilder._Surface, y: float) -> bool:
+	if roads.is_empty() or absf(surf.height(p.x, p.y) - y) > ROAD_LEVEL_M * m2u:
+		return false
+	var cell := StreetProps.ROAD_CELL_M * m2u
+	for seg: Array in (roads.get(Vector2i(floori(p.x / cell), floori(p.y / cell)), []) as Array):
+		var a: Vector2 = seg[0]
+		var ab: Vector2 = (seg[1] as Vector2) - a
+		if ab.length_squared() < 1e-9:
+			continue
+		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		if p.distance_to(a + ab * t) < float(seg[2]) and absf(ab.normalized().dot(dir)) < 0.7:
+			return true
+	return false
 
 ## True when the member running nearest `p` is a footway or cycleway.
 static func _beside_path(s: BridgeStructures.Structure, index: RoadBridgeDecks.Index, p: Vector2) -> bool:
@@ -101,7 +122,7 @@ static func _slices(s: BridgeStructures.Structure, m2u: float) -> Array:
 ## through the edge, and where one does,
 ## the slab's bare face over the abutment wall down to the ground.
 static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Array, index: RoadBridgeDecks.Index,
-		surf: RoadBuilder._Surface, m2u: float) -> void:
+		surf: RoadBuilder._Surface, m2u: float, roads: Dictionary = {}) -> void:
 	var side := RoadBuilder._batch(batches, "deck")
 	var depth := s.depth
 	var para := RoadBuilder.PARAPET_M * m2u
@@ -126,7 +147,7 @@ static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Ar
 				var ya := s.surface_at(pa)
 				var yb := s.surface_at(pb)
 				if kind != 0:
-					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out)
+					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out, true)
 					# The abutment wall down to the ground under an end a road
 					# goes on from, seen from under the deck and from the bank
 					# beside it. Not at a joint with another bridge in mid-air,
@@ -135,8 +156,15 @@ static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Ar
 					var gb := surf.height(pb.x, pb.y) - 0.3 * m2u
 					var wet := surf.ground.water_at(pa.x, pa.y) > 0.0 or surf.ground.water_at(pb.x, pb.y) > 0.0
 					if kind == 2 and not wet and (ga < ya - depth or gb < yb - depth):
-						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, -out)
-						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, out)
+						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, -out, true)
+						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, out, true)
+					continue
+				# No parapet across a road going on from the deck on the ground
+				# (where two roads' approach slabs end at different points):
+				# a wall there stood across the carriageway.
+				if _across_road((pa + pb) * 0.5 + out * BESIDE_M * m2u, (pb - pa).normalized(), roads, m2u,
+						surf, (ya + yb) * 0.5):
+					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out, true)
 					continue
 				# No parapet where the deck's edge lies on the ground (the step
 				# between two roads' staggered ends, a deck let into its bank):
@@ -144,11 +172,17 @@ static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Ar
 				var beside := (pa + pb) * 0.5 + out * BESIDE_M * m2u
 				if surf.ground.water_at(beside.x, beside.y) <= 0.0 \
 						and surf.height(beside.x, beside.y) > minf(ya, yb) - DROP_M * m2u:
-					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out)
+					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out, true)
 					continue
+				# An approach slab's side stands on a wing wall down to the ground.
+				if BridgeApproaches.on_tail(s, (pa + pb) * 0.5, m2u):
+					var ga := surf.height(pa.x, pa.y) - 0.3 * m2u
+					var gb := surf.height(pb.x, pb.y) - 0.3 * m2u
+					if ga < ya - depth or gb < yb - depth:
+						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, out, true)
 				if _beside_path(s, index, (pa + pb) * 0.5):
 					# A footway or cycleway edge: the slab's face and a railing.
-					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out)
+					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out, true)
 					RoadBridgeBuild.railing(side, pa - out * thick * 0.5, pb - out * thick * 0.5, ya, yb, out, m2u)
 					continue
 				var ia := pa - out * thick

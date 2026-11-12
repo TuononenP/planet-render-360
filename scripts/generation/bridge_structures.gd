@@ -44,8 +44,8 @@ const ABUTMENT_SEEK_M := 20.0
 ## FIT_MAX_M / PATH_FIT_MAX_M (beyond that a bank falls away, and the
 ## abutment wall faces it), metres.
 const BLEND_M := 5.0
-const BLEND_GRADE := 0.12
-const FIT_MAX_M := 1.5
+const BLEND_GRADE := 0.06
+const FIT_MAX_M := 0.8
 const PATH_FIT_MAX_M := 1.5
 ## Slab depth as span / SPAN_DEPTH_RATIO, at least MIN_DEPTH_M (metres)
 ## and at most RoadBuilder.DECK_DEPTH_M.
@@ -89,6 +89,23 @@ class Structure extends RefCounted:
 	## Slab depth, world units: a short beam span is shallower than a long one.
 	var depth := 0.9
 	var loose := false  ## Cut from ways on no mapped outline.
+	## Approach slabs (BridgeApproaches): index line -> [points before its
+	## first point, points after its last], the outline before them, and
+	## that outline's abutment edges ([a, b] each).
+	var tails := {}
+	var span := PackedVector2Array()
+	var span_ends: Array = []
+
+	## Index line `li`'s points with its approach slabs (`line` its index line).
+	func points_of(li: int, line: Dictionary) -> PackedVector2Array:
+		var pts: PackedVector2Array = line["points"]
+		if not tails.has(li):
+			return pts
+		var out: PackedVector2Array = (tails[li] as Array)[0]
+		out = out.duplicate()
+		out.append_array(pts)
+		out.append_array((tails[li] as Array)[1])
+		return out
 	## Along each abutment edge: [points, how far the approach's ground
 	## lies over (or under) the level there] (BridgeStructures._abutment_fit).
 	var fits: Array = []
@@ -356,6 +373,7 @@ class Plan extends RefCounted:
 			BridgeStructures._settle(self, index, surf, m2u)
 			for s: Structure in structures:
 				BridgeStructures._branches(s, index, surf, m2u)
+				BridgeApproaches.extend(s, index, surf, m2u)
 				BridgeStructures._abutment_fit(s, index, surf, m2u)
 			_ready = true
 		_mutex.unlock()
@@ -439,8 +457,12 @@ static func _level(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder
 			var y := RoadBridgeBuild._deck_floor(s.spine, i, surf, slab, s.half) + 0.05 * m2u
 			# The approach's ribbon starts at its first dry point (RoadBuilder
 			# drops it over water): a bank carved down under the end is not
-			# where the road is.
+			# where the road is. On land, the road's own level: ground cut
+			# down under the end for a way passing under the span is not
+			# where it runs either (BridgeApproaches.road_level).
 			var dry := _first_dry(road, surf, ABUTMENT_SEEK_M * m2u)
+			if surf.ground.water_at(p.x, p.y) <= 0.0:
+				dry = BridgeApproaches.road_level(road, surf, m2u)
 			if not is_nan(dry):
 				y = dry + 0.05 * m2u
 			if i == 0:
@@ -748,14 +770,17 @@ static func build(batches: Dictionary, surf: RoadBuilder._Surface, m2u: float) -
 		return
 	var plan: Plan = index.structures
 	plan.prepare(surf, m2u)
+	# The roads on the ground: no parapet stands across one going on.
+	var roads := StreetProps._road_grid(surf.place, m2u) if surf.place != null else {}
 	for s: Structure in plan.structures:
 		if not surf.inside(s.bounds.get_center()):
 			continue
 		var opens := _openings(s, index, surf, m2u)
 		BridgeStructureSlab._slab(batches, s, surf, m2u)
-		BridgeStructureSlab._edges(batches, s, opens, index, surf, m2u)
+		BridgeStructureSlab._edges(batches, s, opens, index, surf, m2u, roads)
+		BridgeApproaches.span_end_walls(RoadBuilder._batch(batches, "deck"), s, surf, m2u)
 		for li in s.members:
-			BridgeStructureMembers.lay(batches, s, index.lines[li], surf, m2u)
+			BridgeStructureMembers.lay(batches, s, index.lines[li], surf, m2u, li)
 
 ## Per outline edge, the [from, to, end] stretches (fractions along the
 ## edge) a member road leaves through: no parapet there. `end` marks a
@@ -769,7 +794,7 @@ static func _openings(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuil
 	var reach := END_REACH_M * m2u
 	for li in s.members:
 		var line: Dictionary = index.lines[li]
-		var pts: PackedVector2Array = line["points"]
+		var pts: PackedVector2Array = s.points_of(li, line)
 		var half := float(line["half"])
 		# The way extended past both mapped ends: an end a little inside
 		# the outline still opens the edge it faces.

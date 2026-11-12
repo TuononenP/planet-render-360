@@ -251,13 +251,8 @@ func _fallback_west(d: LocationData, surf: RoadBuilder._Surface, failures: Array
 		if s == null:
 			failures.append("%s, on no outline, should still be on a structure" % id)
 			return
-		for end: Array in [[pts[0], pts[1]], [pts[pts.size() - 1], pts[pts.size() - 2]]]:
-			var p: Vector2 = end[0]
-			if BridgeLandings.approach_from(surf, p, (p - (end[1] as Vector2)).normalized()).is_empty():
-				continue
-			var step := s.surface_at(p) - surf.height(p.x, p.y)
-			if absf(step) > 0.3:
-				failures.append("%s should meet its approach, stands %.2f m off it" % [id, step])
+		var li := surf.road_bridges.line_of(pts)
+		_meets(s, li, surf, failures, id, 0.3)
 
 ## Where the deck has no room over the cycleway along the bank, it still
 ## meets its approaches at both abutments (no step up onto the bridge),
@@ -277,21 +272,35 @@ func _abutments(failures: Array[String]) -> void:
 	# Nor does the cycleway stand up through them.
 	_no_parapets_inside(d, ground, by_area, failures)
 	for s: BridgeStructures.Structure in plan.structures:
-		var n := s.spine.size()
-		for end: Array in [[0, 1], [n - 1, n - 2]]:
-			var p: Vector2 = s.spine[int(end[0])]
-			var road := BridgeLandings.approach_from(surf, p, (p - s.spine[int(end[1])]).normalized())
-			if road.is_empty():
-				continue  # A joint in mid-air, not an abutment.
-			# The approach's ribbon starts at the deck's end, or over water at
-			# its first dry point.
-			var ref := surf.height(p.x, p.y)
-			if surf.ground.water_at(p.x, p.y) > 0.0:
-				var dry := BridgeStructures._first_dry(road, surf, BridgeStructures.ABUTMENT_SEEK_M)
-				ref = dry if not is_nan(dry) else ref
-			var step := s.surface_at(p) - ref
-			if absf(step) > 1.0:
-				failures.append("a deck should meet its approach at the abutment, stands %.2f m off it" % step)
+		for li in s.members:
+			_meets(s, li, surf, failures, "a deck", 1.0)
+
+## The deck of index line `li` on `s` meets the ground where its road goes
+## on at either end: at the end of its approach slab (BridgeApproaches) where
+## it has one, else at the mapped end (over water: the first dry ground; on a
+## bank's edge: the road a metre on).
+func _meets(s: BridgeStructures.Structure, li: int, surf: RoadBuilder._Surface, failures: Array[String],
+		id: String, tol: float) -> void:
+	var line: Dictionary = surf.road_bridges.lines[li]
+	var mapped: PackedVector2Array = line["points"]
+	var pts := s.points_of(li, line)
+	for side_i in 2:
+		var at := mapped[0] if side_i == 0 else mapped[mapped.size() - 1]
+		var back := mapped[1] if side_i == 0 else mapped[mapped.size() - 2]
+		var road := BridgeLandings.approach_from(surf, at, (at - back).normalized())
+		if road.is_empty():
+			continue  # A joint in mid-air, not an abutment.
+		var p := pts[0] if side_i == 0 else pts[pts.size() - 1]
+		# The road a metre on: the ground at the end itself may be the edge
+		# of a bank the deck's abutment stands on.
+		var on := p + (p - (pts[1] if side_i == 0 else pts[pts.size() - 2])).normalized()
+		var ref := maxf(surf.height(p.x, p.y), surf.height(on.x, on.y))
+		if surf.ground.water_at(p.x, p.y) > 0.0:
+			var dry := BridgeStructures._first_dry(road, surf, BridgeStructures.ABUTMENT_SEEK_M)
+			ref = dry if not is_nan(dry) else ref
+		var step := s.surface_at(p) - ref
+		if absf(step) > tol:
+			failures.append("%s should meet its approach, stands %.2f m off it at %s" % [id, step, p])
 
 func _road(d: LocationData, id: String) -> Dictionary:
 	for r: Variant in d.roads:

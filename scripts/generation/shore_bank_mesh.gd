@@ -9,6 +9,12 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
+	# A bridge's abutment (ShoreEvidence._abutments) is concrete, as the
+	# bridge's own walls are: in the quay's plain render it read as an
+	# untextured grey slab under the deck.
+	var abut_verts := PackedVector3Array()
+	var abut_normals := PackedVector3Array()
+	var abut_indices := PackedInt32Array()
 	var seen := {}
 	var defenses := SuomenlinnaSite.rings(data.buildings) if data != null else []
 	for segment in model.segments:
@@ -33,16 +39,12 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 			continue
 		var land: Vector2 = segment["land"]
 		var normal := Vector3(-land.x, 0.0, -land.y)
-		var k := verts.size()
 		var face := PackedVector3Array([Vector3(a.x, level_a - 0.6, a.y), Vector3(b.x, level_b - 0.6, b.y),
 			Vector3(b.x, top_b, b.y), Vector3(a.x, top_a, a.y)])
-		verts.append_array(face)
-		for i in 4:
-			normals.append(normal)
-		if (face[1] - face[0]).cross(face[2] - face[0]).dot(normal) < 0.0:
-			indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
+		if _abutment(segment):
+			_append_face(abut_verts, abut_normals, abut_indices, face, normal)
 		else:
-			indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+			_append_face(verts, normals, indices, face, normal)
 	var caps := transition_caps(model, abort)
 	if abort != null and abort.requested:
 		return
@@ -57,8 +59,47 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 			indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
 		else:
 			indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+	if not abut_indices.is_empty():
+		var abut := TerrainBuilder._add(root, _mesh(abut_verts, abut_normals, abut_indices), abutment_material())
+		abut.name = "ShoreAbutments"
 	if indices.is_empty():
 		return
+	var node := TerrainBuilder._add(root, _mesh(verts, normals, indices), QuayBuilder.stone_material(data))
+	node.name = "ShoreWalls"
+	node.set_meta("shore_transitions", caps.size())
+
+static var _abutment_mat: Material = null
+
+## The bridge deck's concrete (RoadBuilder "deck"), mapped in world space:
+## the shore walls carry no UVs.
+static func abutment_material() -> Material:
+	if _abutment_mat == null:
+		var m := (RoadBuilder._material("deck") as StandardMaterial3D).duplicate() as StandardMaterial3D
+		m.uv1_triplanar = true
+		m.uv1_world_triplanar = true
+		m.uv1_scale = Vector3.ONE / WorldScale.metres_to_units()
+		_abutment_mat = m
+	return _abutment_mat
+
+## True for a bank ShoreEvidence made a bridge's abutment.
+static func _abutment(segment: Dictionary) -> bool:
+	for source in segment.get("sources", []):
+		if str(source).begins_with("abutment:"):
+			return true
+	return false
+
+static func _append_face(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array,
+		face: PackedVector3Array, normal: Vector3) -> void:
+	var k := verts.size()
+	verts.append_array(face)
+	for i in 4:
+		normals.append(normal)
+	if (face[1] - face[0]).cross(face[2] - face[0]).dot(normal) < 0.0:
+		indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
+	else:
+		indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+
+static func _mesh(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array) -> ArrayMesh:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
@@ -66,9 +107,7 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	var node := TerrainBuilder._add(root, mesh, QuayBuilder.stone_material(data))
-	node.name = "ShoreWalls"
-	node.set_meta("shore_transitions", caps.size())
+	return mesh
 
 ## A quay can end beside a sloping natural bank. Close the height
 ## discontinuity with masonry returning landward, using the exact two

@@ -11,12 +11,13 @@ extends RefCounted
 
 ## Builds `line` (a RoadBridgeDecks.Index line) on structure `s`.
 static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictionary,
-		surf: RoadBuilder._Surface, m2u: float) -> void:
+		surf: RoadBuilder._Surface, m2u: float, li: int = -1) -> void:
 	# Parsed as RoadBuilder lays a road: rank, lanes and one-way for the
 	# lane attributes and paint.
 	var road := RoadBuilder._parse(line.get("road", {}), m2u)
 	var width := float(line["half"]) * 2.0
-	var mapped: PackedVector2Array = line["points"]
+	# With its approach slabs (BridgeApproaches), where it has them.
+	var mapped: PackedVector2Array = s.points_of(li, line)
 	var dense := PackedVector2Array()
 	for p in RoadBuilder._resample(mapped, surf.step * 0.34):
 		if surf.inside(p):
