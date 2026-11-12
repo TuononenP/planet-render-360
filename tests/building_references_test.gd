@@ -44,8 +44,12 @@ func _init() -> void:
 		BuildingMasses.end_build()
 	_check(BuildingBuilder._accepted(data, mint, Vector2.ZERO, 1176.0), "Mint must remain a real mapped building")
 	var office: Dictionary = (data.buildings as Array).filter(func(b: Dictionary) -> bool: return b.get("osm_id") == "way:23192809")[0]
-	_check(office.get("height_source") == "levels" and not office.has("reference")
-		and BuildingBuilder._accepted(data, office, Vector2.ZERO, 1176.0), "Adjacent Enso office must remain unchanged and retained")
+	# Retained as a mapped building, or drawn by its own landmark
+	# (enso_gutzeit_hq), which takes the building's place.
+	var drawn := BuildingBuilder._accepted(data, office, Vector2.ZERO, 1176.0) \
+		or BuildingBuilder._near_landmark_candidate(data, float(office["x"]), float(office["z"]))
+	_check(office.get("height_source") == "levels" and not office.has("reference") and drawn,
+		"Adjacent Enso office must remain unchanged and retained")
 	var marble_set := FacadeMaterials._wall_set(office, {}, "helsinki")
 	var marble_tint := FacadeMaterials._wall_tint(office, {}, marble_set, 0.0)
 	var mean: Color = MaterialLibrary.PBR_SETS[marble_set]["mean"]

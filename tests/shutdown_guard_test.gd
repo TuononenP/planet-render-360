@@ -26,7 +26,8 @@ const RULES := [
 	[["HTTPRequest.new()"], ["add_child("], "add_child() it so exit tree cancels it"],
 ]
 const JOINED_IN_CALL := ["res://scripts/generation/world_build_graph.gd",
-	"res://scripts/generation/road_builder.gd", "res://scripts/data/ground_tiff.gd"]
+	"res://scripts/generation/road_builder.gd", "res://scripts/data/ground_tiff.gd",
+	"res://scripts/generation/facade_textures.gd", "res://scripts/generation/build_prewarm.gd"]
 
 func _init() -> void:
 	_run()

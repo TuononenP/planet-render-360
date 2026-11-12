@@ -196,8 +196,9 @@ func _run() -> void:
 	if absf(maxf(span.x, span.z) - 62.5) > 3.0:
 		failures.append("eiffel pier should reach the 62.5 m half-base, spans %s" % span)
 	var iron := pier.mesh.surface_get_material(0) as StandardMaterial3D
-	if iron.roughness < 0.5 or iron.metallic > 0.5:
-		failures.append("eiffel paint should be matte (rough>=0.5, metal<=0.5)")
+	# PRD §4.1: iron-brown #4A3A30, metallic 0.6, roughness 0.55.
+	if absf(iron.roughness - 0.55) > 0.05 or absf(iron.metallic - 0.6) > 0.05:
+		failures.append("eiffel paint should be PRD iron (rough 0.55, metal 0.6), is rough %.2f metal %.2f" % [iron.roughness, iron.metallic])
 	eiffel.free()
 
 	# --- 3) OSM archetypes: textured, multi-part, regional, and sized

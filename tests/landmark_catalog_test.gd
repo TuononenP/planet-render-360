@@ -32,8 +32,11 @@ func _run() -> void:
 			failures.append("%s has out-of-range coordinates" % type)
 		var core := _is_core(type)
 		# The 23 core landmarks predate these rules (checked by landmark_test).
+		# A shorter alias only as the landmark's own name ("Väre"), which a
+		# search for it must find.
+		var own := str(entry.get("name", "")).to_lower()
 		for alias in ([] if core else entry["aliases"]):
-			if str(alias) != str(alias).to_lower() or str(alias).length() < 5:
+			if str(alias) != str(alias).to_lower() or (str(alias).length() < 5 and str(alias) != own):
 				failures.append("%s alias '%s' should be lower case and >= 5 characters" % [type, alias])
 		var got := LocationData.landmark_for(lat, lon, str(entry.get("name", "")))
 		if got != type:

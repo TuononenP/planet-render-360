@@ -69,3 +69,9 @@ func stop() -> void:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 	_result = {}
+
+## A window dropped mid-assignment still joins its task before it is freed.
+func _notification(what: int) -> void:
+	# Inline, not stop(): a RefCounted's methods are gone by PREDELETE.
+	if what == NOTIFICATION_PREDELETE and _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)

@@ -78,7 +78,7 @@ static func entries() -> Array:
 			"clear_offsets_m": [[30.0, 7.0], [-28.0, 5.0], [-8.0, -23.0], [10.0, 27.0], [16.0, -15.0],
 				[-16.0, 23.0], [-28.0, -11.0], [40.0, 3.0], [28.0, 29.0], [-4.0, -35.0], [18.0, 17.0],
 				[-30.0, 9.0]],
-			"kind": "University", "aliases": ["väre", "vare", "väre building", "aalto university väre",
+			"kind": "University", "aliases": ["väre", "väre building", "aalto university väre",
 				"aalto school of arts, design and architecture"]},
 		{"type": "harald_herlin_learning_centre", "name": "Harald Herlin Learning Centre",
 			"lat": 60.184742, "lon": 24.827772, "radius_m": 2500.0, "wiki_title": "Aalto University",

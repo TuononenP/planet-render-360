@@ -25,6 +25,12 @@ func _flat_data(preset_value: int, building_count: int) -> LocationData:
 			"size_x": 4.0, "size_z": 4.0, "height": 10.0, "name": "t"})
 	return data
 
+func _node_count(n: Node) -> int:
+	var total := 1
+	for c in n.get_children():
+		total += _node_count(c)
+	return total
+
 func _run() -> void:
 	var failures: Array[String] = []
 
@@ -141,12 +147,14 @@ func _run() -> void:
 	var fast_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.FAST, 400))
 	var high_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.HIGH, 400))
 	var ultra_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.ULTRA, 400))
-	if fast_world.get_child_count() >= high_world.get_child_count():
-		failures.append("Fast should build fewer nodes than High (%d vs %d)" % [
-			fast_world.get_child_count(), high_world.get_child_count()])
-	if high_world.get_child_count() >= ultra_world.get_child_count():
-		failures.append("Ultra should build more nodes than High (%d vs %d)" % [
-			ultra_world.get_child_count(), high_world.get_child_count()])
+	# Every node, not just the world's children: trees sit in one VegTreeSet.
+	var fast_n := _node_count(fast_world)
+	var high_n := _node_count(high_world)
+	var ultra_n := _node_count(ultra_world)
+	if fast_n >= high_n:
+		failures.append("Fast should build fewer nodes than High (%d vs %d)" % [fast_n, high_n])
+	if high_n >= ultra_n:
+		failures.append("Ultra should build more nodes than High (%d vs %d)" % [ultra_n, high_n])
 	fast_world.free()
 	high_world.free()
 	ultra_world.free()

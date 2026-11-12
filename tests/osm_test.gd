@@ -775,14 +775,16 @@ func _chain_checks(failures: Array[String]) -> void:
 	if OsmFetcher.ENDPOINTS.any(func(ep: String) -> bool: return ep.contains("z.overpass-api.de")):
 		failures.append("z.overpass-api.de refuses connections and must not be listed")
 	# The pipeline's OSM wait must outlast both phases (detailed and the
-	# best-effort ring: each query uses one instance, one ATTEMPT_TIMEOUT),
-	# or a late rescue is dropped. Bounded above too: slack beyond one
-	# extra attempt per phase is dead wait.
+	# best-effort ring: each query uses one instance, one ATTEMPT_TIMEOUT)
+	# and the fallback tiers after them (Postpass, then the OSM API and its
+	# smaller radii), or a late rescue is dropped. Bounded above too: slack
+	# beyond one more attempt overall is dead wait.
 	var t := OsmFetcher.ATTEMPT_TIMEOUT
-	if OsmFetcher.retry_budget_seconds() < 2.0 * t:
-		failures.append("retry budget %ss must cover 2 phases × 1 attempt" % OsmFetcher.retry_budget_seconds())
-	if OsmFetcher.retry_budget_seconds() >= 4.0 * t:
-		failures.append("retry budget %ss has more than one attempt of slack per phase" % OsmFetcher.retry_budget_seconds())
+	var tiers := 2.0 * t + PostpassFallback.TIMEOUT_S + t + OsmApiFallback.extra_budget_seconds()
+	if OsmFetcher.retry_budget_seconds() < tiers:
+		failures.append("retry budget %ss must cover 2 phases and the fallbacks (%ss)" % [OsmFetcher.retry_budget_seconds(), tiers])
+	if OsmFetcher.retry_budget_seconds() >= tiers + t:
+		failures.append("retry budget %ss has more than one attempt of slack over %ss" % [OsmFetcher.retry_budget_seconds(), tiers])
 	# _ready must wire the same constant into the HTTP timeout.
 	var fetcher := OsmFetcher.new()
 	fetcher._ready()
