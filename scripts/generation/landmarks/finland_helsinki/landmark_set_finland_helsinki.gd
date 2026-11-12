@@ -8,7 +8,7 @@ extends RefCounted
 static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"otaniemi_chapel": LandmarkFhEspoo.otaniemi_chapel(model)
-		"aalto_university_main": LandmarkFhEspoo.aalto_main(model)
+		"aalto_university_main": LandmarkFhAaltoMain.build(model)
 		"tapiola_church": LandmarkFhEspoo.tapiola_church(model)
 		"tapiola_central_tower": LandmarkFhEspoo.keskustorni(model)
 		"weegee": LandmarkFhEspoo.weegee(model)
