@@ -325,6 +325,7 @@ func _request_exit() -> void:
 	_leave_view()
 	if _build_abort != null:
 		_build_abort.requested = true
+	_view._reach.abort_build()
 	# Cache scans stop early; the index still gets its last write.
 	CacheStore.stop_scans = true
 	if _view.has_running_threads():

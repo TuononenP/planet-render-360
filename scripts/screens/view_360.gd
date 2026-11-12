@@ -328,6 +328,8 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	var cached := await WorldCache.load_world(self, _threads, data, ground)
 	if not cached.is_empty():
 		return cached
+	# Never beside the altitude far rebuild: they share static caches.
+	await _reach.yield_build(self)
 	var thread := Thread.new()
 	_threads.append(thread)
 	var finishing := [false]
@@ -384,6 +386,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if _streamer != null:
 			_streamer.shutdown()
+		_reach.abort_build()
 		if _tree_lod != null:
 			_tree_lod.stop()
 		for t in _threads:

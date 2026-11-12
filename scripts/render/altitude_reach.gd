@@ -19,8 +19,11 @@ extends RefCounted
 
 const ON_AGL_M := 300.0
 const OFF_AGL_M := 250.0
-## Healthy governor windows (at its ceiling, >= UP_FPS) before boosting.
+## Healthy governor windows in a row (at its ceiling, >= UP_FPS)
+## before boosting; a window under KEEP_FPS closes the gate again (the
+## boost is meant for headroom, not to hold a scene at 30 fps).
 const UP_WINDOWS := 2
+const KEEP_FPS := 40.0
 const HOLD_S := 30.0
 const HOLD_MAX_S := 240.0
 ## Seconds the boost must hold before the far terrain is rebuilt.
@@ -83,24 +86,31 @@ var _base: Node3D
 ## governor `at_ceiling` (not stepping down). Pure gate state machine.
 func window(fps: float, at_ceiling: bool, window_s: float = QualityGovernor.WINDOW_S) -> void:
 	_clock += window_s
-	if fps < QualityGovernor.DOWN_FPS or not at_ceiling:
+	if fps < KEEP_FPS or not at_ceiling:
 		_healthy = 0
 		if gpu_ok:
 			gpu_ok = false
 			_hold_until = _clock + _hold_s
 			_hold_s = minf(_hold_s * 2.0, HOLD_MAX_S)
 		return
-	if fps >= QualityGovernor.UP_FPS:
-		_healthy += 1
-		if _healthy >= UP_WINDOWS and _clock >= _hold_until:
-			gpu_ok = true
+	if fps < QualityGovernor.UP_FPS:
+		_healthy = 0
+		return
+	_healthy += 1
+	if _healthy >= UP_WINDOWS and _clock >= _hold_until:
+		gpu_ok = true
+
+func _on_window(_label: String, fps: float) -> void:
+	if _gov != null and is_instance_valid(_gov):
+		window(fps, _gov.step >= _gov.ceiling_step)
 
 ## Once a frame from View360._process.
 func tick(v: View360, delta: float) -> void:
 	if v._governor != null and v._governor != _gov:
+		if _gov != null and is_instance_valid(_gov) and _gov.quality_changed.is_connected(_on_window):
+			_gov.quality_changed.disconnect(_on_window)
 		_gov = v._governor
-		_gov.quality_changed.connect(func(_label: String, fps: float) -> void:
-			window(fps, _gov.step >= _gov.ceiling_step))
+		_gov.quality_changed.connect(_on_window)
 	var world := v._generated.get_instance_id() if is_instance_valid(v._generated) else 0
 	if world != _world_id:
 		_world_id = world
@@ -116,11 +126,31 @@ func tick(v: View360, delta: float) -> void:
 	_pump_ranging()
 	_tick_far(v)
 
-## Drops the boost at once (preset change, view closing). `rerange`
-## false when the caller re-ranges the whole world itself.
+## Drops the boost at once (preset change, view closing) and closes the
+## GPU gate: the new preset must show its own healthy windows first.
+## `rerange` false when the caller re-ranges the whole world itself,
+## which also cancels ranging still spreading over frames.
 func reset(v: View360, rerange: bool = true) -> void:
+	gpu_ok = false
+	_healthy = 0
 	if on:
 		_set_on(v, false, rerange)
+	elif not rerange:
+		_range_world = null
+
+## Stops a far build in flight; a world build about to start, the view
+## closing or the app quitting must not wait out a full one.
+func abort_build() -> void:
+	if _abort != null:
+		_abort.requested = true
+
+## Aborts a far build in flight and waits for its thread to end, so a
+## world build never runs beside it (they share static caches). The
+## finished thread is collected by the next tick.
+func yield_build(v: View360) -> void:
+	abort_build()
+	while _thread != null and _thread.is_alive():
+		await v.get_tree().process_frame
 
 func _set_on(v: View360, value: bool, rerange: bool = true) -> void:
 	on = value
