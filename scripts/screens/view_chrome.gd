@@ -395,6 +395,10 @@ static func arrive(v: View360) -> void:
 		_show_hint(v)
 		return
 	var eye := v._rig.position
+	if v._drone.on and v._ground != null:
+		# A drone start descends to its takeoff height, not to eye level:
+		# the glide's end sets the height it then holds.
+		eye.y = maxf(eye.y, v._ground.height_at_world(eye.x, eye.z) + v._drone._agl)
 	v._rig.position = eye + Vector3(0, DESCENT_RISE_M, 0)
 	var fly := v.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	fly.tween_property(v._rig, "position", eye, DESCENT_S)
