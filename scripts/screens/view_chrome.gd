@@ -362,6 +362,7 @@ static func refresh_theme(v: View360) -> void:
 		HudParts.apply_icon_button(v._gyro_btn, v._gyro_on)
 	HudParts.apply_icon_button(v._drone.button, v._drone.on)
 	v._drone.sticks.restyle()
+	v._stream_badge.refresh_theme()
 
 ## Scrim on for very bright skies (high sun, snow underfoot) and very
 ## dark ones (night), where glass alone loses its edge.

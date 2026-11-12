@@ -44,6 +44,17 @@ func ceiling_at() -> float:
 			return DOWNLOAD_END + (BUILD_END - DOWNLOAD_END) * BuildAbort.fraction_before(build_step + 1)
 	return 1.0
 
+## A data stage landed (GenerationPipeline.stage_changed with "done").
+func stage_done(i: int) -> void:
+	rows_done += 1
+	if i == 1:
+		imagery_fraction = 0.0
+
+## How far the imagery stage has come (GenerationPipeline.stage_progress).
+func stage_progress(i: int, done: int, total: int) -> void:
+	if i == 1 and total > 0:
+		imagery_fraction = clampf(float(done) / total, 0.0, 1.0)
+
 func tick(dt: float) -> void:
 	var target := floor_at()
 	if shown < target:

@@ -58,6 +58,8 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._hud.add_child(v._date_picker)
 	v._toast = Toast.new()
 	v._hud.add_child(v._toast)
+	v._stream_badge = StreamBadge.new()
+	v._hud.add_child(v._stream_badge)
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
 	v._minimap.visible = UiPrefs.minimap
 	v._fps.visible = UiPrefs.fps_counter
@@ -281,6 +283,22 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._minimap == null:
 		return  # still being built
 	var phone := lay == Responsive.Layout.COMPACT
+	# The way-ahead badge: right-aligned under the top-right chips, where
+	# the FPS counter steps down to make room for it. An open inspector
+	# runs down that edge, so the badge moves left of it, under the ring.
+	var under_right := v._top_right.position.y + v._top_right.size.y + 8.0
+	var badge := v._stream_badge
+	badge.custom_minimum_size.x = minf(StreamBadge.W, w - pad * 2.0)
+	badge.reset_size()
+	var badge_at := Vector2(v._top_right.position.x + v._top_right.size.x - badge.size.x, under_right)
+	var beside_sheet := inspector and v._sheet.visible \
+		and Rect2(badge_at, badge.size).intersects(sheet)
+	if beside_sheet:
+		badge_at = Vector2(sheet.position.x - 8.0 - badge.size.x,
+			maxf(under_right, v._compass.position.y + CompassDial.RING + 8.0))
+	badge.position = badge_at
+	if badge.visible and not beside_sheet:
+		under_right += badge.size.y + 8.0
 	# FPS counter: right-aligned under the top-right chips; on a short
 	# wide window the inspector tucks in there, so it sits under the back
 	# button instead.
@@ -289,7 +307,7 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 		v._fps.position = Vector2(pad, v._exit_btn.position.y + v._exit_btn.size.y + 8.0)
 	else:
 		v._fps.position = Vector2(v._top_right.position.x + v._top_right.size.x - v._fps.size.x,
-			v._top_right.position.y + v._top_right.size.y + 8.0)
+			under_right)
 	# Mini-map: bottom-left above the attribution, over the bar where the
 	# two meet; the landmark sheet takes that edge while it is open.
 	var panel_open: bool = v._landmark_panel != null and v._landmark_panel.is_open()

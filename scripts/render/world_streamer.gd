@@ -249,6 +249,15 @@ var _last_pos := Vector2.INF
 var _vel := Vector2.ZERO
 var _notified_gen := -1
 var _view: View360
+## How far the generation in flight has come, for the HUD's StreamBadge:
+## the pipeline's data stages, then the build (null before the first).
+var progress: SaveProgress
+## Which of GenerationPipeline.STAGES have landed for `progress`.
+var stages_done: Array[bool] = []
+
+## The build phase the generation in flight is in (a BuildAbort.Step).
+func build_step() -> int:
+	return _abort.step if _abort != null else 0
 
 ## Records where the camera spawned (or swapped to) so velocity starts clean.
 func note_spawn(pos: Vector2) -> void:
@@ -449,8 +458,10 @@ func tick(v: View360, delta: float) -> void:
 	if state == State.FETCHING or state == State.READY:
 		if not inside_detailed(pos) and _notified_gen != generation:
 			_notified_gen = generation
-			ViewTools.say(v, "Preparing the way ahead",
-				"The next stretch is building as you go.", "neutral")
+			# The way-ahead badge shows the progress; this says why the
+			# pace eased.
+			ViewTools.say(v, "Slower past the edge",
+				"Full speed returns once the way ahead is ready.", "neutral")
 		return
 	if state == State.DEGRADED and Time.get_ticks_msec() < retry_at_msec:
 		return
@@ -473,6 +484,18 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2) -> void:
 	_pipeline = GenerationPipeline.new()
 	v.add_child(_pipeline)
 	var pipe := _pipeline
+	var p := SaveProgress.new()
+	p.rows = GenerationPipeline.STAGES.size()
+	progress = p
+	stages_done.resize(p.rows)
+	stages_done.fill(false)
+	pipe.stage_changed.connect(func(i: int, _label: String, st: String) -> void:
+		if p == progress and st == "done" and not stages_done[i]:
+			stages_done[i] = true
+			p.stage_done(i))
+	pipe.stage_progress.connect(func(i: int, done: int, total: int) -> void:
+		if p == progress and not stages_done[i]:
+			p.stage_progress(i, done, total))
 	pipe.finished.connect(func(d: LocationData) -> void:
 		if is_instance_valid(_view):
 			_on_finished(_view, d, gen, pipe))
@@ -492,6 +515,8 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	data.season = v._data.season
 	data.view = {}
 	data.focus = {}
+	if progress != null:
+		progress.phase = SaveProgress.Phase.BUILD
 	var built := await v.build_location(data, null, _abort)
 	if gen != generation:
 		if built.size() > 1 and built[1] is Node3D:

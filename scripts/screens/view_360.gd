@@ -95,6 +95,7 @@ var _minimap: MiniMap
 var _fps: FpsCounter
 var _date_picker: DatePicker
 var _toast: Toast
+var _stream_badge: StreamBadge
 var _photo_busy := false
 ## Picked calendar day ({} = the season's own day) and the sun arc's
 ## time-lapse.
@@ -878,6 +879,8 @@ func apply_streamed_world(data: LocationData, built: Array) -> void:
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
 	_streamer.tick(self, delta)
+	if _stream_badge != null and _stream_badge.follow(_streamer, delta):
+		ViewChrome.layout(self)
 	_tick_near_ground()
 	if _mover != null and _rig != null and is_visible_in_tree():
 		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))

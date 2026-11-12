@@ -25,6 +25,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_maths()
 	_state_machine()
+	await _badge()
 	await _movement_and_swap()
 	_clean(CACHE)
 	CacheStore.dir_override = ""
@@ -150,6 +151,53 @@ func _state_machine() -> void:
 	s.reset_for_new_place()
 	_check(s.state == WorldStreamer.State.IDLE and s.generation > gen4,
 		"a new place drops a ready world and bumps the generation")
+
+## The way-ahead badge: hidden for a quick (cached) stretch, then the
+## data stage still on its way, the build step, a steady never-100 %
+## percent, a brief "ready" and gone.
+func _badge() -> void:
+	var s := WorldStreamer.new()
+	s.enabled = true
+	var b := StreamBadge.new()
+	root.add_child(b)
+	s.arm(60.0, 25.0, 1, 2)
+	var gen := s.begin(Vector2(60.01, 25.0), Vector2(0, -900))
+	var p := SaveProgress.new()
+	p.rows = GenerationPipeline.STAGES.size()
+	s.progress = p
+	s.stages_done.resize(p.rows)
+	s.stages_done.fill(false)
+	_check(not b.follow(s, 0.2) and not b.visible, "the badge waits before showing")
+	s.mark_ready(gen)
+	b.follow(s, 0.2)
+	_check(not b.visible, "a stretch ready within the delay never shows")
+	gen = s.begin(Vector2(60.01, 25.0), Vector2(0, -900))
+	p = SaveProgress.new()
+	p.rows = GenerationPipeline.STAGES.size()
+	s.progress = p
+	s.stages_done.fill(false)
+	s.stages_done[0] = true
+	p.rows_done = 1
+	b.follow(s, 0.5)
+	_check(b.follow(s, 0.5) and b.visible, "a slow stretch shows the badge")
+	_check(b._detail.text == "Imagery", "the first stage still on its way is named")
+	for i in 120:
+		b.follow(s, 0.25)
+	p.phase = SaveProgress.Phase.BUILD
+	p.rows_done = p.rows
+	for i in 40:
+		b.follow(s, 0.25)
+	_check(b._detail.text.begins_with("Building the scene · "), "the build step shows")
+	var pct := int(b._percent.text.trim_suffix("%"))
+	_check(pct >= 30 and pct < 100, "the percent moves on but never reaches 100 mid-build")
+	s.mark_ready(gen)
+	b.follow(s, 0.1)
+	_check(b.visible and b._title.text == "Way ahead ready", "a landed stretch says so")
+	for i in 20:
+		b.follow(s, 0.1)
+	await create_timer(0.4).timeout
+	_check(not b.visible, "the ready badge leaves on its own")
+	b.free()
 
 func _movement_and_swap() -> void:
 	var view := View360.new()
