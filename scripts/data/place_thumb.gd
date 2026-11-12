@@ -67,11 +67,7 @@ static func is_blank(img: Image) -> bool:
 ## modify it meanwhile.
 static func save_async(img: Image, lat: float, lon: float, tree: SceneTree) -> bool:
 	var box: Array = [false]
-	var task := WorkerThreadPool.add_task(func() -> void: box[0] = save(img, lat, lon),
-		false, "PlaceThumb")
-	while not WorkerThreadPool.is_task_completed(task):
-		await tree.process_frame
-	WorkerThreadPool.wait_for_task_completion(task)
+	await FrameTask.run(func() -> void: box[0] = save(img, lat, lon), "PlaceThumb", tree)
 	return box[0]
 
 ## Shrinks and writes `img` for the place; false when nothing was saved.

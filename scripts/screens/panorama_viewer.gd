@@ -278,10 +278,21 @@ func close() -> void:
 
 func _exit_tree() -> void:
 	close()
-	# Leaving the tree: every task must still be waited on once.
+	_join_tasks()
+
+## Every decode must still be waited on once: on leaving the tree, and
+## when the viewer is freed without ever entering it.
+func _join_tasks() -> void:
+	if _task != -1:
+		_abandoned.append(_task)
+		_task = -1
 	for t in _abandoned:
 		WorkerThreadPool.wait_for_task_completion(t)
 	_abandoned.clear()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_tasks()
 
 func _toggle_fullscreen() -> void:
 	var full := DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN,

@@ -183,9 +183,18 @@ func _refresh_cards_only() -> void:
 	_thumb_task = task
 
 func _exit_tree() -> void:
+	_join_thumbs()
+
+## The thumbnail task must not outlive the screen, also when it is freed
+## without leaving the tree.
+func _join_thumbs() -> void:
 	if _thumb_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_thumb_task)
 		_thumb_task = -1
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_join_thumbs()
 
 func _empty_card() -> PanelContainer:
 	var card := PanelContainer.new()

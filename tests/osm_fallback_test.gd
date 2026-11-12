@@ -292,6 +292,7 @@ func _poi_failure_checks(failures: Array[String]) -> void:
 	f._detailed_text = CACHED_PAYLOAD
 	f._detailed_ready = true
 	f._ring_pending = false
+	f._bridge_started = true
 	f._poi_started = true
 	f._poi_pending = true
 	f._on_poi_exhausted("fixture timeout", 1)

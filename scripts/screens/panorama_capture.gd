@@ -382,9 +382,5 @@ static func encode(img: Image, heading_deg: float) -> PackedByteArray:
 ## not modify it meanwhile.
 static func encode_async(img: Image, heading_deg: float, tree: SceneTree) -> PackedByteArray:
 	var box: Array = [PackedByteArray()]
-	var task := WorkerThreadPool.add_task(func() -> void: box[0] = encode(img, heading_deg),
-		false, "PanoramaEncode")
-	while not WorkerThreadPool.is_task_completed(task):
-		await tree.process_frame
-	WorkerThreadPool.wait_for_task_completion(task)
+	await FrameTask.run(func() -> void: box[0] = encode(img, heading_deg), "PanoramaEncode", tree)
 	return box[0]

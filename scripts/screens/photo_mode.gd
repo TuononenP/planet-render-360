@@ -140,11 +140,7 @@ static func stamped(host: Node, photo: Image, lines: Array[String]) -> Image:
 ## not modify it meanwhile.
 static func encode_png_async(img: Image, tree: SceneTree) -> PackedByteArray:
 	var box: Array = [PackedByteArray()]
-	var task := WorkerThreadPool.add_task(func() -> void: box[0] = img.save_png_to_buffer(),
-		false, "PhotoEncode")
-	while not WorkerThreadPool.is_task_completed(task):
-		await tree.process_frame
-	WorkerThreadPool.wait_for_task_completion(task)
+	await FrameTask.run(func() -> void: box[0] = img.save_png_to_buffer(), "PhotoEncode", tree)
 	return box[0]
 
 ## Saves `img` as `file`: the system dialog where there is one, else the
