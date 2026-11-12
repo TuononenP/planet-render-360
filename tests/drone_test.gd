@@ -64,6 +64,8 @@ func _maths() -> void:
 		boosted = ViewDrone.steer(boosted, Vector2(0, -1), 1.0 / 60.0, true)
 	_check(absf(boosted.length() - ViewDrone.CRUISE_MPS * ViewDrone.BOOST_MULT) < 1.0,
 		"Shift boosts threefold: %s" % boosted.length())
+	_check(absf(ViewDrone.CRUISE_MPS * 3.6 - 100.0) < 0.5,
+		"cruise is 100 km/h: %.1f" % (ViewDrone.CRUISE_MPS * 3.6))
 	var drift := vel
 	for i in 180:
 		drift = ViewDrone.steer(drift, Vector2.ZERO, 1.0 / 60.0)
@@ -359,5 +361,10 @@ func _flight() -> void:
 	_check(view._drone.on and view._drone.panel.visible, "with start_flying a new place opens in the drone")
 	_check(ViewChrome.hint_text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
 		"and the opening hint says how to fly")
+	# Takeoff starts 100 m up: the drone rises there and hovers.
+	for i in 90:
+		view._drone.process(view, 1.0 / 30.0)
+	var start_agl := view._rig.position.y - view._ground.height_at_world(view._rig.position.x, view._rig.position.z)
+	_check(absf(start_agl - ViewDrone.START_AGL_M) < 2.0, "the drone starts 100 m up: %.1f" % start_agl)
 	view.queue_free()
 	await process_frame

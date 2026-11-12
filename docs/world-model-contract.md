@@ -53,6 +53,16 @@ Axes (unchanged from v1 `OsmFetcher.local_xz`): **+X = east, +Z = south**
 - Far terrain continues as concentric DEM rings (z12 mid → z8 far, to
   ≥9 km) in T3.3; the v1 flat apron + silhouette ring remain only as a
   sub-horizon gap filler.
+- Endless walk & fly (`WorldStreamer`, `scripts/render/world_streamer.gd`):
+  the 2400 m extent is a moving window, not a fence. While streaming is
+  enabled the centre recentres in whole `STEP_M` steps — a background
+  generation for the centre ahead swaps in atomically (`remap_xz` keeps
+  the camera over the same lat/lon), so coordinates stay centre-relative
+  and near the float sweet spot exactly as §1.3 requires. Past the
+  detailed edge, and only while the next centre builds, movement is
+  capped visibly (`INTERIM_MPS`) over the far terrain instead of
+  stopping; the bounded `IN_PLACE_M` / `EDGE_M` fences apply only when
+  streaming is disabled (tests, captures).
 
 ### 1.3 Render-origin rebasing
 

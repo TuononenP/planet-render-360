@@ -16,6 +16,10 @@ extends RefCounted
 
 const TOP_M := 19.0
 const BASE := Vector3(35.0, 5.6, 14.0)
+## The platform's passages as [centre x, width, crown height] (metres,
+## model frame): the stone between them is what a walker meets, the
+## passages themselves are open (ViewWalk's gate solids read this).
+const ARCHES := [[-9.0, 3.6, 4.0], [0.0, 5.0, 4.6], [9.0, 3.6, 4.0]]
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -38,10 +42,8 @@ static func build(model: Node3D) -> void:
 static func _platform(lm: LandmarkMesh) -> void:
 	var hx := BASE.x * 0.5
 	var hz := BASE.z * 0.5
-	# [x, width, crown height]
-	var arches := [[-9.0, 3.6, 4.0], [0.0, 5.0, 4.6], [9.0, 3.6, 4.0]]
 	var x0 := -hx
-	for a in arches:
+	for a in ARCHES:
 		var ax := float(a[0])
 		var aw := float(a[1])
 		var ah := float(a[2])

@@ -11,7 +11,9 @@ extends RefCounted
 ## view; steering, floor and roam rules are static so tests can drive
 ## them. ViewChrome builds the button, readout and sticks into it.
 
-const CRUISE_MPS := 15.0
+## Cruise (full-stick) speed: 100 km/h. Shift still sprints past it
+## at BOOST_MULT, as before.
+const CRUISE_MPS := 100.0 / 3.6
 const BOOST_MULT := 3.0
 const CLIMB_MPS := 8.0
 ## Per second: how fast the drone reaches the wished speed, and how fast
@@ -21,6 +23,9 @@ const DRAG := 1.6
 ## Height over the terrain (metres): the lowest it hovers, and its ceiling.
 const AGL_MIN_M := 8.0
 const AGL_MAX_M := 500.0
+## Height the drone starts at on takeoff: high enough to take the
+## place in (roofs beside it can still push the floor higher).
+const START_AGL_M := 100.0
 ## Roam radius, inside the ±1200 m detailed ground (GroundTruth.extent_m).
 const EDGE_M := 1100.0
 const BOB_M := 0.3
@@ -152,8 +157,10 @@ func enter(v: View360) -> void:
 	_near_at = Vector2.INF
 	_probe_at = v._rig.position if v._rig != null else Vector3.INF
 	if v._ground != null and v._rig != null:
-		_agl = clampf(v._rig.position.y - v._ground.height_at_world(v._rig.position.x, v._rig.position.z),
-			AGL_MIN_M, AGL_MAX_M)
+		# Take off to START_AGL_M (keeping a higher stance it already has):
+		# process() eases the camera up to it over the first second.
+		_agl = clampf(maxf(v._rig.position.y - v._ground.height_at_world(v._rig.position.x, v._rig.position.z),
+			START_AGL_M), AGL_MIN_M, AGL_MAX_M)
 	sync_hud(v)
 	_update_readout(v)
 
@@ -172,7 +179,12 @@ func exit(v: View360, glide_home: bool = true) -> void:
 		return
 	var here := Vector2(v._rig.position.x, v._rig.position.z)
 	var xz := here
-	if not View360.can_move_in_place(xz, v._ground):
+	if v._streamer.enabled:
+		# Land where the drone is: the centre follows, so there is no
+		# walking circle to glide back inside.
+		if not v.stream_enterable(xz):
+			xz = xz.limit_length(WorldStreamer.STREAM_LIMIT_M)
+	elif not View360.can_move_in_place(xz, v._ground):
 		xz = xz.limit_length(View360.IN_PLACE_M - 1.0)
 	# On foot, on open ground: never inside a building.
 	var to := v._walk.landing(v, xz)
@@ -232,7 +244,9 @@ func process(v: View360, delta: float) -> void:
 	var forward := Vector2(-sin(yaw), -cos(yaw))
 	var right := Vector2(cos(yaw), -sin(yaw))
 	_vel = steer(_vel, forward * fwd + right * side, delta, boost)
-	var next := clamp_roam(here, here + _vel * delta, v._ground)
+	if v._streamer.enabled:
+		_vel = WorldStreamer.capped_velocity(_vel, here)
+	var next := v.stream_roam(here, here + _vel * delta)
 	if delta > 0.0:
 		_vel = (next - here) / delta
 	ground_y = v._ground.height_at_world(next.x, next.y)
@@ -245,7 +259,7 @@ func process(v: View360, delta: float) -> void:
 	_floor_clock -= delta
 	if _floor_clock <= 0.0:
 		_floor_clock = FLOOR_EVERY_S
-		var ahead := clamp_roam(next, next + _vel * LOOKAHEAD_S, v._ground)
+		var ahead := v.stream_roam(next, next + _vel * LOOKAHEAD_S)
 		if next.distance_to(_near_at) > NEAR_REFRESH_M:
 			if _spans_for != v._data or _spans.size() != v._data.buildings.size():
 				_spans_for = v._data

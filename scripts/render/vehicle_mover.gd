@@ -60,6 +60,28 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 func count() -> int:
 	return _trains.size()
 
+## Each train as a walker solid (building-shaped dict, 3 m wide over
+## its whole length at where it stands now): a walker must not pass
+## through a tram or a train standing at its platform.
+func walker_solids() -> Array:
+	var out: Array = []
+	for t: Dictionary in _trains:
+		var route: TramRoute = t["route"]
+		var s := float(t["s"])
+		var mid := route.xz_at(s)
+		var ahead := route.xz_at(minf(s + 2.0, route.length_m))
+		var behind := route.xz_at(maxf(s - 2.0, 0.0))
+		var f := (ahead - behind)
+		if f == Vector2.ZERO:
+			f = Vector2(1, 0)
+		f = f.normalized()
+		var side := Vector2(-f.y, f.x)
+		var hl := f * float(t["length"]) * 0.5
+		var hw := side * 1.5
+		out.append({"footprint": PackedVector2Array([mid - hl - hw, mid + hl - hw,
+			mid + hl + hw, mid - hl + hw]), "x": mid.x, "z": mid.y, "kind": "tram"})
+	return out
+
 ## Position (metres along its route) of train `i`.
 func position_of(i: int) -> float:
 	return float((_trains[i] as Dictionary)["s"])

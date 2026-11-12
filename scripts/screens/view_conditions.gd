@@ -13,6 +13,9 @@ static func _on_season_selected(v: View360, index: int) -> void:
 static func _select_season(v: View360, index: int) -> void:
 	if v._data == null:
 		return
+	# A season change owns the world until it lands: no streamed centre
+	# built for the old season may swap in underneath it.
+	v._streamer.cancel_pending()
 	v._data.season = LocationData.clamp_season(index)
 	if v._season_btn != null:
 		v._season_btn.select(v._data.season)

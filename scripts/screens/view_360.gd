@@ -106,6 +106,9 @@ var _carpet: GrassCarpet
 var _near_world := 0
 var _mover: VehicleMover
 var _drone := ViewDrone.new()
+## Endless walk & fly (WorldStreamer): Main enables it for the live app;
+## tests and captures keep the bounded movement they were written for.
+var _streamer := WorldStreamer.new()
 ## A place opens in drone mode (the app sets this; tests and captures
 ## open on foot).
 var start_flying := false
@@ -371,6 +374,8 @@ func _notification(what: int) -> void:
 	# get_image) that wait on the main thread, so service them while
 	# joining or this deadlocks.
 	if what == NOTIFICATION_PREDELETE:
+		if _streamer != null:
+			_streamer.shutdown()
 		for t in _threads:
 			while t.is_alive():
 				RenderingServer.force_sync()
@@ -439,6 +444,9 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		return w is Dictionary and str((w as Dictionary).get("class", "")) == "coastline"))
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
+	_streamer.reset_for_new_place()
+	_streamer.arm(data.latitude, data.longitude, data.season, data.quality_preset)
+	_streamer.note_spawn(Vector2(_rig.position.x, _rig.position.z))
 	_restore_conditions(data)
 	if start_flying:
 		_drone.enter(self)
@@ -741,7 +749,8 @@ func visit(site: Dictionary, closer: bool = false) -> void:
 		standoff = minf(LandmarkVisit.close_standoff_m(site),
 			maxf((lp - cam).length(), LandmarkVisit.CLOSE_MIN_M))
 	var t := lp - dir * standoff
-	if not can_move_in_place(t, _ground):
+	if not can_move_in_place(t, _ground) \
+			and not (_streamer.enabled and WorldStreamer.glide_enterable(t, _ground)):
 		var ll := WorldScale.latlon_from_xz(t.x, t.y, _data.latitude, _data.longitude)
 		visit_requested.emit(site, ll.x, ll.y)
 		return
@@ -831,8 +840,38 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if ViewChrome.handle_key(self, key):
 		get_viewport().set_input_as_handled()
 
+## Whether streaming movement may enter `xz` (WorldStreamer rules when
+## enabled, the old built-area fence otherwise).
+func stream_enterable(xz: Vector2) -> bool:
+	return WorldStreamer.enterable(xz, _ground) if _streamer.enabled \
+		else can_move_in_place(xz, _ground)
+
+## Whether a tap-glide may cross to `xz` while streaming.
+func stream_glide_enterable(xz: Vector2) -> bool:
+	return WorldStreamer.glide_enterable(xz, _ground) if _streamer.enabled \
+		else can_move_in_place(xz, _ground)
+
+## `next` for the drone while streaming: enterable ground, else a slide
+## along the stream limit (the bounded clamp_roam when streaming is off).
+func stream_roam(here: Vector2, next: Vector2) -> Vector2:
+	if not _streamer.enabled:
+		return ViewDrone.clamp_roam(here, next, _ground)
+	if WorldStreamer.enterable(next, _ground):
+		return next
+	if next.length() > 0.0:
+		var slid := (here + (next - here).slide(next.normalized())) \
+			.limit_length(WorldStreamer.STREAM_LIMIT_M)
+		if WorldStreamer.enterable(slid, _ground):
+			return slid
+	return here
+
+## Installs a world built for a new centre (WorldStreamer.apply_swap).
+func apply_streamed_world(data: LocationData, built: Array) -> void:
+	_streamer.apply_swap(self, data, built)
+
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
+	_streamer.tick(self, delta)
 	_tick_near_ground()
 	if _mover != null and _rig != null and is_visible_in_tree():
 		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))

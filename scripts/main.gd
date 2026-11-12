@@ -697,6 +697,7 @@ func _on_generation_finished(data: LocationData) -> void:
 	if not capture_mode:
 		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
 	_view.start_flying = not capture_mode
+	_view._streamer.enabled = not capture_mode
 	_view.show_location(data, built)
 	_notice.show_notes(data.data_notes)
 	_show(_view)
