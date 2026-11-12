@@ -38,6 +38,7 @@ func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abo
 	if abort != null and abort.requested:
 		return
 	domains.estimate(Callable(self, "dry_height"), ground.water_level_m, ground.FREEBOARD_M, sea_level, abort)
+	domains.lower_under_bridges(data.roads, Callable(self, "dry_height"))
 	_evidence = ShoreEvidence.new(data)
 	_index_edges()
 
@@ -195,6 +196,11 @@ func _classify(abort: BuildAbort) -> void:
 			var hard := str(treatment["kind"]) == "hard"
 			var top_a := _bank_top(start, land) if hard else dry_height(start.x, start.y)
 			var top_b := _bank_top(end, land) if hard else dry_height(end.x, end.y)
+			var road_top := _abutment_top(treatment, mid)
+			if hard and not is_nan(road_top):
+				# A bridge abutment's top is the road's level at the bridge's end.
+				top_a = road_top
+				top_b = road_top
 			if str(treatment["kind"]) == "hard" and (is_nan(top_a) or is_nan(top_b)):
 				treatment = {"kind": "natural", "reason": "insufficient_dry_samples", "sources": []}
 			if is_nan(top_a):
@@ -264,6 +270,27 @@ func _make_transitions() -> void:
 				if not transition_cells.has(key):
 					transition_cells[key] = []
 				(transition_cells[key] as Array).append(id)
+
+## The road's level (dry ground at the nearer end of the bridge) for a
+## bank ShoreEvidence made an abutment, else NAN.
+func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
+	for source in treatment.get("sources", []):
+		var ends: PackedVector2Array = _evidence.abutment_ends.get(str(source), PackedVector2Array())
+		if ends.size() == 2:
+			var near0 := ends[0].distance_squared_to(mid) <= ends[1].distance_squared_to(mid)
+			var e := ends[0] if near0 else ends[1]
+			if domains.at(e) < 0:
+				return dry_height(e.x, e.y)
+			# A bridge mapped ending over the water: the road's level is the
+			# dry ground further out along its line.
+			var out := (e - (ends[1] if near0 else ends[0])).normalized()
+			var best := NAN
+			for k in range(1, 11):
+				var q := e + out * 2.0 * float(k) * WorldScale.metres_to_units()
+				if bounds.has_point(q) and domains.at(q) < 0:
+					best = dry_height(q.x, q.y) if is_nan(best) else maxf(best, dry_height(q.x, q.y))
+			return best
+	return NAN
 
 func _bank_top(p: Vector2, land: Vector2) -> float:
 	var values: Array[float] = []

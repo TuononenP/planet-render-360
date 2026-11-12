@@ -28,6 +28,9 @@ const MAX_SHIFT_M := 1.0
 ## (2 m, north of 60°N: Turku's hill streets) keeps the defaults.
 const COARSE_SMOOTH_M := 70.0
 const COARSE_MAX_SHIFT_M := 2.5
+## How far along a road from the bridge it leads onto its embankment is
+## kept (_keep_embankments), metres.
+const EMBANKMENT_M := 40.0
 ## Test hook: false grades coarse DEMs with the defaults too.
 static var coarse_enabled := true
 
@@ -54,6 +57,7 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 	var best_d := PackedFloat32Array()
 	best_d.resize(size * size)
 	best_d.fill(INF)
+	var heads := _bridge_heads(roads)
 	for road in roads:
 		if not (road is Dictionary):
 			continue
@@ -79,12 +83,47 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 			heights.append(_sample(src, size, step, p))
 			valid.append(1 if _dry(level, size, step, p) else 0)
 		var prof := _smooth(heights, valid, arc, smooth_m * m2u)
+		_keep_embankments(prof, heights, line, arc, pts, heads, m2u)
 		for i in line.size():
 			if valid[i] == 1:
 				_stamp(line[i], prof[i], half, src, best_w, best_h, best_d, level, size, step, max_shift_m)
 	for i in size * size:
 		if best_w[i] > 0.0:
 			surface[i] = lerpf(surface[i], best_h[i], best_w[i])
+
+## End points of road bridges (not footbridges).
+static func _bridge_heads(roads: Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for road in roads:
+		if not (road is Dictionary) or not bool((road as Dictionary).get("bridge", false)):
+			continue
+		if RoadBuilder._rank(str((road as Dictionary).get("class", ""))) < 1:
+			continue
+		var pts: PackedVector2Array = (road as Dictionary).get("points", PackedVector2Array())
+		if pts.size() >= 2:
+			out.append(pts[0])
+			out.append(pts[pts.size() - 1])
+	return out
+
+## Within EMBANKMENT_M of a bridge the road leads onto, its profile is never
+## cut below the ground: the crest there is the bridge's embankment, and
+## smoothed away the motorway met its creek bridge at the water's level.
+static func _keep_embankments(prof: PackedFloat32Array, heights: PackedFloat32Array, line: PackedVector2Array,
+		arc: PackedFloat32Array, pts: PackedVector2Array, heads: PackedVector2Array, m2u: float) -> void:
+	if heads.is_empty() or line.is_empty():
+		return
+	var touch := 1.0 * m2u
+	var reach := EMBANKMENT_M * m2u
+	var total := arc[arc.size() - 1]
+	for e in heads:
+		var from_start := pts[0].distance_to(e) <= touch
+		var from_end := pts[pts.size() - 1].distance_to(e) <= touch
+		if not from_start and not from_end:
+			continue
+		for i in line.size():
+			var d := arc[i] if from_start else total - arc[i]
+			if d <= reach:
+				prof[i] = maxf(prof[i], heights[i])
 
 ## Largest cut or fill (source metres) a post inside a mapped square takes:
 ## a surface-model DEM leaves 3–8 m mounds across a plaza, while a real

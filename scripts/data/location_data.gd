@@ -187,6 +187,10 @@ var piers: Array = []
 ## Mapped waterfront edges {points, kind, id, material, height_m}.
 ## Empty for old/offline payloads; inferred banks retain their provenance.
 var shore_structures: Array = []
+## OSM man_made=bridge outlines {points, layer, bridge_structure,
+## bridge_material, name, osm_id} (OsmParser._bridge_area): BridgeStructures
+## builds one deck per outline. Empty where the bridge layer is not cached.
+var bridge_areas: Array = []
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.

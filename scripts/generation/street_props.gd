@@ -395,6 +395,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	var total_m := 0.0
 	var piece := 3.0 * m2u
 	var roads := _road_grid(data, m2u)
+	var decks := BridgeStructures.barrier_rings(data, m2u)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
@@ -429,6 +430,10 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				# A wall mapped across a road runs under its bridge or stops at
 				# its edge: drawn on the terrain it stood across the lanes.
 				if _on_road((p0 + p1) * 0.5, roads, m2u):
+					continue
+				# A wall or rail along the bank ends at the bridge's abutment:
+				# between its carriageways it stood as a stub on the deck.
+				if BridgeStructures.in_rings(p0, decks) or BridgeStructures.in_rings(p1, decks):
 					continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)

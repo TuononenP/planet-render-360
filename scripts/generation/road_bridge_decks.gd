@@ -63,6 +63,9 @@ class Index extends RefCounted:
 	var _roots := PackedInt32Array()  ## Line -> its structure group's root, once grouped.
 	var _members := {}  ## Group root -> PackedInt32Array of its lines.
 	var _group_mutex := Mutex.new()
+	## The world's bridge structures (BridgeStructures.Plan), or null: their
+	## member lines read the structure's level as their profile.
+	var structures: BridgeStructures.Plan = null
 
 	func _init(roads: Array = []) -> void:
 		var m := WorldScale.metres_to_units()
@@ -78,7 +81,7 @@ class Index extends RefCounted:
 				continue
 			var li := lines.size()
 			lines.append({"points": pts, "half": float(d.get("width_m", 6.0)) * 0.5 * m,
-				"layer": int(d.get("layer", 0)), "cls": str(d.get("class", ""))})
+				"layer": int(d.get("layer", 0)), "cls": str(d.get("class", "")), "road": d})
 			var ends := Vector4(pts[0].x, pts[0].y, pts[pts.size() - 1].x, pts[pts.size() - 1].y)
 			var same: PackedInt32Array = _by_ends.get(ends, PackedInt32Array())
 			same.append(li)
@@ -171,7 +174,8 @@ class Index extends RefCounted:
 		return li
 
 	## Line `li`'s dense points and deck heights, profiled with its own
-	## width and layer (computed once per world).
+	## width and layer, or on a bridge structure at the structure's level
+	## (computed once per world).
 	func profile(li: int, surf: RoadBuilder._Surface, m2u: float) -> Array:
 		_profile_mutex.lock()
 		var hit: Array = _profiles.get(li, [])
@@ -180,8 +184,14 @@ class Index extends RefCounted:
 			return hit
 		var line: Dictionary = lines[li]
 		var dense := RoadBuilder._resample(line["points"], surf.step * 0.34)
-		var made: Array = [dense, RoadBuilder.deck_profile(dense, surf, m2u,
-			RoadBridgeDecks.grade_half(float(line["half"]), str(line["cls"]), m2u), int(line["layer"]))]
+		var made: Array
+		var on: BridgeStructures.Structure = structures.of_line(li) if structures != null else null
+		if on != null:
+			structures.prepare(surf, m2u)
+			made = [dense, BridgeStructureMembers.heights(on, dense, line, surf, m2u)]
+		else:
+			made = [dense, RoadBuilder.deck_profile(dense, surf, m2u,
+				RoadBridgeDecks.grade_half(float(line["half"]), str(line["cls"]), m2u), int(line["layer"]))]
 		_profile_mutex.lock()
 		if not _profiles.has(li):
 			_profiles[li] = made
@@ -208,11 +218,62 @@ static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 	if surf.road_bridges == null:
 		RoadBuilder._bridge(batches, inside, width, surf, m2u, "bridge", structure, layer)
 		return
+	# A way on a bridge structure is laid with it (BridgeStructures.build).
+	var plan: BridgeStructures.Plan = surf.road_bridges.structures
+	if plan != null and plan.of_line(surf.road_bridges.line_of(own)) != null:
+		return
 	var sides := beside(inside, half, surf, m2u, own)
 	var on: Array = []  # An Array: a packed one would come back as a copy.
 	var deck := levelled(inside, half, layer, surf, m2u, own, cls, on)
 	if deck.size() != inside.size():
 		return
+	# Under a structure with no room for it (a path on a bank right under
+	# a low deck), the way runs into the abutment, as into a culvert: drawn
+	# there it stood up through the deck above.
+	var buried := _no_room(inside, deck, half, layer, surf, m2u)
+	if not buried.has(1):
+		_lay(batches, inside, deck, on, sides, width, surf, m2u, structure, layer, road)
+		return
+	var n := inside.size()
+	var i := 0
+	while i < n:
+		if buried[i] != 0:
+			i += 1
+			continue
+		var j := i
+		while j + 1 < n and buried[j + 1] == 0:
+			j += 1
+		if j > i:
+			var part := {}
+			if not sides.is_empty():
+				part = {"d": [(sides["d"][0] as PackedFloat32Array).slice(i, j), (sides["d"][1] as PackedFloat32Array).slice(i, j)],
+					"half": [(sides["half"][0] as PackedFloat32Array).slice(i, j), (sides["half"][1] as PackedFloat32Array).slice(i, j)]}
+			_lay(batches, inside.slice(i, j + 1), deck.slice(i, j + 1), on.slice(i, j + 1), part, width, surf, m2u,
+				structure, layer, road)
+		i = j + 1
+
+## 1 where the way passes under a bridge structure with less than the
+## upper slab's depth and a little air between their decks.
+static func _no_room(pts: PackedVector2Array, deck: PackedFloat32Array, half: float, layer: int,
+		surf: RoadBuilder._Surface, m2u: float) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(pts.size())
+	var plan: BridgeStructures.Plan = surf.road_bridges.structures
+	if plan == null or plan.structures.is_empty():
+		return out
+	for i in pts.size():
+		for st: BridgeStructures.Structure in plan.near(pts[i], half):
+			if st.layer > layer and st.contains(pts[i], half) and st.level_at(pts[i]) - deck[i] < st.depth + 0.3 * m2u:
+				out[i] = 1
+	return out
+
+## Lays the deck of `inside` at `deck`: RoadBuilder._bridge, open toward
+## the ways beside it (`sides`) and the decks it runs onto (`on`), then its
+## lane attributes, paint and the strips filling the gaps beside it.
+static func _lay(batches: Dictionary, inside: PackedVector2Array, deck: PackedFloat32Array, on: Array,
+		sides: Dictionary, width: float, surf: RoadBuilder._Surface, m2u: float, structure: String,
+		layer: int, road: Dictionary) -> void:
+	var half := width * 0.5
 	var open := []
 	var any_open := false
 	for s in 2:
@@ -223,7 +284,7 @@ static func build(batches: Dictionary, pts: PackedVector2Array, width: float,
 			flags.append(1 if beside_here or onto else 0)
 			any_open = any_open or beside_here or onto
 		open.append(flags)
-	var fit := {"deck": deck}
+	var fit := {"deck": deck, "railing": str(road.get("class", "")) in PATH_CLASSES}
 	if any_open:
 		fit["open"] = open
 	var top := RoadBuilder._batch(batches, "bridge")
@@ -388,6 +449,7 @@ static func levelled(pts: PackedVector2Array, half: float, layer: int, surf: Roa
 		_level_group(deck, pts, fixed, half, own_li, index, surf, m2u)
 	else:
 		_level_beside(deck, pts, fixed, half, index, surf, m2u, own)
+	_structures(deck, pts, fixed, on, half, layer, cls, index, surf, m2u, true)
 	# Once levelled, the way is part of a road structure: its free ends
 	# ease in at the road grade, not a footway's steep one.
 	var ease_half := grade_half(half, cls, m2u)
@@ -399,6 +461,7 @@ static func levelled(pts: PackedVector2Array, half: float, layer: int, surf: Roa
 	var crossed := PackedByteArray()
 	crossed.resize(n)
 	_cross(deck, pts, crossed, on, half, layer, cls, own_li, index, surf, m2u)
+	_structures(deck, pts, crossed, on, half, layer, cls, index, surf, m2u, false)
 	_ease(deck, pts, crossed, ease_half, m2u)
 	return deck
 
@@ -486,8 +549,8 @@ static func _cross(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: Pac
 		var segs := index.near(pts[i], half + 20.0 * m2u)
 		for k in range(0, segs.size(), 2):
 			var li := segs[k]
-			if li == own_li:
-				continue
+			if li == own_li or (index.structures != null and index.structures.of_line(li) != null):
+				continue  # Itself, or a way on a structure (_structures).
 			var line: Dictionary = index.lines[li]
 			var lp: PackedVector2Array = line["points"]
 			var a := lp[segs[k + 1] - 1]
@@ -532,6 +595,46 @@ static func _cross(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: Pac
 				var clear := (CLEAR_PATH_M if lower_path else CLEAR_ROAD_M) * m2u
 				var need := _floor_at(q, surf, m2u, lower_path) + HIDE_M * m2u
 				if other > deck[i] - clear and deck[i] < need:
+					deck[i] = need
+					fixed[i] = 1
+
+## The bridge structures (BridgeStructures) a way meets. `same`: on its
+## own layer it runs onto a structure, takes its level there and leaves
+## its parapets off. Otherwise: under a structure it dips by CLEAR_PATH_M
+## / CLEAR_ROAD_M, down to its floor, parapets off under the deck and
+## UNDER_MARGIN_M beyond (the structure has already risen where it cannot,
+## BridgeStructures._settle); over one it rises, if it must, to hide it.
+static func _structures(deck: PackedFloat32Array, pts: PackedVector2Array, fixed: PackedByteArray,
+		on: Array, half: float, layer: int, cls: String, index: Index, surf: RoadBuilder._Surface,
+		m2u: float, same: bool) -> void:
+	var plan: BridgeStructures.Plan = index.structures
+	if plan == null or plan.structures.is_empty():
+		return
+	plan.prepare(surf, m2u)
+	var own_path := cls in PATH_CLASSES
+	var margin := half + UNDER_MARGIN_M * m2u
+	for i in pts.size():
+		for s: BridgeStructures.Structure in plan.near(pts[i], margin):
+			var p := pts[i]
+			if s.layer == layer:
+				if same and s.contains(p, BridgeStructures.ON_M * m2u):
+					deck[i] = s.level_at(p)
+					fixed[i] = 1
+					on[i] = 1
+			elif same:
+				continue
+			elif s.layer > layer:
+				if s.contains(p, margin):
+					var clear := (CLEAR_PATH_M if own_path else CLEAR_ROAD_M) * m2u
+					var target := maxf(s.level_at(p) - clear, _floor_at(p, surf, m2u, own_path))
+					on[i] = 1
+					if deck[i] > target:
+						deck[i] = target
+						fixed[i] = 1
+			elif s.contains(p, half):
+				var clear := (CLEAR_PATH_M if s.path else CLEAR_ROAD_M) * m2u
+				var need := _floor_at(p, surf, m2u, s.path) + HIDE_M * m2u
+				if s.level_at(p) > deck[i] - clear and deck[i] < need:
 					deck[i] = need
 					fixed[i] = 1
 

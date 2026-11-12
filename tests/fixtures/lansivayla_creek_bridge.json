@@ -1,0 +1,4679 @@
+{
+ "source": "https://www.openstreetmap.org/copyright",
+ "license": "ODbL 1.0, (c) OpenStreetMap contributors",
+ "note": "Lansivayla over Grasanoja, Espoo (Niittykumpu): highways, barriers, waterways, water and man_made=bridge outlines in the bbox",
+ "source_url": "https://overpass-api.de/api/interpreter (way[highway|barrier|waterway|natural=water|man_made=bridge](60.1654,24.7520,60.1668,24.7556); out geom), fetched 2026-11-12",
+ "elements": [
+  {
+   "type": "way",
+   "id": 4296959,
+   "tags": {
+    "destination": "Kehä II;Niittykumpu;Haukilahti",
+    "destination:lang:en": "Ring II;Niittykumpu;Haukilahti",
+    "destination:ref": "102;;",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "paved:date": "2013",
+    "placement": "transition",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659232,
+     "lon": 24.7516258
+    },
+    {
+     "lat": 60.1659303,
+     "lon": 24.7523869
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 4675081,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659321,
+     "lon": 24.7539367
+    },
+    {
+     "lat": 60.1659199,
+     "lon": 24.754066
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 4759650,
+   "tags": {
+    "bicycle": "no",
+    "destination": "Hanko;Niittykumpu;Olari",
+    "destination:colour": "green;white;white",
+    "destination:ref:to": "51;;",
+    "foot": "no",
+    "highway": "primary_link",
+    "lanes": "1",
+    "lit": "yes",
+    "maxheight": "default",
+    "maxspeed": "50",
+    "oneway": "yes",
+    "sidewalk": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1664874,
+     "lon": 24.7527933
+    },
+    {
+     "lat": 60.166648,
+     "lon": 24.7528625
+    },
+    {
+     "lat": 60.1668902,
+     "lon": 24.7528873
+    },
+    {
+     "lat": 60.167254,
+     "lon": 24.7529744
+    },
+    {
+     "lat": 60.1674478,
+     "lon": 24.7529949
+    },
+    {
+     "lat": 60.1676305,
+     "lon": 24.7529727
+    },
+    {
+     "lat": 60.167814,
+     "lon": 24.752942
+    },
+    {
+     "lat": 60.1680707,
+     "lon": 24.7529232
+    },
+    {
+     "lat": 60.1682526,
+     "lon": 24.7529608
+    },
+    {
+     "lat": 60.1683786,
+     "lon": 24.7530211
+    },
+    {
+     "lat": 60.1685067,
+     "lon": 24.7530957
+    },
+    {
+     "lat": 60.168619,
+     "lon": 24.7531803
+    },
+    {
+     "lat": 60.1688595,
+     "lon": 24.7534379
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 8151614,
+   "tags": {
+    "bridge": "yes",
+    "destination": "Matinkylä",
+    "functional_class": "secondary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "placement": "transition",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661777,
+     "lon": 24.7538495
+    },
+    {
+     "lat": 60.166198,
+     "lon": 24.7535314
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 17492707,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1667593,
+     "lon": 24.753751
+    },
+    {
+     "lat": 60.166835,
+     "lon": 24.7535143
+    },
+    {
+     "lat": 60.1669183,
+     "lon": 24.7533127
+    },
+    {
+     "lat": 60.166999,
+     "lon": 24.7531401
+    },
+    {
+     "lat": 60.1670798,
+     "lon": 24.7530052
+    },
+    {
+     "lat": 60.1671503,
+     "lon": 24.752889
+    },
+    {
+     "lat": 60.1673092,
+     "lon": 24.7527131
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 17492713,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "priority_road": "yes_unposted",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1660999,
+     "lon": 24.7524225
+    },
+    {
+     "lat": 60.1658966,
+     "lon": 24.7495623
+    },
+    {
+     "lat": 60.1658346,
+     "lon": 24.7488676
+    },
+    {
+     "lat": 60.165799,
+     "lon": 24.7485326
+    },
+    {
+     "lat": 60.16573,
+     "lon": 24.7479595
+    },
+    {
+     "lat": 60.1656662,
+     "lon": 24.7474587
+    },
+    {
+     "lat": 60.1655186,
+     "lon": 24.7463729
+    },
+    {
+     "lat": 60.1653603,
+     "lon": 24.7454489
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 17492714,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1660099,
+     "lon": 24.7528903
+    },
+    {
+     "lat": 60.1660562,
+     "lon": 24.75365
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 17492716,
+   "tags": {
+    "bridge": "yes",
+    "destination": "Hanko",
+    "destination:colour": "green",
+    "destination:ref": "51",
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "placement": "transition",
+    "priority_road": "yes_unposted",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661777,
+     "lon": 24.7538495
+    },
+    {
+     "lat": 60.1661643,
+     "lon": 24.753548
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 17492718,
+   "tags": {
+    "destination": "Kehä II;Niittykumpu;Haukilahti",
+    "destination:lang:en": "Ring II;Niittykumpu;Haukilahti",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659199,
+     "lon": 24.754066
+    },
+    {
+     "lat": 60.1658889,
+     "lon": 24.7542806
+    },
+    {
+     "lat": 60.1658529,
+     "lon": 24.7544304
+    },
+    {
+     "lat": 60.1658132,
+     "lon": 24.7545729
+    },
+    {
+     "lat": 60.1657631,
+     "lon": 24.7547197
+    },
+    {
+     "lat": 60.165705,
+     "lon": 24.7548338
+    },
+    {
+     "lat": 60.1656377,
+     "lon": 24.7549305
+    },
+    {
+     "lat": 60.1655776,
+     "lon": 24.7549812
+    },
+    {
+     "lat": 60.1655007,
+     "lon": 24.7550199
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 19972284,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "2",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "parking:both": "no",
+    "parking:both:restriction": "no_stopping",
+    "parking:condition:reason": "turning_lane",
+    "paved:date": "2011-05",
+    "placement": "middle_of:1",
+    "snowplowing": "yes",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt",
+    "turn:lanes": "|merge_to_left"
+   },
+   "geometry": [
+    {
+     "lat": 60.1670941,
+     "lon": 24.7523735
+    },
+    {
+     "lat": 60.166965,
+     "lon": 24.7524529
+    },
+    {
+     "lat": 60.1668014,
+     "lon": 24.7525452
+    },
+    {
+     "lat": 60.1666572,
+     "lon": 24.7526007
+    },
+    {
+     "lat": 60.1664856,
+     "lon": 24.7526438
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 22932942,
+   "tags": {
+    "boat": "no",
+    "name": "Gräsanoja",
+    "name:fi": "Gräsanoja",
+    "name:sv": "Gräsaån",
+    "source": "Bing",
+    "waterway": "river"
+   },
+   "geometry": [
+    {
+     "lat": 60.1810551,
+     "lon": 24.7630195
+    },
+    {
+     "lat": 60.1809818,
+     "lon": 24.7630504
+    },
+    {
+     "lat": 60.1809202,
+     "lon": 24.7630467
+    },
+    {
+     "lat": 60.1808044,
+     "lon": 24.7627979
+    },
+    {
+     "lat": 60.1807181,
+     "lon": 24.7627188
+    },
+    {
+     "lat": 60.1806231,
+     "lon": 24.7625348
+    },
+    {
+     "lat": 60.1805302,
+     "lon": 24.7624056
+    },
+    {
+     "lat": 60.1804313,
+     "lon": 24.762291
+    },
+    {
+     "lat": 60.1802938,
+     "lon": 24.7621863
+    },
+    {
+     "lat": 60.1801386,
+     "lon": 24.7621065
+    },
+    {
+     "lat": 60.1800177,
+     "lon": 24.7620505
+    },
+    {
+     "lat": 60.1796832,
+     "lon": 24.7618311
+    },
+    {
+     "lat": 60.1795344,
+     "lon": 24.7617492
+    },
+    {
+     "lat": 60.1793453,
+     "lon": 24.7616395
+    },
+    {
+     "lat": 60.1790964,
+     "lon": 24.7614776
+    },
+    {
+     "lat": 60.1790093,
+     "lon": 24.761445
+    },
+    {
+     "lat": 60.1789577,
+     "lon": 24.7614422
+    },
+    {
+     "lat": 60.1788818,
+     "lon": 24.7614819
+    },
+    {
+     "lat": 60.1784934,
+     "lon": 24.7618537
+    },
+    {
+     "lat": 60.1783227,
+     "lon": 24.7619976
+    },
+    {
+     "lat": 60.1781046,
+     "lon": 24.7621322
+    },
+    {
+     "lat": 60.1778873,
+     "lon": 24.7621652
+    },
+    {
+     "lat": 60.1776397,
+     "lon": 24.7621317
+    },
+    {
+     "lat": 60.1774835,
+     "lon": 24.7621651
+    },
+    {
+     "lat": 60.1773497,
+     "lon": 24.7621639
+    },
+    {
+     "lat": 60.1772668,
+     "lon": 24.7621256
+    },
+    {
+     "lat": 60.177201,
+     "lon": 24.7621297
+    },
+    {
+     "lat": 60.1770984,
+     "lon": 24.7621157
+    },
+    {
+     "lat": 60.176964,
+     "lon": 24.7620618
+    },
+    {
+     "lat": 60.1768406,
+     "lon": 24.7620709
+    },
+    {
+     "lat": 60.1767326,
+     "lon": 24.7620998
+    },
+    {
+     "lat": 60.1765492,
+     "lon": 24.7621321
+    },
+    {
+     "lat": 60.1764214,
+     "lon": 24.7621246
+    },
+    {
+     "lat": 60.1763361,
+     "lon": 24.7621035
+    },
+    {
+     "lat": 60.1761978,
+     "lon": 24.7620692
+    },
+    {
+     "lat": 60.1761182,
+     "lon": 24.7620272
+    },
+    {
+     "lat": 60.1758449,
+     "lon": 24.7618414
+    },
+    {
+     "lat": 60.1756254,
+     "lon": 24.7616415
+    },
+    {
+     "lat": 60.1755379,
+     "lon": 24.7615533
+    },
+    {
+     "lat": 60.1753,
+     "lon": 24.7612931
+    },
+    {
+     "lat": 60.1751307,
+     "lon": 24.7611657
+    },
+    {
+     "lat": 60.1750404,
+     "lon": 24.7610624
+    },
+    {
+     "lat": 60.1747876,
+     "lon": 24.7607652
+    },
+    {
+     "lat": 60.1746487,
+     "lon": 24.7606232
+    },
+    {
+     "lat": 60.1745322,
+     "lon": 24.7605371
+    },
+    {
+     "lat": 60.1743699,
+     "lon": 24.7603979
+    },
+    {
+     "lat": 60.1741547,
+     "lon": 24.7601789
+    },
+    {
+     "lat": 60.174086,
+     "lon": 24.7600827
+    },
+    {
+     "lat": 60.1740385,
+     "lon": 24.7600317
+    },
+    {
+     "lat": 60.1739274,
+     "lon": 24.7599183
+    },
+    {
+     "lat": 60.1736853,
+     "lon": 24.7597095
+    },
+    {
+     "lat": 60.1736264,
+     "lon": 24.7596465
+    },
+    {
+     "lat": 60.1735445,
+     "lon": 24.7595219
+    },
+    {
+     "lat": 60.1734572,
+     "lon": 24.7594248
+    },
+    {
+     "lat": 60.1733316,
+     "lon": 24.7592095
+    },
+    {
+     "lat": 60.1731583,
+     "lon": 24.7588613
+    },
+    {
+     "lat": 60.1730438,
+     "lon": 24.7586184
+    },
+    {
+     "lat": 60.1728758,
+     "lon": 24.7583054
+    },
+    {
+     "lat": 60.1727736,
+     "lon": 24.7581437
+    },
+    {
+     "lat": 60.1722575,
+     "lon": 24.7575749
+    },
+    {
+     "lat": 60.1715637,
+     "lon": 24.7564198
+    },
+    {
+     "lat": 60.1714715,
+     "lon": 24.756342
+    },
+    {
+     "lat": 60.1712842,
+     "lon": 24.7562587
+    },
+    {
+     "lat": 60.1709954,
+     "lon": 24.7560969
+    },
+    {
+     "lat": 60.1708199,
+     "lon": 24.7560099
+    },
+    {
+     "lat": 60.1707878,
+     "lon": 24.7559807
+    },
+    {
+     "lat": 60.1703099,
+     "lon": 24.7555459
+    },
+    {
+     "lat": 60.1702037,
+     "lon": 24.7554946
+    },
+    {
+     "lat": 60.1700486,
+     "lon": 24.7553943
+    },
+    {
+     "lat": 60.1698046,
+     "lon": 24.7552728
+    },
+    {
+     "lat": 60.1696144,
+     "lon": 24.7552047
+    },
+    {
+     "lat": 60.1694481,
+     "lon": 24.7551711
+    },
+    {
+     "lat": 60.1692797,
+     "lon": 24.7550988
+    },
+    {
+     "lat": 60.169197,
+     "lon": 24.7550627
+    },
+    {
+     "lat": 60.1691372,
+     "lon": 24.7549919
+    },
+    {
+     "lat": 60.1689599,
+     "lon": 24.754625
+    },
+    {
+     "lat": 60.1688092,
+     "lon": 24.7543599
+    },
+    {
+     "lat": 60.1686484,
+     "lon": 24.7539677
+    },
+    {
+     "lat": 60.1684678,
+     "lon": 24.7536382
+    },
+    {
+     "lat": 60.1683578,
+     "lon": 24.7535222
+    },
+    {
+     "lat": 60.16824,
+     "lon": 24.753461
+    },
+    {
+     "lat": 60.167889,
+     "lon": 24.7534436
+    },
+    {
+     "lat": 60.167519,
+     "lon": 24.7533951
+    },
+    {
+     "lat": 60.1671663,
+     "lon": 24.7533004
+    },
+    {
+     "lat": 60.1668555,
+     "lon": 24.7532584
+    },
+    {
+     "lat": 60.1667089,
+     "lon": 24.753209
+    },
+    {
+     "lat": 60.1665883,
+     "lon": 24.7532018
+    },
+    {
+     "lat": 60.1664633,
+     "lon": 24.7532813
+    },
+    {
+     "lat": 60.1664061,
+     "lon": 24.7533485
+    },
+    {
+     "lat": 60.1663498,
+     "lon": 24.7534457
+    },
+    {
+     "lat": 60.1663033,
+     "lon": 24.753554
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 32082681,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "1",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "parking:both": "no",
+    "parking:both:restriction": "no_stopping",
+    "parking:condition:reason": "underpass",
+    "paved:date": "2011-05",
+    "snowplowing": "yes",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1664856,
+     "lon": 24.7526438
+    },
+    {
+     "lat": 60.1664035,
+     "lon": 24.7526569
+    },
+    {
+     "lat": 60.1662529,
+     "lon": 24.7526583
+    },
+    {
+     "lat": 60.1658955,
+     "lon": 24.7526098
+    },
+    {
+     "lat": 60.1656645,
+     "lon": 24.7525756
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 32082684,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "2",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "parking:both": "no",
+    "parking:both:restriction": "no_stopping",
+    "parking:condition:reason": "turning_lane",
+    "paved:date": "2011-05",
+    "placement": "middle_of:1",
+    "snowplowing": "yes",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt",
+    "turn:lanes": "through|slight_right"
+   },
+   "geometry": [
+    {
+     "lat": 60.1656645,
+     "lon": 24.7525756
+    },
+    {
+     "lat": 60.1655144,
+     "lon": 24.7525514
+    },
+    {
+     "lat": 60.1653718,
+     "lon": 24.7525499
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 32082688,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "2",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "paved:date": "2011-05",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt",
+    "turn:lanes": "through|through;slight_right"
+   },
+   "geometry": [
+    {
+     "lat": 60.1656186,
+     "lon": 24.752691
+    },
+    {
+     "lat": 60.1658121,
+     "lon": 24.7527259
+    },
+    {
+     "lat": 60.166269,
+     "lon": 24.7527819
+    },
+    {
+     "lat": 60.1664874,
+     "lon": 24.7527933
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 32082831,
+   "tags": {
+    "destination": "Helsinki",
+    "destination:ref": "51",
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "placement": "transition",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659232,
+     "lon": 24.7516258
+    },
+    {
+     "lat": 60.1659825,
+     "lon": 24.7524042
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114969,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "priority_road": "yes_unposted",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661643,
+     "lon": 24.753548
+    },
+    {
+     "lat": 60.1661252,
+     "lon": 24.7529172
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114972,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1660562,
+     "lon": 24.75365
+    },
+    {
+     "lat": 60.1660662,
+     "lon": 24.753828
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114973,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "priority_road": "yes_unposted",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661252,
+     "lon": 24.7529172
+    },
+    {
+     "lat": 60.1660999,
+     "lon": 24.7524225
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114975,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659825,
+     "lon": 24.7524042
+    },
+    {
+     "lat": 60.1660099,
+     "lon": 24.7528903
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114976,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "3",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "placement": "right_of:1",
+    "priority_road": "yes_unposted",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt",
+    "turn:lanes": "through|through|slight_right"
+   },
+   "geometry": [
+    {
+     "lat": 60.1663274,
+     "lon": 24.7560824
+    },
+    {
+     "lat": 60.1662781,
+     "lon": 24.755395
+    },
+    {
+     "lat": 60.1661777,
+     "lon": 24.7538495
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114977,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway",
+    "lanes": "2",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "name": "Länsiväylä",
+    "name:fi": "Länsiväylä",
+    "name:sv": "Västerleden",
+    "oneway": "yes",
+    "ref": "51",
+    "start_date": "1963",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1660662,
+     "lon": 24.753828
+    },
+    {
+     "lat": 60.166096,
+     "lon": 24.754306
+    },
+    {
+     "lat": 60.1661925,
+     "lon": 24.7558389
+    },
+    {
+     "lat": 60.1663625,
+     "lon": 24.7583091
+    },
+    {
+     "lat": 60.1665478,
+     "lon": 24.7605699
+    },
+    {
+     "lat": 60.166791,
+     "lon": 24.7632584
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114982,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "secondary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661965,
+     "lon": 24.7529201
+    },
+    {
+     "lat": 60.1661838,
+     "lon": 24.7524447
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114983,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659433,
+     "lon": 24.7537056
+    },
+    {
+     "lat": 60.1659321,
+     "lon": 24.7539367
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114986,
+   "tags": {
+    "bridge": "yes",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "layer": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "paved:date": "2013",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659303,
+     "lon": 24.7523869
+    },
+    {
+     "lat": 60.1659489,
+     "lon": 24.7528988
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114987,
+   "tags": {
+    "functional_class": "secondary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "placement": "transition",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.166198,
+     "lon": 24.7535314
+    },
+    {
+     "lat": 60.1661993,
+     "lon": 24.7532702
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114988,
+   "tags": {
+    "functional_class": "secondary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661838,
+     "lon": 24.7524447
+    },
+    {
+     "lat": 60.1661816,
+     "lon": 24.7520844
+    },
+    {
+     "lat": 60.1661846,
+     "lon": 24.7517799
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114990,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "paved:date": "2013",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659489,
+     "lon": 24.7528988
+    },
+    {
+     "lat": 60.1659538,
+     "lon": 24.7532538
+    },
+    {
+     "lat": 60.1659433,
+     "lon": 24.7537056
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133114995,
+   "tags": {
+    "barrier": "retaining_wall"
+   },
+   "geometry": [
+    {
+     "lat": 60.1669636,
+     "lon": 24.7530082
+    },
+    {
+     "lat": 60.166729,
+     "lon": 24.7529809
+    },
+    {
+     "lat": 60.1663755,
+     "lon": 24.7529638
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 133116543,
+   "tags": {
+    "barrier": "guard_rail"
+   },
+   "geometry": [
+    {
+     "lat": 60.1633133,
+     "lon": 24.7517292
+    },
+    {
+     "lat": 60.1635202,
+     "lon": 24.7518888
+    },
+    {
+     "lat": 60.163707,
+     "lon": 24.7520028
+    },
+    {
+     "lat": 60.1641214,
+     "lon": 24.7521798
+    },
+    {
+     "lat": 60.1643645,
+     "lon": 24.7522605
+    },
+    {
+     "lat": 60.1644666,
+     "lon": 24.7523145
+    },
+    {
+     "lat": 60.1645205,
+     "lon": 24.7523367
+    },
+    {
+     "lat": 60.1646163,
+     "lon": 24.7523554
+    },
+    {
+     "lat": 60.1647012,
+     "lon": 24.7523568
+    },
+    {
+     "lat": 60.1647585,
+     "lon": 24.7523463
+    },
+    {
+     "lat": 60.1648103,
+     "lon": 24.752325
+    },
+    {
+     "lat": 60.1648793,
+     "lon": 24.7523149
+    },
+    {
+     "lat": 60.1649255,
+     "lon": 24.7523197
+    },
+    {
+     "lat": 60.1649644,
+     "lon": 24.7523331
+    },
+    {
+     "lat": 60.1650592,
+     "lon": 24.7523949
+    },
+    {
+     "lat": 60.165139,
+     "lon": 24.7524259
+    },
+    {
+     "lat": 60.165215,
+     "lon": 24.7524433
+    },
+    {
+     "lat": 60.1653012,
+     "lon": 24.7524433
+    },
+    {
+     "lat": 60.1654599,
+     "lon": 24.7524452
+    },
+    {
+     "lat": 60.1655556,
+     "lon": 24.7524713
+    },
+    {
+     "lat": 60.1656561,
+     "lon": 24.7525023
+    },
+    {
+     "lat": 60.1658231,
+     "lon": 24.7525429
+    },
+    {
+     "lat": 60.1659024,
+     "lon": 24.7525593
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 158715652,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "destination": "Kehä II",
+    "destination:ref": "102",
+    "destination:ref:to": "1",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "2",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "paved:date": "2011-05",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1664874,
+     "lon": 24.7527933
+    },
+    {
+     "lat": 60.166688,
+     "lon": 24.7527541
+    },
+    {
+     "lat": 60.1668775,
+     "lon": 24.7526755
+    },
+    {
+     "lat": 60.1670254,
+     "lon": 24.7525935
+    },
+    {
+     "lat": 60.1671724,
+     "lon": 24.7524893
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 158715718,
+   "tags": {
+    "functional_class": "service",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "motor_vehicle": "yes",
+    "oneway": "yes",
+    "psv": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659199,
+     "lon": 24.754066
+    },
+    {
+     "lat": 60.1659226,
+     "lon": 24.7542951
+    },
+    {
+     "lat": 60.1659006,
+     "lon": 24.7547722
+    },
+    {
+     "lat": 60.1658929,
+     "lon": 24.7549882
+    },
+    {
+     "lat": 60.1658747,
+     "lon": 24.7554977
+    },
+    {
+     "lat": 60.1658737,
+     "lon": 24.7555261
+    },
+    {
+     "lat": 60.165873,
+     "lon": 24.755805
+    },
+    {
+     "lat": 60.1658875,
+     "lon": 24.7560652
+    },
+    {
+     "lat": 60.1659085,
+     "lon": 24.7562779
+    },
+    {
+     "lat": 60.1659274,
+     "lon": 24.7564685
+    },
+    {
+     "lat": 60.1659772,
+     "lon": 24.7568165
+    },
+    {
+     "lat": 60.1661788,
+     "lon": 24.7582626
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 331407513,
+   "tags": {
+    "functional_class": "secondary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "light:method": "high_pressure_sodium",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661993,
+     "lon": 24.7532702
+    },
+    {
+     "lat": 60.1661965,
+     "lon": 24.7529201
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 331407515,
+   "tags": {
+    "destination": "Kehä II;Olari",
+    "destination:lang:en": "Ring II;Olari",
+    "destination:ref": "102;",
+    "destination:ref:to": "1",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "lit": "yes",
+    "maxspeed": "80",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1665752,
+     "lon": 24.7584424
+    },
+    {
+     "lat": 60.1665653,
+     "lon": 24.7581639
+    },
+    {
+     "lat": 60.1665395,
+     "lon": 24.7573952
+    },
+    {
+     "lat": 60.1665321,
+     "lon": 24.7567202
+    },
+    {
+     "lat": 60.1665411,
+     "lon": 24.7560034
+    },
+    {
+     "lat": 60.1665705,
+     "lon": 24.755346
+    },
+    {
+     "lat": 60.1666164,
+     "lon": 24.7545738
+    },
+    {
+     "lat": 60.1666735,
+     "lon": 24.7541302
+    },
+    {
+     "lat": 60.1667593,
+     "lon": 24.753751
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221104,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "layer": "-1",
+    "lit": "yes",
+    "segregated": "no",
+    "surface": "asphalt",
+    "tunnel": "yes"
+   },
+   "geometry": [
+    {
+     "lat": 60.1655607,
+     "lon": 24.7548954
+    },
+    {
+     "lat": 60.1655777,
+     "lon": 24.7550442
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221108,
+   "tags": {
+    "bicycle": "designated",
+    "bridge": "yes",
+    "foot": "designated",
+    "highway": "cycleway",
+    "layer": "1",
+    "lit": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1657015,
+     "lon": 24.752248
+    },
+    {
+     "lat": 60.1657293,
+     "lon": 24.7523931
+    },
+    {
+     "lat": 60.1657422,
+     "lon": 24.7524899
+    },
+    {
+     "lat": 60.1657467,
+     "lon": 24.7526003
+    },
+    {
+     "lat": 60.1657435,
+     "lon": 24.7526828
+    },
+    {
+     "lat": 60.1657337,
+     "lon": 24.7528018
+    },
+    {
+     "lat": 60.1657143,
+     "lon": 24.7529297
+    },
+    {
+     "lat": 60.1656889,
+     "lon": 24.7530344
+    },
+    {
+     "lat": 60.1656526,
+     "lon": 24.7531294
+    },
+    {
+     "lat": 60.1656138,
+     "lon": 24.7532121
+    },
+    {
+     "lat": 60.1655768,
+     "lon": 24.7532767
+    },
+    {
+     "lat": 60.1655332,
+     "lon": 24.753329
+    },
+    {
+     "lat": 60.1654793,
+     "lon": 24.7533863
+    },
+    {
+     "lat": 60.1654333,
+     "lon": 24.7534301
+    },
+    {
+     "lat": 60.1653824,
+     "lon": 24.7534995
+    },
+    {
+     "lat": 60.165334,
+     "lon": 24.7536261
+    },
+    {
+     "lat": 60.1653109,
+     "lon": 24.753715
+    },
+    {
+     "lat": 60.1652934,
+     "lon": 24.7538185
+    },
+    {
+     "lat": 60.1652819,
+     "lon": 24.7539378
+    },
+    {
+     "lat": 60.1652861,
+     "lon": 24.7540535
+    },
+    {
+     "lat": 60.1652991,
+     "lon": 24.7541695
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221127,
+   "tags": {
+    "bicycle": "use_sidepath",
+    "destination": "Kehä II;Niittykumpu",
+    "destination:lang:en": "Ring II;Niittykumpu",
+    "destination:ref": "102",
+    "functional_class": "primary",
+    "highway": "primary",
+    "lanes": "1",
+    "lit": "yes",
+    "maxspeed": "50",
+    "name": "Gräsanlaakso",
+    "name:fi": "Gräsanlaakso",
+    "name:sv": "Gräsadalen",
+    "oneway": "yes",
+    "source:name:sv": "Digiroad.fi",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1650492,
+     "lon": 24.7529293
+    },
+    {
+     "lat": 60.1651898,
+     "lon": 24.752748
+    },
+    {
+     "lat": 60.1652772,
+     "lon": 24.7526812
+    },
+    {
+     "lat": 60.1654083,
+     "lon": 24.7526461
+    },
+    {
+     "lat": 60.1655409,
+     "lon": 24.7526463
+    },
+    {
+     "lat": 60.1656186,
+     "lon": 24.752691
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221128,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "moped": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1654046,
+     "lon": 24.7544521
+    },
+    {
+     "lat": 60.1654551,
+     "lon": 24.7545612
+    },
+    {
+     "lat": 60.1655135,
+     "lon": 24.7547015
+    },
+    {
+     "lat": 60.165539,
+     "lon": 24.7547918
+    },
+    {
+     "lat": 60.1655607,
+     "lon": 24.7548954
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221135,
+   "tags": {
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "2",
+    "lit": "yes",
+    "maxspeed": "60",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1655007,
+     "lon": 24.7550199
+    },
+    {
+     "lat": 60.1653533,
+     "lon": 24.7550214
+    },
+    {
+     "lat": 60.1652419,
+     "lon": 24.7549703
+    },
+    {
+     "lat": 60.1651474,
+     "lon": 24.7548777
+    },
+    {
+     "lat": 60.1650711,
+     "lon": 24.7547633
+    },
+    {
+     "lat": 60.1649984,
+     "lon": 24.7545855
+    },
+    {
+     "lat": 60.1649439,
+     "lon": 24.7543858
+    },
+    {
+     "lat": 60.1649199,
+     "lon": 24.7542227
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221139,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "moped": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1655777,
+     "lon": 24.7550442
+    },
+    {
+     "lat": 60.1655774,
+     "lon": 24.7551529
+    },
+    {
+     "lat": 60.165569,
+     "lon": 24.7552503
+    },
+    {
+     "lat": 60.1655496,
+     "lon": 24.755355
+    },
+    {
+     "lat": 60.1655241,
+     "lon": 24.755439
+    },
+    {
+     "lat": 60.1654702,
+     "lon": 24.7555291
+    },
+    {
+     "lat": 60.1654166,
+     "lon": 24.7555873
+    },
+    {
+     "lat": 60.1653803,
+     "lon": 24.7556257
+    },
+    {
+     "lat": 60.1653198,
+     "lon": 24.7557223
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221150,
+   "tags": {
+    "highway": "footway",
+    "lit": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1654702,
+     "lon": 24.7555291
+    },
+    {
+     "lat": 60.1655157,
+     "lon": 24.7556959
+    },
+    {
+     "lat": 60.1655629,
+     "lon": 24.7558639
+    },
+    {
+     "lat": 60.1655944,
+     "lon": 24.7559418
+    },
+    {
+     "lat": 60.1656392,
+     "lon": 24.7559832
+    },
+    {
+     "lat": 60.1656913,
+     "lon": 24.7559857
+    },
+    {
+     "lat": 60.1658143,
+     "lon": 24.755946
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 356221153,
+   "tags": {
+    "destination": "Kehä II;Niittykumpu",
+    "destination:lang:en": "Ring II;Niittykumpu",
+    "destination:ref": "102",
+    "functional_class": "primary",
+    "highway": "motorway_link",
+    "lanes": "1",
+    "lit": "yes",
+    "maxspeed": "50",
+    "oneway": "yes",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1649062,
+     "lon": 24.7540236
+    },
+    {
+     "lat": 60.1649245,
+     "lon": 24.753855
+    },
+    {
+     "lat": 60.1649536,
+     "lon": 24.7536432
+    },
+    {
+     "lat": 60.1650069,
+     "lon": 24.7533826
+    },
+    {
+     "lat": 60.1650686,
+     "lon": 24.7532146
+    },
+    {
+     "lat": 60.1651425,
+     "lon": 24.7530612
+    },
+    {
+     "lat": 60.1652279,
+     "lon": 24.7529212
+    },
+    {
+     "lat": 60.1653182,
+     "lon": 24.7528347
+    },
+    {
+     "lat": 60.1654151,
+     "lon": 24.7527665
+    },
+    {
+     "lat": 60.165487,
+     "lon": 24.7527294
+    },
+    {
+     "lat": 60.1655451,
+     "lon": 24.752722
+    },
+    {
+     "lat": 60.1656186,
+     "lon": 24.752691
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 360381459,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1633344,
+     "lon": 24.7388664
+    },
+    {
+     "lat": 60.1633954,
+     "lon": 24.7391516
+    },
+    {
+     "lat": 60.1636362,
+     "lon": 24.740277
+    },
+    {
+     "lat": 60.1636715,
+     "lon": 24.7404027
+    },
+    {
+     "lat": 60.1640472,
+     "lon": 24.741654
+    },
+    {
+     "lat": 60.1642061,
+     "lon": 24.7422436
+    },
+    {
+     "lat": 60.1643195,
+     "lon": 24.7427237
+    },
+    {
+     "lat": 60.1644276,
+     "lon": 24.7431743
+    },
+    {
+     "lat": 60.1646325,
+     "lon": 24.7442366
+    },
+    {
+     "lat": 60.1646696,
+     "lon": 24.7444237
+    },
+    {
+     "lat": 60.1647512,
+     "lon": 24.7449257
+    },
+    {
+     "lat": 60.1648094,
+     "lon": 24.7453445
+    },
+    {
+     "lat": 60.1648833,
+     "lon": 24.7459752
+    },
+    {
+     "lat": 60.164951,
+     "lon": 24.746568
+    },
+    {
+     "lat": 60.1649762,
+     "lon": 24.7469505
+    },
+    {
+     "lat": 60.1649836,
+     "lon": 24.747096
+    },
+    {
+     "lat": 60.1650166,
+     "lon": 24.7480352
+    },
+    {
+     "lat": 60.1650262,
+     "lon": 24.7481984
+    },
+    {
+     "lat": 60.1650444,
+     "lon": 24.7483859
+    },
+    {
+     "lat": 60.1650723,
+     "lon": 24.7485904
+    },
+    {
+     "lat": 60.1651244,
+     "lon": 24.7488875
+    },
+    {
+     "lat": 60.1652184,
+     "lon": 24.7492871
+    },
+    {
+     "lat": 60.1652288,
+     "lon": 24.7493273
+    },
+    {
+     "lat": 60.1653097,
+     "lon": 24.7496399
+    },
+    {
+     "lat": 60.1653618,
+     "lon": 24.7499029
+    },
+    {
+     "lat": 60.1653897,
+     "lon": 24.7500704
+    },
+    {
+     "lat": 60.1654057,
+     "lon": 24.7502005
+    },
+    {
+     "lat": 60.1654121,
+     "lon": 24.7503195
+    },
+    {
+     "lat": 60.1654167,
+     "lon": 24.7504054
+    },
+    {
+     "lat": 60.1654285,
+     "lon": 24.7505963
+    },
+    {
+     "lat": 60.1654454,
+     "lon": 24.7509329
+    },
+    {
+     "lat": 60.1654563,
+     "lon": 24.7510961
+    },
+    {
+     "lat": 60.1654769,
+     "lon": 24.751286
+    },
+    {
+     "lat": 60.1657015,
+     "lon": 24.752248
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434349,
+   "tags": {
+    "bridge:structure": "beam",
+    "layer": "1",
+    "man_made": "bridge"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661413,
+     "lon": 24.7538629
+    },
+    {
+     "lat": 60.1661213,
+     "lon": 24.7535692
+    },
+    {
+     "lat": 60.1661643,
+     "lon": 24.753548
+    },
+    {
+     "lat": 60.166198,
+     "lon": 24.7535314
+    },
+    {
+     "lat": 60.1662371,
+     "lon": 24.7535125
+    },
+    {
+     "lat": 60.1662455,
+     "lon": 24.7535085
+    },
+    {
+     "lat": 60.1662531,
+     "lon": 24.7535048
+    },
+    {
+     "lat": 60.1662604,
+     "lon": 24.7537147
+    },
+    {
+     "lat": 60.1662642,
+     "lon": 24.7538226
+    },
+    {
+     "lat": 60.1661777,
+     "lon": 24.7538495
+    },
+    {
+     "lat": 60.1661413,
+     "lon": 24.7538629
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434350,
+   "tags": {
+    "bridge:structure": "beam",
+    "layer": "1",
+    "man_made": "bridge"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659822,
+     "lon": 24.7536864
+    },
+    {
+     "lat": 60.1659731,
+     "lon": 24.7538605
+    },
+    {
+     "lat": 60.1659635,
+     "lon": 24.7539139
+    },
+    {
+     "lat": 60.1659321,
+     "lon": 24.7539367
+    },
+    {
+     "lat": 60.1658861,
+     "lon": 24.7539756
+    },
+    {
+     "lat": 60.1659101,
+     "lon": 24.7537301
+    },
+    {
+     "lat": 60.1659822,
+     "lon": 24.7536864
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434351,
+   "tags": {
+    "bridge:structure": "beam",
+    "layer": "1",
+    "man_made": "bridge"
+   },
+   "geometry": [
+    {
+     "lat": 60.1661099,
+     "lon": 24.753623
+    },
+    {
+     "lat": 60.1661228,
+     "lon": 24.7538165
+    },
+    {
+     "lat": 60.1660662,
+     "lon": 24.753828
+    },
+    {
+     "lat": 60.1660035,
+     "lon": 24.7538441
+    },
+    {
+     "lat": 60.1659944,
+     "lon": 24.7536804
+    },
+    {
+     "lat": 60.1660562,
+     "lon": 24.75365
+    },
+    {
+     "lat": 60.1661099,
+     "lon": 24.753623
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434352,
+   "tags": {
+    "barrier": "retaining_wall"
+   },
+   "geometry": [
+    {
+     "lat": 60.1659116,
+     "lon": 24.7537212
+    },
+    {
+     "lat": 60.1659433,
+     "lon": 24.7537056
+    },
+    {
+     "lat": 60.1659822,
+     "lon": 24.7536864
+    },
+    {
+     "lat": 60.1659944,
+     "lon": 24.7536804
+    },
+    {
+     "lat": 60.1660562,
+     "lon": 24.75365
+    },
+    {
+     "lat": 60.1661099,
+     "lon": 24.753623
+    },
+    {
+     "lat": 60.1661067,
+     "lon": 24.7535764
+    },
+    {
+     "lat": 60.1661213,
+     "lon": 24.7535692
+    },
+    {
+     "lat": 60.1661643,
+     "lon": 24.753548
+    },
+    {
+     "lat": 60.166198,
+     "lon": 24.7535314
+    },
+    {
+     "lat": 60.1662371,
+     "lon": 24.7535125
+    },
+    {
+     "lat": 60.1662455,
+     "lon": 24.7535085
+    },
+    {
+     "lat": 60.1662531,
+     "lon": 24.7535048
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434353,
+   "tags": {
+    "barrier": "retaining_wall"
+   },
+   "geometry": [
+    {
+     "lat": 60.1662811,
+     "lon": 24.7538173
+    },
+    {
+     "lat": 60.1662642,
+     "lon": 24.7538226
+    },
+    {
+     "lat": 60.1661777,
+     "lon": 24.7538495
+    },
+    {
+     "lat": 60.1661413,
+     "lon": 24.7538629
+    },
+    {
+     "lat": 60.1661263,
+     "lon": 24.7538683
+    },
+    {
+     "lat": 60.1661228,
+     "lon": 24.7538165
+    },
+    {
+     "lat": 60.1660662,
+     "lon": 24.753828
+    },
+    {
+     "lat": 60.1660035,
+     "lon": 24.7538441
+    },
+    {
+     "lat": 60.1659731,
+     "lon": 24.7538605
+    },
+    {
+     "lat": 60.1659635,
+     "lon": 24.7539139
+    },
+    {
+     "lat": 60.1659321,
+     "lon": 24.7539367
+    },
+    {
+     "lat": 60.1658861,
+     "lon": 24.7539756
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434355,
+   "tags": {
+    "waterway": "ditch"
+   },
+   "geometry": [
+    {
+     "lat": 60.16573,
+     "lon": 24.7528383
+    },
+    {
+     "lat": 60.1657225,
+     "lon": 24.7537243
+    },
+    {
+     "lat": 60.1657224,
+     "lon": 24.7538086
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434360,
+   "tags": {
+    "boat": "no",
+    "name": "Gräsanoja",
+    "name:fi": "Gräsanoja",
+    "name:sv": "Gräsaån",
+    "source": "Bing",
+    "waterway": "river"
+   },
+   "geometry": [
+    {
+     "lat": 60.1657894,
+     "lon": 24.7538205
+    },
+    {
+     "lat": 60.1657224,
+     "lon": 24.7538086
+    },
+    {
+     "lat": 60.1655503,
+     "lon": 24.7538302
+    },
+    {
+     "lat": 60.1653613,
+     "lon": 24.7539612
+    },
+    {
+     "lat": 60.1650531,
+     "lon": 24.7540679
+    },
+    {
+     "lat": 60.1645712,
+     "lon": 24.7542287
+    },
+    {
+     "lat": 60.1642463,
+     "lon": 24.7543461
+    },
+    {
+     "lat": 60.1638389,
+     "lon": 24.7545213
+    },
+    {
+     "lat": 60.163663,
+     "lon": 24.7546955
+    },
+    {
+     "lat": 60.163365,
+     "lon": 24.7551157
+    },
+    {
+     "lat": 60.1632096,
+     "lon": 24.7552571
+    },
+    {
+     "lat": 60.1631468,
+     "lon": 24.7553425
+    },
+    {
+     "lat": 60.1630208,
+     "lon": 24.7555137
+    },
+    {
+     "lat": 60.1628704,
+     "lon": 24.7557775
+    },
+    {
+     "lat": 60.162724,
+     "lon": 24.7559871
+    },
+    {
+     "lat": 60.1625196,
+     "lon": 24.7561649
+    },
+    {
+     "lat": 60.16235,
+     "lon": 24.7564046
+    },
+    {
+     "lat": 60.1620376,
+     "lon": 24.7567446
+    },
+    {
+     "lat": 60.1618963,
+     "lon": 24.7568223
+    },
+    {
+     "lat": 60.1616451,
+     "lon": 24.7571015
+    },
+    {
+     "lat": 60.1616248,
+     "lon": 24.757161
+    },
+    {
+     "lat": 60.1615177,
+     "lon": 24.7572282
+    },
+    {
+     "lat": 60.161443,
+     "lon": 24.7573248
+    },
+    {
+     "lat": 60.1613835,
+     "lon": 24.75738
+    },
+    {
+     "lat": 60.1613468,
+     "lon": 24.7575047
+    },
+    {
+     "lat": 60.1613445,
+     "lon": 24.7576659
+    },
+    {
+     "lat": 60.161317,
+     "lon": 24.7578166
+    },
+    {
+     "lat": 60.1612922,
+     "lon": 24.7578919
+    },
+    {
+     "lat": 60.161241,
+     "lon": 24.758051
+    },
+    {
+     "lat": 60.1611761,
+     "lon": 24.7582367
+    },
+    {
+     "lat": 60.1610944,
+     "lon": 24.7585159
+    },
+    {
+     "lat": 60.1609761,
+     "lon": 24.7587757
+    },
+    {
+     "lat": 60.1606446,
+     "lon": 24.7594524
+    },
+    {
+     "lat": 60.1604354,
+     "lon": 24.7598185
+    },
+    {
+     "lat": 60.1602339,
+     "lon": 24.7602435
+    },
+    {
+     "lat": 60.1598688,
+     "lon": 24.7605517
+    },
+    {
+     "lat": 60.1597445,
+     "lon": 24.7608406
+    },
+    {
+     "lat": 60.1577743,
+     "lon": 24.764301
+    },
+    {
+     "lat": 60.1576632,
+     "lon": 24.7645616
+    },
+    {
+     "lat": 60.1574395,
+     "lon": 24.7655088
+    },
+    {
+     "lat": 60.1572405,
+     "lon": 24.7663509
+    },
+    {
+     "lat": 60.1571845,
+     "lon": 24.7665893
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434361,
+   "tags": {
+    "boat": "no",
+    "layer": "-1",
+    "name": "Gräsanoja",
+    "name:fi": "Gräsanoja",
+    "name:sv": "Gräsaån",
+    "source": "Bing",
+    "waterway": "river"
+   },
+   "geometry": [
+    {
+     "lat": 60.1663033,
+     "lon": 24.753554
+    },
+    {
+     "lat": 60.1662498,
+     "lon": 24.7536214
+    },
+    {
+     "lat": 60.1659899,
+     "lon": 24.7538009
+    },
+    {
+     "lat": 60.1658825,
+     "lon": 24.7538316
+    },
+    {
+     "lat": 60.1658388,
+     "lon": 24.753829
+    },
+    {
+     "lat": 60.1657894,
+     "lon": 24.7538205
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434362,
+   "tags": {
+    "bicycle": "designated",
+    "bridge": "yes",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "segregated": "no",
+    "surface": "wood"
+   },
+   "geometry": [
+    {
+     "lat": 60.1657773,
+     "lon": 24.7539256
+    },
+    {
+     "lat": 60.1663689,
+     "lon": 24.7536139
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 576434364,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "moped": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1654046,
+     "lon": 24.7544521
+    },
+    {
+     "lat": 60.1654599,
+     "lon": 24.7543006
+    },
+    {
+     "lat": 60.1655338,
+     "lon": 24.7541716
+    },
+    {
+     "lat": 60.1656586,
+     "lon": 24.7540035
+    },
+    {
+     "lat": 60.1657773,
+     "lon": 24.7539256
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 860163642,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1663689,
+     "lon": 24.7536139
+    },
+    {
+     "lat": 60.1666096,
+     "lon": 24.7534727
+    },
+    {
+     "lat": 60.1666726,
+     "lon": 24.7534557
+    },
+    {
+     "lat": 60.1667392,
+     "lon": 24.7534532
+    },
+    {
+     "lat": 60.1668216,
+     "lon": 24.75348
+    },
+    {
+     "lat": 60.1668694,
+     "lon": 24.7535205
+    },
+    {
+     "lat": 60.1669306,
+     "lon": 24.7535725
+    },
+    {
+     "lat": 60.1669995,
+     "lon": 24.7536199
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 942199555,
+   "tags": {
+    "natural": "water",
+    "water": "river"
+   },
+   "geometry": [
+    {
+     "lat": 60.170347,
+     "lon": 24.7557261
+    },
+    {
+     "lat": 60.1704405,
+     "lon": 24.7558141
+    },
+    {
+     "lat": 60.1707963,
+     "lon": 24.756059
+    },
+    {
+     "lat": 60.1707793,
+     "lon": 24.7558757
+    },
+    {
+     "lat": 60.1706784,
+     "lon": 24.7557949
+    },
+    {
+     "lat": 60.1705618,
+     "lon": 24.7557015
+    },
+    {
+     "lat": 60.1705387,
+     "lon": 24.7556818
+    },
+    {
+     "lat": 60.1704178,
+     "lon": 24.7555844
+    },
+    {
+     "lat": 60.1703505,
+     "lon": 24.7555369
+    },
+    {
+     "lat": 60.1703198,
+     "lon": 24.7554983
+    },
+    {
+     "lat": 60.1702782,
+     "lon": 24.7554725
+    },
+    {
+     "lat": 60.1702238,
+     "lon": 24.7554667
+    },
+    {
+     "lat": 60.1701265,
+     "lon": 24.7553478
+    },
+    {
+     "lat": 60.169993,
+     "lon": 24.7553076
+    },
+    {
+     "lat": 60.1698107,
+     "lon": 24.755204
+    },
+    {
+     "lat": 60.1695961,
+     "lon": 24.7551462
+    },
+    {
+     "lat": 60.1694595,
+     "lon": 24.7551336
+    },
+    {
+     "lat": 60.1692289,
+     "lon": 24.7549812
+    },
+    {
+     "lat": 60.1691679,
+     "lon": 24.754938
+    },
+    {
+     "lat": 60.1690943,
+     "lon": 24.7547967
+    },
+    {
+     "lat": 60.1690371,
+     "lon": 24.7546403
+    },
+    {
+     "lat": 60.1690011,
+     "lon": 24.7544779
+    },
+    {
+     "lat": 60.1689711,
+     "lon": 24.754413
+    },
+    {
+     "lat": 60.1689221,
+     "lon": 24.7543661
+    },
+    {
+     "lat": 60.1688455,
+     "lon": 24.7543234
+    },
+    {
+     "lat": 60.1688321,
+     "lon": 24.7542985
+    },
+    {
+     "lat": 60.1688141,
+     "lon": 24.7542545
+    },
+    {
+     "lat": 60.1688005,
+     "lon": 24.7541868
+    },
+    {
+     "lat": 60.168719,
+     "lon": 24.7539762
+    },
+    {
+     "lat": 60.1685652,
+     "lon": 24.7537181
+    },
+    {
+     "lat": 60.1685366,
+     "lon": 24.7536766
+    },
+    {
+     "lat": 60.1684478,
+     "lon": 24.7535645
+    },
+    {
+     "lat": 60.1683346,
+     "lon": 24.7534366
+    },
+    {
+     "lat": 60.1682844,
+     "lon": 24.7534032
+    },
+    {
+     "lat": 60.1681765,
+     "lon": 24.7533964
+    },
+    {
+     "lat": 60.1680954,
+     "lon": 24.7533591
+    },
+    {
+     "lat": 60.1680555,
+     "lon": 24.7533572
+    },
+    {
+     "lat": 60.1679487,
+     "lon": 24.7533694
+    },
+    {
+     "lat": 60.1677396,
+     "lon": 24.7533697
+    },
+    {
+     "lat": 60.1675556,
+     "lon": 24.753361
+    },
+    {
+     "lat": 60.1674157,
+     "lon": 24.7533039
+    },
+    {
+     "lat": 60.1673361,
+     "lon": 24.7532939
+    },
+    {
+     "lat": 60.1670076,
+     "lon": 24.7531884
+    },
+    {
+     "lat": 60.1669128,
+     "lon": 24.7531593
+    },
+    {
+     "lat": 60.1668296,
+     "lon": 24.7531327
+    },
+    {
+     "lat": 60.1667019,
+     "lon": 24.7531223
+    },
+    {
+     "lat": 60.1666344,
+     "lon": 24.7530971
+    },
+    {
+     "lat": 60.1666008,
+     "lon": 24.7531088
+    },
+    {
+     "lat": 60.166551,
+     "lon": 24.7531287
+    },
+    {
+     "lat": 60.1664335,
+     "lon": 24.7532447
+    },
+    {
+     "lat": 60.1663531,
+     "lon": 24.7533769
+    },
+    {
+     "lat": 60.1663049,
+     "lon": 24.7534472
+    },
+    {
+     "lat": 60.1662455,
+     "lon": 24.7535085
+    },
+    {
+     "lat": 60.1659911,
+     "lon": 24.7537498
+    },
+    {
+     "lat": 60.1659101,
+     "lon": 24.7537301
+    },
+    {
+     "lat": 60.1657777,
+     "lon": 24.753738
+    },
+    {
+     "lat": 60.1657225,
+     "lon": 24.7537243
+    },
+    {
+     "lat": 60.1656501,
+     "lon": 24.7537265
+    },
+    {
+     "lat": 60.1654971,
+     "lon": 24.7537932
+    },
+    {
+     "lat": 60.1653262,
+     "lon": 24.753898
+    },
+    {
+     "lat": 60.1653217,
+     "lon": 24.7539007
+    },
+    {
+     "lat": 60.1652433,
+     "lon": 24.7538989
+    },
+    {
+     "lat": 60.1651257,
+     "lon": 24.7539109
+    },
+    {
+     "lat": 60.1649663,
+     "lon": 24.7540011
+    },
+    {
+     "lat": 60.1649825,
+     "lon": 24.7542021
+    },
+    {
+     "lat": 60.1650634,
+     "lon": 24.7541771
+    },
+    {
+     "lat": 60.1651514,
+     "lon": 24.75415
+    },
+    {
+     "lat": 60.165258,
+     "lon": 24.7541036
+    },
+    {
+     "lat": 60.1653159,
+     "lon": 24.7540785
+    },
+    {
+     "lat": 60.1653817,
+     "lon": 24.7540331
+    },
+    {
+     "lat": 60.1655594,
+     "lon": 24.753878
+    },
+    {
+     "lat": 60.1656977,
+     "lon": 24.7538557
+    },
+    {
+     "lat": 60.1657169,
+     "lon": 24.7538619
+    },
+    {
+     "lat": 60.1657713,
+     "lon": 24.7538795
+    },
+    {
+     "lat": 60.1658729,
+     "lon": 24.7538968
+    },
+    {
+     "lat": 60.1659731,
+     "lon": 24.7538605
+    },
+    {
+     "lat": 60.1660035,
+     "lon": 24.7538441
+    },
+    {
+     "lat": 60.1660662,
+     "lon": 24.753828
+    },
+    {
+     "lat": 60.1661228,
+     "lon": 24.7538165
+    },
+    {
+     "lat": 60.1662539,
+     "lon": 24.7537259
+    },
+    {
+     "lat": 60.1662604,
+     "lon": 24.7537147
+    },
+    {
+     "lat": 60.1663224,
+     "lon": 24.7536087
+    },
+    {
+     "lat": 60.1663798,
+     "lon": 24.7534963
+    },
+    {
+     "lat": 60.1664368,
+     "lon": 24.7533844
+    },
+    {
+     "lat": 60.1665226,
+     "lon": 24.7533055
+    },
+    {
+     "lat": 60.1665961,
+     "lon": 24.7532876
+    },
+    {
+     "lat": 60.1666595,
+     "lon": 24.7533042
+    },
+    {
+     "lat": 60.1668396,
+     "lon": 24.7532979
+    },
+    {
+     "lat": 60.166963,
+     "lon": 24.7533403
+    },
+    {
+     "lat": 60.1674727,
+     "lon": 24.7534367
+    },
+    {
+     "lat": 60.1677029,
+     "lon": 24.7534802
+    },
+    {
+     "lat": 60.1681967,
+     "lon": 24.7535261
+    },
+    {
+     "lat": 60.1682359,
+     "lon": 24.7535423
+    },
+    {
+     "lat": 60.1682853,
+     "lon": 24.7535498
+    },
+    {
+     "lat": 60.1683299,
+     "lon": 24.7535662
+    },
+    {
+     "lat": 60.1683817,
+     "lon": 24.7535973
+    },
+    {
+     "lat": 60.1684399,
+     "lon": 24.7536685
+    },
+    {
+     "lat": 60.1684864,
+     "lon": 24.753765
+    },
+    {
+     "lat": 60.1685091,
+     "lon": 24.7538173
+    },
+    {
+     "lat": 60.1686111,
+     "lon": 24.7540195
+    },
+    {
+     "lat": 60.1687104,
+     "lon": 24.7542671
+    },
+    {
+     "lat": 60.1688432,
+     "lon": 24.7545244
+    },
+    {
+     "lat": 60.1689921,
+     "lon": 24.7548303
+    },
+    {
+     "lat": 60.1690889,
+     "lon": 24.7550437
+    },
+    {
+     "lat": 60.1691472,
+     "lon": 24.7551257
+    },
+    {
+     "lat": 60.1692436,
+     "lon": 24.7551958
+    },
+    {
+     "lat": 60.1692932,
+     "lon": 24.7551933
+    },
+    {
+     "lat": 60.1695513,
+     "lon": 24.7552439
+    },
+    {
+     "lat": 60.1697181,
+     "lon": 24.755295
+    },
+    {
+     "lat": 60.1700193,
+     "lon": 24.7554529
+    },
+    {
+     "lat": 60.1701721,
+     "lon": 24.7555304
+    },
+    {
+     "lat": 60.1702045,
+     "lon": 24.7555577
+    },
+    {
+     "lat": 60.170347,
+     "lon": 24.7557261
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 958593531,
+   "tags": {
+    "barrier": "fence",
+    "fence_type": "railing"
+   },
+   "geometry": [
+    {
+     "lat": 60.1671417,
+     "lon": 24.7536101
+    },
+    {
+     "lat": 60.1671177,
+     "lon": 24.7535826
+    },
+    {
+     "lat": 60.1670763,
+     "lon": 24.7535538
+    },
+    {
+     "lat": 60.167027,
+     "lon": 24.7535464
+    },
+    {
+     "lat": 60.1669773,
+     "lon": 24.7535404
+    },
+    {
+     "lat": 60.1669453,
+     "lon": 24.7535183
+    },
+    {
+     "lat": 60.1668925,
+     "lon": 24.753476
+    },
+    {
+     "lat": 60.1668063,
+     "lon": 24.7534249
+    },
+    {
+     "lat": 60.1667325,
+     "lon": 24.7534008
+    },
+    {
+     "lat": 60.1666849,
+     "lon": 24.7534017
+    },
+    {
+     "lat": 60.1666544,
+     "lon": 24.7534084
+    },
+    {
+     "lat": 60.1665875,
+     "lon": 24.7534387
+    },
+    {
+     "lat": 60.1665137,
+     "lon": 24.753478
+    },
+    {
+     "lat": 60.1663885,
+     "lon": 24.753551
+    },
+    {
+     "lat": 60.1663665,
+     "lon": 24.7535652
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1016670945,
+   "tags": {
+    "bridge:structure": "beam",
+    "layer": "1",
+    "man_made": "bridge"
+   },
+   "geometry": [
+    {
+     "lat": 60.1653228,
+     "lon": 24.754149
+    },
+    {
+     "lat": 60.1652991,
+     "lon": 24.7541695
+    },
+    {
+     "lat": 60.165273,
+     "lon": 24.754192
+    },
+    {
+     "lat": 60.165258,
+     "lon": 24.7541036
+    },
+    {
+     "lat": 60.1652552,
+     "lon": 24.7539688
+    },
+    {
+     "lat": 60.1652607,
+     "lon": 24.7538419
+    },
+    {
+     "lat": 60.1652795,
+     "lon": 24.7537132
+    },
+    {
+     "lat": 60.1653078,
+     "lon": 24.7536
+    },
+    {
+     "lat": 60.1653641,
+     "lon": 24.7534639
+    },
+    {
+     "lat": 60.1654172,
+     "lon": 24.753383
+    },
+    {
+     "lat": 60.1654771,
+     "lon": 24.7533269
+    },
+    {
+     "lat": 60.1655508,
+     "lon": 24.753246
+    },
+    {
+     "lat": 60.1655947,
+     "lon": 24.753177
+    },
+    {
+     "lat": 60.1656432,
+     "lon": 24.7530676
+    },
+    {
+     "lat": 60.1656706,
+     "lon": 24.752982
+    },
+    {
+     "lat": 60.1656926,
+     "lon": 24.7528882
+    },
+    {
+     "lat": 60.1657082,
+     "lon": 24.7527724
+    },
+    {
+     "lat": 60.1657178,
+     "lon": 24.7526804
+    },
+    {
+     "lat": 60.1657191,
+     "lon": 24.7525544
+    },
+    {
+     "lat": 60.1657127,
+     "lon": 24.7524652
+    },
+    {
+     "lat": 60.1656725,
+     "lon": 24.7522673
+    },
+    {
+     "lat": 60.1657015,
+     "lon": 24.752248
+    },
+    {
+     "lat": 60.1657218,
+     "lon": 24.7522345
+    },
+    {
+     "lat": 60.1657447,
+     "lon": 24.752336
+    },
+    {
+     "lat": 60.1657612,
+     "lon": 24.7524523
+    },
+    {
+     "lat": 60.1657649,
+     "lon": 24.7525452
+    },
+    {
+     "lat": 60.1657654,
+     "lon": 24.752639
+    },
+    {
+     "lat": 60.1657612,
+     "lon": 24.7527604
+    },
+    {
+     "lat": 60.1657516,
+     "lon": 24.7528441
+    },
+    {
+     "lat": 60.1657356,
+     "lon": 24.7529342
+    },
+    {
+     "lat": 60.1657091,
+     "lon": 24.7530446
+    },
+    {
+     "lat": 60.1656812,
+     "lon": 24.753131
+    },
+    {
+     "lat": 60.1656336,
+     "lon": 24.7532368
+    },
+    {
+     "lat": 60.1655929,
+     "lon": 24.7533067
+    },
+    {
+     "lat": 60.1655439,
+     "lon": 24.75336
+    },
+    {
+     "lat": 60.1654831,
+     "lon": 24.7534189
+    },
+    {
+     "lat": 60.1654245,
+     "lon": 24.7534906
+    },
+    {
+     "lat": 60.1653916,
+     "lon": 24.7535495
+    },
+    {
+     "lat": 60.1653595,
+     "lon": 24.7536193
+    },
+    {
+     "lat": 60.1653357,
+     "lon": 24.7537122
+    },
+    {
+     "lat": 60.1653193,
+     "lon": 24.7538088
+    },
+    {
+     "lat": 60.1653133,
+     "lon": 24.7538557
+    },
+    {
+     "lat": 60.1653097,
+     "lon": 24.7539642
+    },
+    {
+     "lat": 60.1653159,
+     "lon": 24.7540785
+    },
+    {
+     "lat": 60.1653228,
+     "lon": 24.754149
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1059309816,
+   "tags": {
+    "highway": "service",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1658057,
+     "lon": 24.7554117
+    },
+    {
+     "lat": 60.165818,
+     "lon": 24.755427
+    },
+    {
+     "lat": 60.1658747,
+     "lon": 24.7554977
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1059309817,
+   "tags": {
+    "access": "permissive",
+    "highway": "service",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1658162,
+     "lon": 24.7551628
+    },
+    {
+     "lat": 60.1657543,
+     "lon": 24.7553478
+    },
+    {
+     "lat": 60.1658057,
+     "lon": 24.7554117
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1059309818,
+   "tags": {
+    "highway": "service",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1658929,
+     "lon": 24.7549882
+    },
+    {
+     "lat": 60.1658633,
+     "lon": 24.7550554
+    },
+    {
+     "lat": 60.1658162,
+     "lon": 24.7551628
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1075150947,
+   "tags": {
+    "barrier": "guard_rail"
+   },
+   "geometry": [
+    {
+     "lat": 60.1581319,
+     "lon": 24.6923805
+    },
+    {
+     "lat": 60.1581623,
+     "lon": 24.692527
+    },
+    {
+     "lat": 60.1583305,
+     "lon": 24.6933506
+    },
+    {
+     "lat": 60.1585821,
+     "lon": 24.6946153
+    },
+    {
+     "lat": 60.158863,
+     "lon": 24.6960368
+    },
+    {
+     "lat": 60.1589753,
+     "lon": 24.6965892
+    },
+    {
+     "lat": 60.1590389,
+     "lon": 24.6969176
+    },
+    {
+     "lat": 60.1591459,
+     "lon": 24.6974883
+    },
+    {
+     "lat": 60.1591689,
+     "lon": 24.6976105
+    },
+    {
+     "lat": 60.1593984,
+     "lon": 24.6988275
+    },
+    {
+     "lat": 60.1594471,
+     "lon": 24.6990937
+    },
+    {
+     "lat": 60.1595609,
+     "lon": 24.6997155
+    },
+    {
+     "lat": 60.1596513,
+     "lon": 24.7002461
+    },
+    {
+     "lat": 60.1596594,
+     "lon": 24.7002934
+    },
+    {
+     "lat": 60.1596642,
+     "lon": 24.7003222
+    },
+    {
+     "lat": 60.1597167,
+     "lon": 24.7006329
+    },
+    {
+     "lat": 60.1597744,
+     "lon": 24.7009747
+    },
+    {
+     "lat": 60.1598601,
+     "lon": 24.7014715
+    },
+    {
+     "lat": 60.16001,
+     "lon": 24.7024284
+    },
+    {
+     "lat": 60.1600752,
+     "lon": 24.7028719
+    },
+    {
+     "lat": 60.1602102,
+     "lon": 24.7037821
+    },
+    {
+     "lat": 60.1602837,
+     "lon": 24.7043389
+    },
+    {
+     "lat": 60.1603352,
+     "lon": 24.7047212
+    },
+    {
+     "lat": 60.1604491,
+     "lon": 24.7056415
+    },
+    {
+     "lat": 60.1605315,
+     "lon": 24.7063639
+    },
+    {
+     "lat": 60.1606244,
+     "lon": 24.7072097
+    },
+    {
+     "lat": 60.1607112,
+     "lon": 24.7080743
+    },
+    {
+     "lat": 60.1608002,
+     "lon": 24.7090435
+    },
+    {
+     "lat": 60.1608688,
+     "lon": 24.7098659
+    },
+    {
+     "lat": 60.1609263,
+     "lon": 24.710625
+    },
+    {
+     "lat": 60.1609822,
+     "lon": 24.7114419
+    },
+    {
+     "lat": 60.1610242,
+     "lon": 24.7121754
+    },
+    {
+     "lat": 60.161064,
+     "lon": 24.7129389
+    },
+    {
+     "lat": 60.1611276,
+     "lon": 24.7142003
+    },
+    {
+     "lat": 60.1611774,
+     "lon": 24.715424
+    },
+    {
+     "lat": 60.1612133,
+     "lon": 24.7162586
+    },
+    {
+     "lat": 60.1612592,
+     "lon": 24.717479
+    },
+    {
+     "lat": 60.1613079,
+     "lon": 24.7187771
+    },
+    {
+     "lat": 60.1613527,
+     "lon": 24.7197684
+    },
+    {
+     "lat": 60.1614334,
+     "lon": 24.7214533
+    },
+    {
+     "lat": 60.1614887,
+     "lon": 24.7224702
+    },
+    {
+     "lat": 60.1615584,
+     "lon": 24.7235372
+    },
+    {
+     "lat": 60.1616059,
+     "lon": 24.7242051
+    },
+    {
+     "lat": 60.1616662,
+     "lon": 24.7249109
+    },
+    {
+     "lat": 60.1617287,
+     "lon": 24.7255488
+    },
+    {
+     "lat": 60.1618138,
+     "lon": 24.7264368
+    },
+    {
+     "lat": 60.1618758,
+     "lon": 24.7270514
+    },
+    {
+     "lat": 60.1619383,
+     "lon": 24.7276293
+    },
+    {
+     "lat": 60.1619764,
+     "lon": 24.7279455
+    },
+    {
+     "lat": 60.1620162,
+     "lon": 24.7282762
+    },
+    {
+     "lat": 60.1620813,
+     "lon": 24.7287854
+    },
+    {
+     "lat": 60.1620891,
+     "lon": 24.7288465
+    },
+    {
+     "lat": 60.1621011,
+     "lon": 24.7289402
+    },
+    {
+     "lat": 60.1621467,
+     "lon": 24.7292825
+    },
+    {
+     "lat": 60.162311,
+     "lon": 24.7304773
+    },
+    {
+     "lat": 60.1623389,
+     "lon": 24.7306631
+    },
+    {
+     "lat": 60.1623959,
+     "lon": 24.7310431
+    },
+    {
+     "lat": 60.1624323,
+     "lon": 24.7312858
+    },
+    {
+     "lat": 60.1624857,
+     "lon": 24.7316072
+    },
+    {
+     "lat": 60.1625133,
+     "lon": 24.7317739
+    },
+    {
+     "lat": 60.1626765,
+     "lon": 24.7327573
+    },
+    {
+     "lat": 60.1626806,
+     "lon": 24.7327803
+    },
+    {
+     "lat": 60.1627677,
+     "lon": 24.7332641
+    },
+    {
+     "lat": 60.1629668,
+     "lon": 24.7343277
+    },
+    {
+     "lat": 60.1632272,
+     "lon": 24.7356503
+    },
+    {
+     "lat": 60.1635413,
+     "lon": 24.737124
+    },
+    {
+     "lat": 60.1638935,
+     "lon": 24.7387344
+    },
+    {
+     "lat": 60.1641789,
+     "lon": 24.7400465
+    },
+    {
+     "lat": 60.1642104,
+     "lon": 24.7401914
+    },
+    {
+     "lat": 60.1644548,
+     "lon": 24.7412895
+    },
+    {
+     "lat": 60.164703,
+     "lon": 24.7424487
+    },
+    {
+     "lat": 60.1648971,
+     "lon": 24.7433756
+    },
+    {
+     "lat": 60.1650002,
+     "lon": 24.7438896
+    },
+    {
+     "lat": 60.1651434,
+     "lon": 24.7446342
+    },
+    {
+     "lat": 60.1652855,
+     "lon": 24.7454272
+    },
+    {
+     "lat": 60.1654011,
+     "lon": 24.7461385
+    },
+    {
+     "lat": 60.1655473,
+     "lon": 24.7471082
+    },
+    {
+     "lat": 60.1656576,
+     "lon": 24.7479412
+    },
+    {
+     "lat": 60.1657503,
+     "lon": 24.7487509
+    },
+    {
+     "lat": 60.1657601,
+     "lon": 24.7488446
+    },
+    {
+     "lat": 60.1657814,
+     "lon": 24.7490482
+    },
+    {
+     "lat": 60.1657922,
+     "lon": 24.7491517
+    },
+    {
+     "lat": 60.1658121,
+     "lon": 24.7493423
+    },
+    {
+     "lat": 60.1658282,
+     "lon": 24.749496
+    },
+    {
+     "lat": 60.1658386,
+     "lon": 24.7496254
+    },
+    {
+     "lat": 60.165889,
+     "lon": 24.7502568
+    },
+    {
+     "lat": 60.1658917,
+     "lon": 24.7502927
+    },
+    {
+     "lat": 60.1658995,
+     "lon": 24.7503992
+    },
+    {
+     "lat": 60.1659059,
+     "lon": 24.7504857
+    },
+    {
+     "lat": 60.1659108,
+     "lon": 24.7505512
+    },
+    {
+     "lat": 60.1659488,
+     "lon": 24.7510581
+    },
+    {
+     "lat": 60.1660112,
+     "lon": 24.7520834
+    },
+    {
+     "lat": 60.1660139,
+     "lon": 24.7521295
+    },
+    {
+     "lat": 60.1660275,
+     "lon": 24.7523663
+    },
+    {
+     "lat": 60.1660387,
+     "lon": 24.7525606
+    },
+    {
+     "lat": 60.1660527,
+     "lon": 24.7528047
+    },
+    {
+     "lat": 60.1660588,
+     "lon": 24.7528996
+    },
+    {
+     "lat": 60.1661014,
+     "lon": 24.7535621
+    },
+    {
+     "lat": 60.1661024,
+     "lon": 24.7535782
+    },
+    {
+     "lat": 60.1661193,
+     "lon": 24.7538266
+    },
+    {
+     "lat": 60.1661205,
+     "lon": 24.7538482
+    },
+    {
+     "lat": 60.1661611,
+     "lon": 24.7545768
+    },
+    {
+     "lat": 60.1662164,
+     "lon": 24.7554731
+    },
+    {
+     "lat": 60.1662744,
+     "lon": 24.7563723
+    },
+    {
+     "lat": 60.1663297,
+     "lon": 24.757153
+    },
+    {
+     "lat": 60.1663684,
+     "lon": 24.7576665
+    },
+    {
+     "lat": 60.1663763,
+     "lon": 24.7577739
+    },
+    {
+     "lat": 60.1663792,
+     "lon": 24.7578129
+    },
+    {
+     "lat": 60.166435,
+     "lon": 24.7585706
+    },
+    {
+     "lat": 60.1664925,
+     "lon": 24.7592963
+    },
+    {
+     "lat": 60.1665558,
+     "lon": 24.7600643
+    },
+    {
+     "lat": 60.1666399,
+     "lon": 24.7610312
+    },
+    {
+     "lat": 60.1667071,
+     "lon": 24.7617953
+    },
+    {
+     "lat": 60.1667734,
+     "lon": 24.7625434
+    },
+    {
+     "lat": 60.1667856,
+     "lon": 24.76268
+    },
+    {
+     "lat": 60.1667989,
+     "lon": 24.7628175
+    },
+    {
+     "lat": 60.1668577,
+     "lon": 24.7634257
+    },
+    {
+     "lat": 60.1668738,
+     "lon": 24.7635913
+    },
+    {
+     "lat": 60.16688,
+     "lon": 24.7636467
+    },
+    {
+     "lat": 60.1669061,
+     "lon": 24.7638775
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1075150948,
+   "tags": {
+    "barrier": "guard_rail"
+   },
+   "geometry": [
+    {
+     "lat": 60.1669149,
+     "lon": 24.7638798
+    },
+    {
+     "lat": 60.1668999,
+     "lon": 24.763675
+    },
+    {
+     "lat": 60.1668945,
+     "lon": 24.7636171
+    },
+    {
+     "lat": 60.1668742,
+     "lon": 24.7634021
+    },
+    {
+     "lat": 60.1668154,
+     "lon": 24.7627772
+    },
+    {
+     "lat": 60.1667912,
+     "lon": 24.7625272
+    },
+    {
+     "lat": 60.1667532,
+     "lon": 24.762136
+    },
+    {
+     "lat": 60.1666993,
+     "lon": 24.7615443
+    },
+    {
+     "lat": 60.1666258,
+     "lon": 24.7606993
+    },
+    {
+     "lat": 60.1665364,
+     "lon": 24.7596509
+    },
+    {
+     "lat": 60.1664673,
+     "lon": 24.7587744
+    },
+    {
+     "lat": 60.1663977,
+     "lon": 24.7578441
+    },
+    {
+     "lat": 60.166395,
+     "lon": 24.7578079
+    },
+    {
+     "lat": 60.1663916,
+     "lon": 24.757761
+    },
+    {
+     "lat": 60.1663059,
+     "lon": 24.7565773
+    },
+    {
+     "lat": 60.1662485,
+     "lon": 24.7556897
+    },
+    {
+     "lat": 60.1661924,
+     "lon": 24.7548258
+    },
+    {
+     "lat": 60.1661331,
+     "lon": 24.7538449
+    },
+    {
+     "lat": 60.1661315,
+     "lon": 24.7538181
+    },
+    {
+     "lat": 60.166116,
+     "lon": 24.7535701
+    },
+    {
+     "lat": 60.1660857,
+     "lon": 24.753083
+    },
+    {
+     "lat": 60.166075,
+     "lon": 24.7528774
+    },
+    {
+     "lat": 60.1660579,
+     "lon": 24.7525502
+    },
+    {
+     "lat": 60.1660556,
+     "lon": 24.7525058
+    },
+    {
+     "lat": 60.1660473,
+     "lon": 24.7523661
+    },
+    {
+     "lat": 60.1660325,
+     "lon": 24.7521181
+    },
+    {
+     "lat": 60.1660293,
+     "lon": 24.7520641
+    },
+    {
+     "lat": 60.1659712,
+     "lon": 24.7511538
+    },
+    {
+     "lat": 60.1659341,
+     "lon": 24.7505423
+    },
+    {
+     "lat": 60.1659313,
+     "lon": 24.7504947
+    },
+    {
+     "lat": 60.1659261,
+     "lon": 24.7504276
+    },
+    {
+     "lat": 60.1659239,
+     "lon": 24.7503996
+    },
+    {
+     "lat": 60.1659159,
+     "lon": 24.7502953
+    },
+    {
+     "lat": 60.1658799,
+     "lon": 24.7498293
+    },
+    {
+     "lat": 60.1658583,
+     "lon": 24.7496095
+    },
+    {
+     "lat": 60.1658324,
+     "lon": 24.7493369
+    },
+    {
+     "lat": 60.1658134,
+     "lon": 24.7491366
+    },
+    {
+     "lat": 60.1658054,
+     "lon": 24.7490524
+    },
+    {
+     "lat": 60.1657949,
+     "lon": 24.7489412
+    },
+    {
+     "lat": 60.1657825,
+     "lon": 24.7488239
+    },
+    {
+     "lat": 60.1657279,
+     "lon": 24.7483068
+    },
+    {
+     "lat": 60.1656371,
+     "lon": 24.74758
+    },
+    {
+     "lat": 60.1655672,
+     "lon": 24.7470555
+    },
+    {
+     "lat": 60.1654805,
+     "lon": 24.7464628
+    },
+    {
+     "lat": 60.1654029,
+     "lon": 24.7459912
+    },
+    {
+     "lat": 60.1652895,
+     "lon": 24.7453321
+    },
+    {
+     "lat": 60.1651789,
+     "lon": 24.7447079
+    },
+    {
+     "lat": 60.1650837,
+     "lon": 24.7442053
+    },
+    {
+     "lat": 60.1650223,
+     "lon": 24.7438682
+    },
+    {
+     "lat": 60.1649674,
+     "lon": 24.7436154
+    },
+    {
+     "lat": 60.1649197,
+     "lon": 24.7433554
+    },
+    {
+     "lat": 60.1648527,
+     "lon": 24.7430343
+    },
+    {
+     "lat": 60.1647173,
+     "lon": 24.7424024
+    },
+    {
+     "lat": 60.1645886,
+     "lon": 24.7417874
+    },
+    {
+     "lat": 60.164473,
+     "lon": 24.741259
+    },
+    {
+     "lat": 60.1644263,
+     "lon": 24.7410455
+    },
+    {
+     "lat": 60.164281,
+     "lon": 24.7403845
+    },
+    {
+     "lat": 60.1641357,
+     "lon": 24.739725
+    },
+    {
+     "lat": 60.1640066,
+     "lon": 24.7391623
+    },
+    {
+     "lat": 60.1638582,
+     "lon": 24.7384872
+    },
+    {
+     "lat": 60.1637502,
+     "lon": 24.7379914
+    },
+    {
+     "lat": 60.1635635,
+     "lon": 24.7371488
+    },
+    {
+     "lat": 60.1633823,
+     "lon": 24.7362994
+    },
+    {
+     "lat": 60.1633701,
+     "lon": 24.7362587
+    },
+    {
+     "lat": 60.163271,
+     "lon": 24.7357759
+    },
+    {
+     "lat": 60.1631315,
+     "lon": 24.7350893
+    },
+    {
+     "lat": 60.1630101,
+     "lon": 24.7344767
+    },
+    {
+     "lat": 60.1627511,
+     "lon": 24.7330733
+    },
+    {
+     "lat": 60.1626959,
+     "lon": 24.7327566
+    },
+    {
+     "lat": 60.1625687,
+     "lon": 24.7320259
+    },
+    {
+     "lat": 60.1625264,
+     "lon": 24.731767
+    },
+    {
+     "lat": 60.1624976,
+     "lon": 24.7315909
+    },
+    {
+     "lat": 60.1624834,
+     "lon": 24.7315039
+    },
+    {
+     "lat": 60.1624103,
+     "lon": 24.7310273
+    },
+    {
+     "lat": 60.1623615,
+     "lon": 24.7307097
+    },
+    {
+     "lat": 60.1623517,
+     "lon": 24.7306462
+    },
+    {
+     "lat": 60.162323,
+     "lon": 24.7304603
+    },
+    {
+     "lat": 60.1622572,
+     "lon": 24.7299732
+    },
+    {
+     "lat": 60.1621591,
+     "lon": 24.7292739
+    },
+    {
+     "lat": 60.1621038,
+     "lon": 24.7288397
+    },
+    {
+     "lat": 60.1620955,
+     "lon": 24.7287743
+    },
+    {
+     "lat": 60.1620887,
+     "lon": 24.7287212
+    },
+    {
+     "lat": 60.1620787,
+     "lon": 24.728642
+    },
+    {
+     "lat": 60.1619927,
+     "lon": 24.7279449
+    },
+    {
+     "lat": 60.1619769,
+     "lon": 24.727817
+    },
+    {
+     "lat": 60.161824,
+     "lon": 24.7264229
+    },
+    {
+     "lat": 60.1617406,
+     "lon": 24.7255388
+    },
+    {
+     "lat": 60.1616716,
+     "lon": 24.724783
+    },
+    {
+     "lat": 60.1615757,
+     "lon": 24.7235257
+    },
+    {
+     "lat": 60.1615059,
+     "lon": 24.7224576
+    },
+    {
+     "lat": 60.1614477,
+     "lon": 24.7214405
+    },
+    {
+     "lat": 60.1613842,
+     "lon": 24.7200995
+    },
+    {
+     "lat": 60.161337,
+     "lon": 24.7190238
+    },
+    {
+     "lat": 60.1612904,
+     "lon": 24.7179111
+    },
+    {
+     "lat": 60.1612273,
+     "lon": 24.7162518
+    },
+    {
+     "lat": 60.1612071,
+     "lon": 24.7157413
+    },
+    {
+     "lat": 60.1611941,
+     "lon": 24.7154123
+    },
+    {
+     "lat": 60.1611414,
+     "lon": 24.7141985
+    },
+    {
+     "lat": 60.1610816,
+     "lon": 24.7129414
+    },
+    {
+     "lat": 60.16104,
+     "lon": 24.712172
+    },
+    {
+     "lat": 60.1609945,
+     "lon": 24.7114334
+    },
+    {
+     "lat": 60.1609412,
+     "lon": 24.7106211
+    },
+    {
+     "lat": 60.160884,
+     "lon": 24.7098575
+    },
+    {
+     "lat": 60.160818,
+     "lon": 24.7090346
+    },
+    {
+     "lat": 60.1607303,
+     "lon": 24.7080665
+    },
+    {
+     "lat": 60.1606429,
+     "lon": 24.7072003
+    },
+    {
+     "lat": 60.1605526,
+     "lon": 24.706359
+    },
+    {
+     "lat": 60.1604696,
+     "lon": 24.7056324
+    },
+    {
+     "lat": 60.160349,
+     "lon": 24.7047147
+    },
+    {
+     "lat": 60.1602689,
+     "lon": 24.7040959
+    },
+    {
+     "lat": 60.1601744,
+     "lon": 24.7034218
+    },
+    {
+     "lat": 60.1600484,
+     "lon": 24.7025519
+    },
+    {
+     "lat": 60.1598395,
+     "lon": 24.7012366
+    },
+    {
+     "lat": 60.1597336,
+     "lon": 24.7006093
+    },
+    {
+     "lat": 60.1596829,
+     "lon": 24.7003088
+    },
+    {
+     "lat": 60.1596656,
+     "lon": 24.7002059
+    },
+    {
+     "lat": 60.1596346,
+     "lon": 24.7000223
+    },
+    {
+     "lat": 60.1594634,
+     "lon": 24.6990605
+    },
+    {
+     "lat": 60.1594183,
+     "lon": 24.6988071
+    },
+    {
+     "lat": 60.1594069,
+     "lon": 24.6987431
+    },
+    {
+     "lat": 60.1591845,
+     "lon": 24.6975648
+    },
+    {
+     "lat": 60.1591709,
+     "lon": 24.6974921
+    },
+    {
+     "lat": 60.1590217,
+     "lon": 24.6966959
+    },
+    {
+     "lat": 60.1589659,
+     "lon": 24.6963982
+    },
+    {
+     "lat": 60.1588565,
+     "lon": 24.6958048
+    },
+    {
+     "lat": 60.1587778,
+     "lon": 24.6954036
+    },
+    {
+     "lat": 60.1586716,
+     "lon": 24.694877
+    },
+    {
+     "lat": 60.1585169,
+     "lon": 24.694083
+    },
+    {
+     "lat": 60.1581677,
+     "lon": 24.6923549
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1216103962,
+   "tags": {
+    "bicycle": "yes",
+    "foot": "yes",
+    "highway": "residential",
+    "lit": "yes",
+    "maxspeed": "30",
+    "name": "Niittykatu",
+    "name:fi": "Niittykatu",
+    "name:sv": "Ängsgatan",
+    "parking:both": "no",
+    "parking:both:restriction": "no_parking",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1667982,
+     "lon": 24.7557472
+    },
+    {
+     "lat": 60.1667975,
+     "lon": 24.7554915
+    },
+    {
+     "lat": 60.1668076,
+     "lon": 24.7549731
+    },
+    {
+     "lat": 60.1668083,
+     "lon": 24.7549473
+    },
+    {
+     "lat": 60.1668563,
+     "lon": 24.7543529
+    },
+    {
+     "lat": 60.1669209,
+     "lon": 24.7541021
+    },
+    {
+     "lat": 60.1669293,
+     "lon": 24.7540694
+    },
+    {
+     "lat": 60.1669558,
+     "lon": 24.7539666
+    }
+   ]
+  },
+  {
+   "type": "way",
+   "id": 1550614119,
+   "tags": {
+    "bicycle": "designated",
+    "foot": "designated",
+    "highway": "cycleway",
+    "lit": "yes",
+    "moped": "yes",
+    "segregated": "no",
+    "surface": "asphalt"
+   },
+   "geometry": [
+    {
+     "lat": 60.1652991,
+     "lon": 24.7541695
+    },
+    {
+     "lat": 60.1653261,
+     "lon": 24.7542884
+    },
+    {
+     "lat": 60.165357,
+     "lon": 24.75437
+    },
+    {
+     "lat": 60.1654046,
+     "lon": 24.7544521
+    }
+   ]
+  }
+ ]
+}

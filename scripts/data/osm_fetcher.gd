@@ -160,6 +160,8 @@ var _postpass_http: HTTPRequest
 var _detailed_req: OverpassRequest
 var _ring_req: OverpassRequest
 var _poi_req: OverpassRequest
+var _bridge_req: OverpassRequest
+var _bridge_postpass: HTTPRequest
 var _ring_grace: Timer
 
 func _ready() -> void:
@@ -183,6 +185,14 @@ func _ready() -> void:
 	add_child(_poi_req)
 	_poi_req.answered.connect(_on_poi_answered)
 	_poi_req.exhausted.connect(_on_poi_exhausted)
+	_bridge_req = OverpassRequest.new(15.0)
+	add_child(_bridge_req)
+	_bridge_req.answered.connect(_on_bridges_answered)
+	_bridge_req.exhausted.connect(_on_bridges_exhausted)
+	_bridge_postpass = HTTPRequest.new()
+	_bridge_postpass.timeout = PostpassFallback.TIMEOUT_S
+	add_child(_bridge_postpass)
+	_bridge_postpass.request_completed.connect(_on_bridges_postpass)
 	_ring_grace = Timer.new()
 	_ring_grace.one_shot = true
 	_ring_grace.wait_time = RING_GRACE_S
@@ -293,6 +303,8 @@ var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
 var piers: Array = []
 var shore_structures: Array = []
+## man_made=bridge outlines of the last parse (OsmParser._bridge_area).
+var bridge_areas: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -315,6 +327,10 @@ func cancel() -> void:
 		_ring_req.cancel()
 	if _poi_req != null:
 		_poi_req.cancel()
+	if _bridge_req != null:
+		_bridge_req.cancel()
+	if _bridge_postpass != null:
+		_bridge_postpass.cancel_request()
 	if _ring_grace != null:
 		_ring_grace.stop()
 
@@ -352,6 +368,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	rail_platforms = []
 	rail_stations = []
 	shore_structures = []
+	bridge_areas = []
 	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
@@ -367,6 +384,10 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_poi_started = false
 	_poi_pending = false
 	_poi_cache = CacheStore.osm_poi_path(lat, lon)
+	_bridge_text = ""
+	_bridge_started = false
+	_bridge_pending = false
+	_bridge_cache = CacheStore.osm_bridge_path(lat, lon)
 	_detailed_ready = false
 	_ring_pending = false
 	_tried = 1
@@ -459,6 +480,13 @@ var _poi_cache := ""
 var _poi_started := false
 var _poi_pending := false
 var _poi_enabled := true
+## The bridge outline layer (OsmQuery.build_bridge_area_query): its own
+## request and cache file, asked for alongside the POIs. Without it
+## BridgeStructures falls back to grouping the bridge ways.
+var _bridge_text := ""
+var _bridge_cache := ""
+var _bridge_started := false
+var _bridge_pending := false
 var _ring_pending := false
 var _parse_task := -1
 var _parse_gen := 0
@@ -590,6 +618,15 @@ func _on_ring_grace() -> void:
 func _try_finish() -> void:
 	if not _detailed_ready or _ring_pending:
 		return
+	if not _bridge_started:
+		_bridge_started = true
+		_bridge_text = _read_cache(_bridge_cache)
+		if _bridge_text != "" and not _payload_usable(_bridge_text):
+			_bridge_text = ""
+		if _bridge_text == "" and not offline_mode:
+			_bridge_pending = true
+			_bridge_req.run("data=" + OsmQuery.build_bridge_area_query(_pending_lat, _pending_lon,
+				DETAILED_RADIUS_M).uri_encode(), _check_ring, ring_endpoints().slice(0, 1))
 	if not _poi_started:
 		_poi_started = true
 		var poi_key := BundledOsm.entry_for(_pending_lat, _pending_lon, "poi", OsmQuery.POI_VERSION)
@@ -610,8 +647,43 @@ func _try_finish() -> void:
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
 				_check_ring, ring_endpoints().slice(0, 1))
 			return
-	if not _poi_pending:
+	if not _poi_pending and not _bridge_pending:
 		_finish()
+
+func _on_bridges_answered(text: String) -> void:
+	_bridge_text = text
+	_write_cache(_bridge_cache, text)
+	_bridge_pending = false
+	_try_finish()
+
+## Overpass is out (a rate limit, a paused instance): Postpass has the
+## same outlines.
+func _on_bridges_exhausted(reason: String, _attempts: int) -> void:
+	var err := _bridge_postpass.request(PostpassFallback.endpoint(),
+		["User-Agent: " + Brand.USER_AGENT, "Content-Type: application/x-www-form-urlencoded"],
+		HTTPClient.METHOD_POST, PostpassFallback.build_bridge_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
+	if err != OK:
+		_bridges_unavailable("%s; Postpass failed to start: %s" % [reason, err])
+	else:
+		_bridge_reason = reason
+
+var _bridge_reason := ""
+
+func _on_bridges_postpass(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	if not _bridge_pending:
+		return
+	var json := ""
+	if result == HTTPRequest.RESULT_SUCCESS and code == 200:
+		json = str(PostpassFallback.to_overpass_json(body)["json"])
+	if json == "":
+		_bridges_unavailable("%s; Postpass result=%d code=%d" % [_bridge_reason, result, code])
+		return
+	_on_bridges_answered(json)
+
+func _bridges_unavailable(reason: String) -> void:
+	print("OsmFetcher: bridge outlines unavailable (%s); grouping bridge ways instead" % reason)
+	_bridge_pending = false
+	_try_finish()
 
 func _on_poi_answered(text: String) -> void:
 	_poi_text = text
@@ -771,6 +843,8 @@ func _finish() -> void:
 	# the merged city once more.
 	if _transit_text != "":
 		poi = merge_payloads(poi, _transit_text)
+	if _bridge_text != "":
+		poi = merge_payloads(poi, _bridge_text)
 	var lat := _pending_lat
 	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
@@ -810,6 +884,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	pois = parsed.get("pois", [])
 	piers = parsed.get("piers", [])
 	shore_structures = parsed.get("shore_structures", [])
+	bridge_areas = parsed.get("bridge_areas", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

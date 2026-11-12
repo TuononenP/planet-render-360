@@ -39,6 +39,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var pois: Array = []
 	var piers: Array = []
 	var shore_structures: Array = []
+	var bridge_areas: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
@@ -47,7 +48,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			"barriers": barriers, "country": country, "railways": railways,
 			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
 			"tram_stops": tram_stops, "bus_stops": bus_stops,
-			"rail_platforms": rail_platforms, "rail_stations": rail_stations}
+			"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -131,7 +132,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# statements): stitched outer rings with inner-ring holes.
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
-			if str(el_tags.get("type", "")) == "multipolygon" \
+			if str(el_tags.get("man_made", "")) == "bridge" and el.has("members"):
+				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
+					_bridge_area(bridge_areas, el_tags, r["outer"], source_id)
+			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members") and (OsmApiFallback.names_building(el_tags) or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
 				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
 					buildings, landmarks)
@@ -247,6 +251,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				waterways.append(OsmTags._waterway_entry(el_tags, poly))
 		elif str(el_tags.get("natural", "")) == "coastline":
 			waterways.append(OsmTags._waterway_entry(el_tags, poly, "coastline"))
+		elif str(el_tags.get("man_made", "")) == "bridge":
+			if OsmGeometry._is_closed(poly) and poly.size() >= 4:
+				_bridge_area(bridge_areas, el_tags, poly, source_id)
 		elif str(el_tags.get("man_made", "")) == "pier" and poly.size() >= 2:
 			# A jetty or marina pontoon (floating=yes): MarinaBuilder.
 			piers.append({"points": poly, "floating": str(el_tags.get("floating", "")) == "yes",
@@ -306,7 +313,18 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		"barriers": barriers, "country": country, "railways": railways,
 		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
 		"tram_stops": tram_stops, "bus_stops": bus_stops,
-		"rail_platforms": rail_platforms, "rail_stations": rail_stations}
+		"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
+
+## A man_made=bridge outline (BridgeStructures builds one deck per
+## outline): {points (closed ring), layer, bridge_structure,
+## bridge_material, osm_id}.
+static func _bridge_area(out: Array, tags: Dictionary, ring: PackedVector2Array, source_id: String) -> void:
+	if ring.size() < 4:
+		return
+	out.append({"points": ring, "layer": OsmTags._tag_int(tags.get("layer", 1), -10, 10),
+		"bridge_structure": str(tags.get("bridge:structure", "")),
+		"bridge_material": str(tags.get("bridge:material", tags.get("material", ""))),
+		"name": str(tags.get("name", "")), "osm_id": source_id})
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live

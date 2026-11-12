@@ -682,6 +682,7 @@ func _await_osm(data: LocationData) -> void:
 		data.rail_stations = _osm.rail_stations
 		data.piers = _osm.piers
 		data.shore_structures = _osm.shore_structures
+		data.bridge_areas = _osm.bridge_areas
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
 		_credits[2] = "Map data: © OpenStreetMap contributors"
 	else:

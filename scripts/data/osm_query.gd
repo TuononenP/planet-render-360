@@ -66,6 +66,12 @@ const POI_VERSION := 1
 ## The bundled transit layer's stop and platform statements (the same ones
 ## build_query makes), fetched by tools/prepare_transit_layer.py.
 const TRANSIT_VERSION := 1
+## The bridge outline layer (build_bridge_area_query): its own request and
+## cache file, so adding it refetched no place's detailed data.
+const BRIDGE_AREA_VERSION := 1
+## man_made=bridge outlines over the detailed radius (a motorway
+## interchange maps a few dozen).
+const CAP_BRIDGE_AREAS := 600
 const QUERY_MARK := "pr360_q12"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
@@ -205,6 +211,15 @@ static func build_poi_query(lat: float, lon: float) -> String:
 		clauses.append('node["%s"](around:%d,%.6f,%.6f);' % [key, POI_RADIUS_M, lat, lon])
 	return "[out:json][timeout:%d];(" % OVERPASS_TIMEOUT_S \
 		+ "".join(PackedStringArray(clauses)) + ");out %d;" % CAP_POIS
+
+## man_made=bridge outlines (ways and multipolygon relations) over the
+## detailed radius: BridgeStructures builds one deck per real structure
+## from them. Small (a few hundred bytes per outline).
+static func build_bridge_area_query(lat: float, lon: float, radius_m: int = 1200) -> String:
+	return "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S \
+		+ ('(way["man_made"="bridge"](around:%d,%.6f,%.6f);'
+			+ 'relation["man_made"="bridge"](around:%d,%.6f,%.6f););out geom %d;') \
+			% [radius_m, lat, lon, radius_m, lat, lon, CAP_BRIDGE_AREAS]
 
 ## Second, low-detail ring query (plan §3.1 Ultra budget): major roads
 ## + waterways + coastline out to ring_m. Best-effort — merged over the

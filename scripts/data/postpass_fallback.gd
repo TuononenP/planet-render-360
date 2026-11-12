@@ -10,8 +10,10 @@ extends RefCounted
 ## The query mirrors OsmQuery.build_query: the same layers, street furniture
 ## only near the eye, each group capped like its Overpass statements
 ## (nearest first rather than in id order), the country the place stands in,
-## and Suomenlinna's defensive works. to_overpass_json converts the answer
-## to Overpass `out geom` JSON, so OsmParser consumes it unchanged.
+## Suomenlinna's defensive works and the bridge outlines (on Overpass a
+## request of their own, OsmQuery.build_bridge_area_query).
+## to_overpass_json converts the answer to Overpass `out geom` JSON, so
+## OsmParser consumes it unchanged.
 ## RemoteConfig `postpass_endpoint` can replace the address without an app
 ## update.
 
@@ -24,12 +26,13 @@ const FROM := "SELECT osm_type, osm_id, tags, geom FROM postpass_pointlinepolygo
 const OTHER_AREAS := ("(tags ?| ARRAY['waterway','natural','landuse','leisure','barrier','embankment',"
 	+ "'defensive_works'] OR tags->>'railway' IN (%s) OR tags->>'amenity' = 'parking'"
 	+ " OR tags->>'place' = 'square'"
-	+ " OR tags->>'man_made' IN ('tower','lighthouse','windmill','pier','quay','embankment')"
+	+ " OR tags->>'man_made' IN ('tower','lighthouse','windmill','pier','quay','embankment','bridge')"
 	+ " OR (tags->>'public_transport' = 'platform' AND tags->>'train' = 'yes'))")
 ## The Overpass caps of those layers' statements, summed.
 const CAP_OTHER_AREAS := OsmQuery.CAP_WATERWAYS + OsmQuery.CAP_NATURAL + OsmQuery.CAP_LANDUSE \
 	+ OsmQuery.CAP_LEISURE + 2 * OsmQuery.CAP_BARRIERS + OsmQuery.CAP_RAILWAYS \
-	+ 2 * OsmQuery.CAP_SQUARES + OsmQuery.CAP_PLATFORMS + 150 + 4 * OsmQuery.CAP_RELATIONS + 300
+	+ 2 * OsmQuery.CAP_SQUARES + OsmQuery.CAP_PLATFORMS + 150 + 4 * OsmQuery.CAP_RELATIONS + 300 \
+	+ OsmQuery.CAP_BRIDGE_AREAS
 
 static func endpoint() -> String:
 	return str(RemoteConfig.value("postpass_endpoint", URL))
@@ -89,6 +92,12 @@ static func build_body(lat: float, lon: float, radius_m: int) -> String:
 			+ " AND ST_Intersects(geom, %s) LIMIT 4)" % _point(lat, lon),
 	]
 	return "data=" + " UNION ALL ".join(parts).uri_encode()
+
+## The POST body for the bridge outline layer
+## (OsmQuery.build_bridge_area_query): man_made=bridge ways and relations.
+static func build_bridge_body(lat: float, lon: float, radius_m: int) -> String:
+	return "data=" + _part(_near(lat, lon, radius_m) + " AND osm_type <> 'N' AND tags->>'man_made' = 'bridge'",
+		lat, lon, OsmQuery.CAP_BRIDGE_AREAS).uri_encode()
 
 static func _points(coords: Variant) -> Array:
 	var out: Array = []

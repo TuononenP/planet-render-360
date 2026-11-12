@@ -4,6 +4,13 @@ extends RefCounted
 ## Water ownership and levels, shared by carving, meshes and probes.
 ## Raw rings keep their holes; a bounded cell index avoids lagoon scans.
 const CELL := 64.0
+## Water under a road bridge lies at least this far under its ends, and
+## is lowered for it by at most BRIDGE_DROP_MAX_M (source metres).
+const BRIDGE_ROOM_M := 3.5
+const BRIDGE_DROP_MAX_M := 1.5
+## Only a stream this narrow (mean width, 2 x area / perimeter, metres) is
+## lowered: a smoothed DEM fills in a creek's valley, not a canal's quays.
+const BRIDGE_STREAM_MAX_M := 15.0
 var bodies: Array = []
 var cells: Dictionary = {}
 var bounds := Rect2()
@@ -161,6 +168,83 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 				float(dry.call(axis[1].x - n.x, axis[1].y - n.y))) - freeboard
 	_merge_levels()
 	_join_channel_levels()
+
+## Lowers a narrow non-tidal stream a road bridge crosses to BRIDGE_ROOM_M under
+## the lower of that bridge's two ends (its approaches' dry ground), by
+## at most BRIDGE_DROP_MAX_M, and every body touching it with it. Levelled
+## from banks a smoothed DEM flattened, a creek sat almost level with the
+## motorway crossing it, and no deck could clear it.
+func lower_under_bridges(roads: Array, dry: Callable) -> void:
+	var caps := {}
+	for w: Variant in roads:
+		if not (w is Dictionary) or not bool((w as Dictionary).get("bridge", false)):
+			continue
+		var r: Dictionary = w
+		if RoadBuilder._rank(str(r.get("class", ""))) < 1:
+			continue  # A footbridge's light deck needs no such room.
+		var pts: PackedVector2Array = r.get("points", PackedVector2Array())
+		if pts.size() < 2 or not bounds.has_point(pts[0]) or not bounds.has_point(pts[pts.size() - 1]):
+			continue
+		var top := minf(float(dry.call(pts[0].x, pts[0].y)), float(dry.call(pts[pts.size() - 1].x, pts[pts.size() - 1].y)))
+		for i in pts.size() - 1:
+			for k in 5:
+				var id := at(pts[i].lerp(pts[i + 1], (float(k) + 0.5) / 5.0))
+				if id >= 0 and not bool(bodies[id]["tidal"]) and _stream(bodies[id]):
+					caps[id] = minf(float(caps.get(id, INF)), top - BRIDGE_ROOM_M)
+	if caps.is_empty():
+		return
+	var parent := _groups()
+	var group_cap := {}
+	for id: int in caps:
+		var g := _root(parent, id)
+		group_cap[g] = minf(float(group_cap.get(g, INF)), float(caps[id]))
+	# A stream joined to a lake or a harbour basin keeps their level.
+	for id in bodies.size():
+		var g := _root(parent, id)
+		if group_cap.has(g) and (bool(bodies[id]["tidal"]) or not _stream(bodies[id])):
+			group_cap.erase(g)
+	for id in bodies.size():
+		var g := _root(parent, id)
+		if not group_cap.has(g):
+			continue
+		var body: Dictionary = bodies[id]
+		for key: String in ["level", "level_end"]:
+			if body.has(key):
+				var was := float(body[key])
+				body[key] = maxf(minf(was, float(group_cap[g])), was - BRIDGE_DROP_MAX_M)
+
+## True for a narrow stream body (BRIDGE_STREAM_MAX_M mean width).
+static func _stream(body: Dictionary) -> bool:
+	var ring: PackedVector2Array = body["points"]
+	var area := 0.0
+	var perimeter := 0.0
+	for i in ring.size():
+		var a := ring[i]
+		var b := ring[(i + 1) % ring.size()]
+		area += a.x * b.y - b.x * a.y
+		perimeter += a.distance_to(b)
+	return perimeter > 0.0 and absf(area) / perimeter < BRIDGE_STREAM_MAX_M * WorldScale.metres_to_units()
+
+## Bodies joined by touching (a channel joins the polygons its ends lie
+## in): union-find parents over `bodies`.
+func _groups() -> Array[int]:
+	var parent: Array[int] = []
+	for id in bodies.size():
+		parent.append(id)
+	for id in bodies.size():
+		var rings: Array = [bodies[id]["points"]]
+		rings.append_array(bodies[id]["holes"])
+		for ring in rings:
+			for i in ring.size():
+				var p: Vector2 = (ring[i] + ring[(i + 1) % ring.size()]) * 0.5
+				if not bounds.has_point(p):
+					continue
+				var other := at(p, id)
+				if other >= 0:
+					var a := _root(parent, id)
+					var b := _root(parent, other)
+					parent[maxi(a, b)] = mini(a, b)
+	return parent
 
 func _join_channel_levels() -> void:
 	var endpoints := {}
