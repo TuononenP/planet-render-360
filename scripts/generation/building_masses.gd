@@ -68,10 +68,67 @@ static func _seat_lifts(out: Array) -> void:
 				continue
 			seat = top
 		if seat > lift:
-			var storeys := int(xm["storeys"])
-			var wall := float(xm["wall_m"])
-			xm["storeys"] = maxi(1, roundi(float(storeys) * (wall - seat) / (wall - lift)))
-			xm["min_m"] = seat
+			_lower_to(xm, seat)
+
+## How far (m) a support's top may fall short of a lifted part's floor and
+## still count as carrying it, and the widest gap (m) a lift is brought down
+## across.
+const FLOAT_SLACK_M := 1.5
+const FLOAT_MAX_GAP_M := 15.0
+
+## A lifted part over a mass whose top is lower (or over footprint no mass
+## covers) hung in the air with open sky under it (Seoul: a box over a
+## tower's roof). Within FLOAT_MAX_GAP_M it comes down to the highest top
+## under its centre; with nothing under it, a part of at least
+## OsmParser.GROUND_ORPHAN_M2 stands on the ground (as _ground_orphans does
+## for a part outside every outline: keep the two in step). Smaller ones
+## (skybridges, canopies) and bridge/roof buildings keep their lift.
+static func _seat_floaters(b: Dictionary, out: Array) -> void:
+	if str(b.get("kind", "")) in ["bridge", "roof"] or float(b.get("min_height_m", 0.0)) > 0.0 \
+			or int(b.get("min_level", 0)) > 0:
+		return
+	var m2 := WorldScale.metres_to_units() * WorldScale.metres_to_units()
+	# Judged on the lifts as planned, so the outcome does not depend on the
+	# order the masses are visited in.
+	var lifts: Array = out.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	for xi in out.size():
+		var xm := out[xi] as Dictionary
+		var lift: float = lifts[xi]
+		if lift <= 0.0:
+			continue
+		var centre: Vector2 = xm["centre"]
+		var below := -1.0
+		var carried := false
+		for yi in out.size():
+			var ym := out[yi] as Dictionary
+			if yi == xi or float(lifts[yi]) >= lift \
+					or not Geometry2D.is_point_in_polygon(centre, ym["ring"]) \
+					or _in_hole(centre, ym["holes"]):
+				continue
+			var top := float(ym["wall_m"])
+			# A pitched roof under the part carries it up to its ridge.
+			if top + float(ym["rh_m"]) >= lift - FLOAT_SLACK_M:
+				carried = true
+				break
+			below = maxf(below, top)
+		if carried:
+			continue
+		var wall := float(xm["wall_m"])
+		var seat := -1.0
+		if below >= 0.0 and lift - below <= FLOAT_MAX_GAP_M:
+			seat = below
+		elif below < 0.0 and absf(RingGeometry.signed_area(xm["ring"])) / m2 >= OsmParser.GROUND_ORPHAN_M2:
+			seat = 0.0
+		if seat < 0.0 or wall - seat < 0.5:
+			continue
+		_lower_to(xm, seat)
+
+## Moves a mass's floor to `seat` (m), keeping its storey height.
+static func _lower_to(xm: Dictionary, seat: float) -> void:
+	var wall := float(xm["wall_m"])
+	var lift := float(xm["min_m"])
+	xm["storeys"] = maxi(1, roundi(float(int(xm["storeys"])) * (wall - seat) / (wall - lift)))
+	xm["min_m"] = seat
 
 static func _in_hole(p: Vector2, holes: Array) -> bool:
 	for h in holes:
@@ -153,6 +210,7 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 			out = _plan_masses(b, ctx, [base] + masses, false, look, parent_res, legacy,
 				parent_shape, fh)
 		_seat_lifts(out)
+		_seat_floaters(b, out)
 	_mutex.lock()
 	if _plans.has(ck):
 		var raced: Array = _plans[ck] as Array
