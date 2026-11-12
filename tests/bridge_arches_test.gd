@@ -21,8 +21,13 @@ func _init() -> void:
 			[{}, "unknown"], [{"name": "Västerbron", "bridge_structure": "girder"}, "girder"]]:
 		if BridgeArches.structure(c[0]) != c[1]:
 			failures.append("structure for %s should be %s" % [c[0], c[1]])
-	if _deck_vertices(140.0, "masonry") <= _deck_vertices(140.0, "girder") + 100:
-		failures.append("a masonry deck must receive arch geometry that a girder does not")
+	# A girder is a slab on its abutments (BridgeStructures); only the
+	# masonry bridge's piers and arches stand down in the water.
+	var masonry_r := _deck_range(140.0, "masonry")
+	var girder_r := _deck_range(140.0, "girder")
+	print("masonry reaches %.2f m, girder %.2f m" % [masonry_r.x, girder_r.x])
+	if masonry_r.x > girder_r.x - 1.0:
+		failures.append("a masonry deck must receive arch geometry that a girder does not: reaches %.2f m, the girder %.2f m" % [masonry_r.x, girder_r.x])
 	var tags := OsmTags._road_entry({"highway": "primary", "bridge": "yes", "bridge:structure": "arch", "bridge:material": "steel", "name": "Västerbron"}, PackedVector2Array([Vector2.ZERO, Vector2.ONE]))
 	if BridgeArches.structure(tags) != "steel_arch" or tags.get("name") != "Västerbron":
 		failures.append("OSM bridge structure, material and name must reach the builder")

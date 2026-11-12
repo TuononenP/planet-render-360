@@ -1,11 +1,16 @@
 class_name BridgeStructureSlab
 extends RefCounted
 
-## The concrete of a bridge structure (BridgeStructures): its slab cut from
-## the outline in cells that follow the deck top, and along the outline's
+## The concrete of a bridge structure (BridgeStructures): the deck's shape
+## cut to the roads it carries, its slab in cells that follow the deck
+## top, and along the outline's
 ## edges the fascia, the parapets (railings beside a footway or cycleway)
 ## and, under an open end, the abutment wall down to the ground.
 
+## A deck edge carries a parapet where the ground BESIDE_M out from it
+## lies more than DROP_M under the deck, metres.
+const BESIDE_M := 1.0
+const DROP_M := 0.6
 ## How far a deck's edge beam stands out past its parapet, metres.
 const EDGE_BEAM_LIP_M := 0.12
 
@@ -122,16 +127,24 @@ static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Ar
 				var yb := s.surface_at(pb)
 				if kind != 0:
 					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out)
-					# The abutment wall down to the ground under an open end,
-					# seen from the creek under the deck and from the bank
-					# beside it: a deck end does not hang in the air. Never
-					# across the water: the creek runs on under the deck.
+					# The abutment wall down to the ground under an end a road
+					# goes on from, seen from under the deck and from the bank
+					# beside it. Not at a joint with another bridge in mid-air,
+					# and never across the water: the creek runs on under the deck.
 					var ga := surf.height(pa.x, pa.y) - 0.3 * m2u
 					var gb := surf.height(pb.x, pb.y) - 0.3 * m2u
 					var wet := surf.ground.water_at(pa.x, pa.y) > 0.0 or surf.ground.water_at(pb.x, pb.y) > 0.0
-					if not wet and (ga < ya - depth or gb < yb - depth):
+					if kind == 2 and not wet and (ga < ya - depth or gb < yb - depth):
 						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, -out)
 						RoadBuilder._wall(side, pa, pb, ga, gb, ya - depth, yb - depth, out)
+					continue
+				# No parapet where the deck's edge lies on the ground (the step
+				# between two roads' staggered ends, a deck let into its bank):
+				# a wall there stood on the approach road.
+				var beside := (pa + pb) * 0.5 + out * BESIDE_M * m2u
+				if surf.ground.water_at(beside.x, beside.y) <= 0.0 \
+						and surf.height(beside.x, beside.y) > minf(ya, yb) - DROP_M * m2u:
+					RoadBuilder._wall(side, pa, pb, ya - depth, yb - depth, ya, yb, out)
 					continue
 				if _beside_path(s, index, (pa + pb) * 0.5):
 					# A footway or cycleway edge: the slab's face and a railing.
@@ -170,3 +183,69 @@ static func _edges(batches: Dictionary, s: BridgeStructures.Structure, opens: Ar
 					side.normals.append(Vector3.UP)
 					side.uvs.append(Vector2(float(q % 2), float(q / 2)))
 				RoadBuilder._quad_up(side, kc, kc + 1, kc + 2, kc + 3)
+
+## Cuts the structure's deck to the roads it carries: each member's
+## width and an EDGE_BEAM_M each side, the gaps between members up to
+## 2 x DECK_CLOSE_M filled, clipped to the mapped outline. The outline
+## takes in the shoulders, verges and wing walls, so a deck cut from it
+## flared out past the carriageway it continued.
+static func _fit_deck(s: BridgeStructures.Structure, index: RoadBridgeDecks.Index, m2u: float) -> void:
+	var best := PackedVector2Array()
+	for shrunk: PackedVector2Array in _deck_pieces(s.members, index, m2u, BridgeStructures.DECK_CLOSE_M * m2u):
+		for piece: PackedVector2Array in Geometry2D.intersect_polygons(shrunk, s.ring):
+			if not Geometry2D.is_polygon_clockwise(piece) and absf(BridgeStructures.Plan._area(piece)) > absf(BridgeStructures.Plan._area(best)):
+				best = piece
+	if best.size() >= 3 and absf(BridgeStructures.Plan._area(best)) > absf(BridgeStructures.Plan._area(s.ring)) * 0.25:
+		s.ring = best
+		s.bounds = RingGeometry.aabb(best)
+
+## The decks of index lines `members`: each line's width and an
+## EDGE_BEAM_M each side, merged where their edges lie within 2 x `close`
+## of each other; one ring per separate deck.
+static func _deck_pieces(members: PackedInt32Array, index: RoadBridgeDecks.Index, m2u: float, close: float) -> Array:
+	var merged: Array = []
+	for li in members:
+		var line: Dictionary = index.lines[li]
+		var pts: PackedVector2Array = (line["points"] as PackedVector2Array).duplicate()
+		var n := pts.size()
+		# Run on past both ends by the closing distance, which the shrink
+		# below takes back: the deck ends where the way does.
+		pts[0] = pts[0] + (pts[0] - pts[1]).normalized() * close
+		pts[n - 1] = pts[n - 1] + (pts[n - 1] - pts[n - 2]).normalized() * close
+		var grow := float(line["half"]) + BridgeStructures.EDGE_BEAM_M * m2u + close
+		for poly: PackedVector2Array in Geometry2D.offset_polyline(pts, grow, Geometry2D.JOIN_MITER, Geometry2D.END_BUTT):
+			merged = _union(merged, poly)
+	var out: Array = []
+	for poly: PackedVector2Array in merged:
+		if Geometry2D.is_polygon_clockwise(poly):
+			continue  # A hole the union left: the deck fills it.
+		for shrunk: PackedVector2Array in Geometry2D.offset_polygon(poly, -close, Geometry2D.JOIN_MITER):
+			if shrunk.size() >= 3 and not Geometry2D.is_polygon_clockwise(shrunk):
+				out.append(shrunk)
+	return out
+
+## `polys` (outer rings) with `poly` merged in: joined with every ring it
+## overlaps, until none is left that the grown ring reaches.
+static func _union(polys: Array, poly: PackedVector2Array) -> Array:
+	var acc := poly
+	var box := RingGeometry.aabb(acc)
+	var rest := polys
+	var changed := true
+	while changed:
+		changed = false
+		var out: Array = []
+		for other: PackedVector2Array in rest:
+			if box.intersects(RingGeometry.aabb(other), true):
+				var outers: Array = []
+				for j: PackedVector2Array in Geometry2D.merge_polygons(acc, other):
+					if not Geometry2D.is_polygon_clockwise(j):
+						outers.append(j)
+				if outers.size() == 1:
+					acc = outers[0]
+					box = RingGeometry.aabb(acc)
+					changed = true
+					continue
+			out.append(other)
+		rest = out
+	rest.append(acc)
+	return rest

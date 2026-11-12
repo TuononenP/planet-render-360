@@ -32,6 +32,8 @@ const SAMPLE_M := 4.0
 ## A bridge joins the ground at its ends; an intersecting way there is a
 ## connection, not a crossing underneath it. Allow for coordinate rounding.
 const END_TOLERANCE_M := 0.5
+## Ground kept uncut behind a bridge end, along its approach, metres.
+const ABUTMENT_M := 10.0
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 
@@ -85,6 +87,21 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		for e in [ends[0], ends[ends.size() - 1]]:
 			if int(joints[_node(e, m2u)]) == 1:
 				keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
+				# And the abutment behind it, across the deck's width: the cut
+				# for the way below spread under the approach, and the road
+				# dipped where it met its bridge.
+				var from: Vector2 = ends[1] if e == ends[0] else ends[ends.size() - 2]
+				var out: Vector2 = ((e as Vector2) - from).normalized()
+				var side := Vector2(-out.y, out.x)
+				var half := maxf(float(b.get("width_m", 0.0)), 3.0) * 0.5 * m2u + step * 0.5
+				var back := ABUTMENT_M * m2u
+				var reach := maxf(half, back)
+				for x in range(floori((e.x - reach) / step + hs), ceili((e.x + reach) / step + hs) + 1):
+					for z in range(floori((e.y - reach) / step + hs), ceili((e.y + reach) / step + hs) + 1):
+						var d: Vector2 = Vector2((float(x) - hs) * step, (float(z) - hs) * step) - (e as Vector2)
+						# From one post inside the span: the end's height is read between posts.
+						if d.dot(out) >= -step and d.dot(out) <= back and absf(d.dot(side)) <= half:
+							keep[Vector2i(x, z)] = true
 	# Every crossing at once on every core, then evaluated bridge by bridge.
 	var hits: Array = []
 	if _native:

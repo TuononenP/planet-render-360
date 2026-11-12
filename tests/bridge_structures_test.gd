@@ -7,8 +7,8 @@ extends SceneTree
 ## carriageways and links on them. Each stands at one level. No parapet
 ## stands inside an outline. The cycleway bridge along the creek passes
 ## under, never up through a deck. No barrier runs over a deck, and the
-## pieces of the next crossing west, which has no outline, still build
-## one by one. Synthetic cases: two outlines 6 m apart stay two
+## next crossing west, which has no outline, is a structure cut from its
+## roads that meets each of them. Synthetic cases: two outlines 6 m apart stay two
 ## structures, a road and a railway share one outline, a switchback
 ## footbridge with no outline keeps its ramps, and the ramp arm of a
 ## T-shaped outline comes down to its path instead of running flat.
@@ -234,22 +234,30 @@ func _barriers_stop(d: LocationData, ground: GroundTruth, failures: Array[String
 	if bad > 0:
 		failures.append("%d barrier vertices stand on a bridge outline" % bad)
 
-## The crossing 70 m west has no outline: its ways stay off every
-## structure and build through RoadBridgeDecks.
+## The crossing 70 m west has no outline: each of its carriageways and
+## links is still a structure, its deck cut from the road, and meets its
+## own approaches (built way by way on one copied profile, a deck stood
+## 0.75 m under its own road).
 func _fallback_west(d: LocationData, surf: RoadBuilder._Surface, failures: Array[String]) -> void:
-	var way := _road(d, "way:133114973")
-	if way.is_empty():
-		failures.append("the western motorway bridge must parse")
-		return
-	var pts: PackedVector2Array = way["points"]
-	var li := surf.road_bridges.line_of(pts)
-	if li < 0 or surf.road_bridges.structures.of_line(li) != null:
-		failures.append("a way on no outline must not join a structure")
-	var batches := {}
-	RoadBridgeDecks.build(batches, RoadBuilder._resample(pts, 2.0), float(way["width_m"]), surf, 1.0,
-		"unknown", 1, pts, str(way["class"]), way)
-	if not batches.has("bridge") or (batches["bridge"] as RoadBuilder._Batch).verts.is_empty():
-		failures.append("a way on no outline must still build its own deck")
+	var plan := surf.road_bridges.structures
+	plan.prepare(surf, 1.0)
+	for id: String in ["way:133114973", "way:133114975", "way:133114982", "way:133114986"]:
+		var way := _road(d, id)
+		if way.is_empty():
+			failures.append("the western bridge way %s must parse" % id)
+			return
+		var pts: PackedVector2Array = way["points"]
+		var s := plan.of_line(surf.road_bridges.line_of(pts))
+		if s == null:
+			failures.append("%s, on no outline, should still be on a structure" % id)
+			return
+		for end: Array in [[pts[0], pts[1]], [pts[pts.size() - 1], pts[pts.size() - 2]]]:
+			var p: Vector2 = end[0]
+			if BridgeLandings.approach_from(surf, p, (p - (end[1] as Vector2)).normalized()).is_empty():
+				continue
+			var step := s.surface_at(p) - surf.height(p.x, p.y)
+			if absf(step) > 0.3:
+				failures.append("%s should meet its approach, stands %.2f m off it" % [id, step])
 
 ## Where the deck has no room over the cycleway along the bank, it still
 ## meets its approaches at both abutments (no step up onto the bridge),

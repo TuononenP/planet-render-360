@@ -148,8 +148,8 @@ class Index extends RefCounted:
 				var j := mini(i, pts.size() - 2)
 				var along := (pts[j + 1] - pts[j]).normalized()
 				var left := Vector2(-along.y, along.x)
-				var hits := RoadBridgeDecks._hits(surf, pts[i], along, left, float(line["half"]), m2u, own) \
-					+ RoadBridgeDecks._hits(surf, pts[i], along, -left, float(line["half"]), m2u, own)
+				var hits := RoadBridgeDecks._hits_in(self, pts[i], along, left, float(line["half"]), m2u, own) \
+					+ RoadBridgeDecks._hits_in(self, pts[i], along, -left, float(line["half"]), m2u, own)
 				for hit: Array in hits:
 					# Ways stacked on different layers are separate structures.
 					if int(lines[int(hit[0])]["layer"]) != int(line["layer"]):
@@ -391,7 +391,11 @@ static func _nearest(hits: Array) -> Array:
 ## centreline distance, its half width], nearest foot point per way.
 static func _hits(surf: RoadBuilder._Surface, p: Vector2, along: Vector2, dir: Vector2,
 		half: float, m2u: float, own: PackedVector2Array) -> Array:
-	var index: Index = surf.road_bridges
+	return _hits_in(surf.road_bridges, p, along, dir, half, m2u, own)
+
+## _hits on a bridge index (the grouping needs no surface).
+static func _hits_in(index: Index, p: Vector2, along: Vector2, dir: Vector2,
+		half: float, m2u: float, own: PackedVector2Array) -> Array:
 	if index == null or index.lines.is_empty():
 		return []
 	var gap := BESIDE_GAP_M * m2u

@@ -101,7 +101,9 @@ func _init() -> void:
 	var sd := RoadBuilder._resample(spts, 2.0)
 	var on: Array = []
 	var sdeck := RoadBridgeDecks.levelled(sd, 1.25, 1, ssurf, 1.0, spts, "cycleway", on)
-	var host := RoadBuilder.deck_profile(rd, ssurf, 1.0, 3.5, 1)
+	# The road deck's level there, as it is built (the road is a bridge
+	# structure, BridgeStructures).
+	var host := RoadBridgeDecks.levelled(rd, 3.5, 1, ssurf, 1.0, road_pts, "primary")
 	var si := RoadBridgeDecks._closest(sd, Vector2(0, -4))
 	if int(on[si]) != 1 or absf(sdeck[si] - host[RoadBridgeDecks._closest(rd, Vector2(0, -4))]) > 0.3:
 		failures.append("a cycleway crossing a road deck on its layer should run onto it (on=%s, %.2f vs %.2f)" % [on[si], sdeck[si], host[RoadBridgeDecks._closest(rd, Vector2(0, -4))]])

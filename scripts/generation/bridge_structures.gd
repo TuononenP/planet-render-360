@@ -40,11 +40,12 @@ const END_DOT := 0.6
 ## point, metres.
 const ABUTMENT_SEEK_M := 20.0
 ## The deck eases onto its approach's ground over this far before an
-## abutment, by at most FIT_MAX_M under a road, PATH_FIT_MAX_M under a
-## path's ramp (beyond that a bank falls away, and the abutment wall
-## faces it), metres.
+## abutment (further at BLEND_GRADE for a larger step), by at most
+## FIT_MAX_M / PATH_FIT_MAX_M (beyond that a bank falls away, and the
+## abutment wall faces it), metres.
 const BLEND_M := 5.0
-const FIT_MAX_M := 0.8
+const BLEND_GRADE := 0.12
+const FIT_MAX_M := 1.5
 const PATH_FIT_MAX_M := 1.5
 ## Slab depth as span / SPAN_DEPTH_RATIO, at least MIN_DEPTH_M (metres)
 ## and at most RoadBuilder.DECK_DEPTH_M.
@@ -56,6 +57,9 @@ const WATER_AIR_M := 0.6
 ## parapet), and fills gaps up to twice DECK_CLOSE_M between them, metres.
 const EDGE_BEAM_M := 0.5
 const DECK_CLOSE_M := 4.0
+## Ways on no outline share a deck when their decks' edges lie within
+## twice this, metres.
+const LOOSE_CLOSE_M := 2.0
 ## Barriers stop this far outside an outline (StreetProps).
 const BARRIER_GROW_M := 2.0
 const PARAPET_THICK_M := 0.25
@@ -84,6 +88,7 @@ class Structure extends RefCounted:
 	var abutments := Vector2(NAN, NAN)
 	## Slab depth, world units: a short beam span is shallower than a long one.
 	var depth := 0.9
+	var loose := false  ## Cut from ways on no mapped outline.
 	## Along each abutment edge: [points, how far the approach's ground
 	## lies over (or under) the level there] (BridgeStructures._abutment_fit).
 	var fits: Array = []
@@ -138,7 +143,8 @@ class Structure extends RefCounted:
 				best = on
 		if best.y == INF:
 			return y
-		var blend := BridgeStructures.BLEND_M * WorldScale.metres_to_units()
+		# Over BLEND_M, or as far as BLEND_GRADE needs for a larger step.
+		var blend := maxf(BridgeStructures.BLEND_M * WorldScale.metres_to_units(), absf(best.x) / BridgeStructures.BLEND_GRADE)
 		return y + best.x * (1.0 - smoothstep(0.0, blend, sqrt(best.y)))
 
 	## The main spine's [deck, squared distance] at its point nearest `p`.
@@ -200,7 +206,7 @@ class Plan extends RefCounted:
 			s.layer = int((a as Dictionary).get("layer", 1))
 			s.kind = BridgeArches.structure(a)
 			all.append(s)
-		if all.is_empty() or index == null:
+		if index == null:
 			return
 		var grid := _bounds_grid(all)
 		for li in index.lines.size():
@@ -224,10 +230,51 @@ class Plan extends RefCounted:
 				if BridgeStructures.inside_share(rp, s) >= BridgeStructures.MEMBER_SHARE:
 					s.rails.append(w)
 					break
-		# An outline carrying no road (a rail bridge, an unmapped deck) is
-		# left to RailDecks and the ways themselves.
+		# Road bridge ways on no outline: each deck is cut from the roads
+		# themselves. Ways whose edges nearly touch (a road and the footway
+		# on it) share one; separate carriageways side by side stand each on
+		# their own, held to their own approaches. A footbridge alone keeps
+		# RoadBridgeDecks and its own ramps.
+		var taken := {}
 		for s: Structure in all:
-			if s.members.is_empty():
+			for li in s.members:
+				taken[li] = true
+		var free := PackedInt32Array()
+		for li in index.lines.size():
+			if not taken.has(li):
+				free.append(li)
+		for ring: PackedVector2Array in BridgeStructureSlab._deck_pieces(free, index, m, BridgeStructures.LOOSE_CLOSE_M * m):
+			var s := Structure.new()
+			s.ring = ring
+			s.bounds = RingGeometry.aabb(ring)
+			s.loose = true
+			var road := false
+			for li in free:
+				if not taken.has(li) and s.bounds.intersects(RingGeometry.aabb(index.lines[li]["points"]), true) \
+						and BridgeStructures.inside_share(index.lines[li]["points"], s) >= BridgeStructures.MEMBER_SHARE:
+					s.members.append(li)
+					road = road or not (str(index.lines[li]["cls"]) in RoadBridgeDecks.PATH_CLASSES)
+			if road:
+				for li in s.members:
+					taken[li] = true
+				all.append(s)
+		# An outline carrying no road (a rail bridge, an unmapped deck) is
+		# left to RailDecks and the ways themselves; a masonry bridge keeps
+		# its arches (RoadBridgeBuild._bridge).
+		for s: Structure in all:
+			var masonry := s.kind == "masonry"
+			for li in s.members:
+				masonry = masonry or BridgeArches.structure(index.lines[li]["road"]) == "masonry"
+			if s.members.is_empty() or masonry:
+				continue
+			if not s.loose:
+				BridgeStructureSlab._fit_deck(s, index, m)
+			var on := PackedInt32Array()
+			for li in s.members:
+				if BridgeStructures.inside_share(index.lines[li]["points"], s) >= BridgeStructures.MEMBER_SHARE:
+					on.append(li)
+			s.members = on
+			if on.is_empty():
 				continue
 			var top := -100
 			for li in s.members:
@@ -236,7 +283,6 @@ class Plan extends RefCounted:
 				s.path = s.path and str(index.lines[li]["cls"]) in RoadBridgeDecks.PATH_CLASSES
 				_of_line[li] = s
 			s.layer = top
-			BridgeStructures._fit_deck(s, index, m)
 			structures.append(s)
 		_grid = _bounds_grid(structures)
 
@@ -313,54 +359,6 @@ class Plan extends RefCounted:
 				BridgeStructures._abutment_fit(s, index, surf, m2u)
 			_ready = true
 		_mutex.unlock()
-
-## Cuts the structure's deck to the roads it carries: each member's
-## width and an EDGE_BEAM_M each side, the gaps between members up to
-## 2 x DECK_CLOSE_M filled, clipped to the mapped outline. The outline
-## takes in the shoulders, verges and wing walls, so a deck cut from it
-## flared out past the carriageway it continued.
-static func _fit_deck(s: Structure, index: RoadBridgeDecks.Index, m2u: float) -> void:
-	var close := DECK_CLOSE_M * m2u
-	var merged: Array = []
-	for li in s.members:
-		var line: Dictionary = index.lines[li]
-		var pts: PackedVector2Array = (line["points"] as PackedVector2Array).duplicate()
-		var n := pts.size()
-		# Run on past both ends by the closing distance, which the shrink
-		# below takes back: the deck ends where the way does.
-		pts[0] = pts[0] + (pts[0] - pts[1]).normalized() * close
-		pts[n - 1] = pts[n - 1] + (pts[n - 1] - pts[n - 2]).normalized() * close
-		var grow := float(line["half"]) + EDGE_BEAM_M * m2u + close
-		for poly: PackedVector2Array in Geometry2D.offset_polyline(pts, grow, Geometry2D.JOIN_MITER, Geometry2D.END_BUTT):
-			merged = _union(merged, poly)
-	var best := PackedVector2Array()
-	for poly: PackedVector2Array in merged:
-		if Geometry2D.is_polygon_clockwise(poly):
-			continue  # A hole the union left: the deck fills it.
-		for shrunk: PackedVector2Array in Geometry2D.offset_polygon(poly, -close, Geometry2D.JOIN_MITER):
-			for piece: PackedVector2Array in Geometry2D.intersect_polygons(shrunk, s.ring):
-				if absf(Plan._area(piece)) > absf(Plan._area(best)):
-					best = piece
-	if best.size() >= 3 and absf(Plan._area(best)) > absf(Plan._area(s.ring)) * 0.25:
-		s.ring = best
-		s.bounds = RingGeometry.aabb(best)
-
-## `polys` (outer rings) with `poly` merged in.
-static func _union(polys: Array, poly: PackedVector2Array) -> Array:
-	var acc := poly
-	var out: Array = []
-	for other: PackedVector2Array in polys:
-		var joined := Geometry2D.merge_polygons(acc, other)
-		var outers: Array = []
-		for j: PackedVector2Array in joined:
-			if not Geometry2D.is_polygon_clockwise(j):
-				outers.append(j)
-		if outers.size() == 1:
-			acc = outers[0]
-		else:
-			out.append(other)
-	out.append(acc)
-	return out
 
 ## Share of polyline `pts`'s length inside `s`'s outline (ON_M grown).
 static func inside_share(pts: PackedVector2Array, s: Structure) -> float:
@@ -476,7 +474,7 @@ static func _first_dry(line: PackedVector2Array, surf: RoadBuilder._Surface, rea
 ## surface_at eases the deck onto it, so the deck meets the road across
 ## its whole width.
 static func _abutment_fit(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder._Surface, m2u: float) -> void:
-	var opens := _openings(s, index, m2u)
+	var opens := _openings(s, index, surf, m2u)
 	var lift := 0.05 * m2u
 	for e in s.ring.size():
 		var a := s.ring[e]
@@ -487,8 +485,6 @@ static func _abutment_fit(s: Structure, index: RoadBridgeDecks.Index, surf: Road
 			var pa := a.lerp(b, float(run[0]))
 			var pb := a.lerp(b, float(run[1]))
 			var most := FIT_MAX_M * m2u
-			# A path's ramp lands flush on its path (a road's carriageway
-			# would warp across its lanes that far).
 			if _ends_path(s, index, (pa + pb) * 0.5):
 				most = PATH_FIT_MAX_M * m2u
 			var n := maxi(1, ceili(pa.distance_to(pb) / m2u))
@@ -755,7 +751,7 @@ static func build(batches: Dictionary, surf: RoadBuilder._Surface, m2u: float) -
 	for s: Structure in plan.structures:
 		if not surf.inside(s.bounds.get_center()):
 			continue
-		var opens := _openings(s, index, m2u)
+		var opens := _openings(s, index, surf, m2u)
 		BridgeStructureSlab._slab(batches, s, surf, m2u)
 		BridgeStructureSlab._edges(batches, s, opens, index, surf, m2u)
 		for li in s.members:
@@ -764,7 +760,7 @@ static func build(batches: Dictionary, surf: RoadBuilder._Surface, m2u: float) -
 ## Per outline edge, the [from, to, end] stretches (fractions along the
 ## edge) a member road leaves through: no parapet there. `end` marks a
 ## member's mapped end (an abutment) rather than a way running on.
-static func _openings(s: Structure, index: RoadBridgeDecks.Index, m2u: float) -> Array:
+static func _openings(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder._Surface, m2u: float) -> Array:
 	var out: Array = []
 	out.resize(s.ring.size())
 	for e in s.ring.size():
@@ -795,8 +791,16 @@ static func _openings(s: Structure, index: RoadBridgeDecks.Index, m2u: float) ->
 				var sin_a := maxf(absf(dir.cross(ab / len)), 0.3)
 				var w := (half / sin_a + pad) / len
 				var t := ((hit as Vector2) - a).dot(ab) / (len * len)
-				var at_end := j == 1 or j == ext.size() - 1
-				(out[e] as Array).append([t - w, t + w, at_end])
+				# 2: an abutment (a road goes on from this end on the ground);
+				# 1: an end joining another bridge in mid-air; 0: a way running on.
+				var end := 0
+				if j == 1 or j == ext.size() - 1:
+					var first := j == 1 and (j != ext.size() - 1 \
+						or (hit as Vector2).distance_squared_to(pts[0]) <= (hit as Vector2).distance_squared_to(pts[pts.size() - 1]))
+					var at := pts[0] if first else pts[pts.size() - 1]
+					var back := pts[1] if first else pts[pts.size() - 2]
+					end = 1 if BridgeLandings.approach_from(surf, at, (at - back).normalized()).is_empty() else 2
+				(out[e] as Array).append([t - w, t + w, end])
 	# An abutment is the whole end of the outline, not only the road's
 	# width: a chain of edges across the spine where a member ends opens
 	# from corner to corner (mapped with the way's end node in its middle,
@@ -816,13 +820,13 @@ static func _openings(s: Structure, index: RoadBridgeDecks.Index, m2u: float) ->
 		while across[k] != 0 and chain.size() < s.ring.size():
 			chain.append(k)
 			k = (k + 1) % s.ring.size()
-		var ends := false
+		var ends := 0
 		for c in chain:
 			for o: Array in out[c]:
-				ends = ends or bool(o[2])
-		if ends:
+				ends = maxi(ends, int(o[2]))
+		if ends > 0:
 			for c in chain:
-				out[c] = [[0.0, 1.0, true]]
+				out[c] = [[0.0, 1.0, ends]]
 	return out
 
 ## Unit direction of the spine (main or arm) nearest `p`.
@@ -852,7 +856,7 @@ static func _runs(opens: Array) -> Array:
 		var lo := clampf(float(o[0]), 0.0, 1.0)
 		var hi := clampf(float(o[1]), 0.0, 1.0)
 		if hi > lo:
-			cuts.append([lo, hi, 2 if bool(o[2]) else 1])
+			cuts.append([lo, hi, 2 if int(o[2]) == 2 else 1])
 	cuts.sort_custom(func(x: Array, y: Array) -> bool: return float(x[0]) < float(y[0]))
 	var out: Array = []
 	var at := 0.0
