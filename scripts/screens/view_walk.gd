@@ -115,7 +115,7 @@ static func glide(v: View360, to: Vector3, yaw_to: float, pitch_to: float, secon
 	v._visit_tween.tween_method(func(k: float) -> void:
 		v._rig.position = from.lerp(to, k)
 		v._rig.set_look(lerpf(yaw_from, yaw_end, k), lerpf(pitch_from, pitch_to, k))
-		v._on_look_changed(), 0.0, 1.0, maxf(UiPrefs.motion(seconds), 0.01))
+		ViewChrome._on_look_changed(v, false), 0.0, 1.0, maxf(UiPrefs.motion(seconds), 0.01))
 	v._visit_tween.tween_callback(func() -> void: v._atmos.set_probe_origin(v._rig.position))
 
 # --- Footing ---

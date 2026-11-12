@@ -6,7 +6,8 @@ extends PanelContainer
 ## radius-m, under the top-right status row: a static loader icon, the
 ## title with the percent in data-s, the stage it is on and a 4pt accent
 ## bar. The bar is SaveProgress's steady model: the data stages, then
-## the build. It waits SHOW_DELAY_S so a cached stretch never flashes,
+## the build; past the detailed edge the title says the pace eased.
+## It waits SHOW_DELAY_S so a cached stretch never flashes,
 ## stays while the HUD idles, and says "Way ahead ready" briefly once
 ## the build lands. The host places it (ViewTools.layout).
 
@@ -87,7 +88,6 @@ func follow(s: WorldStreamer, dt: float) -> bool:
 		if s.progress != _model:
 			_model = s.progress  # a new (or redirected) build starts at 0
 			_since = 0.0
-			_title.text = "Preparing the way ahead"
 			_icon.texture = UiIcon.texture("loader-circle", 16)
 		_since += dt
 		_ready_shown = false
@@ -110,6 +110,8 @@ func follow(s: WorldStreamer, dt: float) -> bool:
 	return visible != was
 
 func _show_progress(s: WorldStreamer) -> void:
+	# Past the detailed edge the pace eases until this lands: say why.
+	_title.text = "Slower past the edge" if s.slowed else "Preparing the way ahead"
 	_percent.text = "%d%%" % _model.percent()
 	_bar.value = _model.shown
 	if _model.phase == SaveProgress.Phase.DOWNLOAD:

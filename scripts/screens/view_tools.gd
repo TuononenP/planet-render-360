@@ -56,10 +56,11 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 		sync(v)
 		ViewChrome.layout(v))
 	v._hud.add_child(v._date_picker)
-	v._toast = Toast.new()
-	v._hud.add_child(v._toast)
+	# The way-ahead badge first: a toast draws over it.
 	v._stream_badge = StreamBadge.new()
 	v._hud.add_child(v._stream_badge)
+	v._toast = Toast.new()
+	v._hud.add_child(v._toast)
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
 	v._minimap.visible = UiPrefs.minimap
 	v._fps.visible = UiPrefs.fps_counter
@@ -283,28 +284,34 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._minimap == null:
 		return  # still being built
 	var phone := lay == Responsive.Layout.COMPACT
-	# The way-ahead badge: right-aligned under the top-right chips, where
-	# the FPS counter steps down to make room for it. An open inspector
-	# runs down that edge, so the badge moves left of it, under the ring.
+	# The way-ahead badge: right-aligned under the top-right chips, and
+	# under the pill and its heading tape (phones) or the ring where it
+	# would reach them. An open inspector runs down that edge, so the
+	# badge moves left of it, under the ring.
 	var under_right := v._top_right.position.y + v._top_right.size.y + 8.0
+	var top_end := v._top.position.y + v._top.size.y + 8.0
 	var badge := v._stream_badge
 	badge.custom_minimum_size.x = minf(StreamBadge.W, w - pad * 2.0)
 	badge.reset_size()
 	var badge_at := Vector2(v._top_right.position.x + v._top_right.size.x - badge.size.x, under_right)
+	var ring := Rect2(v._compass.position, Vector2(CompassDial.RING, CompassDial.RING))
 	var beside_sheet := inspector and v._sheet.visible \
 		and Rect2(badge_at, badge.size).intersects(sheet)
 	if beside_sheet:
-		badge_at = Vector2(sheet.position.x - 8.0 - badge.size.x,
-			maxf(under_right, v._compass.position.y + CompassDial.RING + 8.0))
+		badge_at = Vector2(sheet.position.x - 8.0 - badge.size.x, maxf(under_right, ring.end.y + 8.0))
+	if Rect2(badge_at, badge.size).intersects(Rect2(v._top.position, v._top.size)):
+		badge_at.y = maxf(badge_at.y, top_end)
+	if not phone and Rect2(badge_at, badge.size).intersects(ring):
+		badge_at.y = maxf(badge_at.y, ring.end.y + 8.0)
 	badge.position = badge_at
-	if badge.visible and not beside_sheet:
-		under_right += badge.size.y + 8.0
-	# FPS counter: right-aligned under the top-right chips; on a short
-	# wide window the inspector tucks in there, so it sits under the back
-	# button instead.
+	# FPS counter: under the badge while it shows; else right-aligned under
+	# the top-right chips, or, on a short wide window where the inspector
+	# tucks in there, under the back button and the pill.
 	v._fps.reset_size()
-	if inspector and h < 500.0:
-		v._fps.position = Vector2(pad, v._exit_btn.position.y + v._exit_btn.size.y + 8.0)
+	if badge.visible:
+		v._fps.position = Vector2(badge_at.x + badge.size.x - v._fps.size.x, badge_at.y + badge.size.y + 8.0)
+	elif inspector and h < 500.0:
+		v._fps.position = Vector2(pad, maxf(v._exit_btn.position.y + v._exit_btn.size.y + 8.0, top_end))
 	else:
 		v._fps.position = Vector2(v._top_right.position.x + v._top_right.size.x - v._fps.size.x,
 			under_right)
@@ -317,6 +324,11 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._sheet.visible and Rect2(v._minimap.position, Vector2(box, box)).intersects(sheet.grow(MAP_GAP)):
 		v._minimap.position.y = sheet.position.y - MAP_GAP - box
 	v._minimap.visible = UiPrefs.minimap and not panel_open
+	# A short phone's bar reaches up to the pill and the badge: no room.
+	var map_rect := Rect2(v._minimap.position, Vector2(box, box))
+	for c: Control in [v._top, v._exit_btn, badge, v._fps]:
+		if c.visible and map_rect.intersects(c.get_rect()):
+			v._minimap.visible = false
 	# Date sheet: beside the inspector, or in the bar's place (the bar
 	# steps aside while it is open, like the landmark sheet).
 	var picker := v._date_picker
@@ -331,6 +343,48 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 			picker.position = Vector2(roundf((w - ps.x) / 2.0),
 				maxf(h - pad - attr_h - 8.0 - ps.y, pad))
 			v._minimap.visible = false
-	# Toast: above the controls on phones, bottom-right of the free area otherwise.
-	if v._toast.visible:
-		v._toast.place(Vector2(w, h), pad, sheet.position.y if v._sheet.visible else h - pad - attr_h, phone)
+
+## The toast, once the zoom stack has its place. Phones: centred above
+## the controls and above the drone button, the round tab and the
+## mini-map. Wider windows: bottom-right, ending left of the zoom stack
+## and the inspector, and beside the mini-map while that leaves it room.
+static func place_toast(v: View360, phone: bool, inspector: bool, pad: float,
+		w: float, h: float, attr_h: float) -> void:
+	if not v._toast.visible:
+		return
+	var host := Vector2(w, h)
+	var floats: Array[Control] = [v._zoom_stack, v._sheet_tab, v._minimap]
+	var bar := v._sheet.get_rect()
+	if phone or (not inspector and v._sheet.visible and bar.end.y > h - pad - 96.0 - attr_h):
+		# Above the bar and the floating buttons while that leaves room
+		# under the top cluster; else over the bar, never off the top.
+		var top_clear := v._top.get_rect().end.y + 8.0
+		var bottom := bar.position.y if v._sheet.visible else h - pad - attr_h
+		var above := bottom
+		for c in floats:
+			if c.visible:
+				above = minf(above, c.position.y + 4.0)  # place() keeps 12 clear
+		var toast_h := maxf(v._toast.get_combined_minimum_size().y, 56.0)
+		if above - 12.0 - toast_h >= top_clear:
+			bottom = above
+		elif bottom - 12.0 - toast_h < top_clear:
+			bottom = h - pad - attr_h
+		v._toast.place(host, pad, bottom, true)
+		return
+	# The band a toast takes at the bottom edge (two wrapped lines).
+	var band := Rect2(0.0, h - pad - 96.0, w, 96.0)
+	var right := w - pad
+	var left := pad
+	for c in floats:
+		var r := c.get_rect()
+		if not c.visible or not r.intersects(band):
+			continue
+		if c == v._minimap:
+			left = maxf(left, r.end.x + 8.0)
+		else:
+			right = minf(right, r.position.x - 8.0)
+	if inspector and v._sheet.visible and v._sheet.get_rect().intersects(band):
+		right = minf(right, v._sheet.position.x - 8.0)
+	if right - left < 280.0:
+		left = pad  # too narrow beside the mini-map: over it, never the buttons
+	v._toast.place(host, pad, h - pad - attr_h, false, right, right - left)

@@ -323,6 +323,7 @@ func _flight() -> void:
 	# On foot the hint says how to walk, and the touch sticks walk.
 	_check(ViewChrome.hint_text(view).begins_with("Left stick walks" if DroneSticks.wanted() else "W A S D to walk"),
 		"the hint says how to walk: " + ViewChrome.hint_text(view))
+	_check(view._hint.visible and view._hint.modulate.a == 1.0, "and the landing glide leaves it up")
 	_check(view._drone.sticks.visible == DroneSticks.wanted(), "walking keeps the sticks on touch screens only")
 	DroneSticks.forced = true
 	ViewChrome.layout(view)

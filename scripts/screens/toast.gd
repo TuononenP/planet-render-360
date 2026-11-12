@@ -106,25 +106,29 @@ func dismiss() -> void:
 func title_text() -> String:
 	return _title.text
 
-## Phones: centred above `bottom_y`; wider windows: bottom-right.
-func place(host_size: Vector2, pad: float, bottom_y: float, phone: bool) -> void:
-	var w := minf(MAX_W, host_size.x - pad * 2.0)
+## Phones: centred above `bottom_y`; wider windows: bottom-right, or
+## ending at `right` (>= 0) and at most `max_w` wide, so it keeps clear
+## of the buttons and panels the host names.
+func place(host_size: Vector2, pad: float, bottom_y: float, phone: bool,
+		right: float = -1.0, max_w: float = MAX_W) -> void:
+	var w := minf(minf(MAX_W, max_w), host_size.x - pad * 2.0)
 	custom_minimum_size.x = w
 	# Wrapped text needs its width before it can report its height.
 	var text_w := w - 16.0 - 8.0 - 20.0 - 12.0 - (_action.get_combined_minimum_size().x + 12.0 if _action.visible else 0.0)
 	for l: Label in [_title, _message]:
 		l.custom_minimum_size.x = text_w
 		l.size = Vector2(text_w, l.size.y)
-	_settle(host_size, pad, bottom_y, phone, w)
+	_settle(host_size, pad, bottom_y, phone, w, right)
 	# Labels report their wrapped height after a layout pass: settle again.
 	if is_inside_tree():
 		await get_tree().process_frame
-		_settle(host_size, pad, bottom_y, phone, w)
+		_settle(host_size, pad, bottom_y, phone, w, right)
 
-func _settle(host_size: Vector2, pad: float, bottom_y: float, phone: bool, w: float) -> void:
+func _settle(host_size: Vector2, pad: float, bottom_y: float, phone: bool, w: float,
+		right: float = -1.0) -> void:
 	var h := get_combined_minimum_size().y
 	size = Vector2(w, h)
 	if phone:
 		position = Vector2(roundf((host_size.x - w) / 2.0), bottom_y - h - 12.0)
 	else:
-		position = Vector2(host_size.x - pad - w, host_size.y - pad - h)
+		position = Vector2((right if right >= 0.0 else host_size.x - pad) - w, host_size.y - pad - h)

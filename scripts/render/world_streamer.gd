@@ -247,7 +247,9 @@ var _range_preset := -1
 var _ready_data: LocationData
 var _last_pos := Vector2.INF
 var _vel := Vector2.ZERO
-var _notified_gen := -1
+## Past the live detailed edge while the next world builds: the interim
+## pace applies, and the way-ahead badge says so (StreamBadge).
+var slowed := false
 var _view: View360
 ## How far the generation in flight has come, for the HUD's StreamBadge:
 ## the pipeline's data stages, then the build (null before the first).
@@ -410,8 +412,8 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 
 ## Per-frame: track velocity, swap a ready centre in (or drop it when
 ## the camera turned back), and start the next centre early enough that
-## detailed ground is always ahead. Silent while all is well; the one
-## notice comes when the interim cap first bites.
+## detailed ground is always ahead. The way-ahead badge (StreamBadge)
+## shows each build, and says when the interim cap bites (`slowed`).
 func tick(v: View360, delta: float) -> void:
 	_view = v
 	if not enabled or v._data == null or v._ground == null or v._rig == null \
@@ -423,6 +425,7 @@ func tick(v: View360, delta: float) -> void:
 		_vel = _vel.lerp(inst, 1.0 - exp(-3.0 * delta)) \
 			if _last_pos != pos else _vel * exp(-3.0 * delta)
 	_last_pos = pos
+	slowed = (state == State.FETCHING or state == State.READY) and not inside_detailed(pos)
 	if v._data.season != centre_season or v._quality_preset != centre_preset:
 		_cancel_pending()
 		invalidate("season or preset changed")
@@ -446,22 +449,13 @@ func tick(v: View360, delta: float) -> void:
 	var look := Vector2(-sin(v._rig.yaw), -cos(v._rig.yaw))
 	if should_redirect(pos):
 		# Turned away mid-build: aim the build where the camera went now,
-		# not after the stale one lands. The notice already shown stands.
-		var told := _notified_gen == generation
+		# not after the stale one lands.
 		_cancel_pending()
 		invalidate("camera turned away mid-build")
 		_start_generation(v, pos, look)
 		redirected = true
-		if told:
-			_notified_gen = generation
 		return
 	if state == State.FETCHING or state == State.READY:
-		if not inside_detailed(pos) and _notified_gen != generation:
-			_notified_gen = generation
-			# The way-ahead badge shows the progress; this says why the
-			# pace eased.
-			ViewTools.say(v, "Slower past the edge",
-				"Full speed returns once the way ahead is ready.", "neutral")
 		return
 	if state == State.DEGRADED and Time.get_ticks_msec() < retry_at_msec:
 		return
@@ -472,7 +466,6 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2) -> void:
 	var target := step_target(pos, _vel, look)
 	var ll := WorldScale.latlon_from_xz(target.x, target.y, v._data.latitude, v._data.longitude)
 	var gen := begin(ll, target)
-	_notified_gen = -1
 	WorldCache.prefetch(ll.x, ll.y, v._quality_preset, v._data.season)
 	_abort = BuildAbort.new()
 	# A fresh pipeline per generation: a reused one aliases runs (its
