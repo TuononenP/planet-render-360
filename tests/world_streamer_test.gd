@@ -122,6 +122,20 @@ func _state_machine() -> void:
 		"a failed fetch degrades and may retry")
 	var gen4 := s.begin(Vector2(60.01, 25.0), Vector2(0, -900))
 	_check(s.mark_ready(gen4), "a retry can become ready")
+	# Turned after the trigger: the pending centre lies west, the camera
+	# left the live square northward while still nearer the old centre.
+	var west := Vector2(-1200, 0)
+	var north_edge := Vector2(-300, -1250)
+	var gen5 := s.begin(Vector2(60.0, 24.98), west)
+	_check(not s.pending_misses(north_edge), "a build in flight is left to finish")
+	_check(s.mark_ready(gen5), "a westward world is ready")
+	_check(not s.swap_wanted(north_edge), "it never covers the northward camera")
+	_check(s.swap_stale(north_edge),
+		"a ready world the camera turned away from is dropped, not held forever")
+	var over_west := Vector2(-1250, -400)
+	_check(s.swap_wanted(over_west) and not s.pending_misses(over_west),
+		"past the edge over the pending square it still swaps in")
+	_check(not s.pending_misses(Vector2(-300, -1100)), "inside the live square nothing is dropped")
 	s.reset_for_new_place()
 	_check(s.state == WorldStreamer.State.IDLE and s.generation > gen4,
 		"a new place drops a ready world and bumps the generation")
@@ -213,6 +227,22 @@ func _movement_and_swap() -> void:
 	view._streamer.invalidate("test")
 	_check(view._streamer.generation > gen and view._data == data2,
 		"invalidate after the swap leaves the live world alone")
+
+	# Live tick: a ready world the camera turned away from (west target,
+	# camera past the north edge) is dropped, not held forever. The tick
+	# that drops it returns before starting a pipeline.
+	var s := view._streamer
+	s.arm(data2.latitude, data2.longitude, data2.season, view._quality_preset)
+	var gen_turned := s.begin(Vector2(data2.latitude, data2.longitude - 0.02), Vector2(-1200, 0))
+	s.mark_ready(gen_turned)
+	var keep_pos := view._rig.position
+	view._rig.position = Vector3(-300, keep_pos.y, -1250)
+	s.note_spawn(Vector2(-300, -1250))
+	s.tick(view, 1.0 / 30.0)
+	_check(s.state == WorldStreamer.State.IDLE and s.generation > gen_turned and view._data == data2,
+		"tick drops a ready world the camera turned away from")
+	view._rig.position = keep_pos
+	s.note_spawn(after_xz)
 	await _swap_continuity(view, data2, after_xz)
 	view.queue_free()
 	await process_frame

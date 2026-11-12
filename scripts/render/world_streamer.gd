@@ -195,7 +195,8 @@ func should_retry() -> bool:
 ## Whether the pending target is still ahead of a camera at `pos`: the
 ## swap is wanted once the camera is closer to it than to the centre,
 ## and unwanted (dropped) once it is back inside the trigger's inner
-## half with the target behind it.
+## half with the target behind it, or off both squares (a turn after
+## the trigger).
 func swap_wanted(pos: Vector2) -> bool:
 	if state != State.READY:
 		return false
@@ -204,8 +205,19 @@ func swap_wanted(pos: Vector2) -> bool:
 func swap_stale(pos: Vector2) -> bool:
 	if state != State.READY:
 		return false
-	return pos.length() < TRIGGER_M * 0.5 \
-		and pos.distance_to(pending_target_xz) > STEP_M
+	return (pos.length() < TRIGGER_M * 0.5 and pos.distance_to(pending_target_xz) > STEP_M) \
+		or pending_misses(pos)
+
+## Whether the camera at `pos` is past the live detailed edge and outside
+## the ready centre's square too. Unless it is nearer than the live one
+## (swap_wanted, checked first), that centre would wait forever: drop it
+## so the next tick builds one where the camera went. A build in flight
+## is left to finish, so turning while out there cannot restart it
+## endlessly.
+func pending_misses(pos: Vector2) -> bool:
+	if state != State.READY:
+		return false
+	return not inside_detailed(pos) and not inside_detailed(pos - pending_target_xz)
 
 # --- Live driving (View360 delegates here, so View360 stays lean) ---
 
