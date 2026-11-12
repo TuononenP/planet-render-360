@@ -39,15 +39,26 @@ const FADE_FRAC := 0.12
 ## Area batches larger than this (merged scatters, MultiMesh fields)
 ## have no meaningful single distance; they are never ranged.
 const MAX_RANGED_SIZE_M := 2.0 * MERGE_CELL_M
+## Altitude reach (AltitudeReach): while a high drone has GPU headroom
+## each ring reaches about one tier further, and Ultra's past its own
+## caps (roofline detail over the whole detailed extent). Read by every
+## ranging call, so worlds and tree swaps ranged meanwhile agree.
+static var altitude_boost := false
+const DETAIL_M_ALT: Array[float] = [300.0, 450.0, 700.0, 1200.0]
+const TREES_M_ALT: Array[float] = [800.0, 1100.0, 1700.0, 1700.0]
+const FAR_CITY_M_ALT: Array[float] = [7500.0, 12001.0, 12001.0, 12001.0]
 
 static func detail_m(preset: int) -> float:
-	return DETAIL_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	return DETAIL_M_ALT[p] if altitude_boost else DETAIL_M[p]
 
 static func trees_m(preset: int) -> float:
-	return TREES_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	return TREES_M_ALT[p] if altitude_boost else TREES_M[p]
 
 static func far_city_m(preset: int) -> float:
-	return FAR_CITY_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	return FAR_CITY_M_ALT[p] if altitude_boost else FAR_CITY_M[p]
 
 ## Build time (preset-independent): every building mesh adopted flat
 ## into `root` (meta lod_layer == "Buildings") is appended into one

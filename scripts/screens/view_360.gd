@@ -112,6 +112,8 @@ var _drone := ViewDrone.new()
 ## Endless walk & fly (WorldStreamer): Main enables it for the live app;
 ## tests and captures keep the bounded movement they were written for.
 var _streamer := WorldStreamer.new()
+## More distant detail while the drone flies high (AltitudeReach).
+var _reach := AltitudeReach.new()
 ## A place opens in drone mode (the app sets this; tests and captures
 ## open on foot).
 var start_flying := false
@@ -276,6 +278,7 @@ func set_quality_preset(preset_value: int) -> void:
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
 	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
+	_reach.reset(self, false)
 	if _generated != null and is_instance_valid(_generated):
 		LodRing.apply(_generated, _quality_preset)
 
@@ -882,6 +885,7 @@ func _process(delta: float) -> void:
 	if _stream_badge != null and _stream_badge.follow(_streamer, delta):
 		ViewChrome.layout(self)
 	_tick_near_ground()
+	_reach.tick(self, delta)
 	if _mover != null and _rig != null and is_visible_in_tree():
 		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))
 	if _lapse.playing and is_visible_in_tree():
