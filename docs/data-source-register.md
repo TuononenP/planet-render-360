@@ -631,3 +631,47 @@ them 5.1, 5.1 and 4.0 m: `BareEarth.lidar_dem` therefore excludes England
 Terrarium roads 6.7 m, generic filter 5.2 m, national model 0.7 m.
 Scotland, Wales and Northern Ireland (Edinburgh, Cardiff, Belfast) are not
 measured and stay on the generic filter.
+
+### GEDTM30 as a global fallback: measured, not wired (2026-11-12)
+
+Seoul (Korea has no keyless national model found; V-World and NGII did not
+answer) prompted a test of OpenGeoHub's GEDTM30 v1.2 (global ensemble DTM,
+1 arc-second, CC BY 4.0, Zenodo 10.5281/zenodo.18887460; marked "use for
+testing purposes only"). The file
+`https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif`
+answers anonymously with range requests (BigTIFF, float32, deflate +
+predictor 2, 2048-px tiles, 432 GB). One tile covering a world is 5–6 MB
+compressed. Against the national models at the road nodes of the bundled
+detailed snapshots (bilinear GEDTM30 vs the truth post):
+
+| City | road points | GEDTM30 − truth, mean | std | rms |
+|---|---|---|---|---|
+| Tokyo (GSI DEM5A) | 1283 | +7.4 m | 5.9 m | 9.5 m |
+| Paris (IGN RGE ALTI) | 725 | +6.5 m | 6.4 m | 9.1 m |
+
+Its relief error is no better than the generic filter's (about 5.2 m std
+in both cities), and the +6–7 m bias suggests the city blocks are still in
+it, so it is not wired. Mapped squares are instead laid on their own
+best-fit plane in every city (`RoadGrading.grade_areas`, up to 3 m).
+
+### Smoothing the city on coarse surface models (2026-11-12)
+
+Where Terrarium is SRTM / EU-DEM class and no bare-earth model replaces it
+(`RoadGrading.coarse`: `BareEarth` applies, not ArcticDEM), `UrbanSmooth`
+low-passes the ground inside the built area (about a 90 m window, feathered
+at its edge, at most 3 m per post) and roads grade over ±70 m with a 2.5 m
+cap. Grading each road harder on its own did not help (junctions stepped
+between crossing streets' profiles); smoothing the ground under them did.
+Measured with the national models switched off and used as truth (road
+centrelines every 20 m, within 1 km of the viewpoint; roughness = rms of the
+second difference along the road, i.e. how much a street rolls):
+
+| City | roughness: truth | before | after | road std vs truth: before | after |
+|---|---|---|---|---|---|
+| Tokyo (GSI) | 0.65 m | 1.02 m | 0.79 m | 5.28 m | 4.61 m |
+| Paris (IGN) | 0.26 m | 0.68 m | 0.46 m | 5.29 m | 4.59 m |
+| Bern (swisstopo) | 0.44 m | 0.66 m | 0.59 m | 4.36 m | 4.47 m |
+| Seoul (no national model) | — | 1.13 m | 0.73 m | — | — |
+
+Bern, the hilly check, keeps its relief error within 0.1 m. Places with a
+national model, the US and English lidar and ArcticDEM worlds are unchanged.

@@ -108,12 +108,14 @@ const ROWS := [
 	{"id": "venice", "label": "Venice", "name": "Venice, Italy",
 		"lat": 45.4318, "lon": 12.3290, "eye_m": 8.0, "bearing": 104.0, "pitch": -2.0,
 		"clear": false},
-	# Gwanghwamun Square's north half, up the plaza axis to the palace gate
-	# (~240 m) and Bugaksan; the old eye, 120 m south, looked across
-	# Sejong-daero's lanes.
+	# Gwanghwamun from the far side of the Sajik-ro crosswalk on its axis
+	# (~105 m), over the woldae to the gate, the palace walls and Bugaksan,
+	# as in the rebuilt square's photos (refs/seoul/01), zoomed to their
+	# ~85° field of view. The old eye stood
+	# 240 m down the plaza, where the gate read as a speck.
 	{"id": "seoul", "label": "Seoul", "name": "Seoul, South Korea",
-		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.5738, "eye_lon": 126.9769,
-		"eye_m": 6.0, "bearing": 0.0, "pitch": 2.0},
+		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.574978, "eye_lon": 126.976772,
+		"eye_m": 4.0, "bearing": 0.0, "pitch": 3.0, "zoom": 1.35},
 	# Hyde St at Lombard, top of the crooked block, down the cable-car line
 	# (~352°) to Aquatic Park and Alcatraz (~353°, 2.8 km); the extent
 	# covers the slope down to the bay. Hyde St and the 1067 mm cable-car
