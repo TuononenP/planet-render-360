@@ -338,6 +338,39 @@ static func _wait_draws(host: Viewport, frames: int, deadline: int) -> bool:
 	RenderingServer.frame_post_draw.disconnect(on_draw)
 	return drawn[0] >= frames and _alive(host)
 
+## The PoseHeadingDegrees stored in a finished JPEG's GPano XMP, or 0
+## when the packet or field is absent or malformed. The XMP APP1 segment
+## sits near the start of the file, so only the head is decoded.
+static func heading_from_jpeg(jpeg: PackedByteArray) -> float:
+	if jpeg.size() < 4 or jpeg[0] != 0xFF or jpeg[1] != 0xD8:
+		return 0.0
+	# Byte-wise search: the JPEG body after the XMP is not valid UTF-8.
+	var head := jpeg.slice(0, mini(jpeg.size(), 65536))
+	# Attribute form (other writers): GPano:PoseHeadingDegrees="123.0"
+	var text := _value_after(head, "GPano:PoseHeadingDegrees=\"", 0x22)  # '"'
+	if text == "":
+		text = _value_after(head, "GPano:PoseHeadingDegrees>", 0x3C)  # '<'
+	return fposmod(text.to_float(), 360.0) if text.is_valid_float() else 0.0
+
+## The ASCII text between the first `marker` in `head` and the next
+## `stop` byte, or "" when `marker` is absent.
+static func _value_after(head: PackedByteArray, marker: String, stop: int) -> String:
+	var needle := marker.to_ascii_buffer()
+	for i in head.size() - needle.size():
+		var hit := true
+		for j in needle.size():
+			if head[i + j] != needle[j]:
+				hit = false
+				break
+		if hit:
+			var value := PackedByteArray()
+			var at := i + needle.size()
+			while at < head.size() and head[at] != stop:
+				value.append(head[at])
+				at += 1
+			return value.get_string_from_ascii()
+	return ""
+
 ## The finished picture as JPEG bytes carrying the panorama metadata.
 static func encode(img: Image, heading_deg: float) -> PackedByteArray:
 	return with_xmp(img.save_jpg_to_buffer(JPEG_QUALITY), xmp(img.get_width(), img.get_height(), heading_deg))

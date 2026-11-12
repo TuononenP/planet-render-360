@@ -14,6 +14,7 @@ extends Control
 
 signal place_selected(lat: float, lon: float)
 signal back_requested
+signal gallery_requested
 
 const SWIPE := 80.0
 const TINTS := ["1a2350", "b8607e", "7fb8e6", "f0b06a"]  # horizon-* stops
@@ -75,6 +76,12 @@ func _ready() -> void:
 	_count_label = UiTheme.label("", 14, UiTheme.MUTED)
 	_count_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	titles.add_child(_count_label)
+	var gallery := UiTheme.icon_button("")
+	UiIcon.apply(gallery, "rotate-3d", 22)
+	gallery.tooltip_text = "Gallery: saved 360° photos"
+	gallery.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gallery.pressed.connect(func() -> void: gallery_requested.emit())
+	header.add_child(gallery)
 	_view_seg = SegmentedControl.new(["Grid", "List"], ["layout-grid", "list"])
 	_view_seg.set_icon_only(true)
 	_view_seg.select(0)

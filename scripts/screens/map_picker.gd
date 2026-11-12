@@ -9,6 +9,7 @@ extends Control
 
 signal render_requested(lat: float, lon: float)
 signal history_requested
+signal gallery_requested
 signal settings_requested
 ## A render quality was picked from the dropdown beside Explore.
 signal quality_selected(preset: int)
@@ -57,6 +58,7 @@ var _suggest_list: VBoxContainer
 var _map_wrap: Control
 var _zoom_rail: PanelContainer
 var _history_btn: Button
+var _gallery_btn: Button
 var _settings_btn: Button
 var _download_btn: Button
 var _exit_btn: Button
@@ -244,11 +246,13 @@ func _ready() -> void:
 	# screen.
 	_history_btn = UiIcon.button("history", "History & saved places")
 	_history_btn.pressed.connect(func() -> void: history_requested.emit())
+	_gallery_btn = UiIcon.button("rotate-3d", "Gallery: saved 360° photos")
+	_gallery_btn.pressed.connect(func() -> void: gallery_requested.emit())
 	_settings_btn = UiIcon.button("settings", "Settings")
 	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
 	_exit_btn = UiIcon.button("x", "Exit the app")
 	_exit_btn.pressed.connect(func() -> void: exit_requested.emit())
-	_nav = UiTheme.rail([_history_btn, _settings_btn, _exit_btn])
+	_nav = UiTheme.rail([_history_btn, _gallery_btn, _settings_btn, _exit_btn])
 	_nav.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	_search_box = _vbox(6, Control.SIZE_EXPAND_FILL)

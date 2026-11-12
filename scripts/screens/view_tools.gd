@@ -207,15 +207,31 @@ static func panorama(v: View360) -> void:
 		v._photo_busy = false
 		say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
 		return
+	# Gallery copy first: the exported file may land anywhere the dialog
+	# puts it, but the in-app Gallery must always be able to list it.
+	# If the Gallery write fails the export still runs, so the photo is
+	# not lost; the messages below say which copy exists.
+	var in_gallery := not PanoramaLibrary.add(bytes, data.place_name, data.latitude, data.longitude,
+		heading, local, img).is_empty()
 	PhotoMode.save_bytes(bytes, PanoramaCapture.file_name(data.place_name, local), "jpg", "JPEG image",
 		"Save 360° photo", func(path: String, failed: bool) -> void:
 			if not is_instance_valid(v):
 				return
 			v._photo_busy = false
-			if failed:
-				say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+			var shown := path.get_file() if path.begins_with("user://") else path
+			if not in_gallery:
+				if failed:
+					say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+				elif path != "":
+					say(v, "360° photo saved, but not to Gallery", "Gallery is out of space or can't be written to. " + shown, "caution")
+				else:
+					say(v, "Couldn't save the 360° photo to Gallery", "Check there is space on this device, then try again.", "error")
+			elif failed:
+				say(v, "Saved to Gallery, but couldn't export a copy", "Check there is space and the folder can be written to, then export it again from Gallery.", "caution")
 			elif path != "":
-				say(v, "360° photo saved", path.get_file() if path.begins_with("user://") else path))
+				say(v, "360° photo saved", "Find it in Gallery · " + shown)
+			else:
+				say(v, "360° photo saved to Gallery", "No copy was exported. You can export one from Gallery later."))
 
 ## A brief white flash over the scene, like a shutter (none under Reduce motion).
 static func flash(v: View360) -> void:

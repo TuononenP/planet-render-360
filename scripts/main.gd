@@ -8,6 +8,8 @@ var _loading: LoadingScreen
 var _view: View360
 var _notice: DataNotice
 var _history: HistoryScreen
+var _gallery: GalleryScreen
+var _pano_viewer: PanoramaViewer
 var _settings_screen: SettingsScreen
 ## Where Settings' back button returns (the map, or the viewer when
 ## its attribution opened Data sources).
@@ -174,6 +176,9 @@ func _ready() -> void:
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
+	_picker.gallery_requested.connect(func() -> void:
+		_gallery.refresh()
+		_show(_gallery))
 	_picker.settings_requested.connect(func() -> void:
 		_settings_from = _picker
 		_show(_settings_screen))
@@ -243,6 +248,35 @@ func _ready() -> void:
 		_picker.selected_name = ""
 		_start_generation(lat, lon))
 	add_child(_history)
+
+	_gallery = GalleryScreen.new()
+	_gallery.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_gallery.back_requested.connect(func() -> void: _show(_picker))
+	_gallery.panorama_selected.connect(func(entry: Dictionary) -> void:
+		if _pano_viewer.open(entry):
+			_show(_pano_viewer)
+		else:
+			# open() fails only when the file is gone: drop its stale card.
+			_gallery.refresh()
+			_gallery.toast("Couldn't find this photo", "It is no longer on this device.", "error"))
+	add_child(_gallery)
+	_history.gallery_requested.connect(func() -> void:
+		_gallery.refresh()
+		_show(_gallery))
+
+	_pano_viewer = PanoramaViewer.new()
+	_pano_viewer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pano_viewer.back_requested.connect(func() -> void:
+		_pano_viewer.close()
+		_gallery.refresh()
+		_show(_gallery))
+	_pano_viewer.deleted.connect(func(_entry: Dictionary) -> void:
+		_gallery.refresh()
+		_show(_gallery))
+	_pano_viewer.open_failed.connect(func(_entry: Dictionary) -> void:
+		_show(_gallery)
+		_gallery.toast("Couldn't open this photo", "The file may be damaged. It stays in Gallery so you can delete it.", "error"))
+	add_child(_pano_viewer)
 
 	_settings_screen = SettingsScreen.new()
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -315,6 +349,17 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_request_exit()
 
+## The open confirmation veil (SettingsRows.confirm), if any, among the
+## screens: Esc closes it instead of navigating.
+func _find_modal() -> Control:
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
+		if s == null:
+			continue
+		for child in s.get_children():
+			if child.name == "confirm_veil":
+				return child
+	return null
+
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
 ## History and Settings return to the map, a Settings page on phones
 ## returns to its menu, loading cancels) and quits
@@ -325,10 +370,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key.keycode == KEY_Q and (key.ctrl_pressed or key.meta_pressed):
 			_request_exit()
 		elif key.keycode == KEY_ESCAPE:
-			if _picker.visible:
+			# An open confirmation sheet consumes Esc first.
+			var modal := _find_modal()
+			if modal != null:
+				modal.queue_free()
+			elif _picker.visible:
 				_request_exit()
 			elif _loading.visible:
 				_loading.cancel_requested.emit()
+			elif _pano_viewer.visible:
+				_pano_viewer.back_requested.emit()
+			elif _gallery.visible:
+				_show(_picker)
 			elif _settings_screen.visible and _settings_screen.step_back():
 				pass
 			elif _settings_screen.visible and _settings_from != null:
@@ -346,6 +399,8 @@ func _refresh_accent() -> void:
 	_notice.refresh_theme()
 	_loading.refresh_theme()
 	_history.refresh()
+	if _gallery != null:
+		_gallery.refresh_theme()
 	_settings_screen.refresh_theme()
 
 ## Leaving the viewer: History keeps where the person was looking and the
@@ -403,7 +458,7 @@ func _apply_preset(p: int) -> void:
 func _show(screen: Control) -> void:
 	if screen != _view:
 		_leave_view()
-	for s in [_picker, _loading, _view, _history, _settings_screen]:
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
 		s.visible = s == screen
 	if screen == _picker:
 		_picker.refresh_recent()
