@@ -30,6 +30,11 @@ struct Border {
 	bool operator==(const Border &b) const { return axis == b.axis && line == b.line && cell == b.cell; }
 	bool operator<(const Border &b) const { return std::tie(axis, line, cell) < std::tie(b.axis, b.line, b.cell); }
 };
+struct BorderHash {
+	size_t operator()(const Border &b) const {
+		return ((size_t)(uint32_t)b.line * 73856093u) ^ ((size_t)(uint32_t)b.cell * 19349663u) ^ (size_t)b.axis;
+	}
+};
 std::vector<Border> borders(Vector3 p, Rect2 box, Vector2i key) {
 	std::vector<Border> out;
 	if (std::abs((double)p.x - box.position.x) < 0.005) out.push_back({0, key.x, key.y});
@@ -95,7 +100,8 @@ struct IHash {
 Dictionary ShoreMesh::stitch(const Dictionary &input, int size, double step, double origin, Object *abort) {
 	const auto patches = read_patches(input);
 	using Heights = std::array<double, 3>;
-	std::map<Border, std::map<double, Heights>> bins;
+	// Looked up by border only; each border's stations stay sorted.
+	std::unordered_map<Border, std::map<double, Heights>, BorderHash> bins;
 	for (const Patch &p : patches) {
 		if (stopped(abort)) return Dictionary();
 		const Rect2 box = box_at(p.key, step, origin);
