@@ -218,6 +218,13 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var standing := PackedByteArray()
 	for i: int in order:
 		standing.append(stands[i])
+	# Every standing building's plan, on the worker threads, in the order
+	# the shared walls below would plan them one by one.
+	var to_plan: Array = []
+	for i in data.buildings.size():
+		if stands[i] != 0 and not ShipBuilder.accepts(data.buildings[i]):
+			to_plan.append(data.buildings[i])
+	BuildingMasses.prepare(to_plan, ctx)
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
 		func(i: int) -> bool:

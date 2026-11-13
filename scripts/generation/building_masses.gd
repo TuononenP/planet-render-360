@@ -166,6 +166,48 @@ static func key_of(x: float, z: float) -> String:
 ## {ring, holes, centre, key, wall_m, min_m, rh_m, shape, storeys, b_eff,
 ##  main, look}. Heights in metres above the lowest ground under the ring.
 static func plan(b: Dictionary, ctx: Dictionary) -> Array:
+	var ck := _plan_key(b)
+	_mutex.lock()
+	if _plans.has(ck):
+		var cached: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return cached
+	_mutex.unlock()
+	if not (b.get("parts", []) as Array).is_empty():
+		_note_partial(b)
+	var out := _compute(b, ctx)
+	_mutex.lock()
+	if _plans.has(ck):
+		var raced: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return raced
+	_plans[ck] = out
+	_mutex.unlock()
+	return out
+
+## Plans every building of `list` on the worker threads, then files them in
+## list order as plan() called in that order would: of two sharing a key
+## the first keeps it, and only it counts in partial_outlines.
+static func prepare(list: Array, ctx: Dictionary) -> void:
+	var keys := PackedStringArray()
+	for b: Dictionary in list:
+		keys.append(_plan_key(b))
+	var plans: Array = []
+	plans.resize(list.size())
+	var group := WorkerThreadPool.add_group_task(func(k: int) -> void:
+		plans[k] = _compute(list[k], ctx), list.size(), -1, true, "BuildingPlans")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	for k in list.size():
+		_mutex.lock()
+		var fresh := not _plans.has(keys[k])
+		if fresh:
+			_plans[keys[k]] = plans[k]
+		_mutex.unlock()
+		if fresh and not ((list[k] as Dictionary).get("parts", []) as Array).is_empty():
+			_note_partial(list[k])
+
+## The plan memo's key: position and outline, and the OSM source.
+static func _plan_key(b: Dictionary) -> String:
 	var fp0: Variant = b.get("footprint", null)
 	var ck := key_of(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
 	if fp0 is PackedVector2Array and not (fp0 as PackedVector2Array).is_empty():
@@ -174,13 +216,10 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	# Buildings OSM stacks on one outline (a roof canopy over a building,
 	# which OsmParser keeps apart) must neither share a plan nor a mass key:
 	# PartyWalls would read the two as one mass.
-	ck += _src_tag(b)
-	_mutex.lock()
-	if _plans.has(ck):
-		var cached: Array = _plans[ck] as Array
-		_mutex.unlock()
-		return cached
-	_mutex.unlock()
+	return ck + _src_tag(b)
+
+## plan()'s masses for `b`, without the memo.
+static func _compute(b: Dictionary, ctx: Dictionary) -> Array:
 	# An untagged building borrows a tagged neighbour's finish and date
 	# before its look resolves (NeighbourEvidence), so a block is built alike.
 	b = NeighbourEvidence.with_peers(b, ctx)
@@ -192,8 +231,6 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 	var fh := float(look["floor_h"])
 	var masses: Array = b.get("parts", [])
 	var single := masses.is_empty()
-	if not single:
-		_note_partial(b)
 	if single:
 		var stepped := TowerMassing.stack(b, look, parent_res, ctx, parent_shape)
 		if not stepped.is_empty():
@@ -211,13 +248,6 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 				parent_shape, fh)
 		_seat_lifts(out)
 		_seat_floaters(b, out)
-	_mutex.lock()
-	if _plans.has(ck):
-		var raced: Array = _plans[ck] as Array
-		_mutex.unlock()
-		return raced
-	_plans[ck] = out
-	_mutex.unlock()
 	return out
 
 ## Counts `b` in partial_outlines when its parts cover under 90% of it.
