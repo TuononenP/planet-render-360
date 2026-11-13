@@ -13,14 +13,20 @@ class ShorePatchKernel : public RefCounted {
 	PackedFloat32Array base, land;
 	std::vector<Level> levels;
 	std::vector<Bank> banks;
-	std::unordered_map<Vector3i, double, Hash> heights;
+	using Heights = std::unordered_map<Vector3i, double, Hash>;
+	Heights heights;
 	Ref<ShoreSampler> sampler;
 	Ref<ShoreDomainIndex> domains;
 	Ref<ShoreEvidenceIndex> evidence;
 	int size = 0;
 	double step = 1, origin = 0, depth = 2;
 	double grid_height(const PackedFloat32Array &values, Vector2 p) const;
-	double vertex_height(Vector2 p, int owner, bool hard);
+	// The memo is keyed on cm-snapped points, so any memo gives the same
+	// heights: one per thread in cells().
+	double vertex_height(Vector2 p, int owner, bool hard, Heights &memo) const;
+	Dictionary build_with(const Array &pieces, Heights &memo) const;
+	Array cell(const Vector2i &key, const Dictionary &edge_cells, const Dictionary &transition_cells,
+		const Array &edges, const Array &transition_edges, Heights &memo) const;
 protected:
 	static void _bind_methods();
 public:

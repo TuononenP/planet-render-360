@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <vector>
+#include "parallel.h"
 
 namespace godot {
 size_t ShorePatchKernel::Hash::operator()(const Vector3i &p) const {
@@ -42,7 +47,7 @@ double ShorePatchKernel::grid_height(const PackedFloat32Array &values, Vector2 p
 	return Math::lerp(Math::lerp((double)values[k], (double)values[k + 1], tx),
 		Math::lerp((double)values[k + size], (double)values[k + size + 1], tx), tz);
 }
-double ShorePatchKernel::vertex_height(Vector2 p, int owner, bool hard) {
+double ShorePatchKernel::vertex_height(Vector2 p, int owner, bool hard, Heights &heights) const {
 	const Vector3i key((int)Math::round((double)p.x * 100), (int)Math::round((double)p.y * 100), hard ? -2 : owner);
 	const auto cached = heights.find(key);
 	if (cached != heights.end()) return cached->second;
@@ -62,6 +67,9 @@ double ShorePatchKernel::vertex_height(Vector2 p, int owner, bool hard) {
 	return h;
 }
 Dictionary ShorePatchKernel::build(const Array &pieces) {
+	return build_with(pieces, heights);
+}
+Dictionary ShorePatchKernel::build_with(const Array &pieces, Heights &memo) const {
 	std::vector<Vector3> vertices;
 	std::vector<int32_t> owners;
 	std::vector<uint8_t> hard_regions, paving;
@@ -80,7 +88,7 @@ Dictionary ShorePatchKernel::build(const Array &pieces) {
 			const double tri_area = std::abs((double)(ring[i] - ring[0]).cross(ring[i + 1] - ring[0])) * 0.5;
 			if (tri_area < 0.00001) continue;
 			area += tri_area; owners.push_back(owner); hard_regions.push_back(hard ? 1 : 0); paving.push_back(hard && !natural ? 1 : 0);
-			for (const Vector2 &p : {ring[0], ring[i], ring[i + 1]}) vertices.emplace_back(p.x, vertex_height(p, owner, hard), p.y);
+			for (const Vector2 &p : {ring[0], ring[i], ring[i + 1]}) vertices.emplace_back(p.x, vertex_height(p, owner, hard, memo), p.y);
 		}
 	}
 	PackedVector3Array v; v.resize(vertices.size()); if (!vertices.empty()) std::memcpy(v.ptrw(), vertices.data(), vertices.size() * sizeof(Vector3));
@@ -127,68 +135,93 @@ double area_of(const PackedVector2Array &ring) {
 }
 } // namespace
 
+Array ShorePatchKernel::cell(const Vector2i &key, const Dictionary &edge_cells, const Dictionary &transition_cells,
+		const Array &edges, const Array &transition_edges, Heights &memo) const {
+	const Vector2 corner = Vector2(1, 1) * (real_t)origin;
+	// ShorelineModel.cell_box.
+	const Vector2 a0 = snap_cm(corner + Vector2(key) * (real_t)step);
+	const Vector2 b0 = snap_cm(corner + Vector2(key + Vector2i(1, 1)) * (real_t)step);
+	const Rect2 box(a0, b0 - a0);
+	Array cut_edges;
+	const Array transitions = transition_cells.get(key, Array());
+	for (int64_t t = 0; t < transitions.size(); ++t) cut_edges.push_back(transition_edges[(int64_t)transitions[t]]);
+	const Array raw_ids = edge_cells.get(key, Array());
+	for (int64_t r = 0; r < raw_ids.size(); ++r) {
+		const Dictionary raw = edges[(int64_t)raw_ids[r]];
+		const Vector2 a = raw["a"], b = raw["b"];
+		const int count = std::max(1, (int)std::ceil((double)a.distance_to(b) / 2.0));
+		Vector2 c0, c1;
+		if (!clip_segment(a, b, box, c0, c1)) continue;
+		const Vector2 d = b - a;
+		const double len2 = d.length_squared();
+		const int first = std::clamp((int)std::floor((double)(c0 - a).dot(d) / len2 * count), 0, count - 1);
+		const int last = std::clamp((int)std::ceil((double)(c1 - a).dot(d) / len2 * count), first + 1, count);
+		for (int i = first; i < last; ++i) {
+			Array piece;
+			piece.push_back(a.lerp(b, (real_t)((double)i / (double)count)));
+			piece.push_back(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
+			cut_edges.push_back(piece);
+		}
+	}
+	const double expected = box.get_area();
+	const double tolerance = std::max(0.02, expected * 0.001);
+	const Array pieces = ShoreKernels::partition(box, cut_edges);
+	double coverage = 0.0;
+	for (int64_t p = 0; p < pieces.size(); ++p) coverage += std::abs(area_of(pieces[p]));
+	Array entry;
+	entry.push_back(key);
+	if (std::abs(coverage - expected) > tolerance) {
+		entry.push_back(2);
+		entry.push_back(cut_edges);
+		return entry;
+	}
+	Dictionary patch = build_with(pieces, memo);
+	const double area = patch["area"];
+	patch.erase("area");
+	if (std::abs(area - expected) > tolerance || PackedVector3Array(patch["triangles"]).is_empty()) {
+		Dictionary diagnostic;
+		diagnostic["kind"] = "patch_failure";
+		diagnostic["cell"] = key;
+		diagnostic["area"] = area;
+		diagnostic["expected"] = expected;
+		entry.push_back(1);
+		entry.push_back(diagnostic);
+	} else {
+		entry.push_back(0);
+		entry.push_back(patch);
+	}
+	return entry;
+}
+
 Array ShorePatchKernel::cells(const Array &keys, const Dictionary &edge_cells, const Dictionary &transition_cells,
 		const Array &edges, const Array &transition_edges, Object *abort) {
 	Array out;
-	const Vector2 corner = Vector2(1, 1) * (real_t)origin;
-	for (int64_t k = 0; k < keys.size(); ++k) {
-		if (abort != nullptr && (bool)abort->get("requested")) return Array();
-		const Vector2i key = keys[k];
-		// ShorelineModel.cell_box.
-		const Vector2 a0 = snap_cm(corner + Vector2(key) * (real_t)step);
-		const Vector2 b0 = snap_cm(corner + Vector2(key + Vector2i(1, 1)) * (real_t)step);
-		const Rect2 box(a0, b0 - a0);
-		Array cut_edges;
-		const Array transitions = transition_cells.get(key, Array());
-		for (int64_t t = 0; t < transitions.size(); ++t) cut_edges.push_back(transition_edges[(int64_t)transitions[t]]);
-		const Array raw_ids = edge_cells.get(key, Array());
-		for (int64_t r = 0; r < raw_ids.size(); ++r) {
-			const Dictionary raw = edges[(int64_t)raw_ids[r]];
-			const Vector2 a = raw["a"], b = raw["b"];
-			const int count = std::max(1, (int)std::ceil((double)a.distance_to(b) / 2.0));
-			Vector2 c0, c1;
-			if (!clip_segment(a, b, box, c0, c1)) continue;
-			const Vector2 d = b - a;
-			const double len2 = d.length_squared();
-			const int first = std::clamp((int)std::floor((double)(c0 - a).dot(d) / len2 * count), 0, count - 1);
-			const int last = std::clamp((int)std::ceil((double)(c1 - a).dot(d) / len2 * count), first + 1, count);
-			for (int i = first; i < last; ++i) {
-				Array piece;
-				piece.push_back(a.lerp(b, (real_t)((double)i / (double)count)));
-				piece.push_back(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
-				cut_edges.push_back(piece);
-			}
+	if (abort != nullptr && (bool)abort->get("requested")) return out;
+	// Each cell on its own, every core; per-thread height memos, results
+	// in key order.
+	const int n = (int)keys.size();
+	std::vector<Array> entries((size_t)n);
+	std::vector<Vector2i> cell_keys((size_t)n);
+	for (int k = 0; k < n; ++k) cell_keys[k] = keys[k];
+	// A memo per worker thread for this call alone (the id is unique per
+	// call, so a thread never reads a memo of an earlier call).
+	static std::atomic<uint64_t> calls{ 0 };
+	const uint64_t call = ++calls;
+	std::mutex memo_lock;
+	std::vector<std::unique_ptr<Heights>> memos;
+	parallel_for(n, [&](int k) {
+		thread_local Heights *memo = nullptr;
+		thread_local uint64_t memo_call = 0;
+		if (memo_call != call) {
+			std::lock_guard<std::mutex> guard(memo_lock);
+			memos.push_back(std::make_unique<Heights>());
+			memo = memos.back().get();
+			memo_call = call;
 		}
-		const double expected = box.get_area();
-		const double tolerance = std::max(0.02, expected * 0.001);
-		const Array pieces = ShoreKernels::partition(box, cut_edges);
-		double coverage = 0.0;
-		for (int64_t p = 0; p < pieces.size(); ++p) coverage += std::abs(area_of(pieces[p]));
-		Array entry;
-		entry.push_back(key);
-		if (std::abs(coverage - expected) > tolerance) {
-			entry.push_back(2);
-			entry.push_back(cut_edges);
-			out.push_back(entry);
-			continue;
-		}
-		Dictionary patch = build(pieces);
-		const double area = patch["area"];
-		patch.erase("area");
-		if (std::abs(area - expected) > tolerance || PackedVector3Array(patch["triangles"]).is_empty()) {
-			Dictionary diagnostic;
-			diagnostic["kind"] = "patch_failure";
-			diagnostic["cell"] = key;
-			diagnostic["area"] = area;
-			diagnostic["expected"] = expected;
-			entry.push_back(1);
-			entry.push_back(diagnostic);
-		} else {
-			entry.push_back(0);
-			entry.push_back(patch);
-		}
-		out.push_back(entry);
-	}
+		entries[k] = cell(cell_keys[k], edge_cells, transition_cells, edges, transition_edges, *memo);
+	});
+	if (abort != nullptr && (bool)abort->get("requested")) return out;
+	for (int k = 0; k < n; ++k) out.push_back(entries[k]);
 	return out;
 }
 
