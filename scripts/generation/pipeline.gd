@@ -582,7 +582,11 @@ func _fetch_ground_model(data: LocationData) -> void:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	if _ground_raster.is_empty():
-		_note("elevation")
+		# A window the bare-earth model does not cover well enough (past a
+		# border, mostly sea) keeps the Terrarium heights: real elevation,
+		# not an outage. Only a failed or timed-out fetch is one.
+		if not _ground_done or (_ground_fetcher.outage if helsinki else _model_fetcher.outage):
+			_note("elevation")
 		return
 	data.ground_model = _ground_raster
 	data.dem_source["ground_model"] = "helsinki_2021_1m" if helsinki else national

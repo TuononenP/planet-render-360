@@ -27,9 +27,10 @@ const MAX_N := 6690000.0
 const HALF_M := 1450.0
 const CELLS := 600
 const NODATA := -32767.0
-## A window with more missing cells than this is outside the city's data
-## (Espoo, Vantaa, open sea): Terrarium stays.
-const MAX_MISSING := 0.02
+## A window with more missing cells than this is mostly outside the city's
+## data (Espoo, Vantaa, open sea): Terrarium stays. Smaller gaps (a window
+## reaching over the city border) take the Terrarium heights (apply).
+const MAX_MISSING := 0.25
 
 # GRS80 and the GK25 zone (central meridian 25°E, scale 1, false easting 25500000).
 const _A := 6378137.0
@@ -244,6 +245,10 @@ static func apply(data: LocationData) -> bool:
 						float(raster["origin"].x) + float(raster["size"].x) * float(raster["cell"].x) - 5.0),
 					clampf(p.y, float(raster["origin"].y) - float(raster["size"].y) * float(raster["cell"].y) + 5.0,
 						float(raster["origin"].y) - 5.0))
+				if is_nan(h):
+					# A gap inside the window (past the city border): the
+					# Terrarium height there, already sea-corrected.
+					h = data.heights[z * grid + x] if data.heights.size() == grid * grid else NAN
 				if is_nan(h):
 					return false
 			heights[z * grid + x] = h

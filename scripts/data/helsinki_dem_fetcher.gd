@@ -11,6 +11,9 @@ const TIMEOUT_S := 20.0
 
 var _http: HTTPRequest
 var _path := ""
+## Whether the last fetch failed on the network or the server (not on
+## coverage): only that is an elevation outage worth telling the user.
+var outage := false
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
@@ -25,6 +28,7 @@ static func cache_path(lat: float, lon: float) -> String:
 ## unavailable (network, format, or mostly outside the city's data).
 func fetch(lat: float, lon: float, offline: bool = false) -> void:
 	_path = cache_path(lat, lon)
+	outage = false
 	if FileAccess.file_exists(_path):
 		var cached := _decoded(FileAccess.get_file_as_bytes(_path))
 		if not cached.is_empty():
@@ -36,11 +40,13 @@ func fetch(lat: float, lon: float, offline: bool = false) -> void:
 		return
 	var err := _http.request(HelsinkiDem.request_url(lat, lon), ["User-Agent: " + Brand.USER_AGENT])
 	if err != OK:
+		outage = true
 		finished.emit({})
 
 func _on_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		print("Helsinki elevation model unavailable (result=%d code=%d)" % [result, code])
+		outage = true
 		finished.emit({})
 		return
 	var raster := _decoded(body)
