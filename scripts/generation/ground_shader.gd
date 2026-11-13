@@ -38,7 +38,14 @@ uniform float photo_gain = 1.0;
 // structure only (the low-frequency class signal stays the main photo's).
 uniform sampler2D photo_inner : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec4 inner_map = vec4(0.0);
+// A city orthophoto's colour matched to the main mosaic (linear).
+uniform vec3 inner_gain = vec3(1.0);
+uniform vec3 inner_bias = vec3(0.0);
 uniform float lf_lod = 0.0;
+// DemRelief: residual slopes of a 1 m elevation model (RG8, ±1) over
+// relief_rect (centre xz, half xz, units); relief_rect.z 0 = none.
+uniform sampler2D dem_relief : filter_linear, repeat_disable;
+uniform vec4 relief_rect = vec4(0.0);
 uniform float ground_max_low = 0.38;
 uniform float lum_floor = 0.055;
 uniform float urban_unknown = 1.0;
@@ -146,7 +153,8 @@ void fragment() {
 		vec2 iuv = UV * inner_map.xy + inner_map.zw;
 		vec2 ie = min(iuv, 1.0 - iuv);
 		float inside = smoothstep(0.0, 0.1, min(ie.x, ie.y));
-		hf = mix(hf, t_dehaze(texture(photo_inner, iuv).rgb * photo_gain), inside);
+		vec3 inner = max(texture(photo_inner, iuv).rgb * inner_gain + inner_bias, vec3(0.0));
+		hf = mix(hf, t_dehaze(inner * photo_gain), inside);
 	}
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
 	float veg = smoothstep(veg_lo, veg_hi, exg);
@@ -242,6 +250,15 @@ void fragment() {
 	// Crag relief: noise gradients bend the lighting normal on steep and
 	// rocky ground, so DEM slabs read as ribbed rock faces.
 	vec3 nw = normalize(wnrm);
+	if (relief_rect.z > 0.0 && dist_m < 600.0) {
+		vec2 ruv = (wpos.xz - relief_rect.xy) / (2.0 * relief_rect.zw) + 0.5;
+		vec2 re = min(ruv, 1.0 - ruv);
+		float rf = smoothstep(0.0, 0.06, min(re.x, re.y)) * (1.0 - smoothstep(250.0, 600.0, dist_m));
+		if (rf > 0.0) {
+			vec2 sl = texture(dem_relief, ruv).rg * 2.0 - 1.0;
+			nw = normalize(nw - vec3(sl.x, 0.0, sl.y) * rf);
+		}
+	}
 	float steep0 = smoothstep(0.86, 0.6, nw.y);
 	// Forested and grassy slopes keep their own shading: only bare ground
 	// takes the rock relief (it frosted wooded mountainsides).

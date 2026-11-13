@@ -20,19 +20,16 @@ void PhotoSampler::setup(const Ref<Image> &p_image, double p_lat, double p_lon, 
 	height = usable ? image->get_height() : 0;
 }
 
-// TerrainBuilder.satellite_uv.
+// TerrainBuilder.satellite_uv, op for op: float64 throughout (its
+// Vector2s were float32, ~1 m coarse at z17+).
 static Vector2 mosaic_uv(double lat, double lon, int zoom, const Vector2 &origin, double mosaic, double x, double z) {
-	// WorldScale.latlon_from_xz: a Vector2, so float lat / lon.
-	const double north_m = -z, east_m = x;
-	const real_t lat_f = (real_t)(lat + north_m / 110540.0);
-	const real_t lon_f = (real_t)(lon + east_m / (111320.0 * std::cos(lat * (Math::PI / 180.0))));
-	// TileFetcher.global_pixel.
+	double la = lat - z / 110540.0;
+	la = la < -85.0 ? -85.0 : (la > 85.0 ? 85.0 : la);
+	const double lo = lon + x / (111320.0 * std::cos(lat * (Math::PI / 180.0)));
 	const double n = (double)(1 << zoom) * 256.0;
-	const double px = ((double)lon_f + 180.0) / 360.0 * n;
-	const double clamped = (double)lat_f < -85.0 ? -85.0 : ((double)lat_f > 85.0 ? 85.0 : (double)lat_f);
-	const double lat_rad = clamped * (Math::PI / 180.0);
-	const double py = (1.0 - std::asinh(std::tan(lat_rad)) / Math::PI) / 2.0 * n;
-	return (Vector2((real_t)px, (real_t)py) - origin) / (real_t)mosaic;
+	const double px = (lo + 180.0) / 360.0 * n - (double)origin.x;
+	const double py = (1.0 - std::asinh(std::tan(la * (Math::PI / 180.0))) / Math::PI) / 2.0 * n - (double)origin.y;
+	return Vector2((real_t)(px / mosaic), (real_t)(py / mosaic));
 }
 
 Color PhotoSampler::roof_sample(double x, double z, double size_x, double size_z) const {

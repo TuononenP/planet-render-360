@@ -238,6 +238,13 @@ const GENUS := {
 	"cocos": "palm", "roystonea": "palm", "syagrus": "palm",
 }
 
+## Boreal overrides of GENUS (Helsinki's register: Acer, Sorbus and the
+## small flowering street trees are common).
+const BOREAL_GENUS := {
+	"acer": "maple", "sorbus": "rowan", "crataegus": "rowan",
+	"laburnum": "rowan", "syringa": "rowan", "amelanchier": "rowan",
+}
+
 ## Species for a mapped tree from its OSM tags (genus / species /
 ## leaf_type / leaf_cycle), or "" when they say nothing usable. Umbrella
 ## pines get their own model; an evergreen broadleaf in a dry-summer
@@ -250,6 +257,9 @@ static func species_from_tags(tags: Dictionary, biome: String) -> String:
 		return "stone_pine"
 	if genus == "cupressus" and str(tags.get("species", "")).contains("macrocarpa"):
 		return "monterey_cypress"
+	# Northern streets: maples and rowans have their own models.
+	if biome == "boreal" and BOREAL_GENUS.has(genus):
+		return BOREAL_GENUS[genus]
 	if GENUS.has(genus):
 		return GENUS[genus]
 	var leaf := str(tags.get("leaf_type", ""))

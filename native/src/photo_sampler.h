@@ -9,8 +9,8 @@
 namespace godot {
 
 // The satellite photo under world XZ (GroundCover._photo_at through
-// TerrainBuilder.satellite_uv), byte-identical with the script: lat/lon and
-// mercator pixels round to Vector2 floats where the script's do.
+// TerrainBuilder.satellite_uv), byte-identical with the script: float64
+// lat/lon and mercator pixels, the UV rounded to a Vector2 as the script's.
 class PhotoSampler : public RefCounted {
 	GDCLASS(PhotoSampler, RefCounted)
 

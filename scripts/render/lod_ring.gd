@@ -48,13 +48,21 @@ const DETAIL_M_ALT: Array[float] = [300.0, 450.0, 700.0, 1200.0]
 const TREES_M_ALT: Array[float] = [800.0, 1100.0, 1700.0, 1700.0]
 const FAR_CITY_M_ALT: Array[float] = [7500.0, 12001.0, 12001.0, 12001.0]
 
+## Detail city (CityDetail): High and Ultra reach further in a city with
+## open data behind it; Fast and Balanced keep their rings.
+static var city_boost := false
+const DETAIL_M_CITY: Array[float] = [200.0, 300.0, 700.0, 1000.0]
+const TREES_M_CITY: Array[float] = [600.0, 800.0, 1500.0, 1700.0]
+
 static func detail_m(preset: int) -> float:
 	var p := RenderSettings.clamp_preset(preset)
-	return DETAIL_M_ALT[p] if altitude_boost else DETAIL_M[p]
+	var r := DETAIL_M_ALT[p] if altitude_boost else DETAIL_M[p]
+	return maxf(r, DETAIL_M_CITY[p]) if city_boost else r
 
 static func trees_m(preset: int) -> float:
 	var p := RenderSettings.clamp_preset(preset)
-	return TREES_M_ALT[p] if altitude_boost else TREES_M[p]
+	var r := TREES_M_ALT[p] if altitude_boost else TREES_M[p]
+	return maxf(r, TREES_M_CITY[p]) if city_boost else r
 
 static func far_city_m(preset: int) -> float:
 	var p := RenderSettings.clamp_preset(preset)

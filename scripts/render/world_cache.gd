@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 253
+const BUILD_VERSION := 254
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -66,14 +66,14 @@ static func key(data: LocationData) -> String:
 		data.heights.size(), data.buildings.size(), data.roads.size(),
 		data.land_polygons.size(), data.waterways.size(), data.trees.size(),
 		data.landmark_type, data.has_landmark_site, data.landmark_lat, data.landmark_lon,
-		data.seed_value, data.country, str(data.dem_source), str(data.satellite_source),
+		data.seed_value, data.country, str(data.dem_source), str(data.satellite_source), str(data.satellite_inner_source),
 		data.focus.is_empty(),
 		hash(var_to_bytes(data.landmark_candidates)),
 		hash(var_to_bytes([data.shore_structures, data.land_polygons, data.waterways, data.buildings, data.roads])),
 		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
 			data.tram_stops, data.bus_stops, data.rail_platforms, data.rail_stations, data.bridge_areas])),
 		hash(var_to_bytes(data.far_landuse)), hash(var_to_bytes(data.far_towers)),
-		FarCityFetcher.QUERY_VERSION, str(data.climate),
+		FarCityFetcher.QUERY_VERSION, CityDetail.VERSION, str(data.climate),
 		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
 		_image_fingerprint(data.landcover_image), _image_fingerprint(data.canopy_image),
 		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(),

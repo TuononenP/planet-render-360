@@ -73,7 +73,7 @@ static func mesh_key(kind: String, family: String) -> String:
 ## desktop Ultra. Returns the number of items placed.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, m2u: float) -> int:
-	if not RenderQuality.ultra_desktop(data.quality_preset) or data.buildings.is_empty():
+	if not CityDetail.street_extras(data) or data.buildings.is_empty():
 		return 0
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
 	var family := furniture_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))

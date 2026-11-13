@@ -127,6 +127,8 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	if has_sat and data.satellite_inner_texture != null:
 		m.set_shader_parameter("photo_inner", data.satellite_inner_texture)
 		m.set_shader_parameter("inner_map", inner_map(data))
+		m.set_shader_parameter("inner_gain", data.satellite_inner_source.get("gain", Vector3.ONE))
+		m.set_shader_parameter("inner_bias", data.satellite_inner_source.get("bias", Vector3.ZERO))
 	m.set_shader_parameter("ground_max_low",
 		ground_ceiling_image(img, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
 	m.set_shader_parameter("lf_lod", lf_lod(data) if has_sat else 0.0)
@@ -153,6 +155,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("unknown_trust", 0.2 if settled else 0.5)
 	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
 	TerrainGlsl.bind(m, data.quality_preset)
+	DemRelief.bind(m, data)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
 	m.set_shader_parameter("micro_detail", 1.0 if micro_detail(data.quality_preset) else 0.0)
 	return m
@@ -182,9 +185,10 @@ static func _bind_near(m: ShaderMaterial, data: LocationData, m2u: float) -> voi
 ## main UV the vertices already carry (TerrainBuilder.satellite_uv).
 static func inner_map(data: LocationData) -> Vector4:
 	var zoom := int(data.satellite_source.get("source_zoom", data.satellite_zoom))
-	var k := pow(2.0, float(RenderSettings.SATELLITE_INNER_ZOOM - zoom))
+	var src := data.satellite_inner_source
+	var k := pow(2.0, float(int(src.get("zoom", RenderSettings.SATELLITE_INNER_ZOOM)) - zoom))
 	var main_px := float(TerrainBuilder.satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
-	var inner_px := float(RenderSettings.SATELLITE_INNER_SPAN * SatelliteFetcher.TILE_PX)
+	var inner_px := float(int(src.get("span", RenderSettings.SATELLITE_INNER_SPAN)) * SatelliteFetcher.TILE_PX)
 	var off := (data.satellite_origin_px * k - data.satellite_inner_origin_px) / inner_px
 	var sc := main_px * k / inner_px
 	return Vector4(sc, sc, off.x, off.y)

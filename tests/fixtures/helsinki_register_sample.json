@@ -1,0 +1,408 @@
+{
+"type": "FeatureCollection",
+"features": [
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35156",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672123,
+"i_ekoord": 25496007,
+"i_kerrosala": 5726,
+"i_kerrlkm": 8,
+"i_kellarala": 1361,
+"c_valmpvm": "1957-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": null,
+"c_julkisivu": "1",
+"tietopalvelu_id": 35156,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35176",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673237,
+"i_ekoord": 25495784,
+"i_kerrosala": 6172,
+"i_kerrlkm": 7,
+"i_kellarala": null,
+"c_valmpvm": "1924-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": "039",
+"c_julkisivu": "2",
+"tietopalvelu_id": 35176,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35177",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672911,
+"i_ekoord": 25497650,
+"i_kerrosala": 1204,
+"i_kerrlkm": 2,
+"i_kellarala": 307,
+"c_valmpvm": "1814-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": "151",
+"c_julkisivu": "2",
+"tietopalvelu_id": 35177,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35178",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673464,
+"i_ekoord": 25495773,
+"i_kerrosala": 6331,
+"i_kerrlkm": 7,
+"i_kellarala": null,
+"c_valmpvm": "1928-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": null,
+"c_julkisivu": "7",
+"tietopalvelu_id": 35178,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35182",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672123,
+"i_ekoord": 25496355,
+"i_kerrosala": 6423,
+"i_kerrlkm": 8,
+"i_kellarala": null,
+"c_valmpvm": "1981-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "039",
+"c_julkisivu": "4",
+"tietopalvelu_id": 35182,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35185",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672628,
+"i_ekoord": 25498221,
+"i_kerrosala": 4332,
+"i_kerrlkm": 5,
+"i_kellarala": null,
+"c_valmpvm": "1904-12-31T00:00:00+01:39",
+"c_rakeaine": "2",
+"c_kayttark": "039",
+"c_julkisivu": "7",
+"tietopalvelu_id": 35185,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35193",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673619,
+"i_ekoord": 25497625,
+"i_kerrosala": 3752,
+"i_kerrlkm": 4,
+"i_kellarala": null,
+"c_valmpvm": "1938-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "039",
+"c_julkisivu": null,
+"tietopalvelu_id": 35193,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35236",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672105,
+"i_ekoord": 25496721,
+"i_kerrosala": 3868,
+"i_kerrlkm": 4,
+"i_kellarala": null,
+"c_valmpvm": "1896-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": "151",
+"c_julkisivu": "7",
+"tietopalvelu_id": 35236,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35364",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672669,
+"i_ekoord": 25497041,
+"i_kerrosala": 4910,
+"i_kerrlkm": 6,
+"i_kellarala": null,
+"c_valmpvm": "1907-12-31T00:00:00+01:39",
+"c_rakeaine": "2",
+"c_kayttark": "151",
+"c_julkisivu": null,
+"tietopalvelu_id": 35364,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35413",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6674031,
+"i_ekoord": 25497188,
+"i_kerrosala": 6998,
+"i_kerrlkm": 9,
+"i_kellarala": null,
+"c_valmpvm": "1959-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "121",
+"c_julkisivu": "3",
+"tietopalvelu_id": 35413,
+"c_rakennusluokka": "0320"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35451",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672560,
+"i_ekoord": 25497025,
+"i_kerrosala": 5452,
+"i_kerrlkm": 5,
+"i_kellarala": null,
+"c_valmpvm": "1890-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": null,
+"c_julkisivu": "2",
+"tietopalvelu_id": 35451,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35482",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672579,
+"i_ekoord": 25495869,
+"i_kerrosala": 6146,
+"i_kerrlkm": 7,
+"i_kellarala": 2219,
+"c_valmpvm": "1966-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": null,
+"c_julkisivu": "3",
+"tietopalvelu_id": 35482,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35492",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673332,
+"i_ekoord": 25496984,
+"i_kerrosala": 6935,
+"i_kerrlkm": 8,
+"i_kellarala": null,
+"c_valmpvm": "1973-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "039",
+"c_julkisivu": "1",
+"tietopalvelu_id": 35492,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35528",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672147,
+"i_ekoord": 25496784,
+"i_kerrosala": 3128,
+"i_kerrlkm": 4,
+"i_kellarala": null,
+"c_valmpvm": "1910-12-31T00:00:00+01:39",
+"c_rakeaine": "2",
+"c_kayttark": "511",
+"c_julkisivu": "7",
+"tietopalvelu_id": 35528,
+"c_rakennusluokka": "0820"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35625",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673298,
+"i_ekoord": 25495907,
+"i_kerrosala": 4950,
+"i_kerrlkm": 7,
+"i_kellarala": null,
+"c_valmpvm": "1926-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": null,
+"c_julkisivu": "4",
+"tietopalvelu_id": 35625,
+"c_rakennusluokka": "0121"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35909",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672846,
+"i_ekoord": 25497260,
+"i_kerrosala": 3887,
+"i_kerrlkm": 7,
+"i_kellarala": 840,
+"c_valmpvm": "1910-12-31T00:00:00+01:39",
+"c_rakeaine": "1",
+"c_kayttark": "151",
+"c_julkisivu": "6",
+"tietopalvelu_id": 35909,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.35987",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672683,
+"i_ekoord": 25496780,
+"i_kerrosala": 5021,
+"i_kerrlkm": 6,
+"i_kellarala": null,
+"c_valmpvm": "1870-12-31T00:00:00+02:00",
+"c_rakeaine": "2",
+"c_kayttark": "112",
+"c_julkisivu": "2",
+"tietopalvelu_id": 35987,
+"c_rakennusluokka": "0311"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.36017",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6673261,
+"i_ekoord": 25497674,
+"i_kerrosala": 4273,
+"i_kerrlkm": 6,
+"i_kellarala": null,
+"c_valmpvm": "1958-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "214",
+"c_julkisivu": "4",
+"tietopalvelu_id": 36017,
+"c_rakennusluokka": "0610"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.36023",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672617,
+"i_ekoord": 25496233,
+"i_kerrosala": 4573,
+"i_kerrlkm": 5,
+"i_kellarala": 178,
+"c_valmpvm": "1907-12-31T00:00:00+01:39",
+"c_rakeaine": "2",
+"c_kayttark": "151",
+"c_julkisivu": "1",
+"tietopalvelu_id": 36023,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+},
+{
+"type": "Feature",
+"id": "Rakennukset_alue_rekisteritiedot.36047",
+"properties": {
+"tila": "voimassa",
+"tila_koodi": 2,
+"i_nkoord": 6672722,
+"i_ekoord": 25496333,
+"i_kerrosala": 4510,
+"i_kerrlkm": 7,
+"i_kellarala": null,
+"c_valmpvm": "1959-12-31T00:00:00+02:00",
+"c_rakeaine": "1",
+"c_kayttark": "151",
+"c_julkisivu": "3",
+"tietopalvelu_id": 36047,
+"c_rakennusluokka": "0400"
+},
+"geometry": null
+}
+],
+"numberMatched": 20,
+"numberReturned": 20,
+"_source": "City of Helsinki, Rakennukset_alue_rekisteritiedot (CC BY 4.0), kartta.hel.fi WFS, fetched 2026-11-13, trimmed"
+}

@@ -282,6 +282,7 @@ func set_quality_preset(preset_value: int) -> void:
 	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
 	_reach.reset(self, false)
 	if _generated != null and is_instance_valid(_generated):
+		LodRing.city_boost = _data != null and CityDetail.city_at(_data.latitude, _data.longitude) != ""
 		LodRing.apply(_generated, _quality_preset)
 
 ## Replace the generated world in place. The old world is tracked by
@@ -301,6 +302,7 @@ func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 		_generated = make_world(_data, _ground)
 	# Range the near/mid rings for the current preset (a streamed world
 	# arrives already ranged: the streamer ranges it while it waits).
+	LodRing.city_boost = CityDetail.city_at(_data.latitude, _data.longitude) != ""
 	if not pre_ranged or prebuilt == null:
 		LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)

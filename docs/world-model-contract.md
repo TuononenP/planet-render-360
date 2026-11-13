@@ -447,6 +447,27 @@ observed open-sea registration for northern surface-model DEMs; raw source
 files are preserved (see the source register). All generated geometry shares
 the corrected near/fine-ring registration.
 
+### City detail profile (2026-11-14)
+
+`CityDetail` names the places with city open data behind them (Helsinki,
+Espoo; `CityStyles` zones). On High and Ultra there it raises level-of-detail
+ranges and costs only: the full-building cap (past it buildings still become
+impostors at the same footprints), the roofline-detail ring, `LodRing`
+detail/tree reach (`city_boost`), terrain mesh posts (terrain and road drape
+together; `GroundTruth` stays 256 posts on every preset), the desktop street
+extras, and the inner aerial mosaic (`InnerImagery`: the HSY orthophoto at
+z18/z19). Fast and Balanced keep the shared values, so AC-12 holds.
+
+Data-only enrichment applies on every preset and only fills what the map
+leaves out: `HelsinkiRegister` adds `levels`, `height` (levels × 3.2 m when
+the height was a default), `start_year`, `material`, `kind` (for `yes` /
+`residential`) and `basement_m2`, recording `enriched.hel_register`;
+`HelsinkiTrees` adds `genus` / `species` / `height_m` to OSM trees within
+3 m (register-only trees, `source: hel_register`, only on High / Ultra).
+`LocationData.satellite_inner_source` records the inner mosaic
+(`{src, zoom, span, gain, bias}`) and `ground_detail` the DemRelief window
+(`dem_source.ground_detail`); both are part of the world key.
+
 ### Shared shoreline model (2026-11-03)
 
 `GroundTruth.shoreline` owns a `ShorelineModel`, finalized before the world

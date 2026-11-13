@@ -679,7 +679,7 @@ class _Surface extends RefCounted:
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
-		mesh_size = mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset), size)
+		mesh_size = mini(CityDetail.terrain_mesh_posts(data), size)
 		if ground.shoreline != null and ground.shoreline.ready:
 			mesh_size = size
 			step = ground._step_units

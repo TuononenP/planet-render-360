@@ -30,7 +30,7 @@ static func stone_for(data: LocationData) -> Color:
 
 ## Adds the kerb mesh to `root` on desktop Ultra. Returns metres of kerb.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> float:
-	if not RenderQuality.ultra_desktop(data.quality_preset):
+	if not CityDetail.street_extras(data):
 		return 0.0
 	var m := WorldScale.metres_to_units()
 	var junc := RoadSurface.junctions(data)

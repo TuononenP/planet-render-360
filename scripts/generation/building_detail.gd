@@ -19,9 +19,11 @@ extends RefCounted
 const NEAR_RADIUS := 250.0
 const ULTRA_NEAR_RADIUS := 700.0
 
-static func near_radius(preset: int) -> float:
-	return (ULTRA_NEAR_RADIUS if RenderQuality.ultra_desktop(preset) else NEAR_RADIUS) \
-		* WorldScale.metres_to_units()
+static func near_radius(preset: int, data: LocationData = null) -> float:
+	var r := ULTRA_NEAR_RADIUS if RenderQuality.ultra_desktop(preset) else NEAR_RADIUS
+	if data != null:
+		r = CityDetail.near_radius(data, r)  # wider in a detail city
+	return r * WorldScale.metres_to_units()
 
 static var _unit_arrays: Dictionary = {}
 static var _mats: Dictionary = {}

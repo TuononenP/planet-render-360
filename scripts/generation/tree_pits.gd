@@ -10,7 +10,7 @@ const HALF_M := 0.8
 const MAX_PITS := 500
 
 static func plan(data: LocationData, mask: VegetationMask, m: float, ground: GroundTruth = null) -> Array:
-	if not RenderQuality.ultra_desktop(data.quality_preset) \
+	if not CityDetail.street_extras(data) \
 			or CityStyles.region_at(data.latitude, data.longitude) != "new_york":
 		return []
 	var centre := View360.spawn_xz(data)

@@ -35,12 +35,26 @@ static func apply(buildings: Array) -> void:
 			b["height_source"] = "reference"
 			b["levels"] = float(row["levels"])
 			fields.append_array(["height", "levels"])
-		for key in row["values"]:
-			var value: Variant = row["values"][key]
-			var missing := str(b.get(key, "")) == "" if value is String else float(b.get(key, 0)) <= 0.0
-			if missing:
-				b[key] = value
-				fields.append(key)
+		fields.append_array(fill(b, row["values"]))
 		if not fields.is_empty():
 			b["reference"] = {"source": row["source"], "fields": fields,
 				"height_method": row["height_method"], "height_uncertainty_m": row["height_uncertainty_m"]}
+
+## Fills each of `values` into building `b` only where the map leaves it
+## out (an empty string, or a number <= 0); mapped tags always win. With
+## a `provenance` the filled keys are recorded under b.enriched. Returns
+## the filled keys. Shared by the curated rows and the city registers
+## (HelsinkiRegister), which run after them.
+static func fill(b: Dictionary, values: Dictionary, provenance: String = "") -> Array:
+	var fields: Array = []
+	for key in values:
+		var value: Variant = values[key]
+		var missing := str(b.get(key, "")) == "" if value is String else float(b.get(key, 0)) <= 0.0
+		if missing:
+			b[key] = value
+			fields.append(key)
+	if provenance != "" and not fields.is_empty():
+		var enriched: Dictionary = b.get("enriched", {})
+		enriched[provenance] = fields
+		b["enriched"] = enriched
+	return fields

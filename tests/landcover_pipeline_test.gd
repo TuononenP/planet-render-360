@@ -11,7 +11,7 @@ func _run() -> void:
 	var cover := Image.create_from_data(1, 1, false, Image.FORMAT_L8, PackedByteArray([50]))
 	var canopy := Image.create_from_data(1, 1, false, Image.FORMAT_L8, PackedByteArray([12]))
 	pipeline._sat_done = true
-	pipeline._inner_done = true
+	pipeline._inner.done = true
 	pipeline._landcover_done = true
 	pipeline._landcover_image = cover
 	pipeline._canopy_image = canopy

@@ -22,12 +22,20 @@ var _remaining := 0
 var _images := {}
 var _abort: BuildAbort = null
 var _started_ms := 0
+## The capital region's canopy (HsyCanopy) instead of Meta's alone.
+var _hsy := false
+var _hsy_http: HTTPRequest
+## Where the last canopy came from: "meta", "hsy", "hsy+meta" or "".
+var canopy_source := ""
 
 func _ready() -> void:
 	_cover_fetcher = CogFetcher.new()
 	_canopy_fetcher = CogFetcher.new()
 	add_child(_cover_fetcher)
 	add_child(_canopy_fetcher)
+	_hsy_http = HTTPRequest.new()
+	_hsy_http.timeout = 20.0
+	add_child(_hsy_http)
 
 func cancel() -> void:
 	_generation += 1
@@ -37,6 +45,8 @@ func cancel() -> void:
 		_cover_fetcher.cancel()
 	if is_instance_valid(_canopy_fetcher):
 		_canopy_fetcher.cancel()
+	if is_instance_valid(_hsy_http):
+		_hsy_http.cancel_request()
 	for task in _workers:
 		WorkerThreadPool.wait_for_task_completion(task)
 	_workers.clear()
@@ -53,8 +63,12 @@ static func accessed_date(kind: String, lat: float, lon: float) -> String:
 	var timestamp := FileAccess.get_modified_time(path) if FileAccess.file_exists(path) else 0
 	return Time.get_date_string_from_unix_time(timestamp) if timestamp > 0 else Time.get_date_string_from_system()
 
-func fetch(lat: float, lon: float) -> void:
+## `hsy`: use HSY's canopy where it covers the place (CityDetail, High /
+## Ultra in Helsinki and Espoo).
+func fetch(lat: float, lon: float, hsy: bool = false) -> void:
 	cancel()
+	_hsy = hsy and HsyCanopy.covers(lat, lon)
+	canopy_source = ""
 	_abort = BuildAbort.new()
 	_remaining = 2
 	_images = {}
@@ -64,17 +78,32 @@ func fetch(lat: float, lon: float) -> void:
 	_fetch_one("canopy", lat, lon, _canopy_fetcher, _generation)
 
 func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: int) -> void:
+	if kind == "canopy" and _hsy:
+		var hsy: Image = await _fetch_hsy(lat, lon, reader, gen)
+		if gen != _generation:
+			return
+		if hsy != null:
+			_done(kind, hsy, gen)
+			return
+	var image: Image = await _fetch_cog(kind, lat, lon, reader, gen)
+	if gen != _generation:
+		return
+	if kind == "canopy" and image != null:
+		canopy_source = "meta"
+	_done(kind, image, gen)
+
+## The cached or freshly read COG window of `kind`; null when unavailable
+## (or superseded: the caller checks the generation).
+func _fetch_cog(kind: String, lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 	var size := COVER_SIZE if kind == "landcover" else CANOPY_SIZE
 	var path := cache_path(kind, lat, lon)
 	if FileAccess.file_exists(path):
 		var cached := Image.load_from_file(path)
 		if cached != null and not cached.is_empty() and cached.get_size() == Vector2i(size, size):
 			CacheStore.note_read(path)
-			_done(kind, cached, gen)
-			return
+			return cached
 	if offline_mode:
-		_done(kind, null, gen)
-		return
+		return null
 	var box := {}
 	var abort := _abort
 	var task := WorkerThreadPool.add_task(func() -> void:
@@ -86,11 +115,10 @@ func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		WorkerThreadPool.wait_for_task_completion(task)
 		_workers.erase(task)
 	if gen != _generation:
-		return
+		return null
 	var plan: Dictionary = box.get("plan", {})
 	if plan.is_empty() or (plan["groups"] as Array).size() > MAX_GROUPS:
-		_done(kind, null, gen)
-		return
+		return null
 	var tiles: Array = []
 	for group in plan["groups"]:
 		var state := {"done": false, "result": {}}
@@ -104,13 +132,12 @@ func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		if gen != _generation:
 			if reader.finished.is_connected(callback):
 				reader.finished.disconnect(callback)
-			return
+			return null
 		var tile: Dictionary = state["result"]
 		if tile.is_empty() or int(tile.get("index", -1)) != int(group["index"]) \
 				or int(tile.get("ifd", {}).get("width", 0)) != int(group["width"]) \
 				or int(tile.get("ifd", {}).get("tile_width", 0)) != int(plan["tile_size"]):
-			_done(kind, null, gen)
-			return
+			return null
 		tiles.append(tile["pixels"])
 	box = {}
 	task = WorkerThreadPool.add_task(func() -> void: box["bytes"] = assemble(plan, tiles, abort))
@@ -121,11 +148,10 @@ func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		WorkerThreadPool.wait_for_task_completion(task)
 		_workers.erase(task)
 	if gen != _generation:
-		return
+		return null
 	var bytes: PackedByteArray = box.get("bytes", PackedByteArray())
 	if bytes.size() != size * size:
-		_done(kind, null, gen)
-		return
+		return null
 	var image := Image.create_from_data(size, size, false, Image.FORMAT_L8, bytes)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(CacheStore.base_dir()))
 	var temp := path + ".tmp-%d-%d" % [OS.get_process_id(), get_instance_id()]
@@ -134,7 +160,64 @@ func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		CacheStore.note_written(path)
 	else:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(temp))
-	_done(kind, image, gen)
+	return image
+
+## HSY's canopy bands composed over Meta's CHM (HsyCanopy), cached as
+## its own raster; null when a band is unavailable (Meta's alone then).
+func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
+	for kind in ["canopy_hsym", "canopy_hsy"]:
+		var path := cache_path(kind, lat, lon)
+		if FileAccess.file_exists(path):
+			var cached := Image.load_from_file(path)
+			if cached != null and cached.get_size() == Vector2i(CANOPY_SIZE, CANOPY_SIZE):
+				CacheStore.note_read(path)
+				canopy_source = "hsy+meta" if kind == "canopy_hsym" else "hsy"
+				return cached
+	if offline_mode:
+		return null
+	var bands: Array = []
+	for i in HsyCanopy.LAYERS.size():
+		var state := {"done": false, "body": PackedByteArray()}
+		var cb := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+			state["done"] = true
+			if result == HTTPRequest.RESULT_SUCCESS and code == 200:
+				state["body"] = body
+		_hsy_http.request_completed.connect(cb, CONNECT_ONE_SHOT)
+		if _hsy_http.request(HsyCanopy.band_url(i, lat, lon, CANOPY_SIZE), ["User-Agent: " + Brand.USER_AGENT]) != OK:
+			_hsy_http.request_completed.disconnect(cb)
+			return null
+		while not state["done"] and gen == _generation:
+			await get_tree().process_frame
+		if gen != _generation:
+			if _hsy_http.request_completed.is_connected(cb):
+				_hsy_http.request_completed.disconnect(cb)
+			return null
+		var img := Image.new()
+		if (state["body"] as PackedByteArray).is_empty() or img.load_png_from_buffer(state["body"]) != OK:
+			print("HSY canopy band %d unavailable; Meta canopy instead" % i)
+			return null
+		bands.append(img)
+	var chm: Image = await _fetch_cog("canopy", lat, lon, reader, gen)
+	if gen != _generation:
+		return null
+	var box := {}
+	var task := WorkerThreadPool.add_task(func() -> void:
+		box["image"] = HsyCanopy.compose(bands, chm, CANOPY_SIZE))
+	_workers.append(task)
+	while _workers.has(task) and not WorkerThreadPool.is_task_completed(task):
+		await get_tree().process_frame
+	if _workers.has(task):
+		WorkerThreadPool.wait_for_task_completion(task)
+		_workers.erase(task)
+	if gen != _generation or box.get("image") == null:
+		return null
+	var image: Image = box["image"]
+	var kind := "canopy_hsym" if chm != null else "canopy_hsy"
+	var path := cache_path(kind, lat, lon)
+	if image.save_png(path) == OK:
+		CacheStore.note_written(path)
+	canopy_source = "hsy+meta" if chm != null else "hsy"
+	return image
 
 func _done(kind: String, image: Image, gen: int) -> void:
 	if gen != _generation:

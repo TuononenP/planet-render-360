@@ -1,0 +1,321 @@
+{
+"type": "FeatureCollection",
+"features": [
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8881",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25497088.636438,
+6673826.256594,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8881,
+"paatyyppi": "Katu",
+"suku": "Tilia",
+"laji": "x vulgaris",
+"kokoluokka": "30 - 50 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8042",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496908.772374,
+6673492.907117,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8042,
+"paatyyppi": "Puisto",
+"suku": "Crataegus",
+"laji": "grayana",
+"kokoluokka": "30 - 50 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8050",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25495918.610866,
+6673844.808443,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8050,
+"paatyyppi": "Puisto",
+"suku": "Aesculus",
+"laji": "hippocastanum",
+"kokoluokka": "50 - 70 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8052",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25498176.741968,
+6673384.387523,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8052,
+"paatyyppi": "Puisto",
+"suku": "Populus",
+"laji": "sp.",
+"kokoluokka": "30 - 50 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8053",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25497734.832993,
+6671882.166121,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8053,
+"paatyyppi": "Puisto",
+"suku": "Acer",
+"laji": "platanoides",
+"kokoluokka": "30 - 50 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8054",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25497738.122829,
+6671884.38984,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8054,
+"paatyyppi": "Puisto",
+"suku": "Acer",
+"laji": "platanoides",
+"kokoluokka": "20 - 30 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8055",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25497744.165294,
+6671883.003591,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8055,
+"paatyyppi": "Puisto",
+"suku": "Sorbus",
+"laji": "aucuparia",
+"kokoluokka": "20 - 30 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8063",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25498322.394354,
+6673337.754627,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8063,
+"paatyyppi": "Puisto",
+"suku": "Acer",
+"laji": "platanoides",
+"kokoluokka": "0 - 10 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8077",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496336.480724,
+6672275.758457,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8077,
+"paatyyppi": "Katu",
+"suku": "Tilia",
+"laji": "x vulgaris",
+"kokoluokka": "20 - 30 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8093",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25497454.953268,
+6671529.694712,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8093,
+"paatyyppi": "Puisto",
+"suku": "Alnus",
+"laji": "glutinosa",
+"kokoluokka": "50 - 70 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8100",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496793.743375,
+6672714.753714,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8100,
+"paatyyppi": "Katu",
+"suku": "Tilia",
+"laji": "x vulgaris",
+"kokoluokka": "10 - 20 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8125",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496190.413946,
+6672605.094456,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8125,
+"paatyyppi": "Puisto",
+"suku": "Ulmus",
+"laji": "glabra",
+"kokoluokka": "20 - 30 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8126",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496206.67568,
+6672600.784752,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8126,
+"paatyyppi": "Puisto",
+"suku": "Ulmus",
+"laji": "glabra",
+"kokoluokka": "10 - 20 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8139",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25495519.058937,
+6673701.799754,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8139,
+"paatyyppi": "Puisto",
+"suku": "Ulmus",
+"laji": "glabra",
+"kokoluokka": "30 - 50 cm",
+"istutusvuosi": null
+}
+},
+{
+"type": "Feature",
+"id": "Puurekisteri_piste.8142",
+"geometry": {
+"type": "Point",
+"coordinates": [
+25496942.62021,
+6673352.27991,
+0
+]
+},
+"geometry_name": "geom",
+"properties": {
+"id": 8142,
+"paatyyppi": "Puisto",
+"suku": "Malus",
+"laji": "sp.",
+"kokoluokka": "20 - 30 cm",
+"istutusvuosi": null
+}
+}
+],
+"_source": "City of Helsinki, Puurekisteri_piste (CC BY 4.0), kartta.hel.fi WFS, fetched 2026-11-13, trimmed"
+}

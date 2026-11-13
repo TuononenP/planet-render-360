@@ -248,13 +248,19 @@ static func satellite_span_tiles(data: LocationData) -> int:
 ## on the mesh identically before and after the T1.2 metre cutover
 ## (identity then). Mosaic width comes from satellite_span_tiles above.
 static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
-	var ll := WorldScale.latlon_from_xz(wx, wz, data.latitude, data.longitude)
 	var zoom := data.satellite_zoom
 	if not data.satellite_source.is_empty():
 		zoom = int(data.satellite_source.get("source_zoom", zoom))
-	var px := TileFetcher.global_pixel(ll.x, ll.y, zoom)
+	# WorldScale.latlon_from_xz and TileFetcher.global_pixel in float64
+	# scalars: their Vector2s are float32, ~1 m coarse at z17+ (several
+	# pixels of a z19 city orthophoto, InnerImagery).
+	var lat := clampf(data.latitude - wz / 110540.0, -85.0, 85.0)
+	var lon := data.longitude + wx / (111320.0 * cos(deg_to_rad(data.latitude)))
+	var n := float(1 << zoom) * 256.0
+	var px := (lon + 180.0) / 360.0 * n - float(data.satellite_origin_px.x)
+	var py := (1.0 - asinh(tan(deg_to_rad(lat))) / PI) / 2.0 * n - float(data.satellite_origin_px.y)
 	var mosaic_px := float(satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
-	return (px - data.satellite_origin_px) / mosaic_px
+	return Vector2(px / mosaic_px, py / mosaic_px)
 
 ## `abort` stops it between rows / items; a stopped result is dropped.
 static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> MeshInstance3D:
@@ -264,7 +270,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	# Mesh density is the preset's LOD knob over the preset-independent
 	# GroundTruth (T7.1, AC-12): at full density the posts coincide
 	# exactly; coarser meshes sample the same surface bilinearly.
-	var size := mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset),
+	var size := mini(CityDetail.terrain_mesh_posts(data),
 		data.grid_size)
 	# Shoreline cells carry canonical constraints at every quality level.
 	# Flat cells away from those constraints are simplified by ShoreLod.

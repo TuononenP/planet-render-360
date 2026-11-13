@@ -180,9 +180,14 @@ static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: Groun
 		var pick := _species_at(x, z, setting, ground, ctx)
 		# A mapped genus / leaf type names the tree itself (OSM tags).
 		var tagged := TreeSpecies.species_from_tags(t, str(ctx["biome"]))
+		var sp: String = tagged if tagged != "" else pick[0]
 		# Street trees are pollarded/younger than open-grown ones.
 		var size: float = float(pick[1]) * (0.85 if setting == "street" else 1.0)
-		_add(plan, x, z, ground, tagged if tagged != "" else pick[0], size, 1.0, true)
+		# A surveyed size (a city tree register) sets the scale itself.
+		var h := float(t.get("height_m", 0.0))
+		if h > 0.0:
+			size = clampf(h / float(TreeSpecies.spec(sp)["h"]), 0.25, 1.6)
+		_add(plan, x, z, ground, sp, size, 1.0, true)
 
 # --- Land-cover fill -----------------------------------------------------
 

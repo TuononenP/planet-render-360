@@ -191,7 +191,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var aabb_fallbacks := 0
 	var impostor := MassBatch.new()
 	impostor.meta = {"lod_layer": "Buildings", "lod_impostor": true}
-	var cap := RenderSettings.max_buildings_for(data.quality_preset)
+	var cap := CityDetail.max_buildings(data)
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
 	ctx["eye"] = eye
@@ -601,7 +601,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,
-			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset),
+			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset, data),
 			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "",
 			RenderQuality.is_forward_plus() and preset >= RenderSettings.Preset.HIGH)
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church

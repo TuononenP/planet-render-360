@@ -63,6 +63,9 @@ var dem_source: Dictionary = {}
 ## inside its coverage; {} elsewhere. Transient: only dem_source["ground_model"]
 ## is part of the world key.
 var ground_model: Dictionary = {}
+## A finer window of the same model for lighting only (DemRelief), High /
+## Ultra; {} elsewhere. Transient like ground_model (dem_source records it).
+var ground_detail: Dictionary = {}
 ## v2 (T3.7): far-field DEM rings for FarTerrainBuilder, finest first
 ## (contract §2.2) — {zoom, origin_px: Vector2 (global px at zoom of the
 ## window's top-left pixel corner), width, height, heights:
@@ -101,6 +104,9 @@ var satellite_metres_per_px: float = 0.0
 ## it did not arrive whole. Origin in global pixels at that zoom.
 var satellite_inner_texture: Texture2D
 var satellite_inner_origin_px: Vector2 = Vector2.ZERO
+## The inner mosaic's source (InnerImagery): {src, zoom, span,
+## metres_per_px, gain, bias}; {} = Esri at SATELLITE_INNER_* or none.
+var satellite_inner_source: Dictionary = {}
 var landmark_type: String = "none"  # see landmarks() for the types
 ## True site of the landmark (landmarks() entry), so TerrainBuilder
 ## can place the model at its real bearing from the viewpoint instead
