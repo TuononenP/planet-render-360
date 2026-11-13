@@ -272,6 +272,10 @@ per-builder height recomputation (plan invariant 2).
   `scripts/data/` is a pipeline producer prepass: it registers raw source
   grids once before GroundTruth construction and supplies no rendered heights
   to builders.
+- The OSM features GroundTruth reads (water, coastline or sea, buildings,
+  roads) come from Overpass, a bundled snapshot or a saved copy. When none of
+  those answers, they come from the OpenFreeMap vector tiles (`OmtOsmSource`),
+  so the water carving, sea datum, roof stripping and road grading still run.
 
 | API | Signature | Semantics |
 |---|---|---|

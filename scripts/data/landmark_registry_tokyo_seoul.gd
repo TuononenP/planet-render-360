@@ -5,7 +5,7 @@ extends RefCounted
 ## Square) preset surroundings, in the format of LocationData.landmarks().
 ## Types are built by LandmarkSetTokyoSeoul. Sites, footprints, heights and
 ## bearings come from the bundled OSM snapshots (assets/osm_snapshots/
-## {tokyo,seoul}_detailed.json.gz and seoul_poi.json.gz); see
+## {tokyo,seoul}_detailed.osmb and seoul_poi.osmb); see
 ## docs/tokyo-seoul-landmark-sources.md. A site is the area centroid of the
 ## OSM footprint the model replaces; yaw_deg = true bearing of the model's
 ## +X - 90 (axis = cos, sin in x east, z south). The palace grid of

@@ -1,11 +1,28 @@
 # Bundled OpenStreetMap snapshots
 
-These gzip files are OpenStreetMap data © OpenStreetMap contributors,
+These `.osmb` files are OpenStreetMap data © OpenStreetMap contributors,
 available under the [ODbL](https://www.openstreetmap.org/copyright). The
 app's existing OSM attribution applies. They cover only the preset origins,
 not the cities as a whole. The query and integrity metadata is in `scripts/data/bundled_osm.gd`.
 Timestamps are the source replication time in UTC (Overpass `timestamp_osm_base`
 for live responses).
+
+## File format
+
+Each file is a compact, zstd-compressed form of an Overpass JSON response
+(`tools/osmb.py` documents the layout): coordinates as delta-coded integer
+microdegrees (1e-6°, about 11 cm), one string table for tags and roles, and no
+way node-id lists or bounds, which nothing reads. The manifest rows record the
+decompressed payload's size and SHA-256. `BundledOsm.read` checks both and
+decodes the payload back to Overpass JSON text (`SnapshotKernels` natively,
+`OsmbCodec` in GDScript), so the fetchers read it as before. The byte counts
+in the tables below are the original gzip JSON sizes.
+
+To read one as JSON:
+
+```sh
+python3 tools/osmb.py decode assets/osm_snapshots/helsinki_detailed.osmb > helsinki_detailed.json
+```
 
 | Preset | Coordinates | Layer / query | OSM timestamp UTC | Compressed bytes |
 | --- | --- | --- | --- | ---: |
@@ -53,7 +70,7 @@ To replace one of these files, obtain a complete current-query response from
 the app's cache at the exact preset origin, then run, for example:
 
 ```sh
-python3 tools/prepare_osm_snapshot.py detailed /path/to/current-cache.json assets/osm_snapshots/new_york_detailed.json.gz
+python3 tools/prepare_osm_snapshot.py detailed /path/to/current-cache.json assets/osm_snapshots/new_york_detailed.osmb
 ```
 
 Use `far`, `ring`, or `poi` for the other layer types. The tool rejects Overpass errors, missing
@@ -78,7 +95,7 @@ For example, for the New York snapshot:
 ```sh
 osmium extract -s smart -b -74.150,40.595,-73.858,40.817 NewYork.osm.pbf -o new_york_local.osm.pbf
 python3 tools/prepare_osm_extract.py new_york_local.osm.pbf new_york 2026-10-31T00:00:00Z /tmp/pr360_extract --coverage -74.150 40.595 -73.858 40.817
-python3 tools/prepare_osm_snapshot.py far /tmp/pr360_extract/new_york_far.json assets/osm_snapshots/new_york_far.json.gz
+python3 tools/prepare_osm_snapshot.py far /tmp/pr360_extract/new_york_far.json assets/osm_snapshots/new_york_far.osmb
 ```
 
 Pass the source extract's actual replication timestamp, not the conversion
@@ -198,7 +215,7 @@ restricted to verified optional layers in rural extracts.
 
 ## Transit layer
 
-`<preset>_transit.json.gz` rows (layer `transit`, query version
+`<preset>_transit.osmb` rows (layer `transit`, query version
 `OsmQuery.TRANSIT_VERSION`) hold what the detailed snapshots lack: tram stops
 (`railway=tram_stop`, `public_transport=stop_position` + `tram=yes`), every
 `highway=bus_stop` within the 1200 m detailed radius (the detailed files keep
@@ -221,6 +238,6 @@ python3 -I tools/prepare_transit_layer.py helsinki san_francisco --source overpa
 ```
 
 The tool validates each answer with `prepare_osm_snapshot.py transit`, writes
-the gzip and prints the `BundledOsm.ENTRIES` row to add. A rural preset with no
+the `.osmb` file and prints the `BundledOsm.ENTRIES` row to add. A rural preset with no
 transit at all is left without a layer (`--allow-sparse` keeps an empty one).
 Run `tests/transit_layer_test.gd` and `tests/bundled_osm_test.gd` afterwards.

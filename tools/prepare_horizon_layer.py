@@ -6,7 +6,7 @@ around a place. This asks Postpass (postpass.geofabrik.de, a PostGIS copy of
 OSM) the same thing, one request per place, and writes the answer in the
 Overpass `out tags center` shape: a node keeps its position, a lake way or
 relation gets the centre of its bounding box, as Overpass gives it. Only the
-tags HorizonFetcher.parse reads are kept. Each answer is validated and gzipped
+tags HorizonFetcher.parse reads are kept. Each answer is validated and written as .osmb
 by prepare_osm_snapshot.py, and its row goes into
 assets/osm_snapshots/horizon_manifest.json.
 
@@ -139,7 +139,7 @@ def main() -> None:
                 print(f"{name}: FAILED {err}", flush=True)
                 failed.append(name)
                 continue
-        destination = ASSETS / f"{name}_horizon.json.gz"
+        destination = ASSETS / f"{name}_horizon.osmb"
         command = [sys.executable, "-I", str(ROOT / "tools/prepare_osm_snapshot.py"), "horizon",
                    str(source), str(destination)]
         if not json.loads(source.read_bytes())["elements"]:
@@ -153,7 +153,7 @@ def main() -> None:
         stamp = fields["timestamp"].rstrip("Z")
         manifest[f"{name}_horizon"] = [json.loads(lat_text), json.loads(lon_text), "horizon", QUERY_VERSION,
                                        stamp, int(fields["bytes"]), fields["sha256"]]
-        print(f"{name}: elements={fields['elements']} gzip_bytes={fields['gzip_bytes']}", flush=True)
+        print(f"{name}: elements={fields['elements']} file_bytes={fields['file_bytes']}", flush=True)
         # Written after every place, so an interrupted run keeps what it finished.
         MANIFEST.write_text(json.dumps(dict(sorted(manifest.items())), indent=1) + "\n")
     if failed:

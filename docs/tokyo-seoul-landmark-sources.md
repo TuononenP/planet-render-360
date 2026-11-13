@@ -2,7 +2,7 @@
 
 The batch `LandmarkRegistryTokyoSeoul` / `LandmarkSetTokyoSeoul` fills the surroundings of the Tokyo preset (Shibuya Crossing) and the Seoul preset (Gwanghwamun Square). Models use true metres and merged textured surfaces. They approximate exterior envelopes and the details that read at distance; no model has been photographically rated. Values marked *estimate* must not be presented as surveyed dimensions.
 
-Positions, footprints, heights and bearings come from the bundled OSM snapshots, read offline: `assets/osm_snapshots/tokyo_detailed.json.gz`, `seoul_detailed.json.gz` and `seoul_poi.json.gz` (Overpass JSON). A registry site is the area centroid of the OSM footprint the model replaces. `yaw_deg` is the true bearing of the model's +X minus 90, read from the footprint's long edges.
+Positions, footprints, heights and bearings come from the bundled OSM snapshots, read offline: `assets/osm_snapshots/tokyo_detailed.osmb`, `seoul_detailed.osmb` and `seoul_poi.osmb` (Overpass JSON in `.osmb` form; `tools/osmb.py decode` prints it). A registry site is the area centroid of the OSM footprint the model replaces. `yaw_deg` is the true bearing of the model's +X minus 90, read from the footprint's long edges.
 
 ## Shibuya (Tokyo preset: origin 35.6595,139.7005; eye 35.6590,139.7011 at 15 m, bearing 320)
 

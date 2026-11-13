@@ -378,7 +378,7 @@ planet-render-360/
 │   └── bin/                   Generated libraries and .gdextension manifest (tools/build_native.sh)
 ├── assets/                    Runtime assets
 │   ├── eiffel.glb             Eiffel Tower model
-│   ├── osm_snapshots/         Bundled gzip OpenStreetMap layers for the featured places and capitals
+│   ├── osm_snapshots/         Bundled OpenStreetMap layers (.osmb) for the featured places and capitals
 │   │                          (ODbL; provenance in capital_provenance.json and its README)
 │   ├── capital_thumbs/        Capital place thumbnails
 │   ├── brand/, icons/, fonts/  Brand artwork, Lucide icons and typefaces

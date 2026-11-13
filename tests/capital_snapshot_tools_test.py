@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Check that the batch does not skip missing, stale or corrupt snapshots."""
-import gzip
 import hashlib
 import http.server
 import json
@@ -13,31 +12,33 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
 from capital_snapshot_io import LAYERS, annotate_provenance, complete, download, parse_poly
+import osmb
 
 place = {'identifier': 'capital_test', 'lat': 12.0, 'lon': 34.0}
 provenance = {place['identifier']: {'coordinates': [12.0, 34.0], 'country': 'XX', 'source': 'fixture',
               'source_timestamp': '2026-11-03T00:00:00Z', 'captured_at': '2026-11-05',
               'coverage': [1, 2, 3, 4],
               'query_versions': {'detailed_extract': 12, 'ring': 1, 'poi': 1, 'far': 3}, 'attribution': 'OSM'}}
-raw = b'{"elements":[]}'
+payload = osmb.encode({'elements': []})
+raw = osmb.compress(payload)
 with tempfile.TemporaryDirectory() as directory:
     assets = Path(directory)
     manifest = {}
     for layer, (kind, version) in LAYERS.items():
         key = place['identifier'] + '_' + layer
-        (assets / (key + '.json.gz')).write_bytes(gzip.compress(raw))
+        (assets / (key + '.osmb')).write_bytes(raw)
         manifest[key] = [place['lat'], place['lon'], kind, version, '2026-11-03T00:00:00',
-                         len(raw), hashlib.sha256(raw).hexdigest()]
+                         len(payload), hashlib.sha256(payload).hexdigest()]
     assert complete(place, manifest, assets, provenance)
     assert not complete(place, manifest, assets, {})
     key = place['identifier'] + '_poi'
-    (assets / (key + '.json.gz')).write_bytes(gzip.compress(b'corrupt'))
+    (assets / (key + '.osmb')).write_bytes(osmb.compress(b'corrupt'))
     assert not complete(place, manifest, assets, provenance)
-    (assets / (key + '.json.gz')).write_bytes(gzip.compress(raw))
+    (assets / (key + '.osmb')).write_bytes(raw)
     manifest[key][3] += 1
     assert not complete(place, manifest, assets, provenance)
     manifest[key][3] -= 1
-    (assets / (key + '.json.gz')).unlink()
+    (assets / (key + '.osmb')).unlink()
     assert not complete(place, manifest, assets, provenance)
 
 class RangeServer(http.server.BaseHTTPRequestHandler):

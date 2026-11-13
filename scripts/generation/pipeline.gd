@@ -111,6 +111,10 @@ const FARCITY_WAIT_S := 30.0
 ## A background (streamed) run's map-data wait: the camera is moving
 ## toward the edge meanwhile (OsmFetcher.retry_budget_seconds is minutes).
 const STREAM_OSM_WAIT_S := 30.0
+## The same wait once the vector-map tier (OsmFetcher.has_omt) has the
+## stretch's water, buildings and roads in hand: Overpass gets a short
+## head start, then the stretch builds on the vector map.
+const STREAM_OMT_WAIT_S := 8.0
 var _climate: ClimateFetcher
 var _climate_data: Dictionary = {}
 var _climate_done := true
@@ -705,12 +709,14 @@ func _await_osm(data: LocationData) -> void:
 	var waited := 0.0
 	var budget := STREAM_OSM_WAIT_S if background else OsmFetcher.retry_budget_seconds()
 	while not _osm_done and waited < budget and not _cancelled:
+		if background and waited >= STREAM_OMT_WAIT_S and _osm.has_omt():
+			break
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	if not _osm_done and background and not _cancelled:
-		# The way ahead cannot wait minutes on a slow Overpass: a nearby
-		# copy, or the stretch goes on without map data.
-		_osm.give_up("map data over the streamed wait (%d s)" % int(budget))
+		# The way ahead cannot wait minutes on a slow Overpass: a saved
+		# copy, the vector map, or the stretch goes on without map data.
+		_osm.give_up("map data over the streamed wait (%d s)" % int(waited))
 		waited = 0.0
 		while not _osm_done and waited < 10.0 and not _cancelled:
 			await get_tree().process_frame  # a nearby copy still parses
@@ -738,7 +744,7 @@ func _await_osm(data: LocationData) -> void:
 		data.shore_structures = _osm.shore_structures
 		data.bridge_areas = _osm.bridge_areas
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
-		_credits[2] = "Map data: © OpenStreetMap contributors"
+		_credits[2] = "Map data: © OpenStreetMap contributors" + (" · © OpenMapTiles" if _osm.used_omt else "")
 	else:
 		# No map data: the registry's other landmarks still stand.
 		data.landmark_candidates = LandmarkSites.select(data, [])

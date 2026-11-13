@@ -163,8 +163,17 @@ var _poi_req: OverpassRequest
 var _bridge_req: OverpassRequest
 var _bridge_postpass: HTTPRequest
 var _ring_grace: Timer
+## The vector-map tier (OmtOsmSource), fetched alongside a live query.
+var _omt: OmtOsmSource
+## [reason, failure text] while a give-up waits for the vector-map tier.
+var _omt_wait: Array = []
+## Whether the last success came from the vector-map tier.
+var used_omt := false
 
 func _ready() -> void:
+	_omt = OmtOsmSource.new()
+	add_child(_omt)
+	_omt.finished.connect(_on_omt_finished)
 	_http = HTTPRequest.new()
 	_http.timeout = ATTEMPT_TIMEOUT
 	add_child(_http)
@@ -312,9 +321,12 @@ var bridge_areas: Array = []
 ## fetch burned every retry on 44 and then lost the real response's
 ## state. cancel_request() emits no request_completed, so nothing stale
 ## reaches the handlers.
-func cancel() -> void:
+func cancel(keep_omt: bool = false) -> void:
 	# A parse still running off-thread belongs to the abandoned fetch.
 	_parse_gen += 1
+	_omt_wait = []
+	if _omt != null and not keep_omt:
+		_omt.cancel()
 	# So does any step of the OSM API fallback.
 	_api_tier = 0
 	if _http != null:
@@ -394,6 +406,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_api_reason = ""
 	_fallback_detail = ""
 	_fallback_partial = false
+	used_omt = false
 	var want_ring := ring > radius
 	if want_ring:
 		_pending_ring_cache = CacheStore.osm_ring_path(lat, lon, ring)
@@ -445,6 +458,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 			_detailed_fallback("OSM not cached (offline mode)")
 		return
 	var known_empty := _detailed_text == "" and _known_empty(lat, lon)
+	if _detailed_text == "":
+		_omt.start(lat, lon, DETAILED_RADIUS_M)
 	# Both phases go live at once; _try_finish waits for the pair.
 	if want_ring and _ring_text == "" and not known_empty:
 		_ring_pending = true
@@ -607,6 +622,9 @@ func _on_ring_exhausted(reason: String, _attempts: int) -> void:
 
 func _detailed_done() -> void:
 	_detailed_ready = true
+	# The detailed layer is in hand: the vector-map tier is not needed.
+	if _omt != null and not used_omt:
+		_omt.cancel()
 	if _ring_pending:
 		_ring_grace.start()
 	_try_finish()
@@ -761,7 +779,7 @@ func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
 ## build ran out of time): a nearby cached copy if there is one, else
 ## failed. Live requests are dropped so no late answer lands.
 func give_up(reason: String) -> void:
-	cancel()
+	cancel(true)
 	# The ring, bridge and POI steps settle with what is at hand: none of
 	# them may hold the finish or ask Overpass again.
 	_ring_pending = false
@@ -769,8 +787,53 @@ func give_up(reason: String) -> void:
 	_bridge_pending = false
 	_poi_started = true
 	_poi_pending = false
+	_last_resort(reason, reason)
+
+## Whether the vector-map tier is ready to stand in for a live answer that
+## has not arrived (once the detailed layer is in, it is only parsing).
+func has_omt() -> bool:
+	return not _detailed_ready and _omt != null and _omt.state == OmtOsmSource.State.READY
+
+## Out of live map sources: a copy of this spot, then the vector-map tier
+## (waited for while its tiles are still coming), then a neighbour's copy,
+## which leaves part of the view without map data, else `fail`.
+func _last_resort(reason: String, fail: String) -> void:
+	if _use_cached(reason, SAME_PLACE_M):
+		return
+	if _omt.state == OmtOsmSource.State.RUNNING:
+		_omt_wait = [reason, fail]
+		return
+	if _omt.state == OmtOsmSource.State.READY:
+		_use_omt(reason)
+		return
 	if not _use_cached(reason, NEARBY_M):
-		failed.emit(reason)
+		_ring_req.cancel()
+		failed.emit(fail)
+
+func _on_omt_finished(_text: String) -> void:
+	if not _omt_wait.is_empty():
+		var wait := _omt_wait
+		_omt_wait = []
+		_last_resort(wait[0], wait[1])
+
+## Water, buildings and roads from the vector map: the ground is shaped
+## right, the dressing is plainer. Overpass is out, so the ring, bridge and
+## POI steps do not wait on it; the ring would also double the roads.
+func _use_omt(reason: String) -> void:
+	print("OsmFetcher: %s; using the vector map's features" % reason)
+	used_omt = true
+	_fallback_detail = "Simplified map"
+	_fallback_partial = true
+	_ring_req.cancel()
+	_ring_text = ""
+	_ring_pending = false
+	_bridge_started = true
+	_bridge_pending = false
+	_poi_started = true
+	_poi_pending = false
+	_detailed_text = _omt.text
+	_detailed_cached = false
+	_detailed_done()
 
 ## Serve the nearest cached payload within max_m that holds mapped geometry,
 ## and say so: a payload keyed more than SAME_PLACE_M away leaves part of
@@ -800,9 +863,7 @@ func _request_api() -> void:
 
 func _api_failed(why: String, reason: String) -> void:
 	var full := "%s; OSM API %s" % [reason, why]
-	if not _use_cached(full, NEARBY_M):
-		_ring_req.cancel()
-		failed.emit("%s (tried %d endpoint(s))" % [full, _tried])
+	_last_resort(full, "%s (tried %d endpoint(s))" % [full, _tried])
 
 func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 	if OsmApiFallback.steps_down(result, code) \

@@ -47,17 +47,18 @@ with tempfile.TemporaryDirectory(prefix='pr360-capital-') as temp_name:
     for layer, (kind, version) in layer_kinds.items():
         key = args.identifier + '_' + layer
         raw_path = temp / (key + '.json')
-        gzip_path = temp / (key + '.json.gz')
+        osmb_path = temp / (key + '.osmb')
         raw = raw_path.read_bytes()
         if len(raw) > 32 * 1024 * 1024:
             raise SystemExit(f'{key}: payload exceeds the runtime size limit')
         cmd = [sys.executable, str(root / 'tools/prepare_osm_snapshot.py'), kind,
-               str(raw_path), str(gzip_path)]
+               str(raw_path), str(osmb_path)]
         if args.allow_sparse and layer != 'detailed':
             cmd.append('--allow-sparse')
-        subprocess.run(cmd, check=True)
+        done = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, text=True)
+        fields = dict(part.split('=', 1) for part in done.stdout.split())
         entries[key] = [*args.point, 'detailed_extract' if layer == 'detailed' else layer,
-                        version, args.timestamp.removesuffix('Z'), len(raw), hashlib.sha256(raw).hexdigest()]
+                        version, args.timestamp.removesuffix('Z'), int(fields['bytes']), fields['sha256']]
     # Publish only after every layer has validated. Existing entries are not
     # removed when an attempt fails.
     lock_path = root / '.godot' / 'capital-snapshots.lock'
@@ -82,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix='pr360-capital-') as temp_name:
         temporary_provenance = provenance_path.with_suffix('.json.tmp')
         temporary_provenance.write_text(json.dumps(provenance, indent=2, ensure_ascii=False, sort_keys=True) + '\n', encoding='utf-8')
         for key in entries:
-            shutil.copyfile(temp / (key + '.json.gz'), assets / (key + '.json.gz'))
+            shutil.copyfile(temp / (key + '.osmb'), assets / (key + '.osmb'))
         temporary_provenance.replace(provenance_path)
         temporary_manifest.replace(manifest_path)
 print(f'Bundled five validated layers for {args.identifier}')

@@ -4,7 +4,7 @@
 The bundled detailed snapshots carry no tram stops or station nodes, and bus
 stops only within the furniture radius. This gathers what OsmQuery.build_query
 asks for over the detailed radius around each preset, and prepares each answer
-with prepare_osm_snapshot.py (validate, deterministic gzip). It prints the
+with prepare_osm_snapshot.py (validate, write .osmb). It prints the
 BundledOsm.ENTRIES row to add.
 
 Two sources: the app's own Overpass instances (OsmFetcher.ENDPOINTS), one
@@ -226,7 +226,7 @@ def main() -> None:
                 print(f"{name}: FAILED {err}")
                 failed.append(name)
                 continue
-        destination = ROOT / "assets/osm_snapshots" / f"{name}_transit.json.gz"
+        destination = ROOT / "assets/osm_snapshots" / f"{name}_transit.osmb"
         command = [sys.executable, "-I", str(ROOT / "tools/prepare_osm_snapshot.py"), "transit", str(source), str(destination)]
         if args.allow_sparse:
             command.append("--allow-sparse")

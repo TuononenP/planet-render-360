@@ -20,6 +20,7 @@
 #include "road_grader.h"
 #include "shore_classifier.h"
 #include "shore_evidence_kernels.h"
+#include "snapshot_kernels.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -51,6 +52,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShoreDomainIndex);
 	GDREGISTER_CLASS(ShoreEvidenceIndex);
 	GDREGISTER_CLASS(ShorePatchKernel);
+	GDREGISTER_CLASS(SnapshotKernels);
 	GDREGISTER_CLASS(TintKernels);
 	GDREGISTER_CLASS(PhotoSampler);
 	GDREGISTER_CLASS(GridFilters);

@@ -45,12 +45,29 @@ Overpass status check (`BundledOsm.covers`). Fresher data arrives when the
 bundle is rebuilt. Before that, every open of a preset ran the full detailed,
 ring, POI and far-city queries in the background until one answer newer than
 the snapshot was cached. The horizon labels layer is bundled too
-(`assets/osm_snapshots/*_horizon.json.gz`, rows in `horizon_manifest.json`),
+(`assets/osm_snapshots/*_horizon.osmb`, rows in `horizon_manifest.json`),
 built by `tools/prepare_horizon_layer.py` from Postpass with the same
 selection, radii, 1500-row cap and output order as `HorizonFetcher.build_query`,
 keeping only the tags the labels read (`name`, `natural`, `place`, `water`,
 `ele`). A lake's position is the centre of its bounding box, as Overpass
 `out center` gives it.
+
+Snapshots ship as `.osmb` (`tools/osmb.py`): the same Overpass JSON with
+coordinates rounded to 1e-6° and way node-id lists dropped, delta-coded and
+zstd-compressed, about 2.4x smaller than the gzip JSON they replace.
+
+When Overpass and its fallbacks (Postpass, the OSM API, a saved copy of the
+same spot) give nothing, the detailed layer comes from the OpenFreeMap vector
+tiles the map already uses (`OmtOsmSource`, `OmtToOverpass`): z14 OpenMapTiles
+water (the sea included), waterways, building footprints with their heights,
+roads, railways, plazas and land cover, rewritten as Overpass-shaped JSON.
+Street furniture, tree nodes, barriers, building parts, roof shapes and lane
+counts are not in the tiles. That is enough for GroundTruth to carve water,
+set the sea datum, strip roofs and grade roads, so the ground is shaped
+instead of bare elevation. The tiles are fetched alongside every live query
+for a place without bundled or cached data. A streamed stretch builds on them
+after 8 s without an Overpass answer (`Pipeline.STREAM_OMT_WAIT_S`). The
+loading line says "Simplified map", and the credit adds © OpenMapTiles.
 
 Additional capital snapshots prepared from regional OSM extracts, including
 GeoFabrik and BBBike, are listed in
