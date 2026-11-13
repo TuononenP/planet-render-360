@@ -26,6 +26,9 @@ var _cursor := 0
 ## [GeometryInstance3D, layer] per new piece, then sorted by distance.
 var _pieces: Array = []
 var _radius := 0.0
+## Where the camera stood at the swap: the wave spreads from here, so the
+## nearest-first order of _pieces holds however the camera moves on.
+var _origin := Vector2.ZERO
 var _running := false
 var _preset := 0
 
@@ -86,6 +89,7 @@ func start(world: Node3D, eye: Vector2, preset: int) -> void:
 	if _pieces.is_empty():
 		stop()
 		return
+	_origin = eye
 	_radius = maxf(eye.distance_to(_pieces[0][2]) - MARGIN_M, 0.0)
 	for p in _pieces:
 		var gi: GeometryInstance3D = p[0]
@@ -97,7 +101,7 @@ func start(world: Node3D, eye: Vector2, preset: int) -> void:
 	_running = true
 
 ## Grows the wave and hands each piece it passed back to LodRing.
-func tick(eye: Vector2, delta: float, preset: int) -> void:
+func tick(_eye: Vector2, delta: float, preset: int) -> void:
 	if not _running:
 		return
 	_preset = preset
@@ -108,7 +112,7 @@ func tick(eye: Vector2, delta: float, preset: int) -> void:
 	var end := _radius + MARGIN_M
 	while _cursor < _pieces.size():
 		var p: Array = _pieces[_cursor]
-		if eye.distance_to(p[2]) > _radius - MARGIN_M:
+		if _origin.distance_to(p[2]) > _radius - MARGIN_M:
 			break
 		if is_instance_valid(p[0]):
 			LodRing.range_one(p[0], preset, p[1])
@@ -117,7 +121,7 @@ func tick(eye: Vector2, delta: float, preset: int) -> void:
 	# it are still hidden by the end they got at start (nearest first).
 	for i in range(_cursor, _pieces.size()):
 		var p: Array = _pieces[i]
-		if eye.distance_to(p[2]) > end + MARGIN_M:
+		if _origin.distance_to(p[2]) > end + MARGIN_M:
 			break
 		if is_instance_valid(p[0]):
 			(p[0] as GeometryInstance3D).visibility_range_end = end

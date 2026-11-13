@@ -70,6 +70,8 @@ var _mid_fallback_done := false
 ## Bumped per near fetch: a stitch still running for an older one lands
 ## nothing.
 var _stitch_gen := 0
+## True while cached mosaic tiles that failed to decode are fetched again.
+var _repairing := false
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
@@ -175,6 +177,7 @@ func fetch(lat: float, lon: float, grid: int) -> void:
 	_mosaic_images.clear()
 	_mosaic_remaining = _mosaic_tiles.size()
 	_mosaic_emitted = false
+	_repairing = false
 	_stitch_gen += 1
 	for t in _mosaic_tiles:
 		_load_mosaic_tile(t)
@@ -272,6 +275,17 @@ func _stitch_mosaic() -> void:
 		work.call()
 	if gen != _stitch_gen:
 		return
+	var bad: Array = out.get("bad", [])
+	if not bad.is_empty() and not _repairing:
+		# Damaged cached tiles: dropped and fetched again, as before.
+		_repairing = true
+		_mosaic_emitted = false
+		_mosaic_remaining = bad.size()
+		for t: Vector2i in bad:
+			_mosaic_images.erase(t)
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(_mosaic_cache_path(t)))
+			_load_mosaic_tile(t)
+		return
 	if not out.has("heights"):
 		print("DEM z14 mosaic incomplete (%d/%d tiles), falling back to z12 mid tile" % [
 			int(out.get("loaded", 0)), _mosaic_tiles.size()])
@@ -298,14 +312,17 @@ func _stitch_mosaic() -> void:
 ## Leaves `out` without "heights" when a tile is missing.
 static func _stitch_heights(images: Dictionary, tiles: Array[Vector2i], centre_tile: Vector2i,
 		lat: float, lon: float, grid: int, out: Dictionary) -> void:
+	var bad: Array[Vector2i] = []
 	for t in images.keys():
 		if images[t] is String:
 			var img := Image.new()
 			if img.load(images[t]) == OK:
 				images[t] = img
 			else:
+				bad.append(t)
 				images.erase(t)
 	out["loaded"] = images.size()
+	out["bad"] = bad
 	if images.size() < tiles.size():
 		return
 	var span := span_for(lat)

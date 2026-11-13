@@ -39,12 +39,16 @@ static var _listed_dir := ""
 static var _listed_at := -LIST_TTL_MS
 static var _relist_task := -1
 static var _relisted: PackedStringArray = []
+## Names noted while a relist ran: the only ones it may have missed.
+static var _noted_meanwhile: PackedStringArray = []
 
 ## A detailed payload was just written at `path`.
 static func note(path: String) -> void:
 	var f := path.get_file()
 	if path.get_base_dir() == _listed_dir and f.begins_with("osm_") and not f in _listed:
 		_listed.append(f)
+		if _relist_task >= 0:
+			_noted_meanwhile.append(f)
 
 static func _osm_files() -> PackedStringArray:
 	var dir := CacheStore.base_dir()
@@ -56,9 +60,15 @@ static func _osm_files() -> PackedStringArray:
 	elif _relist_task >= 0 and WorkerThreadPool.is_task_completed(_relist_task):
 		WorkerThreadPool.wait_for_task_completion(_relist_task)
 		_relist_task = -1
-		for f in _listed:
-			if not f in _relisted:
-				_relisted.append(f)  # noted while the worker listed
+		# The fresh listing wins (names of files evicted since are gone);
+		# only payloads written while it ran are added back.
+		var seen := {}
+		for f in _relisted:
+			seen[f] = true
+		for f in _noted_meanwhile:
+			if not seen.has(f):
+				_relisted.append(f)
+		_noted_meanwhile = PackedStringArray()
 		_listed = _relisted
 		_listed_at = now
 	elif _relist_task < 0 and now - _listed_at >= LIST_TTL_MS:

@@ -73,6 +73,8 @@ var _water_left := 0
 ## Bumped per fetch: an assembly still running for an older fetch lands
 ## nothing.
 var _fetch_gen := 0
+## True while cached tiles that failed to decode are fetched again (once).
+var _repairing := false
 
 func _ready() -> void:
 	for i in POOL_SIZE:
@@ -134,6 +136,7 @@ static func cache_keys(lat: float, lon: float, with_drapes: bool = true) -> Dict
 
 func fetch(lat: float, lon: float, with_drapes: bool = true) -> void:
 	_fetch_gen += 1
+	_repairing = false
 	_busy = true
 	_with_drapes = with_drapes
 	_lat = lat
@@ -290,15 +293,19 @@ func _finish() -> void:
 	var t1 := Time.get_ticks_msec()
 	var gen := _fetch_gen
 	var out := {}
-	var work := _assemble_all.bind(_layers, _lat, _water_zoom, _water_tiles.duplicate(),
-		_water_bodies, out)
-	_water_bodies = {}
+	# Copies: a new fetch() refills _layers on this thread meanwhile.
+	var work := _assemble_all.bind(_layers.duplicate(true), _lat, _water_zoom,
+		_water_tiles.duplicate(), _water_bodies.duplicate(), out)
 	if is_inside_tree():
 		await FrameTask.run(work, "FarField assemble", get_tree())
 	else:
 		work.call()
 	if gen != _fetch_gen:
 		return
+	if not (out["bad"] as Array).is_empty() and not _repairing:
+		_repair(out["bad"])
+		return
+	_water_bodies = {}
 	if textures:
 		for d in out["drapes"]:
 			d["texture"] = ImageTexture.create_from_image(d["image"])
@@ -308,13 +315,29 @@ func _finish() -> void:
 	_busy = false
 	finished.emit(out["rings"], out["drapes"])
 
+## Cached tiles that would not decode (truncated, damaged): dropped from
+## the cache and fetched again, as a failed cache read always was; then
+## the windows are assembled again.
+func _repair(bad: Array) -> void:
+	_repairing = true
+	_remaining = bad.size()
+	for b in bad:
+		var layer: Dictionary = _layers[int(b[0])]
+		(layer["images"] as Dictionary).erase(b[1])
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(str(b[2])))
+		_cached -= 1
+		_load({"layer": int(b[0]), "kind": layer["kind"], "zoom": layer["zoom"],
+			"tile": b[1], "attempt": 0})
+
 ## Worker-thread half of _finish: fills `out` with rings, drapes (no
 ## texture yet) and the water mask.
 static func _assemble_all(layers: Array, lat: float, water_zoom: int,
 		water_tiles: Array[Vector2i], water_bodies: Dictionary, out: Dictionary) -> void:
 	var rings: Array = []
 	var drapes: Array = []
-	for layer in layers:
+	var bad: Array = []  # [layer index, tile, path] of cached tiles that would not decode
+	for li in layers.size():
+		var layer: Dictionary = layers[li]
 		var images: Dictionary = layer["images"]
 		for t in images.keys():
 			if images[t] is String:
@@ -322,7 +345,13 @@ static func _assemble_all(layers: Array, lat: float, water_zoom: int,
 				if img.load(images[t]) == OK:
 					images[t] = img
 				else:
+					bad.append([li, t, images[t]])
 					images.erase(t)
+	out["bad"] = bad
+	if not bad.is_empty():
+		return  # _finish fetches those tiles again first
+	for layer in layers:
+		var images: Dictionary = layer["images"]
 		if images.size() < (layer["tiles"] as Array).size():
 			print("Far-field %s z%d incomplete (%d/%d tiles): layer dropped" % [
 				layer["kind"], layer["zoom"], images.size(), (layer["tiles"] as Array).size()])
