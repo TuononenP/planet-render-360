@@ -219,12 +219,18 @@ static func _length(pts: PackedVector2Array) -> float:
 		l += pts[i].distance_to(pts[i + 1])
 	return l
 
-## [point, unit direction] at arc length `t` along `pts`.
-static func _at(pts: PackedVector2Array, t: float) -> Array:
-	var run := 0.0
-	for i in pts.size() - 1:
+## [point, unit direction] at arc length `t` along `pts`. A `cursor`
+## ([segment, length before it], from [0, 0.0]) carries the walk on to
+## the next call with a larger `t`, so sampling a whole coastline stays
+## linear instead of walking it from the start for every sample.
+static func _at(pts: PackedVector2Array, t: float, cursor: Array = []) -> Array:
+	var run := 0.0 if cursor.is_empty() else float(cursor[1])
+	for i in range(0 if cursor.is_empty() else int(cursor[0]), pts.size() - 1):
 		var seg := pts[i].distance_to(pts[i + 1])
 		if seg > 0.0 and run + seg >= t:
+			if not cursor.is_empty():
+				cursor[0] = i
+				cursor[1] = run
 			var d := (pts[i + 1] - pts[i]) / seg
 			return [pts[i] + d * (t - run), d]
 		run += seg

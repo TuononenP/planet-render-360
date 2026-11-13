@@ -57,8 +57,9 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 		var pts: PackedVector2Array = line["points"]
 		var total := MarinaBuilder._length(pts)
 		var t := 18.0 * m
+		var cursor: Array = [0, 0.0]
 		while t < total - 18.0 * m:
-			var sample := MarinaBuilder._at(pts, t)
+			var sample := MarinaBuilder._at(pts, t, cursor)
 			var at: Vector2 = sample[0]
 			var dir: Vector2 = sample[1]
 			var hash_v := MarinaBuilder._hash(at.x, at.y, 37.0)
