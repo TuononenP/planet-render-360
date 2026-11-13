@@ -207,6 +207,30 @@ static func _photo_at(data: LocationData, x: float, z: float) -> Color:
 	var c := img.get_pixel(int(uv.x * float(img.get_width())), int(uv.y * float(img.get_height()))).srgb_to_linear()
 	return Color(c.r, c.g, c.b, 1.0)
 
+## A native reader of _photo_at (PhotoSampler) over the place's photo, or
+## null without the library.
+static func _photo_sampler(data: LocationData) -> Object:
+	if not ClassDB.class_exists("PhotoSampler") or data.satellite_image == null:
+		return null
+	var zoom := data.satellite_zoom
+	if not data.satellite_source.is_empty():
+		zoom = int(data.satellite_source.get("source_zoom", zoom))
+	var sampler: Object = ClassDB.instantiate("PhotoSampler")
+	sampler.setup(data.satellite_image, data.latitude, data.longitude, zoom, data.satellite_origin_px,
+		float(TerrainBuilder.satellite_span_tiles(data) * SatelliteFetcher.TILE_PX))
+	return sampler
+
+## _photo_at through `sampler` when there is one.
+static func _photo(sampler: Object, data: LocationData, x: float, z: float) -> Color:
+	return sampler.photo(x, z) if sampler != null else _photo_at(data, x, z)
+
+## _green_around through `sampler` when there is one.
+static func _green_near(sampler: Object, data: LocationData, x: float, z: float) -> bool:
+	if sampler == null:
+		return _green_around(data, x, z)
+	return sampler.green_around(x, z, PHOTO_NEIGHBOUR_M * WorldScale.metres_to_units(),
+		PHOTO_GREEN, PHOTO_MIN_LUM) >= PHOTO_NEIGHBOURS
+
 ## The palette colour at its own brightness, taking most of its hue from
 ## the ground photo under the root.
 static func rooted(base: Color, photo: Color) -> Color:
@@ -269,6 +293,7 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 	var u2m := 1.0 / WorldScale.metres_to_units()
 	var seeds := data.season == LocationData.Season.SUMMER or data.season == LocationData.Season.AUTUMN
 	var steps := int(ceil(reach / sp))
+	var sampler := _photo_sampler(data) if photo_cover else null
 	for j in range(-steps, steps + 1):
 		for i in range(-steps, steps + 1):
 			var h1 := _hash(float(i), float(j), 1.0)
@@ -288,9 +313,9 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 			else:
 				if not photo_cover:
 					continue
-				photo = _photo_at(data, x, z)
+				photo = _photo(sampler, data, x, z)
 				if not photo_green(photo) or ground.land_class_at(x, z) == "urban" \
-						or not _green_around(data, x, z):
+						or not _green_near(sampler, data, x, z):
 					continue
 				# Unmapped green among houses is a garden; out of town, a meadow.
 				sward = "mown" if mask.built_fraction(x, z) > 0.04 else "wild"
@@ -335,7 +360,7 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				hs = lerpf(hr.x, hr.y, clampf(clump * 0.7 + _hash(float(i), float(j), 10.0) * 0.5, 0.0, 1.0))
 			var v := 0.88 + 0.24 * _hash(float(i), float(j), 7.0)
 			if photo.a <= 0.0 and photo_cover:
-				photo = _photo_at(data, x, z)
+				photo = _photo(sampler, data, x, z)
 			var root := rooted(grass, photo)
 			var col := _turf(Color(root.r * v, root.g * v * (0.95 + 0.1 * h1), root.b * v)) * TUFT_VALUE
 			if wild:

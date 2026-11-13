@@ -51,6 +51,8 @@ add_library(planet_render SHARED
 	src/parallel.h
 	src/tint_kernels.cpp
 	src/tint_kernels.h
+	src/photo_sampler.cpp
+	src/photo_sampler.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)
