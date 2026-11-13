@@ -16,6 +16,7 @@
 #include "shore_patch_kernel.h"
 #include "tint_kernels.h"
 #include "photo_sampler.h"
+#include "grid_filters.h"
 #include "shore_evidence_kernels.h"
 
 #include <gdextension_interface.h>
@@ -50,6 +51,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShorePatchKernel);
 	GDREGISTER_CLASS(TintKernels);
 	GDREGISTER_CLASS(PhotoSampler);
+	GDREGISTER_CLASS(GridFilters);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

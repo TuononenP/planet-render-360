@@ -54,6 +54,8 @@ static func apply(surface: PackedFloat32Array, size: int, step: float, half: flo
 ## One box pass of half-width `r` posts along rows (`horizontal`) or
 ## columns, the window clipped at the grid edge.
 static func _box(src: PackedFloat32Array, size: int, r: int, horizontal: bool) -> PackedFloat32Array:
+	if BareEarth._native:
+		return ClassDB.class_call_static("GridFilters", "box_mean", src, size, r, horizontal)
 	var out := PackedFloat32Array()
 	out.resize(size * size)
 	for line in size:

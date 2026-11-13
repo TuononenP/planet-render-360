@@ -66,6 +66,8 @@ const LIDAR_DEM_BOXES := [
 const CANOPY_K := 0.55
 const CANOPY_HALF_M := 120.0
 const CANOPY_MAX_M := 15.0
+## The grid filters run natively (GridFilters) when the library is loaded.
+static var _native := ClassDB.class_exists("GridFilters")
 
 ## True for real geo worlds on a surface-model DEM: ArcticDEM and the
 ## SRTM / EU-DEM class tiles, unless a bare-earth model replaced them or
@@ -130,23 +132,26 @@ static func strip(surface: PackedFloat32Array, size: int, step: float,
 	if holes.is_empty() or holes.size() == surface.size():
 		return
 	var filled := _seed(surface, mask, size)
-	for _s in SWEEPS:
-		for h in holes.size():
-			var i: int = holes[h]
-			var x: int = i % size
-			@warning_ignore("integer_division")
-			var z: int = i / size
-			var sum := 0.0
-			var n := 0
-			if x > 0:
-				sum += filled[i - 1]; n += 1
-			if x < size - 1:
-				sum += filled[i + 1]; n += 1
-			if z > 0:
-				sum += filled[i - size]; n += 1
-			if z < size - 1:
-				sum += filled[i + size]; n += 1
-			filled[i] = sum / float(n)
+	if _native:
+		filled = ClassDB.class_call_static("GridFilters", "relax", filled, holes, size, SWEEPS)
+	else:
+		for _s in SWEEPS:
+			for h in holes.size():
+				var i: int = holes[h]
+				var x: int = i % size
+				@warning_ignore("integer_division")
+				var z: int = i / size
+				var sum := 0.0
+				var n := 0
+				if x > 0:
+					sum += filled[i - 1]; n += 1
+				if x < size - 1:
+					sum += filled[i + 1]; n += 1
+				if z > 0:
+					sum += filled[i - size]; n += 1
+				if z < size - 1:
+					sum += filled[i + size]; n += 1
+				filled[i] = sum / float(n)
 	for h in holes.size():
 		var i: int = holes[h]
 		surface[i] = minf(surface[i], filled[i])
@@ -181,6 +186,8 @@ static func lower_canopy(surface: PackedFloat32Array, size: int, step: float,
 ## Sum of `src` over a (2r+1)-wide window along rows (`rows`) or columns.
 static func _box_sum(src: PackedFloat32Array, size: int, r: int,
 		rows: bool) -> PackedFloat32Array:
+	if _native:
+		return ClassDB.class_call_static("GridFilters", "box_sum", src, size, r, rows)
 	var out := PackedFloat32Array()
 	out.resize(size * size)
 	for line in size:
@@ -279,6 +286,8 @@ static func _footprint_mask(size: int, step: float, half: float,
 ## Mask grown by `r` posts (square neighbourhood, separable).
 static func _dilate(src: PackedByteArray, size: int,
 		r: int) -> PackedByteArray:
+	if _native:
+		return ClassDB.class_call_static("GridFilters", "dilate", src, size, r)
 	var row := PackedByteArray()
 	row.resize(size * size)
 	for z in size:
@@ -309,6 +318,8 @@ static func _max_filter(src: PackedFloat32Array, size: int,
 ## Separable square min or max filter of radius `r`, clamped at edges.
 static func _rank_filter(src: PackedFloat32Array, size: int, r: int,
 		lowest: bool) -> PackedFloat32Array:
+	if _native:
+		return ClassDB.class_call_static("GridFilters", "rank_filter", src, size, r, lowest)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	for z in size:

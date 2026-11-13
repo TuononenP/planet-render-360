@@ -353,6 +353,11 @@ static func _grid_bilinear(data: LocationData, f: Vector2) -> float:
 static func _blur_pass(src: PackedFloat32Array, dst: PackedFloat32Array,
 		size: int) -> void:
 	var inv := 1.0 / (EDGE_SIGMA_M * EDGE_SIGMA_M)
+	if BareEarth._native:
+		# dst is the caller's array: refilled in place.
+		dst.resize(0)
+		dst.append_array(ClassDB.class_call_static("GridFilters", "edge_blur", src, size, inv))
+		return
 	for z in size:
 		for x in size:
 			# Interior fast path — no clamp calls, same dz,dx order.
