@@ -211,6 +211,30 @@ double ShoreSampler::land_height(const Vector2 &p) const {
 	return a + (b - a) * tz;
 }
 
+PackedFloat64Array ShoreSampler::edge_grounds(const PackedVector2Array &points) const {
+	PackedFloat64Array out;
+	if (domain_index == nullptr) return out;
+	out.resize(points.size());
+	double *w = out.ptrw();
+	for (int64_t i = 0; i < points.size(); ++i) {
+		const Vector2 p = points[i];
+		if (!height_bounds.has_point(p)) {
+			w[i] = NAN;
+			continue;
+		}
+		// GroundTruth.water_at: the body's level over the rendered height.
+		const double dry = land_height(p);
+		const double level = water_level(p);
+		if (std::isinf(level) && level < 0) {
+			w[i] = dry;
+			continue;
+		}
+		const double h = height_clamped(p);
+		w[i] = gd_max(0.0, level - h) > 0.0 ? gd_min(dry, h) : dry;
+	}
+	return out;
+}
+
 // BuildingFoundation._sample's ground reads around one footprint, in its
 // order: [all_low, all_high, dry_low, dry_high, dry_n, wet_n, water,
 // centre_wet]. Empty when setup_footing has not run.
@@ -414,6 +438,7 @@ void ShoreSampler::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("nearest_bank", "point", "treatment"), &ShoreSampler::nearest_bank, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("setup_footing", "domains", "levels", "land", "domain_bounds", "height_bounds"), &ShoreSampler::setup_footing);
 	ClassDB::bind_method(D_METHOD("footing", "ring", "centre", "sea_y", "edge_step", "max_n"), &ShoreSampler::footing);
+	ClassDB::bind_method(D_METHOD("edge_grounds", "points"), &ShoreSampler::edge_grounds);
 }
 void ShoreDomainIndex::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "bodies", "cells"), &ShoreDomainIndex::setup);

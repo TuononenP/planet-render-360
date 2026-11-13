@@ -469,3 +469,11 @@ func footing(ring: PackedVector2Array, centre: Vector2, sea_y: float, edge_step:
 	if sampler == null or not sampler.has_method("footing"):
 		return PackedFloat64Array()
 	return sampler.footing(ring, centre, sea_y, edge_step, max_n)
+
+## BuildingFoundation._edge_ground at each point, done natively
+## (ShoreSampler.edge_grounds): NAN outside the bounds, empty without the
+## native sampler.
+func edge_grounds(points: PackedVector2Array) -> PackedFloat64Array:
+	if sampler == null or not sampler.has_method("edge_grounds"):
+		return PackedFloat64Array()
+	return sampler.edge_grounds(points)

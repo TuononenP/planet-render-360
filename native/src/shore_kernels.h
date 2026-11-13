@@ -66,6 +66,10 @@ public:
 	void setup_footing(const Ref<RefCounted> &domains, const PackedFloat64Array &levels, const PackedFloat32Array &land,
 			const Rect2 &domain_bounds, const Rect2 &height_bounds);
 	PackedFloat64Array footing(const PackedVector2Array &ring, const Vector2 &centre, double sea_y, double edge_step, int max_n) const;
+	// BuildingFoundation._edge_ground at each point: the dry height, or
+	// the rendered bed where the point is under water. NAN outside the
+	// model's bounds (the caller reads those); empty before setup_footing.
+	PackedFloat64Array edge_grounds(const PackedVector2Array &points) const;
 };
 
 class ShoreDomainIndex : public RefCounted {

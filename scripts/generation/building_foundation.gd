@@ -182,6 +182,7 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 		var edge_ring: PackedVector2Array = rings[r]
 		var ccw := RingGeometry.signed_area(edge_ring) > 0.0
 		var miters := PlinthStyle.miters(edge_ring, (1.0 if ccw else -1.0) * (-1.0 if r > 0 else 1.0))
+		var grounds := _edge_grounds(ground, edge_ring)
 		for i in edge_ring.size():
 			var a := edge_ring[i]
 			var b := edge_ring[(i + 1) % edge_ring.size()]
@@ -191,8 +192,9 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 			# The dry bank, or the carved bed where water clips the edge,
 			# so a quayside wall reaches down into the water.
 			var mid := (a + b) * 0.5
-			var edge_low := minf(_edge_ground(ground, a), minf(_edge_ground(ground, b),
-				_edge_ground(ground, mid)))
+			var edge_low := minf(_ground_at(ground, grounds, i, a),
+				minf(_ground_at(ground, grounds, (i + 1) % edge_ring.size(), b),
+				_ground_at(ground, grounds, edge_ring.size() + i, mid)))
 			if float(footing["floor"]) - edge_low < EDGE_GAP_M * m:
 				continue
 			var y0 := edge_low - SINK_M * m
@@ -205,6 +207,20 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 				PlinthStyle.coping(coping, a, b, miters[i], miters[(i + 1) % edge_ring.size()], n, y1)
 	BuildingWalls._emit(root, face, PlinthStyle.body_material())
 	BuildingWalls._emit(root, coping, PlinthStyle.coping_material())
+
+## _edge_ground at each corner of `ring` then each edge's midpoint, read
+## natively in one call when the shoreline sampler can (else empty).
+static func _edge_grounds(ground: GroundTruth, ring: PackedVector2Array) -> PackedFloat64Array:
+	if ground.shoreline == null or not ground.shoreline.ready:
+		return PackedFloat64Array()
+	var points := ring.duplicate()
+	for i in ring.size():
+		points.append((ring[i] + ring[(i + 1) % ring.size()]) * 0.5)
+	return ground.shoreline.edge_grounds(points)
+
+## Entry `k` of _edge_grounds, or _edge_ground at `p` where it has none.
+static func _ground_at(ground: GroundTruth, grounds: PackedFloat64Array, k: int, p: Vector2) -> float:
+	return grounds[k] if k < grounds.size() and not is_nan(grounds[k]) else _edge_ground(ground, p)
 
 ## Ground a plinth wall stands on at `p`: the dry (pre-carve) height,
 ## or the rendered bed where `p` is under water.
