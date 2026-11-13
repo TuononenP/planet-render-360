@@ -274,5 +274,6 @@ static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 	if BuildingBuilder._batch != null:
 		lm.append_to_batch(BuildingBuilder._batch, BuildingBuilder._batch_key)
 		return
-	for part in lm.commit(root, "WaterFoundation"):
+	# Kept arrays: LodRing merges these on the build thread (T7.5).
+	for part in lm.commit(root, "WaterFoundation", true):
 		part.set_meta("water_foundation", true)

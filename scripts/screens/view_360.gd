@@ -332,11 +332,9 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	await _reach.yield_build(self)
 	var thread := Thread.new()
 	_threads.append(thread)
-	var finishing := [false]
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data, abort)
 		var w := TerrainBuilder.build_world(data, g, abort)
-		finishing[0] = true
 		_merge(w, abort)
 		# Packed here, detached and pristine, so the save costs the main
 		# thread nothing before the view shows.
@@ -347,13 +345,16 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	# The merge and the pack ask the rendering server about every mesh
 	# node, and each answer to a worker thread waits for the main thread's
 	# next flush: one node a frame, so ~3000 nodes took 26 s at 120 fps
-	# (Paris on Ultra). The main thread answers them here instead, in the
-	# share of each frame a cache save gets (WorldCache.pump_budget_us).
+	# (Paris on Ultra). The build's stages wait the same way for every
+	# texture they create (a 512² facade map: 0.3 ms answered at once, a
+	# frame otherwise). The main thread answers them here instead, for the
+	# whole build, in the share of each frame a cache save gets
+	# (WorldCache.pump_budget_us).
 	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
 		var t := Time.get_ticks_usec()
 		var budget := WorldCache.pump_budget_us(t - last_us)
-		while finishing[0] and thread.is_alive() and Time.get_ticks_usec() - t < budget:
+		while thread.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us = t
 		await get_tree().process_frame

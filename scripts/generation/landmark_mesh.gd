@@ -400,7 +400,9 @@ func append_to_batch(batch: MassBatch, key: String) -> void:
 
 ## One MeshInstance3D per surface key under `parent`, named
 ## `<prefix><key>`; returns the instances in registration order.
-func commit(parent: Node3D, prefix: String = "") -> Array[MeshInstance3D]:
+## `keep` stores each surface's arrays (MeshArrays) for meshes a later
+## merge reads, which would otherwise wait on a server read-back each.
+func commit(parent: Node3D, prefix: String = "", keep: bool = false) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
 	for k in _order:
 		var s: Surf = _surfs[k]
@@ -414,7 +416,15 @@ func commit(parent: Node3D, prefix: String = "") -> Array[MeshInstance3D]:
 		var st := SurfaceTool.new()
 		st.create_from_arrays(arrays, Mesh.PRIMITIVE_TRIANGLES)
 		st.generate_tangents()
-		var mesh := st.commit()
+		var mesh: ArrayMesh
+		if keep:
+			# What SurfaceTool.commit uploads, with the arrays kept.
+			var done := st.commit_to_arrays()
+			mesh = ArrayMesh.new()
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, done)
+			MeshArrays.keep_surface(mesh, done)
+		else:
+			mesh = st.commit()
 		mesh.surface_set_material(0, s.mat)
 		var mi := MeshInstance3D.new()
 		mi.name = prefix + k
