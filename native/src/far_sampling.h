@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -430,27 +431,37 @@ struct Poly {
 		int band = Math::clamp((int)std::floor(((double)p.y - y0) / band_h), 0, (int)bands.size() - 1);
 		const double px = p.x;
 		const double py = p.y;
-		std::vector<uint8_t> parity(rings.size(), 0);
+		// Codes are sorted (read_poly), so each ring's edges form one run:
+		// inside the outer ring (0) and in none of the holes.
+		bool outer = false;
+		int current = -1;
+		uint8_t parity = 0;
 		for (int64_t code : bands[band]) {
 			int ri = (int)(code >> 32);
+			if (ri != current) {
+				if (current == 0) {
+					outer = parity == 1;
+				} else if (current > 0 && parity == 1) {
+					return false;
+				}
+				current = ri;
+				parity = 0;
+			}
 			const PackedVector2Array &ring = rings[ri];
 			int64_t i = code & 0xFFFFFFFF;
 			Vector2 pi = ring[i];
 			Vector2 pj = ring[i > 0 ? i - 1 : ring.size() - 1];
 			if (((double)pi.y > py) != ((double)pj.y > py) &&
 					px < ((double)pj.x - (double)pi.x) * (py - (double)pi.y) / ((double)pj.y - (double)pi.y) + (double)pi.x) {
-				parity[ri] ^= 1;
+				parity ^= 1;
 			}
 		}
-		if (parity[0] == 0) {
+		if (current == 0) {
+			outer = parity == 1;
+		} else if (current > 0 && parity == 1) {
 			return false;
 		}
-		for (size_t k = 1; k < parity.size(); k++) {
-			if (parity[k] == 1) {
-				return false;
-			}
-		}
-		return true;
+		return outer;
 	}
 };
 
@@ -470,6 +481,7 @@ inline Poly read_poly(Object *o) {
 		for (int64_t c = 0; c < codes.size(); c++) {
 			q.bands[b].push_back((int64_t)codes[c]);
 		}
+		std::sort(q.bands[b].begin(), q.bands[b].end());
 	}
 	return q;
 }

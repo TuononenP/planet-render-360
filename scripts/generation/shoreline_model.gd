@@ -24,6 +24,7 @@ var _segment_cells := {}
 var transition_edges: Array = []
 var transition_cells := {}
 var _vertex_heights := {}
+var _bank_tops := {}
 var sampler: Object = null
 
 func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abort: BuildAbort = null) -> void:
@@ -159,6 +160,7 @@ func finish(ground, abort: BuildAbort = null) -> void:
 	_evidence = null
 	_class_cache.clear()
 	_vertex_heights.clear()
+	_bank_tops.clear()
 	_setup_sampler()
 	ready = true
 	print("SHORELINE bodies=%d edges=%d patches=%d hard=%d diagnostics=%d" % [domains.bodies.size(),
@@ -292,7 +294,15 @@ func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
 			return best
 	return NAN
 
+## Neighbouring pieces of an edge share their end points and land side,
+## so each top is read once.
 func _bank_top(p: Vector2, land: Vector2) -> float:
+	var key := Vector4(p.x, p.y, land.x, land.y)
+	if not _bank_tops.has(key):
+		_bank_tops[key] = _bank_top_at(p, land)
+	return _bank_tops[key]
+
+func _bank_top_at(p: Vector2, land: Vector2) -> float:
 	var values: Array[float] = []
 	for distance in [2.0, 5.0, 10.0, 20.0]:
 		var q: Vector2 = p + land * distance

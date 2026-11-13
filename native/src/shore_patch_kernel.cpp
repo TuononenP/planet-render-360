@@ -75,7 +75,7 @@ Dictionary ShorePatchKernel::build(const Array &pieces) {
 		const int owner = domains->at(centre.clamp(lo, hi));
 		const Vector4 near = sampler->nearest_bank(centre);
 		const bool hard = owner < 0 && near.x >= 0 && banks[(int)near.x].hard;
-		const bool natural = hard && evidence.is_valid() && evidence->contains_kind(centre, "natural");
+		const bool natural = hard && evidence.is_valid() && evidence->contains_code(centre, ShoreEvidenceIndex::NATURAL);
 		for (int64_t i = 1; i + 1 < ring.size(); ++i) {
 			const double tri_area = std::abs((double)(ring[i] - ring[0]).cross(ring[i + 1] - ring[0])) * 0.5;
 			if (tri_area < 0.00001) continue;

@@ -296,12 +296,22 @@ Vector4 ShoreSampler::nearest_bank(const Vector2 &p, int treatment) const {
 	double best = INFINITY;
 	bool best_hard = false;
 	Vector4 result(-1, 0, 0, INFINITY);
-	std::unordered_set<int> seen;
+	// A few banks per cell: a stack list beats a hash set here.
+	int local[128];
+	std::vector<int> spill;
+	int count = 0;
+	const auto first_visit = [&](int id) -> bool {
+		for (int k = 0; k < std::min(count, 128); ++k) if (local[k] == id) return false;
+		for (int k : spill) if (k == id) return false;
+		if (count < 128) local[count] = id; else spill.push_back(id);
+		++count;
+		return true;
+	};
 	for (int z = cz - 1; z <= cz + 1; ++z) for (int x = cx - 1; x <= cx + 1; ++x) {
 		const auto cell = bank_cells.find((int64_t)z * size + x);
 		if (cell == bank_cells.end()) continue;
 		for (int id : cell->second) {
-			if (!seen.insert(id).second) continue;
+			if (!first_visit(id)) continue;
 			const Bank &b = banks[id];
 			if ((treatment == 1 && !b.hard) || (treatment == 2 && b.hard)) continue;
 			const Vector2 d = b.b - b.a;
@@ -367,8 +377,18 @@ Array ShoreDomainIndex::outside_runs(const Vector2 &a, const Vector2 &b) const {
 		}
 	}
 	for (int id : candidates) {
-		for (const auto &ring : polygons[id].rings) for (int64_t i = 0; i < ring.size(); ++i) {
-			const Vector2 c = ring[i], e = ring[(i + 1) % ring.size()];
+		const far::Poly &poly = polygons[id];
+		if (poly.bands.empty()) continue;
+		// Only the bands the segment's rows touch (one spare each side). An
+		// edge spanning several bands repeats its cut; the zero-length run
+		// between the copies is skipped below.
+		const int last = (int)poly.bands.size() - 1;
+		const int b0 = Math::clamp((int)std::floor(((double)lo.y - poly.y0) / poly.band_h) - 1, 0, last);
+		const int b1 = Math::clamp((int)std::floor(((double)hi.y - poly.y0) / poly.band_h) + 1, 0, last);
+		for (int band = b0; band <= b1; ++band) for (int64_t code : poly.bands[band]) {
+			const PackedVector2Array &ring = poly.rings[(int)(code >> 32)];
+			const int64_t i = code & 0xFFFFFFFF;
+			const Vector2 c = ring[i > 0 ? i - 1 : ring.size() - 1], e = ring[i];
 			if (std::max(c.x, e.x) < lo.x || std::min(c.x, e.x) > hi.x || std::max(c.y, e.y) < lo.y || std::min(c.y, e.y) > hi.y) continue;
 			Vector2 hit;
 			if (segments_cross(a, b, c, e, hit)) cuts.push_back(std::clamp((double)(hit - a).dot(d) / length, 0.0, 1.0));

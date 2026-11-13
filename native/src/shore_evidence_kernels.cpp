@@ -11,12 +11,20 @@ namespace {
 int64_t key(int x, int z) { return (int64_t)((uint64_t)(uint32_t)x << 32 | (uint32_t)z); }
 
 }
+int ShoreEvidenceIndex::kind_code(const String &kind) {
+	if (kind == "natural") return NATURAL;
+	if (kind == "structure") return STRUCTURE;
+	if (kind == "break") return BREAK;
+	if (kind == "paved") return PAVED;
+	if (kind == "building") return BUILDING;
+	return OTHER;
+}
 void ShoreEvidenceIndex::setup(const Array &input, const Dictionary &p_cells) {
 	features.clear(); cells.clear();
 	for (int64_t i = 0; i < input.size(); ++i) {
 		Dictionary item = input[i];
 		Feature f;
-		f.kind = item["kind"]; f.points = item["points"]; f.area = item.get("area", false);
+		f.kind = item["kind"]; f.code = kind_code(f.kind); f.points = item["points"]; f.area = item.get("area", false);
 		f.width = item.get("width", 0.0); f.id = item.get("id", f.kind);
 		const Array holes = item.get("holes", Array());
 		for (int64_t j = 0; j < holes.size(); ++j) f.holes.push_back(holes[j]);
@@ -34,15 +42,15 @@ void ShoreEvidenceIndex::setup(const Array &input, const Dictionary &p_cells) {
 	}
 }
 std::vector<int> ShoreEvidenceIndex::candidates(const Vector2 &p, double radius) const {
-	std::unordered_set<int> unique;
+	std::vector<int> out;
 	for (int z = (int)std::floor((p.y - radius) / 64.0); z <= (int)std::floor((p.y + radius) / 64.0); ++z) {
 		for (int x = (int)std::floor((p.x - radius) / 64.0); x <= (int)std::floor((p.x + radius) / 64.0); ++x) {
 			const auto cell = cells.find(key(x, z));
-			if (cell != cells.end()) unique.insert(cell->second.begin(), cell->second.end());
+			if (cell != cells.end()) out.insert(out.end(), cell->second.begin(), cell->second.end());
 		}
 	}
-	std::vector<int> out(unique.begin(), unique.end());
 	std::sort(out.begin(), out.end());
+	out.erase(std::unique(out.begin(), out.end()), out.end());
 	return out;
 }
 bool ShoreEvidenceIndex::inside(const Vector2 &p, const Feature &f) {
@@ -65,9 +73,18 @@ Vector4 ShoreEvidenceIndex::nearest(const Vector2 &p, const Feature &f) {
 	return Vector4(point.x, point.y, (real_t)best, dir.angle());
 }
 bool ShoreEvidenceIndex::contains_kind(const Vector2 &p, const String &kind) const {
+	const int code = kind_code(kind);
+	if (code != OTHER) return contains_code(p, code);
 	for (int id : candidates(p, 0)) {
 		const Feature &f = features[id];
 		if (f.kind == kind && f.area && inside(p, f)) return true;
+	}
+	return false;
+}
+bool ShoreEvidenceIndex::contains_code(const Vector2 &p, int code) const {
+	for (int id : candidates(p, 0)) {
+		const Feature &f = features[id];
+		if (f.code == code && f.area && inside(p, f)) return true;
 	}
 	return false;
 }
@@ -79,22 +96,22 @@ Dictionary ShoreEvidenceIndex::classify(const Vector2 &a, const Vector2 &b, cons
 	for (double t : {0.0, 0.5, 1.0}) {
 		const Vector2 p = a.lerp(b, (real_t)t);
 		bool paved = false, built = false;
-		const bool natural = contains_kind(p + land * (real_t)2.0, "natural");
+		const bool natural = contains_code(p + land * (real_t)2.0, NATURAL);
 		natural_cover = natural_cover || natural;
 		for (int id : candidates(p, 24)) {
 			const Feature &f = features[id];
 			// Natural cover was tested above. Its often large boundary is
 			// not distance evidence for paving, frontage or structures.
-			if (f.kind == "natural") continue;
-			const double limit = f.kind == "structure" ? 3.0 : f.kind == "break" ? 1.0 : f.kind == "paved" ? 8.0 : 20.0;
+			if (f.code == NATURAL) continue;
+			const double limit = f.code == STRUCTURE ? 3.0 : f.code == BREAK ? 1.0 : f.code == PAVED ? 8.0 : 20.0;
 			if (!f.bounds.grow(limit + f.width + 0.0001).has_point(p)) continue;
 			const Vector4 near = nearest(p, f);
 			const Vector2 q(near.x, near.y), tangent(std::cos(near.w), std::sin(near.w));
-			if (f.kind == "structure" && near.z <= 3.0 && std::abs((double)dir.dot(tangent)) >= 0.8) explicit_ids.push_back(f.id);
-			else if (f.kind == "break" && near.z <= 1.0) { Dictionary out; out["kind"] = "natural"; out["reason"] = "mapped_access"; Array ids; ids.push_back(f.id); out["sources"] = ids; return out; }
+			if (f.code == STRUCTURE && near.z <= 3.0 && std::abs((double)dir.dot(tangent)) >= 0.8) explicit_ids.push_back(f.id);
+			else if (f.code == BREAK && near.z <= 1.0) { Dictionary out; out["kind"] = "natural"; out["reason"] = "mapped_access"; Array ids; ids.push_back(f.id); out["sources"] = ids; return out; }
 			else if ((q - p).dot(land) >= -0.01) {
-				if (f.kind == "paved" && near.z <= 8.0) { paved = true; sources.push_back(f.id); }
-				if (f.kind == "building" && near.z <= 20.0) { built = true; sources.push_back(f.id); }
+				if (f.code == PAVED && near.z <= 8.0) { paved = true; sources.push_back(f.id); }
+				if (f.code == BUILDING && near.z <= 20.0) { built = true; sources.push_back(f.id); }
 			}
 		}
 		if (!natural && paved && built) ++votes;
