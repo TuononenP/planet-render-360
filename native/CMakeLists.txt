@@ -24,6 +24,8 @@ add_library(planet_render SHARED
 	src/ground_kernels.h
 	src/image_kernels.cpp
 	src/image_kernels.h
+	src/landmark_kernels.cpp
+	src/landmark_kernels.h
 	src/roof_kernels.cpp
 	src/roof_kernels.h
 	src/mass_kernels.cpp

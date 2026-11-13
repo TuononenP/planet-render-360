@@ -16,6 +16,7 @@ class Surf:
 	var n := PackedVector3Array()
 	var uv := PackedVector2Array()
 
+static var _native := ClassDB.class_exists("LandmarkKernels")
 var _surfs: Dictionary = {}
 var _order: Array[String] = []
 
@@ -72,11 +73,7 @@ const BEVEL_MAX_M := 0.15
 ## `bevel` < 0 picks the chamfer from the size, 0 keeps sharp edges.
 func box(key: String, center: Vector3, size: Vector3, basis: Basis = Basis(),
 		bevel: float = -1.0) -> void:
-	var thin := minf(size.x, minf(size.y, size.z))
-	var c := bevel
-	if c < 0.0:
-		c = minf(thin * BEVEL_SHARE, BEVEL_MAX_M) if thin >= BEVEL_MIN_M else 0.0
-	c = minf(c, thin * 0.45)
+	var c := _chamfer(size, bevel)
 	if c > 0.001:
 		_bevel_box(key, center, size, basis, c)
 		return
@@ -91,6 +88,33 @@ func box(key: String, center: Vector3, size: Vector3, basis: Basis = Basis(),
 		var side: Vector3 = f[2]
 		quad(key, o - side - up, o + side - up, o + side + up, o - side + up,
 			(f[0] as Vector3).normalized())
+
+## The chamfer box() gives a box of `size` (`bevel` < 0 picks it).
+static func _chamfer(size: Vector3, bevel: float) -> float:
+	var thin := minf(size.x, minf(size.y, size.z))
+	var c := bevel
+	if c < 0.0:
+		c = minf(thin * BEVEL_SHARE, BEVEL_MAX_M) if thin >= BEVEL_MIN_M else 0.0
+	return minf(c, thin * 0.45)
+
+## box() for each centre and size in turn, natively (LandmarkKernels)
+## when the library is loaded.
+func boxes(key: String, centers: PackedVector3Array, sizes: PackedVector3Array, basis: Basis = Basis(),
+		bevel: float = -1.0) -> void:
+	if not _native:
+		for i in centers.size():
+			box(key, centers[i], sizes[i], basis, bevel)
+		return
+	if centers.is_empty():
+		return
+	var bevels := PackedFloat64Array()
+	for size in sizes:
+		bevels.append(_chamfer(size, bevel))
+	var out: Array = ClassDB.class_call_static("LandmarkKernels", "boxes", centers, sizes, bevels, basis)
+	var s: Surf = _surfs[key]
+	s.v.append_array(out[0])
+	s.n.append_array(out[1])
+	s.uv.append_array(out[2])
 
 ## Box with every edge chamfered by `c`: inset faces, edge strips whose
 ## normals blend the two faces (they shade as a rounded arris) and a

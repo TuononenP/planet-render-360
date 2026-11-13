@@ -276,6 +276,8 @@ static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 				wet = ground.water_at(p.x, p.y) > 0.0 or ground_h < water
 			any_wet = any_wet or wet
 			candidates.append([p, wet, ground_h])
+	var pile_at := PackedVector3Array()
+	var pile_size := PackedVector3Array()
 	for candidate in candidates:
 		var p: Vector2 = candidate[0]
 		if ground != null and any_wet and not bool(candidate[1]):
@@ -290,8 +292,9 @@ static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 			bottom = maxf(minf(bottom, ground_h), water - PILE_DEPTH_M * m)
 		if top <= bottom:
 			continue
-		lm.box("Piles", Vector3(p.x, (bottom + top) * 0.5, p.y),
-			Vector3(0.32 * m, top - bottom, 0.32 * m), Basis(), 0.0)
+		pile_at.append(Vector3(p.x, (bottom + top) * 0.5, p.y))
+		pile_size.append(Vector3(0.32 * m, top - bottom, 0.32 * m))
+	lm.boxes("Piles", pile_at, pile_size, Basis(), 0.0)
 	if BuildingBuilder._batch != null:
 		lm.append_to_batch(BuildingBuilder._batch, BuildingBuilder._batch_key)
 		return

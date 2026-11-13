@@ -3,6 +3,7 @@
 #include "far_kernels.h"
 #include "ground_kernels.h"
 #include "image_kernels.h"
+#include "landmark_kernels.h"
 #include "mass_kernels.h"
 #include "merge_kernels.h"
 #include "mvt_kernels.h"
@@ -31,6 +32,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(FarKernels);
 	GDREGISTER_CLASS(GroundKernels);
 	GDREGISTER_CLASS(ImageKernels);
+	GDREGISTER_CLASS(LandmarkKernels);
 	GDREGISTER_CLASS(MassKernels);
 	GDREGISTER_CLASS(MergeKernels);
 	GDREGISTER_CLASS(MvtKernels);
