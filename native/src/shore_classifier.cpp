@@ -8,6 +8,8 @@
 #include <cmath>
 #include <map>
 #include <unordered_map>
+#include <vector>
+#include "parallel.h"
 
 namespace godot {
 namespace {
@@ -120,94 +122,151 @@ Vector2i ShoreClassifier::cell_at(const Vector2 &p) const {
 Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 	Dictionary result;
 	if (domains.is_null() || evidence.is_null()) return result;
-	Array segments, diagnostics;
-	Dictionary cells;
-	std::unordered_map<Vector3i, Dictionary, CacheHash> cache;
-	std::map<Vector2, std::vector<double>, PointLess> endpoint_tops;
-	const Vector2 pad = Vector2(1, 1) * (real_t)0.01;
+	if (abort != nullptr && (bool)abort->get("requested")) {
+		result["aborted"] = true;
+		return result;
+	}
+	// Every ~2-unit piece of every edge, in order.
+	struct Piece {
+		int edge;
+		Vector2 start, end, mid, dir, n, land;
+		int left = -1, right = -1, body = -1;
+		bool resolved = false;
+		Vector3i key;
+		int first = -1; // the piece whose evidence answers this one's cache cell
+		Dictionary treatment;
+		double top_a = 0.0, top_b = 0.0, water_a = 0.0, water_b = 0.0;
+	};
+	std::vector<Piece> pieces;
+	std::vector<Dictionary> edge_dicts((size_t)edges.size());
 	for (int64_t e = 0; e < edges.size(); ++e) {
-		if (abort != nullptr && (bool)abort->get("requested")) {
-			result["aborted"] = true;
-			return result;
-		}
-		Dictionary edge = edges[e];
-		const Vector2 a = edge["a"], b = edge["b"];
+		edge_dicts[e] = edges[e];
+		const Vector2 a = edge_dicts[e]["a"], b = edge_dicts[e]["b"];
 		const Vector2 dir = (b - a).normalized();
 		const Vector2 n(-dir.y, dir.x);
 		const int count = std::max(1, (int)std::ceil((double)a.distance_to(b) / 2.0));
 		for (int i = 0; i < count; ++i) {
-			const Vector2 start = snap(a.lerp(b, (real_t)((double)i / (double)count)));
-			const Vector2 end = snap(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
-			const Vector2 mid = (start + end) * (real_t)0.5;
-			const int left = at(mid + n * (real_t)0.05);
-			const int right = at(mid - n * (real_t)0.05);
-			if ((left >= 0) == (right >= 0)) {
-				if (left < 0) {
-					Dictionary d;
-					d["kind"] = "ambiguous_shore";
-					d["body"] = edge["body"];
-					d["a"] = start;
-					d["b"] = end;
-					d["reason"] = "no_resolved_water_side";
-					diagnostics.push_back(d);
-				}
-				continue;
-			}
-			const Vector2 land = left >= 0 ? -n : n;
-			const int body = left >= 0 ? left : right;
-			const Vector3i key((int)std::floor((double)mid.x / 10.0), (int)std::floor((double)mid.y / 10.0),
-					(int)std::round((double)land.angle() * 12.0));
-			auto cached = cache.find(key);
-			if (cached == cache.end())
-				cached = cache.emplace(key, evidence->classify(mid - dir * (real_t)5.0, mid + dir * (real_t)5.0, land)).first;
-			Dictionary treatment = cached->second.duplicate();
-			const bool hard = String(treatment["kind"]) == "hard";
-			double top_a = hard ? bank_top(start, land) : dry_height(start);
-			double top_b = hard ? bank_top(end, land) : dry_height(end);
-			if (hard) {
-				const double road_top = abutment_top(treatment, mid);
-				if (!std::isnan(road_top)) {
-					// A bridge abutment's top is the road's level at the bridge's end.
-					top_a = road_top;
-					top_b = road_top;
-				}
-			}
-			if (hard && (std::isnan(top_a) || std::isnan(top_b))) {
-				treatment = Dictionary();
-				treatment["kind"] = "natural";
-				treatment["reason"] = "insufficient_dry_samples";
-				treatment["sources"] = Array();
-			}
-			if (std::isnan(top_a)) top_a = dry_height(start);
-			if (std::isnan(top_b)) top_b = dry_height(end);
-			treatment["a"] = start;
-			treatment["b"] = end;
-			treatment["land"] = land;
-			treatment["body"] = body;
-			treatment["top_a"] = top_a;
-			treatment["top_b"] = top_b;
-			treatment["water_a"] = level(body, start);
-			treatment["water_b"] = level(body, end);
-			const int segment_id = (int)segments.size();
-			segments.push_back(treatment);
-			const Vector2i lo = cell_at(start.min(end) - pad), hi = cell_at(start.max(end) + pad);
-			for (int x = lo.x; x <= hi.x; ++x) {
-				for (int z = lo.y; z <= hi.y; ++z) {
-					const Vector2i cell(x, z);
-					if (!cells.has(cell)) cells[cell] = Array();
-					Array ids = cells[cell];
-					ids.push_back(segment_id);
-				}
-			}
-			if (String(treatment["kind"]) == "hard") {
-				endpoint_tops[start].push_back(top_a);
-				endpoint_tops[end].push_back(top_b);
-			}
-			// The raw edge keeps its resolved segments for local height lookup.
-			if (!edge.has("segments")) edge["segments"] = Array();
-			Array own = edge["segments"];
-			own.push_back(segment_id);
+			Piece p;
+			p.edge = (int)e;
+			p.start = snap(a.lerp(b, (real_t)((double)i / (double)count)));
+			p.end = snap(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
+			p.mid = (p.start + p.end) * (real_t)0.5;
+			p.dir = dir;
+			p.n = n;
+			pieces.push_back(p);
 		}
+	}
+	const int count = (int)pieces.size();
+	// Each piece's water side (read-only lookups), every core.
+	parallel_for(count, [&](int k) {
+		Piece &p = pieces[k];
+		p.left = at(p.mid + p.n * (real_t)0.05);
+		p.right = at(p.mid - p.n * (real_t)0.05);
+		p.resolved = (p.left >= 0) != (p.right >= 0);
+		if (!p.resolved) return;
+		p.land = p.left >= 0 ? -p.n : p.n;
+		p.body = p.left >= 0 ? p.left : p.right;
+		p.key = Vector3i((int)std::floor((double)p.mid.x / 10.0), (int)std::floor((double)p.mid.y / 10.0),
+				(int)std::round((double)p.land.angle() * 12.0));
+	});
+	// The script caches the evidence per cell and bearing: the first piece
+	// in order to reach a cell classifies it for all that follow.
+	std::unordered_map<Vector3i, int, CacheHash> firsts;
+	std::vector<int> classified;
+	for (int k = 0; k < count; ++k) {
+		Piece &p = pieces[k];
+		if (!p.resolved) continue;
+		const auto hit = firsts.emplace(p.key, k);
+		if (hit.second) classified.push_back(k);
+		p.first = hit.first->second;
+	}
+	std::vector<Dictionary> evidence_of((size_t)count);
+	parallel_for((int)classified.size(), [&](int c) {
+		const Piece &p = pieces[classified[c]];
+		evidence_of[classified[c]] = evidence->classify(p.mid - p.dir * (real_t)5.0, p.mid + p.dir * (real_t)5.0, p.land);
+	});
+	// Each piece's treatment, tops and water levels, every core.
+	parallel_for(count, [&](int k) {
+		Piece &p = pieces[k];
+		if (!p.resolved) return;
+		Dictionary treatment = evidence_of[p.first].duplicate();
+		const bool hard = String(treatment["kind"]) == "hard";
+		double top_a = hard ? bank_top(p.start, p.land) : dry_height(p.start);
+		double top_b = hard ? bank_top(p.end, p.land) : dry_height(p.end);
+		if (hard) {
+			const double road_top = abutment_top(treatment, p.mid);
+			if (!std::isnan(road_top)) {
+				// A bridge abutment's top is the road's level at the bridge's end.
+				top_a = road_top;
+				top_b = road_top;
+			}
+		}
+		if (hard && (std::isnan(top_a) || std::isnan(top_b))) {
+			treatment = Dictionary();
+			treatment["kind"] = "natural";
+			treatment["reason"] = "insufficient_dry_samples";
+			treatment["sources"] = Array();
+		}
+		if (std::isnan(top_a)) top_a = dry_height(p.start);
+		if (std::isnan(top_b)) top_b = dry_height(p.end);
+		p.treatment = treatment;
+		p.top_a = top_a;
+		p.top_b = top_b;
+		p.water_a = level(p.body, p.start);
+		p.water_b = level(p.body, p.end);
+	});
+	if (abort != nullptr && (bool)abort->get("requested")) {
+		result["aborted"] = true;
+		return result;
+	}
+	// The segments, cells and diagnostics in the script's order.
+	Array segments, diagnostics;
+	Dictionary cells;
+	std::map<Vector2, std::vector<double>, PointLess> endpoint_tops;
+	const Vector2 pad = Vector2(1, 1) * (real_t)0.01;
+	for (int k = 0; k < count; ++k) {
+		Piece &p = pieces[k];
+		Dictionary &edge = edge_dicts[p.edge];
+		if (!p.resolved) {
+			if (p.left < 0) {
+				Dictionary d;
+				d["kind"] = "ambiguous_shore";
+				d["body"] = edge["body"];
+				d["a"] = p.start;
+				d["b"] = p.end;
+				d["reason"] = "no_resolved_water_side";
+				diagnostics.push_back(d);
+			}
+			continue;
+		}
+		Dictionary treatment = p.treatment;
+		treatment["a"] = p.start;
+		treatment["b"] = p.end;
+		treatment["land"] = p.land;
+		treatment["body"] = p.body;
+		treatment["top_a"] = p.top_a;
+		treatment["top_b"] = p.top_b;
+		treatment["water_a"] = p.water_a;
+		treatment["water_b"] = p.water_b;
+		const int segment_id = (int)segments.size();
+		segments.push_back(treatment);
+		const Vector2i lo = cell_at(p.start.min(p.end) - pad), hi = cell_at(p.start.max(p.end) + pad);
+		for (int x = lo.x; x <= hi.x; ++x) {
+			for (int z = lo.y; z <= hi.y; ++z) {
+				const Vector2i cell(x, z);
+				if (!cells.has(cell)) cells[cell] = Array();
+				Array ids = cells[cell];
+				ids.push_back(segment_id);
+			}
+		}
+		if (String(treatment["kind"]) == "hard") {
+			endpoint_tops[p.start].push_back(p.top_a);
+			endpoint_tops[p.end].push_back(p.top_b);
+		}
+		// The raw edge keeps its resolved segments for local height lookup.
+		if (!edge.has("segments")) edge["segments"] = Array();
+		Array own = edge["segments"];
+		own.push_back(segment_id);
 	}
 	for (int64_t s = 0; s < segments.size(); ++s) {
 		Dictionary segment = segments[s];
