@@ -460,6 +460,7 @@ static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: fl
 				b + cap_b - nrm, a - cap_a - nrm])], id)
 	# Track on its own bed reads as gravel; street track is the road's.
 	var rail_road_index = null
+	var grass_polys = null
 	for rw in data.railways:
 		if rw is Dictionary and bool(rw.get("embedded", false)):
 			rail_road_index = RailBuilder.RoadIndex.new(data, m2u)
@@ -480,7 +481,9 @@ static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: fl
 			var mid := (rp[i] + rp[i + 1]) * 0.5
 			if bool(rw.get("embedded", false)) and RailBuilder._on_road(mid, data, m2u, rail_road_index):
 				continue
-			var grass := str(rw.get("class", "")) == "tram" and _grass_at(mid, data)
+			if str(rw.get("class", "")) == "tram" and grass_polys == null:
+				grass_polys = _grass_polys(data)
+			var grass := str(rw.get("class", "")) == "tram" and _grass_at(mid, grass_polys)
 			paint.call([PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
 				rp[i + 1] - rn, rp[i] - rn])], ID["grass"] if grass else ID["path"])
 	for b in data.buildings:
@@ -592,8 +595,30 @@ static func _fill_rings(img: Image, rings: Array, id: int, n: int) -> void:
 				img.fill_rect(Rect2i(i0, j, i1 - i0 + 1, 1), col)
 			k += 2
 
-static func _grass_at(p: Vector2, data: LocationData) -> bool:
+## The grass polygons' outlines with their corner bounds, for _grass_at.
+static func _grass_polys(data: LocationData) -> Array:
+	var out: Array = []
 	for poly in data.land_polygons:
-		if str(poly.get("class", "")) == "grass" and Geometry2D.is_point_in_polygon(p, poly.get("points", PackedVector2Array())):
+		if str(poly.get("class", "")) == "grass":
+			var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
+			if pts.is_empty():
+				continue
+			var lo := pts[0]
+			var hi := pts[0]
+			for q in pts:
+				lo = Vector2(minf(lo.x, q.x), minf(lo.y, q.y))
+				hi = Vector2(maxf(hi.x, q.x), maxf(hi.y, q.y))
+			out.append([pts, lo, hi])
+	return out
+
+## True inside any grass outline. A point beyond an outline's extreme
+## vertices cannot be inside it.
+static func _grass_at(p: Vector2, grass_polys: Array) -> bool:
+	for g: Array in grass_polys:
+		var lo: Vector2 = g[1]
+		var hi: Vector2 = g[2]
+		if p.x < lo.x or p.y < lo.y or p.x > hi.x or p.y > hi.y:
+			continue
+		if Geometry2D.is_point_in_polygon(p, g[0]):
 			return true
 	return false
