@@ -62,14 +62,20 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	var root := Node3D.new()
 	root.name = "Buildings"
 	var timings := {}
-	var t0 := Time.get_ticks_msec()
-	var smap := SettlementMap.build(data)
-	timings["settlement"] = Time.get_ticks_msec() - t0
+	# The settlement map only reads the place's imagery and land use, and
+	# only the infill and the far city need it: it builds beside the real
+	# buildings. "settlement" is the wait for it after them.
+	var settle := Thread.new()
+	settle.start(func() -> SettlementMap: return SettlementMap.build(data))
 	if not data.buildings.is_empty():
 		_real_buildings(root, data, ground, abort, timings)
 		if abort != null and abort.requested:
+			settle.wait_to_finish()
 			ShopLights.discard()
 			return root
+	var t0 := Time.get_ticks_msec()
+	var smap: SettlementMap = settle.wait_to_finish()
+	timings["settlement"] = Time.get_ticks_msec() - t0
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
 	t0 = Time.get_ticks_msec()
