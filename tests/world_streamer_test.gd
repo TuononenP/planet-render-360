@@ -26,6 +26,7 @@ func _run() -> void:
 	_maths()
 	_state_machine()
 	_handoff()
+	_scout()
 	_reveal()
 	await _badge()
 	await _movement_and_swap()
@@ -129,7 +130,8 @@ func _maths() -> void:
 	var down := 30.0 - WorldStreamer.blend_build_s(30.0, 10.0)
 	_check(up > down * 2.0, "slow builds count more than quick ones (%.1f vs %.1f)" % [up, down])
 	WorldStreamer.note_build_s(RenderSettings.Preset.HIGH, 60.0)
-	_check(WorldStreamer.expected_build_s(RenderSettings.Preset.HIGH) > 45.0
+	_check(WorldStreamer.expected_build_s(RenderSettings.Preset.HIGH)
+		> WorldStreamer.DEFAULT_BUILD_S[RenderSettings.Preset.HIGH] + 20.0
 		and WorldStreamer.expected_build_s(RenderSettings.Preset.FAST)
 		== WorldStreamer.DEFAULT_BUILD_S[0], "a measured build sets only its own preset")
 	WorldStreamer._build_s.clear()
@@ -210,6 +212,17 @@ func _state_machine() -> void:
 		"heading for an early-ready world keeps it")
 	_check(not s.swap_stale(Vector2(0, -50)), "standing still keeps it too")
 	_check(s.swap_stale(Vector2(0, -50), Vector2(0, 27)), "turning back from it drops it")
+	_check(not s.swap_stale(Vector2(0, -50), Vector2(0, 4)),
+		"a walker stepping back while looking around keeps it")
+	# Veering: a world ready 1600 m north, the drone now flying east.
+	_check(not s.heading_misses(Vector2(0, -600), Vector2(0, -27)),
+		"flying on towards the ready world it is not missed")
+	_check(not s.heading_misses(Vector2(300, -600), Vector2(20, -20)),
+		"leaving through the edge the ready square covers it is not missed")
+	_check(s.heading_misses(Vector2(0, -600), Vector2(27, 0)),
+		"flying east out of a square whose next stretch lies north misses it")
+	_check(not s.heading_misses(Vector2(0, -600), Vector2(4, 0)),
+		"a walker sidestepping never counts")
 	# Sideways: past the live edge over the pending square, though still
 	# nearer the old centre than the new one.
 	var side := Vector2(-200, -1100)
@@ -274,7 +287,53 @@ func _handoff() -> void:
 		h2.pump(0)
 	_check(h2.ready_for(big_world) and layer.get_child_count() == WorldHandoff.SPLIT_CHILDREN + 8
 		and layer.get_child(5).name == "Cell5", "every child is back under it, in order")
+	# Parking: a staged world let go stays in the tree, hidden, and comes
+	# back staged and settled with nothing to add.
+	var parked := h2.release()
+	_check(parked == big_world and h2.staged == null and parked.get_parent() == holder,
+		"a released world stays in the tree")
+	h2.adopt(parked)
+	_check(h2.ready_for(parked) and h2.staged_ms(parked) > 400 and not parked.visible,
+		"an adopted world is staged and settled at once")
+	# A swap that keeps the old world hides it instead of freeing it.
+	var view := View360.new()
+	var live := Node3D.new()
+	holder.add_child(live)
+	view._generated = live
+	h2.swap_in(view, true)
+	_check(view._generated == parked and parked.visible and is_instance_valid(live)
+		and not live.visible and not h2.busy(), "a kept old world only hides")
+	view.free()
 	holder.free()
+
+## StreamScout: the ring around a centre, nearest the heading first and
+## never straight ahead; picking a known centre ahead, never the live one.
+func _scout() -> void:
+	var sc := StreamScout.new()
+	var ring := sc.ring_around(60.0, 25.0, Vector2(0, -1))
+	_check(ring.size() == StreamScout.RING_FETCH_MAX, "the ring fetches only the nearest the heading")
+	var first := WorldScale.xz_from_latlon(ring[0].x, ring[0].y, 60.0, 25.0)
+	var last := WorldScale.xz_from_latlon(ring[-1].x, ring[-1].y, 60.0, 25.0)
+	_check(first.y < 0.0 and absf(first.length() - StreamScout.RING_M) < 1.0,
+		"the ring starts beside the heading")
+	_check(absf(last.y) < 1.0, "and ends square to it, never behind")
+	sc.note(ring[0])
+	_check(not sc.ring_around(60.0, 25.0, Vector2(0, -1)).has(ring[0]),
+		"a known centre is not fetched again")
+	# Flying north-east from near the centre: the known north-east centre suits.
+	var ne := WorldScale.latlon_from_xz(780.0, -780.0, 60.0, 25.0)
+	sc.note(ne)
+	sc.note(Vector2(60.0, 25.0))
+	_check(sc.pick(Vector2(0, -100), Vector2(1, -1), 60.0, 25.0) == ne,
+		"a known centre ahead is picked")
+	_check(sc.pick(Vector2(0, -100), Vector2(-1, 1), 60.0, 25.0) == Vector2.INF,
+		"none behind, and never the live centre")
+	for i in StreamScout.KNOWN_MAX + 5:
+		sc.note(Vector2(61.0 + i * 0.001, 25.0))
+	_check(sc.known.size() == StreamScout.KNOWN_MAX, "known centres are capped")
+	_check(WorldStreamer.exit_missed(Vector2(0, -600), Vector2(27, 0), Vector2(0, -1600))
+		and not WorldStreamer.exit_missed(Vector2(0, -600), Vector2(0, -27), Vector2(0, -1600)),
+		"an exit outside a target's square is missed, one inside is not")
 
 ## RevealWave: only new pieces (past the old square) fade in, from the
 ## camera outward, and each gets its LodRing range back once passed.
@@ -511,11 +570,17 @@ func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
 	var here := Vector2(view._rig.position.x, view._rig.position.z)
 	var agl_before := view._rig.position.y - view._ground.height_at_world(here.x, here.y)
 	var old_world := view._generated
+	var old_ground := view._ground
 	view.apply_streamed_world(data3, [ground3, world3])
 	_check(view._generated == world3 and world3.visible and world3.is_inside_tree(),
 		"the swap shows the new world in the scene")
 	_check(is_instance_valid(old_world) and not old_world.visible,
-		"the old world hides at the swap and leaves over the next frames")
+		"the old world hides at the swap")
+	_check(view._streamer._parked.size() == 1 and view._streamer._parked[0]["world"] == old_world,
+		"and is parked for a turn back")
+	_check(view._streamer._parked.size() == 1 and view._streamer._parked[0]["ground"] == old_ground
+		and old_ground != ground3, "with its own ground, not the new world's")
+	view._streamer._free_parked()
 	var pumps := 0
 	while view._streamer._handoff.busy() and pumps < 10000:
 		view._streamer._handoff.pump(0)

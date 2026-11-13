@@ -48,7 +48,8 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 		return null
 	var mover := VehicleMover.new()
 	mover._m2u = WorldScale.metres_to_units()
-	var planned: Dictionary = data.get_meta(PLANS_META, {}) if data.get_meta(PLANS_GROUND, null) == ground \
+	var planned: Dictionary = data.get_meta(PLANS_META, {}) if data.has_meta(PLANS_GROUND) \
+		and data.get_meta(PLANS_GROUND) == ground \
 		else {}
 	var trams := world.find_child("Trams", true, false)
 	if trams != null and not data.railways.is_empty():

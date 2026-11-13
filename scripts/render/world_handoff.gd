@@ -115,14 +115,18 @@ func busy() -> bool:
 ## The swap: the staged world (finished now if it was not yet) becomes
 ## the view's world and shows; the old one hides and leaves over the
 ## next frames. Returns false when nothing is staged.
-func swap_in(v: View360) -> bool:
+## With `keep_old` the old world only hides (WorldStreamer parks it).
+func swap_in(v: View360, keep_old := false) -> bool:
 	if staged == null or not is_instance_valid(staged):
 		return false
 	while not _pending.is_empty():
 		_add_back(_pending.pop_front())
 	var old := v._generated
 	if old != null and is_instance_valid(old) and old != staged:
-		retire(old)
+		if keep_old:
+			old.visible = false
+		else:
+			retire(old)
 	v._generated = staged
 	staged.visible = true
 	staged = null
@@ -143,6 +147,25 @@ func drop_staged() -> void:
 		retire(staged)
 	_pending.clear()
 	staged = null
+
+## Lets go of the fully staged world without freeing it: it stays in the
+## tree, hidden, for WorldStreamer to park. Returns it, or null when
+## nothing is fully staged.
+func release() -> Node3D:
+	if not ready_for(staged):
+		return null
+	var world := staged
+	staged = null
+	return world
+
+## Takes `world` back as the staged world: one parked earlier, still in
+## the tree, hidden, every subtree in place and dressed.
+func adopt(world: Node3D) -> void:
+	drop_staged()
+	staged = world
+	world.visible = false
+	dressed = true
+	_staged_at = 1  # settled long ago
 
 ## The view is going away: its world root frees everything still in the
 ## tree; only detached subtrees are freed here.
