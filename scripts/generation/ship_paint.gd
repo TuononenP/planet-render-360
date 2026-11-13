@@ -211,7 +211,7 @@ static func _build(length: float, freeboard: float, maps: bool) -> Dictionary:
 	var albedo := Image.create_from_data(TEX_W, TEX_H, false, Image.FORMAT_RGB8, alb)
 	albedo.generate_mipmaps()
 	var detail := _detail(length, freeboard, px_m)
-	detail.fix_alpha_edges()
+	FacadePaint.fix_alpha_edges(detail)
 	detail.generate_mipmaps()
 	var out := {"albedo": ImageTexture.create_from_image(albedo),
 		"detail": ImageTexture.create_from_image(detail), "normal": null}

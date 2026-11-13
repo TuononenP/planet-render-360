@@ -18,6 +18,9 @@ const WARM := Color(1.0, 0.62, 0.30)
 const COOL := Color(0.62, 0.72, 1.0)
 ## A lit room by day: a slightly warm, dim interior behind the glass.
 const DAY_ROOM := Color(0.075, 0.062, 0.050)
+## Native ImageKernels (native/, tools/build_native.sh): the same bytes
+## as Image.fix_alpha_edges, which took half of a composition's time.
+static var _native := ClassDB.class_exists("ImageKernels")
 
 ## Transparent paint layer over `base`. Its clear pixels carry the base's
 ## mean colour, so mip levels blend frame edges toward the wall rather
@@ -96,7 +99,7 @@ static func finish(base: Image, paint: Image, emit: Image, nor: Image, rgh: Imag
 		paint.linear_to_srgb()
 		# Clear texels take their neighbours' colour first: mips average
 		# them in, which washed the windows out of distant facades.
-		paint.fix_alpha_edges()
+		fix_alpha_edges(paint)
 		paint.generate_mipmaps()
 		d["paint"] = ImageTexture.create_from_image(paint)
 	if emit != null:
@@ -111,3 +114,10 @@ static func finish(base: Image, paint: Image, emit: Image, nor: Image, rgh: Imag
 		d["normal"] = ImageTexture.create_from_image(nor)
 		d["rough"] = ImageTexture.create_from_image(rgh)
 	return d
+
+## Image.fix_alpha_edges, natively when the library is loaded.
+static func fix_alpha_edges(img: Image) -> void:
+	if _native:
+		ClassDB.class_call_static("ImageKernels", "fix_alpha_edges", img)
+	else:
+		img.fix_alpha_edges()
