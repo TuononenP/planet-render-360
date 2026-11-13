@@ -85,6 +85,8 @@ static var _scan_again := false  # asked for while one was running
 static var _touched: Dictionary = {}  # rel -> true, noted while a scan runs
 static var _cleared: Dictionary = {}  # rel -> true, cleared while a scan runs
 static var _trash_tasks: Array[int] = []  # discard_dir deletions
+## One [done] box per task _spawn started and busy() has not seen finish.
+static var _working: Array = []
 static var _exit_hooked := false
 
 static func base_dir() -> String:
@@ -538,7 +540,7 @@ static func preload_index() -> void:
 		return
 	var path := _lru_path()
 	_hook_exit()
-	_load_task = WorkerThreadPool.add_task(func() -> void:
+	_load_task = _spawn(func() -> void:
 		_loaded = JSON.parse_string(FileAccess.get_file_as_string(path)) \
 			if FileAccess.file_exists(path) else null
 		_index_loaded.call_deferred())
@@ -618,22 +620,27 @@ static func flush_lru() -> void:
 	var index := _lru.duplicate()
 	_lru_pending = ""
 	_hook_exit()
-	_save_task = WorkerThreadPool.add_task(func() -> void: _write_index(path, index))
+	_save_task = _spawn(func() -> void: _write_index(path, index))
 
 static func _join_save() -> void:
 	if _save_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_save_task)
 		_save_task = -1
 
-## An index read, write or scan is still pending or running.
+## An index read, write, scan or deletion is still pending or running.
+## Reads the tasks' own done flags: asking the pool about an ID that was
+## already joined fails with "Invalid Task ID" (seen at quit).
 static func busy() -> bool:
-	for t in [_load_task, _save_task, -1 if _scan_joined else _scan_task]:
-		if t >= 0 and not WorkerThreadPool.is_task_completed(t):
-			return true
-	for t in _trash_tasks:
-		if not WorkerThreadPool.is_task_completed(t):
-			return true
-	return _lru_pending != ""
+	_working = _working.filter(func(box: Array) -> bool: return not box[0])
+	return not _working.is_empty() or _lru_pending != ""
+
+## Starts `work` on a worker (from the main thread) and tracks it for busy().
+static func _spawn(work: Callable) -> int:
+	var box := [false]
+	_working.append(box)
+	return WorkerThreadPool.add_task(func() -> void:
+		work.call()
+		box[0] = true)
 
 ## Joins every task; the store's teardown backstop (Main waits on busy()
 ## first, frame by frame, so this rarely blocks).
@@ -810,7 +817,7 @@ static func _start_scan() -> void:
 	var lru_path := _lru_path()
 	var index := _lru.duplicate()
 	_hook_exit()
-	_scan_task = WorkerThreadPool.add_task(func() -> void:
+	_scan_task = _spawn(func() -> void:
 		var r := _scan_and_count(base, lru_path, index)
 		_scan_done.call_deferred(gen, r))
 
@@ -869,7 +876,7 @@ static func discard_dir(path: String) -> void:
 		DirAccess.rename_absolute(full, "%s%s%d" % [full, TRASH_MARK, Time.get_ticks_usec()])
 	var parent := full.get_base_dir()
 	_hook_exit()
-	_trash_tasks.append(WorkerThreadPool.add_task(func() -> void:
+	_trash_tasks.append(_spawn(func() -> void:
 		for d in DirAccess.get_directories_at(parent):
 			if d.contains(TRASH_MARK):
 				_remove_tree(parent.path_join(d))))
