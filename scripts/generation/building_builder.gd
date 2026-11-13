@@ -175,9 +175,12 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# A curated view can stand a kilometre from the middle of its extent, and
 	# look back at it: the building cap keeps what is near either one.
 	var eye := View360.spawn_xz(data)
-	var sorted := data.buildings.duplicate()
-	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return _view_d2(a, eye) < _view_d2(b, eye))
+	# Indices sorted as the buildings would be (sort_custom permutes by its
+	# comparisons alone), so each building's skip test runs once, below.
+	var order: Array = range(data.buildings.size())
+	order.sort_custom(func(i: int, j: int) -> bool:
+		return _view_d2(data.buildings[i], eye) < _view_d2(data.buildings[j], eye))
+	var sorted: Array = order.map(func(i: int) -> Dictionary: return data.buildings[i])
 	var placed := 0
 	var aabb_fallbacks := 0
 	var impostor := MassBatch.new()
@@ -195,21 +198,32 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# Real footprints out to just inside the detailed extent edge (the
 	# v1 ±105 of 110 units, now metres of the 2400 m extent).
 	var edge := WorldScale.detailed_extent_units() * 0.5 * 0.98
+	# Which buildings stand (not the landmark's own, inside the extent, not
+	# in open water), by data.buildings index.
+	var stands := PackedByteArray()
+	stands.resize(data.buildings.size())
+	for i in data.buildings.size():
+		var bi: Dictionary = data.buildings[i]
+		stands[i] = 1 if _accepted(data, bi, site, edge) and not _in_open_water(ground, bi) else 0
+	var standing := PackedByteArray()
+	for i: int in order:
+		standing.append(stands[i])
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
-		func(b: Dictionary) -> bool:
-			return not ShipBuilder.accepts(b) and _accepted(data, b, site, edge) and not _in_open_water(ground, b))
+		func(i: int) -> bool:
+			return not ShipBuilder.accepts(data.buildings[i]) and stands[i] != 0)
 	timings["shared_walls_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	if RoofGeometry._native:
-		_prepare_roofs(data, ground, ctx, sorted, site, edge)
+		_prepare_roofs(ground, ctx, sorted, standing)
 	timings["roof_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
-	for b in sorted:
+	for k in sorted.size():
+		var b: Dictionary = sorted[k]
 		if abort != null and abort.requested:
 			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
-		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+		if standing[k] == 0:
 			continue
 		if ShipBuilder.build(root, b, data, ground):
 			placed += 1
@@ -737,12 +751,13 @@ static func _cover_for(ring: PackedVector2Array, key: String, take: bool = false
 ## Every standing mass's roof form, computed up front on every core
 ## (RoofKernels.form_many) with _extrude_polygon's own inputs: _roof_form
 ## takes a result only when its call matches it exactly.
-static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Dictionary,
-		sorted: Array, site: Vector2, edge: float) -> void:
+static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
+		sorted: Array, standing: PackedByteArray) -> void:
 	var m2u := WorldScale.metres_to_units()
 	var jobs: Array = []
-	for b in sorted:
-		if ShipBuilder.accepts(b) or not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+	for k in sorted.size():
+		var b: Dictionary = sorted[k]
+		if ShipBuilder.accepts(b) or standing[k] == 0:
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			var md := m as Dictionary

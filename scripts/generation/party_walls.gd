@@ -46,15 +46,17 @@ var _roads := {}
 var _idx: RefCounted = null
 static var _native := ClassDB.class_exists("PartyIndex")
 
-## Index over every mass `accept(b)` keeps (the builder's own skip rules,
-## so a removed landmark parcel never hides its neighbours' walls).
+## Index over every mass `accept(i)` keeps for data.buildings[i] (the
+## builder's own skip rules, so a removed landmark parcel never hides its
+## neighbours' walls).
 static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 		accept: Callable = Callable()) -> PartyWalls:
 	var pw := PartyWalls.new()
 	if _native:
 		pw._idx = ClassDB.instantiate("PartyIndex")
-	for b in data.buildings:
-		if not (b is Dictionary) or (accept.is_valid() and not bool(accept.call(b))):
+	for i in data.buildings.size():
+		var b: Variant = data.buildings[i]
+		if not (b is Dictionary) or (accept.is_valid() and not bool(accept.call(i))):
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			if SuomenlinnaSite.fortress(m["b_eff"]):
