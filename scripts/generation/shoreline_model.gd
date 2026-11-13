@@ -443,3 +443,19 @@ func _setup_sampler() -> void:
 		sampler.setup(base, patches, size, step, origin)
 		if sampler.has_method("setup_banks"):
 			sampler.setup_banks(segments)
+		if sampler.has_method("setup_footing") and domains != null and domains.native != null:
+			# Per body: level, level_end, has_end, axis start, axis end.
+			var levels := PackedFloat64Array()
+			for body: Dictionary in domains.bodies:
+				var ends := body.has("level_end")
+				var axis: PackedVector2Array = body["axis"] if ends else PackedVector2Array([Vector2.ZERO, Vector2.ZERO])
+				levels.append_array([float(body["level"]), float(body.get("level_end", 0.0)), 1.0 if ends else 0.0,
+					axis[0].x, axis[0].y, axis[1].x, axis[1].y])
+			sampler.setup_footing(domains.native, levels, dry if land.is_empty() else land, domains.bounds, bounds)
+
+## BuildingFoundation's ground reads around one footprint, done natively
+## (ShoreSampler.footing); empty without the native sampler.
+func footing(ring: PackedVector2Array, centre: Vector2, sea_y: float, edge_step: float, max_n: int) -> PackedFloat64Array:
+	if sampler == null or not sampler.has_method("footing"):
+		return PackedFloat64Array()
+	return sampler.footing(ring, centre, sea_y, edge_step, max_n)

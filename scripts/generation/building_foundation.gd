@@ -57,40 +57,61 @@ static func _dry_seat(low: float, high: float, tall_m: float) -> Array:
 static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector2,
 		sea_y: float = -INF, tall_m: float = PLINTH_TALL_M, snap_m: float = 0.0) -> Dictionary:
 	var m := WorldScale.metres_to_units()
-	var all_low := ground.height_at_world(centre.x, centre.y)
-	var all_high := all_low
-	var dry_low := INF
-	var dry_high := -INF
-	var dry_n := 0
-	var wet_n := 0
-	var centre_level := ground.water_level_at(centre.x, centre.y, -INF)
-	var centre_wet := is_finite(centre_level) and all_low < centre_level
-	if not centre_wet:
-		# The centre informs low/high but is not a ring sample: wet_samples
-		# and dry_samples stay comparable counts along the ring.
-		var centre_dry := ground.dry_height_at_world(centre.x, centre.y)
-		dry_low = minf(dry_low, centre_dry)
-		dry_high = maxf(dry_high, centre_dry)
-	var water := maxf(sea_y, centre_level)
-	var step := EDGE_STEP_M * m
-	for i in ring.size():
-		var p := ring[i]
-		var q := ring[(i + 1) % ring.size()]
-		water = maxf(water, ground.water_level_at(p.x, p.y, -INF))
-		var n := clampi(ceili(p.distance_to(q) / step), 1, EDGE_SAMPLES_MAX)
-		for k in n:
-			var at := p.lerp(q, float(k) / float(n))
-			var h := ground.height_at_world(at.x, at.y)
-			all_low = minf(all_low, h)
-			all_high = maxf(all_high, h)
-			var level_at := ground.water_level_at(at.x, at.y, -INF)
-			if is_finite(level_at) and h < level_at:
-				wet_n += 1
-			else:
-				var dry_h := ground.dry_height_at_world(at.x, at.y)
-				dry_low = minf(dry_low, dry_h)
-				dry_high = maxf(dry_high, dry_h)
-				dry_n += 1
+	var all_low: float
+	var all_high: float
+	var dry_low: float
+	var dry_high: float
+	var dry_n: int
+	var wet_n: int
+	var water: float
+	var centre_wet: bool
+	# The same reads natively when the shoreline's sampler has them.
+	var reads: PackedFloat64Array = ground.shoreline.footing(ring, centre, sea_y, EDGE_STEP_M * m, EDGE_SAMPLES_MAX) \
+		if ground.shoreline != null and ground.shoreline.ready else PackedFloat64Array()
+	if reads.size() == 8:
+		all_low = reads[0]
+		all_high = reads[1]
+		dry_low = reads[2]
+		dry_high = reads[3]
+		dry_n = int(reads[4])
+		wet_n = int(reads[5])
+		water = reads[6]
+		centre_wet = reads[7] > 0.0
+	else:
+		all_low = ground.height_at_world(centre.x, centre.y)
+		all_high = all_low
+		dry_low = INF
+		dry_high = -INF
+		dry_n = 0
+		wet_n = 0
+		var centre_level := ground.water_level_at(centre.x, centre.y, -INF)
+		centre_wet = is_finite(centre_level) and all_low < centre_level
+		if not centre_wet:
+			# The centre informs low/high but is not a ring sample: wet_samples
+			# and dry_samples stay comparable counts along the ring.
+			var centre_dry := ground.dry_height_at_world(centre.x, centre.y)
+			dry_low = minf(dry_low, centre_dry)
+			dry_high = maxf(dry_high, centre_dry)
+		water = maxf(sea_y, centre_level)
+		var step := EDGE_STEP_M * m
+		for i in ring.size():
+			var p := ring[i]
+			var q := ring[(i + 1) % ring.size()]
+			water = maxf(water, ground.water_level_at(p.x, p.y, -INF))
+			var n := clampi(ceili(p.distance_to(q) / step), 1, EDGE_SAMPLES_MAX)
+			for k in n:
+				var at := p.lerp(q, float(k) / float(n))
+				var h := ground.height_at_world(at.x, at.y)
+				all_low = minf(all_low, h)
+				all_high = maxf(all_high, h)
+				var level_at := ground.water_level_at(at.x, at.y, -INF)
+				if is_finite(level_at) and h < level_at:
+					wet_n += 1
+				else:
+					var dry_h := ground.dry_height_at_world(at.x, at.y)
+					dry_low = minf(dry_low, dry_h)
+					dry_high = maxf(dry_high, dry_h)
+					dry_n += 1
 	# The carved bed under a water-clipped edge is not the building's
 	# ground. Seat on the dry samples; the bed only remains as the
 	# fallback for a footprint with no dry ground at all.

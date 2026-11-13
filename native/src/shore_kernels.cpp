@@ -162,6 +162,101 @@ double ShoreSampler::height(double x, double z) const {
 	return a + tz * (b - a);
 }
 
+// GDScript's minf/maxf/clampf, NaN order included.
+static inline double gd_min(double a, double b) { return a < b ? a : b; }
+static inline double gd_max(double a, double b) { return a > b ? a : b; }
+static inline double gd_clamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+void ShoreSampler::setup_footing(const Ref<RefCounted> &p_domains, const PackedFloat64Array &p_levels,
+		const PackedFloat32Array &p_land, const Rect2 &p_domain_bounds, const Rect2 &p_height_bounds) {
+	footing_domains = p_domains;
+	domain_index = Object::cast_to<ShoreDomainIndex>(p_domains.ptr());
+	levels.assign(p_levels.ptr(), p_levels.ptr() + p_levels.size());
+	land.assign(p_land.ptr(), p_land.ptr() + p_land.size());
+	domain_bounds = p_domain_bounds;
+	height_bounds = p_height_bounds;
+}
+
+// GroundTruth.height_at_world with a ready shoreline.
+double ShoreSampler::height_clamped(const Vector2 &p) const {
+	const Vector2 q = p.clamp(height_bounds.position, height_bounds.get_end());
+	return height(q.x, q.y);
+}
+
+// GroundTruth.water_level_at(x, z, -INF): ShoreDomains.at then .level.
+double ShoreSampler::water_level(const Vector2 &p) const {
+	Vector2 q = p;
+	if (domain_bounds.grow(0.01).has_point(q))
+		q = q.clamp(domain_bounds.position + Vector2(1, 1) * (real_t)0.001, domain_bounds.get_end() - Vector2(1, 1) * (real_t)0.001);
+	const int id = domain_index->at(q, -1);
+	if (id < 0 || (size_t)id * 7 + 7 > levels.size()) return -INFINITY;
+	const double *body = &levels[(size_t)id * 7];
+	if (body[2] == 0.0) return body[0];
+	const Vector2 a0((real_t)body[3], (real_t)body[4]), a1((real_t)body[5], (real_t)body[6]);
+	const Vector2 d = a1 - a0;
+	const double t = gd_clamp((double)(p - a0).dot(d) / gd_max((double)d.length_squared(), 0.0001), 0.0, 1.0);
+	return body[0] + (body[1] - body[0]) * t;
+}
+
+// ShorelineModel.land_height (_grid_height over the land grid).
+double ShoreSampler::land_height(const Vector2 &p) const {
+	if (size < 2 || land.empty()) return 0.0;
+	Vector2 f = (p - Vector2(1, 1) * (real_t)origin) / (real_t)step;
+	f = f.clamp(Vector2(0, 0), Vector2(1, 1) * (real_t)(size - 1));
+	const int x = std::min((int)f.x, size - 2), z = std::min((int)f.y, size - 2);
+	const double tx = (double)f.x - x, tz = (double)f.y - z;
+	const double v00 = land[z * size + x], v01 = land[z * size + x + 1];
+	const double v10 = land[(z + 1) * size + x], v11 = land[(z + 1) * size + x + 1];
+	const double a = v00 + (v01 - v00) * tx, b = v10 + (v11 - v10) * tx;
+	return a + (b - a) * tz;
+}
+
+// BuildingFoundation._sample's ground reads around one footprint, in its
+// order: [all_low, all_high, dry_low, dry_high, dry_n, wet_n, water,
+// centre_wet]. Empty when setup_footing has not run.
+PackedFloat64Array ShoreSampler::footing(const PackedVector2Array &ring, const Vector2 &centre, double sea_y,
+		double edge_step, int max_n) const {
+	PackedFloat64Array out;
+	if (domain_index == nullptr) return out;
+	double all_low = height_clamped(centre), all_high = all_low;
+	double dry_low = INFINITY, dry_high = -INFINITY;
+	int dry_n = 0, wet_n = 0;
+	const double centre_level = water_level(centre);
+	const bool centre_wet = std::isfinite(centre_level) && all_low < centre_level;
+	if (!centre_wet) {
+		const double centre_dry = land_height(centre);
+		dry_low = gd_min(dry_low, centre_dry);
+		dry_high = gd_max(dry_high, centre_dry);
+	}
+	double water = gd_max(sea_y, centre_level);
+	const int64_t count = ring.size();
+	for (int64_t i = 0; i < count; ++i) {
+		const Vector2 p = ring[i], q = ring[(i + 1) % count];
+		water = gd_max(water, water_level(p));
+		const int n = std::clamp((int)std::ceil((double)p.distance_to(q) / edge_step), 1, max_n);
+		for (int k = 0; k < n; ++k) {
+			const Vector2 at = p.lerp(q, (real_t)((double)k / (double)n));
+			const double h = height_clamped(at);
+			all_low = gd_min(all_low, h);
+			all_high = gd_max(all_high, h);
+			const double level_at = water_level(at);
+			if (std::isfinite(level_at) && h < level_at) {
+				wet_n += 1;
+			} else {
+				const double dry_h = land_height(at);
+				dry_low = gd_min(dry_low, dry_h);
+				dry_high = gd_max(dry_high, dry_h);
+				dry_n += 1;
+			}
+		}
+	}
+	out.resize(8);
+	double *o = out.ptrw();
+	o[0] = all_low; o[1] = all_high; o[2] = dry_low; o[3] = dry_high;
+	o[4] = dry_n; o[5] = wet_n; o[6] = water; o[7] = centre_wet ? 1.0 : 0.0;
+	return out;
+}
+
 PackedFloat32Array ShoreSampler::grid_heights() const {
 	PackedFloat32Array out;
 	if (size < 2) return out;
@@ -297,6 +392,8 @@ void ShoreSampler::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("height_range"), &ShoreSampler::height_range);
 	ClassDB::bind_method(D_METHOD("setup_banks", "segments"), &ShoreSampler::setup_banks);
 	ClassDB::bind_method(D_METHOD("nearest_bank", "point", "treatment"), &ShoreSampler::nearest_bank, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("setup_footing", "domains", "levels", "land", "domain_bounds", "height_bounds"), &ShoreSampler::setup_footing);
+	ClassDB::bind_method(D_METHOD("footing", "ring", "centre", "sea_y", "edge_step", "max_n"), &ShoreSampler::footing);
 }
 void ShoreDomainIndex::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "bodies", "cells"), &ShoreDomainIndex::setup);
