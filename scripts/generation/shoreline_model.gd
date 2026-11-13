@@ -26,6 +26,8 @@ var transition_cells := {}
 var _vertex_heights := {}
 var _bank_tops := {}
 var sampler: Object = null
+## Test hook: false classifies with the script even when ShoreClassifier is loaded.
+static var native_classify := true
 
 func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abort: BuildAbort = null) -> void:
 	if data == null or ground == null:
@@ -161,12 +163,14 @@ func finish(ground, abort: BuildAbort = null) -> void:
 	_class_cache.clear()
 	_vertex_heights.clear()
 	_bank_tops.clear()
-	_setup_sampler()
+	_setup_sampler(true)
 	ready = true
 	print("SHORELINE bodies=%d edges=%d patches=%d hard=%d diagnostics=%d" % [domains.bodies.size(),
 		segments.size(), patches.size(), hard_count(), diagnostics.size()])
 
 func _classify(abort: BuildAbort) -> void:
+	if _classify_native(abort):
+		return
 	var endpoint_tops := {}
 	for edge in _edges:
 		if abort != null and abort.requested:
@@ -240,6 +244,34 @@ func _classify(abort: BuildAbort) -> void:
 				sum += float(value)
 			segment[item[1]] = sum / float(values.size())
 	_make_transitions()
+
+## _classify through ShoreClassifier, the same segments, cells and
+## diagnostics; false (nothing done) without the native indexes.
+func _classify_native(abort: BuildAbort) -> bool:
+	if ShoreGeometry.force_script or not native_classify or not ClassDB.class_exists("ShoreClassifier") \
+			or domains.native == null or _evidence.native == null:
+		return false
+	var classifier: Object = ClassDB.instantiate("ShoreClassifier")
+	classifier.setup(dry, size, step, origin, bounds, domains.bounds, domains.native, _levels(),
+		_evidence.native, _evidence.abutment_ends, WorldScale.metres_to_units())
+	var out: Dictionary = classifier.classify(_edges, abort)
+	if out.has("aborted") or not out.has("segments"):
+		return true
+	segments = out["segments"]
+	_segment_cells = out["cells"]
+	diagnostics.append_array(out["diagnostics"])
+	_make_transitions()
+	return true
+
+## Per body: level, level_end, has_end, axis start, axis end.
+func _levels() -> PackedFloat64Array:
+	var levels := PackedFloat64Array()
+	for body: Dictionary in domains.bodies:
+		var ends := body.has("level_end")
+		var axis: PackedVector2Array = body["axis"] if ends else PackedVector2Array([Vector2.ZERO, Vector2.ZERO])
+		levels.append_array([float(body["level"]), float(body.get("level_end", 0.0)), 1.0 if ends else 0.0,
+			axis[0].x, axis[0].y, axis[1].x, axis[1].y])
+	return levels
 
 func _make_transitions() -> void:
 	var ends := {}
@@ -446,22 +478,20 @@ func _restore_indexes() -> void:
 						index[key] = []
 					(index[key] as Array).append(id)
 
-func _setup_sampler() -> void:
+## `patches_only`: the banks and levels are already set (only the patches
+## changed since the last call).
+func _setup_sampler(patches_only := false) -> void:
 	if not ShoreGeometry.force_script and ClassDB.class_exists("ShoreSampler"):
 		if sampler == null:
 			sampler = ClassDB.instantiate("ShoreSampler")
+			patches_only = false
 		sampler.setup(base, patches, size, step, origin)
+		if patches_only:
+			return
 		if sampler.has_method("setup_banks"):
 			sampler.setup_banks(segments)
 		if sampler.has_method("setup_footing") and domains != null and domains.native != null:
-			# Per body: level, level_end, has_end, axis start, axis end.
-			var levels := PackedFloat64Array()
-			for body: Dictionary in domains.bodies:
-				var ends := body.has("level_end")
-				var axis: PackedVector2Array = body["axis"] if ends else PackedVector2Array([Vector2.ZERO, Vector2.ZERO])
-				levels.append_array([float(body["level"]), float(body.get("level_end", 0.0)), 1.0 if ends else 0.0,
-					axis[0].x, axis[0].y, axis[1].x, axis[1].y])
-			sampler.setup_footing(domains.native, levels, dry if land.is_empty() else land, domains.bounds, bounds)
+			sampler.setup_footing(domains.native, _levels(), dry if land.is_empty() else land, domains.bounds, bounds)
 
 ## BuildingFoundation's ground reads around one footprint, done natively
 ## (ShoreSampler.footing); empty without the native sampler.

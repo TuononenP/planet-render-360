@@ -57,6 +57,8 @@ add_library(planet_render SHARED
 	src/grid_filters.h
 	src/road_grader.cpp
 	src/road_grader.h
+	src/shore_classifier.cpp
+	src/shore_classifier.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)

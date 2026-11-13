@@ -18,6 +18,9 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 					keys[k] = true
 	for key in model.transition_cells:
 		keys[key] = true
+	if kernel != null:
+		_native_cells(model, kernel, keys.keys(), abort)
+		return
 	for key in keys:
 		if abort != null and abort.requested:
 			return
@@ -80,6 +83,28 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 			model.diagnostics.append({"kind": "patch_failure", "cell": key, "area": area, "expected": expected})
 			continue
 		model.patches[key] = {"triangles": triangles, "owners": owners, "paving": paving, "hard": hard_regions}
+
+## build()'s cells through ShorePatchKernel.cells, in order: a cell the
+## native partition left a gap in is partitioned by the script here.
+static func _native_cells(model: ShorelineModel, kernel: Object, keys: Array, abort: BuildAbort) -> void:
+	var results: Array = kernel.cells(keys, model.edge_cells, model.transition_cells, model._edges,
+		model.transition_edges, abort)
+	for entry: Array in results:
+		var key: Vector2i = entry[0]
+		match int(entry[1]):
+			0:
+				model.patches[key] = entry[2]
+			1:
+				model.diagnostics.append(entry[2])
+			_:
+				var box := model.cell_box(key)
+				var patch: Dictionary = kernel.build(ShoreGeometry.partition_script(box, entry[2]))
+				var area := float(patch["area"])
+				patch.erase("area")
+				if absf(area - box.get_area()) > maxf(0.02, box.get_area() * 0.001) or patch["triangles"].is_empty():
+					model.diagnostics.append({"kind": "patch_failure", "cell": key, "area": area, "expected": box.get_area()})
+				else:
+					model.patches[key] = patch
 
 ## Replace canonical cells with their exact patches, retaining the ground
 ## material's UVs, far-colour fade and water-level attributes.

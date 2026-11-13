@@ -18,6 +18,7 @@
 #include "photo_sampler.h"
 #include "grid_filters.h"
 #include "road_grader.h"
+#include "shore_classifier.h"
 #include "shore_evidence_kernels.h"
 
 #include <gdextension_interface.h>
@@ -54,6 +55,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(PhotoSampler);
 	GDREGISTER_CLASS(GridFilters);
 	GDREGISTER_CLASS(RoadGrader);
+	GDREGISTER_CLASS(ShoreClassifier);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

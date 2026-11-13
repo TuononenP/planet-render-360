@@ -28,5 +28,12 @@ public:
 		const Array &segments, const Vector4 &grid, const Ref<ShoreSampler> &sampler,
 		const Ref<ShoreDomainIndex> &domains, const Ref<ShoreEvidenceIndex> &evidence);
 	Dictionary build(const Array &pieces);
+	// ShoreSurface.build's cells in `keys` order: each one's transition
+	// edges, its raw shore edges cut into the classifier's ~2-unit pieces,
+	// the partition, its coverage check and build(). Per key [key, 0, patch],
+	// [key, 1, diagnostic] or [key, 2, edges] when the native partition
+	// left a gap (the script partitions those).
+	Array cells(const Array &keys, const Dictionary &edge_cells, const Dictionary &transition_cells,
+		const Array &edges, const Array &transition_edges, Object *abort);
 };
 }

@@ -90,7 +90,111 @@ Dictionary ShorePatchKernel::build(const Array &pieces) {
 	Dictionary out; out["triangles"] = v; out["owners"] = o; out["hard"] = h; out["paving"] = p; out["area"] = area;
 	return out;
 }
+namespace {
+// ShoreGeometry.snap.
+Vector2 snap_cm(const Vector2 &p) {
+	return Vector2(Math::snapped(p.x, (real_t)0.01), Math::snapped(p.y, (real_t)0.01));
+}
+// ShoreGeometry.clip_segment, its parameters in doubles as the script's.
+bool clip_segment(const Vector2 &a, const Vector2 &b, const Rect2 &box, Vector2 &ca, Vector2 &cb) {
+	const double eps = 0.00001;
+	const Vector2 d = b - a;
+	double lo = 0.0, hi = 1.0;
+	for (int axis = 0; axis < 2; ++axis) {
+		const double da = d[axis], aa = a[axis], lo_edge = box.position[axis], hi_edge = box.get_end()[axis];
+		if (std::abs(da) < eps) {
+			if (aa < lo_edge - eps || aa > hi_edge + eps) return false;
+		} else {
+			const double t0 = (lo_edge - aa) / da, t1 = (hi_edge - aa) / da;
+			const double near_t = t0 < t1 ? t0 : t1, far_t = t0 > t1 ? t0 : t1;
+			lo = lo > near_t ? lo : near_t;
+			hi = hi < far_t ? hi : far_t;
+		}
+		if (lo > hi) return false;
+	}
+	if ((hi - lo) * (double)d.length() < eps) return false;
+	ca = snap_cm(a + d * (real_t)lo);
+	cb = snap_cm(a + d * (real_t)hi);
+	return true;
+}
+double area_of(const PackedVector2Array &ring) {
+	double a = 0.0;
+	for (int64_t i = 0; i < ring.size(); ++i) {
+		const Vector2 p = ring[i], q = ring[(i + 1) % ring.size()];
+		a += (double)p.x * (double)q.y - (double)q.x * (double)p.y;
+	}
+	return a * 0.5;
+}
+} // namespace
+
+Array ShorePatchKernel::cells(const Array &keys, const Dictionary &edge_cells, const Dictionary &transition_cells,
+		const Array &edges, const Array &transition_edges, Object *abort) {
+	Array out;
+	const Vector2 corner = Vector2(1, 1) * (real_t)origin;
+	for (int64_t k = 0; k < keys.size(); ++k) {
+		if (abort != nullptr && (bool)abort->get("requested")) return Array();
+		const Vector2i key = keys[k];
+		// ShorelineModel.cell_box.
+		const Vector2 a0 = snap_cm(corner + Vector2(key) * (real_t)step);
+		const Vector2 b0 = snap_cm(corner + Vector2(key + Vector2i(1, 1)) * (real_t)step);
+		const Rect2 box(a0, b0 - a0);
+		Array cut_edges;
+		const Array transitions = transition_cells.get(key, Array());
+		for (int64_t t = 0; t < transitions.size(); ++t) cut_edges.push_back(transition_edges[(int64_t)transitions[t]]);
+		const Array raw_ids = edge_cells.get(key, Array());
+		for (int64_t r = 0; r < raw_ids.size(); ++r) {
+			const Dictionary raw = edges[(int64_t)raw_ids[r]];
+			const Vector2 a = raw["a"], b = raw["b"];
+			const int count = std::max(1, (int)std::ceil((double)a.distance_to(b) / 2.0));
+			Vector2 c0, c1;
+			if (!clip_segment(a, b, box, c0, c1)) continue;
+			const Vector2 d = b - a;
+			const double len2 = d.length_squared();
+			const int first = std::clamp((int)std::floor((double)(c0 - a).dot(d) / len2 * count), 0, count - 1);
+			const int last = std::clamp((int)std::ceil((double)(c1 - a).dot(d) / len2 * count), first + 1, count);
+			for (int i = first; i < last; ++i) {
+				Array piece;
+				piece.push_back(a.lerp(b, (real_t)((double)i / (double)count)));
+				piece.push_back(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
+				cut_edges.push_back(piece);
+			}
+		}
+		const double expected = box.get_area();
+		const double tolerance = std::max(0.02, expected * 0.001);
+		const Array pieces = ShoreKernels::partition(box, cut_edges);
+		double coverage = 0.0;
+		for (int64_t p = 0; p < pieces.size(); ++p) coverage += std::abs(area_of(pieces[p]));
+		Array entry;
+		entry.push_back(key);
+		if (std::abs(coverage - expected) > tolerance) {
+			entry.push_back(2);
+			entry.push_back(cut_edges);
+			out.push_back(entry);
+			continue;
+		}
+		Dictionary patch = build(pieces);
+		const double area = patch["area"];
+		patch.erase("area");
+		if (std::abs(area - expected) > tolerance || PackedVector3Array(patch["triangles"]).is_empty()) {
+			Dictionary diagnostic;
+			diagnostic["kind"] = "patch_failure";
+			diagnostic["cell"] = key;
+			diagnostic["area"] = area;
+			diagnostic["expected"] = expected;
+			entry.push_back(1);
+			entry.push_back(diagnostic);
+		} else {
+			entry.push_back(0);
+			entry.push_back(patch);
+		}
+		out.push_back(entry);
+	}
+	return out;
+}
+
 void ShorePatchKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("cells", "keys", "edge_cells", "transition_cells", "edges", "transition_edges", "abort"),
+		&ShorePatchKernel::cells);
 	ClassDB::bind_method(D_METHOD("setup", "base", "land", "bodies", "segments", "grid", "sampler", "domains", "evidence"), &ShorePatchKernel::setup);
 	ClassDB::bind_method(D_METHOD("build", "pieces"), &ShorePatchKernel::build);
 }
