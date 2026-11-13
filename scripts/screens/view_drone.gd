@@ -15,7 +15,8 @@ extends RefCounted
 ## at BOOST_MULT, as before.
 const CRUISE_MPS := 100.0 / 3.6
 const BOOST_MULT := 3.0
-const CLIMB_MPS := 8.0
+## Climb and descent speed (m/s); Shift multiplies it by BOOST_MULT too.
+const CLIMB_MPS := 20.0
 ## Per second: how fast the drone reaches the wished speed, and how fast
 ## it drifts to a stop with nothing held.
 const ACCEL := 3.0
