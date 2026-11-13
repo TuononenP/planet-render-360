@@ -14,6 +14,7 @@
 #include "shore_kernels.h"
 #include "shore_mesh.h"
 #include "shore_patch_kernel.h"
+#include "tint_kernels.h"
 #include "shore_evidence_kernels.h"
 
 #include <gdextension_interface.h>
@@ -46,6 +47,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShoreDomainIndex);
 	GDREGISTER_CLASS(ShoreEvidenceIndex);
 	GDREGISTER_CLASS(ShorePatchKernel);
+	GDREGISTER_CLASS(TintKernels);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

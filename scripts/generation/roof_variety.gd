@@ -89,6 +89,9 @@ static func _wall_foot(root: Node, first: int) -> float:
 				else _surface_material(mesh, s)
 			if WallVariety.is_wall(sm):
 				var verts: PackedVector3Array = MeshArrays.surface(mesh, s)[Mesh.ARRAY_VERTEX]
+				if WallVariety._native:
+					foot = minf(foot, ClassDB.class_call_static("TintKernels", "min_y", verts))
+					continue
 				for v in verts:
 					foot = minf(foot, v.y)
 	return foot
@@ -129,6 +132,9 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 ## toward the eaves (run-off and dirt) and, where it faces north, leaning to
 ## moss. Only ever darkens: vertex colours stop at 1. Flat surfaces stay `c`.
 static func weathered(verts: PackedVector3Array, normals: PackedVector3Array, c: Color) -> PackedColorArray:
+	if WallVariety._native:
+		return ClassDB.class_call_static("TintKernels", "roof_colours", verts, normals, c,
+			WEATHER_MIN_RISE_M * WorldScale.metres_to_units(), EAVE_SHADE)
 	var y0 := INF
 	var y1 := -INF
 	for v in verts:
