@@ -76,6 +76,13 @@ var _farfield_done := true
 const FARFIELD_WAIT_S := 45.0
 var _dem_centre_m := 0.0
 var _dem_vscale := 0.1
+## A background run (the streamer's way ahead, set before run()): its
+## worker tasks queue at low priority and its main-thread pumps stay small.
+var background := false
+## Fetch only (the streamer warming the caches for a stretch it will build
+## later): every layer is fetched and cached, nothing is prepared to build
+## (no world-cache prefetch, build prewarm or ground model).
+var warm_only := false
 var used_osm := false
 var degraded: Array[String] = []
 var _osm: OsmFetcher
@@ -101,6 +108,9 @@ var _farcity_landuse: Array = []
 var _farcity_towers: Array = []
 var _farcity_done := true
 const FARCITY_WAIT_S := 30.0
+## A background (streamed) run's map-data wait: the camera is moving
+## toward the edge meanwhile (OsmFetcher.retry_budget_seconds is minutes).
+const STREAM_OSM_WAIT_S := 30.0
 var _climate: ClimateFetcher
 var _climate_data: Dictionary = {}
 var _climate_done := true
@@ -251,6 +261,13 @@ func _note(layer: String) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		# Both tasks may wait on main-thread render flushes (the prewarm's
+		# texture saves): serve them while waiting, or freeing a pipeline
+		# mid-run (a cancelled streamed build) deadlocks.
+		for task in [_ground_task, _prewarm_task]:
+			while task >= 0 and not WorkerThreadPool.is_task_completed(task):
+				RenderingServer.force_sync()
+				OS.delay_msec(1)
 		_join_ground()
 		_join_prewarm()
 
@@ -288,7 +305,23 @@ func _start_ground(data: LocationData) -> void:
 		HelsinkiDem.apply(data)
 		GroundModel.apply(data)
 		_ground = GroundTruth.new(data, ground_abort)
-	_ground_task = WorkerThreadPool.add_task(build, true, "GroundTruth")
+	_ground_task = WorkerThreadPool.add_task(build, not background, "GroundTruth")
+
+## A background run starts its fetchers a frame apart: each reads its
+## cache and decodes a little on the main thread, ~30 ms all in one frame.
+## True when the run was cancelled meanwhile (it has said so).
+func _spread() -> bool:
+	if not background:
+		return false
+	await get_tree().process_frame
+	if _cancelled:
+		cancelled.emit()
+		return true
+	return false
+
+## Main-thread share a frame for a prefetched world loading meanwhile.
+func _load_pump_us() -> int:
+	return WorldCache.BG_LOAD_PUMP_US if background else WorldCache.LOAD_PUMP_US
 
 func cancel() -> void:
 	_cancelled = true
@@ -338,11 +371,14 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		data.landmark_lat = float(landmark["lat"])
 		data.landmark_lon = float(landmark["lon"])
 	data.seed_value = int(abs(sin(lat * 12.9898 + lon * 78.233) * 43758.5453)) % 100000
-	if not WorldCache.prefetch(lat, lon, data.quality_preset, data.season):
+	_sat.textures = not warm_only
+	_sat_inner.textures = not warm_only
+	_farfield.textures = not warm_only
+	if not warm_only and not WorldCache.prefetch(lat, lon, data.quality_preset, data.season):
 		_join_prewarm()
 		var preset := data.quality_preset
 		_prewarm_task = WorkerThreadPool.add_task(func() -> void: BuildPrewarm.run(preset),
-			true, "BuildPrewarm")
+			not background, "BuildPrewarm")
 	# Start OSM fetch now so it overlaps the staged timers below.
 	degraded.clear()
 	used_osm = false
@@ -363,6 +399,8 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	if not _osm.offline_mode and not BundledOsm.covers(lat, lon):
 		_overpass_probe.start(OsmFetcher.active_endpoints())
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
+	if await _spread():
+		return
 	_farcity_done = false
 	_farcity_landuse = []
 	_farcity_towers = []
@@ -379,6 +417,8 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	# vertex-colour dressing is its whole point: less data, less time).
 	# Higher presets fetch finer mosaics (T2.2: z16s3 Balanced, z17s7
 	# High, z18s13 Ultra) over the same ground window.
+	if await _spread():
+		return
 	used_satellite = false
 	_sat_done = false
 	_sat_tiles = Vector2i.ZERO
@@ -395,11 +435,15 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		_sat_inner.fetch(lat, lon, RenderSettings.SATELLITE_INNER_ZOOM, RenderSettings.SATELLITE_INNER_SPAN)
 	# Far backdrop fetch overlaps everything else; converted in stage 0
 	# once the detailed centre/scale are known.
+	if await _spread():
+		return
 	_far_done = false
 	_far_heights_m = PackedFloat32Array()
 	_far_fetcher.fetch_far(lat, lon, data.far_grid_size)
 	# T3.7 far-field rings/drapes (drapes skipped on Fast, like the
 	# near drape); also overlapped, applied in stage 0.
+	if await _spread():
+		return
 	_farfield_done = false
 	_farfield_rings = []
 	_farfield_drapes = []
@@ -421,7 +465,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	for i in STAGES.size():
 		_run_stage(i, data)
 	while _stages_left > 0:
-		WorldCache.pump_prefetch()  # the cached world loads meanwhile
+		WorldCache.pump_prefetch(_load_pump_us())  # the cached world loads meanwhile
 		await get_tree().process_frame
 	if _cancelled:
 		cancelled.emit()
@@ -442,7 +486,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	# The prewarm must be done before the build thread reads those caches;
 	# waited frame by frame (its TerrainTextures save needs main flushes).
 	while _prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(_prewarm_task):
-		WorldCache.pump_prefetch()
+		WorldCache.pump_prefetch(_load_pump_us())
 		await get_tree().process_frame
 	_join_prewarm()
 	if _cancelled:
@@ -659,9 +703,18 @@ func _await_osm(data: LocationData) -> void:
 	# OsmFetcher retries across Overpass endpoints; this wait must
 	# outlast the whole chain or a rescued fetch is dropped.
 	var waited := 0.0
-	while not _osm_done and waited < OsmFetcher.retry_budget_seconds() and not _cancelled:
+	var budget := STREAM_OSM_WAIT_S if background else OsmFetcher.retry_budget_seconds()
+	while not _osm_done and waited < budget and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+	if not _osm_done and background and not _cancelled:
+		# The way ahead cannot wait minutes on a slow Overpass: a nearby
+		# copy, or the stretch goes on without map data.
+		_osm.give_up("map data over the streamed wait (%d s)" % int(budget))
+		waited = 0.0
+		while not _osm_done and waited < 10.0 and not _cancelled:
+			await get_tree().process_frame  # a nearby copy still parses
+			waited += get_process_delta_time()
 	if not _osm_done:
 		_note("map")
 	data.pois = _osm.pois
@@ -694,7 +747,8 @@ func _await_osm(data: LocationData) -> void:
 		await get_tree().process_frame
 	if _cancelled:
 		return
-	_start_ground(data)
+	if not warm_only:
+		_start_ground(data)
 	await _await_far_city(data)
 
 ## Climate normals, CHELSA or ERA5 (bounded wait; absent → latitude fallbacks).

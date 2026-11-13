@@ -201,8 +201,7 @@ static func _sparkle(hero: Node3D) -> void:
 	var step := maxi(1, pts.size() / SPARKLES)
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE * SPARKLE_M * WorldScale.metres_to_units()
-	var sh := Shader.new()
-	sh.code = SPARKLE_CODE
+	var sh := SharedShader.of(SPARKLE_CODE)
 	var mat := ShaderMaterial.new()
 	mat.shader = sh
 	mat.set_meta(CityLights.META, 1.0)

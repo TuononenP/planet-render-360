@@ -44,6 +44,9 @@ const MARGIN_PX := 4
 ## Seconds the water mask may take before the far field lands without it.
 const WATER_TIMEOUT_S := 15.0
 
+## False for a fetch-only run (the streamer warming caches): the drapes'
+## GPU textures, made on the main thread, would only be thrown away.
+var textures := true
 ## Test hook: serve the on-device cache only (cache miss = layer absent).
 var offline_mode := false
 ## FarWaterMask of the last fetch; {} when its tiles were not all there.
@@ -67,6 +70,9 @@ var _water_zoom := 0
 var _water_tiles: Array[Vector2i] = []
 var _water_bodies: Dictionary = {}
 var _water_left := 0
+## Bumped per fetch: an assembly still running for an older fetch lands
+## nothing.
+var _fetch_gen := 0
 
 func _ready() -> void:
 	for i in POOL_SIZE:
@@ -127,6 +133,7 @@ static func cache_keys(lat: float, lon: float, with_drapes: bool = true) -> Dict
 	return {"dem": dem, "sat": sat}
 
 func fetch(lat: float, lon: float, with_drapes: bool = true) -> void:
+	_fetch_gen += 1
 	_busy = true
 	_with_drapes = with_drapes
 	_lat = lat
@@ -219,12 +226,12 @@ func _url(job: Dictionary) -> String:
 func _load(job: Dictionary) -> void:
 	var path := _path(job)
 	if FileAccess.file_exists(path):
-		var cached := Image.new()
-		if cached.load(path) == OK:
-			CacheStore.note_read(path)
-			_cached += 1
-			_done(job, cached)
-			return
+		# Decoded in _finish's worker task with the rest: a cached window
+		# is a hundred-odd tiles landing in one frame.
+		CacheStore.note_read(path)
+		_cached += 1
+		_done(job, path)
+		return
 	if offline_mode:
 		_done(job, null)
 		return
@@ -264,7 +271,9 @@ func _free_http() -> HTTPRequest:
 			return http
 	return null
 
-func _done(job: Dictionary, img: Image) -> void:
+## `img` is the decoded Image, a cached tile's path (decoded later), or
+## null when the tile failed.
+func _done(job: Dictionary, img: Variant) -> void:
 	if img != null:
 		_layers[int(job["layer"])]["images"][job["tile"]] = img
 	else:
@@ -273,13 +282,47 @@ func _done(job: Dictionary, img: Image) -> void:
 	if _remaining <= 0:
 		_finish()
 
+## Assembles the windows, despikes the DEM and builds the water mask on
+## a worker thread (seconds of per-pixel work that froze frames while
+## the camera moved); only the textures are made here.
 func _finish() -> void:
 	var fetch_ms := Time.get_ticks_msec() - _t0
 	var t1 := Time.get_ticks_msec()
+	var gen := _fetch_gen
+	var out := {}
+	var work := _assemble_all.bind(_layers, _lat, _water_zoom, _water_tiles.duplicate(),
+		_water_bodies, out)
+	_water_bodies = {}
+	if is_inside_tree():
+		await FrameTask.run(work, "FarField assemble", get_tree())
+	else:
+		work.call()
+	if gen != _fetch_gen:
+		return
+	if textures:
+		for d in out["drapes"]:
+			d["texture"] = ImageTexture.create_from_image(d["image"])
+	water_mask = out["water"]
+	timings = {"fetch_ms": fetch_ms, "assemble_ms": Time.get_ticks_msec() - t1,
+		"tiles": _queue.size(), "cached": _cached, "failed": _failed}
+	_busy = false
+	finished.emit(out["rings"], out["drapes"])
+
+## Worker-thread half of _finish: fills `out` with rings, drapes (no
+## texture yet) and the water mask.
+static func _assemble_all(layers: Array, lat: float, water_zoom: int,
+		water_tiles: Array[Vector2i], water_bodies: Dictionary, out: Dictionary) -> void:
 	var rings: Array = []
 	var drapes: Array = []
-	for layer in _layers:
+	for layer in layers:
 		var images: Dictionary = layer["images"]
+		for t in images.keys():
+			if images[t] is String:
+				var img := Image.new()
+				if img.load(images[t]) == OK:
+					images[t] = img
+				else:
+					images.erase(t)
 		if images.size() < (layer["tiles"] as Array).size():
 			print("Far-field %s z%d incomplete (%d/%d tiles): layer dropped" % [
 				layer["kind"], layer["zoom"], images.size(), (layer["tiles"] as Array).size()])
@@ -289,22 +332,20 @@ func _finish() -> void:
 		else:
 			drapes.append(_assemble_drape(layer))
 	var t2 := Time.get_ticks_msec()
-	var despiked := DemDespike.clean_rings(rings, _lat)
+	var despiked := DemDespike.clean_rings(rings, lat)
 	var t3 := Time.get_ticks_msec()
 	if despiked > 0:
 		print("Far-field DEM: %d spike pixels replaced in %d ms" % [despiked, t3 - t2])
-	water_mask = FarWaterMask.build(_water_zoom, _water_tiles, _water_bodies)
-	_water_bodies = {}
-	print("Far water mask: %s in %d ms" % ["%d tiles z%d" % [_water_tiles.size(), _water_zoom]
-		if not water_mask.is_empty() else "absent", Time.get_ticks_msec() - t3])
-	timings = {"fetch_ms": fetch_ms, "assemble_ms": Time.get_ticks_msec() - t1,
-		"tiles": _queue.size(), "cached": _cached, "failed": _failed}
-	_busy = false
-	finished.emit(rings, drapes)
+	var water := FarWaterMask.build(water_zoom, water_tiles, water_bodies)
+	print("Far water mask: %s in %d ms" % ["%d tiles z%d" % [water_tiles.size(), water_zoom]
+		if not water.is_empty() else "absent", Time.get_ticks_msec() - t3])
+	out["rings"] = rings
+	out["drapes"] = drapes
+	out["water"] = water
 
 ## Decodes the window's Terrarium pixels straight from each tile's byte
 ## buffer (no per-pixel Color allocation) into metres ASL.
-func _assemble_dem(layer: Dictionary) -> Dictionary:
+static func _assemble_dem(layer: Dictionary) -> Dictionary:
 	var rect: Rect2i = layer["rect"]
 	var w := rect.size.x
 	var h := rect.size.y
@@ -329,7 +370,7 @@ func _assemble_dem(layer: Dictionary) -> Dictionary:
 		"width": w, "height": h, "heights": heights,
 		"reach_m": layer["reach_m"]}
 
-func _assemble_drape(layer: Dictionary) -> Dictionary:
+static func _assemble_drape(layer: Dictionary) -> Dictionary:
 	var tiles: Array = layer["tiles"]
 	var first: Vector2i = tiles[0]
 	var last: Vector2i = tiles[tiles.size() - 1]
@@ -345,5 +386,5 @@ func _assemble_drape(layer: Dictionary) -> Dictionary:
 	img.generate_mipmaps()
 	return {"zoom": layer["zoom"], "origin_px": Vector2(first * TILE_PX),
 		"size_px": Vector2i(nx * TILE_PX, ny * TILE_PX),
-		"texture": ImageTexture.create_from_image(img), "image": img,
+		"texture": null, "image": img,  # the texture is made on the main thread
 		"reach_m": layer["reach_m"]}

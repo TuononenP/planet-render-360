@@ -97,9 +97,8 @@ const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3}
 ## map when the caller already has it (GroundTruth.surface), else built here.
 static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		has_sat: bool, cmap: Image = null) -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-		.replace("// @TERRAIN", TerrainGlsl.CODE)
+	var sh := SharedShader.of(GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @TERRAIN", TerrainGlsl.CODE))
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()

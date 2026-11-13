@@ -244,8 +244,7 @@ static func build(root: Node3D, data: LocationData) -> MultiMeshInstance3D:
 
 ## The carpet's material; blank land-cover and height inputs until ticked.
 static func material(data: LocationData, spacing_u: float, radius_u: float) -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+	var sh := SharedShader.of(SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL))
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	m.set_shader_parameter("spacing_u", spacing_u)

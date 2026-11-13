@@ -20,6 +20,10 @@ func _init() -> void:
 	await _test_paused_first()
 	OverpassRequest.clear_cooldowns()
 	_test_empty_marker()
+	# The marker write started a cache scan on a worker: let it end before
+	# quitting, as Main does (a scan still running at quit crashed).
+	while CacheStore.busy():
+		await process_frame
 	if _failures.is_empty():
 		print("OVERPASS RATE LIMIT OK: Retry-After, cooldown, outage pause, single attempt, empty places")
 		quit(0)

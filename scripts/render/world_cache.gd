@@ -31,7 +31,6 @@ const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res:/
 ## every cached world away (world_cache_key_test guards that no builder
 ## names them). Code that decodes data a world is built from stays in.
 const SOURCE_SKIP := ["res://scripts/data/tile_connection.gd",
-	"res://scripts/data/vector_tile_fetcher.gd",
 	"res://scripts/data/search_fetcher.gd", "res://scripts/data/weather_fetcher.gd",
 	"res://scripts/data/wiki_fetcher.gd", "res://scripts/data/wiki_parse.gd",
 	"res://scripts/data/host_policy.gd", "res://scripts/data/remote_config.gd",
@@ -174,17 +173,21 @@ static func prefetch(lat: float, lon: float, preset: int, season: int) -> bool:
 ## 24 s at 120 fps for Paris, 3 s with this share of each frame.
 const LOAD_PUMP_US := 8000
 
+## A background load (the streamer's way ahead, built while the camera
+## moves) gets this much instead: slower to land, but no stutter.
+const BG_LOAD_PUMP_US := 1500
+
 ## Call once a frame while `path` loads on its thread.
-static func pump_load(path: String) -> void:
+static func pump_load(path: String, budget_us := LOAD_PUMP_US) -> void:
 	var t := Time.get_ticks_usec()
-	while Time.get_ticks_usec() - t < LOAD_PUMP_US and ResourceLoader.load_threaded_get_status(path) \
+	while Time.get_ticks_usec() - t < budget_us and ResourceLoader.load_threaded_get_status(path) \
 			== ResourceLoader.THREAD_LOAD_IN_PROGRESS:
 		RenderingServer.force_sync()
 
 ## Call once a frame while a prefetch may be loading (the pipeline's wait).
-static func pump_prefetch() -> void:
+static func pump_prefetch(budget_us := LOAD_PUMP_US) -> void:
 	if _prefetched != "":
-		pump_load(_prefetched)
+		pump_load(_prefetched, budget_us)
 
 ## Unused prefetches still loading; collected once done, so their
 ## scenes are released without blocking the main thread on them.
@@ -228,7 +231,7 @@ static func has_world(data: LocationData) -> bool:
 ## on a Thread too (detached nodes), tracked in `threads` so the view
 ## joins it if it is freed meanwhile.
 static func load_world(view: Node, threads: Array, data: LocationData,
-		ground: GroundTruth) -> Array:
+		ground: GroundTruth, background := false) -> Array:
 	if not enabled():
 		return []
 	var p := _paths(data)
@@ -260,7 +263,7 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 				ResourceLoader.CACHE_MODE_IGNORE) != OK:
 			return []
 	while ResourceLoader.load_threaded_get_status(p["scene"]) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-		pump_load(p["scene"])
+		pump_load(p["scene"], BG_LOAD_PUMP_US if background else LOAD_PUMP_US)
 		await view.get_tree().process_frame
 	var ps := ResourceLoader.load_threaded_get(p["scene"]) as PackedScene
 	var g := ground if ground != null else _ground_from_state(state, data)
@@ -308,14 +311,22 @@ const PUMP_US := 4000
 const PUMP_FRAME_SHARE := 0.25
 const PUMP_MAX_US := 33000
 const HURRY_US := 40000
+## A background build or save (the streamer's way ahead, while the camera
+## moves) takes a small share instead, so frames stay smooth; it lands
+## later, which the streamer's adaptive trigger measures and allows for.
+const BG_PUMP_US := 1500
+const BG_FRAME_SHARE := 0.08
+const BG_MAX_US := 4000
 ## Set when the app is quitting: finish the save as fast as possible.
 static var hurry := false
 
 ## Main-thread microseconds to service the save's mesh reads in a frame
 ## that took `frame_us`.
-static func pump_budget_us(frame_us: int) -> int:
+static func pump_budget_us(frame_us: int, background := false) -> int:
 	if hurry:
 		return HURRY_US
+	if background:
+		return clampi(int(frame_us * BG_FRAME_SHARE), BG_PUMP_US, BG_MAX_US)
 	return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, PUMP_MAX_US)
 
 static func _save_in_progress(path: String) -> bool:
@@ -326,8 +337,11 @@ static func _save_in_progress(path: String) -> bool:
 	return false
 
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
-		packed: PackedScene = null) -> void:
-	if not enabled() or built.size() < 2 or not (built[1] is Node3D):
+		packed: PackedScene = null, background := false) -> void:
+	# A packed world needs only its ground: the streamer saves one after
+	# the world itself has gone (BuildAbort.deferred_save).
+	if not enabled() or built.is_empty() \
+			or (packed == null and (built.size() < 2 or not (built[1] is Node3D))):
 		return
 	var p := _paths(data)
 	if _save_in_progress(p["scene"]):
@@ -367,7 +381,7 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var last_us := [Time.get_ticks_usec()]
 	var pump := func() -> void:
 		var t := Time.get_ticks_usec()
-		var budget := pump_budget_us(t - last_us[0])
+		var budget := pump_budget_us(t - last_us[0], background)
 		while th.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us[0] = t

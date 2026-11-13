@@ -795,6 +795,10 @@ static func reconcile_index() -> void:
 		_start_scan()
 
 static func _start_scan() -> void:
+	# Never once the tree is quitting: a scan started by a write during
+	# teardown ran GDScript on a worker while the engine shut down.
+	if stop_scans:
+		return
 	if _scan_task >= 0:
 		_scan_again = true
 		return

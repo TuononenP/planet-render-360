@@ -105,6 +105,8 @@ var _walk := ViewWalk.new()
 var _near_window: NearGroundWindow
 var _carpet: GrassCarpet
 var _near_world := 0
+## The next of the four near attaches after a world change (4 = all done).
+var _near_step := 4
 ## Tree LOD rings that follow the camera (TreeLodWindow).
 var _tree_lod: TreeLodWindow
 var _mover: VehicleMover
@@ -325,7 +327,8 @@ static func _merge(world: Node3D, abort: BuildAbort) -> void:
 ## Returns [] when `abort` was requested (timeout / cancel).
 func build_location(data: LocationData, ground: GroundTruth = null,
 		abort: BuildAbort = null, wait_save := false) -> Array:
-	var cached := await WorldCache.load_world(self, _threads, data, ground)
+	var bg := abort != null and abort.background  # the streamer's way ahead
+	var cached := await WorldCache.load_world(self, _threads, data, ground, bg)
 	if not cached.is_empty():
 		return cached
 	# Never beside the altitude far rebuild: they share static caches.
@@ -341,7 +344,8 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		var stopped := abort != null and abort.requested
 		if not stopped:
 			BuildPrewarm.remember()
-		return [g, w, null if stopped else WorldCache.pack(w)])
+		return [g, w, null if stopped else WorldCache.pack(w)],
+		Thread.PRIORITY_LOW if bg else Thread.PRIORITY_NORMAL)
 	# The merge and the pack ask the rendering server about every mesh
 	# node, and each answer to a worker thread waits for the main thread's
 	# next flush: one node a frame, so ~3000 nodes took 26 s at 120 fps
@@ -349,11 +353,12 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	# texture they create (a 512² facade map: 0.3 ms answered at once, a
 	# frame otherwise). The main thread answers them here instead, for the
 	# whole build, in the share of each frame a cache save gets
-	# (WorldCache.pump_budget_us).
+	# (WorldCache.pump_budget_us; a small one for the streamer's background
+	# build, whose frames must stay smooth).
 	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
 		var t := Time.get_ticks_usec()
-		var budget := WorldCache.pump_budget_us(t - last_us)
+		var budget := WorldCache.pump_budget_us(t - last_us, bg)
 		while thread.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us = t
@@ -366,7 +371,9 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return []
-	if wait_save:
+	if bg:
+		abort.deferred_save = [data, built[0], packed]
+	elif wait_save:
 		if abort != null:
 			abort.saving = true
 		await WorldCache.save_async(self, _threads, data, built, packed)
@@ -910,19 +917,24 @@ func _process(delta: float) -> void:
 func _tick_near_ground() -> void:
 	var world := _generated.get_instance_id() if is_instance_valid(_generated) else 0
 	if world != _near_world:
-		if _near_window != null:
-			_near_window.stop()
+		for w: Variant in [_near_window, _carpet, _mover, _tree_lod]:
+			if w != null:
+				w.stop()
+		_near_window = null
+		_carpet = null
+		_mover = null
+		_tree_lod = null
 		_near_world = world
-		_near_window = NearGroundWindow.attach(_generated, _data) if world != 0 else null
-		if _carpet != null:
-			_carpet.stop()
-		_carpet = GrassCarpet.attach(_generated, _ground, _data) if world != 0 else null
-		if _mover != null:
-			_mover.stop()
-		_mover = VehicleMover.attach(_generated, _data, _ground) if world != 0 else null
-		if _tree_lod != null:
-			_tree_lod.stop()
-		_tree_lod = TreeLodWindow.attach(_generated) if world != 0 else null
+		_near_step = 0 if world != 0 else 4
+	elif _near_step < 4:
+		# One attach a frame: together they walked a new world in its first
+		# frame, the hitch right after a streamed swap.
+		match _near_step:
+			0: _near_window = NearGroundWindow.attach(_generated, _data)
+			1: _carpet = GrassCarpet.attach(_generated, _ground, _data)
+			2: _mover = VehicleMover.attach(_generated, _data, _ground)
+			3: _tree_lod = TreeLodWindow.attach(_generated)
+		_near_step += 1
 	if _tree_lod != null and _rig != null:
 		_tree_lod.tick(Vector2(_rig.position.x, _rig.position.z), _quality_preset)
 	if _rig != null and _ground != null and (_near_window != null or _carpet != null):

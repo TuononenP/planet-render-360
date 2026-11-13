@@ -48,13 +48,33 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 		return null
 	var mover := VehicleMover.new()
 	mover._m2u = WorldScale.metres_to_units()
+	var planned: Dictionary = data.get_meta(PLANS_META, {}) if data.get_meta(PLANS_GROUND, null) == ground \
+		else {}
 	var trams := world.find_child("Trams", true, false)
 	if trams != null and not data.railways.is_empty():
-		mover._adopt(trams, "Tram", TransitVehicles.plan(data, ground, mover._m2u), data, ground, false)
+		mover._adopt(trams, "Tram", planned["Tram"] if planned.has("Tram")
+			else TransitVehicles.plan(data, ground, mover._m2u), data, ground, false)
 	var trains := world.find_child("Trains", true, false)
 	if trains != null and not data.railways.is_empty():
-		mover._adopt(trains, "Train", StationTrains.plan(data, ground, mover._m2u), data, ground, true)
+		mover._adopt(trains, "Train", planned["Train"] if planned.has("Train")
+			else StationTrains.plan(data, ground, mover._m2u), data, ground, true)
 	return mover if not mover._trains.is_empty() else null
+
+## The tram and train plans attach() needs, worked out ahead (pure, so a
+## worker may run it: the streamer does while a world waits to swap in,
+## sparing the first frames after the swap ~70 ms). Kept on `data` as
+## meta for the `ground` they were planned on.
+const PLANS_META := &"vehicle_plans"
+const PLANS_GROUND := &"vehicle_plans_ground"
+
+static func plan_ahead(data: LocationData, ground: GroundTruth) -> void:
+	if data == null or ground == null or data.railways.is_empty() \
+			or not TransitVehicles.enabled(data.quality_preset):
+		return
+	var m2u := WorldScale.metres_to_units()
+	data.set_meta(PLANS_META, {"Tram": TransitVehicles.plan(data, ground, m2u),
+		"Train": StationTrains.plan(data, ground, m2u)})
+	data.set_meta(PLANS_GROUND, ground)
 
 ## How many trains this mover drives.
 func count() -> int:

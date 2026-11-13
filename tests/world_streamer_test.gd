@@ -25,6 +25,8 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_maths()
 	_state_machine()
+	_handoff()
+	_reveal()
 	await _badge()
 	await _movement_and_swap()
 	_clean(CACHE)
@@ -79,6 +81,58 @@ func _maths() -> void:
 	var step := WorldStreamer.step_target(Vector2(0, -500), Vector2(0, -45), Vector2(0, -1))
 	_check(absf(step.distance_to(Vector2(0, -500 + -WorldStreamer.STEP_M))) < 1.0
 		or step.y < -1000.0, "the new centre steps ahead of travel: %s" % step)
+
+	# Adaptive trigger: a cruising drone at the centre starts at once
+	# when a build takes 40 s (43 s to the edge < 56 s of lead), not
+	# when it takes 10 s; a walker waits for the trigger radius.
+	var cruise := Vector2(0, -ViewDrone.CRUISE_MPS)
+	_check(WorldStreamer.needs_recentre(Vector2.ZERO, cruise, Vector2(0, -1), 40.0),
+		"a slow build starts a cruising drone's next centre early")
+	_check(not WorldStreamer.needs_recentre(Vector2.ZERO, cruise, Vector2(0, -1), 10.0),
+		"a quick build lets the cruising drone go on")
+	_check(not WorldStreamer.needs_recentre(Vector2(0, -300), Vector2(0, -4), Vector2(0, -1), 60.0),
+		"a walker inside the trigger radius waits")
+	_check(WorldStreamer.needs_recentre(Vector2(0, -500), Vector2(0, -4), Vector2(0, -1), 60.0),
+		"the trigger radius still starts a walker's next centre")
+	_check(not WorldStreamer.needs_recentre(Vector2.ZERO, Vector2.ZERO, Vector2(0, -1), 60.0),
+		"standing still never starts one, however slow builds are")
+	# Step: about one build's travel ahead, within bounds that keep the
+	# squares overlapping along travel.
+	_check(WorldStreamer.step_m(4.0, 30.0) == WorldStreamer.STEP_M, "a walker steps STEP_M")
+	_check(absf(WorldStreamer.step_m(27.8, 40.0) - 1112.0) < 0.5, "a drone steps a build's travel")
+	_check(WorldStreamer.step_m(83.0, 60.0) == WorldStreamer.MAX_STEP_M, "a boost steps the most")
+	var far := WorldStreamer.step_target(Vector2(0, -WorldStreamer.TRIGGER_M), Vector2(0, -83),
+		Vector2(0, -1), 60.0)
+	var both := Vector2(0, -WorldStreamer.HALF_EXTENT_M + 1.0)
+	_check(WorldStreamer.inside_detailed(both) and WorldStreamer.inside_detailed(both - far),
+		"squares a longest step apart still overlap: %s" % far)
+	_check(WorldStreamer.step_target(Vector2.ZERO, cruise, Vector2(0, -1)).distance_to(
+		Vector2(0, -WorldStreamer.STEP_M)) < 0.5, "no expected time keeps the old STEP_M")
+	# A centre planned ahead is built only while it still lies ahead, far
+	# enough to be worth it and near enough for the squares to overlap.
+	_check(WorldStreamer.use_plan(Vector2(0, -1500), Vector2(0, -200), Vector2(0, -1)),
+		"a plan straight ahead is used")
+	_check(WorldStreamer.use_plan(Vector2(400, -1500), Vector2(0, -200), Vector2(0, -1)),
+		"a plan a little off the heading is used")
+	_check(not WorldStreamer.use_plan(Vector2(1300, -600), Vector2(0, -200), Vector2(0, -1)),
+		"a plan the camera turned away from is not")
+	_check(not WorldStreamer.use_plan(Vector2(0, -400), Vector2(0, -200), Vector2(0, -1)),
+		"a plan already underfoot is not")
+	_check(not WorldStreamer.use_plan(Vector2(0, -2500), Vector2(0, -200), Vector2(0, -1)),
+		"a plan too far for the squares to overlap is not")
+	# Build time: defaults per preset, raised fast by a slow build and
+	# lowered gently by a quick one.
+	WorldStreamer._build_s.clear()
+	_check(WorldStreamer.expected_build_s(RenderSettings.Preset.HIGH)
+		== WorldStreamer.DEFAULT_BUILD_S[RenderSettings.Preset.HIGH], "unmeasured uses the default")
+	var up := WorldStreamer.blend_build_s(30.0, 50.0) - 30.0
+	var down := 30.0 - WorldStreamer.blend_build_s(30.0, 10.0)
+	_check(up > down * 2.0, "slow builds count more than quick ones (%.1f vs %.1f)" % [up, down])
+	WorldStreamer.note_build_s(RenderSettings.Preset.HIGH, 60.0)
+	_check(WorldStreamer.expected_build_s(RenderSettings.Preset.HIGH) > 45.0
+		and WorldStreamer.expected_build_s(RenderSettings.Preset.FAST)
+		== WorldStreamer.DEFAULT_BUILD_S[0], "a measured build sets only its own preset")
+	WorldStreamer._build_s.clear()
 
 	# Remap: the same lat/lon seen from a centre 900 m north.
 	var lat0 := 60.0
@@ -148,9 +202,110 @@ func _state_machine() -> void:
 	_check(s.swap_wanted(over_west) and not s.pending_misses(over_west),
 		"past the edge over the pending square it still swaps in")
 	_check(not s.pending_misses(Vector2(-300, -1100)), "inside the live square nothing is dropped")
+	# An early (adaptive) build ready while the camera is near the centre.
+	var ahead := Vector2(0, -1600)
+	var gen6 := s.begin(Vector2(60.015, 25.0), ahead)
+	_check(s.mark_ready(gen6), "a far-ahead world is ready")
+	_check(not s.swap_stale(Vector2(0, -50), Vector2(0, -27)),
+		"heading for an early-ready world keeps it")
+	_check(not s.swap_stale(Vector2(0, -50)), "standing still keeps it too")
+	_check(s.swap_stale(Vector2(0, -50), Vector2(0, 27)), "turning back from it drops it")
+	# Sideways: past the live edge over the pending square, though still
+	# nearer the old centre than the new one.
+	var side := Vector2(-200, -1100)
+	var gen7 := s.begin(Vector2(60.01, 24.996), side)
+	_check(s.mark_ready(gen7), "a sideways world is ready")
+	var edge := Vector2(-1210, 0)
+	_check(edge.distance_to(side) > edge.length() and s.swap_wanted(edge),
+		"past the edge over the pending square it swaps even when nearer the old centre")
+	# A camera still easing back from the interim cap plans at its recent
+	# peak pace, so the next step is not sized for the cap.
+	s._vel = Vector2(0, -20)
+	s._pace = 80.0
+	_check(absf(s._planned_vel().length() - 80.0) < 0.01 and s._planned_vel().y < 0.0,
+		"steps are planned at the recent peak pace, along the way of travel")
 	s.reset_for_new_place()
+	_check(s._pace == 0.0 and not s._warmed, "a new place forgets the pace and warms up again")
 	_check(s.state == WorldStreamer.State.IDLE and s.generation > gen4,
 		"a new place drops a ready world and bumps the generation")
+
+## WorldHandoff: a world staged hidden comes back a subtree per pump,
+## keeps its children's order and owners, and a dropped one leaves.
+func _handoff() -> void:
+	var holder := Node3D.new()
+	root.add_child(holder)
+	var world := Node3D.new()
+	for i in 4:
+		var c := Node3D.new()
+		c.name = "Part%d" % i
+		world.add_child(c)
+		c.owner = world
+	var h := WorldHandoff.new()
+	h.stage(holder, world)
+	_check(world.get_parent() == holder and not world.visible and world.get_child_count() == 0,
+		"staging parents the world hidden and takes its subtrees off")
+	_check(not h.ready_for(world), "a world with subtrees still off is not staged yet")
+	h.pump(0)
+	_check(world.get_child_count() == 1, "a spent budget still adds one subtree a pump")
+	while h.busy():
+		h.pump()
+	_check(h.ready_for(world) and world.get_child(3).name == "Part3"
+		and world.get_child(3).owner == world, "every subtree is back, in order, owned")
+	h.drop_staged()
+	_check(h.staged == null and not world.visible and h.busy(), "a dropped world leaves")
+	while h.busy():
+		h.pump()
+	_check(not is_instance_valid(world), "the dropped world is freed")
+	# A big subtree comes back child by child, in order, under its parent.
+	var big_world := Node3D.new()
+	var layer := Node3D.new()
+	layer.name = "Buildings"
+	big_world.add_child(layer)
+	for i in WorldHandoff.SPLIT_CHILDREN + 8:
+		var cell := Node3D.new()
+		cell.name = "Cell%d" % i
+		layer.add_child(cell)
+	var h2 := WorldHandoff.new()
+	h2.stage(holder, big_world)
+	h2.pump(0)
+	_check(layer.get_parent() == big_world and layer.get_child_count() == 0,
+		"a big subtree's parent comes back first, its children after")
+	while h2.busy():
+		h2.pump(0)
+	_check(h2.ready_for(big_world) and layer.get_child_count() == WorldHandoff.SPLIT_CHILDREN + 8
+		and layer.get_child(5).name == "Cell5", "every child is back under it, in order")
+	holder.free()
+
+## RevealWave: only new pieces (past the old square) fade in, from the
+## camera outward, and each gets its LodRing range back once passed.
+func _reveal() -> void:
+	var world := Node3D.new()
+	var group := Node3D.new()
+	group.name = "Buildings"
+	world.add_child(group)
+	var near := MeshInstance3D.new()
+	near.mesh = BoxMesh.new()
+	near.position = Vector3(0, 0, -100)
+	group.add_child(near)
+	var fresh := MeshInstance3D.new()
+	fresh.mesh = BoxMesh.new()
+	fresh.position = Vector3(0, 0, -1500)
+	group.add_child(fresh)
+	var w := RevealWave.new()
+	w.prepare(world, Vector2.ZERO)
+	w.pump()
+	_check(w.prepared(world), "a small world is walked in one pump")
+	w.start(world, Vector2(0, -500), RenderSettings.Preset.HIGH)
+	_check(w.active() and fresh.visibility_range_end > 0.0
+		and fresh.visibility_range_end < 1000.0 + 1.0, "a new piece waits for the wave: %.0f"
+			% fresh.visibility_range_end)
+	_check(near.visibility_range_end == 0.0, "ground the old world had shows at once")
+	w.tick(Vector2(0, -500), 0.1, RenderSettings.Preset.HIGH)
+	_check(w.active(), "the wave takes time to pass")
+	w.tick(Vector2(0, -500), 5.0, RenderSettings.Preset.HIGH)
+	_check(not w.active() and fresh.visibility_range_end == 0.0,
+		"once passed, a piece has its own range back")
+	world.free()
 
 ## The way-ahead badge: hidden for a quick (cached) stretch, then the
 ## data stage still on its way, the build step, a steady never-100 %
@@ -167,6 +322,10 @@ func _badge() -> void:
 	s.progress = p
 	s.stages_done.resize(p.rows)
 	s.stages_done.fill(false)
+	for i in 4:
+		b.follow(s, 1.0)
+	_check(not b.visible, "a build with time to spare before the edge stays quiet")
+	s._edge_s = 0.0  # the camera is at the edge: the badge is wanted
 	_check(not b.follow(s, 0.2) and not b.visible, "the badge waits before showing")
 	s.mark_ready(gen)
 	b.follow(s, 0.2)
@@ -340,8 +499,8 @@ func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
 	# sentinel range then survives the swap (no re-range on its frame).
 	view._streamer.begin_ranging(world3, view._quality_preset)
 	_check(not view._streamer._ready_ranged, "ranging starts unfinished")
-	view._streamer._pump_ranging(2)
-	_check(view._streamer._range_cursor == 2, "ranging advances a slice at a time")
+	view._streamer._pump_ranging(0)
+	_check(view._streamer._range_cursor == 1, "a spent budget still ranges one subtree a tick")
 	while not view._streamer._ready_ranged:
 		view._streamer._pump_ranging()
 	_check(view._streamer._ranged_world == world3, "the ranged world is the named one")
@@ -351,7 +510,18 @@ func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
 		geo.visibility_range_end = 12345.0
 	var here := Vector2(view._rig.position.x, view._rig.position.z)
 	var agl_before := view._rig.position.y - view._ground.height_at_world(here.x, here.y)
+	var old_world := view._generated
 	view.apply_streamed_world(data3, [ground3, world3])
+	_check(view._generated == world3 and world3.visible and world3.is_inside_tree(),
+		"the swap shows the new world in the scene")
+	_check(is_instance_valid(old_world) and not old_world.visible,
+		"the old world hides at the swap and leaves over the next frames")
+	var pumps := 0
+	while view._streamer._handoff.busy() and pumps < 10000:
+		view._streamer._handoff.pump(0)
+		pumps += 1
+	_check(not is_instance_valid(old_world) and pumps > 1,
+		"the old world is freed a subtree at a time (%d pumps)" % pumps)
 	_check(view._drone._vel.length() >= vel_before.length() * 0.9,
 		"the swap keeps drone momentum: %.1f -> %.1f"
 			% [vel_before.length(), view._drone._vel.length()])

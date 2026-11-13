@@ -150,6 +150,13 @@ func _run() -> void:
 		failures.append("a 28 ms frame should pump longer than the base slice")
 	if WorldCache.pump_budget_us(10000000) != WorldCache.PUMP_MAX_US:
 		failures.append("the pump slice should be capped")
+	# A background (streamed) build stays small whatever the frame.
+	if WorldCache.pump_budget_us(8333, true) != WorldCache.BG_PUMP_US:
+		failures.append("a background build should keep the small slice at 120 fps")
+	if WorldCache.pump_budget_us(10000000, true) != WorldCache.BG_MAX_US:
+		failures.append("a background slice should be capped low")
+	if WorldCache.pump_budget_us(28000, true) >= WorldCache.pump_budget_us(28000):
+		failures.append("a background build should take less than a foreground one")
 	WorldCache.hurry = true
 	if WorldCache.pump_budget_us(7000) != WorldCache.HURRY_US:
 		failures.append("quitting should take the hurry slice")

@@ -12,10 +12,18 @@ const MAX_IFDS := 32
 const MAX_TILE_BYTES := 4 * 1024 * 1024
 const REQUEST_TIMEOUT_S := 15.0
 
+## Decoded tiles kept for the session, most recent last: neighbouring
+## places (the streamer's centres 1-2 km apart) need the same few source
+## tiles, which were downloaded and decoded again for every one.
+const TILE_CACHE_SIZE := 24
+
 var _generation := 0
 var _requests: Array[HTTPRequest] = []
 var _tasks: Array[int] = []
-var _metadata := {}
+## Header and IFD chain per URL, shared by every reader (main thread).
+static var _metadata := {}
+static var _tiles := {}
+static var _tile_order: Array[String] = []
 
 func cancel() -> void:
 	_generation += 1
@@ -75,6 +83,15 @@ func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
 	var px := floori(float(x) * float(ifd["width"]) / float(base["width"]))
 	var py := floori(float(y) * float(ifd["height"]) / float(base["height"]))
 	var tile := CogReader.tile_index(ifd, px, py)
+	var width := int(ifd["tile_width"])
+	var height := int(ifd["tile_height"])
+	var key := "%s#%d#%d" % [url, int(ifd["width"]), tile]
+	if _tiles.has(key):
+		_tile_order.erase(key)
+		_tile_order.append(key)
+		finished.emit({"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
+			"pixels": _tiles[key]})
+		return
 	var offset := await _table_entry(url, ifd["offsets"], tile, header, gen)
 	var length := await _table_entry(url, ifd["sizes"], tile, header, gen)
 	if gen != _generation:
@@ -86,8 +103,6 @@ func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
 	if gen != _generation:
 		return
 	var box := {}
-	var width := int(ifd["tile_width"])
-	var height := int(ifd["tile_height"])
 	var predictor := int(ifd.get("predictor", 1))
 	var task := WorkerThreadPool.add_task(func() -> void:
 		box["pixels"] = CogReader.decode_tile(compressed, width, height, predictor))
@@ -103,8 +118,16 @@ func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
 	if pixels.is_empty():
 		finished.emit({})
 		return
+	_remember(key, pixels)
 	finished.emit({"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
 		"pixels": pixels})
+
+static func _remember(key: String, pixels: PackedByteArray) -> void:
+	_tiles[key] = pixels
+	_tile_order.erase(key)
+	_tile_order.append(key)
+	while _tile_order.size() > TILE_CACHE_SIZE:
+		_tiles.erase(_tile_order.pop_front())
 
 func _table_entry(url: String, table: Dictionary, index: int,
 		header: PackedByteArray, gen: int) -> int:

@@ -89,7 +89,9 @@ func follow(s: WorldStreamer, dt: float) -> bool:
 			_model = s.progress  # a new (or redirected) build starts at 0
 			_since = 0.0
 			_icon.texture = UiIcon.texture("loader-circle", 16)
-		_since += dt
+		# A build started early, with time to spare, stays quiet; the badge
+		# comes once the camera may reach the edge before it lands.
+		_since = _since + dt if visible or s.urgent() else 0.0
 		_ready_shown = false
 		_model.build_step = s.build_step()
 		_model.tick(dt)

@@ -430,9 +430,7 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader
 	if double_sided:
-		var sh := Shader.new()
-		sh.code = code.replace("cull_back", "cull_disabled")
-		mat.shader = sh
+		mat.shader = SharedShader.of(code.replace("cull_back", "cull_disabled"))
 	var preset := data.quality_preset if data != null else RenderSettings.Preset.HIGH
 	TerrainGlsl.bind(mat, preset)
 	mat.set_shader_parameter("far_quality", RenderSettings.clamp_preset(preset))

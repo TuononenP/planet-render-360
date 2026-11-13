@@ -67,6 +67,9 @@ var _mosaic_remaining := 0
 var _mosaic_centre := Vector2i.ZERO
 var _mosaic_emitted := false
 var _mid_fallback_done := false
+## Bumped per near fetch: a stitch still running for an older one lands
+## nothing.
+var _stitch_gen := 0
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
@@ -172,6 +175,7 @@ func fetch(lat: float, lon: float, grid: int) -> void:
 	_mosaic_images.clear()
 	_mosaic_remaining = _mosaic_tiles.size()
 	_mosaic_emitted = false
+	_stitch_gen += 1
 	for t in _mosaic_tiles:
 		_load_mosaic_tile(t)
 
@@ -204,11 +208,10 @@ func _mosaic_cache_path(t: Vector2i) -> String:
 func _load_mosaic_tile(t: Vector2i) -> void:
 	var path := _mosaic_cache_path(t)
 	if FileAccess.file_exists(path):
-		var cached := Image.new()
-		if cached.load(path) == OK:
-			CacheStore.note_read(path)
-			_mosaic_tile_done(t, cached)
-			return
+		# Decoded with the stitch on a worker (_stitch_mosaic).
+		CacheStore.note_read(path)
+		_mosaic_tile_done(t, path)
+		return
 	if offline_mode:
 		_mosaic_tile_done(t, null)
 		return
@@ -246,7 +249,8 @@ func _free_http() -> HTTPRequest:
 			return http
 	return null
 
-func _mosaic_tile_done(t: Vector2i, img: Image) -> void:
+## `img`: the decoded Image, a cached tile's path, or null (missing).
+func _mosaic_tile_done(t: Vector2i, img: Variant) -> void:
 	if img != null:
 		_mosaic_images[t] = img
 	_mosaic_remaining -= 1
@@ -254,36 +258,27 @@ func _mosaic_tile_done(t: Vector2i, img: Image) -> void:
 		_mosaic_emitted = true
 		_stitch_mosaic()
 
+## Stitches the mosaic and samples the grid on a worker thread: a few
+## hundred thousand bilinear samples in GDScript held a frame for over
+## 100 ms while the streamer fetched the way ahead.
 func _stitch_mosaic() -> void:
-	if _mosaic_images.size() < _mosaic_tiles.size():
+	var gen := _stitch_gen
+	var out := {}
+	var work := _stitch_heights.bind(_mosaic_images.duplicate(), _mosaic_tiles.duplicate(),
+		_mosaic_centre, _pending_lat, _pending_lon, _pending_grid, out)
+	if is_inside_tree():
+		await FrameTask.run(work, "DEM stitch", get_tree())
+	else:
+		work.call()
+	if gen != _stitch_gen:
+		return
+	if not out.has("heights"):
 		print("DEM z14 mosaic incomplete (%d/%d tiles), falling back to z12 mid tile" % [
-			_mosaic_images.size(), _mosaic_tiles.size()])
+			int(out.get("loaded", 0)), _mosaic_tiles.size()])
 		_fetch_mid_internal()
 		return
 	var span := span_for(_pending_lat)
-	var r := (span - 1) / 2
-	var size := TILE_PX * span
-	var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
-	for t in _mosaic_tiles:
-		var src: Image = _mosaic_images[t]
-		if src.get_format() != Image.FORMAT_RGB8:
-			src.convert(Image.FORMAT_RGB8)
-		var dst := Vector2i((t.x - (_mosaic_centre.x - r)) * TILE_PX,
-			(t.y - (_mosaic_centre.y - r)) * TILE_PX)
-		mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), dst)
-	# Viewpoint pixel inside the mosaic: the centre tile starts r tiles in.
-	var frac := tile_frac(_pending_lat, _pending_lon, ZOOM_NEAR)
-	var centre := Vector2((float(r) + frac.x) * TILE_PX, (float(r) + frac.y) * TILE_PX)
-	var grid := _pending_grid
 	var window := window_px(_pending_lat, ZOOM_NEAR)
-	var step_px := window / float(maxi(grid, 1))
-	var heights := PackedFloat32Array()
-	heights.resize(grid * grid)
-	for z in grid:
-		for x in grid:
-			var fx := centre.x + (float(x) - float(grid) / 2.0) * step_px
-			var fy := centre.y + (float(z) - float(grid) / 2.0) * step_px
-			heights[z * grid + x] = sample_bilinear(mosaic, fx, fy)
 	dem_source = {
 		"zoom_near": ZOOM_NEAR,
 		"zoom_mid": ZOOM_MID,
@@ -297,7 +292,46 @@ func _stitch_mosaic() -> void:
 	# key, so every world the fixed window fits keeps its cached build.
 	if window > WINDOW_NEAR_PX:
 		dem_source["window_px"] = window
-	succeeded.emit(heights, grid)
+	succeeded.emit(out["heights"], _pending_grid)
+
+## Worker half of _stitch_mosaic: decodes cached tiles, stitches, samples.
+## Leaves `out` without "heights" when a tile is missing.
+static func _stitch_heights(images: Dictionary, tiles: Array[Vector2i], centre_tile: Vector2i,
+		lat: float, lon: float, grid: int, out: Dictionary) -> void:
+	for t in images.keys():
+		if images[t] is String:
+			var img := Image.new()
+			if img.load(images[t]) == OK:
+				images[t] = img
+			else:
+				images.erase(t)
+	out["loaded"] = images.size()
+	if images.size() < tiles.size():
+		return
+	var span := span_for(lat)
+	var r := (span - 1) / 2
+	var size := TILE_PX * span
+	var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
+	for t in tiles:
+		var src: Image = images[t]
+		if src.get_format() != Image.FORMAT_RGB8:
+			src.convert(Image.FORMAT_RGB8)
+		var dst := Vector2i((t.x - (centre_tile.x - r)) * TILE_PX,
+			(t.y - (centre_tile.y - r)) * TILE_PX)
+		mosaic.blit_rect(src, Rect2i(0, 0, TILE_PX, TILE_PX), dst)
+	# Viewpoint pixel inside the mosaic: the centre tile starts r tiles in.
+	var frac := tile_frac(lat, lon, ZOOM_NEAR)
+	var centre := Vector2((float(r) + frac.x) * TILE_PX, (float(r) + frac.y) * TILE_PX)
+	var window := window_px(lat, ZOOM_NEAR)
+	var step_px := window / float(maxi(grid, 1))
+	var heights := PackedFloat32Array()
+	heights.resize(grid * grid)
+	for z in grid:
+		for x in grid:
+			var fx := centre.x + (float(x) - float(grid) / 2.0) * step_px
+			var fy := centre.y + (float(z) - float(grid) / 2.0) * step_px
+			heights[z * grid + x] = sample_bilinear(mosaic, fx, fy)
+	out["heights"] = heights
 
 func _fetch_at_zoom(lat: float, lon: float, grid: int) -> void:
 	_pending_lat = lat

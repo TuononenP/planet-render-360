@@ -143,6 +143,11 @@ static func apply_child(root: Node, index: int, preset: int) -> void:
 	var c := root.get_child(index)
 	_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
 
+## One node's range for its `layer` (RevealWave hands a faded-in piece
+## back to its ring).
+static func range_one(gi: GeometryInstance3D, preset: int, layer: String) -> void:
+	_range(gi, preset, layer)
+
 ## One vegetation node added after the build (TreeLodWindow swaps).
 static func apply_vegetation(gi: GeometryInstance3D, preset: int) -> void:
 	_range(gi, preset, "Vegetation")

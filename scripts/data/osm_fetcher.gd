@@ -509,6 +509,7 @@ static func _write_cache(path: String, text: String) -> bool:
 	if not AtomicFile.write_text(path, text):
 		return false
 	CacheStore.note_written(path)
+	OsmNearbyCache.note(path)
 	return true
 
 ## A cached/live detailed payload is usable when it parses to a
@@ -759,6 +760,21 @@ func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
 ## Serve the nearest cached payload within max_m that holds mapped geometry,
 ## and say so: a payload keyed more than SAME_PLACE_M away leaves part of
 ## the view empty ("Nearby"), a closer one is only a stale copy.
+## Stops waiting on the network for the detailed layer (a streamed
+## build ran out of time): a nearby cached copy if there is one, else
+## failed. Live requests are dropped so no late answer lands.
+func give_up(reason: String) -> void:
+	cancel()
+	# The ring, bridge and POI steps settle with what is at hand: none of
+	# them may hold the finish or ask Overpass again.
+	_ring_pending = false
+	_bridge_started = true
+	_bridge_pending = false
+	_poi_started = true
+	_poi_pending = false
+	if not _use_cached(reason, NEARBY_M):
+		failed.emit(reason)
+
 func _use_cached(reason: String, max_m: float) -> bool:
 	for path in OsmNearbyCache.candidates(_pending_lat, _pending_lon, max_m).slice(0, 3):
 		var text := _read_cache(path)
