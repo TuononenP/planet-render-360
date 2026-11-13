@@ -23,7 +23,7 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -40,7 +40,7 @@ jobs:
 
       - name: Keep the logs of failing tests
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-logs
           path: ${{ runner.temp }}/test-logs

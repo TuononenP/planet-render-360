@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 90
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -84,7 +84,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/dist"
           mv ../build/macos/PlanetRender360.dmg "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.dmg"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PlanetRender360-macos-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/dist/*.dmg
@@ -105,7 +105,7 @@ jobs:
     timeout-minutes: 90
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -132,7 +132,7 @@ jobs:
             mv ../build/ios/export/*.ipa "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.ipa"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !inputs.testflight }}
         with:
           name: PlanetRender360-ios-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
