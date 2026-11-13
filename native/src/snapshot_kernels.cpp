@@ -13,7 +13,7 @@ namespace godot {
 
 namespace {
 
-constexpr int VERSION = 1;
+constexpr int VERSION = 2;
 constexpr int64_t F_TAGS = 1, F_GEOM = 2, F_LATLON = 4, F_MEMBERS = 8, F_CENTER = 16;
 constexpr int64_t M_GEOM = 1, M_LATLON = 2;
 
@@ -72,8 +72,8 @@ struct Decoder {
 	static void micro(std::string &s, int64_t v) {
 		char buf[32];
 		uint64_t a = v < 0 ? (uint64_t)0 - (uint64_t)v : (uint64_t)v;
-		snprintf(buf, sizeof(buf), "%s%llu.%06llu", v < 0 ? "-" : "", (unsigned long long)(a / 1000000),
-				(unsigned long long)(a % 1000000));
+		snprintf(buf, sizeof(buf), "%s%llu.%07llu", v < 0 ? "-" : "", (unsigned long long)(a / 10000000),
+				(unsigned long long)(a % 10000000));
 		s += buf;
 	}
 

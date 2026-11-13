@@ -58,8 +58,10 @@ keeping only the tags the labels read (`name`, `natural`, `place`, `water`,
 `out center` gives it.
 
 Snapshots ship as `.osmb` (`tools/osmb.py`): the same Overpass JSON with
-coordinates rounded to 1e-6° and way node-id lists dropped, delta-coded and
-zstd-compressed, about 2.4x smaller than the gzip JSON they replace.
+coordinates kept at OSM's own 1e-7° (so they match live Overpass text exactly
+and ways still meet layers fetched live) and way node-id lists dropped,
+delta-coded and zstd-compressed, about 2.1x smaller than the gzip JSON they
+replace.
 
 When Overpass and its fallbacks (Postpass, the OSM API, a saved copy of the
 same spot) give nothing, the detailed layer comes from the OpenFreeMap vector

@@ -72,7 +72,7 @@ func _damage_checks() -> void:
 ## escape), a node, a way with a null geometry entry and a relation.
 func _known_payload() -> void:
 	var p := PackedByteArray("PROB".to_ascii_buffer())
-	_varint(p, 1)
+	_varint(p, OsmbCodec.VERSION)
 	var header := '{"version":0.6,"osm3s":{"timestamp_osm_base":"2026-11-03T00:00:00Z"}}'.to_utf8_buffer()
 	_varint(p, header.size())
 	p.append_array(header)
@@ -90,8 +90,8 @@ func _known_payload() -> void:
 	_varint(p, 1)
 	_varint(p, 3)
 	_varint(p, 4)
-	_svarint(p, 60168000)
-	_svarint(p, -500000)
+	_svarint(p, 601680000)
+	_svarint(p, -5000000)
 	# way 101: building, three points, the second null
 	_varint(p, 1)
 	_svarint(p, 1)
@@ -123,9 +123,9 @@ func _known_payload() -> void:
 	_svarint(p, 0)
 	_svarint(p, 0)
 	var want := '{"version":0.6,"osm3s":{"timestamp_osm_base":"2026-11-03T00:00:00Z"},"elements":[' \
-		+ '{"type":"node","id":100,"tags":{"name":"Café \\"Q\\"\\\\x"},"lat":60.168000,"lon":-0.500000},' \
-		+ '{"type":"way","id":101,"tags":{"building":"yes"},"geometry":[{"lat":60.168001,"lon":-0.500000},null,{"lat":60.168001,"lon":-0.500001}]},' \
-		+ '{"type":"relation","id":50,"tags":{"type":"multipolygon"},"members":[{"type":"way","ref":101,"role":"outer","geometry":[{"lat":60.168001,"lon":-0.500001}]}]}]}'
+		+ '{"type":"node","id":100,"tags":{"name":"Café \\"Q\\"\\\\x"},"lat":60.1680000,"lon":-0.5000000},' \
+		+ '{"type":"way","id":101,"tags":{"building":"yes"},"geometry":[{"lat":60.1680001,"lon":-0.5000000},null,{"lat":60.1680001,"lon":-0.5000001}]},' \
+		+ '{"type":"relation","id":50,"tags":{"type":"multipolygon"},"members":[{"type":"way","ref":101,"role":"outer","geometry":[{"lat":60.1680001,"lon":-0.5000001}]}]}]}'
 	var script := OsmbCodec.decode_script(p)
 	if script != want:
 		failures.append("script decode of the known payload:\n%s\nwant\n%s" % [script, want])

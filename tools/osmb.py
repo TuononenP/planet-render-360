@@ -5,7 +5,8 @@ A snapshot is an Overpass JSON response. Most of its bytes are coordinate
 text, repeated tag strings and way node-id lists nobody reads, so .osmb
 keeps the same elements in a smaller shape:
 
-  - coordinates as integer microdegrees (1e-6 deg, ~11 cm), delta-coded
+  - coordinates as integers of 1e-7 degrees, OSM's own precision (so the
+    decoded text matches live Overpass coordinates exactly), delta-coded
     against the previous coordinate in the file
   - one string table for types, tag keys and values and member roles
   - element and member ids delta-coded
@@ -39,7 +40,8 @@ Payload layout (varint = unsigned LEB128; svarint = zigzag varint):
 Usage:
   python3 tools/osmb.py encode in.json[.gz] out.osmb   prints size and sha256
   python3 tools/osmb.py decode in.osmb [out.json]      Overpass JSON text
-  python3 tools/osmb.py convert-all                    every bundled snapshot
+  python3 tools/osmb.py convert-all [--from DIR]       every bundled snapshot,
+                                                       from DIR/<key>.json.gz
 """
 
 import gzip
@@ -52,8 +54,8 @@ import subprocess
 import sys
 
 MAGIC = b"PROB"
-VERSION = 1
-SCALE = 1_000_000
+VERSION = 2
+SCALE = 10_000_000
 F_TAGS, F_GEOM, F_LATLON, F_MEMBERS, F_CENTER = 1, 2, 4, 8, 16
 M_GEOM, M_LATLON = 1, 2
 ZSTD_LEVEL = 19
@@ -97,8 +99,14 @@ class _Encoder:
             self.strings[text] = len(self.strings)
         return self.strings[text]
 
-    def coord(self, body, lat, lon):
+    def coord(self, body, lat, lon, exact=True):
         la, lo = _micro(lat), _micro(lon)
+        # Lossless for OSM positions: a snapshot's coordinates must match live
+        # Overpass text exactly, or ways joined across layers (a cached live
+        # detailed layer and a bundled ring) stop meeting at their shared
+        # nodes. A derived `center` (a bounding-box middle) may round.
+        if exact and (la / SCALE != float(lat) or lo / SCALE != float(lon)):
+            raise ValueError("coordinate finer than 1e-7 degrees: %r, %r" % (lat, lon))
         _svarint(body, la - self.lat)
         _svarint(body, lo - self.lon)
         self.lat, self.lon = la, lo
@@ -152,7 +160,7 @@ def encode(data):
         if flags & F_LATLON:
             enc.coord(body, e["lat"], e["lon"])
         if flags & F_CENTER:
-            enc.coord(body, e["center"]["lat"], e["center"]["lon"])
+            enc.coord(body, e["center"]["lat"], e["center"]["lon"], exact=False)
         if flags & F_GEOM:
             enc.points(body, e["geometry"])
         if flags & F_MEMBERS:
@@ -352,18 +360,18 @@ def read_osmb(path):
 ROW = re.compile(r'^(\t"(\w+)": \[)([-\d.]+), ([-\d.]+), "(\w+)", (\d+), "([^"]+)", (\d+), "([0-9a-f]{64})"(\],?)$')
 
 
-def convert_all():
-    """Every bundled .json.gz -> .osmb, manifests and BundledOsm.ENTRIES rewritten."""
+def convert_all(source=SNAPSHOTS):
+    """Every bundled snapshot -> .osmb, manifests and BundledOsm.ENTRIES rewritten.
+
+    Reads <key>.json.gz from `source` (e.g. a checkout from before the switch),
+    or re-encodes an existing .osmb when there is no JSON for it.
+    """
     stats = {"in": 0, "out": 0}
 
     def convert(key):
-        src = os.path.join(SNAPSHOTS, key + ".json.gz")
+        src = os.path.join(source, key + ".json.gz")
         dst = os.path.join(SNAPSHOTS, key + ".osmb")
         if not os.path.exists(src):
-            if os.path.exists(dst):
-                with open(dst, "rb") as f:
-                    payload = decompress(f.read())
-                return len(payload), hashlib.sha256(payload).hexdigest()
             raise FileNotFoundError(src)
         size, sha = write_osmb(read_json(src), dst)
         stats["in"] += os.path.getsize(src)
@@ -376,9 +384,13 @@ def convert_all():
             manifest = json.load(f)
         for key, row in manifest.items():
             row[5], row[6] = convert(key)
+        # Each manifest keeps the layout its own tool writes.
+        if name == "horizon_manifest.json":
+            text = json.dumps(dict(sorted(manifest.items())), indent=1)
+        else:
+            text = json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True)
         with open(path + ".tmp", "w") as f:
-            json.dump(manifest, f, indent=2, ensure_ascii=False)
-            f.write("\n")
+            f.write(text + "\n")
         os.replace(path + ".tmp", path)
         print("%s: %d rows" % (name, len(manifest)))
     with open(BUNDLED_GD) as f:
@@ -411,8 +423,8 @@ def main(argv):
                 f.write(text)
         else:
             sys.stdout.write(text)
-    elif len(argv) == 2 and argv[1] == "convert-all":
-        convert_all()
+    elif len(argv) in (2, 4) and argv[1] == "convert-all":
+        convert_all(argv[3] if len(argv) == 4 and argv[2] == "--from" else SNAPSHOTS)
     else:
         print(__doc__)
         return 2

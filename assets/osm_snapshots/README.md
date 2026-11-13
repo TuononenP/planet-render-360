@@ -10,9 +10,11 @@ for live responses).
 ## File format
 
 Each file is a compact, zstd-compressed form of an Overpass JSON response
-(`tools/osmb.py` documents the layout): coordinates as delta-coded integer
-microdegrees (1e-6°, about 11 cm), one string table for tags and roles, and no
-way node-id lists or bounds, which nothing reads. The manifest rows record the
+(`tools/osmb.py` documents the layout): coordinates as delta-coded integers
+of 1e-7°, OSM's own precision, so they match live Overpass text exactly (a
+cached live layer and a bundled ring still share their coastline nodes); one
+string table for tags and roles; and no way node-id lists or bounds, which
+nothing reads. The manifest rows record the
 decompressed payload's size and SHA-256. `BundledOsm.read` checks both and
 decodes the payload back to Overpass JSON text (`SnapshotKernels` natively,
 `OsmbCodec` in GDScript), so the fetchers read it as before. The byte counts

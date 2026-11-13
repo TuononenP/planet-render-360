@@ -5,7 +5,8 @@ extends RefCounted
 ## tools/osmb.py, which writes it) back to Overpass JSON text, so every
 ## reader of snapshot text (OsmParser, FarCityFetcher, HorizonFetcher, the
 ## header and freshness checks) works unchanged. The text is compact JSON
-## with coordinates to 1e-6 degrees; way node-id lists and bounds are not
+## with coordinates to 1e-7 degrees (OSM's own, so they match live Overpass
+## text exactly); way node-id lists and bounds are not
 ## in the format.
 ##
 ## Native SnapshotKernels decodes the same payload to the same text when
@@ -13,7 +14,7 @@ extends RefCounted
 ## reference the native test compares against. Pure data: worker-safe.
 
 const MAGIC := "PROB"
-const VERSION := 1
+const VERSION := 2
 const F_TAGS := 1
 const F_GEOM := 2
 const F_LATLON := 4
@@ -122,7 +123,7 @@ func _string() -> String:
 
 static func _micro(v: int) -> String:
 	var a := absi(v)
-	return ("-" if v < 0 else "") + str(a / 1000000) + "." + str(a % 1000000).pad_zeros(6)
+	return ("-" if v < 0 else "") + str(a / 10000000) + "." + str(a % 10000000).pad_zeros(7)
 
 ## '"lat":..,"lon":..' for the next coordinate.
 func _coord() -> String:
