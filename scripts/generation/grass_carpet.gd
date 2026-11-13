@@ -321,7 +321,12 @@ static func attach(root: Node, ground: GroundTruth, data: LocationData = null) -
 		return null
 	var c := GrassCarpet.new()
 	c._mmi = mmi
-	c._mat = mmi.material_override as ShaderMaterial
+	# Its own copy: the heights it bakes as the eye moves are this
+	# session's, and the material the world was packed with must not
+	# change under WorldCache's save thread (a texture it never pre-scanned
+	# broke the save: "Resource was not pre cached").
+	c._mat = (mmi.material_override as ShaderMaterial).duplicate() as ShaderMaterial
+	mmi.material_override = c._mat
 	c._terrain = tm
 	c._ground = ground
 	c._cover = data.landcover_image if data != null else null
