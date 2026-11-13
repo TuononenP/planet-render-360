@@ -435,24 +435,27 @@ void fragment() {
 	// slides off cliffs (relief normal) and takes its own texture.
 	float pixel_m = max(length(dg.xy), length(dg.zw));
 	float sc = snow_cover(wpos, nw.y);
+	// The lip where a patch ends (derivatives: before any branch).
+	vec3 lip = snow_edge(sc, wpos, 0.06) * (1.0 - smoothstep(40.0, 160.0, dist_m));
 	vec4 sa = vec4(0.0);
 	vec4 sn = vec4(0.5, 0.5, 1.0, 0.7);
 	float glint = 0.0;
 	if (sc > 0.01) {
 		det_sample(8, g, dg, vary, sa, sn);
-		// Wind relief, hollows a touch bluer (they see sky, not sun),
-		// and ice crystals that catch a direct sun.
+		// Wind relief and ice crystals that catch a direct sun.
 		float near_snow = 1.0 - smoothstep(150.0, 700.0, dist_m);
-		vec3 hollow = vec3(1.0);
 		if (near_snow > 0.0 && ground_quality >= 1) {
 			vec2 dr = snow_drift(g);
 			nw = normalize(nw - vec3(dr.x, 0.0, dr.y) * 0.22 * sc * near_snow);
-			float shade = smoothstep(0.3, 0.7, snow_noise(g / 5.5));
-			hollow = mix(mix(vec3(0.86, 0.92, 1.0), vec3(1.0), shade), vec3(1.0), 1.0 - near_snow);
+			nw = normalize(nw - vec3(lip.x, 0.0, lip.y));
 		}
 		// The layer gives snow its grain; it must not tint or scar it.
-		alb = mix(alb, snow_col * hollow * clamp(lum(sa.rgb / det_mean[8]), 0.9, 1.08), sc);
-		sn.rgb = mix(vec3(0.5, 0.5, 1.0), sn.rgb, 0.45);
+		// Pavements and squares are trodden and gritted.
+		vec3 lying = snow_albedo(g, pixel_m, 0.22 * pave) * clamp(lum(sa.rgb / det_mean[8]), 0.94, 1.05);
+		alb = mix(alb, snow_grit(lying, g, pixel_m, 0.45 * pave), sc);
+		// Its footprint-like normal map tiles visibly a few metres out:
+		// near by only, and gentle.
+		sn.rgb = mix(vec3(0.5, 0.5, 1.0), sn.rgb, 0.3 * (1.0 - smoothstep(8.0, 30.0, dist_m)));
 		if (ground_quality >= 2) {
 			vec4 facet = snow_facet(g, pixel_m);
 			glint = facet.w * sc;
@@ -480,12 +483,16 @@ void fragment() {
 	vec3 nmap = mix(nm.rgb, sn.rgb, sc);
 	NORMAL_MAP = mix(nmap, vec3(0.5 + ripple.x, 0.5 + ripple.y, 1.0), max(max(wf, edge), max(puddle, glint)));
 	NORMAL_MAP_DEPTH = 0.9;
-	AO = contact;
+	// Bare ground at a patch's foot sits in the snow's own shade.
+	AO = contact * (1.0 - 0.3 * lip.z * (1.0 - sc));
 	AO_LIGHT_AFFECT = 0.2;
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
+	r = mix(r, SNOW_ROUGH, sc * (1.0 - wf));
 	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.1, glint);
-	SPECULAR = mix(mix(0.28, 0.5, wet), 1.0, glint);
+	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
+	RIM = SNOW_RIM * sc;
+	RIM_TINT = SNOW_RIM_TINT;
 }
 """

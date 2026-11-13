@@ -49,9 +49,15 @@ void fragment() {
 	float ao = clamp(COLOR.g, 0.0, 1.0);
 	c *= mix(vec3(0.86, 0.95, 1.1), vec3(1.0), smoothstep(0.3, 0.95, ao));
 	vec3 n = normalize(v_n);
+	float snow_load = 0.0;
 	if (snow > 0.0) {
+		// Snow sits in clumps on the upper sprays, not as an even frost,
+		// and is the ground's own snow.
 		float up = (INV_VIEW_MATRIX * vec4(n, 0.0)).y;
-		c = mix(c, vec3(0.86, 0.88, 0.92), smoothstep(0.0, 0.6, up) * snow * snow_line(wpos));
+		float clump = snow_noise(wpos.xz / 0.45 + wpos.y * 0.7) * 0.65 + snow_noise(wpos.xz / 0.17) * 0.35;
+		snow_load = smoothstep(0.0, 0.6, up) * snow * snow_line(wpos);
+		snow_load *= smoothstep(0.75 - 0.5 * snow_load, 0.95 - 0.5 * snow_load, clump + 0.25);
+		c = mix(c, snow_col * (0.94 + 0.08 * clump), snow_load);
 	}
 	// Cards seen edge-on smear into streaks: thin them out by the real
 	// face normal (the shading normal is bent to the crown sphere). Not
@@ -70,7 +76,8 @@ void fragment() {
 	NORMAL = n;
 	ROUGHNESS = 0.82;
 	SPECULAR = 0.22 * mix(0.4, 1.0, edge);
-	BACKLIGHT = translucency * COLOR.rgb;
+	// Snow on the sprays glows when the sun is behind it.
+	BACKLIGHT = mix(translucency * COLOR.rgb, vec3(0.35), snow_load);
 }
 """
 
@@ -105,7 +112,10 @@ void fragment() {
 	vec3 c = t.r * mix(bark_tint, leaf_c, fol);
 	vec3 n = normalize(v_n);
 	if (snow > 0.0) {
-		c = mix(c, vec3(0.86, 0.88, 0.92), clamp(t.b * 1.6, 0.0, 1.0) * snow * snow_line(wpos));
+		float clump = snow_noise(UV * vec2(9.0, 14.0) + wpos.xz * 0.1);
+		float snow_load = clamp(t.b * 1.6, 0.0, 1.0) * snow * snow_line(wpos);
+		snow_load *= smoothstep(0.7 - 0.5 * snow_load, 0.9 - 0.5 * snow_load, clump + 0.25);
+		c = mix(c, snow_col * (0.94 + 0.08 * clump), snow_load);
 	}
 	// Two crossed vertical cards: whichever is near edge-on (in plan
 	// view) smears into a pale streak, so it thins out while the other

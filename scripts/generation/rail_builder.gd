@@ -97,15 +97,26 @@ shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform vec3 steel : source_color;
+// @SNOW
+varying vec3 wpos;
+varying vec3 wnrm;
 
 void vertex() {
+	wpos = VERTEX;
+	wnrm = NORMAL;
 // @DEPTH
 }
 
 void fragment() {
-	ALBEDO = steel;
-	METALLIC = 0.8;
-	ROUGHNESS = mix(0.5, 0.25, clamp(NORMAL.y, 0.0, 1.0));
+	// In winter the head stays bare but dulled by grit and brine, never
+	// a mirror of the sky; snow packs against the sides.
+	float winter = snow_line(wpos);
+	float up = clamp(wnrm.y, 0.0, 1.0);
+	float side = snow_cover(wpos, 1.0) * (1.0 - smoothstep(0.8, 0.95, up));
+	vec3 head = mix(steel, steel * vec3(0.55, 0.52, 0.5), winter);
+	ALBEDO = mix(head, snow_albedo(wpos.xz, max(fwidth(wpos.x), fwidth(wpos.z)), 0.4), side);
+	METALLIC = mix(0.8, 0.45, winter) * (1.0 - side);
+	ROUGHNESS = mix(mix(0.5, 0.25, up), 0.55, max(winter, side));
 }
 """
 
@@ -395,7 +406,7 @@ static func _material(key: String) -> Material:
 			m = RoadSurface.paved_material("concrete", Color.html(CABLE_BED_HEX).srgb_to_linear())
 		"rail":
 			var rsh := Shader.new()
-			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL)
+			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL).replace("// @SNOW", ClimateModel.SNOW_GLSL)
 			var rm := ShaderMaterial.new()
 			rm.shader = rsh
 			rm.set_shader_parameter("steel", Color.html(STEEL_HEX))

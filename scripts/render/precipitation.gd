@@ -48,18 +48,24 @@ uniform bool snow = false;
 uniform vec2 quad_m = vec2(0.006, 0.45);
 uniform vec3 fall_dir = vec3(0.0, -1.0, 0.0);
 uniform float reach_m = 18.0;
+#ifdef SCREEN_CONTRAST
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+#endif
 
 varying float fade;
+// Snow: x the flake's seed, y how out of focus it is (0 sharp .. 1).
+varying vec2 flake;
 
 void vertex() {
 	vec3 c = MODEL_MATRIX[3].xyz;
 	// The particle's random scale doubles as its seed.
 	float s = length(MODEL_MATRIX[0].xyz);
+	float seed = fract(s * 41.3);
 	if (snow) {
 		// Flakes wander as they fall: a path that is a function of height.
-		float seed = fract(s * 41.3) * 6.2831853;
-		c.x += sin(c.y * 1.1 + seed) * 0.35 + sin(c.y * 2.9 + seed * 2.0) * 0.1;
-		c.z += cos(c.y * 0.9 + seed * 1.7) * 0.35;
+		float ph = seed * 6.2831853;
+		c.x += sin(c.y * 1.1 + ph) * 0.35 + sin(c.y * 2.9 + ph * 2.0) * 0.1;
+		c.z += cos(c.y * 0.9 + ph * 1.7) * 0.35;
 	}
 	vec3 to_cam = CAMERA_POSITION_WORLD - c;
 	float dist = max(length(to_cam), 0.05);
@@ -73,6 +79,15 @@ void vertex() {
 	// One pixel's width in metres at this distance.
 	float px = dist * 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 	vec2 size = quad_m * s;
+	float blur = 0.0;
+	if (snow) {
+		// Most flakes are small; the odd one is a clump of several.
+		float k = clamp((s - 0.5) / 1.2, 0.0, 1.0);
+		size = quad_m * (0.55 + 1.9 * k * k * k);
+		// Close to the lens a flake is out of focus: bigger and fainter.
+		blur = 1.0 - smoothstep(0.3, 1.6, dist);
+		size *= 1.0 + 1.6 * blur;
+	}
 	float min_w = px * (snow ? 1.6 : 1.2);
 	float energy = min(1.0, size.x / min_w);
 	size.x = max(size.x, min_w);
@@ -82,22 +97,36 @@ void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(vec4(side * size.x, 0.0), vec4(up * size.y, 0.0),
 		vec4(back, 0.0), vec4(c, 1.0));
 	// No huge smears against the lens; no visible edge at the box's reach.
-	fade = energy * smoothstep(0.4, 2.2, dist) * (1.0 - smoothstep(reach_m * 0.7, reach_m * 1.15, dist));
+	float near_fade = snow ? smoothstep(0.12, 0.5, dist) / (1.0 + 2.6 * blur * blur) : smoothstep(0.4, 2.2, dist);
+	fade = energy * near_fade * (1.0 - smoothstep(reach_m * 0.7, reach_m * 1.15, dist));
 	// Age 0..1 from the particle process: no birth or death in one frame.
 	float age = clamp(INSTANCE_CUSTOM.y, 0.0, 1.0);
 	fade *= smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.85, 1.0, age));
+	flake = vec2(seed, blur);
 }
 
 void fragment() {
 	vec2 q = UV * 2.0 - 1.0;
 	float a;
+	vec3 col = tint;
 	if (snow) {
-		a = 1.0 - smoothstep(0.35, 1.0, length(q));
+		// A flake is no disc: a tumbling, slightly flattened blob.
+		float ang = TIME * (0.8 + 2.2 * flake.x) + flake.x * 40.0;
+		vec2 r = mat2(vec2(cos(ang), sin(ang)), vec2(-sin(ang), cos(ang))) * q;
+		r.x /= 0.62 + 0.38 * fract(flake.x * 7.3);
+		a = 1.0 - smoothstep(mix(0.35, 0.0, flake.y), 1.0, length(r));
+#ifdef SCREEN_CONTRAST
+		// Flakes scatter the light they get, so against a sky brighter
+		// than that they read grey, against dark walls white.
+		float bg = dot(texture(screen_tex, SCREEN_UV).rgb, vec3(0.2126, 0.7152, 0.0722));
+		float lit = max(dot(tint, vec3(0.2126, 0.7152, 0.0722)), 0.02);
+		col *= mix(1.08, 0.62, smoothstep(0.6, 1.1, bg / lit));
+#endif
 	} else {
 		// Sharp across, tapering along the fall line.
 		a = (1.0 - abs(q.x)) * (1.0 - smoothstep(0.1, 1.0, abs(q.y)));
 	}
-	ALBEDO = tint;
+	ALBEDO = col;
 	ALPHA = clamp(a * opacity * fade, 0.0, 1.0);
 }
 """
@@ -156,6 +185,7 @@ void fragment() {
 """
 
 static var _shader: Shader
+static var _contrast_shader: Shader
 static var _veil_shader: Shader
 
 static func _compiled(cached: Shader, code: String) -> Shader:
@@ -168,6 +198,7 @@ static func _compiled(cached: Shader, code: String) -> Shader:
 ## The particle system (and its veils) under `parent`, the camera rig.
 static func build(parent: Node3D, preset: int) -> GPUParticles3D:
 	_shader = _compiled(_shader, SHADER)
+	_contrast_shader = _compiled(_contrast_shader, SHADER.replace("shader_type spatial;", "shader_type spatial;\n#define SCREEN_CONTRAST"))
 	_veil_shader = _compiled(_veil_shader, VEIL_SHADER)
 	var p := Precipitation.new()
 	p.name = "Precipitation"
@@ -185,7 +216,7 @@ static func build(parent: Node3D, preset: int) -> GPUParticles3D:
 	p.process_material = mat
 	var quad := QuadMesh.new()
 	var qm := ShaderMaterial.new()
-	qm.shader = _shader
+	qm.shader = _flake_shader(RenderSettings.clamp_preset(preset))
 	quad.material = qm
 	p.draw_pass_1 = quad
 	parent.add_child(p)
@@ -201,6 +232,11 @@ func _process(_delta: float) -> void:
 	var rig := get_parent() as Node3D
 	if rig != null:
 		position = rig.global_position + Vector3(0.0, BOX_UP_M, 0.0)
+
+## High and Ultra read what lies behind each flake (one screen copy a
+## frame), so flakes go grey against a bright sky as real ones do.
+static func _flake_shader(tier: int) -> Shader:
+	return _contrast_shader if tier >= VEIL_MIN_PRESET else _shader
 
 static func _veil(i: int) -> MeshInstance3D:
 	var radius := float(VEILS[i][0])
@@ -244,6 +280,7 @@ static func set_quality(p: GPUParticles3D, preset: int) -> void:
 	var tier := RenderSettings.clamp_preset(preset)
 	p.amount = int(AMOUNT[tier])
 	_set_veils(p, tier >= VEIL_MIN_PRESET)
+	((p.draw_pass_1 as QuadMesh).material as ShaderMaterial).shader = _flake_shader(tier)
 	# A new count empties the particles: dress it again, preroll and all,
 	# so the air is not bare for a lifetime.
 	if p.emitting and p.has_meta("look"):

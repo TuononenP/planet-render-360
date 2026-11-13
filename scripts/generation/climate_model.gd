@@ -214,6 +214,63 @@ vec2 snow_drift(vec2 p) {
 	float z = snow_noise((p + vec2(0.0, e)) / 5.5) + 0.45 * snow_noise((p + vec2(0.0, e)) / 1.6);
 	return vec2(x - a, z - a) / e;
 }
+// Lying snow's surface response, shared so every snowy surface matches:
+// glossier than chalk, and a soft forward-scatter sheen at grazing
+// angles (RIM), which is most of what keeps snow from reading as matte
+// white plastic.
+const float SNOW_ROUGH = 0.72;
+const float SNOW_SPEC = 0.35;
+const float SNOW_RIM = 0.3;
+const float SNOW_RIM_TINT = 0.65;
+// Snow colour at metre coordinates p: never one flat white. Faint grain
+// at two scales and wind hollows a touch bluer (they see sky, not sun),
+// each settling to its mean before pixel_m can alias it; age (0 fresh,
+// 1 trodden or ploughed) dulls it to a grey buff with grit in it.
+vec3 snow_albedo(vec2 p, float pixel_m, float age) {
+	float fine = mix(snow_noise(p / 0.4), 0.5, smoothstep(0.02, 0.12, pixel_m));
+	float mid = mix(snow_noise(p / 2.6), 0.5, smoothstep(0.3, 2.0, pixel_m));
+	float broad = mix(snow_noise(p / 11.0 + 3.7), 0.5, smoothstep(2.0, 10.0, pixel_m));
+	vec3 c = snow_col * (0.95 + 0.05 * mid + 0.04 * fine);
+	c *= mix(vec3(0.90, 0.95, 1.02), vec3(1.0), smoothstep(0.25, 0.65, broad));
+	vec3 old = vec3(0.60, 0.59, 0.56) * (0.88 + 0.16 * mid + 0.08 * fine);
+	return mix(c, old, clamp(age, 0.0, 1.0));
+}
+// Sand and fine gravel spread on trodden snow (Nordic towns grit their
+// streets and walks): sparse brown specks in patches near by, settling
+// into their average buff tint before they could shimmer.
+vec3 snow_grit(vec3 c, vec2 p, float pixel_m, float amount) {
+	float a = amount * smoothstep(0.2, 0.8, mix(snow_noise(p / 1.7 + 9.1), 0.5, smoothstep(0.3, 1.5, pixel_m)) + 0.15);
+	// Round grains of 5-12 mm, jittered in 4 cm cells.
+	vec2 q = p * 25.0;
+	vec2 id = floor(q);
+	vec2 ctr = vec2(snow_hash(id + 1.7), snow_hash(id + 4.3)) * 0.6 + 0.2;
+	float r = 0.12 + 0.14 * snow_hash(id + 8.9);
+	float aa = max(pixel_m * 25.0, 1e-3);
+	float grain = (1.0 - smoothstep(r - aa, r + aa, length(fract(q) - ctr))) * step(snow_hash(id), 0.24 * a);
+	// Further out, the grains' average (pi r^2 per live cell).
+	float cover = mix(0.027 * a, grain, 1.0 - smoothstep(0.004, 0.015, pixel_m));
+	return mix(c, vec3(0.40, 0.33, 0.25) * (0.8 + 0.4 * snow_hash(id + 5.3)), clamp(cover, 0.0, 1.0));
+}
+// Snow lies centimetres deep, so a patch ends in a rounded lip, not a
+// stencil line. From the cover `sc` at world point p: xy the world-xz
+// slope of that lip (bend the lighting normal by -slope), z how much of
+// an edge this is (0..1, for a contact shade just outside it). Uses
+// derivatives: call where every pixel of the quad runs it.
+vec3 snow_edge(float sc, vec3 p, float depth_m) {
+	float sx = dFdx(sc);
+	float sy = dFdy(sc);
+	float a = dFdx(p.x);
+	float b = dFdx(p.z);
+	float c = dFdy(p.x);
+	float d = dFdy(p.z);
+	float det = a * d - b * c;
+	if (abs(det) < 1e-9) { return vec3(0.0); }
+	vec2 g = vec2(d * sx - b * sy, a * sy - c * sx) / det * depth_m;
+	float len = length(g);
+	// At most ~40 degrees: a lip, never a wall.
+	g *= min(1.0, 0.85 / max(len, 1e-5));
+	return vec3(g, min(len * 2.0, 1.0));
+}
 // Ice crystals: rare cells whose tilted facet can throw the sun back.
 // xyz facet normal (world), w strength; fades before a pixel can span
 // several cells and strobe. Only under a direct sun: a cloud deck has

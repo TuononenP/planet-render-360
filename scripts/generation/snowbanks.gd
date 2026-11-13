@@ -19,7 +19,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	var source := StandardMaterial3D.new()
 	source.albedo_color = Color(0.64, 0.65, 0.61)
 	source.roughness = 0.95
-	var material := StreetSnow.material(source)
+	# Ploughed snow is old snow: grey with grit, not fresh white.
+	var material := StreetSnow.material(source, 0.45)
 	var count := 0
 	for road in data.roads:
 		if not (road is Dictionary) or str(road.get("class", "")) not in ParkedCars.CLASSES \
@@ -28,32 +29,69 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
 		if pts.size() < 2:
 			continue
-		var dense := KerbBuilder._dense(pts, 3.0 * m)
+		var dense := KerbBuilder._dense(pts, 1.8 * m)
+		var half := (float(road.get("width_m", 6.0)) * 0.5 + 0.35) * m
 		for side in [-1.0, 1.0]:
+			# Which stretches hold a bank, then each vertex's size, so
+			# neighbouring stretches join and a run tapers where it stops.
+			var keep: Array[bool] = []
 			for i in dense.size() - 1:
-				var dir := (dense[i + 1] - dense[i]).normalized()
-				var n := Vector2(dir.y, -dir.x) * float(side)
-				var half := (float(road.get("width_m", 6.0)) * 0.5 + 0.35) * m
-				var a := dense[i] + n * half
-				var b := dense[i + 1] + n * half
-				var mid := (a + b) * 0.5
-				if mid.distance_squared_to(centre) > r2 or ground.water_at(mid.x, mid.y) > 0.0 \
-						or ParkedCars._near_junction(mid, junc, KerbBuilder.CUT_M * m) \
-						or ParkedCars.blocked(mid, obstacles, m):
+				var n := _side_normal(dense[i], dense[i + 1], side)
+				var mid := (dense[i] + dense[i + 1]) * 0.5 + n * half
+				keep.append(not (mid.distance_squared_to(centre) > r2 or ground.water_at(mid.x, mid.y) > 0.0
+					or ParkedCars._near_junction(mid, junc, KerbBuilder.CUT_M * m)
+					or ParkedCars.blocked(mid, obstacles, m)))
+			for i in dense.size() - 1:
+				if not keep[i]:
 					continue
-				var ya := ground.height_at_world(a.x, a.y)
-				var yb := ground.height_at_world(b.x, b.y)
-				var wobble := 0.8 + ParkedCars._hash(mid.x, mid.y, 8.0) * 0.35
-				var h := HEIGHT_M * wobble * m
-				var az := Vector3(n.x, 0, n.y)
-				var pa := Vector3(a.x, ya + 0.03 * m, a.y)
-				var pb := Vector3(b.x, yb + 0.03 * m, b.y)
-				var skirt := az * WIDTH_M * 0.5 * m
-				var crown := Vector3.UP * h
-				kit.quad(material, pa - skirt, pb - skirt, pb + crown, pa + crown, (-az + Vector3.UP).normalized())
-				kit.quad(material, pa + crown, pb + crown, pb + skirt, pa + skirt, (az + Vector3.UP).normalized())
+				var a := _ridge(dense, i, keep, side, half, m, ground)
+				var b := _ridge(dense, i + 1, keep, side, half, m, ground)
+				_bank(kit, material, a, b)
 				count += 1
 	if count == 0:
 		return 0
 	kit.flush(root, "Snowbanks")
 	return count
+
+## Outward normal (plan view) of the road stretch a→b on `side`.
+static func _side_normal(a: Vector2, b: Vector2, side: float) -> Vector2:
+	var dir := (b - a).normalized()
+	return Vector2(dir.y, -dir.x) * side
+
+## Ridge line at dense vertex `i`: [foot centre, outward axis, height,
+## half width]. Lumpy by position (shared by both stretches meeting
+## there), shrinking to a low tail where the run stops.
+static func _ridge(dense: PackedVector2Array, i: int, keep: Array[bool], side: float,
+		half: float, m: float, ground: GroundTruth) -> Array:
+	var a := dense[maxi(i - 1, 0)]
+	var b := dense[mini(i + 1, dense.size() - 1)]
+	var n := _side_normal(a, b, side)
+	var joined := i > 0 and i < keep.size() and keep[i - 1] and keep[i]
+	var lump := ParkedCars._hash(dense[i].x, dense[i].y, 8.0)
+	var lump2 := ParkedCars._hash(dense[i].y, dense[i].x, 5.0)
+	var taper := 1.0 if joined else 0.2
+	var c := dense[i] + n * (half + (lump2 - 0.5) * 0.12 * m)
+	var foot := Vector3(c.x, ground.height_at_world(c.x, c.y) + 0.03 * m, c.y)
+	# Ploughs leave heaps, not a kerb: some stretches twice the height of others.
+	var h := HEIGHT_M * (0.5 + 0.95 * lump * lump) * taper * m
+	var w := WIDTH_M * 0.5 * (0.85 + 0.35 * lump2) * (1.0 if joined else 0.6) * m
+	return [foot, Vector3(n.x, 0.0, n.y), h, w]
+
+## Rounded cross-section (foot, shoulder, crown, shoulder, foot) between
+## ridge points a and b: five flat facets, never a sharp prism.
+const PROFILE := [Vector2(-1.0, 0.0), Vector2(-0.62, 0.6), Vector2(-0.22, 0.96),
+	Vector2(0.22, 0.96), Vector2(0.62, 0.6), Vector2(1.0, 0.0)]
+
+static func _bank(kit: ReliefKit, material: Material, a: Array, b: Array) -> void:
+	for k in PROFILE.size() - 1:
+		var p0 := _at(a, PROFILE[k])
+		var p1 := _at(b, PROFILE[k])
+		var p2 := _at(b, PROFILE[k + 1])
+		var p3 := _at(a, PROFILE[k + 1])
+		var n := (p1 - p0 + p2 - p3).cross(p3 - p0 + p2 - p1)
+		if n.y < 0.0:
+			n = -n
+		kit.quad(material, p0, p1, p2, p3, n.normalized() if n.length_squared() > 1e-12 else Vector3.UP)
+
+static func _at(r: Array, q: Vector2) -> Vector3:
+	return (r[0] as Vector3) + (r[1] as Vector3) * (q.x * float(r[3])) + Vector3.UP * (q.y * float(r[2]))

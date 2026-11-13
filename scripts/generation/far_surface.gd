@@ -386,7 +386,7 @@ void fragment() {
 		c *= mix(1.0, (0.58 + 0.56 * crowns + 0.3 * fine_crowns) * (0.82 + 0.36 * stands), forest * 0.85);
 	}
 	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
-	c = mix(c, snow_col, sc);
+	c = mix(c, snow_albedo(wpos.xz, max(fwidth(wpos.x), fwidth(wpos.z)), 0.0), sc);
 	// Cloud shadows sweeping the far slopes (the near field is lit by the
 	// real shadow map only, so they fade in past the detailed ground).
 	c *= 1.0 - 0.5 * t_cloud_shadow(wpos) * smoothstep(1200.0, 2600.0, dist);
