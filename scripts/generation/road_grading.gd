@@ -34,6 +34,10 @@ const EMBANKMENT_M := 40.0
 ## Test hook: false grades coarse DEMs with the defaults too.
 static var coarse_enabled := true
 
+## The per-road profile and stamps run natively (RoadGrader) when the
+## library is loaded.
+static var _native := ClassDB.class_exists("RoadGrader")
+
 ## True when `data`'s heights are a coarse surface model graded harder.
 static func coarse(data: LocationData) -> bool:
 	return coarse_enabled and BareEarth.applies(data) and not BareEarth.surface_model(data)
@@ -58,6 +62,10 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 	best_d.resize(size * size)
 	best_d.fill(INF)
 	var heads := _bridge_heads(roads)
+	var grader: Object = null
+	if _native:
+		grader = ClassDB.instantiate("RoadGrader")
+		grader.setup(src, level, size, step, max_shift_m)
 	for road in roads:
 		if not (road is Dictionary):
 			continue
@@ -84,9 +92,18 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 			valid.append(1 if _dry(level, size, step, p) else 0)
 		var prof := _smooth(heights, valid, arc, smooth_m * m2u)
 		_keep_embankments(prof, heights, line, arc, pts, heads, m2u)
+		if grader != null:
+			grader.stamp_line(line, prof, valid, half)
+			continue
 		for i in line.size():
 			if valid[i] == 1:
 				_stamp(line[i], prof[i], half, src, best_w, best_h, best_d, level, size, step, max_shift_m)
+	if grader != null:
+		# `surface` is the caller's array: refilled in place.
+		var graded: PackedFloat32Array = grader.apply(surface)
+		surface.resize(0)
+		surface.append_array(graded)
+		return
 	for i in size * size:
 		if best_w[i] > 0.0:
 			surface[i] = lerpf(surface[i], best_h[i], best_w[i])
@@ -244,6 +261,8 @@ static func _ring_distance(p: Vector2, ring: PackedVector2Array) -> float:
 ## Triangular low-pass of the dry samples within `radius` of each one.
 static func _smooth(h: PackedFloat32Array, valid: PackedByteArray,
 		arc: PackedFloat32Array, radius: float) -> PackedFloat32Array:
+	if _native:
+		return ClassDB.class_call_static("RoadGrader", "smooth", h, valid, arc, radius)
 	var out := PackedFloat32Array()
 	var n := h.size()
 	for i in n:
