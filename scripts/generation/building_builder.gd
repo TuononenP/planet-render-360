@@ -189,6 +189,10 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
 	ctx["eye"] = eye
+	# Roof colour samples read natively (PhotoSampler) from a usable photo.
+	var img := data.satellite_image
+	if img != null and not img.is_empty() and not img.is_compressed():
+		ctx["photo"] = GroundCover._photo_sampler(data)
 	if data.buildings.any(func(b: Dictionary) -> bool: return bool(b.get("suomenlinna", false))):
 		ctx["fortress_mesh"] = SuomenlinnaFortress.accumulator()
 	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
@@ -464,9 +468,13 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# roof colour (a residual on the shared roofs) then follows the imagery.
 	var hint := Color(0, 0, 0, 0)
 	var bb := RingGeometry.aabb(ring)
-	hint = MaterialLibrary.sampled_roof_color(data,
-		centre.x, centre.y, bb.size.x, bb.size.y,
-		Callable(TerrainBuilder, "satellite_uv"))
+	var photo: Object = ctx.get("photo", null)
+	if photo != null:
+		hint = photo.roof_sample(centre.x, centre.y, bb.size.x, bb.size.y)
+	else:
+		hint = MaterialLibrary.sampled_roof_color(data,
+			centre.x, centre.y, bb.size.x, bb.size.y,
+			Callable(TerrainBuilder, "satellite_uv"))
 	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
 		hint, fidelity, distant, seed_v, look)
 	if bool(b.get("mapped_landmark", false)) and not distant:

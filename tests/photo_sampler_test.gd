@@ -2,8 +2,9 @@ extends SceneTree
 
 ## Native photo reads: godot --headless --path . --script tests/photo_sampler_test.gd
 ## PhotoSampler (native/, tools/build_native.sh) must read exactly what
-## GroundCover._photo_at and _green_around do, at random points on and off
-## a synthetic mosaic, for several latitudes, zooms and source overrides.
+## GroundCover._photo_at and _green_around and MaterialLibrary's
+## sampled_roof_color do, at random points on and off a synthetic mosaic,
+## for several latitudes, zooms and source overrides.
 ## Skips, passing, when the library is not built.
 
 func _init() -> void:
@@ -35,8 +36,12 @@ func _init() -> void:
 		for k in 3000:
 			var x := rng.randf_range(-700.0, 700.0)
 			var z := rng.randf_range(-700.0, 700.0)
+			var sx := rng.randf_range(1.0, 60.0)
+			var sz := rng.randf_range(1.0, 60.0)
 			if var_to_bytes(sampler.photo(x, z)) != var_to_bytes(GroundCover._photo_at(data, x, z)) \
-					or GroundCover._green_near(sampler, data, x, z) != GroundCover._green_around(data, x, z):
+					or GroundCover._green_near(sampler, data, x, z) != GroundCover._green_around(data, x, z) \
+					or var_to_bytes(sampler.roof_sample(x, z, sx, sz)) != var_to_bytes(MaterialLibrary.sampled_roof_color(
+						data, x, z, sx, sz, Callable(TerrainBuilder, "satellite_uv"))):
 				bad += 1
 		if bad > 0:
 			failures.append("%s: %d of 3000 points differ" % [str(place.slice(0, 3)), bad])

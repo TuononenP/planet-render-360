@@ -31,6 +31,9 @@ public:
 	// How many of the four photo points `r` east, west, south and north of
 	// (x, z) are vegetation (GroundCover.photo_green with these thresholds).
 	int green_around(double x, double z, double r, double green_min, double lum_min) const;
+	// MaterialLibrary.sampled_roof_color: the raw photo's mean over a 3 x 3
+	// grid a quarter of the size apart around (x, z), from Color(0, 0, 0).
+	Color roof_sample(double x, double z, double size_x, double size_z) const;
 };
 
 } // namespace godot
