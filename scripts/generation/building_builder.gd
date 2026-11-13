@@ -769,13 +769,22 @@ static func _cover_for(ring: PackedVector2Array, key: String, take: bool = false
 		_covers[key] = [ring, cover]
 	return cover
 
+## _cover_for with the cover already computed: the one kept for this
+## mass when it is the same ring, else `cover`, kept.
+static func _cover_known(ring: PackedVector2Array, key: String, cover: Array) -> Array:
+	var hit: Array = _covers.get(key, [])
+	if not hit.is_empty() and hit[0] == ring:
+		return hit[1]
+	_covers[key] = [ring, cover]
+	return cover
+
 ## Every standing mass's roof form, computed up front on every core
 ## (RoofKernels.form_many) with _extrude_polygon's own inputs: _roof_form
 ## takes a result only when its call matches it exactly.
 static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
 		sorted: Array, standing: PackedByteArray) -> void:
 	var m2u := WorldScale.metres_to_units()
-	var jobs: Array = []
+	var masses: Array = []
 	for k in sorted.size():
 		var b: Dictionary = sorted[k]
 		if ShipBuilder.accepts(b) or standing[k] == 0:
@@ -784,18 +793,34 @@ static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
 			var md := m as Dictionary
 			if SuomenlinnaSite.fortress(md["b_eff"]):
 				continue
-			var ring: PackedVector2Array = md["ring"]
-			if RoofForms.axis_from_tags(md["b_eff"], ring) != Vector2.ZERO:
+			if RoofForms.axis_from_tags(md["b_eff"], md["ring"]) != Vector2.ZERO:
 				continue  # an axis of its own: the GDScript roof path builds it
-			var height_world := float(md["wall_m"]) * m2u
-			var party := PackedByteArray()
-			if _party != null and md.has("key"):
-				party = PartyWalls.party_flags(_cover_for(ring, str(md["key"])))
-			var job := _roof_job(ring, _mass_base(ground, ring, md["centre"], float(ctx.get("sea_y", -INF))) + height_world,
-				height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
-				md.get("holes", []))
-			if not job.is_empty():
-				jobs.append(job)
+			masses.append(md)
+	# The shared-wall covers read the finished index only: on the worker
+	# threads (native PartyIndex), filed below as _cover_for would.
+	var covers: Array = []
+	covers.resize(masses.size())
+	if _party != null and PartyWalls._native:
+		var group := WorkerThreadPool.add_group_task(func(i: int) -> void:
+			var md: Dictionary = masses[i]
+			if md.has("key"):
+				covers[i] = _party.ring_cover(md["ring"], str(md["key"])), masses.size(), -1, true, "RoofCovers")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	var jobs: Array = []
+	for i in masses.size():
+		var md: Dictionary = masses[i]
+		var ring: PackedVector2Array = md["ring"]
+		var height_world := float(md["wall_m"]) * m2u
+		var party := PackedByteArray()
+		if _party != null and md.has("key"):
+			var cover: Array = _cover_known(ring, str(md["key"]), covers[i]) if covers[i] != null \
+				else _cover_for(ring, str(md["key"]))
+			party = PartyWalls.party_flags(cover)
+		var job := _roof_job(ring, _mass_base(ground, ring, md["centre"], float(ctx.get("sea_y", -INF))) + height_world,
+			height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
+			md.get("holes", []))
+		if not job.is_empty():
+			jobs.append(job)
 	var res: Array = ClassDB.class_call_static("RoofKernels", "form_many", jobs)
 	for i in jobs.size():
 		_roofs[jobs[i]] = res[i]
