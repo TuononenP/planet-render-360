@@ -195,7 +195,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	surf.use_native()
-	var plan := RoadMarkings.plan(data, ground)
+	var plan := RoadMarkings.shared_plan(data, ground)
 	var junc := plan.junctions
 	surf.aprons = RoadMarkings._apron_grid(plan.aprons, m2u)
 	for ring: PackedVector2Array in plan.aprons:

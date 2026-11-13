@@ -94,6 +94,32 @@ class Plan extends RefCounted:
 	## Debug and test counters.
 	var scrambles := 0
 
+## Readers of one build's shared plan: the roads and the street lamps.
+const PLAN_READERS := 2
+const PLAN_META := &"road_marking_plan"
+static var _plan_lock := Mutex.new()
+
+## plan() made once per build (its GroundTruth): the roads and the street
+## lamps both read it, from parallel stages, and the later one waits for it.
+## Read-only once made; dropped when both have it.
+static func shared_plan(data: LocationData, ground: GroundTruth) -> Plan:
+	if ground == null:
+		return plan(data, ground)
+	_plan_lock.lock()
+	if not ground.has_meta(PLAN_META):
+		ground.set_meta(PLAN_META, [Mutex.new(), null, 0])
+	var entry: Array = ground.get_meta(PLAN_META)
+	entry[2] = int(entry[2]) + 1
+	if int(entry[2]) >= PLAN_READERS:
+		ground.remove_meta(PLAN_META)
+	_plan_lock.unlock()
+	var lock: Mutex = entry[0]
+	lock.lock()
+	if entry[1] == null:
+		entry[1] = plan(data, ground)
+	lock.unlock()
+	return entry[1]
+
 ## The markings of `data`'s road network.
 static func plan(data: LocationData, ground: GroundTruth) -> Plan:
 	var out := Plan.new()

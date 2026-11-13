@@ -200,7 +200,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 ## Lookup grids from the road plan: the junction surfaces no lamp stands
 ## on, and the signals whose streets take the main-road lamp.
 static func _lamp_sites(data: LocationData, ground: GroundTruth, m2u: float) -> Dictionary:
-	var plan := RoadMarkings.plan(data, ground)
+	var plan := RoadMarkings.shared_plan(data, ground)
 	var aprons := {}
 	for ring: PackedVector2Array in plan.aprons:
 		var box := Rect2(ring[0], Vector2.ZERO)
