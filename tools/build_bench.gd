@@ -2,7 +2,7 @@ extends SceneTree
 
 ## World-build bench + fingerprint (faster-build plan, Step 0).
 ##
-##   snapshot: godot --headless --path . --script tools/build_bench.gd -- snapshot DIR
+##   snapshot: godot --headless --path . --script tools/build_bench.gd -- snapshot DIR [key,key]
 ##     Runs the real GenerationPipeline (cache first) for each golden place
 ##     × preset and freezes its LocationData into DIR (images included), so
 ##     every later build, in any checkout, starts from the same input.
@@ -24,6 +24,7 @@ const PLACES := [
 	{"key": "venice", "lat": 45.4375, "lon": 12.3358},
 	{"key": "zermatt", "lat": 46.0207, "lon": 7.7491},
 	{"key": "bigsur", "lat": 36.2704, "lon": -121.8081},
+	{"key": "niittykumpu", "lat": 60.1700, "lon": 24.7790},
 ]
 
 var _tex_memo := {}
@@ -36,7 +37,7 @@ func _init() -> void:
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() >= 2 and args[0] == "snapshot":
-		await _snapshot(args[1])
+		await _snapshot(args[1], args[2].split(",", false) if args.size() >= 3 else PackedStringArray())
 	elif args.size() >= 3 and (args[0] == "build" or args[0] == "parallel"):
 		await _build(args[1], args[2], args.slice(3), args[0] == "parallel")
 	else:
@@ -47,12 +48,14 @@ func _run() -> void:
 
 # --- snapshot -------------------------------------------------------------
 
-func _snapshot(dir: String) -> void:
+func _snapshot(dir: String, keys: PackedStringArray) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	var pipe := GenerationPipeline.new()
 	root.add_child(pipe)
 	await process_frame
 	for place in PLACES:
+		if not keys.is_empty() and not keys.has(str(place["key"])):
+			continue
 		for preset in 4:
 			var done := [null]
 			var cb := func(d: LocationData) -> void: done[0] = d

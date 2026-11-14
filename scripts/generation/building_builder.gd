@@ -568,9 +568,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null and mass.has("key") else []
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
-	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
-		eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party,
-		str(look.get("wall_set", "")))
+	var trim := BuildingTrim.kind(shape, eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset))
+	_roof_cap(root, ring, idx, top, roof_mat, trim, cap, party, str(look.get("wall_set", "")))
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
 	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
@@ -598,7 +597,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade, "bands": bands,
 			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink, "shop_edges": shop_materials,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
-			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
+			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset), "ultra": RenderQuality.ultra_desktop(preset),
 			"wall_lanterns": RenderQuality.ultra_desktop(preset),
 			"shop_lights": RenderQuality.ultra_desktop(preset)
 				and eye_d < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
@@ -607,7 +606,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,
 			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset, data),
 			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "",
-			RenderQuality.is_forward_plus() and preset >= RenderSettings.Preset.HIGH)
+			RenderQuality.is_forward_plus() and preset >= RenderSettings.Preset.HIGH,
+			BuildingTrim.deck(top, trim) if RenderQuality.ultra_desktop(preset) else top)
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church
 		# towers are skyline and stay in every ring.
 		if str(look.get("kind", "")) != "religious":

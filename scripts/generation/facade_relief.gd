@@ -49,6 +49,7 @@ static func add(root: Node3D, d: Dictionary) -> void:
 	var look: Dictionary = d["look"]
 	var relief: Dictionary = look.get("relief", {})
 	var kit := ReliefKit.new()
+	kit.ultra = bool(d.get("ultra", false))
 	var rows := storey_rows(d, uvp)
 	var stone := ReliefKit.stone(str(look.get("wall_set", "limestone")),
 		look.get("wall_colour", Color(0, 0, 0, 0)))
@@ -74,6 +75,8 @@ static func add(root: Node3D, d: Dictionary) -> void:
 				trim_for(look, stone), str(look.get("ground", "")) == "" and not garage)
 	StreetFront.add(kit, spans, rows, d, stone)
 	AsiaFronts.add(kit, spans, rows, d)
+	if ModernBlockRelief.qualifies(d, uvp.z > 0.0):
+		ModernBlockRelief.add(kit, spans, rows, d, stone)
 	kit.flush(root, "Relief")
 
 ## Bays a wall `len_m` long fits at `bay` metres: none when under half a bay.
@@ -195,6 +198,7 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 		stacks.append(1 if glazed and j > 0 and j < bays - 1 and pick < GLAZED_COLUMN_SHARE else 0)
 	if glazed and bays >= 3 and not stacks.has(1):
 		stacks[bays / 2] = 1
+	sp["stacks"] = stacks
 	for row in rows:
 		if row["ground"]:
 			continue
@@ -273,7 +277,7 @@ static func _deep_balcony(kit: ReliefKit, c: Vector2, ax: Vector3, az: Vector3,
 	var base := Vector3(c.x, y, c.y)
 	kit.box(stone, base + Vector3.UP * t * 0.5 + az * depth * 0.5, ax, az, Vector3(w, t, depth))
 	if glazed:
-		var glass := ReliefKit.glass()
+		var glass := kit.pane()
 		var frame := ReliefKit.flat("#a3a7a3", 0.4, 0.3)
 		var cap := 0.08 * m
 		var h := (storey_h - t - cap) if storey_h > t + cap + 1.0 * m else 2.5 * m
@@ -366,7 +370,7 @@ static func _oriels(kit: ReliefKit, sp: Dictionary, rows: Array, paint: Material
 	var ax := Vector3(dir.x, 0.0, dir.y)
 	var az := Vector3(n.x, 0.0, n.y)
 	var step := float(sp["len_m"]) * m / float(bays)
-	var glass := ReliefKit.glass()
+	var glass := kit.pane()
 	var depth := 0.6 * m
 	var lo := 0 if from_ground else 1
 	for j in range(0 if bays < 3 else 1, bays, 2):

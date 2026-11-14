@@ -541,6 +541,8 @@ static func opening_look(look: Vector2) -> Vector2:
 ## viewpoint sits on its landmark — then FRAME_READ_M back along the v1
 ## framing direction (landmark ENE of the camera), inside the extent.
 static func spawn_xz(data: LocationData) -> Vector2:
+	if data.detail_at_centre:
+		return Vector2.ZERO
 	# A preset's curated eye (PresetViews) needs no framing step-back.
 	if not data.view.is_empty():
 		return PresetViews.eye_xz(data.view, data.latitude, data.longitude)

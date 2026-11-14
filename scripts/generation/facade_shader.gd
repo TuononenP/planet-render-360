@@ -197,7 +197,9 @@ void fragment() {
 		float before = (1.0 - textureGrad(depth_tex, prev, gx, gy).r) - cur + step_d;
 		uv = mix(uv, prev, after / (after - before));
 	}
-	vec3 base = textureGrad(albedo_tex, uv, gx, gy).rgb * tint.rgb;
+	// The building's vertex tint colours the wall under its paint, as in
+	// FacadeLiteShader: painted frames and balconies keep their own colour.
+	vec3 base = textureGrad(albedo_tex, uv, gx, gy).rgb * tint.rgb * COLOR.rgb;
 	vec2 photo_n = vec2(0.0);
 	if (has_photo) {
 		vec2 puv = uv * cells * photo_reps;
@@ -229,7 +231,7 @@ void fragment() {
 	vec3 wm = wpos / units_per_m;
 	float g = vnoise(wm.xz * 0.045 + wm.y * 0.02);
 	float streak = vnoise(vec2((wm.x + wm.z) * 0.9, wm.y * 0.06));
-	vec3 wall = base * COLOR.rgb * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
+	vec3 wall = base * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
 	// Winter on the wall (ClimateModel): snow on the sills under the
 	// panes, and slush and salt the street throws up its foot.
 	float wsnow = snow_line(wpos);

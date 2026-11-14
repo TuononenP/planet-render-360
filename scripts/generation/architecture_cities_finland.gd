@@ -129,7 +129,7 @@ const REGIONS := {
 	"espoo": {
 		"apartments": {"w": [["render", WHITE], ["concrete", WHITE]], "p": "punched", "wn": "wide",
 			"bay": 3.6, "r": [["flat", 1]], "rf": [["membrane", []]], "st": [3, 5], "fix": true,
-			"rv": {"glazed_balcony": 0.55}},
+			"rv": {"glazed_balcony": 0.55, "modern": {"fascia": [["metal", 2], ["render", 1]], "core": 0.6}}},
 		"house": {"w": [["wood", ["#e8d6ae", "#eee9df", "#b6c0b2"]], ["render", WHITE]], "p": "punched",
 			"r": [["gabled", 2], ["flat", 1]], "pitch": 0.45, "rf": SHEET_METAL, "st": [1, 2], "fix": true,
 			"rv": {}},
@@ -137,7 +137,8 @@ const REGIONS := {
 	"tapiola": {
 		"apartments": {"w": [["render", ["#efeee6", "#e1dfd3"]], ["concrete", WHITE]],
 			"p": [["punched", 3], ["strip", 1]], "wn": "wide", "bay": 3.6, "r": [["flat", 1]],
-			"rf": [["membrane", []]], "st": [3, 4], "fix": true, "rv": {"glazed_balcony": 0.45}},
+			"rf": [["membrane", []]], "st": [3, 4], "fix": true,
+			"rv": {"glazed_balcony": 0.45, "modern": {"fascia": [["render", 2], ["metal", 1]], "core": 0.35, "base": 0.9}}},
 	},
 	"otaniemi": {
 		"civic": {"w": [["brick", ["#9a4932", "#ad593e"]]], "p": "strip", "bay": 3.0,
@@ -150,10 +151,12 @@ const REGIONS := {
 	"espoo_modern": {
 		"commercial": {"w": [["glass", []], ["render", WHITE], ["stone", ["#d8d4c8", "#c9c5ba"]]],
 			"p": [["curtain", 2], ["strip", 1]], "r": [["flat", 1]],
-			"rf": [["membrane", []]], "st": [8, 22], "fix": true, "rv": {}},
+			"rf": [["membrane", []]], "st": [8, 22], "fix": true,
+			"rv": {"modern": {"fins": 0.7, "fascia": [["metal", 3], ["alu", 1]]}}},
 		"apartments": {"w": [["render", WHITE], ["brick", ["#b67b57"]]], "p": [["panel", 1], ["punched", 2]],
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [6, 16], "fix": true,
-			"rv": {"glazed_balcony": 0.85}},
+			"rv": {"glazed_balcony": 0.85, "modern": {"fascia": [["metal", 1]], "core": 0.7,
+				"entrance_kind": [["portal", 1]]}}},
 	},
 	"kauniainen": {
 		"house": {"w": [["wood", NORDIC_WOOD], ["render", PASTEL]], "p": "punched", "wn": "casement",

@@ -170,11 +170,13 @@ static func _mat(key: String) -> Material:
 
 ## One building's detail. `top` is the eaves/roof-cap Y, `wall_h` the wall
 ## height, both in internal units; `near` gates everything except towers.
+## `deck` is the flat roof's surface when a parapet sinks it below `top`
+## (BuildingTrim.deck): rooftop plant and clutter stand on it.
 static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		wall_h: float, shape: String, roof_h: float, look: Dictionary,
 		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool,
 		party: PackedByteArray = PackedByteArray(), gable_front: bool = false,
-		ultra: bool = false, country: String = "", clutter: bool = false) -> void:
+		ultra: bool = false, country: String = "", clutter: bool = false, deck: float = NAN) -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
 	if not near and not religious:
 		return
@@ -206,10 +208,11 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 			_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
 		_altana(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if shape == "flat":
-			_plant(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2)
+			var floor_y := top if is_nan(deck) else deck
+			_plant(batch, ring, c, u, v, lu, lv, floor_y, basis, look, seed_v, area_m2)
 			# The city's own rooftop clutter, on the desktop tiers.
 			if ultra or clutter:
-				RoofClutter.add(batch, ring, c, u, v, lu, lv, top, basis, look, seed_v, area_m2, country, wall_h / m2u)
+				RoofClutter.add(batch, ring, c, u, v, lu, lv, floor_y, basis, look, seed_v, area_m2, country, wall_h / m2u)
 	batch.flush(root)
 
 ## Roof surface height above the eaves at an offset from the centre, by

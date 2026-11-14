@@ -124,6 +124,9 @@ var focus: Dictionary = {}
 ## preset's origin, {} otherwise. The eye position also centres some generated
 ## props and is part of the WorldCache key; bearing and pitch remain camera-only.
 var view: Dictionary = {}
+## A streamed or recentred world: its near detail centres on the world
+## centre (the camera), never on a landmark's framing eye (View360.spawn_xz).
+var detail_at_centre := false
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
 const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]

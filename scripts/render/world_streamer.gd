@@ -300,7 +300,7 @@ func should_retry() -> bool:
 func swap_wanted(pos: Vector2) -> bool:
 	if state != State.READY:
 		return false
-	return pos.distance_to(pending_target_xz) < pos.length() \
+	return pos.distance_to(pending_target_xz) <= pos.length() \
 		or (not inside_detailed(pos) and inside_detailed(pos - pending_target_xz))
 
 ## A camera standing still near the centre keeps its ready world: an
@@ -729,6 +729,8 @@ func tick(v: View360, delta: float) -> void:
 		return
 	if needs_recentre(pos, _planned_vel(), look, expected_build_s(v._quality_preset)):
 		_start_generation(v, pos, look)
+	elif DetailDrift.wanted(pos, View360.spawn_xz(v._data), _still_s, v._quality_preset):
+		_start_generation(v, pos, look, true)  # stopped off the detail rings
 	elif not _warmed and v.start_flying and v._drone.on \
 			and Time.get_ticks_msec() - _opened_msec >= int(WARM_S * 1000.0):
 		# A place opens in the drone with every cache cold: the first
@@ -846,17 +848,17 @@ func _worst_line(phases: Array) -> String:
 			parts.append("%s %.1f ms" % [p, _worst[p]])
 	return "worst frame " + ", ".join(parts)
 
-func _start_generation(v: View360, pos: Vector2, look: Vector2) -> void:
+func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -> void:
 	_warmed = true
 	var expected := expected_build_s(v._quality_preset)
-	var target := step_target(pos, _planned_vel(), look, expected)
-	if _revive(v, pos, target - pos):
+	var target := pos if here else step_target(pos, _planned_vel(), look, expected)
+	if not here and _revive(v, pos, target - pos):
 		return
 	# A centre fetched ahead or around (or built a moment ago, a turn
 	# then a U-turn): build that one, its data already on disk.
 	var planned := false
 	var reused := false
-	var ll := _scout.pick(pos, target - pos, v._data.latitude, v._data.longitude)
+	var ll := Vector2.INF if here else _scout.pick(pos, target - pos, v._data.latitude, v._data.longitude)
 	if ll != Vector2.INF:
 		planned = ll == _scout.plan_ll
 		reused = not planned
@@ -927,6 +929,7 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	data.season = v._data.season
 	data.view = {}
 	data.focus = {}
+	data.detail_at_centre = true
 	if progress != null:
 		progress.phase = SaveProgress.Phase.BUILD
 	var built := await v.build_location(data, ground, _abort)

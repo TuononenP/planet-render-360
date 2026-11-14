@@ -10,6 +10,8 @@ extends RefCounted
 ## third-party pixels.
 
 var surfaces: Dictionary = {}
+## Desktop Ultra: built glass takes the lighter Ultra pane (pane()).
+var ultra := false
 
 static var _mats: Dictionary = {}
 ## Native QuadSink (native/, tools/build_native.sh) when loaded: one per
@@ -218,6 +220,23 @@ static func glass() -> Material:
 	m.metallic = 0.2
 	m.metallic_specular = 0.7
 	_mats["glass"] = m
+	return m
+
+## Built glass for this kit: on desktop Ultra a lighter, less metallic
+## pane (the facade shader's dark mirror panes and #4f6170 balcony boxes
+## read as one slab of black glass there); elsewhere glass().
+func pane() -> Material:
+	return glass_ultra() if ultra else glass()
+
+static func glass_ultra() -> Material:
+	if _mats.has("glass_u"):
+		return _mats["glass_u"] as Material
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color.html("#7f909c")
+	m.roughness = 0.06
+	m.metallic = 0.05
+	m.metallic_specular = 0.6
+	_mats["glass_u"] = m
 	return m
 
 ## Canvas in an sRGB hex, striped with cream or plain; both faces drawn.
