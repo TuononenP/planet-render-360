@@ -15,6 +15,7 @@ extends SceneTree
 ##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8;
 ##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
 ##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
+##        [--size=WxH]  (frame size; default 1280x800)  [--png]  (lossless PNG, not JPEG)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -184,9 +185,20 @@ func _run() -> void:
 	main.capture_mode = true
 	# Avoid reopening a saved camera: every capture starts from its preset.
 	main._store.entries.clear()
-	root.size = SIZE
+	var size := SIZE
+	var wh := str(a.get("size", "")).split("x")
+	if wh.size() == 2 and wh[0].is_valid_int() and wh[1].is_valid_int():
+		size = Vector2i(int(wh[0]), int(wh[1]))
+	root.size = size
 	await create_timer(0.5).timeout
-	root.size = SIZE  # the first resize can be lost to window creation
+	root.size = size  # the first resize can be lost to window creation
+	if size != SIZE:
+		# The UI stretch would cap the 3D view at its logical size: render
+		# at the real pixel size instead (the HUD is not in the shot).
+		if root.size_changed.is_connected(main._fit_content_scale):
+			root.size_changed.disconnect(main._fit_content_scale)
+		root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+		root.content_scale_factor = 1.0
 	for child in main.get_children():
 		if child is OnboardingScreen:
 			child.queue_free()
@@ -467,6 +479,8 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	var img := view._viewport.get_texture().get_image()
 	img.convert(Image.FORMAT_RGB8)
 	var path := _out.path_join("%s_%s.jpg" % [id, shot])
+	if OS.get_cmdline_user_args().has("--png"):
+		img.save_png(path.get_basename() + ".png")
 	img.save_jpg(path, 0.88)
 	if shot == "vantage_noon" and OS.get_cmdline_user_args().has("--bake-thumbs"):
 		_bake_thumb(img, id)
