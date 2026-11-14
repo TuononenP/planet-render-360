@@ -212,6 +212,11 @@ func _run() -> void:
 	place_store.entries = [{"name": "Test Place, Somewhere", "lat": 1.0, "lon": 2.0,
 		"quality_preset": 2, "timestamp": now}]
 	screen.bind_store(place_store)
+	# The places list is built once the cache index lands (ensure_index_async).
+	for _i in 300:
+		if CacheStore.index_ready():
+			break
+		await process_frame
 	await process_frame
 	if screen._place_rows.size() != 1 or screen._place_clear_btns.size() != 1:
 		failures.append("storage should list one row per saved place, got %d" % screen._place_rows.size())

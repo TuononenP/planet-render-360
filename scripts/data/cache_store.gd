@@ -551,7 +551,9 @@ static func _index_loaded() -> void:
 	var waiters := _index_waiters
 	_index_waiters = []
 	for w in waiters:
-		w.call()
+		# A screen freed before the index landed leaves a dead lambda.
+		if w.is_valid():
+			w.call()
 
 ## Whether the index is in memory. Screens that only need sizes check
 ## this before place_cache_report, whose _ensure_lru would otherwise
