@@ -11,8 +11,9 @@ extends SceneTree
 ##        [--pin=lat,lon] (one custom location; --places supplies its output id)
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
-##        [--looks="lat,lon,height_m,bearing,pitch;..."]  (candidate eyes, one
-##          <id>_look<N>.jpg each: the eye stands height_m over the ground)
+##        [--looks="lat,lon,height_m,bearing,pitch[,zoom];..."]  (candidate eyes, one
+##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8)
+##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -77,6 +78,10 @@ const CONTROLS := [
 	{"id": "turku", "name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
 	{"id": "zermatt", "name": "Zermatt, Switzerland", "lat": 46.0207, "lon": 7.7491},
 	{"id": "cairo", "name": "Cairo, Egypt", "lat": 30.0444, "lon": 31.2357},
+	# Winter in the golden set: snow lying and falling at the Helsinki
+	# preset's eye, whatever --season and --weather the run is given.
+	{"id": "helsinki_winter", "name": "Helsinki, Finland", "lat": 60.1679, "lon": 24.9525,
+		"season": "winter", "weather": 73},
 ]
 
 var _out := ""
@@ -91,6 +96,8 @@ var _weather_code := 0
 var _season := -1
 ## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
 var _looks: Array = []
+## When the --looks are taken: "" golden hour, "late" two hours after sunset.
+var _look_time := ""
 var _date_override: Dictionary = {}
 var _reference_set := ""
 
@@ -193,10 +200,13 @@ func _run() -> void:
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
 	_weather_code = int(a.get("weather", 0))
+	_look_time = str(a.get("look_time", ""))
 	for spec in str(a.get("looks", "")).split(";", false):
 		var f := spec.split(",")
-		if f.size() == 5:
-			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4])])
+		if f.size() >= 5:
+			# An optional sixth field zooms the look (CameraRig, 0.7-2.8).
+			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4]),
+				float(f[5]) if f.size() >= 6 else 1.0])
 	var season_arg := str(a.get("season", ""))
 	_date_override = ViewLink.parse_date(str(a.get("date", "")))
 	var names := ["spring", "summer", "autumn", "winter"]
@@ -254,11 +264,16 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
 		await process_frame
 	# Clear captures keep a few clouds; forced weather comes overcast.
-	if _season >= 0 and view._data.season != _season:
+	# A place may pin its own season and weather (the winter control).
+	var season := _season
+	if place.has("season"):
+		season = ["spring", "summer", "autumn", "winter"].find(str(place["season"]))
+	var weather := int(place.get("weather", _weather_code))
+	if season >= 0 and view._data.season != season:
 		# Seasons bake into the world: this rebuilds it in that season.
-		await ViewConditions._select_season(view, _season)
-	view._atmos.set_weather(_weather_code, 15.0 if _weather_code == 0 else 100.0)
-	ViewConditions._apply_precip(view, _weather_code)
+		await ViewConditions._select_season(view, season)
+	view._atmos.set_weather(weather, 15.0 if weather == 0 else 100.0)
+	ViewConditions._apply_precip(view, weather)
 	ViewConditions.apply_surface_state(view)
 	if _date_override.is_empty():
 		ViewConditions.spawn_golden_hour(view)
@@ -344,14 +359,24 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_late")
 	if not _looks.is_empty():
-		ViewConditions.spawn_golden_hour(view)
+		# --look_time=late: the looks two hours after sunset (lamps, lit
+		# windows); otherwise at golden hour.
+		if _look_time == "late":
+			ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
+		else:
+			ViewConditions.spawn_golden_hour(view)
+		# A clock change can re-show the place's live weather: pin the run's.
+		var w := int(place.get("weather", _weather_code))
+		view._atmos.set_weather(w, 15.0 if w == 0 else 100.0)
+		ViewConditions._apply_precip(view, w)
+		ViewConditions.apply_surface_state(view)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 	for k in _looks.size():
 		var l: Array = _looks[k]
 		var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
 		var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
 		rig.position = Vector3(at.x, y, at.y)
-		rig.reset_zoom()
+		rig.set_zoom(float(l[5]))
 		rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "look%d" % k)
