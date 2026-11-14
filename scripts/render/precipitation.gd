@@ -25,7 +25,10 @@ extends GPUParticles3D
 const AMOUNT := [800, 1300, 2400, 3600]
 ## Half-extents (m) of the emission box around the eye.
 const RAIN_BOX := Vector3(18.0, 12.0, 18.0)
-const SNOW_BOX := Vector3(20.0, 9.0, 20.0)
+## Snow's box is the tighter: the same budget fills the air near the eye,
+## where flakes are big enough to read (and to catch a lamp); the veils
+## carry the distance.
+const SNOW_BOX := Vector3(14.0, 8.0, 14.0)
 ## Metres each particle falls before it fades out.
 const RAIN_TRAVEL_M := 8.0
 const SNOW_TRAVEL_M := 7.0
@@ -40,9 +43,15 @@ const WIND := WaterShader.WIND
 
 const SHADER := """
 shader_type spatial;
-render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+// Lit (not unshaded): the street lamps light the flakes and drops that
+// pass through their pools at night; the sky's own level is emission.
+render_mode blend_mix, depth_draw_never, cull_disabled, shadows_disabled, diffuse_lambert_wrap, specular_disabled, world_vertex_coords;
 
 uniform vec3 tint : source_color = vec3(0.8);
+// What real light (lamps, sun) makes of a flake or drop: by day a share
+// of the sky's level, at night white, so it flares only in a lamp's pool.
+uniform vec3 lit_col = vec3(0.24);
+uniform vec2 wind_xz = vec2(0.86, 0.51);
 uniform float opacity = 0.4;
 uniform bool snow = false;
 uniform vec2 quad_m = vec2(0.006, 0.45);
@@ -57,15 +66,27 @@ varying float fade;
 varying vec2 flake;
 
 void vertex() {
-	vec3 c = MODEL_MATRIX[3].xyz;
-	// The particle's random scale doubles as its seed.
-	float s = length(MODEL_MATRIX[0].xyz);
-	float seed = fract(s * 41.3);
+	// world_vertex_coords: VERTEX arrives in world space with the particle's
+	// own transform applied (unit scale, no rotation: apply() keeps both),
+	// so the quad corner off the UV gives back the particle's centre.
+	// MODEL_MATRIX holds only the emitter here: reading the centre and the
+	// scale from it put every flake at one point and none was ever seen.
+	vec2 corner = vec2(UV.x - 0.5, 0.5 - UV.y);
+	vec3 c = VERTEX - vec3(corner, 0.0);
+	// Per-particle size and seed from its index.
+	float h1 = fract(sin(float(INSTANCE_ID) * 12.9898 + 1.7) * 43758.5453);
+	float s = mix(snow ? 0.5 : 0.7, snow ? 1.7 : 1.3, h1);
+	float seed = fract(sin(float(INSTANCE_ID) * 78.233 + 3.1) * 43758.5453);
 	if (snow) {
 		// Flakes wander as they fall: a path that is a function of height.
 		float ph = seed * 6.2831853;
 		c.x += sin(c.y * 1.1 + ph) * 0.35 + sin(c.y * 2.9 + ph * 2.0) * 0.1;
 		c.z += cos(c.y * 0.9 + ph * 1.7) * 0.35;
+		// Gusts: the wind rises and falls every several seconds and
+		// sweeps the air downwind, a front that rolls through the box.
+		float front = dot(c.xz, wind_xz) * 0.08;
+		float gust = sin(TIME * 0.35 - front) * 0.6 + sin(TIME * 0.83 - front * 1.7 + 1.3) * 0.4;
+		c.xz += wind_xz * gust * 1.4 + vec2(-wind_xz.y, wind_xz.x) * sin(TIME * 0.5 - front + ph) * 0.25;
 	}
 	vec3 to_cam = CAMERA_POSITION_WORLD - c;
 	float dist = max(length(to_cam), 0.05);
@@ -75,9 +96,10 @@ void vertex() {
 	vec3 side = cross(up, v);
 	side = length(side) > 1e-3 ? normalize(side)
 		: normalize(cross(up, abs(up.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 0.0, 1.0)));
-	vec3 back = cross(side, up);
-	// One pixel's width in metres at this distance.
-	float px = dist * 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
+	// One pixel's width in metres at this distance. abs: the projection's
+	// y scale is negative here (flipped), which made every width negative,
+	// the energy below zero and every flake invisible.
+	float px = dist * 2.0 / abs(PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 	vec2 size = quad_m * s;
 	float blur = 0.0;
 	if (snow) {
@@ -94,14 +116,20 @@ void vertex() {
 	if (snow) {
 		size.y = size.x;
 	}
-	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(vec4(side * size.x, 0.0), vec4(up * size.y, 0.0),
-		vec4(back, 0.0), vec4(c, 1.0));
+	// The billboard is built in world space from the quad's own corner
+	// (UV): overriding MODELVIEW_MATRIX was not honoured and no particle
+	// ever drew.
+	VERTEX = c + side * (corner.x * size.x) + up * (corner.y * size.y);
+	// A flake scatters light from every side; street lamps and the sun
+	// shine from above, so it is lit as a surface facing up (facing the
+	// eye, a lamp overhead met it edge-on and it never flared).
+	NORMAL = vec3(0.0, 1.0, 0.0);
 	// No huge smears against the lens; no visible edge at the box's reach.
 	float near_fade = snow ? smoothstep(0.12, 0.5, dist) / (1.0 + 2.6 * blur * blur) : smoothstep(0.4, 2.2, dist);
 	fade = energy * near_fade * (1.0 - smoothstep(reach_m * 0.7, reach_m * 1.15, dist));
-	// Age 0..1 from the particle process: no birth or death in one frame.
-	float age = clamp(INSTANCE_CUSTOM.y, 0.0, 1.0);
-	fade *= smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.85, 1.0, age));
+	// No per-particle age fade: INSTANCE_CUSTOM never carried the age
+	// here and the fade zeroed every flake (they had never drawn). The
+	// box's reach fade above keeps births and deaths out of sight.
 	flake = vec2(seed, blur);
 }
 
@@ -126,8 +154,11 @@ void fragment() {
 		// Sharp across, tapering along the fall line.
 		a = (1.0 - abs(q.x)) * (1.0 - smoothstep(0.1, 1.0, abs(q.y)));
 	}
-	ALBEDO = col;
+	ALBEDO = lit_col;
+	// By day the sun's share comes on top of this: a little under the sky.
+	EMISSION = col * 0.85;
 	ALPHA = clamp(a * opacity * fade, 0.0, 1.0);
+
 }
 """
 
@@ -228,10 +259,18 @@ static func build(parent: Node3D, preset: int) -> GPUParticles3D:
 	return p
 
 ## Follows the eye while it falls; idle (not even processed) in clear weather.
+## Particles live in world space, so an eye that jumps (a new look, a
+## street-level hop) would leave the air behind it empty for a lifetime:
+## a jump past half the box refills it at once (restart runs the preroll).
 func _process(_delta: float) -> void:
 	var rig := get_parent() as Node3D
 	if rig != null:
-		position = rig.global_position + Vector3(0.0, BOX_UP_M, 0.0)
+		var at := rig.global_position + Vector3(0.0, BOX_UP_M, 0.0)
+		var reach := (process_material as ParticleProcessMaterial).emission_box_extents.x * 0.5
+		var jumped := at.distance_to(position) > reach
+		position = at
+		if jumped and emitting:
+			restart()
 
 ## High and Ultra read what lies behind each flake (one screen copy a
 ## frame), so flakes go grey against a bright sky as real ones do.
@@ -318,8 +357,10 @@ static func apply(p: GPUParticles3D, look: Dictionary) -> void:
 	pm.spread = 10.0 if snow else 2.5
 	pm.initial_velocity_min = speed * 0.85
 	pm.initial_velocity_max = speed * 1.15
-	pm.scale_min = 0.5 if snow else 0.7
-	pm.scale_max = 1.7 if snow else 1.3
+	# Unit scale: the flake shader takes each particle's size from its
+	# index and recovers its centre from a unit quad (Precipitation.SHADER).
+	pm.scale_min = 1.0
+	pm.scale_max = 1.0
 	p.amount_ratio = float(pp["amount_ratio"])
 	p.lifetime = (SNOW_TRAVEL_M if snow else RAIN_TRAVEL_M) / speed
 	# The air is already full when the weather starts. Slow flakes need
@@ -331,6 +372,7 @@ static func apply(p: GPUParticles3D, look: Dictionary) -> void:
 	qm.set_shader_parameter("quad_m", pp["size"])
 	qm.set_shader_parameter("opacity", float(pp["alpha"]))
 	qm.set_shader_parameter("fall_dir", fall)
+	qm.set_shader_parameter("wind_xz", Vector2(WIND.x, WIND.y).normalized())
 	qm.set_shader_parameter("reach_m", box.x)
 	for mi in _veil_nodes(p):
 		var m := mi.material_override as ShaderMaterial
@@ -346,6 +388,15 @@ static func set_light(p: GPUParticles3D, sky: Color, snowing: bool) -> void:
 	# Snow scatters nearly all the light, rain is mostly clear water;
 	# both go dark with the sky.
 	var c := (Color(sky.r * 1.3, sky.g * 1.3, sky.b * 1.3)).clamp() if snowing else sky
-	((p.draw_pass_1 as QuadMesh).material as ShaderMaterial).set_shader_parameter("tint", c)
+	var qm := (p.draw_pass_1 as QuadMesh).material as ShaderMaterial
+	qm.set_shader_parameter("tint", c)
+	# The darker the sky, the more the lamps make of a flake: at night it
+	# is near invisible until it crosses a pool of light, where it flares
+	# white (snow) or pale (rain).
+	var level := clampf((c.r + c.g + c.b) / 3.0, 0.0, 1.0)
+	# Above 1: a flake in a lamp's beam throws much of that light forward
+	# at the eye (forward scattering), far more than a matte surface would.
+	var white := Color(6.0, 6.0, 6.0) if snowing else Color(1.5, 1.5, 1.5)
+	qm.set_shader_parameter("lit_col", white.lerp(c * 0.3, smoothstep(0.05, 0.4, level)))
 	for mi in _veil_nodes(p):
 		(mi.material_override as ShaderMaterial).set_shader_parameter("tint", c)
