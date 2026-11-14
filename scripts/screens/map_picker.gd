@@ -132,6 +132,7 @@ var _store: CacheStore
 var _recent_box: VBoxContainer
 var _recent_row: HBoxContainer
 var _first_note: Label
+var _first_launch := false  # no history yet: the note shows over the featured shelf
 var _offline_badge: Button
 var _offline := false
 var _toast: Toast
@@ -423,7 +424,7 @@ func _ready() -> void:
 	_quick_box.add_child(_recent_box)
 	_quick_box.move_child(_recent_box, 0)
 	_quick_box.add_child(_first_note)
-	_quick_box.move_child(_first_note, 2)
+	_quick_box.move_child(_first_note, 3)
 	_wire_zoom(_sheet)
 	_wire_zoom(_side, false)
 	resized.connect(_on_resized)
@@ -548,24 +549,23 @@ func _settle_shelf() -> void:
 	_set_selected_quick(_selected_quick)
 	MapHome.apply_offline(self)
 
-## Show the cards of the open shelf and name it. First launch keeps to three
-## featured places and no filter.
+## Show the cards of the open shelf and name it. First launch adds a line
+## of copy over the featured places.
 func _apply_shelf() -> void:
-	var first := _first_note != null and _first_note.visible
 	var featured := _shelf_key == CapitalContinents.FEATURED
 	var shelf := _shelf_indices(_shelf_key)
+	if _first_note != null:
+		_first_note.visible = _first_launch and featured
 	for card in _quick_chips:
-		var qi := int(card.get_meta("quick_index"))
-		card.visible = qi < 3 if first else qi in shelf
+		card.visible = int(card.get_meta("quick_index")) in shelf
 	# Cards are built as a shelf opens, so put the built ones in shelf order.
 	var at := 0
 	for qi in shelf:
 		if _quick_by_index.has(qi):
 			_quick_grid.move_child(_quick_by_index[qi], at)
 			at += 1
-	_continent_filter.visible = not first
 	var title := "Around the world"
-	if not featured and not first:
+	if not featured:
 		title = "%s · %d %s" % [CapitalContinents.label_of(_shelf_key), shelf.size(),
 			"place" if shelf.size() == 1 else "places"]
 	_quick_label.text = title.to_upper()

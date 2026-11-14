@@ -20,7 +20,7 @@ func _centre_in(c: Control, scroll: ScrollContainer) -> bool:
 ## down to the shelf, a pick keeps the scroll (the card stays in view) and
 ## a pinned Explore bar for the place starts the scene.
 func _check_explore_bar(failures: Array[String], picker: MapPicker, win: Vector2, label: String) -> void:
-	# A returning user sees the whole shelf (first launch shows three cards).
+	# The whole featured shelf, as on any launch.
 	for chip in picker._quick_chips:
 		chip.visible = true
 	# Measured without the optional elevation, time and weather rows
@@ -386,15 +386,32 @@ func _run() -> void:
 	Responsive.safe_override = []
 	settings.queue_free()
 	# Each continent opens its own shelf: only its cards show, selection follows.
-	# First launch keeps three cards and no filter, so check that, then a returning user.
-	picker._first_note.visible = true
+	# First launch shows the filter and every featured place, with the note
+	# over them; the note leaves on a continent shelf and once there is history.
+	picker._first_launch = true
+	picker._shelf_key = CapitalContinents.FEATURED
 	picker._apply_shelf()
-	if picker._continent_filter.visible:
-		_fail(failures, "First launch should not show the continent filter")
-	picker._first_note.visible = false
+	var featured_shown := 0
+	for card in picker._quick_chips:
+		var featured_card := int(card.get_meta("quick_index")) < PresetViews.ROWS.size()
+		if card.visible != featured_card:
+			_fail(failures, "First launch should show exactly the featured places")
+			break
+		if card.visible:
+			featured_shown += 1
+	if featured_shown != PresetViews.ROWS.size():
+		_fail(failures, "First launch should show all %d featured places, shows %d" % [PresetViews.ROWS.size(), featured_shown])
+	if not picker._continent_filter.visible or not picker._first_note.visible:
+		_fail(failures, "First launch should show the continent filter and the note")
+	picker._shelf_key = CapitalContinents.EUROPE
 	picker._apply_shelf()
-	if not picker._continent_filter.visible:
-		_fail(failures, "A returning user should see the continent filter")
+	if picker._first_note.visible:
+		_fail(failures, "The first-launch note should leave on a continent shelf")
+	picker._first_launch = false
+	picker._shelf_key = CapitalContinents.FEATURED
+	picker._apply_shelf()
+	if picker._first_note.visible or not picker._continent_filter.visible:
+		_fail(failures, "A returning user should see the filter and no note")
 	for width in [390.0, 1280.0]:
 		picker.size = Vector2(width, 844)
 		picker._on_resized()

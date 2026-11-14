@@ -2,11 +2,11 @@ class_name MapHome
 extends RefCounted
 
 ## Map home states from the design system (MapHome): the Recent places
-## rail, the first-launch state (three featured places and one line of
-## copy), offline (a Toast, an "Offline" badge in the search field, and
-## only cached places tappable), the Toast itself, Save for offline
-## carrying its progress on its label, and the map keys (/ or ⌘F search,
-## Enter explores, Esc leaves the field). Operates on the picker via `p`.
+## rail, the first-launch line of copy, offline (a Toast, an "Offline"
+## badge in the search field, and only cached places tappable), the Toast
+## itself, Save for offline carrying its progress on its label, and the
+## map keys (/ or ⌘F search, Enter explores, Esc leaves the field).
+## Operates on the picker via `p`.
 
 const FIRST_LAUNCH := "Pick any point on the map, or start with one of these."
 const OFFLINE_TITLE := "You're offline. Cached places still open."
@@ -61,9 +61,8 @@ static func refresh_recent(p: MapPicker) -> void:
 		card.pressed.connect(func() -> void: p._select_suggestion(full, lat, lon))
 		p._recent_row.add_child(card)
 	p._recent_box.visible = not entries.is_empty()
-	# First launch: three featured places and one line of copy.
-	var first := entries.is_empty()
-	p._first_note.visible = first
+	# First launch: one line of copy over the featured places.
+	p._first_launch = entries.is_empty()
 	p._apply_shelf()
 	apply_offline(p)
 
