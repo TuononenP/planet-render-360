@@ -162,6 +162,7 @@ static func apply_surface_state(v: View360, dress_world := true) -> void:
 ## world's direct children, so those passes skip it.
 static func dress(world: Node, top: bool, v: View360, data: LocationData) -> void:
 	var code := v._atmos.weather_code if v._atmos != null else -1
+	StreetGlow.apply_world(world, data, top)
 	if top:
 		_wet_roads(world, 1.0 if code in ClimateModel.RAINING else 0.0)
 		var snow_on := float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0

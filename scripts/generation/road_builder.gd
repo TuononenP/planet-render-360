@@ -25,8 +25,11 @@ extends RefCounted
 ## (lift_for_layer), so the two can never disagree: at street-level eye
 ## heights a 1 cm lift outweighs the depth bias, and a crossing lifted
 ## less than the road it lies on vanished under it.
-## A carriageway with a building centre this near (m) is a lit street.
+## A way with a building centre this near (m) is a lit street; a major
+## road or a square reaches further (boulevards and plazas stand wide of
+## their buildings, and are lit all the same).
 const LIT_BUILT_M := 35.0
+const LIT_MAJOR_M := 120.0
 const LIFT_MIN_M := 0.03
 const LIFT_MAX_M := 0.05
 const LIFT_TOP_LAYER := 7.7
@@ -208,6 +211,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var seeds := RoadSurface.wear_seeds(data)
 	surf.wear_seeds = seeds
 	surf.built = OverheadWires._centre_grid(data, LIT_BUILT_M * m2u)
+	surf.built_major = OverheadWires._centre_grid(data, LIT_MAJOR_M * m2u)
 	surf.ground_roads = StreetProps._road_grid(data, m2u, true)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
@@ -294,7 +298,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
 	# Lit as StreetProps lines its streets with lamps: any way among
 	# buildings, landuse polygon or not (central Helsinki has none).
-	var lit := urban or OverheadWires._built(mid, surf.built, LIT_BUILT_M * m2u)
+	var lit := urban or _lit_way(dense, int(r["rank"]) >= 2, surf, m2u)
 	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
 		RoadSurface.wear_attr(urban, wear_seed, lit), 1.0)
 	for run in _dry_runs(dense, surf):
@@ -367,9 +371,17 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 ## A square or junction apron with a building near its outline is lit by
 ## the street lamps around it (StreetGlow).
 static func _lit_ring(ring: PackedVector2Array, surf: _Surface, m2u: float) -> bool:
-	var stride := maxi(1, ring.size() / 8)
-	for i in range(0, ring.size(), stride):
-		if OverheadWires._built(ring[i], surf.built, LIT_BUILT_M * m2u):
+	return _lit_way(ring, true, surf, m2u)
+
+## True when a building stands near any of up to 8 points along `pts`
+## (LIT_MAJOR_M for a major road or square, else LIT_BUILT_M): a long
+## way's midpoint alone can sit wide of every building beside it.
+static func _lit_way(pts: PackedVector2Array, major: bool, surf: _Surface, m2u: float) -> bool:
+	var grid: Dictionary = surf.built_major if major else surf.built
+	var radius := (LIT_MAJOR_M if major else LIT_BUILT_M) * m2u
+	var stride := maxi(1, pts.size() / 8)
+	for i in range(0, pts.size(), stride):
+		if OverheadWires._built(pts[i], grid, radius):
 			return true
 	return false
 
@@ -618,6 +630,8 @@ class _Surface extends RefCounted:
 	## Building centres (OverheadWires._centre_grid, LIT_BUILT_M cells): a
 	## way or square among buildings is lit (StreetGlow's pools).
 	var built: Dictionary = {}
+	## The same in LIT_MAJOR_M cells, for major roads and squares.
+	var built_major: Dictionary = {}
 	var districts: Array = []
 	var size := 0
 	var step := 1.0

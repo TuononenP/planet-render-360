@@ -230,6 +230,7 @@ uniform int far_quality = 2;
 // @SNOW
 // @TERRAIN
 // @WATER_FILTER
+// @GLOW
 global uniform float valley_haze_y;
 global uniform vec3 valley_haze_col;
 global uniform float far_fog_density;
@@ -396,6 +397,10 @@ void fragment() {
 	float valley_air = smoothstep(1500.0, 14000.0, dist) * (1.0 - smoothstep(0.0, 900.0, wpos.y - valley_haze_y));
 	c = mix(c, valley_haze_col * 0.85, valley_air * 0.42 * (1.0 - water));
 	ALBEDO = min(c, vec3(albedo_cap));
+	// Night: the far city's carpet of street lights (StreetGlow), mottled
+	// block by block, never on water.
+	EMISSION = far_lamp_tint() * lamp_settle(wpos.xz) * (1.0 - water)
+		* (0.45 + 0.55 * t_noise(wpos.xz / 70.0)) * (0.7 + 0.3 * t_noise(wpos.xz / 23.0 + 4.1));
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
@@ -423,7 +428,7 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
 	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE) \
-		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL)
+		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = code

@@ -102,9 +102,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
 	# The road surface's painted lamp pools (StreetGlow), on every tier:
 	# the street lamps' colour, faint where real lamp lights burn.
+	StreetGlow.set_place_for(data)
 	var real := RenderQuality.ultra_desktop(int(ctx["preset"]))
-	StreetGlow.set_place(StreetLights.colour_for(lamp_style(family, region, "residential"), region),
-		StreetLights.FADE_BEGIN_M * m2u if real else 0.0, StreetLights.FADE_LENGTH_M * m2u if real else 0.0)
 	var radius_m: float = PROP_R[int(ctx["preset"])]
 	if radius_m <= 0.0 or data.buildings.is_empty():
 		return 0

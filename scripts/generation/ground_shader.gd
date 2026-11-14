@@ -66,6 +66,7 @@ uniform float stripe_angle = 0.6;
 
 // @SNOW
 // @TERRAIN
+// @GLOW
 varying vec3 wpos;
 varying vec3 wnrm;
 varying float water_level;
@@ -517,5 +518,10 @@ void fragment() {
 	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
 	RIM = SNOW_RIM * sc;
 	RIM_TINT = SNOW_RIM_TINT;
+	// Night: past the drawn streets the city's lit streets read as a glow
+	// on the ground (StreetGlow's light map), as on the far surface;
+	// nearer (StreetGlow.GROUND_NEAR_M), yards and lawns stay dark.
+	EMISSION = far_lamp_tint() * lamp_settle(wpos.xz) * smoothstep(700.0, 1200.0, dist_m)
+		* (0.45 + 0.55 * t_noise(wpos.xz / 70.0)) * (0.7 + 0.3 * t_noise(wpos.xz / 23.0 + 4.1));
 }
 """

@@ -76,6 +76,10 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	var t0 := Time.get_ticks_msec()
 	var smap: SettlementMap = settle.wait_to_finish()
 	timings["settlement"] = Time.get_ticks_msec() - t0
+	# The far city's street lights at night (StreetGlow, FarSurface).
+	var glow_map := StreetGlow.settle_node(smap)
+	if glow_map != null:
+		root.add_child(glow_map)
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
 	t0 = Time.get_ticks_msec()

@@ -105,6 +105,14 @@ street_lamp_near={
 "type": "vec2",
 "value": Vector2(0, 0)
 }
+street_lamp_settle={
+"type": "sampler2D",
+"value": ""
+}
+street_lamp_settle_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 cloud_shadow_cover={
 "type": "float",
 "value": 0.0

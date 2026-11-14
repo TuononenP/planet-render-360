@@ -130,6 +130,38 @@ func _run() -> void:
 			RoadPaint.material().shader.code]:
 		if not ("lamp_pool" in code or "lamp_mean" in code) or "// @GLOW" in code:
 			failures.append("every street surface shader should paint the lamp pools")
+	# The far city's light map (StreetGlow): built score, parks and water
+	# dark, found on a world root, and painted by the far surface.
+	var smap := SettlementMap.new()
+	smap.n = 2
+	smap.half = 1
+	smap.source = "osm"
+	smap.score = PackedFloat32Array([1.0, 0.5, 1.0, 0.0])
+	smap.blocked = PackedByteArray([0, 0, 1, 0])
+	var simg := StreetGlow.settle_image(smap)
+	if simg == null or simg.get_pixel(0, 0).r < 0.99 or absf(simg.get_pixel(1, 0).r - 0.5) > 0.01 \
+			or simg.get_pixel(0, 1).r != 0.0:
+		failures.append("the light map should carry the built score and drop blocked cells")
+	if StreetGlow.settle_image(SettlementMap.new()) != null:
+		failures.append("an empty settlement map should leave the far city dark")
+	# The map rides its own node: adopted flat into the world (TerrainBuilder)
+	# with the rest of the buildings subtree, whose root is dropped.
+	var world := Node3D.new()
+	var bld := Node3D.new()
+	bld.add_child(StreetGlow.settle_node(smap))
+	TerrainBuilder._adopt_flat(world, bld)
+	if world.get_node_or_null("StreetGlowMap") == null \
+			or not world.get_node("StreetGlowMap").has_meta(StreetGlow.SETTLE_META):
+		failures.append("the light map should survive the buildings subtree's flat adoption")
+	StreetGlow.apply_world(world, null)
+	if StreetGlow._settle_tex == null:
+		failures.append("a shown world should publish its light map")
+	world.free()
+	if not ("lamp_settle" in FarSurface._SHADER_CODE.replace("// @GLOW", StreetGlow.GLSL)) \
+			or not ("// @GLOW" in FarSurface._SHADER_CODE):
+		failures.append("the far surface should paint the far city's street lights")
+	if not ("lamp_settle" in GroundShader.CODE) or not ("// @GLOW" in GroundShader.CODE):
+		failures.append("the detailed ground should carry the city's glow past the streets")
 	# The lit-street flag packs beside the kerb flag and the wear seed.
 	for u in [false, true]:
 		for l in [false, true]:
