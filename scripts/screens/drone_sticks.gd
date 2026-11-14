@@ -93,6 +93,13 @@ func set_flying(flying: bool) -> void:
 func held() -> bool:
 	return visible and (left.is_held() or right.is_held() or look.is_held())
 
+## A view hidden, or the app left, under a thumb never hears it lift:
+## the sticks let go then, so nothing flies or turns on its own after.
+func _notification(what: int) -> void:
+	if (what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree()) \
+			or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+		reset()
+
 ## Centres every thumb and stops the sticks' input.
 func reset() -> void:
 	left.release()

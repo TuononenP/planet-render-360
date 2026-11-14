@@ -154,8 +154,8 @@ func _flight() -> void:
 	_check(view._drone.on and view._drone.panel.visible, "G takes off and shows the readout")
 	_check(view._drone.button.tooltip_text == "Land (G)", "the button now lands")
 	_check(view._toast.title_text() == "Drone flying", "and says so")
-	_check(ViewChrome.hint_text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
-		"the hint says how to fly: " + ViewChrome.hint_text(view))
+	_check(ViewHint.text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
+		"the hint says how to fly: " + ViewHint.text(view))
 	_check(view._drone.sticks.visible == DroneSticks.wanted(), "the sticks show on touch screens only")
 	_check(OS.has_feature("mobile") or not DroneSticks.wanted(), "a desktop flies by keyboard")
 	# Exercise the same held-key path used on desktop, not just the touch sticks.
@@ -274,8 +274,36 @@ func _flight() -> void:
 	DroneSticks.forced = true
 	ViewChrome.layout(view)
 	_check(view._drone.sticks.visible, "forced, the sticks show")
-	_check(ViewChrome.hint_text(view).ends_with("Marked stick looks around") == view._drone.sticks.look.visible,
+	_check(ViewHint.text(view).ends_with("Marked stick looks around") == view._drone.sticks.look.visible,
 		"the hint names the look stick while it shows")
+	var hint_label := view._hint_label
+	var hint_box := Rect2(view._hint.position, view._hint.size)
+	_check(hint_box.size.x <= view._zoom_stack.position.x and Rect2(Vector2.ZERO, view.size).encloses(hint_box)
+		and not hint_box.intersects(Rect2(view._zoom_stack.position, view._zoom_stack.size)),
+		"a hint too wide for the phone breaks into lines, on screen and clear of the button: %s" % hint_box)
+	_check(hint_label.text.replace("\n", " · ") == ViewHint.text(view), "and keeps every part: %s" % hint_label.text)
+	var roomy := view.size
+	view.size = Vector2(390, 300)
+	ViewChrome.layout(view)
+	_check(view._drone.sticks.visible and not view._drone.sticks.look.visible,
+		"a short phone shows the sticks but puts the look stick away")
+	_check(not hint_label.text.contains("Marked stick looks around"),
+		"a showing hint drops the look stick once it is put away: %s" % hint_label.text)
+	view.size = roomy
+	ViewChrome.layout(view)
+	_check(hint_label.text.contains("Marked stick looks around") == view._drone.sticks.look.visible,
+		"and names it again when it comes back: %s" % hint_label.text)
+	view._drone.sticks.visible = false
+	_check(not ViewHint.text(view).contains("Marked stick"), "a hint with the sticks away names none")
+	view._drone.sticks.visible = true
+	view._drone.sticks.look._touch = 7
+	view._drone.sticks.look._move_to(Vector2(0, -40))
+	_check(view._drone.sticks.look_dir != Vector2.ZERO, "a held look stick looks")
+	view.hide()
+	_check(view._drone.sticks.look_dir == Vector2.ZERO and not view._drone.sticks.held(),
+		"and lets go when the view hides under the thumb")
+	view.show()
+	ViewChrome.layout(view)
 	var screen := Rect2(Vector2.ZERO, view.size)
 	var stack := Rect2(view._zoom_stack.position, view._zoom_stack.size)
 	var lw := Rect2(view._drone.sticks.left.position, view._drone.sticks.left.size)
@@ -353,13 +381,13 @@ func _flight() -> void:
 		"and on foot: %.1f m over the street" % (view._rig.position.y - ViewWalk.foot_y(data, view._ground, xz) + ViewWalk.EYE_M))
 
 	# On foot the hint says how to walk, and the touch sticks walk.
-	_check(ViewChrome.hint_text(view).begins_with("Left stick walks" if DroneSticks.wanted() else "W A S D to walk"),
-		"the hint says how to walk: " + ViewChrome.hint_text(view))
+	_check(ViewHint.text(view).begins_with("Left stick walks" if DroneSticks.wanted() else "W A S D to walk"),
+		"the hint says how to walk: " + ViewHint.text(view))
 	_check(view._hint.visible and view._hint.modulate.a == 1.0, "and the landing glide leaves it up")
 	_check(view._drone.sticks.visible == DroneSticks.wanted(), "walking keeps the sticks on touch screens only")
 	DroneSticks.forced = true
 	ViewChrome.layout(view)
-	_check(view._drone.sticks.visible and ViewChrome.hint_text(view).begins_with("Left stick walks"),
+	_check(view._drone.sticks.visible and ViewHint.text(view).begins_with("Left stick walks"),
 		"forced, the sticks show on foot and the hint names them")
 	_check(view._hint.position.y + view._hint.size.y <= view._drone.sticks.left.position.y,
 		"the hint sits above the wells")
@@ -392,7 +420,7 @@ func _flight() -> void:
 	view.start_flying = true
 	view.show_location(data)
 	_check(view._drone.on and view._drone.panel.visible, "with start_flying a new place opens in the drone")
-	_check(ViewChrome.hint_text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
+	_check(ViewHint.text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
 		"and the opening hint says how to fly")
 	# Takeoff starts 100 m up: the drone rises there and hovers.
 	for i in 90:

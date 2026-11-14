@@ -63,6 +63,7 @@ var _nearby_pending := false
 var _exit_btn: Button
 var _attribution: Button
 var _hint: PanelContainer
+var _hint_label: Label
 var _hint_timer: Timer
 var _idle_timer: Timer
 var _fade_tween: Tween
@@ -217,10 +218,10 @@ func refresh_theme() -> void:
 	ViewChrome.refresh_theme(self)
 
 func _dismiss_hint() -> void:
-	ViewChrome._dismiss_hint(self)
+	ViewHint.dismiss(self)
 
 func _show_hint() -> void:
-	ViewChrome._show_hint(self)
+	ViewHint.show(self)
 
 func _on_look_changed() -> void:
 	ViewChrome._on_look_changed(self)

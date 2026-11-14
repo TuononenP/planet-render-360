@@ -112,24 +112,7 @@ static func build(v: View360) -> void:
 	v._fullscreen_btn.pressed.connect(func() -> void: toggle_fullscreen(v))
 	v._top_right.add_child(v._fullscreen_btn)
 
-	v._hint = PanelContainer.new()
-	v._hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v._hint.add_theme_stylebox_override("panel", HudStyle.panel(20, 16, 8))
-	var hint_row := HBoxContainer.new()
-	hint_row.add_theme_constant_override("separation", 8)
-	hint_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v._hint.add_child(hint_row)
-	hint_row.add_child(UiIcon.rect("move", 18, UiTheme.INK))
-	var hint_label := UiTheme.label(hint_text(v), 14, UiTheme.INK)
-	hint_label.name = "Text"
-	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint_row.add_child(hint_label)
-	v._fade.add_child(v._hint)
-	v._hint_timer = Timer.new()
-	v._hint_timer.one_shot = true
-	v._hint_timer.wait_time = 6.0
-	v._hint_timer.timeout.connect(v._dismiss_hint)
-	v._hud.add_child(v._hint_timer)
+	ViewHint.build(v)
 
 	v._sheet = PanelContainer.new()
 	# 16 at the sides so the three Show chips share one row at 320.
@@ -397,7 +380,7 @@ static func arrive(v: View360) -> void:
 	v._fade.modulate.a = 0.0
 	if UiPrefs.reduce_motion:
 		v._fade.modulate.a = 1.0
-		_show_hint(v)
+		ViewHint.show(v)
 		return
 	var eye := v._rig.position
 	if v._drone.on and v._ground != null:
@@ -428,51 +411,9 @@ static func arrive(v: View360) -> void:
 	land.tween_callback(title.queue_free)
 	land.tween_callback(func() -> void: wake(v))
 	# The hint's time starts once the HUD shows it, not while the world built.
-	land.tween_callback(func() -> void: _show_hint(v))
+	land.tween_callback(func() -> void: ViewHint.show(v))
 
-# --- Hint, heading, idle ---
-
-static func _dismiss_hint(v: View360) -> void:
-	if v._hint == null:
-		return
-	if not v._hint.visible:
-		v._hint.set_meta("wanted", false)  # crowded out (_clear_hint): stays down
-		return
-	if v._hint.modulate.a < 1.0:
-		return
-	if v._hint.has_meta("dismiss") and (v._hint.get_meta("dismiss") as Tween).is_valid():
-		return  # Already fading.
-	var tw := v.create_tween()
-	tw.tween_property(v._hint, "modulate:a", 0.0, 0.5)
-	tw.tween_callback(func() -> void:
-		v._hint.hide()
-		v._hint.set_meta("wanted", false))
-	v._hint.set_meta("dismiss", tw)
-
-static func _show_hint(v: View360) -> void:
-	if v._hint == null:
-		return
-	# A fade still running (the drone moved just before landing) would hide it.
-	if v._hint.has_meta("dismiss"):
-		(v._hint.get_meta("dismiss") as Tween).kill()
-	(v._hint.find_child("Text", true, false) as Label).text = hint_text(v)
-	v._hint.modulate.a = 1.0
-	v._hint.set_meta("wanted", true)
-	v._hint.visible = not v._hint.get_meta("crowded", false)
-	if v._hint_timer.is_inside_tree():
-		v._hint_timer.start()
-
-static func hint_text(v: View360) -> String:
-	# The look stick is named by its rim marks; it is put away when crowded.
-	var look := " · Marked stick looks around" if v._drone.sticks == null \
-		or v._drone.sticks.look.visible else ""
-	if not v._drone.on:
-		if DroneSticks.wanted():
-			return "Left stick walks · Right stick turns" + look
-		return "W A S D to walk · Drag to look · Shift to run"
-	if DroneSticks.wanted():
-		return "Left stick flies · Right stick turns and climbs" + look
-	return "W A S D to fly · E and Q to climb · Shift to speed up"
+# --- Heading, idle ---
 
 static func heading_deg(v: View360) -> float:
 	return fposmod(rad_to_deg(-v._rig.yaw), 360.0)
@@ -485,7 +426,7 @@ static func _on_look_changed(v: View360, by_user: bool = true) -> void:
 	if roundi(v._compass.heading / 15.0) != before:
 		announce(v)
 	if by_user:
-		_dismiss_hint(v)
+		ViewHint.dismiss(v)
 
 ## Screen readers hear the place, heading, time and the landmark in
 ## view on change, at most once every 2 s (the Announcer throttles).
@@ -795,40 +736,11 @@ static func layout(v: View360) -> void:
 	if v._sheet_tab.visible and not inspector:
 		hint_bottom = tab_y - 8.0
 	hint_bottom = _place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
+	ViewHint.sync_text(v, (v._zoom_stack.position.x - 8.0 if v._zoom_stack.visible else w) - pad)
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
-	_clear_hint(v, inspector, pad)
+	ViewHint.clear(v, inspector, pad)
 	# Last: the round tab and the drone sticks have their places now.
 	ViewTools.place_toast(v, phone, inspector, pad, w, h, attr_h)
-
-## A wide hint on a narrow screen slides left, clear of the button stack
-## and the inspector.
-static func _clear_hint(v: View360, inspector: bool, pad: float) -> void:
-	var hint := Rect2(v._hint.position, v._hint.size)
-	var blockers: Array[Rect2] = [Rect2(v._zoom_stack.position, v._zoom_stack.size)]
-	if inspector and v._sheet.visible:
-		blockers.append(Rect2(v._sheet.position, v._sheet.size))
-	var limit := INF
-	var hit := false
-	for b in blockers:
-		hit = hit or hint.intersects(b)
-		limit = minf(limit, b.position.x)
-	if hit:
-		v._hint.position.x = maxf(pad, minf(hint.position.x, limit - 8.0 - hint.size.x))
-	# No room beside the mini-map on a short screen: above it instead.
-	if v._minimap != null and v._minimap.visible \
-			and Rect2(v._hint.position, v._hint.size).intersects(v._minimap.get_rect()):
-		v._hint.position.y = v._minimap.position.y - 8.0 - hint.size.y
-	# A short phone has no room left under the pill and the badge: the
-	# hint gives way rather than cover them (the controls show the way).
-	# It comes back once they leave room, unless it was dismissed meanwhile.
-	var hint_now := Rect2(v._hint.position, v._hint.size)
-	var crowded := hint_now.position.y < v._top.get_rect().end.y
-	for c: Control in [v._top, v._stream_badge, v._fps, v._exit_btn, v._zoom_stack]:
-		if c.visible and hint_now.intersects(c.get_rect()):
-			crowded = true
-			break
-	v._hint.set_meta("crowded", crowded)
-	v._hint.visible = not crowded and v._hint.get_meta("wanted", true)
 
 ## The inspector scrolls inside `room` when it is taller than that.
 static func _fit_inspector(v: View360, room: float) -> void:
@@ -874,7 +786,11 @@ static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: floa
 		if v._sheet_tab.visible and not inspector:
 			well = minf(well, tab_y - 8.0)
 		# A stacked look well leaves the readout room under the top cluster.
-		var ceiling := v._top.get_rect().end.y + 8.0
+		var ceiling := v._top.get_rect().end.y
+		for c: Control in [v._top_right, v._stream_badge, v._fps]:
+			if c.visible:
+				ceiling = maxf(ceiling, c.get_rect().end.y)
+		ceiling += 8.0
 		if v._drone.panel.visible:
 			ceiling += v._drone.panel.get_combined_minimum_size().y + 8.0
 		var top := v._drone.sticks.place(pad, v._zoom_stack.position.x - 8.0, well, ceiling)

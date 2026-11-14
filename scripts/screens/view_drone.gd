@@ -209,9 +209,8 @@ func sync_hud(v: View360) -> void:
 		sticks.visible = DroneSticks.wanted()
 		sticks.set_flying(on)
 		sticks.reset()
-	# The hint's new text first, so the layout centres it.
-	ViewChrome._show_hint(v)
-	ViewChrome.layout(v)
+	# The hint shows again, worded and placed by the layout.
+	ViewHint.show(v)
 
 ## Per-frame flight. Called from View360._process while `on`.
 func process(v: View360, delta: float) -> void:
