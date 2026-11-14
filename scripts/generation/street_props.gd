@@ -97,13 +97,18 @@ static func _lap(timings: Dictionary, key: String, t: int) -> int:
 
 static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> int:
+	var m2u: float = ctx["m2u"]
+	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
+	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
+	# The road surface's painted lamp pools (StreetGlow), on every tier:
+	# the street lamps' colour, faint where real lamp lights burn.
+	var real := RenderQuality.ultra_desktop(int(ctx["preset"]))
+	StreetGlow.set_place(StreetLights.colour_for(lamp_style(family, region, "residential"), region),
+		StreetLights.FADE_BEGIN_M * m2u if real else 0.0, StreetLights.FADE_LENGTH_M * m2u if real else 0.0)
 	var radius_m: float = PROP_R[int(ctx["preset"])]
 	if radius_m <= 0.0 or data.buildings.is_empty():
 		return 0
-	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
-	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
-	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
 	var centre := View360.spawn_xz(data)
 	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": [], "post_top": [], "nyc_f": [], "nyc_crook": []}
 	var occupied := {}
@@ -177,7 +182,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				(placed[lamp] as Array).append(Transform3D(basis,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
 			carry = t - seg
-	if RenderQuality.ultra_desktop(int(ctx["preset"])):
+	if real:
 		StreetLights.add(root, placed, region, m2u, centre)
 	var total := 0
 	for style in placed:

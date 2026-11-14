@@ -35,6 +35,7 @@ uniform vec2 dash_motorway = vec2(3.0, 6.0);
 // RoadSurface.CROSSING_KINDS; 0 = a line strip.
 uniform float crossing_kind = 0.0;
 // @SNOW
+// @GLOW
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -116,6 +117,8 @@ void fragment() {
 	ALPHA = clamp(paint, 0.0, 1.0) * kept * (1.0 - sc);
 	ROUGHNESS = mix(0.6, 0.25, wet);
 	SPECULAR = 0.4;
+	// Night: lit as the street under it (StreetGlow), not a dark stripe.
+	EMISSION = lamp_albedo(ALBEDO) * street_lamp_tint * lamp_mean(length(VERTEX));
 	// Thermoplastic stands a little proud of the road: its edges catch the
 	// light up close. The coverage's own gradient is the slope.
 	if (detail > 0.0) {
@@ -184,7 +187,7 @@ static func _shader_for_paint() -> Shader:
 		_shader = Shader.new()
 		_shader.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 			.replace("// @DEPTH", RoadSurface.DEPTH_GLSL) \
-			.replace("// @LINE_MATH", RoadSurface.LINE_GLSL)
+			.replace("// @LINE_MATH", RoadSurface.LINE_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	return _shader
 
 ## The shared material of the line strips.

@@ -216,6 +216,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 	var chunks := {}
 	var poles := {}
 	var m := WorldScale.metres_to_units()
+	# Each span luminaire also gets a real light (StreetLights), sharing
+	# the lampposts' budget.
+	var heads: Array = []
 	for span in spans:
 		var a: Vector2 = span["a"]
 		var key := Vector2i(1 if a.x >= 0 else 0, 1 if a.y >= 0 else 0)
@@ -240,6 +243,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 		if span["lamp"]:
 			StreetProps._box(buffers[1], mid - Vector3.UP * 0.18 * m, Vector3(0.65, 0.18, 0.3) * m)
 			StreetProps._box(buffers[2], mid - Vector3.UP * 0.28 * m, Vector3(0.55, 0.025, 0.25) * m)
+			heads.append(Transform3D(Basis().scaled(Vector3(m, m, m)), mid - Vector3.UP * 0.30 * m))
 	var calls := 0
 	for key in chunks:
 		var mesh := ArrayMesh.new()
@@ -265,6 +269,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 		mi.mesh = mesh
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
+	if not heads.is_empty():
+		var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
+		StreetLights.add(root, {"span": heads}, region, m, View360.spawn_xz(data))
 	return {"spans": spans.size(), "poles": poles.size(), "draw_calls": calls}
 
 static func _tube(buf: TreeMeshLibrary.Buf, a: Vector3, b: Vector3, radius: float) -> void:

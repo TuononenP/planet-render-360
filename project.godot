@@ -93,6 +93,18 @@ climate_water_ice={
 "type": "float",
 "value": 0.0
 }
+street_lamp_glow={
+"type": "float",
+"value": 0.0
+}
+street_lamp_tint={
+"type": "vec3",
+"value": Vector3(1, 0.9, 0.78)
+}
+street_lamp_near={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
 cloud_shadow_cover={
 "type": "float",
 "value": 0.0

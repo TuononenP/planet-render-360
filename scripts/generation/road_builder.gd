@@ -25,6 +25,8 @@ extends RefCounted
 ## (lift_for_layer), so the two can never disagree: at street-level eye
 ## heights a 1 cm lift outweighs the depth bias, and a crossing lifted
 ## less than the road it lies on vanished under it.
+## A carriageway with a building centre this near (m) is a lit street.
+const LIT_BUILT_M := 35.0
 const LIFT_MIN_M := 0.03
 const LIFT_MAX_M := 0.05
 const LIFT_TOP_LAYER := 7.7
@@ -172,7 +174,7 @@ static func _material(finish: String) -> Material:
 		"paving", "sett", "gravel":
 			# Setts and gravel carry traffic; footway paving does not.
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
-				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6))
+				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true)
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
 		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":
@@ -205,6 +207,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var steps := RoadSurface.depth_steps(data)
 	var seeds := RoadSurface.wear_seeds(data)
 	surf.wear_seeds = seeds
+	surf.built = OverheadWires._centre_grid(data, LIT_BUILT_M * m2u)
 	surf.ground_roads = StreetProps._road_grid(data, m2u, true)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
@@ -289,8 +292,11 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	# RoadSurface attributes: lanes, rank, kerbed urban street + wear seed.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
+	# Lit as StreetProps lines its streets with lamps: any way among
+	# buildings, landuse polygon or not (central Helsinki has none).
+	var lit := urban or OverheadWires._built(mid, surf.built, LIT_BUILT_M * m2u)
 	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
-		RoadSurface.wear_attr(urban, wear_seed), 1.0)
+		RoadSurface.wear_attr(urban, wear_seed, lit), 1.0)
 	for run in _dry_runs(dense, surf):
 		if abort != null and abort.requested:
 			break
@@ -348,7 +354,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 	if eligible.is_empty():
 		return
 	b.pad()
-	var attr := Color(0.0, 0.0, 0.0, 1.0)
+	var attr := Color(0.0, 0.0, RoadSurface.wear_attr(false, 0.0, _lit_ring(ring, surf, m2u)), 1.0)
 	var w2 := Vector2(0.0, layer)
 	var weld := {}
 	if surf.native != null and surf.native.has_method("area") \
@@ -357,6 +363,15 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 	else:
 		for t in range(0, eligible.size(), 3):
 			RoadDrape.tri(b, surf, lift, attr, w2, weld, eligible.slice(t, t + 3), m2u)
+
+## A square or junction apron with a building near its outline is lit by
+## the street lamps around it (StreetGlow).
+static func _lit_ring(ring: PackedVector2Array, surf: _Surface, m2u: float) -> bool:
+	var stride := maxi(1, ring.size() / 8)
+	for i in range(0, ring.size(), stride):
+		if OverheadWires._built(ring[i], surf.built, LIT_BUILT_M * m2u):
+			return true
+	return false
 
 ## Height of the drawn terrain at XZ (what a ribbon is laid on), for
 ## tests and other flush-placed props.
@@ -600,6 +615,9 @@ class _Batch extends RefCounted:
 ## on what is drawn whichever way the cell is split.
 class _Surface extends RefCounted:
 	var ground: GroundTruth
+	## Building centres (OverheadWires._centre_grid, LIT_BUILT_M cells): a
+	## way or square among buildings is lit (StreetGlow's pools).
+	var built: Dictionary = {}
 	var districts: Array = []
 	var size := 0
 	var step := 1.0

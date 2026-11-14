@@ -40,6 +40,7 @@ static func amount_for(night_amount: float, twilight: float) -> float:
 static func apply(world: Node, amount: float) -> void:
 	if world == null:
 		return
+	StreetGlow.set_night(amount)
 	var energy := NIGHT_ENERGY * amount
 	var seen := {}
 	var stack: Array[Node] = [world]

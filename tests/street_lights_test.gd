@@ -102,6 +102,42 @@ func _run() -> void:
 		if not glow:
 			failures.append("the wall lantern glass must follow the night glow")
 	relief_root.free()
+	# Span-wire lamps (OverheadWires) join the lampposts' node and budget.
+	var hung := {"span": [Transform3D(Basis(), Vector3(3.0, 7.0, 1.0))]}
+	if StreetLights.add(root, hung, "northern_europe", 1.0) != 0 \
+			or root.get_node("StreetLights").get_child_count() != StreetLights.MAX_LIGHTS:
+		failures.append("a full StreetLights budget should take no more lights")
+	var wired := Node3D.new()
+	StreetLights.add(wired, {"post_top": [Transform3D(Basis(), Vector3(0, 0, 9))]}, "northern_europe", 1.0)
+	StreetLights.add(wired, hung, "northern_europe", 1.0)
+	if wired.get_child_count() != 1 or wired.get_child(0).get_child_count() != 2:
+		failures.append("span lamps should join the one StreetLights node")
+	else:
+		var sl := wired.get_child(0).get_child(1) as SpotLight3D
+		if sl == null or sl.position.distance_to(Vector3(3.0, 7.0, 1.0)) > 0.001 \
+				or (-sl.transform.basis.z).dot(Vector3.DOWN) < 0.99:
+			failures.append("a span lamp should be a downward spot at the luminaire")
+	wired.free()
+	# Painted lamp pools (StreetGlow) follow the night with the lights.
+	CityLights.apply(root, 1.0)
+	if absf(StreetGlow.night - 1.0) > 0.001:
+		failures.append("night should raise the road surface's lamp pools")
+	CityLights.apply(root, 0.0)
+	if StreetGlow.night != 0.0:
+		failures.append("day should put the lamp pools out")
+	for code in [RoadSurface.material(Color(0.1, 0.1, 0.1)).shader.code,
+			RoadSurface.paved_material("pavement", Color(0.3, 0.3, 0.3), 1.0, true).shader.code,
+			RoadPaint.material().shader.code]:
+		if not ("lamp_pool" in code or "lamp_mean" in code) or "// @GLOW" in code:
+			failures.append("every street surface shader should paint the lamp pools")
+	# The lit-street flag packs beside the kerb flag and the wear seed.
+	for u in [false, true]:
+		for l in [false, true]:
+			for sd in [0.0, 1.0]:
+				var b := float(roundi(RoadSurface.wear_attr(u, sd, l) * 255.0)) / 255.0
+				if (b >= 0.5) != u or (fmod(b + 0.012, 0.5) >= 0.25) != l \
+						or absf(clampf((fmod(b + 0.012, 0.25) - 0.012) / 0.2, 0.0, 1.0) - sd) > 0.03:
+					failures.append("wear_attr(%s, %s, %s) should decode back from 8 bits" % [u, sd, l])
 	root.free()
 	failures.erase(failures[0])
 	if failures.is_empty():

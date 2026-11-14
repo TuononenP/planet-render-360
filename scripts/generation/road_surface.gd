@@ -12,7 +12,7 @@ extends RefCounted
 ##
 ## Vertex data (RoadBuilder): UV = (across, along) in 4 m units, UV2.x
 ## the ribbon width in metres, UV2.y its depth layer, COLOR = ((lanes + 16 for one-way) / 32,
-## rank / 2, wear_attr (urban kerb flag + chain wear seed), distance to
+## rank / 2, wear_attr (urban kerb flag + lit flag + chain wear seed), distance to
 ## the nearest junction / JUNCTION_M).
 
 const JUNCTION_M := 30.0
@@ -57,7 +57,10 @@ uniform float snow_mean = 0.378;
 // Vehicles use it (setts, gravel roads; not footways): snow wears into
 // tyre tracks along the ribbon's lanes, as on the asphalt.
 uniform float traffic = 0.0;
+// 1 on streets and squares (RoadBuilder), 0 on track beds.
+uniform float lamp_pools = 0.0;
 // @SNOW
+// @GLOW
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -158,6 +161,12 @@ void fragment() {
 	AO = 1.0 - 0.2 * aa_edge.z * (1.0 - cover);
 	RIM = SNOW_RIM * cover;
 	RIM_TINT = SNOW_RIM_TINT;
+	// Night: the lampposts' pools of light (StreetGlow), on lit streets.
+	// Squares and narrow walks (no lane coordinates) take the pools' mean.
+	if (lamp_pools > 0.0 && mod(attr.b + 0.012, 0.5) >= 0.25) {
+		float lamp = width_m >= 2.0 ? lamp_pool(UV * 4.0, width_m, length(VERTEX), fwidth(UV.y * 4.0)) : lamp_mean(length(VERTEX));
+		EMISSION = lamp_albedo(ALBEDO) * street_lamp_tint * lamp;
+	}
 }
 """
 
@@ -207,6 +216,7 @@ uniform float junction_m = 30.0;
 // Range (m) at which fine cracking has faded out, by preset (DETAIL_M).
 uniform float detail_m = 220.0;
 // @SNOW
+// @GLOW
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -368,7 +378,9 @@ void fragment() {
 	// ways that meet still match.
 	bool urban = attr.b >= 0.5;
 	bool lane_coords = width_m >= 2.0;
-	float age = lane_coords ? clamp((urban ? attr.b - 0.5 : attr.b) / 0.45, 0.0, 1.0) : r_noise(g / 40.0);
+	// + 0.012: an 8-bit vertex colour rounds 0.75 down to 0.749.
+	bool lit = mod(attr.b + 0.012, 0.5) >= 0.25;
+	float age = lane_coords ? clamp((mod(attr.b + 0.012, 0.25) - 0.012) / 0.2, 0.0, 1.0) : r_noise(g / 40.0);
 	float s = age * 97.0;
 	float jfade = smoothstep(2.5, 5.0, jd);
 	float lw = w / float(lanes);
@@ -489,6 +501,12 @@ void fragment() {
 	SPECULAR = mix(mix(0.4, mix(SNOW_SPEC, 0.5, worn), sc), 1.0, glint);
 	RIM = SNOW_RIM * sc * (1.0 - in_track);
 	RIM_TINT = SNOW_RIM_TINT;
+	// Night: the lampposts' pools of light (StreetGlow), on lit streets.
+	// Junction aprons and narrow ways (no lane coordinates) take the mean.
+	if (lit) {
+		EMISSION = lamp_albedo(col) * street_lamp_tint
+			* (lane_coords ? lamp_pool(m, w, length(VERTEX), faa) : lamp_mean(length(VERTEX)));
+	}
 }
 """
 
@@ -515,7 +533,7 @@ static func material(target: Color) -> ShaderMaterial:
 		return _mat
 	var sh := Shader.new()
 	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL).replace("// @DEPTH", DEPTH_GLSL) \
-		.replace("// @LINE_MATH", LINE_GLSL)
+		.replace("// @LINE_MATH", LINE_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	var mean: Color = (MaterialLibrary.PBR_SETS["asphalt"] as Dictionary)["mean"]
@@ -564,11 +582,11 @@ static func set_place(data: LocationData) -> void:
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish).
-static func paved_material(set_name: String, target: Color, traffic: float = 0.0) -> ShaderMaterial:
+static func paved_material(set_name: String, target: Color, traffic: float = 0.0, lamp_pools: bool = false) -> ShaderMaterial:
 	if _paved_shader == null:
 		_paved_shader = Shader.new()
 		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-			.replace("// @DEPTH", DEPTH_GLSL)
+			.replace("// @DEPTH", DEPTH_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	var t := MaterialLibrary._calib_tint(row["mean"], target)
 	var m := ShaderMaterial.new()
@@ -582,6 +600,7 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 	m.set_shader_parameter("snow_nor", PbrTextures._set_tex("snow", "nor"))
 	m.set_shader_parameter("snow_mean", (MaterialLibrary.PBR_SETS["snow"]["mean"] as Color).get_luminance())
 	m.set_shader_parameter("traffic", traffic)
+	m.set_shader_parameter("lamp_pools", 1.0 if lamp_pools else 0.0)
 	return m
 
 static func _tex(map_name: String) -> Texture2D:
@@ -641,9 +660,10 @@ static func depth_steps(data: LocationData) -> PackedByteArray:
 	return steps
 
 ## COLOR.b of a ribbon: the urban kerb flag in the top half (0.5 and up),
-## the chain's wear seed (0..1) scaled into the rest.
-static func wear_attr(urban: bool, seed_01: float) -> float:
-	return (0.5 if urban else 0.0) + clampf(seed_01, 0.0, 1.0) * 0.45
+## the lit-street flag (StreetGlow's lamp pools) in the next quarter, the
+## chain's wear seed (0..1) scaled into the rest.
+static func wear_attr(urban: bool, seed_01: float, lit: bool = false) -> float:
+	return (0.5 if urban else 0.0) + (0.25 if lit else 0.0) + clampf(seed_01, 0.0, 1.0) * 0.2
 
 ## A wear seed (0..1) per road. OSM splits a street into many ways, so ways
 ## that run on in line at a shared end form one chain with one seed, and
