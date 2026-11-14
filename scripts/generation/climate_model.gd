@@ -251,6 +251,31 @@ vec3 snow_grit(vec3 c, vec2 p, float pixel_m, float amount) {
 	float cover = mix(0.027 * a, grain, 1.0 - smoothstep(0.004, 0.015, pixel_m));
 	return mix(c, vec3(0.40, 0.33, 0.25) * (0.8 + 0.4 * snow_hash(id + 5.3)), clamp(cover, 0.0, 1.0));
 }
+// Ground heights near the eye (GrassCarpet): xy centre, z half span,
+// w 1 while baked. How high a wall stands over the street.
+global uniform sampler2D street_heights : filter_linear, repeat_disable;
+global uniform vec4 street_heights_rect;
+// Winter at a wall's foot near the eye: x the slush and grit the street
+// throws up it (a ragged band 35-70 cm high, spattered), y the salt that
+// dries white along its top. Zero without snow or outside the window.
+vec2 snow_splash(vec3 p) {
+	float line = snow_line(p);
+	if (line <= 0.0 || street_heights_rect.w <= 0.0) { return vec2(0.0); }
+	vec2 hu = (p.xz - street_heights_rect.xy) / max(2.0 * street_heights_rect.z, 1e-3) + 0.5;
+	float inside = smoothstep(0.0, 0.1, min(min(hu.x, hu.y), min(1.0 - hu.x, 1.0 - hu.y)));
+	if (inside <= 0.0) { return vec2(0.0); }
+	float h = p.y - texture(street_heights, hu).r;
+	float along = p.x + p.z;
+	float top = 0.35 + 0.35 * snow_noise(vec2(along * 0.7, 3.1)) + 0.08 * snow_noise(vec2(along * 6.0, 1.7));
+	float spat = smoothstep(0.35, 0.75, snow_noise(vec2(along * 11.0, p.y * 11.0)));
+	float dirt = (1.0 - smoothstep(top - 0.15, top, h)) * mix(0.55, 1.0, spat) * (1.0 - 0.5 * smoothstep(0.0, top, h));
+	float salt = smoothstep(top - 0.07, top - 0.02, h) * (1.0 - smoothstep(top - 0.02, top + 0.02, h));
+	return vec2(dirt, salt) * line * inside;
+}
+vec3 apply_splash(vec3 c, vec2 sp) {
+	c = mix(c, c * vec3(0.58, 0.56, 0.52) + vec3(0.03, 0.028, 0.024), sp.x);
+	return mix(c, vec3(0.66, 0.65, 0.62), sp.y * 0.55);
+}
 // Snow lies centimetres deep, so a patch ends in a rounded lip, not a
 // stencil line. From the cover `sc` at world point p: xy the world-xz
 // slope of that lip (bend the lighting normal by -slope), z how much of
@@ -273,15 +298,22 @@ vec3 snow_edge(float sc, vec3 p, float depth_m) {
 }
 // Ice crystals: rare cells whose tilted facet can throw the sun back.
 // xyz facet normal (world), w strength; fades before a pixel can span
-// several cells and strobe. Only under a direct sun: a cloud deck has
+// several cells and strobe. Only under a direct sun or the night's
+// lamps (climate_snow_glint, AtmosphereRig): a cloud deck by day has
 // nothing sharp to reflect.
 vec4 snow_facet(vec2 p, float pixel_m) {
 	float vis = climate_snow_glint * (1.0 - smoothstep(0.012, 0.045, pixel_m));
 	if (vis <= 0.0) { return vec4(0.0, 1.0, 0.0, 0.0); }
-	vec2 id = floor(p * 40.0);
+	vec2 q = p * 40.0;
+	vec2 id = floor(q);
 	if (snow_hash(id) < 0.985) { return vec4(0.0, 1.0, 0.0, 0.0); }
-	vec3 f = vec3(snow_hash(id + 3.1) - 0.5, 0.42, snow_hash(id + 7.7) - 0.5);
-	return vec4(normalize(f), vis);
+	// A crystal is a point somewhere in its cell, not the cell: a square
+	// tile reads as a grey chequer where it does not glint. A gentle tilt
+	// (under ~30 degrees) keeps a dark facet from shading the snow.
+	vec2 c = fract(q) - 0.5 - (vec2(snow_hash(id + 1.3), snow_hash(id + 2.9)) - 0.5) * 0.5;
+	float disc = 1.0 - smoothstep(0.1, 0.18, length(c));
+	vec3 f = vec3(snow_hash(id + 3.1) - 0.5, 0.95, snow_hash(id + 7.7) - 0.5);
+	return vec4(normalize(f), vis * disc);
 }
 // Slope of rain rings on still water at metre coordinates: jittered
 // cells at three scales, so no grid shows; rain sets how many are live.

@@ -170,7 +170,9 @@ static func _material(finish: String) -> Material:
 	var m: Material
 	match finish:
 		"paving", "sett", "gravel":
-			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear())
+			# Setts and gravel carry traffic; footway paving does not.
+			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
+				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6))
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
 		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":

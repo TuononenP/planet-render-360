@@ -164,7 +164,9 @@ static func dress(world: Node, top: bool, v: View360, data: LocationData) -> voi
 	var code := v._atmos.weather_code if v._atmos != null else -1
 	if top:
 		_wet_roads(world, 1.0 if code in ClimateModel.RAINING else 0.0)
-		RoofSnow.apply(world, float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0)
+		var snow_on := float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0
+		RoofSnow.apply(world, snow_on)
+		Icicles.apply(world, snow_on, data)
 	if v._atmos != null:
 		CityLights.apply(world, CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount))
 

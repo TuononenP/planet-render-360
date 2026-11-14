@@ -38,7 +38,10 @@ void fragment() {
 	// or a bench (derivatives first).
 	vec3 lip = snow_edge(snow, wpos, 0.04);
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
-	ALBEDO = mix(col, snow_albedo(wpos.xz, px, age), snow);
+	// Older snow (kerbs, ploughed banks) carries road grit.
+	// The street's slush and salt up the sides of kerbs, plinths and cars.
+	col = apply_splash(col, snow_splash(wpos) * (1.0 - smoothstep(0.3, 0.6, abs(normalize(wnormal).y))));
+	ALBEDO = mix(col, snow_grit(snow_albedo(wpos.xz, px, age), wpos.xz, px, age), snow);
 	float roughness = base_roughness;
 	if (use_rough) { roughness *= texture(rough_tex, uv).r; }
 	ROUGHNESS = mix(roughness, SNOW_ROUGH, snow);

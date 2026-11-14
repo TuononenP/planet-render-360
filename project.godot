@@ -121,6 +121,14 @@ far_fog_density={
 "type": "float",
 "value": 4.5e-05
 }
+street_heights={
+"type": "sampler2D",
+"value": ""
+}
+street_heights_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 
 [gui]
 

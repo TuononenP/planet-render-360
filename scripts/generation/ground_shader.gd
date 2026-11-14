@@ -180,8 +180,9 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
-	// Share of unmown meadow (class 17) among the taps.
+	// Share of unmown meadow (class 17) and of water (15) among the taps.
 	float wildw = 0.0;
+	float waterw = 0.0;
 	// Around the viewpoint the fine map decides. Its borders wander a
 	// little, as grass overgrowing a path edge does, and unmapped texels
 	// leave their share to the extent map below.
@@ -209,6 +210,7 @@ void fragment() {
 				} else {
 					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 					wildw += id == 17 ? bw : 0.0;
+					waterw += id == 15 ? bw : 0.0;
 				}
 			}
 			// Grass beside anything hard is trodden to bare earth, in
@@ -245,6 +247,7 @@ void fragment() {
 			}
 			class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 			wildw += id == 17 ? bw : 0.0;
+			waterw += id == 15 ? bw : 0.0;
 		}
 	}
 	// Crag relief: noise gradients bend the lighting normal on steep and
@@ -452,6 +455,26 @@ void fragment() {
 		// The layer gives snow its grain; it must not tint or scar it.
 		// Pavements and squares are trodden and gritted.
 		vec3 lying = snow_albedo(g, pixel_m, 0.22 * pave) * clamp(lum(sa.rgb / det_mean[8]), 0.94, 1.05);
+		// Snow on frozen water (sea ice the ground draws): wind scours
+		// it to grey-blue ice in patches, and ski and foot trails cross it.
+		// Mapped water, or flat ground lying at its water level (a harbour
+		// the DEM carries as ground at sea level).
+		float at_water = (1.0 - smoothstep(0.15, 0.6, (wpos.y - water_level) * u2m)) * (1.0 - steep);
+		float ice = max(clamp(waterw, 0.0, 1.0), at_water) * climate_water_ice;
+		if (ice > 0.01) {
+			float scour = smoothstep(0.66, 0.74, mix(snow_noise(g / 11.0 + 7.1) * 0.7 + snow_noise(g / 3.0) * 0.3, 0.5, smoothstep(2.0, 12.0, pixel_m)));
+			float trail = 0.0;
+			for (int k = 0; k < 2; k++) {
+				vec2 dir = k == 0 ? normalize(vec2(0.83, 0.56)) : normalize(vec2(-0.35, 0.94));
+				float across = dot(g, vec2(-dir.y, dir.x)) + (snow_noise(vec2(dot(g, dir) / 60.0, float(k) * 5.0)) - 0.5) * 30.0;
+				float lane = abs(fract(across / 140.0 + float(k) * 0.37) - 0.5) * 140.0;
+				trail = max(trail, 1.0 - smoothstep(0.5 + pixel_m * 0.5, 1.0 + pixel_m, lane));
+			}
+			trail *= 1.0 - smoothstep(4.0, 20.0, pixel_m);
+			// A trodden trail a metre wide: packed, grey and gritted.
+			lying = mix(lying, snow_grit(snow_albedo(g, pixel_m, 0.55), g, pixel_m, 0.5), trail * ice);
+			lying = mix(lying, vec3(0.50, 0.58, 0.64) * (0.92 + 0.12 * snow_noise(g / 1.7)), scour * ice * (1.0 - trail));
+		}
 		alb = mix(alb, snow_grit(lying, g, pixel_m, 0.45 * pave), sc);
 		// Its footprint-like normal map tiles visibly a few metres out:
 		// near by only, and gentle.
@@ -490,7 +513,7 @@ void fragment() {
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
 	r = mix(r, SNOW_ROUGH, sc * (1.0 - wf));
-	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.1, glint);
+	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.03, glint);
 	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
 	RIM = SNOW_RIM * sc;
 	RIM_TINT = SNOW_RIM_TINT;

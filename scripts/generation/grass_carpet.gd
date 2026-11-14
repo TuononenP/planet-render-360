@@ -366,6 +366,8 @@ func stop() -> void:
 	if _task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
+	if _tex != null:
+		RenderingServer.global_shader_parameter_set("street_heights_rect", Vector4.ZERO)
 
 ## A carpet dropped with a bake in progress still joins its task.
 func _notification(what: int) -> void:
@@ -423,4 +425,9 @@ func _apply() -> void:
 		_tex.update(img)
 	_h_centre = _box["centre"]
 	_grass = bool(_box.get("grass", true))
-	_mat.set_shader_parameter("h_rect", Vector4(_h_centre.x, _h_centre.y, HEIGHT_SPAN_M * WorldScale.metres_to_units() * 0.5, 1.0))
+	var rect := Vector4(_h_centre.x, _h_centre.y, HEIGHT_SPAN_M * WorldScale.metres_to_units() * 0.5, 1.0)
+	_mat.set_shader_parameter("h_rect", rect)
+	# Shared with the facades (street_heights): how high a wall stands
+	# over the street, for the slush and salt at its foot in winter.
+	RenderingServer.global_shader_parameter_set("street_heights", _tex)
+	RenderingServer.global_shader_parameter_set("street_heights_rect", rect)

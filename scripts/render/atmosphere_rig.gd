@@ -527,6 +527,10 @@ func _apply() -> void:
 		# orange-grey, strongest under a full deck; a clear sky keeps a
 		# faint dome toward the horizon.
 		var g := CITY_SKYGLOW * city_glow * night_amount
+		# Snow on the streets throws the lamps' light back up: a snowy
+		# city's cloud base glows half as bright again.
+		if snow_ground:
+			g *= 1.5
 		lit += g * lerpf(0.5, 1.6, cover)
 		shade += g * lerpf(0.4, 1.3, cover)
 		horizon += g * lerpf(0.6, 1.2, overcast)
@@ -571,11 +575,16 @@ func _apply() -> void:
 	RenderingServer.global_shader_parameter_set("cloud_shadow_cover", 0.0 if night else cover * (1.0 - overcast))
 	RenderingServer.global_shader_parameter_set("cloud_shadow_stretch", float(s["stretch"]))
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
-	# Snow sparkles only under a direct sun (ClimateModel.SNOW_GLSL).
+	# Snow sparkles under a direct sun (ClimateModel.SNOW_GLSL), and at
+	# night under the street lamps: the facets glint at any point light,
+	# so they come on with the lamps (CityLights.amount_for) and the
+	# lamps' own falloff keeps the sparkle in their pools of light.
 	# The weather look's shadow opacity carries precipitation and fog, which
 	# thicken the deck whatever the reported cover says.
 	var direct := smoothstep(0.55, 1.0, float(look["shadow_opacity"]))
-	RenderingServer.global_shader_parameter_set("climate_snow_glint", 0.0 if night else (1.0 - overcast) * direct)
+	var lamps := CityLights.amount_for(night_amount, twilight_amount) * city_glow
+	RenderingServer.global_shader_parameter_set("climate_snow_glint",
+		0.8 * lamps if night else (1.0 - overcast) * direct)
 	environment.fog_light_color = haze_color.darkened(0.3 * darken)
 	# Far valleys fill with the same air (FarSurface).
 	var valley_air := environment.fog_light_color.srgb_to_linear()

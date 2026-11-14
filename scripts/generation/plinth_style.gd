@@ -29,14 +29,17 @@ static var _coping: Material
 ## here), built once. Building UVs run one unit per 4 m, so tile_m 0.75
 ## lays the stone courses every 3 m and 0.5 the coping every 2 m, as the
 ## landmark plinth's metre UVs with tile_m 3.0 and 2.0 do.
+## Through StreetSnow, so in winter the coping holds snow and the street's
+## slush and salt climb the body (ClimateModel.snow_splash); unchanged
+## otherwise.
 static func body_material() -> Material:
 	if _body == null:
-		_body = LandmarkMaterials.pbr(BODY_SET, BODY_HEX, 0.75)
+		_body = StreetSnow.material(LandmarkMaterials.pbr(BODY_SET, BODY_HEX, 0.75), 0.3)
 	return _body
 
 static func coping_material() -> Material:
 	if _coping == null:
-		_coping = LandmarkMaterials.pbr(COPING_SET, COPING_HEX, 0.5)
+		_coping = StreetSnow.material(LandmarkMaterials.pbr(COPING_SET, COPING_HEX, 0.5), 0.2)
 	return _coping
 
 ## Mitred outward direction at each vertex of `ring` (scaled so a face set

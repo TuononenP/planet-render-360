@@ -2,8 +2,10 @@ class_name Snowbanks
 extends RefCounted
 
 ## Ploughed snow just outside the kerbs near the camera. Desktop Ultra,
-## snowy seasons only, merged in one surface. Junctions and mapped
-## obstacles stay clear; each ridge follows the rendered ground.
+## snowy seasons only, merged in one surface. Junctions, mapped obstacles
+## and the ways that cross the kerb line (driveways and other service
+## roads, footways, paths, cycleways, crossings) stay clear; each ridge
+## follows the rendered ground.
 const HEIGHT_M := 0.35
 const WIDTH_M := 0.65
 
@@ -15,9 +17,13 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	var r2 := pow(ParkedCars.RADIUS_M * m, 2.0)
 	var junc := RoadSurface.junctions(data)
 	var obstacles := ParkedCars.obstacle_grid(data, m)
+	_add_accesses(obstacles, data, m)
 	var kit := ReliefKit.new()
 	var source := StandardMaterial3D.new()
-	source.albedo_color = Color(0.64, 0.65, 0.61)
+	# The flanks the plough cut are grimy: road spray and grit in old snow.
+	# (The snow photo averages ~0.38: this lands the flanks near 0.16 linear.)
+	source.albedo_color = Color(0.70, 0.67, 0.62)
+	source.albedo_texture = PbrTextures._set_tex("snow", "diff")
 	source.roughness = 0.95
 	# Ploughed snow is old snow: grey with grit, not fresh white.
 	var material := StreetSnow.material(source, 0.45)
@@ -95,3 +101,34 @@ static func _bank(kit: ReliefKit, material: Material, a: Array, b: Array) -> voi
 
 static func _at(r: Array, q: Vector2) -> Vector3:
 	return (r[0] as Vector3) + (r[1] as Vector3) * (q.x * float(r[3])) + Vector3.UP * (q.y * float(r[2]))
+
+## Ways people and cars cross the kerb by: a bank never blocks them.
+const ACCESS_CLASSES := ["service", "footway", "path", "cycleway", "pedestrian", "steps", "living_street", "track"]
+## Clear width either side of such a way's centreline (metres).
+const ACCESS_CLEAR_M := 1.8
+
+## Adds every access way's segments to `grid` (ParkedCars.obstacle_grid
+## cells), with ACCESS_CLEAR_M clearance.
+static func _add_accesses(grid: Dictionary, data: LocationData, m: float) -> void:
+	var cell := ParkedCars.OBSTACLE_CELL_M * m
+	for road in data.roads:
+		if not (road is Dictionary):
+			continue
+		if str(road.get("class", "")) not in ACCESS_CLASSES and not bool(road.get("crossing", false)):
+			continue
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			var item := [a, b, ACCESS_CLEAR_M * m]
+			var steps := maxi(1, ceili(a.distance_to(b) / cell))
+			var seen := {}
+			for k in steps + 1:
+				var q := a.lerp(b, float(k) / float(steps))
+				var key := Vector2i(floori(q.x / cell), floori(q.y / cell))
+				if seen.has(key):
+					continue
+				seen[key] = true
+				if not grid.has(key):
+					grid[key] = []
+				(grid[key] as Array).append(item)

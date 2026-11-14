@@ -74,6 +74,7 @@ uniform bool photo_turn = false;
 
 varying vec3 wpos;
 varying flat float bld;
+// @SNOW
 
 // Near panes. Head-on reflectance of double glazing (four surfaces); the
 // high metallic over a dark albedo gives it with almost no diffuse.
@@ -229,6 +230,23 @@ void fragment() {
 	float g = vnoise(wm.xz * 0.045 + wm.y * 0.02);
 	float streak = vnoise(vec2((wm.x + wm.z) * 0.9, wm.y * 0.06));
 	vec3 wall = base * COLOR.rgb * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
+	// Winter on the wall (ClimateModel): snow on the sills under the
+	// panes, and slush and salt the street throws up its foot.
+	float wsnow = snow_line(wpos);
+	if (wsnow > 0.0) {
+		float pane_px = max(length(gx * cells), length(gy * cells));
+		if (has_normal && framed) {
+			// A sill is wall a hand's breadth under glass (uv runs down).
+			float d_uv = 0.09 / max(cell_size.y * cells.y, 1e-3);
+			float glass_above = smoothstep(0.32, 0.22, textureGrad(rough_tex, uv - vec2(0.0, d_uv), gx, gy).r);
+			float sill = (1.0 - pane) * glass_above * (1.0 - smoothstep(0.03, 0.1, pane_px));
+			sill *= smoothstep(0.25, 0.6, vnoise(vec2((wm.x + wm.z) * 2.3, wm.y * 0.5)) + 0.3);
+			wall = mix(wall, snow_albedo(wm.xz + wm.y, 0.01, 0.08), sill * wsnow);
+		}
+		vec2 sp = snow_splash(wm * units_per_m);
+		sp.y *= 1.0 - pane;
+		wall = apply_splash(wall, sp);
+	}
 
 	vec2 cg = uv * cells;
 	vec2 cell = floor(cg);
@@ -337,7 +355,7 @@ static var _photo_mutex := Mutex.new()
 static func shader() -> Shader:
 	if _shader == null:
 		var sh := Shader.new()
-		sh.code = SHADER
+		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 		_shader = sh
 	return _shader
 

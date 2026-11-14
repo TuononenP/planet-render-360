@@ -54,11 +54,18 @@ uniform float metallic = 0.0;
 uniform sampler2D snow_alb : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D snow_nor : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float snow_mean = 0.378;
+// Vehicles use it (setts, gravel roads; not footways): snow wears into
+// tyre tracks along the ribbon's lanes, as on the asphalt.
+uniform float traffic = 0.0;
 // @SNOW
 varying vec3 wpos;
+varying vec4 attr;
+varying float width_m;
 
 void vertex() {
 	wpos = VERTEX;
+	attr = COLOR;
+	width_m = UV2.x;
 // @DEPTH
 }
 
@@ -92,7 +99,29 @@ void fragment() {
 	float edge_w = 0.015 + px * 0.3;
 	float worn = smoothstep(0.75 - edge_w, 0.75 + edge_w, tramp);
 	float slush = smoothstep(0.64, 0.74, tramp) * (1.0 - worn);
+	// Tyre tracks on a carriageway: ribbons carry metres across (x) and
+	// along (y) in UV * 4 and the lane count and rank in COLOR.
+	float grind = 0.0;
+	if (traffic > 0.0 && width_m >= 2.0) {
+		vec2 m = UV * 4.0;
+		int lanes = int(attr.r * 32.0 + 0.5) % 16;
+		if (lanes <= 0) {
+			lanes = width_m >= 5.5 ? 2 : 1;
+		}
+		float lw = width_m / float(lanes);
+		float xl = mod(m.x, lw) - lw * 0.5;
+		float wander = (snow_noise(vec2(m.x * 0.4, m.y / 16.0)) - 0.5) * 0.7;
+		float tk = (abs(xl + wander) - 0.85) / 0.38;
+		int rank = int(attr.g * 2.0 + 0.5);
+		grind = exp(-tk * tk) * traffic * (rank >= 1 ? 1.0 : 0.6)
+			* (0.6 + 0.4 * smoothstep(0.3, 0.7, snow_noise(p * 1.6) * 0.6 + snow_noise(p * 5.0) * 0.4))
+			* smoothstep(2.5, 5.0, attr.a * 30.0);
+	}
+	float in_track = smoothstep(0.15, 0.6, grind);
+	worn = max(worn, smoothstep(0.55, 0.85, grind));
+	slush = max(slush * (1.0 - worn), in_track * (1.0 - worn));
 	float cover = sc * (1.0 - 0.9 * worn);
+	vec3 rut = snow_edge(grind * sc, wpos, -0.05);
 	vec3 aa_edge = snow_edge(cover, wpos, 0.03);
 	vec3 lying = snow_albedo(p, px, 0.12 * packed + 0.4 * slush);
 	// Footprint grain and wind relief, as the ground's snow has: a slab
@@ -112,14 +141,18 @@ void fragment() {
 	// tilted the whole slab away from a low sun, a shade darker than the
 	// pavement around it.
 	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), cover);
-	ROUGHNESS = mix(mix(rough, 0.3, sc), SNOW_ROUGH, cover);
-	SPECULAR = mix(0.5, SNOW_SPEC, cover);
+	// Ice crystals glint at the sun by day and at the lamps by night,
+	// as on the ground (ClimateModel.snow_facet).
+	vec4 facet = snow_facet(p, px);
+	float glint = facet.w * cover * (1.0 - in_track);
+	ROUGHNESS = mix(mix(mix(rough, 0.3, sc), SNOW_ROUGH, cover), 0.03, glint);
+	SPECULAR = mix(mix(0.5, SNOW_SPEC, cover), 1.0, glint);
 	METALLIC = metallic;
 	float near_px = 1.0 - smoothstep(0.03, 0.3, px);
 	vec2 layer = (texture(snow_nor, p / 5.0).rg - vec2(0.5)) * 0.6 * (1.0 - smoothstep(8.0, 30.0, length(VERTEX)));
 	// Fine, faint relief: broad swells lit low read as stains.
-	vec2 dr = snow_drift(p * 4.0) * 0.05 * near_px + aa_edge.xy * near_px - layer * vec2(1.0, -1.0);
-	vec3 sn = normalize(vec3(-dr.x, 1.0, -dr.y));
+	vec2 dr = snow_drift(p * 4.0) * 0.05 * near_px + (aa_edge.xy + rut.xy) * near_px - layer * vec2(1.0, -1.0);
+	vec3 sn = normalize(mix(normalize(vec3(-dr.x, 1.0, -dr.y)), facet.xyz, glint));
 	NORMAL = normalize(mix(NORMAL, (VIEW_MATRIX * vec4(sn, 0.0)).xyz, cover));
 	// The worn patch sits below the snow around it.
 	AO = 1.0 - 0.2 * aa_edge.z * (1.0 - cover);
@@ -442,11 +475,18 @@ void fragment() {
 		vec2 tilt = (rut.xy + lip.xy) * 0.5;
 		snm = vec3(0.5 - tilt.x, 0.5 - tilt.y, 1.0);
 	}
+	// Ice crystals in the lying snow glint at the sun and the lamps.
+	float glint = snow_facet(g, pixel_m).w * sc * (1.0 - in_track);
+	if (glint > 0.0) {
+		vec4 facet = snow_facet(g, pixel_m);
+		snm = mix(snm, vec3(0.5 + facet.x * 0.5, 0.5 + facet.z * 0.5, 1.0), glint);
+		rough = mix(rough, 0.03, glint);
+	}
 	ALBEDO = col;
 	ROUGHNESS = clamp(rough, 0.02, 1.0);
 	NORMAL_MAP = mix(nm, snm, sc);
 	NORMAL_MAP_DEPTH = 1.0;
-	SPECULAR = mix(0.4, mix(SNOW_SPEC, 0.5, worn), sc);
+	SPECULAR = mix(mix(0.4, mix(SNOW_SPEC, 0.5, worn), sc), 1.0, glint);
 	RIM = SNOW_RIM * sc * (1.0 - in_track);
 	RIM_TINT = SNOW_RIM_TINT;
 }
@@ -524,7 +564,7 @@ static func set_place(data: LocationData) -> void:
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish).
-static func paved_material(set_name: String, target: Color) -> ShaderMaterial:
+static func paved_material(set_name: String, target: Color, traffic: float = 0.0) -> ShaderMaterial:
 	if _paved_shader == null:
 		_paved_shader = Shader.new()
 		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
@@ -541,6 +581,7 @@ static func paved_material(set_name: String, target: Color) -> ShaderMaterial:
 	m.set_shader_parameter("snow_alb", PbrTextures._set_tex("snow", "diff"))
 	m.set_shader_parameter("snow_nor", PbrTextures._set_tex("snow", "nor"))
 	m.set_shader_parameter("snow_mean", (MaterialLibrary.PBR_SETS["snow"]["mean"] as Color).get_luminance())
+	m.set_shader_parameter("traffic", traffic)
 	return m
 
 static func _tex(map_name: String) -> Texture2D:

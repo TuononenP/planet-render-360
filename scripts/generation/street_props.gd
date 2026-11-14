@@ -453,11 +453,13 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		# Limestone calibrated to weathered masonry: the "stone" set is an
 		# orange sandstone photo too saturated to neutralise (walls read
 		# as orange timber boxes).
-		"wall": MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
-			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0),
+		# Through StreetSnow: in winter the copings hold snow and the
+		# street's slush and salt climb their feet (ClimateModel.snow_splash).
+		"wall": StreetSnow.material(MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
+			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0) as StandardMaterial3D, 0.25),
 		"fence": _fence_material(),
 		"chain_link": _chainlink_material(),
-		"wood_fence": MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0),
+		"wood_fence": StreetSnow.material(MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0) as StandardMaterial3D, 0.25),
 		"hedge": TreeMeshLibrary.leaf_material("broad", TreeSpecies.tint("oak", mini(season, 2)) * 0.85, 0.0, 0.0, true),
 		"hedge_core": _core_material(),
 	}
