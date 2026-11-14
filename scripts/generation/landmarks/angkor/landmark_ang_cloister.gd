@@ -10,8 +10,8 @@ const A = preload("res://scripts/generation/landmarks/angkor/landmark_ang_util.g
 
 static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7B7363", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("stone", "#5E5649", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#86593E", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("stone", LandmarkAngParts.ROOF, 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))
 	lm.use("Root", LandmarkMaterials.pbr("rock", "#4D4438", 3.0))
 	lm.use("Leaf", LandmarkMaterials.pbr("forest", "#3F5530", 4.0))

@@ -89,6 +89,22 @@ const SPECIES := {
 		"leader": 0.7, "branches": 7, "trunk_r": 0.42, "up": 0.65, "droop": 0.35,
 		"clusters": 44, "card": 2.6, "leaf": "olive", "bark": "plane",
 		"tint": "eucalyptus", "evergreen": true},
+	# Khmer open woodland (the Angkor park): the tall, clear-boled
+	# dipterocarps (Dipterocarpus alatus, chheuteal) with small high
+	# crowns, the buttressed pale silk-cotton / spung trees of the temple
+	# courts (Ceiba, Tetrameles; bare in the dry season) and the sugar
+	# palm (Borassus flabellifer, a stiff round fan crown on a tall stem).
+	"dipterocarp": {"gen": "broad", "h": 32.0, "h_var": 0.25, "bole": 0.64, "crown_r": 0.2,
+		"leader": 0.45, "branches": 7, "trunk_r": 0.55, "up": 0.6, "droop": 0.0,
+		"clusters": 50, "card": 3.2, "leaf": "broad", "bark": "plane",
+		"tint": "dipterocarp", "evergreen": true, "flat_top": true},
+	"silk_cotton": {"gen": "broad", "h": 28.0, "h_var": 0.25, "bole": 0.5, "crown_r": 0.36,
+		"leader": 0.3, "branches": 6, "trunk_r": 0.62, "up": 0.3, "droop": 0.05,
+		"clusters": 44, "card": 3.4, "leaf": "broad", "bark": "plane",
+		"tint": "silk_cotton", "evergreen": false, "flat_top": true},
+	"sugar_palm": {"gen": "palm", "h": 17.0, "h_var": 0.25, "fronds": 24, "frond_len": 2.5,
+		"trunk_r": 0.3, "leaf": "palm", "bark": "palm", "tint": "sugar_palm",
+		"evergreen": true},
 	"metrosideros": {"gen": "broad", "h": 9.0, "h_var": 0.25, "bole": 0.2, "crown_r": 0.5,
 		"leader": 0.3, "branches": 6, "trunk_r": 0.3, "up": 0.45, "droop": 0.05,
 		"clusters": 56, "card": 2.6, "leaf": "broad", "bark": "furrowed",
@@ -110,6 +126,9 @@ const TINTS := {
 	"cypress": [Color(0.24, 0.37, 0.20), Color(0.22, 0.35, 0.19), Color(0.22, 0.34, 0.19), Color(0.20, 0.31, 0.18)],
 	"palm": [Color(0.40, 0.54, 0.25), Color(0.38, 0.52, 0.24), Color(0.40, 0.52, 0.25), Color(0.38, 0.50, 0.24)],
 	"eucalyptus": [Color(0.46, 0.54, 0.42), Color(0.43, 0.51, 0.40), Color(0.43, 0.50, 0.40), Color(0.41, 0.48, 0.38)],
+	"dipterocarp": [Color(0.38, 0.52, 0.22), Color(0.33, 0.48, 0.20), Color(0.40, 0.48, 0.22), Color(0.44, 0.46, 0.24)],
+	"silk_cotton": [Color(0.46, 0.60, 0.26), Color(0.40, 0.55, 0.24), Color(0.62, 0.56, 0.26), Color(0.3, 0.4, 0.22)],
+	"sugar_palm": [Color(0.36, 0.48, 0.26), Color(0.34, 0.46, 0.25), Color(0.38, 0.46, 0.26), Color(0.42, 0.46, 0.28)],
 	"evergreen": [Color(0.24, 0.38, 0.19), Color(0.21, 0.34, 0.17), Color(0.21, 0.34, 0.17), Color(0.20, 0.32, 0.17)],
 }
 
@@ -176,6 +195,9 @@ static func mix(biome: String, setting: String) -> Array:
 	match biome:
 		"tropical":
 			return [["palm", 0.45], ["tropical", 0.55]]
+		"khmer":
+			return [["dipterocarp", 0.35], ["sugar_palm", 0.22], ["tropical", 0.2], ["silk_cotton", 0.15],
+				["palm", 0.08]]
 		"arid":
 			return [["palm", 0.4], ["olive", 0.3], ["cypress", 0.2], ["plane", 0.1]]
 		"mediterranean":

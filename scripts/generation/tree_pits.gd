@@ -16,6 +16,7 @@ static func plan(data: LocationData, mask: VegetationMask, m: float, ground: Gro
 	var centre := View360.spawn_xz(data)
 	var roads := StreetFurniture.RoadIndex.new(data, m, (RADIUS_M + SEARCH_M) * m, centre)
 	var out: Array = []
+	var clears := LandmarkSites.tree_clears(data)
 	for tree in data.trees:
 		if not (tree is Dictionary):
 			continue
@@ -27,8 +28,7 @@ static func plan(data: LocationData, mask: VegetationMask, m: float, ground: Gro
 		# keep-out), there is no pit either.
 		if ground != null and ground.water_at(p.x, p.y) > 0.0:
 			continue
-		if data.landmark_type != "none" \
-				and p.distance_to(TerrainBuilder.landmark_world_pos(data)) < VegetationBuilder.LANDMARK_CLEAR_M * m:
+		if LandmarkSites.tree_cleared(p, clears):
 			continue
 		var paved := mask.blocked(p.x, p.y, VegetationMask.ROAD_EDGE)
 		if mask.cover_at(p.x, p.y) >= 0 and not paved:

@@ -287,6 +287,8 @@ static func resolve(b: Dictionary, region: String, density: String,
 			lo = maxi(1, lo - 1)
 			hi = maxi(lo, hi - 2)
 	var storeys := lo + int(_h(seed_v, 5) * float(hi - lo + 1))
+	if b.has("zone_storeys"):
+		storeys = mini(storeys, maxi(int(b["zone_storeys"]), 1))
 	# The Paris whole-facade composer lays out its own bays and storeys.
 	var tiled := FacadeComposer.is_tiled(pattern)
 	var fh := float(p["fh"]) * (_jitter(seed_v, 43, FLOOR_JITTER) if tiled else 1.0)
@@ -383,6 +385,9 @@ static func _ground_of(p: Dictionary, kind: String, density: String,
 ## Religious tower from the building's own religion/denomination tags
 ## (real data) over the regional default.
 static func _tower(p: Dictionary, b: Dictionary) -> String:
+	# A heritage zone's temples are low halls, not pagodas (HeritageZones).
+	if bool(b.get("no_tower", false)):
+		return ""
 	var regional := str(p.get("tw", ""))
 	var religion := str(b.get("religion", "")).to_lower()
 	var denomination := str(b.get("denomination", "")).to_lower()

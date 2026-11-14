@@ -379,7 +379,10 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"start_year": _start_year(tags.get("start_date", "")),
 		"heritage": _tag_truthy(tags.get("heritage", "")) \
 			or tags.has("heritage:operator") \
-			or str(tags.get("historic", "")) in ["building", "yes"],
+			or str(tags.get("historic", "")) in ["building", "yes", "ruins", "city_gate"],
+		# The raw value: a gate or ruin inside a heritage zone is the
+		# landmark model's to draw (HeritageZones).
+		"historic": str(tags.get("historic", "")).strip_edges().to_lower(),
 		"architecture": str(tags.get("building:architecture", "")).strip_edges().to_lower(),
 		"monument": monument_kind(tags),
 	}

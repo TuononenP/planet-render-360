@@ -10,9 +10,9 @@ const A = preload("res://scripts/generation/landmarks/angkor/landmark_ang_util.g
 
 static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#9A5A40", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#8B5B42", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7D7565", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("stone", "#665B4D", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("stone", LandmarkAngParts.ROOF, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#24211D", 2.0))
 
 ## Pre Rup (26 m): Rajendravarman's state temple of 961, a laterite pyramid

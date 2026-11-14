@@ -63,7 +63,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
-		for key in ["clear_offsets_m", "clear_path_m"]:
+		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m"]:
 			if entry.has(key):
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
@@ -115,8 +115,30 @@ static func axis(entry: Dictionary) -> Vector2:
 
 ## Distance from `p` to a site at `at`: to its `clear_path_m` polyline
 ## (a curved bridge), to the segment `span_m` long along its axis for a
-## straight bridge, else to `at` itself.
+## straight bridge, else to `at` itself; never farther than its
+## `clear_rect_m` precinct (0 inside it).
 static func span_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
+	var d := _shape_dist(p, at, entry)
+	if entry.has("clear_rect_m"):
+		d = minf(d, rect_dist(p, at, entry))
+	return d
+
+## Distance from `p` to a site's `clear_rect_m` precinct, [along, across,
+## half_along, half_across] metres in the model frame (yaw_deg turns it):
+## 0 inside, INF without one. A walled temple compound clears its whole
+## court, not a circle round the sanctuary.
+static func rect_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
+	var r: Array = entry.get("clear_rect_m", [])
+	if r.size() < 4:
+		return INF
+	var a := axis(entry)
+	var cross := Vector2(-a.y, a.x)
+	var m := WorldScale.metres_to_units()
+	var d := p - (at + (a * float(r[0]) + cross * float(r[1])) * m)
+	return Vector2(maxf(absf(d.dot(a)) - float(r[2]) * m, 0.0),
+		maxf(absf(d.dot(cross)) - float(r[3]) * m, 0.0)).length()
+
+static func _shape_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
 	if entry.has("clear_path_m"):
 		var path := path_points(at, entry)
 		var best := INF
@@ -188,3 +210,43 @@ static func outside_spans(pts: PackedVector2Array, spans: Array) -> Array:
 	if run.size() >= 2:
 		out.append(run)
 	return out
+
+## Tree keep-outs round the landmarks standing here, [site xz, entry,
+## radius m, reach²] each: the primary always (its `tree_clear_m`, else
+## DEFAULT_TREE_CLEAR_M round the site), a registry candidate only when it
+## declares `tree_clear_m`. Distances run to the site's clearance shape
+## (span_dist), so a precinct rect opens its whole court.
+const DEFAULT_TREE_CLEAR_M := 48.0
+
+static func tree_clears(data: LocationData) -> Array:
+	var out: Array = []
+	if data.landmark_type != "none":
+		var e := LocationData.entry_for_type(data.landmark_type)
+		out.append(_tree_clear(TerrainBuilder.landmark_world_pos(data), e,
+			float(e.get("tree_clear_m", DEFAULT_TREE_CLEAR_M))))
+	for c in data.landmark_candidates:
+		var cd := c as Dictionary
+		if cd.has("tree_clear_m"):
+			out.append(_tree_clear(Vector2(float(cd.get("x", 0.0)), float(cd.get("z", 0.0))), cd,
+				float(cd["tree_clear_m"])))
+	return out
+
+static func _tree_clear(at: Vector2, entry: Dictionary, radius: float) -> Array:
+	var m := WorldScale.metres_to_units()
+	var reach := radius + float(entry.get("span_m", 0.0)) * 0.5
+	for raw in entry.get("clear_offsets_m", []):
+		reach = maxf(reach, radius + Vector2(float(raw[0]), float(raw[1])).length())
+	var r: Array = entry.get("clear_rect_m", [])
+	if r.size() >= 4:
+		reach = maxf(reach, radius + Vector2(absf(float(r[0])) + float(r[2]), absf(float(r[1])) + float(r[3])).length())
+	return [at, entry, radius * m, pow(reach * m, 2.0)]
+
+## True when no tree may stand at `p` (tree_clears).
+static func tree_cleared(p: Vector2, clears: Array) -> bool:
+	for c in clears:
+		var at: Vector2 = c[0]
+		if p.distance_squared_to(at) > float(c[3]):
+			continue
+		if span_dist(p, at, c[1] as Dictionary) < float(c[2]):
+			return true
+	return false

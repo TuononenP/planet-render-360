@@ -17,7 +17,7 @@ static func prasat_kravan(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#A05B40", 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#8F8472", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4F37", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#2A2420", 2.0))
 	# Terrace: laterite body under a sandstone coping, 14 x 52 m.
 	lm.box("Laterite", Vector3(0, 0.4, 0), Vector3(14.0, 0.8, 52.0))
@@ -50,7 +50,7 @@ static func banteay_samre(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#A39378", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("stone", "#B3A488", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4F37", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))
 	var eb := Basis(Vector3.UP, PI * 0.5)
 	var lat: Array[String] = ["Laterite", "Stone", "Dark"]
@@ -105,7 +105,7 @@ static func srah_srang(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#9A8D74", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("stone", "#AA9D84", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4F37", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	var eb := Basis(Vector3.UP, PI * 0.5)
 	# Cruciform platform: the long arm along the bank, the porch to the pool.
 	lm.box("Laterite", Vector3(-6.0, 0.9, 0), Vector3(16.0, 1.8, 48.0))

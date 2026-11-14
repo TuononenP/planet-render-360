@@ -105,6 +105,8 @@ static func _height_context(data: LocationData) -> Dictionary:
 const LOW_RISE_USES := ["retail", "supermarket", "warehouse", "industrial", "garage",
 	"garages", "parking", "kiosk", "service", "shed", "hangar", "barn"]
 const LOW_RISE_STOREYS := 4.0
+## Roof allowance over a heritage zone's storey cap.
+const ZONE_ROOF_M := 4.0
 
 static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		parent_res: Dictionary, look: Dictionary) -> Dictionary:
@@ -139,6 +141,10 @@ static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 	# an untagged Dubai Mall block 61 m tall beside the vantage.
 	if str(m.get("kind", b.get("kind", ""))) in LOW_RISE_USES:
 		est["total_m"] = minf(float(est["total_m"]), LOW_RISE_STOREYS * float(look["floor_h"]))
+	# A heritage zone (HeritageZones) caps what the map does not say.
+	if b.has("zone_storeys"):
+		est["total_m"] = minf(float(est["total_m"]),
+			float(b["zone_storeys"]) * float(look["floor_h"]) + ZONE_ROOF_M)
 	return est
 
 ## Step 3 of the priority: the data-derived local estimate. The plan

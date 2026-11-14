@@ -24,10 +24,10 @@ const IWALL := 4.8      # inner gallery wall height above Y2
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#76705F", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("stone", "#5C574C", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("stone", LandmarkAngParts.ROOF, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#26231F", 2.0))
 	lm.use("Relief", LandmarkMaterials.pbr("stone", "#8B8372", 2.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A5A46", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Face", LandmarkMaterials.pbr("stone", "#857D6B", 2.5))
 	lm.use("Moss", LandmarkMaterials.pbr("forest", "#4E5A38", 4.0))
 	_platform(lm)

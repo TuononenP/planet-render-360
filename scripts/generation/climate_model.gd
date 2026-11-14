@@ -22,6 +22,10 @@ const TREELINE_C := 7.5
 ## Warmest-quarter share of annual precipitation below which summers
 ## are dry (Köppen Cs-like): grass reads golden, not green, in summer.
 const SUMMER_DRY_SHARE := 0.12
+## Driest-quarter share of annual precipitation below which a tropical
+## place has a hard dry season (Köppen Aw, the monsoon savanna of
+## Cambodia and Thailand): the grass is straw-coloured by its end.
+const WINTER_DRY_SHARE := 0.03
 
 static func has(data: LocationData) -> bool:
 	return data != null and data.climate.has("t_warm_c") and data.climate.has("t_cold_c")
@@ -83,6 +87,16 @@ static func summer_dry(data: LocationData) -> bool:
 	var p := float(data.climate.get("precip_mm", 0.0))
 	return p > 0.0 and float(data.climate.get("precip_warm_mm", p)) / p < SUMMER_DRY_SHARE
 
+## Hard tropical dry season in the cool half of the year (Aw): almost
+## none of the year's rain falls in the driest quarter. False without the
+## driest-quarter figure (older climate copies, latitude fallbacks).
+static func winter_dry(data: LocationData) -> bool:
+	if not has(data) or not data.climate.has("precip_dry_mm"):
+		return false
+	var p := float(data.climate.get("precip_mm", 0.0))
+	return p > 0.0 and float(data.climate["t_cold_c"]) >= 18.0 \
+		and float(data.climate["precip_dry_mm"]) / p < WINTER_DRY_SHARE
+
 ## Köppen-B aridity: annual precipitation under 20 × (mean °C + 7) mm.
 static func arid(data: LocationData) -> bool:
 	if not has(data):
@@ -119,6 +133,10 @@ static func grass_tint(data: LocationData, season: int) -> Color:
 		return Color(0.42, 0.33, 0.20, 1.0)
 	if summer_dry(data) and LocationData.clamp_season(season) in [LocationData.Season.SUMMER, LocationData.Season.AUTUMN]:
 		return Color(0.47, 0.38, 0.19, 1.0)
+	# The monsoon dry season (Nov-Apr north of the equator) is the
+	# calendar's winter and spring there; the wet season stays green.
+	if winter_dry(data) and LocationData.clamp_season(season) in [LocationData.Season.WINTER, LocationData.Season.SPRING]:
+		return Color(0.50, 0.41, 0.22, 1.0)
 	return Color(0, 0, 0, 0)
 
 ## Live surface state shared by every draped / vegetation / water

@@ -101,15 +101,26 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 			and (CanopyVegetation.usable(data.canopy_image, 255) \
 				or CanopyVegetation.usable(data.landcover_image, 0)),
 		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
-		"landmark": TerrainBuilder.landmark_world_pos(data) if data.landmark_type != "none" else Vector2(INF, INF),
+		"tree_clears": LandmarkSites.tree_clears(data),
+		"zone": HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M),
+		"origin": Vector2(data.latitude, data.longitude),
 	}
+
+## HeritageZones rules at (x, z) of the build (empty outside every zone).
+static func zone_rule(x: float, z: float, ctx: Dictionary) -> Dictionary:
+	if not bool(ctx.get("zone", false)):
+		return {}
+	var o: Vector2 = ctx["origin"]
+	var ll := WorldScale.latlon_from_xz(x, z, o.x, o.y)
+	return HeritageZones.rule_at(ll.x, ll.y)
 
 static func _hash(x: float, z: float, salt: float) -> float:
 	var v := sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453
 	return v - floor(v)
 
-## No tree stands this close (m) to the landmark.
-const LANDMARK_CLEAR_M := 48.0
+## No tree stands this close (m) to a landmark that declares no
+## `tree_clear_m` of its own (LandmarkSites.tree_clears).
+const LANDMARK_CLEAR_M := LandmarkSites.DEFAULT_TREE_CLEAR_M
 ## What a tree no map or raster put there keeps off: footprints, roads and
 ## their verges, water, sidewalks, and ground painted as paving or a pitch.
 const SYNTHETIC_BITS := VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER \
@@ -124,8 +135,7 @@ static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMa
 	if ground.water_at(x, z) > 0.0:
 		ctx["rej_water"] = int(ctx.get("rej_water", 0)) + 1
 		return false
-	var lm: Vector2 = ctx["landmark"]
-	if Vector2(x, z).distance_to(lm) < LANDMARK_CLEAR_M * float(ctx["m2u"]):
+	if LandmarkSites.tree_cleared(Vector2(x, z), ctx["tree_clears"]):
 		return false
 	return true
 
@@ -146,6 +156,10 @@ static func _species_at(x: float, z: float, setting: String, ground: GroundTruth
 	var noise: FastNoiseLite = ctx["noise"]
 	var u := clampf(0.5 + noise.get_noise_2d(x, z) * 0.9 + (_hash(x, z, 3.1) - 0.5) * 0.45, 0.0, 0.999)
 	var mix := TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type)
+	if bool(ctx.get("zone", false)):
+		var zone_mix := str(zone_rule(x, z, ctx).get("tree_mix", ""))
+		if zone_mix != "":
+			mix = TreeSpecies.mix_for_leaf(zone_mix, setting, leaf_type)
 	if str(ctx["biome"]) == "boreal" and ground.land_class_at(x, z) == "rock" and leaf_type != "broadleaved":
 		mix = [["scots_pine", 0.8], ["birch", 0.2]]
 	var sp := TreeSpecies.pick(mix, u)
@@ -258,7 +272,8 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 			var spread := crown
 			match cls:
 				"forest":
-					p = 0.92
+					# A heritage zone's woods are open woodland, not a closed canopy.
+					p = 0.92 * float(zone_rule(x, z, ctx).get("tree_keep", 1.0))
 				"orchard":
 					p = 0.55
 					size = 0.4

@@ -84,6 +84,11 @@ const CONTROLS := [
 	# preset's eye, whatever --season and --weather the run is given.
 	{"id": "helsinki_winter", "name": "Helsinki, Finland", "lat": 60.1679, "lon": 24.9525,
 		"season": "winter", "weather": 73},
+	# The tropics in the golden set: Angkor Wat and its precinct in the wet
+	# season, and again at the end of the dry season (straw grass).
+	{"id": "angkor_wat", "name": "Angkor Wat, Cambodia", "lat": 13.41249, "lon": 103.86684},
+	{"id": "angkor_wat_dry", "name": "Angkor Wat, Cambodia", "lat": 13.41249, "lon": 103.86684,
+		"season": "winter"},
 ]
 
 var _out := ""

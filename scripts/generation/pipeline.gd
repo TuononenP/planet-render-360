@@ -773,7 +773,8 @@ func _await_osm(data: LocationData) -> void:
 		data.piers = _osm.piers
 		data.shore_structures = _osm.shore_structures
 		data.bridge_areas = _osm.bridge_areas
-		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(_osm_landmarks))
+		HeritageZones.apply(data)
+		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(HeritageZones.filter_candidates(data, _osm_landmarks)))
 		_credits[2] = "Map data: © OpenStreetMap contributors" + (" · © OpenMapTiles" if _osm.used_omt else "")
 	else:
 		# No map data: the registry's other landmarks still stand.

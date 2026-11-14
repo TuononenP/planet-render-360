@@ -24,7 +24,7 @@ static func bayon(model: Node3D) -> void:
 ## raised bank at ground level. Gate faces +Z (south).
 static func south_gate(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7E5A44", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7D7767", 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#22201C", 2.0))
 	lm.use("Naga", LandmarkMaterials.pbr("stone", "#6C675A", 3.0))
