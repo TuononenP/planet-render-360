@@ -619,7 +619,7 @@ Review: `visual-plan/reviews/central-park-final-2026-11-14/` and `central-park-f
 | Landmarks | Bethesda Fountain, Bow Bridge, Gapstow Bridge, Belvedere Castle and Cleopatra's Needle (`LandmarkCentralPark`), ahead of the towers in the icon budget. |
 | Trees | `nyc_park` mix in a Central Park zone (elm form, oak, plane, maple, linden, honey locust); OSM `ulmus` now draws in the elm form everywhere. |
 | Rock | Mapped bare rock of park size stands up as low schist mounds (`RockOutcrops`). |
-| Far canopy | `FarCanopy` plants crowns where the far drape shows canopy past the detailed extent; Central Park reads as woods with open lawns from Midtown (80000 crowns on Ultra). |
+| Far canopy | `FarCanopy` plants trees where the far drape shows canopy past the detailed extent, each its species' impostor (the near trees' crossed cards) in stands of varied size; Central Park reads as woodland with open lawns from Midtown (80000 trees on Ultra, `far-trees-2026-11-14`). |
 | Fixes | Ramps and viaducts no longer climb to a skyscraper's or a bridge's top (`LandmarkRoofs`): the frames over Grand Central, the FDR by 55 Water Street and the FDR under the Brooklyn Bridge's Manhattan end are gone. Slender tower setbacks keep their facade. |
 
 The Lake had dropped to sea level: OSM maps its coves (Bank Rock Bay) as natural=bay, which counted as tidal and pulled the whole lake down 11 m into a trench of grassy cones. A bare bay is now tidal only where it joins real sea water (`OsmTags.bay`, `ShoreDomains._merge_levels`), so park lakes keep their bank level. Cleopatra's Needle keeps a treeless clearing; from the Great Lawn the knoll's trees still hide it, as they do on site.

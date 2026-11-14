@@ -69,6 +69,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 	t = Time.get_ticks_msec()
 	stats["cover"] = GroundCover.build(root, data, ground, mask)
 	stats["rocks"] = RockOutcrops.build(root, data, ground)
+	stats["far_canopy"] = FarCanopy.build(root, data, ground, SettlementMap.build(data))
 	timings["cover"] = Time.get_ticks_msec() - t
 	t = Time.get_ticks_msec()
 	stats["carpet"] = GrassCarpet.build(root, data) != null
