@@ -12,7 +12,8 @@ extends SceneTree
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
 ##        [--looks="lat,lon,height_m,bearing,pitch[,zoom];..."]  (candidate eyes, one
-##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8)
+##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8;
+##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
 ##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
@@ -374,6 +375,12 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	for k in _looks.size():
 		var l: Array = _looks[k]
 		var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
+		# Never shoot from inside a building (AGENTS.md): a blocked eye
+		# moves to the nearest open ground.
+		var free_at := _open_eye(view._data, at, float(l[2]))
+		if free_at != at:
+			print("CAPTURE MOVED %s look%d: eye inside or against a building, moved %.1f m" % [id, k, free_at.distance_to(at) / WorldScale.metres_to_units()])
+			at = free_at
 		var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
 		rig.position = Vector3(at.x, y, at.y)
 		rig.set_zoom(float(l[5]))
@@ -381,6 +388,62 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "look%d" % k)
 	_contact_sheet(id)
+
+## Clearance (m) a capture eye keeps from any building wall: wide enough
+## that a moved eye is not left pressed against the facade it escaped.
+const EYE_CLEAR_M := 3.0
+## How far (m) _open_eye searches for open ground before giving up.
+const EYE_SEARCH_M := 40.0
+## Assumed height (m) of a building with no height tag.
+const EYE_UNKNOWN_HEIGHT_M := 10.0
+
+## `at` (world xz) if it is open ground, else the nearest point on rings
+## around it that lies outside every building footprint by EYE_CLEAR_M.
+## Only buildings at least as tall as the eye (`eye_m` over the ground)
+## count, so an aerial eye over a roof stays put. Unchanged when nothing
+## open is found within EYE_SEARCH_M.
+func _open_eye(data: LocationData, at: Vector2, eye_m: float) -> Vector2:
+	var m := WorldScale.metres_to_units()
+	var reach := (EYE_SEARCH_M + EYE_CLEAR_M) * m
+	var near: Array = []
+	for b in data.buildings:
+		if not (b is Dictionary):
+			continue
+		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
+		if fp.size() < 3:
+			continue
+		var h := float(b.get("height", 0.0))
+		if (h if h > 0.0 else EYE_UNKNOWN_HEIGHT_M) < eye_m:
+			continue
+		var box := Rect2(fp[0], Vector2.ZERO)
+		for v in fp:
+			box = box.expand(v)
+		if box.grow(reach).has_point(at):
+			near.append(fp)
+	if not _eye_blocked(near, at, EYE_CLEAR_M * m):
+		return at
+	var r := 1.0
+	while r <= EYE_SEARCH_M:
+		# About one candidate per metre of ring, so a narrow lane far out
+		# is not stepped over.
+		var steps := maxi(24, ceili(TAU * r))
+		for a in steps:
+			var q := at + Vector2(cos(TAU * a / steps), sin(TAU * a / steps)) * r * m
+			if not _eye_blocked(near, q, EYE_CLEAR_M * m):
+				return q
+		r += 1.0
+	printerr("CAPTURE no open ground within %d m of a look eye" % int(EYE_SEARCH_M))
+	return at
+
+static func _eye_blocked(footprints: Array, p: Vector2, clear: float) -> bool:
+	for fp: PackedVector2Array in footprints:
+		if Geometry2D.is_point_in_polygon(p, fp):
+			return true
+		for i in fp.size():
+			var q := Geometry2D.get_closest_point_to_segment(p, fp[i], fp[(i + 1) % fp.size()])
+			if p.distance_to(q) < clear:
+				return true
+	return false
 
 ## Waits `seconds` while drawing at least `frames` frames. Off-screen,
 ## macOS stops redrawing the window (two frames in 30 s), so a plain timer
