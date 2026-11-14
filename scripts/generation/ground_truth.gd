@@ -137,7 +137,8 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 	water_level_m = data.water_level
 	var has_sea := WaterBuilder._has_coastline(data)
 	for poly in data.land_polygons:
-		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)):
+		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)) \
+				and not bool(poly.get("bay", false)):
 			has_sea = true
 			break
 	if not is_equal_approx(data.water_level, -3.0) and has_sea:

@@ -90,6 +90,7 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 		return root
 	t0 = Time.get_ticks_msec()
 	FarCityBuilder.build(root, data, ground, smap)
+	FarCanopy.build(root, data, ground, smap)
 	timings["far_city"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	ShopLights.add(root, View360.spawn_xz(data))

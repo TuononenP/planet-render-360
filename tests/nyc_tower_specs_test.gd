@@ -82,6 +82,12 @@ func _check_selection(failures: Array[String]) -> void:
 		data.landmark_type = "one_wtc"
 		data.quality_preset = preset
 		var picked := LandmarkSites.select(data, [])
+		data.landmark_candidates = picked
+		for site in LandmarkRoofs.collect(data):
+			if str(LocationData.entry_for_type(str((site[1] as Dictionary).get("type", ""))).get("kind", "")) in LandmarkRoofs.NOT_ROOFS:
+				failures.append("preset %d lands mapped ways on skyscraper or bridge %s" % [preset,
+					str((site[1] as Dictionary)["type"])])
+				break
 		var sky := 0
 		var icons := 0
 		for c in picked:

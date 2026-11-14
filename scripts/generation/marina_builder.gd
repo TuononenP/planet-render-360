@@ -329,7 +329,8 @@ static func mediterranean(data: LocationData) -> bool:
 	if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data):
 		return true
 	for poly in data.land_polygons:
-		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)):
+		if str(poly.get("class", "")) == "water" and bool(poly.get("tidal", false)) \
+				and not bool(poly.get("bay", false)):
 			return true
 	return false
 

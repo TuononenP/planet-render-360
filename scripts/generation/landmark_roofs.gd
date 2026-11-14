@@ -7,18 +7,28 @@ extends RefCounted
 ## viaduct clearance in RoadBuilder.deck_profile.
 
 ## [centre, entry, height_m] for every typed registry candidate and
-## the primary landmark site of `data`.
+## the primary landmark site of `data`. A skyscraper or a bridge carries no
+## mapped way on its "roof": a ramp or viaduct beside or through a tower's
+## base (the Park Avenue Viaduct round the MetLife Building), or under a
+## bridge (the FDR Drive under the Brooklyn Bridge, whose height_m is its
+## towers' and whose clearance runs its whole span), stays on its own deck
+## instead of rising to the landmark's top. A bridge's own deck replaces
+## its mapped one (LandmarkSites.outside_spans).
+const NOT_ROOFS := ["Skyscraper", "Bridge"]
 static func collect(data: LocationData) -> Array:
 	var out: Array = []
 	for c: Variant in data.landmark_candidates:
 		if c is Dictionary and (c as Dictionary).has("type") \
 				and float((c as Dictionary).get("height", 0.0)) > 0.0:
 			var cd := c as Dictionary
+			if str(LocationData.entry_for_type(str(cd["type"])).get("kind", "")) in NOT_ROOFS:
+				continue
 			out.append([Vector2(float(cd.get("x", 0.0)), float(cd.get("z", 0.0))), cd,
 				float(cd["height"])])
 	if data.has_landmark_site and data.landmark_type != "none":
 		var entry := LocationData.entry_for_type(data.landmark_type)
-		if not entry.is_empty() and float(entry.get("height_m", 0.0)) > 0.0:
+		if not entry.is_empty() and float(entry.get("height_m", 0.0)) > 0.0 \
+				and not str(entry.get("kind", "")) in NOT_ROOFS:
 			out.append([WorldScale.xz_from_latlon(data.landmark_lat, data.landmark_lon,
 				data.latitude, data.longitude), entry, float(entry["height_m"])])
 	return out

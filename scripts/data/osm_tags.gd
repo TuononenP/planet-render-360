@@ -712,6 +712,13 @@ static func tidal(tags: Dictionary) -> bool:
 	return str(tags.get("natural", "")) == "bay" or str(tags.get("water", "")) == "sea" \
 		or str(tags.get("tidal", "")) == "yes"
 
+## A natural=bay with no sea tag: tidal only where it joins the sea; a cove
+## of an inland lake (Central Park's Bank Rock Bay) takes the lake's level
+## (ShoreDomains._merge_levels).
+static func bay(tags: Dictionary) -> bool:
+	return str(tags.get("natural", "")) == "bay" and str(tags.get("water", "")) != "sea" \
+		and str(tags.get("tidal", "")) != "yes"
+
 ## Shallow ornamental/swimming basins use calm-water shading.
 static func still_pool(tags: Dictionary) -> bool:
 	return str(tags.get("artificial", "")) == "yes" or str(tags.get("leisure", "")) == "swimming_pool" \

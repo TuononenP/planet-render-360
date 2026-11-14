@@ -194,7 +194,7 @@ func _region_checks(failures: Array[String]) -> void:
 	# city's style zone, so its view reads as that city.
 	for row in PresetViews.ROWS:
 		var city := CityStyles.city_of_region(CityStyles.region_at(float(row["lat"]), float(row["lon"])))
-		var want: String = str({"alps": "interlaken", "big_sur": "", "new_york_midtown": "new_york"}.get(str(row["id"]), str(row["id"])))
+		var want: String = str({"alps": "interlaken", "big_sur": "", "new_york_midtown": "new_york", "central_park": "new_york"}.get(str(row["id"]), str(row["id"])))
 		if city != want:
 			failures.append("quick pick %s stands in city zone '%s', expected '%s'" % [row["id"], city, want])
 	if ArchitectureStyle.region_for(48.8566, 2.3522, "FR") != "haussmann" \

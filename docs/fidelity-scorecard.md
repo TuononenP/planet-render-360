@@ -608,6 +608,22 @@ the largest script. Re-run the relevant checks against the final workspace
 and final native libraries before considering the implementation accepted.
 
 
+### Central Park, 2026-11-14
+
+Provisional agent rating: **recognisable** from the park and from Top of the Rock; the human gate stays open.
+Review: `visual-plan/reviews/central-park-final-2026-11-14/` and `central-park-final2-2026-11-14/` (Bethesda vantage, Midtown north from 270 m over 50th Street, both New York presets).
+
+| Change | Result |
+| --- | --- |
+| Preset | `central_park` on Bethesda Terrace's lower terrace, bundled (detailed, rings, POI, far, transit, horizon). |
+| Landmarks | Bethesda Fountain, Bow Bridge, Gapstow Bridge, Belvedere Castle and Cleopatra's Needle (`LandmarkCentralPark`), ahead of the towers in the icon budget. |
+| Trees | `nyc_park` mix in a Central Park zone (elm form, oak, plane, maple, linden, honey locust); OSM `ulmus` now draws in the elm form everywhere. |
+| Rock | Mapped bare rock of park size stands up as low schist mounds (`RockOutcrops`). |
+| Far canopy | `FarCanopy` plants crowns where the far drape shows canopy past the detailed extent; Central Park reads as woods with open lawns from Midtown (80000 crowns on Ultra). |
+| Fixes | Ramps and viaducts no longer climb to a skyscraper's or a bridge's top (`LandmarkRoofs`): the frames over Grand Central, the FDR by 55 Water Street and the FDR under the Brooklyn Bridge's Manhattan end are gone. Slender tower setbacks keep their facade. |
+
+The Lake had dropped to sea level: OSM maps its coves (Bank Rock Bay) as natural=bay, which counted as tidal and pulled the whole lake down 11 m into a trench of grassy cones. A bare bay is now tidal only where it joins real sea water (`OsmTags.bay`, `ShoreDomains._merge_levels`), so park lakes keep their bank level. Cleopatra's Needle keeps a treeless clearing; from the Great Lawn the knoll's trees still hide it, as they do on site.
+
 ### New York skyline towers, 2026-11-14
 
 Provisional agent rating: unchanged (**recognisable** on Ultra); the human gate stays open.

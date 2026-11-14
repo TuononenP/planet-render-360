@@ -6,6 +6,7 @@ extends RefCounted
 ## Angkor park stay one or two storeys and never turn into apartment
 ## blocks, and footprints of the stone monuments the landmark models
 ## draw (a `historic` gate or ruin) give way to those models.
+## Central Park keeps only its own tree mix (TreeSpecies "nyc_park").
 ## Zones are lat/lon boxes, outermost first; a point inside several takes
 ## the outer rules overlaid by the inner ones. Rule keys:
 ##   max_storeys      cap on an inferred (untagged) height, in storeys
@@ -28,6 +29,8 @@ const ZONES := [
 	# Angkor Thom, the 3 km walled city round the Bayon.
 	{"id": "angkor_thom", "lat": [13.4276, 13.4547], "lon": [103.8451, 103.8728],
 		"rules": {"max_storeys": 1, "drop_historic": true}},
+	{"id": "central_park", "lat": [40.7644, 40.8005], "lon": [-73.9820, -73.9490],
+		"rules": {"tree_mix": "nyc_park"}},
 ]
 
 ## Merged rules at (lat, lon); empty outside every zone.

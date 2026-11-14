@@ -28,7 +28,7 @@ func _init(data: LocationData = null, box: Rect2 = Rect2(), abort: BuildAbort = 
 		if str(poly.get("class", "")) == "water":
 			_add(poly.get("points", PackedVector2Array()), poly.get("holes", []),
 				{"source": i, "kind": "polygon", "tidal": bool(poly.get("tidal", false)),
-				"still_pool": bool(poly.get("still_pool", false))})
+				"bay": bool(poly.get("bay", false)), "still_pool": bool(poly.get("still_pool", false))})
 	_setup_native()
 	for w in data.waterways:
 		if abort != null and abort.requested:
@@ -291,16 +291,22 @@ func _merge_levels() -> void:
 					var a := _root(parent, id)
 					var b := _root(parent, other)
 					parent[maxi(a, b)] = mini(a, b)
+	# A bare natural=bay is tidal only in a group that holds real sea water
+	# (the coast, water=sea, tidal=yes): an inland lake's mapped coves take
+	# the lake's level instead of pulling it down to the sea.
 	var levels := {}
 	var tidal := {}
 	for id in bodies.size():
 		var group := _root(parent, id)
-		levels[group] = maxf(float(levels.get(group, -INF)), float(bodies[id]["level"]))
-		if bool(bodies[id]["tidal"]):
+		if not (bool(bodies[id]["tidal"]) and bool(bodies[id].get("bay", false))):
+			levels[group] = maxf(float(levels.get(group, -INF)), float(bodies[id]["level"]))
+		if bool(bodies[id]["tidal"]) and not bool(bodies[id].get("bay", false)):
 			tidal[group] = float(bodies[id]["level"])
 	for id in bodies.size():
 		var group := _root(parent, id)
-		bodies[id]["level"] = tidal.get(group, levels[group])
+		if not tidal.has(group) and levels.has(group) and bool(bodies[id].get("bay", false)):
+			bodies[id]["tidal"] = false
+		bodies[id]["level"] = tidal.get(group, levels.get(group, float(bodies[id]["level"])))
 
 static func _root(parent: Array[int], id: int) -> int:
 	while parent[id] != id:

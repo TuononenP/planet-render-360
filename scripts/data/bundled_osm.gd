@@ -103,6 +103,11 @@ const ENTRIES := {
 	"new_york_midtown_ring2500": [40.7535, -73.9825, "ring2500", 1, "2026-05-31T22:37:44", 74128, "9f234176667de6bd790c317af2045d434f7db39196c3fb1b34277642a2a733b4"],
 	"new_york_midtown_poi": [40.7535, -73.9825, "poi", 1, "2026-07-15T15:22:01", 244548, "86787e7dfd6d7d3048ce1c39fa8afe243ef13116cce83ec1e1d15b971d7a4033"],
 	"new_york_midtown_far": [40.7535, -73.9825, "far", 3, "2026-07-24T11:04:51", 2812889, "f3ba7988710cc34057f962c0efdd5921ee8de137e2c4412cf8abf3d1db332c77"],
+	"central_park_detailed": [40.7760, -73.9700, "detailed", 12, "2026-11-14T13:45:36", 649115, "dd28ad7b2fb9bdf54d6b0a43808fec522b327a39a0ac8526cb4a783a6ea30061"],
+	"central_park_ring1600": [40.7760, -73.9700, "ring1600", 1, "2026-11-14T13:47:36", 53659, "a5e774dd38227e9bfd2693dbb96c562b5ec7f25607117197ed2603d29a4a6810"],
+	"central_park_ring2500": [40.7760, -73.9700, "ring2500", 1, "2026-11-14T13:47:36", 74196, "bef05539bfaa4ade81feb5cf0bca39e71acc31815f2c043ff41fdd0eed7b81ec"],
+	"central_park_poi": [40.7760, -73.9700, "poi", 1, "2026-11-14T13:48:38", 47991, "cb5adb3b3c885e04c2baf37f0a3edea7e82dc95ee4a32cae084682f808d4d9a6"],
+	"central_park_far": [40.7760, -73.9700, "far", 3, "2026-11-14T13:46:36", 1501436, "3a5560325b34af9b9a1423ee95025568a59bc0743b904b35f5c1679c6dcac790"],
 	"new_york_detailed": [40.7060, -74.0040, "detailed", 12, "2026-11-04T13:18:25", 1172636, "dc262ccf75f0cdc25ec05d2d866c6f72b6f828bb5a5f15e57ed88607c3dda262"],
 	"san_francisco_detailed": [37.8040, -122.4195, "detailed", 12, "2026-11-04T13:16:20", 658733, "31a5fb4cc7aadef50eb310fa6ba1fd4fcd1aeb9c3037e36529dbc5ddd48175d5"],
 	"helsinki_far": [60.1680, 24.9530, "far", 3, "2026-11-04T14:47:51", 1213581, "2ca4652c1d5f3884eca7d6df93e1e64b230d4ab4ead5208ceed1e716644c9dfd"],
@@ -124,6 +129,7 @@ const ENTRIES := {
 	"stockholm_transit": [59.3207, 18.0604, "transit", 1, "2026-11-11T01:16:23", 10595, "0b26039978bc07d01ebac7ca801abde3e7cf9a95898a9e5cc5c6d5a2d003809d"],
 	"new_york_midtown_transit": [40.7535, -73.9825, "transit", 1, "2026-11-11T01:17:52", 31550, "545a2a60b9d0dbdceb024cfaa5d5a3b76f9396bd5bcd71efee7d015042299c1a"],
 	"new_york_transit": [40.7060, -74.0040, "transit", 1, "2026-11-11T01:19:20", 20384, "a357f1fc32655ee39ee7affe0415ca21fb5251c1987a961c20a1c4a18f96fccf"],
+	"central_park_transit": [40.7760, -73.9700, "transit", 1, "2026-11-14T13:55:20", 12134, "8edb602958639f128e468c367cb287f382cc49e78ebd7e3f97ed3e2f6cff17c8"],
 	"san_francisco_transit": [37.8040, -122.4195, "transit", 1, "2026-11-11T01:20:47", 15218, "80d325cb3da217c364d5ef0d76b91fa1aa4bad1db5c0071f0aa5245b21602579"],
 }
 const DIRECTORY := "res://assets/osm_snapshots/"

@@ -195,6 +195,12 @@ static func mix(biome: String, setting: String) -> Array:
 	match biome:
 		"tropical":
 			return [["palm", 0.45], ["tropical", 0.55]]
+		"nyc_park":
+			# Central Park: American elms (the vase-shaped zelkova form, the
+			# same family) along the Mall and drives, oaks, London planes,
+			# maples, lindens and honey locusts, a few pines.
+			return [["zelkova", 0.24], ["oak", 0.24], ["plane", 0.16], ["maple", 0.14], ["lime", 0.1],
+				["honey_locust", 0.06], ["scots_pine", 0.04], ["birch", 0.02]]
 		"khmer":
 			return [["dipterocarp", 0.35], ["sugar_palm", 0.22], ["tropical", 0.2], ["silk_cotton", 0.15],
 				["palm", 0.08]]
@@ -241,7 +247,7 @@ static func mix(biome: String, setting: String) -> Array:
 const GENUS := {
 	"platanus": "plane", "tilia": "lime", "quercus": "oak", "fagus": "oak",
 	"castanea": "oak", "carpinus": "oak", "juglans": "oak",
-	"acer": "lime", "aesculus": "lime", "ulmus": "lime", "fraxinus": "lime",
+	"acer": "lime", "aesculus": "lime", "ulmus": "zelkova", "fraxinus": "lime",
 	"robinia": "lime", "prunus": "lime", "sorbus": "lime", "malus": "lime",
 	"celtis": "lime", "styphnolobium": "lime", "sophora": "lime", "gleditsia": "honey_locust",
 	"pyrus": "callery_pear", "magnolia": "lime", "ginkgo": "ginkgo", "zelkova": "zelkova",
