@@ -83,8 +83,14 @@ static func apply_offline(p: MapPicker) -> void:
 	if p._offline_badge == null:
 		return
 	p._offline_badge.visible = p._offline
+	# Phones share the top row with the nav, so the field is too narrow
+	# for the labelled badge: there it is the wifi-off icon alone, and it
+	# never reaches past the field's left edge.
+	var badge_text := "" if p._current_layout == Responsive.Layout.COMPACT else "Offline"
+	if p._offline_badge.text != badge_text:
+		HudParts.apply_status_badge(p._offline_badge, badge_text, "error", "wifi-off")
 	p._offline_badge.reset_size()
-	p._offline_badge.position = Vector2(p._search.size.x - 52.0 - p._offline_badge.size.x,
+	p._offline_badge.position = Vector2(maxf(p._search.size.x - 52.0 - p._offline_badge.size.x, 0.0),
 		(p._search.size.y - p._offline_badge.size.y) / 2.0)
 	var cards: Array = p._quick_chips.duplicate()
 	if p._recent_row != null:

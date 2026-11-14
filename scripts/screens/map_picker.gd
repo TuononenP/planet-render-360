@@ -430,7 +430,6 @@ func _suggest_style() -> StyleBoxFlat:
 func _on_resized() -> void:
 	MapChrome._on_resized(self)
 	if _toast != null:
-		MapHome.apply_offline(self)
 		MapHome.place_toast(self)
 
 ## History for the Recent places rail and the first-launch state.

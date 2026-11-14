@@ -348,6 +348,7 @@ static func _apply_layout(p: MapPicker, layout: Responsive.Layout) -> void:
 		var sheet_w := 0 if compact else mini(int(p.size.x) - pad * 2, 760)
 		p._sheet.custom_minimum_size = Vector2(sheet_w, 0)
 		p._sheet.size_flags_horizontal = Control.SIZE_FILL if compact else Control.SIZE_SHRINK_CENTER
+	MapHome.apply_offline(p)
 	_queue_focus_update(p)
 
 ## Keep the pin in the part of the map that is not covered by the
