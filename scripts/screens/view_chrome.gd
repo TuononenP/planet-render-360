@@ -239,7 +239,11 @@ static func build(v: View360) -> void:
 	v._idle_timer = Timer.new()
 	v._idle_timer.one_shot = true
 	v._idle_timer.wait_time = IDLE_S
-	v._idle_timer.timeout.connect(func() -> void: idle(v))
+	v._idle_timer.timeout.connect(func() -> void:
+		if v._drone.sticks.held():
+			v._idle_timer.start()  # a thumb resting on a stick is still input
+		else:
+			idle(v))
 	v._hud.add_child(v._idle_timer)
 	_sync_fullscreen(v)
 
@@ -261,7 +265,7 @@ static func _build_drone(v: View360) -> void:
 	panel.visible = false
 	v._drone.panel = panel
 	v._fade.add_child(panel)
-	v._drone.sticks = DroneSticks.new(v._drone, v._walk)
+	v._drone.sticks = DroneSticks.new(v._drone, v._walk, v)
 	v._drone.sticks.visible = false
 	v._hud.add_child(v._drone.sticks)
 
@@ -866,8 +870,12 @@ static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: floa
 			well = minf(well, v._sheet.position.y - 12.0)
 		if v._sheet_tab.visible and not inspector:
 			well = minf(well, tab_y - 8.0)
-		v._drone.sticks.place(pad, v._zoom_stack.position.x - 8.0, well)
-		bottom = minf(bottom, well - DroneSticks.SIZE - 8.0)
+		# A stacked look well leaves the readout room under the top cluster.
+		var ceiling := v._top.get_rect().end.y + 8.0
+		if v._drone.panel.visible:
+			ceiling += v._drone.panel.get_combined_minimum_size().y + 8.0
+		var top := v._drone.sticks.place(pad, v._zoom_stack.position.x - 8.0, well, ceiling)
+		bottom = minf(bottom, top - 8.0)
 	if v._drone.panel.visible:
 		v._drone.panel.reset_size()
 		var ps := v._drone.panel.get_combined_minimum_size()

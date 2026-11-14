@@ -101,6 +101,18 @@ func _maths() -> void:
 	_check(DroneSticks.deflection(Vector2(0, -400), 38.0).is_equal_approx(Vector2(0, -1)), "and never past it")
 	var half := DroneSticks.deflection(Vector2(19, 0), 38.0).x
 	_check(half > 0.0 and half < 0.5, "half way is eased below half: %s" % half)
+	var looked := DroneSticks.look_step(Vector2.ZERO, Vector2(0, 1), 0.5)
+	_check(looked.y < 0.0 and looked.x == 0.0, "the look stick pulled down looks down")
+	_check(DroneSticks.look_step(Vector2.ZERO, Vector2(1, 0), 0.5).x < 0.0, "and pushed right turns right")
+	var placed := DroneSticks.new(ViewDrone.new())
+	placed.place(16.0, 1000.0, 700.0)
+	_check(placed.look.position.y == placed.right.position.y and placed.look.position.x < placed.right.position.x,
+		"a wide screen puts the look stick beside the turn stick")
+	_check(placed.place(16.0, 300.0, 700.0) < 700.0 - DroneSticks.SIZE and placed.look.position.x == placed.right.position.x,
+		"a narrow one stacks it above")
+	placed.place(16.0, 300.0, 700.0, 600.0)
+	_check(not placed.look.visible, "and puts it away where stacking has no room")
+	placed.free()
 
 	var tower := {"x": 0.0, "z": -400.0, "height": 80.0, "footprint": PackedVector2Array([
 		Vector2(-100, -415), Vector2(100, -415), Vector2(100, -385), Vector2(-100, -385)])}
@@ -271,6 +283,9 @@ func _flight() -> void:
 	_check(screen.encloses(lw) and screen.encloses(rw), "so do the sticks: %s %s" % [lw, rw])
 	_check(not lw.intersects(rw) and not rw.intersects(stack), "the wells clear each other and the button")
 	_check(screen.encloses(ro) and not ro.intersects(lw) and not ro.intersects(rw), "the readout sits above the wells: %s" % ro)
+	var kw := Rect2(view._drone.sticks.look.position, view._drone.sticks.look.size)
+	_check(not view._drone.sticks.look.visible or (screen.encloses(kw) and not kw.intersects(ro)
+		and not kw.intersects(lw) and not kw.intersects(stack)), "the look well, if shown, clears the rest: %s" % kw)
 	# A short landscape window keeps the side inspector: the drone
 	# button stays on screen beside it.
 	view.size = Vector2(600, 450)
@@ -297,6 +312,21 @@ func _flight() -> void:
 	view._landmark_panel.close()
 	ViewChrome.layout(view)
 	_check(view._drone.sticks.visible, "and they come back when it closes")
+	# A thumb resting still on a stick sends no events; the HUD must not
+	# idle out from under it, and it does once the thumb lifts.
+	var thumb := InputEventScreenTouch.new()
+	thumb.pressed = true
+	thumb.position = view._drone.sticks.left.size / 2.0
+	view._drone.sticks.left._gui_input(thumb)
+	_check(view._drone.sticks.held(), "a touch on a stick holds it")
+	view._idle_timer.timeout.emit()
+	_check(view._fade.visible and not view._idle_timer.is_stopped(), "a held stick keeps the HUD up")
+	view._drone.sticks.left.release()
+	_check(not view._drone.sticks.held(), "and a released one doesn't")
+	view._idle_timer.timeout.emit()
+	await create_timer(UiPrefs.motion(ViewChrome.FADE_OUT_S) + 0.2).timeout
+	_check(not view._fade.visible, "so the HUD idles once the thumb lifts")
+	ViewChrome.wake(view)
 	view._inspector_open = true
 	DroneSticks.forced = false
 	view.size = Vector2(1280, 800)
