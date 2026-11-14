@@ -21,6 +21,9 @@
 #include "shore_classifier.h"
 #include "shore_evidence_kernels.h"
 #include "snapshot_kernels.h"
+#include "memory_stats.h"
+#include "video_decoder.h"
+#include "video_encoder.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -58,6 +61,9 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(GridFilters);
 	GDREGISTER_CLASS(RoadGrader);
 	GDREGISTER_CLASS(ShoreClassifier);
+	GDREGISTER_CLASS(MemoryStats);
+	GDREGISTER_CLASS(VideoDecoder);
+	GDREGISTER_CLASS(VideoEncoder);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

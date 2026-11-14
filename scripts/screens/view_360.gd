@@ -13,6 +13,9 @@ signal visit_requested(site: Dictionary, lat: float, lon: float)
 signal pref_changed(key: String, value: Variant)
 ## The view settled after opening: its picture for History and Recents.
 signal snapshot_ready(lat: float, lon: float, image: Image)
+## A message for the user while the view is hidden (a video finishing
+## after they left): main shows it on the screen they are on.
+signal toast_requested(title: String, message: String, tone: String)
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
@@ -98,6 +101,8 @@ var _date_picker: DatePicker
 var _toast: Toast
 var _stream_badge: StreamBadge
 var _photo_busy := false
+## Records the view as a video (ViewTools); null where that can't be done.
+var _recorder: VideoRecorder
 ## Picked calendar day ({} = the season's own day) and the sun arc's
 ## time-lapse.
 var _date: Dictionary = {}
@@ -419,6 +424,8 @@ func _notification(what: int) -> void:
 		_threads.clear()
 
 func show_location(data: LocationData, prebuilt: Array = []) -> void:
+	if _recorder != null:
+		_recorder.stop()  # a new place; streaming swaps keep recording
 	if _drone.on:
 		_drone.exit(self, false)
 	set_quality_preset(data.quality_preset)
@@ -925,7 +932,8 @@ func _process(delta: float) -> void:
 	if _gyro_on and _touches.is_empty() and is_visible_in_tree():
 		var g := Input.get_gyroscope()
 		if g.length() > 0.01:
-			_rig.set_look(_rig.yaw + g.y * delta, _rig.pitch + g.x * delta)
+			var turn := CameraRig.gyro_rates(g, Input.get_gravity()) * delta
+			_rig.set_look(_rig.yaw + turn.x, _rig.pitch + turn.y)
 			_on_look_changed()
 
 ## Keeps the fine land-cover map under the eye (NearGroundWindow) and the

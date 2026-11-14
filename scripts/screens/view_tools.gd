@@ -15,6 +15,17 @@ const CHIPS := [["labels", "tag", "Labels", "Name peaks, towns and lakes (N)"],
 const ACTIONS := [["photo", "camera", "Save photo", "Save a photo (P)"],
 	["panorama", "rotate-3d", "Save 360°", "Save a 360° photo to look around in (O)"],
 	["link", "link", "Copy link", "Copy a link to this view (C)"]]
+## Only where a video can be recorded (VideoRecorder.supported).
+const RECORD := ["record", "video", "Record", "Record a video of the view (R)"]
+const STOP_TIP := "Stop and save the video (R)"
+## The toast for each VideoRecorder.StartError: title, what to do.
+const START_ERRORS := {
+	VideoRecorder.StartError.NOT_DRAWN: ["Couldn't start recording", "The scene isn't drawn yet. Try again in a moment."],
+	VideoRecorder.StartError.TOO_LARGE: ["Can't record at this size", "Choose a lower Video quality in Settings, then try again."],
+	VideoRecorder.StartError.UNSUPPORTED: ["Can't record video here", "This device can't record the view as a video."],
+	VideoRecorder.StartError.NO_FILE: ["Couldn't start recording", "Check there is space and the folder can be written to, then try again."],
+	VideoRecorder.StartError.BUSY: ["Still saving the last video", "Try again once it is saved."],
+}
 const DATE_TIP := "Pick a day, season or weather"
 const MAP_GAP := 12.0
 
@@ -34,6 +45,8 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 		b.pressed.connect(_action.bind(v, str(a[0])))
 		v._tool_btns[a[0]] = b
 		actions.add_child(b)
+	if VideoRecorder.supported():
+		_build_record(v, actions)
 	v._tool_btns["date"] = v._sun_arc.day_btn
 	v._horizon = HorizonLabels.new(v)
 	v._hud.add_child(v._horizon)
@@ -76,6 +89,8 @@ static func _action(v: View360, key: String) -> void:
 			panorama(v)
 		"link":
 			copy_link(v)
+		"record":
+			toggle_record(v)
 		"labels":
 			toggle_labels(v)
 		"map":
@@ -98,6 +113,9 @@ static func sync(v: View360) -> void:
 # --- Toast ---
 
 static func say(v: View360, title: String, message: String = "", tone: String = "good") -> void:
+	if not v.is_visible_in_tree():
+		v.toast_requested.emit(title, message, tone)
+		return
 	if v._toast == null:
 		return
 	v._toast.show_message(title, message, tone)
@@ -153,6 +171,7 @@ static func photo(v: View360) -> void:
 		img = await PhotoMode.stamped(v, img, lines)
 		if not is_instance_valid(v):
 			return
+	var size := img.get_size()
 	var bytes := await PhotoMode.encode_png_async(img, v.get_tree())
 	if not is_instance_valid(v):
 		return
@@ -168,7 +187,10 @@ static func photo(v: View360) -> void:
 			if failed:
 				say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
 			elif path != "":
-				say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
+				var shown := path.get_file() if path.begins_with("user://") else path
+				var listed := not MediaLibrary.add(path, MediaLibrary.PHOTO, data.place_name,
+					{"width": size.x, "height": size.y}).is_empty()
+				say(v, "Photo saved", "Find it in Gallery · " + shown if listed else shown))
 
 ## The whole sphere around the eye as one picture (see PanoramaCapture): six
 ## faces rendered off-screen, so the view itself does not move. Takes a few
@@ -236,6 +258,76 @@ static func panorama(v: View360) -> void:
 			else:
 				say(v, "360° photo saved to Gallery", "No copy was exported. You can export one from Gallery later."))
 
+# --- Video ---
+
+static func _build_record(v: View360, actions: Container) -> void:
+	var b := HudParts.outline_button(str(RECORD[1]), str(RECORD[2]))
+	b.tooltip_text = str(RECORD[3])
+	b.pressed.connect(_action.bind(v, str(RECORD[0])))
+	v._tool_btns[RECORD[0]] = b
+	actions.add_child(b)
+	var rec := VideoRecorder.new()
+	rec.name = "VideoRecorder"
+	v._recorder = rec
+	v.add_child(rec)
+	v._hud.add_child(rec.badge)
+	rec.stopped.connect(sync_record.bind(v))
+	rec.finished.connect(func(path: String, failed: bool, note: String, why: String) -> void:
+		if not is_instance_valid(v):
+			return
+		sync_record(v)
+		var shown := path.get_file() if path.begins_with("user://") else path
+		if failed and why == VideoRecorder.NO_FRAMES:
+			say(v, "Nothing was recorded", "Record for a moment longer before you stop.", "caution")
+		elif failed and why != "":
+			say(v, note if note != "" else "Couldn't finish the video", "The recording was lost. Try recording again.", "error")
+		elif failed:
+			say(v, "Couldn't save the video", "Check there is space and the folder can be written to, then try again.", "error")
+		elif path != "":
+			# The recording's own place: the view may show another by now.
+			var listed := not MediaLibrary.add(path, MediaLibrary.VIDEO, rec.recorded_place()).is_empty()
+			say(v, note if note != "" else "Video saved", "Find it in Gallery · " + shown if listed else shown)
+		else:
+			say(v, "Video discarded", "The recording wasn't saved.", "neutral"))
+
+## Record (R): starts a video of the view, or stops and saves it. Waits
+## while the last one is still being saved.
+static func toggle_record(v: View360) -> void:
+	var rec := v._recorder
+	if rec == null or v._data == null:
+		return
+	if rec.state == VideoRecorder.State.SAVING:
+		var busy: Array = START_ERRORS[VideoRecorder.StartError.BUSY]
+		say(v, str(busy[0]), str(busy[1]), "caution")
+		return
+	if rec.is_recording():
+		rec.stop()
+		return
+	var err := rec.start(v, UiPrefs.video_quality)
+	if err != VideoRecorder.StartError.NONE:
+		push_warning("VideoRecorder: " + rec.last_error)
+		var why: Array = START_ERRORS[err]
+		say(v, str(why[0]), str(why[1]), "error")
+		return
+	sync_record(v)
+	say(v, "Recording the view", "Press R or choose Stop to save the video.")
+
+## The Record button and badge as the recorder stands: Stop with a square
+## while recording, Record again (disabled while saving) after.
+static func sync_record(v: View360) -> void:
+	var rec := v._recorder
+	if rec == null or not v._tool_btns.has(RECORD[0]):
+		return
+	var b: Button = v._tool_btns[RECORD[0]]
+	var on := rec.is_recording()
+	b.text = "Stop" if on else str(RECORD[2])
+	b.tooltip_text = STOP_TIP if on else str(RECORD[3])
+	b.disabled = rec.state == VideoRecorder.State.SAVING
+	UiIcon.apply(b, "square" if on else str(RECORD[1]), 18, UiTheme.INK, UiTheme.INK)
+	rec.badge.visible = on
+	rec.badge.show_time(rec.elapsed() if on else 0.0)
+	ViewChrome.layout(v)
+
 ## A brief white flash over the scene, like a shutter (none under Reduce motion).
 static func flash(v: View360) -> void:
 	if UiPrefs.reduce_motion:
@@ -290,6 +382,14 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	# badge moves left of it, under the ring.
 	var under_right := v._top_right.position.y + v._top_right.size.y + 8.0
 	var top_end := v._top.position.y + v._top.size.y + 8.0
+	# Recording: under the place pill (and its tape on phones); the badge
+	# and the FPS counter below keep clear of it.
+	var rec_rect := Rect2()
+	if v._recorder != null and v._recorder.badge.visible:
+		var rec_badge := v._recorder.badge
+		rec_badge.reset_size()
+		rec_badge.position = Vector2(v._top.position.x, top_end)
+		rec_rect = rec_badge.get_rect()
 	var badge := v._stream_badge
 	badge.custom_minimum_size.x = minf(StreamBadge.W, w - pad * 2.0)
 	badge.reset_size()
@@ -303,6 +403,8 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 		badge_at.y = maxf(badge_at.y, top_end)
 	if not phone and Rect2(badge_at, badge.size).intersects(ring):
 		badge_at.y = maxf(badge_at.y, ring.end.y + 8.0)
+	if rec_rect.has_area() and Rect2(badge_at, badge.size).intersects(rec_rect):
+		badge_at.y = rec_rect.end.y + 8.0
 	badge.position = badge_at
 	# FPS counter: under the badge while it shows; else right-aligned under
 	# the top-right chips, or, on a short wide window where the inspector
@@ -315,6 +417,8 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	else:
 		v._fps.position = Vector2(v._top_right.position.x + v._top_right.size.x - v._fps.size.x,
 			under_right)
+	if rec_rect.has_area() and v._fps.get_rect().intersects(rec_rect):
+		v._fps.position.y = rec_rect.end.y + 8.0
 	# Mini-map: bottom-left above the attribution, over the bar where the
 	# two meet; the landmark sheet takes that edge while it is open.
 	var panel_open: bool = v._landmark_panel != null and v._landmark_panel.is_open()
@@ -326,7 +430,10 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	v._minimap.visible = UiPrefs.minimap and not panel_open
 	# A short phone's bar reaches up to the pill and the badge: no room.
 	var map_rect := Rect2(v._minimap.position, Vector2(box, box))
-	for c: Control in [v._top, v._exit_btn, badge, v._fps]:
+	var near_top: Array[Control] = [v._top, v._exit_btn, badge, v._fps]
+	if v._recorder != null:
+		near_top.append(v._recorder.badge)
+	for c: Control in near_top:
 		if c.visible and map_rect.intersects(c.get_rect()):
 			v._minimap.visible = false
 	# Date sheet: beside the inspector, or in the bar's place (the bar

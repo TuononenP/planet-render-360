@@ -1,20 +1,36 @@
 class_name GalleryScreen
 extends Control
 
-## Gallery of saved 360° photos (PLAN-gallery-360.md): PanoramaLibrary
-## entries newest-first as cards (grid) or rows (list), like History.
-## Tap opens the photo in PanoramaViewer; delete removes only the
-## in-app library copy, never an exported file elsewhere.
+## Gallery of what the viewer saved, in three tabs: Photos and Videos
+## (MediaLibrary) and 360° photos (PanoramaLibrary, PLAN-gallery-360.md),
+## newest-first as cards (grid) or rows (list), like History. Tap opens a
+## 360° photo in PanoramaViewer and a photo or video in MediaViewer.
+## Deleting a 360° photo removes only the in-app library copy, never an
+## exported file elsewhere; deleting a photo or video removes its file.
 
 signal panorama_selected(entry: Dictionary)
+## A photo or video (a MediaLibrary entry).
+signal media_selected(entry: Dictionary)
 signal back_requested
 
+enum Category { PHOTOS, VIDEOS, PANORAMAS }
+
 const SWIPE := 80.0
+## Each tab's empty card: icon, title, body.
+const EMPTY := [
+	["camera", "No photos yet", "Open a place and tap Save photo. The photo waits for you here."],
+	["video", "No videos yet", "Open a place and tap Record. When you stop, the video waits for you here to play back."],
+	["rotate-3d", "No 360° photos yet", "Open a place, tap Save 360°, and the photo waits for you here to look around in. "
+		+ "Photos saved before Gallery arrived may live in your Pictures folder."],
+]
 
 var _list: GridContainer
 var _margin: MarginContainer
 var _count_label: Label
 var _view_seg: SegmentedControl
+var _kind_seg: SegmentedControl
+## The tab shown (-1 until the first refresh picks one that has saves).
+var _category := -1
 var _grid_mode := true
 var _touch := OS.has_feature("mobile")
 var _current_layout: int = Responsive.Layout.COMPACT
@@ -28,6 +44,8 @@ var _toast: Toast
 var _imported := false
 ## Background rebuild of missing thumbnails (-1 none).
 var _thumb_task := -1
+## [entry, fields] pairs the rebuild learnt, for MediaLibrary.update.
+var _learnt: Array = []
 
 ## Brief message at the bottom (e.g. a photo that could not be opened).
 func toast(title: String, message: String = "", tone: String = "neutral") -> void:
@@ -77,6 +95,11 @@ func _ready() -> void:
 		_on_resized()
 		refresh())
 	header.add_child(_view_seg)
+	_kind_seg = SegmentedControl.new(["Photos", "Videos", "360°"], ["camera", "video", "rotate-3d"])
+	_kind_seg.item_selected.connect(func(i: int) -> void:
+		_category = i
+		refresh())
+	col.add_child(_kind_seg)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -97,7 +120,7 @@ func _ready() -> void:
 	_menu.add_item("Delete from Gallery", 1)
 	_menu.id_pressed.connect(func(id: int) -> void:
 		if id == 0:
-			panorama_selected.emit(_menu_entry)
+			_open(_menu_entry)
 		else:
 			_confirm_delete(_menu_entry))
 	add_child(_menu)
@@ -120,6 +143,11 @@ func _on_resized() -> void:
 	Responsive.apply_safe_margins(_margin, self, [pad, pad + 8, pad, pad])
 	if _list != null:
 		_list.columns = Responsive.history_columns(layout) if _grid_mode else 1
+	# Phones: the tabs span the width; wider screens keep them compact.
+	if _kind_seg != null:
+		var compact := layout == Responsive.Layout.COMPACT
+		_kind_seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL if compact else Control.SIZE_SHRINK_BEGIN
+		_kind_seg.custom_minimum_size.x = 0.0 if compact else 340.0
 
 func refresh() -> void:
 	if _list == null:
@@ -128,11 +156,16 @@ func refresh() -> void:
 	if not _imported:
 		_imported = true
 		PanoramaLibrary.import_existing()
+		MediaLibrary.import_existing()
 	for child in _list.get_children():
 		child.queue_free()
-	var rows := PanoramaLibrary.entries()
-	_count_label.text = "%d 360° photo%s on this device" % [rows.size(), "" if rows.size() == 1 else "s"] \
-		if not rows.is_empty() else "360° photos you save wait here, on this device."
+	if _category < 0:
+		_category = _first_with_saves()
+	_kind_seg.select(_category)
+	var rows := _rows(_category)
+	var noun: String = ["photo", "video", "360° photo"][_category]
+	_count_label.text = "%d %s%s on this device" % [rows.size(), noun, "" if rows.size() == 1 else "s"] \
+		if not rows.is_empty() else "%s you save wait here, on this device." % ["Photos", "Videos", "360° photos"][_category]
 	_view_seg.visible = not rows.is_empty()
 	_on_resized()
 	if rows.is_empty():
@@ -142,6 +175,32 @@ func refresh() -> void:
 	for e in rows:
 		_list.add_child(_card(e) if _grid_mode else _row(e))
 	_rebuild_missing_thumbs(rows)
+
+## The saves on tab `category`, newest first.
+static func _rows(category: int) -> Array:
+	match category:
+		Category.PHOTOS:
+			return MediaLibrary.entries(MediaLibrary.PHOTO)
+		Category.VIDEOS:
+			return MediaLibrary.entries(MediaLibrary.VIDEO)
+	return PanoramaLibrary.entries()
+
+## The first tab, in order, that has anything saved (Photos when none has).
+static func _first_with_saves() -> int:
+	for c in [Category.PHOTOS, Category.VIDEOS, Category.PANORAMAS]:
+		if not _rows(c).is_empty():
+			return c
+	return Category.PHOTOS
+
+## A photo or video row (MediaLibrary) rather than a 360° photo.
+static func _is_media(e: Dictionary) -> bool:
+	return e.has("kind")
+
+func _open(e: Dictionary) -> void:
+	if _is_media(e):
+		media_selected.emit(e)
+	else:
+		panorama_selected.emit(e)
 
 ## Theme/accent changed: rebuild now if showing, else on next show.
 func refresh_theme() -> void:
@@ -153,12 +212,22 @@ func refresh_theme() -> void:
 func _rebuild_missing_thumbs(rows: Array) -> void:
 	if _thumb_task != -1:
 		return
-	var missing := rows.filter(func(e: Dictionary) -> bool: return not PanoramaLibrary.has_thumb(e))
+	var missing := rows.filter(func(e: Dictionary) -> bool:
+		return not (MediaLibrary.has_thumb(e) if _is_media(e) else PanoramaLibrary.has_thumb(e)))
 	if missing.is_empty():
 		return
+	# What a media rebuild learns (a size, a length) is written to the
+	# index on the main thread once the task is done.
+	_learnt = []
+	var learnt := _learnt
 	_thumb_task = WorkerThreadPool.add_task(func() -> void:
 		for e in missing:
-			PanoramaLibrary.rebuild_thumb(e), false, "Gallery thumbnails")
+			if _is_media(e):
+				var got := MediaLibrary.rebuild_thumb(e)
+				got.erase("ok")
+				learnt.append([e, got])
+			else:
+				PanoramaLibrary.rebuild_thumb(e), false, "Gallery thumbnails")
 	set_process(true)
 
 func _process(_delta: float) -> void:
@@ -167,6 +236,9 @@ func _process(_delta: float) -> void:
 	WorkerThreadPool.wait_for_task_completion(_thumb_task)
 	_thumb_task = -1
 	set_process(false)
+	for pair in _learnt:
+		MediaLibrary.update(pair[0], pair[1])
+	_learnt = []
 	# Thumbs that still failed stay placeholders; refresh won't retry
 	# them in a loop because only a fresh refresh() starts a task.
 	if is_visible_in_tree():
@@ -205,15 +277,14 @@ func _empty_card() -> PanelContainer:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 8)
 	card.add_child(col)
-	var icon := UiIcon.rect("rotate-3d", 40, UiTheme.MUTED)
+	var copy: Array = EMPTY[_category]
+	var icon := UiIcon.rect(str(copy[0]), 40, UiTheme.MUTED)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(icon)
-	var title := UiTheme.label("No 360° photos yet", 20, UiTheme.INK, true)
+	var title := UiTheme.label(str(copy[1]), 20, UiTheme.INK, true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
-	var body := UiTheme.label(
-		"Open a place, tap Save 360°, and the photo waits for you here to look around in. "
-		+ "Photos saved before Gallery arrived may live in your Pictures folder.", 15, UiTheme.MUTED)
+	var body := UiTheme.label(str(copy[2]), 15, UiTheme.MUTED)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(body)
@@ -239,6 +310,10 @@ func _meta(e: Dictionary) -> HFlowContainer:
 		var sz := UiTheme.data_label(UiTheme.cache_size(bytes), 13, UiTheme.MUTED, true)
 		sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(sz)
+	if e.has("duration_s"):
+		var length := UiTheme.data_label(MediaViewer.clock_text(float(e["duration_s"])), 13, UiTheme.MUTED, true)
+		length.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(length)
 	var dims := "%d×%d" % [int(e.get("width", 0)), int(e.get("height", 0))]
 	if int(e.get("width", 0)) > 0:
 		var d := UiTheme.data_label(dims, 13, UiTheme.MUTED, true)
@@ -247,20 +322,42 @@ func _meta(e: Dictionary) -> HFlowContainer:
 	return row
 
 func _thumb(e: Dictionary, height: float) -> Control:
-	var tex := PanoramaLibrary.thumb_texture(e)
+	var video := str(e.get("kind", "")) == MediaLibrary.VIDEO
+	var tex := MediaLibrary.thumb_texture(e) if _is_media(e) else PanoramaLibrary.thumb_texture(e)
 	if tex != null:
 		var photo := RoundedPhoto.new(tex, UiTheme.RADIUS_S)
 		photo.custom_minimum_size = Vector2(0, height)
+		if video:
+			photo.add_child(_play_mark(height))
 		return photo
 	var thumb := PanelContainer.new()
 	thumb.custom_minimum_size = Vector2(0, height)
 	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	thumb.add_theme_stylebox_override("panel", UiTheme.style(Color("1a2350").darkened(0.55), UiTheme.RADIUS_S))
-	var glyph := UiIcon.rect("rotate-3d", 32, Color(UiTheme.HORIZON_DAY, 0.85))
+	var glyph_name := "rotate-3d" if not _is_media(e) else ("video" if video else "camera")
+	var glyph := UiIcon.rect(glyph_name, 32, Color(UiTheme.HORIZON_DAY, 0.85))
 	glyph.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	thumb.add_child(glyph)
 	return thumb
+
+## A round glass play button over a video's thumbnail.
+func _play_mark(height: float) -> Control:
+	var d := 40.0 if height >= 100.0 else 28.0
+	var mark := PanelContainer.new()
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.add_theme_stylebox_override("panel", UiTheme.style(UiTheme.GLASS_FILL, UiTheme.RADIUS_PILL, UiTheme.GLASS_EDGE))
+	mark.custom_minimum_size = Vector2(d, d)
+	mark.set_anchors_preset(Control.PRESET_CENTER)
+	mark.offset_left = -d / 2.0
+	mark.offset_top = -d / 2.0
+	mark.offset_right = d / 2.0
+	mark.offset_bottom = d / 2.0
+	var icon := UiIcon.rect("play", int(d / 2.0), UiTheme.INK)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mark.add_child(icon)
+	return mark
 
 func _card(e: Dictionary) -> Button:
 	var card := _base_button(e)
@@ -330,6 +427,14 @@ func _delete_button(e: Dictionary) -> Button:
 func _confirm_delete(e: Dictionary) -> void:
 	if e.is_empty():
 		return
+	if _is_media(e):
+		var video := str(e.get("kind", "")) == MediaLibrary.VIDEO
+		SettingsRows.confirm(self, "Delete this video?" if video else "Delete this photo?",
+			"“%s” will be deleted from this device." % str(e.get("place", "View")), "Delete",
+			func() -> void:
+				MediaLibrary.remove(e)
+				refresh())
+		return
 	SettingsRows.confirm(self, "Delete this 360° photo?",
 		"“%s” will be removed from Gallery on this device. A copy you exported elsewhere (for example to Pictures) stays."
 		% str(e.get("place", "View")), "Delete", func() -> void:
@@ -366,7 +471,7 @@ func _base_button(e: Dictionary) -> Button:
 	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_M))
 	b.pressed.connect(func() -> void:
 		if absf(b.position.x - float(b.get_meta("rest_x", b.position.x))) < 4.0:
-			panorama_selected.emit(e))
+			_open(e))
 	b.gui_input.connect(func(ev: InputEvent) -> void:
 		var mb := ev as InputEventMouseButton
 		if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:

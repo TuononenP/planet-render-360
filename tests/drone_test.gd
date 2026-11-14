@@ -104,6 +104,26 @@ func _maths() -> void:
 	var looked := DroneSticks.look_step(Vector2.ZERO, Vector2(0, 1), 0.5)
 	_check(looked.y < 0.0 and looked.x == 0.0, "the look stick pulled down looks down")
 	_check(DroneSticks.look_step(Vector2.ZERO, Vector2(1, 0), 0.5).x < 0.0, "and pushed right turns right")
+	# Gyro look: held upright it reads the screen's axes; tilted back or
+	# flat, a turn about the true vertical still turns the view 1:1.
+	var g := 9.8
+	_check(CameraRig.gyro_rates(Vector3(0.3, 0.5, 0.0), Vector3(0, -g, 0)).is_equal_approx(Vector2(0.5, 0.3)),
+		"upright, the gyro turns and tilts on the screen's axes")
+	_check(CameraRig.gyro_rates(Vector3(0, 0, 0.5), Vector3(0, 0, -g)).is_equal_approx(Vector2(0.5, 0)),
+		"lying flat, spinning it turns the view")
+	var tilt := deg_to_rad(60.0)  # top leaned back 60°
+	var up := Vector3(0, cos(tilt), sin(tilt))
+	var spun := CameraRig.gyro_rates(up * 0.5, -up * g)
+	_check(is_equal_approx(spun.x, 0.5) and is_zero_approx(spun.y), "tilted back, a turn turns fully: %s" % spun)
+	_check(is_equal_approx(CameraRig.gyro_rates(Vector3(0.4, 0, 0), -up * g).y, 0.4), "and tilting it tilts")
+	var side := Vector3(-g, 0, 0)  # standing on its side edge: up is the screen's X
+	_check(CameraRig.gyro_rates(Vector3(0.5, 0, 0), side).is_equal_approx(Vector2(0.5, 0)),
+		"on its side edge, a turn only turns")
+	var side_tilt := CameraRig.gyro_rates(Vector3(0, 0.4, 0), side)
+	_check(is_zero_approx(side_tilt.x) and is_equal_approx(absf(side_tilt.y), 0.4),
+		"and tilting it tilts: %s" % side_tilt)
+	_check(CameraRig.gyro_rates(Vector3(0.3, 0.5, 0), Vector3.ZERO).is_equal_approx(Vector2(0.5, 0.3)),
+		"without gravity the screen's axes stand in")
 	var placed := DroneSticks.new(ViewDrone.new())
 	placed.place(16.0, 1000.0, 700.0)
 	_check(placed.look.position.y == placed.right.position.y and placed.look.position.x < placed.right.position.x,

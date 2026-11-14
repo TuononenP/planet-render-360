@@ -12,6 +12,7 @@ extends RefCounted
 ## saves instead of sharing.
 
 const DIR_FALLBACK := "user://photos"
+const VIDEO_DIR_FALLBACK := "user://videos"
 ## Test hook: when non-empty, saves with no dialog go here instead.
 static var dir_override := ""
 const PREFIX := "planet-render-360"
@@ -61,9 +62,44 @@ static func fallback_dir() -> String:
 	if dir_override != "":
 		return dir_override
 	var pictures := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
-	if pictures != "" and DirAccess.dir_exists_absolute(pictures):
+	if usable_dir(pictures):
 		return pictures
 	return DIR_FALLBACK
+
+## A system folder the app can save into: an absolute path that takes a
+## file. Not every platform has one (iOS answers ".", the read-only app
+## bundle), and a sandbox may list one it can't write.
+## Probed once per folder per run: every save and Gallery visit asks.
+static func usable_dir(path: String) -> bool:
+	if _usable.has(path):
+		return _usable[path]
+	var ok := _probe_dir(path)
+	_usable[path] = ok
+	return ok
+
+static var _usable := {}
+
+static func _probe_dir(path: String) -> bool:
+	if path == "" or not path.is_absolute_path() or not DirAccess.dir_exists_absolute(path):
+		return false
+	var probe := path.path_join(".planet-render-360-probe")
+	var f := FileAccess.open(probe, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.close()
+	DirAccess.remove_absolute(probe)
+	return true
+
+## Where videos go with no save dialog: Movies, else Pictures, else the
+## app's own videos folder.
+static func fallback_video_dir() -> String:
+	if dir_override != "":
+		return dir_override
+	for d: int in [OS.SYSTEM_DIR_MOVIES, OS.SYSTEM_DIR_PICTURES]:
+		var path := OS.get_system_dir(d)
+		if usable_dir(path):
+			return path
+	return VIDEO_DIR_FALLBACK
 
 ## `photo` with the stamp rendered over its lower left (needs a window:
 ## a SubViewport draws the text). Returns `photo` itself if nothing could
@@ -157,6 +193,23 @@ static func save_bytes(bytes: PackedByteArray, file: String, extension: String, 
 		title: String, done: Callable) -> void:
 	_save(file, extension, kind, title, func(path: String) -> bool: return _write_bytes(bytes, path), done)
 
+## The same for a finished file on disk (a recorded video): moved to
+## where the person picks, else the Movies / videos folder.
+static func save_file(src: String, file: String, extension: String, kind: String,
+		title: String, done: Callable) -> void:
+	_save(file, extension, kind, title, func(path: String) -> bool: return move_file(src, path), done,
+		fallback_video_dir())
+
+## Moves `src` to `dst`: a rename on the same volume (instant, however big
+## the file), else a copy. `src` is left in place when the copy fails.
+static func move_file(src: String, dst: String) -> bool:
+	if DirAccess.rename_absolute(src, dst) == OK:
+		return true
+	if DirAccess.copy_absolute(src, dst) != OK:
+		return false
+	DirAccess.remove_absolute(src)
+	return true
+
 ## The extensions a typed name may carry for `extension` ("jpg" also
 ## accepts "jpeg"); any other name gets `extension` appended.
 static func accepted_extensions(extension: String) -> Array[String]:
@@ -165,13 +218,29 @@ static func accepted_extensions(extension: String) -> Array[String]:
 		out.append("jpeg")
 	return out
 
+## Desktop asks where to save; phones (and tests) save to a folder.
+static func has_save_dialog() -> bool:
+	return dir_override == "" and not OS.has_feature("mobile") \
+		and DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE)
+
+## `dir`/`file`, or "name-2.ext", "name-3.ext"... when that is taken
+## (names go to the minute; a second save that minute keeps the first).
+static func free_path(dir: String, file: String) -> String:
+	var path := dir.path_join(file)
+	var n := 2
+	while FileAccess.file_exists(path):
+		path = dir.path_join("%s-%d.%s" % [file.get_basename(), n, file.get_extension()])
+		n += 1
+	return path
+
 static func _save(file: String, extension: String, kind: String, title: String,
-		write: Callable, done: Callable) -> void:
+		write: Callable, done: Callable, dir: String = "") -> void:
+	if dir == "":
+		dir = fallback_dir()
 	var accepted := accepted_extensions(extension)
-	if dir_override == "" and not OS.has_feature("mobile") \
-			and DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+	if has_save_dialog():
 		var filter := ", ".join(accepted.map(func(e: String) -> String: return "*." + e))
-		var err := DisplayServer.file_dialog_show(title, fallback_dir(), file, false,
+		var err := DisplayServer.file_dialog_show(title, dir, file, false,
 			DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, PackedStringArray(["%s ; %s" % [filter, kind]]),
 			func(ok: bool, paths: PackedStringArray, _filter: int) -> void:
 				if not ok or paths.is_empty():
@@ -183,9 +252,8 @@ static func _save(file: String, extension: String, kind: String, title: String,
 				_report(write, path, done))
 		if err == OK:
 			return
-	var dir := fallback_dir()
 	DirAccess.make_dir_recursive_absolute(dir)
-	_report(write, dir.path_join(file), done)
+	_report(write, free_path(dir, file), done)
 
 ## Runs the write and reports it to `done(path, failed)`.
 static func _report(write: Callable, path: String, done: Callable) -> void:

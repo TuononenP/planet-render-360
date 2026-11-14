@@ -346,9 +346,12 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var p := _paths(data)
 	if _save_in_progress(p["scene"]):
 		return
+	var name: String = p["scene"].get_file()
+	MemoryLog.mark("cache save %s start" % name)
 	var ps := packed if packed != null else pack(built[1])
 	if ps == null:
 		return
+	MemoryLog.mark("cache save %s packed" % name)
 	var state := _ground_state(built[0] as GroundTruth)
 	# The eye the near layers were centred on (see eye_fits).
 	state["eye"] = View360.spawn_xz(data)
@@ -394,6 +397,7 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 		th.wait_to_finish()
 	if _save_threads.get(p["scene"]) == th:
 		_save_threads.erase(p["scene"])
+	MemoryLog.mark("cache save %s done" % name)
 	# On the main thread: CacheStore's LRU state is not thread-safe.
 	_invalidate_bytes()
 	if dir_override.is_empty():

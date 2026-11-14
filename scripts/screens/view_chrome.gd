@@ -350,6 +350,8 @@ static func refresh_theme(v: View360) -> void:
 	HudParts.apply_icon_button(v._drone.button, v._drone.on)
 	v._drone.sticks.restyle()
 	v._stream_badge.refresh_theme()
+	if v._recorder != null:
+		v._recorder.badge.refresh_theme()
 
 ## Scrim on for very bright skies (high sun, snow underfoot) and very
 ## dark ones (night), where glass alone loses its edge.
@@ -534,6 +536,10 @@ static func toggle_drone(v: View360) -> void:
 static func toggle_gyro(v: View360) -> void:
 	v._gyro_on = not v._gyro_on
 	HudParts.apply_icon_button(v._gyro_btn, v._gyro_on)
+	if v._gyro_on:
+		ViewTools.say(v, "Gyro look on", "Turn and tilt your device to look around.")
+	else:
+		ViewTools.say(v, "Gyro look off", "", "neutral")
 
 # --- Keys (design system viewer keys) ---
 
@@ -569,7 +575,7 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
 			toggle_nearby(v, true)
-		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G, KEY_J:
+		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G, KEY_J, KEY_R:
 			# One press, bare: Cmd/Ctrl+C and the like belong to the system.
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
@@ -578,6 +584,8 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 					ViewTools.photo(v)
 				KEY_O:
 					ViewTools.panorama(v)
+				KEY_R:
+					ViewTools.toggle_record(v)
 				KEY_C:
 					ViewTools.copy_link(v)
 				KEY_N:
@@ -700,11 +708,12 @@ static func layout(v: View360) -> void:
 	if not phone:
 		bar_top = maxf(bar_top, v._compass.position.y + CompassDial.RING + 8.0)
 	else:
-		# On a phone the way-ahead badge and the FPS counter stack under
-		# the tape (ViewTools.layout), and the drone button sits above the
-		# bar: the bar leaves them room.
-		for c: Control in [v._stream_badge, v._fps, v._zoom_stack]:
-			if c.visible:
+		# On a phone the way-ahead and recording badges and the FPS
+		# counter stack under the tape (ViewTools.layout), and the drone
+		# button sits above the bar: the bar leaves them room.
+		for c: Control in [v._stream_badge, v._fps, v._zoom_stack,
+				v._recorder.badge if v._recorder != null else null]:
+			if c != null and c.visible:
 				bar_top += c.get_combined_minimum_size().y + 8.0
 	_fit_inspector(v, h - pad - attr_h - 8.0 - (inspector_top if inspector else bar_top))
 	v._sheet.custom_minimum_size = Vector2(bar_w, 0)

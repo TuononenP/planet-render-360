@@ -5,8 +5,9 @@ extends PanelContainer
 ## radius-m, 56pt minimum and at most 380 wide, with a tone icon, a
 ## 15/600 title, an optional body-s message and one optional text action
 ## in accent. It enters over duration-standard and dismisses itself after
-## 4 s (6 s with an action); error toasts stay until dismissed. One at a
-## time: a new message replaces the old. The host places it (phones:
+## 4 s (6 s with an action); error toasts stay until dismissed with their
+## close button (x). A tap on any toast dismisses it. One at a time: a new
+## message replaces the old. The host places it (phones:
 ## above the bottom bar, centred; desktop: bottom-right) via `place`.
 
 signal action_pressed
@@ -18,6 +19,7 @@ var _icon: TextureRect
 var _title: Label
 var _message: Label
 var _action: Button
+var _close: Button
 var _tween: Tween
 var _timer: Timer
 
@@ -57,6 +59,18 @@ func _init() -> void:
 		action_pressed.emit()
 		dismiss())
 	row.add_child(_action)
+	# Shown on error toasts, the ones that don't time out.
+	_close = Button.new()
+	_close.tooltip_text = "Close"
+	_close.accessibility_name = "Close"
+	_close.custom_minimum_size = Vector2(44, 44)
+	_close.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_close.focus_mode = Control.FOCUS_ALL
+	_close.flat = true
+	UiIcon.apply(_close, "x", 20, UiTheme.MUTED, UiTheme.INK)
+	_close.pressed.connect(dismiss)
+	_close.visible = false
+	row.add_child(_close)
 	_timer = Timer.new()
 	_timer.one_shot = true
 	_timer.timeout.connect(dismiss)
@@ -83,6 +97,11 @@ func show_message(title: String, message: String = "", tone: String = "neutral",
 	_action.add_theme_stylebox_override("hover", lit)
 	_action.add_theme_stylebox_override("pressed", lit)
 	_action.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
+	_close.visible = tone == "error"
+	var round_lit := UiTheme.style(UiTheme.LINE, UiTheme.RADIUS_PILL)
+	_close.add_theme_stylebox_override("hover", round_lit)
+	_close.add_theme_stylebox_override("pressed", round_lit)
+	_close.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
 	visible = true
 	if _tween != null:
 		_tween.kill()
@@ -92,6 +111,14 @@ func show_message(title: String, message: String = "", tone: String = "neutral",
 	_timer.stop()
 	if tone != "error":
 		_timer.start(6.0 if action != "" else 4.0)
+
+## A tap or click on the toast (not on its action) dismisses it.
+func _gui_input(event: InputEvent) -> void:
+	var tap: bool = (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
+		or (event is InputEventScreenTouch and event.pressed)
+	if tap:
+		accept_event()
+		dismiss()
 
 func dismiss() -> void:
 	if not visible:
@@ -114,7 +141,8 @@ func place(host_size: Vector2, pad: float, bottom_y: float, phone: bool,
 	var w := minf(minf(MAX_W, max_w), host_size.x - pad * 2.0)
 	custom_minimum_size.x = w
 	# Wrapped text needs its width before it can report its height.
-	var text_w := w - 16.0 - 8.0 - 20.0 - 12.0 - (_action.get_combined_minimum_size().x + 12.0 if _action.visible else 0.0)
+	var text_w := w - 16.0 - 8.0 - 20.0 - 12.0 - (_action.get_combined_minimum_size().x + 12.0 if _action.visible else 0.0) \
+		- (_close.get_combined_minimum_size().x + 12.0 if _close.visible else 0.0)
 	for l: Label in [_title, _message]:
 		l.custom_minimum_size.x = text_w
 		l.size = Vector2(text_w, l.size.y)

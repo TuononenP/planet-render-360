@@ -84,7 +84,7 @@ const ROWS := [
 	# extent spans 59th to 86th Street.
 	{"id": "central_park", "label": "Central Park", "name": "Central Park, New York, United States",
 		"lat": 40.7760, "lon": -73.9700, "eye_lat": 40.77395, "eye_lon": -73.97078,
-		"eye_m": 2.0, "bearing": 345.0, "pitch": -6.0, "hour": 9.0},
+		"eye_m": 4.0, "bearing": 345.0, "pitch": -6.0, "hour": 9.0},
 	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
 	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
 	# the path at the waterfront road, so asl_m holds the eye on the cliff.

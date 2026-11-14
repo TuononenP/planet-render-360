@@ -10,6 +10,7 @@ var _notice: DataNotice
 var _history: HistoryScreen
 var _gallery: GalleryScreen
 var _pano_viewer: PanoramaViewer
+var _media_viewer: MediaViewer
 var _settings_screen: SettingsScreen
 ## Where Settings' back button returns (the map, or the viewer when
 ## its attribution opened Data sources).
@@ -132,6 +133,8 @@ func _ready() -> void:
 	# The window's close button and the app menu's Quit come through
 	# _request_exit too, so a world still saving is waited for there.
 	get_tree().auto_accept_quit = false
+	# The memory in the stream log, for when iOS ends the app without a report.
+	add_child(MemoryLog.new())
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
 	var remote_config := RemoteConfig.new()
@@ -216,6 +219,11 @@ func _ready() -> void:
 		_show(_settings_screen)
 		_settings_screen.show_data_sources())
 	_view.data_quality_requested.connect(func() -> void: _notice.open())
+	_view.toast_requested.connect(func(title: String, message: String, tone: String) -> void:
+		if _gallery.visible:
+			_gallery.toast(title, message, tone)
+		else:
+			_picker.toast(title, message, tone))
 	_view.pref_changed.connect(func(key: String, value: Variant) -> void:
 		_settings.set_pref(key, value))
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
@@ -259,6 +267,12 @@ func _ready() -> void:
 			# open() fails only when the file is gone: drop its stale card.
 			_gallery.refresh()
 			_gallery.toast("Couldn't find this photo", "It is no longer on this device.", "error"))
+	_gallery.media_selected.connect(func(entry: Dictionary) -> void:
+		if _media_viewer.open(entry):
+			_show(_media_viewer)
+		else:
+			_gallery.refresh()
+			_gallery.toast("Couldn't find this file", "It is no longer on this device.", "error"))
 	add_child(_gallery)
 	_history.gallery_requested.connect(func() -> void:
 		_gallery.refresh()
@@ -277,6 +291,25 @@ func _ready() -> void:
 		_show(_gallery)
 		_gallery.toast("Couldn't open this photo", "The file may be damaged. It stays in Gallery so you can delete it.", "error"))
 	add_child(_pano_viewer)
+
+	_media_viewer = MediaViewer.new()
+	_media_viewer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_media_viewer.back_requested.connect(func() -> void:
+		_media_viewer.close()
+		_gallery.refresh()
+		_show(_gallery))
+	_media_viewer.deleted.connect(func(_entry: Dictionary) -> void:
+		_gallery.refresh()
+		_show(_gallery))
+	_media_viewer.open_failed.connect(func(entry: Dictionary) -> void:
+		_show(_gallery)
+		var video := str(entry.get("kind", "")) == MediaLibrary.VIDEO
+		if video and not MediaLibrary.can_play():
+			_gallery.toast("Videos don't play on this device", "Open the file in another app.", "caution")
+			return
+		_gallery.toast("Couldn't play this video" if video else "Couldn't open this photo",
+			"The file may be damaged. It stays in Gallery so you can delete it.", "error"))
+	add_child(_media_viewer)
 
 	_settings_screen = SettingsScreen.new()
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -353,7 +386,7 @@ func _notification(what: int) -> void:
 ## The open confirmation veil (SettingsRows.confirm), if any, among the
 ## screens: Esc closes it instead of navigating.
 func _find_modal() -> Control:
-	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _media_viewer, _settings_screen]:
 		if s == null:
 			continue
 		for child in s.get_children():
@@ -381,6 +414,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_loading.cancel_requested.emit()
 			elif _pano_viewer.visible:
 				_pano_viewer.back_requested.emit()
+			elif _media_viewer.visible:
+				_media_viewer.back_requested.emit()
 			elif _gallery.visible:
 				_show(_picker)
 			elif _settings_screen.visible and _settings_screen.step_back():
@@ -459,7 +494,10 @@ func _apply_preset(p: int) -> void:
 func _show(screen: Control) -> void:
 	if screen != _view:
 		_leave_view()
-	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
+	# Hidden is not closed: its decoder would keep playing unseen.
+	if screen != _media_viewer and _media_viewer.visible:
+		_media_viewer.close()
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _media_viewer, _settings_screen]:
 		s.visible = s == screen
 	if screen == _picker:
 		_picker.refresh_recent()

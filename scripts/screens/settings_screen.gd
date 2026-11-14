@@ -33,7 +33,7 @@ const CATEGORIES := [
 	["The view", [
 		["quality", "gauge", "Render quality", "Higher quality is more faithful to the real place, but takes longer to build and more power to draw."],
 		["units", "ruler", "Units", "How elevation, coordinates and time are written."],
-		["photos", "camera", "Photos", "Pictures saved from the 360° view."]]],
+		["photos", "camera", "Photos & video", "Pictures and videos saved from the 360° view."]]],
 	["Data", [
 		["storage", "hard-drive", "Storage", "Places you open are kept on this device, so they open instantly next time, even offline."],
 		["sources", "layers", "Data sources", "Where the map, terrain, imagery and weather come from. Each opens its licence."],
@@ -532,7 +532,10 @@ func summary_for(id: String) -> String:
 			return "%s · %s · %s" % ["Imperial" if UiTheme.units_imperial else "Metric",
 				"DMS" if UiTheme.units_dms else "Decimal", "12-hour" if UiTheme.units_12h else "24-hour"]
 		"photos":
-			return "Stamp on" if UiPrefs.photo_stamp else "Stamp off"
+			var stamp := "Stamp on" if UiPrefs.photo_stamp else "Stamp off"
+			if not VideoRecorder.encoder_available():
+				return stamp
+			return "%s · %s video" % [stamp, SettingsPages.VIDEO_QUALITY[UiPrefs.video_quality]]
 		"storage":
 			return UiTheme.cache_size(_cache_bytes)
 		"sources":

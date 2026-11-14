@@ -32,6 +32,8 @@ add_library(planet_render SHARED
 	src/mass_kernels.h
 	src/merge_kernels.cpp
 	src/merge_kernels.h
+	src/memory_stats.cpp
+	src/memory_stats.h
 	src/mvt_kernels.cpp
 	src/mvt_kernels.h
 	src/snapshot_kernels.cpp
@@ -61,8 +63,25 @@ add_library(planet_render SHARED
 	src/road_grader.h
 	src/shore_classifier.cpp
 	src/shore_classifier.h
+	src/video_decoder.cpp
+	src/video_decoder.h
+	src/video_encoder.cpp
+	src/video_encoder.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)
+# The video recorder's platform encoders and the player's decoders
+# (VideoEncoder, VideoDecoder).
+if(APPLE)
+	enable_language(OBJCXX)
+	target_sources(planet_render PRIVATE src/video_encoder_apple.mm src/video_decoder_apple.mm)
+	set_source_files_properties(src/video_encoder_apple.mm src/video_decoder_apple.mm
+		PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+	target_link_libraries(planet_render PRIVATE "-framework AVFoundation" "-framework CoreMedia"
+		"-framework CoreVideo" "-framework Foundation")
+elseif(ANDROID)
+	target_sources(planet_render PRIVATE src/video_encoder_android.cpp src/video_decoder_android.cpp)
+	target_link_libraries(planet_render PRIVATE mediandk)
+endif()
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)
 
 set(OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")

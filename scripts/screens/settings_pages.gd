@@ -36,6 +36,8 @@ const LICENCES := [
 const LICENCE_DIR := "res://licenses/"
 const LICENCE_FILES := ["instrument-sans-OFL.txt", "ibm-plex-mono-OFL.txt", "lucide-LICENSE.txt"]
 const TEXT_SCALES := [0.85, 1.0, 1.3, 1.5, 2.0]
+## Video quality choices, in VideoRecorder.QUALITY_LONG order.
+const VIDEO_QUALITY := ["720p", "1080p", "Native"]
 ## One short line per preset card; the fidelity and first build sit
 ## beside it as dots and a number.
 const PRESET_LINES := [
@@ -343,6 +345,19 @@ static func photos(s: SettingsScreen) -> VBoxContainer:
 	s._toggles["photo_stamp"] = stamp
 	SettingsRows.add(group, stamp)
 	_section(page, "", group)
+	if VideoRecorder.encoder_available():
+		var video := SettingsRows.group()
+		var seg := SegmentedControl.new(VIDEO_QUALITY)
+		seg.custom_minimum_size.x = 260
+		seg.select(UiPrefs.video_quality)
+		seg.item_selected.connect(func(i: int) -> void:
+			if s._settings != null:
+				s._settings.set_pref("video_quality", i)
+				UiPrefs.apply(s._settings)
+				s._refresh_summaries())
+		SettingsRows.add(video, SettingsRows.row("Video quality", seg,
+			"Native records at the window's own size, up to 4K. Larger videos take more space."))
+		_section(page, "Video", video)
 	return page
 
 ## Storage: how much the cache holds in total (no size limit — nothing

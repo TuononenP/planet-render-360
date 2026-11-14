@@ -35,6 +35,22 @@ func handle_drag(relative: Vector2) -> void:
 	pitch = clampf(pitch - relative.y * 0.005, -1.2, 1.2)
 	_apply()
 
+## Gyro look rates (yaw, pitch in rad/s) from the device's rotation rate
+## and gravity, both in screen axes: turning is the spin about the true
+## vertical, tilting the spin about the screen's level right edge, so a
+## tablet held tilted back (or flat) turns the view as far as it turns.
+## Without gravity it falls back to the screen's own axes.
+static func gyro_rates(rate: Vector3, gravity: Vector3) -> Vector2:
+	if gravity.length() < 0.1:
+		return Vector2(rate.y, rate.x)
+	var up := -gravity.normalized()
+	var right := Vector3.RIGHT - up * up.x
+	if right.length() < 0.1:
+		# Standing on its side edge: up is the screen's X, so tilting is
+		# the spin about the level axis across the screen (±Y).
+		return Vector2(rate.dot(up), rate.dot(up.cross(Vector3.BACK).normalized()))
+	return Vector2(rate.dot(up), rate.dot(right.normalized()))
+
 ## Multiply zoom (wheel step ~1.12, pinch by distance ratio).
 func handle_zoom(factor: float) -> void:
 	zoom_factor = clampf(zoom_factor * factor, 0.7, 2.8)

@@ -574,6 +574,11 @@ func _apply_shelf() -> void:
 func _set_selected_quick(index: int) -> void:
 	MapChrome._set_selected_quick(self, index)
 
+func toast(title: String, message: String = "", tone: String = "neutral") -> void:
+	if _toast != null:
+		_toast.show_message(title, message, tone)
+		MapHome.place_toast(self)
+
 func set_download_status(text: String) -> void:
 	MapHome.set_save_label(self, text)
 
