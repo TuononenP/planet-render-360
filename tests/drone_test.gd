@@ -274,6 +274,8 @@ func _flight() -> void:
 	DroneSticks.forced = true
 	ViewChrome.layout(view)
 	_check(view._drone.sticks.visible, "forced, the sticks show")
+	_check(ViewChrome.hint_text(view).ends_with("Marked stick looks around") == view._drone.sticks.look.visible,
+		"the hint names the look stick while it shows")
 	var screen := Rect2(Vector2.ZERO, view.size)
 	var stack := Rect2(view._zoom_stack.position, view._zoom_stack.size)
 	var lw := Rect2(view._drone.sticks.left.position, view._drone.sticks.left.size)

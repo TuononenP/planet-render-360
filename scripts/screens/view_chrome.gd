@@ -463,12 +463,15 @@ static func _show_hint(v: View360) -> void:
 		v._hint_timer.start()
 
 static func hint_text(v: View360) -> String:
+	# The look stick is named by its rim marks; it is put away when crowded.
+	var look := " · Marked stick looks around" if v._drone.sticks == null \
+		or v._drone.sticks.look.visible else ""
 	if not v._drone.on:
 		if DroneSticks.wanted():
-			return "Left stick walks · Right stick turns"
+			return "Left stick walks · Right stick turns" + look
 		return "W A S D to walk · Drag to look · Shift to run"
 	if DroneSticks.wanted():
-		return "Left stick flies · Right stick turns and climbs"
+		return "Left stick flies · Right stick turns and climbs" + look
 	return "W A S D to fly · E and Q to climb · Shift to speed up"
 
 static func heading_deg(v: View360) -> float:
