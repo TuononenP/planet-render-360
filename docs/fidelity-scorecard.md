@@ -608,6 +608,21 @@ the largest script. Re-run the relevant checks against the final workspace
 and final native libraries before considering the implementation accepted.
 
 
+### New York skyline towers, 2026-11-14
+
+Provisional agent rating: unchanged (**recognisable** on Ultra); the human gate stays open.
+Review: `visual-plan/reviews/nyc-towers-2026-11-14/` (both presets, plus looks from the Hudson, Brooklyn Bridge Park, Central Park, the East River and Bryant Park).
+
+| Change | Result |
+| --- | --- |
+| Spec towers | 98 `TowerSpec` rows (`NycTowerSpecs*`): Downtown 24, Midtown 47, West Side 11, Jersey City 8, Brooklyn and Queens 8. |
+| Massing | Each tower's mapped OSM parts in its own frame; pyramid, hip and dome crowns from `roof:height`, `roof:colour` and `roof:material`. |
+| Finishes | Set by hand per tower; new `pink_granite`, `white_granite`, `warm_concrete`, `waffle_bronze`, `red_granite`, `steinway_terracotta`, plus `ceramic_rods` and `black_glass` glazing. |
+| Newer than the snapshots | 99 Hudson, Brooklyn Tower, Trump World Tower, One Court Square and Skyline Tower use parts from live OSM (2026-11-14). |
+| Budget | `LandmarkSites.MAX_SKYLINE_BY_PRESET` 12/30/60/110, ranked by height over distance; the icons keep their slots. |
+
+Still generic: anonymous residential slabs, and towers whose look is only massing at preset distance (Hudson Yards from the river). The Lipstick Building is mapped only in part and stays generic.
+
 ### New York towers, 2026-11-10
 
 Provisional agent rating: **recognisable** on Ultra, with towers no longer flat prisms; the human gate stays open.

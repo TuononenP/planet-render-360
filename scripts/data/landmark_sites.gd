@@ -20,6 +20,13 @@ const MAX_REGISTRY_EXTRAS_BY_PRESET: Array[int] = [6, 12, 18, 22]
 ## preset, after the extras: they never take an icon's slot, only room left
 ## under MAX_BY_PRESET.
 const MAX_BRIDGES_BY_PRESET: Array[int] = [2, 4, 6, 8]
+## Skyline towers (`skyline: true` rows, NycTowerSpecs) per preset, beside
+## the icons: a dense skyline's own buildings, the tallest for their distance
+## first. They never take an icon's, a bridge's or an OSM candidate's slot.
+const MAX_SKYLINE_BY_PRESET: Array[int] = [12, 30, 60, 110]
+## A skyline tower nearer than this ranks as if it stood here: the towers
+## round the eye do not crowd out the far skyline.
+const SKYLINE_NEAR_M := 400.0
 ## Clearance around a registry landmark (its own footprint and grounds)
 ## and around an OSM archetype, metres.
 const REGISTRY_CLEAR_M := 68.0
@@ -48,11 +55,14 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 	if preset == MAX_BY_PRESET.size() - 1:
 		var primary := LocationData.entry_for_type(data.landmark_type)
 		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, MAX_BY_PRESET[preset])
-	var icons: Array = extras.filter(func(e: Dictionary) -> bool: return not _is_capital_bridge(e)).slice(0, registry_limit)
+	var skyline := _skyline(data, extras.filter(func(e: Dictionary) -> bool: return bool(e.get("skyline", false))),
+		MAX_SKYLINE_BY_PRESET[preset])
+	var icons: Array = extras.filter(func(e: Dictionary) -> bool:
+		return not _is_capital_bridge(e) and not bool(e.get("skyline", false))).slice(0, registry_limit)
 	# Bridges fill only the room the icons leave under the preset's candidate cap.
 	var bridges := _nearest_bridges(data, extras,
 		mini(MAX_BRIDGES_BY_PRESET[preset], maxi(MAX_BY_PRESET[preset] - icons.size(), 0)))
-	for e in icons + bridges:
+	for e in icons + bridges + skyline:
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
 			data.latitude, data.longitude)
@@ -68,7 +78,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
 		clear.append([p, entry])
-	var cap: int = MAX_BY_PRESET[preset]
+	var cap: int = MAX_BY_PRESET[preset] + skyline.size()
 	for c in ranked_osm:
 		if out.size() >= cap:
 			break
@@ -81,6 +91,21 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 		if not taken:
 			out.append(c)
 	return out
+
+## The `limit` skyline towers among `towers` to build: priority first, then
+## the tallest for its distance from the view (nearer than SKYLINE_NEAR_M
+## counts as that far).
+static func _skyline(data: LocationData, towers: Array, limit: int) -> Array:
+	var score := func(e: Dictionary) -> float:
+		return float(e.get("height_m", 0.0)) / maxf(SKYLINE_NEAR_M,
+			LocationData.distance_m(data.latitude, data.longitude, float(e["lat"]), float(e["lon"])))
+	towers.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ap := int(a.get("skyline_priority", 0))
+		var bp := int(b.get("skyline_priority", 0))
+		if ap != bp:
+			return ap > bp
+		return score.call(a) > score.call(b))
+	return towers.slice(0, limit)
 
 ## A capital bridge: a secondary bridge entry (BridgeSpec.to_entry).
 static func _is_capital_bridge(entry: Dictionary) -> bool:

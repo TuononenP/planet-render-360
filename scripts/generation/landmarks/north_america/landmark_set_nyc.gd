@@ -1,10 +1,15 @@
 class_name LandmarkSetNyc
 extends RefCounted
 
-## Builders of LandmarkRegistryNyc: one arm per registry type. Returns false
-## for a type it does not own so LandmarkBuilder tries the next set.
+## Builders of LandmarkRegistryNyc: a spec tower through TowerSpec, an icon
+## by its own arm. Returns false for a type it does not own so
+## LandmarkBuilder tries the next set.
 
 static func build(model: Node3D, type: String) -> bool:
+	var spec := NycTowerSpecs.spec_for(type)
+	if not spec.is_empty():
+		TowerSpec.build(model, spec)
+		return true
 	match type:
 		"woolworth_building": LandmarkNycDowntown.woolworth(model)
 		"forty_wall_street": LandmarkNycDowntown.forty_wall(model)

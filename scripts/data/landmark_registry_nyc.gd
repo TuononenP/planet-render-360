@@ -14,7 +14,11 @@ static func _row(type: String, name: String, lat: float, lon: float, height: flo
 		"height_m": height, "clear_m": clear, "yaw_deg": yaw, "kind": "Skyscraper",
 		"skyline_priority": priority, "aliases": aliases}
 
+## The hand-built icons here, then the skyline's spec towers (NycTowerSpecs).
 static func entries() -> Array:
+	return icons() + NycTowerSpecs.entries()
+
+static func icons() -> Array:
 	return [
 		_row("woolworth_building", "Woolworth Building", 40.712471, -74.008358, 241.0, 31.5, 44.0, "Woolworth Building", 6500.0, 2, ["woolworth building"]),
 		_row("forty_wall_street", "40 Wall Street", 40.707007, -74.009732, 284.0, 38.1, 54.0, "40 Wall Street", 6500.0, 2, ["40 wall street", "trump building"]),

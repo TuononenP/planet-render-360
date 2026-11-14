@@ -41,6 +41,14 @@ const LOOKS := {
 	"clear_fin": {"low": Color(0.095, 0.115, 0.122), "top": Color(0.135, 0.155, 0.162),
 		"spandrel": Color(0.090, 0.102, 0.108), "mullion": Color(0.180, 0.190, 0.190),
 		"sill": 108, "mullions": 2, "width": 3, "fin": true},
+	# Clear glass behind a screen of pale ceramic rods (New York Times Building).
+	"ceramic_rods": {"low": Color(0.120, 0.135, 0.140), "top": Color(0.160, 0.175, 0.180),
+		"spandrel": Color(0.330, 0.330, 0.315), "mullion": Color(0.460, 0.455, 0.430),
+		"sill": 110, "mullions": 8, "width": 6, "fin": false},
+	# Near-black glass on dark bronze mullions (Brooklyn Tower, 1990s Midtown).
+	"black_glass": {"low": Color(0.030, 0.032, 0.036), "top": Color(0.052, 0.055, 0.060),
+		"spandrel": Color(0.028, 0.028, 0.030), "mullion": Color(0.090, 0.075, 0.060),
+		"sill": 100, "mullions": 2, "width": 3, "fin": false},
 	# Pale silver-blue glass over light terracotta spandrels (One Vanderbilt).
 	"pale_terracotta": {"low": Color(0.150, 0.180, 0.205), "top": Color(0.215, 0.245, 0.270),
 		"spandrel": Color(0.400, 0.360, 0.290), "mullion": Color(0.440, 0.420, 0.380),

@@ -17,6 +17,12 @@ const FINISHES := {
 	"steel_panel": ["concrete", "panel", "#a4a8ac"],
 	"brick_punched": ["brick", "punched", "#a8654c"],
 	"white_brick_pier": ["brick", "pier", "#cdc8ba"],
+	"pink_granite": ["stone", "strip", "#b39a88"],
+	"white_granite": ["stone", "pier", "#d6d2c8"],
+	"warm_concrete": ["concrete", "panel", "#9a9183"],
+	"waffle_bronze": ["concrete", "punched", "#6a6158"],
+	"red_granite": ["stone", "pier", "#8c5446"],
+	"steinway_terracotta": ["limestone", "pier", "#d6c0a2"],
 }
 
 static var _mutex := Mutex.new()
