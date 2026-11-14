@@ -14,6 +14,7 @@ signal settings_requested
 ## A render quality was picked from the dropdown beside Explore.
 signal quality_selected(preset: int)
 signal download_requested(lat: float, lon: float)
+signal download_cancel_requested
 signal exit_requested
 ## A pasted view link was opened: its ViewLink state (main renders it).
 signal view_link_requested(state: Dictionary)
@@ -65,6 +66,7 @@ var _exit_btn: Button
 var _download_status: Label
 var _download_bar: ProgressBar
 var _download_phase: Label
+var _download_cancel: Button
 ## Last Explore outcome (a timeout); separate from the download line so
 ## neither overwrites the other.
 var _render_status: Label
@@ -353,9 +355,22 @@ func _ready() -> void:
 	_download_bar.custom_minimum_size = Vector2(0, 4)
 	_download_bar.visible = false
 	_action_col.add_child(_download_bar)
+	# The save's step, with Cancel beside it while the save runs.
+	var phase_row := HBoxContainer.new()
+	phase_row.add_theme_constant_override("separation", 8)
+	phase_row.visible = false  # an empty row would still take a gap
+	_action_col.add_child(phase_row)
 	_download_phase = UiTheme.text("", "body-s", UiTheme.MUTED)
+	_download_phase.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_download_phase.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_download_phase.visible = false
-	_action_col.add_child(_download_phase)
+	phase_row.add_child(_download_phase)
+	_download_cancel = UiTheme.quiet_button("Cancel")
+	_download_cancel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_download_cancel.tooltip_text = "Stop saving this place"
+	_download_cancel.visible = false
+	_download_cancel.pressed.connect(func() -> void: download_cancel_requested.emit())
+	phase_row.add_child(_download_cancel)
 	MapChrome.style_download_bar(self)
 	_render_status = UiTheme.text("", "body-s", UiTheme.MUTED)
 	_render_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

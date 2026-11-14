@@ -65,6 +65,7 @@ static func _apply_theme(p: MapPicker) -> void:
 	p._side.add_theme_stylebox_override("panel", _side_style(p))
 	UiTheme.apply_primary(p._render_btn)
 	UiTheme.apply_ghost(p._download_btn)
+	UiTheme.apply_quiet(p._download_cancel)
 	style_quality_bar(p)
 	style_download_bar(p)
 	UiIcon.apply(p._render_btn, "globe", 22, UiTheme.ON_ACCENT, UiTheme.ON_ACCENT)
@@ -194,11 +195,13 @@ static func _lock_quality_menu(p: MapPicker) -> void:
 	if p._quality_bar != null:
 		p._quality_bar.set_disabled(p._render_btn.disabled or p._download_btn.disabled)
 
-## Locks Save for offline while a download runs; a second press would
-## otherwise retarget the pending history entry.
+## Locks Save for offline while a download runs (a second press would
+## otherwise retarget the pending history entry) and offers Cancel.
 static func set_download_busy(p: MapPicker, busy: bool) -> void:
 	if p._download_btn != null:
 		p._download_btn.disabled = busy
+		p._download_cancel.visible = busy
+		p._download_cancel.get_parent().visible = busy  # the step's row
 	_lock_quality_menu(p)
 	if not busy:
 		refresh_cached(p)  # a finished download makes the place cached

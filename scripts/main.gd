@@ -76,6 +76,7 @@ const SAVE_DONE := "Saved for offline"
 const SAVE_PARTLY := "Partly saved · retry"
 const SAVE_FAILED := "Couldn't save. Try again"
 const SAVE_WORLD_FAILED := "Couldn't save the view · retry"
+const SAVE_CANCELLED := "Save cancelled"
 const CLOSING_TITLE := "Saving this place for next time"
 const CLOSING_MESSAGE := "Closing as soon as it's saved."
 var _quitting := false
@@ -185,6 +186,7 @@ func _ready() -> void:
 	_picker.download_requested.connect(func(lat: float, lon: float) -> void:
 		var target := _explore_target(lat, lon)
 		_start_generation(target["at"].x, target["at"].y, target["site"], {}, true))
+	_picker.download_cancel_requested.connect(_cancel_save)
 	_picker.exit_requested.connect(_request_exit)
 	add_child(_picker)
 	_picker.bind_store(_store)
@@ -550,6 +552,19 @@ func _arm_timeout(gen: int) -> void:
 		_end_save(SAVE_FAILED)
 	else:
 		_picker.set_render_status(TIMEOUT_MESSAGE)
+	if _building_world:
+		_abort_build()
+
+## Cancel on Save for offline: stops the save wherever it is, as the
+## timeout does, and keeps what is already in the cache.
+func _cancel_save() -> void:
+	if not _saving:
+		return
+	_gen_id += 1
+	if _save_osm_pack != null:
+		_save_osm_pack.cancel()
+	_pipeline.cancel()
+	_end_save(SAVE_CANCELLED)
 	if _building_world:
 		_abort_build()
 
