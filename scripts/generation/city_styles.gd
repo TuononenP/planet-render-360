@@ -66,6 +66,7 @@ const ZONES := [
 	["shanghai", "shanghai", 31.2304, 121.4737, 14.0],
 	["beijing", "beijing", 39.9042, 116.4074, 14.0],
 	["bangkok", "bangkok", 13.7563, 100.5018, 12.0],
+	["siem_reap", "siem_reap", 13.3600, 103.8600, 4.5],  # the town, not the Angkor park
 	["mumbai", "mumbai", 19.0000, 72.8300, 12.0],     # the island city to Bandra
 	["cairo", "cairo", 30.0444, 31.2357, 10.0],
 	["cape_town", "cape_town", -33.9249, 18.4241, 5.0],
@@ -131,6 +132,7 @@ const CORES := {
 	"shanghai": [[31.2304, 121.4737], [31.2397, 121.4998]],  # People's Square, Lujiazui
 	"beijing": [[39.9055, 116.3976], [39.9100, 116.4580]],   # Tiananmen, CBD
 	"bangkok": [[13.7460, 100.5340], [13.7520, 100.4940]],   # Siam, Rattanakosin
+	"siem_reap": [[13.3545, 103.8556]],                    # the Old Market
 	"mumbai": [[18.9320, 72.8340], [19.0660, 72.8680]],    # Fort, BKC
 	"cairo": [[30.0444, 31.2357]],                         # Tahrir
 	"cape_town": [[-33.9249, 18.4241]],                    # the CBD

@@ -185,6 +185,9 @@ const KIND_TAGS := {
 	"carport": "outbuilding", "roof": "outbuilding", "hut": "outbuilding",
 	"kiosk": "outbuilding", "container": "outbuilding",
 	"static_caravan": "outbuilding", "allotment_house": "outbuilding",
+	# Only HeritageZones writes this: an ancient Khmer structure the map
+	# draws as a footprint (a Suor Prat tower, a Khleang, a ruined prasat).
+	"khmer_ruin": "ruins",
 }
 
 ## `use` hints (amenity / shop / office / tourism ...) for `building=yes`.
@@ -294,6 +297,13 @@ const GENERIC := {
 		"r": [["gabled", 1]], "pitch": 0.8,
 		"rf": [["slate", ["#7c4a38", "#6a7580", "#8d8a86"]], ["terracotta", TERRA]],
 		"fh": 3.6, "st": [1, 2], "ch": 0.1, "dm": 0.0, "eq": 0.0, "ev": 0.6},
+	# Weathered laterite and sandstone masonry, a few deep dark openings,
+	# no glazing, shopfronts or chimneys; a flat or stepped top.
+	"ruins": {"w": [["stone", ["#74583F", "#7C7668", "#827B6D", "#6E6658"]]], "p": "adobe", "bay": 9.0,
+		"fr": "#2a2622", "sh": "#2a2622", "sp": 0.0, "wn": "small",
+		"r": [["pyramidal", 3], ["flat", 1]], "pitch": 0.9,
+		"rf": [["slate", ["#5E594F", "#6A6458"]]],
+		"fh": 3.6, "st": [1, 2], "ch": 0.0, "dm": 0.0, "eq": 0.0, "ev": 0.0},
 	"outbuilding": {"w": [["render", WARM_RENDER], ["concrete", CONCRETE], ["wood", []]], "p": "punched", "bay": 2.8,
 		"fr": "#efece4", "sh": "#5b6b4f", "sp": 0.0, "wn": "small",
 		"r": [["gabled", 2], ["flat", 2]], "pitch": 0.6,

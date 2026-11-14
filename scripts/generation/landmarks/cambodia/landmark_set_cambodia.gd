@@ -27,6 +27,8 @@ static func build(model: Node3D, type: String) -> bool:
 			LandmarkKhAngkor.bayon(model)
 		"angkor_thom_south_gate":
 			LandmarkKhAngkor.south_gate(model)
+		"angkor_thom_walls":
+			LandmarkAngkorThomWalls.build(model)
 		"ta_prohm":
 			LandmarkKhAngkor.ta_prohm(model)
 		"banteay_srei":

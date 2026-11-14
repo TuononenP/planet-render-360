@@ -132,6 +132,10 @@ const EYE_HEIGHT_M := 30.0
 ## — never the landmark.
 const FRAME_MIN_M := 400.0
 const FRAME_READ_M := 800.0
+## Multiplies the landmark framing distance; only capture runs change it
+## (tools/capture_presets.gd --frame_scale), the app always frames at 1.
+static var frame_scale := 1.0
+const FRAME_SCALED_MAX_M := 1000.0
 ## Generic eye clearance: the eye stays CLEAR_ABOVE_M over every roof
 ## within CLEAR_RADIUS_M (CLEAR_REACH_M bounds a footprint's centroid-
 ## to-edge span for the pre-check).
@@ -559,6 +563,14 @@ static func spawn_xz(data: LocationData) -> Vector2:
 		# A low gate or bridge must remain legible from its opening eye;
 		# the 800 m tower vantage can place it behind an entire hillside.
 		distance = clampf(maxf(height * 2.5, float(entry.get("span_m", 0.0)) * 0.8), LandmarkVisit.MIN_M, FRAME_READ_M)
+	# A temple in forest is framed from its clearing, not from 800 m of trees,
+	# and a terrace from the square it faces (bearing site -> eye, ° from north).
+	distance = float(entry.get("frame_m", distance))
+	# A scaled capture eye stays inside the detailed world (1.2 km half extent).
+	distance = minf(distance * frame_scale, maxf(distance, FRAME_SCALED_MAX_M))
+	if entry.has("frame_bearing_deg"):
+		var b := deg_to_rad(float(entry["frame_bearing_deg"]))
+		return lp + Vector2(sin(b), -cos(b)) * distance
 	return lp - TerrainBuilder.LANDMARK_POS.normalized() * distance
 
 ## Camera Y over metre position `xz`. A preset's curated eye stands

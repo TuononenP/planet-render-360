@@ -411,6 +411,21 @@ func disc(key: String, center: Vector3, normal: Vector3, r: float, seg: int = 24
 ## Transfer generated geometry directly when the caller already owns a
 ## batch. Committing temporary meshes first forces a GPU upload/readback
 ## and generates tangents that the final batch would generate again.
+## Appends every surface of `other`, moved by `xf` (normals turned with
+## it), under the same keys: a part built once in its own frame (a gate)
+## placed several times in one model.
+func merge(other: LandmarkMesh, xf: Transform3D) -> void:
+	var rot := xf.basis.orthonormalized()
+	for k in other._order:
+		var o: Surf = other._surfs[k]
+		if not _surfs.has(k):
+			use(k, o.mat)
+		var s: Surf = _surfs[k]
+		for i in o.v.size():
+			s.v.append(xf * o.v[i])
+			s.n.append(rot * o.n[i])
+		s.uv.append_array(o.uv)
+
 func append_to_batch(batch: MassBatch, key: String) -> void:
 	for k in _order:
 		var s: Surf = _surfs[k]

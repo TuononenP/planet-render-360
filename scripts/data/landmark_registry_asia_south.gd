@@ -36,7 +36,7 @@ static func entries() -> Array:
 			"wiki_title": "Boudhanath", "height_m": 36.0, "clear_m": 60.0,
 			"kind": "Stupa", "aliases": ["boudhanath", "bouddhanath", "boudha stupa", "बौद्धनाथ"]},
 		{"type": "angkor_wat", "icon": true, "name": "Angkor Wat", "lat": 13.41249, "lon": 103.86684, "radius_m": 4000.0,
-			"wiki_title": "Angkor Wat", "height_m": 65.0, "clear_m": 90.0,
+			"wiki_title": "Angkor Wat", "height_m": 65.0, "clear_m": 90.0, "frame_m": 450.0,
 			# The precinct west of the temple to the gopura: avenue, libraries,
 			# ponds and the Terrace of Honour stand in open lawn.
 			"clear_rect_m": [-210.0, 0.0, 340.0, 105.0], "tree_clear_m": 25.0,

@@ -52,6 +52,10 @@ const RED_SANDSTONE := ["#a8503a", "#9a4a35", "#b8603f"]
 const OLD_DELHI := ["#c8b898", "#b8a888", "#a89878", "#d8c8a8", "#e0d0b0", "#b08868"]
 const NEW_DELHI := ["#e8dcc8", "#d8ccb8", "#e0d4c0", "#c8c0b0", "#b8b0a0"]
 
+const SIEM_REAP_RENDER := ["#e8d8b0", "#d8e0c8", "#e8c8a8", "#c8d8e0", "#f0e8d8", "#e0b8a0"]
+const SIEM_REAP_ROOFS := [["slate", ["#9a9c9c", "#7d8488", "#a8aaa6"]], ["slate", ["#4f7a86", "#3f5f7a", "#5a7a6a"]],
+	["slate", ["#8a4a3a", "#7c4a38", "#6f6a62"]], ["membrane", []], ["terracotta", ["#a8583a", "#8f4a30"]]]
+
 const BASE := {
 	"kyoto": "japan", "kyoto_machiya": "kyoto",
 	"shanghai": "east_asia", "shanghai_shikumen": "shanghai", "shanghai_bund": "shanghai",
@@ -59,6 +63,7 @@ const BASE := {
 	"beijing": "east_asia", "beijing_hutong": "beijing", "beijing_brick": "beijing",
 	"beijing_tower": "beijing",
 	"bangkok": "southeast_asia", "bangkok_shophouse": "bangkok", "bangkok_tower": "bangkok",
+	"siem_reap": "southeast_asia",
 	"mumbai": "south_asia", "mumbai_gothic": "mumbai", "mumbai_deco": "mumbai", "mumbai_tower": "mumbai",
 	"cairo": "middle_east", "cairo_khedival": "cairo", "cairo_islamic": "cairo", "cairo_tower": "cairo",
 	"cape_town": "sub_saharan_africa", "cape_town_bokaap": "cape_town", "cape_town_modern": "cape_town",
@@ -89,6 +94,10 @@ const ERAS := {
 			"stalinist"], 2.0, 0.0, 99.0, [3, 6]],
 		["beijing", APT, 1990, 2100, [], 5.0, 0.0, 99.0, [7, 40]],
 		["beijing_tower", ["commercial", "civic"], 1990, 2100, [], 2.0, 0.0, 99.0, [8, 99]],
+	],
+	# Siem Reap is one low town: no condominium or tower rows.
+	"siem_reap": [
+		["siem_reap", ALL, 1000, 2100, [], 5.0, 0.0, 99.0],
 	],
 	"bangkok": [
 		["bangkok_shophouse", HAC, 1900, 2000, ["shophouse", "sino_portuguese", "colonial"],
@@ -225,6 +234,27 @@ const REGIONS := {
 			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 4.0, "st": [15, 60], "fix": true, "rv": {}},
 		"civic": {"w": [["stone", ["#c8c4bc", "#d8d0c0"]]], "p": "strip", "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [4, 12], "fix": true, "rv": {}},
+	},
+	# Siem Reap: a low town of two-to-four-storey shophouses and rendered or
+	# timber houses under corrugated metal (bare, grey, teal, blue, rust-red)
+	# with flat concrete decks on newer rows and clay tile on old houses.
+	"siem_reap": {
+		"house": {"w": [["render", SIEM_REAP_RENDER], ["wood", ["#7a5a3a", "#8a6a48", "#5e4a36"]]],
+			"p": "punched", "bay": 3.0, "fr": "#efece4", "sh": "#4f6a5a", "sp": 0.3,
+			"r": [["gabled", 4], ["hipped", 2], ["flat", 2]], "pitch": 0.6, "rf": SIEM_REAP_ROOFS,
+			"fh": 3.0, "st": [1, 2], "ch": 0.0, "eq": 0.4, "ev": 0.9},
+		"apartments": {"w": [["render", SIEM_REAP_RENDER], ["concrete", SHOPHOUSE]],
+			"p": [["shophouse", 2], ["punched", 2], ["balcony", 1]], "wn": "wide", "bay": 4.0,
+			"fr": "#6a6e72", "sh": SHUTTER, "sp": 0.2, "r": [["flat", 3], ["gabled", 2]], "pitch": 0.5,
+			"rf": SIEM_REAP_ROOFS, "fh": 3.2, "st": [2, 4], "fix": true, "eq": 0.8,
+			"g": [["shop", 2], ["none", 1]], "rv": {"signage": 0.4, "awning": 0.4,
+				"awning_colours": ["#2a4a6a", "#c8301a", "#e8b820", "#2a7a3a"]}},
+		"commercial": {"w": [["render", SIEM_REAP_RENDER], ["concrete", SHOPHOUSE]],
+			"p": [["shophouse", 3], ["punched", 1]], "wn": "wide", "bay": 4.0, "fr": "#6a6e72",
+			"sh": SHUTTER, "sp": 0.3, "r": [["flat", 3], ["gabled", 2]], "pitch": 0.5,
+			"rf": SIEM_REAP_ROOFS, "fh": 3.3, "st": [2, 4], "fix": true, "eq": 0.9,
+			"g": [["shop", 2], ["signage", 1]], "gc": ["#c8301a", "#1a5a9a", "#e8b820", "#2a7a3a"],
+			"rv": {"signage": 0.6, "awning": 0.5, "awning_colours": ["#2a4a6a", "#c8301a", "#e8b820"]}},
 	},
 	# Condominium towers (Sukhumvit, Silom): 20–50 storeys of white render
 	# and tinted glass with deep balconies.

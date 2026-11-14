@@ -71,6 +71,10 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		var pts: PackedVector2Array = (p as Dictionary).get("points", PackedVector2Array())
 		if pts.size() < 2 or (pts[pts.size() / 2] - centre).length_squared() > r2:
 			continue
+		# A temple moat's landing stage moors no yachts (HeritageZones).
+		var mid := pts[pts.size() / 2]
+		if bool(HeritageZones.rule_at_xz(data, mid.x, mid.y).get("no_marina", false)):
+			continue
 		piers.append(p)
 	# Pontoon decks first, so boats keep off every one of them.
 	for p in piers:

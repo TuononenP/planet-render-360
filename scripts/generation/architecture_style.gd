@@ -11,7 +11,7 @@ extends RefCounted
 ## Tables live in ArchitectureData (reviewable, docs/architecture-styles.md).
 
 const KINDS: Array[String] = ["house", "apartments", "commercial",
-	"industrial", "religious", "civic", "farm", "outbuilding"]
+	"industrial", "religious", "civic", "farm", "outbuilding", "ruins"]
 ## Per-building texture variants (which bays get shutters, blinds, lit
 ## panes, loggias; Paris pediments/balconettes/fascias). Seeded per
 ## building so a street is not a row of clones.
@@ -251,6 +251,9 @@ static func resolve(b: Dictionary, region: String, density: String,
 		seed_v: float, area_m2: float, ctx: Dictionary = {}) -> Dictionary:
 	var kind := kind_for(b, density, area_m2)
 	var era := BuildingEra.refine(region, kind, b, ctx, seed_v, area_m2)
+	# A heritage zone's town keeps to its older rows (HeritageZones).
+	if bool(b.get("no_new_era", false)) and era.ends_with("_new"):
+		era = region
 	var p := profile(era, kind)
 	var city := city_of(region)
 	var ms := seed_v

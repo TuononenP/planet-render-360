@@ -120,7 +120,7 @@ static func plan(data: LocationData, ground: GroundTruth, smap: SettlementMap) -
 				var sp := TreeSpecies.pick(rows, _hash(x, z, 5.0) * 0.999)
 				var size := lerpf(STAND_SIZE.x, STAND_SIZE.y, clampf(0.5 + stand.get_noise_2d(x, z) * 0.9, 0.0, 1.0)) \
 					* lerpf(TREE_SIZE.x, TREE_SIZE.y, _hash(x, z, 4.0))
-				out.append([Vector3(x, y, z), Vector3(size * widen, size, size * widen), crown_colour(px, winter), sp])
+				out.append([Vector3(x, y, z), Vector3(size * widen, size, size * widen), crown_colour(px, winter, _hash(x, z, 7.0)), sp])
 	return out
 
 ## Probe spacing at distance `d`.
@@ -204,10 +204,12 @@ static func pixel(data: LocationData, bytes: Array, x: float, z: float) -> Color
 ## A tree's tint multiplier from its photo pixel: the impostor shader
 ## already paints the species' colour, so the photo only shifts it, lighter
 ## or darker with the pixel's luminance and warmer where the pixel is
-## yellower. Bare winter trees keep the brightness shift only.
-static func crown_colour(px: Color, winter: bool) -> Color:
+## yellower, each tree a little off its neighbours (`jitter` 0..1) so a
+## stand is not one flat tone. Dark tropical canopy (photo L ~0.12) reads
+## dark, not at a pale floor. Bare winter trees keep the brightness shift only.
+static func crown_colour(px: Color, winter: bool, jitter: float = 0.5) -> Color:
 	var l := 0.299 * px.r + 0.587 * px.g + 0.114 * px.b
-	var v := clampf(l / 0.3, 0.75, 1.25)
+	var v := clampf(l / 0.3, 0.5, 1.25) * (0.88 + 0.24 * jitter)
 	if winter:
 		return Color(v, v, v)
 	var warm := clampf((px.r - px.b) * 2.0, -0.3, 0.3)

@@ -148,3 +148,25 @@ static func preah_palilay(model: Node3D) -> void:
 		Vector2(1.0, 0.4), Vector2(0.9, 0.6), Vector2(0.7, 1.1), Vector2(0.6, 1.6), Vector2(0.45, 2.0),
 		Vector2(0.38, 2.3), Vector2(0.22, 2.55), Vector2(0.0, 2.7)]), 10)
 	lm.commit(model)
+
+## Baksei Chamkrong (c. 947, 21 m) below Phnom Bakheng: four laterite tiers
+## (27 m square at the foot, 12 m high) with steep stairs up all four faces,
+## crowned by a single brick sanctuary tower on a sandstone base, its east
+## doorway framed in stone. Built facing +X (east).
+static func baksei_chamkrong(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	P.kit(lm, "#7C7563")
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#9A5A40", 2.0))
+	var half := [13.5, 11.4, 9.3, 7.2]
+	for i in half.size():
+		var hs: float = half[i]
+		var y0 := 3.0 * float(i)
+		P.block(lm, "Laterite", "Trim", Vector3(0, y0, 0), hs, hs, 3.0)
+		for side in 4:
+			var b := P.facing(side)
+			P.stair(lm, "Laterite", b * Vector3(0, y0, hs + 0.3), b, 3.4, 3.0, 0.42, 0.3)
+	P.block(lm, "Stone", "Trim", Vector3(0, 12.0, 0), 3.8, 3.8, 1.0)
+	U.prasat(lm, "Brick", "Brick", "Dark", Vector3(0, 13.0, 0), 3.0, 8.0, 4, 0.28)
+	lm.box("Stone", Vector3(3.1, 14.6, 0), Vector3(0.5, 3.0, 2.2), Basis(), 0.0)
+	lm.box("Dark", Vector3(3.37, 14.4, 0), Vector3(0.04, 2.4, 1.2), Basis(), 0.0)
+	lm.commit(model)

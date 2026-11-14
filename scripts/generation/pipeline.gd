@@ -775,6 +775,7 @@ func _await_osm(data: LocationData) -> void:
 		data.bridge_areas = _osm.bridge_areas
 		HeritageZones.apply(data)
 		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(HeritageZones.filter_candidates(data, _osm_landmarks)))
+		HeritageZones.drop_cleared(data)
 		_credits[2] = "Map data: © OpenStreetMap contributors" + (" · © OpenMapTiles" if _osm.used_omt else "")
 	else:
 		# No map data: the registry's other landmarks still stand.

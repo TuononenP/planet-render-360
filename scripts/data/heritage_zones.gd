@@ -11,27 +11,52 @@ extends RefCounted
 ## the outer rules overlaid by the inner ones. Rule keys:
 ##   max_storeys      cap on an inferred (untagged) height, in storeys
 ##   no_kinds         inferred kinds that become a house (or a hut)
-##   drop_historic    drop footprints with any `historic` tag
+##   drop_historic    drop footprints with a `historic` tag (true: any;
+##                    an Array: only those values) the models draw
+##   ruins_untyped    an unnamed, untyped footprint is ancient too (inside
+##                    Angkor Thom nearly every mapped footprint is a ruin)
+##   ruins            ancient structures the map draws as plain footprints
+##                    (named prasats, Khleangs, `historic` ruins) build as
+##                    weathered stone (the "ruins" kind), not houses
 ##   no_archetype     OSM temple candidates build no generic model here
 ##   religious_tower  false: no pagoda / spire on a religious building
 ##   tree_keep        share of canopy-raster trees kept (open woodland)
 ##   tree_mix         TreeSpecies mix name for the zone's trees
 ##   ground           "wild": park grass reads as unmown meadow
+##   no_marina        no yachts moored along mapped piers (MarinaBuilder)
+##   no_new_era       the region's newest period row is never picked
+
+## Rules round a temple outside the park, in its village.
+const OUTER_TEMPLE := {"max_storeys": 2, "no_kinds": ["apartments", "commercial", "office", "farm"],
+	"no_archetype": true, "religious_tower": false, "ruins": true, "no_marina": true, "tree_keep": 0.55,
+	"tree_mix": "khmer", "ground": "wild"}
 
 const ZONES := [
 	{"id": "angkor_park", "lat": [13.395, 13.480], "lon": [103.800, 103.960],
 		"rules": {"max_storeys": 2, "no_kinds": ["apartments", "commercial", "office", "farm"],
-			"no_archetype": true, "religious_tower": false,
+			"no_archetype": true, "religious_tower": false, "ruins": true, "no_marina": true,
 			"tree_keep": 0.45, "tree_mix": "khmer", "ground": "wild"}},
 	# The moat-bounded island of Angkor Wat (its outer wall plus the berm).
 	{"id": "angkor_wat_island", "lat": [13.40839, 13.41655], "lon": [103.86144, 103.87170],
 		"rules": {"max_storeys": 1, "drop_historic": true, "tree_keep": 0.35}},
 	# Angkor Thom, the 3 km walled city round the Bayon.
-	{"id": "angkor_thom", "lat": [13.4276, 13.4547], "lon": [103.8451, 103.8728],
-		"rules": {"max_storeys": 1, "drop_historic": true}},
+	# The walls and gates are LandmarkAngkorThomWalls; its other ruins stand.
+	{"id": "angkor_thom", "lat": [13.4266, 13.4560], "lon": [103.8436, 103.8744],
+		"rules": {"max_storeys": 1, "drop_historic": ["city_gate", "citywalls"], "ruins_untyped": true}},
+	# The temples beyond the park, each in its village: the Roluos group
+	# (Bakong, Preah Ko, Lolei), Banteay Srei, Beng Mealea, Phnom Krom.
+	{"id": "roluos", "lat": [13.325, 13.362], "lon": [103.955, 103.990], "rules": OUTER_TEMPLE},
+	{"id": "banteay_srei", "lat": [13.585, 13.612], "lon": [103.948, 103.976], "rules": OUTER_TEMPLE},
+	{"id": "beng_mealea", "lat": [13.464, 13.488], "lon": [104.215, 104.243], "rules": OUTER_TEMPLE},
+	{"id": "phnom_krom", "lat": [13.276, 13.296], "lon": [103.802, 103.822], "rules": OUTER_TEMPLE},
+	# Siem Reap town: shophouses, wats and low resort hotels, not the
+	# region's newest 6-14 storey white blocks.
 	{"id": "central_park", "lat": [40.7644, 40.8005], "lon": [-73.9820, -73.9490],
 		"rules": {"tree_mix": "nyc_park"}},
+	{"id": "siem_reap_town", "lat": [13.330, 13.395], "lon": [103.820, 103.900],
+		"rules": {"max_storeys": 5, "no_new_era": true, "tree_mix": "khmer"}},
 ]
+
 
 ## Merged rules at (lat, lon); empty outside every zone.
 static func rule_at(lat: float, lon: float) -> Dictionary:
@@ -98,17 +123,30 @@ static func apply_buildings(data: LocationData) -> void:
 
 ## One building under `rules`; false when it is dropped.
 static func apply_building(b: Dictionary, rules: Dictionary) -> bool:
-	if bool(rules.get("drop_historic", false)) and str(b.get("historic", "")) != "":
+	var historic := str(b.get("historic", ""))
+	var drop: Variant = rules.get("drop_historic", false)
+	if historic != "" and ((drop is bool and drop) or (drop is Array and (drop as Array).has(historic))):
 		return false
+	if rules.has("max_storeys"):
+		b["zone_storeys"] = int(rules["max_storeys"])
+	var untyped := str(b.get("kind", "")) == "yes" and str(b.get("name", "")) == "" \
+		and str(b.get("use", "")) == ""
+	if bool(rules.get("ruins", false)) and (ancient(b) or (untyped and bool(rules.get("ruins_untyped", false)))):
+		b["kind"] = "khmer_ruin"
+		b["use"] = ""
+		b["no_tower"] = true
+		# A Suor Prat tower or a Khleang stands two storeys of stone.
+		b["zone_storeys"] = maxi(int(b.get("zone_storeys", 2)), 2)
+		return true
 	var area := BuildingHeights._area_m2(b)
 	var kind := ArchitectureStyle.kind_for(b, "mid", area)
 	if kind in (rules.get("no_kinds", []) as Array):
 		b["kind"] = "hut" if area > 0.0 and area < 45.0 else "house"
 		b["use"] = ""
-	if rules.has("max_storeys"):
-		b["zone_storeys"] = int(rules["max_storeys"])
 	if rules.has("religious_tower") and not bool(rules["religious_tower"]):
 		b["no_tower"] = true
+	if bool(rules.get("no_new_era", false)):
+		b["no_new_era"] = true
 	return true
 
 ## OSM landmark candidates outside zones that bar generic archetypes.
@@ -121,3 +159,40 @@ static func filter_candidates(data: LocationData, candidates: Array) -> Array:
 		var cd := c as Dictionary
 		var rules := rule_at_xz(data, float(cd.get("x", 0.0)), float(cd.get("z", 0.0)))
 		return not bool(rules.get("no_archetype", false)))
+
+## Inside a zone, footprints a landmark model clears (the temple's own
+## mapped outline, often its whole enclosure) leave the map altogether:
+## otherwise the ground still paints them as paving, a grey slab the size
+## of Ta Prohm under the model and its trees.
+static func drop_cleared(data: LocationData) -> void:
+	if not near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M):
+		return
+	var site := TerrainBuilder.landmark_site_xz(data)
+	data.buildings = data.buildings.filter(func(b: Variant) -> bool:
+		if not (b is Dictionary):
+			return true
+		var bd := b as Dictionary
+		if rule_at_xz(data, float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).is_empty():
+			return true
+		return BuildingBuilder._accepted(data, bd, site, INF))
+
+## Words naming an ancient Khmer structure, and a living monastery.
+const ANCIENT_WORDS := ["prasat", "ប្រាសាទ", "khleang", "kleang", "pithu", "suor prat", "temple", "ruin"]
+const MODERN_WORDS := ["wat ", "វត្ត", "pagoda", "monastery", "school"]
+
+## True for a footprint of an ancient structure: a `historic` tag or a
+## building=ruins, or a temple (or untyped building) named like a prasat or
+## an ancient temple, but never a named living wat.
+static func ancient(b: Dictionary) -> bool:
+	var name := str(b.get("name", "")).to_lower()
+	for w in MODERN_WORDS:
+		if name.contains(w):
+			return false
+	if str(b.get("historic", "")) != "" or str(b.get("kind", "")) == "ruins":
+		return true
+	if str(b.get("kind", "")) not in ["temple", "yes", "shrine"]:
+		return false
+	for w in ANCIENT_WORDS:
+		if name.contains(w):
+			return true
+	return false

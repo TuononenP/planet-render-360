@@ -11,6 +11,8 @@ static func build(model: Node3D, type: String) -> bool:
 			LandmarkAngThom.baphuon(model)
 		"phimeanakas":
 			LandmarkAngThom.phimeanakas(model)
+		"baksei_chamkrong":
+			LandmarkAngSmall.baksei_chamkrong(model)
 		"terrace_of_the_elephants":
 			LandmarkAngTerraces.elephants(model)
 		"terrace_of_the_leper_king":

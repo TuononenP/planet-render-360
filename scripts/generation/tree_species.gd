@@ -94,9 +94,9 @@ const SPECIES := {
 	# crowns, the buttressed pale silk-cotton / spung trees of the temple
 	# courts (Ceiba, Tetrameles; bare in the dry season) and the sugar
 	# palm (Borassus flabellifer, a stiff round fan crown on a tall stem).
-	"dipterocarp": {"gen": "broad", "h": 32.0, "h_var": 0.25, "bole": 0.64, "crown_r": 0.2,
-		"leader": 0.45, "branches": 7, "trunk_r": 0.55, "up": 0.6, "droop": 0.0,
-		"clusters": 50, "card": 3.2, "leaf": "broad", "bark": "plane",
+	"dipterocarp": {"gen": "broad", "h": 30.0, "h_var": 0.25, "bole": 0.52, "crown_r": 0.28,
+		"leader": 0.45, "branches": 8, "trunk_r": 0.5, "up": 0.55, "droop": 0.0,
+		"clusters": 62, "card": 3.6, "leaf": "broad", "bark": "furrowed",
 		"tint": "dipterocarp", "evergreen": true, "flat_top": true},
 	"silk_cotton": {"gen": "broad", "h": 28.0, "h_var": 0.25, "bole": 0.5, "crown_r": 0.36,
 		"leader": 0.3, "branches": 6, "trunk_r": 0.62, "up": 0.3, "droop": 0.05,

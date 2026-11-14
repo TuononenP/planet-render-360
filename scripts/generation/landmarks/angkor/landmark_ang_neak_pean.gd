@@ -10,6 +10,9 @@ const A = preload("res://scripts/generation/landmarks/angkor/landmark_ang_util.g
 
 ## Surface of the pools; the stepped banks rise from the terrain to meet it.
 const WATER_Y := 0.12
+## Top of the stone banks and the chapel terraces: the pools lie sunk below
+## the walks between them, as at the site, so no chapel stands in water.
+const BANK_Y := 1.6
 
 ## Neak Pean (9.6 m): the 70 m square central pool and the four 24 m pools
 ## at the north, east, south and west (their stepped laterite banks raised
@@ -34,13 +37,16 @@ static func neak_pean(model: Node3D) -> void:
 		var b := A.face(side)
 		var dir := b * Vector3(0, 0, 1)
 		_pool(lm, Vector2(dir.x, dir.z) * 53.0, 12.0, 12.0)
-		_chapel(lm, b * Vector3(0, 0, 38.0), b, side)
+		# The chapel's terrace bridges the walk between the central pool
+		# and the small one, its spout over the central pool.
+		lm.box("Laterite", b * Vector3(0, BANK_Y * 0.5 - 0.4, 38.0), Vector3(9.0, BANK_Y + 0.8, 6.0), b)
+		_chapel(lm, b * Vector3(0, BANK_Y, 38.0), b, side)
 	# Moss on the corners of the central pool's curb.
 	for s in [-1.0, 1.0]:
 		var sg: float = s
 		for t in [-1.0, 1.0]:
 			var tg: float = t
-			lm.box("Moss", Vector3(sg * 33.8, 0.64, tg * 33.8), Vector3(2.6, 0.04, 2.6), Basis(), 0.0)
+			lm.box("Moss", Vector3(sg * 33.8, BANK_Y + 0.02, tg * 33.8), Vector3(2.6, 0.04, 2.6), Basis(), 0.0)
 	_islet(lm)
 	_balaha(lm, Vector3(17.0, WATER_Y, 0), A.face(1))
 	lm.commit(model)
@@ -49,7 +55,7 @@ static func neak_pean(model: Node3D) -> void:
 ## a three-course stepped bank (curb 0.62 m, then 0.42 m and 0.27 m).
 static func _pool(lm: LandmarkMesh, c: Vector2, hx: float, hz: float) -> void:
 	lm.box("Water", Vector3(c.x, WATER_Y * 0.5, c.y), Vector3(hx * 2.0, WATER_Y, hz * 2.0), Basis(), 0.0)
-	var courses := [[0.0, 1.4, 0.62], [1.4, 2.4, 0.42], [2.4, 3.4, 0.27]]
+	var courses := [[0.0, 1.4, BANK_Y], [1.4, 2.4, BANK_Y * 0.66], [2.4, 3.4, BANK_Y * 0.33]]
 	for course in courses:
 		var o0: float = course[0]
 		var o1: float = course[1]

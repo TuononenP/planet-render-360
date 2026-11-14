@@ -16,6 +16,8 @@ extends SceneTree
 ##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
 ##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
 ##        [--size=WxH]  (frame size; default 1280x800)  [--png]  (lossless PNG, not JPEG)
+##        [--frame_scale=2]  (opening eye that many times its usual distance from the landmark)
+##        [--eye_min=40]  (opening eye at least that high over the ground, aimed at the landmark)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -103,6 +105,10 @@ var _weather_code := 0
 var _season := -1
 ## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
 var _looks: Array = []
+## Least height (m) of a landmark's opening eye over the ground (--eye_min).
+var _eye_min := 0.0
+## Frame size every shot is taken at (--size); zero keeps the window's.
+var _shot_size := Vector2i.ZERO
 ## When the --looks are taken: "" golden hour, "late" two hours after sunset.
 var _look_time := ""
 var _date_override: Dictionary = {}
@@ -209,8 +215,17 @@ func _run() -> void:
 			child.queue_free()
 	UiPrefs.reduce_motion = true
 	main._settings.preset = int(a["preset"])  # in memory only, never saved
+	View360.frame_scale = float(a.get("frame_scale", 1.0))
+	_eye_min = float(a.get("eye_min", 0.0))
 	var view: View360 = main._view
 	view._governor.set_process(false)
+	if size != SIZE:
+		# The window can be clamped to the screen (and the container stretch
+		# follows its logical size): the 3D view renders at the asked size,
+		# re-asserted before every shot (_snap) since a place change resizes it.
+		_shot_size = size
+		view._container.stretch = false
+		view._viewport.size = size
 	# Live weather still lands (it carries the place's UTC offset, so the
 	# golden hour is local), then each capture forces clear weather.
 	view._weather.succeeded.connect(func(_t: float, _l: String, _c: float, _code: int) -> void:
@@ -307,6 +322,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		_bake_capital(view._viewport.get_texture().get_image(), float(place["lat"]), float(place["lon"]), id)
 		return
 	var rig := view._rig
+	_lift_eye(view, _eye_min)
 	var open := Vector2(rig.yaw, rig.pitch)
 	await _snap(view, id, "vantage")
 	if OS.get_cmdline_user_args().has("--bank-only"):
@@ -477,7 +493,30 @@ func _settle(seconds: float, frames: int) -> void:
 ## The 3D view only: the SubViewport's own texture carries no HUD.
 ## force_draw renders synchronously, so captures stay fresh even while
 ## the window sits off-screen.
+## --eye_min: a landmark's opening eye at least `metres` over the ground,
+## aimed at the model's middle (a far eye in forest otherwise sees only
+## the trees round it); 0 leaves the app's own opening look.
+func _lift_eye(view: View360, metres: float) -> void:
+	var data: LocationData = view._data
+	if metres <= 0.0 or data.landmark_type == "none":
+		return
+	var rig := view._rig
+	var floor_y := view._ground.height_at_world(rig.position.x, rig.position.z) + metres
+	if rig.position.y >= floor_y:
+		return
+	rig.position.y = floor_y
+	var lp := TerrainBuilder.landmark_world_pos(data)
+	var entry := LocationData.entry_for_type(data.landmark_type)
+	var target := Vector3(lp.x, view._ground.height_at_world(lp.x, lp.y)
+		+ float(entry.get("height_m", 20.0)) * 0.5, lp.y)
+	var look := View360.aim(rig.position, target)
+	rig.set_look(look.x, look.y)
+
 func _snap(view: View360, id: String, shot: String) -> void:
+	if _shot_size != Vector2i.ZERO and view._viewport.size != _shot_size:
+		view._container.stretch = false
+		view._viewport.size = _shot_size
+		await _settle(0.5, SHOT_SETTLE_FRAMES)
 	await process_frame
 	await process_frame
 	RenderingServer.force_draw(false)

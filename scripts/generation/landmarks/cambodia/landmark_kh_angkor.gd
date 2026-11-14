@@ -20,14 +20,26 @@ static func bayon(model: Node3D) -> void:
 ## the central four-faced tower and two lower flanking face towers; and
 ## the causeway over the moat lined with 54 devas on the left and 54 asuras
 ## on the right (seen from outside) hauling the naga, its seven-headed hood
-## rearing at the outer end. The moat is not modelled: the causeway is a
-## raised bank at ground level. Gate faces +Z (south).
+## rearing at the outer end. The moat is the map's water; the causeway is a
+## raised bank at ground level. Gate faces +Z (south). The city's other
+## gates and its wall are LandmarkAngkorThomWalls, built with `gate`.
 static func south_gate(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
+	gate_kit(lm)
+	gate(lm, 54)
+	lm.commit(model)
+
+## The material keys a city gate draws with.
+static func gate_kit(lm: LandmarkMesh) -> void:
 	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7D7767", 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#22201C", 2.0))
 	lm.use("Naga", LandmarkMaterials.pbr("stone", "#6C675A", 3.0))
+
+## One gate of Angkor Thom facing +Z with 72 m of wall either side and its
+## causeway out over the moat; `figures` devas and asuras a side (54 at the
+## restored South Gate, a ruined handful at the others).
+static func gate(lm: LandmarkMesh, figures: int) -> void:
 	# City wall with its parapet.
 	for sx in [-1.0, 1.0]:
 		U.wall_run(lm, "Laterite", "Stone", Vector3(sx * 72.0, 0, 0), Vector3(sx * 9.0, 0, 0), 8.0, 7.0, 0.3)
@@ -83,10 +95,9 @@ static func south_gate(model: Node3D) -> void:
 		lm.beam("Naga", nb, ne, 0.55, 0.55)
 		lm.beam("Naga", nb + Vector3(0, 0.3, 0), ne + Vector3(0, 0.3, 0), 0.2, 0.15, Vector3.RIGHT)
 		U.naga_fan(lm, "Naga", Vector3(x, 1.0, z0 + clen - 1.5), Basis(), 7, 3.6)
-		for i in 54:
-			var z := z0 + 3.0 + (clen - 7.0) * float(i) / 53.0
+		for i in figures:
+			var z := z0 + 3.0 + (clen - 7.0) * float(i) / float(maxi(figures - 1, 1))
 			_tug_figure(lm, Vector3(sx * 5.6, 1.0, z), sx, sx < 0.0)
-	lm.commit(model)
 
 ## One giant of the causeway, 2.6 m tall on its block at `base`, leaning
 ## back toward the gate (-Z) as it hauls the naga at chest height; `side`

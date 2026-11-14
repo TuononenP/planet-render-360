@@ -104,9 +104,26 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 				or CanopyVegetation.usable(data.landcover_image, 0)),
 		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
 		"tree_clears": LandmarkSites.tree_clears(data),
+		"sightline": _sightline(data),
 		"zone": HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M),
 		"origin": Vector2(data.latitude, data.longitude),
 	}
+
+## In a heritage zone's forest the opening eye looks at its temple down a
+## glade: [eye, site, half-width at the eye, at the site] (m), widening
+## toward the model; empty elsewhere (cities frame their landmarks).
+static func _sightline(data: LocationData) -> Array:
+	if data.landmark_type == "none" \
+			or not HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M):
+		return []
+	var site := TerrainBuilder.landmark_world_pos(data)
+	if HeritageZones.rule_at_xz(data, site.x, site.y).is_empty():
+		return []
+	var m := WorldScale.metres_to_units()
+	return [View360.spawn_xz(data), site, SIGHTLINE_EYE_M * m, SIGHTLINE_SITE_M * m]
+
+const SIGHTLINE_EYE_M := 14.0
+const SIGHTLINE_SITE_M := 50.0
 
 ## HeritageZones rules at (x, z) of the build (empty outside every zone).
 static func zone_rule(x: float, z: float, ctx: Dictionary) -> Dictionary:
@@ -139,6 +156,15 @@ static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMa
 		return false
 	if LandmarkSites.tree_cleared(Vector2(x, z), ctx["tree_clears"]):
 		return false
+	var sl: Array = ctx.get("sightline", [])
+	if not sl.is_empty():
+		var a: Vector2 = sl[0]
+		var b: Vector2 = sl[1]
+		var p := Vector2(x, z)
+		var t := clampf((p - a).dot(b - a) / maxf((b - a).length_squared(), 1.0), 0.0, 1.0)
+		if p.distance_to(a.lerp(b, t)) < lerpf(float(sl[2]), float(sl[3]), t):
+			return false
+	return true
 	return true
 
 static func _add(plan: Dictionary, x: float, z: float, ground: GroundTruth, sp: String,

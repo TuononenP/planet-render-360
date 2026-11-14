@@ -13,6 +13,12 @@ static func entries() -> Array:
 			"wiki_title": "Baphuon", "height_m": 34.0, "clear_m": 190.0, "tree_clear_m": 60.0,
 			"kind": "Temple mountain",
 			"aliases": ["baphuon", "baphuon temple", "prasat baphuon", "golden mountain angkor", "ប្រាសាទបាពួន"]},
+		{"type": "baksei_chamkrong", "name": "Baksei Chamkrong",
+			"lat": 13.42524, "lon": 103.85827, "radius_m": 3500.0,
+			"wiki_title": "Baksei Chamkrong", "height_m": 21.0, "clear_m": 35.0, "tree_clear_m": 25.0,
+			"kind": "Temple mountain",
+			"aliases": ["baksei chamkrong", "baksei chamkrong temple", "prasat baksei chamkrong",
+				"ប្រាសាទបក្សីចាំក្រុង"]},
 		{"type": "phimeanakas", "name": "Phimeanakas",
 			"lat": 13.4456, "lon": 103.8558, "radius_m": 4500.0,
 			"wiki_title": "Phimeanakas", "height_m": 21.0, "clear_m": 35.0, "tree_clear_m": 35.0,
@@ -20,7 +26,12 @@ static func entries() -> Array:
 			"aliases": ["phimeanakas", "phimeanakas temple", "vimean akas", "prasat phimeanakas", "ប្រាសាទភិមានអាកាស"]},
 		{"type": "terrace_of_the_elephants", "name": "Terrace of the Elephants",
 			"lat": 13.4456, "lon": 103.8586, "radius_m": 4500.0,
-			"wiki_title": "Terrace of the Elephants", "height_m": 4.2, "clear_m": 185.0,
+			"wiki_title": "Terrace of the Elephants", "height_m": 4.2, "clear_m": 40.0,
+			# The Royal Square before it is open ground; Suor Prat's towers
+			# stand beyond its east side.
+			"clear_rect_m": [70.0, 0.0, 60.0, 170.0], "tree_clear_m": 10.0,
+			# Seen from the Royal Square it faces, Suor Prat's towers behind the eye.
+			"frame_m": 60.0, "frame_bearing_deg": 90.0,
 			"kind": "Terrace",
 			"aliases": ["terrace of the elephants", "elephant terrace", "elephants terrace angkor thom",
 				"terrace of elephants", "ទីលានដំរី"]},
