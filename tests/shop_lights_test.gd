@@ -57,6 +57,18 @@ func _run() -> void:
 		max_x = maxf(max_x, (l as Node3D).position.x / m)
 	if max_x > float(ShopLights.MAX_LIGHTS) * 7.0 + 1.0:
 		failures.append("the cap should keep the nearest lights")
+	# ...nearest the eye, not the world origin.
+	ShopLights.begin_build()
+	for i in ShopLights.MAX_LIGHTS + 40:
+		ShopLights.note(Vector2(float(i) * 7.0, 0.0) * m, Vector2(1, 0), Vector2(0, 1), 1.0, 0.0)
+	var eye_root := Node3D.new()
+	ShopLights.add(eye_root, Vector2(float(ShopLights.MAX_LIGHTS + 40) * 7.0, 0.0) * m)
+	var min_x := INF
+	for l in eye_root.get_node("ShopLights").get_children():
+		min_x = minf(min_x, (l as Node3D).position.x / m)
+	if min_x < 40.0 * 7.0 - 1.0:
+		failures.append("the cap should keep the lights nearest the eye")
+	eye_root.free()
 	root.free()
 	far_root.free()
 	# A cancelled build's points go with it.

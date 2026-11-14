@@ -1,0 +1,173 @@
+extends SceneTree
+
+## Headless: godot --headless --script tests/ground_cover_test.gd
+## GroundCover: colour rooted in the ground photo, cover that reaches on
+## for a walk, chunks that carry their own range, and flowers kept rare.
+
+var failures: Array[String] = ["sentinel: the run did not finish (script error?)"]
+
+func _init() -> void:
+	_run()
+	if failures.is_empty():
+		print("GROUND COVER OK")
+		quit(0)
+	else:
+		for f in failures:
+			printerr("GROUND COVER FAIL: ", f)
+		quit(1)
+
+func _check(ok: bool, what: String) -> void:
+	if not ok:
+		failures.append(what)
+
+## A wide flat park around the viewpoint.
+func _park(preset: int, half: float = 700.0) -> LocationData:
+	var d := LocationData.new()
+	RenderSettings.apply_preset(d, preset)
+	d.heights.resize(d.grid_size * d.grid_size)
+	d.heights.fill(3.0)
+	d.water_level = -3.0
+	d.latitude = 48.8566
+	d.longitude = 2.3522
+	d.land_polygons = [{"class": "grass", "points": PackedVector2Array([Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)]), "holes": []}]
+	return d
+
+func _plan(d: LocationData) -> Dictionary:
+	var g := GroundTruth.new(d)
+	return GroundCover.plan(d, g, VegetationMask.new(d, g))
+
+func _run() -> void:
+	failures.clear()
+	var base := Color(0.26, 0.42, 0.11)
+	_check(GroundCover.rooted(base, Color(0, 0, 0, 0)) == base, "no photo leaves the palette colour")
+	var straw := GroundCover.rooted(base, Color(0.4, 0.3, 0.1, 1.0))
+	_check(straw.r > base.r and straw.g < base.g, "cover takes its hue from a straw-coloured photo")
+	var lum := func(c: Color) -> float: return c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
+	_check(absf(float(lum.call(straw)) - float(lum.call(base))) < 0.02, "the photo sets the hue, not the brightness")
+	_check(GroundCover.green_index(Color(0.1, 0.3, 0.05)) > GroundCover.PHOTO_GREEN, "lawn reads as green")
+	_check(GroundCover.green_index(Color(0.3, 0.28, 0.25)) < GroundCover.PHOTO_GREEN, "bare earth does not")
+	_check(GroundCover.photo_green(Color(0.1, 0.3, 0.05, 1.0)), "bright green photo ground grows cover")
+	_check(not GroundCover.photo_green(Color(0.03, 0.05, 0.02, 1.0)), "dark ground never does, whatever its index")
+	_check(not GroundCover.photo_green(Color(0.1, 0.3, 0.05, 0.0)), "no photo, no cover")
+	var fast := _plan(_park(RenderSettings.Preset.FAST))
+	_check(fast.is_empty(), "Fast lays no cover")
+	var d := _park(RenderSettings.Preset.ULTRA)
+	var placed := _plan(d)
+	var centre := View360.spawn_xz(d)
+	var far_out := 0
+	var total := 0
+	for kind: String in placed:
+		for e: Array in placed[kind]:
+			var o: Vector3 = e[0]
+			var r := Vector2(o.x - centre.x, o.z - centre.y).length()
+			total += 1
+			far_out += 1 if r > 300.0 else 0
+	_check(far_out > 500, "cover reaches on for a walk 300 m out: %d" % far_out)
+	var flowers := float((placed["flower"] as Array).size())
+	_check(flowers / float(total) < 0.06, "flowers stay rare on a lawn: %.3f" % (flowers / float(total)))
+	# Chunks carry their own range past LodRing, and no more than a grid's worth.
+	var g := GroundTruth.new(d)
+	var root := Node3D.new()
+	var built := GroundCover.build(root, d, g, VegetationMask.new(d, g))
+	_check(built == total, "every placement is built: %d of %d" % [built, total])
+	_check(root.get_child_count() > 3, "cover is split into chunks: %d" % root.get_child_count())
+	var ok := true
+	for c in root.get_children():
+		var mmi := c as MultiMeshInstance3D
+		ok = ok and mmi != null and str(mmi.get_meta("lod_layer", "")) == "GroundCover" and float(mmi.get_meta("cover_end", 0.0)) > 0.0
+	_check(ok, "each chunk is on the GroundCover layer with its own range")
+	var first := root.get_child(0) as GeometryInstance3D
+	LodRing.apply(root, RenderSettings.Preset.ULTRA)
+	_check(is_equal_approx(first.visibility_range_end, float(first.get_meta("cover_end"))), "LodRing keeps the chunk's own range")
+	# A cached world reopened 450 m on: its cover is laid again around the
+	# new eye, and nothing but the cover is touched.
+	var keep := Node3D.new()
+	root.add_child(keep)
+	d.view = {"lat": d.latitude, "lon": d.longitude, "eye_lat": d.latitude + 450.0 / 111320.0,
+		"eye_lon": d.longitude}
+	var eye := View360.spawn_xz(d)
+	_check(eye.distance_to(centre) > 400.0, "the reopen eye stands ~450 m on: %.0f" % eye.distance_to(centre))
+	var relaid := GroundCover.recentre(root, d, g)
+	_check(relaid > 0 and keep.get_parent() == root, "cover is re-laid and other layers stay")
+	# Every chunk lies within the new eye's reach, some past the old one's.
+	var reach := float(GroundCover.RADIUS_M[RenderSettings.Preset.ULTRA] \
+		+ GroundCover.WALK_EXTRA_M[RenderSettings.Preset.ULTRA]) + GroundCover.CHUNK_M
+	var beyond_old := 0
+	var stray := 0
+	for c in root.get_children():
+		if c.get_meta("lod_layer", "") != "GroundCover":
+			continue
+		var at := Vector2((c as Node3D).position.x, (c as Node3D).position.z)
+		stray += 1 if at.distance_to(eye) > reach else 0
+		beyond_old += 1 if at.distance_to(centre) > reach else 0
+	_check(stray == 0 and beyond_old > 0,
+		"re-laid cover centres on the new eye: %d stray, %d past the old reach" % [stray, beyond_old])
+	_check(GroundCover.spare_m(RenderSettings.Preset.FAST) == 0.0, "Fast lays no walking reach")
+	root.free()
+	# A park lawn mapped across a street: neither the carriageway nor its
+	# sidewalk strip (the ground paints it as paving) grows any cover.
+	var street := _park(RenderSettings.Preset.ULTRA)
+	var sc := View360.spawn_xz(street)
+	var u := WorldScale.metres_to_units()
+	street.roads = [{"class": "residential", "width_m": 8.0, "sidewalk": 3,
+		"points": PackedVector2Array([Vector2(sc.x - 400.0 * u, sc.y), Vector2(sc.x + 400.0 * u, sc.y)])}]
+	var strip := 0
+	var on_grass := 0
+	var walk_m := GroundMaterial.SIDEWALK_CITY_M if not CityStyles.zone_at(street.latitude, street.longitude).is_empty() \
+		else GroundMaterial.SIDEWALK_M
+	var strip_m := 4.0 + walk_m
+	var lanes := _plan(street)
+	for kind: String in lanes:
+		for e: Array in lanes[kind]:
+			if absf((e[0] as Vector3).x - sc.x) > 380.0 * u:
+				continue
+			var dz := absf((e[0] as Vector3).z - sc.y) / u
+			strip += 1 if dz < strip_m else 0
+			on_grass += 1
+	_check(on_grass > 500 and strip == 0, "no cover on a street's sidewalk: %d of %d" % [strip, on_grass])
+	# A sidewalk on one side only leaves the other side to the lawn. Bit 1 is
+	# the left of travel: east-bound, north (z < 0).
+	(street.roads[0] as Dictionary)["sidewalk"] = 1
+	var lawn_side := 0
+	var walk_side := 0
+	var one_side := _plan(street)
+	for kind: String in one_side:
+		for e: Array in one_side[kind]:
+			var at := e[0] as Vector3
+			if absf(at.x - sc.x) > 380.0 * u:
+				continue
+			var dz := (at.z - sc.y) / u
+			lawn_side += 1 if dz > 6.5 and dz < strip_m else 0
+			walk_side += 1 if dz < 0.0 and dz > -strip_m else 0
+	_check(lawn_side > 20 and walk_side == 0,
+		"the side with no sidewalk keeps its lawn: %d on it, %d on the walk" % [lawn_side, walk_side])
+	# A pitch and a paved square inside the park: painted as such, so no
+	# tuft grows on either (the park round them keeps its lawn).
+	var sports := _park(RenderSettings.Preset.ULTRA)
+	var sp_c := View360.spawn_xz(sports)
+	var pitch := PackedVector2Array([sp_c + Vector2(20, 20) * u, sp_c + Vector2(80, 20) * u,
+		sp_c + Vector2(80, 60) * u, sp_c + Vector2(20, 60) * u])
+	var square := PackedVector2Array([sp_c + Vector2(-80, 20) * u, sp_c + Vector2(-20, 20) * u,
+		sp_c + Vector2(-20, 60) * u, sp_c + Vector2(-80, 60) * u])
+	sports.land_polygons = [{"class": "pitch", "points": pitch, "holes": []},
+		{"class": "urban", "points": square, "holes": []}] + sports.land_polygons
+	var on_pitch := 0
+	var on_square := 0
+	var on_park := 0
+	var laid := _plan(sports)
+	for kind: String in laid:
+		for e: Array in laid[kind]:
+			var at := Vector2((e[0] as Vector3).x, (e[0] as Vector3).z) - sp_c
+			if at.y > 22.0 * u and at.y < 58.0 * u and at.x > 22.0 * u and at.x < 78.0 * u:
+				on_pitch += 1
+			elif at.y > 22.0 * u and at.y < 58.0 * u and at.x > -78.0 * u and at.x < -22.0 * u:
+				on_square += 1
+			else:
+				on_park += 1
+	_check(on_pitch == 0 and on_square == 0 and on_park > 500,
+		"no tufts on a pitch or square in a park: %d, %d (park %d)" % [on_pitch, on_square, on_park])
+	# Photo-green ground grows cover with no mapped polygon; bare ground none.
+	var wild := _park(RenderSettings.Preset.ULTRA)
+	wild.land_polygons = []
+	_check(_plan(wild).is_empty(), "no polygon and no photo lays nothing")

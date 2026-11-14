@@ -20,7 +20,7 @@ const BASE := {
 	"helsinki": "nordic", "helsinki_empire": "helsinki", "helsinki_functional": "helsinki",
 	"helsinki_modern": "helsinki", "helsinki_classicism": "helsinki", "helsinki_wood": "helsinki",
 	"helsinki_suburb": "helsinki", "helsinki_element": "helsinki", "helsinki_midrise": "helsinki",
-	"espoo": "nordic", "tapiola": "espoo", "otaniemi": "espoo", "espoo_modern": "espoo",
+	"helsinki_villa": "helsinki", "espoo": "nordic", "tapiola": "espoo", "otaniemi": "espoo", "espoo_modern": "espoo",
 	"kauniainen": "espoo",
 }
 
@@ -35,6 +35,7 @@ const ERAS := {
 		["helsinki_element", ACC, 1965, 1989, ["prefab", "element", "brutalist"], 3.0, 2.0, 99.0],
 		["helsinki_midrise", ALL, 1990, 2100, ["contemporary"], 2.0, 1.0, 99.0],
 		["helsinki_modern", ACC, 1990, 2100, ["skyscraper", "high-tech"], 0.5, 0.0, 99.0],
+		["helsinki_villa", ["house"], 1900, 1975, ["villa"], 0.5, 4.0, 99.0],
 	],
 	"espoo": [
 		["tapiola", ALL, 1950, 1989, ["modernism", "functionalism", "garden_city"], 5.0, 0.0, 99.0],
@@ -51,10 +52,10 @@ const REGIONS := {
 			"r": [["hipped", 3], ["gabled", 2], ["mansard", 1]], "pitch": 1.15,
 			"rf": SHEET_METAL + [["terracotta", RED_TILE]], "fh": 3.2, "st": [5, 6], "fix": true,
 			"ch": 0.4, "dm": 0.4, "g": [["stone", 2], ["shop", 1]], "ev": 0.2,
-			"rv": {"string_course": true, "balconette": 0.25, "oriel": 0.2, "granite_plinth": true, "turret": 0.35, "snow_guard": true}},
+			"rv": {"string_course": true, "balconette": 0.25, "oriel": 0.2, "granite_plinth": true, "turret": 0.35}},
 		"commercial": {"w": [["render", JUGEND], ["stone", ["#9a948a", "#a8a090"]]], "p": [["ornate", 2], ["punched", 1]],
 			"wn": "casement", "r": [["hipped", 2], ["flat", 1]], "rf": SHEET_METAL, "st": [4, 7],
-			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true, "granite_plinth": true, "turret": 0.2, "snow_guard": true}},
+			"fix": true, "g": [["shop", 1]], "rv": {"string_course": true, "granite_plinth": true, "turret": 0.2}},
 	},
 	"helsinki_empire": {
 		"apartments": {"w": [["render", EMPIRE]], "p": "punched", "wn": "casement", "bay": 2.8,
@@ -86,22 +87,22 @@ const REGIONS := {
 	"helsinki_classicism": {
 		"apartments": {"w": [["render", PASTEL]], "p": "punched", "wn": "casement", "bay": 2.7,
 			"fr": "#eee9dc", "r": [["hipped", 3], ["gabled", 1]], "pitch": 0.65, "rf": SHEET_METAL,
-			"st": [4, 6], "fix": true, "rv": {"string_course": true, "granite_plinth": true, "snow_guard": true}},
+			"st": [4, 6], "fix": true, "rv": {"string_course": true, "granite_plinth": true}},
 	},
 	"helsinki_wood": {
 		"house": {"w": [["wood", NORDIC_WOOD]], "p": "clapboard", "wn": "casement", "bay": 2.6,
 			"fr": "#f2ede0", "r": [["gabled", 3], ["hipped", 1]], "pitch": 0.75, "rf": SHEET_METAL,
-			"st": [1, 2], "fix": true, "rv": {"snow_guard": true}},
+			"st": [1, 2], "fix": true, "rv": {}},
 		"apartments": {"w": [["wood", NORDIC_WOOD]], "p": "clapboard", "wn": "casement",
-			"r": [["gabled", 1]], "rf": SHEET_METAL, "st": [2, 2], "fix": true, "rv": {"snow_guard": true}},
+			"r": [["gabled", 1]], "rf": SHEET_METAL, "st": [2, 2], "fix": true, "rv": {}},
 	},
 	"helsinki_suburb": {
 		"apartments": {"w": [["render", WHITE]], "p": [["punched", 3], ["balcony", 1]], "wn": "wide",
 			"r": [["gabled", 3], ["hipped", 1]], "pitch": 0.35, "rf": SHEET_METAL,
-			"st": [3, 4], "fix": true, "rv": {"glazed_balcony": 0.35, "snow_guard": true}},
+			"st": [3, 4], "fix": true, "rv": {"glazed_balcony": 0.35}},
 		"house": {"w": [["render", WHITE], ["wood", NORDIC_WOOD]], "p": "punched", "wn": "casement",
 			"r": [["gabled", 1]], "pitch": 0.7, "rf": SHEET_METAL, "st": [1, 2], "fix": true,
-			"rv": {"snow_guard": true}},
+			"rv": {}},
 	},
 	"helsinki_element": {
 		"apartments": {"w": [["concrete", PANEL]], "p": "panel", "wn": "wide", "bay": 3.6,
@@ -117,13 +118,21 @@ const REGIONS := {
 			"p": [["punched", 2], ["panel", 1]], "wn": "wide", "bay": 3.2, "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [6, 8], "fix": true, "rv": {"glazed_balcony": 0.65}},
 	},
+	# Kuusisaari and Lehtisaari: large-lot villas of the 1910s–60s, pale
+	# render or timber, hipped tile or metal roofs, or flat modernist ones.
+	"helsinki_villa": {
+		"house": {"w": [["render", PASTEL], ["render", WHITE], ["wood", NORDIC_WOOD]], "p": "punched",
+			"wn": "casement", "bay": 3.0, "fr": "#f2ede0", "r": [["hipped", 3], ["flat", 2], ["gabled", 1]],
+			"pitch": 0.55, "rf": SHEET_METAL + [["terracotta", RED_TILE]], "st": [1, 2], "fix": true,
+			"rv": {"granite_plinth": true}},
+	},
 	"espoo": {
 		"apartments": {"w": [["render", WHITE], ["concrete", WHITE]], "p": "punched", "wn": "wide",
 			"bay": 3.6, "r": [["flat", 1]], "rf": [["membrane", []]], "st": [3, 5], "fix": true,
 			"rv": {"glazed_balcony": 0.55}},
 		"house": {"w": [["wood", ["#e8d6ae", "#eee9df", "#b6c0b2"]], ["render", WHITE]], "p": "punched",
 			"r": [["gabled", 2], ["flat", 1]], "pitch": 0.45, "rf": SHEET_METAL, "st": [1, 2], "fix": true,
-			"rv": {"snow_guard": true}},
+			"rv": {}},
 	},
 	"tapiola": {
 		"apartments": {"w": [["render", ["#efeee6", "#e1dfd3"]], ["concrete", WHITE]],
@@ -139,7 +148,8 @@ const REGIONS := {
 			"rv": {"glazed_balcony": 0.3}},
 	},
 	"espoo_modern": {
-		"commercial": {"w": [["glass", []], ["render", WHITE]], "p": "curtain", "r": [["flat", 1]],
+		"commercial": {"w": [["glass", []], ["render", WHITE], ["stone", ["#d8d4c8", "#c9c5ba"]]],
+			"p": [["curtain", 2], ["strip", 1]], "r": [["flat", 1]],
 			"rf": [["membrane", []]], "st": [8, 22], "fix": true, "rv": {}},
 		"apartments": {"w": [["render", WHITE], ["brick", ["#b67b57"]]], "p": [["panel", 1], ["punched", 2]],
 			"wn": "wide", "r": [["flat", 1]], "rf": [["membrane", []]], "st": [6, 16], "fix": true,
@@ -148,6 +158,6 @@ const REGIONS := {
 	"kauniainen": {
 		"house": {"w": [["wood", NORDIC_WOOD], ["render", PASTEL]], "p": "punched", "wn": "casement",
 			"r": [["hipped", 2], ["gabled", 2]], "pitch": 0.8, "rf": SHEET_METAL, "st": [1, 2],
-			"fix": true, "rv": {"granite_plinth": true, "snow_guard": true}},
+			"fix": true, "rv": {"granite_plinth": true}},
 	},
 }

@@ -261,7 +261,7 @@ static func _build_drone(v: View360) -> void:
 	panel.visible = false
 	v._drone.panel = panel
 	v._fade.add_child(panel)
-	v._drone.sticks = DroneSticks.new(v._drone)
+	v._drone.sticks = DroneSticks.new(v._drone, v._walk)
 	v._drone.sticks.visible = false
 	v._hud.add_child(v._drone.sticks)
 
@@ -362,6 +362,7 @@ static func refresh_theme(v: View360) -> void:
 		HudParts.apply_icon_button(v._gyro_btn, v._gyro_on)
 	HudParts.apply_icon_button(v._drone.button, v._drone.on)
 	v._drone.sticks.restyle()
+	v._stream_badge.refresh_theme()
 
 ## Scrim on for very bright skies (high sun, snow underfoot) and very
 ## dark ones (night), where glass alone loses its edge.
@@ -392,11 +393,18 @@ static func arrive(v: View360) -> void:
 	v._fade.modulate.a = 0.0
 	if UiPrefs.reduce_motion:
 		v._fade.modulate.a = 1.0
+		_show_hint(v)
 		return
 	var eye := v._rig.position
+	if v._drone.on and v._ground != null:
+		# A drone start descends to its takeoff height, not to eye level:
+		# the glide's end sets the height it then holds.
+		eye.y = maxf(eye.y, v._ground.height_at_world(eye.x, eye.z) + v._drone._agl)
 	v._rig.position = eye + Vector3(0, DESCENT_RISE_M, 0)
 	var fly := v.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	fly.tween_property(v._rig, "position", eye, DESCENT_S)
+	# A drone that starts the view waits for the descent, as for a glide.
+	v._visit_tween = fly
 	var title := UiTheme.display_label(v._place_pill.text, 48)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.45))
@@ -415,29 +423,46 @@ static func arrive(v: View360) -> void:
 	land.set_parallel(false)
 	land.tween_callback(title.queue_free)
 	land.tween_callback(func() -> void: wake(v))
+	# The hint's time starts once the HUD shows it, not while the world built.
+	land.tween_callback(func() -> void: _show_hint(v))
 
 # --- Hint, heading, idle ---
 
 static func _dismiss_hint(v: View360) -> void:
-	if v._hint == null or not v._hint.visible or v._hint.modulate.a < 1.0:
+	if v._hint == null:
 		return
+	if not v._hint.visible:
+		v._hint.set_meta("wanted", false)  # crowded out (_clear_hint): stays down
+		return
+	if v._hint.modulate.a < 1.0:
+		return
+	if v._hint.has_meta("dismiss") and (v._hint.get_meta("dismiss") as Tween).is_valid():
+		return  # Already fading.
 	var tw := v.create_tween()
 	tw.tween_property(v._hint, "modulate:a", 0.0, 0.5)
-	tw.tween_callback(v._hint.hide)
+	tw.tween_callback(func() -> void:
+		v._hint.hide()
+		v._hint.set_meta("wanted", false))
+	v._hint.set_meta("dismiss", tw)
 
 static func _show_hint(v: View360) -> void:
 	if v._hint == null:
 		return
+	# A fade still running (the drone moved just before landing) would hide it.
+	if v._hint.has_meta("dismiss"):
+		(v._hint.get_meta("dismiss") as Tween).kill()
 	(v._hint.find_child("Text", true, false) as Label).text = hint_text(v)
 	v._hint.modulate.a = 1.0
-	v._hint.show()
+	v._hint.set_meta("wanted", true)
+	v._hint.visible = not v._hint.get_meta("crowded", false)
 	if v._hint_timer.is_inside_tree():
 		v._hint_timer.start()
 
 static func hint_text(v: View360) -> String:
 	if not v._drone.on:
-		return "Drag to look around · Pinch to zoom" if OS.has_feature("mobile") \
-			else "Drag to look around · Pinch or scroll to zoom"
+		if DroneSticks.wanted():
+			return "Left stick walks · Right stick turns"
+		return "W A S D to walk · Drag to look · Shift to run"
 	if DroneSticks.wanted():
 		return "Left stick flies · Right stick turns and climbs"
 	return "W A S D to fly · E and Q to climb · Shift to speed up"
@@ -445,12 +470,15 @@ static func hint_text(v: View360) -> String:
 static func heading_deg(v: View360) -> float:
 	return fposmod(rad_to_deg(-v._rig.yaw), 360.0)
 
-static func _on_look_changed(v: View360) -> void:
+## `by_user` false (a glide the app makes, such as landing the drone)
+## keeps the controls hint up: only the user's own looking dismisses it.
+static func _on_look_changed(v: View360, by_user: bool = true) -> void:
 	var before := roundi(v._compass.heading / 15.0)
 	v._compass.set_heading(heading_deg(v))
 	if roundi(v._compass.heading / 15.0) != before:
 		announce(v)
-	_dismiss_hint(v)
+	if by_user:
+		_dismiss_hint(v)
 
 ## Screen readers hear the place, heading, time and the landmark in
 ## view on change, at most once every 2 s (the Announcer throttles).
@@ -593,7 +621,7 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
 			toggle_nearby(v, true)
-		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G:
+		KEY_P, KEY_O, KEY_C, KEY_N, KEY_M, KEY_T, KEY_G, KEY_J:
 			# One press, bare: Cmd/Ctrl+C and the like belong to the system.
 			if key.echo or key.ctrl_pressed or key.meta_pressed or key.alt_pressed:
 				return false
@@ -610,6 +638,8 @@ static func handle_key(v: View360, key: InputEventKey) -> bool:
 					ViewTools.toggle_minimap(v)
 				KEY_G:
 					toggle_drone(v)
+				KEY_J:
+					ViewTools.toggle_fps(v)
 				_:
 					ViewConditions.toggle_lapse(v)
 		KEY_ESCAPE:
@@ -716,7 +746,19 @@ static func layout(v: View360) -> void:
 	UiIcon.apply(v._sheet_tab, "chevron-left" if inspector else "chevron-up", 22, UiTheme.INK, UiTheme.INK)
 	# A phone on its side tucks the inspector under the chips, not the ring.
 	var inspector_top := pad + (float(HudParts.SIZE_HUD) if h < 500.0 else float(CompassDial.RING)) + 8.0
-	_fit_inspector(v, inspector, h - pad - attr_h - 8.0 - inspector_top)
+	# A bar taller than the room under the pill (and its tape, or the
+	# ring) scrolls too, so it never runs off the top of a short phone.
+	var bar_top := v._top.position.y + v._top.size.y + 8.0
+	if not phone:
+		bar_top = maxf(bar_top, v._compass.position.y + CompassDial.RING + 8.0)
+	else:
+		# On a phone the way-ahead badge and the FPS counter stack under
+		# the tape (ViewTools.layout), and the drone button sits above the
+		# bar: the bar leaves them room.
+		for c: Control in [v._stream_badge, v._fps, v._zoom_stack]:
+			if c.visible:
+				bar_top += c.get_combined_minimum_size().y + 8.0
+	_fit_inspector(v, h - pad - attr_h - 8.0 - (inspector_top if inspector else bar_top))
 	v._sheet.custom_minimum_size = Vector2(bar_w, 0)
 	v._sheet.reset_size()
 	var sheet_h := v._sheet.get_combined_minimum_size().y
@@ -745,11 +787,11 @@ static func layout(v: View360) -> void:
 	var hint_bottom := v._sheet.position.y - 12.0 if not inspector else h - pad - attr_h - 12.0
 	if v._sheet_tab.visible and not inspector:
 		hint_bottom = tab_y - 8.0
-	_place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
-	if v._drone.panel.visible:
-		hint_bottom = v._drone.panel.position.y - 8.0
+	hint_bottom = _place_drone(v, inspector, bar_taken, pad, w, h, attr_h, hint_bottom, tab_y)
 	v._hint.position = Vector2(roundf((w - v._hint.size.x) / 2.0), hint_bottom - v._hint.size.y)
 	_clear_hint(v, inspector, pad)
+	# Last: the round tab and the drone sticks have their places now.
+	ViewTools.place_toast(v, phone, inspector, pad, w, h, attr_h)
 
 ## A wide hint on a narrow screen slides left, clear of the button stack
 ## and the inspector.
@@ -769,12 +811,23 @@ static func _clear_hint(v: View360, inspector: bool, pad: float) -> void:
 	if v._minimap != null and v._minimap.visible \
 			and Rect2(v._hint.position, v._hint.size).intersects(v._minimap.get_rect()):
 		v._hint.position.y = v._minimap.position.y - 8.0 - hint.size.y
+	# A short phone has no room left under the pill and the badge: the
+	# hint gives way rather than cover them (the controls show the way).
+	# It comes back once they leave room, unless it was dismissed meanwhile.
+	var hint_now := Rect2(v._hint.position, v._hint.size)
+	var crowded := hint_now.position.y < v._top.get_rect().end.y
+	for c: Control in [v._top, v._stream_badge, v._fps, v._exit_btn, v._zoom_stack]:
+		if c.visible and hint_now.intersects(c.get_rect()):
+			crowded = true
+			break
+	v._hint.set_meta("crowded", crowded)
+	v._hint.visible = not crowded and v._hint.get_meta("wanted", true)
 
 ## The inspector scrolls inside `room` when it is taller than that.
-static func _fit_inspector(v: View360, inspector: bool, room: float) -> void:
+static func _fit_inspector(v: View360, room: float) -> void:
 	var scroll := v._sheet_scroll
 	var inner := room - v._sheet.get_theme_stylebox("panel").get_minimum_size().y
-	var tight := inspector and (scroll.get_child(0) as Control).get_combined_minimum_size().y > inner
+	var tight := (scroll.get_child(0) as Control).get_combined_minimum_size().y > inner
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if tight \
 		else ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size.y = inner if tight else 0.0
@@ -796,14 +849,14 @@ static func _inset_hud(v: View360, at: Vector2) -> void:
 	if v._horizon != null:
 		v._horizon.position = -at
 
-## Drone sticks above the controls bar, its round tab and the
+## Touch sticks (flying or walking) above the controls bar, its round tab and the
 ## attribution, the right well short of the zoom stack (and the
 ## inspector beside it); a sheet in the bar's place (landmark, date)
 ## puts them away until it closes. The readout is centred at `bottom`,
-## or above the wells while they show.
+## or above the wells while they show. Returns where the hint's bottom goes.
 static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: float, w: float,
-		h: float, attr_h: float, bottom: float, tab_y: float) -> void:
-	var show := v._drone.on and DroneSticks.wanted() and not bar_taken
+		h: float, attr_h: float, bottom: float, tab_y: float) -> float:
+	var show := DroneSticks.wanted() and not bar_taken
 	if v._drone.sticks.visible and not show:
 		v._drone.sticks.reset()  # a held thumb lets go
 	v._drone.sticks.visible = show
@@ -820,6 +873,8 @@ static func _place_drone(v: View360, inspector: bool, bar_taken: bool, pad: floa
 		var ps := v._drone.panel.get_combined_minimum_size()
 		v._drone.panel.size = ps
 		v._drone.panel.position = Vector2(roundf((w - ps.x) / 2.0), bottom - ps.y)
+		bottom = v._drone.panel.position.y - 8.0
+	return bottom
 
 ## The zoom stack (and gyro): bottom-right on the scene's edge; beside
 ## the inspector, or above the controls sheet, where it would meet them.
@@ -835,6 +890,10 @@ static func _place_zoom_stack(v: View360, phone: bool, inspector: bool, pad: flo
 	var at := Vector2(w - pad - zs.x + inset, h - pad - zs.y + inset)
 	if phone or Rect2(at, zs).intersects(Rect2(v._attribution.position, v._attribution.size)):
 		at.y = h - pad - attr_h - 8.0 - zs.y + inset
+	# Desktop with the inspector tucked away: its round tab takes the
+	# bottom-right corner, so the stack sits above it.
+	if inspector and v._sheet_tab.visible:
+		at.y = minf(at.y, h - pad - attr_h - 8.0 - HudParts.SIZE_TOUCH - 8.0 - zs.y + inset)
 	var sheet := Rect2(v._sheet.position, v._sheet.size).grow(8.0)
 	if v._sheet.visible and Rect2(at, zs).intersects(sheet):
 		if inspector:

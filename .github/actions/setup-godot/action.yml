@@ -7,9 +7,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Cache Godot and export templates
+    # Restore and save are separate steps: actions/cache only saves when the
+    # whole job succeeds, so failing tests would re-download Godot every run.
+    - name: Restore Godot and export templates
       id: cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v6
       with:
         path: |
           ${{ runner.temp }}/godot
@@ -31,12 +33,35 @@ runs:
         mkdir -p "$DEST"
         mv "$RUNNER_TEMP"/tpz/templates/* "$DEST/"
 
+    - name: Save Godot and export templates
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          ${{ runner.temp }}/godot
+          ~/Library/Application Support/Godot/export_templates/${{ inputs.version }}.stable
+        key: godot-${{ runner.os }}-${{ inputs.version }}
+
     - name: Put godot on PATH and import the project
       shell: bash
       run: |
         set -euo pipefail
         mkdir -p "$RUNNER_TEMP/bin"
-        ln -sf "$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" "$RUNNER_TEMP/bin/godot"
+        # The self-hosted runner is a desktop Mac: go through tools/godot_bg.sh
+        # so headless runs never activate Godot or take focus.
+        cat > "$RUNNER_TEMP/bin/godot" <<EOF
+        #!/bin/bash
+        GODOT_BIN="$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" exec "$GITHUB_WORKSPACE/tools/godot_bg.sh" "\$@"
+        EOF
+        chmod +x "$RUNNER_TEMP/bin/godot"
         echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
         # A fresh checkout has no .godot/; class_names only resolve after an import.
-        "$RUNNER_TEMP/bin/godot" --headless --path . --import
+        # Godot has segfaulted mid-import here once (exit 139) and imported
+        # cleanly on the next try, so a crash (exit >= 128) gets one retry.
+        for attempt in 1 2; do
+          rc=0
+          "$RUNNER_TEMP/bin/godot" --headless --path . --import || rc=$?
+          [ "$rc" -lt 128 ] && break
+          echo "::warning::Godot crashed during import (exit $rc, attempt $attempt)"
+        done
+        exit "$rc"

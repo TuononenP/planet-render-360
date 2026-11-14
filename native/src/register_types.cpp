@@ -2,6 +2,8 @@
 #include "earcut_kernels.h"
 #include "far_kernels.h"
 #include "ground_kernels.h"
+#include "image_kernels.h"
+#include "landmark_kernels.h"
 #include "mass_kernels.h"
 #include "merge_kernels.h"
 #include "mvt_kernels.h"
@@ -12,7 +14,13 @@
 #include "shore_kernels.h"
 #include "shore_mesh.h"
 #include "shore_patch_kernel.h"
+#include "tint_kernels.h"
+#include "photo_sampler.h"
+#include "grid_filters.h"
+#include "road_grader.h"
+#include "shore_classifier.h"
 #include "shore_evidence_kernels.h"
+#include "snapshot_kernels.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -29,6 +37,8 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(EarcutKernels);
 	GDREGISTER_CLASS(FarKernels);
 	GDREGISTER_CLASS(GroundKernels);
+	GDREGISTER_CLASS(ImageKernels);
+	GDREGISTER_CLASS(LandmarkKernels);
 	GDREGISTER_CLASS(MassKernels);
 	GDREGISTER_CLASS(MergeKernels);
 	GDREGISTER_CLASS(MvtKernels);
@@ -42,6 +52,12 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShoreDomainIndex);
 	GDREGISTER_CLASS(ShoreEvidenceIndex);
 	GDREGISTER_CLASS(ShorePatchKernel);
+	GDREGISTER_CLASS(SnapshotKernels);
+	GDREGISTER_CLASS(TintKernels);
+	GDREGISTER_CLASS(PhotoSampler);
+	GDREGISTER_CLASS(GridFilters);
+	GDREGISTER_CLASS(RoadGrader);
+	GDREGISTER_CLASS(ShoreClassifier);
 }
 
 static void uninitialize(ModuleInitializationLevel p_level) {

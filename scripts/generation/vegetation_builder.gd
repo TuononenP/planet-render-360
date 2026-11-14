@@ -57,12 +57,24 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 		_fallback_scatter(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root
+	mask.mark_trees(plan["pos"])
+	var timings := {"plan": Time.get_ticks_msec() - t0}
+	var t := Time.get_ticks_msec()
 	var stats := _emit(root, plan, ctx)
+	timings["trees"] = Time.get_ticks_msec() - t
 	stats["fallback"] = fallback
+	t = Time.get_ticks_msec()
 	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
+	timings["props"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
 	stats["cover"] = GroundCover.build(root, data, ground, mask)
+	timings["cover"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
+	stats["carpet"] = GrassCarpet.build(root, data) != null
 	stats["tree_pits"] = TreePits.build(root, data, ground, mask)
+	timings["carpet_pits"] = Time.get_ticks_msec() - t
 	stats["ms"] = Time.get_ticks_msec() - t0
+	print("VEGETATION timings ms ", timings)
 	last_stats = stats
 	root.set_meta("stats", stats)
 	return root
@@ -89,12 +101,30 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 			and (CanopyVegetation.usable(data.canopy_image, 255) \
 				or CanopyVegetation.usable(data.landcover_image, 0)),
 		"treeline": ClimateModel.treeline_m(data) if ClimateModel.has(data) else TreeSpecies.treeline_m(data.latitude),
-		"landmark": TerrainBuilder.landmark_world_pos(data) if data.landmark_type != "none" else Vector2(INF, INF),
+		"tree_clears": LandmarkSites.tree_clears(data),
+		"zone": HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M),
+		"origin": Vector2(data.latitude, data.longitude),
 	}
+
+## HeritageZones rules at (x, z) of the build (empty outside every zone).
+static func zone_rule(x: float, z: float, ctx: Dictionary) -> Dictionary:
+	if not bool(ctx.get("zone", false)):
+		return {}
+	var o: Vector2 = ctx["origin"]
+	var ll := WorldScale.latlon_from_xz(x, z, o.x, o.y)
+	return HeritageZones.rule_at(ll.x, ll.y)
 
 static func _hash(x: float, z: float, salt: float) -> float:
 	var v := sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453
 	return v - floor(v)
+
+## No tree stands this close (m) to a landmark that declares no
+## `tree_clear_m` of its own (LandmarkSites.tree_clears).
+const LANDMARK_CLEAR_M := LandmarkSites.DEFAULT_TREE_CLEAR_M
+## What a tree no map or raster put there keeps off: footprints, roads and
+## their verges, water, sidewalks, and ground painted as paving or a pitch.
+const SYNTHETIC_BITS := VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER \
+	| VegetationMask.PAVED | VegetationMask.PAINTED
 
 ## Ground ok for a trunk at XZ (units): extent, water, exclusion bits.
 static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMask,
@@ -105,8 +135,7 @@ static func _site_ok(x: float, z: float, ground: GroundTruth, mask: VegetationMa
 	if ground.water_at(x, z) > 0.0:
 		ctx["rej_water"] = int(ctx.get("rej_water", 0)) + 1
 		return false
-	var lm: Vector2 = ctx["landmark"]
-	if Vector2(x, z).distance_to(lm) < 48.0 * float(ctx["m2u"]):
+	if LandmarkSites.tree_cleared(Vector2(x, z), ctx["tree_clears"]):
 		return false
 	return true
 
@@ -127,6 +156,10 @@ static func _species_at(x: float, z: float, setting: String, ground: GroundTruth
 	var noise: FastNoiseLite = ctx["noise"]
 	var u := clampf(0.5 + noise.get_noise_2d(x, z) * 0.9 + (_hash(x, z, 3.1) - 0.5) * 0.45, 0.0, 0.999)
 	var mix := TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type)
+	if bool(ctx.get("zone", false)):
+		var zone_mix := str(zone_rule(x, z, ctx).get("tree_mix", ""))
+		if zone_mix != "":
+			mix = TreeSpecies.mix_for_leaf(zone_mix, setting, leaf_type)
 	if str(ctx["biome"]) == "boreal" and ground.land_class_at(x, z) == "rock" and leaf_type != "broadleaved":
 		mix = [["scots_pine", 0.8], ["birch", 0.2]]
 	var sp := TreeSpecies.pick(mix, u)
@@ -161,9 +194,14 @@ static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: Groun
 		var pick := _species_at(x, z, setting, ground, ctx)
 		# A mapped genus / leaf type names the tree itself (OSM tags).
 		var tagged := TreeSpecies.species_from_tags(t, str(ctx["biome"]))
+		var sp: String = tagged if tagged != "" else pick[0]
 		# Street trees are pollarded/younger than open-grown ones.
 		var size: float = float(pick[1]) * (0.85 if setting == "street" else 1.0)
-		_add(plan, x, z, ground, tagged if tagged != "" else pick[0], size, 1.0, true)
+		# A surveyed size (a city tree register) sets the scale itself.
+		var h := float(t.get("height_m", 0.0))
+		if h > 0.0:
+			size = clampf(h / float(TreeSpecies.spec(sp)["h"]), 0.25, 1.6)
+		_add(plan, x, z, ground, sp, size, 1.0, true)
 
 # --- Land-cover fill -----------------------------------------------------
 
@@ -234,7 +272,8 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 			var spread := crown
 			match cls:
 				"forest":
-					p = 0.92
+					# A heritage zone's woods are open woodland, not a closed canopy.
+					p = 0.92 * float(zone_rule(x, z, ctx).get("tree_keep", 1.0))
 				"orchard":
 					p = 0.55
 					size = 0.4
@@ -265,8 +304,7 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 					spread = 1.0
 			if _hash(x, z, 9.0) > p:
 				continue
-			if not _site_ok(x, z, ground, mask, VegetationMask.BUILDING
-					| VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx):
+			if not _site_ok(x, z, ground, mask, SYNTHETIC_BITS, 0.8, ctx):
 				continue
 			if ground.slope_at(x, z) > 1.25:
 				continue
@@ -298,8 +336,7 @@ static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: Grou
 		var dist := rng.randf_range(60.0 * m2u, r_max)
 		var x := cos(ang) * dist
 		var z := sin(ang) * dist
-		if not _site_ok(x, z, ground, mask, VegetationMask.BUILDING
-				| VegetationMask.ROAD_EDGE | VegetationMask.WATER, 1.0, ctx):
+		if not _site_ok(x, z, ground, mask, SYNTHETIC_BITS, 1.0, ctx):
 			continue
 		if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
 			continue
@@ -309,92 +346,24 @@ static func _fallback_scatter(plan: Dictionary, data: LocationData, ground: Grou
 # --- Instancing ----------------------------------------------------------
 
 ## LOD by distance (budget-demoted farthest-first), then one MultiMesh
-## per species/LOD/sector. Returns counts for tests/captures.
+## per species/LOD/sector, under one TreeLod.SET_NAME node that keeps
+## the LOD-independent state so TreeLodWindow can re-centre the rings on
+## the camera at runtime. Returns counts for tests/captures.
 static func _emit(root: Node3D, plan: Dictionary, ctx: Dictionary) -> Dictionary:
-	var pos: Array = plan["pos"]
-	var sps: Array = plan["sp"]
-	var scl: Array = plan["scale"]
 	var real: Array = plan["real"]
-	var m2u: float = ctx["m2u"]
-	var full_u := float(ctx["full_r"]) * m2u
-	var mid_u := float(ctx["mid_r"]) * m2u
-	var budget: int = ctx["budget"]
-	var eye: Vector2 = ctx.get("eye", Vector2.ZERO)
-	var order: Array = range(pos.size())
-	order.sort_custom(func(a: int, b: int) -> bool:
-		var pa: Vector3 = pos[a]
-		var pb: Vector3 = pos[b]
-		return Vector2(pa.x, pa.z).distance_squared_to(eye) < Vector2(pb.x, pb.z).distance_squared_to(eye))
-	var groups := {}
-	var mesh_trees := 0
-	var imp_trees := 0
-	var dropped := 0
-	var lod_counts := [0, 0, 0]
-	for i in order:
-		var p: Vector3 = pos[i]
-		var d := Vector2(p.x, p.z).distance_to(eye)
-		var lod := 0 if d <= full_u else (1 if d <= mid_u else 2)
-		if lod < 2 and mesh_trees >= budget:
-			lod = 2
-		if lod == 2 and imp_trees >= budget * IMPOSTOR_FACTOR:
-			dropped += 1
-			continue
-		if lod < 2:
-			mesh_trees += 1
-		else:
-			imp_trees += 1
-		lod_counts[lod] += 1
-		var sector := int(floor((atan2(p.z, p.x) + PI) / TAU * float(SECTORS))) % SECTORS
-		var key := "%s|%d|%d" % [str(sps[i]), lod, sector]
-		if not groups.has(key):
-			groups[key] = []
-		(groups[key] as Array).append(i)
-	var season: int = ctx["season"]
-	var nodes := 0
-	for key in groups:
-		var parts: PackedStringArray = (key as String).split("|")
-		var sp := parts[0]
-		var lod := int(parts[1])
-		var ids: Array = groups[key]
-		var spec := TreeSpecies.spec(sp)
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = TreeMeshLibrary.mesh(sp, lod, season, float(ctx["snow"]), float(ctx["sway"]))
-		mm.instance_count = ids.size()
-		var origins := PackedVector3Array()
-		for k in ids.size():
-			var i: int = ids[k]
-			var p: Vector3 = pos[i]
-			var h1 := _hash(p.x, p.z, 11.0)
-			var h2 := _hash(p.x, p.z, 12.0)
-			var h3 := _hash(p.x, p.z, 13.0)
-			var hv := float(spec.get("h_var", 0.2))
-			var sc: Vector2 = scl[i]
-			var sy := sc.x * (1.0 + (h1 - 0.5) * 2.0 * hv)
-			var sxz := sy * sc.y * (0.9 + h2 * 0.2)
-			var basis := Basis(Vector3.UP, h3 * TAU)
-			var tilt_axis := Vector3(cos(h1 * 9.0), 0, sin(h1 * 9.0))
-			basis = Basis(tilt_axis, (h2 - 0.5) * 0.06) * basis
-			basis = basis.scaled(Vector3(sxz, sy, sxz) * m2u)
-			mm.set_instance_transform(k, Transform3D(basis, p))
-			origins.append(p)
-			mm.set_instance_color(k, _instance_tint(sp, season, h1, h2, h3))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "VegTrees_%s_lod%d_s%s" % [sp, lod, parts[2]]
-		# Trunk-base origins for tests/captures (headless MultiMesh
-		# storage is a dummy that keeps no transforms).
-		mmi.set_meta("origins", origins)
-		if lod == 2:
-			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(mmi)
-		nodes += 1
+	var st := TreeLod.state(plan, ctx)
+	var a := TreeLod.assign(st, ctx.get("eye", Vector2.ZERO))
+	var tree_set := Node3D.new()
+	tree_set.name = TreeLod.SET_NAME
+	tree_set.set_meta("tree_lod", st)
+	root.add_child(tree_set)
+	var nodes := TreeLod.emit(tree_set, st, a)
+	var lod_counts: Array = a["lod"]
 	var real_n := 0
 	for r in real:
 		real_n += int(r)
 	return {"trees": lod_counts[0] + lod_counts[1] + lod_counts[2], "real": real_n,
-		"lod": lod_counts, "dropped": dropped, "nodes": nodes,
+		"lod": lod_counts, "dropped": a["dropped"], "nodes": nodes,
 		"biome": ctx["biome"], "spacing": ctx.get("forest_spacing", []),
 		"rejected": [ctx.get("rej_mask", 0), ctx.get("rej_water", 0)]}
 

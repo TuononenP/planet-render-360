@@ -19,16 +19,22 @@ extends RefCounted
 ## Boats under 9 m are runabouts / consoles / RIBs, 9-14 m sport cruisers,
 ## longer ones flybridge yachts, sailboats from 7.5 m (VesselPrototypes).
 ## Coastal Mediterranean marinas also berth 10–22 m cruising catamarans.
-## Boats beyond NEAR_M of the eye use a "_far" mesh without rails, rigging
-## and mullions. Cruise liners (QuayMoorings.liners) are committed one by
-## one, outside the MultiMesh budget.
+## Boats are batched per BATCH_M cell (coarser when that would break
+## MAX_DRAW_CALLS); each cell swaps to a "_far" mesh without rails,
+## rigging and mullions beyond NEAR_M of the camera. Large ships (cruise liners and ferries from
+## QuayMoorings.liners, cargo ships from CargoBerths) are committed one by
+## one by LargeShips, outside the MultiMesh budget.
 
 const RADIUS_M := 800.0
 const MAX_BOATS := 700
-## Near + far surfaces of every kind (VesselPrototypes.KINDS) + pontoon.
+## Near + far surfaces of every boat batch + pontoon. One batch per kind
+## (VesselPrototypes.KINDS) always fits; finer cells only while they do.
 const MAX_DRAW_CALLS := 80
-## Boats farther than this from the eye use the reduced "_far" meshes (m).
+## Boats farther than this from the camera use the reduced "_far" meshes (m).
 const NEAR_M := 250.0
+## Side of the square cells boats are batched in for the near/far switch
+## (m); doubled, then dropped to one batch per kind, to fit MAX_DRAW_CALLS.
+const BATCH_M := 120.0
 const MIN_PIER_M := 20.0
 const DECK_W_M := 2.2
 const DECK_UP_M := 0.3
@@ -51,7 +57,7 @@ const MESH_LEN_M := 10.0
 
 ## Boats [position, yaw, scale, kind, colour], deck ribbons (each an
 ## Array of [x, z, water y]) for `data`'s piers, nearest boats first, and
-## liners [centre, yaw, length, beam, height, seed].
+## large ships (LargeShips entries: liners, ferries, then cargo ships).
 static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		mask: VegetationMask = null) -> Dictionary:
 	var boats: Array = []
@@ -59,7 +65,6 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var taken := {}
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
-	var near2 := pow(NEAR_M * m2u, 2.0)
 	var cats := mediterranean(data)
 	var piers: Array = []
 	for p in data.piers:
@@ -76,7 +81,10 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			continue
 		decks.append(_deck(pts, ground, m2u, taken))
 	# Reserve large berths before filling the harbour with small craft.
+	QuayMoorings.begin_plan(data, m2u)
 	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
+	liners.append_array(CargoBerths.plan(data, ground, taken, m2u, mask, liners))
+	QuayMoorings.end_plan()
 	var k := 0
 	for p in piers:
 		var pts: PackedVector2Array = (p as Dictionary)["points"]
@@ -118,8 +126,6 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m + (CELL_M * 2.0 if kind == "catamaran" else 0.0), m2u):
 					continue
 				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
-				if (stern - centre).length_squared() > near2:
-					kind += "_far"
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
 					len_m / MESH_LEN_M * m2u, kind, col])
 			slot += 1
@@ -153,42 +159,57 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		dm.mesh = _deck_mesh(decks, m2u)
 		dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(dm)
-	for base in VesselPrototypes.KINDS:
-		for kind in [base, base + "_far"]:
-			var list := boats.filter(func(b: Array) -> bool: return b[3] == kind)
-			if list.is_empty():
-				continue
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.use_colors = true
-			mm.mesh = mesh(kind)
-			mm.instance_count = list.size()
-			for i in list.size():
-				var b: Array = list[i]
-				mm.set_instance_transform(i, Transform3D(
-					Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0]))
-				mm.set_instance_color(i, b[4])
-			var mmi := MultiMeshInstance3D.new()
-			mmi.name = "Boats_%s" % kind
-			mmi.multimesh = mm
-			if kind.ends_with("_far"):
-				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			holder.add_child(mmi)
-	for l in liners:
-		var ferry: bool = l.size() > 6 and l[6] == "ferry"
-		var hull := "#f0eee8" if ferry else CruiseLinerModel.hull_hex(float(l[5]) * 4.0)
-		var lm := VesselPrototypes.geometry("liner", float(l[2]), float(l[3]), float(l[4]),
-			VesselMaterials.paint(hull, true, 0.42, 0.05), true, true, float(l[5]), "ferry" if ferry else "")
-		var parts := lm.commit(holder, "Liner_")
-		VesselPrototypes.snow_parts(parts)
-		for part in parts:
-			part.position = l[0]
-			part.rotation.y = float(l[1])
-			part.scale = Vector3.ONE * m2u
-			part.set_meta("procedural_liner", true)
-			part.set_meta("vessel_model", "ferry" if ferry else "liner")
+	var cells := _cells(boats, MAX_DRAW_CALLS - (0 if decks.is_empty() else 1), m2u)
+	for key in cells:
+		var list: Array = cells[key]
+		var near_mesh := mesh(list[0][3])
+		var far_mesh := mesh(list[0][3] + "_far")
+		var bounds := CellBatches.bounds(list.map(func(b: Array) -> Transform3D: return _transform(b)), near_mesh.get_aabb().merge(far_mesh.get_aabb()))
+		_add_batch(holder, list, near_mesh, "Boats_%s" % key, 0.0, NEAR_M * m2u, bounds)
+		var far := _add_batch(holder, list, far_mesh, "Boats_%s_far" % key, NEAR_M * m2u, 0.0, bounds)
+		far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	LargeShips.commit(holder, liners, View360.spawn_xz(data), m2u)
 	root.add_child(holder)
 	return boats.size() + liners.size()
+
+static func _add_batch(holder: Node3D, list: Array, boat_mesh: Mesh, batch_name: String,
+		begin: float, end: float, bounds: AABB) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = boat_mesh
+	mm.instance_count = list.size()
+	for i in list.size():
+		var b: Array = list[i]
+		mm.set_instance_transform(i, _transform(b))
+		mm.set_instance_color(i, b[4])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = batch_name
+	mmi.multimesh = mm
+	mmi.custom_aabb = bounds
+	CellBatches.ranged(mmi, begin, end)
+	holder.add_child(mmi)
+	return mmi
+
+static func _transform(b: Array) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, float(b[1])).scaled(Vector3.ONE * float(b[2])), b[0])
+
+## Boats bucketed by kind and BATCH_M cell, the cell doubled while the
+## near + far surfaces of all buckets exceed `budget`, down to one bucket
+## per kind (which always fits).
+static func _cells(boats: Array, budget: int, m2u: float) -> Dictionary:
+	var at_of := func(b: Array) -> Vector3: return b[0]
+	var kind_of := func(b: Array) -> String: return b[3]
+	var cells := {}
+	for cell in [BATCH_M, BATCH_M * 2.0, BATCH_M * 4.0, BATCH_M * 8.0, INF]:
+		cells = CellBatches.group(boats, float(cell) * m2u, at_of, kind_of)
+		var calls := 0
+		for key in cells:
+			var kind: String = cells[key][0][3]
+			calls += mesh(kind).get_surface_count() + mesh(kind + "_far").get_surface_count()
+		if calls <= budget:
+			break
+	return cells
 
 # --- Placement helpers ---------------------------------------------------
 
@@ -198,12 +219,18 @@ static func _length(pts: PackedVector2Array) -> float:
 		l += pts[i].distance_to(pts[i + 1])
 	return l
 
-## [point, unit direction] at arc length `t` along `pts`.
-static func _at(pts: PackedVector2Array, t: float) -> Array:
-	var run := 0.0
-	for i in pts.size() - 1:
+## [point, unit direction] at arc length `t` along `pts`. A `cursor`
+## ([segment, length before it], from [0, 0.0]) carries the walk on to
+## the next call with a larger `t`, so sampling a whole coastline stays
+## linear instead of walking it from the start for every sample.
+static func _at(pts: PackedVector2Array, t: float, cursor: Array = []) -> Array:
+	var run := 0.0 if cursor.is_empty() else float(cursor[1])
+	for i in range(0 if cursor.is_empty() else int(cursor[0]), pts.size() - 1):
 		var seg := pts[i].distance_to(pts[i + 1])
 		if seg > 0.0 and run + seg >= t:
+			if not cursor.is_empty():
+				cursor[0] = i
+				cursor[1] = run
 			var d := (pts[i + 1] - pts[i]) / seg
 			return [pts[i] + d * (t - run), d]
 		run += seg

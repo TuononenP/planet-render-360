@@ -27,37 +27,14 @@ const MAX_N := 6690000.0
 const HALF_M := 1450.0
 const CELLS := 600
 const NODATA := -32767.0
-## A window with more missing cells than this is outside the city's data
-## (Espoo, Vantaa, open sea): Terrarium stays.
-const MAX_MISSING := 0.02
+## A window with more missing cells than this is mostly outside the city's
+## data (Espoo, Vantaa, open sea): Terrarium stays. Smaller gaps (a window
+## reaching over the city border) take the Terrarium heights (apply).
+const MAX_MISSING := 0.25
 
-# GRS80 and the GK25 zone (central meridian 25°E, scale 1, false easting 25500000).
-const _A := 6378137.0
-const _F := 1.0 / 298.257222101
-const _LON0 := 25.0
-const _E0 := 25500000.0
-
-## ETRS-GK25 (E, N) of a WGS84 position (Krüger series).
+## ETRS-GK25 (E, N) of a WGS84 position (Gk25).
 static func gk25(lat: float, lon: float) -> Vector2:
-	var n := _F / (2.0 - _F)
-	var n2 := n * n
-	var n3 := n2 * n
-	var big_a := _A / (1.0 + n) * (1.0 + n2 / 4.0 + n2 * n2 / 64.0)
-	var alpha := [n / 2.0 - 2.0 * n2 / 3.0 + 5.0 * n3 / 16.0,
-		13.0 * n2 / 48.0 - 3.0 * n3 / 5.0, 61.0 * n3 / 240.0]
-	var phi := deg_to_rad(lat)
-	var dl := deg_to_rad(lon - _LON0)
-	var c := 2.0 * sqrt(n) / (1.0 + n)
-	var t := sinh(atanh(sin(phi)) - c * atanh(c * sin(phi)))
-	var xi := atan2(t, cos(dl))
-	var eta := atanh(sin(dl) / sqrt(1.0 + t * t))
-	var e := eta
-	var nn := xi
-	for j in 3:
-		var k := 2.0 * float(j + 1)
-		e += float(alpha[j]) * cos(k * xi) * sinh(k * eta)
-		nn += float(alpha[j]) * sin(k * xi) * cosh(k * eta)
-	return Vector2(_E0 + big_a * e, big_a * nn)
+	return Gk25.from_latlon(lat, lon)
 
 ## Whether the whole request window around (lat, lon) lies in the coverage.
 static func covers(lat: float, lon: float) -> bool:
@@ -69,13 +46,17 @@ static func covers(lat: float, lon: float) -> bool:
 
 ## The GetCoverage URL for the window around (lat, lon), grid-snapped to
 ## whole metres so the same place always asks for the same bytes.
-static func request_url(lat: float, lon: float) -> String:
-	var p := gk25(lat, lon)
-	var e := roundf(p.x)
-	var n := roundf(p.y)
+## `half_m` / `cells` size the window (DemRelief asks for a finer one).
+static func request_url(lat: float, lon: float, half_m: float = HALF_M, cells: int = CELLS) -> String:
+	var c := window_centre(lat, lon)
 	return "%s?service=WCS&version=2.0.1&request=GetCoverage&coverageId=%s&format=image/tiff" \
 		% [URL, COVERAGE] + "&subset=E(%d,%d)&subset=N(%d,%d)&scaleSize=i(%d),j(%d)" % [
-		int(e - HALF_M), int(e + HALF_M), int(n - HALF_M), int(n + HALF_M), CELLS, CELLS]
+		int(c.x - half_m), int(c.x + half_m), int(c.y - half_m), int(c.y + half_m), cells, cells]
+
+## The whole-metre (E, N) a window round (lat, lon) is centred on.
+static func window_centre(lat: float, lon: float) -> Vector2i:
+	var p := gk25(lat, lon)
+	return Vector2i(int(roundf(p.x)), int(roundf(p.y)))
 
 ## Reads a GeoServer GeoTIFF (big-endian or little-endian, float32,
 ## uncompressed, tiled or in strips) into {size, values, origin, cell}:
@@ -244,6 +225,10 @@ static func apply(data: LocationData) -> bool:
 						float(raster["origin"].x) + float(raster["size"].x) * float(raster["cell"].x) - 5.0),
 					clampf(p.y, float(raster["origin"].y) - float(raster["size"].y) * float(raster["cell"].y) + 5.0,
 						float(raster["origin"].y) - 5.0))
+				if is_nan(h):
+					# A gap inside the window (past the city border): the
+					# Terrarium height there, already sea-corrected.
+					h = data.heights[z * grid + x] if data.heights.size() == grid * grid else NAN
 				if is_nan(h):
 					return false
 			heights[z * grid + x] = h

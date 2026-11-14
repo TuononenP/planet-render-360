@@ -18,10 +18,12 @@ concurrency:
 
 jobs:
   tests:
-    runs-on: ubuntu-24.04
+    # Self-hosted runner: never run code from fork pull requests on it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -29,7 +31,7 @@ jobs:
       - name: Class size budget
         run: tools/check_class_size.sh
 
-      - uses: ./.github/actions/setup-godot-linux
+      - uses: ./.github/actions/setup-godot
 
       - name: Headless tests
         env:
@@ -38,7 +40,7 @@ jobs:
 
       - name: Keep the logs of failing tests
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-logs
           path: ${{ runner.temp }}/test-logs

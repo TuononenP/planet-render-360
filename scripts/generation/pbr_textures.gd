@@ -5,9 +5,21 @@ extends RefCounted
 ## MaterialLibrary: set images, weather tiling, calibration tints
 ## and cached PBR materials. Set tables and caches stay in
 ## MaterialLibrary (single source); this class is the loader.
+## Strength of a photo set's normal map on walls and roofs: softened to keep
+## specular shimmer down at Balanced, which has no MSAA.
+const PHOTO_NORMAL_SCALE := 0.7
 static var _mutex := Mutex.new()
-## Set when _pbr_mats went past its 64 cap (see pbr_material).
+## Set when _pbr_mats went past its cap (see pbr_material).
 static var cap_reached := false
+## Most distinct PBR materials (set + tint + repeat) one build keeps.
+## Desktop Ultra adds props with finishes of their own (boats, cars,
+## street furniture): Helsinki asked for 65, and that one material past
+## 64 made the whole world build twice.
+const CAP := 64
+const CAP_ULTRA := 128
+
+static func cap() -> int:
+	return CAP_ULTRA if MaterialLibrary.hi_res else CAP
 ## Parallel build stages (WorldBuildGraph), per pool thread: the cache a
 ## stage sees and its rank in the serial stage order. Keys round tint and
 ## repeat, so two stages can ask one key with slightly different values;
@@ -37,7 +49,7 @@ static func begin_stages() -> void:
 ## Path of one set map: the 2K file on desktop Ultra builds
 ## (MaterialLibrary.hi_res) when it is bundled, else the 1K one.
 static func map_path(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> String:
-	var file := set_name + "_" + map_name + ".jpg"
+	var file := ("concrete" if set_name == "roof_concrete" else set_name) + "_" + map_name + ".jpg"
 	if hi_res and ResourceLoader.exists(MaterialLibrary.TEXTURE_DIR + "2k/" + file):
 		return MaterialLibrary.TEXTURE_DIR + "2k/" + file
 	return MaterialLibrary.TEXTURE_DIR + file
@@ -66,6 +78,18 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 					_weather_tiles(img)
 				elif set_name == "sheet_metal":
 					RoofMetalMaps.paint(img)
+				elif set_name == "membrane":
+					_destripe(img)
+				elif set_name == "roof_concrete":  # its bands run down the columns
+					img.rotate_90(CLOCKWISE)
+					_destripe(img)
+					img.rotate_90(COUNTERCLOCKWISE)
+			elif map_name == "nor" and set_name == "membrane":
+				_destripe_normal(img, 1)
+			elif map_name == "nor" and set_name == "roof_concrete":
+				img.rotate_90(CLOCKWISE)
+				_destripe_normal(img, 0)
+				img.rotate_90(COUNTERCLOCKWISE)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
@@ -107,6 +131,52 @@ static func _weather_tiles(img: Image) -> void:
 				clampf(to.g * (1.0 + k * (c.g / fr.g - 1.0)), 0.0, 1.0),
 				clampf(to.b * (1.0 + k * (c.b / fr.b - 1.0)), 0.0, 1.0)))
 
+## Takes the roll bands out of the linear bitumen photo (three per tile, most
+## of its contrast, and a flat roof's tint amplifies them): each row is scaled
+## to the image mean, per channel, so the grain and the set's mean both stay.
+static func _destripe(img: Image) -> void:
+	if img.get_width() > 512:
+		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	var w := img.get_width()
+	var h := img.get_height()
+	var rows := PackedColorArray()
+	rows.resize(h)
+	var mean := Color(0, 0, 0, 0)
+	for y in h:
+		var sum := Color(0, 0, 0, 0)
+		for x in w:
+			sum += img.get_pixel(x, y)
+		rows[y] = sum / float(w)
+		mean += rows[y] / float(h)
+	for y in h:
+		var gain := Color(mean.r / maxf(rows[y].r, 0.0001), mean.g / maxf(rows[y].g, 0.0001),
+			mean.b / maxf(rows[y].b, 0.0001))
+		for x in w:
+			var c := img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(c.r * gain.r, c.g * gain.g, c.b * gain.b))
+
+## The same bands in a normal map: they tilt whole rows (one channel, `ch`),
+## and would return as relief once a roof's normal map is on.
+static func _destripe_normal(img: Image, ch: int) -> void:
+	if img.get_width() > 512:
+		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	var w := img.get_width()
+	var h := img.get_height()
+	var rows := PackedFloat32Array()
+	rows.resize(h)
+	var mean := 0.0
+	for y in h:
+		var sum := 0.0
+		for x in w:
+			sum += img.get_pixel(x, y)[ch]
+		rows[y] = sum / float(w)
+		mean += rows[y] / float(h)
+	for y in h:
+		for x in w:
+			var c := img.get_pixel(x, y)
+			c[ch] = clampf(c[ch] + mean - rows[y], 0.0, 1.0)
+			img.set_pixel(x, y, c)
+
 ## Runtime texture of one set map for StandardMaterial3D (pbr_material),
 ## mipmapped (T4.7: without mips the tiled roofs and road ribbons alias
 ## to speckle at distance). albedo_texture is a source_color sampler the
@@ -115,20 +185,21 @@ static func _weather_tiles(img: Image) -> void:
 ## linearised image decoded it twice (dark, over-contrasted roofs and
 ## near-black asphalt). The cached Image stays linear and mip-free for
 ## the CPU composers and the GroundMaterial shader (raw samplers).
-static func _set_tex(set_name: String, map_name: String) -> Texture2D:
-	var key := "t:" + set_name + ":" + map_name + (":2k" if map_path(set_name, map_name).contains("/2k/") else "")
+static func _set_tex(set_name: String, map_name: String, hi_res: bool = MaterialLibrary.hi_res) -> Texture2D:
+	var key := "t:" + set_name + ":" + map_name + (":2k" if map_path(set_name, map_name, hi_res).contains("/2k/") else "")
 	_mutex.lock()
 	if MaterialLibrary._set_texs.has(key):
 		var cached_t: Texture2D = MaterialLibrary._set_texs[key] as Texture2D
 		_mutex.unlock()
 		return cached_t
 	_mutex.unlock()
-	var img := (_set_image(set_name, map_name) as Image).duplicate() as Image
-	if map_name == "diff":
-		img.linear_to_srgb()
-	if not img.has_mipmaps():
-		img.generate_mipmaps()
-	var t := ImageTexture.create_from_image(img)
+	var t := SharedTexture.keep("pbr_" + key.substr(2).replace(":", "_"), func() -> Texture2D:
+		var img := (_set_image(set_name, map_name, hi_res) as Image).duplicate() as Image
+		if map_name == "diff":
+			img.linear_to_srgb()
+		if not img.has_mipmaps():
+			img.generate_mipmaps()
+		return ImageTexture.create_from_image(img))
 	_mutex.lock()
 	MaterialLibrary._set_texs[key] = t
 	_mutex.unlock()
@@ -149,8 +220,8 @@ static func _calib_tint(mean: Color, target: Color) -> Color:
 ## it is stored encoded (T4.7 — passing the linear tint raw squared it:
 ## near-black navy asphalt and slate, blown-out bright tints).
 ## Locked: the parallel world build reaches it from several tasks. The
-## 64 cap and its fallbacks follow insertion order, which only a serial
-## build fixes, so cap_reached records any build that went past 64
+## cap and its fallbacks follow insertion order, which only a serial
+## build fixes, so cap_reached records any build that went past cap()
 ## distinct keys and WorldBuildGraph then rebuilds serially.
 static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 		uv_scale: float = 1.0, detail: int = 1) -> StandardMaterial3D:
@@ -167,7 +238,7 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 			_rank_of[cached.get_instance_id()] = rank
 		_mutex.unlock()
 		return cached
-	if mats.size() >= 64:
+	if mats.size() >= cap():
 		if is_same(mats, MaterialLibrary._pbr_mats):
 			cap_reached = true
 		# Full: reuse one of the same set (a brick chimney must not come
@@ -201,7 +272,7 @@ static func pbr_material(set_name: String, tint: Color = Color.WHITE,
 			_rank_of[other.get_instance_id()] = rank
 		m = other
 	else:
-		if mats.size() >= 64 and is_same(mats, MaterialLibrary._pbr_mats):
+		if mats.size() >= cap() and is_same(mats, MaterialLibrary._pbr_mats):
 			cap_reached = true  # two stages raced past the cap
 		mats[key] = m
 		if rank >= 0:

@@ -88,14 +88,27 @@ static func add(plan: Dictionary, data: LocationData, ground: GroundTruth,
 					continue
 				if _near_mapped_tree(buckets, Vector2(x, z)) \
 						or not VegetationBuilder._site_ok(x, z, ground, mask,
-							VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx):
+							VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx) \
+						or (mask.surface != null and mask.surface.hard_at(x, z, 0.0, GroundSurface.NO_TREES)):
 					continue
 				if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
 					continue
+				# A heritage zone's open woodland: a share of the cells only,
+				# each tree its own size (no closed even-aged canopy).
+				var jitter := 1.0
+				if bool(ctx.get("zone", false)):
+					var keep := float(VegetationBuilder.zone_rule(x, z, ctx).get("tree_keep", 1.0))
+					if VegetationBuilder._hash(x, z, seed + 43.0) >= keep:
+						continue
+					jitter = 0.7 + 0.6 * VegetationBuilder._hash(x, z, seed + 44.0)
 				var pick := VegetationBuilder._species_at(x, z, "park" if cover >= 0 else "forest", ground, ctx)
 				var species := str(pick[0])
+				# Rasters say 12 m where they carry no height; the zone's tall
+				# species keep their own height there.
 				var measured := float(value) if measured_canopy else 12.0
 				var size := clampf(measured / float(TreeSpecies.spec(species).get("h", 15.0)), 0.2, 2.5)
+				if jitter != 1.0:
+					size = clampf((size if measured_canopy else 1.0) * jitter, 0.2, 2.5)
 				VegetationBuilder._add(plan, x, z, ground, species, size, 1.0, false)
 				added += 1
 	return added

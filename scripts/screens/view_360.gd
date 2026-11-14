@@ -92,15 +92,33 @@ var _season_btn: SegmentedControl
 var _tool_btns: Dictionary = {}
 var _horizon: HorizonLabels
 var _minimap: MiniMap
+var _fps: FpsCounter
 var _date_picker: DatePicker
 var _toast: Toast
+var _stream_badge: StreamBadge
 var _photo_busy := false
 ## Picked calendar day ({} = the season's own day) and the sun arc's
 ## time-lapse.
 var _date: Dictionary = {}
 var _lapse := TimeLapse.new()
 var _walk := ViewWalk.new()
+var _near_window: NearGroundWindow
+var _carpet: GrassCarpet
+var _near_world := 0
+## The next of the four near attaches after a world change (4 = all done).
+var _near_step := 4
+## Tree LOD rings that follow the camera (TreeLodWindow).
+var _tree_lod: TreeLodWindow
+var _mover: VehicleMover
 var _drone := ViewDrone.new()
+## Endless walk & fly (WorldStreamer): Main enables it for the live app;
+## tests and captures keep the bounded movement they were written for.
+var _streamer := WorldStreamer.new()
+## More distant detail while the drone flies high (AltitudeReach).
+var _reach := AltitudeReach.new()
+## A place opens in drone mode (the app sets this; tests and captures
+## open on foot).
+var start_flying := false
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -262,13 +280,15 @@ func set_quality_preset(preset_value: int) -> void:
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
 	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
+	_reach.reset(self, false)
 	if _generated != null and is_instance_valid(_generated):
+		LodRing.city_boost = _data != null and CityDetail.city_at(_data.latitude, _data.longitude) != ""
 		LodRing.apply(_generated, _quality_preset)
 
 ## Replace the generated world in place. The old world is tracked by
 ## reference: same-named siblings get auto-renamed by the engine, so
 ## the previous name-based cleanup leaked a world per place visited.
-func _rebuild_world(prebuilt: Node3D = null) -> void:
+func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 	if _data == null or _world_root == null:
 		return
 	if _generated != null and is_instance_valid(_generated):
@@ -280,8 +300,11 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 		if _ground == null:
 			_ground = GroundTruth.new(_data)
 		_generated = make_world(_data, _ground)
-	# Range the near/mid rings for the current preset.
-	LodRing.apply(_generated, _quality_preset)
+	# Range the near/mid rings for the current preset (a streamed world
+	# arrives already ranged: the streamer ranges it while it waits).
+	LodRing.city_boost = CityDetail.city_at(_data.latitude, _data.longitude) != ""
+	if not pre_ranged or prebuilt == null:
+		LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
 	ViewConditions.apply_surface_state(self)  # climate snow, rain, ice
 
@@ -290,10 +313,13 @@ func _rebuild_world(prebuilt: Node3D = null) -> void:
 static func make_world(data: LocationData, ground: GroundTruth,
 		abort: BuildAbort = null) -> Node3D:
 	var world := TerrainBuilder.build_world(data, ground, abort)
-	# T7.1: merge building masses per material/cell (preset-independent).
+	_merge(world, abort)
+	return world
+
+## T7.1: merge building masses per material/cell (preset-independent).
+static func _merge(world: Node3D, abort: BuildAbort) -> void:
 	BuildAbort.mark(abort, BuildAbort.Step.MERGE)
 	LodRing.merge_buildings(world)
-	return world
 
 ## Builds [ground, world] for `data` on a worker thread. The build takes
 ## seconds on dense cities; run on the main thread it froze the loading
@@ -303,19 +329,41 @@ static func make_world(data: LocationData, ground: GroundTruth,
 ## Returns [] when `abort` was requested (timeout / cancel).
 func build_location(data: LocationData, ground: GroundTruth = null,
 		abort: BuildAbort = null, wait_save := false) -> Array:
-	var cached := await WorldCache.load_world(self, _threads, data, ground)
+	var bg := abort != null and abort.background  # the streamer's way ahead
+	var cached := await WorldCache.load_world(self, _threads, data, ground, bg)
 	if not cached.is_empty():
 		return cached
+	# Never beside the altitude far rebuild: they share static caches.
+	await _reach.yield_build(self)
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data, abort)
-		var w := make_world(data, g, abort)
+		var w := TerrainBuilder.build_world(data, g, abort)
+		_merge(w, abort)
 		# Packed here, detached and pristine, so the save costs the main
 		# thread nothing before the view shows.
 		var stopped := abort != null and abort.requested
-		return [g, w, null if stopped else WorldCache.pack(w)])
+		if not stopped:
+			BuildPrewarm.remember()
+		return [g, w, null if stopped else WorldCache.pack(w)],
+		Thread.PRIORITY_LOW if bg else Thread.PRIORITY_NORMAL)
+	# The merge and the pack ask the rendering server about every mesh
+	# node, and each answer to a worker thread waits for the main thread's
+	# next flush: one node a frame, so ~3000 nodes took 26 s at 120 fps
+	# (Paris on Ultra). The build's stages wait the same way for every
+	# texture they create (a 512² facade map: 0.3 ms answered at once, a
+	# frame otherwise). The main thread answers them here instead, for the
+	# whole build, in the share of each frame a cache save gets
+	# (WorldCache.pump_budget_us; a small one for the streamer's background
+	# build, whose frames must stay smooth).
+	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
+		var t := Time.get_ticks_usec()
+		var budget := WorldCache.pump_budget_us(t - last_us, bg)
+		while thread.is_alive() and Time.get_ticks_usec() - t < budget:
+			RenderingServer.force_sync()
+		last_us = t
 		await get_tree().process_frame
 	_threads.erase(thread)
 	var built: Array = thread.wait_to_finish()
@@ -325,7 +373,9 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return []
-	if wait_save:
+	if bg:
+		abort.deferred_save = [data, built[0], packed]
+	elif wait_save:
 		if abort != null:
 			abort.saving = true
 		await WorldCache.save_async(self, _threads, data, built, packed)
@@ -344,6 +394,11 @@ func _notification(what: int) -> void:
 	# get_image) that wait on the main thread, so service them while
 	# joining or this deadlocks.
 	if what == NOTIFICATION_PREDELETE:
+		if _streamer != null:
+			_streamer.shutdown()
+		_reach.abort_build()
+		if _tree_lod != null:
+			_tree_lod.stop()
 		for t in _threads:
 			while t.is_alive():
 				RenderingServer.force_sync()
@@ -412,7 +467,12 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		return w is Dictionary and str((w as Dictionary).get("class", "")) == "coastline"))
 	_atmos.set_probe_origin(_rig.position)
 	_rig.set_look(look.x, look.y)
+	_streamer.reset_for_new_place()
+	_streamer.arm(data.latitude, data.longitude, data.season, data.quality_preset)
+	_streamer.note_spawn(Vector2(_rig.position.x, _rig.position.z))
 	_restore_conditions(data)
+	if start_flying:
+		_drone.enter(self)
 	if _landmark_panel != null:
 		_landmark_panel.close()
 	if _horizon != null:
@@ -712,7 +772,8 @@ func visit(site: Dictionary, closer: bool = false) -> void:
 		standoff = minf(LandmarkVisit.close_standoff_m(site),
 			maxf((lp - cam).length(), LandmarkVisit.CLOSE_MIN_M))
 	var t := lp - dir * standoff
-	if not can_move_in_place(t, _ground):
+	if not can_move_in_place(t, _ground) \
+			and not (_streamer.enabled and WorldStreamer.glide_enterable(t, _ground)):
 		var ll := WorldScale.latlon_from_xz(t.x, t.y, _data.latitude, _data.longitude)
 		visit_requested.emit(site, ll.x, ll.y)
 		return
@@ -794,7 +855,7 @@ func _input(event: InputEvent) -> void:
 			or event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey):
 		ViewChrome.wake(self)
 
-## Viewer keys (arrows, +/−, [ ], 1–4, G, H, F, I, L, Esc for callouts).
+## Viewer keys (arrows, +/−, [ ], 1–4, G, H, F, I, J, L, Esc for callouts).
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or not is_visible_in_tree():
@@ -802,8 +863,44 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if ViewChrome.handle_key(self, key):
 		get_viewport().set_input_as_handled()
 
+## Whether streaming movement may enter `xz` (WorldStreamer rules when
+## enabled, the old built-area fence otherwise).
+func stream_enterable(xz: Vector2) -> bool:
+	return WorldStreamer.enterable(xz, _ground) if _streamer.enabled \
+		else can_move_in_place(xz, _ground)
+
+## Whether a tap-glide may cross to `xz` while streaming.
+func stream_glide_enterable(xz: Vector2) -> bool:
+	return WorldStreamer.glide_enterable(xz, _ground) if _streamer.enabled \
+		else can_move_in_place(xz, _ground)
+
+## `next` for the drone while streaming: enterable ground, else a slide
+## along the stream limit (the bounded clamp_roam when streaming is off).
+func stream_roam(here: Vector2, next: Vector2) -> Vector2:
+	if not _streamer.enabled:
+		return ViewDrone.clamp_roam(here, next, _ground)
+	if WorldStreamer.enterable(next, _ground):
+		return next
+	if next.length() > 0.0:
+		var slid := (here + (next - here).slide(next.normalized())) \
+			.limit_length(WorldStreamer.STREAM_LIMIT_M)
+		if WorldStreamer.enterable(slid, _ground):
+			return slid
+	return here
+
+## Installs a world built for a new centre (WorldStreamer.apply_swap).
+func apply_streamed_world(data: LocationData, built: Array) -> void:
+	_streamer.apply_swap(self, data, built)
+
 ## Gyro look on mobile: pauses while a finger is on the scene.
 func _process(delta: float) -> void:
+	_streamer.tick(self, delta)
+	if _stream_badge != null and _stream_badge.follow(_streamer, delta):
+		ViewChrome.layout(self)
+	_tick_near_ground()
+	_reach.tick(self, delta)
+	if _mover != null and _rig != null and is_visible_in_tree():
+		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))
 	if _lapse.playing and is_visible_in_tree():
 		ViewConditions.lapse_tick(self, delta)
 	if _drone.on:
@@ -815,6 +912,40 @@ func _process(delta: float) -> void:
 		if g.length() > 0.01:
 			_rig.set_look(_rig.yaw + g.y * delta, _rig.pitch + g.x * delta)
 			_on_look_changed()
+
+## Keeps the fine land-cover map under the eye (NearGroundWindow) and the
+## tree LOD rings on it (TreeLodWindow), and starts new windows whenever
+## the world has been replaced.
+func _tick_near_ground() -> void:
+	var world := _generated.get_instance_id() if is_instance_valid(_generated) else 0
+	if world != _near_world:
+		for w: Variant in [_near_window, _carpet, _mover, _tree_lod]:
+			if w != null:
+				w.stop()
+		_near_window = null
+		_carpet = null
+		_mover = null
+		_tree_lod = null
+		_near_world = world
+		_near_step = 0 if world != 0 else 4
+	elif _near_step < 4:
+		# One attach a frame: together they walked a new world in its first
+		# frame, the hitch right after a streamed swap.
+		match _near_step:
+			0: _near_window = NearGroundWindow.attach(_generated, _data)
+			1: _carpet = GrassCarpet.attach(_generated, _ground, _data)
+			2: _mover = VehicleMover.attach(_generated, _data, _ground)
+			3: _tree_lod = TreeLodWindow.attach(_generated)
+		_near_step += 1
+	if _tree_lod != null and _rig != null:
+		_tree_lod.tick(Vector2(_rig.position.x, _rig.position.z), _quality_preset)
+	if _rig != null and _ground != null and (_near_window != null or _carpet != null):
+		var eye := Vector2(_rig.position.x, _rig.position.z)
+		var agl := _rig.position.y - _ground.height_at_world(eye.x, eye.y)
+		if _near_window != null:
+			_near_window.tick(eye, agl)
+		if _carpet != null:
+			_carpet.tick(_rig.position, agl)
 
 func _touch_distance() -> float:
 	if _touches.size() < 2:

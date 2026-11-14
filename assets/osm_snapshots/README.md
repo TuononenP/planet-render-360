@@ -1,11 +1,30 @@
 # Bundled OpenStreetMap snapshots
 
-These gzip files are OpenStreetMap data © OpenStreetMap contributors,
+These `.osmb` files are OpenStreetMap data © OpenStreetMap contributors,
 available under the [ODbL](https://www.openstreetmap.org/copyright). The
 app's existing OSM attribution applies. They cover only the preset origins,
 not the cities as a whole. The query and integrity metadata is in `scripts/data/bundled_osm.gd`.
 Timestamps are the source replication time in UTC (Overpass `timestamp_osm_base`
 for live responses).
+
+## File format
+
+Each file is a compact, zstd-compressed form of an Overpass JSON response
+(`tools/osmb.py` documents the layout): coordinates as delta-coded integers
+of 1e-7°, OSM's own precision, so they match live Overpass text exactly (a
+cached live layer and a bundled ring still share their coastline nodes); one
+string table for tags and roles; and no way node-id lists or bounds, which
+nothing reads. The manifest rows record the
+decompressed payload's size and SHA-256. `BundledOsm.read` checks both and
+decodes the payload back to Overpass JSON text (`SnapshotKernels` natively,
+`OsmbCodec` in GDScript), so the fetchers read it as before. The byte counts
+in the tables below are the original gzip JSON sizes.
+
+To read one as JSON:
+
+```sh
+python3 tools/osmb.py decode assets/osm_snapshots/helsinki_detailed.osmb > helsinki_detailed.json
+```
 
 | Preset | Coordinates | Layer / query | OSM timestamp UTC | Compressed bytes |
 | --- | --- | --- | --- | ---: |
@@ -53,7 +72,7 @@ To replace one of these files, obtain a complete current-query response from
 the app's cache at the exact preset origin, then run, for example:
 
 ```sh
-python3 tools/prepare_osm_snapshot.py detailed /path/to/current-cache.json assets/osm_snapshots/new_york_detailed.json.gz
+python3 tools/prepare_osm_snapshot.py detailed /path/to/current-cache.json assets/osm_snapshots/new_york_detailed.osmb
 ```
 
 Use `far`, `ring`, or `poi` for the other layer types. The tool rejects Overpass errors, missing
@@ -78,7 +97,7 @@ For example, for the New York snapshot:
 ```sh
 osmium extract -s smart -b -74.150,40.595,-73.858,40.817 NewYork.osm.pbf -o new_york_local.osm.pbf
 python3 tools/prepare_osm_extract.py new_york_local.osm.pbf new_york 2026-10-31T00:00:00Z /tmp/pr360_extract --coverage -74.150 40.595 -73.858 40.817
-python3 tools/prepare_osm_snapshot.py far /tmp/pr360_extract/new_york_far.json assets/osm_snapshots/new_york_far.json.gz
+python3 tools/prepare_osm_snapshot.py far /tmp/pr360_extract/new_york_far.json assets/osm_snapshots/new_york_far.osmb
 ```
 
 Pass the source extract's actual replication timestamp, not the conversion
@@ -156,6 +175,24 @@ invalidation and live refresh still apply.
 | tokyo | 35.6595, 139.7005 | ring2500 / extract-compatible q1 | 2026-11-03 21:24:23 | 98,901 |
 | tokyo | 35.6595, 139.7005 | poi / extract-compatible q1 | 2026-11-03 21:24:23 | 141,242 |
 | tokyo | 35.6595, 139.7005 | far / extract-compatible q3 | 2026-11-03 21:24:23 | 1,745,939 |
+| helsinki | 60.1680, 24.9530 | transit / OSM API map call | 2026-11-11 00:49:59 | 13,691 |
+| berlin | 52.5244, 13.4105 | transit / OSM API map call | 2026-11-11 00:50:42 | 10,389 |
+| tokyo | 35.6595, 139.7005 | transit / OSM API map call | 2026-11-11 00:51:14 | 9,903 |
+| london | 51.5018, -0.1196 | transit / OSM API map call | 2026-11-11 00:51:49 | 19,215 |
+| dubai | 25.1925, 55.2741 | transit / OSM API map call | 2026-11-11 00:52:18 | 1,996 |
+| banff | 51.1720, -115.5640 | transit / OSM API map call | 2026-11-11 00:52:46 | 1,697 |
+| big_sur | 36.3740, -121.9022 | transit / OSM API map call | 2026-11-11 00:53:12 | 395 |
+| seoul | 37.5728, 126.9769 | transit / OSM API map call | 2026-11-11 00:53:45 | 8,348 |
+| alps | 46.6900, 7.8580 | transit / OSM API map call | 2026-11-11 00:54:16 | 2,550 |
+| rome | 41.8916, 12.4916 | transit / OSM API map call | 2026-11-11 00:54:53 | 6,161 |
+| venice | 45.4318, 12.3290 | transit / OSM API map call | 2026-11-11 00:55:28 | 1,089 |
+| paris | 48.8622, 2.2887 | transit / OSM API map call | 2026-11-11 01:12:05 | 11,627 |
+| monaco | 43.7310, 7.4209 | transit / OSM API map call | 2026-11-11 01:13:29 | 4,766 |
+| espoo | 60.1760, 24.8050 | transit / OSM API map call | 2026-11-11 01:14:56 | 4,797 |
+| stockholm | 59.3207, 18.0604 | transit / OSM API map call | 2026-11-11 01:16:23 | 7,796 |
+| new_york_midtown | 40.7535, -73.9825 | transit / OSM API map call | 2026-11-11 01:17:52 | 17,604 |
+| new_york | 40.7060, -74.0040 | transit / OSM API map call | 2026-11-11 01:19:20 | 11,295 |
+| san_francisco | 37.8040, -122.4195 | transit / OSM API map call | 2026-11-11 01:20:47 | 7,466 |
 
 Paris, Monaco, Espoo, London, Rome, Venice and the Alps use cached Overpass
 responses or the Europe Overpass instance; London's far layer uses BBBike's
@@ -177,3 +214,32 @@ Overpass `is_in` result. Ring and far-city query caps can truncate dense areas.
 Use `--detailed` with `prepare_osm_extract.py` and `detailed-extract` with
 `prepare_osm_snapshot.py` to regenerate these detailed layers. Sparse mode is
 restricted to verified optional layers in rural extracts.
+
+## Transit layer
+
+`<preset>_transit.osmb` rows (layer `transit`, query version
+`OsmQuery.TRANSIT_VERSION`) hold what the detailed snapshots lack: tram stops
+(`railway=tram_stop`, `public_transport=stop_position` + `tram=yes`), every
+`highway=bus_stop` within the 1200 m detailed radius (the detailed files keep
+only those within 450 m of the eye), `railway=station|halt` nodes and
+`railway=platform` or `public_transport=platform` + `train=yes` ways, with the
+caps of the app's own query (1500 stops, 600 platforms). `OsmFetcher` merges
+the layer only when a bundled snapshot stands in for the live detailed answer;
+a live answer or a device cache already carries these elements, and elements
+present in both are read once. A preset without a row loads as before.
+
+Fetch it from the OSM API's map call (the default, `--source api`: the square
+around the preset in small tiles, filtered by the tool to the same tags and
+radius; the API answers 429 when asked too fast and the tool then stops), or
+from the app's Overpass instances (`--source overpass`,
+`OsmFetcher.ENDPOINTS`), one request per city:
+
+```sh
+python3 -I tools/prepare_transit_layer.py --all --allow-sparse
+python3 -I tools/prepare_transit_layer.py helsinki san_francisco --source overpass
+```
+
+The tool validates each answer with `prepare_osm_snapshot.py transit`, writes
+the `.osmb` file and prints the `BundledOsm.ENTRIES` row to add. A rural preset with no
+transit at all is left without a layer (`--allow-sparse` keeps an empty one).
+Run `tests/transit_layer_test.gd` and `tests/bundled_osm_test.gd` afterwards.

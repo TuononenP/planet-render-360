@@ -68,6 +68,10 @@ var _buildings: Array = []
 var _level: PackedFloat32Array = PackedFloat32Array()
 ## Finalized before builders start; untyped to avoid a class-load cycle.
 var shoreline = null
+## The painted ground (GroundSurface), built on first ask; the lock lets
+## the terrain and vegetation stages share one build.
+var _painted: GroundSurface = null
+var _painted_lock := Mutex.new()
 
 ## Bank freeboard (mirrors WaterBuilder._FREEBOARD) and carve depth
 ## below that local surface. v1 carved to the GLOBAL datum
@@ -78,6 +82,15 @@ const CARVE_DEPTH_M := 2.0
 ## Height step (metres) at which _blur_pass stops averaging across a
 ## neighbour: DEM noise is well under it, escarpment posts well over.
 const EDGE_SIGMA_M := 3.0
+
+## What the terrain shader paints over the extent, built once from `data`
+## (the place this ground was made from) and shared by every stage.
+func surface(data: LocationData) -> GroundSurface:
+	_painted_lock.lock()
+	if _painted == null:
+		_painted = GroundSurface.new(GroundMaterial.class_map(data))
+	_painted_lock.unlock()
+	return _painted
 
 ## Land polygons plus their edge-banded indices (land_class_at runs per
 ## tree / building / probe, and a lagoon polygon has tens of thousands
@@ -198,6 +211,9 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 			data.buildings, data.land_polygons)
 		if not BareEarth.surface_model(data):
 			BareEarth.lower_canopy(_surface, size, _step_units, float(size) / 2.0, data.buildings)
+	# A coarse surface model keeps block-scale mounds under the city.
+	if RoadGrading.coarse(data):
+		UrbanSmooth.apply(_surface, size, _step_units, float(size) / 2.0, data.buildings)
 	var tmp := PackedFloat32Array()
 	tmp.resize(size * size)
 	_blur_pass(_surface, tmp, size)
@@ -232,8 +248,14 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 		shoreline.carve(_surface, _level)
 	# Streets and main roads sit on a smoothed profile (RoadGrading).
 	var ways := data.roads + data.railways
+	var coarse := RoadGrading.coarse(data)
 	RoadGrading.grade(_surface, _level, size, _step_units,
-		[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units())
+		[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units(),
+		RoadGrading.COARSE_SMOOTH_M if coarse else RoadGrading.SMOOTH_M,
+		RoadGrading.COARSE_MAX_SHIFT_M if coarse else RoadGrading.MAX_SHIFT_M)
+	# Mapped squares and plazas lie on their own best-fit plane.
+	RoadGrading.grade_areas(_surface, _level, size, _step_units,
+		[] if data.buildings.is_empty() else data.roads)
 	# Ways under a bridge are cut down to clear its deck.
 	Underpasses.carve(_surface, _level, size, _step_units, ways,
 		WorldScale.metres_to_units())
@@ -331,6 +353,11 @@ static func _grid_bilinear(data: LocationData, f: Vector2) -> float:
 static func _blur_pass(src: PackedFloat32Array, dst: PackedFloat32Array,
 		size: int) -> void:
 	var inv := 1.0 / (EDGE_SIGMA_M * EDGE_SIGMA_M)
+	if BareEarth._native:
+		# dst is the caller's array: refilled in place.
+		dst.resize(0)
+		dst.append_array(ClassDB.class_call_static("GridFilters", "edge_blur", src, size, inv))
+		return
 	for z in size:
 		for x in size:
 			# Interior fast path — no clamp calls, same dz,dx order.
@@ -404,6 +431,16 @@ func height_at_world(x: float, z: float) -> float:
 	var b := lerpf(_surface[(z0 + 1) * _size + x0],
 		_surface[(z0 + 1) * _size + x0 + 1], tx)
 	return lerpf(a, b, tz)
+
+## Dry ground at world XZ, in render units: what a footprint stands on
+## before water carving. Inside a water domain this is the pre-carve
+## bank height, never the carved bed; elsewhere it is the final surface.
+## Builders that seat objects on land (foundations) read this, while
+## height_at_world remains the rendered (possibly wet) surface.
+func dry_height_at_world(x: float, z: float) -> float:
+	if shoreline != null and shoreline.ready:
+		return shoreline.land_height(x, z)
+	return height_at_world(x, z)
 
 ## Exact grid-post read (clamped indices) for mesh construction: the
 ## terrain mesh and far-apron edge match the built surface bit-for-bit.

@@ -38,11 +38,11 @@ env:
 jobs:
   macos:
     if: inputs.platform != 'ios'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -66,7 +66,10 @@ jobs:
           echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
           security set-key-partition-list -S apple-tool:,apple: -k "$KC_PASS" "$KEYCHAIN"
-          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          # Self-hosted runner: add to the user's keychain search list (saved
+          # for restore) instead of replacing it.
+          security list-keychains -d user > "$RUNNER_TEMP/keychains.txt"
+          xargs security list-keychains -d user -s "$KEYCHAIN" < "$RUNNER_TEMP/keychains.txt"
           rm "$RUNNER_TEMP/cert.p12"
           echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/asc_key.p8"
 
@@ -81,7 +84,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/dist"
           mv ../build/macos/PlanetRender360.dmg "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.dmg"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PlanetRender360-macos-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/dist/*.dmg
@@ -90,16 +93,19 @@ jobs:
       - name: Remove signing material
         if: always()
         run: |
+          if [ -f "$RUNNER_TEMP/keychains.txt" ]; then
+            xargs security list-keychains -d user -s < "$RUNNER_TEMP/keychains.txt"
+          fi
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/asc_key.p8"
 
   ios:
     if: inputs.platform != 'macos'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -126,7 +132,7 @@ jobs:
             mv ../build/ios/export/*.ipa "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.ipa"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !inputs.testflight }}
         with:
           name: PlanetRender360-ios-${{ inputs.version }}-${{ env.BUILD_NUMBER }}

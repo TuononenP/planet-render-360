@@ -19,6 +19,11 @@ const PODIUM_SHARE := 0.4
 const CROWN_SHARE := 0.3
 ## An inset shaft must keep this share of the podium, or it reads as a spike.
 const MIN_SHAFT_SHARE := 0.35
+## The 1916 resolution: a tower may rise without limit on a quarter of the lot.
+const MIN_TOWER_SHARE := 0.25
+const STREET_WALL_M := 40.0
+const PENCIL_LEVELS := 55
+const PENCIL_SPAN_M := 34.0
 
 ## Parts for `b` (as BuildingMasses plans building:part), or [] for one mass.
 ## `shape` is the building's effective roof form, `res` its resolved height.
@@ -42,11 +47,7 @@ static func stack(b: Dictionary, look: Dictionary, res: Dictionary, ctx: Diction
 	var m := WorldScale.metres_to_units()
 	match _form(b, look, levels, h, span, seed_v):
 		"setback":
-			var inset := clampf(span * 0.075, 1.5, 4.0) * m
-			var first := 0.52 + 0.14 * ArchitectureStyle._h(seed_v, 51)
-			return _parts(b, [ring, BuildingMasses._inset_ring(ring, inset),
-				BuildingMasses._inset_ring(ring, inset * 2.0)],
-				[0.0, h * first, h * (first + 0.22), h], levels)
+			return _setback_stack(b, ring, h, span, levels)
 		"podium":
 			var shaft := BuildingMasses._inset_ring(ring, clampf(span * 0.14, 3.0, 8.0) * m)
 			if shaft.is_empty() or absf(RingGeometry.signed_area(shaft)) \
@@ -60,6 +61,28 @@ static func stack(b: Dictionary, look: Dictionary, res: Dictionary, ctx: Diction
 			return _parts(b, [ring, top], [0.0, h - cap, h], levels)
 	return []
 
+## The 1916 zoning profile: a street wall, then tiers stepping in with height
+## to a tower on at least a quarter of the lot, which keeps the top 45%.
+static func _setback_stack(b: Dictionary, ring: PackedVector2Array, h: float, span: float,
+		levels: int) -> Array:
+	var inset := clampf(span * 0.08, 3.0, 9.0) * WorldScale.metres_to_units()
+	var lot := absf(RingGeometry.signed_area(ring))
+	var rings: Array = [ring]
+	for i in clampi(2 + int(h / 60.0), 3, 6) - 1:
+		var r := BuildingMasses._inset_ring(ring, inset * float(i + 1))
+		if r.is_empty() or absf(RingGeometry.signed_area(r)) < lot * MIN_TOWER_SHARE:
+			break
+		rings.append(r)
+	if rings.size() < 2:
+		return []
+	var street := minf(h * 0.35, STREET_WALL_M)
+	var cuts: Array = [0.0, street]
+	var steps := rings.size() - 2
+	for i in steps:
+		cuts.append(street + (h - street) * 0.55 * float(i + 1) / float(steps))
+	cuts.append(h)
+	return _parts(b, rings, cuts, levels)
+
 ## "setback", "podium", "crown" or "" (the tower stays one mass).
 static func _form(b: Dictionary, look: Dictionary, levels: int, h: float, span: float,
 		seed_v: float) -> String:
@@ -69,6 +92,9 @@ static func _form(b: Dictionary, look: Dictionary, levels: int, h: float, span: 
 	if wall in MASONRY and not glazed:
 		return "setback" if levels >= 20 and h >= 55.0 and span >= 18.0 and year <= SETBACK_UNTIL else ""
 	if (str(look.get("kind", "")) != "commercial" and not glazed) or (year > 0 and year < MODERN_FROM):
+		return ""
+	# A slender supertall rises straight from its lot; a step would be a spike.
+	if levels >= PENCIL_LEVELS and span < PENCIL_SPAN_M:
 		return ""
 	var pick := ArchitectureStyle._h(seed_v, 50)
 	if pick < PODIUM_SHARE:

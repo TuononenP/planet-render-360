@@ -24,9 +24,7 @@ static func ensure_searcher(p: MapPicker) -> void:
 	p.add_child(p._searcher)
 	p._searcher.succeeded.connect(func(n: String, la: float, lo: float) -> void:
 		set_busy(p, false)
-		p._on_picked(la, lo)
-		p.selected_name = n
-		p._show_place(n))
+		select(p, n, la, lo))
 	# A failed search keeps the selected place: no match opens the
 	# no-results state under the field; no connection is the offline state.
 	p._searcher.failed.connect(func(reason: String) -> void:
@@ -242,14 +240,19 @@ static func set_busy(p: MapPicker, on: bool) -> void:
 		p._search_busy_tween = p._search_busy.create_tween().set_loops()
 		p._search_busy_tween.tween_property(p._search_busy, "rotation", TAU, 0.9).from(0.0)
 
+## A named place starts from its preset coordinates (LocationData);
+## only custom coordinate input, which never passes through here, and
+## names with no preset keep the point they were given.
 static func select(p: MapPicker, place: String, lat: float, lon: float) -> void:
+	var resolved := LocationData.canonical_place(place, lat, lon)
+	var name := str(resolved["name"])
 	hide_suggestions(p)
 	p._search.set_block_signals(true)
-	p._search.text = place
+	p._search.text = name
 	p._search.set_block_signals(false)
-	p._on_picked(lat, lon)
-	p.selected_name = place
-	p._show_place(place)
+	p._on_picked(float(resolved["lat"]), float(resolved["lon"]))
+	p.selected_name = name
+	p._show_place(name)
 
 ## Opens a pasted link's view: closes the suggestions and asks main to render it.
 static func open_link(p: MapPicker, state: Dictionary) -> void:

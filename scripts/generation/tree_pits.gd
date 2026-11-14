@@ -9,19 +9,26 @@ const SEARCH_M := 16.0
 const HALF_M := 0.8
 const MAX_PITS := 500
 
-static func plan(data: LocationData, mask: VegetationMask, m: float) -> Array:
-	if not RenderQuality.ultra_desktop(data.quality_preset) \
+static func plan(data: LocationData, mask: VegetationMask, m: float, ground: GroundTruth = null) -> Array:
+	if not CityDetail.street_extras(data) \
 			or CityStyles.region_at(data.latitude, data.longitude) != "new_york":
 		return []
 	var centre := View360.spawn_xz(data)
 	var roads := StreetFurniture.RoadIndex.new(data, m, (RADIUS_M + SEARCH_M) * m, centre)
 	var out: Array = []
+	var clears := LandmarkSites.tree_clears(data)
 	for tree in data.trees:
 		if not (tree is Dictionary):
 			continue
 		var p := Vector2(float(tree.get("x", 0.0)), float(tree.get("z", 0.0)))
 		if p.distance_squared_to(centre) > pow(RADIUS_M * m, 2.0) \
 				or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD | VegetationMask.WATER):
+			continue
+		# Where VegetationBuilder planted no tree (water, the landmark's
+		# keep-out), there is no pit either.
+		if ground != null and ground.water_at(p.x, p.y) > 0.0:
+			continue
+		if LandmarkSites.tree_cleared(p, clears):
 			continue
 		var paved := mask.blocked(p.x, p.y, VegetationMask.ROAD_EDGE)
 		if mask.cover_at(p.x, p.y) >= 0 and not paved:
@@ -39,7 +46,7 @@ static func plan(data: LocationData, mask: VegetationMask, m: float) -> Array:
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask) -> int:
 	var m := WorldScale.metres_to_units()
-	var pits := plan(data, mask, m)
+	var pits := plan(data, mask, m, ground)
 	if pits.is_empty():
 		return 0
 	var buf := TreeMeshLibrary.Buf.new()

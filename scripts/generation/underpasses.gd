@@ -15,6 +15,16 @@ const CLEAR_PATH_M := 2.5
 const CLEAR_RAIL_M := 5.5
 ## Grade the cut ramps back to the ground at, along the lower way.
 const RAMP_GRADE := 0.08
+## A railway climbs back far more gently, so a track under several
+## bridges stays down between them: at the road grade it dipped and rose
+## at every one, and a station yard under its viaducts was a washboard.
+const RAMP_GRADE_RAIL := 0.025
+## Ground left standing between two cut ways (the strip between two
+## tracks) comes down with them when it stands this far above both.
+const RIDGE_M := 0.5
+## Height per layer a viaduct's deck stands at a joint (deck_profile).
+const JOINT_UP_M := 5.0
+const RIDGE_PASSES := 3
 ## A crossing needing more than this is a valley the data already has
 ## (or a layer mistake), never a cut.
 const MAX_CUT_M := 8.0
@@ -22,6 +32,8 @@ const SAMPLE_M := 4.0
 ## A bridge joins the ground at its ends; an intersecting way there is a
 ## connection, not a crossing underneath it. Allow for coordinate rounding.
 const END_TOLERANCE_M := 0.5
+## How far out along its approach a bridge end's embankment is kept uncut.
+const APPROACH_M := 20.0
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 
@@ -59,13 +71,39 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 			boxes.append(_box((w as Dictionary)["points"]))
 	# Per lower way: [arc position, floor height] of each crossing.
 	var cuts := {}
-	# Posts carrying a bridge end stay put: the deck sits on its banks.
+	# Posts beyond a bridge end stay put: the deck sits on its banks.
+	# A viaduct is mapped as many bridge ways end to end, and a joint
+	# between two of them is in mid-air, not a bank: kept, each one left
+	# a pillar of uncut ground standing among the tracks below.
 	var keep := {}
 	var hs := float(size) * 0.5
+	var joints := {}
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
 		for e in [ends[0], ends[ends.size() - 1]]:
-			keep[Vector2i(roundi(e.x / step + hs), roundi(e.y / step + hs))] = true
+			joints[_node(e, m2u)] = int(joints.get(_node(e, m2u), 0)) + 1
+	for b in bridges:
+		var ends: PackedVector2Array = b["points"]
+		for end_i: int in [0, ends.size() - 1]:
+			var e := ends[end_i]
+			if int(joints[_node(e, m2u)]) != 1:
+				continue
+			# The embankment the approach runs on, from the end out along the
+			# bridge's line: never cut for a way passing under the span. Only
+			# posts outside the span: the post nearest the end can lie 4 m
+			# inside it, beside a way passing under, and kept it stood as an
+			# uncut mound under the deck. Cut, the approach roads tipped into
+			# the trench as steep planes at both ends of the bridge.
+			var out := (e - (ends[1] if end_i == 0 else ends[ends.size() - 2])).normalized()
+			var side := Vector2(-out.y, out.x)
+			var half := maxf(float(b.get("width_m", 0.0)), 3.0) * 0.5 * m2u + step * 0.5
+			var back := APPROACH_M * m2u
+			var reach := back + half
+			for x in range(floori((e.x - reach) / step + hs), ceili((e.x + reach) / step + hs) + 1):
+				for z in range(floori((e.y - reach) / step + hs), ceili((e.y + reach) / step + hs) + 1):
+					var d := Vector2((float(x) - hs) * step, (float(z) - hs) * step) - e
+					if d.dot(out) >= 0.0 and d.dot(out) <= back and absf(d.dot(side)) <= half:
+						keep[Vector2i(x, z)] = true
 	# Every crossing at once on every core, then evaluated bridge by bridge.
 	var hits: Array = []
 	if _native:
@@ -86,8 +124,15 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 		var b_len := _length(bp)
 		if b_len <= 0.0:
 			continue
-		var h_a := RoadGrading._sample(src, size, step, bp[0])
-		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1])
+		# The deck as RoadBuilder.deck_profile draws it: on its bank at a true
+		# end, and held a storey up per layer at a joint with the next bridge
+		# way. Taken at ground level there, the cut dug every way under a
+		# viaduct down by the height the deck already stands above it.
+		var up := float(int(b.get("layer", 0))) * JOINT_UP_M
+		var h_a := RoadGrading._sample(src, size, step, bp[0]) \
+			+ (up if int(joints[_node(bp[0], m2u)]) >= 2 else 0.0)
+		var h_b := RoadGrading._sample(src, size, step, bp[bp.size() - 1]) \
+			+ (up if int(joints[_node(bp[bp.size() - 1], m2u)]) >= 2 else 0.0)
 		var b_layer := _layer(b)
 		if _native:
 			_cross_native(cuts, hits[bi], lower, src, size, step, h_a, h_b, b_len, m2u)
@@ -120,8 +165,43 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 							(cuts[k] as Array).append([w_arc + wp[j].distance_to(p), floor_y])
 					w_arc += wp[j].distance_to(wp[j + 1])
 				b_arc += bp[i].distance_to(bp[i + 1])
+	var touched := {}
 	for k in cuts:
-		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u)
+		_cut_way(surface, level, size, step, lower[k], cuts[k], keep, m2u, touched)
+	_level_ridges(surface, level, size, keep, touched)
+
+## Lowers a post left standing between cut posts on opposite sides of it
+## to the higher of the two: parallel ways each cut their own trench and
+## left a ridge between them.
+static func _level_ridges(surface: PackedFloat32Array, level: PackedFloat32Array, size: int,
+		keep: Dictionary, touched: Dictionary) -> void:
+	var pairs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]
+	for _pass in RIDGE_PASSES:
+		var lowered := {}
+		var seen := {}
+		for t: Vector2i in touched:
+			for dz in range(-1, 2):
+				for dx in range(-1, 2):
+					var c := t + Vector2i(dx, dz)
+					if seen.has(c) or touched.has(c) or keep.has(c) \
+							or c.x < 1 or c.y < 1 or c.x >= size - 1 or c.y >= size - 1:
+						continue
+					seen[c] = true
+					var idx := c.y * size + c.x
+					if not is_inf(level[idx]):
+						continue
+					var cap := INF
+					for d: Vector2i in pairs:
+						if touched.has(c + d) and touched.has(c - d):
+							cap = minf(cap, maxf(surface[(c.y + d.y) * size + c.x + d.x],
+								surface[(c.y - d.y) * size + c.x - d.x]))
+					if surface[idx] > cap + RIDGE_M:
+						lowered[c] = cap
+		if lowered.is_empty():
+			return
+		for c: Vector2i in lowered:
+			surface[c.y * size + c.x] = lowered[c]
+			touched[c] = true
 
 ## One bridge's crossings from GroundKernels.underpass_hits (way index,
 ## arc along the bridge and the way, hit x and z), as the script's own
@@ -151,10 +231,16 @@ static func _at_bridge_end(arc: float, length: float, m2u: float) -> bool:
 ## ends stay clear of the cut).
 static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 		size: int, step: float, way: Dictionary, crossings: Array, keep: Dictionary,
-		m2u: float) -> void:
+		m2u: float, touched: Dictionary = {}) -> void:
+	var grade := RAMP_GRADE_RAIL if _clearance(str(way.get("class", ""))) == CLEAR_RAIL_M else RAMP_GRADE
 	var half := maxf(float(way.get("width_m", 0.0)), 3.0) * 0.5 * m2u
-	var inner := half
-	var reach := half + step
+	# A way is narrower than the posts are apart (9 m): the posts along it
+	# came down by different amounts as it passed nearer or farther, and it
+	# rode metre-high bumps (a road dipped and rose again within a few
+	# metres under its overpass). Cut fully to half a post out, as
+	# RoadGrading stamps its profile.
+	var inner := half + step * 0.5
+	var reach := half + step * 1.5
 	var hs := float(size) * 0.5
 	var line := GroundTruth._densify(way["points"], SAMPLE_M * m2u)
 	var s := 0.0
@@ -163,7 +249,7 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 			s += line[i].distance_to(line[i - 1])
 		var cap := INF
 		for c in crossings:
-			cap = minf(cap, float(c[1]) + RAMP_GRADE * absf(s - float(c[0])) / m2u)
+			cap = minf(cap, float(c[1]) + grade * absf(s - float(c[0])) / m2u)
 		if is_inf(cap):
 			continue
 		var p := line[i]
@@ -182,6 +268,12 @@ static func _cut_way(surface: PackedFloat32Array, level: PackedFloat32Array,
 					continue
 				var wgt := 1.0 - smoothstep(inner, reach, d)
 				surface[idx] = minf(surface[idx], lerpf(surface[idx], cap, wgt))
+				if wgt >= 0.5:
+					touched[Vector2i(x, z)] = true
+
+## A way's end as a centimetre grid node, to match ends that meet.
+static func _node(p: Vector2, m2u: float) -> Vector2i:
+	return Vector2i(roundi(p.x * 100.0 / m2u), roundi(p.y * 100.0 / m2u))
 
 ## OSM layer, a bridge without one counting as 1 (above the ground ways).
 static func _layer(w: Dictionary) -> int:

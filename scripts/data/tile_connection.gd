@@ -72,8 +72,9 @@ func close() -> void:
 	_client.close()
 	busy = false
 
-## Advance the request. Returns [] while pending, else [ok, code, body]
-## exactly once per started tile.
+## Advance the request. Returns [] while pending, else [ok, code, body,
+## declared body length (-1 when the server sent none)] exactly once per
+## started tile.
 func poll() -> Array:
 	if not busy:
 		return []
@@ -93,7 +94,7 @@ func poll() -> Array:
 			and st in [HTTPClient.STATUS_CONNECTED, HTTPClient.STATUS_DISCONNECTED]:
 		busy = false
 		_idle_since_ms = Time.get_ticks_msec()
-		return [true, _client.get_response_code(), _body]
+		return [true, _client.get_response_code(), _body, _client.get_response_body_length()]
 	match st:
 		HTTPClient.STATUS_DISCONNECTED:
 			if _sent:

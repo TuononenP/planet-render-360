@@ -186,9 +186,14 @@ func _process(delta: float) -> void:
 # --- State API ---
 
 ## Centre of the reflection capture: the viewpoint (camera rig) — call
-## once a place is shown; the probe re-renders there.
+## once a place is shown; the probe re-renders there. The view probe
+## captures from at least VIEW_CAPTURE_AGL_M over the ground: taken at a
+## walker's eye among trees and walls, its horizon was that near wall,
+## and sea, glass and copper reflected it, dark, until the next capture.
 func set_probe_origin(pos: Vector3) -> void:
 	probe.position = pos
+	var lift := _ground_y(pos.x, pos.z, pos.y) + VIEW_CAPTURE_AGL_M * units_per_metre - pos.y
+	probe.origin_offset = Vector3(0.0, maxf(lift, 0.0), 0.0)
 	_place_street_probes()
 	lightning.centre = pos
 	_refresh_probe()
@@ -362,6 +367,9 @@ func _build_environment() -> void:
 var probe: ReflectionProbe
 var _probe_due := 0.0
 const PROBE_DEBOUNCE_S := 0.4
+## Lowest capture height of the view probe over the ground: over the
+## trees and low roofs, so its horizon is the far scenery and sky.
+const VIEW_CAPTURE_AGL_M := 30.0
 
 func _build_probe() -> void:
 	probe = ReflectionProbe.new()
@@ -519,6 +527,10 @@ func _apply() -> void:
 		# orange-grey, strongest under a full deck; a clear sky keeps a
 		# faint dome toward the horizon.
 		var g := CITY_SKYGLOW * city_glow * night_amount
+		# Snow on the streets throws the lamps' light back up: a snowy
+		# city's cloud base glows half as bright again.
+		if snow_ground:
+			g *= 1.5
 		lit += g * lerpf(0.5, 1.6, cover)
 		shade += g * lerpf(0.4, 1.3, cover)
 		horizon += g * lerpf(0.6, 1.2, overcast)
@@ -563,16 +575,25 @@ func _apply() -> void:
 	RenderingServer.global_shader_parameter_set("cloud_shadow_cover", 0.0 if night else cover * (1.0 - overcast))
 	RenderingServer.global_shader_parameter_set("cloud_shadow_stretch", float(s["stretch"]))
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", solar_dir)
-	# Snow sparkles only under a direct sun (ClimateModel.SNOW_GLSL).
+	# Snow sparkles under a direct sun (ClimateModel.SNOW_GLSL), and at
+	# night under the street lamps: the facets glint at any point light,
+	# so they come on with the lamps (CityLights.amount_for) and the
+	# lamps' own falloff keeps the sparkle in their pools of light.
 	# The weather look's shadow opacity carries precipitation and fog, which
 	# thicken the deck whatever the reported cover says.
 	var direct := smoothstep(0.55, 1.0, float(look["shadow_opacity"]))
-	RenderingServer.global_shader_parameter_set("climate_snow_glint", 0.0 if night else (1.0 - overcast) * direct)
+	var lamps := CityLights.amount_for(night_amount, twilight_amount) * city_glow
+	RenderingServer.global_shader_parameter_set("climate_snow_glint",
+		0.8 * lamps if night else (1.0 - overcast) * direct)
 	environment.fog_light_color = haze_color.darkened(0.3 * darken)
+	# Far valleys fill with the same air (FarSurface).
+	var valley_air := environment.fog_light_color.srgb_to_linear()
+	RenderingServer.global_shader_parameter_set("valley_haze_col", Vector3(valley_air.r, valley_air.g, valley_air.b))
 	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
 	# A marine layer carries the fog itself; the air above it stays hazy.
 	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)
 	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
+	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
 	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
 	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms

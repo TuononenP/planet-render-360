@@ -36,6 +36,15 @@ extends RefCounted
 ## Heights stay GroundTruth's; this class only colours.
 
 const CLASS_TEXELS := 1024
+## Half a class texel (2.34 m): how far road paint stops inside its ribbon.
+const ROAD_INSET_M := 1.2
+## The near class map: its square's side around the viewpoint, the band at
+## its edge that hands over to the extent map, and texels per preset (Fast
+## .. Ultra). 4096 over 1200 m is 0.29 m a texel, 8x the extent map.
+const NEAR_WINDOW_M := 1200.0
+const NEAR_FADE_M := 60.0
+const NEAR_TEXELS: Array[int] = [0, 2048, 4096, 4096]
+const NEAR_TEXELS_MOBILE := 2048
 ## Native GroundKernels (native/, tools/build_native.sh) when loaded.
 static var _native := ClassDB.class_exists("GroundKernels")
 ## Metres at which the full photo starts / finishes taking over.
@@ -57,7 +66,7 @@ const ID := {
 	"": 0, "building": 1, "road": 2, "urban": 3, "grass": 4,
 	"forest": 5, "field": 6, "orchard": 7, "cemetery": 8, "pitch": 9,
 	"wetland": 10, "sand": 11, "rock": 12, "quarry": 13, "glacier": 14,
-	"water": 15, "path": 16,
+	"water": 15, "path": 16, "meadow": 17,
 }
 
 ## Paved sidewalk width beside a road whose `sidewalk` tag names a side
@@ -84,23 +93,27 @@ const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3}
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with
 ## no imagery, the procedural colour image TerrainBuilder bakes over
 ## the extent (vertex UV = extent UV). `photo_rect` is the photo-UV
-## box of the detailed extent (gain statistics only).
+## box of the detailed extent (gain statistics only). `cmap` is the class
+## map when the caller already has it (GroundTruth.surface), else built here.
 static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
-		has_sat: bool) -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-		.replace("// @TERRAIN", TerrainGlsl.CODE)
+		has_sat: bool, cmap: Image = null) -> ShaderMaterial:
+	var sh := SharedShader.of(GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @TERRAIN", TerrainGlsl.CODE).replace("// @GLOW", StreetGlow.GLSL))
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()
 	m.set_shader_parameter("photo", photo)
-	var cmap := class_map(data)
+	if cmap == null:
+		cmap = class_map(data)
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season))))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
+	_bind_near(m, data, m2u)
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)
+	# One mowing direction per place, so neighbouring lawns agree.
+	m.set_shader_parameter("stripe_angle", fposmod(data.latitude * 37.1 + data.longitude * 53.7, PI))
 	m.set_shader_parameter("near_m", NEAR_M)
 	m.set_shader_parameter("far_m", FAR_M)
 	m.set_shader_parameter("lum_floor", LUM_FLOOR)
@@ -114,6 +127,8 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	if has_sat and data.satellite_inner_texture != null:
 		m.set_shader_parameter("photo_inner", data.satellite_inner_texture)
 		m.set_shader_parameter("inner_map", inner_map(data))
+		m.set_shader_parameter("inner_gain", data.satellite_inner_source.get("gain", Vector3.ONE))
+		m.set_shader_parameter("inner_bias", data.satellite_inner_source.get("bias", Vector3.ZERO))
 	m.set_shader_parameter("ground_max_low",
 		ground_ceiling_image(img, photo_rect, gain, cmap) if has_sat else GROUND_CEILING)
 	m.set_shader_parameter("lf_lod", lf_lod(data) if has_sat else 0.0)
@@ -140,8 +155,29 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("unknown_trust", 0.2 if settled else 0.5)
 	# Photographic layers (TerrainTextures.LAYERS) and the tier's cost.
 	TerrainGlsl.bind(m, data.quality_preset)
+	DemRelief.bind(m, data)
 	m.set_shader_parameter("ground_quality", RenderSettings.clamp_preset(data.quality_preset))
+	m.set_shader_parameter("micro_detail", 1.0 if micro_detail(data.quality_preset) else 0.0)
 	return m
+
+## A second, finer sample of the ground's main layer close to the eye:
+## desktop High and Ultra only (one more fetch across the whole ground).
+static func micro_detail(preset: int) -> bool:
+	return not OS.has_feature("mobile") and RenderSettings.clamp_preset(preset) >= RenderSettings.Preset.HIGH
+
+## Binds the near class map around the viewpoint, if this tier has one.
+static func _bind_near(m: ShaderMaterial, data: LocationData, m2u: float) -> void:
+	var n := near_texels(data.quality_preset)
+	var centre := View360.spawn_xz(data)
+	var size_u := NEAR_WINDOW_M * m2u
+	var t0 := Time.get_ticks_msec()
+	var near := near_class_map(data, n, centre, size_u)
+	if near == null:
+		return
+	m.set_shader_parameter("near_class", ImageTexture.create_from_image(near))
+	m.set_shader_parameter("near_n", float(n))
+	m.set_shader_parameter("near_rect", Vector4(centre.x, centre.y, size_u * 0.5, NEAR_FADE_M * m2u))
+	print("NEAR-CLASS %d texels in %d ms" % [n, Time.get_ticks_msec() - t0])
 
 ## Main-photo UV → inner-mosaic UV as (scale u, scale v, offset u,
 ## offset v). Exact, not fitted: a global pixel at the inner zoom is the
@@ -149,9 +185,10 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 ## main UV the vertices already carry (TerrainBuilder.satellite_uv).
 static func inner_map(data: LocationData) -> Vector4:
 	var zoom := int(data.satellite_source.get("source_zoom", data.satellite_zoom))
-	var k := pow(2.0, float(RenderSettings.SATELLITE_INNER_ZOOM - zoom))
+	var src := data.satellite_inner_source
+	var k := pow(2.0, float(int(src.get("zoom", RenderSettings.SATELLITE_INNER_ZOOM)) - zoom))
 	var main_px := float(TerrainBuilder.satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
-	var inner_px := float(RenderSettings.SATELLITE_INNER_SPAN * SatelliteFetcher.TILE_PX)
+	var inner_px := float(int(src.get("span", RenderSettings.SATELLITE_INNER_SPAN)) * SatelliteFetcher.TILE_PX)
 	var off := (data.satellite_origin_px * k - data.satellite_inner_origin_px) / inner_px
 	var sc := main_px * k / inner_px
 	return Vector4(sc, sc, off.x, off.y)
@@ -255,9 +292,13 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 	var none := Color(0, 0, 0, 0)
 	var rows := {
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
-		"road": [Color(0, 0, 0, 1), Color(0.40, 0.39, 0.37), 0.0, 0.25, 0.95, 0.45, none],
+		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
 		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
+		# Unmown meadow: the lawn layer with some forest-floor litter, a
+		# little drier and more photo-led than a mown lawn.
+		"meadow": [Color(0, 0.8, 0, 0), grass.lerp(Color(0.55, 0.52, 0.30), 0.22), 0.55, 1.0, 0.97, 0.6,
+			Color(0, 0.2, 0, 0)],
 		"forest": [Color(0, 0.25, 0, 0), MaterialLibrary.ground_color("forest"), 0.45, 1.0, 0.97, 0.6, Color(0, 0.75, 0, 0)],
 		"field": [Color(0, 0.6, 0.2, 0), MaterialLibrary.ground_color("field"), 0.6, 1.0, 0.97, 0.6, Color(0, 0, 0.2, 0)],
 		"orchard": [Color(0, 0.8, 0, 0), MaterialLibrary.ground_color("orchard"), 0.5, 1.0, 0.97, 0.55, Color(0, 0.2, 0, 0)],
@@ -298,12 +339,74 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			fills.append([id, rings])
 		else:
 			_fill_rings(img, rings, id, n)
+	_paint_classes(data, paint, ROAD_INSET_M)
+	if _native and not fills.is_empty():
+		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
+			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
+				WorldScale.detailed_extent_units(), _fill_bytes(fills)))
+	if data.quality_preset > RenderSettings.Preset.FAST \
+			and data.landcover_image != null and not data.landcover_image.is_empty():
+		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
+	return img
+
+## Texels per side of the near class map for `preset`; 0 for none.
+static func near_texels(preset: int) -> int:
+	var n: int = NEAR_TEXELS[RenderSettings.clamp_preset(preset)]
+	return mini(n, NEAR_TEXELS_MOBILE) if OS.has_feature("mobile") else n
+
+## The class map again, finely, over a square of `size_u` around `centre`:
+## the land-cover borders the eye actually sees up close. Unmapped ground
+## stays 0, and the shader takes the extent map's answer there (WorldCover
+## included). Null without the native rasteriser, which this size needs.
+static func near_class_map(data: LocationData, n: int, centre: Vector2, size_u: float) -> Image:
+	if not _native or n <= 0:
+		return null
+	var fills: Array = []
+	var inset_m := 0.5 * size_u / WorldScale.metres_to_units() / float(n)
+	_paint_classes(data, func(rings: Array, id: int) -> void: fills.append([id, rings]), inset_m)
+	var to_window := Transform2D(0.0, -centre)
+	var half := size_u * 0.5
+	var kept: Array = []
+	for f: Array in fills:
+		var moved: Array = []
+		var lo := Vector2(INF, INF)
+		var hi := Vector2(-INF, -INF)
+		for ring: PackedVector2Array in f[1]:
+			var r: PackedVector2Array = to_window * ring
+			moved.append(r)
+			for p in r:
+				lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.y))
+				hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.y))
+		# By bounds: a road or park can cross the window with no corner in it.
+		if lo.x <= half and hi.x >= -half and lo.y <= half and hi.y >= -half:
+			kept.append([f[0], moved])
+	if kept.is_empty():
+		return Image.create(n, n, false, Image.FORMAT_R8)
+	return Image.create_from_data(n, n, false, Image.FORMAT_R8,
+		ClassDB.class_call_static("GroundKernels", "fill_rings", n, size_u, _fill_bytes(kept)))
+
+## Replaces each fill's class id with the texel byte fill_rect would write.
+static func _fill_bytes(fills: Array) -> Array:
+	var probe := Image.create(1, 1, false, Image.FORMAT_R8)
+	var bytes := {}
+	for f: Array in fills:
+		var id: int = f[0]
+		if not bytes.has(id):
+			probe.fill(Color(float(id) / 255.0, 0, 0))
+			bytes[id] = probe.get_data()[0]
+		f[0] = bytes[id]
+	return fills
+
+## Calls `paint`(rings, id) for everything on the ground, in paint order.
+static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: float) -> void:
 	var polys: Array = data.land_polygons
 	for k in range(polys.size() - 1, -1, -1):
 		var poly = polys[k]
 		if not (poly is Dictionary):
 			continue
 		var cls := str((poly as Dictionary).get("class", ""))
+		if cls == "grass" and str((poly as Dictionary).get("sward", "")) == "wild":
+			cls = "meadow"
 		if not ID.has(cls):
 			continue
 		var rings: Array = [(poly as Dictionary).get("points", PackedVector2Array())]
@@ -340,6 +443,10 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				id = ID["path"]
 		elif line is PackedVector2Array:
 			pts = line
+		# The ribbon covers the carriageway. Its ground paint stays inside,
+		# so the texel blend never shows as a grey rim along the kerb.
+		if id == ID["road"]:
+			width = maxf(width - road_inset_m * 2.0 * m2u, width * 0.4)
 		for i in pts.size() - 1:
 			var a := pts[i]
 			var b := pts[i + 1]
@@ -348,11 +455,16 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				continue
 			var dir := d.normalized()
 			var nrm := Vector2(-dir.y, dir.x) * width * 0.5
+			# Bends close over the joint; the ends of a way stop where its
+			# ribbon does, or the paint shows as a patch past a dead end.
 			var cap := dir * width * 0.5
-			paint.call([PackedVector2Array([a - cap + nrm, b + cap + nrm,
-				b + cap - nrm, a - cap - nrm])], id)
+			var cap_a := Vector2.ZERO if i == 0 else cap
+			var cap_b := Vector2.ZERO if i == pts.size() - 2 else cap
+			paint.call([PackedVector2Array([a - cap_a + nrm, b + cap_b + nrm,
+				b + cap_b - nrm, a - cap_a - nrm])], id)
 	# Track on its own bed reads as gravel; street track is the road's.
 	var rail_road_index = null
+	var grass_polys = null
 	for rw in data.railways:
 		if rw is Dictionary and bool(rw.get("embedded", false)):
 			rail_road_index = RailBuilder.RoadIndex.new(data, m2u)
@@ -373,7 +485,9 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 			var mid := (rp[i] + rp[i + 1]) * 0.5
 			if bool(rw.get("embedded", false)) and RailBuilder._on_road(mid, data, m2u, rail_road_index):
 				continue
-			var grass := str(rw.get("class", "")) == "tram" and _grass_at(mid, data)
+			if str(rw.get("class", "")) == "tram" and grass_polys == null:
+				grass_polys = _grass_polys(data)
+			var grass := str(rw.get("class", "")) == "tram" and _grass_at(mid, grass_polys)
 			paint.call([PackedVector2Array([rp[i] + rn, rp[i + 1] + rn,
 				rp[i + 1] - rn, rp[i] - rn])], ID["grass"] if grass else ID["path"])
 	for b in data.buildings:
@@ -391,23 +505,6 @@ static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
 				paint.call([PackedVector2Array([Vector2(bx - hx, bz - hz),
 					Vector2(bx + hx, bz - hz), Vector2(bx + hx, bz + hz),
 					Vector2(bx - hx, bz + hz)])], ID["building"])
-	if _native and not fills.is_empty():
-		# Each class id's texel byte as fill_rect writes it.
-		var probe := Image.create(1, 1, false, Image.FORMAT_R8)
-		var bytes := {}
-		for f: Array in fills:
-			var id: int = f[0]
-			if not bytes.has(id):
-				probe.fill(Color(float(id) / 255.0, 0, 0))
-				bytes[id] = probe.get_data()[0]
-			f[0] = bytes[id]
-		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
-			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
-				WorldScale.detailed_extent_units(), fills))
-	if data.quality_preset > RenderSettings.Preset.FAST \
-			and data.landcover_image != null and not data.landcover_image.is_empty():
-		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
-	return img
 
 ## Fill only unclassified texels. Mapped OSM polygons, roads and building
 ## footprints always win; unmapped WorldCover water is left to the existing
@@ -422,7 +519,7 @@ static func _worldcover_fallback(target: Image, source: Image, arid: bool) -> Im
 	var h := target.get_height()
 	var values := src.get_data()
 	var out := target.get_data()
-	var classes := {10: ID["forest"], 20: ID["grass"], 30: ID["grass"],
+	var classes := {10: ID["forest"], 20: ID["meadow"], 30: ID["meadow"],
 		40: ID["field"], 50: ID["urban"], 60: ID["sand"] if arid else ID["rock"],
 		70: ID["glacier"], 90: ID["wetland"], 95: ID["forest"], 100: ID["rock"]}
 	for y in h:
@@ -502,8 +599,30 @@ static func _fill_rings(img: Image, rings: Array, id: int, n: int) -> void:
 				img.fill_rect(Rect2i(i0, j, i1 - i0 + 1, 1), col)
 			k += 2
 
-static func _grass_at(p: Vector2, data: LocationData) -> bool:
+## The grass polygons' outlines with their corner bounds, for _grass_at.
+static func _grass_polys(data: LocationData) -> Array:
+	var out: Array = []
 	for poly in data.land_polygons:
-		if str(poly.get("class", "")) == "grass" and Geometry2D.is_point_in_polygon(p, poly.get("points", PackedVector2Array())):
+		if str(poly.get("class", "")) == "grass":
+			var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
+			if pts.is_empty():
+				continue
+			var lo := pts[0]
+			var hi := pts[0]
+			for q in pts:
+				lo = Vector2(minf(lo.x, q.x), minf(lo.y, q.y))
+				hi = Vector2(maxf(hi.x, q.x), maxf(hi.y, q.y))
+			out.append([pts, lo, hi])
+	return out
+
+## True inside any grass outline. A point beyond an outline's extreme
+## vertices cannot be inside it.
+static func _grass_at(p: Vector2, grass_polys: Array) -> bool:
+	for g: Array in grass_polys:
+		var lo: Vector2 = g[1]
+		var hi: Vector2 = g[2]
+		if p.x < lo.x or p.y < lo.y or p.x > hi.x or p.y > hi.y:
+			continue
+		if Geometry2D.is_point_in_polygon(p, g[0]):
 			return true
 	return false

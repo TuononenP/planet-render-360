@@ -86,6 +86,7 @@ func _run() -> void:
 	_api_checks(failures)
 	await _fallback_flow_checks(failures)
 	await _poi_failure_checks(failures)
+	await _give_up_checks(failures)
 	if failures.is_empty():
 		print("OSM FALLBACK OK: api url, xml convert, nearby cache, cache fallback order")
 		quit(0)
@@ -280,6 +281,31 @@ func _fallback_flow_checks(failures: Array[String]) -> void:
 	if _ok or not _failed_reason.contains("OSM API"):
 		failures.append("far cache must fail via the OSM API step, got ok=%s reason=%s" % [_ok, _failed_reason])
 
+## A streamed build out of time stops waiting on Overpass (give_up): a
+## neighbour's cached copy serves, else it fails with the reason given.
+func _give_up_checks(failures: Array[String]) -> void:
+	for nearby in [true, false]:
+		_with_cache_dir({"osm_v2_48860_2352_r1200.json": CACHED_PAYLOAD} if nearby else {})
+		var f := OsmFetcher.new()
+		root.add_child(f)
+		await process_frame
+		var result := {"ok": false, "failed": "", "detail": ""}
+		f.succeeded.connect(func(_b, _r, _l, _lm) -> void: result["ok"] = true)
+		f.failed.connect(func(reason: String) -> void: result["failed"] = reason)
+		f.fallback_used.connect(func(detail: String, _p: bool) -> void: result["detail"] = detail)
+		f._pending_lat = LAT
+		f._pending_lon = LON
+		f.give_up("streamed wait over")
+		var deadline := Time.get_ticks_msec() + 5000
+		while not result["ok"] and result["failed"] == "" and Time.get_ticks_msec() < deadline:
+			await process_frame
+		if nearby and (not result["ok"] or not str(result["detail"]).begins_with("Nearby")):
+			failures.append("give_up must serve a neighbour's copy: %s" % [result])
+		if not nearby and (result["ok"] or not str(result["failed"]).contains("streamed wait over")):
+			failures.append("give_up with nothing nearby must fail with its reason: %s" % [result])
+		f.queue_free()
+		CacheStore.dir_override = ""
+
 func _poi_failure_checks(failures: Array[String]) -> void:
 	_with_cache_dir({})
 	var f := OsmFetcher.new()
@@ -292,6 +318,7 @@ func _poi_failure_checks(failures: Array[String]) -> void:
 	f._detailed_text = CACHED_PAYLOAD
 	f._detailed_ready = true
 	f._ring_pending = false
+	f._bridge_started = true
 	f._poi_started = true
 	f._poi_pending = true
 	f._on_poi_exhausted("fixture timeout", 1)

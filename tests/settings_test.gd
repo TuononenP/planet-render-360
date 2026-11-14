@@ -25,6 +25,12 @@ func _flat_data(preset_value: int, building_count: int) -> LocationData:
 			"size_x": 4.0, "size_z": 4.0, "height": 10.0, "name": "t"})
 	return data
 
+func _node_count(n: Node) -> int:
+	var total := 1
+	for c in n.get_children():
+		total += _node_count(c)
+	return total
+
 func _run() -> void:
 	var failures: Array[String] = []
 
@@ -141,12 +147,14 @@ func _run() -> void:
 	var fast_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.FAST, 400))
 	var high_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.HIGH, 400))
 	var ultra_world := TerrainBuilder.build_world(_flat_data(RenderSettings.Preset.ULTRA, 400))
-	if fast_world.get_child_count() >= high_world.get_child_count():
-		failures.append("Fast should build fewer nodes than High (%d vs %d)" % [
-			fast_world.get_child_count(), high_world.get_child_count()])
-	if high_world.get_child_count() >= ultra_world.get_child_count():
-		failures.append("Ultra should build more nodes than High (%d vs %d)" % [
-			ultra_world.get_child_count(), high_world.get_child_count()])
+	# Every node, not just the world's children: trees sit in one VegTreeSet.
+	var fast_n := _node_count(fast_world)
+	var high_n := _node_count(high_world)
+	var ultra_n := _node_count(ultra_world)
+	if fast_n >= high_n:
+		failures.append("Fast should build fewer nodes than High (%d vs %d)" % [fast_n, high_n])
+	if high_n >= ultra_n:
+		failures.append("Ultra should build more nodes than High (%d vs %d)" % [ultra_n, high_n])
 	fast_world.free()
 	high_world.free()
 	ultra_world.free()
@@ -196,10 +204,24 @@ func _run() -> void:
 	if QualityGovernor.step_label(2, 2) != "High" or not QualityGovernor.step_label(2, 0).begins_with("High · 65% res"):
 		failures.append("governor label should be the tier plus any reduction: %s / %s"
 			% [QualityGovernor.step_label(2, 2), QualityGovernor.step_label(2, 0)])
-	# Offline storage management: size is readable, label reports it.
-	if screen._usage == null or not (screen.summary_for("storage").contains(" MB of ")
-			or screen.summary_for("storage").contains(" GB of ")):
-		failures.append("settings should report offline cache size")
+	# Offline storage management: size is readable with no limit framing,
+	# and the Storage places list shows one row per saved place.
+	if screen._usage == null or screen.summary_for("storage").contains(" of "):
+		failures.append("settings should report cache size without a limit: %s" % screen.summary_for("storage"))
+	var place_store := CacheStore.new()
+	place_store.entries = [{"name": "Test Place, Somewhere", "lat": 1.0, "lon": 2.0,
+		"quality_preset": 2, "timestamp": now}]
+	screen.bind_store(place_store)
+	# The places list is built once the cache index lands (ensure_index_async).
+	for _i in 300:
+		if CacheStore.index_ready():
+			break
+		await process_frame
+	await process_frame
+	if screen._place_rows.size() != 1 or screen._place_clear_btns.size() != 1:
+		failures.append("storage should list one row per saved place, got %d" % screen._place_rows.size())
+	elif not screen._place_clear_btns[0].disabled:
+		failures.append("a place holding 0 bytes should not offer Clear")
 	if OfflineDownloader.cache_size_bytes() < 0:
 		failures.append("cache size should be readable")
 	if OfflineDownloader.JOBS != 5:
@@ -282,6 +304,12 @@ func _run() -> void:
 	if not rig.environment.volumetric_fog_albedo.is_equal_approx(rig.haze_color):
 		failures.append("volumetric fog should take the haze colour")
 	rig.free()
+	var fps_prefs := RenderSettings.new()
+	if fps_prefs.pref("fps_counter") != false:
+		failures.append("the FPS counter should default to off")
+	fps_prefs.set_pref("fps_counter", true)
+	if fps_prefs.pref("fps_counter") != true:
+		failures.append("the FPS counter pref should round-trip")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(RenderSettings.path_override))
 
 	if failures.is_empty():

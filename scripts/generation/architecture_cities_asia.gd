@@ -56,7 +56,7 @@ const REGIONS := {
 			"p": [["tiles", 3], ["strip", 2], ["punched", 2]], "wn": "wide", "bay": 2.6,
 			"fr": "#8a8c8e", "r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.2,
 			"st": [3, 9], "fix": true, "eq": 0.9, "g": [["signage", 1]], "ev": 0.0, "vt": 0.3,
-			"rv": {"signage": 0.75, "screens": 0.7, "awning": 0.15,
+			"rv": {"signage": 0.75, "screens": 0.7, "sign_stack": 0.3, "awning": 0.15,
 				"awning_colours": ["#2a4a6a", "#8a2a1a", "#e8e4da"]}},
 	},
 	# Low houses: render or dark timber, dark kawara tile roofs, eaves.
@@ -172,7 +172,7 @@ const REGIONS := {
 			"p": [["strip", 3], ["tiles", 2], ["curtain", 1]], "wn": "wide", "bay": 3.0,
 			"fr": "#8a8c8e", "r": [["flat", 1]], "rf": [["concrete", GREEN_ROOF], ["membrane", []]],
 			"fh": 3.4, "st": [3, 9], "fix": true, "eq": 0.85, "g": [["signage", 3], ["shop", 1]],
-			"gc": SEOUL_SIGNS, "ev": 0.0, "rv": {"signage": 0.8, "awning": 0.1,
+			"gc": SEOUL_SIGNS, "ev": 0.0, "rv": {"signage": 0.8, "sign_bands": 0.6, "awning": 0.1,
 				"awning_colours": ["#2a4a6a", "#8a2a1a", "#e8e4da"]}},
 	},
 	# Villas and dagagu: 3–5 storey red-brick walk-ups on small plots,
@@ -190,7 +190,7 @@ const REGIONS := {
 		"commercial": {"w": [["brick", SEOUL_BRICK], ["concrete", ["#d8d6d0"]]], "p": "punched",
 			"wn": "wide", "bay": 2.8, "fr": "#9a9c9e", "r": [["flat", 1]], "rf": [["concrete", GREEN_ROOF]],
 			"fh": 3.0, "st": [2, 5], "fix": true, "eq": 0.7, "g": [["signage", 2], ["shop", 1]],
-			"gc": SEOUL_SIGNS, "rv": {"signage": 0.7}},
+			"gc": SEOUL_SIGNS, "rv": {"signage": 0.7, "sign_bands": 0.5}},
 	},
 	# Hanok: one storey, white plaster between dark timber posts on a
 	# granite base, deep eaves under curved grey giwa roofs.

@@ -22,12 +22,15 @@ func _check(ok: bool, what: String) -> void:
 func _run() -> void:
 	CacheStore.dir_override = CACHE
 	PlaceThumb.dir_override = CACHE + "/thumbs"
+	WorldCache.dir_override = CACHE + "/worlds"
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_view_link()
 	_seasons()
 	_store_camera()
 	_thumbs()
+	await _thumb_save_async()
 	_photo_names()
+	await _photo_encode_async()
 	_time_lapse()
 	_calendar()
 	_horizon_data()
@@ -39,6 +42,7 @@ func _run() -> void:
 	_clean(CACHE)
 	CacheStore.dir_override = ""
 	PlaceThumb.dir_override = ""
+	WorldCache.dir_override = ""
 	if failures.is_empty():
 		print("VIEWER TOOLS OK: links, camera per place, thumbnails, photo, time-lapse, calendar, horizon labels, mini-map, walking, HUD wiring")
 		quit(0)
@@ -174,6 +178,46 @@ func _thumbs() -> void:
 	PlaceThumb.save(wide, 12.0, 34.0)
 	store.remove_place(store.entries[0])
 	_check(not PlaceThumb.exists(12.0, 34.0), "remove_place deletes the picture")
+
+func _thumb_save_async() -> void:
+	# Saving a thumbnail must not block the main thread (it froze leaving
+	# the view): frames keep running while the shrink + JPEG write runs.
+	var wide := Image.create(1600, 600, false, Image.FORMAT_RGBA8)
+	wide.fill(Color(0.3, 0.4, 0.9))
+	var frames := [0]
+	var on_frame := func() -> void: frames[0] += 1
+	process_frame.connect(on_frame)
+	var ok: bool = await PlaceThumb.save_async(wide, 11.0, 22.0, self)
+	process_frame.disconnect(on_frame)
+	_check(ok and PlaceThumb.exists(11.0, 22.0), "async thumbnail should be saved")
+	var tmp_left: Array = []
+	for f in DirAccess.get_files_at(PlaceThumb.path(11.0, 22.0).get_base_dir()):
+		if f.contains(".tmp-"):
+			tmp_left.append(f)
+	_check(tmp_left.is_empty(), "the atomic thumbnail write should leave no temporary file: %s" % [tmp_left])
+	_check(frames[0] >= 1, "thumbnail save should let frames run while it works")
+	var black := Image.create(800, 500, false, Image.FORMAT_RGBA8)
+	black.fill(Color.BLACK)
+	_check(not await PlaceThumb.save_async(black, 5.0, 6.0, self) and not PlaceThumb.exists(5.0, 6.0),
+		"an async save of a blank frame still saves nothing")
+	PlaceThumb.remove(11.0, 22.0)
+
+func _photo_encode_async() -> void:
+	# Encoding a photo must not block the main thread (it froze Save
+	# photo): frames keep running, and the bytes are a decodable PNG.
+	var img := Image.create(512, 256, false, Image.FORMAT_RGB8)
+	for i in 16:
+		img.fill_rect(Rect2i(i * 32, 0, 32, 256), Color(float(i % 8) / 7.0, float(i / 4) / 3.0, 0.5))
+	var frames := [0]
+	var on_frame := func() -> void: frames[0] += 1
+	process_frame.connect(on_frame)
+	var bytes: PackedByteArray = await PhotoMode.encode_png_async(img, self)
+	process_frame.disconnect(on_frame)
+	_check(frames[0] >= 1, "photo encode should let frames run while it encodes")
+	_check(bytes == img.save_png_to_buffer(), "async photo encode should match save_png_to_buffer")
+	var back := Image.new()
+	_check(back.load_png_from_buffer(bytes) == OK and back.get_size() == Vector2i(512, 256),
+		"async photo bytes should decode at the image size")
 
 # --- Photo ---
 
@@ -320,10 +364,34 @@ func _walk_maths() -> void:
 	_check(ViewWalk.glide_seconds(5.0) == ViewWalk.GLIDE_MIN_S and ViewWalk.glide_seconds(5000.0) == ViewWalk.GLIDE_MAX_S,
 		"glides take between the minimum and the maximum")
 	_check(ViewWalk.ground_hit(Vector3(0, 30, 0), Vector3(0, 0.1, -1), null) == Vector2.INF, "no ground, no hit")
-	_check(is_equal_approx(ViewWalk.lifted(0.0, 1, 1.0), ViewWalk.RISE_MPS), "E climbs RISE_MPS a second")
-	_check(ViewWalk.lifted(0.0, -1, 1.0) == 0.0, "Q never goes below the eye level")
-	_check(ViewWalk.lifted(ViewWalk.LIFT_MAX_M, 1, 5.0) == ViewWalk.LIFT_MAX_M, "the climb stops at the ceiling")
-	_check(ViewWalk.lifted(0.0, 1, 1.0, true) > ViewWalk.lifted(0.0, 1, 1.0), "Shift climbs faster")
+	# A 20 m square block from x 0..20, z 0..20.
+	var block := [{"x": 10.0, "z": 10.0, "footprint": PackedVector2Array([
+		Vector2(0, 0), Vector2(20, 0), Vector2(20, 20), Vector2(0, 20)])}]
+	_check(ViewWalk.blocked(block, Vector2(10, 10)), "inside a building is blocked")
+	_check(ViewWalk.blocked(block, Vector2(-0.2, 10)), "so is brushing its wall")
+	_check(not ViewWalk.blocked(block, Vector2(-2, 10)), "the pavement beside it is not")
+	_check(ViewWalk.step(block, Vector2(-1, 10), Vector2(-0.4, 10)) == Vector2(-1, 10), "walking straight into a wall stops")
+	var slid := ViewWalk.step(block, Vector2(-1, 10), Vector2(-0.3, 10.7))
+	_check(slid.x <= -ViewWalk.BODY_M + 0.01 and slid.y > 10.0, "walking at it at an angle slides along: %s" % slid)
+	_check(ViewWalk.step(block, Vector2(10, 10), Vector2(10, 9)) == Vector2(10, 9), "a walker set inside can walk out")
+	var out := ViewWalk.free_spot(block, Vector2(10, 10))
+	_check(not ViewWalk.blocked(block, out) and out.distance_to(Vector2(10, 10)) <= 14.0,
+		"set down inside, the nearest open ground: %s" % out)
+	_check(ViewWalk.free_spot(block, Vector2(-5, -5)) == Vector2(-5, -5), "open ground stays put")
+	var east := func(q: Vector2) -> bool: return q.x > 25.0
+	var picked := ViewWalk.free_spot(block, Vector2(10, 10), east)
+	_check(picked.x > 25.0 and not ViewWalk.blocked(block, picked), "the open ground must pass the check: %s" % picked)
+	_check(ViewWalk.free_spot(block, Vector2(-5, -5), east).x > 25.0, "clear of walls but refused: it looks further")
+	var square := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(20, 20), Vector2(0, 20)])
+	_check(not ViewWalk.blocked([{"kind": "roof", "footprint": square}], Vector2(10, 10)), "a roof on posts is walked under")
+	_check(not ViewWalk.blocked([{"kind": "yes", "min_height_m": 5.0, "footprint": square}], Vector2(10, 10)),
+		"so is a part raised over the eye")
+	var yard := [{"kind": "yes", "footprint": square, "holes": [PackedVector2Array([
+		Vector2(6, 6), Vector2(14, 6), Vector2(14, 14), Vector2(6, 14)])]}]
+	_check(not ViewWalk.blocked(yard, Vector2(10, 10)), "a courtyard is open ground")
+	_check(ViewWalk.blocked(yard, Vector2(6.2, 10)), "its walls still block")
+	_check(ViewWalk.blocked(yard, Vector2(3, 10)), "and the building around it is solid")
+	_check(ViewWalk.step(yard, Vector2(7, 10), Vector2(6.4, 10)) == Vector2(7, 10), "a courtyard wall stops a walker inside")
 
 # --- Search: a pasted link opens its view ---
 
@@ -417,6 +485,25 @@ func _view_wiring() -> void:
 	_check(view._minimap.visible and not Rect2(view._hint.position, view._hint.size).intersects(view._minimap.get_rect()),
 		"the hint keeps off the mini-map on a phone on its side")
 	UiPrefs.minimap = minimap_was
+	var fps_was := UiPrefs.fps_counter
+	UiPrefs.fps_counter = false
+	var fps_events := []
+	view.pref_changed.connect(func(k: String, val: Variant) -> void: fps_events.append([k, val]))
+	ViewTools.toggle_fps(view)
+	_check(UiPrefs.fps_counter and view._fps.visible and fps_events == [["fps_counter", true]],
+		"the FPS counter switches on and reports the pref")
+	_check(not view._fps.get_rect().intersects(view._top_right.get_rect()), "the FPS counter sits clear of the top-right chips")
+	_check(view._fps.is_processing(), "the FPS counter processes while shown")
+	var side_size := view.size
+	view.size = Vector2(844, 390)
+	ViewChrome.layout(view)
+	_check(not view._fps.get_rect().intersects(view._sheet.get_rect()) and not view._fps.get_rect().intersects(view._top_right.get_rect()),
+		"the FPS counter keeps off the inspector on a phone on its side")
+	view.size = side_size
+	ViewChrome.layout(view)
+	ViewTools.toggle_fps(view)
+	_check(not UiPrefs.fps_counter and not view._fps.visible and not view._fps.is_processing(), "and off again, idle")
+	UiPrefs.fps_counter = fps_was
 	view.size = Vector2(1280, 800)
 	ViewChrome.layout(view)
 	_check(not view._sheet_scroll.clip_contents, "a roomy inspector doesn't clip focus rings")
@@ -651,18 +738,25 @@ func _view_wiring() -> void:
 	Input.flush_buffered_events()
 	view._walk.process_keys(view, 0.01)
 
-	# At the edge, holding an outward direction must not suppress climbing.
-	view._rig.position = Vector3(0, View360.eye_y(data, view._ground, Vector2(0, -View360.IN_PLACE_M), false),
-		-View360.IN_PLACE_M)
+	# On foot the eye walks down to the street, and E does not climb.
+	var street := Vector2(0, -100)
+	view._rig.position = Vector3(street.x, ViewWalk.foot_y(data, view._ground, street), street.y)
+	view._rig.set_look(0.0, 0.0)
 	for code in [KEY_W, KEY_E]:
 		var ev := InputEventKey.new()
 		ev.keycode = code
 		ev.pressed = true
 		Input.parse_input_event(ev)
 	Input.flush_buffered_events()
-	var before_climb := view._rig.position.y
-	view._walk.process_keys(view, 0.5)
-	_check(view._rig.position.y > before_climb + 1.0, "climb while walking against the edge")
+	var walk_from := view._rig.position
+	for i in 10:
+		view._walk.process_keys(view, 0.1)
+	var on_foot := Vector2(view._rig.position.x, view._rig.position.z)
+	_check(absf(view._rig.position.y - ViewWalk.foot_y(data, view._ground, on_foot)) < 0.5,
+		"the eye stays at walking height, E or not: %.1f" % (view._rig.position.y
+			- ViewWalk.foot_y(data, view._ground, on_foot) + ViewWalk.EYE_M))
+	var paced := Vector2(walk_from.x, walk_from.z).distance_to(on_foot)
+	_check(paced <= ViewWalk.WALK_MPS * 1.0 + 0.1, "at a walking pace: %.1f m in 1 s" % paced)
 	for code in [KEY_W, KEY_E]:
 		var ev := InputEventKey.new()
 		ev.keycode = code

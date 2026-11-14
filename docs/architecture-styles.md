@@ -106,17 +106,17 @@ outranks the map):
 | New York (`new_york`, brick walk-ups + fire escapes) | `nyc_brownstone` rowhouses; `nyc_prewar` dated or heritage towers and the Financial District; `nyc_castiron` SoHo/Tribeca, `nyc_loft` DUMBO, `nyc_nycha` LES housing towers; `nyc_pencil` slender supertalls, `nyc_international` dated mid-century commercial towers, and `nyc_glass` contemporary towers. |
 | Chicago (`chicago`, brick 2-/3-flats) | `chicago_greystone`; `chicago_tower` ≥12 levels |
 | San Francisco (`san_francisco`, Edwardian flats 1906–1925: pastel stucco, white-trimmed bays, bracketed cornices, garages under) | `sf_victorian` 1850–1905, heritage houses, Haight / Alamo Sq / Mission / Pacific Heights / Noe Valley (painted clapboard, bays, stoops); `sf_stucco` 1926–1955, Marina / Sunset / Richmond (pastel stucco over a garage, side stair, some tile); `sf_prewar` ≥9 levels pre-1950, heritage or Nob Hill / Union Sq, ≤30 levels (buff brick, terracotta, granite); `sf_chinatown` walk-ups in Chinatown (brick and render, fire escapes, red/green/gold awnings and signs); `sf_tower` ≥9 levels otherwise, FiDi / SoMa / Mission Bay (glass). SF's structural rules also read the most local district circle a building stands in. |
-| Tokyo (`tokyo`, dense 3–8 storey mixed) | `tokyo_house` (dark kawara roofs); `tokyo_tower` ≥15 levels |
+| Tokyo (`tokyo`, dense 3–8 storey mixed) | `tokyo_house` pre-1975 / heritage (dark kawara roofs); `tokyo_house_modern` 1975+, flat or mono-pitch roofs, Setagaya / Suginami (ceramic siding, galvalume); `tokyo_mokuchin` 2-level apartments, Nakano (mortar or wood, low tin roofs); `tokyo_mansion` 4–14 levels on larger plots, Ebisu / Meguro / Aoyama (tiled fronts, deep balcony slabs); `tokyo_zakkyo` small commercial ≥5 levels or anything in Center Gai / Dogenzaka / Kabukicho / Ginza / Akihabara / Ikebukuro (full-height sign columns, screens, sign boards); `tokyo_tower` ≥15 levels, Shinjuku / Marunouchi / Roppongi / Shibuya station east. Tokyo's structural rules (`ArchitectureCitiesEastAsia.tokyo_rule`) read the most local district circle. |
 | Hong Kong (`hong_kong`, 20–40 storey slender towers) | `hk_tenement` 1900–1969 / ≤9 levels (shophouse pattern, signage); `hk_office` |
 | Singapore (`singapore`, HDB slabs with colour bands) | `sg_shophouse` 1840–1959 / ≤4 levels; `sg_tower` ≥30 levels |
-| Seoul (`seoul`, 12–25 storey white apartment-complex slabs; signed commercial streets) | `seoul_villa` 1970–2005 / 2–6 levels (red-brick walk-ups, green-painted flat roofs, water tanks); `seoul_hanok` pre-1960, heritage houses, Bukchon / Ikseon-dong / Seochon (white plaster and dark timber on granite, deep eaves, grey giwa hipped roofs); `seoul_tower` ≥20 levels, Yeouido / Teheran-ro / Jongno (glass) |
+| Seoul (`seoul`, 12–25 storey white apartment-complex slabs; signed commercial streets) | `seoul_villa` 1970–2005 / 2–6 levels (red-brick walk-ups, green-painted flat roofs, water tanks); `seoul_hanok` pre-1960, heritage houses, Bukchon / Ikseon-dong / Seochon (white plaster and dark timber on granite, deep eaves, grey giwa hipped roofs); `seoul_danji` apartments ≥12 levels or in Jamsil / Apgujeong / Banpo / Ichon / Mokdong / Nowon (cream slabs, glazed balconies, the block number painted on each end, `danji_number`); `seoul_shopping` ≤9 levels in Jongno 2–3-ga / Myeongdong / Hongdae / Sinchon / Gangnam station (a sign board under every lower storey, `sign_bands`); `seoul_officetel` 1995+, Gangnam / Seocho / Gongdeok (glass and stone); `seoul_tower` ≥40-level apartments or ≥10-level non-residential, Yeouido / Teheran-ro / Jongno (glass). Seoul's rules are `ArchitectureCitiesEastAsia.seoul_rule`. Mangwon / Yeonnam and Hwagok are villa districts. |
 | Dubai (`dubai`, 6–15 storey sand-render blocks with balconies and shops) | `dubai_tower` ≥20 levels, Sheikh Zayed Road / Downtown / Business Bay / Marina (blue-silver curtain walls); `dubai_heritage` pre-1970, Al Fahidi / Al Shindagha (coral stone and gypsum, small screened openings, flat roofs); `dubai_villa` houses, Jumeirah (pale render, parapet or hipped terracotta) |
 | Monaco (`monaco`, Belle Époque: pastel stucco, French windows, louvred shutters, balconettes, terracotta or slate mansards) | `monaco_old` pre-1860, heritage ≤5 levels, Le Rocher (Genoese ochre/rose houses, green shutters); `monaco_tower` ≥1960 or ≥10 levels, Fontvieille / Larvotto (white render, deep terraces) |
 | Interlaken (`interlaken`, Bernese chalets: dark spruce over a white base, half-hipped roofs, 1.4 m eaves, balconies) | `interlaken_hotel` 1860–1930, big or ≥5-level commercial, Höheweg (cream render, slate mansards, balconettes); `interlaken_modern` ≥1955 or ≥6 levels |
 | Banff (`banff`, Banff Avenue: log, river rock and Rundle stone fronts, steep metal gables) | `banff_heritage` 1885–1949 or heritage (Rundle stone, verdigris copper roofs, dormers); `banff_house` (clapboard cottages) |
 | Copenhagen (`copenhagen`, brick and rendered 5-storey blocks, dormered red tile) | `copenhagen_old` pre-1860, Nyhavn (painted plaster townhouses, steep tile); `copenhagen_modern` ≥7 levels, Ørestad |
 | Oslo (`oslo`, bygårder: 4–5 storey render and brick, hipped slate) | `oslo_wood` 1–2 levels / heritage, Damstredet (painted clapboard); `oslo_modern` ≥7 levels, Bjørvika |
-| Helsinki (`helsinki`, Jugend: grey-green render on granite, steep tile / black metal, 5–7 storeys) | `helsinki_empire` 1810–1880, Kruununhaka (ochre render, white pilasters, low black roofs); `helsinki_functional` 1930–1989, Töölö (light render, flat); `helsinki_modern` ≥10 levels, Kalasatama |
+| Helsinki (`helsinki`, Jugend: grey-green render on granite, steep tile / black metal, 5–7 storeys) | `helsinki_empire` 1700–1880, Kruununhaka (ochre render, white pilasters, low black roofs); `helsinki_classicism` 1920–1934, Töölö, Vallila, Torkkelinmäki (pastel render, hipped); `helsinki_functional` 1935–1964, Lauttasaari, Munkkiniemen puistotie (light render or brick, flat); `helsinki_midrise` ≥1990, Kalasatama, Sompasaari, Jätkäsaari, Ruoholahti, Katajanokanranta; `helsinki_villa` houses on Kuusisaari, Lehtisaari and in Vanha Munkkiniemi; `helsinki_modern` ≥10 levels |
 | Edinburgh (`edinburgh`, sandstone tenements, slate, chimney rows) | `edinburgh_old` pre-1767, 6–12 levels, Royal Mile (rubble, crow-step gables); `edinburgh_georgian` 1767–1850, New Town (ashlar terraces); `edinburgh_modern` |
 | Dublin (`dublin`, Georgian red brick, 4 storeys over a basement, parapet slate) | `dublin_victorian` 1–2 level brick cottages; `dublin_modern` ≥6 levels, Docklands |
 | Brussels (`brussels`, maisons de maître: pale render or brick on bluestone, French windows, slate mansards) | `brussels_old` pre-1860, Grand-Place (stone guild houses, step / bell gables); `brussels_modern` ≥6 levels, European Quarter |
@@ -258,13 +258,30 @@ Finnish fabric uses `ArchitectureCitiesFinland`: Helsinki's Empire centre, Jugen
 1920s classicism, wooden Käpylä/Vallila, forest-suburb lamellas, 1965–89 precast panels,
 and contemporary courtyard blocks. Espoo uses Tapiola modernism, Otaniemi brick/copper,
 modern centres and Kauniainen villas. The east-centred Helsinki zone precedes Espoo: Munkkivuori stays Helsinki while
-Tapiola and Otaniemi lie outside its radius; eastern Helsinki remains covered.
+Tapiola and Otaniemi lie outside its radius; eastern Helsinki remains covered. A small Espoo zone row precedes Helsinki at
+Keilaniemi so the whole tip stays Espoo, where a 0.75 km `espoo_modern` district now allows
+light stone and strip-window offices beside curtain walls. Lauttasaari is a 1.5 km
+`helsinki_functional` district (1940s–50s lamellas such as Aropaltio's and Ervi's) with
+Vattuniemi as a nested `helsinki_midrise` district.
 
-Relief keys: `glazed_balcony` (probability) builds a deep balcony with glass fronts and
+Inner-Helsinki districts follow OSM `start_date` clusters (2026-11-12). Katajanokka is split:
+its 1901–13 Jugend west (Luotsikatu, Kauppiaankatu) is a 0.33 km `helsinki` circle and
+Katajanokanranta's 1976–83 housing a 0.45 km `helsinki_midrise` one. Kallio keeps its Jugend
+circle with Torkkelinmäki's 1920s blocks nested as `helsinki_classicism`. Jätkäsaari is
+re-centred on its built quarters, and Ruoholahti (1990s brick) and Sompasaari get their own
+`helsinki_midrise` circles; before, Ruoholahti fell back to Jugend or pastel render and
+Sompasaari sat just outside Kalasatama. Munkkiniemen puistotie's 1935–54 blocks are
+`helsinki_functional`. Vanha Munkkiniemi, Kuusisaari and Lehtisaari are `helsinki_villa`
+districts: houses there take the villa profile (pastel or white render or timber, hipped
+tile or metal roofs or flat modernist ones, granite plinths, one or two storeys), and their
+apartment blocks fall to `helsinki_suburb` as before. A viewpoint on Lehtisaari or
+Kuusisaari is in the Helsinki zone, so Otaniemi's generic buildings seen from there use
+Helsinki's rules; its bespoke landmarks are unaffected.
+
+Relief keys: `danji_number`, `sign_bands`, `sign_stack` (probabilities, `AsiaFronts`) paint a danji slab's block number on its narrow ends, put a sign board across each lower storey of a street front, and run a vertical sign column up the full front. `glazed_balcony` (probability) builds a deep balcony with glass fronts and
 vertical aluminium mullions; `turret` (probability) adds one steep-roofed corner tower
 on an exposed street front; `granite_plinth` (boolean) adds rough grey/pink granite
-courses at the base; `snow_guard` (boolean) adds eave rails and roof-ladder rungs on
-pitched roofs. They share the existing facade/roof detail distance and quality gates.
+courses at the base. They share the existing facade/roof detail distance and quality gates.
 
 Street and seasonal context for the Finland hero pass: separately mapped sidewalks
 can widen a carriageway only up to mapped tree/cycle/path verges; an ordinary
@@ -319,15 +336,31 @@ mapped quays on tidal water with a clear fairway also berth up to two procedural
 large vessels (140-300 m, `QuayMoorings.liners`, up to 1200 m from the eye,
 never beside lake water). Nearby mapped passenger terminals select a ferry
 silhouette and also allow suitable terminal-adjacent shorelines when a quay is
-not mapped; aligned quay fragments can be joined. Mapped ships take precedence. Vessels are lofted hulls (`HullLoft`) with per-type
-models: `CruiseLinerModel`, `PassengerVesselModel` (classic coastal ship,
-houseboat, tall ship), `MotorYachtModel` (flybridge, sport, runabout, RIB,
-console) and `SailYachtModel`, sharing `VesselMaterials`/`VesselKit`. Marina
+not mapped; aligned quay fragments can be joined. Mapped ships take precedence.
+Quay runs fronting port land (`CargoBerths`: industrial land tagged
+`industrial=port|shipyard|container_terminal` or `harbour=yes`, or warehouses
+and industrial buildings covering 35% of the footprint within 200 m, 20% on
+plain industrial land) berth up to three cargo ships instead of liners;
+terminals keep their ferries first. `LargeShips` commits liners, cruise ferries
+and cargo ships, detailed within 650 m of the eye, and `ShipMooring` adds
+lines to quay bitts, fenders and a gangway or accommodation ladder.
+Vessels are lofted hulls (`HullLoft`) with per-type models: `CruiseLinerModel`
+and `CruiseFerryModel` (sharing `LinerSuperstructure`: lifeboat recess,
+balcony decks, bridge wings, funnel, radar mast), `CargoShipModel` with
+`CargoDeckGear` (container, bulk, tanker, general), `PassengerVesselModel`
+(classic coastal ship, houseboat, tall ship), `MotorYachtModel` (flybridge,
+sport, runabout, RIB, console) and `SailYachtModel`, sharing
+`VesselMaterials`/`VesselKit`. Large steel ships use `ShipPaint` (weathered hull
+plating, waterline grime, rust streaks, draught marks, matte enamel),
+`ShipHullKit` hull details and `ShipLights` (lit cabins, navigation and deck
+lights on the CityLights night cycle); yachts keep their gelcoat. Marina
 boats are MultiMesh prototypes (`VesselPrototypes`); those beyond 250 m use
 reduced `_far` meshes without rails, rigging and mullions, and the combined
 marina surface budget is `MarinaBuilder.MAX_DRAW_CALLS`. Mapped
-`building=ship|boat|houseboat` features pick a model by type and length (>= 100 m
-is a liner, sailing types a yacht or tall ship, other `boat` features a yacht or
+`building=ship|boat|houseboat` features pick a model by type and length
+(container, bulk, cargo and tanker `ship:type` families from 40 m are cargo
+ships, ro-ro and ferry types from 100 m cruise ferries, other ships from 100 m
+liners, sailing types a yacht or tall ship, other `boat` features a yacht or
 day boat, anything else a coastal passenger ship) at every tier; those
 individual building-layer meshes are outside the marina budget. Untagged vessels
 use a generic hull colour and height. Snow covers decks/roofs in mapped meshes,

@@ -30,7 +30,7 @@ static func entries() -> Array:
 		{"type": "willis_tower", "name": "Willis Tower", "lat": 41.8789, "lon": -87.6359, "radius_m": 8000.0,
 			"wiki_title": "Willis Tower", "height_m": 527.3, "clear_m": 55.0, "kind": "Skyscraper",
 			"aliases": ["willis tower", "sears tower"]},
-		{"type": "chrysler_building", "name": "Chrysler Building", "lat": 40.7516, "lon": -73.9755,
+		{"type": "chrysler_building", "skyline_priority": 2, "name": "Chrysler Building", "lat": 40.7516, "lon": -73.9755,
 			"radius_m": 6000.0, "wiki_title": "Chrysler Building", "height_m": 318.9, "clear_m": 50.0,
 			"yaw_deg": 29.0, "kind": "Skyscraper", "aliases": ["chrysler building"]},
 		# The above-ground station hall; the much larger underground PATH

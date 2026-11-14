@@ -61,14 +61,33 @@ static func is_blank(img: Image) -> bool:
 				return false
 	return true
 
+## `save` on a worker thread, a frame at a time: shrinking a full-size
+## read-back and encoding it froze the app (the macOS beachball) on
+## leaving the view. `img` is handed to the worker; the caller must not
+## modify it meanwhile.
+static func save_async(img: Image, lat: float, lon: float, tree: SceneTree) -> bool:
+	var box: Array = [false]
+	await FrameTask.run(func() -> void: box[0] = save(img, lat, lon), "PlaceThumb", tree)
+	return box[0]
+
 ## Shrinks and writes `img` for the place; false when nothing was saved.
+## Written to a temporary name and renamed over the place's file, so a
+## reader (History's cards, now on the main thread while a save_async
+## write runs) never sees a half-written JPEG.
 static func save(img: Image, lat: float, lon: float) -> bool:
 	var small := shrink(img)
 	if small == null:
 		return false
 	var p := path(lat, lon)
 	DirAccess.make_dir_recursive_absolute(p.get_base_dir())
-	return small.save_jpg(p, QUALITY) == OK
+	var tmp := "%s.tmp-%d.jpg" % [p, Time.get_ticks_usec()]
+	if small.save_jpg(tmp, QUALITY) != OK:
+		return false
+	if DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp),
+			ProjectSettings.globalize_path(p)) == OK:
+		return true
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+	return false
 
 static func exists(lat: float, lon: float) -> bool:
 	return FileAccess.file_exists(path(lat, lon))

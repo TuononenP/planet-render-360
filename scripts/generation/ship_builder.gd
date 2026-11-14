@@ -2,15 +2,25 @@ class_name ShipBuilder
 extends RefCounted
 
 ## Mapped vessels retain their oriented map envelope, but use a lofted hull
-## and a vessel model chosen by type and length (cruise liner, passenger
-## ship, tall ship, motor or sailing yacht, runabout, houseboat) rather than
+## and a vessel model chosen by type and length (cruise liner, cruise
+## ferry, cargo ship, passenger ship, tall ship, motor or sailing yacht,
+## runabout, houseboat) rather than
 ## apartment height inference and facade extrusion. Missing type / height /
 ## colour uses a documented generic look: a coastal passenger ship, or a
 ## cruise liner from LINER_MIN_M.
 const KINDS := ["ship", "boat", "houseboat"]
 const SAILING := ["sailing", "sailboat", "sailing_ship", "tall_ship"]
 const LINER_MIN_M := 100.0
+const CARGO_MIN_M := 40.0
 const HULL_COLOURS := ["#2d3b4a", "#6f2c26", "#202225", "#e6e4db", "#2f4a3c"]
+## Mapped ship:type values (normalised at the parser) by model variant.
+const CARGO_TYPES := {
+	"container": ["container", "container_ship", "containership"],
+	"bulk": ["bulk_carrier", "bulk", "bulker", "ore_carrier"],
+	"general": ["cargo", "general_cargo", "multipurpose", "reefer", "heavy_load"],
+	"tanker": ["tanker", "oil_tanker", "chemical_tanker", "product_tanker", "gas_carrier", "lng_carrier", "lpg_carrier"],
+}
+const FERRY_TYPES := ["ro_ro", "roro", "ro_pax", "ropax", "ferry", "car_ferry", "cruise_ferry"]
 
 static func accepts(b: Dictionary) -> bool:
 	return str(b.get("kind", "")) in KINDS
@@ -84,6 +94,10 @@ static func model_for(b: Dictionary, length: float) -> String:
 	var vessel := str(b.get("vessel_kind", "motor"))
 	if vessel in SAILING:
 		return "tall_ship" if length >= 30.0 else "sail_yacht"
+	if variant_for(b) != "" and length >= CARGO_MIN_M:
+		return "cargo"
+	if vessel in FERRY_TYPES and length >= LINER_MIN_M:
+		return "cruise_ferry"
 	if length >= LINER_MIN_M:
 		return "liner"
 	if kind == "boat" or vessel in ["yacht", "motor_yacht", "pleasure", "sport"]:
@@ -92,6 +106,14 @@ static func model_for(b: Dictionary, length: float) -> String:
 		if length < 30.0:
 			return "motor_yacht"
 	return "passenger"
+
+## The cargo variant of a mapped vessel type ("" when it is no cargo ship).
+static func variant_for(b: Dictionary) -> String:
+	var vessel := str(b.get("vessel_kind", ""))
+	for variant in CARGO_TYPES:
+		if vessel in CARGO_TYPES[variant]:
+			return variant
+	return ""
 
 static func build(root: Node3D, b: Dictionary, data: LocationData, ground: GroundTruth) -> bool:
 	if not accepts(b):
@@ -107,10 +129,15 @@ static func build(root: Node3D, b: Dictionary, data: LocationData, ground: Groun
 	var maps := data.quality_preset != RenderSettings.Preset.FAST
 	var colour := str(b.get("colour", ""))
 	if MaterialLibrary.parse_colour_tag(colour).a <= 0.0:
-		colour = CruiseLinerModel.hull_hex(seed_value * 4.0) if model == "liner" \
-			else str(HULL_COLOURS[int(seed_value * HULL_COLOURS.size()) % HULL_COLOURS.size()])
+		colour = str(HULL_COLOURS[int(seed_value * HULL_COLOURS.size()) % HULL_COLOURS.size()])
+		if model == "liner":
+			colour = CruiseLinerModel.hull_hex(seed_value * 4.0)
+		elif model == "cruise_ferry":
+			colour = "#f0eee8"
+		elif model == "cargo":
+			colour = str(LargeShips.CARGO_HULLS[int(seed_value * 50.0) % LargeShips.CARGO_HULLS.size()])
 	var lm := VesselPrototypes.geometry(model, length, float(f["beam"]), height(b, length),
-		VesselMaterials.paint(colour, maps, 0.42, 0.05), maps, maps, seed_value)
+		VesselMaterials.paint(colour, maps, 0.42, 0.05), maps, maps, seed_value, variant_for(b))
 	var yaw := atan2(-(f["axis"] as Vector2).y, (f["axis"] as Vector2).x)
 	for part in lm.commit(root, "MappedShip_"):
 		part.position = Vector3(at.x, y, at.y)

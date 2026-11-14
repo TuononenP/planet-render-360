@@ -16,22 +16,23 @@ static var solid_panels := false
 ## the glass edge thickens.
 static var high_contrast := false
 ## The 360 viewer's own switches: names along the skyline, the mini-map
-## inset, and the stamp on saved photos.
+## inset, the stamp on saved photos and the FPS counter.
 static var horizon_labels := false
 static var minimap := false
 static var photo_stamp := true
+static var fps_counter := false
 
 static func apply(s: RenderSettings) -> void:
 	UiTheme.units_imperial = bool(s.pref("imperial"))
 	UiTheme.units_dms = bool(s.pref("dms"))
 	UiTheme.units_12h = bool(s.pref("clock_12h"))
-	CacheStore.max_cache_bytes = int(s.pref("cache_limit_mb")) * 1024 * 1024
 	reduce_motion = _or_os(s.pref("reduce_motion"), "accessibility_should_reduce_animation")
 	solid_panels = _or_os(s.pref("solid_panels"), "accessibility_should_reduce_transparency")
 	high_contrast = _or_os(s.pref("high_contrast"), "accessibility_should_increase_contrast")
 	horizon_labels = bool(s.pref("horizon_labels"))
 	minimap = bool(s.pref("minimap"))
 	photo_stamp = bool(s.pref("photo_stamp"))
+	fps_counter = bool(s.pref("fps_counter"))
 	LoadingScreen.reduce_motion = reduce_motion
 	UiTheme.text_scale = clampf(float(s.pref("text_scale")), 0.85, 2.0)
 	UiTheme.apply_mode(int(s.pref("theme")))

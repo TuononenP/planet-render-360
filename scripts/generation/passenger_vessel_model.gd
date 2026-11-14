@@ -31,7 +31,8 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 		"stern_rake": length * 0.012, "keel_lift": 0.9, "lod": 0 if detail else 1}
 	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
-	lm.use("Boot", VesselMaterials.get_mat("red", maps))
+	ShipPaint.dress(lm, p["hull"], length, fb, maps)
+	ShipLights.register(lm, maps)
 	lm.use("Funnel", VesselMaterials.paint(str(p.get("funnel", FUNNELS[int(length) % FUNNELS.size()])), maps, 0.5, 0.05))
 	lm.use("Black", VesselMaterials.get_mat("black", maps))
 	lm.use("Orange", VesselMaterials.get_mat("orange", maps))
@@ -49,7 +50,7 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 		var cx := house_x - tier * length * 0.02
 		var l := tier_len - tier * length * 0.13
 		var w := tier_w - tier * beam * 0.1
-		roof_y = VesselKit.house(lm, cx, l, w, y, floor_h, true, 1.5 if detail else 0.0, 0.14)
+		roof_y = VesselKit.house(lm, cx, l, w, y, floor_h, true, 1.5 if detail else 0.0, 0.14, "White", ShipLights.cabin_key(tier))
 		y = roof_y
 	# Boat deck: lifeboats beside the second tier, rails round the top tier.
 	var top_x := house_x - (decks - 1) * length * 0.02
@@ -95,6 +96,10 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 	var main := Vector3(-length * 0.32, HullLoft.sheer(spec, -length * 0.32), 0)
 	VesselKit.mast(lm, "Black", fore, maxf(h - fore.y, 1.0), maxf(beam * 0.02, 0.07), detail)
 	VesselKit.mast(lm, "Black", main, maxf(h * 0.78 - main.y, 1.0), maxf(beam * 0.018, 0.06), detail)
+	if detail and wh_h > 0.0:
+		ShipLights.nav(lm, wh_x, roof_y + wh_h * 0.55, wh_w * 0.5 + 0.12, Vector3(fore.x, h * 0.93, 0),
+			Vector3(-length * 0.47, HullLoft.sheer(spec, -length * 0.47) + 0.6, 0),
+			Vector3(main.x, h * 0.74, 0) if length > 50.0 else Vector3.INF)
 	if detail:
 		VesselForms.fittings(lm, spec)
 		if bool(p.get("ultra", false)):

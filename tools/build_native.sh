@@ -38,11 +38,16 @@ for p in "${platforms[@]}"; do
 					-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ;;
 			ios)
 				# A plain dylib: Godot's iOS export wraps it in a framework.
+				# 15.0 is the oldest target the SDK's libc++ still supports.
 				build ios $target -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \
 					-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_SYSTEM_PROCESSOR=arm64 \
-					-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 ;;
+					-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 ;;
 			android)
-				ndk="${ANDROID_NDK_ROOT:-$(ls -d "$HOME"/Library/Android/sdk/ndk/* | sort -V | tail -1)}"
+				ndk="${ANDROID_NDK_ROOT:-$(ls -d "$HOME"/Library/Android/sdk/ndk/* 2>/dev/null | sort -V | tail -1)}"
+				if [ ! -f "$ndk/build/cmake/android.toolchain.cmake" ]; then
+					echo "android: no NDK found; set ANDROID_NDK_ROOT or install one under ~/Library/Android/sdk/ndk" >&2
+					exit 1
+				fi
 				build android $target \
 					-DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
 					-DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 ;;

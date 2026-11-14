@@ -22,6 +22,10 @@ const TREELINE_C := 7.5
 ## Warmest-quarter share of annual precipitation below which summers
 ## are dry (Köppen Cs-like): grass reads golden, not green, in summer.
 const SUMMER_DRY_SHARE := 0.12
+## Driest-quarter share of annual precipitation below which a tropical
+## place has a hard dry season (Köppen Aw, the monsoon savanna of
+## Cambodia and Thailand): the grass is straw-coloured by its end.
+const WINTER_DRY_SHARE := 0.03
 
 static func has(data: LocationData) -> bool:
 	return data != null and data.climate.has("t_warm_c") and data.climate.has("t_cold_c")
@@ -83,6 +87,16 @@ static func summer_dry(data: LocationData) -> bool:
 	var p := float(data.climate.get("precip_mm", 0.0))
 	return p > 0.0 and float(data.climate.get("precip_warm_mm", p)) / p < SUMMER_DRY_SHARE
 
+## Hard tropical dry season in the cool half of the year (Aw): almost
+## none of the year's rain falls in the driest quarter. False without the
+## driest-quarter figure (older climate copies, latitude fallbacks).
+static func winter_dry(data: LocationData) -> bool:
+	if not has(data) or not data.climate.has("precip_dry_mm"):
+		return false
+	var p := float(data.climate.get("precip_mm", 0.0))
+	return p > 0.0 and float(data.climate["t_cold_c"]) >= 18.0 \
+		and float(data.climate["precip_dry_mm"]) / p < WINTER_DRY_SHARE
+
 ## Köppen-B aridity: annual precipitation under 20 × (mean °C + 7) mm.
 static func arid(data: LocationData) -> bool:
 	if not has(data):
@@ -119,6 +133,10 @@ static func grass_tint(data: LocationData, season: int) -> Color:
 		return Color(0.42, 0.33, 0.20, 1.0)
 	if summer_dry(data) and LocationData.clamp_season(season) in [LocationData.Season.SUMMER, LocationData.Season.AUTUMN]:
 		return Color(0.47, 0.38, 0.19, 1.0)
+	# The monsoon dry season (Nov-Apr north of the equator) is the
+	# calendar's winter and spring there; the wet season stays green.
+	if winter_dry(data) and LocationData.clamp_season(season) in [LocationData.Season.WINTER, LocationData.Season.SPRING]:
+		return Color(0.50, 0.41, 0.22, 1.0)
 	return Color(0, 0, 0, 0)
 
 ## Live surface state shared by every draped / vegetation / water
@@ -214,17 +232,106 @@ vec2 snow_drift(vec2 p) {
 	float z = snow_noise((p + vec2(0.0, e)) / 5.5) + 0.45 * snow_noise((p + vec2(0.0, e)) / 1.6);
 	return vec2(x - a, z - a) / e;
 }
+// Lying snow's surface response, shared so every snowy surface matches:
+// glossier than chalk, and a soft forward-scatter sheen at grazing
+// angles (RIM), which is most of what keeps snow from reading as matte
+// white plastic.
+const float SNOW_ROUGH = 0.72;
+const float SNOW_SPEC = 0.35;
+const float SNOW_RIM = 0.3;
+const float SNOW_RIM_TINT = 0.65;
+// Snow colour at metre coordinates p: never one flat white. Faint grain
+// at two scales and wind hollows a touch bluer (they see sky, not sun),
+// each settling to its mean before pixel_m can alias it; age (0 fresh,
+// 1 trodden or ploughed) dulls it to a grey buff with grit in it.
+vec3 snow_albedo(vec2 p, float pixel_m, float age) {
+	float fine = mix(snow_noise(p / 0.4), 0.5, smoothstep(0.02, 0.12, pixel_m));
+	float mid = mix(snow_noise(p / 2.6), 0.5, smoothstep(0.3, 2.0, pixel_m));
+	float broad = mix(snow_noise(p / 11.0 + 3.7), 0.5, smoothstep(2.0, 10.0, pixel_m));
+	vec3 c = snow_col * (0.95 + 0.05 * mid + 0.04 * fine);
+	c *= mix(vec3(0.90, 0.95, 1.02), vec3(1.0), smoothstep(0.25, 0.65, broad));
+	vec3 old = vec3(0.60, 0.59, 0.56) * (0.88 + 0.16 * mid + 0.08 * fine);
+	return mix(c, old, clamp(age, 0.0, 1.0));
+}
+// Sand and fine gravel spread on trodden snow (Nordic towns grit their
+// streets and walks): sparse brown specks in patches near by, settling
+// into their average buff tint before they could shimmer.
+vec3 snow_grit(vec3 c, vec2 p, float pixel_m, float amount) {
+	float a = amount * smoothstep(0.2, 0.8, mix(snow_noise(p / 1.7 + 9.1), 0.5, smoothstep(0.3, 1.5, pixel_m)) + 0.15);
+	// Round grains of 5-12 mm, jittered in 4 cm cells.
+	vec2 q = p * 25.0;
+	vec2 id = floor(q);
+	vec2 ctr = vec2(snow_hash(id + 1.7), snow_hash(id + 4.3)) * 0.6 + 0.2;
+	float r = 0.12 + 0.14 * snow_hash(id + 8.9);
+	float aa = max(pixel_m * 25.0, 1e-3);
+	float grain = (1.0 - smoothstep(r - aa, r + aa, length(fract(q) - ctr))) * step(snow_hash(id), 0.24 * a);
+	// Further out, the grains' average (pi r^2 per live cell).
+	float cover = mix(0.027 * a, grain, 1.0 - smoothstep(0.004, 0.015, pixel_m));
+	return mix(c, vec3(0.40, 0.33, 0.25) * (0.8 + 0.4 * snow_hash(id + 5.3)), clamp(cover, 0.0, 1.0));
+}
+// Ground heights near the eye (GrassCarpet): xy centre, z half span,
+// w 1 while baked. How high a wall stands over the street.
+global uniform sampler2D street_heights : filter_linear, repeat_disable;
+global uniform vec4 street_heights_rect;
+// Winter at a wall's foot near the eye: x the slush and grit the street
+// throws up it (a ragged band 35-70 cm high, spattered), y the salt that
+// dries white along its top. Zero without snow or outside the window.
+vec2 snow_splash(vec3 p) {
+	float line = snow_line(p);
+	if (line <= 0.0 || street_heights_rect.w <= 0.0) { return vec2(0.0); }
+	vec2 hu = (p.xz - street_heights_rect.xy) / max(2.0 * street_heights_rect.z, 1e-3) + 0.5;
+	float inside = smoothstep(0.0, 0.1, min(min(hu.x, hu.y), min(1.0 - hu.x, 1.0 - hu.y)));
+	if (inside <= 0.0) { return vec2(0.0); }
+	float h = p.y - texture(street_heights, hu).r;
+	float along = p.x + p.z;
+	float top = 0.35 + 0.35 * snow_noise(vec2(along * 0.7, 3.1)) + 0.08 * snow_noise(vec2(along * 6.0, 1.7));
+	float spat = smoothstep(0.35, 0.75, snow_noise(vec2(along * 11.0, p.y * 11.0)));
+	float dirt = (1.0 - smoothstep(top - 0.15, top, h)) * mix(0.55, 1.0, spat) * (1.0 - 0.5 * smoothstep(0.0, top, h));
+	float salt = smoothstep(top - 0.07, top - 0.02, h) * (1.0 - smoothstep(top - 0.02, top + 0.02, h));
+	return vec2(dirt, salt) * line * inside;
+}
+vec3 apply_splash(vec3 c, vec2 sp) {
+	c = mix(c, c * vec3(0.58, 0.56, 0.52) + vec3(0.03, 0.028, 0.024), sp.x);
+	return mix(c, vec3(0.66, 0.65, 0.62), sp.y * 0.55);
+}
+// Snow lies centimetres deep, so a patch ends in a rounded lip, not a
+// stencil line. From the cover `sc` at world point p: xy the world-xz
+// slope of that lip (bend the lighting normal by -slope), z how much of
+// an edge this is (0..1, for a contact shade just outside it). Uses
+// derivatives: call where every pixel of the quad runs it.
+vec3 snow_edge(float sc, vec3 p, float depth_m) {
+	float sx = dFdx(sc);
+	float sy = dFdy(sc);
+	float a = dFdx(p.x);
+	float b = dFdx(p.z);
+	float c = dFdy(p.x);
+	float d = dFdy(p.z);
+	float det = a * d - b * c;
+	if (abs(det) < 1e-9) { return vec3(0.0); }
+	vec2 g = vec2(d * sx - b * sy, a * sy - c * sx) / det * depth_m;
+	float len = length(g);
+	// At most ~40 degrees: a lip, never a wall.
+	g *= min(1.0, 0.85 / max(len, 1e-5));
+	return vec3(g, min(len * 2.0, 1.0));
+}
 // Ice crystals: rare cells whose tilted facet can throw the sun back.
 // xyz facet normal (world), w strength; fades before a pixel can span
-// several cells and strobe. Only under a direct sun: a cloud deck has
+// several cells and strobe. Only under a direct sun or the night's
+// lamps (climate_snow_glint, AtmosphereRig): a cloud deck by day has
 // nothing sharp to reflect.
 vec4 snow_facet(vec2 p, float pixel_m) {
 	float vis = climate_snow_glint * (1.0 - smoothstep(0.012, 0.045, pixel_m));
 	if (vis <= 0.0) { return vec4(0.0, 1.0, 0.0, 0.0); }
-	vec2 id = floor(p * 40.0);
+	vec2 q = p * 40.0;
+	vec2 id = floor(q);
 	if (snow_hash(id) < 0.985) { return vec4(0.0, 1.0, 0.0, 0.0); }
-	vec3 f = vec3(snow_hash(id + 3.1) - 0.5, 0.42, snow_hash(id + 7.7) - 0.5);
-	return vec4(normalize(f), vis);
+	// A crystal is a point somewhere in its cell, not the cell: a square
+	// tile reads as a grey chequer where it does not glint. A gentle tilt
+	// (under ~30 degrees) keeps a dark facet from shading the snow.
+	vec2 c = fract(q) - 0.5 - (vec2(snow_hash(id + 1.3), snow_hash(id + 2.9)) - 0.5) * 0.5;
+	float disc = 1.0 - smoothstep(0.1, 0.18, length(c));
+	vec3 f = vec3(snow_hash(id + 3.1) - 0.5, 0.95, snow_hash(id + 7.7) - 0.5);
+	return vec4(normalize(f), vis * disc);
 }
 // Slope of rain rings on still water at metre coordinates: jittered
 // cells at three scales, so no grid shows; rain sets how many are live.
@@ -251,7 +358,7 @@ vec2 rain_ripples(vec2 m, float t, float pixel_m) {
 """
 
 const GLOBALS := ["climate_snow_on", "climate_snow_y", "climate_snow_band",
-	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice"]
+	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice", "valley_haze_y"]
 ## Open-Meteo WMO codes: falling snow / rain (incl. showers, storms).
 const SNOWING := [71, 73, 75, 77, 85, 86]
 const RAINING := [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
@@ -305,7 +412,12 @@ static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionar
 	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
 	g["climate_rain"] = float(WeatherLook.for_code(weather_code, 100.0)["intensity"]) if weather_code in RAINING else 0.0
 	g["climate_water_ice"] = ice_amount(data)
+	g["valley_haze_y"] = valley_y(data)
 	return g
+
+## Valley floor around the viewpoint in render Y (the viewpoint is Y = 0).
+static func valley_y(data: LocationData) -> float:
+	return (DemStats.valley_asl_m(data) - data.centre_elevation_m) * WorldScale.metres_to_units()
 
 static func apply_globals(data: LocationData, weather_code: int = -1) -> void:
 	var g := globals_for(data, weather_code)

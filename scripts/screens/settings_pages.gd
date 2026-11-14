@@ -12,9 +12,13 @@ const SOURCES := [
 	["Globe tiles", "OpenStreetMap tile service", "https://operations.osmfoundation.org/policies/tiles/"],
 	["Elevation", "AWS Terrain Tiles · EU-DEM / Copernicus, USGS 3DEP, SRTM", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"],
 	["Elevation, Helsinki", "© City of Helsinki, Elevation model 2021 · CC BY 4.0", "https://hri.fi/data/en/dataset/helsingin-korkeusmalli"],
+	["Buildings, Helsinki", "© City of Helsinki, building register · CC BY 4.0", "https://hri.fi/data/en/dataset/helsingin-rakennukset"],
+	["Trees, Helsinki", "© City of Helsinki, tree register · CC BY 4.0", "https://hri.fi/data/en/dataset/helsingin-kaupungin-puurekisteri"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
+	["Imagery, Helsinki region", "© HSY, orthophoto 2023 · CC BY 4.0", "https://hri.fi/data/en/dataset/paakaupunkiseudun-ortoilmakuvat"],
 	["Land cover", "© ESA WorldCover project 2021 · contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium · CC BY 4.0", "https://esa-worldcover.org/"],
 	["Canopy height", "© Meta and World Resources Institute · source imagery © 2016 Vantor · CC BY 4.0", "https://registry.opendata.aws/dataforgood-fb-forestsv2/"],
+	["Tree canopy, Helsinki region", "© HSY, land cover 2024 · CC BY 4.0", "https://hri.fi/data/en/dataset/paakaupunkiseudun-maanpeiteaineisto"],
 	["Climate", "CHELSA V2.1 (Karger et al.) · CC BY 4.0", "https://chelsa-climate.org/"],
 	["Climate fallback", "ERA5 (Copernicus) via Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
 	["Weather", "Open-Meteo · CC BY 4.0", "https://open-meteo.com/en/license"],
@@ -23,7 +27,6 @@ const SOURCES := [
 	["Landmark details", "Wikipedia · CC BY-SA 4.0", "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"],
 	["Landmark photos", "Wikimedia Commons · credited on each photo", "https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia"],
 	["Textures", "Poly Haven · CC0", "https://polyhaven.com/license"],
-	["Parked car models", "Generic passenger car pack · Comrade1280 · CC BY 4.0 · modified", "https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5"],
 ]
 const LICENCES := [
 	["Instrument Sans", "SIL Open Font License", "https://openfontlicense.org/"],
@@ -227,6 +230,13 @@ static func quality(s: SettingsScreen) -> VBoxContainer:
 	s._specs_title = UiTheme.section_label("")
 	sect.add_child(_inset(s._specs_title))
 	sect.move_child(sect.get_child(sect.get_child_count() - 1), 0)
+	var fps_group := SettingsRows.group()
+	var fps := SettingsRows.toggle("FPS counter", false,
+		func(on: bool) -> void: s._on_viewer_pref("fps_counter", on),
+		"Shows the frame rate in the corner of the 360° view (J).")
+	s._toggles["fps_counter"] = fps
+	SettingsRows.add(fps_group, fps)
+	_section(page, "", fps_group)
 	return page
 
 ## The accent disc behind the chosen card's check.
@@ -335,8 +345,9 @@ static func photos(s: SettingsScreen) -> VBoxContainer:
 	_section(page, "", group)
 	return page
 
-## Storage: the cache size over a usage bar, the size limit, then Clear
-## cache in its own group.
+## Storage: how much the cache holds in total (no size limit — nothing
+## is removed automatically), a per-place list to clear one place at a
+## time, then Clear cache for everything in its own group.
 static func storage(s: SettingsScreen) -> VBoxContainer:
 	var page := _page()
 	var group := SettingsRows.group()
@@ -347,37 +358,15 @@ static func storage(s: SettingsScreen) -> VBoxContainer:
 	s._usage = Readout.new("Downloaded places", true)
 	s._usage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(s._usage)
-	s._usage_of = UiTheme.data_label("", 15, UiTheme.MUTED)
-	s._usage_of.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	head.add_child(s._usage_of)
-	s._usage_bar = ProgressBar.new()
-	s._usage_bar.show_percentage = false
-	s._usage_bar.max_value = 1.0
-	s._usage_bar.custom_minimum_size = Vector2(0, 8)
-	style_usage_bar(s._usage_bar)
-	usage.add_child(s._usage_bar)
 	SettingsRows.add(group, _pad(usage, 16, 16))
-	var limit_row := HBoxContainer.new()
-	limit_row.add_theme_constant_override("separation", 12)
-	s._limit_slider = HSlider.new()
-	s._limit_slider.min_value = 256
-	s._limit_slider.max_value = CacheStore.MAX_LIMIT_MB
-	s._limit_slider.step = 256
-	# Exponential, so 256 MB to a few GB keeps most of the track.
-	s._limit_slider.exp_edit = true
-	s._limit_slider.custom_minimum_size = Vector2(200, 44)
-	s._limit_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	HudStyle.apply_slider(s._limit_slider)
-	s._limit_slider.value_changed.connect(func(v: float) -> void:
-		s._limit_label.text = UiTheme.cache_size(int(v) * 1048576))
-	s._limit_slider.drag_ended.connect(func(_changed: bool) -> void: s._on_cache_limit())
-	limit_row.add_child(s._limit_slider)
-	s._limit_label = UiTheme.data_label("", 15, UiTheme.MUTED)
-	s._limit_label.custom_minimum_size.x = 72
-	s._limit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	limit_row.add_child(s._limit_label)
-	SettingsRows.add(group, SettingsRows.row("Size limit", limit_row))
-	_section(page, "", group, "When the cache is full, the places you opened longest ago make room first.")
+	_section(page, "", group, "Everything you open is kept on this device until you clear it. Nothing is removed automatically.")
+	s._places_group = SettingsRows.group()
+	s._places_note = UiTheme.label("", 14, UiTheme.MUTED)
+	s._places_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	s._places_note.visible = false
+	var places_sect := _section(page, "Places", s._places_group,
+		"Clearing a place frees its downloaded data and built world. The place stays in Saved places and downloads again when you open it.")
+	places_sect.add_child(_inset(s._places_note))
 	var clear := SettingsRows.group()
 	var clear_col := VBoxContainer.new()
 	clear_col.add_theme_constant_override("separation", 12)
@@ -392,14 +381,6 @@ static func storage(s: SettingsScreen) -> VBoxContainer:
 	SettingsRows.add(clear, _pad(clear_col, 16, 16))
 	_section(page, "", clear)
 	return page
-
-static func style_usage_bar(bar: ProgressBar) -> void:
-	var track := UiTheme.style(UiTheme.FIELD, UiTheme.RADIUS_PILL)
-	track.set_content_margin_all(0)
-	bar.add_theme_stylebox_override("background", track)
-	var fill := UiTheme.style(UiTheme.TEAL, UiTheme.RADIUS_PILL)
-	fill.set_content_margin_all(0)
-	bar.add_theme_stylebox_override("fill", fill)
 
 static func sources(_s: SettingsScreen) -> VBoxContainer:
 	var page := _page()

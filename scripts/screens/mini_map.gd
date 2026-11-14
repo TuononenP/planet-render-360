@@ -6,11 +6,10 @@ extends Control
 ## drawn from the camera's heading and field of view. The tiles are the
 ## same OSM raster tiles and on-device cache as the picker's raster map,
 ## requested only for the few under the inset (tile usage policy), and
-## recoloured into the live theme's map palette. Tapping it returns to the
-## map (open_requested). The OpenStreetMap credit is the viewer's own
-## attribution pill, always on screen.
-
-signal open_requested
+## recoloured into the live theme's map palette. It is purely
+## informational: clicks pass through to the view beneath it. The
+## OpenStreetMap credit is the viewer's own attribution pill, always on
+## screen.
 
 const ZOOM := 14
 const SIZE_DESKTOP := 128.0
@@ -47,10 +46,7 @@ var _has_place := false
 
 func _init(view: View360) -> void:
 	_view = view
-	mouse_filter = Control.MOUSE_FILTER_STOP
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	focus_mode = Control.FOCUS_ALL
-	tooltip_text = "Open the map"
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	set_box(SIZE_DESKTOP)
 	_layer = Control.new()
@@ -69,8 +65,6 @@ func _init(view: View360) -> void:
 	_over.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_over.draw.connect(_draw_over)
 	add_child(_over)
-	focus_entered.connect(_over.queue_redraw)
-	focus_exited.connect(_over.queue_redraw)
 	restyle()
 
 func _ready() -> void:
@@ -146,7 +140,7 @@ func _process(_delta: float) -> void:
 			or px != _last_px:
 		_last_heading = heading
 		_last_fov = fov
-		accessibility_name = "Mini-map, facing %s. Opens the map" % _view._compass.readout()
+		accessibility_name = "Mini-map, facing %s" % _view._compass.readout()
 		_over.queue_redraw()
 
 func _draw_tiles() -> void:
@@ -184,14 +178,3 @@ func _draw_over() -> void:
 	# Glass edge over the tile corners.
 	_over.draw_style_box(UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_M, UiTheme.GLASS_EDGE),
 		Rect2(Vector2.ZERO, size))
-	if has_focus():
-		_over.draw_style_box(UiTheme._focus_ring(UiTheme.RADIUS_M), Rect2(Vector2.ZERO, size))
-
-func _gui_input(event: InputEvent) -> void:
-	var tapped := (event is InputEventMouseButton and (event as InputEventMouseButton).pressed \
-			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT) \
-		or (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) \
-		or event.is_action_pressed("ui_accept")
-	if tapped:
-		open_requested.emit()
-		accept_event()

@@ -66,12 +66,22 @@ const FIXTURE_V2 := """
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8565,"lon":2.3525},{"lat":48.8570,"lon":2.3540}]},
  {"type":"way","id":101,"tags":{"highway":"residential","width":"7","lanes":"2","surface":"sett","bridge":"yes","layer":"1","name":"Rue Test"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8565,"lon":2.3525},{"lat":48.8570,"lon":2.3540}]},
- {"type":"way","id":102,"tags":{"highway":"primary","lanes":"4","tunnel":"yes"},
+ {"type":"way","id":102,"tags":{"highway":"primary","lanes":"4","tunnel":"no"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":104,"tags":{"highway":"primary","tunnel":"yes"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":105,"tags":{"highway":"corridor"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":106,"tags":{"highway":"service","tunnel":"building_passage"},
+  "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
+ {"type":"way","id":107,"tags":{"highway":"footway","indoor":"yes"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8570,"lon":2.3540}]},
  {"type":"way","id":103,"tags":{"highway":"footway"},
   "geometry":[{"lat":48.8560,"lon":2.3510},{"lat":48.8561,"lon":2.3511}]},
  {"type":"way","id":201,"tags":{"waterway":"river","name":"Test River"},
   "geometry":[{"lat":48.8558,"lon":2.3515},{"lat":48.8563,"lon":2.3530},{"lat":48.8568,"lon":2.3545}]},
+ {"type":"way","id":204,"tags":{"waterway":"drain","tunnel":"yes","layer":"-1"},
+  "geometry":[{"lat":48.8559,"lon":2.3516},{"lat":48.8564,"lon":2.3531}]},
  {"type":"way","id":202,"tags":{"waterway":"riverbank"},
   "geometry":[{"lat":48.8550,"lon":2.3510},{"lat":48.8550,"lon":2.3515},{"lat":48.8555,"lon":2.3515},
               {"lat":48.8555,"lon":2.3510},{"lat":48.8550,"lon":2.3510}]},
@@ -187,8 +197,10 @@ func _run() -> void:
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
 	_sidewalk_checks(failures)
+	_stop_checks(failures)
 	_height_unit_checks(failures)
 	_poi_checks(failures)
+	_riverbank_relation_checks(failures)
 
 	if failures.is_empty():
 		print("OSM OK: parser, footprints, tags, land cover, query, retry chain")
@@ -211,6 +223,73 @@ func _poi_checks(failures: Array[String]) -> void:
 		failures.append("POI tags, local position or deduplication lost: %s" % [pois])
 	if not (OsmParser.parse_features('{"elements":[]}', 0.0, 0.0).get("pois", []) as Array).is_empty():
 		failures.append("old payload without POIs must remain empty")
+
+## Partial riverbank multipolygon (the Eiffel flood): the Seine relation
+## arrived with 2 of 8 outers, one bank each way. The banks must rejoin
+## into one closed water ring — never emit as open chains whose implicit
+## closing chord floods the city. A lone unpairable bank must drop.
+func _riverbank_relation_checks(failures: Array[String]) -> void:
+	var bank_a := [{"lat": 48.8566, "lon": 2.3500}, {"lat": 48.8566, "lon": 2.3509},
+		{"lat": 48.8566, "lon": 2.3519}, {"lat": 48.8566, "lon": 2.3528}]
+	var bank_b := [{"lat": 48.8565, "lon": 2.3528}, {"lat": 48.8565, "lon": 2.3519},
+		{"lat": 48.8565, "lon": 2.3509}, {"lat": 48.8565, "lon": 2.3500}]
+	var rel := {"type": "relation", "id": 2191006,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "river", "name": "Test Seine"},
+		"members": [
+			{"type": "way", "ref": 101, "role": "outer", "geometry": bank_a},
+			{"type": "way", "ref": 102, "role": "outer", "geometry": bank_b},
+			{"type": "way", "ref": 103, "role": "outer"},
+			{"type": "way", "ref": 104, "role": "outer", "geometry": []}]}
+	var waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [rel]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			waters.append(entry)
+	if waters.size() != 1:
+		failures.append("partial riverbank must rejoin into one water ring, got %d" % waters.size())
+		return
+	var pts: PackedVector2Array = waters[0]["points"]
+	if pts.size() < 6 or not OsmGeometry._is_closed(pts):
+		failures.append("rejoined riverbank must be a closed ring, got %d posts" % pts.size())
+		return
+	var bb := OsmGeometry._ring_aabb(pts)
+	if bb.size.x > 300.0 or bb.size.y > 300.0:
+		failures.append("rejoined riverbank spans %s, expected the ~200 m reach" % bb.size)
+	var lone := {"type": "relation", "id": 2191007,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "river", "name": "Lone Bank"},
+		"members": [{"type": "way", "ref": 201, "role": "outer", "geometry": bank_a}]}
+	var lone_waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [lone]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			lone_waters.append(entry)
+	if not lone_waters.is_empty():
+		failures.append("a lone 200 m bank must drop, not close across the city")
+	# A nearly-closed ring (dust gap) still emits: the old degrade path
+	# survives for joints under DUST_M, only kilometre chords drop.
+	var dusty := {"type": "relation", "id": 2191008,
+		"tags": {"type": "multipolygon", "natural": "water", "water": "pond", "name": "Dusty Pond"},
+		"members": [{"type": "way", "ref": 301, "role": "outer", "geometry": [
+			{"lat": 48.8566, "lon": 2.3500}, {"lat": 48.8566, "lon": 2.3503},
+			{"lat": 48.8564, "lon": 2.3503}, {"lat": 48.8566, "lon": 2.350007}]}]}
+	var dusty_waters: Array = []
+	for entry in (OsmFetcher.parse_features(JSON.stringify({"elements": [dusty]}), 48.8566, 2.3522).get("land", []) as Array):
+		if str(entry.get("class", "")) == "water":
+			dusty_waters.append(entry)
+	if dusty_waters.size() != 1 \
+			or not OsmGeometry._is_closed(dusty_waters[0]["points"] as PackedVector2Array):
+		failures.append("a ring with a dust gap must still emit closed, got %d" % dusty_waters.size())
+	# A lone curved bank (a meander, 400 m across its 630 m arc) must not
+	# close across the bend; a lake missing 15% of its shore still closes.
+	var meander := PackedVector2Array()
+	for k in 33:
+		meander.append(Vector2.from_angle(PI * float(k) / 32.0) * 200.0)
+	if not OsmGeometry._join_rings([meander]).is_empty():
+		failures.append("a lone meander bank must drop, not flood the land inside the bend")
+	var lake := PackedVector2Array()
+	for k in 52:
+		lake.append(Vector2.from_angle(TAU * 0.85 * float(k) / 51.0) * 200.0)
+	var lakes := OsmGeometry._join_rings([lake])
+	if lakes.size() != 1 or not OsmGeometry._is_closed(lakes[0] as PackedVector2Array):
+		failures.append("a lake missing a stretch of shore must still close, got %d rings" % lakes.size())
 
 func _height_unit_checks(failures: Array[String]) -> void:
 	for raw in ["100 ft", "100'", "100 FT"]:
@@ -382,7 +461,8 @@ func _v2_checks(failures: Array[String]) -> void:
 			orphan_ok = true
 	if not orphan_ok:
 		failures.append("orphan part must be promoted to a building")
-	# Attributed roads (§2.5): width tag → lanes×3 → class default.
+	# Attributed roads (§2.5): width tag → lanes×3 → class default; the
+	# tunnel, corridor, building passage and indoor footway are dropped.
 	var roads: Array = result["roads"]
 	if roads.size() != 3:
 		failures.append("expected 3 roads (id-duplicate merged), got %d" % roads.size())
@@ -396,17 +476,21 @@ func _v2_checks(failures: Array[String]) -> void:
 			failures.append("R1 attributes wrong: %s" % r1)
 		var r2: Dictionary = roads[1]
 		if absf(float(r2["width_m"]) - 12.0) > 0.01 \
-				or not bool(r2["tunnel"]) or bool(r2["bridge"]):
-			failures.append("R2 should be lanes×3 with a tunnel: %s" % r2)
+				or bool(r2["tunnel"]) or bool(r2["bridge"]):
+			failures.append("R2 should be lanes×3 at grade: %s" % r2)
 		if absf(float(roads[2]["width_m"]) - 2.0) > 0.01 \
 				or str(roads[2]["class"]) != "footway":
 			failures.append("R3 should be class-default footway: %s" % roads[2])
+	if OsmTags.buried_highway({"highway": "service", "level": "-1"}) \
+			or not OsmTags.buried_highway({"highway": "footway", "location": "underground"}):
+		failures.append("an open level=-1 ramp stays; an underground footway goes")
 	# V1 downgrade for the pipeline/RoadBuilder (deleted T4.4).
 	var v1 := OsmFetcher.roads_to_v1(roads)
 	if v1.size() != 3 or not (v1[0] is PackedVector2Array) \
 			or (v1[0] as PackedVector2Array).size() != 3:
 		failures.append("roads_to_v1 must yield bare centrelines: %s" % [v1])
-	# Waterways (§2.6): river line + coastline; riverbank → land water.
+	# Waterways (§2.6): river line + coastline; riverbank → land water;
+	# the culverted drain stays under ground.
 	var waters: Array = result["waterways"]
 	if waters.size() != 2:
 		failures.append("expected 2 waterways, got %d" % waters.size())
@@ -532,6 +616,16 @@ func _land_checks(failures: Array[String]) -> void:
 			{"leisure": "sports_centre"}, {"natural": "tree"}]:
 		if OsmFetcher.land_class(tags) != "":
 			failures.append("land_class(%s) should stay unmapped" % [tags])
+	# Harbour use of industrial land behind quays (CargoBerths).
+	for row in [[{"landuse": "industrial", "industrial": "port"}, "port"],
+			[{"landuse": "industrial", "industrial": "container_terminal"}, "port"],
+			[{"landuse": "industrial", "harbour": "yes"}, "port"],
+			[{"landuse": "industrial"}, "industrial"], [{"landuse": "port"}, ""],
+			[{"landuse": "commercial"}, ""]]:
+		if OsmTags.harbour_use(row[0]) != row[1]:
+			failures.append("harbour_use(%s) should be %s" % [row[0], row[1]])
+	if OsmFetcher.land_class({"landuse": "port"}) != "":
+		failures.append("landuse=port must stay out of the land cover")
 
 func _query_checks(failures: Array[String]) -> void:
 	# Preset maps: the detailed query reaches the 1200 m half-extent on
@@ -591,8 +685,8 @@ func _query_checks(failures: Array[String]) -> void:
 			or not (with_country["buildings"] as Array).is_empty() \
 			or str(OsmFetcher.parse_features("{}", 0.0, 0.0).get("country", "?")) != "":
 		failures.append("parse must read the is_in area's ISO code and nothing else from it")
-	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 28:
-		failures.append("expected 28 formatted around clauses, got %s" % q)
+	if q.count("(around:%d,48.856600,2.352200)" % OsmFetcher.DETAILED_RADIUS_M) != 34:
+		failures.append("expected 34 formatted around clauses, got %s" % q)
 	# Explicit radius still threads through (compat for callers/tests).
 	if not q.contains('node["railway"="subway_entrance"]'):
 		failures.append("detailed furniture query must include subway entrances")
@@ -602,7 +696,7 @@ func _query_checks(failures: Array[String]) -> void:
 	if not ny_query.contains("around:450,40.702650,-73.996860"):
 		failures.append("New York furniture query should be centred on the preset eye")
 	var q420 := OsmFetcher.build_query(48.8566, 2.3522, 420)
-	if q420.count("420,48.856600,2.352200") != 28:
+	if q420.count("420,48.856600,2.352200") != 34:
 		failures.append("explicit radius must thread into all clauses")
 	# Ring query: majors + waterways + coastline, 3 clauses.
 	var qr := OsmFetcher.build_ring_query(48.8566, 2.3522, 1600)
@@ -656,59 +750,48 @@ func _busy_checks(failures: Array[String]) -> void:
 		if http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
 			failures.append("cancel() must stop the in-flight Overpass request")
 	busy.free()
-	# Concurrent queries start on different instances, and the far-city
-	# order names hosts, so reordering ENDPOINTS cannot change it.
+	# Every query starts on the main instance (the mirrors do not answer),
+	# and the far-city order names hosts, so reordering ENDPOINTS cannot
+	# change it.
 	var ring := OsmFetcher.ring_endpoints()
-	if ring.size() != OsmFetcher.ENDPOINTS.size() or ring[0] == OsmFetcher.ENDPOINTS[0]:
-		failures.append("ring query must cover every endpoint and start on a mirror: %s" % [ring])
+	if ring.size() != OsmFetcher.ENDPOINTS.size() \
+			or ring[0] != "https://overpass-api.de/api/interpreter":
+		failures.append("ring query must cover every endpoint and start on the main instance: %s" % [ring])
 	var far := FarCityFetcher.endpoints()
-	if far.size() != 3 or not far[0].contains("z.overpass-api.de") \
-			or far[1] != "https://overpass-api.de/api/interpreter" \
-			or not far[2].contains("private.coffee"):
+	if far.size() != 2 or far[0] != "https://overpass-api.de/api/interpreter" \
+			or not far[1].contains("private.coffee"):
 		failures.append("far-city endpoints wrong: %s" % [far])
 	if HorizonFetcher.endpoints() != far:
 		failures.append("horizon labels should use the available far-city mirrors")
 
 func _chain_checks(failures: Array[String]) -> void:
-	# Transient Overpass failures (client timeout, 502 from an
-	# overloaded instance) must fall through to another endpoint;
-	# a client error such as 400 must not.
-	if OsmFetcher.ENDPOINTS.size() < 2:
-		failures.append("expected fallback Overpass endpoints")
-	# Distinct instances, not just a repeat of the first: when the
-	# main instance answers 502 (overloaded) a same-instance retry
-	# rarely rescues the fetch, so at least 3 distinct hosts are needed.
+	# A second, distinct instance stays listed for a caller that may use
+	# two (the offline pack) while the main one is paused.
 	var distinct: Dictionary = {}
 	for ep in OsmFetcher.ENDPOINTS:
 		distinct[ep] = true
-	if distinct.size() < 3:
-		failures.append("expected >=3 distinct Overpass endpoints, got %d" % distinct.size())
-	# The pipeline's OSM wait must outlast both phases (detailed, then
-	# the best-effort ring: one ATTEMPT_TIMEOUT per endpoint per phase),
-	# or a late rescue is dropped. Bounded above too: slack beyond one
-	# extra attempt per phase is dead wait.
-	var n := float(OsmFetcher.ENDPOINTS.size())
+	if distinct.size() < 2 or distinct.size() != OsmFetcher.ENDPOINTS.size():
+		failures.append("expected >=2 distinct Overpass endpoints: %s" % [OsmFetcher.ENDPOINTS])
+	if OsmFetcher.ENDPOINTS.any(func(ep: String) -> bool: return ep.contains("z.overpass-api.de")):
+		failures.append("z.overpass-api.de refuses connections and must not be listed")
+	# The pipeline's OSM wait must outlast both phases (detailed and the
+	# best-effort ring: each query uses one instance, one ATTEMPT_TIMEOUT)
+	# and the fallback tiers after them (Postpass, then the OSM API and its
+	# smaller radii), or a late rescue is dropped. Bounded above too: slack
+	# beyond one more attempt overall is dead wait.
 	var t := OsmFetcher.ATTEMPT_TIMEOUT
-	if OsmFetcher.retry_budget_seconds() < 2.0 * n * t:
-		failures.append("retry budget %ss must cover 2 phases × %d attempts" % [OsmFetcher.retry_budget_seconds(), OsmFetcher.ENDPOINTS.size()])
-	if OsmFetcher.retry_budget_seconds() >= 2.0 * (n + 1.0) * t:
-		failures.append("retry budget %ss has more than one attempt of slack per phase" % OsmFetcher.retry_budget_seconds())
+	var tiers := 2.0 * t + PostpassFallback.TIMEOUT_S + t + OsmApiFallback.extra_budget_seconds()
+	if OsmFetcher.retry_budget_seconds() < tiers:
+		failures.append("retry budget %ss must cover 2 phases and the fallbacks (%ss)" % [OsmFetcher.retry_budget_seconds(), tiers])
+	if OsmFetcher.retry_budget_seconds() >= tiers + t:
+		failures.append("retry budget %ss has more than one attempt of slack over %ss" % [OsmFetcher.retry_budget_seconds(), tiers])
 	# _ready must wire the same constant into the HTTP timeout.
 	var fetcher := OsmFetcher.new()
 	fetcher._ready()
 	if fetcher._http == null or fetcher._http.timeout != OsmFetcher.ATTEMPT_TIMEOUT:
 		failures.append("HTTP timeout should be ATTEMPT_TIMEOUT (%s), got %s" % [OsmFetcher.ATTEMPT_TIMEOUT, fetcher._http.timeout if fetcher._http != null else -1])
 	fetcher.free()
-	# Retry chain: a retryable failure (including a 200 with no
-	# buildings from one instance) advances; the last attempt or a
-	# non-retryable failure gives up.
-	var last := OsmFetcher.ENDPOINTS.size() - 1
-	if OsmFetcher.next_attempt(0, true) != 1:
-		failures.append("retryable failure on attempt 0 should advance to 1")
-	if OsmFetcher.next_attempt(last, true) != -1:
-		failures.append("retryable failure on the last attempt should give up")
-	if OsmFetcher.next_attempt(0, false) != -1:
-		failures.append("non-retryable failure should give up immediately")
+	# Which failures a caller allowing several instances moves on from.
 	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_TIMEOUT, 0):
 		failures.append("timeout (result=13 code=0) must be retryable")
 	if not OsmFetcher.is_retryable(HTTPRequest.RESULT_SUCCESS, 502):
@@ -1010,6 +1093,14 @@ func _underground_checks(failures: Array[String]) -> void:
 		func(b: Dictionary) -> String: return str(b.get("name", "")))
 	if names != ["Over"]:
 		failures.append("parser should skip the underground building, got %s" % [names])
+	# building=no and building:part=no name things that are not buildings.
+	var not_built: Array = OsmFetcher.parse_features(JSON.stringify({"elements": [
+		{"type": "way", "id": 3, "tags": {"building": "no", "name": "Not"},
+			"geometry": _box_geom(48.8566, 2.3522, 0.0002, 0.0003)},
+		{"type": "way", "id": 4, "tags": {"building:part": "no", "height": "9"},
+			"geometry": _box_geom(48.8570, 2.3522, 0.0002, 0.0003)}]}), 48.8566, 2.3522)["buildings"]
+	if not not_built.is_empty():
+		failures.append("building=no and building:part=no must not build, got %s" % [not_built.size()])
 
 func _box_geom(lat: float, lon: float, dlat: float, dlon: float) -> Array:
 	return [{"lat": lat, "lon": lon}, {"lat": lat + dlat, "lon": lon},
@@ -1017,12 +1108,13 @@ func _box_geom(lat: float, lon: float, dlat: float, dlon: float) -> Array:
 
 ## building:part outside every building: a big lifted part with nothing
 ## under it stands on the ground (no floating slab); one standing on
-## another part, or a small skybridge, keeps its lift.
+## another part starts at that part's top; a small skybridge keeps its lift.
 func _orphan_part_checks(failures: Array[String]) -> void:
 	var text := JSON.stringify({"elements": [
 		{"type": "way", "id": 1, "tags": {"building:part": "yes", "min_height": "60", "height": "90", "name": "Slab"},
 			"geometry": _box_geom(48.8566, 2.3522, 0.00027, 0.00041)},
-		# Upper first: listed after Base it would nest in it as a part.
+		# Upper stands wholly inside Base, its floor below Base's top: an
+		# orphan never nests in another, so Upper starts on Base's roof.
 		{"type": "way", "id": 3, "tags": {"building:part": "yes", "min_height": "40", "height": "80", "name": "Upper"},
 			"geometry": _box_geom(48.85825, 2.3524, 0.00015, 0.00030)},
 		{"type": "way", "id": 2, "tags": {"building:part": "yes", "height": "45", "name": "Base"},
@@ -1033,8 +1125,10 @@ func _orphan_part_checks(failures: Array[String]) -> void:
 	var lift := func(n: String) -> float: return float(_by_name(bs, n).get("min_height_m", -1.0))
 	if lift.call("Slab") != 0.0:
 		failures.append("an unsupported lifted orphan part should stand on the ground, lift %s" % lift.call("Slab"))
-	if lift.call("Upper") != 40.0:
-		failures.append("an orphan part on another part keeps its lift, got %s" % lift.call("Upper"))
+	if lift.call("Upper") != 45.0:
+		failures.append("an orphan part on another part starts at its top, got %s" % lift.call("Upper"))
+	if not (_by_name(bs, "Base")["parts"] as Array).is_empty():
+		failures.append("an orphan part must not take another as its part")
 	if lift.call("Bridge") != 20.0:
 		failures.append("a small lifted part (skybridge) keeps its lift, got %s" % lift.call("Bridge"))
 
@@ -1061,3 +1155,53 @@ func _sidewalk_checks(failures: Array[String]) -> void:
 	if not bool(OsmTags._rail_entry({"railway": "tram", "gauge": "1067", "electrified": "no"},
 			PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])).get("cable", false)):
 		failures.append("a non-electrified street tram (Hyde St's track) is a cable car")
+
+## Tram and bus stop nodes (TransitVehicles): asked for over the whole
+## radius, parsed to {x, z, name}; a bus stop stays street furniture too.
+func _stop_checks(failures: Array[String]) -> void:
+	var q := OsmFetcher.build_query(48.8566, 2.3522)
+	for clause in ['node["railway"="tram_stop"]', 'node["public_transport"="stop_position"]["tram"="yes"]',
+			'node["highway"="bus_stop"](around:%d,' % OsmFetcher.DETAILED_RADIUS_M]:
+		if not q.contains(clause):
+			failures.append("the detailed query must ask for %s" % clause)
+	var parsed := OsmFetcher.parse_features("""{"elements":[
+		{"type":"node","id":1,"lat":48.8570,"lon":2.3522,"tags":{"railway":"tram_stop","name":"Quai"}},
+		{"type":"node","id":2,"lat":48.8566,"lon":2.3530,"tags":{"public_transport":"stop_position","tram":"yes"}},
+		{"type":"node","id":3,"lat":48.8566,"lon":2.3540,"tags":{"public_transport":"stop_position","bus":"yes"}},
+		{"type":"node","id":4,"lat":48.8560,"lon":2.3522,"tags":{"highway":"bus_stop","name":"Pont","shelter":"yes"}}
+	]}""", 48.8566, 2.3522)
+	var trams: Array = parsed.get("tram_stops", [])
+	var buses: Array = parsed.get("bus_stops", [])
+	if trams.size() != 2 or buses.size() != 1 or (parsed["furniture"] as Array).size() != 1:
+		failures.append("stops: expected 2 tram, 1 bus (also furniture), got %s / %s" % [trams, buses])
+		return
+	var quai: Dictionary = trams[0]
+	var pont: Dictionary = buses[0]
+	if str(quai["name"]) != "Quai" or absf(float(quai["x"])) > 0.5 or absf(float(quai["z"]) + 44.5) > 1.0 \
+			or str(pont["name"]) != "Pont" or float(pont["z"]) < 60.0 or str(trams[1]["name"]) != "":
+		failures.append("stops carry their place and name: %s %s" % [quai, pont])
+	var old := OsmFetcher.parse_features("{}", 0.0, 0.0)
+	if not (old.get("tram_stops", [0]) as Array).is_empty() or not LocationData.new().tram_stops.is_empty() \
+			or not LocationData.new().bus_stops.is_empty():
+		failures.append("payloads without stops give empty stop lists")
+	# Railway platforms and mainline stations (StationTrains).
+	for clause in ['way["railway"="platform"]', 'way["public_transport"="platform"]["train"="yes"]',
+			'node["railway"~"^(station|halt)$"]']:
+		if not q.contains(clause):
+			failures.append("the detailed query must ask for %s" % clause)
+	var rail := OsmFetcher.parse_features("""{"elements":[
+		{"type":"way","id":10,"tags":{"railway":"platform"},"geometry":[{"lat":48.8570,"lon":2.3522},{"lat":48.8580,"lon":2.3522}]},
+		{"type":"way","id":11,"tags":{"public_transport":"platform","train":"yes"},"geometry":[{"lat":48.8570,"lon":2.3530},{"lat":48.8580,"lon":2.3530}]},
+		{"type":"way","id":12,"tags":{"public_transport":"platform","bus":"yes"},"geometry":[{"lat":48.8570,"lon":2.3540},{"lat":48.8580,"lon":2.3540}]},
+		{"type":"way","id":13,"tags":{"railway":"platform","location":"underground"},"geometry":[{"lat":48.8570,"lon":2.3550},{"lat":48.8580,"lon":2.3550}]},
+		{"type":"node","id":14,"lat":48.8575,"lon":2.3522,"tags":{"railway":"station","name":"Gare"}},
+		{"type":"node","id":15,"lat":48.8575,"lon":2.3530,"tags":{"railway":"station","station":"subway"}}
+	]}""", 48.8566, 2.3522)
+	var platforms: Array = rail.get("rail_platforms", [])
+	var stations: Array = rail.get("rail_stations", [])
+	if platforms.size() != 2 or (platforms[0]["points"] as PackedVector2Array).size() != 2 or stations.size() != 1 \
+			or str(stations[0]["name"]) != "Gare" or not (rail["railways"] as Array).is_empty():
+		failures.append("platforms: expected 2 open-air train platforms and 1 mainline station, got %s / %s" % [platforms, stations])
+	if not (old.get("rail_platforms", [0]) as Array).is_empty() or not (old.get("rail_stations", [0]) as Array).is_empty() \
+			or not LocationData.new().rail_platforms.is_empty() or not LocationData.new().rail_stations.is_empty():
+		failures.append("payloads without platforms give empty platform and station lists")

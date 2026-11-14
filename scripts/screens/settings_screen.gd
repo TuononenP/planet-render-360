@@ -52,9 +52,15 @@ var _preset_checks: Array[Control] = []
 var _specs: Dictionary = {}  # key -> Readout
 var _specs_title: Label
 var _usage: Readout
-var _usage_of: Label
-var _usage_bar: ProgressBar
 var _cache_bytes := 0
+## The shared History store (Main binds it, as for HistoryScreen), so
+## the Storage places list and History can never diverge.
+var _store: CacheStore
+var _places_group: PanelContainer
+var _places_note: Label
+var _place_rows: Array = []  # CacheStore.place_cache_report rows on show
+var _index_waiting := false  # a storage refresh is owed when the cache index lands
+var _place_clear_btns: Array[Button] = []
 var _grid: GridContainer
 var _accent_btns: Array[Button] = []
 var _layout_btns: Array[Button] = []
@@ -65,8 +71,6 @@ var _layout_seg: SegmentedControl
 var _unit_segs: Dictionary = {}  # pref key -> SegmentedControl
 var _unit_samples: Dictionary = {}  # pref key -> Label
 var _toggles: Dictionary = {}  # pref key -> Button
-var _limit_slider: HSlider
-var _limit_label: Label
 
 var _bg: ColorRect
 var _rail: PanelContainer
@@ -160,6 +164,7 @@ func _ready() -> void:
 	_on_resized()
 	_restyle_cats()
 	_refresh()
+	_refresh_storage()
 
 ## Each visit starts on the phone menu (except the reopen after a
 ## rebuild) and reads the cache size afresh.
@@ -491,7 +496,8 @@ func _refresh_appearance() -> void:
 		for key in _toggles:
 			var on := {"reduce_motion": UiPrefs.reduce_motion, "solid_panels": UiPrefs.solid_panels,
 				"high_contrast": UiPrefs.high_contrast,
-				"photo_stamp": UiPrefs.photo_stamp}.get(key, false) as bool
+				"photo_stamp": UiPrefs.photo_stamp,
+				"fps_counter": UiPrefs.fps_counter}.get(key, false) as bool
 			(_toggles[key] as Button).set_pressed_no_signal(on)
 			(_toggles[key] as Button).queue_redraw()
 	SettingsPages.show_unit_samples(self)
@@ -528,8 +534,7 @@ func summary_for(id: String) -> String:
 		"photos":
 			return "Stamp on" if UiPrefs.photo_stamp else "Stamp off"
 		"storage":
-			var limit := int(_settings.pref("cache_limit_mb")) if _settings != null else 2048
-			return "%s of %s" % [UiTheme.cache_size(_cache_bytes), UiTheme.cache_size(limit * 1048576)]
+			return UiTheme.cache_size(_cache_bytes)
 		"sources":
 			return "%d sources and licences" % SettingsPages.SOURCES.size()
 		"privacy":
@@ -588,13 +593,101 @@ func _on_unit(key: String, on: bool) -> void:
 	_refresh_summaries()
 	units_changed.emit()
 
-func _on_cache_limit() -> void:
-	if _settings == null:
-		return
-	_settings.set_pref("cache_limit_mb", int(_limit_slider.value))
-	UiPrefs.apply(_settings)
-	CacheStore.enforce_size_cap(false)
+## The shared History store (Main's single instance, as History gets).
+func bind_store(store: CacheStore) -> void:
+	_store = store
 	_refresh_storage()
+
+## One Storage places-list row: name over region/state/size, with its
+## Clear button at the trailing edge (44 pt target, trash icon).
+func _place_row(row: Dictionary) -> Control:
+	var entry: Dictionary = row["entry"]
+	var parts := UiTheme.split_place(str(row["name"]))
+	var bytes := int(row["bytes"])
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(44, 44)
+	btn.tooltip_text = "Clear cache for %s" % parts[0]
+	btn.disabled = bytes <= 0
+	UiIcon.apply(btn, "trash-2", 20, UiTheme.SIGNAL_ERROR, UiTheme.SIGNAL_ERROR)
+	btn.add_theme_stylebox_override("normal", UiTheme.style(Color.TRANSPARENT, UiTheme.RADIUS_PILL))
+	btn.add_theme_stylebox_override("hover", UiTheme.style(UiTheme.LINE, UiTheme.RADIUS_PILL))
+	btn.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_PILL))
+	btn.pressed.connect(func() -> void: _confirm_clear_place(row))
+	_place_clear_btns.append(btn)
+	var state_word: String = {"full": "Cached", "partial": "Partly cached",
+		"none": "Not cached"}.get(str(row["state"]), "Not cached")
+	var desc: String = state_word
+	if parts[1] != "":
+		desc = "%s · %s" % [parts[1], state_word]
+	if entry.has("timestamp"):
+		desc += " · %s" % UiTheme.relative_time(float(entry["timestamp"]))
+	var trailing := HBoxContainer.new()
+	trailing.add_theme_constant_override("separation", 8)
+	var size_l := UiTheme.data_label(UiTheme.cache_size(bytes), 14, UiTheme.MUTED, true)
+	size_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	trailing.add_child(size_l)
+	trailing.add_child(btn)
+	return SettingsRows.row(parts[0], trailing, desc)
+
+## Rebuild the places list from the bound store (largest first, from
+## CacheStore.place_cache_report), with the Other-cache row when bytes
+## belong to no listed place.
+func _refresh_places() -> void:
+	if _places_group == null:
+		return
+	var col := _places_group.get_child(0) as VBoxContainer
+	for c in col.get_children():
+		col.remove_child(c)
+		c.free()
+	_place_clear_btns.clear()
+	_place_rows = []
+	if _store == null:
+		SettingsRows.add(_places_group, SettingsRows.row("No saved places yet", null,
+			"Places you open will appear here."))
+		return
+	var report := CacheStore.place_cache_report(_store.entries)
+	_place_rows = report.get("rows", [])
+	_cache_bytes = int(report.get("total_bytes", _cache_bytes))
+	if _place_rows.is_empty():
+		SettingsRows.add(_places_group, SettingsRows.row("No saved places yet", null,
+			"Places you open will appear here."))
+	else:
+		for row in _place_rows:
+			SettingsRows.add(_places_group, _place_row(row))
+	var other := int(report.get("other_bytes", 0))
+	if other > 0:
+		SettingsRows.add(_places_group, SettingsRows.row("Other cache", null,
+			"%s · Map tiles and other files not tied to one place. Clear cache below frees these too."
+				% UiTheme.cache_size(other)))
+	_show_storage()
+
+func _set_places_note(text: String) -> void:
+	if _places_note == null:
+		return
+	_places_note.text = text
+	_places_note.visible = text != ""
+
+## Clear one place from Storage: behind a confirmation naming what it
+## frees. The place stays in Saved places; a place still being saved
+## is refused and the row is left untouched.
+func _confirm_clear_place(row: Dictionary) -> void:
+	if _store == null:
+		return
+	var entry: Dictionary = row["entry"]
+	var name: String = UiTheme.split_place(str(row["name"]))[0]
+	if WorldCache.is_place_busy(float(row["lat"]), float(row["lon"])):
+		_set_places_note("%s is still being saved. Try again in a moment." % name)
+		return
+	SettingsRows.confirm(self, "Clear cache for %s?" % name,
+		"This frees %s. %s stays in Saved places and downloads again when you open it."
+			% [UiTheme.cache_size(int(row["bytes"])), name],
+		"Clear cache", func() -> void:
+			var res: Dictionary = _store.clear_place_cache(entry)
+			if bool(res.get("busy", false)):
+				_set_places_note("%s is still being saved. Try again in a moment." % name)
+				return
+			_refresh_storage()
+			_set_places_note("Freed %s for %s." % [UiTheme.cache_size(int(res.get("bytes", 0))), name]))
 
 ## Clear cache, behind a confirmation that shows what it frees.
 func _confirm_clear() -> void:
@@ -617,8 +710,6 @@ func refresh_theme() -> void:
 		SettingsPages.style_preset(btn)
 	for check in _preset_checks:
 		(check as PanelContainer).add_theme_stylebox_override("panel", SettingsPages.check_style())
-	if _usage_bar != null:
-		SettingsPages.style_usage_bar(_usage_bar)
 	_restyle_cats()
 
 func bind_settings(settings: RenderSettings) -> void:
@@ -646,21 +737,28 @@ func _refresh() -> void:
 
 ## Reads the cache size from disk (a walk of the cache folders), so it
 ## runs when Settings is shown and after the cache changes, not on
-## every refresh.
+## every refresh. With a bound store it also rebuilds the places list.
 func _refresh_storage() -> void:
-	_cache_bytes = OfflineDownloader.cache_size_bytes()
+	if not CacheStore.index_ready():
+		# Build with the last known size and refresh when the index
+		# lands: the report below would join its parse on the main thread.
+		if not _index_waiting:
+			_index_waiting = true
+			CacheStore.ensure_index_async(func() -> void:
+				_index_waiting = false
+				if is_instance_valid(self):
+					_refresh_storage())
+		_show_storage()
+		return
+	if _store != null and _places_group != null:
+		_refresh_places()  # sets _cache_bytes from the report total
+	else:
+		_cache_bytes = OfflineDownloader.cache_size_bytes()
 	_show_storage()
 
 func _show_storage() -> void:
-	var limit_mb := 2048
-	if _limit_slider != null and _settings != null:
-		_limit_slider.set_value_no_signal(float(_settings.pref("cache_limit_mb")))
-		_limit_label.text = UiTheme.cache_size(int(_limit_slider.value) * 1048576)
-		limit_mb = int(_limit_slider.value)
 	if _usage != null:
 		var size_text := UiTheme.cache_size(_cache_bytes)
 		var gap := size_text.find(" ")
 		_usage.set_value(size_text.substr(0, gap), size_text.substr(gap + 1))
-		_usage_of.text = "of %s" % UiTheme.cache_size(limit_mb * 1048576)
-		_usage_bar.value = clampf(float(_cache_bytes) / float(limit_mb * 1048576), 0.0, 1.0)
 	_refresh_summaries()

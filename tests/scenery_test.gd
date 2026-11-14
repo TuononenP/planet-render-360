@@ -399,8 +399,8 @@ func _probe_ground(failures: Array[String], label: String, data: LocationData) -
 	# species/LOD/sector; every instance origin is the trunk base on
 	# the ground (the mesh's root flare sinks below it).
 	var trees := 0
-	for child in world.get_children():
-		if child is MultiMeshInstance3D and str(child.name).begins_with("VegTrees"):
+	for child in world.find_children("VegTrees_*", "MultiMeshInstance3D", true, false):
+		if child is MultiMeshInstance3D:
 			var origins: PackedVector3Array = child.get_meta("origins", PackedVector3Array())
 			for p in origins:
 				trees += 1

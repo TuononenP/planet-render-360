@@ -21,7 +21,7 @@ static func preah_khan(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#85796A", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("stone", "#968A74", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4F37", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))
 	lm.use("Root", LandmarkMaterials.pbr("rock", "#4D4438", 3.0))
 	lm.use("Moss", LandmarkMaterials.pbr("forest", "#4E5C34", 4.0))

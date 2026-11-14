@@ -26,6 +26,13 @@ const BIN_STEP_M := 70.0
 const KERB_OUT_M := 0.6
 ## A road farther than this from a node does not orient it (m).
 const SNAP_M := 25.0
+## A spot in another way's carriageway slides along its street this far
+## (m), a metre at a time, to the first clear ground (a signal pole stops
+## short of the crossing road, at its corner).
+const SLIDE_M := 14
+## A bridge kerb counts this much further (m) than a street's, so a node
+## where a bridge meets its street snaps to the street.
+const BRIDGE_BIAS_M := 1.0
 const LENS := {"r": Color(1.0, 0.08, 0.03), "g": Color(0.1, 1.0, 0.45)}
 
 static var _meshes: Dictionary = {}
@@ -66,7 +73,7 @@ static func mesh_key(kind: String, family: String) -> String:
 ## desktop Ultra. Returns the number of items placed.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, m2u: float) -> int:
-	if not RenderQuality.ultra_desktop(data.quality_preset) or data.buildings.is_empty():
+	if not CityDetail.street_extras(data) or data.buildings.is_empty():
 		return 0
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
 	var family := furniture_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
@@ -90,8 +97,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		if count >= MAX_ITEMS:
 			break
 		for spot in spots(e[1], roads, family, m2u):
-			var p: Vector2 = spot[0]
-			if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
+			var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u)
+			if p.x == INF or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
 					or ground.water_at(p.x, p.y) > 0.0:
 				continue
 			var basis := Basis(Vector3.UP, _yaw(spot[1])).scaled(Vector3.ONE * m2u)
@@ -119,6 +126,21 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	root.add_child(holder)
 	return count
 
+## `p`, or the nearest point along its street (a signal faces along it,
+## anything else faces across it) out of every carriageway; INF when
+## there is none within SLIDE_M.
+static func _clear_of_lanes(p: Vector2, facing: Vector2, is_signal: bool, mask: VegetationMask,
+		m2u: float) -> Vector2:
+	if not mask.blocked(p.x, p.y, VegetationMask.ROAD, 0.0):
+		return p
+	var along := facing if is_signal else Vector2(-facing.y, facing.x)
+	for k in range(1, SLIDE_M + 1):
+		for sgn in [1.0, -1.0]:
+			var q: Vector2 = p + along * sgn * float(k) * m2u
+			if not mask.blocked(q.x, q.y, VegetationMask.ROAD, 0.0):
+				return q
+	return Vector2(INF, INF)
+
 ## [position, facing direction, mesh key] for one item: signals become a
 ## pole on each kerb facing its oncoming lane, stops and road-bound
 ## items move to the kerb, benches face the street.
@@ -129,6 +151,9 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 	var r := roads.nearest(p, SNAP_M * m2u)
 	if r.is_empty():
 		return [] if kind in ["signals", "bus_stop"] else [[p, Vector2.RIGHT, key]]
+	# An item on a bridge belongs on its deck, not on the ground under it.
+	if bool(r.get("bridge", false)):
+		return []
 	var c: Vector2 = r["point"]
 	var dir: Vector2 = r["dir"]
 	var nrm := Vector2(-dir.y, dir.x)
@@ -155,21 +180,30 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 	var out: Array = []
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var centre := View360.spawn_xz(data)
-	var majors := {}  # snapped node -> major roads through it
+	var majors := {}  # snapped node -> directions major roads leave it in
 	for i in data.roads.size():
 		var rd: Variant = data.roads[i]
-		if not (rd is Dictionary) or bool((rd as Dictionary).get("tunnel", false)):
+		# A paved square's outline is no street.
+		if not (rd is Dictionary) or bool((rd as Dictionary).get("tunnel", false)) \
+				or bool((rd as Dictionary).get("area", false)):
 			continue
 		var cls := str((rd as Dictionary).get("class", ""))
 		var pts: PackedVector2Array = (rd as Dictionary).get("points", PackedVector2Array())
 		if cls in StreetProps.MAJOR:
-			for q in pts:
+			for j in pts.size():
+				var q := pts[j]
 				if (q - centre).length_squared() <= r2:
 					var k := Vector2i(roundi(q.x * 2.0), roundi(q.y * 2.0))
 					if not majors.has(k):
-						majors[k] = {}
-					(majors[k] as Dictionary)[i] = true
-		if family == "japan" or cls not in StreetProps.LIT or pts.size() < 2:
+						majors[k] = []
+					if j > 0:
+						(majors[k] as Array).append((pts[j - 1] - q).normalized())
+					if j < pts.size() - 1:
+						(majors[k] as Array).append((pts[j + 1] - q).normalized())
+		# A bridge still meets its streets (above), but no bin stands on
+		# the ground under it.
+		if family == "japan" or cls not in StreetProps.LIT or pts.size() < 2 \
+				or bool((rd as Dictionary).get("bridge", false)):
 			continue
 		# A bin every BIN_STEP_M, alternating kerbs.
 		var w := float((rd as Dictionary).get("width_m", 6.0)) * 0.5 * m2u + KERB_OUT_M * m2u
@@ -189,7 +223,7 @@ static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: floa
 					out.append({"x": q.x, "z": q.y, "kind": "bin"})
 			t -= seg
 	for k in majors:
-		if (majors[k] as Dictionary).size() >= 2:
+		if RoadSurface.arms(majors[k]) >= 3:
 			out.append({"x": float(k.x) / 2.0, "z": float(k.y) / 2.0, "kind": "signals"})
 	return out
 
@@ -350,9 +384,11 @@ static func _material(name: String) -> Material:
 class RoadIndex:
 	var _cells := {}
 	var _cell := 20.0
+	var _m2u := 1.0
 
 	func _init(data: LocationData, m2u: float, reach_u: float, centre: Vector2 = Vector2.ZERO) -> void:
 		_cell = 20.0 * m2u
+		_m2u = m2u
 		var r2 := reach_u * reach_u
 		for rd in data.roads:
 			if not (rd is Dictionary):
@@ -364,6 +400,7 @@ class RoadIndex:
 				continue
 			var pts: PackedVector2Array = d.get("points", PackedVector2Array())
 			var half := float(d.get("width_m", 6.0)) * 0.5 * m2u
+			var bridge := bool(d.get("bridge", false))
 			for i in pts.size() - 1:
 				var a := pts[i]
 				var b := pts[i + 1]
@@ -376,9 +413,9 @@ class RoadIndex:
 						var k := Vector2i(cx, cz)
 						if not _cells.has(k):
 							_cells[k] = []
-						(_cells[k] as Array).append([a, b, half])
+						(_cells[k] as Array).append([a, b, half, bridge])
 
-	## {point, dir, half} of the nearest segment within `max_d`, or {}.
+	## {point, dir, half, bridge} of the nearest segment within `max_d`, or {}.
 	func nearest(p: Vector2, max_d: float) -> Dictionary:
 		var best := {}
 		var best_d := max_d
@@ -390,8 +427,8 @@ class RoadIndex:
 					var a: Vector2 = s[0]
 					var b: Vector2 = s[1]
 					var q := Geometry2D.get_closest_point_to_segment(p, a, b)
-					var d := q.distance_to(p)
+					var d := q.distance_to(p) + (BRIDGE_BIAS_M * _m2u if bool(s[3]) else 0.0)
 					if d < best_d and a.distance_to(b) > 0.001:
 						best_d = d
-						best = {"point": q, "dir": (b - a).normalized(), "half": float(s[2])}
+						best = {"point": q, "dir": (b - a).normalized(), "half": float(s[2]), "bridge": bool(s[3])}
 		return best

@@ -61,8 +61,8 @@ func _run() -> void:
 	bare.seed_value = good.seed_value
 	good.view = {"eye_lat": 48.85, "eye_lon": 2.35, "bearing": 0.0}
 	bare.view = {"eye_lat": 48.86, "eye_lon": 2.35, "bearing": 0.0}
-	if WorldCache.key(good) == WorldCache.key(bare):
-		failures.append("different placement centres must not share a world")
+	if WorldCache.key(good) != WorldCache.key(bare):
+		failures.append("the opening eye must not change the world key (the entry records it)")
 	bare.view = good.view.duplicate()
 	bare.view["bearing"] = 90.0
 	if WorldCache.key(good) != WorldCache.key(bare):
@@ -86,6 +86,7 @@ func _run() -> void:
 	if not str(paths["scene"]).begins_with(WorldCache.dir_override + "/") \
 			or not str(paths["ground"]).begins_with(WorldCache.dir_override + "/"):
 		failures.append("test cache override must contain both files")
+	_check_deps(failures)
 	WorldCache.dir_override = ""
 	# A second save for the same key must not share a temporary file.
 	var gate := Semaphore.new()
@@ -100,6 +101,48 @@ func _run() -> void:
 	writer.wait_to_finish()
 	if WorldCache._save_in_progress(paths["scene"]):
 		failures.append("a completed save must not block a later save")
+	# A cached world is reused while the eye stays near the one it was built around.
+	var eye := _data()
+	eye.latitude = 60.168
+	eye.longitude = 24.953
+	eye.quality_preset = RenderSettings.Preset.ULTRA
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657, "eye_lon": 24.9558}
+	var built := View360.spawn_xz(eye)
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("the eye a world was built around must reuse it")
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.167408, "eye_lon": 24.953232}
+	var moved := built.distance_to(View360.spawn_xz(eye))
+	if absf(moved - 237.0) > 10.0:
+		failures.append("Helsinki reopen eye should stand ~237 m from the preset eye, got %.0f" % moved)
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~237 m from the built eye must reuse the world")
+	# A reopen reaches as far as a walk inside the open world, on every
+	# preset and platform: ~400 m reuses, ~650 m rebuilds.
+	for p in range(4):
+		eye.quality_preset = p
+		if not WorldCache.eye_fits(built, eye):
+			failures.append("preset %d should reuse a world ~237 m away" % p)
+	eye.quality_preset = RenderSettings.Preset.ULTRA
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657 + 650.0 / 111320.0, "eye_lon": 24.9558}
+	if WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~650 m from the built eye must rebuild")
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.1657 + 400.0 / 111320.0, "eye_lon": 24.9558}
+	if not WorldCache.eye_fits(built, eye):
+		failures.append("a reopen ~400 m from the built eye must reuse the world")
+	# Measured from the scene centre too: past the walk circle (and past
+	# where the world's own eye stood) the detailed extent runs out.
+	eye.view = {"lat": 60.168, "lon": 24.953, "eye_lat": 60.168 - 900.0 / 111320.0, "eye_lon": 24.953}
+	var out := View360.spawn_xz(eye).normalized()
+	if WorldCache.eye_fits(out * 400.0, eye):
+		failures.append("a reopen 900 m from the centre must rebuild a world built 400 m out")
+	if not WorldCache.eye_fits(out * 950.0, eye):
+		failures.append("an off-centre preset eye may reopen as far out as it was built")
+	# Debug fingerprint: fetch-only data sources are skipped, and nothing a
+	# build runs may use one (else editing it could leave a stale world on
+	# screen): not the builders, not the data helpers they call.
+	_check_skipped_sources(failures)
+	if WorldCache._state_fits({}, eye):
+		failures.append("an entry without a recorded eye (old format) must rebuild")
 	# Save pump: a slow frame gets a bigger slice, a quit takes the most.
 	if WorldCache.pump_budget_us(7000) != WorldCache.PUMP_US:
 		failures.append("a fast frame should keep the base pump slice")
@@ -107,6 +150,13 @@ func _run() -> void:
 		failures.append("a 28 ms frame should pump longer than the base slice")
 	if WorldCache.pump_budget_us(10000000) != WorldCache.PUMP_MAX_US:
 		failures.append("the pump slice should be capped")
+	# A background (streamed) build stays small whatever the frame.
+	if WorldCache.pump_budget_us(8333, true) != WorldCache.BG_PUMP_US:
+		failures.append("a background build should keep the small slice at 120 fps")
+	if WorldCache.pump_budget_us(10000000, true) != WorldCache.BG_MAX_US:
+		failures.append("a background slice should be capped low")
+	if WorldCache.pump_budget_us(28000, true) >= WorldCache.pump_budget_us(28000):
+		failures.append("a background build should take less than a foreground one")
 	WorldCache.hurry = true
 	if WorldCache.pump_budget_us(7000) != WorldCache.HURRY_US:
 		failures.append("quitting should take the hurry slice")
@@ -118,3 +168,78 @@ func _run() -> void:
 		for f in failures:
 			printerr("WORLD CACHE KEY FAIL: ", f)
 		quit(1)
+
+## Data scripts the builders name that run before a build (fetching what
+## LocationData carries), not inside it: they may use skipped sources.
+const FETCH_TIME := ["cache_store.gd", "far_city_fetcher.gd", "ground_model_fetcher.gd",
+	"osm_fetcher.gd", "satellite_fetcher.gd", "tile_fetcher.gd"]
+
+## Source text with comments dropped, so a doc mention is not a use.
+func _code(path: String) -> String:
+	var out := PackedStringArray()
+	for line in FileAccess.get_file_as_string(path).split("\n"):
+		var hash_at := line.find("#")
+		out.append(line if hash_at < 0 else line.substr(0, hash_at))
+	return "\n".join(out)
+
+func _class_of(path: String) -> String:
+	var m := RegEx.create_from_string("(?m)^class_name\\s+(\\w+)").search(
+		FileAccess.get_file_as_string(path))
+	return "" if m == null else m.get_string(1)
+
+func _check_skipped_sources(failures: Array[String]) -> void:
+	var build_files: Array[String] = []
+	for d in ["res://scripts/generation", "res://scripts/render"]:
+		build_files.append_array(WorldCache._source_files(d))
+	var build_src := ""
+	for f in build_files:
+		build_src += _code(f) + "\n"
+	# Data helpers a build runs: the fingerprinted data files the builders name.
+	for f in WorldCache._source_files("res://scripts/data"):
+		var c := _class_of(f)
+		if f.get_file() in FETCH_TIME or c == "":
+			continue
+		if RegEx.create_from_string("\\b%s\\b" % c).search(build_src) != null:
+			build_files.append(f)
+	for f in WorldCache.SOURCE_SKIP:
+		if not FileAccess.file_exists(f):
+			failures.append("skipped source %s no longer exists" % f)
+			continue
+		var c := _class_of(f)
+		var uses := RegEx.create_from_string("\\b%s\\b" % c) if c != "" else null
+		for b in build_files:
+			if b == "res://scripts/render/world_cache.gd":
+				continue  # lists the skipped files; runs none of them
+			var code := _code(b)
+			if code.contains(f.get_file()) or (uses != null and uses.search(code) != null):
+				failures.append("%s uses skipped source %s: keep it in the fingerprint" % [b, f])
+
+## A saved world naming a shared texture that a newer tag deleted can
+## never load: deps_present() must say so before a threaded load is tried.
+func _check_deps(failures: Array[String]) -> void:
+	var dir := WorldCache.dir_override
+	DirAccess.make_dir_recursive_absolute(dir)
+	var dep_path := dir + "/dep_test.res"
+	var scene_path := dir + "/world_deps_test.scn"
+	var mesh := BoxMesh.new()
+	if ResourceSaver.save(mesh, dep_path) != OK:
+		failures.append("could not write the dependency fixture")
+		return
+	mesh.take_over_path(dep_path)
+	var root := Node3D.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	root.add_child(mi)
+	mi.owner = root
+	var ps := PackedScene.new()
+	if ps.pack(root) != OK or ResourceSaver.save(ps, scene_path) != OK:
+		failures.append("could not write the world fixture")
+		root.free()
+		return
+	root.free()
+	if not WorldCache.deps_present(scene_path):
+		failures.append("a world whose dependencies exist must count as loadable")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(dep_path))
+	if WorldCache.deps_present(scene_path):
+		failures.append("a world naming a deleted user:// file must not count as loadable")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(scene_path))

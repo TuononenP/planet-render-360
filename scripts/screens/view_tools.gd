@@ -39,8 +39,9 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._hud.add_child(v._horizon)
 	v._hud.move_child(v._horizon, v._fade.get_index())
 	v._minimap = MiniMap.new(v)
-	v._minimap.open_requested.connect(func() -> void: v.back_requested.emit())
 	v._hud.add_child(v._minimap)
+	v._fps = FpsCounter.new()
+	v._hud.add_child(v._fps)
 	v._date_picker = DatePicker.new()
 	v._date_picker.date_picked.connect(func(date: Dictionary) -> void:
 		ViewConditions.set_date(v, date))
@@ -55,10 +56,14 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 		sync(v)
 		ViewChrome.layout(v))
 	v._hud.add_child(v._date_picker)
+	# The way-ahead badge first: a toast draws over it.
+	v._stream_badge = StreamBadge.new()
+	v._hud.add_child(v._stream_badge)
 	v._toast = Toast.new()
 	v._hud.add_child(v._toast)
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
 	v._minimap.visible = UiPrefs.minimap
+	v._fps.visible = UiPrefs.fps_counter
 	sync(v)
 
 static func _action(v: View360, key: String) -> void:
@@ -146,12 +151,24 @@ static func photo(v: View360) -> void:
 			UiTheme.clock(v._time_hour), ViewConditions.date_text(v._date),
 			HudParts.short_sources(data.attribution))
 		img = await PhotoMode.stamped(v, img, lines)
-	PhotoMode.save(img, PhotoMode.file_name(data.place_name, local), func(path: String, failed: bool) -> void:
+		if not is_instance_valid(v):
+			return
+	var bytes := await PhotoMode.encode_png_async(img, v.get_tree())
+	if not is_instance_valid(v):
+		return
+	if bytes.is_empty():
 		v._photo_busy = false
-		if failed:
-			say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
-		elif path != "":
-			say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
+		say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
+		return
+	PhotoMode.save_bytes(bytes, PhotoMode.file_name(data.place_name, local), "png", "PNG image",
+		"Save photo", func(path: String, failed: bool) -> void:
+			if not is_instance_valid(v):
+				return
+			v._photo_busy = false
+			if failed:
+				say(v, "Couldn't save the photo", "Check there is space and the folder can be written to, then try again.", "error")
+			elif path != "":
+				say(v, "Photo saved", path.get_file() if path.begins_with("user://") else path))
 
 ## The whole sphere around the eye as one picture (see PanoramaCapture): six
 ## faces rendered off-screen, so the view itself does not move. Takes a few
@@ -186,16 +203,38 @@ static func panorama(v: View360) -> void:
 		v._photo_busy = false
 		say(v, "Couldn't take the 360° photo", "The scene didn't draw. Try again.", "error")
 		return
-	var bytes := PanoramaCapture.encode(img, heading)
+	var bytes := await PanoramaCapture.encode_async(img, heading, v.get_tree())
+	if not is_instance_valid(v):
+		return
+	if bytes.is_empty():
+		v._photo_busy = false
+		say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+		return
+	# Gallery copy first: the exported file may land anywhere the dialog
+	# puts it, but the in-app Gallery must always be able to list it.
+	# If the Gallery write fails the export still runs, so the photo is
+	# not lost; the messages below say which copy exists.
+	var in_gallery := not PanoramaLibrary.add(bytes, data.place_name, data.latitude, data.longitude,
+		heading, local, img).is_empty()
 	PhotoMode.save_bytes(bytes, PanoramaCapture.file_name(data.place_name, local), "jpg", "JPEG image",
 		"Save 360° photo", func(path: String, failed: bool) -> void:
 			if not is_instance_valid(v):
 				return
 			v._photo_busy = false
-			if failed:
-				say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+			var shown := path.get_file() if path.begins_with("user://") else path
+			if not in_gallery:
+				if failed:
+					say(v, "Couldn't save the 360° photo", "Check there is space and the folder can be written to, then try again.", "error")
+				elif path != "":
+					say(v, "360° photo saved, but not to Gallery", "Gallery is out of space or can't be written to. " + shown, "caution")
+				else:
+					say(v, "Couldn't save the 360° photo to Gallery", "Check there is space on this device, then try again.", "error")
+			elif failed:
+				say(v, "Saved to Gallery, but couldn't export a copy", "Check there is space and the folder can be written to, then export it again from Gallery.", "caution")
 			elif path != "":
-				say(v, "360° photo saved", path.get_file() if path.begins_with("user://") else path))
+				say(v, "360° photo saved", "Find it in Gallery · " + shown)
+			else:
+				say(v, "360° photo saved to Gallery", "No copy was exported. You can export one from Gallery later."))
 
 ## A brief white flash over the scene, like a shutter (none under Reduce motion).
 static func flash(v: View360) -> void:
@@ -230,6 +269,12 @@ static func toggle_minimap(v: View360) -> void:
 	sync(v)
 	ViewChrome.layout(v)
 
+static func toggle_fps(v: View360) -> void:
+	UiPrefs.fps_counter = not UiPrefs.fps_counter
+	v._fps.visible = UiPrefs.fps_counter
+	v.pref_changed.emit("fps_counter", UiPrefs.fps_counter)
+	ViewChrome.layout(v)
+
 # --- Layout ---
 
 ## Places the date sheet, the mini-map and the toast. `sheet` is the
@@ -239,6 +284,37 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._minimap == null:
 		return  # still being built
 	var phone := lay == Responsive.Layout.COMPACT
+	# The way-ahead badge: right-aligned under the top-right chips, and
+	# under the pill and its heading tape (phones) or the ring where it
+	# would reach them. An open inspector runs down that edge, so the
+	# badge moves left of it, under the ring.
+	var under_right := v._top_right.position.y + v._top_right.size.y + 8.0
+	var top_end := v._top.position.y + v._top.size.y + 8.0
+	var badge := v._stream_badge
+	badge.custom_minimum_size.x = minf(StreamBadge.W, w - pad * 2.0)
+	badge.reset_size()
+	var badge_at := Vector2(v._top_right.position.x + v._top_right.size.x - badge.size.x, under_right)
+	var ring := Rect2(v._compass.position, Vector2(CompassDial.RING, CompassDial.RING))
+	var beside_sheet := inspector and v._sheet.visible \
+		and Rect2(badge_at, badge.size).intersects(sheet)
+	if beside_sheet:
+		badge_at = Vector2(sheet.position.x - 8.0 - badge.size.x, maxf(under_right, ring.end.y + 8.0))
+	if Rect2(badge_at, badge.size).intersects(Rect2(v._top.position, v._top.size)):
+		badge_at.y = maxf(badge_at.y, top_end)
+	if not phone and Rect2(badge_at, badge.size).intersects(ring):
+		badge_at.y = maxf(badge_at.y, ring.end.y + 8.0)
+	badge.position = badge_at
+	# FPS counter: under the badge while it shows; else right-aligned under
+	# the top-right chips, or, on a short wide window where the inspector
+	# tucks in there, under the back button and the pill.
+	v._fps.reset_size()
+	if badge.visible:
+		v._fps.position = Vector2(badge_at.x + badge.size.x - v._fps.size.x, badge_at.y + badge.size.y + 8.0)
+	elif inspector and h < 500.0:
+		v._fps.position = Vector2(pad, maxf(v._exit_btn.position.y + v._exit_btn.size.y + 8.0, top_end))
+	else:
+		v._fps.position = Vector2(v._top_right.position.x + v._top_right.size.x - v._fps.size.x,
+			under_right)
 	# Mini-map: bottom-left above the attribution, over the bar where the
 	# two meet; the landmark sheet takes that edge while it is open.
 	var panel_open: bool = v._landmark_panel != null and v._landmark_panel.is_open()
@@ -248,6 +324,11 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 	if v._sheet.visible and Rect2(v._minimap.position, Vector2(box, box)).intersects(sheet.grow(MAP_GAP)):
 		v._minimap.position.y = sheet.position.y - MAP_GAP - box
 	v._minimap.visible = UiPrefs.minimap and not panel_open
+	# A short phone's bar reaches up to the pill and the badge: no room.
+	var map_rect := Rect2(v._minimap.position, Vector2(box, box))
+	for c: Control in [v._top, v._exit_btn, badge, v._fps]:
+		if c.visible and map_rect.intersects(c.get_rect()):
+			v._minimap.visible = false
 	# Date sheet: beside the inspector, or in the bar's place (the bar
 	# steps aside while it is open, like the landmark sheet).
 	var picker := v._date_picker
@@ -262,6 +343,49 @@ static func layout(v: View360, lay: Responsive.Layout, inspector: bool, pad: flo
 			picker.position = Vector2(roundf((w - ps.x) / 2.0),
 				maxf(h - pad - attr_h - 8.0 - ps.y, pad))
 			v._minimap.visible = false
-	# Toast: above the controls on phones, bottom-right of the free area otherwise.
-	if v._toast.visible:
-		v._toast.place(Vector2(w, h), pad, sheet.position.y if v._sheet.visible else h - pad - attr_h, phone)
+
+## The toast, once the zoom stack has its place. Phones: centred above
+## the controls and above the drone button, the round tab and the
+## mini-map. Wider windows: bottom-right, ending left of the zoom stack
+## and the inspector, and beside the mini-map while that leaves it room.
+static func place_toast(v: View360, phone: bool, inspector: bool, pad: float,
+		w: float, h: float, attr_h: float) -> void:
+	if not v._toast.visible:
+		return
+	var host := Vector2(w, h)
+	var floats: Array[Control] = [v._zoom_stack, v._sheet_tab, v._minimap]
+	var bar := v._sheet.get_rect()
+	if phone or (not inspector and v._sheet.visible and bar.end.y > h - pad - 96.0 - attr_h):
+		# Above the bar and the floating buttons (and the touch sticks)
+		# while that leaves room under the top cluster; else over the
+		# bar, never off the top.
+		var top_clear := v._top.get_rect().end.y + 8.0
+		var bottom := bar.position.y if v._sheet.visible else h - pad - attr_h
+		var above := bottom
+		for c in floats + [v._drone.sticks]:
+			if c.visible:
+				above = minf(above, c.position.y + 4.0)  # place() keeps 12 clear
+		var toast_h := maxf(v._toast.get_combined_minimum_size().y, 56.0)
+		if above - 12.0 - toast_h >= top_clear:
+			bottom = above
+		elif bottom - 12.0 - toast_h < top_clear:
+			bottom = h - pad - attr_h
+		v._toast.place(host, pad, bottom, true)
+		return
+	# The band a toast takes at the bottom edge (two wrapped lines).
+	var band := Rect2(0.0, h - pad - 96.0, w, 96.0)
+	var right := w - pad
+	var left := pad
+	for c in floats:
+		var r := c.get_rect()
+		if not c.visible or not r.intersects(band):
+			continue
+		if c == v._minimap:
+			left = maxf(left, r.end.x + 8.0)
+		else:
+			right = minf(right, r.position.x - 8.0)
+	if inspector and v._sheet.visible and v._sheet.get_rect().intersects(band):
+		right = minf(right, v._sheet.position.x - 8.0)
+	if right - left < 280.0:
+		left = pad  # too narrow beside the mini-map: over it, never the buttons
+	v._toast.place(host, pad, h - pad - attr_h, false, right, right - left)

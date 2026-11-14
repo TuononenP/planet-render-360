@@ -12,7 +12,7 @@ static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -
 	var ax := Vector3(dir.x, 0, dir.y)
 	var az := Vector3(n.x, 0, n.y)
 	var h := minf(float(rows[0]["y1"]) - float(rows[0]["y0"]), 1.2 * m)
-	var stone := ReliefKit.stone("stone", Color.html("#958c86" if ArchitectureStyle._h(seed_v, 93) < 0.5 else "#928f89").srgb_to_linear())
+	var stone := _base_stone("#958c86" if ArchitectureStyle._h(seed_v, 93) < 0.5 else "#928f89")
 	var len := float(sp["len_m"]) * m
 	var count := maxi(1, ceili(len / (0.95 * m)))
 	for row in 3:
@@ -23,6 +23,20 @@ static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -
 			kit.box(stone, Vector3(c2.x, float(rows[0]["y0"]) + rh * (float(row) + 0.5), c2.y)
 				+ az * (0.06 + ArchitectureStyle._h(seed_v + j, 94 + row) * 0.04) * m,
 				ax, az, Vector3(width - 0.025 * m, rh - 0.02 * m, 0.18 * m))
+
+static var _base_stones := {}
+static var _base_mutex := Mutex.new()
+
+## The granite base's stone, one shared material per tint (merged cells
+## batch by material). Through StreetSnow: in winter its top course holds
+## snow and the street's slush and salt climb it (ClimateModel.snow_splash).
+static func _base_stone(hex: String) -> Material:
+	_base_mutex.lock()
+	if not _base_stones.has(hex):
+		_base_stones[hex] = StreetSnow.material(ReliefKit.stone("stone", Color.html(hex).srgb_to_linear()) as StandardMaterial3D, 0.3)
+	var mat: Material = _base_stones[hex]
+	_base_mutex.unlock()
+	return mat
 
 ## Last construction year a Jugend / national-romantic corner turret fits.
 const TURRET_LAST_YEAR := 1930

@@ -113,8 +113,6 @@ func _test_replace_and_clear() -> void:
 		_failures.append("a good file should apply")
 	if OsmFetcher.active_endpoints() != ["https://a.example/api/interpreter", "https://b.example/api/interpreter"]:
 		_failures.append("Overpass instances should come from the file")
-	if OsmFetcher.next_attempt(0, true) != 1 or OsmFetcher.next_attempt(1, true) != -1:
-		_failures.append("the retry chain should follow the file's two instances")
 	if OsmFetcher.endpoint_order(["b.example"])[0] != "https://b.example/api/interpreter":
 		_failures.append("endpoint_order should work on the file's instances")
 	if SatelliteFetcher.url_template() % [16, 5, 6] != "https://tiles.example/16/5/6":

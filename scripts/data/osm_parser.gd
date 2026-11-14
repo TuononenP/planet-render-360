@@ -32,16 +32,23 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var barriers: Array = []
 	var railways: Array = []
 	var furniture: Array = []
+	var tram_stops: Array = []
+	var bus_stops: Array = []
+	var rail_platforms: Array = []
+	var rail_stations: Array = []
 	var pois: Array = []
 	var piers: Array = []
 	var shore_structures: Array = []
+	var bridge_areas: Array = []
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return {"buildings": buildings, "roads": roads, "land": land,
 			"landmarks": landmarks, "waterways": waterways, "trees": trees,
 			"barriers": barriers, "country": country, "railways": railways,
-			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
+			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
+			"tram_stops": tram_stops, "bus_stops": bus_stops,
+			"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -112,17 +119,28 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 				var fp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
 				furniture.append({"x": fp.x, "z": fp.y, "kind": fk,
 					"shelter": str(el_tags.get("shelter", "")) == "yes"})
+			var stop := OsmTags.stop_kind(el_tags)
+			if stop != "":
+				var sp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				(tram_stops if stop == "tram" else bus_stops).append({"x": sp.x, "z": sp.y,
+					"name": str(el_tags.get("name", ""))})
+			if OsmTags.rail_station(el_tags):
+				var rp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				rail_stations.append({"x": rp.x, "z": rp.y, "name": str(el_tags.get("name", ""))})
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
-			if str(el_tags.get("type", "")) == "multipolygon" \
-					and el.has("members") and (el_tags.has("building") or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
+			if str(el_tags.get("man_made", "")) == "bridge" and el.has("members"):
+				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
+					_bridge_area(bridge_areas, el_tags, r["outer"], source_id)
+			elif str(el_tags.get("type", "")) == "multipolygon" \
+					and el.has("members") and (OsmApiFallback.names_building(el_tags) or (el_tags.has("defensive_works") and not el_tags.has("building:part"))):
 				_relation_buildings(el_tags, el.get("members", []), c_lat, c_lon,
 					buildings, landmarks)
 			elif str(el_tags.get("type", "")) == "multipolygon" \
-					and el.has("members") and el_tags.has("building:part"):
+					and el.has("members") and str(el_tags.get("building:part", "no")) != "no":
 				# A part with holes (a cloister court, a ring of chapels):
 				# each outer nests like a part way, carrying its inners.
 				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
@@ -186,7 +204,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			max_z = maxf(max_z, p.y)
 		var poly := PackedVector2Array(pts)
 		var aabb := Rect2(min_x, min_z, max_x - min_x, max_z - min_z)
-		if el_tags.has("building"):
+		# A platform is noted for StationTrains whatever else it is drawn as.
+		if OsmTags.rail_platform(el_tags):
+			rail_platforms.append({"points": poly})
+		if OsmApiFallback.names_building(el_tags):
 			var entry := OsmTags._building_entry(el_tags, poly, aabb)
 			buildings.append(entry)
 			var arch := OsmTags.archetype_for(el_tags)
@@ -199,12 +220,18 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"size_x": entry["size_x"], "size_z": entry["size_z"]}
 				_framed_landmark(lmk, poly, entry["height_source"] != "default")
 				landmarks.append(lmk)
-		elif el_tags.has("building:part"):
+		elif str(el_tags.get("building:part", "no")) != "no":
 			part_ways.append({"tags": el_tags, "points": poly, "aabb": aabb, "osm_id": source_id})
 		elif el_tags.has("highway"):
 			# A closed highway area (a square) is filled, not outlined.
 			var sq := OsmTags.paved_area_class(el_tags)
-			if sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
+			if OsmTags.buried_highway(el_tags):
+				pass  # A road tunnel, metro passage or indoor corridor.
+			elif OsmTags.unbuilt_highway(el_tags):
+				pass  # A proposed or demolished road: nothing stands there.
+			elif sq != "" and OsmTags._tag_truthy(el_tags.get("bridge", "")):
+				pass  # A deck area: the bridge's own ways (or its model) carry it, not the ground.
+			elif sq != "" and OsmGeometry._is_closed(poly) and poly.size() >= 4:
 				roads.append(OsmTags._area_entry(el_tags, sq, poly, []))
 			elif sq == "" or not OsmGeometry._is_closed(poly):
 				roads.append(OsmTags._road_entry(el_tags, poly))
@@ -215,13 +242,18 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			roads.append(OsmTags._area_entry(el_tags,
 				OsmTags.paved_area_class(el_tags), poly, []))
 		elif el_tags.has("waterway"):
-			if str(el_tags.get("waterway", "")) == "riverbank" \
+			if OsmTags.buried_waterway(el_tags):
+				pass  # A culverted drain or piped brook runs under the street.
+			elif str(el_tags.get("waterway", "")) == "riverbank" \
 					and OsmGeometry._is_closed(poly):
 				land.append({"class": "water", "points": poly, "holes": []})
 			else:
 				waterways.append(OsmTags._waterway_entry(el_tags, poly))
 		elif str(el_tags.get("natural", "")) == "coastline":
 			waterways.append(OsmTags._waterway_entry(el_tags, poly, "coastline"))
+		elif str(el_tags.get("man_made", "")) == "bridge":
+			if OsmGeometry._is_closed(poly) and poly.size() >= 4:
+				_bridge_area(bridge_areas, el_tags, poly, source_id)
 		elif str(el_tags.get("man_made", "")) == "pier" and poly.size() >= 2:
 			# A jetty or marina pontoon (floating=yes): MarinaBuilder.
 			piers.append({"points": poly, "floating": str(el_tags.get("floating", "")) == "yes",
@@ -256,6 +288,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					entry["still_pool"] = OsmTags.still_pool(el_tags)
 				if cls == "forest":
 					entry.merge(OsmTags.tree_tags(el_tags))
+				if cls == "grass":
+					entry["sward"] = OsmTags.sward(el_tags)
+				if cls == "urban" and OsmTags.harbour_use(el_tags) != "":
+					entry["harbour_use"] = OsmTags.harbour_use(el_tags)
 				land.append(entry)
 			elif str(el_tags.get("natural", "")) == "tree_row":
 				# A mapped row of trees: one tree every TREE_ROW_M along it.
@@ -265,6 +301,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					trees.append(tree)
 		_stamp_sources([buildings, roads, land], source_starts, source_id)
 	RoadWidths.from_sidewalks(roads, trees)
+	_drop_duplicate_buildings(buildings)
+	_drop_duplicate_parts(part_ways)
 	_nest_parts(buildings, part_ways)
 	BuildingReferences.apply(buildings)
 	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
@@ -273,7 +311,20 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	return {"buildings": buildings, "roads": roads, "land": land,
 		"landmarks": landmarks, "waterways": waterways, "trees": trees,
 		"barriers": barriers, "country": country, "railways": railways,
-		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures}
+		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
+		"tram_stops": tram_stops, "bus_stops": bus_stops,
+		"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
+
+## A man_made=bridge outline (BridgeStructures builds one deck per
+## outline): {points (closed ring), layer, bridge_structure,
+## bridge_material, osm_id}.
+static func _bridge_area(out: Array, tags: Dictionary, ring: PackedVector2Array, source_id: String) -> void:
+	if ring.size() < 4:
+		return
+	out.append({"points": ring, "layer": OsmTags._tag_int(tags.get("layer", 1), -10, 10),
+		"bridge_structure": str(tags.get("bridge:structure", "")),
+		"bridge_material": str(tags.get("bridge:material", tags.get("material", ""))),
+		"name": str(tags.get("name", "")), "osm_id": source_id})
 
 ## Building multipolygon relation (courtyard blocks): one building per
 ## stitched outer ring, its contained inner rings as `holes`. Tags live
@@ -376,41 +427,169 @@ static func _monument_landmarks(buildings: Array, landmarks: Array) -> void:
 			"name": str(b.get("name", "")), "height": h,
 			"size_x": 24.0, "size_z": 24.0, "monument": true})
 
+## Order-free identity of a ring: its vertices (closing duplicate
+## dropped) rounded to a centimetre and sorted.
+static func ring_signature(ring: PackedVector2Array) -> String:
+	var n := ring.size()
+	if n > 1 and ring[0].distance_to(ring[n - 1]) < 0.01:
+		n -= 1
+	var keys := PackedStringArray()
+	for i in n:
+		keys.append("%.2f,%.2f" % [ring[i].x, ring[i].y])
+	keys.sort()
+	return ",".join(keys)
+
+## One outline mapped as two buildings (a tagged way and the building
+## relation using it as its outer, or two relations on one outer way)
+## built both: their walls and roofs coincided and z-fought under two
+## facades. One stays, the copy that says most (courtyards, a mapped
+## height, a name), else the first; it takes what only the other mapped
+## and lists the other's id in `alias_ids` (id-keyed lookups: far-city
+## tower suppression, reference rows). Outlines that stand at different
+## floors (a roof canopy or a bridge building over another) are not
+## copies.
+static func _drop_duplicate_buildings(buildings: Array) -> void:
+	var at := {}
+	var drop := {}
+	for i in buildings.size():
+		var b: Dictionary = buildings[i]
+		var fp: Variant = b.get("footprint", null)
+		if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+			continue
+		var sig := "%s|%s|%s|%s" % [ring_signature(fp), str(b.get("min_height_m", 0.0)),
+			str(b.get("min_level", 0)), str(b.get("kind", "")) == "roof"]
+		if not at.has(sig):
+			at[sig] = i
+			continue
+		var j: int = at[sig]
+		var keep: Dictionary = buildings[j]
+		var lose := b
+		if _building_detail(b) > _building_detail(buildings[j]):
+			keep = b
+			lose = buildings[j]
+			drop[j] = true
+			at[sig] = i
+		else:
+			drop[i] = true
+		_absorb(keep, lose)
+	if drop.is_empty():
+		return
+	var kept: Array = []
+	for i in buildings.size():
+		if not drop.has(i):
+			kept.append(buildings[i])
+	buildings.assign(kept)
+
+## `keep` takes from the copy `lose` the courtyards, mapped height and
+## name it lacks, and its id(s) as aliases.
+static func _absorb(keep: Dictionary, lose: Dictionary) -> void:
+	if (keep.get("holes", []) as Array).is_empty() and not (lose.get("holes", []) as Array).is_empty():
+		keep["holes"] = lose["holes"]
+	if str(keep.get("height_source", "default")) == "default" \
+			and str(lose.get("height_source", "default")) != "default":
+		for k in ["height", "height_source", "levels"]:
+			keep[k] = lose[k]
+	if str(keep.get("name", "")) == "" and str(lose.get("name", "")) != "":
+		keep["name"] = lose["name"]
+	var aliases: Array = keep.get("alias_ids", [])
+	if str(lose.get("osm_id", "")) != "":
+		aliases.append(str(lose["osm_id"]))
+	aliases.append_array(lose.get("alias_ids", []))
+	if not aliases.is_empty():
+		keep["alias_ids"] = aliases
+
+## The ids `b` was mapped under: its own and any merged copy's.
+static func ids_of(b: Dictionary) -> Array:
+	var out: Array = []
+	if str(b.get("osm_id", "")) != "":
+		out.append(str(b["osm_id"]))
+	out.append_array(b.get("alias_ids", []))
+	return out
+
+static func _building_detail(b: Dictionary) -> int:
+	return (4 if not (b.get("holes", []) as Array).is_empty() else 0) \
+		+ (2 if str(b.get("height_source", "default")) != "default" else 0) \
+		+ (1 if str(b.get("name", "")) != "" else 0)
+
+## The same building:part mapped twice (same rings, same tags) drew two
+## coincident masses; only the first is kept. Parts that differ in any
+## tag (height, finish) or in their courtyards are distinct masses
+## (PartyWalls lets the taller keep a shared wall).
+static func _drop_duplicate_parts(part_ways: Array) -> void:
+	var seen := {}
+	var kept: Array = []
+	for pw in part_ways:
+		var tags: Dictionary = pw["tags"]
+		var sig := ring_signature(pw["points"])
+		for h in pw.get("holes", []):
+			sig += "|h" + ring_signature(h)
+		var keys := tags.keys()
+		keys.sort()
+		for k in keys:
+			sig += "|%s=%s" % [k, tags[k]]
+		if seen.has(sig):
+			continue
+		seen[sig] = true
+		kept.append(pw)
+	part_ways.assign(kept)
+
+## Share of a part its centroid's building must cover to keep it: a
+## ring-shaped part's centroid falls in its courtyard, on the small
+## building standing there (Helsinki, Kamppi), which it barely touches.
+const NEST_MIN_SHARE := 0.25
+## Share of a part a building must cover to take it by overlap alone
+## (a U-shaped part whose centroid lies in its open notch).
+const ADOPT_MIN_SHARE := 0.5
+
 ## Nest building:part ways into their parents by centroid containment
 ## (smallest containing footprint wins; AABB pre-filter keeps the
-## Paris case — 807 parts × 2504 buildings — cheap). A part without
-## its own height tags inherits the parent mass height. Parts with no
-## containing parent are real masses the payload left orphaned, so
-## they are emitted as buildings rather than dropped.
+## Paris case — 807 parts × 2504 buildings — cheap). When the centroid
+## misses every building, or lands in one covering under
+## NEST_MIN_SHARE of the part, the building covering most of it (at
+## least ADOPT_MIN_SHARE) takes it instead, else it is an orphan: a
+## kiosk in a courtyard must not give its mass to the block around it.
+## Shares count the part's courtyards as uncovered. A part without its own
+## height tags inherits the parent mass height. Parts with no parent
+## are real masses the payload left orphaned, so they are emitted as
+## buildings rather than dropped; an orphan is never a parent, as its
+## own mass would give way to the part nested in it.
 static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 	var boxes: Array[Rect2] = []
 	for b in buildings:
 		var fp: PackedVector2Array = b["footprint"]
 		boxes.append(OsmGeometry._ring_aabb(fp))
+	var orphans: Array = []
 	for pw in part_ways:
 		var tags: Dictionary = pw["tags"]
 		var pts: PackedVector2Array = pw["points"]
 		var paabb: Rect2 = pw["aabb"]
 		var centre := OsmGeometry._polygon_centroid(pts, paabb.get_center())
 		var best := -1
-		var best_area := INF
-		for i in buildings.size():
+		var best_size := INF
+		for i in boxes.size():
 			if not boxes[i].has_point(centre):
 				continue
 			var fp: PackedVector2Array = buildings[i]["footprint"]
 			if not OsmGeometry._point_in_ring(centre, fp):
 				continue
-			var area := boxes[i].size.x * boxes[i].size.y
-			if area < best_area:
+			var size := OsmGeometry._ring_area_abs(fp)
+			if size < best_size:
 				best = i
-				best_area = area
+				best_size = size
+		var holes: Array = pw.get("holes", [])
+		var area := part_area(pts, holes)
+		best = settle_parent(buildings, best, pts, holes, area, func() -> Array:
+			var candidates: Array = []
+			for i in boxes.size():
+				if boxes[i].intersects(paabb):
+					candidates.append(i)
+			return candidates)
 		if best < 0:
 			var orphan := OsmTags._building_entry(tags, pts, paabb)
 			orphan["holes"] = pw.get("holes", [])
 			orphan["orphan_part"] = true
 			orphan["osm_id"] = str(pw.get("osm_id", ""))
-			buildings.append(orphan)
-			boxes.append(paabb)
+			orphans.append(orphan)
 			continue
 		var parent: Dictionary = buildings[best]
 		var res := OsmTags._resolve_height(tags, {
@@ -434,7 +613,68 @@ static func _nest_parts(buildings: Array, part_ways: Array) -> void:
 			if tags.has(key):
 				part[{"building": "kind", "amenity": "use", "tourism": "use"}.get(key, key)] = str(tags[key])
 		(parent["parts"] as Array).append(part)
+	buildings.append_array(orphans)
 	_ground_orphans(buildings)
+
+## The parent of a part (`area`, courtyards `holes` excluded) whose
+## centroid falls in building `centroid` (-1: none). That building keeps
+## it while covering NEST_MIN_SHARE of it; else the building covering
+## most of it (covering_building over the indices `candidates` returns)
+## takes it; else the centroid's building still keeps it when the part
+## covers ADOPT_MIN_SHARE of that building (an outline mapped as a tower's
+## base inside its podium part); else it is an orphan (-1), as a part
+## round a kiosk in its courtyard is. FarCityFetcher nests by it too.
+static func settle_parent(buildings: Array, centroid: int, pts: PackedVector2Array,
+		holes: Array, area: float, candidates: Callable) -> int:
+	var shared := 0.0
+	if centroid >= 0:
+		shared = cover(pts, holes, buildings[centroid]["footprint"])
+		if shared >= NEST_MIN_SHARE * area:
+			return centroid
+	var covering := covering_building(buildings, candidates.call(), pts, holes, area)
+	if covering >= 0 or centroid < 0:
+		return covering
+	var fp: PackedVector2Array = buildings[centroid]["footprint"]
+	return centroid if shared >= ADOPT_MIN_SHARE * OsmGeometry._ring_area_abs(fp) else -1
+
+## Area of part ring `pts` (less its courtyards `holes`) inside `fp`.
+static func cover(pts: PackedVector2Array, holes: Array, fp: PackedVector2Array) -> float:
+	var shared := OsmGeometry.overlap_area(pts, fp)
+	for h in holes:
+		shared -= OsmGeometry.overlap_area(h, fp)
+	return shared
+
+## Area of part ring `pts` less its courtyards `holes`.
+static func part_area(pts: PackedVector2Array, holes: Array) -> float:
+	var area := OsmGeometry._ring_area_abs(pts)
+	for h in holes:
+		area -= OsmGeometry._ring_area_abs(h)
+	return area
+
+## Of the buildings at indices `candidates`, the one covering most of the
+## part (`area`, holes excluded), or -1 when none covers ADOPT_MIN_SHARE
+## of it or the part has no area. Covers are compared in whole percent of
+## the part, so clipper noise does not decide: within one, the smaller
+## building wins.
+static func covering_building(buildings: Array, candidates: Array, pts: PackedVector2Array,
+		holes: Array, area: float) -> int:
+	if area <= 0.0:
+		return -1
+	var best := -1
+	var best_pct := -1
+	var best_size := INF
+	for i in candidates:
+		var fp: PackedVector2Array = buildings[i]["footprint"]
+		var shared := cover(pts, holes, fp)
+		if shared < ADOPT_MIN_SHARE * area:
+			continue
+		var pct := roundi(100.0 * shared / area)
+		var size := OsmGeometry._ring_area_abs(fp)
+		if pct > best_pct or (pct == best_pct and size < best_size):
+			best = i
+			best_pct = pct
+			best_size = size
+	return best
 
 ## Smallest footprint (m²) a lifted orphan part must have to be grounded:
 ## skybridges and walkway roofs between towers stay up.
@@ -444,7 +684,7 @@ const GROUND_ORPHAN_M2 := 200.0
 ## off the ground (min_height / building:min_level) with nothing under it
 ## — its lower parts lost to a cap or the query edge — it floated as a
 ## slab over the skyline (New York). A part that high implies a building
-## below, so it stands on the ground instead.
+## below, so it stands on the ground instead. Then _seat_orphans.
 static func _ground_orphans(buildings: Array) -> void:
 	for b in buildings:
 		var o: Dictionary = b
@@ -469,6 +709,39 @@ static func _ground_orphans(buildings: Array) -> void:
 		if not held:
 			o["min_height_m"] = 0.0
 			o["min_level"] = 0
+	_seat_orphans(buildings)
+
+## A lifted orphan part standing wholly inside a ground-standing mass
+## whose top is above its floor starts at the highest such top, as
+## BuildingMasses._seat_lifts seats nested parts: both drew the band
+## between, z-fighting where their walls share a plane. Only min_height
+## moves: min_level and levels keep the storeys counted above the
+## tagged floor. An outline with parts is not a mass (its parts are).
+static func _seat_orphans(buildings: Array) -> void:
+	for b in buildings:
+		var o: Dictionary = b
+		if not bool(o.get("orphan_part", false)):
+			continue
+		var lift := maxf(float(o.get("min_height_m", 0.0)), float(o.get("min_level", 0)) * 3.0)
+		if lift <= 0.0:
+			continue
+		var fp: PackedVector2Array = o["footprint"]
+		var at := Vector2(float(o["x"]), float(o["z"]))
+		var need := 0.99 * OsmGeometry._ring_area_abs(fp)
+		var seat := lift
+		for other in buildings:
+			var u: Dictionary = other
+			var top := float(u.get("height", 0.0))
+			if is_same(u, o) or top <= seat + 0.05 or top > float(o.get("height", 0.0)) - 0.5 \
+					or float(u.get("min_height_m", 0.0)) > 0.0 or int(u.get("min_level", 0)) > 0 \
+					or not (u.get("parts", []) as Array).is_empty() \
+					or not OsmGeometry._point_in_ring(at, u["footprint"] as PackedVector2Array) \
+					or cover(fp, [], u["footprint"]) < need:
+				continue
+			seat = top
+		if seat > lift:
+			o["min_height_m"] = seat
+
 ## Concatenate two Overpass responses' element lists, detailed first so
 ## the parse-time id-dedup keeps the detailed copy. Either side may be
 ## "" or invalid — the other side still parses.

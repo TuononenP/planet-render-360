@@ -140,11 +140,11 @@ void sky() {
 	float side = pow(smu * 0.5 + 0.5, 3.0);
 	float band = exp(-hy * 9.0);
 	col = mix(col, glow_color, clamp(band * side * glow_amount, 0.0, 1.0));
-	col += glow_color * (pow(sm, 24.0) * 0.12 + pow(sm, 400.0) * 0.5) * glow_amount;
+	col += glow_color * (pow(sm, 24.0) * 0.12 + pow(sm, 900.0) * 0.42) * glow_amount;
 	// Sun glare: a tight bright core and a wide soft aureole in the sun's
 	// own light, under the clouds (they cover it where they are thick).
 	col += LIGHT0_COLOR * LIGHT0_ENERGY * sun_disc
-		* (pow(m, 1400.0) * 1.2 + pow(m, 150.0) * 0.16 + pow(m, 14.0) * 0.018 + pow(m, 3.0) * 0.004);
+		* (pow(m, 1400.0) * 0.55 + pow(m, 150.0) * 0.07 + pow(m, 14.0) * 0.018 + pow(m, 3.0) * 0.004);
 	if (twilight > 0.001) {
 		// Opposite the low sun: Earth's shadow (blue-grey band on the
 		// horizon) under the pink Belt of Venus.
@@ -242,9 +242,11 @@ void sky() {
 		alpha = c * smoothstep(-0.01, 0.10, y) * 0.96;
 		col = mix(col, cc, alpha);
 	}
-	// Sun disc (~0.8 deg) behind the clouds.
-	float disc = smoothstep(0.99985, 0.99994, mu);
-	col += LIGHT0_COLOR * LIGHT0_ENERGY * disc * sun_disc * 6.0 * (1.0 - alpha);
+	// Sun disc (~0.6 deg, hard edge) behind the clouds. The core still
+	// clips white; lower energy smears less bloom into the surround so
+	// the disc reads against the glory instead of one white blob.
+	float disc = smoothstep(0.999930, 0.999955, mu);
+	col += LIGHT0_COLOR * LIGHT0_ENERGY * disc * sun_disc * 3.5 * (1.0 - alpha);
 	if (moon > 0.001) {
 		// Moon: a mottled disc (maria) lit by the true sun, so its phase
 		// and the tilt of the terminator are real; earthshine keeps the

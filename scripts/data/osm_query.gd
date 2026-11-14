@@ -44,6 +44,14 @@ const CAP_POIS := 2500
 ## area:highway, multipolygon squares).
 const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
+## Tram and bus stop nodes over the whole detailed radius
+## (TransitVehicles stands trams at them). Payloads cached or bundled
+## before this statement simply carry none; no query version bump.
+const CAP_STOPS := 1500
+## Railway platform ways and mainline station nodes (StationTrains
+## stands trains beside them). As with the stops: older payloads carry
+## none and are not refetched for them; no query version bump.
+const CAP_PLATFORMS := 600
 ## Marks a response as this query's (an Overpass `make` element): a
 ## cached detailed payload without it predates the current statements
 ## (q3 railways and squares, q4 furniture, q5 piers, q6–q7 shore
@@ -55,6 +63,15 @@ const QUERY_VERSION := 12
 ## Independent snapshot versions; bump when the corresponding query changes.
 const RING_VERSION := 1
 const POI_VERSION := 1
+## The bundled transit layer's stop and platform statements (the same ones
+## build_query makes), fetched by tools/prepare_transit_layer.py.
+const TRANSIT_VERSION := 1
+## The bridge outline layer (build_bridge_area_query): its own request and
+## cache file, so adding it refetched no place's detailed data.
+const BRIDGE_AREA_VERSION := 1
+## man_made=bridge outlines over the detailed radius (a motorway
+## interchange maps a few dozen).
+const CAP_BRIDGE_AREAS := 600
 const QUERY_MARK := "pr360_q12"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
@@ -132,6 +149,14 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 		# the server timeout, which drops the statements printed last.
 		('way["railway"~"^(%s)$"](around:%d,%.6f,%.6f);out geom %d;')
 			% ["|".join(PackedStringArray(OsmTags.RAIL_CLASSES)), radius_m, lat, lon, CAP_RAILWAYS],
+		('(node["railway"="tram_stop"](around:%d,%.6f,%.6f);'
+			+ 'node["public_transport"="stop_position"]["tram"="yes"](around:%d,%.6f,%.6f);'
+			+ 'node["highway"="bus_stop"](around:%d,%.6f,%.6f););out %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon, CAP_STOPS],
+		('(way["railway"="platform"](around:%d,%.6f,%.6f);'
+			+ 'way["public_transport"="platform"]["train"="yes"](around:%d,%.6f,%.6f);'
+			+ 'node["railway"~"^(station|halt)$"](around:%d,%.6f,%.6f););out geom %d;')
+			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon, CAP_PLATFORMS],
 		('(way["area:highway"="pedestrian"](around:%d,%.6f,%.6f);'
 			+ 'way["place"="square"](around:%d,%.6f,%.6f);'
 			+ 'relation["highway"]["type"="multipolygon"](around:%d,%.6f,%.6f);'
@@ -186,6 +211,15 @@ static func build_poi_query(lat: float, lon: float) -> String:
 		clauses.append('node["%s"](around:%d,%.6f,%.6f);' % [key, POI_RADIUS_M, lat, lon])
 	return "[out:json][timeout:%d];(" % OVERPASS_TIMEOUT_S \
 		+ "".join(PackedStringArray(clauses)) + ");out %d;" % CAP_POIS
+
+## man_made=bridge outlines (ways and multipolygon relations) over the
+## detailed radius: BridgeStructures builds one deck per real structure
+## from them. Small (a few hundred bytes per outline).
+static func build_bridge_area_query(lat: float, lon: float, radius_m: int = 1200) -> String:
+	return "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S \
+		+ ('(way["man_made"="bridge"](around:%d,%.6f,%.6f);'
+			+ 'relation["man_made"="bridge"](around:%d,%.6f,%.6f););out geom %d;') \
+			% [radius_m, lat, lon, radius_m, lat, lon, CAP_BRIDGE_AREAS]
 
 ## Second, low-detail ring query (plan §3.1 Ultra budget): major roads
 ## + waterways + coastline out to ring_m. Best-effort — merged over the

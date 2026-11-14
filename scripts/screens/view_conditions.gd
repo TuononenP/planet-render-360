@@ -13,6 +13,9 @@ static func _on_season_selected(v: View360, index: int) -> void:
 static func _select_season(v: View360, index: int) -> void:
 	if v._data == null:
 		return
+	# A season change owns the world until it lands: no streamed centre
+	# built for the old season may swap in underneath it.
+	v._streamer.cancel_pending()
 	v._data.season = LocationData.clamp_season(index)
 	if v._season_btn != null:
 		v._season_btn.select(v._data.season)
@@ -129,7 +132,10 @@ static func _apply_utc_offset(v: View360, hours: float) -> void:
 ## Climate snow / rain / ice for the shown place and its live weather:
 ## shader globals (ClimateModel) plus wet road materials, which are
 ## standard materials and so take the wetness here.
-static func apply_surface_state(v: View360) -> void:
+## `dress_world` false when the world was dressed already (dress_world:
+## the streamer does it while a world waits staged, sparing the swap
+## frame ~45 ms of walking every mesh).
+static func apply_surface_state(v: View360, dress_world := true) -> void:
 	if v._data == null:
 		return
 	var code := v._atmos.weather_code if v._atmos != null else -1
@@ -144,12 +150,26 @@ static func apply_surface_state(v: View360) -> void:
 			and ClimateModel.snowy_at_viewpoint(v._data, v._data.season))
 		if v._ground != null:
 			v._atmos.lightning.ground_height = v._ground.height_at_world
-	if v._generated != null and is_instance_valid(v._generated):
-		_wet_roads(v._generated, 1.0 if code in ClimateModel.RAINING else 0.0)
-		RoofSnow.apply(v._generated, float(ClimateModel.globals_for(v._data, code)["climate_snow_on"]) > 0.0)
-		_city_lights(v)
+	if dress_world and v._generated != null and is_instance_valid(v._generated):
+		dress(v._generated, true, v, v._data)
 	# The city glow above has just moved the sky these take their light from.
 	_precip_tint(v)
+
+## Wet roads, roof snow and city lights on `world`, built for `data`
+## (the live world, or one staged to replace it).
+## `top` false for a piece below the world's own children (WorldHandoff
+## stages big subtrees child by child): roads and roofs are only ever the
+## world's direct children, so those passes skip it.
+static func dress(world: Node, top: bool, v: View360, data: LocationData) -> void:
+	var code := v._atmos.weather_code if v._atmos != null else -1
+	StreetGlow.apply_world(world, data, top)
+	if top:
+		_wet_roads(world, 1.0 if code in ClimateModel.RAINING else 0.0)
+		var snow_on := float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0
+		RoofSnow.apply(world, snow_on)
+		Icicles.apply(world, snow_on, data)
+	if v._atmos != null:
+		CityLights.apply(world, CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount))
 
 ## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
 ## darker albedo. Dry values are kept on the shared material, so the

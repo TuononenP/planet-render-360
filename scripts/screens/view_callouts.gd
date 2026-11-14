@@ -10,7 +10,8 @@ extends Control
 ## named OSM landmark candidates, nearby articles (add_sites) and the
 ## landmark the viewer came to see (LocationData.focus). Each site is a
 ## LandmarkVisit site plus its world `pos`; tapping a callout opens it in
-## the landmark panel (site_tapped).
+## the landmark panel (site_tapped), while tapping the landmark itself
+## in the scene toggles its callout (toggle_site / toggle_at).
 
 signal site_tapped(site: Dictionary)
 
@@ -19,6 +20,9 @@ const DWELL_S := 0.4
 const MAX_SHOWN := 2
 const LIFT := 72.0
 const TAP_MAX_PX := 14.0
+## A scene tap this close (screen px) to a landmark's projected body
+## counts as clicking that landmark.
+const PICK_PX := 80.0
 ## Two sites this close (metres) are one place: the first one wins.
 const SAME_SITE_M := 60.0
 
@@ -29,6 +33,12 @@ var _sites: Array = []  # LandmarkVisit site + {pos: Vector3}
 var _since := {}  # id -> seconds inside the cone
 const SHEET_HYSTERESIS := 24.0
 var _dismissed := {}  # id -> true until it leaves the cone
+## Shown by a click on the landmark itself: stays up outside the cone
+## until clicked again (or Esc), unlike an automatic callout.
+var _pinned := {}  # id -> true
+## Hidden by a click on the landmark itself: the automatic callout
+## stays away until the landmark is clicked again.
+var _suppressed := {}  # id -> true
 var _cards := {}  # id -> PanelContainer
 var _anchors := {}  # id -> screen point
 
@@ -118,6 +128,9 @@ func _add(s: Dictionary, xz: Vector2, lift: float) -> void:
 		y = TerrainBuilder.site_ground_y(_data, _ground, xz.x, xz.y) \
 			if not _ground.is_inside(xz.x, xz.y) else _ground.height_at_world(xz.x, xz.y)
 	s["pos"] = Vector3(xz.x, y + lift, xz.y)
+	# The ground the landmark stands on: a click picks its body from
+	# here to its top, not just the floating anchor at `pos`.
+	s["base_y"] = y
 	_sites.append(s)
 
 func sites() -> Array:
@@ -130,6 +143,8 @@ func clear() -> void:
 	_anchors.clear()
 	_since.clear()
 	_dismissed.clear()
+	_pinned.clear()
+	_suppressed.clear()
 	queue_redraw()
 
 ## Esc: close the open callouts. Returns false when none were open.
@@ -138,11 +153,85 @@ func dismiss() -> bool:
 		return false
 	for id in _cards:
 		_dismissed[id] = true
+		_pinned.erase(id)
 	for id in _cards.keys():
 		(_cards[id] as Node).queue_free()
 	_cards.clear()
 	_anchors.clear()
 	queue_redraw()
+	return true
+
+## Clicking a landmark toggles its callout: shown (pinned, so it stays
+## up outside the view-centre cone) when it was hidden, hidden (and kept
+## from auto-showing) when it was up. Returns whether it is shown now.
+func toggle_site(s: Dictionary) -> bool:
+	var id := str(s.get("id", ""))
+	if id == "":
+		return false
+	if _cards.has(id) or _pinned.has(id):
+		if _cards.has(id):
+			(_cards[id] as Node).queue_free()
+			_cards.erase(id)
+			_anchors.erase(id)
+		_pinned.erase(id)
+		_suppressed[id] = true
+		queue_redraw()
+		return false
+	_suppressed.erase(id)
+	_dismissed.erase(id)
+	_pinned[id] = true
+	if not _sites.any(func(other: Dictionary) -> bool: return str(other.get("id", "")) == id) and s.has("pos"):
+		_sites.append(s)
+	_cards[id] = _make_card(s, distance_to(s))
+	queue_redraw()
+	return true
+
+## Whether `s`'s callout is up (automatic, or pinned by a click).
+func is_shown(s: Dictionary) -> bool:
+	return _cards.has(str(s.get("id", "")))
+
+## The landmark under screen point `pt` (viewport pixels, as
+## Camera3D.unproject_position gives), {} for none: the nearest site
+## whose projected body comes close enough. The body is the vertical
+## span from the ground it stands on (`base_y`, set in _add) to its
+## top — the anchor at `pos` floats up to 60 m above a low landmark,
+## so a click on the building itself lands well below it. The reach
+## around that span grows with its projected height (a tall, near
+## landmark is wide on screen too), at least PICK_PX.
+func site_at(pt: Vector2) -> Dictionary:
+	if _view == null or _view._rig == null or _view._rig.camera == null:
+		return {}
+	var cam := _view._rig.camera
+	var best: Dictionary = {}
+	var best_score := 1.0
+	for s in _sites:
+		if not s.has("pos"):
+			continue
+		var pos: Vector3 = s["pos"]
+		if cam.is_position_behind(pos):
+			continue
+		var base_y := float(s.get("base_y",
+			pos.y - maxf(float(s.get("height_m", 0.0)), 40.0) * 0.5))
+		var top_y := maxf(base_y + maxf(float(s.get("height_m", 0.0)), 20.0), pos.y)
+		var a := cam.unproject_position(Vector3(pos.x, base_y, pos.z))
+		var b := cam.unproject_position(Vector3(pos.x, top_y, pos.z))
+		var reach := clampf(a.distance_to(b) * 0.6, PICK_PX, 280.0)
+		var score := _segment_distance(pt, a, b) / reach
+		if score <= best_score:
+			best = s
+			best_score = score
+	return best
+
+static func _segment_distance(pt: Vector2, a: Vector2, b: Vector2) -> float:
+	return pt.distance_to(Geometry2D.get_closest_point_to_segment(pt, a, b))
+
+## A scene tap at `pt`: toggles the landmark under it, if any. Returns
+## true when a landmark took the tap (so it does not also walk there).
+func toggle_at(pt: Vector2) -> bool:
+	var s := site_at(pt)
+	if s.is_empty():
+		return false
+	toggle_site(s)
 	return true
 
 ## A landmark behind the controls sheet waits until it is in view: no card,
@@ -154,7 +243,7 @@ func _behind_sheet(cam: Camera3D, s: Dictionary) -> bool:
 		and _view._sheet.get_global_rect().grow(grow).has_point(global_position + cam.unproject_position(s["pos"]))
 
 func _process(delta: float) -> void:
-	if not is_visible_in_tree() or _sites.is_empty() or _view._rig == null:
+	if not is_visible_in_tree() or _sites.is_empty() or _view == null or _view._rig == null:
 		return
 	var cam := _view._rig.camera
 	if cam == null:
@@ -168,22 +257,36 @@ func _process(delta: float) -> void:
 		var id: String = s["id"]
 		if ang <= CONE_DEG:
 			_since[id] = float(_since.get(id, 0.0)) + delta
-			if float(_since[id]) >= DWELL_S and not _dismissed.has(id) and not _behind_sheet(cam, s):
+			if float(_since[id]) >= DWELL_S and not _dismissed.has(id) and not _suppressed.has(id) \
+					and not _behind_sheet(cam, s):
 				inside.append([ang, s, to.length()])
 		else:
 			_since.erase(id)
 			_dismissed.erase(id)
 	inside.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	# Automatic callouts (nearest the centre, at most MAX_SHOWN), plus
+	# any a click pinned: those stay up wherever the landmark is on
+	# screen, not only in the cone.
 	var want := {}
 	for item in inside.slice(0, MAX_SHOWN):
 		var s: Dictionary = item[1]
-		want[s["id"]] = true
-		if not _cards.has(s["id"]):
-			_cards[s["id"]] = _make_card(s, float(item[2]))
+		want[s["id"]] = [s, float(item[2])]
+	for s in _sites:
+		var id: String = s["id"]
+		if not _pinned.has(id) or want.has(id) or _dismissed.has(id) or _suppressed.has(id) \
+				or _behind_sheet(cam, s) or cam.is_position_behind(s["pos"]):
+			continue
+		if not Rect2(Vector2(-80, -80), size + Vector2(160, 160)).has_point(cam.unproject_position(s["pos"])):
+			continue
+		want[id] = [s, origin.distance_to(s["pos"] as Vector3)]
+	for id in want:
+		var s: Dictionary = want[id][0]
+		if not _cards.has(id):
+			_cards[id] = _make_card(s, float(want[id][1]))
 			ViewChrome.announce(_view, str(s["name"]))
 		var pt := cam.unproject_position(s["pos"])
-		_anchors[s["id"]] = pt
-		var card := _cards[s["id"]] as PanelContainer
+		_anchors[id] = pt
+		var card := _cards[id] as PanelContainer
 		card.reset_size()
 		card.position = Vector2(clampf(pt.x - card.size.x / 2.0, 8.0, size.x - card.size.x - 8.0),
 			clampf(pt.y - LIFT - card.size.y, 8.0, size.y - card.size.y - 8.0))
@@ -266,7 +369,7 @@ func _card_input(card: Control, s: Dictionary, e: InputEvent) -> void:
 
 ## Metres from the camera to a site.
 func distance_to(s: Dictionary) -> float:
-	if _view._rig == null or not s.has("pos"):
+	if _view == null or _view._rig == null or not s.has("pos"):
 		return -1.0
 	return (s["pos"] as Vector3).distance_to(_view._rig.global_position)
 

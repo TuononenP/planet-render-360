@@ -26,8 +26,10 @@ const STATES := {
 	61: ["rain", 0.35, 10000.0], 63: ["rain", 0.6, 5000.0], 65: ["rain", 0.9, 2000.0],
 	66: ["rain", 0.4, 8000.0], 67: ["rain", 0.8, 3000.0],
 	80: ["rain", 0.4, 9000.0], 81: ["rain", 0.65, 4500.0], 82: ["rain", 0.95, 1800.0],
-	71: ["snow", 0.3, 3000.0], 73: ["snow", 0.6, 1200.0], 75: ["snow", 0.9, 600.0],
-	77: ["snow", 0.25, 3000.0], 85: ["snow", 0.5, 1800.0], 86: ["snow", 0.85, 700.0],
+	# Snow hides far more than rain of the same rate: heavy snowfall is
+	# a few hundred metres of visibility.
+	71: ["snow", 0.3, 2000.0], 73: ["snow", 0.6, 800.0], 75: ["snow", 0.9, 300.0],
+	77: ["snow", 0.25, 2500.0], 85: ["snow", 0.5, 1200.0], 86: ["snow", 0.85, 400.0],
 	95: ["rain", 0.7, 3000.0], 96: ["rain", 0.85, 1500.0], 99: ["rain", 0.95, 1500.0],
 }
 ## Fog visibility below which the scene counts as foggy (denser
@@ -80,7 +82,8 @@ static func particle_params(look: Dictionary) -> Dictionary:
 	var inten := float(look.get("intensity", 0.0))
 	if str(look.get("precip", "none")) == "snow":
 		return {"amount_ratio": lerpf(0.35, 1.0, inten), "speed": lerpf(0.9, 1.5, inten),
-			"slant": lerpf(0.15, 0.45, inten), "size": Vector2.ONE * lerpf(0.016, 0.032, inten),
+			# Heavy snow falls as clumps of several flakes, 3-5 cm across.
+			"slant": lerpf(0.15, 0.45, inten), "size": Vector2.ONE * lerpf(0.022, 0.045, inten),
 			"alpha": lerpf(0.7, 0.92, inten), "veil": lerpf(0.10, 0.34, inten)}
 	var speed := lerpf(3.5, 9.0, inten)
 	return {"amount_ratio": lerpf(0.3, 1.0, inten), "speed": speed,

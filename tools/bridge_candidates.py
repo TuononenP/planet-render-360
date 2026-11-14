@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """List the named bridges in the bundled OSM snapshots, with measured geometry.
 
-Offline. Reads assets/osm_snapshots/<prefix>_{detailed,far}.json.gz (Overpass
+Offline. Reads assets/osm_snapshots/<prefix>_{detailed,far}.osmb (Overpass
 shaped, `out geom`) and prints one JSON line per named bridge: the centre of the
 deck, its true bearing (compass degrees, principal axis of the ways with that
 name), its length, and the OSM tags that matter (bridge, bridge:structure,
@@ -16,11 +16,13 @@ listed and is authored from published figures instead.
 """
 import argparse
 import glob
-import gzip
 import json
 import math
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import osmb  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "osm_snapshots")
 KEEP_TAGS = ("bridge", "bridge:structure", "bridge:movable", "layer", "width", "lanes",
@@ -28,8 +30,7 @@ KEEP_TAGS = ("bridge", "bridge:structure", "bridge:movable", "layer", "width", "
 
 
 def load(path):
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        return json.load(f).get("elements", [])
+    return osmb.read_osmb(path).get("elements", [])
 
 
 def metres(lat0, p):
@@ -101,7 +102,7 @@ def candidates(prefix, min_length):
     out = {}
     water = []
     for layer in ("detailed", "far"):
-        path = os.path.join(ROOT, "%s_%s.json.gz" % (prefix, layer))
+        path = os.path.join(ROOT, "%s_%s.osmb" % (prefix, layer))
         if not os.path.exists(path):
             continue
         elements = load(path)
@@ -147,7 +148,7 @@ def main():
     ap.add_argument("--water-only", action="store_true", help="only bridges that cross mapped water")
     args = ap.parse_args()
     prefixes = sorted({os.path.basename(p).rsplit("_", 1)[0] for p in glob.glob(
-        os.path.join(ROOT, args.prefix + "_*.json.gz"))})
+        os.path.join(ROOT, args.prefix + "_*.osmb"))})
     if not prefixes:
         print("no snapshot matches %r in %s" % (args.prefix, os.path.normpath(ROOT)), file=sys.stderr)
         return 1

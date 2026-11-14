@@ -70,6 +70,29 @@ func _init() -> void:
 	abort.requested = true
 	if Canopy.add({"pos": [], "sp": [], "scale": [], "real": []}, data, ground, mask, ctx, abort) != 0:
 		failures.append("cancelled canopy placement must stop")
+	# Canopy over a pitch: the ground is painted as the pitch, so no
+	# tree stands on it; the canopy round it still plants.
+	var pitched := LocationData.new()
+	RenderSettings.apply_preset(pitched, RenderSettings.Preset.HIGH)
+	pitched.latitude = 48.8566
+	pitched.longitude = 2.3522
+	pitched.grid_size = 32
+	pitched.heights.resize(pitched.grid_size * pitched.grid_size)
+	pitched.heights.fill(3.0)
+	pitched.water_level = -3.0
+	pitched.canopy_image = Image.create_from_data(1, 1, false, Image.FORMAT_L8, PackedByteArray([15]))
+	pitched.land_polygons = [{"class": "pitch", "points": PackedVector2Array([Vector2(-200, -200),
+		Vector2(200, -200), Vector2(200, 200), Vector2(-200, 200)]), "holes": []}]
+	var pg := GroundTruth.new(pitched)
+	var pitch_plan := {"pos": [], "sp": [], "scale": [], "real": []}
+	Canopy.add(pitch_plan, pitched, pg, VegetationMask.new(pitched, pg), VegetationBuilder._context(pitched, pg))
+	var on_pitch := 0
+	for p in pitch_plan["pos"]:
+		if absf((p as Vector3).x) < 199.0 and absf((p as Vector3).z) < 199.0:
+			on_pitch += 1
+	if on_pitch > 0 or (pitch_plan["pos"] as Array).is_empty():
+		failures.append("canopy plants round a pitch but not on it: %d of %d" % [on_pitch,
+			(pitch_plan["pos"] as Array).size()])
 	if failures.is_empty():
 		print("CANOPY VEGETATION OK: height cells, mapped trees, Fast and cancellation")
 		quit(0)

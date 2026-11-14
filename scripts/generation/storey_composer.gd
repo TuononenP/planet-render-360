@@ -86,20 +86,6 @@ static func _base(loader: Callable, set_name: String, map_name: String, w: int,
 	_base_mutex.unlock()
 	return img
 
-static func _finish(alb: Image, nor: Image, rgh: Image, depth: bool = false) -> Dictionary:
-	# Composed in linear; encode for the sRGB-decoding albedo sampler.
-	alb.linear_to_srgb()
-	alb.generate_mipmaps()
-	var d := {"albedo": ImageTexture.create_from_image(alb), "normal": null, "rough": null}
-	if depth and rgh != null:
-		d["depth"] = FacadeComposer.depth_from_rough(rgh)
-	if nor != null and rgh != null:
-		nor.generate_mipmaps(true)
-		rgh.generate_mipmaps()
-		d["normal"] = ImageTexture.create_from_image(nor)
-		d["rough"] = ImageTexture.create_from_image(rgh)
-	return d
-
 ## Row layout of the Paris facade (texture px from the top, S tall), top
 ## row first: y/h of the row, window top and height, balcony slab line and
 ## rail height, and which rows are ground, entresol (rusticated), balcony
@@ -401,8 +387,11 @@ static func compose_glass(detail: int) -> Dictionary:
 	var alb := Image.create(S, S, false, Image.FORMAT_RGBA8)
 	var step := S / 8
 	var mull := FacadeComposer.MULLION
+	var emit := FacadePaint.emit_layer(alb) if detail >= 1 else null
 	for py in 8:
 		for px in 8:
+			FacadePaint.pane(emit, Rect2i(px * step + 3, py * step + 3, step - 6, step - 16),
+				_h(float(px) * 5.3 + 1.7, float(py) * 2.1 + 0.4))
 			var v := 0.76 + _h(float(px) * 3.1, float(py) * 7.7) * 0.2
 			var sky := FacadeComposer.SKY_GLASS.lerp(FacadeComposer.SKY_GLASS_TOP,
 				1.0 - float(py) / 8.0)
@@ -427,4 +416,4 @@ static func compose_glass(detail: int) -> Dictionary:
 			nor.fill_rect(Rect2i(0, i * step + 1, S, 2), Color(0.5, 0.62, 1.0))
 			rgh.fill_rect(Rect2i(i * step - 2, 0, 4, S), Color(0.5, 0.5, 0.5))
 			rgh.fill_rect(Rect2i(0, i * step - 2, S, 4), Color(0.5, 0.5, 0.5))
-	return _finish(alb, nor, rgh)
+	return FacadePaint.finish(alb, null, emit, nor, rgh)

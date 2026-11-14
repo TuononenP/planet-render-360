@@ -61,6 +61,8 @@ static func loading_line(keys: Array) -> String:
 static func partial_line(detail: String) -> String:
 	if detail.begins_with("Nearby"):
 		return "The live map is unavailable. Using saved data from a nearby spot."
+	if detail.begins_with("Simplified"):
+		return "The live map is unavailable. Showing simplified buildings, roads and water."
 	return "The live map is slow. Showing the part of the area it returned."
 
 ## True unless the map answered, validly, with no buildings (open sea,

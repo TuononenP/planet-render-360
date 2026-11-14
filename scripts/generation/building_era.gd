@@ -144,13 +144,6 @@ const CITY_ERAS := {
 		["sf_chinatown", AC, 1906, 1930, ["chinese", "chinese_revival", "chinoiserie"], 0.2, 0.0, 2.5],
 		["sf_tower", ACC, 1950, 2100, MODERN, 0.8, 0.0, 99.0],
 	],
-	"tokyo": [
-		["tokyo", AC, 1950, 2100, [], 5.0, 0.0, 99.0],
-		["tokyo_house", ["house"], 1000, 2100, ["minka", "machiya", "traditional",
-			"sukiya"], 1.0, 0.0, 99.0],
-		["tokyo_tower", ACC, 1990, 2100, ["high-tech", "metabolism", "skyscraper",
-			"postmodern"], 0.6, 0.0, 99.0],
-	],
 	"hong_kong": [
 		["hong_kong", APT, 1970, 2100, ["public_housing", "residential_tower"], 5.0, 0.0, 99.0],
 		["hk_tenement", AC, 1900, 1969, ["tong_lau", "tenement", "shophouse",
@@ -162,13 +155,6 @@ const CITY_ERAS := {
 		["sg_shophouse", HAC, 1840, 1959, ["shophouse", "straits_eclectic", "peranakan",
 			"art_deco", "colonial"], 1.5, 0.0, 99.0],
 		["sg_tower", ACC, 1980, 2100, MODERN + ["condominium"], 1.0, 0.0, 99.0],
-	],
-	"seoul": [
-		["seoul", APT, 1975, 2100, ["apartment_complex", "danji"], 5.0, 0.0, 99.0],
-		["seoul_villa", HAC, 1970, 2005, ["villa", "dagagu", "dasedae", "multiplex"], 3.0, 0.0, 99.0],
-		["seoul_hanok", ["house", "commercial"], 1300, 1960, ["hanok", "traditional", "joseon",
-			"korean_traditional"], 0.25, 0.0, 99.0],
-		["seoul_tower", ACC, 1985, 2100, MODERN, 1.0, 0.0, 99.0],
 	],
 	"dubai": [
 		["dubai", AC, 1975, 2100, [], 5.0, 0.0, 99.0],
@@ -202,7 +188,7 @@ const CITY_ERAS := {
 
 static var ERAS: Dictionary = ArchitectureData._merged([CITY_ERAS, ArchitectureCitiesNorth.ERAS, ArchitectureCitiesFinland.ERAS,
 	ArchitectureCitiesSouth.ERAS, ArchitectureCitiesCentral.ERAS, ArchitectureCitiesWorld.ERAS,
-	ArchitectureCitiesNewWorld.ERAS])
+	ArchitectureCitiesNewWorld.ERAS, ArchitectureCitiesEastAsia.ERAS])
 
 ## Sub-region key for one building (see the class doc). `ctx` is the
 ## build context (BuildingHeights._height_context): its `cores` give the
@@ -232,6 +218,13 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		for e in cands:
 			if ((e as Array)[4] as Array).has(arch):
 				return str((e as Array)[0])
+	# A Seoul palace hall comes from the walls' circles or a heritage
+	# hall (ArchitectureCitiesEastAsia.seoul_rule), never by elimination:
+	# a church, whose kind only the palace row lists, keeps the city fabric.
+	if city == "seoul" and _rules(city, kind, c) != "seoul_palace":
+		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) != "seoul_palace")
+		if cands.is_empty():
+			return region
 	var year := int(c["year"])
 	# Tall historic New York buildings keep their masonry even when a
 	# broad, overlapping year band would otherwise choose walk-up fabric.
@@ -297,6 +290,7 @@ static func cues(b: Dictionary, ctx: Dictionary, area_m2: float) -> Dictionary:
 	return {"arch": str(b.get("architecture", "")).strip_edges().to_lower().replace(" ", "_").replace("-", "_"),
 		"year": int(b.get("start_year", 0)), "lv": lv, "district": district,
 		"roof": str(b.get("roof_shape", "")).strip_edges().to_lower(),
+		"tag": str(b.get("kind", "")).to_lower(), "name": str(b.get("name", "")),
 		"area": area_m2, "heritage": bool(b.get("heritage", false)), "dist": dist}
 
 ## Block size (m) and the share of untagged buildings whose era follows
@@ -433,6 +427,8 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			var district := str(c["district"])
 			if _empire(kind, c):
 				return "helsinki_empire"
+			if kind == "house" and district == "helsinki_villa":
+				return "helsinki_villa"
 			if kind == "house":
 				return "helsinki_wood" if district == "helsinki_wood" or bool(c["heritage"]) else "helsinki_suburb"
 			if lv >= 10:
@@ -516,12 +512,7 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 3 or (lv <= 0 and district != "sf_tower"):
 				return "sf_stucco" if district == "sf_stucco" else "san_francisco"
 		"tokyo":
-			if kind == "house":
-				return "tokyo_house"
-			if lv >= 15:
-				return "tokyo_tower"
-			if lv >= 1:
-				return "tokyo"
+			return ArchitectureCitiesEastAsia.tokyo_rule(kind, c)
 		"hong_kong":
 			if kind == "commercial" and lv >= 12:
 				return "hk_office"
@@ -537,14 +528,7 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 5:
 				return "singapore"
 		"seoul":
-			if lv >= 20 or (kind != "apartments" and lv >= 10):
-				return "seoul_tower"
-			if kind == "house" and old:
-				return "seoul_hanok"
-			if kind == "apartments" and lv >= 10:
-				return "seoul"
-			if lv >= 2 and lv <= 6:
-				return "seoul_villa"
+			return ArchitectureCitiesEastAsia.seoul_rule(kind, c)
 		"dubai":
 			if lv >= 20 or (kind == "commercial" and lv >= 12):
 				return "dubai_tower"

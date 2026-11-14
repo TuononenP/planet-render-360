@@ -34,6 +34,7 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 	# Main scaffold branches (golden-angle spiral).
 	var nb: int = s["branches"]
 	var tips: Array = []
+	var mids: Array = []
 	var mains: Array = []
 	var attach_hi := top_y - crown_h * 0.05 if leader < 0.5 else base_y + crown_h * minf(leader, 0.85) * 0.9
 	for i in nb:
@@ -43,21 +44,30 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 		var start := Vector3(0, ay, 0) + lean * tf * tf
 		var az := float(i) * 2.39996 + rng.randf_range(-0.35, 0.35)
 		var dh := Vector3(cos(az), 0, sin(az))
-		var ey := clampf(lerpf(ay + ry * 0.2, cc.y + ry * 0.85, float(s["up"])) + rng.randf_range(-0.12, 0.12) * ry,
-			cc.y - ry * 0.55, cc.y + ry * 0.9)
-		var q := (ey - cc.y) / ry
-		var hr := rx * sqrt(maxf(0.06, 1.0 - q * q)) * rng.randf_range(0.72, 0.92)
-		var end := Vector3(dh.x * hr, ey - float(s["droop"]) * ry * 0.35, dh.z * hr)
-		var ctrl := start.lerp(end, 0.45) + Vector3(0, (end.y - start.y) * 0.35 + ry * 0.12, 0) \
-			- dh * hr * 0.12
+		# A real branch angle (steeper for upright species and higher up
+		# the trunk) run out to the crown surface at its own height, so
+		# low branches carry the lower crown instead of all of them
+		# spoking up to the top (a broom on a pole).
+		var el := lerpf(0.2, 1.15, float(s["up"])) * lerpf(0.7, 1.15, f) + rng.randf_range(-0.15, 0.15)
+		var dir := (dh * cos(el) + Vector3.UP * sin(el)).normalized()
+		var reach := _ray_ellipsoid(start, dir, cc, rx, ry) * rng.randf_range(0.8, 0.93)
+		if reach <= 0.0:
+			reach = rx * 0.8
+		var end := _clamp_ellipsoid(start + dir * reach - Vector3(0, float(s["droop"]) * ry * 0.18, 0), cc, rx, ry)
+		var hr := Vector2(end.x, end.z).length()
+		var ctrl := start.lerp(end, 0.45) + Vector3(0, reach * 0.1, 0) - dh * hr * 0.08
 		var path := TreeMeshLibrary._bezier(start, ctrl, end, 4 if lod == 0 else 2)
 		var r0 := tr * (0.55 if leader < 0.5 else 0.38) * (1.0 - 0.4 * f)
 		var br: Array = []
 		for k in path.size():
 			br.append(lerpf(r0, 0.035, float(k) / float(path.size() - 1)))
-		TreeMeshLibrary._tube(bark, path, br, 6 if lod == 0 else 4, 0.7, 1.0)
+		# In leaf, tips darken so pale bark does not streak through the
+		# foliage; bare winter branches are the whole silhouette.
+		TreeMeshLibrary._tube(bark, path, br, 6 if lod == 0 else 4, 0.7, 1.0 if bare else 0.55)
 		mains.append(path)
 		tips.append(end)
+		# Foliage also rides the outer half of the branch, not only its tip.
+		mids.append(path[path.size() * 3 / 5])
 		# Secondaries (always on bare winter trees: the structure shows).
 		if lod == 0 or bare:
 			var kids := rng.randi_range(2, 3) + (1 if bare else 0)
@@ -69,7 +79,8 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 				var ln := (end - start).length() * rng.randf_range(0.35, 0.5)
 				var se := _clamp_ellipsoid(sp0 + d * ln, cc, rx, ry)
 				var smid := sp0.lerp(se, 0.5) + Vector3(0, ln * 0.08 - float(s["droop"]) * ln * 0.2, 0)
-				TreeMeshLibrary._tube(bark, TreeMeshLibrary._bezier(sp0, smid, se, 2), [r0 * 0.45, r0 * 0.3, 0.02], 4 if lod == 0 else 3, 0.75, 1.0)
+				TreeMeshLibrary._tube(bark, TreeMeshLibrary._bezier(sp0, smid, se, 2), [r0 * 0.45, r0 * 0.3, 0.02], 4 if lod == 0 else 3,
+					0.75 if bare else 0.6, 1.0 if bare else 0.45)
 				tips.append(se)
 	# Foliage clusters (or winter twig cards).
 	var count := int(float(s["clusters"]) * (1.0 if lod == 0 else 0.4))
@@ -77,27 +88,65 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 	if bare:
 		count = int(float(s["clusters"]) * (0.55 if lod == 0 else 0.3))
 		card *= 0.85
-	var anchors: Array = tips.duplicate()
-	for path in mains:
-		anchors.append(path[path.size() / 2])
+	# Lobed crown: every branch tip is a lobe and clusters scatter
+	# around it (Gaussian), so the crown breaks into sub-crowns with
+	# see-through gaps instead of one smooth ellipsoid shell. Upper
+	# lobes are slightly denser.
+	var sigma := Vector3(rx, ry * 0.8, rx) * 0.28
+	var anchors: Array = []
+	var lobe_of: Array = []
+	var weights: Array = []
+	var wsum := 0.0
+	# More tips than clusters (bare trees, LOD 1): keep a spread over the
+	# whole crown height, not just the lowest branches' tips.
+	if tips.size() > count and count > 0:
+		var spread: Array = []
+		for k in count:
+			spread.append(tips[int(float(k) * float(tips.size()) / float(count))])
+		tips = spread
+	for t in tips:
+		anchors.append(t)
+		lobe_of.append(t)
+	# Branch-middle lobes (lighter weight) fill the crown's inner layer.
+	var lobes: Array = tips.duplicate()
+	if not bare:
+		lobes.append_array(mids)
+	for li in lobes.size():
+		var t: Vector3 = lobes[li]
+		var w := 0.7 + 0.6 * clampf((t.y - base_y) / maxf(crown_h, 0.1), 0.0, 1.0)
+		if li >= tips.size():
+			w *= 0.5
+		weights.append(w)
+		wsum += w
 	var tries := 0
-	while anchors.size() < count and tries < count * 6:
+	while anchors.size() < count and tries < count * 8 and not lobes.is_empty():
 		tries += 1
-		var dir := Vector3(rng.randfn(), rng.randfn() * 0.8, rng.randfn()).normalized()
-		var r := rng.randf_range(0.5, 0.97)
-		var p := cc + Vector3(dir.x * rx * r, dir.y * ry * r, dir.z * rx * r)
+		var pick := rng.randf() * wsum
+		var li := 0
+		while li < lobes.size() - 1 and pick > float(weights[li]):
+			pick -= float(weights[li])
+			li += 1
+		var lobe: Vector3 = lobes[li]
+		var p := lobe + Vector3(rng.randfn() * sigma.x, rng.randfn() * sigma.y, rng.randfn() * sigma.z)
+		# Resample instead of clamping: clamped samples pile up on the
+		# shell and bring back the smooth-ellipsoid look.
+		var q := p - cc
+		if Vector3(q.x / rx, q.y / ry, q.z / rx).length() > 0.95:
+			continue
 		if p.y < base_y + 0.3:
 			continue
-		if s.get("flat_top", false) and dir.y < -0.2:
+		if s.get("flat_top", false) and (p.y - cc.y) / ry < -0.2:
 			continue
 		anchors.append(p)
+		lobe_of.append(lobe)
 	anchors = anchors.slice(0, count)
 	var quads := 3 if lod == 0 else 2
-	for p in anchors:
+	for ai in anchors.size():
+		var p: Vector3 = anchors[ai]
+		var lobe: Vector3 = lobe_of[ai]
 		var sz: float = card * rng.randf_range(0.8, 1.2)
 		var rel: Vector3 = (p - cc)
 		var nn := Vector3(rel.x / maxf(rx, 0.1), rel.y / maxf(ry, 0.1), rel.z / maxf(rx, 0.1))
-		var radial := clampf(nn.length(), 0.0, 1.0)
 		var out_n := (nn.normalized() + Vector3(0, 0.25, 0)).normalized()
 		var jitter := Vector3(rng.randfn(), rng.randfn(), rng.randfn()) * 0.35
 		var cn := (out_n + jitter).normalized()
@@ -108,6 +157,11 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 		var a1 := t1 * cos(ang) + t2 * sin(ang)
 		var a2 := cn.cross(a1).normalized()
 		var planes: Array = [[a1, a2], [a1, cn], [a2, cn]]
+		# Per-cluster colour: value jitter goes into AO (green = AO);
+		# outer/upper clusters a touch warmer, inner ones cooler.
+		var value := rng.randf_range(0.9, 1.1)
+		var warm := rng.randf_range(-0.6, 0.6) + 0.4 * (clampf(nn.length(), 0.0, 1.0) + clampf(nn.y, -1.0, 1.0)) - 0.3
+		var tint := Color(1.0 + 0.07 * warm, 1.0, 1.0 - 0.09 * warm)
 		for qi in quads:
 			var u_ax: Vector3 = planes[qi][0]
 			var v_ax: Vector3 = planes[qi][1]
@@ -122,9 +176,29 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 				var sn := Vector3(cr.x / maxf(rx, 0.1), cr.y / maxf(ry, 0.1), cr.z / maxf(rx, 0.1))
 				nrm.append((sn.normalized() * 0.8 + cn * 0.2 + Vector3(0, 0.15, 0)).normalized())
 				var hgt := clampf(((c as Vector3).y - base_y) / maxf(crown_h, 0.1), 0.0, 1.0)
-				ao.append(clampf(lerpf(0.6, 1.0, radial) * lerpf(0.85, 1.05, hgt), 0.45, 1.0))
-			TreeMeshLibrary._card(leaf, corners, nrm, ao)
+				# Deep inside the crown and between lobes is shaded.
+				var depth := pow(clampf(sn.length(), 0.0, 1.0), 1.3)
+				var dv := (c as Vector3) - lobe
+				var dl := Vector3(dv.x / maxf(sigma.x, 0.05), dv.y / maxf(sigma.y, 0.05),
+					dv.z / maxf(sigma.z, 0.05)).length()
+				var lobe_lit := lerpf(0.78, 1.0, exp(-0.25 * dl * dl))
+				ao.append(clampf(lerpf(0.35, 1.0, depth) * lobe_lit * lerpf(0.85, 1.05, hgt) * value, 0.3, 1.0))
+			TreeMeshLibrary._card(leaf, corners, nrm, ao, [], tint)
 	return [bark, leaf]
+
+## Distance along `dir` (unit) from `p` to the crown ellipsoid's
+## surface, or 0 when the ray misses it.
+static func _ray_ellipsoid(p: Vector3, dir: Vector3, cc: Vector3, rx: float, ry: float) -> float:
+	var o := p - cc
+	var on := Vector3(o.x / rx, o.y / ry, o.z / rx)
+	var dn := Vector3(dir.x / rx, dir.y / ry, dir.z / rx)
+	var a := dn.dot(dn)
+	var b := 2.0 * on.dot(dn)
+	var c := on.dot(on) - 1.0
+	var disc := b * b - 4.0 * a * c
+	if a <= 0.0 or disc < 0.0:
+		return 0.0
+	return maxf((-b + sqrt(disc)) / (2.0 * a), 0.0)
 
 static func _clamp_ellipsoid(p: Vector3, cc: Vector3, rx: float, ry: float) -> Vector3:
 	var r := p - cc

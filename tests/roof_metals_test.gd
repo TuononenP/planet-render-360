@@ -31,6 +31,7 @@ func _init() -> void:
 	_check(flat.albedo_texture == MaterialLibrary._set_tex("membrane", "diff"), "Untagged flat roofs retain membrane")
 	_folds()
 	_means()
+	_membrane(absent)
 	var fast := FacadeMaterials.roof_set_material("sheet_metal", Color.WHITE, 0) as StandardMaterial3D
 	_check(not fast.normal_enabled and fast.normal_texture == null, "Distant Fast roof remains albedo-only")
 	fast = FacadeMaterials.roof_for_building({"roof_material": "metal"}, "nordic", "gabled",
@@ -98,6 +99,52 @@ func _means() -> void:
 			set_name + " calibration mean must match the loaded PBR map")
 		if set_name == "sheet_metal":
 			_check(absf(measured.x - measured.z) < 0.003, "Sheet paint must cover the source metal's blue oxidation")
+
+## Flat roofs: no roll bands in the albedo or normal map, the calibrated mean
+## kept. A style's flat concrete stays concrete: the bitumen photo is so dark
+## that its capped tint could not reach a pale or painted finish.
+func _membrane(absent: Color) -> void:
+	var img := MaterialLibrary._set_image("membrane", "diff", false)
+	var bands := _row_spread(img, 0)
+	var expected: Color = MaterialLibrary.PBR_SETS["membrane"]["mean"]
+	_check(bands.y / bands.x < 0.03, "Membrane albedo must lose its roll bands, row spread %s" % bands.y)
+	_check(absf(bands.x - expected.r) < 0.004, "Destriping must keep the membrane mean, got %s" % bands.x)
+	_check(_row_spread(MaterialLibrary._set_image("membrane", "nor", false), 1).y < 0.003,
+		"Membrane normals must lose the roll bands too")
+	for set_name in ["slate", "terracotta", "membrane"]:
+		var near := FacadeMaterials.roof_set_material(set_name, Color.WHITE, 1) as StandardMaterial3D
+		_check(near.normal_enabled and near.normal_scale < 1.0, set_name + " roofs must render their normal map")
+		var far := FacadeMaterials.roof_set_material(set_name, Color.WHITE, 0) as StandardMaterial3D
+		_check(not far.normal_enabled, set_name + " on Fast stays albedo-only")
+	var green := Color("#5f8f72").srgb_to_linear()
+	var painted := _roof({}, "flat", absent, {"roof_set": "concrete", "roof_colour": green})
+	_check(painted.albedo_texture == MaterialLibrary._set_tex("roof_concrete", "diff"), "Flat concrete must stay concrete")
+	var turned := MaterialLibrary._set_image("roof_concrete", "diff", false).duplicate() as Image
+	turned.rotate_90(CLOCKWISE)
+	var board := _row_spread(turned, 0)
+	var plain: Color = MaterialLibrary.PBR_SETS["concrete"]["mean"]
+	_check(board.y / board.x < 0.03, "Roof concrete must lose its board bands, spread %s" % board.y)
+	_check(absf(board.x - plain.r) < 0.015, "Destriping must keep the concrete mean, got %s" % board.x)
+	var wall := MaterialLibrary._set_image("concrete", "diff", false).duplicate() as Image
+	wall.rotate_90(CLOCKWISE)
+	_check(_row_spread(wall, 0).y > board.y * 3.0, "Walls and landmarks keep the plain concrete photo")
+	var mean: Color = MaterialLibrary.PBR_SETS["concrete"]["mean"] * painted.albedo_color.srgb_to_linear()
+	_check(mean.g > mean.r * 1.2, "A painted flat concrete roof must keep its paint")
+
+## Mean of channel `ch` and the standard deviation of its row means.
+func _row_spread(img: Image, ch: int) -> Vector2:
+	var rows: Array[float] = []
+	var mean := 0.0
+	for y in img.get_height():
+		var sum := 0.0
+		for x in img.get_width():
+			sum += img.get_pixel(x, y)[ch]
+		rows.append(sum / img.get_width())
+		mean += rows[y] / img.get_height()
+	var deviation := 0.0
+	for row in rows:
+		deviation += (row - mean) * (row - mean) / rows.size()
+	return Vector2(mean, sqrt(deviation))
 
 func _round_trip(world: Node3D, roof: MeshInstance3D) -> void:
 	roof.owner = world

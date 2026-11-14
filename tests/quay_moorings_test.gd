@@ -68,7 +68,42 @@ func _init() -> void:
 	for node in root.find_children("Boats_*","MultiMeshInstance3D",true,false):
 		calls += node.multimesh.mesh.get_surface_count()
 	_check(calls>0 and calls<=MarinaBuilder.MAX_DRAW_CALLS, "Merged boat surfaces must meet the draw budget")
+	# Every kind strung along 1.6 km of quay: fixed 120 m cells would break
+	# the budget, so the batching coarsens until it fits.
+	var spread: Array = []
+	for i in 160:
+		spread.append([Vector3(-800.0 + float(i) * 10.0, 0.0, 50.0), 0.0, 1.0,
+			VesselPrototypes.KINDS[i % VesselPrototypes.KINDS.size()], Color.WHITE])
+	var surfaces := func(groups: Dictionary) -> int:
+		var n := 0
+		for key in groups:
+			var kind: String = groups[key][0][3]
+			n += MarinaBuilder.mesh(kind).get_surface_count() + MarinaBuilder.mesh(kind + "_far").get_surface_count()
+		return n
+	var fine := CellBatches.group(spread, MarinaBuilder.BATCH_M, func(b: Array) -> Vector3: return b[0],
+		func(b: Array) -> String: return b[3])
+	_check(int(surfaces.call(fine)) > MarinaBuilder.MAX_DRAW_CALLS - 1, "A long mixed quay must overflow fixed 120 m cells")
+	_check(int(surfaces.call(MarinaBuilder._cells(spread, MarinaBuilder.MAX_DRAW_CALLS - 1, 1.0)))
+		<= MarinaBuilder.MAX_DRAW_CALLS - 1, "Boat batches must coarsen to meet the draw budget")
 	_check(QuayDetails.build(root,d,g)>0, "Final hard quay should get mooring bollards")
+	var kept := d.buildings
+	d.buildings = [{"x": -200.0, "z": 0.0, "height": 8.0, "footprint": PackedVector2Array([Vector2(-470, -30),
+		Vector2(70, -30), Vector2(70, 30), Vector2(-470, 30)])}]
+	var shed_mask := VegetationMask.new(d, g)
+	d.buildings = kept
+	var shed_root := Node3D.new()
+	_check(QuayDetails.build(shed_root, d, g, shed_mask) == 0, "No quay bollard inside a quayside building")
+	shed_root.free()
+	var kept_roads := d.roads
+	d.roads = [{"class": "primary", "width_m": 12.0, "bridge": true, "points": PackedVector2Array([Vector2(-200, -60), Vector2(-200, 60)])}]
+	var bridge_mask := VegetationMask.new(d, g)
+	d.roads = kept_roads
+	var bridge_root := Node3D.new()
+	var open_root := Node3D.new()
+	_check(QuayDetails.build(bridge_root, d, g, bridge_mask) == QuayDetails.build(open_root, d, g),
+		"A bridge over the quay keeps the bollards beside it")
+	bridge_root.free()
+	open_root.free()
 	root.free()
 	var ring_root := Node3D.new()
 	var ring_mesh := LandmarkMesh.new()

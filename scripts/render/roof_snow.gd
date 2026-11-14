@@ -14,17 +14,20 @@ extends RefCounted
 
 const SHADER := """
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_back;
+// Wrap lighting: a snow-only pass, so a soft terminator on gables stands
+// in for the light snow scatters under its surface.
+render_mode blend_mix, depth_draw_never, cull_back, diffuse_lambert_wrap;
 // @SNOW
 varying vec3 wpos;
 varying float wny;
 varying vec3 wnrm;
 void vertex() {
-	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	wny = wnrm.y;
-	// A few centimetres proud of the roof so the pass never z-fights.
-	VERTEX += NORMAL * 0.03;
+	// A few centimetres proud of the roof so the pass never z-fights,
+	// and lying snow a hand deep on the flatter planes it settles on.
+	VERTEX += NORMAL * (0.03 + 0.08 * smoothstep(0.45, 0.85, wny));
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
@@ -32,18 +35,22 @@ void fragment() {
 	// Roofs are never one clean sheet: it thins where the roof's own
 	// warmth and the wind get at it, without opening holes.
 	float a = snow_line(wpos) * smoothstep(0.30, 0.60, wny) * mix(0.86, 1.0, smoothstep(0.15, 0.4, n));
+	// Where it thins, the edge is a rounded lip (derivatives first).
+	vec3 lip = snow_edge(a, wpos, 0.08);
 	if (a < 0.01) {
 		discard;
 	}
-	ALBEDO = snow_col * (0.92 + 0.12 * n);
+	ALBEDO = snow_albedo(wpos.xz, px, 0.0) * (0.95 + 0.08 * n);
 	ALPHA = a * 0.97;
 	float near_px = 1.0 - smoothstep(0.4, 2.5, px);
 	vec2 dr = near_px > 0.0 ? snow_drift(wpos.xz) * near_px : vec2(0.0);
 	// Drift bends the roof's own normal, so a gable keeps its lit side.
-	vec3 nw = normalize(normalize(wnrm) - vec3(dr.x, 0.0, dr.y) * 0.2);
+	vec3 nw = normalize(normalize(wnrm) - vec3(dr.x + lip.x * near_px, 0.0, dr.y + lip.y * near_px) * 0.2);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
-	ROUGHNESS = 0.85;
-	SPECULAR = 0.3;
+	ROUGHNESS = SNOW_ROUGH;
+	SPECULAR = SNOW_SPEC;
+	RIM = SNOW_RIM;
+	RIM_TINT = SNOW_RIM_TINT;
 }
 """
 

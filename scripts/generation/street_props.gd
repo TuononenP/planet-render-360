@@ -4,7 +4,9 @@ extends RefCounted
 ## Street furniture + linear barriers (T5.1/T7.2, PRD §3.4 props).
 ## * Lampposts: only along real OSM carriageways in built-up blocks
 ##   (lit streets), every 25 m alternating sides on the verge, never in
-##   a footprint / carriageway / junction surface / water. Regional style:
+##   a footprint / carriageway / junction surface / water, nor along a
+##   paved square's outline. Finland's lit park paths add lamps only
+##   where they cross green cover. Regional style:
 ##   cast-iron lantern
 ##   (Paris + historic European cores), black heritage post (British and
 ##   Irish side streets), galvanised cobra-head (North America), concrete
@@ -48,41 +50,78 @@ static var _mats: Dictionary = {}
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
+	var timings := {}
+	var t := Time.get_ticks_msec()
+	# Planned before the lamps: a side-street lamp gives way only where a
+	# utility pole really stands (the poles stop at their radius and cap).
+	var pole_plan := UtilityPoles.plan(data, ground, mask)
+	ctx = ctx.duplicate()
+	ctx["pole_grid"] = UtilityPoles.pole_grid(pole_plan)
+	t = _lap(timings, "pole_plan", t)
 	var lamps := _lampposts(root, data, ground, mask, ctx)
+	t = _lap(timings, "lamps", t)
 	var bar := _barriers(root, data, ground, ctx)
+	t = _lap(timings, "barriers", t)
 	ShoreRailings.build(root, data, ground)
+	t = _lap(timings, "shore_railings", t)
 	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
+	t = _lap(timings, "furniture", t)
 	var boats := MarinaBuilder.build(root, data, ground, mask)
+	t = _lap(timings, "marina", t)
 	boats += HarbourFerries.build(root, data, ground, mask)
-	var quay_bollards := QuayDetails.build(root, data, ground)
+	t = _lap(timings, "ferries", t)
+	var quay_bollards := QuayDetails.build(root, data, ground, mask)
+	t = _lap(timings, "quay", t)
 	var cars := ParkedCars.build(root, data, ground)
+	t = _lap(timings, "cars", t)
+	var trams := TransitVehicles.build(root, data, ground)
+	t = _lap(timings, "trams", t)
+	var trains := StationTrains.build(root, data, ground)
+	t = _lap(timings, "trains", t)
 	var wires := OverheadWires.build(root, data, ground)
+	t = _lap(timings, "wires", t)
+	var poles := UtilityPoles.build(root, data, ground, pole_plan)
+	t = _lap(timings, "utility_poles", t)
 	var snowbanks := Snowbanks.build(root, data, ground)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "wires": wires, "snowbanks": snowbanks}
+	t = _lap(timings, "snowbanks", t)
+	print("PROPS timings ms ", timings)
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks}
+
+## Records the ms since `t` under `key`; returns the time now.
+static func _lap(timings: Dictionary, key: String, t: int) -> int:
+	var now := Time.get_ticks_msec()
+	timings[key] = now - t
+	return now
 
 # --- Lampposts -----------------------------------------------------------
 
 static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> int:
+	var m2u: float = ctx["m2u"]
+	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
+	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
+	# The road surface's painted lamp pools (StreetGlow), on every tier:
+	# the street lamps' colour, faint where real lamp lights burn.
+	StreetGlow.set_place_for(data)
+	var real := RenderQuality.ultra_desktop(int(ctx["preset"]))
 	var radius_m: float = PROP_R[int(ctx["preset"])]
 	if radius_m <= 0.0 or data.buildings.is_empty():
 		return 0
-	var m2u: float = ctx["m2u"]
 	var r_u := radius_m * m2u
-	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
-	var family := lamp_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
 	var centre := View360.spawn_xz(data)
 	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": [], "post_top": [], "nyc_f": [], "nyc_crook": []}
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
 	var sites := _lamp_sites(data, ground, m2u)
+	var pole_grid: Dictionary = ctx.get("pole_grid", {})
 	for r in data.roads:
 		var pts: PackedVector2Array
 		var cls := "residential"
 		var width_m := 6.0
 		if r is Dictionary:
 			var rd: Dictionary = r
-			if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)):
+			# A paved square's outline is no street to line with lamps.
+			if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)) or bool(rd.get("area", false)):
 				continue
 			pts = rd.get("points", PackedVector2Array())
 			cls = str(rd.get("class", "residential"))
@@ -91,7 +130,10 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			pts = r
 		else:
 			continue
-		var park_path := family == "span" and cls in ["footway", "path"] and r is Dictionary and bool(r.get("lit", false))
+		# Lit park paths only: Helsinki tags its sidewalks, crossings and
+		# square footways lit too, and those take no lamps of their own.
+		var park_path := family == "span" and cls in ["footway", "path"] and r is Dictionary and bool(r.get("lit", false)) \
+				and not bool(r.get("kerb_line", false)) and not bool(r.get("crossing", false))
 		if (cls not in LIT and not park_path) or pts.size() < 2:
 			continue
 		if family == "span" and RenderQuality.ultra_desktop(data.quality_preset) and cls != "pedestrian" and not park_path:
@@ -117,10 +159,15 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				var p := c + nrm * off * side
 				if (p - centre).length() > r_u or mask.built_fraction(p.x, p.y) < 0.04:
 					continue
+				if park_path and mask.cover_at(p.x, p.y) < 0:
+					continue
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
 					continue
 				if _on_apron(sites["aprons"], p, m2u):
+					continue
+				# A utility pole (with its own bracket lamp) already stands here.
+				if style == "utility" and UtilityPoles.near_pole(pole_grid, p):
 					continue
 				var ok := Vector2i(int(floor(p.x / occ_cell)), int(floor(p.y / occ_cell)))
 				if occupied.has(ok):
@@ -134,7 +181,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				(placed[lamp] as Array).append(Transform3D(basis,
 					Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
 			carry = t - seg
-	if RenderQuality.ultra_desktop(int(ctx["preset"])):
+	if real:
 		StreetLights.add(root, placed, region, m2u, centre)
 	var total := 0
 	for style in placed:
@@ -157,7 +204,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 ## Lookup grids from the road plan: the junction surfaces no lamp stands
 ## on, and the signals whose streets take the main-road lamp.
 static func _lamp_sites(data: LocationData, ground: GroundTruth, m2u: float) -> Dictionary:
-	var plan := RoadMarkings.plan(data, ground)
+	var plan := RoadMarkings.shared_plan(data, ground)
 	var aprons := {}
 	for ring: PackedVector2Array in plan.aprons:
 		var box := Rect2(ring[0], Vector2.ZERO)
@@ -351,6 +398,8 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		"hedge": TreeMeshLibrary.Buf.new(), "hedge_core": TreeMeshLibrary.Buf.new()}
 	var total_m := 0.0
 	var piece := 3.0 * m2u
+	var roads := _road_grid(data, m2u)
+	var decks := BridgeStructures.barrier_rings(data, m2u)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
@@ -382,6 +431,14 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				if not ground.is_inside(p0.x, p0.y) or ground.water_at(p0.x, p0.y) > 0.0 \
 						or ground.water_at(p1.x, p1.y) > 0.0:
 					continue
+				# A wall mapped across a road runs under its bridge or stops at
+				# its edge: drawn on the terrain it stood across the lanes.
+				if _on_road((p0 + p1) * 0.5, roads, m2u):
+					continue
+				# A wall or rail along the bank ends at the bridge's abutment:
+				# between its carriageways it stood as a stub on the deck.
+				if BridgeStructures.in_rings(p0, decks) or BridgeStructures.in_rings(p1, decks):
+					continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)
 				total_m += p0.distance_to(p1) / m2u
@@ -400,11 +457,13 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		# Limestone calibrated to weathered masonry: the "stone" set is an
 		# orange sandstone photo too saturated to neutralise (walls read
 		# as orange timber boxes).
-		"wall": MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
-			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0),
+		# Through StreetSnow: in winter the copings hold snow and the
+		# street's slush and salt climb their feet (ClimateModel.snow_splash).
+		"wall": StreetSnow.material(MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
+			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0) as StandardMaterial3D, 0.25),
 		"fence": _fence_material(),
 		"chain_link": _chainlink_material(),
-		"wood_fence": MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0),
+		"wood_fence": StreetSnow.material(MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0) as StandardMaterial3D, 0.25),
 		"hedge": TreeMeshLibrary.leaf_material("broad", TreeSpecies.tint("oak", mini(season, 2)) * 0.85, 0.0, 0.0, true),
 		"hedge_core": _core_material(),
 	}
@@ -420,6 +479,44 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Prop_barrier_%s" % kind
 		root.add_child(mi)
 	return total_m
+
+## Grid (ROAD_CELL_M cells) of linear road ways' segments as
+## [a, b, half width]: barriers stop where they meet one. `on_ground`
+## leaves out bridges (the roads a pier must not stand on).
+const ROAD_CELL_M := 32.0
+
+static func _road_grid(data: LocationData, m2u: float, on_ground := false) -> Dictionary:
+	var grid := {}
+	var cell := ROAD_CELL_M * m2u
+	for w: Variant in data.roads:
+		if not (w is Dictionary):
+			continue
+		var d: Dictionary = w
+		if bool(d.get("area", false)) or bool(d.get("tunnel", false)) or (on_ground and bool(d.get("bridge", false))):
+			continue
+		var pts: PackedVector2Array = d.get("points", PackedVector2Array())
+		var half := float(d.get("width_m", 4.0)) * 0.5 * m2u
+		for j in range(1, pts.size()):
+			var lo := pts[j - 1].min(pts[j]) - Vector2(half, half)
+			var hi := pts[j - 1].max(pts[j]) + Vector2(half, half)
+			for cx in range(floori(lo.x / cell), floori(hi.x / cell) + 1):
+				for cz in range(floori(lo.y / cell), floori(hi.y / cell) + 1):
+					var key := Vector2i(cx, cz)
+					if not grid.has(key):
+						grid[key] = []
+					(grid[key] as Array).append([pts[j - 1], pts[j], half])
+	return grid
+
+## True where `p` lies on a road way's carriageway (within its half width).
+static func _on_road(p: Vector2, grid: Dictionary, m2u: float) -> bool:
+	var cell := ROAD_CELL_M * m2u
+	for seg: Array in (grid.get(Vector2i(floori(p.x / cell), floori(p.y / cell)), []) as Array):
+		var a: Vector2 = seg[0]
+		var ab: Vector2 = (seg[1] as Vector2) - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 1e-9), 0.0, 1.0)
+		if p.distance_to(a + ab * t) < float(seg[2]):
+			return true
+	return false
 
 ## Draped box piece a→b: two sides + top (+ end caps), UVs in metres/2.
 static func _wall_piece(b: TreeMeshLibrary.Buf, p0: Vector2, p1: Vector2, y0: float,

@@ -9,6 +9,7 @@ extends Control
 
 signal render_requested(lat: float, lon: float)
 signal history_requested
+signal gallery_requested
 signal settings_requested
 ## A render quality was picked from the dropdown beside Explore.
 signal quality_selected(preset: int)
@@ -17,10 +18,10 @@ signal exit_requested
 ## A pasted view link was opened: its ViewLink state (main renders it).
 signal view_link_requested(state: Dictionary)
 
-# Paris is the starting place (its quick pick starts selected), so the
-# first Explore opens on its curated view.
-var _lat := float(PresetViews.ROWS[0]["lat"])
-var _lon := float(PresetViews.ROWS[0]["lon"])
+# Helsinki is the starting place (its quick pick starts selected), so
+# the first Explore opens on its curated view.
+var _lat := float(PresetViews.default_row()["lat"])
+var _lon := float(PresetViews.default_row()["lon"])
 var _canvas: MapTileView
 var _coord_label: Label
 var _name_label: Label
@@ -57,6 +58,7 @@ var _suggest_list: VBoxContainer
 var _map_wrap: Control
 var _zoom_rail: PanelContainer
 var _history_btn: Button
+var _gallery_btn: Button
 var _settings_btn: Button
 var _download_btn: Button
 var _exit_btn: Button
@@ -155,12 +157,17 @@ func _passive(node: Control) -> Control:
 
 ## The glass panels and the scroll areas in them pass zoom input to the map
 ## under them (MapTileView.panel_zoom_input); their taps stay with them.
-func _wire_zoom(node: Control) -> void:
+## With `scroll_zooms` off (the side panel) the wheel and trackpad scroll
+## stay with the panel; only pinches reach the map.
+func _wire_zoom(node: Control, scroll_zooms := true) -> void:
 	if node is PanelContainer or node is ScrollContainer:
-		node.gui_input.connect(_canvas.panel_zoom_input.bind(node))
+		node.gui_input.connect(func(event: InputEvent) -> void:
+			if not scroll_zooms and (event is InputEventMouseButton or event is InputEventPanGesture):
+				return
+			_canvas.panel_zoom_input(event, node))
 	for child in node.get_children():
 		if child is Control:
-			_wire_zoom(child as Control)
+			_wire_zoom(child as Control, scroll_zooms)
 
 func _vbox(sep: int, flags: int = Control.SIZE_FILL) -> VBoxContainer:
 	var v := VBoxContainer.new()
@@ -180,8 +187,10 @@ func _ready() -> void:
 	add_child(_map_wrap)
 	_canvas = MapTileView.new()
 	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_canvas.picked.connect(_on_picked)
+	# A tap or drag on the map is not a new destination: no zoom warm-up.
+	_canvas.picked.connect(func(la: float, lo: float) -> void: _on_picked(la, lo, false))
 	_map_wrap.add_child(_canvas)
+	_canvas.set_lat_lon(_lat, _lon)
 	_zoom_in_btn = UiIcon.button("plus", "Zoom in")
 	_zoom_in_btn.pressed.connect(func() -> void:
 		if MapHome.globe_shown(self):
@@ -237,11 +246,13 @@ func _ready() -> void:
 	# screen.
 	_history_btn = UiIcon.button("history", "History & saved places")
 	_history_btn.pressed.connect(func() -> void: history_requested.emit())
+	_gallery_btn = UiIcon.button("rotate-3d", "Gallery: saved 360° photos")
+	_gallery_btn.pressed.connect(func() -> void: gallery_requested.emit())
 	_settings_btn = UiIcon.button("settings", "Settings")
 	_settings_btn.pressed.connect(func() -> void: settings_requested.emit())
 	_exit_btn = UiIcon.button("x", "Exit the app")
 	_exit_btn.pressed.connect(func() -> void: exit_requested.emit())
-	_nav = UiTheme.rail([_history_btn, _settings_btn, _exit_btn])
+	_nav = UiTheme.rail([_history_btn, _gallery_btn, _settings_btn, _exit_btn])
 	_nav.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	_search_box = _vbox(6, Control.SIZE_EXPAND_FILL)
@@ -283,8 +294,8 @@ func _ready() -> void:
 	_continent_filter.set_available(_quick_continents)
 	for qi in PresetViews.ROWS.size():
 		_add_quick_card(qi)
-	# Paris is the starting place, so its card starts out selected.
-	_set_selected_quick(0)
+	# Helsinki is the starting place, so its card starts out selected.
+	_set_selected_quick(PresetViews.default_index())
 
 	# Selected place: info column (name, coordinates) and action column
 	# (Explore, offline). Side by side on tablets.
@@ -297,10 +308,10 @@ func _ready() -> void:
 	_sheet_cols.add_child(_action_col)
 	_selected_label = UiTheme.section_label("Selected place")
 	_info_col.add_child(_selected_label)
-	_name_label = UiTheme.display_label("Paris", 36)
+	_name_label = UiTheme.display_label("Helsinki", 36)
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_info_col.add_child(_name_label)
-	_region_label = UiTheme.label("France", 14, UiTheme.MUTED)
+	_region_label = UiTheme.label("Finland", 14, UiTheme.MUTED)
 	_info_col.add_child(_region_label)
 	_cached_chip = MapChrome.make_cached_chip()
 	_info_col.add_child(_cached_chip)
@@ -399,7 +410,7 @@ func _ready() -> void:
 	_quick_box.add_child(_first_note)
 	_quick_box.move_child(_first_note, 2)
 	_wire_zoom(_sheet)
-	_wire_zoom(_side)
+	_wire_zoom(_side, false)
 	resized.connect(_on_resized)
 	for node in [_sheet, _side, _top_col]:
 		node.resized.connect(_queue_focus_update)
@@ -602,7 +613,7 @@ func _on_search(text: String) -> void:
 func _ensure_searcher() -> void:
 	MapSearch.ensure_searcher(self)
 
-func _on_picked(lat: float, lon: float) -> void:
+func _on_picked(lat: float, lon: float, warm: bool = true) -> void:
 	_hide_suggestions()
 	set_download_status("")  # a search or save message was about the last place
 	set_render_status("")
@@ -614,7 +625,7 @@ func _on_picked(lat: float, lon: float) -> void:
 	# Keep the map centred on the choice: search and quick picks arrive
 	# without a map tap, so without this the pin stayed on the old place.
 	if _canvas != null:
-		_canvas.set_lat_lon(lat, lon)
+		_canvas.set_lat_lon(lat, lon, warm)
 	if _globe != null:
 		_globe.pin = Vector2(lat, lon)
 		_globe.queue_redraw()

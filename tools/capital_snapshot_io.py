@@ -1,10 +1,13 @@
 """Shared checks for capital snapshot preparation tools."""
-import gzip
 import hashlib
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import osmb  # noqa: E402
 
 LAYERS = {'detailed': ('detailed_extract', 12), 'ring1600': ('ring1600', 1),
           'ring2500': ('ring2500', 1), 'poi': ('poi', 1), 'far': ('far', 3)}
@@ -38,11 +41,10 @@ def complete(place, manifest, assets: Path, provenance):
         if row[5] <= 0 or row[5] > MAX_BYTES:
             return False
         try:
-            with gzip.open(assets / (key + '.json.gz'), 'rb') as data:
-                raw = data.read(MAX_BYTES + 1)
+            raw = osmb.decompress((assets / (key + '.osmb')).read_bytes())
             if len(raw) != row[5] or hashlib.sha256(raw).hexdigest() != row[6]:
                 return False
-        except (OSError, EOFError):
+        except (OSError, EOFError, subprocess.CalledProcessError):
             return False
     return True
 

@@ -81,13 +81,13 @@ static func apply_environment(env: Environment, preset: int, forward_plus: bool 
 	env.ssao_enabled = f["ssao"]
 	# Metre world, eye at 30 m, buildings 100 m+ away: a 10 m radius
 	# grounds bases, eaves and courtyards (2.5 m was a few pixels and
-	# invisible in the Paris captures). AO only darkens indirect light
-	# (light_affect 0) — direct sun keeps its full strength.
+	# invisible in the Paris captures). A fifth of it also reaches direct
+	# sun, so masses meeting in full light keep a contact shadow.
 	env.ssao_radius = 10.0
 	env.ssao_intensity = 3.0
 	env.ssao_power = 1.4
 	env.ssao_detail = 0.6
-	env.ssao_light_affect = 0.0
+	env.ssao_light_affect = 0.2
 	env.ssil_enabled = f["ssil"]
 	env.ssil_radius = 6.0
 	env.ssil_intensity = 0.7

@@ -136,6 +136,77 @@ static func mesh_of(f: Array) -> ArrayMesh:
 	arrays[Mesh.ARRAY_TANGENT] = f[3]
 	return MeshArrays.mesh(arrays)
 
+## Roof shapes whose ends are upright walls, and how far off vertical a face
+## may lean (normal y) to be one. Hips, mansards and spires stay roof.
+const GABLED: Array[String] = ["gabled", "gambrel", "saltbox", "round", "skillion"]
+const GABLE_MAX_Y := 0.2
+## A roof's UVs run 0.05 per metre; a plain wall's (PartyWalls.firewall) 0.25.
+const GABLE_UV_SCALE := 5.0
+
+## Moves `mesh`'s near-vertical triangles (the gable ends of a ridged roof) out
+## of it, in place, and returns them as wall meshes [exposed, party]: those
+## over a party edge of `ring` continue its bare firewall. Either can be null.
+static func split_gables(mesh: ArrayMesh, ring: PackedVector2Array = PackedVector2Array(),
+		party: PackedByteArray = PackedByteArray()) -> Array:
+	var src := MeshArrays.surface(mesh, 0)
+	var normals: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
+	var roof_tris := PackedInt32Array()
+	var open_tris := PackedInt32Array()
+	var party_tris := PackedInt32Array()
+	for t in normals.size() / 3:
+		var n := normals[t * 3]
+		if absf(n.y) >= GABLE_MAX_Y:
+			roof_tris.append(t)
+		elif _on_party(Vector2(n.x, n.z), ring, party):
+			party_tris.append(t)
+		else:
+			open_tris.append(t)
+	if open_tris.is_empty() and party_tris.is_empty():
+		return [null, null]
+	var roof := _triangles(src, roof_tris, 1.0)
+	if mesh.get_surface_count() == 0:
+		mesh.set_meta(MeshArrays.META, [roof])  # still held: never uploaded
+	else:
+		mesh.clear_surfaces()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, roof)
+		mesh.set_meta(MeshArrays.META, [roof])
+	return [null if open_tris.is_empty() else MeshArrays.mesh(_triangles(src, open_tris, GABLE_UV_SCALE)),
+		null if party_tris.is_empty() else MeshArrays.mesh(_triangles(src, party_tris, GABLE_UV_SCALE))]
+
+## True when a face looking along `n` (XZ) stands over a party edge of `ring`.
+static func _on_party(n: Vector2, ring: PackedVector2Array, party: PackedByteArray) -> bool:
+	if party.size() != ring.size():
+		return false
+	for i in ring.size():
+		if party[i] == 1 and PartyWalls.outward(ring, i).dot(n.normalized()) > 0.7:
+			return true
+	return false
+
+## Mesh arrays holding triangles `tris` of triangle soup `src`.
+static func _triangles(src: Array, tris: PackedInt32Array, uv_scale: float) -> Array:
+	var sv: PackedVector3Array = src[Mesh.ARRAY_VERTEX]
+	var sn: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
+	var su: PackedVector2Array = src[Mesh.ARRAY_TEX_UV]
+	var st: PackedFloat32Array = src[Mesh.ARRAY_TANGENT]
+	var v := PackedVector3Array()
+	var n := PackedVector3Array()
+	var u := PackedVector2Array()
+	var t := PackedFloat32Array()
+	for tri in tris:
+		for i in range(tri * 3, tri * 3 + 3):
+			v.append(sv[i])
+			n.append(sn[i])
+			u.append(su[i] * uv_scale)
+			for k in 4:
+				t.append(st[i * 4 + k])
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = v
+	arrays[Mesh.ARRAY_NORMAL] = n
+	arrays[Mesh.ARRAY_TEX_UV] = u
+	arrays[Mesh.ARRAY_TANGENT] = t
+	return arrays
+
 ## True for a large footprint that is clearly not convex (courtyard
 ## blocks, U and L wings): see INSET_MIN_AREA_M2.
 static func needs_inset(ring: PackedVector2Array) -> bool:

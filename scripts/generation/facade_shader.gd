@@ -17,7 +17,10 @@ extends RefCounted
 ##   - glass that is glass: smooth enough (0.12–0.18; smoother renders the
 ##     indirect reflections as noise) for probes and SSR to mirror the
 ##     street, a fraction of a degree of tilt per pane so reflections
-##     break up as float glass does;
+##     break up as float glass does; near panes reflect like double
+##     glazing and trade the room for the mirror by Fresnel, so head-on
+##     you look in and at a shallow angle you see the street (the shells
+##     are hollow, so the see-through is the traced room, never alpha);
 ##   - world-space weathering: building-scale hue and grime noise and
 ##     faint rain streaks, so a 40 m wall does not repeat its tile;
 ##   - the wall photo's full grain: the composers shrink each 1K photo to
@@ -71,6 +74,18 @@ uniform bool photo_turn = false;
 
 varying vec3 wpos;
 varying flat float bld;
+// @SNOW
+
+// Near panes. Head-on reflectance of double glazing (four surfaces); the
+// high metallic over a dark albedo gives it with almost no diffuse.
+const float GLASS_F0 = 0.13;
+const float GLASS_METALLIC = 0.8;
+const float GLASS_ALBEDO = 0.14;
+// Daytime room brightness behind a near pane (emission, so it ignores the
+// shade the wall is in: brighter reads as a lit room, not as glass), and
+// the glass's own tint.
+const float DAY_ROOM_NEAR = 0.035;
+const vec3 GLASS_TINT = vec3(0.90, 0.97, 0.94);
 
 float h12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -159,6 +174,9 @@ void fragment() {
 	// colour, not a sparkle of walls, floor and furniture.
 	// Full room detail from ~80 px a pane, flat colour below ~30 px.
 	float far_room = smoothstep(0.012, 0.033, max(length(gx * cells), length(gy * cells)));
+	// Glass treatment from ~50 px a pane, none under ~17 px: distant panes
+	// keep the plain look and cannot shimmer.
+	float near_glass = 1.0 - smoothstep(0.02, 0.06, max(length(gx * cells), length(gy * cells)));
 	// Window reveals: steep parallax over the depth map (white = wall face).
 	if (has_depth && framed) {
 		float layers = mix(32.0, 8.0, abs(vts.z));
@@ -212,6 +230,23 @@ void fragment() {
 	float g = vnoise(wm.xz * 0.045 + wm.y * 0.02);
 	float streak = vnoise(vec2((wm.x + wm.z) * 0.9, wm.y * 0.06));
 	vec3 wall = base * COLOR.rgb * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
+	// Winter on the wall (ClimateModel): snow on the sills under the
+	// panes, and slush and salt the street throws up its foot.
+	float wsnow = snow_line(wpos);
+	if (wsnow > 0.0) {
+		float pane_px = max(length(gx * cells), length(gy * cells));
+		if (has_normal && framed) {
+			// A sill is wall a hand's breadth under glass (uv runs down).
+			float d_uv = 0.09 / max(cell_size.y * cells.y, 1e-3);
+			float glass_above = smoothstep(0.32, 0.22, textureGrad(rough_tex, uv - vec2(0.0, d_uv), gx, gy).r);
+			float sill = (1.0 - pane) * glass_above * (1.0 - smoothstep(0.03, 0.1, pane_px));
+			sill *= smoothstep(0.25, 0.6, vnoise(vec2((wm.x + wm.z) * 2.3, wm.y * 0.5)) + 0.3);
+			wall = mix(wall, snow_albedo(wm.xz + wm.y, 0.01, 0.08), sill * wsnow);
+		}
+		vec2 sp = snow_splash(wm * units_per_m);
+		sp.y *= 1.0 - pane;
+		wall = apply_splash(wall, sp);
+	}
 
 	vec2 cg = uv * cells;
 	vec2 cell = floor(cg);
@@ -271,20 +306,34 @@ void fragment() {
 	back = mix(back, 0.5, far_room);
 	lamp_k = mix(lamp_k, 0.65, far_room);
 	drape = mix(drape, clamp(1.0 - 2.0 * open_half + blind * 0.5, 0.0, 1.0) * 0.6, far_room);
-	float day_room = 0.07 * mix(1.0, 0.35, back) * (1.0 - night);
+	// From ~33 px a pane to ~8 px, curtains settle to the building's average:
+	// a tenfold albedo range picked per window reads as a checkerboard.
+	float pane_mean = smoothstep(0.03, 0.12, max(length(gx * cells), length(gy * cells))) * 0.85;
+	drape = mix(drape, 0.3, pane_mean);
+	fabric = mix(fabric, vec3(0.76, 0.71, 0.64), pane_mean);
+	room = mix(room, vec3(0.525, 0.505, 0.46), pane_mean);
+	float day_k = mix(0.07, DAY_ROOM_NEAR, curtain_wall ? 0.0 : near_glass);
+	float day_room = day_k * mix(1.0, 0.35, back) * (1.0 - night);
 	vec3 inside = room * mix(day_room, lamp_k * mix(1.0, 0.55, back) * lit, night);
-	vec3 drape_e = fabric * mix(0.07 * (1.0 - night), 0.55 * lit, night);
+	vec3 drape_e = fabric * mix(day_k * (1.0 - night), 0.55 * lit, night);
 	inside = mix(inside, drape_e, drape);
 	// Tinted curtain walls show less of the room by day; at night the lit
 	// floors behind them read strongly.
 	float transmit = curtain_wall ? mix(0.35, 0.8, night) : 0.85;
 	vec3 glass_e = inside * transmit * mix(vec3(1.0), lamp * night_energy * 1.4, step(0.001, lit));
+	// What the glass reflects it does not let through: the room gives way
+	// to the mirror as the view gets shallow.
+	float fresnel = GLASS_F0 + (1.0 - GLASS_F0) * pow(1.0 - clamp(vts.z, 0.0, 1.0), 5.0);
+	glass_e *= mix(vec3(1.0), GLASS_TINT * (1.0 - fresnel), near_glass);
 
-	vec3 glass_alb = curtain_wall ? base * 0.8 : mix(vec3(0.015), fabric * 0.18, drape);
+	// A curtain wall's floors differ a little: no two batches of glass match.
+	vec3 glass_alb = curtain_wall ? base * 0.8 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
+		: mix(mix(vec3(0.015), fabric * 0.18, drape), vec3(GLASS_ALBEDO), near_glass);
 	ALBEDO = mix(wall, glass_alb, pane);
 	// Below ~0.12 the indirect reflections render as salt-and-pepper noise.
-	ROUGHNESS = mix(rough, mix(0.12, 0.18, h12(vec2(seed, 29.0))), pane);
-	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : 0.0, pane);
+	// Sub-pixel panes share one value: picked per pane they alias to speckle.
+	ROUGHNESS = mix(rough, mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean)), pane);
+	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
 	SPECULAR = mix(0.5, 0.65, pane);
 	EMISSION = glass_e * pane;
 	vec3 nm = has_normal ? textureGrad(normal_tex, uv, gx, gy).rgb : vec3(0.5, 0.5, 1.0);
@@ -294,7 +343,7 @@ void fragment() {
 	nxy *= min(1.0, 0.92 / max(length(nxy), 1e-4));
 	nm.xy = nxy * 0.5 + 0.5;
 	// About 0.3 degrees of tilt per pane.
-	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012;
+	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012 * (1.0 - pane_mean);
 	NORMAL_MAP = mix(nm, vec3(0.5 + tilt, 1.0), pane);
 }
 """
@@ -306,7 +355,7 @@ static var _photo_mutex := Mutex.new()
 static func shader() -> Shader:
 	if _shader == null:
 		var sh := Shader.new()
-		sh.code = SHADER
+		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 		_shader = sh
 	return _shader
 
@@ -319,10 +368,11 @@ static func photo_texture(set_name: String, map_name: String) -> Texture2D:
 	_photo_mutex.unlock()
 	if cached != null:
 		return cached
-	var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
-	img.convert(Image.FORMAT_RGBA8)
-	img.generate_mipmaps()
-	var tex := ImageTexture.create_from_image(img)
+	var tex := SharedTexture.keep("photo_" + key.replace(":", "_"), func() -> Texture2D:
+		var img := (MaterialLibrary._set_image(set_name, map_name) as Image).duplicate() as Image
+		img.convert(Image.FORMAT_RGBA8)
+		img.generate_mipmaps()
+		return ImageTexture.create_from_image(img))
 	_photo_mutex.lock()
 	_photos[key] = tex
 	_photo_mutex.unlock()

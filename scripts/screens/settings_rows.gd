@@ -172,10 +172,21 @@ static func destructive(text: String) -> Button:
 static func confirm(host: Control, title: String, message: String, action: String,
 		on_confirm: Callable) -> Control:
 	var veil := ColorRect.new()
+	veil.name = "confirm_veil"
 	veil.color = Color(UiTheme.SKY_000, 0.55)
 	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 	veil.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Esc closes the sheet instead of falling through to the host
+	# screen's navigation (which would orphan the sheet on a hidden
+	# screen and resurrect it later over different content).
+	veil.focus_mode = Control.FOCUS_ALL
+	veil.gui_input.connect(func(ev: InputEvent) -> void:
+		var k := ev as InputEventKey
+		if k != null and k.pressed and k.keycode == KEY_ESCAPE:
+			veil.queue_free()
+			veil.accept_event())
 	host.add_child(veil)
+	veil.call_deferred("grab_focus")
 	var sheet := PanelContainer.new()
 	var st := UiTheme.style(UiTheme.SURFACE, UiTheme.RADIUS_L, UiTheme.LINE, true)
 	st.set_content_margin_all(24)

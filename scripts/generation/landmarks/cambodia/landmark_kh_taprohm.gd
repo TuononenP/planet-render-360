@@ -17,10 +17,10 @@ const BAYON = preload("res://scripts/generation/landmarks/cambodia/landmark_kh_b
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7C7160", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("stone", "#645C4E", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("stone", LandmarkAngParts.ROOF, 3.0))
 	lm.use("Face", LandmarkMaterials.pbr("stone", "#827866", 2.5))
 	lm.use("Relief", LandmarkMaterials.pbr("stone", "#8D8471", 2.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#86593E", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))
 	lm.use("Rubble", LandmarkMaterials.pbr("stone", "#6A6252", 2.5))
 	lm.use("Root", LandmarkMaterials.pbr("rock", "#4D4438", 3.0))

@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Validate and gzip a cached Overpass response for BundledOsm."""
+"""Validate a cached Overpass response and write it as a BundledOsm .osmb snapshot.
+
+Prints the payload size and SHA-256 its manifest row records (tools/osmb.py).
+"""
 import argparse
-import gzip
-import hashlib
 import json
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import osmb  # noqa: E402
+
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi"))
+parser.add_argument("layer", choices=("detailed", "detailed-extract", "far", "ring", "poi", "transit", "horizon"))
 parser.add_argument("source", type=Path, help="current-query cache JSON")
-parser.add_argument("destination", type=Path, help="snapshot .json.gz")
+parser.add_argument("destination", type=Path, help="snapshot .osmb")
 parser.add_argument("--allow-sparse", action="store_true", help="accept empty optional layers in a verified rural extract")
 args = parser.parse_args()
 if args.allow_sparse and args.layer in ("detailed", "detailed-extract"):
@@ -46,11 +51,21 @@ elif args.layer == "far":
 elif args.layer == "ring":
     if not args.allow_sparse and not any("highway" in el.get("tags", {}) and el.get("geometry") for el in elements):
         raise SystemExit("ring highway geometry missing")
+elif args.layer == "horizon":
+    # Optional labels: an empty list (open sea) is valid, a nameless or unplaced row is not.
+    for el in elements:
+        if not el.get("tags", {}).get("name") or not ("lat" in el or "center" in el):
+            raise SystemExit("horizon row without a name or a position")
+elif args.layer == "transit":
+    stop_tags = (("railway", "tram_stop"), ("highway", "bus_stop"), ("railway", "station"), ("railway", "halt"),
+                 ("railway", "platform"), ("public_transport", "stop_position"), ("public_transport", "platform"))
+    if not args.allow_sparse and not any(any(el.get("tags", {}).get(k) == v for k, v in stop_tags) for el in elements):
+        raise SystemExit("no transit stops, stations or platforms")
 elif args.layer == "poi" and not args.allow_sparse and not any(any(k in el.get("tags", {}) for k in ("shop", "amenity", "office", "tourism", "craft", "advertising")) for el in elements):
     raise SystemExit("POI tags missing")
+if args.destination.suffix != ".osmb":
+    raise SystemExit("destination must be an .osmb file")
 args.destination.parent.mkdir(parents=True, exist_ok=True)
-with args.destination.open("wb") as out:
-    with gzip.GzipFile(fileobj=out, mode="wb", filename="", mtime=0) as zipped:
-        zipped.write(raw)
-print(f"timestamp={stamp} bytes={len(raw)} sha256={hashlib.sha256(raw).hexdigest()} "
-      f"elements={len(elements)} buildings={buildings} gzip_bytes={args.destination.stat().st_size}")
+size, sha = osmb.write_osmb(data, str(args.destination))
+print(f"timestamp={stamp} bytes={size} sha256={sha} "
+      f"elements={len(elements)} buildings={buildings} file_bytes={args.destination.stat().st_size}")

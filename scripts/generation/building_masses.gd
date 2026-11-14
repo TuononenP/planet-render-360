@@ -19,13 +19,23 @@ extends RefCounted
 ## them untagged (OsmTags._roof_tags writes "" / 0 for absent tags).
 const INHERITED_ROOF_KEYS: Array[String] = ["roof_shape", "roof_colour",
 	"roof_material", "roof_height_m", "roof_levels", "roof_dir", "roof_orient"]
+## A part this share of the largest can carry a tower's roofline.
+const MAIN_MIN_SHARE := 0.12
 
 static var _plans: Dictionary = {}
 static var _mutex := Mutex.new()
 
+## Buildings whose mapped parts leave over a tenth of the outline uncovered,
+## and that ground in m²: it stands unbuilt. Logged per build (BuildingBuilder)
+## before deciding whether to fill it.
+static var partial_outlines := 0
+static var partial_lost_m2 := 0.0
+
 static func begin_build() -> void:
 	_mutex.lock()
 	_plans.clear()
+	partial_outlines = 0
+	partial_lost_m2 = 0.0
 	_mutex.unlock()
 
 ## Releases the plans (each holds a copy of its building's tags) once the
@@ -35,6 +45,119 @@ static func end_build() -> void:
 	_plans.clear()
 	_mutex.unlock()
 
+## A raised part standing inside a lower part whose top is above the
+## raised part's floor (min_level × the style's floor height under a
+## tagged height) drew that band twice: inside the lower part, but on a
+## shared edge in the same plane as its wall, the two facades z-fought.
+## Such a part now starts at the lower part's wall top.
+static func _seat_lifts(out: Array) -> void:
+	var grow := 0.05 * WorldScale.metres_to_units()
+	for x in out:
+		var xm := x as Dictionary
+		var lift := float(xm["min_m"])
+		if lift <= 0.0:
+			continue
+		var seat := lift
+		var xbox := RingGeometry.aabb(xm["ring"])
+		for y in out:
+			var ym := y as Dictionary
+			var top := float(ym["wall_m"])
+			if float(ym["min_m"]) > 0.0 or top <= seat + 0.05 or top > float(xm["wall_m"]) - 0.5 \
+					or not RingGeometry.aabb(ym["ring"]).grow(grow).encloses(xbox) \
+					or not _within(xm["ring"], ym["ring"]) or _in_hole(xm["centre"], ym["holes"]):
+				continue
+			seat = top
+		if seat > lift:
+			_lower_to(xm, seat)
+
+## How far (m) a support's top may fall short of a lifted part's floor and
+## still count as carrying it, and the widest gap (m) a lift is brought down
+## across.
+const FLOAT_SLACK_M := 1.5
+const FLOAT_MAX_GAP_M := 15.0
+
+## A lifted part over a mass whose top is lower (or over footprint no mass
+## covers) hung in the air with open sky under it (Seoul: a box over a
+## tower's roof). Within FLOAT_MAX_GAP_M it comes down to the highest top
+## under its centre; with nothing under it, a part of at least
+## OsmParser.GROUND_ORPHAN_M2 stands on the ground (as _ground_orphans does
+## for a part outside every outline: keep the two in step). Smaller ones
+## (skybridges, canopies) and bridge/roof buildings keep their lift.
+static func _seat_floaters(b: Dictionary, out: Array) -> void:
+	if str(b.get("kind", "")) in ["bridge", "roof"] or float(b.get("min_height_m", 0.0)) > 0.0 \
+			or int(b.get("min_level", 0)) > 0:
+		return
+	var m2 := WorldScale.metres_to_units() * WorldScale.metres_to_units()
+	# Judged on the lifts as planned, so the outcome does not depend on the
+	# order the masses are visited in.
+	var lifts: Array = out.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	for xi in out.size():
+		var xm := out[xi] as Dictionary
+		var lift: float = lifts[xi]
+		if lift <= 0.0:
+			continue
+		var centre: Vector2 = xm["centre"]
+		var below := -1.0
+		var carried := false
+		for yi in out.size():
+			var ym := out[yi] as Dictionary
+			if yi == xi or float(lifts[yi]) >= lift \
+					or not Geometry2D.is_point_in_polygon(centre, ym["ring"]) \
+					or _in_hole(centre, ym["holes"]):
+				continue
+			var top := float(ym["wall_m"])
+			# A pitched roof under the part carries it up to its ridge.
+			if top + float(ym["rh_m"]) >= lift - FLOAT_SLACK_M:
+				carried = true
+				break
+			below = maxf(below, top)
+		if carried:
+			continue
+		var wall := float(xm["wall_m"])
+		var seat := -1.0
+		if below >= 0.0 and lift - below <= FLOAT_MAX_GAP_M:
+			seat = below
+		elif below < 0.0 and absf(RingGeometry.signed_area(xm["ring"])) / m2 >= OsmParser.GROUND_ORPHAN_M2:
+			seat = 0.0
+		if seat < 0.0 or wall - seat < 0.5:
+			continue
+		_lower_to(xm, seat)
+
+## Moves a mass's floor to `seat` (m), keeping its storey height.
+static func _lower_to(xm: Dictionary, seat: float) -> void:
+	var wall := float(xm["wall_m"])
+	var lift := float(xm["min_m"])
+	xm["storeys"] = maxi(1, roundi(float(int(xm["storeys"])) * (wall - seat) / (wall - lift)))
+	xm["min_m"] = seat
+
+static func _in_hole(p: Vector2, holes: Array) -> bool:
+	for h in holes:
+		if Geometry2D.is_point_in_polygon(p, h as PackedVector2Array):
+			return true
+	return false
+
+## True when every vertex of `inner` lies inside `outer` or on its edge.
+static func _within(inner: PackedVector2Array, outer: PackedVector2Array) -> bool:
+	var tol := 0.05 * WorldScale.metres_to_units()
+	for p in inner:
+		if Geometry2D.is_point_in_polygon(p, outer):
+			continue
+		var on := false
+		for i in outer.size():
+			var q := Geometry2D.get_closest_point_to_segment(p, outer[i], outer[(i + 1) % outer.size()])
+			if q.distance_to(p) <= tol:
+				on = true
+				break
+		if not on:
+			return false
+	return true
+
+## "@<osm id>" of `b` ("" without one), telling apart two buildings
+## mapped on one outline.
+static func _src_tag(b: Dictionary) -> String:
+	var src := str(b.get("osm_id", ""))
+	return "" if src.is_empty() else "@" + src
+
 ## Stable identity of a mass: its centroid (internal units).
 static func key_of(x: float, z: float) -> String:
 	return "%.2f,%.2f" % [x, z]
@@ -43,17 +166,60 @@ static func key_of(x: float, z: float) -> String:
 ## {ring, holes, centre, key, wall_m, min_m, rh_m, shape, storeys, b_eff,
 ##  main, look}. Heights in metres above the lowest ground under the ring.
 static func plan(b: Dictionary, ctx: Dictionary) -> Array:
-	var fp0: Variant = b.get("footprint", null)
-	var ck := key_of(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
-	if fp0 is PackedVector2Array and not (fp0 as PackedVector2Array).is_empty():
-		var f := fp0 as PackedVector2Array
-		ck += "|%d|%s" % [f.size(), key_of(f[0].x, f[0].y)]
+	var ck := _plan_key(b)
 	_mutex.lock()
 	if _plans.has(ck):
 		var cached: Array = _plans[ck] as Array
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
+	if not (b.get("parts", []) as Array).is_empty():
+		_note_partial(b)
+	var out := _compute(b, ctx)
+	_mutex.lock()
+	if _plans.has(ck):
+		var raced: Array = _plans[ck] as Array
+		_mutex.unlock()
+		return raced
+	_plans[ck] = out
+	_mutex.unlock()
+	return out
+
+## Plans every building of `list` on the worker threads, then files them in
+## list order as plan() called in that order would: of two sharing a key
+## the first keeps it, and only it counts in partial_outlines.
+static func prepare(list: Array, ctx: Dictionary) -> void:
+	var keys := PackedStringArray()
+	for b: Dictionary in list:
+		keys.append(_plan_key(b))
+	var plans: Array = []
+	plans.resize(list.size())
+	var group := WorkerThreadPool.add_group_task(func(k: int) -> void:
+		plans[k] = _compute(list[k], ctx), list.size(), -1, true, "BuildingPlans")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	for k in list.size():
+		_mutex.lock()
+		var fresh := not _plans.has(keys[k])
+		if fresh:
+			_plans[keys[k]] = plans[k]
+		_mutex.unlock()
+		if fresh and not ((list[k] as Dictionary).get("parts", []) as Array).is_empty():
+			_note_partial(list[k])
+
+## The plan memo's key: position and outline, and the OSM source.
+static func _plan_key(b: Dictionary) -> String:
+	var fp0: Variant = b.get("footprint", null)
+	var ck := key_of(float(b.get("x", 0.0)), float(b.get("z", 0.0)))
+	if fp0 is PackedVector2Array and not (fp0 as PackedVector2Array).is_empty():
+		var f := fp0 as PackedVector2Array
+		ck += "|%d|%s" % [f.size(), key_of(f[0].x, f[0].y)]
+	# Buildings OSM stacks on one outline (a roof canopy over a building,
+	# which OsmParser keeps apart) must neither share a plan nor a mass key:
+	# PartyWalls would read the two as one mass.
+	return ck + _src_tag(b)
+
+## plan()'s masses for `b`, without the memo.
+static func _compute(b: Dictionary, ctx: Dictionary) -> Array:
 	# An untagged building borrows a tagged neighbour's finish and date
 	# before its look resolves (NeighbourEvidence), so a block is built alike.
 	b = NeighbourEvidence.with_peers(b, ctx)
@@ -80,14 +246,31 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 		if not base.is_empty():
 			out = _plan_masses(b, ctx, [base] + masses, false, look, parent_res, legacy,
 				parent_shape, fh)
-	_mutex.lock()
-	if _plans.has(ck):
-		var raced: Array = _plans[ck] as Array
-		_mutex.unlock()
-		return raced
-	_plans[ck] = out
-	_mutex.unlock()
+		_seat_lifts(out)
+		_seat_floaters(b, out)
 	return out
+
+## Counts `b` in partial_outlines when its parts cover under 90% of it.
+static func _note_partial(b: Dictionary) -> void:
+	var fp: Variant = b.get("footprint", null)
+	if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+		return
+	var outline := fp as PackedVector2Array
+	var total := absf(RingGeometry.signed_area(outline))
+	if total <= 0.0:
+		return
+	var covered := 0.0
+	for p in b.get("parts", []):
+		var pf: Variant = (p as Dictionary).get("footprint", null)
+		if pf is PackedVector2Array and (pf as PackedVector2Array).size() >= 3:
+			for piece in Geometry2D.intersect_polygons(outline, pf):
+				covered += absf(RingGeometry.signed_area(piece))
+	if covered < total * 0.9:
+		var m2 := WorldScale.metres_to_units() * WorldScale.metres_to_units()
+		_mutex.lock()
+		partial_outlines += 1
+		partial_lost_m2 += (total - minf(covered, total)) / m2
+		_mutex.unlock()
 
 static func _inset_ring(ring: PackedVector2Array, inset: float) -> PackedVector2Array:
 	var pieces := RingGeometry._solid_parts(Geometry2D.offset_polygon(ring, -inset))
@@ -107,7 +290,7 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 	# A generated tower's roofline detail belongs on its top, not on the
 	# base the upper tiers stand on (TowerMassing).
 	var main_mass := masses.size() - 1 if masses.back() is Dictionary \
-		and bool((masses.back() as Dictionary).get("stack_top", false)) else _largest(masses)
+		and bool((masses.back() as Dictionary).get("stack_top", false)) else _tower_main(masses, look)
 	for mi in masses.size():
 		if not (masses[mi] is Dictionary):
 			continue
@@ -236,8 +419,9 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			part_look["pattern"] = "curtain"
 			part_look["relief"] = {"mullion": true}
 		out.append({"ring": ring, "holes": holes, "centre": Vector2(cx, cz),
-			"key": key_of(cx, cz) + "#%d" % mi, "wall_m": wall, "min_m": min_m,
+			"key": key_of(cx, cz) + "#%d" % mi + _src_tag(b), "wall_m": wall, "min_m": min_m,
 			"rh_m": rh, "shape": shape, "storeys": storeys, "b_eff": b_eff,
+			"own_parts": not (b.get("parts", []) as Array).is_empty(),
 			# A mapped landmark's parts are its towers and domes: no made-up
 			# tower, stacks or dormers on any of them.
 			"main": mi == main_mass and not bool(b.get("mapped_landmark", false)),
@@ -296,6 +480,26 @@ static func _capped(masses: Array, mi: int, ring: PackedVector2Array, fh: float)
 
 ## Index of the largest footprint: roofline detail goes on it only (a
 ## church of five parts has one tower, not five).
+## The mass that carries the roofline: a mapped tower's tallest substantial
+## part (its largest is often the podium), else the largest.
+static func _tower_main(masses: Array, look: Dictionary) -> int:
+	var largest := _largest(masses)
+	if not (str(look.get("kind", "")) in TowerMassing.KINDS) or not (masses[largest] is Dictionary):
+		return largest
+	var lot := absf(RingGeometry.signed_area((masses[largest] as Dictionary).get("footprint", PackedVector2Array())))
+	var best := largest
+	var tallest := float((masses[largest] as Dictionary).get("height", 0.0))
+	for i in masses.size():
+		if not (masses[i] is Dictionary):
+			continue
+		var fp: Variant = (masses[i] as Dictionary).get("footprint", null)
+		if fp is PackedVector2Array and (fp as PackedVector2Array).size() >= 3 \
+				and absf(RingGeometry.signed_area(fp as PackedVector2Array)) >= lot * MAIN_MIN_SHARE \
+				and float((masses[i] as Dictionary).get("height", 0.0)) > tallest:
+			tallest = float((masses[i] as Dictionary).get("height", 0.0))
+			best = i
+	return best
+
 static func _largest(masses: Array) -> int:
 	var best := 0
 	var best_area := -1.0

@@ -39,15 +39,34 @@ const FADE_FRAC := 0.12
 ## Area batches larger than this (merged scatters, MultiMesh fields)
 ## have no meaningful single distance; they are never ranged.
 const MAX_RANGED_SIZE_M := 2.0 * MERGE_CELL_M
+## Altitude reach (AltitudeReach): while a high drone has GPU headroom
+## each ring reaches about one tier further, and Ultra's past its own
+## caps (roofline detail over the whole detailed extent). Read by every
+## ranging call, so worlds and tree swaps ranged meanwhile agree.
+static var altitude_boost := false
+const DETAIL_M_ALT: Array[float] = [300.0, 450.0, 700.0, 1200.0]
+const TREES_M_ALT: Array[float] = [800.0, 1100.0, 1700.0, 1700.0]
+const FAR_CITY_M_ALT: Array[float] = [7500.0, 12001.0, 12001.0, 12001.0]
+
+## Detail city (CityDetail): High and Ultra reach further in a city with
+## open data behind it; Fast and Balanced keep their rings.
+static var city_boost := false
+const DETAIL_M_CITY: Array[float] = [200.0, 300.0, 700.0, 1000.0]
+const TREES_M_CITY: Array[float] = [600.0, 800.0, 1500.0, 1700.0]
 
 static func detail_m(preset: int) -> float:
-	return DETAIL_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	var r := DETAIL_M_ALT[p] if altitude_boost else DETAIL_M[p]
+	return maxf(r, DETAIL_M_CITY[p]) if city_boost else r
 
 static func trees_m(preset: int) -> float:
-	return TREES_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	var r := TREES_M_ALT[p] if altitude_boost else TREES_M[p]
+	return maxf(r, TREES_M_CITY[p]) if city_boost else r
 
 static func far_city_m(preset: int) -> float:
-	return FAR_CITY_M[RenderSettings.clamp_preset(preset)]
+	var p := RenderSettings.clamp_preset(preset)
+	return FAR_CITY_M_ALT[p] if altitude_boost else FAR_CITY_M[p]
 
 ## Build time (preset-independent): every building mesh adopted flat
 ## into `root` (meta lod_layer == "Buildings") is appended into one
@@ -123,8 +142,24 @@ static func merge_buildings(root: Node3D) -> int:
 ## Layers are the builders' subtree names (meta lod_layer on children
 ## adopted flat, else the world child's own name: FarTerrain, Water).
 static func apply(root: Node, preset: int) -> void:
-	for c in root.get_children():
-		_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
+	for i in root.get_child_count():
+		apply_child(root, i, preset)
+
+## Ranges one top-level subtree of `root` (child `index`): the pieces
+## apply() is made of, for callers spreading the walk over frames.
+static func apply_child(root: Node, index: int, preset: int) -> void:
+	var c := root.get_child(index)
+	_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
+
+## One node's range for its `layer` (RevealWave hands a faded-in piece
+## back to its ring).
+static func range_one(gi: GeometryInstance3D, preset: int, layer: String) -> void:
+	_range(gi, preset, layer)
+
+## One vegetation node added after the build (TreeLodWindow swaps).
+static func apply_vegetation(gi: GeometryInstance3D, preset: int) -> void:
+	_range(gi, preset, "Vegetation")
+	_shadow(gi, preset, "Vegetation")
 
 static func _apply(node: Node, preset: int, layer: String) -> void:
 	var l := str(node.get_meta("lod_layer", layer))
@@ -147,6 +182,10 @@ static func _shadow(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
+	# A builder that switches its own near and far meshes (ParkedCars)
+	# keeps the ranges it set.
+	if gi.has_meta("lod_own"):
+		return
 	if layer == "FarCity":
 		# A whole band in or out (its AABB centre is no distance): a
 		# 1 m range end hides it, 0 shows it.
@@ -159,6 +198,8 @@ static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 	var end := 0.0
 	if layer == "Buildings" and bool(gi.get_meta("lod_detail", false)):
 		end = detail_m(preset)
+	elif layer == "GroundCover":
+		end = float(gi.get_meta("cover_end", 0.0))
 	elif layer == "Vegetation":
 		var size := gi.get_aabb().size
 		if maxf(size.x, size.z) <= MAX_RANGED_SIZE_M:

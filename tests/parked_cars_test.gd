@@ -57,16 +57,6 @@ func _run() -> void:
 		failures.append("parked sides: measured room parks both, no room none, a no-parking tag wins")
 	_width_barriers(failures)
 	_directions_and_obstacles(failures)
-	var yellow := Color(0.95, 0.62, 0.02)
-	var taxi_count := 0
-	for i in 500:
-		var p := Vector2(float(i) * 7.0, 31.0)
-		if ParkedCars.paint_for(p, "sedan", true) == yellow:
-			taxi_count += 1
-		if ParkedCars.paint_for(p, "sedan", false) == yellow:
-			failures.append("taxi paint must stay in New York")
-	if taxi_count < 20 or taxi_count > 100:
-		failures.append("New York should have a modest share of yellow sedans: %d" % taxi_count)
 	# Placement on a slope (5 %, z down the street).
 	var data := _data(0.05)
 	data.roads = roads
@@ -81,7 +71,9 @@ func _run() -> void:
 	for c in cars:
 		var p: Vector3 = c[0]
 		sides[signf(p.x)] = true
-		if absf(absf(p.x) - (6.0 - ParkedCars.KERB_IN_M)) > 0.05 or absf(p.x - 40.0) < 5.0:
+		# KERB_JITTER_M of sideways play, nothing more.
+		if absf(absf(p.x) - (6.0 - ParkedCars.KERB_IN_M)) > ParkedCars.KERB_JITTER_M + 0.02 \
+				or absf(p.x - 40.0) < 5.0:
 			failures.append("a car off Hyde's kerbs at %s" % p)
 			break
 		var fwd: Vector3 = (c[1] as Basis).x.normalized()
@@ -128,33 +120,47 @@ func _run() -> void:
 				failures.append("%s and its distant batch must share bounds and a switch distance" % near.name)
 		if pairs == 0:
 			failures.append("Ultra should have detailed and distant car batches")
+		# The world's LOD pass must leave the cars' own switch alone.
+		var switch_far := (batches.get_children().filter(func(n: Node) -> bool:
+			return n.name.ends_with("_far"))[0] as MultiMeshInstance3D)
+		var begin := switch_far.visibility_range_begin
+		LodRing.apply(holder, RenderSettings.Preset.ULTRA)
+		if begin <= 0.0 or switch_far.visibility_range_begin != begin:
+			failures.append("LodRing cleared the parked cars' near/far switch")
+		var shadows := batches.get_children().filter(func(n: Node) -> bool:
+			return n.name.ends_with("_shadow"))
+		if shadows.size() != pairs:
+			failures.append("every car group should have a contact shadow batch: %d of %d" % [shadows.size(), pairs])
+		for node in batches.get_children():
+			var mm := (node as MultiMeshInstance3D).multimesh
+			if not mm.use_custom_data:
+				failures.append("%s should carry the paint finish" % node.name)
+				break
 	holder.free()
+	# A causeway the map does not call a bridge parks no car on the water.
+	var causeway := OsmTags._road_entry({"highway": "residential", "lanes": "2", "parking:both": "lane"},
+		_line(Vector2(-100, 0), Vector2(100, 0)))
+	var dry := _data()
+	dry.roads = [causeway]
+	var wet := _data()
+	wet.roads = [causeway]
+	wet.land_polygons = [{"class": "water", "points": PackedVector2Array([Vector2(-150, -40),
+		Vector2(150, -40), Vector2(150, 40), Vector2(-150, 40)])}]
+	var dry_cars := ParkedCars.plan(dry, GroundTruth.new(dry), 1.0).size()
+	var wet_cars := ParkedCars.plan(wet, GroundTruth.new(wet), 1.0).size()
+	if dry_cars == 0 or wet_cars != 0:
+		failures.append("cars park on the dry street but not over water: %d dry, %d wet" % [dry_cars, wet_cars])
 	# The headless renderer does not retain MultiMesh instance transforms,
 	# so check the bounds calculation using known placements directly.
 	var placements := [[Vector3(20, 3, -40), Basis.IDENTITY],
 		[Vector3(35, 4, -30), Basis(Vector3.UP, 0.8)]]
-	var near_box := ParkedCars.CarModels.mesh("sedan").get_aabb()
-	var far_box := ParkedCars.mesh("sedan").get_aabb()
+	var near_box := CarModel.mesh("sedan").get_aabb()
+	var far_box := CarModel.mesh("sedan", true).get_aabb()
 	var bounds := ParkedCars._batch_bounds(placements, near_box.merge(far_box)).grow(0.001)
 	for car in placements:
 		for box in [near_box, far_box]:
 			if not bounds.encloses(Transform3D(car[1], car[0]) * box):
 				failures.append("shared batch bounds must contain both LODs at every car")
-	for kind in ["sedan", "hatch", "wagon", "suv", "van"]:
-		var mesh := ParkedCars.mesh(kind)
-		if mesh.get_surface_count() < 3:
-			failures.append("%s should build body, glass and tyres" % kind)
-		# Front faces as Godot winds them (BoxMesh): clockwise about the
-		# outward normal, so cull_back keeps the outside.
-		for si in mesh.get_surface_count():
-			var arr := mesh.surface_get_arrays(si)
-			var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-			var nn: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
-			var ix: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
-			for t in range(0, ix.size(), 3):
-				if (v[ix[t + 1]] - v[ix[t]]).cross(v[ix[t + 2]] - v[ix[t]]).dot(nn[ix[t]]) > 0.0:
-					failures.append("%s surface %d has a back-facing triangle" % [kind, si])
-					break
 	failures.remove_at(0)
 	if failures.is_empty():
 		print("PARKED CARS OK: parking tags, kerb widths from sidewalks, both kerbs, slope pitch, junctions clear, Ultra only")

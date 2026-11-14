@@ -30,7 +30,7 @@ static func stone_for(data: LocationData) -> Color:
 
 ## Adds the kerb mesh to `root` on desktop Ultra. Returns metres of kerb.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> float:
-	if not RenderQuality.ultra_desktop(data.quality_preset):
+	if not CityDetail.street_extras(data):
 		return 0.0
 	var m := WorldScale.metres_to_units()
 	var junc := RoadSurface.junctions(data)
@@ -38,22 +38,25 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> floa
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var total := 0.0
 	var r2 := pow(RADIUS_M * m, 2.0)
+	var centre := View360.spawn_xz(data)
 	for line in data.roads:
 		if not (line is Dictionary):
 			continue
 		var rd: Dictionary = line
 		if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)) or bool(rd.get("area", false)):
 			continue
-		if str(rd.get("class", "")) not in StreetProps.LIT:
+		# A pedestrian street is paved flush, wall to wall.
+		var cls := str(rd.get("class", ""))
+		if cls not in StreetProps.LIT or cls == "pedestrian":
 			continue
 		var pts: PackedVector2Array = rd.get("points", PackedVector2Array())
 		if pts.size() < 2:
 			continue
 		var mid := pts[pts.size() / 2]
-		if mid.length_squared() > r2 or ground.land_class_at(mid.x, mid.y) != "urban":
+		if mid.distance_squared_to(centre) > r2 or ground.land_class_at(mid.x, mid.y) != "urban":
 			continue
 		var half := float(rd.get("width_m", 6.0)) * 0.5 * m - INSET_M * m
-		for run in _runs(_dense(pts, STEP_M * m), junc, m, r2):
+		for run in _runs(_dense(pts, STEP_M * m), junc, m, r2, centre):
 			for side in [-1.0, 1.0]:
 				total += _strip(st, run, half * side, side, ground, m)
 	if total <= 0.0:
@@ -67,7 +70,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> floa
 	var set_name := "concrete" if stone == CONCRETE else "stone"
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	mi.material_override = StreetSnow.material(MaterialLibrary.pbr_material(set_name,
-		MaterialLibrary._calib_tint(row["mean"], stone), 1.0) as StandardMaterial3D)
+		MaterialLibrary._calib_tint(row["mean"], stone), 1.0) as StandardMaterial3D, 0.35)
 	root.add_child(mi)
 	return total / m
 
@@ -83,12 +86,13 @@ static func _dense(pts: PackedVector2Array, step: float) -> PackedVector2Array:
 	return out
 
 ## Pieces of the line farther than CUT_M from any junction and inside
-## the radius.
-static func _runs(line: PackedVector2Array, junc: Dictionary, m: float, r2: float) -> Array:
+## the radius around the eye at `centre`.
+static func _runs(line: PackedVector2Array, junc: Dictionary, m: float, r2: float,
+		centre: Vector2 = Vector2.ZERO) -> Array:
 	var out: Array = []
 	var cur := PackedVector2Array()
 	for p in line:
-		var keep := p.length_squared() <= r2 \
+		var keep := p.distance_squared_to(centre) <= r2 \
 			and RoadSurface.junction_frac(junc, p) * RoadSurface.JUNCTION_M > CUT_M * m
 		if keep:
 			cur.append(p)

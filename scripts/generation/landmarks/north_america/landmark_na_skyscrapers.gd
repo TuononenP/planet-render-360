@@ -106,6 +106,8 @@ static func chrysler_building(model: Node3D) -> void:
 	lm.use("Steel", LandmarkMaterials.paint("#C9CFD4", 0.22, 0.9))
 	lm.use("Glass", LandmarkMaterials.glass("#3A4349"))
 	lm.use("Dark", LandmarkMaterials.pbr("brick", "#5A5A5C", 3.0))
+	var kit := SkyKit.new(lm)
+	kit.wall("Facade", "white_brick_pier", 3.0, 3.66)
 	# [y0, y1, half-width] stacked masses.
 	var masses := [[0.0, 30.0, 29.0], [30.0, 58.0, 25.0], [58.0, 120.0, 21.0],
 		[120.0, 184.0, 17.5], [184.0, CHRYSLER_CROWN_M, 15.0]]
@@ -115,16 +117,13 @@ static func chrysler_building(model: Node3D) -> void:
 		var y1: float = m[1]
 		var hw: float = m[2]
 		var skin := 0.3
-		lm.box("Brick", Vector3(0, (y0 + y1) * 0.5, 0), Vector3(hw * 2.0 - skin * 2.0, y1 - y0, hw * 2.0 - skin * 2.0))
 		var bays := floori(hw * 2.0 / 3.0)
 		for q in 4:
 			var r := Basis(Vector3.UP, PI * 0.5 * q)
 			var n := r * Vector3(0, 0, 1)
 			var right := r * Vector3(-1, 0, 0)
 			var o := n * (hw - skin) - right * hw + Vector3(0, y0, 0)
-			var rows := floori((y1 - y0 - 1.2) / storey)
-			LandmarkDetail.pierced_face(lm, "Brick", "Glass", o, right, n, hw * 2.0, y1 - y0 - 1.2, bays, rows,
-				Vector2(1.5, 2.2), 0.9, storey, skin)
+			kit.face("Facade", Vector2(o.x, o.z), Vector2((o + right * hw * 2.0).x, (o + right * hw * 2.0).z), y0, y1, n, bays)
 			# Dark brick piers between the window columns, white spandrels.
 			var basis := Basis(right, Vector3.UP, n)
 			for k in bays + 1:

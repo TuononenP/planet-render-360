@@ -33,6 +33,49 @@ func _run() -> void:
 	if map.zoom_level != z0 - 1:
 		failures.append("map wheel-down should zoom out (now %d)" % map.zoom_level)
 
+	# --- Map: a smooth scroll (pan gesture) steps once per gesture, momentum included ---
+	var zs := map.zoom_level
+	var here := Vector2(195, 250)
+	var t := 100000
+	var swipe_up := InputEventPanGesture.new()
+	swipe_up.delta = Vector2(0, -1.2)
+	swipe_up.position = here
+	map._gui_input(swipe_up)  # the real-clock path zooms too
+	if map.zoom_level != zs + 1:
+		failures.append("a scroll up should zoom in (was %d, now %d)" % [zs, map.zoom_level])
+	map.zoom_level = zs
+	# A flick and a momentum tail far longer than the gap, events 50 ms apart.
+	for i in 30:
+		map.scroll_zoom_at_time(-0.4, here, t + i * 50)
+	if map.zoom_level != zs + 1:
+		failures.append("a flick with momentum should zoom in one step (was %d, now %d)" % [zs, map.zoom_level])
+	t += 30 * 50
+	# A pause ends the gesture: the same direction steps again.
+	t += MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(-1.2, here, t)
+	if map.zoom_level != zs + 2:
+		failures.append("after a pause a scroll up should zoom in again (now %d)" % map.zoom_level)
+	# Within a gesture a reversal steps at once.
+	t += 50
+	map.scroll_zoom_at_time(1.2, here, t)
+	if map.zoom_level != zs + 1:
+		failures.append("a reversal should zoom straight back out (now %d)" % map.zoom_level)
+	# Sideways scroll neither steps nor wipes progress.
+	t += MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(-0.6, here, t)
+	map.scroll_zoom_at_time(0.0, here, t + 20)
+	map.scroll_zoom_at_time(-0.6, here, t + 40)
+	if map.zoom_level != zs + 2:
+		failures.append("a sideways event should not wipe scroll progress (now %d)" % map.zoom_level)
+	# Leftover scroll from an earlier gesture does not carry over.
+	t += 40 + MapTileView.SCROLL_ZOOM_GAP_MS
+	map.scroll_zoom_at_time(0.9, here, t)
+	t += 5000
+	map.scroll_zoom_at_time(0.2, here, t)
+	if map.zoom_level != zs + 2:
+		failures.append("a later brush should not tip leftover scroll into a step (now %d)" % map.zoom_level)
+	map.zoom_level = zs  # where the pinch check below expects it
+
 	# --- Map: pinch (two touches moving apart) zooms in ---
 	var t0 := InputEventScreenTouch.new()
 	t0.index = 0
@@ -228,6 +271,28 @@ func _run() -> void:
 			failures.append("tapping a prediction should select Paris (lat=%f name=%s)" % [picker._lat, picker.selected_name])
 		if picker._suggest_panel.visible:
 			failures.append("prediction panel should hide after selection")
+	# Selecting a named city always starts from its preset coordinates,
+	# however the geocoder spelled or centred it; a street address and
+	# typed coordinates keep the point they were given.
+	MapSearch.select(picker, "Helsinki, Finland", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001:
+		failures.append("selecting Helsinki should start at its preset (60.1680, 24.9530), got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Helsinki, Uusimaa", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001 \
+			or picker.selected_name != "Helsinki, Finland":
+		failures.append("a regional spelling of Helsinki should resolve to the preset, got (%f, %f, %s)" % [picker._lat, picker._lon, picker.selected_name])
+	MapSearch.select(picker, "Paris, Ile-de-France", 48.8566, 2.3522)
+	if absf(picker._lat - 48.8622) > 0.0001 or absf(picker._lon - 2.2887) > 0.0001:
+		failures.append("selecting Paris should start at its preset (48.8622, 2.2887), got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Paris, Texas", 33.6609, -95.5555)
+	if absf(picker._lat - 33.6609) > 0.0001 or absf(picker._lon + 95.5555) > 0.0001:
+		failures.append("a distant same-name town should keep its own point, got (%f, %f)" % [picker._lat, picker._lon])
+	MapSearch.select(picker, "Mannerheimintie 5, Helsinki", 60.1700, 24.9400)
+	if absf(picker._lat - 60.1700) > 0.0001 or absf(picker._lon - 24.9400) > 0.0001:
+		failures.append("a street address should keep its own point, got (%f, %f)" % [picker._lat, picker._lon])
+	picker._on_search_text_changed("60.1700, 24.9400")
+	if absf(picker._lat - 60.1700) > 0.0001 or absf(picker._lon - 24.9400) > 0.0001:
+		failures.append("typed coordinates should start exactly there, got (%f, %f)" % [picker._lat, picker._lon])
 	# A place the server returns twice under one label shows as one row.
 	MapSearch.show_suggestions(picker, [
 		{"name": "Phnom Penh, Cambodia", "lat": 11.56, "lon": 104.93},
@@ -282,6 +347,10 @@ func _run() -> void:
 	picker._searcher.failed.emit(SearchFetcher.NO_MATCH % "xyzzy")
 	if picker._search_busy.visible:
 		failures.append("spinner should hide when the search answers")
+	# An online answer for a known city starts at its preset, too.
+	picker._searcher.succeeded.emit("Helsinki, Uusimaa", 60.1699, 24.9384)
+	if absf(picker._lat - 60.1680) > 0.0001 or absf(picker._lon - 24.9530) > 0.0001:
+		failures.append("an online Helsinki result should start at its preset, got (%f, %f)" % [picker._lat, picker._lon])
 	picker.queue_free()
 
 	# --- Panels over the map: wheel and pinch in a sheet gap zoom the map under it ---

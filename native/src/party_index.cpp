@@ -19,6 +19,7 @@ constexpr double GAP_M = 0.9;
 constexpr double STREET_M = 9.0;
 constexpr double CELL_M = 32.0;
 constexpr double OPEN = -INFINITY;
+constexpr double SAME_TOL_M = 0.05;
 
 inline double D(real_t v) {
 	return (double)v;
@@ -114,6 +115,7 @@ int PartyIndex::key_id(const String &key) {
 	}
 	int id = (int)keys.size();
 	keys.emplace(k, id);
+	key_tops.push_back(-INFINITY);
 	return id;
 }
 
@@ -133,6 +135,7 @@ void PartyIndex::insert(std::unordered_map<int64_t, std::vector<int>> &grid, con
 
 void PartyIndex::add_ring(const PackedVector2Array &ring, const String &key, double top, bool hole) {
 	int kid = key_id(key);
+	key_tops[kid] = Math::max(key_tops[kid], top);
 	bool ccw = signed_area(ring) > 0.0;
 	int64_t n = ring.size();
 	for (int64_t i = 0; i < n; i++) {
@@ -184,10 +187,25 @@ Array PartyIndex::partition(const Vector2 &a, const Vector2 &b, const Vector2 &n
 					continue;
 				}
 				seen.push_back(rid);
-				if (D(r.out.dot(n)) > -PARALLEL) {
+				double rec_top = r.top;
+				double facing = D(r.out.dot(n));
+				if (facing >= PARALLEL) {
+					// PartyWalls: the same wall drawn by another mass is
+					// hidden here when that mass stands at least as tall
+					// (a tie goes to the first registered).
+					if (key < 0 || std::abs(D((r.a - a).dot(n))) > SAME_TOL_M ||
+							std::abs(D((r.b - a).dot(n))) > SAME_TOL_M) {
+						continue;
+					}
+					double own = key_tops[key];
+					if (!(r.top > own + SAME_TOL_M || (r.top >= own - SAME_TOL_M && r.key < key))) {
+						continue;
+					}
+					// A tie hides the whole wall, even a few cm taller.
+					rec_top = Math::max(r.top, own);
+				} else if (facing > -PARALLEL) {
 					continue;
-				}
-				if (std::abs(D((r.a - a).dot(n))) > tol || std::abs(D((r.b - a).dot(n))) > tol) {
+				} else if (std::abs(D((r.a - a).dot(n))) > tol || std::abs(D((r.b - a).dot(n))) > tol) {
 					continue;
 				}
 				double t0 = Math::clamp(D((r.a - a).dot(e)) / len2, 0.0, 1.0);
@@ -195,7 +213,7 @@ Array PartyIndex::partition(const Vector2 &a, const Vector2 &b, const Vector2 &n
 				if (std::abs(t1 - t0) * std::sqrt(len2) < MIN_COVER_M) {
 					continue;
 				}
-				spans.push_back({ Math::min(t0, t1), Math::max(t0, t1), r.top });
+				spans.push_back({ Math::min(t0, t1), Math::max(t0, t1), rec_top });
 			}
 		}
 	}

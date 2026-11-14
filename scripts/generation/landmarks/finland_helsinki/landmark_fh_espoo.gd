@@ -58,55 +58,6 @@ static func otaniemi_chapel(model: Node3D) -> void:
 		lm.frustum("Metal", Vector3(x, 5.8, 23.8), 0.4, 0.2, 0.65, 12)
 	lm.commit(model, "Otaniemi_")
 
-## Aalto's 1964 Undergraduate Centre: dark brick courtyard wings,
-## the rising copper auditorium fan, and stepped outdoor theatre.
-static func aalto_main(model: Node3D) -> void:
-	var lm := _materials()
-	for row in [[0, -24, 116, 16, 10.4], [-50, 9, 16, 54, 10.4], [49, 13, 16, 62, 10.4],
-			[-23, 40, 70, 15, 7.2], [70, -32, 35, 14, 7.2]]:
-		var x: float = row[0]
-		var z: float = row[1]
-		var w: float = row[2]
-		var d: float = row[3]
-		var h: float = row[4]
-		U.blk(lm, "Granite", x, 0, z, w + 0.3, 0.65, d + 0.3)
-		U.blk(lm, "Brick", x, 0.65, z, w, h - 0.65, d)
-		U.blk(lm, "Copper", x, h, z, w + 0.4, 0.22, d + 0.4)
-		U.box_windows(lm, "Glass", x, z, w, d, 1.3, 2, 3.9, maxi(2, int(w / 3)), maxi(2, int(d / 3)), 1.8, 2.5)
-	# Fan is a sector, not a cylinder: its radial ends are brick and its
-	# copper roof rises toward the auditorium's broad curved rear wall.
-	var centre := Vector3(5, 0, -1)
-	var segs := 40
-	for i in segs:
-		var a := PI * (0.10 + 0.80 * float(i) / float(segs))
-		var b := PI * (0.10 + 0.80 * float(i + 1) / float(segs))
-		var p := centre + Vector3(cos(a), 0, -sin(a)) * 15.0
-		var q := centre + Vector3(cos(b), 0, -sin(b)) * 15.0
-		lm.quad("Brick", p, q, q + Vector3.UP * 21, p + Vector3.UP * 21,
-			((p + q) * 0.5 - centre).normalized())
-		var n := Vector3(0, 1, 0)
-		lm.tri("Copper", centre + Vector3.UP * 9, p + Vector3.UP * 21, q + Vector3.UP * 21,
-			n, n, n, Vector2.ZERO, Vector2(0, 27), Vector2(2, 27))
-		lm.beam("Copper", centre + Vector3.UP * 9.05, p + Vector3.UP * 21.05, 0.055, 0.08)
-	for s in [-1.0, 1.0]:
-		var p := centre + Vector3(s * cos(PI * 0.1), 0, -sin(PI * 0.1)) * 15.0
-		lm.quad("Brick", centre, p, p + Vector3.UP * 21, centre + Vector3.UP * 9, Vector3(0, 0, 1))
-	# Broad exterior amphitheatre steps curve out toward Alvarinaukio.
-	for step in 16:
-		var r0 := 8.0 + float(step) * 0.85
-		var r1 := r0 + 0.8
-		var y := float(step + 1) * 0.23
-		for i in 32:
-			var a := PI * (0.12 + 0.76 * float(i) / 32.0)
-			var b := PI * (0.12 + 0.76 * float(i + 1) / 32.0)
-			var p := Vector3(cos(a), 0, sin(a))
-			var q := Vector3(cos(b), 0, sin(b))
-			var c := Vector3(5, y, 7)
-			lm.quad("Granite", c + p * r0, c + q * r0, c + q * r1, c + p * r1, Vector3.UP)
-			lm.quad("Brick", c + p * r1 - Vector3.UP * 0.23, c + q * r1 - Vector3.UP * 0.23,
-				c + q * r1, c + p * r1, (p + q).normalized())
-	lm.commit(model, "Aalto_")
-
 ## Ruusuvuori's concrete sanctuary cube and low courtyard parish wing.
 ## The bells hang in a separate low portal, with no invented steeple.
 static func tapiola_church(model: Node3D) -> void:

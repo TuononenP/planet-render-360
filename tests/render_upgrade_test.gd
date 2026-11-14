@@ -223,6 +223,9 @@ func _run() -> void:
 	var all_nodes := RoadSurface.junctions(jd)
 	if RoadSurface.junction_frac(all_nodes, Vector2(0, 0)) > 0.01:
 		failures.append("junctions() must keep footway nodes (kerbs and parked cars depend on them)")
+	jd.roads.resize(2)
+	if RoadSurface.junction_frac(RoadSurface.junctions(jd), Vector2(0, 0)) < 0.99:
+		failures.append("a street merely split into two ways is no junction for kerbs and parked cars")
 	if RoadSurface.junction_frac(paint, Vector2(0, 0)) < 0.99:
 		failures.append("a way split with a footway is no paint junction (%.2f)" % RoadSurface.junction_frac(paint, Vector2(0, 0)))
 	if RoadSurface.junction_frac(paint, Vector2(120, 0)) > 0.01:
@@ -244,14 +247,14 @@ func _run() -> void:
 		failures.append("asphalt ribbons should carry width, lane count and one-way flag per vertex")
 	roads.free()
 	# Centre line: yellow in the Americas (and Norway), white elsewhere.
-	var mat := RoadSurface.material(Color(0.05, 0.05, 0.05))
+	var mat := RoadPaint.material()
 	for c in [["US", 0.0, true], ["NO", 0.0, true], ["FR", -74.0, false], ["", -74.0, true], ["", 2.35, false]]:
 		var cd := _flat(RenderSettings.Preset.HIGH)
 		cd.country = c[0]
 		cd.longitude = c[1]
 		RoadSurface.set_place(cd)
-		var cc: Color = mat.get_shader_parameter("centre_col")
-		if (cc.b < cc.r * 0.3) != bool(c[2]):
+		var cc: Vector3 = mat.get_shader_parameter("centre_col")
+		if (cc.z < cc.x * 0.3) != bool(c[2]):
 			failures.append("centre line for country '%s' at lon %.1f: %s" % [c[0], c[1], cc])
 	RoadSurface.set_place(_flat(RenderSettings.Preset.HIGH))
 	# A bay clipped to the extent (long collinear edges, regular interior
@@ -313,7 +316,7 @@ func _run() -> void:
 					var o2: Vector3 = e[0]
 					kept += 1
 					if (o2.x > 29.0 and o2.x < 71.0 and o2.z > -61.0 and o2.z < -19.0) \
-							or (o2.x < -19.0 and absf(o2.z - 40.0) < 1.0) \
+							or (o2.x > -71.0 and o2.x < -19.0 and absf(o2.z - 40.0) < 1.0) \
 							or (o2.x > -65.0 and o2.x < -25.0 and o2.z > -65.0 and o2.z < -25.0):
 						on_paving += 1
 			if on_paving > 0 or kept < 150:

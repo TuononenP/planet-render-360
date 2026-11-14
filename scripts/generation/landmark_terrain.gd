@@ -63,6 +63,9 @@ static func floor_y(data: LocationData, ground: GroundTruth, p: Vector2) -> floa
 ## Join an authored crag/mound's bottom edge to the real terrain. A
 ## corrected datum can expose a short gap where the DEM is lower.
 static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
+	if not outline(type).is_empty():
+		_plinth(root, ground, type)
+		return
 	if type not in RELIEFS:
 		return
 	var model := root.get_node("Model") as Node3D
@@ -98,6 +101,114 @@ static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
 	for part in lm.commit(model):
 		if overrides.get(str(part.name)) != null:
 			part.set_surface_override_material(0, overrides[str(part.name)])
+
+## Model-local outline (metres, before yaw) of a landmark extruded from
+## its OSM footprint (the capital-region malls and the Redi podium),
+## empty for every other model.
+static func outline(type: String) -> PackedVector2Array:
+	return LandmarkFhMallFootprints.outline(type)
+
+## Seat of an outline-built model: the median ground along its outline,
+## so a long mall on a slope is buried uphill about as much as it stands
+## proud downhill, where _plinth closes the gap. Render units.
+static func outline_base_y(data: LocationData, ground: GroundTruth, at: Vector2,
+		entry: Dictionary) -> float:
+	var axis := LandmarkSites.axis(entry)
+	var side := Vector2(-axis.y, axis.x)
+	var ys: Array[float] = []
+	for p in _outline_samples(outline(str(entry.get("type", "")))):
+		var w := at + (axis * p.x + side * p.y) * WorldScale.metres_to_units()
+		ys.append(TerrainBuilder.site_ground_y(data, ground, w.x, w.y))
+	if ys.is_empty():
+		return TerrainBuilder.site_ground_y(data, ground, at.x, at.y)
+	ys.sort()
+	return ys[ys.size() / 2]
+
+## Outline vertices plus points at most PLINTH_STEP_M apart along each edge.
+const PLINTH_STEP_M := 8.0
+static func _outline_samples(poly: PackedVector2Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in poly.size():
+		var a := poly[i]
+		var b := poly[(i + 1) % poly.size()]
+		var n := maxi(ceili(a.distance_to(b) / PLINTH_STEP_M), 1)
+		for k in n:
+			out.append(a.lerp(b, float(k) / float(n)))
+	return out
+
+## The plinth (PlinthStyle) stands this far proud of a landmark's wall
+## face, so the base reads as its own course under the walls, and its
+## coping is twice a house's: a mall-sized wall needs a heavier cap.
+const PLINTH_PROUD_M := 0.12
+const COPING_DEPTH_M := PlinthStyle.COPING_DEPTH_M * 2.0
+
+## Carry an outline-built model down to the terrain wherever the ground
+## along its outline lies below the model base (a mall's downhill end on
+## a slope): a granite plinth with a dressed coping where it is deep
+## enough to show one, upgraded alongside the walls on Ultra.
+static func _plinth(root: Node3D, ground: GroundTruth, type: String) -> void:
+	var model := root.get_node("Model") as Node3D
+	var wall: MeshInstance3D = null
+	for part in LandmarkBuilder.parts(root):
+		if str(part.name) == "Wall":
+			wall = part
+	if wall == null:
+		return
+	var to_world := root.transform * model.transform
+	var to_model := to_world.affine_inverse()
+	var lm := LandmarkMesh.new()
+	lm.use("Plinth", LandmarkMaterials.pbr(PlinthStyle.BODY_SET, PlinthStyle.BODY_HEX, 3.0))
+	lm.use("Coping", LandmarkMaterials.pbr(PlinthStyle.COPING_SET, PlinthStyle.COPING_HEX, 2.0))
+	var pts := _outline_samples(outline(type))
+	var turn := 1.0 if LandmarkFhMallFootprints.area_of(pts) > 0.0 else -1.0
+	var count := pts.size()
+	# Mitred vertex directions, so the proud faces meet at corners.
+	var miters := PlinthStyle.miters(pts, turn)
+	for i in count:
+		var k := (i + 1) % count
+		var wa := to_world * Vector3(pts[i].x, 0.0, pts[i].y)
+		var wb := to_world * Vector3(pts[k].x, 0.0, pts[k].y)
+		var ya := _plinth_floor(ground, wa)
+		var yb := _plinth_floor(ground, wb)
+		if wa.y - ya < 0.05 and wb.y - yb < 0.05:
+			continue
+		var e := pts[k] - pts[i]
+		var n := Vector3(e.y, 0.0, -e.x).normalized() * turn
+		var pa := pts[i] + miters[i] * PLINTH_PROUD_M
+		var pb := pts[k] + miters[k] * PLINTH_PROUD_M
+		var low_a := to_model * Vector3(wa.x, ya, wa.z)
+		var low_b := to_model * Vector3(wb.x, yb, wb.z)
+		lm.quad("Plinth", Vector3(pa.x, low_a.y, pa.y), Vector3(pb.x, low_b.y, pb.y),
+			Vector3(pb.x, 0.0, pb.y), Vector3(pa.x, 0.0, pa.y), n)
+		if wa.y - ya < COPING_DEPTH_M + 0.25 or wb.y - yb < COPING_DEPTH_M + 0.25:
+			# Too shallow for coping: close the proud top back to the wall.
+			lm.quad("Plinth", Vector3(pts[i].x, 0.0, pts[i].y), Vector3(pts[k].x, 0.0, pts[k].y),
+				Vector3(pb.x, 0.0, pb.y), Vector3(pa.x, 0.0, pa.y), Vector3.UP)
+			continue
+		# Coping: proud face, drip underside and the ledge back to the wall.
+		var ca := pts[i] + miters[i] * (PLINTH_PROUD_M + PlinthStyle.COPING_PROUD_M)
+		var cb := pts[k] + miters[k] * (PLINTH_PROUD_M + PlinthStyle.COPING_PROUD_M)
+		var top := -0.02
+		var bot := -COPING_DEPTH_M
+		lm.quad("Coping", Vector3(ca.x, bot, ca.y), Vector3(cb.x, bot, cb.y),
+			Vector3(cb.x, top, cb.y), Vector3(ca.x, top, ca.y), n)
+		lm.quad("Coping", Vector3(pa.x, top, pa.y), Vector3(pb.x, top, pb.y),
+			Vector3(cb.x, top, cb.y), Vector3(ca.x, top, ca.y), Vector3.UP)
+		lm.quad("Coping", Vector3(ca.x, bot, ca.y), Vector3(cb.x, bot, cb.y),
+			Vector3(pb.x, bot, pb.y), Vector3(pa.x, bot, pa.y), Vector3.DOWN)
+	var upgraded := wall.get_surface_override_material(0) is ShaderMaterial
+	for part in lm.commit(model):
+		if upgraded:
+			part.set_surface_override_material(0,
+				LandmarkShader.swap(part.mesh.surface_get_material(0) as StandardMaterial3D))
+
+## Plinth bottom under world point `w`: just below the detailed ground
+## when that lies under the base, else the base (no plinth beyond the
+## detailed extent, where haze hides the far terrain's coarse seat).
+static func _plinth_floor(ground: GroundTruth, w: Vector3) -> float:
+	if not ground.is_inside(w.x, w.z):
+		return w.y
+	return minf(w.y, ground.height_at_world(w.x, w.z) - 0.3)
 
 ## Drop DEM triangles touching the island envelope. A small margin
 ## keeps coarse edges outside the rock; the sea closes the gap. Test

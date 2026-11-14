@@ -21,7 +21,12 @@ uniform sampler2D photo : source_color, filter_linear_mipmap_anisotropic, repeat
 uniform sampler2D class_map : filter_nearest, repeat_disable;
 uniform sampler2D palette : filter_nearest, repeat_disable;
 uniform float class_n = 1024.0;
-uniform int max_id = 16;
+// The fine class map around the viewpoint (GroundMaterial.near_class_map):
+// near_rect = centre x, centre z, half side, hand-over band; near_n 0 = none.
+uniform sampler2D near_class : filter_nearest, repeat_disable;
+uniform float near_n = 0.0;
+uniform vec4 near_rect = vec4(0.0);
+uniform int max_id = 17;
 uniform float extent_u = 220.0;
 uniform float u2m = 1.0;
 uniform float near_m = 140.0;
@@ -33,7 +38,14 @@ uniform float photo_gain = 1.0;
 // structure only (the low-frequency class signal stays the main photo's).
 uniform sampler2D photo_inner : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec4 inner_map = vec4(0.0);
+// A city orthophoto's colour matched to the main mosaic (linear).
+uniform vec3 inner_gain = vec3(1.0);
+uniform vec3 inner_bias = vec3(0.0);
 uniform float lf_lod = 0.0;
+// DemRelief: residual slopes of a 1 m elevation model (RG8, ±1) over
+// relief_rect (centre xz, half xz, units); relief_rect.z 0 = none.
+uniform sampler2D dem_relief : filter_linear, repeat_disable;
+uniform vec4 relief_rect = vec4(0.0);
 uniform float ground_max_low = 0.38;
 uniform float lum_floor = 0.055;
 uniform float urban_unknown = 1.0;
@@ -46,9 +58,15 @@ uniform vec3 unknown_veg : source_color = vec3(0.35, 0.48, 0.24);
 uniform float veg_lo = 0.03;
 uniform float veg_hi = 0.12;
 uniform int ground_quality = 2;
+// 1 = a finer sample of the main layer close to the eye (micro_detail).
+uniform float micro_detail = 0.0;
+// Mowing direction of this place's lawns (radians from +x): stripes run
+// along it and alternate light and dark with the view.
+uniform float stripe_angle = 0.6;
 
 // @SNOW
 // @TERRAIN
+// @GLOW
 varying vec3 wpos;
 varying vec3 wnrm;
 varying float water_level;
@@ -96,6 +114,38 @@ float paving(vec2 g) {
 	return 1.0 + big + vis * (jit + joint);
 }
 
+// One class-map tap's share of the ground's material weights.
+void class_tap(int id, float bw, float veg, inout vec4 W0, inout vec4 W1, inout vec3 col,
+		inout float trust, inout float farc, inout float rough, inout float hfk, inout float pave) {
+	// Ids past the palette (an unbound/white class map reads 255)
+	// fall back to unmapped ground; texelFetch past the 32-texel
+	// palette is undefined (Metal returned the red fill).
+	if (id == 0 || id > max_id) {
+		float wild = (1.0 - veg) * (1.0 - urban_unknown);
+		W0 += bw * vec4((1.0 - veg) * urban_unknown, veg * 0.7, wild * 0.5, 0.0);
+		W1 += bw * vec4(0.0, veg * 0.3, wild * 0.5, 0.0);
+		col += bw * mix(unknown_bare, unknown_veg, veg);
+		trust += bw * unknown_trust;
+		farc += bw;
+		rough += bw * 0.96;
+		hfk += bw * 0.35;
+		pave += bw * (1.0 - veg) * urban_unknown * 0.7;
+	} else {
+		vec4 p0 = texelFetch(palette, ivec2(id, 0), 0);
+		vec4 p1 = texelFetch(palette, ivec2(id, 1), 0);
+		vec4 p2 = texelFetch(palette, ivec2(id, 2), 0);
+		vec4 p3 = texelFetch(palette, ivec2(id, 3), 0);
+		W0 += bw * p0;
+		W1 += bw * p3;
+		col += bw * srgb_lin(p1.rgb);
+		trust += bw * p1.a;
+		farc += bw * p2.r;
+		rough += bw * p2.g;
+		hfk += bw * p2.b;
+		pave += bw * p2.a;
+	}
+}
+
 void fragment() {
 	float dist_m = length(VERTEX) * u2m;
 	vec3 lf = t_dehaze(textureLod(photo, UV, lf_lod).rgb * photo_gain);
@@ -104,7 +154,8 @@ void fragment() {
 		vec2 iuv = UV * inner_map.xy + inner_map.zw;
 		vec2 ie = min(iuv, 1.0 - iuv);
 		float inside = smoothstep(0.0, 0.1, min(ie.x, ie.y));
-		hf = mix(hf, t_dehaze(texture(photo_inner, iuv).rgb * photo_gain), inside);
+		vec3 inner = max(texture(photo_inner, iuv).rgb * inner_gain + inner_bias, vec3(0.0));
+		hf = mix(hf, t_dehaze(inner * photo_gain), inside);
 	}
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
 	float veg = smoothstep(veg_lo, veg_hi, exg);
@@ -130,44 +181,88 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
-	for (int k = 0; k < 4; k++) {
-		ivec2 o = ivec2(k & 1, k >> 1);
-		float bw = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
-		int id = int(texelFetch(class_map, clamp(c0 + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
-		if (bank_paving > 0.5) {
-			id = 3;
+	// Share of unmown meadow (class 17) and of water (15) among the taps.
+	float wildw = 0.0;
+	float waterw = 0.0;
+	// Around the viewpoint the fine map decides. Its borders wander a
+	// little, as grass overgrowing a path edge does, and unmapped texels
+	// leave their share to the extent map below.
+	float coarse = 1.0;
+	if (near_n > 0.5) {
+		vec2 ed = abs(wpos.xz - near_rect.xy);
+		float nw = 1.0 - smoothstep(near_rect.z - near_rect.w, near_rect.z, max(ed.x, ed.y));
+		coarse = 1.0 - nw;
+		if (nw > 0.0) {
+			vec2 warp = (vec2(t_noise(g * 0.9 + 3.1), t_noise(g * 0.9 + 11.7)) - 0.5) * 0.7
+				+ (vec2(t_noise(g * 3.7 + 5.3), t_noise(g * 3.7 + 19.1)) - 0.5) * 0.18;
+			vec2 nuv = ((wpos.xz + warp / u2m - near_rect.xy) / (2.0 * near_rect.z) + 0.5) * near_n - 0.5;
+			vec2 nf = fract(nuv);
+			ivec2 n0 = ivec2(floor(nuv));
+			ivec2 nmax = ivec2(int(near_n) - 1);
+			for (int k = 0; k < 4; k++) {
+				ivec2 o = ivec2(k & 1, k >> 1);
+				float bw = nw * (o.x == 1 ? nf.x : 1.0 - nf.x) * (o.y == 1 ? nf.y : 1.0 - nf.y);
+				int id = int(texelFetch(near_class, clamp(n0 + o, ivec2(0), nmax), 0).r * 255.0 + 0.5);
+				if (bank_paving > 0.5) {
+					id = 3;
+				}
+				if (id == 0) {
+					coarse += bw;
+				} else {
+					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
+					wildw += id == 17 ? bw : 0.0;
+					waterw += id == 15 ? bw : 0.0;
+				}
+			}
+			// Grass beside anything hard is trodden to bare earth, in
+			// patches: a kerb, a path or a wall looks for it within about a metre.
+			float lawn = W0.y;
+			if (lawn > 0.3 && dist_m < 350.0) {
+				float texel_m = 2.0 * near_rect.z * u2m / near_n;
+				ivec2 cc0 = ivec2(floor(nuv + 0.5));
+				float hard = 0.0;
+				for (int k = 0; k < 8; k++) {
+					float ang = float(k) * 0.7853982;
+					float rad = (k % 2 == 0 ? 0.55 : 1.15) / texel_m;
+					ivec2 o = ivec2(round(vec2(cos(ang), sin(ang)) * rad));
+					int nid = int(texelFetch(near_class, clamp(cc0 + o, ivec2(0), nmax), 0).r * 255.0 + 0.5);
+					hard += (nid == 1 || nid == 2 || nid == 3 || nid == 16) ? 1.0 : 0.0;
+				}
+				float worn = clamp(hard / 3.0, 0.0, 1.0)
+					* smoothstep(0.3, 0.7, t_noise(g * 1.1) * 0.7 + t_noise(g * 4.3 + 9.0) * 0.3)
+					* (1.0 - smoothstep(150.0, 350.0, dist_m)) * nw * 0.85;
+				W0.w += W0.y * worn;
+				W0.y *= 1.0 - worn;
+				col = mix(col, vec3(0.22, 0.17, 0.12), worn * clamp(lawn, 0.0, 1.0));
+				trust *= 1.0 - 0.6 * worn;
+			}
 		}
-		// Ids past the palette (an unbound/white class map reads 255)
-		// fall back to unmapped ground; texelFetch past the 32-texel
-		// palette is undefined (Metal returned the red fill).
-		if (id == 0 || id > max_id) {
-			float wild = (1.0 - veg) * (1.0 - urban_unknown);
-			W0 += bw * vec4((1.0 - veg) * urban_unknown, veg * 0.7, wild * 0.5, 0.0);
-			W1 += bw * vec4(0.0, veg * 0.3, wild * 0.5, 0.0);
-			col += bw * mix(unknown_bare, unknown_veg, veg);
-			trust += bw * unknown_trust;
-			farc += bw;
-			rough += bw * 0.96;
-			hfk += bw * 0.35;
-			pave += bw * (1.0 - veg) * urban_unknown * 0.7;
-		} else {
-			vec4 p0 = texelFetch(palette, ivec2(id, 0), 0);
-			vec4 p1 = texelFetch(palette, ivec2(id, 1), 0);
-			vec4 p2 = texelFetch(palette, ivec2(id, 2), 0);
-			vec4 p3 = texelFetch(palette, ivec2(id, 3), 0);
-			W0 += bw * p0;
-			W1 += bw * p3;
-			col += bw * srgb_lin(p1.rgb);
-			trust += bw * p1.a;
-			farc += bw * p2.r;
-			rough += bw * p2.g;
-			hfk += bw * p2.b;
-			pave += bw * p2.a;
+	}
+	if (coarse > 0.0005) {
+		for (int k = 0; k < 4; k++) {
+			ivec2 o = ivec2(k & 1, k >> 1);
+			float bw = coarse * (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
+			int id = int(texelFetch(class_map, clamp(c0 + o, ivec2(0), cmax), 0).r * 255.0 + 0.5);
+			if (bank_paving > 0.5) {
+				id = 3;
+			}
+			class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
+			wildw += id == 17 ? bw : 0.0;
+			waterw += id == 15 ? bw : 0.0;
 		}
 	}
 	// Crag relief: noise gradients bend the lighting normal on steep and
 	// rocky ground, so DEM slabs read as ribbed rock faces.
 	vec3 nw = normalize(wnrm);
+	if (relief_rect.z > 0.0 && dist_m < 600.0) {
+		vec2 ruv = (wpos.xz - relief_rect.xy) / (2.0 * relief_rect.zw) + 0.5;
+		vec2 re = min(ruv, 1.0 - ruv);
+		float rf = smoothstep(0.0, 0.06, min(re.x, re.y)) * (1.0 - smoothstep(250.0, 600.0, dist_m));
+		if (rf > 0.0) {
+			vec2 sl = texture(dem_relief, ruv).rg * 2.0 - 1.0;
+			nw = normalize(nw - vec3(sl.x, 0.0, sl.y) * rf);
+		}
+	}
 	float steep0 = smoothstep(0.86, 0.6, nw.y);
 	// Forested and grassy slopes keep their own shading: only bare ground
 	// takes the rock relief (it frosted wooded mountainsides).
@@ -211,9 +306,50 @@ void fragment() {
 		float m_fine = t_noise(g / 5.1 + 11.0) * 0.6 + t_noise(g / 1.7 + 3.0) * 0.4;
 		vec3 lush = vec3(0.50, 0.64, 0.36);
 		vec3 dried = vec3(0.78, 0.68, 0.34);
-		vec3 tone = mix(lush, dried, smoothstep(0.32, 0.72, m_big));
-		tone *= 0.88 + 0.24 * mix(0.5, m_fine, 1.0 - smoothstep(120.0, 600.0, dist_m));
+		float wild = clamp(wildw, 0.0, 1.0);
+		// Unmown meadow dries in bigger, bolder patches than a watered lawn.
+		vec3 tone = mix(lush, dried, smoothstep(mix(0.32, 0.22, wild), mix(0.72, 0.62, wild), m_big));
+		float near_fine = 1.0 - smoothstep(120.0, 600.0, dist_m);
+		tone *= 0.88 + mix(0.24, 0.34, wild) * mix(0.5, m_fine, near_fine);
+		// Close by, grass is blades, not felt: streaky light and dark grain
+		// (and in a meadow the odd pale seed head) at the scale of a tuft.
+		if (ground_quality >= 1 && dist_m < 45.0) {
+			float near_b = 1.0 - smoothstep(18.0, 45.0, dist_m);
+			float grain = t_noise(g * vec2(6.3, 2.1) + 31.0) * 0.6 + t_noise(g * 13.0 + 7.0) * 0.4;
+			tone *= 1.0 + (grain - 0.5) * 0.22 * near_b;
+			float seed = smoothstep(0.80, 0.9, t_noise(g * 2.7 + 41.0)) * wild * near_b;
+			tone = mix(tone, dried * 1.15, seed * 0.35);
+		}
 		base *= mix(vec3(1.0), tone, meadow * 0.85);
+		// Mown lawns carry the mower's stripes: blades leaning away from
+		// the eye show their lit sides, those leaning toward it their
+		// shadowed bases, so the bands swap as the view turns.
+		float mown = meadow * (1.0 - wild) * (1.0 - smoothstep(90.0, 170.0, dist_m));
+		if (ground_quality >= 1 && mown > 0.01) {
+			vec2 sd = vec2(cos(stripe_angle), sin(stripe_angle));
+			float sc_m = dot(g, vec2(-sd.y, sd.x)) / 1.3;
+			float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(sc_m));
+			float band = smoothstep(-0.12, 0.12, sin(sc_m * 3.14159265)) * 2.0 - 1.0;
+			vec2 to_eye = normalize(CAMERA_POSITION_WORLD.xz - wpos.xz + vec2(1e-4));
+			base *= 1.0 + 0.075 * band * dot(sd, to_eye) * mown * aa;
+		}
+		// Seen low, mown turf shows blade sides: paler and a touch silvery.
+		// Standing meadow hides its soil behind shaded blades instead: it
+		// deepens toward the horizon, as the blade carpet under the eye
+		// does, so the carpet's rim does not read as a lawn's edge.
+		float ndv = clamp(dot(normalize(CAMERA_POSITION_WORLD - wpos), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+		float graze = pow(1.0 - ndv, 3.0) * meadow * (1.0 - steep);
+		base = mix(base, vec3(lum(base)) * 1.12, 0.16 * graze * (1.0 - wild));
+		float stand = pow(1.0 - ndv, 1.5) * meadow * wild * (1.0 - steep);
+		base = mix(base, base * vec3(0.6, 0.7, 0.48), 0.85 * stand);
+		// Sunlit turf is a deep, slightly grey green, never poster green.
+		float turf = lum(base);
+		base = mix(base, vec3(turf), 0.18 * meadow) * mix(1.0, 0.93, meadow);
+		// A lawn is never a plane: slow swells catch the light.
+		if (ground_quality >= 1 && dist_m < 260.0) {
+			vec2 swell = t_relief(g, 7.0, 2);
+			nw = normalize(nw - vec3(swell.x, 0.0, swell.y) * 0.35 * meadow * (1.0 - smoothstep(120.0, 260.0, dist_m)));
+		}
 	}
 	// Photographic layers by weight, each normalised by its mean so the
 	// class colour sets the value and the texture only adds structure.
@@ -222,13 +358,20 @@ void fragment() {
 	vec3 det = vec3(0.0);
 	vec4 nm = vec4(0.0);
 	float wt = 0.0;
+	int main_layer = -1;
+	float main_w = 0.0;
 	for (int i = 0; i < 8; i++) {
 		if (w[i] < 0.02) {
 			continue;
 		}
+		if (w[i] > main_w) {
+			main_w = w[i];
+			main_layer = i;
+		}
 		vec4 a;
 		vec4 n;
-		if (i == 4 && ground_quality >= 2 && steep > 0.05) {
+		// Rock and cliff layers wrap steep faces (biplanar), so they do not streak.
+		if ((i == 4 || i == 2) && ground_quality >= 2 && steep > 0.05) {
 			det_side(4, pm, dpx, dpy, nw, a, n);
 		} else {
 			det_sample(i, g, dg, vary, a, n);
@@ -239,6 +382,16 @@ void fragment() {
 	}
 	det = clamp(det / max(wt, 1e-3), vec3(0.3), vec3(2.0));
 	nm /= max(wt, 1e-3);
+	// Close to the eye one repeat of a layer is too coarse: the main layer
+	// again at about a quarter the size gives the surface its fine grain.
+	if (micro_detail > 0.5 && dist_m < 90.0 && main_layer >= 0) {
+		float mf = (1.0 - smoothstep(30.0, 90.0, dist_m)) * main_w;
+		vec4 ma;
+		vec4 mn;
+		det_sample(main_layer, g * 3.7, dg * 3.7, false, ma, mn);
+		det *= mix(vec3(1.0), clamp(ma.rgb / det_mean[main_layer], vec3(0.6), vec3(1.5)), 0.3 * mf);
+		nm.rg += (mn.rg - vec2(0.5)) * 0.6 * mf;
+	}
 	// Strata on cliffs: bands of stone by height, wobbling along the face.
 	float strata = t_noise(vec2(pm.y / 2.3 + t_noise(g / 60.0) * 3.0, 0.5));
 	det *= 1.0 + (strata - 0.5) * 0.3 * steep;
@@ -286,24 +439,47 @@ void fragment() {
 	// slides off cliffs (relief normal) and takes its own texture.
 	float pixel_m = max(length(dg.xy), length(dg.zw));
 	float sc = snow_cover(wpos, nw.y);
+	// The lip where a patch ends (derivatives: before any branch).
+	vec3 lip = snow_edge(sc, wpos, 0.06) * (1.0 - smoothstep(40.0, 160.0, dist_m));
 	vec4 sa = vec4(0.0);
 	vec4 sn = vec4(0.5, 0.5, 1.0, 0.7);
 	float glint = 0.0;
 	if (sc > 0.01) {
 		det_sample(8, g, dg, vary, sa, sn);
-		// Wind relief, hollows a touch bluer (they see sky, not sun),
-		// and ice crystals that catch a direct sun.
+		// Wind relief and ice crystals that catch a direct sun.
 		float near_snow = 1.0 - smoothstep(150.0, 700.0, dist_m);
-		vec3 hollow = vec3(1.0);
 		if (near_snow > 0.0 && ground_quality >= 1) {
 			vec2 dr = snow_drift(g);
 			nw = normalize(nw - vec3(dr.x, 0.0, dr.y) * 0.22 * sc * near_snow);
-			float shade = smoothstep(0.3, 0.7, snow_noise(g / 5.5));
-			hollow = mix(mix(vec3(0.86, 0.92, 1.0), vec3(1.0), shade), vec3(1.0), 1.0 - near_snow);
+			nw = normalize(nw - vec3(lip.x, 0.0, lip.y));
 		}
 		// The layer gives snow its grain; it must not tint or scar it.
-		alb = mix(alb, snow_col * hollow * clamp(lum(sa.rgb / det_mean[8]), 0.9, 1.08), sc);
-		sn.rgb = mix(vec3(0.5, 0.5, 1.0), sn.rgb, 0.45);
+		// Pavements and squares are trodden and gritted.
+		vec3 lying = snow_albedo(g, pixel_m, 0.22 * pave) * clamp(lum(sa.rgb / det_mean[8]), 0.94, 1.05);
+		// Snow on frozen water (sea ice the ground draws): wind scours
+		// it to grey-blue ice in patches, and ski and foot trails cross it.
+		// Mapped water, or flat ground lying at its water level (a harbour
+		// the DEM carries as ground at sea level).
+		float at_water = (1.0 - smoothstep(0.15, 0.6, (wpos.y - water_level) * u2m)) * (1.0 - steep);
+		float ice = max(clamp(waterw, 0.0, 1.0), at_water) * climate_water_ice;
+		if (ice > 0.01) {
+			float scour = smoothstep(0.66, 0.74, mix(snow_noise(g / 11.0 + 7.1) * 0.7 + snow_noise(g / 3.0) * 0.3, 0.5, smoothstep(2.0, 12.0, pixel_m)));
+			float trail = 0.0;
+			for (int k = 0; k < 2; k++) {
+				vec2 dir = k == 0 ? normalize(vec2(0.83, 0.56)) : normalize(vec2(-0.35, 0.94));
+				float across = dot(g, vec2(-dir.y, dir.x)) + (snow_noise(vec2(dot(g, dir) / 60.0, float(k) * 5.0)) - 0.5) * 30.0;
+				float lane = abs(fract(across / 140.0 + float(k) * 0.37) - 0.5) * 140.0;
+				trail = max(trail, 1.0 - smoothstep(0.5 + pixel_m * 0.5, 1.0 + pixel_m, lane));
+			}
+			trail *= 1.0 - smoothstep(4.0, 20.0, pixel_m);
+			// A trodden trail a metre wide: packed, grey and gritted.
+			lying = mix(lying, snow_grit(snow_albedo(g, pixel_m, 0.55), g, pixel_m, 0.5), trail * ice);
+			lying = mix(lying, vec3(0.50, 0.58, 0.64) * (0.92 + 0.12 * snow_noise(g / 1.7)), scour * ice * (1.0 - trail));
+		}
+		alb = mix(alb, snow_grit(lying, g, pixel_m, 0.45 * pave), sc);
+		// Its footprint-like normal map tiles visibly a few metres out:
+		// near by only, and gentle.
+		sn.rgb = mix(vec3(0.5, 0.5, 1.0), sn.rgb, 0.3 * (1.0 - smoothstep(8.0, 30.0, dist_m)));
 		if (ground_quality >= 2) {
 			vec4 facet = snow_facet(g, pixel_m);
 			glint = facet.w * sc;
@@ -331,12 +507,21 @@ void fragment() {
 	vec3 nmap = mix(nm.rgb, sn.rgb, sc);
 	NORMAL_MAP = mix(nmap, vec3(0.5 + ripple.x, 0.5 + ripple.y, 1.0), max(max(wf, edge), max(puddle, glint)));
 	NORMAL_MAP_DEPTH = 0.9;
-	AO = contact;
+	// Bare ground at a patch's foot sits in the snow's own shade.
+	AO = contact * (1.0 - 0.3 * lip.z * (1.0 - sc));
 	AO_LIGHT_AFFECT = 0.2;
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
-	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.1, glint);
-	SPECULAR = mix(mix(0.28, 0.5, wet), 1.0, glint);
+	r = mix(r, SNOW_ROUGH, sc * (1.0 - wf));
+	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.03, glint);
+	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
+	RIM = SNOW_RIM * sc;
+	RIM_TINT = SNOW_RIM_TINT;
+	// Night: past the drawn streets the city's lit streets read as a glow
+	// on the ground (StreetGlow's light map), as on the far surface;
+	// nearer (StreetGlow.GROUND_NEAR_M), yards and lawns stay dark.
+	EMISSION = far_lamp_tint() * lamp_settle(wpos.xz) * smoothstep(700.0, 1200.0, dist_m)
+		* (0.45 + 0.55 * t_noise(wpos.xz / 70.0)) * (0.7 + 0.3 * t_noise(wpos.xz / 23.0 + 4.1));
 }
 """

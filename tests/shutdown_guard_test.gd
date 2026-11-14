@@ -14,7 +14,9 @@ extends SceneTree
 ##  - HTTPRequest: parented (add_child), so exit tree cancels it
 ## Fork-join scripts (JOINED_IN_CALL) wait for every task they add before
 ## the adding call returns, so no task can outlive a caller to need the
-## PREDELETE join; they must still wait (wait_for_).
+## PREDELETE join; they must still wait (wait_for_). Static-only owners
+## (JOINED_ON_EXIT) have no instance to get PREDELETE: they wait for the
+## task when the tree exits (tree_exiting) instead.
 
 ## [creates, required tokens (all), what is missing]
 const RULES := [
@@ -26,7 +28,10 @@ const RULES := [
 	[["HTTPRequest.new()"], ["add_child("], "add_child() it so exit tree cancels it"],
 ]
 const JOINED_IN_CALL := ["res://scripts/generation/world_build_graph.gd",
-	"res://scripts/generation/road_builder.gd", "res://scripts/data/ground_tiff.gd"]
+	"res://scripts/generation/road_builder.gd", "res://scripts/data/ground_tiff.gd",
+	"res://scripts/generation/facade_textures.gd", "res://scripts/generation/build_prewarm.gd",
+	"res://scripts/generation/building_builder.gd", "res://scripts/generation/building_masses.gd"]
+const JOINED_ON_EXIT := ["res://scripts/data/osm_nearby_cache.gd"]
 
 func _init() -> void:
 	_run()
@@ -46,7 +51,10 @@ func _run() -> void:
 			for need: String in rule[1]:
 				if need == "NOTIFICATION_PREDELETE" and path in JOINED_IN_CALL:
 					continue
-				if not code.contains(need):
+				var token := need
+				if need == "NOTIFICATION_PREDELETE" and path in JOINED_ON_EXIT:
+					token = "tree_exiting.connect("
+				if not code.contains(token):
 					failures.append("%s creates %s but lacks %s: %s"
 						% [path, "/".join(creates), need, rule[2]])
 	if files.is_empty():

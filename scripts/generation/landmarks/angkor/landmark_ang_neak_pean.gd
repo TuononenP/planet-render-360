@@ -24,7 +24,7 @@ const WATER_Y := 0.12
 ## Built facing +X (east).
 static func neak_pean(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7D5B45", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#827A6B", 3.0))
 	lm.use("Water", LandmarkMaterials.pbr("concrete", "#35564F", 6.0, 0.1))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))

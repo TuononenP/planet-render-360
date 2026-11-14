@@ -208,16 +208,28 @@ static func helsinki(model: Node3D) -> void:
 	lm.use("Stairs", LandmarkMaterials.pbr("limestone", "#A79C8C", 3.0))
 	lm.use("Windows", LandmarkMaterials.glass("#262D31"))
 	lm.use("Gilt", LandmarkMaterials.gold())
-	var plat := 7.0
-	lm.box("Stairs", Vector3(0, plat * 0.5, 0), Vector3(78.0, plat, 78.0))
+	# y = 0 is Senate Square at the stair's foot (registry `base_at_m`);
+	# the terrace stands 9.8 m above it, level with the hilltop in the
+	# city's elevation model. Its walls and the cheeks go `found` m below
+	# y = 0 so the lower streets east and north never show a gap.
+	var plat := 9.8
+	var found := 4.0
+	lm.box("Stairs", Vector3(0, (plat - found) * 0.5, 0), Vector3(78.0, plat + found, 78.0))
 	lm.box("Stairs", Vector3(0, plat + 0.3, 0), Vector3(78.6, 0.6, 78.6))
-	# Monumental stair: 28 risers of 0.25 m, 64 m wide, between cheeks.
-	for k in 28:
-		var z := 39.0 + float(k) * 0.8
-		var h := plat * (1.0 - float(k) / 28.0)
-		lm.box("Stairs", Vector3(0, h * 0.5, z + 0.4), Vector3(64.0, h, 0.8), Basis(), 0.0)
+	# Monumental stair: a 2 m landing flush with the terrace paving, then
+	# 49 risers of about 0.21 m over 30 m (z 41..71), 64 m wide, between
+	# cheeks. Every step stands on the same `found` footing as the walls,
+	# so the square's slope never opens under it.
+	var deck := plat + 0.6
+	lm.box("Stairs", Vector3(0, (deck - found) * 0.5, 40.0), Vector3(64.0, deck + found, 2.0), Basis(), 0.0)
+	var risers := 49
+	var tread := 30.0 / float(risers)
+	for k in risers:
+		var z := 41.0 + float(k) * tread
+		var h := deck * (1.0 - float(k + 1) / float(risers + 1))
+		lm.box("Stairs", Vector3(0, (h - found) * 0.5, z + tread * 0.5), Vector3(64.0, h + found, tread), Basis(), 0.0)
 	for sx in [-1.0, 1.0]:
-		lm.box("Stairs", Vector3(sx * 33.0, plat * 0.5 + 0.3, 50.2), Vector3(2.0, plat + 0.6, 22.4))
+		lm.box("Stairs", Vector3(sx * 33.0, (plat + 0.6 - found) * 0.5, 55.0), Vector3(2.0, plat + 0.6 + found, 32.0))
 	var arm_l := 54.0
 	var arm_w := 22.0
 	var wall := 17.0
@@ -276,34 +288,36 @@ static func helsinki(model: Node3D) -> void:
 			lm.lathe("Gilt", dr + Vector3(0, 10.1, 0), _ball(0.25), 8)
 			lm.box("Gilt", dr + Vector3(0, 11.4, 0), Vector3(0.18, 2.2, 0.18))
 			lm.box("Gilt", dr + Vector3(0, 11.9, 0), Vector3(0.9, 0.16, 0.16))
-	# Central drum with its colonnade, dome, lantern and cross (62 m).
+	# Central drum with its colonnade, dome, lantern and cross, 62 m above
+	# the square: the drum gives back what the measured terrace added.
 	var c := Vector3(0, plat + wall + 2.0, 0)
+	var drum := 13.0 - (plat - 7.0)
 	lm.frustum("White", c - Vector3(0, 2.0, 0), 11.0, 11.0, 2.0, 32)
-	lm.frustum("White", c, 9.0, 9.0, 13.0, 32)
+	lm.frustum("White", c, 9.0, 9.0, drum, 32)
 	lm.frustum("White", c, 11.0, 11.0, 0.5, 32)
 	for k in 24:
 		var a := TAU * float(k) / 24.0
 		var d := Vector3(cos(a), 0, sin(a))
-		LandmarkDetail.column(lm, "White", c + d * 10.0 + Vector3(0, 0.5, 0), 0.48, 11.0, "corinthian", 0)
+		LandmarkDetail.column(lm, "White", c + d * 10.0 + Vector3(0, 0.5, 0), 0.48, drum - 2.0, "corinthian", 0)
 		if k % 2 == 0:
 			var aw := TAU * (float(k) + 0.5) / 24.0
 			var dw := Vector3(cos(aw), 0, sin(aw))
-			LandmarkDetail.window(lm, "White", "Windows", c + dw * 9.0 + Vector3(0, 6.0, 0), dw, 1.4, 4.4, true,
+			LandmarkDetail.window(lm, "White", "Windows", c + dw * 9.0 + Vector3(0, drum * 0.46, 0), dw, 1.4, drum * 0.34, true,
 				0.18)
-	lm.frustum("White", c + Vector3(0, 11.5, 0), 11.0, 10.8, 1.0, 32)
-	lm.lathe("White", c + Vector3(0, 12.5, 0), PackedVector2Array([Vector2(10.8, 0), Vector2(11.3, 0.4),
+	lm.frustum("White", c + Vector3(0, drum - 1.5, 0), 11.0, 10.8, 1.0, 32)
+	lm.lathe("White", c + Vector3(0, drum - 0.5, 0), PackedVector2Array([Vector2(10.8, 0), Vector2(11.3, 0.4),
 		Vector2(11.4, 0.8), Vector2(10.0, 0.8)]), 32)
-	lm.lathe("Green", c + Vector3(0, 13.3, 0), _dome(10.0, 12.0), 32)
+	lm.lathe("Green", c + Vector3(0, drum + 0.3, 0), _dome(10.0, 12.0), 32)
 	for k in 16:
 		var a := TAU * float(k) / 16.0
 		var d := Vector3(cos(a), 0, sin(a))
-		var prev := c + d * 10.05 + Vector3(0, 13.3, 0)
+		var prev := c + d * 10.05 + Vector3(0, drum + 0.3, 0)
 		for j in range(1, 7):
 			var t := PI * 0.5 * float(j) / 8.0
-			var q := c + d * (cos(t) * 10.05) + Vector3(0, 13.3 + sin(t) * 12.0 * (0.85 + 0.15 * sin(t)), 0)
+			var q := c + d * (cos(t) * 10.05) + Vector3(0, drum + 0.3 + sin(t) * 12.0 * (0.85 + 0.15 * sin(t)), 0)
 			lm.beam("Green", prev, q, 0.4, 0.3, d.cross(Vector3.UP))
 			prev = q
-	var lan := c + Vector3(0, 24.6, 0)
+	var lan := c + Vector3(0, drum + 11.6, 0)
 	lm.frustum("White", lan, 2.6, 2.6, 4.2, 16)
 	for k in 8:
 		var a := TAU * (float(k) + 0.5) / 8.0
@@ -324,10 +338,12 @@ static func helsinki(model: Node3D) -> void:
 static func _portico(lm: LandmarkMesh, r: Basis, plat: float, z: float, w: float, h: float) -> void:
 	var out := r * Vector3(0, 0, 1)
 	var rt := r * Vector3(1, 0, 0)
-	lm.box("White", r * Vector3(0, plat + 0.3, z + 3.0), Vector3(w + 0.8, 0.6, 6.4), r)
+	# Stylobate: a step above the terrace slab (top plat + 0.6), never
+	# coplanar with it, so the column bases do not z-fight the paving.
+	lm.box("White", r * Vector3(0, plat + 0.75, z + 3.0), Vector3(w + 0.8, 0.3, 6.4), r)
 	for k in 6:
 		var x := -w * 0.42 + w * 0.84 * float(k) / 5.0
-		LandmarkDetail.column(lm, "White", r * Vector3(x, plat + 0.6, z + 3.5), 0.85, h - 2.6, "corinthian", 0)
+		LandmarkDetail.column(lm, "White", r * Vector3(x, plat + 0.9, z + 3.5), 0.85, h - 2.9, "corinthian", 0)
 	lm.box("White", r * Vector3(0, plat + h - 1.4, z + 3.0), Vector3(w + 0.8, 1.0, 6.0), r)
 	lm.box("White", r * Vector3(0, plat + h - 0.5, z + 3.0), Vector3(w + 0.6, 0.8, 5.8), r)
 	var front := r * Vector3(0, plat + h, z + 5.9)

@@ -133,6 +133,16 @@ static func stamped(host: Node, photo: Image, lines: Array[String]) -> Image:
 		return photo
 	return out
 
+## `img` as PNG bytes, encoded on a worker thread, a frame at a time:
+## encoding a full-size photo is pure CPU work, and on the main thread
+## it froze the app (the macOS beachball) between the shutter flash and
+## the save dialog. `img` is only read by the worker; the caller must
+## not modify it meanwhile.
+static func encode_png_async(img: Image, tree: SceneTree) -> PackedByteArray:
+	var box: Array = [PackedByteArray()]
+	await FrameTask.run(func() -> void: box[0] = img.save_png_to_buffer(), "PhotoEncode", tree)
+	return box[0]
+
 ## Saves `img` as `file`: the system dialog where there is one, else the
 ## Pictures / photos folder. `done(path, failed)` gets the saved path; ""
 ## with failed false when the person cancelled, failed true when the write

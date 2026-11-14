@@ -21,22 +21,25 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check config.json is valid JSON
         run: python3 -m json.tool site/config.json > /dev/null
 
-      - uses: actions/configure-pages@v5
+      - name: Ensure GNU tar (upload-pages-artifact needs gtar on macOS)
+        run: command -v gtar >/dev/null || brew install gnu-tar
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

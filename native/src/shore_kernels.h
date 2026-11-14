@@ -2,9 +2,12 @@
 
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector4.hpp>
@@ -24,6 +27,8 @@ public:
 	static Array partition(const Rect2 &box, const Array &segments);
 };
 
+class ShoreDomainIndex;
+
 // Immutable corrected-surface sampler shared by all placement consumers.
 class ShoreSampler : public RefCounted {
 	GDCLASS(ShoreSampler, RefCounted)
@@ -38,6 +43,16 @@ class ShoreSampler : public RefCounted {
 	double step = 1.0;
 	double origin = 0.0;
 	Vector2 y_range;
+	// BuildingFoundation footing reads (setup_footing): the water bodies,
+	// their levels and the dry land grid, as GroundTruth reads them.
+	Ref<RefCounted> footing_domains;
+	const ShoreDomainIndex *domain_index = nullptr;
+	std::vector<double> levels;
+	std::vector<float> land;
+	Rect2 domain_bounds, height_bounds;
+	double height_clamped(const Vector2 &p) const;
+	double water_level(const Vector2 &p) const;
+	double land_height(const Vector2 &p) const;
 protected:
 	static void _bind_methods();
 public:
@@ -48,6 +63,13 @@ public:
 	Vector4 nearest_bank(const Vector2 &point, int treatment = 0) const;
 	const std::vector<Vector3> *dry_triangles(double x, double z) const;
 	Vector2 height_range() const;
+	void setup_footing(const Ref<RefCounted> &domains, const PackedFloat64Array &levels, const PackedFloat32Array &land,
+			const Rect2 &domain_bounds, const Rect2 &height_bounds);
+	PackedFloat64Array footing(const PackedVector2Array &ring, const Vector2 &centre, double sea_y, double edge_step, int max_n) const;
+	// BuildingFoundation._edge_ground at each point: the dry height, or
+	// the rendered bed where the point is under water. NAN outside the
+	// model's bounds (the caller reads those); empty before setup_footing.
+	PackedFloat64Array edge_grounds(const PackedVector2Array &points) const;
 };
 
 class ShoreDomainIndex : public RefCounted {

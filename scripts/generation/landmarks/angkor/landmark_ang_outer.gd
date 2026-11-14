@@ -19,7 +19,7 @@ const K = preload("res://scripts/generation/landmarks/angkor/landmark_ang_outer_
 static func beng_mealea(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#7D7966", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#6F5340", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#23201C", 2.0))
 	lm.use("Root", LandmarkMaterials.pbr("rock", "#4D4438", 3.0))
 	lm.use("Moss", LandmarkMaterials.pbr("forest", "#4E5C34", 4.0))
@@ -126,7 +126,7 @@ static func _gallery_ring(lm: LandmarkMesh, rng: RandomNumberGenerator, hx: floa
 static func phnom_krom(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#8A7D68", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4E38", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#2A2622", 2.0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 889
@@ -170,7 +170,7 @@ static func phnom_krom(model: Node3D) -> void:
 ## was found). The baray water is terrain. Built facing +X (east).
 static func west_mebon(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4E38", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#9A8C72", 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#2A2622", 2.0))
 	# Island revetment, 1 m high, and its stepped sandstone edge.

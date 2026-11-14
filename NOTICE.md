@@ -14,7 +14,6 @@ is in the app under Settings → About and Settings → Data sources.
 | OpenMapTiles-schema vector tiles from OpenFreeMap, and Terrarium elevation tiles from AWS Terrain Tiles, packed for offline use | `assets/map/` | Vector tiles: © OpenStreetMap contributors (ODbL), © OpenMapTiles, [OpenFreeMap](https://openfreemap.org/). Elevation: [Mapzen/Tilezen attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md) (EU-DEM / Copernicus, USGS 3DEP, SRTM and others). |
 | Capital city names and coordinates | `scripts/data/capital_catalog.gd` | [GeoNames](https://www.geonames.org/about.html), CC BY 4.0 |
 | Photographic PBR textures | `assets/textures/` | [Poly Haven](https://polyhaven.com/license), CC0 |
-| Generic passenger car pack, by Comrade1280, modified | `assets/vehicles/` | CC BY 4.0, [source](https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5). Full note in `assets/vehicles/LICENSE.txt`. |
 | Instrument Sans | `assets/fonts/` | SIL Open Font License 1.1. Copyright 2022 The Instrument Sans Project Authors. Text: `licenses/instrument-sans-OFL.txt` |
 | IBM Plex Mono | `assets/fonts/` | SIL Open Font License 1.1. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". Text: `licenses/ibm-plex-mono-OFL.txt` |
 | Lucide icons | `assets/icons/` | ISC License, with the Feather-derived icons under MIT. Text: `licenses/lucide-LICENSE.txt` |

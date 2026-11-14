@@ -192,6 +192,7 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			if RenderQuality.ultra_desktop(data.quality_preset):
 				LandmarkLights.dress(hero, str(c["type"]))
 				LandmarkShader.upgrade(hero)
+				FacadeShader.upgrade(hero)
 			var entry := LocationData.entry_for_type(str(c["type"]))
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, entry, half), cz)
@@ -247,13 +248,19 @@ static func satellite_span_tiles(data: LocationData) -> int:
 ## on the mesh identically before and after the T1.2 metre cutover
 ## (identity then). Mosaic width comes from satellite_span_tiles above.
 static func satellite_uv(data: LocationData, wx: float, wz: float) -> Vector2:
-	var ll := WorldScale.latlon_from_xz(wx, wz, data.latitude, data.longitude)
 	var zoom := data.satellite_zoom
 	if not data.satellite_source.is_empty():
 		zoom = int(data.satellite_source.get("source_zoom", zoom))
-	var px := TileFetcher.global_pixel(ll.x, ll.y, zoom)
+	# WorldScale.latlon_from_xz and TileFetcher.global_pixel in float64
+	# scalars: their Vector2s are float32, ~1 m coarse at z17+ (several
+	# pixels of a z19 city orthophoto, InnerImagery).
+	var lat := clampf(data.latitude - wz / 110540.0, -85.0, 85.0)
+	var lon := data.longitude + wx / (111320.0 * cos(deg_to_rad(data.latitude)))
+	var n := float(1 << zoom) * 256.0
+	var px := (lon + 180.0) / 360.0 * n - float(data.satellite_origin_px.x)
+	var py := (1.0 - asinh(tan(deg_to_rad(lat))) / PI) / 2.0 * n - float(data.satellite_origin_px.y)
 	var mosaic_px := float(satellite_span_tiles(data) * SatelliteFetcher.TILE_PX)
-	return (px - data.satellite_origin_px) / mosaic_px
+	return Vector2(px / mosaic_px, py / mosaic_px)
 
 ## `abort` stops it between rows / items; a stopped result is dropped.
 static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> MeshInstance3D:
@@ -263,7 +270,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	# Mesh density is the preset's LOD knob over the preset-independent
 	# GroundTruth (T7.1, AC-12): at full density the posts coincide
 	# exactly; coarser meshes sample the same surface bilinearly.
-	var size := mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset),
+	var size := mini(CityDetail.terrain_mesh_posts(data),
 		data.grid_size)
 	# Shoreline cells carry canonical constraints at every quality level.
 	# Flat cells away from those constraints are simplified by ShoreLod.
@@ -454,7 +461,8 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	else:
 		fallback.generate_mipmaps()
 		photo = ImageTexture.create_from_image(fallback)
-	var terrain := _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat))
+	var terrain := _add(null, mesh, GroundMaterial.build(data, photo, rect, has_sat,
+		ground.surface(data).image))
 	terrain.name = "Terrain"
 	if shore:
 		print("SHORE TERRAIN total_ms=", Time.get_ticks_msec() - shore_started)
@@ -557,6 +565,7 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	if RenderQuality.ultra_desktop(data.quality_preset):
 		LandmarkLights.dress(root, data.landmark_type)
 		LandmarkShader.upgrade(root)
+		FacadeShader.upgrade(root)
 	var entry := LocationData.entry_for_type(data.landmark_type)
 	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)
@@ -566,13 +575,24 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	return root
 
 ## Base Y: `absolute` uses base_asl_m, `sea` uses ASL zero, `water` uses
-## mapped water (local DEM when absent), else the lowest footprint ground,
+## mapped water (local DEM when absent), else the lowest footprint ground
+## (the median ground along the outline for a model extruded from its
+## OSM footprint, see LandmarkTerrain.outline_base_y),
 ## raised by `base_drop_m` for a model hung below its origin (a dam
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
+## `base_at_m` [x, z] instead reads the ground at that one model-local
+## point (a terrace's y = 0 at the foot of its stair, not on its hill).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
 	if entry.has("base_half_m"):
 		half = float(entry["base_half_m"]) * WorldScale.metres_to_units()
+	if entry.has("base_at_m"):
+		var at: Array = entry["base_at_m"]
+		var off := Vector3(float(at[0]), 0.0, float(at[1])).rotated(Vector3.UP,
+			-deg_to_rad(float(entry.get("yaw_deg", 0.0)))) * WorldScale.metres_to_units()
+		x += off.x
+		z += off.z
+		half = 0.0
 	if str(entry.get("base", "")) == "absolute":
 		return ground.render_y(float(entry["base_asl_m"]))
 	if str(entry.get("base", "")) == "sea":
@@ -582,6 +602,9 @@ static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 			return ground.water_level_at(x, z)
 		var fallback := site_ground_y(data, ground, x, z, half)
 		return ground.water_level_at(x, z, fallback) if ground.is_inside(x, z) else fallback
+	if not entry.has("base_at_m") and not LandmarkTerrain.outline(str(entry.get("type", ""))).is_empty():
+		return LandmarkTerrain.outline_base_y(data, ground, Vector2(x, z), entry) - 0.3 \
+			+ float(entry.get("base_drop_m", 0.0))
 	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:

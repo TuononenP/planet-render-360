@@ -11,8 +11,11 @@ extends SceneTree
 ##        [--pin=lat,lon] (one custom location; --places supplies its output id)
 ##        [--settle=seconds]  (wait after golden hour is set; default SETTLE_S)
 ##        [--weather=WMO code]  (forced weather; default 0 clear, 61 rain)
-##        [--looks="lat,lon,height_m,bearing,pitch;..."]  (candidate eyes, one
-##          <id>_look<N>.jpg each: the eye stands height_m over the ground)
+##        [--looks="lat,lon,height_m,bearing,pitch[,zoom];..."]  (candidate eyes, one
+##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8;
+##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
+##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
+##        [--size=WxH]  (frame size; default 1280x800)  [--png]  (lossless PNG, not JPEG)
 ##
 ## Runs the real app flow (Main → pipeline → View360, caches first) for
 ## every quick-pick preset plus generic controls, under fixed conditions
@@ -77,6 +80,15 @@ const CONTROLS := [
 	{"id": "turku", "name": "Turku, Finland", "lat": 60.4518, "lon": 22.2666},
 	{"id": "zermatt", "name": "Zermatt, Switzerland", "lat": 46.0207, "lon": 7.7491},
 	{"id": "cairo", "name": "Cairo, Egypt", "lat": 30.0444, "lon": 31.2357},
+	# Winter in the golden set: snow lying and falling at the Helsinki
+	# preset's eye, whatever --season and --weather the run is given.
+	{"id": "helsinki_winter", "name": "Helsinki, Finland", "lat": 60.1679, "lon": 24.9525,
+		"season": "winter", "weather": 73},
+	# The tropics in the golden set: Angkor Wat and its precinct in the wet
+	# season, and again at the end of the dry season (straw grass).
+	{"id": "angkor_wat", "name": "Angkor Wat, Cambodia", "lat": 13.41249, "lon": 103.86684},
+	{"id": "angkor_wat_dry", "name": "Angkor Wat, Cambodia", "lat": 13.41249, "lon": 103.86684,
+		"season": "winter"},
 ]
 
 var _out := ""
@@ -91,6 +103,8 @@ var _weather_code := 0
 var _season := -1
 ## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
 var _looks: Array = []
+## When the --looks are taken: "" golden hour, "late" two hours after sunset.
+var _look_time := ""
 var _date_override: Dictionary = {}
 var _reference_set := ""
 
@@ -176,9 +190,20 @@ func _run() -> void:
 	main.capture_mode = true
 	# Avoid reopening a saved camera: every capture starts from its preset.
 	main._store.entries.clear()
-	root.size = SIZE
+	var size := SIZE
+	var wh := str(a.get("size", "")).split("x")
+	if wh.size() == 2 and wh[0].is_valid_int() and wh[1].is_valid_int():
+		size = Vector2i(int(wh[0]), int(wh[1]))
+	root.size = size
 	await create_timer(0.5).timeout
-	root.size = SIZE  # the first resize can be lost to window creation
+	root.size = size  # the first resize can be lost to window creation
+	if size != SIZE:
+		# The UI stretch would cap the 3D view at its logical size: render
+		# at the real pixel size instead (the HUD is not in the shot).
+		if root.size_changed.is_connected(main._fit_content_scale):
+			root.size_changed.disconnect(main._fit_content_scale)
+		root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+		root.content_scale_factor = 1.0
 	for child in main.get_children():
 		if child is OnboardingScreen:
 			child.queue_free()
@@ -193,10 +218,13 @@ func _run() -> void:
 	view._weather.failed.connect(func(_r: String) -> void: _weather_in = true)
 	var times: PackedStringArray = str(a["times"]).split(",")
 	_weather_code = int(a.get("weather", 0))
+	_look_time = str(a.get("look_time", ""))
 	for spec in str(a.get("looks", "")).split(";", false):
 		var f := spec.split(",")
-		if f.size() == 5:
-			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4])])
+		if f.size() >= 5:
+			# An optional sixth field zooms the look (CameraRig, 0.7-2.8).
+			_looks.append([float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[4]),
+				float(f[5]) if f.size() >= 6 else 1.0])
 	var season_arg := str(a.get("season", ""))
 	_date_override = ViewLink.parse_date(str(a.get("date", "")))
 	var names := ["spring", "summer", "autumn", "winter"]
@@ -254,11 +282,16 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
 		await process_frame
 	# Clear captures keep a few clouds; forced weather comes overcast.
-	if _season >= 0 and view._data.season != _season:
+	# A place may pin its own season and weather (the winter control).
+	var season := _season
+	if place.has("season"):
+		season = ["spring", "summer", "autumn", "winter"].find(str(place["season"]))
+	var weather := int(place.get("weather", _weather_code))
+	if season >= 0 and view._data.season != season:
 		# Seasons bake into the world: this rebuilds it in that season.
-		await ViewConditions._select_season(view, _season)
-	view._atmos.set_weather(_weather_code, 15.0 if _weather_code == 0 else 100.0)
-	ViewConditions._apply_precip(view, _weather_code)
+		await ViewConditions._select_season(view, season)
+	view._atmos.set_weather(weather, 15.0 if weather == 0 else 100.0)
+	ViewConditions._apply_precip(view, weather)
 	ViewConditions.apply_surface_state(view)
 	if _date_override.is_empty():
 		ViewConditions.spawn_golden_hour(view)
@@ -344,18 +377,90 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_late")
 	if not _looks.is_empty():
-		ViewConditions.spawn_golden_hour(view)
+		# --look_time=late: the looks two hours after sunset (lamps, lit
+		# windows); otherwise at golden hour.
+		if _look_time == "late":
+			ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
+		else:
+			ViewConditions.spawn_golden_hour(view)
+		# A clock change can re-show the place's live weather: pin the run's.
+		var w := int(place.get("weather", _weather_code))
+		view._atmos.set_weather(w, 15.0 if w == 0 else 100.0)
+		ViewConditions._apply_precip(view, w)
+		ViewConditions.apply_surface_state(view)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 	for k in _looks.size():
 		var l: Array = _looks[k]
 		var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
+		# Never shoot from inside a building (AGENTS.md): a blocked eye
+		# moves to the nearest open ground.
+		var free_at := _open_eye(view._data, at, float(l[2]))
+		if free_at != at:
+			print("CAPTURE MOVED %s look%d: eye inside or against a building, moved %.1f m" % [id, k, free_at.distance_to(at) / WorldScale.metres_to_units()])
+			at = free_at
 		var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
 		rig.position = Vector3(at.x, y, at.y)
-		rig.reset_zoom()
+		rig.set_zoom(float(l[5]))
 		rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "look%d" % k)
 	_contact_sheet(id)
+
+## Clearance (m) a capture eye keeps from any building wall: wide enough
+## that a moved eye is not left pressed against the facade it escaped.
+const EYE_CLEAR_M := 3.0
+## How far (m) _open_eye searches for open ground before giving up.
+const EYE_SEARCH_M := 40.0
+## Assumed height (m) of a building with no height tag.
+const EYE_UNKNOWN_HEIGHT_M := 10.0
+
+## `at` (world xz) if it is open ground, else the nearest point on rings
+## around it that lies outside every building footprint by EYE_CLEAR_M.
+## Only buildings at least as tall as the eye (`eye_m` over the ground)
+## count, so an aerial eye over a roof stays put. Unchanged when nothing
+## open is found within EYE_SEARCH_M.
+func _open_eye(data: LocationData, at: Vector2, eye_m: float) -> Vector2:
+	var m := WorldScale.metres_to_units()
+	var reach := (EYE_SEARCH_M + EYE_CLEAR_M) * m
+	var near: Array = []
+	for b in data.buildings:
+		if not (b is Dictionary):
+			continue
+		var fp: PackedVector2Array = b.get("footprint", PackedVector2Array())
+		if fp.size() < 3:
+			continue
+		var h := float(b.get("height", 0.0))
+		if (h if h > 0.0 else EYE_UNKNOWN_HEIGHT_M) < eye_m:
+			continue
+		var box := Rect2(fp[0], Vector2.ZERO)
+		for v in fp:
+			box = box.expand(v)
+		if box.grow(reach).has_point(at):
+			near.append(fp)
+	if not _eye_blocked(near, at, EYE_CLEAR_M * m):
+		return at
+	var r := 1.0
+	while r <= EYE_SEARCH_M:
+		# About one candidate per metre of ring, so a narrow lane far out
+		# is not stepped over.
+		var steps := maxi(24, ceili(TAU * r))
+		for a in steps:
+			var q := at + Vector2(cos(TAU * a / steps), sin(TAU * a / steps)) * r * m
+			if not _eye_blocked(near, q, EYE_CLEAR_M * m):
+				return q
+		r += 1.0
+	printerr("CAPTURE no open ground within %d m of a look eye" % int(EYE_SEARCH_M))
+	return at
+
+static func _eye_blocked(footprints: Array, p: Vector2, clear: float) -> bool:
+	for fp: PackedVector2Array in footprints:
+		if Geometry2D.is_point_in_polygon(p, fp):
+			return true
+		for i in fp.size():
+			var q := Geometry2D.get_closest_point_to_segment(p, fp[i], fp[(i + 1) % fp.size()])
+			if p.distance_to(q) < clear:
+				return true
+	return false
 
 ## Waits `seconds` while drawing at least `frames` frames. Off-screen,
 ## macOS stops redrawing the window (two frames in 30 s), so a plain timer
@@ -379,6 +484,8 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	var img := view._viewport.get_texture().get_image()
 	img.convert(Image.FORMAT_RGB8)
 	var path := _out.path_join("%s_%s.jpg" % [id, shot])
+	if OS.get_cmdline_user_args().has("--png"):
+		img.save_png(path.get_basename() + ".png")
 	img.save_jpg(path, 0.88)
 	if shot == "vantage_noon" and OS.get_cmdline_user_args().has("--bake-thumbs"):
 		_bake_thumb(img, id)

@@ -150,7 +150,7 @@ narrow streets (<3 m), roof furniture, and watercourses <5 m wide remain approxi
 | AC-09 | Ground never bleaches, slope shading | **(f)** + luminance sampling + **(a)** slopes | Max urban-ground luminance ≤0.85 sampled; pavement/grass base reads; DEM slope shading visible on horizon hills |
 | AC-10 | 2 textured tree species, quay spacing | **(d)** tree presence + **(f)** species read | Quay/street rows at 8–12 m where OSM trees exist; 0 trees inside footprints/water (automated, T5.1); rater confirms broadleaf+pine, canopy Ø 4–7 m, ±10% variance, 0 bare cones |
 | AC-11 | Photographic clouds, 28–40% H band | **(f)** sky review | Rater confirms photographic/volumetric-look clouds with #E8C9A0 undersides at Paris state; 0 faceted slabs at any tier; coverage responds to weather (T6.4) |
-| AC-12 | 3 tiers exist, F2 default, switch ≤2 s, 0 moves/shifts | **(f)** + automated tier-diff | Transform diff = 0 and hue ΔE ≤2% across a tier switch (T7.1 assert); switch timed ≤2 s; F2 confirmed default in settings. Relaxed 2026-11-01 for desktop Ultra only: it may add decorative extras (shader facades with interiors and per-pane night lights, relief / trim / roof detail to 700 m) that lower tiers never build; real buildings, roads and landmarks still never move (lod_test footprint checks) |
+| AC-12 | 3 tiers exist, F2 default, switch ≤2 s, 0 moves/shifts | **(f)** + automated tier-diff | Transform diff = 0 and hue ΔE ≤2% across a tier switch (T7.1 assert); switch timed ≤2 s; F2 confirmed default in settings. Relaxed 2026-11-01 for desktop Ultra only: it may add decorative extras (shader facades with interiors and per-pane night lights, relief / trim / roof detail to 700 m) that lower tiers never build. Relaxed 2026-11-10 for desktop Balanced and High (Forward+): a facade shader may light night windows per bay and storey where the Standard material lit a whole column; by day it must match Standard within the 2% hue bar. Real buildings, roads and landmarks still never move (lod_test footprint checks) |
 | AC-13 | Visible tier separation (textures/shadows/bloom/props) | **(f)** side-by-side tier review | Rater compares F1/F2/F3 captures: texture/shadow/reflection/bloom/prop columns per PRD §3.4 verified present and tier-separated |
 | AC-14 | F1 ≥30 fps, ≤400 draws, ≤6 shared materials | Performance counters (with checks) | fps + draw-call + material-instance counts recorded per location/tier in every scored run; F1 bar: ≥30 fps target profile, ≤400 draws, ≤6 distant materials |
 | AC-15 | Picker geometry ±2%, launches spawn view | **(f)** picker review | Layout sampled against §4.6 (title/search/map/pin/card/button geometry, teal #3E8F88); tap-through opens the (e)-verified spawn view |
@@ -312,6 +312,22 @@ San Francisco's fabric now comes from the following, each with its test:
 
 The generic parts apply wherever their data occurs.
 
+Round ts-r3, 2026-11-11 (Tokyo and Seoul hero pass, `.agents/plans/2026-11-11-tokyo-seoul-hero.md`):
+- Captures: `visual-plan/reviews/tokyo-seoul-r3-2026-11-11/` (local golden hour, noon and night, clear summer;
+  r2 in `tokyo-seoul-r2-2026-11-11/` also has the roof views).
+- Rater: Claude (agent pre-rating).
+
+| preset | grade | change since ultra-p8 | biggest remaining tell |
+|---|---|---|---|
+| Tokyo | recognisable | ↑ zakkyo sign columns and boards, QFRONT poster screen, Scramble Square / Hikarie / Stream / 109 models, utility poles and cables | No crowd; the eye stands on a bare station roof deck; neighbours of QFRONT carry no screens |
+| Seoul | recognisable | ↑ Gyeongbokgung behind the gate, Sejong and Yi statues, officetels and towers by tag | Gate still small at 240 m; square paving reads uniform grey; the core gate stands about 10 m off its OSM outline |
+
+Tokyo's and Seoul's fabric now comes from the following, each with its test:
+- Data rows, district circles and per-city rules (`ArchitectureCitiesEastAsia`; architecture_test).
+- Slab-end block numbers, per-storey sign boards and full-height sign columns (`AsiaFronts`; asia_fronts_test).
+- Concrete utility poles and cables on JP and KR side streets (`UtilityPoles`; utility_poles_test).
+- The `tokyo_seoul` landmark batch (tokyo_seoul_landmarks_test).
+
 Cameras moved after rating (`ultra-p8j-2026-11-03/`; candidates were shot with the new
 `--looks=` option): Big Sur from the hillside east of the bridge's north end (30 m up, 200°), Seoul 120 m
 up the plaza axis, Stockholm held at 32 m ASL on the Mariaberget cliff (the smoothed DEM put it at the
@@ -401,6 +417,37 @@ Helsinki/Espoo Mint and Enso refinement, 2026-11-03:
 | Helsinki, winter | recognisable | Mint and office corrections retain snow | Bright snow, colourful water and procedural facades |
 | Espoo, summer | recognisable | Fresh control after facade changes | Coarse pool banks and repetitive surrounding masses |
 | Espoo, winter | recognisable | Fresh control at 8.69° sun | Winter brightness and pool edge differ from reference |
+
+Keilaniemi, Tapiola and Lauttasaari, 2026-11-12 (landmark search views, summer noon, 21 June):
+- Captures: `visual-plan/reviews/west-metro-2026-11-12/` and the Finago recolour in `west-metro-r2-2026-11-12/`.
+- Agent pre-ratings; human gate pending. Eight OSM-outline landmarks (`LandmarkRegistryWestMetro`), a Keilaniemi Espoo zone row and Lauttasaari/Vattuniemi districts; sources in docs/espoo-landmark-sources.md and docs/helsinki-landmark-sources.md.
+
+| view | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Keilaniemi (Finago Tower) | recognisable | Finago Tower's white piers and KONE's dark glass at OSM heights on the shore; Keilalampi glass cone | Opening eye stands in shore forest, towers small in frame; Life Science Center and Portti stay generic |
+| Tapiola (Cultural Centre) | recognisable | Cultural Centre wings and hall block beside Keskustorni and the pool; Mäntytorni and hip-flask houses | Cultural Centre cladding and hall heights are estimates; the demolished swimming hall still extrudes from OSM |
+| Lauttasaari (church) | recognisable from above | 61 m bell tower marks the island; 1950s functionalist district fabric | Ground opening lands in trees; church halls and manor colours are estimates |
+
+Niittykumpu, 2026-11-12 (landmark search views, summer noon, 21 June):
+- Captures: `visual-plan/reviews/niittykumpu-2026-11-12/` and the lighter tower bands in `niittykumpu-r2-2026-11-12/`.
+- Agent pre-ratings; human gate pending. Five OSM-outline landmarks and a 0.6 km `espoo_modern` metro-centre district; sources in docs/espoo-landmark-sources.md.
+
+| view | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Niittykumpu (Niittyhuippu) | recognisable | 90 m white Niittyhuippu and Niittytori rise from the Niitty mall podium; dark Niittytaival tower; modern blocks round the station | Opening eye stands on the Länsiväylä ramps with the tower distant; tower balcony and facade detail are estimates |
+| Olari (church) | recognisable from above | Red-brick Olari Church with pilasters and slit windows beside the metro-centre towers | Opening eye stands over a neighbouring roof; heights estimated |
+
+Inner Helsinki and the western islands, 2026-11-12 (model sheets, four bearings, flat ground):
+- Captures: `visual-plan/reviews/helsinki-areas-2026-11-12/` (model sheets from `tools/capture_landmarks.gd`, not in-world landmark views).
+- Agent pre-ratings; human gate pending; in-world views not yet captured. 19 OSM-outline landmarks (`LandmarkRegistryInnerHelsinki`, `LandmarkRegistryWestMetro`), split Katajanokka, Torkkelinmäki, Ruoholahti, Sompasaari and Munkkiniemen puistotie districts, and a new `helsinki_villa` era for Vanha Munkkiniemi, Kuusisaari and Lehtisaari; sources in docs/helsinki-landmark-sources.md and docs/espoo-landmark-sources.md.
+
+| area | grade | change | biggest remaining tell |
+|---|---|---|---|
+| Katajanokka | recognisable (model) | Aalto's white marble Enso HQ replaces the generic block in front of Uspenski; Merikasarmi's ochre Empire wings and porticos; brick ferry terminal | Casino and the prison hotel stay generic; Merikasarmi storey heights estimated |
+| Kallio | recognisable (model) | Linnanmäki's timber coaster and Kingi, Raketti and Panoraama towers replace generic 53–75 m boxes; Kallio Library; Siren office slab | Coaster track profile estimated; Taiga coaster not modelled |
+| Jätkäsaari / Ruoholahti | recognisable (model) | Clarion's chequered towers; the Salmisaari chimneys (114 m, 150 m) replace generic tall boxes; the Cable Factory | Second Clarion tower height estimated from a photograph; West Terminal 2 roof simplified |
+| Munkkiniemi / Kuusisaari / Lehtisaari | recognisable at close range (model) | Aalto House, Studio Aalto, Didrichsen, Villa Gyllenberg; villa and functionalist district fabric | Small low buildings among trees; Kalastajatorppa and the manor not modelled |
+| Otaniemi | recognisable (model) | Aalto's campus: the 1971 water tower (twelve-sided tank on blade columns), Otahalli and his library (entrance canopy, framed window bands) beside the existing main building; Dipoli's leaning copper fascias over timber-framed glass and boulder heaps; the chapel; the Väre block (with the School of Business and A Bloc) as brick-and-silver-glass blocks, tall brick blocks, dark glass halls and the black stair wedge from the OSM parts; the metro station's main entrance canopy and its Tietotie pavilion; the power plant's 75 m chimney replaces a generic box | The 1971 Otahalli annexe stays generic; Väre's block heights and Dipoli's boulder layout are estimates |
 
 Round sto-r1, 2026-11-03 (Stockholm hero work in progress):
 - Captures: `visual-plan/reviews/sto-r1-2026-11-03/` and `sto-r1-winter-2026-11-03/`, Ultra, clear golden hour. The images predate the Tyska kyrkan and street/bridge changes.
@@ -560,6 +607,37 @@ screenshot test completed. The class-size check passed at 806/1000 lines for
 the largest script. Re-run the relevant checks against the final workspace
 and final native libraries before considering the implementation accepted.
 
+
+### New York skyline towers, 2026-11-14
+
+Provisional agent rating: unchanged (**recognisable** on Ultra); the human gate stays open.
+Review: `visual-plan/reviews/nyc-towers-2026-11-14/` (both presets, plus looks from the Hudson, Brooklyn Bridge Park, Central Park, the East River and Bryant Park).
+
+| Change | Result |
+| --- | --- |
+| Spec towers | 98 `TowerSpec` rows (`NycTowerSpecs*`): Downtown 24, Midtown 47, West Side 11, Jersey City 8, Brooklyn and Queens 8. |
+| Massing | Each tower's mapped OSM parts in its own frame; pyramid, hip and dome crowns from `roof:height`, `roof:colour` and `roof:material`. |
+| Finishes | Set by hand per tower; new `pink_granite`, `white_granite`, `warm_concrete`, `waffle_bronze`, `red_granite`, `steinway_terracotta`, plus `ceramic_rods` and `black_glass` glazing. |
+| Newer than the snapshots | 99 Hudson, Brooklyn Tower, Trump World Tower, One Court Square and Skyline Tower use parts from live OSM (2026-11-14). |
+| Budget | `LandmarkSites.MAX_SKYLINE_BY_PRESET` 12/30/60/110, ranked by height over distance; the icons keep their slots. |
+
+Still generic: anonymous residential slabs, and towers whose look is only massing at preset distance (Hudson Yards from the river). The Lipstick Building is mapped only in part and stays generic.
+
+### New York towers, 2026-11-10
+
+Provisional agent rating: **recognisable** on Ultra, with towers no longer flat prisms; the human gate stays open.
+Reviews: `visual-plan/reviews/nyc-p0-2026-11-10/` (before) and `nyc-signoff-2026-11-10/` (after, from the committed tree), with `before_after.jpg` for the sign-off. The Midtown "before" there is a pinned camera, since the preset did not exist yet.
+
+| Change | Result |
+| --- | --- |
+| Window scale | Raised parts count their own storeys; distant and far glass tile by real bay and storey. |
+| Blank walls | Curtain walls and a building's own lower parts no longer leave blank firewall bands. |
+| Tower types | `NycTowerLooks` picks one of nine finishes; `TowerLooks` gives other cities a regional glazing mix. |
+| Massing and tops | 1916 setback profile, plant floors, penthouses and parapets scaled to height. |
+| Icons | 22 new `SkyKit` towers; Empire State about 70k to 12.4k triangles. |
+| Cold load | Ultra New York build 9.2 s before, 9.5 s after. |
+
+Midtown is bundled (five `new_york_midtown_*` layers, about 7 MB gzipped) and opens offline. `BundledOsm.MAX_BYTES` rose from 32 to 48 MB for its 39 MB far layer.
 
 ### New York continuation, 2026-11-04
 

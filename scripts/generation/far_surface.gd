@@ -143,6 +143,13 @@ static func climate_params(data: LocationData) -> Dictionary:
 		forest = forest.lerp(meadow, 0.35 if arid else 0.15)
 	return {"tl": tl, "sl": sl, "forest": forest, "meadow": meadow, "dry_a": dry.a, "arid": arid}
 
+## The far shader's aspect inputs for `data`'s place: which way the sun
+## stands, and the treeline's height in world units (the frame the snow
+## line uses: metres above the place's centre).
+static func aspect_params(data: LocationData) -> Dictionary:
+	return {"sun_side": 1.0 if data.latitude >= 0.0 else -1.0,
+		"treeline_y": (ClimateModel.treeline_m(data) - data.centre_elevation_m) * WorldScale.metres_to_units()}
+
 ## Mountain colour ramp for terrain with no imagery (returned LINEAR,
 ## from sRGB picks — the v1 ramp fed sRGB values as linear and washed
 ## to cream). Forest/meadow below the treeline, alpine grass then rock
@@ -223,6 +230,25 @@ uniform int far_quality = 2;
 // @SNOW
 // @TERRAIN
 // @WATER_FILTER
+// @GLOW
+global uniform float valley_haze_y;
+global uniform vec3 valley_haze_col;
+global uniform float far_fog_density;
+// +1 where the sun stands in the south, -1 in the southern hemisphere.
+uniform float sun_side = 1.0;
+// Height of the treeline in world units (aspect_params); far above by default.
+uniform float treeline_y = 100000.0;
+// DEM normals (FarDemNormals): one ring through each drape's UVs.
+uniform sampler2D dem_fine : filter_linear_mipmap_anisotropic, repeat_disable;
+uniform sampler2D dem_coarse : filter_linear_mipmap_anisotropic, repeat_disable;
+uniform vec4 dem_fine_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform vec4 dem_coarse_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform float has_dem_fine = 0.0;
+uniform float has_dem_coarse = 0.0;
+// FarWaterMask through the drape UVs: 1 = via UV, 2 = via UV2, 0 = none.
+uniform sampler2D water_mask : filter_linear_mipmap, repeat_disable;
+uniform vec4 water_mask_map = vec4(1.0, 1.0, 0.0, 0.0);
+uniform float has_water_mask = 0.0;
 varying vec3 wpos;
 varying vec3 wnrm;
 void vertex() {
@@ -234,6 +260,17 @@ float edge_w(vec2 uv) {
 	return smoothstep(0.0, 0.015, min(d.x, d.y));
 }
 float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+vec3 dem_normal(sampler2D tex, vec2 uv) {
+	vec2 rg = texture(tex, uv).rg * 2.0 - 1.0;
+	return vec3(rg.x, sqrt(max(1.0 - dot(rg, rg), 0.0)), rg.y);
+}
+// Value noise on the three axis planes, weighted by the slope: projected
+// straight down it smears into streaks on a mountainside.
+float canopy_noise(vec3 p, vec3 n, float scale) {
+	vec3 w = pow(abs(n), vec3(4.0));
+	w /= w.x + w.y + w.z;
+	return w.y * t_noise(p.xz / scale) + w.x * t_noise(p.zy / scale + 3.1) + w.z * t_noise(p.xy / scale + 7.7);
+}
 void fragment() {
 	vec4 dg = vec4(dFdx(wpos.xz), dFdy(wpos.xz));
 	vec3 dpx = dFdx(wpos);
@@ -255,6 +292,14 @@ void fragment() {
 	// Far lakes and sea (FarSurface.ramp_color alpha 0): a glossy surface
 	// with wind waves instead of matte ground, matching the near water.
 	float water = clamp(1.0 - COLOR.a, 0.0, 1.0);
+	// The water mask (FarWaterMask) decides where it covers: crisp shores
+	// between ring vertices 30-300 m apart. Lakes are 0.5, sea 1.0.
+	if (has_water_mask > 0.5) {
+		vec2 muv = (has_water_mask > 1.5 ? UV2 : UV) * water_mask_map.xy + water_mask_map.zw;
+		if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) {
+			water = smoothstep(0.18, 0.42, texture(water_mask, muv).r);
+		}
+	}
 	// Ridges and gullies in the light: the ring mesh is 30-70 m between
 	// vertices, so mountainsides were smooth domes under a painted
 	// photo. Noise gradients bend the lighting normal (strongest on steep
@@ -262,9 +307,26 @@ void fragment() {
 	// shimmers.
 	float fade = 1.0 - smoothstep(9000.0, 26000.0, dist);
 	float steep0 = smoothstep(0.93, 0.6, nw.y);
+	// Real ridges and gullies from the DEM where a ring covers this ground.
+	// They replace the noise below rather than stack on it, and stay short of
+	// full strength: the imagery already carries its own baked shading.
+	vec3 dem_n = nw;
+	float dem_w = 0.0;
+	if (has_dem_coarse > 0.0) {
+		vec2 duv = UV2 * dem_coarse_map.xy + dem_coarse_map.zw;
+		dem_w = edge_w(duv);
+		dem_n = dem_normal(dem_coarse, duv);
+	}
+	if (has_dem_fine > 0.0) {
+		vec2 duv = UV * dem_fine_map.xy + dem_fine_map.zw;
+		float w = edge_w(duv);
+		dem_n = normalize(mix(dem_n, dem_normal(dem_fine, duv), w));
+		dem_w = max(dem_w, w);
+	}
+	nw = normalize(mix(nw, dem_n, dem_w * mix(0.7, 0.92, smoothstep(5000.0, 16000.0, dist)) * (1.0 - water)));
 	if (fade > 0.01) {
 		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
-		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf));
+		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf) * (1.0 - 0.85 * dem_w));
 	}
 	if (water > 0.01) {
 		float wave_scale = max(25.0, dist * 0.004);
@@ -277,9 +339,14 @@ void fragment() {
 	}
 	// Steep faces read as rock: the photo's value, mostly its own hue
 	// pulled toward neutral stone.
-	float steep = smoothstep(0.8, 0.55, nw.y);
+	// The sun-facing side of a slope dries out: rock shows sooner and trees
+	// climb higher there. Above the treeline the green thins toward stone.
+	float sunward = dot(normalize(nw.xz + vec2(1e-4)), vec2(0.0, sun_side)) * smoothstep(0.98, 0.8, nw.y);
+	float tree_y = treeline_y + sunward * 120.0;
+	float above_trees = smoothstep(tree_y - 100.0, tree_y + 400.0, wpos.y) * (1.0 - water);
+	float steep = smoothstep(0.8 + 0.05 * sunward, 0.55 + 0.05 * sunward, nw.y);
 	float l = lum(c);
-	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), steep * 0.55 * (1.0 - 0.8 * vegf));
+	c = mix(c, mix(vec3(l * 1.1, l * 1.05, l), c, 0.4), max(steep * 0.55 * (1.0 - 0.8 * vegf * (1.0 - above_trees)), above_trees * 0.35));
 	vec3 nmap = vec3(0.5, 0.5, 1.0);
 	float dfade = far_quality >= 2 ? 1.0 - smoothstep(2500.0, 7500.0, dist) : 0.0;
 	if (dfade > 0.01) {
@@ -299,12 +366,41 @@ void fragment() {
 		c *= mix(1.0, clamp(r, 0.55, 1.6), dfade * 0.65 * (1.0 - water));
 		nmap = mix(nmap, n.rgb, dfade * 0.8 * (1.0 - water));
 	}
+	// Past that, bare rock keeps a coarser version of the same structure.
+	float rock_fade = far_quality >= 2 ? (1.0 - dfade) * (1.0 - smoothstep(7500.0, 15000.0, dist)) : 0.0;
+	if (rock_fade > 0.01 && steep > 0.4 && vegf < 0.5) {
+		vec4 a;
+		vec4 n;
+		det_side(4, wpos / 60.0, dpx / 60.0, dpy / 60.0, nw, a, n);
+		c *= mix(1.0, clamp(lum(a.rgb) / max(lum(det_mean[4]), 1e-3), 0.6, 1.5), rock_fade * 0.6 * (1.0 - water));
+	}
+	// Forest past the real trees: the photo is a soft green wash here, so
+	// dark leafy ground gets crowns (clumps growing with distance so they
+	// never shimmer) and lighter and darker stands.
+	float forest = vegf * smoothstep(0.22, 0.08, lum(c)) * (1.0 - water)
+		* (far_quality >= 1 ? 1.0 - smoothstep(6000.0, 14000.0, dist) : 0.0);
+	if (forest > 0.01) {
+		float crown_m = max(9.0, dist * 0.003);
+		float crowns = canopy_noise(wpos, wnrm, crown_m);
+		float fine_crowns = canopy_noise(wpos + vec3(5.3, 1.7, 3.9), wnrm, crown_m * 0.47);
+		float stands = canopy_noise(wpos + vec3(2.1, 8.4, 6.2), wnrm, 160.0);
+		c *= mix(1.0, (0.58 + 0.56 * crowns + 0.3 * fine_crowns) * (0.82 + 0.36 * stands), forest * 0.85);
+	}
 	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
-	c = mix(c, snow_col, sc);
+	c = mix(c, snow_albedo(wpos.xz, max(fwidth(wpos.x), fwidth(wpos.z)), 0.0), sc);
 	// Cloud shadows sweeping the far slopes (the near field is lit by the
 	// real shadow map only, so they fade in past the detailed ground).
 	c *= 1.0 - 0.5 * t_cloud_shadow(wpos) * smoothstep(1200.0, 2600.0, dist);
+	// Valleys hold more air than the ridges above them, so ridges stand
+	// apart in layers. Far terrain only: the detailed ground and the city
+	// stay clear whatever their height.
+	float valley_air = smoothstep(1500.0, 14000.0, dist) * (1.0 - smoothstep(0.0, 900.0, wpos.y - valley_haze_y));
+	c = mix(c, valley_haze_col * 0.85, valley_air * 0.42 * (1.0 - water));
 	ALBEDO = min(c, vec3(albedo_cap));
+	// Night: the far city's carpet of street lights (StreetGlow), mottled
+	// block by block, never on water.
+	EMISSION = far_lamp_tint() * lamp_settle(wpos.xz) * (1.0 - water)
+		* (0.45 + 0.55 * t_noise(wpos.xz / 70.0)) * (0.7 + 0.3 * t_noise(wpos.xz / 23.0 + 4.1));
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
@@ -313,6 +409,14 @@ void fragment() {
 	float water_rough = water_roughness(mix(0.08, 0.5, climate_water_ice), nw);
 	ROUGHNESS = mix(mix(0.96, 0.82, steep), water_rough, water);
 	SPECULAR = mix(mix(0.2, 0.3, steep), 0.34, water);
+	// Haze thins with height: integrated along the view ray, not the scene
+	// fog's uniform air, so high peaks keep their rock and snow contrast.
+	// Level with the valley floor it equals the scene fog.
+	float h0 = max(CAMERA_POSITION_WORLD.y - valley_haze_y, 0.0);
+	float h1 = max(wpos.y - valley_haze_y, 0.0);
+	float rise = h1 - h0;
+	float air = abs(rise) < 1.0 ? exp(-h0 / 2500.0) : 2500.0 / rise * (exp(-h0 / 2500.0) - exp(-h1 / 2500.0));
+	FOG = vec4(valley_haze_col, 1.0 - exp(-far_fog_density * dist * air));
 }
 """
 static var _shader: Shader
@@ -324,25 +428,29 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
 	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE) \
-		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL)
+		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = code
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader
 	if double_sided:
-		var sh := Shader.new()
-		sh.code = code.replace("cull_back", "cull_disabled")
-		mat.shader = sh
+		mat.shader = SharedShader.of(code.replace("cull_back", "cull_disabled"))
 	var preset := data.quality_preset if data != null else RenderSettings.Preset.HIGH
 	TerrainGlsl.bind(mat, preset)
 	mat.set_shader_parameter("far_quality", RenderSettings.clamp_preset(preset))
+	if data != null:
+		var aspect := aspect_params(data)
+		mat.set_shader_parameter("sun_side", aspect["sun_side"])
+		mat.set_shader_parameter("treeline_y", aspect["treeline_y"])
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:
 		mat.set_shader_parameter("fine_tex", fine)
 	if coarse != null:
 		mat.set_shader_parameter("coarse_tex", coarse)
+	FarDemNormals.bind(mat, data, fine, coarse)
+	FarWaterMask.bind(mat, data, fine, coarse)
 	return mat
 
 ## Linear albedo of the finest drape covering metre XZ, gained and

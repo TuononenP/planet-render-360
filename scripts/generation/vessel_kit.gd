@@ -23,9 +23,10 @@ static func windows(lm: LandmarkMesh, x0: float, x1: float, z: float, y0: float,
 ## A deckhouse: walls, an overhanging roof slab and (optionally) windows.
 ## Returns the roof's top y.
 static func house(lm: LandmarkMesh, centre_x: float, len: float, wid: float, y: float,
-		h: float, win: bool, pitch: float, over: float = 0.12, wall_key: String = "White") -> float:
+		h: float, win: bool, pitch: float, over: float = 0.12, wall_key: String = "White",
+		glass_key: String = "Glass") -> float:
 	if pitch > 0.0:
-		VesselForms.cabin(lm, centre_x, len, wid, y, h, pitch, wall_key, 0.12)
+		VesselForms.cabin(lm, centre_x, len, wid, y, h, pitch, wall_key, 0.12, glass_key)
 		VesselForms.slab(lm, "White", Vector3(centre_x - h * 0.03, y + h + 0.04, 0),
 			Vector3(len + over * 2.0, 0.08, wid + over * 2.0), minf(wid * 0.12, h * 0.45))
 		return y + h + 0.08
@@ -33,7 +34,7 @@ static func house(lm: LandmarkMesh, centre_x: float, len: float, wid: float, y: 
 	lm.box("White", Vector3(centre_x, y + h + 0.04, 0), Vector3(len + over * 2.0, 0.08, wid + over * 2.0), Basis(), 0.0)
 	if win:
 		windows(lm, centre_x - len * 0.5 + 0.35, centre_x + len * 0.5 - 0.35, wid * 0.5,
-			y + h * 0.3, y + h * 0.82, pitch)
+			y + h * 0.3, y + h * 0.82, pitch, glass_key)
 	return y + h + 0.08
 
 ## Mast: tapered round spar from `base` up `h`.
@@ -58,6 +59,52 @@ static func lifeboat(lm: LandmarkMesh, at: Vector3, len: float) -> void:
 	HullLoft.loft(lm, spec, keys, at + Vector3(0, len * 0.04, 0))
 	for x in [-0.24, -0.02, 0.16]:
 		lm.box("White", at + Vector3(len * float(x), len * 0.13, 0), Vector3(len * 0.06, 0.05, len * 0.18), Basis(), 0.0)
+
+## Enclosed lifeboat or tender of `len` metres sitting on its keel at
+## `at`, +X bow: a white hull, a rounded orange canopy over its whole
+## length (low at the ends), a row of small windows down each side and a
+## steering cupola aft.
+static func enclosed_lifeboat(lm: LandmarkMesh, at: Vector3, len: float) -> void:
+	var spec := {"length": len, "beam": len * 0.34, "freeboard": len * 0.09, "draft": len * 0.06,
+		"entry": 0.4, "flare": 0.12, "stern_w": 0.55, "deadrise": 0.3, "bow_rise": len * 0.02, "lod": 1}
+	var origin := at + Vector3(0, len * 0.06, 0)
+	HullLoft.loft(lm, spec, {"hull": "White", "boot": "White", "bottom": "White", "deck": "Orange"}, origin)
+	# Canopy: semi-elliptic sections on the sheer, its crown tapering to the ends.
+	var crown := len * 0.13
+	var rows: Array = []
+	var x0 := -len * 0.46
+	var x1 := len * 0.44
+	for i in 15:
+		var t := float(i) / 14.0
+		var x := lerpf(x0, x1, t)
+		var k := sqrt(maxf(1.0 - pow(absf(2.0 * t - 1.0), 4.0), 0.0))
+		var hw := HullLoft.half(spec, x) * 0.97
+		var sh := HullLoft.sheer(spec, x)
+		var row := PackedVector3Array()
+		for j in 11:
+			var a := PI * float(j) / 10.0
+			row.append(origin + Vector3(x, sh + crown * k * sin(a), -hw * cos(a)))
+		rows.append(row)
+	lm.grid("Orange", rows, origin + Vector3(0, HullLoft.sheer(spec, 0.0), 0), true)
+	# Windows high on the canopy sides.
+	for i in 6:
+		var x := lerpf(-len * 0.28, len * 0.24, float(i) / 5.0)
+		var hw := HullLoft.half(spec, x) * 0.97
+		var y := HullLoft.sheer(spec, x) + crown * 0.55
+		var z := hw * cos(asin(0.55)) + 0.02
+		for side in [-1.0, 1.0]:
+			var n := Vector3(0, 0.55, float(side) * 0.84).normalized()
+			var up := Vector3(0, 0.84, -float(side) * 0.55).normalized() * len * 0.022
+			var c := origin + Vector3(x, y, float(side) * z)
+			lm.quad("Dark", c + Vector3(-len * 0.035, 0, 0) - up, c + Vector3(len * 0.035, 0, 0) - up,
+				c + Vector3(len * 0.035, 0, 0) + up, c + Vector3(-len * 0.035, 0, 0) + up, n)
+	# Steering cupola aft on the crown.
+	var cx := -len * 0.24
+	var cy := HullLoft.sheer(spec, cx) + crown * sqrt(maxf(1.0 - pow(absf(2.0 * (cx - x0) / (x1 - x0) - 1.0), 4.0), 0.0)) - len * 0.01
+	lm.lathe("Orange", origin + Vector3(cx, cy, 0), PackedVector2Array([Vector2(len * 0.07, 0),
+		Vector2(len * 0.07, len * 0.035), Vector2(len * 0.05, len * 0.055), Vector2(0.01, len * 0.062)]), 12)
+	lm.lathe("Dark", origin + Vector3(cx, cy + len * 0.03, 0), PackedVector2Array([Vector2(len * 0.071, 0),
+		Vector2(len * 0.071, len * 0.016)]), 12, 1.0, 1.0, 0.0, true, false)
 
 ## Outboard motor with its cowl at the transom (x = stern), `s` metres tall.
 static func outboard(lm: LandmarkMesh, stern: Vector3, s: float, detail: bool = false) -> void:

@@ -24,7 +24,10 @@ var _segment_cells := {}
 var transition_edges: Array = []
 var transition_cells := {}
 var _vertex_heights := {}
+var _bank_tops := {}
 var sampler: Object = null
+## Test hook: false classifies with the script even when ShoreClassifier is loaded.
+static var native_classify := true
 
 func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abort: BuildAbort = null) -> void:
 	if data == null or ground == null:
@@ -38,6 +41,7 @@ func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abo
 	if abort != null and abort.requested:
 		return
 	domains.estimate(Callable(self, "dry_height"), ground.water_level_m, ground.FREEBOARD_M, sea_level, abort)
+	domains.lower_under_bridges(data.roads, Callable(self, "dry_height"))
 	_evidence = ShoreEvidence.new(data)
 	_index_edges()
 
@@ -46,6 +50,13 @@ func empty() -> bool:
 
 func dry_height(x: float, z: float) -> float:
 	return _grid_height(dry, Vector2(x, z))
+
+## Corrected dry surface: pre-carve height inside water, the final
+## surface elsewhere (roads and grading included), in render units.
+func land_height(x: float, z: float) -> float:
+	if land.is_empty():
+		return dry_height(x, z)
+	return _grid_height(land, Vector2(x, z))
 
 func _grid_height(values: PackedFloat32Array, p: Vector2) -> float:
 	if size < 2 or values.is_empty():
@@ -151,12 +162,15 @@ func finish(ground, abort: BuildAbort = null) -> void:
 	_evidence = null
 	_class_cache.clear()
 	_vertex_heights.clear()
-	_setup_sampler()
+	_bank_tops.clear()
+	_setup_sampler(true)
 	ready = true
 	print("SHORELINE bodies=%d edges=%d patches=%d hard=%d diagnostics=%d" % [domains.bodies.size(),
 		segments.size(), patches.size(), hard_count(), diagnostics.size()])
 
 func _classify(abort: BuildAbort) -> void:
+	if _classify_native(abort):
+		return
 	var endpoint_tops := {}
 	for edge in _edges:
 		if abort != null and abort.requested:
@@ -188,6 +202,11 @@ func _classify(abort: BuildAbort) -> void:
 			var hard := str(treatment["kind"]) == "hard"
 			var top_a := _bank_top(start, land) if hard else dry_height(start.x, start.y)
 			var top_b := _bank_top(end, land) if hard else dry_height(end.x, end.y)
+			var road_top := _abutment_top(treatment, mid)
+			if hard and not is_nan(road_top):
+				# A bridge abutment's top is the road's level at the bridge's end.
+				top_a = road_top
+				top_b = road_top
 			if str(treatment["kind"]) == "hard" and (is_nan(top_a) or is_nan(top_b)):
 				treatment = {"kind": "natural", "reason": "insufficient_dry_samples", "sources": []}
 			if is_nan(top_a):
@@ -226,6 +245,34 @@ func _classify(abort: BuildAbort) -> void:
 			segment[item[1]] = sum / float(values.size())
 	_make_transitions()
 
+## _classify through ShoreClassifier, the same segments, cells and
+## diagnostics; false (nothing done) without the native indexes.
+func _classify_native(abort: BuildAbort) -> bool:
+	if ShoreGeometry.force_script or not native_classify or not ClassDB.class_exists("ShoreClassifier") \
+			or domains.native == null or _evidence.native == null:
+		return false
+	var classifier: Object = ClassDB.instantiate("ShoreClassifier")
+	classifier.setup(dry, size, step, origin, bounds, domains.bounds, domains.native, _levels(),
+		_evidence.native, _evidence.abutment_ends, WorldScale.metres_to_units())
+	var out: Dictionary = classifier.classify(_edges, abort)
+	if out.has("aborted") or not out.has("segments"):
+		return true
+	segments = out["segments"]
+	_segment_cells = out["cells"]
+	diagnostics.append_array(out["diagnostics"])
+	_make_transitions()
+	return true
+
+## Per body: level, level_end, has_end, axis start, axis end.
+func _levels() -> PackedFloat64Array:
+	var levels := PackedFloat64Array()
+	for body: Dictionary in domains.bodies:
+		var ends := body.has("level_end")
+		var axis: PackedVector2Array = body["axis"] if ends else PackedVector2Array([Vector2.ZERO, Vector2.ZERO])
+		levels.append_array([float(body["level"]), float(body.get("level_end", 0.0)), 1.0 if ends else 0.0,
+			axis[0].x, axis[0].y, axis[1].x, axis[1].y])
+	return levels
+
 func _make_transitions() -> void:
 	var ends := {}
 	for segment in segments:
@@ -258,7 +305,36 @@ func _make_transitions() -> void:
 					transition_cells[key] = []
 				(transition_cells[key] as Array).append(id)
 
+## The road's level (dry ground at the nearer end of the bridge) for a
+## bank ShoreEvidence made an abutment, else NAN.
+func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
+	for source in treatment.get("sources", []):
+		var ends: PackedVector2Array = _evidence.abutment_ends.get(str(source), PackedVector2Array())
+		if ends.size() == 2:
+			var near0 := ends[0].distance_squared_to(mid) <= ends[1].distance_squared_to(mid)
+			var e := ends[0] if near0 else ends[1]
+			if domains.at(e) < 0:
+				return dry_height(e.x, e.y)
+			# A bridge mapped ending over the water: the road's level is the
+			# dry ground further out along its line.
+			var out := (e - (ends[1] if near0 else ends[0])).normalized()
+			var best := NAN
+			for k in range(1, 11):
+				var q := e + out * 2.0 * float(k) * WorldScale.metres_to_units()
+				if bounds.has_point(q) and domains.at(q) < 0:
+					best = dry_height(q.x, q.y) if is_nan(best) else maxf(best, dry_height(q.x, q.y))
+			return best
+	return NAN
+
+## Neighbouring pieces of an edge share their end points and land side,
+## so each top is read once.
 func _bank_top(p: Vector2, land: Vector2) -> float:
+	var key := Vector4(p.x, p.y, land.x, land.y)
+	if not _bank_tops.has(key):
+		_bank_tops[key] = _bank_top_at(p, land)
+	return _bank_tops[key]
+
+func _bank_top_at(p: Vector2, land: Vector2) -> float:
 	var values: Array[float] = []
 	for distance in [2.0, 5.0, 10.0, 20.0]:
 		var q: Vector2 = p + land * distance
@@ -402,10 +478,32 @@ func _restore_indexes() -> void:
 						index[key] = []
 					(index[key] as Array).append(id)
 
-func _setup_sampler() -> void:
+## `patches_only`: the banks and levels are already set (only the patches
+## changed since the last call).
+func _setup_sampler(patches_only := false) -> void:
 	if not ShoreGeometry.force_script and ClassDB.class_exists("ShoreSampler"):
 		if sampler == null:
 			sampler = ClassDB.instantiate("ShoreSampler")
+			patches_only = false
 		sampler.setup(base, patches, size, step, origin)
+		if patches_only:
+			return
 		if sampler.has_method("setup_banks"):
 			sampler.setup_banks(segments)
+		if sampler.has_method("setup_footing") and domains != null and domains.native != null:
+			sampler.setup_footing(domains.native, _levels(), dry if land.is_empty() else land, domains.bounds, bounds)
+
+## BuildingFoundation's ground reads around one footprint, done natively
+## (ShoreSampler.footing); empty without the native sampler.
+func footing(ring: PackedVector2Array, centre: Vector2, sea_y: float, edge_step: float, max_n: int) -> PackedFloat64Array:
+	if sampler == null or not sampler.has_method("footing"):
+		return PackedFloat64Array()
+	return sampler.footing(ring, centre, sea_y, edge_step, max_n)
+
+## BuildingFoundation._edge_ground at each point, done natively
+## (ShoreSampler.edge_grounds): NAN outside the bounds, empty without the
+## native sampler.
+func edge_grounds(points: PackedVector2Array) -> PackedFloat64Array:
+	if sampler == null or not sampler.has_method("edge_grounds"):
+		return PackedFloat64Array()
+	return sampler.edge_grounds(points)

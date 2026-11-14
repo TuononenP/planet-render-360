@@ -5,7 +5,8 @@ extends RefCounted
 ## software-rasterised orthographically (side view, z-buffered, texel-
 ## sampled leaf atlas + bark), so the cross-card silhouette is the real
 ## tree's. Packed channels, read by TreeMeshLibrary.IMPOSTOR_SHADER:
-##   R = luminance (texture x baked AO), G = foliage (1) vs bark (0),
+##   R = luminance (texture x baked AO x crown-cavity shade),
+##   G = bark 0, foliage 0.55..1 (above 0.55: cluster warmth, cool..warm),
 ##   B = up-facing foliage (snow mask), A = coverage.
 ## Season tint stays a material uniform, so one texture serves all
 ## seasons (deciduous winter has its own bare texture).
@@ -89,9 +90,14 @@ static func paint(sp: String, bare: bool, res: float = 1.0) -> Image:
 			var ua := b.uvs[ia]
 			var ub := b.uvs[ib]
 			var uc := b.uvs[ic]
-			var aoa := b.colors[ia].r
-			var aob := b.colors[ib].r
-			var aoc := b.colors[ic].r
+			var aoa := b.colors[ia].g
+			var aob := b.colors[ib].g
+			var aoc := b.colors[ic].g
+			# Cluster warmth from the vertex tint (TreeGenerators: r/g =
+			# 1 + 0.07 w), packed into G above the foliage floor.
+			var wa := _warmth(b.colors[ia])
+			var wb := _warmth(b.colors[ib])
+			var wc := _warmth(b.colors[ic])
 			var up := (b.normals[ia].y + b.normals[ib].y + b.normals[ic].y) / 3.0
 			for y in range(miny, maxy + 1):
 				for x in range(minx, maxx + 1):
@@ -120,9 +126,11 @@ static func paint(sp: String, bare: bool, res: float = 1.0) -> Image:
 						px[o + 2] = 0.0
 					else:
 						px[o] = clampf(ao * c.g, 0.0, 1.0)
-						px[o + 1] = 0.0 if bare else 1.0
+						px[o + 1] = 0.0 if bare else 0.55 + 0.45 * (0.5 + 0.5 * (wa * l0 + wb * l1 + wc * l2))
 						px[o + 2] = smoothstep(0.2, 0.7, up)
 					px[o + 3] = 1.0
+	if not bare:
+		_cavity_shade(px, depth, w, h)
 	var bytes := PackedByteArray()
 	bytes.resize(w * h * 4)
 	for i in px.size():
@@ -131,3 +139,48 @@ static func paint(sp: String, bare: bool, res: float = 1.0) -> Image:
 	if ss > 1:
 		out.resize(w / ss, h / ss, Image.INTERPOLATE_BILINEAR)
 	return out
+
+static func _warmth(c: Color) -> float:
+	return clampf((c.r / maxf(c.g, 0.001) - 1.0) / 0.07, -1.0, 1.0)
+
+## Foliage seen through a gap lies deep behind the crown's front
+## surface and sits in its shade: darken texels by how far (in metres,
+## the mesh's own z) they are behind the front-most foliage around them
+## (block max depth, dilated). Stands in for the self-shadowing the
+## mesh crowns get at runtime.
+static func _cavity_shade(px: PackedFloat32Array, depth: PackedFloat32Array, w: int, h: int) -> void:
+	const BLK := 8
+	const REACH := 3
+	var bw := (w + BLK - 1) / BLK
+	var bh := (h + BLK - 1) / BLK
+	var bmax := PackedFloat32Array()
+	bmax.resize(bw * bh)
+	bmax.fill(-INF)
+	for y in h:
+		for x in w:
+			var d := depth[y * w + x]
+			var bi := (y / BLK) * bw + x / BLK
+			if d > bmax[bi]:
+				bmax[bi] = d
+	var front := PackedFloat32Array()
+	front.resize(bw * bh)
+	for by in bh:
+		for bx in bw:
+			var m := -INF
+			for dy in range(-REACH, REACH + 1):
+				for dx in range(-REACH, REACH + 1):
+					var nx := bx + dx
+					var ny := by + dy
+					if nx >= 0 and ny >= 0 and nx < bw and ny < bh:
+						m = maxf(m, bmax[ny * bw + nx])
+			front[by * bw + bx] = m
+	# Full shade ~3 m behind the local front (a broadleaf crown's
+	# outer leaf layer is about a metre deep).
+	var span := 3.0
+	for y in h:
+		for x in w:
+			var i := y * w + x
+			if px[i * 4 + 1] < 0.5 or depth[i] == -INF:
+				continue
+			var behind := front[(y / BLK) * bw + x / BLK] - depth[i]
+			px[i * 4] *= lerpf(1.0, 0.6, clampf(behind / span, 0.0, 1.0))

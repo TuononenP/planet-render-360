@@ -8,7 +8,9 @@ func _init() -> void:
 	MaterialLibrary.hi_res = true
 	var hull := VesselMaterials.paint("#2d3b4a")
 	# model, length, beam, height, Ultra cap (4x original budget after the requested extra detail pass), far baseline, variant
-	for c in [["liner", 250.0, 31.0, 50.0, 160000, 936, ""], ["passenger", 50.0, 8.0, 12.0, 32000, 636, ""],
+	for c in [["liner", 250.0, 31.0, 50.0, 160000, 2500, ""], ["cruise_ferry", 200.0, 30.0, 44.0, 120000, 2500, ""],
+			["cargo", 300.0, 45.0, 52.0, 120000, 3000, "container"], ["cargo", 190.0, 30.0, 32.0, 60000, 2000, "bulk"],
+			["cargo", 250.0, 44.0, 40.0, 60000, 2000, "tanker"], ["cargo", 110.0, 17.0, 26.0, 50000, 2000, "general"], ["passenger", 50.0, 8.0, 12.0, 32000, 636, ""],
 			["tall_ship", 60.0, 9.5, 32.0, 24000, 638, ""], ["houseboat", 14.0, 4.2, 4.5, 8000, 274, ""],
 			["motor_yacht", 24.0, 0.0, 0.0, 12000, 390, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, 10000, 332, "sport"],
 			["sail_yacht", 12.0, 0.0, 0.0, 12000, 480, ""], ["runabout", 7.0, 0.0, 0.0, 8000, 404, "runabout"],
@@ -16,7 +18,7 @@ func _init() -> void:
 		var near := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, true, true, 0.9, c[6])
 		var far := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, false, true, 0.9, c[6])
 		_check(near.triangle_count() > 200 and near.triangle_count() <= int(c[4]), "%s %s m: %d triangles outside budget" % [c[0], c[1], near.triangle_count()])
-		_check(far.triangle_count() <= int(c[5]), "%s far exceeds recorded baseline" % c[0])
+		_check(far.triangle_count() <= int(c[5]), "%s far exceeds recorded baseline (%d)" % [c[0], far.triangle_count()])
 		_check(far.triangle_count() < near.triangle_count(), "%s far geometry must be cheaper" % c[0])
 		var root := Node3D.new()
 		var box := AABB()

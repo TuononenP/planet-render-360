@@ -45,6 +45,7 @@ const ZONES := [
 	["banff", "banff", 51.1784, -115.5708, 3.0],
 	["copenhagen", "copenhagen", 55.6761, 12.5683, 5.0],
 	["oslo", "oslo", 59.9139, 10.7522, 5.0],
+	["espoo", "espoo", 60.1755, 24.8310, 1.0],          # Keilaniemi, before Helsinki's rim
 	["helsinki", "helsinki", 60.1900, 24.9950, 9.0],
 	["espoo", "espoo", 60.1900, 24.7700, 9.0],
 	["edinburgh", "edinburgh", 55.9533, -3.1883, 5.0],
@@ -210,6 +211,21 @@ const DISTRICTS := [
 	["tokyo", "tokyo_tower", 35.6896, 139.6995, 0.9, 20.0],      # Shinjuku
 	["tokyo", "tokyo_tower", 35.6812, 139.7671, 0.8, 20.0],      # Marunouchi
 	["tokyo", "tokyo_tower", 35.6605, 139.7292, 0.5, 10.0],      # Roppongi
+	["tokyo", "tokyo_tower", 35.6585, 139.7030, 0.3, 10.0],      # Shibuya station east (Hikarie, Stream)
+	["tokyo", "tokyo_zakkyo", 35.6608, 139.6985, 0.35, 15.0],    # Center Gai, Udagawacho
+	["tokyo", "tokyo_zakkyo", 35.6575, 139.6965, 0.3, 12.0],     # Dogenzaka
+	["tokyo", "tokyo_zakkyo", 35.6945, 139.7030, 0.4, 20.0],     # Kabukicho
+	["tokyo", "tokyo_zakkyo", 35.6717, 139.7650, 0.5, 10.0],     # Ginza
+	["tokyo", "tokyo_zakkyo", 35.6984, 139.7731, 0.4, 15.0],     # Akihabara
+	["tokyo", "tokyo_zakkyo", 35.7300, 139.7135, 0.4, 10.0],     # Ikebukuro east
+	["tokyo", "tokyo_mansion", 35.6467, 139.7101, 0.8, 8.0],     # Ebisu
+	["tokyo", "tokyo_mansion", 35.6340, 139.7160, 0.8, 8.0],     # Meguro
+	["tokyo", "tokyo_mansion", 35.6700, 139.7100, 0.6, 6.0],     # Jingumae, Aoyama
+	["tokyo", "tokyo_mokuchin", 35.7076, 139.6638, 1.5, 6.0],    # Nakano
+	["tokyo", "tokyo_house", 35.6460, 139.6530, 3.0, 8.0],       # Setagaya
+	["tokyo", "tokyo_house_modern", 35.6460, 139.6530, 3.0, 8.0],
+	["tokyo", "tokyo_house", 35.6995, 139.6366, 2.5, 8.0],       # Suginami
+	["tokyo", "tokyo_house_modern", 35.6995, 139.6366, 2.5, 8.0],
 	["hong_kong", "hk_tenement", 22.3300, 114.1620, 1.2, 6.0],   # Sham Shui Po
 	["hong_kong", "hk_tenement", 22.3190, 114.1700, 0.8, 4.0],   # Mong Kok
 	["hong_kong", "hk_office", 22.2830, 114.1585, 0.8, 20.0],    # Central
@@ -218,12 +234,33 @@ const DISTRICTS := [
 	["singapore", "sg_shophouse", 1.3066, 103.8518, 0.6, 20.0],  # Little India
 	["singapore", "sg_shophouse", 1.3120, 103.9010, 0.8, 10.0],  # Joo Chiat
 	["singapore", "sg_tower", 1.2840, 103.8510, 1.0, 20.0],      # CBD
+	["seoul", "seoul_palace", 37.5783, 126.9770, 0.25, 40.0],    # Gyeongbokgung, Heungnyemun to Gyeonghoeru
+	["seoul", "seoul_palace", 37.5815, 126.9770, 0.22, 40.0],    # Gyeongbokgung, north courts
+	["seoul", "seoul_palace", 37.5794, 126.9910, 0.3, 40.0],     # Changdeokgung
+	["seoul", "seoul_palace", 37.5788, 126.9950, 0.25, 40.0],    # Changgyeonggung
+	["seoul", "seoul_palace", 37.5744, 126.9941, 0.2, 40.0],     # Jongmyo
+	["seoul", "seoul_palace", 37.5658, 126.9751, 0.12, 40.0],    # Deoksugung
 	["seoul", "seoul_hanok", 37.5826, 126.9837, 0.6, 40.0],      # Bukchon
 	["seoul", "seoul_hanok", 37.5744, 126.9897, 0.2, 40.0],      # Ikseon-dong
 	["seoul", "seoul_hanok", 37.5790, 126.9700, 0.5, 12.0],      # Seochon
 	["seoul", "seoul_tower", 37.5250, 126.9250, 1.0, 20.0],      # Yeouido
 	["seoul", "seoul_tower", 37.5030, 127.0400, 1.2, 15.0],      # Teheran-ro
 	["seoul", "seoul_tower", 37.5680, 126.9800, 0.7, 8.0],       # Jongno CBD
+	["seoul", "seoul_shopping", 37.5715, 126.9880, 0.45, 10.0],  # Jongno 2–3-ga, Insadong
+	["seoul", "seoul_shopping", 37.5636, 126.9850, 0.4, 20.0],   # Myeongdong
+	["seoul", "seoul_shopping", 37.5560, 126.9230, 0.6, 15.0],   # Hongdae
+	["seoul", "seoul_shopping", 37.5598, 126.9425, 0.4, 10.0],   # Sinchon
+	["seoul", "seoul_shopping", 37.4980, 127.0276, 0.4, 10.0],   # Gangnam station
+	["seoul", "seoul_officetel", 37.4950, 127.0280, 0.9, 8.0],   # Gangnam, Seocho
+	["seoul", "seoul_officetel", 37.5440, 126.9510, 0.5, 8.0],   # Gongdeok, Mapo
+	["seoul", "seoul_danji", 37.5110, 127.0850, 1.2, 20.0],      # Jamsil
+	["seoul", "seoul_danji", 37.5290, 127.0300, 0.7, 20.0],      # Apgujeong
+	["seoul", "seoul_danji", 37.5050, 126.9950, 0.9, 20.0],      # Banpo
+	["seoul", "seoul_danji", 37.5200, 126.9700, 0.6, 15.0],      # Ichon
+	["seoul", "seoul_danji", 37.5300, 126.8750, 1.2, 20.0],      # Mokdong
+	["seoul", "seoul_danji", 37.6550, 127.0650, 1.8, 20.0],      # Nowon, Sanggye
+	["seoul", "seoul_villa", 37.5600, 126.9100, 1.0, 10.0],      # Mangwon, Yeonnam
+	["seoul", "seoul_villa", 37.5400, 126.8450, 1.2, 10.0],      # Hwagok
 	["dubai", "dubai_tower", 25.2100, 55.2750, 1.5, 20.0],       # Sheikh Zayed Road
 	["dubai", "dubai_tower", 25.1950, 55.2780, 1.0, 20.0],       # Downtown
 	["dubai", "dubai_tower", 25.1860, 55.2650, 1.0, 15.0],       # Business Bay
@@ -256,10 +293,13 @@ const DISTRICTS := [
 	["helsinki", "helsinki_empire", 60.1720, 24.9550, 0.5, 8.0],  # Kruununhaka
 	["helsinki", "helsinki_classicism", 60.1800, 24.9200, 1.0, 5.0],  # Töölö
 	["helsinki", "helsinki_midrise", 60.1870, 24.9770, 0.6, 20.0],  # Kalasatama
-	["helsinki", "helsinki", 60.1670, 24.9700, 0.7, 8.0],  # Katajanokka
+	["helsinki", "helsinki_midrise", 60.1830, 24.9870, 0.4, 8.0],  # Sompasaari
+	["helsinki", "helsinki", 60.1673, 24.9640, 0.33, 8.0],  # Katajanokka, Jugend west
+	["helsinki", "helsinki_midrise", 60.1668, 24.9750, 0.45, 8.0],  # Katajanokanranta, 1976–83
 	["helsinki", "helsinki", 60.1580, 24.9400, 0.55, 8.0],  # Eira
 	["helsinki", "helsinki", 60.1580, 24.9500, 0.5, 8.0],  # Ullanlinna
 	["helsinki", "helsinki", 60.1850, 24.9500, 0.65, 8.0],  # Kallio
+	["helsinki", "helsinki_classicism", 60.1853, 24.9548, 0.2, 8.0],  # Torkkelinmäki, 1920s
 	["helsinki", "helsinki", 60.1620, 24.9350, 0.5, 8.0],  # Punavuori
 	["helsinki", "helsinki_classicism", 60.1950, 24.9570, 0.7, 8.0],  # Vallila
 	["helsinki", "helsinki_wood", 60.2140, 24.9470, 0.65, 8.0],  # Käpylä
@@ -267,15 +307,23 @@ const DISTRICTS := [
 	["helsinki", "helsinki_suburb", 60.1950, 25.0350, 0.8, 8.0],  # Herttoniemi
 	["helsinki", "helsinki_suburb", 60.2030, 25.0570, 0.7, 8.0],  # Roihuvuori
 	["helsinki", "helsinki_suburb", 60.2060, 24.8720, 0.7, 8.0],  # Munkkivuori
+	["helsinki", "helsinki_functional", 60.1975, 24.8765, 0.5, 8.0],  # Munkkiniemen puistotie, 1935–54
+	["helsinki", "helsinki_villa", 60.1935, 24.8670, 0.4, 8.0],  # Vanha Munkkiniemi villas
+	["helsinki", "helsinki_villa", 60.1865, 24.8580, 0.5, 8.0],  # Kuusisaari
+	["helsinki", "helsinki_villa", 60.1818, 24.8505, 0.45, 8.0],  # Lehtisaari
 	["helsinki", "helsinki_element", 60.2100, 25.0830, 0.8, 8.0],  # Itäkeskus
 	["helsinki", "helsinki_element", 60.2370, 25.0830, 1.0, 8.0],  # Kontula
 	["helsinki", "helsinki_element", 60.1800, 24.9620, 0.28, 8.0],  # Merihaka
-	["helsinki", "helsinki_midrise", 60.1550, 24.9200, 0.85, 8.0],  # Jätkäsaari
+	["helsinki", "helsinki_midrise", 60.1565, 24.9130, 0.75, 8.0],  # Jätkäsaari
+	["helsinki", "helsinki_midrise", 60.1625, 24.9110, 0.5, 8.0],  # Ruoholahti, 1990s brick
+	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
+	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
 	["espoo", "tapiola", 60.1760, 24.8050, 1.0, 8.0],  # Tapiola
 	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
 	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
 	["espoo", "espoo_modern", 60.1590, 24.7380, 1.1, 8.0],  # Matinkylä
-	["espoo", "espoo_modern", 60.1700, 24.8280, 0.7, 8.0],  # Keilaniemi
+	["espoo", "espoo_modern", 60.1700, 24.7650, 0.6, 8.0],  # Niittykumpu metro centre
+	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town

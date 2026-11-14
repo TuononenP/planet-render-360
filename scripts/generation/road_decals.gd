@@ -36,7 +36,7 @@ static var _litter: Texture2D
 ## Adds the decals under one "RoadDecals" node of `root` on desktop Ultra.
 ## Returns the number added.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
-	if not RenderQuality.ultra_desktop(data.quality_preset):
+	if not CityDetail.street_extras(data):
 		return 0
 	var m := WorldScale.metres_to_units()
 	var spots: Array = []  # [distance², position (x, z), yaw, kind]

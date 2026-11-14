@@ -62,14 +62,24 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	var root := Node3D.new()
 	root.name = "Buildings"
 	var timings := {}
-	var t0 := Time.get_ticks_msec()
-	var smap := SettlementMap.build(data)
-	timings["settlement"] = Time.get_ticks_msec() - t0
+	# The settlement map only reads the place's imagery and land use, and
+	# only the infill and the far city need it: it builds beside the real
+	# buildings. "settlement" is the wait for it after them.
+	var settle := Thread.new()
+	settle.start(func() -> SettlementMap: return SettlementMap.build(data))
 	if not data.buildings.is_empty():
 		_real_buildings(root, data, ground, abort, timings)
 		if abort != null and abort.requested:
+			settle.wait_to_finish()
 			ShopLights.discard()
 			return root
+	var t0 := Time.get_ticks_msec()
+	var smap: SettlementMap = settle.wait_to_finish()
+	timings["settlement"] = Time.get_ticks_msec() - t0
+	# The far city's street lights at night (StreetGlow, FarSurface).
+	var glow_map := StreetGlow.settle_node(smap)
+	if glow_map != null:
+		root.add_child(glow_map)
 	# Absence-only (T4.5): fills only where OSM has no buildings and the
 	# imagery / land cover says settlement; 0 in a fully mapped city.
 	t0 = Time.get_ticks_msec()
@@ -82,13 +92,22 @@ static func build_buildings(data: LocationData, ground: GroundTruth = null,
 	FarCityBuilder.build(root, data, ground, smap)
 	timings["far_city"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
-	ShopLights.add(root)
+	ShopLights.add(root, View360.spawn_xz(data))
 	if FacadeShader.enabled(data.quality_preset):
 		FacadeShader.upgrade(root)
+	elif FacadeLiteShader.enabled(data.quality_preset):
+		FacadeLiteShader.upgrade(root)
 	FacadeTextures.end_build()
 	timings["finishing"] = Time.get_ticks_msec() - t0
+	timings["facade_compose"] = FacadeTextures.compose_ms  # inside the others
+	FacadeTextures.compose_ms = 0
 	print("BUILDINGS timings ms ", timings)
 	print("BUILDINGS census %s (settlement=%s)" % [str(last_stats), smap.source])
+	if failed_parts > 0:
+		print("BUILDINGS %d masses failed to build" % failed_parts)
+	if BuildingMasses.partial_outlines > 0:
+		print("BUILDINGS %d outlines under 90%% covered by their parts, %.0f m² unbuilt"
+			% [BuildingMasses.partial_outlines, BuildingMasses.partial_lost_m2])
 	return root
 
 static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
@@ -149,20 +168,41 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
+## Squared distance from `b` to the nearer of the camera and the view's
+## subject at the map centre.
+static func _view_d2(b: Dictionary, eye: Vector2) -> float:
+	var p := Vector2(float(b["x"]), float(b["z"]))
+	return minf(p.length_squared(), p.distance_squared_to(eye))
+
+## Masses that failed to extrude in the last build (a sibling can still
+## stand, so the logged fallback does not see them).
+static var failed_parts := 0
+
 static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort,
 		timings: Dictionary) -> void:
+	failed_parts = 0
 	var t0 := Time.get_ticks_msec()
-	var sorted := data.buildings.duplicate()
-	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return (float(a["x"]) ** 2 + float(a["z"]) ** 2) \
-			< (float(b["x"]) ** 2 + float(b["z"]) ** 2))
+	# A curated view can stand a kilometre from the middle of its extent, and
+	# look back at it: the building cap keeps what is near either one.
+	var eye := View360.spawn_xz(data)
+	# Indices sorted as the buildings would be (sort_custom permutes by its
+	# comparisons alone), so each building's skip test runs once, below.
+	var order: Array = range(data.buildings.size())
+	order.sort_custom(func(i: int, j: int) -> bool:
+		return _view_d2(data.buildings[i], eye) < _view_d2(data.buildings[j], eye))
+	var sorted: Array = order.map(func(i: int) -> Dictionary: return data.buildings[i])
 	var placed := 0
 	var aabb_fallbacks := 0
 	var impostor := MassBatch.new()
 	impostor.meta = {"lod_layer": "Buildings", "lod_impostor": true}
-	var cap := RenderSettings.max_buildings_for(data.quality_preset)
+	var cap := CityDetail.max_buildings(data)
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
+	ctx["eye"] = eye
+	# Roof colour samples read natively (PhotoSampler) from a usable photo.
+	var img := data.satellite_image
+	if img != null and not img.is_empty() and not img.is_compressed():
+		ctx["photo"] = GroundCover._photo_sampler(data)
 	if data.buildings.any(func(b: Dictionary) -> bool: return bool(b.get("suomenlinna", false))):
 		ctx["fortress_mesh"] = SuomenlinnaFortress.accumulator()
 	ctx["sea_y"] = ground.render_y(WaterBuilder.SEA_LEVEL_M) if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
@@ -172,21 +212,39 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# Real footprints out to just inside the detailed extent edge (the
 	# v1 ±105 of 110 units, now metres of the 2400 m extent).
 	var edge := WorldScale.detailed_extent_units() * 0.5 * 0.98
+	# Which buildings stand (not the landmark's own, inside the extent, not
+	# in open water), by data.buildings index.
+	var stands := PackedByteArray()
+	stands.resize(data.buildings.size())
+	for i in data.buildings.size():
+		var bi: Dictionary = data.buildings[i]
+		stands[i] = 1 if _accepted(data, bi, site, edge) and not _in_open_water(ground, bi) else 0
+	var standing := PackedByteArray()
+	for i: int in order:
+		standing.append(stands[i])
+	# Every standing building's plan, on the worker threads, in the order
+	# the shared walls below would plan them one by one.
+	var to_plan: Array = []
+	for i in data.buildings.size():
+		if stands[i] != 0 and not ShipBuilder.accepts(data.buildings[i]):
+			to_plan.append(data.buildings[i])
+	BuildingMasses.prepare(to_plan, ctx)
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
-		func(b: Dictionary) -> bool:
-			return not ShipBuilder.accepts(b) and _accepted(data, b, site, edge) and not _in_open_water(ground, b))
+		func(i: int) -> bool:
+			return not ShipBuilder.accepts(data.buildings[i]) and stands[i] != 0)
 	timings["shared_walls_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	if RoofGeometry._native:
-		_prepare_roofs(data, ground, ctx, sorted, site, edge)
+		_prepare_roofs(ground, ctx, sorted, standing)
 	timings["roof_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
-	for b in sorted:
+	for k in sorted.size():
+		var b: Dictionary = sorted[k]
 		if abort != null and abort.requested:
 			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
-		if not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+		if standing[k] == 0:
 			continue
 		if ShipBuilder.build(root, b, data, ground):
 			placed += 1
@@ -217,7 +275,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 			var footing := BuildingFoundation.sample(ground, fallback_ring, Vector2(pos.x, pos.z), float(ctx["sea_y"]))
 			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) \
 				else BuildingFoundation.SINK_M * WorldScale.metres_to_units())
-			BuildingFoundation.build(root, fallback_ring, [], footing, b)
+			BuildingFoundation.build(root, fallback_ring, [], footing, b, ground)
 			BuildingFoundation.plinth(root, fallback_ring, [], footing, ground)
 			var look := _look_for(b, ctx)
 			var res := _resolve_total(b, b, ctx, {}, look)
@@ -266,7 +324,7 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 	var first := root.get_child_count()
 	var m2u := WorldScale.metres_to_units()
 	var done := false
-	var masses := BuildingMasses.plan(b, ctx)
+	var masses := BuildingTerraces.split(BuildingMasses.plan(b, ctx), ground, float(ctx.get("sea_y", -INF)))
 	# The building's paint weight (its main mass's look) and its place's tone
 	# feed the vertex tint; a distant building's residual (_extrude_polygon)
 	# starts from none.
@@ -286,6 +344,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 		MeshArrays.hold()
 	for m in masses:
 		var md := m as Dictionary
+		if float(md.get("min_m", 0.0)) > 0.0:
+			md["seat"] = _seat_under(masses, md["centre"], ground, ctx)
 		if ctx.has("fortress_mesh") and SuomenlinnaFortress.build_mass(ctx["fortress_mesh"], md, data, ground):
 			done = true
 			continue
@@ -302,6 +362,8 @@ static func _extrude_masses(root: Node3D, data: LocationData,
 					and str(b.get("osm_id", "")) in ["way:75363809", "way:278042253", "way:278069587"]:
 				var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)))
 				NycCrownMaterials.crown_details(root, b, md, float(footing["floor"]))
+		else:
+			failed_parts += 1
 	if done and _batch == null:
 		RoofVariety.tint(root, first, float(b.get("x", 0.0)), float(b.get("z", 0.0)),
 			chroma, tone, ctx["wall_vt"], ctx["roof_vt"])
@@ -368,17 +430,27 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		idx = RingGeometry.drop_hole_triangles(cap, idx, holes)
 	if idx.size() < 3:
 		return false
-	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)))
+	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)),
+		float(mass.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
+		float(mass.get(BuildingTerraces.SNAP_KEY, 0.0)))
 	var base := float(footing["floor"])
 	# Walls sink 0.6 m below the lowest ground (no floating on slopes);
 	# the real height stands above that ground, not above the sunk base.
 	var sink := 0.0 if bool(footing["raised"]) else BuildingFoundation.SINK_M * WorldScale.metres_to_units()
-	var top := base + height_world
+	var top := _standing_top(footing, height_world, b)
 	base -= sink
 	if float(mass.get("min_m", 0.0)) > 0.0:
-		base += sink + float(mass["min_m"]) * WorldScale.metres_to_units()
+		# A raised part (a setback, a crown) stands on the mass under it:
+		# that mass's floor, less whatever its plinth took out of its
+		# height. Seated on its own ring it hung in the air above a tower
+		# on a slope.
+		var seat: Array = mass.get("seat", [])
+		var floor_y := float(seat[0]) if not seat.is_empty() else base + sink
+		var shift := float(seat[1]) if not seat.is_empty() else 0.0
+		base = floor_y + float(mass["min_m"]) * WorldScale.metres_to_units() - shift
+		top = floor_y + height_world - shift
 	else:
-		BuildingFoundation.build(root, ring, holes, footing, b)
+		BuildingFoundation.build(root, ring, holes, footing, b, ground)
 		BuildingFoundation.plinth(root, ring, holes, footing, ground)
 	# Party walls: hidden stretches skipped, firewalls above lower
 	# neighbours, gables (not slopes) and no cornice on shared edges.
@@ -388,24 +460,38 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	if _party != null and mass.has("key"):
 		cover = _cover_for(ring, str(mass["key"]), true)
 		party = PartyWalls.party_flags(cover)
-		fire = PartyWalls.firewall(look)
+		# A mapped part stands against its own building's lower parts, which
+		# leave windows above them, not a blank lot-line wall.
+		if not bool(mass.get("own_parts", false)):
+			fire = PartyWalls.firewall(look)
 	# T4.3: tags → satellite → regional resolution with real storey
 	# rows; past the fidelity radius the ≤6 distant set is shared.
 	var region := str(ctx.get("region", "generic"))
 	var fidelity := int(ctx.get("fidelity", 2))
-	var seed_v := TerrainBuilder._hash(centre.x, centre.y)
+	var seed_at: Vector2 = mass.get(BuildingTerraces.SEED_KEY, centre)
+	var seed_v := TerrainBuilder._hash(seed_at.x, seed_at.y)
+	# Geometry detail follows the camera (eye_d). Full materials also stay on
+	# the view's subject at the map centre, which a far eye looks back at.
+	var eye_d := centre.distance_to(ctx.get("eye", Vector2.ZERO) as Vector2)
 	# A mapped landmark keeps full detail at any distance: it is the skyline.
 	var distant := _batch != null or (not bool(b.get("mapped_landmark", false)) \
-		and centre.length() / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
+		and minf(eye_d, centre.length()) / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))
+	# A plinth a storey tall gets that storey's doors and windows, near only.
+	if with_detail and not distant and float(mass.get("min_m", 0.0)) <= 0.0:
+		BuildingBasement.dress(root, ring, footing, ground, party)
 	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
 		fidelity, distant, seed_v, look)
 	# Roof sampling spans the ring's AABB. A distant building reads it too: its
 	# roof colour (a residual on the shared roofs) then follows the imagery.
 	var hint := Color(0, 0, 0, 0)
 	var bb := RingGeometry.aabb(ring)
-	hint = MaterialLibrary.sampled_roof_color(data,
-		centre.x, centre.y, bb.size.x, bb.size.y,
-		Callable(TerrainBuilder, "satellite_uv"))
+	var photo: Object = ctx.get("photo", null)
+	if photo != null:
+		hint = photo.roof_sample(centre.x, centre.y, bb.size.x, bb.size.y)
+	else:
+		hint = MaterialLibrary.sampled_roof_color(data,
+			centre.x, centre.y, bb.size.x, bb.size.y,
+			Callable(TerrainBuilder, "satellite_uv"))
 	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
 		hint, fidelity, distant, seed_v, look)
 	if bool(b.get("mapped_landmark", false)) and not distant:
@@ -427,10 +513,9 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# the windows (a mansard eats most of an attic floor).
 	var v_rep := float(maxi(storeys, 1))
 	if not look.is_empty():
-		var wall_m := height_world / WorldScale.metres_to_units()
-		var fh := float(look["floor_h"])
-		v_rep = roundf(clampf(v_rep, maxf(1.0, wall_m / (fh * 1.35)),
-			maxf(1.0, wall_m / (fh * 0.75))))
+		# height_world is the wall's absolute top: a raised part counts its own.
+		var wall_m := height_world / WorldScale.metres_to_units() - float(mass.get("min_m", 0.0))
+		v_rep = BuildingWalls.storey_repeats(wall_m, storeys, float(look["floor_h"]))
 	# T4.6: a ground storey of its own (shopfront, signage band, a
 	# chalet's rendered base) under the tiled storeys when the look has one.
 	var ground_mat: Material = null
@@ -462,6 +547,11 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		if bool(bands["attic"]):
 			attic_mat = FacadeMaterials.facade_for_building(b, region, storeys, fidelity, false,
 				seed_v, BuildingWalls.attic_look(look))
+	if fidelity >= 2 and look.has("tower_look") and FacadeMaterials.facade_uv(facade).z > 0.0:
+		var mech := BuildingWalls.mech_floors(upper, seed_v, with_detail)
+		if not mech.is_empty():
+			bands["mech"] = mech
+			bands["louvre"] = FacadeTextures.louvre(1, str(look["wall_set"]) == "glass")
 	if top - base < 0.05 * WorldScale.metres_to_units():
 		pass  # a part that is only roof (a dome on its drum) has no walls
 	elif ground_mat != null:
@@ -475,41 +565,49 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	else:
 		BuildingWalls.upper_walls(root, ring, base, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	for h in holes:
-		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null else []
+		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null and mass.has("key") else []
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	_roof_cap(root, ring, idx, top, roof_mat, BuildingTrim.kind(shape,
-		centre.length() / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party)
+		eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset)), cap, party,
+		str(look.get("wall_set", "")))
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
 	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
 	if not job.is_empty():
+		# Near ordinary buildings: a gable end is wall, not a triangle of tile.
+		var gable_look := look if not distant and _batch == null \
+			and not bool(b.get("mapped_landmark", false)) else {}
 		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6],
-			RoofForms.axis_from_tags(b, ring))
+			RoofForms.axis_from_tags(b, ring), gable_look)
 	if not roofed:
 		# No pitched roof built (flat, or no form fits): dormers, stacks and
 		# gables must not stand on a roof that is not there.
 		shape = "flat"
 		roof_h_world = 0.0
+	if with_detail and fidelity >= 2 and shape == "flat" and look.has("tower_look"):
+		TowerTop.add(root, ring, top, height_world / WorldScale.metres_to_units(), seed_v,
+			FacadeTextures.louvre(1, str(look["wall_set"]) == "glass"), roof_mat)
 	if not distant and _batch == null and not look.is_empty() \
-			and centre.length() < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
+			and eye_d < FacadeRelief.radius_m(preset) * WorldScale.metres_to_units():
 		var g_y := base if ground_mat == null else minf(base + sink
 			+ float(look["floor_h"]) * WorldScale.metres_to_units()
-			* (1.15 if str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
+			* (1.15 if not shop_materials.is_empty() or str(look.get("ground", "")) in ["shop", "signage"] else 1.0),
 			top - float(look["floor_h"]) * WorldScale.metres_to_units() * 0.6)
 		FacadeRelief.add(root, {"ring": ring, "cover": cover, "base": base, "g_top": g_y,
 			"top": top, "v_rep": v_rep, "storeys": storeys, "look": look, "facade": facade, "bands": bands,
-			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink,
+			"seed": seed_v, "party": _party, "b": b, "ground_y": base + sink, "shop_edges": shop_materials,
 			"roof_h": roof_h_world, "shape": shape, "gable_front": gable_front, "raised": raised,
 			"party_flags": party, "screens": RenderQuality.ultra_desktop(preset),
 			"wall_lanterns": RenderQuality.ultra_desktop(preset),
 			"shop_lights": RenderQuality.ultra_desktop(preset)
-				and centre.length() < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
+				and eye_d < ShopLights.SHOP_RADIUS_M * WorldScale.metres_to_units()})
 	if with_detail and not distant and _batch == null and not look.is_empty():
 		var before := root.get_child_count()
 		BuildingDetail.add(root, ring, top, height_world, shape, roof_h_world,
-			look, facade, roof_mat, seed_v, centre.length() < BuildingDetail.near_radius(preset),
-			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "")
+			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset, data),
+			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "",
+			RenderQuality.is_forward_plus() and preset >= RenderSettings.Preset.HIGH)
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church
 		# towers are skyline and stay in every ring.
 		if str(look.get("kind", "")) != "religious":
@@ -570,20 +668,63 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 
 static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Array,
 		top: float, mat: Material, trim: int = 0, cap: PackedVector2Array = PackedVector2Array(),
-		party: PackedByteArray = PackedByteArray()) -> void:
-	BuildingWalls._roof_cap(root, ring, idx, top, mat, trim, cap, party)
+		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
+	BuildingWalls._roof_cap(root, ring, idx, top, mat, trim, cap, party, wall_set)
 
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
-		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO) -> bool:
+		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO,
+		gable_look: Dictionary = {}) -> bool:
 	var key := [ring, top, rh, shape, party, gable_front, holes] if not _roofs.is_empty() else []
 	var mesh := RoofGeometry.mesh_of(_roofs[key]) if axis == Vector2.ZERO and _roofs.has(key) \
 		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes, axis)
+	if mesh != null and not gable_look.is_empty() and shape in RoofGeometry.GABLED:
+		var gables := RoofGeometry.split_gables(mesh, ring, party)
+		if gables[0] != null:
+			(gables[0] as ArrayMesh).set_meta(RoofVariety.WALL_TINT, PartyWalls.gable_tint(gable_look))
+			TerrainBuilder._add(root, gables[0], PartyWalls.gable(gable_look))
+		if gables[1] != null:
+			TerrainBuilder._add(root, gables[1], PartyWalls.firewall(gable_look))
 	if mesh != null and _batch != null:
 		_batch.add_mesh(_batch_key, mat, mesh)
 	elif mesh != null:
 		TerrainBuilder._add(root, mesh, mat)
 	return mesh != null
+
+## Top of a mass standing on `footing`. A tagged height runs from the
+## lowest ground, so the plinth comes out of it, though never most of the
+## building: a tall plinth on a steep site is a storey of its own, and a
+## low building still shows a storey above its floor. Levels count from
+## the floor and stand on top.
+static func _standing_top(footing: Dictionary, height_world: float, b: Dictionary) -> float:
+	var m := WorldScale.metres_to_units()
+	var floor_y := float(footing["floor"])
+	if str(b.get("height_source", "")) != "tag_height":
+		return floor_y + height_world
+	var out_of_height := minf(float(footing["plinth"]), maxf(BuildingFoundation.PLINTH_MAX_M * m, height_world * 0.35))
+	return maxf(floor_y + height_world - out_of_height, floor_y + minf(height_world, BuildingFoundation.MIN_BODY_M * m))
+
+## [floor, height lost to the plinth] of the standing mass of `masses`
+## that a raised mass at `centre` rests on: the one whose ring holds it,
+## else the first. Empty when nothing stands on the ground.
+static func _seat_under(masses: Array, centre: Vector2, ground: GroundTruth, ctx: Dictionary) -> Array:
+	var m2u := WorldScale.metres_to_units()
+	var best: Array = []
+	for m in masses:
+		var md := m as Dictionary
+		if float(md.get("min_m", 0.0)) > 0.0:
+			continue
+		var inside := Geometry2D.is_point_in_polygon(centre, md["ring"])
+		if not best.is_empty() and not inside:
+			continue
+		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)),
+			float(md.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
+			float(md.get(BuildingTerraces.SNAP_KEY, 0.0)))
+		var height_world := float(md["wall_m"]) * m2u
+		best = [float(footing["floor"]), float(footing["floor"]) + height_world - _standing_top(footing, height_world, md["b_eff"])]
+		if inside:
+			break
+	return best
 
 ## Floor under a mass, clearing the visible water for accepted
 ## waterfront buildings (shrines, boathouses, named pier structures).
@@ -602,6 +743,13 @@ static func _roof_job(ring: PackedVector2Array, top: float, height_world: float,
 		holes: Array) -> Array:
 	if shape == "flat" or roof_h_world <= 0.01:
 		return []
+	# A detached gabled house of 9+ corners roofs its simplified ring
+	# (RoofForms.gable_ring): true gables, not an inset hip.
+	if shape == "gabled" and ring.size() > 8 and holes.is_empty() and not party.has(1):
+		var gable := RoofForms.gable_ring(ring)
+		if not gable.is_empty():
+			ring = gable
+			party = PackedByteArray()
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var eave_u := float(look.get("eave", 0.0)) * WorldScale.metres_to_units()
 	if eave_u > 0.0 and shape in ["gabled", "hipped", "pyramidal"] \
@@ -625,32 +773,58 @@ static func _cover_for(ring: PackedVector2Array, key: String, take: bool = false
 		_covers[key] = [ring, cover]
 	return cover
 
+## _cover_for with the cover already computed: the one kept for this
+## mass when it is the same ring, else `cover`, kept.
+static func _cover_known(ring: PackedVector2Array, key: String, cover: Array) -> Array:
+	var hit: Array = _covers.get(key, [])
+	if not hit.is_empty() and hit[0] == ring:
+		return hit[1]
+	_covers[key] = [ring, cover]
+	return cover
+
 ## Every standing mass's roof form, computed up front on every core
 ## (RoofKernels.form_many) with _extrude_polygon's own inputs: _roof_form
 ## takes a result only when its call matches it exactly.
-static func _prepare_roofs(data: LocationData, ground: GroundTruth, ctx: Dictionary,
-		sorted: Array, site: Vector2, edge: float) -> void:
+static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
+		sorted: Array, standing: PackedByteArray) -> void:
 	var m2u := WorldScale.metres_to_units()
-	var jobs: Array = []
-	for b in sorted:
-		if ShipBuilder.accepts(b) or not _accepted(data, b, site, edge) or _in_open_water(ground, b):
+	var masses: Array = []
+	for k in sorted.size():
+		var b: Dictionary = sorted[k]
+		if ShipBuilder.accepts(b) or standing[k] == 0:
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			var md := m as Dictionary
 			if SuomenlinnaSite.fortress(md["b_eff"]):
 				continue
-			var ring: PackedVector2Array = md["ring"]
-			if RoofForms.axis_from_tags(md["b_eff"], ring) != Vector2.ZERO:
+			if RoofForms.axis_from_tags(md["b_eff"], md["ring"]) != Vector2.ZERO:
 				continue  # an axis of its own: the GDScript roof path builds it
-			var height_world := float(md["wall_m"]) * m2u
-			var party := PackedByteArray()
-			if _party != null and md.has("key"):
-				party = PartyWalls.party_flags(_cover_for(ring, str(md["key"])))
-			var job := _roof_job(ring, _mass_base(ground, ring, md["centre"], float(ctx.get("sea_y", -INF))) + height_world,
-				height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
-				md.get("holes", []))
-			if not job.is_empty():
-				jobs.append(job)
+			masses.append(md)
+	# The shared-wall covers read the finished index only: on the worker
+	# threads (native PartyIndex), filed below as _cover_for would.
+	var covers: Array = []
+	covers.resize(masses.size())
+	if _party != null and PartyWalls._native:
+		var group := WorkerThreadPool.add_group_task(func(i: int) -> void:
+			var md: Dictionary = masses[i]
+			if md.has("key"):
+				covers[i] = _party.ring_cover(md["ring"], str(md["key"])), masses.size(), -1, true, "RoofCovers")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	var jobs: Array = []
+	for i in masses.size():
+		var md: Dictionary = masses[i]
+		var ring: PackedVector2Array = md["ring"]
+		var height_world := float(md["wall_m"]) * m2u
+		var party := PackedByteArray()
+		if _party != null and md.has("key"):
+			var cover: Array = _cover_known(ring, str(md["key"]), covers[i]) if covers[i] != null \
+				else _cover_for(ring, str(md["key"]))
+			party = PartyWalls.party_flags(cover)
+		var job := _roof_job(ring, _mass_base(ground, ring, md["centre"], float(ctx.get("sea_y", -INF))) + height_world,
+			height_world, str(md["shape"]), float(md["rh_m"]) * m2u, md["look"], party,
+			md.get("holes", []))
+		if not job.is_empty():
+			jobs.append(job)
 	var res: Array = ClassDB.class_call_static("RoofKernels", "form_many", jobs)
 	for i in jobs.size():
 		_roofs[jobs[i]] = res[i]

@@ -6,7 +6,7 @@ extends RefCounted
 ## subtree; nothing writes either while they run. The builders couple
 ## only through static caches: those shared across stages are locked
 ## and keyed by content. PbrTextures' keys round tint and repeat, so it
-## resolves each key's values by serial stage rank; its 64-entry cap
+## resolves each key's values by serial stage rank; its cap
 ## falls back by insertion order, so a build that crosses it is rebuilt
 ## serially. Buildings and the far city stay one task (the
 ## facade caches, also capped, keep their serial order). Subtrees are
@@ -22,7 +22,6 @@ class Stage extends RefCounted:
 	var fn: Callable
 	var node: Node3D = null
 	var ms := 0
-	var task := -1
 	var finished := false
 
 ## Called from the build thread (View360.build_location). On the main
@@ -72,23 +71,25 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			return VegetationBuilder.build_vegetation(data, ground, abort)),
 	]
 	var mutex := Mutex.new()
-	for i in stages.size():
-		var st := stages[i]
-		var cache: Dictionary = before_clear if i <= 2 else MaterialLibrary._pbr_mats
+	var tasks: Array[int] = []
+	for lane: Array in _lanes():
 		var run := func() -> void:
-			var s0 := Time.get_ticks_msec()
-			if abort == null or not abort.requested:
-				PbrTextures.push_stage(cache, i)  # rank = serial stage order
-				st.node = st.fn.call()
-				PbrTextures.pop_stage()
-			st.ms = Time.get_ticks_msec() - s0
-			mutex.lock()
-			st.finished = true
-			_progress(abort, stages, st.step)
-			mutex.unlock()
-		st.task = WorkerThreadPool.add_task(run, true, "WorldBuild")
-	for st in stages:
-		WorkerThreadPool.wait_for_task_completion(st.task)
+			for i: int in lane:
+				var st := stages[i]
+				var cache: Dictionary = before_clear if i <= 2 else MaterialLibrary._pbr_mats
+				var s0 := Time.get_ticks_msec()
+				if abort == null or not abort.requested:
+					PbrTextures.push_stage(cache, i)  # rank = serial stage order
+					st.node = st.fn.call()
+					PbrTextures.pop_stage()
+				st.ms = Time.get_ticks_msec() - s0
+				mutex.lock()
+				st.finished = true
+				_progress(abort, stages, st.step)
+				mutex.unlock()
+		tasks.append(WorkerThreadPool.add_task(run, true, "WorldBuild"))
+	for task in tasks:
+		WorkerThreadPool.wait_for_task_completion(task)
 	BuildingBuilder._suppress_begin_build = false
 	if (abort != null and abort.requested) or PbrTextures.cap_reached:
 		for st in stages:
@@ -121,6 +122,23 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			abort.set_ms(s, ms[s])
 		print("%s total=%d parallel" % [abort.timings_line(), Time.get_ticks_msec() - t0])
 	return root
+
+## Stage indices grouped into tasks; a task runs its stages in order.
+## Set to try another grouping (tests, benches).
+static var lanes_override: Array = []
+
+## A debug build checks every object a script touches against one
+## engine-wide lock, so seven script-heavy stages at once mostly wait on
+## each other: buildings and vegetation get a task each and the short
+## stages share a third (Helsinki on Ultra: 11.4 s with seven tasks,
+## 7.3 s with three). Release builds have no such check and keep one
+## task per stage.
+static func _lanes() -> Array:
+	if not lanes_override.is_empty():
+		return lanes_override
+	if OS.is_debug_build():
+		return [[3], [6], [0, 1, 2, 4, 5]]
+	return [[0], [1], [2], [3], [4], [5], [6]]
 
 static func _stage(step: int, fn: Callable) -> Stage:
 	var s := Stage.new()

@@ -63,6 +63,9 @@ var dem_source: Dictionary = {}
 ## inside its coverage; {} elsewhere. Transient: only dem_source["ground_model"]
 ## is part of the world key.
 var ground_model: Dictionary = {}
+## A finer window of the same model for lighting only (DemRelief), High /
+## Ultra; {} elsewhere. Transient like ground_model (dem_source records it).
+var ground_detail: Dictionary = {}
 ## v2 (T3.7): far-field DEM rings for FarTerrainBuilder, finest first
 ## (contract §2.2) — {zoom, origin_px: Vector2 (global px at zoom of the
 ## window's top-left pixel corner), width, height, heights:
@@ -73,6 +76,9 @@ var dem_rings: Array = []
 ## {zoom, origin_px: Vector2, size_px: Vector2i, texture: Texture2D,
 ## reach_m}. Empty = colour-ramp fallback on the far rings.
 var far_drapes: Array = []
+## Water over the far rings (FarWaterMask: sea and lakes from OpenMapTiles),
+## {} = none: the rings fall back to OSM polygons and the sea-level rule.
+var far_water_mask: Dictionary = {}
 ## Satellite mosaic draped on the detailed terrain (SatelliteFetcher).
 ## Null means "no imagery": vertex colours dress the terrain instead.
 var satellite_texture: Texture2D
@@ -98,6 +104,9 @@ var satellite_metres_per_px: float = 0.0
 ## it did not arrive whole. Origin in global pixels at that zoom.
 var satellite_inner_texture: Texture2D
 var satellite_inner_origin_px: Vector2 = Vector2.ZERO
+## The inner mosaic's source (InnerImagery): {src, zoom, span,
+## metres_per_px, gain, bias}; {} = Esri at SATELLITE_INNER_* or none.
+var satellite_inner_source: Dictionary = {}
 var landmark_type: String = "none"  # see landmarks() for the types
 ## True site of the landmark (landmarks() entry), so TerrainBuilder
 ## can place the model at its real bearing from the viewpoint instead
@@ -187,10 +196,27 @@ var piers: Array = []
 ## Mapped waterfront edges {points, kind, id, material, height_m}.
 ## Empty for old/offline payloads; inferred banks retain their provenance.
 var shore_structures: Array = []
+## OSM man_made=bridge outlines {points, layer, bridge_structure,
+## bridge_material, name, osm_id} (OsmParser._bridge_area): BridgeStructures
+## builds one deck per outline. Empty where the bridge layer is not cached.
+var bridge_areas: Array = []
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.
 var railways: Array = []
+## OSM tram stops (railway=tram_stop, tram stop positions) and bus stops
+## (highway=bus_stop): {x, z, name} in current internal units. Empty for
+## payloads cached or bundled before the query asked for them;
+## TransitVehicles then spaces its trams along the track alone.
+var tram_stops: Array = []
+var bus_stops: Array = []
+## OSM railway platforms (railway=platform, train platforms):
+## {points} outlines or centre lines in current internal units, and
+## mainline station nodes {x, z, name}. Empty for payloads cached or
+## bundled before the query asked for them; StationTrains then finds
+## termini from the track's dead ends alone.
+var rail_platforms: Array = []
+var rail_stations: Array = []
 ## v2 (T5.4, contract §2.6 amendment 2026-10-28): far built-up landuse
 ## past the detailed extent — {class: residential|commercial|industrial|
 ## retail, points: PackedVector2Array, holes: Array} in metre XZ, from
@@ -234,6 +260,7 @@ static func known_places() -> Array:
 		{"name": "Cairo, Egypt", "lat": 30.0444, "lon": 31.2357},
 		{"name": "Cape Town, South Africa", "lat": -33.9249, "lon": 18.4241},
 		{"name": "New York, United States", "lat": 40.7128, "lon": -74.0060},
+		{"name": "Midtown Manhattan, United States", "lat": 40.7535, "lon": -73.9825},
 		{"name": "San Francisco, United States", "lat": 37.7749, "lon": -122.4194},
 		{"name": "Rio de Janeiro, Brazil", "lat": -22.9068, "lon": -43.1729},
 		{"name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503},
@@ -316,6 +343,31 @@ static func landmark_name(type: String) -> String:
 			return str(entry.get("name", type.capitalize()))
 	return type.capitalize()
 
+## The canonical place a named selection starts from: {"name", "lat",
+## "lon"} at the place's preset coordinates (its PresetViews origin for
+## a curated city, else its gazetteer point), so picking Helsinki starts
+## at the same point however it was found. A geocoder spelling with a
+## regional suffix ("Helsinki, Uusimaa", "Paris, Ile-de-France") resolves
+## to the gazetteer name when its point lies within 50 km of it; a
+## same-named place farther away, a street address and any other name
+## with no gazetteer entry keep the point they were given.
+static func canonical_place(place_name: String, lat: float, lon: float) -> Dictionary:
+	var want := place_name.strip_edges().to_lower()
+	for place in known_places():
+		if str(place["name"]).to_lower() == want:
+			return {"name": str(place["name"]), "lat": float(place["lat"]), "lon": float(place["lon"])}
+	var city := want.split(",")[0].strip_edges()
+	var found: Dictionary = {}
+	for place in known_places():
+		if str(place["name"]).to_lower().split(",")[0].strip_edges() == city:
+			if not found.is_empty():
+				return {"name": place_name, "lat": lat, "lon": lon}  # ambiguous name
+			found = place
+	if not found.is_empty() and WorldScale.xz_from_latlon(
+			float(found["lat"]), float(found["lon"]), lat, lon).length() <= 50000.0:
+		return {"name": str(found["name"]), "lat": float(found["lat"]), "lon": float(found["lon"])}
+	return {"name": place_name, "lat": lat, "lon": lon}
+
 static func known_place(lat: float, lon: float) -> String:
 	var view := PresetViews.for_pin(lat, lon)
 	if not view.is_empty():
@@ -373,7 +425,7 @@ static func _core_landmarks() -> Array:
 			"wiki_title": "Turku Cathedral", "height_m": 101.0,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
 		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
-			"wiki_title": "Helsinki Cathedral", "height_m": 62.0,
+			"wiki_title": "Helsinki Cathedral", "height_m": 62.0, "base_at_m": [0.0, 70.0],
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
 		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
 			"wiki_title": "Eiffel Tower", "height_m": 330.0,
@@ -396,7 +448,7 @@ static func _core_landmarks() -> Array:
 		{"type": "pyramid", "name": "Great Pyramid of Giza", "lat": 29.9792, "lon": 31.1342, "radius_m": 13000.0,
 			"wiki_title": "Great Pyramid of Giza", "height_m": 139.0,
 			"aliases": ["pyramid", "giza", "khufu", "cheops"]},
-		{"type": "statue_liberty", "name": "Statue of Liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
+		{"type": "statue_liberty", "skyline_priority": 3, "name": "Statue of Liberty", "lat": 40.6892, "lon": -74.0445, "radius_m": 7000.0,
 			"wiki_title": "Statue of Liberty", "height_m": 93.0,
 			"aliases": ["statue of liberty", "lady liberty"]},
 		{"type": "sydney_opera", "name": "Sydney Opera House", "lat": -33.8568, "lon": 151.2153, "radius_m": 5000.0,
@@ -408,10 +460,10 @@ static func _core_landmarks() -> Array:
 			"aliases": ["burj khalifa", "burj dubai"]},
 		# Lower Manhattan's streets run close to the Midtown grid (29°).
 		{"type": "one_wtc", "name": "One World Trade Center", "lat": 40.7130, "lon": -74.0132, "radius_m": 6000.0,
-			"wiki_title": "One World Trade Center", "height_m": 541.3, "clear_m": 50.0, "yaw_deg": 29.0,
+			"wiki_title": "One World Trade Center", "height_m": 541.3, "clear_m": 50.0, "yaw_deg": 29.0, "ultra_registry_limit": 24,
 			"kind": "Skyscraper", "aliases": ["one world trade", "one wtc", "freedom tower"]},
-		{"type": "empire_state", "name": "Empire State Building", "lat": 40.7484, "lon": -73.9857, "radius_m": 6000.0,
-			"wiki_title": "Empire State Building", "height_m": 443.2, "clear_m": 70.0, "yaw_deg": 29.0,
+		{"type": "empire_state", "skyline_priority": 3, "name": "Empire State Building", "lat": 40.7484, "lon": -73.9857, "radius_m": 6000.0,
+			"wiki_title": "Empire State Building", "height_m": 443.2, "clear_m": 70.0, "yaw_deg": 29.0, "ultra_registry_limit": 24,
 			"kind": "Skyscraper", "aliases": ["empire state"]},
 		{"type": "salute", "name": "Santa Maria della Salute", "lat": 45.4309, "lon": 12.3346, "radius_m": 3000.0,
 			"wiki_title": "Santa Maria della Salute", "height_m": 60.0, "clear_m": 45.0, "yaw_deg": 150.0,
@@ -419,7 +471,7 @@ static func _core_landmarks() -> Array:
 		{"type": "monte_carlo_casino", "name": "Monte Carlo Casino", "lat": 43.7393, "lon": 7.4283, "radius_m": 2500.0,
 			"wiki_title": "Monte Carlo Casino", "height_m": 34.0, "clear_m": 60.0, "yaw_deg": -30.0,
 			"kind": "Casino", "aliases": ["monte carlo casino", "casino de monte-carlo", "casino de monte carlo"]},
-		{"type": "gwanghwamun", "name": "Gwanghwamun", "lat": 37.5760, "lon": 126.9769, "radius_m": 3000.0,
+		{"type": "gwanghwamun", "name": "Gwanghwamun", "lat": 37.575928, "lon": 126.976817, "radius_m": 3000.0,
 			"wiki_title": "Gwanghwamun", "height_m": 19.0, "clear_m": 30.0, "kind": "Palace gate",
 			"aliases": ["gwanghwamun", "광화문"]},
 		{"type": "banff_springs", "name": "Banff Springs Hotel", "lat": 51.1643, "lon": -115.5618, "radius_m": 3000.0,
@@ -439,7 +491,7 @@ static func _core_landmarks() -> Array:
 		{"type": "tower_bridge", "name": "Tower Bridge", "lat": 51.5055, "lon": -0.0754, "radius_m": 5000.0,
 			"wiki_title": "Tower Bridge", "height_m": 65.0, "clear_m": 30.0, "yaw_deg": 95.0,
 			"span_m": 256.0, "base": "sea", "kind": "Bridge", "aliases": ["tower bridge"]},
-		{"type": "brooklyn_bridge", "name": "Brooklyn Bridge", "lat": 40.7056, "lon": -73.9964, "radius_m": 5000.0,
+		{"type": "brooklyn_bridge", "skyline_priority": 3, "name": "Brooklyn Bridge", "lat": 40.7056, "lon": -73.9964, "radius_m": 5000.0,
 			"wiki_title": "Brooklyn Bridge", "height_m": 84.3, "clear_m": 22.0, "yaw_deg": 46.0,
 			"span_m": 1132.0, "base": "sea", "kind": "Bridge", "aliases": ["brooklyn bridge"]},
 		{"type": "sydney_harbour_bridge", "name": "Sydney Harbour Bridge", "lat": -33.8523, "lon": 151.2106,

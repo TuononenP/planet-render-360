@@ -34,6 +34,9 @@ extends RefCounted
 ## A pin this close to a row's origin opens with that row's view.
 const MATCH_M := 15.0
 
+## The place selected when the app starts.
+const DEFAULT_ID := "helsinki"
+
 const ROWS := [
 	# Palais de Chaillot esplanade, on the axis to the Eiffel Tower
 	# (~600 m, bearing 135°); the tower opens just left of centre.
@@ -71,6 +74,11 @@ const ROWS := [
 	{"id": "new_york", "label": "New York", "name": "New York, United States",
 		"lat": 40.7060, "lon": -74.0040, "eye_lat": 40.70265, "eye_lon": -73.99686,
 		"eye_m": 6.0, "bearing": 295.0, "pitch": 3.0, "hour": 8.0},
+	# Top of the Rock's south deck, down Midtown to the Empire State (~207°)
+	# with Chrysler to the left; the extent covers the towers it faces.
+	{"id": "new_york_midtown", "label": "Midtown", "name": "Midtown Manhattan, United States",
+		"lat": 40.7535, "lon": -73.9825, "eye_lat": 40.7588, "eye_lon": -73.9795,
+		"eye_m": 6.0, "asl_m": 262.0, "bearing": 195.0, "pitch": -7.0, "hour": 9.0},
 	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
 	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
 	# the path at the waterfront road, so asl_m holds the eye on the cliff.
@@ -100,12 +108,14 @@ const ROWS := [
 	{"id": "venice", "label": "Venice", "name": "Venice, Italy",
 		"lat": 45.4318, "lon": 12.3290, "eye_m": 8.0, "bearing": 104.0, "pitch": -2.0,
 		"clear": false},
-	# Gwanghwamun Square's north half, up the plaza axis to the palace gate
-	# (~240 m) and Bugaksan; the old eye, 120 m south, looked across
-	# Sejong-daero's lanes.
+	# Gwanghwamun from the far side of the Sajik-ro crosswalk on its axis
+	# (~105 m), over the woldae to the gate, the palace walls and Bugaksan,
+	# as in the rebuilt square's photos (refs/seoul/01), zoomed to their
+	# ~85° field of view. The old eye stood
+	# 240 m down the plaza, where the gate read as a speck.
 	{"id": "seoul", "label": "Seoul", "name": "Seoul, South Korea",
-		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.5738, "eye_lon": 126.9769,
-		"eye_m": 6.0, "bearing": 0.0, "pitch": 2.0},
+		"lat": 37.5728, "lon": 126.9769, "eye_lat": 37.574978, "eye_lon": 126.976772,
+		"eye_m": 4.0, "bearing": 0.0, "pitch": 3.0, "zoom": 1.35},
 	# Hyde St at Lombard, top of the crooked block, down the cable-car line
 	# (~352°) to Aquatic Park and Alcatraz (~353°, 2.8 km); the extent
 	# covers the slope down to the bay. Hyde St and the 1067 mm cable-car
@@ -124,6 +134,17 @@ const ROWS := [
 		"lat": 60.1760, "lon": 24.8050, "eye_lat": 60.1780, "eye_lon": 24.8076,
 		"eye_m": 5.0, "bearing": 230.0, "pitch": 2.0, "clear": false},
 ]
+
+## Index of the starting place in ROWS (and in LocationData.quick_picks()).
+static func default_index() -> int:
+	for i in ROWS.size():
+		if str(ROWS[i]["id"]) == DEFAULT_ID:
+			return i
+	return 0
+
+## The starting place's row.
+static func default_row() -> Dictionary:
+	return ROWS[default_index()]
 
 ## The row whose origin lies within MATCH_M of (lat, lon), {} for none.
 static func for_pin(lat: float, lon: float) -> Dictionary:

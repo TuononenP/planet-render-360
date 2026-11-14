@@ -24,7 +24,7 @@ static func phnom_bakheng(model: Node3D) -> void:
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#8A7A62", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("stone", "#9C8C72", 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#2A2622", 2.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A5438", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#8E5A3E", 3.0))
 	lm.box("Laterite", Vector3(0, 1.0, 0), Vector3(76.0, 2.0, 76.0))
 	lm.box("Laterite", Vector3(0, 0.2, 0), Vector3(77.0, 0.4, 77.0))

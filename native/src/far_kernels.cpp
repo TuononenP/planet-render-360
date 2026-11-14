@@ -63,6 +63,11 @@ Array FarKernels::ring_colors(const PackedVector3Array &pos, int loops, int per,
 	const double datum_m = params["datum_m"];
 	const double y_scale = params["y_scale"];
 	const Rect2 wbounds = params["wbounds"];
+	const WaterMask mask = read_mask(params.get("water_mask", Dictionary()));
+	Far geo; // merc_uv's viewpoint, for the mask lookup
+	geo.lat = params.get("lat", 0.0);
+	geo.lon = params.get("lon", 0.0);
+	geo.m2u = params.get("m2u", 1.0);
 	std::vector<Poly> polys;
 	for (int64_t i = 0; i < water.size(); i++) {
 		Object *o = water[i];
@@ -105,8 +110,14 @@ Array FarKernels::ring_colors(const PackedVector3Array &pos, int loops, int per,
 				}
 			}
 			double h_asl = asl_y(v.y);
-			// FarSampler._far_water
-			bool wet = in_osm || (water_asl == -3.0 ? h_asl < water_asl + 1.0 : h_asl < SEA_LEVEL_M);
+			// FarSampler._far_water: the water mask decides where it covers.
+			int mv = MASK_NONE;
+			if (!in_osm && mask.n > 0) {
+				Vector2 muv = merc_uv(geo, (double)v.x / geo.m2u, (double)v.z / geo.m2u);
+				mv = mask.sample_uv(muv.x, muv.y);
+			}
+			bool wet = in_osm || (mv != MASK_NONE ? mv != MASK_LAND
+					: (water_asl == -3.0 ? h_asl < water_asl + 1.0 : h_asl < SEA_LEVEL_M));
 			cout[row + j] = ramp_color(cl, nrm, h_asl, wet, hash((double)v.x * 1.3, (double)v.z * 1.7));
 		}
 	});

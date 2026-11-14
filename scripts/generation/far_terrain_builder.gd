@@ -57,7 +57,9 @@ const INNER_TUCK_M := 0.15
 ## loops grow geometrically with radial step = RADIAL_ASPECT x the
 ## tangential step, so cells stay near-square from 400 m to 30 km.
 ## A LOD knob only — heights come from the same DEM at every preset.
-const RING_SEGS: Array[int] = [96, 128, 192, 256]
+const RING_SEGS: Array[int] = [96, 128, 256, 320]
+## Denser rings for a high drone (AltitudeReach), per base preset.
+const ALT_RING_SEGS: Array[int] = [128, 256, 384, 448]
 const RADIAL_ASPECT := 1.5
 ## Outer-edge skirt drop as a fraction of the ring radius (hides the
 ## ring/z8 interpolation crack; invisible at 30 km).
@@ -65,7 +67,9 @@ const OUTER_SKIRT_FRAC := 0.02
 
 ## Far-field subtree: gap-filler apron + mid ring + far ring + far skirt.
 ## `abort` stops it between rows / items; a stopped result is dropped.
-static func build_far(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
+## `segs` > 0 replaces the preset's RING_SEGS (AltitudeReach).
+static func build_far(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null,
+		segs: int = 0) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var root := Node3D.new()
@@ -90,7 +94,7 @@ static func build_far(data: LocationData, ground: GroundTruth = null, abort: Bui
 	# the hot path; fallback only for direct _ring_bands/_far_terrain callers
 	# or WorldCache restore where ground may be null/incomplete.
 	var wbounds := _water_bounds(water)
-	var bands := _ring_bands(data, ground, water, wbounds, abort)
+	var bands := _ring_bands(data, ground, water, wbounds, abort, segs)
 	if abort != null and abort.requested:
 		return root
 	for band in bands:
@@ -167,8 +171,8 @@ static func _blend_height_uv(data: LocationData, ground: GroundTruth,
 static func _water_index(data: LocationData) -> Array:
 	return FarSampler._water_index(data)
 
-static func _far_water(h: float, water_level_m: float, in_osm: bool) -> bool:
-	return FarSampler._far_water(h, water_level_m, in_osm)
+static func _far_water(h: float, water_level_m: float, in_osm: bool, mask: int = FarWaterMask.NONE) -> bool:
+	return FarSampler._far_water(h, water_level_m, in_osm, mask)
 
 static func _in_osm_water(p: Vector2, index: Array, bounds: Rect2 = Rect2()) -> bool:
 	return FarSampler._in_osm_water(p, index, bounds)
@@ -189,8 +193,8 @@ static func _water_bounds(index: Array) -> Rect2:
 	return FarSampler._water_bounds(index)
 
 static func _is_wet(ground: GroundTruth, h_render: float, p: Vector2,
-		index: Array, bounds: Rect2) -> bool:
-	return FarSampler._is_wet(ground, h_render, p, index, bounds)
+		index: Array, bounds: Rect2, mask: int = FarWaterMask.NONE) -> bool:
+	return FarSampler._is_wet(ground, h_render, p, index, bounds, mask)
 
 static func _drapes_for(data: LocationData, reach_m: float) -> Array:
 	var d := data.far_drapes
@@ -237,7 +241,7 @@ static func _far_ground(data: LocationData, ground: GroundTruth) -> MeshInstance
 ## a distance-scaled skirt at the outer edge. Normals come from the
 ## mesh neighbours (one height sample per vertex). Empty (no meshes)
 ## when there is no far data to blend toward.
-static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: Array = [], wbounds: Rect2 = Rect2(), abort: BuildAbort = null) -> Array:
+static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: Array = [], wbounds: Rect2 = Rect2(), abort: BuildAbort = null, segs_override: int = 0) -> Array:
 	var grid := data.far_grid_size
 	if data.far_heights.size() != grid * grid or grid < 2:
 		return []
@@ -251,7 +255,8 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: A
 	if s_0 <= 0.0 or r_out <= s_0:
 		return []
 	var m2u := WorldScale.metres_to_units()
-	var segs: int = RING_SEGS[clampi(data.quality_preset, 0, RING_SEGS.size() - 1)]
+	var segs: int = segs_override if segs_override > 0 \
+		else RING_SEGS[clampi(data.quality_preset, 0, RING_SEGS.size() - 1)]
 	var per := 4 * segs
 	var q := 1.0 + RADIAL_ASPECT * 2.0 / float(segs)
 	var radii: Array[float] = []
@@ -296,7 +301,7 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: A
 		wbounds = _water_bounds(water)
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
-	var nc := FarSampler.native_ring_colors(pos, loops, per, climate, ground, water, wbounds)
+	var nc := FarSampler.native_ring_colors(data, pos, loops, per, climate, ground, water, wbounds)
 	if not nc.is_empty():
 		normals = nc[0]
 		colors = nc[1]
@@ -317,7 +322,8 @@ static func _ring_bands(data: LocationData, ground: GroundTruth = null, water: A
 				nrm = -nrm
 			normals[k * per + j] = nrm
 			colors[k * per + j] = FarSampler.far_color_at_cached(climate, data, nrm,
-				ground.asl_y(v.y), _is_wet(ground, v.y, Vector2(v.x, v.z), water, wbounds),
+				ground.asl_y(v.y), _is_wet(ground, v.y, Vector2(v.x, v.z), water, wbounds,
+					FarWaterMask.sample(data, v.x, v.z)),
 				v.x, v.z)
 	var out: Array = []
 	var mid := _band_mesh(data, pos, normals, colors, per, 0, k_mid,
@@ -449,7 +455,8 @@ static func _far_terrain(data: LocationData, ground: GroundTruth = null, water: 
 			normals.append(nrm)
 			var in_osm := _in_osm_water(Vector2(wx, wz), water, wsafe)
 			var wet := _far_water(raw,
-				ground.asl_y(ground.water_level_m), in_osm)
+				ground.asl_y(ground.water_level_m), in_osm,
+				FarWaterMask.sample_uv(data.far_water_mask, uv_cache.x, uv_cache.y))
 			colors.append(FarSampler.far_color_at_cached(climate_far, data, nrm, ground.asl_y(ground.render_y(raw)),
 				wet, float(x), float(z)))
 			uvs.append(FarSurface.drape_uv_uv(drape, uv_cache.x, uv_cache.y) \

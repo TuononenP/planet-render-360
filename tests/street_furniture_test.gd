@@ -77,6 +77,30 @@ func _run() -> void:
 		failures.append("fill: %d bins along 800 m of street, %d signals at the crossing" % [bins, sigs])
 	if StreetFurniture.fill(d, roads, "japan", m).any(func(it: Dictionary) -> bool: return it["kind"] == "bin"):
 		failures.append("Japanese streets get no fill bins")
+	# A main road split into two ways is no junction; a T is one. A paved
+	# square's outline takes no bins.
+	var split := _data()
+	split.roads = [
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([Vector2(-200, 0), Vector2(0, 0)])},
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(200, 5)])},
+	]
+	var split_roads := StreetFurniture.RoadIndex.new(split, m, 425.0 * m, Vector2.ZERO)
+	if StreetFurniture.fill(split, split_roads, "europe", m).any(func(it: Dictionary) -> bool: return it["kind"] == "signals"):
+		failures.append("fill: no signals where a main road is merely split into two ways")
+	split.roads.append({"class": "secondary", "width_m": 8.0, "points": PackedVector2Array([Vector2(0, 0), Vector2(0, 200)])})
+	if StreetFurniture.fill(split, split_roads, "europe", m).filter(func(it: Dictionary) -> bool: return it["kind"] == "signals").size() != 1:
+		failures.append("fill: signals where a main road meets a T")
+	(split.roads[1] as Dictionary)["bridge"] = true
+	if StreetFurniture.fill(split, split_roads, "europe", m).filter(func(it: Dictionary) -> bool: return it["kind"] == "signals").size() != 1:
+		failures.append("fill: a T at a bridge head keeps its signals")
+	var promenade := OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(0, 3), Vector2(10, 3), Vector2(10, 20), Vector2(0, 20)]), [])
+	if ShoreRailings._index([promenade], Vector2.ZERO, 1.0, false).is_empty():
+		failures.append("a waterfront square's edge is a walk a railing can follow")
+	split.roads = [OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-150, -150), Vector2(150, -150), Vector2(150, 150), Vector2(-150, 150)]), [])]
+	if not StreetFurniture.fill(split, split_roads, "europe", m).is_empty():
+		failures.append("fill: no bins along a paved square's outline")
 	# An offset preset eye must dress nearby roads even when they are far from the origin.
 	var offset := _data()
 	offset.latitude = 40.7060
@@ -130,6 +154,26 @@ func _run() -> void:
 		failures.append("subway globes should have separate white and green hemispheres")
 	if iron_top < globe_bottom:
 		failures.append("subway lamps must be supported by the entrance posts")
+	# A signal at the crossing: its poles stand at the corners, never in the
+	# crossing road's lanes; a bench beside a bridge is not put under it.
+	var crossing := _data()
+	var cg_heights := PackedFloat32Array()
+	cg_heights.resize(crossing.grid_size * crossing.grid_size)
+	cg_heights.fill(3.0)
+	crossing.heights = cg_heights
+	crossing.water_level = -3.0
+	var cmask := VegetationMask.new(crossing, GroundTruth.new(crossing))
+	var croads := StreetFurniture.RoadIndex.new(crossing, m, 400.0 * m)
+	for spot: Array in StreetFurniture.spots({"x": 0.0, "z": 0.0, "kind": "signals"}, croads, "europe", m):
+		var at := StreetFurniture._clear_of_lanes(spot[0], spot[1], true, cmask, m)
+		if at.x == INF or cmask.blocked(at.x, at.y, VegetationMask.ROAD, 0.0) \
+				or at.distance_to(spot[0]) > float(StreetFurniture.SLIDE_M) * m:
+			failures.append("a crossing's signal pole should slide clear of the lanes: %s -> %s" % [spot[0], at])
+	crossing.roads.append({"class": "primary", "width_m": 10.0, "bridge": true,
+		"points": PackedVector2Array([Vector2(-150, 100) * m, Vector2(150, 100) * m])})
+	croads = StreetFurniture.RoadIndex.new(crossing, m, 400.0 * m)
+	if not StreetFurniture.spots({"x": 60.0 * m, "z": 104.0 * m, "kind": "bench"}, croads, "europe", m).is_empty():
+		failures.append("a bench on a bridge should not stand on the ground under it")
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("STREET FURNITURE OK: OSM kinds, kerb placement, regional kit, sparse fill, meshes")

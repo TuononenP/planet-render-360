@@ -40,7 +40,7 @@ func _test_endpoints() -> void:
 	urls.append_array(OsmFetcher.ENDPOINTS)
 	urls.append_array([SearchFetcher.ENDPOINT, SatelliteFetcher.URL_TEMPLATE, WeatherFetcher.URL_TEMPLATE,
 		ClimateFetcher.BASE, ClimateFetcher.FALLBACK_URL, DemFetcher.URL_TEMPLATE,
-		LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE, OsmApiFallback.URL,
+		LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE, OsmApiFallback.URL, PostpassFallback.URL,
 		"https://" + VectorTileFetcher.VECTOR_HOST, "https://" + TileConnection.HOST, Brand.CONFIG_URL])
 	for url in urls:
 		if HostPolicy.is_blocked(url):

@@ -27,6 +27,13 @@ var requested := false
 ## The built world is being written to the world cache (set by
 ## View360.build_location when the caller waits for the save).
 var saving := false
+## A background build (the streamer's way ahead): View360.build_location
+## gives it a small main-thread share per frame and a low-priority thread.
+var background := false
+## A background build's cache save, held back ([data, ground, packed]):
+## writing a world reads every mesh back from the renderer, which stalls
+## frames while the camera moves; the streamer saves it once still.
+var deferred_save: Array = []
 ## The phase the build thread is in (a Step); read by the main thread.
 var step := 0
 ## Per-step wall-clock ms (filled by the build). Key = Step int.

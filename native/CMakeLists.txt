@@ -22,6 +22,10 @@ add_library(planet_render SHARED
 	src/far_sampling.h
 	src/ground_kernels.cpp
 	src/ground_kernels.h
+	src/image_kernels.cpp
+	src/image_kernels.h
+	src/landmark_kernels.cpp
+	src/landmark_kernels.h
 	src/roof_kernels.cpp
 	src/roof_kernels.h
 	src/mass_kernels.cpp
@@ -30,6 +34,8 @@ add_library(planet_render SHARED
 	src/merge_kernels.h
 	src/mvt_kernels.cpp
 	src/mvt_kernels.h
+	src/snapshot_kernels.cpp
+	src/snapshot_kernels.h
 	src/party_index.cpp
 	src/party_index.h
 	src/quad_sink.cpp
@@ -45,6 +51,16 @@ add_library(planet_render SHARED
 	src/shore_evidence_kernels.cpp
 	src/shore_evidence_kernels.h
 	src/parallel.h
+	src/tint_kernels.cpp
+	src/tint_kernels.h
+	src/photo_sampler.cpp
+	src/photo_sampler.h
+	src/grid_filters.cpp
+	src/grid_filters.h
+	src/road_grader.cpp
+	src/road_grader.h
+	src/shore_classifier.cpp
+	src/shore_classifier.h
 )
 target_link_libraries(planet_render PRIVATE godot-cpp)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)

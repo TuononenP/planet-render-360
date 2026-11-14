@@ -14,6 +14,7 @@ extends Control
 
 signal place_selected(lat: float, lon: float)
 signal back_requested
+signal gallery_requested
 
 const SWIPE := 80.0
 const TINTS := ["1a2350", "b8607e", "7fb8e6", "f0b06a"]  # horizon-* stops
@@ -21,6 +22,10 @@ const TINTS := ["1a2350", "b8607e", "7fb8e6", "f0b06a"]  # horizon-* stops
 var _list: GridContainer
 var _fav_grid: GridContainer
 var _store: CacheStore
+## Per-place sizes for the badges, built once per refresh from
+## CacheStore.place_cache_report instead of sizing every card alone.
+var _badge_bytes: Dictionary = {}  # "lat_lon" -> bytes
+var _index_waiting := false  # a refresh is owed when the cache index lands
 var _margin: MarginContainer
 var _title: Label
 var _count_label: Label
@@ -71,6 +76,12 @@ func _ready() -> void:
 	_count_label = UiTheme.label("", 14, UiTheme.MUTED)
 	_count_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	titles.add_child(_count_label)
+	var gallery := UiTheme.icon_button("")
+	UiIcon.apply(gallery, "rotate-3d", 22)
+	gallery.tooltip_text = "Gallery: saved 360° photos"
+	gallery.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gallery.pressed.connect(func() -> void: gallery_requested.emit())
+	header.add_child(gallery)
 	_view_seg = SegmentedControl.new(["Grid", "List"], ["layout-grid", "list"])
 	_view_seg.set_icon_only(true)
 	_view_seg.select(0)
@@ -173,6 +184,18 @@ func bind_store(store: CacheStore) -> void:
 	_store = store
 	refresh()
 
+## Builds without badges while the cache index is still loading (its
+## report would join the parse on the main thread), then refreshes
+## again when it lands.
+func _await_index() -> void:
+	if _index_waiting:
+		return
+	_index_waiting = true
+	CacheStore.ensure_index_async(func() -> void:
+		_index_waiting = false
+		if is_instance_valid(self):
+			refresh())
+
 func refresh() -> void:
 	if _list == null:
 		return
@@ -192,6 +215,12 @@ func refresh() -> void:
 		_list.columns = 1
 		_list.add_child(_empty_card())
 		return
+	_badge_bytes = {}
+	if CacheStore.index_ready():
+		for row in CacheStore.place_cache_report(entries).get("rows", []):
+			_badge_bytes[_place_key(row)] = int(row["bytes"])
+	else:
+		_await_index()
 	_on_resized()
 	var favourites: Array = entries.filter(func(e: Dictionary) -> bool: return bool(e.get("favourite", false)))
 	var others: Array = entries.filter(func(e: Dictionary) -> bool: return not bool(e.get("favourite", false)))
@@ -246,6 +275,10 @@ func _empty_card() -> PanelContainer:
 
 # --- Cards and rows ---
 
+## Key into _badge_bytes for an entry (or a report row, same fields).
+func _place_key(e: Dictionary) -> String:
+	return "%s_%s" % [float(e.get("lat", 0.0)), float(e.get("lon", 0.0))]
+
 ## Cache state as a StatusBadge: Cached (good), Partial (caution) or
 ## nothing when no layer is on the device. Returns [word, tone] or [].
 func _cache_state(e: Dictionary) -> Array:
@@ -272,7 +305,9 @@ func _badges(e: Dictionary) -> HFlowContainer:
 	var state := _cache_state(e)
 	if not state.is_empty():
 		row.add_child(_badge(state[0], state[1], "hard-drive"))
-		var bytes := CacheStore.entry_bytes(e)
+		var bytes := int(_badge_bytes.get(_place_key(e), -1))
+		if bytes < 0:
+			bytes = CacheStore.entry_bytes(e)  # a card built outside refresh()
 		if bytes > 0:
 			var sz := UiTheme.data_label(UiTheme.cache_size(bytes), 13, UiTheme.MUTED, true)
 			sz.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -519,9 +554,14 @@ func _remove(e: Dictionary) -> void:
 	if _store == null or e.is_empty():
 		return
 	var name_text: String = UiTheme.split_place(str(e.get("name", "")))[0]
-	_store.remove_place(e)
+	var bytes := CacheStore.entry_bytes(e)
+	var res := _store.remove_place(e)
+	if bool(res.get("busy", false)):
+		toast("%s is still being saved. Try again in a moment." % name_text)
+		return
 	refresh()
-	toast("%s removed from cache" % name_text)
+	toast("%s removed from cache · %s freed" % [name_text, UiTheme.cache_size(bytes)]
+		if bytes > 0 else "%s removed from cache" % name_text)
 
 func _confirm_clear() -> void:
 	SettingsRows.confirm(self, "Clear all cache?",

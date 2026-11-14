@@ -130,7 +130,21 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 	var sum_e := 0.0
 	var n := 0
 	var per: Array[String] = []
-	for p in pts:
+	# The same ground without mapped buildings: BareEarth lowers the surface
+	# model around them on purpose, and z14 still carries those roofs.
+	var mapped := data.buildings
+	data.buildings = []
+	var unstripped := GroundTruth.new(data)
+	data.buildings = mapped
+	# Reserve points on the 1/2 ring, used only while too few land points
+	# remain after the water and stripped-roof exclusions.
+	var primary := pts.size()
+	var half: float = RADIUS_M * 0.5
+	pts.append_array([Vector2(half, half), Vector2(-half, half), Vector2(half, -half), Vector2(-half, -half)])
+	for i in pts.size():
+		if i >= primary and n >= 6:
+			break
+		var p := pts[i]
 		var ll := WorldScale.latlon_from_xz(p.x, p.y, data.latitude, data.longitude)
 		var ref := _dem_z14(ll.x, ll.y)
 		if is_nan(ref):
@@ -140,6 +154,10 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 		if ground.water_at(p.x, p.y) > 0.05:
 			# Mapped water: the bed is carved below the surface on purpose.
 			per.append("(%.0f,%.0f) water, carved %.1f m — excluded" % [p.x, p.y, got - ref])
+			continue
+		var stripped := unstripped.asl_y(unstripped.height_at_world(p.x, p.y)) - got
+		if stripped >= 0.5:
+			per.append("(%.0f,%.0f) %+.2f, roofs stripped %.1f m — excluded" % [p.x, p.y, got - ref, stripped])
 			continue
 		var e := absf(got - ref)
 		per.append("(%.0f,%.0f) %+.2f" % [p.x, p.y, got - ref])
@@ -213,17 +231,20 @@ func _check_bc(loc: Dictionary, data: LocationData, ground: GroundTruth, built: 
 		var m := _measure(poly, tris)
 		var expect := _expected_height(b, ctx)
 		if m["top"] > -INF:
-			# OSM height is from the lowest ground at the footprint
-			# (the builder's wall base, before its 0.6 m sink).
+			# A tagged height is from the lowest ground at the footprint
+			# (the builder's wall base, before its 0.6 m sink). Levels count
+			# from the floor, which stands on a plinth on a slope.
 			var base := INF
 			for q in poly:
 				base = minf(base, ground.height_at_world(q.x, q.y))
-			var got := float(m["top"]) - base
+			var lift := _floor_lift(b, ctx, data, ground, base)
+			var got := float(m["top"]) - base - lift
 			errs.append(absf(got - expect))
-			per_c.append("%s %.1f→%.1f m" % [str(b.get("height_source", "")), expect, got])
+			per_c.append("%s %s %.1f→%.1f m (floor +%.1f%s%s)" % [_row_id(b), str(b.get("height_source", "")), expect, got, lift, _parts_note(b),
+				_plan_note(b, ctx) if absf(got - expect) >= 2.0 else ""])
 		else:
 			errs.append(expect)  # fail-closed: nothing rendered
-			per_c.append("%s %.1f→none" % [str(b.get("height_source", "")), expect])
+			per_c.append("%s %s %.1f→none%s (%s)" % [_row_id(b), str(b.get("height_source", "")), expect, _parts_note(b), _absent_note(b, ctx, data, ground)])
 	var iou := _median(ious)
 	var off := _median(offsets)
 	var urban := bool(loc["urban"])
@@ -276,6 +297,9 @@ func _roof_triangles(built: Node3D, sample: Array) -> Array:
 	var out: Array = []
 	for c in built.get_children():
 		if not (c is MeshInstance3D) or str(c.get_meta("lod_layer", "Buildings")) != "Buildings":
+			continue
+		# Chimneys and rooftop plant stand above the height a tag describes.
+		if bool(c.get_meta("lod_detail", false)):
 			continue
 		var mi := c as MeshInstance3D
 		for s in mi.mesh.get_surface_count():
@@ -361,11 +385,65 @@ func _expected_height(b: Dictionary, ctx: Dictionary) -> float:
 		# are separate), so the rendered top is the storeys plus the roof
 		# the builder stands on them (BuildingMasses: roof:height /
 		# roof:levels when tagged, else the shape's rise).
-		var look := BuildingHeights._look_for(b, ctx)
 		var plan := BuildingMasses.plan(b, ctx)
+		# The planned look: it carries NeighbourEvidence, BuildingHeights' does not.
+		var look: Dictionary = plan[0]["look"] if not plan.is_empty() else BuildingHeights._look_for(b, ctx)
 		var rh := float(plan[0]["rh_m"]) if not plan.is_empty() and (b.get("parts", []) as Array).is_empty() else 0.0
-		return float(b["levels"]) * float(look["floor_h"]) + rh
+		# A mapped part taller than its outline's own tag sets the top
+		# (Turku: Sokos Wiklund's 8-storey hotel part on a 4-level outline).
+		return maxf(float(b["levels"]) * float(look["floor_h"]) + rh, _tallest_part(b, float(look["floor_h"])))
 	return 0.0
+
+## Top (m) of `b`'s tallest tagged part: its height, or its levels at `floor_h`.
+func _tallest_part(b: Dictionary, floor_h: float) -> float:
+	var top := 0.0
+	for p in b.get("parts", []):
+		var pd := p as Dictionary
+		var src := str(pd.get("height_source", ""))
+		if src == "tag_height":
+			top = maxf(top, float(pd.get("height", 0.0)))
+		elif src == "levels":
+			top = maxf(top, float(pd.get("levels", 0)) * floor_h)
+	return top
+
+## How far a levels-tagged building's floor stands above `low`, its lowest
+## ground (BuildingFoundation raises floors on slopes). 0 for a tagged height.
+func _floor_lift(b: Dictionary, ctx: Dictionary, data: LocationData, ground: GroundTruth, low: float) -> float:
+	if str(b.get("height_source", "")) != "levels":
+		return 0.0
+	var plan := BuildingMasses.plan(b, ctx)
+	if plan.is_empty():
+		return 0.0
+	var sea_y := ground.render_y(WaterBuilder.SEA_LEVEL_M) \
+		if WaterBuilder._has_coastline(data) or LandmarkTerrain.has_sea(data) else -INF
+	return maxf(float(BuildingFoundation.sample(ground, plan[0]["ring"], plan[0]["centre"], sea_y)["floor"]) - low, 0.0)
+
+## Why a sampled building has no rendered roof over its footprint.
+func _absent_note(b: Dictionary, ctx: Dictionary, data: LocationData, ground: GroundTruth) -> String:
+	var edge := WorldScale.detailed_extent_units() * 0.5 * 0.98
+	if not BuildingBuilder._accepted(data, b, TerrainBuilder.landmark_site_xz(data), edge):
+		return "landmark site or outside the extent"
+	if BuildingBuilder._in_open_water(ground, b):
+		return "on mapped water, %.1f m deep" % ground.water_at(float(b["x"]), float(b["z"]))
+	if BuildingMasses.plan(b, ctx).is_empty():
+		return "no masses planned"
+	return "planned but no roof over the footprint, kind %s" % str(b.get("kind", "?"))
+
+func _row_id(b: Dictionary) -> String:
+	return str(b.get("osm_id", "?"))
+
+## Why a row is off: the planned masses' roof shape, roof rise and walls (m).
+func _plan_note(b: Dictionary, ctx: Dictionary) -> String:
+	var bits: Array[String] = []
+	for m in BuildingMasses.plan(b, ctx):
+		var md := m as Dictionary
+		bits.append("%s roof +%.1f, walls %.1f%s" % [str(md.get("shape", "")), float(md.get("rh_m", 0.0)),
+			float(md.get("wall_m", 0.0)), (" from %.1f" % float(md.get("min_m", 0.0))) if float(md.get("min_m", 0.0)) > 0.0 else ""])
+	return "; plan: " + ", ".join(bits) if not bits.is_empty() else ""
+
+func _parts_note(b: Dictionary) -> String:
+	var parts := (b.get("parts", []) as Array).size()
+	return ", %d parts" % parts if parts > 0 else ""
 
 # --- (d) water + roads ---
 

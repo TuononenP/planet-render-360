@@ -24,6 +24,8 @@ const MARGIN_PX := 256.0
 ## A failed tile is not asked for again for this long.
 const RETRY_MS := 30000
 const EARTH_CIRCUMFERENCE_M := 40075016.686
+## Zoom steps either side of the current one warmed over the whole view.
+const PREFETCH_FULL_STEPS := 2
 
 var view: MapTileView
 
@@ -47,8 +49,14 @@ var _failed: Dictionary = {}  # Vector3i -> msec of the failure
 var _state: Array = []
 var _layout_shift := Vector2.ZERO
 var _layout_zoom := -1
+var _resync_queued := false
 ## Shared with worker builds; set on the way out so they stop early.
 var _cancel: Array = [false]
+## Off for test and capture runs (started with --script; the app never
+## is), so they never bulk-download tiles around the places they pick.
+static var warm_up_enabled := not OS.get_cmdline_args().has("--script")
+## A place picked before the view had a size, warmed once it has one.
+var _warm_at: Variant = null
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -107,6 +115,56 @@ static func tiles_for(origin: Vector2, view_size: Vector2, zoom: int, margin: fl
 	var centre := Vector2i((origin + view_size / 2.0) / tile_px)
 	return MapTileView.centre_out_order(tiles, centre)
 
+## Tiles to warm around (lat, lon) for every other picker zoom, nearest
+## zoom to `current_zoom` first: {"vector": [Vector3i], "dem": [Vector3i]},
+## each covering just the view. Zooms more than PREFETCH_FULL_STEPS away
+## warm only the middle half of the view around the pin (the part a zoom
+## shows first), which keeps the dense deep zooms from costing tens of MB
+## per pick. Static and pure so tests can pin it.
+static func prefetch_plan(lat: float, lon: float, view_size: Vector2, focus: Vector2, current_zoom: int) -> Dictionary:
+	var zooms: Array[int] = []
+	for step in range(1, MapTileView.MAX_ZOOM - MapTileView.MIN_ZOOM + 1):
+		for z in [current_zoom + step, current_zoom - step]:
+			if z >= MapTileView.MIN_ZOOM and z <= MapTileView.MAX_ZOOM:
+				zooms.append(z)
+	var vector: Array[Vector3i] = []
+	var dem: Array[Vector3i] = []
+	# Picker zooms past the data's deepest share its tiles: plan each once
+	# (the current one is the view's job).
+	var planned: Array[int] = [data_zoom(current_zoom)]
+	for zoom in zooms:
+		if planned.has(data_zoom(zoom)):
+			continue
+		planned.append(data_zoom(zoom))
+		var origin := TileFetcher.global_pixel(lat, lon, zoom) - focus
+		var span := view_size
+		if absi(zoom - current_zoom) > PREFETCH_FULL_STEPS:
+			span = view_size / 2.0
+			origin = TileFetcher.global_pixel(lat, lon, zoom) - span / 2.0
+		for t in tiles_for(origin, span, zoom, 0.0):
+			var tile: Vector3i = t
+			vector.append(tile)
+			if tile.x <= MapStyle.SHADE_MAX_ZOOM:
+				dem.append(tile)
+	return {"vector": vector, "dem": dem}
+
+## Warm the disk cache around a newly picked place for every zoom, behind
+## the visible tiles, so zooming there later does not wait on the network.
+func prefetch_around(lat: float, lon: float) -> void:
+	if view == null or _omt == null or not warm_up_enabled:
+		return
+	_omt.clear_prefetch()
+	_dem.clear_prefetch()
+	if view.size.x < 1.0 or view.size.y < 1.0:
+		_warm_at = Vector2(lat, lon)  # not laid out yet: refresh() warms it
+		return
+	_warm_at = null
+	var plan := prefetch_plan(lat, lon, view.size, view.focus_point(), view.zoom_level)
+	for t in plan["vector"]:
+		_omt.prefetch_tile(t.x, t.y, t.z)
+	for t in plan["dem"]:
+		_dem.prefetch_tile(t.x, t.y, t.z)
+
 ## Ask for everything the view needs; called by MapTileView.refresh_tiles.
 func refresh() -> void:
 	if view == null or _omt == null or not is_inside_tree():
@@ -131,12 +189,17 @@ func refresh() -> void:
 		elif _bytes.has(tile):
 			_queue(k)
 		elif now - int(_failed.get(tile, -RETRY_MS)) >= RETRY_MS:
+			_failed.erase(tile)  # asked again: the view waits for it
 			fetch.append(tile)
 			_omt.request_tile(tile.x, tile.y, tile.z)
 	_omt.discard_queued_except(fetch)
 	_dem.discard_queued_except(tiles if shade else [])
 	_prune()
 	_sync(true)
+	# After the view's own tiles, so they are queued first.
+	if _warm_at != null and view.size.x >= 1.0 and view.size.y >= 1.0:
+		var at: Vector2 = _warm_at
+		prefetch_around(at.x, at.y)
 
 func _on_tile(z: int, x: int, y: int, body: PackedByteArray) -> void:
 	var tile := Vector3i(z, x, y)
@@ -145,14 +208,43 @@ func _on_tile(z: int, x: int, y: int, body: PackedByteArray) -> void:
 	_bytes_order.erase(tile)
 	_bytes_order.append(tile)
 	while _bytes_order.size() > MAX_BYTES:
-		_bytes.erase(_bytes_order.pop_front())
+		var old: Vector3i = _bytes_order.pop_front()
+		if _needs_body(old):
+			# The view still has to build it: dropping it would leave the
+			# tile with no node and no failure, holding the labels back.
+			_bytes_order.append(old)
+			break
+		_bytes.erase(old)
 	for k in _wanted:
 		if k.z == z and k.x == x and k.y == y and not _nodes.has(k):
 			_queue(k)
 
+## True when a wanted tile at `tile` (z/x/y) still has no node or build.
+func _needs_body(tile: Vector3i) -> bool:
+	for k in _wanted:
+		if k.z == tile.x and k.x == tile.y and k.y == tile.z and not _nodes.has(k) and not _built.has(k):
+			return true
+	return false
+
 func _on_failed(z: int, x: int, y: int) -> void:
-	_failed[Vector3i(z, x, y)] = Time.get_ticks_msec()
+	var tile := Vector3i(z, x, y)
+	_failed[tile] = Time.get_ticks_msec()
 	_prune()
+	var wanted := false
+	for k in _wanted:
+		if k.z == z and k.x == x and k.y == y:
+			wanted = true
+			break
+	# The last missing tile may have failed: settle the labels, once per
+	# frame however many fail together.
+	if wanted and not _resync_queued:
+		_resync_queued = true
+		_resync.call_deferred()
+
+func _resync() -> void:
+	_resync_queued = false
+	if is_inside_tree():
+		_sync(true)
 
 func _on_dem(z: int, x: int, y: int, body: PackedByteArray) -> void:
 	var tile := Vector3i(z, x, y)
@@ -256,14 +348,27 @@ func _make_node(k: Vector4i) -> void:
 	if _shade.has(tile):
 		node.set_shade(_shade[tile])
 
+## True once every wanted tile has its node or has failed; with
+## `on_screen`, only those that reach into the view (not the margin ring).
+func _view_complete(on_screen: bool = false) -> bool:
+	var screen := Rect2(Vector2.ZERO, view.size if view != null else Vector2.ZERO)
+	var origin := Vector2.ZERO
+	if on_screen and view != null:
+		origin = TileFetcher.global_pixel(view.centre_lat, view.centre_lon, view.zoom_level) - view.focus_point()
+	for k in _wanted:
+		if _nodes.has(k) or _failed.has(Vector3i(k.z, k.x, k.y)):
+			continue
+		if on_screen:
+			var px := 256.0 * pow(2.0, k.w - k.z)
+			if not Rect2(Vector2(k.x, k.y) * px - origin, Vector2(px, px)).intersects(screen):
+				continue
+		return false
+	return true
+
 ## Free nodes nobody needs. The previous zoom's nodes stay as stand-ins
 ## until every wanted tile of the new zoom has its node (or failed).
 func _prune() -> void:
-	var complete := true
-	for k in _wanted:
-		if not _nodes.has(k) and not _failed.has(Vector3i(k.z, k.x, k.y)):
-			complete = false
-			break
+	var complete := _view_complete()
 	var zoom := view.zoom_level if view != null else 0
 	for k in _nodes.keys():
 		var key: Vector4i = k
@@ -278,8 +383,10 @@ func _process(_delta: float) -> void:
 	_sync(false)
 
 ## Place the nodes for the view's centre/zoom. Labels are laid out again
-## only when forced (a refresh, a new tile, a zoom); in between, a pan just
-## shifts the laid-out labels with the map.
+## only when forced (a refresh, a new tile, a zoom) and every wanted tile
+## is in; while tiles stream in, the labels already placed stay (moved to
+## a new zoom), so names do not pop in and out tile by tile. In between, a
+## pan just shifts the laid-out labels with the map.
 func _sync(force: bool) -> void:
 	if view == null:
 		return
@@ -303,8 +410,10 @@ func _sync(force: bool) -> void:
 		var node: VectorTileNode = _nodes[key]
 		node.position = Vector2(key.x, key.y) * 256.0 * pow(2.0, zoom - key.z) + shift
 		node.scale = Vector2.ONE * pow(2.0, zoom - key.w)
-	if force or zoom != _layout_zoom:
+	if (force or zoom != _layout_zoom) and _view_complete(true):
 		_layout_labels(zoom, shift)
+	elif zoom != _layout_zoom:
+		_carry_labels(zoom, shift)
 	else:
 		_labels.position = shift - _layout_shift
 
@@ -323,6 +432,21 @@ func _layout_labels(zoom: int, shift: Vector2) -> void:
 		if int(a["priority"]) != int(b["priority"]):
 			return int(a["priority"]) < int(b["priority"])
 		return int(a.get("ele", 0)) > int(b.get("ele", 0)))
+	_layout_shift = shift
+	_layout_zoom = zoom
+	_labels.position = Vector2.ZERO
+	_labels.set_labels(candidates, _graticule(zoom, shift))
+
+## Keep the labels placed so far while a zoom streams in: each moves to
+## where its spot sits at `zoom`; collisions drop any that now overlap.
+func _carry_labels(zoom: int, shift: Vector2) -> void:
+	var f := pow(2.0, zoom - _layout_zoom) if _layout_zoom >= 0 else 1.0
+	var candidates: Array = []
+	for l in _labels.placed_labels():
+		var label: Dictionary = (l as Dictionary).duplicate()
+		label["pos"] = ((label["pos"] as Vector2) - _layout_shift) * f + shift
+		label["run"] = float(label["run"]) * f
+		candidates.append(label)
 	_layout_shift = shift
 	_layout_zoom = zoom
 	_labels.position = Vector2.ZERO

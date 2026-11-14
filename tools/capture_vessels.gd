@@ -3,17 +3,22 @@ extends SceneTree
 ## Reproducible vessel inspection, including costs before GPU upload.
 ## tools/godot_bg.sh --path . --script tools/capture_vessels.gd --position 4000,4000 -- --out=visual-plan/reviews/vessels/before
 ## Add --metrics-only and --headless for geometry-only measurements.
+## --only=liner,ferry limits the studio shots to those case ids. Ships of
+## 40 m and more also get close-ups (bow quarter, midships) and a night shot.
 const CASES := [
 	["liner", 250.0, 31.0, 50.0, ""], ["passenger", 50.0, 8.0, 12.0, ""],
 	["tall_ship", 60.0, 9.5, 32.0, ""], ["houseboat", 14.0, 4.2, 4.5, ""],
 	["motor_yacht", 24.0, 0.0, 0.0, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, "sport"],
 	["sail_yacht", 12.0, 0.0, 0.0, ""], ["runabout", 7.0, 0.0, 0.0, "runabout"],
 	["runabout", 7.0, 0.0, 0.0, "console"], ["runabout", 7.0, 0.0, 0.0, "rib"],
-	["ferry", 94.5, 21.3, 16.0, ""], ["catamaran", 12.0, 0.0, 15.5, ""]]
+	["ferry", 94.5, 21.3, 16.0, ""], ["catamaran", 12.0, 0.0, 15.5, ""],
+	["cruise_ferry", 200.0, 30.0, 44.0, ""], ["cargo", 300.0, 45.0, 52.0, "container"],
+	["cargo", 190.0, 30.0, 32.0, "bulk"], ["cargo", 250.0, 44.0, 40.0, "tanker"], ["cargo", 110.0, 17.0, 26.0, "general"]]
 const SIZE := Vector2i(960, 640)
 var _out := "visual-plan/reviews/vessels"
 var _metrics_only := false
 var _benchmark_only := false
+var _only: PackedStringArray = []
 
 func _init() -> void:
 	_run.call_deferred()
@@ -29,6 +34,8 @@ func _run() -> void:
 			_out = arg.trim_prefix("--out=")
 		_metrics_only = _metrics_only or arg == "--metrics-only"
 		_benchmark_only = _benchmark_only or arg == "--benchmark-only"
+		if arg.begins_with("--only="):
+			_only = arg.trim_prefix("--only=").split(",", false)
 	DirAccess.make_dir_recursive_absolute(_out)
 	MaterialLibrary.hi_res = true
 	var stats := {"models": {}, "prototypes": {}}
@@ -103,6 +110,8 @@ func _captures(stats: Dictionary) -> void:
 		if c[0] == "catamaran" and "catamaran" not in VesselPrototypes.KINDS:
 			continue
 		var id: String = c[4] if c[4] != "" else c[0]
+		if not _only.is_empty() and id not in _only:
+			continue
 		var holder := Node3D.new()
 		vp.add_child(holder)
 		VesselPrototypes.snow_parts(_model(c, true).commit(holder))
@@ -120,6 +129,8 @@ func _captures(stats: Dictionary) -> void:
 		camera.look_at_from_position(deck_target + Vector3(-0.4, 0.65, 1).normalized() * length * 0.85, deck_target)
 		await _settle(12)
 		vp.get_texture().get_image().save_jpg(_out.path_join(id + "_deck.jpg"), 0.9)
+		if length >= 40.0:
+			await _close_ups(vp, camera, env.environment, light, holder, id, length, height)
 		if id in ["houseboat", "sail_yacht"]:
 			RenderingServer.global_shader_parameter_set("climate_snow_on", 1.0)
 			await _settle(12)
@@ -172,6 +183,34 @@ func _captures(stats: Dictionary) -> void:
 	stats["renderer"] = RenderingServer.get_current_rendering_method()
 	vp.get_texture().get_image().save_jpg(_out.path_join("fleet.jpg"), 0.9)
 	vp.free()
+
+## Bow quarter and midships from near the waterline, then the bow quarter
+## again at night with CityLights at full strength.
+func _close_ups(vp: SubViewport, camera: Camera3D, env: Environment, light: DirectionalLight3D,
+		holder: Node3D, id: String, length: float, height: float) -> void:
+	var bow := Vector3(length * 0.3, height * 0.22, 0)
+	camera.look_at_from_position(bow + Vector3(0.55, 0.12, 1).normalized() * length * 0.42, bow)
+	await _settle(12)
+	vp.get_texture().get_image().save_jpg(_out.path_join(id + "_close_bow.jpg"), 0.9)
+	var mid := Vector3(-length * 0.05, height * 0.3, 0)
+	camera.look_at_from_position(mid + Vector3(-0.15, 0.05, 1).normalized() * length * 0.3, mid)
+	await _settle(12)
+	vp.get_texture().get_image().save_jpg(_out.path_join(id + "_close_mid.jpg"), 0.9)
+	var bg := env.background_color
+	var ambient := env.ambient_light_energy
+	var sun := light.light_energy
+	env.background_color = Color("#0b1220")
+	env.ambient_light_energy = 0.08
+	light.light_energy = 0.03
+	CityLights.apply(holder, 1.0)
+	camera.look_at_from_position(Vector3(0, height * 0.35, 0) + Vector3(0.8, 0.3, 1).normalized() * length * 0.75,
+		Vector3(0, height * 0.35, 0))
+	await _settle(12)
+	vp.get_texture().get_image().save_jpg(_out.path_join(id + "_night.jpg"), 0.9)
+	CityLights.apply(holder, 0.0)
+	env.background_color = bg
+	env.ambient_light_energy = ambient
+	light.light_energy = sun
 
 func _settle(frames: int) -> void:
 	for i in frames:

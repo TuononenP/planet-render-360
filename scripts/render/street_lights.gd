@@ -13,7 +13,7 @@ extends RefCounted
 const META := "street_light"
 const MAX_LIGHTS := 320
 ## Light energy at full night (Godot units, not physical).
-const ENERGY := 1.4
+const ENERGY := 3.0
 const LANTERN_RANGE_M := 14.0
 const SPOT_RANGE_M := 20.0
 const SPOT_ANGLE_DEG := 62.0
@@ -23,7 +23,9 @@ const FADE_LENGTH_M := 60.0
 const LANTERN_HEAD := Vector3(0.0, 4.1, 0.0)
 const COBRA_HEAD := Vector3(1.85, 8.0, 0.0)
 ## Spot heads of the regional arm styles (the rest use COBRA_HEAD).
-const HEADS := {"post_top": Vector3(0, 4.4, 0), "nyc_f": Vector3(1.45, 7.0, 0), "nyc_crook": Vector3(1.45, 5.2, 0), "cobra": Vector3(2.6, 8.85, 0.0), "utility": Vector3(1.15, 5.58, 0.0)}
+## "span": a Nordic luminaire hung on a span wire over the street
+## (OverheadWires), its transform already at the lamp.
+const HEADS := {"span": Vector3.ZERO, "post_top": Vector3(0, 4.4, 0), "nyc_f": Vector3(1.45, 7.0, 0), "nyc_crook": Vector3(1.45, 5.2, 0), "cobra": Vector3(2.6, 8.85, 0.0), "utility": Vector3(1.15, 5.58, 0.0)}
 const SODIUM_REGIONS := ["eastern_europe", "middle_east", "south_asia", "latin_america",
 	"sub_saharan_africa"]
 
@@ -36,6 +38,8 @@ static func colour_for(style: String, region: String) -> Color:
 
 ## Adds the lights for `placed` (StreetProps: style -> lamp transforms)
 ## under one "StreetLights" node of `root`. Returns the number added.
+## Later calls (the span-wire lamps) join the same node and share its
+## MAX_LIGHTS budget with the lamps already there.
 static func add(root: Node3D, placed: Dictionary, region: String, m2u: float, centre: Vector2 = Vector2.ZERO) -> int:
 	var all: Array = []
 	for style in placed:
@@ -45,9 +49,13 @@ static func add(root: Node3D, placed: Dictionary, region: String, m2u: float, ce
 	if all.is_empty():
 		return 0
 	all.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
-	var holder := Node3D.new()
-	holder.name = "StreetLights"
-	for i in mini(all.size(), MAX_LIGHTS):
+	var holder := root.get_node_or_null("StreetLights") as Node3D
+	var fresh := holder == null
+	if fresh:
+		holder = Node3D.new()
+		holder.name = "StreetLights"
+	var before := holder.get_child_count()
+	for i in mini(all.size(), MAX_LIGHTS - before):
 		var t: Transform3D = all[i][1]
 		var style: String = all[i][2]
 		var light: Light3D
@@ -74,8 +82,9 @@ static func add(root: Node3D, placed: Dictionary, region: String, m2u: float, ce
 		light.visible = false
 		light.set_meta(META, ENERGY)
 		holder.add_child(light)
-	root.add_child(holder)
-	return holder.get_child_count()
+	if fresh:
+		root.add_child(holder)
+	return holder.get_child_count() - before
 
 ## Night share `amount` (CityLights.amount_for) on one marked light.
 static func apply(light: Light3D, amount: float) -> void:

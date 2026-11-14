@@ -36,6 +36,7 @@ const VARS := {
 	"bio10": ["t_warm_c", 0.1, -273.15, 4000],   # mean temperature, warmest quarter
 	"bio11": ["t_cold_c", 0.1, -273.15, 4000],   # mean temperature, coldest quarter
 	"bio12": ["precip_mm", 0.1, 0.0, 60000],     # annual precipitation
+	"bio17": ["precip_dry_mm", 0.1, 0.0, 60000],   # precipitation, driest quarter
 	"bio18": ["precip_warm_mm", 0.1, 0.0, 60000],  # precipitation, warmest quarter
 	"scd": ["snow_days", 1.0, 0.0, 366],         # snow cover days
 }
@@ -81,7 +82,10 @@ func fetch(lat: float, lon: float) -> void:
 	var path := cache_path(lat, lon)
 	if FileAccess.file_exists(path):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-		if parsed is Dictionary and (parsed as Dictionary).has("t_warm_c"):
+		# A copy saved before the driest-quarter rainfall was fetched is
+		# refreshed once when online (ClimateModel.winter_dry needs it).
+		if parsed is Dictionary and (parsed as Dictionary).has("t_warm_c") \
+				and ((parsed as Dictionary).has("precip_dry_mm") or offline_mode):
 			CacheStore.note_read(path)
 			timings = {"ms": Time.get_ticks_msec() - _t0, "cached": true}
 			finished.emit.call_deferred(parsed)
@@ -236,14 +240,17 @@ static func normals_from_daily(parsed: Variant) -> Dictionary:
 	for m in 12:
 		monthly.append(t_sum[m] / t_n[m])
 	var precip := 0.0
+	var dry := INF
 	for m in 12:
 		precip += p_sum[m]
+		dry = minf(dry, p_sum[m] + p_sum[(m + 1) % 12] + p_sum[(m + 2) % 12])
 	return {
 		"t_monthly_c": monthly,
 		"t_warm_c": q_t[warm],
 		"t_cold_c": q_t[cold],
 		"precip_mm": precip / n_years,
 		"precip_warm_mm": (p_sum[warm] + p_sum[(warm + 1) % 12] + p_sum[(warm + 2) % 12]) / n_years,
+		"precip_dry_mm": dry / n_years,
 		"snow_days": frost / n_years,
 	}
 

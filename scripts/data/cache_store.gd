@@ -28,8 +28,10 @@ extends RefCounted
 ##
 ## LRU bookkeeping lives in user://cache/lru.json (path -> bytes +
 ## last-access time), updated via note_read()/note_written() on every
-## cache hit/write. Cap enforcement runs whenever a write pushes the
-## tracked total over max_cache_bytes, oldest-atime first.
+## cache hit/write. There is no size limit and nothing is evicted
+## automatically; the index only accounts for what is on the device so
+## Settings can show per-place sizes. The person frees space explicitly
+## per place (clear_place_cache) or all at once (OfflineDownloader).
 
 const PATH := "user://history.json"
 const MAX_ENTRIES := 50
@@ -41,33 +43,21 @@ const DATA_VERSION := 2
 const LANDCOVER_VERSION := 2
 const CACHE_DIR := "user://cache"
 const LRU_FILE := "lru.json"
-## Share of data_cap() an over-cap cache is trimmed down to.
-const TRIM_TO := 0.9
-## Largest size limit Settings offers (20 GB).
-const MAX_LIMIT_MB := 20480
 ## The index is written at most this often while the cache is in use.
 const SAVE_EVERY_S := 2.0
 ## Marks a folder discard_dir moved aside for deletion.
 const TRASH_MARK := ".trash-"
 
-## The settings size limit in bytes (default 2 GB: an Ultra place holds
-## ~50 MB of data and its built world ~180 MB). It covers downloaded data and built worlds together: worlds
-## keep at most half (WorldCache.enforce_budget) and data fills the rest
-## (data_cap). Set from the cache_limit_mb pref by UiPrefs.apply.
-static var max_cache_bytes := 2048 * 1024 * 1024
 ## Test hook (offline_mode precedent): when non-empty, all cache paths
-## resolve under this directory instead of CACHE_DIR, so eviction and
+## resolve under this directory instead of CACHE_DIR, so accounting and
 ## key tests never touch the real on-device cache.
 static var dir_override := ""
 ## Tests can isolate history without discarding the reusable data cache.
 static var history_override := ""
-## Capture and windowed-test runs may reuse downloaded data without
-## evicting the person's cached files as they visit many places.
+## Deprecated no-op, kept for the capture/windowed tests that set it:
+## nothing is evicted automatically any more, so there is nothing to
+## suppress. Do not add new readers.
 static var eviction_suppressed := false
-## Called on the main thread when the cache dropped places on its own to
-## stay under the limit (Main offers a bigger one). Not called when the
-## person lowers the limit themselves (enforce_size_cap(false)).
-static var on_full: Callable
 ## Set on quit: a scan running on a worker gives up, its result dropped.
 static var stop_scans := false
 
@@ -85,26 +75,19 @@ static var _tracked_bytes := -1  # -1 = unknown, summed from the index on next u
 static var _reconciled := false
 static var _load_task := -1
 static var _loaded: Variant = null  # the index preload_index parsed
+static var _index_waiters: Array[Callable] = []  # called when the preload lands
 static var _save_task := -1
 static var _save_armed := false
 static var _scan_task := -1
 static var _scan_gen := 0  # bumped per scan and reset: a stale result is dropped
 static var _scan_joined := false  # finish() already waited for _scan_task
 static var _scan_again := false  # asked for while one was running
-static var _scan_again_report := false
 static var _touched: Dictionary = {}  # rel -> true, noted while a scan runs
+static var _cleared: Dictionary = {}  # rel -> true, cleared while a scan runs
 static var _trash_tasks: Array[int] = []  # discard_dir deletions
+## One [done] box per task _spawn started and busy() has not seen finish.
+static var _working: Array = []
 static var _exit_hooked := false
-
-## Bytes downloaded data may hold: the limit minus what built worlds
-## use. Tests (under dir_override, or headless with the world cache off)
-## never count or trim the real worlds.
-static func data_cap() -> int:
-	var worlds := WorldCache.total_bytes() if _shares_with_worlds() else 0
-	return maxi(0, max_cache_bytes - worlds)
-
-static func _shares_with_worlds() -> bool:
-	return dir_override == "" and WorldCache.enabled()
 
 static func base_dir() -> String:
 	return dir_override if dir_override != "" else CACHE_DIR
@@ -132,12 +115,24 @@ static func osm_api_path(lat: float, lon: float, radius_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_api%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), radius_m]
 
+## Marker that Overpass and the OSM API both found nothing here (open sea,
+## wilderness), so the next load within OsmFetcher.EMPTY_TTL_S does not
+## ask either again. Not a detailed payload: OsmNearbyCache skips it.
+static func osm_empty_path(lat: float, lon: float) -> String:
+	return "%s/osm_v%d_%d_%d_empty_q%d.json" % [base_dir(), DATA_VERSION,
+		quant(lat), quant(lon), OsmQuery.QUERY_VERSION]
+
 static func osm_ring_path(lat: float, lon: float, ring_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_ring%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), ring_m]
 
 static func osm_poi_path(lat: float, lon: float) -> String:
 	return "%s/osm_v%d_%d_%d_poi_q1.json" % [base_dir(), DATA_VERSION, quant(lat), quant(lon)]
+
+## The bridge outline layer (OsmQuery.build_bridge_area_query).
+static func osm_bridge_path(lat: float, lon: float) -> String:
+	return "%s/osm_v%d_%d_%d_bridges_q%d.json" % [base_dir(), DATA_VERSION, quant(lat), quant(lon),
+		OsmQuery.BRIDGE_AREA_VERSION]
 
 static func landcover_path(kind: String, lat: float, lon: float) -> String:
 	return "%s/%s_v%d_%d_%d.png" % [base_dir(), kind, LANDCOVER_VERSION,
@@ -359,30 +354,176 @@ func set_favourite(entry: Dictionary, on: bool) -> void:
 	entry["favourite"] = on
 	save_store()
 
-## Bytes the entry's cached files take on the device.
+## Every data-cache path that may hold this place's downloads: the
+## entry's own key set (legacy saved keys included) plus the key sets of
+## all four presets, since satellite zoom/span and the OSM radius follow
+## the preset the place was opened or warmed at. Deduplicated.
+static func place_cache_keys_all_presets(lat: float, lon: float) -> Array:
+	var seen := {}
+	var out: Array = []
+	for p in 4:
+		var keys := place_cache_keys(lat, lon, p)
+		for layer in keys:
+			for k in keys[layer]:
+				if not seen.has(str(k)):
+					seen[str(k)] = true
+					out.append(str(k))
+	return out
+
+static func _entry_data_paths(entry: Dictionary, layered: Dictionary = {}) -> Array:
+	var seen := {}
+	var out: Array = []
+	var keys := layered if not layered.is_empty() else entry_cache_keys(entry)
+	for layer in keys:
+		for k in keys[layer]:
+			if not seen.has(str(k)):
+				seen[str(k)] = true
+				out.append(str(k))
+	if entry.has("lat") and entry.has("lon"):
+		for k in place_cache_keys_all_presets(float(entry["lat"]), float(entry["lon"])):
+			if not seen.has(k):
+				seen[k] = true
+				out.append(k)
+	return out
+
+## A cache file's size from the LRU index when it is loaded (the index
+## is written on every note_written), else by opening the file. Sizing
+## a whole History must not open hundreds of files per place.
+static func _stored_bytes(path: String) -> int:
+	if _lru_loaded:
+		var row: Variant = _lru.get(_rel(path), null)
+		if row is Dictionary:
+			return int(row.get("bytes", 0))
+	return _file_bytes(path)
+
+## Bytes the entry's cached files take on the device: downloaded data
+## plus its built worlds, so History and Settings agree on a place.
 static func entry_bytes(entry: Dictionary) -> int:
 	var total := 0
-	var keys := entry_cache_keys(entry)
-	for layer in keys:
-		for k in keys[layer]:
-			total += _file_bytes(str(k))
+	for k in _entry_data_paths(entry):
+		if FileAccess.file_exists(k):
+			total += _stored_bytes(k)
+	if entry.has("lat") and entry.has("lon"):
+		total += WorldCache.bytes_for_place(float(entry["lat"]), float(entry["lon"]))
 	return total
 
-## Remove from cache: deletes the entry's cached files (tiles shared
-## with a nearby place download again when that place opens) and drops
-## it from History.
-func remove_place(entry: Dictionary) -> void:
-	var keys := entry_cache_keys(entry)
-	for layer in keys:
-		for k in keys[layer]:
-			if FileAccess.file_exists(str(k)):
-				DirAccess.remove_absolute(str(k))
+## Per-place inventory for Settings → Storage: one row per entry
+## (largest first, then name), plus the bytes no entry can claim
+## (map tiles, search/Wikipedia files, streamed or orphan worlds) as
+## "other_bytes". Row sizes count shared tiles for each place that uses
+## them, so rows may sum past the true total in "total_bytes".
+static func place_cache_report(entries_in: Array) -> Dictionary:
+	_ensure_lru()
+	var by_place := WorldCache.bytes_by_place()
+	var sizes := {}  # path -> bytes, for files counted once as attributed
+	var rows: Array = []
+	var attributed_worlds := {}
+	var attributed_world_bytes := 0
+	for e in entries_in:
+		if not e is Dictionary:
+			continue
+		var entry: Dictionary = e
+		var data_bytes := 0
+		var layered := entry_cache_keys(entry)
+		var paths := _entry_data_paths(entry, layered)
+		for k in paths:
+			if FileAccess.file_exists(k):
+				if not sizes.has(k):
+					sizes[k] = _stored_bytes(k)
+				data_bytes += int(sizes[k])
+		var world_bytes := 0
+		if entry.has("lat") and entry.has("lon"):
+			var pk := "%d_%d" % [quant(float(entry["lat"])), quant(float(entry["lon"]))]
+			world_bytes = int(by_place.get(pk, 0))
+			if not attributed_worlds.has(pk):
+				attributed_worlds[pk] = true
+				attributed_world_bytes += world_bytes
+		# Cached state is judged at the entry's own preset (as History's
+		# badge is), not against the all-preset union used for sizing:
+		# a place fully downloaded at its tier is "full".
+		var status := keys_cached_status(layered)
+		var want := 0
+		var have := 0
+		for layer in status:
+			want += int(status[layer]["total"])
+			have += int(status[layer]["cached"])
+		var state := "none"
+		if data_bytes + world_bytes > 0:
+			state = "full" if want > 0 and have >= want else "partial"
+		rows.append({"entry": entry, "name": str(entry.get("name", "Place")),
+			"lat": float(entry.get("lat", 0.0)), "lon": float(entry.get("lon", 0.0)),
+			"data_bytes": data_bytes, "world_bytes": world_bytes,
+			"bytes": data_bytes + world_bytes, "state": state})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["bytes"]) != int(b["bytes"]):
+			return int(a["bytes"]) > int(b["bytes"])
+		return str(a["name"]) < str(b["name"]))
+	var unique_data := 0
+	for k in sizes:
+		unique_data += int(sizes[k])
+	var data_total := data_bytes()
+	var world_total := WorldCache.total_bytes()
+	var other := maxi(0, data_total - unique_data) \
+		+ maxi(0, world_total - attributed_world_bytes)
+	return {"rows": rows, "other_bytes": other,
+		"total_bytes": data_total + world_total}
+
+## Clear one place's cache: deletes its downloaded data (all presets)
+## and its built worlds, and nothing else. The History entry, its
+## favourite, camera and thumbnail all stay (Settings → Storage).
+## Tiles shared with a nearby place are deleted too, so that place
+## downloads them again when it opens. Refuses while a world for this
+## place is being saved or prefetched.
+func clear_place_cache(entry: Dictionary) -> Dictionary:
+	var res := {"ok": false, "busy": false, "files": 0, "bytes": 0,
+		"data_bytes": 0, "world_bytes": 0}
+	if not entry.has("lat") or not entry.has("lon"):
+		return res
+	var lat := float(entry["lat"])
+	var lon := float(entry["lon"])
+	if WorldCache.is_place_busy(lat, lon):
+		res["busy"] = true
+		return res
+	_ensure_lru()
+	var files := 0
+	var freed := 0
+	for k in _entry_data_paths(entry):
+		if FileAccess.file_exists(k):
+			var size := _stored_bytes(k)
+			DirAccess.remove_absolute(k)
+			var rel := _rel(k)
+			_lru.erase(rel)
+			if _scan_task >= 0:
+				_cleared[rel] = true
+			files += 1
+			freed += size
+	res["data_bytes"] = freed
+	var worlds := WorldCache.remove_for_place(lat, lon)
+	files += int(worlds.get("files", 0))
+	freed += int(worlds.get("bytes", 0))
+	res["world_bytes"] = int(worlds.get("bytes", 0))
+	res["files"] = files
+	res["bytes"] = freed
+	res["ok"] = true
+	_tracked_bytes = _index_bytes()
+	_queue_lru_save()
+	return res
+
+## Remove from cache: clears the place's cache (clear_place_cache),
+## deletes its thumbnail and drops it from History. When the place is
+## still being saved the clear is refused, so nothing is dropped and
+## the result says busy — the caller can say so instead of claiming
+## the place was removed while its files remain.
+func remove_place(entry: Dictionary) -> Dictionary:
+	var res := clear_place_cache(entry)
+	if bool(res.get("busy", false)):
+		return res
 	PlaceThumb.remove(float(entry.get("lat", 0.0)), float(entry.get("lon", 0.0)))
 	entries.erase(entry)
-	_tracked_bytes = -1
 	save_store()
+	return res
 
-# --- LRU size cap + per-layer invalidation (all static) ---
+# --- LRU accounting + per-layer invalidation (all static) ---
 #
 # Work that grows with the number of cache files runs on worker tasks: a
 # 20 GB cache holds ~250k files, one disk scan of them takes seconds and
@@ -399,7 +540,7 @@ static func preload_index() -> void:
 		return
 	var path := _lru_path()
 	_hook_exit()
-	_load_task = WorkerThreadPool.add_task(func() -> void:
+	_load_task = _spawn(func() -> void:
 		_loaded = JSON.parse_string(FileAccess.get_file_as_string(path)) \
 			if FileAccess.file_exists(path) else null
 		_index_loaded.call_deferred())
@@ -407,6 +548,31 @@ static func preload_index() -> void:
 static func _index_loaded() -> void:
 	if _load_task >= 0 and not _lru_loaded:
 		_ensure_lru()
+	var waiters := _index_waiters
+	_index_waiters = []
+	for w in waiters:
+		# A screen freed before the index landed leaves a dead lambda.
+		if w.is_valid():
+			w.call()
+
+## Whether the index is in memory. Screens that only need sizes check
+## this before place_cache_report, whose _ensure_lru would otherwise
+## join the preload parse on the main thread (see ensure_index_async).
+static func index_ready() -> bool:
+	return _lru_loaded
+
+## Calls `done` when the index is in memory, without ever joining the
+## preload on the main thread: at once when it already is, else when
+## preload_index's deferred completion lands. For a screen opening in
+## the first moments after launch, which builds without sizes and
+## refreshes itself from `done`.
+static func ensure_index_async(done: Callable) -> void:
+	if _lru_loaded:
+		done.call()
+		return
+	if not _index_waiters.has(done):
+		_index_waiters.append(done)
+	preload_index()
 
 ## The index, loaded: waits for preload_index's task if it is still
 ## parsing, else reads it here.
@@ -456,22 +622,27 @@ static func flush_lru() -> void:
 	var index := _lru.duplicate()
 	_lru_pending = ""
 	_hook_exit()
-	_save_task = WorkerThreadPool.add_task(func() -> void: _write_index(path, index))
+	_save_task = _spawn(func() -> void: _write_index(path, index))
 
 static func _join_save() -> void:
 	if _save_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_save_task)
 		_save_task = -1
 
-## An index read, write or scan is still pending or running.
+## An index read, write, scan or deletion is still pending or running.
+## Reads the tasks' own done flags: asking the pool about an ID that was
+## already joined fails with "Invalid Task ID" (seen at quit).
 static func busy() -> bool:
-	for t in [_load_task, _save_task, -1 if _scan_joined else _scan_task]:
-		if t >= 0 and not WorkerThreadPool.is_task_completed(t):
-			return true
-	for t in _trash_tasks:
-		if not WorkerThreadPool.is_task_completed(t):
-			return true
-	return _lru_pending != ""
+	_working = _working.filter(func(box: Array) -> bool: return not box[0])
+	return not _working.is_empty() or _lru_pending != ""
+
+## Starts `work` on a worker (from the main thread) and tracks it for busy().
+static func _spawn(work: Callable) -> int:
+	var box := [false]
+	_working.append(box)
+	return WorkerThreadPool.add_task(func() -> void:
+		work.call()
+		box[0] = true)
 
 ## Joins every task; the store's teardown backstop (Main waits on busy()
 ## first, frame by frame, so this rarely blocks).
@@ -514,12 +685,13 @@ static func reset_lru() -> void:
 	_lru_loaded = false
 	_loaded = null
 	_load_task = -1
+	_index_waiters.clear()
 	_lru_pending = ""
 	_tracked_bytes = -1
 	_reconciled = false
 	_touched.clear()
+	_cleared.clear()
 	_scan_again = false
-	_scan_again_report = false
 
 static func _rel(path: String) -> String:
 	return _rel_to(path, base_dir())
@@ -533,18 +705,20 @@ static func _file_bytes(path: String) -> int:
 	var f := FileAccess.open(path, FileAccess.READ)
 	return int(f.get_length()) if f != null else 0
 
-## Record a cache hit. atime_override is a test hook (default: now).
-static func note_read(path: String, atime_override: float = -1.0) -> void:
+## Record a cache hit. atime_override is a test hook (default: now);
+## `bytes` spares reopening a file the caller has just read.
+static func note_read(path: String, atime_override: float = -1.0, bytes: int = -1) -> void:
 	_ensure_lru()
 	var now := Time.get_unix_time_from_system() \
 		if atime_override < 0.0 else atime_override
 	var rel := _rel(path)
-	_lru[rel] = {"bytes": _file_bytes(path), "atime": now}
+	_lru[rel] = {"bytes": bytes if bytes >= 0 else _file_bytes(path), "atime": now}
 	_touch(rel)
 	_queue_lru_save()
 
-## Record a cache write, enforcing the size cap when the tracked
-## total exceeds it. atime_override is a test hook (default: now).
+## Record a cache write. Nothing is evicted; the first write in a
+## session also reconciles the index against the files on disk.
+## atime_override is a test hook (default: now).
 static func note_written(path: String, atime_override: float = -1.0) -> void:
 	_ensure_lru()
 	if _tracked_bytes < 0:
@@ -558,8 +732,8 @@ static func note_written(path: String, atime_override: float = -1.0) -> void:
 	_touch(rel)
 	_tracked_bytes += size - old
 	_queue_lru_save()
-	if _tracked_bytes > data_cap() or not _reconciled:
-		enforce_size_cap()
+	if not _reconciled:
+		reconcile_index()
 
 ## A row noted while a scan works on a copy wins over the scan's.
 static func _touch(rel: String) -> void:
@@ -580,7 +754,7 @@ static func data_bytes() -> int:
 	if _tracked_bytes < 0:
 		_tracked_bytes = _index_bytes()
 	if not _reconciled:
-		enforce_size_cap()
+		reconcile_index()
 	return _tracked_bytes
 
 ## Every cache file except the LRU index itself: {"path", "rel",
@@ -618,81 +792,52 @@ static func _scan_dir(dir_path: String, base: String, lru_path: String,
 		name = dir.get_next()
 	dir.list_dir_end()
 
-## Trim built worlds to their share, then, once data is over data_cap(),
-## evict it oldest-atime-first down to TRIM_TO of the cap: a cache kept
-## at the cap rescanned every file on each tile a new place wrote. The
-## scan and the eviction run on a worker; the session's first call also
-## scans when under the cap, to count what the index does not track.
-## Legacy (non-v2) files go first — they are dead weight no fetcher
-## reads. The LRU index itself is never evicted.
-static func enforce_size_cap(report_full: bool = true) -> void:
-	if eviction_suppressed:
-		return
-	var worlds_removed := 0
-	if _shares_with_worlds() and WorldCache.total_bytes() > max_cache_bytes / 2:
-		worlds_removed = WorldCache.enforce_budget()
-	if worlds_removed > 0 and report_full and on_full.is_valid():
-		on_full.call()
+## Reconcile the index against the files on disk: count what the index
+## does not track (map tiles) and drop index rows for files that are
+## gone. Never deletes a cache file — there is no size limit. The scan
+## runs on a worker; the session's first accounting call starts it.
+static func reconcile_index() -> void:
 	_ensure_lru()
 	if _tracked_bytes < 0:
 		_tracked_bytes = _index_bytes()
-	if _tracked_bytes > data_cap() or not _reconciled:
-		_start_scan(report_full)
+	if not _reconciled:
+		_start_scan()
 
-static func _start_scan(report: bool) -> void:
+static func _start_scan() -> void:
+	# Never once the tree is quitting: a scan started by a write during
+	# teardown ran GDScript on a worker while the engine shut down.
+	if stop_scans:
+		return
 	if _scan_task >= 0:
 		_scan_again = true
-		_scan_again_report = _scan_again_report or report
 		return
 	_touched.clear()
+	_cleared.clear()
 	_scan_gen += 1
 	var gen := _scan_gen
 	var base := base_dir()
 	var lru_path := _lru_path()
 	var index := _lru.duplicate()
-	var cap := data_cap()
 	_hook_exit()
-	_scan_task = WorkerThreadPool.add_task(func() -> void:
-		var r := _scan_and_trim(base, lru_path, index, cap)
-		_scan_done.call_deferred(gen, report, r))
+	_scan_task = _spawn(func() -> void:
+		var r := _scan_and_count(base, lru_path, index)
+		_scan_done.call_deferred(gen, r))
 
-## On a worker: the whole directory, trimmed when it is over `cap`.
-## {"rows": rel -> {bytes, atime} for every file left, "total", "freed"}.
-static func _scan_and_trim(base: String, lru_path: String, index: Dictionary,
-		cap: int) -> Dictionary:
+## On a worker: the whole directory, counted, nothing removed.
+## {"rows": rel -> {bytes, atime} for every file found, "total"}.
+static func _scan_and_count(base: String, lru_path: String, index: Dictionary) -> Dictionary:
 	var files: Array = []
 	_scan_dir(base, base, lru_path, index, files)
 	if stop_scans:
 		return {"stopped": true}
 	var total := 0
-	for e in files:
-		total += int(e["bytes"])
-	var freed := 0
-	if total > cap:
-		files.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-			var la := is_v2_name(str(a["rel"]))
-			var lb := is_v2_name(str(b["rel"]))
-			if la != lb:
-				return lb  # legacy first
-			if float(a["atime"]) != float(b["atime"]):
-				return float(a["atime"]) < float(b["atime"])
-			return str(a["rel"]) < str(b["rel"]))
-		var target := int(cap * TRIM_TO)
-		var kept: Array = []
-		for e in files:
-			if total > target and not stop_scans:
-				DirAccess.remove_absolute(str(e["path"]))
-				total -= int(e["bytes"])
-				freed += int(e["bytes"])
-			else:
-				kept.append(e)
-		files = kept
 	var rows := {}
 	for e in files:
+		total += int(e["bytes"])
 		rows[str(e["rel"])] = {"bytes": int(e["bytes"]), "atime": float(e["atime"])}
-	return {"rows": rows, "total": total, "freed": freed}
+	return {"rows": rows, "total": total}
 
-static func _scan_done(gen: int, report: bool, r: Dictionary) -> void:
+static func _scan_done(gen: int, r: Dictionary) -> void:
 	if gen != _scan_gen or _scan_task < 0:
 		return  # reset (or a newer scan) since it started
 	if not _scan_joined:
@@ -701,9 +846,17 @@ static func _scan_done(gen: int, report: bool, r: Dictionary) -> void:
 	_scan_task = -1
 	if r.has("stopped"):
 		_touched.clear()
+		_cleared.clear()
 		return
 	var rows: Dictionary = r["rows"]
 	var total := int(r["total"])
+	for rel in _cleared:
+		# Deleted by a per-place clear while the scan ran: the scan's copy
+		# still lists them, so drop them again instead of resurrecting.
+		if rows.has(rel):
+			total -= int((rows[rel] as Dictionary).get("bytes", 0))
+			rows.erase(rel)
+	_cleared.clear()
 	for rel in _touched:
 		if _lru.has(rel):
 			total += int(_lru[rel]["bytes"]) - int((rows.get(rel, {}) as Dictionary).get("bytes", 0))
@@ -713,14 +866,8 @@ static func _scan_done(gen: int, report: bool, r: Dictionary) -> void:
 	_tracked_bytes = total
 	_reconciled = true
 	_queue_lru_save()
-	if int(r["freed"]) > 0 and report and on_full.is_valid():
-		on_full.call()
 	if _scan_again:
 		_scan_again = false
-		var again_report := _scan_again_report
-		_scan_again_report = false
-		if _tracked_bytes > data_cap():
-			_start_scan(again_report)
 
 ## Moves a directory aside (one rename) and deletes it on a worker:
 ## clearing a 20 GB cache removes ~250k files. Trash an earlier quit left
@@ -731,7 +878,7 @@ static func discard_dir(path: String) -> void:
 		DirAccess.rename_absolute(full, "%s%s%d" % [full, TRASH_MARK, Time.get_ticks_usec()])
 	var parent := full.get_base_dir()
 	_hook_exit()
-	_trash_tasks.append(WorkerThreadPool.add_task(func() -> void:
+	_trash_tasks.append(_spawn(func() -> void:
 		for d in DirAccess.get_directories_at(parent):
 			if d.contains(TRASH_MARK):
 				_remove_tree(parent.path_join(d))))

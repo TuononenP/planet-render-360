@@ -183,9 +183,52 @@ void fragment() {
 	}
 	s *= 1.0 + 0.5 * climate_rain;
 	s *= wave_amp * mix(1.0, 0.55, brackish);
-	// Frozen water: still, matte, white-grey ice (ClimateModel).
+	// Frozen water (ClimateModel): fast ice, snow on it near and far.
 	float ice_cover = local_ice(seav, shorev * shore_m, openv);
+	// Where the fast ice gives out toward open water (a harbour's deeper
+	// channel, the open sea) it breaks into floes of brash ice in dark
+	// water instead of fading; the floes settle to their share far off.
+	if (ice_cover > 0.001 && ice_cover < 0.999) {
+		float floe = mix(w_noise(pm / 7.0) * 0.65 + w_noise(pm / 2.1 + 3.3) * 0.35, 0.5, smoothstep(0.6, 3.0, pixel_m));
+		float fw = 0.03 + pixel_m * 0.05;
+		ice_cover = smoothstep(floe - fw, floe + fw, ice_cover * 1.1 - 0.05);
+	}
 	s *= 1.0 - ice_cover;
+	vec3 ice_c = vec3(0.0);
+	float ice_rough = 0.55;
+	if (ice_cover > 0.0) {
+		float snowy = snow_line(wpos);
+		float shore_d = clamp(shorev, 0.0, 1.0) * shore_m;
+		float wob = (w_noise(pm / 5.0) - 0.5) * 1.6;
+		// The tide crack: the ice hinges a metre or two off the quay and
+		// the seam stays wet and grey.
+		float crack = (1.0 - smoothstep(0.25, 0.7, abs(shore_d - 1.6 - wob * 0.5))) * (1.0 - smoothstep(0.5, 2.0, pixel_m));
+		// Pressure ridge: rubble pushed up a few metres out, in blocks.
+		float ridge_band = 1.0 - smoothstep(1.5, 3.5, abs(shore_d - 6.0 - wob * 2.0));
+		float blocks = w_noise(pm * 1.3) * 0.6 + w_noise(pm * 3.7) * 0.4;
+		float ridge = ridge_band * smoothstep(0.35, 0.7, blocks);
+		vec2 rubble = noise_grad(pm * 1.3) * 0.5 * ridge * water_wave_weight(pixel_m, 0.8);
+		// Wind scours the snow off in patches: bare grey-blue ice shows.
+		float scour = smoothstep(0.66, 0.74, mix(w_noise(pm / 11.0 + 7.1) * 0.7 + w_noise(pm / 3.0) * 0.3, 0.5, smoothstep(2.0, 12.0, pixel_m)))
+			* (1.0 - ridge_band);
+		// Ski and foot trails across the ice: sparse, wandering, trodden grey.
+		float trail = 0.0;
+		for (int k = 0; k < 2; k++) {
+			vec2 dir = k == 0 ? normalize(vec2(0.83, 0.56)) : normalize(vec2(-0.35, 0.94));
+			float across = dot(pm, vec2(-dir.y, dir.x)) + (w_noise(vec2(dot(pm, dir) / 60.0, float(k) * 5.0)) - 0.5) * 30.0;
+			float lane = abs(fract(across / 140.0 + float(k) * 0.37) - 0.5) * 140.0;
+			trail = max(trail, 1.0 - smoothstep(0.3 + pixel_m * 0.5, 0.6 + pixel_m, lane));
+		}
+		trail *= (1.0 - ridge_band) * (1.0 - smoothstep(4.0, 20.0, pixel_m));
+		vec3 bare_ice = vec3(0.50, 0.58, 0.64) * (0.92 + 0.12 * w_noise(pm / 1.7));
+		vec3 snow_c = snow_albedo(pm, pixel_m, 0.25 * trail) * mix(1.0, 1.04, ridge);
+		vec3 snowless = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snowy);
+		ice_c = mix(snowless, snow_c, snowy);
+		ice_c = mix(ice_c, bare_ice, scour * snowy);
+		ice_c = mix(ice_c, vec3(0.30, 0.32, 0.33), crack);
+		ice_rough = mix(mix(SNOW_ROUGH, 0.15, scour), 0.2, crack);
+		s += rubble * ice_cover;
+	}
 	vec3 n_world = normalize(vec3(-s.x, 1.0, -s.y));
 	// Always the upward normal: water is only ever seen from above,
 	// and its triangles wind either way (cull_disabled).
@@ -234,12 +277,11 @@ void fragment() {
 	// Light through the thin tops of the waves: a faint green on slopes.
 	col += vec3(0.010, 0.034, 0.028) * smoothstep(0.02, 0.14, length(s)) * (1.0 - ice_cover);
 	col = mix(col, foam_color.rgb, foam);
-	vec3 ice = mix(vec3(0.70, 0.76, 0.80), vec3(0.86, 0.89, 0.92), snow_line(wpos));
-	ALBEDO = mix(col, ice, ice_cover);
+	ALBEDO = mix(col, ice_c, ice_cover);
 	float rough = mix(near_rough, far_rough, smoothstep(60.0, 1500.0, dist_m));
 	rough = mix(rough, 0.45, foam);
 	rough = mix(rough, 0.12, sqrt(climate_rain) * (1.0 - smoothstep(150.0, 900.0, dist_m)));
-	ROUGHNESS = water_roughness(mix(rough, 0.55, ice_cover), n_world);
+	ROUGHNESS = water_roughness(mix(rough, ice_rough, ice_cover), n_world);
 	SPECULAR = mix(mix(spec, 0.2, foam), 0.25, ice_cover);
 	METALLIC = 0.0;
 }

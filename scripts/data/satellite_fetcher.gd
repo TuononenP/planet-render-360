@@ -121,6 +121,10 @@ static func fallback_for(zoom: int, span: int) -> Vector2i:
 		s += 1
 	return Vector2i(zoom - 1, maxi(s, 3))
 
+## False for a fetch-only run (the streamer warming caches): the mosaic's
+## GPU texture, made on the main thread, would only be thrown away.
+var textures := true
+
 func fetch(lat: float, lon: float, zoom: int = 16, span: int = 3) -> void:
 	_pending_lat = lat
 	_pending_lon = lon
@@ -326,4 +330,4 @@ func _stitched(gen: int, mosaic: Image) -> void:
 		"source_zoom": _zoom,
 		"source_span": _span,
 	}
-	succeeded.emit(ImageTexture.create_from_image(mosaic), mosaic, origin, _zoom)
+	succeeded.emit(ImageTexture.create_from_image(mosaic) if textures else null, mosaic, origin, _zoom)

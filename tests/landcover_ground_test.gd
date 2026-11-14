@@ -23,6 +23,15 @@ func _init() -> void:
 	var actual := GroundMaterial.class_map(data, 4)
 	if roundi(actual.get_pixel(3, 0).r * 255.0) != int(GroundMaterial.ID["urban"]):
 		failures.append("class map did not consume available WorldCover")
+	_check_near_map(failures)
+	if TerrainTextures.LAYERS[3] != "soil" or not MaterialLibrary.PBR_SETS.has("soil"):
+		failures.append("the soil set should be terrain layer 3")
+	if TerrainTextures.LAYERS.size() != TerrainTextures.TILE_M.size():
+		failures.append("each terrain layer needs a tile size")
+	# Road ground must not draw the soil layer now in the old asphalt slot.
+	var pal := GroundMaterial.palette()
+	if pal.get_pixel(int(GroundMaterial.ID["road"]), 0).a != 0.0:
+		failures.append("road ground should not weight the soil layer")
 	if failures.is_empty():
 		print("LANDCOVER GROUND OK: classes, OSM precedence, water and climate fallback")
 		quit(0)
@@ -30,3 +39,39 @@ func _init() -> void:
 		for failure in failures:
 			printerr("LANDCOVER GROUND FAIL: ", failure)
 		quit(1)
+
+## The class id `near` holds at world (x, z), for a window of `size` around `centre`.
+func _near_id(near: Image, centre: Vector2, size: float, x: float, z: float) -> int:
+	var n := near.get_width()
+	var px := int((x - centre.x + size * 0.5) / size * float(n))
+	var py := int((z - centre.y + size * 0.5) / size * float(n))
+	return roundi(near.get_pixel(px, py).r * 255.0)
+
+func _check_near_map(failures: Array[String]) -> void:
+	if GroundMaterial.near_texels(RenderSettings.Preset.FAST) != 0 or GroundMaterial.near_texels(RenderSettings.Preset.ULTRA) != 4096:
+		failures.append("near map sizes per tier are wrong")
+	var d := LocationData.new()
+	d.land_polygons = [{"class": "grass", "points": PackedVector2Array([Vector2(60, -100), Vector2(160, -100),
+		Vector2(160, 100), Vector2(60, 100)]), "holes": []}]
+	d.buildings = [{"x": 110.0, "z": -40.0, "size_x": 20.0, "size_z": 20.0, "height": 9.0}]
+	# A road with both ends far outside the window still crosses it.
+	d.roads = [{"class": "residential", "width_m": 8.0, "points": PackedVector2Array([Vector2(-5000, 0), Vector2(5000, 0)])},
+		{"class": "residential", "width_m": 8.0, "points": PackedVector2Array([Vector2(30, 20), Vector2(30, 60)])}]
+	var centre := Vector2(100, 0)
+	var near := GroundMaterial.near_class_map(d, 512, centre, 200.0)
+	if near == null:
+		print("LANDCOVER GROUND: native rasteriser absent, near map not checked")
+		return
+	for c: Array in [[110.0, -40.0, "building"], [70.0, 50.0, "grass"], [100.0, 0.0, "road"], [40.0, 50.0, ""]]:
+		var id := _near_id(near, centre, 200.0, float(c[0]), float(c[1]))
+		if id != int(GroundMaterial.ID[c[2]]):
+			failures.append("near map at (%.0f, %.0f) holds %d, want %s" % [c[0], c[1], id, c[2]])
+	# Near paint stops half a fine texel inside the ribbon, not the coarse 1.2 m.
+	var edge := _near_id(near, centre, 200.0, 100.0, 3.5)
+	if edge != int(GroundMaterial.ID["road"]):
+		failures.append("the near map keeps the road almost to its edge, got %d" % edge)
+	if _near_id(near, centre, 200.0, 30.0, 58.0) != int(GroundMaterial.ID["road"]) or _near_id(near, centre, 200.0, 30.0, 63.0) != 0:
+		failures.append("road paint should stop at a dead end")
+	var far_away := GroundMaterial.near_class_map(d, 64, Vector2(0, 90000), 100.0)
+	if far_away == null or far_away.get_pixel(32, 32).r != 0.0:
+		failures.append("a window over nothing stays unmapped")

@@ -30,7 +30,7 @@ const MULLION := Color(0.36, 0.375, 0.39)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
-	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse"]
+	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse", "pier", "louvre"]
 const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small", "gothic"]
 ## Photo repeats per bay cell: brick courses and boards must read at
 ## real size, so those bases tile 2x2 inside each bay.
@@ -104,7 +104,7 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	if FacadePatterns.has(pattern):
 		FacadePatterns.prepass(pattern, base, nor, W, pv)
 	alb = FacadePaint.layer(base)
-	var emit := FacadePaint.emit_layer(base) if detail >= 1 and not glass else null
+	var emit := FacadePaint.emit_layer(base) if detail >= 1 else null
 	for bay in BAYS:
 		var ox := bay * CELL
 		var hv := _hash(float(bay) * 9.3 + float(pattern.length()) + variant * 4.1, 3.7)
@@ -131,8 +131,14 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 				if bay % 2 == 0 and hv <= 0.7:
 					FacadePaint.pane(emit, Rect2i(ox + 57, 44, 17, 26), hv)
 			"curtain":
-				_curtain(alb, nor, rgh, ox, hv)
-				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63), hv)
+				if FacadeCurtainKit.has(str(look.get("curtain", ""))):
+					FacadeCurtainKit.draw(str(look["curtain"]), alb, nor, rgh, ox, hv)
+				else:
+					_curtain(alb, nor, rgh, ox, hv)
+				# One bay per look always lights: with four bays, some looks'
+				# hashes all miss the lit share and the tower would stay dark.
+				FacadePaint.pane(emit, Rect2i(ox + 4, 30, CELL - 8, 63),
+					0.6 + hv * 0.4 if bay == int(variant) % BAYS else hv)
 			_:
 				FacadePatterns.bay(pattern, alb, nor, rgh, emit, base, ox, bay, hv, pv)
 	# Ultra: recessed panes (a curtain wall is flush glass).
@@ -141,7 +147,7 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 	if glass:
 		# Curtain glass has no wall photo to tint: one flat layer.
 		base.blend_rect(alb, Rect2i(0, 0, W, CELL), Vector2i.ZERO)
-		return FacadePaint.finish(base, null, null, nor, rgh, depth_fn)
+		return FacadePaint.finish(base, null, emit, nor, rgh, depth_fn)
 	return FacadePaint.finish(base, alb, emit, nor, rgh, depth_fn)
 
 ## Dirt washed down from each sill (base layer, so it takes the tint).

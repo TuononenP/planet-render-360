@@ -18,6 +18,8 @@ const WARMTH := 0.04
 ## Shade at the foot of a wall and the height (m) it fades out over.
 const FOOT_SHADE := 0.82
 const FADE_M := 14.0
+## The per-vertex tints run natively (TintKernels) when the library is loaded.
+static var _native := ClassDB.class_exists("TintKernels")
 
 static func mark(m: BaseMaterial3D) -> void:
 	m.set_meta("wall", true)
@@ -67,12 +69,16 @@ static func _family(x: float, z: float, tone: float) -> int:
 			return i
 	return 0
 
-## Per-vertex colours of one wall surface: `c` shaded by height above the
-## surface's lowest vertex.
-static func colours(verts: PackedVector3Array, c: Color) -> PackedColorArray:
-	var y0 := INF
-	for v in verts:
-		y0 = minf(y0, v.y)
+## Per-vertex colours of one wall surface: `c` shaded by height above
+## `foot`, the building's lowest wall vertex (INF: this surface's own).
+static func colours(verts: PackedVector3Array, c: Color, foot: float = INF) -> PackedColorArray:
+	if _native:
+		return ClassDB.class_call_static("TintKernels", "wall_colours", verts, c, foot,
+			FADE_M * WorldScale.metres_to_units(), FOOT_SHADE)
+	var y0 := foot
+	if is_inf(y0):
+		for v in verts:
+			y0 = minf(y0, v.y)
 	var fade := FADE_M * WorldScale.metres_to_units()
 	var cols := PackedColorArray()
 	cols.resize(verts.size())

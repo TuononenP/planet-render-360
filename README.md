@@ -36,7 +36,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; fly a drone over the whole detailed area (G: W A S D fly with momentum, E / Q climb up to 500 m over the ground, Shift speeds up, on-screen sticks on touch screens); play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P), save a 360° photo you can look around in (O; a JPEG with panorama metadata, for photo viewers and social sites), or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
-- Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, cache size, and render quality (Fast / Balanced / High / Ultra).
+- Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, storage (no cache size limit; clear one place's cache at a time from the Storage list, or all of it), and render quality (Fast / Balanced / High / Ultra).
 
 To refresh the capital catalog, download `countryInfo.txt` and `cities1000.zip`
 from [GeoNames](https://download.geonames.org/export/dump/) and run
@@ -205,6 +205,7 @@ godot --headless --script tests/build_guard_test.gd # no second world build whil
 godot --headless --script tests/loading_building_test.gd # "Building the scene" progress after the fetch
 godot --headless --script tests/responsive_test.gd # breakpoints + layout switching
 godot --headless --script tests/settings_test.gd # render-quality presets, persistence, FPS ceiling
+godot --headless --script tests/place_cache_clear_test.gd # no cache size limit; per-place cache report/clear, History remove
 godot --headless --script tests/zoom_search_test.gd # map/360 zoom, on-device search predictions, time of day
 godot --headless --script tests/accent_sun_test.gd # Auto accent follows the sun
 godot --headless --script tests/sky_test.gd      # sky per season, time of day and weather
@@ -236,7 +237,7 @@ godot --headless --script tests/snapshot_reader_test.gd # bundled snapshots load
 godot --headless --script tests/quality_governor_test.gd # FPS governor holds after a step down; first preset follows the GPU
 godot --script tests/screenshot_test.gd         # capture UI screenshots (phone/tablet/desktop)
 godot --script tests/panorama_render_test.gd     # 360° photo projection: six coloured walls land where the viewer sees them (windowed)
-godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, eviction (windowed)
+godot --script tests/world_cache_test.gd        # built-world cache: save, cached revisit, explicit budget utility (windowed)
 tools/check_class_size.sh                       # every class under scripts/ at or under 1000 lines
 tools/run_tests.sh [name ...]                   # all headless tests (skips windowed and live-network ones); also runs on every pull request
 ```
@@ -313,7 +314,7 @@ planet-render-360/
 │   │   ├── horizon_fetcher.gd     One Overpass call for the named peaks, towns and lakes (horizon labels)
 │   │   ├── view_link.gd           Shareable view links + the camera state History keeps per place
 │   │   ├── place_thumb.gd         History / Recents pictures and bundled preset thumbnails
-│   │   ├── cache_store.gd         History + versioned, LRU-capped tile/area cache
+│   │   ├── cache_store.gd         History + versioned tile/area cache (no size limit; per-place clearing)
 │   │   └── offline_downloader.gd  "Download for offline" cache warmer
 │   ├── map/                   Vector map in the design system Map style: MVT decode, style rules,
 │   │                          line meshing, hillshade, labels
@@ -333,14 +334,16 @@ planet-render-360/
 │   │   │                          Far terrain rings and the far city, only where the place is built up
 │   │   ├── building_*.gd, roof_*.gd, facade_*.gd, storey_composer.gd, architecture_*.gd
 │   │   │                          OSM building extrusion, regional style, roofs and facades; city and country-era style tables
-│   │   ├── tower_massing.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
+│   │   ├── tower_massing.gd, tower_top.gd, tower_looks.gd, nyc_tower_looks.gd, facade_curtain_kit.gd, neighbour_evidence.gd, wall_variety.gd, party_walls.gd
 │   │   │                          Tower setbacks, evidence from neighbouring buildings, paint families, party walls
-│   │   ├── road_*.gd, street_*.gd, rail_builder.gd, kerb_builder.gd, bridge_arches.gd
+│   │   ├── road_*.gd, street_*.gd, rail_builder.gd, rail_decks.gd, kerb_builder.gd, bridge_arches.gd
 │   │   │                          Roads, markings, rails, kerbs, bridges and street furniture
 │   │   ├── shoreline_model.gd, shore_*.gd, water_*.gd, quay_*.gd
 │   │   │                          Shared shoreline geometry, water ownership, banks, quays and moorings
 │   │   ├── tree_*.gd, vegetation_*.gd, canopy_vegetation.gd, foliage_textures.gd, climate_model.gd
-│   │   ├── parked_cars.gd, car_models.gd, car_paint.gdshader
+│   │   ├── parked_cars.gd, car_paint.gd, vehicles/ (VehicleKit, CarSpecs, CarModel, CarFleet,
+│   │   │                          TramSpecs, TramModel, TramRoute, TransitVehicles,
+│   │   │                          TrainSpecs, StationTrains)
 │   │   │                          Parked vehicle placement, imported models and paint shader
 │   │   ├── ship_builder.gd, marina_builder.gd, harbour_ferries.gd, vessel_*.gd, *_model.gd
 │   │   │                          Procedural vessels, marinas and harbour ferries
@@ -375,14 +378,13 @@ planet-render-360/
 │   └── bin/                   Generated libraries and .gdextension manifest (tools/build_native.sh)
 ├── assets/                    Runtime assets
 │   ├── eiffel.glb             Eiffel Tower model
-│   ├── osm_snapshots/         Bundled gzip OpenStreetMap layers for the featured places and capitals
+│   ├── osm_snapshots/         Bundled OpenStreetMap layers (.osmb) for the featured places and capitals
 │   │                          (ODbL; provenance in capital_provenance.json and its README)
 │   ├── capital_thumbs/        Capital place thumbnails
 │   ├── brand/, icons/, fonts/  Brand artwork, Lucide icons and typefaces
 │   ├── map/                   Bundled map-tile packs (Git LFS)
 │   ├── preset_thumbs/         Curated place thumbnails
 │   ├── textures/              CC0 Poly Haven PBR sets (2k/) and foliage atlases (foliage/)
-│   └── vehicles/              Imported car models, textures and attribution
 ├── assets_src/blender/        Blender sources (offline only, never shipped)
 ├── tests/                     About 150 regression scripts and offline fixtures/ (mostly headless;
 │                              screenshot_test.gd, panorama_render_test.gd and world_cache_test.gd need a window)

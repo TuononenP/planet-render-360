@@ -12,11 +12,16 @@ an unverified source never blocks the app.
 |---|---|---|---|---|---|---|---|---|
 | Elevation (DEM) | AWS Terrain Tiles (Terrarium) | `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` — same endpoint at zoom 14 (near mosaic), 12 (mid), 8 (far); T2.1 | PNG 256px, height = R*256 + G + B/256 − 32768 m; z14 ≈ 9.6 m/px at equator (≈6.3 m/px at Paris latitude) | Attribution required; per-region credits incl. EU-DEM/Copernicus ("Europe terrain data produced using Copernicus data and information funded by the European Union - EU-DEM layers"), USGS 3DEP, SRTM — full list in the Tilezen/Joerd attribution doc (`https://github.com/tilezen/joerd/blob/master/docs/attribution.md`); AWS Open Data page `https://registry.opendata.aws/terrain-tiles/` points to the same doc as the licence | Yes — z14 verified HTTP 200, `image/png`, no auth (2026-10-28): Paris tile `14/8299/5636` (78,499 bytes, S3 source tag `eudem_dem_5deg_n45e000.tif`) and Interlaken neighbour `14/8550/5783` both 200; decoded Paris window 27.2–61.1 m, consistent with the z12 reading | Yes — verified, no key/account; S3 static tiles, no published rate limit — still cache per tile (`user://cache`) and fetch mosaics in a bounded pool | tile failure → lower zoom for that cell → per-tile cache → procedural DEM (T2.1) | **verified, wired in `DemFetcher` (z12+z8); z14 mosaic gate passed for T2.1** |
 | Elevation, inside Helsinki (bare earth) | City of Helsinki elevation model 2021 (Korkeusmalli, 1 m, airborne laser scanning, N2000 heights) | `https://kartta.hel.fi/ws/geoserver/avoindata/wcs` — WCS 2.0.1 GetCoverage, `coverageId=avoindata__Korkeusmalli_2021_1m`, `subset=E(..)&subset=N(..)` in EPSG:3879 (ETRS-GK25), `scaleSize=i(600),j(600)` | GeoTIFF, big-endian float32, uncompressed (~1.4 MB per 2.9 km window); sea ≈ 0.0–0.2 m, no roofs or trees | CC BY 4.0 — “© City of Helsinki, Elevation model 2021”; credited in-app | Yes — GetCapabilities, DescribeCoverage and GetCoverage answered 200 on 2026-11-09 | Yes — no key or account (the National Land Survey's 2 m model needs a My Account API key) | Terrarium z14/z12 + `BareEarth` + `CoastalDem` (outside the city's extent E 25 487 000–25 516 000, N 6 655 000–6 690 000, or when the request fails) | **wired 2026-11-09** (`HelsinkiDem`, `HelsinkiDemFetcher`; replaces the heights grid after `CoastalDem` has registered the far rings) |
+| Buildings, inside Helsinki (register facts) | City of Helsinki building register (Rakennukset, register attributes) | `https://kartta.hel.fi/ws/geoserver/avoindata/wfs` — WFS 2.0.0 GetFeature, `typeNames=avoindata:Rakennukset_alue_rekisteritiedot`, `outputFormat=application/json`, `propertyName=i_ekoord,i_nkoord,i_kerrlkm,…` (no geometry), `bbox=E0,N0,E1,N1,EPSG:3879` (±1450 m) | GeoJSON, one point (`i_ekoord`/`i_nkoord`, GK25) per building with floors, completion date, facade / frame material codes, use class (1994) and RL2018 class; ~3 000 rows, ~1 MB per central window | CC BY 4.0 — “© City of Helsinki, building register”; credited in-app | Yes — answered 200 on 2026-11-13 (3 113 rows round Kluuvi in 0.5 s); bbox axis order E,N verified | Yes — no key or account | OSM tags + regional defaults (outside Helsinki, Espoo has no open register, or when the request fails) | **wired 2026-11-14** (`HelsinkiRegister`, `RegisterCodes`, `CityOpenData`; fill-only after OSM tags and `BuildingReferences`, every preset) |
+| Street and park trees, inside Helsinki | City of Helsinki tree register (Puurekisteri) | same WFS, `typeNames=avoindata:Puurekisteri_piste`, GK25 bbox | GeoJSON points (GK25) with genus (`suku`), species (`laji`), trunk-diameter class (`kokoluokka`), planting year; ~7 400 trees round Kluuvi | CC BY 4.0 — “© City of Helsinki, tree register”; credited in-app | Yes — answered 200 on 2026-11-13 | Yes — no key or account | OSM `natural=tree` + canopy raster | **wired 2026-11-14** (`HelsinkiTrees`; names/sizes OSM trees within 3 m on every preset, plants register-only trees on High / Ultra) |
+| Aerial imagery, capital region (inner mosaic) | HSY orthophoto 2023 | `https://kartta.hsy.fi/geoserver/wms` — WMS 1.3.0 GetMap, `layers=taustakartat_ja_aluejaot:Ortoilmakuva_2023`, `crs=EPSG:3857`, bbox on the slippy-tile pixel grid, ≤1920 px parts | JPEG; layer extent lat 59.90–60.61, lon 24.25–25.37 (Helsinki, Espoo, Vantaa, Kauniainen); z19 ≈ 0.15 m/px at 60°N (cars and lane paint resolve) | CC BY 4.0 — “© HSY, orthophoto 2023”; credited in-app when used | Yes — 256 px and 2048 px GetMaps answered 200 `image/jpeg` on 2026-11-13 | Yes — no key or account | Esri z18 inner mosaic (desktop Ultra), else none | **wired 2026-11-14** (`OrthoSource`, `OrthoFetcher`, `InnerImagery`; High / Ultra in Helsinki and Espoo, colour-matched to the main mosaic) |
+| Tree canopy, capital region | HSY land cover 2024, tree-canopy height bands | `https://kartta.hsy.fi/geoserver/wms` — WMS 1.3.0 GetMap of `asuminen_ja_maankaytto:maanpeite_puusto_{2_10m,10_15m,15_20m,yli20m}_2024`, `crs=EPSG:4326` (lat,lon axes), `transparent=true`, 768² on `LandcoverFetcher`'s canopy grid | PNG RGBA, alpha = canopy of that band; ~70 KB per band | CC BY 4.0 — “© HSY, land cover 2024”; credited in-app when used | Yes — answered 200 on 2026-11-13 | Yes — no key or account | Meta CHMv2 alone (outside the region, or a failed band) | **wired 2026-11-14** (`HsyCanopy`; presence and band from HSY, height within the band from Meta's CHM; High / Ultra) |
+| Elevation relief, inside Helsinki (lighting only) | City of Helsinki elevation model 2021 — a second, finer window | same WCS as the Helsinki elevation row, ±640 m at `scaleSize=i(512),j(512)` (2.5 m) | GeoTIFF float32 | as the Helsinki elevation row | Yes | Yes | no relief map (the 9.4 m ground posts alone) | **wired 2026-11-14** (`DemRelief`; residual slopes bend the ground shader's normal within 600 m, High / Ultra; geometry unchanged) |
 | Elevation, Japan (bare earth) | GSI Japan DEM5A (5 m, airborne laser/photogrammetry) with DEM10B (10 m) where 5 m is missing | `https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/15/{x}/{y}.png`, fallback `…/dem_png/14/{x}/{y}.png` | PNG 256 px, height = (R·65536 + G·256 + B) × 0.01 m, 2^23 = no data, two's complement below zero; ~4 × 4 z15 tiles (~65 KB each) per world | GSI terms of use (compatible with CC BY 4.0) — “Geospatial Information Authority of Japan”; credited in-app | Yes — tiles answered 200 on 2026-11-09 (Shibuya); no key | Yes — no key or account | Terrarium + `BareEarth` (outside Japan, a missing tile, or a failed request) | **wired 2026-11-09** (`GroundModel`, `GroundModelFetcher`; Shibuya roads 13.6 m → 1.4 m rms against it, see below) |
 | Elevation, France (bare earth) | IGN RGE ALTI (1 m DTM) via the Géoplateforme WMS-R | `https://data.geopf.fr/wms-r/wms` — `GetMap`, `LAYERS=ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES`, `CRS=EPSG:3857`, `BBOX=…&WIDTH=300&HEIGHT=300`, `FORMAT=image/x-bil;bits=32` | Raw little-endian float32, 360 KB per window | Licence Ouverte 2.0 — “© IGN, RGE ALTI”; credited in-app | Yes — answered 200 on 2026-11-09 (Paris) | Yes — no key or account | Terrarium + `BareEarth` (outside France, or when the request fails) | **wired 2026-11-09** (`GroundModel`; Paris roads 9.8 m → 0.5 m rms) |
 | Elevation, Netherlands (bare earth) | AHN DTM 0.5 m (Rijkswaterstaat) via PDOK WCS | `https://service.pdok.nl/rws/ahn/wcs/v1_0` — WCS 2.0.1 GetCoverage, `COVERAGEID=dtm_05m`, `SUBSETTINGCRS`/`OUTPUTCRS` EPSG:3857, `SCALESIZE=x(300),y(300)` | GeoTIFF float32, Adobe deflate + floating-point predictor (`GroundTiff`), ~250 KB; no-data under buildings and water (40–50 % of an Amsterdam window), filled from the ground around | CC0 — “AHN, Rijkswaterstaat”; credited in-app | Yes — answered 200 on 2026-11-09 (Amsterdam) | Yes — no key or account | Terrarium + `BareEarth` (outside the Netherlands, or when the request fails) | **wired 2026-11-09** (`GroundModel`; Amsterdam roads 9.3 m → 0.5 m rms) |
 | Elevation, Switzerland (bare earth) | swisstopo swissALTI3D (2 m DTM) via the geo.admin.ch STAC API | `https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items?bbox=…&limit=100` lists the 1 km tiles; each `…_2_2056_5728.tif` asset is fetched from `https://data.geo.admin.ch/ch.swisstopo.swissalti3d/…` | Cloud-optimised GeoTIFF, float32, 128 px LZW tiles, ~1 MB per 1 km tile (6–16 tiles per world); decoded by `GroundTiff` on worker threads (~6 s for Bern), resampled from LV95 to Web Mercator (`NationalGrids.lv95`) and only that 360 KB raster is cached | Open Government Data — “© swisstopo”; credited in-app | Yes — STAC and tiles answered 200 on 2026-11-09 (Bern) | Yes — no key or account | Terrarium + `BareEarth` (outside Switzerland, or when a request fails) | **wired 2026-11-09** (`GroundModel`, `GroundModelFetcher`; Bern roads 6.7 m → 0.7 m rms) |
-| Buildings + roads | OpenStreetMap via Overpass API | Same endpoint(s) as wired (`OsmFetcher.ENDPOINTS`, POST) — **no new endpoint** for T2.3; richer tags + wider radius ride the existing query | JSON (`out geom` already returns all tags; T2.3 only parses more of them) | © OpenStreetMap contributors (ODbL); attribution shown in-app | Yes — same verified path; expanded tags confirmed present in live data (2026-10-28): 31 Paris ways returned `height` (4), `building:levels` (19), `roof:shape` (2); global taginfo counts confirm `building:colour` (107k), `roof:colour` (180k), `building:material`, `roof:material`, `roof:height`, `min_height`, `building:part` all in use. Note: `overpass-api.de` returns HTTP 406 to default curl UA — identifying `User-Agent` (as the fetcher sends) is required | Yes — no key/account; **rate limits:** shared free capacity, HTTP 502/429 under load already observed — keep `[timeout:30]`, the 5-endpoint retry chain, identifying UA, preset-scaled radius, and aggressive cache (T2.3/T2.5) | per-tag fallback: missing tag → existing default (`building:levels×3.2` → `height` → documented regional default, never global 10 m); query failure → on-device cache → procedural-absence-only dressing | **verified, wired in `OsmFetcher`; tag expansion gate passed for T2.3 (parse-only, no endpoint change)** |
+| Buildings + roads | OpenStreetMap via Overpass API | Same endpoint(s) as wired (`OsmFetcher.ENDPOINTS`, POST) — **no new endpoint** for T2.3; richer tags + wider radius ride the existing query | JSON (`out geom` already returns all tags; T2.3 only parses more of them) | © OpenStreetMap contributors (ODbL); attribution shown in-app | Yes — same verified path; expanded tags confirmed present in live data (2026-10-28): 31 Paris ways returned `height` (4), `building:levels` (19), `roof:shape` (2); global taginfo counts confirm `building:colour` (107k), `roof:colour` (180k), `building:material`, `roof:material`, `roof:height`, `min_height`, `building:part` all in use. Note: `overpass-api.de` returns HTTP 406 to default curl UA — identifying `User-Agent` (as the fetcher sends) is required | Yes — no key/account; **rate limits:** shared free capacity, HTTP 502/429 under load already observed — keep `[timeout:30]`, one instance per query with a pause after a failure, identifying UA, preset-scaled radius, and aggressive cache (T2.3/T2.5) | per-tag fallback: missing tag → existing default (`building:levels×3.2` → `height` → documented regional default, never global 10 m); query failure → on-device cache → procedural-absence-only dressing | **verified, wired in `OsmFetcher`; tag expansion gate passed for T2.3 (parse-only, no endpoint change)** |
 | Map tiles (globe; picker fallback) | OpenStreetMap raster tiles | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | PNG 256px | © OpenStreetMap contributors; attribution always visible bottom-right of the map | Yes — OSMF Tile Usage Policy reviewed (2026-10-27): identifying User-Agent, HTTPS URL, cache ≥7 days (we cache on device), no bulk/prefetch — only visible picker tiles are fetched | Yes — no key/account | blank map + pin until tiles arrive; cached tiles offline | **verified, wired in `TileFetcher`/`MapTileView`** |
 | Map tiles (picker, vector) | OpenFreeMap public instance (design system Map style) | TileJSON `https://tiles.openfreemap.org/planet` names the dated tile path (`/planet/<build>/{z}/{x}/{y}.pbf`, z0–14); fetched once, cached in `user://cache/vector/tiles_path.txt` for offline use | Mapbox Vector Tile v2, OpenMapTiles schema, served `Content-Encoding: gzip` (inflated in `VectorTileFetcher.inflate`); `Cache-Control: max-age=315360000` (immutable per build) | Attribution required: "OpenFreeMap © OpenMapTiles Data from OpenStreetMap" (openfreemap.org, checked 2026-11-01); shown as "© OpenStreetMap contributors · © OpenMapTiles" on the map chip and in full (plus "Terrain: AWS Terrain Tiles" for the hillshade) in the picker's attribution line; project MIT, data ODbL | Yes — HTTPS, identifying User-Agent, only visible tiles, cached on device (`VectorTileFetcher`) | Yes — public instance "completely free: no limits on the number of map views or requests… no registration… no API keys" (openfreemap.org, 2026-11-01) | map-land ground + cached tiles offline; `MapTileView.vector = false` restores the OSM raster path | **verified (TileJSON + z4/z9/z13/z14 tiles decoded against mapbox-vector-tile, 2026-11-01), wired in `VectorTileFetcher`/`VectorMapLayer`** |
 | Hillshade (picker) | AWS Terrain Tiles (Terrarium) — same source as the Elevation row | same endpoint, at the vector tile's data zoom, only up to style zoom 12 (`MapStyle.SHADE_MAX_ZOOM`) | PNG 256px Terrarium | as the Elevation row | Yes — same verified path, own cache `user://cache/vector/dem_*.png` | Yes | no relief (flat map) | **wired in `VectorMapLayer`** |
@@ -37,7 +42,39 @@ instance on 2026-11-05, using OSM data dated 2026-11-02T21:21:26Z. The
 far-city query was run as six independent output statements against that same
 data timestamp and combined in query order after checking each response for
 errors. Snapshot versions, sizes and hashes are recorded in `BundledOsm`;
-`tools/prepare_osm_snapshot.py` validates and compresses each response.
+`tools/prepare_osm_snapshot.py` validates and compresses each response. The Midtown preset (`new_york_midtown_*`, origin 40.7535,-73.9825) was fetched on 2026-11-10 from overpass.private.coffee with the app's own queries; only the server `[timeout:]` was raised to 240 s for the detailed and far layers, which the dense extent exceeded at 30 s. That mirror's source timestamps (May-July 2026) are older than the fetch date.
+
+Since 2026-11-11 the bundled layers are not refreshed from Overpass in the
+background: opening a preset or capital sends no map query and skips the
+Overpass status check (`BundledOsm.covers`). Fresher data arrives when the
+bundle is rebuilt. Before that, every open of a preset ran the full detailed,
+ring, POI and far-city queries in the background until one answer newer than
+the snapshot was cached. The horizon labels layer is bundled too
+(`assets/osm_snapshots/*_horizon.osmb`, rows in `horizon_manifest.json`),
+built by `tools/prepare_horizon_layer.py` from Postpass with the same
+selection, radii, 1500-row cap and output order as `HorizonFetcher.build_query`,
+keeping only the tags the labels read (`name`, `natural`, `place`, `water`,
+`ele`). A lake's position is the centre of its bounding box, as Overpass
+`out center` gives it.
+
+Snapshots ship as `.osmb` (`tools/osmb.py`): the same Overpass JSON with
+coordinates kept at OSM's own 1e-7° (so they match live Overpass text exactly
+and ways still meet layers fetched live) and way node-id lists dropped,
+delta-coded and zstd-compressed, about 2.1x smaller than the gzip JSON they
+replace.
+
+When Overpass and its fallbacks (Postpass, the OSM API, a saved copy of the
+same spot) give nothing, the detailed layer comes from the OpenFreeMap vector
+tiles the map already uses (`OmtOsmSource`, `OmtToOverpass`): z14 OpenMapTiles
+water (the sea included), waterways, building footprints with their heights,
+roads, railways, plazas and land cover, rewritten as Overpass-shaped JSON.
+Street furniture, tree nodes, barriers, building parts, roof shapes and lane
+counts are not in the tiles. That is enough for GroundTruth to carve water,
+set the sea datum, strip roofs and grade roads, so the ground is shaped
+instead of bare elevation. The tiles are fetched alongside every live query
+for a place without bundled or cached data. A streamed stretch builds on them
+after 8 s without an Overpass answer (`Pipeline.STREAM_OMT_WAIT_S`). The
+loading line says "Simplified map", and the credit adds © OpenMapTiles.
 
 Additional capital snapshots prepared from regional OSM extracts, including
 GeoFabrik and BBBike, are listed in
@@ -149,6 +186,11 @@ the same CDN, CC0 1.0, 21 files ≈75 MB. Every file verified as a 2048×2048
 JPEG before bundling. `TerrainTextures` builds desktop Ultra's terrain arrays
 from them at 2048 px, block-compressed (BC1 albedo, BC3 normal + roughness).
 Only `grass` (the building-ground set, not a terrain layer) stays 1k.
+
+Soil layer (2026-11-10): `soil` (`dirt_floor`, packed earth for worn verges)
+at 1k and 2k from the same CDN, CC0 1.0, 6 files ≈13 MB, verified 1024² and
+2048² JPEGs. It takes the terrain array slot asphalt held, so the layer count
+and phone memory do not grow: roads draw their own ribbons and never used it.
 
 ## Foliage, bark and tree-impostor textures — T5.1 (2026-10-28)
 
@@ -307,9 +349,67 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   coordinates) so `OsmParser` is unchanged. Live in-engine run (Interlaken,
   Overpass bypassed): 1200 m → 400, stepped to 800 m, 2225 buildings /
   988 roads in 6.7 s, cached under the `r800` key.
-- Detailed-phase fallback order in `OsmFetcher`: every Overpass endpoint →
-  cached payload at the same place (any radius, ≤150 m) → OSM API bbox →
-  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
+- Postpass fallback (2026-11-11): `POST https://postpass.geofabrik.de/api/interpreter`
+  (FOSSGIS / Geofabrik; a PostGIS copy of the whole planet a few minutes
+  behind OSM, a separate server and operator from overpass-api.de; no key;
+  ODbL, same attribution). It answers GeoJSON, uncompressed. Live probe
+  (Helsinki, 1200 m): the building query took 0.5 s and returned all 1595
+  buildings in the bundled snapshot's box, plus 281 in the box corners the
+  snapshot's circle leaves out, with the same `building:levels`, `roof:*` and
+  `height` tags. The app's detailed query (`PostpassFallback.build_body`,
+  1200 m circle) answered in 1.6 s with 8.3 MB: 20 437 features, 1587 of them buildings. The old
+  `/api/0.2/interpreter` path redirects (308); a bad query answers 400 with
+  plain text. `PostpassFallback` mirrors the detailed query in one SQL query:
+  the same layers in the same circle, street furniture within 450 m of the
+  eye, each group capped like its Overpass statements (nearest first rather
+  than in id order), point-mapped towers, Suomenlinna's `defensive_works`, and
+  the country the place stands in (an `admin_level=2` boundary containing it,
+  returned as tags only, like Overpass `is_in`). With these caps the answer took
+  2.2 s and 8.1 MB in Helsinki (country FI) and 2.4 s and 8.1 MB in Midtown
+  Manhattan (4076 buildings, country US). The GeoJSON is converted to Overpass
+  `out geom` JSON. An answer with no buildings but mapped shores (water,
+  waterways, quays) is kept, as Overpass's own check keeps it, and the OSM API
+  fallback now keeps such answers too. osm2pgsql drops a relation's `type` tag, so area relations
+  are rebuilt as multipolygons with one closed member per ring, and route
+  relations are left out. Payloads are cached under the OSM API key
+  (`api1200`), so Overpass is asked again on the next load. `RemoteConfig`
+  `postpass_endpoint` can replace the address. The ohsome API
+  (`api.ohsome.org`) was probed on the same day as an alternative: its
+  metadata answered, but `/v1/elements/geometry` returned HTTP 403.
+- Detailed-phase fallback order in `OsmFetcher`: one Overpass instance →
+  cached payload at the same place (any radius, ≤150 m) → Postpass → OSM API
+  bbox → cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
+- Single attempt (2026-11-11): the main instance failed TLS handshakes
+  (`result=5`), `private.coffee` accepted connections but sent nothing, and
+  `z.overpass-api.de` refused connections, so walking the list only delayed
+  the fallbacks. Every live query now uses one instance
+  (`OverpassRequest.max_attempts`, 2 for the offline pack) and
+  `z.overpass-api.de` is removed. A network failure, a 5xx or a 15 s silence
+  pauses that instance for 90 s (`OverpassRequest.OUTAGE_PAUSE_S`), so the
+  other queries of the same load and a quick reload go straight to their
+  fallbacks instead of repeating it. A caller holding an older copy waits
+  10 s for the first byte instead of 15 s (35 s before 2026-11-11). A place where Overpass and the OSM
+  API both return no buildings over the full 1200 m is marked
+  (`osm_v2_<lat>_<lon>_empty_q<N>.json`) and not asked again for 7 days.
+  Status check (2026-11-11): when a 3D load starts, `OverpassProbe` asks
+  every instance for `/api/status` (no query runs, no query slot is used;
+  4 s timeout, one check per 60 s). An instance with a free slot, or no
+  rate limit, is confirmed for 60 s and any pause on it lifted; one whose
+  next slot is N s away is waited out when N is up to 10 s (the queries are
+  held back N s, nothing is paused) and paused exactly N s when it is longer;
+  one that fails or answers anything else is paused 90 s. A good status
+  answer lifts only a pause an earlier status check set, never one a real
+  query caused (a 504 on `/api/interpreter`). The load's Overpass queries wait
+  until the first instance has answered, or every instance has answered or
+  timed out, and use the first instance that is not paused; a mirror is used
+  only when the check confirmed it. The 4 s and the query's 15 s first-byte
+  wait are measured on the wall clock, as Godot's timers count frame time and
+  a stalled loading frame timed both instances out in 0 ms. With neither answering (the main
+  instance refused connections and private.coffee was silent while this
+  was written) the load goes straight to the cache and OSM API.
+  The far-city query asks for `building:part` only within 100 m of the tall
+  outlines (`around.near`/`around.wide`) instead of every part in the 12 km
+  disc; its cache key is unchanged, as older payloads are a superset.
 
 ## Verified evidence — data-source gate T0.4 (2026-10-28)
 
@@ -355,8 +455,8 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
 | T2.1 DEM mosaic z14+z12+z8 | Elevation (DEM) | same endpoint, z14 probed live |
 | T2.2 satellite z17/18/16 | Satellite imagery | same endpoint, z17+z18 probed live |
 | T3.7 far-field DEM rings (~25 m/px z12 to 9.5 km, ~100 m/px z10 to 33 km) + far imagery drapes (~12/50/200 m/px, z13/z11/z9 at mid-latitudes, to 9.5/33/60 km) — `FarFieldFetcher` | Elevation (DEM) + Satellite imagery | same endpoints and cache keys (`dem_v2_*`, `sat_v2_*`), zoom picked per latitude by target m/px; ~32 DEM + ≤~100 low-zoom imagery tiles per cold place, cached per tile, bounded pool of 8; same Esri credit string (pipeline adds it when only far drapes landed); incomplete layer → dropped → coarser ring / z8 grid / colour ramp |
-| T5.4 far-city ring query (built-up `landuse` ways + multipolygons and `building` with height ≥ 50 m / levels ≥ 15, `around:12000`) — `FarCityFetcher` | Land cover + Buildings | same Overpass endpoints (mirror-first order so it never queues behind the detailed query), one request per place, `[timeout:30]`, identifying UA, cached as `osm_v2_<lat>_<lon>_farcity12000_q2.json` (osm layer); older unversioned entries are offline/failure fallback. Historical query measured live 2026-10-28: Paris 5.1 MB / 22 s (1129 landuse, 730 towers), Interlaken 0.8 MB / 7 s, Big Sur 13 KB / 7 s; failure → empty → imagery-only far city |
-| Horizon labels query (named `natural=peak` to 45 km, `place=city|town|village` to 30 km, lake/reservoir `natural=water` to 20 km, `out tags center 1500`) — `HorizonFetcher` | Names for the skyline (peaks, towns, lakes: name, `ele`, position; no geometry) | same Overpass endpoints, mirror-first order, one request per place, `[timeout:30]`, identifying UA, issued only when the person turns horizon labels on, cached as `osm_v2_<lat>_<lon>_horizon45000.json` (osm layer); failure → empty → no labels; credit is the viewer's existing © OpenStreetMap contributors attribution |
+| T5.4 far-city ring query (built-up `landuse` ways + multipolygons and `building` with height ≥ 50 m / levels ≥ 15, `around:12000`) — `FarCityFetcher` | Land cover + Buildings | same Overpass endpoints (main instance, one attempt; `building:part` only within 100 m of the tall outlines), one request per place, `[timeout:30]`, identifying UA, cached as `osm_v2_<lat>_<lon>_farcity12000_q2.json` (osm layer); older unversioned entries are offline/failure fallback. Historical query measured live 2026-10-28: Paris 5.1 MB / 22 s (1129 landuse, 730 towers), Interlaken 0.8 MB / 7 s, Big Sur 13 KB / 7 s; failure → empty → imagery-only far city |
+| Horizon labels query (named `natural=peak` to 45 km, `place=city|town|village` to 30 km, lake/reservoir `natural=water` to 20 km, `out tags center 1500`) — `HorizonFetcher` | Names for the skyline (peaks, towns, lakes: name, `ele`, position; no geometry) | same Overpass endpoints, main instance, one attempt, one request per place, `[timeout:30]`, identifying UA, issued only when the person turns horizon labels on, cached as `osm_v2_<lat>_<lon>_horizon45000.json` (osm layer); presets and capitals use the bundled horizon layer instead and never send it; failure → empty → no labels; credit is the viewer's existing © OpenStreetMap contributors attribution |
 | T2.3 OSM footprints + rich tags + wider radius | Buildings + roads | same endpoint, tags confirmed live |
 | T2.4 land-cover classes + waterways + relations | Land cover | same endpoint, parse-only change |
 | T4.3 PBR sets by class/region (Phase 4, gated here) | PBR textures | Poly Haven CC0, API+CDN probed live |
@@ -555,3 +655,47 @@ them 5.1, 5.1 and 4.0 m: `BareEarth.lidar_dem` therefore excludes England
 Terrarium roads 6.7 m, generic filter 5.2 m, national model 0.7 m.
 Scotland, Wales and Northern Ireland (Edinburgh, Cardiff, Belfast) are not
 measured and stay on the generic filter.
+
+### GEDTM30 as a global fallback: measured, not wired (2026-11-12)
+
+Seoul (Korea has no keyless national model found; V-World and NGII did not
+answer) prompted a test of OpenGeoHub's GEDTM30 v1.2 (global ensemble DTM,
+1 arc-second, CC BY 4.0, Zenodo 10.5281/zenodo.18887460; marked "use for
+testing purposes only"). The file
+`https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif`
+answers anonymously with range requests (BigTIFF, float32, deflate +
+predictor 2, 2048-px tiles, 432 GB). One tile covering a world is 5–6 MB
+compressed. Against the national models at the road nodes of the bundled
+detailed snapshots (bilinear GEDTM30 vs the truth post):
+
+| City | road points | GEDTM30 − truth, mean | std | rms |
+|---|---|---|---|---|
+| Tokyo (GSI DEM5A) | 1283 | +7.4 m | 5.9 m | 9.5 m |
+| Paris (IGN RGE ALTI) | 725 | +6.5 m | 6.4 m | 9.1 m |
+
+Its relief error is no better than the generic filter's (about 5.2 m std
+in both cities), and the +6–7 m bias suggests the city blocks are still in
+it, so it is not wired. Mapped squares are instead laid on their own
+best-fit plane in every city (`RoadGrading.grade_areas`, up to 3 m).
+
+### Smoothing the city on coarse surface models (2026-11-12)
+
+Where Terrarium is SRTM / EU-DEM class and no bare-earth model replaces it
+(`RoadGrading.coarse`: `BareEarth` applies, not ArcticDEM), `UrbanSmooth`
+low-passes the ground inside the built area (about a 90 m window, feathered
+at its edge, at most 3 m per post) and roads grade over ±70 m with a 2.5 m
+cap. Grading each road harder on its own did not help (junctions stepped
+between crossing streets' profiles); smoothing the ground under them did.
+Measured with the national models switched off and used as truth (road
+centrelines every 20 m, within 1 km of the viewpoint; roughness = rms of the
+second difference along the road, i.e. how much a street rolls):
+
+| City | roughness: truth | before | after | road std vs truth: before | after |
+|---|---|---|---|---|---|
+| Tokyo (GSI) | 0.65 m | 1.02 m | 0.79 m | 5.28 m | 4.61 m |
+| Paris (IGN) | 0.26 m | 0.68 m | 0.46 m | 5.29 m | 4.59 m |
+| Bern (swisstopo) | 0.44 m | 0.66 m | 0.59 m | 4.36 m | 4.47 m |
+| Seoul (no national model) | — | 1.13 m | 0.73 m | — | — |
+
+Bern, the hilly check, keeps its relief error within 0.1 m. Places with a
+national model, the US and English lidar and ArcticDEM worlds are unchanged.

@@ -31,6 +31,9 @@ class PartyIndex : public RefCounted {
 	std::vector<Road> roads;
 	std::unordered_map<int64_t, std::vector<int>> edge_cells, road_cells;
 	std::unordered_map<std::string, int> keys;
+	// Wall top per key id (ids are registration order): of two masses
+	// drawing the same wall, the taller (else the first) keeps it.
+	std::vector<double> key_tops;
 
 	int key_id(const String &key);
 	void insert(std::unordered_map<int64_t, std::vector<int>> &grid, const Vector2 &a, const Vector2 &b, int rec);

@@ -52,6 +52,9 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 			clampi(int(area_m2 / 250.0), 1, 5))
 		if _h(seed_v, 73) < 0.35:
 			placed += _sign_frame(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
+		# Seoul's villas and walk-ups keep a water tank on the green roof.
+		if str(look.get("era", "")) in ["seoul_villa", "seoul_shopping"] and _h(seed_v, 77) < 0.5:
+			placed += _tanks(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1)
 	# Before the regional tanks: Israel is in the Middle East region.
 	elif city in SOLAR_HEATER_CITIES or country.to_upper() in SOLAR_HEATER_COUNTRIES:
 		placed += _solar_heaters(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1 + int(_h(seed_v, 76) * 3.0))

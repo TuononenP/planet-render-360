@@ -147,6 +147,16 @@ func _run() -> void:
 	picker._on_resized()
 	await process_frame
 	await process_frame
+	# Startup default: Helsinki, Finland is the selected place, its card
+	# is the selected quick pick, and the map is centred on it.
+	if absf(picker._lat - 60.1680) > 0.001 or absf(picker._lon - 24.9530) > 0.001:
+		_fail(failures, "picker should start on Helsinki (60.1680, 24.9530), got (%f, %f)" % [picker._lat, picker._lon])
+	if picker._name_label.text != "Helsinki" or picker._region_label.text != "Finland":
+		_fail(failures, "picker should start showing Helsinki / Finland, got '%s' / '%s'" % [picker._name_label.text, picker._region_label.text])
+	if picker._selected_quick < 0 or str(picker._quick_places[picker._selected_quick][1]) != "Helsinki, Finland":
+		_fail(failures, "the Helsinki quick pick should start selected, got index %d" % picker._selected_quick)
+	if absf(picker._canvas.centre_lat - picker._lat) > 0.001 or absf(picker._canvas.centre_lon - picker._lon) > 0.001:
+		_fail(failures, "map should start centred on the selected place, got (%f, %f)" % [picker._canvas.centre_lat, picker._canvas.centre_lon])
 	if picker.effective_layout() != Responsive.Layout.COMPACT:
 		_fail(failures, "picker at 390pt should be COMPACT, got %d" % picker.effective_layout())
 	# Quality is a four-step bar above Explore: the tier is visible without a menu.
@@ -254,7 +264,7 @@ func _run() -> void:
 			if (quick_row.get_child(0) as Button).button_pressed:
 				_fail(failures, "only the tapped place card should stay pressed")
 			# A manual map pick clears the selection.
-			picker._on_picked(48.8566, 2.3522)
+			picker._on_picked(48.8566, 2.3522, false)
 			await process_frame
 			if tokyo_chip.button_pressed:
 				_fail(failures, "manual map pick should clear the Tokyo selection")

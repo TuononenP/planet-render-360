@@ -14,9 +14,10 @@ extends RefCounted
 ## ways become decks with fascia sides and parapets, gently arched bank to
 ## bank (grade and rise capped); non-bridge segments over water
 ## are dropped (no shards in the river); tunnels are skipped. Asphalt
-## is RoadSurface's shader: lane markings, crossings, kerbs, wear and
-## weather on every tier, from the per-vertex lanes / rank / urban flag
-## / junction distance written here. v1 bare centrelines
+## is RoadSurface's shader: kerbs, wear and weather on every tier, from
+## the per-vertex rank / urban flag / junction distance written here.
+## Lines, crossings, stop lines and symbols are a paint layer of their
+## own over it (RoadMarkings, RoadPaint, RoadGlyphs). v1 bare centrelines
 ## are still accepted as {width 1.7 units, class unclassified}.
 ## TerrainBuilder.build_world adopts the children flat.
 
@@ -24,6 +25,11 @@ extends RefCounted
 ## (lift_for_layer), so the two can never disagree: at street-level eye
 ## heights a 1 cm lift outweighs the depth bias, and a crossing lifted
 ## less than the road it lies on vanished under it.
+## A way with a building centre this near (m) is a lit street; a major
+## road or a square reaches further (boulevards and plazas stand wide of
+## their buildings, and are lit all the same).
+const LIT_BUILT_M := 35.0
+const LIT_MAJOR_M := 120.0
 const LIFT_MIN_M := 0.03
 const LIFT_MAX_M := 0.05
 const LIFT_TOP_LAYER := 7.7
@@ -64,6 +70,13 @@ const CHUNKS := 4
 ## carriageways (rank 2 asphalt tops out at layer ~6.8).
 const CROSSING_MIN_M := 4.0
 const CROSSING_LAYER := 6.9
+## A crossing's band or a stop line is laid as its own wide ribbon, flat
+## between its edges, over road ribbons flat between theirs: where the
+## ground curves the road stood proud of the paint and bit a ragged notch
+## out of it, centimetres on a gentle street and more across a steep
+## one. Bands lie this much higher, with a row every BAND_ROW_M.
+const BAND_LIFT_M := 0.1
+const BAND_ROW_M := 1.0
 static var _mats: Dictionary = {}
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
@@ -92,6 +105,10 @@ static func _parse(line: Variant, m2u: float) -> Dictionary:
 	if bool(road.get("tunnel", false)):
 		return {}
 	var cls := str(road.get("class", "unclassified"))
+	# A footway mapped below ground (a station concourse, a subway under
+	# the street) with no tunnel tag is still not on the surface.
+	if int(road.get("layer", 0)) < 0 and _rank(cls) == 0 and not bool(road.get("crossing", false)):
+		return {}
 	var crossing := bool(road.get("crossing", false))
 	return {"points": road.get("points", PackedVector2Array()),
 		"width_u": maxf(maxf(float(road.get("width_m", 0.0)), CROSSING_MIN_M if crossing else 0.0) * m2u, 0.4),
@@ -143,19 +160,31 @@ static func _district_finish(road: Dictionary, districts: Array, m2u: float) -> 
 			return "sett"
 	return finish
 
+## The surface finish `line` is laid with, its district's included.
+static func finish_of(line: Variant, surf: _Surface, m2u: float) -> String:
+	var r := _parse(line, m2u)
+	if r.is_empty():
+		return "asphalt"
+	if line is Dictionary and not surf.districts.is_empty():
+		return _district_finish(line, surf.districts, m2u)
+	return str(r["finish"])
+
 static func _material(finish: String) -> Material:
 	if _mats.has(finish):
 		return _mats[finish] as Material
 	var m: Material
 	match finish:
 		"paving", "sett", "gravel":
-			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear())
+			# Setts and gravel carry traffic; footway paving does not.
+			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
+				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true)
 		"deck":
 			m = _pbr("concrete", FINISH_HEX["deck"])
 		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":
 			var kind := "solid" if finish == "marking" else ("zebra" if finish == "crossing" else finish.trim_prefix("crossing_"))
-			m = RoadSurface.crossing_material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear(),
-				float(RoadSurface.CROSSING_KINDS[kind]))
+			m = RoadPaint.crossing_material(float(RoadSurface.CROSSING_KINDS[kind]))
+		"paint":
+			m = RoadPaint.material()
 		_:
 			m = RoadSurface.material(Color.html(FINISH_HEX["asphalt"]).srgb_to_linear())
 	_mats[finish] = m
@@ -173,11 +202,22 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	surf.use_native()
-	var plan := RoadMarkings.plan(data, ground)
+	var plan := RoadMarkings.shared_plan(data, ground)
 	var junc := plan.junctions
+	surf.aprons = RoadMarkings._apron_grid(plan.aprons, m2u)
+	for ring: PackedVector2Array in plan.aprons:
+		surf.apron_rings.append([ring, RingGeometry.aabb(ring)])
 	var steps := RoadSurface.depth_steps(data)
+	var seeds := RoadSurface.wear_seeds(data)
+	surf.wear_seeds = seeds
+	surf.built = OverheadWires._centre_grid(data, LIT_BUILT_M * m2u)
+	surf.built_major = OverheadWires._centre_grid(data, LIT_MAJOR_M * m2u)
+	surf.ground_roads = StreetProps._road_grid(data, m2u, true)
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
+	# Bridge structures are levelled once, before the chunks read them.
+	surf.road_bridges.structures.exclude_spans(spans, surf.road_bridges, m2u)
+	surf.road_bridges.structures.prepare(surf, m2u)
 	# Fixed chunks of the road list, built at once and joined in order:
 	# the same mesh whichever threads ran them.
 	var n := data.roads.size()
@@ -188,7 +228,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
-			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}))
+			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}), seeds[i])
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
 	WorkerThreadPool.wait_for_group_task_completion(group)
@@ -196,7 +236,11 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	for own in parts:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
-	RoadMarkings.lay(plan, batches, surf, m2u)
+	RoadTapers.lay(batches, data, surf, m2u)
+	BridgeStructures.build(batches, surf, m2u)
+	RoadMarkings.lay(plan, batches, surf, m2u, data)
+	RoadPaint.lay(batches, data, surf, plan, seeds, m2u)
+	RoadGlyphs.lay(batches, data, surf, m2u, plan)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -214,9 +258,19 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 ## One road element (at depth `step`, RoadSurface.depth_steps) into
 ## `batches`: draped ribbons on dry land, decks on its bridge spans.
 static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, surf: _Surface,
-		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort, marking: Dictionary = {}) -> void:
+		ground: GroundTruth, junc: Dictionary, spans: Array, abort: BuildAbort, marking: Dictionary = {},
+		wear_seed: float = 0.5) -> void:
 	var r := _parse(line, m2u)
 	if r.is_empty():
+		return
+	if marking.has("runs"):
+		# A crossing paints only where it is over the road.
+		var whole := marking.duplicate()
+		whole.erase("runs")
+		for piece: PackedVector2Array in marking["runs"]:
+			var part: Dictionary = (line as Dictionary).duplicate()
+			part["points"] = piece
+			_road(batches, part, step, m2u, surf, ground, junc, spans, abort, whole, wear_seed)
 		return
 	if not marking.is_empty():
 		r["finish"] = marking["finish"]
@@ -234,21 +288,28 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		finish = _district_finish(line, surf.districts, m2u)
 	if bool(r["bridge"]):
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, float(r["width_u"]), surf, m2u, "bridge",
-				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)))
+			RoadBridgeDecks.build(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u,
+				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")), r, wear_seed)
 		return
 	var layer := depth_layer(int(r["rank"]), finish, step)
-	var lift := lift_for_layer(layer) * m2u
-	# RoadSurface attributes: lanes, rank, kerbed urban street.
+	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u
+	# RoadSurface attributes: lanes, rank, kerbed urban street + wear seed.
 	var mid := dense[dense.size() / 2]
 	var urban := int(r["rank"]) >= 1 and ground.land_class_at(mid.x, mid.y) == "urban"
+	# Lit as StreetProps lines its streets with lamps: any way among
+	# buildings, landuse polygon or not (central Helsinki has none).
+	var lit := urban or _lit_way(dense, int(r["rank"]) >= 2, surf, m2u)
 	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
-		1.0 if urban else 0.0, 1.0)
+		RoadSurface.wear_attr(urban, wear_seed, lit), 1.0)
 	for run in _dry_runs(dense, surf):
 		if abort != null and abort.requested:
 			break
-		_ribbon(_batch(batches, finish), _straighten(run, surf.step), float(r["width_u"]),
-			surf, lift, attr, junc, layer)
+		var pieces: Array = [run]
+		if int(r["rank"]) == 0 and not finish.begins_with("crossing") and not surf.aprons.is_empty():
+			pieces = RoadCrossingClip.on_road_runs(run, {}, surf.aprons, m2u, false)
+		for piece: PackedVector2Array in pieces:
+			_ribbon(_batch(batches, finish), band_rows(piece, m2u) if finish.begins_with("crossing") \
+				else _straighten(piece, surf.step), float(r["width_u"]), surf, lift, attr, junc, layer)
 
 ## Paved area (a square) filled flat on the drawn terrain: the outer
 ## ring ear-clipped, triangles over its holes, open water or past the
@@ -258,34 +319,71 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 		lift: float, m2u: float, layer: float = AREA_LAYER) -> void:
 	if ring.size() < 3:
 		return
-	var idx := Geometry2D.triangulate_polygon(ring)
-	if idx.is_empty():
+	# A junction's apron comes out of a paved area (a square whose corner
+	# reaches into the junction): the carriageway is the apron's, and the
+	# square's thin triangles showed through it as pale streaks. Aprons
+	# and glyphs are laid through here too, on their own layers.
+	var pieces: Array = [ring]
+	if layer == AREA_LAYER and not surf.apron_rings.is_empty():
+		holes = holes.duplicate()
+		var box := RingGeometry.aabb(ring)
+		for apron: Array in surf.apron_rings:
+			if not box.intersects(apron[1]):
+				continue
+			var next: Array = []
+			for piece: PackedVector2Array in pieces:
+				for cut: PackedVector2Array in Geometry2D.clip_polygons(piece, apron[0]):
+					if Geometry2D.is_polygon_clockwise(cut):
+						holes.append(cut)
+					else:
+						next.append(cut)
+			pieces = next
+	var eligible := PackedVector2Array()
+	for piece: PackedVector2Array in pieces:
+		var idx := Geometry2D.triangulate_polygon(piece)
+		for t in range(0, idx.size(), 3):
+			var tri := PackedVector2Array([piece[idx[t]], piece[idx[t + 1]], piece[idx[t + 2]]])
+			var c := (tri[0] + tri[1] + tri[2]) / 3.0
+			if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
+				continue
+			if surf.ground.water_at(c.x, c.y) > 0.0:
+				continue
+			var in_hole := false
+			for h in holes:
+				if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
+					in_hole = true
+					break
+			if not in_hole:
+				eligible.append_array(tri)
+	if eligible.is_empty():
 		return
 	b.pad()
-	var attr := Color(0.0, 0.0, 0.0, 1.0)
+	var attr := Color(0.0, 0.0, RoadSurface.wear_attr(false, 0.0, _lit_ring(ring, surf, m2u)), 1.0)
 	var w2 := Vector2(0.0, layer)
 	var weld := {}
-	var eligible := PackedVector2Array()
-	for t in range(0, idx.size(), 3):
-		var tri := PackedVector2Array([ring[idx[t]], ring[idx[t + 1]], ring[idx[t + 2]]])
-		var c := (tri[0] + tri[1] + tri[2]) / 3.0
-		if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
-			continue
-		if surf.ground.water_at(c.x, c.y) > 0.0:
-			continue
-		var in_hole := false
-		for h in holes:
-			if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
-				in_hole = true
-				break
-		if not in_hole:
-			eligible.append_array(tri)
 	if surf.native != null and surf.native.has_method("area") \
 			and (surf.native_shore or not surf.near_shore(eligible, 0.0)):
 		b.append(surf.native.area(eligible, lift, attr, layer, m2u, b.verts.size()))
 	else:
 		for t in range(0, eligible.size(), 3):
 			RoadDrape.tri(b, surf, lift, attr, w2, weld, eligible.slice(t, t + 3), m2u)
+
+## A square or junction apron with a building near its outline is lit by
+## the street lamps around it (StreetGlow).
+static func _lit_ring(ring: PackedVector2Array, surf: _Surface, m2u: float) -> bool:
+	return _lit_way(ring, true, surf, m2u)
+
+## True when a building stands near any of up to 8 points along `pts`
+## (LIT_MAJOR_M for a major road or square, else LIT_BUILT_M): a long
+## way's midpoint alone can sit wide of every building beside it.
+static func _lit_way(pts: PackedVector2Array, major: bool, surf: _Surface, m2u: float) -> bool:
+	var grid: Dictionary = surf.built_major if major else surf.built
+	var radius := (LIT_MAJOR_M if major else LIT_BUILT_M) * m2u
+	var stride := maxi(1, pts.size() / 8)
+	for i in range(0, pts.size(), stride):
+		if OverheadWires._built(pts[i], grid, radius):
+			return true
+	return false
 
 ## Height of the drawn terrain at XZ (what a ribbon is laid on), for
 ## tests and other flush-placed props.
@@ -323,6 +421,14 @@ static func _resample(pts: PackedVector2Array, max_len: float) -> PackedVector2A
 		for k in range(1, n + 1):
 			out.append(a.lerp(b, float(k) / float(n)))
 	return out
+
+## The rows of a crossing band or stop line: every BAND_ROW_M. The
+## ground a ribbon is laid on swells between its grid posts on a steep,
+## twisted cell, and only a ribbon with rows on the swell rides it; a
+## band left with a row at each end cut under the street it crosses, and
+## the street hid its stripes (Lombard Street's brow at Hyde).
+static func band_rows(pts: PackedVector2Array, m2u: float) -> PackedVector2Array:
+	return _resample(pts, BAND_ROW_M * m2u)
 
 ## Drops the resampled points that sit on a straight stretch, keeping
 ## rows at most `max_len` apart: RoadDrape cuts each quad along the
@@ -417,204 +523,33 @@ static func _quad_up(b: _Batch, a: int, bb: int, c: int, d: int) -> void:
 		b.indices.push_back(a); b.indices.push_back(c); b.indices.push_back(bb)
 		b.indices.push_back(bb); b.indices.push_back(c); b.indices.push_back(d)
 
-## Deck heights along a bridge polyline (world units, one per point):
-## bank to bank, rising in a smooth arch toward BRIDGE_CLEAR_M over the
-## water (0.6 m over ground) below, capped at BRIDGE_GRADE and
-## BRIDGE_RISE_M so a short or low crossing stays nearly flat. The slab
-## never dips into the water: an end the river carve reaches is lifted
-## to the water, and every wet point keeps the slab above it. With a
-## `half` width the flat deck also clears the ground under both edges
-## (a bank sloping across the way), lifted like a ribbon.
+## Deck heights along a bridge polyline (RoadBridgeBuild.deck_profile).
 static func deck_profile(pts: PackedVector2Array, surf: _Surface, m2u: float,
-		half: float = 0.0, layer: int = 0) -> PackedFloat32Array:
-	var n := pts.size()
-	var total := 0.0
-	var dist := PackedFloat32Array([0.0])
-	for i in range(1, n):
-		total += pts[i].distance_to(pts[i - 1])
-		dist.append(total)
-	var deck := PackedFloat32Array()
-	if total <= 0.0:
-		return deck
-	var slab := (DECK_DEPTH_M + 0.5) * m2u
-	var h0 := _deck_floor(pts, 0, surf, slab, half)
-	var h1 := _deck_floor(pts, n - 1, surf, slab, half)
-	var need := 0.0
-	for i in n:
-		var t := dist[i] / total
-		var under := surf.height(pts[i].x, pts[i].y)
-		var water := surf.ground.water_at(pts[i].x, pts[i].y) > 0.0
-		var floor_y := maxf(under, surf.ground.water_level_at(pts[i].x, pts[i].y) if water else under)
-		var clear := BRIDGE_CLEAR_M * m2u if water else 0.6 * m2u
-		# Points by the banks would need a huge arch to clear the
-		# water there; the middle two-thirds set the rise.
-		need = maxf(need, (floor_y + clear - lerpf(h0, h1, t)) / maxf(sin(PI * t), 0.5))
-	var rise := clampf(need, 0.0, minf(BRIDGE_GRADE * total / PI, BRIDGE_RISE_M * m2u))
-	# Lift over the arch where the slab would touch the water, eased out
-	# at RAMP_GRADE both ways so it reads as a ramp, not a step.
-	var lift := PackedFloat32Array()
-	for i in n:
-		var t := dist[i] / total
-		var arch := lerpf(h0, h1, t) + 0.05 * m2u + rise * sin(PI * t)
-		deck.append(arch)
-		lift.append(maxf(_deck_floor(pts, i, surf, slab, half) + 0.05 * m2u - arch, 0.0))
-	for i in range(1, n):
-		lift[i] = maxf(lift[i], lift[i - 1] - RAMP_GRADE * (dist[i] - dist[i - 1]))
-	for i in range(n - 2, -1, -1):
-		lift[i] = maxf(lift[i], lift[i + 1] - RAMP_GRADE * (dist[i + 1] - dist[i]))
-	for i in n:
-		deck[i] += lift[i]
-	# A mapped elevated way over land is a viaduct, not a ground ribbon.
-	# Keep the existing bank-to-bank water profile for mixed crossings.
-	# It climbs from the ground at both ends at a ramp grade (steeper
-	# for a path, which takes steps) up to the layer's clearance, so a
-	# short bridge peaks lower instead of hovering flat at both ends.
-	if layer > 0 and _land_bridge(pts, surf):
-		var grade := PATH_RAMP_GRADE if half * 2.0 <= PATH_WIDTH_M * m2u else RAMP_GRADE
-		var end0 := deck[0]
-		var end1 := deck[n - 1]
-		for i in n:
-			var ramp := minf(end0 + grade * dist[i], end1 + grade * (total - dist[i]))
-			var high := _deck_floor(pts, i, surf, 0.0, half) + float(layer) * 5.0 * m2u
-			deck[i] = maxf(deck[i], minf(high, ramp))
-	return deck
+		half: float = 0.0, layer: int = 0, arch: bool = true) -> PackedFloat32Array:
+	return RoadBridgeBuild.deck_profile(pts, surf, m2u, half, layer, arch)
 
-static func _land_bridge(pts: PackedVector2Array, surf: _Surface) -> bool:
-	for p in pts:
-		if surf.ground.water_at(p.x, p.y) > 0.0:
-			return false
-	return true
-
-## Lowest deck height at point i: the drawn ground under its centre and
-## both edges (`half` out), or over water the water surface plus `slab`
-## (slab depth and a little air).
+## Lowest deck height at point i (RoadBridgeBuild._deck_floor).
 static func _deck_floor(pts: PackedVector2Array, i: int, surf: _Surface, slab: float,
 		half: float) -> float:
-	var p := pts[i]
-	var h := surf.height(p.x, p.y)
-	if half > 0.0:
-		var s := _side(pts, i) * half
-		h = maxf(h, maxf(surf.height(p.x + s.x, p.y + s.y), surf.height(p.x - s.x, p.y - s.y)))
-	if surf.ground.water_at(p.x, p.y) > 0.0:
-		h = maxf(h, surf.ground.water_level_at(p.x, p.y) + slab)
-	return h
+	return RoadBridgeBuild._deck_floor(pts, i, surf, slab, half)
 
-## Bridge deck on a real `bridge=yes` way (profile from deck_profile),
-## with slab fascias on both sides and parapets; the deck top goes to
-## the `top_finish` batch (RailBuilder lays ballast there).
+## Bridge deck on a mapped bridge way (RoadBridgeBuild._bridge).
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
-		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0) -> void:
-	var inside := PackedVector2Array()
-	for p in pts:
-		if surf.inside(p):
-			inside.append(p)
-	if inside.size() < 2:
-		return
-	pts = inside
-	var n := pts.size()
-	var deck := deck_profile(pts, surf, m2u, width * 0.5, layer)
-	if deck.is_empty():
-		return
-	var dist := PackedFloat32Array([0.0])
-	for i in range(1, n):
-		dist.append(dist[i - 1] + pts[i].distance_to(pts[i - 1]))
-	var top := _batch(batches, top_finish)
-	var side := _batch(batches, "deck")
-	var half := width * 0.5
-	var k0 := top.verts.size()
-	for i in n:
-		var s := _side(pts, i) * half
-		var l := pts[i] + s
-		var r := pts[i] - s
-		top.verts.append(Vector3(l.x, deck[i], l.y))
-		top.verts.append(Vector3(r.x, deck[i], r.y))
-		top.normals.append(Vector3.UP)
-		top.normals.append(Vector3.UP)
-		top.uvs.append(Vector2(0.0, dist[i] / m2u / 4.0))
-		top.uvs.append(Vector2(width / m2u / 4.0, dist[i] / m2u / 4.0))
-	for i in n - 1:
-		var a := k0 + i * 2
-		_quad_up(top, a, a + 1, a + 2, a + 3)
-	# Fascia + parapet walls along both edges (outer: slab bottom to
-	# parapet top; inner: deck to parapet top), and the parapet cap.
-	var depth := DECK_DEPTH_M * m2u
-	var para := PARAPET_M * m2u
-	var thick := 0.25 * m2u
-	for sgn in [1.0, -1.0]:
-		for i in n - 1:
-			var sa: Vector2 = _side(pts, i) * half * sgn
-			var sb: Vector2 = _side(pts, i + 1) * half * sgn
-			var oa := pts[i] + sa
-			var ob := pts[i + 1] + sb
-			var ia := oa - sa.normalized() * thick
-			var ib := ob - sb.normalized() * thick
-			_wall(side, oa, ob, deck[i] - depth, deck[i + 1] - depth, deck[i] + para,
-				deck[i + 1] + para, sa.normalized())
-			_wall(side, ia, ib, deck[i], deck[i + 1], deck[i] + para, deck[i + 1] + para,
-				-sa.normalized())
-			var k := side.verts.size()
-			side.verts.push_back(Vector3(oa.x, deck[i] + para, oa.y))
-			side.verts.push_back(Vector3(ia.x, deck[i] + para, ia.y))
-			side.verts.push_back(Vector3(ob.x, deck[i + 1] + para, ob.y))
-			side.verts.push_back(Vector3(ib.x, deck[i + 1] + para, ib.y))
-			for q in 4:
-				side.normals.append(Vector3.UP)
-				side.uvs.append(Vector2(float(q % 2), float(q / 2)))
-			_quad_up(side, k, k + 1, k + 2, k + 3)
-	# Slab underside (seen from the quay).
-	var kb := side.verts.size()
-	for i in n:
-		var s := _side(pts, i) * half
-		side.verts.append(Vector3(pts[i].x + s.x, deck[i] - depth, pts[i].y + s.y))
-		side.verts.append(Vector3(pts[i].x - s.x, deck[i] - depth, pts[i].y - s.y))
-		side.normals.append(Vector3.DOWN)
-		side.normals.append(Vector3.DOWN)
-		side.uvs.append(Vector2(0, dist[i] / m2u / 4.0))
-		side.uvs.append(Vector2(1, dist[i] / m2u / 4.0))
-	for i in n - 1:
-		var a := kb + i * 2
-		var va := side.verts[a]
-		var front := (side.verts[a + 2] - va).cross(side.verts[a + 1] - va)
-		if front.y <= 0.0:
-			side.indices.push_back(a); side.indices.push_back(a + 1); side.indices.push_back(a + 2)
-			side.indices.push_back(a + 1); side.indices.push_back(a + 3); side.indices.push_back(a + 2)
-		else:
-			side.indices.push_back(a); side.indices.push_back(a + 2); side.indices.push_back(a + 1)
-			side.indices.push_back(a + 1); side.indices.push_back(a + 2); side.indices.push_back(a + 3)
-	if layer > 0 and top_finish == "bridge" and _land_bridge(pts, surf):
-		_land_piers(side, pts, dist, deck, surf, m2u)
-	# A long crossing stands on piers under arched spandrels.
-	if top_finish == "bridge" and structure == "masonry":
-		BridgeArches.add(side, pts, dist, deck, half, depth, surf.ground, m2u)
+		surf: _Surface, m2u: float, top_finish: String = "bridge", structure: String = "unknown", layer: int = 0,
+		fit: Dictionary = {}) -> void:
+	RoadBridgeBuild._bridge(batches, pts, width, surf, m2u, top_finish, structure, layer, fit)
 
-## Simple concrete columns beneath land viaducts, spaced along the
-## mapped way. Their tops meet the deck and bottoms follow the terrain.
+## Piers under a land viaduct (RoadBridgeBuild._land_piers).
 static func _land_piers(side: _Batch, pts: PackedVector2Array, dist: PackedFloat32Array,
 		deck: PackedFloat32Array, surf: _Surface, m2u: float) -> void:
-	var next := 15.0 * m2u
-	for i in range(1, pts.size() - 1):
-		if dist[i] < next:
-			continue
-		next = dist[i] + 30.0 * m2u
-		var p := pts[i]
-		var low := surf.height(p.x, p.y) - 0.1 * m2u
-		var high := deck[i] - DECK_DEPTH_M * m2u
-		if high <= low + 0.2 * m2u:
-			continue
-		var d := (pts[i + 1] - pts[i - 1]).normalized()
-		var n := Vector2(-d.y, d.x)
-		var x := d * 1.25 * m2u
-		var z := n * 1.25 * m2u
-		var corners := [p - x - z, p + x - z, p + x + z, p - x + z]
-		for k in 4:
-			var a: Vector2 = corners[k]
-			var b: Vector2 = corners[(k + 1) % 4]
-			_wall(side, a, b, low, low, high, high, ((a + b) * 0.5 - p).normalized())
+	RoadBridgeBuild._land_piers(side, pts, dist, deck, surf, m2u)
 
 ## Vertical quad a→b between bottom (ya0, yb0) and top (ya1, yb1),
 ## front face toward `out`.
+## `metric_v` runs the texture's V in metres of wall height, not once
+## over the whole wall.
 static func _wall(b: _Batch, a: Vector2, c: Vector2, ya0: float, yc0: float,
-		ya1: float, yc1: float, out: Vector2) -> void:
+		ya1: float, yc1: float, out: Vector2, metric_v: bool = false) -> void:
 	var k := b.verts.size()
 	b.verts.push_back(Vector3(a.x, ya0, a.y)); b.verts.push_back(Vector3(c.x, yc0, c.y))
 	b.verts.push_back(Vector3(c.x, yc1, c.y)); b.verts.push_back(Vector3(a.x, ya1, a.y))
@@ -622,7 +557,9 @@ static func _wall(b: _Batch, a: Vector2, c: Vector2, ya0: float, yc0: float,
 	for q in 4:
 		b.normals.append(n3)
 	var len_u := a.distance_to(c)
-	b.uvs.push_back(Vector2(0, 1)); b.uvs.push_back(Vector2(len_u, 1))
+	var va := maxf(ya1 - ya0, 0.0) if metric_v else 1.0
+	var vc := maxf(yc1 - yc0, 0.0) if metric_v else 1.0
+	b.uvs.push_back(Vector2(0, va)); b.uvs.push_back(Vector2(len_u, vc))
 	b.uvs.push_back(Vector2(len_u, 0)); b.uvs.push_back(Vector2(0, 0))
 	var front := (b.verts[k + 2] - b.verts[k]).cross(b.verts[k + 1] - b.verts[k])
 	if front.dot(n3) >= 0.0:
@@ -690,6 +627,11 @@ class _Batch extends RefCounted:
 ## on what is drawn whichever way the cell is split.
 class _Surface extends RefCounted:
 	var ground: GroundTruth
+	## Building centres (OverheadWires._centre_grid, LIT_BUILT_M cells): a
+	## way or square among buildings is lit (StreetGlow's pools).
+	var built: Dictionary = {}
+	## The same in LIT_MAJOR_M cells, for major roads and squares.
+	var built_major: Dictionary = {}
 	var districts: Array = []
 	var size := 0
 	var step := 1.0
@@ -703,14 +645,75 @@ class _Surface extends RefCounted:
 	## surface by use_native(), else null: _ribbon lays its ribbons.
 	var native: Object = null
 	var native_shore := false
+	## Ends of bridge ways by node, and how many bridge ways end there.
+	var _bridge_ends := {}
+	## Non-bridge ways by vertex node ([points, index]): approaches.
+	var _way_nodes := {}
+	## Bridge way end points: a joint may sit metres off the node.
+	var _bridge_end_pts := PackedVector2Array()
+	var _bridge_lines: Array = []  ## Bridge polylines (beside-joints).
+	var road_bridges: RoadBridgeDecks.Index = null  ## Road bridge ways sharing structures.
+	var _pier_lines: Array = []  ## Pier polylines (landings).
+	var roof_sites: Array = []  ## Registry landmark roofs (LandmarkRoofs).
+	## The place and the roads' chain wear seeds (RoadSurface.wear_seeds), so
+	## a bridge deck is laid and painted like the road it carries.
+	var place: LocationData = null
+	var wear_seeds := PackedFloat32Array()
+	## Roads on the ground (StreetProps._road_grid): no pier stands on one.
+	var ground_roads := {}
+
+	static func _node(p: Vector2) -> Vector2i:
+		var m := WorldScale.metres_to_units()
+		return Vector2i(roundi(p.x * 100.0 / m), roundi(p.y * 100.0 / m))
+
+	## True where two bridge ways meet (BridgeLandings.joint).
+	func bridge_joint(p: Vector2, outward: Vector2 = Vector2.ZERO) -> bool:
+		return BridgeLandings.joint(self, p, outward)
+
+	func landmark_roof_y(p: Vector2) -> float:  ## Roof Y covering `p`.
+		return LandmarkRoofs.roof_y(roof_sites, p, height)
+
+	## Junction aprons ({cell: [rings]}, RoadMarkings' grid): a footway
+	## (and the plain paving of a crossing's stub) stops at their edge, as
+	## at a kerb. Laid on into the junction it poked through the apron
+	## wherever their two drapes disagree.
+	var aprons: Dictionary = {}
+	## The same aprons as [ring, bounds]: they are cut out of paved areas.
+	var apron_rings: Array = []
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
+		place = data
+		for pier in data.piers:
+			if pier is Dictionary:
+				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
+		road_bridges = RoadBridgeDecks.Index.new(data.roads)
+		road_bridges.structures = BridgeStructures.Plan.new(data.bridge_areas, road_bridges, data.railways)
+		roof_sites = LandmarkRoofs.collect(data)
+		for w: Variant in data.roads + data.railways:
+			if not (w is Dictionary):
+				continue
+			var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+			if ends.size() < 2:
+				continue
+			if bool((w as Dictionary).get("bridge", false)):
+				_bridge_lines.append(ends)
+				for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
+					_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
+					_bridge_end_pts.append(e)
+			elif not bool((w as Dictionary).get("tunnel", false)) \
+					and not bool((w as Dictionary).get("area", false)):
+				for vi in ends.size():
+					var node := _node(ends[vi])
+					if not _way_nodes.has(node):
+						_way_nodes[node] = []
+					(_way_nodes[node] as Array).append([ends, vi])
+
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
-		mesh_size = mini(RenderSettings.terrain_mesh_posts_for(data.quality_preset), size)
+		mesh_size = mini(CityDetail.terrain_mesh_posts(data), size)
 		if ground.shoreline != null and ground.shoreline.ready:
 			mesh_size = size
 			step = ground._step_units

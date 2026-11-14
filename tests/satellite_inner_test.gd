@@ -27,8 +27,13 @@ func _run() -> void:
 		var map := GroundMaterial.inner_map(d)
 		for p in [Vector2(0, 0), Vector2(320, -280), Vector2(-330, 300), Vector2(150, 340)]:
 			var w: Vector2 = p * m
-			var ll := WorldScale.latlon_from_xz(w.x, w.y, d.latitude, d.longitude)
-			var exact := (TileFetcher.global_pixel(ll.x, ll.y, z) - d.satellite_inner_origin_px) / size
+			# The exact path in float64 (WorldScale / TileFetcher Vector2s
+			# are float32, ~1 m coarse).
+			var la := d.latitude - float(w.y) / 110540.0
+			var lo := d.longitude + float(w.x) / (111320.0 * cos(deg_to_rad(d.latitude)))
+			var n := float(1 << z) * 256.0
+			var exact := Vector2(((lo + 180.0) / 360.0 * n - float(d.satellite_inner_origin_px.x)) / size,
+				((1.0 - asinh(tan(deg_to_rad(la))) / PI) / 2.0 * n - float(d.satellite_inner_origin_px.y)) / size)
 			var uv := TerrainBuilder.satellite_uv(d, w.x, w.y)
 			var fit := Vector2(uv.x * map.x + map.z, uv.y * map.y + map.w)
 			if (exact - fit).length() * size > 0.5:

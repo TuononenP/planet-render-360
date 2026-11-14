@@ -18,26 +18,28 @@ signal failed(reason: String)
 ## view is left without map data.
 signal fallback_used(detail: String, partial: bool)
 
-## Overpass endpoints, tried in order. The main instance regularly
-## times out (result=13) or returns 502 when overloaded; a transient
-## failure must not lose the whole fetch. Only full-planet instances
-## belong here — regional ones (osm.ch, maprva.org, ...) silently
-## return zero buildings outside their extract. The main instance
-## is not repeated: z.overpass-api.de (same operator, separate pool)
-## answered a live probe (2026-10-31) while the main one timed out. The
-## OSM-FR instance now refuses unlisted clients (HTTP 403, live probe
-## 2026-11-04), so it is no longer a public fallback.
-## A later probe (2026-10-31, Helsinki 1200 m) had private.coffee
-## answering nothing, not even a one-node query, so it is tried last.
+## Overpass endpoints. Each live query uses one instance, the first that
+## is not paused (OverpassRequest.max_attempts): a failure goes straight
+## to the cache and OSM API fallbacks instead of waiting on mirrors that
+## rarely answer. private.coffee is only reached while the main instance
+## is paused and a caller allows a second instance (the offline pack).
+## Only full-planet instances belong here — regional ones (osm.ch,
+## maprva.org, ...) silently return zero buildings outside their extract.
+## The OSM-FR instance refuses unlisted clients (HTTP 403, live probe
+## 2026-11-04). A probe (2026-10-31, Helsinki 1200 m) had private.coffee
+## answering nothing, not even a one-node query; on 2026-11-11 it still
+## accepted connections but sent nothing for 40 s. z.overpass-api.de
+## refuses connections since 2026-11-11 (port 443 and 80, live probe) and
+## was removed.
 ## No Russian-operated instance belongs here (see HostPolicy); the
 ## Russian-hosted mirror that used to be listed was removed for that reason.
-## When all of these fail, OsmApiFallback (the OSM API bbox) is next.
+## When all of these fail, PostpassFallback (a PostGIS copy of OSM on a
+## separate server) is next, then OsmApiFallback (the OSM API bbox).
 ## The reason both tiers give for a valid but empty answer (open sea,
 ## wilderness); DataNotes.osm_outage matches on it.
 const NO_BUILDINGS := "returned no buildings"
 const ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
-	"https://z.overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
 ]
 
@@ -61,11 +63,12 @@ static func endpoint_order(first: Array[String]) -> Array[String]:
 static func active_endpoints() -> Array[String]:
 	return RemoteConfig.value("overpass_endpoints", ENDPOINTS)
 
-## The ring runs alongside the detailed query, so it starts on a mirror:
-## starting both on the main instance took two of its per-IP slots and
-## could queue the detailed query behind the app's own garnish.
+## The ring runs alongside the detailed query. It used to start on a
+## mirror to keep the main instance's per-IP slots for the detailed
+## query, but no mirror answers (2026-11-11), so it starts on the main
+## instance too (a 429 there: OverpassRequest.RATE_LIMIT_CODES).
 static func ring_endpoints() -> Array[String]:
-	return endpoint_order(["z.overpass-api.de"])
+	return endpoint_order(["//overpass-api.de"])
 
 ## Seconds the best-effort ring may still run once the detailed data is
 ## ready; past this the fetch finishes with the detailed data alone.
@@ -80,15 +83,25 @@ const ATTEMPT_TIMEOUT := 60.0
 
 ## Worst-case seconds for both fetch phases (detailed and the
 ## best-effort ring, now concurrent, so this is a generous bound): one
-## attempt timeout per endpoint per phase, plus slack each. Callers
-## waiting on succeeded/failed must wait at least this long or a late
-## rescue is dropped. Typical is far lower (a fast 502 moves on in ~1 s,
-## a silent mirror in OverpassRequest.FIRST_BYTE_TIMEOUT).
-## Plus one OSM API attempt, and a second's worth of each step down to a
-## smaller box (OsmApiFallback.STEP_DOWN_CODES) so a late result lands.
+## attempt timeout per phase (each query uses one instance), plus slack
+## each. Callers waiting on succeeded/failed must wait at least this long
+## or a late rescue is dropped. Typical is far lower (a failure falls back
+## at once, a silent instance after OverpassRequest.FIRST_BYTE_TIMEOUT).
+## Plus one Postpass attempt, one OSM API attempt, and a second's worth of
+## each step down to a smaller box (OsmApiFallback.STEP_DOWN_CODES) so a
+## late result lands.
 static func retry_budget_seconds() -> float:
-	return 2.0 * (float(active_endpoints().size()) * ATTEMPT_TIMEOUT + 5.0) \
+	return 2.0 * (ATTEMPT_TIMEOUT + 5.0) + PostpassFallback.TIMEOUT_S + 5.0 \
 		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
+
+## How long a place where Overpass and the OSM API both found nothing is
+## not asked again (CacheStore.osm_empty_path).
+const EMPTY_TTL_S := 7 * 24 * 3600
+
+static func _known_empty(lat: float, lon: float) -> bool:
+	var path := CacheStore.osm_empty_path(lat, lon)
+	return FileAccess.file_exists(path) \
+		and Time.get_unix_time_from_system() - FileAccess.get_modified_time(path) < EMPTY_TTL_S
 
 const CACHE_DIR := "user://cache"
 
@@ -143,16 +156,32 @@ static func ring_radius_for_preset(preset: int) -> int:
 
 ## OSM API fallback only; Overpass goes through the two requests below.
 var _http: HTTPRequest
+var _postpass_http: HTTPRequest
 var _detailed_req: OverpassRequest
 var _ring_req: OverpassRequest
 var _poi_req: OverpassRequest
+var _bridge_req: OverpassRequest
+var _bridge_postpass: HTTPRequest
 var _ring_grace: Timer
+## The vector-map tier (OmtOsmSource), fetched alongside a live query.
+var _omt: OmtOsmSource
+## [reason, failure text] while a give-up waits for the vector-map tier.
+var _omt_wait: Array = []
+## Whether the last success came from the vector-map tier.
+var used_omt := false
 
 func _ready() -> void:
+	_omt = OmtOsmSource.new()
+	add_child(_omt)
+	_omt.finished.connect(_on_omt_finished)
 	_http = HTTPRequest.new()
 	_http.timeout = ATTEMPT_TIMEOUT
 	add_child(_http)
 	_http.request_completed.connect(_on_api_done)
+	_postpass_http = HTTPRequest.new()
+	_postpass_http.timeout = PostpassFallback.TIMEOUT_S
+	add_child(_postpass_http)
+	_postpass_http.request_completed.connect(_on_postpass_done)
 	_detailed_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
 	add_child(_detailed_req)
 	_detailed_req.answered.connect(_on_detailed_answered)
@@ -165,6 +194,14 @@ func _ready() -> void:
 	add_child(_poi_req)
 	_poi_req.answered.connect(_on_poi_answered)
 	_poi_req.exhausted.connect(_on_poi_exhausted)
+	_bridge_req = OverpassRequest.new(15.0)
+	add_child(_bridge_req)
+	_bridge_req.answered.connect(_on_bridges_answered)
+	_bridge_req.exhausted.connect(_on_bridges_exhausted)
+	_bridge_postpass = HTTPRequest.new()
+	_bridge_postpass.timeout = PostpassFallback.TIMEOUT_S
+	add_child(_bridge_postpass)
+	_bridge_postpass.request_completed.connect(_on_bridges_postpass)
 	_ring_grace = Timer.new()
 	_ring_grace.one_shot = true
 	_ring_grace.wait_time = RING_GRACE_S
@@ -262,11 +299,21 @@ var country := ""
 var railways: Array = []
 ## Street furniture nodes of the last success (OsmParser.furniture_kind).
 var furniture: Array = []
+## Tram and bus stop nodes {x, z, name} of the last success (empty for
+## payloads cached before the query asked for them).
+var tram_stops: Array = []
+var bus_stops: Array = []
+## Railway platform outlines {points} and mainline station nodes
+## {x, z, name} of the last success (empty for older payloads).
+var rail_platforms: Array = []
+var rail_stations: Array = []
 ## Shop, amenity, office, tourism, craft and advertising nodes.
 var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
 var piers: Array = []
 var shore_structures: Array = []
+## man_made=bridge outlines of the last parse (OsmParser._bridge_area).
+var bridge_areas: Array = []
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -274,19 +321,28 @@ var shore_structures: Array = []
 ## fetch burned every retry on 44 and then lost the real response's
 ## state. cancel_request() emits no request_completed, so nothing stale
 ## reaches the handlers.
-func cancel() -> void:
+func cancel(keep_omt: bool = false) -> void:
 	# A parse still running off-thread belongs to the abandoned fetch.
 	_parse_gen += 1
+	_omt_wait = []
+	if _omt != null and not keep_omt:
+		_omt.cancel()
 	# So does any step of the OSM API fallback.
 	_api_tier = 0
 	if _http != null:
 		_http.cancel_request()
+	if _postpass_http != null:
+		_postpass_http.cancel_request()
 	if _detailed_req != null:
 		_detailed_req.cancel()
 	if _ring_req != null:
 		_ring_req.cancel()
 	if _poi_req != null:
 		_poi_req.cancel()
+	if _bridge_req != null:
+		_bridge_req.cancel()
+	if _bridge_postpass != null:
+		_bridge_postpass.cancel_request()
 	if _ring_grace != null:
 		_ring_grace.stop()
 
@@ -319,7 +375,12 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_pending_lon = lon
 	country = ""
 	railways = []
+	tram_stops = []
+	bus_stops = []
+	rail_platforms = []
+	rail_stations = []
 	shore_structures = []
+	bridge_areas = []
 	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
@@ -330,16 +391,22 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_pending_ring_cache = ""
 	_detailed_text = ""
 	_ring_text = ""
+	_transit_text = ""
 	_poi_text = ""
 	_poi_started = false
 	_poi_pending = false
 	_poi_cache = CacheStore.osm_poi_path(lat, lon)
+	_bridge_text = ""
+	_bridge_started = false
+	_bridge_pending = false
+	_bridge_cache = CacheStore.osm_bridge_path(lat, lon)
 	_detailed_ready = false
 	_ring_pending = false
 	_tried = 1
 	_api_reason = ""
 	_fallback_detail = ""
 	_fallback_partial = false
+	used_omt = false
 	var want_ring := ring > radius
 	if want_ring:
 		_pending_ring_cache = CacheStore.osm_ring_path(lat, lon, ring)
@@ -372,9 +439,9 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 			return
 		if _detailed_text != "":
 			_detailed_cached = true
-			if not offline_mode:
-				BundledOsm.refresh(get_tree(), snapshot, _pending_cache, _pending_body,
-					_detailed_check(lat, lon), active_endpoints())
+			_transit_text = await _reader().read(BundledOsm.entry_for(lat, lon, "transit", OsmQuery.TRANSIT_VERSION))
+			if gen != _parse_gen:
+				return
 	if want_ring:
 		var ring_key := BundledOsm.entry_for(lat, lon, "ring%d" % ring, OsmQuery.RING_VERSION)
 		_ring_text = _read_cache(_pending_ring_cache) if BundledOsm.cache_is_newer(_pending_ring_cache, ring_key) else ""
@@ -384,23 +451,31 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 			_ring_text = await _reader().read(ring_key)
 			if gen != _parse_gen:
 				return
-			if _ring_text != "" and not offline_mode:
-				BundledOsm.refresh(get_tree(), ring_key, _pending_ring_cache,
-					"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
 	if offline_mode:
 		if _detailed_text != "":
 			_detailed_done()
 		else:
 			_detailed_fallback("OSM not cached (offline mode)")
 		return
+	var known_empty := _detailed_text == "" and _known_empty(lat, lon)
+	if _detailed_text == "":
+		_omt.start(lat, lon, DETAILED_RADIUS_M)
 	# Both phases go live at once; _try_finish waits for the pair.
-	if want_ring and _ring_text == "":
+	if want_ring and _ring_text == "" and not known_empty:
 		_ring_pending = true
 		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
 			_check_ring, ring_endpoints())
 	if _detailed_text != "":
 		_detailed_done()
+	elif known_empty:
+		print("OsmFetcher: no buildings here on the last check; not asking Overpass again")
+		_api_failed(NO_BUILDINGS, "Overpass " + NO_BUILDINGS)
 	else:
+		# With an older copy of this place on hand, a queued instance is
+		# not worth the full first-byte wait.
+		_detailed_req.first_byte_timeout = OverpassRequest.FALLBACK_FIRST_BYTE_S \
+			if not OsmNearbyCache.candidates(lat, lon, SAME_PLACE_M).is_empty() \
+			else OverpassRequest.FIRST_BYTE_TIMEOUT
 		_detailed_req.run(_pending_body, _detailed_check(lat, lon), active_endpoints())
 
 var _pending_lat := 0.0
@@ -412,11 +487,21 @@ var _detailed_text := ""
 var _detailed_cached := false
 var _detailed_ready := false
 var _ring_text := ""
+## The bundled transit layer, read only when a bundled snapshot stands in for
+## the detailed answer (a live answer already carries these stops).
+var _transit_text := ""
 var _poi_text := ""
 var _poi_cache := ""
 var _poi_started := false
 var _poi_pending := false
 var _poi_enabled := true
+## The bridge outline layer (OsmQuery.build_bridge_area_query): its own
+## request and cache file, asked for alongside the POIs. Without it
+## BridgeStructures falls back to grouping the bridge ways.
+var _bridge_text := ""
+var _bridge_cache := ""
+var _bridge_started := false
+var _bridge_pending := false
 var _ring_pending := false
 var _parse_task := -1
 var _parse_gen := 0
@@ -439,6 +524,7 @@ static func _write_cache(path: String, text: String) -> bool:
 	if not AtomicFile.write_text(path, text):
 		return false
 	CacheStore.note_written(path)
+	OsmNearbyCache.note(path)
 	return true
 
 ## A cached/live detailed payload is usable when it parses to a
@@ -488,14 +574,11 @@ static func is_retryable(result: int, code: int) -> bool:
 		return true
 	return code in [403, 406, 429, 500, 502, 503, 504]
 
-## Next attempt index for a failed attempt, or -1 to give up.
-static func next_attempt(attempt: int, retryable: bool) -> int:
-	return attempt + 1 if retryable and attempt + 1 < active_endpoints().size() else -1
-
 ## One instance returning neither buildings nor shore geometry is not authoritative: it may lag
-## replication or hold a partial extract, so OverpassRequest tries the
-## next instance (a genuinely empty area just pays a few fast empty
-## responses). This also covers corrupt payloads, which parse to nothing.
+## replication or hold a partial extract, so the payload is rejected and
+## the OSM API asked instead; when that finds nothing too, the place is
+## marked empty (CacheStore.osm_empty_path). This also covers corrupt
+## payloads, which parse to nothing.
 ## Runs on OverpassRequest's worker thread, so it captures the centre
 ## instead of reading this node's state.
 static func _detailed_check(lat: float, lon: float) -> Callable:
@@ -539,6 +622,9 @@ func _on_ring_exhausted(reason: String, _attempts: int) -> void:
 
 func _detailed_done() -> void:
 	_detailed_ready = true
+	# The detailed layer is in hand: the vector-map tier is not needed.
+	if _omt != null and not used_omt:
+		_omt.cancel()
 	if _ring_pending:
 		_ring_grace.start()
 	_try_finish()
@@ -551,6 +637,15 @@ func _on_ring_grace() -> void:
 func _try_finish() -> void:
 	if not _detailed_ready or _ring_pending:
 		return
+	if not _bridge_started:
+		_bridge_started = true
+		_bridge_text = _read_cache(_bridge_cache)
+		if _bridge_text != "" and not _payload_usable(_bridge_text):
+			_bridge_text = ""
+		if _bridge_text == "" and not offline_mode:
+			_bridge_pending = true
+			_bridge_req.run("data=" + OsmQuery.build_bridge_area_query(_pending_lat, _pending_lon,
+				DETAILED_RADIUS_M).uri_encode(), _check_ring, ring_endpoints().slice(0, 1))
 	if not _poi_started:
 		_poi_started = true
 		var poi_key := BundledOsm.entry_for(_pending_lat, _pending_lon, "poi", OsmQuery.POI_VERSION)
@@ -566,17 +661,48 @@ func _try_finish() -> void:
 			if gen != _parse_gen:
 				return
 			_poi_pending = false
-			if _poi_text != "" and not offline_mode:
-				BundledOsm.refresh(get_tree(), poi_key, _poi_cache,
-					"data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
-					_check_ring, ring_endpoints())
 		if _poi_text == "" and _poi_enabled and not offline_mode:
 			_poi_pending = true
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
 				_check_ring, ring_endpoints().slice(0, 1))
 			return
-	if not _poi_pending:
+	if not _poi_pending and not _bridge_pending:
 		_finish()
+
+func _on_bridges_answered(text: String) -> void:
+	_bridge_text = text
+	_write_cache(_bridge_cache, text)
+	_bridge_pending = false
+	_try_finish()
+
+## Overpass is out (a rate limit, a paused instance): Postpass has the
+## same outlines.
+func _on_bridges_exhausted(reason: String, _attempts: int) -> void:
+	var err := _bridge_postpass.request(PostpassFallback.endpoint(),
+		["User-Agent: " + Brand.USER_AGENT, "Content-Type: application/x-www-form-urlencoded"],
+		HTTPClient.METHOD_POST, PostpassFallback.build_bridge_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
+	if err != OK:
+		_bridges_unavailable("%s; Postpass failed to start: %s" % [reason, err])
+	else:
+		_bridge_reason = reason
+
+var _bridge_reason := ""
+
+func _on_bridges_postpass(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	if not _bridge_pending:
+		return
+	var json := ""
+	if result == HTTPRequest.RESULT_SUCCESS and code == 200:
+		json = str(PostpassFallback.to_overpass_json(body)["json"])
+	if json == "":
+		_bridges_unavailable("%s; Postpass result=%d code=%d" % [_bridge_reason, result, code])
+		return
+	_on_bridges_answered(json)
+
+func _bridges_unavailable(reason: String) -> void:
+	print("OsmFetcher: bridge outlines unavailable (%s); grouping bridge ways instead" % reason)
+	_bridge_pending = false
+	_try_finish()
 
 func _on_poi_answered(text: String) -> void:
 	_poi_text = text
@@ -590,16 +716,124 @@ func _on_poi_exhausted(reason: String, _attempts: int) -> void:
 	_try_finish()
 
 ## Detailed phase out of live Overpass options. Register fallback order:
-## same-place cache (any radius) → OSM API bbox → nearby cache → procedural.
+## same-place cache (any radius) → Postpass → OSM API bbox → nearby cache
+## → procedural.
 func _detailed_fallback(reason: String) -> void:
 	if _use_cached(reason, SAME_PLACE_M):
 		return
 	if offline_mode:
 		_api_failed("skipped (offline mode)", reason)
 		return
-	_api_tier = 0
 	_api_reason = reason
+	var err := _postpass_http.request(PostpassFallback.endpoint(),
+		["User-Agent: " + Brand.USER_AGENT, "Content-Type: application/x-www-form-urlencoded"],
+		HTTPClient.METHOD_POST,
+		PostpassFallback.build_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
+	if err != OK:
+		_postpass_failed("failed to start: %s" % err)
+
+## Postpass gave nothing usable: on to the OSM API.
+func _postpass_failed(why: String) -> void:
+	print("OsmFetcher: %s; Postpass %s; trying the OSM API" % [_api_reason, why])
+	_api_tier = 0
 	_request_api()
+
+func _on_postpass_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
+		_postpass_failed("failed (result=%d code=%d)" % [result, code])
+		return
+	_join_parse()
+	var gen := _parse_gen
+	var lat := _pending_lat
+	var lon := _pending_lon
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		_on_postpass_converted.call_deferred(gen,
+			_with_shores(PostpassFallback.to_overpass_json(body), lat, lon)))
+
+## Marks a converted fallback payload with no buildings that still maps a
+## shore (a harbour, a lake edge), which Overpass's own check accepts too.
+## Parses only then, as a payload without buildings is small. Thread-safe.
+static func _with_shores(converted: Dictionary, lat: float, lon: float) -> Dictionary:
+	converted["shores"] = int(converted["buildings"]) == 0 and str(converted["json"]) != "" \
+		and _has_shore_data(parse_features(converted["json"], lat, lon))
+	return converted
+
+func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
+	_join_parse()
+	if gen != _parse_gen:
+		return
+	# Nothing mapped (open sea, wilderness, a garbled answer): the OSM API
+	# decides, so the known-empty marker still needs both sources to agree.
+	if int(converted["buildings"]) == 0 and not converted["shores"]:
+		_postpass_failed(NO_BUILDINGS)
+		return
+	_detailed_text = converted["json"]
+	_detailed_cached = false
+	# Under the OSM API key, not osm_path: it is not the Overpass query's
+	# answer, so Overpass is asked again next time.
+	_write_cache(CacheStore.osm_api_path(_pending_lat, _pending_lon, DETAILED_RADIUS_M),
+		_detailed_text)
+	_detailed_done()
+
+## Stops waiting on the network for the detailed layer (a streamed
+## build ran out of time): a nearby cached copy if there is one, else
+## failed. Live requests are dropped so no late answer lands.
+func give_up(reason: String) -> void:
+	cancel(true)
+	# The ring, bridge and POI steps settle with what is at hand: none of
+	# them may hold the finish or ask Overpass again.
+	_ring_pending = false
+	_bridge_started = true
+	_bridge_pending = false
+	_poi_started = true
+	_poi_pending = false
+	_last_resort(reason, reason)
+
+## Whether the vector-map tier is ready to stand in for a live answer that
+## has not arrived (once the detailed layer is in, it is only parsing).
+func has_omt() -> bool:
+	return not _detailed_ready and _omt != null and _omt.state == OmtOsmSource.State.READY
+
+## Out of live map sources: a copy of this spot, then the vector-map tier
+## (waited for while its tiles are still coming), then a neighbour's copy,
+## which leaves part of the view without map data, else `fail`.
+func _last_resort(reason: String, fail: String) -> void:
+	if _use_cached(reason, SAME_PLACE_M):
+		return
+	if _omt.state == OmtOsmSource.State.RUNNING:
+		_omt_wait = [reason, fail]
+		return
+	if _omt.state == OmtOsmSource.State.READY:
+		_use_omt(reason)
+		return
+	if not _use_cached(reason, NEARBY_M):
+		_ring_req.cancel()
+		failed.emit(fail)
+
+func _on_omt_finished(_text: String) -> void:
+	if not _omt_wait.is_empty():
+		var wait := _omt_wait
+		_omt_wait = []
+		_last_resort(wait[0], wait[1])
+
+## Water, buildings and roads from the vector map: the ground is shaped
+## right, the dressing is plainer. Overpass is out, so the ring, bridge and
+## POI steps do not wait on it; the ring would also double the roads.
+func _use_omt(reason: String) -> void:
+	print("OsmFetcher: %s; using the vector map's features" % reason)
+	used_omt = true
+	_fallback_detail = "Simplified map"
+	_fallback_partial = true
+	_ring_req.cancel()
+	_ring_text = ""
+	_ring_pending = false
+	_bridge_started = true
+	_bridge_pending = false
+	_poi_started = true
+	_poi_pending = false
+	_detailed_text = _omt.text
+	_detailed_cached = false
+	_detailed_done()
 
 ## Serve the nearest cached payload within max_m that holds mapped geometry,
 ## and say so: a payload keyed more than SAME_PLACE_M away leaves part of
@@ -629,9 +863,7 @@ func _request_api() -> void:
 
 func _api_failed(why: String, reason: String) -> void:
 	var full := "%s; OSM API %s" % [reason, why]
-	if not _use_cached(full, NEARBY_M):
-		_ring_req.cancel()
-		failed.emit("%s (tried %d endpoint(s))" % [full, _tried])
+	_last_resort(full, "%s (tried %d endpoint(s))" % [full, _tried])
 
 func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 	if OsmApiFallback.steps_down(result, code) \
@@ -644,14 +876,22 @@ func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByt
 		return
 	_join_parse()
 	var gen := _parse_gen
+	var lat := _pending_lat
+	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		_on_api_converted.call_deferred(gen, OsmApiFallback.to_overpass_json(body)))
+		_on_api_converted.call_deferred(gen,
+			_with_shores(OsmApiFallback.to_overpass_json(body), lat, lon)))
 
 func _on_api_converted(gen: int, converted: Dictionary) -> void:
 	_join_parse()
 	if gen != _parse_gen:
 		return
-	if int(converted["buildings"]) == 0:
+	if int(converted["buildings"]) == 0 and not converted["shores"]:
+		# Both sources agree over the whole view: remember it, so the next
+		# load does not ask either again (a smaller box proves nothing).
+		if _api_reason == "Overpass " + NO_BUILDINGS \
+				and OsmApiFallback.RADII_M[_api_tier] >= DETAILED_RADIUS_M:
+			_write_cache(CacheStore.osm_empty_path(_pending_lat, _pending_lon), '{"elements":[]}')
 		_api_failed(NO_BUILDINGS, _api_reason)
 		return
 	_detailed_text = converted["json"]
@@ -676,6 +916,12 @@ func _finish() -> void:
 	var detailed := _detailed_text
 	var ring := _ring_text
 	var poi := _poi_text
+	# Small next to the city, so joined with the POIs rather than re-parsing
+	# the merged city once more.
+	if _transit_text != "":
+		poi = merge_payloads(poi, _transit_text)
+	if _bridge_text != "":
+		poi = merge_payloads(poi, _bridge_text)
 	var lat := _pending_lat
 	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
@@ -708,9 +954,14 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	country = str(parsed.get("country", ""))
 	railways = parsed.get("railways", [])
 	furniture = parsed.get("furniture", [])
+	tram_stops = parsed.get("tram_stops", [])
+	bus_stops = parsed.get("bus_stops", [])
+	rail_platforms = parsed.get("rail_platforms", [])
+	rail_stations = parsed.get("rail_stations", [])
 	pois = parsed.get("pois", [])
 	piers = parsed.get("piers", [])
 	shore_structures = parsed.get("shore_structures", [])
+	bridge_areas = parsed.get("bridge_areas", [])
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

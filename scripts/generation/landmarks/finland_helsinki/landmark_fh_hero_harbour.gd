@@ -45,6 +45,13 @@ static func kappeli(model: Node3D) -> void:
 		lm.frustum("Metal", c + Vector3.UP * 8.0, 0.13, 0.06, 0.8, 12)
 	U.blk(lm, "Glass", 0, 7.4, 0, 8.0, 1.9, 5.0)
 	U.hip(lm, "Metal", Vector3(0, 9.3, 0), 9.0, 6.0, 1.5, 0.1)
+	# Esplanade terrace: entrance steps, lamp posts and the low stone
+	# kerb that separates the restaurant terrace from the park path.
+	U.steps(lm, "Stone", Vector3(0, 0, 10.2), Vector3.BACK, 10.0, 0.45, 0.18, 3)
+	for x in [-16.0, -5.5, 5.5, 16.0]:
+		U.blk(lm, "Metal", x, 0, 11.4, 0.14, 3.1, 0.14)
+		lm.lathe("Glass", Vector3(x, 3.1, 11.4), U.ball(0.28), 10)
+	U.blk(lm, "Stone", 0, 0, 12.3, 44.0, 0.28, 0.5)
 	lm.commit(model)
 
 ## Pink-granite basin, bronze pedestal, seaweed, four sea lions and the
@@ -127,6 +134,14 @@ static func allas(model: Node3D) -> void:
 		U.blk(lm, "Pool", x, 0.35, z, float(pool[2]), 0.05, float(pool[3]))
 		for side in [-1.0, 1.0]:
 			U.blk(lm, "Trim", x + side * 11.1, 0.4, z, 0.18, 0.45, 25.2)
+	# Lane ropes across both main pools and benches along the boardwalk.
+	for pool_x in [-13.5, 13.5]:
+		for lane in 5:
+			U.blk(lm, "Trim", pool_x - 8.0 + float(lane) * 4.0, 0.42, 8.0, 0.14, 0.07, 24.0)
+	for bx in [-22.0, -6.0, 10.0, 24.0]:
+		U.blk(lm, "Wood", bx, 1.25, -9.0, 3.2, 0.14, 0.7)
+		U.blk(lm, "Metal", bx - 1.3, 0.8, -9.0, 0.12, 0.45, 0.6)
+		U.blk(lm, "Metal", bx + 1.3, 0.8, -9.0, 0.12, 0.45, 0.6)
 	U.blk(lm, "Pool", 14, 0.35, 25.0, 12.0, 0.05, 6.0)
 	U.blk(lm, "Wood", -4.0, 0, -23.0, 48.0, 5.8, 18.0)
 	U.blk(lm, "Metal", -4.0, 5.8, -23.0, 49.0, 0.25, 19.0)

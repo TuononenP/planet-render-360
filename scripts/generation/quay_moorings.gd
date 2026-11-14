@@ -20,6 +20,21 @@ const LINER_EYE_CLEAR_M := 40.0
 const LINER_TURN_RAD := 0.12
 const LINER_DEVIATION_M := 6.0
 
+## One harbour plan's shared lookups: [data, its ferry terminals, its
+## joined quay lines (null until asked for), m]. The terminal test runs
+## for every vertex of every coastline and water polygon, twice (liners,
+## then cargo berths), and each one scanned every building and POI:
+## 2.4 s of a Paris build with no ship to berth. Other data, and calls
+## outside a plan, find their own.
+static var _scope: Array = []
+
+## Brackets MarinaBuilder.plan for `data`.
+static func begin_plan(data: LocationData, m: float) -> void:
+	_scope = [data, _terminals(data), null, m]
+
+static func end_plan() -> void:
+	_scope = []
+
 static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 		m: float, mask: VegetationMask = null) -> Array:
 	var lines: Array = []
@@ -42,8 +57,9 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 		var pts: PackedVector2Array = line["points"]
 		var total := MarinaBuilder._length(pts)
 		var t := 18.0 * m
+		var cursor: Array = [0, 0.0]
 		while t < total - 18.0 * m:
-			var sample := MarinaBuilder._at(pts, t)
+			var sample := MarinaBuilder._at(pts, t, cursor)
 			var at: Vector2 = sample[0]
 			var dir: Vector2 = sample[1]
 			var hash_v := MarinaBuilder._hash(at.x, at.y, 37.0)
@@ -119,6 +135,8 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			b = swap
 		var dir := (b - a).normalized()
 		var ferry := _near_terminal(data, (a + b) * 0.5, m)
+		if not ferry and CargoBerths.port_run(data, a, b, m):
+			continue  # cargo quays berth cargo ships (CargoBerths)
 		var length := minf(200.0 if ferry else 230.0, run_m - 30.0)
 		if length < LINER_MIN_M:
 			continue
@@ -140,8 +158,9 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			if not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
 				continue
 			out.append([Vector3(c.x, ground.water_level_at(c.x, c.y), c.y), atan2(-bow_dir.y, bow_dir.x),
-				length, beam, clampf(length * (0.16 if ferry else 0.2), 22.0, 65.0),
-				0.0, "ferry" if ferry else "liner"])
+				length, beam, clampf(length * 0.21 if ferry else length * 0.2, 22.0, 65.0),
+				fposmod(c.x * 0.0131 + c.y * 0.0077, 1.0), "ferry" if ferry else "liner",
+				berth_info(ground, a, b, at, berth, beam, m)])
 			break
 		if out.size() >= MAX_LINERS:
 			return out
@@ -150,6 +169,16 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 ## Join nearby quay fragments before looking for straight berths. A gap is
 ## allowed only when the joined polyline still passes the straightness test.
 static func _quay_lines(data: LocationData, m: float) -> Array:
+	var scope := _scope
+	var scoped: bool = scope.size() == 4 and is_same(scope[0], data) and scope[3] == m
+	if scoped and scope[2] != null:
+		return scope[2]
+	var lines := _join_quay_lines(data, m)
+	if scoped:
+		scope[2] = lines
+	return lines
+
+static func _join_quay_lines(data: LocationData, m: float) -> Array:
 	var lines: Array = []
 	for structure in data.shore_structures:
 		if str(structure.get("kind", "")) == "quay":
@@ -227,15 +256,26 @@ static func _mapped_quay_at(data: LocationData, at: Vector2, m: float) -> bool:
 	return false
 
 static func _terminal_distance(data: LocationData, at: Vector2) -> float:
+	var scope := _scope
+	var terminals: PackedVector2Array = scope[1] if scope.size() == 4 and is_same(scope[0], data) \
+		else _terminals(data)
 	var distance := INF
+	for t in terminals:
+		distance = minf(distance, at.distance_to(t))
+	return distance
+
+## Where `data`'s ferry terminals stand (buildings, then POIs), less the
+## ones that keep ferry scenery of their own (HarbourFerries).
+static func _terminals(data: LocationData) -> PackedVector2Array:
+	var out := PackedVector2Array()
 	for b in data.buildings:
 		if b is Dictionary and str(b.get("use", "")) == "ferry_terminal" and not HarbourFerries.terminal(b):
-			distance = minf(distance, at.distance_to(Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0)))))
+			out.append(Vector2(float(b.get("x", 0.0)), float(b.get("z", 0.0))))
 	for p in data.pois:
 		if p is Dictionary and str(p.get("kind", "")) == "ferry_terminal" \
 				and not str(p.get("name", "")).to_lower().contains("staten island ferry"):
-			distance = minf(distance, at.distance_to(Vector2(float(p.get("x", 0.0)), float(p.get("z", 0.0)))))
-	return distance
+			out.append(Vector2(float(p.get("x", 0.0)), float(p.get("z", 0.0))))
+	return out
 
 static func _near_terminal(data: LocationData, at: Vector2, m: float) -> bool:
 	return _terminal_distance(data, at) < 400.0 * m
@@ -306,6 +346,20 @@ static func _liner_berth(ground: GroundTruth, mask: VegetationMask, at: Vector2,
 		if deep:
 			return {"centre": c, "side": sign_n}
 	return {}
+
+## Where the quay is in the berthed ship's own frame (metres, +X bow,
+## +Z = the berth normal): "quay_z" the quay edge, "quay_top" its height
+## over the water, "along" the run's ends in ship x. ShipMooring reads it.
+static func berth_info(ground: GroundTruth, a: Vector2, b: Vector2, at: Vector2, berth: Dictionary,
+		beam: float, m: float) -> Dictionary:
+	var c: Vector2 = berth["centre"]
+	var side: float = berth["side"]
+	var dir := (b - a).normalized()
+	var land := at - Vector2(-dir.y, dir.x) * side * 3.0 * m
+	var water := ground.water_level_at(c.x, c.y)
+	var top := (ground.height_at_world(land.x, land.y) - water) / m
+	return {"quay_z": -side * (beam * 0.5 + 2.0), "quay_top": clampf(top, 0.8, 6.0),
+		"along": Vector2((a - c).dot(dir) / m, (b - c).dot(dir) / m)}
 
 ## The carved sea floor is often 2 m deep; interpolated floats can fall
 ## microscopically below that value, so allow a millimetre of rounding.

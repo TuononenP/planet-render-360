@@ -24,6 +24,21 @@ func _run() -> void:
 		printerr("DEM FAIL: unexpected Paris tile ", tile)
 		quit(1)
 		return
+	# A cached mosaic tile that will not decode is reported (so it is
+	# fetched again), not silently dropped.
+	var bad_path := "user://dem_test_bad_tile.png"
+	var f := FileAccess.open(bad_path, FileAccess.WRITE)
+	f.store_string("not a png")
+	f.close()
+	var out := {}
+	var tiles: Array[Vector2i] = [Vector2i(1, 1)]
+	DemFetcher._stitch_heights({Vector2i(1, 1): bad_path}, tiles, Vector2i(1, 1), 48.8566, 2.3522, 8, out)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(bad_path))
+	var bad: Array = out.get("bad", [])
+	if out.has("heights") or bad.size() != 1 or bad[0] != Vector2i(1, 1):
+		printerr("DEM FAIL: a damaged cached tile must be reported for a refetch: ", out.keys())
+		quit(1)
+		return
 
 	var fetcher := DemFetcher.new()
 	root.add_child(fetcher)

@@ -107,6 +107,33 @@ static func land_class(tags: Dictionary) -> String:
 		return "urban"
 	return ""
 
+## Harbour use of industrial land behind a quay (CargoBerths): "port"
+## when tagged as a port, shipyard, container terminal or harbour,
+## "industrial" otherwise, "" for other land. landuse=port itself stays
+## out of the land cover (it would invite infill or shadow other cover).
+static func harbour_use(tags: Dictionary) -> String:
+	if str(tags.get("landuse", "")) != "industrial":
+		return ""
+	if str(tags.get("harbour", "")) == "yes" \
+			or str(tags.get("industrial", "")) in ["port", "shipyard", "container_terminal"]:
+		return "port"
+	return "industrial"
+
+## How a green area is kept: "mown" for parks, gardens, lawns, pitches,
+## golf courses, village greens and cemeteries, "wild" for meadows,
+## grassland, heath and scrub, "" when the tags do not say.
+static func sward(tags: Dictionary) -> String:
+	var natural := str(tags.get("natural", ""))
+	var landuse := str(tags.get("landuse", ""))
+	var leisure := str(tags.get("leisure", ""))
+	if leisure in ["park", "garden", "pitch", "golf_course", "common"] \
+			or landuse in ["grass", "recreation_ground", "village_green", "cemetery"] \
+			or str(tags.get("amenity", "")) == "grave_yard":
+		return "mown"
+	if landuse == "meadow" or natural in ["grassland", "heath", "scrub"]:
+		return "wild"
+	return ""
+
 ## Metres from a raw OSM tag value, including feet ("100 ft", "100'"):
 ## NAN when missing, unparseable, or outside [lo, hi] (callers fall
 ## through to their next source — never a silent 0).
@@ -142,12 +169,40 @@ static func rail_class(tags: Dictionary) -> String:
 	var cls := str(tags.get("railway", ""))
 	return cls if cls in RAIL_CLASSES else ""
 
+## Transit stop kind of a node: "tram" (railway=tram_stop, or a
+## stop_position with tram=yes), "bus" (highway=bus_stop) or "".
+static func stop_kind(tags: Dictionary) -> String:
+	if str(tags.get("railway", "")) == "tram_stop" or (str(tags.get("public_transport", "")) == "stop_position"
+			and str(tags.get("tram", "")) == "yes"):
+		return "tram"
+	if str(tags.get("highway", "")) == "bus_stop":
+		return "bus"
+	return ""
+
+## Whether a way is a railway platform StationTrains may stand a train
+## at: railway=platform, or a public transport platform for trains. One
+## under ground has no open track beside it.
+static func rail_platform(tags: Dictionary) -> bool:
+	if underground(tags) or _tag_truthy(tags.get("tunnel", "")) or _tag_truthy(tags.get("indoor", "")):
+		return false
+	return str(tags.get("railway", "")) == "platform" or (str(tags.get("public_transport", "")) == "platform"
+		and str(tags.get("train", "")) == "yes")
+
+## Whether a node is a mainline railway station (railway=station or
+## halt; a metro's or a light railway's is not).
+static func rail_station(tags: Dictionary) -> bool:
+	return str(tags.get("railway", "")) in ["station", "halt"] \
+		and not str(tags.get("station", "")) in ["subway", "light_rail", "monorail", "funicular"] \
+		and str(tags.get("subway", "")) != "yes"
+
 ## One railway dict: the gauge (mm tag, else 1000 mm tram / 1435 mm),
 ## whether the track is set in a street (trams unless embedded=no, or
 ## embedded=yes), whether a cable runs in a slot between the rails
 ## (`cable_tram=cable`, or a street tram with `electrified=no`: San
 ## Francisco maps most of its cable-car track only so) and the bed width
-## (ballast shoulders past the rails).
+## (ballast shoulders past the rails). Track under a roof (`covered`) is
+## left undrawn like a tunnel's, and marked: a station's shed is no
+## tunnel to StationTrains.
 static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var cls := rail_class(tags)
 	var gauge_mm := _tag_int(str(tags.get("gauge", "")).split(";")[0], 0, 3000)
@@ -163,6 +218,8 @@ static func _rail_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"bridge": _tag_truthy(tags.get("bridge", "")),
 		"tunnel": _tag_truthy(tags.get("tunnel", "")) or underground(tags)
 			or _tag_truthy(tags.get("covered", "")),
+		"covered": _tag_truthy(tags.get("covered", "")) and not _tag_truthy(tags.get("tunnel", ""))
+			and not underground(tags),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"width_m": gauge + (0.3 if embedded else 1.9)}
 
@@ -322,7 +379,10 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"start_year": _start_year(tags.get("start_date", "")),
 		"heritage": _tag_truthy(tags.get("heritage", "")) \
 			or tags.has("heritage:operator") \
-			or str(tags.get("historic", "")) in ["building", "yes"],
+			or str(tags.get("historic", "")) in ["building", "yes", "ruins", "city_gate"],
+		# The raw value: a gate or ruin inside a heritage zone is the
+		# landmark model's to draw (HeritageZones).
+		"historic": str(tags.get("historic", "")).strip_edges().to_lower(),
 		"architecture": str(tags.get("building:architecture", "")).strip_edges().to_lower(),
 		"monument": monument_kind(tags),
 	}
@@ -496,7 +556,11 @@ static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary
 		"tunnel": _tag_truthy(tags.get("tunnel", "")),
 		"layer": _tag_int(tags.get("layer", 0), -10, 10),
 		"sidewalk": sidewalk_sides(tags), "sidewalk_separate": sidewalk_sides(tags, true),
-		"oneway": oneway(tags), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
+		"oneway": oneway(tags), "cycle_lane": cycle_lane_sides(tags),
+		"lanes_forward": _tag_int(tags.get("lanes:forward", 0), 0, 20),
+		"lanes_backward": _tag_int(tags.get("lanes:backward", 0), 0, 20),
+		"unmarked": str(tags.get("lane_markings", "")).strip_edges().to_lower() == "no",
+		"turn_forward": turn_lanes(tags, "forward"), "turn_backward": turn_lanes(tags, "backward"), "trolley_wire": str(tags.get("trolley_wire", "")) == "yes",
 		"class": road_class}
 
 ## Width of a parking lane along a kerb (m).
@@ -517,6 +581,44 @@ static func parking_sides(tags: Dictionary) -> int:
 				sides = maxi(sides, 0) | int(side[1])
 			elif v in PARKING_NO:
 				sides = maxi(sides, 0) & ~int(side[1])
+	return sides
+
+## The turns painted on each lane in `direction` ("forward" or "backward"),
+## left to right in the direction of travel: [["left"], ["through", "right"]].
+## A plain `turn:lanes` means forward. Merges and `none` paint nothing.
+static func turn_lanes(tags: Dictionary, direction: String) -> Array:
+	var value := str(tags.get("turn:lanes:" + direction, "")).strip_edges().to_lower()
+	if value == "" and direction == "forward":
+		value = str(tags.get("turn:lanes", "")).strip_edges().to_lower()
+	var out: Array = []
+	if value == "":
+		return out
+	for lane in value.split("|"):
+		var turns: Array = []
+		for raw in lane.split(";"):
+			var t := raw.strip_edges()
+			if t in ["left", "slight_left", "sharp_left"] and not turns.has("left"):
+				turns.append("left")
+			elif t in ["right", "slight_right", "sharp_right"] and not turns.has("right"):
+				turns.append("right")
+			elif t == "through" and not turns.has("through"):
+				turns.append("through")
+		out.append(turns)
+	return out
+
+## Sides of a road with a painted bike lane, as bits (1 left, 2 right)
+## from `cycleway` and `cycleway:both|left|right`. A bare `cycleway=lane`
+## on a one-way street is one lane, on its right unless tagged otherwise.
+static func cycle_lane_sides(tags: Dictionary) -> int:
+	var sides := 0
+	if str(tags.get("cycleway", "")).strip_edges().to_lower() == "lane":
+		sides = 2 if oneway(tags) != 0 else 3
+	for side in [["both", 3], ["left", 1], ["right", 2]]:
+		var v := str(tags.get("cycleway:" + str(side[0]), "")).strip_edges().to_lower()
+		if v == "lane":
+			sides |= int(side[1])
+		elif v != "":
+			sides &= ~int(side[1])
 	return sides
 
 ## Sides of a road with a sidewalk, as bits (1 left, 2 right) from
@@ -564,6 +666,32 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 	if wc == "coastline" or navigation_waterway(wc):
 		width_m = 0.0
 	return {"points": pts, "width_m": width_m, "class": wc}
+
+## A waterway under ground (tunnel=culvert/yes, location=underground,
+## covered=yes): Helsinki maps its storm drains this way, and drawing
+## them would lay water across squares and carve the street.
+static func buried_waterway(tags: Dictionary) -> bool:
+	return _tag_truthy(tags.get("tunnel", "")) or underground(tags) \
+		or _tag_truthy(tags.get("covered", ""))
+
+## A highway that is not built (proposed, planned, also as
+## highway=construction + construction=proposed) or no longer there
+## (abandoned, disused, razed, demolished): mapped, but nothing to draw.
+static func unbuilt_highway(tags: Dictionary) -> bool:
+	var h := str(tags.get("highway", ""))
+	if h == "construction":
+		return str(tags.get("construction", "")) in ["proposed", "planned"]
+	return h in ["proposed", "planned", "abandoned", "disused", "razed", "demolished"]
+
+## A highway no one sees from the street: a tunnel (building passages
+## and culverts too), one at location=underground or indoors, or a
+## corridor. Helsinki maps hundreds of service tunnels and metro
+## passages. A negative `level` alone is kept: open ramps and sunken
+## underpass approaches carry it too.
+static func buried_highway(tags: Dictionary) -> bool:
+	return _tag_truthy(tags.get("tunnel", "")) \
+		or str(tags.get("location", "")).strip_edges() == "underground" \
+		or _tag_truthy(tags.get("indoor", "")) or str(tags.get("highway", "")) == "corridor"
 
 ## Navigable routes across existing water must not carve or shade their
 ## own channels, even when a cached feature carries a positive width.

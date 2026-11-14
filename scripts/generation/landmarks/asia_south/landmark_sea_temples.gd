@@ -16,14 +16,20 @@ const U = preload("res://scripts/generation/landmarks/asia_south/landmark_asia_s
 ## rises 13.5 m in three tiers with steep axial stairs to the upper
 ## gallery, four corner towers, cross galleries and the central
 ## lotus-bud tower 43 m above the upper level, 65 m above the ground.
+## The sandstone is the weathered grey of the real temple (lichen-dark,
+## not buff), laterite only on the terrace's flanks; the precinct round
+## it (wall, gopura, causeway, avenue, libraries) is
+## LandmarkAngkorWatPrecinct.
 static func angkor_wat(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Sand", LandmarkMaterials.pbr("stone", "#8E8574", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#8A5A40", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#6C655A", 3.0))
+	lm.use("Sand", LandmarkMaterials.pbr("stone", LandmarkAngParts.STONE_GREY, 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("slate", LandmarkAngParts.ROOF, 3.0))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#3E3A33", 2.0))
-	# Outer terrace and gallery (floor 2 m).
-	lm.box("Laterite", Vector3(0, 1.0, 0), Vector3(221.0, 2.0, 193.0))
+	lm.use("Flag", LandmarkMaterials.pbr("stone", LandmarkAngParts.FLAGSTONE, 4.0))
+	# Outer terrace (laterite flanks, worn sandstone flags) and gallery (floor 2 m).
+	lm.box("Laterite", Vector3(0, 0.94, 0), Vector3(221.0, 1.88, 193.0))
+	lm.box("Flag", Vector3(0, 1.94, 0), Vector3(221.4, 0.12, 193.4), Basis(), 0.0)
 	_gallery(lm, Vector3(0, 2.0, 0), 107.5, 93.5, 4.6, true)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -37,7 +43,7 @@ static func angkor_wat(model: Node3D) -> void:
 		_prang(lm, Vector3(-107.5, 2.0, z), 4.0 if z == 0.0 else 3.2, 22.0 if z == 0.0 else 16.0)
 	# Second level: platform with stairs, and the cruciform cloister west of it.
 	var c2 := Vector3(12.0, 0, 0)
-	lm.box("Laterite", c2 + Vector3(0, 5.25, 0), Vector3(117.0, 6.5, 102.0))
+	lm.box("Sand", c2 + Vector3(0, 5.25, 0), Vector3(117.0, 6.5, 102.0))
 	lm.box("Sand", c2 + Vector3(0, 8.3, 0), Vector3(118.0, 0.4, 103.0))
 	_cloister(lm, Vector3(-62.0, 2.0, 0))
 	_gallery(lm, c2 + Vector3(0, 8.5, 0), 57.5, 50.0, 4.2, false)
@@ -50,7 +56,7 @@ static func angkor_wat(model: Node3D) -> void:
 	for t in tiers:
 		var hw: float = t[0]
 		var plan := U.redent(hw, 2.0, 2)
-		U.plan_frustum(lm, "Laterite", c3, plan, 1.0, 1.0, float(t[1]), float(t[2]) - 0.5)
+		U.plan_frustum(lm, "Sand", c3, plan, 1.0, 1.0, float(t[1]), float(t[2]) - 0.5)
 		U.plan_frustum(lm, "Sand", c3, plan, 1.02, 1.02, float(t[2]) - 0.5, float(t[2]))
 	for k in 4:
 		var b := Basis(Vector3.UP, PI * 0.5 * float(k))
@@ -66,6 +72,7 @@ static func angkor_wat(model: Node3D) -> void:
 		for sz in [-1.0, 1.0]:
 			_prang(lm, c3 + Vector3(sx * 28.0, 22.0, sz * 28.0), 5.0, 31.0)
 	_prang(lm, c3 + Vector3(0, 22.0, 0), 7.5, 43.0)
+	LandmarkAngkorWatPrecinct.build(lm)
 	lm.commit(model)
 
 ## Covered gallery ring round `c` (half extents hx, hz): the relief wall

@@ -63,10 +63,10 @@ const PREF_DEFAULTS := {
 	"theme": 2,  # 0 Night, 1 Day, 2 Match system
 	"reduce_motion": null, "solid_panels": null, "high_contrast": null,
 	"imperial": false, "dms": false, "clock_12h": false,
-	"cache_limit_mb": 2048, "text_scale": 1.0,
-	"cache_full_asked_mb": 0,  # the limit a full cache last offered to raise
+	"text_scale": 1.0,
 	"onboarded": false,
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
+	"fps_counter": false,
 }
 
 ## Bumped when the desktop default changes; older files migrate once.

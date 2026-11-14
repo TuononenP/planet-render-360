@@ -27,11 +27,25 @@ const SLEEPER_HEX := "#8c8984"
 const STEEL_HEX := "#77736f"
 ## Gap between the slot rails over a cable car's cable (m), and the
 ## concrete bed the cable-car track is set in: its width past the rails
-## (m) and depth layer (over every carriageway, under the rails).
+## (m) and depth layer: over every carriageway (rank 2 asphalt tops out
+## near 6.8), under the road paint (RoadPaint.LAYER) and the rails. Its
+## lift follows its layer, as a road ribbon's does: lower than the
+## asphalt it is set in, it showed through only in patches.
 const CABLE_SLOT_M := 0.03
 const CABLE_BED_M := 1.2
-const CABLE_BED_LAYER := 7.0
+const CABLE_BED_LAYER := 6.85
+## Worn concrete, a shade lighter than the asphalt beside it; the rails
+## stand this far over the bed so its drape never swallows them.
+const CABLE_BED_HEX := "#7f7b74"
+const CABLE_RAIL_CLEAR_M := 0.02
 const TRACK_BED_HEX := "#a39d92"
+## Bridge tracks this close side by side (centre to centre) share one
+## deck edge: no parapet stands between them.
+const BESIDE_M := 32.0
+const BESIDE_MIN_M := 0.3
+## A viaduct's fascias: soot-darkened London stock brick.
+const VIADUCT_BRICK_HEX := "#4a3b33"
+const BESIDE_CELL_M := 32.0
 
 ## Ballast bed: speckled stone, concrete sleepers across it (UV.y along
 ## in 4 m units, UV2.x the bed width in metres), anti-aliased into their
@@ -83,15 +97,26 @@ shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform vec3 steel : source_color;
+// @SNOW
+varying vec3 wpos;
+varying vec3 wnrm;
 
 void vertex() {
+	wpos = VERTEX;
+	wnrm = NORMAL;
 // @DEPTH
 }
 
 void fragment() {
-	ALBEDO = steel;
-	METALLIC = 0.8;
-	ROUGHNESS = mix(0.5, 0.25, clamp(NORMAL.y, 0.0, 1.0));
+	// In winter the head stays bare but dulled by grit and brine, never
+	// a mirror of the sky; snow packs against the sides.
+	float winter = snow_line(wpos);
+	float up = clamp(wnrm.y, 0.0, 1.0);
+	float side = snow_cover(wpos, 1.0) * (1.0 - smoothstep(0.8, 0.95, up));
+	vec3 head = mix(steel, steel * vec3(0.55, 0.52, 0.5), winter);
+	ALBEDO = mix(head, snow_albedo(wpos.xz, max(fwidth(wpos.x), fwidth(wpos.z)), 0.4), side);
+	METALLIC = mix(0.8, 0.45, winter) * (1.0 - side);
+	ROUGHNESS = mix(mix(0.5, 0.25, up), 0.55, max(winter, side));
 }
 """
 
@@ -108,10 +133,13 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var road_index := RoadIndex.new(data, m2u)
 	var spans := LandmarkSites.bridge_spans(data)
 	var batches := {}
+	var beside := deck_index(data.railways, m2u)
+	if not beside.is_empty():
+		beside["decks"] = RailDecks.of(data, surf, m2u)
 	for w in data.railways:
 		if abort != null and abort.requested:
 			return
-		_way(batches, w, surf, spans, m2u, data, road_index)
+		_way(batches, w, surf, spans, m2u, data, road_index, beside)
 	for key in batches:
 		var b: RoadBuilder._Batch = batches[key]
 		if b.indices.is_empty():
@@ -120,12 +148,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Rail_" + str(key)
 		mi.mesh = b.mesh()
 		mi.material_override = _material(str(key))
-		if str(key) != "deck":
+		if not str(key) in ["deck", "deck_brick"]:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
 static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
-		spans: Array, m2u: float, data: LocationData = null, road_index = null) -> void:
+		spans: Array, m2u: float, data: LocationData = null, road_index = null, beside: Dictionary = {}) -> void:
 	if not (w is Dictionary) or bool((w as Dictionary).get("tunnel", false)):
 		return
 	var way: Dictionary = w
@@ -145,12 +173,14 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 				_rails(RoadBuilder._batch(batches, "rail"), dense, deck, gauge, 0.0, m2u, RAIL_LAYER)
 			return
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, piece, gauge, bed, surf, m2u)
+			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), gauge, bed, surf, m2u, beside)
 		return
 	var embedded := bool(way.get("embedded", false))
 	for run in RoadBuilder._dry_runs(dense, surf):
 		var ys := PackedFloat32Array()
 		var lift := (STREET_RAIL_LIFT_M if embedded else BED_LIFT_M + RAIL_HEIGHT_M) * m2u
+		if embedded and bool(way.get("cable", false)):
+			lift = (RoadBuilder.lift_for_layer(CABLE_BED_LAYER) + CABLE_RAIL_CLEAR_M) * m2u
 		for p in run:
 			ys.append(surf.height(p.x, p.y) + lift)
 		if embedded:
@@ -168,9 +198,9 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			if bool(way.get("cable", false)):
 				# A concrete track bed in the asphalt, and the cable slot:
 				# two steel slot rails either side of a gap.
-				RoadBuilder._ribbon(RoadBuilder._batch(batches, "track_bed"),
+				RoadBuilder._ribbon(RoadBuilder._batch(batches, "cable_bed"),
 					RoadBuilder._straighten(run, surf.step), gauge + CABLE_BED_M * m2u, surf,
-					STREET_RAIL_LIFT_M * 0.6 * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
+					RoadBuilder.lift_for_layer(CABLE_BED_LAYER) * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
 				_rails(RoadBuilder._batch(batches, "rail"), run, ys, CABLE_SLOT_M * m2u, 0.0, m2u, RAIL_LAYER)
 		else:
 			RoadBuilder._ribbon(RoadBuilder._batch(batches, "ballast"),
@@ -179,10 +209,47 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			_rails(RoadBuilder._batch(batches, "rail"), run, ys, gauge,
 				RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
 
+## Points along every bridge track, by BESIDE_CELL_M cell: a station's
+## viaduct is mapped a bridge way per track, and each drawn with its own
+## parapets stood a wall between every pair of tracks.
+static func deck_index(railways: Array, m2u: float) -> Dictionary:
+	var index := {}
+	for w in railways:
+		if not (w is Dictionary) or not bool((w as Dictionary).get("bridge", false)) \
+				or bool((w as Dictionary).get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		for p in RoadBuilder._resample(pts, 2.0 * m2u):
+			var cell := Vector2i((p / (BESIDE_CELL_M * m2u)).floor())
+			if not index.has(cell):
+				index[cell] = PackedVector2Array()
+			var cell_pts: PackedVector2Array = index[cell]
+			cell_pts.append(p)
+			index[cell] = cell_pts
+	return index
+
+## Whether another bridge track runs within BESIDE_M of `mid` on the
+## side `out` points to (unit; `along` the track there).
+static func deck_beside(index: Dictionary, mid: Vector2, out: Vector2, m2u: float) -> bool:
+	var along := Vector2(out.y, -out.x)
+	var cell := Vector2i((mid / (BESIDE_CELL_M * m2u)).floor())
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var cell_pts: PackedVector2Array = index.get(cell + Vector2i(dx, dz), PackedVector2Array())
+			for q in cell_pts:
+				var v := q - mid
+				var side := v.dot(out)
+				if side > BESIDE_MIN_M * m2u and side < BESIDE_M * m2u and absf(v.dot(along)) < 3.0 * m2u:
+					return true
+	return false
+
 ## Deck (RoadBuilder's slab, fascias and parapets) with a ballast top,
-## and the rails on it.
+## and the rails on it. An edge another bridge track runs beside
+## (`beside`, deck_index) carries no parapet.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
-		bed: float, surf: RoadBuilder._Surface, m2u: float) -> void:
+		bed: float, surf: RoadBuilder._Surface, m2u: float, beside: Dictionary = {}) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
@@ -192,18 +259,82 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 	var top := RoadBuilder._batch(batches, "rail_deck")
 	top.pad()
 	var k0 := top.verts.size()
-	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck")
+	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5, 0, false)
+	if deck.size() != inside.size():
+		return
+	var fit := {"deck": deck, "side": "deck_brick", "metric_v": true}
+	if beside.has("decks"):
+		# Level with the tracks alongside; the fascia still reaches down to
+		# where the deck stood on its own.
+		var low := PackedFloat32Array()
+		for d in deck:
+			low.append(d - RoadBuilder.DECK_DEPTH_M * m2u)
+		deck = (beside["decks"] as RailDecks).level(inside, deck)
+		fit["deck"] = deck
+		fit["low"] = low
+	if not beside.is_empty():
+		var left := PackedByteArray()
+		var right := PackedByteArray()
+		for i in inside.size() - 1:
+			var mid := (inside[i] + inside[i + 1]) * 0.5
+			var out := RoadBuilder._side(inside, i).normalized()
+			left.append(1 if deck_beside(beside, mid, out, m2u) else 0)
+			right.append(1 if deck_beside(beside, mid, -out, m2u) else 0)
+		fit["open"] = [left, right]
+	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck", "unknown", 0, fit)
 	top.pad()
 	for i in range(k0, top.verts.size()):
 		top.uv2s[i] = Vector2(bed / m2u, BED_LAYER)
-	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5)
-	if deck.size() != inside.size():
-		return
+	if beside.has("decks"):
+		_fill(top, inside, deck, bed, beside["decks"], m2u)
 	var ys := PackedFloat32Array()
 	for d in deck:
 		ys.append(d + RAIL_HEIGHT_M * m2u)
 	_rails(RoadBuilder._batch(batches, "rail"), inside, ys, gauge,
 		RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
+
+## The slab between a viaduct's track groups: along `pts` (deck heights
+## `deck`), where a track `decks.across` stands FILL_MIN_M to LEVEL_M off
+## to the left, a ballast strip from this deck's left edge to that
+## track's near edge, on the deck level. One track of each pair fills (the
+## left one sees its neighbour on its left, the other sees none there),
+## so no gap is laid twice. Both ends of a segment must have a neighbour
+## and the one level, or the strip is left out (a viaduct's ends).
+static func _fill(top: RoadBuilder._Batch, pts: PackedVector2Array, deck: PackedFloat32Array,
+		bed: float, decks: RailDecks, m2u: float) -> void:
+	var half := bed * 0.5
+	var rows: Array = []
+	for i in pts.size():
+		var dir := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)]).normalized()
+		var hit := decks.across(pts[i], dir)
+		if hit.is_empty() or absf(float(hit["h"]) - deck[i]) > 0.05 * m2u:
+			rows.append([])
+			continue
+		var out := Vector2(-dir.y, dir.x)
+		var near_edge: Vector2 = pts[i] + out * half
+		var far_edge: Vector2 = (hit["at"] as Vector2) - out * half
+		rows.append([near_edge, far_edge])
+	var along := 0.0
+	for i in pts.size() - 1:
+		var seg := pts[i].distance_to(pts[i + 1])
+		var a: Array = rows[i]
+		var b: Array = rows[i + 1]
+		if not a.is_empty() and not b.is_empty():
+			var k := top.verts.size()
+			var span_a: float = (a[0] as Vector2).distance_to(a[1])
+			var span_b: float = (b[0] as Vector2).distance_to(b[1])
+			if span_a > 0.2 * m2u and span_b > 0.2 * m2u:
+				var ends := [[a[0], deck[i], 0.0, span_a, along], [a[1], deck[i], span_a, span_a, along],
+					[b[0], deck[i + 1], 0.0, span_b, along + seg], [b[1], deck[i + 1], span_b, span_b, along + seg]]
+				for e: Array in ends:
+					var q: Vector2 = e[0]
+					top.verts.append(Vector3(q.x, float(e[1]), q.y))
+					top.normals.append(Vector3.UP)
+					top.uvs.append(Vector2(float(e[2]) / m2u / 4.0, float(e[4]) / m2u / 4.0))
+					top.colors.append(Color(0, 0.5, 0, 1))
+					top.uv2s.append(Vector2(float(e[3]) / m2u, BED_LAYER))
+				RoadBuilder._quad_up(top, k, k + 1, k + 2, k + 3)
+		along += seg
 
 ## Two rails `gauge` apart along `line`, head tops at `ys`: a flat head
 ## strip, plus side walls `height` deep for rails standing on a bed.
@@ -270,13 +401,18 @@ static func _material(key: String) -> Material:
 			# Depth-layered like the road ribbons (a plain PBR deck would
 			# z-fight the asphalt it is set in).
 			m = RoadSurface.paved_material("pavement", Color.html(TRACK_BED_HEX).srgb_to_linear())
+		"cable_bed":
+			# Poured concrete: paving slabs read as a footway down the middle of the street.
+			m = RoadSurface.paved_material("concrete", Color.html(CABLE_BED_HEX).srgb_to_linear())
 		"rail":
 			var rsh := Shader.new()
-			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL)
+			rsh.code = RAIL_CODE.replace("// @DEPTH", RoadSurface.DEPTH_GLSL).replace("// @SNOW", ClimateModel.SNOW_GLSL)
 			var rm := ShaderMaterial.new()
 			rm.shader = rsh
 			rm.set_shader_parameter("steel", Color.html(STEEL_HEX))
 			m = rm
+		"deck_brick":
+			m = RoadBuilder._pbr("brick", VIADUCT_BRICK_HEX)
 		_:
 			m = RoadBuilder._material(key)
 	_mats[key] = m

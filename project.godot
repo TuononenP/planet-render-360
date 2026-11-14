@@ -93,6 +93,26 @@ climate_water_ice={
 "type": "float",
 "value": 0.0
 }
+street_lamp_glow={
+"type": "float",
+"value": 0.0
+}
+street_lamp_tint={
+"type": "vec3",
+"value": Vector3(1, 0.9, 0.78)
+}
+street_lamp_near={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+street_lamp_settle={
+"type": "sampler2D",
+"value": ""
+}
+street_lamp_settle_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 cloud_shadow_cover={
 "type": "float",
 "value": 0.0
@@ -108,6 +128,26 @@ cloud_shadow_stretch={
 cloud_sun_dir={
 "type": "vec3",
 "value": Vector3(0, 1, 0)
+}
+valley_haze_y={
+"type": "float",
+"value": 0.0
+}
+valley_haze_col={
+"type": "vec3",
+"value": Vector3(0.7, 0.75, 0.8)
+}
+far_fog_density={
+"type": "float",
+"value": 4.5e-05
+}
+street_heights={
+"type": "sampler2D",
+"value": ""
+}
+street_heights_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
 }
 
 [gui]

@@ -13,12 +13,22 @@ extends RefCounted
 ## ± lightness and ± warm/cool shift of a roof's tint.
 const SPREAD := 0.18
 const WARMTH := 0.05
+## Share of a pitched roof's colour left at its eaves, and the least rise (m)
+## that counts as pitched.
+const EAVE_SHADE := 0.86
+const WEATHER_MIN_RISE_M := 0.5
+## Mesh meta: a colour multiplied into its wall surfaces' tint.
+const WALL_TINT := "wall_tint"
 
 ## Tags `m` as a roof material: RoofSnow overlays it while snow lies, and
-## it multiplies the per-building vertex tint into its albedo.
+## it multiplies the per-building vertex tint into its albedo. A photo set's
+## normal map comes assigned but off; metals tune and enable their own first.
 static func mark(m: BaseMaterial3D) -> void:
 	m.set_meta("roof", true)
 	m.vertex_color_use_as_albedo = true
+	if m.normal_texture != null and not m.normal_enabled:
+		m.normal_enabled = true
+		m.normal_scale = PbrTextures.PHOTO_NORMAL_SCALE
 
 static func is_roof(m: Material) -> bool:
 	return m != null and m.has_meta("roof")
@@ -51,6 +61,7 @@ static func tint(root: Node, first: int, x: float, z: float, chroma: float = 0.0
 		tone: float = 0.0, wall_vt: Color = Color.WHITE, roof_vt: Color = Color.WHITE) -> void:
 	var c := tint_for(x, z, chroma * ROOF_CHROMA, tone) * roof_vt
 	var wall_c := WallVariety.tint_for(x, z, chroma, tone) * wall_vt
+	var foot := _wall_foot(root, first)
 	for k in range(first, root.get_child_count()):
 		var mi := root.get_child(k) as MeshInstance3D
 		if mi == null or not (mi.mesh is ArrayMesh):
@@ -62,12 +73,33 @@ static func tint(root: Node, first: int, x: float, z: float, chroma: float = 0.0
 				else _surface_material(mesh, s)
 			hit = hit or is_roof(sm) or WallVariety.is_wall(sm)
 		if hit:
-			mi.mesh = _recoloured(mesh, mi.material_override, c, wall_c)
+			mi.mesh = _recoloured(mesh, mi.material_override, c, wall_c, foot)
+
+## Lowest wall vertex of one building's meshes: its storey bands are separate
+## surfaces, and the foot shade must start once, at the ground.
+static func _wall_foot(root: Node, first: int) -> float:
+	var foot := INF
+	for k in range(first, root.get_child_count()):
+		var mi := root.get_child(k) as MeshInstance3D
+		if mi == null or not (mi.mesh is ArrayMesh):
+			continue
+		var mesh := mi.mesh as ArrayMesh
+		for s in MeshArrays.surface_count(mesh):
+			var sm := mi.material_override if mi.material_override != null \
+				else _surface_material(mesh, s)
+			if WallVariety.is_wall(sm):
+				var verts: PackedVector3Array = MeshArrays.surface(mesh, s)[Mesh.ARRAY_VERTEX]
+				if WallVariety._native:
+					foot = minf(foot, ClassDB.class_call_static("TintKernels", "min_y", verts))
+					continue
+				for v in verts:
+					foot = minf(foot, v.y)
+	return foot
 
 ## `mesh` rebuilt with colour `c` on its roof surfaces, from its kept
 ## arrays (no server read-back on the build thread).
 ## A held mesh (MeshArrays.hold) is coloured in place: its first upload.
-static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color) -> ArrayMesh:
+static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color, foot: float) -> ArrayMesh:
 	var held := mesh.get_surface_count() == 0
 	var src: Array = []
 	for s in MeshArrays.surface_count(mesh):
@@ -75,22 +107,51 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 	var out := mesh if held else ArrayMesh.new()
 	if held:
 		out.set_meta(MeshArrays.META, [])
+	var kept := 0
 	for s in src.size():
 		var mat := _surface_material(mesh, s)
 		var arrays: Array = (src[s] as Array).duplicate()
+		# An empty surface has nothing to colour and cannot be uploaded.
+		if (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+			continue
 		var active := over if over != null else mat
 		if is_roof(active):
-			var cols := PackedColorArray()
-			cols.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
-			cols.fill(c)
-			arrays[Mesh.ARRAY_COLOR] = cols
+			arrays[Mesh.ARRAY_COLOR] = weathered(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_NORMAL], c)
 		elif WallVariety.is_wall(active):
-			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c)
+			# A gable end carries its wall's paint on a shared white render.
+			var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
+			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		if mat != null:
-			out.surface_set_material(s, mat)
+			out.surface_set_material(kept, mat)
+		kept += 1
 		MeshArrays.keep_surface(out, arrays)
 	return out
+
+## Per-vertex colours of one roof surface: `c`, on a pitched surface darkened
+## toward the eaves (run-off and dirt) and, where it faces north, leaning to
+## moss. Only ever darkens: vertex colours stop at 1. Flat surfaces stay `c`.
+static func weathered(verts: PackedVector3Array, normals: PackedVector3Array, c: Color) -> PackedColorArray:
+	if WallVariety._native:
+		return ClassDB.class_call_static("TintKernels", "roof_colours", verts, normals, c,
+			WEATHER_MIN_RISE_M * WorldScale.metres_to_units(), EAVE_SHADE)
+	var y0 := INF
+	var y1 := -INF
+	for v in verts:
+		y0 = minf(y0, v.y)
+		y1 = maxf(y1, v.y)
+	var cols := PackedColorArray()
+	cols.resize(verts.size())
+	var rise := y1 - y0
+	if rise < WEATHER_MIN_RISE_M * WorldScale.metres_to_units():
+		cols.fill(c)
+		return cols
+	for i in verts.size():
+		var k := lerpf(EAVE_SHADE, 1.0, (verts[i].y - y0) / rise)
+		var north := clampf(-normals[i].z, 0.0, 1.0)
+		cols[i] = Color(c.r * k * (1.0 - 0.09 * north), c.g * k * (1.0 - 0.02 * north),
+			c.b * k * (1.0 - 0.11 * north))
+	return cols
 
 ## Surface `s`'s material; none on a held mesh (MeshArrays.mesh sets none).
 static func _surface_material(mesh: ArrayMesh, s: int) -> Material:

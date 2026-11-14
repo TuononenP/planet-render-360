@@ -27,8 +27,12 @@ signal zoom_past_min
 const MIN_ZOOM := 4
 const MAX_ZOOM := 15
 const TAP_MAX_PX := 14.0
-## Summed trackpad scroll that counts as one zoom step.
-const SCROLL_ZOOM_NOTCH := 3.0
+## Summed trackpad / smooth-mouse scroll that counts as one zoom step.
+const SCROLL_ZOOM_NOTCH := 1.0
+## A pause in scroll events this long ends a gesture. Within one gesture,
+## same-direction scroll after a step is dropped, so a flick and its
+## momentum tail step once instead of trickling steps in after it stops.
+const SCROLL_ZOOM_GAP_MS := 220
 ## Zoom levels between the coarse preview and full detail.
 const PREVIEW_DROP := 2
 ## How far up the tile pyramid _draw looks for a stand-in texture.
@@ -143,6 +147,8 @@ var _last_tap_msec := 0
 var _last_tap_pos := Vector2.ZERO
 var _magnify_accum := 1.0
 var _scroll_accum := 0.0
+var _scroll_last_msec := -SCROLL_ZOOM_GAP_MS
+var _scroll_step_dir := 0.0  # direction this gesture already stepped, 0 if none
 var _panel_touches: Dictionary = {}  # touch index -> canvas position, for pinches on a panel
 var _panel_pinch_base := 0.0
 
@@ -190,10 +196,14 @@ func _ready() -> void:
 		_marker.queue_redraw())
 	refresh_tiles()
 
-func set_lat_lon(lat: float, lon: float) -> void:
+## `warm` (a searched or listed place, not a tap or drag) also fetches every
+## other zoom here in the background, so zooming in on it is quick.
+func set_lat_lon(lat: float, lon: float, warm: bool = false) -> void:
 	centre_lat = lat
 	centre_lon = lon
 	refresh_tiles()
+	if warm and _vector != null:
+		_vector.prefetch_around(lat, lon)
 	queue_redraw()
 	if _pin != null:
 		_pin.ping()
@@ -207,21 +217,20 @@ func zoom_in() -> void:
 func zoom_out() -> void:
 	zoom_at(_focus(), -1)
 
-## Zoom by whole tile steps, keeping the place under `at` under `at`.
+## Zoom by whole tile steps around the centre; `at` is unused so the picked coordinates stay.
 func zoom_at(at: Vector2, steps: int) -> void:
 	var new_zoom := clampi(zoom_level + steps, MIN_ZOOM, MAX_ZOOM)
 	if new_zoom == zoom_level:
 		if steps < 0 and zoom_level == MIN_ZOOM:
 			zoom_past_min.emit()
 		return
-	var anchor := TileFetcher.lat_lon_from_pixel(
-		TileFetcher.global_pixel(centre_lat, centre_lon, zoom_level) + (at - _focus()),
-		zoom_level)
-	var anchor_px := TileFetcher.global_pixel(anchor.x, anchor.y, new_zoom)
+	# The centre (the picked coordinates) stays put: zooming only rescales
+	# the map around it, so scrolling never changes the readout.
 	zoom_level = new_zoom
-	_set_centre_from_pixel(anchor_px - (at - _focus()))
 	refresh_tiles()
-	picked.emit(centre_lat, centre_lon)
+	queue_redraw()
+	if _marker != null:
+		_marker.queue_redraw()
 
 func pan_by_pixels(delta: Vector2) -> void:
 	# Dragging right should pull the map right: the centre moves the
@@ -333,6 +342,7 @@ func _tap(at: Vector2) -> void:
 	var site := landmarks.hit_at(at) if landmarks != null else {}
 	if not site.is_empty():
 		_last_tap_msec = 0  # a marker tap never starts a double tap
+		landmarks.toggle_chip(site)  # the name chip follows the click
 		landmark_picked.emit(site)
 	elif _is_double_tap(at):
 		zoom_at(at, 1)
@@ -492,13 +502,28 @@ func magnify(factor: float, at: Vector2) -> void:
 ## deltas, not wheel clicks: sum them and zoom a step per notch. Scrolling
 ## up (negative y) zooms in, like the wheel.
 func scroll_zoom(delta_y: float, at: Vector2) -> void:
+	scroll_zoom_at_time(delta_y, at, Time.get_ticks_msec())
+
+## scroll_zoom with the event time given, so tests need no real clock.
+func scroll_zoom_at_time(delta_y: float, at: Vector2, now: int) -> void:
+	if delta_y == 0.0:
+		return  # a sideways scroll says nothing about zoom
+	var dir := signf(delta_y)
+	var gap := now - _scroll_last_msec
+	_scroll_last_msec = now
+	if gap >= SCROLL_ZOOM_GAP_MS:
+		# A fresh gesture: nothing left over from an earlier one counts.
+		_scroll_accum = 0.0
+		_scroll_step_dir = 0.0
+	elif dir == _scroll_step_dir:
+		return  # the flick that already stepped, or its momentum
+	if dir != signf(_scroll_accum):
+		_scroll_accum = 0.0  # a reversal is deliberate and starts afresh
 	_scroll_accum += delta_y
-	if _scroll_accum <= -SCROLL_ZOOM_NOTCH:
+	if absf(_scroll_accum) >= SCROLL_ZOOM_NOTCH:
 		_scroll_accum = 0.0
-		zoom_at(at, 1)
-	elif _scroll_accum >= SCROLL_ZOOM_NOTCH:
-		_scroll_accum = 0.0
-		zoom_at(at, -1)
+		_scroll_step_dir = dir
+		zoom_at(at, 1 if dir < 0.0 else -1)
 
 ## Zoom input from a glass panel or scroll area laid over the map (the
 ## sheet, the side panel and the lists in them): the wheel, a trackpad

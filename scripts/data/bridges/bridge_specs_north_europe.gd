@@ -175,20 +175,6 @@ static func rows() -> Array:
 				"eastbound carriageway 219892295 (263 m, bearing 102.7) crosses water from 56.6 to 251.8 m of " +
 				"the way, consistent with the 40-42-40 m spans sitting over the channel when the list runs " +
 				"west to east; the list direction is assumed to be Sorensen-to-Kulosaari"},
-		{"id": "br_helsinki_kruunuvuorensilta", "cc": "FI", "name": "Kruunuvuorensilta", "wiki": "Crown Bridges",
-			"aliases": ["kruunuvuori bridge", "crown bridge helsinki"], "lat": 60.1736, "lon": 25.0022,
-			"bearing": 126.2, "st": "stayed", "spans": [200.0, 260.0], "width": 26.0, "clear": 20.0, "tower": 135.0,
-			"towers": [1], "pylon": "single", "material": "steel", "base": "sea", "tier": 2, "conf": 1,
-			"src": "fi Wikipedia (opened April 2026: 1191 m curved composite cable-stayed bridge, longest span " +
-				"260 m, pylon 135 m, clearance up to 20 m, 17 stay pairs), OSM cycleway way 986936385 (1174 " +
-				"m, bearing 126.2) and Wikipedia 60.17396,25.00244; only the stayed part modelled: side span, " +
-				"width and horizontal curve not represented | verified: fi+en Wikipedia: Kruunuvuorensilta is " +
-				"1191 m, a horizontally curved composite cable-stayed bridge, longest span 260 m, 17 stay " +
-				"pairs, 135 m reinforced-concrete pylon between two islets, clearance up to 20 m, opened to " +
-				"cyclists 18 April 2026; 72 m deck segments; OSM way 986936385 (1152 m, bearing 126.2, mid " +
-				"60.17311,25.00217); span list and the curved plan are not published in the sources found | " +
-				"round 2: verify2: searched and not found - fi Wikipedia re-read: no span list; curved plan " +
-				"not representable"},
 		{"id": "br_copenhagen_langebro", "cc": "DK", "name": "Langebro", "wiki": "Langebro",
 			"aliases": ["long bridge copenhagen"], "lat": 55.67025, "lon": 12.57861, "bearing": 131.6, "st": "bascule",
 			"spans": [106.0, 53.0, 95.0], "width": 30.0, "clear": 7.5, "material": "concrete", "base": "sea", "tier": 2,

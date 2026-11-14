@@ -5,14 +5,17 @@ extends RefCounted
 ## model refinements cannot change the harbour traffic placement rules.
 static func build() -> LandmarkMesh:
 	var lm := LandmarkMesh.new()
-	VesselMaterials.register(lm, true, VesselMaterials.get_mat("orange"))
-	lm.use("Orange", VesselMaterials.get_mat("orange"))
 	var length := HarbourFerries.LENGTH_M
 	var beam := HarbourFerries.BEAM_M
+	var orange := Color("#e0651c")
+	VesselMaterials.register(lm, true, VesselMaterials.get_mat("orange"))
+	lm.use("Hull", ShipPaint.hull(orange, length, 3.4))
+	lm.use("Orange", ShipPaint.enamel(orange))
+	lm.use("White", ShipPaint.enamel(Color("#ebe9e2")))
 	var spec := {"length": length, "beam": beam, "freeboard": 3.4, "draft": 1.8,
 		"entry": 0.27, "bow_pow": 1.65, "flare": 0.09, "bow_rise": 0.12,
 		"stern_rise": 0.12, "double_ended": true, "end_width": 0.4, "lod": 0, "ultra": true}
-	HullLoft.loft(lm, spec, {"hull": "Orange", "boot": "Dark", "bottom": "Bottom", "deck": "White"})
+	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "White"})
 	for level in 3:
 		var y := 3.7 + float(level) * 3.0
 		var deck_len := length - 15.0 - float(level) * 6.0

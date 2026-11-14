@@ -160,8 +160,11 @@ class Canvas:
 
 ## One leaf blade: base at (bx, by), pointing along `ang`, length `ln`,
 ## half-width `hw`. shape: 0 ovate, 1 lanceolate, 2 needle-thin.
+## `blue` is the blue/green ratio, `rib` the midrib luminance factor and
+## `rim` how much the blade darkens toward its edge.
 static func _blade(cv: Canvas, bx: float, by: float, ang: float, ln: float,
-		hw: float, lum: float, hue: float, shape: int) -> void:
+		hw: float, lum: float, hue: float, shape: int, blue: float = 0.78,
+		rib: float = 0.82, rim: float = 0.18) -> void:
 	var d := Vector2(cos(ang), sin(ang))
 	var n := Vector2(-d.y, d.x)
 	var ex := bx + d.x * ln
@@ -188,10 +191,10 @@ static func _blade(cv: Canvas, bx: float, by: float, ang: float, ln: float,
 			if absf(v) > 1.0:
 				continue
 			# Folded blade: one half catches more light; midrib + rim darker.
-			var l := lum * (0.88 + 0.12 * signf(v)) * (1.0 - 0.18 * absf(v) * absf(v))
+			var l := lum * (0.88 + 0.12 * signf(v)) * (1.0 - rim * absf(v) * absf(v))
 			if absf(v) < 0.09 and shape != 2:
-				l *= 0.82
-			cv.put(x, y, Color(l * (0.9 + hue), l, l * (0.78 - hue)))
+				l *= rib
+			cv.put(x, y, Color(l * (0.9 + hue), l, l * (blue - hue)))
 
 ## Thick stroke for twigs/rachis/needles.
 static func _stroke(cv: Canvas, a: Vector2, b: Vector2, wa: float, wb: float,
@@ -231,8 +234,12 @@ static func paint_leaf(kind: String, res: float = 1.0) -> Image:
 			_paint_twigs(cv, rng, s)
 	return cv.to_image(out, out)
 
-## Broadleaf cluster card: 6-8 sub-clumps on twigs from the lower
-## centre, leaves alternate along each twig; open gaps between clumps.
+## Broadleaf cluster card: sub-clumps on short twigs from the lower
+## centre spread over the whole card (one central clump, the rest on a
+## jittered ring), with open gaps between them. Within a clump the
+## shaded under-leaves are painted first and the sunlit outer leaves
+## last, so one card already reads as layered foliage. Near-neutral
+## colour: the material tint sets the hue.
 static func _paint_clumps(cv: Canvas, rng: RandomNumberGenerator, s: float, kind: String) -> void:
 	var twig := Color(0.36, 0.30, 0.24)
 	var leaf_len := 40.0 if kind == "broad" else (30.0 if kind == "birch" else 48.0)
@@ -240,28 +247,36 @@ static func _paint_clumps(cv: Canvas, rng: RandomNumberGenerator, s: float, kind
 	var shape := 0 if kind != "olive" else 1
 	var clumps := 11 if kind != "birch" else 13
 	var root := Vector2(512, 980) * s
+	var ring0 := rng.randf_range(0.0, TAU)
 	for c in clumps:
-		# Clump centres fill a lumpy disc; short stems point at the root.
-		var a := rng.randf_range(0.0, TAU)
-		var rr := sqrt(rng.randf()) * 300.0
-		var centre := Vector2(512, 480) + Vector2(cos(a), sin(a) * 0.9) * rr
+		var centre := Vector2(512, 470)
+		if c > 0:
+			var a := ring0 + TAU * float(c - 1) / float(clumps - 1) + rng.randf_range(-0.2, 0.2)
+			var rr := rng.randf_range(210.0, 310.0) if c % 3 != 0 else rng.randf_range(110.0, 180.0)
+			centre += Vector2(cos(a), sin(a) * 0.92) * rr
 		var tip := centre * s
 		_stroke(cv, tip.lerp(root, 0.35), tip, 6.0 * s, 2.5 * s, twig)
-		var cr := rng.randf_range(115.0, 165.0) * s
-		var leaves := int(rng.randf_range(95.0, 125.0) * (1.4 if kind == "olive" else 1.0))
-		for i in leaves:
+		var cr := rng.randf_range(105.0, 150.0) * s
+		var count := int(rng.randf_range(95.0, 125.0) * (1.4 if kind == "olive" else 1.0))
+		var leaves: Array = []
+		for i in count:
 			# Leaves on short shoots radiating out of the clump centre.
 			var ang := rng.randf_range(0.0, TAU)
 			var dist := sqrt(rng.randf()) * cr
-			var base := tip + Vector2(cos(ang), sin(ang)) * dist * 0.85
 			var la := ang + rng.randf_range(-0.6, 0.6)
 			if kind == "birch":
 				la = lerpf(la, PI * 0.5, 0.45)  # pendulous
-			# Inner leaves sit in shade.
-			var lum := rng.randf_range(0.62, 1.0) * lerpf(0.78, 1.0, dist / cr)
-			_blade(cv, base.x, base.y, la, leaf_len * s * rng.randf_range(0.8, 1.2),
-				leaf_hw * s * rng.randf_range(0.85, 1.15), lum,
-				rng.randf_range(-0.05, 0.05), shape)
+			# Under-leaves and the clump core sit in shade.
+			var under := rng.randf() < 0.35
+			var lum := (rng.randf_range(0.42, 0.62) if under else rng.randf_range(0.72, 1.0)) \
+				* lerpf(0.8, 1.0, dist / cr)
+			leaves.append([lum, tip + Vector2(cos(ang), sin(ang)) * dist * 0.85, la])
+		leaves.sort_custom(func(x: Array, y: Array) -> bool: return float(x[0]) < float(y[0]))
+		for lf in leaves:
+			var base: Vector2 = lf[1]
+			_blade(cv, base.x, base.y, float(lf[2]), leaf_len * s * rng.randf_range(0.8, 1.2),
+				leaf_hw * s * rng.randf_range(0.85, 1.15), float(lf[0]),
+				rng.randf_range(-0.04, 0.06), shape, 0.88, 1.06, 0.32)
 
 ## Spruce/fir branch plume: u = along the branch (trunk at left), side
 ## shoots sweep forward and droop, each densely set with short needles.

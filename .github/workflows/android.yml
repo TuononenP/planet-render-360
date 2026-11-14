@@ -31,11 +31,11 @@ env:
 
 jobs:
   android:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Map packs and OSM snapshots are Git LFS objects.
           lfs: true
@@ -43,25 +43,29 @@ jobs:
       - name: Compute build number
         run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools platforms;android-35 build-tools;35.0.0
 
-      - uses: ./.github/actions/setup-godot-linux
+      - uses: ./.github/actions/setup-godot
 
       - name: Point Godot at the Android SDK and JDK
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import glob, os, re
-          files = glob.glob(os.path.expanduser("~/.config/godot/editor_settings-*.tres"))
+          files = glob.glob(os.path.expanduser("~/Library/Application Support/Godot/editor_settings-*.tres"))
           assert files, "Godot editor settings not found (did the import step run?)"
           path = max(files, key=os.path.getmtime)
+          # The self-hosted runner shares these settings with the desktop
+          # editor: keep a copy so the last step can put them back.
+          open(os.path.join(os.environ["RUNNER_TEMP"], "editor_settings.path"), "w").write(path)
+          open(os.path.join(os.environ["RUNNER_TEMP"], "editor_settings.bak"), "w").write(open(path).read())
           settings = {
               "export/android/android_sdk_path": os.environ["ANDROID_HOME"],
               "export/android/java_sdk_path": os.environ["JAVA_HOME"],
@@ -117,12 +121,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/dist"
           mv ../build/android/PlanetRender360.apk "$RUNNER_TEMP/dist/PlanetRender360-$VERSION-$BUILD_NUMBER.apk"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PlanetRender360-android-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/dist/*.apk
           if-no-files-found: error
 
-      - name: Remove signing material
+      - name: Remove signing material and restore editor settings
         if: always()
-        run: rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/debug.keystore"
+        run: |
+          rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/debug.keystore"
+          if [ -f "$RUNNER_TEMP/editor_settings.bak" ]; then
+            cp "$RUNNER_TEMP/editor_settings.bak" "$(cat "$RUNNER_TEMP/editor_settings.path")"
+          fi

@@ -46,7 +46,8 @@ func _eras() -> void:
 	for row in [["house", "", "helsinki_suburb"], ["house", "helsinki_wood", "helsinki_wood"],
 			["apartments", "helsinki_classicism", "helsinki_classicism"],
 			["apartments", "helsinki", "helsinki"], ["apartments", "helsinki_midrise", "helsinki_midrise"],
-			["apartments", "helsinki_element", "helsinki_element"]]:
+			["apartments", "helsinki_element", "helsinki_element"],
+			["house", "helsinki_villa", "helsinki_villa"], ["apartments", "helsinki_villa", "helsinki_suburb"]]:
 		var cues := base.duplicate()
 		cues["district"] = row[1]
 		_check(BuildingEra._rules("helsinki", row[0], cues) == row[2], "Helsinki era %s" % [row])
@@ -81,6 +82,18 @@ func _relief() -> void:
 	_check(mesh.get_surface_count() >= 4, "granite, tower roof, balcony glass and frames")
 	_check(mesh.get_aabb().end.y >= 26.4, "turret rises above eaves")
 	root_node.free()
+	# A glazed balcony closes its bay: slab to the next floor, full bay wide,
+	# so the window painted on the wall behind cannot show round it.
+	var box_kit := ReliefKit.new()
+	var m := WorldScale.metres_to_units()
+	FacadeRelief._deep_balcony(box_kit, Vector2.ZERO, Vector3.RIGHT, Vector3.BACK, 3.0 * m, 0.0, stone, true, true, 3.0 * m)
+	var box_root := Node3D.new()
+	box_kit.flush(box_root, "GlazedBox")
+	var box := (box_root.get_child(0) as MeshInstance3D).mesh.get_aabb()
+	_check(absf(box.end.y - 3.0 * m) < 0.05 * m, "glazed balcony reaches the next floor (%.2f)" % (box.end.y / m))
+	_check(box.size.x >= 2.99 * m, "glazed balcony spans its bay (%.2f)" % (box.size.x / m))
+	_check(box.size.z >= 1.95 * m and box.size.z <= 2.2 * m, "balcony stands ~2 m out (%.2f)" % (box.size.z / m))
+	box_root.free()
 	var dome_kit := ReliefKit.new()
 	FinlandRelief.corner_dome(dome_kit, sp, {"top": 20.0}, stone)
 	var dome_root := Node3D.new()
@@ -129,6 +142,21 @@ func _wires_and_snow() -> void:
 	_check(int(stats["spans"]) > 0 and int(stats["poles"]) > 0, "electrified tram has wires and fallback poles")
 	_check(int(stats["draw_calls"]) <= OverheadWires.MAX_DRAW_CALLS, "wire draw-call budget")
 	node.free()
+	# A double track 3.5 m apart, the second one long straight segment:
+	# no free pole stands in either bed.
+	data.railways.append(OsmTags._rail_entry({"railway": "tram", "electrified": "contact_line"},
+		PackedVector2Array([Vector2(-1500, 3.5), Vector2(1500, 3.5)])))
+	var m := WorldScale.metres_to_units()
+	var clear := true
+	for span in OverheadWires.plan(data, ground):
+		for support in span["supports"]:
+			var x: float = (support[0] as Vector3).x / m
+			var z: float = (support[0] as Vector3).z / m
+			if not support[1] and ((absf(z) < OverheadWires.TRACK_CLEAR_M and absf(x) <= 80.0)
+					or absf(z - 3.5) < OverheadWires.TRACK_CLEAR_M):
+				clear = false
+	_check(clear, "span poles stay off a parallel track's bed")
+	data.railways.resize(1)
 	data.quality_preset = RenderSettings.Preset.HIGH
 	_check(OverheadWires.plan(data, ground).is_empty(), "wires Ultra only")
 	data.quality_preset = RenderSettings.Preset.ULTRA
@@ -138,11 +166,33 @@ func _wires_and_snow() -> void:
 	_check(_street_wired(data, ground, "US", {"highway": "residential", "trolley_wire": "yes"}),
 		"trolleybus streets have overhead wire outside Finland and Sweden")
 	_check(not _street_wired(data, ground, "US", {"highway": "residential"}), "plain US streets have no overhead wire")
+	data.country = "FI"
+	data.buildings = [{"x": 0.0, "z": 20.0, "height": 12.0}]
+	data.roads = [OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-60, 0), Vector2(60, 0), Vector2(60, 40), Vector2(-60, 40)]), [])]
+	_check(OverheadWires.plan(data, ground).is_empty(), "a paved square's outline has no span lamps")
+	data.buildings = []
 	data.roads = [OsmTags._road_entry({"highway": "residential", "width": "8"},
 		PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
 	data.country = "SE"
 	data.buildings = [{"x": 0.0, "z": 20.0, "height": 12.0}]
 	_check(OverheadWires.plan(data, ground).any(func(span: Dictionary) -> bool: return bool(span["lamp"])), "Swedish urban roads have span lamps")
+	data.roads = [OsmTags._road_entry({"highway": "pedestrian"}, PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
+	_check(OverheadWires.plan(data, ground).is_empty(), "pedestrian streets keep lampposts, no span lamps")
+	# The span cap keeps the spans nearest the eye, whatever the way order.
+	data.country = "US"
+	data.roads = []
+	for k in 16:
+		data.roads.append(OsmTags._road_entry({"highway": "residential", "trolley_wire": "yes"},
+			PackedVector2Array([Vector2(-500, 300 + k * 10), Vector2(500, 300 + k * 10)])))
+	data.roads.append(OsmTags._road_entry({"highway": "residential", "trolley_wire": "yes"},
+		PackedVector2Array([Vector2(-60, 0), Vector2(60, 0)])))
+	var capped := OverheadWires.plan(data, ground)
+	var m_u := WorldScale.metres_to_units()
+	_check(capped.size() == OverheadWires.MAX_SPANS and capped.any(func(span: Dictionary) -> bool:
+		return absf((span["a"] as Vector2).y / m_u) < 1.0), "the span cap keeps the spans nearest the eye")
+	data.roads = [OsmTags._road_entry({"highway": "residential", "width": "8"},
+		PackedVector2Array([Vector2(-70, 20), Vector2(70, 20)]))]
 	data.country = "FI"
 	data.season = LocationData.Season.WINTER
 	node = Node3D.new()
@@ -152,7 +202,7 @@ func _wires_and_snow() -> void:
 	node = Node3D.new()
 	_check(Snowbanks.build(node, data, ground) == 0, "summer has no snowbanks")
 	node.free()
-	_check((ParkedCars._material("body") as ShaderMaterial).shader.code.contains("snow_cover"), "snow on car roofs")
+	_check(CarPaint.shader().code.contains("snow_cover"), "snow on car roofs")
 	_check((StreetFurniture._material("wood") as ShaderMaterial).shader.code.contains("snow_cover"), "snow on benches")
 	_check(StreetProps.lamp_family("nordic", "FI") == "span", "Finnish span lamps")
 	_check(StreetFurniture.furniture_family("nordic", "FI") == "nordic", "Nordic furniture")

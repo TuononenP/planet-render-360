@@ -9,14 +9,27 @@ extends RefCounted
 
 const U = preload("res://scripts/generation/landmarks/cambodia/landmark_kh_util.gd")
 
+## Shared Khmer palette for the Angkor park's temples: the weathered grey
+## sandstone (lichen-darkened, a little warm at golden hour), its lighter
+## mouldings, the porous brown laterite of platforms and enclosure walls
+## (brown, not brick-red), the dark stone roof slabs and worn paving. A
+## temple keeps its own sandstone hex where the stone really differs
+## (Banteay Srei's pink, Banteay Samre's buff); laterite and roofs are one
+## stone across the park.
+const STONE_GREY := "#827B6D"
+const TRIM := "#8C8574"
+const LATERITE := "#74583F"
+const ROOF := "#5E594F"
+const FLAGSTONE := "#7C7668"
+
 ## Registers the keys the Angkor temples draw with: sandstone "Stone" (tint
 ## `stone_hex`) and its lighter mouldings "Trim", "Laterite", the dark
 ## "Roof" slabs, "Dark" doorways and "Moss".
 static func kit(lm: LandmarkMesh, stone_hex: String = "#7D7565") -> void:
 	lm.use("Stone", LandmarkMaterials.pbr("stone", stone_hex, 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("stone", "#8E8672", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A5640", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("stone", "#5F594D", 3.0))
+	lm.use("Trim", LandmarkMaterials.pbr("stone", TRIM, 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LATERITE, 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("stone", ROOF, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#242120", 2.0))
 	lm.use("Moss", LandmarkMaterials.pbr("forest", "#4E5C34", 4.0))
 

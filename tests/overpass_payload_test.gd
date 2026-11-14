@@ -7,6 +7,7 @@ class ReplySequence extends OverpassRequest:
 	var visited: Array[String] = []
 	func _start() -> void:
 		_token += 1
+		_sent += 1
 		visited.append(_endpoints[_attempt])
 		var reply: Array = replies[_attempt]
 		_on_done.call_deferred(HTTPRequest.RESULT_SUCCESS, int(reply[0]),
@@ -86,9 +87,15 @@ func _retry_checks(complete: String, partial: String, errors: Array[String]) -> 
 		{"replies": [[403, "white-listed usages only"], [200, partial], [200, complete]],
 			"attempts": 3, "accepted": true},
 		{"replies": [[400, "invalid query"], [200, complete]], "attempts": 1, "accepted": false},
-		{"replies": [[403, "denied"], [403, "denied"]], "attempts": 2, "accepted": false}]:
+		{"replies": [[403, "denied"], [403, "denied"]], "attempts": 2, "accepted": false},
+		{"replies": [[502, "busy"], [200, complete]], "attempts": 1, "accepted": false,
+			"max_attempts": 1},
+		# A mirror the status check confirmed takes over from a failed instance.
+		{"replies": [[502, "busy"], [200, complete]], "attempts": 2, "accepted": true,
+			"max_attempts": 1, "confirmed": 1}]:
 		var request := ReplySequence.new()
 		request.replies = test["replies"]
+		request.max_attempts = int(test.get("max_attempts", 3))
 		root.add_child(request)
 		var accepted: Array[String] = []
 		var exhausted: Array[int] = []
@@ -97,6 +104,8 @@ func _retry_checks(complete: String, partial: String, errors: Array[String]) -> 
 		var endpoints: Array[String] = []
 		for i in request.replies.size():
 			endpoints.append("fixture://mirror-%d" % i)
+		if test.has("confirmed"):
+			OverpassRequest.confirm(endpoints[int(test["confirmed"])])
 		request.run("data=fixture", func(text: String) -> String:
 			return "" if OsmFetcher._payload_usable(text) else "invalid payload", endpoints)
 		var start := Time.get_ticks_msec()
@@ -111,3 +120,4 @@ func _retry_checks(complete: String, partial: String, errors: Array[String]) -> 
 			errors.append("invalid queries and exhausted mirrors must fail with the correct attempt count")
 		request.queue_free()
 		await process_frame
+		OverpassRequest.clear_cooldowns()

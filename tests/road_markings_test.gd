@@ -27,8 +27,11 @@ func _place(country: String = "") -> LocationData:
 func _road(a: Vector2, mid: Vector2, b: Vector2, oneway: int = 0) -> Dictionary:
 	return {"class": "residential", "width_m": 8.0, "oneway": oneway, "points": PackedVector2Array([a, mid, b])}
 
-func _four_way() -> Array:
-	return [_road(Vector2(-100, 0), Vector2(0, 0), Vector2(100, 0)), _road(Vector2(0, -100), Vector2(0, 0), Vector2(0, 100))]
+func _four_way(cls: String = "residential") -> Array:
+	var roads := [_road(Vector2(-100, 0), Vector2(0, 0), Vector2(100, 0)), _road(Vector2(0, -100), Vector2(0, 0), Vector2(0, 100))]
+	for r: Dictionary in roads:
+		r["class"] = cls
+	return roads
 
 func _crossing(a: Vector2, b: Vector2, extra: Dictionary = {}) -> Dictionary:
 	var tags := {"highway": "footway", "footway": "crossing"}
@@ -69,12 +72,252 @@ func _check(ok: bool, what: String) -> void:
 	if not ok:
 		failures.append(what)
 
-func _run() -> void:
-	failures.clear()
-	# Apron and inferred zebras at a plain four-way.
+## Wear seeds: a split street ages as one, a side street on its own, and
+## the order of the road list changes nothing.
+func _check_wear_seeds() -> void:
+	var west := _road(Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0))
+	var east := _road(Vector2(0, 0), Vector2(50, 0), Vector2(100, 0))
+	var side := _road(Vector2(0, 0), Vector2(0, 50), Vector2(0, 100))
+	var d := _place()
+	d.roads = [west, east, side]
+	var seeds := RoadSurface.wear_seeds(d)
+	_check(is_equal_approx(seeds[0], seeds[1]), "a street split into two ways keeps one wear seed")
+	_check(not is_equal_approx(seeds[0], seeds[2]), "a side street gets its own wear seed")
+	d.roads = [side, east, west]
+	var again := RoadSurface.wear_seeds(d)
+	_check(is_equal_approx(again[2], seeds[0]) and is_equal_approx(again[0], seeds[2]),
+		"wear seeds do not depend on the road order")
+	_check(RoadSurface.wear_attr(true, 0.0) >= 0.5 and RoadSurface.wear_attr(true, 1.0) < 1.0,
+		"an urban ribbon stays in the upper half of COLOR.b at any seed")
+	_check(RoadSurface.wear_attr(false, 1.0) < 0.5, "a rural ribbon stays in the lower half of COLOR.b at any seed")
+
+## An apron follows its kerbs and takes the finish of the roads it joins.
+func _check_apron_shape() -> void:
 	var d := _place()
 	d.roads = _four_way()
 	var p := _plan(d)
+	_check(p.aprons.size() == 1 and p.apron_arms.size() == 1, "one apron with its arms")
+	if p.aprons.size() != 1:
+		return
+	var ring: PackedVector2Array = p.aprons[0]
+	_check(Geometry2D.is_point_in_polygon(Vector2(4.5, 4.5), ring), "the kerb corner curves into the junction's corner")
+	_check(not Geometry2D.is_point_in_polygon(Vector2(6.2, 6.2), ring), "the pavement keeps its corner: an apron is not a hull")
+	var paved := _road(Vector2(-100, 0), Vector2(0, 0), Vector2(100, 0))
+	paved["surface"] = "paving_stones"
+	var paved2 := paved.duplicate()
+	paved2["points"] = PackedVector2Array([Vector2(0, -100), Vector2(0, 0), Vector2(0, 100)])
+	var side := _road(Vector2(0, 0), Vector2(70, 70), Vector2(100, 100))
+	d.roads = [paved, paved2, side]
+	var surf := RoadBuilder._Surface.new(d, GroundTruth.new(d))
+	_check(RoadMarkings.apron_finish([[0, 8.0], [1, 8.0], [2, 4.0]], d, surf, 1.0) == "sett",
+		"an apron among paved streets is paved")
+	_check(RoadMarkings.apron_finish([[0, 2.0], [2, 8.0]], d, surf, 1.0) == "asphalt",
+		"the wider road sets the apron's finish")
+
+## The paint layer's lane layout, dash chains, crossing clips and styles.
+func _check_paint() -> void:
+	var plain := RoadPaint.lane_lines(6.0, 2, false, 1, true, 0.12)
+	_check(plain.size() == 1 and is_equal_approx(float(plain[0]["x"]), 0.0) and bool(plain[0]["centre"]),
+		"a plain two-lane street has one centre line")
+	var parked := RoadPaint.lane_lines(8.2, 2, false, 1, true, 0.12, Vector2(0.0, 2.2))
+	var centre := 0.0
+	for l: Dictionary in parked:
+		if bool(l["centre"]):
+			centre = float(l["x"])
+	_check(is_equal_approx(centre, 1.1), "parking on the right moves the centre line left: %.2f" % centre)
+	_check(not parked.any(func(l: Dictionary) -> bool: return bool(l["solid"])), "a side street's parking lane has no line")
+	var main_parked := RoadPaint.lane_lines(8.2, 2, false, 2, true, 0.12, Vector2(0.0, 2.2))
+	_check(main_parked.any(func(l: Dictionary) -> bool: return bool(l["solid"]) and is_equal_approx(float(l["x"]), -1.9)),
+		"a line marks off a main road's tagged parking lane")
+	# Kerbside room inferred from the sidewalks moves the lanes in, and paints nothing.
+	var hyde := RoadPaint.lane_lines(12.0, 0, false, 1, true, 0.125, Vector2(2.5, 2.5), 0,
+		{"class": "tertiary", "inferred_parking": true, "double_centre": true})
+	_check(hyde.size() == 2 and hyde.all(func(l: Dictionary) -> bool: return bool(l["centre"]) and bool(l["solid"])),
+		"an unlaned US town street has a double centre line and nothing else: %s" % [hyde])
+	var inferred_main := RoadPaint.lane_lines(14.0, 2, false, 2, true, 0.12, Vector2(2.5, 2.5), 0, {"inferred_parking": true})
+	_check(not inferred_main.any(func(l: Dictionary) -> bool: return not bool(l["centre"])), "inferred parking is never marked off")
+	_check(not RoadPaint.lane_lines(12.0, 2, false, 2, true, 0.12, Vector2.ZERO, 0, {"class": "primary"}).any(
+		func(l: Dictionary) -> bool: return not bool(l["centre"])), "a kerbed main street in town has no edge lines")
+	_check(RoadPaint.lane_lines(12.0, 2, false, 2, false, 0.12, Vector2.ZERO, 0, {"class": "primary"}).filter(
+		func(l: Dictionary) -> bool: return bool(l["solid"]) and not bool(l["centre"])).size() == 2, "an open main road has both edge lines")
+	_check(RoadPaint.lane_lines(12.0, 2, true, 2, true, 0.12, Vector2.ZERO, 0, {"class": "motorway"}).filter(
+		func(l: Dictionary) -> bool: return bool(l["solid"])).size() == 2, "a motorway keeps its edge lines in town")
+	var houses := _place()
+	houses.buildings = [{"x": 20.0, "z": 18.0, "size_x": 10.0, "size_z": 10.0, "height": 9.0}]
+	var house_grid := RoadMarkings._building_grid(houses, 1.0)
+	_check(RoadPaint.built_up(PackedVector2Array([Vector2(-40, 0), Vector2(40, 0)]), house_grid, 1.0), "a street past a house is in town")
+	_check(not RoadPaint.built_up(PackedVector2Array([Vector2(-40, 200), Vector2(40, 200)]), house_grid, 1.0), "a road in open country is not")
+	_check(RoadPaint.lane_lines(8.0, 0, false, 1, true, 0.12, Vector2.ZERO, 0, {"class": "residential"}).is_empty(),
+		"a side street with no lanes tagged has no lines")
+	_check(RoadPaint.lane_lines(8.0, 2, false, 1, true, 0.12, Vector2.ZERO, 0, {"class": "residential"}).size() == 1,
+		"a side street tagged with two lanes has its centre line")
+	_check(RoadPaint.lane_lines(8.0, 2, false, 1, true, 0.12, Vector2.ZERO, 0, {"unmarked": true}).is_empty(),
+		"lane_markings=no paints nothing")
+	_check(RoadPaint.lane_lines(8.0, 0, true, 1, true, 0.12, Vector2.ZERO, 0, {"class": "tertiary"}).is_empty(),
+		"an unlaned one-way street is one lane")
+	_check(RoadPaint.lane_lines(10.0, 0, true, 2, false, 0.12).filter(func(l: Dictionary) -> bool: return not bool(l["solid"])).size() == 2,
+		"an unlaned 10 m one-way main road has three lanes")
+	# Three lanes: opposing traffic meets off the middle, on a lane boundary.
+	var three := RoadPaint.lane_lines(9.9, 3, false, 1, true, 0.12)
+	var c3 := three.filter(func(l: Dictionary) -> bool: return bool(l["centre"]))
+	_check(c3.size() == 1 and is_equal_approx(float(c3[0]["x"]), 1.65), "two lanes forward put the centre line left of the middle: %s" % [three])
+	_check(three.size() == 2 and three.any(func(l: Dictionary) -> bool: return is_equal_approx(float(l["x"]), -1.65) and not bool(l["centre"])),
+		"the other boundary is a lane divider: %s" % [three])
+	c3 = RoadPaint.lane_lines(9.9, 3, false, 1, true, 0.12, Vector2.ZERO, 0, {"forward": 1, "backward": 2}) \
+		.filter(func(l: Dictionary) -> bool: return bool(l["centre"]))
+	_check(c3.size() == 1 and is_equal_approx(float(c3[0]["x"]), -1.65), "lanes:forward=1 moves it to the right")
+	_check(RoadPaint.lane_lines(6.0, 2, false, 1, true, 0.12, Vector2.ZERO, 0, {"rails": [[0.2, 0.98]]}).is_empty(),
+		"no line is painted along a rail set in the street")
+	var rail_grid := {}
+	RoadMarkings._grid_add(rail_grid, Vector2(-100, 1.6), Vector2(100, 1.6), [Vector2(-100, 1.6), Vector2(100, 1.6), 0, 0.98], 1.0)
+	var along := RoadPaint.rails_along(PackedVector2Array([Vector2(-50, 0), Vector2(50, 0)]), rail_grid, 6.0, 1.0)
+	_check(along.size() == 1 and is_equal_approx(float(along[0][0]), -1.6), "a track to the south of eastbound travel is on its right: %s" % [along])
+	_check(RoadPaint.rails_along(PackedVector2Array([Vector2(0, -50), Vector2(0, 50)]), rail_grid, 6.0, 1.0).is_empty(),
+		"a track crossing the street is not along it")
+	var squeezed := RoadPaint.lane_lines(6.0, 2, false, 1, true, 0.12, Vector2(2.2, 2.2))
+	_check(squeezed.size() == 1 and is_equal_approx(float(squeezed[0]["x"]), 0.0), "lanes keep the road when strips leave no room")
+	_check(RoadPaint.lane_lines(4.0, 1, false, 1, true, 0.12).is_empty(), "a narrow lane gets no lines")
+	var bike := RoadPaint.lane_lines(9.0, 2, false, 1, true, 0.12, Vector2.ZERO, 2)
+	_check(bike.any(func(l: Dictionary) -> bool: return bool(l["solid"]) and is_equal_approx(float(l["x"]), -3.0)),
+		"a bike lane is marked off its 1.5 m from the right kerb")
+	_check(OsmTags.cycle_lane_sides({"cycleway:right": "lane"}) == 2, "cycleway:right=lane is the right side")
+	_check(OsmTags.cycle_lane_sides({"cycleway": "lane"}) == 3, "cycleway=lane on a two-way road is both sides")
+	_check(OsmTags.cycle_lane_sides({"cycleway": "lane", "oneway": "yes"}) == 2, "cycleway=lane on a one-way road is one side")
+	_check(RoadPaint.style_for("US", "urban") == [3.05, 9.14, 0.125], "US dashes follow the MUTCD")
+	_check(RoadPaint.style_for("AT", "motorway")[1] == 12.0, "Austrian motorway gaps are 12 m")
+	_check(RoadPaint.style_for("XX", "urban") == RoadPaint.STYLES[""]["urban"], "an unlisted country uses the default")
+	# A street split in two is one chain; a side street is its own.
+	var d := _place()
+	var a := _road(Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0))
+	var b := _road(Vector2(0, 0), Vector2(50, 0), Vector2(100, 0))
+	var side := _road(Vector2(0, 0), Vector2(0, 50), Vector2(0, 100))
+	var wider := _road(Vector2(100, 0), Vector2(150, 0), Vector2(200, 0))
+	wider["width_m"] = 12.0
+	wider["parking_m"] = 4.0
+	# Drawn the other way round, as mappers do.
+	var back := _road(Vector2(300, 0), Vector2(250, 0), Vector2(200, 0))
+	var laned := _road(Vector2(300, 0), Vector2(350, 0), Vector2(400, 0))
+	laned["lanes"] = 4
+	d.roads = [a, b, side, wider, back, laned]
+	var chains := RoadPaint.line_chains(d, PackedInt32Array([0, 1, 2, 3, 4, 5]))
+	_check(chains.size() == 3, "split ways join; a turn or a new layout starts a chain, got %d: %s" % [chains.size(), chains])
+	_check(chains.any(func(c: Array) -> bool: return c == [0, 1, 3, ~4]),
+		"the street is one chain through a width change and a reversed way: %s" % [chains])
+	var oneway_a := _road(Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0), 1)
+	var oneway_b := _road(Vector2(100, 0), Vector2(50, 0), Vector2(0, 0), 1)
+	d.roads = [oneway_a, oneway_b]
+	_check(RoadPaint.line_chains(d, PackedInt32Array([0, 1])).size() == 2, "one-ways meeting head on are two streets")
+	oneway_b["oneway"] = -1
+	_check(RoadPaint.line_chains(d, PackedInt32Array([0, 1])).size() == 1, "a one-way drawn backwards runs on")
+	# A crossing's paint stops at the kerb.
+	var grid := {}
+	RoadMarkings._grid_add(grid, Vector2(-100, 0), Vector2(100, 0), [Vector2(-100, 0), Vector2(100, 0), 4.5], 1.0)
+	var runs := RoadCrossingClip.on_road_runs(PackedVector2Array([Vector2(0.3, -20.4), Vector2(0.3, 20.3)]), grid, {}, 1.0)
+	_check(runs.size() == 1, "one stretch of a crossing is over the road, got %d" % runs.size())
+	if runs.size() == 1:
+		var run: PackedVector2Array = runs[0]
+		_check(absf(absf(run[0].y) - 4.5) < 0.1 and absf(absf(run[run.size() - 1].y) - 4.5) < 0.1,
+			"a crossing's paint ends at the kerb: %.2f to %.2f" % [run[0].y, run[run.size() - 1].y])
+	RoadMarkings._grid_add(grid, Vector2(50, 0), Vector2(50, 60), [Vector2(50, 0), Vector2(50, 60), 3.0, true], 1.0)
+	var drive := PackedVector2Array([Vector2(40, 30), Vector2(60, 30)])
+	_check(RoadCrossingClip.on_road_runs(drive, grid, {}, 1.0, true, true).is_empty(), "a driveway is no carriageway")
+	_check(RoadCrossingClip.pieces(drive, grid, {}, 1.0).size() == 1, "a crossing over only a service road is still painted")
+	_check(RoadCrossingClip.on_road_runs(PackedVector2Array([Vector2(0, 20), Vector2(0, 40)]), grid, {}, 1.0).is_empty(),
+		"a way wholly on the pavement paints nothing")
+
+## A bent crossing is laid in straight pieces; a stop line gives way to paint.
+func _check_crossing_shape() -> void:
+	var nearly := PackedVector2Array([Vector2(0, 0), Vector2(5, 0.4), Vector2(10, 0)])
+	_check(RoadCrossingClip.straight_pieces(nearly, 1.0).size() == 1, "a nearly straight crossing stays one piece")
+	var bent := PackedVector2Array([Vector2(0, 0), Vector2(5, 0), Vector2(5, 5)])
+	var pieces := RoadCrossingClip.straight_pieces(bent, 1.0)
+	_check(pieces.size() == 2, "a crossing turning a corner is two pieces, got %d" % pieces.size())
+	var road := {}
+	RoadMarkings._grid_add(road, Vector2(0, -50), Vector2(0, 50), [Vector2(0, -50), Vector2(0, 50), 6.0, false], 1.0)
+	var hooked := RoadCrossingClip.pieces(PackedVector2Array([Vector2(-8, 0), Vector2(4.5, 0), Vector2(6, 1.5), Vector2(8, 1.5)]), road, {}, 1.0)
+	_check(hooked.size() == 1 and hooked[0][0].distance_to(hooked[0][1]) > 10.0, "the hook a way makes at the kerb paints no scrap: %s" % [hooked])
+	var grid := {}
+	RoadMarkings._grid_add(grid, Vector2(-10, 0), Vector2(10, 0), [Vector2(-10, 0), Vector2(10, 0), 2.0], 1.0)
+	var clear := RoadCrossingClip.on_road_runs(PackedVector2Array([Vector2(0, -10), Vector2(0, 10)]), grid, {}, 1.0, false)
+	_check(clear.size() == 2, "a line through a crossing keeps both sides of it, got %d" % clear.size())
+	# Two ways mapped over one crossing paint one band; bands meeting at a corner do not overlap.
+	var by_road := {
+		0: {"finish": "crossing", "width_m": 4.0, "runs": [PackedVector2Array([Vector2(0, 0), Vector2(12, 0)])]},
+		1: {"finish": "crossing", "width_m": 4.0, "runs": [PackedVector2Array([Vector2(1, 0.5), Vector2(11, 0.5)])]},
+		2: {"finish": "crossing_ladder", "width_m": 4.0, "runs": [PackedVector2Array([Vector2(11, 0), Vector2(11, 14)])]},
+		3: {"finish": "paving", "width_m": 2.0}}
+	RoadCrossingClip.dedupe(by_road, 1.0)
+	_check((by_road[0]["runs"] as Array).size() == 1 and (by_road[1]["runs"] as Array).is_empty(),
+		"the shorter of two bands over one crossing is dropped: %s" % [by_road])
+	var met: PackedVector2Array = (by_road[0]["runs"] as Array)[0]
+	_check(absf(met[1].x - 9.0) < 0.1 and (by_road[2]["runs"] as Array).size() == 1,
+		"a band meeting a longer one at a corner ends at its edge: %s" % [met])
+	_check(not by_road[3].has("runs"), "plain paving is left alone")
+
+## Lane lines stop at junctions, crossings and stop lines.
+func _check_cuts() -> void:
+	var plan := RoadMarkings.Plan.new()
+	plan.clear = [PackedVector2Array([Vector2(-8, -8), Vector2(8, -8), Vector2(8, 8), Vector2(-8, 8)])]
+	plan.discs = [[Vector2(200, 0), 6.0]]
+	plan.by_road = {7: {"finish": "crossing", "width_m": 4.0, "runs": [PackedVector2Array([Vector2(60, -5), Vector2(60, 5)])]},
+		8: {"finish": "paving", "width_m": 4.0, "runs": [PackedVector2Array([Vector2(120, -5), Vector2(120, 5)])]}}
+	plan.stops = [PackedVector2Array([Vector2(65, 0.15), Vector2(65, 4)])]
+	var grid := RoadPaintCut.zones(plan, 1.0)
+	var street := PackedVector2Array()
+	for x in range(-100, 301, 3):
+		street.append(Vector2(float(x), 0.4))
+	var kept := RoadPaintCut.keep(street, grid, 1.0)
+	_check(kept.size() == 4, "a street is cut at the junction, the crossing and the bare node, got %d" % kept.size())
+	if kept.size() == 4:
+		_check(absf((kept[0] as PackedVector2Array)[(kept[0] as PackedVector2Array).size() - 1].x + 8.0) < 0.1, "the line stops at the apron's edge")
+		_check(absf((kept[1] as PackedVector2Array)[0].x - 8.0) < 0.1 and absf((kept[1] as PackedVector2Array)[(kept[1] as PackedVector2Array).size() - 1].x - 57.7) < 0.1,
+			"the line stops short of the crossing band: %s" % [kept[1]])
+		_check(absf((kept[2] as PackedVector2Array)[0].x - 65.525) < 0.1, "nothing is painted between a crossing and its stop line: %s" % [(kept[2] as PackedVector2Array)[0]])
+		_check(absf((kept[2] as PackedVector2Array)[(kept[2] as PackedVector2Array).size() - 1].x - 194.0) < 0.15, "a junction without an apron still clears its lines")
+	_check(RoadPaintCut.keep(street, RoadPaintCut.zones(plan, 1.0, true), 1.0).size() == 3, "junction zones alone leave the crossing out")
+	# A junction whose apron a building denies still has its zone.
+	var d := _place()
+	d.roads = _four_way()
+	d.buildings = [{"x": 3.0, "z": 3.0, "size_x": 2.0, "size_z": 2.0, "height": 9.0}]
+	var p := _plan(d)
+	_check(p.aprons.is_empty() and p.discs.size() == 1, "a denied apron leaves a disc: %s" % [p.discs])
+	_check(RoadPaintCut.inside(RoadPaintCut.zones(p, 1.0), Vector2(4, 0), 1.0), "lines stop at a junction with no apron")
+
+## A line painted round a mapped curve is eased, not kinked at each chord.
+func _check_rounded() -> void:
+	var bend := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(25, 1.6), Vector2(29, 4.6), Vector2(40, 18)])
+	var eased := RoadPaint.rounded(bend, 1.0)
+	_check(eased[0] == bend[0] and eased[eased.size() - 1] == bend[bend.size() - 1], "easing keeps a line's ends")
+	var sharpest := 0.0
+	var off := 0.0
+	for i in range(1, eased.size() - 1):
+		sharpest = maxf(sharpest, absf((eased[i] - eased[i - 1]).angle_to(eased[i + 1] - eased[i])))
+		var near := INF
+		for k in bend.size() - 1:
+			near = minf(near, Geometry2D.get_closest_point_to_segment(eased[i], bend[k], bend[k + 1]).distance_to(eased[i]))
+		off = maxf(off, near)
+	_check(sharpest < deg_to_rad(8.0), "an eased bend turns under 8 degrees a corner, got %.1f" % rad_to_deg(sharpest))
+	_check(off < 0.5, "an eased line stays by the mapped one, strayed %.2f m" % off)
+	var straight := PackedVector2Array([Vector2(0, 0), Vector2(10, 0.1), Vector2(30, 0)])
+	_check(RoadPaint.rounded(straight, 1.0) == straight, "a straight street is left as mapped")
+
+func _run() -> void:
+	failures.clear()
+	_check_rounded()
+	_check_crossing_shape()
+	_check_wear_seeds()
+	_check_apron_shape()
+	_check_paint()
+	_check_cuts()
+	# Side streets meeting get an apron and no zebras.
+	var d := _place()
+	d.roads = _four_way()
+	var p := _plan(d)
+	_check(p.aprons.size() == 1 and p.inferred.is_empty(), "side streets meeting are not given crossings, got %d" % p.inferred.size())
+	# Apron and inferred zebras at a main road's four-way.
+	d = _place()
+	d.roads = _four_way("primary")
+	p = _plan(d)
 	_check(p.aprons.size() == 1, "a four-way gets one apron, got %d" % p.aprons.size())
 	if p.aprons.size() == 1:
 		var hull: PackedVector2Array = p.aprons[0]
@@ -90,7 +333,7 @@ func _run() -> void:
 	_check(p.stops.is_empty(), "no signals, no stop lines")
 	# A mapped crossing, even an unmarked one, replaces the inferred zebra.
 	d = _place()
-	d.roads = _four_way()
+	d.roads = _four_way("primary")
 	d.roads.append(_crossing(Vector2(14, -5), Vector2(14, 5), {"crossing": "unmarked"}))
 	p = _plan(d)
 	_check(p.inferred.size() == 3, "a mapped crossing replaces that arm's inferred zebra, got %d" % p.inferred.size())
@@ -191,6 +434,13 @@ func _run() -> void:
 	d.roads.append(_crossing(Vector2(30, -5), Vector2(30, 5), SIGNAL))
 	p = _plan(d)
 	_check(p.stops.size() == 1 and absf(p.stops[0][0].distance_to(p.stops[0][1]) - 7.4) < 0.1, "an arriving one-way stops across its width")
+	# The bar spans the lanes, not the parked cars beside them.
+	(d.roads[1] as Dictionary)["width_m"] = 12.0
+	(d.roads[1] as Dictionary)["parking_m"] = 5.0
+	(d.roads[2] as Dictionary)["points"] = PackedVector2Array([Vector2(30, -7), Vector2(30, 7)])
+	p = _plan(d)
+	_check(p.stops.size() == 1 and absf(p.stops[0][0].distance_to(p.stops[0][1]) - 6.4) < 0.1,
+		"a stop line leaves the parking strips out: %s" % [p.stops])
 	# A lone signal node on an arm: a bar toward the junction, at the node.
 	d = _place("FR")
 	d.roads = _four_way()
@@ -204,6 +454,20 @@ func _run() -> void:
 	_check(ringed.get("modern", 0) > 0 and ringed.get("utility", 0) > 0, "only streets near signals change lamp: %s" % [ringed])
 	_check(ringed.get("modern", 0) + ringed.get("utility", 0) <= plain.get("utility", 0) - 4,
 		"no lamp on the junction surface: %s vs %s" % [ringed, plain])
+	# Finnish lit footways: a park path takes lamps, a sidewalk, a square's
+	# footway and a paved square's outline do not.
+	d = _lamp_place(false)
+	d.country = "FI"
+	var path := PackedVector2Array([Vector2(-70, 50), Vector2(70, 50)])
+	d.roads = [OsmTags._road_entry({"highway": "footway", "lit": "yes"}, path)]
+	_check(_lamps(d).get("post_top", 0) == 0, "a lit footway off green cover has no lamps")
+	d.roads.append(OsmTags._road_entry({"highway": "footway", "footway": "sidewalk", "lit": "yes"}, path))
+	d.roads.append(OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
+		PackedVector2Array([Vector2(-60, 30), Vector2(60, 30), Vector2(60, 70), Vector2(-60, 70)]), []))
+	_check(_lamps(d).get("post_top", 0) == 0, "no lamps along sidewalks or a square's outline")
+	d.land_polygons.append({"class": "grass", "points": PackedVector2Array([Vector2(-80, 40),
+		Vector2(80, 40), Vector2(80, 60), Vector2(-80, 60)]), "holes": []})
+	_check(_lamps(d).get("post_top", 0) > 0, "a lit park path has lamps")
 	# Everything lays into real meshes.
 	d = _place("JP")
 	d.roads = _four_way()

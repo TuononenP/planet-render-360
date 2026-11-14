@@ -29,9 +29,15 @@ const AHN_URL := "https://service.pdok.nl/rws/ahn/wcs/v1_0"
 const AHN_COVERAGE := "dtm_05m"
 const EPSG_3857 := "http://www.opengis.net/def/crs/EPSG/0/3857"
 
+## Whether the last fetch lost a request to the network, the server or the
+## clock (not to coverage: a 404 or a window outside the country's data):
+## only that is an elevation outage worth telling the user.
+var outage := false
+
 ## Emits `finished` with the decoded raster, {} when the window is
 ## unavailable (network, format, or mostly outside the country's data).
 func fetch(source: String, lat: float, lon: float, offline: bool = false) -> void:
+	outage = false
 	var raster := {}
 	match source:
 		"gsi":
@@ -382,6 +388,8 @@ func _get_many(jobs: Array, offline: bool, valid: Callable) -> Array:
 		while remaining[0] > 0 and waited < TIMEOUT_S:
 			await get_tree().process_frame
 			waited += get_process_delta_time()
+		if remaining[0] > 0:
+			outage = true
 		first = last
 	return out
 
@@ -401,9 +409,12 @@ func _download(url: String, path: String, k: int, out: Array, remaining: Array,
 				CacheStore.note_written(path)
 		elif result == HTTPRequest.RESULT_SUCCESS and code == 404:
 			CacheStore.note_absent(path)
+		else:
+			outage = true
 		remaining[0] -= 1
 		http.queue_free()
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
 	if http.request(url, ["User-Agent: " + Brand.USER_AGENT]) != OK:
+		outage = true
 		remaining[0] -= 1
 		http.queue_free()

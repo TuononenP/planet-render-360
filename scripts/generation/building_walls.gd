@@ -29,6 +29,8 @@ static func _clean_ring(raw: PackedVector2Array) -> PackedVector2Array:
 ## Height (m) of blank firewall above a lower neighbour before the
 ## windowed facade resumes on a wall that rises well past it.
 const FIREWALL_BAND_M := 9.0
+## Towers shorter than this have no plant floors in their shaft.
+const MECH_MIN_STOREYS := 30
 ## A masonry front's elevation: the first upper storey of a decorated front
 ## stands taller (the piano nobile), and about half of the punched masonry
 ## fronts end in a plainer top storey with small windows (the attic).
@@ -74,10 +76,56 @@ static func attic_look(look: Dictionary) -> Dictionary:
 static func band_unit(y0: float, top: float, n: int, plan: Dictionary) -> float:
 	return (top - y0) / (float(n) + (PIANO_STRETCH - 1.0 if bool(plan.get("piano", false)) else 0.0))
 
+## A tower's plant floors among its `n` upper storeys, ascending: one every
+## 20-30 storeys, and the top two when this mass carries the roofline.
+## [] below MECH_MIN_STOREYS.
+static func mech_floors(n: int, seed_v: float, roofline: bool) -> Array:
+	if n < MECH_MIN_STOREYS:
+		return []
+	var out: Array = []
+	var gap := 20 + int(ArchitectureStyle._h(seed_v, 61) * 11.0)
+	var f := gap
+	while f < n - 6:
+		out.append(f)
+		f += gap
+	if roofline:
+		out.append(n - 2)
+		out.append(n - 1)
+	return out
+
+## y0..top as runs of `facade` split by single `louvre` storeys at `mech`.
+static func _plant_run(root: Node3D, ring: PackedVector2Array, y0: float, top: float,
+		facade: Material, louvre: Material, n: int, mech: Array, cover: Array,
+		fire: Material, bay_scale: float) -> void:
+	var unit := (top - y0) / float(n)
+	var start := 0
+	for f in mech:
+		var floor_i := int(f)
+		if floor_i > start:
+			_walls(root, ring, y0 + float(start) * unit, y0 + float(floor_i) * unit, facade,
+				float(floor_i - start), cover, fire, false, {}, bay_scale)
+		_walls(root, ring, y0 + float(floor_i) * unit, y0 + float(floor_i + 1) * unit, louvre,
+			1.0, cover, fire, false, {}, bay_scale)
+		start = floor_i + 1
+	if start < n:
+		_walls(root, ring, y0 + float(start) * unit, top, facade, float(n - start),
+			cover, fire, false, {}, bay_scale)
+
+## Tile repeats up a wall of `wall_m` metres: the storey count, kept within
+## ~30% of the style's floor height so a roof carved out of the total or a
+## parent's storeys on a thin part never squash the windows.
+static func storey_repeats(wall_m: float, storeys: int, floor_h: float) -> float:
+	return roundf(clampf(float(maxi(storeys, 1)), maxf(1.0, wall_m / (floor_h * 1.35)),
+		maxf(1.0, wall_m / (floor_h * 0.75))))
+
 ## The upper storeys y0..top as the plan's bands, `attic` on the top storey.
 static func upper_walls(root: Node3D, ring: PackedVector2Array, y0: float, top: float,
 		facade: Material, attic: Material, n: int, plan: Dictionary, cover: Array,
 		fire: Material, bay_scale: float) -> void:
+	var mech: Array = plan.get("mech", [])
+	if not mech.is_empty():
+		_plant_run(root, ring, y0, top, facade, plan["louvre"], n, mech, cover, fire, bay_scale)
+		return
 	var unit := band_unit(y0, top, n, plan)
 	var y := y0
 	var rest := n
@@ -107,6 +155,7 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 	var per_material := {}
 	var blank := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
+	var curve := curve_bays(ring, cover, FacadeMaterials.facade_uv(mat).x * bay_scale, edge_materials)
 	for i in ring.size():
 		var edge_mat: Material = edge_materials.get(i, mat)
 		var edge_face := face
@@ -130,7 +179,9 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 			var a := ea.lerp(eb, float(pc[0]))
 			var b := ea.lerp(eb, float(pc[1]))
 			var nb_top := float(pc[2])
-			if is_inf(nb_top):
+			# A neighbour that stops below this wall (a raised tier) does not touch it.
+			if is_inf(nb_top) or nb_top <= base:
+				var u0 := 0.0
 				var u1 := 1.0
 				var v0 := 1.0
 				if uvp.x > 0.0:
@@ -138,33 +189,112 @@ static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 					# An edge under half a bay shows only the blank margin left
 					# of the first window (a pillar must not become a zebra).
 					u1 = 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
+					if curve.has(i):
+						u0 = (curve[i] as Vector2).x / uvp.y
+						u1 = (curve[i] as Vector2).y / uvp.y
 					if uvp.z > 0.0:
 						v0 = v_repeat
-				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0))
+				_quad(edge_face, a, b, base, top, n, Vector2(u1, v0), u0)
 			elif nb_top < top - 0.3 * m2u:
 				var y0 := maxf(base, nb_top)
 				var arr := blank if fire != null else edge_face
 				# Blank only just above the neighbour: a tower's side rising
 				# well past it has windows (a Manhattan tower, not a row house).
+				# A curtain wall, or a wall given no firewall, has no blank band.
+				var no_band := fire == null or str(edge_mat.get_meta("facade_set", "")) == "glass"
 				var y1 := top
-				if fire != null and uvp.x > 0.0 and top - y0 > FIREWALL_BAND_M * m2u * 1.5:
-					y1 = y0 + FIREWALL_BAND_M * m2u
+				if no_band or top - y0 > FIREWALL_BAND_M * m2u * 1.5:
+					y1 = y0 if no_band else y0 + FIREWALL_BAND_M * m2u
 					var len_m := (b - a).length() / m2u
-					var u1 := 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
+					var u1 := 1.0
+					if uvp.x > 0.0:
+						u1 = 0.03 if len_m < bay * 0.5 else maxf(1.0, roundf(len_m / bay)) / uvp.y
 					var v_up := (v_repeat if uvp.z > 0.0 else 1.0) * (top - y1) / maxf(top - base, 1e-4)
 					_quad(edge_face, a, b, y1, top, n, Vector2(u1, v_up))
-				_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
-					(y1 - y0) / m2u / 4.0))
+				if y1 > y0:
+					_quad(arr, a, b, y0, y1, n, Vector2((b - a).length() / m2u / 4.0,
+						(y1 - y0) / m2u / 4.0))
 	_emit(root, face, mat)
 	for edge_mat in per_material:
 		_emit(root, per_material[edge_mat], edge_mat)
 	if fire != null:
 		_emit(root, blank, fire)
 
+## Curved walls: OSM draws a curve as many short edges, and each began its
+## windows afresh, squeezed, stretched or left blank. A run of CURVE_MIN_EDGES
+## or more short, open edges, each turning under CURVE_TURN_DEG, shares one
+## bay count spread along it by length. {edge: Vector2(u0, u1)} in bays;
+## `skip` edges (another material's) stay out. FacadeRelief leaves these
+## edges plain, since it lays relief on whole bays.
+const CURVE_TURN_DEG := 25.0
+const CURVE_EDGE_BAYS := 1.5
+const CURVE_MIN_EDGES := 3
+
+static func curve_bays(ring: PackedVector2Array, cover: Array, bay_m: float,
+		skip: Dictionary = {}) -> Dictionary:
+	var out := {}
+	var n := ring.size()
+	if bay_m <= 0.0 or n < CURVE_MIN_EDGES:
+		return out
+	var m2u := WorldScale.metres_to_units()
+	var ok := PackedByteArray()
+	ok.resize(n)
+	for i in n:
+		var len_m := ring[i].distance_to(ring[(i + 1) % n]) / m2u
+		var pieces: Array = cover[i] if i < cover.size() else [[0.0, 1.0, PartyWalls.OPEN]]
+		ok[i] = 1 if len_m > 0.001 and len_m < bay_m * CURVE_EDGE_BAYS and not skip.has(i) \
+			and pieces.size() == 1 and is_inf(float(pieces[0][2])) else 0
+	# link[i]: edge i runs on smoothly into edge i + 1.
+	var link := PackedByteArray()
+	link.resize(n)
+	var cos_max := cos(deg_to_rad(CURVE_TURN_DEG))
+	for i in n:
+		var j := (i + 1) % n
+		if ok[i] == 1 and ok[j] == 1:
+			var d0 := (ring[j] - ring[i]).normalized()
+			var d1 := (ring[(j + 1) % n] - ring[j]).normalized()
+			link[i] = 1 if d0.dot(d1) > cos_max else 0
+	# Start just after a break so no run wraps past edge 0; a ring that is
+	# one curve all round (a round tower) starts at 0.
+	var start := 0
+	for i in n:
+		if link[(i - 1 + n) % n] == 0:
+			start = i
+			break
+	var run: Array[int] = []
+	for k in n + 1:
+		var i := (start + k) % n
+		if k < n and ok[i] == 1 and (run.is_empty() or link[run[-1]] == 1):
+			run.append(i)
+			continue
+		_spread_run(out, ring, run, bay_m)
+		run = []
+		if k < n and ok[i] == 1:
+			run.append(i)
+	return out
+
+static func _spread_run(out: Dictionary, ring: PackedVector2Array, run: Array[int], bay_m: float) -> void:
+	if run.size() < CURVE_MIN_EDGES:
+		return
+	var m2u := WorldScale.metres_to_units()
+	var n := ring.size()
+	var total := 0.0
+	for i in run:
+		total += ring[i].distance_to(ring[(i + 1) % n]) / m2u
+	var bays := FacadeRelief.bay_count(total, bay_m)
+	if bays == 0:
+		return
+	var s := 0.0
+	for i in run:
+		var len_m := ring[i].distance_to(ring[(i + 1) % n]) / m2u
+		out[i] = Vector2(bays * s / total, bays * (s + len_m) / total)
+		s += len_m
+
 ## One wall quad a→b from y0 to y1 facing n into `arr` [verts, normals,
-## uvs, tangents, indices]; `uv` is the far corner (u at b, v at the base).
+## uvs, tangents, indices]; `uv` is the far corner (u at b, v at the base),
+## `u0` the u at a.
 static func _quad(arr: Array, a: Vector2, b: Vector2, y0: float, y1: float,
-		n: Vector2, uv: Vector2) -> void:
+		n: Vector2, uv: Vector2, u0: float = 0.0) -> void:
 	var verts: PackedVector3Array = arr[0]
 	var normals: PackedVector3Array = arr[1]
 	var uvs: PackedVector2Array = arr[2]
@@ -190,8 +320,8 @@ static func _quad(arr: Array, a: Vector2, b: Vector2, y0: float, y1: float,
 		normals.append(n3)
 		if use_tangents:
 			tangents.push_back(t3.x); tangents.push_back(t3.y); tangents.push_back(t3.z); tangents.push_back(w)
-	uvs.push_back(Vector2(0, uv.y)); uvs.push_back(Vector2(uv.x, uv.y))
-	uvs.push_back(Vector2(uv.x, 0)); uvs.push_back(Vector2(0, 0))
+	uvs.push_back(Vector2(u0, uv.y)); uvs.push_back(Vector2(uv.x, uv.y))
+	uvs.push_back(Vector2(uv.x, 0)); uvs.push_back(Vector2(u0, 0))
 	# Forward order faces (e.y, -e.x): with s < 0 that is the
 	# outward normal already, else the reversed order is emitted.
 	var s := e.x * n.y - e.y * n.x
@@ -229,10 +359,10 @@ static func _emit(root: Node3D, arr: Array, mat: Material) -> void:
 static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 		idx: PackedInt32Array, top: float, mat: Material, trim: int = 0,
 		cap: PackedVector2Array = PackedVector2Array(),
-		party: PackedByteArray = PackedByteArray()) -> void:
+		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
 	# Cornice / parapet relief at the wall top (BuildingTrim, near only);
 	# a parapet sinks the deck behind it.
-	BuildingTrim.add(root, ring, top, trim, party)
+	BuildingTrim.add(root, ring, top, trim, party, wall_set)
 	top = BuildingTrim.deck(top, trim)
 	if not cap.is_empty():
 		ring = cap

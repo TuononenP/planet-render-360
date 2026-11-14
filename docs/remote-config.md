@@ -13,7 +13,7 @@ The file is `site/config.json`, published by `.github/workflows/pages.yml` to
 | Key | Type | Replaces |
 | --- | --- | --- |
 | `nominatim_endpoint` | https URL | `SearchFetcher.ENDPOINT`, the place-search address |
-| `overpass_endpoints` | 1 to 8 https URLs | `OsmFetcher.ENDPOINTS`, the Overpass instances in the order they are tried |
+| `overpass_endpoints` | 1 to 8 https URLs | `OsmFetcher.ENDPOINTS`, the Overpass instances in order (a live query uses the first one not paused) |
 | `satellite_url_template` | https URL with exactly three `%d` (zoom, tile y, tile x) | `SatelliteFetcher.URL_TEMPLATE`, the imagery address |
 
 ```json

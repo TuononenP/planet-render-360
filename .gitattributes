@@ -1,2 +1,2 @@
 assets/map/*.tilepack filter=lfs diff=lfs merge=lfs -text
-assets/osm_snapshots/*.json.gz filter=lfs diff=lfs merge=lfs -text
+assets/osm_snapshots/*.osmb filter=lfs diff=lfs merge=lfs -text

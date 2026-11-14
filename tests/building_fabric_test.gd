@@ -266,6 +266,53 @@ func _run() -> void:
 	if by_storeys.size() != 1 or float(by_storeys[0]["min_m"]) > 0.0:
 		failures.append("a storey-sized part lifted past its top added a base (%d masses)" % by_storeys.size())
 
+	# (Plans are cached per outline: each case below has its own.)
+	# A lifted part over a lower ground part hung in the air (Seoul): it
+	# comes down to the roof under it. One over nothing, big enough, stands
+	# on the ground; a small one (skybridge) and a mapped bridge keep theirs.
+	var low := pent.merged({"footprint": _rect(160, 0, 190, 30), "x": 175.0, "z": 15.0,
+		"height": 45.0, "min_height_m": 0.0}, true)
+	var box := pent.merged({"footprint": _rect(165, 5, 185, 25), "x": 175.0, "z": 15.0,
+		"height": 80.0, "min_height_m": 58.0}, true)
+	var gap := BuildingMasses.plan(_bldg(_rect(160, 0, 190, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, box]}), ctx)
+	var gap_lifts: Array = gap.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if gap.size() != 2 or absf(float(gap_lifts.max()) - 45.0) > 0.6:
+		failures.append("a part hovering over a lower roof kept lift %s (want 45)" % [gap_lifts])
+	# A gap well past the limit is an overhang, not a slip; a floor within
+	# the slack of the roof under it is carried as it is.
+	var far_box := box.merged({"min_height_m": 70.0}, true)
+	var far := BuildingMasses.plan(_bldg(_rect(160, 0, 191, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, far_box]}), ctx)
+	var far_lifts: Array = far.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if far.size() != 2 or absf(float(far_lifts.max()) - 70.0) > 0.6:
+		failures.append("a part 25 m over a lower roof was moved %s" % [far_lifts])
+	var near_box := box.merged({"min_height_m": 46.0}, true)
+	var near := BuildingMasses.plan(_bldg(_rect(160, 0, 193, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, near_box]}), ctx)
+	var near_lifts: Array = near.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if near.size() != 2 or absf(float(near_lifts.max()) - 46.0) > 0.6:
+		failures.append("a part carried by the roof under it was moved %s" % [near_lifts])
+	var wide_off := pent.merged({"footprint": _rect(220, 5, 240, 25), "x": 230.0, "z": 15.0,
+		"height": 80.0, "min_height_m": 60.0}, true)
+	var uncovered := BuildingMasses.plan(_bldg(_rect(160, 0, 250, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, wide_off]}), ctx)
+	var unc_lifts: Array = uncovered.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if uncovered.size() != 2 or float(unc_lifts.max()) > 0.0:
+		failures.append("a large part over no mass kept lift %s" % [unc_lifts])
+	var small_off := pent.merged({"footprint": _rect(220, 5, 226, 11), "x": 223.0, "z": 8.0,
+		"height": 80.0, "min_height_m": 60.0}, true)
+	var skywalk := BuildingMasses.plan(_bldg(_rect(160, 0, 251, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, small_off]}), ctx)
+	var sky_lifts: Array = skywalk.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if skywalk.size() != 2 or absf(float(sky_lifts.max()) - 60.0) > 0.6:
+		failures.append("a small lifted part lost its lift %s" % [sky_lifts])
+	var bridged_box := BuildingMasses.plan(_bldg(_rect(160, 0, 252, 30), 16,
+		{"kind": "bridge", "height": 80.0, "height_source": "tag_height", "parts": [low, wide_off]}), ctx)
+	var br_lifts: Array = bridged_box.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if bridged_box.size() != 2 or absf(float(br_lifts.max()) - 60.0) > 0.6:
+		failures.append("a bridge part lost its lift %s" % [br_lifts])
+
 	# --- Courtyard: inner ring walls face into the hole; cap avoids it. ---
 	var bridged := RingGeometry.bridge_holes(_rect(0, 0, 40, 40), [_rect(12, 12, 28, 28)])
 	var tri := Geometry2D.triangulate_polygon(bridged)

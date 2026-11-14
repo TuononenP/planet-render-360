@@ -64,6 +64,8 @@ func _maths() -> void:
 		boosted = ViewDrone.steer(boosted, Vector2(0, -1), 1.0 / 60.0, true)
 	_check(absf(boosted.length() - ViewDrone.CRUISE_MPS * ViewDrone.BOOST_MULT) < 1.0,
 		"Shift boosts threefold: %s" % boosted.length())
+	_check(absf(ViewDrone.CRUISE_MPS * 3.6 - 100.0) < 0.5,
+		"cruise is 100 km/h: %.1f" % (ViewDrone.CRUISE_MPS * 3.6))
 	var drift := vel
 	for i in 180:
 		drift = ViewDrone.steer(drift, Vector2.ZERO, 1.0 / 60.0)
@@ -315,10 +317,55 @@ func _flight() -> void:
 	xz = Vector2(view._rig.position.x, view._rig.position.z)
 	_check(View360.can_move_in_place(xz, view._ground), "landing comes back inside the walking area: %s" % xz.length())
 	_check(view._rig.camera.rotation.z == 0.0, "level again")
+	_check(absf(view._rig.position.y - ViewWalk.foot_y(data, view._ground, xz)) < 0.5,
+		"and on foot: %.1f m over the street" % (view._rig.position.y - ViewWalk.foot_y(data, view._ground, xz) + ViewWalk.EYE_M))
+
+	# On foot the hint says how to walk, and the touch sticks walk.
+	_check(ViewChrome.hint_text(view).begins_with("Left stick walks" if DroneSticks.wanted() else "W A S D to walk"),
+		"the hint says how to walk: " + ViewChrome.hint_text(view))
+	_check(view._hint.visible and view._hint.modulate.a == 1.0, "and the landing glide leaves it up")
+	_check(view._drone.sticks.visible == DroneSticks.wanted(), "walking keeps the sticks on touch screens only")
+	DroneSticks.forced = true
+	ViewChrome.layout(view)
+	_check(view._drone.sticks.visible and ViewChrome.hint_text(view).begins_with("Left stick walks"),
+		"forced, the sticks show on foot and the hint names them")
+	_check(view._hint.position.y + view._hint.size.y <= view._drone.sticks.left.position.y,
+		"the hint sits above the wells")
+	var left_stick := view._drone.sticks.left
+	left_stick._move_to(Vector2(0, -left_stick.reach()))
+	_check(view._walk.stick_move.y < -0.9 and view._drone.stick_move == Vector2.ZERO,
+		"the left stick walks once landed: %s" % view._walk.stick_move)
+	view._rig.set_look(0.0, 0.0)
+	var walk_from := Vector2(view._rig.position.x, view._rig.position.z)
+	for i in 20:
+		await process_frame
+	var walked := Vector2(view._rig.position.x, view._rig.position.z) - walk_from
+	_check(walked.y < -0.1, "pushing it walks forward: %s" % walked)
+	view._drone.sticks.reset()
+	_check(view._walk.stick_move == Vector2.ZERO, "letting go stops")
+	var yaw_was := view._rig.yaw
+	view._walk.stick_aux = Vector2(1, 0)
+	for i in 10:
+		await process_frame
+	view._walk.stick_aux = Vector2.ZERO
+	_check(view._rig.yaw < yaw_was, "the right stick turns on foot")
+	DroneSticks.forced = false
+	ViewChrome.layout(view)
 
 	# A new scene opens on foot.
 	press.call(KEY_G)
 	view.show_location(data)
 	_check(not view._drone.on, "a new place opens walking")
+	# The app opens places flying.
+	view.start_flying = true
+	view.show_location(data)
+	_check(view._drone.on and view._drone.panel.visible, "with start_flying a new place opens in the drone")
+	_check(ViewChrome.hint_text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
+		"and the opening hint says how to fly")
+	# Takeoff starts 100 m up: the drone rises there and hovers.
+	for i in 90:
+		view._drone.process(view, 1.0 / 30.0)
+	var start_agl := view._rig.position.y - view._ground.height_at_world(view._rig.position.x, view._rig.position.z)
+	_check(absf(start_agl - ViewDrone.START_AGL_M) < 2.0, "the drone starts 100 m up: %.1f" % start_agl)
 	view.queue_free()
 	await process_frame

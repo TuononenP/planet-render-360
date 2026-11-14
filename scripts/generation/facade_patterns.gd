@@ -22,7 +22,12 @@ extends RefCounted
 ## bands go on the paint layer (FacadePaint). FacadeComposer passes its
 ## look values in `pv` and owns the shared window table, pane and hash.
 
-const NAMES: Array[String] = ["panel", "ornate", "brownstone", "shophouse"]
+##   pier       continuous masonry piers between recessed windows and dark
+##              spandrels (New York's prewar and limestone towers).
+
+##   louvre     a plant floor: horizontal slats, no windows.
+
+const NAMES: Array[String] = ["panel", "ornate", "brownstone", "shophouse", "pier", "louvre"]
 ## Matches FacadeComposer.CELL (pinned by tests/architecture_test.gd).
 const CELL := 128
 const DARK := Color(0.03, 0.03, 0.03)
@@ -58,6 +63,18 @@ static func prepass(pattern: String, base: Image, nor: Image, w: int, pv: Dictio
 		"ornate":
 			_band(base, nor, w, 106, 6)
 			_band(base, nor, w, 0, 3)
+		"louvre":
+			for y in range(0, CELL, 12):
+				FacadePaint.shade(base, Rect2i(0, y, w, 7), Color(0, 0, 0, 0.42))
+				FacadePaint.shade(base, Rect2i(0, y + 7, w, 2), Color(1, 1, 1, 0.12))
+				if nor != null:
+					nor.fill_rect(Rect2i(0, y + 7, w, 2), Color(0.5, 0.72, 1.0))
+		"pier":
+			for x in range(0, w + 1, CELL):
+				var r := Rect2i(x - 22, 0, 44, CELL).intersection(Rect2i(0, 0, w, CELL))
+				if r.size.x > 0:
+					FacadePaint.shade(base, r, FacadePaint.LIGHT)
+				FacadePaint.shade(base, Rect2i(x + 22, 0, 3, CELL).intersection(Rect2i(0, 0, w, CELL)), FacadePaint.SHADOW)
 		"brownstone":
 			for y in [0, 40, 80]:
 				FacadePaint.shade(base, Rect2i(0, y, w, 1), Color(0, 0, 0, 0.12))
@@ -86,6 +103,8 @@ static func bay(pattern: String, alb: Image, nor: Image, rgh: Image, emit: Image
 			_panel(alb, nor, rgh, emit, base, ox, hv, pv)
 		"ornate":
 			_ornate(alb, nor, rgh, emit, base, ox, bay_i, hv, pv)
+		"pier":
+			_pier(alb, nor, rgh, emit, ox, hv, pv)
 		"brownstone":
 			_brownstone(alb, nor, rgh, emit, base, ox, hv, pv)
 		"shophouse":
@@ -109,6 +128,16 @@ static func _panel(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 			alb.fill_rect(Rect2i(ox + 6, 60, 11, 9), Color(0.30, 0.30, 0.30))
 	if nor != null:
 		nor.fill_rect(Rect2i(ox + 18, 83, 92, 2), Color(0.5, 0.75, 1.0))
+
+static func _pier(alb: Image, nor: Image, rgh: Image, emit: Image,
+		ox: int, hv: float, pv: Dictionary) -> void:
+	_win(alb, nor, rgh, emit, Rect2i(ox + 26, 12, 76, 80), pv["frame"], pv["glass"], hv, 2, 2)
+	# The dark spandrel panel recessed between the piers.
+	alb.fill_rect(Rect2i(ox + 26, 94, 76, 26), Color(0.13, 0.12, 0.11))
+	alb.fill_rect(Rect2i(ox + 26, 94, 76, 2), DARK)
+	if nor != null:
+		nor.fill_rect(Rect2i(ox + 24, 0, 2, CELL), Color(0.62, 0.5, 1.0))
+		nor.fill_rect(Rect2i(ox + 102, 0, 2, CELL), Color(0.38, 0.5, 1.0))
 
 static func _ornate(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 		ox: int, bay_i: int, hv: float, pv: Dictionary) -> void:

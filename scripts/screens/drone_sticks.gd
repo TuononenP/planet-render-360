@@ -1,14 +1,15 @@
 class_name DroneSticks
 extends Control
 
-## Drone mode's two on-screen sticks for touch screens: the left flies
-## (up is forward), the right turns (sideways) and climbs (up). Each is
+## The two on-screen sticks for touch screens: the left flies, or walks
+## while the drone is landed (up is forward), the right turns (sideways)
+## and, flying, climbs (up). Each is
 ## a round HUD glass well with a thumb that follows the finger and
 ## springs back on release; the thumb takes the accent fill while held.
 ## The layer itself passes input through, so only touches that start on
 ## a stick are the stick's and the rest still turn the view. Each stick
-## writes its deflection into the drone (ViewDrone.stick_move /
-## stick_aux).
+## writes its deflection into the drone while it flies, else into
+## walking (ViewDrone / ViewWalk stick_move and stick_aux).
 
 const SIZE := 120.0
 const THUMB := float(HudParts.SIZE_TOUCH)
@@ -41,13 +42,26 @@ static func deflection(offset: Vector2, reach: float) -> Vector2:
 	var k := (m - DEAD_ZONE) / (1.0 - DEAD_ZONE)
 	return offset.normalized() * pow(k, 1.5)
 
-func _init(drone: ViewDrone) -> void:
+func _init(drone: ViewDrone, walk: ViewWalk = null) -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left = Stick.new(func(d: Vector2) -> void: drone.stick_move = d, "Fly")
-	right = Stick.new(func(d: Vector2) -> void: drone.stick_aux = d, "Turn and climb")
+	left = Stick.new(func(d: Vector2) -> void:
+		if drone.on or walk == null:
+			drone.stick_move = d
+		else:
+			walk.stick_move = d, "Fly")
+	right = Stick.new(func(d: Vector2) -> void:
+		if drone.on or walk == null:
+			drone.stick_aux = d
+		else:
+			walk.stick_aux = d, "Turn and climb")
 	add_child(left)
 	add_child(right)
+
+## Names the sticks for the mode: flying or walking (no climbing on foot).
+func set_flying(flying: bool) -> void:
+	left.accessibility_name = "Fly" if flying else "Walk"
+	right.accessibility_name = "Turn and climb" if flying else "Turn"
 
 ## Centres both thumbs and stops the drone's stick input.
 func reset() -> void:

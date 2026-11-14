@@ -5,7 +5,8 @@ extends Control
 ## icon in ink at each landmark (curated registry from zoom 6, nearby
 ## articles from zoom 11). The selected one takes the accent fill with
 ## an on-accent icon (design system: active state on glass). Hovering
-## shows a float-glass name chip. Drawn in a child layer of MapTileView
+## shows a float-glass name chip, and clicking a marker toggles that
+## chip (touch has no hover). Drawn in a child layer of MapTileView
 ## because the map's own canvas runs the recolour shader. Markers that
 ## would overlap a better-ranked one are left out, so dense cities stay
 ## readable. The map hit-tests taps against the placed markers.
@@ -23,6 +24,9 @@ var _curated: Array = []
 var _wiki: Array = []
 var _placed: Array = []  # [screen point, site], best ranked first
 var _hover_id := ""
+## Name chip shown by clicking a marker (touch has no hover): clicking
+## the same marker again hides it. Hovering shows the chip regardless.
+var _pinned_id := ""
 
 func _init(map: MapTileView) -> void:
 	_map = map
@@ -87,6 +91,27 @@ func hit_at(pos: Vector2) -> Dictionary:
 			best_d = d
 	return best
 
+## Clicking a marker toggles its name chip: shown when it was hidden,
+## hidden when it was the pinned one. Returns whether it is shown now.
+func toggle_chip(s: Dictionary) -> bool:
+	var id := str(s.get("id", ""))
+	if id == "":
+		return false
+	_pinned_id = "" if _pinned_id == id else id
+	queue_redraw()
+	return _pinned_id == id
+
+## The marker under `pos` was clicked: toggle its chip, {} for none.
+func toggle_at(pos: Vector2) -> Dictionary:
+	var s := hit_at(pos)
+	if not s.is_empty():
+		toggle_chip(s)
+	return s
+
+## Whether the name chip for `id` is up (hovered, or pinned by a click).
+func chip_shown(id: String) -> bool:
+	return id != "" and (id == _hover_id or id == _pinned_id)
+
 ## Pointer moved over the map: highlight the marker under it.
 func hover_at(pos: Vector2) -> bool:
 	var s := hit_at(pos)
@@ -98,6 +123,7 @@ func hover_at(pos: Vector2) -> bool:
 
 func _draw() -> void:
 	var hover: Array = []
+	var pinned: Array = []
 	for item in layout():
 		var s: Dictionary = item[1]
 		var p: Vector2 = item[0]
@@ -111,8 +137,11 @@ func _draw() -> void:
 				false, UiTheme.ON_ACCENT if on else UiTheme.INK)
 		if str(s["id"]) == _hover_id:
 			hover = item
-	if not hover.is_empty():
-		_draw_chip(hover[0], str(hover[1]["name"]))
+		elif str(s["id"]) == _pinned_id:
+			pinned = item
+	var chip := hover if not hover.is_empty() else pinned
+	if not chip.is_empty():
+		_draw_chip(chip[0], str(chip[1]["name"]))
 
 func _draw_chip(p: Vector2, text: String) -> void:
 	var font := UiTheme.sans(600)

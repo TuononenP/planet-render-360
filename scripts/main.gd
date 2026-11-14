@@ -8,6 +8,8 @@ var _loading: LoadingScreen
 var _view: View360
 var _notice: DataNotice
 var _history: HistoryScreen
+var _gallery: GalleryScreen
+var _pano_viewer: PanoramaViewer
 var _settings_screen: SettingsScreen
 ## Where Settings' back button returns (the map, or the viewer when
 ## its attribution opened Data sources).
@@ -77,12 +79,6 @@ const SAVE_WORLD_FAILED := "Couldn't save the view · retry"
 const CLOSING_TITLE := "Saving this place for next time"
 const CLOSING_MESSAGE := "Closing as soon as it's saved."
 var _quitting := false
-const CACHE_FULL_TITLE := "Storage full"
-const CACHE_FULL_MESSAGE := "Places you opened longest ago were removed and will rebuild next time."
-## The bigger size limit a full cache offers (MB), 0 when none; shown
-## once, as soon as the map or the viewer is on screen.
-var _cache_offer_mb := 0
-var _cache_offer_shown := false
 
 const SAFE_POLL_S := 0.25
 var _safe_seen: Array[float] = []
@@ -146,15 +142,13 @@ func _ready() -> void:
 			# The pipeline reports its overall fraction only at the end; a
 			# save follows its rows finishing instead.
 			if _saving and not _save_retry_in_progress and state == "done":
-				_save_progress.rows_done += 1
-				if i == 1:
-					_save_progress.imagery_fraction = 0.0)
+				_save_progress.stage_done(i))
 	_pipeline.progress_changed.connect(
 		func(f: float, label: String) -> void: _loading.set_progress(f, label))
 	_pipeline.stage_progress.connect(func(i: int, done: int, total: int) -> void:
 		_loading.set_stage_progress(i, done, total)
-		if _saving and not _save_retry_in_progress and i == 1 and total > 0:
-			_save_progress.imagery_fraction = clampf(float(done) / total, 0.0, 1.0))
+		if _saving and not _save_retry_in_progress:
+			_save_progress.stage_progress(i, done, total))
 	_pipeline.stage_took.connect(func(i: int, seconds: float) -> void:
 		_loading.set_stage_took(i, seconds))
 	_pipeline.finished.connect(_on_generation_finished)
@@ -180,6 +174,9 @@ func _ready() -> void:
 	_picker.history_requested.connect(func() -> void:
 		_history.refresh()
 		_show(_history))
+	_picker.gallery_requested.connect(func() -> void:
+		_gallery.refresh()
+		_show(_gallery))
 	_picker.settings_requested.connect(func() -> void:
 		_settings_from = _picker
 		_show(_settings_screen))
@@ -222,11 +219,7 @@ func _ready() -> void:
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
 		if capture_mode:
 			return
-		if PlaceThumb.save(image, lat, lon):
-			_thumb_key = _view.look_key()
-		# History rebuilds when it opens; only a visible one needs it now.
-		if _history.visible:
-			_history.refresh())
+		_store_thumb(image, lat, lon, _view.look_key(), true))
 	# Go there, beyond the built area: a new scene at the landmark's standoff.
 	_view.visit_requested.connect(func(site: Dictionary, lat: float, lon: float) -> void:
 		if not _generating:
@@ -254,9 +247,39 @@ func _ready() -> void:
 		_start_generation(lat, lon))
 	add_child(_history)
 
+	_gallery = GalleryScreen.new()
+	_gallery.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_gallery.back_requested.connect(func() -> void: _show(_picker))
+	_gallery.panorama_selected.connect(func(entry: Dictionary) -> void:
+		if _pano_viewer.open(entry):
+			_show(_pano_viewer)
+		else:
+			# open() fails only when the file is gone: drop its stale card.
+			_gallery.refresh()
+			_gallery.toast("Couldn't find this photo", "It is no longer on this device.", "error"))
+	add_child(_gallery)
+	_history.gallery_requested.connect(func() -> void:
+		_gallery.refresh()
+		_show(_gallery))
+
+	_pano_viewer = PanoramaViewer.new()
+	_pano_viewer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pano_viewer.back_requested.connect(func() -> void:
+		_pano_viewer.close()
+		_gallery.refresh()
+		_show(_gallery))
+	_pano_viewer.deleted.connect(func(_entry: Dictionary) -> void:
+		_gallery.refresh()
+		_show(_gallery))
+	_pano_viewer.open_failed.connect(func(_entry: Dictionary) -> void:
+		_show(_gallery)
+		_gallery.toast("Couldn't open this photo", "The file may be damaged. It stays in Gallery so you can delete it.", "error"))
+	add_child(_pano_viewer)
+
 	_settings_screen = SettingsScreen.new()
 	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_settings_screen.bind_settings(_settings)
+	_settings_screen.bind_store(_store)
 	_settings_screen.back_requested.connect(func() -> void:
 		_show(_settings_from if _settings_from != null else _picker))
 	AccentSun.refresh = _refresh_accent
@@ -286,11 +309,6 @@ func _ready() -> void:
 		SettingsScreen.reopen = false
 		_settings_from = _picker
 		_show(_settings_screen)
-	CacheStore.on_full = _on_cache_full
-	for toast: Toast in [_picker._toast, _view._toast]:
-		if toast != null:
-			toast.action_pressed.connect(_on_toast_action.bind(toast))
-
 ## Quit the app. Full screen hides the OS window controls, so the
 ## picker Exit button and these keys are the way out on desktop.
 ## A world still saving to the cache (or building) is waited for with
@@ -307,6 +325,7 @@ func _request_exit() -> void:
 	_leave_view()
 	if _build_abort != null:
 		_build_abort.requested = true
+	_view._reach.abort_build()
 	# Cache scans stop early; the index still gets its last write.
 	CacheStore.stop_scans = true
 	if _view.has_running_threads():
@@ -329,49 +348,16 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_request_exit()
 
-## The cache dropped places to stay under its limit: offer twice the
-## limit, once per limit (asked again only after it changes), when the
-## disk has room for the extra at least twice over.
-func _on_cache_full() -> void:
-	var limit := int(_settings.pref("cache_limit_mb"))
-	if _cache_offer_mb > 0 or int(_settings.pref("cache_full_asked_mb")) == limit:
-		return
-	var bigger := mini(limit * 2, CacheStore.MAX_LIMIT_MB)
-	var dir := DirAccess.open("user://")
-	if bigger <= limit or dir == null \
-			or dir.get_space_left() < (bigger - limit) * 1048576 * 2:
-		return
-	_cache_offer_mb = bigger
-	_offer_cache_room()
-
-## Shown on the map or in the viewer; during loading it waits for _show.
-func _offer_cache_room() -> void:
-	var toast: Toast = _view._toast if _view.visible else _picker._toast if _picker.visible else null
-	if _cache_offer_mb <= 0 or _cache_offer_shown or toast == null:
-		return
-	_cache_offer_shown = true
-	_settings.set_pref("cache_full_asked_mb", int(_settings.pref("cache_limit_mb")))
-	toast.show_message(CACHE_FULL_TITLE, CACHE_FULL_MESSAGE, "caution",
-		"Raise to %s" % UiTheme.cache_size(_cache_offer_mb * 1048576))
-	_place_toast(toast)
-
-func _on_toast_action(toast: Toast) -> void:
-	if toast.title_text() != CACHE_FULL_TITLE or _cache_offer_mb <= 0:
-		return
-	var mb := _cache_offer_mb
-	_cache_offer_mb = 0
-	_settings.set_pref("cache_limit_mb", mb)
-	UiPrefs.apply(_settings)
-	# After the action's own dismiss, so the confirmation is not faded out.
-	await get_tree().process_frame
-	toast.show_message("Size limit raised to %s" % UiTheme.cache_size(mb * 1048576), "", "good")
-	_place_toast(toast)
-
-func _place_toast(toast: Toast) -> void:
-	if toast == _view._toast:
-		ViewChrome.layout(_view)
-	else:
-		MapHome.place_toast(_picker)
+## The open confirmation veil (SettingsRows.confirm), if any, among the
+## screens: Esc closes it instead of navigating.
+func _find_modal() -> Control:
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
+		if s == null:
+			continue
+		for child in s.get_children():
+			if child.name == "confirm_veil":
+				return child
+	return null
 
 ## Ctrl/Cmd+Q quits anywhere. Esc steps back one screen (the viewer,
 ## History and Settings return to the map, a Settings page on phones
@@ -383,10 +369,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key.keycode == KEY_Q and (key.ctrl_pressed or key.meta_pressed):
 			_request_exit()
 		elif key.keycode == KEY_ESCAPE:
-			if _picker.visible:
+			# An open confirmation sheet consumes Esc first.
+			var modal := _find_modal()
+			if modal != null:
+				modal.queue_free()
+			elif _picker.visible:
 				_request_exit()
 			elif _loading.visible:
 				_loading.cancel_requested.emit()
+			elif _pano_viewer.visible:
+				_pano_viewer.back_requested.emit()
+			elif _gallery.visible:
+				_show(_picker)
 			elif _settings_screen.visible and _settings_screen.step_back():
 				pass
 			elif _settings_screen.visible and _settings_from != null:
@@ -404,6 +398,8 @@ func _refresh_accent() -> void:
 	_notice.refresh_theme()
 	_loading.refresh_theme()
 	_history.refresh()
+	if _gallery != null:
+		_gallery.refresh_theme()
 	_settings_screen.refresh_theme()
 
 ## Leaving the viewer: History keeps where the person was looking and the
@@ -418,8 +414,25 @@ func _leave_view() -> void:
 	# The picture costs a full-size read-back and an encode: only when the
 	# view changed since the last one.
 	var key := _view.look_key()
-	if key != _thumb_key and PlaceThumb.save(_view.snapshot(), float(state["lat"]), float(state["lon"])):
+	if key != _thumb_key:
+		_store_thumb(_view.snapshot(), float(state["lat"]), float(state["lon"]), key, false)
+
+## Writes the History picture on a worker, so leaving the view never
+## waits on the shrink and the encode. `key` is claimed at once, so the
+## view's snapshot timer and leaving cannot save the same look twice; a
+## failed write gives it back for the next try. Runs unawaited: the
+## callers (leaving, quitting) do not wait for the picture.
+func _store_thumb(image: Image, lat: float, lon: float, key: Array, refresh_history: bool) -> void:
+	if image == null or image.is_empty():
+		return
+	if not key.is_empty():
 		_thumb_key = key
+	var ok := await PlaceThumb.save_async(image, lat, lon, get_tree())
+	if not ok and not key.is_empty() and _thumb_key == key:
+		_thumb_key = []
+	# History rebuilds when it opens; only a visible one needs it now.
+	if refresh_history and _history != null and _history.visible:
+		_history.refresh()
 
 ## What Try again reopens: the camera the person was last at (saved on
 ## leaving), keeping the time, season and date a shared link carried. A
@@ -444,12 +457,10 @@ func _apply_preset(p: int) -> void:
 func _show(screen: Control) -> void:
 	if screen != _view:
 		_leave_view()
-	for s in [_picker, _loading, _view, _history, _settings_screen]:
+	for s in [_picker, _loading, _view, _history, _gallery, _pano_viewer, _settings_screen]:
 		s.visible = s == screen
 	if screen == _picker:
 		_picker.refresh_recent()
-	if screen == _picker or screen == _view:
-		_offer_cache_room()
 	_notice.set_on_screen(screen == _view)
 	if screen != _view:
 		var at := _picker.selected_point()
@@ -696,6 +707,8 @@ func _on_generation_finished(data: LocationData) -> void:
 		return
 	if not capture_mode:
 		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
+	_view.start_flying = not capture_mode
+	_view._streamer.enabled = not capture_mode
 	_view.show_location(data, built)
 	_notice.show_notes(data.data_notes)
 	_show(_view)

@@ -25,7 +25,7 @@ static func ta_keo(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Stone", LandmarkMaterials.pbr("stone", "#8A7E6A", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("stone", "#9A8E78", 3.0))
-	lm.use("Laterite", LandmarkMaterials.pbr("stone", "#7A4F37", 3.0))
+	lm.use("Laterite", LandmarkMaterials.pbr("stone", LandmarkAngParts.LATERITE, 3.0))
 	lm.use("Dark", LandmarkMaterials.pbr("concrete", "#25221E", 2.0))
 	lm.use("Tile", LandmarkMaterials.pbr("brick", "#8A4E36", 3.0))
 	var wall: Array[String] = ["Stone", "Trim", "Dark"]
