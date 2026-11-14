@@ -132,7 +132,7 @@ var _store: CacheStore
 var _recent_box: VBoxContainer
 var _recent_row: HBoxContainer
 var _first_note: Label
-var _first_launch := false  # no history yet: the note shows over the featured shelf
+var _first_note_done := false  # a continent was opened: the first-launch note has done its job
 var _offline_badge: Button
 var _offline := false
 var _toast: Toast
@@ -424,7 +424,7 @@ func _ready() -> void:
 	_quick_box.add_child(_recent_box)
 	_quick_box.move_child(_recent_box, 0)
 	_quick_box.add_child(_first_note)
-	_quick_box.move_child(_first_note, 3)
+	_quick_box.move_child(_first_note, _quick_scroll.get_index())
 	_wire_zoom(_sheet)
 	_wire_zoom(_side, false)
 	resized.connect(_on_resized)
@@ -526,6 +526,8 @@ func _shelf_indices(key: String) -> Array[int]:
 ## phone and push the panel's footer thousands of pixels down).
 func _set_shelf(key: String) -> void:
 	_shelf_key = key
+	if key != CapitalContinents.FEATURED:
+		_first_note_done = true
 	_continent_filter.select(key)
 	_quick_scroll.scroll_horizontal = 0
 	_shelf_build += 1
@@ -549,13 +551,14 @@ func _settle_shelf() -> void:
 	_set_selected_quick(_selected_quick)
 	MapHome.apply_offline(self)
 
-## Show the cards of the open shelf and name it. First launch adds a line
-## of copy over the featured places.
+## Show the cards of the open shelf and name it. First launch (no history)
+## adds a line of copy over the featured places until a continent is opened.
 func _apply_shelf() -> void:
 	var featured := _shelf_key == CapitalContinents.FEATURED
 	var shelf := _shelf_indices(_shelf_key)
 	if _first_note != null:
-		_first_note.visible = _first_launch and featured
+		_first_note.visible = featured and not _first_note_done \
+			and _store != null and _store.entries.is_empty()
 	for card in _quick_chips:
 		card.visible = int(card.get_meta("quick_index")) in shelf
 	# Cards are built as a shelf opens, so put the built ones in shelf order.

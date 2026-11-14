@@ -62,7 +62,6 @@ static func refresh_recent(p: MapPicker) -> void:
 		p._recent_row.add_child(card)
 	p._recent_box.visible = not entries.is_empty()
 	# First launch: one line of copy over the featured places.
-	p._first_launch = entries.is_empty()
 	p._apply_shelf()
 	apply_offline(p)
 
