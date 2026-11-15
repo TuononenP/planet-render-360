@@ -10,8 +10,11 @@ capital's station building as a `station` archetype on its real outline
     python3 -I tools/capital_stations.py dump --work /tmp/st AT HU
 
 tools/capital_stations.tsv lists one main station per capital: its rough
-point, name, Wikipedia title, an optional height and clock tower, aliases
-and optionally the OSM way ("w<id>") or relation ("r<id>"). Without an id
+point, name, Wikipedia title, an optional height and clock tower, aliases,
+optionally the OSM way ("w<id>") or relation ("r<id>"), and a `style`
+(JSON, the keys of LandmarkCoreBArchStation) describing the real building
+from photos: body height, colours, roof, towers, dome, hall and so on. The
+registry height_m is the style's highest point (style_top). Without an id
 the station building within RESOLVE_M of the point is taken (tagged
 as the station, else holding the station node, else named as one; the
 largest of its rank); a
@@ -335,30 +338,69 @@ def read_tsv() -> list[dict]:
         if not line.strip() or line.startswith("#"):
             continue
         cells = line.split("\t")
-        cc, city, lat, lon, name, wiki, height, tower, aliases, osm = (cells + [""] * 10)[:10]
+        cc, city, lat, lon, name, wiki, height, tower, aliases, osm, style = (cells + [""] * 11)[:11]
         rows.append({"cc": cc, "city": city, "lat": float(lat), "lon": float(lon), "osm": osm,
                      "name": name, "wiki": wiki,
                      "height": float(height) if height else 0.0, "tower": tower == "tower",
-                     "aliases": [a.strip() for a in aliases.split(",") if a.strip()]})
+                     "aliases": [a.strip() for a in aliases.split(",") if a.strip()],
+                     "style": json.loads(style) if style.strip() else {}})
     return rows
 
 
+def style_top(style: dict, h: float) -> float:
+    """The highest point LandmarkCoreBArchStation draws for `style` on a
+    body of default height `h`: every style height is a total."""
+    eave = float(style.get("eave", h))
+    if style.get("underground"):
+        return eave
+    roof = style.get("roof", "flat")
+    top = eave + (float(style.get("roof_rise", 5.0)) if roof == "hip" else 1.0 if roof == "overhang" else 0.0)
+    if "tower" in style:
+        top = max(top, float(style.get("tower_h", eave + 15.0)))
+    if "dome" in style:
+        top = max(top, float(style.get("dome_top", eave + float(style.get("dome_r", 8.0)) * 1.6)))
+    if style.get("hall"):
+        top = max(top, float(style.get("hall_top", eave + 8.0)))
+    if "centre_h" in style:
+        rise = float(style.get("centre_rise", 0.0)) if style.get("centre_roof", "flat") != "flat" else 0.0
+        top = max(top, float(style["centre_h"]) + rise)
+    if roof == "gable":
+        top = max(top, eave + float(style.get("roof_rise", 3.0)))
+    if "shell_canopy" in style:
+        top = max(top, eave - 1.0 + float(style["shell_canopy"][1]) + 0.4)
+    if "portal" in style:
+        top = max(top, float(style["portal"][1]))
+    if "cantilever" in style:
+        top = max(top, eave + float(style["cantilever"][1]) + 0.2)
+    if style.get("hall") and "hall_belfry" in style:
+        top = max(top, float(style.get("hall_top", eave + 8.0)) + float(style["hall_belfry"]))
+    if "pavilions" in style:
+        top = max(top, float(style["pavilions"][1]))
+    if style.get("shells"):
+        top = max(top, float(style.get("shell_top", eave + (6.0 if style["shells"] == "umbrella" else 4.0))))
+    return top
+
+
 def gd_entry(row: dict, m: dict) -> str:
-    # Untagged: a modest station hall, taller for a long one; a tower row
-    # needs room for its clock tower.
+    # Untagged: a modest station hall, taller for a long one. The style (the
+    # real building's form, from photos) may set the body and its features.
     h = max(m["height"], 8.0) if m["height"] > 0.0 else (18.0 if m["length"] > 120.0 else 14.0)
-    if row["tower"]:
-        h = max(h, 24.0)
+    style = dict(row["style"])
+    if row["tower"] and not style:
+        style = {"tower": "side", "tower_h": max(h + 10.0, 24.0)}
+    top = style_top(style, h)
+    if "eave" not in style and not style.get("underground"):
+        style["eave"] = h
     hl = m["length"] * 0.5 + 4.0
     hw = m["width"] * 0.5 + 4.0
     aliases = sorted({row["name"].lower(), *[a.lower() for a in row["aliases"]]})
     outline = ", ".join(f"[{x}, {z}]" for x, z in m["outline"])
     return ("\t\t{" + f'"type": "{row["type"]}", "name": "{row["name"]}", "lat": {m["lat"]}, "lon": {m["lon"]},\n'
-            f'\t\t\t"radius_m": 6000.0, "wiki_title": "{row["wiki"]}", "height_m": {h}, "kind": "Station",\n'
+            f'\t\t\t"radius_m": 6000.0, "wiki_title": "{row["wiki"]}", "height_m": {round(top, 1)}, "kind": "Station",\n'
             f'\t\t\t"secondary": true, "yaw_deg": {m["yaw_deg"]}, "clear_m": 12.0,'
             f' "clear_rect_m": [0.0, 0.0, {hl:.1f}, {hw:.1f}],\n'
-            f'\t\t\t"archetype": "station", "tower": {"true" if row["tower"] else "false"},'
-            f' "capital": "{row["cc"]}",\n'
+            f'\t\t\t"archetype": "station", "capital": "{row["cc"]}",\n'
+            f'\t\t\t"style": {json.dumps(style, ensure_ascii=False)},\n'
             f'\t\t\t"aliases": [{", ".join(json.dumps(a, ensure_ascii=False) for a in aliases)}],\n'
             f'\t\t\t"outline_m": [{outline}]' + "},")
 

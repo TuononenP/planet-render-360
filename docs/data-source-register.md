@@ -732,7 +732,12 @@ its minimum-area rectangle (yaw), outline and tagged height. Nearby `railway=rai
   own work, sized from published figures and placed and turned on the OSM
   outline.
 - Every other capital: `LandmarkRegistryCapitalStationsOsm` is generated,
-  and the `station` archetype is drawn on the real outline.
+  and the `station` archetype is drawn on the real outline. Each row's
+  `style` (body height, wall and roof colours, roof type, towers, dome,
+  hall and so on) comes from the station's Wikipedia lead photo, read
+  through the REST summary API (`en.wikipedia.org/api/rest_v1/page/summary`,
+  offline review only, identifying User-Agent). Where the article shows no
+  station photo, the style comes from published descriptions.
 
 The public Overpass instances were at capacity for the batch, so the OSM API
 was used. Attribution: © OpenStreetMap contributors (ODbL), as for every

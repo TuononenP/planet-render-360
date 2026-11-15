@@ -7,7 +7,8 @@ extends SceneTree
 ## StationsOsm). Each row names a capital of CapitalCatalog, stands within
 ## STATION_REACH_M of it, is a secondary "Station" (never displaces a
 ## capital's icon), clears its footprint with clear_rect_m, and builds a
-## model reaching its height_m. The station tags make an OSM building a
+## model reaching its height_m (from its style: a hall, tower or dome
+## only where the real station has one). The station tags make an OSM building a
 ## `station` archetype, metro stops and museums excepted, and small halts
 ## stay ordinary buildings.
 
@@ -87,6 +88,19 @@ func _init() -> void:
 	if absf(low_top - 10.0) > 1.0:
 		failures.append("a 10 m station should stand 10 m tall, got %.1f m" % low_top)
 	low.free()
+	# The archetype draws a hall, tower or dome only where the style asks:
+	# a plain station is its body; a tower or dome sets the top.
+	var ring := PackedVector2Array([Vector2(-40, -12), Vector2(40, -12), Vector2(40, 12), Vector2(-40, 12)])
+	var plain := LandmarkMesh.new()
+	for key in ["Walls", "Roof", "Trim", "Windows", "Gilt", "Dial", "Steel"]:
+		plain.use(key, LandmarkMaterials.paint("#888888"))
+	if absf(LandmarkCoreBArchStation.build(plain, 14.0, ring) - 14.0) > 0.01:
+		failures.append("a plain station should stop at its body height")
+	if absf(LandmarkCoreBArchStation.build(plain, 14.0, ring, {"eave": 12.0, "tower": "centre", "tower_h": 40.0,
+			"tower_cap": "spire"}) - 40.0) > 0.01:
+		failures.append("a tower style should reach its tower_h")
+	if absf(LandmarkCoreBArchStation.build(plain, 14.0, ring, {"eave": 12.0, "dome": true, "dome_top": 30.0}) - 30.0) > 0.01:
+		failures.append("a dome style should reach its dome_top")
 	if failures.is_empty():
 		print("CAPITAL STATIONS OK: %d stations" % rows.size())
 		quit(0)

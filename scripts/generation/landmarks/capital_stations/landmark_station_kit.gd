@@ -92,7 +92,9 @@ static func arch_window(lm: LandmarkMesh, frame: String, glass: String, foot: Ve
 	var hw := w * 0.5
 	var spring := maxf(h - hw, 0.1)
 	var f := fw if fw > 0.0 else clampf(w * 0.08, 0.15, 0.9)
-	var g := foot + n * 0.04
+	# Glass and frame stand well clear of the wall face: at a grazing view
+	# from a few hundred metres a closer pane flickers into the wall.
+	var g := foot + n * 0.12
 	lm.quad(glass, g - r * hw, g + r * hw, g + r * hw + Vector3.UP * spring, g - r * hw + Vector3.UP * spring, n)
 	var cen := g + Vector3.UP * spring
 	var prev := cen + r * hw
@@ -101,18 +103,18 @@ static func arch_window(lm: LandmarkMesh, frame: String, glass: String, foot: Ve
 		var t := PI * float(k) / float(seg)
 		var p := cen + r * hw * cos(t) + Vector3.UP * hw * sin(t)
 		lm.tri(glass, cen, prev, p, n, n, n, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
-		lm.beam(frame, prev + (prev - cen).normalized() * f * 0.5 + n * 0.1,
-			p + (p - cen).normalized() * f * 0.5 + n * 0.1, f, 0.3, n)
+		lm.beam(frame, prev + (prev - cen).normalized() * f * 0.5 + n * 0.2,
+			p + (p - cen).normalized() * f * 0.5 + n * 0.2, f, 0.3, n)
 		prev = p
 	for s in [-1.0, 1.0]:
-		lm.box(frame, foot + r * (hw + f * 0.5) * float(s) + n * 0.15 + Vector3.UP * spring * 0.5,
+		lm.box(frame, foot + r * (hw + f * 0.5) * float(s) + n * 0.25 + Vector3.UP * spring * 0.5,
 			Vector3(f, spring, 0.3), Basis(r, Vector3.UP, n), 0.0)
 	for b in bars:
 		var x := ((float(b) + 1.0) / float(bars + 1) * 2.0 - 1.0) * hw
 		var top := spring + sqrt(maxf(hw * hw - x * x, 0.0))
-		lm.box(frame, foot + r * x + n * 0.1 + Vector3.UP * top * 0.5, Vector3(0.14, top, 0.14),
+		lm.box(frame, foot + r * x + n * 0.18 + Vector3.UP * top * 0.5, Vector3(0.14, top, 0.14),
 			Basis(r, Vector3.UP, n), 0.0)
-	lm.box(frame, foot + n * 0.1 + Vector3.UP * spring, Vector3(w, 0.18, 0.16), Basis(r, Vector3.UP, n), 0.0)
+	lm.box(frame, foot + n * 0.18 + Vector3.UP * spring, Vector3(w, 0.18, 0.16), Basis(r, Vector3.UP, n), 0.0)
 
 ## `count` round-headed openings evenly along a..b, sills `y` up.
 static func arch_row(lm: LandmarkMesh, frame: String, glass: String, a: Vector3, b: Vector3, out: Vector3,
@@ -205,7 +207,9 @@ static func block(lm: LandmarkMesh, wall: String, trim: String, glass: String, r
 		w: float, d: float, y0: float, h: float, roof_kind: String = "flat", rh: float = 0.0, bay: float = 4.2,
 		pitch: float = 4.5, arched: bool = false) -> void:
 	lm.box(wall, Vector3(cx, y0 + h * 0.5, cz), Vector3(w, h, d))
-	lm.box(trim, Vector3(cx, y0 + h - 0.35, cz), Vector3(w + 0.7, 0.7, d + 0.7))
+	# The cornice stops just under the roof line: a face coplanar with the
+	# block's top would flicker against it.
+	lm.box(trim, Vector3(cx, y0 + h - 0.4, cz), Vector3(w + 0.7, 0.7, d + 0.7))
 	lm.box(trim, Vector3(cx, y0 + 0.5, cz), Vector3(w + 0.4, 1.0, d + 0.4))
 	var rows := maxi(int((h - 1.5) / pitch), 1)
 	for face in LandmarkFhParts.faces(cx, cz, w, d):
@@ -227,9 +231,10 @@ static func block(lm: LandmarkMesh, wall: String, trim: String, glass: String, r
 	var top := Vector3(cx, y0 + h, cz)
 	match roof_kind:
 		"hip":
-			LandmarkFhUtil.hip(lm, roof, top, w + 0.6, d + 0.6, rh, 0.0 if absf(w - d) < 1.0 else 0.3)
+			hip_roof(lm, roof, top, w + 0.6, d + 0.6, rh)
 		"mansard":
-			LandmarkFhUtil.hip(lm, roof, top, w + 0.4, d + 0.4, rh, 0.55)
+			# Lifted a hair so the roof's base cap does not lie on the block's top.
+			LandmarkFhUtil.hip(lm, roof, top + Vector3.UP * 0.03, w + 0.4, d + 0.4, rh - 0.03, 0.55)
 		"gable_x":
 			LandmarkFhUtil.ridge_x(lm, roof, wall, top, w, d, rh)
 		"gable_z":
@@ -237,6 +242,35 @@ static func block(lm: LandmarkMesh, wall: String, trim: String, glass: String, r
 		"barrel":
 			LandmarkFhHelsinkiCity._barrel(lm, roof, top - Vector3(w * 0.5, 0, 0), top + Vector3(w * 0.5, 0, 0),
 				d * 0.5 + 0.3, rh)
+
+## A true hipped roof over a `w` (X) by `d` (Z) rectangle with eaves at
+## `c`: four sloping planes meeting on a ridge along the long side (a
+## pyramid when square), `rise` tall.
+static func hip_roof(lm: LandmarkMesh, key: String, c: Vector3, w: float, d: float, rise: float) -> void:
+	var half := absf(w - d) * 0.5
+	var ax := Vector3(half, 0, 0) if w >= d else Vector3(0, 0, half)
+	var r0 := c + Vector3.UP * rise - ax
+	var r1 := c + Vector3.UP * rise + ax
+	var a := c + Vector3(-w * 0.5, 0, -d * 0.5)
+	var b := c + Vector3(w * 0.5, 0, -d * 0.5)
+	var e := c + Vector3(w * 0.5, 0, d * 0.5)
+	var f := c + Vector3(-w * 0.5, 0, d * 0.5)
+	var nn := Vector3(0, d * 0.5, -rise).normalized()
+	var ns := Vector3(0, d * 0.5, rise).normalized()
+	var nw := Vector3(-rise, w * 0.5, 0).normalized()
+	var ne := Vector3(rise, w * 0.5, 0).normalized()
+	if w >= d:
+		# Ridge along X: long planes north and south, hip ends east and west.
+		lm.quad(key, a, b, r1, r0, nn)
+		lm.quad(key, e, f, r0, r1, ns)
+		lm.tri(key, f, a, r0, nw, nw, nw, Vector2.ZERO, Vector2(d, 0), Vector2(d * 0.5, rise))
+		lm.tri(key, b, e, r1, ne, ne, ne, Vector2.ZERO, Vector2(d, 0), Vector2(d * 0.5, rise))
+	else:
+		# Ridge along Z: long planes west and east, hip ends north and south.
+		lm.quad(key, f, a, r0, r1, nw)
+		lm.quad(key, b, e, r1, r0, ne)
+		lm.tri(key, a, b, r0, nn, nn, nn, Vector2.ZERO, Vector2(w, 0), Vector2(w * 0.5, rise))
+		lm.tri(key, e, f, r1, ns, ns, ns, Vector2.ZERO, Vector2(w, 0), Vector2(w * 0.5, rise))
 
 ## Materials every station model uses: Walls and Trim (`wall_set` tinted
 ## `wall` / `trim`), Roof, Glass, Steel (painted iron), Dial and Gilt.

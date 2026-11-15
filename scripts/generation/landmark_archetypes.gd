@@ -29,7 +29,7 @@ static func build(model: Node3D, archetype: String, h: float, size: Vector2,
 	if archetype == "station":
 		# Built long along +X: turned a quarter when the footprint is long in Z.
 		_station_mats(lm)
-		LandmarkCoreBArchStation.build(lm, h, _rect(l, w), false)
+		LandmarkCoreBArchStation.build(lm, h, _rect(l, w))
 		lm.commit(model)
 		if size.y > size.x:
 			model.rotation.y = PI * 0.5
@@ -52,22 +52,39 @@ static func build(model: Node3D, archetype: String, h: float, size: Vector2,
 		model.rotation.y = PI * 0.5
 
 ## A registry station row (LandmarkRegistryCapitalStationsOsm): the
-## `station` archetype on the row's own outline_m and height_m, dressed in
-## the look of the region it stands in.
+## `station` archetype on the row's own outline_m and height_m, as its
+## `style` describes the real building (LandmarkCoreBArchStation), dressed
+## in the look of the region it stands in unless the style names its wall
+## and roof colours (`wall`, `wall_set`, `roof_hex`, `roof_set`).
 static func station(model: Node3D, entry: Dictionary) -> void:
 	var look := _look(ArchitectureStyle.region_for(float(entry["lat"]), float(entry["lon"])))
+	var style: Dictionary = entry.get("style", {})
 	var lm := LandmarkMesh.new()
-	lm.use("Walls", LandmarkMaterials.pbr(str(look["set"]), str(look["wall"]), 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr(str(look["roof_set"]), str(look["roof"]), 2.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#D8CFBE", 3.0))
-	lm.use("Windows", LandmarkMaterials.glass("#22292D"))
+	lm.use("Walls", LandmarkMaterials.pbr(str(style.get("wall_set", look["set"])),
+		str(style.get("wall", look["wall"])), 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr(str(style.get("roof_set", look["roof_set"])),
+		str(style.get("roof_hex", look["roof"])), 2.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", str(style.get("trim", "#D8CFBE")), 3.0))
+	lm.use("Windows", LandmarkMaterials.glass(str(style.get("glass_hex", "#22292D"))))
+	# Curtain walls: a light, sky-grey glazing read at city scale.
+	lm.use("Curtain", LandmarkMaterials.pbr("render", str(style.get("glass_hex", "#9FB4C4")), 6.0, 0.2, 0.3))
+	lm.use("Gilt", LandmarkMaterials.gold())
+	if style.has("band_hex"):
+		lm.use("Band", LandmarkMaterials.pbr("copper", str(style["band_hex"]), 2.0))
+	if style.has("louvre_hex"):
+		lm.use("Louvre", LandmarkMaterials.paint(str(style["louvre_hex"])))
+	if style.has("shell_canopy"):
+		lm.use("Shell", LandmarkMaterials.pbr("concrete", "#B9B3A8", 4.0))
+	if style.has("floor_band_hex"):
+		lm.use("FloorBand", LandmarkMaterials.pbr("render", str(style["floor_band_hex"]), 3.0))
+		lm.use("Blocks", LandmarkMaterials.pbr("render", "#D6E2E4", 1.0, 0.3, 0.1))
 	_station_mats(lm)
 	var poly := PackedVector2Array()
 	for p in entry.get("outline_m", []):
 		poly.append(Vector2(float(p[0]), float(p[1])))
 	if poly.size() < 3:
 		poly = _rect(40.0, 20.0)
-	LandmarkCoreBArchStation.build(lm, float(entry.get("height_m", 16.0)), poly, bool(entry.get("tower", false)))
+	LandmarkCoreBArchStation.build(lm, float(entry.get("height_m", 16.0)), poly, style)
 	lm.commit(model)
 
 static func _station_mats(lm: LandmarkMesh) -> void:

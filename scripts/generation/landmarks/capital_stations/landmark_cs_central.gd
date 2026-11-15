@@ -8,24 +8,44 @@ extends RefCounted
 
 const K = preload("res://scripts/generation/landmarks/capital_stations/landmark_station_kit.gd")
 
-## Berlin Hauptbahnhof (gmp, 2006): the 321 m east-west glass barrel over
-## the elevated through tracks, the flat-roofed north-south hall below it,
-## and the two 46 m "Bügelbauten" office slabs straddling the barrel
-## either side of the crossing; the forecourt is Washingtonplatz (+Z).
+## Berlin Hauptbahnhof (gmp, 2006): the 321 m east-west glass barrel, a
+## light fine-meshed vault over the elevated through tracks that runs on
+## unbroken under the two 46 m "Bügelbauten", office bars of pale grey-
+## green curtain wall on a fine grid that straddle it, and the lower
+## flat-roofed glass north-south halls between them either side of it; the forecourt is
+## Washingtonplatz (+Z).
 static func berlin_hbf(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "concrete", "#9EA3A6", "#BFC3C5", "sheet_metal", "#7D868C", "#8C949A")
-	K.shed(lm, "Roof", "Steel", "Glass", Vector3(-160, 0, 0), Vector3.RIGHT, 66.0, 321.0, 14.0, 12.0, 8.0, 0.92, 3)
-	# North-south hall: glass walls and a flat glass roof at 26 m.
-	lm.box("Glass", Vector3(0, 13.0, 0), Vector3(40.0, 26.0, 160.0), Basis(), 0.0)
-	lm.box("Steel", Vector3(0, 26.2, 0), Vector3(41.0, 0.5, 161.0), Basis(), 0.0)
-	LandmarkFhParts.ribs(lm, "Steel", Vector3(-20, 0, 80.1), Vector3(20, 0, 80.1), Vector3.BACK, 0.0, 26.0, 2.5, 0.2, 0.3)
+	K.mats(lm, "concrete", "#9EA3A6", "#BFC3C5", "sheet_metal", "#7D868C", "#AEB6B9")
+	lm.use("Glass", LandmarkMaterials.glass("#9FB3B5"))
+	lm.use("Vault", LandmarkMaterials.pbr("concrete", "#C3CED2", 20.0, 0.15, 0.3))
+	K.shed(lm, "Vault", "Steel", "Vault", Vector3(-160, 0, 0), Vector3.RIGHT, 66.0, 321.0, 14.0, 12.0, 6.0, 1.0, 3)
+	# North-south hall: glass halls with flat glass roofs at 18 m either side
+	# of the barrel, which passes over the crossing unbroken.
+	for zc in [-56.5, 56.5]:
+		lm.box("Glass", Vector3(0, 9.0, zc), Vector3(40.0, 18.0, 47.0), Basis(), 0.0)
+		lm.box("Steel", Vector3(0, 18.2, zc), Vector3(41.0, 0.5, 48.0), Basis(), 0.0)
+	LandmarkFhParts.ribs(lm, "Steel", Vector3(-20, 0, 80.1), Vector3(20, 0, 80.1), Vector3.BACK, 0.0, 18.0, 2.5, 0.2, 0.3)
 	for s in [-1.0, 1.0]:
 		var x: float = s * 33.0
 		for z in [-56.5, 56.5]:
-			K.block(lm, "Glass", "Steel", "Walls", "Roof", x, float(z), 17.0, 47.0, 0.0, 46.0, "flat", 0.0, 3.0, 3.8)
-		K.block(lm, "Glass", "Steel", "Walls", "Roof", x, 0.0, 17.0, 66.0, 30.0, 16.0, "flat", 0.0, 3.0, 3.8)
+			_curtain(lm, Vector3(x, 0, float(z)), Vector3(17.0, 46.0, 47.0))
+		_curtain(lm, Vector3(x, 30.0, 0.0), Vector3(17.0, 16.0, 66.0))
 	lm.commit(model)
+
+## A curtain-walled bar `size` standing on `base`: glass faces with a fine
+## grid of mullions and floor bands, a flat roof.
+static func _curtain(lm: LandmarkMesh, base: Vector3, size: Vector3) -> void:
+	lm.use("Curtain", LandmarkMaterials.pbr("concrete", "#9FB3B5", 20.0, 0.18, 0.35))
+	lm.box("Curtain", base + Vector3.UP * size.y * 0.5, size, Basis(), 0.0)
+	lm.box("Roof", base + Vector3.UP * (size.y + 0.2), Vector3(size.x + 0.4, 0.4, size.z + 0.4))
+	var y := 3.8
+	while y < size.y - 0.5:
+		lm.box("Steel", base + Vector3.UP * y, Vector3(size.x + 0.2, 0.25, size.z + 0.2), Basis(), 0.0)
+		y += 3.8
+	for face in LandmarkFhParts.faces(base.x, base.z, size.x, size.z):
+		LandmarkFhParts.ribs(lm, "Steel", (face[0] as Vector3) + Vector3.UP * base.y, (face[1] as Vector3) + Vector3.UP * base.y,
+			face[2], base.y, base.y + size.y, 2.7, 0.12, 0.15)
 
 ## Wien Hauptbahnhof (2014), here with the tracks along Z and the city
 ## end (Südtiroler Platz) at +Z: five white roof ribbons over the island
@@ -100,48 +120,58 @@ static func _ribbon(lm: LandmarkMesh, x: float, z0: float, z1: float) -> void:
 		var z := z0 - 20.0 * float(k)
 		lm.box("Steel", Vector3(x, 5.2, z), Vector3(0.7, 10.4, 0.7), Basis(), 0.0)
 
-## Josef Fanta's station building (1909) on Wilsonova: the Art Nouveau
+## Josef Fanta's station building (1909) on Wilsonova (cream render, red
+## tile roofs, pale grey sheds, copper only on the domes): the Art Nouveau
 ## central hall with its great semicircular glazed arch and dome, the two
 ## 45 m towers with their glass-and-metal globes, the wings either side,
 ## and the two arched train sheds behind.
 static func praha_hln(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#D8CDB0", "#E3DAC4", "copper", "#5E8C7A")
+	K.mats(lm, "render", "#E3DCCB", "#ECE6D8", "terracotta", "#A8503A")
+	lm.use("Copper", LandmarkMaterials.pbr("copper", "#5E8C7A", 2.0))
+	lm.use("Shed", LandmarkMaterials.pbr("sheet_metal", "#C9CDD0", 2.0))
 	for s in [-1.0, 1.0]:
-		K.shed(lm, "Roof", "Steel", "Glass", Vector3(s * 17.0, 0, -20), Vector3.FORWARD, 33.0, 230.0, 8.0, 12.0, 9.0,
+		K.shed(lm, "Shed", "Steel", "Glass", Vector3(s * 17.0, 0, -20), Vector3.FORWARD, 33.0, 230.0, 8.0, 12.0, 9.0,
 			0.5, 1)
 		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 52.0, -4.0, 50.0, 18.0, 0.0, 15.0, "mansard", 4.0, 4.5, 5.0, true)
 		var tx: float = s * 25.0
 		K.block(lm, "Walls", "Trim", "Glass", "Roof", tx, 1.0, 9.0, 9.0, 0.0, 36.0, "flat", 0.0, 3.0, 6.0)
-		lm.lathe("Roof", Vector3(tx, 36.0, 1.0), LandmarkFhUtil.dome_prof(4.2, 4.5), 16)
+		lm.lathe("Copper", Vector3(tx, 36.0, 1.0), LandmarkFhUtil.dome_prof(4.2, 4.5), 16)
 		lm.lathe("Gilt", Vector3(tx, 40.5, 1.0), LandmarkFhUtil.ball(1.6), 12)
 		lm.box("Gilt", Vector3(tx, 43.8, 1.0), Vector3(0.3, 1.2, 0.3))
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -2.0, 40.0, 26.0, 0.0, 20.0, "flat", 0.0, 4.0, 5.0)
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 2.0, 11.05), Vector3.BACK, 26.0, 26.0, 7, 1.4)
-	lm.lathe("Roof", Vector3(0, 20.0, -2.0), LandmarkFhUtil.dome_prof(15.0, 9.0), 20, 1.0, 1.0)
+	lm.lathe("Copper", Vector3(0, 20.0, -2.0), LandmarkFhUtil.dome_prof(15.0, 9.0), 20, 1.0, 1.0)
 	K.clock(lm, "Dial", "Trim", Vector3(0, 22.0, 11.6), Vector3.BACK, 1.6)
 	for x in [-14.0, -8.0, 8.0, 14.0]:
 		K.statue(lm, "Trim", Vector3(x, 20.0, 10.6), 3.5)
 	lm.commit(model)
 
-## Budapest Keleti (Rochlitz and Feketeházy, 1884): the stone front whose
-## great glazed arch closes the 42 m iron shed, the statues of Watt and
-## Stephenson either side and the allegorical group on the crown, the
-## corner pavilions and the office wings along the shed.
+## Budapest Keleti (Rochlitz and Feketeházy, 1884): the light stone
+## frame whose great glazed arch closes the 42 m iron shed, its two tall
+## piers holding the statues of Watt and Stephenson in their niches under
+## the sculpted crest group and flag; the ochre-yellow corner pavilions
+## and side ranges with white trim under dark grey mansard roofs.
 static func keleti(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "limestone", "#CFC3A9", "#DED4C0", "slate", "#4F575E")
+	K.mats(lm, "limestone", "#D9CFB8", "#F2EEE4", "slate", "#4F575E")
+	lm.use("Ochre", LandmarkMaterials.pbr("render", "#E3C25F", 3.0))
 	K.shed(lm, "Roof", "Steel", "Glass", Vector3(0, 0, -2), Vector3.FORWARD, 42.0, 185.0, 18.0, 12.0, 9.0, 0.5, 1)
 	lm.box("Walls", Vector3(0, 15.0, 0.5), Vector3(48.0, 30.0, 4.0))
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 1.0, 2.55), Vector3.BACK, 32.0, 27.0, 8, 1.4)
 	lm.box("Trim", Vector3(0, 30.6, 0.5), Vector3(49.0, 1.2, 5.0))
-	lm.box("Trim", Vector3(0, 31.8, 1.0), Vector3(14.0, 1.2, 3.0))
-	K.statue(lm, "Trim", Vector3(0, 33.0, 1.0), 2.0)
 	for s in [-1.0, 1.0]:
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 31.0, -1.0, 14.0, 14.0, 0.0, 22.0, "flat", 0.0, 3.4, 5.5, true)
-		lm.lathe("Roof", Vector3(s * 31.0, 22.0, -1.0), LandmarkFhUtil.dome_prof(6.0, 5.0), 4, 1.0, 1.0, PI * 0.25, false)
-		K.statue(lm, "Trim", Vector3(s * 19.0, 18.0, 3.0), 4.0)
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 31.0, -98.0, 14.0, 180.0, 0.0, 16.0, "hip", 3.0, 4.5, 5.0, true)
+		var x: float = s * 21.0
+		lm.box("Walls", Vector3(x, 16.0, 2.6), Vector3(5.0, 32.0, 1.6))
+		lm.box("Glass", Vector3(x, 15.0, 3.45), Vector3(2.6, 6.0, 0.1), Basis(), 0.0)
+		K.statue(lm, "Trim", Vector3(x, 12.2, 3.6), 5.0)
+		K.block(lm, "Ochre", "Trim", "Glass", "Roof", s * 31.0, -1.0, 14.0, 14.0, 0.0, 22.0, "mansard", 5.0, 3.4, 5.5, true)
+		K.block(lm, "Ochre", "Trim", "Glass", "Roof", s * 31.0, -98.0, 14.0, 180.0, 0.0, 16.0, "mansard", 3.5, 4.5, 5.0, true)
+	# The crest: a sculpted group and its flag about 6 m over the arch.
+	lm.box("Trim", Vector3(0, 32.2, 1.0), Vector3(14.0, 2.0, 3.0))
+	for x in [-3.5, 0.0, 3.5]:
+		K.statue(lm, "Trim", Vector3(x, 33.2, 1.0), 3.6 if absf(x) > 1.0 else 4.2)
+	lm.box("Steel", Vector3(0, 38.0, 0.6), Vector3(0.15, 3.0, 0.15), Basis(), 0.0)
 	lm.commit(model)
 
 ## Warszawa Centralna (Arseniusz Romanowicz, 1975) on Aleje Jerozolimskie
@@ -204,20 +234,27 @@ static func warszawa_centralna(model: Node3D) -> void:
 const WARSAW_ROOF_Y := 16.0
 const WARSAW_SLAB := 1.4
 
-## Heinrich Wenck's København H (1911): the national-romantic red brick
-## and granite station with its great arched hall roof of copper, the
-## gabled front on Bernstorffsgade and the clock tower at the corner.
+## Heinrich Wenck's København H (1911): the national-romantic deep red
+## brick and granite station on Bernstorffsgade, its front a run of steep
+## gables, the main gable with its great round-arched window over the
+## arcaded porch along the street, the steep dark roof of the hall behind
+## them (its arched timber trusses are inside), and the clock tower at the
+## corner with its tall slender spire.
 static func kobenhavn_h(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "brick", "#9A4C38", "#C9BFAE", "copper", "#5C8D7B")
-	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -14.0, 74.0, 44.0, 0.0, 13.0, "barrel", 14.0, 5.0, 5.0)
+	K.mats(lm, "brick", "#8A3A28", "#C9BFAE", "slate", "#3D4651")
+	lm.use("Spire", LandmarkMaterials.pbr("copper", "#4F6B63", 2.0))
+	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -14.0, 74.0, 44.0, 0.0, 13.0, "gable_x", 14.0, 5.0, 5.0)
 	for s in [-1.0, 1.0]:
 		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 62.0, -6.0, 50.0, 26.0, 0.0, 12.0, "gable_x", 8.0, 4.0, 4.5, true)
-	for i in 3:
-		var x := -24.0 + 24.0 * float(i)
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", x, 10.0, 14.0, 8.0, 0.0, 12.0, "gable_z", 7.0, 3.2, 4.5, true)
-	LandmarkStationKit.lunette(lm, "Trim", "Glass", Vector3(0, 13.0, 8.1), Vector3.BACK, 40.0, 12.0, 12, 7)
-	K.clock_tower(lm, "Walls", "Trim", "Roof", "Dial", "Glass", Vector3(-41.0, 0, 9.0), 8.0, 32.0, "spire", 9.0)
+	for i in 5:
+		var x := -32.0 + 16.0 * float(i)
+		var big := i == 2
+		K.block(lm, "Walls", "Trim", "Glass", "Roof", x, 10.0, 14.0 if big else 12.0, 8.0, 0.0, 14.0 if big else 12.0,
+			"gable_z", 10.0 if big else 7.0, 3.2, 4.5, not big)
+	K.arch_window(lm, "Trim", "Glass", Vector3(0, 4.0, 14.05), Vector3.BACK, 9.0, 15.0, 3, 0.7)
+	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, 16.5, 70.0, 5.0, 0.0, 4.5, "flat", 0.0, 3.5, 4.5, true)
+	K.clock_tower(lm, "Walls", "Trim", "Spire", "Dial", "Glass", Vector3(-41.0, 0, 9.0), 7.0, 30.0, "spire", 16.0)
 	lm.commit(model)
 
 ## Adolf W. Edelsvärd's Stockholm Central (1871) on Vasagatan: the long
@@ -237,17 +274,22 @@ static func stockholm_central(model: Node3D) -> void:
 			1.5, 12.0, 0.3, 0)
 	lm.commit(model)
 
-## Oslo S: the 1882 Østbanehallen on Jernbanetorget, rendered brick with
-## its pedimented centre and hipped roofs, beside the 1980 concourse of
-## glass and concrete, and the platform canopies behind.
+## Oslo S: the 1882 Østbanehallen on Jernbanetorget, pale buff render
+## with its pedimented centre and hipped roofs, beside the lower 1980s
+## concourse of glass and concrete with its big glazed hall toward the
+## square, and the low flat canopies over the island platforms behind.
 static func oslo_s(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#C9B48E", "#DCCFB5", "slate", "#454C52")
+	K.mats(lm, "render", "#E2D3B0", "#ECE2CC", "slate", "#454C52")
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", -40.0, 0.0, 90.0, 24.0, 0.0, 13.0, "hip", 5.0, 4.0, 5.0, true)
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", -40.0, 2.0, 22.0, 26.0, 0.0, 15.0, "gable_z", 5.0, 3.6, 5.0, true)
 	K.clock(lm, "Dial", "Trim", Vector3(-40.0, 17.2, 15.2), Vector3.BACK, 1.2)
-	K.block(lm, "Glass", "Steel", "Walls", "Roof", 50.0, -6.0, 80.0, 36.0, 0.0, 20.0, "flat", 0.0, 3.0, 4.0)
+	K.block(lm, "Trim", "Steel", "Glass", "Roof", 50.0, -6.0, 80.0, 36.0, 0.0, 12.0, "flat", 0.0, 4.0, 4.0)
+	lm.box("Glass", Vector3(50.0, 8.0, 12.2), Vector3(40.0, 15.0, 0.3), Basis(), 0.0)
+	lm.box("Roof", Vector3(50.0, 15.6, 6.0), Vector3(44.0, 0.8, 12.6))
 	for i in 6:
-		K.shed(lm, "Roof", "Steel", "Glass", Vector3(-90, 0, -30.0 - 12.0 * float(i)), Vector3.RIGHT, 10.0, 230.0, 5.0,
-			1.2, 12.0, 0.3, 0)
+		var z := -30.0 - 12.0 * float(i)
+		lm.box("Roof", Vector3(25.0, 6.0, z), Vector3(230.0, 0.5, 8.0))
+		for k in 12:
+			lm.box("Steel", Vector3(-88.0 + 20.0 * float(k), 3.0, z), Vector3(0.4, 6.0, 0.4), Basis(), 0.0)
 	lm.commit(model)
