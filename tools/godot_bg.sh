@@ -26,6 +26,11 @@
 # Godot binary installed somewhere else; GODOT_NOACTIVATE_DYLIB points
 # at the shim (default ~/.local/lib/godot_noactivate.dylib).
 #
+# Batch runs (--headless, --script, --import, --export) are killed when
+# their memory footprint (compressed and swapped pages included) passes
+# GODOT_MEM_CAP_GB (default 24; 0 turns the cap off): a runaway script
+# loop in an agent's capture once filled 100+ GB of swap and froze the Mac.
+#
 # Install it ahead of Homebrew's godot on PATH so every caller gets it:
 #   cp tools/godot_bg.sh ~/.local/bin/godot
 
@@ -53,18 +58,70 @@ for a in "$@"; do
 	esac
 done
 
+cap_gb=${GODOT_MEM_CAP_GB:-24}
+
+# Physical footprint of a process in KB, compressed and swapped pages included.
+footprint_kb() {
+	footprint -p "$1" 2>/dev/null | awk '/phys_footprint:/ {
+		v = $2; gsub(",", "", v); u = $3
+		if (u == "MB") v *= 1024; else if (u == "GB") v *= 1048576
+		printf "%d", v; exit }'
+}
+
+# Kills Godot `$1` once its footprint passes the cap; sets `watch` to its pid.
+watch_memory() {
+	watch=
+	[ "$cap_gb" = 0 ] && return
+	command -v footprint >/dev/null || return
+	(
+		cap_kb=$((cap_gb * 1048576))
+		while kill -0 "$1" 2>/dev/null; do
+			kb=$(footprint_kb "$1")
+			if [ -n "$kb" ] && [ "$kb" -gt "$cap_kb" ]; then
+				echo "godot_bg: Godot $1 passed the ${cap_gb} GB memory cap ($((kb / 1048576)) GB); killed it. GODOT_MEM_CAP_GB raises the cap." >&2
+				kill -9 "$1"
+				break
+			fi
+			sleep 2
+		done
+	) &
+	watch=$!
+}
+
+# Runs a batch job under the memory cap, keeping its exit code.
+capped() {
+	if [ "$cap_gb" = 0 ] || ! command -v footprint >/dev/null; then
+		exec "$REAL" "$@"
+	fi
+	"$REAL" "$@" &
+	pid=$!
+	trap 'kill -TERM "$pid" 2>/dev/null' INT TERM HUP
+	watch_memory "$pid"
+	wait "$pid"
+	rc=$?
+	while kill -0 "$pid" 2>/dev/null; do
+		wait "$pid"
+		rc=$?
+	done
+	[ -n "$watch" ] && kill "$watch" 2>/dev/null
+	exit $rc
+}
+
 # Headless batch jobs can still initialize macOS application APIs. Apply the
 # same no-activation protection without changing their command-line arguments.
 shim=${GODOT_NOACTIVATE_DYLIB:-$HOME/.local/lib/godot_noactivate.dylib}
 if [ "${GODOT_FOREGROUND:-0}" != 1 ] && [ "$headless_run" = 1 ] && [ -f "$shim" ]; then
 	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
-	exec "$REAL" "$@"
+	capped "$@"
 fi
 
 # An interactive editor launch is yours; --import/--export are batch jobs.
-if [ "${GODOT_FOREGROUND:-0}" = 1 ] || [ "$headless" = 1 ] \
+if [ "${GODOT_FOREGROUND:-0}" = 1 ] \
 		|| { [ "$editor" = 1 ] && [ "$scripted" = 0 ]; }; then
 	exec "$REAL" "$@"
+fi
+if [ "$headless" = 1 ]; then
+	capped "$@"
 fi
 
 [ "$has_mode" = 0 ] && args=(--windowed "${args[@]}")
@@ -75,7 +132,7 @@ fi
 if [ -f "$shim" ] && [ "$scripted" = 1 ]; then
 	export GODOT_NOACTIVATE_HIDE=1
 	export DYLD_INSERT_LIBRARIES="$shim${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
-	exec "$REAL" "${args[@]}"
+	capped "${args[@]}"
 fi
 
 front_field() { lsappinfo info -only "$1" "$(lsappinfo front)" 2>/dev/null; }
@@ -84,6 +141,7 @@ prev=$(front_field bundleID | sed -n 's/.*bundleID="\([^"]*\)".*/\1/p')
 "$REAL" "${args[@]}" &
 pid=$!
 trap 'kill -TERM "$pid" 2>/dev/null' INT TERM HUP
+[ "$scripted" = 1 ] && watch_memory "$pid"
 
 mine=0
 [ -t 0 ] && [ "$scripted" = 0 ] && mine=1
@@ -107,4 +165,5 @@ fi
 wait "$pid"
 rc=$?
 [ -n "$guard" ] && kill "$guard" 2>/dev/null
+[ -n "$watch" ] && kill "$watch" 2>/dev/null
 exit $rc
