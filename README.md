@@ -36,7 +36,7 @@ Planet Render 360 is a Godot 4.7.2 mobile-first app that lets you pick any point
 - In the 360 view: tap the ground or hold W A S D to walk inside the built area and E / Q to rise and come back down; fly a drone over the whole detailed area (G: W A S D fly with momentum, E / Q climb up to 500 m over the ground, Shift speeds up, on-screen sticks on touch screens); play the day as a time-lapse (T) or pick any calendar date for the sun's path; name the peaks, towns and lakes on the skyline (N); show a mini-map with the view cone (M); save a photo (P), save a 360° photo you can look around in (O; a JPEG with panorama metadata, for photo viewers and social sites), or copy a link to the exact view (C) and paste it into search to reopen it; list the landmarks nearby (L).
 - Viewer keys: arrows look (Shift for bigger steps), + / − zoom, [ ] move the time by 15 minutes (Shift: an hour), 1–4 pick the season, H hides the HUD, F toggles full screen, I shows or hides the controls sheet, Esc closes an open panel and otherwise steps back to the map (⌘Q / Ctrl+Q quits).
 - When live data does not arrive, the view says so in plain words and shows what it uses instead.
-- Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, storage (no cache size limit; clear one place's cache at a time from the Storage list, or all of it), and render quality (Fast / Balanced / High / Ultra).
+- Settings: Night, Day or system theme, an accent that can follow the sun, Reduce motion, Solid panels and Increase contrast, layout, units, storage (no cache size limit; clear one place's cache at a time from the Storage list, or all of it), and render quality (Fast / Balanced / High / Ultra, with optional volumetric haze & god-rays on desktop Ultra).
 
 To refresh the capital catalog, download `countryInfo.txt` and `cities1000.zip`
 from [GeoNames](https://download.geonames.org/export/dump/) and run
@@ -223,6 +223,8 @@ godot --headless --script tests/architecture_test.gd # regional building styles 
 godot --headless --script tests/facade_relief_test.gd # window recesses and roof variety
 godot --headless --script tests/far_city_test.gd # far city only where the place is built up
 godot --headless --script tests/lod_test.gd     # LOD rings keep every object in place at every preset
+godot --headless --script tests/impostor_test.gd # >3 km octahedral landmark impostors: CPU bake, cross-fade, cache round-trip
+godot --headless --script tests/haze_test.gd    # Ultra volumetric haze & god-rays: gate, governor order, display restore
 godot --headless --script tests/render_upgrade_test.gd # grade, lit windows at night, wall tints
 godot --headless --script tests/parallel_build_test.gd # parallel world build matches the serial one
 godot --headless --script tests/fidelity_scorecard_test.gd # golden locations vs source data (live when uncached)

@@ -22,6 +22,7 @@ static var horizon_labels := false
 static var minimap := false
 static var photo_stamp := true
 static var fps_counter := false
+static var haze := true
 static var video_quality := 1
 
 static func apply(s: RenderSettings) -> void:
@@ -35,6 +36,7 @@ static func apply(s: RenderSettings) -> void:
 	minimap = bool(s.pref("minimap"))
 	photo_stamp = bool(s.pref("photo_stamp"))
 	fps_counter = bool(s.pref("fps_counter"))
+	haze = s.haze_pref()
 	video_quality = clampi(int(s.pref("video_quality")), 0, VideoRecorder.QUALITY_LONG.size() - 1)
 	LoadingScreen.reduce_motion = reduce_motion
 	UiTheme.text_scale = clampf(float(s.pref("text_scale")), 0.85, 2.0)

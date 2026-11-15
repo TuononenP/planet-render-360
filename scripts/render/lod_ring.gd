@@ -175,7 +175,7 @@ static func _apply(node: Node, preset: int, layer: String) -> void:
 ## pass triangles); far terrain casts valley-wall shadows on High+.
 static func _shadow(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 	# Roads set their own: flush ribbons off, bridge decks on (RoadBuilder).
-	if layer == "Water" or layer == "FarCity":
+	if layer == "Water" or layer == "FarCity" or bool(gi.get_meta("lod_impostor", false)):
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	elif layer == "FarTerrain":
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON \
@@ -197,6 +197,31 @@ static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 		gi.visibility_range_end_margin = 0.0
 		gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 		return
+	if layer == "Landmarks":
+		if bool(gi.get_meta("lod_impostor", false)):
+			var reach := far_city_m(preset)
+			var shown := float(gi.get_meta("far_r0", 0.0)) < reach
+			if not shown:
+				gi.visibility_range_begin = 0.0
+				gi.visibility_range_begin_margin = 0.0
+				gi.visibility_range_end = 1.0
+				gi.visibility_range_end_margin = 0.0
+				gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+				return
+			var only := bool(gi.get_meta("impostor_only", true))
+			gi.visibility_range_begin = 0.0 if only else LandmarkImpostor.R_IMPOSTOR_M
+			gi.visibility_range_begin_margin = 0.0 if only else LandmarkImpostor.CROSSFADE_M
+			gi.visibility_range_end = reach
+			gi.visibility_range_end_margin = reach * FADE_FRAC
+			gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			return
+		if bool(gi.get_meta("lod_near_landmark", false)):
+			gi.visibility_range_begin = 0.0
+			gi.visibility_range_begin_margin = 0.0
+			gi.visibility_range_end = LandmarkImpostor.R_IMPOSTOR_M
+			gi.visibility_range_end_margin = LandmarkImpostor.CROSSFADE_M
+			gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			return
 	var end := 0.0
 	if layer == "Buildings" and bool(gi.get_meta("lod_detail", false)):
 		end = detail_m(preset)

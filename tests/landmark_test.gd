@@ -281,6 +281,31 @@ func _run() -> void:
 		failures.append("build_world should add the Landmark_ node")
 	world.free()
 
+	# --- 6) Golden far-landmark silhouette: Paris centre -> Eiffel (> 3 km) ---
+	var paris_far := _flat_data()
+	paris_far.latitude = 48.8566
+	paris_far.longitude = 2.3522
+	paris_far.landmark_type = "eiffel"
+	paris_far.has_landmark_site = true
+	paris_far.landmark_lat = 48.85826
+	paris_far.landmark_lon = 2.29450
+	var paris_world := TerrainBuilder.build_world(paris_far)
+	var far_eiffel: Node3D = null
+	for child in paris_world.get_children():
+		if child.name == "Landmark_eiffel":
+			far_eiffel = child as Node3D
+	if far_eiffel == null or not bool(far_eiffel.get_meta("lod_impostor", false)):
+		failures.append("Paris-centre Eiffel at 4.2 km should build as an octahedral impostor")
+	else:
+		var imp_parts := LandmarkBuilder.parts(far_eiffel)
+		if imp_parts.size() != 1:
+			failures.append("far Eiffel impostor should be 1 octahedral mesh, got %d" % imp_parts.size())
+		else:
+			var imp_h := imp_parts[0].get_aabb().size.y
+			if absf(imp_h - 330.0) > 15.0:
+				failures.append("far Eiffel impostor silhouette should stand ~330 m tall, got %.1f m" % imp_h)
+	paris_world.free()
+
 	if failures.is_empty():
 		print("LANDMARK OK: registry detection, true-metre textured models, archetypes, true-bearing placement, OSM suppression")
 		quit(0)

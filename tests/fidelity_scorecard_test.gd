@@ -105,7 +105,7 @@ func _score(loc: Dictionary, preset: int) -> Dictionary:
 	_osm_real = pipe.used_osm
 	var ok := true
 	for r in [_check_a(loc, data, ground), _check_bc(loc, data, ground, buildings),
-			_check_d(data, ground, water, roads), _check_e(data)]:
+			_check_d(data, ground, water, roads), _check_e(data, ground)]:
 		for l in r["lines"]:
 			lines.append(l)
 		for v in r["verdicts"]:
@@ -614,7 +614,7 @@ func _near_visible(p: Vector2, tris: Array, r: float, ground: GroundTruth) -> Di
 
 # --- (e) landmark bearing ---
 
-func _check_e(data: LocationData) -> Dictionary:
+func _check_e(data: LocationData, ground: GroundTruth = null) -> Dictionary:
 	if data.landmark_type == "none" or not data.has_landmark_site:
 		return {"lines": ["- (e) landmark: n/a — no registry landmark for this location → N-A"], "verdicts": ["e:N-A"]}
 	var site := TerrainBuilder.landmark_world_pos(data)
@@ -624,9 +624,22 @@ func _check_e(data: LocationData) -> Dictionary:
 	var model_brg := fposmod(rad_to_deg(atan2(d.x, -d.y)), 360.0)
 	var true_brg := _geodesic_bearing(cam_ll.x, cam_ll.y, data.landmark_lat, data.landmark_lon)
 	var err := absf(wrapf(model_brg - true_brg, -180.0, 180.0))
-	var v := "PASS" if err <= 1.0 else "FAIL"
-	return {"lines": ["- (e) %s: bearing error %.3f° (model %.2f°, geodesic %.2f°, %.0f m; bar ≤ 1°) → %s; apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)"
-		% [data.landmark_type, err, model_brg, true_brg, d.length(), v]], "verdicts": ["e:" + v]}
+	var sil_ok := true
+	var sil_note := "apparent height + AC-06 silhouette → BLOCKED(headless — needs the windowed spawn capture)"
+	if site.length() > LandmarkImpostor.R_IMPOSTOR_M:
+		var lm := TerrainBuilder._landmark(data, ground if ground != null else GroundTruth.new(data))
+		var parts := LandmarkBuilder.parts(lm)
+		var entry := LocationData.entry_for_type(data.landmark_type)
+		var expect_h := float(entry.get("height_m", 0.0))
+		var got_h := parts[0].get_aabb().size.y if not parts.is_empty() else 0.0
+		sil_ok = bool(lm.get_meta("lod_impostor", false)) and not parts.is_empty() \
+			and (expect_h <= 0.0 or absf(got_h - expect_h) <= maxf(8.0, expect_h * 0.06))
+		sil_note = "far octahedral impostor %.1f m (registry %.1f m) → %s" \
+			% [got_h, expect_h, "PASS" if sil_ok else "FAIL"]
+		lm.free()
+	var v := "PASS" if err <= 1.0 and sil_ok else "FAIL"
+	return {"lines": ["- (e) %s: bearing error %.3f° (model %.2f°, geodesic %.2f°, %.0f m; bar ≤ 1°) → %s; %s"
+		% [data.landmark_type, err, model_brg, true_brg, d.length(), v, sil_note]], "verdicts": ["e:" + v]}
 
 static func _geodesic_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 	var p1 := deg_to_rad(lat1)

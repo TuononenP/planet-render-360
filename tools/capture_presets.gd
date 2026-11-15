@@ -396,7 +396,7 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await process_frame
 		RenderingServer.force_draw(false)
-		var card := view._viewport.get_texture().get_image()
+		var card := view.snapshot()
 		card.save_jpg(_out.path_join("%s_card.jpg" % id), 0.88)
 		_bake_capital(card, str(place["name"]), id)
 		return
@@ -675,7 +675,7 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	await process_frame
 	await process_frame
 	RenderingServer.force_draw(false)
-	var img := view._viewport.get_texture().get_image()
+	var img := view.snapshot()
 	img.convert(Image.FORMAT_RGB8)
 	var path := _out.path_join("%s_%s.jpg" % [id, shot])
 	if OS.get_cmdline_user_args().has("--png"):

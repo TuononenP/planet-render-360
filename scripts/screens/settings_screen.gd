@@ -16,6 +16,8 @@ signal accent_changed(index: int)
 signal layout_changed(index: int)
 ## Units changed: screens showing numbers reformat them.
 signal units_changed
+## Viewer toggle (haze, FPS counter, photo stamp) changed.
+signal viewer_pref_changed(key: String, value: Variant)
 
 ## Set before a theme rebuild so Main reopens Settings afterwards.
 static var reopen := false
@@ -497,9 +499,16 @@ func _refresh_appearance() -> void:
 			var on := {"reduce_motion": UiPrefs.reduce_motion, "solid_panels": UiPrefs.solid_panels,
 				"high_contrast": UiPrefs.high_contrast,
 				"photo_stamp": UiPrefs.photo_stamp,
-				"fps_counter": UiPrefs.fps_counter}.get(key, false) as bool
-			(_toggles[key] as Button).set_pressed_no_signal(on)
-			(_toggles[key] as Button).queue_redraw()
+				"fps_counter": UiPrefs.fps_counter,
+				"haze": UiPrefs.haze}.get(key, false) as bool
+			var btn := _toggles[key] as Button
+			if key == "haze":
+				var allow := RenderSettings.haze_allowed(_settings.preset)
+				btn.disabled = not allow
+				btn.get_child(0).modulate.a = 1.0 if allow else 0.55
+				on = allow and _settings.haze_pref()
+			btn.set_pressed_no_signal(on)
+			btn.queue_redraw()
 	SettingsPages.show_unit_samples(self)
 	_refresh_summaries()
 
@@ -577,6 +586,7 @@ func _on_viewer_pref(key: String, on: bool) -> void:
 	_settings.set_pref(key, on)
 	UiPrefs.apply(_settings)
 	_refresh_summaries()
+	viewer_pref_changed.emit(key, on)
 
 func _rebuild_app() -> void:
 	UiPrefs.apply(_settings)

@@ -25,19 +25,29 @@ const HOLD_MAX_S := 160.0
 ## the settings screen's summary and the governor cannot drift apart.
 ## The governor never changes the tier (T7.4): its label is the user's
 ## tier, plus the reduced render scale while it is stepping down.
-static func step_label(ceiling: int, current: int) -> String:
+static func step_label(ceiling: int, current: int,
+		cur_haze: int = 2, max_haze: int = 0) -> String:
 	var label := RenderSettings.preset_name(ceiling)
 	if current < ceiling:
 		label += " · %d%% res%s" % [roundi(RenderSettings.render_scale_for(current) * 100.0),
 			"" if RenderSettings.shadows_for(current) else ", no shadows"]
+	elif max_haze > 0 and cur_haze < max_haze:
+		label += " · no rays" if cur_haze == 1 else " · no haze"
 	return label
 
 var step := 3  # start at the user's ceiling, adapt down if needed
 ## Highest step the user's RenderSettings preset allows (0..3). The
 ## governor still steps down under low FPS, but never back above this.
 var ceiling_step := 3
+## Cheapest Ultra step-down before render scale or shadows:
+## 2 = god-rays + thickened haze, 1 = thickened haze only (no post pass),
+## 0 = haze off. `haze_ceiling == 0` disables the haze sub-steps so all
+## non-haze presets and existing step curves behave identically.
+var haze_step := 0
+var haze_ceiling := 0
 var viewport: SubViewport
 var sun: DirectionalLight3D
+var haze: HazeRig
 
 func set_preset(preset_value: int) -> void:
 	ceiling_step = RenderSettings.clamp_preset(preset_value)
@@ -45,26 +55,45 @@ func set_preset(preset_value: int) -> void:
 	# screen, or a freshly opened place) applies straight away, in
 	# both directions. FPS adaptation still steps down from here.
 	step = ceiling_step
+	haze_step = haze_ceiling
 	_hold_until = 0.0
 	_hold_s = HOLD_S
 	_healthy = 0
 	_apply()
 
+func set_haze_ceiling(max_haze: int) -> void:
+	haze_ceiling = clampi(max_haze, 0, 2)
+	haze_step = haze_ceiling if step >= ceiling_step else 0
+	_apply()
+
 ## The step to be on after a window of `window_s` seconds that averaged
 ## `fps`. Pure state-machine: _process feeds it, tests drive it directly.
+## When `haze_ceiling > 0`, `haze_step` drops (2 -> 1 -> 0) before `step`
+## touches render scale or shadows, and climbs back last once `step` has
+## already recovered to `ceiling_step`.
 func adapt(fps: float, window_s: float = WINDOW_S) -> int:
 	_clock += window_s
 	if fps < DOWN_FPS:
 		_healthy = 0
+		if haze_step > 0:
+			_hold_until = _clock + _hold_s
+			_hold_s = minf(_hold_s * 2.0, HOLD_MAX_S)
+			haze_step -= 1
+			return step
 		if step > 0:
 			_hold_until = _clock + _hold_s
 			_hold_s = minf(_hold_s * 2.0, HOLD_MAX_S)
 			return step - 1
 	elif fps > UP_FPS:
 		_healthy += 1
-		if _healthy >= UP_WINDOWS and _clock >= _hold_until and step < ceiling_step:
-			_healthy = 0
-			return step + 1
+		if _healthy >= UP_WINDOWS and _clock >= _hold_until:
+			if step < ceiling_step:
+				_healthy = 0
+				return step + 1
+			if haze_step < haze_ceiling:
+				_healthy = 0
+				haze_step += 1
+				return step
 	else:
 		_healthy = 0
 	return step
@@ -85,16 +114,19 @@ func _process(delta: float) -> void:
 	if _elapsed < WINDOW_S:
 		return
 	current_fps = _frames / _elapsed
+	var prev_haze := haze_step
 	var new_step := adapt(current_fps, _elapsed)
 	_frames = 0
 	_elapsed = 0.0
-	if new_step != step:
+	if new_step != step or haze_step != prev_haze:
 		step = new_step
 		_apply()
-	quality_changed.emit(step_label(ceiling_step, step), current_fps)
+	quality_changed.emit(step_label(ceiling_step, step, haze_step, haze_ceiling), current_fps)
 
 func _apply() -> void:
 	if viewport != null:
 		viewport.scaling_3d_scale = RenderSettings.render_scale_for(step)
 	if sun != null:
 		sun.shadow_enabled = RenderSettings.shadows_for(step)
+	if haze != null:
+		haze.set_governor_step(haze_step)

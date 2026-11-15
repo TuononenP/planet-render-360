@@ -133,6 +133,19 @@ var lightning: LightningRig
 ## Coastal fog lying on the sea (fog weather at a place with a coastline).
 var marine: MarineLayer
 var _coastal := false
+## Unified volumetric-haze driver (0..1, fed by HazeRig on Ultra): scales
+## fog light energy, directional sun scatter, glow highlight threshold/
+## intensity and froxel density together without re-capturing probes.
+var haziness := 0.0
+var _base_sun_scatter := 0.0
+var _base_vol_density := 0.0
+
+func set_haziness(value: float) -> void:
+	var h := clampf(value, 0.0, 1.0)
+	if is_equal_approx(h, haziness):
+		return
+	haziness = h
+	_apply_haziness()
 var _preset: int = RenderSettings.Preset.HIGH
 var _drift := 0.0
 var _drift_accum := 0.0
@@ -595,14 +608,25 @@ func _apply() -> void:
 	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
 	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
 	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
-	environment.fog_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
+	_base_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms
 	# and to the night.
 	environment.ambient_light_energy = PostGrade.AMBIENT_ENERGY * float(look["ambient_gain"])
 	environment.tonemap_exposure = PostGrade.EXPOSURE \
 		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount)
 	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
+	_base_vol_density = environment.volumetric_fog_density
+	_apply_haziness()
 	_update_lightning()
+
+func _apply_haziness() -> void:
+	if environment == null:
+		return
+	environment.fog_light_energy = lerpf(1.0, 1.18, haziness)
+	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.45, haziness)
+	environment.glow_hdr_threshold = lerpf(PostGrade.GLOW_THRESHOLD, 0.86, haziness)
+	environment.glow_intensity = PostGrade.GLOW_INTENSITY * lerpf(1.0, 1.2, haziness)
+	environment.volumetric_fog_density = _base_vol_density * lerpf(1.0, 1.35, haziness)
 
 ## The moon's place at a local clock hour (see solar_at).
 func moon_at(hour_f: float) -> Dictionary:

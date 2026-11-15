@@ -106,7 +106,7 @@ static func toggle(label: String, on: bool, changed: Callable, description: Stri
 	b.custom_minimum_size = Vector2(0, ROW_H)
 	b.tooltip_text = label
 	var clear := StyleBoxEmpty.new()
-	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		b.add_theme_stylebox_override(state, clear)
 	b.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_S))
 	var r := row(label, null, description)
@@ -120,14 +120,17 @@ static func toggle(label: String, on: bool, changed: Callable, description: Stri
 	return b
 
 static func _draw_switch(b: Button) -> void:
-	var on := b.button_pressed
+	var on := b.button_pressed and not b.disabled
+	var alpha := 0.45 if b.disabled else 1.0
 	var track := Rect2(Vector2(b.size.x - 16.0 - 44.0, (b.size.y - 26.0) / 2.0), Vector2(44, 26))
-	var st := UiTheme.style(UiTheme.TEAL if on else UiTheme.FIELD, 13,
-		Color.TRANSPARENT if on else UiTheme.LINE_STRONG)
+	var fill := UiTheme.TEAL if on else UiTheme.FIELD
+	var border := Color.TRANSPARENT if on else UiTheme.LINE_STRONG
+	var st := UiTheme.style(Color(fill, fill.a * alpha), 13, Color(border, border.a * alpha))
 	b.draw_style_box(st, track)
 	var cx := track.end.x - 13.0 if on else track.position.x + 13.0
+	var thumb := UiTheme.ON_ACCENT if on else UiTheme.MUTED
 	b.draw_circle(Vector2(cx, track.get_center().y), 10.0,
-		UiTheme.ON_ACCENT if on else UiTheme.MUTED, true, -1.0, true)
+		Color(thumb, thumb.a * alpha), true, -1.0, true)
 
 ## A row that opens `url` in the browser, with a trailing arrow.
 static func link(label: String, description: String, url: String) -> Button:

@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 261
+const BUILD_VERSION := 262
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -279,6 +279,8 @@ static func load_world(view: Node, threads: Array, data: LocationData,
 	threads.append(th)
 	th.start(func() -> Node3D:
 		var w := ps.instantiate() as Node3D
+		if w != null:
+			LandmarkImpostor.restore_cached(w)
 		if w != null and recover:
 			var t := Time.get_ticks_msec()
 			GroundCover.recentre(w, data, g)

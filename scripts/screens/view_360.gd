@@ -19,6 +19,7 @@ signal toast_requested(title: String, message: String, tone: String)
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
+var _haze: HazeRig
 var _rig: CameraRig
 var _world_root: Node3D
 var _sun: DirectionalLight3D
@@ -183,11 +184,16 @@ func _ready() -> void:
 	_viewport = SubViewport.new()
 	_container.add_child(_viewport)
 	_build_3d()
+	_haze = HazeRig.new()
+	add_child(_haze)
+	_haze.attach_view(_viewport, _container, _rig.get_node("Camera3D") as Camera3D, _atmos)
 	_governor = QualityGovernor.new()
 	add_child(_governor)
 	_governor.viewport = _viewport
 	_governor.sun = _sun
+	_governor.haze = _haze
 	_governor.set_preset(_quality_preset)
+	sync_haze()
 	_weather = WeatherFetcher.new()
 	add_child(_weather)
 	_weather.succeeded.connect(_on_weather)
@@ -289,6 +295,7 @@ func set_quality_preset(preset_value: int) -> void:
 	Precipitation.set_quality(_precip, _quality_preset)
 	if _governor != null:
 		_governor.set_preset(_quality_preset)
+	sync_haze()
 	# LOD rings re-range in place: nothing rebuilds or moves (AC-12).
 	_reach.reset(self, false)
 	if _generated != null and is_instance_valid(_generated):
@@ -526,13 +533,19 @@ func look_key() -> Array:
 		return []
 	return [camera_state(), snappedf(_time_hour, 0.01), _data.season, _date]
 
+func sync_haze() -> void:
+	if _haze != null:
+		_haze.sync_gate(_quality_preset, _governor)
+
 ## The scene as drawn now at the viewport's full size; null when nothing
 ## is drawn (headless) or no place is shown.
 func snapshot() -> Image:
 	if _viewport == null or _data == null or DisplayServer.get_name() == "headless":
 		return null
 	var img := _viewport.get_texture().get_image()
-	return null if img == null or img.is_empty() else img
+	if img == null or img.is_empty():
+		return null
+	return _haze.composite_onto(img) if _haze != null else img
 
 ## A few seconds after opening (once the descent has settled) the view's
 ## picture goes to History, so a place has one even if the app is closed

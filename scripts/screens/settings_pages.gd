@@ -233,6 +233,11 @@ static func quality(s: SettingsScreen) -> VBoxContainer:
 	sect.add_child(_inset(s._specs_title))
 	sect.move_child(sect.get_child(sect.get_child_count() - 1), 0)
 	var fps_group := SettingsRows.group()
+	var haze := SettingsRows.toggle("Volumetric haze & god-rays", true,
+		func(on: bool) -> void: s._on_viewer_pref("haze", on),
+		"Sun shafts and thickened air at low sun. Available on Ultra (desktop).")
+	s._toggles["haze"] = haze
+	SettingsRows.add(fps_group, haze)
 	var fps := SettingsRows.toggle("FPS counter", false,
 		func(on: bool) -> void: s._on_viewer_pref("fps_counter", on),
 		"Shows the frame rate in the corner of the 360° view (J).")

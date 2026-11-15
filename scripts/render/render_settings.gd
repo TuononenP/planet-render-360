@@ -68,7 +68,17 @@ const PREF_DEFAULTS := {
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
 	"video_quality": 1,  # VideoRecorder.QUALITY_LONG: 720p, 1080p, Native
 	"fps_counter": false,
+	"haze": null,  # null = Auto (on for desktop Ultra, off otherwise)
 }
+
+## Volumetric haze & god-rays are an Ultra desktop (Forward+) extra.
+static func haze_allowed(preset_value: int, forward_plus: bool = RenderQuality.is_forward_plus()) -> bool:
+	return RenderQuality.ultra_desktop(preset_value, forward_plus)
+
+## Effective haze choice on Ultra (null auto -> true; explicit bool kept).
+func haze_pref() -> bool:
+	var v: Variant = pref("haze")
+	return true if v == null else bool(v)
 
 ## Bumped when the desktop default changes; older files migrate once.
 const PRESET_VERSION := 1

@@ -188,28 +188,34 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 		if Vector2(cx, cz).length() > LANDMARK_MAX_M:
 			continue
 		if c.has("type"):
-			var hero := LandmarkBuilder.build(str(c["type"]))
-			if RenderQuality.ultra_desktop(data.quality_preset):
-				LandmarkLights.dress(hero, str(c["type"]))
-				LandmarkShader.upgrade(hero)
-				FacadeShader.upgrade(hero)
-			var entry := LocationData.entry_for_type(str(c["type"]))
+			var c_type := str(c["type"])
+			var dist_m := Vector2(cx, cz).length()
+			var hero := LandmarkBuilder.build(c_type)
+			var entry := LocationData.entry_for_type(c_type)
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, entry, half), cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
-			LandmarkTerrain.stitch(hero, ground, str(c["type"]))
+			LandmarkTerrain.stitch(hero, ground, c_type)
+			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type)
+			if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
+				LandmarkLights.dress(hero, c_type)
+				LandmarkShader.upgrade(hero)
+				FacadeShader.upgrade(hero)
 			hero.set_meta("lod_layer", "Landmarks")
 			root.add_child(hero)
 			continue
+		var arch_dist_m := Vector2(cx, cz).length()
+		var arch_kind := str(c.get("archetype", "tower"))
 		var node := LandmarkBuilder.build_archetype(
-			str(c.get("archetype", "tower")), float(c.get("height", 30.0)),
+			arch_kind, float(c.get("height", 30.0)),
 			Vector2(float(c.get("size_x", 12.0)), float(c.get("size_z", 12.0))),
 			ArchitectureStyle.region_for(data.latitude, data.longitude, data.country))
-		if LandmarkShader.enabled(data.quality_preset):
-			LandmarkShader.upgrade(node)
 		node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
 			float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
 		node.rotation.y = float(c.get("yaw", 0.0))
+		var arch_imp := LandmarkImpostor.apply_if_far(node, arch_dist_m, arch_kind)
+		if arch_imp != "stripped" and LandmarkShader.enabled(data.quality_preset):
+			LandmarkShader.upgrade(node)
 		node.set_meta("lod_layer", "Landmarks")
 		root.add_child(node)
 
@@ -562,15 +568,16 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 		ground = GroundTruth.new(data)
 	var pos := landmark_world_pos(data)
 	var root := LandmarkBuilder.build(data.landmark_type)
-	if RenderQuality.ultra_desktop(data.quality_preset):
-		LandmarkLights.dress(root, data.landmark_type)
-		LandmarkShader.upgrade(root)
-		FacadeShader.upgrade(root)
 	var entry := LocationData.entry_for_type(data.landmark_type)
 	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)
 	root.rotation.y = -deg_to_rad(float(entry.get("yaw_deg", 0.0)))
 	LandmarkTerrain.stitch(root, ground, data.landmark_type)
+	var imp_mode := LandmarkImpostor.apply_if_far(root, pos.length(), data.landmark_type)
+	if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
+		LandmarkLights.dress(root, data.landmark_type)
+		LandmarkShader.upgrade(root)
+		FacadeShader.upgrade(root)
 	root.set_meta("lod_layer", "Landmarks")
 	return root
 

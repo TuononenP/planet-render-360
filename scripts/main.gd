@@ -326,6 +326,9 @@ func _ready() -> void:
 	_settings_screen.layout_changed.connect(func(i: int) -> void:
 		_picker.set_layout_override(i))
 	_settings_screen.preset_changed.connect(_apply_preset)
+	_settings_screen.viewer_pref_changed.connect(func(_k: String, _v: Variant) -> void:
+		ViewTools.sync(_view)
+		_view.sync_haze())
 	add_child(_settings_screen)
 
 	_show(_picker)
