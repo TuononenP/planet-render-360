@@ -388,7 +388,9 @@ func _build_probe() -> void:
 	probe = ReflectionProbe.new()
 	probe.name = "ViewReflections"
 	probe.update_mode = ReflectionProbe.UPDATE_ONCE
-	probe.size = Vector3(4800.0, 1600.0, 4800.0) * units_per_metre
+	# The box covers everything the capture reaches: a smaller box ended in
+	# a hard line on the far sea, the sky's bright radiance past it.
+	probe.size = Vector3(60000.0, 8000.0, 60000.0) * units_per_metre
 	probe.max_distance = 30000.0 * units_per_metre
 	probe.box_projection = false
 	probe.enable_shadows = true

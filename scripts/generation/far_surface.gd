@@ -249,6 +249,12 @@ uniform float has_dem_coarse = 0.0;
 uniform sampler2D water_mask : filter_linear_mipmap, repeat_disable;
 uniform vec4 water_mask_map = vec4(1.0, 1.0, 0.0, 0.0);
 uniform float has_water_mask = 0.0;
+// The near water's sea body (WaterSurface.sea_palette), linear RGB, so
+// the far sea keeps its colour instead of the photo's hazy grey-green.
+uniform vec3 water_shallow = vec3(0.035, 0.075, 0.070);
+uniform vec3 water_deep = vec3(0.018, 0.040, 0.042);
+// WaterShader far_rough: the gloss the near water ends on at its edge.
+uniform float water_far_rough = 0.09;
 varying vec3 wpos;
 varying vec3 wnrm;
 void vertex() {
@@ -328,14 +334,33 @@ void fragment() {
 		vec2 gr = t_relief(wpos.xz, max(55.0, dist * 0.005), far_quality >= 2 ? 4 : 2);
 		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 48.0 * (0.25 + 0.75 * steep0) * fade * (1.0 - water) * (1.0 - 0.75 * vegf) * (1.0 - 0.85 * dem_w));
 	}
+	// Wave slope variance the filter removed: it widens the glint
+	// (roughness) instead of leaving a flat mirror of the pale horizon.
+	float water_lost = 0.0;
 	if (water > 0.01) {
 		float wave_scale = max(25.0, dist * 0.004);
 		vec2 wg = t_relief(wpos.xz + vec2(TIME * 0.6, TIME * 0.25), wave_scale, 2);
 		// The second relief octave is 2.1x finer. Distance alone misses
 		// the large pixel footprint when looking across a flat bay.
-		wg *= water_wave_weight(water_pixel_m, wave_scale / 2.1);
-		nw = normalize(mix(nw, normalize(vec3(-wg.x * 4.0, 1.0, -wg.y * 4.0)), water));
-		c = mix(c, c * 0.55 + vec3(0.012, 0.026, 0.03), water);
+		float ww = water_wave_weight(water_pixel_m, wave_scale / 2.1);
+		vec2 s = wg * 4.0 * ww;
+		// The near sea's 46 m and 27 m swell (WaterShader), so its
+		// reflection streaks carry on past the detailed ground.
+		vec2 wd = vec2(0.8, 0.6);
+		vec2 wd2 = normalize(wd + vec2(0.4, -0.3));
+		float k1 = 6.2831853 / 46.0;
+		float k2 = 6.2831853 / 27.0;
+		float w1 = water_wave_weight(water_pixel_m, 46.0);
+		float w2 = water_wave_weight(water_pixel_m, 27.0);
+		s += wd * 0.048 * cos(dot(wd, wpos.xz) * k1 - TIME * sqrt(9.81 * k1)) * w1;
+		s += wd2 * 0.042 * cos(dot(wd2, wpos.xz) * k2 - TIME * 1.1 * sqrt(9.81 * k2)) * w2;
+		water_lost = 0.5 * (0.048 * 0.048 * (1.0 - w1) + 0.042 * 0.042 * (1.0 - w2)) + 0.012 * (1.0 - ww);
+		nw = normalize(mix(nw, normalize(vec3(-s.x, 1.0, -s.y)), water));
+		// Open-water colour from the near sea, lightly modulated by the
+		// photo so sandbanks and river plumes still show.
+		vec3 sea_c = mix(water_shallow, water_deep, 0.85);
+		sea_c *= clamp(lum(c) / max(lum(sea_c) * 2.2, 1e-3), 0.8, 1.25);
+		c = mix(c, sea_c, water);
 	}
 	// Steep faces read as rock: the photo's value, mostly its own hue
 	// pulled toward neutral stone.
@@ -406,7 +431,7 @@ void fragment() {
 	TANGENT = normalize((VIEW_MATRIX * vec4(tw, 0.0)).xyz);
 	BINORMAL = normalize((VIEW_MATRIX * vec4(cross(tw, nw), 0.0)).xyz);
 	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), sc);
-	float water_rough = water_roughness(mix(0.08, 0.5, climate_water_ice), nw);
+	float water_rough = water_roughness(mix(sqrt(water_far_rough * water_far_rough + water_lost), 0.5, climate_water_ice), nw);
 	ROUGHNESS = mix(mix(0.96, 0.82, steep), water_rough, water);
 	SPECULAR = mix(mix(0.2, 0.3, steep), 0.34, water);
 	// Haze thins with height: integrated along the view ray, not the scene
@@ -443,6 +468,10 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		var aspect := aspect_params(data)
 		mat.set_shader_parameter("sun_side", aspect["sun_side"])
 		mat.set_shader_parameter("treeline_y", aspect["treeline_y"])
+		var sea := WaterSurface.sea_palette(data)
+		mat.set_shader_parameter("water_shallow", sea["shallow"])
+		mat.set_shader_parameter("water_deep", sea["deep"])
+		mat.set_shader_parameter("water_far_rough", 0.23 if bool(sea["harbour"]) else 0.09)
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:
