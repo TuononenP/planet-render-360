@@ -62,7 +62,7 @@ static func _height_context(data: LocationData) -> Dictionary:
 			continue
 		var bd := b as Dictionary
 		var src := str(bd.get("height_source", ""))
-		if str(bd.get("kind", "")) in ["ship", "boat", "houseboat"] or ChimneyBuilder.accepts(bd):
+		if BuildingBuilder._solid_free(bd):
 			continue  # a tagged mast or stack is not a neighbour's building height
 		if src not in ["tag_height", "reference"] and not (src == "levels" and float(bd.get("levels", 0)) > 0.0):
 			continue
