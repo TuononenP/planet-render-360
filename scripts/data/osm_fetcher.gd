@@ -59,8 +59,14 @@ static func endpoint_order(first: Array[String]) -> Array[String]:
 			out.append(ep)
 	return out
 
-## The instances in use: ENDPOINTS unless RemoteConfig replaces them.
+## The instances in use: ENDPOINTS unless RemoteConfig replaces them, and
+## none on iOS and Android, where waiting on Overpass held up the stretches
+## loaded ahead. With none, every query goes straight to its fallback
+## (Postpass, the OSM API, the vector map, the caches) and no probe runs.
 static func active_endpoints() -> Array[String]:
+	if OS.has_feature("mobile"):
+		var none: Array[String] = []
+		return none
 	return RemoteConfig.value("overpass_endpoints", ENDPOINTS)
 
 ## The ring runs alongside the detailed query. It used to start on a
@@ -460,8 +466,9 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	var known_empty := _detailed_text == "" and _known_empty(lat, lon)
 	if _detailed_text == "":
 		_omt.start(lat, lon, DETAILED_RADIUS_M)
-	# Both phases go live at once; _try_finish waits for the pair.
-	if want_ring and _ring_text == "" and not known_empty:
+	# Both phases go live at once; _try_finish waits for the pair. The
+	# ring has no fallback, so without Overpass it is not asked for.
+	if want_ring and _ring_text == "" and not known_empty and not active_endpoints().is_empty():
 		_ring_pending = true
 		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
 			_check_ring, ring_endpoints())
@@ -661,7 +668,7 @@ func _try_finish() -> void:
 			if gen != _parse_gen:
 				return
 			_poi_pending = false
-		if _poi_text == "" and _poi_enabled and not offline_mode:
+		if _poi_text == "" and _poi_enabled and not offline_mode and not active_endpoints().is_empty():
 			_poi_pending = true
 			_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
 				_check_ring, ring_endpoints().slice(0, 1))
