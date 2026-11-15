@@ -82,6 +82,9 @@ var _src := Vector2i.ZERO
 var _out := Vector2i.ZERO
 ## Draws the view at the video's size; only that is read back.
 var _scaler: VideoScaler
+## Written straight to its final place (Android's Movies), with nothing
+## to move once finished.
+var _in_place := false
 
 ## The native encoder is built and this platform has one, and frames can
 ## be read back (a RenderingDevice renderer, a real window).
@@ -174,12 +177,20 @@ func start(v: View360, quality: int) -> StartError:
 	var dir := temp_dir()
 	DirAccess.make_dir_recursive_absolute(dir)
 	VideoRecorder.sweep()
-	_temp = ProjectSettings.globalize_path(dir.path_join("%s%d.mp4" % [TEMP_PREFIX, Time.get_ticks_usec()]))
 	var enc: Object = ClassDB.instantiate("VideoEncoder")
 	if enc == null:
 		last_error = "no video encoder"
 		return StartError.UNSUPPORTED
-	if not bool(enc.call("start", _temp, size.x, size.y, FPS, bitrate(size))):
+	# Android: straight into Movies where the platform lets native code
+	# create a video there (Android 11+), so the gallery lists it.
+	_in_place = false
+	var target := shared_target(_data.place_name, _local_now())
+	if target != "" and bool(enc.call("start", target, size.x, size.y, FPS, bitrate(size))):
+		_temp = target
+		_in_place = true
+	else:
+		_temp = ProjectSettings.globalize_path(dir.path_join("%s%d.mp4" % [TEMP_PREFIX, Time.get_ticks_usec()]))
+	if not _in_place and not bool(enc.call("start", _temp, size.x, size.y, FPS, bitrate(size))):
 		last_error = str(enc.call("get_last_error"))
 		DirAccess.remove_absolute(_temp)
 		match int(enc.call("get_error_kind")):
@@ -254,9 +265,43 @@ static func is_finished_mp4(path: String) -> bool:
 		at += size
 	return false
 
-## Where this recording is written while it runs (see TEMP_DIR).
+## Android's Movies folder path for a recording of `place` at `when` (the
+## minute's name plus its second, so two in a minute never collide), or ""
+## elsewhere: Godot reaches that folder only through MediaStore, which
+## won't file a video there, but the native encoder can create one by path.
+static func shared_target(place: String, when: Dictionary) -> String:
+	if OS.get_name() != "Android" or PhotoMode.dir_override != "":
+		return ""
+	var movies := OS.get_system_dir(OS.SYSTEM_DIR_MOVIES)
+	if not movies.is_absolute_path():
+		return ""
+	# The place's clock has no seconds: the device's give them.
+	var second := int(when.get("second", Time.get_datetime_dict_from_system()["second"]))
+	var name := "%s-%02d.mp4" % [file_name(place, when).get_basename(), second]
+	return movies.path_join(name)
+
+## Asks Android to index a video written into Movies by path, so the
+## gallery lists it now rather than at the next idle rescan
+## (MediaScannerConnection, through Godot's Java bridge; nothing elsewhere).
+static func index_shared(path: String) -> void:
+	if OS.get_name() != "Android" or not Engine.has_singleton("AndroidRuntime"):
+		return
+	var runtime := Engine.get_singleton("AndroidRuntime")
+	var activity: Variant = runtime.call("getActivity")
+	var scanner: Variant = JavaClassWrapper.wrap("android.media.MediaScannerConnection")
+	if activity == null or scanner == null:
+		push_warning("VideoRecorder: can't ask Android to index " + path)
+		return
+	scanner.call("scanFile", activity, PackedStringArray([path]), PackedStringArray(["video/mp4"]), null)
+
+## Where this recording is written while it runs (see TEMP_DIR). Android's
+## Movies is shared storage, reached through MediaStore rather than plain
+## file paths, so the encoder writes privately there and the finished file
+## is copied in.
 static func temp_dir() -> String:
-	return TEMP_DIR if PhotoMode.has_save_dialog() else PhotoMode.fallback_video_dir()
+	if PhotoMode.has_save_dialog() or OS.get_name() == "Android":
+		return TEMP_DIR
+	return PhotoMode.fallback_video_dir()
 
 ## The view's drawn texture now: {rid, size, format}, or {} when there is
 ## none. The view's render target is remade whenever it changes size, so
@@ -371,6 +416,9 @@ func _finish_now() -> String:
 	_encoder = null
 	var path := ""
 	if bool(enc.call("finish")):
+		if _in_place:
+			VideoRecorder.index_shared(_temp)
+			return _temp
 		path = VideoRecorder._keep(_temp, file_name(_data.place_name if _data != null else "", _local_now()))
 	DirAccess.remove_absolute(_temp)
 	return path
@@ -393,7 +441,8 @@ func stop(note: String = "") -> void:
 	var place := _data.place_name if _data != null else ""
 	var enc := _encoder
 	_encoder = null
-	VideoRecorder._finish(weakref(self), enc, _temp, file_name(place, _local_now()), note, get_tree())
+	VideoRecorder._finish(weakref(self), enc, _temp, file_name(place, _local_now()), note, get_tree(),
+		_in_place)
 
 ## The place's local date and time, for the file name.
 func _local_now() -> Dictionary:
@@ -411,7 +460,7 @@ static func _keep(temp: String, file: String) -> String:
 ## file) when the recorder is freed meanwhile; the outcome reaches it
 ## through `rec` only while it still exists.
 static func _finish(rec: WeakRef, enc: Object, temp: String, file: String, note: String,
-		tree: SceneTree) -> void:
+		tree: SceneTree, in_place: bool = false) -> void:
 	var ok := [false]
 	await FrameTask.run(func() -> void: ok[0] = bool(enc.call("finish")), "VideoFinish", tree)
 	if not ok[0]:
@@ -419,6 +468,10 @@ static func _finish(rec: WeakRef, enc: Object, temp: String, file: String, note:
 		push_warning("VideoRecorder: " + why)
 		DirAccess.remove_absolute(temp)
 		VideoRecorder._report(rec, "", true, note, why if why != "" else "the video encoder failed")
+		return
+	if in_place:
+		VideoRecorder.index_shared(temp)
+		VideoRecorder._report(rec, temp, false, note, "")
 		return
 	var done := func(path: String, failed: bool) -> void:
 		if failed:

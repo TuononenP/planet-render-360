@@ -32,6 +32,7 @@ class AndroidVideoBackend : public VideoBackend {
 	AMediaCodec *codec = nullptr;
 	AMediaMuxer *muxer = nullptr;
 	int fd = -1;
+	std::string file_path;
 	int width = 0;
 	int height = 0;
 	int32_t color = COLOR_YUV420_SEMIPLANAR;
@@ -249,6 +250,7 @@ public:
 			return false;
 		}
 		read_layout();
+		file_path = path;
 		fd = ::open(path.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0644);
 		if (fd < 0) {
 			error = "couldn't create the video file";
@@ -300,6 +302,7 @@ public:
 			// A muxer stopped with no samples fails: say what happened.
 			muxing = false;
 			release();
+			::unlink(file_path.c_str());
 			error = VIDEO_NO_FRAMES;
 			return false;
 		}
@@ -341,6 +344,11 @@ public:
 			muxing = false;
 		}
 		release();
+		if (!ok) {
+			// A file that couldn't be finished can't play: don't leave it
+			// (it may be in the shared Movies folder, out of the app's reach).
+			::unlink(file_path.c_str());
+		}
 		return ok;
 	}
 };

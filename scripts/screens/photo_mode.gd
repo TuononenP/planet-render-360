@@ -62,27 +62,31 @@ static func fallback_dir() -> String:
 	if dir_override != "":
 		return dir_override
 	var pictures := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
-	if usable_dir(pictures):
+	if usable_dir(pictures, "png"):
 		return pictures
 	return DIR_FALLBACK
 
 ## A system folder the app can save into: an absolute path that takes a
-## file. Not every platform has one (iOS answers ".", the read-only app
-## bundle), and a sandbox may list one it can't write.
-## Probed once per folder per run: every save and Gallery visit asks.
-static func usable_dir(path: String) -> bool:
-	if _usable.has(path):
-		return _usable[path]
-	var ok := _probe_dir(path)
-	_usable[path] = ok
+## file of `extension`. Not every platform has one (iOS answers ".", the
+## read-only app bundle), and a sandbox may list one it can't write. On
+## Android, Movies and Pictures are written through MediaStore, which takes
+## only a file of a type that belongs there (a video in Movies), so the
+## probe is of the kind that will be saved.
+## Probed once per folder and type per run: every save and Gallery visit asks.
+static func usable_dir(path: String, extension: String = "tmp") -> bool:
+	var key := "%s|%s" % [path, extension]
+	if _usable.has(key):
+		return _usable[key]
+	var ok := _probe_dir(path, extension)
+	_usable[key] = ok
 	return ok
 
 static var _usable := {}
 
-static func _probe_dir(path: String) -> bool:
-	if path == "" or not path.is_absolute_path() or not DirAccess.dir_exists_absolute(path):
+static func _probe_dir(path: String, extension: String) -> bool:
+	if path == "" or not path.is_absolute_path():
 		return false
-	var probe := path.path_join(".planet-render-360-probe")
+	var probe := path.path_join("planet-render-360-probe." + extension)
 	var f := FileAccess.open(probe, FileAccess.WRITE)
 	if f == null:
 		return false
@@ -97,7 +101,7 @@ static func fallback_video_dir() -> String:
 		return dir_override
 	for d: int in [OS.SYSTEM_DIR_MOVIES, OS.SYSTEM_DIR_PICTURES]:
 		var path := OS.get_system_dir(d)
-		if usable_dir(path):
+		if usable_dir(path, "mp4"):
 			return path
 	return VIDEO_DIR_FALLBACK
 
