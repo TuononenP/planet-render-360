@@ -102,7 +102,7 @@ func window(fps: float, at_ceiling: bool, window_s: float = QualityGovernor.WIND
 
 func _on_window(_label: String, fps: float) -> void:
 	if _gov != null and is_instance_valid(_gov):
-		window(fps, _gov.step >= _gov.ceiling_step)
+		window(fps, _gov.at_ceiling())
 
 ## Once a frame from View360._process.
 func tick(v: View360, delta: float) -> void:

@@ -70,6 +70,20 @@ func _test_gpu_gate() -> void:
 	_check(not r4.gpu_ok, "a preset change closes the gate")
 	r4.window(60.0, true)
 	_check(not r4.gpu_ok, "the new preset needs its own healthy windows")
+	var gov := QualityGovernor.new()
+	gov.set_preset(RenderSettings.Preset.ULTRA)
+	gov.set_haze_ceiling(2)
+	gov.haze_step = 1
+	var r5 := AltitudeReach.new()
+	r5._gov = gov
+	r5._on_window("Ultra · no rays", 62.0)
+	r5._on_window("Ultra · no rays", 62.0)
+	_check(not r5.gpu_ok, "stepped-down haze sub-step keeps AltitudeReach closed")
+	gov.haze_step = 2
+	r5._on_window("Ultra", 62.0)
+	r5._on_window("Ultra", 62.0)
+	_check(r5.gpu_ok, "full ceiling including haze opens AltitudeReach")
+	gov.free()
 
 func _test_rings() -> void:
 	var base: Array = []

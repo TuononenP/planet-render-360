@@ -16,9 +16,13 @@ extends Control
 ##         that hardware-blends the bilinearly upsampled shafts onto the
 ##         world view.
 ##  - When the pass is OFF (Fast / Balanced / High, non-Forward+, user
-##    toggled `haze` off, or QualityGovernor stepped rays off), `HazeRig`
-##    is hidden and `rays_vp` is `UPDATE_DISABLED` — restoring the exact
-##    pre-feature display path with zero overhead.
+##    toggled `haze` off, `View360` is off-screen, or QualityGovernor
+##    eased rays down to 0), `HazeRig` is hidden and `rays_vp` is
+##    `UPDATE_DISABLED` — zero background GPU work.
+##  - Capture parity: `View360.snapshot()` composites the active shaft
+##    buffer onto saved 2D photos and thumbnails; 6-face `PanoramaCapture`
+##    intentionally uses `AtmosphereRig.set_haziness` alone so cube faces
+##    never seam across borders.
 ##
 ## Pass cost measured by `tools/haze_spike.gd` on the capture machine
 ## (2026-11-15, Apple M5 Ultra, Metal 4.0 Forward+, 1280x720, 48 taps,
@@ -72,6 +76,7 @@ var pass_active := false
 
 var _target_haziness := 0.0
 var _target_ray_sky := 0.0
+var _target_rays := 0.0
 var _base_haziness := 0.0
 var _base_rays := 0.0
 var _sun_dir := Vector3(0.0, 0.2, -0.98)
@@ -91,16 +96,26 @@ func _init() -> void:
 ## Wire into View360 immediately above `_container` and below `_hud`.
 func attach_view(world_vp: SubViewport, world_container: SubViewportContainer,
 		world_cam: Camera3D, atmos: AtmosphereRig) -> void:
+	if _world_container != null and _world_container != world_container \
+			and _world_container.visibility_changed.is_connected(_refresh_pass_state):
+		_world_container.visibility_changed.disconnect(_refresh_pass_state)
 	_world_vp = world_vp
 	_world_container = world_container
 	_world_cam = world_cam
 	_atmos = atmos
 	_saved_world_update_mode = world_vp.render_target_update_mode
 	_ensure_viewports()
+	if _rays_mat != null:
+		_rays_mat.set_shader_parameter("world", _world_vp.get_texture())
 	if not resized.is_connected(_on_resized):
 		resized.connect(_on_resized)
+	if _world_container != null and not _world_container.visibility_changed.is_connected(_refresh_pass_state):
+		_world_container.visibility_changed.connect(_refresh_pass_state)
 	_on_resized()
 	_set_pass_active(false)
+
+func _view_shown() -> bool:
+	return _world_container == null or _world_container.is_visible_in_tree()
 
 func _ensure_viewports() -> void:
 	if overlay != null or _world_vp == null:
@@ -178,6 +193,7 @@ func set_enabled(on: bool) -> void:
 	if not enabled:
 		_target_haziness = 0.0
 		_target_ray_sky = 0.0
+		_target_rays = 0.0
 		haziness = 0.0
 		ray_amount = 0.0
 		if _atmos != null:
@@ -249,11 +265,20 @@ func _recompute_targets() -> void:
 	if not enabled or governor_step <= 0:
 		_target_haziness = 0.0
 		_target_ray_sky = 0.0
+		_target_rays = 0.0
 		return
 	_target_haziness = _base_haziness
 	_target_ray_sky = _base_rays if governor_step >= 2 else 0.0
+	var aspect := float(_world_vp.size.x) / maxf(float(_world_vp.size.y), 1.0) \
+		if _world_vp != null else 1.7778
+	_sun_facing = float(project_sun(_world_cam, aspect, _sun_dir)["facing"]) if _world_cam != null else 1.0
+	_target_rays = _target_ray_sky * _sun_facing
 
 func _process(delta: float) -> void:
+	if not _view_shown():
+		if pass_active:
+			_set_pass_active(false)
+		return
 	if not enabled and haziness <= 0.0005 and ray_amount <= 0.0005:
 		if pass_active:
 			_set_pass_active(false)
@@ -268,8 +293,8 @@ func _process(delta: float) -> void:
 	var rate := EASE_REDUCED_PER_S if UiPrefs.reduce_motion else EASE_PER_S
 	var step_d := clampf(rate * delta, 0.0, 1.0)
 	haziness = move_toward(haziness, _target_haziness, step_d)
-	var target_rays := _target_ray_sky * _sun_facing
-	ray_amount = move_toward(ray_amount, target_rays, step_d)
+	_target_rays = _target_ray_sky * _sun_facing
+	ray_amount = move_toward(ray_amount, _target_rays, step_d)
 	if _atmos != null:
 		_atmos.set_haziness(haziness)
 	_push_uniforms(aspect)
@@ -277,17 +302,17 @@ func _process(delta: float) -> void:
 
 func _push_uniforms(aspect: float) -> void:
 	if _rays_mat != null:
-		_rays_mat.set_shader_parameter("world", _world_vp.get_texture())
 		_rays_mat.set_shader_parameter("sun_uv", _sun_uv)
 		_rays_mat.set_shader_parameter("aspect", aspect)
 		_rays_mat.set_shader_parameter("ray_amount", ray_amount)
 		_rays_mat.set_shader_parameter("sun_color", Vector3(_sun_color.r, _sun_color.g, _sun_color.b))
-		_rays_mat.set_shader_parameter("taps", float(TAPS if governor_step >= 2 else 0))
+		var active_rays := governor_step >= 2 or ray_amount > 0.001
+		_rays_mat.set_shader_parameter("taps", float(TAPS if active_rays else 0))
 	if _overlay_mat != null:
 		_overlay_mat.set_shader_parameter("ray_amount", ray_amount)
 
 func _refresh_pass_state() -> void:
-	var want_pass := enabled and governor_step >= 2 and (_target_ray_sky > 0.001 or ray_amount > 0.001)
+	var want_pass := enabled and _view_shown() and (_target_rays > 0.001 or ray_amount > 0.001)
 	if want_pass != pass_active:
 		_set_pass_active(want_pass)
 
@@ -297,6 +322,8 @@ func _set_pass_active(on: bool) -> void:
 		return
 	if on:
 		_on_resized()
+		if _rays_mat != null:
+			_rays_mat.set_shader_parameter("world", _world_vp.get_texture())
 		rays_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		overlay.visible = true
 		visible = true

@@ -128,7 +128,10 @@ static func restore_cached(world: Node) -> void:
 					if (probe == null or probe.is_empty()) and tex.has_meta("impostor_image"):
 						var img := tex.get_meta("impostor_image") as Image
 						if img != null and not img.is_empty():
-							var fresh := ImageTexture.create_from_image(img)
+							var gpu_img := img.duplicate() as Image
+							gpu_img.generate_mipmaps()
+							FoliageTextures.preserve_coverage(gpu_img, ALPHA_CUT)
+							var fresh := ImageTexture.create_from_image(gpu_img)
 							fresh.set_meta("view", int(tex.get_meta("view", 0)))
 							fresh.set_meta("impostor_image", img)
 							mat.albedo_texture = fresh
@@ -177,6 +180,7 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 	var images: Array[Image] = []
 	var texs: Array[ImageTexture] = []
 	var key_dir := RELIEF_KEY.normalized()
+	var headless := DisplayServer.get_name() == "headless"
 	for v_idx in 4:
 		var bytes := _rasterize_view(batches, center, y1, span_y,
 			normals[v_idx], rights[v_idx], widths[v_idx] * 0.5, key_dir)
@@ -187,7 +191,10 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 		FoliageTextures.preserve_coverage(gpu_img, ALPHA_CUT)
 		var tex := ImageTexture.create_from_image(gpu_img)
 		tex.set_meta("view", v_idx)
-		tex.set_meta("impostor_image", base_img)
+		# Only attach the CPU fallback image under the headless dummy renderer
+		# (which drops GPU texels); real GPU .scn caches embed `tex` directly.
+		if headless:
+			tex.set_meta("impostor_image", base_img)
 		texs.append(tex)
 
 	var mask_bytes := PackedByteArray()

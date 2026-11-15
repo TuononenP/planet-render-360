@@ -136,8 +136,8 @@ func _test_governor_order() -> void:
 	# 1st slow window: drops rays only (haze_step 2 -> 1), keeping step=3 (full res + shadows).
 	gov.step = gov.adapt(20.0)
 	gov._apply()
-	if gov.step != 3 or gov.haze_step != 1 or haze.governor_step != 1 or haze.pass_active:
-		_failures.append("1st slow window must drop rays only (step=%d haze_step=%d pass=%s)" % [
+	if gov.step != 3 or gov.haze_step != 1 or haze.governor_step != 1 or haze.pass_active or gov.at_ceiling():
+		_failures.append("1st slow window must drop rays only and report below ceiling (step=%d haze_step=%d pass=%s)" % [
 			gov.step, gov.haze_step, haze.pass_active])
 	if QualityGovernor.step_label(3, gov.step, gov.haze_step, gov.haze_ceiling) != "Ultra · no rays":
 		_failures.append("unexpected 1st step-down label: %s" % QualityGovernor.step_label(3, gov.step, gov.haze_step, gov.haze_ceiling))
@@ -160,8 +160,8 @@ func _test_governor_order() -> void:
 		_failures.append("render scale should recover to step 3 before haze re-enables (step=%d haze=%d)" % [gov.step, gov.haze_step])
 	for _i in 200:
 		gov.step = gov.adapt(90.0)
-	if gov.step != 3 or gov.haze_step != 2:
-		_failures.append("healthy GPU should eventually recover full haze_step=2 (step=%d haze=%d)" % [gov.step, gov.haze_step])
+	if gov.step != 3 or gov.haze_step != 2 or not gov.at_ceiling():
+		_failures.append("healthy GPU should eventually recover full haze_step=2 at ceiling (step=%d haze=%d)" % [gov.step, gov.haze_step])
 	haze.free()
 	sun.free()
 	vp.free()
@@ -217,6 +217,42 @@ func _test_display_path_and_ease() -> void:
 	if haze.ray_amount >= normal_step:
 		_failures.append("reduce_motion should ease slower (%f vs %f)" % [haze.ray_amount, normal_step])
 	UiPrefs.reduce_motion = false
+
+	# Live governor step-down (2 -> 1 while ray_amount > 0) eases out smoothly
+	# instead of snapping off on frame 1, then disables rays_vp once settled.
+	for _i in 10:
+		haze._process(1.0 / 60.0)
+	var mid_rays := haze.ray_amount
+	haze.set_governor_step(1)
+	if not haze.pass_active or haze.ray_amount <= 0.0:
+		_failures.append("governor step-down with live rays must ease out, not snap off on frame 1")
+	haze._process(1.0 / 60.0)
+	if haze.ray_amount >= mid_rays or haze.ray_amount <= 0.0:
+		_failures.append("governor step-down should step ray_amount down gradually (%f -> %f)" % [mid_rays, haze.ray_amount])
+	for _i in 60:
+		haze._process(1.0 / 60.0)
+	if haze.pass_active or haze.rays_vp.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+		_failures.append("once eased to 0 under governor step 1, rays_vp must disable")
+	haze.set_governor_step(2)
+	haze._process(1.0 / 60.0)
+
+	# Off-screen pause: hiding the parent view disables rays_vp immediately,
+	# and showing it resumes cleanly.
+	holder.visible = false
+	await process_frame
+	if haze.pass_active or haze.rays_vp.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+		_failures.append("hiding parent view must pause rays_vp off-screen")
+	holder.visible = true
+	await process_frame
+	if not haze.pass_active or haze.rays_vp.render_target_update_mode != SubViewport.UPDATE_ALWAYS:
+		_failures.append("showing parent view again must resume rays_vp")
+
+	# Looking >90 deg away from the sun eases ray_amount to 0 and disables rays_vp.
+	cam.look_at(cam.global_position - sun_dir, Vector3.UP)
+	for _i in 60:
+		haze._process(1.0 / 60.0)
+	if haze.pass_active or haze.rays_vp.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+		_failures.append("looking away from the sun should disable rays_vp once eased out")
 
 	# Turning haze off restores exact pre-feature display state.
 	haze.set_enabled(false)

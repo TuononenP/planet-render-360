@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 262
+const BUILD_VERSION := 263
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -35,7 +35,9 @@ const SOURCE_SKIP := ["res://scripts/data/tile_connection.gd",
 	"res://scripts/data/wiki_fetcher.gd", "res://scripts/data/wiki_parse.gd",
 	"res://scripts/data/host_policy.gd", "res://scripts/data/remote_config.gd",
 	"res://scripts/data/offline_downloader.gd", "res://scripts/data/place_thumb.gd",
-	"res://scripts/data/map_pack.gd", "res://scripts/data/horizon_fetcher.gd"]
+	"res://scripts/data/map_pack.gd", "res://scripts/data/horizon_fetcher.gd",
+	"res://scripts/render/haze_rig.gd", "res://scripts/render/godray_shader.gd",
+	"res://scripts/render/quality_governor.gd", "res://scripts/render/altitude_reach.gd"]
 
 static var _source_hash := ""
 static var _bytes := -1  # -1 = unknown, rescan on next total_bytes()

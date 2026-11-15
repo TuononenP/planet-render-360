@@ -366,6 +366,16 @@ func _reveal() -> void:
 	block.mesh = BoxMesh.new()
 	block.position = Vector3(0, 0, -1500)
 	homes.add_child(block)
+	var landmark := Node3D.new()
+	landmark.name = "Landmark_eiffel"
+	landmark.set_meta("lod_layer", "Landmarks")
+	landmark.position = Vector3(0, 0, -4200)
+	world.add_child(landmark)
+	var imp := MeshInstance3D.new()
+	imp.mesh = BoxMesh.new()
+	imp.set_meta("lod_layer", "Landmarks")
+	imp.set_meta("lod_impostor", true)
+	landmark.add_child(imp)
 	var w := RevealWave.new()
 	w.prepare(world, Vector2.ZERO)
 	w.pump()
@@ -377,6 +387,8 @@ func _reveal() -> void:
 	_check(near.visibility_range_end == 0.0, "ground the old world had shows at once")
 	_check(edge.visibility_range_end == 0.0, "a piece reaching into the old square is not hidden")
 	_check(block.visibility_range_end == 0.0, "a new building shows at the swap")
+	_check(imp.visibility_range_end == 0.0 and not imp.has_meta(RevealWave.PENDING),
+		"far landmarks stay on the skyline across a swap")
 	var held := fresh.visibility_range_end
 	LodRing.apply(world, RenderSettings.Preset.HIGH)
 	_check(fresh.visibility_range_end == held, "a re-range mid-wave leaves its pieces hidden")

@@ -66,6 +66,11 @@ func set_haze_ceiling(max_haze: int) -> void:
 	haze_step = haze_ceiling if step >= ceiling_step else 0
 	_apply()
 
+## True only when neither render scale/shadows nor Ultra haze sub-steps
+## are stepped down below their allowed ceilings.
+func at_ceiling() -> bool:
+	return step >= ceiling_step and haze_step >= haze_ceiling
+
 ## The step to be on after a window of `window_s` seconds that averaged
 ## `fps`. Pure state-machine: _process feeds it, tests drive it directly.
 ## When `haze_ceiling > 0`, `haze_step` drops (2 -> 1 -> 0) before `step`

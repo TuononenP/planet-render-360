@@ -20,7 +20,7 @@ const MARGIN_M := 200.0
 ## far city stood where the new detailed buildings are and leaves at the
 ## swap, so a building fading in behind the wave left that ground empty
 ## for a second or two.
-const SKIP_LAYERS := ["FarCity", "FarTerrain", "Water", "Buildings"]
+const SKIP_LAYERS := ["FarCity", "FarTerrain", "Water", "Buildings", "Landmarks"]
 
 var _world: Node3D
 ## The old square's centre in the new world's frame.
