@@ -1,6 +1,7 @@
 # Remote config
 
-The app can switch the addresses of three public services without an update.
+The app can switch the addresses of its public map services, and the order
+the map data asks them in, without an update.
 This is required by the Nominatim usage policy, and it is how the app moves
 off a service that blocks it, changes its terms or goes away.
 
@@ -15,6 +16,11 @@ The file is `site/config.json`, published by `.github/workflows/pages.yml` to
 | `nominatim_endpoint` | https URL | `SearchFetcher.ENDPOINT`, the place-search address |
 | `overpass_endpoints` | 1 to 8 https URLs | `OsmFetcher.ENDPOINTS`, the Overpass instances in order (a live query uses the first one not paused) |
 | `satellite_url_template` | https URL with exactly three `%d` (zoom, tile y, tile x) | `SatelliteFetcher.URL_TEMPLATE`, the imagery address |
+| `map_source_first` | `"postpass"` or `"overpass"` | `MapSources.FIRST`, the source the detailed map data and the POIs ask first (default `"postpass"`; the other one is next) |
+| `overpass_on_mobile` | `true` or `false` | Whether iOS and Android ask Overpass at all (default `false`: they use Postpass, the OSM API and the caches) |
+
+To go back to Overpass first everywhere, publish
+`{"version": 1, "map_source_first": "overpass", "overpass_on_mobile": true}`.
 
 ```json
 {

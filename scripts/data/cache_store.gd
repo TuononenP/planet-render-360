@@ -115,6 +115,13 @@ static func osm_api_path(lat: float, lon: float, radius_m: int) -> String:
 	return "%s/osm_v%d_%d_%d_api%d.json" % [base_dir(), DATA_VERSION,
 		quant(lat), quant(lon), radius_m]
 
+## Postpass's answer to the detailed query (PostpassFallback.build_body,
+## the same layers as the Overpass query): read back as a fresh answer
+## while Postpass is asked first (MapSources), else only as a saved copy.
+static func osm_postpass_path(lat: float, lon: float, radius_m: int) -> String:
+	return "%s/osm_v%d_%d_%d_pp%d_q%d.json" % [base_dir(), DATA_VERSION,
+		quant(lat), quant(lon), radius_m, OsmQuery.QUERY_VERSION]
+
 ## Marker that Overpass and the OSM API both found nothing here (open sea,
 ## wilderness), so the next load within OsmFetcher.EMPTY_TTL_S does not
 ## ask either again. Not a detailed payload: OsmNearbyCache skips it.

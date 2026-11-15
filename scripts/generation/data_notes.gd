@@ -68,5 +68,7 @@ static func partial_line(detail: String) -> String:
 ## True unless the map answered, validly, with no buildings (open sea,
 ## wilderness): that is an empty place, not an outage.
 static func osm_outage(reason: String) -> bool:
-	return not reason.contains(
-		"Overpass %s; OSM API %s" % [OsmFetcher.NO_BUILDINGS, OsmFetcher.NO_BUILDINGS])
+	for source in ["Overpass", "Postpass"]:
+		if reason.contains("%s %s; OSM API %s" % [source, OsmFetcher.NO_BUILDINGS, OsmFetcher.NO_BUILDINGS]):
+			return false
+	return true

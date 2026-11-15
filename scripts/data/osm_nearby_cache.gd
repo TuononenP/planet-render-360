@@ -5,12 +5,12 @@ extends RefCounted
 ## failed. Cache keys quantise to ~110 m, and a payload at any radius
 ## still covers most of a neighbouring view, so real data from a cached
 ## spot a few hundred metres away beats procedural dressing. Payloads
-## converted from the OSM API ("api" keys) are lossy, so a real Overpass
-## payload at the same distance goes first.
+## converted from the OSM API ("api" keys) are lossy, so an Overpass or
+## Postpass ("pp") payload at the same distance goes first.
 
 static func _regex() -> RegEx:
 	var rx := RegEx.new()
-	rx.compile("^osm_v%d_(-?\\d+)_(-?\\d+)_(r|api)(\\d+)(?:_q(\\d+))?\\.json$" % CacheStore.DATA_VERSION)
+	rx.compile("^osm_v%d_(-?\\d+)_(-?\\d+)_(r|pp|api)(\\d+)(?:_q(\\d+))?\\.json$" % CacheStore.DATA_VERSION)
 	return rx
 
 ## Metres from the place to the spot a detailed cache file was keyed at,

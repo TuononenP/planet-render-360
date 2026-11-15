@@ -37,8 +37,15 @@ const CAP_OTHER_AREAS := OsmQuery.CAP_WATERWAYS + OsmQuery.CAP_NATURAL + OsmQuer
 ## Coastline has its own part (build_body), so no way comes twice.
 const NOT_COAST := "tags->>'natural' IS DISTINCT FROM 'coastline'"
 
+## Seconds a small layer (the POIs) may take, like its Overpass request.
+const LAYER_TIMEOUT_S := 15.0
+
 static func endpoint() -> String:
 	return str(RemoteConfig.value("postpass_endpoint", URL))
+
+## The headers every Postpass POST carries.
+static func headers() -> PackedStringArray:
+	return ["User-Agent: " + Brand.USER_AGENT, "Content-Type: application/x-www-form-urlencoded"]
 
 static func _sql_list(values: Array) -> String:
 	var quoted: PackedStringArray = []
@@ -106,6 +113,13 @@ static func build_body(lat: float, lon: float, radius_m: int) -> String:
 static func build_bridge_body(lat: float, lon: float, radius_m: int) -> String:
 	return "data=" + _part(_near(lat, lon, radius_m) + " AND osm_type <> 'N' AND tags->>'man_made' = 'bridge'",
 		lat, lon, OsmQuery.CAP_BRIDGE_AREAS).uri_encode()
+
+## The POST body for the POI layer (OsmQuery.build_poi_query): shop,
+## amenity, office, tourism, craft and advertising nodes, nearest first.
+static func build_poi_body(lat: float, lon: float) -> String:
+	return "data=" + _part(_near(lat, lon, OsmQuery.POI_RADIUS_M) + " AND osm_type = 'N' AND tags ?| "
+		+ "ARRAY['shop','amenity','office','tourism','craft','advertising']",
+		lat, lon, OsmQuery.CAP_POIS).uri_encode()
 
 static func _points(coords: Variant) -> Array:
 	var out: Array = []

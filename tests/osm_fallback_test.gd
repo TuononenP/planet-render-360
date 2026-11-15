@@ -176,6 +176,15 @@ func _api_checks(failures: Array[String]) -> void:
 	var api := CacheStore.osm_api_path(LAT, LON, 1200)
 	if api == CacheStore.osm_path(LAT, LON, 1200) or CacheStore.layer_of(api) != "osm":
 		failures.append("API cache key must differ from the Overpass key but stay in the osm layer")
+	# Postpass's answer has a key of its own too, and the nearby cache
+	# finds it, ahead of a lossy API copy at the same spot.
+	var pp := CacheStore.osm_postpass_path(LAT, LON, 1200)
+	if pp in [api, CacheStore.osm_path(LAT, LON, 1200)] or CacheStore.layer_of(pp) != "osm":
+		failures.append("Postpass cache key must differ from the others but stay in the osm layer")
+	_with_cache_dir({pp.get_file(): CACHED_PAYLOAD, api.get_file(): CACHED_PAYLOAD})
+	var pp_order := OsmNearbyCache.candidates(LAT, LON, OsmFetcher.SAME_PLACE_M)
+	if pp_order.size() != 2 or not pp_order[0].ends_with(pp.get_file()):
+		failures.append("a Postpass payload goes before an API one at the same spot: %s" % [pp_order])
 	_with_cache_dir({
 		"osm_v2_48857_2352_api1200.json": CACHED_PAYLOAD,
 		"osm_v2_48857_2352_r800.json": CACHED_PAYLOAD,

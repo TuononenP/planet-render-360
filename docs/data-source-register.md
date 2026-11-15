@@ -371,14 +371,27 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   waterways, quays) is kept, as Overpass's own check keeps it, and the OSM API
   fallback now keeps such answers too. osm2pgsql drops a relation's `type` tag, so area relations
   are rebuilt as multipolygons with one closed member per ring, and route
-  relations are left out. Payloads are cached under the OSM API key
-  (`api1200`), so Overpass is asked again on the next load. `RemoteConfig`
+  relations are left out. Payloads are cached under their own key
+  (`pp1200_q<query version>`), read back as a fresh answer while Postpass
+  goes first. `RemoteConfig`
   `postpass_endpoint` can replace the address. The ohsome API
   (`api.ohsome.org`) was probed on the same day as an alternative: its
   metadata answered, but `/v1/elements/geometry` returned HTTP 403.
-- Detailed-phase fallback order in `OsmFetcher`: one Overpass instance →
-  cached payload at the same place (any radius, ≤150 m) → Postpass → OSM API
-  bbox → cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
+- Postpass first (2026-11-15, `MapSources`): the app's detailed query took
+  45-58 s on Overpass (32-34 s to the first byte, then HTTP 502 under load)
+  and 1.2-3.0 s on Postpass in Helsinki, Midtown Manhattan and Shibuya.
+  Parsed with `OsmParser`, the two answers matched within about 1% for
+  buildings, roads, trees, railways, stops and land in Helsinki and New
+  York; in Shibuya Postpass gave 5% more buildings (nearest first under the
+  same caps). Only Postpass's answer carries the bridge outlines, so the
+  separate bridge query is skipped after it. The POIs ask Postpass too
+  (`PostpassFallback.build_poi_body`). iOS and Android ask no Overpass
+  instance. `RemoteConfig` `map_source_first` and `overpass_on_mobile` put
+  Overpass back (`docs/remote-config.md`).
+- Detailed-phase order in `OsmFetcher`: Postpass → one Overpass instance →
+  cached payload at the same place (any radius, ≤150 m) → OSM API bbox →
+  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing. With
+  Overpass first: Overpass → same-place cache → Postpass → the rest.
 - Single attempt (2026-11-11): the main instance failed TLS handshakes
   (`result=5`), `private.coffee` accepted connections but sent nothing, and
   `z.overpass-api.de` refused connections, so walking the list only delayed
