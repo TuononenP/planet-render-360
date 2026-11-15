@@ -111,6 +111,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 	var th := int(_one(tags, 323)) if tiled else int(_one(tags, 278, h))
 	if offsets.is_empty() or tw <= 0 or th <= 0:
 		return {}
+	var counts: Array = tags.get(325 if tiled else 279, [])
 	var across := ceili(float(w) / float(tw))
 	for idx in offsets.size():
 		var x0 := (idx % across) * tw if tiled else 0
@@ -119,6 +120,13 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 		if rows <= 0:
 			continue
 		var start := int(offsets[idx])
+		if start == 0 or (idx < counts.size() and int(counts[idx]) == 0):
+			# A sparse file leaves an all-nodata block (open sea) out, offset
+			# and byte count 0: read, it would be the file's header as heights.
+			for r in rows:
+				for c in mini(tw, w - x0):
+					out[(y0 + r) * w + x0 + c] = NODATA
+			continue
 		if start + tw * (th if tiled else rows) * 4 > bytes.size():
 			return {}
 		sp.seek(start)

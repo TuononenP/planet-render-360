@@ -98,7 +98,10 @@ static func dress(root: Node3D, ring: PackedVector2Array, footing: Dictionary,
 				_opening(frames, panes, c, dir, n, LIGHT_W_M, sill, sill + LIGHT_H_M * m, true)
 			# A row of windows for every further storey the wall stands.
 			var up := UPPER_SILL_M
-			while (y1 - mid) / m >= up + UPPER_H_M + UPPER_TOP_GAP_M:
+			# Never above the plinth itself: a corrupt ground read far below
+			# the floor would otherwise add rows without end.
+			var rise_m := minf((y1 - mid) / m, float(footing["plinth"]) / m)
+			while rise_m >= up + UPPER_H_M + UPPER_TOP_GAP_M:
 				_opening(frames, panes, c, dir, n, LIGHT_W_M, mid + up * m, mid + (up + UPPER_H_M) * m, true)
 				up += STOREY_M
 	BuildingWalls._emit(root, frames, _mat("frame", Color("#76726b"), 0.8))

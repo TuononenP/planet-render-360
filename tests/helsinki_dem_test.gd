@@ -9,7 +9,9 @@ func _init() -> void:
 
 ## A 4 x 4 float32 GeoTIFF in one 4 x 4 tile, big-endian like GeoServer's:
 ## height = 10 + column + 2 * row, cell 5 m, top-left corner (1000, 2000).
-func _tiff(tiled: bool, matrix: bool = false) -> PackedByteArray:
+## `sparse` leaves the tile out as GDAL does an all-nodata one (offset and
+## byte count 0).
+func _tiff(tiled: bool, matrix: bool = false, sparse: bool = false) -> PackedByteArray:
 	var sp := StreamPeerBuffer.new()
 	sp.big_endian = true
 	sp.put_data("MM".to_utf8_buffer())
@@ -20,7 +22,7 @@ func _tiff(tiled: bool, matrix: bool = false) -> PackedByteArray:
 		[277, 3, 1, 1 << 16], [339, 3, 1, 3 << 16],
 	]
 	if tiled:
-		entries.append_array([[322, 4, 1, 4], [323, 4, 1, 4], [324, 4, 1, 0]])
+		entries.append_array([[322, 4, 1, 4], [323, 4, 1, 4], [324, 4, 1, 0], [325, 4, 1, 0 if sparse else 64]])
 	else:
 		entries.append_array([[273, 4, 1, 0], [278, 4, 1, 4]])
 	if matrix:
@@ -38,7 +40,7 @@ func _tiff(tiled: bool, matrix: bool = false) -> PackedByteArray:
 		sp.put_u16(e[1])
 		sp.put_u32(e[2])
 		match e[0]:
-			324, 273: sp.put_u32(data_at)
+			324, 273: sp.put_u32(0 if sparse else data_at)
 			33550: sp.put_u32(scale_at)
 			33922, 34264: sp.put_u32(tie_at if e[0] == 33922 else scale_at)
 			_: sp.put_u32(e[3])
@@ -84,6 +86,10 @@ func _run() -> void:
 			failures.append("sample gave %.3f / %.3f, expected 13 / 13.5" % [h, mid])
 		if not is_nan(HelsinkiDem.sample(raster, 900.0, 2000.0)):
 			failures.append("a point outside the raster has a height")
+	# A sparse tile is missing ground, not the file's header read as heights.
+	var sparse := HelsinkiDem.decode(_tiff(true, false, true))
+	if sparse.is_empty() or Array(sparse["values"]).any(func(v: float) -> bool: return v != HelsinkiDem.NODATA):
+		failures.append("a sparse tile did not read as nodata: %s" % [sparse.get("values")])
 	if not HelsinkiDem.decode("not a tiff at all, just text".to_utf8_buffer()).is_empty():
 		failures.append("garbage decoded")
 	# Resample onto a heights grid: a flat 7.5 m raster over the window.
