@@ -39,11 +39,15 @@ extends SceneTree
 ##   <id>_agx.jpg                opening look with AgX instead of ACES
 ##   audit.json                  per place, every StandardMaterial3D's mean
 ##                               linear albedo, flagged against ALBEDO_RANGES
-## With --bake-thumbs (use --times=noon): each preset's noon vantage becomes its shipped card
-## picture, res://assets/preset_thumbs/<id>.jpg (PlaceThumb.load_preset).
+## With --bake-thumbs (use --times=noon): each preset's opening look, in the afternoon
+## (sun at CARD_SUN_DEG), becomes its shipped card picture, res://assets/preset_thumbs/<id>.jpg
+## (PlaceThumb.load_preset); a preset in THUMB_LOOKS is shot from its own card look instead
+## (<id>_thumb.jpg), framed on the city's best-known landmark. Card bakes run on Ultra.
+## --look_time=noon takes candidate --looks at noon.
 ## With --capital-thumbs: every catalog capital without a picture is built and its noon
-## opening look becomes res://assets/capital_thumbs/<quantised lat>_<lon>.jpg
-## (PlaceThumb.load_capital). Nothing else is captured; --places=quantlat_quantlon,... limits it,
+## look (aimed at its registry landmark when it has one, from THUMB_LOOKS["cap_<key>"]
+## when listed, else the opening look) becomes res://assets/capital_thumbs/<city>_<country>.jpg
+## (PlaceThumb.load_capital). Nothing else is captured; --places=berlin_germany,... limits it,
 ## --limit=N stops after N pictures, --shard=i/n takes every n-th place (run n instances), --redo replaces existing ones. Re-run to retry skipped places.
 ## Reference photos live in visual-plan/refs/<id>/ (see its README).
 ## History and user thumbnails are never written; settings are not saved.
@@ -93,6 +97,72 @@ const CONTROLS := [
 		"season": "winter"},
 ]
 
+## --bake-thumbs: card looks [lat, lon, height_m, bearing°, pitch°, zoom] for presets
+## whose opening look does not frame the city's best-known landmark well at card size.
+## Checked in captures (visual-plan/reviews/thumbcand*-2026-11-15).
+const THUMB_LOOKS := {
+	# From above the south side of Senate Square, down it to Helsinki Cathedral.
+	"helsinki": [60.1683, 24.9522, 45.0, 358.0, -6.0, 1.25],
+	# Monteliusvägen, across Riddarfjärden to City Hall.
+	"stockholm": [59.3207, 18.0604, 25.0, 335.0, 1.0, 2.8],
+	# The Bacino, across to Santa Maria della Salute.
+	"venice": [45.4318, 12.3405, 5.0, 258.0, 3.0, 2.2],
+	# Gwanghwamun on its axis, closer than the opening look.
+	"seoul": [37.574978, 126.976772, 4.0, 0.0, 6.0, 1.9],
+	# Surprise Corner, close on the Banff Springs Hotel.
+	"banff": [51.1676, -115.5596, 28.0, 203.0, -3.0, 2.5],
+	# Over the station side, down onto the Scramble and QFRONT.
+	"tokyo": [35.65915, 139.70085, 20.0, 318.0, -15.0, 1.0],
+	# Over Russian Hill, out to the Golden Gate Bridge.
+	"san_francisco": [37.80195, -122.4196, 40.0, 292.0, 1.0, 2.8],
+	# Queen's Walk, across the Thames to Big Ben and Parliament.
+	"london": [51.5018, -0.1196, 8.0, 249.0, 7.0, 1.8],
+	# Brooklyn Bridge Park, the Lower Manhattan skyline and Brooklyn Bridge.
+	"new_york": [40.7030, -73.9975, 6.0, 338.0, 8.0, 1.25],
+	# Over the Mall, down Central Park to the Billionaires' Row skyline.
+	"central_park": [40.7745, -73.9705, 70.0, 205.0, -4.0, 1.3],
+	# Over the port's north shore, onto the Casino's domes and gardens.
+	"monaco": [43.7370, 7.4262, 60.0, 33.0, -2.0, 2.8],
+	# The opening look, closer on the Eiffel Tower.
+	"paris": [48.8622, 2.2887, 6.0, 142.0, 6.0, 1.5],
+	# The opening look, up past the mall roofs to Burj Khalifa.
+	"dubai": [25.19787, 55.28278, 20.0, 265.0, 20.0, 1.3],
+	# Top of the Rock, the Empire State Building centred.
+	"new_york_midtown": [40.7588, -73.9795, 240.0, 204.0, -6.0, 1.6],
+	# Capitals (--capital-thumbs) whose automatic landmark look is blocked
+	# or too far; checked in visual-plan/reviews/capcand*-2026-11-15.
+	# Up to the Parthenon on the Acropolis from the north.
+	"cap_athens_greece": [37.976, 23.724, 40.0, 154.7, 4.1, 2.48],
+	# Parliament House and its flagmast over the lake shore.
+	"cap_canberra_australia": [-35.296, 149.1255, 60.0, 183.9, -0.3, 2.8],
+	# Cairo Tower from across the Nile (the registry primary is the Giza pyramid, 11 km off).
+	"cap_cairo_egypt": [30.0455, 31.23, 30.0, 274.6, 6.6, 1.49],
+	# Down onto the Umayyad Mosque's minarets and dome, the mountains behind.
+	"cap_damascus_syria": [33.51, 36.305, 90.0, 45.4, -13.1, 1.67],
+	# Over the Temple of Literature's courtyards.
+	"cap_hanoi_vietnam": [21.03, 105.838, 60.0, 234.2, -11.2, 2.8],
+	# From the north over the Royal Palace to the Almudena dome.
+	"cap_madrid_spain": [40.42, -3.713, 40.0, 203.4, -4.9, 2.71],
+	"cap_havana_cuba": [23.135, -82.365, 50.0, 86.8, -0.4, 2.8],
+	# Across Victoria Harbour to the Bank of China Tower.
+	"cap_hong_kong_hong_kong": [22.287, 114.169, 30.0, 222.0, 7.5, 1.72],
+	# Gran Torre Santiago against the Andes.
+	"cap_santiago_chile": [-33.44, -70.63, 150.0, 41.1, 0.0, 2.8],
+	# St Peter's Basilica over the colonnades (the registry's primary is the Colosseum).
+	"cap_vatican_city_vatican": [41.9022, 12.4605, 40.0, 270.0, 3.0, 1.99],
+	"cap_warsaw_poland": [52.23, 21.013, 50.0, 292.8, 7.5, 1.14],
+	# Charles Bridge, St Vitus on the castle hill behind.
+	"cap_prague_czechia": [50.0855, 14.413, 40.0, 304.0, 0.4, 2.8],
+	# Hassan Tower across its esplanade.
+	"cap_rabat_morocco": [34.0228, -6.821, 25.0, 311.1, -0.8, 1.95],
+	# Taipei 101 over the city, the hills behind.
+	"cap_taipei_taiwan": [25.045, 121.545, 150.0, 122.6, 2.5, 2.3],
+	# Over KLCC, the Petronas Towers and their skybridge.
+	"cap_kuala_lumpur_malaysia": [3.1535, 101.7095, 120.0, 26.3, 11.1, 1.0],
+	# Down Kartavya Path to India Gate.
+	"cap_new_delhi_india": [28.6129, 77.2262, 25.0, 90.0, -0.7, 2.42],
+}
+
 var _out := ""
 var _stats := {}
 var _audit := {}
@@ -119,6 +189,10 @@ func _init() -> void:
 
 func _args() -> Dictionary:
 	var a := {"tag": "capture", "preset": 2, "places": "", "times": "golden,noon,night"}
+	# Card pictures are baked on Ultra (--preset= still overrides it).
+	var cmd := OS.get_cmdline_user_args()
+	if cmd.has("--bake-thumbs") or cmd.has("--capital-thumbs"):
+		a["preset"] = 3
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--") and arg.contains("="):
 			var kv := arg.substr(2).split("=", true, 1)
@@ -140,14 +214,12 @@ func _capital_places(filter: String, redo: bool) -> Array:
 	var picks := LocationData.quick_picks()
 	for i in range(PresetViews.ROWS.size(), picks.size()):
 		var pick: Array = picks[i]
-		var lat := float(pick[2])
-		var lon := float(pick[3])
-		var key := "%d_%d" % [CacheStore.quant(lat), CacheStore.quant(lon)]
+		var key := PlaceThumb.capital_slug(str(pick[1]))
 		if not want.is_empty() and not want.has(key):
 			continue
-		if not redo and FileAccess.file_exists(ProjectSettings.globalize_path(PlaceThumb.capital_path(lat, lon))):
+		if not redo and FileAccess.file_exists(ProjectSettings.globalize_path(PlaceThumb.capital_path(str(pick[1])))):
 			continue
-		out.append({"id": "cap_" + key, "name": str(pick[1]), "lat": lat, "lon": lon})
+		out.append({"id": "cap_" + key, "name": str(pick[1]), "lat": float(pick[2]), "lon": float(pick[3])})
 	return out
 
 func _places(filter: String, landmark_types: String = "", pin: String = "") -> Array:
@@ -217,6 +289,7 @@ func _run() -> void:
 	main._settings.preset = int(a["preset"])  # in memory only, never saved
 	View360.frame_scale = float(a.get("frame_scale", 1.0))
 	_eye_min = float(a.get("eye_min", 0.0))
+	_card_sun = float(a.get("card_sun", CARD_SUN_DEG))
 	var view: View360 = main._view
 	view._governor.set_process(false)
 	if size != SIZE:
@@ -315,15 +388,22 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		ViewConditions.set_time_minutes(view, PresetViews.opening_hour(view._data.view, view._atmos.golden_hour()) * 60.0)
 	await _settle(settle_s, SETTLE_FRAMES)
 	if OS.get_cmdline_user_args().has("--capital-thumbs"):
-		ViewConditions.jump_to(view, "noon")
+		if THUMB_LOOKS.has(id):
+			_place_eye(view, id, "card", THUMB_LOOKS[id])
+		else:
+			_aim_landmark_card(view, id)
+		_set_card_time(view)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await process_frame
 		RenderingServer.force_draw(false)
-		_bake_capital(view._viewport.get_texture().get_image(), float(place["lat"]), float(place["lon"]), id)
+		var card := view._viewport.get_texture().get_image()
+		card.save_jpg(_out.path_join("%s_card.jpg" % id), 0.88)
+		_bake_capital(card, str(place["name"]), id)
 		return
 	var rig := view._rig
 	_lift_eye(view, _eye_min)
 	var open := Vector2(rig.yaw, rig.pitch)
+	var eye_open := rig.position
 	await _snap(view, id, "vantage")
 	if OS.get_cmdline_user_args().has("--bank-only"):
 		rig.set_look(open.x, open.y - 0.3)
@@ -371,6 +451,16 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		ViewConditions.jump_to(view, "noon")
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_noon")
+		if OS.get_cmdline_user_args().has("--bake-thumbs"):
+			if THUMB_LOOKS.has(id):
+				_place_eye(view, id, "thumb", THUMB_LOOKS[id])
+			_set_card_time(view)
+			await _settle(1.0, SHOT_SETTLE_FRAMES)
+			await _snap(view, id, "thumb")
+			rig.reset_zoom()
+			rig.position = eye_open
+			rig.set_look(open.x, open.y)
+			ViewConditions.jump_to(view, "noon")
 	if times.has("night"):
 		ViewConditions.jump_to(view, "moon")
 		# Moonrise can come with the sun still up: then shoot the moonlit
@@ -397,6 +487,8 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		# windows); otherwise at golden hour.
 		if _look_time == "late":
 			ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
+		elif _look_time == "noon":
+			ViewConditions.jump_to(view, "noon")
 		else:
 			ViewConditions.spawn_golden_hour(view)
 		# A clock change can re-show the place's live weather: pin the run's.
@@ -406,21 +498,25 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		ViewConditions.apply_surface_state(view)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 	for k in _looks.size():
-		var l: Array = _looks[k]
-		var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
-		# Never shoot from inside a building (AGENTS.md): a blocked eye
-		# moves to the nearest open ground.
-		var free_at := _open_eye(view._data, at, float(l[2]))
-		if free_at != at:
-			print("CAPTURE MOVED %s look%d: eye inside or against a building, moved %.1f m" % [id, k, free_at.distance_to(at) / WorldScale.metres_to_units()])
-			at = free_at
-		var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
-		rig.position = Vector3(at.x, y, at.y)
-		rig.set_zoom(float(l[5]))
-		rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
+		_place_eye(view, id, "look%d" % k, _looks[k])
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "look%d" % k)
 	_contact_sheet(id)
+
+## Stands the camera at look `l` ([lat, lon, height_m, bearing°, pitch°, zoom]).
+func _place_eye(view: View360, id: String, shot: String, l: Array) -> void:
+	var rig := view._rig
+	var at := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
+	# Never shoot from inside a building (AGENTS.md): a blocked eye
+	# moves to the nearest open ground.
+	var free_at := _open_eye(view._data, at, float(l[2]))
+	if free_at != at:
+		print("CAPTURE MOVED %s %s: eye inside or against a building, moved %.1f m" % [id, shot, free_at.distance_to(at) / WorldScale.metres_to_units()])
+		at = free_at
+	var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
+	rig.position = Vector3(at.x, y, at.y)
+	rig.set_zoom(float(l[5]) if l.size() >= 6 else 1.0)
+	rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
 
 ## Clearance (m) a capture eye keeps from any building wall: wide enough
 ## that a moved eye is not left pressed against the facade it escaped.
@@ -512,6 +608,65 @@ func _lift_eye(view: View360, metres: float) -> void:
 	var look := View360.aim(rig.position, target)
 	rig.set_look(look.x, look.y)
 
+## Sun elevation (degrees) card pictures are taken at, in the afternoon:
+## the noon sun washes them out (--card_sun= overrides it).
+const CARD_SUN_DEG := 15.0
+var _card_sun := CARD_SUN_DEG
+
+## The morning or afternoon minute the sun stands at _card_sun, whichever
+## puts it more behind the camera (the landmark lit from the front, not a
+## backlit silhouette); solar noon where it never climbs that high. Call
+## once the camera faces the card's look.
+func _set_card_time(view: View360) -> void:
+	var t := ViewConditions.sun_times(view)
+	var noon := (t.x + t.y) / 2.0
+	var facing := -view._rig.yaw  # compass bearing, radians
+	var best := noon
+	var best_off := -1.0
+	for step in [5.0, -5.0]:
+		var m := noon
+		while m > t.x and m < t.y and float(view._atmos.solar_at(m / 60.0)["elevation"]) > _card_sun:
+			m += step
+		var az := deg_to_rad(float(view._atmos.solar_at(m / 60.0)["azimuth"]))
+		var off := absf(angle_difference(az, facing))
+		if off > best_off:
+			best_off = off
+			best = m
+	ViewConditions.set_time_minutes(view, best)
+
+## Vertical angle (degrees) a capital's landmark fills on its card.
+const CARD_FILL_DEG := 28.0
+## Farthest (m) a capital card's eye stands from the world centre, inside
+## the detailed extent.
+const CARD_EYE_REACH_M := 1100.0
+
+## --capital-thumbs: stands the eye off the place's landmark toward the
+## city centre (about 3.5 heights away), over the rooftops, aimed at the
+## landmark's middle and zoomed so it fills about CARD_FILL_DEG of the
+## frame; leaves the opening look when the place has no landmark.
+func _aim_landmark_card(view: View360, id: String) -> void:
+	var data: LocationData = view._data
+	if data.landmark_type == "none":
+		return
+	var entry := LocationData.entry_for_type(data.landmark_type)
+	var m := WorldScale.metres_to_units()
+	var h := float(entry.get("height_m", 20.0))
+	var lp := TerrainBuilder.landmark_world_pos(data)
+	var toward_centre := -lp.normalized() if lp.length() > m else Vector2(0.0, 1.0)
+	var eye := lp + toward_centre * clampf(h * 3.5, 180.0, 700.0) * m
+	if eye.length() > CARD_EYE_REACH_M * m:
+		eye = eye.normalized() * CARD_EYE_REACH_M * m
+	var eye_m := clampf(h * 0.5, 20.0, 80.0)
+	eye = _open_eye(data, eye, eye_m)
+	var rig := view._rig
+	rig.position = Vector3(eye.x, view._ground.height_at_world(eye.x, eye.y) + eye_m * m, eye.y)
+	var base_y := TerrainBuilder.site_ground_y(data, view._ground, lp.x, lp.y)
+	var dist_m := eye.distance_to(lp) / m
+	rig.set_zoom(clampf(CARD_FILL_DEG / rad_to_deg(atan2(h, dist_m)), 1.0, 2.8))
+	var look := View360.aim(rig.position, Vector3(lp.x, base_y + h * 0.5 * m, lp.y))
+	rig.set_look(look.x, look.y)
+	print("CARD %s: %s, %d m off, eye %d m up" % [id, entry.get("name", ""), int(dist_m), int(eye_m)])
+
 func _snap(view: View360, id: String, shot: String) -> void:
 	if _shot_size != Vector2i.ZERO and view._viewport.size != _shot_size:
 		view._container.stretch = false
@@ -526,7 +681,7 @@ func _snap(view: View360, id: String, shot: String) -> void:
 	if OS.get_cmdline_user_args().has("--png"):
 		img.save_png(path.get_basename() + ".png")
 	img.save_jpg(path, 0.88)
-	if shot == "vantage_noon" and OS.get_cmdline_user_args().has("--bake-thumbs"):
+	if shot == "thumb" and OS.get_cmdline_user_args().has("--bake-thumbs"):
 		_bake_thumb(img, id)
 	var s := frame_stats(img)
 	var rig := view._rig
@@ -574,12 +729,12 @@ func _bake_thumb(img: Image, id: String) -> void:
 	small.save_jpg(dir.path_join("%s.jpg" % id), PlaceThumb.QUALITY)
 
 ## --capital-thumbs: the noon opening look, card-sized, as the capital's picture.
-func _bake_capital(img: Image, lat: float, lon: float, id: String) -> void:
+func _bake_capital(img: Image, place_name: String, id: String) -> void:
 	var small := PlaceThumb.shrink(img)
 	if small == null:
 		printerr("CAPTURE BAKE %s: blank frame, not written" % id)
 		return
-	var path := ProjectSettings.globalize_path(PlaceThumb.capital_path(lat, lon))
+	var path := ProjectSettings.globalize_path(PlaceThumb.capital_path(place_name))
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	small.save_jpg(path, PlaceThumb.QUALITY)
 	print("CAPITAL THUMB %s -> %s" % [id, path.get_file()])

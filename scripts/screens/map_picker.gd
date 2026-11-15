@@ -494,7 +494,7 @@ func _add_quick_card(qi: int) -> void:
 	card.set_meta("lon", qlon)
 	card.set_meta("quick_index", qi)
 	var qphoto := PlaceThumb.load_preset(str(PresetViews.ROWS[qi]["id"])) \
-		if qi < PresetViews.ROWS.size() else PlaceThumb.load_capital(qlat, qlon)
+		if qi < PresetViews.ROWS.size() else PlaceThumb.load_capital(qname)
 	if qphoto != null:
 		card.set_photo(qphoto)
 	card.pressed.connect(func() -> void:

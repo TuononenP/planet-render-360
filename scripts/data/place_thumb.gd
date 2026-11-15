@@ -10,7 +10,7 @@ extends RefCounted
 
 const DIR := "user://thumbs"
 const BUNDLED_DIR := "res://assets/preset_thumbs"
-## Capital pictures, keyed by the quantised coordinates of the catalog point.
+## Capital pictures, named after the place (capital_path).
 const CAPITAL_DIR := "res://assets/capital_thumbs"
 const WIDTH := 320
 const HEIGHT := 200
@@ -131,11 +131,16 @@ static func _load_shipped(p: String) -> Texture2D:
 
 ## A capital's picture, shipped in res://assets/capital_thumbs (baked by
 ## tools/capture_presets.gd --capital-thumbs), null when it has none.
-static func load_capital(lat: float, lon: float) -> Texture2D:
-	return _load_shipped(capital_path(lat, lon))
+static func load_capital(place_name: String) -> Texture2D:
+	return _load_shipped(capital_path(place_name))
 
-static func capital_path(lat: float, lon: float) -> String:
-	return "%s/%d_%d.jpg" % [CAPITAL_DIR, CacheStore.quant(lat), CacheStore.quant(lon)]
+## Named after the place, "Berlin, Germany" -> capital_thumbs/berlin_germany.jpg.
+static func capital_path(place_name: String) -> String:
+	return "%s/%s.jpg" % [CAPITAL_DIR, capital_slug(place_name)]
+
+static func capital_slug(place_name: String) -> String:
+	var re := RegEx.create_from_string("[^a-z0-9]+")
+	return re.sub(place_name.to_lower(), "_", true).trim_prefix("_").trim_suffix("_")
 
 static func bundled_path(id: String) -> String:
 	return "%s/%s.jpg" % [BUNDLED_DIR, id]
