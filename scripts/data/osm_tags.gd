@@ -48,6 +48,12 @@ static func _station_building(tags: Dictionary) -> bool:
 	return b == "train_station" or str(tags.get("railway", "")) == "station" \
 		or (str(tags.get("public_transport", "")) == "station" and str(tags.get("train", "")) == "yes")
 
+## A mapped chimney stack (man_made=chimney, or building=chimney): drawn
+## as a round shaft (ChimneyBuilder), never as a windowed tower. Not an
+## archetype: it takes no landmark slot and clears nothing round it.
+static func is_chimney(tags: Dictionary) -> bool:
+	return str(tags.get("man_made", "")) == "chimney" or str(tags.get("building", "")) == "chimney"
+
 ## "obelisk" / "column" for a historic monument or memorial (a building
 ## way such as Nelson's Column, or man_made=obelisk|column), "" otherwise.
 ## The parser turns the tall slender ones into free-standing landmarks.
@@ -401,6 +407,8 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 		"architecture": str(tags.get("building:architecture", "")).strip_edges().to_lower(),
 		"monument": monument_kind(tags),
 	}
+	if is_chimney(tags):
+		entry["chimney"] = true
 	entry.merge(_roof_tags(tags))
 	entry.merge(fortification_tags(tags))
 	if str(entry["kind"]) in ["ship", "boat", "houseboat"]:

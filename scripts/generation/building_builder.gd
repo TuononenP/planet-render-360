@@ -239,13 +239,13 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# the shared walls below would plan them one by one.
 	var to_plan: Array = []
 	for i in data.buildings.size():
-		if stands[i] != 0 and not ShipBuilder.accepts(data.buildings[i]):
+		if stands[i] != 0 and not _solid_free(data.buildings[i]):
 			to_plan.append(data.buildings[i])
 	BuildingMasses.prepare(to_plan, ctx)
 	# Shared walls between every mass that will stand (same skip rules).
 	_party = PartyWalls.build(data, ground, ctx,
 		func(i: int) -> bool:
-			return not ShipBuilder.accepts(data.buildings[i]) and stands[i] != 0)
+			return not _solid_free(data.buildings[i]) and stands[i] != 0)
 	timings["shared_walls_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	if RoofGeometry._native:
@@ -260,6 +260,9 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		if standing[k] == 0:
 			continue
 		if ShipBuilder.build(root, b, data, ground):
+			placed += 1
+			continue
+		if ChimneyBuilder.build(root, b, ground, float(ctx.get("sea_y", -INF))):
 			placed += 1
 			continue
 		if placed >= cap and not bool(b.get("mapped_landmark", false)):
@@ -826,7 +829,7 @@ static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
 	var masses: Array = []
 	for k in sorted.size():
 		var b: Dictionary = sorted[k]
-		if ShipBuilder.accepts(b) or standing[k] == 0:
+		if _solid_free(b) or standing[k] == 0:
 			continue
 		for m in BuildingMasses.plan(b, ctx):
 			var md := m as Dictionary
@@ -863,6 +866,11 @@ static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
 	var res: Array = ClassDB.class_call_static("RoofKernels", "form_many", jobs)
 	for i in jobs.size():
 		_roofs[jobs[i]] = res[i]
+
+## A vessel or a chimney: drawn by its own builder, outside the masses,
+## shared walls and roof forms.
+static func _solid_free(b: Dictionary) -> bool:
+	return ShipBuilder.accepts(b) or ChimneyBuilder.accepts(b)
 
 ## A mapped landmark candidate clears nothing: its own building is the model.
 static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> bool:

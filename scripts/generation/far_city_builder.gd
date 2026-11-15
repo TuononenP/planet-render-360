@@ -206,6 +206,12 @@ func _towers() -> void:
 		var base := _site(ring, 1e6)
 		if base == INF:
 			continue
+		if ChimneyBuilder.accepts(t):
+			# A stack, not a tower: no facade, penthouse or setbacks.
+			ChimneyBuilder.append_far(batch, _key(c.x, c.y), t, base + 2.0)
+			_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
+			towers += 1
+			continue
 		var kind := str(t.get("kind", "yes"))
 		var mat: Material = _dfs[int(_hash(c.x, c.y) * 4.0) % _dfs.size()] \
 			if kind in ["apartments", "residential", "dormitory", "hotel"] else _glass
