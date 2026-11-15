@@ -59,5 +59,5 @@ static func summary() -> String:
 	parts.append("engine %s MB" % UiTheme.grouped(OS.get_static_memory_usage() / MB))
 	parts.append("video %s MB" % UiTheme.grouped(int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)) / MB))
 	parts.append("objects %d" % int(Performance.get_monitor(Performance.OBJECT_COUNT)))
-	parts.append(MemoryBudget.summary())
+	parts.append(MemoryBudget.summary(foot))
 	return ", ".join(parts)

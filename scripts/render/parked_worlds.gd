@@ -9,9 +9,6 @@ extends RefCounted
 ## none while MemoryGuard is short of memory: each holds a whole world,
 ## its satellite mosaic and its ground.
 
-## Most kept on any device (an 8 GB phone, a desktop).
-const MAX := 2
-
 var _parked: Array[Dictionary] = []
 ## Frees a world over the frames to come (WorldHandoff.retire).
 var _retire: Callable
@@ -22,7 +19,7 @@ func _init(retire: Callable) -> void:
 ## How many may stay now.
 static func cap() -> int:
 	return 0 if MemoryGuard.level >= MemoryGuard.Level.TIGHT \
-		else mini(MAX, MemoryBudget.PARK_MAX[MemoryBudget.tier()])
+		else MemoryBudget.PARK_MAX[MemoryBudget.tier()]
 
 func size() -> int:
 	return _parked.size()

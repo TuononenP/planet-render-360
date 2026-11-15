@@ -9,10 +9,6 @@ extends RefCounted
 ## again from the disk caches. Fetch-only pipelines (warm_only) write
 ## those caches; the real build reads them.
 
-## Fetch-only pipelines at once, at most (the oldest stops for a newer
-## plan, so a twisting flight cannot pile them up). Fewer on a phone with
-## less memory, none while MemoryGuard is short: see warm_max().
-const WARM_MAX := 2
 ## Ring centres around the live one, and how far out they sit: inside
 ## the step range WorldStreamer.use_plan accepts.
 const RING_DIRS := 8
@@ -115,7 +111,10 @@ func survey(lat: float, lon: float, heading: Vector2) -> void:
 ## streamer's own build is not on the network (`net_busy`).
 func pump(v: View360, net_busy: bool) -> void:
 	if warm_max() == 0 and not _warms.is_empty():
-		stop()  # memory is short: each holds a stretch's data
+		# Memory is short: each holds a stretch's data. The ring stays,
+		# to be fetched once there is room again.
+		for w in _warms.duplicate():
+			_end_warm(w, true)
 	if net_busy or _ring.is_empty() or not _warms.is_empty() or warm_max() == 0:
 		return
 	var ll: Vector2 = _ring.pop_front()
@@ -145,11 +144,12 @@ func _end_warm(warm: GenerationPipeline, stop_it: bool) -> void:
 			warm.cancel()
 		warm.queue_free()
 
-## Fetch-only pipelines allowed now: the device's tier, none while
-## MemoryGuard is short of memory.
+## Fetch-only pipelines at once, at most (the oldest stops for a newer
+## plan, so a twisting flight cannot pile them up): the device's tier
+## (MemoryBudget.WARM_MAX), none while MemoryGuard is short of memory.
 static func warm_max() -> int:
 	return 0 if MemoryGuard.level >= MemoryGuard.Level.TIGHT \
-		else mini(WARM_MAX, MemoryBudget.WARM_MAX[MemoryBudget.tier()])
+		else MemoryBudget.WARM_MAX[MemoryBudget.tier()]
 
 ## Stops every fetch and the ring (the plan is forgotten too).
 func stop() -> void:

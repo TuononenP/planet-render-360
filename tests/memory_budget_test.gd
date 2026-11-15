@@ -42,6 +42,8 @@ func _run() -> void:
 	_check(MemoryBudget.tier_for(int(8 * GB * MemoryBudget.ANDROID_SHARE)) == MemoryBudget.Tier.T2,
 		"an 8 GB Android phone (4.4 GB share) is T2")
 	_check(MemoryBudget.tier_for(5 * GB) == MemoryBudget.Tier.T2, "5 GB limit is T2")
+	_check(MemoryBudget.tier_for(int(11 * GB * MemoryBudget.ANDROID_SHARE)) == MemoryBudget.Tier.T3,
+		"a 12 GB Android phone (~11 GB reported) is T3")
 	_check(MemoryBudget.tier_for(12 * GB) == MemoryBudget.Tier.T3, "a 16 GB desktop is T3")
 	# Each per-tier table covers every tier and never grows downward.
 	for table in [MemoryBudget.PARK_MAX, MemoryBudget.WARM_MAX, MemoryBudget.BUILDING_SCALE,
@@ -64,8 +66,11 @@ func _run() -> void:
 	MemoryBudget.tier_override = -1
 	# The live read gives something sane on this machine.
 	_check(MemoryBudget.limit_bytes() >= MemoryBudget.MIN_LIMIT, "the live limit is at least the floor")
-	_check(MemoryBudget.tier() >= MemoryBudget.Tier.T0 and MemoryBudget.tier() <= MemoryBudget.Tier.T3,
-		"the live tier is a tier")
+	if MemoryBudget.platform() == "desktop":
+		_check(MemoryBudget.tier() == MemoryBudget.Tier.T3, "a desktop is T3 whatever its RAM")
+	# One footprint reading serves the limit, usage and the summary.
+	_check(MemoryBudget.usage(2 * GB) > 0.0 and MemoryBudget.headroom_bytes(2 * GB) >= 0,
+		"usage and headroom take a footprint already read")
 	_check(MemoryBudget.summary().contains("tier T"), "the summary names the tier")
 	if _failures.is_empty():
 		print("MEMORY BUDGET PASS")

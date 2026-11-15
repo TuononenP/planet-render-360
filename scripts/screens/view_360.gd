@@ -395,7 +395,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	elif wait_save:
 		if abort != null:
 			abort.saving = true
-		await WorldCache.save_async(self, _threads, data, built, packed)
+		await WorldCache.save_async(self, _threads, data, built, packed, false, true)
 	else:
 		WorldCache.save_async(self, _threads, data, built, packed)
 	return built

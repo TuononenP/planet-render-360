@@ -406,7 +406,9 @@ var _still_s := 0.0
 ## remembers which have their data on disk (StreamScout).
 var _scout := StreamScout.new()
 ## Built worlds kept hidden for a turn back (ParkedWorlds).
-var _parked := ParkedWorlds.new(func(w: Node3D) -> void: _handoff.retire(w))
+## A bound method, not a lambda: a lambda would hold the streamer and
+## the streamer it, and neither would ever be freed.
+var _parked := ParkedWorlds.new(_handoff.retire)
 ## When the place opened, and whether its first stretch has started.
 var _opened_msec := 0
 var _warmed := true

@@ -8,6 +8,9 @@ var _loading: LoadingScreen
 var _view: View360
 var _notice: DataNotice
 var _memory_guard: MemoryGuard
+## Highest preset this session builds at after MemoryGuard ran out of
+## room (Settings keeps the person's choice; a new choice clears this).
+var _memory_ceiling: int = RenderSettings.Preset.ULTRA
 var _history: HistoryScreen
 var _gallery: GalleryScreen
 var _pano_viewer: PanoramaViewer
@@ -496,18 +499,25 @@ func _retry_view() -> Dictionary:
 	view.merge(ViewLink.to_view(camera), true)
 	return view
 
-## Push a saved render preset to the picker and the 360 view.
 ## Memory nearly out (MemoryGuard EMERGENCY): one preset lower from the
-## next stretch and the next place on, kept in Settings, and said once.
+## next stretch and the next place on, for this session only (a brief
+## squeeze must not lower the person's choice for good), said once.
 func _on_memory_level(_level: int) -> void:
-	if not MemoryGuard.take_preset_drop() or _settings.preset <= RenderSettings.Preset.FAST:
+	if not MemoryGuard.take_preset_drop() or _preset() <= RenderSettings.Preset.FAST:
 		return
-	_settings.set_preset(_settings.preset - 1)
-	_apply_preset(_settings.preset)
-	_settings_screen.bind_settings(_settings)
+	_memory_ceiling = _preset() - 1
+	_picker.set_quality_preset(_memory_ceiling)
+	_view.set_quality_preset(_memory_ceiling)
 	_picker.toast("Detail lowered", "Lowered detail to stay within this device's memory.", "caution")
 
+## The preset worlds are built at: the person's, under any memory ceiling.
+func _preset() -> int:
+	return mini(_settings.preset, _memory_ceiling)
+
+## Push a saved render preset to the picker and the 360 view. A choice
+## made now lifts the session's memory ceiling.
 func _apply_preset(p: int) -> void:
+	_memory_ceiling = RenderSettings.Preset.ULTRA
 	_picker.set_quality_preset(p)
 	_view.set_quality_preset(p)
 
@@ -572,7 +582,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 		else _picker.selected_name
 	if display_name == "":
 		display_name = LocationData.known_place(lat, lon)
-	_loading.begin(display_name, lat, lon, _settings.preset)
+	_loading.begin(display_name, lat, lon, _preset())
 	_notice.clear()
 	if save_only:
 		_picker.set_download_busy(true)
@@ -591,7 +601,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 		_show(_picker)
 		return
 	_pipeline.run(lat, lon, display_name if not focus.is_empty() else _picker.selected_name,
-		_settings.preset, focus, view)
+		_preset(), focus, view)
 
 ## Stops generation `gen` if it is still running after
 ## generation_timeout_s: cancels the fetch, asks a world build to stop at

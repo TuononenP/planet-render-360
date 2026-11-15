@@ -25,10 +25,12 @@ const MIN_LIMIT := 1024 * MB
 const ENV_LIMIT := "PR360_MEMORY_LIMIT_MB"
 
 ## Memory tiers by the limit: T0 below a 6 GB phone (best effort), T1 a
-## 6 GB phone (≈3–3.5 GB kill line), T2 an 8 GB phone, T3 desktop and
-## 12 GB phones and up.
+## 6 GB phone (≈3–3.5 GB kill line), T2 an 8 GB phone, T3 12 GB phones
+## and up (an Android 12 GB phone reports ~11 GB, ×0.55 ≈ 6 GB). Desktops
+## are always T3: their sizes come from the GPU rule (RenderSettings),
+## and MemoryGuard still watches their limit.
 enum Tier { T0, T1, T2, T3 }
-const TIER_FLOORS := [0, 3072 * MB, 4096 * MB, 7168 * MB]
+const TIER_FLOORS := [0, 3072 * MB, 4096 * MB, 5632 * MB]
 
 ## Per tier (index = Tier): what a world may hold.
 ## Stretches kept built behind a streaming camera (WorldStreamer).
@@ -84,22 +86,26 @@ static func tier_for(limit: int) -> int:
 	return t
 
 ## The limit now, in bytes. On Android it falls while other apps take
-## memory; on iOS it is the fixed kill line.
-static func limit_bytes() -> int:
+## memory; on iOS it is the fixed kill line. `footprint`: one already read
+## (reading it costs a /proc walk on Android), else read here.
+static func limit_bytes(footprint := -1) -> int:
 	if limit_override > 0:
 		return limit_override
 	var env := OS.get_environment(ENV_LIMIT)
 	if env.is_valid_int() and int(env) > 0:
 		return int(env) * MB
-	return limit_for(platform(), MemoryLog.footprint(), available_bytes(), physical_bytes())
+	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
+	return limit_for(platform(), fp, available_bytes(), physical_bytes())
 
 ## Bytes left before the limit (never below 0).
-static func headroom_bytes() -> int:
-	return maxi(limit_bytes() - MemoryLog.footprint(), 0)
+static func headroom_bytes(footprint := -1) -> int:
+	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
+	return maxi(limit_bytes(fp) - fp, 0)
 
 ## The footprint as a share of the limit (1.0 = at the limit).
-static func usage() -> float:
-	return float(MemoryLog.footprint()) / float(maxi(limit_bytes(), 1))
+static func usage(footprint := -1) -> float:
+	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
+	return float(fp) / float(maxi(limit_bytes(fp), 1))
 
 ## The device's tier, read once: it sizes every world this session, so a
 ## brief squeeze from another app must not change it mid-session.
@@ -107,7 +113,8 @@ static func tier() -> int:
 	if tier_override >= 0:
 		return tier_override
 	if _tier < 0:
-		_tier = tier_for(_stable_limit())
+		var simulated := limit_override > 0 or OS.get_environment(ENV_LIMIT).is_valid_int()
+		_tier = Tier.T3 if platform() == "desktop" and not simulated else tier_for(_stable_limit())
 	return _tier
 
 ## The limit with nothing else running: Android's share of RAM rather than
@@ -142,6 +149,8 @@ static func cap_preset(preset: int) -> int:
 	return mini(preset, ceiling_preset())
 
 ## "limit 3,300 MB, headroom 1,200 MB, tier T1" for the memory log.
-static func summary() -> String:
-	return "limit %s MB, headroom %s MB, tier T%d" % [UiTheme.grouped(limit_bytes() / MB),
-		UiTheme.grouped(headroom_bytes() / MB), tier()]
+static func summary(footprint := -1) -> String:
+	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
+	var limit := limit_bytes(fp)
+	return "limit %s MB, headroom %s MB, tier T%d" % [UiTheme.grouped(limit / MB),
+		UiTheme.grouped(maxi(limit - fp, 0) / MB), tier()]

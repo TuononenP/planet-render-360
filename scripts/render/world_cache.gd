@@ -347,19 +347,22 @@ static func _save_in_progress(path: String) -> bool:
 	_save_threads.erase(path)
 	return false
 
-## Whether a build packs its world for a save now. Not while memory is
-## short, and a streamed stretch (saved later from the pack, which pins
-## the whole world after it has gone) not on a phone below T2. A world
-## built unpacked in the foreground is packed when its save runs.
+## Whether a build packs its world for a save. A place opened in the
+## foreground always does (on the build thread, while the world is still
+## pristine; its save may wait for memory). A streamed stretch, saved
+## later from the pack, which pins the whole world after it has gone, not
+## while memory is short or on a phone below T2.
 static func pack_wanted(background: bool) -> bool:
-	return enabled() and MemoryGuard.save_allowed() \
-		and (not background or MemoryBudget.tier() >= MemoryBudget.Tier.T2)
+	return enabled() and (not background or (MemoryGuard.save_allowed()
+		and MemoryBudget.tier() >= MemoryBudget.Tier.T2))
 
 ## Seconds a save waits for MemoryGuard to allow it before it is dropped.
 const SAVE_WAIT_S := 120.0
 
+## `asked`: the person asked for this save (Save for offline): it does not
+## wait for memory, only an EMERGENCY drops it.
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
-		packed: PackedScene = null, background := false) -> void:
+		packed: PackedScene = null, background := false, asked := false) -> void:
 	# A packed world needs only its ground: the streamer saves one after
 	# the world itself has gone (BuildAbort.deferred_save).
 	if not enabled() or built.is_empty() \
@@ -373,15 +376,19 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	# waits for room, and is dropped if none comes (the world is built
 	# again next visit instead of ending the app).
 	var waited := 0.0
-	while not MemoryGuard.save_allowed():
+	while not MemoryGuard.save_allowed() and not (asked and not MemoryGuard.save_dropped()):
 		if MemoryGuard.save_dropped() or waited >= SAVE_WAIT_S or not is_instance_valid(view) \
 				or not view.is_inside_tree():
 			print("WORLD CACHE save of %s skipped: memory short" % name)
 			return
 		await view.get_tree().create_timer(1.0).timeout
 		waited += 1.0
-	if packed == null and not is_instance_valid(built[1]):
-		return  # the world left while the save waited
+	if waited > 0.0:
+		# Another save of this world may have started meanwhile.
+		if _save_in_progress(p["scene"]):
+			return
+		if packed == null and not is_instance_valid(built[1]):
+			return  # the world left while the save waited
 	MemoryLog.mark("cache save %s start" % name)
 	var ps := packed if packed != null else pack(built[1])
 	if ps == null:
