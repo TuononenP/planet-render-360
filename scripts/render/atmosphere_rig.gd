@@ -622,11 +622,13 @@ func _apply() -> void:
 func _apply_haziness() -> void:
 	if environment == null:
 		return
-	environment.fog_light_energy = lerpf(1.0, 1.18, haziness)
-	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.45, haziness)
-	environment.glow_hdr_threshold = lerpf(PostGrade.GLOW_THRESHOLD, 0.86, haziness)
-	environment.glow_intensity = PostGrade.GLOW_INTENSITY * lerpf(1.0, 1.2, haziness)
-	environment.volumetric_fog_density = _base_vol_density * lerpf(1.0, 1.35, haziness)
+	environment.fog_light_energy = lerpf(1.0, 1.10, haziness)
+	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.28, haziness)
+	# Keep glow_hdr_threshold >= 1.0 (PostGrade contract) so the sun-side
+	# sky dome and clouds never trigger wide screen-space bloom.
+	environment.glow_hdr_threshold = PostGrade.GLOW_THRESHOLD
+	environment.glow_intensity = PostGrade.GLOW_INTENSITY * lerpf(1.0, 1.05, haziness)
+	environment.volumetric_fog_density = _base_vol_density * lerpf(1.0, 1.22, haziness)
 
 ## The moon's place at a local clock hour (see solar_at).
 func moon_at(hour_f: float) -> Dictionary:

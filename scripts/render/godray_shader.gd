@@ -20,9 +20,9 @@ const TAPS := 48
 const FADE := 0.95
 ## Linear-luminance window separating bright sun-side sky from buildings,
 ## bridges, terrain and mid-tone sunlit stone.
-const LUMA_FLOOR := 0.48
+const LUMA_FLOOR := 0.50
 const LUMA_CEIL := 0.92
-const OVERLAY_GAIN := 0.38
+const OVERLAY_GAIN := 0.34
 
 const RAYS_CODE := """
 shader_type spatial;
@@ -35,7 +35,7 @@ uniform vec2 sun_uv = vec2(0.5, 0.35);
 uniform float aspect = 1.7778;
 uniform float ray_amount = 0.0;
 uniform vec3 sun_color = vec3(1.0, 0.85, 0.64);
-uniform float luma_floor = 0.48;
+uniform float luma_floor = 0.50;
 uniform float luma_ceil = 0.92;
 
 vec3 srgb_to_linear(vec3 s) {
@@ -48,36 +48,49 @@ void fragment() {
 		vec2 to_sun = sun_uv - UV;
 		vec2 metric = vec2(to_sun.x * aspect, to_sun.y);
 		float dist = length(metric);
-		float cone = 1.0 - smoothstep(0.06, 1.05, dist);
+		float cone = 1.0 - smoothstep(0.05, 0.92, dist);
 		if (cone > 0.001 && dist > 1e-4) {
-			float reach = min(1.0, 0.38 / max(dist, 0.001));
-			vec2 step_uv = (to_sun * reach) / max(taps, 1.0);
-			float ign = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
-			vec2 uv = UV + step_uv * ign;
-			float w = 1.0;
-			float w_sum = 0.0;
-			vec3 acc = vec3(0.0);
-			for (int i = 0; i < 64; i++) {
-				if (float(i) >= taps) {
-					break;
+			vec3 base_s = srgb_to_linear(texture(world, UV).rgb);
+			float base_luma = dot(base_s, vec3(0.2126, 0.7152, 0.0722));
+			// Protect bright sky and specular roofs (`base_luma >= 0.72` -> 0),
+			// while allowing warm shafts across dark foliage and shaded streets.
+			float sky_protect = 1.0 - smoothstep(0.38, 0.72, base_luma);
+			if (sky_protect > 0.005) {
+				float reach = min(1.0, 0.38 / max(dist, 0.001));
+				vec2 step_uv = (to_sun * reach) / max(taps, 1.0);
+				float ign = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
+				vec2 uv = UV + step_uv * ign;
+				float w = 1.0;
+				float w_sum = 0.0;
+				float blocked = 0.0;
+				vec3 acc = vec3(0.0);
+				for (int i = 0; i < 64; i++) {
+					if (float(i) >= taps) {
+						break;
+					}
+					vec2 clamped = clamp(uv, vec2(0.001), vec2(0.999));
+					float in_bounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+					vec3 s = srgb_to_linear(texture(world, clamped).rgb);
+					float luma = dot(s, vec3(0.2126, 0.7152, 0.0722));
+					float tap_dist = length(vec2((clamped.x - sun_uv.x) * aspect, clamped.y - sun_uv.y));
+					float sun_source = exp(-tap_dist * 3.4);
+					float emitter = smoothstep(luma_floor, luma_ceil, luma) * sun_source * in_bounds;
+					blocked += (1.0 - smoothstep(0.18, 0.48, luma)) * w * in_bounds;
+					acc += s * (emitter * w);
+					w_sum += w;
+					w *= fade;
+					uv += step_uv;
 				}
-				vec2 clamped = clamp(uv, vec2(0.001), vec2(0.999));
-				float in_bounds = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-				vec3 s = srgb_to_linear(texture(world, clamped).rgb);
-				float luma = dot(s, vec3(0.2126, 0.7152, 0.0722));
-				float tap_dist = length(vec2((clamped.x - sun_uv.x) * aspect, clamped.y - sun_uv.y));
-				float sun_source = exp(-tap_dist * 3.6);
-				float emitter = smoothstep(luma_floor, luma_ceil, luma) * sun_source * in_bounds;
-				acc += s * (emitter * w);
-				w_sum += w;
-				w *= fade;
-				uv += step_uv;
+				float inv_w = 1.0 / max(w_sum, 1.0);
+				vec3 streak = acc * inv_w;
+				float occ_frac = blocked * inv_w;
+				float shaft_gate = clamp(0.35 + occ_frac * 1.8, 0.0, 1.0) * sky_protect;
+				float mag = dot(streak, vec3(0.2126, 0.7152, 0.0722));
+				streak = mix(streak, sun_color * mag * 1.15, 0.65);
+				streak = streak / (vec3(1.0) + streak * 1.2);
+				float disc_guard = smoothstep(0.012, 0.055, dist);
+				out_rays = streak * (cone * disc_guard * shaft_gate);
 			}
-			vec3 streak = acc / max(w_sum, 1.0);
-			float mag = dot(streak, vec3(0.2126, 0.7152, 0.0722));
-			streak = mix(streak, sun_color * mag * 1.1, 0.6);
-			float disc_guard = smoothstep(0.01, 0.05, dist);
-			out_rays = streak * (cone * disc_guard);
 		}
 	}
 	ALBEDO = out_rays;
@@ -89,7 +102,7 @@ shader_type canvas_item;
 render_mode blend_add;
 
 uniform float ray_amount = 0.0;
-uniform float gain = 0.38;
+uniform float gain = 0.34;
 
 void fragment() {
 	vec3 r = texture(TEXTURE, UV).rgb * (ray_amount * gain);

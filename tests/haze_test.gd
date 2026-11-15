@@ -103,10 +103,10 @@ func _test_atmosphere_driver() -> void:
 	rig.set_haziness(1.0)
 	if rig.environment.fog_light_energy <= base_e \
 			or rig.environment.fog_sun_scatter <= base_sc \
-			or rig.environment.glow_hdr_threshold >= base_th \
+			or rig.environment.glow_hdr_threshold < PostGrade.GLOW_THRESHOLD \
 			or rig.environment.glow_intensity <= base_gi \
 			or rig.environment.volumetric_fog_density <= base_vd:
-		_failures.append("set_haziness(1.0) should thicken fog, sun scatter, glow and volume together")
+		_failures.append("set_haziness(1.0) should thicken fog, sun scatter and volume while keeping glow_hdr_threshold >= 1.0")
 	rig.set_haziness(0.0)
 	if not is_equal_approx(rig.environment.fog_light_energy, base_e) \
 			or not is_equal_approx(rig.environment.fog_sun_scatter, base_sc) \

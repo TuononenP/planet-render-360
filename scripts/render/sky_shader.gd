@@ -141,10 +141,11 @@ void sky() {
 	float band = exp(-hy * 9.0);
 	col = mix(col, glow_color, clamp(band * side * glow_amount, 0.0, 1.0));
 	col += glow_color * (pow(sm, 24.0) * 0.12 + pow(sm, 900.0) * 0.42) * glow_amount;
-	// Sun glare: a tight bright core and a wide soft aureole in the sun's
-	// own light, under the clouds (they cover it where they are thick).
+	// Sun glare: a tight bright core and a controlled aureole in the
+	// sun's own light, under the clouds (kept below HDR bloom outside the
+	// inner ~3 deg corona so wide glow mips do not wash out the sky).
 	col += LIGHT0_COLOR * LIGHT0_ENERGY * sun_disc
-		* (pow(m, 1400.0) * 0.55 + pow(m, 150.0) * 0.07 + pow(m, 14.0) * 0.018 + pow(m, 3.0) * 0.004);
+		* (pow(m, 1600.0) * 0.42 + pow(m, 180.0) * 0.045 + pow(m, 18.0) * 0.010 + pow(m, 4.0) * 0.0025);
 	if (twilight > 0.001) {
 		// Opposite the low sun: Earth's shadow (blue-grey band on the
 		// horizon) under the pink Belt of Venus.
@@ -186,7 +187,7 @@ void sky() {
 			float cl;
 			float ci = smoothstep(0.56, 0.86, fbm(cu, 4, cl));
 			ci *= 0.32 * (1.0 - overcast) * smoothstep(0.02, 0.25, y) * (0.35 + 0.65 * cloud_cover);
-			vec3 cic = mix(cloud_lit, vec3(1.0), 0.35) + LIGHT0_COLOR * pow(m, 4.0) * 0.5;
+			vec3 cic = mix(cloud_lit, vec3(1.0), 0.25) + LIGHT0_COLOR * pow(m, 12.0) * 0.22;
 			col = mix(col, cic, ci);
 		}
 		// Dome projection keeps the horizon finite and compresses the
@@ -229,8 +230,9 @@ void sky() {
 		}
 		float thick = smoothstep(thr, thr + 0.3, den);
 		vec3 cc = mix(cloud_shade, cloud_lit, lit * (1.0 - 0.55 * thick));
-		// Silver lining: thin cloud edges near the sun glow.
-		cc += LIGHT0_COLOR * pow(m, 6.0) * (1.0 - thick) * 0.6 * (1.0 - overcast);
+		// Silver lining: thin cloud rims close to the sun catch a bright edge
+		// without pushing a wide patch of sky past the HDR glow threshold.
+		cc += LIGHT0_COLOR * pow(m, 18.0) * (1.0 - thick) * 0.28 * (1.0 - overcast);
 		if (flash > 0.001) {
 			// Lightning lights the deck from inside: thick cores glow,
 			// brightest around the strike, the whole deck faintly.
@@ -246,7 +248,7 @@ void sky() {
 	// clips white; lower energy smears less bloom into the surround so
 	// the disc reads against the glory instead of one white blob.
 	float disc = smoothstep(0.999930, 0.999955, mu);
-	col += LIGHT0_COLOR * LIGHT0_ENERGY * disc * sun_disc * 3.5 * (1.0 - alpha);
+	col += LIGHT0_COLOR * LIGHT0_ENERGY * disc * sun_disc * 2.2 * (1.0 - alpha);
 	if (moon > 0.001) {
 		// Moon: a mottled disc (maria) lit by the true sun, so its phase
 		// and the tilt of the terminator are real; earthshine keeps the

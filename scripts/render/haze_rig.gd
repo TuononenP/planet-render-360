@@ -37,10 +37,10 @@ const RAYS_SCALE := 0.5
 const EASE_PER_S := 3.0
 const EASE_REDUCED_PER_S := 1.2
 ## True solar altitude window (deg): shafts start just as the disc clears
-## the horizon, peak through golden hour / low sun, and soften overhead.
+## the horizon, peak at low golden-hour sun, and taper steeply above ~15 deg.
 const RAY_START_ELEV := 0.5
-const RAY_PEAK_ELEV := 14.0
-const RAY_HIGH_ELEV := 55.0
+const RAY_PEAK_ELEV := 10.0
+const RAY_HIGH_ELEV := 28.0
 ## Overcast kills direct shafts just as SkyShader hides the solar disc.
 const CLOUD_FADE_START := 55.0
 const CLOUD_KILL := 90.0
@@ -216,7 +216,7 @@ func set_governor_step(step_val: int) -> void:
 static func sky_weights(elev_deg: float, cloud_cover: float, visibility_m: float) -> Dictionary:
 	var vis := visibility_m if visibility_m > 0.0 else 20000.0
 	var up := smoothstep(RAY_START_ELEV, RAY_PEAK_ELEV, elev_deg)
-	var low_boost := 1.0 - 0.42 * smoothstep(RAY_PEAK_ELEV, RAY_HIGH_ELEV, elev_deg)
+	var low_boost := 1.0 - 0.72 * smoothstep(RAY_PEAK_ELEV, RAY_HIGH_ELEV, elev_deg)
 	var clear := 1.0 - smoothstep(CLOUD_FADE_START, CLOUD_KILL, clampf(cloud_cover, 0.0, 100.0))
 	var vis_shafts := smoothstep(FOG_VIS_M * 0.15, FOG_VIS_M, vis)
 	var rays := clampf(up * low_boost * clear * vis_shafts, 0.0, 1.0)
