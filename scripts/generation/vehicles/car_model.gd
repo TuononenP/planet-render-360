@@ -3,15 +3,12 @@ extends RefCounted
 
 ## Procedural parked cars: one cached mesh per kind and level of detail,
 ## built from its CarSpecs spec. The body is one loft (VehicleKit.body)
-## with glass, lamps and trim as regions of it; wheels, mirrors, handles
-## and plates are added near to. Paint is the instance colour (CarPaint);
+## with glass and trim as regions of it (and the far mesh's lamps); the
+## wheels, and near to the lamp clusters, mirrors (CarParts), handles and
+## plates are added. Paint is the instance colour (CarPaint);
 ## every other surface is a shared material. A car faces +X, centred on
 ## its footprint, wheels on y = 0 (metres).
 
-## Where the tail lamp's inner edge falls across the end face (share of the
-## half width, the ring VehicleKit.body lofts; the head lamp's is the spec's
-## lamp_k).
-const LAMP_K_R := 0.45
 ## The bumper lip's reach, and the slats' pitch in the drawn openings (metres).
 const LIP_M := 0.022
 const SLAT_M := 0.016
@@ -25,18 +22,26 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 		return _meshes[id]
 	var s := CarSpecs.spec(kind)
 	var lm := LandmarkMesh.new()
-	lm.use("Paint", paint(kind))
-	for key in ["Glass", "Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board"]:
+	lm.use("Paint", paint(kind, far))
+	# Near to, the glass shows the cabin behind it; far off it is dark.
+	lm.use("Glass", material("Glass" if not far and bool(s["cabin"]) else "GlassDark"))
+	for key in ["Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board",
+			"Drl", "TailGlow", "Cabin", "Grille"]:
 		lm.use(key, material(key))
 	VehicleKit.body(lm, s, far)
 	var r := float(s["wheel_r"])
 	var tw := float(s["tyre_w"])
 	for ax: float in [float(s["axle_f"]), float(s["axle_r"])]:
-		var z := VehicleKit.half_width(s, ax) - tw * 0.5 - 0.02
+		# Out under the flare, the tyre's face near flush with the arch.
+		var z := VehicleKit.half_width(s, ax) + float(s["flare"]) * 0.6 - tw * 0.5 - 0.025
 		for side: float in [1.0, -1.0]:
-			VehicleKit.wheel(lm, Vector3(ax, r, side * z), r, tw, side, far, int(s["spokes"]))
+			CarParts.wheel(lm, Vector3(ax, r, side * z), r, tw, side, far, int(s["spokes"]), bool(s["twin"]))
 	if not far:
 		_fittings(lm, s)
+		CarDetails.front(lm, s)
+		CarDetails.rear(lm, s)
+		if bool(s["cabin"]):
+			CarDetails.interior(lm, s)
 	var out := lm.to_array_mesh(false)
 	_meshes[id] = out
 	return out
@@ -46,12 +51,8 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 	var gh: PackedFloat32Array = s["gh"]
 	var doors: PackedFloat32Array = s["doors"]
-	var mx := gh[3] - 0.3
-	var belt := VehicleKit.soft(s["belt"], mx, 0.1)
-	var w := VehicleKit.half_width(s, mx)
 	for side: float in [1.0, -1.0]:
-		VehicleKit.blob(lm, "Paint", Vector3(mx, belt + 0.1, side * (w + 0.06)), Vector3(0.07, 0.06, 0.1))
-		lm.box("Trim", Vector3(mx, belt + 0.05, side * (w - 0.03)), Vector3(0.06, 0.03, 0.12), Basis(), 0.0)
+		CarParts.mirror(lm, s, side)
 		for x: float in [doors[1] + 0.14, doors[0] + 0.14]:
 			var hb := VehicleKit.soft(s["belt"], x, 0.1)
 			lm.box("Trim", Vector3(x, hb - 0.09, side * (VehicleKit.half_width(s, x) * 0.985)),
@@ -81,33 +82,8 @@ static func _end_face(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 	var pp := VehicleKit.end_at(s, end, 0.0, tp)
 	lm.box("Trim", pp + pf.x * 0.001, Vector3(0.016, 0.135, 0.545), pf, 0.0)
 	lm.box("Plate", pp + pf.x * 0.004, Vector3(0.02, 0.11, 0.52), pf, 0.0)
-	var lamp: Vector2 = s["lamp_f"] if front else s["lamp_r"]
-	var tm := (lamp.x + lamp.y) * 0.5
-	# Lamp fittings grow with a tall lamp (a bus's clusters).
-	var ls := clampf((VehicleKit.end_at(s, end, 0.0, lamp.y).y - VehicleKit.end_at(s, end, 0.0, lamp.x).y) / 0.1,
-		1.0, 2.2)
-	var wide := float(s["lamp_k"]) < 0.6
-	for side: float in [1.0, -1.0]:
-		if front:
-			# Projectors: a dark ring round a bright lens, an indicator beyond.
-			for kp: float in ([0.6, 0.8] if wide else [0.8]):
-				var k := side * kp
-				var f := VehicleKit.end_frame(s, end, k, tm)
-				var p := VehicleKit.end_at(s, end, k, tm)
-				lm.disc("Trim", p + f.x * 0.004, f.x, 0.034 * ls, 14)
-				lm.disc("HeadLamp", p + f.x * 0.008, f.x, 0.02 * ls, 12)
-			var ki := side * 0.92
-			var fi := VehicleKit.end_frame(s, end, ki, lerpf(lamp.x, lamp.y, 0.25))
-			lm.box("Amber", VehicleKit.end_at(s, end, ki, lerpf(lamp.x, lamp.y, 0.25)) + fi.x * 0.004,
-				Vector3(0.012, 0.03 * ls, 0.07), fi, 0.0)
-		else:
-			var ki := side * 0.82
-			var ty := lerpf(lamp.x, lamp.y, 0.25)
-			var fi := VehicleKit.end_frame(s, end, ki, ty)
-			lm.box("Amber", VehicleKit.end_at(s, end, ki, ty) + fi.x * 0.004, Vector3(0.012, 0.03, 0.08), fi, 0.0)
-			var kr := side * 0.6
-			var fr := VehicleKit.end_frame(s, end, kr, ty)
-			lm.box("Plate", VehicleKit.end_at(s, end, kr, ty) + fr.x * 0.004, Vector3(0.012, 0.03, 0.08), fr, 0.0)
+	CarDetails.plate_text(lm, pp + pf.x * 0.0155, pf, int(float(s["len"]) * 100.0) + (0 if front else 3))
+	CarParts.lamps(lm, s, end, float(s["lamp_k"]) if front else float(s["lamp_k_r"]))
 	_lip(lm, s, end)
 	if not front:
 		var ep := VehicleKit.end_at(s, end, 0.6, 0.08)
@@ -123,8 +99,9 @@ static func _lip(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 	var out: Array[float] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 	for i in 3:
 		var x := xs - end * 0.1 * float(i + 1)
-		var w := VehicleKit.half_width(s, x) * VehicleKit.lin(s["bulge"], 0.0)
-		base.append(Vector3(x, VehicleKit.soft(s["floor"], x, 0.06), w))
+		var fl := VehicleKit.soft(s["floor"], x, 0.06)
+		var belt := VehicleKit.soft(s["belt"], x, 0.1)
+		base.append(Vector3(x, fl, VehicleKit.side_w(s, x, VehicleKit.half_width(s, x), 0.0, fl, belt)))
 		out.append(1.0 - float(i + 1) / 3.0)
 	for row in 3:
 		var t: float = [0.12, 0.06, 0.0][row]
@@ -139,7 +116,8 @@ static func _lip(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 			if i < 6:
 				p = VehicleKit.end_at(s, end, [0.0, 0.3, 0.6, 0.8, 0.92, 1.0][i], t)
 			else:
-				p = Vector3(p.x, lerpf(VehicleKit.soft(s["floor"], p.x, 0.06), VehicleKit.soft(s["belt"], p.x, 0.1), t), p.z)
+				p = VehicleKit.rake(s, Vector3(p.x, lerpf(VehicleKit.soft(s["floor"], p.x, 0.06),
+					VehicleKit.soft(s["belt"], p.x, 0.1), t), p.z))
 			pts.append(p + n * (LIP_M * reach * out[i]))
 		rows.append(pts)
 	VehicleKit.skin(lm, rows, func(_r: int, _c: int) -> String: return "Trim", [], true, end > 0.0)
@@ -211,8 +189,8 @@ static func _rails(lm: LandmarkMesh, s: Dictionary) -> void:
 		lm.box("Trim", pts[2] + Vector3(0.0, 0.0, 0.0), Vector3(0.03, 0.028, 0.03), Basis(), 0.0)
 
 ## The body paint of `kind`: CarPaint with the kind's shut lines.
-static func paint(kind: String) -> ShaderMaterial:
-	var id := "Paint_" + kind
+static func paint(kind: String, far: bool = false) -> ShaderMaterial:
+	var id := "Paint_" + kind + ("_far" if far else "")
 	if _materials.has(id):
 		return _materials[id]
 	var s := CarSpecs.spec(kind)
@@ -234,7 +212,7 @@ static func paint(kind: String) -> ShaderMaterial:
 		top.append(Vector4(gh[0] - 0.03, wb, -half + 0.12, wb - 0.03))
 	var m := ShaderMaterial.new()
 	m.shader = CarPaint.shader()
-	m.set_shader_parameter("face", _face(s))
+	m.set_shader_parameter("face", _face(s, far))
 	m.set_shader_parameter("seam_side", side)
 	m.set_shader_parameter("seam_side_n", side.size())
 	m.set_shader_parameter("seam_top", top)
@@ -249,18 +227,18 @@ static func paint(kind: String) -> ShaderMaterial:
 ## grille (half width, y low, y high, slats) and the lower intake (the
 ## same), the plate recess (y, half height, half width) and the lines (the
 ## bumper split y, the bonnet edge y and its half width). Zero where a face
-## has none.
-static func _face(s: Dictionary) -> PackedVector4Array:
+## has none, and near to where the opening is modelled (CarDetails.front).
+static func _face(s: Dictionary, far: bool) -> PackedVector4Array:
 	var out := PackedVector4Array()
 	for end: float in [1.0, -1.0]:
 		var front := end > 0.0
 		var lamp: Vector2 = s["lamp_f"] if front else s["lamp_r"]
 		var span := lamp.y - lamp.x
-		var lk := float(s["lamp_k"]) if front else LAMP_K_R
-		var y0 := VehicleKit.end_at(s, end, 0.0, lamp.x).y
+		var lk := float(s["lamp_k"]) if front else float(s["lamp_k_r"])
 		var y1 := VehicleKit.end_at(s, end, 0.0, lamp.y).y
-		var lm_t := (lamp.x + lamp.y) * 0.5
-		out.append(Vector4(VehicleKit.end_at(s, end, lk, lm_t).z, y0, y1, VehicleKit.end_at(s, end, 1.0, lm_t).z))
+		# The lamps are modelled (CarParts.lamps; the far loft's own lamp
+		# quads), so no lamp opening is drawn.
+		out.append(Vector4())
 		var gt: Vector2 = s["grille"]
 		var grille := Vector4()
 		var intake := Vector4()
@@ -274,6 +252,10 @@ static func _face(s: Dictionary) -> PackedVector4Array:
 			intake = Vector4(VehicleKit.end_at(s, end, 0.86, gt.y).z, i0, i1, maxf(2.0, roundf((i1 - i0) / 0.022)))
 			lines = Vector4(VehicleKit.end_at(s, end, 0.0, (gt.y + lamp.x) * 0.5).y,
 				VehicleKit.end_at(s, end, 0.0, 0.93).y, VehicleKit.end_at(s, end, 0.8, 0.93).z, 0.0)
+		if not far:
+			intake = Vector4()
+			if float(s["len"]) <= 8.0:
+				grille = Vector4()
 		out.append(grille)
 		out.append(intake)
 		out.append(Vector4(VehicleKit.end_at(s, end, 0.0, float(s["plate_t"]) if front else 0.5).y, 0.0725, 0.285, 0.0))
@@ -287,11 +269,27 @@ static func material(key: String) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	match key:
 		"Glass":
-			# Smooth, dark glass: a strong grazing (Fresnel) mirror of the sky
-			# and the street, the cabin dark behind it face on.
+			# Tinted glass over the modelled cabin: premultiplied, so the
+			# grazing (Fresnel) mirror of the sky and street stays at full
+			# strength while the cabin shows through face on.
+			m.albedo_color = Color(0.02, 0.03, 0.035, 0.5)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.blend_mode = BaseMaterial3D.BLEND_MODE_PREMULT_ALPHA
+			m.roughness = 0.04
+			m.metallic_specular = 0.6
+		"GlassDark":
+			# Far off (and on the bus): smooth, dark glass, the cabin dark behind it.
 			m.albedo_color = Color(0.03, 0.04, 0.05)
 			m.roughness = 0.04
 			m.metallic_specular = 0.6
+		"Cabin":
+			# Upholstery, carpet and the door cards: dark, matt.
+			m.albedo_color = Color(0.055, 0.052, 0.05)
+			m.roughness = 0.9
+		"Grille":
+			m.albedo_color = Color(0.1, 0.1, 0.105)
+			m.metallic = 0.6
+			m.roughness = 0.35
 		"Trim":
 			m.albedo_color = Color(0.035, 0.035, 0.038)
 			m.roughness = 0.5
@@ -304,9 +302,9 @@ static func material(key: String) -> StandardMaterial3D:
 			m.roughness = 0.32
 		"HeadLamp":
 			# A clear lens over a bright reflector.
-			m.albedo_color = Color(0.36, 0.39, 0.42)
-			m.metallic = 0.6
-			m.roughness = 0.08
+			m.albedo_color = Color(0.62, 0.65, 0.68)
+			m.metallic = 0.45
+			m.roughness = 0.1
 			m.clearcoat_enabled = true
 			m.clearcoat = 1.0
 			m.clearcoat_roughness = 0.03
@@ -329,6 +327,19 @@ static func material(key: String) -> StandardMaterial3D:
 		"Sign":
 			m.albedo_color = Color(0.9, 0.78, 0.25)
 			m.roughness = 0.35
+		"Drl":
+			# A daytime light guide: milky white, a little lit.
+			m.albedo_color = Color(0.86, 0.88, 0.9)
+			m.roughness = 0.3
+			m.emission_enabled = true
+			m.emission = Color(0.9, 0.93, 1.0)
+			m.emission_energy_multiplier = 0.25
+		"TailGlow":
+			m.albedo_color = Color(0.75, 0.06, 0.05)
+			m.roughness = 0.2
+			m.emission_enabled = true
+			m.emission = Color(0.8, 0.05, 0.03)
+			m.emission_energy_multiplier = 0.15
 		"Board":
 			# A bus's destination sign, dark by day (TransitVehicles lights it).
 			m.albedo_color = Color(0.025, 0.025, 0.025)

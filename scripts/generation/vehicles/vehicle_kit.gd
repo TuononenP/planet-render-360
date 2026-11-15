@@ -14,9 +14,14 @@ extends RefCounted
 ##   wheel arches are cut by lifting the side's lower edge over the wheel
 ##   circle; nose and tail close by shrinking the end section to the
 ##   centreline along a bowed plan.
-## * wheel(): a tyre with a spoked alloy rim, turned about the axle.
+## * rake(), side_w(), face_point(): where the lofted surface lies, for
+##   the parts laid on it (CarParts, CarModel). Wheels are CarParts'.
 
 const SMOOTH_COS := 0.74
+## Height share over which the shoulder's character line steps in.
+const SHOULDER_T := 0.03
+## How far out from its arch a flare runs back into the flank (metres).
+const FLARE_M := 0.3
 
 const ROLE_UNDER := 0
 const ROLE_SIDE := 1
@@ -190,34 +195,6 @@ static func revolve(lm: LandmarkMesh, key: String, centre: Vector3, prof: Packed
 			if (c - e).length_squared() > 1e-12:
 				lm.tri(key, a, c, e, na, nc, ne, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
 
-## A road wheel on its axle at `centre`, outer face toward `side`. Keys:
-## Rubber (tyre, the dark behind the spokes) and Rim.
-static func wheel(lm: LandmarkMesh, centre: Vector3, r: float, width: float, side: float,
-		far: bool, spokes: int = 5) -> void:
-	var hw := width * 0.5
-	var rr := r * 0.66
-	if far:
-		revolve(lm, "Rubber", centre, PackedVector2Array([Vector2(rr, -hw), Vector2(r, -hw),
-			Vector2(r, hw), Vector2(rr, hw)]), 12, side, false)
-		lm.disc("Rim", centre + Vector3(0, 0, side * hw * 0.98), Vector3(0, 0, side), rr, 12)
-		return
-	revolve(lm, "Rubber", centre, PackedVector2Array([Vector2(rr, -hw * 0.9), Vector2(r * 0.9, -hw),
-		Vector2(r * 0.975, -hw * 0.86), Vector2(r, -hw * 0.6), Vector2(r, hw * 0.6),
-		Vector2(r * 0.975, hw * 0.86), Vector2(r * 0.9, hw), Vector2(rr, hw * 0.9)]), 28, side)
-	# Rim: lip, the barrel behind it, the dark back and a brake disc.
-	revolve(lm, "Rim", centre, PackedVector2Array([Vector2(rr, hw * 0.9), Vector2(rr * 0.93, hw * 0.84),
-		Vector2(rr * 0.9, hw * 0.25)]), 28, side, false)
-	lm.disc("Rubber", centre + Vector3(0, 0, side * hw * 0.25), Vector3(0, 0, side), rr * 0.9, 20)
-	lm.disc("Rim", centre + Vector3(0, 0, side * hw * 0.3), Vector3(0, 0, side), rr * 0.62, 20)
-	for k in spokes:
-		var a := TAU * float(k) / float(spokes) + 0.3
-		var dir := Vector3(cos(a), sin(a), 0)
-		var basis := Basis(dir, Vector3(-dir.y, dir.x, 0), Vector3(0, 0, 1))
-		lm.box("Rim", centre + dir * rr * 0.54 + Vector3(0, 0, side * hw * 0.68),
-			Vector3(rr * 0.8, rr * 0.2, 0.024), basis, 0.0)
-	revolve(lm, "Rim", centre, PackedVector2Array([Vector2(rr * 0.25, hw * 0.5), Vector2(rr * 0.25, hw * 0.76),
-		Vector2(0.0, hw * 0.8)]), 14, side, false)
-
 ## Half width of the body in plan at `x`: a slight barrel, and
 ## superellipse corners into the nose and tail.
 static func half_width(s: Dictionary, x: float) -> float:
@@ -238,6 +215,56 @@ static func half_width(s: Dictionary, x: float) -> float:
 		w *= e + (1.0 - e) * pow(1.0 - pow(k, pw), 1.0 / pw)
 	return w
 
+## Half width of the flank at station `x`, height share `hf` (height `y`
+## under a belt at `belt`): the plan width `w` bowed by the bulge table,
+## stepped in above the shoulder line and pushed out over the arches.
+static func side_w(s: Dictionary, x: float, w: float, hf: float, y: float, belt: float) -> float:
+	var ws := w * lin(s["bulge"], hf)
+	var sh: Vector2 = s["shoulder"]
+	ws -= sh.y * smoothstep(sh.x, sh.x + SHOULDER_T, hf)
+	return ws + flare_at(s, x, y, belt)
+
+## How far the arch flares stand out at (`x`, `y`): a smooth ring round
+## each arch, full at its edge and gone FLARE_M out from it, kept off the
+## shoulder below the belt.
+static func flare_at(s: Dictionary, x: float, y: float, belt: float) -> float:
+	var f := float(s["flare"])
+	if f <= 0.0:
+		return 0.0
+	var ra := float(s["arch_r"])
+	var r := float(s["wheel_r"])
+	var ring := 0.0
+	for ax: float in [float(s["axle_f"]), float(s["axle_r"])]:
+		var d := maxf(Vector2(x - ax, y - r).length() - ra, 0.0)
+		var k := clampf(1.0 - d / FLARE_M, 0.0, 1.0)
+		ring = maxf(ring, k * k * (3.0 - 2.0 * k))
+	return f * ring * (1.0 - smoothstep(belt - 0.16, belt - 0.03, y))
+
+## The end faces lean back above the bumper: `p` moved toward the middle
+## near the nose and tail, by rake_f / rake_r at the belt, nothing at the
+## bumper. Every body point and every point placed on it goes through
+## here; the ramp stops short of the glasshouse so the roof is untouched.
+static func rake(s: Dictionary, p: Vector3) -> Vector3:
+	var half := float(s["len"]) * 0.5
+	var gh: PackedFloat32Array = s["gh"]
+	var x_f := half - float(s["bulge_f"])
+	var x_r := -half + float(s["bulge_r"])
+	var rf := float(s["rake_f"])
+	var lf := minf(0.55, x_f - gh[3] - 0.03)
+	if rf > 0.0 and lf > 0.05 and p.x > x_f - lf:
+		p.x -= rf * smoothstep(x_f - lf, x_f, p.x) * _rake_h(s, x_f, p.y)
+	var rr := float(s["rake_r"])
+	var lr := minf(0.5, gh[0] - x_r - 0.03)
+	if rr > 0.0 and lr > 0.05 and p.x < x_r + lr:
+		p.x += rr * smoothstep(x_r + lr, x_r, p.x) * _rake_h(s, x_r, p.y)
+	return p
+
+static func _rake_h(s: Dictionary, xe: float, y: float) -> float:
+	var fl := soft(s["floor"], xe, 0.06)
+	var belt := soft(s["belt"], xe, 0.1)
+	var yb := lerpf(fl, belt, float(s["bumper_t"]))
+	return pow(clampf((y - yb) / maxf(belt - yb, 0.01), 0.0, 1.0), 1.2)
+
 ## Stations along the body: the ends, corner and arch curves, the
 ## glasshouse and trim boundaries, filled in evenly between.
 static func _stations(s: Dictionary, far: bool) -> PackedFloat32Array:
@@ -251,7 +278,7 @@ static func _stations(s: Dictionary, far: bool) -> PackedFloat32Array:
 		must.append(x_f - float(s["corner_f"]) * (1.0 - f))
 		must.append(x_r + float(s["corner_r"]) * (1.0 - f))
 	var ra := float(s["arch_r"])
-	var na := 2 if far else 8
+	var na := 2 if far else 16
 	for ax: float in [float(s["axle_f"]), float(s["axle_r"])]:
 		for k in na + 1:
 			must.append(ax - ra * cos(PI * float(k) / float(na)))
@@ -297,7 +324,10 @@ static func _side_ts(s: Dictionary, far: bool) -> PackedFloat32Array:
 	var grille: Vector2 = s["grille"]
 	var need: Array[float] = [lamp_f.x, lamp_f.y, lamp_r.x, lamp_r.y, 0.94]
 	if not far:
-		need.append_array([grille.x, grille.y, float(s["valance"]), float(s["clad"])])
+		var sh: Vector2 = s["shoulder"]
+		need.append_array([grille.x, grille.y, float(s["valance"]), float(s["clad"]), float(s["bumper_t"])])
+		if sh.y > 0.0:
+			need.append_array([sh.x, sh.x + SHOULDER_T])
 	for t in need:
 		var clear := t > 0.0
 		for k in out:
@@ -305,6 +335,12 @@ static func _side_ts(s: Dictionary, far: bool) -> PackedFloat32Array:
 				clear = false
 		if clear:
 			out.append(t)
+	# The shoulder's two rows sit closer than the rest may.
+	var sh2: Vector2 = s["shoulder"]
+	if not far and sh2.y > 0.0:
+		for t in [sh2.x, sh2.x + SHOULDER_T]:
+			if not out.has(t):
+				out.append(t)
 	if not far:
 		for t: float in [0.05, 0.12, 0.22, 0.34, 0.46, 0.58, 0.70, 0.80, 0.88]:
 			var clear := true
@@ -324,7 +360,6 @@ static func _section(s: Dictionary, x: float, ts: PackedFloat32Array, vs: Packed
 	var fl := soft(s["floor"], x, 0.06)
 	var belt := soft(s["belt"], x, 0.1)
 	var w := half_width(s, x)
-	var bulge: PackedVector2Array = s["bulge"]
 	var low := fl
 	var ra := float(s["arch_r"])
 	for ax: float in [float(s["axle_f"]), float(s["axle_r"])]:
@@ -342,9 +377,12 @@ static func _section(s: Dictionary, x: float, ts: PackedFloat32Array, vs: Packed
 		ao.append_array([0.3, 0.3])
 	var ws := w
 	for t in ts:
-		var y := lerpf(low, belt, t)
+		# Rows keep their height along the car and gather on the arch's edge
+		# where it rises through them, so the shoulder line and the flares
+		# run straight over the wheels.
+		var y := maxf(lerpf(fl, belt, t), low)
 		var hf := (y - fl) / maxf(belt - fl, 0.01)
-		ws = w * lin(bulge, hf)
+		ws = side_w(s, x, w, hf, y, belt)
 		pts.append(Vector3(x, y, ws))
 		var shade := 0.55 + 0.45 * smoothstep(0.0, 0.2, hf)
 		if arch:
@@ -381,6 +419,10 @@ static func _section(s: Dictionary, x: float, ts: PackedFloat32Array, vs: Packed
 ## Lofts the body of spec `s` into `lm`: keys Paint, Glass, Trim, Rubber,
 ## HeadLamp, TailLamp and (a bus's destination sign) Board.
 static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
+	if far and float(s["flare"]) > 0.0:
+		# Too few stations far off to round a flare: it would read as a dent.
+		s = s.duplicate()
+		s["flare"] = 0.0
 	var xs := _stations(s, far)
 	var ts := _side_ts(s, far)
 	var vs := PackedFloat32Array([0.0, 1.0]) if far else PackedFloat32Array([0.0, 0.07, 0.36, 0.65, 0.93, 1.0])
@@ -434,9 +476,37 @@ static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
 		ao.append(nose[1])
 		rx.append(x_f)
 		re.append(1.0 - e)
+	for r in rows.size():
+		var row: PackedVector3Array = rows[r]
+		for i in row.size():
+			row[i] = rake(s, row[i])
+		rows[r] = row
+	var bed := not far and bool(s["bed"])
+	var bx: Vector2 = s["bed_x"]
 	var keys := func(r: int, c: int) -> String:
-		return _key(s, role[c], tmid[c], (rx[r] + rx[r + 1]) * 0.5, (re[r] + re[r + 1]) * 0.5, x_r, x_f)
+		var xm := (rx[r] + rx[r + 1]) * 0.5
+		var em := (re[r] + re[r + 1]) * 0.5
+		if bed and em == 0.0 and role[c] == ROLE_ROOF and xm > bx.x and xm < bx.y:
+			return ""
+		return _key(s, role[c], tmid[c], xm, em, x_r, x_f, far)
 	skin(lm, rows, keys, ao, true)
+	if far or not bool(s["cabin"]):
+		return
+	# The cabin's lining: the body's own quads around the cabin, facing in
+	# and dark, so what is seen through the glass is the inside of the car.
+	var gh: PackedFloat32Array = s["gh"]
+	var c0 := gh[0] - (0.02 if bed else 0.4)
+	var c1 := gh[3] + 0.05
+	var lining := func(r: int, c: int) -> String:
+		var xm := (rx[r] + rx[r + 1]) * 0.5
+		if xm < c0 or xm > c1:
+			return ""
+		var key: String = keys.call(r, c)
+		return "" if key == "" or key == "Glass" else "Cabin"
+	skin(lm, rows, lining, [], true, true)
+	if bed:
+		var c_roof := role.find(ROLE_ROOF)
+		CarDetails.bed(lm, s, rows, rx, re, c_roof)
 
 ## The end section drawn in to `k` of its width and bowed out by
 ## `bulge` (signed along x), less toward the top so the face leans back.
@@ -476,9 +546,36 @@ static func _deck_y(pts: PackedVector3Array, d0: int, z: float) -> float:
 static func end_at(s: Dictionary, end: float, k: float, t: float) -> Vector3:
 	var bulge := float(s["bulge_f"]) if end > 0.0 else float(s["bulge_r"])
 	var xs := end * (float(s["len"]) * 0.5 - bulge)
-	var w := half_width(s, xs) * lin(s["bulge"], t)
+	var fl := soft(s["floor"], xs, 0.06)
+	var belt := soft(s["belt"], xs, 0.1)
+	var y := lerpf(fl, belt, t)
+	var w := side_w(s, xs, half_width(s, xs), t, y, belt)
 	var x := xs + end * bulge * (1.0 - k * k) * (1.0 - 0.35 * t * t)
-	return Vector3(x, lerpf(soft(s["floor"], xs, 0.06), soft(s["belt"], xs, 0.1), t), k * w)
+	return rake(s, Vector3(x, y, k * w))
+
+## end_at() carried round the corner: `u` up to 1 crosses the end face
+## (0 the centreline), beyond it runs back along the flank, u - 1 metres
+## from the corner, on side `side` (+1 / -1).
+static func face_point(s: Dictionary, end: float, side: float, u: float, t: float) -> Vector3:
+	if u <= 1.0:
+		return end_at(s, end, side * u, t)
+	var bulge := float(s["bulge_f"]) if end > 0.0 else float(s["bulge_r"])
+	var x := end * (float(s["len"]) * 0.5 - bulge - (u - 1.0))
+	var fl := soft(s["floor"], x, 0.06)
+	var belt := soft(s["belt"], x, 0.1)
+	var y := lerpf(fl, belt, t)
+	return rake(s, Vector3(x, y, side * side_w(s, x, half_width(s, x), t, y, belt)))
+
+## The outward normal of the body at face_point().
+static func face_normal(s: Dictionary, end: float, side: float, u: float, t: float) -> Vector3:
+	var e := 0.02
+	var du := face_point(s, end, side, u + e, t) - face_point(s, end, side, maxf(u - e, 0.0), t)
+	var dt := face_point(s, end, side, u, t + e) - face_point(s, end, side, u, t - e)
+	var n := du.cross(dt).normalized()
+	var out := face_point(s, end, side, u, t) - Vector3(0.0, face_point(s, end, side, u, t).y, 0.0)
+	if n.dot(out) < 0.0:
+		n = -n
+	return n
 
 ## The face at end_at(): x out of it, y up, z across.
 static func end_frame(s: Dictionary, end: float, k: float, t: float) -> Basis:
@@ -518,14 +615,15 @@ static func roof_on_mesh(s: Dictionary, x: float, z: float) -> float:
 
 ## Material key of a body quad: `t` up the side, `xm` its station, `em`
 ## its depth into the front (+) or rear (-) face (0 on the flanks).
-static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: float, x_f: float) -> String:
+static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: float, x_f: float,
+		far: bool) -> String:
 	match role:
 		ROLE_UNDER:
 			return "Rubber"
 		ROLE_PAINT:
 			return "Paint"
 		ROLE_MOULD:
-			return "Trim"
+			return "Chrome" if bool(s["chrome"]) and not far else "Trim"
 		ROLE_SIDE_GLASS:
 			# An upright tail carries its window in the rear face.
 			if em < -0.1 and bool(s["tail_glass"]):
@@ -544,8 +642,9 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 			if em == 0.0 and ((xm > gh[2] and xm < gh[3]) or (xm > gh[0] and xm < gh[1])):
 				return "Glass"
 			return "Paint"
-	var front := em > 0.0 or xm > x_f - float(s["lamp_wrap_f"])
-	var rear := em < 0.0 or xm < x_r + float(s["lamp_wrap"])
+	# Near to, the lamps are clusters laid on the paint (CarParts.lamps).
+	var front := far and (em > 0.0 or xm > x_f - float(s["lamp_wrap_f"]))
+	var rear := far and (em < 0.0 or xm < x_r + float(s["lamp_wrap"]))
 	if front:
 		# Between the lamps the paint carries the drawn grille (CarPaint).
 		var lamp: Vector2 = s["lamp_f"]

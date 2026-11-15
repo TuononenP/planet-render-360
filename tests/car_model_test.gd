@@ -51,7 +51,7 @@ func _init() -> void:
 			if glass == null or glass.roughness > 0.06:
 				failures.append("%s glass should be smooth enough to mirror the street" % kind)
 		print("CAR MODEL %s triangles: near %d, far %d" % [kind, counts[0], counts[1]])
-		if counts[0] > 12000 or counts[1] > 1600 or counts[1] * 4 > counts[0]:
+		if counts[0] > 24000 or counts[1] > 1600 or counts[1] * 4 > counts[0]:
 			failures.append("%s triangle budget: near %d, far %d" % [kind, counts[0], counts[1]])
 	if failures.is_empty():
 		print("CAR MODEL OK: every kind lofts a grounded body near and far, faces outward, paint on CarPaint")

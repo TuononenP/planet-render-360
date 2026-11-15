@@ -92,7 +92,9 @@ void fragment() {
 		vec4 lines = face[o + 4];
 		vec2 lc = vec2(lamp.x + lamp.w, lamp.y + lamp.z) * 0.5;
 		vec2 lh = vec2(lamp.w - lamp.x, lamp.z - lamp.y) * 0.5;
-		opening = max(opening, cov(sd_box(q, lc, lh, 0.02) - 0.012, px));
+		if (lamp.w > 0.0) {
+			opening = max(opening, cov(sd_box(q, lc, lh, 0.02) - 0.012, px));
+		}
 		if (grille.x > 0.0) {
 			vec2 gc = vec2(0.0, (grille.y + grille.z) * 0.5);
 			vec2 gh = vec2(grille.x, (grille.z - grille.y) * 0.5);
