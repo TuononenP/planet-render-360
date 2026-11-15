@@ -64,10 +64,10 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 	mat.set_shader_parameter("sea_shallow", sea["shallow"])
 	mat.set_shader_parameter("sea_deep", sea["deep"])
 	mat.set_shader_parameter("harbour", 1.0 if bool(sea["harbour"]) else 0.0)
+	mat.set_shader_parameter("far_rough", sea["far_rough"])
 	if bool(sea["harbour"]):
 		mat.set_shader_parameter("wave_amp", 0.55)
 		mat.set_shader_parameter("near_rough", 0.18)
-		mat.set_shader_parameter("far_rough", 0.23)
 		mat.set_shader_parameter("spec", 0.20)
 	var wl := ground.water_level_m
 	if ground.shoreline != null and ground.shoreline.ready:

@@ -471,7 +471,7 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		var sea := WaterSurface.sea_palette(data)
 		mat.set_shader_parameter("water_shallow", sea["shallow"])
 		mat.set_shader_parameter("water_deep", sea["deep"])
-		mat.set_shader_parameter("water_far_rough", 0.23 if bool(sea["harbour"]) else 0.09)
+		mat.set_shader_parameter("water_far_rough", sea["far_rough"])
 	mat.set_shader_parameter("has_fine", 1.0 if fine != null else 0.0)
 	mat.set_shader_parameter("has_coarse", 1.0 if coarse != null else 0.0)
 	if fine != null:

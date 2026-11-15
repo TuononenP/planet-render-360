@@ -62,7 +62,10 @@ static func sea_palette(data: LocationData) -> Dictionary:
 	elif harbour:
 		shallow = Vector3(0.045, 0.065, 0.050)
 		deep = Vector3(0.020, 0.038, 0.030)
-	return {"shallow": shallow, "deep": deep, "harbour": harbour, "brackish": salt}
+	# Gloss the sea ends on far out (WaterShader far_rough), shared with
+	# the far rings so the two meet without a seam.
+	var far_rough := 0.23 if harbour else 0.09
+	return {"shallow": shallow, "deep": deep, "harbour": harbour, "brackish": salt, "far_rough": far_rough}
 
 ## A hard quay reaches deep water quickly; beaches retain the long shelf.
 static func sea_ramp_m(hard_distance: float, shore_distance: float, grid_step: float) -> float:
