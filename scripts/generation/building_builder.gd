@@ -183,9 +183,17 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 ## Rotated rectangle footprint (internal units) for procedural masses.
 ## Squared distance from `b` to the nearer of the camera and the view's
 ## subject at the map centre.
-static func _view_d2(b: Dictionary, eye: Vector2) -> float:
+static func _view_d2(b: Dictionary, eye: Vector2, reach: Vector2 = Vector2.ZERO) -> float:
 	var p := Vector2(float(b["x"]), float(b["z"]))
-	return minf(p.length_squared(), p.distance_squared_to(eye))
+	return minf(p.length_squared(), p.distance_squared_to(_eye_point(p, eye, reach)))
+
+## Distance from `p` to the eye, or to the camera's path through a
+## streamed world (eye ± reach, LocationData.detail_reach).
+static func eye_dist(p: Vector2, eye: Vector2, reach: Vector2) -> float:
+	return p.distance_to(_eye_point(p, eye, reach))
+
+static func _eye_point(p: Vector2, eye: Vector2, reach: Vector2) -> Vector2:
+	return eye if reach == Vector2.ZERO else Geometry2D.get_closest_point_to_segment(p, eye - reach, eye + reach)
 
 ## Masses that failed to extrude in the last build (a sibling can still
 ## stand, so the logged fallback does not see them).
@@ -198,11 +206,12 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	# A curated view can stand a kilometre from the middle of its extent, and
 	# look back at it: the building cap keeps what is near either one.
 	var eye := View360.spawn_xz(data)
+	var reach := data.detail_reach
 	# Indices sorted as the buildings would be (sort_custom permutes by its
 	# comparisons alone), so each building's skip test runs once, below.
 	var order: Array = range(data.buildings.size())
 	order.sort_custom(func(i: int, j: int) -> bool:
-		return _view_d2(data.buildings[i], eye) < _view_d2(data.buildings[j], eye))
+		return _view_d2(data.buildings[i], eye, reach) < _view_d2(data.buildings[j], eye, reach))
 	var sorted: Array = order.map(func(i: int) -> Dictionary: return data.buildings[i])
 	var placed := 0
 	var aabb_fallbacks := 0
@@ -212,6 +221,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	var ctx := _height_context(data)
 	ctx["poi_index"] = PoiFacadeIndex.new(data.pois)
 	ctx["eye"] = eye
+	ctx["eye_reach"] = reach
 	# Roof colour samples read natively (PhotoSampler) from a usable photo.
 	var img := data.satellite_image
 	if img != null and not img.is_empty() and not img.is_compressed():
@@ -498,7 +508,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	var seed_v := TerrainBuilder._hash(seed_at.x, seed_at.y)
 	# Geometry detail follows the camera (eye_d). Full materials also stay on
 	# the view's subject at the map centre, which a far eye looks back at.
-	var eye_d := centre.distance_to(ctx.get("eye", Vector2.ZERO) as Vector2)
+	var eye_d := eye_dist(centre, ctx.get("eye", Vector2.ZERO) as Vector2,
+		ctx.get("eye_reach", Vector2.ZERO) as Vector2)
 	# A mapped landmark keeps full detail at any distance: it is the skyline.
 	var distant := _batch != null or (not bool(b.get("mapped_landmark", false)) \
 		and minf(eye_d, centre.length()) / WorldScale.metres_to_units() > MaterialLibrary.full_detail_radius_m(fidelity))

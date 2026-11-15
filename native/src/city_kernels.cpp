@@ -42,6 +42,9 @@ constexpr double STREET_M = 12.0;
 constexpr double LANDMARK_CLEAR_M = 120.0;
 // FarCityBuilder.PAIR_*: an apartment lot wider than PAIR_MIN_M holds two buildings.
 constexpr double PAIR_MIN_M = 28.0;
+constexpr double HOUSE_SPREAD = 0.4;
+// FarCityBuilder.HASH_SNAP_M.
+constexpr double HASH_SNAP_M = 0.5;
 constexpr double PAIR_GAP_M = 5.0;
 constexpr double PAIR_SHARE = 0.35;
 // SettlementMap.
@@ -64,6 +67,11 @@ struct City {
 	bool sea = true;
 	double h_edge = -1.0;
 	int n = 0, half = 0;
+	// SettlementMap.shift and LocationData.origin_m: the grid and the
+	// hashes stand on the streamer's continuous map; cell0 is cell (0, 0)
+	// counted on it (FarCityBuilder.grid_cell0).
+	Vector2 shift, origin;
+	Vector2i cell0;
 	PackedFloat32Array score;
 	PackedByteArray cls, blocked;
 	std::vector<uint8_t> tower_cell;
@@ -84,6 +92,13 @@ struct City {
 // FarCityBuilder._hash
 double city_hash(double x, double z, double salt = 0.0) {
 	return Math::fposmod(std::sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453, 1.0);
+}
+
+// FarCityBuilder._at: city_hash at world XZ taken on the continuous map,
+// snapped to HASH_SNAP_M so each world's float rounding hashes alike.
+double at_hash(const City &c, double x, double z, double salt = 0.0) {
+	return city_hash(Math::snapped(x + (double)c.origin.x, HASH_SNAP_M),
+			Math::snapped(z + (double)c.origin.y, HASH_SNAP_M), salt);
 }
 
 // ArchitectureStyle._h / _pick_weighted
@@ -427,12 +442,12 @@ void pitched_roof(Row &row, int oct, int band, int mat, const Vector2 *ring, dou
 }
 
 // FarCityBuilder._district
-int district_of(const Vector2 &ctr) {
+int district_of(const City &c, const Vector2 &ctr) {
 	constexpr double DISTRICT_M = 600.0;
-	double px = std::floor((double)ctr.x / DISTRICT_M);
-	double pz = std::floor((double)ctr.y / DISTRICT_M);
-	double cx = (px + 0.5) * DISTRICT_M;
-	double cz = (pz + 0.5) * DISTRICT_M;
+	double px = std::floor(((double)ctr.x + (double)c.origin.x) / DISTRICT_M);
+	double pz = std::floor(((double)ctr.y + (double)c.origin.y) / DISTRICT_M);
+	double cx = (px + 0.5) * DISTRICT_M - (double)c.origin.x;
+	double cz = (pz + 0.5) * DISTRICT_M - (double)c.origin.y;
 	double old_share = Math::lerp(0.5, 0.15, Math::smoothstep(R_IN, RADIUS_M, std::sqrt(cx * cx + cz * cz)));
 	double pick = city_hash(px, pz, 23.0);
 	if (pick < old_share) {
@@ -454,20 +469,20 @@ void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, doub
 	if (std::isinf(base)) {
 		return;
 	}
-	double seed_v = city_hash(ctr.x, ctr.y, 11.0);
+	double seed_v = at_hash(c, ctr.x, ctr.y, 11.0);
 	int lo = prof.st_lo;
 	int hi = prof.st_hi;
 	if (kind == "apartments") {
 		// SettlementMap.score_at
-		int ci = (int)std::floor((double)ctr.x / CELL_M) + c.half;
-		int cj = (int)std::floor((double)ctr.y / CELL_M) + c.half;
+		int ci = (int)std::floor(((double)ctr.x + (double)c.shift.x) / CELL_M) + c.half;
+		int cj = (int)std::floor(((double)ctr.y + (double)c.shift.y) / CELL_M) + c.half;
 		double sc = (ci < 0 || cj < 0 || ci >= c.n || cj >= c.n) ? 0.0 : (double)c.score[cj * c.n + ci];
 		if (sc > 0.65) {
 			lo += 1;
 			hi = (int)std::ceil((double)hi * 1.3);
 		}
 	}
-	int district = (kind == "apartments" || kind == "commercial") ? district_of(ctr) : 0;
+	int district = (kind == "apartments" || kind == "commercial") ? district_of(c, ctr) : 0;
 	if (district != 0) {
 		int mid = (int)((double)(lo + hi) * 0.5);
 		if (district < 0) {
@@ -489,7 +504,7 @@ void mass(const City &c, Row &row, const Vector2 &ctr, const Vector2 &size, doub
 		shape = pick_weighted(prof.roofs, seed_v, 29);
 	}
 	double span = Math::min((double)size.x, (double)size.y);
-	double pitch = prof.pitch * (0.9 + 0.2 * city_hash(ctr.x, ctr.y, 41.0));
+	double pitch = prof.pitch * (0.9 + 0.2 * at_hash(c, ctr.x, ctr.y, 41.0));
 	double rh = roof_height_m(shape, span, pitch);
 	if (shape != "flat") {
 		wall = Math::max(wall - rh * 0.5, fh);
@@ -534,7 +549,8 @@ void fabric_row(const City &c, int j, Row &row) {
 			continue;
 		}
 		// SettlementMap.centre
-		Vector2 cc = Vector2(((double)(i - c.half) + 0.5) * CELL_M, ((double)(j - c.half) + 0.5) * CELL_M);
+		Vector2 cc = Vector2(((double)(i - c.half) + 0.5) * CELL_M - (double)c.shift.x,
+				((double)(j - c.half) + 0.5) * CELL_M - (double)c.shift.y);
 		double d2 = cc.length_squared();
 		// The detailed extent is a square: inside it (past R_IN only in
 		// its corners) real buildings stand, and a block there z-fought them.
@@ -556,7 +572,7 @@ void fabric_row(const City &c, int j, Row &row) {
 			prof = &c.house;
 			kind = "house";
 		}
-		double yaw = city_hash(std::floor((double)i / 6.0), std::floor((double)j / 6.0), 3.0) * Math::PI * 0.5;
+		double yaw = city_hash(std::floor((double)(i + c.cell0.x) / 6.0), std::floor((double)(j + c.cell0.y) / 6.0), 3.0) * Math::PI * 0.5;
 		double thin = Math::lerp(1.0, THIN_FAR, Math::smoothstep(SPLIT_M, RADIUS_M, d));
 		double keep = Math::clamp((s - 0.12) / 0.45, 0.2, 1.0) * thin;
 		int lots = d < SPLIT_M ? 2 : 1;
@@ -564,7 +580,7 @@ void fabric_row(const City &c, int j, Row &row) {
 		for (int lj = 0; lj < lots; lj++) {
 			for (int li = 0; li < lots; li++) {
 				Vector2 lc = cc + Vector2(((double)li + 0.5) * lot - CELL_M * 0.5, ((double)lj + 0.5) * lot - CELL_M * 0.5);
-				double hv = city_hash(lc.x, lc.y);
+				double hv = at_hash(c, lc.x, lc.y);
 				if (hv > keep) {
 					continue;
 				}
@@ -573,23 +589,25 @@ void fabric_row(const City &c, int j, Row &row) {
 				}
 				if (kind == "house") {
 					for (int hi = 0; hi < 2; hi++) {
-						Vector2 o((city_hash(lc.x, lc.y, 5.0 + hi) - 0.5) * lot * 0.5, ((double)hi - 0.5) * lot * 0.45);
+						Vector2 o((at_hash(c, lc.x, lc.y, 5.0 + hi) - 0.5) * lot * HOUSE_SPREAD, ((double)hi - 0.5) * lot * 0.45);
 						mass(c, row, lc + o.rotated(yaw),
-								Vector2(Math::lerp(9.0, 14.0, city_hash(lc.x, lc.y, 7.0 + hi)), Math::lerp(7.0, 10.0, hv)),
+								Vector2(Math::lerp(9.0, 14.0, at_hash(c, lc.x, lc.y, 7.0 + hi)), Math::lerp(7.0, 10.0, hv)),
 								yaw, *prof, d, "house");
 					}
 				} else {
 					double fill = kind == "industrial" ? 0.75 : 1.0;
-					double side = (lot - STREET_M) * fill;
+					// FarCityBuilder: the turned block keeps to the square that
+					// still fits its lot (it overlapped the next lot's).
+					double side = (lot - STREET_M) * fill / (std::abs(std::cos(yaw)) + std::abs(std::sin(yaw)));
 					// Footprints differ in size and sit off-centre in their
 					// lot; some apartment lots hold a pair.
-					Vector2 size(side * Math::lerp(0.55, 1.0, city_hash(lc.x, lc.y, 2.0)),
-							side * Math::lerp(0.5, 1.0, city_hash(lc.x, lc.y, 4.0)));
+					Vector2 size(side * Math::lerp(0.55, 1.0, at_hash(c, lc.x, lc.y, 2.0)),
+							side * Math::lerp(0.5, 1.0, at_hash(c, lc.x, lc.y, 4.0)));
 					Vector2 slack = Vector2(side, side) - size;
-					Vector2 at = lc + Vector2((city_hash(lc.x, lc.y, 13.0) - 0.5) * slack.x,
-											  (city_hash(lc.x, lc.y, 17.0) - 0.5) * slack.y)
+					Vector2 at = lc + Vector2((at_hash(c, lc.x, lc.y, 13.0) - 0.5) * slack.x,
+											  (at_hash(c, lc.x, lc.y, 17.0) - 0.5) * slack.y)
 											  .rotated(yaw);
-					if (kind == "apartments" && size.x > PAIR_MIN_M && city_hash(lc.x, lc.y, 19.0) < PAIR_SHARE) {
+					if (kind == "apartments" && size.x > PAIR_MIN_M && at_hash(c, lc.x, lc.y, 19.0) < PAIR_SHARE) {
 						double w = (size.x - PAIR_GAP_M) * 0.5;
 						for (int pi = 0; pi < 2; pi++) {
 							double off = ((double)pi - 0.5) * (w + PAIR_GAP_M);
@@ -614,6 +632,9 @@ Dictionary CityKernels::fabric(const Dictionary &city, const Dictionary &far_par
 	c.h_edge = city["h_edge"];
 	c.n = city["n"];
 	c.half = city["half"];
+	c.shift = city.get("shift", Vector2());
+	c.origin = city.get("origin", Vector2());
+	c.cell0 = city.get("cell0", Vector2i());
 	c.score = city["score"];
 	c.cls = city["cls"];
 	c.blocked = city["blocked"];
@@ -710,7 +731,7 @@ Dictionary CityKernels::fabric(const Dictionary &city, const Dictionary &far_par
 	return out;
 }
 
-Dictionary CityKernels::settlement_features(const Array &infos, int n, int half) {
+Dictionary CityKernels::settlement_features(const Array &infos, int n, int half, const Vector2 &shift) {
 	struct Drape {
 		int id, width, height;
 		double step;
@@ -729,9 +750,9 @@ Dictionary CityKernels::settlement_features(const Array &infos, int n, int half)
 	ls.resize(count); gs.resize(count); stds.resize(count); brs.resize(count);
 	ids.resize(count); present.resize(count);
 	for (int j = 0; j < n; ++j) {
-		const double z = (double(j - half) + 0.5) * CELL_M;
+		const double z = (double(j - half) + 0.5) * CELL_M - (double)shift.y;
 		for (int i = 0; i < n; ++i) {
-			const double x = (double(i - half) + 0.5) * CELL_M;
+			const double x = (double(i - half) + 0.5) * CELL_M - (double)shift.x;
 			if (x * x + z * z > RADIUS_M * RADIUS_M) continue;
 			for (const Drape &d : drapes) {
 				const double u = d.col[i], v = d.row[j];
@@ -815,7 +836,7 @@ Dictionary CityKernels::settlement_finish(const Dictionary &features, const Dict
 void CityKernels::_bind_methods() {
 	ClassDB::bind_static_method("CityKernels", D_METHOD("fabric", "city", "far", "dem_rings"),
 			&CityKernels::fabric);
-	ClassDB::bind_static_method("CityKernels", D_METHOD("settlement_features", "infos", "n", "half"),
+	ClassDB::bind_static_method("CityKernels", D_METHOD("settlement_features", "infos", "n", "half", "shift"),
 			&CityKernels::settlement_features);
 	ClassDB::bind_static_method("CityKernels", D_METHOD("settlement_finish", "features", "l0", "g0", "n"),
 			&CityKernels::settlement_finish);

@@ -509,6 +509,7 @@ func _free_world(world: Node3D) -> void:
 ## claim the new place's first generation.
 func reset_for_new_place() -> void:
 	cancel_pending()
+	ShaderOrigin.reset()
 	_opened_msec = Time.get_ticks_msec()
 	_warmed = false
 	_unsaved = []
@@ -935,6 +936,8 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	data.view = {}
 	data.focus = {}
 	data.detail_at_centre = true
+	data.detail_reach = pending_target_xz * 0.5
+	data.origin_m = ShaderOrigin.ahead(v._generated, pending_target_xz)
 	if progress != null:
 		progress.phase = SaveProgress.Phase.BUILD
 	var built := await v.build_location(data, ground, _abort)
@@ -942,6 +945,8 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()
 		return
+	if built.size() > 1 and built[1] is Node3D:
+		(built[1] as Node3D).set_meta(ShaderOrigin.META, data.origin_m)
 	if built.is_empty():
 		mark_failed(gen, "build stopped")
 		ViewTools.say(v, "Couldn't prepare the way ahead",

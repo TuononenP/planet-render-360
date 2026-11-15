@@ -46,11 +46,16 @@ var cls := PackedByteArray()
 var blocked := PackedByteArray()
 ## "drape+osm" | "drape" | "osm" | "" (no source → empty map)
 var source := ""
+## Grid offset (m, 0..CELL_M): cell edges fall on whole CELL_M of the
+## world's continuous map (LocationData.origin_m), so a streamed world's
+## cells are the last one's, not a grid re-centred on each world.
+var shift := Vector2.ZERO
 
 static func build(data: LocationData) -> SettlementMap:
 	var m := SettlementMap.new()
 	m.half = int(ceil(RADIUS_M / CELL_M))
 	m.n = m.half * 2
+	m.shift = Vector2(fposmod(data.origin_m.x, CELL_M), fposmod(data.origin_m.y, CELL_M))
 	m.score.resize(m.n * m.n)
 	m.cls.resize(m.n * m.n)
 	m.blocked.resize(m.n * m.n)
@@ -83,14 +88,14 @@ func index(i: int, j: int) -> int:
 
 ## Cell (column i east, row j south) containing metre XZ; (-1,-1) outside.
 func cell_of(x: float, z: float) -> Vector2i:
-	var i := int(floor(x / CELL_M)) + half
-	var j := int(floor(z / CELL_M)) + half
+	var i := int(floor((x + shift.x) / CELL_M)) + half
+	var j := int(floor((z + shift.y) / CELL_M)) + half
 	if i < 0 or j < 0 or i >= n or j >= n:
 		return Vector2i(-1, -1)
 	return Vector2i(i, j)
 
 func centre(i: int, j: int) -> Vector2:
-	return Vector2((float(i - half) + 0.5) * CELL_M, (float(j - half) + 0.5) * CELL_M)
+	return Vector2((float(i - half) + 0.5) * CELL_M - shift.x, (float(j - half) + 0.5) * CELL_M - shift.y)
 
 func score_at(x: float, z: float) -> float:
 	var c := cell_of(x, z)
@@ -190,11 +195,11 @@ func _from_drapes(data: LocationData) -> void:
 	var xs := PackedFloat32Array()
 	xs.resize(n)
 	for i in n:
-		xs[i] = (float(i - half) + 0.5) * CELL_M
+		xs[i] = (float(i - half) + 0.5) * CELL_M - shift.x
 	var zs := PackedFloat32Array()
 	zs.resize(n)
 	for j in n:
-		zs[j] = (float(j - half) + 0.5) * CELL_M
+		zs[j] = (float(j - half) + 0.5) * CELL_M - shift.y
 	var infos: Array = []
 	for di in data.far_drapes.size():
 		var d: Dictionary = data.far_drapes[di]
@@ -240,7 +245,7 @@ func _from_drapes(data: LocationData) -> void:
 	has_feat.resize(n * n)
 	var features := {}
 	if _native:
-		features = ClassDB.class_call_static("CityKernels", "settlement_features", infos, n, half)
+		features = ClassDB.class_call_static("CityKernels", "settlement_features", infos, n, half, shift)
 		l_vals = features["l"]
 		g_vals = features["g"]
 		std_vals = features["std"]
@@ -393,10 +398,10 @@ func _from_landuse(data: LocationData) -> PackedByteArray:
 		if bb.end.x < -RADIUS_M or bb.end.y < -RADIUS_M \
 				or bb.position.x > RADIUS_M or bb.position.y > RADIUS_M:
 			continue
-		var i0 := clampi(int(floor(bb.position.x / CELL_M)) + half, 0, n - 1)
-		var j0 := clampi(int(floor(bb.position.y / CELL_M)) + half, 0, n - 1)
-		var i1 := clampi(int(floor(bb.end.x / CELL_M)) + half, 0, n - 1)
-		var j1 := clampi(int(floor(bb.end.y / CELL_M)) + half, 0, n - 1)
+		var i0 := clampi(int(floor((bb.position.x + shift.x) / CELL_M)) + half, 0, n - 1)
+		var j0 := clampi(int(floor((bb.position.y + shift.y) / CELL_M)) + half, 0, n - 1)
+		var i1 := clampi(int(floor((bb.end.x + shift.x) / CELL_M)) + half, 0, n - 1)
+		var j1 := clampi(int(floor((bb.end.y + shift.y) / CELL_M)) + half, 0, n - 1)
 		# Banded index: a big landuse polygon with many holes is otherwise
 		# a full vertex + hole walk per cell (same lagoon-scale hang).
 		var poly_index := PolygonIndex.new(pts, pd.get("holes", []))

@@ -33,6 +33,9 @@ const GROUND_NEAR_M := 700.0
 ## city glows too. A node of its own: TerrainBuilder adopts the buildings
 ## subtree's children flat and drops its root (and any meta on it).
 const SETTLE_META := "street_glow_settle"
+## Beside it, the map's grid offset (SettlementMap.shift): its centre lies
+## at -shift.
+const SHIFT_META := "street_glow_shift"
 
 const GLSL := """
 global uniform float street_lamp_glow;
@@ -147,17 +150,20 @@ static func settle_node(smap: SettlementMap) -> Node3D:
 	var n := Node3D.new()
 	n.name = "StreetGlowMap"
 	n.set_meta(SETTLE_META, img)
+	n.set_meta(SHIFT_META, smap.shift)
 	return n
 
 ## Publishes `img` (settle_image) as the far city's light map, or clears it.
-static func set_settlement(img: Image) -> void:
+static func set_settlement(img: Image, shift: Vector2 = Vector2.ZERO) -> void:
 	if img == null:
 		RenderingServer.global_shader_parameter_set("street_lamp_settle_rect", Vector4.ZERO)
 		return
 	var half_u := float(img.get_width()) * 0.5 * SettlementMap.CELL_M * WorldScale.metres_to_units()
 	_settle_tex = ImageTexture.create_from_image(img)
 	RenderingServer.global_shader_parameter_set("street_lamp_settle", _settle_tex)
-	RenderingServer.global_shader_parameter_set("street_lamp_settle_rect", Vector4(0.0, 0.0, half_u, 1.0))
+	var m := WorldScale.metres_to_units()
+	RenderingServer.global_shader_parameter_set("street_lamp_settle_rect",
+		Vector4(-shift.x * m, -shift.y * m, half_u, 1.0))
 
 ## Everything a shown world needs (ViewConditions.dress): the place's lamps
 ## (`top`, the world itself) and the light map its build left on a node
@@ -167,9 +173,11 @@ static func apply_world(world: Node, data: LocationData, top: bool = true) -> vo
 	if top and data != null:
 		set_place_for(data)
 	var img: Image = null
+	var shift := Vector2.ZERO
 	for n in [world] + (world.get_children() if world != null else []):
 		if n != null and (n as Node).has_meta(SETTLE_META):
 			img = (n as Node).get_meta(SETTLE_META) as Image
+			shift = (n as Node).get_meta(SHIFT_META, Vector2.ZERO)
 			break
 	if img != null or top:
-		set_settlement(img)
+		set_settlement(img, shift)

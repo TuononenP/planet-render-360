@@ -35,6 +35,10 @@ func _run() -> void:
 			failures.append("dropping only %s leaves the key unchanged" % layer)
 	if WorldCache.key(good) != WorldCache.key(good):
 		failures.append("key is not stable for the same data")
+	var streamed := _data()
+	streamed.origin_m = Vector2(1234.5, -300.0)
+	if WorldCache.key(streamed) == WorldCache.key(_data()):
+		failures.append("a streamed world's origin must change the world key")
 	good.far_towers = [{"height": 50.0}]
 	bare.far_towers = [{"height": 51.0}]
 	bare.far_heights = good.far_heights

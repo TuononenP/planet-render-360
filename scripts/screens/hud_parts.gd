@@ -292,7 +292,9 @@ static func attribution() -> Button:
 
 ## Short source names for the pill ("Map data: © OpenStreetMap
 ## contributors" -> "© OpenStreetMap contributors"); the full credit
-## stays in the tooltip and in Settings → Data sources.
+## stays in the tooltip and in Settings → Data sources. Several credits
+## of one owner name it once ("© City of Helsinki: Elevation model 2021,
+## building register, tree register"), where its first credit stood.
 static func short_sources(attribution_text: String) -> String:
 	var out: Array[String] = []
 	for part in attribution_text.split(" · ", false):
@@ -308,4 +310,26 @@ static func short_sources(attribution_text: String) -> String:
 			s = s.left(dash)
 		if s != "" and not out.has(s):
 			out.append(s)
-	return " · ".join(out)
+	return " · ".join(_by_owner(out))
+
+## `parts` with the "© Owner, work" credits of one owner joined into one.
+static func _by_owner(parts: Array[String]) -> Array[String]:
+	var works := {}
+	for s in parts:
+		var comma := s.find(", ")
+		if s.begins_with("© ") and comma > 2:
+			var owner := s.left(comma)
+			if not works.has(owner):
+				works[owner] = []
+			(works[owner] as Array).append(s.substr(comma + 2))
+	var out: Array[String] = []
+	var named := {}
+	for s in parts:
+		var comma := s.find(", ")
+		var owner := s.left(comma) if s.begins_with("© ") and comma > 2 else ""
+		if owner == "" or (works[owner] as Array).size() < 2:
+			out.append(s)
+		elif not named.has(owner):
+			named[owner] = true
+			out.append("%s: %s" % [owner, ", ".join(PackedStringArray(works[owner]))])
+	return out

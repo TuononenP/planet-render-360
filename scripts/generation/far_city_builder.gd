@@ -38,15 +38,29 @@ const LANDMARK_CLEAR_M := 120.0
 ## An apartment lot wider than PAIR_MIN_M holds two narrower buildings,
 ## PAIR_GAP_M apart, in PAIR_SHARE of its lots.
 const PAIR_MIN_M := 28.0
+## A house lot's two houses stand at most this share of the lot apart
+## along the lot, so a turned house stays inside its lot.
+const HOUSE_SPREAD := 0.4
 const PAIR_GAP_M := 5.0
 const PAIR_SHARE := 0.35
 ## Patch size of a district's character (_district; CityKernels matches).
 const DISTRICT_M := 600.0
+## Grid _at snaps the continuous-map XZ to before hashing (CityKernels matches).
+const HASH_SNAP_M := 0.5
 ## Native CityKernels when loaded.
 static var _native := ClassDB.class_exists("CityKernels")
 
 static func _hash(x: float, z: float, salt: float = 0.0) -> float:
 	return fposmod(sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453, 1.0)
+
+## _hash at world XZ (x, z) taken on the continuous map (data.origin_m):
+## a lot, block or tower hashes the same in every streamed world, so the
+## far city keeps its blocks through a swap instead of reshuffling. The
+## sum is snapped to HASH_SNAP_M: the hash swings fully within a float32
+## ulp, and each world rounds its own local XZ differently.
+func _at(x: float, z: float, salt: float = 0.0) -> float:
+	var o := data.origin_m if data != null else Vector2.ZERO
+	return _hash(snappedf(x + o.x, HASH_SNAP_M), snappedf(z + o.y, HASH_SNAP_M), salt)
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		smap: SettlementMap) -> void:
@@ -136,7 +150,8 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 			for id in OsmParser.ids_of(bd):
 				_detailed_ids[id] = true
 		var r := Vector2(float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).length()
-		if r >= 700.0 and str(bd.get("height_source", "")) in ["tag_height", "levels"]:
+		if r >= 700.0 and str(bd.get("height_source", "")) in ["tag_height", "levels"] \
+				and not ChimneyBuilder.accepts(bd):  # a stack is not the street's height
 			hs.append(float(bd.get("height", 0.0)))
 	if hs.size() >= 8:
 		hs.sort()
@@ -213,7 +228,7 @@ func _towers() -> void:
 			towers += 1
 			continue
 		var kind := str(t.get("kind", "yes"))
-		var mat: Material = _dfs[int(_hash(c.x, c.y) * 4.0) % _dfs.size()] \
+		var mat: Material = _dfs[int(_at(c.x, c.y) * 4.0) % _dfs.size()] \
 			if kind in ["apartments", "residential", "dormitory", "hotel"] else _glass
 		var tower_effective: Dictionary = t.duplicate()
 		NycCrownMaterials.apply(t, t, tower_effective)
@@ -268,7 +283,7 @@ func _penthouse(mass: Dictionary, ring: PackedVector2Array, base: float) -> void
 	if BuildingBuilder._effective_shape(str(mass.get("roof_shape", "")), "flat", false) != "flat":
 		return
 	var total := float(mass.get("height", 0.0))
-	TowerTop.penthouse(null, ring, base + total, total, _hash(ring[0].x, ring[0].y),
+	TowerTop.penthouse(null, ring, base + total, total, _at(ring[0].x, ring[0].y),
 		FacadeTextures.louvre(1, true), _drs[1 % _drs.size()])
 
 ## A residential tower can have a mapped glass curtain wall, including on
@@ -285,7 +300,7 @@ func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> M
 		var look := BuildingHeights._look_for(mass, _height_ctx)
 		return FacadeMaterials.facade_for_building(mass, _region,
 			maxi(1, int(mass.get("levels", 0))), _fidelity,
-			true, _hash(centre.x, centre.y), look)
+			true, _at(centre.x, centre.y), look)
 	# A tall glazed tower takes its region's glazing, not the one shared glass.
 	if not _height_ctx.is_empty():
 		var tower_look := BuildingHeights._look_for(mass, _height_ctx)
@@ -315,7 +330,7 @@ func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: M
 				storeys, float(mat.get_meta("facade_floor_m", 3.5)))
 		var plan := {}
 		if FacadeMaterials.facade_uv(mat).z > 0.0:
-			var mech := BuildingWalls.mech_floors(int(repeats), _hash(ring[0].x, ring[0].y), false)
+			var mech := BuildingWalls.mech_floors(int(repeats), _at(ring[0].x, ring[0].y), false)
 			if not mech.is_empty():
 				plan = {"mech": mech, "louvre": FacadeTextures.louvre(1, str(mat.get_meta("facade_set", "")) == "glass")}
 		if plan.is_empty():
@@ -333,12 +348,19 @@ func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: M
 		if idx.size() >= 3:
 			BuildingBuilder._roof_cap(null, ring, idx, wall_top, roof_mat)
 
+## Cell (i, j) = (0, 0) of `m` counted on the continuous map's CELL_M
+## grid (`origin`: LocationData.origin_m).
+static func grid_cell0(m: SettlementMap, origin: Vector2) -> Vector2i:
+	return Vector2i(roundi((origin.x - m.shift.x) / SettlementMap.CELL_M) - m.half,
+		roundi((origin.y - m.shift.y) / SettlementMap.CELL_M) - m.half)
+
 func _fabric() -> void:
 	var apt := ArchitectureStyle.profile(_region, "apartments")
 	var house := ArchitectureStyle.profile(_region, "house")
 	var ind := ArchitectureStyle.profile(_region, "industrial")
 	var com := ArchitectureStyle.profile(_region, "commercial")
 	var r2_out := SettlementMap.RADIUS_M * SettlementMap.RADIUS_M
+	var cell0 := grid_cell0(smap, data.origin_m)
 	for j in smap.n:
 		for i in smap.n:
 			var k := smap.index(i, j)
@@ -365,8 +387,9 @@ func _fabric() -> void:
 			elif s < 0.42:
 				prof = house
 				kind = "house"
-			# District grid orientation: shared by ~600 m patches.
-			var yaw := _hash(floorf(float(i) / 6.0), floorf(float(j) / 6.0), 3.0) * PI * 0.5
+			# District grid orientation: shared by ~600 m patches of the
+			# continuous map's cells (cell0: this grid's first, there).
+			var yaw := _hash(floorf(float(i + cell0.x) / 6.0), floorf(float(j + cell0.y) / 6.0), 3.0) * PI * 0.5
 			var thin := lerpf(1.0, THIN_FAR, smoothstep(SPLIT_M, SettlementMap.RADIUS_M, d))
 			var keep := clampf((s - 0.12) / 0.45, 0.2, 1.0) * thin
 			var lots := 2 if d < SPLIT_M else 1
@@ -375,29 +398,33 @@ func _fabric() -> void:
 				for li in lots:
 					var lc := cc + Vector2((float(li) + 0.5) * lot - SettlementMap.CELL_M * 0.5,
 						(float(lj) + 0.5) * lot - SettlementMap.CELL_M * 0.5)
-					var hv := _hash(lc.x, lc.y)
+					var hv := _at(lc.x, lc.y)
 					if hv > keep:
 						continue
 					if _near_landmark(lc.x, lc.y):
 						continue
 					if kind == "house":
 						for hi in 2:
-							var o := Vector2((_hash(lc.x, lc.y, 5.0 + hi) - 0.5) * lot * 0.5,
+							var o := Vector2((_at(lc.x, lc.y, 5.0 + hi) - 0.5) * lot * HOUSE_SPREAD,
 								(float(hi) - 0.5) * lot * 0.45)
-							_mass(lc + o.rotated(yaw), Vector2(lerpf(9.0, 14.0, _hash(lc.x, lc.y, 7.0 + hi)),
+							_mass(lc + o.rotated(yaw), Vector2(lerpf(9.0, 14.0, _at(lc.x, lc.y, 7.0 + hi)),
 								lerpf(7.0, 10.0, hv)), yaw, prof, d, "house")
 					else:
 						var fill := 0.75 if kind == "industrial" else 1.0
-						var side := (lot - STREET_M) * fill
+						# The block turns with its district: only the square that
+						# still fits the lot at that angle is its own. A full-size
+						# turned block reached into the next lot, and two flat
+						# roofs of one storey count z-fought where they crossed.
+						var side := (lot - STREET_M) * fill / (absf(cos(yaw)) + absf(sin(yaw)))
 						# Footprints differ in size and sit off-centre in
 						# their lot; some apartment lots hold a pair.
-						var size := Vector2(side * lerpf(0.55, 1.0, _hash(lc.x, lc.y, 2.0)),
-							side * lerpf(0.5, 1.0, _hash(lc.x, lc.y, 4.0)))
+						var size := Vector2(side * lerpf(0.55, 1.0, _at(lc.x, lc.y, 2.0)),
+							side * lerpf(0.5, 1.0, _at(lc.x, lc.y, 4.0)))
 						var slack := Vector2(side, side) - size
-						var at := lc + Vector2((_hash(lc.x, lc.y, 13.0) - 0.5) * slack.x,
-							(_hash(lc.x, lc.y, 17.0) - 0.5) * slack.y).rotated(yaw)
+						var at := lc + Vector2((_at(lc.x, lc.y, 13.0) - 0.5) * slack.x,
+							(_at(lc.x, lc.y, 17.0) - 0.5) * slack.y).rotated(yaw)
 						if kind == "apartments" and size.x > PAIR_MIN_M \
-								and _hash(lc.x, lc.y, 19.0) < PAIR_SHARE:
+								and _at(lc.x, lc.y, 19.0) < PAIR_SHARE:
 							var w := (size.x - PAIR_GAP_M) * 0.5
 							for pi in 2:
 								var off := (float(pi) - 0.5) * (w + PAIR_GAP_M)
@@ -429,6 +456,7 @@ func _native_fabric() -> bool:
 	var city := {
 		"far_ok": _far_ok, "sea": _sea, "h_edge": _h_edge,
 		"n": smap.n, "half": smap.half, "score": smap.score, "cls": smap.cls,
+		"shift": smap.shift, "origin": data.origin_m, "cell0": grid_cell0(smap, data.origin_m),
 		"blocked": smap.blocked, "tower_cells": towers,
 		"apt": ArchitectureStyle.profile(_region, "apartments"),
 		"house": ArchitectureStyle.profile(_region, "house"),
@@ -459,12 +487,12 @@ func _paint() -> Vector2:
 ## A patch's character, so the fabric is not one even texture: -1 older (the
 ## lower storeys of the range, pitched where the region pitches), 1 newer
 ## (the upper storeys, flat where it builds flat), 0 mixed. Older patches
-## lean toward the centre.
-static func _district(c: Vector2) -> int:
-	var px := floorf(c.x / DISTRICT_M)
-	var pz := floorf(c.y / DISTRICT_M)
-	var cx := (px + 0.5) * DISTRICT_M
-	var cz := (pz + 0.5) * DISTRICT_M
+## lean toward the centre. Patches lie on the continuous map (`origin`).
+static func _district(c: Vector2, origin: Vector2 = Vector2.ZERO) -> int:
+	var px := floorf((c.x + origin.x) / DISTRICT_M)
+	var pz := floorf((c.y + origin.y) / DISTRICT_M)
+	var cx := (px + 0.5) * DISTRICT_M - origin.x
+	var cz := (pz + 0.5) * DISTRICT_M - origin.y
 	var old_share := lerpf(0.5, 0.15, smoothstep(R_IN, SettlementMap.RADIUS_M, sqrt(cx * cx + cz * cz)))
 	var pick := _hash(px, pz, 23.0)
 	if pick < old_share:
@@ -478,14 +506,14 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 	var base := _site(ring, minf(size.x, size.y))
 	if base == INF:
 		return
-	var seed_v := _hash(c.x, c.y, 11.0)
+	var seed_v := _at(c.x, c.y, 11.0)
 	var st: Array = prof["st"]
 	var lo := int(st[0])
 	var hi := int(st[1])
 	if kind == "apartments" and smap.score_at(c.x, c.y) > 0.65:
 		lo += 1
 		hi = int(ceil(float(hi) * 1.3))
-	var district := _district(c) if kind in ["apartments", "commercial"] else 0
+	var district := _district(c, data.origin_m) if kind in ["apartments", "commercial"] else 0
 	if district != 0:
 		var mid := int(float(lo + hi) * 0.5)
 		if district < 0:
@@ -504,7 +532,7 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 		shape = ArchitectureStyle._pick_weighted(prof["r"] as Array, seed_v, 29)
 	var span := minf(size.x, size.y)
 	# Each roof a little steeper or flatter than its neighbour's (+-10%).
-	var pitch := float(prof.get("pitch", 1.0)) * (0.9 + 0.2 * _hash(c.x, c.y, 41.0))
+	var pitch := float(prof.get("pitch", 1.0)) * (0.9 + 0.2 * _at(c.x, c.y, 41.0))
 	var rh := BuildingBuilder._roof_height_m(shape, span, 0.0, pitch)
 	if shape != "flat":
 		wall = maxf(wall - rh * 0.5, fh)

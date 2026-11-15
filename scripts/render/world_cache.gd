@@ -81,6 +81,10 @@ static func key(data: LocationData) -> String:
 		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(),
 		str([data.far_water_mask.get("zoom", 0), data.far_water_mask.get("origin_px", Vector2.ZERO),
 			hash(data.far_water_mask.get("bytes", PackedByteArray()))]), _sources()]
+	if data.origin_m != Vector2.ZERO or data.detail_reach != Vector2.ZERO:
+		# A streamed world's far city stands on its origin (grid and hashes)
+		# and its near detail on its reach: a world built on others is not it.
+		fp.append(str([data.origin_m, data.detail_reach]))
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]

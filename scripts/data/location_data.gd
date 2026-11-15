@@ -127,6 +127,17 @@ var view: Dictionary = {}
 ## A streamed or recentred world: its near detail centres on the world
 ## centre (the camera), never on a landmark's framing eye (View360.spawn_xz).
 var detail_at_centre := false
+## A streamed world: half the step that reached its centre (its own XZ
+## frame). The camera crosses it from about -detail_reach (where it swaps
+## in) to +detail_reach (where the next swaps in), so near detail and full
+## materials cover that whole stretch, not only a circle round the centre:
+## around the camera at the swap they changed, and stayed coarse.
+var detail_reach := Vector2.ZERO
+## Where this world's origin lies (m) on the continuous map the streamer
+## carries from world to world (ShaderOrigin): zero for an opened place.
+## The far city's grid and hashes stand on it, so its blocks keep their
+## places through a swap instead of reshuffling.
+var origin_m := Vector2.ZERO
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
 const SEASON_NAMES: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
