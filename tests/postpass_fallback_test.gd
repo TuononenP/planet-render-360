@@ -66,7 +66,10 @@ func _body_checks(failures: Array[String]) -> void:
 			"::geography, 1200)", "'building:part'", "'natural' = 'tree'", "'tram'",
 			"'defensive_works'", "UNION ALL", "ORDER BY geom <->", "'ISO3166-1'",
 			"LIMIT %d" % OsmQuery.CAP_TREE_NODES, "LIMIT %d" % OsmQuery.CAP_FURNITURE,
-			"::geography, %d)" % OsmQuery.FURNITURE_RADIUS_M, "'lighthouse'"]:
+			"::geography, %d)" % OsmQuery.FURNITURE_RADIUS_M, "'lighthouse'",
+			# Coastline reaches the detailed square's corners (1200 m × √2).
+			"::geography, 1698) AND osm_type = 'W' AND tags->>'natural' = 'coastline'",
+			"IS DISTINCT FROM 'coastline'", "LIMIT %d" % OsmQuery.CAP_RING_COASTLINE]:
 		if not sql.contains(needle):
 			failures.append("sql lacks %s" % needle)
 	for rail in OsmTags.RAIL_CLASSES:

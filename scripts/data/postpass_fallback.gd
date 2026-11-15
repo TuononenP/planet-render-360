@@ -34,6 +34,9 @@ const CAP_OTHER_AREAS := OsmQuery.CAP_WATERWAYS + OsmQuery.CAP_NATURAL + OsmQuer
 	+ 2 * OsmQuery.CAP_SQUARES + OsmQuery.CAP_PLATFORMS + 150 + 4 * OsmQuery.CAP_RELATIONS + 300 \
 	+ OsmQuery.CAP_BRIDGE_AREAS
 
+## Coastline has its own part (build_body), so no way comes twice.
+const NOT_COAST := "tags->>'natural' IS DISTINCT FROM 'coastline'"
+
 static func endpoint() -> String:
 	return str(RemoteConfig.value("postpass_endpoint", URL))
 
@@ -85,7 +88,12 @@ static func build_body(lat: float, lon: float, radius_m: int) -> String:
 			+ " AND NOT tags ?| ARRAY['building','building:part']",
 			lat, lon, OsmQuery.CAP_HIGHWAYS + OsmQuery.CAP_SQUARES),
 		_part(near + " AND osm_type <> 'N' AND NOT tags ?| ARRAY['building','building:part','highway','area:highway']"
-			+ " AND " + OTHER_AREAS % _sql_list(rail), lat, lon, CAP_OTHER_AREAS),
+			+ " AND " + OTHER_AREAS % _sql_list(rail) + " AND " + NOT_COAST, lat, lon, CAP_OTHER_AREAS),
+		# Coastline out to the detailed square's corners: on Overpass the
+		# ring query brings it, and a run cut at the circle left the coast
+		# open, so the whole near sea was dropped (ShoreCoast).
+		_part(_near(lat, lon, ceili(radius_m * sqrt(2.0))) + " AND osm_type = 'W' AND tags->>'natural' = 'coastline'",
+			lat, lon, OsmQuery.CAP_RING_COASTLINE),
 		# The country (Overpass is_in): tags only, at the place's own point.
 		"(SELECT osm_type, osm_id, tags, %s AS geom FROM postpass_polygon WHERE osm_type = 'R'" % _point(lat, lon)
 			+ " AND tags->>'admin_level' = '2' AND tags ? 'ISO3166-1'"
