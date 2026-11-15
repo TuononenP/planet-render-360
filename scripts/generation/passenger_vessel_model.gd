@@ -26,9 +26,10 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 	var maps: bool = p.get("maps", true)
 	var fb := clampf(h * 0.2, 1.1, 4.2)
 	var spec := {"length": length, "beam": beam, "freeboard": fb, "draft": minf(beam * 0.3, 2.6),
-		"entry": 0.27, "bow_pow": 1.8, "stern_w": 0.62, "flare": 0.07, "deadrise": 0.0,
+		"entry": 0.27, "bow_pow": 1.8, "stern_w": 0.4, "flare": 0.07, "deadrise": 0.0,
+		"stern_round": 1.0, "stern_tail": 0.14,
 		"bow_rise": fb * 0.55, "stern_rise": fb * 0.15, "stem_rake": length * 0.03,
-		"stern_rake": length * 0.012, "keel_lift": 0.9, "lod": 0 if detail else 1}
+		"stern_rake": length * 0.025, "keel_lift": 0.9, "lod": 0 if detail else 1}
 	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
 	ShipPaint.dress(lm, p["hull"], length, fb, maps)
@@ -112,6 +113,12 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 		VesselKit.guard(lm, spec, length * 0.2, length * 0.46, 0.9, 1.4, 0.04)
 		VesselKit.guard(lm, spec, -length * 0.46, -length * 0.3, 0.9, 1.4, 0.04)
 		VesselKit.guard(lm, spec, -length * 0.3, length * 0.2, 0.9, 1.4, 0.04)
+		var boat_len := clampf(length * 0.08, 3.0, 7.0)
+		var boat_mid := top_x - length * 0.04
+		ClassicSteamerDetails.dress(lm, spec, {"house_x": house_x, "tier_len": tier_len, "tier_w": tier_w,
+			"floor_h": floor_h, "decks": decks, "roof_y": roof_y, "wh_x": wh_x, "wh_l": wh_l,
+			"wh_w": wh_w if wh_h > 0.0 else 0.0, "funnel": f_base, "fr": fr,
+			"boat_x0": boat_mid - boat_len * 1.1 - 0.8, "boat_x1": boat_mid + boat_len * 1.1 + 0.8})
 		# Portholes along the hull side.
 		var n := int(length / 2.2)
 		for i in n:
@@ -166,15 +173,20 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 	var maps: bool = p.get("maps", true)
 	var fb := clampf(length * 0.045, 1.2, 4.0)
 	var spec := {"length": length, "beam": beam, "freeboard": fb, "draft": minf(beam * 0.4, 3.5),
-		"entry": 0.3, "bow_pow": 1.7, "stern_w": 0.7, "flare": 0.1, "deadrise": 0.0,
+		"entry": 0.3, "bow_pow": 1.7, "stern_w": 0.5, "flare": 0.1, "deadrise": 0.0,
+		"stern_round": 1.0, "stern_tail": 0.14,
 		"bow_rise": fb * 0.6, "stern_rise": fb * 0.4, "stem_rake": length * 0.05,
-		"stern_rake": length * 0.01, "keel_lift": 0.9, "lod": 0 if detail else 1}
+		"stern_rake": length * 0.025, "keel_lift": 0.9, "lod": 0 if detail else 1}
 	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
 	lm.use("Sail", VesselMaterials.get_mat("canvas", maps))
 	lm.use("Boot", VesselMaterials.get_mat("red", maps))
 	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Boot", "bottom": "Bottom", "deck": "Deck"})
 	var deck_y := fb + 0.02
+	if detail:
+		TallShipDetails.build(lm, spec, p, deck_y, h)
+		return
+	# Distant model: a deckhouse block, poles and yards with furled sails.
 	lm.box("White", Vector3(-length * 0.34, deck_y + beam * 0.12, 0), Vector3(length * 0.2, beam * 0.24, beam * 0.6), Basis(), 0.03)
 	VesselKit.windows(lm, -length * 0.42, -length * 0.26, beam * 0.3, deck_y + beam * 0.07, deck_y + beam * 0.18, 1.2)
 	var masts := [0.28, -0.02, -0.3]
@@ -182,22 +194,7 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 		var mx: float = length * float(masts[i])
 		var mh: float = h * (0.82 if i == 1 else 0.7) if i < 2 else h * 0.55
 		var mr := maxf(beam * 0.025, 0.1)
-		VesselKit.mast(lm, "Steel", Vector3(mx, deck_y, 0), mh, mr, detail)
-		if detail:
-			for side in [-1.0, 1.0]:
-				for offset in [-0.055, 0.055]:
-					HullLoft.tube(lm, "Steel", [Vector3(mx, deck_y + mh * 0.85, 0),
-						Vector3(mx + length * float(offset), HullLoft.sheer(spec, mx), float(side) * beam * 0.42)], 0.018, 4)
-			if bool(p.get("ultra", false)):
-				for side in [-1.0, 1.0]:
-					var a := Vector3(mx - length * 0.055, deck_y, float(side) * beam * 0.42)
-					var b := Vector3(mx + length * 0.055, deck_y, float(side) * beam * 0.42)
-					var top := Vector3(mx, deck_y + mh * 0.85, 0)
-					for rung in 20:
-						var t := (float(rung) + 0.5) / 24.0
-						HullLoft.tube(lm, "Dark", [a.lerp(top, t), b.lerp(top, t)], 0.012, 4)
-				VesselEquipment.line(lm, Vector3(mx, deck_y + mh * 0.75, 0), Vector3(length * 0.43, deck_y, 0), length * 0.01)
-		# Yards across the mast, each with a furled sail along it.
+		VesselKit.mast(lm, "Steel", Vector3(mx, deck_y, 0), mh, mr, false)
 		var yards := 3 if i < 2 else 1
 		for k in yards:
 			var yy := deck_y + mh * (0.38 + 0.2 * float(k))
@@ -205,11 +202,3 @@ static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 			lm.beam("Steel", Vector3(mx, yy, -span * 0.5), Vector3(mx, yy, span * 0.5), maxf(beam * 0.012, 0.06))
 			if i < 2:
 				lm.beam("Sail", Vector3(mx + mr + 0.1, yy - mr, -span * 0.46), Vector3(mx + mr + 0.1, yy - mr, span * 0.46), maxf(beam * 0.05, 0.2))
-	if detail:
-		VesselForms.fittings(lm, spec)
-		if bool(p.get("ultra", false)):
-			VesselEquipment.deck(lm, spec)
-			for x in [-0.12, 0.15]:
-				VesselForms.hatch(lm, Vector3(length * float(x), deck_y + 0.06, 0), length * 0.08, beam * 0.32)
-		lm.beam("Steel", Vector3(length * 0.4, fb + beam * 0.05, 0), Vector3(length * 0.5, fb + beam * 0.2, 0), 0.12)
-		VesselKit.guard(lm, spec, -length * 0.46, length * 0.46, 1.0, 1.2, 0.04)

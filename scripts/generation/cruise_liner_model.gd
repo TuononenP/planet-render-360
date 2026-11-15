@@ -20,8 +20,9 @@ static func hull_hex(seed_value: float) -> String:
 static func spec(length: float, beam: float, detail: bool, ultra: bool) -> Dictionary:
 	var hull_h := length * 0.042
 	return {"length": length, "beam": beam, "freeboard": hull_h, "draft": length * 0.032,
-		"entry": 0.17, "bow_pow": 1.9, "stern_w": 0.85, "flare": 0.1, "deadrise": 0.0,
-		"bow_rise": hull_h * 0.3, "stem_rake": length * 0.022, "stern_rake": length * 0.004,
+		"entry": 0.17, "bow_pow": 1.9, "stern_w": 0.7, "flare": 0.1, "deadrise": 0.0,
+		"stern_round": 1.0, "stern_tail": 0.1,
+		"bow_rise": hull_h * 0.3, "stem_rake": length * 0.022, "stern_rake": length * 0.012,
 		"keel_lift": 0.8, "deck_inset": 0.2, "boot_m": clampf(length * 0.004, 0.4, 1.2),
 		"anchors": false, "lod": 0 if detail else 1, "ultra": ultra}
 

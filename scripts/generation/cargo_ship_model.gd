@@ -20,9 +20,10 @@ static func spec(length: float, beam: float, variant: String, detail: bool, ultr
 	var full := variant in ["bulk", "tanker"]
 	var fb: float = length * float({"container": 0.036, "bulk": 0.03, "tanker": 0.028}.get(variant, 0.034))
 	return {"length": length, "beam": beam, "freeboard": fb, "draft": length * (0.06 if full else 0.048),
-		"entry": 0.13 if full else 0.24, "bow_pow": 2.7 if full else 1.8, "stern_w": 0.8,
+		"entry": 0.13 if full else 0.24, "bow_pow": 2.7 if full else 1.8, "stern_w": 0.78,
+		"stern_round": 0.6, "stern_tail": 0.07,
 		"flare": 0.03, "deadrise": 0.0, "bow_rise": fb * 0.35, "stern_rise": fb * 0.1,
-		"stem_rake": length * 0.018, "stern_rake": length * 0.006, "keel_lift": 0.7,
+		"stem_rake": length * 0.018, "stern_rake": length * 0.01, "keel_lift": 0.7,
 		"deck_inset": 0.15, "boot_m": clampf(length * 0.006, 0.6, 1.6), "anchors": false,
 		"lod": 0 if detail else 1, "ultra": ultra}
 
