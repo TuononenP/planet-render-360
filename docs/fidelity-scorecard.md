@@ -38,6 +38,47 @@ human rating (f) are tier-graded (a lower tier may score "recognisable" where Ul
 Known ceiling (plan R2): free zoom-14 DEM and zoom-17/18 satellite cap near-field detail;
 narrow streets (<3 m), roof furniture, and watercourses <5 m wide remain approximate at every tier.
 
+### Measured against the budget (2026-11-15, desktop)
+
+`tools/perf_baseline.gd`, one run per preset, each in an empty isolated cache
+(results in `visual-plan/reviews/perf-2026-11-15/`). Machine: Apple M5 Ultra, macOS,
+Forward+, 1280×800. Overpass was failing its status check during the run, so cold opens
+used the OSM API and vector-map fallbacks.
+
+- **Cold:** fetch and build with nothing cached.
+- **Warm build:** data cached, world not.
+- **Cached:** reopen from the world cache.
+- **Fly:** 90 s east at 40 m/s, 120 m up, streaming on.
+- **Peak:** OS footprint, which includes GPU memory on Apple Silicon.
+
+Every cached reopen loaded its saved world. Before the 2026-11-15 world-key fix, the first
+revisit of each new place rebuilt instead.
+
+| Preset | Place | Cold s | Warm build s | Cached s | Save s | Mesh nodes | Fly p95 / max ms | Peak MB |
+|---|---|---|---|---|---|---|---|---|
+| Fast | Helsinki | 10.9 | 7.8 | **3.8** | 9.2 | 1279 | 9.4 / 235 | 4,834 |
+| Fast | New York | **29.2** | 24.1 | 2.6 | 7.1 | 1302 | 9.4 / 266 | 4,678 |
+| Fast | Paris | 10.8 | 8.0 | 2.4 | 6.0 | 1204 | 9.4 / **3,834** | 4,836 |
+| Fast | Turku | 14.0 | 6.1 | 2.3 | 6.2 | 1300 | 9.2 / 120 | 4,192 |
+| High | Helsinki | 25.6 | 11.4 | 4.2 | 15.3 | 2071 | 21.3 / 265 | 7,584 |
+| High | New York | 39.9 | 28.5 | 3.1 | 13.6 | 1836 | 14.7 / **2,395** | 8,350 |
+| High | Paris | 22.0 | 11.4 | 2.9 | 11.8 | 1751 | 14.7 / 320 | 8,967 |
+| High | Turku | 16.9 | 7.9 | 2.9 | 12.0 | 1941 | 11.8 / 559 | 8,093 |
+| Ultra | Helsinki | 26.7 | 11.0 | 4.5 | 29.8 | 3183 | 23.4 / 204 | 12,452 |
+| Ultra | New York | 45.2 | 29.5 | 3.5 | 24.0 | 2418 | **47.1** / 379 | 15,405 |
+| Ultra | Paris | 14.8 | 10.3 | 3.0 | **70.4** | 3213 | 32.2 / **3,124** | 15,093 |
+| Ultra | Turku | 18.9 | 10.4 | 6.5 | 20.9 | 2700 | 35.3 / 469 | 13,293 |
+
+**Over budget:**
+- New York Fast cold: its "Roads & landmarks" stage takes 17–21 s on every preset.
+- Helsinki Fast cached.
+- Streaming frames of several seconds in Paris and New York. These follow the vector-map
+  fallback after a slow Overpass, and are not script time.
+- Ultra fly p95 is above 30 fps.
+
+**Memory:** peaks are well past a phone's limit. `MemoryBudget` and `MemoryGuard` now plan and
+shed against each device's own limit. No phone numbers are recorded yet.
+
 ## 3. The six checks
 
 ### (a) DEM spot-height error — terrain matches the real relief

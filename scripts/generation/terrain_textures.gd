@@ -24,9 +24,10 @@ static var _mutex := Mutex.new()
 const HI_RES := 2048
 
 static func size_for(preset: int) -> int:
-	if RenderQuality.ultra_desktop(preset):
-		return HI_RES
-	return 512 if RenderSettings.clamp_preset(preset) <= RenderSettings.Preset.BALANCED else 1024
+	var size := HI_RES if RenderQuality.ultra_desktop(preset) \
+		else (512 if RenderSettings.clamp_preset(preset) <= RenderSettings.Preset.BALANCED else 1024)
+	# Each size used stays loaded: none past what the device's memory allows.
+	return mini(size, MemoryBudget.TERRAIN_TEXTURE_MAX[MemoryBudget.tier()])
 
 ## Packed arrays persist under user:// (built once per install): built
 ## worlds then reference them as external resources instead of

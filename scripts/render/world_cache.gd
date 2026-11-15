@@ -75,7 +75,10 @@ static func key(data: LocationData) -> String:
 		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
 			data.tram_stops, data.bus_stops, data.rail_platforms, data.rail_stations, data.bridge_areas])),
 		hash(var_to_bytes(data.far_landuse)), hash(var_to_bytes(data.far_towers)),
-		FarCityFetcher.QUERY_VERSION, CityDetail.VERSION, str(data.climate),
+		# Sorted keys: a fetched climate and the same one read back from the
+		# cache list their keys in different orders, and str() keeps that
+		# order, so the first revisit of every place missed its saved world.
+		FarCityFetcher.QUERY_VERSION, CityDetail.VERSION, JSON.stringify(data.climate, "", true),
 		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
 		_image_fingerprint(data.landcover_image), _image_fingerprint(data.canopy_image),
 		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(),
@@ -344,6 +347,17 @@ static func _save_in_progress(path: String) -> bool:
 	_save_threads.erase(path)
 	return false
 
+## Whether a build packs its world for a save now. Not while memory is
+## short, and a streamed stretch (saved later from the pack, which pins
+## the whole world after it has gone) not on a phone below T2. A world
+## built unpacked in the foreground is packed when its save runs.
+static func pack_wanted(background: bool) -> bool:
+	return enabled() and MemoryGuard.save_allowed() \
+		and (not background or MemoryBudget.tier() >= MemoryBudget.Tier.T2)
+
+## Seconds a save waits for MemoryGuard to allow it before it is dropped.
+const SAVE_WAIT_S := 120.0
+
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
 		packed: PackedScene = null, background := false) -> void:
 	# A packed world needs only its ground: the streamer saves one after
@@ -355,6 +369,19 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	if _save_in_progress(p["scene"]):
 		return
 	var name: String = p["scene"].get_file()
+	# Memory short (MemoryGuard): a save copies the whole world, so it
+	# waits for room, and is dropped if none comes (the world is built
+	# again next visit instead of ending the app).
+	var waited := 0.0
+	while not MemoryGuard.save_allowed():
+		if MemoryGuard.save_dropped() or waited >= SAVE_WAIT_S or not is_instance_valid(view) \
+				or not view.is_inside_tree():
+			print("WORLD CACHE save of %s skipped: memory short" % name)
+			return
+		await view.get_tree().create_timer(1.0).timeout
+		waited += 1.0
+	if packed == null and not is_instance_valid(built[1]):
+		return  # the world left while the save waited
 	MemoryLog.mark("cache save %s start" % name)
 	var ps := packed if packed != null else pack(built[1])
 	if ps == null:

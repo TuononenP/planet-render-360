@@ -15,6 +15,32 @@
 
 namespace godot {
 
+#if defined(__ANDROID__)
+// Sum of the kB values on the lines starting with `a` (and `b`, when given)
+// in a /proc file, or -1 when the file or the `a` line is missing.
+static int64_t sum_kb(const char *path, const char *a, const char *b) {
+	FILE *f = std::fopen(path, "r");
+	if (f == nullptr) {
+		return -1;
+	}
+	char line[256];
+	int64_t total = -1;
+	const size_t la = std::strlen(a);
+	const size_t lb = b != nullptr ? std::strlen(b) : 0;
+	while (std::fgets(line, sizeof(line), f) != nullptr) {
+		long long v = 0;
+		if (std::strncmp(line, a, la) == 0 && std::sscanf(line + la, "%lld", &v) == 1) {
+			total = (total < 0 ? 0 : total) + v;
+		} else if (b != nullptr && total >= 0 && std::strncmp(line, b, lb) == 0
+				&& std::sscanf(line + lb, "%lld", &v) == 1) {
+			total += v;
+		}
+	}
+	std::fclose(f);
+	return total;
+}
+#endif
+
 int64_t MemoryStats::footprint_bytes() {
 #if defined(__APPLE__)
 	task_vm_info_data_t info;
@@ -24,23 +50,15 @@ int64_t MemoryStats::footprint_bytes() {
 	}
 	return (int64_t)info.phys_footprint;
 #elif defined(__ANDROID__)
-	FILE *f = std::fopen("/proc/self/status", "r");
-	if (f == nullptr) {
-		return -1;
+	// Pss (+ SwapPss) is what the low-memory killer weighs: shared pages
+	// count once per sharer and zram-swapped pages still count. VmRSS
+	// (older kernels without smaps_rollup) over-counts shared pages.
+	int64_t pss = sum_kb("/proc/self/smaps_rollup", "Pss:", "SwapPss:");
+	if (pss >= 0) {
+		return pss * 1024;
 	}
-	char line[256];
-	int64_t kb = -1;
-	while (std::fgets(line, sizeof(line), f) != nullptr) {
-		if (std::strncmp(line, "VmRSS:", 6) == 0) {
-			long long v = 0;
-			if (std::sscanf(line + 6, "%lld", &v) == 1) {
-				kb = v;
-			}
-			break;
-		}
-	}
-	std::fclose(f);
-	return kb < 0 ? -1 : kb * 1024;
+	int64_t rss = sum_kb("/proc/self/status", "VmRSS:", nullptr);
+	return rss < 0 ? -1 : rss * 1024;
 #else
 	return -1;
 #endif
@@ -49,6 +67,11 @@ int64_t MemoryStats::footprint_bytes() {
 int64_t MemoryStats::available_bytes() {
 #if defined(__APPLE__) && TARGET_OS_IPHONE
 	return (int64_t)os_proc_available_memory();
+#elif defined(__ANDROID__)
+	// The system's reclaimable memory: Android sets no per-app limit, the
+	// low-memory killer acts as this runs out.
+	int64_t kb = sum_kb("/proc/meminfo", "MemAvailable:", nullptr);
+	return kb < 0 ? -1 : kb * 1024;
 #else
 	return -1;
 #endif

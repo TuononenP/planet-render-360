@@ -609,11 +609,11 @@ func _swap_continuity(view: View360, data2: LocationData, at: Vector2) -> void:
 		"the swap shows the new world in the scene")
 	_check(is_instance_valid(old_world) and not old_world.visible,
 		"the old world hides at the swap")
-	_check(view._streamer._parked.size() == 1 and view._streamer._parked[0]["world"] == old_world,
+	_check(view._streamer._parked.size() == 1 and view._streamer._parked._parked[0]["world"] == old_world,
 		"and is parked for a turn back")
-	_check(view._streamer._parked.size() == 1 and view._streamer._parked[0]["ground"] == old_ground
+	_check(view._streamer._parked.size() == 1 and view._streamer._parked._parked[0]["ground"] == old_ground
 		and old_ground != ground3, "with its own ground, not the new world's")
-	view._streamer._free_parked()
+	view._streamer._parked.free_all()
 	var pumps := 0
 	while view._streamer._handoff.busy() and pumps < 10000:
 		view._streamer._handoff.pump(0)

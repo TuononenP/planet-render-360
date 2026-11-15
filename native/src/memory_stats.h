@@ -15,9 +15,11 @@ protected:
 
 public:
 	// The footprint the OS counts against the app (phys_footprint on
-	// Apple, resident set on Android), in bytes; -1 where unknown.
+	// Apple, Pss + SwapPss on Android, else its resident set), in bytes;
+	// -1 where unknown.
 	static int64_t footprint_bytes();
-	// Bytes the app may still use before iOS ends it; -1 elsewhere.
+	// Bytes the app may still use before iOS ends it, or the system's
+	// MemAvailable on Android; -1 elsewhere.
 	static int64_t available_bytes();
 };
 

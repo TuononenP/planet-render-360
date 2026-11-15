@@ -363,7 +363,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		var stopped := abort != null and abort.requested
 		if not stopped:
 			BuildPrewarm.remember()
-		return [g, w, null if stopped else WorldCache.pack(w)],
+		return [g, w, WorldCache.pack(w) if not stopped and WorldCache.pack_wanted(bg) else null],
 		Thread.PRIORITY_LOW if bg else Thread.PRIORITY_NORMAL)
 	# The merge and the pack ask the rendering server about every mesh
 	# node, and each answer to a worker thread waits for the main thread's
@@ -391,7 +391,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 			(built[1] as Node3D).free()
 		return []
 	if bg:
-		abort.deferred_save = [data, built[0], packed]
+		abort.deferred_save = [data, built[0], packed] if packed != null else []
 	elif wait_save:
 		if abort != null:
 			abort.saving = true

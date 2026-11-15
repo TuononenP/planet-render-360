@@ -45,7 +45,8 @@ static func footprint() -> int:
 			return b
 	return OS.get_static_memory_usage()
 
-## "footprint 2,345 MB, left 1,210 MB, engine 812 MB, video 1,034 MB".
+## "footprint 2,345 MB, left 1,210 MB, engine 812 MB, video 1,034 MB,
+## objects 9262, limit 3,300 MB, headroom 955 MB, tier T1".
 static func summary() -> String:
 	var parts: Array[String] = []
 	var native := ClassDB.class_exists("MemoryStats")
@@ -58,4 +59,5 @@ static func summary() -> String:
 	parts.append("engine %s MB" % UiTheme.grouped(OS.get_static_memory_usage() / MB))
 	parts.append("video %s MB" % UiTheme.grouped(int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)) / MB))
 	parts.append("objects %d" % int(Performance.get_monitor(Performance.OBJECT_COUNT)))
+	parts.append(MemoryBudget.summary())
 	return ", ".join(parts)

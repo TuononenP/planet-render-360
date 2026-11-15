@@ -25,6 +25,7 @@ current wording in App Store Connect and the Play Console before submitting.
 | Esri written confirmation | See `docs/data-source-register.md`. Imagery is under every scene. |
 | Android: AAB and size | Play takes `.aab`, and Godot builds one only with Gradle (`gradle_build/use_gradle_build=true`, a build template in `android/`). Bundled data after the new filter is roughly 500 MB (snapshots 248, map packs 192, textures about 58). That is well over the size Play allows in the base module (check the current limit in the Play Console), so the data needs Play Asset Delivery or a download on first use. Decide which (see below). |
 | Apple developer and Play developer accounts, signing keys, app records | Outside the repository. |
+| iOS: Increased Memory Limit capability | The iOS preset asks for `com.apple.developer.kernel.increased-memory-limit` (`entitlements/increased_memory_limit`), which lets a city stay open on 6 GB iPhones instead of being ended for memory. Turn on "Increased Memory Limit" for the App ID in the Apple Developer portal, or automatic signing cannot make a profile that carries it. |
 | Version numbers | `version/name`, `version/code`, `short_version` and `version` in `export_presets.cfg`, and the `version` input of both workflows, are typed by hand. There are no release tags yet. |
 
 ## Draft declarations

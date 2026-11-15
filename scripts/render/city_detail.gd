@@ -24,10 +24,11 @@ static func city_at(lat: float, lon: float) -> String:
 	var city := str(z[0])
 	return city if city in CITIES else ""
 
-## Whether `preset` at (lat, lon) gets the raised budgets.
+## Whether `preset` at (lat, lon) gets the raised budgets: not on a phone
+## with too little memory for them (MemoryBudget.CITY_DETAIL).
 static func boosted(preset: int, lat: float, lon: float) -> bool:
 	return RenderSettings.clamp_preset(preset) >= RenderSettings.Preset.HIGH \
-		and city_at(lat, lon) != ""
+		and MemoryBudget.CITY_DETAIL[MemoryBudget.tier()] and city_at(lat, lon) != ""
 
 static func for_data(data: LocationData) -> bool:
 	return data != null and boosted(data.quality_preset, data.latitude, data.longitude)

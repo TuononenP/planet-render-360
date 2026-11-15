@@ -121,6 +121,11 @@ func _process(delta: float) -> void:
 	current_fps = _frames / _elapsed
 	var prev_haze := haze_step
 	var new_step := adapt(current_fps, _elapsed)
+	if MemoryGuard.level >= MemoryGuard.Level.CRITICAL:
+		# Memory short: the lowest step's smaller render targets and no
+		# shadow maps, held until MemoryGuard lets go (then FPS decides).
+		new_step = 0
+		haze_step = 0
 	_frames = 0
 	_elapsed = 0.0
 	if new_step != step or haze_step != prev_haze:

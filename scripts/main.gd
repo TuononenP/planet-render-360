@@ -7,6 +7,7 @@ var _picker: MapPicker
 var _loading: LoadingScreen
 var _view: View360
 var _notice: DataNotice
+var _memory_guard: MemoryGuard
 var _history: HistoryScreen
 var _gallery: GalleryScreen
 var _pano_viewer: PanoramaViewer
@@ -135,6 +136,9 @@ func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	# The memory in the stream log, for when iOS ends the app without a report.
 	add_child(MemoryLog.new())
+	# Sheds what can be rebuilt before the OS ends the app for its memory.
+	_memory_guard = MemoryGuard.new()
+	add_child(_memory_guard)
 	_pipeline = GenerationPipeline.new()
 	add_child(_pipeline)
 	var remote_config := RemoteConfig.new()
@@ -236,6 +240,7 @@ func _ready() -> void:
 			_start_generation(lat, lon, site))
 	add_child(_view)
 	_view.set_quality_preset(_settings.preset)
+	_memory_guard.level_changed.connect(_on_memory_level)
 
 	# Above the view: plain-language notice when live data did not arrive.
 	_notice = DataNotice.new()
@@ -385,6 +390,8 @@ func _say_closing() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_request_exit()
+	elif what == NOTIFICATION_OS_MEMORY_WARNING and _memory_guard != null:
+		_memory_guard.warn()  # iOS: memory is low, shed before it ends the app
 
 ## The open confirmation veil (SettingsRows.confirm), if any, among the
 ## screens: Esc closes it instead of navigating.
@@ -490,6 +497,16 @@ func _retry_view() -> Dictionary:
 	return view
 
 ## Push a saved render preset to the picker and the 360 view.
+## Memory nearly out (MemoryGuard EMERGENCY): one preset lower from the
+## next stretch and the next place on, kept in Settings, and said once.
+func _on_memory_level(_level: int) -> void:
+	if not MemoryGuard.take_preset_drop() or _settings.preset <= RenderSettings.Preset.FAST:
+		return
+	_settings.set_preset(_settings.preset - 1)
+	_apply_preset(_settings.preset)
+	_settings_screen.bind_settings(_settings)
+	_picker.toast("Detail lowered", "Lowered detail to stay within this device's memory.", "caution")
+
 func _apply_preset(p: int) -> void:
 	_picker.set_quality_preset(p)
 	_view.set_quality_preset(p)

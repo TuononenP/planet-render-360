@@ -82,9 +82,6 @@ const TURN_BACK_MPS := 6.0
 ## one where it is going (see heading_misses): a glance or a short
 ## swerve keeps it.
 const MISS_HOLD_S := 3.0
-## Built worlds kept hidden for a turn back (see _park), at most: each
-## holds a whole stretch in memory.
-const PARK_MAX := 2
 ## Seconds standing still before a streamed world is written to the
 ## world cache (never while moving: the save stalls frames).
 const SAVE_STILL_S := 2.0
@@ -408,11 +405,8 @@ var _still_s := 0.0
 ## Fetches the centres ahead and around before they are wanted, and
 ## remembers which have their data on disk (StreamScout).
 var _scout := StreamScout.new()
-## Built worlds not shown, kept hidden in the tree for a turn back:
-## {world, data, ground, ll}, oldest first. A ready world given up for a
-## new heading, and the world each swap leaves, park here; a centre
-## started towards one swaps it in again with no build at all.
-var _parked: Array[Dictionary] = []
+## Built worlds kept hidden for a turn back (ParkedWorlds).
+var _parked := ParkedWorlds.new(func(w: Node3D) -> void: _handoff.retire(w))
 ## When the place opened, and whether its first stretch has started.
 var _opened_msec := 0
 var _warmed := true
@@ -492,7 +486,7 @@ func _cancel_pending() -> void:
 ## a new place, teardown). The next begin() starts from a clean slate.
 func cancel_pending() -> void:
 	_cancel_pending()
-	_free_parked()
+	_parked.free_all()
 	_scout.stop()
 	invalidate("cancelled")
 
@@ -524,7 +518,7 @@ func shutdown() -> void:
 	cancel_pending()
 	_reveal.stop()
 	_handoff.clear()
-	_parked.clear()  # in the world root, which frees them
+	_parked.forget()  # in the world root, which frees them
 	_view = null
 
 ## Installs a world built for a new centre without reopening the place:
@@ -574,7 +568,7 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 		var old_world := v._generated
 		_handoff.swap_in(v, true)
 		if is_instance_valid(old_world) and old_world != built[1]:
-			_park(old_world, old_data, old_ground, Vector2(centre_lat, centre_lon))
+			_parked.park(old_world, old_data, old_ground, Vector2(centre_lat, centre_lon))
 		ViewConditions.apply_surface_state(v, not dressed)
 		if not _reveal.prepared(built[1]):
 			_reveal.prepare(built[1], old_centre)
@@ -624,7 +618,8 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 	arm(data.latitude, data.longitude, data.season, data.quality_preset)
 	note_spawn(new_xz)
 	_vel = vel
-	_prune_parked()
+	# Too far to be picked again.
+	_parked.prune(centre_lat, centre_lon, MAX_STEP_M + 1.0)
 	_scout.survey(data.latitude, data.longitude, vel)
 
 ## Per-frame: track velocity, swap a ready centre in (or drop it when
@@ -667,7 +662,15 @@ func tick(v: View360, delta: float) -> void:
 	# is still on its way back to full speed.
 	_pace = maxf(_vel.length(), _pace - PACE_DECAY_MPS2 * delta)
 	_still_s = _still_s + delta if _vel.length() < 1.0 else 0.0
-	if not _unsaved.is_empty() and _still_s >= SAVE_STILL_S:
+	# Memory short (MemoryGuard): parked stretches go, then the held-back
+	# save, then the stretch being fetched; nothing new starts.
+	_parked.trim()
+	if MemoryGuard.level >= MemoryGuard.Level.CRITICAL:
+		_unsaved = []
+	if not MemoryGuard.stream_allowed() and state == State.FETCHING:
+		_cancel_pending()
+		invalidate("memory short")
+	if not _unsaved.is_empty() and _still_s >= SAVE_STILL_S and MemoryGuard.save_allowed():
 		WorldCache.save_async(v, v._threads, _unsaved[0], [_unsaved[1]], _unsaved[2], true)
 		_unsaved = []
 	_reveal.tick(pos, delta, v._quality_preset)
@@ -684,7 +687,7 @@ func tick(v: View360, delta: float) -> void:
 		and needs_recentre(pos, _vel, look, expected_build_s(v._quality_preset))
 	if v._data.season != centre_season or v._quality_preset != centre_preset:
 		_cancel_pending()
-		_free_parked()
+		_parked.free_all()
 		invalidate("season or preset changed")
 		arm(v._data.latitude, v._data.longitude, v._data.season, v._quality_preset)
 	if state == State.READY:
@@ -744,17 +747,6 @@ func tick(v: View360, delta: float) -> void:
 		# crossed the edge. Start it where the camera looks.
 		_start_generation(v, pos, look)
 
-## Parks `world` (built for `ll`, lat/lon) hidden for a turn back; the
-## oldest leaves beyond PARK_MAX.
-func _park(world: Node3D, data: LocationData, ground: GroundTruth, ll: Vector2) -> void:
-	if data == null or ground == null:
-		_handoff.retire(world)
-		return
-	world.visible = false
-	_parked.append({"world": world, "data": data, "ground": ground, "ll": ll})
-	while _parked.size() > PARK_MAX:
-		_handoff.retire(_parked.pop_front()["world"])
-
 ## Parks the ready world rather than dropping it, once fully staged.
 func _park_ready() -> void:
 	if _ready.size() < 2 or not (_ready[1] is Node3D) or _ready_data == null \
@@ -762,52 +754,38 @@ func _park_ready() -> void:
 		return
 	var world := _handoff.release()
 	_reveal.forget(world)
-	_park(world, _ready_data, _ready[0], pending_latlon)
+	_parked.park(world, _ready_data, _ready[0], pending_latlon)
 	_ready = []
 	_ready_data = null
-
-## Frees parked worlds too far from the live centre to be picked again.
-func _prune_parked() -> void:
-	for i in range(_parked.size() - 1, -1, -1):
-		var ll: Vector2 = _parked[i]["ll"]
-		if WorldScale.xz_from_latlon(ll.x, ll.y, centre_lat, centre_lon).length() > MAX_STEP_M + 1.0:
-			_handoff.retire(_parked[i]["world"])
-			_parked.remove_at(i)
-
-func _free_parked() -> void:
-	for p in _parked:
-		_handoff.retire(p["world"])
-	_parked.clear()
 
 ## Swaps a parked world back in as the ready one when it lies where a
 ## camera at `pos` heading `dir` is going: no fetch, no build.
 func _revive(v: View360, pos: Vector2, dir: Vector2) -> bool:
-	for i in range(_parked.size() - 1, -1, -1):
-		var p: Dictionary = _parked[i]
-		var ll: Vector2 = p["ll"]
-		var xz := WorldScale.xz_from_latlon(ll.x, ll.y, v._data.latitude, v._data.longitude)
-		if not is_instance_valid(p["world"]) or xz.length() <= STEP_M * 0.5 \
-				or not use_plan(xz, pos, dir) or exit_missed(pos, _vel, xz):
-			continue
-		_parked.remove_at(i)
-		var world: Node3D = p["world"]
-		var data: LocationData = p["data"]
-		var gen := begin(ll, xz)
-		mark_ready(gen)
-		_started_msec = Time.get_ticks_msec()
-		_ready = [p["ground"], world]
-		_ready_data = data
-		# Ranged again: the altitude boost may have changed since it was
-		# parked, and it would come back on the old rings.
-		begin_ranging(world, v._quality_preset)
-		_handoff.adopt(world)
-		_reveal.prepare(world, remap_xz(Vector2.ZERO, centre_lat, centre_lon,
-			data.latitude, data.longitude))
-		_log("STREAM gen %d: revived a built stretch %.0f m ahead at %.1f m/s" % [
-			gen, xz.distance_to(pos), _vel.length()])
-		_scout.plan(v, pos, xz, step_m(_pace, expected_build_s(v._quality_preset)))
-		return true
-	return false
+	var at := func(p: Dictionary) -> Vector2:
+		return WorldScale.xz_from_latlon(p["ll"].x, p["ll"].y, v._data.latitude, v._data.longitude)
+	var p := _parked.take(func(e: Dictionary) -> bool:
+		var xz: Vector2 = at.call(e)
+		return xz.length() > STEP_M * 0.5 and use_plan(xz, pos, dir) and not exit_missed(pos, _vel, xz))
+	if p.is_empty():
+		return false
+	var world: Node3D = p["world"]
+	var data: LocationData = p["data"]
+	var xz: Vector2 = at.call(p)
+	var gen := begin(p["ll"], xz)
+	mark_ready(gen)
+	_started_msec = Time.get_ticks_msec()
+	_ready = [p["ground"], world]
+	_ready_data = data
+	# Ranged again: the altitude boost may have changed since it was
+	# parked, and it would come back on the old rings.
+	begin_ranging(world, v._quality_preset)
+	_handoff.adopt(world)
+	_reveal.prepare(world, remap_xz(Vector2.ZERO, centre_lat, centre_lon,
+		data.latitude, data.longitude))
+	_log("STREAM gen %d: revived a built stretch %.0f m ahead at %.1f m/s" % [
+		gen, xz.distance_to(pos), _vel.length()])
+	_scout.plan(v, pos, xz, step_m(_pace, expected_build_s(v._quality_preset)))
+	return true
 
 ## Charges this frame to the phase it belongs to (see _worst), and logs
 ## the swap's frames once they have passed.
@@ -855,6 +833,8 @@ func _worst_line(phases: Array) -> String:
 	return "worst frame " + ", ".join(parts)
 
 func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -> void:
+	if not MemoryGuard.stream_allowed():
+		return  # tried again next frame; the camera holds at the edge meanwhile
 	_warmed = true
 	var expected := expected_build_s(v._quality_preset)
 	var target := pos if here else step_target(pos, _planned_vel(), look, expected)

@@ -35,6 +35,17 @@ func _run() -> void:
 			failures.append("dropping only %s leaves the key unchanged" % layer)
 	if WorldCache.key(good) != WorldCache.key(good):
 		failures.append("key is not stable for the same data")
+	# A fetched climate and the same one read back from the cache list
+	# their keys in different orders: the world must still be found.
+	var fetched := _data()
+	fetched.climate = {"t_warm_c": 15.65, "t_cold_c": -3.95, "snow_days": 160.0}
+	var reread := _data()
+	reread.climate = {"snow_days": 160.0, "t_cold_c": -3.95, "t_warm_c": 15.65}
+	if WorldCache.key(fetched) != WorldCache.key(reread):
+		failures.append("the same climate in another key order must keep the world key")
+	reread.climate["snow_days"] = 120.0
+	if WorldCache.key(fetched) == WorldCache.key(reread):
+		failures.append("a different climate must change the world key")
 	var streamed := _data()
 	streamed.origin_m = Vector2(1234.5, -300.0)
 	if WorldCache.key(streamed) == WorldCache.key(_data()):

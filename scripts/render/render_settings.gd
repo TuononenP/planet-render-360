@@ -84,9 +84,13 @@ func haze_pref() -> bool:
 ## Bumped when the desktop default changes; older files migrate once.
 const PRESET_VERSION := 1
 
-## Fresh-install preset: Ultra on desktop (Forward+, where its extras
-## live) unless the GPU is known to be weak, High on phones.
+## Fresh-install preset: what the device's memory affords (MemoryBudget:
+## Fast, Balanced or High on phones by their limit), else Ultra on desktop
+## (Forward+, where its extras live) unless the GPU is known to be weak.
 static func default_preset() -> int:
+	var by_memory: int = MemoryBudget.DEFAULT_PRESET[MemoryBudget.tier()]
+	if by_memory >= 0:
+		return by_memory
 	return preset_for_adapter(OS.has_feature("pc"), RenderingServer.get_video_adapter_type(),
 		RenderingServer.get_video_adapter_name())
 
@@ -176,9 +180,10 @@ static func satellite_span_for(value: int, lat: float = 0.0) -> int:
 ## Desktop Ultra (Forward+) affords 10000 inside its longer first build;
 ## phones keep 6000.
 static func max_buildings_for(value: int, forward_plus: bool = RenderQuality.is_forward_plus()) -> int:
-	if forward_plus and clamp_preset(value) == Preset.ULTRA:
-		return 10000
-	return [600, 1200, 2500, 6000][clamp_preset(value)]
+	var n: int = 10000 if forward_plus and clamp_preset(value) == Preset.ULTRA \
+		else [600, 1200, 2500, 6000][clamp_preset(value)]
+	# Fewer on a phone with less memory (MemoryBudget.BUILDING_SCALE).
+	return int(n * MemoryBudget.BUILDING_SCALE[MemoryBudget.tier()])
 
 static func vegetation_count_for(value: int, urban: bool) -> int:
 	if urban:
@@ -230,7 +235,8 @@ func load_settings() -> void:
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
-		preset = clamp_preset(int(parsed.get("preset", default_preset())))
+		# Never above what this device's memory runs (MemoryBudget).
+		preset = MemoryBudget.cap_preset(clamp_preset(int(parsed.get("preset", default_preset()))))
 		if int(parsed.get("preset_version", 0)) < PRESET_VERSION:
 			# Files saved while High was the desktop default move to Ultra once.
 			if preset == Preset.HIGH:
@@ -257,7 +263,7 @@ func save_settings(changes: Dictionary) -> void:
 		push_warning("RenderSettings: cannot write %s" % path)
 
 func set_preset(value: int) -> void:
-	preset = clamp_preset(value)
+	preset = MemoryBudget.cap_preset(clamp_preset(value))
 	save_settings({"preset": preset, "preset_version": PRESET_VERSION})
 
 func set_accent(index: int, auto: bool) -> void:
