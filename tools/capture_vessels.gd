@@ -184,7 +184,7 @@ func _captures(stats: Dictionary) -> void:
 	vp.get_texture().get_image().save_jpg(_out.path_join("fleet.jpg"), 0.9)
 	vp.free()
 
-## Bow quarter and midships from near the waterline, then the bow quarter
+## Bow quarter, midships and stern quarter from near the waterline, then the bow quarter
 ## again at night with CityLights at full strength.
 func _close_ups(vp: SubViewport, camera: Camera3D, env: Environment, light: DirectionalLight3D,
 		holder: Node3D, id: String, length: float, height: float) -> void:
@@ -196,6 +196,10 @@ func _close_ups(vp: SubViewport, camera: Camera3D, env: Environment, light: Dire
 	camera.look_at_from_position(mid + Vector3(-0.15, 0.05, 1).normalized() * length * 0.3, mid)
 	await _settle(12)
 	vp.get_texture().get_image().save_jpg(_out.path_join(id + "_close_mid.jpg"), 0.9)
+	var stern := Vector3(-length * 0.42, height * 0.18, 0)
+	camera.look_at_from_position(stern + Vector3(-0.75, 0.08, 1).normalized() * length * 0.4, stern)
+	await _settle(12)
+	vp.get_texture().get_image().save_jpg(_out.path_join(id + "_close_stern.jpg"), 0.9)
 	var bg := env.background_color
 	var ambient := env.ambient_light_energy
 	var sun := light.light_energy

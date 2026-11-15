@@ -19,8 +19,9 @@ static func livery_hex(seed_value: float) -> String:
 static func spec(length: float, beam: float, detail: bool, ultra: bool) -> Dictionary:
 	var fb := clampf(length * 0.07, 7.0, 16.0)
 	return {"length": length, "beam": beam, "freeboard": fb, "draft": clampf(length * 0.032, 3.5, 7.0),
-		"entry": 0.2, "bow_pow": 2.2, "stern_w": 0.95, "flare": 0.06, "deadrise": 0.0,
-		"bow_rise": length * 0.012, "stem_rake": length * 0.025, "stern_rake": length * 0.002,
+		"entry": 0.2, "bow_pow": 2.2, "stern_w": 0.74, "flare": 0.06, "deadrise": 0.0,
+		"stern_round": 1.0, "stern_tail": 0.08,
+		"bow_rise": length * 0.012, "stem_rake": length * 0.025, "stern_rake": length * 0.01,
 		"keel_lift": 0.8, "deck_inset": 0.2, "boot_m": clampf(length * 0.005, 0.5, 1.1),
 		"anchors": false, "lod": 0 if detail else 1, "ultra": ultra}
 
@@ -85,17 +86,25 @@ static func _visor(lm: LandmarkMesh, s: Dictionary) -> void:
 			path.append(Vector3(x, low, (HullLoft.side_z(s, x, low) + 0.04) * float(side)))
 		HullLoft.tube(lm, "Black", path, 0.05, 4)
 
-## The stern ramp: a raised steel panel on the transom with its hinge.
+## The stern ramp: a closed steel panel in the hull colour, laid on the
+## raked transom, with seams, stiffeners and its hinge.
 static func _ramp(lm: LandmarkMesh, s: Dictionary) -> void:
-	var length: float = s["length"]
 	var beam: float = s["beam"]
 	var fb: float = s["freeboard"]
-	var x := -length * 0.5 - 0.08
-	var w := beam * 0.42
+	var w := minf(beam * 0.42, HullLoft.half(s, HullLoft.x0(s)) * 1.3)
 	var y0 := 1.6
 	var y1 := fb * 0.72
-	lm.box("DeckSteel", Vector3(x, (y0 + y1) * 0.5, 0), Vector3(0.18, y1 - y0, w), Basis(), 0.0)
+	var a := Vector3(HullLoft.transom_x(s, y0) - 0.1, y0, 0)
+	var b := Vector3(HullLoft.transom_x(s, y1) - 0.1, y1, 0)
+	var up := (b - a).normalized()
+	var aft := Vector3(-up.y, up.x, 0)
+	var basis := Basis(up.cross(Vector3.BACK), up, Vector3.BACK)
+	lm.box("Hull", (a + b) * 0.5, Vector3(0.16, a.distance_to(b), w), basis, 0.0)
+	var seam: Array = []
+	for c in [Vector2(-0.5, 0.0), Vector2(0.5, 0.0), Vector2(0.5, 1.0), Vector2(-0.5, 1.0), Vector2(-0.5, 0.0)]:
+		seam.append(a.lerp(b, (c as Vector2).y) + aft * 0.09 + Vector3(0, 0, (c as Vector2).x * w))
+	HullLoft.tube(lm, "Black", seam, 0.05, 4)
 	for k in 5:
-		var y := lerpf(y0 + 0.6, y1 - 0.6, float(k) / 4.0)
-		lm.box("Black", Vector3(x - 0.1, y, 0), Vector3(0.04, 0.08, w * 0.94), Basis(), 0.0)
-	HullLoft.tube(lm, "Black", [Vector3(x - 0.12, y0, -w * 0.5), Vector3(x - 0.12, y0, w * 0.5)], 0.18, 8)
+		var at := a.lerp(b, lerpf(0.12, 0.88, float(k) / 4.0)) + aft * 0.1
+		lm.box("Black", at, Vector3(0.04, 0.08, w * 0.94), basis, 0.0)
+	HullLoft.tube(lm, "Black", [a + aft * 0.12 - Vector3(0, 0, w * 0.5), a + aft * 0.12 + Vector3(0, 0, w * 0.5)], 0.18, 8)

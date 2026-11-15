@@ -26,6 +26,8 @@ extends RefCounted
 ##   cockpit_y          sole height above water
 ##   double_ended       mirror the entry shape at the stern
 ##   boot_m             boot-top stripe height above the waterline (m)
+##   stern_round        0 square .. 1 elliptical stern quarters in plan (0)
+##   stern_tail         share of the length over which the stern narrows (0.1)
 const TIP := 0.03
 const STATIONS_HI := [0.0, 0.02, 0.06, 0.12, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.78, 0.85, 0.9, 0.94, 0.97, 1.0]
 const STATIONS_LO := [0.0, 0.06, 0.2, 0.4, 0.6, 0.78, 0.9, 0.97, 1.0]
@@ -53,11 +55,23 @@ static func plan(spec: Dictionary, t: float) -> float:
 		w = 1.0 - pow(k, _f(spec, "bow_pow", 1.9)) * (1.0 - TIP)
 	if bool(spec.get("double_ended", false)):
 		return 1.0 - pow(clampf((maxf(t, 1.0 - t) - (1.0 - e)) / e, 0.0, 1.0), _f(spec, "bow_pow", 1.9)) * (1.0 - _f(spec, "end_width", 0.35))
-	var tail := 0.1
+	var tail := _f(spec, "stern_tail", 0.1)
 	if t < tail:
 		var k := 1.0 - t / tail
-		w = minf(w, lerpf(1.0, _f(spec, "stern_w", 0.8), k * k))
+		var sw := _f(spec, "stern_w", 0.8)
+		var round_w := sw + (1.0 - sw) * sqrt(maxf(0.0, 1.0 - k * k))
+		w = minf(w, lerpf(lerpf(1.0, sw, k * k), round_w, _f(spec, "stern_round", 0.0)))
 	return w
+
+## The transom's x at height `y` (it follows `stern_rake` up the face).
+static func transom_x(spec: Dictionary, y: float) -> float:
+	var pts := section(spec, 0.0)
+	for i in range(5, 0, -1):
+		var lo: Vector3 = pts[i]
+		var hi: Vector3 = pts[i - 1]
+		if y <= hi.y or i == 1:
+			return lerpf(lo.x, hi.x, clampf((y - lo.y) / maxf(hi.y - lo.y, 0.001), 0.0, 1.0))
+	return (pts[0] as Vector3).x
 
 ## Half-beam at the sheer at `x`.
 static func half(spec: Dictionary, x: float) -> float:
