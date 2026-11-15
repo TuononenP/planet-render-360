@@ -1,0 +1,50 @@
+class_name LandmarkSetCapitalStations
+extends RefCounted
+
+## Builders of the capital_stations landmark batch: one `match` arm per
+## registry type of LandmarkRegistryCapitalStations. Returns false for a
+## type it does not own so LandmarkBuilder tries the next set. The rows of
+## LandmarkRegistryCapitalStationsOsm have no arm: they are `station`
+## archetypes on their own outlines (LandmarkArchetypes.station).
+
+static func build(model: Node3D, type: String) -> bool:
+	match type:
+		"gare_du_nord": LandmarkCsWest.gare_du_nord(model)
+		"amsterdam_centraal": LandmarkCsWest.amsterdam_centraal(model)
+		"brussels_central_station": LandmarkCsWest.brussels_central(model)
+		"heuston_station": LandmarkCsWest.heuston(model)
+		"bern_station": LandmarkCsWest.bern(model)
+		"madrid_atocha": LandmarkCsWest.atocha(model)
+		"rossio_station": LandmarkCsWest.rossio(model)
+		"roma_termini": LandmarkCsWest.termini(model)
+		"berlin_hauptbahnhof": LandmarkCsCentral.berlin_hbf(model)
+		"wien_hauptbahnhof": LandmarkCsCentral.wien_hbf(model)
+		"praha_hlavni_nadrazi": LandmarkCsCentral.praha_hln(model)
+		"budapest_keleti": LandmarkCsCentral.keleti(model)
+		"warszawa_centralna": LandmarkCsCentral.warszawa_centralna(model)
+		"kobenhavn_h": LandmarkCsCentral.kobenhavn_h(model)
+		"stockholm_central_station": LandmarkCsCentral.stockholm_central(model)
+		"oslo_central_station": LandmarkCsCentral.oslo_s(model)
+		"tallinn_balti_jaam": LandmarkCsEast.balti_jaam(model)
+		"riga_central_station": LandmarkCsEast.riga_central(model)
+		"sofia_central_station": LandmarkCsEast.sofia_central(model)
+		"bucuresti_nord": LandmarkCsEast.gara_de_nord(model)
+		"athens_larissis_station": LandmarkCsEast.athens_larissis(model)
+		"kyiv_passenger_station": LandmarkCsEast.kyiv_passenger(model)
+		"ankara_gari": LandmarkCsEast.ankara_gari(model)
+		"tokyo_station": LandmarkCsAsia.tokyo_station(model)
+		"old_seoul_station": LandmarkCsAsia.old_seoul_station(model)
+		"beijing_railway_station": LandmarkCsAsia.beijing_station(model)
+		"new_delhi_railway_station": LandmarkCsAsia.new_delhi(model)
+		"kuala_lumpur_railway_station": LandmarkCsAsia.kuala_lumpur_station(model)
+		"hua_lamphong": LandmarkCsAsia.hua_lamphong(model)
+		"taipei_main_station": LandmarkCsAsia.taipei_main(model)
+		"tehran_railway_station": LandmarkCsAsia.tehran_station(model)
+		"union_station_washington": LandmarkCsAmericasAfrica.union_station_dc(model)
+		"retiro_mitre": LandmarkCsAmericasAfrica.retiro_mitre(model)
+		"estacion_central_santiago": LandmarkCsAmericasAfrica.estacion_central(model)
+		"buenavista_station": LandmarkCsAmericasAfrica.buenavista(model)
+		"ramses_station": LandmarkCsAmericasAfrica.ramses(model)
+		"maputo_railway_station": LandmarkCsAmericasAfrica.maputo(model)
+		_: return false
+	return true

@@ -83,14 +83,14 @@ const CAP_RELATIONS := 220
 ## "out geom 900" is the retired v1 cap the query tests guard against.
 const CAP_BUILDING_RELATIONS := 1000
 ## Parts within LANDMARK_PARTS_M of a landmark-type building (churches,
-## mosques, temples, castles, towers): the general CAP_PARTS prints in id
-## order and thins a dense city's parts evenly, so a cathedral could lose
-## its dome. Own statement in the same request (no extra Overpass call);
+## mosques, temples, castles, towers, railway stations): the general
+## CAP_PARTS prints in id order and thins a dense city's parts evenly, so
+## a cathedral could lose its dome. Own statement in the same request (no extra Overpass call);
 ## parse dedups the overlap. 80 m: `around.set` measures to the outline,
 ## and a central dome sits that far in from a big cathedral's walls.
 const CAP_LANDMARK_PARTS := 800
 const LANDMARK_PARTS_M := 80
-const LANDMARK_KINDS := "cathedral|church|chapel|mosque|temple|synagogue|castle|tower"
+const LANDMARK_KINDS := "cathedral|church|chapel|mosque|temple|synagogue|castle|tower|train_station"
 ## Ring (low-detail majors) caps: small payload by construction; the
 ## 1600 m Paris ring carries ≈630 elements (≈590 highways) in ≈0.8 MB.
 const CAP_RING_HIGHWAYS := 800

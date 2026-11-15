@@ -3,7 +3,8 @@ extends SceneTree
 ## Landmark catalog test: godot --headless --script tests/landmark_catalog_test.gd
 ## Offline. Guards every registry entry (core and region batches):
 ## complete fields, unique type, name lookup returns the entry itself
-## (no alias shadowing), a bespoke model (not the archetype fallback)
+## (no alias shadowing), a bespoke model (not the archetype fallback;
+## capital station rows may name the `station` archetype on their outline)
 ## that is merged, textured, bounded in triangles, and within 3% (or
 ## 2 m) of its registry height_m.
 
@@ -41,7 +42,8 @@ func _run() -> void:
 		var got := LocationData.landmark_for(lat, lon, str(entry.get("name", "")))
 		if got != type:
 			failures.append("searching '%s' should give %s, got %s" % [entry.get("name"), type, got])
-		if not core and not _in_core_match(type) and not LandmarkBuilder.is_bespoke(type):
+		var archetype := str(entry.get("archetype", "")) == "station"
+		if not core and not archetype and not _in_core_match(type) and not LandmarkBuilder.is_bespoke(type):
 			failures.append("%s has no bespoke builder (would fall back to a generic tower)" % type)
 			continue
 		var model := LandmarkBuilder.build(type)

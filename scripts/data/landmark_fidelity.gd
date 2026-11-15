@@ -9,7 +9,7 @@ extends RefCounted
 
 ## Archetypes whose real form lives in their parts. Stadiums, wheels,
 ## lighthouses, windmills and monuments keep their models.
-const ARCHETYPES: Array[String] = ["cathedral", "church", "mosque", "temple", "castle", "tower"]
+const ARCHETYPES: Array[String] = ["cathedral", "church", "mosque", "temple", "castle", "tower", "station"]
 ## Share of the outline the ground-standing parts must cover: only the
 ## parts are drawn when parts exist, so a half-mapped church would be
 ## a nave floating beside a hole.

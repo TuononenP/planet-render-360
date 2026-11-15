@@ -1,0 +1,105 @@
+# cc	city	lat	lon	name	wiki_title	height_m	tower	aliases	osm
+# Hand-built termini (LandmarkRegistryCapitalStations): outlines via `dump` only.
+AT	Vienna	48.1851	16.3777	Wien Hauptbahnhof	Wien Hauptbahnhof				bespoke
+BE	Brussels	50.8456	4.3571	Brussels-Central	Brussels-Central railway station				bespoke
+BG	Sofia	42.7123	23.3210	Sofia Central Station	Sofia Central railway station				bespoke
+CZ	Prague	50.0832	14.4353	Praha hlavní nádraží	Praha hlavní nádraží				bespoke
+DE	Berlin	52.5251	13.3694	Berlin Hauptbahnhof	Berlin Hauptbahnhof				bespoke
+DK	Copenhagen	55.6726	12.5646	Copenhagen Central Station	Copenhagen Central Station				bespoke
+EE	Tallinn	59.4401	24.7371	Tallinn Baltic Station	Balti jaam				bespoke
+ES	Madrid	40.4066	-3.6896	Madrid Atocha	Madrid Atocha railway station				bespoke
+FR	Paris	48.8809	2.3553	Gare du Nord	Gare du Nord				bespoke
+GR	Athens	37.9919	23.7210	Athens Central Station	Athens railway station				bespoke
+HU	Budapest	47.5003	19.0838	Budapest Keleti	Budapest Keleti station				bespoke
+IE	Dublin	53.3464	-6.2925	Dublin Heuston	Heuston railway station				bespoke
+IT	Rome	41.9010	12.5018	Roma Termini	Roma Termini railway station				bespoke
+LV	Riga	56.9466	24.1208	Riga Central Station	Riga Central Station				bespoke
+NL	Amsterdam	52.3789	4.9003	Amsterdam Centraal	Amsterdam Centraal station				bespoke
+NO	Oslo	59.9110	10.7528	Oslo Central Station	Oslo Central Station				bespoke
+PL	Warsaw	52.2289	21.0031	Warszawa Centralna	Warszawa Centralna railway station				bespoke
+PT	Lisbon	38.7141	-9.1410	Rossio Station	Rossio railway station				bespoke
+RO	Bucharest	44.4465	26.0745	Bucharest North Station	București Nord railway station				bespoke
+SE	Stockholm	59.3302	18.0576	Stockholm Central Station	Stockholm Central Station				bespoke
+CH	Bern	46.9489	7.4393	Bern railway station	Bern railway station				bespoke
+TR	Ankara	39.9360	32.8436	Ankara railway station	Ankara railway station				bespoke
+UA	Kyiv	50.4407	30.4892	Kyiv Passenger Station	Kyiv-Pasazhyrskyi railway station				bespoke
+JP	Tokyo	35.6812	139.7671	Tokyo Station	Tokyo Station				bespoke
+KR	Seoul	37.5559	126.9723	Old Seoul Station	Culture Station Seoul 284				bespoke
+CN	Beijing	39.9030	116.4270	Beijing railway station	Beijing railway station				bespoke
+IN	New Delhi	28.6431	77.2197	New Delhi railway station	New Delhi railway station				bespoke
+MY	Kuala Lumpur	3.1395	101.6936	Kuala Lumpur railway station	Kuala Lumpur railway station				bespoke
+TH	Bangkok	13.7377	100.5172	Hua Lamphong	Bangkok railway station				bespoke
+TW	Taipei	25.0478	121.5170	Taipei Main Station	Taipei Main Station				bespoke
+IR	Tehran	35.6564	51.3906	Tehran railway station	Tehran railway station				bespoke
+US	Washington	38.8973	-77.0063	Washington Union Station	Union Station (Washington, D.C.)				bespoke
+AR	Buenos Aires	-34.5915	-58.3747	Retiro Mitre	Retiro Mitre railway station				bespoke
+CL	Santiago	-33.4516	-70.6790	Estación Central	Estación Central railway station				bespoke
+MX	Mexico City	19.4466	-99.1525	Buenavista	Buenavista railway station (Mexico City)				bespoke
+EG	Cairo	30.0626	31.2466	Ramses Station	Ramses Station				bespoke
+MZ	Maputo	-25.9715	32.5642	Maputo railway station	Maputo railway station				bespoke
+# Every other capital with a passenger railway: the `station` archetype.
+GH	Accra	5.5473	-0.2093	Accra railway station	Accra railway station
+DZ	Algiers	36.7790	3.0610	Algiers railway station	Gare d'Alger			gare d'alger
+MG	Antananarivo	-18.9049	47.5221	Soarano Station	Soarano railway station			gare de soarano
+TM	Ashgabat	37.9465	58.3803	Ashgabat railway station	Ashgabat railway station	50	tower
+ER	Asmara	15.338864	38.949346	Asmara railway station	Asmara railway station
+IQ	Baghdad	33.325040	44.379269	Baghdad Central Station	Baghdad Central Station
+AZ	Baku	40.3794	49.8470	Baku railway station	Baku railway station
+ML	Bamako	12.6489	-7.9947	Bamako railway station	Bamako railway station			gare de bamako
+RS	Belgrade	44.793630	20.453128	Belgrade Centre	Belgrade Centre railway station			beograd centar, prokop station
+KG	Bishkek	42.863832	74.605704	Bishkek-2 railway station	Bishkek-2 railway station			bishkek railway station
+CO	Bogota	4.6040	-74.0870	La Sabana Station	La Sabana railway station			estación de la sabana
+BR	Brasilia	-15.775473	-47.940999	Brasília Rodoferroviária	Rodoferroviária de Brasília			rodoferroviaria
+SK	Bratislava	48.1583	17.1067	Bratislava main station	Bratislava hlavná stanica			bratislava hlavná stanica
+CG	Brazzaville	-4.269386	15.288376	Brazzaville railway station	Brazzaville railway station			gare de brazzaville
+AU	Canberra	-35.3190	149.1478	Canberra railway station	Canberra railway station			kingston railway station canberra
+LK	Colombo	6.9339	79.8500	Colombo Fort	Colombo Fort railway station			fort railway station colombo
+SN	Dakar	14.6726	-17.4310	Dakar railway station	Dakar railway station	20	tower	gare de dakar
+SY	Damascus	33.5112	36.2922	Hejaz Railway Station	Hejaz railway station			damascus hejaz station
+BD	Dhaka	23.7323	90.4260	Kamalapur railway station	Kamalapur railway station			dhaka railway station
+TJ	Dushanbe	38.556879	68.799684	Dushanbe railway station	Dushanbe railway station
+ZW	Harare	-17.8337	31.0468	Harare railway station	Harare railway station
+VN	Hanoi	21.0245	105.8412	Hanoi railway station	Hanoi railway station			ga hà nội
+CU	Havana	23.1293	-82.3525	Havana Central Station	Havana Central railway station	35	tower	estación central de ferrocarriles habana
+ID	Jakarta	-6.1376	106.8146	Jakarta Kota	Jakarta Kota railway station			stasiun jakarta kota
+UG	Kampala	0.3127	32.5868	Kampala railway station	Kampala railway station
+SD	Khartoum	15.595073	32.527011	Khartoum railway station	Khartoum railway station
+CD	Kinshasa	-4.301133	15.317938	Kinshasa Central Station	Kinshasa railway station			gare centrale de kinshasa
+MD	Chisinau	47.0115	28.8590	Chișinău railway station	Chișinău railway station			gara feroviară chișinău
+BO	La Paz	-16.4893	-68.1453	La Paz Central Station	La Paz railway station			estación central la paz
+PE	Lima	-12.0442	-77.0292	Desamparados Station	Desamparados railway station			estación desamparados
+SI	Ljubljana	46.0583	14.5108	Ljubljana railway station	Ljubljana railway station			železniška postaja ljubljana
+AO	Luanda	-8.8094	13.2350	Bungo station	Luanda railway station			estação do bungo
+ZM	Lusaka	-15.4210	28.2830	Lusaka railway station	Lusaka railway station
+LU	Luxembourg	49.5999	6.1335	Luxembourg railway station	Luxembourg railway station	40	tower	gare de luxembourg
+PH	Manila	14.6127	120.9730	Tutuban station	Tutuban railway station			tutuban
+BY	Minsk	53.8906	27.5503	Minsk Passenger station	Minsk-Passazhirsky railway station			minsk railway station
+MC	Monaco	43.7389	7.4202	Monaco-Monte-Carlo station	Monaco-Monte-Carlo station			gare de monaco
+UY	Montevideo	-34.898538	-56.193808	General Artigas Central Station	Montevideo Central railway station	35	tower	estación central general artigas
+KE	Nairobi	-1.2905	36.8283	Nairobi railway station	Nairobi railway station
+BF	Ouagadougou	12.373615	-1.526566	Ouagadougou railway station	Ouagadougou railway station			gare de ouagadougou
+CA	Ottawa	45.4166	-75.6516	Ottawa station	Ottawa station			ottawa via rail station
+KH	Phnom Penh	11.5725	104.9190	Phnom Penh railway station	Phnom Penh railway station
+ME	Podgorica	42.4326	19.2717	Podgorica railway station	Podgorica railway station
+ZA	Pretoria	-25.7584	28.1888	Pretoria railway station	Pretoria railway station
+ZA	Cape Town	-33.9220	18.4260	Cape Town railway station	Cape Town railway station
+KP	Pyongyang	39.004695	125.735871	Pyongyang railway station	Pyongyang railway station	45	tower
+EC	Quito	-0.2413	-78.5157	Chimbacalle Station	Chimbacalle railway station			estación de chimbacalle
+MA	Rabat	34.0164	-6.8352	Rabat-Ville station	Rabat-Ville railway station			gare rabat ville
+CR	San Jose	9.9215	-84.0816	Pacific Station	Estación al Pacífico			estación al pacífico
+BA	Sarajevo	43.8590	18.4005	Sarajevo railway station	Sarajevo railway station
+MK	Skopje	41.9895	21.4430	Skopje railway station	Skopje railway station
+GE	Tbilisi	41.7210	44.7985	Tbilisi Central Station	Tbilisi Central railway station
+UZ	Tashkent	41.2918	69.2870	Tashkent railway station	Tashkent railway station			tashkent north station
+TN	Tunis	36.7958	10.1810	Tunis railway station	Tunis railway station			gare de tunis
+MN	Ulaanbaatar	47.9100	106.8860	Ulaanbaatar railway station	Ulaanbaatar railway station
+VA	Vatican City	41.9006	12.4535	Vatican railway station	Vatican railway station			stazione di città del vaticano
+LT	Vilnius	54.6703	25.2846	Vilnius railway station	Vilnius railway station			vilniaus geležinkelio stotis
+NZ	Wellington	-41.2789	174.7802	Wellington railway station	Wellington railway station
+CM	Yaounde	3.8722	11.5240	Yaoundé railway station	Yaoundé railway station			gare de yaoundé
+AM	Yerevan	40.1570	44.5100	Yerevan railway station	Yerevan railway station	46	tower	sasuntsi davit station
+HR	Zagreb	45.8045	15.9786	Zagreb Main Station	Zagreb Glavni kolodvor			zagreb glavni kolodvor
+KZ	Astana	51.1150	71.5290	Nurly Zhol station	Nurly Zhol railway station			astana nurly zhol
+MM	Naypyidaw	19.735910	96.206741	Naypyidaw railway station	Naypyidaw railway station
+HK	Hong Kong	22.3030	114.1817	Hung Hom station	Hung Hom station
+NG	Abuja	9.046184	7.342114	Abuja Idu station	Idu railway station			idu station

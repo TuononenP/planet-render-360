@@ -31,7 +31,22 @@ static func archetype_for(tags: Dictionary) -> String:
 		return "castle"
 	if b == "stadium" or str(tags.get("leisure", "")) == "stadium":
 		return "stadium"
+	if _station_building(tags):
+		return "station"
 	return ""
+
+## A mainline railway station building: building=train_station, or a
+## building tagged as the station itself; not a metro or light-rail stop,
+## and not a station hall reused as a museum (the Musée d'Orsay).
+static func _station_building(tags: Dictionary) -> bool:
+	var b := str(tags.get("building", ""))
+	if b == "" or b == "no":
+		return false
+	if str(tags.get("station", "")) in ["subway", "light_rail", "monorail", "funicular", "miniature"] \
+			or str(tags.get("tourism", "")) == "museum" or str(tags.get("subway", "")) == "yes":
+		return false
+	return b == "train_station" or str(tags.get("railway", "")) == "station" \
+		or (str(tags.get("public_transport", "")) == "station" and str(tags.get("train", "")) == "yes")
 
 ## "obelisk" / "column" for a historic monument or memorial (a building
 ## way such as Nelson's Column, or man_made=obelisk|column), "" otherwise.

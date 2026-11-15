@@ -699,3 +699,28 @@ second difference along the road, i.e. how much a street rolls):
 
 Bern, the hilly check, keeps its relief error within 0.1 m. Places with a
 national model, the US and English lidar and ArcticDEM worlds are unchanged.
+
+## Capital railway stations (2026-11-15)
+
+Every capital with a passenger railway has its main station as a registry
+landmark. `tools/capital_stations.tsv` lists one station per capital: a rough
+point, the name and the Wikipedia title (for heights, towers and the
+descriptions in the model docs). `tools/capital_stations.py` reads each
+station's surroundings from the OSM API map call
+(`https://api.openstreetmap.org/api/0.6/map.json`, one bounded request per
+station, an identifying User-Agent and a pause between requests; offline
+tooling only, never called by the app). Within 500 m it takes the
+largest building tagged as the station (`building=train_station`, or a
+`railway=station` building). Failing that, it takes the building that holds
+the `railway=station` node, then one named as a station. It then measures
+its minimum-area rectangle (yaw), outline and tagged height. Nearby `railway=rail` lines decide which side is the forecourt.
+
+- Hand-built termini: `LandmarkRegistryCapitalStations`. The models are our
+  own work, sized from published figures and placed and turned on the OSM
+  outline.
+- Every other capital: `LandmarkRegistryCapitalStationsOsm` is generated,
+  and the `station` archetype is drawn on the real outline.
+
+The public Overpass instances were at capacity for the batch, so the OSM API
+was used. Attribution: © OpenStreetMap contributors (ODbL), as for every
+OSM-derived layer.

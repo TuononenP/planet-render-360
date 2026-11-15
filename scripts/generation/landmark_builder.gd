@@ -13,7 +13,7 @@ extends RefCounted
 ## Root sits at ground level (y=0).
 
 const ARCHETYPES := ["church", "cathedral", "castle", "lighthouse", "stadium",
-	"mosque", "temple", "windmill", "tower", "big_wheel"]
+	"mosque", "temple", "windmill", "tower", "big_wheel", "station"]
 
 ## Region batches of bespoke landmarks, tried in order for a type the
 ## core match above does not know (LandmarkSet*.build returns false for
@@ -75,6 +75,8 @@ static func build(type: String) -> Node3D:
 		_:
 			if build_bespoke(model, type):
 				pass
+			elif str(LocationData.entry_for_type(type).get("archetype", "")) == "station":
+				LandmarkArchetypes.station(model, LocationData.entry_for_type(type))
 			elif type in ARCHETYPES:
 				LandmarkArchetypes.build(model, type, 45.0, Vector2(120.0, 120.0))
 			else:
@@ -87,7 +89,8 @@ static func build(type: String) -> Node3D:
 ## back to metres here — contract §7 V7/V19, true footprint_m in T5.2).
 ## `region` (ArchitectureStyle.region_for) dresses it in the regional
 ## wall set, stone/roof colours and tower style; "" keeps the neutral
-## limestone/slate look. Height 20–184 m, footprint 24–240 m.
+## limestone/slate look. Height 20–184 m (a station from 8 m), footprint
+## 24–240 m.
 static func build_archetype(archetype: String, height_m: float, footprint: Vector2,
 		region: String = "") -> Node3D:
 	var root := Node3D.new()
@@ -96,7 +99,10 @@ static func build_archetype(archetype: String, height_m: float, footprint: Vecto
 	var to_m := 1.0 / WorldScale.metres_to_units()
 	var size := Vector2(clampf(footprint.x * to_m, 24.0, 240.0),
 		clampf(footprint.y * to_m, 24.0, 240.0))
-	LandmarkArchetypes.build(model, archetype, clampf(height_m, 20.0, 184.0), size, region)
+	# A station hall is often lower than the 20 m floor the towers and
+	# churches keep; 8 m still reads as a hall with its roof.
+	var lo := 8.0 if archetype == "station" else 20.0
+	LandmarkArchetypes.build(model, archetype, clampf(height_m, lo, 184.0), size, region)
 	return root
 
 ## All MeshInstance3D parts of a landmark (under its Model node).

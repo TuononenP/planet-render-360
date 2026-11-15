@@ -31,6 +31,9 @@ const SKYLINE_NEAR_M := 400.0
 ## and around an OSM archetype, metres.
 const REGISTRY_CLEAR_M := 68.0
 const OSM_CLEAR_M := 36.0
+## Smallest footprint (m²) an OSM station building needs to be drawn as the
+## `station` archetype; a halt's ticket office stays an ordinary building.
+const STATION_MIN_M2 := 1500.0
 
 static func select(data: LocationData, ranked_osm: Array) -> Array:
 	var out: Array = []
@@ -82,6 +85,8 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 	for c in ranked_osm:
 		if out.size() >= cap:
 			break
+		if str(c.get("archetype", "")) == "station" and not major_station(c):
+			continue
 		var at := Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0)))
 		var taken := false
 		for cl in clear:
@@ -91,6 +96,12 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 		if not taken:
 			out.append(c)
 	return out
+
+## True when an OSM station candidate's footprint is big enough to stand
+## as a landmark (STATION_MIN_M2).
+static func major_station(c: Dictionary) -> bool:
+	var to_m := 1.0 / WorldScale.metres_to_units()
+	return float(c.get("size_x", 0.0)) * float(c.get("size_z", 0.0)) * to_m * to_m >= STATION_MIN_M2
 
 ## The `limit` skyline towers among `towers` to build: priority first, then
 ## the tallest for its distance from the view (nearer than SKYLINE_NEAR_M
