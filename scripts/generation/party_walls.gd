@@ -41,6 +41,11 @@ var _edges_added := 0
 var _tops := {}
 var _order := {}
 var _roads := {}
+## Registered outlines for enclosed(): [ring, holes, key, top, order, box]
+## in every CELL_M cell its box touches, and each key's own record (kept
+## by the script whether or not the native index holds the edges).
+var _outlines := {}
+var _outline_of := {}
 ## Native PartyIndex (native/, tools/build_native.sh) holding the same
 ## grid when the library is loaded; null runs the script's own.
 var _idx: RefCounted = null
@@ -93,6 +98,70 @@ func add_mass(m: Dictionary, ground: GroundTruth, sea_y: float = -INF) -> void:
 	_add_ring(ring, str(m["key"]), top, false)
 	for h in m["holes"]:
 		_add_ring(h as PackedVector2Array, str(m["key"]), top, true)
+	_add_outline(ring, m["holes"], str(m["key"]), top)
+
+func _add_outline(ring: PackedVector2Array, holes: Array, key: String, top: float) -> void:
+	var box := RingGeometry.aabb(ring)
+	var c := CELL_M * WorldScale.metres_to_units()
+	var rec := [ring, holes, key, top, _outline_of.size(), box]
+	_outline_of[key] = rec
+	for ix in range(floori(box.position.x / c), floori(box.end.x / c) + 1):
+		for iz in range(floori(box.position.y / c), floori(box.end.y / c) + 1):
+			var cell := Vector2i(ix, iz)
+			if not _outlines.has(cell):
+				_outlines[cell] = []
+			_outlines[cell].append(rec)
+
+## True when the registered mass `key` (outline `ring`, its roof rising
+## `roof_h` above its wall top) stands wholly inside another registered
+## mass at least as tall: every face of it is hidden, and its roof would
+## lie in the plane of the other's (z-fighting). Of two equal masses on
+## one outline the first registered is kept.
+func enclosed(ring: PackedVector2Array, key: String, roof_h: float = 0.0) -> bool:
+	if not _outline_of.has(key):
+		return false
+	var tol := SAME_TOL_M * WorldScale.metres_to_units()
+	var own_top := float(_outline_of[key][3]) + roof_h
+	var own_order := int(_outline_of[key][4])
+	var box := RingGeometry.aabb(ring)
+	var c := CELL_M * WorldScale.metres_to_units()
+	var cell := Vector2i(floori(box.position.x / c), floori(box.position.y / c))
+	var inset := BuildingMasses._inset_ring(ring, tol)
+	for rec: Array in _outlines.get(cell, []):
+		var other_top := float(rec[3])
+		if str(rec[2]) == key or other_top < own_top - tol:
+			continue
+		# Two equal masses on one outline: the later one gives way.
+		if other_top <= own_top + tol and int(rec[4]) > own_order \
+				and box.grow(tol).encloses(rec[5] as Rect2):
+			continue
+		if not (rec[5] as Rect2).grow(tol).encloses(box) \
+				or not BuildingMasses._within(ring, rec[0] as PackedVector2Array) \
+				or _pokes_into(rec[0] as PackedVector2Array, inset) \
+				or _meets_hole(ring, rec[1] as Array):
+			continue
+		return true
+	return false
+
+## True when a corner of `outer` lies inside `inner` (the ring shrunk
+## 5 cm): the ring then spans a notch of `outer` though all its corners
+## are inside it.
+static func _pokes_into(outer: PackedVector2Array, inner: PackedVector2Array) -> bool:
+	for p in outer:
+		if Geometry2D.is_point_in_polygon(p, inner):
+			return true
+	return false
+
+## True when `ring` reaches into any of `holes` (a courtyard is open sky).
+static func _meets_hole(ring: PackedVector2Array, holes: Array) -> bool:
+	for h: PackedVector2Array in holes:
+		for p in h:
+			if Geometry2D.is_point_in_polygon(p, ring):
+				return true
+		for p in ring:
+			if Geometry2D.is_point_in_polygon(p, h):
+				return true
+	return false
 
 func _add_ring(ring: PackedVector2Array, key: String, top: float, hole: bool) -> void:
 	if _idx != null:
@@ -172,11 +241,15 @@ func partition(a: Vector2, b: Vector2, n: Vector2, key: String) -> Array:
 					# The same wall drawn by another mass: hidden here when
 					# that mass stands at least as tall (a tie goes to the
 					# first registered), so only one copy is drawn.
-					if absf((p0 - a).dot(n)) > same_tol or absf((p1 - a).dot(n)) > same_tol \
-							or not _same_wall_owner(float(rec[3]), str(rec[2]), own_top, own_order, same_tol):
+					if absf((p0 - a).dot(n)) > same_tol or absf((p1 - a).dot(n)) > same_tol:
 						continue
-					# A tie hides the whole wall, even a few cm taller.
-					rec_top = maxf(float(rec[3]), own_top)
+					# An unregistered (raised) part gives the shared wall to
+					# the mass registered there, up to that mass's top.
+					if own_order >= 0:
+						if not _same_wall_owner(float(rec[3]), str(rec[2]), own_top, own_order, same_tol):
+							continue
+						# A tie hides the whole wall, even a few cm taller.
+						rec_top = maxf(float(rec[3]), own_top)
 				elif on.dot(n) > -PARALLEL:
 					continue
 				elif absf((p0 - a).dot(n)) > tol or absf((p1 - a).dot(n)) > tol:
@@ -191,12 +264,11 @@ func partition(a: Vector2, b: Vector2, n: Vector2, key: String) -> Array:
 	return _pieces(spans, sqrt(len2) / m)
 
 ## True when the registered mass `other_key` (wall top `other_top`) keeps
-## a wall it shares, same facing, with a mass of `own_top` / `own_order`.
-## An unregistered mass (own_order < 0: raised part) keeps its walls.
+## a wall it shares, same facing, with a mass of `own_top` / `own_order`
+## (a registered one: partition gives an unregistered raised part's
+## shared wall to the other up to its top).
 func _same_wall_owner(other_top: float, other_key: String, own_top: float,
 		own_order: int, tol: float) -> bool:
-	if own_order < 0:
-		return false
 	if other_top > own_top + tol:
 		return true
 	return other_top >= own_top - tol and int(_order.get(other_key, own_order)) < own_order

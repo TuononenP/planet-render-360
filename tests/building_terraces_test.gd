@@ -50,8 +50,8 @@ func _run() -> void:
 	for step: Dictionary in steps:
 		var piece: PackedVector2Array = step["ring"]
 		covered += absf(RingGeometry.signed_area(piece))
-		if step.has("key") or str(step["shape"]) != "flat":
-			failures.append("terrace kept the whole block's key or roof: %s" % [step.keys()])
+		if str(step.get("key", "")) != "k#0" or str(step["shape"]) != "flat":
+			failures.append("terrace lost the block's key or kept its roof: %s" % [step.keys()])
 		var seat := BuildingFoundation.sample(cliff, piece, step["centre"])
 		var buried := (float(seat["high"]) - float(seat["floor"])) / m
 		if buried > BuildingFoundation.BURY_MAX_M + 0.05:

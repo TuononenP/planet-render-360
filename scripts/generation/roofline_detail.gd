@@ -75,7 +75,11 @@ static func party_stacks(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 		batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, top + h * 0.5 - 0.2 * m, p.y),
 			Vector3(w, h, d)), masonry)
 		var y_cap := top + h - 0.2 * m
-		batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, y_cap + 0.06 * m, p.y),
+		# The cap oversails the stack on three sides but stops short of
+		# the party wall: over it, an equal-height neighbour's cap would
+		# share its top (z-fighting).
+		var pc := p - n * 0.035 * m
+		batch.add("box", BuildingDetail._xf(basis, Vector3(pc.x, y_cap + 0.06 * m, pc.y),
 			Vector3(w + 0.14 * m, 0.12 * m, d + 0.14 * m)), masonry)
 		var pots := clampi(int(w / (0.42 * m)), 2, 9)
 		for k in pots:

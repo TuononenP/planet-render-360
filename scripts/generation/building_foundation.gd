@@ -7,6 +7,9 @@ extends RefCounted
 ## This is a fallback construction detail, not a surveyed floor elevation.
 const FREEBOARD_M := 1.5
 const DECK_M := 0.24
+## The deck's top stands this far above the floor (m): a deck raised to a
+## level bank's top would lie in the plane of that ground (z-fighting).
+const DECK_LIFT_M := 0.03
 const POST_SPACING_M := 4.0
 ## Low pier relief can be DEM interpolation across its water boundary.
 ## A steep bank must not lift the whole waterfront building to its top.
@@ -233,7 +236,7 @@ static func build(root: Node3D, ring: PackedVector2Array, holes: Array,
 	if not bool(footing["raised"]):
 		return
 	var m := WorldScale.metres_to_units()
-	var floor_y := float(footing["floor"])
+	var floor_y := float(footing["floor"]) + DECK_LIFT_M * m
 	var water := float(footing["water"])
 	var timber := str(building.get("kind", "")) in ["shrine", "temple", "boathouse", "roof"]
 	var lm := LandmarkMesh.new()

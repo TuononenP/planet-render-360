@@ -56,6 +56,7 @@ pointing/emulate_touch_from_mouse=true
 
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
+limits/cluster_builder/max_clustered_elements=2048
 reflections/reflection_atlas/reflection_size=512
 reflections/reflection_atlas/reflection_size.mobile=256
 reflections/reflection_atlas/reflection_count=8
@@ -102,6 +103,10 @@ street_lamp_tint={
 "value": Vector3(1, 0.9, 0.78)
 }
 street_lamp_near={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+world_origin_m={
 "type": "vec2",
 "value": Vector2(0, 0)
 }

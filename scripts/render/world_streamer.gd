@@ -293,14 +293,18 @@ func should_retry() -> bool:
 	return state == State.DEGRADED
 
 ## Whether the pending target is still ahead of a camera at `pos`: the
-## swap is wanted once the camera is closer to it than to the centre,
-## or past the live edge over the pending square; unwanted (dropped)
-## once it is back inside the trigger's inner half heading away from
-## the target, or off both squares (a turn after the trigger).
+## swap is wanted once the camera is SWAP_MARGIN_M closer to it than to
+## the centre (or stands on it), or past the live edge over the pending
+## square; unwanted (dropped) once it is back inside the trigger's inner
+## half heading away from the target, or off both squares (a turn after
+## the trigger). The margin keeps a camera wandering about the midpoint
+## from swapping back and forth, every swap a reshuffle.
+const SWAP_MARGIN_M := 150.0
 func swap_wanted(pos: Vector2) -> bool:
 	if state != State.READY:
 		return false
-	return pos.distance_to(pending_target_xz) <= pos.length() \
+	var d := pos.distance_to(pending_target_xz)
+	return d <= pos.length() - SWAP_MARGIN_M or d <= SWAP_MARGIN_M * 0.5 \
 		or (not inside_detailed(pos) and inside_detailed(pos - pending_target_xz))
 
 ## A camera standing still near the centre keeps its ready world: an
@@ -556,6 +560,7 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 		data.latitude, data.longitude)
 	var old_data := v._data
 	var old_ground := v._ground
+	ShaderOrigin.carry(v._generated, built[1] as Node3D, old_centre)
 	v._data = data
 	v._ground = built[0]
 	if ranged:
@@ -791,9 +796,9 @@ func _revive(v: View360, pos: Vector2, dir: Vector2) -> bool:
 		_started_msec = Time.get_ticks_msec()
 		_ready = [p["ground"], world]
 		_ready_data = data
-		_ready_ranged = true
-		_ranged_world = world
-		_range_world = null
+		# Ranged again: the altitude boost may have changed since it was
+		# parked, and it would come back on the old rings.
+		begin_ranging(world, v._quality_preset)
 		_handoff.adopt(world)
 		_reveal.prepare(world, remap_xz(Vector2.ZERO, centre_lat, centre_lon,
 			data.latitude, data.longitude))

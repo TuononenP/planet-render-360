@@ -117,6 +117,9 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 	var ctx := _height_context(data)
 	var plan := InfillPlanner.new(data, ground, smap, ctx)
 	var m2u := WorldScale.metres_to_units()
+	# Placed infill footprints: boxes are sited only against real
+	# buildings, and two overlapping ones of one default height z-fought.
+	var placed: Array[PackedVector2Array] = []
 	# 2x the preset count, in a 9-98 ring: the foreground roofscape
 	# must reach the frame bottom (PRD §4.2), not start past a hole.
 	for i in RenderSettings.procedural_buildings_for(data.quality_preset) * 2:
@@ -152,10 +155,20 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 		var kind := str(style["kind"])
 		var size_u := ArchitectureStyle.infill_size_m(kind, ra, rb) * m2u
 		var yaw := floorf(rs * 977.0) * PI / 2.0 + (ra - 0.5) * 0.3
+		var ring := _rect_ring(Vector2(pos.x, pos.z), size_u, yaw)
+		var reach := size_u.length()
+		var clear := true
+		for q in placed:
+			if q[0].distance_to(ring[0]) < reach + q[0].distance_to(q[2]) \
+					and not Geometry2D.intersect_polygons(q, ring).is_empty():
+				clear = false
+				break
+		if not clear:
+			continue
+		placed.append(ring)
 		var b := {"kind": kind}
 		var look := ArchitectureStyle.resolve(b, str(ctx["region"]),
 			str(ctx["density"]), rs, size_u.x * size_u.y / (m2u * m2u))
-		var ring := _rect_ring(Vector2(pos.x, pos.z), size_u, yaw)
 		var matched := float(style["total_m"]) > 0.0
 		var total_m := float(style["total_m"]) if matched else float(look["default_h"])
 		var shape := str(look["roof_shape"])
@@ -392,6 +405,9 @@ static func _accepted(data: LocationData, b: Dictionary, site: Vector2, edge: fl
 ## to sit on or by water.
 const WATER_OK_KINDS: Array[String] = ["boat", "houseboat", "boathouse", "bridge",
 	"ship", "train_station", "transportation", "church", "cathedral", "chapel"]
+## Drop of the eave-level seal cap under a pitched roof (m): a low roof
+## rising from the eave line would otherwise z-fight it along the eave.
+const SEAL_DROP_M := 0.05
 
 static func _in_open_water(ground: GroundTruth, b: Dictionary) -> bool:
 	var canopy := str(b.get("kind", "")) == "roof" or str(b.get("use", "")) == "pier"
@@ -430,6 +446,13 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		idx = RingGeometry.drop_hole_triangles(cap, idx, holes)
 	if idx.size() < 3:
 		return false
+	# Wholly inside a mass at least as tall: nothing of it shows but a roof
+	# z-fighting the other's. Not a terrace piece: its footprint's key is
+	# registered with the lowest terrace's top, not its own.
+	if _party != null and mass.has("key") and float(mass.get("min_m", 0.0)) <= 0.0 \
+			and not mass.has("terrace") \
+			and _party.enclosed(ring, str(mass["key"]), roof_h_world):
+		return true
 	var footing := BuildingFoundation.sample(ground, ring, centre, float(ctx.get("sea_y", -INF)),
 		float(mass.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
 		float(mass.get(BuildingTerraces.SNAP_KEY, 0.0)))
@@ -569,10 +592,22 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		_walls(root, h, base, top, facade, v_rep, hc, fire, true, {}, bay_scale)
 	var preset := data.quality_preset if data != null else int(RenderSettings.Preset.HIGH)
 	var trim := BuildingTrim.kind(shape, eye_d / WorldScale.metres_to_units(), BuildingTrim.radius_m(preset))
-	_roof_cap(root, ring, idx, top, roof_mat, trim, cap, party, str(look.get("wall_set", "")))
+	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
+	# An overhanging eave is the roofline: a stone cornice under it would
+	# lie in (or poke through) the roof's own slope.
+	if not job.is_empty() and float(job[1]) < top:
+		trim = BuildingTrim.NONE
+	if job.is_empty():
+		_roof_cap(root, ring, idx, top, roof_mat, trim, cap, party, str(look.get("wall_set", "")))
+	else:
+		# Under a pitched roof the cap is only a seal: SEAL_DROP_M below the
+		# eave, so a low roof rising from the eave line never shares its
+		# plane. The cornice keeps the wall top (no parapet sinks a deck).
+		BuildingTrim.add(root, ring, top, trim, party, str(look.get("wall_set", "")))
+		_roof_cap(root, ring, idx, top - SEAL_DROP_M * WorldScale.metres_to_units(), roof_mat,
+			BuildingTrim.NONE, cap, party)
 	var gable_front := str((look.get("relief", {}) as Dictionary).get("gable", "")) != ""
 	var roofed := false
-	var job := _roof_job(ring, top, height_world, shape, roof_h_world, look, party, holes)
 	if not job.is_empty():
 		# Near ordinary buildings: a gable end is wall, not a triangle of tile.
 		var gable_look := look if not distant and _batch == null \

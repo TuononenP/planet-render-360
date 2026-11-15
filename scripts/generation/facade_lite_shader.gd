@@ -38,6 +38,9 @@ uniform bool curtain_wall = false;
 uniform vec2 cells = vec2(4.0, 1.0);
 uniform float night_energy = 0.0;
 varying vec3 wpos;
+// Where this world's origin lies on the streamer's continuous map (m,
+// WorldStreamer): the lit-window cells hold through a swap.
+global uniform vec2 world_origin_m;
 
 float h13(vec3 p) {
 	p = fract(p * 0.1031);
@@ -65,7 +68,8 @@ void fragment() {
 	SPECULAR = specular_value;
 	if (has_emit && night_energy > 0.001) {
 		// Shared walls have few tints, so the seed also takes the ground cell.
-		float bld = floor(wpos.x / 37.0) * 7.0 + floor(wpos.z / 37.0) * 13.0 + floor(COLOR.g * 31.0);
+		vec2 at = wpos.xz + world_origin_m;
+		float bld = floor(at.x / 37.0) * 7.0 + floor(at.y / 37.0) * 13.0 + floor(COLOR.g * 31.0);
 		vec2 cg = UV * cells;
 		float bay_px = max(length(dFdx(cg)), length(dFdy(cg)));
 		vec2 cell = floor(cg);

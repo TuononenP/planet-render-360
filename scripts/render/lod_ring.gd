@@ -19,8 +19,8 @@ extends RefCounted
 ##
 ## The 360 camera never translates, so ring assignment is static: it is
 ## written once per build as GeometryInstance3D visibility ranges with a
-## FADE_FRAC hysteresis margin (fade-self where the renderer supports
-## it). A preset switch only re-runs apply(): nothing is rebuilt, moved
+## FADE_FRAC dithered fade margin (fade-self where the renderer supports
+## it; a fade, not hysteresis: a camera at the edge sees it half faded). A preset switch only re-runs apply(): nothing is rebuilt, moved
 ## or recoloured (PRD AC-12) — the merge is preset-independent.
 
 ## Roofline-detail reach per preset (Fast, Balanced, High, Ultra).
@@ -34,7 +34,8 @@ const FAR_CITY_M: Array[float] = [4500.0, 7500.0, 12001.0, 12001.0]
 ## works per cell; draw calls scale with cells × materials, not
 ## buildings).
 const MERGE_CELL_M := 400.0
-## Hysteresis band as a fraction of each ring radius.
+## Fade band (dithered, VISIBILITY_RANGE_FADE_SELF) as a fraction of each
+## ring radius.
 const FADE_FRAC := 0.12
 ## Area batches larger than this (merged scatters, MultiMesh fields)
 ## have no meaningful single distance; they are never ranged.
@@ -183,8 +184,9 @@ static func _shadow(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 
 static func _range(gi: GeometryInstance3D, preset: int, layer: String) -> void:
 	# A builder that switches its own near and far meshes (ParkedCars)
-	# keeps the ranges it set.
-	if gi.has_meta("lod_own"):
+	# keeps the ranges it set; a piece the reveal wave still hides gets
+	# its range when the wave hands it back.
+	if gi.has_meta("lod_own") or gi.has_meta(RevealWave.PENDING):
 		return
 	if layer == "FarCity":
 		# A whole band in or out (its AABB centre is no distance): a

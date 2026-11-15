@@ -141,6 +141,8 @@ static func _outline_samples(poly: PackedVector2Array) -> PackedVector2Array:
 ## coping is twice a house's: a mall-sized wall needs a heavier cap.
 const PLINTH_PROUD_M := 0.12
 const COPING_DEPTH_M := PlinthStyle.COPING_DEPTH_M * 2.0
+## Rise of a shallow plinth ledge above the model floor (m).
+const LEDGE_LIP_M := 0.02
 
 ## Carry an outline-built model down to the terrain wherever the ground
 ## along its outline lies below the model base (a mall's downhill end on
@@ -178,12 +180,16 @@ static func _plinth(root: Node3D, ground: GroundTruth, type: String) -> void:
 		var pb := pts[k] + miters[k] * PLINTH_PROUD_M
 		var low_a := to_model * Vector3(wa.x, ya, wa.z)
 		var low_b := to_model * Vector3(wb.x, yb, wb.z)
+		var shallow := wa.y - ya < COPING_DEPTH_M + 0.25 or wb.y - yb < COPING_DEPTH_M + 0.25
+		# A shallow ledge stands a 2 cm lip above the floor: level with it,
+		# it lay in the plane of the paving where the ground barely drops.
+		var lip := LEDGE_LIP_M if shallow else 0.0
 		lm.quad("Plinth", Vector3(pa.x, low_a.y, pa.y), Vector3(pb.x, low_b.y, pb.y),
-			Vector3(pb.x, 0.0, pb.y), Vector3(pa.x, 0.0, pa.y), n)
-		if wa.y - ya < COPING_DEPTH_M + 0.25 or wb.y - yb < COPING_DEPTH_M + 0.25:
+			Vector3(pb.x, lip, pb.y), Vector3(pa.x, lip, pa.y), n)
+		if shallow:
 			# Too shallow for coping: close the proud top back to the wall.
-			lm.quad("Plinth", Vector3(pts[i].x, 0.0, pts[i].y), Vector3(pts[k].x, 0.0, pts[k].y),
-				Vector3(pb.x, 0.0, pb.y), Vector3(pa.x, 0.0, pa.y), Vector3.UP)
+			lm.quad("Plinth", Vector3(pts[i].x, lip, pts[i].y), Vector3(pts[k].x, lip, pts[k].y),
+				Vector3(pb.x, lip, pb.y), Vector3(pa.x, lip, pa.y), Vector3.UP)
 			continue
 		# Coping: proud face, drip underside and the ledge back to the wall.
 		var ca := pts[i] + miters[i] * (PLINTH_PROUD_M + PlinthStyle.COPING_PROUD_M)

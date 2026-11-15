@@ -168,11 +168,52 @@ const STONE_TARGETS := {
 	"concrete": Color(0.36, 0.35, 0.33),
 }
 
+## Railings fade out between these distances (m).
+const IRON_FADE_M := Vector2(220.0, 380.0)
+
+## `img` with mipmaps whose share of texels at or over `cutoff` alpha
+## stays the full image's: plain box mips of thin cut-out bars fall under
+## the cutoff a level or two down and the bars vanish in patches.
+static func coverage_mips(img: Image, cutoff: float) -> Image:
+	var want := _coverage(img, cutoff, 1.0)
+	var data := img.get_data()
+	var level := img.duplicate() as Image
+	var w := img.get_width()
+	var h := img.get_height()
+	while w > 1 or h > 1:
+		w = maxi(1, w / 2)
+		h = maxi(1, h / 2)
+		level.resize(w, h, Image.INTERPOLATE_BILINEAR)
+		var lo := 0.5
+		var hi := 8.0
+		for i in 12:
+			var mid := (lo + hi) * 0.5
+			if _coverage(level, cutoff, mid) < want:
+				lo = mid
+			else:
+				hi = mid
+		var out := level.duplicate() as Image
+		for y in h:
+			for x in w:
+				var c := out.get_pixel(x, y)
+				c.a = minf(c.a * hi, 1.0)
+				out.set_pixel(x, y, c)
+		data.append_array(out.get_data())
+	return Image.create_from_data(img.get_width(), img.get_height(), true, img.get_format(), data)
+
+static func _coverage(img: Image, cutoff: float, scale: float) -> float:
+	var n := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			if img.get_pixel(x, y).a * scale >= cutoff:
+				n += 1
+	return float(n) / float(img.get_width() * img.get_height())
+
 ## Wrought iron: vertical bars between rails with a scroll band, alpha-cut.
 static func iron() -> Material:
 	if _mats.has("iron"):
 		return _mats["iron"] as Material
-	var img := Image.create(64, 64, true, Image.FORMAT_RGBA8)
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	var c := Color(0.09, 0.09, 0.10, 1.0)
 	img.fill_rect(Rect2i(0, 0, 64, 5), c)
@@ -184,11 +225,19 @@ static func iron() -> Material:
 		for k in 12:
 			var ang := float(k) / 12.0 * TAU
 			img.set_pixel(clampi(x + int(cos(ang) * 4.0), 0, 63), clampi(51 + int(sin(ang) * 4.0), 0, 63), c)
-	img.generate_mipmaps()
 	var m := StandardMaterial3D.new()
-	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.albedo_texture = ImageTexture.create_from_image(coverage_mips(img, 0.4))
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	m.alpha_scissor_threshold = 0.4
+	# 2 px bars cut out at one threshold broke up and crawled with the
+	# distance: coverage-kept mips thin them evenly, alpha to coverage
+	# (with MSAA) softens their edges, and past IRON_FADE_M they dither
+	# out before they are thinner than a pixel.
+	m.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE_AND_TO_ONE
+	m.alpha_antialiasing_edge = 0.3
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_DITHER
+	m.distance_fade_min_distance = IRON_FADE_M.y
+	m.distance_fade_max_distance = IRON_FADE_M.x
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.metallic = 0.6
 	m.roughness = 0.5
@@ -216,7 +265,8 @@ static func glass() -> Material:
 		return _mats["glass"] as Material
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color.html("#4f6170")
-	m.roughness = 0.08
+	# Under ~0.12 screen-space reflections render as sparkling noise.
+	m.roughness = 0.14
 	m.metallic = 0.2
 	m.metallic_specular = 0.7
 	_mats["glass"] = m
@@ -233,7 +283,7 @@ static func glass_ultra() -> Material:
 		return _mats["glass_u"] as Material
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color.html("#7f909c")
-	m.roughness = 0.06
+	m.roughness = 0.13
 	m.metallic = 0.05
 	m.metallic_specular = 0.6
 	_mats["glass_u"] = m

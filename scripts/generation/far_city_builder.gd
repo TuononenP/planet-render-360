@@ -3,8 +3,9 @@ extends RefCounted
 
 ## T5.4 + T7.3 — the city past the detailed extent, from real data.
 ## Replaces the v1 random silhouette ring. Every SettlementMap cell
-## from R_IN to SettlementMap.RADIUS_M that real evidence calls built
-## (far imagery drape texture/colour + OSM built-up landuse) gets
+## past the detailed square (R_IN each way) to SettlementMap.RADIUS_M
+## that real evidence calls built (far imagery drape texture/colour + OSM
+## built-up landuse) gets
 ## low-poly textured masses:
 ##  - density thins with the settlement score and with distance
 ##    (THIN_FAR at the map edge) — haze (AtmosphereRig) does the rest;
@@ -194,8 +195,8 @@ func _towers() -> void:
 		var c := Vector2(float(t.get("x", 0.0)), float(t.get("z", 0.0)))
 		if _detailed_ids.has(str(t.get("osm_id", ""))):
 			continue
-		if c.length() < R_IN or c.length() > SettlementMap.RADIUS_M:
-			continue  # inside the extent the real building is already built
+		if absf(c.x) < R_IN and absf(c.y) < R_IN or c.length() > SettlementMap.RADIUS_M:
+			continue  # inside the extent (a square) the real building is already built
 		var ring := BuildingBuilder._clean_ring(t.get("footprint", PackedVector2Array()))
 		if ring.size() < 3 or _on_tower_site(c.x, c.y):
 			continue
@@ -331,7 +332,6 @@ func _fabric() -> void:
 	var house := ArchitectureStyle.profile(_region, "house")
 	var ind := ArchitectureStyle.profile(_region, "industrial")
 	var com := ArchitectureStyle.profile(_region, "commercial")
-	var r2_in := R_IN * R_IN
 	var r2_out := SettlementMap.RADIUS_M * SettlementMap.RADIUS_M
 	for j in smap.n:
 		for i in smap.n:
@@ -341,7 +341,10 @@ func _fabric() -> void:
 				continue
 			var cc := smap.centre(i, j)
 			var d2 := cc.length_squared()
-			if d2 < r2_in or d2 > r2_out or _tower_cells.has(Vector2i(i, j)):
+			# The detailed extent is a square: inside it (past R_IN only in
+			# its corners) real buildings stand, and a block there z-fought them.
+			if absf(cc.x) < R_IN and absf(cc.y) < R_IN or d2 > r2_out \
+					or _tower_cells.has(Vector2i(i, j)):
 				continue
 			var d := sqrt(d2)
 			var cls := smap.cls[k]

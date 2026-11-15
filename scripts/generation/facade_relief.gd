@@ -84,7 +84,8 @@ static func bay_count(len_m: float, bay: float) -> int:
 	return 0 if len_m < bay * 0.5 else maxi(1, roundi(len_m / bay))
 
 ## Exposed stretches of the ring's edges: [{a, b, n, dir, len_m, first,
-## last}] (first/last: the stretch starts/ends at a ring corner).
+## last, a_inside, b_inside}] (first/last: the stretch starts/ends at a
+## ring corner; a_inside/b_inside: that corner is an inside one).
 static func exposed_spans(ring: PackedVector2Array, cover: Array) -> Array:
 	var m := WorldScale.metres_to_units()
 	var out: Array = []
@@ -103,8 +104,17 @@ static func exposed_spans(ring: PackedVector2Array, cover: Array) -> Array:
 			var len := a.distance_to(b)
 			if len < MIN_SPAN_M * m:
 				continue
+			var first := float(pc[0]) < 0.001
+			var last := float(pc[1]) > 0.999
+			# An inside corner: the neighbouring edge runs out into this
+			# edge's front, so relief run into the corner from both faces
+			# overlaps there (coplanar tops z-fight).
+			var prev := ring[(i - 1 + ring.size()) % ring.size()]
+			var next := ring[(i + 2) % ring.size()]
 			out.append({"a": a, "b": b, "n": n, "dir": (b - a) / len, "len_m": len / m,
-				"first": float(pc[0]) < 0.001, "last": float(pc[1]) > 0.999, "edge": i})
+				"first": first, "last": last, "edge": i,
+				"a_inside": first and (prev - ea).dot(n) > 0.01 * m,
+				"b_inside": last and (next - eb).dot(n) > 0.01 * m})
 	return out
 
 ## Storey rows bottom-up, in world Y: {y0, y1, storey, ground, win0, win1,
@@ -199,16 +209,23 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 	if glazed and bays >= 3 and not stacks.has(1):
 		stacks[bays / 2] = 1
 	sp["stacks"] = stacks
+	# At an inside corner at its end the stretch's courses and balconies
+	# stop their own depth short of it: the next face's run fills the
+	# corner, and the two never overlap.
+	var b_inside := bool(sp.get("b_inside", false))
+	var b_depth := 0.55 * m if paris else 0.8 * m
 	for row in rows:
 		if row["ground"]:
 			continue
 		var y0 := float(row["y0"])
 		if courses:
-			kit.box(frame, Vector3(mid.x, y0 + 0.09 * m, mid.y) + az * 0.06 * m, ax, az,
-				Vector3(len, 0.18 * m, 0.12 * m))
+			var cl := len - (0.12 * m if b_inside else 0.0)
+			var cm := a + dir * cl * 0.5
+			kit.box(frame, Vector3(cm.x, y0 + 0.09 * m, cm.y) + az * 0.06 * m, ax, az,
+				Vector3(cl, 0.18 * m, 0.12 * m))
 		if row["balcony"]:
-			_balcony(kit, a, dir, n, len, float(row["slab"]), float(row["rail_h"]),
-				0.55 * m if paris else 0.8 * m, stone)
+			_balcony(kit, a, dir, n, len - (b_depth if b_inside else 0.0), float(row["slab"]),
+				float(row["rail_h"]), b_depth, stone)
 		for j in bays:
 			var c := a + dir * step * (float(j) + 0.5)
 			if mullion:
@@ -228,11 +245,13 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 				_deep_balcony(kit, c, ax, az, step if glazed_here else step * 0.86, y0, stone, solid, glazed_here,
 					float(row["y1"]) - y0)
 				continue
-			if punched and not row["balcony"] and pattern != "balcony":
-				kit.box(stone, Vector3(c.x, w0 - 0.04 * m, c.y) + az * 0.07 * m, ax, az,
-					Vector3(ww + 0.2 * m, 0.08 * m, 0.14 * m))
 			var rail_here: bool = row["balconette"] if paris \
 				else (french and hv < float(relief.get("balconette", 0.0)))
+			# A balconette's slab is the window's sill: a sill under it
+			# would share its top (z-fighting).
+			if punched and not row["balcony"] and pattern != "balcony" and not rail_here:
+				kit.box(stone, Vector3(c.x, w0 - 0.04 * m, c.y) + az * 0.07 * m, ax, az,
+					Vector3(ww + 0.2 * m, 0.08 * m, 0.14 * m))
 			if rail_here and not row["balcony"]:
 				var h := minf(0.9 * m, (float(row["win1"]) - w0) * 0.32)
 				var off := az * 0.16 * m
@@ -253,8 +272,9 @@ static func _balcony(kit: ReliefKit, a: Vector2, dir: Vector2, n: Vector2,
 	var az := Vector3(n.x, 0.0, n.y)
 	var mid := a + dir * len * 0.5
 	var t := 0.16 * m
+	# 1.5 cm short of each end: a string course ends at it, a quoin 1 cm in.
 	kit.box(stone, Vector3(mid.x, slab - t * 0.5, mid.y) + az * depth * 0.5, ax, az,
-		Vector3(len, t, depth))
+		Vector3(len - 0.03 * m, t, depth))
 	var h := clampf(rail_h, 0.8 * m, 1.1 * m)
 	var f0 := Vector3(a.x, slab, a.y) + az * (depth - 0.03 * m) + ax * 0.05 * m
 	var f1 := f0 + ax * (len - 0.1 * m)
@@ -281,22 +301,31 @@ static func _deep_balcony(kit: ReliefKit, c: Vector2, ax: Vector3, az: Vector3,
 		var frame := ReliefKit.flat("#a3a7a3", 0.4, 0.3)
 		var cap := 0.08 * m
 		var h := (storey_h - t - cap) if storey_h > t + cap + 1.0 * m else 2.5 * m
-		kit.box(glass, base + Vector3.UP * (t + h * 0.5) + az * depth, ax, az, Vector3(w, h, 0.025 * m))
+		# The glass ends 1 cm inside the side walls' outer faces, the
+		# transom stands within the mullions' depth (5 mm off front and
+		# back): shared planes z-fight.
+		kit.box(glass, base + Vector3.UP * (t + h * 0.5) + az * depth, ax, az, Vector3(w - 0.02 * m, h, 0.025 * m))
 		kit.box(stone, base + Vector3.UP * (t + h + cap * 0.5) + az * depth * 0.5, ax, az, Vector3(w, cap, depth))
 		for s in [-1.0, 1.0]:
 			kit.box(stone, base + Vector3.UP * (t + h * 0.5) + az * depth * 0.5 + ax * s * (w * 0.5 - 0.05 * m),
 				ax, az, Vector3(0.1 * m, h, depth))
+		# Mullions run 1 cm past the glass's top and bottom: level with it,
+		# their ends shared its planes where both stand proud of the cap
+		# and the slab.
 		for s in [-1.0, 0.0, 1.0]:
 			kit.box(frame, base + Vector3.UP * (t + h * 0.5) + az * (depth + 0.02 * m) + ax * s * w * 0.48,
-				ax, az, Vector3(0.035 * m, h, 0.04 * m))
+				ax, az, Vector3(0.035 * m, h + 0.02 * m, 0.04 * m))
 		kit.box(frame, base + Vector3.UP * (t + 1.0 * m) + az * (depth + 0.02 * m), ax, az,
-			Vector3(w, 0.05 * m, 0.04 * m))
+			Vector3(w, 0.05 * m, 0.03 * m))
 	elif solid:
 		kit.box(stone, base + Vector3.UP * (t + 0.5 * m) + az * (depth - 0.05 * m), ax, az,
 			Vector3(w, 1.0 * m, 0.1 * m))
+		# Side walls stop at the parapet's back: run on to its front they
+		# would share its front, ends and top (z-fighting).
+		var side_d := depth - 0.1 * m
 		for s in [-1.0, 1.0]:
-			kit.box(stone, base + Vector3.UP * (t + 0.5 * m) + az * depth * 0.5 + ax * s * (w * 0.5 - 0.05 * m),
-				ax, az, Vector3(0.1 * m, 1.0 * m, depth))
+			kit.box(stone, base + Vector3.UP * (t + 0.5 * m) + az * side_d * 0.5 + ax * s * (w * 0.5 - 0.05 * m),
+				ax, az, Vector3(0.1 * m, 1.0 * m, side_d))
 	else:
 		var f0 := base + Vector3.UP * t + az * (depth - 0.03 * m) - ax * w * 0.5
 		var f1 := f0 + ax * w
@@ -317,14 +346,19 @@ static func _quoins(kit: ReliefKit, sp: Dictionary, rows: Array, stone: Material
 	var y_lo := float(rows[0]["y1"]) if rows[0]["ground"] else float(rows[0]["y0"])
 	var y_hi := float(rows[-1]["y1"])
 	var courses := int((y_hi - y_lo) / (0.6 * m))
-	for end in [[sp["first"], sp["a"], 1.0], [sp["last"], sp["b"], -1.0]]:
+	# Quoins dress an outside corner only: at an inside one both faces'
+	# stones would overlap in the corner.
+	for end in [[sp["first"] and not sp.get("a_inside", false), sp["a"], 1.0],
+			[sp["last"] and not sp.get("b_inside", false), sp["b"], -1.0]]:
 		if not end[0]:
 			continue
 		var p: Vector2 = end[1]
 		for k in courses:
 			var w := (0.9 if k % 2 == 0 else 0.55) * m
+			# 1 cm short of the corner: flush with it, a quoin's end shared
+			# the string course's end plane.
 			var c := Vector3(p.x, y_lo + (float(k) + 0.5) * 0.6 * m, p.y) \
-				+ ax * float(end[2]) * w * 0.5 + az * 0.03 * m
+				+ ax * float(end[2]) * (w * 0.5 + 0.01 * m) + az * 0.03 * m
 			kit.box(stone, c, ax, az, Vector3(w, 0.52 * m, 0.06 * m))
 
 ## Painted finishes: a bay on a timber or rendered front is built of the

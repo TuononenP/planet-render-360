@@ -526,7 +526,6 @@ Profile read_profile(const Dictionary &d) {
 
 // FarCityBuilder._fabric, one settlement-map row.
 void fabric_row(const City &c, int j, Row &row) {
-	const double r2_in = R_IN * R_IN;
 	const double r2_out = RADIUS_M * RADIUS_M;
 	for (int i = 0; i < c.n; i++) {
 		int k = j * c.n + i;
@@ -537,7 +536,10 @@ void fabric_row(const City &c, int j, Row &row) {
 		// SettlementMap.centre
 		Vector2 cc = Vector2(((double)(i - c.half) + 0.5) * CELL_M, ((double)(j - c.half) + 0.5) * CELL_M);
 		double d2 = cc.length_squared();
-		if (d2 < r2_in || d2 > r2_out || c.tower_cell[k]) {
+		// The detailed extent is a square: inside it (past R_IN only in
+		// its corners) real buildings stand, and a block there z-fought them.
+		bool detailed = std::abs((double)cc.x) < R_IN && std::abs((double)cc.y) < R_IN;
+		if (detailed || d2 > r2_out || c.tower_cell[k]) {
 			continue;
 		}
 		double d = std::sqrt(d2);

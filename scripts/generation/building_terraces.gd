@@ -122,10 +122,12 @@ static func terraces(md: Dictionary, ground: GroundTruth, sea_y: float, depth: i
 			step["ring"] = piece
 			step["holes"] = cut[1]
 			step["centre"] = _centroid(piece)
-			# Its own walls all round: the neighbours' shared walls were
-			# found against the whole footprint, and a stepped block has a
+			# The footprint's key stays: the neighbours' shared walls are
+			# registered against the whole footprint, so a piece still
+			# skips a wall a neighbour draws (else both copies z-fight) and
+			# keeps a flush coping on a party edge. Its cut edges meet no
+			# registered wall and stand as its own. A stepped block has a
 			# flat roof on each terrace.
-			step.erase("key")
 			step["shape"] = "flat"
 			step["rh_m"] = 0.0
 			step["terrace"] = k

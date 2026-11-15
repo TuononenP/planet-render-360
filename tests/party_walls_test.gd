@@ -91,9 +91,16 @@ func _run(native: bool) -> void:
 	var piece: Array = pw.ring_cover(left, "l")[1][0]
 	_check(is_equal_approx(float(piece[2]), 6.0), "%s: party wall top is the neighbour's" % tag)
 
-	# An unregistered mass (raised part) keeps every wall.
+	# An unregistered mass (raised part) in the plane of a registered
+	# one's walls leaves them to it up to its top, and keeps the rest.
 	pw = _index(native)
 	pw._add_ring(sq, "a", 12.0, false)
 	var cr := pw.ring_cover(sq, "raised")
 	for i in 4:
-		_check(_covered(cr, i) < 0.01, "%s: unregistered mass keeps edge %d" % [tag, i])
+		_check(_covered(cr, i) > 0.99 and is_equal_approx(float(cr[i][0][2]), 12.0),
+			"%s: unregistered mass gives edge %d up to the registered top" % [tag, i])
+	pw = _index(native)
+	pw._add_ring(_rect(30, 0, 40, 10), "a", 12.0, false)
+	cr = pw.ring_cover(sq, "raised")
+	for i in 4:
+		_check(_covered(cr, i) < 0.01, "%s: unregistered mass keeps its own edge %d" % [tag, i])

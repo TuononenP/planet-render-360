@@ -49,7 +49,8 @@ static func deck(top: float, trim: int) -> float:
 
 ## Party edges (PartyWalls) get no cornice: the street front runs on into
 ## the neighbour's. Parapets stay on them (a firewall parapet is real, and
-## the sunk deck needs its inner face there). `wall_set` dresses a cornice
+## the sunk deck needs its inner face there), with a coping flush to the
+## wall. `wall_set` dresses a cornice
 ## in the wall's own stone.
 static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
@@ -85,7 +86,7 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 	else:
 		var inner := _offset(ring, -PARAPET_T_M * m, _ccw)
 		var cin := _offset(ring, -(PARAPET_T_M + COPING_M) * m, _ccw)
-		var cout := _offset(ring, COPING_M * m, _ccw)
+		var cout := _offset(ring, COPING_M * m, _ccw, party)
 		var y0 := deck(top, trim)
 		var y1 := top - COPING_H_M * m
 		for i in ring.size():
@@ -95,6 +96,25 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 			_quad(verts, normals, uvs, idx, Vector3(inner[i].x, y0, inner[i].y),
 				Vector3(inner[j].x, y0, inner[j].y), Vector3(inner[j].x, y1, inner[j].y),
 				Vector3(inner[i].x, y1, inner[i].y), -o3)
+			# A party edge's coping stops at the wall line: oversailing it
+			# would lay this coping's top in the plane of an equal-height
+			# neighbour's, overlapping it (z-fighting).
+			if party.size() == ring.size() and party[i] == 1:
+				_quad(verts, normals, uvs, idx, Vector3(cin[i].x, top, cin[i].y),
+					Vector3(cin[j].x, top, cin[j].y), Vector3(ring[j].x, top, ring[j].y),
+					Vector3(ring[i].x, top, ring[i].y), Vector3.UP)
+				continue
+			# An open edge's coping ends square at a party corner (it no
+			# longer mitres into the party edge's): close its end.
+			var e3 := Vector3(ring[j].x - ring[i].x, 0.0, ring[j].y - ring[i].y).normalized()
+			if party.size() == ring.size() and party[(i - 1 + ring.size()) % ring.size()] == 1:
+				_quad(verts, normals, uvs, idx, Vector3(ring[i].x, y1, ring[i].y),
+					Vector3(cout[i].x, y1, cout[i].y), Vector3(cout[i].x, top, cout[i].y),
+					Vector3(ring[i].x, top, ring[i].y), -e3)
+			if party.size() == ring.size() and party[j] == 1:
+				_quad(verts, normals, uvs, idx, Vector3(ring[j].x, y1, ring[j].y),
+					Vector3(cout[j].x, y1, cout[j].y), Vector3(cout[j].x, top, cout[j].y),
+					Vector3(ring[j].x, top, ring[j].y), e3)
 			# Coping: oversailing slab — underside lip, outer edge, top.
 			_quad(verts, normals, uvs, idx, Vector3(ring[i].x, y1, ring[i].y),
 				Vector3(ring[j].x, y1, ring[j].y), Vector3(cout[j].x, y1, cout[j].y),
@@ -145,13 +165,26 @@ static func _out_normal_ccw(ring: PackedVector2Array, i: int, ccw: bool) -> Vect
 	return (Vector2(e.y, -e.x) if ccw else Vector2(-e.y, e.x)).normalized()
 
 ## The ring offset by d (outward > 0, inward < 0), mitred, miter capped.
-static func _offset(ring: PackedVector2Array, d: float, ccw: Variant = null) -> PackedVector2Array:
+## With `party` flags a corner on a party edge moves only off the open
+## edge: mitred, it would reach past the party wall into the neighbour's
+## coping and lie in its plane.
+static func _offset(ring: PackedVector2Array, d: float, ccw: Variant = null,
+		party: PackedByteArray = PackedByteArray()) -> PackedVector2Array:
 	var _ccw: bool = ccw if ccw != null else RingGeometry.signed_area(ring) > 0.0
 	var out := PackedVector2Array()
 	var n := ring.size()
+	var flags := party.size() == n
 	for i in n:
 		var n0 := _out_normal_ccw(ring, (i - 1 + n) % n, _ccw)
 		var n1 := _out_normal_ccw(ring, i, _ccw)
+		if flags and (party[(i - 1 + n) % n] == 1 or party[i] == 1):
+			var keep := Vector2.ZERO
+			if party[(i - 1 + n) % n] == 0:
+				keep = n0
+			elif party[i] == 0:
+				keep = n1
+			out.append(ring[i] + keep * d)
+			continue
 		var denom := 1.0 + n0.dot(n1)
 		var off := (n0 + n1) * d / maxf(denom, 0.0001)
 		if off.length() > absf(d) * 3.0:

@@ -74,6 +74,9 @@ uniform bool photo_turn = false;
 
 varying vec3 wpos;
 varying flat float bld;
+// Where this world's origin lies on the streamer's continuous map (m,
+// WorldStreamer): weathering hashes on it, so it holds through a swap.
+global uniform vec2 world_origin_m;
 // @SNOW
 
 // Near panes. Head-on reflectance of double glazing (four surfaces); the
@@ -177,11 +180,14 @@ void fragment() {
 	// Glass treatment from ~50 px a pane, none under ~17 px: distant panes
 	// keep the plain look and cannot shimmer.
 	float near_glass = 1.0 - smoothstep(0.02, 0.06, max(length(gx * cells), length(gy * cells)));
-	// Window reveals: steep parallax over the depth map (white = wall face).
-	if (has_depth && framed) {
+	// Window reveals: steep parallax over the depth map (white = wall face),
+	// full from ~33 px a pane and gone under ~11 px: over a hard black and
+	// white depth map a far reveal's edges only sparkle.
+	float reveal = 1.0 - smoothstep(0.03, 0.09, max(length(gx * cells), length(gy * cells)));
+	if (has_depth && framed && reveal > 0.0) {
 		float layers = mix(32.0, 8.0, abs(vts.z));
 		float step_d = 1.0 / layers;
-		vec2 delta = vts.xy * depth_scale / layers;
+		vec2 delta = vts.xy * depth_scale * reveal / layers;
 		float cur = 0.0;
 		float d = 1.0 - textureGrad(depth_tex, uv, gx, gy).r;
 		for (int i = 0; i < 32; i++) {
@@ -228,9 +234,12 @@ void fragment() {
 	float pane = has_normal ? smoothstep(0.32, 0.22, rough) : 0.0;
 	// Weathering in world space (metres): building-scale hue and grime,
 	// faint vertical rain streaks.
-	vec3 wm = wpos / units_per_m;
+	vec3 wm = wpos / units_per_m + vec3(world_origin_m.x, 0.0, world_origin_m.y);
 	float g = vnoise(wm.xz * 0.045 + wm.y * 0.02);
-	float streak = vnoise(vec2((wm.x + wm.z) * 0.9, wm.y * 0.06));
+	// The streaks repeat about every metre along the wall: they settle to
+	// their mean before a pixel spans one, or they crawl at a distance.
+	float s_at = (wm.x + wm.z) * 0.9;
+	float streak = mix(vnoise(vec2(s_at, wm.y * 0.06)), 0.5, smoothstep(0.25, 0.75, fwidth(s_at)));
 	vec3 wall = base * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
 	// Winter on the wall (ClimateModel): snow on the sills under the
 	// panes, and slush and salt the street throws up its foot.
@@ -245,7 +254,7 @@ void fragment() {
 			sill *= smoothstep(0.25, 0.6, vnoise(vec2((wm.x + wm.z) * 2.3, wm.y * 0.5)) + 0.3);
 			wall = mix(wall, snow_albedo(wm.xz + wm.y, 0.01, 0.08), sill * wsnow);
 		}
-		vec2 sp = snow_splash(wm * units_per_m);
+		vec2 sp = snow_splash(wpos);
 		sp.y *= 1.0 - pane;
 		wall = apply_splash(wall, sp);
 	}
@@ -260,9 +269,10 @@ void fragment() {
 	vec2 lc = curtain_wall ? vec2(floor(cell.x / 5.0), cell.y) : cell;
 	float lit = step(h13(vec3(lc + 0.37, bld + 11.0)), occ) * night;
 	vec3 lamp = lamp_colour(h13(vec3(lc, bld + 3.7)), TIME);
-	// Panes under ~2 px glow at the building's lit share in an average warm
-	// white: picked one by one they alias to white speckle on the skyline.
-	float sub = smoothstep(0.25, 0.7, max(length(gx * cells), length(gy * cells)));
+	// Panes under ~6 px blend into the building's lit share in an average
+	// warm white, gone over by ~1.5 px: picked one by one they alias to
+	// white speckle on the skyline (and glow blooms each one).
+	float sub = smoothstep(0.16, 0.65, max(length(gx * cells), length(gy * cells)));
 	lit = mix(lit, occ * night, sub);
 	lamp = mix(lamp, vec3(1.0, 0.80, 0.58), sub);
 
@@ -334,7 +344,10 @@ void fragment() {
 	ALBEDO = mix(wall, glass_alb, pane);
 	// Below ~0.12 the indirect reflections render as salt-and-pepper noise.
 	// Sub-pixel panes share one value: picked per pane they alias to speckle.
-	ROUGHNESS = mix(rough, mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean)), pane);
+	// Distant panes (no glass treatment) are rougher still: a mirror a few
+	// pixels wide sparkles as screen-space reflections find and lose it.
+	float pane_rough = mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean));
+	ROUGHNESS = mix(rough, mix(0.3, pane_rough, near_glass), pane);
 	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
 	SPECULAR = mix(0.5, 0.65, pane);
 	EMISSION = glass_e * pane;

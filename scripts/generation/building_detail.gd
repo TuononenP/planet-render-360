@@ -299,9 +299,11 @@ static func _altana(batch: Batch, ring: PackedVector2Array, c: Vector2,
 	for sz in [-1.0, 1.0]:
 		batch.add("box", _xf(basis, _at(c, u, v, du, dv + sz * d * 0.5, y + 1.0 * m2u),
 			Vector3(w, 0.08 * m2u, 0.08 * m2u)), timber)
+	# The end rails run between the side rails, not through them: crossed
+	# rails share their tops (z-fighting).
 	for sx in [-1.0, 1.0]:
 		batch.add("box", _xf(basis, _at(c, u, v, du + sx * w * 0.5, dv, y + 1.0 * m2u),
-			Vector3(0.08 * m2u, 0.08 * m2u, d)), timber)
+			Vector3(0.08 * m2u, 0.08 * m2u, d - 0.08 * m2u)), timber)
 
 static func _dormers(batch: Batch, c: Vector2, u: Vector2, v: Vector2,
 		lu: float, lv: float, top: float, roof_h: float, shape: String,

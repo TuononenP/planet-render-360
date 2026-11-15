@@ -193,16 +193,20 @@ Array PartyIndex::partition(const Vector2 &a, const Vector2 &b, const Vector2 &n
 					// PartyWalls: the same wall drawn by another mass is
 					// hidden here when that mass stands at least as tall
 					// (a tie goes to the first registered).
-					if (key < 0 || std::abs(D((r.a - a).dot(n))) > SAME_TOL_M ||
+					if (std::abs(D((r.a - a).dot(n))) > SAME_TOL_M ||
 							std::abs(D((r.b - a).dot(n))) > SAME_TOL_M) {
 						continue;
 					}
-					double own = key_tops[key];
-					if (!(r.top > own + SAME_TOL_M || (r.top >= own - SAME_TOL_M && r.key < key))) {
-						continue;
+					// An unregistered (raised) part gives the shared wall to
+					// the mass registered there, up to that mass's top.
+					if (key >= 0) {
+						double own = key_tops[key];
+						if (!(r.top > own + SAME_TOL_M || (r.top >= own - SAME_TOL_M && r.key < key))) {
+							continue;
+						}
+						// A tie hides the whole wall, even a few cm taller.
+						rec_top = Math::max(r.top, own);
 					}
-					// A tie hides the whole wall, even a few cm taller.
-					rec_top = Math::max(r.top, own);
 				} else if (facing > -PARALLEL) {
 					continue;
 				} else if (std::abs(D((r.a - a).dot(n))) > tol || std::abs(D((r.b - a).dot(n))) > tol) {

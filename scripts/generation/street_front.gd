@@ -155,7 +155,9 @@ static func shopfront_pieces(step_m: float, height_m: float, door: bool, sign_px
 		piece.call(6.0, 9.0, gy, c - 6.0, 0.07)
 		piece.call(c - 9.0, c - 6.0, gy, c - 6.0, 0.07)
 		piece.call(63.0, 65.0, gy, c - 12.0, 0.05)
-		piece.call(6.0, c - 6.0, c - 12.0, c, 0.08)  # stall riser
+		# Stall riser, its ends just inside the mullions' (a shared end
+		# plane z-fights).
+		piece.call(6.5, c - 6.5, c - 12.0, c, 0.08)
 	return out
 
 ## Shopfront frames along a street span, on the bays the wall painted: the
@@ -216,7 +218,7 @@ static func _garage(kit: ReliefKit, sp: Dictionary, rows: Array, ground_y: float
 	# Panel grooves, then the header and jambs in the trim.
 	var groove := ReliefKit.flat("#2e2e2c", 0.8)
 	for k in range(1, 4):
-		var gy := Vector3.UP * dh * float(k) / 4.0 + az * 0.005 * m
+		var gy := Vector3.UP * dh * float(k) / 4.0 + az * 0.01 * m
 		kit.quad(groove, dc - ax * dw * 0.48 + gy, dc + ax * dw * 0.48 + gy,
 			dc + ax * dw * 0.48 + gy + Vector3.UP * 0.03 * m, dc - ax * dw * 0.48 + gy + Vector3.UP * 0.03 * m, az)
 	kit.box(trim, dc + Vector3.UP * (dh + 0.09 * m), ax, az, Vector3(dw + 0.3 * m, 0.18 * m, 0.12 * m))
@@ -259,7 +261,9 @@ static func _cornice(kit: ReliefKit, sp: Dictionary, top: float, trim: Material)
 	var len := float(sp["len_m"]) * m
 	var mid2: Vector2 = (sp["a"] as Vector2) + dir * len * 0.5
 	var mid := Vector3(mid2.x, top, mid2.y)
-	kit.box(trim, mid - Vector3.UP * 0.16 * m + az * 0.225 * m, ax, az, Vector3(len, 0.32 * m, 0.45 * m))
+	# Its top 2 cm under the wall top: a parapet's coping lies at the top
+	# itself, and the two would z-fight where they overlap.
+	kit.box(trim, mid - Vector3.UP * 0.18 * m + az * 0.225 * m, ax, az, Vector3(len, 0.32 * m, 0.45 * m))
 	kit.box(trim, mid - Vector3.UP * 0.62 * m + az * 0.04 * m, ax, az, Vector3(len, 0.28 * m, 0.08 * m))
 	var count := maxi(roundi(len / (0.6 * m)), 2)
 	for k in count:
@@ -320,7 +324,10 @@ static func _stoop(kit: ReliefKit, sp: Dictionary, ground_y: float, stone: Mater
 	for k in 5:
 		var h := 0.3 * m * float(k + 1)
 		var depth := 2.4 * m * (1.0 - float(k) / 5.0)
-		kit.box(stone, c + Vector3.UP * h * 0.5 + az * depth * 0.5, ax, az, Vector3(w, h, depth))
+		# Each step 2 cm narrower each side than the one under it: nested
+		# boxes sharing their end planes z-fight.
+		kit.box(stone, c + Vector3.UP * h * 0.5 + az * depth * 0.5, ax, az,
+			Vector3(w - 0.04 * m * float(k), h, depth))
 	for s in [-1.0, 1.0]:
 		var foot: Vector3 = c + ax * s * w * 0.5 + az * 2.4 * m + Vector3.UP * 0.3 * m
 		var head: Vector3 = c + ax * s * w * 0.5 + Vector3.UP * 1.5 * m

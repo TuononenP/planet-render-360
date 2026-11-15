@@ -3,8 +3,8 @@ extends RefCounted
 
 ## Endless walk & fly: after a streamed swap, the ground that is new (past
 ## the old world's square) fades in from the camera outward instead of
-## appearing all at once. Each new piece small enough to range (building
-## cells, trees, props: LodRing.MAX_RANGED_SIZE_M) gets a temporary
+## appearing all at once. Each new piece small enough to range (trees,
+## props: LodRing.MAX_RANGED_SIZE_M) gets a temporary
 ## visibility range end that grows at SPEED_MPS with the renderer's
 ## dithered fade (VISIBILITY_RANGE_FADE_SELF); once the wave has passed a
 ## piece it gets its own LodRing range back. Terrain, roads and water are
@@ -16,8 +16,11 @@ extends RefCounted
 const SPEED_MPS := 900.0
 const MARGIN_M := 200.0
 ## Layers that never fade in: whole bands or rings (LodRing ranges them
-## by its own rules) and the water sheet.
-const SKIP_LAYERS := ["FarCity", "FarTerrain", "Water"]
+## by its own rules), the water sheet, and buildings: the old world's
+## far city stood where the new detailed buildings are and leaves at the
+## swap, so a building fading in behind the wave left that ground empty
+## for a second or two.
+const SKIP_LAYERS := ["FarCity", "FarTerrain", "Water", "Buildings"]
 
 var _world: Node3D
 ## The old square's centre in the new world's frame.
@@ -31,6 +34,10 @@ var _radius := 0.0
 var _origin := Vector2.ZERO
 var _running := false
 var _preset := 0
+## Meta on a piece the wave still holds hidden: LodRing leaves its range
+## alone (a re-range by the altitude boost or a preset change mid-wave
+## showed it at once, and the wave then hid it again: a blink).
+const PENDING := "reveal_pending"
 
 func active() -> bool:
 	return _running
@@ -69,12 +76,20 @@ func _collect(node: Node, layer: String, parent_xf: Transform3D) -> void:
 	if node is GeometryInstance3D and not node.has_meta("lod_own"):
 		var gi := node as GeometryInstance3D
 		var box := xf * gi.get_aabb()
-		if maxf(box.size.x, box.size.z) <= LodRing.MAX_RANGED_SIZE_M:
+		if maxf(box.size.x, box.size.z) <= LodRing.MAX_RANGED_SIZE_M and _new_ground(box):
 			var c := box.get_center()
-			if not WorldStreamer.inside_detailed(Vector2(c.x, c.z) - _old_centre):
-				_pieces.append([gi, l, Vector2(c.x, c.z)])
+			_pieces.append([gi, l, Vector2(c.x, c.z)])
 	for ch in node.get_children():
 		_collect(ch, l, xf)
+
+## Whether `box` (new frame) lies wholly outside the old square: a piece
+## reaching into it was on screen the frame before the swap, and hiding
+## it would blink it out.
+func _new_ground(box: AABB) -> bool:
+	var h := WorldStreamer.HALF_EXTENT_M
+	var lo := Vector2(box.position.x, box.position.z) - _old_centre
+	var hi := Vector2(box.end.x, box.end.z) - _old_centre
+	return hi.x < -h or lo.x > h or hi.y < -h or lo.y > h
 
 ## The swap happened with the camera at `eye` (the new frame): hide the
 ## new pieces past the nearest one and start the wave there.
@@ -93,6 +108,7 @@ func start(world: Node3D, eye: Vector2, preset: int) -> void:
 	_radius = maxf(eye.distance_to(_pieces[0][2]) - MARGIN_M, 0.0)
 	for p in _pieces:
 		var gi: GeometryInstance3D = p[0]
+		gi.set_meta(PENDING, true)
 		gi.visibility_range_begin = 0.0
 		gi.visibility_range_end = _radius + MARGIN_M
 		gi.visibility_range_end_margin = MARGIN_M
@@ -115,7 +131,7 @@ func tick(_eye: Vector2, delta: float, preset: int) -> void:
 		if _origin.distance_to(p[2]) > _radius - MARGIN_M:
 			break
 		if is_instance_valid(p[0]):
-			LodRing.range_one(p[0], preset, p[1])
+			_hand_back(p[0], preset, p[1])
 		_cursor += 1
 	# Only the band the wave is crossing needs its end moved: pieces past
 	# it are still hidden by the end they got at start (nearest first).
@@ -133,8 +149,13 @@ func finish(preset: int) -> void:
 	if _running:
 		for i in range(_cursor, _pieces.size()):
 			if is_instance_valid(_pieces[i][0]):
-				LodRing.range_one(_pieces[i][0], preset, _pieces[i][1])
+				_hand_back(_pieces[i][0], preset, _pieces[i][1])
+		_cursor = _pieces.size()
 	stop()
+
+func _hand_back(gi: GeometryInstance3D, preset: int, layer: String) -> void:
+	gi.remove_meta(PENDING)
+	LodRing.range_one(gi, preset, layer)
 
 ## Stops preparing or running for `world` only (a staged world dropped).
 func forget(world: Node3D) -> void:
@@ -142,6 +163,10 @@ func forget(world: Node3D) -> void:
 		finish(_preset)
 
 func stop() -> void:
+	if _running:
+		for i in range(_cursor, _pieces.size()):
+			if is_instance_valid(_pieces[i][0]):
+				(_pieces[i][0] as Node).remove_meta(PENDING)
 	_running = false
 	_world = null
 	_pieces.clear()

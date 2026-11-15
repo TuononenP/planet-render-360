@@ -335,12 +335,14 @@ func _scout() -> void:
 		and not WorldStreamer.exit_missed(Vector2(0, -600), Vector2(0, -27), Vector2(0, -1600)),
 		"an exit outside a target's square is missed, one inside is not")
 
-## RevealWave: only new pieces (past the old square) fade in, from the
-## camera outward, and each gets its LodRing range back once passed.
+## RevealWave: only new pieces (wholly past the old square) fade in, from
+## the camera outward, and each gets its LodRing range back once passed;
+## a re-range meanwhile (altitude boost, preset change) leaves them to the
+## wave. Buildings switch at the swap, as the far city they replace does.
 func _reveal() -> void:
 	var world := Node3D.new()
 	var group := Node3D.new()
-	group.name = "Buildings"
+	group.name = "Vegetation"
 	world.add_child(group)
 	var near := MeshInstance3D.new()
 	near.mesh = BoxMesh.new()
@@ -350,6 +352,20 @@ func _reveal() -> void:
 	fresh.mesh = BoxMesh.new()
 	fresh.position = Vector3(0, 0, -1500)
 	group.add_child(fresh)
+	# Reaches 10 m into the old square: it was on screen before the swap.
+	var edge := MeshInstance3D.new()
+	var wide := BoxMesh.new()
+	wide.size = Vector3(1, 1, 40)
+	edge.mesh = wide
+	edge.position = Vector3(0, 0, -(WorldStreamer.HALF_EXTENT_M + 10.0))
+	group.add_child(edge)
+	var homes := Node3D.new()
+	homes.name = "Buildings"
+	world.add_child(homes)
+	var block := MeshInstance3D.new()
+	block.mesh = BoxMesh.new()
+	block.position = Vector3(0, 0, -1500)
+	homes.add_child(block)
 	var w := RevealWave.new()
 	w.prepare(world, Vector2.ZERO)
 	w.pump()
@@ -359,11 +375,16 @@ func _reveal() -> void:
 		and fresh.visibility_range_end < 1000.0 + 1.0, "a new piece waits for the wave: %.0f"
 			% fresh.visibility_range_end)
 	_check(near.visibility_range_end == 0.0, "ground the old world had shows at once")
+	_check(edge.visibility_range_end == 0.0, "a piece reaching into the old square is not hidden")
+	_check(block.visibility_range_end == 0.0, "a new building shows at the swap")
+	var held := fresh.visibility_range_end
+	LodRing.apply(world, RenderSettings.Preset.HIGH)
+	_check(fresh.visibility_range_end == held, "a re-range mid-wave leaves its pieces hidden")
 	w.tick(Vector2(0, -500), 0.1, RenderSettings.Preset.HIGH)
 	_check(w.active(), "the wave takes time to pass")
 	w.tick(Vector2(0, -500), 5.0, RenderSettings.Preset.HIGH)
-	_check(not w.active() and fresh.visibility_range_end == 0.0,
-		"once passed, a piece has its own range back")
+	_check(not w.active() and is_equal_approx(fresh.visibility_range_end, LodRing.trees_m(RenderSettings.Preset.HIGH))
+		and not fresh.has_meta(RevealWave.PENDING), "once passed, a piece has its own range back")
 	world.free()
 
 ## The way-ahead badge: hidden for a quick (cached) stretch, then the

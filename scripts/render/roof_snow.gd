@@ -18,6 +18,9 @@ shader_type spatial;
 // in for the light snow scatters under its surface.
 render_mode blend_mix, depth_draw_never, cull_back, diffuse_lambert_wrap;
 // @SNOW
+// Where this world's origin lies on the streamer's continuous map (m,
+// WorldStreamer): the snow's grain and drifts hold through a swap.
+global uniform vec2 world_origin_m;
 varying vec3 wpos;
 varying float wny;
 varying vec3 wnrm;
@@ -31,7 +34,8 @@ void vertex() {
 }
 void fragment() {
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
-	float n = mix(snow_noise(wpos.xz / 2.3) * 0.7 + snow_noise(wpos.xz / 0.7) * 0.3, 0.5, smoothstep(0.4, 2.5, px));
+	vec2 hp = wpos.xz + world_origin_m;
+	float n = mix(snow_noise(hp / 2.3) * 0.7 + snow_noise(hp / 0.7) * 0.3, 0.5, smoothstep(0.4, 2.5, px));
 	// Roofs are never one clean sheet: it thins where the roof's own
 	// warmth and the wind get at it, without opening holes.
 	float a = snow_line(wpos) * smoothstep(0.30, 0.60, wny) * mix(0.86, 1.0, smoothstep(0.15, 0.4, n));
@@ -40,10 +44,10 @@ void fragment() {
 	if (a < 0.01) {
 		discard;
 	}
-	ALBEDO = snow_albedo(wpos.xz, px, 0.0) * (0.95 + 0.08 * n);
+	ALBEDO = snow_albedo(hp, px, 0.0) * (0.95 + 0.08 * n);
 	ALPHA = a * 0.97;
 	float near_px = 1.0 - smoothstep(0.4, 2.5, px);
-	vec2 dr = near_px > 0.0 ? snow_drift(wpos.xz) * near_px : vec2(0.0);
+	vec2 dr = near_px > 0.0 ? snow_drift(hp) * near_px : vec2(0.0);
 	// Drift bends the roof's own normal, so a gable keeps its lit side.
 	vec3 nw = normalize(normalize(wnrm) - vec3(dr.x + lip.x * near_px, 0.0, dr.y + lip.y * near_px) * 0.2);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
