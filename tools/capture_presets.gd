@@ -15,6 +15,8 @@ extends SceneTree
 ##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8;
 ##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
 ##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
+##        [--keep_centre]  (shoot every look in the place's own world; by default a look
+##          whose view would run off the detailed square gets a world centred ahead of it)
 ##        [--size=WxH]  (frame size; default 1280x800)  [--png]  (lossless PNG, not JPEG)
 ##        [--frame_scale=2]  (opening eye that many times its usual distance from the landmark)
 ##        [--eye_min=40]  (opening eye at least that high over the ground, aimed at the landmark)
@@ -181,6 +183,8 @@ var _eye_min := 0.0
 var _shot_size := Vector2i.ZERO
 ## When the --looks are taken: "" golden hour, "late" two hours after sunset.
 var _look_time := ""
+## --keep_centre: looks never rebuild the world around themselves.
+var _keep_centre := false
 var _date_override: Dictionary = {}
 var _reference_set := ""
 
@@ -307,6 +311,7 @@ func _run() -> void:
 	var times: PackedStringArray = str(a["times"]).split(",")
 	_weather_code = int(a.get("weather", 0))
 	_look_time = str(a.get("look_time", ""))
+	_keep_centre = OS.get_cmdline_user_args().has("--keep_centre")
 	for spec in str(a.get("looks", "")).split(";", false):
 		var f := spec.split(",")
 		if f.size() >= 5:
@@ -354,33 +359,9 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		audit: bool, settle_s: float = SETTLE_S) -> void:
 	var id := str(place["id"])
 	main._picker.selected_name = str(place["name"])
-	_weather_in = false
-	main._start_generation(float(place["lat"]), float(place["lon"]))
-	var start := Time.get_ticks_msec()
-	while (main._generating or not view.visible) \
-			and Time.get_ticks_msec() - start < int(PLACE_TIMEOUT_S * 1000.0):
-		await process_frame
-	if not view.visible or main._generating:
-		printerr("CAPTURE SKIP %s: no view after %d s" % [id, (Time.get_ticks_msec() - start) / 1000])
+	if not await _build(main, view, id, float(place["lat"]), float(place["lon"])):
 		return
-	print("CAPTURE %s built in %d s" % [id, (Time.get_ticks_msec() - start) / 1000])
-	main._notice.visible = false
-	view._governor.set_preset(int(main._settings.preset))
-	var wait := Time.get_ticks_msec()
-	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
-		await process_frame
-	# Clear captures keep a few clouds; forced weather comes overcast.
-	# A place may pin its own season and weather (the winter control).
-	var season := _season
-	if place.has("season"):
-		season = ["spring", "summer", "autumn", "winter"].find(str(place["season"]))
-	var weather := int(place.get("weather", _weather_code))
-	if season >= 0 and view._data.season != season:
-		# Seasons bake into the world: this rebuilds it in that season.
-		await ViewConditions._select_season(view, season)
-	view._atmos.set_weather(weather, 15.0 if weather == 0 else 100.0)
-	ViewConditions._apply_precip(view, weather)
-	ViewConditions.apply_surface_state(view)
+	await _dress(view, place)
 	if _date_override.is_empty():
 		ViewConditions.spawn_golden_hour(view)
 	else:
@@ -483,25 +464,95 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "vantage_late")
 	if not _looks.is_empty():
-		# --look_time=late: the looks two hours after sunset (lamps, lit
-		# windows); otherwise at golden hour.
-		if _look_time == "late":
-			ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
-		elif _look_time == "noon":
-			ViewConditions.jump_to(view, "noon")
-		else:
-			ViewConditions.spawn_golden_hour(view)
-		# A clock change can re-show the place's live weather: pin the run's.
-		var w := int(place.get("weather", _weather_code))
-		view._atmos.set_weather(w, 15.0 if w == 0 else 100.0)
-		ViewConditions._apply_precip(view, w)
-		ViewConditions.apply_surface_state(view)
+		_look_light(view, place)
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 	for k in _looks.size():
+		var centre := _look_centre(view, _looks[k])
+		if centre != Vector2.INF:
+			# The detailed square follows the eye, as the streamer moves it
+			# when the drone flies there: the view stays on detailed ground.
+			print("CAPTURE RECENTRE %s look%d at %.5f,%.5f" % [id, k, centre.x, centre.y])
+			if not await _build(main, view, id, centre.x, centre.y):
+				continue
+			await _dress(view, place)
+			if not _date_override.is_empty():
+				await ViewConditions.set_date(view, _date_override)
+			_look_light(view, place)
+			await _settle(settle_s, SETTLE_FRAMES)
 		_place_eye(view, id, "look%d" % k, _looks[k])
 		await _settle(1.0, SHOT_SETTLE_FRAMES)
 		await _snap(view, id, "look%d" % k)
 	_contact_sheet(id)
+
+## Builds the world centred on lat/lon through the app flow and waits for
+## the view and the place's live weather; false when it never came.
+func _build(main: Node, view: View360, id: String, lat: float, lon: float) -> bool:
+	_weather_in = false
+	main._start_generation(lat, lon)
+	var start := Time.get_ticks_msec()
+	while (main._generating or not view.visible) \
+			and Time.get_ticks_msec() - start < int(PLACE_TIMEOUT_S * 1000.0):
+		await process_frame
+	if not view.visible or main._generating:
+		printerr("CAPTURE SKIP %s: no view after %d s" % [id, (Time.get_ticks_msec() - start) / 1000])
+		return false
+	print("CAPTURE %s built in %d s" % [id, (Time.get_ticks_msec() - start) / 1000])
+	main._notice.visible = false
+	view._governor.set_preset(int(main._settings.preset))
+	var wait := Time.get_ticks_msec()
+	while not _weather_in and Time.get_ticks_msec() - wait < int(WEATHER_WAIT_S * 1000.0):
+		await process_frame
+	return true
+
+## The run's season and forced weather on a freshly built world.
+func _dress(view: View360, place: Dictionary) -> void:
+	# Clear captures keep a few clouds; forced weather comes overcast.
+	# A place may pin its own season and weather (the winter control).
+	var season := _season
+	if place.has("season"):
+		season = ["spring", "summer", "autumn", "winter"].find(str(place["season"]))
+	var weather := int(place.get("weather", _weather_code))
+	if season >= 0 and view._data.season != season:
+		# Seasons bake into the world: this rebuilds it in that season.
+		await ViewConditions._select_season(view, season)
+	view._atmos.set_weather(weather, 15.0 if weather == 0 else 100.0)
+	ViewConditions._apply_precip(view, weather)
+	ViewConditions.apply_surface_state(view)
+
+## The clock the --looks are taken at, with the run's weather pinned.
+func _look_light(view: View360, place: Dictionary) -> void:
+	# --look_time=late: the looks two hours after sunset (lamps, lit
+	# windows); otherwise at golden hour.
+	if _look_time == "late":
+		ViewConditions.set_time_minutes(view, ViewConditions.sun_times(view).y + 120.0)
+	elif _look_time == "noon":
+		ViewConditions.jump_to(view, "noon")
+	else:
+		ViewConditions.spawn_golden_hour(view)
+	# A clock change can re-show the place's live weather: pin the run's.
+	var w := int(place.get("weather", _weather_code))
+	view._atmos.set_weather(w, 15.0 if w == 0 else 100.0)
+	ViewConditions._apply_precip(view, w)
+	ViewConditions.apply_surface_state(view)
+
+## How far ahead of a look's eye (m) its own world is centred: the eye
+## keeps detailed ground behind it, and most of the square lies in view.
+const LOOK_AHEAD_M := 800.0
+## A look whose wanted centre is this close to the live one keeps it.
+const LOOK_RECENTRE_M := 300.0
+
+## Lat/lon to rebuild the world around for look `l`, or Vector2.INF when
+## the live centre already serves it (or --keep_centre).
+func _look_centre(view: View360, l: Array) -> Vector2:
+	if _keep_centre:
+		return Vector2.INF
+	var b := deg_to_rad(float(l[3]))
+	var eye := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
+	# Bearing 0 looks north (-Z), 90 east (+X), as CameraRig.set_look(-bearing).
+	var want := eye + Vector2(sin(b), -cos(b)) * LOOK_AHEAD_M * WorldScale.metres_to_units()
+	if want.length() <= LOOK_RECENTRE_M * WorldScale.metres_to_units():
+		return Vector2.INF
+	return WorldScale.latlon_from_xz(want.x, want.y, view._data.latitude, view._data.longitude)
 
 ## Stands the camera at look `l` ([lat, lon, height_m, bearing°, pitch°, zoom]).
 func _place_eye(view: View360, id: String, shot: String, l: Array) -> void:
