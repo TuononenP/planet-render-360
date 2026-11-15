@@ -222,12 +222,15 @@ static func sweep() -> void:
 	if _swept:
 		return
 	_swept = true
-	for d in [TEMP_DIR, PhotoMode.fallback_video_dir()]:
+	for d in {TEMP_DIR: true, PhotoMode.fallback_video_dir(): true, PhotoMode.chosen_video_dir(): true}.keys():
+		if d == "":
+			continue
 		for f in temp_files(d):
 			var path := ProjectSettings.globalize_path(d.path_join(f))
-			if is_finished_mp4(path):
-				_keep(path, file_name(RECOVERED_PLACE, Time.get_datetime_dict_from_system()))
-			DirAccess.remove_absolute(path)
+			# One that couldn't be kept anywhere waits for the next run.
+			if not is_finished_mp4(path) \
+					or _keep(path, file_name(RECOVERED_PLACE, Time.get_datetime_dict_from_system())) != "":
+				DirAccess.remove_absolute(path)
 
 ## The temporary video files in `dir` (hidden: their names start with a dot).
 static func temp_files(dir: String) -> Array[String]:
@@ -294,11 +297,16 @@ static func index_shared(path: String) -> void:
 		return
 	scanner.call("scanFile", activity, PackedStringArray([path]), PackedStringArray(["video/mp4"]), null)
 
-## Where this recording is written while it runs (see TEMP_DIR). Android's
-## Movies is shared storage, reached through MediaStore rather than plain
-## file paths, so the encoder writes privately there and the finished file
-## is copied in.
+## Where this recording is written while it runs (see TEMP_DIR): the
+## folder chosen in Settings when there is one, so keeping it is a rename
+## and a folder that can't be written fails at Start, not at Stop.
+## Android's Movies is shared storage, reached through MediaStore rather
+## than plain file paths, so the encoder writes privately there and the
+## finished file is copied in.
 static func temp_dir() -> String:
+	var chosen := PhotoMode.chosen_video_dir()
+	if chosen != "":
+		return chosen
 	if PhotoMode.has_save_dialog() or OS.get_name() == "Android":
 		return TEMP_DIR
 	return PhotoMode.fallback_video_dir()
@@ -419,7 +427,8 @@ func _finish_now() -> String:
 		if _in_place:
 			VideoRecorder.index_shared(_temp)
 			return _temp
-		path = VideoRecorder._keep(_temp, file_name(_data.place_name if _data != null else "", _local_now()))
+		# Not kept anywhere: the file stays for the next run's sweep.
+		return VideoRecorder._keep(_temp, file_name(_data.place_name if _data != null else "", _local_now()))
 	DirAccess.remove_absolute(_temp)
 	return path
 
@@ -448,13 +457,21 @@ func stop(note: String = "") -> void:
 func _local_now() -> Dictionary:
 	return ViewConditions.place_now(_v) if is_instance_valid(_v) else Time.get_datetime_dict_from_system()
 
-## Moves a finished temporary file into the videos folder under a free
-## name; the path, or "" when it couldn't be kept.
+## Moves a finished temporary file under a free name into the folder
+## chosen in Settings, else the videos folder, else the app's own videos
+## folder; the path, or "" when none of them could take it.
 static func _keep(temp: String, file: String) -> String:
-	var dir := PhotoMode.fallback_video_dir()
-	DirAccess.make_dir_recursive_absolute(dir)
-	var path := PhotoMode.free_path(dir, file)
-	return path if PhotoMode.move_file(temp, path) else ""
+	var dirs := {PhotoMode.chosen_video_dir(): true, PhotoMode.fallback_video_dir(): true,
+		PhotoMode.VIDEO_DIR_FALLBACK: true}
+	for dir: String in dirs.keys():
+		if dir == "":
+			continue
+		DirAccess.make_dir_recursive_absolute(dir)
+		var path := PhotoMode.free_path(dir, file)
+		if PhotoMode.move_file(temp, path):
+			return path
+	push_warning("VideoRecorder: couldn't keep %s anywhere; the next run tries again" % temp)
+	return ""
 
 ## Static, so finishing and saving carry on (and clean up the temporary
 ## file) when the recorder is freed meanwhile; the outcome reaches it
@@ -473,15 +490,22 @@ static func _finish(rec: WeakRef, enc: Object, temp: String, file: String, note:
 		VideoRecorder.index_shared(temp)
 		VideoRecorder._report(rec, temp, false, note, "")
 		return
+	var chosen := PhotoMode.chosen_video_dir()
+	if chosen != "":
+		# A folder chosen in Settings: saved there with no dialog.
+		var to := VideoRecorder._keep(temp, file)
+		VideoRecorder._report(rec, to, to == "",
+			note if to == "" or to.get_base_dir() == chosen else SAVED_INSTEAD, "")
+		return
 	var done := func(path: String, failed: bool) -> void:
 		if failed:
 			# The picked folder couldn't take it: the videos folder keeps
-			# it rather than the recording being lost.
+			# it rather than the recording being lost, or failing that the
+			# file stays for the next run's sweep.
 			var kept := VideoRecorder._keep(temp, file)
-			if kept != "":
-				VideoRecorder._report(rec, kept, false, SAVED_INSTEAD, "")
-				return
-		# Saved (moved away), cancelled, or not saved anywhere.
+			VideoRecorder._report(rec, kept, kept == "", SAVED_INSTEAD if kept != "" else note, "")
+			return
+		# Saved (moved away) or cancelled.
 		DirAccess.remove_absolute(temp)
 		VideoRecorder._report(rec, path, failed, note, "")
 	PhotoMode.save_file(temp, file, "mp4", "MP4 video", "Save video", done)

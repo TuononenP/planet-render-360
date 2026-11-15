@@ -67,6 +67,7 @@ const PREF_DEFAULTS := {
 	"onboarded": false,
 	"horizon_labels": false, "minimap": false, "photo_stamp": true,
 	"video_quality": 1,  # VideoRecorder.QUALITY_LONG: 720p, 1080p, Native
+	"video_dir": "",  # desktop: the folder videos save to; "" asks every time
 	"fps_counter": false,
 	"haze": null,  # null = Auto (on for desktop Ultra, off otherwise)
 }

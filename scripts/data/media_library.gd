@@ -157,7 +157,8 @@ static func update(entry: Dictionary, fields: Dictionary) -> void:
 			return
 
 ## Adopts earlier saves from the folders photos and videos go to with no
-## dialog. Returns how many were added; re-running adds nothing twice.
+## dialog (also the one chosen in Settings and the app's own videos
+## folder). Returns how many were added; re-running adds nothing twice.
 static func import_existing() -> int:
 	var rows := _read_index()
 	var known := {}
@@ -165,9 +166,10 @@ static func import_existing() -> int:
 		if e is Dictionary:
 			known[str(e.get("path", ""))] = true
 	var fresh := 0
-	var dirs := [PhotoMode.fallback_dir(), PhotoMode.fallback_video_dir()]
-	for d: String in ({dirs[0]: true, dirs[1]: true}).keys():
-		if not DirAccess.dir_exists_absolute(d):
+	var dirs := {PhotoMode.fallback_dir(): true, PhotoMode.fallback_video_dir(): true,
+		PhotoMode.chosen_video_dir(): true, PhotoMode.VIDEO_DIR_FALLBACK: true}
+	for d: String in dirs.keys():
+		if d == "" or not DirAccess.dir_exists_absolute(d):
 			continue
 		for name in DirAccess.get_files_at(d):
 			var kind := kind_of_name(name)

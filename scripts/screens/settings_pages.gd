@@ -362,8 +362,54 @@ static func photos(s: SettingsScreen) -> VBoxContainer:
 				s._refresh_summaries())
 		SettingsRows.add(video, SettingsRows.row("Video quality", seg,
 			"Native records at the window's own size, up to 4K. Larger videos take more space."))
+		if PhotoMode.has_save_dialog():
+			SettingsRows.add(video, _video_folder_row(s))
 		_section(page, "Video", video)
 	return page
+
+## Save videos to (desktop): a folder videos save to with no dialog, or
+## Ask every time (the Save dialog after each recording).
+static func _video_folder_row(s: SettingsScreen) -> Control:
+	var tail := HBoxContainer.new()
+	tail.add_theme_constant_override("separation", 8)
+	var shown := UiTheme.label("", 14, UiTheme.MUTED)
+	shown.custom_minimum_size.x = 140
+	shown.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	shown.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	shown.mouse_filter = Control.MOUSE_FILTER_PASS
+	tail.add_child(shown)
+	var choose := UiTheme.ghost_button("Choose…")
+	tail.add_child(choose)
+	var reset := UiTheme.quiet_button("Reset")
+	reset.tooltip_text = "Ask where to save each video"
+	tail.add_child(reset)
+	var sync := func(note: String) -> void:
+		var dir := UiPrefs.video_dir
+		shown.text = note if note != "" else (dir.trim_suffix("/").get_file() if dir != "" else "Ask every time")
+		shown.tooltip_text = dir
+		reset.visible = dir != ""
+	var set_dir := func(dir: String) -> void:
+		if s._settings != null:
+			s._settings.set_pref("video_dir", dir)
+			UiPrefs.apply(s._settings)
+		sync.call("")
+	choose.pressed.connect(func() -> void:
+		var start := UiPrefs.video_dir if UiPrefs.video_dir != "" else PhotoMode.fallback_video_dir()
+		DisplayServer.file_dialog_show("Choose a folder for videos", ProjectSettings.globalize_path(start), "",
+			false, DisplayServer.FILE_DIALOG_MODE_OPEN_DIR, PackedStringArray(),
+			func(ok: bool, paths: PackedStringArray, _filter: int) -> void:
+				if not ok or paths.is_empty() or not is_instance_valid(shown):
+					return
+				# Probed now, not cached: the person may fix a folder and pick it again.
+				if PhotoMode._probe_dir(paths[0], "mp4"):
+					set_dir.call(paths[0])
+				else:
+					sync.call("Can't save to that folder")))
+	reset.pressed.connect(func() -> void: set_dir.call(""))
+	sync.call("")
+	return SettingsRows.row("Save videos to", tail,
+		"Videos save straight to this folder. Ask every time shows the Save dialog after each recording.")
 
 ## Storage: how much the cache holds in total (no size limit — nothing
 ## is removed automatically), a per-place list to clear one place at a

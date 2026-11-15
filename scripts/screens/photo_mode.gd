@@ -105,6 +105,15 @@ static func fallback_video_dir() -> String:
 			return path
 	return VIDEO_DIR_FALLBACK
 
+## The folder chosen in Settings for videos on desktop, saved to with no
+## dialog; "" when none is set or it can't be written now (an unplugged
+## drive): probed on every ask, not cached like usable_dir.
+static func chosen_video_dir() -> String:
+	var dir := UiPrefs.video_dir
+	if dir == "" or dir_override != "" or OS.has_feature("mobile"):
+		return ""
+	return dir if _probe_dir(dir, "mp4") else ""
+
 ## `photo` with the stamp rendered over its lower left (needs a window:
 ## a SubViewport draws the text). Returns `photo` itself if nothing could
 ## be rendered.
@@ -207,9 +216,14 @@ static func save_file(src: String, file: String, extension: String, kind: String
 ## Moves `src` to `dst`: a rename on the same volume (instant, however big
 ## the file), else a copy. `src` is left in place when the copy fails.
 static func move_file(src: String, dst: String) -> bool:
-	if DirAccess.rename_absolute(src, dst) == OK:
+	var renamed := DirAccess.rename_absolute(src, dst)
+	if renamed == OK:
 		return true
-	if DirAccess.copy_absolute(src, dst) != OK:
+	var copied := DirAccess.copy_absolute(src, dst)
+	if copied != OK:
+		# Left in the log: why a save failed (a protected folder, a missing file).
+		push_warning("PhotoMode: couldn't move %s (exists: %s) to %s: rename %s, copy %s" % [
+			src, FileAccess.file_exists(src), dst, error_string(renamed), error_string(copied)])
 		return false
 	DirAccess.remove_absolute(src)
 	return true

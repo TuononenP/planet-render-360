@@ -24,6 +24,8 @@ func _run() -> void:
 	_test_sizes()
 	_test_names()
 	_test_save_file()
+	_test_chosen_folder()
+	_test_keep_falls_back()
 	_test_pacing()
 	_test_formats()
 	_test_stale_frames()
@@ -34,6 +36,7 @@ func _run() -> void:
 		_test_second_start()
 		_test_push_cost()
 		await _test_save_outlives_recorder()
+		await _test_save_to_chosen()
 		_test_recover_leftovers()
 	_test_headless_unsupported()
 	_cleanup()
@@ -101,6 +104,43 @@ func _test_save_file() -> void:
 	PhotoMode.dir_override = ""
 	_check(got.size() == 2 and str(got[0]) == out.path_join("clip-2.mp4"), "a taken name gets -2: %s" % [got])
 	_check(FileAccess.get_file_as_bytes(out.path_join("clip.mp4")) == PackedByteArray([1, 2, 3, 4]), "the first save is kept")
+
+## The folder chosen in Settings counts only while it can be written, and
+## then the recording is written there from the start.
+func _test_chosen_folder() -> void:
+	var chosen := _dir.path_join("chosen")
+	DirAccess.make_dir_recursive_absolute(chosen)
+	UiPrefs.video_dir = ""
+	_check(PhotoMode.chosen_video_dir() == "", "no folder chosen asks every time")
+	UiPrefs.video_dir = _dir.path_join("missing")
+	_check(PhotoMode.chosen_video_dir() == "", "a missing chosen folder isn't used")
+	UiPrefs.video_dir = chosen
+	_check(PhotoMode.chosen_video_dir() == chosen, "a writable chosen folder is used")
+	_check(VideoRecorder.temp_dir() == chosen, "recordings are written in the chosen folder: %s" % VideoRecorder.temp_dir())
+	PhotoMode.dir_override = _dir.path_join("out")
+	_check(PhotoMode.chosen_video_dir() == "", "the test hook wins over the chosen folder")
+	PhotoMode.dir_override = ""
+	UiPrefs.video_dir = ""
+
+## A videos folder that can't take the file: the app's own videos folder
+## keeps it rather than the recording being lost.
+func _test_keep_falls_back() -> void:
+	var blocker := _dir.path_join("blocker")
+	var b := FileAccess.open(blocker, FileAccess.WRITE)
+	b.close()
+	var temp := _dir.path_join(".rec-keep.mp4")
+	var f := FileAccess.open(temp, FileAccess.WRITE)
+	f.store_buffer(PackedByteArray([7, 8]))
+	f.close()
+	# A folder under a file can never be made.
+	PhotoMode.dir_override = blocker.path_join("videos")
+	var name := "planet-render-360_keep-test_20261101-1730.mp4"
+	var kept := VideoRecorder._keep(temp, name)
+	PhotoMode.dir_override = ""
+	_check(kept.get_base_dir() == PhotoMode.VIDEO_DIR_FALLBACK and FileAccess.file_exists(kept),
+		"kept in the app's own videos folder: %s" % kept)
+	_check(not FileAccess.file_exists(temp), "the temporary file is moved")
+	DirAccess.remove_absolute(kept)
 
 func _test_pacing() -> void:
 	# A draw a little early still takes the frame; half a frame early does not.
@@ -319,6 +359,34 @@ func _test_save_outlives_recorder() -> void:
 	_check(VideoRecorder.temp_files(out).is_empty(), "saves leave no temporary files: %s" % [VideoRecorder.temp_files(out)])
 	rec2.queue_free()
 	PhotoMode.dir_override = ""
+
+## With a folder chosen in Settings the video saves there with no dialog.
+func _test_save_to_chosen() -> void:
+	var chosen := _dir.path_join("chosen-save")
+	DirAccess.make_dir_recursive_absolute(chosen)
+	UiPrefs.video_dir = chosen
+	var temp := chosen.path_join(VideoRecorder.TEMP_PREFIX + "chosen.mp4")
+	var enc: Object = ClassDB.instantiate("VideoEncoder")
+	enc.call("start", temp, 64, 64, 30, 500000)
+	var px := PackedByteArray()
+	px.resize(64 * 64 * 4)
+	for i in 5:
+		while not bool(enc.call("push_frame", px, 64, 64, i * 33333)):
+			OS.delay_msec(2)
+	var rec := VideoRecorder.new()
+	root.add_child(rec)
+	rec.state = VideoRecorder.State.SAVING
+	var got: Array = []
+	rec.finished.connect(func(p: String, f: bool, n: String, why: String) -> void: got.append_array([p, f, n, why]))
+	VideoRecorder._finish(weakref(rec), enc, temp, "chosen.mp4", "", self)
+	var n := 0
+	while got.is_empty() and n < 600:
+		await process_frame
+		n += 1
+	_check(got == [chosen.path_join("chosen.mp4"), false, "", ""], "saved to the chosen folder: %s" % [got])
+	_check(VideoRecorder.temp_files(chosen).is_empty(), "no temporary file is left in the chosen folder")
+	rec.queue_free()
+	UiPrefs.video_dir = ""
 
 ## A run that quit mid-save leaves a finished temporary video: the next
 ## run keeps it; one cut off mid-recording (no index) can't play and goes.

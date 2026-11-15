@@ -17,13 +17,15 @@ static var solid_panels := false
 static var high_contrast := false
 ## The 360 viewer's own switches: names along the skyline, the mini-map
 ## inset, the stamp on saved photos, the FPS counter and the size of
-## recorded videos (VideoRecorder.QUALITY_LONG index).
+## recorded videos (VideoRecorder.QUALITY_LONG index), and the folder
+## they save to with no dialog ("" asks every time; PhotoMode.chosen_video_dir).
 static var horizon_labels := false
 static var minimap := false
 static var photo_stamp := true
 static var fps_counter := false
 static var haze := true
 static var video_quality := 1
+static var video_dir := ""
 
 static func apply(s: RenderSettings) -> void:
 	UiTheme.units_imperial = bool(s.pref("imperial"))
@@ -38,6 +40,8 @@ static func apply(s: RenderSettings) -> void:
 	fps_counter = bool(s.pref("fps_counter"))
 	haze = s.haze_pref()
 	video_quality = clampi(int(s.pref("video_quality")), 0, VideoRecorder.QUALITY_LONG.size() - 1)
+	var vd: Variant = s.pref("video_dir")
+	video_dir = vd if vd is String else ""
 	LoadingScreen.reduce_motion = reduce_motion
 	UiTheme.text_scale = clampf(float(s.pref("text_scale")), 0.85, 2.0)
 	UiTheme.apply_mode(int(s.pref("theme")))

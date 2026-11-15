@@ -282,7 +282,7 @@ static func _build_record(v: View360, actions: Container) -> void:
 		elif failed and why != "":
 			say(v, note if note != "" else "Couldn't finish the video", "The recording was lost. Try recording again.", "error")
 		elif failed:
-			say(v, "Couldn't save the video", "Check there is space and the folder can be written to, then try again.", "error")
+			say(v, "Couldn't save the video", "The recording is kept and saves to your videos folder the next time the app opens.", "error")
 		elif path != "":
 			# The recording's own place: the view may show another by now.
 			var listed := not MediaLibrary.add(path, MediaLibrary.VIDEO, rec.recorded_place()).is_empty()
