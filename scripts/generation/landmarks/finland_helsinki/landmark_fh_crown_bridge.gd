@@ -95,12 +95,11 @@ const MAST_ANCHORS := Vector2(101.0, 122.0)
 ## A stay's ends, metres: on the cable boxes in the opening facing its
 ## span, this far to its own side of the pylon's axis; at the deck on a bracket this far outside the edge (far
 ## enough that the straight cable clears the fence where the curving deck
-## swings under it) and this far below the deck top. Its lowest length is
-## a dark anchor tube.
+## swings under it) and this far below the deck top. It ends there in a
+## collar and a black anchor pipe (LandmarkFhStayAnchor).
 const STAY_TOP_HALF := 0.25
 const STAY_OUT_M := 1.2
 const STAY_DROP_M := 0.9
-const ANCHOR_TUBE_M := 3.5
 ## Cross-section, metres from the centre line (positive south): the
 ## tramway's north edge, metre-gauge tracks, the kerbed separator, the
 ## cycle path and footway.
@@ -178,11 +177,13 @@ static func build(model: Node3D) -> void:
 	lm.use("Track", LandmarkMaterials.pbr("concrete", "#B4B1AA", 3.0))
 	lm.use("Cycle", LandmarkMaterials.pbr("asphalt", "#7C4236", 4.0))
 	lm.use("Footway", LandmarkMaterials.pbr("asphalt", "#4A4B4C", 4.0))
-	lm.use("Marking", LandmarkMaterials.paint("#EDEDE8", 0.7, 0.0))
+	var marking := LandmarkMaterials.paint("#EDEDE8", 0.7, 0.0)
+	lm.use("Marking", marking)
 	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#B0ACA3", 3.0))
 	lm.use("Steel", LandmarkMaterials.paint("#B9BEC2", 0.45, 0.55))
 	lm.use("Slats", _slat_material())
-	lm.use("Pole", LandmarkMaterials.paint("#3B4045", 0.5, 0.45))
+	var pole := LandmarkMaterials.paint("#3B4045", 0.5, 0.45)
+	lm.use("Pole", pole)
 	lm.use("Fitting", LandmarkMaterials.paint("#A8864E", 0.4, 0.7))
 	lm.use("StayLamp", _stay_material())
 	lm.use("Rail", LandmarkMaterials.paint("#4F5254", 0.35, 0.8))
@@ -195,7 +196,7 @@ static func build(model: Node3D) -> void:
 	_poles(lm, plan)
 	_piers(lm)
 	_pylon(lm)
-	_stays(lm)
+	_stays(lm, LandmarkFhStayAnchor.part(pole, marking))
 	lm.commit(model)
 	model.set_meta(LandmarkLights.FLOOD_META, flood_spots())
 	model.set_meta(LandmarkLights.HALO_META, beacon_halos())
@@ -929,24 +930,25 @@ static func stay_pairs() -> Array:
 ## Stays in two planes: every pair runs from the cable boxes in the
 ## opening of the pylon's end face towards it, near the top, down to
 ## brackets standing off both edge girders, outside the
-## fences. Each cable starts from its bracket as a dark anchor tube.
-static func _stays(lm: LandmarkMesh) -> void:
+## fences. Each cable ends on its bracket in a collar and a dark anchor pipe.
+static func _stays(lm: LandmarkMesh, anchor: LandmarkMesh) -> void:
 	for pair: Array in stay_pairs():
 		var s: float = pair[0]
 		var d := at(s)
 		var dt := heading(s)
 		var dn := Vector3(-dt.y, 0, dt.x)
-		var basis := Basis(Vector3(dt.x, 0, dt.y), Vector3.UP, dn)
 		for side: float in [-1.0, 1.0]:
 			var ends := stay_ends(s, float(pair[1]), side)
 			var top: Vector3 = ends[0]
 			var low: Vector3 = ends[1]
-			var sheath := low + (top - low).normalized() * ANCHOR_TUBE_M
-			lm.beam("Pole", low, sheath, 0.45, 0.45)
-			lm.beam("StayLamp", sheath, top, 0.22, 0.22)
-			# A steel rib cantilevering from under the deck edge to the anchor.
-			lm.box("Girder", low - dn * side * (STAY_OUT_M * 0.5 + 0.4) - Vector3.UP * 0.35,
-				Vector3(0.5, 1.0, STAY_OUT_M + 1.4), basis, 0.0)
+			var along := (top - low).normalized()
+			# The white cable ends in a black collar by the edge band's lower
+			# edge; the anchor pipe hangs from it below the deck edge.
+			LandmarkFhStayAnchor.place(lm, anchor, low, along)
+			lm.beam("StayLamp", LandmarkFhStayAnchor.cable_start(low, along), top, 0.22, 0.22)
+			# A slim steel rib from under the girder out to the pipe.
+			var rib := low - Vector3.UP * 0.15
+			lm.beam("Girder", rib - dn * side * (STAY_OUT_M + 1.0), rib - dn * side * 0.1, 0.3, 0.5, Vector3(dt.x, 0, dt.y))
 
 ## Four-sided prism from a rectangle at `base` (half-sizes h0 along t
 ## and n) up `h` metres to one of half-sizes h1, with a top cap.

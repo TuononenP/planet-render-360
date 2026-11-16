@@ -72,8 +72,8 @@ func _check_model(failures: Array[String]) -> void:
 			LandmarkFhCrownBridge.CAP_DEPTH_M, bounds.position.y])
 	_check_pylon(failures)
 	_check_stays(failures)
-	if tris > 60000:
-		failures.append("%d triangles is over the 60k budget" % tris)
+	if tris > 66000:
+		failures.append("%d triangles is over the 66k budget" % tris)
 	print("KRUUNUVUORENSILTA model: %d parts, %d tris, bounds %s" % [parts.size(), tris, bounds])
 	# Night: the deck's own lamps and the red aviation lights glow, and the
 	# floodlights stand round the pylon aimed up it, not round the bounds.
