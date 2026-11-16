@@ -5,14 +5,18 @@ extends RefCounted
 ## bridge: 1191 m of curved composite deck from Korkeasaari's Palosaari
 ## tip to Kruunuvuorenranta carrying two tram tracks on its north half
 ## and the cycle path and footway on its south edge behind a wind screen,
-## hung by 17 pairs of stays in one central plane from one 135 m white
-## concrete pylon. The pylon is a slender needle standing through the
-## deck's median on the artificial islet between Nimismies and Emäntä:
-## two legs in line along the bridge forming a slim diamond, rising as a
-## V from one foot on the islet, widest apart at the deck and closing
-## near the top; the stays land on the median strip. The 260 m main span over the channel to the
-## east keeps 20 m clearance; the back span to the west rests on
-## auxiliary piers, and both approaches on V piers 64 to 72 m apart.
+## hung from one 135 m white concrete pylon by 17 pairs of stays each
+## way (68 cables, 90 to 257 m long) in two planes. The pylon is a
+## slender needle standing through the deck's median on the artificial
+## islet between Nimismies and Emäntä: two legs in line along the bridge
+## forming a slim diamond, each an octagon in section, rising as a V from
+## one foot on the islet,
+## widest apart at the deck and merging two thirds of the way up; near
+## the top a tall rectangular opening in each end face holds the cable
+## boxes, and from them the stays fan out to brackets outside both deck
+## edges. Both stayed spans, 260 m each way from the pylon, stand free of
+## piers; the eastern one over the channel keeps 20 m clearance. Beyond
+## them both approaches rest on V piers 64 to 70 m apart.
 ## Built along the bridge's mapped curve (KruunuvuorensiltaLine) at yaw 0,
 ## y = 0 at sea level. The deck crests at 24 m over the main span, lands
 ## at 3.5 m on the Kruunuvuorenranta shore and 7 m on the Palosaari
@@ -29,23 +33,36 @@ const ROUND_M := 3.0
 const CREST_BACK_M := 30.0
 const CREST_MAIN_M := 300.0
 const MAIN_SPAN_M := 260.0
-const PIER_STEP_M := 66.0
-const BACK_PIERS: Array[float] = [72.0, 144.0, 216.0]
+const BACK_SPAN_M := 260.0
+const PIER_STEP_M := 70.0
 ## The pylon's axis, metres south of the deck centre line: in the median
 ## between the tramway's separator and the cycle path.
 const PYLON_X := 2.6
-## Where the slit between the two legs closes and the solid head starts.
-const JOIN_M := 120.0
+## Where the slit between the two legs closes and the solid shaft starts.
+const JOIN_M := 92.0
 ## The pylon is a slim diamond along the deck: its two legs rise as a V
 ## from one foot on the plinth, are widest apart at the deck (the slit's
 ## half-width SLIT_DECK there) and close again as a long A at JOIN_M.
-## A leg's length along the deck at the plinth (x) and at JOIN_M (y),
-## the head's half-length at the mast top, and the half-thickness across
+## Its outer half-length along the deck at the plinth (x), at the knee
+## in the deck (y) and at the mast top (z), and its half-thickness across
 ## the deck at the water (x) and the mast top (y), metres.
-const LEG_LONG := Vector2(3.6, 1.91)
-const HEAD_TOP_M := 1.6
+const LEG_OUT := Vector3(3.6, 5.0, 1.9)
 const LEG_THICK := Vector2(1.6, 1.1)
 const SLIT_DECK := 1.75
+## The legs are eight-sided: every corner is cut back by this share of
+## the leg's thickness across the deck (0.29 makes a near-regular
+## octagon). Above JOIN_M the cut eases to HEAD_CHAMFER_M at the cable
+## opening's sill, so the opening's side walls keep their thickness.
+const CHAMFER_SHARE := 0.29
+const HEAD_CHAMFER_M := 0.3
+## The cable opening near the top, a rectangle in each end face of the
+## pylon (the faces looking along the deck, where the stays enter): its
+## sill and head heights and its half-width across the deck, metres. It
+## frames the cable zone (kruunusillat.fi: 101 to 122 m). The steel cable
+## boxes fill it SLOT_INSET_M behind each face.
+const SLOT_M := Vector2(99.0, 124.0)
+const SLOT_HALF := 0.65
+const SLOT_INSET_M := 0.7
 ## The legs stand on the islet plinth at this height.
 const PLINTH_TOP_M := 3.8
 ## The kerbed median island round the legs on the deck: its half-length
@@ -56,17 +73,23 @@ const ISLAND_HALF_M := 14.0
 const CAP_DEPTH_M := 4.0
 const MAST_TOP_M := 131.5
 const PYLON_TOP_M := 135.0
-## Stays per direction (17 pairs in all) and their deck reach, metres
-## from the pylon; the farthest is anchored highest on the mast.
-const STAYS_EAST := 9
-const STAYS_WEST := 8
+## Stay pairs per direction (kruunusillat.fi, YIT: 17 each way, one
+## cable of a pair on each deck edge) and their deck reach, metres from
+## the pylon; the farthest is anchored highest in the cable opening.
+const STAYS_EAST := 17
+const STAYS_WEST := 17
 const REACH_EAST := Vector2(44.0, 236.0)
 const REACH_WEST := Vector2(40.0, 214.0)
-const MAST_ANCHORS := Vector2(84.0, 128.0)
-## The stays land on the separator kerb: the line they follow, metres
-## south of the centre line, and the half-spacing of each pair's cables.
-const STAY_LINE := 0.6
-const STAY_PAIR := 0.3
+const MAST_ANCHORS := Vector2(101.0, 122.0)
+## A stay's ends, metres: on the cable boxes in the opening facing its
+## span, this far to its own side of the pylon's axis; at the deck on a bracket this far outside the edge (far
+## enough that the straight cable clears the fence where the curving deck
+## swings under it) and this far below the deck top. Its lowest length is
+## a dark anchor tube.
+const STAY_TOP_HALF := 0.25
+const STAY_OUT_M := 1.2
+const STAY_DROP_M := 0.9
+const ANCHOR_TUBE_M := 3.5
 ## Cross-section, metres from the centre line (positive south): the
 ## tramway's north edge, metre-gauge tracks, the kerbed separator, the
 ## cycle path and footway.
@@ -481,15 +504,13 @@ static func _poles(lm: LandmarkMesh, plan: Dictionary) -> void:
 					0.05, 0.05)
 		last = i
 
-## Pier positions along the deck: auxiliary piers under the back span,
-## the anchor pier closing the main span, then the approach piers.
+## Pier positions along the deck: none under either stayed span; the
+## anchor pier closing each of them, then the approach piers beyond.
 static func pier_s() -> PackedFloat32Array:
 	var sp := pylon_s()
 	var total := length_m()
 	var out := PackedFloat32Array()
-	for d in BACK_PIERS:
-		out.append(sp - d)
-	var s := sp - BACK_PIERS[BACK_PIERS.size() - 1] - PIER_STEP_M
+	var s := sp - BACK_SPAN_M
 	while s > 40.0:
 		out.append(s)
 		s -= PIER_STEP_M
@@ -503,10 +524,10 @@ static func pier_s() -> PackedFloat32Array:
 ## (no plinth), its sides already leaning out with the V's flare; from its
 ## top the V notch opens and two broad square legs splay up straight into
 ## the soffit. The taller the pier, the lower (as a share of its height)
-## the notch starts, so the tall ones read as a more open V. The main
-## span's anchor pier is heavier.
+## the notch starts, so the tall ones read as a more open V. The anchor
+## piers closing the two stayed spans are heavier.
 static func _piers(lm: LandmarkMesh) -> void:
-	var anchor := pylon_s() + MAIN_SPAN_M
+	var anchors: Array[float] = [pylon_s() + MAIN_SPAN_M, pylon_s() - BACK_SPAN_M]
 	for s in pier_s():
 		var c := at(s)
 		var t := heading(s)
@@ -514,7 +535,7 @@ static func _piers(lm: LandmarkMesh) -> void:
 		var n3 := Vector3(-t.y, 0, t.x)
 		var base := Vector3(c.x, 0.0, c.y)
 		var y1 := deck_y(s) - DEPTH_M + 0.2
-		var grow := 1.3 if absf(s - anchor) < 1.0 else 1.0
+		var grow := 1.3 if absf(s - anchors[0]) < 1.0 or absf(s - anchors[1]) < 1.0 else 1.0
 		var tall := clampf((y1 - 6.0) / 14.0, 0.0, 1.0)
 		# The legs meet the deck near its edges, just inside where the
 		# soffit (1.8 m in from each edge) turns up into its chamfers.
@@ -591,7 +612,7 @@ static func _rod(lm: LandmarkMesh, a: Vector3, b: Vector3, r: float) -> void:
 ## The pylon's frame: its axis at sea level (in the median, PYLON_X south
 ## of the deck centre line) and the unit vectors along (t3) and across
 ## (n3) the deck.
-static func _pylon_frame() -> Array:
+static func pylon_frame() -> Array:
 	var sp := pylon_s()
 	var c := at(sp)
 	var t := heading(sp)
@@ -605,43 +626,121 @@ static func pylon_knee_y() -> float:
 	return deck_y(pylon_s()) - DEPTH_M * 0.5
 
 ## The pylon's section at height y, metres: its outer half-length along
-## the deck (x), the slit's half-width there (y: nothing on the plinth,
-## widest at the knee, nothing again from JOIN_M up) and its
-## half-thickness across the deck (z). Each piece is linear in y, so
-## every face is flat.
+## the deck (x), the half-width of the slit between its legs (y: nothing
+## on the plinth, widest at the knee, nothing again from JOIN_M up) and
+## its half-thickness across the deck (z). Each piece is linear in y, so every face is flat.
 static func pylon_section(y: float) -> Vector3:
 	var yk := pylon_knee_y()
 	var g := 0.0
+	var a := 0.0
 	if y <= yk:
-		g = SLIT_DECK * clampf((y - PLINTH_TOP_M) / (yk - PLINTH_TOP_M), 0.0, 1.0)
+		var f := clampf((y - PLINTH_TOP_M) / (yk - PLINTH_TOP_M), 0.0, 1.0)
+		g = SLIT_DECK * f
+		a = lerpf(LEG_OUT.x, LEG_OUT.y, f)
 	else:
 		g = SLIT_DECK * maxf(0.0, (JOIN_M - y) / (JOIN_M - yk))
-	var a := 0.0
-	if y < JOIN_M:
-		a = g + lerpf(LEG_LONG.x, LEG_LONG.y, clampf((y - PLINTH_TOP_M) / (JOIN_M - PLINTH_TOP_M), 0.0, 1.0))
-	else:
-		a = lerpf(LEG_LONG.y, HEAD_TOP_M, (y - JOIN_M) / (MAST_TOP_M - JOIN_M))
+		a = lerpf(LEG_OUT.y, LEG_OUT.z, clampf((y - yk) / (MAST_TOP_M - yk), 0.0, 1.0))
 	return Vector3(a, g, lerpf(LEG_THICK.x, LEG_THICK.y, y / MAST_TOP_M))
 
+## How far the pylon's corners are cut back at height y, metres: a share
+## of the legs' thickness up to JOIN_M, easing above it to the head's
+## smaller cut at the cable opening's sill.
+static func pylon_chamfer(y: float) -> float:
+	var legs := CHAMFER_SHARE * 2.0 * pylon_section(minf(y, JOIN_M)).z
+	return lerpf(legs, HEAD_CHAMFER_M, clampf((y - JOIN_M) / (SLOT_M.x - JOIN_M), 0.0, 1.0))
+
+## Eight corners at height y round the rectangle t0..t1 along the deck by
+## n0..n1 across it (metres about the pylon's axis, frame `fr`), its two
+## corners on the n0 side cut back by `ca` and those on the n1 side by `cb`.
+static func _ring(fr: Array, y: float, t0: float, t1: float, n0: float, n1: float, ca: float,
+		cb: float) -> PackedVector3Array:
+	var o: Vector3 = (fr[0] as Vector3) + Vector3.UP * y
+	var out := PackedVector3Array()
+	for p: Vector2 in [Vector2(t0 + ca, n0), Vector2(t1 - ca, n0), Vector2(t1, n0 + ca), Vector2(t1, n1 - cb),
+			Vector2(t1 - cb, n1), Vector2(t0 + cb, n1), Vector2(t0, n1 - cb), Vector2(t0, n0 + ca)]:
+		out.append(o + (fr[1] as Vector3) * p.x + (fr[2] as Vector3) * p.y)
+	return out
+
+## The pylon's whole eight-sided outline at height y.
+static func _body_ring(fr: Array, y: float) -> PackedVector3Array:
+	var q := pylon_section(y)
+	var c := pylon_chamfer(y)
+	return _ring(fr, y, -q.x, q.x, -q.z, q.z, c, c)
+
+## Side faces between two rings of eight corners (an uncut corner, two
+## corners at one point, makes no face).
+static func _prism(lm: LandmarkMesh, key: String, r0: PackedVector3Array, r1: PackedVector3Array) -> void:
+	var mid := Vector3.ZERO
+	for i in 8:
+		mid += (r0[i] + r1[i]) / 16.0
+	for i in 8:
+		var j := (i + 1) % 8
+		if r0[i].is_equal_approx(r0[j]) and r1[i].is_equal_approx(r1[j]):
+			continue
+		var nrm := (r0[j] - r0[i]).cross(r1[i] - r0[i]).normalized()
+		if nrm.dot((r0[i] + r0[j] + r1[i] + r1[j]) * 0.25 - mid) < 0.0:
+			nrm = -nrm
+		lm.quad(key, r0[i], r0[j], r1[j], r1[i], nrm)
+
+## Flat face closing a ring of eight corners, facing `nrm`.
+static func _ring_cap(lm: LandmarkMesh, key: String, r: PackedVector3Array, nrm: Vector3) -> void:
+	lm.quad(key, r[0], r[1], r[2], r[3], nrm)
+	lm.quad(key, r[0], r[3], r[4], r[7], nrm)
+	lm.quad(key, r[4], r[5], r[6], r[7], nrm)
+
 ## The pylon, a slender needle through the deck's median: a plinth on the
-## islet; two legs in line along the deck, splaying as a V from one foot
-## on the plinth to the deck and closing again to JOIN_M;
-## the solid head tapering to the mast top; the service balcony, red
+## islet; two eight-sided legs in line along the deck, splaying as a V
+## from one foot on the plinth to the knee inside the deck and closing
+## again to JOIN_M; the solid eight-sided shaft above them, with the
+## cable opening in both end faces near the top; the service balcony, red
 ## aviation lights and the lightning rod at 135 m.
 static func _pylon(lm: LandmarkMesh) -> void:
-	var fr := _pylon_frame()
+	var fr := pylon_frame()
 	var base: Vector3 = fr[0]
 	var t3: Vector3 = fr[1]
 	var n3: Vector3 = fr[2]
 	var basis := Basis(t3, Vector3.UP, n3)
 	# The islet plinth reaches down to the seabed.
 	lm.box("Footing", base, Vector3(14.0, 8.0, 7.0), basis, 0.0)
+	# Each leg: its inner face on the slit, its outer face on the pylon's
+	# outline, all four corners cut. At JOIN_M the slit has closed, so the
+	# two legs' tops fill the shaft's base.
+	var yk := pylon_knee_y()
 	for side: float in [-1.0, 1.0]:
-		_leg_shaft(lm, base, t3, n3, side)
-	# The head stands on the legs where the slit closes, flush with them.
-	var head := pylon_section(JOIN_M)
-	_taper(lm, "Concrete", base + Vector3.UP * JOIN_M, t3, n3, Vector2(head.x, head.z),
-		Vector2(HEAD_TOP_M, LEG_THICK.y), MAST_TOP_M - JOIN_M)
+		var rings: Array[PackedVector3Array] = []
+		for y: float in [PLINTH_TOP_M, yk, JOIN_M]:
+			var q := pylon_section(y)
+			var c := pylon_chamfer(y)
+			rings.append(_ring(fr, y, minf(side * q.y, side * q.x), maxf(side * q.y, side * q.x), -q.z, q.z, c, c))
+		_prism(lm, "Concrete", rings[0], rings[1])
+		_prism(lm, "Concrete", rings[1], rings[2])
+	# The solid shaft from the legs up to the opening's sill (its top
+	# face); a wall on each side across the deck leaves the opening between
+	# them, filled behind both end faces by the steel cable boxes; the cap
+	# closes it, with its soffit.
+	var join := _body_ring(fr, JOIN_M)
+	var sill_ring := _body_ring(fr, SLOT_M.x)
+	var head_ring := _body_ring(fr, SLOT_M.y)
+	var top_ring := _body_ring(fr, MAST_TOP_M)
+	_prism(lm, "Concrete", join, sill_ring)
+	_ring_cap(lm, "Concrete", join, Vector3.DOWN)
+	_ring_cap(lm, "Concrete", sill_ring, Vector3.UP)
+	_prism(lm, "Concrete", head_ring, top_ring)
+	_ring_cap(lm, "Concrete", head_ring, Vector3.DOWN)
+	_ring_cap(lm, "Concrete", top_ring, Vector3.UP)
+	var sill := pylon_section(SLOT_M.x)
+	var cap := pylon_section(SLOT_M.y)
+	_taper(lm, "Steel", base + Vector3.UP * SLOT_M.x, t3, n3, Vector2(sill.x - SLOT_INSET_M, SLOT_HALF),
+		Vector2(cap.x - SLOT_INSET_M, SLOT_HALF), SLOT_M.y - SLOT_M.x)
+	for side: float in [-1.0, 1.0]:
+		var walls: Array[PackedVector3Array] = []
+		for q: Vector3 in [sill, cap]:
+			var y := SLOT_M.x if q == sill else SLOT_M.y
+			if side > 0.0:
+				walls.append(_ring(fr, y, -q.x, q.x, SLOT_HALF, q.z, 0.0, HEAD_CHAMFER_M))
+			else:
+				walls.append(_ring(fr, y, -q.x, q.x, -q.z, -SLOT_HALF, HEAD_CHAMFER_M, 0.0))
+		_prism(lm, "Concrete", walls[0], walls[1])
 	lm.box("Steel", base + Vector3.UP * 128.5, Vector3(5.4, 0.35, 4.6), basis)
 	lm.box("Steel", base + Vector3.UP * (MAST_TOP_M + 0.4), Vector3(1.4, 0.8, 1.4), basis)
 	lm.beam("Steel", base + Vector3.UP * (MAST_TOP_M + 0.8), base + Vector3.UP * PYLON_TOP_M, 0.2, 0.2)
@@ -655,36 +754,6 @@ static func _pylon(lm: LandmarkMesh) -> void:
 			lm.box("BeaconLamp", base + t3 * side * (pylon_section(y).x + 0.2) + Vector3.UP * y, Vector3(0.5, 0.8, 0.9),
 				basis, 0.0)
 	_island(lm)
-
-## One leg of the pylon, on the `side` (along the deck) of the slit: two
-## straight four-sided shafts, leaning out as a V from the plinth (where
-## the legs share one foot) to the knee inside the deck, then in to
-## JOIN_M, its inner face on the slit and its outer face on the pylon's
-## outline. At JOIN_M the slit has closed, so the two legs' tops are
-## exactly the head's base.
-static func _leg_shaft(lm: LandmarkMesh, base: Vector3, t3: Vector3, n3: Vector3, side: float) -> void:
-	# Corners round the shaft: inner and outer along the deck, each on both
-	# faces across it.
-	var corner := func(y: float, i: int) -> Vector3:
-		var q := pylon_section(y)
-		var along := q.y if i == 0 or i == 3 else q.x
-		var across := -q.z if i < 2 else q.z
-		return base + Vector3.UP * y + t3 * side * along + n3 * across
-	var yk := pylon_knee_y()
-	for seg: Vector2 in [Vector2(PLINTH_TOP_M, yk), Vector2(yk, JOIN_M)]:
-		var ym := (seg.x + seg.y) * 0.5
-		var qm := pylon_section(ym)
-		var mid := base + Vector3.UP * ym + t3 * side * (qm.x + qm.y) * 0.5
-		for i in 4:
-			var j := (i + 1) % 4
-			var a: Vector3 = corner.call(seg.x, i)
-			var b: Vector3 = corner.call(seg.x, j)
-			var c: Vector3 = corner.call(seg.y, j)
-			var d: Vector3 = corner.call(seg.y, i)
-			var nrm := (b - a).cross(d - a).normalized()
-			if nrm.dot((a + b + c + d) * 0.25 - mid) < 0.0:
-				nrm = -nrm
-			lm.quad("Concrete", a, b, c, d, nrm)
 
 ## The kerbed median island round the pylon's legs: a lozenge on the cycle
 ## path's north edge against the separator, as wide as the pylon plus a
@@ -717,7 +786,7 @@ static func _island(lm: LandmarkMesh) -> void:
 static func flood_spots() -> Array:
 	var sp := pylon_s()
 	var c := at(sp)
-	var fr := _pylon_frame()
+	var fr := pylon_frame()
 	var base: Vector3 = fr[0]
 	var t3: Vector3 = fr[1]
 	var n3: Vector3 = fr[2]
@@ -757,7 +826,7 @@ static func flood_spots() -> Array:
 ## model metres): a wide one on the top, smaller ones on both narrow ends
 ## of the pylon at 72 m and 102 m.
 static func beacon_halos() -> Array:
-	var fr := _pylon_frame()
+	var fr := pylon_frame()
 	var base: Vector3 = fr[0]
 	var t3: Vector3 = fr[1]
 	var out: Array = [[base + Vector3.UP * (MAST_TOP_M + 1.3), TOP_HALO_M, BEACON_RED]]
@@ -766,34 +835,51 @@ static func beacon_halos() -> Array:
 			out.append([base + t3 * side * (pylon_section(y).x + 0.5) + Vector3.UP * y, MAST_HALO_M, BEACON_RED])
 	return out
 
-## Stays in one central plane: each pair astride the pylon's axis, from
-## the leg facing its span (in the slit zone; the highest on the solid
-## head), fanning both ways along the curve to anchors on the separator
-## kerb.
-static func _stays(lm: LandmarkMesh) -> void:
+## Both ends of the stay at deck arc length `s`, anchored `ym` up the
+## pylon, on the deck edge `side` (-1 north, 1 south): [on the cable
+## boxes in the opening of the end face towards it, on its bracket
+## outside the deck edge], model metres.
+static func stay_ends(s: float, ym: float, side: float) -> Array:
+	var fr := pylon_frame()
+	var d := at(s)
+	var dt := heading(s)
+	var dn := Vector3(-dt.y, 0, dt.x)
+	var along := signf(s - pylon_s()) * (pylon_section(ym).x - SLOT_INSET_M)
+	return [(fr[0] as Vector3) + (fr[1] as Vector3) * along + (fr[2] as Vector3) * side * STAY_TOP_HALF + Vector3.UP * ym,
+		Vector3(d.x, deck_y(s) - STAY_DROP_M, d.y) + dn * side * (d.z + STAY_OUT_M)]
+
+## Every stay pair as [deck arc length, height on the pylon]: fanning
+## both ways along the curve, the farthest anchored highest.
+static func stay_pairs() -> Array:
 	var sp := pylon_s()
-	var fr := _pylon_frame()
-	var base: Vector3 = fr[0]
-	var t3: Vector3 = fr[1]
-	var n3: Vector3 = fr[2]
+	var out: Array = []
 	for dir: float in [1.0, -1.0]:
 		var count := STAYS_EAST if dir > 0.0 else STAYS_WEST
 		var reach := REACH_EAST if dir > 0.0 else REACH_WEST
 		for k in count:
 			var f := float(k) / (count - 1)
-			var s: float = sp + dir * lerpf(reach.x, reach.y, f)
-			var ym := lerpf(MAST_ANCHORS.x, MAST_ANCHORS.y, f)
-			var q := pylon_section(ym)
-			var hub := base + t3 * dir * (q.x + q.y) * 0.5 + Vector3.UP * ym
-			var d := at(s)
-			var dt := heading(s)
-			var dn := Vector3(-dt.y, 0, dt.x)
-			var yd := deck_y(s)
-			for side: float in [-1.0, 1.0]:
-				var top := hub + n3 * side * STAY_PAIR
-				var low := Vector3(d.x, yd + KERB_M, d.y) + dn * (STAY_LINE + side * STAY_PAIR)
-				lm.beam("StayLamp", top, low, 0.22, 0.22)
-				lm.box("Girder", low, Vector3(0.9, 0.7, 0.3), Basis(Vector3(dt.x, 0, dt.y), Vector3.UP, dn), 0.0)
+			out.append([sp + dir * lerpf(reach.x, reach.y, f), lerpf(MAST_ANCHORS.x, MAST_ANCHORS.y, f)])
+	return out
+
+## Stays in two planes: every pair runs from the cable boxes in the
+## opening of the pylon's end face towards it, near the top, down to
+## brackets standing off both edge girders, outside the
+## fences. Each cable starts from its bracket as a dark anchor tube.
+static func _stays(lm: LandmarkMesh) -> void:
+	for pair: Array in stay_pairs():
+		var s: float = pair[0]
+		var d := at(s)
+		var dt := heading(s)
+		var dn := Vector3(-dt.y, 0, dt.x)
+		var basis := Basis(Vector3(dt.x, 0, dt.y), Vector3.UP, dn)
+		for side: float in [-1.0, 1.0]:
+			var ends := stay_ends(s, float(pair[1]), side)
+			var top: Vector3 = ends[0]
+			var low: Vector3 = ends[1]
+			var sheath := low + (top - low).normalized() * ANCHOR_TUBE_M
+			lm.beam("Pole", low, sheath, 0.45, 0.45)
+			lm.beam("StayLamp", sheath, top, 0.22, 0.22)
+			lm.box("Girder", low - dn * side * (STAY_OUT_M * 0.5), Vector3(0.9, 0.5, STAY_OUT_M + 0.5), basis, 0.0)
 
 ## Four-sided prism from a rectangle at `base` (half-sizes h0 along t
 ## and n) up `h` metres to one of half-sizes h1, with a top cap.

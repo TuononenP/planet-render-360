@@ -12,8 +12,8 @@ extends RefCounted
 ## The pylon stands on Kruunuvuorensillan tekosaari (way 1033592478),
 ## the artificial islet between Nimismies and Emäntä.
 ## Sources: OpenStreetMap (ODbL); fi Wikipedia "Kruunuvuorensilta" and
-## kruunusillat.fi (1191 m, 135 m pylon, 17 stay pairs, longest stay
-## 257 m, 20 m navigation clearance, tram, cycle and footpaths, the paths
+## kruunusillat.fi (1191 m, 135 m pylon, 17 stay pairs each side of it,
+## 90 to 257 m long, anchored 101 to 122 m up, 20 m navigation clearance, tram, cycle and footpaths, the paths
 ## on the south edge behind a wind screen); ASCE Civil Engineering Source
 ## 2026-04 (diamond-shaped pylon, about 250 m cable-stayed spans each way).
 
