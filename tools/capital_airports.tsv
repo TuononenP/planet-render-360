@@ -1,0 +1,15 @@
+# cc	city	icao	lat	lon	name	wiki_title	half_m	aliases (comma separated)
+# The airport's reference point, rough: `build` finds the aerodrome by ICAO code and measures it.
+# half_m: reach round the point for a fallback box query when the ICAO lookup finds nothing.
+IS	Reykjavik	BIRK	64.1300	-21.9406	Reykjavik Airport	Reykjavík Airport	2500	reykjavik airport,reykjavíkurflugvöllur,rkv
+EE	Tallinn	EETN	59.4133	24.8328	Tallinn Airport	Tallinn Airport	3000	tallinn airport,lennart meri tallinn airport,tll
+SE	Stockholm	ESSB	59.3544	17.9417	Stockholm Bromma Airport	Stockholm Bromma Airport	2500	stockholm bromma airport,bromma airport,bma
+PT	Lisbon	LPPT	38.7742	-9.1342	Lisbon Airport	Humberto Delgado Airport	3000	lisbon airport,humberto delgado airport,aeroporto de lisboa,lis
+US	Washington	KDCA	38.8512	-77.0402	Reagan National Airport	Ronald Reagan Washington National Airport	2500	reagan national airport,ronald reagan washington national airport,washington national airport,dca
+AR	Buenos Aires	SABE	-34.5592	-58.4156	Aeroparque Jorge Newbery	Jorge Newbery Airfield	2500	aeroparque jorge newbery,aeroparque,jorge newbery airport,aep
+TW	Taipei	RCSS	25.0694	121.5525	Taipei Songshan Airport	Taipei Songshan Airport	2500	taipei songshan airport,songshan airport,tsa
+NZ	Wellington	NZWN	-41.3272	174.8053	Wellington Airport	Wellington Airport	2500	wellington airport,wlg
+NP	Kathmandu	VNKT	27.6966	85.3591	Tribhuvan International Airport	Tribhuvan International Airport	2500	tribhuvan international airport,kathmandu airport,ktm
+LA	Vientiane	VLVT	17.9883	102.5633	Wattay International Airport	Wattay International Airport	2500	wattay international airport,vientiane airport,vte
+MZ	Maputo	FQMA	-25.9208	32.5726	Maputo International Airport	Maputo International Airport	2500	maputo international airport,maputo airport,mpm
+LT	Vilnius	EYVI	54.6341	25.2858	Vilnius Airport	Vilnius Airport	2500	vilnius airport,vilniaus oro uostas,vno

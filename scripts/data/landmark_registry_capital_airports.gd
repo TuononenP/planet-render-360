@@ -1,0 +1,76 @@
+class_name LandmarkRegistryCapitalAirports
+extends RefCounted
+
+## The airports that stand close to a capital's centre, each a hand-built
+## airfield (LandmarkSetCapitalAirports, scripts/generation/landmarks/
+## capital_airports). The model frame: +X along the longest runway, +Z to its
+## right, origin at the terminal's centre; lat/lon is that origin and
+## yaw_deg turns the frame onto the map, both measured from OpenStreetMap
+## (tools/capital_airports.py build). Secondary: an airport stands beside a
+## capital's icons, never instead of them. clear_rect_m ([along, across,
+## half_along, half_across] metres) covers the whole airfield, so the
+## buildings and trees on it make way for the model.
+
+static func entries() -> Array:
+	return [
+		{"type": "reykjavik_airport", "name": "Reykjavik Airport", "lat": 64.132107, "lon": -21.946316,
+			"radius_m": 6000.0, "wiki_title": "Reykjavík Airport", "height_m": 12.0, "kind": "Airport",
+			"secondary": true, "capital": "IS", "yaw_deg": 85.3, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [407.0, -94.0, 895.0, 692.0],
+			"aliases": ["reykjavik airport", "reykjavíkurflugvöllur"]},
+		{"type": "tallinn_airport", "name": "Tallinn Airport", "lat": 59.416417, "lon": 24.800196,
+			"radius_m": 6000.0, "wiki_title": "Tallinn Airport", "height_m": 27.0, "kind": "Airport",
+			"secondary": true, "capital": "EE", "yaw_deg": 0.3, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [1955.0, 217.0, 2072.0, 509.0],
+			"aliases": ["tallinn airport", "lennart meri tallinn airport"]},
+		{"type": "stockholm_bromma_airport", "name": "Stockholm Bromma Airport", "lat": 59.355755, "lon": 17.94513,
+			"radius_m": 6000.0, "wiki_title": "Stockholm Bromma Airport", "height_m": 26.0, "kind": "Airport",
+			"secondary": true, "capital": "SE", "yaw_deg": 34.9, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-75.0, 151.0, 984.0, 530.0],
+			"aliases": ["stockholm bromma airport", "bromma airport"]},
+		{"type": "vilnius_airport", "name": "Vilnius Airport", "lat": 54.643418, "lon": 25.280793,
+			"radius_m": 6000.0, "wiki_title": "Vilnius Airport", "height_m": 36.0, "kind": "Airport",
+			"secondary": true, "capital": "LT", "yaw_deg": -68.0, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-1192.0, 511.0, 1825.0, 686.0],
+			"aliases": ["vilnius airport", "vilniaus oro uostas"]},
+		{"type": "lisbon_airport", "name": "Lisbon Airport", "lat": 38.76991, "lon": -9.130911,
+			"radius_m": 6000.0, "wiki_title": "Humberto Delgado Airport", "height_m": 33.0, "kind": "Airport",
+			"secondary": true, "capital": "PT", "yaw_deg": -67.2, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [1014.0, -479.0, 1933.0, 803.0],
+			"aliases": ["lisbon airport", "humberto delgado airport", "aeroporto de lisboa"]},
+		{"type": "washington_national_airport", "name": "Reagan National Airport", "lat": 38.853107, "lon": -77.042817,
+			"radius_m": 6000.0, "wiki_title": "Ronald Reagan Washington National Airport", "height_m": 36.0, "kind": "Airport",
+			"secondary": true, "capital": "US", "yaw_deg": 85.5, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [230.0, -164.0, 1162.0, 762.0],
+			"aliases": ["reagan national airport", "ronald reagan washington national airport", "washington national airport"]},
+		{"type": "aeroparque_jorge_newbery", "name": "Aeroparque Jorge Newbery", "lat": -34.556915, "lon": -58.413581,
+			"radius_m": 6000.0, "wiki_title": "Jorge Newbery Airfield", "height_m": 35.0, "kind": "Airport",
+			"secondary": true, "capital": "AR", "yaw_deg": 33.9, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-220.0, 285.0, 1521.0, 378.0],
+			"aliases": ["aeroparque jorge newbery", "aeroparque", "jorge newbery airport"]},
+		{"type": "taipei_songshan_airport", "name": "Taipei Songshan Airport", "lat": 25.064048, "lon": 121.551657,
+			"radius_m": 6000.0, "wiki_title": "Taipei Songshan Airport", "height_m": 20.5, "kind": "Airport",
+			"secondary": true, "capital": "TW", "yaw_deg": 2.2, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [62.0, -326.0, 1339.0, 613.0],
+			"aliases": ["taipei songshan airport", "songshan airport"]},
+		{"type": "wellington_airport", "name": "Wellington Airport", "lat": -41.328963, "lon": 174.811073,
+			"radius_m": 6000.0, "wiki_title": "Wellington Airport", "height_m": 32.4, "kind": "Airport",
+			"secondary": true, "capital": "NZ", "yaw_deg": -87.1, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [235.0, -264.0, 1060.0, 465.0],
+			"aliases": ["wellington airport"]},
+		{"type": "kathmandu_airport", "name": "Tribhuvan International Airport", "lat": 27.700067, "lon": 85.35742,
+			"radius_m": 6000.0, "wiki_title": "Tribhuvan International Airport", "height_m": 16.7, "kind": "Airport",
+			"secondary": true, "capital": "NP", "yaw_deg": -67.9, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-721.0, 328.0, 2012.0, 590.0],
+			"aliases": ["tribhuvan international airport", "kathmandu airport"]},
+		{"type": "wattay_airport", "name": "Wattay International Airport", "lat": 17.975456, "lon": 102.568434,
+			"radius_m": 6000.0, "wiki_title": "Wattay International Airport", "height_m": 14.4, "kind": "Airport",
+			"secondary": true, "capital": "LA", "yaw_deg": 45.2, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-1080.0, -625.0, 1853.0, 1049.0],
+			"aliases": ["wattay international airport", "vientiane airport"]},
+		{"type": "maputo_airport", "name": "Maputo International Airport", "lat": -25.923896, "lon": 32.574809,
+			"radius_m": 6000.0, "wiki_title": "Maputo International Airport", "height_m": 30.0, "kind": "Airport",
+			"secondary": true, "capital": "MZ", "yaw_deg": -61.0, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [1698.0, -280.0, 2828.0, 869.0],
+			"aliases": ["maputo international airport", "maputo airport"]},
+	]

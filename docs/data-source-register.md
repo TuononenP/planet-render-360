@@ -759,6 +759,36 @@ its minimum-area rectangle (yaw), outline and tagged height. Nearby `railway=rai
   offline review only, identifying User-Agent). Where the article shows no
   station photo, the style comes from Wikimedia Commons photos or published
   descriptions.
+
+## Capital airports (2026-11-16)
+
+Capitals whose airport stands within about 8 km of the centre have it as a
+hand-built airfield landmark (`LandmarkRegistryCapitalAirports`, models in
+`scripts/generation/landmarks/capital_airports`). `tools/capital_airports.tsv`
+lists each airport's ICAO code and rough point. `tools/capital_airports.py`
+asks an Overpass instance for the aerodrome found by that code (`aeroway=*`
+features and the buildings inside it; a box round the point when the code
+finds nothing), through an identifying User-Agent, with a pause and retries
+between requests (offline tooling only, never called by the app). The public
+instances used are `overpass.openstreetmap.fr`, `overpass.kumi.systems` and
+`overpass-api.de`; no Russian-operated host is used. From the answer it
+writes one `CaLayout*` class per airport with the runway centre lines and
+their painted designators, taxiways, aprons, terminals, hangars, control
+towers and stand positions in the model frame (+X along the longest runway,
+origin at the terminal's centre).
+
+- The paved surfaces, runway paint, hangars, sheds and control tower
+  positions come straight from the OSM measurements; runway pieces mapped in
+  parts are joined into one strip.
+- The terminals are extruded on their real outlines, with storeys and
+  colours chosen by us from the tagged heights and general knowledge of each
+  building; they are not photo-checked models like the hand-built stations.
+- Parked aircraft are our own low-poly models in the airlines' tail colours,
+  put on the mapped stands, or on a grid inside the aprons where the stands
+  are not mapped.
+
+Attribution: © OpenStreetMap contributors (ODbL), as for every OSM-derived
+layer.
 - Capitals whose station building has no photo to check a model against
   (Brasília, Kinshasa) are marked `-` in the list and get no landmark.
 

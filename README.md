@@ -177,6 +177,7 @@ godot --headless --script tests/progressive_map_test.gd # progressive map: previ
 godot --headless --script tests/vector_map_test.gd # vector map: MVT decode, Map style rules, tile build
 godot --headless --script tests/landmark_test.gd # landmark registry, models, placement
 godot --headless --script tests/landmark_fidelity_test.gd # well-mapped OSM landmarks drawn from their own parts
+godot --headless --script tests/capital_airports_test.gd # hand-built airfields of capitals with a central airport, parked-aircraft kit
 godot --headless --script tests/landmark_info_test.gd # landmark markers, details and visits (Wikipedia fixtures)
 godot --headless --script tests/landmark_list_test.gd # 360 view's nearby-landmarks list, panel flow, L key
 godot --headless --script tests/monument_test.gd # memorial columns and obelisks become landmarks
