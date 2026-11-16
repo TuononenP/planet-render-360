@@ -44,6 +44,7 @@ func _run() -> void:
 		built += 1
 		_check_entry(row)
 		_check_model(row)
+	_check_span_ends()
 	if failures.is_empty():
 		print("BRIDGE SPECS OK: %d bridges, %d built" % [rows.size(), built])
 		quit(0)
@@ -51,6 +52,29 @@ func _run() -> void:
 		for f in failures:
 			printerr("BRIDGE SPECS FAIL: ", f)
 		quit(1)
+
+## A parametric model's deck stops at its span's ends, so a mapped deck
+## running on past them (Pont d'Arcole's branches onto its quay) is kept,
+## while one on the span or beside it within clear_m is the model's.
+func _check_span_ends() -> void:
+	var entry := LocationData.entry_for_type("br_paris_pont_d_arcole")
+	if entry.is_empty():
+		failures.append("Pont d'Arcole should be registered")
+		return
+	var a := LandmarkSites.axis(entry)
+	var across := Vector2(-a.y, a.x)
+	var half := float(entry["span_m"]) * 0.5
+	var spans := [[Vector2.ZERO, entry]]
+	var line := PackedVector2Array()
+	for k in 61:
+		line.append(a * (-half + float(k) * (2.0 * half + 10.0) / 60.0))
+	var runs := LandmarkSites.outside_spans(line, spans)
+	_check(runs.size() == 1 and (runs[0] as PackedVector2Array)[0].dot(a) > half,
+		"a deck past the span's end should be kept from the end on: %s" % [runs])
+	_check(LandmarkSites.on_span(a * half * 0.5 + across * 8.0, Vector2.ZERO, entry),
+		"a deck beside the span within clear_m is the model's")
+	_check(not LandmarkSites.on_span(a * (half + 6.0), Vector2.ZERO, entry),
+		"a deck 6 m past the span's end is not the model's")
 
 func _check_capital(row: Dictionary, capitals: Dictionary) -> void:
 	var best := INF

@@ -76,7 +76,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
-		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m", "tree_rect"]:
+		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m", "tree_rect", "deck_ends"]:
 			if entry.has(key):
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
@@ -234,7 +234,7 @@ static func outside_spans(pts: PackedVector2Array, spans: Array) -> Array:
 	for p in pts:
 		var inside := false
 		for sp in spans:
-			if span_dist(p, sp[0] as Vector2, sp[1] as Dictionary) < clear_m(sp[1] as Dictionary):
+			if on_span(p, sp[0] as Vector2, sp[1] as Dictionary):
 				inside = true
 				break
 		if inside:
@@ -246,6 +246,20 @@ static func outside_spans(pts: PackedVector2Array, spans: Array) -> Array:
 	if run.size() >= 2:
 		out.append(run)
 	return out
+
+## True where a registry bridge's model carries the road at `p`: within
+## its clear_m of the axis and, for a model whose deck stops at the
+## span's ends (`deck_ends`, the BridgeParam models of BridgeSpec rows),
+## no further along it than those ends. Measured round the ends too, a
+## deck mapped on past them (Pont d'Arcole's two branches onto its quay)
+## was dropped up to clear_m short of the bank.
+static func on_span(p: Vector2, at: Vector2, entry: Dictionary) -> bool:
+	if span_dist(p, at, entry) >= clear_m(entry):
+		return false
+	var half := float(entry.get("span_m", 0.0)) * 0.5
+	if not bool(entry.get("deck_ends", false)) or half <= 0.0:
+		return true
+	return absf((p - at).dot(axis(entry))) <= half
 
 ## Tree keep-outs round the landmarks standing here, [site xz, entry,
 ## radius m, reach²] each: the primary always (its `tree_clear_m`, else

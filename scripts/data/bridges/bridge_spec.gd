@@ -92,6 +92,9 @@ static func to_entry(row: Dictionary) -> Dictionary:
 		"yaw_deg": fposmod(float(row["bearing"]) - 90.0, 360.0),
 		"span_m": snappedf(length_m(row), 0.1), "base": str(row.get("base", "water")),
 		"kind": "Bridge", "secondary": true, "tier": int(row.get("tier", 2)),
+		# The model's deck stops at the span's ends: mapped decks beyond
+		# them are the road (LandmarkSites.on_span).
+		"deck_ends": true,
 		"aliases": aliases,
 	}
 
