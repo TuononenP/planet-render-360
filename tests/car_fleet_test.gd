@@ -42,6 +42,18 @@ func _init() -> void:
 		if (car[1] as Color) == CarFleet.TAXI_YELLOW or car[0] == "cab_london":
 			failures.append("another city's cab parked in Helsinki")
 			break
+	# A few sports coupes park everywhere, in their own bold paint.
+	for region_row in [["", "US"], ["", "JP"], ["helsinki", "FI"], ["", "PT"]]:
+		var sports := 0
+		for i in 1000:
+			var sp: Array = CarFleet.pick(CarFleet.profile_for(region_row[0], region_row[1]), Vector2(float(i) * 7.0, 31.0))
+			if sp[0] == "sports":
+				sports += 1
+				if not CarFleet.SPORTS_PAINT.has(sp[1]):
+					failures.append("a sports coupe in fleet paint: %s" % sp[1])
+					break
+		if sports < 8 or sports > 60:
+			failures.append("%s should park a few sports coupes: %d of 1000" % [region_row, sports])
 	var fleet := CarFleet.profile_for("san_francisco", "US")
 	if CarFleet.pick(fleet, Vector2(12.5, -40.0)) != CarFleet.pick(fleet, Vector2(12.5, -40.0)):
 		failures.append("picks must be deterministic")

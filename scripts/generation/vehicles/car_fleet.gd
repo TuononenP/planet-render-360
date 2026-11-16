@@ -57,6 +57,10 @@ const REGION_FLEET := {
 	"dublin": "europe", "edinburgh": "europe",
 }
 const TAXI_SHARE := 0.05
+## The share of slots a sports coupe takes (in bolder paint than the fleet's).
+const SPORTS_SHARE := 0.025
+const SPORTS_PAINT := [Color(0.5, 0.02, 0.02), Color(0.9, 0.62, 0.03), Color(0.02, 0.12, 0.45), WHITE, BLACK,
+	Color(0.7, 0.18, 0.02), Color(0.05, 0.3, 0.12), SILVER]
 ## kind, body colours, share of slots (default TAXI_SHARE).
 const TAXIS := {
 	"new_york": {"kind": "taxi", "paint": [TAXI_YELLOW], "share": 0.1},
@@ -87,10 +91,14 @@ static func pick(fleet: Dictionary, p: Vector2) -> Array:
 	var kinds: Array = fleet["kinds"]
 	var paints: Array = fleet["paint"]
 	var is_taxi := ParkedCars._hash(p.x, p.y, 9.1) < float(taxi.get("share", TAXI_SHARE))
-	var kind: String = taxi["kind"] if is_taxi else kinds[int(ParkedCars._hash(p.x, p.y, 2.7) * kinds.size()) % kinds.size()]
+	var is_sports := not is_taxi and ParkedCars._hash(p.x, p.y, 10.7) < SPORTS_SHARE
+	var kind: String = taxi["kind"] if is_taxi else ("sports" if is_sports \
+		else kinds[int(ParkedCars._hash(p.x, p.y, 2.7) * kinds.size()) % kinds.size()])
 	var cab_paint: Array = taxi["paint"]
 	if is_taxi and not cab_paint.is_empty():
 		paints = cab_paint
+	elif is_sports:
+		paints = SPORTS_PAINT
 	var colour: Color = paints[int(ParkedCars._hash(p.x, p.y, 4.9) * paints.size()) % paints.size()]
 	var solid_shade := colour.v > 0.8 or colour.v < 0.05
 	var share := 0.0 if is_taxi else (0.25 if solid_shade else 0.85)

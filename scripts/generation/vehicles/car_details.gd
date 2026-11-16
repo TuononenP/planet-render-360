@@ -47,10 +47,23 @@ static func front(lm: LandmarkMesh, s: Dictionary) -> void:
 	var ug := lk - 0.04 / maxf(w_end, 0.3)
 	var g := Vector2(lamp.x + 0.12 * span, lamp.y)
 	var trim := "Chrome" if bool(s["chrome"]) else "Grille"
-	if not bus:
+	var face_h := VehicleKit.end_at(s, 1.0, 0.0, 1.0).y - VehicleKit.end_at(s, 1.0, 0.0, 0.0).y
+	if bool(s["bar_f"]):
+		# A light bar joining the head lamps across the nose.
+		var bt := lamp.y - 0.2 * span
+		for side: float in [1.0, -1.0]:
+			CarParts.patch(lm, s, 1.0, side, "Trim", 0.0, lk + 0.01, _flat(Vector2(bt - 0.03 / face_h, bt + 0.03 / face_h)),
+				0.004, false, false)
+			CarParts.patch(lm, s, 1.0, side, "Drl", 0.0, lk + 0.01, _flat(Vector2(bt - 0.011 / face_h, bt + 0.011 / face_h)),
+				0.008, false, false)
+	if bool(s["vents"]):
+		# Air curtains: an upright dark vent at each corner of the bumper.
+		var vt := Vector2(float(s["grille"].x) + 0.03, float(s["bumper_t"]) - 0.03)
+		for side: float in [1.0, -1.0]:
+			CarParts.patch(lm, s, 1.0, side, "Rubber", 0.885, 0.965, _flat(vt), 0.005, true, true, 8)
+	if not bus and not bool(s["grille_closed"]):
 		for side: float in [1.0, -1.0]:
 			CarParts.patch(lm, s, 1.0, side, "Rubber", 0.0, ug, _flat(g), 0.004, false, false, 6)
-		var face_h := VehicleKit.end_at(s, 1.0, 0.0, 1.0).y - VehicleKit.end_at(s, 1.0, 0.0, 0.0).y
 		var bars := clampi(roundi((g.y - g.x) * face_h / 0.032), 3, 7)
 		for i in bars:
 			var t := lerpf(g.x, g.y, (float(i) + 0.5) / float(bars))
@@ -66,12 +79,18 @@ static func front(lm: LandmarkMesh, s: Dictionary) -> void:
 		var bn := VehicleKit.face_normal(s, 1.0, 1.0, 0.0, lerpf(g.x, g.y, 0.62))
 		lm.disc("Chrome", bp + bn * 0.02, bn, 0.04, 16)
 		lm.disc("Trim", bp + bn * 0.021, bn, 0.028, 16)
+	elif not bus:
+		# A closed nose: only a badge between the lamps.
+		var cp := VehicleKit.face_point(s, 1.0, 1.0, 0.0, lerpf(g.x, g.y, 0.35))
+		var cn := VehicleKit.face_normal(s, 1.0, 1.0, 0.0, lerpf(g.x, g.y, 0.35))
+		lm.disc("Chrome", cp + cn * 0.006, cn, 0.04, 16)
+		lm.disc("Trim", cp + cn * 0.007, cn, 0.028, 16)
 	# The lower intake: a dark mesh split by a bar, a fog lamp at each end.
 	var gt: Vector2 = s["grille"]
 	# Out past the drawn intake (CarPaint's, for the far mesh) so none shows.
 	var ui := 0.88
 	for side: float in [1.0, -1.0]:
-		CarParts.patch(lm, s, 1.0, side, "Rubber", 0.0, ui, _flat(gt), 0.005, false, false, 8)
+		CarParts.patch(lm, s, 1.0, side, "Rubber", 0.0, ui, _flat(gt), 0.009, false, true, 8)
 		var ft := (gt.x + gt.y) * 0.5
 		var fu := ui * 0.86
 		var fp := VehicleKit.face_point(s, 1.0, side, fu, ft)
@@ -81,6 +100,25 @@ static func front(lm: LandmarkMesh, s: Dictionary) -> void:
 		lm.disc("Chrome", fp + fn * 0.008, fn, fr, 16)
 		lm.disc("HeadLamp", fp + fn * 0.01, fn, fr * 0.6, 12)
 	_rail(lm, s, 1.0, "Grille", _across(ui * 0.62, (gt.x + gt.y) * 0.5, 6), 0.007, 0.012)
+	if bool(s["aero_f"]):
+		_aero_front(lm, s, gt)
+
+## A sports car's front: a shallow splitter under the nose with an end plate
+## at each side (the intake is CarPaint's drawn opening).
+static func _aero_front(lm: LandmarkMesh, s: Dictionary, gt: Vector2) -> void:
+	var nose := VehicleKit.end_at(s, 1.0, 0.0, 0.0)
+	var ew := VehicleKit.end_at(s, 1.0, 1.0, 0.04).z
+	# Slats across each side of the intake, clear of the plate in the middle.
+	for side: float in [1.0, -1.0]:
+		for j in 5:
+			var t := lerpf(gt.x + 0.04, gt.y - 0.04, (float(j) + 0.5) / 5.0)
+			_rail(lm, s, 1.0, "Grille", [Vector3(side, 0.5, t), Vector3(side, 0.66, t), Vector3(side, 0.82, t)], 0.012, 0.013)
+	# The splitter: a shallow black lip under the bumper with an end plate
+	# at each side.
+	# Kept inside the car's stated length (parked cars are spaced by it).
+	lm.box("Rubber", Vector3(nose.x - 0.045, nose.y + 0.016, 0.0), Vector3(0.1, 0.02, ew * 1.5), Basis(), 0.005)
+	for side: float in [1.0, -1.0]:
+		lm.box("Rubber", Vector3(nose.x - 0.04, nose.y + 0.05, side * ew * 0.76), Vector3(0.1, 0.07, 0.012), Basis(), 0.0)
 
 static func rear(lm: LandmarkMesh, s: Dictionary) -> void:
 	var gh: PackedFloat32Array = s["gh"]
@@ -92,6 +130,24 @@ static func rear(lm: LandmarkMesh, s: Dictionary) -> void:
 		lm.box("TailGlow", Vector3(x, y + 0.008, 0.0), Vector3(0.04, 0.018, 0.34), Basis(), 0.006)
 	if bool(s["rear_wiper"]):
 		_rear_wiper(lm, s)
+	if bool(s["spoiler"]):
+		_spoiler(lm, s)
+	var lr: Vector2 = s["lamp_r"]
+	if bool(s["bar_r"]):
+		# A light bar joining the tail lamps: a gloss panel, a glowing strip.
+		var uk := float(s["lamp_k_r"]) + 0.02
+		for side: float in [1.0, -1.0]:
+			CarParts.patch(lm, s, -1.0, side, "Trim", 0.0, uk, _flat(Vector2(lerpf(lr.x, lr.y, 0.3), lerpf(lr.x, lr.y, 0.95))),
+				0.004, false, false)
+			CarParts.patch(lm, s, -1.0, side, "TailGlow", 0.0, uk,
+				_flat(Vector2(lerpf(lr.x, lr.y, 0.58), lerpf(lr.x, lr.y, 0.76))), 0.008, false, false)
+	# Diffuser fins in a deep rear valance.
+	var vr := float(s["valance_r"])
+	if vr >= 0.16:
+		for side: float in [1.0, -1.0]:
+			for u: float in [0.12, 0.36]:
+				_rail(lm, s, -1.0, "Grille", [Vector3(side, u, 0.02), Vector3(side, u, vr * 0.5), Vector3(side, u, vr - 0.03)],
+					0.01, 0.014)
 	# Reflectors low on the bumper corners, a badge on the boot or tailgate.
 	for side: float in [1.0, -1.0]:
 		CarParts.patch(lm, s, -1.0, side, "TailLamp", 0.66, 0.9, _flat(Vector2(0.2, 0.25)), 0.006)
@@ -99,7 +155,27 @@ static func rear(lm: LandmarkMesh, s: Dictionary) -> void:
 	var bt := minf(lamp.y + 0.05, 0.92) if lamp.y < 0.8 else lamp.x - 0.08
 	var bp := VehicleKit.face_point(s, -1.0, 1.0, 0.0, bt)
 	var bn := VehicleKit.face_normal(s, -1.0, 1.0, 0.0, bt)
-	lm.disc("Chrome", bp + bn * 0.006, bn, 0.035, 16)
+	# A small ring like the nose's: a bare chrome disc mirrors the sky as a white dot.
+	lm.disc("Chrome", bp + bn * 0.006, bn, 0.03, 16)
+	lm.disc("Trim", bp + bn * 0.0068, bn, 0.021, 16)
+
+## A lip over the head of the rear window, carrying the roof line back.
+static func _spoiler(lm: LandmarkMesh, s: Dictionary) -> void:
+	var gh: PackedFloat32Array = s["gh"]
+	var x0 := gh[1] + 0.1
+	var zt := VehicleKit.roof_half(s, gh[1]) - 0.01
+	var r0 := PackedVector3Array()
+	var r1 := PackedVector3Array()
+	var r2 := PackedVector3Array()
+	var r3 := PackedVector3Array()
+	for i in 7:
+		var z := zt * (1.0 - float(i) / 6.0)
+		var y1 := VehicleKit.roof_on_mesh(s, gh[1] + 0.02, z)
+		r0.append(Vector3(x0, VehicleKit.roof_on_mesh(s, x0, z) + 0.006, z))
+		r1.append(Vector3(gh[1] - 0.12, y1 - 0.004, z * 0.97))
+		r2.append(Vector3(gh[1] - 0.105, y1 - 0.03, z * 0.97))
+		r3.append(Vector3(gh[1] - 0.02, VehicleKit.roof_on_mesh(s, gh[1] - 0.02, z) + 0.004, z))
+	_skin_facing(lm, [r0, r1, r2, r3], Vector3.UP, "Trim")
 
 ## A hatch's wiper parked along the foot of its rear window, from a pivot
 ## on the centreline.
@@ -118,7 +194,7 @@ static func _rear_wiper(lm: LandmarkMesh, s: Dictionary) -> void:
 		pts.append(CarModel._on_glass(s, x + 0.01 * float(k), -w * 0.62 * float(k) / 4.0, 0.012))
 	for k in 4:
 		lm.beam("Trim", pts[k], pts[k + 1], 0.016, 0.012, n, k == 0 or k == 3)
-		lm.beam("Rim", pts[k] + n * 0.008, pts[k + 1] + n * 0.008, 0.02, 0.012, n, k == 0 or k == 3)
+		lm.beam("Trim", pts[k] + n * 0.008, pts[k + 1] + n * 0.008, 0.02, 0.012, n, k == 0 or k == 3)
 
 ## Seats, dashboard and steering wheel (see the class notes).
 static func interior(lm: LandmarkMesh, s: Dictionary) -> void:
@@ -132,8 +208,12 @@ static func interior(lm: LandmarkMesh, s: Dictionary) -> void:
 	var tilt := Basis(Vector3(0, 0, 1), 0.22)
 	# Front seats: back just ahead of the centre pillar.
 	var xb := doors[1] + 0.12
+	# A low coupe has less head room: the seat back and headrest shrink to fit
+	# under the roof (a headrest through the glass reads as a fault).
+	var head := VehicleKit.roof_at(s, xb - 0.1, 0.0) - 0.06 - seat
+	var fit := clampf(head / 0.86, 0.5, 1.0)
 	for side: float in [1.0, -1.0]:
-		_seat(lm, Vector3(xb, seat, side * zs), 0.5 * f, tilt)
+		_seat(lm, Vector3(xb, seat, side * zs), 0.5 * f, tilt, fit)
 	if bool(s["rear_seats"]):
 		var xr := maxf(doors[0] + 0.08, gh[0] + float(s["rear_pillar"]) * 0.5)
 		var top := VehicleKit.roof_at(s, xr, 0.0)
@@ -145,8 +225,8 @@ static func interior(lm: LandmarkMesh, s: Dictionary) -> void:
 			lm.box("Cabin", Vector3(xr - 0.08, seat + back_h + 0.08, z), Vector3(0.09, 0.15, 0.24), tilt, 0.03)
 		# A saloon's parcel shelf, from the bench's back to the rear window.
 		if gh[0] > -float(s["len"]) * 0.5 + 0.35 and not bool(s["bed"]) and not bool(s["tail_glass"]):
-			var y := VehicleKit.soft(s["belt"], gh[0], 0.1) + 0.03
-			var x0 := gh[0] + 0.02
+			var y := VehicleKit.soft(s["belt"], gh[0], 0.1) - 0.03
+			var x0 := gh[0] + 0.12
 			var x1 := xr - 0.06
 			if x1 > x0:
 				lm.box("Trim", Vector3((x0 + x1) * 0.5, y, 0.0),
@@ -155,12 +235,15 @@ static func interior(lm: LandmarkMesh, s: Dictionary) -> void:
 		# A van's bulkhead behind the cab.
 		var xw := xb - 0.32
 		var h := VehicleKit.roof_at(s, xw, 0.0) - 0.06 - fy
-		lm.box("Cabin", Vector3(xw, fy + h * 0.5, 0.0), Vector3(0.04, h, 2.0 * VehicleKit.half_width(s, xw) - 0.2),
+		# No wider than the roof above it: the body leans in toward the top.
+		lm.box("Cabin", Vector3(xw, fy + h * 0.5, 0.0), Vector3(0.04, h, 2.0 * VehicleKit.roof_half(s, xw) - 0.08),
 			Basis(), 0.0)
 	# The dashboard under the windscreen, and the steering wheel.
 	var xd := gh[3] - 0.05
 	var dl := clampf((xd - (xb + 0.55)) * 0.75, 0.3, 0.6)
-	var dy := VehicleKit.soft(s["belt"], xd, 0.1) + 0.03
+	# Its top stays a centimetre under the deck's skin: higher, it poked
+	# through the bonnet's low edges as a dark patch with z-fighting stripes.
+	var dy := VehicleKit.soft(s["belt"], xd, 0.1) - 0.01
 	var dw := 2.0 * VehicleKit.half_width(s, xd - dl * 0.5) - 0.16
 	lm.box("Trim", Vector3(xd - dl * 0.5, dy - 0.14, 0.0), Vector3(dl, 0.28, dw), Basis(), 0.04)
 	var drv := (1.0 if bool(s["rhd"]) else -1.0) * zs
@@ -179,10 +262,10 @@ static func interior(lm: LandmarkMesh, s: Dictionary) -> void:
 	lm.beam("Trim", wc, wc + Vector3(0.3, -0.12, 0.0), 0.06, 0.06)
 
 ## A seat: cushion, back leaning by `tilt`, headrest.
-static func _seat(lm: LandmarkMesh, at: Vector3, w: float, tilt: Basis) -> void:
+static func _seat(lm: LandmarkMesh, at: Vector3, w: float, tilt: Basis, k: float = 1.0) -> void:
 	lm.box("Cabin", at + Vector3(0.25, -0.06, 0.0), Vector3(0.5, 0.13, w), Basis(), 0.04)
-	lm.box("Cabin", at + Vector3(-0.04, 0.3, 0.0), Vector3(0.12, 0.6, w * 0.95), tilt, 0.04)
-	lm.box("Cabin", at + Vector3(-0.12, 0.69, 0.0), Vector3(0.1, 0.17, w * 0.55), tilt, 0.035)
+	lm.box("Cabin", at + Vector3(-0.04 * k, 0.3 * k, 0.0), Vector3(0.12, 0.6 * k, w * 0.95), tilt, 0.04)
+	lm.box("Cabin", at + Vector3(-0.12 * k, 0.69 * k, 0.0), Vector3(0.1, 0.17 * k, w * 0.55), tilt, 0.035)
 
 ## A pickup's open bed between bed_x, its walls hung from the deck edge of
 ## the loft's rows (`c_roof`: the first roof point, the deck's edge).
@@ -227,13 +310,43 @@ static func bed(lm: LandmarkMesh, s: Dictionary, rows: Array, rx: PackedFloat32A
 				Vector3(ra * 2.0, top_y - fy, 0.24), Basis(), 0.04)
 
 ## skin() with mirroring, its quads turned to face `want` (on the +z half).
-static func _skin_facing(lm: LandmarkMesh, rows: Array, want: Vector3) -> void:
+static func _skin_facing(lm: LandmarkMesh, rows: Array, want: Vector3, key: String = "Rubber") -> void:
 	var p0: PackedVector3Array = rows[0]
 	var p1: PackedVector3Array = rows[1]
 	var n := Vector3.ZERO
 	for c in p0.size() - 1:
 		n += (p1[c + 1] - p0[c]).cross(p0[c + 1] - p1[c])
-	VehicleKit.skin(lm, rows, func(_r: int, _c: int) -> String: return "Rubber", [], true, n.dot(want) < 0.0)
+	VehicleKit.skin(lm, rows, func(_r: int, _c: int) -> String: return key, [], true, n.dot(want) < 0.0)
+
+## A mid-engined car's engine: louvres across the cover on the rear deck,
+## a dark intake behind each door with slats across it.
+static func engine(lm: LandmarkMesh, s: Dictionary) -> void:
+	var gh: PackedFloat32Array = s["gh"]
+	var doors: PackedFloat32Array = s["doors"]
+	var half := float(s["len"]) * 0.5
+	var x0 := gh[0] - 0.14
+	var x1 := -half + float(s["bulge_r"]) + 0.5
+	var zw := VehicleKit.half_width(s, (x0 + x1) * 0.5) * 0.52
+	var n := 8
+	# A dark panel under the louvres, then the slats lying across it.
+	var xm := (x0 + x1) * 0.5
+	var ym := VehicleKit.soft(s["belt"], xm, 0.1) + 0.012 + VehicleKit.lin(s["crown"], xm)
+	lm.box("Rubber", Vector3(xm, ym + 0.002, 0.0), Vector3(x0 - x1, 0.008, zw * 2.0), Basis(), 0.0)
+	for i in n:
+		var x := lerpf(x0 - 0.03, x1 + 0.03, float(i) / float(n - 1))
+		var y := VehicleKit.soft(s["belt"], x, 0.1) + 0.012 + VehicleKit.lin(s["crown"], x) + 0.008
+		lm.box("Grille", Vector3(x, y, 0.0), Vector3(0.03, 0.016, zw * 2.0 - 0.06), Basis(), 0.004)
+	# Side intakes behind the door: a dark opening and four slats.
+	var xc := doors[0] - 0.42
+	var fl := VehicleKit.soft(s["floor"], xc, 0.06)
+	var belt := VehicleKit.soft(s["belt"], xc, 0.1)
+	var yc := lerpf(fl, belt, 0.5)
+	for side: float in [1.0, -1.0]:
+		var zc := side * (VehicleKit.side_w(s, xc, VehicleKit.half_width(s, xc), 0.5, yc, belt) + 0.002)
+		lm.box("Rubber", Vector3(xc, yc, zc), Vector3(0.5, 0.2, 0.03), Basis(), 0.006)
+		for j in 4:
+			var yj := yc - 0.075 + 0.05 * float(j)
+			lm.box("Grille", Vector3(xc, yj, zc + side * 0.014), Vector3(0.46, 0.012, 0.014), Basis(), 0.0)
 
 ## Seven characters across a number plate whose face centre is `at`, in
 ## its frame `f` (x out of it, y up, z across), drawn as seven-segment
@@ -243,9 +356,18 @@ static func plate_text(lm: LandmarkMesh, at: Vector3, f: Basis, code: int) -> vo
 	var cw := 0.044
 	var ch := 0.07
 	var st := 0.008
+	var prev_glyph := -1
 	for i in 7:
 		var zc := (float(i) - 3.0) * 0.062 + (0.012 if i >= 3 else -0.012)
-		var bits: int = SEGS[(code * 7 + i * 13 + i * i * 5) % SEGS.size()]
+		# Hashed per glyph, never the same glyph twice running: a polynomial in
+		# i alone reads the same from both ends (a mirror-image palindrome).
+		var mix: int = (code * 2654435761 + (i + 1) * 40503) & 0xFFFFFFFF
+		mix = (mix ^ (mix >> 13)) * 1274126177
+		var gi: int = (mix >> 16) % SEGS.size()
+		if i > 0 and gi == prev_glyph:
+			gi = (gi + 5) % SEGS.size()
+		prev_glyph = gi
+		var bits: int = SEGS[gi]
 		# Segments a..g: top, upper right, lower right, bottom, lower left,
 		# upper left, middle (y, z offsets; vertical or not).
 		var seg := [[ch * 0.5, 0.0, false], [ch * 0.25, cw * 0.5, true], [-ch * 0.25, cw * 0.5, true],

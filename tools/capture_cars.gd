@@ -12,7 +12,7 @@ const PAINTS := {
 	"suv": Color(0.85, 0.85, 0.84), "compact_suv": Color(0.55, 0.56, 0.57), "van": Color(0.85, 0.85, 0.84),
 	"pickup": Color(0.03, 0.03, 0.035), "kei": Color(0.85, 0.85, 0.84), "minivan": Color(0.42, 0.4, 0.34),
 	"cab_london": Color(0.03, 0.03, 0.035), "bus": Color(0.1, 0.32, 0.6), "taxi": Color(0.95, 0.62, 0.02),
-	"taxi_lisbon": Color(0.03, 0.03, 0.035),
+	"taxi_lisbon": Color(0.03, 0.03, 0.035), "sports": Color(0.5, 0.02, 0.02),
 }
 var _out := "visual-plan/reviews/cars"
 var _metrics_only := false
@@ -62,6 +62,7 @@ func _car(kind: String, far: bool, at: Vector3 = Vector3.ZERO, yaw: float = 0.0)
 	mm.set_instance_custom_data(0, Color(0.0 if solid else 1.0, 0.3, 0.0, 0.0))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	var shadow := MeshInstance3D.new()
 	shadow.mesh = ParkedCars.shadow_mesh(kind)
 	shadow.transform = Transform3D(Basis(Vector3.UP, yaw), at)
@@ -102,6 +103,8 @@ func _captures() -> void:
 	light.light_energy = 1.6
 	light.shadow_enabled = true
 	light.directional_shadow_max_distance = 80.0
+	light.shadow_bias = 0.06
+	light.shadow_normal_bias = 1.6
 	vp.add_child(light)
 	var camera := Camera3D.new()
 	camera.fov = 38.0
@@ -145,6 +148,22 @@ func _captures() -> void:
 				camera.look_at_from_position(tail + Vector3(-1.0, 0.18, 0.42).normalized() * maxf(length * 0.55, 2.6), tail)
 				await _settle(10)
 				vp.get_texture().get_image().save_jpg(_out.path_join(kind + "_tail.jpg"), 0.9)
+				# The windscreen's foot from behind and above the driver's seat: wipers, scuttle.
+				var gh3 := float((s["gh"] as PackedFloat32Array)[3])
+				var sb := Vector3(gh3 - 0.05, float(s["belt_h"]) + 0.1, 0.0)
+				camera.look_at_from_position(sb + Vector3(-0.9, 0.55, 0.55), sb)
+				await _settle(10)
+				vp.get_texture().get_image().save_jpg(_out.path_join(kind + "_screen.jpg"), 0.9)
+				# Under the body from ground height, side on: the gap between sill and road.
+				var belly := Vector3(0.0, 0.17, 0.0)
+				camera.look_at_from_position(Vector3(0.6, 0.22, 3.2), belly)
+				await _settle(10)
+				vp.get_texture().get_image().save_jpg(_out.path_join(kind + "_belly.jpg"), 0.9)
+				# The bumper's lower corner from just above the ground.
+				var corner := Vector3(length * 0.5 - 0.15, 0.2, float(s["wid"]) * 0.35)
+				camera.look_at_from_position(corner + Vector3(0.9, 0.12, 0.8).normalized() * 1.1, corner)
+				await _settle(10)
+				vp.get_texture().get_image().save_jpg(_out.path_join(kind + "_corner.jpg"), 0.9)
 				var wheel := Vector3(float(s["axle_f"]), float(s["wheel_r"]), float(s["wid"]) * 0.5)
 				camera.look_at_from_position(wheel + Vector3(0.35, 0.25, 1.0).normalized() * 1.9, wheel)
 				await _settle(10)
@@ -164,6 +183,14 @@ func _captures() -> void:
 		camera.look_at_from_position(mid + Vector3(-0.15, 0.08, 1).normalized() * x * 0.62, mid)
 		await _settle(12)
 		vp.get_texture().get_image().save_jpg(_out.path_join("lineup.jpg"), 0.9)
+		# A pedestrian's eye along the kerb: 1.7 m up, a few cars in view, near and further.
+		camera.fov = 60.0
+		for k in 3:
+			var from := Vector3(6.0 + float(k) * 18.0, 1.7, 5.5)
+			camera.look_at_from_position(from, from + Vector3(14.0, -0.6, -4.5))
+			await _settle(12)
+			vp.get_texture().get_image().save_jpg(_out.path_join("street_%d.jpg" % k), 0.9)
+		camera.fov = 38.0
 		vp.remove_child(row)
 		row.free()
 	vp.free()

@@ -3,9 +3,11 @@ extends RefCounted
 
 ## Modelled parts of the procedural cars (CarModel), on LandmarkMesh in
 ## the car's frame (metres; +X forward, wheels on y = 0):
-## * wheel(): a tyre with rounded shoulders on a dished alloy: tapered
-##   spokes (single or paired) falling from the rim lip to a recessed hub,
-##   a brake disc and caliper behind them.
+## * wheel(): a tyre with rounded shoulders on a dished, two-tone alloy:
+##   tapered spokes (single or paired) with bright machined faces and dark
+##   flanks falling from the rim lip to a recessed hub, a dark barrel, a
+##   brake disc and caliper behind them. `dark` blacks the whole rim;
+##   `sport` paints the calipers red.
 ## * lamps(): head and tail lamp clusters laid a few millimetres over the
 ##   paint and carried round the corner onto the flank (VehicleKit
 ##   face_point): a dark bezel, the lens, a light guide along its top (head)
@@ -22,47 +24,80 @@ const INSERT_LIFT := 0.012
 ## A road wheel on its axle at `centre`, outer face toward `side`. Keys:
 ## Rubber (tyre, the dark behind the spokes), Rim, Trim (caliper, cap badge).
 static func wheel(lm: LandmarkMesh, centre: Vector3, r: float, width: float, side: float,
-		far: bool, spokes: int = 5, twin: bool = false) -> void:
+		far: bool, spokes: int = 5, twin: bool = false, dark: bool = false, sport: bool = false) -> void:
 	var hw := width * 0.5
-	var rr := r * 0.7
+	var rr := r * 0.74
+	var bright := "RimGun" if dark else "Rim"
 	if far:
 		VehicleKit.revolve(lm, "Rubber", centre, PackedVector2Array([Vector2(rr, -hw), Vector2(r, -hw),
 			Vector2(r, hw), Vector2(rr, hw)]), 12, side, false)
-		lm.disc("Rim", centre + Vector3(0, 0, side * hw * 0.98), Vector3(0, 0, side), rr, 12)
+		# Dark like the near wheel's barrel and spokes, so the switch does not flash.
+		lm.disc("RimDark", centre + Vector3(0, 0, side * hw * 0.98), Vector3(0, 0, side), rr * 0.92, 12)
+		lm.disc("Rim", centre + Vector3(0, 0, side * hw * 0.99), Vector3(0, 0, side), rr * 0.3, 6)
 		return
+	# Near to only: the far mesh keeps one Rim surface.
 	VehicleKit.revolve(lm, "Rubber", centre, PackedVector2Array([Vector2(rr * 1.02, -hw * 0.86),
 		Vector2(r * 0.84, -hw * 0.98), Vector2(r * 0.95, -hw * 0.9), Vector2(r * 0.995, -hw * 0.68),
 		Vector2(r, -hw * 0.3), Vector2(r, hw * 0.3), Vector2(r * 0.995, hw * 0.68), Vector2(r * 0.95, hw * 0.9),
 		Vector2(r * 0.84, hw * 0.98), Vector2(rr * 1.02, hw * 0.86)]), 32, side)
 	# Rim: a lip proud of the tyre's bead, the barrel inside it, then the
 	# dark back the spokes stand against.
-	VehicleKit.revolve(lm, "Rim", centre, PackedVector2Array([Vector2(rr * 1.02, hw * 0.86),
-		Vector2(rr * 1.0, hw * 0.93), Vector2(rr * 0.95, hw * 0.95), Vector2(rr * 0.92, hw * 0.88),
+	VehicleKit.revolve(lm, bright, centre, PackedVector2Array([Vector2(rr * 1.02, hw * 0.86),
+		Vector2(rr * 1.0, hw * 0.93), Vector2(rr * 0.95, hw * 0.95), Vector2(rr * 0.92, hw * 0.88)]), 32, side, false)
+	VehicleKit.revolve(lm, "RimDark", centre, PackedVector2Array([Vector2(rr * 0.92, hw * 0.88),
 		Vector2(rr * 0.9, hw * 0.2)]), 32, side, false)
 	lm.disc("Rubber", centre + Vector3(0, 0, side * hw * 0.2), Vector3(0, 0, side), rr * 0.9, 24)
 	# Brake disc, and its caliper at the back of it.
-	lm.disc("Rim", centre + Vector3(0, 0, side * hw * 0.32), Vector3(0, 0, side), rr * 0.7, 24)
-	var cal := Vector3(-0.55, 0.62, 0.0).normalized()
-	lm.box("Trim", centre + cal * rr * 0.6 + Vector3(0, 0, side * hw * 0.42),
-		Vector3(rr * 0.28, rr * 0.34, hw * 0.3), Basis(Vector3(0, 0, 1), atan2(cal.y, cal.x)), 0.01)
+	# Dull cast iron, darker than the spokes whatever their finish, so they stand off it.
+	lm.disc("RimDark" if dark else "RimGun", centre + Vector3(0, 0, side * hw * 0.32), Vector3(0, 0, side), rr * 0.7, 24)
+	# The disc's dark hat, and a caliper bridging its rim.
+	lm.disc("RimDark", centre + Vector3(0, 0, side * hw * 0.325), Vector3(0, 0, side), rr * 0.3, 20)
+	_caliper(lm, centre, side, rr, hw, "TailLamp" if sport else "Trim")
 	var hub := hw * 0.6
 	for k in spokes:
 		var a := TAU * float(k) / float(spokes) + PI * 0.5
 		if twin:
 			for d: float in [-0.13, 0.13]:
-				_spoke(lm, centre, side, a + d * TAU / float(spokes), rr, hw, hub, 0.5)
+				_spoke(lm, centre, side, a + d * TAU / float(spokes), rr, hw, hub, 0.5, bright)
 		else:
-			_spoke(lm, centre, side, a, rr, hw, hub, 1.0)
+			_spoke(lm, centre, side, a, rr, hw, hub, 1.0, bright)
 	# The hub: a domed cap with a dark badge.
-	VehicleKit.revolve(lm, "Rim", centre, PackedVector2Array([Vector2(rr * 0.24, hub - 0.004),
+	VehicleKit.revolve(lm, bright, centre, PackedVector2Array([Vector2(rr * 0.24, hub - 0.004),
 		Vector2(rr * 0.23, hub + 0.02), Vector2(rr * 0.15, hub + 0.03), Vector2(0.0, hub + 0.032)]), 20, side, true)
-	lm.disc("Trim", centre + Vector3(0, 0, side * (hub + 0.0325)), Vector3(0, 0, side), rr * 0.09, 14)
+	# A silver badge on a black wheel's gunmetal cap; a dark one on a bright wheel's.
+	lm.disc("Rim" if dark else "Trim", centre + Vector3(0, 0, side * (hub + 0.0325)), Vector3(0, 0, side), rr * 0.09, 14)
+
+## A brake caliper: a sector of a ring over the disc's rim, its face and
+## edges lofted, 50 degrees wide, behind the spokes.
+static func _caliper(lm: LandmarkMesh, centre: Vector3, side: float, rr: float, hw: float, key: String) -> void:
+	var ri := rr * 0.5
+	var ro := rr * 0.76
+	var z0 := side * hw * 0.3
+	var z1 := side * hw * 0.5
+	var a0 := deg_to_rad(112.0)
+	var n := 6
+	var zn := Vector3(0, 0, side)
+	for i in n:
+		var t0 := a0 + deg_to_rad(50.0) * float(i) / float(n)
+		var t1 := a0 + deg_to_rad(50.0) * float(i + 1) / float(n)
+		var d0 := Vector3(cos(t0), sin(t0), 0)
+		var d1 := Vector3(cos(t1), sin(t1), 0)
+		lm.quad(key, centre + d0 * ri + Vector3(0, 0, z1), centre + d0 * ro + Vector3(0, 0, z1),
+			centre + d1 * ro + Vector3(0, 0, z1), centre + d1 * ri + Vector3(0, 0, z1), zn)
+		var dm := (d0 + d1).normalized()
+		lm.quad(key, centre + d0 * ro + Vector3(0, 0, z1), centre + d0 * ro + Vector3(0, 0, z0),
+			centre + d1 * ro + Vector3(0, 0, z0), centre + d1 * ro + Vector3(0, 0, z1), dm)
+	for t: float in [a0, a0 + deg_to_rad(50.0)]:
+		var d := Vector3(cos(t), sin(t), 0)
+		var en := Vector3(-d.y, d.x, 0) * (-1.0 if t == a0 else 1.0)
+		lm.quad(key, centre + d * ri + Vector3(0, 0, z1), centre + d * ro + Vector3(0, 0, z1),
+			centre + d * ro + Vector3(0, 0, z0), centre + d * ri + Vector3(0, 0, z0), en)
 
 ## One spoke from the hub out to the rim lip at angle `a`: its face falls
 ## from the lip into the dish, tapering in toward the hub; `wk` scales its
 ## width (paired spokes are thin).
 static func _spoke(lm: LandmarkMesh, centre: Vector3, side: float, a: float, rr: float, hw: float,
-		hub: float, wk: float) -> void:
+		hub: float, wk: float, bright: String) -> void:
 	var dir := Vector3(cos(a), sin(a), 0.0)
 	var across := Vector3(-dir.y, dir.x, 0.0)
 	var z := Vector3(0, 0, side)
@@ -80,7 +115,9 @@ static func _spoke(lm: LandmarkMesh, centre: Vector3, side: float, a: float, rr:
 	var p0: PackedVector3Array = rows[0]
 	var p1: PackedVector3Array = rows[1]
 	var n := (p1[2] - p0[1]).cross(p0[2] - p1[1])
-	VehicleKit.skin(lm, rows, func(_r: int, _c: int) -> String: return "Rim", [], false, n.dot(z) < 0.0)
+	# The face is machined bright, the flanks stay dark.
+	VehicleKit.skin(lm, rows, func(_r: int, c: int) -> String: return bright if c == 1 else "RimDark", [], false,
+		n.dot(z) < 0.0)
 
 ## Head (`end` +1) or tail (-1) lamp clusters on both sides, inner edge at
 ## `u_in` (share of the half width across the end face).
@@ -118,12 +155,23 @@ static func lamps(lm: LandmarkMesh, s: Dictionary, end: float, u_in: float) -> v
 		patch(lm, s, end, side, "HeadLamp" if front else "TailLamp", u_in, u_out, band, LENS_LIFT, false, false)
 		if front:
 			# A light guide along the top, then two projectors and the indicator.
-			patch(lm, s, end, side, "Drl", at.call(0.08), at.call(0.94), inset.call(0.08, 0.94, 0.76, 0.9),
-				INSERT_LIFT, false, false)
+			# A blade lamp (a sports car's) has a thick light strip and one
+			# bright lens under it instead of the round projectors.
+			var blade := bool(s["lamp_blade"])
+			patch(lm, s, end, side, "Drl", at.call(0.08), at.call(0.94),
+				inset.call(0.08, 0.94, 0.5 if blade else 0.76, 0.86 if blade else 0.9), INSERT_LIFT, false, false)
+			if blade:
+				# The lens material, not chrome: polished metal flared into a hot
+				# bloom when the low sun met it head on.
+				patch(lm, s, end, side, "HeadLamp", at.call(0.14), at.call(0.8), inset.call(0.14, 0.8, 0.14, 0.38),
+					INSERT_LIFT, false, false)
 			var ls := clampf(span * face_h / 0.14, 1.0, 2.2)
-			for a: float in [0.42, 0.68]:
+			# Two projectors on the face, clear of the corner (u = 1) they
+			# would otherwise straddle.
+			for uk: float in ([] if blade else [lerpf(u_in, 1.0, 0.3), lerpf(u_in, 1.0, 0.72)]):
+				var a := clampf((uk - u_in) / (u_out - u_in), 0.05, 0.95)
 				var b: Vector2 = band.call(a)
-				var u: float = at.call(a)
+				var u: float = uk
 				var t := lerpf(b.x, b.y, 0.38)
 				var n := VehicleKit.face_normal(s, end, side, u, t)
 				var p := VehicleKit.face_point(s, end, side, u, t)
@@ -137,8 +185,12 @@ static func lamps(lm: LandmarkMesh, s: Dictionary, end: float, u_in: float) -> v
 			# end and the indicator below the bar toward the outer.
 			patch(lm, s, end, side, "TailGlow", at.call(0.2), at.call(0.93), inset.call(0.2, 0.93, 0.58, 0.76),
 				INSERT_LIFT, false, false)
-			patch(lm, s, end, side, "HeadLamp", at.call(0.06), at.call(0.16), inset.call(0.06, 0.16, 0.22, 0.78),
-				INSERT_LIFT, false, false)
+			var rb: Vector2 = band.call(0.14)
+			var rt := (rb.x + rb.y) * 0.5
+			var rn := VehicleKit.face_normal(s, end, side, at.call(0.14), rt)
+			var rp := VehicleKit.face_point(s, end, side, at.call(0.14), rt)
+			lm.disc("Trim", rp + rn * INSERT_LIFT, rn, 0.03, 14)
+			lm.disc("HeadLamp", rp + rn * (INSERT_LIFT + 0.002), rn, 0.021, 12)
 			patch(lm, s, end, side, "Amber", at.call(0.55), at.call(0.9), inset.call(0.55, 0.9, 0.2, 0.42),
 				INSERT_LIFT, false, false)
 
@@ -148,17 +200,27 @@ static func lamps(lm: LandmarkMesh, s: Dictionary, end: float, u_in: float) -> v
 ## say not (a patch meeting its mirror at the centreline keeps that edge).
 static func patch(lm: LandmarkMesh, s: Dictionary, end: float, side: float, key: String, u0: float, u1: float,
 		band: Callable, lift: float, round_in: bool = true, round_out: bool = true, nt: int = 3) -> void:
-	var nu := 18
-	# Shares along the patch, one of them moved onto the body's corner
-	# (u = 1) where the patch wraps it: a sheet spanning the corner between
-	# two samples would cut through it.
-	var shares := PackedFloat32Array()
-	for i in nu + 1:
-		shares.append(float(i) / float(nu))
+	# Shares along the patch. Where it wraps the body's corner (u = 1) the
+	# samples gather round it: a chord across a tight corner cuts inside the
+	# body and the sheet would vanish there.
+	var raw: Array[float] = []
+	for i in 15:
+		raw.append(float(i) / 14.0)
 	if u0 < 1.0 and u1 > 1.0:
 		var ac := (1.0 - u0) / (u1 - u0)
-		var near := clampi(roundi(ac * float(nu)), 1, nu - 1)
-		shares[near] = ac
+		var span_u := u1 - u0
+		var kept: Array[float] = []
+		for a in raw:
+			if absf(a - ac) * span_u > 0.12:
+				kept.append(a)
+		for du: float in [-0.1, -0.07, -0.045, -0.025, -0.01, 0.0, 0.01, 0.025, 0.045, 0.07, 0.1]:
+			var a := ac + du / span_u
+			if a > 0.0 and a < 1.0:
+				kept.append(a)
+		kept.sort()
+		raw = kept
+	var shares := PackedFloat32Array(raw)
+	var nu := shares.size() - 1
 	var on: Array = []
 	for j in nt + 1:
 		var row := PackedVector3Array()
@@ -211,3 +273,15 @@ static func mirror(lm: LandmarkMesh, s: Dictionary, side: float) -> void:
 	# A repeater on the leading edge, toward the tip.
 	lm.box("Amber", c + Vector3(half.x * 0.62, -half.y * 0.3, side * half.z * 0.45),
 		Vector3(0.02, 0.014 * f, half.z * 0.7), Basis(), 0.0)
+
+## A round exhaust tip at `at` pointing out along `dir` (+1 / -1 along x),
+## its bore dark, set 0.015 m into the body.
+static func exhaust(lm: LandmarkMesh, at: Vector3, dir: float, r: float = 0.045) -> void:
+	var tip := LandmarkMesh.new()
+	tip.use("Chrome", CarModel.material("Chrome"))
+	tip.use("Rubber", CarModel.material("Rubber"))
+	VehicleKit.revolve(tip, "Chrome", Vector3.ZERO, PackedVector2Array([Vector2(r * 0.98, 0.0),
+		Vector2(r, 0.03), Vector2(r, 0.055), Vector2(r * 0.8, 0.06), Vector2(r * 0.76, 0.055), Vector2(r * 0.74, 0.0)]),
+		20, 1.0, true)
+	tip.disc("Rubber", Vector3(0, 0, 0.02), Vector3(0, 0, 1), r * 0.76, 18)
+	lm.merge(tip, Transform3D(Basis(Vector3.UP, PI * 0.5 * dir), at - Vector3(0.025 * dir, 0.0, 0.0)))

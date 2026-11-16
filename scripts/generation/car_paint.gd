@@ -117,8 +117,8 @@ void fragment() {
 			d = min(d, abs(q.y - lines.y));
 		}
 	}
-	float seam = clamp((0.004 - d) / px + 0.5, 0.0, 1.0) * clamp(0.012 / px, 0.0, 1.0);
-	vec3 col = (body_pos.y > livery_y ? livery_col : instance_paint.rgb) * (1.0 - 0.85 * seam);
+	float seam = clamp((0.0026 - d) / px + 0.5, 0.0, 1.0) * clamp(0.008 / px, 0.0, 1.0);
+	vec3 col = (body_pos.y > livery_y ? livery_col : instance_paint.rgb) * (1.0 - 0.72 * seam);
 	col = mix(col, vec3(0.012, 0.012, 0.014), opening);
 	col = mix(col, vec3(0.2, 0.21, 0.22), max(slat, mesh_bars * 0.5));
 	// Flake: a roughness wobble per millimetre, faded before it can shimmer.
@@ -133,7 +133,12 @@ void fragment() {
 	col = mix(col, col * 0.45 + vec3(0.05, 0.042, 0.032), grime);
 	rough = mix(rough, 0.78, grime);
 	float snow = snow_cover(wpos, normalize(wnormal).y);
-	ALBEDO = mix(col, snow_col, snow);
+	// Real paint reflects well under 0.8 of the light on it; at full albedo a
+	// sunlit roof or boot overexposes, washes out and blooms into a halo.
+	ALBEDO = mix(col * 0.6, snow_col, snow);
+	// A faint glow in the paint's own colour: a shaded body lit only by cool
+	// sky light turns olive (yellow) or grey-green; this keeps its hue.
+	EMISSION = ALBEDO * 0.09 * (1.0 - snow);
 	ROUGHNESS = mix(mix(rough, 0.45, opening), 0.86, snow);
 	METALLIC = mix(0.7 * metal, 0.8, max(slat, mesh_bars)) * (1.0 - snow);
 	SPECULAR = 0.65;
@@ -152,7 +157,7 @@ const SHADOW_LAYER := 9.0
 const SHADOW_CODE := """
 shader_type spatial;
 render_mode unshaded, blend_mul, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
-uniform float strength = 0.72;
+uniform float strength = 0.88;
 void vertex() {
 	POSITION = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
 	if (PROJECTION_MATRIX[3][3] < 0.5) {
@@ -161,7 +166,7 @@ void vertex() {
 }
 void fragment() {
 	vec2 q = (UV - 0.5) * 2.0;
-	float under = 1.0 - smoothstep(0.3, 1.0, length(q * vec2(0.95, 0.9)));
+	float under = 1.0 - smoothstep(0.58, 1.0, length(q * vec2(0.95, 0.9)));
 	ALBEDO = vec3(1.0 - strength * under * under);
 }
 """

@@ -29,6 +29,7 @@ const ROLE_PAINT := 2
 const ROLE_MOULD := 3
 const ROLE_SIDE_GLASS := 4
 const ROLE_ROOF := 5
+const ROLE_RAIL := 6
 
 ## Piecewise-linear lookup in a (key, value) table sorted by key.
 static func lin(table: PackedVector2Array, k: float) -> float:
@@ -222,6 +223,9 @@ static func side_w(s: Dictionary, x: float, w: float, hf: float, y: float, belt:
 	var ws := w * lin(s["bulge"], hf)
 	var sh: Vector2 = s["shoulder"]
 	ws -= sh.y * smoothstep(sh.x, sh.x + SHOULDER_T, hf)
+	# Below the sill line the flank tucks under: a crisp lower crease.
+	var sl: Vector2 = s["sill"]
+	ws -= sl.y * (1.0 - smoothstep(sl.x - SHOULDER_T, sl.x, hf))
 	return ws + flare_at(s, x, y, belt)
 
 ## How far the arch flares stand out at (`x`, `y`): a smooth ring round
@@ -278,7 +282,7 @@ static func _stations(s: Dictionary, far: bool) -> PackedFloat32Array:
 		must.append(x_f - float(s["corner_f"]) * (1.0 - f))
 		must.append(x_r + float(s["corner_r"]) * (1.0 - f))
 	var ra := float(s["arch_r"])
-	var na := 2 if far else 16
+	var na := 2 if far else 12
 	for ax: float in [float(s["axle_f"]), float(s["axle_r"])]:
 		for k in na + 1:
 			must.append(ax - ra * cos(PI * float(k) / float(na)))
@@ -328,6 +332,7 @@ static func _side_ts(s: Dictionary, far: bool) -> PackedFloat32Array:
 		need.append_array([grille.x, grille.y, float(s["valance"]), float(s["clad"]), float(s["bumper_t"])])
 		if sh.y > 0.0:
 			need.append_array([sh.x, sh.x + SHOULDER_T])
+		need.append(float(s["valance_r"]))
 	for t in need:
 		var clear := t > 0.0
 		for k in out:
@@ -340,6 +345,15 @@ static func _side_ts(s: Dictionary, far: bool) -> PackedFloat32Array:
 	if not far and sh2.y > 0.0:
 		for t in [sh2.x, sh2.x + SHOULDER_T]:
 			if not out.has(t):
+				out.append(t)
+	var sl2: Vector2 = s["sill"]
+	if not far and sl2.y > 0.0:
+		for t in [sl2.x - SHOULDER_T, sl2.x]:
+			var clear := true
+			for k in out:
+				if absf(k - t) < 0.012:
+					clear = false
+			if clear:
 				out.append(t)
 	if not far:
 		for t: float in [0.05, 0.12, 0.22, 0.34, 0.46, 0.58, 0.70, 0.80, 0.88]:
@@ -366,7 +380,7 @@ static func _section(s: Dictionary, x: float, ts: PackedFloat32Array, vs: Packed
 		var dx := absf(x - ax)
 		if dx < ra:
 			low = maxf(low, float(s["wheel_r"]) + sqrt(ra * ra - dx * dx))
-	low = minf(low, belt - 0.08)
+	low = minf(low, belt - float(s["arch_margin"]))
 	var arch := low > fl + 0.01
 	pts.append(Vector3(x, fl, 0.0))
 	ao.append(0.3)
@@ -442,12 +456,12 @@ static func body(lm: LandmarkMesh, s: Dictionary, far: bool) -> void:
 	for i in vs.size() - 1:
 		var mould := not far and i == 0
 		var rail := not far and i == vs.size() - 2
-		role.append(ROLE_MOULD if mould else (ROLE_PAINT if rail else ROLE_SIDE_GLASS))
+		role.append(ROLE_MOULD if mould else (ROLE_RAIL if rail else ROLE_SIDE_GLASS))
 	if far:
 		for i in wr.size():
 			role.append(ROLE_ROOF)
 	else:
-		role.append(ROLE_PAINT)  # roof rail and screen pillar
+		role.append(ROLE_RAIL)  # roof rail and screen pillar
 		for i in wr.size() - 1:
 			role.append(ROLE_ROOF)
 	while tmid.size() < role.size():
@@ -605,6 +619,18 @@ static func roof_at(s: Dictionary, x: float, z: float) -> float:
 	var zt := gb - (float(s["tumble"]) + 0.02) * frac
 	return hside + (top - hside) * (1.0 - pow(minf(absf(z) / zt, 1.0), 2.0))
 
+## Half width of the roof (the glasshouse's top edge) at `x`.
+static func roof_half(s: Dictionary, x: float) -> float:
+	var belt := soft(s["belt"], x, 0.1)
+	var w := half_width(s, x)
+	var wd := w * lin(s["bulge"], 1.0) - 0.03
+	var gb := minf(wd - float(s["shelf"]), w * lin(s["gh_w"], x))
+	var crown := lin(s["crown"], x)
+	var y0 := belt + 0.012 + crown * (1.0 - pow(gb / wd, 2.0))
+	var top := maxf(belt + 0.012 + crown, soft(s["roof"], x, 0.07))
+	var frac := clampf((maxf(y0, top - float(s["roof_crown"])) - y0) / float(s["gh_full"]), 0.0, 1.0)
+	return gb - (float(s["tumble"]) + 0.02) * frac
+
 ## roof_at() as the near loft draws it: straight between its stations, so
 ## what lies on the glass touches it.
 static func roof_on_mesh(s: Dictionary, x: float, z: float) -> float:
@@ -622,6 +648,12 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 			return "Rubber"
 		ROLE_PAINT:
 			return "Paint"
+		ROLE_RAIL:
+			# Gloss-black pillars and rails float the roof over the glass.
+			var ghr: PackedFloat32Array = s["gh"]
+			if bool(s["black_pillars"]) and em == 0.0 and xm > ghr[0] and xm < ghr[3]:
+				return "Trim"
+			return "Paint"
 		ROLE_MOULD:
 			return "Chrome" if bool(s["chrome"]) and not far else "Trim"
 		ROLE_SIDE_GLASS:
@@ -630,16 +662,24 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 				return "Glass"
 			var sg: Vector2 = s["side_glass"]
 			if em != 0.0 or xm < sg.x or xm > sg.y:
-				return "Paint"
-			for p: Vector2 in s["pillars"]:
+				var ghs: PackedFloat32Array = s["gh"]
+				return "Trim" if bool(s["black_pillars"]) and em == 0.0 and xm > ghs[0] and xm < ghs[3] else "Paint"
+			# Far off the pillars are too thin to read: they would only flash.
+			# A bus's posts take the body colour: dark glass between black
+			# posts reads as one black slab.
+			var post := "Paint" if float(s["len"]) > 8.0 else "Trim"
+			for p: Vector2 in (s["pillars"] if not far else []):
 				if xm > p.x and xm < p.y:
-					return "Trim"
+					return post
 			return "Glass"
 		ROLE_ROOF:
 			var gh: PackedFloat32Array = s["gh"]
 			if em == 0.0 and xm > gh[2] and xm < float(s["board_x"]):
 				return "Board"
 			if em == 0.0 and ((xm > gh[2] and xm < gh[3]) or (xm > gh[0] and xm < gh[1])):
+				return "Glass"
+			# A glass roof panel between the screens' headers.
+			if bool(s["roof_glass"]) and em == 0.0 and xm > gh[1] + 0.14 and xm < gh[2] - 0.14:
 				return "Glass"
 			return "Paint"
 	# Near to, the lamps are clusters laid on the paint (CarParts.lamps).
@@ -654,7 +694,13 @@ static func _key(s: Dictionary, role: int, t: float, xm: float, em: float, x_r: 
 		var lamp: Vector2 = s["lamp_r"]
 		if t > lamp.x and t < lamp.y and -em < float(s["lamp_in_r"]):
 			return "TailLamp"
-	if (em != 0.0 or xm > x_f - 0.3 or xm < x_r + 0.3) and t < float(s["valance"]):
+	# The black bumper skirt runs back along the flank to the arch's edge,
+	# so no body-coloured skirt hangs below it ahead of the wheel.
+	var arch_f := float(s["axle_f"]) + float(s["arch_r"]) + 0.03
+	var arch_r := float(s["axle_r"]) - float(s["arch_r"]) - 0.03
+	if (em > 0.0 or xm > minf(x_f - 0.3, arch_f)) and t < float(s["valance"]):
+		return "Trim"
+	if (em < 0.0 or xm < maxf(x_r + 0.3, arch_r)) and t < float(s["valance_r"]):
 		return "Trim"
 	if t < float(s["clad"]):
 		return "Trim"

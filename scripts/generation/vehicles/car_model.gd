@@ -26,7 +26,7 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	# Near to, the glass shows the cabin behind it; far off it is dark.
 	lm.use("Glass", material("Glass" if not far and bool(s["cabin"]) else "GlassDark"))
 	for key in ["Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board",
-			"Drl", "TailGlow", "Cabin", "Grille"]:
+			"Drl", "TailGlow", "Cabin", "Grille", "RimDark", "RimGun"]:
 		lm.use(key, material(key))
 	VehicleKit.body(lm, s, far)
 	var r := float(s["wheel_r"])
@@ -35,7 +35,8 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 		# Out under the flare, the tyre's face near flush with the arch.
 		var z := VehicleKit.half_width(s, ax) + float(s["flare"]) * 0.6 - tw * 0.5 - 0.025
 		for side: float in [1.0, -1.0]:
-			CarParts.wheel(lm, Vector3(ax, r, side * z), r, tw, side, far, int(s["spokes"]), bool(s["twin"]))
+			CarParts.wheel(lm, Vector3(ax, r, side * z), r, tw, side, far, int(s["spokes"]), bool(s["twin"]),
+					bool(s["dark_wheels"]), bool(s["sport"]))
 	if not far:
 		_fittings(lm, s)
 		CarDetails.front(lm, s)
@@ -46,6 +47,24 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	_meshes[id] = out
 	return out
 
+## The near body's glass alone, for a shadow-only batch: see-through
+## materials cast no shadow, so sunlight came in at the windows and
+## striped the road beside the car. Null when the kind has no glass.
+static func glass_shadow_mesh(kind: String) -> ArrayMesh:
+	var id := kind + "_glass_shadow"
+	if _meshes.has(id):
+		return _meshes[id]
+	var src := mesh(kind)
+	var out: ArrayMesh = null
+	for si in src.get_surface_count():
+		if src.surface_get_name(si) != "Glass":
+			continue
+		out = ArrayMesh.new()
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(si))
+		out.surface_set_material(0, material("GlassDark"))
+	_meshes[id] = out
+	return out
+
 ## Mirrors, door handles, a cab's roof sign, the aerial, roof rails, wipers
 ## and what stands on each end face (_end_face).
 static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
@@ -53,7 +72,8 @@ static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 	var doors: PackedFloat32Array = s["doors"]
 	for side: float in [1.0, -1.0]:
 		CarParts.mirror(lm, s, side)
-		for x: float in [doors[1] + 0.14, doors[0] + 0.14]:
+		# One handle for a two-door car (its rear and middle cuts coincide).
+		for x: float in ([doors[0] + 0.14] if doors[0] == doors[1] else [doors[1] + 0.14, doors[0] + 0.14]):
 			var hb := VehicleKit.soft(s["belt"], x, 0.1)
 			lm.box("Trim", Vector3(x, hb - 0.09, side * (VehicleKit.half_width(s, x) * 0.985)),
 				Vector3(0.17, 0.028, 0.03), Basis(), 0.0)
@@ -64,6 +84,8 @@ static func _fittings(lm: LandmarkMesh, s: Dictionary) -> void:
 		lm.box("Sign", Vector3(sx, VehicleKit.soft(s["roof"], sx, 0.07) + 0.06, 0.0),
 			Vector3(0.14, 0.12, 0.34), Basis(), 0.02)
 	_wipers(lm, s)
+	if bool(s["mid_engine"]):
+		CarDetails.engine(lm, s)
 	if bool(s["split"]):
 		_split(lm, s)
 	if bool(s["rails"]):
@@ -86,8 +108,11 @@ static func _end_face(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 	CarParts.lamps(lm, s, end, float(s["lamp_k"]) if front else float(s["lamp_k_r"]))
 	_lip(lm, s, end)
 	if not front:
-		var ep := VehicleKit.end_at(s, end, 0.6, 0.08)
-		lm.beam("Chrome", ep + Vector3(0.08, 0.0, 0.0), ep + Vector3(-0.02, 0.0, 0.0), 0.05, 0.04, Vector3.UP, true)
+		# An exhaust tip each side, set in the diffuser where there is one.
+		var et := maxf(float(s["valance_r"]) * 0.5, 0.08)
+		for side: float in [1.0, -1.0]:
+			var ep := VehicleKit.end_at(s, end, side * 0.6, et)
+			CarParts.exhaust(lm, ep, end)
 
 ## A bumper lip under the nose or tail, tapering out along the flank.
 static func _lip(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
@@ -97,8 +122,11 @@ static func _lip(lm: LandmarkMesh, s: Dictionary, end: float) -> void:
 		base.append(VehicleKit.end_at(s, end, k, 0.0))
 	var xs := end * (float(s["len"]) * 0.5 - (float(s["bulge_f"]) if end > 0.0 else float(s["bulge_r"])))
 	var out: Array[float] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+	# The lip runs back along the flank only as far as the arch allows.
+	var oh := float(s["front_oh"]) if end > 0.0 else float(s["len"]) * 0.5 + float(s["axle_r"])
+	var step := clampf((oh - float(s["arch_r"]) - 0.06) / 3.0, 0.02, 0.1)
 	for i in 3:
-		var x := xs - end * 0.1 * float(i + 1)
+		var x := xs - end * step * float(i + 1)
 		var fl := VehicleKit.soft(s["floor"], x, 0.06)
 		var belt := VehicleKit.soft(s["belt"], x, 0.1)
 		base.append(Vector3(x, fl, VehicleKit.side_w(s, x, VehicleKit.half_width(s, x), 0.0, fl, belt)))
@@ -140,17 +168,21 @@ static func _wipers(lm: LandmarkMesh, s: Dictionary) -> void:
 		xa -= 0.005
 	for side: float in [1.0, -1.0]:
 		var blade: Array[Vector3] = []
-		for k in 5:
-			blade.append(_on_glass(s, xb, side * gb * lerpf(0.08, 0.8, float(k) / 4.0), 0.011 * f))
-		for k in 4:
+		# Eight short pieces follow a strongly curved screen; five straight
+		# ones left gaps and steps on a coupe's.
+		for k in 9:
+			blade.append(_on_glass(s, xb, side * gb * lerpf(0.08, 0.8, float(k) / 8.0), 0.011 * f))
+		for k in 8:
 			var n := _glass_n(s, xb, blade[k].z)
-			lm.beam("Rim", blade[k], blade[k + 1], 0.022 * f, 0.014 * f, n, k == 0 or k == 3)
-		var pivot := _on_glass(s, gh[3] + 0.03, side * gb * 0.84, 0.012 * f)
+			lm.beam("Trim", blade[k], blade[k + 1], 0.022 * f, 0.014 * f, n, k == 0 or k == 7)
+		# The pivot stands on the glass's foot, not past it: on a low nose the
+		# bonnet falls away there and the stub would float over it.
+		var pivot := _on_glass(s, gh[3] - 0.012, side * gb * 0.84, 0.012 * f)
 		var mid := _on_glass(s, xa, side * gb * 0.42, 0.008 * f)
 		var tip := _on_glass(s, xa, side * gb * 0.12, 0.008 * f)
 		lm.beam("Trim", pivot, mid, 0.016 * f, 0.012 * f, _glass_n(s, xa, mid.z), true)
 		lm.beam("Trim", mid, tip, 0.012 * f, 0.01 * f, _glass_n(s, xa, tip.z), true)
-		lm.disc("Trim", pivot, _glass_n(s, gh[3] + 0.03, pivot.z), 0.022 * f, 8)
+		lm.disc("Trim", pivot, _glass_n(s, gh[3] - 0.012, pivot.z), 0.022 * f, 8)
 
 ## A point `lift` off the near loft's glass at (`x`, `z`).
 static func _on_glass(s: Dictionary, x: float, z: float, lift: float) -> Vector3:
@@ -262,6 +294,15 @@ static func _face(s: Dictionary, far: bool) -> PackedVector4Array:
 		out.append(lines)
 	return out
 
+## A faint self-light on a wheel part. Under a night sky the ambient light
+## on the wheels is nil and a metal only mirrors the black street, so the
+## wheel would fill as a flat black disc; this keeps tyre and spokes readable.
+## Negligible against the daylight on them.
+static func _night_fill(m: StandardMaterial3D, tint: Color, energy: float) -> void:
+	m.emission_enabled = true
+	m.emission = tint
+	m.emission_energy_multiplier = energy
+
 ## The shared material of a non-paint surface key.
 static func material(key: String) -> StandardMaterial3D:
 	if _materials.has(key):
@@ -272,7 +313,7 @@ static func material(key: String) -> StandardMaterial3D:
 			# Tinted glass over the modelled cabin: premultiplied, so the
 			# grazing (Fresnel) mirror of the sky and street stays at full
 			# strength while the cabin shows through face on.
-			m.albedo_color = Color(0.02, 0.03, 0.035, 0.5)
+			m.albedo_color = Color(0.02, 0.03, 0.035, 0.64)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.blend_mode = BaseMaterial3D.BLEND_MODE_PREMULT_ALPHA
 			m.roughness = 0.04
@@ -291,15 +332,20 @@ static func material(key: String) -> StandardMaterial3D:
 			m.metallic = 0.6
 			m.roughness = 0.35
 		"Trim":
-			m.albedo_color = Color(0.035, 0.035, 0.038)
-			m.roughness = 0.5
+			m.albedo_color = Color(0.03, 0.03, 0.033)
+			m.roughness = 0.65
+			m.metallic_specular = 0.25
 		"Rubber":
-			m.albedo_color = Color(0.025, 0.025, 0.025)
+			m.albedo_color = Color(0.045, 0.045, 0.047)
 			m.roughness = 0.95
+			_night_fill(m, Color(0.5, 0.5, 0.52), 0.02)
 		"Rim":
+			# Not fully metal: a mirror of a dark night street is black, and
+			# the wheel must still read by what little light falls on it.
 			m.albedo_color = Color(0.62, 0.64, 0.66)
-			m.metallic = 0.85
-			m.roughness = 0.32
+			m.metallic = 0.55
+			m.roughness = 0.36
+			_night_fill(m, Color(0.62, 0.64, 0.66), 0.06)
 		"HeadLamp":
 			# A clear lens over a bright reflector.
 			m.albedo_color = Color(0.62, 0.65, 0.68)
@@ -340,6 +386,18 @@ static func material(key: String) -> StandardMaterial3D:
 			m.emission_enabled = true
 			m.emission = Color(0.8, 0.05, 0.03)
 			m.emission_energy_multiplier = 0.15
+		"RimGun":
+			# A black wheel's machined faces: gunmetal, so its spokes read.
+			m.albedo_color = Color(0.4, 0.41, 0.43)
+			m.metallic = 0.3
+			m.roughness = 0.4
+			_night_fill(m, Color(0.4, 0.41, 0.43), 0.06)
+		"RimDark":
+			# The dark of a two-tone alloy: its barrel and the spokes' flanks.
+			m.albedo_color = Color(0.07, 0.07, 0.075)
+			m.metallic = 0.3
+			m.roughness = 0.38
+			_night_fill(m, Color(0.3, 0.3, 0.32), 0.04)
 		"Board":
 			# A bus's destination sign, dark by day (TransitVehicles lights it).
 			m.albedo_color = Color(0.025, 0.025, 0.025)
