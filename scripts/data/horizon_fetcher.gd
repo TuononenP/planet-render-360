@@ -2,9 +2,10 @@ class_name HorizonFetcher
 extends Node
 
 ## Names for the skyline (HorizonLabels): the named peaks, towns and
-## lakes around a place, from ONE aggregated Overpass request per place
-## (register rate discipline), cached, best-effort, asked for only when
-## the person turns horizon labels on:
+## lakes around a place, from ONE aggregated request per place (register
+## rate discipline), Postpass first and then Overpass (LayerRequest),
+## cached, best-effort, asked for only when the person turns horizon labels
+## on:
 ##  - natural=peak with a name (and its ele), to RADIUS_PEAK_M;
 ##  - place=city|town|village with a name, to RADIUS_TOWN_M;
 ##  - natural=water lake / reservoir with a name, to RADIUS_LAKE_M.
@@ -26,14 +27,14 @@ const QUERY_VERSION := 1
 
 var offline_mode := false
 
-var _req: OverpassRequest
+var _req: LayerRequest
 var _busy := false
 var _lat := 0.0
 var _lon := 0.0
 var _cache := ""
 
 func _ready() -> void:
-	_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
+	_req = LayerRequest.new(ATTEMPT_TIMEOUT, ATTEMPT_TIMEOUT)
 	add_child(_req)
 	_req.answered.connect(_on_answered)
 	_req.exhausted.connect(func(reason: String, _attempts: int) -> void:
@@ -90,7 +91,7 @@ func fetch(lat: float, lon: float) -> void:
 	if offline_mode:
 		_emit("")
 		return
-	_req.run("data=" + build_query(lat, lon).uri_encode(),
+	_req.run(PostpassLayers.build_horizon_body(lat, lon), "data=" + build_query(lat, lon).uri_encode(),
 		func(text: String) -> String: return "" if _usable(text) else "unusable payload",
 		endpoints())
 

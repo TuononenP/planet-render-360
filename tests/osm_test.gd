@@ -736,9 +736,10 @@ func _busy_checks(failures: Array[String]) -> void:
 	busy.cancel()
 	if busy._http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
 		failures.append("cancel() must stop the in-flight request")
-	# Overpass goes through the two OverpassRequests, each with its own
-	# HTTPRequest: fetch() and cancel() must abandon both.
-	for req in [busy._detailed_req, busy._ring_req]:
+	# Overpass goes through the two OverpassRequests (the ring's inside its
+	# LayerRequest), each with its own HTTPRequest: fetch() and cancel()
+	# must abandon both.
+	for req in [busy._detailed_req, busy._ring_req.overpass]:
 		var http: HTTPRequest = (req as OverpassRequest)._http
 		if http.request("http://127.0.0.1:9/") != OK:
 			failures.append("test precondition: loopback request should start")

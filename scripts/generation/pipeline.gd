@@ -408,8 +408,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_climate_took = 0.0
 	# Before any Overpass query: they wait for it and use only an instance
 	# that answered, or go straight to their fallbacks when none did. A
-	# bundled preset asks no Overpass query, so it skips the check too.
-	if not _osm.offline_mode and not BundledOsm.covers(lat, lon):
+	# bundled preset asks no Overpass query, so it skips the check too, as
+	# does a load that asks Postpass first (Overpass is then only its
+	# fallback, tried without a status check).
+	if not _osm.offline_mode and not BundledOsm.covers(lat, lon) and not MapSources.postpass_first():
 		_overpass_probe.start(OsmFetcher.active_endpoints())
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
 	_city.offline = _osm.offline_mode

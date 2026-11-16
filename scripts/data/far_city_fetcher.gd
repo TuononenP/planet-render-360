@@ -1,8 +1,9 @@
 class_name FarCityFetcher
 extends Node
 
-## T5.4 — the far city's real data: ONE aggregated Overpass request per
-## place (register rate discipline), cached, best-effort.
+## T5.4 — the far city's real data: ONE aggregated request per place
+## (register rate discipline), Postpass first and then Overpass
+## (LayerRequest), cached, best-effort.
 ##  - built-up landuse (residential / commercial / industrial / retail
 ##    ways + multipolygon relations) to RADIUS_M: where the distant city
 ##    is and what kind of fabric it is (LocationData.far_landuse);
@@ -45,7 +46,7 @@ var offline_mode := false
 ## {ms, bytes, cached, landuse, towers} of the last fetch.
 var timings: Dictionary = {}
 
-var _req: OverpassRequest
+var _req: LayerRequest
 var _busy := false
 var _lat := 0.0
 var _lon := 0.0
@@ -57,7 +58,7 @@ var _gen := 0
 var _partial := false
 
 func _ready() -> void:
-	_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
+	_req = LayerRequest.new(ATTEMPT_TIMEOUT, ATTEMPT_TIMEOUT)
 	add_child(_req)
 	_req.answered.connect(_on_answered)
 	_req.exhausted.connect(func(reason: String, _attempts: int) -> void:
@@ -166,9 +167,9 @@ func _request() -> void:
 	var has_copy := false
 	for old_path in _fallback_paths(_lat, _lon):
 		has_copy = has_copy or FileAccess.file_exists(old_path)
-	_req.first_byte_timeout = OverpassRequest.FALLBACK_FIRST_BYTE_S if has_copy \
+	_req.overpass.first_byte_timeout = OverpassRequest.FALLBACK_FIRST_BYTE_S if has_copy \
 		else OverpassRequest.FIRST_BYTE_TIMEOUT
-	_req.run("data=" + build_query(_lat, _lon).uri_encode(),
+	_req.run(PostpassLayers.build_far_body(_lat, _lon), "data=" + build_query(_lat, _lon).uri_encode(),
 		func(text: String) -> String: return "" if _usable(text) else "unusable payload",
 		endpoints())
 

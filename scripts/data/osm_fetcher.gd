@@ -141,7 +141,7 @@ static func ring_radius_for_preset(preset: int) -> int:
 var _http: HTTPRequest
 var _postpass_http: HTTPRequest
 var _detailed_req: OverpassRequest
-var _ring_req: OverpassRequest
+var _ring_req: LayerRequest
 var _poi_req: OverpassRequest
 var _bridge_req: OverpassRequest
 var _bridge_postpass: PostpassRequest
@@ -170,7 +170,7 @@ func _ready() -> void:
 	add_child(_detailed_req)
 	_detailed_req.answered.connect(_on_detailed_answered)
 	_detailed_req.exhausted.connect(_on_detailed_exhausted)
-	_ring_req = OverpassRequest.new(ATTEMPT_TIMEOUT)
+	_ring_req = LayerRequest.new(ATTEMPT_TIMEOUT)
 	add_child(_ring_req)
 	_ring_req.answered.connect(_on_ring_answered)
 	_ring_req.exhausted.connect(_on_ring_exhausted)
@@ -429,11 +429,11 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	if _detailed_text == "":
 		_omt.start(lat, lon, DETAILED_RADIUS_M)
 	# Both phases go live at once; _try_finish waits for the pair. The
-	# ring has no fallback, so without Overpass it is not asked for.
-	if want_ring and _ring_text == "" and not known_empty and not active_endpoints().is_empty():
+	# ring asks Postpass and Overpass in MapSources order (LayerRequest).
+	if want_ring and _ring_text == "" and not known_empty:
 		_ring_pending = true
-		_ring_req.run("data=" + build_ring_query(lat, lon, ring).uri_encode(),
-			_check_ring, ring_endpoints())
+		_ring_req.run(PostpassLayers.build_ring_body(lat, lon, ring),
+			"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
 	if _detailed_text != "":
 		_detailed_done()
 	elif known_empty:
@@ -580,7 +580,7 @@ static func _detailed_check(lat: float, lon: float) -> Callable:
 		return "Overpass " + NO_BUILDINGS
 
 static func _check_ring(text: String) -> String:
-	return "" if _payload_usable(text) else "Overpass ring query returned an unusable payload"
+	return "" if _payload_usable(text) else "ring query returned an unusable payload"
 
 func _on_detailed_answered(text: String) -> void:
 	_detailed_text = text

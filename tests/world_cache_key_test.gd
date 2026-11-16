@@ -186,7 +186,7 @@ func _run() -> void:
 
 ## Data scripts the builders name that run before a build (fetching what
 ## LocationData carries), not inside it: they may use skipped sources.
-const FETCH_TIME := ["cache_store.gd", "far_city_fetcher.gd", "ground_model_fetcher.gd",
+const FETCH_TIME := ["cache_store.gd", "far_city_fetcher.gd", "ground_model_fetcher.gd", "map_sources.gd",
 	"osm_fetcher.gd", "satellite_fetcher.gd", "tile_fetcher.gd"]
 
 ## Source text with comments dropped, so a doc mention is not a use.
