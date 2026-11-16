@@ -63,8 +63,9 @@ static func sofia_central(model: Node3D) -> void:
 		var x := -57.0 + 6.0 * float(k)
 		lm.beam("Walls", Vector3(x, 0, 27.0), Vector3(x, 22.0, 31.0), 1.1, 1.4)
 		lm.beam("Walls", Vector3(x, 0, -27.0), Vector3(x, 22.0, -30.0), 1.1, 1.4)
-	lm.box("Walls", Vector3(0, 22.6, 2.0), Vector3(128.0, 1.2, 66.0))
-	lm.box("Trim", Vector3(0, 23.0, 35.0), Vector3(128.0, 1.6, 0.6))
+	# The slab rises toward the forecourt, its edge 2.6 m over the back.
+	lm.box("Walls", Vector3(0, 22.6, 2.0), Vector3(128.0, 1.2, 66.0), Basis(Vector3.RIGHT, -0.08))
+	lm.box("Trim", Vector3(0, 25.6, 35.0), Vector3(128.0, 1.6, 0.6))
 	for x in [-30.0, 0.0, 30.0]:
 		lm.box("Trim", Vector3(x, 2.5, 25.5), Vector3(8.0, 5.0, 3.0))
 	for s in [-1.0, 1.0]:
