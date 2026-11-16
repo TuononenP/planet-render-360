@@ -192,7 +192,7 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 
 ## The run [low, high] (metres along `route`) a train standing at `s0`
 ## may use: up to `run` each way, and not past a tunnel mouth, the edge
-## of the data or the route's own ends.
+## of the data, a bridge with no known deck or the route's own ends.
 func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: PackedVector2Array,
 		ground: GroundTruth) -> Vector2:
 	var lo := s0
@@ -204,7 +204,9 @@ func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: Packed
 			if next < reach or next > route.length_m - reach:
 				break
 			var p := route.xz_at(next)
-			var ok := ground == null or ground.is_inside(p.x, p.y)
+			# Never onto a bridge whose deck height is unknown.
+			var ok := (ground == null or ground.is_inside(p.x, p.y)) \
+				and not route.unsupported(next - reach, next + reach)
 			for m in mouths:
 				if m.distance_to(p) < (TransitVehicles.TUNNEL_CLEAR_M + reach) * _m2u:
 					ok = false

@@ -146,11 +146,17 @@ const KIND := {
 				"doors": [4.6, -1.2], "pitch": 0.82, "bogies": [3.45, -3.45], "pole": 1.2}}},
 }
 
-## Whether trams run on `rail`: mapped tram track, and in San Francisco
-## the light rail too (its street-running metro).
+## Whether trams run on `rail`: mapped tram track, in San Francisco the
+## light rail too (its street-running metro), and round Helsinki the
+## metre-gauge light rail (Kruunusillat, Raide-Jokeri), which trams run.
 static func carries(region: String, rail: Dictionary) -> bool:
 	var cls := str(rail.get("class", ""))
-	return cls == "tram" or (cls == "light_rail" and region == "san_francisco")
+	if cls == "tram":
+		return true
+	if cls != "light_rail":
+		return false
+	return region == "san_francisco" \
+		or (region in ["helsinki", "espoo"] and float(rail.get("gauge_m", 1.435)) < 1.2)
 
 ## The tram that runs on `rail` in CityStyles region `region` of
 ## country `country` (ISO alpha-2): {"kind", "livery"}, or {} when none
@@ -166,7 +172,7 @@ static func pick(region: String, country: String, rail: Dictionary, h: float) ->
 			if str(rail.get("class", "")) == "tram" and bool(rail.get("embedded", false)) and gauge > 1.3:
 				return {"kind": "pcc", "livery": PCC_LIVERIES[mini(int(h * PCC_LIVERIES.size()), PCC_LIVERIES.size() - 1)]}
 			return {"kind": "lrv", "livery": "sf_lrv"}
-		"helsinki":
+		"helsinki", "espoo":
 			return {"kind": "modern2" if h < 0.3 else "modern3", "livery": "helsinki"}
 		"lisbon":
 			if gauge <= 0.95:

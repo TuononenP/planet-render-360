@@ -9,8 +9,8 @@ extends RefCounted
 ## * Where: at a mapped tram stop, snapped to the nearest track within
 ##   SNAP_M, OCCUPIED of them taken; and one at a hashed spot in every
 ##   BLOCK_M of route without a stop (bundled and older payloads carry
-##   no stops, so there every block gets its tram). Never on a bridge,
-##   in a tunnel or within TUNNEL_CLEAR_M of a tunnel mouth, SPACING_M
+##   no stops, so there every block gets its tram). Never on a bridge
+##   whose deck height is unknown (BridgeTramDeck knows a few), in a tunnel or within TUNNEL_CLEAR_M of a tunnel mouth, SPACING_M
 ##   apart, the MAX_TRAINS nearest the eye. Positions are hashed, so a
 ##   street always shows the same trams.
 ## * How: each body section is its own instance on TramRoute.place_train
@@ -135,7 +135,8 @@ static func _train(route: TramRoute, s_in: float, region: String, country: Strin
 	if route.length_m < 2.0 * reach:
 		return {}
 	var s := clampf(s_in, reach, route.length_m - reach)
-	if route.bridged(s - reach, s + reach):
+	# On a bridge only where its deck is known (BridgeTramDeck).
+	if route.unsupported(s - reach, s + reach):
 		return {}
 	var a := route.xz_at(s - length * 0.5)
 	var b := route.xz_at(s + length * 0.5)

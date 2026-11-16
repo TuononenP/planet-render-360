@@ -113,6 +113,7 @@ static func chains(data: LocationData, ground: GroundTruth, m2u: float,
 		for k in range(1, route.points.size()):
 			route.cum.append(route.cum[k - 1] + route.points[k].distance_to(route.points[k - 1]))
 		route.length_m = route.cum[route.cum.size() - 1] / m2u
+		BridgeTramDeck.apply(route, data, m2u)
 		out.append(route)
 	out.sort_custom(func(a: TramRoute, b: TramRoute) -> bool:
 		return a.length_m > b.length_m)
@@ -279,6 +280,17 @@ func nearest(p: Vector2) -> Vector2:
 	return Vector2(best_s / _m2u, sqrt(best) / _m2u)
 
 ## Whether any track between `s0` and `s1` metres is on a bridge.
+## Whether any segment between s0 and s1 is a bridge with no deck height
+## known (the tram would stand at ground or sea level under it).
+func unsupported(s0: float, s1: float) -> bool:
+	var i0 := _segment(clampf(s0 * _m2u, 0.0, cum[cum.size() - 1]))
+	var i1 := _segment(clampf(s1 * _m2u, 0.0, cum[cum.size() - 1]))
+	for i in range(i0, i1 + 1):
+		if bool((ways[i] as Dictionary).get("bridge", false)) \
+				and (heights.is_empty() or is_nan(heights[i]) or is_nan(heights[i + 1])):
+			return true
+	return false
+
 func bridged(s0: float, s1: float) -> bool:
 	var i0 := _segment(clampf(s0 * _m2u, 0.0, cum[cum.size() - 1]))
 	var i1 := _segment(clampf(s1 * _m2u, 0.0, cum[cum.size() - 1]))

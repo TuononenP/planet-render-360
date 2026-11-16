@@ -164,7 +164,16 @@ func _selection(failures: Array[String]) -> void:
 		failures.append("Helsinki's trams are green under a pale top")
 	if not TramSpecs.pick("", "DE", heavy, 0.5).is_empty() or not TramSpecs.pick("", "DE", light, 0.5).is_empty() \
 			or not TramSpecs.pick("san_francisco", "US", heavy, 0.5).is_empty():
-		failures.append("no tram runs on heavy rail, or on light rail outside San Francisco")
+		failures.append("no tram runs on heavy rail, or on light rail outside San Francisco and Helsinki")
+	# Kruunusillat and Raide-Jokeri: metre-gauge light rail that trams run.
+	var metre_light := OsmTags._rail_entry({"railway": "light_rail", "gauge": "1000"},
+		PackedVector2Array([Vector2.ZERO, Vector2(10, 0)]))
+	for region: String in ["helsinki", "espoo"]:
+		if str(TramSpecs.pick(region, "FI", metre_light, 0.5).get("livery", "")) != "helsinki":
+			failures.append("%s's metre-gauge light rail runs Helsinki trams" % region)
+	if TramSpecs.carries("helsinki", light) or TramSpecs.carries("helsinki", heavy) \
+			or TramSpecs.carries("lisbon", metre_light):
+		failures.append("only Helsinki's metre-gauge light rail is tram track, not standard gauge or elsewhere")
 
 func _route(failures: Array[String]) -> void:
 	var data := _data(60.17, 24.94)
