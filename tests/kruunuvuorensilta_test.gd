@@ -91,6 +91,20 @@ func _check_model(failures: Array[String]) -> void:
 	var stay_mat := stay_part.mesh.surface_get_material(0) as StandardMaterial3D if stay_part != null else null
 	if stay_mat == null or stay_mat.emission_energy_multiplier > 0.0:
 		failures.append("the stays should not glow by day")
+	# ... and follow the night by themselves, on presets that never dress
+	# the hero: CityLights raises the glow as the sky darkens.
+	if stay_mat != null:
+		var holder := Node3D.new()
+		var probe := MeshInstance3D.new()
+		probe.mesh = stay_part.mesh
+		holder.add_child(probe)
+		CityLights.apply(holder, 1.0)
+		if stay_mat.emission_energy_multiplier <= 0.0:
+			failures.append("the undressed stays should glow at night")
+		CityLights.apply(holder, 0.0)
+		if stay_mat.emission_energy_multiplier > 0.0:
+			failures.append("the undressed stays should go dark again by day")
+		holder.free()
 	var spots := LandmarkLights.dress(root, "kruunuvuorensilta")
 	var night_mat := stay_part.get_surface_override_material(0) if stay_part != null else null
 	if night_mat == null or float(night_mat.get_meta(CityLights.META, 0.0)) <= 0.0:

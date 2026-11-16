@@ -143,6 +143,8 @@ const FIN_RAIL_M := 1.3
 const PYLON_WASH := Color(0.36, 0.48, 1.0)
 const PYLON_LIGHT := 2.0
 const STAY_GLOW := Color("#5F7DFF")
+## The stays' emission energy in full night.
+const STAY_NIGHT := 0.35
 const DECK_WARM := Color(1.0, 0.86, 0.62)
 const DECK_LIGHT := 0.45
 ## Downlight range, metres: from the pole head (~8 m up) to the deck
@@ -201,16 +203,18 @@ static func build(model: Node3D) -> void:
 	model.set_meta(LandmarkLights.FLOOD_META, flood_spots())
 	model.set_meta(LandmarkLights.HALO_META, beacon_halos())
 
-## White stays by day: built with no glow of their own, so they stay
-## plain white wherever nothing follows the night. Where the hero is
-## dressed ("Lamp" parts follow the night) they glow faintly blue after
-## dark, as the lit cable fans do over the water.
+## The stays have a day look and a night look on every preset: plain
+## white by day (no glow), and after dark a faint blue glow, as the lit
+## cable fans have over the water. The material itself follows the night
+## (CityLights drives it wherever the view has a sky clock), so it does
+## not depend on the hero being dressed. NIGHT_GLOW_META keeps the
+## dressed hero's own lamp path (LandmarkLights) at the same energy.
 static func _stay_material() -> StandardMaterial3D:
 	var m := LandmarkMaterials.paint("#F1F2F0", 0.4, 0.2).duplicate() as StandardMaterial3D
 	m.emission_enabled = true
 	m.emission = STAY_GLOW
-	m.emission_energy_multiplier = 0.0
-	m.set_meta(LandmarkLights.NIGHT_GLOW_META, 0.35)
+	m.set_meta(LandmarkLights.NIGHT_GLOW_META, STAY_NIGHT)
+	CityLights.mark_glow(m, STAY_NIGHT * LandmarkLights.LAMP_GAIN / CityLights.NIGHT_ENERGY)
 	return m
 
 ## Light grey slats with see-through gaps: a stripe mask repeating every
