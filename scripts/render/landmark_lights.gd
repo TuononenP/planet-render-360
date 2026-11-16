@@ -28,6 +28,33 @@ const SPOTS := 4
 ## reaches only the deck, a cool wash differs from the warm default; and
 ## then its cone falloff (spot_angle_attenuation, low = flat pool).
 const FLOOD_META := "flood_spots"
+## Model-node meta: [[centre, radius, colour], ...] in model metres: soft
+## glows round a landmark's own beacons (aviation lights) at night, the
+## halo a bright lamp throws in the night air, which bloom alone cannot.
+const HALO_META := "beacon_halos"
+## Smallest angular radius of a halo (rad), so a far beacon stays a glow.
+const HALO_MIN_RAD := 0.006
+const HALO_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
+uniform float night_energy = 0.0;
+uniform vec3 colour : source_color = vec3(1.0, 0.05, 0.02);
+uniform float quad_u = 1.0;
+void vertex() {
+	// Grow with distance so the halo never shrinks under HALO_MIN_RAD.
+	float dist = length(INV_VIEW_MATRIX[3].xyz - MODEL_MATRIX[3].xyz);
+	VERTEX *= max(1.0, dist * %f * 2.0 / quad_u);
+	// Billboard: the quad faces the camera at the halo's centre.
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1],
+		INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+}
+void fragment() {
+	float r = length(UV - 0.5) * 2.0;
+	// A bright core fading into a wide soft glow, zero at the quad's edge.
+	float glow = (exp(-r * r * 18.0) * 1.6 + exp(-r * r * 4.0) * 0.35) * (1.0 - smoothstep(0.8, 1.0, r));
+	ALBEDO = colour * glow * night_energy;
+}
+""" % HALO_MIN_RAD
 ## Footprints longer than ELONGATED × their width line their long sides.
 const ELONGATED := 2.0
 const SIDE_STEP_M := 45.0
@@ -87,6 +114,7 @@ const GLOW := {
 ## night. Returns the number of spots added (0 for a glowing lattice).
 static func dress(hero: Node3D, type: String) -> int:
 	_night_lamps(hero)
+	_halos(hero)
 	if GLOW.has(type):
 		_glow(hero, GLOW[type][0], float(GLOW[type][1]))
 		if type == "eiffel":
@@ -194,6 +222,32 @@ static func _night_lamps(hero: Node3D) -> void:
 			var lamp := mat.duplicate() as StandardMaterial3D
 			CityLights.mark_glow(lamp, mat.emission_energy_multiplier * LAMP_GAIN / CityLights.NIGHT_ENERGY)
 			mi.set_surface_override_material(s, lamp)
+
+## Night halos round the model's beacons (HALO_META): one billboard each,
+## additive, dark by day (CityLights drives night_energy).
+static func _halos(hero: Node3D) -> void:
+	var model := hero.get_node_or_null("Model") as Node3D
+	if model == null or not model.has_meta(HALO_META):
+		return
+	var m := WorldScale.metres_to_units()
+	var holder := Node3D.new()
+	holder.name = "BeaconHalos"
+	for raw in model.get_meta(HALO_META):
+		var own: Array = raw
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * float(own[1]) * 2.0 * m
+		var mat := ShaderMaterial.new()
+		mat.shader = SharedShader.of(HALO_CODE)
+		mat.set_meta(CityLights.META, 1.0)
+		mat.set_shader_parameter("quad_u", quad.size.x)
+		mat.set_shader_parameter("colour", own[2] as Color)
+		quad.material = mat
+		var mi := MeshInstance3D.new()
+		mi.mesh = quad
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.position = model.transform * (own[0] as Vector3)
+		holder.add_child(mi)
+	hero.add_child(holder)
 
 ## SPARKLES flash points spread over the hero's structure (its mesh
 ## vertices, evenly strided), as one billboard MultiMesh.

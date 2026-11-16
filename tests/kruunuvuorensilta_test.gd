@@ -78,6 +78,10 @@ func _check_model(failures: Array[String]) -> void:
 	var spots := LandmarkLights.dress(root, "kruunuvuorensilta")
 	if spots != LandmarkFhCrownBridge.flood_spots().size() or spots < 16:
 		failures.append("expected 6 pylon floodlights and 10+ deck downlights, got %d spots" % spots)
+	# Red night halos round the top aviation light and the mast's two pairs.
+	var halos := root.get_node_or_null("BeaconHalos")
+	if halos == null or halos.get_child_count() != 5:
+		failures.append("expected 5 beacon halos, got %d" % (halos.get_child_count() if halos != null else 0))
 	var c := LandmarkFhCrownBridge.at(LandmarkFhCrownBridge.pylon_s())
 	var holder := root.get_node_or_null("LandmarkLights")
 	var k := 0

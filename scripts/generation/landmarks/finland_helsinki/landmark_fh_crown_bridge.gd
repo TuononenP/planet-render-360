@@ -101,6 +101,12 @@ const DECK_FALLOFF := 0.6
 const BEACON_RED := Color(1.0, 0.08, 0.03)
 const BEACON_GLOW := 0.5
 const BEACON_REACH_M := 7.0
+## Night halo radius (m) round the top aviation light and the mast's
+## lower pairs; the top one glows widest, as in night photos.
+const TOP_HALO_M := 9.0
+## Heights (m) of the mast's paired aviation lights below the top one.
+const MAST_BEACON_Y: Array[float] = [72.0, 102.0]
+const MAST_HALO_M := 4.0
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -130,6 +136,7 @@ static func build(model: Node3D) -> void:
 	_stays(lm)
 	lm.commit(model)
 	model.set_meta(LandmarkLights.FLOOD_META, flood_spots())
+	model.set_meta(LandmarkLights.HALO_META, beacon_halos())
 
 ## White stays by day; at night ("Lamp" parts follow the night) they
 ## glow faintly blue, as the lit cable fans do over the water.
@@ -510,7 +517,7 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	# Pure red at a high energy: red carries little luminance, so it needs
 	# this much to read as a bright red point rather than dull orange.
 	lm.box("BeaconLamp", base + Vector3.UP * (MAST_TOP_M + 1.3), Vector3(1.8, 1.0, 1.8), basis, 0.0)
-	for y: float in [72.0, 102.0]:
+	for y: float in MAST_BEACON_Y:
 		for side: float in [-1.0, 1.0]:
 			lm.box("BeaconLamp", base + n3 * side * (_mast_half(y) + 0.2) + Vector3.UP * y, Vector3(0.9, 0.8, 0.5),
 				basis, 0.0)
@@ -555,6 +562,20 @@ static func flood_spots() -> Array:
 	# The top aviation light's red glow over the mast cap.
 	out.append([base + Vector3.UP * (PYLON_TOP_M + 2.0), base + t3 * 0.5 + Vector3.UP * MAST_TOP_M, 60.0,
 		BEACON_GLOW, BEACON_REACH_M, BEACON_RED])
+	return out
+
+## Red night halos round the aviation lights (LandmarkLights.HALO_META,
+## model metres): a wide one on the top, smaller ones on both faces of
+## the mast at 72 m and 102 m.
+static func beacon_halos() -> Array:
+	var c := at(pylon_s())
+	var t := heading(pylon_s())
+	var n3 := Vector3(-t.y, 0, t.x)
+	var base := Vector3(c.x, 0.0, c.y)
+	var out: Array = [[base + Vector3.UP * (MAST_TOP_M + 1.3), TOP_HALO_M, BEACON_RED]]
+	for y: float in MAST_BEACON_Y:
+		for side: float in [-1.0, 1.0]:
+			out.append([base + n3 * side * (_mast_half(y) + 0.5) + Vector3.UP * y, MAST_HALO_M, BEACON_RED])
 	return out
 
 ## Mast half-width across the deck at height y (for the stay anchors).
