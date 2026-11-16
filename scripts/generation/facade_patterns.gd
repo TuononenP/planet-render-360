@@ -34,6 +34,18 @@ const DARK := Color(0.03, 0.03, 0.03)
 const IRON := Color(0.0116, 0.0116, 0.0137)
 const JOINT := Color(0.0, 0.0, 0.0, 0.34)
 const JOINT_LIGHT := Color(1.0, 1.0, 1.0, 0.10)
+## Panel-to-panel tone step: the share of the wall's brightness a panel
+## runs lighter or darker than its neighbours.
+const TONE_STEP := 0.07
+
+## Mean luminance (linear 0..1) of `r` in `img`, from an 8 x 8 grid of samples.
+static func _mean_luma(img: Image, r: Rect2i) -> float:
+	var sum := 0.0
+	for j in 8:
+		for i in 8:
+			var c := img.get_pixel(r.position.x + (i * r.size.x) / 8, r.position.y + (j * r.size.y) / 8)
+			sum += c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
+	return sum / 64.0
 
 static func has(pattern: String) -> bool:
 	return pattern in NAMES
@@ -47,7 +59,12 @@ static func prepass(pattern: String, base: Image, nor: Image, w: int, pv: Dictio
 			for bay in w / CELL:
 				var ox := bay * CELL
 				var tone := FacadeComposer._hash(float(bay) * 3.1 + float(variant) * 1.7, 2.3)
-				var c := Color(1, 1, 1, 0.07) if tone > 0.5 else Color(0, 0, 0, 0.07)
+				# A panel runs ±TONE_STEP of the wall's own brightness. A blend
+				# toward white adds the same amount to any wall, which on dark
+				# brick turned half the bays pale pink, so it is scaled to it.
+				var lum := _mean_luma(base, Rect2i(ox, 0, CELL, CELL))
+				var c := Color(1, 1, 1, TONE_STEP * lum / maxf(1.0 - lum, 0.2)) if tone > 0.5 \
+					else Color(0, 0, 0, TONE_STEP)
 				FacadePaint.shade(base, Rect2i(ox, 0, CELL, CELL), c)
 			for x in range(0, w, CELL):
 				FacadePaint.shade(base, Rect2i(x, 0, 2, CELL), JOINT)
