@@ -301,7 +301,7 @@ static func entries() -> Array:
 		{"type": "belgrade_centre_station", "name": "Belgrade Centre", "lat": 44.79368, "lon": 20.453133,
 			"radius_m": 6000.0, "wiki_title": "Belgrade Centre railway station", "height_m": 26.8, "kind": "Station",
 			"secondary": true, "capital": "RS", "yaw_deg": -156.2, "clear_m": 16.0,
-			"clear_rect_m": [0.0, -6.9, 122.4, 31.1],
+			"clear_rect_m": [0.0, -6.9, 122.6, 31.1],
 			"aliases": ["belgrade centre", "beograd centar", "prokop station"]},
 		{"type": "bratislava_station", "name": "Bratislava main station", "lat": 48.158757, "lon": 17.106107,
 			"radius_m": 6000.0, "wiki_title": "Bratislava hlavná stanica", "height_m": 15.8, "kind": "Station",

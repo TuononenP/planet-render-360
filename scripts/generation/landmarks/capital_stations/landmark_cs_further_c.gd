@@ -96,7 +96,7 @@ static func monaco(model: Node3D) -> void:
 	lm.box("Trim", Vector3(0, 13.8, -6.0), Vector3(64.6, 0.4, 20.6))
 	lm.box("Roof", Vector3(0, 14.05, -6.0), Vector3(64.0, 0.1, 20.0))
 	var f := 4.3
-	lm.box("Curtain", Vector3(0, 4.8, f), Vector3(40.0, 9.6, 0.2))
+	lm.box("Curtain", Vector3(0, 4.85, f), Vector3(40.4, 9.7, 0.2))
 	K.lunette(lm, "Trim", "Curtain", Vector3(0, 9.6, f), Vector3.BACK, 40.0, 3.4, 12, 0)
 	var y := 3.4
 	while y < 12.6:
@@ -134,7 +134,7 @@ static func ouagadougou(model: Node3D) -> void:
 			lm.beam("Shell", prev, p, 0.5, 0.9)
 			prev = p
 	for x in [x0 - 1.0, x1 + 1.0]:
-		lm.beam("Shell", Vector3(x, 13.0, z0 + depth - 0.5), Vector3(x * 0.85, 0.0, z0 + depth + 2.0), 1.4, 1.4,
+		lm.beam("Shell", Vector3(x, 13.0, z0 + depth - 0.5), Vector3(x, 0.0, z0 + depth + 2.0), 1.4, 1.4,
 			Vector3.ZERO, true)
 	lm.commit(model)
 

@@ -62,7 +62,8 @@ static func belgrade(model: Node3D) -> void:
 		var w := a.distance_to(b)
 		lm.box("Curtain", m + Vector3.UP * 7.0 - out * 18.0, Vector3(w + 0.4, 14.0, 36.0), basis)
 		lm.box("Walls", m + Vector3.UP * 14.4 - out * 18.0, Vector3(w + 0.4, 0.8, 37.0), basis)
-		LandmarkFhParts.strips(lm, "Fins", a + Vector3.UP * 0.0, b, out, 15.0, 11.0, maxi(int(w / 1.2), 2), 0.35, 1.2)
+		# Fins broad and well spaced: thin close ones shimmer at a distance.
+		LandmarkFhParts.strips(lm, "Fins", a, b, out, 15.0, 11.0, maxi(int(w / 2.6), 2), 0.9, 1.2)
 		lm.box("Walls", m + Vector3.UP * 26.4 - out * 18.0, Vector3(w + 0.4, 0.8, 38.0), basis)
 		LandmarkFhParts.strips(lm, "Walls", a, b, out, 0.0, 14.0, 4, 0.4, 0.3)
 	# The fin band's lid and back.
@@ -95,6 +96,8 @@ static func _fascia(lm: LandmarkMesh, c: Vector3, w: float, depth: float, h: flo
 	lm.quad("Walls", c + a + lo, c + b + lo, c + b + hi, c + a + hi, Vector3(0, 0.3, 1).normalized())
 	lm.quad("Walls", c + a + hi, c + b + hi, c + b + Vector3.UP * h * 0.6, c + a + Vector3.UP * h * 0.6, Vector3.UP)
 	lm.quad("Walls", c + b + lo, c + a + lo, c + a, c + b, Vector3.DOWN)
+	# The back, closing the band against the roof behind it.
+	lm.quad("Walls", c + b, c + a, c + a + Vector3.UP * h * 0.6, c + b + Vector3.UP * h * 0.6, Vector3.FORWARD)
 	for e in [a, b]:
 		var nx := Vector3(signf(e.x), 0, 0)
 		lm.quad("Walls", c + e, c + e + lo, c + e + hi, c + e + Vector3.UP * h * 0.6, nx)
