@@ -11,7 +11,8 @@ extends SceneTree
 ## roads that meets each of them. Synthetic cases: two outlines 6 m apart stay two
 ## structures, a road and a railway share one outline, a switchback
 ## footbridge with no outline keeps its ramps, and the ramp arm of a
-## T-shaped outline comes down to its path instead of running flat.
+## T-shaped outline comes down to its path instead of running flat, and a
+## spine forking into short branches lands where they meet their roads.
 
 const LAT := 60.1661
 const LON := 24.7537
@@ -59,6 +60,7 @@ func _init() -> void:
 	_road_and_rail(failures)
 	_switchback(failures)
 	_arm(failures)
+	_fork_end(failures)
 	_rise_for_path(failures)
 	if failures.is_empty():
 		print("bridge structures: OK")
@@ -372,6 +374,41 @@ func _switchback(failures: Array[String]) -> void:
 	if deck[0] - ground > 0.5 or deck[deck.size() / 2] - ground < 2.0:
 		failures.append("a switchback footbridge should ramp from the ground: ends %.1f m, middle %.1f m" % [
 			deck[0] - ground, deck[deck.size() / 2] - ground])
+
+## A road bridge whose end forks into two short bridge ways, each landing
+## on a road (Pont d'Arcole onto Quai de l'Hôtel de Ville): the fork is an
+## abutment, not a joint in mid-air, and both branches meet their roads.
+func _fork_end(failures: Array[String]) -> void:
+	var d := _flat()
+	d.roads = [
+		{"class": "primary", "width_m": 7.0, "lanes": 2, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(-20, 0), Vector2(12, 0)])},
+		{"class": "residential", "width_m": 4.0, "lanes": 1, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(12, 0), Vector2(20, -6)])},
+		{"class": "residential", "width_m": 4.0, "lanes": 1, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(20, 6), Vector2(12, 0)])},
+		{"class": "primary", "width_m": 7.0, "lanes": 2,
+			"points": PackedVector2Array([Vector2(-40, 0), Vector2(-20, 0)])},
+		{"class": "residential", "width_m": 4.0, "lanes": 1,
+			"points": PackedVector2Array([Vector2(20, -6), Vector2(40, -6)])},
+		{"class": "residential", "width_m": 4.0, "lanes": 1,
+			"points": PackedVector2Array([Vector2(20, 6), Vector2(40, 6)])}]
+	d.bridge_areas = [{"points": _rect(-20, -9, 20, 9), "layer": 1}]
+	var surf := RoadBuilder._Surface.new(d, GroundTruth.new(d))
+	var plan := surf.road_bridges.structures
+	plan.prepare(surf, 1.0)
+	if plan.structures.size() != 1 or (plan.structures[0] as BridgeStructures.Structure).members.size() != 3:
+		failures.append("a forked bridge outline should be one structure with all three ways")
+		return
+	var s: BridgeStructures.Structure = plan.structures[0]
+	# The abutment at whichever spine end is the fork (the spine may run
+	# either way).
+	var fork_first := s.spine[0].distance_to(Vector2(12, 0)) < 0.5
+	var fork := s.abutments.x if fork_first else s.abutments.y
+	if is_nan(fork):
+		failures.append("a spine end forking into branches that land on roads should be an abutment")
+	for li in s.members:
+		_meets(s, li, surf, failures, "a forked end", 0.5)
 
 ## A T-shaped outline: a road bridge and a cycleway arm leaving its side.
 ## The arm meets the road's level and comes down to the ground at its far

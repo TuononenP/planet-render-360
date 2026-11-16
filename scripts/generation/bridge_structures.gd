@@ -39,6 +39,8 @@ const END_DOT := 0.6
 ## How far along its approach an abutment seeks the road's first dry
 ## point, metres.
 const ABUTMENT_SEEK_M := 20.0
+## A member ending this close to a spine end forks from it, metres.
+const FORK_SNAP_M := 0.5
 ## The deck eases onto its approach's ground over this far before an
 ## abutment (further at BLEND_GRADE for a larger step), by at most
 ## FIT_MAX_M / PATH_FIT_MAX_M (beyond that a bank falls away, and the
@@ -452,23 +454,70 @@ static func _level(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder
 			var i := int(end[0])
 			var p := s.spine[i]
 			var road := BridgeLandings.approach_from(surf, p, (p - s.spine[int(end[1])]).normalized())
+			var y := NAN
 			if road.is_empty():
-				continue
-			var y := RoadBridgeBuild._deck_floor(s.spine, i, surf, slab, s.half) + 0.05 * m2u
-			# The approach's ribbon starts at its first dry point (RoadBuilder
-			# drops it over water): a bank carved down under the end is not
-			# where the road is. On land, the road's own level: ground cut
-			# down under the end for a way passing under the span is not
-			# where it runs either (BridgeApproaches.road_level).
-			var dry := _first_dry(road, surf, ABUTMENT_SEEK_M * m2u)
-			if surf.ground.water_at(p.x, p.y) <= 0.0:
-				dry = BridgeApproaches.road_level(road, surf, m2u)
-			if not is_nan(dry):
-				y = dry + 0.05 * m2u
+				# A spine forking into short member ways that each land on a
+				# road (Pont d'Arcole's two branches onto the quay) ends at
+				# their landings, not in mid-air.
+				y = _fork_landing(s, p, index, surf, m2u)
+				if is_nan(y):
+					continue
+			else:
+				y = RoadBridgeBuild._deck_floor(s.spine, i, surf, slab, s.half) + 0.05 * m2u
+				var dry := _landing(road, p, surf, m2u)
+				if not is_nan(dry):
+					y = dry + 0.05 * m2u
 			if i == 0:
 				s.abutments.x = y
 			else:
 				s.abutments.y = y
+
+## The level of approach `road` leaving a deck end at `p`, or NAN. The
+## approach's ribbon starts at its first dry point (RoadBuilder drops it
+## over water): a bank carved down under the end is not where the road
+## is. On land, the road's own level: ground cut down under the end for a
+## way passing under the span is not where it runs either
+## (BridgeApproaches.road_level).
+static func _landing(road: PackedVector2Array, p: Vector2, surf: RoadBuilder._Surface, m2u: float) -> float:
+	if surf.ground.water_at(p.x, p.y) <= 0.0:
+		return BridgeApproaches.road_level(road, surf, m2u)
+	return _first_dry(road, surf, ABUTMENT_SEEK_M * m2u)
+
+## The level where a spine end at `p` with no road of its own lands
+## through the structure's other members leaving that node: the mean of
+## their far ends' approach levels (plus the deck's lift), or NAN when
+## none of them goes on as a road (a joint in mid-air).
+static func _fork_landing(s: Structure, p: Vector2, index: RoadBridgeDecks.Index,
+		surf: RoadBuilder._Surface, m2u: float) -> float:
+	var snap := FORK_SNAP_M * m2u
+	var sum := 0.0
+	var count := 0
+	for li in s.members:
+		if li == s.spine_line:
+			continue
+		var pts: PackedVector2Array = index.lines[li]["points"]
+		if pts.size() < 2:
+			continue
+		var n := pts.size()
+		var far := -1
+		var back := -1
+		if pts[0].distance_to(p) <= snap:
+			far = n - 1
+			back = n - 2
+		elif pts[n - 1].distance_to(p) <= snap:
+			far = 0
+			back = 1
+		if far < 0:
+			continue
+		var q := pts[far]
+		var road := BridgeLandings.approach_from(surf, q, (q - pts[back]).normalized())
+		if road.is_empty():
+			continue
+		var y := _landing(road, q, surf, m2u)
+		if not is_nan(y):
+			sum += y
+			count += 1
+	return sum / float(count) + 0.05 * m2u if count > 0 else NAN
 
 ## The approach's ground where the deck meets it: the ground at the way's
 ## end, or where that is over water, the highest dry ground along `line`
