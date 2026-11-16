@@ -40,6 +40,11 @@ const HEIGHT_JITTER := 0.02
 static var _meshes: Dictionary = {}
 const CELL_M := 40.0
 const DETAIL_M := 110.0
+## Render layer of the cars (and buses): off the default layer, so the
+## street's decals (RoadDecals: manhole covers, gutter grates, leaf litter,
+## cull mask without this bit) do not project onto bonnets and roofs, where a
+## grate beside the kerb drew a dark striped patch.
+const CAR_LAYER := 2
 
 ## Cars [position, basis, kind, colour, distance², finish] for `data`'s
 ## streets, nearest first; finish is the CarPaint instance data.
@@ -49,6 +54,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var junc := RoadSurface.junctions(data)
 	var obstacles := obstacle_grid(data, m2u)
+	var walls := building_grid(data, m2u)
 	# Standing trams and buses hold their kerb.
 	for item: Array in TransitVehicles.footprints(data, ground, m2u):
 		_add_obstacle(obstacles, item[0], item[1], float(item[2]), m2u)
@@ -71,7 +77,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 		for side in [[1, 1.0], [2, -1.0]]:
 			if sides & int(side[0]) != 0:
 				_kerb(cars, pts, (half - KERB_IN_M) * float(side[1]) * m2u, centre, r2, junc, ground, m2u,
-				int(road.get("oneway", 0)), left_traffic, obstacles, fleet)
+				int(road.get("oneway", 0)), left_traffic, obstacles, fleet, walls)
 	cars.sort_custom(func(a: Array, b: Array) -> bool:
 		return float(a[4]) < float(b[4]))
 	return cars.slice(0, MAX_CARS)
@@ -92,7 +98,7 @@ static func sides_of(road: Dictionary) -> int:
 ## One kerb: slots along the polyline offset `off` to its left.
 static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vector2, r2: float,
 		junc: Dictionary, ground: GroundTruth, m2u: float, oneway: int,
-		left_traffic: bool, obstacles: Dictionary, fleet: Dictionary) -> void:
+		left_traffic: bool, obstacles: Dictionary, fleet: Dictionary, walls: Dictionary = {}) -> void:
 	for i in pts.size() - 1:
 		var a := pts[i]
 		var b := pts[i + 1]
@@ -121,6 +127,10 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var q := p + left * KERB_JITTER_M * m2u * (_hash(p.x, p.y, 7.3) * 2.0 - 1.0)
 			var front := q + fw * length * 0.4
 			var back := q - fw * length * 0.4
+			# A road the map runs through a building's footprint (a plaza, an
+			# arcade) would park the car in the wall.
+			if _in_building(q, fw, length, CarSpecs.width_m(kind) * m2u, walls, m2u):
+				continue
 			var yf := ground.height_at_world(front.x, front.y)
 			var yb := ground.height_at_world(back.x, back.y)
 			var forward := Vector3(fw.x * length * 0.8, yf - yb, fw.y * length * 0.8).normalized()
@@ -179,6 +189,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		near.custom_aabb = bounds
 		far.custom_aabb = bounds
 		_add_batch(holder, list, shadow_mesh(kind), str(group_key) + "_shadow", 0.0, 0.0)
+		var glass := CarModel.glass_shadow_mesh(kind)
+		if glass != null:
+			_add_batch(holder, list, glass, str(group_key) + "_glass", 0.0, DETAIL_M)
+			(holder.get_child(holder.get_child_count() - 1) as GeometryInstance3D).cast_shadow = \
+				GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	root.add_child(holder)
 	return cars.size()
 
@@ -198,6 +213,7 @@ static func _add_batch(holder: Node3D, cars: Array, car_mesh: Mesh, batch_name: 
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Cars_" + batch_name
 	mmi.multimesh = mm
+	mmi.layers = CAR_LAYER
 	CellBatches.ranged(mmi, begin_m * WorldScale.metres_to_units(), end_m * WorldScale.metres_to_units())
 	if car_mesh is PlaneMesh:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -240,6 +256,8 @@ static func facing(dir: Vector2, off: float, oneway: int, left_traffic: bool) ->
 	return dir if (off < 0.0) != left_traffic else -dir
 
 const OBSTACLE_CELL_M := 6.0
+## Cell of the building index (m): coarser, a building spans many cells.
+const BUILDING_CELL_M := 24.0
 
 static func obstacle_grid(data: LocationData, m2u: float) -> Dictionary:
 	var grid := {}
@@ -277,6 +295,50 @@ static func _add_obstacle(grid: Dictionary, a: Vector2, b: Vector2, radius: floa
 			if not grid.has(key):
 				grid[key] = []
 			(grid[key] as Array).append([a, b, radius])
+
+## Building outlines [ring, box] in every OBSTACLE_CELL_M cell their box touches.
+static func building_grid(data: LocationData, m2u: float) -> Dictionary:
+	var grid := {}
+	var cell := BUILDING_CELL_M * m2u
+	for b in data.buildings:
+		if not (b is Dictionary):
+			continue
+		var fp: Variant = (b as Dictionary).get("footprint", null)
+		if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+			continue
+		var ring := fp as PackedVector2Array
+		var box := Rect2(ring[0], Vector2.ZERO)
+		for v in ring:
+			box = box.expand(v)
+		var rec := [ring, box]
+		for cx in range(floori(box.position.x / cell), floori(box.end.x / cell) + 1):
+			for cz in range(floori(box.position.y / cell), floori(box.end.y / cell) + 1):
+				var key := Vector2i(cx, cz)
+				if not grid.has(key):
+					grid[key] = []
+				(grid[key] as Array).append(rec)
+	return grid
+
+## True when a car of `length` x `width` (world units) at `q` facing `fw`
+## has its centre, ends or corners inside a building's outline.
+static func _in_building(q: Vector2, fw: Vector2, length: float, width: float, grid: Dictionary,
+		m2u: float) -> bool:
+	if grid.is_empty():
+		return false
+	var side := Vector2(-fw.y, fw.x)
+	var pts: Array[Vector2] = [q]
+	for e: float in [-0.5, 0.0, 0.5]:
+		for s: float in [-0.5, 0.5]:
+			pts.append(q + fw * length * e + side * width * s)
+	pts.append(q + fw * length * 0.5)
+	pts.append(q - fw * length * 0.5)
+	var cell := BUILDING_CELL_M * m2u
+	for p in pts:
+		var key := Vector2i(floori(p.x / cell), floori(p.y / cell))
+		for rec in grid.get(key, []):
+			if (rec[1] as Rect2).has_point(p) and Geometry2D.is_point_in_polygon(p, rec[0] as PackedVector2Array):
+				return true
+	return false
 
 static func blocked(p: Vector2, grid: Dictionary, m2u: float) -> bool:
 	var key := Vector2i(floori(p.x / (OBSTACLE_CELL_M * m2u)), floori(p.y / (OBSTACLE_CELL_M * m2u)))

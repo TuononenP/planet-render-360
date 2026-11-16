@@ -82,6 +82,22 @@ func _run() -> void:
 		failures.append("cars should line both kerbs: %s" % [sides.keys()])
 	if not pitched:
 		failures.append("cars on a 5 % street should pitch with it")
+	# A building across part of the street (the map runs the road through
+	# its footprint): no car stands in it, the rest of the street still parks.
+	var u := WorldScale.metres_to_units()
+	var ring := PackedVector2Array([Vector2(-20, -40) * u, Vector2(20, -40) * u, Vector2(20, 40) * u,
+		Vector2(-20, 40) * u])
+	var walled := _data(0.05)
+	walled.roads = roads
+	walled.buildings = [{"x": 0.0, "z": 0.0, "footprint": ring}]
+	var kept := ParkedCars.plan(walled, GroundTruth.new(walled), u)
+	for c in kept:
+		var cp := Vector2((c[0] as Vector3).x, (c[0] as Vector3).z)
+		if Geometry2D.is_point_in_polygon(cp, ring):
+			failures.append("a car parked inside a building at %s" % c[0])
+			break
+	if kept.size() >= cars.size() or kept.size() < cars.size() - 40:
+		failures.append("a building should remove the cars inside it only: %d of %d kept" % [kept.size(), cars.size()])
 	# Junctions (a node shared with a cross street) stay clear.
 	var hyde_x := hyde.duplicate()
 	hyde_x["points"] = PackedVector2Array([Vector2(0, -150), Vector2(0, 0), Vector2(0, 150)])
@@ -114,6 +130,16 @@ func _run() -> void:
 				failures.append("%s must have a distant batch" % near.name)
 				continue
 			pairs += 1
+			if near.layers != ParkedCars.CAR_LAYER or (RoadDecals.DECAL_MASK & near.layers) != 0:
+				failures.append("%s must sit on its own layer, off the street decals' mask" % near.name)
+			var glass := batches.get_node_or_null(str(near.name).trim_suffix("_near") + "_glass") as MultiMeshInstance3D
+			if glass == null or glass.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+				failures.append("%s needs a shadow-only glass batch (see-through glass casts none)" % near.name)
+			# Front faces only: the cabin lining lies on the body skin, and a
+			# double-sided caster shadowed the bonnet with it.
+			for batch: MultiMeshInstance3D in [near, far]:
+				if batch.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_ON:
+					failures.append("%s must cast ordinary shadows (both faces shadowed the bonnet)" % batch.name)
 			if near.multimesh.custom_aabb != far.multimesh.custom_aabb \
 					or near.multimesh.custom_aabb.size == Vector3.ZERO \
 					or near.visibility_range_end != far.visibility_range_begin:

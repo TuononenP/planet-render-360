@@ -23,6 +23,9 @@ const DEPTH_M := 1.6
 const FADE_BEGIN_M := 140.0
 const FADE_LENGTH_M := 60.0
 const TEX := 128
+## Everything but the cars' layer (ParkedCars.CAR_LAYER): a decal's box reaches
+## a parked car's bonnet, and a grate's slats showed on it.
+const DECAL_MASK := 0xFFFFF & ~ParkedCars.CAR_LAYER
 const LITTER_RADIUS_M := 250.0
 const MAX_LITTER := 400
 ## Litter patch diameter (m), and its leaf density by season (0..1).
@@ -76,7 +79,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		d.distance_fade_enabled = true
 		d.distance_fade_begin = FADE_BEGIN_M * m
 		d.distance_fade_length = FADE_LENGTH_M * m
-		d.cull_mask = 0xFFFFF
+		d.cull_mask = DECAL_MASK
 		holder.add_child(d)
 	_add_litter(holder, data, ground, m)
 	root.add_child(holder)
@@ -103,6 +106,7 @@ static func _add_litter(holder: Node3D, data: LocationData, ground: GroundTruth,
 		d.position = Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)
 		d.rotation.y = _hash(p) * TAU
 		d.albedo_mix = share
+		d.cull_mask = DECAL_MASK
 		d.upper_fade = 0.1
 		d.lower_fade = 0.1
 		d.distance_fade_enabled = true
