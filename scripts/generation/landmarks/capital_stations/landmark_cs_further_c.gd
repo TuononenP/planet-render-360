@@ -4,7 +4,7 @@ extends RefCounted
 ## The last capital stations hand-built after the photo review, in the
 ## station frame (+X along the main facade, +Z the forecourt): Ottawa,
 ## Podgorica, Skopje, Tbilisi Central, Monaco-Monte-Carlo's entrance,
-## Ouagadougou, Abuja Idu, Bamako and Manila's Tutuban.
+## Ouagadougou, Abuja Idu, Bamako, Manila's Tutuban and Tunis.
 
 const K = preload("res://scripts/generation/landmarks/capital_stations/landmark_station_kit.gd")
 
@@ -202,4 +202,40 @@ static func tutuban(model: Node3D) -> void:
 	K.hip_roof(lm, "Roof", Vector3(0, 11.8, 0.5), 106.0, 30.0, 4.0)
 	# The centre pediment.
 	K.block(lm, "Upper", "Trim", "Glass", "Roof", 0.0, 2.0, 18.0, 28.0, 6.4, 6.0, "gable_z", 4.2, 3.0, 3.0)
+	lm.commit(model)
+
+## Tunis station (1970s): the cream concrete block with its upper floors
+## of grey horizontal louvre panels set between broad pilasters, the dark
+## recessed ground floor under a deep overhang, and the big blue Arabic
+## letters of its name standing on the roof.
+static func tunis(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	K.mats(lm, "concrete", "#DCD3BE", "#E8E1D0", "concrete", "#BDB7AA")
+	lm.use("Louvre", LandmarkMaterials.pbr("sheet_metal", "#8E9498", 2.0))
+	lm.use("Sign", LandmarkMaterials.lit("#2F6FC8", 0.5))
+	# The upper floors, carried over the recessed ground floor.
+	lm.box("Walls", Vector3(0, 9.0, -1.0), Vector3(90.0, 9.0, 36.0))
+	lm.use("Shop", LandmarkMaterials.pbr("render", "#7F96A6", 6.0, 0.2, 0.3))
+	lm.box("Shop", Vector3(0, 2.25, -3.0), Vector3(86.0, 4.5, 30.0))
+	# The canopy band over the doors, carrying the station name.
+	lm.box("Trim", Vector3(0, 4.4, 19.5), Vector3(88.0, 1.2, 5.0))
+	lm.box("Sign", Vector3(0, 4.4, 22.05), Vector3(24.0, 0.7, 0.1))
+	lm.box("Trim", Vector3(0, 4.8, -1.0), Vector3(90.6, 0.6, 36.6))
+	lm.box("Trim", Vector3(0, 13.6, -1.0), Vector3(90.6, 0.4, 36.6))
+	lm.box("Roof", Vector3(0, 13.85, -1.0), Vector3(90.0, 0.1, 36.0))
+	for k in 8:
+		var x := -40.5 + 11.57 * float(k)
+		# A louvre panel between two pilasters: framed, its slats proud.
+		lm.box("Trim", Vector3(x - 5.4, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
+		for j in 6:
+			lm.box("Louvre", Vector3(x + 0.4, 6.6 + 1.0 * float(j), 17.35), Vector3(9.4, 0.35, 0.5))
+	lm.box("Trim", Vector3(44.4, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
+	for x in [-38.0, -20.0, 0.0, 20.0, 38.0]:
+		lm.box("Walls", Vector3(x, 2.4, 15.6), Vector3(0.9, 4.8, 0.9))
+	# The name on the roof: a row of tall blue letter blocks.
+	for k in 9:
+		var x := -16.0 + 4.0 * float(k)
+		var hh := 3.2 if k % 3 == 0 else 2.2
+		lm.box("Sign", Vector3(x, 13.9 + hh * 0.5, 16.6), Vector3(2.6, hh, 0.4))
+	lm.box("Steel", Vector3(0, 14.3, 16.2), Vector3(36.0, 0.3, 0.3))
 	lm.commit(model)

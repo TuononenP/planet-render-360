@@ -83,5 +83,6 @@ static func build(model: Node3D, type: String) -> bool:
 		"abuja_idu_station": LandmarkCsFurtherC.abuja(model)
 		"bamako_station": LandmarkCsFurtherC.bamako(model)
 		"tutuban_station": LandmarkCsFurtherC.tutuban(model)
+		"tunis_station": LandmarkCsFurtherC.tunis(model)
 		_: return false
 	return true

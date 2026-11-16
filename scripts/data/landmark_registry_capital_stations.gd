@@ -373,7 +373,7 @@ static func entries() -> Array:
 			"secondary": true, "capital": "NG", "yaw_deg": 24.7, "clear_m": 16.0,
 			"clear_rect_m": [0.0, -2.0, 95.0, 23.0],
 			"aliases": ["abuja idu station", "idu station"]},
-		{"type": "bamako_station", "name": "Bamako railway station", "lat": 12.648281, "lon": -7.999008,
+		{"type": "bamako_station", "name": "Bamako railway station", "lat": 12.648282, "lon": -7.999008,
 			"radius_m": 6000.0, "wiki_title": "Dakar–Niger Railway", "height_m": 16.6, "kind": "Station",
 			"secondary": true, "capital": "ML", "yaw_deg": -19.3, "clear_m": 16.0,
 			"clear_rect_m": [0.0, -1.9, 41.4, 20.5],
@@ -383,4 +383,9 @@ static func entries() -> Array:
 			"secondary": true, "capital": "PH", "yaw_deg": -77.3, "clear_m": 16.0,
 			"clear_rect_m": [0.0, 0.9, 56.0, 18.4],
 			"aliases": ["tutuban station", "tutuban", "manila tutuban"]},
+		{"type": "tunis_station", "name": "Tunis railway station", "lat": 36.795218, "lon": 10.180554,
+			"radius_m": 6000.0, "wiki_title": "Tunis", "height_m": 17.1, "kind": "Station",
+			"secondary": true, "capital": "TN", "yaw_deg": -7.0, "clear_m": 16.0,
+			"clear_rect_m": [-0.5, -0.9, 49.0, 21.4],
+			"aliases": ["tunis railway station", "gare de tunis"]},
 	]
