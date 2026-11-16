@@ -354,7 +354,10 @@ def style_top(style: dict, h: float) -> float:
     if style.get("underground"):
         return eave
     roof = style.get("roof", "flat")
-    top = eave + (float(style.get("roof_rise", 5.0)) if roof == "hip" else 1.0 if roof == "overhang" else 0.0)
+    top = eave + (float(style.get("roof_rise", 5.0)) if roof == "hip"
+                  else float(style.get("roof_rise", 6.0)) if roof in ("vault", "vaults")
+                  else float(style.get("roof_rise", 3.0)) if roof == "gable"
+                  else 1.0 if roof == "overhang" else 0.0)
     if "tower" in style:
         top = max(top, float(style.get("tower_h", eave + 15.0)))
     if "dome" in style:

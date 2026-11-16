@@ -34,6 +34,11 @@ extends RefCounted
 ##             canopy, or (massive) a clad block with broad piers and head
 ##   screens   true: sun-screen fins over a dark recessed ground floor
 ##   floor_band_hex a coloured band between the floors, glass-block panels
+##   roof "vault": one barrel vault `roof_rise` tall along the building;
+##             "vaults": a row of barrel vaults across it (near-rectangular
+##             plans; else a hip)
+##   stilts    h: the body raised `h` on a grid of concrete pylons
+##   shell_size the umbrella shells' spacing (m)
 ##   roof "gable": a long pitched roof along the building
 ##   front_clock one clock over the middle of the front
 ##   windows   "rect": plain rectangular windows, no arched ground floor
@@ -286,7 +291,7 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		top = maxf(top, _towers(lm, poly, style, lo, hi, mid, eave, hall_w))
 	match str(style.get("shells", "")):
 		"umbrella":
-			top = maxf(top, _umbrellas(lm, poly, lo, hi, float(style.get("shell_top", eave + 6.0))))
+			top = maxf(top, _umbrellas(lm, poly, lo, hi, float(style.get("shell_top", eave + 6.0)), float(style.get("shell_size", 24.0))))
 		"folded":
 			top = maxf(top, _folded(lm, lo, hi, float(style.get("shell_top", eave + 4.0))))
 	if bool(style.get("canopy", true)) and eave >= 5.0 and not style.has("colonnade") and not style.has("portal") \
@@ -377,10 +382,13 @@ static func front_point(poly: PackedVector2Array, x: float, lo: Vector2, hi: Vec
 static func _body(lm: LandmarkMesh, poly: PackedVector2Array, eave: float, style: Dictionary) -> float:
 	var glass := bool(style.get("glass", false))
 	var storey := float(style.get("storey", STOREY_M))
-	lm.poly_prism("Curtain" if glass else "Walls", poly, 0.0, eave, false)
+	var base := float(style.get("stilts", 0.0))
+	lm.poly_prism("Curtain" if glass else "Walls", poly, base, eave, false)
 	var rings := Geometry2D.offset_polygon(poly, 0.3, Geometry2D.JOIN_ROUND)
 	var ring: PackedVector2Array = rings[0] if not rings.is_empty() else poly
-	lm.poly_prism("Trim", ring, 0.0, 0.8, false)
+	lm.poly_prism("Trim", ring, base, base + 0.8, false)
+	if base > 0.0:
+		_stilts(lm, ring, base)
 	if glass:
 		var y := storey
 		while y < eave - 1.0:
@@ -438,10 +446,61 @@ static func _body(lm: LandmarkMesh, poly: PackedVector2Array, eave: float, style
 			lm.poly_prism("Roof", slab, eave, eave + 1.0, false)
 			flat_cap(lm, "Roof", slab, eave + 1.0)
 			top = eave + 1.0
+		"vault", "vaults":
+			var rise := float(style.get("roof_rise", 6.0))
+			var rect := simplify(ring, 1.5)
+			if not (rect.size() <= 6 and _convex(rect)):
+				_hip(lm, ring, eave, rise)
+				return eave + rise
+			flat_cap(lm, "Roof", ring, eave)
+			var vlo := Vector2(INF, INF)
+			var vhi := Vector2(-INF, -INF)
+			for q in rect:
+				vlo = vlo.min(q)
+				vhi = vhi.max(q)
+			if str(style.get("roof", "")) == "vault":
+				# One long barrel along the building (Astana's wave roof).
+				var zc := (vlo.y + vhi.y) * 0.5
+				_vault(lm, Vector3(vlo.x, eave, zc), Vector3(vhi.x, eave, zc), (vhi.y - vlo.y) * 0.5, rise)
+			else:
+				# A row of barrels across the building, about 14 m apart.
+				var n := maxi(int((vhi.x - vlo.x) / 14.0), 2)
+				var step := (vhi.x - vlo.x) / float(n)
+				for k in n:
+					var x := vlo.x + step * (float(k) + 0.5)
+					_vault(lm, Vector3(x, eave, vlo.y), Vector3(x, eave, vhi.y), step * 0.5, rise)
+			top = eave + rise
 		_:
 			# The flat roof covers the cornice band to its outer edge.
 			flat_cap(lm, "Roof", ring, eave)
 	return top
+
+## A body raised `base` high (Skopje): its underside and square concrete
+## pylons on a 12 m grid carrying it.
+static func _stilts(lm: LandmarkMesh, ring: PackedVector2Array, base: float) -> void:
+	var tris := Geometry2D.triangulate_polygon(ring)
+	for i in range(0, tris.size(), 3):
+		var a := ring[tris[i]]
+		var b := ring[tris[i + 1]]
+		var c := ring[tris[i + 2]]
+		# Both windings: only the one facing down is seen from under it.
+		lm.tri("Trim", Vector3(a.x, base, a.y), Vector3(c.x, base, c.y), Vector3(b.x, base, b.y),
+			Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+		lm.tri("Trim", Vector3(a.x, base, a.y), Vector3(b.x, base, b.y), Vector3(c.x, base, c.y),
+			Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector2.ZERO, Vector2(1, 0), Vector2(0, 1))
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in ring:
+		lo = lo.min(p)
+		hi = hi.max(p)
+	var x := lo.x + 4.0
+	while x < hi.x - 2.0:
+		var z := lo.y + 4.0
+		while z < hi.y - 2.0:
+			if Geometry2D.is_point_in_polygon(Vector2(x, z), ring):
+				lm.box("Trim", Vector3(x, base * 0.5, z), Vector3(2.4, base, 2.4))
+			z += 12.0
+		x += 12.0
 
 ## A hipped roof over any outline. The eaves ledge covers the cornice
 ## band. A convex outline (most station blocks) gets a true hip, its
@@ -589,8 +648,8 @@ static func _hall(lm: LandmarkMesh, front: Vector3, lo: Vector2, hi: Vector2, ea
 
 ## A field of umbrella shells (inverted hypar umbrellas on single stems)
 ## over the outline, crowns `tip` high (Kamalapur, Dhaka).
-static func _umbrellas(lm: LandmarkMesh, poly: PackedVector2Array, lo: Vector2, hi: Vector2, tip: float) -> float:
-	var size := 24.0
+static func _umbrellas(lm: LandmarkMesh, poly: PackedVector2Array, lo: Vector2, hi: Vector2, tip: float,
+		size: float = 24.0) -> float:
 	var nx := maxi(int((hi.x - lo.x) / size), 1)
 	var nz := maxi(int((hi.y - lo.y) / size), 1)
 	var sx := (hi.x - lo.x) / float(nx)
