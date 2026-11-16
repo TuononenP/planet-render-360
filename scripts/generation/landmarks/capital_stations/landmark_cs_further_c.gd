@@ -177,8 +177,11 @@ static func bamako(model: Node3D) -> void:
 	lm.box("Walls", Vector3(0, 12.5, 14.6), Vector3(10.0, 5.0, 1.0))
 	lm.box("Trim", Vector3(0, 15.2, 14.6), Vector3(11.0, 0.5, 1.4))
 	LandmarkFhUtil.hip(lm, "Trim", Vector3(0, 15.4, 14.6), 11.0, 1.4, 1.2)
+	# The scrolled shoulders as solid quarter-wedges either side.
 	for s in [-1.0, 1.0]:
-		lm.beam("Walls", Vector3(s * 5.0, 12.8, 14.6), Vector3(s * 9.0, 10.0, 14.6), 1.6, 0.8)
+		for k in 3:
+			var hh := 2.4 - 0.8 * float(k)
+			lm.box("Walls", Vector3(s * (5.6 + 1.2 * float(k)), 10.0 + hh * 0.5, 14.6), Vector3(1.2, hh, 1.0))
 	K.clock(lm, "Dial", "Trim", Vector3(0, 12.6, 15.15), Vector3.BACK, 1.4)
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 0.2, 15.05), Vector3.BACK, 4.0, 6.0, 3)
 	lm.commit(model)

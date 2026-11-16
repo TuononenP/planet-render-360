@@ -140,8 +140,9 @@ static func pyongyang(model: Node3D) -> void:
 ## portal block whose great arch frames the blue-glazed entrance.
 static func tashkent(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "limestone", "#EEEBE2", "#E3DCC8", "concrete", "#7A8794")
-	lm.use("Blue", LandmarkMaterials.glass("#2C4E9C"))
+	K.mats(lm, "limestone", "#E9DFC4", "#F2ECDC", "concrete", "#7A8794")
+	# Deep blue glazing; the dark glass shader would read it as black.
+	lm.use("Blue", LandmarkMaterials.pbr("render", "#2F5CB8", 4.0, 0.15, 0.3))
 	for s in [-1.0, 1.0]:
 		var x0: float = s * 30.0
 		var x1: float = s * 160.0
@@ -161,6 +162,10 @@ static func tashkent(model: Node3D) -> void:
 		K.arch_window(lm, "Trim", "Blue", Vector3(s * 19.0, 0.2, 18.05), Vector3.BACK, 7.0, 14.0, 3)
 		lm.box("Blue", Vector3(s * 19.0, 19.0, 18.1), Vector3(7.0, 3.0, 0.2))
 	lm.box("Trim", Vector3(0, 25.0, 18.3), Vector3(30.0, 3.0, 0.6))
+	# The portal's carved frame round the great arch.
+	for s in [-1.0, 1.0]:
+		lm.box("Trim", Vector3(s * 10.0, 12.0, 18.4), Vector3(2.4, 24.0, 0.8))
+	lm.box("Trim", Vector3(0, 23.0, 18.4), Vector3(22.4, 1.6, 0.8))
 	lm.commit(model)
 
 ## Baku station (1926, Moorish revival): the cream stone range with its

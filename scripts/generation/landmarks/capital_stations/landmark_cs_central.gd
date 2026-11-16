@@ -70,6 +70,26 @@ static func wien_hbf(model: Node3D) -> void:
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", -110.0, -120.0, 26.0, 250.0, 0.0, 16.0, "flat", 0.0, 4.0, 4.5)
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", 112.0, -95.0, 22.0, 100.0, 0.0, 8.0, "flat", 0.0, 4.0, 4.0)
 	lm.box("Roof", Vector3(112.0, 8.6, -95.0), Vector3(30.0, 0.8, 108.0))
+	# The entrance hall on Südtiroler Platz: a glazed hall under the dark
+	# wedge roof that cantilevers out over the square, thickest at its tip.
+	lm.use("Dark", LandmarkMaterials.pbr("sheet_metal", "#3A3D40", 2.0))
+	lm.box("Glass", Vector3(0, 7.0, 12.0), Vector3(56.0, 14.0, 24.0))
+	LandmarkFhParts.strips(lm, "Steel", Vector3(-27.5, 0, 24.05), Vector3(27.5, 0, 24.05), Vector3.BACK, 0.0, 14.0, 15,
+		0.25, 0.2)
+	var w0 := Vector3(-34.0, 14.0, -2.0)
+	var w1 := Vector3(34.0, 14.0, -2.0)
+	var t0 := Vector3(-34.0, 17.5, 40.0)
+	var t1 := Vector3(34.0, 17.5, 40.0)
+	var drop := Vector3.DOWN * 4.5
+	lm.quad("Dark", w0, w1, t1, t0, Vector3(0, 1, -0.08).normalized())
+	lm.quad("Dark", w1 + drop * 0.3, w0 + drop * 0.3, t0 + drop, t1 + drop, Vector3.DOWN)
+	lm.quad("Dark", t0 + drop, t0, t1, t1 + drop, Vector3.BACK)
+	for e in [[w0, t0, -1.0], [w1, t1, 1.0]]:
+		var a: Vector3 = e[0]
+		var b: Vector3 = e[1]
+		var nx := Vector3(float(e[2]), 0, 0)
+		lm.quad("Dark", a + drop * 0.3, b + drop, b, a, nx)
+		lm.quad("Dark", a, b, b + drop, a + drop * 0.3, -nx)
 	lm.commit(model)
 
 const WIEN_PITCH := 30.0
