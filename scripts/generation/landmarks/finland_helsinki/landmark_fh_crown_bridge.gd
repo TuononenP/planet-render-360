@@ -91,8 +91,16 @@ const DECK_REACH_M := 22.0
 ## lines that light the paths evenly: height over the deck (m), reach
 ## (m) and energy against DECK_LIGHT.
 const FILL_Y_M := 4.5
-const FILL_REACH_M := 13.0
-const FILL_SHARE := 0.6
+const FILL_REACH_M := 16.0
+const FILL_SHARE := 0.9
+## Cone falloff of the deck lights: flat, so each pool is even across
+## its width instead of a hot spot under the lamp.
+const DECK_FALLOFF := 0.6
+## Red glow of the top aviation light on the mast cap: a small spot just
+## above it, aimed down, energy share and reach (m).
+const BEACON_RED := Color(1.0, 0.08, 0.03)
+const BEACON_GLOW := 0.5
+const BEACON_REACH_M := 7.0
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -111,7 +119,7 @@ static func build(model: Node3D) -> void:
 	lm.use("StayLamp", _stay_material())
 	lm.use("Rail", LandmarkMaterials.paint("#4F5254", 0.35, 0.8))
 	lm.use("Lamp", LandmarkMaterials.lit("#FFD892", 2.8))
-	lm.use("BeaconLamp", LandmarkMaterials.lit("#FF2A1A", 3.5))
+	lm.use("BeaconLamp", LandmarkMaterials.lit("#FF0602", 12.0))
 	var plan := _plan()
 	_deck(lm, plan)
 	_rails(lm, plan)
@@ -499,7 +507,9 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	lm.box("Steel", base + Vector3.UP * (MAST_TOP_M + 0.4), Vector3(1.4, 0.8, 1.4), basis)
 	lm.beam("Steel", base + Vector3.UP * (MAST_TOP_M + 0.8), base + Vector3.UP * PYLON_TOP_M, 0.2, 0.2)
 	# Red aviation obstacle lights: on the top and on both faces of the mast.
-	lm.box("BeaconLamp", base + Vector3.UP * (MAST_TOP_M + 1.1), Vector3(1.0, 0.6, 1.0), basis, 0.0)
+	# Pure red at a high energy: red carries little luminance, so it needs
+	# this much to read as a bright red point rather than dull orange.
+	lm.box("BeaconLamp", base + Vector3.UP * (MAST_TOP_M + 1.3), Vector3(1.8, 1.0, 1.8), basis, 0.0)
 	for y: float in [72.0, 102.0]:
 		for side: float in [-1.0, 1.0]:
 			lm.box("BeaconLamp", base + n3 * side * (_mast_half(y) + 0.2) + Vector3.UP * y, Vector3(0.9, 0.8, 0.5),
@@ -535,13 +545,16 @@ static func flood_spots() -> Array:
 		var i := poles[k]
 		var head := _sp(plan, i, Vector2(POLE_X, 0.0), POLE_TOP_M - 0.2)
 		out.append([head, _sp(plan, i, Vector2(POLE_X + 0.5, 0.0), 0.0), 70.0, DECK_LIGHT,
-			minf(DECK_REACH_M, head.y - 1.0), DECK_WARM])
+			minf(DECK_REACH_M, head.y - 1.0), DECK_WARM, DECK_FALLOFF])
 		# Midway fill: the even glow of the handrail lines between poles.
 		if k + 1 < poles.size():
 			var mid := (i + poles[k + 1]) / 2
 			var fill := _sp(plan, mid, Vector2(POLE_X, 0.0), FILL_Y_M)
-			out.append([fill, _sp(plan, mid, Vector2(POLE_X, 0.0), 0.0), 75.0, DECK_LIGHT * FILL_SHARE,
-				minf(FILL_REACH_M, fill.y - 1.0), DECK_WARM])
+			out.append([fill, _sp(plan, mid, Vector2(POLE_X + 0.5, 0.0), 0.0), 75.0, DECK_LIGHT * FILL_SHARE,
+				minf(FILL_REACH_M, fill.y - 1.0), DECK_WARM, DECK_FALLOFF])
+	# The top aviation light's red glow over the mast cap.
+	out.append([base + Vector3.UP * (PYLON_TOP_M + 2.0), base + t3 * 0.5 + Vector3.UP * MAST_TOP_M, 60.0,
+		BEACON_GLOW, BEACON_REACH_M, BEACON_RED])
 	return out
 
 ## Mast half-width across the deck at height y (for the stay anchors).

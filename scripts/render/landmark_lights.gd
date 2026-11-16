@@ -25,7 +25,8 @@ const SPOTS := 4
 ## Model-node meta: [[lamp, aim, cone angle in degrees, energy share], ...]
 ## in model metres, replacing the spots placed round the bounds. An entry
 ## may add its own range (m) and light colour: a downlight over a deck
-## reaches only the deck, a cool wash differs from the warm default.
+## reaches only the deck, a cool wash differs from the warm default; and
+## then its cone falloff (spot_angle_attenuation, low = flat pool).
 const FLOOD_META := "flood_spots"
 ## Footprints longer than ELONGATED × their width line their long sides.
 const ELONGATED := 2.0
@@ -111,6 +112,8 @@ static func dress(hero: Node3D, type: String) -> int:
 				float(own[3]), float(own[2])]
 			if own.size() > 5:
 				lamp.append_array([float(own[4]) * m, own[5] as Color])
+			if own.size() > 6:
+				lamp.append(float(own[6]))
 			lamps.append(lamp)
 	elif long_len > ELONGATED * short_half * 2.0:
 		var along := Vector3.RIGHT if long_x else Vector3.BACK
@@ -148,7 +151,7 @@ static func dress(hero: Node3D, type: String) -> int:
 		if (lamp as Array).size() > 6:
 			spot.spot_range = float(lamp[5])
 			spot.light_color = lamp[6] as Color
-		spot.spot_angle_attenuation = 2.5
+		spot.spot_angle_attenuation = float(lamp[7]) if (lamp as Array).size() > 7 else 2.5
 		spot.spot_attenuation = 0.35
 		spot.light_energy = 0.0
 		spot.shadow_enabled = false
