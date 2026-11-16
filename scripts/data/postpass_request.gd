@@ -5,7 +5,8 @@ extends Node
 ## layer through LayerRequest): sends the body, converts the GeoJSON answer
 ## to Overpass `out geom` JSON (PostpassFallback) on a worker, as the far
 ## city's runs to megabytes, and reports it, or why there is none. The
-## detailed layer converts off-thread in OsmFetcher.
+## detailed layer converts off-thread in OsmFetcher. Requests wait their
+## turn at PostpassGate, so only one Postpass request is on the wire.
 
 signal answered(text: String)
 signal failed(reason: String)
@@ -25,22 +26,33 @@ func _init(timeout_s: float = PostpassFallback.TIMEOUT_S) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join()
+		PostpassGate.leave(self)
 
 func _join() -> void:
 	if _task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 
-## Sends `body` (a PostpassFallback.build_*_body); a request still in
-## flight is dropped first. `check`, when given, runs on the worker too and
-## returns "" for a usable converted answer, or why it is not.
+## Sends `body` (a PostpassFallback.build_*_body) when PostpassGate lets
+## it; a request still in flight or waiting is dropped first. `check`, when
+## given, runs on the worker too and returns "" for a usable converted
+## answer, or why it is not.
 func run(body: String, check: Callable = Callable()) -> void:
 	cancel()
 	_check = check
+	var token := _token
+	PostpassGate.enter(self, _send.bind(body, token), func(why: String) -> void:
+		if token == _token:
+			failed.emit("Postpass " + why))
+
+func _send(body: String, token: int) -> void:
+	if token != _token:
+		PostpassGate.leave(self)
+		return
 	var err := _http.request(PostpassFallback.endpoint(), PostpassFallback.headers(),
 		HTTPClient.METHOD_POST, body)
 	if err != OK:
-		var token := _token
+		PostpassGate.leave(self)
 		(func() -> void:
 			if token == _token:
 				failed.emit("Postpass failed to start: %s" % err)).call_deferred()
@@ -49,8 +61,12 @@ func run(body: String, check: Callable = Callable()) -> void:
 func cancel() -> void:
 	_token += 1
 	_http.cancel_request()
+	PostpassGate.leave(self)
 
 func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	PostpassGate.leave(self)
+	if PostpassFallback.refused(code):
+		PostpassGate.note_refused()
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		failed.emit("Postpass result=%d code=%d" % [result, code])
 		return

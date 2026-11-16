@@ -11,7 +11,6 @@ extends Node
 ##    "overpass_endpoints": ["https://…/api/interpreter", …],
 ##    "postpass_endpoint": "https://…/api/interpreter",
 ##    "satellite_url_template": "https://…/tile/%d/%d/%d",
-##    "map_source_first": "postpass" | "overpass",
 ##    "overpass_on_mobile": false}
 ##
 ## Every key is optional, and a value that fails its check is ignored, so
@@ -23,7 +22,7 @@ extends Node
 ##
 ## The file travels over HTTPS from the project's own pages and only
 ## carries addresses of the public data services the app already calls and
-## the order the map data asks them in (MapSources).
+## whether phones ask Overpass (MapSources).
 ## Cached tiles from a replaced imagery source stay until the cache
 ## evicts them.
 
@@ -33,7 +32,7 @@ const MAX_URL_LENGTH := 512
 const MAX_OVERPASS_ENDPOINTS := 8
 ## Keys the file may set. Anything else is ignored.
 const KEYS := ["nominatim_endpoint", "overpass_endpoints", "postpass_endpoint",
-	"satellite_url_template", "map_source_first", "overpass_on_mobile"]
+	"satellite_url_template", "overpass_on_mobile"]
 
 ## Test hook: when non-empty, the cache lives here instead of user://.
 static var cache_path_override := ""
@@ -81,9 +80,6 @@ static func sanitize(raw: Variant) -> Variant:
 	var template: Variant = raw.get("satellite_url_template")
 	if is_https_url(template) and is_tile_template(str(template)):
 		out["satellite_url_template"] = str(template)
-	var first: Variant = raw.get("map_source_first")
-	if first is String and first in [MapSources.POSTPASS, MapSources.OVERPASS]:
-		out["map_source_first"] = first
 	var on_mobile: Variant = raw.get("overpass_on_mobile")
 	if on_mobile is bool:
 		out["overpass_on_mobile"] = on_mobile

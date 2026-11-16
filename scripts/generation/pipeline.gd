@@ -93,9 +93,6 @@ var _osm: OsmFetcher
 ## City registers (buildings, trees) where a city publishes them.
 var _city: CityOpenData
 var _city_credits: Array[String] = []
-## Asks the Overpass instances for their status as a load starts; the
-## load's Overpass queries wait for it (OverpassRequest.run).
-var _overpass_probe: OverpassProbe
 var _osm_buildings: Array = []
 ## Closure W2: the unfrozen OSM payload — §2.5 attributed road dicts plus
 ## the §2.6 extras — lands on LocationData in _await_osm. The v1 bare
@@ -205,8 +202,6 @@ func _ready() -> void:
 	add_child(_osm)
 	_city = CityOpenData.new()
 	add_child(_city)
-	_overpass_probe = OverpassProbe.new()
-	add_child(_overpass_probe)
 	_osm.succeeded.connect(func(b: Array, _r: Array, l: Array, lm: Array) -> void:
 		_osm_buildings = b
 		_osm_land = l
@@ -344,9 +339,6 @@ func cancel() -> void:
 		_farcity.cancel()
 	if _city != null:
 		_city.cancel()
-	# After the fetchers, so the queries it releases are already cancelled.
-	if _overpass_probe != null:
-		_overpass_probe.cancel()
 	if _climate != null:
 		_climate.cancel()
 	if _landcover != null:
@@ -406,13 +398,6 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_fetch_started_msec = Time.get_ticks_msec()
 	_sat_took = 0.0
 	_climate_took = 0.0
-	# Before any Overpass query: they wait for it and use only an instance
-	# that answered, or go straight to their fallbacks when none did. A
-	# bundled preset asks no Overpass query, so it skips the check too, as
-	# does a load that asks Postpass first (Overpass is then only its
-	# fallback, tried without a status check).
-	if not _osm.offline_mode and not BundledOsm.covers(lat, lon) and not MapSources.postpass_first():
-		_overpass_probe.start(OsmFetcher.active_endpoints())
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
 	_city.offline = _osm.offline_mode
 	_city_credits = []

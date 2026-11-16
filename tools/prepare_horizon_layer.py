@@ -16,6 +16,12 @@ assets/osm_snapshots/horizon_manifest.json.
 Places are the `<name>_detailed` rows of BundledOsm.ENTRIES and of the capital
 manifest, at exactly their coordinates. Answers are kept in --work so a failed
 place can be retried alone (--no-fetch reuses them).
+
+Postpass usage policy: requests go one at a time with --pause seconds
+between them, under an identifying User-Agent, and --endpoint points them at
+a self-hosted Postpass instead. Anything bulkier than these few hundred
+small lookups belongs on a Geofabrik extract (download.geofabrik.de), not on
+Postpass.
 """
 import argparse
 import json
@@ -40,7 +46,7 @@ RADIUS_TOWN_M = 30000  # HorizonFetcher.RADIUS_TOWN_M
 RADIUS_LAKE_M = 20000  # HorizonFetcher.RADIUS_LAKE_M
 CAP = 1500  # HorizonFetcher.CAP
 KEEP_TAGS = ("name", "natural", "place", "water", "ele")
-USER_AGENT = "PlanetRender360-snapshot-tool/1.0"
+USER_AGENT = "planet-render-360-snapshot-tool (https://github.com/TuononenP/planet-render-360)"
 TYPES = {"N": "node", "W": "way", "R": "relation"}
 
 
@@ -69,9 +75,9 @@ def sql(lat: float, lon: float) -> str:
         f" OR (tags->>'natural' = 'water' AND tags->>'water' IN ('lake','reservoir') AND ST_DWithin(geom::geography, {here}, {RADIUS_LAKE_M})))")
 
 
-def fetch(lat: float, lon: float) -> bytes:
+def fetch(lat: float, lon: float, endpoint: str = URL) -> bytes:
     body = urllib.parse.urlencode({"data": sql(lat, lon)}).encode()
-    request = urllib.request.Request(URL, data=body, headers={"User-Agent": USER_AGENT})
+    request = urllib.request.Request(endpoint, data=body, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(request, timeout=180) as response:
             answer = json.loads(response.read())
@@ -115,10 +121,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*", help="preset or capital names, e.g. helsinki capital_fi")
     parser.add_argument("--all", action="store_true", help="every preset and capital")
-    parser.add_argument("--pause", type=float, default=1.0, help="seconds between requests")
+    parser.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
+    parser.add_argument("--endpoint", default=URL, help="Postpass interpreter URL (https)")
     parser.add_argument("--work", type=Path, help="directory for the converted answers")
     parser.add_argument("--no-fetch", action="store_true", help="reuse answers already in --work")
     args = parser.parse_args()
+    if not args.endpoint.startswith("https://"):
+        raise SystemExit("--endpoint must be an https URL")
     known = places()
     names = sorted(known) if args.all else args.names
     if not names or any(name not in known for name in names):
@@ -134,7 +143,7 @@ def main() -> None:
             if index:
                 time.sleep(args.pause)
             try:
-                source.write_bytes(fetch(float(lat_text), float(lon_text)))
+                source.write_bytes(fetch(float(lat_text), float(lon_text), args.endpoint))
             except (RuntimeError, ValueError, TypeError, KeyError, AttributeError) as err:
                 print(f"{name}: FAILED {err}", flush=True)
                 failed.append(name)

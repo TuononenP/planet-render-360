@@ -81,7 +81,7 @@ func _order() -> void:
 	req._postpass_tried = true
 	req._on_postpass_failed("Postpass down")
 	_check(got == ["Postpass down"], "without Overpass a Postpass failure ends the layer: %s" % [got])
-	# Overpass first (remote switch) and out: Postpass is asked next, then both reasons end it.
+	# Overpass out before Postpass was asked: Postpass is next, then both reasons end it.
 	got.clear()
 	req._reason = ""
 	req._postpass_tried = false
@@ -90,7 +90,11 @@ func _order() -> void:
 	_check(got.is_empty() and stub.ran, "Overpass out: Postpass is asked next")
 	req._on_postpass_failed("Postpass down")
 	_check(got == ["Overpass 504; Postpass down"], "both out: one failure with both reasons: %s" % [got])
-	_check(MapSources.postpass_first(), "Postpass is asked first by default")
+	# With Overpass to ask, a run still goes to Postpass first.
+	stub.ran = false
+	var some: Array[String] = ["https://overpass.example/api/interpreter"]
+	req.run("pp", "op", func(_t: String) -> String: return "", some)
+	_check(stub.ran and not req._overpass_tried, "Postpass is always asked first")
 	req.free()
 
 ## A Postpass answer is converted and checked on a worker; the check's

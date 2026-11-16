@@ -1,19 +1,13 @@
 class_name MapSources
 extends RefCounted
 
-## Which live OSM services the detailed map data comes from, and in what
-## order. Postpass answers first by default: a live probe (2026-11-15, the
-## app's own 1200 m query in Helsinki, New York and Tokyo) had it answer in
-## about 2 s where Overpass took 45-58 s (32-34 s to the first byte) and
-## then refused with 502 under load. Overpass stays as the next source and
-## can be put first again without an app update (RemoteConfig
-## `map_source_first`), and on iOS and Android it is off unless
-## RemoteConfig `overpass_on_mobile` turns it on.
-
-const POSTPASS := "postpass"
-const OVERPASS := "overpass"
-## The source asked first for the detailed layer: POSTPASS or OVERPASS.
-const FIRST := POSTPASS
+## Which live OSM services the map data comes from. Postpass is always
+## asked first: a live probe (2026-11-15, the app's own 1200 m query in
+## Helsinki, New York and Tokyo) had it answer in about 2 s where Overpass
+## took 45-58 s (32-34 s to the first byte) and then refused with 502 under
+## load. Overpass is the next source; on iOS and Android it is off unless
+## RemoteConfig `overpass_on_mobile` turns it on. RemoteConfig
+## `postpass_endpoint` moves Postpass to another (self-hosted) instance.
 
 ## Overpass endpoints. Each live query uses one instance, the first that
 ## is not paused (OverpassRequest.max_attempts): a failure goes straight
@@ -34,10 +28,6 @@ const OVERPASS_ENDPOINTS: Array[String] = [
 	"https://overpass-api.de/api/interpreter",
 	"https://overpass.private.coffee/api/interpreter",
 ]
-
-## Whether the detailed layer asks Postpass before Overpass.
-static func postpass_first() -> bool:
-	return str(RemoteConfig.value("map_source_first", FIRST)) == POSTPASS
 
 ## Whether this device may ask Overpass at all: not on iOS and Android,
 ## where waiting on it held up the stretches loaded ahead, unless the

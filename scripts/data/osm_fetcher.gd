@@ -143,7 +143,6 @@ var _postpass_http: HTTPRequest
 var _detailed_req: OverpassRequest
 var _ring_req: LayerRequest
 var _poi_req: OverpassRequest
-var _bridge_req: OverpassRequest
 var _bridge_postpass: PostpassRequest
 var _poi_postpass: PostpassRequest
 var _ring_grace: Timer
@@ -178,10 +177,6 @@ func _ready() -> void:
 	add_child(_poi_req)
 	_poi_req.answered.connect(_on_poi_answered)
 	_poi_req.exhausted.connect(_on_poi_exhausted)
-	_bridge_req = OverpassRequest.new(15.0)
-	add_child(_bridge_req)
-	_bridge_req.answered.connect(_on_bridges_answered)
-	_bridge_req.exhausted.connect(_on_bridges_exhausted)
 	_bridge_postpass = PostpassRequest.new()
 	add_child(_bridge_postpass)
 	# A late answer (the step settled meanwhile: give_up, the vector map)
@@ -191,7 +186,7 @@ func _ready() -> void:
 			_on_bridges_answered(text))
 	_bridge_postpass.failed.connect(func(why: String) -> void:
 		if _bridge_pending:
-			_bridges_unavailable("%s; %s" % [_bridge_reason, why]))
+			_bridges_unavailable(why))
 	_poi_postpass = PostpassRequest.new(PostpassFallback.LAYER_TIMEOUT_S)
 	add_child(_poi_postpass)
 	_poi_postpass.answered.connect(func(text: String) -> void:
@@ -293,14 +288,13 @@ func cancel(keep_omt: bool = false) -> void:
 		_http.cancel_request()
 	if _postpass_http != null:
 		_postpass_http.cancel_request()
+		PostpassGate.leave(self)
 	if _detailed_req != null:
 		_detailed_req.cancel()
 	if _ring_req != null:
 		_ring_req.cancel()
 	if _poi_req != null:
 		_poi_req.cancel()
-	if _bridge_req != null:
-		_bridge_req.cancel()
 	if _bridge_postpass != null:
 		_bridge_postpass.cancel()
 		_poi_postpass.cancel()
@@ -311,6 +305,7 @@ func cancel(keep_omt: bool = false) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_join_parse()
+		PostpassGate.leave(self)
 
 ## Bundled snapshots load on workers; created on first use.
 var _snapshots: SnapshotReader
@@ -394,10 +389,10 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	if dcached != "" and OsmQuery.is_current(dcached):
 		_detailed_text = dcached
 		_detailed_cached = true
-	# Postpass's answer stands for a fresh one while Postpass is asked first.
+	# Postpass's answer stands for a fresh one (Postpass is asked first).
 	_from_postpass = false
 	var pp_path := CacheStore.osm_postpass_path(lat, lon, DETAILED_RADIUS_M)
-	if _detailed_text == "" and MapSources.postpass_first() and BundledOsm.cache_is_newer(pp_path, snapshot):
+	if _detailed_text == "" and BundledOsm.cache_is_newer(pp_path, snapshot):
 		_detailed_text = _read_cache(pp_path)
 		_detailed_cached = _detailed_text != ""
 		_from_postpass = _detailed_cached
@@ -442,15 +437,12 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	else:
 		_go_live()
 
-## The detailed layer's live sources, in MapSources order: Postpass then
-## Overpass, or Overpass then Postpass; the OSM API after both.
+## The detailed layer's live sources: Postpass, then Overpass; the OSM API
+## after both.
 func _go_live() -> void:
 	_postpass_tried = false
 	_overpass_tried = false
-	if MapSources.postpass_first():
-		_start_postpass("")
-	else:
-		_run_overpass()
+	_start_postpass("")
 
 func _run_overpass() -> void:
 	_overpass_tried = true
@@ -632,11 +624,7 @@ func _try_finish() -> void:
 			_bridge_text = ""
 		if _bridge_text == "" and not offline_mode and not _from_postpass:
 			_bridge_pending = true
-			if _postpass_layers_first():
-				_on_bridges_exhausted("Postpass asked first", 0)
-			else:
-				_bridge_req.run("data=" + OsmQuery.build_bridge_area_query(_pending_lat, _pending_lon,
-					DETAILED_RADIUS_M).uri_encode(), _check_ring, ring_endpoints().slice(0, 1))
+			_bridge_postpass.run(PostpassFallback.build_bridge_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
 	if not _poi_started:
 		_poi_started = true
 		var poi_key := BundledOsm.entry_for(_pending_lat, _pending_lon, "poi", OsmQuery.POI_VERSION)
@@ -654,18 +642,10 @@ func _try_finish() -> void:
 			_poi_pending = false
 		if _poi_text == "" and _poi_enabled and not offline_mode:
 			_poi_pending = true
-			if _postpass_layers_first():
-				_poi_postpass.run(PostpassFallback.build_poi_body(_pending_lat, _pending_lon))
-			else:
-				_run_poi_overpass()
+			_poi_postpass.run(PostpassFallback.build_poi_body(_pending_lat, _pending_lon))
 			return
 	if not _poi_pending and not _bridge_pending:
 		_finish()
-
-## Whether the POI and bridge layers ask Postpass before Overpass: when it
-## goes first, or when there is no Overpass to ask.
-func _postpass_layers_first() -> bool:
-	return MapSources.postpass_first() or active_endpoints().is_empty()
 
 func _run_poi_overpass() -> void:
 	_poi_req.run("data=" + OsmQuery.build_poi_query(_pending_lat, _pending_lon).uri_encode(),
@@ -686,14 +666,6 @@ func _on_bridges_answered(text: String) -> void:
 	_write_cache(_bridge_cache, text)
 	_bridge_pending = false
 	_try_finish()
-
-## Overpass is out (a rate limit, a paused instance): Postpass has the
-## same outlines.
-func _on_bridges_exhausted(reason: String, _attempts: int) -> void:
-	_bridge_reason = reason
-	_bridge_postpass.run(PostpassFallback.build_bridge_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
-
-var _bridge_reason := ""
 
 func _bridges_unavailable(reason: String) -> void:
 	print("OsmFetcher: bridge outlines unavailable (%s); grouping bridge ways instead" % reason)
@@ -734,10 +706,21 @@ func _detailed_fallback(reason: String) -> void:
 func _start_postpass(reason: String) -> void:
 	_api_reason = reason
 	_postpass_tried = true
+	# Ahead of the other layers' Postpass requests (PostpassGate).
+	var gen := _parse_gen
+	PostpassGate.enter(self, _send_postpass.bind(gen), func(why: String) -> void:
+		if gen == _parse_gen:
+			_postpass_failed(why), true)
+
+func _send_postpass(gen: int) -> void:
+	if gen != _parse_gen:
+		PostpassGate.leave(self)
+		return
 	var err := _postpass_http.request(PostpassFallback.endpoint(), PostpassFallback.headers(),
 		HTTPClient.METHOD_POST,
 		PostpassFallback.build_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
 	if err != OK:
+		PostpassGate.leave(self)
 		_postpass_failed("failed to start: %s" % err)
 
 ## Postpass gave nothing usable: on to Overpass when it has not been asked
@@ -757,6 +740,9 @@ func _postpass_failed(why: String) -> void:
 	_request_api()
 
 func _on_postpass_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	PostpassGate.leave(self)
+	if PostpassFallback.refused(code):
+		PostpassGate.note_refused()
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_postpass_failed("failed (result=%d code=%d)" % [result, code])
 		return

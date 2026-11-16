@@ -372,8 +372,7 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   fallback now keeps such answers too. osm2pgsql drops a relation's `type` tag, so area relations
   are rebuilt as multipolygons with one closed member per ring, and route
   relations are left out. Payloads are cached under their own key
-  (`pp1200_q<query version>`), read back as a fresh answer while Postpass
-  goes first. `RemoteConfig`
+  (`pp1200_q<query version>`), read back as a fresh answer. `RemoteConfig`
   `postpass_endpoint` can replace the address. The ohsome API
   (`api.ohsome.org`) was probed on the same day as an alternative: its
   metadata answered, but `/v1/elements/geometry` returned HTTP 403.
@@ -386,12 +385,32 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   same caps). Only Postpass's answer carries the bridge outlines, so the
   separate bridge query is skipped after it. The POIs ask Postpass too
   (`PostpassFallback.build_poi_body`). iOS and Android ask no Overpass
-  instance. `RemoteConfig` `map_source_first` and `overpass_on_mobile` put
-  Overpass back (`docs/remote-config.md`).
+  instance unless `RemoteConfig` `overpass_on_mobile` allows it
+  (`docs/remote-config.md`). Since 2026-11-16 Postpass is always first; the
+  `map_source_first` switch is gone.
+- Postpass usage policy (reviewed 2026-11-16, Geofabrik's rules for
+  automated requests):
+  - No parallel requests: `PostpassGate` keeps one Postpass request on the
+    wire for the whole app. The detailed layer goes first; the ring, far
+    city, horizon, bridge and POI layers wait their turn.
+  - Back-off: after HTTP 429 or 503, Postpass rests for 60 s and the layers
+    go to their next source.
+  - Caching: every answer is cached on the device (detailed `pp` key, ring,
+    POI, bridge, far city and horizon), and presets ship bundled snapshots.
+  - Indexes: each table read has a bbox `&&` or `ST_Intersects` test
+    (spatial index) and a nearest-first `LIMIT`; `tests/postpass_fallback_test.gd`
+    checks every body for both.
+  - Identification: `Brand.USER_AGENT` (project name and URL); the snapshot
+    tool sends its own UA with the project URL. No web page calls Postpass,
+    so no Referer applies.
+  - Popularity: `RemoteConfig` `postpass_endpoint` moves the app to a
+    self-hosted Postpass without an update once usage grows.
+  - No scraping: the only bulk use is `tools/prepare_horizon_layer.py`
+    (one small lookup per preset or capital, serial, 5 s apart, run by
+    hand). Anything larger should come from a Geofabrik extract.
 - Detailed-phase order in `OsmFetcher`: Postpass → one Overpass instance →
   cached payload at the same place (any radius, ≤150 m) → OSM API bbox →
-  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing. With
-  Overpass first: Overpass → same-place cache → Postpass → the rest.
+  cached payload within 500 m (`OsmNearbyCache`) → procedural dressing.
 - Single attempt (2026-11-11): the main instance failed TLS handshakes
   (`result=5`), `private.coffee` accepted connections but sent nothing, and
   `z.overpass-api.de` refused connections, so walking the list only delayed

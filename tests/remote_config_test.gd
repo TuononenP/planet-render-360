@@ -130,22 +130,20 @@ func _test_replace_and_clear() -> void:
 			or SatelliteFetcher.url_template() != SatelliteFetcher.URL_TEMPLATE:
 		_failures.append("an empty file should restore every built-in default")
 
-## Postpass first by default; the file can put Overpass first again and
-## allow it on phones, and a value of the wrong kind is ignored.
+## Postpass is always asked first, so the file cannot reorder the sources
+## (an old `map_source_first` key is ignored); it can allow Overpass on
+## phones, and a value of the wrong kind is ignored.
 func _test_source_order() -> void:
 	RemoteConfig.clear()
-	if not MapSources.postpass_first():
-		_failures.append("by default the map data should ask Postpass first")
 	if MapSources.overpass_allowed() == OS.has_feature("mobile"):
 		_failures.append("by default Overpass should be off on phones only")
 	RemoteConfig.apply({"version": RemoteConfig.SCHEMA, "map_source_first": "overpass",
 		"overpass_on_mobile": true})
-	if MapSources.postpass_first() or not MapSources.overpass_allowed():
-		_failures.append("the file should be able to put Overpass first and allow it on phones")
-	var bad: Variant = RemoteConfig.sanitize({"version": RemoteConfig.SCHEMA,
-		"map_source_first": "nominatim", "overpass_on_mobile": "yes"})
-	if bad == null or (bad as Dictionary).has("map_source_first") or (bad as Dictionary).has("overpass_on_mobile"):
-		_failures.append("an unknown source or a non-bool switch should be ignored")
+	if RemoteConfig.value("map_source_first", "") != "" or not MapSources.overpass_allowed():
+		_failures.append("the file should allow Overpass on phones but not put it first")
+	var bad: Variant = RemoteConfig.sanitize({"version": RemoteConfig.SCHEMA, "overpass_on_mobile": "yes"})
+	if bad == null or (bad as Dictionary).has("overpass_on_mobile"):
+		_failures.append("a non-bool switch should be ignored")
 	RemoteConfig.clear()
 
 func _test_cache(cache: String) -> void:

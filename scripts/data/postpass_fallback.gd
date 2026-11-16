@@ -43,6 +43,11 @@ const LAYER_TIMEOUT_S := 15.0
 static func endpoint() -> String:
 	return str(RemoteConfig.value("postpass_endpoint", URL))
 
+## Whether an HTTP status is the server turning requests away (rate limit,
+## overload): PostpassGate then rests Postpass for a while.
+static func refused(code: int) -> bool:
+	return code == 429 or code == 503
+
 ## The headers every Postpass POST carries.
 static func headers() -> PackedStringArray:
 	return ["User-Agent: " + Brand.USER_AGENT, "Content-Type: application/x-www-form-urlencoded"]

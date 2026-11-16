@@ -1,11 +1,10 @@
 class_name LayerRequest
 extends Node
 
-## One map layer from both live OSM services, in MapSources order: Postpass
-## first by default, then Overpass, or the other way round when RemoteConfig
-## `map_source_first` puts Overpass first. With no Overpass instance to ask
-## (MapSources.overpass_endpoints: none on iOS and Android) only Postpass is
-## asked. Emits OverpassRequest's signals, so a fetcher swaps one for this.
+## One map layer from both live OSM services: Postpass first, then Overpass.
+## With no Overpass instance to ask (MapSources.overpass_endpoints: none on
+## iOS and Android) only Postpass is asked. Emits OverpassRequest's signals,
+## so a fetcher swaps one for this.
 
 signal answered(text: String)
 signal exhausted(reason: String, attempts: int)
@@ -42,10 +41,7 @@ func run(postpass_body: String, overpass_body: String, check: Callable, endpoint
 	_postpass_tried = false
 	_overpass_tried = false
 	_reason = ""
-	if MapSources.postpass_first() or endpoints.is_empty():
-		_run_postpass()
-	else:
-		_run_overpass()
+	_run_postpass()
 
 func cancel() -> void:
 	overpass.cancel()

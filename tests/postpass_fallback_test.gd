@@ -45,6 +45,7 @@ const LAKE_ONLY := """{"type": "FeatureCollection", "features": [
 func _init() -> void:
 	var failures: Array[String] = []
 	_body_checks(failures)
+	_index_checks(failures)
 	_convert_checks(failures)
 	_garbage_checks(failures)
 	_config_checks(failures)
@@ -84,6 +85,28 @@ func _body_checks(failures: Array[String]) -> void:
 		failures.append("envelope not centred on the place: %s" % sql.get_slice("AND", 0))
 	if body.contains(" ") or body.contains("'"):
 		failures.append("body is not url-encoded")
+
+## Postpass usage policy: queries must use the database indexes. Every
+## table read has a spatial-index test (a bbox `&&` or ST_Intersects), and
+## every part is capped.
+func _index_checks(failures: Array[String]) -> void:
+	var bodies := {
+		"detailed": PostpassFallback.build_body(LAT, LON, 1200),
+		"bridge": PostpassFallback.build_bridge_body(LAT, LON, 1200),
+		"poi": PostpassFallback.build_poi_body(LAT, LON),
+		"ring": PostpassLayers.build_ring_body(LAT, LON, 2500),
+		"far": PostpassLayers.build_far_body(LAT, LON),
+		"horizon": PostpassLayers.build_horizon_body(LAT, LON),
+	}
+	for name in bodies:
+		var sql := str(bodies[name]).trim_prefix("data=").uri_decode()
+		var reads := sql.split("FROM postpass_")
+		for i in range(1, reads.size()):
+			if not reads[i].contains("&&") and not reads[i].contains("ST_Intersects("):
+				failures.append("%s: a table read without a spatial-index test: %s" % [name, reads[i].left(80)])
+		for part in sql.split(" UNION ALL "):
+			if not part.contains(" LIMIT "):
+				failures.append("%s: a part without a LIMIT: %s" % [name, part.left(80)])
 
 func _convert_checks(failures: Array[String]) -> void:
 	var res := PostpassFallback.to_overpass_json(GEOJSON.to_utf8_buffer())
