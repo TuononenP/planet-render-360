@@ -18,6 +18,7 @@ extends RefCounted
 ##             "star" (belvedere and needle with a star), "dome_spire"
 ##             (dome under a gilt needle), "belvedere" (an open lantern of
 ##             columns under a hip) or "belfry" (arched belfry, cupola)
+##   cap_hex   the tower roof in its own colour (sheet metal)
 ##   dome      a dome over the middle: `dome_r` radius, `dome_top` tip
 ##   hall      true: the arched booking hall in the middle of the front,
 ##             `hall_top` to its crown, with its lunette and clock
@@ -27,8 +28,10 @@ extends RefCounted
 ##   band_hex  a cladding band `band_h` tall round the upper facade
 ##   louvre_hex horizontal louvre bands across the upper floors
 ##   centre_blank the centre block as a blank wall with a frieze
-##   shell_canopy [depth, rise]: a curved ribbed shell canopy on piers
-##   portal    [w, h, arched]: a framed central portal with a deep canopy
+##   shell_canopy [depth, rise]: a cantilevered shell flush with the roof,
+##             ribs curving `rise` down to the front, inclined end legs
+##   portal    [w, h, arched, massive]: a framed central portal with a deep
+##             canopy, or (massive) a clad block with broad piers and head
 ##   screens   true: sun-screen fins over a dark recessed ground floor
 ##   floor_band_hex a coloured band between the floors, glass-block panels
 ##   roof "gable": a long pitched roof along the building
@@ -159,30 +162,34 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		lm.box("Roof", Vector3((x0 + x1) * 0.5, eave + lift - 0.4, front.z + depth), Vector3(x1 - x0, 1.2, 0.5))
 		top = maxf(top, eave + lift + 0.2)
 	if style.has("shell_canopy"):
-		# A curved, ribbed concrete shell canopy on piers over the forecourt
-		# (Ouagadougou): `depth` out from the front, crown `rise` above it.
+		# A cantilevered concrete shell over the forecourt (Ouagadougou): a
+		# deep slab flush with the roof `depth` out from the front, ribs under
+		# it curving down `rise` to the facade, an inclined leg at each end.
 		var sc: Array = style["shell_canopy"]
 		var depth := float(sc[0])
-		var crown := float(sc[1])
+		var rise := float(sc[1])
 		var run := front_run(poly, front, lo, hi)
-		var inset := (run.y - run.x) * 0.1 + 2.0
+		var inset := 2.0
 		var x0 := run.x + inset
 		var x1 := run.y - inset
-		var base_y := eave - 1.0
-		var slab_y := base_y + crown
-		lm.box("Shell", Vector3((x0 + x1) * 0.5, slab_y, front.z + depth * 0.5), Vector3(x1 - x0, 0.8, depth))
-		var ribs := maxi(int((x1 - x0) / 5.0), 2)
-		var seg := 8
+		var under := eave - 1.5
+		lm.box("Shell", Vector3((x0 + x1) * 0.5, eave - 0.75, front.z + depth * 0.5), Vector3(x1 - x0, 1.5, depth))
+		# The outer fascia hangs a little below the slab.
+		lm.box("Shell", Vector3((x0 + x1) * 0.5, under - 0.5, front.z + depth - 0.4), Vector3(x1 - x0, 1.0, 0.8))
+		var ribs := maxi(int((x1 - x0) / 4.0), 2)
+		var seg := 6
 		for r in ribs + 1:
 			var x := x0 + (x1 - x0) * float(r) / float(ribs)
 			for k in seg:
 				var t0 := float(k) / float(seg)
 				var t1 := float(k + 1) / float(seg)
-				lm.beam("Shell", Vector3(x, base_y + sin(t0 * PI) * (crown - 0.4), front.z + t0 * depth),
-					Vector3(x, base_y + sin(t1 * PI) * (crown - 0.4), front.z + t1 * depth), 0.5, 1.0)
-			if r % 2 == 0:
-				lm.box("Shell", Vector3(x, slab_y * 0.5, front.z + depth - 0.8), Vector3(1.2, slab_y, 1.2))
-		top = maxf(top, slab_y + 0.4)
+				lm.beam("Shell", Vector3(x, under - rise * cos(t0 * PI * 0.5) + 0.3, front.z + t0 * depth),
+					Vector3(x, under - rise * cos(t1 * PI * 0.5) + 0.3, front.z + t1 * depth), 0.6, 1.2)
+		for x in [x0, x1]:
+			var out := -1.0 if x == x0 else 1.0
+			lm.beam("Shell", Vector3(x, eave - 0.75, front.z + depth - 0.6),
+				Vector3(x + out * eave * 0.45, 0.0, front.z + depth * 0.4), 1.6, 1.6, Vector3.ZERO, true)
+		top = maxf(top, eave)
 	if style.has("portal"):
 		# A framed central portal: stone piers and lintel round a full-height
 		# glazed or arched opening, a deep flat canopy over its foot.
@@ -190,6 +197,7 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		var pw := float(pt[0])
 		var ph := float(pt[1])
 		var arched := pt.size() > 2 and bool(pt[2])
+		var massive := pt.size() > 3 and bool(pt[3])
 		# The frame stands 2 m proud of the facade and the glazing 1 m: in the
 		# wall's own plane it would flicker into it.
 		var f := front + Vector3(0, 0, 2.0)
@@ -199,10 +207,19 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		if arched:
 			LandmarkStationKit.arch_window(lm, "Trim", "Curtain", f + Vector3(0, 0.2, -1.0), Vector3.BACK, pw, ph - 2.4, 5, 0.6)
 		else:
-			lm.box("Curtain", f + Vector3(0, (ph - 2.0) * 0.5, -1.0), Vector3(pw, ph - 2.0, 0.2), Basis(), 0.0)
+			var gh := ph * 0.62 if massive else ph - 2.0
+			lm.box("Curtain", f + Vector3(0, gh * 0.5, -1.0), Vector3(pw, gh, 0.2), Basis(), 0.0)
 			LandmarkFhParts.ribs(lm, "Steel", f + Vector3(-pw * 0.5, 0, -0.85), f + Vector3(pw * 0.5, 0, -0.85), Vector3.BACK,
-				0.0, ph - 2.0, 2.0, 0.15, 0.15)
-		lm.box("Roof", f + Vector3(0, minf(6.0, ph * 0.4), 3.0), Vector3(pw + 2.0, 0.6, 6.0))
+				0.0, gh, 2.0, 0.15, 0.15)
+		if massive:
+			# A clad entrance block (Abuja): broad piers and a deep head over
+			# the glazing, rising above the wings, its soffit over the doors.
+			var head := ph * 0.62
+			for s in [-1.0, 1.0]:
+				lm.box("Trim", f + Vector3(s * (pw * 0.5 + 2.5), ph * 0.5, 1.0), Vector3(5.0, ph, 6.0))
+			lm.box("Trim", f + Vector3(0, (head + ph) * 0.5, 1.0), Vector3(pw + 10.0, ph - head, 6.0))
+		else:
+			lm.box("Roof", f + Vector3(0, minf(6.0, ph * 0.4), 3.0), Vector3(pw + 2.0, 0.6, 6.0))
 		top = maxf(top, ph)
 	if bool(style.get("screens", false)):
 		# Sun-screen fins across the upper front over a dark recessed ground
@@ -283,16 +300,18 @@ static func _towers(lm: LandmarkMesh, poly: PackedVector2Array, style: Dictionar
 			var off := maxf(hall_w * 0.5 + tw * 0.5 + 1.0, (hi.x - lo.x) * 0.2)
 			xs = [mid.x - off, mid.x + off]
 		"ends": xs = [lo.x + tw * 0.5 + 1.0, hi.x - tw * 0.5 - 1.0]
+	# The tower roof in its own colour when the style names one (`cap_hex`).
+	var rk := "Cap" if style.has("cap_hex") else "Roof"
 	for x in xs:
 		var f := front_point(poly, float(x), lo, hi)
 		var base := f + Vector3(0, 0, tw * 0.5 - 0.6)
 		match cap:
 			"star", "dome_spire", "belvedere", "belfry":
 				var shaft := tip - cap_h * (2.0 if cap == "star" or cap == "dome_spire" else 1.0)
-				LandmarkStationKit.clock_tower(lm, "Walls", "Trim", "Roof", "Dial", "Windows", base, tw, shaft, "flat", 0.3)
+				LandmarkStationKit.clock_tower(lm, "Walls", "Trim", rk, "Dial", "Windows", base, tw, shaft, "flat", 0.3)
 				_cap(lm, cap, base + Vector3.UP * shaft, tw, tip - shaft)
 			_:
-				LandmarkStationKit.clock_tower(lm, "Walls", "Trim", "Roof", "Dial", "Windows", base, tw, tip - cap_h, cap,
+				LandmarkStationKit.clock_tower(lm, "Walls", "Trim", rk, "Dial", "Windows", base, tw, tip - cap_h, cap,
 					cap_h)
 	return tip
 

@@ -73,8 +73,10 @@ static func station(model: Node3D, entry: Dictionary) -> void:
 		lm.use("Band", LandmarkMaterials.pbr("copper", str(style["band_hex"]), 2.0))
 	if style.has("louvre_hex"):
 		lm.use("Louvre", LandmarkMaterials.paint(str(style["louvre_hex"])))
+	if style.has("cap_hex"):
+		lm.use("Cap", LandmarkMaterials.pbr("sheet_metal", str(style["cap_hex"]), 2.0))
 	if style.has("shell_canopy"):
-		lm.use("Shell", LandmarkMaterials.pbr("concrete", "#B9B3A8", 4.0))
+		lm.use("Shell", LandmarkMaterials.pbr("render", str(style.get("wall", "#B9B3A8")), 4.0))
 	if style.has("floor_band_hex"):
 		lm.use("FloorBand", LandmarkMaterials.pbr("render", str(style["floor_band_hex"]), 3.0))
 		lm.use("Blocks", LandmarkMaterials.pbr("render", "#D6E2E4", 1.0, 0.3, 0.1))

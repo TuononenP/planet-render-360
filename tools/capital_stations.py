@@ -366,8 +366,6 @@ def style_top(style: dict, h: float) -> float:
         top = max(top, float(style["centre_h"]) + rise)
     if roof == "gable":
         top = max(top, eave + float(style.get("roof_rise", 3.0)))
-    if "shell_canopy" in style:
-        top = max(top, eave - 1.0 + float(style["shell_canopy"][1]) + 0.4)
     if "portal" in style:
         top = max(top, float(style["portal"][1]))
     if "cantilever" in style:
