@@ -19,7 +19,7 @@ static func entries() -> Array:
 				"st peter's square", "piazza san pietro"]},
 		{"type": "pantheon_rome", "name": "Pantheon, Rome", "lat": 41.89861, "lon": 12.47686,
 			"radius_m": 2500.0, "wiki_title": "Pantheon, Rome", "height_m": 43.3, "kind": "Temple",
-			"clear_m": 70.0,
+			"clear_m": 95.0,
 			"aliases": ["pantheon, rome", "pantheon rome", "pantheon di roma", "pantheon"]},
 		{"type": "milan_cathedral", "name": "Milan Cathedral", "lat": 45.46417, "lon": 9.19167,
 			"radius_m": 3000.0, "wiki_title": "Milan Cathedral", "height_m": 108.5, "kind": "Cathedral",

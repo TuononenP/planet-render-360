@@ -231,16 +231,17 @@ static func _ring_normal(ring: PackedVector3Array, i: int) -> Vector3:
 
 ## Origin at the middle of the chapel, long axis along X: Sixtus IV's
 ## plain brick hall (1473-81; 40.9 x 13.4 m, 20.7 m to the ridge) with
-## six tall round-arched windows down each side under the crenellated
-## parapet and its guard walk, two windows in each end wall, the heavy
-## buttresses added when the walls cracked, and the low tiled roof; the
-## Vatican palaces close the courts round it (Apostolic Palace to the
-## east, the Museums' wings north and south).
+## six tall round-arched windows down each side under a row of small
+## square openings of the guard walk and a plain cornice, two windows in
+## each end wall, the heavy buttresses added when the walls cracked, and
+## the low tiled roof closed by pale plastered gables; the lower Vatican
+## palaces close the courts round it (the Apostolic Palace to the east,
+## the Museums' wings north and south) so the chapel stands above them.
 static func sistine(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#9A6A4C", 3.0))
-	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#A65A3E", 2.0))
-	lm.use("Plaster", LandmarkMaterials.pbr("render", "#CDB48A", 4.0))
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#B07C5A", 3.0))
+	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#8F5B47", 2.0))
+	lm.use("Plaster", LandmarkMaterials.pbr("render", "#C99A6F", 4.0))
 	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E1D6BC", 2.0))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#4A4136", 3.0))
 	var lx := 40.9
@@ -267,24 +268,33 @@ static func sistine(model: Node3D) -> void:
 		var r := Vector3.UP.cross(n)
 		var o := Vector3(s * (lx * 0.5 - 0.8), 10.2, 0) - r * (wz - 1.6) * 0.5
 		LandmarkRmLKit.arcade(lm, "Brick", "Shadow", o, r, n, wz - 1.6, 7.0, 2, 2.4, 3.4, 0.8, 0.4)
-	# Crenellated parapet with the guard walk behind it, then the roof.
-	lm.box("Trim", Vector3(0, 17.3, 0), Vector3(lx + 0.6, 0.4, wz + 0.6))
+	# The guard walk's small square openings under a plain moulded cornice,
+	# then the low roof closed by pale plastered gables.
 	for s in [-1.0, 1.0]:
-		lm.box("Brick", Vector3(0, 17.9, s * (wz * 0.5 - 0.3)), Vector3(lx, 0.8, 0.6))
-		lm.box("Brick", Vector3(s * (lx * 0.5 - 0.3), 17.9, 0), Vector3(0.6, 0.8, wz))
-		SEuUtil.crenels(lm, "Brick", Vector3(-lx * 0.5, 18.3, s * (wz * 0.5 - 0.3)),
-			Vector3(lx * 0.5, 18.3, s * (wz * 0.5 - 0.3)), 0.9, 1.1, 0.6)
-		SEuUtil.crenels(lm, "Brick", Vector3(s * (lx * 0.5 - 0.3), 18.3, -wz * 0.5),
-			Vector3(s * (lx * 0.5 - 0.3), 18.3, wz * 0.5), 0.9, 1.1, 0.6)
-	lm.gable("Tile", Vector3(0, 17.5, 0), wz - 2.4, lx - 2.4, 3.2, Basis(Vector3.UP, PI * 0.5), 0.2, "Brick")
+		for k in 12:
+			var wx := -lx * 0.5 + 1.6 + (lx - 3.2) * float(k) / 11.0
+			lm.box("Shadow", Vector3(wx, 16.1, s * (wz * 0.5 + 0.02)), Vector3(1.1, 1.1, 0.12))
+		for k in 3:
+			var wz2 := -wz * 0.5 + 2.4 + (wz - 4.8) * float(k) / 2.0
+			lm.box("Shadow", Vector3(s * (lx * 0.5 + 0.02), 16.1, wz2), Vector3(0.12, 1.1, 1.1))
+	LandmarkDetail.cornice(lm, "Trim", Vector3(-lx * 0.5 - 0.3, 17.0, wz * 0.5 + 0.3),
+		Vector3(lx * 0.5 + 0.3, 17.0, wz * 0.5 + 0.3), Vector3(0, 0, 1), 0.9, true)
+	LandmarkDetail.cornice(lm, "Trim", Vector3(lx * 0.5 + 0.3, 17.0, -wz * 0.5 - 0.3),
+		Vector3(-lx * 0.5 - 0.3, 17.0, -wz * 0.5 - 0.3), Vector3(0, 0, -1), 0.9, true)
+	LandmarkDetail.cornice(lm, "Trim", Vector3(lx * 0.5 + 0.3, 17.0, wz * 0.5 + 0.3),
+		Vector3(lx * 0.5 + 0.3, 17.0, -wz * 0.5 - 0.3), Vector3(1, 0, 0), 0.9, true)
+	LandmarkDetail.cornice(lm, "Trim", Vector3(-lx * 0.5 - 0.3, 17.0, -wz * 0.5 - 0.3),
+		Vector3(-lx * 0.5 - 0.3, 17.0, wz * 0.5 + 0.3), Vector3(-1, 0, 0), 0.9, true)
+	lm.box("Brick", Vector3(0, 17.3, 0), Vector3(lx - 0.4, 0.6, wz - 0.4))
+	lm.gable("Tile", Vector3(0, 17.6, 0), wz - 1.2, lx - 1.2, 3.1, Basis(Vector3.UP, PI * 0.5), 0.2, "Plaster")
 	# The chimney of the conclave on the roof's west end.
 	lm.box("Brick", Vector3(-15.0, 19.6, 3.0), Vector3(0.8, 2.8, 0.8))
 	lm.box("Shadow", Vector3(-15.0, 20.1, 3.0), Vector3(0.3, 0.7, 0.3))
 	# Palaces closing the courts: north and south wings, east palace, west range.
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(0, 0, -27.0), 52.0, 16.5, 16.0, Vector3(0, 0, 1), 4, 11, 1.6, 2.4, "Tile")
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(0, 0, 28.0), 60.0, 16.0, 22.0, Vector3(0, 0, -1), 4, 12, 1.6, 2.4, "Tile")
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(62.0, 0, 2.0), 90.0, 19.5, 24.0, Vector3(-1, 0, 0), 4, 12, 1.8, 2.5, "", 1)
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(-42.0, 0, 2.0), 44.0, 15.5, 16.0, Vector3(1, 0, 0), 4, 8, 1.6, 2.4, "Tile")
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(38.0, 0, -27.0), 24.0, 16.5, 16.0, Vector3(0, 0, 1), 4, 5, 1.6, 2.4, "Tile")
-	LandmarkRmLUtil.block(lm, "Plaster", Vector3(40.0, 0, 28.0), 20.0, 16.0, 22.0, Vector3(0, 0, -1), 4, 4, 1.6, 2.4, "Tile")
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(0, 0, -27.0), 52.0, 13.5, 16.0, Vector3(0, 0, 1), 3, 11, 1.6, 2.4, "Tile")
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(0, 0, 28.0), 60.0, 13.0, 22.0, Vector3(0, 0, -1), 3, 12, 1.6, 2.4, "Tile")
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(62.0, 0, 2.0), 90.0, 16.5, 24.0, Vector3(-1, 0, 0), 3, 12, 1.8, 2.5, "", 1)
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(-42.0, 0, 2.0), 44.0, 12.5, 16.0, Vector3(1, 0, 0), 3, 8, 1.6, 2.4, "Tile")
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(38.0, 0, -27.0), 24.0, 13.5, 16.0, Vector3(0, 0, 1), 3, 5, 1.6, 2.4, "Tile")
+	LandmarkRmLUtil.block(lm, "Plaster", Vector3(40.0, 0, 28.0), 20.0, 13.0, 22.0, Vector3(0, 0, -1), 3, 4, 1.6, 2.4, "Tile")
 	lm.commit(model)

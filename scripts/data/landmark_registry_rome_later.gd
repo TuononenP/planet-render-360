@@ -78,6 +78,5 @@ static func entries() -> Array:
 		{"type": "sistine_chapel", "name": "Sistine Chapel", "lat": 41.90293, "lon": 12.45440,
 			"radius_m": 3500.0, "wiki_title": "Sistine Chapel", "height_m": 20.7, "kind": "Chapel",
 			"clear_m": 95.0, "yaw_deg": -1.0,
-			"aliases": ["sistine chapel", "cappella sistina", "vatican museums", "musei vaticani",
-				"apostolic palace", "palazzo apostolico"]},
+			"aliases": ["sistine chapel", "cappella sistina"]},
 	]

@@ -24,10 +24,10 @@ const LANTERN_Y := 116.2
 ## 140 statues), the obelisk and the two fountains.
 static func peters(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D6CAAE", 4.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E7DDC6", 3.0))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D3BE94", 4.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E0D0AE", 3.0))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#4A4338", 3.0))
-	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#A0A5A6", 3.0, 0.55, 0.3))
+	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#9AA09E", 3.0, 0.55, 0.12))
 	lm.use("Steps", LandmarkMaterials.pbr("stone", "#BDB4A2", 2.0))
 	lm.use("Gold", LandmarkMaterials.gold())
 	lm.use("Water", LandmarkMaterials.glass("#3A6E7A"))
@@ -366,11 +366,11 @@ const ROT_R := 28.0
 ## entablature with the M·AGRIPPA inscription and the pediment.
 static func pantheon(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#9C6E52", 3.0))
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#7E675A", 3.0))
 	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#9B9486", 3.0))
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#8C8B87", 2.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#D9CDB4", 3.0))
-	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#A65A3E", 2.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#C4B79B", 3.0))
+	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#8F5B47", 2.0))
 	lm.use("Bronze", LandmarkMaterials.pbr("concrete", "#6C5A3C", 2.0, 0.4, 0.7))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#463F36", 3.0))
 	lm.use("Pink", LandmarkMaterials.pbr("stone", "#A78C80", 2.0))
@@ -457,4 +457,24 @@ static func pantheon(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		lm.beam("Trim", Vector3(s * 16.6, ey + 4.0, zf - 1.3), Vector3(0, ey + 9.6, zf - 1.3), 0.9, 1.0)
 	lm.disc("Shadow", Vector3(0, ey + 6.2, zf - 0.85), Vector3(0, 0, -1), 0.9, 12)
+	_rotonda(lm)
 	lm.commit(model)
+
+## Piazza della Rotonda's fountain 78 m north of the rotunda, 11 m west of
+## its axis: Della Porta's 1575 marble basin on two steps, the stem with
+## its upper bowl, and Barigioni's 1711 pedestal carrying the 6.3 m
+## Macuteo obelisk of Ramesses II, 14.5 m in all.
+static func _rotonda(lm: LandmarkMesh) -> void:
+	var c := Vector3(-11.0, 0, -78.0)
+	lm.frustum("Trim", c, 5.9, 5.6, 0.3, 20)
+	lm.frustum("Trim", c + Vector3(0, 0.3, 0), 5.4, 5.1, 0.3, 20)
+	lm.lathe("Pink", c + Vector3(0, 0.6, 0), PackedVector2Array([Vector2(4.6, 0), Vector2(4.6, 0.9),
+		Vector2(4.2, 0.9), Vector2(4.2, 0.1), Vector2(0.01, 0.1)]), 20, 1.0, 1.0, 0.0, true, false)
+	lm.frustum("Trim", c + Vector3(0, 0.6, 0), 1.3, 0.9, 2.2, 12)
+	lm.lathe("Trim", c + Vector3(0, 2.8, 0), PackedVector2Array([Vector2(0.9, 0), Vector2(2.0, 0.3),
+		Vector2(2.1, 0.7), Vector2(1.7, 0.7), Vector2(0.01, 0.4)]), 14, 1.0, 1.0, 0.0, true, false)
+	lm.box("Trim", c + Vector3(0, 4.5, 0), Vector3(2.4, 1.6, 2.4))
+	lm.box("Trim", c + Vector3(0, 5.5, 0), Vector3(1.6, 1.0, 1.6))
+	lm.box("Trim", c + Vector3(0, 6.1, 0), Vector3(2.0, 0.3, 2.0))
+	lm.spire("Pink", c + Vector3(0, 6.25, 0), 0.62, 7.3, 0.4)
+	lm.spire("Pink", c + Vector3(0, 13.55, 0), 0.4, 0.95, 0.0)
