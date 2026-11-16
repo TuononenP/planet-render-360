@@ -20,6 +20,7 @@ func _init() -> void:
 func _run() -> void:
 	await process_frame
 	_dir = ProjectSettings.globalize_path("user://video_recorder_test")
+	_cleanup(_dir)
 	DirAccess.make_dir_recursive_absolute(_dir)
 	_test_sizes()
 	_test_names()
@@ -39,7 +40,7 @@ func _run() -> void:
 		await _test_save_to_chosen()
 		_test_recover_leftovers()
 	_test_headless_unsupported()
-	_cleanup()
+	_cleanup(_dir)
 	if _failures.is_empty():
 		print("VIDEO RECORDER OK: sizes, names, save, pacing, formats, stale frames, %s" % ("encoder" if encoded else "encoder skipped (no native build)"))
 		quit(0)
@@ -421,9 +422,11 @@ func _test_recover_leftovers() -> void:
 func _test_headless_unsupported() -> void:
 	_check(not VideoRecorder.supported(), "headless has no frames to record")
 
-func _cleanup() -> void:
-	for sub in ["out", ""]:
-		var d := _dir.path_join(sub)
-		for f in DirAccess.get_files_at(d):
-			DirAccess.remove_absolute(d.path_join(f))
-		DirAccess.remove_absolute(d)
+## Removes the test folder with everything in it (chosen-save, blocker...),
+## so a file left by an earlier run cannot rename the next run's saves.
+func _cleanup(d: String) -> void:
+	for sub in DirAccess.get_directories_at(d):
+		_cleanup(d.path_join(sub))
+	for f in DirAccess.get_files_at(d):
+		DirAccess.remove_absolute(d.path_join(f))
+	DirAccess.remove_absolute(d)
