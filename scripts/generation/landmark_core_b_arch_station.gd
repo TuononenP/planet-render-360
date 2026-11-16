@@ -18,7 +18,7 @@ extends RefCounted
 ##             "star" (belvedere and needle with a star), "dome_spire"
 ##             (dome under a gilt needle), "belvedere" (an open lantern of
 ##             columns under a hip) or "belfry" (arched belfry, cupola)
-##   cap_hex   the tower roof in its own colour (sheet metal)
+##   cap_hex   the tower roofs and dome in their own colour (sheet metal)
 ##   dome      a dome over the middle: `dome_r` radius, `dome_top` tip
 ##   hall      true: the arched booking hall in the middle of the front,
 ##             `hall_top` to its crown, with its lunette and clock
@@ -266,7 +266,7 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		var drum := maxf(tip - r * 0.9 - 1.2, eave)
 		lm.lathe("Walls", c + Vector3.UP * (eave - 0.5), PackedVector2Array([Vector2(r, 0.0), Vector2(r, drum - eave + 0.5)]),
 			20)
-		lm.lathe("Roof", c + Vector3.UP * drum, LandmarkFhUtil.dome_prof(r * 1.04, tip - drum - 1.2), 20)
+		lm.lathe("Cap" if style.has("cap_hex") else "Roof", c + Vector3.UP * drum, LandmarkFhUtil.dome_prof(r * 1.04, tip - drum - 1.2), 20)
 		lm.frustum("Gilt", c + Vector3.UP * (tip - 1.2), 0.25, 0.05, 1.2, 6)
 		top = maxf(top, tip)
 	if style.has("tower"):
