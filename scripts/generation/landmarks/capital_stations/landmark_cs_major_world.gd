@@ -27,9 +27,8 @@ static func desamparados(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		lm.box("Trim", Vector3(s * 8.5, 7.5, 21.5), Vector3(1.2, 15.0, 0.6))
 	lm.box("Walls", Vector3(0, 17.5, 20.6), Vector3(9.0, 5.0, 1.4))
-	lm.lathe("Trim", Vector3(0, 20.0, 20.6), PackedVector2Array([Vector2(4.5, 0.0), Vector2(3.0, 1.6),
-		Vector2(0.0, 2.0)]), 12, 1.0, 0.3)
-	K.clock(lm, "Dial", "Trim", Vector3(0, 17.6, 21.35), Vector3.BACK, 1.6)
+	LandmarkFhUtil.hip(lm, "Trim", Vector3(0, 20.0, 20.6), 9.0, 1.4, 1.8)
+	K.clock(lm, "Dial", "Trim", Vector3(0, 17.6, 21.55), Vector3.BACK, 1.6)
 	lm.box("Steel", Vector3(0, 24.5, 20.4), Vector3(0.15, 5.0, 0.15), Basis(), 0.0)
 	lm.commit(model)
 

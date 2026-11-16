@@ -64,7 +64,7 @@ static func entries() -> Array:
 			"radius_m": 6000.0, "wiki_title": "Uganda Railways Corporation", "height_m": 7.0, "kind": "Station",
 			"secondary": true, "yaw_deg": 143.2, "clear_m": 12.0, "clear_rect_m": [0.0, 0.0, 95.6, 9.1],
 			"archetype": "station", "capital": "UG",
-			"style": {"eave": 6.0, "storey": 6.0, "roof": "overhang", "overhang": 5.0, "wall": "#c8c4bc", "wall_set": "concrete", "roof_hex": "#a9a59c", "roof_set": "concrete", "canopy": false, "windows": "rect"},
+			"style": {"eave": 6.0, "storey": 6.0, "roof": "overhang", "overhang": 5.0, "wall": "#c8c4bc", "wall_set": "concrete", "roof_hex": "#a9a59c", "roof_set": "concrete", "canopy": false, "windows": "rect", "smooth": 3.0},
 			"aliases": ["kampala railway station"],
 			"outline_m": [[-91.6, -2.9], [-22.6, -5.1], [-13.8, -2.6], [-8.2, -2.7], [0.1, -2.9], [91.5, -3.1], [91.6, 4.9], [45.0, 5.1], [-44.1, 5.1], [-91.5, 5.1]]},
 		{"type": "station_sd_khartoum", "name": "Khartoum railway station", "lat": 15.595163, "lon": 32.527577,

@@ -35,7 +35,8 @@ static func riga_central(model: Node3D) -> void:
 	K.canopy(lm, "Trim", "Steel", Vector3(-40, 0, 20.0), Vector3(20, 0, 20.0), Vector3.BACK, 7.0, 6.0, 7)
 	# The tower: four light steel legs round a glazed shaft, four dials, a
 	# flat cap and a short mast.
-	var t := Vector3(42.0, 0, 26.0)
+	# Clear of the building's eave by a few metres.
+	var t := Vector3(42.0, 0, 28.0)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
 			lm.box("Steel", t + Vector3(sx * 2.0, 14.5, sz * 2.0), Vector3(0.6, 29.0, 0.6), Basis(), 0.0)

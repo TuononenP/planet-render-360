@@ -224,12 +224,12 @@ static func tunis(model: Node3D) -> void:
 	lm.box("Trim", Vector3(0, 13.6, -1.0), Vector3(90.6, 0.4, 36.6))
 	lm.box("Roof", Vector3(0, 13.85, -1.0), Vector3(90.0, 0.1, 36.0))
 	for k in 8:
-		var x := -40.5 + 11.57 * float(k)
-		# A louvre panel between two pilasters: framed, its slats proud.
-		lm.box("Trim", Vector3(x - 5.4, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
+		var x := -39.9 + 11.4 * float(k)
+		# A louvre panel between two pilasters, inside the end walls.
+		lm.box("Trim", Vector3(x - 5.1, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
 		for j in 6:
-			lm.box("Louvre", Vector3(x + 0.4, 6.6 + 1.0 * float(j), 17.35), Vector3(9.4, 0.35, 0.5))
-	lm.box("Trim", Vector3(44.4, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
+			lm.box("Louvre", Vector3(x + 0.3, 6.6 + 1.0 * float(j), 17.35), Vector3(9.0, 0.35, 0.5))
+	lm.box("Trim", Vector3(44.1, 9.0, 17.3), Vector3(1.2, 9.0, 0.6))
 	for x in [-38.0, -20.0, 0.0, 20.0, 38.0]:
 		lm.box("Walls", Vector3(x, 2.4, 15.6), Vector3(0.9, 4.8, 0.9))
 	# The name on the roof: a row of tall blue letter blocks.
