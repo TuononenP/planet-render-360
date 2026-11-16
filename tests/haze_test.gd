@@ -107,6 +107,10 @@ func _test_atmosphere_driver() -> void:
 			or rig.environment.glow_intensity <= base_gi \
 			or rig.environment.volumetric_fog_density <= base_vd:
 		_failures.append("set_haziness(1.0) should thicken fog, sun scatter and volume while keeping glow_hdr_threshold >= 1.0")
+	# The glow's per-pixel cap stays low: uncapped, the sun's reflection on a
+	# glossy bonnet bloomed into a white blaze across the car and the road.
+	if rig.environment.glow_hdr_luminance_cap > 2.0:
+		_failures.append("glow_hdr_luminance_cap must stay at or under 2.0 (sun glints on glossy paint blazed)")
 	rig.set_haziness(0.0)
 	if not is_equal_approx(rig.environment.fog_light_energy, base_e) \
 			or not is_equal_approx(rig.environment.fog_sun_scatter, base_sc) \
@@ -233,6 +237,10 @@ func _test_display_path_and_ease() -> void:
 		haze._process(1.0 / 60.0)
 	if haze.pass_active or haze.rays_vp.render_target_update_mode != SubViewport.UPDATE_DISABLED:
 		_failures.append("once eased to 0 under governor step 1, rays_vp must disable")
+	# The ray quad lives in its own 3D world: sharing the city's, it stood in
+	# the street at the world origin as a black panel.
+	if not haze.rays_vp.own_world_3d:
+		_failures.append("rays_vp needs its own 3D world, or the ray quad shows in the city at the origin")
 	haze.set_governor_step(2)
 	haze._process(1.0 / 60.0)
 

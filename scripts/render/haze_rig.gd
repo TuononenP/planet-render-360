@@ -123,6 +123,9 @@ func _ensure_viewports() -> void:
 	var world_rt := _world_vp.get_texture()
 	rays_vp = SubViewport.new()
 	rays_vp.name = "HazeRays"
+	# Its own 3D world: sharing the city's, the ray quad stood in the street
+	# at the world origin, a black 3 m panel seen from nearby.
+	rays_vp.own_world_3d = true
 	rays_vp.transparent_bg = false
 	rays_vp.handle_input_locally = false
 	rays_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED

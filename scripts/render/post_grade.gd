@@ -28,6 +28,10 @@ const SATURATION := 1.0
 const AMBIENT_ENERGY := 0.55
 const GLOW_THRESHOLD := 1.0
 const GLOW_INTENSITY := 0.32
+## Brightest value one pixel may feed the glow: a smooth bonnet's reflection
+## of the low sun is many times over, and uncapped it bloomed into a white
+## blaze across the car and the road beside it.
+const GLOW_LUMINANCE_CAP := 1.4
 
 static func apply(env: Environment) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -55,6 +59,7 @@ static func apply(env: Environment) -> void:
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = GLOW_THRESHOLD
 	env.glow_hdr_scale = 2.0
+	env.glow_hdr_luminance_cap = GLOW_LUMINANCE_CAP
 	env.glow_intensity = GLOW_INTENSITY
 	env.glow_strength = 1.0
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
