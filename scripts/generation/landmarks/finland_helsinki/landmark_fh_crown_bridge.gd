@@ -488,7 +488,9 @@ static func _piers(lm: LandmarkMesh) -> void:
 		var y1 := deck_y(s) - DEPTH_M + 0.2
 		var grow := 1.3 if absf(s - anchor) < 1.0 else 1.0
 		var tall := clampf((y1 - 6.0) / 14.0, 0.0, 1.0)
-		var top := c.z * 0.6
+		# The legs meet the deck near its edges, just inside where the
+		# soffit (1.8 m in from each edge) turns up into its chamfers.
+		var top := c.z - 2.0
 		_v_pier(lm, base, t3 * 1.7 * grow, n3, -CAP_DEPTH_M, y1 * lerpf(0.4, 0.3, tall), y1, top * 0.55, top,
 			top * 0.38)
 
@@ -537,6 +539,26 @@ static func _v_pier(lm: LandmarkMesh, base: Vector3, half_t: Vector3, n3: Vector
 			var nrm := (n3 * (v.y - u.y) - Vector3.UP * (v.x - u.x)).normalized() * side
 			lm.quad("Concrete", p.call(u.x, u.y) - half_t, p.call(v.x, v.y) - half_t, p.call(v.x, v.y) + half_t,
 				p.call(u.x, u.y) + half_t, nrm)
+	# A round steel tie rod across the notch, a little under the soffit,
+	# its ends set into the legs' inner faces.
+	var yr := y1 - maxf(1.2, (y1 - yn) * 0.16)
+	var xr := gap * (yr - yn) / (y1 - yn) + 0.3
+	_rod(lm, p.call(-xr, yr), p.call(xr, yr), 0.28)
+
+## Round steel rod of radius `r` from `a` to `b` (eight sides, smooth
+## normals, open ends).
+static func _rod(lm: LandmarkMesh, a: Vector3, b: Vector3, r: float) -> void:
+	var axis := (b - a).normalized()
+	var u := axis.cross(Vector3.UP).normalized()
+	var v := axis.cross(u).normalized()
+	for i in 8:
+		var a0 := TAU * i / 8.0
+		var a1 := TAU * (i + 1) / 8.0
+		var n0 := u * cos(a0) + v * sin(a0)
+		var n1 := u * cos(a1) + v * sin(a1)
+		var w := r * a0
+		lm.tri("Steel", a + n0 * r, b + n0 * r, b + n1 * r, n0, n0, n1, Vector2(w, 0), Vector2(w, 1), Vector2(w + r, 1))
+		lm.tri("Steel", a + n0 * r, b + n1 * r, a + n1 * r, n0, n1, n1, Vector2(w, 0), Vector2(w + r, 1), Vector2(w + r, 0))
 
 ## Tapering member from `a` to `b`: width (along `side`) and depth at each
 ## end in `s0` and `s1` (x width, y depth), open ends.
