@@ -4,7 +4,7 @@ extends RefCounted
 ## The last capital stations hand-built after the photo review, in the
 ## station frame (+X along the main facade, +Z the forecourt): Ottawa,
 ## Podgorica, Skopje, Tbilisi Central, Monaco-Monte-Carlo's entrance,
-## Ouagadougou and Abuja Idu.
+## Ouagadougou, Abuja Idu, Bamako and Manila's Tutuban.
 
 const K = preload("res://scripts/generation/landmarks/capital_stations/landmark_station_kit.gd")
 
@@ -115,12 +115,9 @@ static func monaco(model: Node3D) -> void:
 static func ouagadougou(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	K.mats(lm, "brick", "#C8874A", "#B4743E", "render", "#9A5A38")
-	# The hood in smooth untextured concrete: any grained texture tinted
+	# The hood in render tiled large: at the usual scale its grain tinted
 	# ochre reads as timber.
-	var shell := StandardMaterial3D.new()
-	shell.albedo_color = Color("#B97A44")
-	shell.roughness = 0.85
-	lm.use("Shell", shell)
+	lm.use("Shell", LandmarkMaterials.pbr("render", "#B97A44", 14.0))
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -3.0, 62.0, 18.0, 0.0, 13.0, "flat", 0.0, 4.0, 4.5)
 	var x0 := -24.0
 	var x1 := 24.0
@@ -163,4 +160,49 @@ static func abuja(model: Node3D) -> void:
 		lm.box("Walls", Vector3(s * 10.5, 12.0, 0.0), Vector3(5.0, 24.0, 36.0))
 	lm.box("Walls", Vector3(0, 21.0, 0.0), Vector3(16.0, 6.0, 36.0))
 	lm.box("Trim", Vector3(0, 17.9, 14.0), Vector3(16.0, 0.2, 8.0))
+	lm.commit(model)
+
+## Bamako station (1913): the ochre laterite range of two storeys with its
+## string courses, the blue tiled name band across the front, and the
+## centre gable with scrolled shoulders framing the round clock under a
+## small pediment.
+static func bamako(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	K.mats(lm, "stone", "#C98E5E", "#D9A878", "concrete", "#A8806A")
+	lm.use("Tile", LandmarkMaterials.pbr("render", "#3E78A8", 2.0))
+	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -2.0, 76.0, 34.0, 0.0, 10.0, "flat", 0.0, 4.0, 4.6, true)
+	LandmarkFhParts.box_band(lm, "Trim", 0.0, -2.0, 76.0, 34.0, 5.0, 0.4, 0.2)
+	lm.box("Tile", Vector3(0, 7.6, 15.1), Vector3(22.0, 1.0, 0.2))
+	# The centre gable: a raised panel between scrolled shoulders.
+	lm.box("Walls", Vector3(0, 12.5, 14.6), Vector3(10.0, 5.0, 1.0))
+	lm.box("Trim", Vector3(0, 15.2, 14.6), Vector3(11.0, 0.5, 1.4))
+	LandmarkFhUtil.hip(lm, "Trim", Vector3(0, 15.4, 14.6), 11.0, 1.4, 1.2)
+	for s in [-1.0, 1.0]:
+		lm.beam("Walls", Vector3(s * 5.0, 12.8, 14.6), Vector3(s * 9.0, 10.0, 14.6), 1.6, 0.8)
+	K.clock(lm, "Dial", "Trim", Vector3(0, 12.6, 15.15), Vector3.BACK, 1.4)
+	K.arch_window(lm, "Trim", "Glass", Vector3(0, 0.2, 15.05), Vector3.BACK, 4.0, 6.0, 3)
+	lm.commit(model)
+
+## Tutuban, Manila (1887): the long range with its red brick ground floor
+## of arched openings, the cream timber upper storey with louvred windows
+## behind a veranda, the hipped red-brown roofs and the gabled pediment
+## over the centre.
+static func tutuban(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	K.mats(lm, "brick", "#A3473A", "#EFE6CC", "terracotta", "#8C4A3A")
+	lm.use("Upper", LandmarkMaterials.pbr("render", "#EDE3C4", 3.0))
+	lm.box("Walls", Vector3(0, 3.0, 0.0), Vector3(104.0, 6.0, 28.0))
+	K.arch_row(lm, "Trim", "Glass", Vector3(-50.0, 0, 14.05), Vector3(50.0, 0, 14.05), Vector3.BACK, 0.4, 20, 2.6, 4.6, 1)
+	lm.box("Trim", Vector3(0, 6.2, 0.0), Vector3(104.8, 0.4, 28.8))
+	lm.box("Upper", Vector3(0, 9.0, -1.0), Vector3(102.0, 5.6, 26.0))
+	LandmarkFhUtil.window_grid(lm, "Glass", Vector3(-49.0, 0, 12.05), Vector3(49.0, 0, 12.05), Vector3.BACK, 7.4, 1, 3.0,
+		26, 2.0, 3.0)
+	# The veranda: a balustrade on posts under the eaves.
+	LandmarkFhUtil.merlons(lm, "Trim", Vector3(-51.0, 6.4, 14.2), Vector3(51.0, 6.4, 14.2), 0.6, 0.12, 1.0, 0.12)
+	lm.box("Trim", Vector3(0, 7.45, 14.2), Vector3(102.0, 0.1, 0.3))
+	for i in 18:
+		lm.box("Trim", Vector3(-51.0 + 6.0 * float(i), 9.2, 14.2), Vector3(0.3, 5.6, 0.3))
+	K.hip_roof(lm, "Roof", Vector3(0, 11.8, 0.5), 106.0, 30.0, 4.0)
+	# The centre pediment.
+	K.block(lm, "Upper", "Trim", "Glass", "Roof", 0.0, 2.0, 18.0, 28.0, 6.4, 6.0, "gable_z", 4.2, 3.0, 3.0)
 	lm.commit(model)

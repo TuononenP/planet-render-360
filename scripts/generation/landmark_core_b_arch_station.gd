@@ -19,6 +19,7 @@ extends RefCounted
 ##             (dome under a gilt needle), "belvedere" (an open lantern of
 ##             columns under a hip) or "belfry" (arched belfry, cupola)
 ##   cap_hex   the tower roofs and dome in their own colour (sheet metal)
+##   tower_side -1 puts a "side" tower on the -X side
 ##   dome      a dome over the middle: `dome_r` radius, `dome_top` tip
 ##   hall      true: the arched booking hall in the middle of the front,
 ##             `hall_top` to its crown, with its lunette and clock
@@ -326,7 +327,11 @@ static func _towers(lm: LandmarkMesh, poly: PackedVector2Array, style: Dictionar
 	match str(style["tower"]):
 		"centre": xs = [mid.x]
 		# Beside the hall or centre block when there is one, else at the end.
-		"side": xs = [mid.x + hall_w * 0.5 + tw * 0.5 + 1.0] if hall_w > 0.0 else [hi.x - tw * 0.5 - 2.0]
+		"side":
+			# On the hall's +X side, or its -X side when `tower_side` is -1.
+			var sd := float(style.get("tower_side", 1.0))
+			xs = [mid.x + sd * (hall_w * 0.5 + tw * 0.5 + 1.0)] if hall_w > 0.0 \
+				else [(hi.x - tw * 0.5 - 2.0) if sd > 0.0 else (lo.x + tw * 0.5 + 2.0)]
 		"twin":
 			var off := maxf(hall_w * 0.5 + tw * 0.5 + 1.0, (hi.x - lo.x) * 0.2)
 			xs = [mid.x - off, mid.x + off]
