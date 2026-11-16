@@ -23,7 +23,9 @@ extends RefCounted
 
 const SPOTS := 4
 ## Model-node meta: [[lamp, aim, cone angle in degrees, energy share], ...]
-## in model metres, replacing the spots placed round the bounds.
+## in model metres, replacing the spots placed round the bounds. An entry
+## may add its own range (m) and light colour: a downlight over a deck
+## reaches only the deck, a cool wash differs from the warm default.
 const FLOOD_META := "flood_spots"
 ## Footprints longer than ELONGATED × their width line their long sides.
 const ELONGATED := 2.0
@@ -105,8 +107,11 @@ static func dress(hero: Node3D, type: String) -> int:
 	if model != null and model.has_meta(FLOOD_META):
 		for raw in model.get_meta(FLOOD_META):
 			var own: Array = raw
-			lamps.append([model.transform * (own[0] as Vector3), model.transform * (own[1] as Vector3), 0.0,
-				float(own[3]), float(own[2])])
+			var lamp := [model.transform * (own[0] as Vector3), model.transform * (own[1] as Vector3), 0.0,
+				float(own[3]), float(own[2])]
+			if own.size() > 5:
+				lamp.append_array([float(own[4]) * m, own[5] as Color])
+			lamps.append(lamp)
 	elif long_len > ELONGATED * short_half * 2.0:
 		var along := Vector3.RIGHT if long_x else Vector3.BACK
 		var across := Vector3.BACK if long_x else Vector3.RIGHT
@@ -137,11 +142,14 @@ static func dress(hero: Node3D, type: String) -> int:
 		# Wide, soft-edged cones that overlap their neighbours: an even
 		# wash, not a row of rings.
 		spot.spot_angle = clampf(rad_to_deg(atan2(maxf(box.size.y * 0.55, float(lamp[2]) * 1.6), dist)), 25.0, 75.0)
+		spot.light_color = COLOUR
 		if (lamp as Array).size() > 4:
 			spot.spot_angle = float(lamp[4])
+		if (lamp as Array).size() > 6:
+			spot.spot_range = float(lamp[5])
+			spot.light_color = lamp[6] as Color
 		spot.spot_angle_attenuation = 2.5
 		spot.spot_attenuation = 0.35
-		spot.light_color = COLOUR
 		spot.light_energy = 0.0
 		spot.shadow_enabled = false
 		spot.visible = false

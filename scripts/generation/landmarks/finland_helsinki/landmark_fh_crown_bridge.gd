@@ -45,26 +45,73 @@ const MAST_ANCHORS := Vector2(84.0, 128.0)
 const TRAM_EDGE := -7.5
 const TRACKS: Array[float] = [-5.4, -1.8]
 const GAUGE_HALF := 0.5
+## Rail-head height over the deck top.
+const RAIL_TOP_M := 0.12
 const SEPARATOR := Vector2(0.3, 0.9)
-const CYCLE_EDGE := 4.0
+## The separator: a concrete kerb this high over the deck top, carrying a
+## fence of light vertical slats (SLAT_M apart) up to its top rail; and
+## the tram slab's height, just under the rail heads (grooved rails
+## nearly flush).
+const KERB_M := 0.3
+const DIVIDER_M := 1.35
+const SLAT_M := 0.15
+const SLAB_M := 0.1
+## The footway along the south fence, metres wide: it keeps this width
+## and the two-way cycle path takes the rest of the deck (about 4 m on
+## the spans, more where the deck widens round the pylon).
+const FOOTWAY_M := 3.0
 ## Catenary and lighting poles every this many deck samples.
 const POLE_EVERY := 6
 const POLE_FIRST := 3
+## Pole top (where the Y head forks), the cantilever tube, the contact
+## wires over the deck top, and the reach of each Y arm, metres.
+const POLE_TOP_M := 8.2
+const ARM_Y := 6.6
+const WIRE_Y := 5.9
+const HEAD_HALF := 3.2
+## The poles stand midway between the tracks.
+const POLE_X := -3.6
+## South fence: fin spacing along the deck and its handrail's top over
+## the deck, metres.
+const FIN_STEP_M := 0.5
+const FIN_RAIL_M := 1.3
+## Night light, matched to night photos: the pylon washed in saturated
+## blue, the stays glowing faintly blue, and the deck a warm white band
+## under the poles with the handrail LED lines along both edges
+## (LandmarkLights energy shares).
+const PYLON_WASH := Color(0.36, 0.48, 1.0)
+const PYLON_LIGHT := 2.0
+const STAY_GLOW := Color("#5F7DFF")
+const DECK_WARM := Color(1.0, 0.86, 0.62)
+const DECK_LIGHT := 0.45
+## Downlight range, metres: from the pole head (~8 m up) to the deck
+## halfway to the next pole (poles 36 m apart).
+const DECK_REACH_M := 22.0
+## Fill light midway between poles, standing in for the handrails' LED
+## lines that light the paths evenly: height over the deck (m), reach
+## (m) and energy against DECK_LIGHT.
+const FILL_Y_M := 4.5
+const FILL_REACH_M := 13.0
+const FILL_SHARE := 0.6
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#E3E1DA", 4.0))
 	lm.use("Footing", LandmarkMaterials.pbr("concrete", "#8E8B84", 3.0))
 	lm.use("Girder", LandmarkMaterials.paint("#DADDDE", 0.5, 0.3))
-	lm.use("Track", LandmarkMaterials.pbr("concrete", "#7E7C77", 3.0))
+	lm.use("Track", LandmarkMaterials.pbr("concrete", "#B4B1AA", 3.0))
 	lm.use("Cycle", LandmarkMaterials.pbr("asphalt", "#7C4236", 4.0))
+	lm.use("Footway", LandmarkMaterials.pbr("asphalt", "#4A4B4C", 4.0))
+	lm.use("Marking", LandmarkMaterials.paint("#EDEDE8", 0.7, 0.0))
 	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#B0ACA3", 3.0))
 	lm.use("Steel", LandmarkMaterials.paint("#B9BEC2", 0.45, 0.55))
-	lm.use("Stay", LandmarkMaterials.paint("#F1F2F0", 0.4, 0.2))
+	lm.use("Slats", _slat_material())
+	lm.use("Pole", LandmarkMaterials.paint("#3B4045", 0.5, 0.45))
+	lm.use("Fitting", LandmarkMaterials.paint("#A8864E", 0.4, 0.7))
+	lm.use("StayLamp", _stay_material())
 	lm.use("Rail", LandmarkMaterials.paint("#4F5254", 0.35, 0.8))
-	lm.use("Glass", LandmarkMaterials.glass("#9DB3BE"))
-	lm.use("Lamp", LandmarkMaterials.lit("#FFF1D6", 0.9))
-	lm.use("BeaconLamp", LandmarkMaterials.lit("#FF2A1A", 1.4))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFD892", 2.8))
+	lm.use("BeaconLamp", LandmarkMaterials.lit("#FF2A1A", 3.5))
 	var plan := _plan()
 	_deck(lm, plan)
 	_rails(lm, plan)
@@ -75,6 +122,38 @@ static func build(model: Node3D) -> void:
 	_stays(lm)
 	lm.commit(model)
 	model.set_meta(LandmarkLights.FLOOD_META, flood_spots())
+
+## White stays by day; at night ("Lamp" parts follow the night) they
+## glow faintly blue, as the lit cable fans do over the water.
+static func _stay_material() -> StandardMaterial3D:
+	var m := LandmarkMaterials.paint("#F1F2F0", 0.4, 0.2).duplicate() as StandardMaterial3D
+	m.emission_enabled = true
+	m.emission = STAY_GLOW
+	m.emission_energy_multiplier = 0.35
+	return m
+
+## Light grey slats with see-through gaps: a stripe mask repeating every
+## SLAT_M along the deck (strip UV v runs in metres along it), both sides
+## drawn.
+static func _slat_material() -> StandardMaterial3D:
+	var img := Image.create(2, 8, false, Image.FORMAT_RGBA8)
+	for y in 8:
+		var a := 1.0 if y < 5 else 0.0
+		for x in 2:
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	# Mipmapped: from afar the stripes average to a solid light fence.
+	img.generate_mipmaps()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color("#C9CCCE")
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	m.uv1_scale = Vector3(1.0, 1.0 / SLAT_M, 1.0)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.metallic = 0.4
+	m.roughness = 0.45
+	return m
 
 ## Length of the deck centre line, metres.
 static func length_m() -> float:
@@ -116,6 +195,14 @@ static func at(s: float) -> Vector3:
 			var f := (s - cum[i]) / maxf(cum[i + 1] - cum[i], 0.001)
 			return c[i].lerp(c[i + 1], clampf(f, 0.0, 1.0))
 	return c[c.size() - 1]
+
+## Rail-head centre of track `track` (a TRACKS offset, metres south of
+## the centre line) at arc length s, model-local metres: where _rails
+## lays it, shared with the trams that ride it (BridgeTramDeck).
+static func rail_point(s: float, track: float) -> Vector3:
+	var c := at(s)
+	var t := heading(s)
+	return Vector3(c.x - t.y * track, deck_y(s) + RAIL_TOP_M, c.y + t.x * track)
 
 ## Unit heading (x, z) at arc length s.
 static func heading(s: float) -> Vector2:
@@ -187,17 +274,41 @@ static func _deck(lm: LandmarkMesh, plan: Dictionary) -> void:
 	_strip(lm, plan, "Concrete", w, lip, Vector2(0.3, -1.0), lip, Vector2(0, 1))
 	_strip(lm, plan, "Concrete", Vector2(0.3, -1.0), lip, Vector2(0.3, -1.0), 0.15, Vector2(1, 0))
 	_strip(lm, plan, "Concrete", Vector2(-0.3, 1.0), lip, e, lip, Vector2(0, 1))
-	_strip(lm, plan, "Concrete", Vector2(-0.3, 1.0), 0.15, Vector2(-0.3, 1.0), lip, Vector2(-1, 0))
-	# North service strip, tramway, separator, cycle path and footway.
+	_strip(lm, plan, "Concrete", Vector2(-0.3, 1.0), 0.05, Vector2(-0.3, 1.0), lip, Vector2(-1, 0))
+	# North service strip, the tramway's light concrete slab, the
+	# separator (a slat fence on a kerb), the two-way cycle path with its
+	# dashed centre line and the asphalt footway along the fence.
 	_strip(lm, plan, "Paving", Vector2(0.3, -1.0), 0.15, Vector2(TRAM_EDGE, 0.0), 0.15, Vector2(0, 1))
-	_strip(lm, plan, "Paving", Vector2(TRAM_EDGE, 0.0), 0.15, Vector2(TRAM_EDGE, 0.0), 0.0, Vector2(1, 0))
-	_strip(lm, plan, "Track", Vector2(TRAM_EDGE, 0.0), 0.0, Vector2(SEPARATOR.x, 0.0), 0.0, Vector2(0, 1))
-	_strip(lm, plan, "Concrete", Vector2(SEPARATOR.x, 0.0), 0.0, Vector2(SEPARATOR.x, 0.0), 0.2, Vector2(-1, 0))
-	_strip(lm, plan, "Concrete", Vector2(SEPARATOR.x, 0.0), 0.2, Vector2(SEPARATOR.y, 0.0), 0.2, Vector2(0, 1))
-	_strip(lm, plan, "Concrete", Vector2(SEPARATOR.y, 0.0), 0.2, Vector2(SEPARATOR.y, 0.0), 0.05, Vector2(1, 0))
-	_strip(lm, plan, "Cycle", Vector2(SEPARATOR.y, 0.0), 0.05, Vector2(CYCLE_EDGE, 0.0), 0.05, Vector2(0, 1))
-	_strip(lm, plan, "Paving", Vector2(CYCLE_EDGE, 0.0), 0.05, Vector2(CYCLE_EDGE, 0.0), 0.15, Vector2(-1, 0))
-	_strip(lm, plan, "Paving", Vector2(CYCLE_EDGE, 0.0), 0.15, Vector2(-0.3, 1.0), 0.15, Vector2(0, 1))
+	_strip(lm, plan, "Paving", Vector2(TRAM_EDGE, 0.0), 0.15, Vector2(TRAM_EDGE, 0.0), SLAB_M, Vector2(1, 0))
+	_strip(lm, plan, "Track", Vector2(TRAM_EDGE, 0.0), SLAB_M, Vector2(SEPARATOR.x, 0.0), SLAB_M, Vector2(0, 1))
+	var sx := Vector2(SEPARATOR.x, 0.0)
+	var sy := Vector2(SEPARATOR.y, 0.0)
+	_strip(lm, plan, "Concrete", sx, SLAB_M, sx, KERB_M, Vector2(-1, 0))
+	_strip(lm, plan, "Concrete", sx, KERB_M, sy, KERB_M, Vector2(0, 1))
+	_strip(lm, plan, "Concrete", sy, KERB_M, sy, 0.05, Vector2(1, 0))
+	# The slat fence on the kerb: one double-sided panel whose stripe
+	# texture (period SLAT_M along the deck) cuts the gaps, under a flat
+	# top rail.
+	var mid := (sx + sy) * 0.5
+	_strip(lm, plan, "Slats", mid, KERB_M, mid, DIVIDER_M - 0.05, Vector2(-1, 0))
+	var ri := mid - Vector2(0.06, 0.0)
+	var ro := mid + Vector2(0.06, 0.0)
+	_strip(lm, plan, "Steel", ri, DIVIDER_M - 0.06, ri, DIVIDER_M, Vector2(-1, 0))
+	_strip(lm, plan, "Steel", ri, DIVIDER_M, ro, DIVIDER_M, Vector2(0, 1))
+	_strip(lm, plan, "Steel", ro, DIVIDER_M, ro, DIVIDER_M - 0.06, Vector2(1, 0))
+	# The cycle path's south edge, kept FOOTWAY_M + the edge beam off the
+	# south edge (offsets are x + edge * half-width, see _sp).
+	var ce := Vector2(-0.3 - FOOTWAY_M, 1.0)
+	_strip(lm, plan, "Cycle", sy, 0.05, ce, 0.05, Vector2(0, 1))
+	var lane := (sy + ce) * 0.5
+	for i in (plan["s"] as PackedFloat32Array).size() - 1:
+		var a := _sp(plan, i, lane, 0.06)
+		var b := a.lerp(_sp(plan, i + 1, lane, 0.06), 0.3)
+		var l: Vector3 = (plan["lat"][i] as Vector3) * 0.06
+		lm.quad("Marking", a - l, a + l, b + l, b - l, Vector3.UP)
+	# A solid white line parts the cycle path from the footway, level with it.
+	_strip(lm, plan, "Marking", ce - Vector2(0.15, 0.0), 0.06, ce, 0.06, Vector2(0, 1))
+	_strip(lm, plan, "Footway", ce, 0.05, Vector2(-0.3, 1.0), 0.05, Vector2(0, 1))
 	# Abutments under both ends and the Palosaari underpass wall.
 	var total := length_m()
 	for s: float in [0.0, 18.3, total]:
@@ -213,58 +324,113 @@ static func _rails(lm: LandmarkMesh, plan: Dictionary) -> void:
 	for track in TRACKS:
 		for side: float in [-1.0, 1.0]:
 			var o: float = track + side * GAUGE_HALF
-			_strip(lm, plan, "Rail", Vector2(o - 0.04, 0.0), 0.12, Vector2(o + 0.04, 0.0), 0.12, Vector2(0, 1))
-			_strip(lm, plan, "Rail", Vector2(o - 0.04, 0.0), 0.0, Vector2(o - 0.04, 0.0), 0.12, Vector2(-1, 0))
-			_strip(lm, plan, "Rail", Vector2(o + 0.04, 0.0), 0.12, Vector2(o + 0.04, 0.0), 0.0, Vector2(1, 0))
+			_strip(lm, plan, "Rail", Vector2(o - 0.04, 0.0), RAIL_TOP_M, Vector2(o + 0.04, 0.0), RAIL_TOP_M, Vector2(0, 1))
+			_strip(lm, plan, "Rail", Vector2(o - 0.04, 0.0), 0.0, Vector2(o - 0.04, 0.0), RAIL_TOP_M, Vector2(-1, 0))
+			_strip(lm, plan, "Rail", Vector2(o + 0.04, 0.0), RAIL_TOP_M, Vector2(o + 0.04, 0.0), 0.0, Vector2(1, 0))
 
-## North railing (posts, top and middle rails) and the south wind screen
-## (glass panels between posts under a handrail).
+## North railing (posts, a top rail, dense vertical bars) and the south fin fence,
+## each with an LED strip under its handrail: they wash the paths and
+## read from afar as two glowing lines along the curve.
 static func _railings(lm: LandmarkMesh, plan: Dictionary) -> void:
 	var north := Vector2(0.15, -1.0)
-	var south := Vector2(-0.15, 1.0)
 	var count: int = (plan["s"] as PackedFloat32Array).size()
 	for i in count:
-		for o: Vector2 in [north, south]:
-			var tall := 1.7 if o == south else 1.2
-			var foot := _sp(plan, i, o, 0.25)
-			lm.beam("Steel", foot, foot + Vector3.UP * tall, 0.12, 0.12)
+		var foot := _sp(plan, i, north, 0.25)
+		lm.beam("Steel", foot, foot + Vector3.UP * 1.2, 0.12, 0.12)
 		if i == count - 1:
 			continue
-		for y: float in [0.6, 1.2]:
-			lm.beam("Steel", _sp(plan, i, north, 0.25 + y), _sp(plan, i + 1, north, 0.25 + y), 0.08, 0.08)
-		lm.beam("Steel", _sp(plan, i, south, 1.95), _sp(plan, i + 1, south, 1.95), 0.1, 0.1)
-	for side: float in [-1.0, 1.0]:
-		_strip(lm, plan, "Glass", south, 0.35, south, 1.9, Vector2(side, 0))
-	# LED strips under both handrails: they wash the paths and read from
-	# afar as two glowing lines along the curve.
-	for rail: Array in [[1.0, 1.88], [-1.0, 1.4]]:
+		lm.beam("Steel", _sp(plan, i, north, 1.45), _sp(plan, i + 1, north, 1.45), 0.08, 0.08)
+	# Dense vertical bars between the posts, as on the separator.
+	_strip(lm, plan, "Slats", north, 0.3, north, 1.41, Vector2(1, 0))
+	_fins(lm, plan)
+	for rail: Array in [[1.0, FIN_RAIL_M - 0.17, 0.45, 0.31], [-1.0, 1.4, 0.21, 0.09]]:
 		var edge: float = rail[0]
 		var y: float = rail[1]
-		var inner := Vector2(-0.21 * edge, edge)
-		var outer := Vector2(-0.09 * edge, edge)
+		var inner := Vector2(-float(rail[2]) * edge, edge)
+		var outer := Vector2(-float(rail[3]) * edge, edge)
 		_strip(lm, plan, "Lamp", inner, y, outer, y, Vector2(0, -1))
 		_strip(lm, plan, "Lamp", inner, y, inner, y + 0.07, Vector2(-edge, 0))
 		_strip(lm, plan, "Lamp", outer, y, outer, y + 0.07, Vector2(edge, 0))
 
-## Combined catenary and lighting poles on the separator: an arm over
-## both tracks carrying the contact wires, a luminaire over the paths.
-static func _poles(lm: LandmarkMesh, plan: Dictionary) -> void:
+## The south fence: light flat fins every FIN_STEP_M, slanted along the
+## deck, in an S profile: from the kerb they lean in over the walkway,
+## steepen up to the handrail, then curve back out over the water above
+## it (two-sided panels, no edges, to stay in budget).
+static func _fins(lm: LandmarkMesh, plan: Dictionary) -> void:
+	var s: PackedFloat32Array = plan["s"]
+	var edge := Vector2(-0.15, 1.0)
+	for i in s.size() - 1:
+		var a0 := _sp(plan, i, edge, 0.25)
+		var a1 := _sp(plan, i + 1, edge, 0.25)
+		var t := (a1 - a0).normalized()
+		var lat: Vector3 = plan["lat"][i]
+		var w := t * 0.06
+		# In over the walkway, steeper up to the handrail, then back out.
+		var rises: Array[Vector3] = [-lat * 0.16 + t * 0.08 + Vector3.UP * 0.5,
+			-lat * 0.06 + t * 0.1 + Vector3.UP * (FIN_RAIL_M - 0.75),
+			lat * 0.3 + t * 0.08 + Vector3.UP * 0.22]
+		var n := maxi(1, roundi((s[i + 1] - s[i]) / FIN_STEP_M))
+		for k in n:
+			var a := a0.lerp(a1, float(k) / float(n))
+			for rise in rises:
+				var b := a + rise
+				var nrm := rise.cross(t).normalized()
+				lm.quad("Steel", a - w, a + w, b + w, b - w, -nrm)
+				lm.quad("Steel", a + w, a - w, b - w, b + w, nrm)
+				a = b
+	# Handrail: a flat bar along the fins' inner face at the bend, its
+	# sides and soffit.
+	var hi := Vector2(-0.52, 1.0)
+	var ho := Vector2(-0.24, 1.0)
+	_strip(lm, plan, "Steel", hi, FIN_RAIL_M - 0.1, hi, FIN_RAIL_M, Vector2(-1, 0))
+	_strip(lm, plan, "Steel", hi, FIN_RAIL_M, ho, FIN_RAIL_M, Vector2(0, 1))
+	_strip(lm, plan, "Steel", ho, FIN_RAIL_M, ho, FIN_RAIL_M - 0.1, Vector2(1, 0))
+	_strip(lm, plan, "Steel", ho, FIN_RAIL_M - 0.1, hi, FIN_RAIL_M - 0.1, Vector2(0, -1))
+
+## Deck samples carrying a catenary pole (none round the pylon).
+static func _pole_samples(plan: Dictionary) -> PackedInt32Array:
 	var sp := pylon_s()
 	var s: PackedFloat32Array = plan["s"]
-	var mid := Vector2((SEPARATOR.x + SEPARATOR.y) * 0.5, 0.0)
-	var last := -1
+	var out := PackedInt32Array()
 	for i in range(POLE_FIRST, s.size() - 1, POLE_EVERY):
-		if absf(s[i] - sp) < 15.0:
-			continue
-		var foot := _sp(plan, i, mid, 0.2)
-		lm.beam("Steel", foot, foot + Vector3.UP * 8.0, 0.26, 0.26)
-		lm.beam("Steel", _sp(plan, i, mid, 7.4), _sp(plan, i, Vector2(TRACKS[0] - 1.0, 0.0), 7.4), 0.14, 0.14)
-		lm.beam("Steel", _sp(plan, i, mid, 7.9), _sp(plan, i, Vector2(CYCLE_EDGE - 0.5, 0.0), 7.9), 0.12, 0.12)
-		lm.box("Steel", _sp(plan, i, Vector2(CYCLE_EDGE - 0.5, 0.0), 7.75), Vector3(0.7, 0.18, 0.7), Basis(), 0.0)
-		lm.box("Lamp", _sp(plan, i, Vector2(CYCLE_EDGE - 0.5, 0.0), 7.64), Vector3(0.55, 0.04, 0.55), Basis(), 0.0)
+		if absf(s[i] - sp) >= 15.0:
+			out.append(i)
+	return out
+
+## Combined catenary and lighting poles between the two tracks, feeding
+## both: an anthracite pole on a footing block; a cantilever tube out
+## over each track, each half braced by a tie from higher up, with a
+## registration arm down to each contact wire and brass insulators; and a
+## Y head whose upswept arms carry LED luminaires over both tracks.
+static func _poles(lm: LandmarkMesh, plan: Dictionary) -> void:
+	var x := POLE_X
+	var last := -1
+	for i in _pole_samples(plan):
+		var lat: Vector3 = plan["lat"][i]
+		var foot := _sp(plan, i, Vector2(x, 0.0), SLAB_M)
+		lm.box("Footing", foot + Vector3.UP * 0.12, Vector3(0.45, 0.24, 0.45), Basis(Vector3.UP.cross(lat), Vector3.UP, lat))
+		var top := foot + Vector3.UP * (POLE_TOP_M - SLAB_M)
+		lm.beam("Pole", foot, top, 0.3, 0.22, lat)
+		# Cantilever: out over both tracks, each half tied from higher up
+		# the pole, an insulator at the pole.
+		var ends: Array[float] = [TRACKS[0] - 1.0, TRACKS[1] + 1.0]
+		lm.beam("Pole", _sp(plan, i, Vector2(ends[0], 0.0), ARM_Y), _sp(plan, i, Vector2(ends[1], 0.0), ARM_Y), 0.08)
+		for end in ends:
+			lm.beam("Pole", _sp(plan, i, Vector2(x, 0.0), ARM_Y + 0.9), _sp(plan, i, Vector2(lerpf(x, end, 0.7), 0.0), ARM_Y), 0.06)
+			lm.box("Fitting", _sp(plan, i, Vector2(x + signf(end - x) * 0.35, 0.0), ARM_Y), Vector3(0.14, 0.14, 0.3), Basis(), 0.0)
+		for track in TRACKS:
+			var hang := _sp(plan, i, Vector2(track + signf(x - track) * 0.7, 0.0), ARM_Y)
+			lm.box("Fitting", hang - Vector3.UP * 0.1, Vector3(0.1, 0.2, 0.1), Basis(), 0.0)
+			lm.beam("Pole", hang, _sp(plan, i, Vector2(track, 0.0), WIRE_Y + 0.05), 0.04)
+		# Y head: two arms rising half a metre to their tips, a lit bar
+		# under the outer part of each.
+		for end: float in [x - HEAD_HALF, x + HEAD_HALF]:
+			var arm_tip := _sp(plan, i, Vector2(end, 0.0), POLE_TOP_M + 0.5)
+			lm.beam("Pole", top, arm_tip, 0.16, 0.1)
+			lm.beam("Lamp", top.lerp(arm_tip, 0.45) - Vector3.UP * 0.07, arm_tip - Vector3.UP * 0.07, 0.12, 0.03)
 		if last >= 0:
 			for track in TRACKS:
-				lm.beam("Rail", _sp(plan, last, Vector2(track, 0.0), 5.9), _sp(plan, i, Vector2(track, 0.0), 5.9),
+				lm.beam("Rail", _sp(plan, last, Vector2(track, 0.0), WIRE_Y), _sp(plan, i, Vector2(track, 0.0), WIRE_Y),
 					0.05, 0.05)
 		last = i
 
@@ -341,7 +507,8 @@ static func _pylon(lm: LandmarkMesh) -> void:
 
 ## Night floodlights of the white pylon (LandmarkLights.FLOOD_META,
 ## model metres): four on the deck beside the legs washing the mast up
-## to its top, two on the islet plinth lighting the diamond's legs.
+## to its top in blue, two on the islet plinth lighting the diamond's
+## legs; then the warm white downlights of the deck.
 static func flood_spots() -> Array:
 	var sp := pylon_s()
 	var c := at(sp)
@@ -354,8 +521,27 @@ static func flood_spots() -> Array:
 	for along: float in [-1.0, 1.0]:
 		for side: float in [-1.0, 1.0]:
 			out.append([base + t3 * along * 10.0 + n3 * side * (c.z + 6.0) + Vector3.UP * (yd + 1.0),
-				base + Vector3.UP * 100.0, 22.0, 1.4])
-		out.append([base + t3 * along * 14.0 + Vector3.UP * 4.5, base + Vector3.UP * (JOIN_M * 0.6), 40.0, 0.9])
+				base + Vector3.UP * 100.0, 22.0, PYLON_LIGHT, 160.0, PYLON_WASH])
+		out.append([base + t3 * along * 14.0 + Vector3.UP * 4.5, base + Vector3.UP * (JOIN_M * 0.6), 40.0, PYLON_LIGHT * 0.65,
+			160.0, PYLON_WASH])
+	# Warm white downlights under every pole's Y head, on the tramway and the
+	# paths beside it; each reaches DECK_REACH_M so neighbouring pools
+	# meet halfway between the poles and the deck has no dark gaps. The
+	# spots cast no shadows, so on the low approaches the reach stops a
+	# metre above the water instead of pooling on the sea under the deck.
+	var plan := _plan()
+	var poles := _pole_samples(plan)
+	for k in poles.size():
+		var i := poles[k]
+		var head := _sp(plan, i, Vector2(POLE_X, 0.0), POLE_TOP_M - 0.2)
+		out.append([head, _sp(plan, i, Vector2(POLE_X + 0.5, 0.0), 0.0), 70.0, DECK_LIGHT,
+			minf(DECK_REACH_M, head.y - 1.0), DECK_WARM])
+		# Midway fill: the even glow of the handrail lines between poles.
+		if k + 1 < poles.size():
+			var mid := (i + poles[k + 1]) / 2
+			var fill := _sp(plan, mid, Vector2(POLE_X, 0.0), FILL_Y_M)
+			out.append([fill, _sp(plan, mid, Vector2(POLE_X, 0.0), 0.0), 75.0, DECK_LIGHT * FILL_SHARE,
+				minf(FILL_REACH_M, fill.y - 1.0), DECK_WARM])
 	return out
 
 ## Mast half-width across the deck at height y (for the stay anchors).
@@ -385,7 +571,7 @@ static func _stays(lm: LandmarkMesh) -> void:
 			for side: float in [-1.0, 1.0]:
 				var top := base + n3 * side * _mast_half(ym) * 0.7 + Vector3.UP * ym
 				var low := Vector3(d.x, yd - 0.4, d.y) + dn * side * (d.z + 0.35)
-				lm.beam("Stay", top, low, 0.22, 0.22)
+				lm.beam("StayLamp", top, low, 0.22, 0.22)
 				lm.box("Girder", low, Vector3(0.9, 0.7, 0.7), Basis(Vector3(dt.x, 0, dt.y), Vector3.UP, dn), 0.0)
 
 ## Four-sided prism from a rectangle at `base` (half-sizes h0 along t

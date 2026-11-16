@@ -52,7 +52,7 @@ func _check_model(failures: Array[String]) -> void:
 		bounds = box if i == 0 else bounds.merge(box)
 		var n: int = part.mesh.surface_get_array_len(0) / 3
 		tris += n
-		if str(part.name).ends_with("Stay"):
+		if str(part.name).ends_with("StayLamp"):
 			stays = n
 	if absf(bounds.end.y - 135.0) > 2.0:
 		failures.append("pylon top %.1f m, want 135 m" % bounds.end.y)
@@ -74,16 +74,21 @@ func _check_model(failures: Array[String]) -> void:
 	for lamp in ["Lamp", "BeaconLamp"]:
 		if not names.has(lamp):
 			failures.append("no %s part for the night" % lamp)
+	# Six floodlights up the pylon first, then the poles' deck downlights.
 	var spots := LandmarkLights.dress(root, "kruunuvuorensilta")
-	if spots != 6:
-		failures.append("expected 6 pylon floodlights, got %d" % spots)
+	if spots != LandmarkFhCrownBridge.flood_spots().size() or spots < 16:
+		failures.append("expected 6 pylon floodlights and 10+ deck downlights, got %d spots" % spots)
 	var c := LandmarkFhCrownBridge.at(LandmarkFhCrownBridge.pylon_s())
 	var holder := root.get_node_or_null("LandmarkLights")
+	var k := 0
 	for spot in (holder.get_children() if holder != null else []):
 		var p := (spot as Node3D).position
 		var aim := -(spot as Node3D).transform.basis.z
-		if Vector2(p.x, p.z).distance_to(Vector2(c.x, c.y)) > 30.0 or aim.y < 0.5:
+		if k < 6 and (Vector2(p.x, p.z).distance_to(Vector2(c.x, c.y)) > 30.0 or aim.y < 0.5):
 			failures.append("floodlight at %s should stand by the pylon and aim up it" % p)
+		if k >= 6 and (aim.y > -0.9 or (spot as SpotLight3D).spot_range >= p.y):
+			failures.append("deck light at %s should shine down onto the deck only" % p)
+		k += 1
 	root.free()
 
 func _check_profile(failures: Array[String]) -> void:
