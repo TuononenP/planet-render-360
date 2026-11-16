@@ -730,14 +730,18 @@ its minimum-area rectangle (yaw), outline and tagged height. Nearby `railway=rai
 
 - Hand-built termini: `LandmarkRegistryCapitalStations`. The models are our
   own work, sized from published figures and placed and turned on the OSM
-  outline.
+  outline. They cover the major termini and the main stations of the large
+  capitals, each checked against photos of the building.
 - Every other capital: `LandmarkRegistryCapitalStationsOsm` is generated,
   and the `station` archetype is drawn on the real outline. Each row's
   `style` (body height, wall and roof colours, roof type, towers, dome,
   hall and so on) comes from the station's Wikipedia lead photo, read
   through the REST summary API (`en.wikipedia.org/api/rest_v1/page/summary`,
   offline review only, identifying User-Agent). Where the article shows no
-  station photo, the style comes from published descriptions.
+  station photo, the style comes from Wikimedia Commons photos or published
+  descriptions.
+- Capitals whose station building has no photo to check a model against
+  (Brasília, Kinshasa) are marked `-` in the list and get no landmark.
 
 The public Overpass instances were at capacity for the batch, so the OSM API
 was used. Attribution: © OpenStreetMap contributors (ODbL), as for every
