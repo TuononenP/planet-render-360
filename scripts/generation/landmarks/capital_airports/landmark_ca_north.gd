@@ -65,3 +65,34 @@ static func vilnius(model: Node3D) -> void:
 	K.towers(lm, d, 36.0)
 	K.park(lm, d, [["narrow", "#073590"], ["narrow", "#C6007E"], ["narrow", "#1E4D9B"], ["turboprop", "#C8102E"]], 8)
 	lm.commit(model)
+
+## Copenhagen Airport on Amager, the largest airfield of the batch: two
+## parallel 3,300-3,500 m runways (04L/22R, 04R/22L) crossed by 12/30, the
+## 1939 Vilhelm Lauritzen Terminal (white, functionalist) beside Terminal 2
+## (1960) and Terminal 3 (glass and steel under a broad roof carried on tall
+## columns, with rows of skylights), Fingers A, B, C and E and CPH Go reaching
+## onto the apron with boarding bridges, and the slender 70 m concrete control
+## tower of 2008 with its flared glass cab south-east of the runways.
+static func copenhagen(model: Node3D) -> void:
+	var d: Dictionary = CaLayoutCopenhagen.DATA
+	var lm := LandmarkMesh.new()
+	K.mats(lm, "render", "#E4E4E0", "membrane", "#8B9094")
+	K.surfaces(lm, d)
+	K.buildings(lm, d)
+	K.terminal_set(lm, d, {
+		"Terminal 3 Københavns Lufthavn": [14.0, 3, 2.5, 5.0, 14.0],
+		"Terminal 2 Københavns Lufthavn": [12.0, 3, 1.5],
+		"Vilhelm Lauritzen Terminalen": [8.5, 2, 0.8],
+		"Finger A": [7.5, 2, 1.0], "Finger B": [10.8, 3, 1.0], "Finger C": [8.0, 2, 1.0],
+		"Finger E": [14.0, 3, 1.2, 4.0, 12.0], "CPH Go": [14.4, 4, 1.2, 4.0, 12.0],
+		"_big": [10.0, 2, 1.0], "_small": [4.5, 1]})
+	for t in d["towers"]:
+		var p := Vector2(float(t["p"][0]), float(t["p"][1]))
+		if float(t["h"]) >= 60.0:
+			K.tower(lm, p, float(t["h"]) - 5.5 - 10.0, 3.6, 8.0, 5.5, 10.0)
+		else:
+			K.tower(lm, p, 24.0, 2.4, 3.8, 3.0, 5.0)
+	K.park(lm, d, [["narrow", "#0B2D6B"], ["narrow", "#D81939"], ["narrow", "#0B2D6B"], ["wide", "#0B2D6B"],
+		["narrow", "#FF6600"], ["narrow", "#D81939"], ["narrow", "#073590"], ["narrow", "#0B2D6B"]], 48,
+		Vector2.ZERO, 2500.0, true)
+	lm.commit(model)

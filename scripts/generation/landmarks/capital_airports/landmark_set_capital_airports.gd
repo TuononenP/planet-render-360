@@ -11,6 +11,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"tallinn_airport": LandmarkCaNorth.tallinn(model)
 		"stockholm_bromma_airport": LandmarkCaNorth.stockholm(model)
 		"vilnius_airport": LandmarkCaNorth.vilnius(model)
+		"copenhagen_airport": LandmarkCaNorth.copenhagen(model)
 		"lisbon_airport": LandmarkCaAtlantic.lisbon(model)
 		"washington_national_airport": LandmarkCaAtlantic.washington(model)
 		"aeroparque_jorge_newbery": LandmarkCaAtlantic.aeroparque(model)

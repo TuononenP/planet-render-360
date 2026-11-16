@@ -20,6 +20,7 @@ const TAXI_TOP := GROUND + LIFT + 0.05
 const RUNWAY_TOP := GROUND + LIFT + 0.08
 const LINE_LIFT := 0.03
 const MIN_RING_M := 1.0
+const GATE_GAP_M := 9.0
 
 ## Registers the ground, hangar and aircraft materials and the terminal
 ## set: Walls (`wall_set` tinted `wall`), Roof, Glass and Trim. A landmark
@@ -92,9 +93,11 @@ static func terminals(data: Dictionary) -> Array:
 
 ## A terminal block on the measured outline `ring`: walls to `h`, a glazing
 ## band on each of `storeys` storeys (`glaze_lo` / `glaze_hi` metres within a
-## storey), a flat roof with an `overhang`-metre fascia when set.
-static func terminal(lm: LandmarkMesh, ring_pts: Array, h: float, storeys: int, glaze_lo: float = 0.9,
-		glaze_hi: float = 2.9, overhang: float = 0.0) -> void:
+## storey), a flat roof with an `overhang`-metre fascia when set and, when
+## `sky_w` is set, glazed skylight strips that wide every `sky_pitch` metres
+## along the long axis.
+static func terminal(lm: LandmarkMesh, ring_pts: Array, h: float, storeys: int, glaze_lo: float = 1.0,
+		glaze_hi: float = 2.5, overhang: float = 0.0, sky_w: float = 0.0, sky_pitch: float = 0.0) -> void:
 	var ring := _poly(ring_pts)
 	if ring.size() < 3:
 		return
@@ -102,14 +105,47 @@ static func terminal(lm: LandmarkMesh, ring_pts: Array, h: float, storeys: int, 
 	var pitch := h / float(maxi(storeys, 1))
 	for k in storeys:
 		band(lm, "Glass", ring, pitch * float(k) + glaze_lo, pitch * float(k) + minf(glaze_hi, pitch - 0.3))
+	var top := h
 	if overhang > 0.0:
 		for p in Geometry2D.offset_polygon(ring, overhang, Geometry2D.JOIN_MITER):
 			lm.poly_prism("Trim", p, h - 0.1, h + 0.45, true)
+		top = h + 0.45
 	else:
 		cap(lm, "Roof", ring, h)
+	if sky_w > 0.0:
+		skylights(lm, ring, top + 0.05, sky_w, sky_pitch)
+
+## Glazed strips `w` wide every `pitch` metres across `ring`, running along
+## its longest edge, flat at height `y`.
+static func skylights(lm: LandmarkMesh, ring: PackedVector2Array, y: float, w: float, pitch: float) -> void:
+	var best := 0.0
+	var ax := Vector2.RIGHT
+	for i in ring.size():
+		var e := ring[(i + 1) % ring.size()] - ring[i]
+		if e.length() > best:
+			best = e.length()
+			ax = e.normalized()
+	var cr := Vector2(-ax.y, ax.x)
+	var a0 := INF
+	var a1 := -INF
+	var c0 := INF
+	var c1 := -INF
+	for v in ring:
+		a0 = minf(a0, v.dot(ax))
+		a1 = maxf(a1, v.dot(ax))
+		c0 = minf(c0, v.dot(cr))
+		c1 = maxf(c1, v.dot(cr))
+	var c := c0 + pitch * 0.5
+	while c < c1:
+		var rect := PackedVector2Array([ax * a0 + cr * (c - w * 0.5), ax * a1 + cr * (c - w * 0.5),
+			ax * a1 + cr * (c + w * 0.5), ax * a0 + cr * (c + w * 0.5)])
+		for piece in Geometry2D.intersect_polygons(rect, ring):
+			cap(lm, "Glass", piece, y)
+		c += pitch
 
 ## Every terminal of the layout as a block: `rules` maps a building's name to
-## [height, storeys] (or [height, storeys, overhang]); the others take their
+## [height, storeys] (or [height, storeys, overhang] or
+## [height, storeys, overhang, skylight width, skylight pitch]); the others take their
 ## tagged height, else `_small` ([h, storeys]) under 400 m2, else `_big`.
 static func terminal_set(lm: LandmarkMesh, data: Dictionary, rules: Dictionary) -> void:
 	for i in terminals(data):
@@ -122,7 +158,8 @@ static func terminal_set(lm: LandmarkMesh, data: Dictionary, rules: Dictionary) 
 				rule = rules.get("_small", [4.0, 1])
 			else:
 				rule = rules.get("_big", [12.0, 3])
-		terminal(lm, b["ring"], float(rule[0]), int(rule[1]), 0.9, 2.9, float(rule[2]) if rule.size() > 2 else 0.0)
+		terminal(lm, b["ring"], float(rule[0]), int(rule[1]), 1.0, 2.5, float(rule[2]) if rule.size() > 2 else 0.0,
+			float(rule[3]) if rule.size() > 4 else 0.0, float(rule[4]) if rule.size() > 4 else 0.0)
 
 ## The layout's control towers (one per place), `default_h` high to the mast
 ## tip where OpenStreetMap gives no height: a tapering shaft, glazed cab and mast.
@@ -177,48 +214,106 @@ static func jet_bridge(lm: LandmarkMesh, a: Vector3, b: Vector3) -> void:
 	lm.box("Trim", Vector3(b.x, 0.45, b.z), Vector3(2.2, 0.9, 0.9), Basis(), 0.0)
 	lm.lathe("Trim", a - Vector3.UP * 1.3, PackedVector2Array([Vector2(1.7, 0.0), Vector2(1.7, 2.6)]), 10)
 
-## Parked aircraft on the layout's stand positions nearest `near`, nose
-## toward the closest terminal vertex: `fleet` is [kind, tail hex] cycled
-## over at most `limit` stands within `reach_m`.
+## Parked aircraft on the layout's stand positions nearest `near` (grid spots
+## inside the aprons when it has too few): `fleet` is [kind, tail hex] cycled
+## over at most `limit` aircraft within `reach_m`. A mapped stand marks where
+## the nose wheel stops, so an aircraft at a stand within 70 m of a terminal
+## wall stands nose-in to it with its nose wheel on the stand, and one at a
+## gate node inside a terminal stands outside the nearest wall; an aircraft
+## never overlaps a building or another aircraft. With `bridges`, a boarding
+## bridge joins the wall to its door.
 static func park(lm: LandmarkMesh, data: Dictionary, fleet: Array, limit: int, near: Vector2 = Vector2.ZERO,
-		reach_m: float = 500.0) -> void:
-	var term: Array[Vector2] = []
+		reach_m: float = 500.0, bridges: bool = false) -> void:
+	var rings: Array[PackedVector2Array] = []
 	for i in terminals(data):
-		for p in (data["buildings"][i]["ring"] as Array):
-			term.append(Vector2(float(p[0]), float(p[1])))
-	var stands: Array = []
-	for s in data["stands"]:
-		var p := Vector2(float(s[0]), float(s[1]))
-		if p.distance_to(near) <= reach_m:
-			stands.append(p)
-	if stands.size() < limit:
-		stands.append_array(_apron_spots(data, near, reach_m, 46.0))
+		rings.append(_poly(data["buildings"][i]["ring"]))
 	var blocks: Array[PackedVector2Array] = []
 	for b in data["buildings"]:
 		var ring := _poly(b["ring"])
 		if ring.size() >= 3:
-			for g in Geometry2D.offset_polygon(ring, 10.0, Geometry2D.JOIN_MITER):
+			for g in Geometry2D.offset_polygon(ring, 3.0, Geometry2D.JOIN_MITER):
 				blocks.append(g)
-	stands = stands.filter(func(p: Vector2) -> bool:
-		for g in blocks:
-			if Geometry2D.is_point_in_polygon(p, g):
-				return false
-		return true)
-	stands.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(near) < b.distance_to(near))
+	var cands: Array = []
+	for s in data["stands"]:
+		var p := Vector2(float(s[0]), float(s[1]))
+		if p.distance_to(near) <= reach_m:
+			cands.append([p, true])
+	if cands.size() < limit:
+		for p in _apron_spots(data, near, reach_m, 46.0):
+			cands.append([p, false])
+	cands.sort_custom(func(a: Array, b: Array) -> bool: return (a[0] as Vector2).distance_to(near) < (b[0] as Vector2).distance_to(near))
+	var placed: Array[Vector2] = []
 	var n := 0
-	for p: Vector2 in stands:
+	for c in cands:
 		if n >= limit or fleet.is_empty():
 			break
-		var aim := Vector2(1, 0)
-		var best := INF
-		for t: Vector2 in term:
-			var d := p.distance_to(t)
-			if d < best:
-				best = d
-				aim = t - p
+		var p: Vector2 = c[0]
 		var spec: Array = fleet[n % fleet.size()]
-		LandmarkAircraft.place(lm, str(spec[0]), str(spec[1]), p, atan2(aim.y, aim.x))
+		var kind := str(spec[0])
+		var length := LandmarkAircraft.length_m(kind)
+		var best := INF
+		var wall := p + Vector2.RIGHT
+		for ring in rings:
+			for i in ring.size():
+				var q := Geometry2D.get_closest_point_to_segment(p, ring[i], ring[(i + 1) % ring.size()])
+				if p.distance_to(q) < best:
+					best = p.distance_to(q)
+					wall = q
+		var dir := (wall - p).normalized() if best < INF and best > 0.01 else Vector2.RIGHT
+		var centre := p - dir * length * 0.35 if bool(c[1]) and best < 70.0 else p
+		var at_gate := false
+		for ring in rings:
+			if Geometry2D.is_point_in_polygon(p, ring):
+				at_gate = true
+		if at_gate:
+			# A gate node inside a terminal: the aircraft stands outside the
+			# nearest wall, nose-in, its nose GATE_GAP_M from the wall.
+			if best < 0.01:
+				continue
+			var out := (wall - p).normalized()
+			dir = -out
+			centre = wall + out * (GATE_GAP_M + length * 0.5)
+		var clear := true
+		for k in [-0.45, 0.0, 0.45]:
+			var at := centre + dir * length * float(k)
+			for g in blocks:
+				if Geometry2D.is_point_in_polygon(at, g):
+					clear = false
+					break
+		for o in placed:
+			if o.distance_to(centre) < 36.0:
+				clear = false
+		if not clear:
+			continue
+		placed.append(centre)
+		LandmarkAircraft.place(lm, kind, str(spec[1]), centre, atan2(dir.y, dir.x))
+		if bridges:
+			_bridge(lm, rings, kind, centre, dir)
 		n += 1
+
+## A boarding bridge from the nearest terminal face to the left-hand door of
+## the aircraft of `kind` parked at `p` with its nose along `dir`, when the
+## door stands 6 to 40 m from a terminal wall.
+static func _bridge(lm: LandmarkMesh, rings: Array[PackedVector2Array], kind: String, p: Vector2, dir: Vector2) -> void:
+	var spec: Dictionary = LandmarkAircraft.SPECS[kind]
+	var length := float(spec["L"])
+	var r := float(spec["D"]) * 0.5
+	if length < 25.0:
+		return
+	var left := Vector2(dir.y, -dir.x)
+	var door := p + dir * (length * 0.5 - length * 0.16) + left * r
+	var best := INF
+	var at := Vector2.ZERO
+	for ring in rings:
+		for i in ring.size():
+			var q := Geometry2D.get_closest_point_to_segment(door, ring[i], ring[(i + 1) % ring.size()])
+			if door.distance_to(q) < best:
+				best = door.distance_to(q)
+				at = q
+	if best < 6.0 or best > 40.0:
+		return
+	var y := APRON_TOP + r + float(spec["clear"]) - 0.4
+	jet_bridge(lm, Vector3(at.x, y, at.y), Vector3(door.x, y, door.y))
 
 ## Grid points `step` metres apart inside the aprons (22 m clear of their
 ## edges), within `reach_m` of `near`: parking where the layout has no stands.

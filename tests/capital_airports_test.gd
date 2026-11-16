@@ -9,7 +9,7 @@ extends SceneTree
 ## each type at about its real length.
 
 const AIRPORT_REACH_M := 8000.0
-const MIN_AIRPORTS := 12
+const MIN_AIRPORTS := 13
 const REAL_LENGTH_M := {"narrow": 37.6, "wide": 58.8, "turboprop": 32.8, "light": 8.3}
 
 func _init() -> void:
