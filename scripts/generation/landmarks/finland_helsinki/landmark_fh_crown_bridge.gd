@@ -12,7 +12,8 @@ extends RefCounted
 ## forming a slim diamond, each an octagon in section, rising as a V from
 ## one foot on the islet,
 ## widest apart at the deck and merging two thirds of the way up; near
-## the top a tall rectangular opening in each end face holds the cable
+## the top (cast in lifts, the joints showing as fine lines) a tall
+## rectangular opening in each end face holds the cable
 ## boxes, and from them the stays fan out to brackets outside both deck
 ## edges. Both stayed spans, 260 m each way from the pylon, stand free of
 ## piers; the eastern one over the channel keeps 20 m clearance. Beyond
@@ -55,6 +56,16 @@ const SLIT_DECK := 1.75
 ## opening's sill, so the opening's side walls keep their thickness.
 const CHAMFER_SHARE := 0.29
 const HEAD_CHAMFER_M := 0.3
+## The pylon was cast in lifts: a casting joint shows as a thin darker
+## line round it every this many metres.
+const LIFT_M := 4.2
+## The light concrete edge band of the deck's fascia reaches this far
+## below the deck top; the dark steel girder shows under it.
+const FASCIA_BAND_M := 0.45
+## The artificial rock islet under the pylon: half-lengths along and
+## across the deck and its top over the sea, metres.
+const ISLET_HALF := Vector2(30.0, 42.0)
+const ISLET_TOP_M := 1.9
 ## The cable opening near the top, a rectangle in each end face of the
 ## pylon (the faces looking along the deck, where the stays enter): its
 ## sill and head heights and its half-width across the deck, metres. It
@@ -162,8 +173,8 @@ const MAST_HALO_M := 4.0
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#E3E1DA", 4.0))
-	lm.use("Footing", LandmarkMaterials.pbr("concrete", "#8E8B84", 3.0))
-	lm.use("Girder", LandmarkMaterials.paint("#DADDDE", 0.5, 0.3))
+	lm.use("Footing", LandmarkMaterials.pbr("rock", "#8E8B84", 3.0))
+	lm.use("Girder", LandmarkMaterials.paint("#5E6367", 0.5, 0.3))
 	lm.use("Track", LandmarkMaterials.pbr("concrete", "#B4B1AA", 3.0))
 	lm.use("Cycle", LandmarkMaterials.pbr("asphalt", "#7C4236", 4.0))
 	lm.use("Footway", LandmarkMaterials.pbr("asphalt", "#4A4B4C", 4.0))
@@ -189,13 +200,16 @@ static func build(model: Node3D) -> void:
 	model.set_meta(LandmarkLights.FLOOD_META, flood_spots())
 	model.set_meta(LandmarkLights.HALO_META, beacon_halos())
 
-## White stays by day; at night ("Lamp" parts follow the night) they
-## glow faintly blue, as the lit cable fans do over the water.
+## White stays by day: built with no glow of their own, so they stay
+## plain white wherever nothing follows the night. Where the hero is
+## dressed ("Lamp" parts follow the night) they glow faintly blue after
+## dark, as the lit cable fans do over the water.
 static func _stay_material() -> StandardMaterial3D:
 	var m := LandmarkMaterials.paint("#F1F2F0", 0.4, 0.2).duplicate() as StandardMaterial3D
 	m.emission_enabled = true
 	m.emission = STAY_GLOW
-	m.emission_energy_multiplier = 0.35
+	m.emission_energy_multiplier = 0.0
+	m.set_meta(LandmarkLights.NIGHT_GLOW_META, 0.35)
 	return m
 
 ## Light grey slats with see-through gaps: a stripe mask repeating every
@@ -331,11 +345,14 @@ static func _deck(lm: LandmarkMesh, plan: Dictionary) -> void:
 	var w := Vector2(0.0, -1.0)
 	var lip := 0.25
 	# Fascias, soffit chamfers and soffit.
-	_strip(lm, plan, "Girder", w, lip, w, -1.0, Vector2(-1, 0))
+	# Each fascia: the light concrete edge band over the dark steel girder.
+	_strip(lm, plan, "Concrete", w, lip, w, -FASCIA_BAND_M, Vector2(-1, 0))
+	_strip(lm, plan, "Girder", w, -FASCIA_BAND_M, w, -1.0, Vector2(-1, 0))
 	_strip(lm, plan, "Girder", w, -1.0, Vector2(1.8, -1.0), -DEPTH_M, Vector2(-1, -1.1))
 	_strip(lm, plan, "Girder", Vector2(1.8, -1.0), -DEPTH_M, Vector2(-1.8, 1.0), -DEPTH_M, Vector2(0, -1))
 	_strip(lm, plan, "Girder", Vector2(-1.8, 1.0), -DEPTH_M, e, -1.0, Vector2(1, -1.1))
-	_strip(lm, plan, "Girder", e, -1.0, e, lip, Vector2(1, 0))
+	_strip(lm, plan, "Girder", e, -1.0, e, -FASCIA_BAND_M, Vector2(1, 0))
+	_strip(lm, plan, "Concrete", e, -FASCIA_BAND_M, e, lip, Vector2(1, 0))
 	# Edge beams.
 	_strip(lm, plan, "Concrete", w, lip, Vector2(0.3, -1.0), lip, Vector2(0, 1))
 	_strip(lm, plan, "Concrete", Vector2(0.3, -1.0), lip, Vector2(0.3, -1.0), 0.15, Vector2(1, 0))
@@ -661,11 +678,69 @@ static func _ring(fr: Array, y: float, t0: float, t1: float, n0: float, n1: floa
 		out.append(o + (fr[1] as Vector3) * p.x + (fr[2] as Vector3) * p.y)
 	return out
 
-## The pylon's whole eight-sided outline at height y.
-static func _body_ring(fr: Array, y: float) -> PackedVector3Array:
-	var q := pylon_section(y)
+## The pylon's whole eight-sided outline at height y, `grow` metres proud.
+static func _body_ring(fr: Array, y: float, grow: float = 0.0) -> PackedVector3Array:
+	var q := pylon_section(y) + Vector3(grow, 0.0, grow)
 	var c := pylon_chamfer(y)
 	return _ring(fr, y, -q.x, q.x, -q.z, q.z, c, c)
+
+## The outline at height y of the leg on the `side` (along the deck) of
+## the slit: its inner face on the slit, its outer face on the pylon's
+## outline, all four corners cut.
+static func _leg_ring(fr: Array, y: float, side: float, grow: float = 0.0) -> PackedVector3Array:
+	var q := pylon_section(y)
+	var c := pylon_chamfer(y)
+	return _ring(fr, y, minf(side * q.y, side * q.x) - grow, maxf(side * q.y, side * q.x) + grow, -q.z - grow,
+		q.z + grow, c, c)
+
+## The outline at height y of the wall on the `side` (across the deck) of
+## the cable opening, its outer corners cut.
+static func _wall_ring(fr: Array, y: float, side: float, grow: float = 0.0) -> PackedVector3Array:
+	var q := pylon_section(y) + Vector3(grow, 0.0, grow)
+	if side > 0.0:
+		return _ring(fr, y, -q.x, q.x, SLOT_HALF, q.z, 0.0, HEAD_CHAMFER_M)
+	return _ring(fr, y, -q.x, q.x, -q.z, -SLOT_HALF, HEAD_CHAMFER_M, 0.0)
+
+## Casting joints: a thin darker band round the pylon every LIFT_M, on
+## each leg, the shaft and the opening's walls (none inside the deck).
+static func _lift_joints(lm: LandmarkMesh, fr: Array) -> void:
+	var yd := deck_y(pylon_s())
+	var y := PLINTH_TOP_M + LIFT_M
+	while y < MAST_TOP_M - 1.0:
+		var lo := y - 0.04
+		var hi := y + 0.04
+		if y > yd - DEPTH_M - 0.3 and y < yd + 0.5:
+			pass
+		elif y < JOIN_M:
+			for side: float in [-1.0, 1.0]:
+				_prism(lm, "Track", _leg_ring(fr, lo, side, 0.02), _leg_ring(fr, hi, side, 0.02))
+		elif hi < SLOT_M.x or lo > SLOT_M.y:
+			_prism(lm, "Track", _body_ring(fr, lo, 0.02), _body_ring(fr, hi, 0.02))
+		elif lo > SLOT_M.x and hi < SLOT_M.y:
+			for side: float in [-1.0, 1.0]:
+				_prism(lm, "Track", _wall_ring(fr, lo, side, 0.02), _wall_ring(fr, hi, side, 0.02))
+		y += LIFT_M
+
+## The artificial rock islet the pylon stands on: a low irregular mound,
+## its sloping shore running under the water and its top nearly flat.
+static func _islet(lm: LandmarkMesh, fr: Array) -> void:
+	var base: Vector3 = fr[0]
+	var n := 22
+	var shore := PackedVector3Array()
+	var brow := PackedVector3Array()
+	for i in n:
+		var a := TAU * i / n
+		var r := 1.0 + 0.16 * sin(3.0 * a + 1.0) + 0.09 * sin(5.0 * a + 2.3)
+		var dir: Vector3 = (fr[1] as Vector3) * cos(a) * ISLET_HALF.x + (fr[2] as Vector3) * sin(a) * ISLET_HALF.y
+		shore.append(base + dir * r - Vector3.UP * 1.5)
+		brow.append(base + dir * r * 0.8 + Vector3.UP * (ISLET_TOP_M - 0.4))
+	var top := base + Vector3.UP * ISLET_TOP_M
+	for i in n:
+		var j := (i + 1) % n
+		var out := (shore[i] + shore[j] - base * 2.0).normalized()
+		lm.quad("Footing", shore[i], shore[j], brow[j], brow[i], (out + Vector3.UP * 1.5).normalized())
+		lm.tri("Footing", brow[i], brow[j], top, Vector3.UP, Vector3.UP, Vector3.UP,
+			Vector2(brow[i].x, brow[i].z), Vector2(brow[j].x, brow[j].z), Vector2(top.x, top.z))
 
 ## Side faces between two rings of eight corners (an uncut corner, two
 ## corners at one point, makes no face).
@@ -692,28 +767,25 @@ static func _ring_cap(lm: LandmarkMesh, key: String, r: PackedVector3Array, nrm:
 ## islet; two eight-sided legs in line along the deck, splaying as a V
 ## from one foot on the plinth to the knee inside the deck and closing
 ## again to JOIN_M; the solid eight-sided shaft above them, with the
-## cable opening in both end faces near the top; the service balcony, red
-## aviation lights and the lightning rod at 135 m.
+## cable opening in both end faces near the top; red aviation lights and
+## the lightning rod at 135 m. It stands on a rock islet.
 static func _pylon(lm: LandmarkMesh) -> void:
 	var fr := pylon_frame()
 	var base: Vector3 = fr[0]
 	var t3: Vector3 = fr[1]
 	var n3: Vector3 = fr[2]
 	var basis := Basis(t3, Vector3.UP, n3)
-	# The islet plinth reaches down to the seabed.
-	lm.box("Footing", base, Vector3(14.0, 8.0, 7.0), basis, 0.0)
+	# The concrete plinth stands on the rock islet and reaches down to the
+	# seabed.
+	lm.box("Track", base, Vector3(14.0, 8.0, 7.0), basis, 0.0)
+	_islet(lm, fr)
 	# Each leg: its inner face on the slit, its outer face on the pylon's
 	# outline, all four corners cut. At JOIN_M the slit has closed, so the
 	# two legs' tops fill the shaft's base.
 	var yk := pylon_knee_y()
 	for side: float in [-1.0, 1.0]:
-		var rings: Array[PackedVector3Array] = []
-		for y: float in [PLINTH_TOP_M, yk, JOIN_M]:
-			var q := pylon_section(y)
-			var c := pylon_chamfer(y)
-			rings.append(_ring(fr, y, minf(side * q.y, side * q.x), maxf(side * q.y, side * q.x), -q.z, q.z, c, c))
-		_prism(lm, "Concrete", rings[0], rings[1])
-		_prism(lm, "Concrete", rings[1], rings[2])
+		_prism(lm, "Concrete", _leg_ring(fr, PLINTH_TOP_M, side), _leg_ring(fr, yk, side))
+		_prism(lm, "Concrete", _leg_ring(fr, yk, side), _leg_ring(fr, JOIN_M, side))
 	# The solid shaft from the legs up to the opening's sill (its top
 	# face); a wall on each side across the deck leaves the opening between
 	# them, filled behind both end faces by the steel cable boxes; the cap
@@ -733,15 +805,8 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	_taper(lm, "Steel", base + Vector3.UP * SLOT_M.x, t3, n3, Vector2(sill.x - SLOT_INSET_M, SLOT_HALF),
 		Vector2(cap.x - SLOT_INSET_M, SLOT_HALF), SLOT_M.y - SLOT_M.x)
 	for side: float in [-1.0, 1.0]:
-		var walls: Array[PackedVector3Array] = []
-		for q: Vector3 in [sill, cap]:
-			var y := SLOT_M.x if q == sill else SLOT_M.y
-			if side > 0.0:
-				walls.append(_ring(fr, y, -q.x, q.x, SLOT_HALF, q.z, 0.0, HEAD_CHAMFER_M))
-			else:
-				walls.append(_ring(fr, y, -q.x, q.x, -q.z, -SLOT_HALF, HEAD_CHAMFER_M, 0.0))
-		_prism(lm, "Concrete", walls[0], walls[1])
-	lm.box("Steel", base + Vector3.UP * 128.5, Vector3(5.4, 0.35, 4.6), basis)
+		_prism(lm, "Concrete", _wall_ring(fr, SLOT_M.x, side), _wall_ring(fr, SLOT_M.y, side))
+	_lift_joints(lm, fr)
 	lm.box("Steel", base + Vector3.UP * (MAST_TOP_M + 0.4), Vector3(1.4, 0.8, 1.4), basis)
 	lm.beam("Steel", base + Vector3.UP * (MAST_TOP_M + 0.8), base + Vector3.UP * PYLON_TOP_M, 0.2, 0.2)
 	# Red aviation obstacle lights: on the top and on both narrow ends of
@@ -879,7 +944,9 @@ static func _stays(lm: LandmarkMesh) -> void:
 			var sheath := low + (top - low).normalized() * ANCHOR_TUBE_M
 			lm.beam("Pole", low, sheath, 0.45, 0.45)
 			lm.beam("StayLamp", sheath, top, 0.22, 0.22)
-			lm.box("Girder", low - dn * side * (STAY_OUT_M * 0.5), Vector3(0.9, 0.5, STAY_OUT_M + 0.5), basis, 0.0)
+			# A steel rib cantilevering from under the deck edge to the anchor.
+			lm.box("Girder", low - dn * side * (STAY_OUT_M * 0.5 + 0.4) - Vector3.UP * 0.35,
+				Vector3(0.5, 1.0, STAY_OUT_M + 1.4), basis, 0.0)
 
 ## Four-sided prism from a rectangle at `base` (half-sizes h0 along t
 ## and n) up `h` metres to one of half-sizes h1, with a top cap.

@@ -82,7 +82,19 @@ func _check_model(failures: Array[String]) -> void:
 		if not names.has(lamp):
 			failures.append("no %s part for the night" % lamp)
 	# Six floodlights up the pylon first, then the poles' deck downlights.
+	# The stays are plain white by day (no glow of their own) and glow only
+	# once the hero is dressed to follow the night.
+	var stay_part: MeshInstance3D = null
+	for part: MeshInstance3D in parts:
+		if str(part.name).ends_with("StayLamp"):
+			stay_part = part
+	var stay_mat := stay_part.mesh.surface_get_material(0) as StandardMaterial3D if stay_part != null else null
+	if stay_mat == null or stay_mat.emission_energy_multiplier > 0.0:
+		failures.append("the stays should not glow by day")
 	var spots := LandmarkLights.dress(root, "kruunuvuorensilta")
+	var night_mat := stay_part.get_surface_override_material(0) if stay_part != null else null
+	if night_mat == null or float(night_mat.get_meta(CityLights.META, 0.0)) <= 0.0:
+		failures.append("the dressed stays should glow at night")
 	if spots != LandmarkFhCrownBridge.flood_spots().size() or spots < 16:
 		failures.append("expected 6 pylon floodlights and 10+ deck downlights, got %d spots" % spots)
 	# Red night halos round the top aviation light and the mast's two pairs.

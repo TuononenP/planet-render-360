@@ -22,6 +22,10 @@ extends RefCounted
 ## SPARKLE_MIN minutes of every night hour, as the real one does.
 
 const SPOTS := 4
+## On a "Lamp" part's material: its emission energy at night, for a part
+## built with none (lit cables, which must read plain white by day on
+## presets that never dress the hero).
+const NIGHT_GLOW_META := "night_glow"
 ## Model-node meta: [[lamp, aim, cone angle in degrees, energy share], ...]
 ## in model metres, replacing the spots placed round the bounds. An entry
 ## may add its own range (m) and light colour: a downlight over a deck
@@ -219,8 +223,11 @@ static func _night_lamps(hero: Node3D) -> void:
 			var mat := mi.mesh.surface_get_material(s) as StandardMaterial3D
 			if mat == null or not mat.emission_enabled:
 				continue
+			# A part that only glows at night (NIGHT_GLOW_META) is built
+			# dark, so it stays dark by day where nothing follows the night.
+			var energy := float(mat.get_meta(NIGHT_GLOW_META, mat.emission_energy_multiplier))
 			var lamp := mat.duplicate() as StandardMaterial3D
-			CityLights.mark_glow(lamp, mat.emission_energy_multiplier * LAMP_GAIN / CityLights.NIGHT_ENERGY)
+			CityLights.mark_glow(lamp, energy * LAMP_GAIN / CityLights.NIGHT_ENERGY)
 			mi.set_surface_override_material(s, lamp)
 
 ## Night halos round the model's beacons (HALO_META): one billboard each,
