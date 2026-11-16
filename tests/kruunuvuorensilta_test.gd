@@ -65,6 +65,13 @@ func _check_model(failures: Array[String]) -> void:
 	# 17 stay pairs in two planes: 34 beams of 8 triangles.
 	if stays != 34 * 8:
 		failures.append("expected 34 stays (272 triangles), got %d triangles" % stays)
+	# Piers and pylon stand on caps that reach below the waterline, and the
+	# pylon's V legs close on the mast low.
+	if bounds.position.y > -LandmarkFhCrownBridge.CAP_DEPTH_M + 0.5:
+		failures.append("piers should reach %.0f m under the water, lowest point %.1f m" % [
+			LandmarkFhCrownBridge.CAP_DEPTH_M, bounds.position.y])
+	if LandmarkFhCrownBridge.JOIN_M > 45.0:
+		failures.append("pylon legs close at %.0f m, want a low close under 45 m" % LandmarkFhCrownBridge.JOIN_M)
 	if tris > 60000:
 		failures.append("%d triangles is over the 60k budget" % tris)
 	print("KRUUNUVUORENSILTA model: %d parts, %d tris, bounds %s" % [parts.size(), tris, bounds])

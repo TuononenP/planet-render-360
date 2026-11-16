@@ -29,7 +29,11 @@ const CREST_MAIN_M := 300.0
 const MAIN_SPAN_M := 260.0
 const PIER_STEP_M := 66.0
 const BACK_PIERS: Array[float] = [72.0, 144.0, 216.0]
-const JOIN_M := 62.0
+## Where the pylon's legs close on the mast.
+const JOIN_M := 36.0
+## The pier legs and the pylon's islet plinth reach this far below the
+## waterline, so nothing floats and no base shows above the water.
+const CAP_DEPTH_M := 4.0
 const MAST_TOP_M := 131.5
 const PYLON_TOP_M := 135.0
 ## Stays per direction (17 pairs in all) and their deck reach, metres
@@ -467,8 +471,12 @@ static func pier_s() -> PackedFloat32Array:
 		s += 64.0
 	return out
 
-## V piers: a footing at the waterline and two splayed blade columns
-## to the soffit; the main span's anchor pier is heavier.
+## V piers, as in photos: a steel-clad solid block rises out of the water
+## (no plinth), its sides already leaning out with the V's flare; from its
+## top the V notch opens and two broad square legs splay up straight into
+## the soffit. The taller the pier, the lower (as a share of its height)
+## the notch starts, so the tall ones read as a more open V. The main
+## span's anchor pier is heavier.
 static func _piers(lm: LandmarkMesh) -> void:
 	var anchor := pylon_s() + MAIN_SPAN_M
 	for s in pier_s():
@@ -477,13 +485,73 @@ static func _piers(lm: LandmarkMesh) -> void:
 		var t3 := Vector3(t.x, 0, t.y)
 		var n3 := Vector3(-t.y, 0, t.x)
 		var base := Vector3(c.x, 0.0, c.y)
-		var soffit := deck_y(s) - DEPTH_M
-		var heavy := absf(s - anchor) < 1.0
-		var basis := Basis(t3, Vector3.UP, n3)
-		lm.box("Footing", base + Vector3.UP * 0.2, Vector3(7.0 if heavy else 5.0, 2.4, c.z * 1.3 + 4.0), basis)
-		for side: float in [-1.0, 1.0]:
-			lm.beam("Concrete", base + n3 * side * 1.6 + Vector3.UP * 1.4,
-				base + n3 * side * c.z * 0.55 + Vector3.UP * soffit, 3.2 if heavy else 2.0, 1.1, t3)
+		var y1 := deck_y(s) - DEPTH_M + 0.2
+		var grow := 1.3 if absf(s - anchor) < 1.0 else 1.0
+		var tall := clampf((y1 - 6.0) / 14.0, 0.0, 1.0)
+		var top := c.z * 0.6
+		_v_pier(lm, base, t3 * 1.7 * grow, n3, -CAP_DEPTH_M, y1 * lerpf(0.4, 0.3, tall), y1, top * 0.55, top,
+			top * 0.38)
+
+## V pier in the plane across the deck (`n3`), `half_t` thick each way
+## along it. Its outer sides run straight from `foot` half-width at the
+## water to `top` at y1. Below `yn` it is one solid steel-clad block
+## (reaching down to y0 under the water); above, the notch opens from its
+## tip on the block to `gap` half-width at y1, parting the two legs.
+static func _v_pier(lm: LandmarkMesh, base: Vector3, half_t: Vector3, n3: Vector3, y0: float, yn: float, y1: float,
+		foot: float, top: float, gap: float) -> void:
+	var t := half_t.normalized()
+	var ht := half_t.length()
+	var out := func(y: float) -> float: return maxf(0.5, foot + (top - foot) * y / y1)
+	# The clad block: a box flaring with the wall, all four sides and top.
+	var lip := 0.08
+	var a0: float = float(out.call(y0)) + lip
+	var a1: float = float(out.call(yn)) + lip
+	var b := ht + lip
+	var lo: Array[Vector3] = [base + Vector3.UP * y0 + n3 * a0 + t * b, base + Vector3.UP * y0 - n3 * a0 + t * b,
+		base + Vector3.UP * y0 - n3 * a0 - t * b, base + Vector3.UP * y0 + n3 * a0 - t * b]
+	var hi: Array[Vector3] = [base + Vector3.UP * yn + n3 * a1 + t * b, base + Vector3.UP * yn - n3 * a1 + t * b,
+		base + Vector3.UP * yn - n3 * a1 - t * b, base + Vector3.UP * yn + n3 * a1 - t * b]
+	for i in 4:
+		var j := (i + 1) % 4
+		var mid := (lo[i] + lo[j] + hi[i] + hi[j]) * 0.25 - base
+		var nrm := Vector3(mid.x, 0.0, mid.z).normalized()
+		if i == 0 or i == 2:
+			nrm = t if i == 0 else -t
+		lm.quad("Steel", lo[i], lo[j], hi[j], hi[i], nrm)
+	lm.quad("Steel", hi[0], hi[1], hi[2], hi[3], Vector3.UP)
+	# The two legs, each a four-sided slab from the block's top to the
+	# soffit: inner foot at the notch tip, outer edge on the flare.
+	var p := func(x: float, y: float) -> Vector3: return base + n3 * x + Vector3.UP * y
+	for side: float in [-1.0, 1.0]:
+		var ring: Array[Vector2] = [Vector2(0.0, yn), Vector2(side * float(out.call(yn)), yn),
+			Vector2(side * top, y1), Vector2(side * gap, y1)]
+		for f: float in [-1.0, 1.0]:
+			var o := half_t * f
+			lm.quad("Concrete", p.call(ring[0].x, ring[0].y) + o, p.call(ring[1].x, ring[1].y) + o,
+				p.call(ring[2].x, ring[2].y) + o, p.call(ring[3].x, ring[3].y) + o, t * f)
+		# Outer side and the notch face (the top meets the soffit, the
+		# bottom sits on the block).
+		for e: Array in [[1, 2], [3, 0]]:
+			var u: Vector2 = ring[e[0]]
+			var v: Vector2 = ring[e[1]]
+			var nrm := (n3 * (v.y - u.y) - Vector3.UP * (v.x - u.x)).normalized() * side
+			lm.quad("Concrete", p.call(u.x, u.y) - half_t, p.call(v.x, v.y) - half_t, p.call(v.x, v.y) + half_t,
+				p.call(u.x, u.y) + half_t, nrm)
+
+## Tapering member from `a` to `b`: width (along `side`) and depth at each
+## end in `s0` and `s1` (x width, y depth), open ends.
+static func _blade(lm: LandmarkMesh, a: Vector3, b: Vector3, side: Vector3, s0: Vector2, s1: Vector2) -> void:
+	var axis := (b - a).normalized()
+	var sv := (side - axis * side.dot(axis)).normalized()
+	var dv := axis.cross(sv).normalized()
+	var signs: Array[Vector2] = [Vector2(1, 1), Vector2(-1, 1), Vector2(-1, -1), Vector2(1, -1)]
+	for i in 4:
+		var j := (i + 1) % 4
+		var p0 := sv * signs[i].x * s0.x * 0.5 + dv * signs[i].y * s0.y * 0.5
+		var p1 := sv * signs[j].x * s0.x * 0.5 + dv * signs[j].y * s0.y * 0.5
+		var q0 := sv * signs[i].x * s1.x * 0.5 + dv * signs[i].y * s1.y * 0.5
+		var q1 := sv * signs[j].x * s1.x * 0.5 + dv * signs[j].y * s1.y * 0.5
+		lm.quad("Concrete", a + p0, a + p1, b + q1, b + q0, (p0 + p1).normalized())
 
 ## The pylon: a plinth on the islet, the diamond's two legs splaying out
 ## past the deck edges and closing on the mast at JOIN_M, a cross beam
@@ -498,15 +566,17 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	var basis := Basis(t3, Vector3.UP, n3)
 	var base := Vector3(c.x, 0.0, c.y)
 	var yd := deck_y(sp)
-	var knee := c.z + 2.6
-	lm.box("Footing", base + Vector3.UP * 1.5, Vector3(14.0, 5.0, knee * 2.0 + 8.0), basis)
+	var knee := c.z + 5.5
+	# The islet plinth reaches down to the seabed; the V legs start on it,
+	# splay out past the deck edges and close in steeply on the mast.
+	lm.box("Footing", base, Vector3(14.0, 8.0, (c.z + 2.6) * 2.0 + 8.0), basis, 0.0)
 	for side: float in [-1.0, 1.0]:
-		var foot := base + n3 * side * 3.0 + Vector3.UP * 4.0
-		var k := base + n3 * side * knee + Vector3.UP * (yd - 2.0)
+		var foot := base + n3 * side * 3.0 + Vector3.UP * 3.8
+		var k := base + n3 * side * knee + Vector3.UP * (yd - 3.0)
 		var top := base + n3 * side * 1.6 + Vector3.UP * (JOIN_M + 2.0)
-		lm.beam("Concrete", foot, k, 4.2, 2.8, t3)
-		lm.beam("Concrete", k, top, 3.8, 2.4, t3)
-		lm.box("Concrete", k, Vector3(4.2, 3.0, 3.0), basis)
+		_blade(lm, foot, k, t3, Vector2(6.4, 3.2), Vector2(5.2, 2.6))
+		_blade(lm, k, top, t3, Vector2(5.2, 2.6), Vector2(4.0, 1.8))
+		lm.box("Concrete", k, Vector3(5.4, 3.0, 3.0), basis)
 	lm.box("Concrete", base + Vector3.UP * (yd - DEPTH_M - 0.9), Vector3(3.5, 1.8, knee * 2.0), basis)
 	_taper(lm, "Concrete", base + Vector3.UP * (JOIN_M - 4.0), t3, n3, Vector2(3.4, 2.6), Vector2(2.2, 1.6),
 		MAST_TOP_M - JOIN_M + 4.0)
