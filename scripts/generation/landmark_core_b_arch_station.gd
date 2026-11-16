@@ -75,6 +75,19 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 		var e := front_point(poly, mid.x, lo, hi)
 		LandmarkStationKit.block(lm, "Walls", "Trim", "Windows", "Roof", e.x, e.z - 6.0, w, 12.0, 0.0,
 			h, "flat", 0.0, 3.5, 4.0, true)
+		if style.has("glass_hex"):
+			# A glazed entrance front under horizontal sun louvres (Monaco).
+			var gw := w - 3.0
+			var gh := h - 1.5
+			# Clear of the block's own window frames, which stand ~0.4 m proud.
+			lm.box("Curtain", Vector3(e.x, gh * 0.5, e.z + 0.6), Vector3(gw, gh, 0.2), Basis(), 0.0)
+			var ly := 3.2
+			while ly < gh - 0.2:
+				lm.box("Steel", Vector3(e.x, ly, e.z + 1.1), Vector3(gw, 0.08, 0.7))
+				ly += 0.9
+			for k in 5:
+				var x := e.x - gw * 0.5 + gw * float(k) / 4.0
+				lm.box("Steel", Vector3(x, gh * 0.5, e.z + 0.85), Vector3(0.25, gh, 0.4))
 		return h
 	var eave := float(style.get("eave", h))
 	var top := _body(lm, poly, eave, style)
@@ -185,10 +198,10 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 				var t1 := float(k + 1) / float(seg)
 				lm.beam("Shell", Vector3(x, under - rise * cos(t0 * PI * 0.5) + 0.3, front.z + t0 * depth),
 					Vector3(x, under - rise * cos(t1 * PI * 0.5) + 0.3, front.z + t1 * depth), 0.6, 1.2)
+		# The legs lean out over the forecourt, clear of the building.
 		for x in [x0, x1]:
-			var out := -1.0 if x == x0 else 1.0
 			lm.beam("Shell", Vector3(x, eave - 0.75, front.z + depth - 0.6),
-				Vector3(x + out * eave * 0.45, 0.0, front.z + depth * 0.4), 1.6, 1.6, Vector3.ZERO, true)
+				Vector3(x, 0.0, front.z + depth + eave * 0.35), 1.6, 1.6, Vector3.ZERO, true)
 		top = maxf(top, eave)
 	if style.has("portal"):
 		# A framed central portal: stone piers and lintel round a full-height
