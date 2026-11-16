@@ -97,7 +97,7 @@ static func monaco(model: Node3D) -> void:
 	lm.box("Roof", Vector3(0, 14.05, -6.0), Vector3(64.0, 0.1, 20.0))
 	var f := 4.3
 	lm.box("Curtain", Vector3(0, 4.85, f), Vector3(40.4, 9.7, 0.2))
-	K.lunette(lm, "Trim", "Curtain", Vector3(0, 9.6, f), Vector3.BACK, 40.0, 3.4, 12, 0)
+	K.lunette(lm, "Steel", "Curtain", Vector3(0, 9.6, f), Vector3.BACK, 40.0, 3.4, 12, 0)
 	var y := 3.4
 	while y < 12.6:
 		var half := 20.0 if y <= 9.6 else 20.0 * sqrt(maxf(1.0 - pow((y - 9.6) / 3.4, 2.0), 0.0))
@@ -164,8 +164,7 @@ static func abuja(model: Node3D) -> void:
 
 ## Bamako station (1913): the ochre laterite range of two storeys with its
 ## string courses, the blue tiled name band across the front, and the
-## centre gable with scrolled shoulders framing the round clock under a
-## small pediment.
+## raised centre gable framing the round clock under a small pediment.
 static func bamako(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	K.mats(lm, "stone", "#C98E5E", "#D9A878", "concrete", "#A8806A")
@@ -174,15 +173,10 @@ static func bamako(model: Node3D) -> void:
 	LandmarkFhParts.box_band(lm, "Trim", 0.0, -2.0, 76.0, 34.0, 5.0, 0.4, 0.2)
 	lm.box("Tile", Vector3(0, 7.6, 15.1), Vector3(22.0, 1.0, 0.2))
 	# The centre gable: a raised panel between scrolled shoulders.
-	lm.box("Walls", Vector3(0, 12.5, 14.6), Vector3(10.0, 5.0, 1.0))
-	lm.box("Trim", Vector3(0, 15.2, 14.6), Vector3(11.0, 0.5, 1.4))
-	LandmarkFhUtil.hip(lm, "Trim", Vector3(0, 15.4, 14.6), 11.0, 1.4, 1.2)
-	# The scrolled shoulders as solid quarter-wedges either side.
-	for s in [-1.0, 1.0]:
-		for k in 3:
-			var hh := 2.4 - 0.8 * float(k)
-			lm.box("Walls", Vector3(s * (5.6 + 1.2 * float(k)), 10.0 + hh * 0.5, 14.6), Vector3(1.2, hh, 1.0))
-	K.clock(lm, "Dial", "Trim", Vector3(0, 12.6, 15.15), Vector3.BACK, 1.4)
+	lm.box("Walls", Vector3(0, 12.5, 14.8), Vector3(10.0, 5.0, 1.0))
+	lm.box("Trim", Vector3(0, 15.2, 14.8), Vector3(11.0, 0.5, 1.4))
+	LandmarkFhUtil.hip(lm, "Trim", Vector3(0, 15.4, 14.8), 11.0, 1.4, 1.2)
+	K.clock(lm, "Dial", "Trim", Vector3(0, 12.6, 15.35), Vector3.BACK, 1.4)
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 0.2, 15.05), Vector3.BACK, 4.0, 6.0, 3)
 	lm.commit(model)
 
