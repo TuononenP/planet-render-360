@@ -39,6 +39,7 @@ extends RefCounted
 ##             plans; else a hip)
 ##   stilts    h: the body raised `h` on a grid of concrete pylons
 ##   shell_size the umbrella shells' spacing (m)
+##   clip      [x0, z0, x1, z1]: draw only the outline inside this box
 ##   roof "gable": a long pitched roof along the building
 ##   front_clock one clock over the middle of the front
 ##   windows   "rect": plain rectangular windows, no arched ground floor
@@ -69,6 +70,18 @@ static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Di
 	# Footprints smoothed to within 0.6 m: survey jitter in an outline
 	# would otherwise show as ragged roof edges and slivers at notches.
 	var poly := simple(simplify(clean(raw), 0.6))
+	if style.has("clip"):
+		# Only the station hall where OSM maps it together with long
+		# platform roofs (Dhaka): the outline cut to [x0, z0, x1, z1].
+		var cb: Array = style["clip"]
+		var box := PackedVector2Array([Vector2(cb[0], cb[1]), Vector2(cb[2], cb[1]), Vector2(cb[2], cb[3]),
+			Vector2(cb[0], cb[3])])
+		var best := 0.0
+		for piece in Geometry2D.intersect_polygons(poly, box):
+			var a := absf(RingGeometry.signed_area(piece as PackedVector2Array))
+			if a > best:
+				best = a
+				poly = piece as PackedVector2Array
 	var lo := Vector2(INF, INF)
 	var hi := Vector2(-INF, -INF)
 	for p in poly:
