@@ -79,9 +79,9 @@ static func bratislava(model: Node3D) -> void:
 	lm.box("Curtain", Vector3(0, 3.0, -2.0), Vector3(160.0, 6.0, 22.0))
 	LandmarkFhParts.strips(lm, "Steel", Vector3(-79.0, 0, 9.05), Vector3(79.0, 0, 9.05), Vector3.BACK, 0.0, 6.0, 41, 0.2,
 		0.15)
-	_fascia(lm, Vector3(0, 6.0, 9.0), 164.0, 6.0, 2.4)
+	_fascia(lm, Vector3(0, 6.0, 9.0), 160.0, 6.0, 2.4)
 	lm.box("Curtain", Vector3(0, 11.5, -4.0), Vector3(100.0, 5.0, 18.0))
-	_fascia(lm, Vector3(0, 14.0, 5.0), 108.0, 8.0, 3.0)
+	_fascia(lm, Vector3(0, 14.0, 5.0), 100.0, 8.0, 3.0)
 	lm.box("Roof", Vector3(0, 13.9, -4.0), Vector3(100.0, 0.4, 18.0))
 	lm.commit(model)
 

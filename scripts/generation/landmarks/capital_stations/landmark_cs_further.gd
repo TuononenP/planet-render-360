@@ -14,18 +14,18 @@ const K = preload("res://scripts/generation/landmarks/capital_stations/landmark_
 ## and the arched, gabled porch at the east end.
 static func accra(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#ECE2BF", "#8B2A22", "sheet_metal", "#B9A585")
+	K.mats(lm, "render", "#ECE2BF", "#8B2A22", "sheet_metal", "#B98A55")
 	lm.use("Red", LandmarkMaterials.pbr("render", "#8B2A22", 3.0))
 	lm.use("Cap", LandmarkMaterials.pbr("sheet_metal", "#9C2A22", 2.0))
 	lm.box("Walls", Vector3(0, 2.6, -2.0), Vector3(30.0, 5.2, 12.0))
 	lm.box("Red", Vector3(0, 0.6, -2.0), Vector3(30.4, 1.2, 12.4))
 	LandmarkFhUtil.window_grid(lm, "Glass", Vector3(-14.0, 0, 4.05), Vector3(14.0, 0, 4.05), Vector3.BACK, 1.6, 1, 3.0,
 		8, 1.4, 2.2)
-	LandmarkFhUtil.ridge_x(lm, "Roof", "Walls", Vector3(0, 5.2, 1.0), 31.0, 19.0, 3.0, 0.6)
+	LandmarkFhUtil.ridge_x(lm, "Roof", "Walls", Vector3(0, 5.2, 1.0), 31.0, 19.0, 4.6, 0.6)
 	LandmarkFhUtil.columns(lm, "Red", Vector3(-14.5, 0, 9.8), Vector3(14.5, 0, 9.8), 9, 4.4, 0.3)
 	lm.box("Red", Vector3(0, 4.8, 9.8), Vector3(30.0, 0.5, 0.5))
 	# The clock turret on the ridge.
-	var t := Vector3(-2.0, 7.8, 1.0)
+	var t := Vector3(-2.0, 9.4, 1.0)
 	lm.box("Steel", t + Vector3.UP * 0.9, Vector3(2.6, 1.8, 2.6))
 	lm.box("Walls", t + Vector3.UP * 2.8, Vector3(3.0, 2.0, 3.0))
 	for i in 4:

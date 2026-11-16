@@ -142,7 +142,7 @@ static func kyiv_passenger(model: Node3D) -> void:
 ## ochre wings either side.
 static func ankara_gari(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "limestone", "#E3D6BD", "#EDE5D3", "roof_concrete", "#8D877E")
+	K.mats(lm, "limestone", "#CDB08A", "#E6D8BE", "roof_concrete", "#8D877E")
 	lm.use("Wing", LandmarkMaterials.pbr("render", "#C9A77A", 3.0))
 	lm.use("Sign", LandmarkMaterials.lit("#B3262A", 0.4))
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, -2.0, 36.0, 28.0, 0.0, 22.0, "flat", 0.0, 4.0, 5.0)

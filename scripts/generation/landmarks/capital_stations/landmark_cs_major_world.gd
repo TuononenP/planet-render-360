@@ -70,7 +70,9 @@ static func minsk_passenger(model: Node3D) -> void:
 		lm.box("Curtain", Vector3(cx, 12.0, -6.0), Vector3(70.0, 24.0, 60.0))
 		for y in [6.0, 12.0, 18.0]:
 			LandmarkFhParts.box_band(lm, "Walls", cx, -6.0, 70.0, 60.0, y - 0.4, 0.8, 0.2)
-		lm.box("Roof", Vector3(cx, 24.6, -4.0), Vector3(74.0, 1.2, 66.0))
+		lm.box("Walls", Vector3(cx, 25.1, -2.0), Vector3(76.0, 2.2, 72.0))
+		lm.lathe("Walls", Vector3(cx + signf(cx) * 38.0, 24.0, -2.0), PackedVector2Array([Vector2(35.8, 0.05),
+			Vector2(35.8, 2.15)]), 16, 0.12, 1.0)
 	# The atrium and its pointed glass gable.
 	lm.box("Curtain", Vector3(0, 15.0, 0.0), Vector3(40.0, 30.0, 52.0))
 	LandmarkFhUtil.ridge_z(lm, "Curtain", "Curtain", Vector3(0, 30.0, 0.0), 40.0, 52.0, 9.0, 0.6)

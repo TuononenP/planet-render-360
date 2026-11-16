@@ -145,22 +145,22 @@ static func tashkent(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		var x0: float = s * 30.0
 		var x1: float = s * 160.0
-		lm.box("Walls", Vector3((x0 + x1) * 0.5, 8.0, -4.0), Vector3(130.0, 16.0, 34.0))
-		lm.box("Trim", Vector3((x0 + x1) * 0.5, 15.6, -4.0), Vector3(130.7, 0.8, 34.7))
-		lm.box("Roof", Vector3((x0 + x1) * 0.5, 16.05, -4.0), Vector3(130.0, 0.1, 34.0))
-		K.arch_row(lm, "Trim", "Blue", Vector3(x0, 0, 13.05), Vector3(x1, 0, 13.05), Vector3.BACK, 1.0, 20, 4.4, 12.0, 1)
-		K.arch_row(lm, "Trim", "Glass", Vector3(x0, 0, -21.05), Vector3(x1, 0, -21.05), Vector3.FORWARD, 1.0, 20, 3.0, 9.0, 1)
-		LandmarkFhParts.strips(lm, "Trim", Vector3(x0, 0, 13.0), Vector3(x1, 0, 13.0), Vector3.BACK, 0.0, 15.2, 21,
+		lm.box("Walls", Vector3((x0 + x1) * 0.5, 10.0, -4.0), Vector3(130.0, 20.0, 34.0))
+		lm.box("Trim", Vector3((x0 + x1) * 0.5, 19.6, -4.0), Vector3(130.7, 0.8, 34.7))
+		lm.box("Roof", Vector3((x0 + x1) * 0.5, 20.05, -4.0), Vector3(130.0, 0.1, 34.0))
+		K.arch_row(lm, "Trim", "Blue", Vector3(x0, 0, 13.05), Vector3(x1, 0, 13.05), Vector3.BACK, 0.6, 20, 4.6, 17.0, 3)
+		K.arch_row(lm, "Trim", "Glass", Vector3(x0, 0, -21.05), Vector3(x1, 0, -21.05), Vector3.FORWARD, 1.0, 20, 3.0, 12.0, 1)
+		LandmarkFhParts.strips(lm, "Trim", Vector3(x0, 0, 13.0), Vector3(x1, 0, 13.0), Vector3.BACK, 0.0, 19.2, 21,
 			1.0, 0.5)
 	# The central portal block and its great arch.
-	lm.box("Walls", Vector3(0, 12.0, -2.0), Vector3(60.0, 24.0, 40.0))
-	lm.box("Trim", Vector3(0, 23.6, -2.0), Vector3(60.8, 0.8, 40.8))
-	lm.box("Roof", Vector3(0, 24.05, -2.0), Vector3(60.0, 0.1, 40.0))
-	K.arch_window(lm, "Trim", "Blue", Vector3(0, 0.2, 18.05), Vector3.BACK, 16.0, 19.0, 7)
+	lm.box("Walls", Vector3(0, 14.0, -2.0), Vector3(60.0, 28.0, 40.0))
+	lm.box("Trim", Vector3(0, 27.6, -2.0), Vector3(60.8, 0.8, 40.8))
+	lm.box("Roof", Vector3(0, 28.05, -2.0), Vector3(60.0, 0.1, 40.0))
+	K.arch_window(lm, "Trim", "Blue", Vector3(0, 0.2, 18.05), Vector3.BACK, 16.0, 23.0, 7)
 	for s in [-1.0, 1.0]:
 		K.arch_window(lm, "Trim", "Blue", Vector3(s * 19.0, 0.2, 18.05), Vector3.BACK, 7.0, 14.0, 3)
 		lm.box("Blue", Vector3(s * 19.0, 19.0, 18.1), Vector3(7.0, 3.0, 0.2))
-	lm.box("Trim", Vector3(0, 21.0, 18.3), Vector3(30.0, 3.0, 0.6))
+	lm.box("Trim", Vector3(0, 25.0, 18.3), Vector3(30.0, 3.0, 0.6))
 	lm.commit(model)
 
 ## Baku station (1926, Moorish revival): the cream stone range with its
@@ -179,13 +179,17 @@ static func baku(model: Node3D) -> void:
 	LandmarkFhUtil.merlons(lm, "Trim", Vector3(-65.0, 13.0, 13.3), Vector3(65.0, 13.0, 13.3), 2.0, 1.0, 1.2, 0.5)
 	for x in [-58.0, 0.0, 58.0]:
 		var w := 30.0 if x == 0.0 else 18.0
-		lm.box("Walls", Vector3(x, 8.5, 0.0), Vector3(w, 17.0, 32.0))
-		lm.box("Trim", Vector3(x, 16.6, 0.0), Vector3(w + 0.7, 0.8, 32.7))
-		lm.box("Roof", Vector3(x, 17.05, 0.0), Vector3(w, 0.1, 32.0))
-		LandmarkFhUtil.merlons(lm, "Trim", Vector3(x - w * 0.5, 17.0, 16.3), Vector3(x + w * 0.5, 17.0, 16.3), 2.0, 1.0,
+		var ph := 17.0 if x == 0.0 else 21.0
+		lm.box("Walls", Vector3(x, ph * 0.5, 0.0), Vector3(w, ph, 32.0))
+		lm.box("Trim", Vector3(x, ph - 0.4, 0.0), Vector3(w + 0.7, 0.8, 32.7))
+		lm.box("Roof", Vector3(x, ph + 0.05, 0.0), Vector3(w, 0.1, 32.0))
+		LandmarkFhUtil.merlons(lm, "Trim", Vector3(x - w * 0.5, ph, 16.3), Vector3(x + w * 0.5, ph, 16.3), 2.0, 1.0,
 			1.2, 0.5)
+		if x != 0.0:
+			LandmarkFhUtil.window_grid(lm, "Glass", Vector3(x - 6.0, 0, 16.05), Vector3(x + 6.0, 0, 16.05), Vector3.BACK,
+				13.5, 2, 3.6, 3, 1.6, 2.4)
 		for s in [-1.0, 1.0]:
-			lm.box("Trim", Vector3(x + s * (w * 0.5 - 0.6), 9.0, 16.2), Vector3(1.2, 18.0, 0.6))
+			lm.box("Trim", Vector3(x + s * (w * 0.5 - 0.6), ph * 0.5, 16.2), Vector3(1.2, ph, 0.6))
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 0.2, 16.05), Vector3.BACK, 9.0, 11.5, 5)
 	lm.disc("Trim", Vector3(0, 14.2, 16.1), Vector3.BACK, 2.2, 20)
 	lm.disc("Glass", Vector3(0, 14.2, 16.2), Vector3.BACK, 1.7, 20)
