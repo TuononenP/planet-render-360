@@ -45,8 +45,8 @@ errors. Snapshot versions, sizes and hashes are recorded in `BundledOsm`;
 `tools/prepare_osm_snapshot.py` validates and compresses each response. The Midtown preset (`new_york_midtown_*`, origin 40.7535,-73.9825) was fetched on 2026-11-10 from overpass.private.coffee with the app's own queries; only the server `[timeout:]` was raised to 240 s for the detailed and far layers, which the dense extent exceeded at 30 s. That mirror's source timestamps (May-July 2026) are older than the fetch date. The Central Park preset (`central_park_*`, origin 40.7760,-73.9700) was fetched on 2026-11-14 from overpass-api.de with the app's own queries (server `[timeout:]` raised to 240 s for the detailed and far layers), its transit layer through the OSM API (`tools/prepare_transit_layer.py --source api`) and its horizon layer from Postpass. Five New York towers newer than the bundled New York snapshots (99 Hudson Street, Brooklyn Tower, Trump World Tower, One Court Square, Skyline Tower) take their part outlines from live Overpass answers of the same day, written into `NycTowerSpecs*` as data.
 
 Since 2026-11-11 the bundled layers are not refreshed from Overpass in the
-background: opening a preset or capital sends no map query and skips the
-Overpass status check (`BundledOsm.covers`). Fresher data arrives when the
+background: opening a preset or capital sends no map query
+(`BundledOsm.covers`). Fresher data arrives when the
 bundle is rebuilt. Before that, every open of a preset ran the full detailed,
 ring, POI and far-city queries in the background until one answer newer than
 the snapshot was cached. The horizon labels layer is bundled too
@@ -391,8 +391,11 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
 - Postpass usage policy (reviewed 2026-11-16, Geofabrik's rules for
   automated requests):
   - No parallel requests: `PostpassGate` keeps one Postpass request on the
-    wire for the whole app. The detailed layer goes first; the ring, far
-    city, horizon, bridge and POI layers wait their turn.
+    wire for the whole app. The detailed layer is sent before the ring and
+    goes to the front of the line; the ring, far city, horizon, bridge and
+    POI layers wait their turn. A layer that waits 30 s
+    (`PostpassGate.MAX_WAIT_S`) goes to its next source instead, and the
+    detailed layer's retry budget counts that wait.
   - Back-off: after HTTP 429 or 503, Postpass rests for 60 s and the layers
     go to their next source.
   - Caching: every answer is cached on the device (detailed `pp` key, ring,
@@ -423,22 +426,13 @@ Live evidence (2026-10-28, identifying UA, `out geom`):
   10 s for the first byte instead of 15 s (35 s before 2026-11-11). A place where Overpass and the OSM
   API both return no buildings over the full 1200 m is marked
   (`osm_v2_<lat>_<lon>_empty_q<N>.json`) and not asked again for 7 days.
-  Status check (2026-11-11): when a 3D load starts, `OverpassProbe` asks
-  every instance for `/api/status` (no query runs, no query slot is used;
-  4 s timeout, one check per 60 s). An instance with a free slot, or no
-  rate limit, is confirmed for 60 s and any pause on it lifted; one whose
-  next slot is N s away is waited out when N is up to 10 s (the queries are
-  held back N s, nothing is paused) and paused exactly N s when it is longer;
-  one that fails or answers anything else is paused 90 s. A good status
-  answer lifts only a pause an earlier status check set, never one a real
-  query caused (a 504 on `/api/interpreter`). The load's Overpass queries wait
-  until the first instance has answered, or every instance has answered or
-  timed out, and use the first instance that is not paused; a mirror is used
-  only when the check confirmed it. The 4 s and the query's 15 s first-byte
-  wait are measured on the wall clock, as Godot's timers count frame time and
-  a stalled loading frame timed both instances out in 0 ms. With neither answering (the main
-  instance refused connections and private.coffee was silent while this
-  was written) the load goes straight to the cache and OSM API.
+  Status check (2026-11-11 to 2026-11-16): `OverpassProbe` asked every
+  instance for `/api/status` as a 3D load started and let a confirmed mirror
+  stand in for a paused instance. With Postpass always asked first it never
+  ran, so it was removed; a request now uses only the first instance that is
+  not paused (the offline pack walks its mirror pair). The query's 15 s
+  first-byte wait is measured on the wall clock, as Godot's timers count
+  frame time and a stalled loading frame timed it out in 0 ms.
   The far-city query asks for `building:part` only within 100 m of the tall
   outlines (`around.near`/`around.wide`) instead of every part in the 12 km
   disc; its cache key is unchanged, as older payloads are a superset.
@@ -759,6 +753,12 @@ its minimum-area rectangle (yaw), outline and tagged height. Nearby `railway=rai
   offline review only, identifying User-Agent). Where the article shows no
   station photo, the style comes from Wikimedia Commons photos or published
   descriptions.
+- Capitals whose station building has no photo to check a model against
+  (Brasília, Kinshasa) are marked `-` in the list and get no landmark.
+
+The public Overpass instances were at capacity for the batch, so the OSM API
+was used. Attribution: © OpenStreetMap contributors (ODbL), as for every
+OSM-derived layer.
 
 ## Capital airports (2026-11-16)
 
@@ -789,9 +789,3 @@ origin at the terminal's centre).
 
 Attribution: © OpenStreetMap contributors (ODbL), as for every OSM-derived
 layer.
-- Capitals whose station building has no photo to check a model against
-  (Brasília, Kinshasa) are marked `-` in the list and get no landmark.
-
-The public Overpass instances were at capacity for the batch, so the OSM API
-was used. Attribution: © OpenStreetMap contributors (ODbL), as for every
-OSM-derived layer.

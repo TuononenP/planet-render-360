@@ -21,6 +21,7 @@ func _run() -> void:
 	await _serial()
 	await _urgent_and_cancel()
 	await _refused()
+	await _reentry_and_wait()
 	await _requests()
 	PostpassGate.reset()
 	if _fails == 0:
@@ -96,6 +97,49 @@ func _refused() -> void:
 		"a newcomer is told to skip too: %s" % [_log])
 	_check(PostpassFallback.refused(429) and PostpassFallback.refused(503) and not PostpassFallback.refused(504),
 		"429 and 503 count as refusals")
+	PostpassGate.reset()
+
+## An owner that enters again while holding the slot does not stall the
+## line; a waiter past its max wait is told to skip; a freed owner's skip
+## never runs.
+func _reentry_and_wait() -> void:
+	PostpassGate.reset()
+	_log.clear()
+	var a := Owner.new("a")
+	var b := Owner.new("b")
+	_enter(a)
+	_enter(b)
+	_enter(a)  # again, without leaving first: behind b now
+	await process_frame
+	_check(_log == ["a", "b"] and PostpassGate.holds(b) and PostpassGate.waiting() == 1,
+		"re-entering hands the slot on instead of stalling: %s" % [_log])
+	PostpassGate.leave(b)
+	await process_frame
+	_check(_log.back() == "a", "and the re-entered owner follows: %s" % [_log])
+	PostpassGate.leave(a)
+	await process_frame
+	# A short max wait: the waiter skips once it passes.
+	_log.clear()
+	var holder := Owner.new("holder")
+	var slow := Owner.new("slow")
+	_enter(holder)
+	PostpassGate.enter(slow, func() -> void: _log.append("slow"),
+		func(why: String) -> void: _log.append("skip slow: " + why), false, 0.05)
+	await create_timer(0.2).timeout
+	_check(_log.size() == 2 and str(_log[1]).begins_with("skip slow: waited")
+		and PostpassGate.waiting() == 0, "a waiter past its max wait skips: %s" % [_log])
+	PostpassGate.leave(holder)
+	await process_frame
+	_check(_log.size() == 2, "an expired waiter is not sent later: %s" % [_log])
+	# A freed owner is told nothing.
+	_log.clear()
+	PostpassGate.note_refused()
+	var node := Node.new()
+	PostpassGate.enter(node, func() -> void: _log.append("node"),
+		func(why: String) -> void: _log.append("skip node: " + why))
+	node.free()
+	await process_frame
+	_check(_log.is_empty(), "a freed owner's skip does not run: %s" % [_log])
 	PostpassGate.reset()
 
 ## Two PostpassRequests: the second waits, and reports the skip as a failure

@@ -70,11 +70,12 @@ const ATTEMPT_TIMEOUT := 60.0
 ## each. Callers waiting on succeeded/failed must wait at least this long
 ## or a late rescue is dropped. Typical is far lower (a failure falls back
 ## at once, a silent instance after OverpassRequest.FIRST_BYTE_TIMEOUT).
-## Plus one Postpass attempt, one OSM API attempt, and a second's worth of
+## Plus one Postpass attempt and its longest wait for Postpass's one slot
+## (PostpassGate.MAX_WAIT_S), one OSM API attempt, and a second's worth of
 ## each step down to a smaller box (OsmApiFallback.STEP_DOWN_CODES) so a
 ## late result lands.
 static func retry_budget_seconds() -> float:
-	return 2.0 * (ATTEMPT_TIMEOUT + 5.0) + PostpassFallback.TIMEOUT_S + 5.0 \
+	return 2.0 * (ATTEMPT_TIMEOUT + 5.0) + PostpassGate.MAX_WAIT_S + PostpassFallback.TIMEOUT_S + 5.0 \
 		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
 
 ## How long a place where Overpass and the OSM API both found nothing is
@@ -424,11 +425,9 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	if _detailed_text == "":
 		_omt.start(lat, lon, DETAILED_RADIUS_M)
 	# Both phases go live at once; _try_finish waits for the pair. The
-	# ring asks Postpass and Overpass in MapSources order (LayerRequest).
+	# ring asks Postpass, then Overpass (LayerRequest).
 	if want_ring and _ring_text == "" and not known_empty:
 		_ring_pending = true
-		_ring_req.run(PostpassLayers.build_ring_body(lat, lon, ring),
-			"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
 	if _detailed_text != "":
 		_detailed_done()
 	elif known_empty:
@@ -436,13 +435,18 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 		_api_failed(NO_BUILDINGS, "Overpass " + NO_BUILDINGS)
 	else:
 		_go_live()
+	# The ring is sent after the detailed request, so the detailed layer
+	# holds Postpass's one slot first and the ring waits its turn
+	# (PostpassGate).
+	if _ring_pending and gen == _parse_gen:
+		_ring_req.run(PostpassLayers.build_ring_body(lat, lon, ring),
+			"data=" + build_ring_query(lat, lon, ring).uri_encode(), _check_ring, ring_endpoints())
 
 ## The detailed layer's live sources: Postpass, then Overpass; the OSM API
 ## after both.
 func _go_live() -> void:
-	_postpass_tried = false
 	_overpass_tried = false
-	_start_postpass("")
+	_start_postpass()
 
 func _run_overpass() -> void:
 	_overpass_tried = true
@@ -483,9 +487,8 @@ var _parse_gen := 0
 var _tried := 1
 var _api_tier := 0
 var _api_reason := ""
-## Which live sources the detailed layer has asked, and whether its answer
+## Whether the detailed layer has asked Overpass, and whether its answer
 ## is Postpass's (which carries the bridge outlines too).
-var _postpass_tried := false
 var _overpass_tried := false
 var _from_postpass := false
 var _fallback_detail := ""
@@ -683,29 +686,24 @@ func _on_poi_exhausted(reason: String, _attempts: int) -> void:
 	_poi_pending = false
 	_try_finish()
 
-## Detailed phase out of live Overpass options. Register fallback order:
-## same-place cache (any radius) → Postpass (unless asked already) → OSM
-## API bbox → nearby cache → procedural.
+## Detailed phase out of live options (Postpass, then Overpass). Register
+## fallback order: same-place cache (any radius) → OSM API bbox → nearby
+## cache → procedural.
 func _detailed_fallback(reason: String) -> void:
-	# Postpass's own failure, when it went first, stays in the reason.
+	# Postpass's own failure stays in the reason.
 	var full := reason if _api_reason == "" else "%s; %s" % [_api_reason, reason]
 	if _use_cached(full, SAME_PLACE_M):
 		return
 	if offline_mode:
 		_api_failed("skipped (offline mode)", reason)
 		return
-	if _postpass_tried:
-		_api_reason = full
-		_api_tier = 0
-		_request_api()
-		return
-	_start_postpass(reason)
+	_api_reason = full
+	_api_tier = 0
+	_request_api()
 
-## Asks Postpass for the detailed layer; `reason` is why Overpass did not
-## answer ("" when Postpass goes first).
-func _start_postpass(reason: String) -> void:
-	_api_reason = reason
-	_postpass_tried = true
+## Asks Postpass for the detailed layer, the first live source.
+func _start_postpass() -> void:
+	_api_reason = ""
 	# Ahead of the other layers' Postpass requests (PostpassGate).
 	var gen := _parse_gen
 	PostpassGate.enter(self, _send_postpass.bind(gen), func(why: String) -> void:
@@ -723,9 +721,9 @@ func _send_postpass(gen: int) -> void:
 		PostpassGate.leave(self)
 		_postpass_failed("failed to start: %s" % err)
 
-## Postpass gave nothing usable: on to Overpass when it has not been asked
-## (Postpass went first), else to a copy of this spot (when Postpass went
-## first, nothing has looked for one yet), else to the OSM API.
+## Postpass gave nothing usable: on to Overpass when there is one to ask,
+## else to a copy of this spot (nothing has looked for one yet), else to
+## the OSM API.
 func _postpass_failed(why: String) -> void:
 	var failed := "Postpass " + why
 	_api_reason = failed if _api_reason == "" else "%s; %s" % [_api_reason, failed]
@@ -774,8 +772,8 @@ func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
 	_detailed_text = converted["json"]
 	_detailed_cached = false
 	_from_postpass = true
-	# Under its own key, not osm_path: while Overpass goes first, it is
-	# asked again next time.
+	# Under its own key, not osm_path: an Overpass answer and a Postpass
+	# one at the same spot stay apart (OsmNearbyCache ranks them).
 	_write_cache(CacheStore.osm_postpass_path(_pending_lat, _pending_lon, DETAILED_RADIUS_M),
 		_detailed_text)
 	_detailed_done()

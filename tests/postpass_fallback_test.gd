@@ -98,15 +98,18 @@ func _index_checks(failures: Array[String]) -> void:
 		"far": PostpassLayers.build_far_body(LAT, LON),
 		"horizon": PostpassLayers.build_horizon_body(LAT, LON),
 	}
+	var capped := RegEx.create_from_string("^\\(SELECT .* LIMIT \\d+\\)$")
 	for name in bodies:
 		var sql := str(bodies[name]).trim_prefix("data=").uri_decode()
 		var reads := sql.split("FROM postpass_")
 		for i in range(1, reads.size()):
 			if not reads[i].contains("&&") and not reads[i].contains("ST_Intersects("):
 				failures.append("%s: a table read without a spatial-index test: %s" % [name, reads[i].left(80)])
+		# Each part's own outer LIMIT closes it: one inside a subquery does
+		# not cap the outer read.
 		for part in sql.split(" UNION ALL "):
-			if not part.contains(" LIMIT "):
-				failures.append("%s: a part without a LIMIT: %s" % [name, part.left(80)])
+			if capped.search(part.strip_edges()) == null:
+				failures.append("%s: a part not capped by its own LIMIT: %s" % [name, part.right(80)])
 
 func _convert_checks(failures: Array[String]) -> void:
 	var res := PostpassFallback.to_overpass_json(GEOJSON.to_utf8_buffer())

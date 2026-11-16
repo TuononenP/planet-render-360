@@ -78,23 +78,20 @@ func _order() -> void:
 	# No Overpass to ask (iOS, Android): a Postpass failure ends the layer.
 	var none: Array[String] = []
 	req._endpoints = none
-	req._postpass_tried = true
 	req._on_postpass_failed("Postpass down")
 	_check(got == ["Postpass down"], "without Overpass a Postpass failure ends the layer: %s" % [got])
-	# Overpass out before Postpass was asked: Postpass is next, then both reasons end it.
+	# With Overpass to ask, a run goes to Postpass first; its failure asks
+	# Overpass, and Overpass out ends the layer with both reasons.
 	got.clear()
-	req._reason = ""
-	req._postpass_tried = false
-	req._overpass_tried = true
-	req._on_overpass_exhausted("Overpass 504", 1)
-	_check(got.is_empty() and stub.ran, "Overpass out: Postpass is asked next")
-	req._on_postpass_failed("Postpass down")
-	_check(got == ["Overpass 504; Postpass down"], "both out: one failure with both reasons: %s" % [got])
-	# With Overpass to ask, a run still goes to Postpass first.
 	stub.ran = false
 	var some: Array[String] = ["https://overpass.example/api/interpreter"]
 	req.run("pp", "op", func(_t: String) -> String: return "", some)
 	_check(stub.ran and not req._overpass_tried, "Postpass is always asked first")
+	req.overpass.cancel()
+	req._overpass_tried = true
+	req._reason = "Postpass down"
+	req._on_overpass_exhausted("Overpass 504", 1)
+	_check(got == ["Postpass down; Overpass 504"], "both out: one failure with both reasons: %s" % [got])
 	req.free()
 
 ## A Postpass answer is converted and checked on a worker; the check's

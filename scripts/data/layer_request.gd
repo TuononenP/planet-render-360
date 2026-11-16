@@ -16,7 +16,6 @@ var _postpass_body := ""
 var _overpass_body := ""
 var _check: Callable
 var _endpoints: Array[String] = []
-var _postpass_tried := false
 var _overpass_tried := false
 var _reason := ""
 
@@ -38,7 +37,6 @@ func run(postpass_body: String, overpass_body: String, check: Callable, endpoint
 	_overpass_body = overpass_body
 	_check = check
 	_endpoints = endpoints
-	_postpass_tried = false
 	_overpass_tried = false
 	_reason = ""
 	_run_postpass()
@@ -48,7 +46,6 @@ func cancel() -> void:
 	_postpass.cancel()
 
 func _run_postpass() -> void:
-	_postpass_tried = true
 	_postpass.run(_postpass_body, _check)
 
 func _run_overpass() -> void:
@@ -65,7 +62,4 @@ func _on_postpass_failed(why: String) -> void:
 
 func _on_overpass_exhausted(reason: String, attempts: int) -> void:
 	_reason = reason if _reason == "" else "%s; %s" % [_reason, reason]
-	if not _postpass_tried:
-		_run_postpass()
-	else:
-		exhausted.emit(_reason, attempts)
+	exhausted.emit(_reason, attempts)
