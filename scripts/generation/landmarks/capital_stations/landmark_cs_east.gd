@@ -66,7 +66,7 @@ static func sofia_central(model: Node3D) -> void:
 	lm.box("Walls", Vector3(0, 22.6, 2.0), Vector3(128.0, 1.2, 66.0))
 	lm.box("Trim", Vector3(0, 23.0, 35.0), Vector3(128.0, 1.6, 0.6))
 	for x in [-30.0, 0.0, 30.0]:
-		lm.box("Trim", Vector3(x, 2.0, 32.0), Vector3(8.0, 4.0, 6.0))
+		lm.box("Trim", Vector3(x, 2.5, 25.5), Vector3(8.0, 5.0, 3.0))
 	for s in [-1.0, 1.0]:
 		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 80.0, -6.0, 30.0, 36.0, 0.0, 12.0, "flat", 0.0, 4.0, 4.0)
 	lm.commit(model)

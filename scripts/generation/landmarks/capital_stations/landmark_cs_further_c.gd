@@ -44,7 +44,7 @@ static func podgorica(model: Node3D) -> void:
 		LandmarkFhParts.band(lm, "Glass", Vector3(-80.0, 0, 7.0), Vector3(64.0, 0, 7.0), Vector3.BACK, y, 1.5, 0.08)
 	lm.box("Glass", Vector3(-8.0, 1.8, 7.05), Vector3(140.0, 3.4, 0.2))
 	K.canopy(lm, "Trim", "Trim", Vector3(-80.0, 0, 7.0), Vector3(64.0, 0, 7.0), Vector3.BACK, 4.0, 3.8, 12)
-	K.block(lm, "Walls", "Trim", "Glass", "Roof", 73.0, 0.0, 18.0, 16.0, 0.0, 16.0, "flat", 0.0, 3.0, 3.2)
+	K.block(lm, "Walls", "Trim", "Glass", "Roof", 73.0, 0.0, 18.0, 16.0, 0.0, 22.0, "flat", 0.0, 3.0, 3.2)
 	lm.commit(model)
 
 ## Skopje station (Kenzo Tange, 1981): the raised raw-concrete deck on its
@@ -127,7 +127,7 @@ static func ouagadougou(model: Node3D) -> void:
 	lm.box("Shell", Vector3(0, 12.4, z0 + depth - 0.5), Vector3(x1 - x0 + 2.0, 2.4, 1.0))
 	for i in 13:
 		var x := x0 + (x1 - x0) * float(i) / 12.0
-		var prev := Vector3(x, 7.0, z0)
+		var prev := Vector3(x, 7.0, z0 + 0.6)
 		for k in range(1, 7):
 			var t := float(k) / 6.0
 			var p := Vector3(x, 13.0 - 6.0 * cos(t * PI * 0.5), z0 + t * depth)

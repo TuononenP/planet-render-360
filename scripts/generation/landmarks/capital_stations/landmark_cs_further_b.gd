@@ -35,7 +35,7 @@ static func ashgabat(model: Node3D) -> void:
 		var n := Vector3(sin(PI * 0.5 * float(i)), 0, cos(PI * 0.5 * float(i)))
 		K.clock(lm, "Dial", "Trim", c + n * 2.55 + Vector3.UP * 16.5, n, 1.4)
 	lm.lathe("Gilt", c + Vector3.UP * 19.1, LandmarkFhUtil.dome_prof(2.4, 2.0), 12)
-	lm.frustum("Gilt", c + Vector3.UP * 21.0, 0.6, 0.05, 26.0, 8)
+	lm.frustum("Gilt", c + Vector3.UP * 21.0, 0.6, 0.05, 12.0, 8)
 	lm.commit(model)
 
 ## Belgrade Centre (Prokop, 2016): the long glazed hall, its glass wall
@@ -204,10 +204,10 @@ static func phnom_penh(model: Node3D) -> void:
 	lm.box("Green", Vector3(0, 13.0, 12.2), Vector3(40.0, 0.6, 0.4))
 	for s in [-1.0, 1.0]:
 		var x: float = s * 24.5
-		lm.box("Walls", Vector3(x, 9.5, 2.0), Vector3(9.0, 19.0, 9.0))
-		LandmarkFhParts.strips(lm, "Trim", Vector3(x - 3.0, 0, 6.55), Vector3(x + 3.0, 0, 6.55), Vector3.BACK, 5.0, 12.0,
+		lm.box("Walls", Vector3(x, 9.5, 9.0), Vector3(9.0, 19.0, 9.0))
+		LandmarkFhParts.strips(lm, "Trim", Vector3(x - 3.0, 0, 13.55), Vector3(x + 3.0, 0, 13.55), Vector3.BACK, 5.0, 12.0,
 			4, 0.6, 0.3)
-		lm.box("Green", Vector3(x, 17.6, 2.0), Vector3(9.4, 0.6, 9.4))
-		lm.box("Trim", Vector3(x, 19.2, 2.0), Vector3(9.8, 0.8, 9.8))
+		lm.box("Green", Vector3(x, 17.6, 9.0), Vector3(9.4, 0.6, 9.4))
+		lm.box("Trim", Vector3(x, 19.2, 9.0), Vector3(9.8, 0.8, 9.8))
 	lm.box("Green", Vector3(0, 4.2, 14.0), Vector3(58.0, 0.4, 4.0))
 	lm.commit(model)

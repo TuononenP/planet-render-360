@@ -187,10 +187,10 @@ static func entries() -> Array:
 			"aliases": ["astana nurly zhol", "nurly zhol station"],
 			"outline_m": [[-312.7, 38.7], [-313.0, -38.7], [312.7, -38.7], [313.0, 38.7]]},
 		{"type": "station_hk_hong_kong", "name": "Hung Hom station", "lat": 22.302862, "lon": 114.181585,
-			"radius_m": 6000.0, "wiki_title": "Hung Hom station", "height_m": 13.0, "kind": "Station",
+			"radius_m": 6000.0, "wiki_title": "Hung Hom station", "height_m": 18.0, "kind": "Station",
 			"secondary": true, "yaw_deg": 95.5, "clear_m": 12.0, "clear_rect_m": [0.0, 0.0, 82.0, 38.1],
 			"archetype": "station", "capital": "HK",
-			"style": {"eave": 12, "glass": true, "storey": 6, "roof_hex": "#EDEDE8", "roof_set": "concrete", "roof": "overhang", "overhang": 6.0},
+			"style": {"eave": 12, "glass": true, "storey": 6, "roof_hex": "#EDEDE8", "roof_set": "concrete", "shells": "folded", "shell_top": 18},
 			"aliases": ["hung hom station"],
 			"outline_m": [[-77.9, 34.1], [-78.0, -34.1], [77.9, -34.1], [78.0, 34.1]]},
 	]

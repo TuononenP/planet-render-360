@@ -98,8 +98,8 @@ static func havana_central(model: Node3D) -> void:
 	K.hip_roof(lm, "Roof", Vector3(-6.0, 4.75, 16.0), 14.6, 6.6, 1.6)
 	for x in [-12.5, 0.5]:
 		lm.box("Trim", Vector3(x, 2.25, 18.6), Vector3(0.7, 4.5, 0.7))
-	_belvedere_tower(lm, Vector3(-6.0, 0, 9.0), 8.0, 45.0)
-	_belvedere_tower(lm, Vector3(33.0, 0, 9.0), 7.0, 37.0)
+	_belvedere_tower(lm, Vector3(-6.0, 0, 11.0), 8.0, 45.0)
+	_belvedere_tower(lm, Vector3(33.0, 0, 11.0), 7.0, 37.0)
 	lm.commit(model)
 
 ## A square tower `w` wide standing on `base`, `h` to its flat cap: plain
