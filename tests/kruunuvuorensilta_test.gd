@@ -65,18 +65,11 @@ func _check_model(failures: Array[String]) -> void:
 	# 17 stay pairs in two planes: 34 beams of 8 triangles.
 	if stays != 34 * 8:
 		failures.append("expected 34 stays (272 triangles), got %d triangles" % stays)
-	# Piers and pylon stand on caps that reach below the waterline, and the
-	# pylon's legs meet as an A about midway between the deck and the top,
-	# under the lowest stay.
+	# Piers and pylon stand on caps that reach below the waterline.
 	if bounds.position.y > -LandmarkFhCrownBridge.CAP_DEPTH_M + 0.5:
 		failures.append("piers should reach %.0f m under the water, lowest point %.1f m" % [
 			LandmarkFhCrownBridge.CAP_DEPTH_M, bounds.position.y])
-	var midway := (LandmarkFhCrownBridge.deck_y(LandmarkFhCrownBridge.pylon_s()) + LandmarkFhCrownBridge.PYLON_TOP_M) * 0.5
-	if absf(LandmarkFhCrownBridge.JOIN_M - midway) > 8.0:
-		failures.append("pylon legs meet at %.0f m, want about midway up (%.0f m)" % [LandmarkFhCrownBridge.JOIN_M, midway])
-	if LandmarkFhCrownBridge.MAST_ANCHORS.x <= LandmarkFhCrownBridge.JOIN_M:
-		failures.append("the lowest stay (%.0f m) should anchor on the mast above the legs' apex (%.0f m)" % [
-			LandmarkFhCrownBridge.MAST_ANCHORS.x, LandmarkFhCrownBridge.JOIN_M])
+	_check_pylon(failures)
 	if tris > 60000:
 		failures.append("%d triangles is over the 60k budget" % tris)
 	print("KRUUNUVUORENSILTA model: %d parts, %d tris, bounds %s" % [parts.size(), tris, bounds])
@@ -106,6 +99,38 @@ func _check_model(failures: Array[String]) -> void:
 			failures.append("deck light at %s should shine down onto the deck only" % p)
 		k += 1
 	root.free()
+
+## The pylon is a needle through the deck's median: south of the
+## separator, leaving the cycle path at least 2.5 m beside it; its two
+## legs rise as a V from one foot on the plinth, are parted along the
+## deck by a slit widest at the deck and closed near the top; above the
+## deck it never widens upwards.
+func _check_pylon(failures: Array[String]) -> void:
+	var B := LandmarkFhCrownBridge
+	var sp: float = B.pylon_s()
+	var h: float = B.at(sp).z
+	var yd: float = B.deck_y(sp)
+	var path_edge: float = h - 0.3 - B.FOOTWAY_M
+	var prev := Vector3(INF, INF, INF)
+	var y := 0.0
+	while y <= B.MAST_TOP_M:
+		var q: Vector3 = B.pylon_section(y)
+		if B.PYLON_X - q.z < B.SEPARATOR.y or B.PYLON_X + q.z > path_edge - 2.5:
+			failures.append("pylon at %.0f m (%.1f..%.1f m across) leaves the median" % [y, B.PYLON_X - q.z, B.PYLON_X + q.z])
+			break
+		if y > yd and (q.x > prev.x + 0.001 or q.y > prev.y + 0.001 or q.z > prev.z + 0.001):
+			failures.append("pylon section widens at %.0f m" % y)
+			break
+		prev = q
+		y += 2.0
+	if B.pylon_section(yd).y < 1.5:
+		failures.append("the legs should stand at least 3 m apart at the deck")
+	if B.pylon_section(B.PLINTH_TOP_M).y > 0.001 or B.pylon_section(yd * 0.5).y >= B.pylon_section(B.pylon_knee_y()).y:
+		failures.append("below the deck the legs should close as a V onto one foot")
+	if B.JOIN_M < 100.0 or B.pylon_section(B.JOIN_M).y > 0.001:
+		failures.append("the slit should close near the top (JOIN_M %.0f m)" % B.JOIN_M)
+	if absf(B.STAY_LINE - (B.SEPARATOR.x + B.SEPARATOR.y) * 0.5) > 1.0:
+		failures.append("stays should land on the separator line, not at %.1f m" % B.STAY_LINE)
 
 func _check_profile(failures: Array[String]) -> void:
 	var sp := LandmarkFhCrownBridge.pylon_s()
