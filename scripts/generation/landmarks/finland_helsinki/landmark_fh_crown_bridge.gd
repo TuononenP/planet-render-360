@@ -6,9 +6,10 @@ extends RefCounted
 ## tip to Kruunuvuorenranta carrying two tram tracks on its north half
 ## and the cycle path and footway on its south edge behind a wind screen,
 ## hung by 17 pairs of stays in two planes from one 135 m white concrete
-## pylon. The pylon's diamond-shaped lower part straddles the deck on the
-## artificial islet between Nimismies and Emäntä, and a single mast rises
-## from where its legs meet. The 260 m main span over the channel to the
+## pylon. The pylon straddles the deck on the artificial islet between
+## Nimismies and Emäntä: above the deck its two legs lean together as an
+## A and meet midway up, and a single mast carrying the stays rises from
+## the apex. The 260 m main span over the channel to the
 ## east keeps 20 m clearance; the back span to the west rests on
 ## auxiliary piers, and both approaches on V piers 64 to 72 m apart.
 ## Built along the bridge's mapped curve (KruunuvuorensiltaLine) at yaw 0,
@@ -29,8 +30,17 @@ const CREST_MAIN_M := 300.0
 const MAIN_SPAN_M := 260.0
 const PIER_STEP_M := 66.0
 const BACK_PIERS: Array[float] = [72.0, 144.0, 216.0]
-## Where the pylon's legs close on the mast.
-const JOIN_M := 36.0
+## The apex of the pylon's A, where its legs meet: midway between the
+## deck and the top.
+const JOIN_M := 78.0
+## The legs' knees stand this far outside the deck edges; a leg's section
+## at the knee and at the apex (x along the deck, y its thickness), and
+## the mast's half-sizes at its head (x along, y across), metres. At its
+## base the mast is exactly the two legs side by side.
+const KNEE_OUT_M := 4.0
+const LEG_KNEE := Vector2(5.6, 2.8)
+const LEG_APEX := Vector2(4.8, 2.3)
+const MAST_HEAD := Vector2(1.8, 1.4)
 ## The pier legs and the pylon's islet plinth reach this far below the
 ## waterline, so nothing floats and no base shows above the water.
 const CAP_DEPTH_M := 4.0
@@ -575,10 +585,11 @@ static func _blade(lm: LandmarkMesh, a: Vector3, b: Vector3, side: Vector3, s0: 
 		var q1 := sv * signs[j].x * s1.x * 0.5 + dv * signs[j].y * s1.y * 0.5
 		lm.quad("Concrete", a + p0, a + p1, b + q1, b + q0, (p0 + p1).normalized())
 
-## The pylon: a plinth on the islet, the diamond's two legs splaying out
-## past the deck edges and closing on the mast at JOIN_M, a cross beam
-## under the deck, the tapering mast, the service balcony, red aviation
-## lights and the lightning rod at 135 m.
+## The pylon: a plinth on the islet, two legs splaying out past the deck
+## edges and from there leaning straight together as an A whose apex is
+## at JOIN_M, a cross beam under the deck, the tapering mast on the apex,
+## the service balcony, red aviation lights and the lightning rod at
+## 135 m.
 static func _pylon(lm: LandmarkMesh) -> void:
 	var sp := pylon_s()
 	var c := at(sp)
@@ -588,20 +599,20 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	var basis := Basis(t3, Vector3.UP, n3)
 	var base := Vector3(c.x, 0.0, c.y)
 	var yd := deck_y(sp)
-	var knee := c.z + 5.5
-	# The islet plinth reaches down to the seabed; the V legs start on it,
-	# splay out past the deck edges and close in steeply on the mast.
+	var knee := c.z + KNEE_OUT_M
+	# The islet plinth reaches down to the seabed; the legs start on it,
+	# splay out past the deck edges and lean in until their inner faces
+	# meet at the apex.
 	lm.box("Footing", base, Vector3(14.0, 8.0, (c.z + 2.6) * 2.0 + 8.0), basis, 0.0)
 	for side: float in [-1.0, 1.0]:
 		var foot := base + n3 * side * 3.0 + Vector3.UP * 3.8
 		var k := base + n3 * side * knee + Vector3.UP * (yd - 3.0)
-		var top := base + n3 * side * 1.6 + Vector3.UP * (JOIN_M + 2.0)
-		_blade(lm, foot, k, t3, Vector2(6.4, 3.2), Vector2(5.2, 2.6))
-		_blade(lm, k, top, t3, Vector2(5.2, 2.6), Vector2(4.0, 1.8))
-		lm.box("Concrete", k, Vector3(5.4, 3.0, 3.0), basis)
+		_blade(lm, foot, k, t3, Vector2(6.4, 3.2), LEG_KNEE)
+		_upper_leg(lm, base, t3, n3, side, yd - 3.0)
+		lm.box("Concrete", k, Vector3(5.8, 3.0, 3.2), basis)
 	lm.box("Concrete", base + Vector3.UP * (yd - DEPTH_M - 0.9), Vector3(3.5, 1.8, knee * 2.0), basis)
-	_taper(lm, "Concrete", base + Vector3.UP * (JOIN_M - 4.0), t3, n3, Vector2(3.4, 2.6), Vector2(2.2, 1.6),
-		MAST_TOP_M - JOIN_M + 4.0)
+	# The mast stands on the apex, flush with the two legs' tops.
+	_taper(lm, "Concrete", base + Vector3.UP * JOIN_M, t3, n3, _mast_base(), MAST_HEAD, MAST_TOP_M - JOIN_M)
 	lm.box("Steel", base + Vector3.UP * 128.5, Vector3(5.4, 0.35, 4.6), basis)
 	lm.box("Steel", base + Vector3.UP * (MAST_TOP_M + 0.4), Vector3(1.4, 0.8, 1.4), basis)
 	lm.beam("Steel", base + Vector3.UP * (MAST_TOP_M + 0.8), base + Vector3.UP * PYLON_TOP_M, 0.2, 0.2)
@@ -611,12 +622,12 @@ static func _pylon(lm: LandmarkMesh) -> void:
 	lm.box("BeaconLamp", base + Vector3.UP * (MAST_TOP_M + 1.3), Vector3(1.8, 1.0, 1.8), basis, 0.0)
 	for y: float in MAST_BEACON_Y:
 		for side: float in [-1.0, 1.0]:
-			lm.box("BeaconLamp", base + n3 * side * (_mast_half(y) + 0.2) + Vector3.UP * y, Vector3(0.9, 0.8, 0.5),
+			lm.box("BeaconLamp", base + n3 * side * (_pylon_half(y) + 0.2) + Vector3.UP * y, Vector3(0.9, 0.8, 0.5),
 				basis, 0.0)
 
 ## Night floodlights of the white pylon (LandmarkLights.FLOOD_META,
 ## model metres): four on the deck beside the legs washing the mast up
-## to its top in blue, two on the islet plinth lighting the diamond's
+## to its top in blue, two on the islet plinth lighting the A's
 ## legs; then the warm white downlights of the deck.
 static func flood_spots() -> Array:
 	var sp := pylon_s()
@@ -658,7 +669,7 @@ static func flood_spots() -> Array:
 
 ## Red night halos round the aviation lights (LandmarkLights.HALO_META,
 ## model metres): a wide one on the top, smaller ones on both faces of
-## the mast at 72 m and 102 m.
+## the pylon at 72 m (on the legs) and 102 m (on the mast).
 static func beacon_halos() -> Array:
 	var c := at(pylon_s())
 	var t := heading(pylon_s())
@@ -667,13 +678,67 @@ static func beacon_halos() -> Array:
 	var out: Array = [[base + Vector3.UP * (MAST_TOP_M + 1.3), TOP_HALO_M, BEACON_RED]]
 	for y: float in MAST_BEACON_Y:
 		for side: float in [-1.0, 1.0]:
-			out.append([base + n3 * side * (_mast_half(y) + 0.5) + Vector3.UP * y, MAST_HALO_M, BEACON_RED])
+			out.append([base + n3 * side * (_pylon_half(y) + 0.5) + Vector3.UP * y, MAST_HALO_M, BEACON_RED])
 	return out
 
 ## Mast half-width across the deck at height y (for the stay anchors).
 static func _mast_half(y: float) -> float:
-	var f := clampf((y - JOIN_M + 4.0) / (MAST_TOP_M - JOIN_M + 4.0), 0.0, 1.0)
-	return lerpf(2.6, 1.6, f)
+	var f := clampf((y - JOIN_M) / (MAST_TOP_M - JOIN_M), 0.0, 1.0)
+	return lerpf(_mast_base().y, MAST_HEAD.y, f)
+
+## The mast's half-sizes at its base (x along the deck, y across): the
+## two legs' tops side by side, so legs and mast run on without a step.
+static func _mast_base() -> Vector2:
+	var apex := _leg(JOIN_M)
+	return Vector2(LEG_APEX.x * 0.5, apex.x + apex.y)
+
+## A leg of the A above the knee: a straight four-sided shaft cut level at
+## both ends, from y0 (inside the knee block) to the apex, where its inner
+## face reaches the centre line and its top meets the other leg's and the
+## mast's base, so the two merge into the mast with no gap.
+static func _upper_leg(lm: LandmarkMesh, base: Vector3, t3: Vector3, n3: Vector3, side: float, y0: float) -> void:
+	# Corners in the order _taper uses: (along, across) signs round the shaft.
+	var st: Array[float] = [-1.0, 1.0, 1.0, -1.0]
+	var sn: Array[float] = [-1.0, -1.0, 1.0, 1.0]
+	var corner := func(y: float, i: int) -> Vector3:
+		var leg := _leg(y)
+		var f := clampf((y - y0) / (JOIN_M - y0), 0.0, 1.0)
+		var along := lerpf(LEG_KNEE.x, LEG_APEX.x, f) * 0.5
+		return base + Vector3.UP * y + t3 * st[i] * along + n3 * (side * leg.x + sn[i] * leg.y)
+	for i in 4:
+		var j := (i + 1) % 4
+		var a: Vector3 = corner.call(y0, i)
+		var b: Vector3 = corner.call(y0, j)
+		var c: Vector3 = corner.call(JOIN_M, j)
+		var d: Vector3 = corner.call(JOIN_M, i)
+		var hint := t3 * (st[i] + st[j]) + n3 * (sn[i] + sn[j])
+		var nrm := (b - a).cross(d - a).normalized()
+		if nrm.dot(hint) < 0.0:
+			nrm = -nrm
+		lm.quad("Concrete", a, b, c, d, nrm)
+
+## A leg of the A at height y, between its knee at the deck and the apex:
+## its centre line's distance from the deck centre (x) and its
+## half-thickness across the deck (y). The legs run straight, and the
+## apex offset equals the half-thickness there, so the inner faces meet
+## exactly at JOIN_M.
+static func _leg(y: float) -> Vector2:
+	var sp := pylon_s()
+	var knee := at(sp).z + KNEE_OUT_M
+	var yk := deck_y(sp) - 3.0
+	var rise := JOIN_M - yk
+	# 1 / cos of the lean: a leaning leg is this much thicker across.
+	var slope := sqrt(1.0 + pow((knee - LEG_APEX.y * 0.5) / rise, 2.0))
+	var f := clampf((y - yk) / rise, 0.0, 1.0)
+	return Vector2(lerpf(knee, LEG_APEX.y * 0.5 * slope, f), lerpf(LEG_KNEE.y, LEG_APEX.y, f) * 0.5 * slope)
+
+## Outer face of the pylon across the deck at height y: a leg's below the
+## apex, the mast's above it (for the aviation lights).
+static func _pylon_half(y: float) -> float:
+	if y >= JOIN_M:
+		return _mast_half(y)
+	var leg := _leg(y)
+	return leg.x + leg.y
 
 ## Stays in two planes, from both faces of the mast to anchors on the
 ## outside of each edge girder, fanning both ways along the curve.
