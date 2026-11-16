@@ -169,7 +169,7 @@ static func entries() -> Array:
 			"radius_m": 6000.0, "wiki_title": "Railway stations in Cameroon", "height_m": 30.0, "kind": "Station",
 			"secondary": true, "yaw_deg": 114.3, "clear_m": 12.0, "clear_rect_m": [0.0, 0.0, 34.5, 13.7],
 			"archetype": "station", "capital": "CM",
-			"style": {"eave": 9.0, "storey": 4.0, "roof": "flat", "wall": "#e2b45e", "wall_set": "render", "trim": "#a9452f", "tower": "side", "tower_w": 3.0, "tower_h": 30.0, "tower_cap": "flat"},
+			"style": {"eave": 9.0, "storey": 4.0, "roof": "flat", "wall": "#e2b45e", "wall_set": "render", "trim": "#a9452f", "tower": "side", "tower_w": 3.0, "tower_h": 30.0, "tower_cap": "flat", "smooth": 2.5},
 			"aliases": ["gare de yaoundé", "yaoundé railway station"],
 			"outline_m": [[29.9, -9.6], [30.5, 8.8], [19.9, 9.0], [19.9, 7.0], [16.2, 7.1], [16.2, 8.6], [11.8, 9.5], [9.7, 8.4], [6.9, 9.5], [4.8, 8.1], [2.0, 9.3], [-0.6, 8.3], [-3.0, 9.6], [-5.5, 8.4], [-7.9, 9.6], [-10.0, 8.4], [-13.1, 9.5], [-15.6, 8.4], [-18.0, 9.6], [-20.1, 8.3], [-23.1, 9.5], [-25.6, 8.3], [-28.0, 9.6], [-30.5, 8.2], [-30.2, -9.6]]},
 		{"type": "station_hr_zagreb", "name": "Zagreb Main Station", "lat": 45.8047, "lon": 15.978771,

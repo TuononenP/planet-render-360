@@ -41,6 +41,7 @@ extends RefCounted
 ##   stilts    h: the body raised `h` on a grid of concrete pylons
 ##   shell_size the umbrella shells' spacing (m)
 ##   clip      [x0, z0, x1, z1]: draw only the outline inside this box
+##   smooth    m: simplify a noisy outline to within this (default 0.6)
 ##   roof "gable": a long pitched roof along the building
 ##   front_clock one clock over the middle of the front
 ##   windows   "rect": plain rectangular windows, no arched ground floor
@@ -70,7 +71,7 @@ const STOREY_M := 4.5
 static func build(lm: LandmarkMesh, h: float, raw: PackedVector2Array, style: Dictionary = {}) -> float:
 	# Footprints smoothed to within 0.6 m: survey jitter in an outline
 	# would otherwise show as ragged roof edges and slivers at notches.
-	var poly := simple(simplify(clean(raw), 0.6))
+	var poly := simple(simplify(clean(raw), float(style.get("smooth", 0.6))))
 	if style.has("clip"):
 		# Only the station hall where OSM maps it together with long
 		# platform roofs (Dhaka): the outline cut to [x0, z0, x1, z1].
