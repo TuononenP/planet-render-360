@@ -126,6 +126,14 @@ func _climate() -> void:
 	for name in ["maple", "rowan"]:
 		_check(TreeSpecies.spec(name).has("trunk_r"), "complete %s tree row" % name)
 
+## Wire spans with an end on the bridge model at `site` (`entry`).
+func _wired_on_deck(spans: Array, site: Vector2, entry: Dictionary) -> int:
+	var n := 0
+	for span in spans:
+		if LandmarkSites.on_span(span["a"], site, entry) or LandmarkSites.on_span(span["b"], site, entry):
+			n += 1
+	return n
+
 ## Whether a lone street with `tags` in `country` gets overhead wire.
 func _street_wired(data: LocationData, ground: GroundTruth, country: String, tags: Dictionary) -> bool:
 	data.country = country
@@ -162,6 +170,23 @@ func _wires_and_snow() -> void:
 	data.quality_preset = RenderSettings.Preset.ULTRA
 	data.railways[0]["electrified"] = "no"
 	_check(OverheadWires.plan(data, ground).is_empty(), "non-electrified track has no wire")
+	# The Crown Bridge's model carries its own catenary: no pole of the
+	# mapped tram line stands on the seabed along its deck. The eye stays
+	# at the origin either way, so the deck is in the wires' reach: without
+	# the bridge the same line is wired along it.
+	data.detail_at_centre = true
+	data.landmark_type = "kruunuvuorensilta"
+	var bridge := LandmarkSites.bridge_spans(data)
+	var site: Vector2 = bridge[0][0]
+	var span_entry: Dictionary = bridge[0][1]
+	var deck := LandmarkSites.path_points(site, span_entry)
+	data.railways = [OsmTags._rail_entry({"railway": "tram", "electrified": "contact_line", "bridge": "yes"}, deck)]
+	_check(_wired_on_deck(OverheadWires.plan(data, ground), site, span_entry) == 0,
+		"a registry bridge's mapped tram line has no wire poles along the deck")
+	data.landmark_type = "none"
+	_check(_wired_on_deck(OverheadWires.plan(data, ground), site, span_entry) > 0,
+		"the same line without the bridge model is wired along the deck")
+	data.detail_at_centre = false
 	data.railways = []
 	_check(_street_wired(data, ground, "US", {"highway": "residential", "trolley_wire": "yes"}),
 		"trolleybus streets have overhead wire outside Finland and Sweden")

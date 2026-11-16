@@ -115,10 +115,14 @@ static func entries() -> Array:
 			"radius_m": 6000.0, "wiki_title": "Redi (shopping centre)", "height_m": 98.0, "clear_m": 30.0,
 			"kind": "Tower", "aliases": ["visio, kalasatama", "visio kalasatama", "kalasataman visio"]},
 		# Built along its mapped curve at yaw 0: `clear_path_m` (not the
-		# straight `span_m`) is the corridor its model replaces.
+		# straight `span_m`) is the corridor its model replaces. Framed
+		# side-on from the open water south-south-west of it, far enough
+		# for all 1.2 km to fit the view (it runs WNW-ESE, so the default
+		# WSW eye looked along it), the afternoon sun behind the eye.
 		{"type": "kruunuvuorensilta", "name": "Kruunuvuorensilta", "lat": 60.1736, "lon": 25.0022,
 			"radius_m": 6000.0, "wiki_title": "Crown Bridges", "height_m": 135.0, "clear_m": 15.0,
 			"yaw_deg": 0.0, "span_m": 1195.0, "base": "sea", "kind": "Bridge",
+			"frame_m": 700.0, "frame_bearing_deg": 215.0,
 			"clear_path_m": KruunuvuorensiltaLine.clear_path(),
 			"aliases": ["kruunuvuorensilta", "kruunuvuori bridge", "crown bridge helsinki", "kronbergsbron",
 				"kruunusillat"]},

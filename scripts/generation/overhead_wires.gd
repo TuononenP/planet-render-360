@@ -35,6 +35,7 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		var hung := data.country.to_upper() in ["FI", "SE"] and cls in StreetProps.LIT and cls != "pedestrian"
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
+	var bridges := LandmarkSites.bridge_spans(data)
 	var tracks := _track_grid(lines, m)
 	var centres := _centre_grid(data, 35.0 * m)
 	var rings := _ring_grid(data, 12.0 * m)
@@ -55,6 +56,10 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 			if mid.distance_to(centre) > RADIUS_M * m or a.distance_to(b) < 2.0 * m:
 				continue
 			if bool(entry[2]) and not _built(mid, centres, 35.0 * m):
+				continue
+			# A registry bridge's model carries its own catenary poles on
+			# the deck; none stand on the seabed beside it.
+			if _on_bridge_model(a, bridges) or _on_bridge_model(b, bridges):
 				continue
 			candidates.append([mid.distance_squared_to(centre), a, b, entry])
 	candidates.sort_custom(func(x: Array, y: Array) -> bool: return float(x[0]) < float(y[0]))
@@ -80,6 +85,13 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		if spans.size() >= MAX_SPANS:
 			break
 	return spans
+
+## Whether a registry bridge's model carries the way at `p`.
+static func _on_bridge_model(p: Vector2, bridges: Array) -> bool:
+	for sp in bridges:
+		if LandmarkSites.on_span(p, sp[0] as Vector2, sp[1] as Dictionary):
+			return true
+	return false
 
 ## Segments of the wired tracks bucketed by cell, so a pole can stay off
 ## a neighbouring track bed (a terminus loop holds a dozen ways).

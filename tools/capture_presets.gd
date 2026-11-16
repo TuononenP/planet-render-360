@@ -30,6 +30,9 @@ extends SceneTree
 ##   <id>_vantage.jpg            opening look at golden hour
 ##   <id>_h000/090/180/270.jpg   N, E, S, W at golden hour
 ##   <id>_close1/2.jpg           narrow-FOV close-ups of the opening look
+##                               (--landmarks: h000-h270 instead orbit the
+##                               landmark, each eye on that bearing from it
+##                               looking back at it; close2 aims at it)
 ##   <id>_vantage_noon/night.jpg same opening look at noon and at night
 ##   <id>_vantage_late.jpg       two hours after sunset (--times=late)
 ##   <id>_roofs.jpg              from 140 m up, looking down the opening look (--times=roofs)
@@ -241,7 +244,8 @@ func _places(filter: String, landmark_types: String = "", pin: String = "") -> A
 			if entry.is_empty():
 				printerr("CAPTURE: unknown landmark type ", type)
 				continue
-			all.append({"id": type, "name": entry["name"], "lat": entry["lat"], "lon": entry["lon"]})
+			all.append({"id": type, "name": entry["name"], "lat": entry["lat"], "lon": entry["lon"],
+				"landmark": true})
 		return all
 	for row in PresetViews.ROWS:
 		all.append({"id": row["id"], "name": row["name"], "lat": row["lat"], "lon": row["lon"]})
@@ -405,14 +409,23 @@ func _capture(main: Node, view: View360, place: Dictionary, times: PackedStringA
 		await _snap(view, id, "agx")
 		env.tonemap_mode = tonemap
 		_audit[id] = albedo_audit(view._world_root)
-	for bearing in [0, 90, 180, 270]:
-		rig.set_look(-deg_to_rad(float(bearing)), -0.06)
-		await _snap(view, id, "h%03d" % bearing)
+	var landmark := bool(place.get("landmark", false)) and view._data.landmark_type != "none"
+	if landmark:
+		await _orbit_shots(view, id, eye_open)
+	else:
+		for bearing in [0, 90, 180, 270]:
+			rig.set_look(-deg_to_rad(float(bearing)), -0.06)
+			await _snap(view, id, "h%03d" % bearing)
 	rig.set_look(open.x, open.y)
 	rig.zoom_factor = 2.8
 	rig.handle_zoom(1.0)
 	await _snap(view, id, "close1")
-	rig.set_look(open.x, open.y - 0.3)
+	if landmark:
+		# A mid shot of the whole landmark, not the near water below it.
+		var mid := View360.aim(eye_open, _landmark_target(view))
+		rig.set_look(mid.x, mid.y)
+	else:
+		rig.set_look(open.x, open.y - 0.3)
 	rig.zoom_factor = 2.0
 	rig.handle_zoom(1.0)
 	await _snap(view, id, "close2")
@@ -643,6 +656,43 @@ func _settle(seconds: float, frames: int) -> void:
 ## --eye_min: a landmark's opening eye at least `metres` over the ground,
 ## aimed at the model's middle (a far eye in forest otherwise sees only
 ## the trees round it); 0 leaves the app's own opening look.
+## A registry landmark's middle (render units), where its opening eye aims.
+func _landmark_target(view: View360) -> Vector3:
+	var data: LocationData = view._data
+	var lp := TerrainBuilder.landmark_world_pos(data)
+	var entry := LocationData.entry_for_type(data.landmark_type)
+	return Vector3(lp.x, view._ground.height_at_world(lp.x, lp.y)
+		+ float(entry.get("height_m", 20.0)) * 0.5, lp.y)
+
+## --landmarks h shots: an eye on each bearing from the landmark at the
+## opening eye's distance (pulled in to stay inside the built world), at
+## the app's eye height over its own ground and clear of what stands in
+## front, aimed back at the landmark. One eye's compass sweep would face
+## away from it in at least one shot.
+func _orbit_shots(view: View360, id: String, eye_open: Vector3) -> void:
+	var rig := view._rig
+	var data: LocationData = view._data
+	var target := _landmark_target(view)
+	var lp := Vector2(target.x, target.z)
+	var dist := Vector2(eye_open.x - lp.x, eye_open.z - lp.y).length()
+	for bearing in [0, 90, 180, 270]:
+		var b := deg_to_rad(float(bearing))
+		var out := Vector2(sin(b), -cos(b))
+		var d := dist
+		while d > 50.0 and not view._ground.is_inside(lp.x + out.x * d, lp.y + out.y * d):
+			d *= 0.85
+		var xz := lp + out * d
+		var y := View360.eye_y(data, view._ground, xz, false)
+		var look := View360.aim(Vector3(xz.x, y, xz.y), target)
+		y = maxf(y, View360.view_clearance_y(data, view._ground, xz, look.x, look.y))
+		rig.position = Vector3(xz.x, y, xz.y)
+		look = View360.aim(rig.position, target)
+		rig.set_look(look.x, look.y)
+		await _settle(1.0, SHOT_SETTLE_FRAMES)
+		await _snap(view, id, "h%03d" % bearing)
+	rig.position = eye_open
+	await _settle(1.0, SHOT_SETTLE_FRAMES)
+
 func _lift_eye(view: View360, metres: float) -> void:
 	var data: LocationData = view._data
 	if metres <= 0.0 or data.landmark_type == "none":
