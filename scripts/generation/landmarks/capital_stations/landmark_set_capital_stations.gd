@@ -74,5 +74,12 @@ static func build(model: Node3D, type: String) -> bool:
 		"dushanbe_station": LandmarkCsFurtherB.dushanbe(model)
 		"chisinau_station": LandmarkCsFurtherB.chisinau(model)
 		"phnom_penh_station": LandmarkCsFurtherB.phnom_penh(model)
+		"ottawa_station": LandmarkCsFurtherC.ottawa(model)
+		"podgorica_station": LandmarkCsFurtherC.podgorica(model)
+		"skopje_station": LandmarkCsFurtherC.skopje(model)
+		"tbilisi_central_station": LandmarkCsFurtherC.tbilisi(model)
+		"monaco_monte_carlo_station": LandmarkCsFurtherC.monaco(model)
+		"ouagadougou_station": LandmarkCsFurtherC.ouagadougou(model)
+		"abuja_idu_station": LandmarkCsFurtherC.abuja(model)
 		_: return false
 	return true
