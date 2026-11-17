@@ -101,7 +101,8 @@ static func to_entry(row: Dictionary) -> Dictionary:
 		"aliases": aliases,
 	}
 
-## Steepest grade of a fitted bridge's hump, at its ends.
+## Bound on a fitted bridge's hump: a parabola this steep at its ends.
+## BridgeCamber's eased hump meets the road flat and stays under it.
 const CAMBER_GRADE := 0.1
 ## Structures that stay level however low their banks.
 const NO_CAMBER := ["pontoon", "swing", "lift", "bascule"]
@@ -110,7 +111,7 @@ const NO_CAMBER := ["pontoon", "swing", "lift", "bascule"]
 ## `clear` (never under a lower deck's room): the model built from it
 ## meets banks that stand lower or higher than the table's estimate. Over
 ## lower banks it humps back up toward its own clearance at mid-span
-## (`camber`, BridgeCamber), as far as CAMBER_GRADE at its ends allows.
+## (`camber`, BridgeCamber), as far as CAMBER_GRADE allows.
 ## `tilt_m` raises its +X end and lowers its -X end by that much.
 ## `rise_m` is the least hump it must have (ground under the span), within
 ## the same grade, whatever its structure.

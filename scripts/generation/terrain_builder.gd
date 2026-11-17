@@ -714,7 +714,7 @@ static func span_rise_m(ground: GroundTruth, at: Vector2, entry: Dictionary, wat
 			if not ground.is_inside(p.x, p.y) or ground.water_at(p.x, p.y) > 0.0:
 				continue
 			var g := (ground.height_at_world(p.x, p.y) - water_y) / m2u + SPAN_GROUND_AIR_M
-			need = maxf(need, (g - deck) / maxf(1.0 - k * k, 0.1))
+			need = maxf(need, (g - deck) / maxf(BridgeCamber.lift(k, 1.0, 1.0), 0.1))
 	return need
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:

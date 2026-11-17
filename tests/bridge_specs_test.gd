@@ -144,6 +144,8 @@ func _check_seated(arcole: Dictionary) -> void:
 		# The hump leaves the ends at the banks' height and the feet on the water.
 		_check(BridgeCamber.lift(half, half, camber) < 0.001 and absf(BridgeCamber.lift(0.0, half, camber) - camber) < 0.001,
 			"the hump is none at the ends and whole at mid-span")
+		var end_grade := (BridgeCamber.lift(half * 0.98, half, camber) - BridgeCamber.lift(half, half, camber)) / (half * 0.02)
+		_check(end_grade < 0.005, "the hump meets the road level, got a %.3f grade at its end" % end_grade)
 	var a := LandmarkSites.axis(entry)
 	var spans := [[Vector2.ZERO, entry]]
 	_check(LandmarkSites.lands_at_span(PackedVector2Array([a * (half + 1.5), a * (half + 1.5) + Vector2(6, 8)]), spans),

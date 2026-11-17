@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Humps a parametric bridge (BridgeParam) built level at its banks'
 ## height: the deck keeps that height at both ends and rises `rise`
-## metres to mid-span on a parabola, as a river bridge between low quays
+## metres to mid-span on an eased curve, as a river bridge between low quays
 ## does. Everything over the water rides up with it whole (girders, ribs
 ## and arches keep their depth and shape), and only what stands in the
 ## water's first FOOT_M stretches: the piers grow taller toward the
@@ -23,10 +23,13 @@ const FOOT_SHARE := 0.4
 ## Most cuts of one triangle (a guard, never reached by a sane model).
 const MAX_PIECES := 4096
 
-## How far the deck stands over its ends at `x`, `half` from the middle.
+## How far the deck stands over its ends at `x`, `half` from the middle:
+## level at the ends, so the deck eases onto its road with no crease, and
+## steepest about a fifth of the way in.
 static func lift(x: float, half: float, rise: float) -> float:
 	var k := clampf(x / maxf(half, 0.001), -1.0, 1.0)
-	return rise * (1.0 - k * k)
+	var u := 1.0 - k * k
+	return rise * u * u
 
 ## `tilt` raises the +X end and lowers the -X end by that much, in a
 ## straight fall along the bridge (banks of unequal height).
