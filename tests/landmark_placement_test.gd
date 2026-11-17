@@ -190,7 +190,9 @@ func _run() -> void:
 	var hg := GroundTruth.new(hd)
 	var he := LocationData.entry_for_type("helsinki_cathedral")
 	var at: Array = he["base_at_m"]
-	var anchor := hg.height_at_world(float(at[0]), float(at[1])) - 0.3
+	var he_axis := LandmarkSites.axis(he)
+	var at_w := he_axis * float(at[0]) + Vector2(-he_axis.y, he_axis.x) * float(at[1])
+	var anchor := hg.height_at_world(at_w.x, at_w.y) - 0.3
 	var cathedral := TerrainBuilder._landmark(hd, hg)
 	_check(absf(cathedral.position.y - anchor) < 0.01, "Helsinki Cathedral must stand on the ground at its stair's foot")
 	_check(cathedral.position.y < TerrainBuilder.site_ground_y(hd, hg, 0, 0, 20.0) - 0.3 - 0.5,
@@ -212,29 +214,44 @@ func _run() -> void:
 	for z in 241:
 		for x in 241:
 			var wz := (float(z) - 120.5) * step
-			sd.heights[z * 241 + x] = 10.0 + 0.5 * clampf(78.0 - wz, 0.0, 60.0)
+			sd.heights[z * 241 + x] = 10.0 + 0.5 * clampf(66.0 - wz, 0.0, 60.0)
 	var cg := GroundTruth.new(sd)
 	var stair := TerrainBuilder._landmark(sd, cg)
-	var spec: Dictionary = LandmarkStairCut.STAIRS["helsinki_cathedral"]
+	var spec: Dictionary = LandmarkStairCut.stairs()["helsinki_cathedral"]
 	var buried := 0
 	var worst := -INF
+	var top_z := float(spec["top_z"])
+	var run := float(spec["foot_z"]) - top_z
+	var axis := LandmarkSites.axis(LocationData.entry_for_type("helsinki_cathedral"))
+	var risers := int(spec["risers"])
 	for sx in [-25.0, 0.0, 25.0]:
-		for k in 49:
-			# The front and back of each tread, deck 10.4 m over 49 risers.
+		for k in risers:
+			# The front and back of each tread, deck 10.4 m over the risers.
 			for zf in [0.02, 0.98]:
-				var zs: float = 41.0 + (float(k) + zf) * 30.0 / 49.0
-				var tread := stair.position.y + 10.4 * (1.0 - float(k + 1) / 50.0)
-				var over: float = cg.height_at_world(sx, zs) - tread
+				var zs: float = top_z + (float(k) + zf) * run / float(risers)
+				var tread := stair.position.y + 10.4 * (1.0 - float(k + 1) / float(risers + 1))
+				var wp: Vector2 = axis * float(sx) + Vector2(-axis.y, axis.x) * zs
+				var over: float = cg.height_at_world(wp.x, wp.y) - tread
 				worst = maxf(worst, over)
 				if over > 0.0:
 					buried += 1
+	var mon := stair.get_node_or_null("Model/Monument") as Node3D
+	_check(mon != null, "Helsinki Cathedral must build its Alexander II monument as its own node")
+	if mon != null:
+		var mw := mon.global_transform.origin if mon.is_inside_tree() else \
+			(stair.transform * (stair.get_node("Model") as Node3D).transform * mon.position)
+		_check(absf(mw.y - (cg.height_at_world(mw.x, mw.z) - 0.3)) < 0.01,
+			"the monument must stand on the square under it, not on the stair's datum")
 	_check(buried == 0, "the ground must stay under every Helsinki Cathedral tread, %d buried, worst %.2f m over" % [buried, worst])
 	_check(cg.height_at_world(0.0, 20.0) > stair.position.y + 10.4 + 2.0,
 		"the stair cut must leave the hill under the terrace alone")
-	_check(absf(cg.height_at_world(0.0, 100.0) - cg.height_at_world(0.0, 140.0)) < 0.05,
+	var base: Array = LocationData.entry_for_type("helsinki_cathedral")["base_at_m"]
+	var anchor_at := Vector2(float(base[0]), float(base[1]))
+	var anchor_w := axis * anchor_at.x + Vector2(-axis.y, axis.x) * anchor_at.y
+	_check(absf(cg.height_at_world(anchor_w.x, anchor_w.y) - cg.height_at_world(anchor_w.x, 160.0)) < 0.05,
 		"the square at the anchor must keep its own level")
-	_check(LandmarkStairCut.rect_m(spec).has_point(Vector2(0, 71.0 + 9.0)) and not LandmarkStairCut.rect_m(spec).grow(
-		LandmarkStairCut.FEATHER_M + LandmarkStairCut.REACH_M).has_point(Vector2(0, 100.0)), "the cut must reach a post past the foot and stop short of the anchor")
+	_check(LandmarkStairCut.rect_m(spec).has_point(Vector2(0, float(spec["foot_z"]) + 9.0)) and not LandmarkStairCut.rect_m(spec).grow(
+		LandmarkStairCut.FEATHER_M + LandmarkStairCut.REACH_M).has_point(anchor_at), "the cut must reach a post past the foot and stop short of the anchor")
 	stair.free()
 	# A mall extruded from its OSM outline sits at the median ground along
 	# that outline, and on a slope a plinth carries its walls down to the

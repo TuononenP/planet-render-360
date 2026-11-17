@@ -400,6 +400,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	var piece := 3.0 * m2u
 	var roads := _road_grid(data, m2u)
 	var decks := BridgeStructures.barrier_rings(data, m2u)
+	var models := LandmarkSites.model_rect_sites(data)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
@@ -434,6 +435,10 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				# A wall mapped across a road runs under its bridge or stops at
 				# its edge: drawn on the terrain it stood across the lanes.
 				if _on_road((p0 + p1) * 0.5, roads, m2u):
+					continue
+				# A landmark model that builds its own walls (model_rects_m)
+				# stands where the mapped ones would cross it.
+				if LandmarkSites.in_model_rects((p0 + p1) * 0.5, models):
 					continue
 				# A wall or rail along the bank ends at the bridge's abutment:
 				# between its carriageways it stood as a stub on the deck.

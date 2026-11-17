@@ -63,6 +63,7 @@ static func floor_y(data: LocationData, ground: GroundTruth, p: Vector2) -> floa
 ## Join an authored crag/mound's bottom edge to the real terrain. A
 ## corrected datum can expose a short gap where the DEM is lower.
 static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
+	_seat(root, ground)
 	if not outline(type).is_empty():
 		_plinth(root, ground, type)
 		return
@@ -101,6 +102,27 @@ static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
 	for part in lm.commit(model):
 		if overrides.get(str(part.name)) != null:
 			part.set_surface_override_material(0, overrides[str(part.name)])
+
+## Marks a child of a model's "Model" node that stands on the ground
+## under its own origin rather than on the model's datum: a monument out on
+## a square that falls away from the model's base (Helsinki Cathedral's
+## Alexander II statue).
+const SEAT_META := "seat_ground"
+
+## Sets each SEAT_META child's height so its origin stands on the ground
+## under it, sunk as TerrainBuilder._hero_y sinks a model.
+static func _seat(root: Node3D, ground: GroundTruth) -> void:
+	var model := root.get_node_or_null("Model") as Node3D
+	if model == null:
+		return
+	var to_world := root.transform * model.transform
+	for child in model.get_children():
+		if not (child is Node3D) or not bool(child.get_meta(SEAT_META, false)):
+			continue
+		var n := child as Node3D
+		var w := to_world * n.position
+		var on := Vector3(w.x, ground.height_at_world(w.x, w.z) - 0.3 * WorldScale.metres_to_units(), w.z)
+		n.position.y = (to_world.affine_inverse() * on).y
 
 ## Model-local outline (metres, before yaw) of a landmark extruded from
 ## its OSM footprint (the capital-region malls and the Redi podium),

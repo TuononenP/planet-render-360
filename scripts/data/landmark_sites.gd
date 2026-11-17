@@ -76,7 +76,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
-		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m", "tree_rect", "deck_ends", "deck_m", "deck_width_m"]:
+		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "model_rects_m", "tree_clear_m", "tree_rect", "deck_ends", "deck_m", "deck_width_m"]:
 			if entry.has(key):
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
@@ -173,6 +173,37 @@ static func rect_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
 	var d := p - (at + (a * float(r[0]) + cross * float(r[1])) * m)
 	return Vector2(maxf(absf(d.dot(a)) - float(r[2]) * m, 0.0),
 		maxf(absf(d.dot(cross)) - float(r[3]) * m, 0.0)).length()
+
+## True when `p` lies inside one of a site's `model_rects_m` precincts
+## ([along, across, half_along, half_across] metres in the model frame,
+## as `clear_rect_m`): ground the model itself builds out (Helsinki
+## Cathedral's wings, pavilions and the statue before it), where mapped
+## buildings and barriers would stand inside or across it.
+static func in_model_rect(p: Vector2, at: Vector2, entry: Dictionary) -> bool:
+	for raw in entry.get("model_rects_m", []):
+		if rect_dist(p, at, {"clear_rect_m": raw, "yaw_deg": entry.get("yaw_deg", 0.0)}) <= 0.0:
+			return true
+	return false
+
+## The sites in `data` that carry `model_rects_m`, as [at, entry]: the
+## hero and every registry candidate.
+static func model_rect_sites(data: LocationData) -> Array:
+	var out: Array = []
+	if data.landmark_type != "none":
+		var entry := LocationData.entry_for_type(data.landmark_type)
+		if entry.has("model_rects_m"):
+			out.append([TerrainBuilder.landmark_site_xz(data), entry])
+	for c in data.landmark_candidates:
+		if (c as Dictionary).has("model_rects_m"):
+			out.append([Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0))), c])
+	return out
+
+## True when `p` lies in any of `sites`' model rects (model_rect_sites).
+static func in_model_rects(p: Vector2, sites: Array) -> bool:
+	for site in sites:
+		if in_model_rect(p, site[0], site[1]):
+			return true
+	return false
 
 static func _shape_dist(p: Vector2, at: Vector2, entry: Dictionary) -> float:
 	if entry.has("clear_path_m"):

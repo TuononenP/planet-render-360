@@ -439,8 +439,12 @@ static func _core_landmarks() -> Array:
 		{"type": "turku_cathedral", "name": "Turku Cathedral", "lat": 60.4524, "lon": 22.2781, "radius_m": 2500.0,
 			"wiki_title": "Turku Cathedral", "height_m": 101.0,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
-		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.1704, "lon": 24.9522, "radius_m": 5000.0,
-			"wiki_title": "Helsinki Cathedral", "height_m": 62.0, "base_at_m": [0.0, 100.0],
+		# The origin is the mapped church's centre, turned with the mapped
+		# front (stair, wings and the pavilions' fronts); the model builds
+		# the wings, pavilions and the Alexander II statue (model_rects_m).
+		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.170382, "lon": 24.952182, "radius_m": 5000.0,
+			"wiki_title": "Helsinki Cathedral", "height_m": 62.0, "yaw_deg": -2.6, "base_at_m": [-30.0, 84.0],
+			"model_rects_m": [[0.0, 36.0, 67.0, 22.0], [0.6, 97.0, 11.0, 10.0]],
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
 		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
 			"wiki_title": "Eiffel Tower", "height_m": 330.0,

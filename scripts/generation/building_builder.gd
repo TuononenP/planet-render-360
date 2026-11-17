@@ -405,7 +405,8 @@ static func _accepted(data: LocationData, b: Dictionary, site: Vector2, edge: fl
 	var z := float(b["z"])
 	if data.landmark_type != "none":
 		var entry := LocationData.entry_for_type(data.landmark_type)
-		if LandmarkSites.span_dist(Vector2(x, z), site, entry) < LandmarkSites.clear_m(entry):
+		if LandmarkSites.span_dist(Vector2(x, z), site, entry) < LandmarkSites.clear_m(entry) \
+				or LandmarkSites.in_model_rect(Vector2(x, z), site, entry):
 			return false
 	return not _near_landmark_candidate(data, x, z) and absf(x) <= edge and absf(z) <= edge
 
@@ -888,8 +889,9 @@ static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> 
 	for c in data.landmark_candidates:
 		if bool(c.get("mapped", false)):
 			continue
-		if LandmarkSites.span_dist(Vector2(x, z), Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0))),
-				c) < float(c.get("clear_m", LandmarkSites.OSM_CLEAR_M)):
+		var at := Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0)))
+		if LandmarkSites.span_dist(Vector2(x, z), at, c) < float(c.get("clear_m", LandmarkSites.OSM_CLEAR_M)) \
+				or LandmarkSites.in_model_rect(Vector2(x, z), at, c):
 			return true
 	return false
 

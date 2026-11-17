@@ -15,15 +15,19 @@ extends RefCounted
 ## stands on the ground at its registry `base_at_m` point, on the square
 ## clear of the cut, so the cut reads that same point for its datum.
 
-## Model-local stair, metres: the widest step across x0..x1, the
-## deck `top_m` over the foot at `top_z`, `risers` steps down to `foot_z`.
-## Mirrors LandmarkCathedrals.helsinki: a 10.4 m deck (terrace 9.8 +
-## paving 0.6), the landing at z 40..41, 49 risers over z 41..71 whose ends
-## widen to x ±37 at the foot, the terrace's front wall at z 39.
-const STAIRS := {
-	"helsinki_cathedral": {"x0": -37.0, "x1": 37.0, "top_m": 10.4, "top_z": 41.0,
-		"foot_z": 71.0, "risers": 49},
-}
+## Model-local front, metres: the terrace front it falls from across
+## x0..x1 (out to the corner pavilions), the deck `top_m` over the foot at
+## `top_z`, `risers` steps down to `foot_z`; behind the stair (|x| up to
+## `deck_half`) the ground is held under the deck, behind the wings
+## either side under their `wing_m` decks. Helsinki Cathedral's from
+## LandmarkFhSenateFront.
+static func stairs() -> Dictionary:
+	return {
+		"helsinki_cathedral": {"x0": -LandmarkFhSenateFront.PAV_OUT, "x1": LandmarkFhSenateFront.PAV_OUT,
+			"top_m": 10.4, "top_z": LandmarkFhSenateFront.TOP_Z, "foot_z": LandmarkFhSenateFront.FOOT_Z,
+			"risers": LandmarkFhSenateFront.RISERS, "deck_half": LandmarkFhSenateFront.STAIR_HALF,
+			"wing_m": LandmarkFhSenateFront.WING_DECK},
+	}
 
 ## Past the stair on every side: over one terrain post spacing.
 const REACH_M := 10.0
@@ -38,9 +42,10 @@ static func cut(surface: PackedFloat32Array, size: int, step: float, data: Locat
 		return
 	var half := float(size) * 0.5
 	var m2u := WorldScale.metres_to_units()
-	for site in LandmarkTerrain._sites(data, STAIRS.keys()):
+	var table := stairs()
+	for site in LandmarkTerrain._sites(data, table.keys()):
 		var entry: Dictionary = site[1]
-		var spec: Dictionary = STAIRS[str(entry["type"])]
+		var spec: Dictionary = table[str(entry["type"])]
 		var rect := rect_m(spec)
 		var at: Vector2 = site[0]
 		var axis := LandmarkSites.axis(entry)
@@ -60,7 +65,7 @@ static func cut(surface: PackedFloat32Array, size: int, step: float, data: Locat
 				if d >= FEATHER_M:
 					continue
 				var i := z * size + x
-				var target := minf(surface[i], root + hold_m(spec, l.y) * m2u)
+				var target := minf(surface[i], root + hold_m(spec, l) * m2u)
 				surface[i] = lerpf(target, surface[i], smoothstep(0.0, FEATHER_M, maxf(d, 0.0)))
 
 ## The cut's model-local rect (x, z), metres.
@@ -70,12 +75,13 @@ static func rect_m(spec: Dictionary) -> Rect2:
 	return Rect2(lo, hi - lo)
 
 ## Height over the model's y = 0, metres, the ground is held at, at
-## model-local `z`: under the deck behind the stair, under the foot below
-## the steps, and just under the bottom tread on the square past it.
-static func hold_m(spec: Dictionary, z: float) -> float:
-	if z < float(spec["top_z"]):
-		return float(spec["top_m"]) - CLEAR_M
-	if z <= float(spec["foot_z"]):
+## model-local `l` (x, z): under the deck (or a wing's deck) behind the
+## stair, under the foot below the steps, and just under the bottom tread
+## on the square past it.
+static func hold_m(spec: Dictionary, l: Vector2) -> float:
+	if l.y < float(spec["top_z"]):
+		return (float(spec["top_m"]) if absf(l.x) <= float(spec["deck_half"]) else float(spec["wing_m"])) - CLEAR_M
+	if l.y <= float(spec["foot_z"]):
 		return -CLEAR_M
 	return float(spec["top_m"]) / (float(spec["risers"]) + 1.0) - CLEAR_M
 

@@ -200,20 +200,21 @@ static func _turku_tower(lm: LandmarkMesh) -> void:
 ## dome on a drum ringed by 24 Corinthian columns (62 m to the cross),
 ## Lohrmann's four small corner domes on colonnaded drums, the twelve
 ## zinc apostles on the pediment apexes and corners (1849), and the
-## monumental granite stair down to the square (south, +Z), widening as
-## it falls, its stepped ends free in front of the terrace's wall.
+## monumental granite stair down to the square (south, +Z) between the
+## raised wings to Lohrmann's corner pavilions, with Alexander II's
+## monument before it (LandmarkFhSenateFront).
 static func helsinki(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("White", LandmarkMaterials.pbr("render", "#ECE9E1", 3.0))
 	lm.use("Green", LandmarkMaterials.pbr("concrete", "#4E8C74", 2.0, 0.55, 0.3))
 	lm.use("Stairs", LandmarkMaterials.pbr("limestone", "#A99289", 3.0))
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#8E807A", 2.5))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#B3A493", 4.0))
 	lm.use("Iron", LandmarkMaterials.paint("#2B2D2C"))
 	lm.use("Windows", LandmarkMaterials.glass("#262D31"))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	# y = 0 is Senate Square south of the stair's foot (registry
 	# `base_at_m`, clear of the ground LandmarkStairCut holds under the
-	# steps, whose table mirrors this stair); the terrace stands 9.8 m
+	# front, whose table mirrors it); the terrace stands 9.8 m
 	# above it, level with the hilltop in the city's elevation model. Its
 	# granite walls go `found` m below y = 0 so the lower streets east and
 	# north never show a gap.
@@ -221,31 +222,9 @@ static func helsinki(model: Node3D) -> void:
 	var found := 4.0
 	lm.box("Granite", Vector3(0, (plat - found) * 0.5, 0), Vector3(78.0, plat + found, 78.0))
 	lm.box("Stairs", Vector3(0, plat + 0.3, 0), Vector3(78.6, 0.6, 78.6))
-	# Monumental stair: a 2 m landing flush with the terrace paving, then
-	# 49 risers of about 0.21 m over 30 m (z 41..71), 64 m wide at the top
-	# and widening to 74 m at the foot, so each end steps down and out in
-	# front of the terrace's wall, with no cheek. Every step stands on the
-	# same `found` footing as the walls, so the square's slope never opens
-	# under it.
-	var deck := plat + 0.6
-	lm.box("Stairs", Vector3(0, (deck - found) * 0.5, 40.0), Vector3(64.0, deck + found, 2.0), Basis(), 0.0)
-	var risers := 49
-	var tread := 30.0 / float(risers)
-	for k in risers:
-		var z := 41.0 + float(k) * tread
-		var h := deck * (1.0 - float(k + 1) / float(risers + 1))
-		var w := 64.0 + 10.0 * float(k + 1) / float(risers)
-		lm.box("Stairs", Vector3(0, (h - found) * 0.5, z + tread * 0.5), Vector3(w, h + found, tread), Basis(), 0.0)
-	# The terrace's front edge beside the stair: a granite kerb between
-	# square posts, an iron rail on top.
-	for sx in [-1.0, 1.0]:
-		lm.box("Granite", Vector3(sx * 35.7, deck + 0.2, 38.7), Vector3(6.6, 0.4, 0.6))
-		for px in [32.5, 38.9]:
-			lm.box("Granite", Vector3(sx * px, deck + 0.9, 38.7), Vector3(0.9, 1.8, 0.9))
-		for ry in [0.65, 1.15]:
-			lm.box("Iron", Vector3(sx * 35.7, deck + ry, 38.7), Vector3(5.5, 0.06, 0.06), Basis(), 0.0)
-		for k in 9:
-			lm.box("Iron", Vector3(sx * (33.3 + 0.6 * float(k)), deck + 0.8, 38.7), Vector3(0.04, 0.8, 0.04), Basis(), 0.0)
+	# The stair, the wings and pavilions either side of it and the
+	# Alexander II monument on the square (LandmarkFhSenateFront).
+	LandmarkFhSenateFront.build(lm, plat, found)
 	var arm_l := 54.0
 	var arm_w := 22.0
 	var wall := 17.0
@@ -347,6 +326,8 @@ static func helsinki(model: Node3D) -> void:
 	lm.box("Gilt", Vector3(0, (lan.y + 8.3 + top) * 0.5, 0), Vector3(0.3, top - lan.y - 8.3, 0.3))
 	lm.box("Gilt", Vector3(0, top - 1.6, 0), Vector3(1.6, 0.3, 0.3))
 	lm.commit(model)
+	LandmarkFhSenateFront.monument(model, LandmarkMaterials.pbr("stone", "#B3A493", 4.0),
+		LandmarkMaterials.paint("#2B2D2C"))
 
 ## Hexastyle Corinthian portico: columns on a stylobate, architrave,
 ## frieze and cornice, the pediment with raking cornices, and three
