@@ -76,7 +76,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			"span_m": float(entry.get("span_m", 0.0)), "base": str(entry.get("base", "ground")),
 			"base_drop_m": float(entry.get("base_drop_m", 0.0)),
 			"registry": true})
-		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m", "tree_rect", "deck_ends"]:
+		for key in ["clear_offsets_m", "clear_path_m", "clear_rect_m", "tree_clear_m", "tree_rect", "deck_ends", "deck_m", "deck_width_m"]:
 			if entry.has(key):
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
@@ -260,6 +260,22 @@ static func on_span(p: Vector2, at: Vector2, entry: Dictionary) -> bool:
 	if not bool(entry.get("deck_ends", false)) or half <= 0.0:
 		return true
 	return absf((p - at).dot(axis(entry))) <= half
+
+## True when `piece`, a mapped deck outside every span (outside_spans),
+## starts within clear_m of the end of a model whose deck stops there
+## (`deck_ends`): the road on its abutment, which the model's deck is
+## built level with (TerrainBuilder.landing_clear_m).
+static func lands_at_span(piece: PackedVector2Array, spans: Array) -> bool:
+	for sp in spans:
+		var entry := sp[1] as Dictionary
+		if not bool(entry.get("deck_ends", false)):
+			continue
+		var reach := axis(entry) * float(entry.get("span_m", 0.0)) * 0.5 * WorldScale.metres_to_units()
+		for end: Vector2 in [(sp[0] as Vector2) + reach, (sp[0] as Vector2) - reach]:
+			for p: Vector2 in [piece[0], piece[piece.size() - 1]]:
+				if p.distance_to(end) < clear_m(entry):
+					return true
+	return false
 
 ## Tree keep-outs round the landmarks standing here, [site xz, entry,
 ## radius m, reach²] each: the primary always (its `tree_clear_m`, else

@@ -11,9 +11,13 @@ extends RefCounted
 ## a girder or truss (rail below road); `arch_spans` limits a truss to some spans.
 
 ## Girder depth, slab included: about 1/18 of the longest span, 1.2..6 m, and
-## never more than the clearance leaves.
+## never more than the clearance leaves. Under a deck built down to low
+## banks (BridgeSpec.fitted, which marks its `camber`) at most half the
+## clearance: deeper, a long-span girder walled the river off at its ends.
 static func girder_depth(row: Dictionary) -> float:
-	return minf(clampf(BridgeSpec.widest_span(row) / 18.0, 1.2, 6.0), float(row["clear"]) - 0.3)
+	var clear := float(row["clear"])
+	var depth := minf(clampf(BridgeSpec.widest_span(row) / 18.0, 1.2, 6.0), clear - 0.3)
+	return minf(depth, maxf(1.2, clear * 0.5)) if row.has("camber") else depth
 
 ## Piers under every interior support and the abutments, up to the soffit.
 static func piers(lm: LandmarkMesh, row: Dictionary, soffit: float) -> void:

@@ -197,6 +197,10 @@ static func _pbr(set_name: String, hex: String) -> Material:
 		MaterialLibrary._calib_tint(row["mean"], target), 1.0)
 	return m
 
+## Most open water under a mapped deck going on from a registry bridge's
+## end that is still laid as road on its abutment, metres.
+const LANDING_WET_M := 8.0
+
 static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	_mats.clear()
 	var m2u := WorldScale.metres_to_units()
@@ -286,11 +290,26 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	var finish := str(r["finish"])
 	if line is Dictionary and not surf.districts.is_empty() and marking.is_empty():
 		finish = _district_finish(line, surf.districts, m2u)
+	var lines: Array = [dense]
 	if bool(r["bridge"]):
-		for piece in LandmarkSites.outside_spans(dense, spans):
+		lines = []
+		for piece: PackedVector2Array in LandmarkSites.outside_spans(dense, spans):
+			# A dry piece going on from a registry model's deck end is the
+			# road on its abutment: a ribbon on the ground the model's deck
+			# is built level with, not a deck of its own ramping up beside it.
+			# A few wet metres at the model's end are under its deck's edge.
+			if not spans.is_empty() and LandmarkSites.lands_at_span(piece, spans):
+				var wet := 0
+				for run: PackedVector2Array in _dry_runs(piece, surf):
+					wet -= run.size()
+				wet += piece.size()
+				if float(wet) * surf.step * 0.34 <= LANDING_WET_M * m2u:
+					lines.append(piece)
+					continue
 			RoadBridgeDecks.build(batches, BridgeLandings.landed(piece, dense, surf, m2u), float(r["width_u"]), surf, m2u,
 				str(r.get("bridge_structure", "unknown")), int(r.get("layer", 0)), pts, str(r.get("class", "")), r, wear_seed)
-		return
+		if lines.is_empty():
+			return
 	var layer := depth_layer(int(r["rank"]), finish, step)
 	var lift := (lift_for_layer(layer) + (BAND_LIFT_M if finish.begins_with("crossing") else 0.0)) * m2u
 	# RoadSurface attributes: lanes, rank, kerbed urban street + wear seed.
@@ -301,7 +320,10 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	var lit := urban or _lit_way(dense, int(r["rank"]) >= 2, surf, m2u)
 	var attr := Color((clampf(float(r["lanes"]), 0.0, 8.0) + (16.0 if int(r.get("oneway", 0)) != 0 else 0.0)) / 32.0, float(r["rank"]) / 2.0,
 		RoadSurface.wear_attr(urban, wear_seed, lit), 1.0)
-	for run in _dry_runs(dense, surf):
+	var runs: Array = []
+	for src: PackedVector2Array in lines:
+		runs.append_array(_dry_runs(src, surf))
+	for run in runs:
 		if abort != null and abort.requested:
 			break
 		var pieces: Array = [run]

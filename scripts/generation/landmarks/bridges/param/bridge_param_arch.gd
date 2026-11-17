@@ -38,10 +38,12 @@ static func deck(lm: LandmarkMesh, row: Dictionary) -> void:
 		var span := xs[i + 1] - xs[i]
 		var cx := (xs[i] + xs[i + 1]) * 0.5
 		var r := span * 0.5
-		var t := clampf(span / 45.0, 0.8, 2.5)
+		# Under a low deck (one built down to its banks, BridgeSpec.fitted)
+		# the rib thins so a shallow arch still fits over the water.
+		var t := minf(clampf(span / 45.0, 0.8, 2.5), maxf(soffit * 0.45, 0.3))
 		# The springing keeps the whole rib above the water.
 		var spring := maxf(soffit - rise, t * 0.5 + 0.05)
-		var ry := soffit - t * 0.5 - spring
+		var ry := maxf(soffit - t * 0.5 - spring, 0.1)
 		var pts := LandmarkBrKit.arch_pts(cx, spring, r, ry, SEG)
 		var cols := maxi(int(span / 10.0), 2)
 		for z in zs:

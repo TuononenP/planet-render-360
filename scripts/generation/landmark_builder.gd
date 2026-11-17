@@ -83,6 +83,16 @@ static func build(type: String) -> Node3D:
 				LandmarkArchetypes.build(model, "tower", 120.0, Vector2(24.0, 24.0))
 	return root
 
+## A BridgeSpecs bridge built with its deck `deck_m` over the water
+## instead of its row's clearance, `tilt_m` higher at its +X end and lower
+## at its -X end (TerrainBuilder.landing_ends_m).
+## `rise_m` is the least hump it needs to clear the ground under its span.
+static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_m: float = 0.0) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Landmark_%s" % type
+	BridgeParam.build(model_root(root), BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m))
+	return root
+
 ## On-the-fly archetype for any OSM-tagged feature (OsmFetcher.
 ## archetype_for), built at the feature's real height and footprint
 ## (height in metres; footprint in current internal units, converted

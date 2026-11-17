@@ -190,10 +190,11 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 		if c.has("type"):
 			var c_type := str(c["type"])
 			var dist_m := Vector2(cx, cz).length()
-			var hero := LandmarkBuilder.build(c_type)
 			var entry := LocationData.entry_for_type(c_type)
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
-			hero.position = Vector3(cx, _hero_y(data, ground, cx, cz, entry, half), cz)
+			var hero_y := _hero_y(data, ground, cx, cz, entry, half)
+			var hero := _hero(c_type, entry, ground, Vector2(cx, cz), hero_y)
+			hero.position = Vector3(cx, hero_y, cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
 			LandmarkTerrain.stitch(hero, ground, c_type)
 			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type)
@@ -567,10 +568,11 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var pos := landmark_world_pos(data)
-	var root := LandmarkBuilder.build(data.landmark_type)
 	var entry := LocationData.entry_for_type(data.landmark_type)
 	var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
-	root.position = Vector3(pos.x, _hero_y(data, ground, pos.x, pos.y, entry, half), pos.y)
+	var root_y := _hero_y(data, ground, pos.x, pos.y, entry, half)
+	var root := _hero(data.landmark_type, entry, ground, pos, root_y)
+	root.position = Vector3(pos.x, root_y, pos.y)
 	root.rotation.y = -deg_to_rad(float(entry.get("yaw_deg", 0.0)))
 	LandmarkTerrain.stitch(root, ground, data.landmark_type)
 	var imp_mode := LandmarkImpostor.apply_if_far(root, pos.length(), data.landmark_type)
@@ -613,6 +615,107 @@ static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		return LandmarkTerrain.outline_base_y(data, ground, Vector2(x, z), entry) - 0.3 \
 			+ float(entry.get("base_drop_m", 0.0))
 	return site_ground_y(data, ground, x, z, half) - 0.3 + float(entry.get("base_drop_m", 0.0))
+
+## How far past each end of a parametric bridge's span the landing's
+## ground is sought, the highest table clearance that still counts as a
+## bank-to-bank bridge, and the least its deck stands over the water, metres.
+const LANDING_SEEK_M := 12.0
+const LANDING_FIT_CLEAR_M := 15.0
+const DECK_MIN_AIR_M := 2.0
+
+## The deck height over the water, metres, at which a parametric bridge
+## (`deck_ends`, standing on the water at `water_y`) meets the ground it
+## lands on, or NAN to keep the row's own. At each end, the highest dry
+## ground within LANDING_SEEK_M past the span along the axis (a quay's
+## top, not the foot of its wall), the two ends averaged. The row's
+## clearance is an estimate, and the rendered banks often stand lower
+## (Pont d'Arcole's deck stood 3-4 m over the quay its road goes on
+## along). The model is built to that height (BridgeSpec.fitted), not
+## sunk: its arch and piers still stand on the water. A bridge whose
+## table clearance is over LANDING_FIT_CLEAR_M (a high-level crossing
+## reached by viaducts) keeps its own height.
+static func landing_clear_m(ground: GroundTruth, at: Vector2, entry: Dictionary, water_y: float) -> float:
+	var ends := landing_ends_m(ground, at, entry, water_y)
+	return NAN if is_nan(ends.x) else (ends.x + ends.y) * 0.5
+
+## Steepest lengthwise fall of a deck fitted to banks of unequal height.
+const LANDING_TILT_GRADE := 0.04
+
+## The deck heights over the water, metres, at the model's -X and +X ends
+## (see landing_clear_m), NAN both when the row keeps its own height. Banks
+## of unequal height (a bridge off a river terrace onto a floodplain) get
+## a deck that falls from one to the other, at most LANDING_TILT_GRADE:
+## at their mean height it stood over the low bank and under the high one.
+static func landing_ends_m(ground: GroundTruth, at: Vector2, entry: Dictionary, water_y: float) -> Vector2:
+	if not bool(entry.get("deck_ends", false)) or not entry.has("deck_m") \
+			or float(entry["deck_m"]) > LANDING_FIT_CLEAR_M:
+		return Vector2(NAN, NAN)
+	var m2u := WorldScale.metres_to_units()
+	var a := LandmarkSites.axis(entry)
+	var half := float(entry.get("span_m", 0.0)) * 0.5 * m2u
+	var across := Vector2(-a.y, a.x)
+	var side := float(entry.get("deck_width_m", 0.0)) * 0.5 * m2u
+	var ends := Vector2(NAN, NAN)
+	for e in 2:
+		var s := -1.0 if e == 0 else 1.0
+		var best := -INF
+		# Across the deck's width too: on a bank sloping across the bridge a
+		# deck set to the ground on its axis ran into the higher side.
+		for k in int(LANDING_SEEK_M) + 1:
+			for w: float in [0.0, -side, side]:
+				var p := at + a * s * (half + float(k) * m2u) + across * w
+				if ground.is_inside(p.x, p.y) and ground.water_at(p.x, p.y) <= 0.0:
+					best = maxf(best, ground.height_at_world(p.x, p.y))
+		if best > -INF:
+			ends[e] = maxf((best - water_y) / m2u, DECK_MIN_AIR_M)
+	if is_nan(ends.x) and is_nan(ends.y):
+		return ends
+	if is_nan(ends.x):
+		ends.x = ends.y
+	if is_nan(ends.y):
+		ends.y = ends.x
+	var most := LANDING_TILT_GRADE * float(entry.get("span_m", 0.0)) * 0.5
+	var mid := (ends.x + ends.y) * 0.5
+	var d := clampf((ends.y - ends.x) * 0.5, -most, most)
+	d = clampf(d, -(mid - DECK_MIN_AIR_M), mid - DECK_MIN_AIR_M)
+	return Vector2(mid - d, mid + d)
+
+## The model of registry landmark `type` standing at `y`: a parametric
+## bridge is built to meet its landings (landing_ends_m).
+static func _hero(type: String, entry: Dictionary, ground: GroundTruth, at: Vector2, y: float) -> Node3D:
+	var ends := landing_ends_m(ground, at, entry, y)
+	if is_nan(ends.x):
+		return LandmarkBuilder.build(type)
+	return LandmarkBuilder.build_bridge(type, (ends.x + ends.y) * 0.5, (ends.y - ends.x) * 0.5,
+		span_rise_m(ground, at, entry, y, ends))
+
+## Room a fitted deck keeps over dry ground under its span, metres.
+const SPAN_GROUND_AIR_M := 0.6
+
+## The least hump (BridgeCamber), metres, that carries a deck falling
+## straight between `ends` (landing_ends_m) clear of the dry ground under
+## its span: a bar, an island or a floodplain standing higher than the
+## banks at its ends came up through a level deck.
+static func span_rise_m(ground: GroundTruth, at: Vector2, entry: Dictionary, water_y: float, ends: Vector2) -> float:
+	var m2u := WorldScale.metres_to_units()
+	var a := LandmarkSites.axis(entry)
+	var half_m := float(entry.get("span_m", 0.0)) * 0.5
+	if half_m <= 0.0:
+		return 0.0
+	var across := Vector2(-a.y, a.x)
+	var side := float(entry.get("deck_width_m", 0.0)) * 0.5 * m2u
+	var need := 0.0
+	var n := maxi(8, int(half_m / 4.0))
+	for i in range(-n + 1, n):
+		var k := float(i) / float(n)
+		var deck := lerpf(ends.x, ends.y, (k + 1.0) * 0.5)
+		for w: float in [0.0, -side, side]:
+			var p := at + a * k * half_m * m2u + across * w
+			if not ground.is_inside(p.x, p.y) or ground.water_at(p.x, p.y) > 0.0:
+				continue
+			var g := (ground.height_at_world(p.x, p.y) - water_y) / m2u + SPAN_GROUND_AIR_M
+			need = maxf(need, (g - deck) / maxf(1.0 - k * k, 0.1))
+	return need
 
 static func _beam(parent: Node3D, from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
 	var mi := _add(parent, _cyl(radius * 0.8, radius, 1.0, 6), mat)

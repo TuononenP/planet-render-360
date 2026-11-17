@@ -35,6 +35,9 @@ static func build(model: Node3D, row: Dictionary) -> void:
 		"lift": BridgeParamMovable.lift(lm, row)
 		"pontoon": BridgeParamMovable.pontoon(lm, row)
 		_: BridgeParamBeam.girder(lm, row)
+	# A row fitted to low banks (BridgeSpec.fitted) humps toward mid-span.
+	BridgeCamber.apply(lm, half_length(row), float(row["clear"]), float(row.get("camber", 0.0)),
+		float(row.get("tilt", 0.0)))
 	lm.commit(model)
 
 static func _materials(lm: LandmarkMesh, row: Dictionary) -> void:

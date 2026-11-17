@@ -93,10 +93,37 @@ static func to_entry(row: Dictionary) -> Dictionary:
 		"span_m": snappedf(length_m(row), 0.1), "base": str(row.get("base", "water")),
 		"kind": "Bridge", "secondary": true, "tier": int(row.get("tier", 2)),
 		# The model's deck stops at the span's ends: mapped decks beyond
-		# them are the road (LandmarkSites.on_span).
-		"deck_ends": true,
+		# them are the road (LandmarkSites.on_span), and its deck, deck_m
+		# over the water, is built to meet the ground there
+		# (TerrainBuilder.landing_clear_m).
+		"deck_ends": true, "deck_m": float(row.get("clear", 0.0)),
+		"deck_width_m": float(row.get("width", 10.0)),
 		"aliases": aliases,
 	}
+
+## Steepest grade of a fitted bridge's hump, at its ends.
+const CAMBER_GRADE := 0.1
+## Structures that stay level however low their banks.
+const NO_CAMBER := ["pontoon", "swing", "lift", "bascule"]
+
+## `row` with its deck `deck_m` over the water at its ends instead of its
+## `clear` (never under a lower deck's room): the model built from it
+## meets banks that stand lower or higher than the table's estimate. Over
+## lower banks it humps back up toward its own clearance at mid-span
+## (`camber`, BridgeCamber), as far as CAMBER_GRADE at its ends allows.
+## `tilt_m` raises its +X end and lowers its -X end by that much.
+## `rise_m` is the least hump it must have (ground under the span), within
+## the same grade, whatever its structure.
+static func fitted(row: Dictionary, deck_m: float, tilt_m: float = 0.0, rise_m: float = 0.0) -> Dictionary:
+	var out := row.duplicate()
+	out["tilt"] = tilt_m
+	var clear := maxf(deck_m, float(row.get("lower", 0.0)) + 2.0)
+	out["clear"] = clear
+	var most := CAMBER_GRADE * length_m(row) * 0.25
+	out["camber"] = clampf(rise_m, 0.0, most)
+	if not str(row.get("st", "")) in NO_CAMBER:
+		out["camber"] = clampf(maxf(float(row.get("clear", clear)) - clear, rise_m), 0.0, most)
+	return out
 
 ## Problems with a row, empty when it is sound. `catalog_cc` is the set of
 ## country codes the capital catalog knows (empty skips that check).
