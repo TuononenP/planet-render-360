@@ -590,7 +590,7 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 ## raised by `base_drop_m` for a model hung below its origin (a dam
 ## whose crest is y = 0 but whose toe stands on the canyon floor).
 ## `base_at_m` [x, z] instead reads the ground at that one model-local
-## point (a terrace's y = 0 at the foot of its stair, not on its hill).
+## point (a terrace's y = 0 on the square past its stair, not on its hill).
 static func _hero_y(data: LocationData, ground: GroundTruth, x: float, z: float,
 		entry: Dictionary, half: float) -> float:
 	if entry.has("base_half_m"):

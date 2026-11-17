@@ -260,6 +260,9 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 	# Ways under a bridge are cut down to clear its deck.
 	Underpasses.carve(_surface, _level, size, _step_units, ways,
 		WorldScale.metres_to_units())
+	# A landmark's built stair keeps its treads over the ground the
+	# elevation model ramps up it (after the square's plane fit).
+	LandmarkStairCut.cut(_surface, size, _step_units, data)
 	# Y-scale conversion (see header): carving above is in source
 	# metres; the stored surface and water datum are render units.
 	if not is_equal_approx(data.water_level, -3.0):

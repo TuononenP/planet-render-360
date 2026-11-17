@@ -202,6 +202,40 @@ func _run() -> void:
 		"a secondary Helsinki Cathedral must use the same stair-foot anchor")
 	cathedral.free()
 	hx.free()
+	# An elevation model ramps the stair up to the terrace: the ground under
+	# it is held below every tread (it covered all 49 steps), and the square
+	# past the cut keeps its level.
+	var sd := _data("helsinki_cathedral", 10.0, -10.0)
+	sd.grid_size = 241
+	sd.heights.resize(241 * 241)
+	var step := WorldScale.detailed_extent_units() / 240.0
+	for z in 241:
+		for x in 241:
+			var wz := (float(z) - 120.5) * step
+			sd.heights[z * 241 + x] = 10.0 + 0.5 * clampf(78.0 - wz, 0.0, 60.0)
+	var cg := GroundTruth.new(sd)
+	var stair := TerrainBuilder._landmark(sd, cg)
+	var spec: Dictionary = LandmarkStairCut.STAIRS["helsinki_cathedral"]
+	var buried := 0
+	var worst := -INF
+	for sx in [-25.0, 0.0, 25.0]:
+		for k in 49:
+			# The front and back of each tread, deck 10.4 m over 49 risers.
+			for zf in [0.02, 0.98]:
+				var zs: float = 41.0 + (float(k) + zf) * 30.0 / 49.0
+				var tread := stair.position.y + 10.4 * (1.0 - float(k + 1) / 50.0)
+				var over: float = cg.height_at_world(sx, zs) - tread
+				worst = maxf(worst, over)
+				if over > 0.0:
+					buried += 1
+	_check(buried == 0, "the ground must stay under every Helsinki Cathedral tread, %d buried, worst %.2f m over" % [buried, worst])
+	_check(cg.height_at_world(0.0, 20.0) > stair.position.y + 10.4 + 2.0,
+		"the stair cut must leave the hill under the terrace alone")
+	_check(absf(cg.height_at_world(0.0, 100.0) - cg.height_at_world(0.0, 140.0)) < 0.05,
+		"the square at the anchor must keep its own level")
+	_check(LandmarkStairCut.rect_m(spec).has_point(Vector2(0, 71.0 + 9.0)) and not LandmarkStairCut.rect_m(spec).grow(
+		LandmarkStairCut.FEATHER_M + LandmarkStairCut.REACH_M).has_point(Vector2(0, 100.0)), "the cut must reach a post past the foot and stop short of the anchor")
+	stair.free()
 	# A mall extruded from its OSM outline sits at the median ground along
 	# that outline, and on a slope a plinth carries its walls down to the
 	# terrain at the downhill end instead of leaving them floating.
