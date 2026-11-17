@@ -259,11 +259,21 @@ static func paved_area_class(tags: Dictionary, is_area: bool = false) -> String:
 		return "pedestrian"
 	if str(tags.get("place", "")) == "square" and not tags.has("building"):
 		return "pedestrian"
-	if str(tags.get("amenity", "")) == "parking" and not tags.has("building") \
-			and str(tags.get("parking", "surface")) in ["", "surface"] \
+	if _standing_area(tags) and not tags.has("building") \
 			and str(tags.get("surface", "")) not in ["grass", "ground", "dirt", "earth", "sand", "mud"]:
 		return "parking"
 	return ""
+
+## A mapped area where vehicles stand on the street's own paving: a
+## surface car park or a parking lane, street-side bay or lay-by, cycle
+## and motorcycle stands, a bus station or a (tourist) bus halting bay.
+## Unpaved between the square and the street beside it, Senate Square's
+## bus bay and parking lanes showed the bare terrain.
+static func _standing_area(tags: Dictionary) -> bool:
+	var amenity := str(tags.get("amenity", ""))
+	if amenity in ["parking", "motorcycle_parking"]:
+		return str(tags.get("parking", "surface")) in ["", "surface", "lane", "street_side", "layby"]
+	return amenity in ["bicycle_parking", "bus_station"] or amenity.ends_with("_bus_halting")
 
 ## One paved-area road dict: a filled polygon (`area`, outer ring
 ## `points` without the closing repeat, `holes`) that RoadBuilder lays

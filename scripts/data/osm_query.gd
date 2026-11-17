@@ -44,6 +44,10 @@ const CAP_POIS := 2500
 ## area:highway, multipolygon squares).
 const CAP_RAILWAYS := 2500
 const CAP_SQUARES := 400
+## Areas where vehicles stand on paving (OsmTags._standing_area): car
+## parks and parking lanes, cycle and motorcycle stands, bus stations and
+## bus halting bays.
+const STANDING_AMENITIES := "^(parking|motorcycle_parking|bicycle_parking|bus_station|.*_bus_halting)$"
 ## Tram and bus stop nodes over the whole detailed radius
 ## (TransitVehicles stands trams at them). Payloads cached or bundled
 ## before this statement simply carry none; no query version bump.
@@ -163,9 +167,9 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			+ 'relation["place"="square"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
 			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon,
 				radius_m, lat, lon, CAP_SQUARES],
-		('(way["amenity"="parking"](around:%d,%.6f,%.6f);'
-			+ 'relation["amenity"="parking"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
-			% [radius_m, lat, lon, radius_m, lat, lon, CAP_SQUARES],
+		('(way["amenity"~"%s"](around:%d,%.6f,%.6f);'
+			+ 'relation["amenity"~"%s"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;')
+			% [STANDING_AMENITIES, radius_m, lat, lon, STANDING_AMENITIES, radius_m, lat, lon, CAP_SQUARES],
 		'way["waterway"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_WATERWAYS],
 		'relation["waterway"]["type"="multipolygon"](around:%d,%.6f,%.6f);out geom %d;'

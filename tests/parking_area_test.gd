@@ -10,15 +10,20 @@ func _init() -> void:
 		{"type": "way", "id": 3, "tags": {"amenity": "parking", "surface": "grass"}, "geometry": ring},
 		{"type": "way", "id": 4, "tags": {"amenity": "parking", "building": "yes"}, "geometry": ring},
 		{"type": "relation", "id": 5, "tags": {"amenity": "parking", "type": "multipolygon"},
-			"members": [{"type": "way", "role": "outer", "geometry": ring}]}]
+			"members": [{"type": "way", "role": "outer", "geometry": ring}]},
+		# Senate Square's edge: a parking lane, cycle stands and a bus bay.
+		{"type": "way", "id": 6, "tags": {"amenity": "parking", "parking": "lane"}, "geometry": ring},
+		{"type": "way", "id": 7, "tags": {"amenity": "bicycle_parking"}, "geometry": ring},
+		{"type": "way", "id": 8, "tags": {"amenity": "unsigned_tourist_bus_halting"}, "geometry": ring},
+		{"type": "way", "id": 9, "tags": {"amenity": "bicycle_parking", "surface": "grass"}, "geometry": ring}]
 	var parsed := OsmParser.parse_features(JSON.stringify({"elements": elements}), 0.0, 0.0)
 	var areas: Array = parsed["roads"]
 	var query := OsmQuery.build_query(0.0, 0.0)
-	if areas.size() != 2 or not areas.all(func(area: Dictionary) -> bool:
+	if areas.size() != 5 or not areas.all(func(area: Dictionary) -> bool:
 			return area.get("class") == "parking" and area.get("area") == true) \
-			or not query.contains('way["amenity"="parking"]') \
-			or not query.contains('relation["amenity"="parking"]'):
-		printerr("PARKING AREA FAIL: surface ways/relations should be filled, excluding buildings, grass and underground parking: ", areas)
+			or not query.contains('way["amenity"~"%s"]' % OsmQuery.STANDING_AMENITIES) \
+			or not query.contains('relation["amenity"~"%s"]' % OsmQuery.STANDING_AMENITIES):
+		printerr("PARKING AREA FAIL: surface car parks, parking lanes, stands and bus bays should be filled, excluding buildings, grass and underground parking: ", areas)
 		quit(1)
 		return
 	var data := LocationData.new()
