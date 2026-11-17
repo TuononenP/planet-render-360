@@ -26,6 +26,7 @@ func _init() -> void:
 	_check_standing(failures, data, ground, m2u)
 	_check_unknown_bridge(failures, ground, m2u)
 	_check_moving(failures, m2u)
+	_check_meeting(failures, m2u)
 	_finish(failures)
 
 func _data() -> LocationData:
@@ -238,6 +239,71 @@ func _check_moving(failures: Array[String], m2u: float) -> void:
 		failures.append("no tram crossed the bridge in 20 minutes")
 	elif standing > on * 0.05:
 		failures.append("trams stood %.0f s of %.0f s on the bridge: they should keep moving" % [standing, on])
+	holder.free()
+
+## Both tracks over the deck, each with street track at either end: the
+## two trams (one each way) keep in step, the same distance from the
+## middle of the deck whenever both are out, and pass each other there.
+func _check_meeting(failures: Array[String], m2u: float) -> void:
+	var data := _data()
+	var ground := GroundTruth.new(data)
+	var total := LandmarkFhCrownBridge.length_m()
+	data.railways = []
+	for across: float in [-1.2, -5.0]:
+		var west := _offset(0.0, across) - LandmarkFhCrownBridge.heading(0.0) * 10.0
+		var east := _offset(total, across) + LandmarkFhCrownBridge.heading(total) * 10.0
+		var deck: Array = [west]
+		var k := 30.0
+		while k < total:
+			deck.append(_offset(k, across))
+			k += 30.0
+		deck.append(east)
+		var lines: Array = [[west - LandmarkFhCrownBridge.heading(0.0) * 300.0, west], deck,
+			[east, east + LandmarkFhCrownBridge.heading(total) * 300.0]]
+		for i in 3:
+			var tags := {"railway": "light_rail", "gauge": "1000"}
+			if i == 1:
+				tags["bridge"] = "yes"
+			data.railways.append(OsmTags._rail_entry(tags,
+				PackedVector2Array((lines[i] as Array).map(func(p: Vector2) -> Vector2: return p * m2u))))
+	var plan := TransitVehicles.plan(data, ground, m2u)
+	var holder := Node3D.new()
+	for t in plan.size():
+		for i in ((plan[t] as Dictionary)["sections"] as Array).size():
+			for part in ["near", "far", "shadow"]:
+				var n := Node3D.new()
+				n.name = "Tram%d_%d_%s" % [t, i, part]
+				holder.add_child(n)
+	var mover := VehicleMover.new()
+	mover._m2u = m2u
+	mover._adopt(holder, "Tram", plan, data, ground, false)
+	mover._time_deck()
+	if mover.count() != 2:
+		failures.append("two tracks over the deck should carry two trams, got %d" % mover.count())
+		holder.free()
+		return
+	var a: Dictionary = mover._trains[0]
+	var b: Dictionary = mover._trains[1]
+	if is_nan(float(a["deck_mid"])) or is_nan(float(b["deck_mid"])):
+		failures.append("both trams should keep the deck's timetable")
+		holder.free()
+		return
+	var met := false
+	for n in 12000:
+		mover.tick(0.1, Vector2.ZERO)
+		if bool(a["hidden"]) or bool(b["hidden"]):
+			continue
+		var da := (float(a["s"]) - float(a["deck_mid"])) * float(a["dir"])
+		var db := (float(b["s"]) - float(b["deck_mid"])) * float(b["dir"])
+		if absf(da - db) > 3.0:
+			failures.append("the deck trams should keep in step: %.0f m and %.0f m from mid-span" % [da, db])
+			break
+		if absf(da) < 5.0:
+			var pa := (a["route"] as TramRoute).xz_at(float(a["s"]))
+			var pb := (b["route"] as TramRoute).xz_at(float(b["s"]))
+			met = met or pa.distance_to(pb) < 15.0 * m2u
+	if not met:
+		failures.append("the two trams should pass each other mid-span")
 	holder.free()
 
 func _finish(failures: Array[String]) -> void:

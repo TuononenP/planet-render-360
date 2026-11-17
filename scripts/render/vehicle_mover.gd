@@ -46,6 +46,10 @@ const SIGNAL_SNAP_M := 10.0
 const SIGNAL_CYCLE_S := 60.0
 const SIGNAL_RED := 0.45
 const SIGNAL_MERGE_M := 20.0
+## The trams on the tracks over a registry bridge's deck (one each way,
+## TransitVehicles) keep a timetable: they pass each other mid-span this
+## many seconds after the world appears, and again every cycle.
+const MEET_AT_S := 30.0
 ## Countries driving on the left (ISO 3166-1 alpha-2): their trams keep
 ## left too.
 const LEFT_HAND := ["GB", "IE", "JP", "HK", "MO", "AU", "NZ", "ZA", "IN", "PK", "BD", "LK", "TH",
@@ -59,6 +63,8 @@ const MAX_STEP_S := 0.1
 var _trains: Array = []
 var _m2u := 1.0
 var _clock := 0.0
+## The deck trams' shared cycle (s): the longest of their runs at cruise.
+var _deck_cycle := 0.0
 
 ## A mover for the trams and platform trains under `world`, planned from
 ## `data` as the world was built; null when there are none to move.
@@ -78,6 +84,7 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 	if trains != null and not data.railways.is_empty():
 		mover._adopt(trains, "Train", planned["Train"] if planned.has("Train")
 			else StationTrains.plan(data, ground, mover._m2u), data, ground, true)
+	mover._time_deck()
 	return mover if not mover._trains.is_empty() else null
 
 ## The tram and train plans attach() needs, worked out ahead (pure, so a
@@ -216,6 +223,7 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 			"dwell_range": TRAIN_DWELL_S if platform_only else DWELL_S,
 			"cruise": TRAIN_CRUISE_MS if platform_only else CRUISE_MS,
 			"loop": not platform_only, "hidden": false,
+			"deck_mid": NAN if platform_only else _deck_mid(route),
 			"signals": PackedFloat32Array() if platform_only else _signals(route, span, data),
 			"salt": salt, "target": NAN, "blocked": 0.0, "moved": false, "age": 0.0, "mid": route.xz_at(s0), "n": 0})
 
@@ -319,6 +327,9 @@ func _next(t: Dictionary) -> float:
 
 ## One simulation step of train `t`.
 func _step(t: Dictionary, dt: float) -> void:
+	if not is_nan(float(t["deck_mid"])) and _deck_cycle > 0.0:
+		_keep_time(t)
+		return
 	if bool(t["hidden"]):
 		_enter(t)
 		return
@@ -432,6 +443,38 @@ func _enter(t: Dictionary) -> void:
 	t["s"] = start
 	t["v"] = float(t["cruise"])
 	t["target"] = NAN
+	t["moved"] = true
+
+## Where `route` crosses the middle of a registry bridge's deck (metres
+## along it), or NAN off every deck: the middle of its stretch with deck
+## heights (BridgeTramDeck).
+static func _deck_mid(route: TramRoute) -> float:
+	var lo := INF
+	var hi := -INF
+	for k in route.heights.size():
+		if not is_nan(route.heights[k]):
+			lo = minf(lo, route.cum[k])
+			hi = maxf(hi, route.cum[k])
+	return (lo + hi) * 0.5 / WorldScale.metres_to_units() if lo < INF else NAN
+
+## The deck trams' shared cycle: the longest of their runs at cruise, so
+## each is back at the deck's middle in step with the others.
+func _time_deck() -> void:
+	_deck_cycle = 0.0
+	for t: Dictionary in _trains:
+		if not is_nan(float(t["deck_mid"])):
+			_deck_cycle = maxf(_deck_cycle, (float(t["hi"]) - float(t["lo"])) / float(t["cruise"]) + 2.0)
+
+## A deck tram on the timetable: at the deck's middle at MEET_AT_S and
+## every _deck_cycle after, running at cruise either side of it; off its
+## run (it has left) for the rest of the cycle.
+func _keep_time(t: Dictionary) -> void:
+	var u := fposmod(_clock - MEET_AT_S + _deck_cycle * 0.5, _deck_cycle) - _deck_cycle * 0.5
+	var s := float(t["deck_mid"]) + float(t["dir"]) * float(t["cruise"]) * u
+	var gone := s < float(t["lo"]) or s > float(t["hi"])
+	t["hidden"] = gone
+	t["v"] = 0.0 if gone else float(t["cruise"])
+	t["s"] = clampf(s, float(t["lo"]), float(t["hi"]))
 	t["moved"] = true
 
 ## Puts every section of train `t` where its route says (as
