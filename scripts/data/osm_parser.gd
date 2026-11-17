@@ -259,7 +259,11 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			# A jetty or marina pontoon (floating=yes): MarinaBuilder.
 			piers.append({"points": poly, "floating": str(el_tags.get("floating", "")) == "yes",
 				"width_m": OsmTags._tag_metres(el_tags.get("width", ""), 0.5, 40.0)})
-		elif el_tags.has("barrier"):
+		elif el_tags.has("barrier") and not (OsmGeometry._is_closed(poly) \
+				and str(el_tags.get("natural", "")) in ["scrub", "grassland", "heath"]):
+			# A closed planting bed also tagged barrier=fence (Tapiola's
+			# coloured grass beds) is ground cover, not a fence: it falls
+			# through to the land branch below.
 			barriers.append({"points": poly,
 				"osm_id": source_id,
 				"class": str(el_tags.get("barrier", "yes")),
