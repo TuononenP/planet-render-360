@@ -178,3 +178,71 @@ static func emit(tree_set: Node3D, st: Dictionary, a: Dictionary, preset: int = 
 		nodes += 1
 	tree_set.set_meta("tree_eye", a["eye"])
 	return nodes
+
+## The species/sector bundles a runtime re-centre writes, for `a` over
+## `tree_set`'s current nodes: each bundle is every LOD group one tree
+## can move between (its species and sector never change), so writing
+## a bundle at a time never shows a tree twice or not at all.
+static func bundles(tree_set: Node3D, a: Dictionary) -> Array:
+	var out := {}
+	for key in a["groups"]:
+		var parts := (key as String).split("|")
+		out["%s|%s" % [parts[0], parts[2]]] = true
+	for c in tree_set.get_children():
+		var m := _NAME.search(c.name)
+		if m != null:
+			out["%s|%s" % [m.get_string(1), m.get_string(3)]] = true
+	return out.keys()
+
+static var _NAME := RegEx.create_from_string("^VegTrees_(.+)_lod(\\d)_s(\\d+)$")
+
+## Writes one bundle ("sp|sector") of `a` into `tree_set` (main thread):
+## an existing node keeps its MultiMesh and only takes the new buffer,
+## with room to spare so most moves never reallocate it; a group gone
+## from the bundle is emptied, a new one gets a node as emit makes them.
+static func write_bundle(tree_set: Node3D, st: Dictionary, a: Dictionary, bundle: String, preset: int) -> void:
+	var sp := bundle.get_slice("|", 0)
+	var s := bundle.get_slice("|", 1)
+	var groups: Dictionary = a["groups"]
+	for lod in 3:
+		var g: Array = groups.get("%s|%d|%s" % [sp, lod, s], [])
+		var mmi := tree_set.get_node_or_null("VegTrees_%s_lod%d_s%s" % [sp, lod, s]) as MultiMeshInstance3D
+		if mmi == null:
+			if g.is_empty():
+				continue
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = true
+			mm.mesh = TreeMeshLibrary.mesh(sp, lod, int(st["season"]), float(st["snow"]), float(st["sway"]))
+			mmi = MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.name = "VegTrees_%s_lod%d_s%s" % [sp, lod, s]
+			if lod == 2:
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			tree_set.add_child(mmi)
+		if g.is_empty():
+			mmi.multimesh.visible_instance_count = 0
+			mmi.set_meta("origins", PackedVector3Array())
+			continue
+		_fill(mmi.multimesh, g[0], int(g[2]))
+		mmi.set_meta("origins", g[1])
+		if preset >= 0:
+			# Its AABB moved with the trees: the range check sees the new one.
+			LodRing.apply_vegetation(mmi, preset)
+
+## `n` rows of `buf` into `mm`, which keeps a quarter more room than it
+## needs (rows past `n` repeat the first, so the AABB stays the trees').
+static func _fill(mm: MultiMesh, buf: PackedFloat32Array, n: int) -> void:
+	var cap := mm.instance_count
+	if cap < n or cap > n * 2 + 64:
+		cap = n + n / 4 + 16
+		mm.instance_count = cap
+	if cap > n:
+		var fill := buf.slice(0, ROW)
+		while fill.size() < (cap - n) * ROW:
+			fill.append_array(fill)
+		fill.resize((cap - n) * ROW)
+		buf = buf.duplicate()
+		buf.append_array(fill)
+	mm.buffer = buf
+	mm.visible_instance_count = n

@@ -45,6 +45,9 @@ func _init() -> void:
 		if w.needs_refresh(Vector2(10, 0)):
 			failures.append("a 10 m step must not re-centre (refresh at 20 m)")
 		var eye := Vector2(500, 5)
+		var before := {}
+		for n in root.find_children("VegTrees_*", "MultiMeshInstance3D", true, false):
+			before[n.name] = n.get_instance_id()
 		w.tick(eye, 2)
 		for i in 200:
 			if not w.busy():
@@ -61,6 +64,13 @@ func _init() -> void:
 				near += 1
 		if near != 21:
 			failures.append("moved eye: %d LOD 0 trees, want 21" % near)
+		# The move rewrote the nodes already there instead of replacing them.
+		for n in root.find_children("VegTrees_*", "MultiMeshInstance3D", true, false):
+			if before.has(n.name) and before[n.name] != n.get_instance_id():
+				failures.append("%s was replaced, not rewritten" % n.name)
+		for name in before:
+			if not is_instance_valid(instance_from_id(before[name])):
+				failures.append("%s was freed by the move" % name)
 		w.stop()
 	root.free()
 	if failures.is_empty():
