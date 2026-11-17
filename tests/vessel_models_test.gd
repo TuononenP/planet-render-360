@@ -10,11 +10,11 @@ func _init() -> void:
 	# model, length, beam, height, Ultra cap (4x original budget after the requested extra detail pass), far baseline, variant
 	for c in [["liner", 250.0, 31.0, 50.0, 160000, 2500, ""], ["cruise_ferry", 200.0, 30.0, 44.0, 120000, 2500, ""],
 			["cargo", 300.0, 45.0, 52.0, 120000, 3000, "container"], ["cargo", 190.0, 30.0, 32.0, 60000, 2000, "bulk"],
-			["cargo", 250.0, 44.0, 40.0, 60000, 2000, "tanker"], ["cargo", 110.0, 17.0, 26.0, 50000, 2000, "general"], ["passenger", 50.0, 8.0, 12.0, 32000, 636, ""],
-			["tall_ship", 60.0, 9.5, 32.0, 24000, 638, ""], ["houseboat", 14.0, 4.2, 4.5, 8000, 274, ""],
-			["motor_yacht", 24.0, 0.0, 0.0, 12000, 390, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, 10000, 332, "sport"],
-			["sail_yacht", 12.0, 0.0, 0.0, 12000, 480, ""], ["runabout", 7.0, 0.0, 0.0, 8000, 404, "runabout"],
-			["runabout", 7.0, 0.0, 0.0, 8000, 432, "console"], ["runabout", 7.0, 0.0, 0.0, 8000, 720, "rib"], ["catamaran", 12.0, 0.0, 0.0, 16000, 1500, ""]]:
+			["cargo", 250.0, 44.0, 40.0, 60000, 2000, "tanker"], ["cargo", 110.0, 17.0, 26.0, 50000, 2000, "general"], ["passenger", 50.0, 8.0, 12.0, 32000, 637, ""],
+			["tall_ship", 60.0, 9.5, 32.0, 24000, 639, ""], ["houseboat", 14.0, 4.2, 4.5, 8000, 275, ""],
+			["motor_yacht", 24.0, 0.0, 0.0, 12000, 391, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, 10000, 333, "sport"],
+			["sail_yacht", 12.0, 0.0, 0.0, 12000, 481, ""], ["runabout", 7.0, 0.0, 0.0, 8000, 405, "runabout"],
+			["runabout", 7.0, 0.0, 0.0, 8000, 433, "console"], ["runabout", 7.0, 0.0, 0.0, 8000, 721, "rib"], ["catamaran", 12.0, 0.0, 0.0, 16000, 1500, ""]]:
 		var near := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, true, true, 0.9, c[6])
 		var far := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, false, true, 0.9, c[6])
 		_check(near.triangle_count() > 200 and near.triangle_count() <= int(c[4]), "%s %s m: %d triangles outside budget" % [c[0], c[1], near.triangle_count()])
@@ -29,7 +29,7 @@ func _init() -> void:
 		_check(absf(box.size.x - float(c[1])) / float(c[1]) < 0.02 or box.size.x >= float(c[1]) * 0.98, "%s length %.1f vs %.1f" % [c[0], box.size.x, c[1]])
 		root.free()
 	var surfaces := 1 # pontoon
-	var far_baselines := {"motor": 332, "yacht": 390, "sail": 480, "day": 404, "rib": 720, "steam": 556, "houseboat": 274, "catamaran": 1500}
+	var far_baselines := {"motor": 333, "yacht": 391, "sail": 481, "day": 405, "rib": 721, "steam": 557, "houseboat": 275, "catamaran": 1500}
 	for kind in VesselPrototypes.KINDS:
 		var near_mesh := VesselPrototypes.mesh(kind)
 		var far_mesh := VesselPrototypes.mesh(kind + "_far")

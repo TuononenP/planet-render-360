@@ -215,9 +215,11 @@ static func loft(lm: LandmarkMesh, spec: Dictionary, keys: Dictionary, origin: V
 	for i in first.size() - 1:
 		lm.tri(str(keys.get("hull", "Hull")), c, first[i + 1], first[i], Vector3.LEFT, Vector3.LEFT,
 			Vector3.LEFT, _xy(c), _xy(first[i + 1]), _xy(first[i]))
+	# The top of the fan closes the transom between the sheer corners on
+	# every LOD; without it a distant hull shows an open V at the stern.
+	lm.tri(str(keys.get("hull", "Hull")), c, first[first.size() - 1], first[0], Vector3.LEFT, Vector3.LEFT,
+		Vector3.LEFT, _xy(c), _xy(first[first.size() - 1]), _xy(first[0]))
 	if near:
-		lm.tri(str(keys.get("hull", "Hull")), c, first[first.size() - 1], first[0], Vector3.LEFT, Vector3.LEFT,
-			Vector3.LEFT, _xy(c), _xy(first[first.size() - 1]), _xy(first[0]))
 		var last: PackedVector3Array = rows[rows.size() - 1]
 		var stem := Vector3.ZERO
 		for p in last:
