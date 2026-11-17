@@ -16,8 +16,8 @@ extends RefCounted
 ## * How: each body section is its own instance on TramRoute.place_train
 ##   (bogies on the rails, the body along their chord), the detailed
 ##   mesh within DETAIL_M and the folded one beyond.
-## Trams do not move yet; a train is an arc length on its route, so a
-## mover only has to advance it (TramRoute).
+## A train is an arc length on its route (TramRoute); VehicleMover
+## advances it.
 ## * Buses: a city bus (CarModel "bus") stands at BUS_OCCUPIED of the
 ##   mapped bus stops within BUS_RADIUS_M of the eye, at the kerb of the
 ##   nearest street within BUS_SNAP_M on the stop's side, facing with
@@ -102,9 +102,17 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 	spots.sort_custom(func(a: Array, b: Array) -> bool:
 		return float(a[2]) < float(b[2]))
 	var trains: Array = []
+	# A track over a registry bridge's deck (Kruunuvuorensilta) carries one
+	# tram, which starts out on the deck.
+	var decked := {}
 	for spot: Array in spots:
 		if trains.size() >= MAX_TRAINS:
 			break
+		var route: TramRoute = spot[0]
+		if not route.heights.is_empty():
+			var s := float(spot[1])
+			if decked.has(route) or not route.bridged(s, s) or route.unsupported(s, s):
+				continue
 		var train := _train(spot[0], float(spot[1]), region, data.country, mouths, ground, m2u)
 		if train.is_empty():
 			continue
@@ -115,6 +123,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 				break
 		if clear:
 			trains.append(train)
+			if not route.heights.is_empty():
+				decked[route] = true
 	return trains
 
 ## Length of the equal blocks a route is cut into (about BLOCK_M each).

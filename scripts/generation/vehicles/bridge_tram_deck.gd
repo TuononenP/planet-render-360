@@ -11,6 +11,9 @@ extends RefCounted
 ## Resample step over the deck (m): the deck crests 17 m over 500 m and
 ## curves, so the tram follows both.
 const STEP_M := 4.0
+## How far past an end of the model's deck the mapped bridge way may run
+## on (to its abutment) and still be carried at that end's rail height, m.
+const END_REACH_M := 40.0
 
 ## Registry bridge types whose model lays tram track, and the lookup that
 ## answers a model-local point for them.
@@ -40,9 +43,12 @@ static func apply(route: TramRoute, data: LocationData, m2u: float) -> void:
 		var rail: Dictionary = route.ways[i]
 		var bridge := bool(rail.get("bridge", false))
 		var n := maxi(1, ceili(a.distance_to(b) / (STEP_M * m2u))) if bridge else 1
+		# The node a bridge way ends on starts the next way: it is on the
+		# bridge too, or the bridge's last stretch has no height at its end.
+		var ends_bridge := i > 0 and bool((route.ways[i - 1] as Dictionary).get("bridge", false))
 		for k in n:
 			var p := a.lerp(b, float(k) / float(n))
-			var on := _on_deck(p, decks, m2u) if bridge else Vector4(0, 0, 0, -1)
+			var on := _on_deck(p, decks, m2u) if bridge or (k == 0 and ends_bridge) else Vector4(0, 0, 0, -1)
 			if on.w > 0.0:
 				p = Vector2(on.x, on.z)
 				any = true
@@ -99,7 +105,7 @@ static func _crown(local: Vector2) -> Vector4:
 			best_s = run + a.distance_to(q)
 		run += a.distance_to(b)
 	if best_s <= 0.5 or best_s >= run - 0.5:
-		return Vector4(0, 0, 0, -1)
+		return _past_end(local, best_s <= 0.5)
 	var centre := LandmarkFhCrownBridge.at(best_s)
 	if best > centre.z:
 		return Vector4(0, 0, 0, -1)
@@ -111,3 +117,15 @@ static func _crown(local: Vector2) -> Vector4:
 			track = o
 	var r := LandmarkFhCrownBridge.rail_point(best_s, track)
 	return Vector4(r.x, r.y, r.z, 1.0)
+
+## A mapped bridge-way point just past the west (`west`) or east end of
+## the deck, within END_REACH_M of it: the way runs on to its abutment at
+## that end's rail height, where the deck lands on the ground, so a tram
+## passes on and off the deck. Where it stands (model-local), w = -1
+## farther out.
+static func _past_end(local: Vector2, west: bool) -> Vector4:
+	var s := 0.0 if west else LandmarkFhCrownBridge.length_m()
+	var c := LandmarkFhCrownBridge.at(s)
+	if local.distance_to(Vector2(c.x, c.y)) > END_REACH_M:
+		return Vector4(0, 0, 0, -1)
+	return Vector4(local.x, LandmarkFhCrownBridge.deck_y(s) + LandmarkFhCrownBridge.RAIL_TOP_M, local.y, 1.0)
