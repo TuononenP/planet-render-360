@@ -37,11 +37,15 @@ static func covers(lat: float, lon: float) -> bool:
 ## EPSG:4326 axes are lat, lon), `size` pixels a side: the same edges, so
 ## pixel centres match plan_window's.
 static func band_url(i: int, lat: float, lon: float, size: int) -> String:
+	return layer_url(LAYERS[i], lat, lon, size)
+
+## GetMap URL of any HSY `layer` over that window (HsyCover too).
+static func layer_url(layer: String, lat: float, lon: float, size: int) -> String:
 	var half := LandcoverFetcher.EXTENT_M * 0.5
 	var dlat := half / 110540.0
 	var dlon := half / (111320.0 * cos(deg_to_rad(lat)))
 	return "%s?service=WMS&version=1.3.0&request=GetMap&layers=%s&styles=&crs=EPSG:4326&format=image/png&transparent=true&width=%d&height=%d&bbox=%.7f,%.7f,%.7f,%.7f" % [
-		URL, LAYERS[i], size, size, lat - dlat, lon - dlon, lat + dlat, lon + dlon]
+		URL, layer, size, size, lat - dlat, lon - dlon, lat + dlat, lon + dlon]
 
 ## L8 canopy heights from the four band images (any format, `size` a
 ## side, alpha = canopy) and an optional CHM (L8 metres, 255 no data).

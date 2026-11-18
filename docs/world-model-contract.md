@@ -468,6 +468,28 @@ the height was a default), `start_year`, `material`, `kind` (for `yes` /
 (`{src, zoom, span, gain, bias}`) and `ground_detail` the DemRelief window
 (`dem_source.ground_detail`); both are part of the world key.
 
+
+### City detail, round 2 (2026-11-18)
+
+- `LocationData.hsy_cover_image` (R8 `GroundMaterial` ids, High / Ultra in
+  the HSY region): `GroundMaterial.class_map` paints OSM land polygons,
+  lays HSY over texels that are unmapped or landuse paving (`urban`), then
+  paints sidewalks, surveyed pavements, roads, rail and footprints on top.
+  The near map leaves landuse paving to the extent map when HSY is present.
+  `GroundTruth.surface` reads the same map.
+- `LocationData.paved_areas` (`HelsinkiStreets`): surveyed pavements,
+  squares and paths, `{class: "urban" | "path", points, holes}`, painted
+  after sidewalk bands. A road with `surveyed = true` took its kerb-to-kerb
+  `width_m` (and `parking_m`) from the survey, is `width_tagged`, and paints
+  no inferred pavement band.
+- `HelsinkiLod2` sets `height_source = "tag_height"` (the model's measured
+  ground-to-top height) where the height was estimated, marks `lod2 = true`
+  (no `TowerMassing` setbacks), and fills `roof_shape`, `roof_angle` and
+  `levels`; the roof's rise and ridge come from the footprint. It runs
+  before `HelsinkiRegister`, and both record `enriched.<source>`.
+- `ShoreCoast` joins coastline pieces whose ends lie within `JOIN_M`
+  (0.1 m), so sources that differ in the last coordinate digit still
+  close the sea.
 ### Shared shoreline model (2026-11-03)
 
 `GroundTruth.shoreline` owns a `ShorelineModel`, finalized before the world

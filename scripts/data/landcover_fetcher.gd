@@ -25,6 +25,9 @@ var _started_ms := 0
 ## The capital region's canopy (HsyCanopy) instead of Meta's alone.
 var _hsy := false
 var _hsy_http: HTTPRequest
+## HSY's surface classes (HsyCover) on their own connection: they load
+## beside the canopy bands.
+var _cover_http: HTTPRequest
 ## Where the last canopy came from: "meta", "hsy", "hsy+meta" or "".
 var canopy_source := ""
 
@@ -36,6 +39,9 @@ func _ready() -> void:
 	_hsy_http = HTTPRequest.new()
 	_hsy_http.timeout = 20.0
 	add_child(_hsy_http)
+	_cover_http = HTTPRequest.new()
+	_cover_http.timeout = 20.0
+	add_child(_cover_http)
 
 func cancel() -> void:
 	_generation += 1
@@ -47,6 +53,8 @@ func cancel() -> void:
 		_canopy_fetcher.cancel()
 	if is_instance_valid(_hsy_http):
 		_hsy_http.cancel_request()
+	if is_instance_valid(_cover_http):
+		_cover_http.cancel_request()
 	for task in _workers:
 		WorkerThreadPool.wait_for_task_completion(task)
 	_workers.clear()
@@ -70,12 +78,14 @@ func fetch(lat: float, lon: float, hsy: bool = false) -> void:
 	_hsy = hsy and HsyCanopy.covers(lat, lon)
 	canopy_source = ""
 	_abort = BuildAbort.new()
-	_remaining = 2
+	_remaining = 3 if _hsy else 2
 	_images = {}
 	timings = {}
 	_started_ms = Time.get_ticks_msec()
 	_fetch_one("landcover", lat, lon, _cover_fetcher, _generation)
 	_fetch_one("canopy", lat, lon, _canopy_fetcher, _generation)
+	if _hsy:
+		_fetch_hsy_cover(lat, lon, _generation)
 
 func _fetch_one(kind: String, lat: float, lon: float, reader: CogFetcher, gen: int) -> void:
 	if kind == "canopy" and _hsy:
@@ -175,28 +185,14 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 				return cached
 	if offline_mode:
 		return null
-	var bands: Array = []
+	var urls: Array = []
 	for i in HsyCanopy.LAYERS.size():
-		var state := {"done": false, "body": PackedByteArray()}
-		var cb := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-			state["done"] = true
-			if result == HTTPRequest.RESULT_SUCCESS and code == 200:
-				state["body"] = body
-		_hsy_http.request_completed.connect(cb, CONNECT_ONE_SHOT)
-		if _hsy_http.request(HsyCanopy.band_url(i, lat, lon, CANOPY_SIZE), ["User-Agent: " + Brand.USER_AGENT]) != OK:
-			_hsy_http.request_completed.disconnect(cb)
-			return null
-		while not state["done"] and gen == _generation:
-			await get_tree().process_frame
-		if gen != _generation:
-			if _hsy_http.request_completed.is_connected(cb):
-				_hsy_http.request_completed.disconnect(cb)
-			return null
-		var img := Image.new()
-		if (state["body"] as PackedByteArray).is_empty() or img.load_png_from_buffer(state["body"]) != OK:
-			print("HSY canopy band %d unavailable; Meta canopy instead" % i)
-			return null
-		bands.append(img)
+		urls.append(HsyCanopy.band_url(i, lat, lon, CANOPY_SIZE))
+	var bands: Variant = await _fetch_bands(_hsy_http, urls, gen)
+	if not (bands is Array):
+		if gen == _generation:
+			print("HSY canopy bands unavailable; Meta canopy instead")
+		return null
 	var chm: Image = await _fetch_cog("canopy", lat, lon, reader, gen)
 	if gen != _generation:
 		return null
@@ -218,6 +214,74 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 		CacheStore.note_written(path)
 	canopy_source = "hsy+meta" if chm != null else "hsy"
 	return image
+
+## The PNG band images at `urls`, one after another on `http`; null when
+## any is unavailable or the fetch was superseded.
+func _fetch_bands(http: HTTPRequest, urls: Array, gen: int) -> Variant:
+	var bands: Array = []
+	for url in urls:
+		var state := {"done": false, "body": PackedByteArray()}
+		var cb := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+			state["done"] = true
+			if result == HTTPRequest.RESULT_SUCCESS and code == 200:
+				state["body"] = body
+		http.request_completed.connect(cb, CONNECT_ONE_SHOT)
+		if http.request(str(url), ["User-Agent: " + Brand.USER_AGENT]) != OK:
+			http.request_completed.disconnect(cb)
+			return null
+		while not state["done"] and gen == _generation:
+			await get_tree().process_frame
+		if gen != _generation:
+			if http.request_completed.is_connected(cb):
+				http.request_completed.disconnect(cb)
+			return null
+		var img := Image.new()
+		if (state["body"] as PackedByteArray).is_empty() or img.load_png_from_buffer(state["body"]) != OK:
+			return null
+		bands.append(img)
+	return bands
+
+## HSY's surface classes over the extent (HsyCover), as the class map's
+## size, cached per place; emits layer_finished("hsy_cover", ...), null
+## when unavailable.
+func _fetch_hsy_cover(lat: float, lon: float, gen: int) -> void:
+	var size := GroundMaterial.CLASS_TEXELS
+	var path := cache_path("hsy_cover%d" % HsyCover.VERSION, lat, lon)
+	if FileAccess.file_exists(path):
+		var cached := Image.load_from_file(path)
+		if cached != null and cached.get_size() == Vector2i(size, size):
+			if cached.get_format() != Image.FORMAT_R8:
+				cached.convert(Image.FORMAT_R8)
+			CacheStore.note_read(path)
+			_done("hsy_cover", cached, gen)
+			return
+	if offline_mode:
+		_done("hsy_cover", null, gen)
+		return
+	var urls: Array = []
+	for i in HsyCover.LAYERS.size():
+		urls.append(HsyCover.band_url(i, lat, lon, size))
+	var bands: Variant = await _fetch_bands(_cover_http, urls, gen)
+	if gen != _generation:
+		return
+	if not (bands is Array):
+		print("HSY land cover unavailable; map and WorldCover classes only")
+		_done("hsy_cover", null, gen)
+		return
+	var box := {}
+	var task := WorkerThreadPool.add_task(func() -> void: box["image"] = HsyCover.compose(bands, size))
+	_workers.append(task)
+	while _workers.has(task) and not WorkerThreadPool.is_task_completed(task):
+		await get_tree().process_frame
+	if _workers.has(task):
+		WorkerThreadPool.wait_for_task_completion(task)
+		_workers.erase(task)
+	if gen != _generation:
+		return
+	var image: Image = box.get("image")
+	if image != null and image.save_png(path) == OK:
+		CacheStore.note_written(path)
+	_done("hsy_cover", image, gen)
 
 func _done(kind: String, image: Image, gen: int) -> void:
 	if gen != _generation:

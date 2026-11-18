@@ -1,6 +1,9 @@
 class_name ShoreCoast
 extends RefCounted
 
+## Ends of coastline pieces closer than this (m) are one node.
+const JOIN_M := 0.1
+
 ## Close directed coastline runs only at the detailed-extent boundary.
 ## In XZ (Z south), OSM's water side is the positive 90-degree normal.
 static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
@@ -13,11 +16,16 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 			var cut := ShoreGeometry.clip_segment(line[i], line[i + 1], box)
 			if cut.size() == 2:
 				edges.append(cut)
+	# Runs from two sources (a live detailed layer, a bundled ring layer)
+	# can disagree in the last digit at a shared node: join ends within
+	# JOIN_M, not only bit-identical ones, or one gap drops the whole sea.
+	var join := JOIN_M * WorldScale.metres_to_units()
 	var starts := {}
 	for i in edges.size():
-		if not starts.has(edges[i][0]):
-			starts[edges[i][0]] = []
-		(starts[edges[i][0]] as Array).append(i)
+		var key := _key(edges[i][0], join)
+		if not starts.has(key):
+			starts[key] = []
+		(starts[key] as Array).append(i)
 	var used := {}
 	var chains: Array = []
 	# Border starts first: otherwise an arbitrary middle segment leaves an
@@ -37,11 +45,7 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 		while next >= 0 and not used.has(next):
 			used[next] = true
 			chain.append(edges[next][1])
-			next = -1
-			for candidate in starts.get(chain[-1], []):
-				if not used.has(candidate):
-					next = candidate
-					break
+			next = _next_start(starts, edges, used, chain[-1], join)
 		chains.append(chain)
 	# Boundary intervals are shared by ALL open runs. Closing each run
 	# independently and unioning them can flood a peninsula or an island.
@@ -50,7 +54,15 @@ static func domains(waterways: Array, box: Rect2, diagnostics: Array) -> Array:
 	var incomplete := false
 	var snap := BORDER_SNAP_M * WorldScale.metres_to_units()
 	for k in chains.size():
-		chains[k] = _snap_ends(chains[k], box, snap)
+		var c: PackedVector2Array = chains[k]
+		# A ring whose closing node two sources put JOIN_M apart closes
+		# exactly, like any other join.
+		if c.size() >= 4 and c[0].distance_to(c[-1]) < join \
+				and not _on_border(c[0], box) and not _on_border(c[-1], box):
+			c[c.size() - 1] = c[0]
+			chains[k] = c
+		else:
+			chains[k] = _snap_ends(c, box, snap)
 	for chain in chains:
 		if chain.size() < 2:
 			continue
@@ -189,3 +201,22 @@ static func _perimeter(p: Vector2, box: Rect2) -> float:
 		return box.size.x + box.size.y + box.end.x - p.x
 	return 2.0 * box.size.x + box.size.y + box.end.y - p.y
 
+
+static func _key(p: Vector2, cell: float) -> Vector2i:
+	return Vector2i(floori(p.x / cell), floori(p.y / cell))
+
+## The unused edge starting within `cell` of `p` (nearest first), -1 none.
+static func _next_start(starts: Dictionary, edges: Array, used: Dictionary, p: Vector2, cell: float) -> int:
+	var k := _key(p, cell)
+	var best := -1
+	var best_d := cell * 1.0001  # ties keep the first (OSM order), as before
+	for dx in [-1, 0, 1]:
+		for dz in [-1, 0, 1]:
+			for candidate in starts.get(k + Vector2i(dx, dz), []):
+				if used.has(candidate):
+					continue
+				var d := p.distance_to(edges[candidate][0])
+				if d < best_d:
+					best_d = d
+					best = candidate
+	return best

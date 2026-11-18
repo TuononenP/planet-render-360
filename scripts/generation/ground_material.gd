@@ -13,7 +13,7 @@ extends RefCounted
 ##   GroundTruth.land_class_at reads (first polygon wins, holes
 ##   honoured), then roads and building footprints on top.
 ## - Each class picks tiled PBR detail from eight photographic layers
-##   (TerrainTextures: pavement, lawn, rocky ground, asphalt, cliff,
+##   (TerrainTextures: pavement, lawn, rocky ground, soil, cliff,
 ##   forest floor, gravel, sand; sampled without visible repetition),
 ##   a class base colour, and how much of the LOW-FREQUENCY photo
 ##   (a ~5 m mip) tints it. Inside footprints and on road ribbons the
@@ -265,7 +265,7 @@ static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
 	return ground_ceiling_image(_image_of(photo), rect, gain, cmap)
 
 ## Per-class lookup, 32 x 4 RGBA8 (nearest):
-## row 0 detail weights (pavement, lawn, rocky ground, asphalt);
+## row 0 detail weights (pavement, lawn, rocky ground, soil);
 ## row 1 base colour (sRGB) + photo tint trust in A;
 ## row 2 R = full-photo cap with distance, G = roughness, B = how
 ## much of the photo's own fine luminance structure (markings, paving,
@@ -329,24 +329,38 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 ## to what lies beneath (even-odd over outer + hole rings); roads then
 ## footprints paint on top. Scanline spans → Image.fill_rect.
 static func class_map(data: LocationData, n: int = CLASS_TEXELS) -> Image:
+	var img: Image
+	if HsyCover.applies(data):
+		# HSY's 2 m surface classes decide where the map only says "a
+		# residential block" (landuse paving) or nothing; mapped parks,
+		# water, roads and footprints still win.
+		img = _rasterise(n, func(paint: Callable) -> void: _paint_land(data, paint))
+		img = HsyCover.overlay(img, data.hsy_cover_image, [0, int(ID["urban"])])
+		img = HsyCover.overlay(img, _rasterise(n, func(paint: Callable) -> void:
+			_paint_features(data, paint, ROAD_INSET_M)), [])
+	else:
+		img = _rasterise(n, func(paint: Callable) -> void: _paint_classes(data, paint, ROAD_INSET_M))
+	if data.quality_preset > RenderSettings.Preset.FAST \
+			and data.landcover_image != null and not data.landcover_image.is_empty():
+		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
+	return img
+
+## An n x n class map from `painter`(paint): with the native GroundKernels
+## the fills queue up in paint order and rasterise at once on every core;
+## otherwise each fills right away.
+static func _rasterise(n: int, painter: Callable) -> Image:
 	var img := Image.create(n, n, false, Image.FORMAT_R8)
 	img.fill(Color(0, 0, 0))
-	# With the native GroundKernels the fills queue up in paint order and
-	# rasterise at once on every core; otherwise each fills right away.
 	var fills: Array = []
-	var paint := func(rings: Array, id: int) -> void:
+	painter.call(func(rings: Array, id: int) -> void:
 		if _native:
 			fills.append([id, rings])
 		else:
-			_fill_rings(img, rings, id, n)
-	_paint_classes(data, paint, ROAD_INSET_M)
+			_fill_rings(img, rings, id, n))
 	if _native and not fills.is_empty():
 		img = Image.create_from_data(n, n, false, Image.FORMAT_R8,
 			ClassDB.class_call_static("GroundKernels", "fill_rings", n,
 				WorldScale.detailed_extent_units(), _fill_bytes(fills)))
-	if data.quality_preset > RenderSettings.Preset.FAST \
-			and data.landcover_image != null and not data.landcover_image.is_empty():
-		img = _worldcover_fallback(img, data.landcover_image, ClimateModel.arid(data))
 	return img
 
 ## Texels per side of the near class map for `preset`; 0 for none.
@@ -363,7 +377,13 @@ static func near_class_map(data: LocationData, n: int, centre: Vector2, size_u: 
 		return null
 	var fills: Array = []
 	var inset_m := 0.5 * size_u / WorldScale.metres_to_units() / float(n)
-	_paint_classes(data, func(rings: Array, id: int) -> void: fills.append([id, rings]), inset_m)
+	# With HSY's surface classes, landuse paving defers to the extent map
+	# (which carries them): unmapped here, so the shader reads it.
+	var skip_urban := HsyCover.applies(data)
+	_paint_land(data, func(rings: Array, id: int) -> void:
+		if not (skip_urban and id == int(ID["urban"])):
+			fills.append([id, rings]))
+	_paint_features(data, func(rings: Array, id: int) -> void: fills.append([id, rings]), inset_m)
 	var to_window := Transform2D(0.0, -centre)
 	var half := size_u * 0.5
 	var kept: Array = []
@@ -399,6 +419,11 @@ static func _fill_bytes(fills: Array) -> Array:
 
 ## Calls `paint`(rings, id) for everything on the ground, in paint order.
 static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: float) -> void:
+	_paint_land(data, paint)
+	_paint_features(data, paint, road_inset_m)
+
+## OSM land-cover polygons, back to front (the first in the list wins).
+static func _paint_land(data: LocationData, paint: Callable) -> void:
 	var polys: Array = data.land_polygons
 	for k in range(polys.size() - 1, -1, -1):
 		var poly = polys[k]
@@ -414,13 +439,22 @@ static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: fl
 			if hole is PackedVector2Array:
 				rings.append(hole)
 		paint.call(rings, int(ID[cls]))
+
+## Sidewalks, roads, rail and building footprints, over the land cover.
+static func _paint_features(data: LocationData, paint: Callable, road_inset_m: float) -> void:
 	var m2u := WorldScale.metres_to_units()
 	# Sidewalks first, so every carriageway paints over them at junctions.
 	var walk_m := SIDEWALK_CITY_M if not CityStyles.zone_at(data.latitude, data.longitude).is_empty() \
 		else SIDEWALK_M
 	for line in data.roads:
-		if line is Dictionary and int((line as Dictionary).get("sidewalk", 0)) != 0:
+		# A surveyed street's pavements come from the survey below.
+		if line is Dictionary and int((line as Dictionary).get("sidewalk", 0)) != 0 \
+				and not bool((line as Dictionary).get("surveyed", false)):
 			_sidewalks(line, paint, m2u, walk_m)
+	for area in data.paved_areas:
+		var rings: Array = [area["points"]]
+		rings.append_array(area.get("holes", []))
+		paint.call(rings, int(ID.get(str(area["class"]), ID["urban"])))
 	for line in data.roads:
 		var pts := PackedVector2Array()
 		var width := 1.7

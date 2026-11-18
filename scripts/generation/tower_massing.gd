@@ -30,7 +30,8 @@ const PENCIL_SPAN_M := 34.0
 static func stack(b: Dictionary, look: Dictionary, res: Dictionary, ctx: Dictionary,
 		shape: String) -> Array:
 	if int(ctx.get("fidelity", 0)) < 2 or shape != "flat" or not b.has("height_source") \
-			or bool(b.get("mapped_landmark", false)) or not (str(look.get("kind", "")) in KINDS) \
+			or bool(b.get("mapped_landmark", false)) or bool(b.get("lod2", false)) \
+			or not (str(look.get("kind", "")) in KINDS) \
 			or not (b.get("parts", []) as Array).is_empty() or not (b.get("holes", []) as Array).is_empty() \
 			or float(b.get("min_height_m", 0.0)) > 0.0 or int(b.get("min_level", 0)) > 0:
 		return []

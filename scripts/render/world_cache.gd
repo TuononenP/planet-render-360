@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 282
+const BUILD_VERSION := 283
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -72,7 +72,7 @@ static func key(data: LocationData) -> String:
 		data.focus.is_empty(),
 		hash(var_to_bytes(data.landmark_candidates)),
 		hash(var_to_bytes([data.shore_structures, data.land_polygons, data.waterways, data.buildings, data.roads])),
-		hash(var_to_bytes([data.trees, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
+		hash(var_to_bytes([data.trees, data.paved_areas, data.barriers, data.railways, data.street_furniture, data.piers, data.pois,
 			data.tram_stops, data.bus_stops, data.rail_platforms, data.rail_stations, data.bridge_areas])),
 		hash(var_to_bytes(data.far_landuse)), hash(var_to_bytes(data.far_towers)),
 		# Sorted keys: a fetched climate and the same one read back from the
@@ -81,6 +81,7 @@ static func key(data: LocationData) -> String:
 		FarCityFetcher.QUERY_VERSION, CityDetail.VERSION, JSON.stringify(data.climate, "", true),
 		CacheStore.LANDCOVER_VERSION, LandcoverSource.WORLDCOVER_BASE, LandcoverSource.CANOPY_BASE,
 		_image_fingerprint(data.landcover_image), _image_fingerprint(data.canopy_image),
+		_image_fingerprint(data.hsy_cover_image),
 		data.far_heights.size(), data.dem_rings.size(), data.far_drapes.size(),
 		str([data.far_water_mask.get("zoom", 0), data.far_water_mask.get("origin_px", Vector2.ZERO),
 			hash(data.far_water_mask.get("bytes", PackedByteArray()))]), _sources()]

@@ -204,6 +204,13 @@ var pois: Array = []
 ## source was unavailable; OSM and existing imagery fallbacks still apply.
 var landcover_image: Image = null
 var canopy_image: Image = null
+## HSY's 2 m surface classes (HsyCover; R8 GroundMaterial ids) over the
+## detailed extent: High / Ultra in Helsinki and Espoo, null elsewhere.
+var hsy_cover_image: Image = null
+## Surveyed pavements, squares and paths (HelsinkiStreets): {class
+## ("urban" / "path"), points, holes} in local metres; the ground class
+## map paints them over the land cover.
+var paved_areas: Array = []
 ## OSM man_made=pier ways {points, floating, width_m}: jetties and marina
 ## pontoons (MarinaBuilder moors boats along them on desktop Ultra).
 var piers: Array = []

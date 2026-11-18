@@ -20,10 +20,6 @@ const HALF_M := 1450.0
 const MAX_FEATURES := 20000
 ## In-service buildings (tila "voimassa"); demolished ones are 3+.
 const IN_SERVICE := 2
-## A register point a little outside every footprint (a corner-placed
-## point, a footprint drawn slightly small) still joins the nearest one.
-const SNAP_M := 3.5
-const CELL_M := 50.0
 ## Storey height when register floors give a missing height (the
 ## OSM `building:levels` rule, OsmTags._resolve_height).
 const STOREY_M := 3.2
@@ -101,84 +97,13 @@ static func apply(buildings: Array, c_lat: float, c_lon: float, rows: Array) -> 
 	var stats := {"rows": rows.size(), "matched": 0, "filled": 0}
 	if rows.is_empty() or buildings.is_empty():
 		return stats
-	var grid := _grid(buildings)
-	var hits := {}  # building index -> [rows]
-	var f := Gk25.frame(c_lat, c_lon)
-	for r in rows:
-		var p := Gk25.frame_xz(f, float(r["e"]), float(r["n"]))
-		var i := _owner(buildings, grid, p)
-		if i < 0:
-			continue
-		if not hits.has(i):
-			hits[i] = []
-		(hits[i] as Array).append(r)
-		stats["matched"] = int(stats["matched"]) + 1
+	var hits := FootprintMatcher.match(buildings, c_lat, c_lon, rows)
+	for i in hits:
+		stats["matched"] = int(stats["matched"]) + (hits[i] as Array).size()
 	for i in hits:
 		if not _enrich(buildings[i], hits[i]).is_empty():
 			stats["filled"] = int(stats["filled"]) + 1
 	return stats
-
-## Whether a building takes register facts: not a part-modelled
-## landmark, a vessel or a fortification (their own builders).
-static func _eligible(b: Dictionary) -> bool:
-	return (b.get("parts", []) as Array).is_empty() \
-		and not str(b.get("kind", "")) in ["ship", "boat", "houseboat"] \
-		and not b.has("defensive_works") and not b.get("suomenlinna", false)
-
-## Building index buckets per CELL_M cell of each footprint's AABB.
-static func _grid(buildings: Array) -> Dictionary:
-	var grid := {}
-	for i in buildings.size():
-		var b: Variant = buildings[i]
-		if not (b is Dictionary) or not _eligible(b):
-			continue
-		var fp: PackedVector2Array = (b as Dictionary).get("footprint", PackedVector2Array())
-		if fp.size() < 3:
-			continue
-		var lo := fp[0]
-		var hi := fp[0]
-		for q in fp:
-			lo = lo.min(q)
-			hi = hi.max(q)
-		lo -= Vector2(SNAP_M, SNAP_M)
-		hi += Vector2(SNAP_M, SNAP_M)
-		for cx in range(floori(lo.x / CELL_M), floori(hi.x / CELL_M) + 1):
-			for cz in range(floori(lo.y / CELL_M), floori(hi.y / CELL_M) + 1):
-				var key := Vector2i(cx, cz)
-				if not grid.has(key):
-					grid[key] = []
-				(grid[key] as Array).append(i)
-	return grid
-
-## The building containing `p`, else the nearest within SNAP_M; -1 none.
-static func _owner(buildings: Array, grid: Dictionary, p: Vector2) -> int:
-	var key := Vector2i(floori(p.x / CELL_M), floori(p.y / CELL_M))
-	var near := -1
-	var near_d := SNAP_M
-	for i in grid.get(key, []):
-		var b: Dictionary = buildings[i]
-		var fp: PackedVector2Array = b["footprint"]
-		if WorldScale.point_in_polygon(p, fp):
-			var in_hole := false
-			for h in b.get("holes", []):
-				if WorldScale.point_in_polygon(p, h):
-					in_hole = true
-					break
-			if not in_hole:
-				return i
-		var d := _edge_distance(p, fp)
-		if d < near_d:
-			near_d = d
-			near = i
-	return near
-
-static func _edge_distance(p: Vector2, fp: PackedVector2Array) -> float:
-	var best := INF
-	for k in fp.size():
-		var a := fp[k]
-		var b := fp[(k + 1) % fp.size()]
-		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)))
-	return best
 
 ## Fills one building from its register rows (several buildings of one
 ## register entry can share an OSM outline): the most floors, and the

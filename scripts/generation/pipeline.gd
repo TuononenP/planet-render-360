@@ -143,6 +143,7 @@ var _landcover: LandcoverFetcher
 var _landcover_done := true
 var _landcover_image: Image = null
 var _canopy_image: Image = null
+var _hsy_cover_image: Image = null
 ## The optional rasters overlap other fetches and never extend Imagery
 ## beyond this many seconds from the start of a place.
 const LANDCOVER_WAIT_S := 45.0
@@ -248,7 +249,9 @@ func _ready() -> void:
 		if kind == "landcover":
 			_landcover_image = image
 		elif kind == "canopy":
-			_canopy_image = image)
+			_canopy_image = image
+		elif kind == "hsy_cover":
+			_hsy_cover_image = image)
 	_landcover.finished.connect(func(_cover: Image, _canopy: Image) -> void:
 		_landcover_done = true)
 	_sat = SatelliteFetcher.new()
@@ -448,6 +451,7 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_climate.fetch(lat, lon)
 	_landcover_image = null
 	_canopy_image = null
+	_hsy_cover_image = null
 	_landcover_done = quality_preset <= RenderSettings.Preset.FAST
 	if not _landcover_done:
 		_landcover.fetch(lat, lon, CityDetail.boosted(quality_preset, lat, lon))
@@ -516,6 +520,8 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	credits.append_array(_city_credits)
 	if data.landcover_image != null:
 		credits.append("Land cover: © ESA WorldCover project 2021 (contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium)")
+	if HsyCover.applies(data):
+		credits.append(HsyCover.CREDIT)
 	if data.canopy_image != null and _landcover.canopy_source.begins_with("hsy"):
 		credits.append(HsyCanopy.CREDIT)
 	if data.canopy_image != null and _landcover.canopy_source != "hsy":
@@ -751,6 +757,7 @@ func _await_satellite(data: LocationData) -> void:
 		_landcover_done = true
 	data.landcover_image = _landcover_image
 	data.canopy_image = _canopy_image
+	data.hsy_cover_image = _hsy_cover_image
 
 ## Nearest first, except monuments (columns, obelisks) and observation
 ## wheels in range rank first: they are few, and one cut by the cap
@@ -829,6 +836,8 @@ func _await_osm(data: LocationData) -> void:
 	if used_osm:
 		_city_credits = await _city.land(data,
 			CityOpenData.STREAM_LAND_WAIT_S if background else CityOpenData.LAND_WAIT_S)
+		if _cancelled:
+			return
 	_mark("registers")
 	if not warm_only:
 		_start_ground(data)

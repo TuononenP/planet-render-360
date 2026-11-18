@@ -148,3 +148,160 @@ static func _cells(a: Vector2, b: Vector2) -> Array[Vector2i]:
 		for y in range(lo.y, hi.y + 1):
 			out.append(Vector2i(x, y))
 	return out
+
+# --- Surveyed carriageway (HelsinkiStreets) ----------------------------------
+
+## Road classes a surveyed carriageway gives a width.
+const CAR_CLASSES := ["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link",
+	"secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified", "residential",
+	"living_street", "service"]
+## Farthest a kerb is looked for either side of the centreline (m).
+const SURVEY_REACH_M := 20.0
+const SURVEY_MIN_M := 2.5
+const SURVEY_MAX_M := 40.0
+## Share of a road's probes that must stand on the surveyed carriageway.
+const SURVEY_SHARE := 0.5
+
+## Sets each car road's width (in place) to its kerb-to-kerb width across
+## the surveyed carriageway polygons `drive` (+ `parking` strips, whose
+## share becomes `parking_m`): the median over probes every PROBE_M, each
+## the distance either side to where the surveyed street ends. Marks the
+## road `width_tagged` (no sidewalk widening on top) and `surveyed`.
+## Returns how many roads took a width. Polygons {points, holes}, metres.
+## `mark` false (no surveyed pavements landed): widths only, so the
+## inferred pavement bands stay.
+static func from_polygons(roads: Array, drive: Array, parking: Array, mark: bool = true) -> int:
+	var all := drive + parking
+	var edges := _edge_grid(all)
+	var polys_at := _poly_grid(all)
+	var drive_at := _poly_grid(drive)
+	var drive_edges := _edge_grid(drive)
+	var count := 0
+	for r in roads:
+		if not (r is Dictionary):
+			continue
+		var road: Dictionary = r
+		if bool(road.get("area", false)) or bool(road.get("width_tagged", false)) \
+				or bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) \
+				or bool(road.get("kerb_line", false)) or not str(road.get("class", "")) in CAR_CLASSES:
+			continue
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+		var widths: Array[float] = []
+		var drives: Array[float] = []
+		var probes := 0
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			var len := a.distance_to(b)
+			if len < 4.0:
+				continue
+			var dir := (b - a) / len
+			var n := Vector2(dir.y, -dir.x)
+			var k_n := maxi(1, int(len / PROBE_M))
+			for k in k_n:
+				probes += 1
+				var p := a + dir * len * (float(k) + 0.5) / float(k_n)
+				if not _inside(p, all, polys_at):
+					continue
+				var l := _exit(p, n, all, edges, polys_at)
+				var rr := _exit(p, -n, all, edges, polys_at)
+				if l <= 0.0 or rr <= 0.0:
+					continue
+				widths.append(l + rr)
+				if _inside(p, drive, drive_at):
+					var dl := _exit(p, n, drive, drive_edges, drive_at)
+					var dr := _exit(p, -n, drive, drive_edges, drive_at)
+					drives.append(dl + dr if dl > 0.0 and dr > 0.0 else l + rr)
+		if probes == 0 or float(widths.size()) < SURVEY_SHARE * float(probes):
+			continue
+		widths.sort()
+		var w := widths[widths.size() / 2]
+		if w < SURVEY_MIN_M or w > SURVEY_MAX_M:
+			continue
+		road["width_m"] = w
+		road["width_tagged"] = true
+		if mark:
+			road["surveyed"] = true
+		if not drives.is_empty():
+			drives.sort()
+			var park := w - drives[drives.size() / 2]
+			road["parking_m"] = park if park >= 1.5 else 0.0
+		count += 1
+	return count
+
+## Polygon indices per CELL_M cell of their bounding boxes.
+static func _poly_grid(polys: Array) -> Dictionary:
+	var grid := {}
+	for i in polys.size():
+		var pts: PackedVector2Array = polys[i]["points"]
+		var lo := pts[0]
+		var hi := pts[0]
+		for q in pts:
+			lo = lo.min(q)
+			hi = hi.max(q)
+		var c0 := _cell(lo)
+		var c1 := _cell(hi)
+		for x in range(c0.x, c1.x + 1):
+			for y in range(c0.y, c1.y + 1):
+				var key := Vector2i(x, y)
+				if not grid.has(key):
+					grid[key] = []
+				(grid[key] as Array).append(i)
+	return grid
+
+## Polygon edges [a, b] per CELL_M cell they touch (bounding box).
+static func _edge_grid(polys: Array) -> Dictionary:
+	var grid := {}
+	for poly in polys:
+		var rings: Array = [poly["points"]]
+		rings.append_array(poly.get("holes", []))
+		for ring: PackedVector2Array in rings:
+			for i in ring.size():
+				var a := ring[i]
+				var b := ring[(i + 1) % ring.size()]
+				var c0 := _cell(a.min(b))
+				var c1 := _cell(a.max(b))
+				for x in range(c0.x, c1.x + 1):
+					for y in range(c0.y, c1.y + 1):
+						var key := Vector2i(x, y)
+						if not grid.has(key):
+							grid[key] = []
+						(grid[key] as Array).append([a, b])
+	return grid
+
+static func _inside(p: Vector2, polys: Array, grid: Dictionary) -> bool:
+	for i in grid.get(_cell(p), []):
+		var poly: Dictionary = polys[i]
+		if WorldScale.point_in_polygon(p, poly["points"]):
+			var hole := false
+			for h in poly.get("holes", []):
+				if WorldScale.point_in_polygon(p, h):
+					hole = true
+					break
+			if not hole:
+				return true
+	return false
+
+## Distance from `p` along `dir` to where the polygons' union ends
+## (edges crossed between adjoining parts are passed); 0 past the reach.
+static func _exit(p: Vector2, dir: Vector2, polys: Array, edges: Dictionary, polys_at: Dictionary) -> float:
+	var end := p + dir * SURVEY_REACH_M
+	var hits: Array[float] = []
+	var seen := {}
+	var c0 := _cell(p.min(end))
+	var c1 := _cell(p.max(end))
+	for x in range(c0.x, c1.x + 1):
+		for y in range(c0.y, c1.y + 1):
+			for e in edges.get(Vector2i(x, y), []):
+				var key := Vector4(e[0].x, e[0].y, e[1].x, e[1].y)
+				if seen.has(key):
+					continue
+				seen[key] = true
+				var hit: Variant = Geometry2D.segment_intersects_segment(p, end, e[0], e[1])
+				if hit != null:
+					hits.append(p.distance_to(hit))
+	hits.sort()
+	for t in hits:
+		if not _inside(p + dir * (t + 0.15), polys, polys_at):
+			return t
+	return 0.0
