@@ -20,31 +20,31 @@ const SAMPLE_M := 4.0
 ## a 9–25 m grid the ground beside the street went down with it.
 const MAX_SHIFT_M := 1.0
 ## On a coarse surface-model DEM (SRTM / EU-DEM class, no bare-earth model
-## replacing it: Seoul, Busan, Istanbul ...) the post grid carries 3–8 m
-## mounds 30–90 m across where city blocks and canopy were, which the 1 m
-## cap leaves under every street. There the profile low-pass spans a block
-## and a post may move further; a linear ramp still maps to itself, so
-## only crests and dips sharper than the window are trimmed. ArcticDEM
-## (2 m, north of 60°N: Turku's hill streets) keeps the defaults.
-const COARSE_SMOOTH_M := 70.0
-const COARSE_MAX_SHIFT_M := 2.5
+## replacing it: Seoul, Busan, Istanbul ...) the per-road grade creases:
+## parallel carriageways and the slip road between them (Sajik-ro at
+## Gwanghwamun) settle on profiles of their own and the ground between
+## them folds. There the whole network is pulled onto one smooth field
+## instead (grade_network): three box passes of NETWORK_RADIUS_M (about a
+## Gaussian of that sigma), at most NETWORK_MAX_SHIFT_M per post. ArcticDEM
+## (2 m, north of 60°N: Turku's hill streets) keeps the per-road grade.
+const NETWORK_RADIUS_M := 20.0
+const NETWORK_MAX_SHIFT_M := 2.0
 ## How far along a road from the bridge it leads onto its embankment is
 ## kept (_keep_embankments), metres.
 const EMBANKMENT_M := 40.0
-## Test hook: false grades coarse DEMs with the defaults too.
+## Test hook: false grades coarse DEMs per road like the rest.
 static var coarse_enabled := true
 
 ## The per-road profile and stamps run natively (RoadGrader) when the
 ## library is loaded.
 static var _native := ClassDB.class_exists("RoadGrader")
 
-## True when `data`'s heights are a coarse surface model graded harder.
+## True when `data`'s heights are a coarse surface model (grade_network).
 static func coarse(data: LocationData) -> bool:
 	return coarse_enabled and BareEarth.applies(data) and not BareEarth.surface_model(data)
 
 ## Grades `surface` (size × size posts, `step` units apart, source
 ## metres in Y) in place. `level` marks carved water posts (-INF = dry).
-## `smooth_m` / `max_shift_m`: SMOOTH_M / MAX_SHIFT_M, or the COARSE_ pair.
 static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 		size: int, step: float, roads: Array, m2u: float,
 		smooth_m: float = SMOOTH_M, max_shift_m: float = MAX_SHIFT_M) -> void:
@@ -107,6 +107,80 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 	for i in size * size:
 		if best_w[i] > 0.0:
 			surface[i] = lerpf(surface[i], best_h[i], best_w[i])
+
+## Pulls every post in a road corridor onto one smooth field of the dry
+## ground, so crossing streets, parallel carriageways and slip roads share
+## their heights (see NETWORK_RADIUS_M). The corridor is the per-road
+## stamp's footprint; within EMBANKMENT_M of a road bridge's end the ground
+## is never cut. Water-carved posts neither move nor pull the field down.
+static func grade_network(surface: PackedFloat32Array, level: PackedFloat32Array,
+		size: int, step: float, roads: Array, m2u: float) -> void:
+	if size < 3 or roads.is_empty():
+		return
+	var weight := PackedFloat32Array()
+	weight.resize(size * size)
+	var any := false
+	for road in roads:
+		if not (road is Dictionary):
+			continue
+		var r: Dictionary = road
+		if bool(r.get("bridge", false)) or bool(r.get("tunnel", false)) \
+				or RoadBuilder._rank(str(r.get("class", "unclassified"))) < 1:
+			continue
+		var pts: PackedVector2Array = r.get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		var half := maxf(float(r.get("width_m", 0.0)), 3.0) * 0.5 * m2u
+		for p in GroundTruth._densify(pts, step * 0.5):
+			_corridor(p, half, weight, size, step)
+		any = true
+	if not any:
+		return
+	# Dry-weighted low-pass: blur(h · dry) / blur(dry).
+	var num := PackedFloat32Array()
+	num.resize(size * size)
+	var den := PackedFloat32Array()
+	den.resize(size * size)
+	for i in size * size:
+		if is_inf(level[i]):
+			num[i] = surface[i]
+			den[i] = 1.0
+	var r := maxi(1, roundi(NETWORK_RADIUS_M * m2u / step))
+	for k in 3:
+		num = UrbanSmooth.box(UrbanSmooth.box(num, size, r, true), size, r, false)
+		den = UrbanSmooth.box(UrbanSmooth.box(den, size, r, true), size, r, false)
+	var heads := _bridge_heads(roads)
+	var reach := EMBANKMENT_M * m2u
+	var hs := float(size) * 0.5
+	for i in size * size:
+		var w := weight[i]
+		if w <= 0.0 or not is_inf(level[i]) or den[i] <= 0.0001:
+			continue
+		var target := clampf(num[i] / den[i], surface[i] - NETWORK_MAX_SHIFT_M, surface[i] + NETWORK_MAX_SHIFT_M)
+		if not heads.is_empty():
+			var at := Vector2((float(i % size) - hs) * step, (float(i / size) - hs) * step)
+			for e in heads:
+				if at.distance_to(e) <= reach:
+					target = maxf(target, surface[i])
+					break
+		surface[i] = lerpf(surface[i], target, minf(w, 1.0))
+
+## Corridor weight around road point `p` (the _stamp footprint): 1 across
+## the carriageway and half a post, easing to 0 by 1.8 posts out.
+static func _corridor(p: Vector2, half: float, weight: PackedFloat32Array, size: int, step: float) -> void:
+	var inner := half + step * 0.5
+	var reach := half + step * 1.8
+	var hs := float(size) * 0.5
+	var x0 := clampi(int(floor((p.x - reach) / step + hs)), 0, size - 1)
+	var x1 := clampi(int(ceil((p.x + reach) / step + hs)), 0, size - 1)
+	var z0 := clampi(int(floor((p.y - reach) / step + hs)), 0, size - 1)
+	var z1 := clampi(int(ceil((p.y + reach) / step + hs)), 0, size - 1)
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var d := Vector2((float(x) - hs) * step, (float(z) - hs) * step).distance_to(p)
+			if d < reach:
+				var i := z * size + x
+				weight[i] = maxf(weight[i], 1.0 - smoothstep(inner, reach, d))
 
 ## End points of road bridges (not footbridges).
 static func _bridge_heads(roads: Array) -> PackedVector2Array:

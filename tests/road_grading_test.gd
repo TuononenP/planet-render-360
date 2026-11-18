@@ -93,32 +93,69 @@ func _run() -> void:
 	var nested := _surface(bumpy)
 	RoadGrading.grade_areas(nested, _dry(), SIZE, step, [_square(18, 22), _square(10, 30)])
 	_check(_std(nested, 18, 22, flat) < 0.3, "a forecourt inside a square lies flat")
-	# A street over a coarse surface model's block mounds: the 1 m cap leaves
-	# them, the coarse pair levels them; a plain ramp stays a ramp.
+	# grade_network (coarse DEMs): Sajik-ro's two carriageways and the shorter
+	# slip road between them, over mounds that differ across the roadway,
+	# end up on one surface; the per-road grade creases between them.
 	var m := WorldScale.metres_to_units()
-	var road := {"class": "residential", "width_m": 8.0,
-		"points": PackedVector2Array([_post(2, 20), _post(38, 20)])}
-	var mounds := func(x: int, _z: int) -> float: return 30.0 + 2.5 * sin(float(x) * 0.9)
-	var fine := _surface(mounds)
-	RoadGrading.grade(fine, _dry(), SIZE, step, [road], m)
-	var harsh := _surface(mounds)
-	RoadGrading.grade(harsh, _dry(), SIZE, step, [road], m, RoadGrading.COARSE_SMOOTH_M, RoadGrading.COARSE_MAX_SHIFT_M)
+	var lanes: Array = [
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([_post(2, 19), _post(38, 19)])},
+		{"class": "primary", "width_m": 10.0, "points": PackedVector2Array([_post(2, 21), _post(38, 21)])},
+		{"class": "tertiary_link", "width_m": 10.0, "points": PackedVector2Array([_post(12, 20), _post(28, 20)])}]
+	# Within the cap, as UrbanSmooth leaves them before the grade.
+	var mounds := func(x: int, z: int) -> float: return 30.0 + 1.2 * sin(float(x) * 0.9) + 0.7 * sin(float(z) * 1.7)
+	var crease := func(s: PackedFloat32Array) -> float:
+		var worst := 0.0
+		for x in range(14, 27):
+			var a19: float = s[19 * SIZE + x]
+			var a20: float = s[20 * SIZE + x]
+			var a21: float = s[21 * SIZE + x]
+			worst = maxf(worst, maxf(absf(a19 - a20), maxf(absf(a21 - a20), absf(a19 - a21))))
+		return worst
 	var along := func(s: PackedFloat32Array) -> float:
 		var lo := INF
 		var hi := -INF
-		for x in range(10, 31):
+		for x in range(12, 29):
 			lo = minf(lo, s[20 * SIZE + x])
 			hi = maxf(hi, s[20 * SIZE + x])
 		return hi - lo
-	_check(float(along.call(harsh)) < 0.5 * float(along.call(fine)),
-		"coarse grading levels block mounds (%.2f m vs %.2f m)" % [along.call(harsh), along.call(fine)])
+	var per_road := _surface(mounds)
+	RoadGrading.grade(per_road, _dry(), SIZE, step, lanes, m)
+	var net := _surface(mounds)
+	var net_before := net.duplicate()
+	RoadGrading.grade_network(net, _dry(), SIZE, step, lanes, m)
+	_check(float(crease.call(net)) < 0.3, "parallel ways share one surface (crease %.2f m)" % crease.call(net))
+	_check(float(crease.call(net)) < float(crease.call(per_road)),
+		"the network grade creases less than per-road grading (%.2f vs %.2f m)" % [crease.call(net), crease.call(per_road)])
+	_check(float(along.call(net)) < 0.4 * float(along.call(net_before)),
+		"the network grade levels block mounds (%.2f m from %.2f m)" % [along.call(net), along.call(net_before)])
+	_check(is_equal_approx(net[3 * SIZE + 20], net_before[3 * SIZE + 20]), "ground off the roads is untouched")
+	var net_moved := 0.0
+	for i in net.size():
+		net_moved = maxf(net_moved, absf(net[i] - net_before[i]))
+	_check(net_moved <= RoadGrading.NETWORK_MAX_SHIFT_M + 1e-4, "the network grade respects its cap (%.2f m)" % net_moved)
+	var road := {"class": "residential", "width_m": 8.0,
+		"points": PackedVector2Array([_post(2, 20), _post(38, 20)])}
 	var ramp := _surface(func(x: int, _z: int) -> float: return 10.0 + 0.8 * float(x))
 	var ramp_before := ramp.duplicate()
-	RoadGrading.grade(ramp, _dry(), SIZE, step, [road], m, RoadGrading.COARSE_SMOOTH_M, RoadGrading.COARSE_MAX_SHIFT_M)
+	RoadGrading.grade_network(ramp, _dry(), SIZE, step, [road], m)
 	var drift := 0.0
 	for x in range(10, 31):
 		drift = maxf(drift, absf(ramp[20 * SIZE + x] - ramp_before[20 * SIZE + x]))
-	_check(drift < 0.25, "a straight ramp keeps its grade under coarse grading (moved %.3f m)" % drift)
+	_check(drift < 0.1, "a straight ramp keeps its grade on the network (moved %.3f m)" % drift)
+	var wet_net := _dry()
+	wet_net[20 * SIZE + 20] = 25.0
+	var lake := _surface(mounds)
+	var lake_before := lake.duplicate()
+	RoadGrading.grade_network(lake, wet_net, SIZE, step, [road], m)
+	_check(is_equal_approx(lake[20 * SIZE + 20], lake_before[20 * SIZE + 20]), "a water-carved post on the network is left alone")
+	# A road ending at a road bridge keeps its embankment: never cut there.
+	var bridge := {"class": "primary", "width_m": 8.0, "bridge": true,
+		"points": PackedVector2Array([_post(30, 20), _post(38, 20)])}
+	var to_bridge := {"class": "primary", "width_m": 8.0, "points": PackedVector2Array([_post(4, 20), _post(30, 20)])}
+	var bank := _surface(func(x: int, _z: int) -> float: return 30.0 + (4.0 if x >= 27 else 0.0))
+	var bank_before := bank.duplicate()
+	RoadGrading.grade_network(bank, _dry(), SIZE, step, [to_bridge, bridge], m)
+	_check(bank[20 * SIZE + 29] >= bank_before[20 * SIZE + 29] - 1e-4, "the embankment at a bridge head is not cut")
 	var arctic := LocationData.new()
 	arctic.latitude = 60.45
 	arctic.longitude = 22.27

@@ -3,7 +3,7 @@ extends SceneTree
 ## Native road grading: godot --headless --path . --script tests/road_grader_test.gd
 ## RoadGrading.grade through RoadGrader (native/, tools/build_native.sh)
 ## must grade exactly the script's surface: random hilly grids with water
-## posts, crossing roads of every width, fine and coarse settings. Skips,
+## posts, crossing roads of every width, default and wider settings. Skips,
 ## passing, when the library is not built.
 
 func _init() -> void:
@@ -37,7 +37,7 @@ func _init() -> void:
 			RoadGrading._native = native
 			var graded := surface.duplicate()
 			if coarse:
-				RoadGrading.grade(graded, level, size, step, roads, m, RoadGrading.COARSE_SMOOTH_M, RoadGrading.COARSE_MAX_SHIFT_M)
+				RoadGrading.grade(graded, level, size, step, roads, m, 70.0, 2.5)
 			else:
 				RoadGrading.grade(graded, level, size, step, roads, m)
 			out[native] = graded

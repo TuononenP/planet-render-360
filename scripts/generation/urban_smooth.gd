@@ -41,10 +41,10 @@ static func apply(surface: PackedFloat32Array, size: int, step: float, half: flo
 		return
 	# A soft edge: the urban mask blurred once, so the smoothing fades out
 	# over about one RADIUS_M instead of stepping at the mask.
-	weight = _box(_box(weight, size, r, true), size, r, false)
+	weight = box(box(weight, size, r, true), size, r, false)
 	var smooth := surface.duplicate()
 	for k in 2:
-		smooth = _box(_box(smooth, size, r, true), size, r, false)
+		smooth = box(box(smooth, size, r, true), size, r, false)
 	for i in size * size:
 		if weight[i] <= 0.0:
 			continue
@@ -52,8 +52,9 @@ static func apply(surface: PackedFloat32Array, size: int, step: float, half: flo
 		surface[i] = lerpf(surface[i], target, minf(weight[i], 1.0))
 
 ## One box pass of half-width `r` posts along rows (`horizontal`) or
-## columns, the window clipped at the grid edge.
-static func _box(src: PackedFloat32Array, size: int, r: int, horizontal: bool) -> PackedFloat32Array:
+## columns, the window clipped at the grid edge (also RoadGrading's
+## network field).
+static func box(src: PackedFloat32Array, size: int, r: int, horizontal: bool) -> PackedFloat32Array:
 	if BareEarth._native:
 		return ClassDB.class_call_static("GridFilters", "box_mean", src, size, r, horizontal)
 	var out := PackedFloat32Array()

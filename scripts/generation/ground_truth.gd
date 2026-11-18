@@ -249,11 +249,13 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 		shoreline.carve(_surface, _level)
 	# Streets and main roads sit on a smoothed profile (RoadGrading).
 	var ways := data.roads + data.railways
-	var coarse := RoadGrading.coarse(data)
-	RoadGrading.grade(_surface, _level, size, _step_units,
-		[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units(),
-		RoadGrading.COARSE_SMOOTH_M if coarse else RoadGrading.SMOOTH_M,
-		RoadGrading.COARSE_MAX_SHIFT_M if coarse else RoadGrading.MAX_SHIFT_M)
+	# A coarse surface model grades the network as one (no creases between ways).
+	if RoadGrading.coarse(data):
+		RoadGrading.grade_network(_surface, _level, size, _step_units,
+			[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units())
+	else:
+		RoadGrading.grade(_surface, _level, size, _step_units,
+			[] if data.buildings.is_empty() else ways, WorldScale.metres_to_units())
 	# Mapped squares and plazas lie on their own best-fit plane.
 	RoadGrading.grade_areas(_surface, _level, size, _step_units,
 		[] if data.buildings.is_empty() else data.roads)
