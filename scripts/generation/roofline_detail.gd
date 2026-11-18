@@ -27,6 +27,10 @@ static func _mat(key: String) -> Material:
 			m.roughness = 0.95
 		"glass":
 			return ReliefKit.glass()
+		"frame":
+			m.albedo_color = Color(0.24, 0.26, 0.28)
+			m.metallic = 0.2
+			m.roughness = 0.65
 		_:
 			m.albedo_color = Color(0.5, 0.5, 0.5)
 	_mats[key] = m
@@ -43,12 +47,12 @@ static func _basis(dir: Vector2, n: Vector2) -> Basis:
 	return Basis(x, Vector3.UP, z)
 
 ## Stacks on party edges; true when any stood (BuildingDetail then skips
-## its own chimneys).
+## its own chimneys). Works on courtyard and multi-corner blocks as well as
+## boxy parcels, checking that each stack stays inside `ring` and clear of `holes`.
 static func party_stacks(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 		c: Vector2, top: float, roof_h: float, party: PackedByteArray,
-		look: Dictionary) -> bool:
-	if party.size() != ring.size() or not party.has(1) or float(look.get("chimney", 0.0)) < 0.3 \
-			or not RoofForms.boxy(ring):
+		look: Dictionary, holes: Array = []) -> bool:
+	if party.size() != ring.size() or not party.has(1) or float(look.get("chimney", 0.0)) < 0.3:
 		return false
 	var m := WorldScale.metres_to_units()
 	var masonry := BuildingDetail._mat("brick")
@@ -65,29 +69,118 @@ static func party_stacks(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 			continue
 		var dir := e / L
 		var n := PartyWalls.outward(ring, i)
-		# The ridge meets the party wall about where the centre projects.
-		var t := clampf((c - a).dot(dir), L * 0.25, L * 0.75)
-		var w := clampf(L * 0.3, 1.2 * m, 4.0 * m)
+		var ts: Array[float] = []
+		if L >= 14.0 * m:
+			ts.append(L * 0.30)
+			ts.append(L * 0.70)
+		else:
+			# The ridge meets the party wall about where the centre projects.
+			ts.append(clampf((c - a).dot(dir), L * 0.25, L * 0.75))
+		var w := clampf(L * 0.24, 1.2 * m, 3.6 * m)
 		var d := 0.6 * m
 		var h := roof_h + 1.1 * m
-		var p := a + dir * t - n * (d * 0.5 + 0.04 * m)
 		var basis := _basis(dir, n)
-		batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, top + h * 0.5 - 0.2 * m, p.y),
-			Vector3(w, h, d)), masonry)
-		var y_cap := top + h - 0.2 * m
-		# The cap oversails the stack on three sides but stops short of
-		# the party wall: over it, an equal-height neighbour's cap would
-		# share its top (z-fighting).
-		var pc := p - n * 0.035 * m
-		batch.add("box", BuildingDetail._xf(basis, Vector3(pc.x, y_cap + 0.06 * m, pc.y),
-			Vector3(w + 0.14 * m, 0.12 * m, d + 0.14 * m)), masonry)
-		var pots := clampi(int(w / (0.42 * m)), 2, 9)
-		for k in pots:
-			var q := p + dir * (-w * 0.5 + (float(k) + 0.5) * w / float(pots))
-			batch.add("cyl", BuildingDetail._xf(Basis(), Vector3(q.x, y_cap + 0.37 * m, q.y),
-				Vector3(0.24 * m, 0.5 * m, 0.24 * m)), _mat("pot"))
-		placed = true
+		for t in ts:
+			var p := a + dir * t - n * (d * 0.5 + 0.04 * m)
+			if not _clear_of_holes(p, ring, holes, 0.3 * m):
+				continue
+			_add_stack(batch, basis, p, dir, n, top, h, w, d, masonry, true)
+			placed = true
 	return placed
+
+## Parisian mansard terrasson detail: rendered limestone chimney stacks with
+## terracotta clay pots (mitrons) riding behind the brisis eaves on courtyard
+## and multi-corner blocks, plus subtle flush skylights on wide mansards.
+static func mansard_roof_details(batch: BuildingDetail.Batch, ring: PackedVector2Array,
+		holes: Array, top: float, roof_h: float, shape: String, party: PackedByteArray,
+		look: Dictionary, seed_v: float, area_m2: float, with_skylights: bool = false) -> bool:
+	if shape != "mansard":
+		return false
+	var m := WorldScale.metres_to_units()
+	if roof_h < 1.4 * m or float(look.get("chimney", 0.0)) < 0.4:
+		return false
+	var masonry := BuildingDetail._mat("brick")
+	if str(look.get("wall_set", "")) in ["limestone", "render", "stone"]:
+		masonry = _mat("render")
+	var has_party := party.size() == ring.size() and party.has(1)
+	var placed := false
+	var sky_count := 0
+	for i in ring.size():
+		if has_party and party[i] == 1:
+			continue
+		var a := ring[i]
+		var e := ring[(i + 1) % ring.size()] - a
+		var L := e.length()
+		if L < 8.0 * m:
+			continue
+		var dir := e / L
+		var n := PartyWalls.outward(ring, i)
+		var basis := _basis(dir, n)
+		var count := maxi(1, int(L / (12.0 * m)))
+		var step := L / float(count)
+		for k in count:
+			var hval := ArchitectureStyle._h(seed_v + float(i) * 0.31, 60 + k * 7)
+			if hval > 0.68:
+				continue
+			var along := step * (float(k) + 0.3 + 0.4 * ArchitectureStyle._h(seed_v + float(i), 80 + k))
+			if along < 2.2 * m or L - along < 2.2 * m:
+				continue
+			var inset := lerpf(2.3, 3.2, ArchitectureStyle._h(seed_v + float(i), 95 + k)) * m
+			var p := a + dir * along - n * inset
+			if not _clear_of_holes(p, ring, holes, 1.4 * m):
+				continue
+			var w := lerpf(1.6, 2.8, ArchitectureStyle._h(seed_v + float(i), 110 + k)) * m
+			var d := 0.56 * m
+			var h := roof_h + lerpf(0.85, 1.25, ArchitectureStyle._h(seed_v + float(i), 125 + k)) * m
+			_add_stack(batch, basis, p, dir, n, top, h, w, d, masonry, false)
+			placed = true
+		# Subtle flush roof skylights on wide mansard terrassons.
+		if with_skylights and area_m2 >= 220.0 and sky_count < 4 and L >= 10.0 * m:
+			var hs := ArchitectureStyle._h(seed_v + float(i) * 0.53, 140)
+			if hs < 0.55:
+				var sp := a + dir * (L * (0.35 + 0.3 * hs)) - n * (3.6 * m)
+				if _clear_of_holes(sp, ring, holes, 1.8 * m):
+					var y_sky := top + roof_h * 0.88
+					batch.add("box", BuildingDetail._xf(basis, Vector3(sp.x, y_sky, sp.y),
+						Vector3(1.5 * m, 0.14 * m, 1.1 * m)), _mat("frame"))
+					batch.add("box", BuildingDetail._xf(basis, Vector3(sp.x, y_sky + 0.04 * m, sp.y),
+						Vector3(1.32 * m, 0.10 * m, 0.92 * m)), _mat("glass"))
+					sky_count += 1
+	return placed
+
+static func _add_stack(batch: BuildingDetail.Batch, basis: Basis, p: Vector2,
+		dir: Vector2, n: Vector2, top: float, h: float, w: float, d: float,
+		masonry: Material, flush_party: bool) -> void:
+	var m := WorldScale.metres_to_units()
+	batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, top + h * 0.5 - 0.2 * m, p.y),
+		Vector3(w, h, d)), masonry)
+	var y_cap := top + h - 0.2 * m
+	# A party-wall stack's cap stops short of the lot line so an equal-height
+	# neighbour's cap never z-fights it.
+	var pc := p - n * (0.035 * m) if flush_party else p
+	batch.add("box", BuildingDetail._xf(basis, Vector3(pc.x, y_cap + 0.06 * m, pc.y),
+		Vector3(w + 0.14 * m, 0.12 * m, d + 0.14 * m)), masonry)
+	var pots := clampi(int(w / (0.42 * m)), 2, 9)
+	for k in pots:
+		var q := p + dir * (-w * 0.5 + (float(k) + 0.5) * w / float(pots))
+		batch.add("cyl", BuildingDetail._xf(Basis(), Vector3(q.x, y_cap + 0.37 * m, q.y),
+			Vector3(0.24 * m, 0.5 * m, 0.24 * m)), _mat("pot"))
+
+static func _clear_of_holes(p: Vector2, ring: PackedVector2Array, holes: Array, margin: float) -> bool:
+	if not RingGeometry.point_in_ring(p, ring):
+		return false
+	for h in holes:
+		var hr := h as PackedVector2Array
+		if hr.size() < 3:
+			continue
+		if RingGeometry.point_in_ring(p, hr):
+			return false
+		if margin > 0.0:
+			for j in hr.size():
+				var q := Geometry2D.get_closest_point_to_segment(p, hr[j], hr[(j + 1) % hr.size()])
+				if p.distance_to(q) < margin:
+					return false
+	return true
 
 ## Dormers on the window axes of exposed eave edges. True when this rule
 ## decided (dormers placed or rolled out); false leaves BuildingDetail's

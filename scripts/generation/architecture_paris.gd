@@ -8,6 +8,8 @@ extends RefCounted
 
 ## Zinc / slate mansard family (PRD §4.2, #46525E).
 const ZINC := ["#46525e", "#4f5b66", "#56616b", "#4a5560"]
+## Weathered standing-seam Parisian zinc (muted blue-grey, PRD §4.2 family).
+const ZINC_METAL := ["#5a646e", "#66707a", "#525c66", "#6d7780"]
 ## Haussmann limestone (around PRD #D6C5A3). Post-Haussmann rows use the
 ## same palette, bay and pattern so both eras share facade materials
 ## (they differ in relief and storeys): the per-place budget (T7.2).
@@ -25,12 +27,14 @@ const REGIONS := {
 	# allowed bow windows and higher rooflines), more balconies.
 	"paris_post_haussmann": {
 		"apartments": {"w": [["limestone", STONE]], "p": "haussmann",
-			"bay": 2.4, "r": [["mansard", 1]], "pitch": 1.1, "rf": [["slate", ZINC]],
+			"bay": 2.4, "r": [["mansard", 1]], "pitch": 1.1,
+			"rf": [["slate", ZINC], ["sheet_metal", ZINC_METAL]],
 			"fh": 3.2, "st": [6, 8], "fix": true, "ch": 0.8, "dm": 1.0, "eq": 0.0, "g": [], "ev": 0.0,
 			"rv": {"balcony_rows": [2, 5, 6], "balconette": 0.75, "oriel": 0.35,
 				"string_course": true, "awning": 0.45, "awning_colours": CAFE}},
 		"commercial": {"w": [["limestone", STONE]], "p": "haussmann", "bay": 2.4,
-			"r": [["mansard", 1]], "rf": [["slate", ZINC]], "fh": 3.3, "st": [5, 7], "fix": true,
+			"r": [["mansard", 1]], "rf": [["slate", ZINC], ["sheet_metal", ZINC_METAL]],
+			"fh": 3.3, "st": [5, 7], "fix": true,
 			"ch": 0.6, "dm": 1.0, "eq": 0.1, "g": [], "ev": 0.0,
 			"rv": {"balcony_rows": [2, 5], "balconette": 0.7, "oriel": 0.3,
 				"string_course": true, "awning": 0.6, "awning_colours": CAFE}},

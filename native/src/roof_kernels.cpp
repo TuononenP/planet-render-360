@@ -1,5 +1,6 @@
 #include "roof_kernels.h"
 
+#include "earcut_kernels.h"
 #include "parallel.h"
 
 #include <godot_cpp/classes/geometry2d.hpp>
@@ -13,8 +14,10 @@
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -41,8 +44,6 @@ constexpr int BARREL_SEGMENTS = 8;
 // RoofDomes
 constexpr int DOME_STEPS = 8;
 constexpr int MIN_SIDES = 24;
-// RoofSkeleton
-constexpr double MERGE_M = 0.08;
 
 bool is_ridged(const std::string &s) {
 	for (const char *r : RIDGED) {
@@ -646,8 +647,18 @@ bool domes(Faces &f, const Ring &ring, const Vector2 &c, double top, double rh, 
 
 using Rings = std::vector<Ring>;
 
+struct RegionComp {
+	Ring outer;
+	Rings holes;
+};
+
+using Region = std::vector<RegionComp>;
+
+constexpr double MIN_AREA_M2 = 0.02;
+
 Rings to_rings(const TypedArray<PackedVector2Array> &a) {
 	Rings out;
+	out.reserve((size_t)a.size());
 	for (int64_t i = 0; i < a.size(); i++) {
 		out.push_back(a[i]);
 	}
@@ -655,66 +666,331 @@ Rings to_rings(const TypedArray<PackedVector2Array> &a) {
 }
 
 bool in_any(const Vector2 &p, const Rings &rings) {
-	Geometry2D *g = Geometry2D::get_singleton();
 	for (const Ring &r : rings) {
-		if (g->is_point_in_polygon(p, r)) {
+		if (point_in_ring(p, r)) {
 			return true;
 		}
 	}
 	return false;
 }
 
-struct VecKeyLess {
-	bool operator()(const Vector2i &a, const Vector2i &b) const {
-		return a.x != b.x ? a.x < b.x : a.y < b.y;
+void split_winding(const Rings &polys, double min_area, Rings &outers, Rings &holes) {
+	Geometry2D *g = Geometry2D::get_singleton();
+	double largest = 0.0;
+	bool cw = false;
+	for (const Ring &p : polys) {
+		if (p.size() < 3) {
+			continue;
+		}
+		double a = std::abs(signed_area(p));
+		if (a > largest) {
+			largest = a;
+			cw = g->is_polygon_clockwise(p);
+		}
 	}
-};
+	if (largest < min_area) {
+		return;
+	}
+	for (const Ring &p : polys) {
+		if (p.size() < 3 || std::abs(signed_area(p)) < min_area) {
+			continue;
+		}
+		if (g->is_polygon_clockwise(p) == cw) {
+			outers.push_back(p);
+		} else {
+			holes.push_back(p);
+		}
+	}
+}
 
-void sk_add_ring(const Ring &r, double step, double f, Ring &pts, std::vector<float> &lift,
-		std::set<Vector2i, VecKeyLess> &seen, const Rings &within, const Rings &outside) {
+Rings solid_rings(const TypedArray<PackedVector2Array> &polys, double min_area) {
+	Rings outers, holes;
+	split_winding(to_rings(polys), min_area, outers, holes);
+	return outers;
+}
+
+Rings merge_disjoint(Rings rings, double min_area) {
+	if (rings.size() <= 1) {
+		return rings;
+	}
+	Geometry2D *g = Geometry2D::get_singleton();
+	size_t i = 0;
+	while (i < rings.size()) {
+		bool merged = false;
+		for (size_t j = i + 1; j < rings.size(); j++) {
+			if (!g->intersect_polygons(rings[i], rings[j]).is_empty()) {
+				Rings u = solid_rings(g->merge_polygons(rings[i], rings[j]), min_area);
+				if (u.size() == 1) {
+					rings[i] = u[0];
+					rings.erase(rings.begin() + (ptrdiff_t)j);
+					merged = true;
+					break;
+				}
+			}
+		}
+		if (!merged) {
+			i++;
+		}
+	}
+	return rings;
+}
+
+Region inset_region(const Region &comps, double dd, double min_area) {
+	Geometry2D *g = Geometry2D::get_singleton();
+	Region out;
+	for (const RegionComp &c : comps) {
+		Rings shrunk = solid_rings(g->offset_polygon(c.outer, -dd, Geometry2D::JOIN_MITER), min_area);
+		if (shrunk.empty()) {
+			continue;
+		}
+		if (c.holes.empty()) {
+			for (const Ring &s : shrunk) {
+				out.push_back({ s, {} });
+			}
+			continue;
+		}
+		Rings grown;
+		for (const Ring &h : c.holes) {
+			Rings gh = solid_rings(g->offset_polygon(h, dd, Geometry2D::JOIN_MITER), min_area);
+			grown.insert(grown.end(), gh.begin(), gh.end());
+		}
+		grown = merge_disjoint(std::move(grown), min_area);
+		for (const Ring &s : shrunk) {
+			Region pieces;
+			pieces.push_back({ s, {} });
+			for (const Ring &gr : grown) {
+				Region next_pieces;
+				for (const RegionComp &p : pieces) {
+					TypedArray<PackedVector2Array> clipped = g->clip_polygons(p.outer, gr);
+					if (clipped.is_empty()) {
+						continue;
+					}
+					Rings new_outers, new_holes;
+					split_winding(to_rings(clipped), min_area, new_outers, new_holes);
+					for (const Ring &no : new_outers) {
+						Rings hs;
+						for (const Ring &nh : new_holes) {
+							if (point_in_ring(nh[0], no)) {
+								hs.push_back(nh);
+							}
+						}
+						for (const Ring &eh : p.holes) {
+							if (point_in_ring(eh[0], no) && !in_any(eh[0], hs)) {
+								hs.push_back(eh);
+							}
+						}
+						next_pieces.push_back({ no, std::move(hs) });
+					}
+				}
+				pieces = std::move(next_pieces);
+			}
+			out.insert(out.end(), pieces.begin(), pieces.end());
+		}
+	}
+	return out;
+}
+
+double orient2d(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
+	return (D(b.x) - D(a.x)) * (D(c.y) - D(a.y)) - (D(b.y) - D(a.y)) * (D(c.x) - D(a.x));
+}
+
+bool in_circle(const Vector2 &a, const Vector2 &b, const Vector2 &c, const Vector2 &d) {
+	double adx = D(a.x) - D(d.x), ady = D(a.y) - D(d.y);
+	double bdx = D(b.x) - D(d.x), bdy = D(b.y) - D(d.y);
+	double cdx = D(c.x) - D(d.x), cdy = D(c.y) - D(d.y);
+	double al = adx * adx + ady * ady;
+	double bl = bdx * bdx + bdy * bdy;
+	double cl = cdx * cdx + cdy * cdy;
+	double det = al * (bdx * cdy - bdy * cdx) - bl * (adx * cdy - ady * cdx) + cl * (adx * bdy - ady * bdx);
+	double sc = Math::max(al, Math::max(bl, cl));
+	return det > 1e-6 * sc * sc;
+}
+
+void lawson_cdt(const std::vector<Vector2> &pts, std::vector<std::array<int32_t, 3>> &tris) {
+	constexpr int max_passes = 32;
+	bool changed = true;
+	std::vector<uint8_t> used;
+	for (int pass = 0; pass < max_passes && changed; pass++) {
+		changed = false;
+		std::map<std::pair<int32_t, int32_t>, std::vector<std::pair<size_t, int>>> edges;
+		for (size_t ti = 0; ti < tris.size(); ti++) {
+			for (int e = 0; e < 3; e++) {
+				int32_t u = tris[ti][e];
+				int32_t v = tris[ti][(e + 1) % 3];
+				edges[{ Math::min(u, v), Math::max(u, v) }].emplace_back(ti, e);
+			}
+		}
+		used.assign(tris.size(), 0);
+		for (const auto &kv : edges) {
+			const auto &pair = kv.second;
+			if (pair.size() != 2) {
+				continue;
+			}
+			size_t t0 = pair[0].first;
+			size_t t1 = pair[1].first;
+			if (used[t0] || used[t1]) {
+				continue;
+			}
+			int e0 = pair[0].second;
+			int e1 = pair[1].second;
+			int32_t a = tris[t0][e0];
+			int32_t b = tris[t0][(e0 + 1) % 3];
+			int32_t c = tris[t0][(e0 + 2) % 3];
+			int32_t d = tris[t1][(e1 + 2) % 3];
+			if (d == a || d == b || d == c || pts[a].is_equal_approx(pts[b])) {
+				continue;
+			}
+			if (tris[t1][e1] != b || tris[t1][(e1 + 1) % 3] != a) {
+				continue;
+			}
+			if (orient2d(pts[c], pts[d], pts[b]) <= 1e-6 || orient2d(pts[d], pts[c], pts[a]) <= 1e-6) {
+				continue;
+			}
+			if (in_circle(pts[a], pts[b], pts[c], pts[d])) {
+				tris[t0] = { c, d, b };
+				tris[t1] = { d, c, a };
+				used[t0] = 1;
+				used[t1] = 1;
+				changed = true;
+			}
+		}
+	}
+}
+
+Ring subdivide_ring(const Ring &r, double step) {
+	Ring out;
 	int64_t n = r.size();
 	for (int64_t i = 0; i < n; i++) {
 		Vector2 a = r[i];
 		Vector2 b = r[(i + 1) % n];
 		int parts = Math::max(1, (int)std::ceil(D((b - a).length()) / step));
 		for (int s = 0; s < parts; s++) {
-			Vector2 p = a.lerp(b, (double)s / (double)parts);
-			if (!within.empty() && !in_any(p, within)) {
-				continue;
+			out.push_back(a.lerp(b, (double)s / (double)parts));
+		}
+	}
+	return out;
+}
+
+Region subdivide_region(const Region &comps, double step) {
+	Region out;
+	out.reserve(comps.size());
+	for (const RegionComp &c : comps) {
+		Rings hs;
+		hs.reserve(c.holes.size());
+		for (const Ring &h : c.holes) {
+			hs.push_back(subdivide_ring(h, step));
+		}
+		out.push_back({ subdivide_ring(c.outer, step), std::move(hs) });
+	}
+	return out;
+}
+
+void triangulate_piece(Faces &f, const Ring &outer, double outer_y, const Rings &holes,
+		const std::vector<double> &hole_ys, const Vector2 &fu) {
+	if (outer.size() < 3) {
+		return;
+	}
+	std::vector<Vector2> pts;
+	std::vector<double> ys;
+	pts.reserve((size_t)outer.size());
+	ys.reserve((size_t)outer.size());
+	for (int64_t i = 0; i < outer.size(); i++) {
+		pts.push_back(outer[i]);
+		ys.push_back(outer_y);
+	}
+	Array h_arr;
+	for (size_t j = 0; j < holes.size(); j++) {
+		const Ring &h = holes[j];
+		h_arr.push_back(h);
+		for (int64_t i = 0; i < h.size(); i++) {
+			pts.push_back(h[i]);
+			ys.push_back(hole_ys[j]);
+		}
+	}
+	PackedInt32Array idx = EarcutKernels::triangulate(outer, h_arr);
+	const int32_t *ip = idx.ptr();
+	std::vector<std::array<int32_t, 3>> tris;
+	tris.reserve((size_t)(idx.size() / 3));
+	for (int64_t k = 0; k + 2 < idx.size(); k += 3) {
+		int32_t a = ip[k];
+		int32_t b = ip[k + 1];
+		int32_t c = ip[k + 2];
+		double cr = orient2d(pts[a], pts[b], pts[c]);
+		if (std::abs(cr) < 1e-6) {
+			continue;
+		}
+		if (cr < 0.0) {
+			std::swap(b, c);
+		}
+		tris.push_back({ a, b, c });
+	}
+	if (!holes.empty() && tris.size() >= 2) {
+		lawson_cdt(pts, tris);
+	}
+	for (const auto &t : tris) {
+		push_tri(f, Vector2(), Vector3(pts[t[0]].x, ys[t[0]], pts[t[0]].y),
+				Vector3(pts[t[1]].x, ys[t[1]], pts[t[1]].y),
+				Vector3(pts[t[2]].x, ys[t[2]], pts[t[2]].y), fu, true);
+	}
+}
+
+void emit_band(Faces &f, const Region &r0, double y0, const Region &r1, double y1, const Vector2 &fu) {
+	Rings r1_holes;
+	for (const RegionComp &c1 : r1) {
+		r1_holes.insert(r1_holes.end(), c1.holes.begin(), c1.holes.end());
+	}
+	for (const RegionComp &c0 : r0) {
+		Rings band_holes;
+		std::vector<double> hole_ys;
+		for (const RegionComp &c1 : r1) {
+			if (point_in_ring(c1.outer[0], c0.outer) && !in_any(c1.outer[0], c0.holes)) {
+				band_holes.push_back(c1.outer);
+				hole_ys.push_back(y1);
 			}
-			if (in_any(p, outside)) {
-				continue;
+		}
+		for (const Ring &h0 : c0.holes) {
+			if (!in_any(h0[0], r1_holes)) {
+				band_holes.push_back(h0);
+				hole_ys.push_back(y0);
 			}
-			Vector2i key((int)std::round(D(p.x) / MERGE_M), (int)std::round(D(p.y) / MERGE_M));
-			if (!seen.insert(key).second) {
-				continue;
+		}
+		triangulate_piece(f, c0.outer, y0, band_holes, hole_ys, fu);
+	}
+	for (const Ring &h1 : r1_holes) {
+		Rings inner_holes;
+		std::vector<double> inner_ys;
+		for (const RegionComp &c0 : r0) {
+			for (const Ring &h0 : c0.holes) {
+				if (point_in_ring(h0[0], h1)) {
+					inner_holes.push_back(h0);
+					inner_ys.push_back(y0);
+				}
 			}
-			pts.push_back(p);
-			lift.push_back((float)f);
+		}
+		if (!inner_holes.empty()) {
+			triangulate_piece(f, h1, y1, inner_holes, inner_ys, fu);
 		}
 	}
 }
 
 bool survives(const Ring &ring, const Rings &holes, double d) {
 	Geometry2D *g = Geometry2D::get_singleton();
-	Rings inner = to_rings(g->offset_polygon(ring, -d, Geometry2D::JOIN_MITER));
+	Rings inner = solid_rings(g->offset_polygon(ring, -d, Geometry2D::JOIN_MITER), 0.001);
 	for (const Ring &h : holes) {
 		Rings next;
-		for (const Ring &gr : to_rings(g->offset_polygon(h, d, Geometry2D::JOIN_MITER))) {
+		for (const Ring &gr : solid_rings(g->offset_polygon(h, d, Geometry2D::JOIN_MITER), 0.001)) {
 			for (const Ring &c : inner) {
-				for (const Ring &x : to_rings(g->clip_polygons(c, gr))) {
-					next.push_back(x);
-				}
+				Rings clipped = solid_rings(g->clip_polygons(c, gr), 0.001);
+				next.insert(next.end(), clipped.begin(), clipped.end());
 			}
 		}
-		inner = next;
+		inner = std::move(next);
 	}
 	return !inner.empty();
 }
 
 double depth(const Ring &ring, const Rings &holes) {
 	double lo = 0.0;
-	// RingGeometry.aabb(ring).size.length() * 0.5
 	Vector2 mn = ring[0];
 	Vector2 mx = ring[0];
 	for (int64_t i = 0; i < ring.size(); i++) {
@@ -737,74 +1013,78 @@ double depth(const Ring &ring, const Rings &holes) {
 
 bool skeleton(Faces &f, const Ring &ring, const Rings &holes, double top, double rh, bool mansard,
 		const Vector2 &fu) {
-	Geometry2D *g = Geometry2D::get_singleton();
-	double run = Math::min(Math::clamp(rh * 1.1, 1.2 * 1.0, 3.6 * 1.0), depth(ring, holes) * 0.96);
-	if (run < 0.3) {
+	double d_max = depth(ring, holes) * 0.96;
+	if (d_max < 0.3) {
 		return false;
 	}
-	rh = Math::min(rh, run * 1.2);
-	double step = Math::clamp(run * 1.2, 2.0, 4.5);
-	Ring pts;
-	std::vector<float> lift;
-	std::set<Vector2i, VecKeyLess> seen;
-	const Rings none;
-	sk_add_ring(ring, step, 0.0, pts, lift, seen, none, none);
+	std::vector<std::pair<double, double>> knots;
+	if (mansard) {
+		double d1 = Math::min(Math::clamp(rh * 0.36, 0.9, 2.4), d_max * 0.38);
+		if (d1 < 0.25) {
+			d1 = Math::min(d_max * 0.5, 0.5);
+		}
+		rh = Math::min(rh, d1 * 3.4);
+		double d_end = Math::min(Math::max(d1 + 1.2, Math::clamp(rh * 2.2, 3.6, 8.0)), d_max);
+		knots.emplace_back(d1, 0.72);
+		if (d_end - d1 > 2.6) {
+			knots.emplace_back((d1 + d_end) * 0.5, 0.86);
+		}
+		if (d_end - d1 > 0.35) {
+			knots.emplace_back(d_end, 1.0);
+		} else {
+			knots[0].second = 1.0;
+		}
+	} else {
+		double run = Math::min(Math::clamp(rh * 1.5, 1.4, 8.0), d_max);
+		if (run < 0.3) {
+			return false;
+		}
+		rh = Math::min(rh, run * 1.2);
+		if (run >= 1.8) {
+			knots.emplace_back(run * 0.5, 0.5);
+		}
+		knots.emplace_back(run, 1.0);
+	}
+	Rings clean_holes;
 	for (const Ring &h : holes) {
-		sk_add_ring(h, step, 0.0, pts, lift, seen, none, none);
-	}
-	const std::pair<double, double> mans[2] = { { 0.38, 0.75 }, { 1.0, 1.0 } };
-	const std::pair<double, double> str[2] = { { 0.5, 0.5 }, { 1.0, 1.0 } };
-	for (const auto &knot : mansard ? mans : str) {
-		double d = knot.first * run;
-		double fk = knot.second;
-		Rings grown;
-		for (const Ring &h : holes) {
-			for (const Ring &gr : to_rings(g->offset_polygon(h, d, Geometry2D::JOIN_MITER))) {
-				grown.push_back(gr);
-			}
-		}
-		Rings inner = to_rings(g->offset_polygon(ring, -d, Geometry2D::JOIN_MITER));
-		for (const Ring &c : inner) {
-			sk_add_ring(c, step, fk, pts, lift, seen, none, grown);
-		}
-		for (const Ring &gr : grown) {
-			sk_add_ring(gr, step, fk, pts, lift, seen, inner, none);
+		if (h.size() >= 3 && std::abs(signed_area(h)) >= MIN_AREA_M2) {
+			clean_holes.push_back(h);
 		}
 	}
-	if (pts.size() < 3) {
+	std::vector<Region> tiers;
+	std::vector<double> ys;
+	tiers.push_back({ { ring, std::move(clean_holes) } });
+	ys.push_back(top);
+	double prev_d = 0.0;
+	for (const auto &knot : knots) {
+		double d = knot.first;
+		double dd = d - prev_d;
+		if (dd < 0.05) {
+			continue;
+		}
+		Region next_comps = inset_region(tiers.back(), dd, MIN_AREA_M2);
+		if (next_comps.empty()) {
+			break;
+		}
+		tiers.push_back(std::move(next_comps));
+		ys.push_back(top + rh * knot.second);
+		prev_d = d;
+	}
+	if (tiers.size() < 2) {
 		return false;
 	}
-	PackedInt32Array tri = g->triangulate_delaunay(pts);
+	double step = Math::clamp(d_max * 0.55, 1.8, 3.2);
+	for (size_t ti = 0; ti < tiers.size(); ti++) {
+		tiers[ti] = subdivide_region(tiers[ti], step);
+	}
 	size_t before = f.verts.size();
-	Rings cores;
-	for (const Ring &h : holes) {
-		for (const Ring &cr : to_rings(g->offset_polygon(h, -0.05, Geometry2D::JOIN_SQUARE))) {
-			cores.push_back(cr);
-		}
+	for (size_t k = 0; k + 1 < tiers.size(); k++) {
+		emit_band(f, tiers[k], ys[k], tiers[k + 1], ys[k + 1], fu);
 	}
-	const int32_t *tp = tri.ptr();
-	for (int64_t k = 0; k + 2 < tri.size(); k += 3) {
-		int32_t a = tp[k];
-		int32_t b = tp[k + 1];
-		int32_t c = tp[k + 2];
-		if ((double)lift[a] + (double)lift[b] + (double)lift[c] <= 0.0) {
-			continue;
-		}
-		const Vector2 probes[4] = { (pts[a] + pts[b] + pts[c]) / 3.0, (pts[a] + pts[b]) * 0.5,
-			(pts[b] + pts[c]) * 0.5, (pts[c] + pts[a]) * 0.5 };
-		bool ok = true;
-		for (const Vector2 &p : probes) {
-			if (!g->is_point_in_polygon(p, ring) || in_any(p, cores)) {
-				ok = false;
-				break;
-			}
-		}
-		if (!ok) {
-			continue;
-		}
-		push_tri(f, Vector2(), Vector3(pts[a].x, top + rh * (double)lift[a], pts[a].y),
-				Vector3(pts[b].x, top + rh * (double)lift[b], pts[b].y),
-				Vector3(pts[c].x, top + rh * (double)lift[c], pts[c].y), fu, true);
+	double top_y = ys.back();
+	for (const RegionComp &c : tiers.back()) {
+		std::vector<double> hys(c.holes.size(), top_y);
+		triangulate_piece(f, c.outer, top_y, c.holes, hys, fu);
 	}
 	return f.verts.size() > before;
 }

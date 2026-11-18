@@ -77,6 +77,37 @@ static func glass_material(detail: int = 1) -> StandardMaterial3D:
 	FacadeMaterials._glass_mats[detail] = m
 	return m
 
+## Roof skylight / conservatory glazing: dark tinted glass with slim iron
+## rafters at roof UV scale (~1.5 m panes on 0.05/m roof UVs). Marked as a
+## roof (snow overlay + per-building tint), never a vertical curtain wall.
+static func skylight_material(detail: int = 1) -> StandardMaterial3D:
+	detail = clampi(detail, 0, 1)
+	var key := "skylight|%d" % detail
+	if FacadeMaterials._glass_mats.has(key):
+		return FacadeMaterials._glass_mats[key] as StandardMaterial3D
+	var texs := composed(["skylight", detail], func() -> Dictionary:
+		return StoreyComposer.compose_skylight(detail))
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = texs["albedo"] as Texture2D
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.metallic = 0.38
+	m.metallic_specular = 0.65
+	if detail >= 1 and texs["normal"] != null:
+		m.normal_texture = texs["normal"] as Texture2D
+		m.normal_enabled = true
+		m.normal_scale = PbrTextures.PHOTO_NORMAL_SCALE
+		m.roughness_texture = texs["rough"] as Texture2D
+		m.roughness = 1.0
+	else:
+		m.roughness = 0.22
+	# 8×8 panes per tile on 0.05/m roof UVs (20 m per UV unit) → ~1.5 m panes.
+	var s := 20.0 / 12.0
+	m.uv1_scale = Vector3(s, s, s)
+	RoofVariety.mark(m)
+	m.set_meta("roof_set", "glass")
+	FacadeMaterials._glass_mats[key] = m
+	return m
+
 ## The shared curtain wall of distant and far glass towers: the same tiled
 ## bay-and-storey mapping as a near one, so its panes keep their real size.
 ## One per glazing type (`look["curtain"]`), so the count stays fixed.
@@ -205,6 +236,8 @@ static func _recipe(inputs: Array, loader: Callable) -> Callable:
 			int(inputs[3]), inputs[4], loader)
 	if kind == "glass" and inputs.size() == 2:
 		return func() -> Dictionary: return StoreyComposer.compose_glass(int(inputs[1]))
+	if kind == "skylight" and inputs.size() == 2:
+		return func() -> Dictionary: return StoreyComposer.compose_skylight(int(inputs[1]))
 	if kind == "storeys" and inputs.size() == 5:
 		return func() -> Dictionary: return StoreyComposer.compose_haussmann(str(inputs[1]), int(inputs[2]),
 			int(inputs[3]), loader, int(inputs[4]))

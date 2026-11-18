@@ -21,17 +21,17 @@ extends RefCounted
 ## 1.25, not 1.3: at golden hour a slope facing the low sun gets ~3.4x
 ## the light of flat ground, and anything over ~0.3 albedo there (pale
 ## soil, rock, render) compressed to colourless white.
-const EXPOSURE := 1.25
+const EXPOSURE := 1.16
 const WHITE := 6.0
 const CONTRAST := 1.1
 const SATURATION := 1.0
 const AMBIENT_ENERGY := 0.55
-const GLOW_THRESHOLD := 1.0
-const GLOW_INTENSITY := 0.32
+const GLOW_THRESHOLD := 1.35
+const GLOW_INTENSITY := 0.18
 ## Brightest value one pixel may feed the glow: a smooth bonnet's reflection
 ## of the low sun is many times over, and uncapped it bloomed into a white
 ## blaze across the car and the road beside it.
-const GLOW_LUMINANCE_CAP := 1.4
+const GLOW_LUMINANCE_CAP := 1.30
 
 static func apply(env: Environment) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY

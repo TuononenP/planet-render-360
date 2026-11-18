@@ -176,7 +176,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		wall_h: float, shape: String, roof_h: float, look: Dictionary,
 		wall_mat: Material, roof_mat: Material, seed_v: float, near: bool,
 		party: PackedByteArray = PackedByteArray(), gable_front: bool = false,
-		ultra: bool = false, country: String = "", clutter: bool = false, deck: float = NAN) -> void:
+		ultra: bool = false, country: String = "", clutter: bool = false, deck: float = NAN,
+		holes: Array = []) -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
 	if not near and not religious:
 		return
@@ -199,10 +200,12 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
 		# Bell-capped stacks are drawn by _chimneys, so a Venetian terrace
 		# skips the plain party-wall stacks.
-		var stacks := str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) != "bell" \
-			and RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look)
-		if not stacks:
-			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
+		var bell := str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) == "bell"
+		var stacks := not bell and RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look, holes)
+		var mansard_stacks := not bell and RooflineDetail.mansard_roof_details(batch, ring, holes,
+			top, roof_h, shape, party, look, seed_v, area_m2, ultra or clutter)
+		if not stacks and not mansard_stacks:
+			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2, holes)
 		if not RooflineDetail.bay_dormers(batch, ring, top, roof_h, shape, party,
 				gable_front, look, roof_mat, seed_v):
 			_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
@@ -236,7 +239,7 @@ static func _at(c: Vector2, u: Vector2, v: Vector2, du: float, dv: float, y: flo
 static func _chimneys(batch: Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, top: float,
 		roof_h: float, shape: String, basis: Basis, look: Dictionary,
-		seed_v: float, area_m2: float) -> void:
+		seed_v: float, area_m2: float, holes: Array = []) -> void:
 	if ArchitectureStyle._h(seed_v, 21) >= float(look["chimney"]):
 		return
 	var m2u := WorldScale.metres_to_units()
@@ -245,7 +248,8 @@ static func _chimneys(batch: Batch, ring: PackedVector2Array, c: Vector2,
 	for i in count:
 		var du := lu * (0.45 - 0.9 * float(i) if count == 2 else 0.35)
 		var dv := lv * 0.30 * (1.0 if ArchitectureStyle._h(seed_v, 22 + i) < 0.5 else -1.0)
-		if not RingGeometry.point_in_ring(c + u * du + v * dv, ring):
+		var p := c + u * du + v * dv
+		if not RooflineDetail._clear_of_holes(p, ring, holes, 0.5 * m2u):
 			continue
 		var surface := _roof_y(shape, du, dv, lu, lv, roof_h)
 		var ridge := roof_h

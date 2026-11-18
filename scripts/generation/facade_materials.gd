@@ -489,7 +489,7 @@ static func _roof_floor(set_name: String, tint: Color) -> Color:
 
 static func roof_set_material(set_name: String, tint: Color, detail: int = 1) -> Material:
 	if set_name == "glass":
-		return glass_material(1)
+		return FacadeTextures.skylight_material(detail)
 	# Roofs take a concrete without the photo's board bands; walls and
 	# landmarks keep the plain set.
 	var photo := "roof_concrete" if set_name == "concrete" else set_name
@@ -497,6 +497,11 @@ static func roof_set_material(set_name: String, tint: Color, detail: int = 1) ->
 		float(MaterialLibrary.ROOF_UV.get(set_name, 8.0)), detail)
 	if set_name in ["copper", "sheet_metal"]:
 		m.normal_enabled = detail >= 1
+		m.metallic_specular = 0.30
+	else:
+		# Matte roofs (slate, tiles, membrane, concrete) must not catch a
+		# grazing-angle plastic Fresnel glare under low golden-hour sun.
+		m.metallic_specular = 0.18
 	RoofVariety.mark(m)  # RoofSnow overlay + per-building tint
 	m.set_meta("roof_set", set_name)  # a distant roof's residual needs the set
 	return m

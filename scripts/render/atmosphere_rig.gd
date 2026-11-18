@@ -610,7 +610,7 @@ func _apply() -> void:
 	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
 	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
 	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
-	_base_sun_scatter = 0.0 if night else 0.25 * low_sun * (1.0 - overcast)
+	_base_sun_scatter = 0.0 if night else 0.14 * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms
 	# and to the night.
 	environment.ambient_light_energy = PostGrade.AMBIENT_ENERGY * float(look["ambient_gain"])
@@ -624,8 +624,8 @@ func _apply() -> void:
 func _apply_haziness() -> void:
 	if environment == null:
 		return
-	environment.fog_light_energy = lerpf(1.0, 1.10, haziness)
-	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.28, haziness)
+	environment.fog_light_energy = lerpf(1.0, 1.04, haziness)
+	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.18, haziness)
 	# Keep glow_hdr_threshold >= 1.0 (PostGrade contract) so the sun-side
 	# sky dome and clouds never trigger wide screen-space bloom.
 	environment.glow_hdr_threshold = PostGrade.GLOW_THRESHOLD

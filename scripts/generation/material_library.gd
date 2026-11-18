@@ -380,6 +380,7 @@ static func slate() -> StandardMaterial3D:
 	var row: Dictionary = PBR_SETS["slate"]
 	var m := pbr_material("slate", neutral_slate(_calib_tint(row["mean"], PRD_SLATE)),
 		float(ROOF_UV["slate"]))
+	m.metallic_specular = 0.18
 	RoofVariety.mark(m)
 	_mat_mutex.lock()
 	if _slate_mat != null:
@@ -575,6 +576,7 @@ static func roof_for_color(c: Color) -> Material:
 		return slate()
 	_mat_mutex.unlock()
 	var m := pbr_material(set_name, tint, float(ROOF_UV[set_name]))
+	m.metallic_specular = 0.18
 	RoofVariety.mark(m)
 	_mat_mutex.lock()
 	if _roof_mats.has(key):

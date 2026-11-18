@@ -90,6 +90,13 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 				img.rotate_90(CLOCKWISE)
 				_destripe_normal(img, 0)
 				img.rotate_90(COUNTERCLOCKWISE)
+			elif map_name == "rough":
+				if set_name == "slate":
+					_remap_roughness(img, 0.74, 0.94)
+				elif set_name == "sheet_metal":
+					_remap_roughness(img, 0.56, 0.84)
+				elif set_name == "copper":
+					_remap_roughness(img, 0.52, 0.82)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)
@@ -176,6 +183,18 @@ static func _destripe_normal(img: Image, ch: int) -> void:
 			var c := img.get_pixel(x, y)
 			c[ch] = clampf(c[ch] + mean - rows[y], 0.0, 1.0)
 			img.set_pixel(x, y, c)
+
+## Lifts a roof roughness map into [lo, hi] while keeping tile/grain contrast:
+## raw slate and metal roughness photos (~0.45) turn flat/shallow mansards into
+## bright mirrors at golden hour.
+static func _remap_roughness(img: Image, lo: float, hi: float) -> void:
+	if img.get_width() > 512:
+		img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var r := lerpf(lo, hi, c.r)
+			img.set_pixel(x, y, Color(r, r, r, 1.0))
 
 ## Runtime texture of one set map for StandardMaterial3D (pbr_material),
 ## mipmapped (T4.7: without mips the tiled roofs and road ribbons alias

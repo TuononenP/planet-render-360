@@ -340,7 +340,10 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 				shape = "flat"
 		var roof_levels := int(b_eff.get("roof_levels", 0))
 		if roof_tag <= 0.0 and roof_levels > 0 and shape != "flat":
+			var span_rl := BuildingHeights._ring_span_m(ring)
 			roof_tag = float(roof_levels) * fh * 0.95
+			if shape not in ["cone", "onion", "dome", "pyramidal"]:
+				roof_tag = minf(roof_tag, maxf(span_rl * 0.65, 2.4))
 		# A mapped `roof:angle` fixes the pitch of a ridged roof: it rises
 		# tan(angle) over half the span (the span the roof height is built on).
 		var angle := float(b.get("roof_angle", 0.0))

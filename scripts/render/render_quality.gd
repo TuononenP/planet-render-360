@@ -30,7 +30,7 @@ const SUN_ANGLE_DEG := 0.53
 ## visibility (the Eiffel Tower stays legible from the Tuileries into
 ## the sun); dense enough that sun-side shafts read at golden hour.
 ## Paris captures 2026-10-30: 0.0012 over 500 m milked the far city.
-const VOLUME_PER_M := 0.0004
+const VOLUME_PER_M := 0.00028
 const VOLUME_FOG_PER_M := 0.003
 const VOLUME_LENGTH_M := 250.0
 
@@ -110,8 +110,8 @@ static func apply_environment(env: Environment, preset: int, forward_plus: bool 
 	env.volumetric_fog_length = VOLUME_LENGTH_M
 	# Froxels crowd toward the eye, where shafts are seen.
 	env.volumetric_fog_detail_spread = 2.0
-	# Forward scattering: shafts glow looking toward the sun.
-	env.volumetric_fog_anisotropy = 0.8
+	# Forward scattering: shafts glow looking toward the sun without bleaching it.
+	env.volumetric_fog_anisotropy = 0.62
 	# Sun and bounce light only: a uniform ambient fill flattens depth.
 	env.volumetric_fog_gi_inject = 0.3
 	env.volumetric_fog_ambient_inject = 0.0

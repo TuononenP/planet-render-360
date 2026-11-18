@@ -22,7 +22,7 @@ const FADE := 0.95
 ## bridges, terrain and mid-tone sunlit stone.
 const LUMA_FLOOR := 0.50
 const LUMA_CEIL := 0.92
-const OVERLAY_GAIN := 0.34
+const OVERLAY_GAIN := 0.18
 
 const RAYS_CODE := """
 shader_type spatial;
@@ -52,9 +52,9 @@ void fragment() {
 		if (cone > 0.001 && dist > 1e-4) {
 			vec3 base_s = srgb_to_linear(texture(world, UV).rgb);
 			float base_luma = dot(base_s, vec3(0.2126, 0.7152, 0.0722));
-			// Protect bright sky and specular roofs (`base_luma >= 0.72` -> 0),
+			// Protect bright sky, sunward haze and roofs (`base_luma >= 0.56` -> 0),
 			// while allowing warm shafts across dark foliage and shaded streets.
-			float sky_protect = 1.0 - smoothstep(0.38, 0.72, base_luma);
+			float sky_protect = 1.0 - smoothstep(0.28, 0.56, base_luma);
 			if (sky_protect > 0.005) {
 				float reach = min(1.0, 0.38 / max(dist, 0.001));
 				vec2 step_uv = (to_sun * reach) / max(taps, 1.0);
@@ -102,7 +102,7 @@ shader_type canvas_item;
 render_mode blend_add;
 
 uniform float ray_amount = 0.0;
-uniform float gain = 0.34;
+uniform float gain = 0.18;
 
 void fragment() {
 	vec3 r = texture(TEXTURE, UV).rgb * (ray_amount * gain);

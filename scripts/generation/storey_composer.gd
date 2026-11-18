@@ -417,3 +417,53 @@ static func compose_glass(detail: int) -> Dictionary:
 			rgh.fill_rect(Rect2i(i * step - 2, 0, 4, S), Color(0.5, 0.5, 0.5))
 			rgh.fill_rect(Rect2i(0, i * step - 2, S, 4), Color(0.5, 0.5, 0.5))
 	return FacadePaint.finish(alb, null, emit, nor, rgh)
+
+## Roof skylight / conservatory glazing: elongated dark reflective glass panes
+## (12 rafters across u × 5 purlins along v → ~1.0 m × 2.4 m panes at roof UV
+## scale) with slim dark iron glazing bars (no bright curtain-wall spandrel
+## bands or night-lit room emission).
+static func compose_skylight(detail: int) -> Dictionary:
+	var alb := Image.create(S, S, false, Image.FORMAT_RGBA8)
+	var cols := 12
+	var rows := 5
+	var glass_lo := _lin("#24313b")
+	var glass_hi := _lin("#30404c")
+	var bar := _lin("#252a30")
+	for py in rows:
+		var y0 := int(roundf(float(py) * float(S) / float(rows)))
+		var y1 := int(roundf(float(py + 1) * float(S) / float(rows)))
+		for px in cols:
+			var x0 := int(roundf(float(px) * float(S) / float(cols)))
+			var x1 := int(roundf(float(px + 1) * float(S) / float(cols)))
+			var hv := _h(float(px) * 3.7 + 1.3, float(py) * 7.1 + 0.9)
+			var c := glass_lo.lerp(glass_hi, 0.25 + hv * 0.55)
+			alb.fill_rect(Rect2i(x0, y0, x1 - x0, y1 - y0), c)
+	# Slim iron rafters along u (down-slope strips) and purlins along v.
+	for i in cols:
+		var ox := int(roundf(float(i) * float(S) / float(cols)))
+		alb.fill_rect(Rect2i(ox, 0, 2, S), bar)
+	for j in rows:
+		var oy := int(roundf(float(j) * float(S) / float(rows)))
+		alb.fill_rect(Rect2i(0, oy, S, 2), bar)
+	alb.fill_rect(Rect2i(S - 1, 0, 1, S), bar)
+	alb.fill_rect(Rect2i(0, S - 1, S, 1), bar)
+	var nor: Image = null
+	var rgh: Image = null
+	if detail >= 1:
+		nor = Image.create(S, S, false, Image.FORMAT_RGBA8)
+		nor.fill(Color(0.5, 0.5, 1.0))
+		rgh = Image.create(S, S, false, Image.FORMAT_RGBA8)
+		rgh.fill(Color(0.16, 0.16, 0.16))
+		for i in cols:
+			var ox := int(roundf(float(i) * float(S) / float(cols)))
+			nor.fill_rect(Rect2i(maxi(ox - 1, 0), 0, 1, S), Color(0.42, 0.5, 1.0))
+			nor.fill_rect(Rect2i(mini(ox + 2, S - 1), 0, 1, S), Color(0.58, 0.5, 1.0))
+			rgh.fill_rect(Rect2i(ox, 0, 2, S), Color(0.62, 0.62, 0.62))
+		for j in rows:
+			var oy := int(roundf(float(j) * float(S) / float(rows)))
+			nor.fill_rect(Rect2i(0, maxi(oy - 1, 0), S, 1), Color(0.5, 0.42, 1.0))
+			nor.fill_rect(Rect2i(0, mini(oy + 2, S - 1), S, 1), Color(0.5, 0.58, 1.0))
+			rgh.fill_rect(Rect2i(0, oy, S, 2), Color(0.62, 0.62, 0.62))
+		rgh.fill_rect(Rect2i(S - 1, 0, 1, S), Color(0.62, 0.62, 0.62))
+		rgh.fill_rect(Rect2i(0, S - 1, S, 1), Color(0.62, 0.62, 0.62))
+	return FacadePaint.finish(alb, null, null, nor, rgh)
