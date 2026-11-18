@@ -58,6 +58,7 @@ static func _coast_samples(data: LocationData) -> Array[float]:
 			if pts[i].distance_to(pts[i + 1]) > 1.0 * m:
 				segments.append([pts[i], pts[i + 1]])
 	var samples: Array[float] = []
+	var grid := SegmentGrid.new(segments, 150.0 * m)
 	for segment in segments:
 		var a: Vector2 = segment[0]
 		var b: Vector2 = segment[1]
@@ -68,7 +69,7 @@ static func _coast_samples(data: LocationData) -> Array[float]:
 			var origin := a.lerp(b, (float(j) + 0.5) / float(count))
 			for distance in [90.0, 150.0, 200.0]:
 				var p := origin + water_normal * float(distance) * m
-				if not _open_water(p, segments, 60.0 * m):
+				if not grid.open_water(p, 60.0 * m):
 					continue
 				var h := _sample(data, p)
 				if is_finite(h):
@@ -136,19 +137,84 @@ static func estimate_from_mask(data: LocationData) -> float:
 				samples.append(heights[y * w + x])
 	return _bias_of(samples)
 
-static func _open_water(p: Vector2, segments: Array, minimum: float) -> bool:
-	var best := INF
-	var water := false
-	for segment in segments:
-		var a: Vector2 = segment[0]
-		var b: Vector2 = segment[1]
-		var q := Geometry2D.get_closest_point_to_segment(p, a, b)
-		var d := p.distance_to(q)
-		if d < best:
-			best = d
-			var dir := b - a
-			water = (p - q).dot(Vector2(-dir.y, dir.x)) > 0.0
-	return water and best >= minimum
+## Coastline segments binned in square cells, so a point finds its nearest
+## one without testing them all (every sample point against every segment
+## took 4-9 s on Helsinki's coast). The answer is the brute-force one: the
+## nearest segment (the first of equals) decides which side is water.
+class SegmentGrid:
+	extends RefCounted
+	## Segments spanning more cells than this are tested for every point.
+	const MAX_SPAN_CELLS := 64
+	var segments: Array
+	var cell: float
+	var cells := {}  # Vector2i -> Array of segment indices (shared, not copied)
+	var long: Array = []
+	var lo := Vector2i.ZERO  # the cells' bounds
+	var hi := Vector2i.ZERO
+
+	func _init(segs: Array, cell_size: float) -> void:
+		segments = segs
+		cell = cell_size
+		var first := true
+		for i in segs.size():
+			var a: Vector2 = segs[i][0]
+			var b: Vector2 = segs[i][1]
+			var c0 := _cell_of(Vector2(minf(a.x, b.x), minf(a.y, b.y)))
+			var c1 := _cell_of(Vector2(maxf(a.x, b.x), maxf(a.y, b.y)))
+			lo = c0 if first else Vector2i(mini(lo.x, c0.x), mini(lo.y, c0.y))
+			hi = c1 if first else Vector2i(maxi(hi.x, c1.x), maxi(hi.y, c1.y))
+			first = false
+			if (c1.x - c0.x + 1) * (c1.y - c0.y + 1) > MAX_SPAN_CELLS:
+				long.append(i)
+				continue
+			for x in range(c0.x, c1.x + 1):
+				for y in range(c0.y, c1.y + 1):
+					var key := Vector2i(x, y)
+					if not cells.has(key):
+						cells[key] = []
+					(cells[key] as Array).append(i)
+
+	func _cell_of(p: Vector2) -> Vector2i:
+		return Vector2i(floori(p.x / cell), floori(p.y / cell))
+
+	## Whether `p` lies on the water side of its nearest segment, at least
+	## `minimum` from it.
+	func open_water(p: Vector2, minimum: float) -> bool:
+		if segments.is_empty():
+			return false
+		var best := INF
+		var best_i := -1
+		var water := false
+		var c := _cell_of(p)
+		var last := maxi(maxi(absi(c.x - lo.x), absi(c.x - hi.x)),
+			maxi(absi(c.y - lo.y), absi(c.y - hi.y)))
+		for ring in last + 1:
+			var lists: Array = []
+			if ring == 0:
+				lists.append(long)
+				lists.append(cells.get(c, []))
+			else:
+				for dx in range(-ring, ring + 1):
+					var steps := range(-ring, ring + 1) if absi(dx) == ring else [-ring, ring]
+					for dy: int in steps:
+						lists.append(cells.get(c + Vector2i(dx, dy), []))
+			for list in lists:
+				for i in list:
+					var a: Vector2 = segments[i][0]
+					var b: Vector2 = segments[i][1]
+					var q := Geometry2D.get_closest_point_to_segment(p, a, b)
+					var d := p.distance_to(q)
+					if d < best or (d == best and i < best_i):
+						best = d
+						best_i = i
+						var dir := b - a
+						water = (p - q).dot(Vector2(-dir.y, dir.x)) > 0.0
+			if best < minimum:
+				return false  # too close to a coast, whichever side
+			# Every segment not scanned yet is at least `ring` cells away.
+			if best <= float(ring) * cell:
+				break
+		return water and best >= minimum
 
 static func _sample(data: LocationData, p: Vector2) -> float:
 	var ll := WorldScale.latlon_from_xz(p.x, p.y, data.latitude, data.longitude)

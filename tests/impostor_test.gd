@@ -157,6 +157,29 @@ func _test_determinism() -> Array[String]:
 	if d1 == "" or d1 != d2:
 		failures.append("fresh Eiffel bakes are not bit-identical")
 
+	# The view cache returns what a fresh rasterising would, and only for
+	# the same content.
+	LandmarkImpostor.view_cache_enabled = false
+	var f0 := LandmarkBuilder.build("eiffel")
+	var fresh := _digest(LandmarkImpostor.bake(f0))
+	f0.free()
+	LandmarkImpostor.view_cache_enabled = true
+	LandmarkImpostor.clear_view_cache()
+	var miss_root := LandmarkBuilder.build("eiffel")
+	var miss := _digest(LandmarkImpostor.bake(miss_root))
+	var hit_root := LandmarkBuilder.build("eiffel")
+	var hit := _digest(LandmarkImpostor.bake(hit_root))
+	var other_root := LandmarkBuilder.build("tower_bridge")
+	var other := _digest(LandmarkImpostor.bake(other_root))
+	miss_root.free()
+	hit_root.free()
+	other_root.free()
+	if fresh == "" or fresh != miss or fresh != hit:
+		failures.append("a cached bake differs from a fresh one")
+	if LandmarkImpostor.view_cache_hits != 1 or other == hit:
+		failures.append("the view cache should hit once (same model) and never for another model: %d hits" \
+			% LandmarkImpostor.view_cache_hits)
+
 	var tb_plain := LandmarkBuilder.build("tower_bridge")
 	var tb_rot := LandmarkBuilder.build("tower_bridge")
 	tb_rot.position = Vector3(4100.0, 12.0, -2300.0)

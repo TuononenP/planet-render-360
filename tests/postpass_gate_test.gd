@@ -21,6 +21,7 @@ func _run() -> void:
 	await _serial()
 	await _urgent_and_cancel()
 	await _refused()
+	await _low_priority()
 	await _reentry_and_wait()
 	await _requests()
 	PostpassGate.reset()
@@ -76,6 +77,53 @@ func _urgent_and_cancel() -> void:
 	await process_frame
 	_check(_log.back() == "late", "then the newcomer: %s" % [_log])
 	PostpassGate.leave(late)
+
+## A fetch-ahead's requests (a node under one marked LOW_META) go behind
+## every live one, urgent or not, and keep their own order.
+func _low_priority() -> void:
+	PostpassGate.reset()
+	_log.clear()
+	var warm := Node.new()
+	warm.set_meta(PostpassGate.LOW_META, true)
+	var nodes: Dictionary = {}
+	for n: String in ["first", "w1", "w2", "live", "live2", "urgent"]:
+		var node := Node.new()
+		node.name = n
+		nodes[n] = node
+		if n.begins_with("w"):
+			warm.add_child(node)
+	var enter := func(n: String, urgent := false) -> void:
+		PostpassGate.enter(nodes[n], func() -> void: _log.append(n),
+			func(why: String) -> void: _log.append("skip " + n + ": " + why), urgent)
+	for n: String in ["first", "w1", "w2", "live", "live2"]:
+		enter.call(n)
+	enter.call("urgent", true)
+	for n: String in ["first", "urgent", "live", "live2", "w1", "w2"]:
+		PostpassGate.leave(nodes[n])
+		await process_frame
+	_check(_log == ["first", "urgent", "live", "live2", "w1", "w2"],
+		"live requests go ahead of a fetch-ahead's, in order: %s" % [_log])
+	# While a live build holds them back, a fetch-ahead's request does not start
+	# even in a free slot; it goes once the live layers are in.
+	PostpassGate.reset()
+	_log.clear()
+	PostpassGate.hold_low()
+	enter.call("w1")
+	await process_frame
+	_check(_log.is_empty() and not PostpassGate.holds(nodes["w1"]) and PostpassGate.waiting() == 1,
+		"a fetch-ahead waits for the live layers: %s" % [_log])
+	enter.call("live")
+	await process_frame
+	_check(_log == ["live"], "a live request goes at once: %s" % [_log])
+	PostpassGate.leave(nodes["live"])
+	PostpassGate.release_low()
+	await process_frame
+	await process_frame
+	_check(_log == ["live", "w1"], "the fetch-ahead goes once released: %s" % [_log])
+	PostpassGate.reset()
+	warm.free()
+	for n: String in ["first", "live", "live2", "urgent"]:
+		(nodes[n] as Node).free()
 
 func _refused() -> void:
 	PostpassGate.reset()

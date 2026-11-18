@@ -51,7 +51,24 @@ var source := ""
 ## cells are the last one's, not a grid re-centred on each world.
 var shift := Vector2.ZERO
 
+## The map of the last `data` built: the buildings and the vegetation
+## stages of one world build each ask for it, at once.
+static var _last: SettlementMap = null
+static var _last_key: Array = []
+static var _last_mutex := Mutex.new()
+
 static func build(data: LocationData) -> SettlementMap:
+	var key := [data.get_instance_id(), data.origin_m, data.far_drapes.hash(),
+		data.far_landuse.hash(), _native]
+	_last_mutex.lock()
+	if _last == null or _last_key != key:
+		_last = _build(data)
+		_last_key = key
+	var m := _last
+	_last_mutex.unlock()
+	return m
+
+static func _build(data: LocationData) -> SettlementMap:
 	var m := SettlementMap.new()
 	m.half = int(ceil(RADIUS_M / CELL_M))
 	m.n = m.half * 2

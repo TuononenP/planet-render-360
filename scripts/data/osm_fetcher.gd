@@ -358,6 +358,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_bridge_pending = false
 	_bridge_cache = CacheStore.osm_bridge_path(lat, lon)
 	_detailed_ready = false
+	_settled = false
 	_ring_pending = false
 	_tried = 1
 	_api_reason = ""
@@ -465,6 +466,11 @@ var _pending_ring_cache := ""
 var _detailed_text := ""
 var _detailed_cached := false
 var _detailed_ready := false
+## Whether the detailed layer goes to the front of PostpassGate's line:
+## not for a fetch ahead (StreamScout), which waits behind a live build.
+var gate_urgent := true
+## settle() ran: no layer still missing is asked of the network.
+var _settled := false
 var _ring_text := ""
 ## The bundled transit layer, read only when a bundled snapshot stands in for
 ## the detailed answer (a live answer already carries these stops).
@@ -625,7 +631,7 @@ func _try_finish() -> void:
 		_bridge_text = _read_cache(_bridge_cache)
 		if _bridge_text != "" and not _payload_usable(_bridge_text):
 			_bridge_text = ""
-		if _bridge_text == "" and not offline_mode and not _from_postpass:
+		if _bridge_text == "" and not offline_mode and not _from_postpass and not _settled:
 			_bridge_pending = true
 			_bridge_postpass.run(PostpassFallback.build_bridge_body(_pending_lat, _pending_lon, DETAILED_RADIUS_M))
 	if not _poi_started:
@@ -643,7 +649,7 @@ func _try_finish() -> void:
 			if gen != _parse_gen:
 				return
 			_poi_pending = false
-		if _poi_text == "" and _poi_enabled and not offline_mode:
+		if _poi_text == "" and _poi_enabled and not offline_mode and not _settled:
 			_poi_pending = true
 			_poi_postpass.run(PostpassFallback.build_poi_body(_pending_lat, _pending_lon))
 			return
@@ -708,7 +714,7 @@ func _start_postpass() -> void:
 	var gen := _parse_gen
 	PostpassGate.enter(self, _send_postpass.bind(gen), func(why: String) -> void:
 		if gen == _parse_gen:
-			_postpass_failed(why), true)
+			_postpass_failed(why), gate_urgent)
 
 func _send_postpass(gen: int) -> void:
 	if gen != _parse_gen:
@@ -791,6 +797,27 @@ func give_up(reason: String) -> void:
 	_poi_started = true
 	_poi_pending = false
 	_last_resort(reason, reason)
+
+## Whether the detailed layer is in hand and only the ring, the bridge
+## outlines or the POIs are still out.
+func waiting_on_extras() -> bool:
+	return _detailed_ready and (_ring_pending or _bridge_pending or _poi_pending)
+
+## Finishes on what is in hand (a late streamed build): the layers still
+## out are dropped and asked again on the next visit; those on disk or
+## bundled are still read (_try_finish asks the network for none).
+func settle() -> void:
+	if not waiting_on_extras():
+		return
+	_parse_gen += 1  # a bundled POI read still awaited is dropped
+	_settled = true
+	for req: Object in [_ring_req, _poi_req, _bridge_postpass, _poi_postpass]:
+		req.cancel()
+	_ring_grace.stop()
+	_ring_pending = false
+	_bridge_pending = false
+	_poi_pending = false
+	_try_finish()
 
 ## Whether the vector-map tier is ready to stand in for a live answer that
 ## has not arrived (once the detailed layer is in, it is only parsing).

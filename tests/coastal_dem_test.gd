@@ -37,6 +37,7 @@ func _init() -> void:
 	data.waterways = []
 	if CoastalDem.estimate(data) != 0.0:
 		failures.append("inland places have no sea registration")
+	_grid_matches_brute_force(failures)
 	if failures.is_empty():
 		print("COASTAL DEM OK: sea registration, fine rings, coarse fallback, idempotence, confidence guards")
 		quit(0)
@@ -44,3 +45,43 @@ func _init() -> void:
 		for failure in failures:
 			printerr("COASTAL DEM FAIL: ", failure)
 		quit(1)
+
+## SegmentGrid answers exactly what testing every segment would, ties
+## (a point nearest a vertex two segments share) included.
+func _grid_matches_brute_force(failures: Array[String]) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var segments: Array = []
+	var at := Vector2(-900, -900)
+	for i in 400:  # a wandering coastline, and a few long straight cuts
+		var next := at + Vector2(rng.randf_range(-60, 90), rng.randf_range(-60, 90))
+		segments.append([at, next])
+		at = next
+	segments.append([Vector2(-2000, 300), Vector2(2500, -400)])
+	segments.append([Vector2(0, -3000), Vector2(120, 3000)])
+	var grid := CoastalDem.SegmentGrid.new(segments, 150.0)
+	var mismatches := 0
+	for k in 3000:
+		var p := Vector2(rng.randf_range(-3000, 3000), rng.randf_range(-3000, 3000))
+		if k < 40:
+			p = segments[k * 7][1]  # exactly on a shared vertex
+		if grid.open_water(p, 60.0) != _brute_open_water(p, segments, 60.0):
+			mismatches += 1
+	if mismatches > 0:
+		failures.append("the segment grid disagreed with brute force at %d of 3000 points" % mismatches)
+	if CoastalDem.SegmentGrid.new([], 150.0).open_water(Vector2.ZERO, 60.0):
+		failures.append("no coastline is no open water")
+
+static func _brute_open_water(p: Vector2, segments: Array, minimum: float) -> bool:
+	var best := INF
+	var water := false
+	for segment in segments:
+		var a: Vector2 = segment[0]
+		var b: Vector2 = segment[1]
+		var q := Geometry2D.get_closest_point_to_segment(p, a, b)
+		var d := p.distance_to(q)
+		if d < best:
+			best = d
+			var dir := b - a
+			water = (p - q).dot(Vector2(-dir.y, dir.x)) > 0.0
+	return water and best >= minimum

@@ -119,6 +119,15 @@ const STREAM_OSM_WAIT_S := 30.0
 ## stretch's water, buildings and roads in hand: Overpass gets a short
 ## head start, then the stretch builds on the vector map.
 const STREAM_OMT_WAIT_S := 8.0
+## A late streamed run (`hurry`) holds this long for the layers around
+## the detailed one (the ring's far roads, bridge outlines, POIs, the far
+## city, the sharper inner mosaic), then builds without them; the
+## fetch-ahead of the next stretch fills their caches.
+const HURRY_EXTRAS_S := 4.0
+## Set by WorldStreamer while the camera is about to run out of ground.
+var hurry := false
+## Seconds from the run's start to each step landing (stream.log).
+var timings := {}
 var _climate: ClimateFetcher
 var _climate_data: Dictionary = {}
 var _climate_done := true
@@ -287,6 +296,8 @@ func _join_ground() -> void:
 		WorkerThreadPool.wait_for_task_completion(_ground_task)
 		_ground_task = -1
 
+var _ground_ms := {}
+
 ## The GroundTruth built early for `data`, waiting (frame by frame) for
 ## the task if it is still running; null when none was built for it.
 func ground_for(data: LocationData) -> GroundTruth:
@@ -295,6 +306,8 @@ func ground_for(data: LocationData) -> GroundTruth:
 	while _ground_task >= 0 and not WorkerThreadPool.is_task_completed(_ground_task):
 		await get_tree().process_frame
 	_join_ground()
+	_mark("ground")
+	timings["ground ms"] = _ground_ms
 	var g := _ground
 	_ground = null
 	_ground_data = null
@@ -306,12 +319,25 @@ func _start_ground(data: LocationData) -> void:
 	_ground_data = data
 	_ground_abort = BuildAbort.new()
 	var ground_abort := _ground_abort
+	_ground_ms = {}
+	var ms := _ground_ms  # written by the task alone, read once it is joined
 	var build := func() -> void:
+		var t := Time.get_ticks_msec()
+		var lap := func(what: String) -> void:
+			ms[what] = Time.get_ticks_msec() - t
+			t = Time.get_ticks_msec()
 		CoastalDem.correct(data)
+		lap.call("coastal")
 		HelsinkiDem.apply(data)
+		lap.call("hki dem")
 		GroundModel.apply(data)
+		lap.call("model")
 		_ground = GroundTruth.new(data, ground_abort)
+		lap.call("truth")
 	_ground_task = WorkerThreadPool.add_task(build, not background, "GroundTruth")
+
+func _mark(what: String) -> void:
+	timings[what] = snappedf((Time.get_ticks_msec() - _fetch_started_msec) / 1000.0, 0.1)
 
 ## A background run starts its fetchers a frame apart: each reads its
 ## cache and decodes a little on the main thread, ~30 ms all in one frame.
@@ -331,6 +357,8 @@ func _load_pump_us() -> int:
 
 func cancel() -> void:
 	_cancelled = true
+	if not warm_only:
+		PostpassGate.release_low()
 	if _ground_abort != null:
 		_ground_abort.requested = true
 	if _osm != null:
@@ -379,7 +407,8 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_sat.textures = not warm_only
 	_inner.set_textures(not warm_only)
 	_farfield.textures = not warm_only
-	if not warm_only and not WorldCache.prefetch(lat, lon, data.quality_preset, data.season):
+	# A streamed stretch has no world on disk to load (WorldCache.pack_wanted).
+	if not warm_only and (background or not WorldCache.prefetch(lat, lon, data.quality_preset, data.season)):
 		_join_prewarm()
 		var preset := data.quality_preset
 		_prewarm_task = WorkerThreadPool.add_task(func() -> void: BuildPrewarm.run(preset),
@@ -396,6 +425,12 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_osm_trees = []
 	_osm_barriers = []
 	_fetch_started_msec = Time.get_ticks_msec()
+	timings = {}
+	_osm.gate_urgent = not warm_only
+	set_meta(PostpassGate.LOW_META, warm_only)
+	if not warm_only:
+		PostpassGate.hold_low()  # released once its layers are in (_await_far_city)
+	_farcity.coarse = background
 	_sat_took = 0.0
 	_climate_took = 0.0
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
@@ -489,10 +524,12 @@ func run(lat: float, lon: float, place_name_override: String = "",
 
 	# The prewarm must be done before the build thread reads those caches;
 	# waited frame by frame (its TerrainTextures save needs main flushes).
+	_mark("stages")
 	while _prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(_prewarm_task):
 		WorldCache.pump_prefetch(_load_pump_us())
 		await get_tree().process_frame
 	_join_prewarm()
+	_mark("prewarm")
 	if _cancelled:
 		cancelled.emit()
 		return
@@ -678,12 +715,21 @@ func _await_satellite(data: LocationData) -> void:
 	# interrupts. Fits the §3.1 tier budgets (High ≤75 s, Ultra ≤150 s).
 	var budget := clampf(12.0 + float(_sat.pending_tile_count()) * 0.6, 20.0, 120.0)
 	var waited := 0.0
+	var inner_held := 0.0  # with the main mosaic in hand, the inner one still out
 	# Tiles already settled while the earlier stage ran (cache hits).
 	if not _sat_done:
 		stage_progress.emit(1, _sat_tiles.x, maxi(_sat_tiles.y, _sat.pending_tile_count()))
 	while not (_sat_done and _inner.done) and waited < budget and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+		if _sat_done and not timings.has("satellite"):
+			_mark("satellite")
+		if _inner.done and not timings.has("inner imagery"):
+			_mark("inner imagery")
+		inner_held = inner_held + get_process_delta_time() if _sat_done and not _inner.done else 0.0
+		if hurry and inner_held >= HURRY_EXTRAS_S:
+			print("Streamed build is late: ground photo without the sharper inner mosaic")
+			break
 	if _sat_texture == null and data.quality_preset > RenderSettings.Preset.FAST:
 		_note("imagery")
 	if _sat_texture != null:
@@ -724,12 +770,17 @@ func _await_osm(data: LocationData) -> void:
 	# OsmFetcher retries across Overpass endpoints; this wait must
 	# outlast the whole chain or a rescued fetch is dropped.
 	var waited := 0.0
+	var held := 0.0  # with the detailed layer in hand, the rest still out
 	var budget := STREAM_OSM_WAIT_S if background else OsmFetcher.retry_budget_seconds()
 	while not _osm_done and waited < budget and not _cancelled:
 		if background and waited >= STREAM_OMT_WAIT_S and _osm.has_omt():
 			break
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+		held = held + get_process_delta_time() if _osm.waiting_on_extras() else 0.0
+		if hurry and held >= HURRY_EXTRAS_S:
+			print("Streamed build is late: map data without the ring, bridge outlines and POIs")
+			_osm.settle()
 	if not _osm_done and background and not _cancelled:
 		# The way ahead cannot wait minutes on a slow Overpass: a saved
 		# copy, the vector map, or the stretch goes on without map data.
@@ -740,6 +791,7 @@ func _await_osm(data: LocationData) -> void:
 			waited += get_process_delta_time()
 	if not _osm_done:
 		_note("map")
+	_mark("map")
 	data.pois = _osm.pois
 	if not _osm_buildings.is_empty() or not _osm_land.is_empty() or not _osm_waterways.is_empty() \
 			or not _osm_roads_v2.is_empty() or not _osm.shore_structures.is_empty():
@@ -777,9 +829,11 @@ func _await_osm(data: LocationData) -> void:
 	if used_osm:
 		_city_credits = await _city.land(data,
 			CityOpenData.STREAM_LAND_WAIT_S if background else CityOpenData.LAND_WAIT_S)
+	_mark("registers")
 	if not warm_only:
 		_start_ground(data)
 	await _await_far_city(data)
+	_mark("far city")
 
 ## Climate normals, CHELSA or ERA5 (bounded wait; absent → latitude fallbacks).
 func _await_climate(data: LocationData) -> void:
@@ -799,10 +853,17 @@ func _await_climate(data: LocationData) -> void:
 ## the far city continues from imagery alone). Over budget, the fetch
 ## keeps running and caches for the next visit.
 func _await_far_city(data: LocationData) -> void:
-	var waited := 0.0
+	# A streamed run counts the wait from its start, not from here.
+	var waited := (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0 if background else 0.0
+	var held := 0.0
 	while not _farcity_done and waited < FARCITY_WAIT_S and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+		held += get_process_delta_time()
+		if hurry and held >= HURRY_EXTRAS_S:
+			break  # a late streamed build: the far city from imagery alone
+	if not warm_only:
+		PostpassGate.release_low()  # the live layers are in: a fetch-ahead may go
 	if not _farcity_done:
 		print("Far-city fetch over budget; far city from imagery only")
 		return

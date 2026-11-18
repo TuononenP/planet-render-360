@@ -48,8 +48,17 @@ var timings: Dictionary = {}
 
 var _req: LayerRequest
 var _busy := false
+## A streamed run (GenerationPipeline.background) asks around the nearest
+## point of a lattice COARSE_CELLS wider than StreamLattice's (~2.2 km)
+## instead of its own centre, so the stretches of one flight share a
+## query and its cache; the features are still placed around the centre.
+const COARSE_CELLS := 5
+var coarse := false
+## The centre asked about (and cached under), and the one parsed around.
 var _lat := 0.0
 var _lon := 0.0
+var _c_lat := 0.0
+var _c_lon := 0.0
 var _cache := ""
 var _t0 := 0
 var _parse_task := -1
@@ -139,6 +148,12 @@ func _reader() -> SnapshotReader:
 func fetch(lat: float, lon: float) -> void:
 	cancel()
 	var gen := _gen
+	_c_lat = lat
+	_c_lon = lon
+	if coarse:
+		var cell := StreamLattice.snap(Vector2(lat, lon), COARSE_CELLS)
+		lat = cell.x
+		lon = cell.y
 	_lat = lat
 	_lon = lon
 	_t0 = Time.get_ticks_msec()
@@ -208,8 +223,8 @@ static func _usable(text: String) -> bool:
 func _parse_off_thread(text: String, cached: bool, fallback: bool = false, trusted: bool = false) -> void:
 	_join_parse()
 	var gen := _gen
-	var lat := _lat
-	var lon := _lon
+	var lat := _c_lat
+	var lon := _c_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
 		var parsed := parse(text, lat, lon) if fallback or trusted or not cached or _usable(text) else {}
 		_on_parsed.call_deferred(gen, text.length(), cached, parsed))

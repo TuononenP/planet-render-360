@@ -172,6 +172,15 @@ func _run() -> void:
 		failures.append("a background slice should be capped low")
 	if WorldCache.pump_budget_us(28000, true) >= WorldCache.pump_budget_us(28000):
 		failures.append("a background build should take less than a foreground one")
+	# A late one takes a foreground share, capped lower.
+	if WorldCache.pump_budget_us(8333, true, true) != WorldCache.PUMP_US:
+		failures.append("a late background build should take the foreground slice at 120 fps")
+	if WorldCache.pump_budget_us(10000000, true, true) != WorldCache.BG_URGENT_MAX_US:
+		failures.append("a late background slice should be capped below a foreground one")
+	if WorldCache.pump_budget_us(28000, false, true) != WorldCache.pump_budget_us(28000):
+		failures.append("urgency should not change a foreground build's slice")
+	if WorldCache.pack_wanted(true):
+		failures.append("a streamed stretch should never be packed for a save")
 	WorldCache.hurry = true
 	if WorldCache.pump_budget_us(7000) != WorldCache.HURRY_US:
 		failures.append("quitting should take the hurry slice")

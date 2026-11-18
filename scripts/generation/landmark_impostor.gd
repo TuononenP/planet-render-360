@@ -36,6 +36,55 @@ const BOW_FRAC := 0.08
 ## contrast into the albedo while StandardMaterial3D takes live sun/haze/night).
 const RELIEF_KEY := Vector3(0.42, 0.78, -0.46)
 
+## The rasterised views by the model's content. Rasterising is the bake's
+## cost (seconds a stretch in GDScript), and the same far landmark returns
+## in every stretch of a flight with the same mesh, so its four views are
+## kept (the textures, mipmaps and octahedron are made fresh each time, so
+## no resource is shared between worlds). Oldest out past VIEW_CACHE_MAX.
+const VIEW_CACHE_MAX := 48
+static var view_cache_enabled := true
+static var view_cache_hits := 0
+static var view_cache_misses := 0
+static var _views := {}  # content key -> Array of 4 PackedByteArray
+static var _view_keys: Array = []
+static var _views_mutex := Mutex.new()
+
+static func clear_view_cache() -> void:
+	_views_mutex.lock()
+	_views.clear()
+	_view_keys.clear()
+	view_cache_hits = 0
+	view_cache_misses = 0
+	_views_mutex.unlock()
+
+## Everything the rasteriser reads: each surface's geometry and colours.
+static func _content_key(batches: Array) -> String:
+	var parts: Array = []
+	var verts := 0
+	for b in batches:
+		parts.append([hash(b["v"]), hash(b["n"]), hash(b["idx"]), hash(b["cols"]), b["color"]])
+		verts += (b["v"] as PackedVector3Array).size()
+	return "%d_%d_%d_%d" % [parts.hash(), verts, batches.size(), SIZE]
+
+static func _views_for(key: String) -> Array:
+	_views_mutex.lock()
+	var got: Array = _views.get(key, [])
+	if got.is_empty():
+		view_cache_misses += 1
+	else:
+		view_cache_hits += 1
+	_views_mutex.unlock()
+	return got
+
+static func _remember_views(key: String, views: Array) -> void:
+	_views_mutex.lock()
+	if not _views.has(key):
+		_view_keys.append(key)
+		while _view_keys.size() > VIEW_CACHE_MAX:
+			_views.erase(_view_keys.pop_front())
+	_views[key] = views
+	_views_mutex.unlock()
+
 ## Test hook to force a bake failure and verify real-mesh fallback.
 static var _fail_bake_test := false
 static var _notes_mutex := Mutex.new()
@@ -181,9 +230,14 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 	var texs: Array[ImageTexture] = []
 	var key_dir := RELIEF_KEY.normalized()
 	var headless := DisplayServer.get_name() == "headless"
+	var key := _content_key(batches) if view_cache_enabled else ""
+	var views: Array = _views_for(key) if view_cache_enabled else []
+	var rastered := views.is_empty()
 	for v_idx in 4:
-		var bytes := _rasterize_view(batches, center, y1, span_y,
-			normals[v_idx], rights[v_idx], widths[v_idx] * 0.5, key_dir)
+		var bytes: PackedByteArray = views[v_idx] if not rastered else _rasterize_view(batches,
+			center, y1, span_y, normals[v_idx], rights[v_idx], widths[v_idx] * 0.5, key_dir)
+		if rastered:
+			views.append(bytes)
 		var base_img := Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RGBA8, bytes)
 		images.append(base_img)
 		var gpu_img := base_img.duplicate() as Image
@@ -197,6 +251,8 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 			tex.set_meta("impostor_image", base_img)
 		texs.append(tex)
 
+	if rastered and view_cache_enabled:
+		_remember_views(key, views)
 	var mask_bytes := PackedByteArray()
 	mask_bytes.resize(SIZE * SIZE * 4)
 	var front_bytes := images[0].get_data()

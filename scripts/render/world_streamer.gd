@@ -82,9 +82,6 @@ const TURN_BACK_MPS := 6.0
 ## one where it is going (see heading_misses): a glance or a short
 ## swerve keeps it.
 const MISS_HOLD_S := 3.0
-## Seconds standing still before a streamed world is written to the
-## world cache (never while moving: the save stalls frames).
-const SAVE_STILL_S := 2.0
 
 ## Measured build seconds per preset (session-wide, see blend_build_s).
 static var _build_s := {}
@@ -398,9 +395,7 @@ var _worst := {}
 var _after_swap := 0
 ## Seconds from start to each data stage landing (the STREAM log line).
 var _stage_s := {}
-## The latest streamed world's held-back cache save, and how long the
-## camera has stood still (it is written only then; see BuildAbort).
-var _unsaved: Array = []
+## How long the camera has stood still.
 var _still_s := 0.0
 ## Fetches the centres ahead and around before they are wanted, and
 ## remembers which have their data on disk (StreamScout).
@@ -508,7 +503,6 @@ func reset_for_new_place() -> void:
 	ShaderOrigin.reset()
 	_opened_msec = Time.get_ticks_msec()
 	_warmed = false
-	_unsaved = []
 	_scout.clear()
 	_vel = Vector2.ZERO
 	_pace = 0.0
@@ -664,22 +658,22 @@ func tick(v: View360, delta: float) -> void:
 	# is still on its way back to full speed.
 	_pace = maxf(_vel.length(), _pace - PACE_DECAY_MPS2 * delta)
 	_still_s = _still_s + delta if _vel.length() < 1.0 else 0.0
-	# Memory short (MemoryGuard): parked stretches go, then the held-back
-	# save, then the stretch being fetched; nothing new starts.
+	# Memory short (MemoryGuard): parked stretches go, then the stretch
+	# being fetched; nothing new starts.
 	_parked.trim()
-	if MemoryGuard.level >= MemoryGuard.Level.CRITICAL:
-		_unsaved = []
 	if not MemoryGuard.stream_allowed() and state == State.FETCHING:
 		_cancel_pending()
 		invalidate("memory short")
-	if not _unsaved.is_empty() and _still_s >= SAVE_STILL_S and MemoryGuard.save_allowed():
-		WorldCache.save_async(v, v._threads, _unsaved[0], [_unsaved[1]], _unsaved[2], true)
-		_unsaved = []
 	_reveal.tick(pos, delta, v._quality_preset)
-	# Ring fetches wait while the build's own data is on the network.
-	_scout.pump(v, state == State.FETCHING and _fetched_msec == 0)
+	# Fetches ahead wait while the build's own data is on the network,
+	# and for the whole of a late build.
+	_scout.pump(v, state == State.FETCHING and (_fetched_msec == 0 or urgent()))
 	slowed = (state == State.FETCHING or state == State.READY) and not inside_detailed(pos)
 	_edge_s = detailed_ahead(pos, _vel) / _vel.length() if _vel.length() > 0.5 else INF
+	if state == State.FETCHING and _abort != null:
+		_abort.urgent = urgent()  # a late build: no garnish, a bigger frame share
+		if _pipeline != null:
+			_pipeline.hurry = _abort.urgent
 	_miss_s = _miss_s + delta if heading_misses(pos, _vel) else 0.0
 	var look := Vector2(-sin(v._rig.yaw), -cos(v._rig.yaw))
 	# Heading somewhere the pending world does not cover, with the edge
@@ -800,7 +794,7 @@ func _note_frame(delta: float) -> void:
 	if _after_swap > 0:
 		_after_swap -= 1
 		if _after_swap == 0:
-			_log("STREAM swap: %s" % _worst_line(["swap call", "swap+0", "swap+1", "swap+2", "swap+3"]))
+			_log("STREAM swap: %s" % _worst_line(["ready", "swap call", "swap+0", "swap+1", "swap+2", "swap+3"]))
 			_worst.clear()
 
 ## Prints `line` and keeps it in LOG_PATH too: Godot keeps only its last
@@ -853,6 +847,13 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 		target = WorldScale.xz_from_latlon(ll.x, ll.y, v._data.latitude, v._data.longitude)
 	else:
 		ll = WorldScale.latlon_from_xz(target.x, target.y, v._data.latitude, v._data.longitude)
+		# On the lattice, where the caches keyed by a centre hit again.
+		var s := StreamLattice.snap(ll)
+		var sxz := WorldScale.xz_from_latlon(s.x, s.y, v._data.latitude, v._data.longitude)
+		if not here and sxz.distance_to(pos) >= STEP_M * 0.6 and sxz.length() > STEP_M * 0.5 \
+				and not exit_missed(pos, _planned_vel(), sxz):
+			ll = s
+			target = sxz
 	_scout.plan_ll = Vector2.INF
 	_scout.note(ll)
 	var gen := begin(ll, target)
@@ -904,6 +905,7 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	# frame) rather than build it again, and before freeing the pipeline,
 	# whose predelete would otherwise block on that task.
 	var ground: GroundTruth = null
+	var timings := pipe.timings
 	if gen == generation and state == State.FETCHING:
 		ground = await pipe.ground_for(data)
 	if is_instance_valid(pipe):
@@ -948,15 +950,14 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	var now := Time.get_ticks_msec()
 	var took := (now - _started_msec) / 1000.0
 	note_build_s(v._quality_preset, took)
-	if not _abort.deferred_save.is_empty():
-		_unsaved = _abort.deferred_save  # the newer stretch replaces it
 	var stages: Array[String] = []
 	for i in _stage_s:
 		stages.append("%s %.1f s" % [GenerationPipeline.STAGES[i], _stage_s[i]])
-	_log("STREAM gen %d: fetch %.1f s (%s), build %.1f s, total %.1f s (expect next %.1f s); %s" % [
+	_log("STREAM gen %d: fetch %.1f s (%s), build %.1f s, total %.1f s (expect next %.1f s); %s; fetch s %s; %s %s; postpass %s" % [
 		gen, (_fetched_msec - _started_msec) / 1000.0, ", ".join(stages),
 		(now - _fetched_msec) / 1000.0, took, expected_build_s(v._quality_preset),
-		_worst_line(["fetch", "build"])])
+		_worst_line(["fetch", "build"]), timings, _abort.timings_line(), _abort.stage_ms,
+		PostpassGate.take_stats()])
 	# Range the LOD rings while the world waits to swap in, a few
 	# subtrees per tick, so neither this frame nor the swap frame
 	# pays for the whole walk.

@@ -38,6 +38,11 @@ const CONTROLS := [
 ]
 
 var _out := ""
+## --fly_only=1: from the first open straight to the flight (a release
+## export overflows the reflection probe atlas when a place is reopened).
+var _fly_only := false
+## --heading=DEG: the flight's direction, 0 = east, 90 = south (XZ plane).
+var _heading_deg := 0.0
 var _peak := 0
 var _levels: Array = []
 
@@ -67,6 +72,8 @@ func _places(filter: String) -> Array:
 
 func _run() -> void:
 	var a := _args()
+	_fly_only = str(a.get("fly_only", "0")) == "1"
+	_heading_deg = float(a.get("heading", "0"))
 	var preset := int(a["preset"])
 	var limit_mb := int(a.get("memory_limit_mb", "0"))
 	if limit_mb > 0:
@@ -130,6 +137,8 @@ func _headline(r: Dictionary) -> Dictionary:
 		h["fly_p95_ms"] = r["fly"]["p95_ms"]
 		h["fly_max_ms"] = r["fly"]["max_ms"]
 		h["swaps"] = r["fly"]["swaps"].size()
+		h["slowed_s"] = r["fly"]["slowed_s"]
+		h["badge_s"] = r["fly"]["badge_s"]
 	h["peak_mb"] = r.get("peak_mb", 0)
 	h["peak_share"] = r.get("peak_share", 0)
 	h["guard"] = (r.get("guard", []) as Array).map(func(e: Array) -> String: return str(e[1]))
@@ -150,6 +159,11 @@ func _measure(main: Node, view: View360, place: Dictionary, fly_s: float, speed:
 	r["save_s"] = save[0]
 	r["save_peak_mb"] = save[1]
 	r["cold_key"] = WorldCache.key(view._data) if view._data != null else ""
+	if _fly_only:
+		if fly_s > 0.0:
+			r["fly"] = await _fly(view, fly_s, speed)
+		r["peak_mb"] = _peak / MB
+		return r
 	var saved := Array(DirAccess.get_files_at(WorldCache.base_dir()))
 	var cached := await _open(main, view, place)
 	if cached >= 0.0:
@@ -217,17 +231,29 @@ func _fly(view: View360, seconds: float, speed: float) -> Dictionary:
 	var log_from := _file_len(log_path)
 	view._streamer.enabled = true
 	var rig := view._rig
-	rig.yaw = -PI * 0.5  # look east, the way it flies
+	var dir := Vector2(cos(deg_to_rad(_heading_deg)), sin(deg_to_rad(_heading_deg)))
+	rig.yaw = atan2(-dir.x, -dir.y)  # look the way it flies (east: -PI/2)
 	rig.pitch = -0.15
+	# Seconds the person waited: held at the edge by the interim speed cap
+	# (`slowed`), and with the "Preparing the way ahead" badge up (a build
+	# in flight that the edge is closer to than its time left).
+	var waited := {"slowed_s": 0.0, "badge_s": 0.0}
+	var streamer := view._streamer
 	var step := func(dt: float) -> void:
 		var here := Vector2(rig.position.x, rig.position.z)
-		var vel := WorldStreamer.capped_velocity(Vector2(speed, 0.0), here)
+		var vel := WorldStreamer.capped_velocity(dir * speed, here)
+		if streamer.slowed:
+			waited["slowed_s"] += dt
+		if streamer.state == WorldStreamer.State.FETCHING and streamer.urgent():
+			waited["badge_s"] += dt
 		var next := view.stream_roam(here, here + vel * dt)
 		var ground := view._ground.height_at_world(next.x, next.y) if view._ground != null else 0.0
 		rig.position = Vector3(next.x, ground + FLY_UP_M, next.y)
 	var times := await _frames(seconds, step)
 	view._streamer.enabled = false
 	var s := _stats(times)
+	s["slowed_s"] = snappedf(waited["slowed_s"], 0.1)
+	s["badge_s"] = snappedf(waited["badge_s"], 0.1)
 	var lines := _read_from(log_path, log_from)
 	s["gens"] = lines.filter(func(l: String) -> bool: return l.contains("STREAM gen") and l.contains("total"))
 	s["swaps"] = lines.filter(func(l: String) -> bool: return l.contains("STREAM swap:"))

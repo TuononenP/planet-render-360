@@ -30,14 +30,16 @@ var saving := false
 ## A background build (the streamer's way ahead): View360.build_location
 ## gives it a small main-thread share per frame and a low-priority thread.
 var background := false
-## A background build's cache save, held back ([data, ground, packed]):
-## writing a world reads every mesh back from the renderer, which stalls
-## frames while the camera moves; the streamer saves it once still.
-var deferred_save: Array = []
+## A background build the camera is about to run out of ground for (set
+## each frame by WorldStreamer): it gets a normal thread and a bigger
+## main-thread share (WorldCache.pump_budget_us).
+var urgent := false
 ## The phase the build thread is in (a Step); read by the main thread.
 var step := 0
 ## Per-step wall-clock ms (filled by the build). Key = Step int.
 var ms: Dictionary = {}
+## Every stage's ms in WorldBuildGraph order (`ms` keeps a Step's slowest).
+var stage_ms: Array = []
 ## Steps finished (the parallel build ends them out of order).
 var _done: Array[bool] = [false, false, false, false, false, false]
 var _mutex := Mutex.new()

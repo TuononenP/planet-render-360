@@ -17,6 +17,10 @@ const RING_M := 1100.0
 ## each costs a round of Overpass queries, and a U-turn is covered by
 ## WorldStreamer's parked worlds instead.
 const RING_FETCH_MAX := 4
+## Faster than this, no ring is fetched: it is insurance for a turn, its
+## five Postpass requests a centre would hold the one slot the build and
+## the plan ahead need, and a fast camera is past it before it lands.
+const RING_MAX_MPS := 15.0
 ## Ring centres this close to the heading are left to the plan ahead.
 const RING_SKIP_DEG := 30.0
 ## A ring centre this near a known one is not fetched again.
@@ -63,6 +67,7 @@ func _near_known(xz: Vector2, lat: float, lon: float) -> bool:
 
 ## Remembers `ll` as known (newest), forgetting the oldest beyond KNOWN_MAX.
 func note(ll: Vector2) -> void:
+	_ring.erase(ll)  # built or fetched: not fetched again
 	known.erase(ll)
 	known.append(ll)
 	while known.size() > KNOWN_MAX:
@@ -85,19 +90,19 @@ func pick(pos: Vector2, dir: Vector2, lat: float, lon: float) -> Vector2:
 	return Vector2.INF
 
 ## Plans the centre after `target` (one more step the same way, `step`
-## metres) and starts fetching its data.
+## metres, on the StreamLattice) and queues its data first: `pump`
+## fetches it once the build's own data is in, never beside it (one
+## Postpass request runs at a time, and the build's come first).
 func plan(v: View360, pos: Vector2, target: Vector2, step: float) -> void:
 	var dir := (target - pos).normalized()
 	if dir == Vector2.ZERO:
 		return
 	var next := target + dir * step
-	plan_ll = WorldScale.latlon_from_xz(next.x, next.y, v._data.latitude, v._data.longitude)
-	var cap := warm_max()
-	if cap == 0:
-		return  # memory: the stretch is fetched when it is built
-	while _warms.size() >= cap:
-		_end_warm(_warms[0], true)
-	_warm(v, plan_ll, "a stretch ahead")
+	_ring.erase(plan_ll)  # the plan it replaces is no longer wanted
+	plan_ll = StreamLattice.snap(
+		WorldScale.latlon_from_xz(next.x, next.y, v._data.latitude, v._data.longitude))
+	_ring.erase(plan_ll)
+	_ring.push_front(plan_ll)
 
 ## A new live centre (`lat`, `lon`): queue its ring, nearest `heading`
 ## first, and forget known centres too far to be picked again.
@@ -105,22 +110,37 @@ func survey(lat: float, lon: float, heading: Vector2) -> void:
 	for i in range(known.size() - 1, -1, -1):
 		if WorldScale.xz_from_latlon(known[i].x, known[i].y, lat, lon).length() > KNOWN_REACH_M:
 			known.remove_at(i)
-	_ring = ring_around(lat, lon, heading)
+	_ring = []
+	if plan_ll != Vector2.INF and not plan_ll in known:
+		_ring.append(plan_ll)  # still to fetch: ahead of the ring
+	for ll in ring_around(lat, lon, heading) if heading.length() <= RING_MAX_MPS else []:
+		var s := StreamLattice.snap(ll)
+		if not s in _ring and not s in known:
+			_ring.append(s)
 
-## Starts the next ring fetch while a pipeline slot is free and the
-## streamer's own build is not on the network (`net_busy`).
+## Starts the plan ahead, then the next ring fetch while a pipeline slot is
+## free and the streamer's own build is not on the network (`net_busy`).
 func pump(v: View360, net_busy: bool) -> void:
 	if warm_max() == 0 and not _warms.is_empty():
 		# Memory is short: each holds a stretch's data. The ring stays,
 		# to be fetched once there is room again.
 		for w in _warms.duplicate():
 			_end_warm(w, true)
-	if net_busy or _ring.is_empty() or not _warms.is_empty() or warm_max() == 0:
+	if _ring.is_empty() or warm_max() == 0:
 		return
-	var ll: Vector2 = _ring.pop_front()
+	# The plan ahead starts with the build it follows (its Postpass requests
+	# queue behind the build's own, PostpassGate), so it is fetched by the
+	# time that build lands, and beside a ring fetch (the oldest stops when
+	# the slots are full). The ring waits for the build's data, one at a time.
+	var ll: Vector2 = _ring[0]
+	if ll != plan_ll and (net_busy or not _warms.is_empty()):
+		return
+	_ring.pop_front()
 	if ll in known:
 		return
-	_warm(v, ll, "a stretch around")
+	while _warms.size() >= warm_max():
+		_end_warm(_warms[0], true)
+	_warm(v, ll, "a stretch ahead" if ll == plan_ll else "a stretch around")
 
 func _warm(v: View360, ll: Vector2, what: String) -> void:
 	note(ll)

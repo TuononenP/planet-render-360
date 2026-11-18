@@ -180,7 +180,14 @@ static func _adopt_flat(root: Node3D, subtree: Node3D) -> void:
 ## metre position (T5.2): no framing cut — the v1 ±105-unit window is
 ## gone; only the LANDMARK_MAX_M haze limit applies.
 static func _landmark_candidates(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
+	var spent := {}  # model type -> ms, for the timings line
+	var t0 := Time.get_ticks_msec()
+	var last := ""
 	for c in data.landmark_candidates:
+		if last != "":
+			spent[last] = int(spent.get(last, 0)) + Time.get_ticks_msec() - t0
+		t0 = Time.get_ticks_msec()
+		last = str(c.get("type", c.get("archetype", "")))
 		if bool(c.get("mapped", false)):
 			continue
 		var cx := float(c.get("x", 0.0))
@@ -219,6 +226,13 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			LandmarkShader.upgrade(node)
 		node.set_meta("lod_layer", "Landmarks")
 		root.add_child(node)
+	if last != "":
+		spent[last] = int(spent.get(last, 0)) + Time.get_ticks_msec() - t0
+	var top := spent.keys()
+	top.sort_custom(func(a: Variant, b: Variant) -> bool: return spent[a] > spent[b])
+	print("LANDMARKS timings ms (%d built; impostor views cached %d, rasterised %d) %s" % [
+		spent.size(), LandmarkImpostor.view_cache_hits, LandmarkImpostor.view_cache_misses,
+		", ".join(top.slice(0, 8).map(func(k: Variant) -> String: return "%s=%d" % [k, spent[k]]))])
 
 static func _mat(color: Color, roughness: float = 0.95) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()

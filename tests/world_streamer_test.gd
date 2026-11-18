@@ -328,12 +328,62 @@ func _scout() -> void:
 		"a known centre ahead is picked")
 	_check(sc.pick(Vector2(0, -100), Vector2(-1, 1), 60.0, 25.0) == Vector2.INF,
 		"none behind, and never the live centre")
+	_lattice()
+	# A new live centre queues the plan ahead first, then its ring, all on
+	# the lattice and none twice.
+	var sc2 := StreamScout.new()
+	sc2.plan_ll = StreamLattice.snap(WorldScale.latlon_from_xz(0.0, -1100.0, 60.0, 25.0))
+	sc2.survey(60.0, 25.0, Vector2(0, -1))
+	_check(sc2._ring[0] == sc2.plan_ll, "the plan ahead is fetched before the ring")
+	for i in sc2._ring.size():
+		_check(StreamLattice.snap(sc2._ring[i]) == sc2._ring[i] and sc2._ring.find(sc2._ring[i]) == i,
+			"ring centre %d is a lattice point, queued once" % i)
+	# Fast, only the plan ahead is fetched: no ring to hold the Postpass slot.
+	var sc3 := StreamScout.new()
+	sc3.plan_ll = sc2.plan_ll
+	sc3.survey(60.0, 25.0, Vector2(0, -StreamScout.RING_MAX_MPS - 5.0))
+	_check(sc3._ring == [sc3.plan_ll], "a fast camera fetches the plan ahead and no ring: %s" % [sc3._ring])
+	var queued := sc2._ring.size()
+	sc2.note(sc2.plan_ll)
+	_check(sc2._ring.size() == queued - 1 and not sc2.plan_ll in sc2._ring,
+		"a centre built or fetched leaves the queue")
 	for i in StreamScout.KNOWN_MAX + 5:
 		sc.note(Vector2(61.0 + i * 0.001, 25.0))
 	_check(sc.known.size() == StreamScout.KNOWN_MAX, "known centres are capped")
 	_check(WorldStreamer.exit_missed(Vector2(0, -600), Vector2(27, 0), Vector2(0, -1600))
 		and not WorldStreamer.exit_missed(Vector2(0, -600), Vector2(0, -27), Vector2(0, -1600)),
 		"an exit outside a target's square is missed, one inside is not")
+
+## StreamLattice: the same point for every centre near it, exact under
+## CacheStore.quant, and never far from where the camera was headed.
+func _lattice() -> void:
+	for at: Vector2 in [Vector2(60.168, 24.953), Vector2(48.8566, 2.3522), Vector2(-33.86, 151.21),
+			Vector2(0.01, -0.01), Vector2(78.22, 15.65)]:
+		var p := StreamLattice.snap(at)
+		_check(StreamLattice.snap(p) == p, "a lattice point snaps to itself at %s" % at)
+		var off := WorldScale.xz_from_latlon(p.x, p.y, at.x, at.y)
+		_check(absf(off.x) <= 260.0 and absf(off.y) <= 230.0,
+			"the lattice point is near at %s: %s" % [at, off])
+		for d: Vector2 in [Vector2(150, 0), Vector2(-150, 120), Vector2(0, -180)]:
+			var near := WorldScale.latlon_from_xz(off.x + d.x, off.y + d.y, at.x, at.y)
+			var q := StreamLattice.snap(near)
+			_check(q == p and CacheStore.quant(q.x) == CacheStore.quant(p.x)
+				and CacheStore.quant(q.y) == CacheStore.quant(p.y),
+				"a centre %s m from a lattice point snaps to it at %s" % [d, at])
+		var coarse := StreamLattice.snap(at, FarCityFetcher.COARSE_CELLS)
+		_check(StreamLattice.snap(coarse) == coarse, "a coarse cell centre is a lattice point at %s" % at)
+	# A step ahead, snapped, is still a stretch ahead the camera can swap to.
+	for i in 8:
+		var a := TAU * i / 8.0
+		var dir := Vector2(sin(a), -cos(a))
+		for step: float in [WorldStreamer.STEP_M, WorldStreamer.MAX_STEP_M]:
+			var pos := dir * 300.0
+			var ll := StreamLattice.snap(WorldScale.latlon_from_xz(
+				(pos + dir * step).x, (pos + dir * step).y, 60.168, 24.953))
+			var xz := WorldScale.xz_from_latlon(ll.x, ll.y, 60.168, 24.953)
+			_check(xz.distance_to(pos) >= WorldStreamer.STEP_M * 0.6
+				and dir.dot((xz - pos).normalized()) > 0.9,
+				"a snapped step of %d m along %s stays ahead: %s" % [int(step), dir, xz])
 
 ## RevealWave: only new pieces (wholly past the old square) fade in, from
 ## the camera outward, and each gets its LodRing range back once passed;

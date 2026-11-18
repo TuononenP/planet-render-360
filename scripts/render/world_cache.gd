@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 280
+const BUILD_VERSION := 282
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -328,14 +328,19 @@ const HURRY_US := 40000
 const BG_PUMP_US := 1500
 const BG_FRAME_SHARE := 0.08
 const BG_MAX_US := 4000
+## A background build the camera is about to run out of ground for
+## (BuildAbort.urgent) takes a foreground build's share, up to this.
+const BG_URGENT_MAX_US := 12000
 ## Set when the app is quitting: finish the save as fast as possible.
 static var hurry := false
 
 ## Main-thread microseconds to service the save's mesh reads in a frame
 ## that took `frame_us`.
-static func pump_budget_us(frame_us: int, background := false) -> int:
+static func pump_budget_us(frame_us: int, background := false, urgent := false) -> int:
 	if hurry:
 		return HURRY_US
+	if background and urgent:
+		return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, BG_URGENT_MAX_US)
 	if background:
 		return clampi(int(frame_us * BG_FRAME_SHARE), BG_PUMP_US, BG_MAX_US)
 	return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, PUMP_MAX_US)
@@ -348,13 +353,12 @@ static func _save_in_progress(path: String) -> bool:
 	return false
 
 ## Whether a build packs its world for a save. A place opened in the
-## foreground always does (on the build thread, while the world is still
-## pristine; its save may wait for memory). A streamed stretch, saved
-## later from the pack, which pins the whole world after it has gone, not
-## while memory is short or on a phone below T2.
+## foreground does (on the build thread, while the world is still
+## pristine; its save may wait for memory). A streamed stretch never: its
+## key holds the path flown to it (origin_m, detail_reach), so its file
+## (hundreds of MB, seconds to pack and to write) was never loaded again.
 static func pack_wanted(background: bool) -> bool:
-	return enabled() and (not background or (MemoryGuard.save_allowed()
-		and MemoryBudget.tier() >= MemoryBudget.Tier.T2))
+	return enabled() and not background
 
 ## Seconds a save waits for MemoryGuard to allow it before it is dropped.
 const SAVE_WAIT_S := 120.0
@@ -363,8 +367,7 @@ const SAVE_WAIT_S := 120.0
 ## wait for memory, only an EMERGENCY drops it.
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
 		packed: PackedScene = null, background := false, asked := false) -> void:
-	# A packed world needs only its ground: the streamer saves one after
-	# the world itself has gone (BuildAbort.deferred_save).
+	# A packed world needs only its ground (the world itself may have gone).
 	if not enabled() or built.is_empty() \
 			or (packed == null and (built.size() < 2 or not (built[1] is Node3D))):
 		return

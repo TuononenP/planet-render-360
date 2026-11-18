@@ -120,6 +120,7 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			ms[st.step] = maxi(int(ms.get(st.step, 0)), st.ms)
 		for s in ms:
 			abort.set_ms(s, ms[s])
+		abort.stage_ms = stages.map(func(st: Variant) -> int: return st.ms)
 		print("%s total=%d parallel" % [abort.timings_line(), Time.get_ticks_msec() - t0])
 	return root
 

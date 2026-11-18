@@ -357,14 +357,17 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data, abort)
 		var w := TerrainBuilder.build_world(data, g, abort)
+		var m0 := Time.get_ticks_msec()
 		_merge(w, abort)
+		if abort != null:
+			abort.set_ms(BuildAbort.Step.MERGE, Time.get_ticks_msec() - m0)
 		# Packed here, detached and pristine, so the save costs the main
 		# thread nothing before the view shows.
 		var stopped := abort != null and abort.requested
 		if not stopped:
 			BuildPrewarm.remember()
 		return [g, w, WorldCache.pack(w) if not stopped and WorldCache.pack_wanted(bg) else null],
-		Thread.PRIORITY_LOW if bg else Thread.PRIORITY_NORMAL)
+		Thread.PRIORITY_LOW if bg and not abort.urgent else Thread.PRIORITY_NORMAL)
 	# The merge and the pack ask the rendering server about every mesh
 	# node, and each answer to a worker thread waits for the main thread's
 	# next flush: one node a frame, so ~3000 nodes took 26 s at 120 fps
@@ -377,7 +380,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
 		var t := Time.get_ticks_usec()
-		var budget := WorldCache.pump_budget_us(t - last_us, bg)
+		var budget := WorldCache.pump_budget_us(t - last_us, bg, bg and abort.urgent)
 		while thread.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us = t
@@ -391,7 +394,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 			(built[1] as Node3D).free()
 		return []
 	if bg:
-		abort.deferred_save = [data, built[0], packed] if packed != null else []
+		pass  # a streamed stretch is never saved (WorldCache.pack_wanted)
 	elif wait_save:
 		if abort != null:
 			abort.saving = true
