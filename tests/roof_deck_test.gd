@@ -24,6 +24,10 @@ func _init() -> void:
 		failures.append("bridge over the roof should land at roof height, mid %.1f m over ground (generic layer height %.1f)" % [deck[2] - ground_y, plain_deck[2] - ground_y])
 	if deck[0] > ground_y + 1.0 or deck[deck.size() - 1] > ground_y + 1.0:
 		failures.append("bridge must still meet the ground beyond the roof, ends %.1f / %.1f" % [deck[0] - ground_y, deck[deck.size() - 1] - ground_y])
+	var tower := _data([{"x": 0.0, "z": 0.0, "type": "big_ben", "height": 96.0, "clear_m": 36.0}])
+	var tower_surf := RoadBuilder._Surface.new(tower, GroundTruth.new(tower))
+	if tower_surf.landmark_roof_y(Vector2.ZERO) > -1e8:
+		failures.append("a clock tower's height is no roof (Big Ben's Palace site lifted a footbridge 96 m)")
 	if failures.is_empty():
 		print("ROOF DECK OK: layer-5 bridge lands on a 20 m landmark roof, ground beyond it")
 		quit(0)

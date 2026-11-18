@@ -460,7 +460,7 @@ static func _core_landmarks() -> Array:
 			"wiki_title": "Tokyo Tower", "height_m": 333.0,
 			"aliases": ["tokyo tower", "tokyo tawā"]},
 		{"type": "big_ben", "name": "Big Ben", "lat": 51.5007, "lon": -0.1246, "radius_m": 6000.0,
-			"wiki_title": "Big Ben", "height_m": 96.0, "clear_m": 36.0, "yaw_deg": 6.2,
+			"wiki_title": "Big Ben", "height_m": 96.0, "clear_m": 36.0, "yaw_deg": 6.2, "kind": "Clock tower",
 			"clear_offsets_m": [[0.0, 0.0], [0.0, 45.0], [35.0, 30.0], [-10.0, 90.0], [35.0, 90.0],
 				[-45.0, 80.0], [-45.0, 120.0], [-10.0, 140.0], [35.0, 150.0], [-10.0, 190.0],
 				[35.0, 200.0], [-10.0, 240.0], [35.0, 245.0], [-28.0, 262.0]],

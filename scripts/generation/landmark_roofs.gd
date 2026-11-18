@@ -13,8 +13,10 @@ extends RefCounted
 ## bridge (the FDR Drive under the Brooklyn Bridge, whose height_m is its
 ## towers' and whose clearance runs its whole span), stays on its own deck
 ## instead of rising to the landmark's top. A bridge's own deck replaces
-## its mapped one (LandmarkSites.outside_spans).
-const NOT_ROOFS := ["Skyscraper", "Bridge"]
+## its mapped one (LandmarkSites.outside_spans). A clock tower's height is
+## its spire: Big Ben's clearance covers the Palace of Westminster, and a
+## mapped footbridge by Old Palace Yard rose 96 m into the sky.
+const NOT_ROOFS := ["Skyscraper", "Bridge", "Clock tower"]
 static func collect(data: LocationData) -> Array:
 	var out: Array = []
 	for c: Variant in data.landmark_candidates:
