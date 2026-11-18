@@ -16,6 +16,10 @@ extends RefCounted
 const TOP_M := 34.0
 const BLOCK := Vector3(80.0, 18.0, 46.0)
 const GROUND_M := 7.6
+## The gaming-room wing: its eave, and its far end along +X (the mapped
+## outline runs 130 m north-east of the entrance axis).
+const WING_M := 16.0
+const WING_END_M := 128.0
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
@@ -78,7 +82,36 @@ static func build(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		_attic_rail(lm, Vector3(s * (hx + 4.6), 0.8, hz + 1.0), Vector3(s * (hx + 4.6), 0.8, hz + 17.4))
 	_square_front(lm, hz)
+	_gaming_wing(lm, hx)
 	lm.commit(model)
+
+## The gaming-room wing north-east of the main block (+X; the Touzet and
+## Médecin rooms, 1898-1910), along the mapped outline: a slightly lower
+## stone range in the same dress, arched windows over a rusticated
+## ground floor, balustraded attic and a low copper roof.
+static func _gaming_wing(lm: LandmarkMesh, hx: float) -> void:
+	var size := Vector3(WING_END_M - hx, WING_M, 43.0)
+	var c := Vector3((hx + WING_END_M) * 0.5, 0, 2.5)
+	var wz := size.z * 0.5
+	lm.box("Stone", c + Vector3(0, size.y * 0.5, 0), size)
+	lm.box("Trim", c + Vector3(0, 0.4, 0), size + Vector3(0.8, 0.8 - size.y, 0.8))
+	lm.box("Trim", c + Vector3(0, GROUND_M, 0), size + Vector3(1.0, 0.8 - size.y, 1.0))
+	lm.box("Trim", c + Vector3(0, size.y - 0.6, 0), size + Vector3(0.8, 1.2 - size.y, 0.8))
+	for s in [-1.0, 1.0]:
+		var n := Vector3(0, 0, s)
+		for k in 12:
+			var x := c.x - size.x * 0.5 + 5.0 + 7.1 * k
+			LandmarkDetail.window(lm, "Trim", "Windows", Vector3(x, 3.8, c.z + s * wz), n, 2.2, 4.0, false, 0.3)
+			LandmarkDetail.window(lm, "Trim", "Windows", Vector3(x, 11.4, c.z + s * wz), n, 2.6, 5.0, true, 0.3)
+		_attic_rail(lm, Vector3(hx + 1.0, size.y, c.z + s * (wz - 0.4)),
+			Vector3(WING_END_M - 1.0, size.y, c.z + s * (wz - 0.4)))
+	for k in 5:
+		var z := c.z - wz + 5.5 + 8.0 * k
+		LandmarkDetail.window(lm, "Trim", "Windows", Vector3(WING_END_M, 3.8, z), Vector3(1, 0, 0), 2.2, 4.0, false, 0.3)
+		LandmarkDetail.window(lm, "Trim", "Windows", Vector3(WING_END_M, 11.4, z), Vector3(1, 0, 0), 2.6, 5.0, true, 0.3)
+	_attic_rail(lm, Vector3(WING_END_M - 0.4, size.y, c.z - wz + 1.0), Vector3(WING_END_M - 0.4, size.y, c.z + wz - 1.0))
+	lm.lathe("Copper", c + Vector3(0, size.y, 0), PackedVector2Array([Vector2(sqrt(2.0) * 0.94, 0),
+		Vector2(sqrt(2.0) * 0.8, 2.6), Vector2(sqrt(2.0) * 0.62, 3.6)]), 4, size.x * 0.5, wz, PI * 0.25, false)
 
 ## Square side: entrance pavilion with arched doorway, glass marquee,
 ## the clock under a sculpture group and pediment, two flanking towers,

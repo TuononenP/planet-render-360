@@ -126,8 +126,8 @@ const THUMB_LOOKS := {
 	"new_york": [40.7030, -73.9975, 6.0, 338.0, 8.0, 1.25],
 	# Over the Mall, down Central Park to the Billionaires' Row skyline.
 	"central_park": [40.7745, -73.9705, 70.0, 205.0, -4.0, 1.3],
-	# Over the port's north shore, onto the Casino's domes and gardens.
-	"monaco": [43.7370, 7.4262, 60.0, 33.0, -2.0, 2.8],
+	# From the gardens on the Casino's entrance axis, up to its towers and cupola.
+	"monaco": [43.739826, 7.426711, 20.0, 127.0, 2.0, 2.0],
 	# The opening look, closer on the Eiffel Tower.
 	"paris": [48.8622, 2.2887, 6.0, 142.0, 6.0, 1.5],
 	# The opening look, up past the mall roofs to Burj Khalifa.
