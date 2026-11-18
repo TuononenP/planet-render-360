@@ -432,7 +432,7 @@ static func landmarks() -> Array:
 static func _regional_extras() -> Array:
 	return [
 		{"type": "riddarholmen", "name": "Riddarholmen Church", "lat": 59.32468, "lon": 18.06454, "radius_m": 3000.0,
-			"wiki_title": "Riddarholmen Church", "height_m": 90.0, "clear_m": 50.0, "yaw_deg": -7.8, "kind": "Church",
+			"wiki_title": "Riddarholmen Church", "height_m": 90.0, "clear_m": 50.0, "yaw_deg": -13.2, "kind": "Church",
 			"aliases": ["riddarholmen church", "riddarholmskyrkan"]},
 	]
 
