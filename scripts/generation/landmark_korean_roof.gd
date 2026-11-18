@@ -13,7 +13,7 @@ extends RefCounted
 ## The kit's surface keys: Granite, Timber, Dancheong, Tiles, Shadow and
 ## Plaster.
 static func materials(lm: LandmarkMesh) -> void:
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#B4ADA2", 3.0))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#C9C3B7", 3.0))
 	lm.use("Timber", LandmarkMaterials.paint("#8E2B20", 0.7, 0.0))
 	lm.use("Dancheong", LandmarkMaterials.paint("#3F7A66", 0.65, 0.0))
 	lm.use("Tiles", LandmarkMaterials.pbr("slate", "#4A4E52", 1.5))

@@ -753,6 +753,13 @@ Bern's +0.3 m comes from UrbanSmooth (it does not move with the network
 grade's radius or cap); Bern itself runs on swisstopo, so the coarse path
 never applies there.
 
+**Road references (2026-11-19).** `RoadReferences` gives single mapped
+ways a width OSM leaves untagged, with its source, method and
+uncertainty, and never overrides a tagged width. Gwanghwamun's crossing
+(way 1209111146) spans the restored Woldae's 30 m front (± 5 m; the
+city's plan gives the terrace as 50 × 30 m, Economist Korea 2022-07-17;
+Esri's imagery predates the 2023 rebuild, so it could not be measured).
+
 ## Capital railway stations (2026-11-15)
 
 Every capital with a passenger railway has its main station as a registry

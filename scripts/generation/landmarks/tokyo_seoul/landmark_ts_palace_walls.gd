@@ -22,7 +22,7 @@ const EAST := [Vector2(8.1, 3.2), Vector2(18.0, 3.1), Vector2(91.3, 1.3), Vector
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#B4ADA2", 3.0))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#C9C3B7", 3.0))
 	lm.use("Plaster", LandmarkMaterials.pbr("render", "#D9CDB8", 3.0))
 	lm.use("Tiles", LandmarkMaterials.pbr("slate", "#4A4E52", 1.5))
 	lm.use("Footing", LandmarkMaterials.pbr("stone", "#8C877E", 3.0))
