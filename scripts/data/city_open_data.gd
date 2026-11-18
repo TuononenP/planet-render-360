@@ -19,6 +19,11 @@ var offline := false
 
 var _layers := {}  # name -> {http, path, rows, task, done}
 var _land_task := -1
+## Decoded answers by cache path, newest last (main thread only): the
+## live build reuses what the fetch-ahead's warm run of the same lattice
+## centre decoded. Rows are read-only to every merge.
+static var _decoded := {}
+const DECODED_KEEP := 8
 ## Test hook: when set, a merge waits on it before it starts.
 var _merge_gate: Semaphore = null
 const LAYER_NAMES := ["register", "trees", "carriageway", "walkways"]
@@ -65,6 +70,10 @@ func fetch(lat: float, lon: float) -> void:
 		if not covered:
 			continue
 		layer["path"] = cache_path(name, lat, lon)
+		if _decoded.has(layer["path"]) and FileAccess.file_exists(layer["path"]):
+			layer["rows"] = _decoded[layer["path"]]
+			layer["done"] = true
+			continue
 		if FileAccess.file_exists(layer["path"]):
 			CacheStore.note_read(layer["path"])
 			_decode(name, FileAccess.get_file_as_bytes(layer["path"]), false)
@@ -124,6 +133,8 @@ func _process(_delta: float) -> void:
 			_join(layer)
 			var out: Dictionary = layer.get("out", {})
 			layer["rows"] = out.get("rows", [])
+			if out.get("valid", false):
+				_remember(str(layer["path"]), layer["rows"])
 			if layer.get("fresh", false) and out.get("valid", false):
 				var f := FileAccess.open(str(layer["path"]), FileAccess.WRITE)
 				if f != null:
@@ -132,6 +143,12 @@ func _process(_delta: float) -> void:
 					CacheStore.note_written(str(layer["path"]))
 			layer["bytes"] = PackedByteArray()
 			layer["done"] = true
+
+static func _remember(path: String, rows: Array) -> void:
+	_decoded.erase(path)
+	_decoded[path] = rows
+	while _decoded.size() > DECODED_KEEP:
+		_decoded.erase(_decoded.keys()[0])
 
 func _join(layer: Dictionary) -> void:
 	if int(layer["task"]) >= 0:
@@ -148,11 +165,16 @@ func is_done() -> bool:
 ## register into data.buildings (every preset), the tree register into
 ## data.trees (register-only trees on High / Ultra). Returns the credits
 ## of the layers that landed.
-func land(data: LocationData, budget_s: float = LAND_WAIT_S) -> Array[String]:
+## `merge_layers` false (a fetch-ahead warm run): only the wait, so the
+## answers land in the cache; nothing is merged.
+func land(data: LocationData, budget_s: float = LAND_WAIT_S, merge_layers: bool = true) -> Array[String]:
 	var waited := 0.0
 	while not is_done() and waited < budget_s and is_inside_tree():
 		await get_tree().process_frame
 		waited += get_process_delta_time()
+	if not merge_layers:
+		var none: Array[String] = []
+		return none
 	var reg: Array = _layers["register"]["rows"] if _layers["register"]["done"] else []
 	var trees: Array = _layers["trees"]["rows"] if _layers["trees"]["done"] else []
 	var car: Array = _layers["carriageway"]["rows"] if _layers["carriageway"]["done"] else []

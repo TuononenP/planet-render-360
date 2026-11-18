@@ -147,6 +147,9 @@ var _hsy_cover_image: Image = null
 ## The optional rasters overlap other fetches and never extend Imagery
 ## beyond this many seconds from the start of a place.
 const LANDCOVER_WAIT_S := 45.0
+## A streamed build's land-cover wait, from the run's start: whatever
+## layers landed by then are used, the rest go without (WorldCover, OSM).
+const STREAM_LANDCOVER_WAIT_S := 15.0
 var _sat_texture: Texture2D
 var _sat_image: Image
 var _sat_origin := Vector2.ZERO
@@ -749,12 +752,15 @@ func _await_satellite(data: LocationData) -> void:
 		_inner.land(data)
 		var ortho := OrthoSource.credit(str(data.satellite_inner_source.get("src", "")))
 		_credits[1] = IMAGERY_CREDIT + (" · " + ortho if ortho != "" else "")
+	var cover_wait := STREAM_LANDCOVER_WAIT_S if background and not warm_only else LANDCOVER_WAIT_S
 	while not _landcover_done and not _cancelled \
-			and Time.get_ticks_msec() - _fetch_started_msec < int(LANDCOVER_WAIT_S * 1000.0):
+			and Time.get_ticks_msec() - _fetch_started_msec < int(cover_wait * 1000.0):
 		await get_tree().process_frame
 	if not _landcover_done:
+		print("Land cover over its wait (%d s): the layers in hand only" % int(cover_wait))
 		_landcover.cancel()
 		_landcover_done = true
+	_mark("landcover")
 	data.landcover_image = _landcover_image
 	data.canopy_image = _canopy_image
 	data.hsy_cover_image = _hsy_cover_image
@@ -835,7 +841,7 @@ func _await_osm(data: LocationData) -> void:
 	# build reads them.
 	if used_osm:
 		_city_credits = await _city.land(data,
-			CityOpenData.STREAM_LAND_WAIT_S if background else CityOpenData.LAND_WAIT_S)
+			CityOpenData.STREAM_LAND_WAIT_S if background else CityOpenData.LAND_WAIT_S, not warm_only)
 		if _cancelled:
 			return
 	_mark("registers")

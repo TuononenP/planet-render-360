@@ -24,10 +24,10 @@ var _abort: BuildAbort = null
 var _started_ms := 0
 ## The capital region's canopy (HsyCanopy) instead of Meta's alone.
 var _hsy := false
-var _hsy_http: HTTPRequest
-## HSY's surface classes (HsyCover) on their own connection: they load
-## beside the canopy bands.
-var _cover_http: HTTPRequest
+## HSY band requests in flight (HsyCanopy, HsyCover), BAND_PARALLEL per
+## layer: the canopy and surface classes load beside each other.
+var _band_http: Array[HTTPRequest] = []
+const BAND_PARALLEL := 4
 ## Where the last canopy came from: "meta", "hsy", "hsy+meta" or "".
 var canopy_source := ""
 
@@ -36,12 +36,6 @@ func _ready() -> void:
 	_canopy_fetcher = CogFetcher.new()
 	add_child(_cover_fetcher)
 	add_child(_canopy_fetcher)
-	_hsy_http = HTTPRequest.new()
-	_hsy_http.timeout = 20.0
-	add_child(_hsy_http)
-	_cover_http = HTTPRequest.new()
-	_cover_http.timeout = 20.0
-	add_child(_cover_http)
 
 func cancel() -> void:
 	_generation += 1
@@ -51,10 +45,11 @@ func cancel() -> void:
 		_cover_fetcher.cancel()
 	if is_instance_valid(_canopy_fetcher):
 		_canopy_fetcher.cancel()
-	if is_instance_valid(_hsy_http):
-		_hsy_http.cancel_request()
-	if is_instance_valid(_cover_http):
-		_cover_http.cancel_request()
+	for http in _band_http:
+		if is_instance_valid(http):
+			http.cancel_request()
+			http.queue_free()
+	_band_http.clear()
 	for task in _workers:
 		WorkerThreadPool.wait_for_task_completion(task)
 	_workers.clear()
@@ -188,8 +183,8 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 	var urls: Array = []
 	for i in HsyCanopy.LAYERS.size():
 		urls.append(HsyCanopy.band_url(i, lat, lon, CANOPY_SIZE))
-	var bands: Variant = await _fetch_bands(_hsy_http, urls, gen)
-	if not (bands is Array):
+	var bodies: Variant = await _fetch_bands(urls, gen)
+	if not (bodies is Array):
 		if gen == _generation:
 			print("HSY canopy bands unavailable; Meta canopy instead")
 		return null
@@ -198,7 +193,8 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 		return null
 	var box := {}
 	var task := WorkerThreadPool.add_task(func() -> void:
-		box["image"] = HsyCanopy.compose(bands, chm, CANOPY_SIZE))
+		var bands: Variant = decode_bands(bodies)
+		box["image"] = HsyCanopy.compose(bands, chm, CANOPY_SIZE) if bands is Array else null)
 	_workers.append(task)
 	while _workers.has(task) and not WorkerThreadPool.is_task_completed(task):
 		await get_tree().process_frame
@@ -215,28 +211,48 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 	canopy_source = "hsy+meta" if chm != null else "hsy"
 	return image
 
-## The PNG band images at `urls`, one after another on `http`; null when
-## any is unavailable or the fetch was superseded.
-func _fetch_bands(http: HTTPRequest, urls: Array, gen: int) -> Variant:
+## The PNG bodies of `urls`, BAND_PARALLEL at a time, in order; null
+## when any is unavailable or the fetch was superseded.
+func _fetch_bands(urls: Array, gen: int) -> Variant:
+	var bodies: Array = []
+	bodies.resize(urls.size())
+	var state := {"pending": 0, "failed": false}
+	var next := 0
+	while (next < urls.size() or int(state["pending"]) > 0) and gen == _generation \
+			and not state["failed"]:
+		while next < urls.size() and int(state["pending"]) < BAND_PARALLEL:
+			var http := HTTPRequest.new()
+			http.timeout = 20.0
+			add_child(http)
+			_band_http.append(http)
+			var index := next
+			http.request_completed.connect(func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+				state["pending"] = int(state["pending"]) - 1
+				if result == HTTPRequest.RESULT_SUCCESS and code == 200 and not body.is_empty():
+					bodies[index] = body
+				else:
+					state["failed"] = true
+				_band_http.erase(http)
+				http.queue_free(), CONNECT_ONE_SHOT)
+			next += 1
+			if http.request(str(urls[index]), ["User-Agent: " + Brand.USER_AGENT]) != OK:
+				state["failed"] = true
+				_band_http.erase(http)
+				http.queue_free()
+				break
+			state["pending"] = int(state["pending"]) + 1
+		await get_tree().process_frame
+	if gen != _generation or state["failed"]:
+		return null
+	return bodies
+
+## The band images of PNG `bodies` (any thread); null when one is not a PNG.
+static func decode_bands(bodies: Array) -> Variant:
 	var bands: Array = []
-	for url in urls:
-		var state := {"done": false, "body": PackedByteArray()}
-		var cb := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
-			state["done"] = true
-			if result == HTTPRequest.RESULT_SUCCESS and code == 200:
-				state["body"] = body
-		http.request_completed.connect(cb, CONNECT_ONE_SHOT)
-		if http.request(str(url), ["User-Agent: " + Brand.USER_AGENT]) != OK:
-			http.request_completed.disconnect(cb)
-			return null
-		while not state["done"] and gen == _generation:
-			await get_tree().process_frame
-		if gen != _generation:
-			if http.request_completed.is_connected(cb):
-				http.request_completed.disconnect(cb)
-			return null
+	for body: Variant in bodies:
 		var img := Image.new()
-		if (state["body"] as PackedByteArray).is_empty() or img.load_png_from_buffer(state["body"]) != OK:
+		if not (body is PackedByteArray) or (body as PackedByteArray).is_empty() \
+				or img.load_png_from_buffer(body) != OK:
 			return null
 		bands.append(img)
 	return bands
@@ -261,15 +277,17 @@ func _fetch_hsy_cover(lat: float, lon: float, gen: int) -> void:
 	var urls: Array = []
 	for i in HsyCover.LAYERS.size():
 		urls.append(HsyCover.band_url(i, lat, lon, size))
-	var bands: Variant = await _fetch_bands(_cover_http, urls, gen)
+	var bodies: Variant = await _fetch_bands(urls, gen)
 	if gen != _generation:
 		return
-	if not (bands is Array):
+	if not (bodies is Array):
 		print("HSY land cover unavailable; map and WorldCover classes only")
 		_done("hsy_cover", null, gen)
 		return
 	var box := {}
-	var task := WorkerThreadPool.add_task(func() -> void: box["image"] = HsyCover.compose(bands, size))
+	var task := WorkerThreadPool.add_task(func() -> void:
+		var bands: Variant = decode_bands(bodies)
+		box["image"] = HsyCover.compose(bands, size) if bands is Array else null)
 	_workers.append(task)
 	while _workers.has(task) and not WorkerThreadPool.is_task_completed(task):
 		await get_tree().process_frame
