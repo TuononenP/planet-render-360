@@ -11,17 +11,18 @@ static func build() -> LandmarkMesh:
 	VesselMaterials.register(lm, true, VesselMaterials.get_mat("orange"))
 	lm.use("Hull", ShipPaint.hull(orange, length, 3.4))
 	lm.use("Orange", ShipPaint.enamel(orange))
-	lm.use("White", ShipPaint.enamel(Color("#ebe9e2")))
+	lm.use("White", ShipPaint.enamel(Color("#dedbd2")))
+	lm.use("DeckSteel", VesselMaterials.get_mat("grey_deck"))
 	var spec := {"length": length, "beam": beam, "freeboard": 3.4, "draft": 1.8,
 		"entry": 0.27, "bow_pow": 1.65, "flare": 0.09, "bow_rise": 0.12,
 		"stern_rise": 0.12, "double_ended": true, "end_width": 0.4, "lod": 0, "ultra": true}
-	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "White"})
+	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "DeckSteel"})
 	for level in 3:
 		var y := 3.7 + float(level) * 3.0
 		var deck_len := length - 15.0 - float(level) * 6.0
 		var width := beam - 3.0 - float(level) * 0.7
-		VesselForms.cabin(lm, 0, deck_len - 3.0, width - 2.0, y, 2.7, 2.8, "Orange", 0.0)
-		VesselForms.slab(lm, "White", Vector3(0, y + 2.73, 0), Vector3(deck_len + 0.4, 0.16, width + 0.4), 2.0)
+		VesselForms.cabin(lm, 0, deck_len - 3.0, width - 2.0, y, 2.7, 2.8, "Orange", 0.0, "Glass", "DeckSteel")
+		VesselForms.slab(lm, "DeckSteel", Vector3(0, y + 2.73, 0), Vector3(deck_len + 0.4, 0.16, width + 0.4), 2.0)
 		# Outer promenade posts carry the roof and handrail around each deck.
 		for side in [-1.0, 1.0]:
 			var z: float = float(side) * width * 0.48
@@ -32,8 +33,8 @@ static func build() -> LandmarkMesh:
 	for end in [-1.0, 1.0]:
 		# Both boarding ends and pilothouses have the same dimensions.
 		var x: float = float(end) * 25.0
-		VesselForms.cabin(lm, x, 10.0, 9.0, 12.45, 2.4, 1.35, "White", 0.0)
-		VesselForms.slab(lm, "White", Vector3(x, 14.9, 0), Vector3(10.3, 0.1, 9.3), 1.0)
+		VesselForms.cabin(lm, x, 10.0, 9.0, 12.45, 2.4, 1.35, "White", 0.0, "Glass", "DeckSteel")
+		VesselForms.slab(lm, "DeckSteel", Vector3(x, 14.9, 0), Vector3(10.3, 0.1, 9.3), 1.0)
 		var bx: float = float(end) * length * 0.435
 		VesselForms.slab(lm, "Dark", Vector3(bx, 3.52, 0), Vector3(5.0, 0.12, beam * 0.39), 0.4)
 		for side in [-1.0, 1.0]:

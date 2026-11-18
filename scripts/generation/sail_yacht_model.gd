@@ -38,8 +38,8 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	var cx1 := length * 0.17
 	var cw := beam * 0.58
 	if detail:
-		VesselForms.cabin(lm, (cx0 + cx1) * 0.5, cx1 - cx0, cw, deck_y, roof_h, length * 0.08, "White", 0.7)
-		VesselForms.slab(lm, "White", Vector3((cx0 + cx1) * 0.5 - roof_h * 0.15, deck_y + roof_h + 0.025, 0),
+		VesselForms.cabin(lm, (cx0 + cx1) * 0.5, cx1 - cx0, cw, deck_y, roof_h, length * 0.08, "White", 0.7, "Glass", "Roof")
+		VesselForms.slab(lm, "Roof", Vector3((cx0 + cx1) * 0.5 - roof_h * 0.15, deck_y + roof_h + 0.025, 0),
 			Vector3(cx1 - cx0, 0.05, cw * 0.98), cw * 0.18)
 	else:
 		lm.box("White", Vector3((cx0 + cx1) * 0.5, deck_y + roof_h * 0.5, 0), Vector3(cx1 - cx0, roof_h, cw), Basis(), 0.03)

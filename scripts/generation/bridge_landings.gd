@@ -160,19 +160,36 @@ static func landed(piece: PackedVector2Array, whole: PackedVector2Array,
 	if piece.size() < 2 or whole.size() < 2:
 		return piece
 	var out := piece.duplicate()
-	if piece[0] == whole[0] and not surf.bridge_joint(piece[0], (piece[0] - piece[1]).normalized()) \
-			and surf.ground.water_at(piece[0].x, piece[0].y) > 0.0:
-		var head := _tail(piece[0], (piece[0] - piece[1]).normalized(), surf, m2u)
+	var head_dir := (piece[0] - piece[1]).normalized()
+	if piece[0] == whole[0] and not surf.bridge_joint(piece[0], head_dir) \
+			and surf.ground.water_at(piece[0].x, piece[0].y) > 0.0 \
+			and not _berth_end(piece[0], head_dir, surf, m2u):
+		var head := _tail(piece[0], head_dir, surf, m2u)
 		head.reverse()
 		head.append_array(out)
 		out = head
+	var tail_dir := (out[out.size() - 1] - out[out.size() - 2]).normalized()
 	if piece[piece.size() - 1] == whole[whole.size() - 1] \
 			and not surf.bridge_joint(piece[piece.size() - 1],
 				(piece[piece.size() - 1] - piece[piece.size() - 2]).normalized()) \
-			and surf.ground.water_at(out[out.size() - 1].x, out[out.size() - 1].y) > 0.0:
-		out.append_array(_tail(out[out.size() - 1],
-			(out[out.size() - 1] - out[out.size() - 2]).normalized(), surf, m2u))
+			and surf.ground.water_at(out[out.size() - 1].x, out[out.size() - 1].y) > 0.0 \
+			and not _berth_end(out[out.size() - 1], tail_dir, surf, m2u):
+		out.append_array(_tail(out[out.size() - 1], tail_dir, surf, m2u))
 	return out
+
+## True when a wet bridge end with no connected approach way already ends
+## on a moored vessel or pier (a boarding gangplank, not a river crossing).
+static func _berth_end(p: Vector2, dir: Vector2, surf: RoadBuilder._Surface, m2u: float) -> bool:
+	if approach_from(surf, p, dir).size() >= 2:
+		return false
+	if ShipBuilder.near_vessel(surf._vessel_rings, p, 3.0 * m2u):
+		return true
+	for raw in surf._pier_lines:
+		var line: PackedVector2Array = raw
+		for i in range(1, line.size()):
+			if Geometry2D.get_closest_point_to_segment(p, line[i - 1], line[i]).distance_to(p) <= 1.5 * m2u:
+				return true
+	return false
 
 ## Points past `from_p` in the `dir` direction up to the first dry
 ## point and one step beyond it, never further than LANDING_MAX_M.

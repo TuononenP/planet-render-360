@@ -46,7 +46,8 @@ static func _cap(lm: LandmarkMesh, key: String, ring: PackedVector3Array, top: b
 ## A rounded deckhouse with a raked front. Glazing is part of the skin,
 ## so there is no opaque box behind the windscreen or floating glass.
 static func cabin(lm: LandmarkMesh, cx: float, length: float, width: float, y: float, height: float,
-		pitch: float = 0.0, wall: String = "White", rake: float = 0.25, glass: String = "Glass") -> void:
+		pitch: float = 0.0, wall: String = "White", rake: float = 0.25, glass: String = "Glass",
+		roof: String = "") -> void:
 	var rows: Array = []
 	var radius := minf(width * 0.14, height * 0.45)
 	for f in [0.0, 0.28, 0.8, 1.0]:
@@ -71,7 +72,7 @@ static func cabin(lm: LandmarkMesh, cx: float, length: float, width: float, y: f
 				var a := base[i].lerp(base[i + 1], t)
 				var b := top[i].lerp(top[i + 1], t)
 				lm.beam(wall, a, b, minf(0.065, height * 0.06))
-	_cap(lm, wall, rows[3].slice(0, rows[3].size() - 1), true)
+	_cap(lm, roof if roof != "" else wall, rows[3].slice(0, rows[3].size() - 1), true)
 
 static func cleat(lm: LandmarkMesh, at: Vector3, size: float) -> void:
 	lm.box("Steel", at + Vector3(0, size * 0.14, 0), Vector3(size * 0.45, size * 0.28, size * 0.24), Basis(), 0.0)

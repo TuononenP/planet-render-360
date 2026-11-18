@@ -79,6 +79,7 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary, m: 
 	if ground.shoreline == null or not ground.shoreline.ready:
 		return out
 	var eye := View360.spawn_xz(data)
+	var bridge_list := QuayMoorings.bridges(data, m)
 	var runs: Array = []
 	for points in QuayMoorings._quay_lines(data, m):
 		runs.append_array(QuayMoorings._straight_runs(points, m))
@@ -112,7 +113,10 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary, m: 
 					or QuayMoorings._near_eye(c, dir, length, beam, eye, m) \
 					or not _clear(out + placed, c, m) or QuayMoorings._mapped_ship_near(data, c, length, m):
 				continue
-			if not MarinaBuilder._claim(taken, c - dir * length * 0.5 * m, dir, length, beam, m):
+			var stern := c - dir * length * 0.5 * m
+			var bow := c + dir * length * 0.5 * m
+			if QuayMoorings.near_bridge(bridge_list, stern, bow, (beam * 0.5 + 6.0) * m) \
+					or not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
 				continue
 			var info := QuayMoorings.berth_info(ground, a, b, at, berth, beam, m)
 			# Bulk carriers and tankers often wait in ballast, high in the water.

@@ -49,7 +49,7 @@ static func _promenade(lm: LandmarkMesh, spec: Dictionary, d: Dictionary) -> voi
 	var x0: float = float(d["house_x"]) - float(d["tier_len"]) * 0.5 - length * 0.06
 	var hw := minf(HullLoft.half(spec, x0), HullLoft.half(spec, x1)) - 0.12
 	var top: float = fb + 0.02 + float(d["floor_h"]) + 0.05
-	VesselForms.slab(lm, "White", Vector3((x0 + x1) * 0.5, top - 0.06, 0), Vector3(x1 - x0, 0.12, hw * 2.0), minf(hw * 0.5, 1.6))
+	VesselForms.slab(lm, "DeckSteel", Vector3((x0 + x1) * 0.5, top - 0.06, 0), Vector3(x1 - x0, 0.12, hw * 2.0), minf(hw * 0.5, 1.6))
 	var n := maxi(int((x1 - x0) / 2.6), 2)
 	var b0: float = d["boat_x0"]
 	var b1: float = d["boat_x1"]
@@ -84,7 +84,7 @@ static func _wings(lm: LandmarkMesh, spec: Dictionary, d: Dictionary) -> void:
 		return
 	for s in [-1.0, 1.0]:
 		var cz := (inner + reach) * 0.5 * float(s)
-		lm.box("White", Vector3(x, y - 0.07, cz), Vector3(depth, 0.1, reach - inner), Basis(), 0.0)
+		lm.box("DeckSteel", Vector3(x, y - 0.07, cz), Vector3(depth, 0.1, reach - inner), Basis(), 0.0)
 		lm.box("White", Vector3(x + depth * 0.5 - 0.03, y + 0.5, cz), Vector3(0.06, 1.0, reach - inner), Basis(), 0.0)
 		lm.box("White", Vector3(x, y + 0.5, reach * float(s)), Vector3(depth, 1.0, 0.06), Basis(), 0.0)
 		HullLoft.tube(lm, "Dark", [Vector3(x + depth * 0.5 - 0.03, y + 1.03, inner * float(s)),

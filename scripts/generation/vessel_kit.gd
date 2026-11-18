@@ -20,18 +20,18 @@ static func windows(lm: LandmarkMesh, x0: float, x1: float, z: float, y0: float,
 				lm.box(post_key, Vector3(x, (y0 + y1) * 0.5, float(s) * (z + 0.02)),
 					Vector3(0.07, y1 - y0 + 0.02, 0.04), Basis(), 0.0)
 
-## A deckhouse: walls, an overhanging roof slab and (optionally) windows.
-## Returns the roof's top y.
+## A deckhouse: walls, an overhanging roof slab in `roof_key` and
+## (optionally) windows. Returns the roof's top y.
 static func house(lm: LandmarkMesh, centre_x: float, len: float, wid: float, y: float,
 		h: float, win: bool, pitch: float, over: float = 0.12, wall_key: String = "White",
-		glass_key: String = "Glass") -> float:
+		glass_key: String = "Glass", roof_key: String = "White") -> float:
 	if pitch > 0.0:
 		VesselForms.cabin(lm, centre_x, len, wid, y, h, pitch, wall_key, 0.12, glass_key)
-		VesselForms.slab(lm, "White", Vector3(centre_x - h * 0.03, y + h + 0.04, 0),
+		VesselForms.slab(lm, roof_key, Vector3(centre_x - h * 0.03, y + h + 0.04, 0),
 			Vector3(len + over * 2.0, 0.08, wid + over * 2.0), minf(wid * 0.12, h * 0.45))
 		return y + h + 0.08
 	lm.box(wall_key, Vector3(centre_x, y + h * 0.5, 0), Vector3(len, h, wid), Basis(), 0.03)
-	lm.box("White", Vector3(centre_x, y + h + 0.04, 0), Vector3(len + over * 2.0, 0.08, wid + over * 2.0), Basis(), 0.0)
+	lm.box(roof_key, Vector3(centre_x, y + h + 0.04, 0), Vector3(len + over * 2.0, 0.08, wid + over * 2.0), Basis(), 0.0)
 	if win:
 		windows(lm, centre_x - len * 0.5 + 0.35, centre_x + len * 0.5 - 0.35, wid * 0.5,
 			y + h * 0.3, y + h * 0.82, pitch, glass_key)

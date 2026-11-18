@@ -93,16 +93,16 @@ static func mesh(kind: String) -> ArrayMesh:
 		if base == "steam" and part.name == "Glass":
 			material = ShipLights.cabin_glass(0)  # one lit glass surface
 		if not detail:
-			# Distant fittings share a compact palette. Painted topsides keep
-			# their own material so instance colour never tints glass or decks.
-			if part.name in ["White", "Deck", "DeckSteel", "Sail", "Canvas", "Roof"]:
+			# Distant fittings share a compact palette. Decks and cabin roofs stay
+			# matte non-slip grey so distant fleets never glare white from above.
+			if part.name in ["Deck", "DeckSteel", "Roof"]:
+				material = VesselMaterials.get_mat("grey_deck")
+			elif part.name in ["White", "Sail", "Canvas"]:
 				material = VesselMaterials.get_mat("white")
 			elif part.name not in ["Hull", "Glass"] and not str(part.name).begins_with("Cabin"):
 				material = ShipLights.cabin_glass(0) if base == "steam" else VesselMaterials.get_mat("glass")
 		elif part.name in ["Bottom", "Black"]:
 			material = VesselMaterials.get_mat("dark")
-		elif base in ["day", "rib"] and part.name == "Deck":
-			material = VesselMaterials.get_mat("white")
 		if grouped.has(material):
 			var target: Array = grouped[material]
 			for slot in [Mesh.ARRAY_VERTEX, Mesh.ARRAY_NORMAL, Mesh.ARRAY_TANGENT, Mesh.ARRAY_TEX_UV]:

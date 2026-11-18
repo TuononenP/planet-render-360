@@ -25,7 +25,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 		"keel_lift": 0.7, "lod": 0 if detail else 1}
 	spec["ultra"] = bool(p.get("ultra", false))
 	VesselMaterials.register(lm, p.get("maps", true), p["hull"], VesselMaterials.get_mat("antifoul", p.get("maps", true)))
-	var keys := {"hull": "Hull", "boot": "Dark" if not small else "Hull", "bottom": "Bottom", "deck": "White" if small else "Deck"}
+	var keys := {"hull": "Hull", "boot": "Dark" if not small else "Hull", "bottom": "Bottom", "deck": "Roof" if small else "Deck"}
 	if detail:
 		spec["cockpit"] = Rect2(-length * 0.39, 0, length * (0.65 if small else 0.1), float(spec["beam"]) * (0.31 if small else 0.3))
 		spec["cockpit_y"] = float(spec["freeboard"]) * (0.35 if small else 0.55)
@@ -68,7 +68,7 @@ static func _cruiser(lm: LandmarkMesh, spec: Dictionary, variant: String, detail
 		Vector3(sal_x1 + length * 0.05, deck_y + sal_h * 0.35, sal_w * 0.47),
 		Vector3(sal_x1 - 0.02, wy - 0.02, sal_w * 0.5), Vector3(sal_x1 - 0.02, wy - 0.02, -sal_w * 0.5),
 		Vector3(0.6, 0.8, 0).normalized())
-	lm.box("White", Vector3(sal_x0 + length * 0.18, wy + 0.04, 0),
+	lm.box("Roof", Vector3(sal_x0 + length * 0.18, wy + 0.04, 0),
 		Vector3(sal_x1 - sal_x0 + length * 0.1, 0.08, sal_w + 0.2), Basis(), 0.0)
 	var top := wy + 0.08
 	if variant == "flybridge":
@@ -80,7 +80,7 @@ static func _cruiser(lm: LandmarkMesh, spec: Dictionary, variant: String, detail
 			Vector3(fx1 + length * 0.025, top + fly_h * 0.15, sal_w * 0.28),
 			Vector3(fx1 + 0.02, top + fly_h, sal_w * 0.3), Vector3(fx1 + 0.02, top + fly_h, -sal_w * 0.3),
 			Vector3(0.6, 0.8, 0).normalized())
-		lm.box("White", Vector3((fx0 + fx1) * 0.5 + 0.2, top + fly_h + 0.04, 0),
+		lm.box("Roof", Vector3((fx0 + fx1) * 0.5 + 0.2, top + fly_h + 0.04, 0),
 			Vector3(fx1 - fx0 + length * 0.07, 0.08, sal_w * 0.7), Basis(), 0.0)
 		top += fly_h + 0.08
 	# Radar arch aft of the helm.
@@ -129,7 +129,7 @@ static func _open_boat(lm: LandmarkMesh, spec: Dictionary, variant: String, deta
 			path.append(Vector3(x, fb + 0.02, HullLoft.half(spec, x) - beam * 0.055))
 		HullLoft.tube(lm, "Dark", path, beam * 0.1, 8 if detail else 5)
 	else:
-		lm.box("White", Vector3(length * 0.2, deck_y + 0.15, 0), Vector3(length * 0.2, 0.1, hull_hw * 1.2), Basis(), 0.0)
+		lm.box("Roof", Vector3(length * 0.2, deck_y + 0.15, 0), Vector3(length * 0.2, 0.1, hull_hw * 1.2), Basis(), 0.0)
 	# Centre console with windscreen / T-top, bench seat aft.
 	var cx := -length * 0.02
 	lm.box("White", Vector3(cx, deck_y + length * 0.07, 0), Vector3(length * 0.14, length * 0.14, beam * 0.3), Basis(), 0.02)
@@ -142,7 +142,7 @@ static func _open_boat(lm: LandmarkMesh, spec: Dictionary, variant: String, deta
 		for s in [-1.0, 1.0]:
 			lm.beam("Steel", Vector3(cx - length * 0.05, deck_y + length * 0.14, float(s) * beam * 0.15),
 				Vector3(cx - length * 0.05, deck_y + length * 0.3, float(s) * beam * 0.15), 0.04)
-		lm.box("White", Vector3(cx - length * 0.05, deck_y + length * 0.31, 0), Vector3(length * 0.2, 0.05, beam * 0.45), Basis(), 0.0)
+		lm.box("Roof", Vector3(cx - length * 0.05, deck_y + length * 0.31, 0), Vector3(length * 0.2, 0.05, beam * 0.45), Basis(), 0.0)
 	VesselKit.outboard(lm, Vector3(HullLoft.x0(spec) - 0.02, fb * 0.9, 0), length * 0.18)
 	if detail:
 		VesselKit.guard(lm, spec, length * 0.12, length * 0.42, length * 0.05, 0.4)

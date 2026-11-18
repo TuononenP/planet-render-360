@@ -29,7 +29,7 @@ const RADIUS_M := 800.0
 const MAX_BOATS := 700
 ## Near + far surfaces of every boat batch + pontoon. One batch per kind
 ## (VesselPrototypes.KINDS) always fits; finer cells only while they do.
-const MAX_DRAW_CALLS := 80
+const MAX_DRAW_CALLS := 96
 ## Boats farther than this from the camera use the reduced "_far" meshes (m).
 const NEAR_M := 250.0
 ## Side of the square cells boats are batched in for the near/far switch
@@ -84,7 +84,13 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		if _length(pts) < MIN_PIER_M * m2u:
 			continue
 		decks.append(_deck(pts, ground, m2u, taken))
-	# Reserve large berths before filling the harbour with small craft.
+	# Reserve mapped vessels and large berths before filling the harbour with small craft.
+	for b in data.buildings:
+		if b is Dictionary and ShipBuilder.accepts(b):
+			var vf := ShipBuilder.frame(b)
+			_claim(taken, (vf["centre"] as Vector2) - (vf["axis"] as Vector2) * float(vf["length"]) * 0.5,
+				vf["axis"], float(vf["length"]) / m2u + 4.0, float(vf["beam"]) / m2u + 3.0, m2u)
+	var bridge_list := QuayMoorings.bridges(data, m2u)
 	QuayMoorings.begin_plan(data, m2u)
 	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
 	liners.append_array(CargoBerths.plan(data, ground, taken, m2u, mask, liners))
@@ -121,6 +127,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				var stern: Vector2 = pos + nrm * side * (DECK_W_M * 0.5 + 0.5) * m2u
 				var out := nrm * side
 				var bow := stern + out * len_m * m2u
+				if QuayMoorings.near_bridge(bridge_list, stern, bow, (beam_m * 0.5 + 2.5) * m2u):
+					continue
 				if not _wet(ground, stern, m2u, y_ref, mask, true) or not _wet(ground, bow, m2u, y_ref, mask) \
 						or not _wet(ground, stern + out * len_m * 0.5 * m2u, m2u, y_ref, mask):
 					continue

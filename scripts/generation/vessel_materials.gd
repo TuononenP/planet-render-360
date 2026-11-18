@@ -9,7 +9,7 @@ static var _cache := {}
 static var _mutex := Mutex.new()
 
 const PAINTS := {
-	"white": ["#e9e7df", 0.27, 0.0], "cream": ["#d8d2bd", 0.5, 0.04],
+	"white": ["#dedbd2", 0.42, 0.0], "cream": ["#d8d2bd", 0.5, 0.04],
 	"steel": ["#c3c8ca", 0.28, 0.85], "dark": ["#26292c", 0.5, 0.1],
 	"black": ["#15171a", 0.55, 0.1], "orange": ["#e0651c", 0.5, 0.05],
 	"grey_deck": ["#7e8885", 0.7, 0.05], "pool": ["#2f8fb0", 0.12, 0.0],
@@ -55,10 +55,10 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 			m = StandardMaterial3D.new()
 			m.albedo_color = Color.WHITE
 			m.vertex_color_use_as_albedo = true
-			m.roughness = 0.28
+			m.roughness = 0.42
 			m.metallic = 0.05
 			m.clearcoat_enabled = true
-			m.clearcoat = 0.6
+			m.clearcoat = 0.3
 		_:
 			var spec: Array = PAINTS.get(name, PAINTS["white"])
 			m = paint(str(spec[0]), maps, float(spec[1]), float(spec[2]))
@@ -68,9 +68,11 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 				m.albedo_color = Color(str(spec[0]))
 				m.normal_enabled = false
 				m.normal_texture = null
+			# A light coat: a glossier one mirrors the whole sky off flat
+			# cabin tops, which then read as blank white slabs from above.
 			if name in ["white", "cream"]:
 				m.clearcoat_enabled = true
-				m.clearcoat = 0.6
+				m.clearcoat = 0.2
 			if name in ["white", "cream", "grey_deck"]:
 				RoofVariety.mark(m)
 	_mutex.lock()
@@ -123,6 +125,7 @@ static func register(lm: LandmarkMesh, maps: bool, hull: Material, bottom: Mater
 	lm.use("Boot", bottom if bottom != null else get_mat("antifoul", maps))
 	lm.use("Bottom", bottom if bottom != null else get_mat("antifoul", maps))
 	lm.use("Deck", get_mat("teak", maps))
+	lm.use("Roof", get_mat("grey_deck", maps))
 	lm.use("White", get_mat("white", maps))
 	lm.use("Glass", get_mat("glass", maps))
 	lm.use("Steel", get_mat("steel", maps))

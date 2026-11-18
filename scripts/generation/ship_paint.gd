@@ -133,7 +133,7 @@ static func _ribs() -> Dictionary:
 ## VesselMaterials.register) at weathered steel and matte enamel. The hull
 ## colour comes from the material the caller painted.
 static func dress(lm: LandmarkMesh, hull_mat: Material, length: float, freeboard: float, maps: bool,
-		boot: Color = Color("#a3281f"), white: Color = Color("#ebe9e2")) -> void:
+		boot: Color = Color("#a3281f"), white: Color = Color("#dedbd2")) -> void:
 	var colour := Color("#2d3b4a")
 	if hull_mat is StandardMaterial3D:
 		colour = (hull_mat as StandardMaterial3D).albedo_color

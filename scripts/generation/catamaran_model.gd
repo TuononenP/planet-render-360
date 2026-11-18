@@ -21,7 +21,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 		"lod": 0 if detail else 1, "ultra": ultra}
 	for side in [-1.0, 1.0]:
 		var z: float = float(side) * length * 0.19
-		var hull := HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "White"}, Vector3(0, 0, z))
+		var hull := HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "Deck"}, Vector3(0, 0, z))
 		if detail:
 			var paths: Array = hull["sheer"]
 			var outer: PackedVector3Array = paths[0 if side < 0.0 else 1]
@@ -43,8 +43,8 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 			Vector3(length * 0.61, length * 0.035, beam * 0.86), length * 0.035)
 		VesselForms.slab(lm, "Deck", Vector3(-length * 0.12, length * 0.125, 0),
 			Vector3(length * 0.59, length * 0.006, beam * 0.83), length * 0.03)
-		VesselForms.cabin(lm, -length * 0.02, length * 0.34, beam * 0.73, length * 0.12, length * 0.1, length * 0.08, "White", 0.42)
-		VesselForms.slab(lm, "White", Vector3(-length * 0.13, length * 0.226, 0),
+		VesselForms.cabin(lm, -length * 0.02, length * 0.34, beam * 0.73, length * 0.12, length * 0.1, length * 0.08, "White", 0.42, "Glass", "Roof")
+		VesselForms.slab(lm, "Roof", Vector3(-length * 0.13, length * 0.226, 0),
 			Vector3(length * 0.61, length * 0.012, beam * 0.82), length * 0.045)
 		for side in [-1.0, 1.0]:
 			var z: float = float(side) * beam * 0.32
@@ -54,7 +54,7 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 			VesselForms.hatch(lm, Vector3(length * 0.24, HullLoft.sheer(spec, length * 0.24) + 0.03, float(side) * length * 0.19), length * 0.06, length * 0.08)
 	else:
 		lm.box("White", Vector3(-length * 0.12, length * 0.105, 0), Vector3(length * 0.61, length * 0.035, beam * 0.86), Basis(), 0.0)
-		VesselKit.house(lm, -length * 0.02, length * 0.34, beam * 0.73, length * 0.12, length * 0.1, true, 0.0)
+		VesselKit.house(lm, -length * 0.02, length * 0.34, beam * 0.73, length * 0.12, length * 0.1, true, 0.0, 0.12, "White", "Glass", "Roof")
 	# Crossbeam and fine netting on the open foredeck.
 	lm.box("Canvas", Vector3(length * 0.31, length * 0.1, 0), Vector3(length * 0.23, 0.015, length * 0.25), Basis(), 0.0)
 	lm.beam("White", Vector3(length * 0.43, length * 0.1, -length * 0.19), Vector3(length * 0.43, length * 0.1, length * 0.19), length * 0.018)

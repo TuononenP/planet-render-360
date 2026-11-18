@@ -61,12 +61,12 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	var house_w := beam * 0.72
 	var y := deck_y + 0.02
 	for i in tiers:
-		_tier(lm, house_x, house_l, house_w, y, tier_h, "Glass" if i == tiers - 1 else ShipLights.cabin_key(i), detail)
+		_tier(lm, house_x, house_l, house_w, y, tier_h, "Glass" if i == tiers - 1 else ShipLights.cabin_key(i), detail, i == tiers - 1)
 		y += tier_h
 	y += 0.1
 	var bridge_y := y - tier_h - 0.1
 	if detail:
-		VesselForms.cabin(lm, house_x + house_l * 0.5 - 2.5, 4.0, beam * 1.02, bridge_y, tier_h, 0.0, "White", 0.0, "Glass")
+		VesselForms.cabin(lm, house_x + house_l * 0.5 - 2.5, 4.0, beam * 1.02, bridge_y, tier_h, 0.0, "White", 0.0, "Glass", "DeckSteel")
 	else:
 		lm.box("White", Vector3(house_x + house_l * 0.5 - 2.5, bridge_y + tier_h * 0.5, 0), Vector3(4.0, tier_h, beam * 1.02), Basis(), 0.0)
 	var top_y := y
@@ -118,10 +118,10 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 
 ## One flat-walled accommodation tier: steel walls, a window row on every
 ## face (cabin glass, or plain bridge glass on top) and a thin deck edge.
-static func _tier(lm: LandmarkMesh, cx: float, l: float, w: float, y: float, th: float, key: String, detail: bool) -> void:
+static func _tier(lm: LandmarkMesh, cx: float, l: float, w: float, y: float, th: float, key: String, detail: bool, top: bool = false) -> void:
 	lm.box("White", Vector3(cx, y + th * 0.5, 0), Vector3(l, th, w), Basis(), 0.0)
 	VesselKit.windows(lm, cx - l * 0.5 + 1.0, cx + l * 0.5 - 1.0, w * 0.5, y + th * 0.38, y + th * 0.78, 1.6 if detail else 0.0, key)
 	for end in [-1.0, 1.0]:
 		lm.box(key, Vector3(cx + float(end) * (l * 0.5 + 0.01), y + th * 0.58, 0), Vector3(0.02, th * 0.4, w * 0.8), Basis(), 0.0)
-	if detail:
-		lm.box("White", Vector3(cx, y + th - 0.05, 0), Vector3(l + 0.4, 0.1, w + 0.4), Basis(), 0.0)
+	if detail or top:
+		lm.box("DeckSteel" if top else "White", Vector3(cx, y + th + (0.01 if top else -0.05), 0), Vector3(l + 0.4, 0.1, w + 0.4), Basis(), 0.0)

@@ -681,6 +681,7 @@ class _Surface extends RefCounted:
 	var _bridge_lines: Array = []  ## Bridge polylines (beside-joints).
 	var road_bridges: RoadBridgeDecks.Index = null  ## Road bridge ways sharing structures.
 	var _pier_lines: Array = []  ## Pier polylines (landings).
+	var _vessel_rings: Array = []  ## Mapped vessel footprints (gangplanks).
 	var roof_sites: Array = []  ## Registry landmark roofs (LandmarkRoofs).
 	## The place and the roads' chain wear seeds (RoadSurface.wear_seeds), so
 	## a bridge deck is laid and painted like the road it carries.
@@ -714,6 +715,7 @@ class _Surface extends RefCounted:
 		for pier in data.piers:
 			if pier is Dictionary:
 				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
+		_vessel_rings = ShipBuilder.vessel_rings(data, 3.0 * WorldScale.metres_to_units())
 		road_bridges = RoadBridgeDecks.Index.new(data.roads)
 		road_bridges.structures = BridgeStructures.Plan.new(data.bridge_areas, road_bridges, data.railways)
 		roof_sites = LandmarkRoofs.collect(data)

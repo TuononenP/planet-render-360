@@ -78,7 +78,7 @@ static func build(lm: LandmarkMesh, p: Dictionary, spec: Dictionary, cfg: Dictio
 	var wing_x := fronts[bi] - 5.5
 	var wing_y := _base(bi, y0, d0, dh)
 	if detail:
-		VesselForms.cabin(lm, wing_x, 7.0, beam * 1.06, wing_y, dh, 0.0, "White", 0.0, "Glass")
+		VesselForms.cabin(lm, wing_x, 7.0, beam * 1.06, wing_y, dh, 0.0, "White", 0.0, "Glass", "DeckSteel")
 	else:
 		lm.box("White", Vector3(wing_x, wing_y + dh * 0.5, 0), Vector3(7.0, dh, beam * 1.06), Basis(), 0.0)
 		VesselKit.windows(lm, wing_x - 3.0, wing_x + 3.4, beam * 0.53, wing_y + dh * 0.3, wing_y + dh * 0.8, 0.0)
@@ -157,7 +157,7 @@ static func _deck(lm: LandmarkMesh, i: int, yb: float, dh: float, front: float, 
 		var cx := (front + aft) * 0.5
 		lm.box("White", Vector3(cx, yb + dh * 0.5, 0), Vector3(front - aft, dh, half * 2.0), Basis(), 0.0)
 		VesselKit.windows(lm, aft + 1.5, front - rf * 0.5, half, yb + dh * 0.3, yb + dh * 0.78, 0.0, glass)
-		lm.box("White", Vector3(cx, yb + dh - 0.05, 0), Vector3(front - aft + 0.3, 0.1, half * 2.0 + 0.3), Basis(), 0.0)
+		lm.box("DeckSteel", Vector3(cx, yb + dh + 0.01, 0), Vector3(front - aft + 0.3, 0.1, half * 2.0 + 0.3), Basis(), 0.0)
 		return
 	var inset := BALCONY_M if balcony else 0.0
 	var wall := plan(front - inset, aft, half - inset, maxf(rf - inset, 1.0), 1.0)
@@ -176,7 +176,7 @@ static func _deck(lm: LandmarkMesh, i: int, yb: float, dh: float, front: float, 
 	var centre := Vector3((front + aft) * 0.5, yb + dh * 0.5, 0)
 	for b in 3:
 		lm.grid(glass if b == 1 else "White", [rows[b], rows[b + 1]], centre, true)
-	_plate(lm, "White", plan(front + 0.15, aft - 0.15, half + 0.15, rf + 0.15, 1.15), yb + dh - 0.16, yb + dh)
+	_plate(lm, "White", plan(front + 0.15, aft - 0.15, half + 0.15, rf + 0.15, 1.15), yb + dh - 0.16, yb + dh, "DeckSteel")
 	if not balcony:
 		return
 	var x0 := aft + 2.0
@@ -194,13 +194,17 @@ static func _deck(lm: LandmarkMesh, i: int, yb: float, dh: float, front: float, 
 
 ## A plate with both faces (decks seen from above and their overhangs
 ## from below).
-static func _plate(lm: LandmarkMesh, key: String, poly: PackedVector2Array, y0: float, y1: float) -> void:
-	lm.poly_prism(key, poly, y0, y1)
+static func _plate(lm: LandmarkMesh, key: String, poly: PackedVector2Array, y0: float, y1: float,
+		top_key: String = "") -> void:
+	lm.poly_prism(key, poly, y0, y1, false)
+	var top := top_key if top_key != "" else key
 	var idx := Geometry2D.triangulate_polygon(poly)
 	for t in range(0, idx.size(), 3):
 		var a := poly[idx[t]]
 		var b := poly[idx[t + 1]]
 		var c := poly[idx[t + 2]]
+		lm.tri(top, Vector3(a.x, y1, a.y), Vector3(b.x, y1, b.y), Vector3(c.x, y1, c.y),
+			Vector3.UP, Vector3.UP, Vector3.UP, a, b, c)
 		lm.tri(key, Vector3(a.x, y0, a.y), Vector3(b.x, y0, b.y), Vector3(c.x, y0, c.y),
 			Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, a, b, c)
 

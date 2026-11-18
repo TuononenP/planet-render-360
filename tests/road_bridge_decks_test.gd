@@ -120,6 +120,17 @@ func _init() -> void:
 	var span := RoadBuilder._resample(PackedVector2Array([Vector2(-110, 0), Vector2(110, 0)]), 4.0)
 	if RoadBridgeDecks.mostly_land(span, river_surf):
 		failures.append("a 220 m bridge over 140 m of water is a water crossing")
+	# A short boarding gangplank onto a moored vessel stops at the hull instead
+	# of marching LANDING_MAX_M across the river to the opposite bank.
+	var plank_data := _data(100.0, false)
+	plank_data.buildings = [{"kind": "ship", "x": -35.0, "z": 0.0, "footprint": PackedVector2Array([
+		Vector2(-42, -20), Vector2(-28, -20), Vector2(-28, 20), Vector2(-42, 20)])}]
+	var plank := PackedVector2Array([Vector2(-52, 0), Vector2(-41, 0)])
+	plank_data.roads = [{"class": "footway", "width_m": 2.0, "bridge": true, "points": plank}]
+	var psurf := RoadBuilder._Surface.new(plank_data, GroundTruth.new(plank_data))
+	var landed_plank := BridgeLandings.landed(plank, plank, psurf, 1.0)
+	if landed_plank[landed_plank.size() - 1].x > -35.0:
+		failures.append("a ship gangplank must not extend across the river (end x=%.1f)" % landed_plank[landed_plank.size() - 1].x)
 	# Built through the road builder: the twins' shared edges lose their
 	# parapets; the lifted overpass over the ditch keeps its piers.
 	var twin_parapets := _deck_vertices(_data(6.0))

@@ -96,6 +96,11 @@ func _init() -> void:
 	shed_root.free()
 	var kept_roads := d.roads
 	d.roads = [{"class": "primary", "width_m": 12.0, "bridge": true, "points": PackedVector2Array([Vector2(-200, -60), Vector2(-200, 60)])}]
+	var bridged_boats: Array = MarinaBuilder.plan(d, g, 1.0)["boats"]
+	for b_entry in bridged_boats:
+		var bp: Vector3 = b_entry[0]
+		var half_len := float(b_entry[2]) * 5.0
+		_check(absf(bp.x - (-200.0)) > half_len + 8.0, "No boat may berth under a bridge (x=%.1f, half=%.1f)" % [bp.x, half_len])
 	var bridge_mask := VegetationMask.new(d, g)
 	d.roads = kept_roads
 	var bridge_root := Node3D.new()

@@ -51,7 +51,10 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 		var cx := house_x - tier * length * 0.02
 		var l := tier_len - tier * length * 0.13
 		var w := tier_w - tier * beam * 0.1
-		roof_y = VesselKit.house(lm, cx, l, w, y, floor_h, true, 1.5 if detail else 0.0, 0.14, "White", ShipLights.cabin_key(tier))
+		# Walkable deckhouse tops in grey non-slip paint, as on real boats:
+		# white ones read as blank slabs from above.
+		roof_y = VesselKit.house(lm, cx, l, w, y, floor_h, true, 1.5 if detail else 0.0, 0.14, "White",
+			ShipLights.cabin_key(tier), "DeckSteel")
 		y = roof_y
 	# Boat deck: lifeboats beside the second tier, rails round the top tier.
 	var top_x := house_x - (decks - 1) * length * 0.02
@@ -75,8 +78,8 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 	var wh_l := length * 0.09
 	if wh_h > 0.5:
 		if detail:
-			VesselForms.cabin(lm, wh_x, wh_l, wh_w, roof_y, wh_h, 0.8, "White", 0.3)
-			VesselForms.slab(lm, "White", Vector3(wh_x - wh_h * 0.08, roof_y + wh_h + 0.05, 0),
+			VesselForms.cabin(lm, wh_x, wh_l, wh_w, roof_y, wh_h, 0.8, "White", 0.3, "Glass", "DeckSteel")
+			VesselForms.slab(lm, "DeckSteel", Vector3(wh_x - wh_h * 0.08, roof_y + wh_h + 0.05, 0),
 				Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), minf(wh_w * 0.12, wh_h * 0.4))
 		else:
 			lm.box("White", Vector3(wh_x, roof_y + wh_h * 0.5, 0), Vector3(wh_l, wh_h, wh_w), Basis(), 0.02)
@@ -85,7 +88,7 @@ static func _classic(lm: LandmarkMesh, p: Dictionary) -> void:
 				Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, wh_w * 0.46),
 				Vector3(wh_x + wh_l * 0.5 + 0.015, roof_y + wh_h * 0.85, -wh_w * 0.46), Vector3.RIGHT)
 			VesselKit.windows(lm, wh_x - wh_l * 0.4, wh_x + wh_l * 0.4, wh_w * 0.5, roof_y + wh_h * 0.3, roof_y + wh_h * 0.85, 0.0)
-			lm.box("White", Vector3(wh_x, roof_y + wh_h + 0.05, 0), Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), Basis(), 0.0)
+			lm.box("DeckSteel", Vector3(wh_x, roof_y + wh_h + 0.05, 0), Vector3(wh_l + 0.5, 0.1, wh_w + 0.5), Basis(), 0.0)
 	else:
 		wh_h = 0.0
 	# Funnel aft of the wheelhouse and two pole masts.

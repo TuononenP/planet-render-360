@@ -147,6 +147,48 @@ static func build(root: Node3D, b: Dictionary, data: LocationData, ground: Groun
 		part.set_meta("vessel_name", str(b.get("name", "")))
 	return true
 
+## Mapped vessel footprints as [ring, bounds grown by `reach`].
+static func vessel_rings(data: LocationData, reach: float = 0.0) -> Array:
+	var out: Array = []
+	if data == null:
+		return out
+	for b in data.buildings:
+		if not (b is Dictionary) or not accepts(b):
+			continue
+		var bd: Dictionary = b
+		var ring: PackedVector2Array = bd.get("footprint", PackedVector2Array())
+		if ring.size() < 3:
+			ring = BuildingWalls._rect_ring(Vector2(float(bd.get("x", 0.0)), float(bd.get("z", 0.0))),
+				Vector2(float(bd.get("size_x", 10.0)), float(bd.get("size_z", 3.0))), 0.0)
+		if ring.size() >= 3:
+			out.append([ring, RingGeometry.aabb(ring).grow(reach)])
+	return out
+
+## True when `p` lies inside or within `reach` of any entry of `vessel_rings`.
+static func near_vessel(vessels: Array, p: Vector2, reach: float) -> bool:
+	for entry: Array in vessels:
+		if not (entry[1] as Rect2).has_point(p):
+			continue
+		var ring: PackedVector2Array = entry[0]
+		if Geometry2D.is_point_in_polygon(p, ring):
+			return true
+		for i in ring.size():
+			if Geometry2D.get_closest_point_to_segment(p, ring[i], ring[(i + 1) % ring.size()]).distance_to(p) <= reach:
+				return true
+	return false
+
+## True when bridge polyline `pts` is a short boarding gangplank onto a
+## mapped vessel rather than a river crossing.
+static func gangplank(pts: PackedVector2Array, vessels: Array, m2u: float) -> bool:
+	if pts.size() < 2 or vessels.is_empty():
+		return false
+	var length := 0.0
+	for i in pts.size() - 1:
+		length += pts[i].distance_to(pts[i + 1])
+	if length > 25.0 * m2u:
+		return false
+	return near_vessel(vessels, pts[0], 3.0 * m2u) or near_vessel(vessels, pts[pts.size() - 1], 3.0 * m2u)
+
 ## A ten-metre prototype for the Ultra quay-side MultiMeshes. +X is bow.
 static func mesh(kind: String) -> ArrayMesh:
 	return VesselPrototypes.mesh(kind)

@@ -41,6 +41,9 @@ static func posts(model: ShorelineModel, evidence: ShoreEvidence) -> Dictionary:
 			var shore: PackedVector2Array = run["shore"]
 			var wall: PackedVector2Array = run["wall"]
 			var land: Vector2 = run["land"]
+			var id := model.domains.at(shore[shore.size() / 2] - land.normalized() * 0.5 * m2u)
+			if id >= 0 and not model.domains.is_quayed(id):
+				continue
 			var levels := _levels(model, evidence, wall, land, m2u)
 			for i in wall.size():
 				if is_nan(levels[i]):

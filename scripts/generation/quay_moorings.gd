@@ -53,6 +53,7 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 				lines.append({"points": points, "mapped": false})
 	var centre := View360.spawn_xz(data)
 	var stairs := _stairs(data)
+	var bridge_list := bridges(data, m)
 	var out: Array = []
 	for line in lines:
 		var pts: PackedVector2Array = line["points"]
@@ -81,8 +82,10 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 			var beam := length * 0.30
 			var position := at + normal * side * (beam * 0.5 + 1.4 * m)
 			var stern := position - dir * length * 0.5
+			var bow := position + dir * length * 0.5
 			# Stairs down the wall run on to the water: no berth across them.
-			if _near_stairs(stairs, position, dir, length, beam, m):
+			if _near_stairs(stairs, position, dir, length, beam, m) \
+					or near_bridge(bridge_list, stern, bow, beam * 0.5 + 3.0 * m):
 				continue
 			var clear := true
 			for along in [-0.5, 0.0, 0.5]:
@@ -144,6 +147,7 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 	if ground.shoreline == null or not ground.shoreline.ready:
 		return out
 	var eye := View360.spawn_xz(data)
+	var bridge_list := bridges(data, m)
 	var runs: Array = []
 	for points in _quay_lines(data, m):
 		runs.append_array(_straight_runs(points, m))
@@ -180,7 +184,9 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 				continue
 			var bow_dir := dir
 			var stern := c - dir * length * 0.5 * m
-			if not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
+			var bow := c + dir * length * 0.5 * m
+			if near_bridge(bridge_list, stern, bow, (beam * 0.5 + 6.0) * m) \
+					or not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
 				continue
 			out.append([Vector3(c.x, ground.water_level_at(c.x, c.y), c.y), atan2(-bow_dir.y, bow_dir.x),
 				length, beam, clampf(length * 0.21 if ferry else length * 0.2, 22.0, 65.0),
@@ -405,3 +411,61 @@ static func _spaced(out: Array, c: Vector2, m: float) -> bool:
 		if Vector2(q.x, q.z).distance_to(c) < LINER_SPACING_M * m:
 			return false
 	return true
+
+## Bridge segments and outlines in `data`, for berth bridge-clearance checks.
+static func bridges(data: LocationData, m: float) -> Dictionary:
+	var segs: Array = []
+	var polys: Array = []
+	for r in data.roads:
+		if not (r is Dictionary) or not bool((r as Dictionary).get("bridge", false)) \
+				or bool((r as Dictionary).get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = (r as Dictionary).get("points", PackedVector2Array())
+		var hw := maxf(float((r as Dictionary).get("width_m", 4.0)), 2.0) * 0.5 * m
+		for i in pts.size() - 1:
+			segs.append([pts[i], pts[i + 1], hw, Rect2(pts[i], Vector2.ZERO).expand(pts[i + 1]).grow(hw)])
+	for rw in data.railways:
+		if not (rw is Dictionary) or not bool((rw as Dictionary).get("bridge", false)) \
+				or bool((rw as Dictionary).get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = (rw as Dictionary).get("points", PackedVector2Array())
+		var hw := maxf(float((rw as Dictionary).get("width_m", 5.0)), 4.0) * 0.5 * m
+		for i in pts.size() - 1:
+			segs.append([pts[i], pts[i + 1], hw, Rect2(pts[i], Vector2.ZERO).expand(pts[i + 1]).grow(hw)])
+	for sp in LandmarkSites.bridge_spans(data):
+		var at: Vector2 = sp[0]
+		var entry: Dictionary = sp[1]
+		var reach := LandmarkSites.axis(entry) * float(entry.get("span_m", 0.0)) * 0.5 * m
+		var hw := LandmarkSites.clear_m(entry) * m
+		segs.append([at - reach, at + reach, hw, Rect2(at - reach, Vector2.ZERO).expand(at + reach).grow(hw)])
+	for area in data.bridge_areas:
+		if not (area is Dictionary):
+			continue
+		var ring: PackedVector2Array = (area as Dictionary).get("points", PackedVector2Array())
+		if ring.size() < 3:
+			continue
+		polys.append([ring, RingGeometry.aabb(ring)])
+		for i in ring.size():
+			var p0 := ring[i]
+			var p1 := ring[(i + 1) % ring.size()]
+			segs.append([p0, p1, 0.0, Rect2(p0, Vector2.ZERO).expand(p1)])
+	return {"segs": segs, "polys": polys}
+
+## True when hull centreline `stern..bow` comes within `clearance` of any bridge.
+static func near_bridge(bridge_list: Dictionary, stern: Vector2, bow: Vector2, clearance: float) -> bool:
+	var box := Rect2(stern, Vector2.ZERO).expand(bow).grow(clearance)
+	for seg: Array in bridge_list["segs"]:
+		if not (seg[3] as Rect2).intersects(box, true):
+			continue
+		var hits := Geometry2D.get_closest_points_between_segments(stern, bow, seg[0], seg[1])
+		if hits[0].distance_to(hits[1]) <= float(seg[2]) + clearance:
+			return true
+	var mid := (stern + bow) * 0.5
+	for poly: Array in bridge_list["polys"]:
+		if not (poly[1] as Rect2).intersects(box, true):
+			continue
+		var ring: PackedVector2Array = poly[0]
+		if Geometry2D.is_point_in_polygon(stern, ring) or Geometry2D.is_point_in_polygon(mid, ring) \
+				or Geometry2D.is_point_in_polygon(bow, ring):
+			return true
+	return false

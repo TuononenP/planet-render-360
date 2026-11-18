@@ -16,6 +16,10 @@ const BRIDGE_STREAM_MAX_M := 15.0
 ## upper walls (its low quay, then the upper wall), lowered for it by at
 ## most QUAY_DROP_MAX_M, metres.
 const QUAY_MIN_LENGTH_M := 100.0
+## Setback upper walls must cover at least this share of a body's clipped
+## perimeter before it is lowered as a two-level quayed river (a few
+## hillside retaining walls along a single-level river must not drop it 5 m).
+const QUAY_MIN_SHARE := 0.12
 const QUAY_DROP_M := 6.4
 const QUAY_DROP_MAX_M := 5.0
 var bodies: Array = []
@@ -251,7 +255,9 @@ func lower_for_quays(quays: Array, dry: Callable) -> void:
 	var group_cap := {}
 	for id: int in streets:
 		var values: Array = streets[id]
-		if float(lengths.get(id, 0.0)) < QUAY_MIN_LENGTH_M * m2u or values.size() < 3:
+		var qlen := float(lengths.get(id, 0.0))
+		if qlen < QUAY_MIN_LENGTH_M * m2u or qlen < _clipped_perimeter(bodies[id]) * QUAY_MIN_SHARE \
+				or values.size() < 3:
 			continue
 		values.sort()
 		var g := _root(parent, id)
@@ -277,6 +283,18 @@ func quayed_flags() -> PackedByteArray:
 	for id in bodies.size():
 		out.append(1 if is_quayed(id) else 0)
 	return out
+
+## Total length of `body`'s edges inside `bounds`.
+func _clipped_perimeter(body: Dictionary) -> float:
+	var total := 0.0
+	var rings: Array = [body["points"]]
+	rings.append_array(body["holes"])
+	for ring: PackedVector2Array in rings:
+		for i in ring.size():
+			var cut := ShoreGeometry.clip_segment(ring[i], ring[(i + 1) % ring.size()], bounds)
+			if cut.size() == 2:
+				total += cut[0].distance_to(cut[1])
+	return total
 
 ## True for a narrow stream body (BRIDGE_STREAM_MAX_M mean width).
 static func _stream(body: Dictionary) -> bool:

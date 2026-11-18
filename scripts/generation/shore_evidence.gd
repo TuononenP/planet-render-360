@@ -73,19 +73,22 @@ func _init(data: LocationData = null) -> void:
 		f["kind"] = "structure"
 		f["area"] = false
 		_add(f)
+	var m2u := WorldScale.metres_to_units()
+	var vessels := ShipBuilder.vessel_rings(data, 3.0 * m2u)
 	var water_edges := _water_edges(data)
 	# Bridges standing on abutments: every bridge landing on a quayed bank,
 	# and road bridges over streams.
-	var abutted: Array = _quay_fronts(data)
+	var abutted: Array = _quay_fronts(data, vessels)
 	for road in data.roads:
 		if road is Dictionary and bool(road.get("bridge", false)) and not bool(road.get("tunnel", false)) \
+				and not ShipBuilder.gangplank(road.get("points", PackedVector2Array()), vessels, m2u) \
 				and _abutments(road, water_edges):
 			abutted.append(road.get("points", PackedVector2Array()))
 	for road in data.roads:
 		if not (road is Dictionary) or bool(road.get("tunnel", false)):
 			continue
 		var rpts: PackedVector2Array = road.get("points", PackedVector2Array())
-		if bool(road.get("bridge", false)) and abutted.has(rpts):
+		if bool(road.get("bridge", false)) and (abutted.has(rpts) or ShipBuilder.gangplank(rpts, vessels, m2u)):
 			continue
 		# A footbridge passing under a road bridge's abutments (a path along
 		# the creek under the motorway) does not break them.
@@ -184,7 +187,7 @@ func _abutments(road: Dictionary, edges: Array) -> bool:
 ## inside the detailed area, each also added as a mapped structure. Under
 ## a bridge the quayed bank is that bridge's abutment instead
 ## (`abutment_runs`); returns those bridges' points.
-func _quay_fronts(data: LocationData) -> Array:
+func _quay_fronts(data: LocationData, vessels: Array = []) -> Array:
 	var abutted: Array = []
 	var walls := {}
 	for i in features.size():
@@ -202,7 +205,7 @@ func _quay_fronts(data: LocationData) -> Array:
 		if not (road is Dictionary) or not bool(road.get("bridge", false)) or bool(road.get("tunnel", false)):
 			continue
 		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
-		if pts.size() < 2:
+		if pts.size() < 2 or ShipBuilder.gangplank(pts, vessels, m2u):
 			continue
 		var reach := (float(road.get("width_m", 0.0)) * 0.5 + ABUTMENT_REACH_M) * m2u
 		bridges.append({"points": pts, "reach": reach, "box": RingGeometry.aabb(pts).grow(reach),

@@ -11,8 +11,8 @@ static func cruiser(lm: LandmarkMesh, spec: Dictionary, variant: String) -> void
 	var y := fb + 0.02
 	var h := length * 0.12
 	var width := beam * 0.76
-	VesselForms.cabin(lm, -length * 0.105, length * 0.39, width, y, h, length * 0.065, "White", 0.48)
-	VesselForms.slab(lm, "White", Vector3(-length * 0.12, y + h + 0.04, 0),
+	VesselForms.cabin(lm, -length * 0.105, length * 0.39, width, y, h, length * 0.065, "White", 0.48, "Glass", "Roof")
+	VesselForms.slab(lm, "Roof", Vector3(-length * 0.12, y + h + 0.04, 0),
 		Vector3(length * 0.41, 0.1, width * 1.06), width * 0.2)
 	# Aft cockpit seating and low bathing platform stay inside the hull length.
 	VesselForms.slab(lm, "Deck", Vector3(-length * 0.465, fb * 0.55, 0), Vector3(length * 0.065, 0.08, beam * 0.73), beam * 0.12)
@@ -25,7 +25,7 @@ static func cruiser(lm: LandmarkMesh, spec: Dictionary, variant: String) -> void
 		for side in [-1.0, 1.0]:
 			VesselForms.slab(lm, "White", Vector3(-length * 0.1, top + length * 0.015, float(side) * width * 0.36),
 				Vector3(length * 0.25, length * 0.03, width * 0.08), width * 0.035)
-		VesselForms.cabin(lm, -length * 0.025, length * 0.07, width * 0.64, top, length * 0.04, 0.7, "White", 0.6)
+		VesselForms.cabin(lm, -length * 0.025, length * 0.07, width * 0.64, top, length * 0.04, 0.7, "White", 0.6, "Glass", "Roof")
 		VesselForms.slab(lm, "Canvas", Vector3(-length * 0.15, top + length * 0.018, 0),
 			Vector3(length * 0.06, length * 0.036, width * 0.55), width * 0.06)
 		if bool(spec.get("ultra", false)):
@@ -35,7 +35,7 @@ static func cruiser(lm: LandmarkMesh, spec: Dictionary, variant: String) -> void
 	for side in [-1.0, 1.0]:
 		HullLoft.tube(lm, "Steel", [Vector3(arch_x, y + h, float(side) * width * 0.4),
 			Vector3(arch_x - length * 0.02, top + length * 0.045, float(side) * width * 0.35)], length * 0.0035, 8)
-	VesselForms.slab(lm, "White", Vector3(arch_x, top + length * 0.045, 0),
+	VesselForms.slab(lm, "Roof", Vector3(arch_x, top + length * 0.045, 0),
 		Vector3(length * 0.17, 0.1, width * 0.85), width * 0.12)
 	lm.lathe("White", Vector3(arch_x, top + length * 0.045 + 0.05, 0),
 		PackedVector2Array([Vector2(length * 0.016, 0), Vector2(length * 0.018, length * 0.01), Vector2(length * 0.01, length * 0.022)]), 12)
@@ -86,7 +86,7 @@ static func open_boat(lm: LandmarkMesh, spec: Dictionary, variant: String) -> vo
 		HullLoft.tube(lm, "Dark", path, beam * 0.095, 16 if ultra else 9, true)
 	# Bowrider has twin helms and a broad windshield; other craft a console.
 	var width := beam * (0.72 if variant == "runabout" else 0.32)
-	VesselForms.cabin(lm, length * 0.04, length * 0.16, width, y + length * 0.02, length * 0.16, 0.55, "White", 0.45)
+	VesselForms.cabin(lm, length * 0.04, length * 0.16, width, y + length * 0.02, length * 0.16, 0.55, "White", 0.45, "Glass", "Roof")
 	for side in [-1.0, 1.0]:
 		VesselForms.slab(lm, "Canvas", Vector3(-length * 0.15, y + length * 0.07, float(side) * beam * 0.18),
 			Vector3(length * 0.09, length * 0.04, beam * 0.2), beam * 0.06)
