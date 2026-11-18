@@ -39,6 +39,19 @@ func _decode() -> void:
 	_check(HelsinkiStreets.walk_class({"type": "Portaat", "material": "Graniittikivi"}) == "", "Steps stay terrain")
 	_check(HelsinkiStreets.walk_class({"type": "Puistokäytävät", "material": "Kivituhka"}) == "path", "Stone dust is path")
 	_check(HelsinkiStreets.walk_class({"type": "Jalankulkualue", "material": "Graniittilaatta"}) == "urban", "Slabs are paving")
+	_check(HelsinkiStreets.walk_class({"type": "Jalkakäytävä", "material": "Noppakivi"}) == "sett", "Setts are their own paving")
+	var sett := int(GroundMaterial.ID["sett"])
+	_check(is_equal_approx(GroundMaterial.palette().get_pixel(sett, 2).a, 1.0), "Setts are laid paving in the palette")
+	_check(GroundSurface.HARD.has(sett) and GroundSurface.NO_PLANTING.has(sett), "Setts are hard ground nothing is planted on")
+	var square_ring := PackedVector2Array([Vector2(0, 0), Vector2(60, 0), Vector2(60, 40), Vector2(0, 40)])
+	var cobbled := {"class": "pedestrian", "area": true, "points": square_ring}
+	var flagged := {"class": "pedestrian", "area": true,
+		"points": PackedVector2Array([Vector2(200, 0), Vector2(260, 0), Vector2(260, 40), Vector2(200, 40)])}
+	var tagged := {"class": "pedestrian", "area": true, "surface": "asphalt", "points": square_ring}
+	var laid := [{"class": "sett", "points": PackedVector2Array([Vector2(-1, -1), Vector2(61, -1), Vector2(61, 41), Vector2(-1, 41)]), "holes": []}]
+	_check(HelsinkiStreets.sett_squares([cobbled, flagged, tagged], laid) == 1, "One square is laid in setts")
+	_check(str(cobbled.get("surface", "")) == "sett" and RoadBuilder._finish("pedestrian", "sett") == "sett", "A cobbled square takes the sett finish")
+	_check(str(flagged.get("surface", "")) == "" and str(tagged["surface"]) == "asphalt", "Squares without setts or with a mapped surface keep theirs")
 	for layer in HelsinkiStreets.LAYERS:
 		_check(not HostPolicy.is_blocked(HelsinkiStreets.request_url(layer, 60.169, 24.945)), "Street URLs pass HostPolicy")
 

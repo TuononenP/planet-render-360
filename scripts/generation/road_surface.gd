@@ -59,6 +59,10 @@ uniform float snow_mean = 0.378;
 uniform float traffic = 0.0;
 // 1 on streets and squares (RoadBuilder), 0 on track beds.
 uniform float lamp_pools = 0.0;
+// 1 for setts and cobbles: 13 x 11 cm granite setts in world metres in
+// place of the pavement set's slabs, ±9% a stone and dark 1.2 cm joints
+// that fade out once a stone is a few pixels.
+uniform float sett_on = 0.0;
 // @SNOW
 // @GLOW
 varying vec3 wpos;
@@ -90,6 +94,31 @@ void fragment() {
 	col *= mix(1.0, 0.75, wet);
 	rough = mix(rough, 0.3, wet);
 	float sc = snow_cover(wpos, 1.0);
+	// Setts replace the pavement set's own slabs: each stone takes one
+	// colour from a coarse mip of the set (its mean once stones are below
+	// a few pixels), even roughness, no slab joints in the normal map.
+	float st_flat = 0.0;
+	if (sett_on > 0.5) {
+		st_flat = 1.0;
+		vec2 st_sz = vec2(0.13, 0.11);
+		vec2 st_u = wpos.xz / st_sz;
+		st_u.x += 0.5 * mod(floor(st_u.y), 2.0);
+		vec2 st_fw = fwidth(wpos.xz) / st_sz;
+		float st_near = 1.0 - smoothstep(0.08, 0.35, max(st_fw.x, st_fw.y));
+		// Lying snow buries the joints.
+		float st_vis = st_near * (1.0 - sc);
+		float st_h = fract(sin(dot(floor(st_u), vec2(12.9898, 78.233))) * 43758.5453);
+		vec3 st_mean = textureLod(alb_tex, vec2(0.5), 9.0).rgb;
+		vec3 st_stone = textureLod(alb_tex, vec2(st_h, fract(st_h * 7.13)), 4.0).rgb;
+		col = tint * mix(st_mean, st_stone, st_near) * mix(1.0, 0.75, wet);
+		rough = mix(0.85, 0.3, wet);
+		vec2 st_e = min(fract(st_u), 1.0 - fract(st_u)) * st_sz;
+		vec2 st_fm = max(fwidth(wpos.xz), vec2(1e-4));
+		vec2 st_jl = smoothstep(vec2(0.012), vec2(0.012) + st_fm, st_e);
+		float st_joint = 1.0 - min(st_jl.x, st_jl.y);
+		col *= 1.0 + st_vis * ((st_h - 0.5) * 0.18 - 0.3 * st_joint);
+		rough = mix(rough, 0.95, st_vis * st_joint);
+	}
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
 	vec2 p = wpos.xz;
 	// Paved streets, squares and walks are trampled: feet and wheels
@@ -143,7 +172,7 @@ void fragment() {
 	// through the ribbons' UV tangent frame the world-sampled snow layer
 	// tilted the whole slab away from a low sun, a shade darker than the
 	// pavement around it.
-	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), cover);
+	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), max(cover, st_flat));
 	// Ice crystals glint at the sun by day and at the lamps by night,
 	// as on the ground (ClimateModel.snow_facet).
 	vec4 facet = snow_facet(p, px);
@@ -582,7 +611,8 @@ static func set_place(data: LocationData) -> void:
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish).
-static func paved_material(set_name: String, target: Color, traffic: float = 0.0, lamp_pools: bool = false) -> ShaderMaterial:
+static func paved_material(set_name: String, target: Color, traffic: float = 0.0, lamp_pools: bool = false,
+		sett: bool = false) -> ShaderMaterial:
 	if _paved_shader == null:
 		_paved_shader = Shader.new()
 		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
@@ -601,6 +631,7 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 	m.set_shader_parameter("snow_mean", (MaterialLibrary.PBR_SETS["snow"]["mean"] as Color).get_luminance())
 	m.set_shader_parameter("traffic", traffic)
 	m.set_shader_parameter("lamp_pools", 1.0 if lamp_pools else 0.0)
+	m.set_shader_parameter("sett_on", 1.0 if sett else 0.0)
 	return m
 
 static func _tex(map_name: String) -> Texture2D:

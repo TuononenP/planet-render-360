@@ -29,6 +29,8 @@ const PARKING := ["Pysäköintialue"]
 ## with the terrain.
 const SKIP_WALK := ["Portaat", "Lämmitettävät portaat"]
 const GRAVEL := ["Kivituhka", "Sora", "Murske"]
+## Pavements laid in cobbles or setts: GroundMaterial's "sett" class.
+const SETTS := ["Nupukivi", "Noppakivi", "Graniittinoppakivi"]
 
 static func covers(lat: float, lon: float) -> bool:
 	return HelsinkiRegister.covers(lat, lon)
@@ -97,11 +99,15 @@ static func localise(rows: Array, c_lat: float, c_lon: float) -> Array:
 	return out
 
 ## Ground class of a light-traffic part: "path" for stone dust and
-## gravel, else "urban" (paving); "" for parts left to the terrain.
+## gravel, "sett" for cobbles and setts, else "urban" (paving); "" for
+## parts left to the terrain.
 static func walk_class(part: Dictionary) -> String:
 	if str(part["type"]) in SKIP_WALK:
 		return ""
-	return "path" if str(part["material"]) in GRAVEL else "urban"
+	var material := str(part["material"])
+	if material in GRAVEL:
+		return "path"
+	return "sett" if material in SETTS else "urban"
 
 ## Merges both layers into `data` (local metres): street widths from the
 ## carriageway, pavements into data.paved_areas. Returns the counts.
@@ -123,7 +129,58 @@ static func apply(data: LocationData, carriageway: Array, walkways: Array) -> Di
 	var widths := RoadWidths.from_polygons(data.roads, drive, parking, not paved.is_empty()) \
 		if not drive.is_empty() else 0
 	_keep_bands_without_pavement(data.roads, paved)
-	return {"drive": drive.size(), "parking": parking.size(), "widths": widths, "paved": paved.size()}
+	var squares := sett_squares(data.roads, paved)
+	return {"drive": drive.size(), "parking": parking.size(), "widths": widths, "paved": paved.size(),
+		"squares": squares}
+
+## Probe spacing over a mapped square (m) and the share of its probes on
+## surveyed setts that lays the whole square in setts.
+const SQUARE_PROBE_M := 4.0
+const SQUARE_SETT_SHARE := 0.5
+
+## Lays each mapped pedestrian area (a square, `area`) with no mapped
+## `surface` in setts (in place) where the survey's sett paving covers
+## most of it: OSM draws it as one paved plate over the ground's own
+## classes. Returns how many.
+static func sett_squares(roads: Array, paved: Array) -> int:
+	var setts: Array = paved.filter(func(a: Dictionary) -> bool: return str(a["class"]) == "sett")
+	if setts.is_empty():
+		return 0
+	var grid := RoadWidths._poly_grid(setts)
+	var count := 0
+	for r in roads:
+		if not (r is Dictionary):
+			continue
+		var road: Dictionary = r
+		if not bool(road.get("area", false)) or str(road.get("surface", "")) != "":
+			continue
+		var ring: PackedVector2Array = road.get("points", PackedVector2Array())
+		if ring.size() < 3:
+			continue
+		var holes: Array = road.get("holes", [])
+		var box := Rect2(ring[0], Vector2.ZERO)
+		for p in ring:
+			box = box.expand(p)
+		var step := maxf(SQUARE_PROBE_M, sqrt(box.get_area() / 400.0))
+		var on := 0
+		var stone := 0
+		var y := box.position.y + step * 0.5
+		while y < box.end.y:
+			var x := box.position.x + step * 0.5
+			while x < box.end.x:
+				var p := Vector2(x, y)
+				if Geometry2D.is_point_in_polygon(p, ring) \
+						and not holes.any(func(h: PackedVector2Array) -> bool: return Geometry2D.is_point_in_polygon(p, h)):
+					on += 1
+					if RoadWidths._inside(p, setts, grid):
+						stone += 1
+				x += step
+			y += step
+		if on >= 4 and float(stone) >= SQUARE_SETT_SHARE * float(on):
+			road["surface"] = "sett"
+			road["surface_source"] = "survey"
+			count += 1
+	return count
 
 ## Pavement within this of a surveyed street's kerb counts as its own (m).
 const BESIDE_M := 2.5

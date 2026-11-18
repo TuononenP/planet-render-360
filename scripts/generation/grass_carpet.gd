@@ -84,7 +84,7 @@ int class_at(vec2 xz) {
 }
 
 bool hard(int id) {
-	return id == 1 || id == 2 || id == 3 || id == 15 || id == 16;
+	return id == 1 || id == 2 || id == 3 || id == 15 || id == 16 || id == 18;
 }
 
 void vertex() {

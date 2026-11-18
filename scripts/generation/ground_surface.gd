@@ -10,11 +10,11 @@ extends RefCounted
 ## the shader lets the photo decide, and so do the placers' photo rules.
 
 ## Hard ground nothing grows on (GrassCarpet's hard() ids): building,
-## road, paving, water, path.
-const HARD: Array[int] = [1, 2, 3, 15, 16]
+## road, paving, water, path, setts.
+const HARD: Array[int] = [1, 2, 3, 15, 16, 18]
 ## Ground no synthetic tree or grass is planted on: hard ground plus
 ## pitch, sand, rock, quarry and glacier.
-const NO_PLANTING: Array[int] = [1, 2, 3, 9, 11, 12, 13, 14, 15, 16]
+const NO_PLANTING: Array[int] = [1, 2, 3, 9, 11, 12, 13, 14, 15, 16, 18]
 ## Ground even a measured tree (canopy raster) cannot stand on: a street
 ## tree grows out of paving, but not out of a carriageway, a pitch, a
 ## track bed, water, a quarry or a glacier.

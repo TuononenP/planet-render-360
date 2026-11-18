@@ -26,7 +26,7 @@ uniform float class_n = 1024.0;
 uniform sampler2D near_class : filter_nearest, repeat_disable;
 uniform float near_n = 0.0;
 uniform vec4 near_rect = vec4(0.0);
-uniform int max_id = 17;
+uniform int max_id = 18;
 uniform float extent_u = 220.0;
 uniform float u2m = 1.0;
 uniform float near_m = 140.0;
@@ -99,18 +99,22 @@ vec3 srgb_lin(vec3 c) {
 // 2 x 1.4 m running-bond flagstones with ±4% per-slab value and 3 cm
 // darker joints; the slab layer fades with its screen footprint so it
 // never aliases. Multiplies value only, so hue is preset-stable.
-float paving(vec2 g) {
+// `sett` (the share of class 18) lays 13 x 11 cm granite setts instead:
+// ±9% per stone and deeper 2.4 cm joints, gone a few metres out.
+float paving(vec2 g, float sett) {
 	float big = (t_noise(g / 23.0) - 0.5) * 0.11 + (t_noise(g / 6.5 + 17.0) - 0.5) * 0.06;
-	vec2 slab = vec2(2.0, 1.4);
+	float s = step(0.5, sett);
+	vec2 slab = mix(vec2(2.0, 1.4), vec2(0.13, 0.11), s);
 	vec2 su = g / slab;
 	su.x += 0.5 * mod(floor(su.y), 2.0);
 	vec2 fw = fwidth(g) / slab;
 	float vis = 1.0 - smoothstep(0.08, 0.35, max(fw.x, fw.y));
-	float jit = (t_hash(floor(su) + 3.1) - 0.5) * 0.08;
+	float jit = (t_hash(floor(su) + 3.1) - 0.5) * mix(0.08, 0.18, s);
 	vec2 e = min(fract(su), 1.0 - fract(su)) * slab;
 	vec2 fm = max(fwidth(g), vec2(1e-4));
-	vec2 jl = smoothstep(vec2(0.015), vec2(0.015) + fm, e);
-	float joint = -0.10 * (1.0 - min(jl.x, jl.y));
+	float jw = mix(0.015, 0.012, s);
+	vec2 jl = smoothstep(vec2(jw), vec2(jw) + fm, e);
+	float joint = mix(-0.10, -0.22, s) * (1.0 - min(jl.x, jl.y));
 	return 1.0 + big + vis * (jit + joint);
 }
 
@@ -181,8 +185,10 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
-	// Share of unmown meadow (class 17) and of water (15) among the taps.
+	// Share of unmown meadow (class 17), of water (15) and of setts (18)
+	// among the taps.
 	float wildw = 0.0;
+	float settw = 0.0;
 	float waterw = 0.0;
 	// Around the viewpoint the fine map decides. Its borders wander a
 	// little, as grass overgrowing a path edge does, and unmapped texels
@@ -211,6 +217,7 @@ void fragment() {
 				} else {
 					class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 					wildw += id == 17 ? bw : 0.0;
+					settw += id == 18 ? bw : 0.0;
 					waterw += id == 15 ? bw : 0.0;
 				}
 			}
@@ -226,7 +233,7 @@ void fragment() {
 					float rad = (k % 2 == 0 ? 0.55 : 1.15) / texel_m;
 					ivec2 o = ivec2(round(vec2(cos(ang), sin(ang)) * rad));
 					int nid = int(texelFetch(near_class, clamp(cc0 + o, ivec2(0), nmax), 0).r * 255.0 + 0.5);
-					hard += (nid == 1 || nid == 2 || nid == 3 || nid == 16) ? 1.0 : 0.0;
+					hard += (nid == 1 || nid == 2 || nid == 3 || nid == 16 || nid == 18) ? 1.0 : 0.0;
 				}
 				float worn = clamp(hard / 3.0, 0.0, 1.0)
 					* smoothstep(0.3, 0.7, t_noise(g * 1.1) * 0.7 + t_noise(g * 4.3 + 9.0) * 0.3)
@@ -248,6 +255,7 @@ void fragment() {
 			}
 			class_tap(id, bw, veg, W0, W1, col, trust, farc, rough, hfk, pave);
 			wildw += id == 17 ? bw : 0.0;
+			settw += id == 18 ? bw : 0.0;
 			waterw += id == 15 ? bw : 0.0;
 		}
 	}
@@ -400,7 +408,7 @@ void fragment() {
 	// than a few screen pixels; close up it is blur, so PBR carries.
 	float hf_on = smoothstep(60.0, 260.0, dist_m);
 	vec3 near_c = base * det * mix(1.0, ratio, hfk * hf_on);
-	near_c *= mix(1.0, paving(g), pave * (1.0 - steep));
+	near_c *= mix(1.0, paving(g, settw), pave * (1.0 - steep));
 	// Cliffs keep their rock detail further out than flat cover.
 	float wf = smoothstep(near_m, far_m, dist_m) * farc * (1.0 - 0.6 * steep);
 	vec3 alb = mix(near_c, mix(base, hf, 0.6), wf);

@@ -66,7 +66,7 @@ const ID := {
 	"": 0, "building": 1, "road": 2, "urban": 3, "grass": 4,
 	"forest": 5, "field": 6, "orchard": 7, "cemetery": 8, "pitch": 9,
 	"wetland": 10, "sand": 11, "rock": 12, "quarry": 13, "glacier": 14,
-	"water": 15, "path": 16, "meadow": 17,
+	"water": 15, "path": 16, "meadow": 17, "sett": 18,
 }
 
 ## Paved sidewalk width beside a road whose `sidewalk` tag names a side
@@ -87,7 +87,9 @@ const ARID_VEG_HI := 0.24
 
 ## Procedural paving weight per class (palette row 2 A): open urban
 ## ground is laid paving; paved paths a little; everything else none.
-const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3}
+## "sett" (id 18) is laid paving in small granite setts or cobbles: the
+## shader lays its blocks instead of flagstones (surveyed pavements).
+const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3, "sett": 1.0}
 
 ## The shared ground material for one built place. `photo` is the
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with
@@ -235,7 +237,7 @@ static func ground_ceiling_image(img: Image, rect: Rect2, gain: float, cmap: Ima
 	var w := img.get_width()
 	var h := img.get_height()
 	var n := cmap.get_width()
-	var open_ids: Array[int] = [ID[""], ID["urban"], ID["path"], ID["sand"]]
+	var open_ids: Array[int] = [ID[""], ID["urban"], ID["path"], ID["sand"], ID["sett"]]
 	var lums: Array[float] = []
 	for j in 48:
 		for i in 48:
@@ -294,6 +296,8 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
 		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
 		"urban": [Color(1, 0, 0, 0), Color(0.50, 0.495, 0.48), 0.12, 0.45, 0.95, 0.55, none],
+		# Grey granite setts: a little darker and rougher than flagstones.
+		"sett": [Color(1, 0, 0, 0), Color(0.45, 0.44, 0.43), 0.12, 0.45, 0.97, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
 		# Unmown meadow: the lawn layer with some forest-floor litter, a
 		# little drier and more photo-led than a mown lawn.
@@ -451,6 +455,15 @@ static func _paint_features(data: LocationData, paint: Callable, road_inset_m: f
 		if line is Dictionary and int((line as Dictionary).get("sidewalk", 0)) != 0 \
 				and not bool((line as Dictionary).get("surveyed", false)):
 			_sidewalks(line, paint, m2u, walk_m)
+	# Mapped pedestrian areas (squares) before the surveyed pavements, so
+	# the survey's own paving (setts on a cobbled square) shows on them.
+	for line in data.roads:
+		if line is Dictionary and bool((line as Dictionary).get("area", false)) \
+				and not bool((line as Dictionary).get("tunnel", false)) \
+				and not bool((line as Dictionary).get("bridge", false)):
+			var area_rings: Array = [(line as Dictionary).get("points", PackedVector2Array())]
+			area_rings.append_array((line as Dictionary).get("holes", []))
+			paint.call(area_rings, ID["urban"])
 	for area in data.paved_areas:
 		var rings: Array = [area["points"]]
 		rings.append_array(area.get("holes", []))
@@ -461,12 +474,8 @@ static func _paint_features(data: LocationData, paint: Callable, road_inset_m: f
 		var id: int = ID["road"]
 		if line is Dictionary:
 			var road: Dictionary = line
-			if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)):
-				continue
-			if bool(road.get("area", false)):
-				var area_rings: Array = [road.get("points", PackedVector2Array())]
-				area_rings.append_array(road.get("holes", []))
-				paint.call(area_rings, ID["urban"])
+			if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) \
+					or bool(road.get("area", false)):
 				continue
 			pts = road.get("points", PackedVector2Array())
 			width = maxf(float(road.get("width_m", 0.0)) * m2u, 0.4)

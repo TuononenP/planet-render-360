@@ -179,7 +179,7 @@ static func _material(finish: String) -> Material:
 		"paving", "sett", "gravel":
 			# Setts and gravel carry traffic; footway paving does not.
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
-				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true)
+				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true, finish == "sett")
 		"deck":
 			# A Paris bridge is stone: its fascias in the quay walls' limestone
 			# (board-formed concrete read as tan wooden planks beside them).
