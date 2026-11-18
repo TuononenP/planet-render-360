@@ -227,6 +227,9 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 	for (int k = 0; k < count; ++k) {
 		Piece &p = pieces[k];
 		Dictionary &edge = edge_dicts[p.edge];
+		// A piece shorter than the snap grid collapses to a point: no
+		// water side to find and nothing to build (as the script).
+		if (p.start == p.end) continue;
 		if (!p.resolved) {
 			if (p.left < 0) {
 				Dictionary d;

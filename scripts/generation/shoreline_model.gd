@@ -185,6 +185,10 @@ func _classify(abort: BuildAbort) -> void:
 				return
 			var start := ShoreGeometry.snap(a.lerp(b, float(i) / float(count)))
 			var end := ShoreGeometry.snap(a.lerp(b, float(i + 1) / float(count)))
+			# An edge shorter than the snap grid collapses to a point: no
+			# water side to find and nothing to build.
+			if start == end:
+				continue
 			var mid := (start + end) * 0.5
 			var left := domains.at(mid + n * 0.05)
 			var right := domains.at(mid - n * 0.05)

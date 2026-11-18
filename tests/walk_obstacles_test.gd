@@ -184,7 +184,7 @@ func _walking() -> void:
 	route.cum = PackedFloat32Array([0.0, 100.0])
 	route.length_m = 100.0
 	var mover := VehicleMover.new()
-	mover._trains = [{"route": route, "s": 50.0, "length": 30.0}]
+	mover._trains = [{"route": route, "s": 50.0, "length": 30.0, "hidden": false}]
 	var tram_solids: Array = mover.walker_solids()
 	_check(tram_solids.size() == 1 and ViewWalk.blocked(tram_solids, Vector2(0, -630)),
 		"a standing tram blocks its track")
