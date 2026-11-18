@@ -72,7 +72,10 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 			"paving": PackedByteArray(out["paving"])}
 
 static func _kind(patch: Dictionary, triangle: int) -> int:
-	return 0 if int(patch["owners"][triangle]) >= 0 else 2 if int(patch["hard"][triangle]) != 0 else 1
+	if int(patch["owners"][triangle]) >= 0:
+		return 0
+	var hard := int(patch["hard"][triangle])
+	return 3 if hard == 2 else 2 if hard != 0 else 1
 
 static func _borders(p: Vector3, box: Rect2, key: Vector2i) -> Array:
 	var out: Array = []

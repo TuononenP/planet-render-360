@@ -48,7 +48,8 @@ struct Patch {
 	PackedVector3Array points;
 	PackedInt32Array owners;
 	PackedByteArray hard, paving;
-	int kind(int triangle) const { return owners[triangle] >= 0 ? 0 : hard[triangle] ? 2 : 1; }
+	// ShoreStitch._kind: water, natural, hard, a low quay's walk.
+	int kind(int triangle) const { return owners[triangle] >= 0 ? 0 : hard[triangle] == 2 ? 3 : hard[triangle] ? 2 : 1; }
 };
 std::vector<Patch> read_patches(const Dictionary &input) {
 	std::vector<Patch> out;
@@ -99,7 +100,7 @@ struct IHash {
 
 Dictionary ShoreMesh::stitch(const Dictionary &input, int size, double step, double origin, Object *abort) {
 	const auto patches = read_patches(input);
-	using Heights = std::array<double, 3>;
+	using Heights = std::array<double, 4>;
 	// Looked up by border only; each border's stations stay sorted.
 	std::unordered_map<Border, std::map<double, Heights>, BorderHash> bins;
 	for (const Patch &p : patches) {
@@ -110,7 +111,7 @@ Dictionary ShoreMesh::stitch(const Dictionary &input, int size, double step, dou
 			for (const Border &edge : borders(v, box, p.key)) {
 				auto &positions = bins[edge];
 				const double along = edge.axis == 0 ? v.z : v.x;
-				auto it = positions.emplace(along, Heights{INFINITY, INFINITY, INFINITY}).first;
+				auto it = positions.emplace(along, Heights{INFINITY, INFINITY, INFINITY, INFINITY}).first;
 				const int kind = p.kind(i / 3);
 				it->second[kind] = std::min(it->second[kind], (double)v.y);
 			}

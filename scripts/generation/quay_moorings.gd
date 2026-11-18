@@ -52,6 +52,7 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 					points.append(points[0])
 				lines.append({"points": points, "mapped": false})
 	var centre := View360.spawn_xz(data)
+	var stairs := _stairs(data)
 	var out: Array = []
 	for line in lines:
 		var pts: PackedVector2Array = line["points"]
@@ -80,6 +81,9 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 			var beam := length * 0.30
 			var position := at + normal * side * (beam * 0.5 + 1.4 * m)
 			var stern := position - dir * length * 0.5
+			# Stairs down the wall run on to the water: no berth across them.
+			if _near_stairs(stairs, position, dir, length, beam, m):
+				continue
 			var clear := true
 			for along in [-0.5, 0.0, 0.5]:
 				for across in [-0.5, 0.5]:
@@ -92,6 +96,27 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 			if out.size() >= MAX_BOATS:
 				return out
 	return out
+
+## The mapped steps ways' lines (stairs down a quay wall).
+static func _stairs(data: LocationData) -> Array:
+	var out: Array = []
+	for road in data.roads:
+		if road is Dictionary and str(road.get("class", "")) == "steps":
+			var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+			if pts.size() >= 2:
+				out.append(pts)
+	return out
+
+## True when a stair comes within the boat's hull (length, beam) and 3 m.
+static func _near_stairs(stairs: Array, position: Vector2, dir: Vector2, length: float, beam: float, m: float) -> bool:
+	var reach := beam * 0.5 + 3.0 * m
+	for pts: PackedVector2Array in stairs:
+		for i in pts.size() - 1:
+			for along in [-0.5, -0.25, 0.0, 0.25, 0.5]:
+				var q: Vector2 = position + dir * length * along
+				if Geometry2D.get_closest_point_to_segment(q, pts[i], pts[i + 1]).distance_to(q) <= reach:
+					return true
+	return false
 
 static func _hard_span(ground: GroundTruth, at: Vector2, dir: Vector2, length: float) -> bool:
 	for along in [-0.35, 0.0, 0.35]:

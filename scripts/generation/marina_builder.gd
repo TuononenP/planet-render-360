@@ -362,6 +362,9 @@ static func _hash(x: float, z: float, salt: float) -> float:
 
 # --- Meshes (metres; +X bow, origin at the stern's waterline centre) -----
 
+## How far a pontoon's sides reach under its deck, metres.
+const PONTOON_DEPTH_M := 0.5
+
 static func _deck_mesh(decks: Array, m2u: float) -> ArrayMesh:
 	var b := TreeMeshLibrary.Buf.new()
 	var half := DECK_W_M * 0.5 * m2u
@@ -375,6 +378,12 @@ static func _deck_mesh(decks: Array, m2u: float) -> ArrayMesh:
 				Vector3(float(p1[0]) + float(p1[3]) * half, float(p1[2]) + up, float(p1[1]) + float(p1[4]) * half),
 				Vector3(float(p1[0]) - float(p1[3]) * half, float(p1[2]) + up, float(p1[1]) - float(p1[4]) * half)]
 			_quad(b, c, Vector3.UP)
+			# Side faces down below the waterline: a flat strip had no
+			# thickness and floated on the water with no contact line.
+			var drop := Vector3(0.0, -PONTOON_DEPTH_M * m2u, 0.0)
+			var out0 := Vector3(-float(p0[3]), 0.0, -float(p0[4]))
+			_quad(b, [c[0], c[3], (c[3] as Vector3) + drop, (c[0] as Vector3) + drop], out0)
+			_quad(b, [c[1], c[2], (c[2] as Vector3) + drop, (c[1] as Vector3) + drop], -out0)
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, b.arrays())
 	m.surface_set_material(0, _material("pontoon"))

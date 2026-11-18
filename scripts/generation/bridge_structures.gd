@@ -91,6 +91,8 @@ class Structure extends RefCounted:
 	## Slab depth, world units: a short beam span is shallower than a long one.
 	var depth := 0.9
 	var loose := false  ## Cut from ways on no mapped outline.
+	var wet := false  ## Its spine crosses water (_over_water).
+	var ground: RoadBuilder._Surface = null  ## The world's surface (set by prepare).
 	## Approach slabs (BridgeApproaches): index line -> [points before its
 	## first point, points after its last], the outline before them, and
 	## that outline's abutment edges ([a, b] each).
@@ -160,11 +162,10 @@ class Structure extends RefCounted:
 			var on := BridgeStructures._on_line(f[0], f[1], p)
 			if on.y < best.y:
 				best = on
-		if best.y == INF:
-			return y
-		# Over BLEND_M, or as far as BLEND_GRADE needs for a larger step.
-		var blend := maxf(BridgeStructures.BLEND_M * WorldScale.metres_to_units(), absf(best.x) / BridgeStructures.BLEND_GRADE)
-		return y + best.x * (1.0 - smoothstep(0.0, blend, sqrt(best.y)))
+		if best.y != INF:
+			# Over BLEND_M, or as far as BLEND_GRADE needs for a larger step.
+			y += best.x * (1.0 - smoothstep(0.0, maxf(BridgeStructures.BLEND_M * WorldScale.metres_to_units(), absf(best.x) / BridgeStructures.BLEND_GRADE), sqrt(best.y)))
+		return y if ground == null else BridgeStructureSlab.above_ground(ground, p, y)
 
 	## The main spine's [deck, squared distance] at its point nearest `p`.
 	func main_at(p: Vector2) -> Vector2:
@@ -371,6 +372,7 @@ class Plan extends RefCounted:
 		if not _ready:
 			var index: RoadBridgeDecks.Index = surf.road_bridges
 			for s: Structure in structures:
+				s.ground = surf
 				BridgeStructures._level(s, index, surf, m2u)
 			BridgeStructures._settle(self, index, surf, m2u)
 			for s: Structure in structures:
@@ -459,7 +461,7 @@ static func _level(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder
 				# A spine forking into short member ways that each land on a
 				# road (Pont d'Arcole's two branches onto the quay) ends at
 				# their landings, not in mid-air.
-				y = _fork_landing(s, p, index, surf, m2u)
+				y = BridgeFork.landing(s, p, index, surf, m2u)
 				if is_nan(y):
 					continue
 			else:
@@ -482,42 +484,6 @@ static func _landing(road: PackedVector2Array, p: Vector2, surf: RoadBuilder._Su
 	if surf.ground.water_at(p.x, p.y) <= 0.0:
 		return BridgeApproaches.road_level(road, surf, m2u)
 	return _first_dry(road, surf, ABUTMENT_SEEK_M * m2u)
-
-## The level where a spine end at `p` with no road of its own lands
-## through the structure's other members leaving that node: the mean of
-## their far ends' approach levels (plus the deck's lift), or NAN when
-## none of them goes on as a road (a joint in mid-air).
-static func _fork_landing(s: Structure, p: Vector2, index: RoadBridgeDecks.Index,
-		surf: RoadBuilder._Surface, m2u: float) -> float:
-	var snap := FORK_SNAP_M * m2u
-	var sum := 0.0
-	var count := 0
-	for li in s.members:
-		if li == s.spine_line:
-			continue
-		var pts: PackedVector2Array = index.lines[li]["points"]
-		if pts.size() < 2:
-			continue
-		var n := pts.size()
-		var far := -1
-		var back := -1
-		if pts[0].distance_to(p) <= snap:
-			far = n - 1
-			back = n - 2
-		elif pts[n - 1].distance_to(p) <= snap:
-			far = 0
-			back = 1
-		if far < 0:
-			continue
-		var q := pts[far]
-		var road := BridgeLandings.approach_from(surf, q, (q - pts[back]).normalized())
-		if road.is_empty():
-			continue
-		var y := _landing(road, q, surf, m2u)
-		if not is_nan(y):
-			sum += y
-			count += 1
-	return sum / float(count) + 0.05 * m2u if count > 0 else NAN
 
 ## The approach's ground where the deck meets it: the ground at the way's
 ## end, or where that is over water, the highest dry ground along `line`
@@ -551,7 +517,9 @@ static func _abutment_fit(s: Structure, index: RoadBridgeDecks.Index, surf: Road
 		var a := s.ring[e]
 		var b := s.ring[(e + 1) % s.ring.size()]
 		for run: Array in _runs(opens[e] as Array):
-			if int(run[2]) != 2:
+			# An edge a way runs on through (1) meets the ground as an abutment does
+			# (2): left standing, its fascia showed as a dark riser over the plaza.
+			if int(run[2]) == 0:
 				continue
 			var pa := a.lerp(b, float(run[0]))
 			var pb := a.lerp(b, float(run[1]))
@@ -585,6 +553,7 @@ static func _over_water(s: Structure, surf: RoadBuilder._Surface, m2u: float) ->
 		var p := s.spine[k]
 		if surf.ground.water_at(p.x, p.y) <= 0.0:
 			continue
+		s.wet = true
 		var need := surf.ground.water_level_at(p.x, p.y) + air
 		if s.heights[k] < need:
 			s.bump(s.dist[k], s.dist[k], need, true, g)
@@ -627,7 +596,10 @@ static func _pin(s: Structure, m2u: float) -> void:
 		if not is_nan(ax) and not is_nan(ay):
 			var line := lerpf(ax, ay, d / total)
 			cap = maxf(cap, line)
-			low = minf(low, line)
+			# Over water the girder never hangs under that line: between quays
+			# standing high over a river it dipped to the water's clearance at
+			# the ramp grade and climbed back, a deck sagging to mid-span.
+			low = line if s.wet else minf(low, line)
 		s.heights[k] = clampf(s.heights[k], low, maxf(cap, low))
 
 ## Members leaving the spine's side become arms: a member running beside
@@ -670,6 +642,8 @@ static func _branches(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuil
 			if sqrt(on.y) <= reach:
 				deck[i] = on.x
 				anchor[i] = 1
+		var along := RoadBridgeBuild._dist_of(dense)
+		var loose_ends: Array[int] = []
 		# A free end lands on the ground, at the path that goes on from it
 		# where one does.
 		for end: Array in [[0, 1], [n - 1, n - 2]]:
@@ -681,10 +655,26 @@ static func _branches(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuil
 			var road := BridgeLandings.approach_from(surf, p, (p - dense[int(end[1])]).normalized())
 			if road.is_empty() and (surf.bridge_joint(p, (p - dense[int(end[1])]).normalized())
 					or surf.ground.water_at(p.x, p.y) > 0.0):
+				if surf.ground.water_at(p.x, p.y) <= 0.0:
+					# A joint of ways on dry ground stands on it, as a land end does
+					# (it kept the arm's over-water viaduct height, 1 m over the plaza).
+					deck[i] = surf.height(p.x, p.y) + 0.05 * m2u
+				else:
+					loose_ends.append(i)
 				continue  # It goes on as another bridge, or over the water.
 			var dry := _first_dry(road, surf, ABUTMENT_SEEK_M * m2u) if not road.is_empty() else NAN
 			deck[i] = (dry if not is_nan(dry) else surf.height(p.x, p.y)) + 0.05 * m2u
-		var along := RoadBridgeBuild._dist_of(dense)
+		# A free end (over water, or on to another bridge) stays at the level of the
+		# nearest anchored point of its arm.
+		for i: int in loose_ends:
+			var dir := 1 if i == 0 else -1
+			var j := i + dir
+			while j > 0 and j < n - 1 and anchor[j] == 0:
+				j += dir
+			# Level with it: a footway beside the road kept its own low viaduct
+			# profile past the road's end and ramped 12% up to it, a steep
+			# dark face over the deck's head.
+			deck[i] = deck[j]
 		var prev := 0
 		for i in range(1, n):
 			if anchor[i] == 0:
@@ -745,9 +735,19 @@ static func _settle(plan: Plan, index: RoadBridgeDecks.Index, surf: RoadBuilder.
 			var deck: PackedFloat32Array = prof[1]
 			if deck.size() != dense.size():
 				continue
-			for p in dense:
-				if s.contains(p, float(line["half"])):
-					under.append(p)
+			var first := -1
+			var last := -1
+			for k in dense.size():
+				if s.contains(dense[k], float(line["half"])):
+					under.append(dense[k])
+					if first < 0:
+						first = k
+					last = k
+			# A road that starts or ends inside the outline is an approach
+			# the bridge lands on (the plaza road at an island's tip), not one
+			# it crosses: the deck rose over it, a dome at the bridge's end.
+			if first == 0 or last == dense.size() - 1:
+				continue
 			if not under.is_empty():
 				_rise_over(s, under, func(p: Vector2) -> float: return deck[BridgeStructures._closest(dense, p)],
 					str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES, g, margin, surf, m2u)

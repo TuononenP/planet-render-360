@@ -293,7 +293,7 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 	var rows := {
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
 		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
-		"urban": [Color(1, 0, 0, 0), Color(0.54, 0.51, 0.45), 0.12, 0.45, 0.95, 0.55, none],
+		"urban": [Color(1, 0, 0, 0), Color(0.50, 0.495, 0.48), 0.12, 0.45, 0.95, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
 		# Unmown meadow: the lawn layer with some forest-floor litter, a
 		# little drier and more photo-led than a mown lawn.

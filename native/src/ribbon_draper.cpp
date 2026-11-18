@@ -57,6 +57,9 @@ struct Row {
 	Vector3 n;
 };
 
+// RoadDrape.SEAM
+const double SEAM = 0.05;
+
 struct Out {
 	std::vector<Vector3> verts, normals;
 	std::vector<Vector2> uvs, uv2s;
@@ -263,20 +266,33 @@ Array RibbonDraper::build(const PackedVector2Array &pts, double width, double li
 	double along = 0.0;
 	const double u1 = width / m2u / 4.0;
 	const Vector2 w2(width / m2u, layer);
-	// RoadDrape._emit
-	auto emit = [&](const Poly &pc) {
+	// RoadDrape._emit: `on`, the shore triangle the piece was cut to, else null.
+	auto emit = [&](const Poly &pc, const Vector3 *on) {
 		std::vector<int32_t> ids;
+		const Vector3 normal = on != nullptr ? (on[1] - on[0]).cross(on[2] - on[0]) : Vector3();
 		for (size_t i = 0; i < pc.pos.size(); i++) {
 			const Vector2 p = pc.pos[i];
 			const int64_t kx = (int64_t)std::round((double)p.x * 1000.0);
 			const int64_t kz = (int64_t)std::round((double)p.y * 1000.0);
-			const int64_t key = (int64_t)(((uint64_t)kx << 32) ^ ((uint64_t)kz & 0xffffffffULL));
+			int64_t key = (int64_t)(((uint64_t)kx << 32) ^ ((uint64_t)kz & 0xffffffffULL));
+			double y = INFINITY;
+			if (std::abs(normal.y) > 1e-9) {
+				// RoadDrape._emit: a piece on the lower ground beside a wall
+				// lies on its own triangle, welded apart from the upper level.
+				auto top = o.weld.find(key);
+				y = top != o.weld.end() ? (double)o.verts[top->second - base].y - lift : height(p.x, p.y);
+				const double own = on[0].y - (normal.x * (p.x - on[0].x) + normal.z * (p.y - on[0].z)) / normal.y;
+				if (y - own > SEAM) {
+					y = own;
+					key ^= (int64_t)1 << 62;
+				}
+			}
 			auto it = o.weld.find(key);
 			int32_t id;
 			if (it == o.weld.end()) {
 				id = base + (int32_t)o.verts.size();
 				o.weld.emplace(key, id);
-				o.verts.push_back(Vector3(p.x, height(p.x, p.y) + lift, p.y));
+				o.verts.push_back(Vector3(p.x, (std::isinf(y) ? height(p.x, p.y) : y) + lift, p.y));
 				o.normals.push_back(pc.nrm[i].normalized());
 				o.uvs.push_back(pc.uv[i]);
 				o.colors.push_back(Color(attr.r, attr.g, attr.b, pc.jf[i]));
@@ -317,7 +333,7 @@ Array RibbonDraper::build(const PackedVector2Array &pts, double width, double li
 			for (const auto &p : pc.pos) centre += p;
 			if (!pc.pos.empty()) centre /= (real_t)pc.pos.size();
 			const auto *triangles = shore_sampler.is_valid() ? shore_sampler->dry_triangles(centre.x, centre.y) : nullptr;
-			if (triangles == nullptr) { emit(pc); continue; }
+			if (triangles == nullptr) { emit(pc, nullptr); continue; }
 			double x0 = INFINITY, z0 = INFINITY, x1 = -INFINITY, z1 = -INFINITY;
 			for (const auto &p : pc.pos) {
 				x0 = mn(x0, p.x); x1 = mx(x1, p.x);
@@ -340,7 +356,7 @@ Array RibbonDraper::build(const PackedVector2Array &pts, double width, double li
 					}
 					clipped = std::move(next);
 				}
-				if (clipped.pos.size() >= 3) emit(clipped);
+				if (clipped.pos.size() >= 3) emit(clipped, &(*triangles)[i]);
 			}
 		}
 	};

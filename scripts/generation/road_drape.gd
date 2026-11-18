@@ -83,7 +83,7 @@ static func _lay(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
 					if clipped.pos.size() < 3:
 						break
 				if clipped.pos.size() >= 3:
-					_emit(b, surf, lift, attr, w2, weld, clipped)
+					_emit(b, surf, lift, attr, w2, weld, clipped, triangles.slice(i, i + 3))
 		else:
 			_emit(b, surf, lift, attr, w2, weld, pc as _Poly)
 
@@ -146,19 +146,42 @@ static func _cut(poly: _Poly, fam: int, surf: RoadBuilder._Surface, out: Array) 
 	if cur.pos.size() >= 3:
 		out.append(cur)
 
+## Two surfaces this far apart in height over one point are two levels
+## (a wall between them), world units.
+const SEAM := 0.05
+
+## The drawn surface's height at `p`: the welded corner's when one is there.
+static func weld_top(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
+		weld: Dictionary, key: Vector3i, p: Vector2) -> float:
+	var id: int = weld.get(key, -1)
+	return b.verts[id].y - lift if id >= 0 else surf.height(p.x, p.y)
+
 ## Adds a convex piece, its corners on the drawn surface plus `lift`,
 ## fanned into triangles that face up.
 static func _emit(b: RoadBuilder._Batch, surf: RoadBuilder._Surface, lift: float,
-		attr: Color, w2: Vector2, weld: Dictionary, pc: _Poly) -> void:
+		attr: Color, w2: Vector2, weld: Dictionary, pc: _Poly, on := PackedVector3Array()) -> void:
 	var ids := PackedInt32Array()
 	for i in pc.pos.size():
 		var p := pc.pos[i]
-		var key := Vector2i(roundi(p.x * 1000.0), roundi(p.y * 1000.0))
+		var key := Vector3i(roundi(p.x * 1000.0), roundi(p.y * 1000.0), 0)
+		var y := INF
+		var normal := (on[1] - on[0]).cross(on[2] - on[0]) if on.size() == 3 else Vector3.ZERO
+		if absf(normal.y) > 1e-9:
+			# At a wall the surface has two heights over one point and
+			# surf.height gives the upper. A piece on the lower ground (a
+			# pavement's edge past a quay's upper wall) lies on its own
+			# triangle `on`, welded apart: lifted to the upper height along
+			# the wall's line, it hung down the wall's face as a curtain.
+			y = weld_top(b, surf, lift, weld, key, p)
+			var own := on[0].y - (normal.x * (p.x - on[0].x) + normal.z * (p.y - on[0].z)) / normal.y
+			if y - own > SEAM:
+				y = own
+				key.z = 1
 		var id: int = weld.get(key, -1)
 		if id < 0:
 			id = b.verts.size()
 			weld[key] = id
-			b.verts.append(Vector3(p.x, surf.height(p.x, p.y) + lift, p.y))
+			b.verts.append(Vector3(p.x, (surf.height(p.x, p.y) if is_inf(y) else y) + lift, p.y))
 			b.normals.append(pc.nrm[i].normalized())
 			b.uvs.append(pc.uv[i])
 			attr.a = pc.jf[i]

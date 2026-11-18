@@ -28,7 +28,7 @@ void ShorePatchKernel::setup(const PackedFloat32Array &p_base, const PackedFloat
 		const Ref<ShoreDomainIndex> &p_domains, const Ref<ShoreEvidenceIndex> &p_evidence) {
 	base = p_base; land = p_land; size = (int)grid.x; step = grid.y; origin = grid.z; depth = grid.w;
 	sampler = p_sampler; domains = p_domains; evidence = p_evidence;
-	levels.clear(); banks.clear(); heights.clear();
+	levels.clear(); banks.clear(); quays.clear(); heights.clear();
 	for (int64_t i = 0; i < p_bodies.size(); ++i) {
 		Dictionary body = p_bodies[i]; Level level;
 		level.start = body["level"]; level.end = body.get("level_end", level.start); level.profile = body.has("level_end");
@@ -37,8 +37,52 @@ void ShorePatchKernel::setup(const PackedFloat32Array &p_base, const PackedFloat
 	}
 	for (int64_t i = 0; i < segments.size(); ++i) {
 		Dictionary s = segments[i];
-		banks.push_back({s["a"], s["b"], s["top_a"], s["top_b"], s["body"], String(s["kind"]) == "hard"});
+		// A low quay's wall (ShorelineModel.quays) or a bridge's abutment: its street keeps its own class.
+		bool quay = false;
+		const Array sources = s.get("sources", Array());
+		for (int64_t k = 0; k < sources.size(); ++k) quay = quay || String(sources[k]).begins_with("quay:") || String(sources[k]).begins_with("abutment:");
+		banks.push_back({s["a"], s["b"], s["top_a"], s["top_b"], s["body"], String(s["kind"]) == "hard", quay});
 	}
+}
+void ShorePatchKernel::setup_quays(const Array &p_quays, double p_pave_reach) {
+	pave_reach = p_pave_reach;
+	quays.clear(); heights.clear();
+	for (int64_t i = 0; i < p_quays.size(); ++i) {
+		const Dictionary q = p_quays[i];
+		Quay quay;
+		quay.ring = q["ring"]; quay.body = q["body"]; quay.low = q["low"];
+		if (quay.ring.is_empty()) continue;
+		quay.box = Rect2(quay.ring[0], Vector2());
+		for (int64_t k = 1; k < quay.ring.size(); ++k) quay.box = quay.box.expand(quay.ring[k]);
+		quays.push_back(quay);
+	}
+}
+int ShorePatchKernel::quay_at(Vector2 p) const {
+	for (size_t i = 0; i < quays.size(); ++i) {
+		const Quay &q = quays[i];
+		if (!q.box.has_point(p)) continue;
+		// Geometry2D.is_point_in_polygon: even-odd crossings.
+		bool inside = false;
+		const int64_t n = q.ring.size();
+		for (int64_t a = 0, b = n - 1; a < n; b = a++) {
+			const Vector2 pa = q.ring[a], pb = q.ring[b];
+			if ((pa.y > p.y) != (pb.y > p.y) && p.x < (pb.x - pa.x) * (p.y - pa.y) / (pb.y - pa.y) + pa.x) inside = !inside;
+		}
+		if (inside) return (int)i;
+	}
+	return -1;
+}
+double ShorePatchKernel::quay_height(Vector2 p, int quay, Heights &memo) const {
+	const Vector3i key((int)Math::round((double)p.x * 100), (int)Math::round((double)p.y * 100), -3 - quay);
+	const auto cached = memo.find(key);
+	if (cached != memo.end()) return cached->second;
+	const Quay &q = quays[quay];
+	double h = levels[q.body].at(p) + q.low;
+	const Vector4 near = sampler->nearest_bank(p, 2);
+	if (near.x >= 0 && near.w < step)
+		h = Math::lerp(levels[banks[(int)near.x].body].at(p), h, std::clamp((double)near.w / step, 0.0, 1.0));
+	memo[key] = h;
+	return h;
 }
 double ShorePatchKernel::grid_height(const PackedFloat32Array &values, Vector2 p) const {
 	const Vector2 f = ((p - Vector2(origin, origin)) / (real_t)step).clamp(Vector2(), Vector2(size - 1, size - 1));
@@ -83,12 +127,19 @@ Dictionary ShorePatchKernel::build_with(const Array &pieces, Heights &memo) cons
 		const int owner = domains->at(centre.clamp(lo, hi));
 		const Vector4 near = sampler->nearest_bank(centre);
 		const bool hard = owner < 0 && near.x >= 0 && banks[(int)near.x].hard;
-		const bool natural = hard && evidence.is_valid() && evidence->contains_code(centre, ShoreEvidenceIndex::NATURAL);
+		const int quay = owner < 0 ? quay_at(centre) : -1;
+		const bool street_of_quay = hard && near.x >= 0 && banks[(int)near.x].quay;
+		const bool natural = (hard || quay >= 0) && evidence.is_valid() && evidence->contains_code(centre, ShoreEvidenceIndex::NATURAL);
 		for (int64_t i = 1; i + 1 < ring.size(); ++i) {
 			const double tri_area = std::abs((double)(ring[i] - ring[0]).cross(ring[i + 1] - ring[0])) * 0.5;
 			if (tri_area < 0.00001) continue;
-			area += tri_area; owners.push_back(owner); hard_regions.push_back(hard ? 1 : 0); paving.push_back(hard && !natural ? 1 : 0);
-			for (const Vector2 &p : {ring[0], ring[i], ring[i + 1]}) vertices.emplace_back(p.x, vertex_height(p, owner, hard, memo), p.y);
+			// 2: a low quay's walk (ShoreMesh.stitch keeps it apart from the street).
+			area += tri_area; owners.push_back(owner); hard_regions.push_back(quay >= 0 ? 2 : hard ? 1 : 0);
+			// ShoreSurface.HARD_PAVING_M: forced only near the wall.
+			const bool pave_hard = hard && !street_of_quay && near.w <= pave_reach;
+			paving.push_back((quay >= 0 || pave_hard) && !natural ? 1 : 0);
+			for (const Vector2 &p : {ring[0], ring[i], ring[i + 1]})
+				vertices.emplace_back(p.x, quay >= 0 ? quay_height(p, quay, memo) : vertex_height(p, owner, hard, memo), p.y);
 		}
 	}
 	PackedVector3Array v; v.resize(vertices.size()); if (!vertices.empty()) std::memcpy(v.ptrw(), vertices.data(), vertices.size() * sizeof(Vector3));
@@ -230,5 +281,6 @@ void ShorePatchKernel::_bind_methods() {
 		&ShorePatchKernel::cells);
 	ClassDB::bind_method(D_METHOD("setup", "base", "land", "bodies", "segments", "grid", "sampler", "domains", "evidence"), &ShorePatchKernel::setup);
 	ClassDB::bind_method(D_METHOD("build", "pieces"), &ShorePatchKernel::build);
+	ClassDB::bind_method(D_METHOD("setup_quays", "quays", "pave_reach"), &ShorePatchKernel::setup_quays);
 }
 }

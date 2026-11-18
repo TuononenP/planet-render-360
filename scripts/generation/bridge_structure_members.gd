@@ -9,6 +9,9 @@ extends RefCounted
 ## ground by BridgeLandings) is a deck of its own (RoadBridgeBuild._bridge)
 ## at its own profile, eased into the structure's level.
 
+## How far a footway's or cycleway's paving stands over the slab, metres.
+const PAVED_LIFT_M := 0.1
+
 ## Builds `line` (a RoadBridgeDecks.Index line) on structure `s`.
 static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictionary,
 		surf: RoadBuilder._Surface, m2u: float, li: int = -1) -> void:
@@ -45,9 +48,19 @@ static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictio
 	# A footway or cycleway keeps its paving on the deck (asphalt there
 	# read as a different road starting at the abutment).
 	var finish := RoadBuilder.finish_of(line.get("road", {}), surf, m2u)
+	# Only a footway or cycleway keeps its paving on the deck: a carriageway
+	# tagged sett or paving was laid in light patches on the dark deck beside
+	# its asphalt neighbours (one bridge, two surfaces).
+	# On a deck that also carries a carriageway a footway's ribbon shows as
+	# light wedges across the dark asphalt where it swings in from the kerb.
+	if not s.path or not (str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES):
+		finish = "asphalt"
 	var top := RoadBuilder._batch(batches, finish if finish in ["paving", "sett", "gravel"] else "bridge")
 	var side := RoadBuilder._batch(batches, "deck")
-	var lift := BridgeStructures.RIBBON_LIFT_M * m2u
+	# A footway's paving stands on the deck as a raised pavement does: laid 2 cm
+	# over the slab, the slab's own triangles cut through it, and the pavement
+	# showed in patches of light paving on the dark deck.
+	var lift := (PAVED_LIFT_M if finish in ["paving", "sett", "gravel"] else BridgeStructures.RIBBON_LIFT_M) * m2u
 	var i := 0
 	while i < n:
 		var j := i
@@ -72,8 +85,16 @@ static func lay(batches: Dictionary, s: BridgeStructures.Structure, line: Dictio
 			var deck_top := RoadBuilder._batch(batches, "bridge")
 			deck_top.pad()
 			var k1 := deck_top.verts.size()
+			# A footway's own deck past the outline runs over the slab's end
+			# (its approach): stood PAVED_LIFT_M proud, it no longer cuts through
+			# the slab's triangles in patches of another finish.
+			var raised := run_deck
+			if finish in ["paving", "sett", "gravel"]:
+				raised = run_deck.duplicate()
+				for k in raised.size():
+					raised[k] += PAVED_LIFT_M * m2u
 			RoadBridgeBuild._bridge(batches, run, width, surf, m2u, "bridge", s.kind, s.layer,
-				{"deck": run_deck, "railing": str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES})
+				{"deck": raised, "railing": str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES})
 			RoadBridgeDecks._mark(deck_top, k1, width, m2u, road, seed, urban)
 		i = j + 1
 	RoadBridgeDecks._paint(batches, dense, deck, width, surf, m2u, road, seed, line.get("road", {}), rise)

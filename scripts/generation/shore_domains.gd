@@ -11,6 +11,13 @@ const BRIDGE_DROP_MAX_M := 1.5
 ## Only a stream this narrow (mean width, 2 x area / perimeter, metres) is
 ## lowered: a smoothed DEM fills in a creek's valley, not a canal's quays.
 const BRIDGE_STREAM_MAX_M := 15.0
+## A river with low quays (ShoreEvidence.quays) along at least
+## QUAY_MIN_LENGTH_M lies QUAY_DROP_M under the streets behind their
+## upper walls (its low quay, then the upper wall), lowered for it by at
+## most QUAY_DROP_MAX_M, metres.
+const QUAY_MIN_LENGTH_M := 100.0
+const QUAY_DROP_M := 6.4
+const QUAY_DROP_MAX_M := 5.0
 var bodies: Array = []
 var cells: Dictionary = {}
 var bounds := Rect2()
@@ -151,13 +158,6 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 						var q: Vector2 = p + n * sign * 15.0
 						if bounds.has_point(q) and at(q) < 0:
 							samples.append(float(dry.call(q.x, q.y)))
-		if samples.size() >= 3:
-			samples.sort()
-			body["level"] = samples[samples.size() / 10] - freeboard
-		else:
-			body["level"] = inside - freeboard if not is_inf(inside) else datum
-			if not is_inf(inside):
-				diagnostics.append({"kind": "level_fallback", "body": id})
 		if str(body["kind"]) == "channel":
 			var axis: PackedVector2Array = body["axis"]
 			var d := (axis[1] - axis[0]).normalized()
@@ -166,7 +166,17 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 				float(dry.call(axis[0].x - n.x, axis[0].y - n.y))) - freeboard
 			body["level_end"] = minf(float(dry.call(axis[1].x + n.x, axis[1].y + n.y)),
 				float(dry.call(axis[1].x - n.x, axis[1].y - n.y))) - freeboard
-	_merge_levels()
+			continue
+		body["_samples"] = samples
+		body["_inside"] = inside
+		if samples.size() >= 3:
+			samples.sort()
+			body["level"] = samples[samples.size() / 10] - freeboard
+		else:
+			body["level"] = inside - freeboard if not is_inf(inside) else datum
+			if not is_inf(inside):
+				diagnostics.append({"kind": "level_fallback", "body": id})
+	_merge_levels(datum, freeboard)
 	_join_channel_levels()
 
 ## Lowers a narrow non-tidal stream a road bridge crosses to BRIDGE_ROOM_M under
@@ -212,6 +222,61 @@ func lower_under_bridges(roads: Array, dry: Callable) -> void:
 			if body.has(key):
 				var was := float(body[key])
 				body[key] = maxf(minf(was, float(group_cap[g])), was - BRIDGE_DROP_MAX_M)
+
+## Lowers a non-tidal body with low quays (ShoreEvidence.quays) to
+## QUAY_DROP_M under the median street behind their upper walls, by at
+## most QUAY_DROP_MAX_M, and every body touching it with it. Levelled from
+## a smoothed DEM that blurs the low quays into the river, the Seine stood
+## 2–3 m under its streets instead of 6–7, with no room for a low quay.
+func lower_for_quays(quays: Array, dry: Callable) -> void:
+	var m2u := WorldScale.metres_to_units()
+	var streets := {}
+	var lengths := {}
+	for q: Dictionary in quays:
+		var shore: PackedVector2Array = q["shore"]
+		var wall: PackedVector2Array = q["wall"]
+		var land: Vector2 = (q["land"] as Vector2).normalized()
+		var id := at(shore[shore.size() / 2] - land * 0.5 * m2u)
+		if id < 0 or bool(bodies[id]["tidal"]):
+			continue
+		if not streets.has(id):
+			streets[id] = []
+		for i in wall.size():
+			var p: Vector2 = wall[i] + land * 2.0 * m2u
+			if bounds.has_point(p):
+				(streets[id] as Array).append(float(dry.call(p.x, p.y)))
+			if i > 0:
+				lengths[id] = float(lengths.get(id, 0.0)) + shore[i - 1].distance_to(shore[i])
+	var parent := _groups()
+	var group_cap := {}
+	for id: int in streets:
+		var values: Array = streets[id]
+		if float(lengths.get(id, 0.0)) < QUAY_MIN_LENGTH_M * m2u or values.size() < 3:
+			continue
+		values.sort()
+		var g := _root(parent, id)
+		group_cap[g] = minf(float(group_cap.get(g, INF)), float(values[values.size() / 2]) - QUAY_DROP_M * m2u)
+	for id in bodies.size():
+		var g := _root(parent, id)
+		if not group_cap.has(g) or bool(bodies[id]["tidal"]):
+			continue
+		var body: Dictionary = bodies[id]
+		body["quayed"] = true
+		for key: String in ["level", "level_end"]:
+			if body.has(key):
+				var was := float(body[key])
+				body[key] = maxf(minf(was, float(group_cap[g])), was - QUAY_DROP_MAX_M * m2u)
+
+## True for a body lowered for its quays (lower_for_quays).
+func is_quayed(id: int) -> bool:
+	return id >= 0 and id < bodies.size() and bool((bodies[id] as Dictionary).get("quayed", false))
+
+## is_quayed of every body, as bytes, for the native classifier.
+func quayed_flags() -> PackedByteArray:
+	var out := PackedByteArray()
+	for id in bodies.size():
+		out.append(1 if is_quayed(id) else 0)
+	return out
 
 ## True for a narrow stream body (BRIDGE_STREAM_MAX_M mean width).
 static func _stream(body: Dictionary) -> bool:
@@ -269,7 +334,7 @@ func _join_channel_levels() -> void:
 			body["level"] = endpoints[ShoreGeometry.snap(body["axis"][0])]
 			body["level_end"] = endpoints[ShoreGeometry.snap(body["axis"][1])]
 
-func _merge_levels() -> void:
+func _merge_levels(datum: float = 0.0, freeboard: float = 0.0) -> void:
 	# Only actually touching/overlapping polygons join. Nearby lake bounds
 	# do not establish hydraulic connectivity, and river profiles stay graded.
 	var parent: Array[int] = []
@@ -291,22 +356,46 @@ func _merge_levels() -> void:
 					var a := _root(parent, id)
 					var b := _root(parent, other)
 					parent[maxi(a, b)] = mini(a, b)
-	# A bare natural=bay is tidal only in a group that holds real sea water
-	# (the coast, water=sea, tidal=yes): an inland lake's mapped coves take
-	# the lake's level instead of pulling it down to the sea.
+	# Touching polygons form one basin, so pool their dry-bank samples before
+	# taking the 10th percentile: a small high side polygon must not lift a
+	# whole river above its banks via a group-wide max.
 	var levels := {}
 	var tidal := {}
+	var pooled := {}
+	var insides := {}
 	for id in bodies.size():
+		var body: Dictionary = bodies[id]
+		if str(body["kind"]) == "channel":
+			continue
 		var group := _root(parent, id)
-		if not (bool(bodies[id]["tidal"]) and bool(bodies[id].get("bay", false))):
-			levels[group] = maxf(float(levels.get(group, -INF)), float(bodies[id]["level"]))
-		if bool(bodies[id]["tidal"]) and not bool(bodies[id].get("bay", false)):
-			tidal[group] = float(bodies[id]["level"])
+		if bool(body["tidal"]) and not bool(body.get("bay", false)):
+			tidal[group] = float(body["level"])
+		elif not (bool(body["tidal"]) and bool(body.get("bay", false))):
+			if body.has("_samples"):
+				if not pooled.has(group):
+					pooled[group] = []
+				(pooled[group] as Array).append_array(body["_samples"])
+				insides[group] = minf(float(insides.get(group, INF)), float(body.get("_inside", INF)))
+			else:
+				levels[group] = maxf(float(levels.get(group, -INF)), float(body["level"]))
+	for group: int in pooled:
+		var samples: Array = pooled[group]
+		if samples.size() >= 3:
+			samples.sort()
+			levels[group] = float(samples[samples.size() / 10]) - freeboard
+		else:
+			var inside := float(insides.get(group, INF))
+			levels[group] = inside - freeboard if not is_inf(inside) else datum
 	for id in bodies.size():
+		var body: Dictionary = bodies[id]
+		body.erase("_samples")
+		body.erase("_inside")
+		if str(body["kind"]) == "channel":
+			continue
 		var group := _root(parent, id)
-		if not tidal.has(group) and levels.has(group) and bool(bodies[id].get("bay", false)):
-			bodies[id]["tidal"] = false
-		bodies[id]["level"] = tidal.get(group, levels.get(group, float(bodies[id]["level"])))
+		if not tidal.has(group) and levels.has(group) and bool(body.get("bay", false)):
+			body["tidal"] = false
+		body["level"] = tidal.get(group, levels.get(group, float(body["level"])))
 
 static func _root(parent: Array[int], id: int) -> int:
 	while parent[id] != id:

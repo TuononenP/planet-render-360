@@ -120,7 +120,7 @@ func _check_seated(arcole: Dictionary) -> void:
 			top = maxf(top, box.end.y)
 			low = minf(low, box.position.y)
 		var camber := float(BridgeSpec.fitted(BridgeSpecs.row_for("br_paris_pont_d_arcole"), fit)["camber"])
-		_check(camber > 0.5 and camber <= BridgeSpec.CAMBER_GRADE * half * 0.5 + 0.01,
+		_check(camber > 0.5 and camber * BridgeCamber.LIFT_STEEPEST <= BridgeSpec.DECK_GRADE * half + 0.01,
 			"a bridge fitted to low banks humps within its grade, got %.2f m" % camber)
 		_check(absf(top - (fit + camber + BridgeSpec.PARAPET_M)) < 0.3 and low > -0.01,
 			"the fitted model's railing tops out at %.2f m (deck %.2f + hump %.2f), lowest %.2f" % [top, fit, camber, low])
@@ -146,6 +146,27 @@ func _check_seated(arcole: Dictionary) -> void:
 			"the hump is none at the ends and whole at mid-span")
 		var end_grade := (BridgeCamber.lift(half * 0.98, half, camber) - BridgeCamber.lift(half, half, camber)) / (half * 0.02)
 		_check(end_grade < 0.005, "the hump meets the road level, got a %.3f grade at its end" % end_grade)
+		var ramp_end := (BridgeCamber.ramp(half, half, 1.5) - BridgeCamber.ramp(half * 0.98, half, 1.5)) / (half * 0.02)
+		_check(absf(BridgeCamber.ramp(half, half, 1.5) - 1.5) < 0.001 and ramp_end < 0.005,
+			"the tilt meets each road level, got a %.3f grade at its end" % ramp_end)
+		# Hump and tilt together stay under the deck's steepest grade.
+		var both := LandmarkBuilder.build_bridge("br_paris_pont_d_arcole", 3.0, 0.8, 0.5)
+		var tops := {}
+		for mi in LandmarkBuilder.parts(both):
+			if mi.name != "Deck":
+				continue
+			var vs: PackedVector3Array = mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+			for v in vs:
+				if absf(v.x) <= half:
+					var bin := int(floorf(v.x / 2.0))
+					tops[bin] = maxf(float(tops.get(bin, -INF)), v.y)
+		var steepest := 0.0
+		for bin: int in tops:
+			if tops.has(bin + 1):
+				steepest = maxf(steepest, absf(float(tops[bin + 1]) - float(tops[bin])) / 2.0)
+		_check(tops.size() > 4 and steepest <= BridgeSpec.DECK_GRADE + 0.01,
+			"a humped, tilted deck should stay under a %.2f grade, got %.3f" % [BridgeSpec.DECK_GRADE, steepest])
+		both.free()
 	var a := LandmarkSites.axis(entry)
 	var spans := [[Vector2.ZERO, entry]]
 	_check(LandmarkSites.lands_at_span(PackedVector2Array([a * (half + 1.5), a * (half + 1.5) + Vector2(6, 8)]), spans),
@@ -193,7 +214,7 @@ func _check_fitted(row: Dictionary) -> void:
 	for deck: float in [2.0, 3.5]:
 		var fit := BridgeSpec.fitted(row, deck)
 		var camber := float(fit.get("camber", 0.0))
-		_check(camber >= 0.0 and camber <= BridgeSpec.CAMBER_GRADE * BridgeSpec.length_m(row) * 0.25 + 0.001,
+		_check(camber >= 0.0 and camber * BridgeCamber.LIFT_STEEPEST <= BridgeSpec.DECK_GRADE * BridgeSpec.length_m(row) * 0.5 + 0.001,
 			"%s humps %.2f m at a %.1f m deck, over its grade" % [id, camber, deck])
 		var root := LandmarkBuilder.build_bridge(id, deck)
 		var tris := 0

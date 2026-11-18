@@ -35,6 +35,9 @@ const COBRA_COUNTRIES := ["US", "CA"]
 const UTILITY_COUNTRIES := ["JP", "KR", "TW"]
 ## Linear colour of free-standing walls: grey-beige weathered masonry.
 const WALL_STONE := Color(0.26, 0.24, 0.21)
+## A mapped wall this close to a low quay's upper wall (ShorelineModel
+## .quays) is that wall, metres.
+const QUAY_WALL_REACH_M := 1.5
 ## barrier class → [kind, height m, thickness m]
 const BARRIERS := {
 	"wall": ["wall", 1.8, 0.4], "city_wall": ["wall", 6.0, 1.6],
@@ -400,6 +403,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	var piece := 3.0 * m2u
 	var roads := _road_grid(data, m2u)
 	var decks := BridgeStructures.barrier_rings(data, m2u)
+	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and not (ground.shoreline as ShorelineModel).quays.is_empty() else null
 	var models := LandmarkSites.model_rect_sites(data)
 	for br in data.barriers:
 		if not (br is Dictionary):
@@ -443,6 +447,11 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				# A wall or rail along the bank ends at the bridge's abutment:
 				# between its carriageways it stood as a stub on the deck.
 				if BridgeStructures.in_rings(p0, decks) or BridgeStructures.in_rings(p1, decks):
+					continue
+				# A low quay's upper wall and its parapet are ShoreBankMesh's:
+				# drawn on the drop it stands on, the mapped wall zigzagged
+				# between the walk and the street.
+				if shore != null and shore.near_quay_wall((p0 + p1) * 0.5, QUAY_WALL_REACH_M * m2u):
 					continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)

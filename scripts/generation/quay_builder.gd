@@ -24,14 +24,71 @@ const UNDERWATER_M := 0.6
 
 static var _stone_mats := {}
 
+## Pale limestone of the Seine quays (linear target for the render set).
+const LIMESTONE := Color(0.56, 0.52, 0.44)
+
+## Seine ashlar: courses COURSE_M high, blocks 2 x COURSE_M long, joints
+## staggered half a block course to course, each block a little lighter or
+## darker; mapped in world space (a tile is TILE_COURSES courses high).
+const ASHLAR_COURSE_M := 0.6
+const ASHLAR_TILE_COURSES := 4
+
+static func _ashlar_material() -> StandardMaterial3D:
+	var n := 256
+	var course := n / ASHLAR_TILE_COURSES
+	var block := course * 2
+	var img := Image.create(n, n, false, Image.FORMAT_RGB8)
+	for y in n:
+		var c := y / course
+		var shift := (block / 2) if c % 2 == 1 else 0
+		for x in n:
+			var bx := (x + shift) % n / block
+			var h := fposmod(sin(float(c * 7 + bx * 13) * 12.9898) * 43758.5453, 1.0)
+			# Weathered: blocks of several shades, the odd one sooty, a fine
+			# grain, and grime run down from each bed joint, so a long wall
+			# no longer reads as one clean printed grid.
+			var tone := 0.92 + 0.12 * h
+			if fposmod(h * 7.31, 1.0) < 0.12:
+				tone *= 0.93
+			var grain := fposmod(sin(float(x * 31 + y * 17) * 78.233) * 43758.5453, 1.0)
+			tone *= 0.97 + 0.06 * grain
+			var drip := fposmod(sin(float((x + shift) / 3) * 4.17 + float(c) * 1.3) * 43758.5453, 1.0)
+			if drip < 0.3:
+				tone *= 1.0 - 0.05 * (1.0 - float(y % course) / float(course))
+			var joint_h := (y % course) < 2
+			var joint_v := ((x + shift) % block) < 2
+			if joint_h or joint_v:
+				tone *= 0.62
+			var base := Color(0.80, 0.77, 0.69)
+			img.set_pixel(x, y, Color(base.r * tone, base.g * tone, base.b * tone))
+	img.generate_mipmaps()
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.roughness = 0.9
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / (ASHLAR_COURSE_M * ASHLAR_TILE_COURSES * WorldScale.metres_to_units())
+	return m
+
+## True where the quays and bridges are pale limestone (Paris's core).
+static func stone_quays(data: LocationData) -> bool:
+	return data != null and ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country) == "haussmann"
+
 ## Fine-grained stone calibrated in linear space to the regional kerb
 ## colour (granite in Europe, concrete in North America). Cache by
 ## colour so building another region cannot recolour an existing quay.
 ## World triplanar mapping keeps long walls at real texture scale.
 static func stone_material(data: LocationData = null) -> StandardMaterial3D:
 	var target := KerbBuilder.stone_for(data) if data != null else KerbBuilder.GRANITE
+	# Paris's quay walls are pale limestone ashlar, not the dark granite of a
+	# kerb: a tall wall of it read as a flat lilac-grey slab.
+	if stone_quays(data):
+		target = LIMESTONE
 	var key := target.to_html(false)
 	if not _stone_mats.has(key):
+		if stone_quays(data):
+			_stone_mats[key] = _ashlar_material()
+			return _stone_mats[key]
 		var row: Dictionary = MaterialLibrary.PBR_SETS["render"]
 		# Set means are already linear (a second decode read the stone
 		# ~1.6x too bright: pale, textureless quay slabs).

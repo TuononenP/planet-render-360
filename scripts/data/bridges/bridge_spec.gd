@@ -101,9 +101,9 @@ static func to_entry(row: Dictionary) -> Dictionary:
 		"aliases": aliases,
 	}
 
-## Bound on a fitted bridge's hump: a parabola this steep at its ends.
-## BridgeCamber's eased hump meets the road flat and stays under it.
-const CAMBER_GRADE := 0.1
+## Steepest grade of a fitted bridge's deck, hump and tilt together
+## (BridgeCamber), as on a city road bridge.
+const DECK_GRADE := 0.06
 ## Structures that stay level however low their banks.
 const NO_CAMBER := ["pontoon", "swing", "lift", "bascule"]
 
@@ -111,7 +111,7 @@ const NO_CAMBER := ["pontoon", "swing", "lift", "bascule"]
 ## `clear` (never under a lower deck's room): the model built from it
 ## meets banks that stand lower or higher than the table's estimate. Over
 ## lower banks it humps back up toward its own clearance at mid-span
-## (`camber`, BridgeCamber), as far as CAMBER_GRADE allows.
+## (`camber`, BridgeCamber), as far as DECK_GRADE left by its tilt allows.
 ## `tilt_m` raises its +X end and lowers its -X end by that much.
 ## `rise_m` is the least hump it must have (ground under the span), within
 ## the same grade, whatever its structure.
@@ -120,7 +120,8 @@ static func fitted(row: Dictionary, deck_m: float, tilt_m: float = 0.0, rise_m: 
 	out["tilt"] = tilt_m
 	var clear := maxf(deck_m, float(row.get("lower", 0.0)) + 2.0)
 	out["clear"] = clear
-	var most := CAMBER_GRADE * length_m(row) * 0.25
+	var half := length_m(row) * 0.5
+	var most := maxf(DECK_GRADE * half - BridgeCamber.RAMP_STEEPEST * absf(tilt_m), 0.0) / BridgeCamber.LIFT_STEEPEST
 	out["camber"] = clampf(rise_m, 0.0, most)
 	if not str(row.get("st", "")) in NO_CAMBER:
 		out["camber"] = clampf(maxf(float(row.get("clear", clear)) - clear, rise_m), 0.0, most)

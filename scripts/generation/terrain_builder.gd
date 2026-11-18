@@ -688,7 +688,7 @@ static func landing_ends_m(ground: GroundTruth, at: Vector2, entry: Dictionary, 
 		ends.x = ends.y
 	if is_nan(ends.y):
 		ends.y = ends.x
-	var most := LANDING_TILT_GRADE * float(entry.get("span_m", 0.0)) * 0.5
+	var most := LANDING_TILT_GRADE * float(entry.get("span_m", 0.0)) * 0.5 / BridgeCamber.RAMP_STEEPEST
 	var mid := (ends.x + ends.y) * 0.5
 	var d := clampf((ends.y - ends.x) * 0.5, -most, most)
 	d = clampf(d, -(mid - DECK_MIN_AIR_M), mid - DECK_MIN_AIR_M)
@@ -722,7 +722,7 @@ static func span_rise_m(ground: GroundTruth, at: Vector2, entry: Dictionary, wat
 	var n := maxi(8, int(half_m / 4.0))
 	for i in range(-n + 1, n):
 		var k := float(i) / float(n)
-		var deck := lerpf(ends.x, ends.y, (k + 1.0) * 0.5)
+		var deck := (ends.x + ends.y) * 0.5 + BridgeCamber.ramp(k, 1.0, (ends.y - ends.x) * 0.5)
 		for w: float in [0.0, -side, side]:
 			var p := at + a * k * half_m * m2u + across * w
 			if not ground.is_inside(p.x, p.y) or ground.water_at(p.x, p.y) > 0.0:

@@ -9,6 +9,10 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 		kernel = ClassDB.instantiate("ShorePatchKernel")
 		kernel.setup(model.base, model.land, model.domains.bodies, model.segments,
 			Vector4(model.size, model.step, model.origin, model.depth), model.sampler, model.domains.native, model._evidence.native)
+		if kernel.has_method("setup_quays"):
+			kernel.setup_quays(model.quays, HARD_PAVING_M * WorldScale.metres_to_units())
+		elif not model.quays.is_empty():
+			kernel = null  # A library built before low quays: the script lays them.
 	var keys := {}
 	for key in model.edge_cells:
 		for dx in range(-1, 2):
@@ -65,6 +69,7 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 			var centre := RingGeometry.centroid(piece)
 			var body := model.domains.at(centre)
 			var near := model.nearest(centre)
+			var quay := model.quay_at(centre) if body < 0 else -1
 			var hard := body < 0 and not near.is_empty() and str(near["segment"]["kind"]) == "hard"
 			var natural_cover := model._evidence != null and model._evidence.contains_kind(centre, "natural")
 			for i in range(1, piece.size() - 1):
@@ -74,15 +79,35 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 					continue
 				area += tri_area
 				owners.append(body)
-				hard_regions.append(1 if hard else 0)
-				paving.append(1 if hard and not natural_cover else 0)
+				# 2: a low quay's walk (ShoreStitch keeps it apart from the street).
+				hard_regions.append(2 if quay >= 0 else 1 if hard else 0)
+				# A low quay's walk is paving; the street behind its wall keeps
+				# the class the ground has there (forced, it met its asphalt in
+				# patches of another grey).
+				var pave_hard := hard and not _street_of_quay(near) and float(near["distance"]) <= HARD_PAVING_M * WorldScale.metres_to_units()
+				paving.append(1 if (quay >= 0 or pave_hard) and not natural_cover else 0)
 				for p in points:
-					triangles.append(Vector3(p.x, model.vertex_height(p, body, near), p.y))
+					triangles.append(Vector3(p.x, model.vertex_height(p, body, near, quay), p.y))
 		var expected := box.size.x * box.size.y
 		if absf(area - expected) > maxf(0.02, expected * 0.001) or triangles.is_empty():
 			model.diagnostics.append({"kind": "patch_failure", "cell": key, "area": area, "expected": expected})
 			continue
 		model.patches[key] = {"triangles": triangles, "owners": owners, "paving": paving, "hard": hard_regions}
+
+## A hard bank forces the paving class this far from its wall, metres; the
+## ground's own class (asphalt, paving, grass) shows beyond. The whole cell
+## forced, its block edge met the street's asphalt in angular patches of
+## another grey.
+const HARD_PAVING_M := 4.0
+
+## True when `near` (ShorelineModel.nearest) is a low quay's wall or a bridge's abutment.
+static func _street_of_quay(near: Dictionary) -> bool:
+	if near.is_empty():
+		return false
+	for source in near["segment"].get("sources", []):
+		if str(source).begins_with("quay:") or str(source).begins_with("abutment:"):
+			return true
+	return false
 
 ## build()'s cells through ShorePatchKernel.cells, in order: a cell the
 ## native partition left a gap in is partitioned by the script here.

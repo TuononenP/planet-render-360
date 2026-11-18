@@ -54,10 +54,28 @@ static func _slab(batches: Dictionary, s: BridgeStructures.Structure, surf: Road
 	var top := RoadBuilder._batch(batches, "bridge")
 	var side := RoadBuilder._batch(batches, "deck")
 	var depth := s.depth
-	for piece: PackedVector2Array in _slices(s, m2u):
+	for piece_in: PackedVector2Array in _slices(s, m2u):
+		var piece := piece_in
 		var tri := Geometry2D.triangulate_polygon(piece)
 		if tri.is_empty():
-			continue
+			# A sliver the ear clipper refuses (a cell piece along a slanted
+			# outline edge) left a hole in the deck, the underside and the
+			# ground showing through: other winding, then a fan over its hull.
+			var rev := piece.duplicate()
+			rev.reverse()
+			tri = Geometry2D.triangulate_polygon(rev)
+			if not tri.is_empty():
+				piece = rev
+			else:
+				var hull := Geometry2D.convex_hull(piece)
+				if hull.size() > 1 and hull[0] == hull[hull.size() - 1]:
+					hull.remove_at(hull.size() - 1)
+				if hull.size() < 3 or absf(BridgeStructures.Plan._area(hull)) < 0.0001:
+					continue
+				piece = hull
+				tri = PackedInt32Array()
+				for k in range(1, hull.size() - 1):
+					tri.append_array(PackedInt32Array([0, k, k + 1]))
 		top.pad()
 		var kt := top.verts.size()
 		var ks := side.verts.size()
@@ -73,6 +91,24 @@ static func _slab(batches: Dictionary, s: BridgeStructures.Structure, surf: Road
 		for t in range(0, tri.size(), 3):
 			_tri(top, kt + tri[t], kt + tri[t + 1], kt + tri[t + 2], true)
 			_tri(side, ks + tri[t], ks + tri[t + 1], ks + tri[t + 2], false)
+
+## A slab lying on the ground (within SKIM_M of it) stays just over the
+## highest drawn ground around the point: the terrain's own triangles crest
+## between the slab's and showed through its head as light patches.
+const SKIM_M := 0.8
+const SKIM_REACH_M := 2.0
+const SKIM_CLEAR_M := 0.08
+
+static func above_ground(surf: RoadBuilder._Surface, p: Vector2, y: float) -> float:
+	var m2u := WorldScale.metres_to_units()
+	var here := surf.height(p.x, p.y)
+	if absf(y - here) > SKIM_M * m2u:
+		return y
+	var r := SKIM_REACH_M * m2u
+	var high := here
+	for d: Vector2 in [Vector2(r, 0.0), Vector2(-r, 0.0), Vector2(0.0, r), Vector2(0.0, -r)]:
+		high = maxf(high, surf.height(p.x + d.x, p.y + d.y))
+	return maxf(y, minf(high, y + SKIM_M * m2u) + SKIM_CLEAR_M * m2u)
 
 ## Triangle a-b-c wound to face up (`up`) or down.
 static func _tri(b: RoadBuilder._Batch, a: int, bb: int, c: int, up: bool) -> void:

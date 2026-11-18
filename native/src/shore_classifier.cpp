@@ -33,8 +33,10 @@ struct CacheHash {
 void ShoreClassifier::setup(const PackedFloat32Array &p_dry, int p_size, double p_step, double p_origin,
 		const Rect2 &p_bounds, const Rect2 &p_domain_bounds, const Ref<ShoreDomainIndex> &p_domains,
 		const PackedFloat64Array &p_levels, const Ref<ShoreEvidenceIndex> &p_evidence, const Dictionary &p_abutment_ends,
-		double p_m2u) {
+		double p_m2u, const PackedFloat32Array &p_land, const PackedByteArray &p_quayed) {
 	dry = p_dry;
+	quayed = p_quayed;
+	land_grid = p_land;
 	size = p_size;
 	step = p_step;
 	origin = p_origin;
@@ -78,6 +80,19 @@ double ShoreClassifier::dry_height(const Vector2 &p) const {
 	return a + (b - a) * tz;
 }
 
+double ShoreClassifier::land_height(const Vector2 &p) const {
+	if (size < 2 || land_grid.is_empty()) return 0.0;
+	Vector2 f = (p - Vector2(1, 1) * (real_t)origin) / (real_t)step;
+	f = f.clamp(Vector2(0, 0), Vector2(1, 1) * (real_t)(size - 1));
+	const int x = std::min((int)f.x, size - 2), z = std::min((int)f.y, size - 2);
+	const double tx = (double)f.x - x, tz = (double)f.y - z;
+	const float *v = land_grid.ptr();
+	const double v00 = v[z * size + x], v01 = v[z * size + x + 1];
+	const double v10 = v[(z + 1) * size + x], v11 = v[(z + 1) * size + x + 1];
+	const double a = v00 + (v01 - v00) * tx, b = v10 + (v11 - v10) * tx;
+	return a + (b - a) * tz;
+}
+
 // ShorelineModel._bank_top_at: the median dry height 2, 5, 10 and 20
 // inland, over open dry ground only; NAN under three samples.
 double ShoreClassifier::bank_top(const Vector2 &p, const Vector2 &land) const {
@@ -101,12 +116,12 @@ double ShoreClassifier::abutment_top(const Dictionary &treatment, const Vector2 
 		if (ends.size() != 2) continue;
 		const bool near0 = ends[0].distance_squared_to(mid) <= ends[1].distance_squared_to(mid);
 		const Vector2 e = near0 ? ends[0] : ends[1];
-		if (at(e) < 0) return dry_height(e);
+		if (at(e) < 0) return land_height(e);
 		const Vector2 out = (e - (near0 ? ends[1] : ends[0])).normalized();
 		double best = NAN;
 		for (int k = 1; k < 11; ++k) {
 			const Vector2 q = e + out * (real_t)2.0 * (real_t)(double)k * (real_t)m2u;
-			if (bounds.has_point(q) && at(q) < 0) best = std::isnan(best) ? dry_height(q) : gd_max(best, dry_height(q));
+			if (bounds.has_point(q) && at(q) < 0) best = std::isnan(best) ? land_height(q) : gd_max(best, land_height(q));
 		}
 		return best;
 	}
@@ -190,7 +205,18 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 		Piece &p = pieces[k];
 		if (!p.resolved) return;
 		Dictionary treatment = evidence_of[p.first].duplicate();
-		const bool hard = String(treatment["kind"]) == "hard";
+		bool hard = String(treatment["kind"]) == "hard";
+		// ShorelineModel._classify: a steep natural bank on a quayed river is a wall.
+		if (!hard && p.body >= 0 && p.body < quayed.size() && quayed[p.body]) {
+			const double rise = bank_top(p.mid, p.land);
+			if (!std::isnan(rise) && rise - level(p.body, p.mid) > 4.0 * m2u) {
+				treatment = Dictionary();
+				treatment["kind"] = "hard";
+				treatment["reason"] = "quayed_bank";
+				treatment["sources"] = Array();
+				hard = true;
+			}
+		}
 		double top_a = hard ? bank_top(p.start, p.land) : dry_height(p.start);
 		double top_b = hard ? bank_top(p.end, p.land) : dry_height(p.end);
 		if (hard) {
@@ -289,7 +315,7 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 
 void ShoreClassifier::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "dry", "size", "step", "origin", "bounds", "domain_bounds", "domains", "levels",
-			"evidence", "abutment_ends", "m2u"), &ShoreClassifier::setup);
+			"evidence", "abutment_ends", "m2u", "land", "quayed"), &ShoreClassifier::setup);
 	ClassDB::bind_method(D_METHOD("classify", "edges", "abort"), &ShoreClassifier::classify);
 }
 

@@ -234,13 +234,223 @@ func _run() -> void:
 	_rendered_surface_fixture()
 	_bridge_and_far_fixture()
 	_area_packing_fixture()
+	_low_quay_fixture()
 	if failures.is_empty():
-		print("SHORELINE OK: exact coverage, natural and hard banks, evidence, queries, cache, hole fallback")
+		print("SHORELINE OK: exact coverage, natural and hard banks, low quays, evidence, queries, cache, hole fallback")
 		quit(0)
 	else:
 		for failure in failures:
 			printerr("SHORELINE FAIL: ", failure)
 		quit(1)
+
+## A river whose mapped retaining wall stands 10 m back from its edge (a
+## Paris quay): the river lies a quay's height under the street, the edge
+## is a wall up to a low walk, and the upper wall rises from the walk to
+## the street.
+func _low_quay_fixture() -> void:
+	var data := _data()
+	data.land_polygons[0]["tidal"] = false
+	data.shore_structures = [{"points": PackedVector2Array([Vector2(-10, -300), Vector2(-10, 300)]),
+		"kind": "retaining_wall", "id": "way:upper"}]
+	for force_script in [false, true]:
+		ShoreGeometry.force_script = force_script
+		var ground := GroundTruth.new(data)
+		var model: ShorelineModel = ground.shoreline
+		var tag := " (script=%s)" % force_script
+		_check(model.quays.size() == 1, "a wall 10 m back from a river's edge should make one low quay, got %d%s" % [model.quays.size(), tag])
+		var level := ground.water_level_at(10, 0)
+		_check(absf(level - (3.0 - ShoreDomains.QUAY_DROP_MAX_M - ground.FREEBOARD_M)) < 0.05,
+			"a quayed river should be lowered toward a quay's height under its street, at %.2f%s" % [level, tag])
+		var walk := ground.height_at_world(-5, 0)
+		_check(absf(walk - (level + ShorelineModel.LOW_QUAY_M)) < 0.05,
+			"the low quay should stand %.1f m over the water, got %.2f over it%s" % [ShorelineModel.LOW_QUAY_M, walk - level, tag])
+		_check(absf(ground.height_at_world(-20, 0) - 3.0) < 0.05, "the street behind the upper wall keeps its height%s" % tag)
+		var edge_hard := false
+		for segment in model.segments:
+			var mid: Vector2 = (segment["a"] + segment["b"]) * 0.5
+			if absf(mid.x) < 0.1 and absf(mid.y) < 50 and str(segment["kind"]) == "hard" \
+					and (segment.get("sources", []) as Array).has(model.quays[0]["id"] if not model.quays.is_empty() else ""):
+				edge_hard = true
+		_check(edge_hard, "the river's edge in front of a low quay should be a wall%s" % tag)
+		var upper := 0.0
+		for cap in ShoreBankMesh.transition_caps(model):
+			var face: PackedVector3Array = cap["face"]
+			# Its ends ease down to the water beside the unwalled bank beyond.
+			if absf(face[0].x + 10.0) < 0.1 and absf(face[1].x + 10.0) < 0.1 and maxf(absf(face[0].z), absf(face[1].z)) < 160.0:
+				var lo := minf(minf(face[0].y, face[1].y), minf(face[2].y, face[3].y))
+				var hi := maxf(maxf(face[0].y, face[1].y), maxf(face[2].y, face[3].y))
+				if absf(lo - walk) < 0.1 and absf(hi - 3.0) < 0.1:
+					upper += absf(face[1].z - face[0].z)
+		_check(upper > 300.0, "the upper wall should rise from the walk to the street along its middle 300 m, got %.0f m%s" % [upper, tag])
+		var restored: ShorelineModel = ShorelineModel.from_state(model.state())
+		_check(restored.quays.size() == model.quays.size(), "a cached shoreline should keep its low quays%s" % tag)
+	_quay_wall_break_fixture(data)
+	# A bridge landing on the quayed bank stands on an abutment at the
+	# street's height, and stairs down to the walk leave the wall whole.
+	data.roads = [
+		{"class": "primary", "bridge": true, "width_m": 8.0, "osm_id": "way:bridge",
+			"points": PackedVector2Array([Vector2(-40, 100), Vector2(200, 100)])},
+		{"class": "steps", "points": PackedVector2Array([Vector2(-10, -100), Vector2(0, -100)])}]
+	for force_script in [false, true]:
+		ShoreGeometry.force_script = force_script
+		var ground := GroundTruth.new(data)
+		var model: ShorelineModel = ground.shoreline
+		var tag := " (script=%s)" % force_script
+		var abutment := false
+		var stairs_hard := false
+		for segment in model.segments:
+			var mid: Vector2 = (segment["a"] + segment["b"]) * 0.5
+			if absf(mid.x) > 0.1 or str(segment["kind"]) != "hard":
+				continue
+			if absf(mid.y - 100.0) < 2.0 and (segment.get("sources", []) as Array).has("abutment:way:bridge"):
+				abutment = true
+			if absf(mid.y + 100.0) < 1.5:
+				stairs_hard = true
+		_check(abutment, "the quayed bank under a bridge should be its abutment%s" % tag)
+		_check(stairs_hard, "stairs down to a low quay should leave its wall whole%s" % tag)
+		_check(absf(ground.height_at_world(-5, 100) - 3.0) < 0.1,
+			"the ground under the bridge's end should stand at the street, got %.2f%s" % [ground.height_at_world(-5, 100), tag])
+		var level := ground.water_level_at(10, 0)
+		_check(absf(ground.height_at_world(-5, 0) - (level + ShorelineModel.LOW_QUAY_M)) < 0.05,
+			"the low quay should go on beside the bridge%s" % tag)
+	# The bank beside a bridge's abutment with no wall mapped is the abutment
+	# too, its street level with the bridge's end.
+	var walled: Array = data.shore_structures
+	data.shore_structures = [{"points": PackedVector2Array([Vector2(-10, -300), Vector2(-10, 60)]),
+		"kind": "retaining_wall", "id": "way:upper"}]
+	for force_script in [false, true]:
+		ShoreGeometry.force_script = force_script
+		var ground := GroundTruth.new(data)
+		var approach := false
+		for segment in ground.shoreline.segments:
+			var mid: Vector2 = (segment["a"] + segment["b"]) * 0.5
+			if absf(mid.x) < 0.1 and absf(mid.y - 76.0) < 1.5 and str(segment["kind"]) == "hard" \
+					and (segment.get("sources", []) as Array).has("abutment:way:bridge"):
+				approach = true
+		_check(approach, "the unwalled bank beside a bridge's abutment should be its abutment (script=%s)" % force_script)
+		_check(absf(ground.height_at_world(-3, 76) - 3.0) < 0.1,
+			"the street beside a bridge's abutment should stand at its level, got %.2f (script=%s)" % [ground.height_at_world(-3, 76), force_script])
+	data.shore_structures = walled
+	data.roads = []
+	# A model that dips toward the river behind the wall: the street is levelled.
+	var dipped := _data()
+	dipped.land_polygons[0]["tidal"] = false
+	dipped.shore_structures = data.shore_structures.duplicate(true)
+	dipped.grid_size = 256
+	dipped.heights.resize(256 * 256)
+	dipped.heights.fill(3.0)
+	var post := 2400.0 / 255.0
+	for z in 256:
+		for x in 256:
+			var px := -1200.0 + float(x) * post
+			if px > -32.0 and px < 0.0:
+				dipped.heights[z * 256 + x] = 1.5
+	var terraced := GroundTruth.new(dipped)
+	_check(terraced.shoreline.quays.size() == 1, "the dipped fixture should have its low quay")
+	var far_street := terraced.height_at_world(-60, 0)
+	for d: float in [3.0, 8.0]:
+		var h := terraced.height_at_world(-10.0 - d, 0)
+		_check(absf(h - far_street) < 0.5, "the street %.0f m behind the wall should be level with it further back (%.2f), got %.2f" % [d, far_street, h])
+	ShoreGeometry.force_script = false
+	# A wall farther back than any quay's is a street's, not the river's.
+	data.shore_structures[0]["points"] = PackedVector2Array([Vector2(-30, -300), Vector2(-30, 300)])
+	var far := GroundTruth.new(data)
+	_check(far.shoreline.quays.is_empty(), "a wall 30 m back from the edge is no quay")
+	# An inland earthen embankment is a slope, not a low quay's masonry wall.
+	data.shore_structures = [{"points": PackedVector2Array([Vector2(-10, -300), Vector2(-10, 300)]),
+		"kind": "embankment", "id": "way:embankment"}]
+	_check(GroundTruth.new(data).shoreline.quays.is_empty(), "an inland embankment must not form a vertical low-quay wall")
+	# A park hill behind a quay's street must not lift the street onto a cliff.
+	var hilly := _data()
+	hilly.land_polygons[0]["tidal"] = false
+	hilly.shore_structures = [{"points": PackedVector2Array([Vector2(-10, -300), Vector2(-10, 300)]),
+		"kind": "retaining_wall", "id": "way:hill_wall"}]
+	hilly.grid_size = 256
+	hilly.heights.resize(256 * 256)
+	for z in 256:
+		for x in 256:
+			var px := -1200.0 + float(x) * post
+			hilly.heights[z * 256 + x] = 3.0 + maxf(-px - 22.0, 0.0) * 0.3
+	var hill_ground := GroundTruth.new(hilly)
+	_check(absf(hill_ground.height_at_world(-16.0, 0) - 3.0) < 0.6,
+		"a hillside behind a quay street must not lift the street, got %.2f" % hill_ground.height_at_world(-16.0, 0))
+	# A small high polygon touching a river must not lift the river above its banks.
+	var split_river := _data()
+	split_river.grid_size = 128
+	split_river.heights.resize(128 * 128)
+	var rpost := 2400.0 / 127.0
+	for z in 128:
+		for x in 128:
+			var pz := -1200.0 + float(z) * rpost
+			split_river.heights[z * 128 + x] = 12.0 if pz > 500.0 else 3.0
+	split_river.land_polygons = [
+		{"class": "water", "tidal": false, "points": PackedVector2Array([
+			Vector2(0, -400), Vector2(80, -400), Vector2(80, 520), Vector2(0, 520)]), "holes": []},
+		{"class": "water", "tidal": false, "points": PackedVector2Array([
+			Vector2(0, 515), Vector2(40, 515), Vector2(40, 560), Vector2(0, 560)]), "holes": []}]
+	var river_ground := GroundTruth.new(split_river)
+	_check(river_ground.water_level_at(40, 0) < 3.0,
+		"a small high tributary polygon must not lift a river above its dry banks (%.2f)" % river_ground.water_level_at(40, 0))
+
+## A short break in the mapped wall is bridged (one quay, its walk whole).
+## Across a long one the street stands out to the water between two
+## quays: the wall at the water's edge rises to it there, and a pavement
+## along the upper wall lies on the street and the walk, not down the wall.
+func _quay_wall_break_fixture(data: LocationData) -> void:
+	var whole: Array = data.shore_structures
+	for gap: float in [4.0, 15.0]:
+		data.shore_structures = [
+			{"points": PackedVector2Array([Vector2(-10, -300), Vector2(-10, -gap)]), "kind": "retaining_wall", "id": "way:upper_a"},
+			{"points": PackedVector2Array([Vector2(-10, gap), Vector2(-10, 300)]), "kind": "retaining_wall", "id": "way:upper_b"}]
+		for force_script in [false, true]:
+			ShoreGeometry.force_script = force_script
+			var ground := GroundTruth.new(data)
+			var model: ShorelineModel = ground.shoreline
+			var tag := " (gap=%.0f script=%s)" % [gap * 2.0, force_script]
+			var walk := ground.water_level_at(10, 0) + ShorelineModel.LOW_QUAY_M
+			if gap < ShoreEvidence.QUAY_GAP_M * 0.5:
+				_check(model.quays.size() == 1, "a wall with a short break should make one low quay, got %d%s" % [model.quays.size(), tag])
+				_check(absf(ground.height_at_world(-5, 0) - walk) < 0.05, "the walk should go on past a short break in the wall%s" % tag)
+				continue
+			_check(model.quays.size() == 2, "a wall with a long break should make two low quays, got %d%s" % [model.quays.size(), tag])
+			_check(absf(ground.height_at_world(-5, 0) - 3.0) < 0.1, "the street should stand out to the water across a long break%s" % tag)
+			var root := Node3D.new()
+			ShoreBankMesh.build(root, model, null, data)
+			var walls := root.get_node_or_null("ShoreWalls") as MeshInstance3D
+			var faces := 0
+			var short := 0
+			if walls != null:
+				var verts: PackedVector3Array = walls.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				for i in range(0, verts.size() - 3, 4):
+					var top := -INF
+					var front := true
+					for k in 4:
+						var v := verts[i + k]
+						front = front and absf(v.x) < 0.01 and absf(v.z) <= gap + 1.01
+						top = maxf(top, v.y)
+					if front:
+						faces += 1
+						if top < 2.9:
+							short += 1
+			root.free()
+			_check(faces > 0 and short == 0, "the wall at the water's edge should rise to the street between two quays, %d of %d faces short%s" % [short, faces, tag])
+			var surf := RoadBuilder._Surface.new(data, ground)
+			if not force_script:
+				surf.use_native()
+			var batch := RoadBuilder._Batch.new()
+			RoadBuilder._ribbon(batch, PackedVector2Array([Vector2(-10.6, -100), Vector2(-10.6, -40)]), 3.0, surf, 0.02)
+			var hung := 0
+			var low := 0
+			for i in range(0, batch.indices.size(), 3):
+				var ys := [batch.verts[batch.indices[i]].y, batch.verts[batch.indices[i + 1]].y, batch.verts[batch.indices[i + 2]].y]
+				if ys.max() - ys.min() > 0.5:
+					hung += 1
+				if absf(float(ys.max()) - walk - 0.02) < 0.05:
+					low += 1
+			_check(batch.indices.size() > 0 and hung == 0, "a pavement along the upper wall should not hang down it, %d triangles do%s" % [hung, tag])
+			_check(low > 0, "a pavement's edge past the upper wall should lie on the walk%s" % tag)
+	ShoreGeometry.force_script = false
+	data.shore_structures = whole
 
 func _topology_fixtures() -> void:
 	var diagonal := PackedVector2Array([Vector2(-100, -100), Vector2(100, 100), Vector2(300, -100)])

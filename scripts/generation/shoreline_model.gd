@@ -26,6 +26,19 @@ var transition_cells := {}
 var _vertex_heights := {}
 var _bank_tops := {}
 var sampler: Object = null
+## Low quays (ShoreEvidence.quays) on banks tall enough for one: {id,
+## ring (the water's edge, then the upper wall back), body, low (over the
+## water), wall, land}. The ground inside a ring stands `low` over the
+## water; its edges inland are walls (ShoreBankMesh).
+var quays: Array = []
+## ShoreTerrace's street posts: index -> (height, weight), until hold_terrace.
+var _terrace := {}
+var _quay_boxes: Array = []
+## A low quay's walk over the water, and the least upper wall over it, metres.
+const LOW_QUAY_M := 2.4
+## A natural bank this much over a quayed river's water is a wall, metres.
+const QUAYED_RISE_M := 4.0
+const QUAY_WALL_MIN_M := 1.5
 ## Test hook: false classifies with the script even when ShoreClassifier is loaded.
 static var native_classify := true
 
@@ -43,6 +56,16 @@ func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abo
 	domains.estimate(Callable(self, "dry_height"), ground.water_level_m, ground.FREEBOARD_M, sea_level, abort)
 	domains.lower_under_bridges(data.roads, Callable(self, "dry_height"))
 	_evidence = ShoreEvidence.new(data)
+	domains.lower_for_quays(_evidence.quays, Callable(self, "dry_height"))
+	# The street along the quays' upper walls, levelled (ShoreTerrace)
+	# before the water is carved and the roads graded.
+	var levelled := ShoreTerrace.posts(self, _evidence)
+	for k: int in levelled["heights"]:
+		dry[k] = levelled["heights"][k]
+		# The surface under the river is carved below anyway.
+		if not levelled["wet"].has(k):
+			ground._surface[k] = levelled["heights"][k]
+			_terrace[k] = Vector2(levelled["heights"][k], levelled["weights"][k])
 	_index_edges()
 
 func empty() -> bool:
@@ -131,6 +154,17 @@ func carve(surface: PackedFloat32Array, levels: PackedFloat32Array) -> void:
 				surface[index] = minf(surface[index], level - depth)
 				levels[index] = maxf(levels[index], level)
 
+## Puts the street ShoreTerrace levelled back under the passes that ran
+## after it, by its weight. A plaza's plane fit and the cut for a way under
+## a bridge read the elevation model's blurred river dip behind the wall
+## and pulled the street there down by two metres, so the wall's top waved
+## and a pale slope ran along it.
+func hold_terrace(surface: PackedFloat32Array) -> void:
+	for k: int in _terrace:
+		var held: Vector2 = _terrace[k]
+		surface[k] = lerpf(surface[k], held.x, held.y)
+	_terrace.clear()
+
 func finish(ground, abort: BuildAbort = null) -> void:
 	if abort != null and abort.requested:
 		return
@@ -149,6 +183,7 @@ func finish(ground, abort: BuildAbort = null) -> void:
 		if is_inf(ground._level[i]):
 			land[i] = base[i]
 	_classify(abort)
+	_make_quays()
 	var classified := Time.get_ticks_msec()
 	if abort != null and abort.requested:
 		return
@@ -204,6 +239,14 @@ func _classify(abort: BuildAbort) -> void:
 				_class_cache[cache_key] = _evidence.classify(mid - dir * 5.0, mid + dir * 5.0, land)
 			var treatment: Dictionary = (_class_cache[cache_key] as Dictionary).duplicate()
 			var hard := str(treatment["kind"]) == "hard"
+			# On a river with quays (ShoreDomains.lower_for_quays) a natural
+			# bank rising steeply from the lowered water is a quay wall too: it
+			# stood as a ramp six metres high, as at an island's tip.
+			if not hard and domains.is_quayed(body):
+				var rise := _bank_top_at(mid, land)
+				if not is_nan(rise) and rise - domains.level(body, mid) > QUAYED_RISE_M * WorldScale.metres_to_units():
+					treatment = {"kind": "hard", "reason": "quayed_bank", "sources": []}
+					hard = true
 			var top_a := _bank_top(start, land) if hard else dry_height(start.x, start.y)
 			var top_b := _bank_top(end, land) if hard else dry_height(end.x, end.y)
 			var road_top := _abutment_top(treatment, mid)
@@ -257,7 +300,7 @@ func _classify_native(abort: BuildAbort) -> bool:
 		return false
 	var classifier: Object = ClassDB.instantiate("ShoreClassifier")
 	classifier.setup(dry, size, step, origin, bounds, domains.bounds, domains.native, _levels(),
-		_evidence.native, _evidence.abutment_ends, WorldScale.metres_to_units())
+		_evidence.native, _evidence.abutment_ends, WorldScale.metres_to_units(), land, domains.quayed_flags())
 	var out: Dictionary = classifier.classify(_edges, abort)
 	if out.has("aborted") or not out.has("segments"):
 		return true
@@ -309,6 +352,84 @@ func _make_transitions() -> void:
 					transition_cells[key] = []
 				(transition_cells[key] as Array).append(id)
 
+## `quays` from the evidence's, where the street behind the upper wall
+## stands QUAY_WALL_MIN_M over the low quay; their rings' inland edges cut
+## the shore patches (as transition edges do) so the walk meets the wall.
+func _make_quays() -> void:
+	quays = []
+	if _evidence == null:
+		return
+	var m2u := WorldScale.metres_to_units()
+	for q: Dictionary in _evidence.quays:
+		var shore: PackedVector2Array = q["shore"]
+		var wall: PackedVector2Array = q["wall"]
+		var land: Vector2 = q["land"]
+		var mid := shore[shore.size() / 2]
+		var body := domains.at(mid - land * 0.5 * m2u)
+		if body < 0:
+			continue
+		var streets: Array[float] = []
+		for p in wall:
+			var behind := p + land * 2.0 * m2u
+			if bounds.has_point(behind):
+				streets.append(land_height(behind.x, behind.y))
+		if streets.size() < 2:
+			continue
+		streets.sort()
+		var low := LOW_QUAY_M * m2u
+		if streets[streets.size() / 2] - (domains.level(body, mid) + low) < QUAY_WALL_MIN_M * m2u:
+			continue
+		var ring := PackedVector2Array()
+		for p in shore:
+			ring.append(ShoreGeometry.snap(p))
+		var back := PackedVector2Array()
+		for i in range(wall.size() - 1, -1, -1):
+			back.append(ShoreGeometry.snap(wall[i]))
+		ring.append_array(back)
+		quays.append({"id": q["id"], "ring": ring, "body": body, "low": low, "land": land,
+			"wall": back})
+		# The ring's inland edges: from the last station to the wall, along
+		# the wall, back to the first station.
+		for i in range(shore.size() - 1, ring.size()):
+			_add_cut(ring[i], ring[(i + 1) % ring.size()])
+	_quay_boxes = []
+	for q: Dictionary in quays:
+		_quay_boxes.append(RingGeometry.aabb(q["ring"]))
+
+func _add_cut(a: Vector2, b: Vector2) -> void:
+	if a.distance_squared_to(b) < 0.0001:
+		return
+	var id := transition_edges.size()
+	transition_edges.append([a, b])
+	var lo := cell_at(a.min(b))
+	var hi := cell_at(a.max(b))
+	for x in range(lo.x, hi.x + 1):
+		for z in range(lo.y, hi.y + 1):
+			var key := Vector2i(x, z)
+			if not transition_cells.has(key):
+				transition_cells[key] = []
+			(transition_cells[key] as Array).append(id)
+
+## The low quay (index in `quays`) whose ring holds `p`, else -1.
+func quay_at(p: Vector2) -> int:
+	if _quay_boxes.size() != quays.size():
+		_quay_boxes = []
+		for q: Dictionary in quays:
+			_quay_boxes.append(RingGeometry.aabb(q["ring"]))
+	for i in quays.size():
+		if (_quay_boxes[i] as Rect2).has_point(p) and Geometry2D.is_point_in_polygon(p, quays[i]["ring"]):
+			return i
+	return -1
+
+## True when `p` lies within `reach` of a low quay's upper wall.
+func near_quay_wall(p: Vector2, reach: float) -> bool:
+	for q: Dictionary in quays:
+		var wall: PackedVector2Array = q["wall"]
+		for i in wall.size() - 1:
+			if Geometry2D.get_closest_point_to_segment(p, wall[i], wall[i + 1]).distance_to(p) <= reach:
+				return true
+	return false
+
 ## The road's level (dry ground at the nearer end of the bridge) for a
 ## bank ShoreEvidence made an abutment, else NAN.
 func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
@@ -317,8 +438,10 @@ func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
 		if ends.size() == 2:
 			var near0 := ends[0].distance_squared_to(mid) <= ends[1].distance_squared_to(mid)
 			var e := ends[0] if near0 else ends[1]
+			# The graded ground (land_height: roads and streets graded), which a
+			# deck's landing meets, not the raw DEM a step above or below it.
 			if domains.at(e) < 0:
-				return dry_height(e.x, e.y)
+				return land_height(e.x, e.y)
 			# A bridge mapped ending over the water: the road's level is the
 			# dry ground further out along its line.
 			var out := (e - (ends[1] if near0 else ends[0])).normalized()
@@ -326,7 +449,7 @@ func _abutment_top(treatment: Dictionary, mid: Vector2) -> float:
 			for k in range(1, 11):
 				var q := e + out * 2.0 * float(k) * WorldScale.metres_to_units()
 				if bounds.has_point(q) and domains.at(q) < 0:
-					best = dry_height(q.x, q.y) if is_nan(best) else maxf(best, dry_height(q.x, q.y))
+					best = land_height(q.x, q.y) if is_nan(best) else maxf(best, land_height(q.x, q.y))
 			return best
 	return NAN
 
@@ -376,7 +499,9 @@ func nearest(p: Vector2, treatment: int = 0) -> Dictionary:
 					out = {"segment": s, "at": q, "distance": distance}
 	return out
 
-func vertex_height(p: Vector2, body: int, bank: Dictionary = {}) -> float:
+func vertex_height(p: Vector2, body: int, bank: Dictionary = {}, quay: int = -1) -> float:
+	if quay >= 0 and body < 0:
+		return _quay_height(p, quay)
 	var hard_region := body < 0 and not bank.is_empty() and str(bank["segment"]["kind"]) == "hard"
 	var cache_key := Vector3i(roundi(p.x * 100.0), roundi(p.y * 100.0), -2 if hard_region else body)
 	if _vertex_heights.has(cache_key):
@@ -394,6 +519,20 @@ func vertex_height(p: Vector2, body: int, bank: Dictionary = {}) -> float:
 		var rim := lerpf(float(s["top_a"]), float(s["top_b"]), t) if str(s["kind"]) == "hard" \
 			else domains.level(int(s["body"]), p)
 		h = lerpf(rim, h, clampf(float(bank["distance"]) / step, 0.0, 1.0))
+	_vertex_heights[cache_key] = h
+	return h
+
+## A low quay's walk: `low` over the water, falling to the water's level
+## over one post where a natural bank (a bridge's break) meets it.
+func _quay_height(p: Vector2, quay: int) -> float:
+	var cache_key := Vector3i(roundi(p.x * 100.0), roundi(p.y * 100.0), -3 - quay)
+	if _vertex_heights.has(cache_key):
+		return _vertex_heights[cache_key]
+	var q: Dictionary = quays[quay]
+	var h := domains.level(int(q["body"]), p) + float(q["low"])
+	var bank := nearest(p, 2)
+	if not bank.is_empty() and float(bank["distance"]) < step:
+		h = lerpf(domains.level(int(bank["segment"]["body"]), p), h, clampf(float(bank["distance"]) / step, 0.0, 1.0))
 	_vertex_heights[cache_key] = h
 	return h
 
@@ -436,7 +575,7 @@ func hard_count() -> int:
 func state() -> Dictionary:
 	return {"bodies": domains.state(), "segments": segments, "edge_cells": edge_cells, "edges": _edges, "segment_cells": _segment_cells,
 		"patches": patches, "diagnostics": diagnostics, "dry": dry, "land": land, "base": base, "size": size,
-		"step": step, "origin": origin, "bounds": bounds, "depth": depth}
+		"step": step, "origin": origin, "bounds": bounds, "depth": depth, "quays": quays}
 
 static func from_state(saved: Dictionary):
 	if not saved.has_all(["bodies", "segments", "segment_cells", "edges", "edge_cells", "patches", "diagnostics",
@@ -455,6 +594,7 @@ static func from_state(saved: Dictionary):
 	for field in ["segments", "edge_cells", "patches", "diagnostics", "dry", "land", "base", "size", "step", "origin", "bounds", "depth"]:
 		model.set(field, saved[field])
 	model._edges = saved["edges"]
+	model.quays = saved.get("quays", [])
 	model._restore_indexes()
 	model.domains = ShoreDomains.new()
 	model.domains.restore(saved["bodies"], model.bounds)

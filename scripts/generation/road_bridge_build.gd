@@ -200,8 +200,9 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, width: float,
 			var foot_a := low[i] if low.size() == n else deck[i] - depth
 			var foot_b := low[i + 1] if low.size() == n else deck[i + 1] - depth
 			if not open.is_empty() and (open[0 if sgn > 0.0 else 1] as PackedByteArray)[i] != 0:
-				# A hair under the deck, so it never shows along a slab laid beside it.
-				RoadBuilder._wall(side, oa, ob, foot_a, foot_b, deck[i] - 0.02 * m2u, deck[i + 1] - 0.02 * m2u,
+				# Under the deck, so it never shows along a slab laid beside it (a
+				# hair under it still stood through a neighbour a few cm lower).
+				RoadBuilder._wall(side, oa, ob, foot_a, foot_b, deck[i] - 0.3 * m2u, deck[i + 1] - 0.3 * m2u,
 					sa.normalized(), metric)
 				continue
 			if bool(fit.get("railing", false)):

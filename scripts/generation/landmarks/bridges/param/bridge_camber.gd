@@ -31,8 +31,20 @@ static func lift(x: float, half: float, rise: float) -> float:
 	var u := 1.0 - k * k
 	return rise * u * u
 
-## `tilt` raises the +X end and lowers the -X end by that much, in a
-## straight fall along the bridge (banks of unequal height).
+## Steepest grade of `lift` is this many times rise / half (at k = 1/√3).
+const LIFT_STEEPEST := 1.54
+## Steepest grade of `ramp` is this many times tilt / half (at mid-span).
+const RAMP_STEEPEST := 1.5
+
+## How far the deck stands over its middle at `x` on banks of unequal
+## height: `tilt` up at the +X end and down at the -X end, level at both
+## so the deck meets each road without a crease.
+static func ramp(x: float, half: float, tilt: float) -> float:
+	var k := clampf(x / maxf(half, 0.001), -1.0, 1.0)
+	return tilt * (1.5 * k - 0.5 * k * k * k)
+
+## `tilt` raises the +X end and lowers the -X end by that much, on an
+## S-curve along the bridge (banks of unequal height).
 static func apply(lm: LandmarkMesh, half: float, deck: float, rise: float, tilt: float = 0.0) -> void:
 	if (rise <= 0.0 and is_zero_approx(tilt)) or half <= 0.0 or deck <= 0.0:
 		return
@@ -75,7 +87,7 @@ static func apply(lm: LandmarkMesh, half: float, deck: float, rise: float, tilt:
 				stack.append([mv, tri[b], tri[c], mn, tri[3 + b], tri[3 + c], mu, tri[6 + b], tri[6 + c]])
 		for i in v.size():
 			var p := v[i]
-			p.y += (lift(p.x, half, rise) + tilt * clampf(p.x / half, -1.0, 1.0)) * clampf(p.y / foot, 0.0, 1.0)
+			p.y += (lift(p.x, half, rise) + ramp(p.x, half, tilt)) * clampf(p.y / foot, 0.0, 1.0)
 			v[i] = p
 		s.v = v
 		s.n = n

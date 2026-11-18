@@ -61,8 +61,8 @@ const EDGE_M := 2.0
 ## at the PRD's #4C4C4E–#5C5A58 through the ACES grade (the #4C4C4E
 ## albedo itself rendered near-black); paving is the PRD #8A8274 and
 ## setts/gravel sit warmer and lighter than asphalt.
-const FINISH_HEX := {"asphalt": "#585552", "paving": "#8a8274",
-	"sett": "#837a6e", "gravel": "#9a8c72", "deck": "#a39d92"}
+const FINISH_HEX := {"asphalt": "#585552", "paving": "#8e887c",
+	"sett": "#8a8478", "gravel": "#9a8c72", "deck": "#a39d92"}
 ## Road-list chunks built in parallel (fixed, so the mesh never depends
 ## on the core count).
 const CHUNKS := 4
@@ -78,6 +78,8 @@ const CROSSING_LAYER := 6.9
 const BAND_LIFT_M := 0.1
 const BAND_ROW_M := 1.0
 static var _mats: Dictionary = {}
+## The bridges' concrete where the place's bridges are stone (else null).
+static var _stone_deck: Material = null
 
 ## Roads subtree: draped ribbons on the ground, bridge decks over water.
 ## `abort` stops it between rows / items; a stopped result is dropped.
@@ -179,7 +181,9 @@ static func _material(finish: String) -> Material:
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
 				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true)
 		"deck":
-			m = _pbr("concrete", FINISH_HEX["deck"])
+			# A Paris bridge is stone: its fascias in the quay walls' limestone
+			# (board-formed concrete read as tan wooden planks beside them).
+			m = _stone_deck if _stone_deck != null else _pbr("concrete", FINISH_HEX["deck"])
 		"crossing", "crossing_ladder", "crossing_lines", "crossing_dashes", "marking":
 			var kind := "solid" if finish == "marking" else ("zebra" if finish == "crossing" else finish.trim_prefix("crossing_"))
 			m = RoadPaint.crossing_material(float(RoadSurface.CROSSING_KINDS[kind]))
@@ -203,6 +207,7 @@ const LANDING_WET_M := 8.0
 
 static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	_mats.clear()
+	_stone_deck = QuayBuilder.stone_material(data) if QuayBuilder.stone_quays(data) else null
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	surf.use_native()
