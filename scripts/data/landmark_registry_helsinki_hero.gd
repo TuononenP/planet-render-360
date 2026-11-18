@@ -9,7 +9,7 @@ static func entries() -> Array:
 	return [
 		{"type": "kamppi_chapel", "name": "Kamppi Chapel", "lat": 60.16945, "lon": 24.93592,
 			"radius_m": 5000.0, "wiki_title": "Kamppi Chapel", "height_m": 11.5, "clear_m": 18.0,
-			"yaw_deg": -18.0, "kind": "Chapel", "aliases": ["kamppi chapel", "kampin kappeli", "kampens kapell"]},
+			"yaw_deg": -5.6, "kind": "Chapel", "aliases": ["kamppi chapel", "kampin kappeli", "kampens kapell"]},
 		{"type": "amos_rex", "name": "Amos Rex", "lat": 60.17008, "lon": 24.93604,
 			"radius_m": 5000.0, "wiki_title": "Amos Rex", "height_m": 6.35, "clear_m": 43.0,
 			"yaw_deg": -3.0, "kind": "Museum", "aliases": ["amos rex", "amos rex museum", "amos rex museo"]},

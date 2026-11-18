@@ -713,9 +713,9 @@ best-fit plane in every city (`RoadGrading.grade_areas`, up to 3 m).
 Where Terrarium is SRTM / EU-DEM class and no bare-earth model replaces it
 (`RoadGrading.coarse`: `BareEarth` applies, not ArcticDEM), `UrbanSmooth`
 low-passes the ground inside the built area (about a 90 m window, feathered
-at its edge, at most 3 m per post) and roads grade over ±70 m with a 2.5 m
-cap. Grading each road harder on its own did not help (junctions stepped
-between crossing streets' profiles); smoothing the ground under them did.
+at its edge, at most 3 m per post). Grading each road harder on its own did
+not help (junctions stepped between crossing streets' profiles); smoothing
+the ground under them did.
 Measured with the national models switched off and used as truth (road
 centrelines every 20 m, within 1 km of the viewpoint; roughness = rms of the
 second difference along the road, i.e. how much a street rolls):
@@ -729,6 +729,29 @@ second difference along the road, i.e. how much a street rolls):
 
 Bern, the hilly check, keeps its relief error within 0.1 m. Places with a
 national model, the US and English lidar and ArcticDEM worlds are unchanged.
+
+**Network grade (2026-11-18).** Per-road grading still folded the ground
+between parallel ways: Sajik-ro's two carriageways and the slip road
+between them each settled on a profile of their own, and the ribbons
+draped over the crease (walk mode at Gwanghwamun). On coarse DEMs every
+road corridor is now pulled onto one smooth field of the dry ground
+instead (`RoadGrading.grade_network`: three box passes of 20 m, about a
+Gaussian of that sigma, at most 2 m per post; never cut within 40 m of a
+road bridge's end). Same method as above, plus crease = rms of the ground
+at ±(half-width − 1 m) across a road minus its centreline; "off" is the
+per-road grade with the 1 m cap and no UrbanSmooth, "on" is UrbanSmooth
+plus the network grade:
+
+| City | roughness truth / off / on | crease truth / off / on | road std vs truth off / on |
+|---|---|---|---|
+| Tokyo (GSI) | 0.72 / 1.11 / 0.80 m | 0.15 / 0.24 / 0.18 m | 5.27 / 4.55 m |
+| Paris (IGN) | 0.85 / 0.90 / 0.76 m | 0.17 / 0.27 / 0.21 m | 4.79 / 4.31 m |
+| Bern (swisstopo) | 0.74 / 0.97 / 0.82 m | 0.25 / 0.25 / 0.25 m | 4.37 / 4.66 m |
+| Seoul | — / 1.13 / 0.61 m | — / 0.44 / 0.24 m | — |
+
+Bern's +0.3 m comes from UrbanSmooth (it does not move with the network
+grade's radius or cap); Bern itself runs on swisstopo, so the coarse path
+never applies there.
 
 ## Capital railway stations (2026-11-15)
 
