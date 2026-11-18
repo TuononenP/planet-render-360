@@ -93,13 +93,19 @@ in `LandmarkFhWestFootprints`, with entries in `LandmarkRegistryWestMetro`.
       slot windows under a two-storey box of silver glass with aluminium mullions.
     - Block-sized parts with no level tag (F, O, P, U) and A Bloc's way 815467162: taller
       all-brick blocks with rows of slots over a glazed or perforated-metal ground storey; the
-      A Bloc block has the band of vertical brick louvres seen from the square.
+      A Bloc block has the band of corten-brown louvres seen from the square and a ground storey of
+      milky channel glass.
     - The School of Business atrium (X), A Bloc's mall hall (way 522627432) and its link (way
       815467164): dark curtain walls in black frames; the mall hall's face to
-      Korkeakouluaukio carries the yellow graphic and metro entrance A (node
+      Korkeakouluaukio carries metro entrance A (node
       [4050038154](https://www.openstreetmap.org/node/4050038154)) under a black canopy with
       the red station sign and the metro sign pole.
-    - A Bloc's block A on the square (way 815467163): brick piers under a band of silver glass.
+    - A Bloc's block A on the square (way 815467163): a close rhythm of brick piers and narrow
+      glazing under a storey of milky channel glass, as in the user-supplied aerial photograph of
+      the square front.
+    - The ground under the A Bloc stands 3–6 m over Väre's base (2 m DEM, rising toward
+      Korkeakouluaukio and Otaniementie), so its parts stand on their own ground instead of on
+      Väre's datum: the blocks and halls at metro entrance A, the station hall at its door.
     - The station's entrance hall (way [402618641](https://www.openstreetmap.org/way/402618641)):
       glass under a deep black canopy with a warm perforated soffit, the red sign over the
       Otaniementie door (node 5026528602), as in "Entrance to Aalto University metro station".
@@ -110,7 +116,7 @@ in `LandmarkFhWestFootprints`, with entries in `LandmarkRegistryWestMetro`.
       climbing onto it.
   - Which untagged parts are tall brick blocks or dark halls, the 9 m brick base, 17.5 m glass
     tops, 20–21.5 m tall blocks, 19 m School of Business atrium, 11.5 m mall hall, 10 m
-    connectors, the perforated ground storeys and the yellow graphic's shapes are estimates.
+    connectors and the perforated ground storeys are estimates.
 - `aalto_university_metro_station`: the Tietotie entrance pavilion, way
   [408595707](https://www.openstreetmap.org/way/408595707) (`building=transportation`, one
   level; entrance B, node [4104851062](https://www.openstreetmap.org/node/4104851062)), entry at

@@ -35,12 +35,22 @@ func _init() -> void:
 		var bounds := AABB()
 		var first := true
 		var tris := 0
-		if model.get_child_count() < 3 or model.get_child_count() > 10:
-			failures.append("%s must merge geometry by material, got %d parts" % [type, model.get_child_count()])
-		for part in model.get_children():
-			var mesh := (part as MeshInstance3D).mesh
-			bounds = mesh.get_aabb() if first else bounds.merge(mesh.get_aabb())
-			first = false
+		# Parts sit on the model or, merged the same way, on its children
+		# that stand on their own ground (LandmarkTerrain.SEAT_META), which
+		# may reach below their origin and are left out of the bounds.
+		var direct := 0
+		for child in model.get_children():
+			if child is MeshInstance3D:
+				direct += 1
+			elif not bool(child.get_meta(LandmarkTerrain.SEAT_META, false)) or child.get_child_count() > 10:
+				failures.append("%s child %s must be a part or a seated group of parts" % [type, child.name])
+		if direct < 3 or direct > 10:
+			failures.append("%s must merge geometry by material, got %d parts" % [type, direct])
+		for part in LandmarkBuilder.parts(model):
+			var mesh := part.mesh
+			if part.get_parent() == model:
+				bounds = mesh.get_aabb() if first else bounds.merge(mesh.get_aabb())
+				first = false
 			var vertices: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 			tris += vertices.size() / 3
 			for v in vertices:
@@ -65,7 +75,7 @@ func _init() -> void:
 		var lookup := LocationData.landmark_for(float(entry["lat"]), float(entry["lon"]), str(entry["name"]))
 		if lookup != type:
 			failures.append("%s name resolves to %s" % [type, lookup])
-		print("WEST METRO %s: %d tris, %.2f m, %d parts" % [type, tris, bounds.end.y, model.get_child_count()])
+		print("WEST METRO %s: %d tris, %.2f m, %d parts" % [type, tris, bounds.end.y, LandmarkBuilder.parts(model).size()])
 		model.free()
 	_check_neighbours(failures)
 	_check_extras(failures)

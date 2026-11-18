@@ -38,7 +38,9 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 	var bridges := LandmarkSites.bridge_spans(data)
 	var tracks := _track_grid(lines, m)
 	var centres := _centre_grid(data, 35.0 * m)
-	var rings := _ring_grid(data, 12.0 * m)
+	var replaced := _replaced(data)
+	var rings := _ring_grid(data, 12.0 * m, replaced, false)
+	var models := _ring_grid(data, 12.0 * m, replaced, true)
 	var poles := {}
 	# Every candidate span first, nearest the eye first, so the cap drops
 	# the far ones rather than whichever ways the data lists last.
@@ -77,8 +79,13 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 			var at: Vector2 = anchor[0]
 			if not anchor[1]:
 				at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
+				if _inside(at, data, models, 12.0 * m):
+					break
 			var y := ground.height_at_world(at.x, at.y)
 			supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(anchor[1]), y])
+		# A pole that would stand inside a landmark model drops the span.
+		if supports.size() < 2:
+			continue
 		spans.append({"a": a, "b": b, "supports": supports, "contact": bool(entry[1]),
 			"lamp": bool(entry[2]), "ya": ground.height_at_world(a.x, a.y) + CONTACT_M * m,
 			"yb": ground.height_at_world(b.x, b.y) + CONTACT_M * m})
@@ -185,14 +192,29 @@ static func _built(p: Vector2, centres: Dictionary, radius: float) -> bool:
 					return true
 	return false
 
+## By data.buildings index, 1 for a mapped building a landmark model stands
+## in for (BuildingBuilder leaves it unbuilt): its mapped walls are not the
+## model's, so no span hangs on them and no pole stands inside them.
+static func _replaced(data: LocationData) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(data.buildings.size())
+	var site := TerrainBuilder.landmark_site_xz(data)
+	for i in data.buildings.size():
+		out[i] = 0 if BuildingBuilder._accepted(data, data.buildings[i], site, INF) else 1
+	return out
+
 ## Indices into data.buildings (ascending) by `radius` cell, for every
 ## cell a footprint's bounds grown by `radius` touch: a point's cell then
-## lists every building with wall within `radius` of it.
-static func _ring_grid(data: LocationData, radius: float) -> Dictionary:
+## lists every building with wall within `radius` of it. Only the
+## buildings whose `replaced` flag (_replaced; none when empty) matches
+## `models` are listed.
+static func _ring_grid(data: LocationData, radius: float, replaced := PackedByteArray(),
+		models := false) -> Dictionary:
 	var grid := {}
 	for i in data.buildings.size():
 		var ring: PackedVector2Array = data.buildings[i].get("footprint", PackedVector2Array())
-		if ring.is_empty():
+		var is_model := not replaced.is_empty() and replaced[i] == 1
+		if ring.is_empty() or is_model != models:
 			continue
 		var lo := ring[0]
 		var hi := ring[0]
@@ -206,6 +228,13 @@ static func _ring_grid(data: LocationData, radius: float) -> Dictionary:
 					grid[cell] = []
 				(grid[cell] as Array).append(i)
 	return grid
+
+## Whether `p` lies inside a footprint listed in `grid` (_ring_grid).
+static func _inside(p: Vector2, data: LocationData, grid: Dictionary, radius: float) -> bool:
+	for i: int in grid.get(Vector2i(floori(p.x / radius), floori(p.y / radius)), []):
+		if Geometry2D.is_point_in_polygon(p, data.buildings[i].get("footprint", PackedVector2Array())):
+			return true
+	return false
 
 ## Facade attachment nearest to the nominal pole; no building means pole.
 static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: float) -> Array:

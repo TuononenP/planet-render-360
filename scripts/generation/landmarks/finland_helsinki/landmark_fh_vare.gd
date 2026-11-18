@@ -15,14 +15,15 @@ extends RefCounted
 ## brick with a close rhythm of tall slots under a two-storey silver glass
 ## box. TALL, block-sized parts with no level tag (F, O, P, U) and A Bloc's
 ## way 815467162: all-brick blocks over a glazed or perforated-metal ground
-## storey, the last with a band of brick louvres. HALLS: the School of
+## storey, the last with a band of louvres. HALLS: the School of
 ## Business atrium (X), A Bloc's mall hall (way 522627432) and its link
 ## (way 815467164), dark curtain walls. LINKS, the two-storey parts between
 ## the blocks (ways 522627431, 941553970, 522627430). LOW, A Bloc's
 ## two-storey block A on the square. STATION, the metro entrance hall
 ## (way 402618641). PAVILION, Väre's glass part S; STAIR, the black metal
 ## skillion (way 941553972); BRIDGE, the glass part over the School of
-## Business entrance (way 941553973).
+## Business entrance (way 941553973). The A Bloc's parts stand on their
+## own ground in seated groups (_a_bloc).
 
 const F = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_mall_footprints.gd")
 const W = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_west_footprints.gd")
@@ -97,15 +98,35 @@ const PAVILION_M := 7.5
 const DIAMOND_CORNER := 5
 const DIAMOND_SIDE := 7.0
 
+## The A Bloc's parts by index: A Bloc N and way 815467161 among the
+## GLASS_TOPS, its louvred block among the TALL, its mall hall and link
+## among the HALLS.
+const ABLOC_GLASS_TOPS := [11, 12]
+const ABLOC_TALL := [4]
+const ABLOC_HALLS := [1, 2]
+## The ground under the A Bloc rises 3-6 m over Väre's base toward
+## Korkeakouluaukio and Otaniementie, so it stands on its own ground
+## (LandmarkTerrain.SEAT_META) in two groups: the blocks and halls on the
+## ground at metro entrance A, the station hall on the ground at its
+## Otaniementie door, about 2 m higher. Their walls reach FOOT_M under the
+## origin, so a corner over lower ground never stands open.
+const FOOT_M := -4.0
+## Channel glass: the pitch and width of its vertical joints.
+const CHANNEL_PITCH := 0.55
+const CHANNEL_JOINT := 0.035
+
 static func vare(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	_materials(lm)
-	for flat in GLASS_TOPS:
-		_glass_top(lm, W._poly(flat))
+	for i in GLASS_TOPS.size():
+		if i not in ABLOC_GLASS_TOPS:
+			_glass_top(lm, W._poly(GLASS_TOPS[i]))
 	for i in TALL.size():
-		_tall(lm, W._poly(TALL[i]), float(TALL_M[i]), bool(TALL_PERF[i]), bool(TALL_LOUVRE[i]))
+		if i not in ABLOC_TALL:
+			_tall(lm, W._poly(TALL[i]), float(TALL_M[i]), bool(TALL_PERF[i]), bool(TALL_LOUVRE[i]))
 	for i in HALLS.size():
-		_hall(lm, W._poly(HALLS[i]), float(HALLS_M[i]))
+		if i not in ABLOC_HALLS:
+			_hall(lm, W._poly(HALLS[i]), float(HALLS_M[i]))
 	for flat in LINKS:
 		var poly := W._poly(flat)
 		lm.poly_prism("Glass", poly, 0.0, LINK_M, false)
@@ -113,7 +134,6 @@ static func vare(model: Node3D) -> void:
 		W.ribbons(lm, "Black", poly, 4.6, 0.25, 1, 4.6, 0.1)
 		lm.poly_prism("Black", F.offset(poly, 0.1), LINK_M - 0.7, LINK_M + 0.1, false)
 		lm.poly_prism("Roof", poly, LINK_M - 0.05, LINK_M)
-	_low(lm, W._poly(LOW))
 	var bridge := W._poly(BRIDGE)
 	lm.poly_prism("Glass", bridge, 4.6, HALLS_M[0] - 0.5)
 	W.ribs(lm, "Black", bridge, 4.6, HALLS_M[0] - 0.5, 1.5, 0.08, 0.1)
@@ -122,14 +142,12 @@ static func vare(model: Node3D) -> void:
 	W.ribs(lm, "Black", pavilion, 0.0, 4.6, 1.5, 0.1, 0.12)
 	lm.poly_prism("Black", F.offset(pavilion, 0.4), 4.6, 5.2)
 	_stair(lm, W._poly(STAIR))
-	_station_hall(lm, W._poly(STATION))
-	_mall_front(lm)
 	lm.commit(model, "Vare_")
+	_a_bloc(model)
 
 static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Glass", LandmarkMaterials.glass("#2F3E46"))
 	lm.use("Silver", LandmarkMaterials.pbr("concrete", "#B3BDC3", 3.0, 0.2, 0.55))
-	lm.use("Pane", LandmarkMaterials.pbr("concrete", "#7D8E98", 3.0, 0.12, 0.6))
 	lm.use("Brick", LandmarkMaterials.pbr("brick", "#74382A", 3.0))
 	lm.use("Roof", LandmarkMaterials.paint("#4F5253", 0.8))
 	lm.use("Alu", LandmarkMaterials.paint("#9EA4A7", 0.45, 0.5))
@@ -137,57 +155,127 @@ static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Soffit", LandmarkMaterials.pbr("sheet_metal", "#8A5236", 1.5, 0.5, 0.5))
 	lm.use("Sign", LandmarkMaterials.lit("#E5322D", 0.5))
 
-## Brick base with two rows of tall slots, the silver glass box above it.
-static func _glass_top(lm: LandmarkMesh, poly: PackedVector2Array) -> void:
-	lm.poly_prism("Brick", poly, 0.0, BRICK_M, false)
-	W.edge_windows(lm, "Glass", poly, 0.6, 1, 0.0, 1.35, 0.62, 3.6)
-	W.edge_windows(lm, "Glass", poly, 4.9, 1, 0.0, 1.35, 0.62, 3.0)
+## The A Bloc's own palette, after the photographs of the square front:
+## clear glazing that reads blue-green against the brick, milky-white
+## channel glass lit from within (also its white trim and the metro sign's
+## M), black metal for frames and roofs, corten-brown louvres.
+static func _a_bloc_materials(lm: LandmarkMesh) -> void:
+	lm.use("Clear", LandmarkMaterials.pbr("concrete", "#6E98A8", 3.0, 0.08, 0.2))
+	lm.use("Channel", LandmarkMaterials.lit("#D3DCDB", 0.08))
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#74382A", 3.0))
+	lm.use("Black", LandmarkMaterials.paint("#1E1F20", 0.6, 0.4))
+	lm.use("Soffit", LandmarkMaterials.pbr("sheet_metal", "#8A5236", 1.5, 0.5, 0.5))
+	lm.use("Sign", LandmarkMaterials.lit("#E5322D", 0.5))
+
+## The A Bloc's surface for one of Väre's keys.
+static func _k(key: String, abloc: bool) -> String:
+	if not abloc:
+		return key
+	return str({"Glass": "Clear", "Alu": "Channel", "Roof": "Black", "Silver": "Channel"}.get(key, key))
+
+## The A Bloc in its two seated groups.
+static func _a_bloc(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	_a_bloc_materials(lm)
+	for i in ABLOC_GLASS_TOPS:
+		_glass_top(lm, _shift(GLASS_TOPS[i], METRO_A), FOOT_M, true)
+	for i in ABLOC_TALL:
+		_tall(lm, _shift(TALL[i], METRO_A), float(TALL_M[i]), bool(TALL_PERF[i]), bool(TALL_LOUVRE[i]), FOOT_M, true)
+	for i in ABLOC_HALLS:
+		_hall(lm, _shift(HALLS[i], METRO_A), float(HALLS_M[i]), FOOT_M, true)
+	_low(lm, _shift(LOW, METRO_A))
+	_mall_front(lm)
+	_seated(model, "ABloc", METRO_A, lm)
+	lm = LandmarkMesh.new()
+	_a_bloc_materials(lm)
+	_station_hall(lm, _shift(STATION, METRO_SOUTH))
+	_seated(model, "ABlocStation", METRO_SOUTH, lm)
+
+## Flat x, z pairs as a polygon about `at`.
+static func _shift(flat: Array, at: Vector2) -> PackedVector2Array:
+	var poly := W._poly(flat)
+	for i in poly.size():
+		poly[i] -= at
+	return poly
+
+## Commits `lm` under a child of `model` at `at` that stands on its own ground.
+static func _seated(model: Node3D, node_name: String, at: Vector2, lm: LandmarkMesh) -> void:
+	var node := Node3D.new()
+	node.name = node_name
+	node.position = Vector3(at.x, 0.0, at.y)
+	node.set_meta(LandmarkTerrain.SEAT_META, true)
+	model.add_child(node)
+	lm.commit(node, "Vare_")
+
+## Milky channel glass between y0 and y1 on `poly`, its vertical joints and
+## a dark edge at its foot.
+static func _channel(lm: LandmarkMesh, poly: PackedVector2Array, y0: float, y1: float) -> void:
+	lm.poly_prism("Channel", poly, y0, y1, false)
+	W.ribs(lm, "Clear", poly, y0, y1, CHANNEL_PITCH, CHANNEL_JOINT, 0.04)
+	W.ribbons(lm, "Black", poly, y0, 0.2, 1, 1.0, 0.06)
+
+## Brick base with two rows of tall slots, the silver glass box above it;
+## the A Bloc's (`abloc`) box is channel glass.
+static func _glass_top(lm: LandmarkMesh, poly: PackedVector2Array, foot: float = 0.0, abloc: bool = false) -> void:
+	lm.poly_prism("Brick", poly, foot, BRICK_M, false)
+	W.edge_windows(lm, _k("Glass", abloc), poly, 0.6, 1, 0.0, 1.35, 0.62, 3.6)
+	W.edge_windows(lm, _k("Glass", abloc), poly, 4.9, 1, 0.0, 1.35, 0.62, 3.0)
 	var box := F.offset(poly, 0.15)
-	lm.poly_prism("Silver", box, BRICK_M, GLASS_M - 0.3, false)
-	W.ribbons(lm, "Pane", box, BRICK_M + 1.2, 2.2, 2, 4.0, 0.04)
-	W.ribs(lm, "Alu", box, BRICK_M, GLASS_M - 0.3, 1.35, 0.07, 0.1)
-	W.ribbons(lm, "Alu", box, BRICK_M, 0.25, 3, 4.0, 0.08)
-	lm.poly_prism("Alu", F.offset(box, 0.08), GLASS_M - 0.4, GLASS_M)
-	lm.poly_prism("Roof", box, GLASS_M, GLASS_M + 0.02)
+	if abloc:
+		_channel(lm, box, BRICK_M, GLASS_M - 0.3)
+	else:
+		lm.poly_prism("Silver", box, BRICK_M, GLASS_M - 0.3, false)
+		W.ribbons(lm, "Glass", box, BRICK_M + 1.2, 2.2, 2, 4.0, 0.04)
+		W.ribs(lm, "Alu", box, BRICK_M, GLASS_M - 0.3, 1.35, 0.07, 0.1)
+		W.ribbons(lm, "Alu", box, BRICK_M, 0.25, 3, 4.0, 0.08)
+	lm.poly_prism(_k("Alu", abloc), F.offset(box, 0.08), GLASS_M - 0.4, GLASS_M)
+	lm.poly_prism(_k("Roof", abloc), box, GLASS_M, GLASS_M + 0.02)
 
 ## Tall brick block: glazed or perforated-metal ground storey, rows of
-## slots, a solid brick top; with `louvre`, a band of vertical brick fins
-## over a dark recess below the top.
-static func _tall(lm: LandmarkMesh, poly: PackedVector2Array, top: float, perf: bool, louvre: bool) -> void:
+## slots, a solid brick top; with `louvre`, a band of vertical fins over a
+## dark recess below the top. The A Bloc's (`abloc`) ground storey is
+## channel glass and its fins corten.
+static func _tall(lm: LandmarkMesh, poly: PackedVector2Array, top: float, perf: bool, louvre: bool,
+		foot: float = 0.0, abloc: bool = false) -> void:
 	var ground := 6.5
 	var inset := F.offset(poly, -0.2)
-	lm.poly_prism("Silver" if perf else "Glass", inset, 0.0, ground, false)
-	W.ribs(lm, "Black" if not perf else "Alu", inset, 0.0, ground, 1.5, 0.1, 0.12)
+	if abloc:
+		_channel(lm, inset, foot, ground)
+	else:
+		lm.poly_prism("Silver" if perf else "Glass", inset, foot, ground, false)
+		W.ribs(lm, "Black" if not perf else "Alu", inset, foot, ground, 1.5, 0.1, 0.12)
 	lm.poly_prism("Brick", poly, ground, top)
 	var slots_top := top - (6.5 if louvre else 2.6)
 	var rows := maxi(int((slots_top - ground - 0.8) / 3.4), 1)
-	W.edge_windows(lm, "Glass", poly, ground + 0.8, rows, 3.4, 1.35, 0.62, 2.7)
+	W.edge_windows(lm, _k("Glass", abloc), poly, ground + 0.8, rows, 3.4, 1.35, 0.62, 2.7)
 	if louvre:
 		lm.poly_prism("Black", F.offset(poly, 0.02), top - 6.0, top - 1.4, false)
-		W.ribs(lm, "Brick", poly, top - 6.0, top - 1.4, 0.45, 0.14, 0.25)
-	lm.poly_prism("Alu", F.offset(poly, 0.05), top - 0.15, top, false)
+		W.ribs(lm, "Soffit" if abloc else "Brick", poly, top - 6.0, top - 1.4, 0.45, 0.14, 0.25)
+	lm.poly_prism(_k("Alu", abloc), F.offset(poly, 0.05), top - 0.15, top, false)
 
 ## Dark curtain-wall volume: tall glass in black frames, a floor line every
 ## 4.5 m and a black fascia.
-static func _hall(lm: LandmarkMesh, poly: PackedVector2Array, top: float) -> void:
-	lm.poly_prism("Glass", poly, 0.0, top - 1.0, false)
-	W.ribs(lm, "Black", poly, 0.0, top - 1.0, 1.8, 0.1, 0.14)
+static func _hall(lm: LandmarkMesh, poly: PackedVector2Array, top: float, foot: float = 0.0,
+		abloc: bool = false) -> void:
+	lm.poly_prism(_k("Glass", abloc), poly, foot, top - 1.0, false)
+	W.ribs(lm, "Black", poly, foot, top - 1.0, 1.8, 0.1, 0.14)
 	W.ribbons(lm, "Black", poly, 4.5, 0.3, maxi(int((top - 2.0) / 4.5), 1), 4.5, 0.1)
 	lm.poly_prism("Black", F.offset(poly, 0.12), top - 1.2, top)
-	lm.poly_prism("Roof", poly, top - 0.02, top + 0.02)
+	lm.poly_prism(_k("Roof", abloc), poly, top - 0.02, top + 0.02)
 
-## A Bloc's block on the square: brick piers under a band of silver glass.
+## A Bloc's block on the square: a close rhythm of brick piers and narrow
+## glazing under a brick lintel, the channel-glass storey above.
 static func _low(lm: LandmarkMesh, poly: PackedVector2Array) -> void:
 	var glass_y := 5.6
-	lm.poly_prism("Glass", F.offset(poly, -0.3), 0.0, glass_y, false)
-	lm.poly_prism("Brick", F.offset(poly, -0.3), glass_y - 0.9, glass_y, false)
-	W.ribs(lm, "Brick", poly, 0.0, glass_y, 2.4, 0.7, 0.3)
+	var inner := F.offset(poly, -0.3)
+	lm.poly_prism("Brick", inner, FOOT_M, 0.3, false)
+	lm.poly_prism("Clear", inner, 0.3, glass_y, false)
+	lm.poly_prism("Brick", inner, glass_y - 0.9, glass_y, false)
+	W.ribs(lm, "Brick", poly, FOOT_M, glass_y, 1.25, 0.7, 0.3)
 	var box := F.offset(poly, 0.1)
-	lm.poly_prism("Silver", box, glass_y, LOW_M - 0.3, false)
-	W.ribbons(lm, "Pane", box, glass_y + 0.6, 2.4, 1, 4.0, 0.04)
-	W.ribs(lm, "Alu", box, glass_y, LOW_M - 0.3, 1.35, 0.07, 0.1)
-	lm.poly_prism("Alu", F.offset(box, 0.08), LOW_M - 0.4, LOW_M)
-	lm.poly_prism("Roof", box, LOW_M, LOW_M + 0.02)
+	_channel(lm, box, glass_y, LOW_M - 0.3)
+	lm.poly_prism("Channel", F.offset(box, 0.08), LOW_M - 0.4, LOW_M)
+	lm.poly_prism("Black", box, LOW_M, LOW_M + 0.02)
 
 ## The black metal wedge: steps climbing from its far end to the
 ## pavilion roof.
@@ -206,39 +294,33 @@ static func _stair(lm: LandmarkMesh, poly: PackedVector2Array) -> void:
 		for piece in Geometry2D.intersect_polygons(poly, band):
 			lm.poly_prism("Black", piece, 0.0, 0.4 + 4.8 * float(k + 1) / float(steps))
 
-## The station's entrance hall: glass in black frames under a deep black
-## metal canopy with a warm perforated soffit, the red station sign over
-## the Otaniementie doors and the metro sign on its pole.
+## The station's entrance hall about its Otaniementie door: glass in black
+## frames under a deep black metal canopy, the red station sign over the
+## doors and the metro sign on its pole.
 static func _station_hall(lm: LandmarkMesh, poly: PackedVector2Array) -> void:
 	var eave := STATION_M - 1.4
-	lm.poly_prism("Glass", poly, 0.0, eave, false)
-	W.ribs(lm, "Black", poly, 0.0, eave, 1.6, 0.1, 0.12)
+	lm.poly_prism("Clear", poly, FOOT_M, eave, false)
+	W.ribs(lm, "Black", poly, FOOT_M, eave, 1.6, 0.1, 0.12)
 	var canopy := F.offset(poly, 2.4)
-	_underside(lm, "Soffit", canopy, eave)
+	_underside(lm, "Black", canopy, eave)
 	lm.poly_prism("Black", canopy, eave, STATION_M)
-	_sign(lm, poly, METRO_SOUTH, eave - 0.9)
-	_metro_pole(lm, poly, METRO_SOUTH, 5.0)
+	_sign(lm, poly, Vector2.ZERO, eave - 0.9)
+	_metro_pole(lm, poly, Vector2.ZERO, 5.0, true)
 
-## The mall hall's face to the square: the yellow graphic on its glass,
-## the canopy and red sign over metro entrance A and the metro sign pole.
+## The mall hall's face to the square about metro entrance A: the canopy
+## and red sign over the entrance and the metro sign pole.
 static func _mall_front(lm: LandmarkMesh) -> void:
-	var hall := W._poly(HALLS[1])
-	var a := Vector2(43.1, 86.1)
-	var b := Vector2(54.2, 92.3)
+	var hall := _shift(HALLS[1], METRO_A)
+	var a := Vector2(43.1, 86.1) - METRO_A
+	var b := Vector2(54.2, 92.3) - METRO_A
 	var out := W.outward(hall, a, b)
 	var along := (b - a).normalized()
 	var basis := Basis(Vector3.UP, atan2(-along.y, along.x))
-	var mid := a.lerp(b, 0.45) + out * 0.2
-	lm.use("Yellow", LandmarkMaterials.paint("#E8C619", 0.5, 0.1))
-	for bar in [[-2.6, 7.6, 3.4, 0.5], [-0.6, 8.6, 2.6, -0.6], [1.4, 7.0, 3.0, 0.3], [0.2, 9.6, 2.2, 0.9]]:
-		var c := mid + along * float(bar[0])
-		lm.box("Yellow", Vector3(c.x, float(bar[1]), c.y), Vector3(float(bar[2]), 0.9, 0.06),
-			basis * Basis(Vector3.BACK, float(bar[3])), 0.0)
-	var cc := METRO_A + out * 1.6
+	var cc := out * 1.6
 	lm.box("Black", Vector3(cc.x, 4.4, cc.y), Vector3(9.0, 0.7, 3.2), basis, 0.0)
 	lm.box("Soffit", Vector3(cc.x, 4.03, cc.y), Vector3(8.8, 0.04, 3.0), basis, 0.0)
-	_sign(lm, hall, METRO_A, 3.2)
-	_metro_pole(lm, hall, METRO_A, 9.0)
+	_sign(lm, hall, Vector2.ZERO, 3.2)
+	_metro_pole(lm, hall, Vector2.ZERO, 9.0, true)
 
 ## The red station-name band over a door at `at` on the edge of `poly`.
 static func _sign(lm: LandmarkMesh, poly: PackedVector2Array, at: Vector2, y: float) -> void:
@@ -256,8 +338,10 @@ static func _sign(lm: LandmarkMesh, poly: PackedVector2Array, at: Vector2, y: fl
 	var p := Geometry2D.get_closest_point_to_segment(at, a, b) + out * 0.25
 	lm.box("Sign", Vector3(p.x, y, p.y), Vector3(4.8, 0.55, 0.12), Basis(Vector3.UP, atan2(-along.y, along.x)), 0.0)
 
-## The red metro "M" sign on its steel pole, `away` metres out from a door.
-static func _metro_pole(lm: LandmarkMesh, poly: PackedVector2Array, at: Vector2, away: float) -> void:
+## The red metro "M" sign on its steel pole, `away` metres out from a door;
+## on the A Bloc (`abloc`) the pole is black and the M its channel glass.
+static func _metro_pole(lm: LandmarkMesh, poly: PackedVector2Array, at: Vector2, away: float,
+		abloc: bool = false) -> void:
 	var best := Vector2.ZERO
 	var dist := INF
 	var out := Vector2.ZERO
@@ -268,8 +352,23 @@ static func _metro_pole(lm: LandmarkMesh, poly: PackedVector2Array, at: Vector2,
 			best = q
 			out = W.outward(poly, poly[i], poly[(i + 1) % poly.size()])
 	var p := best + out * away
-	lm.frustum("Alu", Vector3(p.x, 0.0, p.y), 0.07, 0.07, 4.2, 8)
-	lm.box("Sign", Vector3(p.x, 4.75, p.y), Vector3(0.9, 1.1, 0.9), Basis(), 0.0)
+	lm.frustum("Black" if abloc else "Alu", Vector3(p.x, 0.0, p.y), 0.07, 0.07, 4.2, 8)
+	# A flat double-faced plate with a white M, square to the wall behind it.
+	var along := Vector2(-out.y, out.x)
+	var basis := Basis(Vector3.UP, atan2(-along.y, along.x))
+	lm.box("Sign", Vector3(p.x, 4.75, p.y), Vector3(1.0, 1.0, 0.1), basis, 0.0)
+	var mark := "Channel" if abloc else "White"
+	if not abloc:
+		lm.use("White", LandmarkMaterials.lit("#F4F1EA", 0.4))
+	for side in [-1.0, 1.0]:
+		var o := Vector3(out.x, 0.0, out.y) * 0.07 * float(side)
+		var c := Vector3(p.x, 4.75, p.y) + o
+		var h := basis.x * 0.5
+		var up := Vector3.UP * 0.5
+		var pts := [c - h * 0.62 - up * 0.62, c - h * 0.62 + up * 0.62, c, c + h * 0.62 + up * 0.62,
+			c + h * 0.62 - up * 0.62]
+		for i in 4:
+			lm.beam(mark, pts[i], pts[i + 1], 0.12, 0.03, basis.z)
 
 ## Downward-facing cap of `poly` at height y (seen from below).
 static func _underside(lm: LandmarkMesh, key: String, poly: PackedVector2Array, y: float) -> void:
