@@ -42,6 +42,9 @@ const EDGE_GAP_M := 0.15
 ## Deepest a pile reaches under the water surface, whatever the bed reads.
 const PILE_DEPTH_M := 12.0
 
+## Whether the plinth's edge loop runs natively (PlinthKernels); tests turn it off.
+static var _native_plinth := ClassDB.class_exists("PlinthKernels")
+
 ## Floor and plinth for a dry seat on `low`..`high` ground.
 static func _dry_seat(low: float, high: float, tall_m: float) -> Array:
 	var m := WorldScale.metres_to_units()
@@ -173,19 +176,41 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 		footing: Dictionary, ground: GroundTruth) -> void:
 	if float(footing.get("plinth", 0.0)) <= 0.0:
 		return
+	var rings: Array = [ring]
+	rings.append_array(holes)
+	var grounds: Array = []
+	var ccw := PackedByteArray()
+	for edge_ring: PackedVector2Array in rings:
+		ccw.append(1 if RingGeometry.signed_area(edge_ring) > 0.0 else 0)
+		grounds.append(_ground_table(ground, edge_ring))
+	var arrays := plinth_arrays(rings, grounds, ccw, float(footing["floor"]))
+	BuildingWalls._emit(root, arrays[0], PlinthStyle.body_material())
+	BuildingWalls._emit(root, arrays[1], PlinthStyle.coping_material())
+
+## The plinth's [face, coping] BuildingWalls arrays for `rings` (the
+## footprint, then its holes), their `grounds` tables (_ground_table) and
+## winding (`ccw`, one byte each), standing from the building's `floor`
+## down. Native (PlinthKernels) where it is built, else the script's loop.
+static func plinth_arrays(rings: Array, grounds: Array, ccw: PackedByteArray, floor_y: float) -> Array:
 	var m := WorldScale.metres_to_units()
-	var y1 := float(footing["floor"]) - SINK_M * m
+	if _native_plinth:
+		return ClassDB.class_call_static("PlinthKernels", "plinth", rings, grounds, ccw,
+			PackedFloat64Array([m, floor_y, SINK_M, EDGE_GAP_M, PlinthStyle.COPING_MIN_M,
+				PlinthStyle.COPING_DEPTH_M, PlinthStyle.COPING_PROUD_M]), BuildingBuilder._batch == null)
+	return plinth_arrays_script(rings, grounds, ccw, floor_y)
+
+static func plinth_arrays_script(rings: Array, grounds: Array, ccw: PackedByteArray, floor_y: float) -> Array:
+	var m := WorldScale.metres_to_units()
+	var y1 := floor_y - SINK_M * m
 	var face := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
 	var coping := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(),
 		PackedFloat32Array(), PackedInt32Array()]
-	var rings: Array = [ring]
-	rings.append_array(holes)
 	for r in rings.size():
 		var edge_ring: PackedVector2Array = rings[r]
-		var ccw := RingGeometry.signed_area(edge_ring) > 0.0
-		var miters := PlinthStyle.miters(edge_ring, (1.0 if ccw else -1.0) * (-1.0 if r > 0 else 1.0))
-		var grounds := _edge_grounds(ground, edge_ring)
+		var edge_grounds: PackedFloat64Array = grounds[r]
+		var counter := ccw[r] != 0
+		var miters := PlinthStyle.miters(edge_ring, (1.0 if counter else -1.0) * (-1.0 if r > 0 else 1.0))
 		for i in edge_ring.size():
 			var a := edge_ring[i]
 			var b := edge_ring[(i + 1) % edge_ring.size()]
@@ -194,36 +219,43 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 				continue
 			# The dry bank, or the carved bed where water clips the edge,
 			# so a quayside wall reaches down into the water.
-			var mid := (a + b) * 0.5
-			var edge_low := minf(_ground_at(ground, grounds, i, a),
-				minf(_ground_at(ground, grounds, (i + 1) % edge_ring.size(), b),
-				_ground_at(ground, grounds, edge_ring.size() + i, mid)))
-			if float(footing["floor"]) - edge_low < EDGE_GAP_M * m:
+			var edge_low := minf(edge_grounds[i],
+				minf(edge_grounds[(i + 1) % edge_ring.size()], edge_grounds[edge_ring.size() + i]))
+			if floor_y - edge_low < EDGE_GAP_M * m:
 				continue
 			var y0 := edge_low - SINK_M * m
-			var n := Vector2(d.y, -d.x).normalized() if ccw else Vector2(-d.y, d.x).normalized()
+			var n := Vector2(d.y, -d.x).normalized() if counter else Vector2(-d.y, d.x).normalized()
 			if r > 0:
 				n = -n
 			BuildingWalls._quad(face, a, b, y0, y1, n,
 				Vector2(d.length() / m / 4.0, (y1 - y0) / m / 4.0))
 			if y1 - edge_low >= PlinthStyle.COPING_MIN_M * m:
 				PlinthStyle.coping(coping, a, b, miters[i], miters[(i + 1) % edge_ring.size()], n, y1)
-	BuildingWalls._emit(root, face, PlinthStyle.body_material())
-	BuildingWalls._emit(root, coping, PlinthStyle.coping_material())
+	return [face, coping]
 
-## _edge_ground at each corner of `ring` then each edge's midpoint, read
-## natively in one call when the shoreline sampler can (else empty).
-static func _edge_grounds(ground: GroundTruth, ring: PackedVector2Array) -> PackedFloat64Array:
-	if ground.shoreline == null or not ground.shoreline.ready:
-		return PackedFloat64Array()
+## The ground at each corner of `ring` then each edge's midpoint (the
+## order PlinthKernels.edge_points gives): read natively in one call when the
+## shoreline sampler can, else (or where it has none) _edge_ground.
+static func _ground_table(ground: GroundTruth, ring: PackedVector2Array) -> PackedFloat64Array:
+	var points: PackedVector2Array = ClassDB.class_call_static("PlinthKernels", "edge_points", ring) \
+		if _native_plinth else _edge_points(ring)
+	var table := PackedFloat64Array()
+	if ground.shoreline != null and ground.shoreline.ready:
+		table = ground.shoreline.edge_grounds(points)
+	if table.size() != points.size():
+		table.resize(points.size())
+		table.fill(NAN)
+	for k in table.size():
+		if is_nan(table[k]):
+			table[k] = _edge_ground(ground, points[k])
+	return table
+
+## `ring`'s corners then its edge midpoints.
+static func _edge_points(ring: PackedVector2Array) -> PackedVector2Array:
 	var points := ring.duplicate()
 	for i in ring.size():
 		points.append((ring[i] + ring[(i + 1) % ring.size()]) * 0.5)
-	return ground.shoreline.edge_grounds(points)
-
-## Entry `k` of _edge_grounds, or _edge_ground at `p` where it has none.
-static func _ground_at(ground: GroundTruth, grounds: PackedFloat64Array, k: int, p: Vector2) -> float:
-	return grounds[k] if k < grounds.size() and not is_nan(grounds[k]) else _edge_ground(ground, p)
+	return points
 
 ## Ground a plinth wall stands on at `p`: the dry (pre-carve) height,
 ## or the rendered bed where `p` is under water.

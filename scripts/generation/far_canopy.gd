@@ -91,6 +91,44 @@ static func plan(data: LocationData, ground: GroundTruth, smap: SettlementMap) -
 	var stand := FastNoiseLite.new()
 	stand.frequency = 1.0 / 180.0
 	stand.seed = 7
+	var hits: Dictionary = _probes_native(data, bytes, cells, dark, budget) if _native \
+		else _probes_script(data, bytes, cells, dark, budget)
+	var xs: PackedFloat64Array = hits["x"]
+	var zs: PackedFloat64Array = hits["z"]
+	var rgb: PackedFloat32Array = hits["rgb"]
+	var widens: PackedFloat64Array = hits["widen"]
+	for k in xs.size():
+		var x := xs[k]
+		var z := zs[k]
+		var px := Color(rgb[k * 3], rgb[k * 3 + 1], rgb[k * 3 + 2], 1.0)
+		var widen := widens[k]
+		var y := FarTerrainBuilder._blend_height(data, ground, surf, x, z) if far_ok \
+			else ground.height_at_world(x, z)
+		var rows := mix
+		if zoned:
+			var zone_mix := str(HeritageZones.rule_at_xz(data, x, z).get("tree_mix", ""))
+			if zone_mix != "":
+				rows = TreeSpecies.mix(zone_mix, "park")
+		var sp := TreeSpecies.pick(rows, _hash(x, z, 5.0) * 0.999)
+		var size := lerpf(STAND_SIZE.x, STAND_SIZE.y, clampf(0.5 + stand.get_noise_2d(x, z) * 0.9, 0.0, 1.0)) \
+			* lerpf(TREE_SIZE.x, TREE_SIZE.y, _hash(x, z, 4.0))
+		out.append([Vector3(x, y, z), Vector3(size * widen, size, size * widen), crown_colour(px, winter, _hash(x, z, 7.0)), sp])
+	return out
+
+## Whether the probe pass runs natively (CanopyKernels); tests turn it off.
+static var _native := ClassDB.class_exists("CanopyKernels")
+
+## The probes that find canopy, in cell order, up to `budget`: {x, z:
+## PackedFloat64Array, rgb: PackedFloat32Array (the pixel, 3 each), widen:
+## PackedFloat64Array (the cell's step against the finest)}. A probe is
+## jittered a full step (the second jitter reads the first's x), takes the
+## finest drape's pixel and is canopy when darker than `dark` and greener
+## than grey by MIN_GREEN.
+static func _probes_script(data: LocationData, bytes: Array, cells: Array, dark: float, budget: int) -> Dictionary:
+	var xs := PackedFloat64Array()
+	var zs := PackedFloat64Array()
+	var rgb := PackedFloat32Array()
+	var widens := PackedFloat64Array()
 	for c in cells:
 		var centre: Vector2 = c[0]
 		var step := step_at(float(c[1]))
@@ -98,8 +136,8 @@ static func plan(data: LocationData, ground: GroundTruth, smap: SettlementMap) -
 		var widen := step / float(STEPS_M[0][1])
 		for sj in per_cell:
 			for si in per_cell:
-				if out.size() >= budget:
-					return out
+				if xs.size() >= budget:
+					return {"x": xs, "z": zs, "rgb": rgb, "widen": widens}
 				var x := centre.x + (float(si) + 0.5) * step - SettlementMap.CELL_M * 0.5
 				var z := centre.y + (float(sj) + 0.5) * step - SettlementMap.CELL_M * 0.5
 				x += (_hash(x, z, 1.0) - 0.5) * step
@@ -110,18 +148,34 @@ static func plan(data: LocationData, ground: GroundTruth, smap: SettlementMap) -
 				var l := 0.299 * px.r + 0.587 * px.g + 0.114 * px.b
 				if l >= dark or px.g - (px.r + px.b) * 0.5 < MIN_GREEN:
 					continue
-				var y := FarTerrainBuilder._blend_height(data, ground, surf, x, z) if far_ok \
-					else ground.height_at_world(x, z)
-				var rows := mix
-				if zoned:
-					var zone_mix := str(HeritageZones.rule_at_xz(data, x, z).get("tree_mix", ""))
-					if zone_mix != "":
-						rows = TreeSpecies.mix(zone_mix, "park")
-				var sp := TreeSpecies.pick(rows, _hash(x, z, 5.0) * 0.999)
-				var size := lerpf(STAND_SIZE.x, STAND_SIZE.y, clampf(0.5 + stand.get_noise_2d(x, z) * 0.9, 0.0, 1.0)) \
-					* lerpf(TREE_SIZE.x, TREE_SIZE.y, _hash(x, z, 4.0))
-				out.append([Vector3(x, y, z), Vector3(size * widen, size, size * widen), crown_colour(px, winter, _hash(x, z, 7.0)), sp])
-	return out
+				xs.append(x)
+				zs.append(z)
+				rgb.append(px.r)
+				rgb.append(px.g)
+				rgb.append(px.b)
+				widens.append(widen)
+	return {"x": xs, "z": zs, "rgb": rgb, "widen": widens}
+
+static func _probes_native(data: LocationData, bytes: Array, cells: Array, dark: float, budget: int) -> Dictionary:
+	var centres := PackedVector2Array()
+	var dists := PackedFloat64Array()
+	for c in cells:
+		centres.append(c[0])
+		dists.append(float(c[1]))
+	var steps := PackedFloat64Array()
+	for row in STEPS_M:
+		steps.append(float(row[0]))
+		steps.append(float(row[1]))
+	var drapes: Array = []
+	for di in data.far_drapes.size():
+		var d: Dictionary = data.far_drapes[di]
+		var img: Variant = d.get("image", null)
+		if not (img is Image) or (bytes[di] as PackedByteArray).is_empty():
+			continue
+		drapes.append({"bytes": bytes[di], "w": (img as Image).get_width(), "h": (img as Image).get_height(),
+			"zoom": int(d["zoom"]), "origin": d["origin_px"] as Vector2, "size": Vector2(d["size_px"] as Vector2i)})
+	return ClassDB.class_call_static("CanopyKernels", "probes", centres, dists, steps, drapes,
+		data.latitude, data.longitude, dark, MIN_GREEN, SettlementMap.CELL_M, budget)
 
 ## Probe spacing at distance `d`.
 static func step_at(d: float) -> float:

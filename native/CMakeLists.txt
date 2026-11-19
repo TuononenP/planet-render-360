@@ -58,6 +58,10 @@ add_library(planet_render SHARED
 	src/tint_kernels.cpp
 	src/tint_kernels.h
 	src/photo_sampler.cpp
+	src/canopy_kernels.cpp
+	src/canopy_kernels.h
+	src/plinth_kernels.cpp
+	src/plinth_kernels.h
 	src/photo_sampler.h
 	src/grid_filters.cpp
 	src/grid_filters.h

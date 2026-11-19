@@ -14,6 +14,8 @@
 #include "shore_kernels.h"
 #include "shore_mesh.h"
 #include "shore_patch_kernel.h"
+#include "canopy_kernels.h"
+#include "plinth_kernels.h"
 #include "tint_kernels.h"
 #include "photo_sampler.h"
 #include "grid_filters.h"
@@ -59,6 +61,8 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShorePatchKernel);
 	GDREGISTER_CLASS(SnapshotKernels);
 	GDREGISTER_CLASS(StepsKernels);
+	GDREGISTER_CLASS(CanopyKernels);
+	GDREGISTER_CLASS(PlinthKernels);
 	GDREGISTER_CLASS(TintKernels);
 	GDREGISTER_CLASS(PhotoSampler);
 	GDREGISTER_CLASS(GridFilters);
