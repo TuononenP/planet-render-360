@@ -37,8 +37,13 @@ const TRAIN_DWELL_S := Vector2(30.0, 80.0)
 ## train held up this way waits before it turns round.
 const FOLLOW_M := 10.0
 const BLOCKED_S := 6.0
-## Twin tracks of one line lie at most this far apart (metres).
+## Twin tracks of one line lie at most this far apart (metres), running
+## alongside (within TWIN_DEG); a track nearer than TramRoute.SAME_RAIL_M
+## is the same rail (a switch). Which side the twin is on is voted at
+## DIR_SAMPLES points along a track.
 const TWIN_M := 8.0
+const TWIN_DEG := 25.0
+const DIR_SAMPLES := 7
 ## A traffic light stops a tram when it stands this close to the track
 ## (metres); its cycle (s) and the share of it that is red, and how close
 ## two lights stand to count as one junction (metres).
@@ -86,8 +91,9 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 		else {}
 	var trams := world.find_child("Trams", true, false)
 	if trams != null and not data.railways.is_empty():
-		mover._adopt(trams, "Tram", planned["Tram"] if planned.has("Tram")
-			else TransitVehicles.plan(data, ground, mover._m2u), data, ground, false)
+		var plan: Array = planned["Tram"] if planned.has("Tram") else TransitVehicles.plan(data, ground, mover._m2u)
+		mover._adopt(trams, "Tram", plan, data, ground, false)
+		mover._share(planned["TramZones"] if planned.has("TramZones") else zones_of(plan))
 	var trains := world.find_child("Trains", true, false)
 	if trains != null and not data.railways.is_empty():
 		mover._adopt(trains, "Train", planned["Train"] if planned.has("Train")
@@ -107,8 +113,18 @@ static func compute_plans(data: LocationData, ground: GroundTruth) -> Dictionary
 			or not TransitVehicles.enabled(data.quality_preset):
 		return {}
 	var m2u := WorldScale.metres_to_units()
-	return {"Tram": TransitVehicles.plan(data, ground, m2u),
+	var trams := TransitVehicles.plan(data, ground, m2u)
+	return {"Tram": trams, "TramZones": zones_of(trams),
 		"Train": StationTrains.plan(data, ground, m2u)}
+
+## Where the tracks of the trams of `plan` come close enough for two of
+## them to touch (TramRails).
+static func zones_of(plan: Array) -> Array:
+	var routes: Array = []
+	for train: Dictionary in plan:
+		if not routes.has(train["route"]):
+			routes.append(train["route"])
+	return TramRails.zones(routes, WorldScale.metres_to_units())
 
 static func store_plans(data: LocationData, ground: GroundTruth, plans: Dictionary) -> void:
 	if data == null or ground == null or plans.is_empty():
@@ -189,6 +205,7 @@ func stop() -> void:
 func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, ground: GroundTruth,
 		platform_only: bool) -> void:
 	var mouths := TramRoute.mouths(data, func(_rail: Dictionary) -> bool: return true)
+	var dirs := {}
 	for k in plan.size():
 		var train: Dictionary = plan[k]
 		if platform_only and str(train.get("at", "")) != "platform":
@@ -237,10 +254,12 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 		var at_stop := platform_only
 		for stop: float in sorted:
 			at_stop = at_stop or absf(stop - s0) < 3.0
+		if not platform_only and not dirs.has(route):
+			dirs[route] = _track_dir(route, plan, data.country)
 		_trains.append({
 			"route": route, "sections": sections, "nodes": nodes, "length": float(train["length"]),
 			"s": s0, "v": 0.0, "lo": span.x, "hi": span.y,
-			"dir": (1.0 if salt < 0.5 else -1.0) if platform_only else _track_dir(route, plan, data.country),
+			"dir": (1.0 if salt < 0.5 else -1.0) if platform_only else float(dirs[route]),
 			"stops": sorted, "dwell": (TRAIN_DWELL_S if platform_only else DWELL_S).x * salt if at_stop else 0.0,
 			"dwell_range": TRAIN_DWELL_S if platform_only else DWELL_S,
 			"cruise": TRAIN_CRUISE_MS if platform_only else CRUISE_MS,
@@ -248,34 +267,60 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 			"deck_mid": NAN if platform_only else _deck_mid(route),
 			"signals": PackedFloat32Array() if platform_only else _signals(route, span, data),
 			"salt": salt, "target": NAN, "blocked": 0.0, "moved": false, "age": 0.0, "mid": route.xz_at(s0), "n": 0,
+			"zones": [], "claims": {},
 			"headlight": null, "taillight": null})
 		if _night_lights and _trains.size() <= MAX_HEADLIGHT_TRAINS:
 			_attach_vehicle_lights(holder, _trains[_trains.size() - 1])
 
+## Hands each tram the zones of `zones` (TramRails) its track is in.
+func _share(zones: Array) -> void:
+	for t: Dictionary in _trains:
+		if bool(t["loop"]):
+			t["zones"] = TramRails.of(t["route"], zones)
+
 ## The way trams run along `route` (1 with its points, -1 against them):
 ## the driving side of `country` against its twin track (the nearest
-## other route of `plan` within TWIN_M), or one hashed way for a single
-## track; every tram on the track runs the same way.
+## other route of `plan` alongside it within TWIN_M, voted at DIR_SAMPLES
+## points along the route; one nearer than TramRoute.SAME_RAIL_M there is
+## on the same rail, not its twin, and one crossing it is no twin), or one
+## hashed way for a single track; every tram on the track runs the same way.
 static func _track_dir(route: TramRoute, plan: Array, country: String) -> float:
-	var mid := route.length_m * 0.5
-	var p := route.xz_at(mid)
-	var f := route.xz_at(mid + 2.0) - route.xz_at(mid - 2.0)
-	var best := INF
-	var side := 0.0
+	var others: Array = []
+	var boxes: Array[Rect2] = []
 	for o: Dictionary in plan:
 		var other: TramRoute = o["route"]
-		if other == route:
-			continue
-		var near := other.nearest(p)
-		if near.y < TWIN_M and near.y < best:
-			best = near.y
-			# > 0: the twin lies to the right of the route's own direction.
-			side = (other.xz_at(near.x) - p).dot(Vector2(-f.y, f.x))
-	if best == INF:
+		if other != route and not others.has(other):
+			others.append(other)
+			var box := Rect2(other.points[0], Vector2.ZERO)
+			for q in other.points:
+				box = box.expand(q)
+			boxes.append(box.grow(TWIN_M * route._m2u))
+	var vote := 0
+	for k in DIR_SAMPLES:
+		var at := route.length_m * (float(k) + 0.5) / float(DIR_SAMPLES)
+		var p := route.xz_at(at)
+		var f := route.xz_at(at + 2.0) - route.xz_at(at - 2.0)
+		var best := INF
+		var side := 0.0
+		for n in others.size():
+			if not boxes[n].has_point(p):
+				continue
+			var other: TramRoute = others[n]
+			var near := other.nearest(p)
+			var g := other.xz_at(near.x + 2.0) - other.xz_at(near.x - 2.0)
+			if near.y >= TramRoute.SAME_RAIL_M and near.y < TWIN_M and near.y < best \
+					and absf(f.normalized().dot(g.normalized())) > cos(deg_to_rad(TWIN_DEG)):
+				best = near.y
+				# > 0: the twin lies to the right of the route's own direction.
+				side = (other.xz_at(near.x) - p).dot(Vector2(-f.y, f.x))
+		if best < INF:
+			vote += 1 if side > 0.0 else -1
+	if vote == 0:
+		var p := route.xz_at(route.length_m * 0.5)
 		return 1.0 if TransitVehicles._hash(p.x, p.y, 23.0) < 0.5 else -1.0
 	var keep_right := not (country in LEFT_HAND)
 	# Driving on the right, a track with its twin on its left runs forward.
-	var forward := side < 0.0 if keep_right else side > 0.0
+	var forward := vote < 0 if keep_right else vote > 0
 	return 1.0 if forward else -1.0
 
 ## Where traffic lights stand along `route` within `span` (metres): one
@@ -386,6 +431,8 @@ func _step(t: Dictionary, dt: float) -> void:
 		limit = minf(limit, sqrt(2.0 * BRAKE_MS2 * maxf(gap, 0.0)))
 	if loop:
 		limit = minf(limit, _light_limit(t, s, v, dir))
+		# Another route's tram where the tracks meet: wait for it to pass.
+		limit = minf(limit, TramRails.limit(t, _trains, dt, BRAKE_MS2))
 	var target_v := minf(float(t["cruise"]), limit)
 	if v < target_v:
 		v = minf(v + ACCEL_MS2 * dt, target_v)
@@ -464,6 +511,8 @@ func _enter(t: Dictionary) -> void:
 			var room := (float(o["s"]) - start) * dir - (float(o["length"]) + float(t["length"])) * 0.5 - FOLLOW_M
 			if room < float(t["cruise"]) * float(t["cruise"]) / (2.0 * BRAKE_MS2):
 				return
+	if not TramRails.can_enter(t, _trains, start, dir, float(t["cruise"]), BRAKE_MS2):
+		return
 	t["hidden"] = false
 	t["s"] = start
 	t["v"] = float(t["cruise"])

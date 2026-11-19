@@ -4,7 +4,8 @@ extends SceneTree
 ## Trams (TramSpecs, TramModel, TramRoute, TransitVehicles): every type
 ## builds grounded, outward-facing sections near and far within budget;
 ## the city and the track pick the type and livery; ways join into one
-## route across shared nodes with a continuous, monotonic pose; an
+## route across shared nodes with a continuous, monotonic pose; a rail
+## mapped twice (copied, reversed or overlapping) is one route; an
 ## articulated tram's bogies stay on a curve; trams keep out of tunnels,
 ## off bridges and apart; and the quality gate holds.
 
@@ -44,10 +45,11 @@ func _run() -> void:
 	_models(failures)
 	_selection(failures)
 	_route(failures)
+	_one_rail(failures)
 	_placement(failures)
 	failures.remove_at(0)
 	if failures.is_empty():
-		print("TRAM OK: every type builds grounded and outward-facing near and far, cities pick their trams, routes join and pose continuously, bogies hold a curve, placement keeps clear and gated")
+		print("TRAM OK: every type builds grounded and outward-facing near and far, cities pick their trams, routes join and pose continuously, one rail is one route, bogies hold a curve, placement keeps clear and gated")
 		quit(0)
 	else:
 		for failure in failures:
@@ -245,6 +247,36 @@ func _route(failures: Array[String]) -> void:
 					failures.append("%s section %d bogie at %.2f is %.3f m off the track" % [kind, i, x, off])
 			if i > 0 and (poses[i - 1].basis.x.dot(poses[i].basis.x) > 0.9999 or poses[i - 1].basis.x.dot(poses[i].basis.x) < 0.9):
 				failures.append("%s sections %d and %d should bend at their joint" % [kind, i - 1, i])
+
+## The same rail mapped again (a copy, a reversed copy, a way overlapping
+## it and running on) carries one route, not two trams can drive through
+## each other on; a branch leaving at a shallow switch stays its own route.
+func _one_rail(failures: Array[String]) -> void:
+	var data := _data(60.17, 24.94)
+	data.railways = [
+		_rail({"gauge": "1000"}, [Vector2(0, 0), Vector2(120, 0), Vector2(200, 0)]),
+		_rail({"gauge": "1000"}, [Vector2(0, 0.2), Vector2(200, 0.2)]),
+		_rail({"gauge": "1000"}, [Vector2(200, -0.3), Vector2(90, -0.3), Vector2(0, -0.3)]),
+		# On the rail from 100 m, then on alone to 300 m.
+		_rail({"gauge": "1000"}, [Vector2(100, 0.4), Vector2(300, 0.4)]),
+		# A branch off at a shallow switch (7.6 degrees).
+		_rail({"gauge": "1000"}, [Vector2(60, 0), Vector2(120, -8)]),
+		# Mostly on the rail, then 40 m of its own: that part stays.
+		_rail({"gauge": "1000"}, [Vector2(120, -0.5), Vector2(200, -0.5), Vector2(200, -40)]),
+	]
+	var ground := GroundTruth.new(data)
+	var m2u := WorldScale.metres_to_units()
+	var routes := TramRoute.chains(data, ground, m2u)
+	var lengths := routes.map(func(r: TramRoute) -> float: return snappedf(r.length_m, 0.1))
+	if routes.size() != 3 or absf(routes[0].length_m - 300.0) > 1.0 \
+			or absf(routes[1].length_m - Vector2(60, -8).length()) > 0.1 or absf(routes[2].length_m - 40.0) > 2.0:
+		failures.append("a rail mapped five times should be one 300 m route beside a 60.5 m branch and a 40 m spur: %s" % [lengths])
+		return
+	var main := routes[0]
+	for s in range(0, 300, 5):
+		if absf(main.xz_at(float(s)).y) > 0.5:
+			failures.append("the joined rail should stay on the mapped line: %s at %d m" % [main.xz_at(float(s)), s])
+			break
 
 func _placement(failures: Array[String]) -> void:
 	var data := _data(60.17, 24.94)

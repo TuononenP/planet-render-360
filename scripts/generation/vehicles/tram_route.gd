@@ -23,6 +23,18 @@ extends RefCounted
 const JOIN_M := 0.5
 ## Ways meeting at a sharper turn than this are a junction, not a line.
 const MAX_TURN_DEG := 75.0
+## A way lying within this of a longer one (metres) is on the same rail:
+## the track mapped twice, or two ways overlapping (twin tracks lie twice
+## as far apart). Two routes on one rail would carry trams through each
+## other.
+const SAME_RAIL_M := 1.5
+## A stretch of a way at least DUP_RUN_M long on another's rail is cut
+## out, and a way all on it dropped (a branch leaving its line at a switch
+## shares a few metres and keeps them, and a way shorter than that, a
+## switch's own piece, is kept whole). What is left must be DUP_MIN_M long.
+const DUP_RUN_M := 20.0
+const DUP_STEP_M := 2.0
+const DUP_MIN_M := 4.0
 ## Half length of the chord pose_at() takes its heading from (m).
 const HEADING_M := 1.0
 
@@ -56,6 +68,7 @@ static func chains(data: LocationData, ground: GroundTruth, m2u: float,
 		var pts: PackedVector2Array = rail.get("points", PackedVector2Array())
 		if pts.size() >= 2:
 			lines.append(rail)
+	lines = _distinct(lines, m2u)
 	var tol := JOIN_M * m2u
 	# Way ends by cell, [way index, at its tail end].
 	var ends := {}
@@ -159,6 +172,142 @@ static func mouths(data: LocationData, carries: Callable = Callable()) -> Packed
 
 static func _cell(p: Vector2, tol: float) -> Vector2i:
 	return Vector2i(floori(p.x / (tol * 2.0)), floori(p.y / (tol * 2.0)))
+
+## `lines` with one way per rail: longest first, a long stretch of a way
+## on the rail of one kept before it (within SAME_RAIL_M, either way round,
+## both on a bridge or both not) is cut out, a cut end put on the kept
+## way's end where that is close so the line still joins, and a way all on
+## it dropped. The rest keep their order; an uncut way is passed on as it is.
+static func _distinct(lines: Array, m2u: float) -> Array:
+	var order := range(lines.size())
+	var lens := PackedFloat32Array()
+	for rail: Dictionary in lines:
+		lens.append(_polyline_length(rail["points"]))
+	order.sort_custom(func(a: int, b: int) -> bool:
+		return lens[a] > lens[b] or (lens[a] == lens[b] and a < b))
+	var tol := SAME_RAIL_M * m2u
+	var cell := 8.0 * m2u
+	# Kept segments by cell, as [a, b, on a bridge]; kept way ends.
+	var grid := {}
+	var tips := PackedVector2Array()
+	var kept: Array = []
+	kept.resize(lines.size())
+	for i: int in order:
+		var rail: Dictionary = lines[i]
+		var pts: PackedVector2Array = rail["points"]
+		var pieces: Array = [pts]
+		var bridge := bool(rail.get("bridge", false))
+		if not grid.is_empty():
+			pieces = _uncovered(pts, bridge, grid, cell, tol, tips, m2u)
+		var out: Array = []
+		for piece: PackedVector2Array in pieces:
+			var r := rail
+			if piece != pts:
+				r = rail.duplicate()
+				r["points"] = piece
+			out.append(r)
+			tips.append(piece[0])
+			tips.append(piece[piece.size() - 1])
+			for k in piece.size() - 1:
+				var a := piece[k]
+				var b := piece[k + 1]
+				var lo := Vector2i(floori((minf(a.x, b.x) - tol) / cell), floori((minf(a.y, b.y) - tol) / cell))
+				var hi := Vector2i(floori((maxf(a.x, b.x) + tol) / cell), floori((maxf(a.y, b.y) + tol) / cell))
+				for cx in range(lo.x, hi.x + 1):
+					for cz in range(lo.y, hi.y + 1):
+						var key := Vector2i(cx, cz)
+						if not grid.has(key):
+							grid[key] = []
+						(grid[key] as Array).append([a, b, bridge])
+		kept[i] = out
+	var result: Array = []
+	for out: Array in kept:
+		result.append_array(out)
+	return result
+
+## The stretches of `pts` (a way on a bridge when `bridge`) that stay off
+## the kept segments in `grid`: [pts] when no long stretch is on them.
+static func _uncovered(pts: PackedVector2Array, bridge: bool, grid: Dictionary, cell: float, tol: float,
+		tips: PackedVector2Array, m2u: float) -> Array:
+	# A way shorter than a long stretch is a switch's piece, joining lines.
+	if _polyline_length(pts) < DUP_RUN_M * m2u:
+		return [pts]
+	# Samples along the way as [arc length, on a kept rail].
+	var marks: Array = []
+	var at := 0.0
+	for k in pts.size() - 1:
+		var a := pts[k]
+		var b := pts[k + 1]
+		var seg := a.distance_to(b)
+		var n := maxi(1, ceili(seg / (DUP_STEP_M * m2u)))
+		for j in range(0 if k == 0 else 1, n + 1):
+			var p := a.lerp(b, float(j) / float(n))
+			var hit := false
+			for e: Array in grid.get(Vector2i(floori(p.x / cell), floori(p.y / cell)), []):
+				if bool(e[2]) == bridge and p.distance_to(Geometry2D.get_closest_point_to_segment(p, e[0], e[1])) < tol:
+					hit = true
+					break
+			marks.append([at + seg * float(j) / float(n), hit])
+		at += seg
+	# Arc-length spans to keep: everything but the long covered runs.
+	var keep: Array = []
+	var from := 0.0
+	var k := 0
+	while k < marks.size():
+		if not bool(marks[k][1]):
+			k += 1
+			continue
+		var j := k
+		while j + 1 < marks.size() and bool(marks[j + 1][1]):
+			j += 1
+		var u0 := float(marks[k][0])
+		var u1 := float(marks[j][0])
+		if u1 - u0 >= DUP_RUN_M * m2u:
+			if u0 > from:
+				keep.append(Vector2(from, u0))
+			from = u1
+		k = j + 1
+	if from == 0.0:
+		return [pts]
+	if at > from:
+		keep.append(Vector2(from, at))
+	var out: Array = []
+	for span: Vector2 in keep:
+		if span.y - span.x < DUP_MIN_M * m2u:
+			continue
+		var piece := _cut(pts, span.x, span.y)
+		# A cut end next to a kept way's end takes that node, so they join.
+		for e in [0, piece.size() - 1]:
+			if (e == 0 and span.x == 0.0) or (e > 0 and span.y == at):
+				continue
+			for tip in tips:
+				if tip.distance_to(piece[e]) < 2.0 * tol:
+					piece[e] = tip
+					break
+		out.append(piece)
+	return out
+
+## The part of the line `pts` between arc lengths `u0` and `u1`.
+static func _cut(pts: PackedVector2Array, u0: float, u1: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var at := 0.0
+	for k in pts.size() - 1:
+		var seg := pts[k].distance_to(pts[k + 1])
+		var next := at + seg
+		if next >= u0 and at <= u1:
+			var t0 := clampf((u0 - at) / seg, 0.0, 1.0) if seg > 0.0 else 0.0
+			var t1 := clampf((u1 - at) / seg, 0.0, 1.0) if seg > 0.0 else 1.0
+			for p: Vector2 in [pts[k].lerp(pts[k + 1], t0), pts[k].lerp(pts[k + 1], t1)]:
+				if out.is_empty() or out[out.size() - 1] != p:
+					out.append(p)
+		at = next
+	return out
+
+static func _polyline_length(pts: PackedVector2Array) -> float:
+	var total := 0.0
+	for k in pts.size() - 1:
+		total += pts[k].distance_to(pts[k + 1])
+	return total
 
 ## The unused way that carries on straightest from `tip` (heading
 ## `dir`): [way index, joined at its tail end], or [].

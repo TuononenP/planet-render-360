@@ -7,7 +7,9 @@ extends SceneTree
 ## under reduced motion. A tram stands only at a mapped stop, at a red
 ## light or queued behind another tram: each track of a pair runs one way
 ## (driving on the right), and at the end of its run a tram leaves and
-## comes back in at the start.
+## comes back in at the start. Where tracks of different routes meet (a
+## crossing, a switch, a rail mapped twice) no two trams ever touch, and
+## trams sharing a rail run the same way.
 
 func _init() -> void:
 	_run()
@@ -120,6 +122,7 @@ func _run() -> void:
 	if VehicleMover.attach(Node3D.new(), data, ground) != null:
 		failures.append("no trams in the world, no mover")
 	_check_never_stops(failures)
+	_check_junctions(failures)
 	_finish(failures, world)
 
 ## Twin tracks 3.6 m apart with mapped stops and a traffic light: for
@@ -200,11 +203,116 @@ func _check_never_stops(failures: Array[String]) -> void:
 		failures.append("the traffic light beside the tracks should be on the trams' runs")
 	world.free()
 
+## Twin tracks with a single line crossing both, a branch leaving the
+## south track at a shallow switch and a way mapped over part of the north
+## track: for 20 minutes no two trams' bodies come within a car's width,
+## none stands still (off a stop) for two minutes waiting for another,
+## and trams on one rail all run the same way.
+func _check_junctions(failures: Array[String]) -> void:
+	var data := _data()
+	data.country = "FI"
+	data.railways = [_rail({"gauge": "1000"}, [Vector2(-500, -196.4), Vector2(400, -196.4)]),
+		_rail({"gauge": "1000"}, [Vector2(-500, -200), Vector2(400, -200)]),
+		_rail({"gauge": "1000"}, [Vector2(0, -450), Vector2(0, 60)]),
+		_rail({"gauge": "1000"}, [Vector2(-150, -196.4), Vector2(-100, -192), Vector2(-70, -170), Vector2(-60, -140),
+			Vector2(-60, 60)]),
+		_rail({"gauge": "1000"}, [Vector2(250, -200.3), Vector2(-250, -200.3), Vector2(-260, -230), Vector2(-260, -440)]),
+	]
+	for i in 9:
+		data.tram_stops.append({"x": -450.0 + 100.0 * float(i), "z": -198.2, "name": "Main %d" % i})
+	for z: float in [-400.0, -330.0, -260.0, -120.0, -50.0, 20.0]:
+		data.tram_stops.append({"x": 2.0, "z": z, "name": "Cross %d" % z})
+		data.tram_stops.append({"x": -58.0, "z": z, "name": "Branch %d" % z})
+	var ground := GroundTruth.new(data)
+	var world := Node3D.new()
+	TransitVehicles.build(world, data, ground)
+	var mover := VehicleMover.attach(world, data, ground)
+	var routes := {}
+	if mover != null:
+		for t: Dictionary in mover._trains:
+			routes[t["route"]] = true
+	if mover == null or routes.size() < 3:
+		failures.append("the junction should carry trams on at least three tracks: %d" % routes.size())
+		world.free()
+		return
+	var m2u := WorldScale.metres_to_units()
+	# Routes sharing a rail (within 1 m for 20 m or more) run the same way.
+	for t: Dictionary in mover._trains:
+		for o: Dictionary in mover._trains:
+			var a: TramRoute = t["route"]
+			var b: TramRoute = o["route"]
+			if a == b:
+				continue
+			var shared := 0.0
+			var same := 0.0
+			var s := 1.0
+			while s < a.length_m - 1.0:
+				var near := b.nearest(a.xz_at(s))
+				if near.y < 1.0:
+					shared += 2.0
+					var fa := (a.xz_at(s + 1.0) - a.xz_at(s - 1.0)) * float(t["dir"])
+					var fb := (b.xz_at(near.x + 1.0) - b.xz_at(near.x - 1.0)) * float(o["dir"])
+					same += 2.0 * signf(fa.dot(fb))
+				s += 2.0
+			if shared >= 20.0 and same < shared * 0.5:
+				failures.append("trams sharing %.0f m of one rail run opposite ways" % shared)
+				world.free()
+				return
+	var still: Array = []
+	still.resize(mover.count())
+	still.fill(0.0)
+	for step in 12000:
+		mover.tick(0.1, Vector2.ZERO)
+		for i in mover.count():
+			var t: Dictionary = mover._trains[i]
+			var standing := not bool(t["hidden"]) and float(t["v"]) < 0.05 and float(t["dwell"]) <= 0.0
+			still[i] = float(still[i]) + 0.1 if standing else 0.0
+			if float(still[i]) > 120.0:
+				failures.append("tram %d has stood at %s for two minutes: trams at a junction wait for each other" % [
+					i, (t["route"] as TramRoute).xz_at(float(t["s"]))])
+				world.free()
+				return
+		if step % 5 != 0:
+			continue
+		for i in mover.count():
+			var t: Dictionary = mover._trains[i]
+			if bool(t["hidden"]):
+				continue
+			for j in range(i + 1, mover.count()):
+				var o: Dictionary = mover._trains[j]
+				if bool(o["hidden"]):
+					continue
+				var gap := _body_gap(t, o, m2u)
+				if gap < TramSpecs.width_m("modern3"):
+					failures.append("trams %d and %d touch (%.2f m between their tracks) at %s after %.0f s" % [
+						i, j, gap, (t["route"] as TramRoute).xz_at(float(t["s"])), step * 0.1])
+					world.free()
+					return
+	world.free()
+
+## Closest distance (metres) between the track lines under two trams.
+func _body_gap(t: Dictionary, o: Dictionary, m2u: float) -> float:
+	var a: TramRoute = t["route"]
+	var b: TramRoute = o["route"]
+	var reach := (float(t["length"]) + float(o["length"])) * 0.5 + 3.0
+	if a.xz_at(float(t["s"])).distance_to(b.xz_at(float(o["s"]))) > reach * m2u:
+		return INF
+	var best := INF
+	var x := -float(t["length"]) * 0.5
+	while x <= float(t["length"]) * 0.5:
+		var p := a.xz_at(float(t["s"]) + x)
+		var y := -float(o["length"]) * 0.5
+		while y <= float(o["length"]) * 0.5:
+			best = minf(best, p.distance_to(b.xz_at(float(o["s"]) + y)))
+			y += 1.0
+		x += 1.0
+	return best / m2u
+
 func _finish(failures: Array[String], world: Node) -> void:
 	world.free()
 	failures.remove_at(0)
 	if failures.is_empty():
-		print("VEHICLE MOVER OK: trams move along their track, stay in their run, clear of tunnels and each other, deterministic, running under reduced motion")
+		print("VEHICLE MOVER OK: trams move along their track, stay in their run, clear of tunnels and each other and of other routes' trams, deterministic, running under reduced motion")
 		quit(0)
 	else:
 		for f in failures:
