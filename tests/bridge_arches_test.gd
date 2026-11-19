@@ -21,6 +21,37 @@ func _init() -> void:
 			[{}, "unknown"], [{"name": "Västerbron", "bridge_structure": "girder"}, "girder"]]:
 		if BridgeArches.structure(c[0]) != c[1]:
 			failures.append("structure for %s should be %s" % [c[0], c[1]])
+	# Paris maps its arches with no material: an outline is a stone arch
+	# where the place's bridges are stone (RoadBuilder sets it), and only
+	# there; the way's own structure stays unknown.
+	var unmarked := {"bridge_structure": "arch", "bridge_material": ""}
+	var reach := {}
+	for stone in [true, false]:
+		BridgeArches.stone_arches = stone
+		if BridgeArches.stone_arch(unmarked) != stone or BridgeArches.stone_arch({"bridge_structure": "arch", "bridge_material": "steel"}) \
+				or BridgeArches.stone_arch({"bridge_structure": "beam"}) or BridgeArches.stone_arch({}):
+			failures.append("an unmarked arch outline is a stone arch where bridges are stone, and only it (stone=%s)" % stone)
+		if BridgeArches.structure(unmarked) != "unknown":
+			failures.append("an unmarked arch way stays unknown (stone=%s)" % stone)
+		# Its structure keeps levelling its deck, and the arches go under the slab.
+		var outlined := _data(140.0, "")
+		outlined.bridge_areas = [{"points": PackedVector2Array([Vector2(-105, -8), Vector2(105, -8),
+			Vector2(105, 8), Vector2(-105, 8)]), "layer": 1, "bridge_structure": "arch", "bridge_material": "",
+			"name": "", "osm_id": "r1"}]
+		var surf := RoadBuilder._Surface.new(outlined, GroundTruth.new(outlined))
+		var plan := surf.road_bridges.structures
+		if plan.structures.size() != 1 or (plan.structures[0] as BridgeStructures.Structure).arched != stone:
+			failures.append("the outline is a levelled structure, arched only in a stone place (stone=%s)" % stone)
+			continue
+		var batches := {}
+		BridgeStructures.build(batches, surf, 1.0)
+		var lowest := INF
+		for v: Vector3 in RoadBuilder._batch(batches, "deck").verts:
+			lowest = minf(lowest, v.y)
+		reach[stone] = lowest
+	if reach.has(true) and reach.has(false) and float(reach[true]) > float(reach[false]) - 1.0:
+		failures.append("arches must reach down under a stone outline's slab: lowest %.2f m, %.2f m without" % [reach[true], reach[false]])
+	BridgeArches.stone_arches = false
 	# A girder is a slab on its abutments (BridgeStructures); only the
 	# masonry bridge's piers and arches stand down in the water.
 	var masonry_r := _deck_range(140.0, "masonry")

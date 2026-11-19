@@ -295,10 +295,35 @@ static func _area_entry(tags: Dictionary, cls: String, outer: PackedVector2Array
 	var ring := outer
 	if ring.size() >= 2 and ring[0].distance_to(ring[ring.size() - 1]) < 0.01:
 		ring = ring.slice(0, ring.size() - 1)
-	return {"points": ring, "holes": holes, "area": true, "class": cls,
+	var entry := {"points": ring, "holes": holes, "area": true, "class": cls,
 		"width_m": road_class_width(cls), "lanes": 0,
 		"surface": str(tags.get("surface", "")), "bridge": false, "tunnel": false,
 		"layer": _tag_int(tags.get("layer", 0), -10, 10)}
+	if cls == "steps":
+		entry.merge(steps_fields(tags))
+	return entry
+
+## What a flight of steps (`highway=steps`) says about itself, for the
+## ground and the stair meshes: `step_count` (0 unmapped), `incline` ("up"
+## or "down" along the way's node order, "" unknown) and whether it has a
+## `handrail` on any side.
+static func steps_fields(tags: Dictionary) -> Dictionary:
+	var handrail := false
+	for key in ["handrail", "handrail:left", "handrail:right", "handrail:center"]:
+		handrail = handrail or _tag_truthy(tags.get(key, ""))
+	return {"step_count": _tag_int(tags.get("step_count", 0), 0, 1000),
+		"incline": steps_incline(tags), "handrail": handrail}
+
+## `incline` of a way: "up" / "down" as mapped, or the sign of a
+## percentage or degrees ("-12%", "8°"); `yes` and the rest give no direction.
+static func steps_incline(tags: Dictionary) -> String:
+	var raw := str(tags.get("incline", "")).strip_edges().to_lower()
+	if raw in ["up", "down"]:
+		return raw
+	var num := raw.trim_suffix("%").trim_suffix("°").trim_suffix("deg").strip_edges()
+	if num.is_valid_float() and num.to_float() != 0.0:
+		return "up" if num.to_float() > 0.0 else "down"
+	return ""
 
 ## A building or part that lies wholly below the surface: tagged
 ## location=underground, or every `level` (single, "a;b" or "a-b")
@@ -576,6 +601,12 @@ static func crossing_style(tags: Dictionary) -> String:
 
 ## One contract-§2.5 attributed road dict.
 static func _road_entry(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
+	var entry := _road_fields(tags, pts)
+	if str(entry["class"]) == "steps":
+		entry.merge(steps_fields(tags))
+	return entry
+
+static func _road_fields(tags: Dictionary, pts: PackedVector2Array) -> Dictionary:
 	var road_class := str(tags.get("highway", "unclassified"))
 	var lanes := _tag_int(tags.get("lanes", 0), 0, 20)
 	var width_m := road_class_width(road_class)

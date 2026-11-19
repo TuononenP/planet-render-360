@@ -28,6 +28,21 @@ const PIER_BELOW_M := 1.5
 ## tags take precedence; unknown bridges retain a plain deck.
 const KNOWN_STRUCTURES := {"västerbron": "steel_arch", "vasterbron": "steel_arch", "centralbron": "girder"}
 
+## Where a place's bridges are stone (RoadBuilder sets it per place from
+## QuayBuilder.stone_quays: Paris's core), an outline mapped `arch` with no
+## material is a stone arch: Paris maps every arch bridge that way, and the
+## Carrousel and the Pont Marie stood as plain slabs. It stays false
+## elsewhere, where an unmarked arch may as well be steel.
+static var stone_arches := false
+
+## True for an outline `area` (bridge_structure, bridge_material) that is an
+## unmarked arch in a stone place. BridgeStructures keeps levelling its deck
+## and adds the arches under its slab.
+static func stone_arch(area: Dictionary) -> bool:
+	var tag := str(area.get("bridge_structure", "")).strip_edges().to_lower().replace("-", "_")
+	return stone_arches and tag in ["arch", "arch_bridge"] \
+		and str(area.get("bridge_material", "")).strip_edges() == ""
+
 static func structure(road: Dictionary) -> String:
 	var tag := str(road.get("bridge_structure", "")).strip_edges().to_lower().replace("-", "_")
 	var material := str(road.get("bridge_material", "")).strip_edges().to_lower()

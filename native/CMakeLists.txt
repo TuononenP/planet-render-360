@@ -38,6 +38,8 @@ add_library(planet_render SHARED
 	src/mvt_kernels.h
 	src/snapshot_kernels.cpp
 	src/snapshot_kernels.h
+	src/steps_kernels.cpp
+	src/steps_kernels.h
 	src/party_index.cpp
 	src/party_index.h
 	src/quad_sink.cpp

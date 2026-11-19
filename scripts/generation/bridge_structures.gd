@@ -92,6 +92,9 @@ class Structure extends RefCounted:
 	var depth := 0.9
 	var loose := false  ## Cut from ways on no mapped outline.
 	var wet := false  ## Its spine crosses water (_over_water).
+	## An unmarked arch outline in a stone place (BridgeArches.stone_arch): it
+	## stands on piers and arched spandrels along its spine over water.
+	var arched := false
 	var ground: RoadBuilder._Surface = null  ## The world's surface (set by prepare).
 	## Approach slabs (BridgeApproaches): index line -> [points before its
 	## first point, points after its last], the outline before them, and
@@ -225,6 +228,7 @@ class Plan extends RefCounted:
 			s.bounds = RingGeometry.aabb(ring)
 			s.layer = int((a as Dictionary).get("layer", 1))
 			s.kind = BridgeArches.structure(a)
+			s.arched = BridgeArches.stone_arch(a)
 			all.append(s)
 		if index == null:
 			return
@@ -827,9 +831,21 @@ static func build(batches: Dictionary, surf: RoadBuilder._Surface, m2u: float) -
 		var opens := _openings(s, index, surf, m2u)
 		BridgeStructureSlab._slab(batches, s, surf, m2u)
 		BridgeStructureSlab._edges(batches, s, opens, index, surf, m2u, roads)
+		if s.arched and s.wet and s.spine.size() >= 2:
+			BridgeArches.add(RoadBuilder._batch(batches, "deck"), s.spine, s.dist, s.heights,
+				_outline_half(s), s.depth, surf.ground, m2u)
 		BridgeApproaches.span_end_walls(RoadBuilder._batch(batches, "deck"), s, surf, m2u)
 		for li in s.members:
 			BridgeStructureMembers.lay(batches, s, index.lines[li], surf, m2u, li)
+
+## Half the outline's width across its spine: the arches' spandrel walls
+## stand at its edges, not at the widest road's.
+static func _outline_half(s: Structure) -> float:
+	var dir := (s.spine[s.spine.size() - 1] - s.spine[0]).normalized()
+	var half := s.half
+	for p in s.ring:
+		half = maxf(half, absf((p - s.spine[0]).cross(dir)))
+	return half
 
 ## Per outline edge, the [from, to, end] stretches (fractions along the
 ## edge) a member road leaves through: no parapet there. `end` marks a

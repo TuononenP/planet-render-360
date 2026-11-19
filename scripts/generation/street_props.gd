@@ -406,6 +406,8 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and (ground.shoreline as ShorelineModel).ready else null
 	var has_quays := shore != null and not shore.quays.is_empty()
 	var models := LandmarkSites.model_rect_sites(data)
+	var stairs := StairBuilder.footprints(ground, m2u)
+	var statues := _statue_centres(data)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
@@ -427,6 +429,10 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		var hgt := (tagged_height if is_finite(tagged_height) and tagged_height >= 0.1 and tagged_height <= 30.0 else float(row[1])) * m2u
 		var thick := float(row[2]) * m2u
 		var pts: PackedVector2Array = (br as Dictionary).get("points", PackedVector2Array())
+		# A fence ring round a statue's pedestal is its railing, not a
+		# picket panel taller than the people standing at it.
+		if cls == "fence" and kind == "fence" and not is_finite(tagged_height) and _rings_statue(pts, statues):
+			hgt = float(BARRIERS["railing"][1]) * m2u
 		for i in pts.size() - 1:
 			var a := pts[i]
 			var b := pts[i + 1]
@@ -440,7 +446,7 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 					continue
 				# A wall mapped across a road runs under its bridge or stops at
 				# its edge: drawn on the terrain it stood across the lanes.
-				if _on_road((p0 + p1) * 0.5, roads, m2u):
+				if _on_road((p0 + p1) * 0.5, roads, m2u) or StairBuilder.covers((p0 + p1) * 0.5, stairs):
 					continue
 				# A landmark model that builds its own walls (model_rects_m)
 				# stands where the mapped ones would cross it.
@@ -464,10 +470,24 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 						continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)
+				if kind == "fence" or kind == "chain_link":
+					var edge := _edge_base(ground, p0, p1, y0, y1, m2u)
+					y0 = edge.x
+					y1 = edge.y
+				var h1 := -1.0
+				if cls == "retaining_wall" and not is_finite(tagged_height):
+					# A retaining wall holds back the drop across it: from the
+					# lower side up to the higher, with its coping.
+					var rise := _retained(ground, p0, p1, m2u)
+					if not rise.is_empty():
+						y0 = rise[0]
+						y1 = rise[1]
+						hgt = rise[2]
+						h1 = rise[3]
 				total_m += p0.distance_to(p1) / m2u
 				match kind:
 					"wall":
-						_wall_piece(bufs["wall"], p0, p1, y0, y1, hgt, thick, 0.3 * m2u, m2u)
+						_wall_piece(bufs["wall"], p0, p1, y0, y1, hgt, thick, 0.3 * m2u, m2u, h1)
 					"fence", "chain_link":
 						_fence_piece(bufs[kind], p0, p1, y0, y1, hgt, m2u)
 					"wood_fence":
@@ -541,9 +561,68 @@ static func _on_road(p: Vector2, grid: Dictionary, m2u: float) -> bool:
 			return true
 	return false
 
+## Where a fence or railing a→b stands: on the higher of the ground either
+## side of it, EDGE_PROBE_M out, when they differ by more than EDGE_STEP_M
+## (it guards a drop, so it stands on the edge, not halfway down the slope);
+## else on the ground under it. Returns the base at a and at b.
+const EDGE_PROBE_M := 1.5
+const EDGE_STEP_M := 0.4
+
+static func _edge_base(ground: GroundTruth, a: Vector2, b: Vector2, y0: float, y1: float,
+		m2u: float) -> Vector2:
+	var side := (b - a).orthogonal().normalized() * EDGE_PROBE_M * m2u
+	var l0 := ground.height_at_world(a.x + side.x, a.y + side.y)
+	var r0 := ground.height_at_world(a.x - side.x, a.y - side.y)
+	var l1 := ground.height_at_world(b.x + side.x, b.y + side.y)
+	var r1 := ground.height_at_world(b.x - side.x, b.y - side.y)
+	if maxf(absf(l0 - r0), absf(l1 - r1)) <= EDGE_STEP_M * m2u:
+		return Vector2(y0, y1)
+	return Vector2(maxf(maxf(l0, r0), y0), maxf(maxf(l1, r1), y1))
+
+## Centres of the statues StatueBuilder stands (a mapped statue's footprint).
+static func _statue_centres(data: LocationData) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for b: Variant in data.buildings:
+		if b is Dictionary and (b as Dictionary).has("statue") and StatueBuilder.accepts(b):
+			out.append(Vector2(float((b as Dictionary).get("x", 0.0)), float((b as Dictionary).get("z", 0.0))))
+	return out
+
+## True when the closed line `pts` goes round one of `centres`.
+static func _rings_statue(pts: PackedVector2Array, centres: PackedVector2Array) -> bool:
+	if centres.is_empty() or pts.size() < 4 or pts[0].distance_to(pts[pts.size() - 1]) > 0.5 * WorldScale.metres_to_units():
+		return false
+	for c in centres:
+		if Geometry2D.is_point_in_polygon(c, pts):
+			return true
+	return false
+
+## What a retaining wall a→b holds back: [base at a, base at b, height at
+## a, height at b] from the ground RETAIN_PROBE_M either side of it (the
+## lower side to the higher, plus the coping), or [] when both sides are
+## level (the wall keeps its table height) or the drop is not a wall's.
+const RETAIN_PROBE_M := 2.0
+const RETAIN_MIN_M := 0.3
+const RETAIN_MAX_M := 8.0
+const COPING_M := 0.15
+
+static func _retained(ground: GroundTruth, a: Vector2, b: Vector2, m2u: float) -> Array:
+	var side := (b - a).orthogonal().normalized() * RETAIN_PROBE_M * m2u
+	var base: Array[float] = []
+	var top: Array[float] = []
+	for p in [a, b]:
+		var l := ground.height_at_world(p.x + side.x, p.y + side.y)
+		var r := ground.height_at_world(p.x - side.x, p.y - side.y)
+		base.append(minf(l, r))
+		top.append(maxf(l, r) + COPING_M * m2u)
+	var drop := maxf(top[0] - base[0], top[1] - base[1]) / m2u - COPING_M
+	if drop < RETAIN_MIN_M or drop > RETAIN_MAX_M:
+		return []
+	return [base[0], base[1], top[0] - base[0], top[1] - base[1]]
+
 ## Draped box piece a→b: two sides + top (+ end caps), UVs in metres/2.
+## `h1` is the height at b when it differs from `h` at a (a retaining wall).
 static func _wall_piece(b: TreeMeshLibrary.Buf, p0: Vector2, p1: Vector2, y0: float,
-		y1: float, h: float, t: float, sink: float, m2u: float) -> void:
+		y1: float, h: float, t: float, sink: float, m2u: float, h1: float = -1.0) -> void:
 	var d := (p1 - p0)
 	var ln := d.length()
 	if ln < 0.0001:
@@ -553,14 +632,16 @@ static func _wall_piece(b: TreeMeshLibrary.Buf, p0: Vector2, p1: Vector2, y0: fl
 	var a := Vector3(p0.x, y0 - sink, p0.y)
 	var c := Vector3(p1.x, y1 - sink, p1.y)
 	var up := Vector3(0, h + sink, 0)
+	var up1 := up if h1 < 0.0 else Vector3(0, h1 + sink, 0)
 	var o := Vector3(n2.x, 0, n2.y)
 	var u1 := ln / m2u / 2.0
 	var v1 := (h + sink) / m2u / 2.0
-	var uvs := [Vector2(0, 0), Vector2(u1, 0), Vector2(u1, v1), Vector2(0, v1)]
-	TreeMeshLibrary._card(b, [a + o + up, c + o + up, c + o, a + o], [n3, n3, n3, n3], [1.0, 1.0, 0.75, 0.75], uvs)
-	TreeMeshLibrary._card(b, [c - o + up, a - o + up, a - o, c - o], [-n3, -n3, -n3, -n3], [1.0, 1.0, 0.75, 0.75], uvs)
+	var v2 := v1 if h1 < 0.0 else (h1 + sink) / m2u / 2.0
+	var uvs := [Vector2(0, 0), Vector2(u1, 0), Vector2(u1, v2), Vector2(0, v1)]
+	TreeMeshLibrary._card(b, [a + o + up, c + o + up1, c + o, a + o], [n3, n3, n3, n3], [1.0, 1.0, 0.75, 0.75], uvs)
+	TreeMeshLibrary._card(b, [c - o + up1, a - o + up, a - o, c - o], [-n3, -n3, -n3, -n3], [1.0, 1.0, 0.75, 0.75], uvs)
 	var tu := t / m2u / 2.0
-	TreeMeshLibrary._card(b, [a - o + up, c - o + up, c + o + up, a + o + up],
+	TreeMeshLibrary._card(b, [a - o + up, c - o + up1, c + o + up1, a + o + up],
 		[Vector3.UP, Vector3.UP, Vector3.UP, Vector3.UP], [1.0, 1.0, 1.0, 1.0],
 		[Vector2(0, 0), Vector2(u1, 0), Vector2(u1, tu), Vector2(0, tu)])
 

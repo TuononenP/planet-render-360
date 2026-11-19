@@ -130,6 +130,20 @@ func _run() -> void:
 			RoadPaint.material().shader.code]:
 		if not ("lamp_pool" in code or "lamp_mean" in code) or "// @GLOW" in code:
 			failures.append("every street surface shader should paint the lamp pools")
+	# The ground and the paved ribbons lay one stone (PavingGlsl): spliced
+	# into both, no marker left, and on for paving and setts, off for gravel.
+	var paved := RoadSurface.paved_material("pavement", Color(0.3, 0.3, 0.3), 0.0, true, false, true)
+	if not ("// @PAVING" in GroundShader.CODE) or not ("// @PAVING" in RoadSurface.PAVED_CODE):
+		failures.append("both the ground and the paved ribbons should mark where the shared stone goes")
+	for code in [GroundMaterial.shader_code(), paved.shader.code]:
+		if not (PavingGlsl.CODE in code) or "// @PAVING" in code or not ("paving_look(" in code):
+			failures.append("the ground and the paved ribbons should both carry PavingGlsl's stone")
+	if "float paving(" in GroundMaterial.shader_code():
+		failures.append("the ground should lay the shared stone, not a pattern of its own")
+	for row in [["paving", 1.0], ["sett", 1.0], ["gravel", 0.0]]:
+		var finish := RoadBuilder._material(str(row[0])) as ShaderMaterial
+		if float(finish.get_shader_parameter("paving_on")) != float(row[1]):
+			failures.append("the %s finish should lay paving_on = %s" % [row[0], row[1]])
 	# The far city's light map (StreetGlow): built score, parks and water
 	# dark, found on a world root, and painted by the far surface.
 	var smap := SettlementMap.new()

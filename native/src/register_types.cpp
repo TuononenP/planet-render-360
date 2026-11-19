@@ -21,6 +21,7 @@
 #include "shore_classifier.h"
 #include "shore_evidence_kernels.h"
 #include "snapshot_kernels.h"
+#include "steps_kernels.h"
 #include "memory_stats.h"
 #include "video_decoder.h"
 #include "video_encoder.h"
@@ -56,6 +57,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(ShoreEvidenceIndex);
 	GDREGISTER_CLASS(ShorePatchKernel);
 	GDREGISTER_CLASS(SnapshotKernels);
+	GDREGISTER_CLASS(StepsKernels);
 	GDREGISTER_CLASS(TintKernels);
 	GDREGISTER_CLASS(PhotoSampler);
 	GDREGISTER_CLASS(GridFilters);

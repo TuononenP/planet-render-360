@@ -63,8 +63,12 @@ uniform float lamp_pools = 0.0;
 // place of the pavement set's slabs, ±9% a stone and dark 1.2 cm joints
 // that fade out once a stone is a few pixels.
 uniform float sett_on = 0.0;
+// 1 for the paved finishes (slabs, setts): PavingGlsl's stone, the same the
+// ground lays, over the pavement set. Gravel and track beds have none.
+uniform float paving_on = 0.0;
 // @SNOW
 // @GLOW
+// @PAVING
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -105,19 +109,18 @@ void fragment() {
 		st_u.x += 0.5 * mod(floor(st_u.y), 2.0);
 		vec2 st_fw = fwidth(wpos.xz) / st_sz;
 		float st_near = 1.0 - smoothstep(0.08, 0.35, max(st_fw.x, st_fw.y));
-		// Lying snow buries the joints.
-		float st_vis = st_near * (1.0 - sc);
 		float st_h = fract(sin(dot(floor(st_u), vec2(12.9898, 78.233))) * 43758.5453);
 		vec3 st_mean = textureLod(alb_tex, vec2(0.5), 9.0).rgb;
 		vec3 st_stone = textureLod(alb_tex, vec2(st_h, fract(st_h * 7.13)), 4.0).rgb;
 		col = tint * mix(st_mean, st_stone, st_near) * mix(1.0, 0.75, wet);
 		rough = mix(0.85, 0.3, wet);
-		vec2 st_e = min(fract(st_u), 1.0 - fract(st_u)) * st_sz;
-		vec2 st_fm = max(fwidth(wpos.xz), vec2(1e-4));
-		vec2 st_jl = smoothstep(vec2(0.012), vec2(0.012) + st_fm, st_e);
-		float st_joint = 1.0 - min(st_jl.x, st_jl.y);
-		col *= 1.0 + st_vis * ((st_h - 0.5) * 0.18 - 0.3 * st_joint);
-		rough = mix(rough, 0.95, st_vis * st_joint);
+	}
+	// The stone's own tone, joints and gloss (PavingGlsl): filtered, so they
+	// settle with distance instead of fading, and the same as the ground's.
+	if (paving_on > 0.5) {
+		float pv_rgh = 0.9;
+		col *= paving_look(wpos.xz, sett_on, pv_rgh);
+		rough = mix(pv_rgh, 0.3, wet);
 	}
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
 	vec2 p = wpos.xz;
@@ -172,7 +175,9 @@ void fragment() {
 	// through the ribbons' UV tangent frame the world-sampled snow layer
 	// tilted the whole slab away from a low sun, a shade darker than the
 	// pavement around it.
-	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), max(cover, st_flat));
+	// Setts keep the set's own relief, 40% strong: a flat normal left a
+	// broad, even sheen under a low sun.
+	NORMAL_MAP = mix(texture(nor_tex, UV).rgb, vec3(0.5, 0.5, 1.0), max(cover, st_flat * 0.6));
 	// Ice crystals glint at the sun by day and at the lamps by night,
 	// as on the ground (ClimateModel.snow_facet).
 	vec4 facet = snow_facet(p, px);
@@ -610,13 +615,15 @@ static func set_place(data: LocationData) -> void:
 		_mat.set_shader_parameter("detail_m", _detail_m)
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
-## (linear albedo), one per call (RoadBuilder caches per finish).
+## (linear albedo), one per call (RoadBuilder caches per finish). `sett`
+## lays granite setts, `paving` PavingGlsl's stone over the set.
 static func paved_material(set_name: String, target: Color, traffic: float = 0.0, lamp_pools: bool = false,
-		sett: bool = false) -> ShaderMaterial:
+		sett: bool = false, paving: bool = false) -> ShaderMaterial:
 	if _paved_shader == null:
 		_paved_shader = Shader.new()
 		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-			.replace("// @DEPTH", DEPTH_GLSL).replace("// @GLOW", StreetGlow.GLSL)
+			.replace("// @DEPTH", DEPTH_GLSL).replace("// @GLOW", StreetGlow.GLSL) \
+			.replace("// @PAVING", PavingGlsl.CODE)
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	var t := MaterialLibrary._calib_tint(row["mean"], target)
 	var m := ShaderMaterial.new()
@@ -632,6 +639,7 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 	m.set_shader_parameter("traffic", traffic)
 	m.set_shader_parameter("lamp_pools", 1.0 if lamp_pools else 0.0)
 	m.set_shader_parameter("sett_on", 1.0 if sett else 0.0)
+	m.set_shader_parameter("paving_on", 1.0 if paving else 0.0)
 	return m
 
 static func _tex(map_name: String) -> Texture2D:

@@ -197,6 +197,7 @@ func _run() -> void:
 	_underground_checks(failures)
 	_orphan_part_checks(failures)
 	_sidewalk_checks(failures)
+	_steps_checks(failures)
 	_stop_checks(failures)
 	_height_unit_checks(failures)
 	_poi_checks(failures)
@@ -1156,6 +1157,30 @@ func _sidewalk_checks(failures: Array[String]) -> void:
 	if not bool(OsmTags._rail_entry({"railway": "tram", "gauge": "1067", "electrified": "no"},
 			PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])).get("cable", false)):
 		failures.append("a non-electrified street tram (Hyde St's track) is a cable car")
+
+## A flight of steps keeps its step count, direction and handrail, as a
+## way and as a closed area; other ways carry none of them.
+func _steps_checks(failures: Array[String]) -> void:
+	var line := PackedVector2Array([Vector2.ZERO, Vector2(10, 0)])
+	var flight := OsmTags._road_entry({"highway": "steps", "step_count": "33", "incline": "down",
+		"handrail:left": "yes"}, line)
+	if int(flight.get("step_count", -1)) != 33 or str(flight.get("incline", "?")) != "down" \
+			or not bool(flight.get("handrail", false)):
+		failures.append("steps way must keep count, incline and handrail: %s" % flight)
+	var bare := OsmTags._road_entry({"highway": "steps"}, line)
+	if int(bare.get("step_count", -1)) != 0 or str(bare.get("incline", "?")) != "" or bool(bare.get("handrail", true)):
+		failures.append("bare steps default to 0 steps, no incline, no handrail: %s" % bare)
+	if OsmTags._road_entry({"highway": "footway", "step_count": "4"}, line).has("step_count"):
+		failures.append("only steps carry a step count")
+	for row in [["up", "up"], ["down", "down"], ["-12%", "down"], ["8%", "up"], ["yes", ""], ["", ""], ["0%", ""]]:
+		if OsmTags.steps_incline({"incline": row[0]}) != row[1]:
+			failures.append("incline %s read as %s, want %s" % [row[0], OsmTags.steps_incline({"incline": row[0]}), row[1]])
+	var ring := PackedVector2Array([Vector2.ZERO, Vector2(10, 0), Vector2(10, 5), Vector2(0, 5)])
+	var area := OsmTags._area_entry({"highway": "steps", "area": "yes", "step_count": "7", "handrail": "yes"}, "steps", ring, [])
+	if int(area.get("step_count", -1)) != 7 or not bool(area.get("handrail", false)):
+		failures.append("steps area must keep count and handrail: %s" % area)
+	if (OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian", ring, []) as Dictionary).has("step_count"):
+		failures.append("a plaza carries no step count")
 
 ## Tram and bus stop nodes (TransitVehicles): asked for over the whole
 ## radius, parsed to {x, z, name}; a bus stop stays street furniture too.

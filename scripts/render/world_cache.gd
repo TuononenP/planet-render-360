@@ -21,7 +21,7 @@ extends RefCounted
 ## shown while developing. Headless runs (dummy renderer, no mesh data to
 ## save) bypass the cache entirely.
 
-const BUILD_VERSION := 299
+const BUILD_VERSION := 302
 const DIR := "user://worlds"
 ## Sources whose output a cached world freezes (debug-build fingerprint).
 const SOURCE_DIRS := ["res://scripts/generation", "res://scripts/render", "res://scripts/data"]
@@ -468,7 +468,7 @@ static func _own(n: Node, owner_node: Node) -> void:
 ## GroundTruth state (everything _init computes; the polygon/building
 ## arrays come back from `data`).
 const GROUND_FIELDS := ["extent_m", "water_level_m", "surface_min", "surface_max",
-	"datum_m", "_y_scale", "_surface", "_size", "_step_units", "_half_units", "_level"]
+	"datum_m", "_y_scale", "_surface", "_size", "_step_units", "_half_units", "_level", "steps"]
 
 static func _ground_state(g: GroundTruth) -> Dictionary:
 	var out := {}

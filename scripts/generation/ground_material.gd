@@ -91,6 +91,12 @@ const ARID_VEG_HI := 0.24
 ## shader lays its blocks instead of flagstones (surveyed pavements).
 const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3, "sett": 1.0}
 
+## GroundShader's code with its splices in.
+static func shader_code() -> String:
+	return GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @TERRAIN", TerrainGlsl.CODE).replace("// @PAVING", PavingGlsl.CODE) \
+		.replace("// @GLOW", StreetGlow.GLSL)
+
 ## The shared ground material for one built place. `photo` is the
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with
 ## no imagery, the procedural colour image TerrainBuilder bakes over
@@ -99,8 +105,7 @@ const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3, "sett": 1.0}
 ## map when the caller already has it (GroundTruth.surface), else built here.
 static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		has_sat: bool, cmap: Image = null) -> ShaderMaterial:
-	var sh := SharedShader.of(GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-		.replace("// @TERRAIN", TerrainGlsl.CODE).replace("// @GLOW", StreetGlow.GLSL))
+	var sh := SharedShader.of(shader_code())
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	var m2u := WorldScale.metres_to_units()

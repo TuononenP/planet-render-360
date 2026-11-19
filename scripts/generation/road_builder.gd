@@ -183,7 +183,8 @@ static func _material(finish: String) -> Material:
 		"paving", "sett", "gravel":
 			# Setts and gravel carry traffic; footway paving does not.
 			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
-				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true, finish == "sett")
+				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true, finish == "sett",
+				finish != "gravel")
 		"deck":
 			# A Paris bridge is stone: its fascias in the quay walls' limestone
 			# (board-formed concrete read as tan wooden planks beside them).
@@ -212,6 +213,7 @@ const LANDING_WET_M := 8.0
 static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	_mats.clear()
 	_stone_deck = QuayBuilder.stone_material(data) if QuayBuilder.stone_quays(data) else null
+	BridgeArches.stone_arches = QuayBuilder.stone_quays(data)
 	var m2u := WorldScale.metres_to_units()
 	var surf := _Surface.new(data, ground)
 	surf.use_native()
@@ -242,11 +244,15 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var n := data.roads.size()
 	var parts: Array = []
 	parts.resize(CHUNKS)
+	# Flights of steps the ground was held to are drawn as stairs, not ribbons.
+	var stairs := StairBuilder.skipped_roads(ground)
 	var job := func(c: int) -> void:
 		var own := {}
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
 			if abort != null and abort.requested:
 				break
+			if stairs.has(i):
+				continue
 			_road(own, data.roads[i], steps[i], m2u, surf, ground, junc, spans, abort, plan.by_road.get(i, {}), seeds[i])
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
@@ -273,6 +279,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		if not (str(finish) in ["bridge", "deck"]):
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
+	StairBuilder.lay(root, data, ground, surf, m2u)
 
 ## Paths a pedestrian square paves over (not steps, crossings, bridges,
 ## tunnels or a piece already clipped).

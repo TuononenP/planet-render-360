@@ -68,6 +68,11 @@ var _buildings: Array = []
 var _level: PackedFloat32Array = PackedFloat32Array()
 ## Finalized before builders start; untyped to avoid a class-load cycle.
 var shoreline = null
+## The flights of steps the ground was held to (StepsGround.apply, heights
+## in render units): StairBuilder draws them and RoadBuilder leaves their
+## ribbons out. Saved with the ground, so a rebuild over a cached ground
+## still knows them.
+var steps: Array = []
 ## The painted ground (GroundSurface), built on first ask; the lock lets
 ## the terrain and vegetation stages share one build.
 var _painted: GroundSurface = null
@@ -267,6 +272,9 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 	LandmarkStairCut.cut(_surface, size, _step_units, data)
 	if shoreline != null and not shoreline.empty():
 		shoreline.hold_terrace(_surface)
+	# Flights of steps hold the ground to their levels last of all: over
+	# the terrace levelling, the squares' planes and the DEM's blur.
+	steps = StepsGround.apply(_surface, _level, size, _step_units, data, WorldScale.metres_to_units())
 	# Y-scale conversion (see header): carving above is in source
 	# metres; the stored surface and water datum are render units.
 	if not is_equal_approx(data.water_level, -3.0):
@@ -279,6 +287,9 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 			if not is_inf(_level[i]):
 				_level[i] = render_y(_level[i])
 		water_level_m = render_y(water_level_m)
+		for flight: Dictionary in steps:
+			flight["y_top"] = render_y(float(flight["y_top"]))
+			flight["y_bot"] = render_y(float(flight["y_bot"]))
 	surface_min = INF
 	surface_max = -INF
 	for h2 in _surface:

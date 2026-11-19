@@ -3,8 +3,8 @@ extends RefCounted
 
 ## GroundMaterial's spatial shader (split out of ground_material.gd to
 ## keep that class under the size limit). "// @SNOW" is replaced with
-## ClimateModel.SNOW_GLSL and "// @TERRAIN" with TerrainGlsl.CODE at
-## build time.
+## ClimateModel.SNOW_GLSL, "// @TERRAIN" with TerrainGlsl.CODE and
+## "// @PAVING" with PavingGlsl.CODE at build time.
 ##
 ## Per pixel: land-cover classes pick up to eight photographic layers
 ## (TerrainTextures) by palette weight, sampled without visible
@@ -94,29 +94,13 @@ vec3 srgb_lin(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
 }
 
-// PAVING (T4.7): achromatic value gain for laid urban ground at metre
-// coords g. ±8% patches over 6–25 m (wear, cleaning, repairs) plus
-// 2 x 1.4 m running-bond flagstones with ±4% per-slab value and 3 cm
-// darker joints; the slab layer fades with its screen footprint so it
-// never aliases. Multiplies value only, so hue is preset-stable.
-// `sett` (the share of class 18) lays 13 x 11 cm granite setts instead:
-// ±9% per stone and deeper 2.4 cm joints, gone a few metres out.
-float paving(vec2 g, float sett) {
-	float big = (t_noise(g / 23.0) - 0.5) * 0.11 + (t_noise(g / 6.5 + 17.0) - 0.5) * 0.06;
-	float s = step(0.5, sett);
-	vec2 slab = mix(vec2(2.0, 1.4), vec2(0.13, 0.11), s);
-	vec2 su = g / slab;
-	su.x += 0.5 * mod(floor(su.y), 2.0);
-	vec2 fw = fwidth(g) / slab;
-	float vis = 1.0 - smoothstep(0.08, 0.35, max(fw.x, fw.y));
-	float jit = (t_hash(floor(su) + 3.1) - 0.5) * mix(0.08, 0.18, s);
-	vec2 e = min(fract(su), 1.0 - fract(su)) * slab;
-	vec2 fm = max(fwidth(g), vec2(1e-4));
-	float jw = mix(0.015, 0.012, s);
-	vec2 jl = smoothstep(vec2(jw), vec2(jw) + fm, e);
-	float joint = mix(-0.10, -0.22, s) * (1.0 - min(jl.x, jl.y));
-	return 1.0 + big + vis * (jit + joint);
-}
+// PAVING: the value gain and roughness of laid stone at metre coords g
+// (PavingGlsl, shared with the paved ribbons so a square and the walks
+// across it carry one structure): slabs, or with `sett` (the share of
+// class 18) granite setts; joints and tone settle with distance instead of
+// fading, and the age mottling keeps a plaza from reading as one slab.
+// Multiplies value only, so hue is preset-stable.
+// @PAVING
 
 // One class-map tap's share of the ground's material weights.
 void class_tap(int id, float bw, float veg, inout vec4 W0, inout vec4 W1, inout vec3 col,
@@ -185,6 +169,7 @@ void fragment() {
 	float rough = 0.0;
 	float hfk = 0.0;
 	float pave = 0.0;
+	float pave_rgh = 0.9;
 	// Share of unmown meadow (class 17), of water (15) and of setts (18)
 	// among the taps.
 	float wildw = 0.0;
@@ -412,7 +397,7 @@ void fragment() {
 	// than a few screen pixels; close up it is blur, so PBR carries.
 	float hf_on = smoothstep(60.0, 260.0, dist_m);
 	vec3 near_c = base * det * mix(1.0, ratio, hfk * hf_on);
-	near_c *= mix(1.0, paving(g, settw), pave * (1.0 - steep));
+	near_c *= mix(1.0, paving_look(g, settw, pave_rgh), pave * (1.0 - steep));
 	// Cliffs keep their rock detail further out than flat cover.
 	float wf = smoothstep(near_m, far_m, dist_m) * farc * (1.0 - 0.6 * steep);
 	vec3 alb = mix(near_c, mix(base, hf, 0.6), wf);
@@ -525,6 +510,9 @@ void fragment() {
 	// The layers' own roughness maps carry gloss variation near by.
 	float rmap = mix(nm.a, sn.a, sc);
 	float r = mix(rough, clamp(rmap, 0.62, 1.0), 0.5 * (1.0 - wf));
+	// Laid stone: its own gloss, slab by slab, breaking the broad sheen a
+	// low sun finds on an even field.
+	r = mix(r, pave_rgh, clamp(pave, 0.0, 1.0) * (1.0 - steep) * (1.0 - wf));
 	r = mix(r, SNOW_ROUGH, sc * (1.0 - wf));
 	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.03, glint);
 	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
