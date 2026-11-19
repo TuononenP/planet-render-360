@@ -227,7 +227,7 @@ func _settle(view: View360) -> Dictionary:
 	return s
 
 func _fly(view: View360, seconds: float, speed: float) -> Dictionary:
-	var log_path := WorldStreamer.LOG_PATH
+	var log_path := StreamLog.LOG_PATH
 	var log_from := _file_len(log_path)
 	view._streamer.enabled = true
 	var rig := view._rig

@@ -89,10 +89,17 @@ static func build_roads(data: LocationData, ground: GroundTruth = null, abort: B
 	RoadSurface.set_place(data)
 	var root := Node3D.new()
 	root.name = "Roads"
+	var timings := {}
+	var t := Time.get_ticks_msec()
 	_roads(root, data, ground, abort)
+	t = StreetProps._lap(timings, "roads", t)
 	RoadDecals.build(root, data, ground)
+	t = StreetProps._lap(timings, "decals", t)
 	KerbBuilder.build(root, data, ground)
+	t = StreetProps._lap(timings, "kerbs", t)
 	RailBuilder.build(root, data, ground, abort)
+	t = StreetProps._lap(timings, "rails", t)
+	print("ROADS timings ms ", timings)
 	return root
 
 ## {points, width_u, finish, rank, bridge} for one road element, or {}

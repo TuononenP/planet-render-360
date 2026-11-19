@@ -55,6 +55,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
 	var timings := {}
 	var t := Time.get_ticks_msec()
+	# A streamed stretch dropped while its detail builds stops between the
+	# slower kinds (its result is freed, never shown).
+	var abort: BuildAbort = ctx.get("abort")
 	# Planned before the lamps: a side-street lamp gives way only where a
 	# utility pole really stands (the poles stop at their radius and cap).
 	var pole_plan := UtilityPoles.plan(data, ground, mask)
@@ -63,6 +66,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "pole_plan", t)
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	t = _lap(timings, "lamps", t)
+	if abort != null and abort.requested:
+		return {}
 	var bar := _barriers(root, data, ground, ctx)
 	t = _lap(timings, "barriers", t)
 	ShoreRailings.build(root, data, ground)
@@ -71,6 +76,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "furniture", t)
 	var plazas := PlazaLife.build(root, data, ground, mask, ctx)
 	t = _lap(timings, "plazas", t)
+	if abort != null and abort.requested:
+		return {}
 	var boats := MarinaBuilder.build(root, data, ground, mask)
 	t = _lap(timings, "marina", t)
 	boats += HarbourFerries.build(root, data, ground, mask)
@@ -78,12 +85,16 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "ferries", t)
 	var quay_bollards := QuayDetails.build(root, data, ground, mask)
 	t = _lap(timings, "quay", t)
+	if abort != null and abort.requested:
+		return {}
 	var cars := ParkedCars.build(root, data, ground)
 	t = _lap(timings, "cars", t)
 	var trams := TransitVehicles.build(root, data, ground)
 	t = _lap(timings, "trams", t)
 	var trains := StationTrains.build(root, data, ground)
 	t = _lap(timings, "trains", t)
+	if abort != null and abort.requested:
+		return {}
 	var wires := OverheadWires.build(root, data, ground)
 	t = _lap(timings, "wires", t)
 	var poles := UtilityPoles.build(root, data, ground, pole_plan)

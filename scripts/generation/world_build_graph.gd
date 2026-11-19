@@ -11,6 +11,12 @@ extends RefCounted
 ## serially. Buildings and the far city stay one task (the
 ## facade caches, also capped, keep their serial order). Subtrees are
 ## adopted in the serial order, so the world is the same either way.
+##
+## A background build (the streamer's way ahead) is layered: the stages
+## build the core only (terrain, water, buildings, roads, landmarks,
+## trees), and build_detail() makes the street props, ground cover and
+## rocks afterwards, so the detail never holds the swap (StreamDetail
+## attaches it). A foreground build makes everything at once, as before.
 
 ## True builds serially (tests and the bench compare the two). The
 ## parallel world matched the serial one byte for byte on Paris,
@@ -51,6 +57,9 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 		StreetProps._chainlink_material()
 	var hide := TerrainBuilder.debug_hide_buildings
 	var vehicle_box := [{}]
+	var layered := abort != null and abort.background
+	var keep := {}
+	var veg_layer := VegetationBuilder.Layer.CORE if layered else VegetationBuilder.Layer.ALL
 	var stages: Array[Stage] = [
 		_stage(BuildAbort.Step.FAR, func() -> Node3D:
 			return FarTerrainBuilder.build_far(data, ground, abort)),
@@ -71,13 +80,24 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 				vehicle_box[0] = VehicleMover.compute_plans(data, ground)
 			return lm),
 		_stage(BuildAbort.Step.VEGETATION, func() -> Node3D:
-			return VegetationBuilder.build_vegetation(data, ground, abort)),
+			return VegetationBuilder.build_vegetation(data, ground, abort, veg_layer, keep)),
 	]
 	var mutex := Mutex.new()
 	var tasks: Array[int] = []
-	for lane: Array in _lanes():
+	var lanes := _lanes(layered)
+	# Stages in no lane go to whichever task ends its own first.
+	var spare: Array = range(stages.size()).filter(func(i: int) -> bool:
+		return not lanes.any(func(l: Array) -> bool: return i in l))
+	for lane: Array in lanes:
 		var run := func() -> void:
-			for i: int in lane:
+			var mine := lane.duplicate()
+			while true:
+				mutex.lock()
+				var from: Array = mine if not mine.is_empty() else spare
+				var i: int = from.pop_front() if not from.is_empty() else -1
+				mutex.unlock()
+				if i < 0:
+					return
 				var st := stages[i]
 				var cache: Dictionary = before_clear if i <= 2 else MaterialLibrary._pbr_mats
 				var s0 := Time.get_ticks_msec()
@@ -126,8 +146,30 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 		for s in ms:
 			abort.set_ms(s, ms[s])
 		abort.stage_ms = stages.map(func(st: Variant) -> int: return st.ms)
-		print("%s total=%d parallel" % [abort.timings_line(), Time.get_ticks_msec() - t0])
+		print("%s total=%d parallel%s" % [abort.timings_line(), Time.get_ticks_msec() - t0,
+			" core" if layered else ""])
+		if layered and keep.has("mask"):
+			abort.detail = keep
 	return root
+
+## The detail layer of a world build() made the core of: a detached
+## "Vegetation" subtree (its children tagged with that layer, whose LOD
+## rules they take as when built at once), or null when `keep` (BuildAbort.detail) holds
+## none. Serial, on the caller's thread, after the stages: it shares
+## their static caches, so never beside another build. `abort` stops it
+## between kinds; a stopped result is freed here.
+static func build_detail(data: LocationData, ground: GroundTruth, keep: Dictionary,
+		abort: BuildAbort = null) -> Node3D:
+	if not keep.has("mask") or (abort != null and abort.requested):
+		return null
+	var node := VegetationBuilder.build_vegetation(data, ground, abort,
+		VegetationBuilder.Layer.DETAIL, keep)
+	if abort != null and abort.requested:
+		node.free()
+		return null
+	for c in node.get_children():
+		TerrainBuilder.tag_layer(c, str(node.name))
+	return node
 
 ## Stage indices grouped into tasks; a task runs its stages in order.
 ## Set to try another grouping (tests, benches).
@@ -139,11 +181,16 @@ static var lanes_override: Array = []
 ## stages share a third (Helsinki on Ultra: 11.4 s with seven tasks,
 ## 7.3 s with three). Release builds have no such check and keep one
 ## task per stage.
-static func _lanes() -> Array:
+## A layered build's vegetation stage is short (no props, no cover) and
+## its landmarks can be the longest (a far landmark's views rasterised
+## for the first time: 10 s behind the terrain and water in one task on
+## a Helsinki flight), so each of the four gets a task and the far
+## terrain, terrain and water go to whichever ends first.
+static func _lanes(layered := false) -> Array:
 	if not lanes_override.is_empty():
 		return lanes_override
 	if OS.is_debug_build():
-		return [[3], [6], [4], [0, 1, 2, 5]]
+		return [[3], [5], [4], [6]] if layered else [[3], [6], [4], [0, 1, 2, 5]]
 	return [[0], [1], [2], [3], [4], [5], [6]]
 
 static func _stage(step: int, fn: Callable) -> Stage:

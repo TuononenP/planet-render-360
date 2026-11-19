@@ -45,7 +45,9 @@ static func take_stats() -> String:
 ## Runs `start` now if no Postpass request is in flight, else when the ones
 ## ahead have left. `urgent` (the detailed layer) goes to the front of the
 ## line, a fetch-ahead's (a node under one marked LOW_META) goes to the back,
-## behind every live one. While Postpass rests after a refusal, or once it has waited
+## behind every live one; its own `urgent` request goes ahead of the other
+## fetch-ahead requests (the next stretch's map before any stretch's far
+## city, ring or POIs). While Postpass rests after a refusal, or once it has waited
 ## `max_wait_s` in line, `skip(reason)` is called (never synchronously)
 ## instead. An owner already holding or waiting is replaced, not doubled.
 static func enter(owner: Object, start: Callable, skip: Callable, urgent: bool = false,
@@ -58,21 +60,23 @@ static func enter(owner: Object, start: Callable, skip: Callable, urgent: bool =
 	_free_stale()
 	var low := _is_low(owner)
 	# A slot freed this frame goes to the ones already waiting first.
-	if _busy == null and (urgent or not _eligible_waiting()) and not (low and low_held()):
+	if _busy == null and ((urgent and not low) or not _eligible_waiting()) and not (low and low_held()):
 		_take(owner, start)
 		return
 	_last_id += 1
 	var id := _last_id
 	var entry := {"id": id, "owner": owner, "start": start, "skip": skip,
-		"queued": Time.get_ticks_msec(), "low": low}
-	if urgent:
+		"queued": Time.get_ticks_msec(), "low": low, "urgent": urgent}
+	if urgent and not low:
 		_queue.push_front(entry)
-	elif low:
+	elif low and not urgent:
 		_queue.append(entry)
 	else:
-		var at := _queue.size()  # behind the live ones, ahead of the fetch-ahead's
+		# Behind the live ones; a live one ahead of every fetch-ahead's, a
+		# fetch-ahead's detailed layer ahead of its other layers only.
+		var at := _queue.size()
 		for i in _queue.size():
-			if _queue[i]["low"]:
+			if _queue[i]["low"] and not (low and _queue[i]["urgent"]):
 				at = i
 				break
 		_queue.insert(at, entry)

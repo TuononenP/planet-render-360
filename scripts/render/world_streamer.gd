@@ -301,6 +301,13 @@ func swap_wanted(pos: Vector2) -> bool:
 	return d <= pos.length() - SWAP_MARGIN_M or d <= SWAP_MARGIN_M * 0.5 \
 		or (not inside_detailed(pos) and inside_detailed(pos - pending_target_xz))
 
+## Whether a staged world may show now: at once when the edge is near
+## (its detail layer then joins it shown, StreamDetail), else once it has
+## settled `staged_ms` and its detail is in, so nothing arrives late in
+## view while the camera still has ground ahead.
+static func may_show(near_edge: bool, staged_ms: int, detail_pending: bool) -> bool:
+	return near_edge or (staged_ms >= SETTLE_MS and not detail_pending)
+
 ## A camera standing still near the centre keeps its ready world: an
 ## early build lands before the camera has gone anywhere. So does one
 ## stepping back at walking pace (looking around): only a turn faster
@@ -364,6 +371,9 @@ var _ready_data: LocationData
 ## Stages the ready world into the scene and frees the old one, a slice
 ## a frame (WorldHandoff), so the swap frame does neither wholesale.
 var _handoff := WorldHandoff.new()
+## Builds a stretch's detail layer after its core and hands it over, so
+## the detail holds no swap the camera needs now (StreamDetail).
+var _detail := StreamDetail.new()
 ## Fades the new ground in from the camera outward after a swap.
 var _reveal := RevealWave.new()
 var _last_pos := Vector2.INF
@@ -468,6 +478,14 @@ func _pump_ranging(budget_us: int = 1000) -> void:
 		_range_world = null
 		_ready_ranged = true
 
+## `world` gained children after its build (StreamDetail, while it still
+## waits detached): if it was ranged already, ranging goes on with them.
+func range_more(world: Node3D) -> void:
+	if _ready_ranged and _ranged_world == world and _range_cursor < world.get_child_count():
+		_range_world = world
+		_ranged_world = null
+		_ready_ranged = false
+
 ## Ranges whatever is left of the pending world at once (a swap that
 ## arrived before the slices did).
 func _finish_ranging() -> void:
@@ -485,10 +503,23 @@ func _cancel_pending() -> void:
 			rp.queue_free()
 	_retiring_pipes.clear()
 
+## Keeps `pipe` until it has settled (retire_when_settled frees it), and
+## forgets those that have gone. Never a typed lambda over the list: a
+## freed pipeline cannot be passed as one, and the error it raised ended
+## _on_finished before the build (every stretch after a swap was lost).
+func _retire_pipe(pipe: GenerationPipeline) -> void:
+	var live: Array[GenerationPipeline] = []
+	for rp: Variant in _retiring_pipes:
+		if is_instance_valid(rp):
+			live.append(rp)
+	live.append(pipe)
+	_retiring_pipes = live
+
 ## Cancels any pending generation and drops its world (a season change,
 ## a new place, teardown). The next begin() starts from a clean slate.
 func cancel_pending() -> void:
 	_cancel_pending()
+	_detail.cancel(false, _view._generated if is_instance_valid(_view) else null)
 	_parked.free_all()
 	_scout.stop()
 	invalidate("cancelled")
@@ -519,6 +550,7 @@ func reset_for_new_place() -> void:
 func shutdown() -> void:
 	cancel_pending()
 	_reveal.stop()
+	_detail.cancel(true)  # the view joins its thread (View360._notification)
 	_handoff.clear()
 	_parked.forget()  # in the world root, which frees them
 	_view = null
@@ -572,49 +604,12 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 		if is_instance_valid(old_world) and old_world != built[1]:
 			_parked.park(old_world, old_data, old_ground, Vector2(centre_lat, centre_lon))
 		ViewConditions.apply_surface_state(v, not dressed)
-		if not _reveal.prepared(built[1]):
+		if not _reveal.preparing(built[1]):  # late children: start() walks them
 			_reveal.prepare(built[1], old_centre)
 		_reveal.start(built[1], new_xz, v._quality_preset)
 	else:
 		v._rebuild_world(built[1], false)
-	var y := v._ground.height_at_world(new_xz.x, new_xz.y) + agl
-	if not v._drone.on:
-		# Keep the walker's height when the new centre's floor agrees
-		# with it (ViewWalk lerps the small rest while moving); snap
-		# when it does not — a set-down from flight, an authored
-		# island or quay floor — so the eye is right even standing
-		# still, where no lerp runs.
-		var foot := ViewWalk.foot_y(data, v._ground, new_xz)
-		if absf(foot - y) > 0.5:
-			y = foot
-	v._rig.position = Vector3(new_xz.x, y, new_xz.y)
-	v._atmos.ground_at = func(x: float, z: float) -> float: return v._ground.height_at_world(x, z)
-	v._atmos.set_place(data.latitude, data.longitude)
-	v._atmos.set_coast(v._ground.render_y(0.0), data.waterways.any(func(w: Variant) -> bool:
-		return w is Dictionary and str((w as Dictionary).get("class", "")) == "coastline"))
-	v._atmos.set_probe_origin(v._rig.position)
-	if v._horizon != null:
-		v._horizon.set_place(data, v._ground)
-	if v._minimap != null:
-		v._minimap.set_place(data)
-	v._walk._spans_for = null
-	v._walk._near_at = Vector2.INF
-	v._walk._near.clear()
-	v._drone._spans_for = null
-	v._drone._near_at = Vector2.INF
-	v._drone._near.clear()
-	if v._drone.on:
-		# Momentum is frame-relative and survives the recentre: only
-		# the height-over-ground and floor caches are re-derived. A
-		# resync left pending by a glide the swap just killed must
-		# not eat the first frame's momentum either.
-		v._drone._resync = false
-		v._drone._agl = clampf(agl, ViewDrone.AGL_MIN_M, ViewDrone.AGL_MAX_M)
-	else:
-		v._drone._resync = true
-	v._drone._floor_clock = 0.0
-	v._drone._floor_here = -INF
-	v._drone._floor_target = -INF
+	StreamSwap.seat(v, data, new_xz, agl)
 	ViewChrome.show_place(v, data)
 	var vel := _vel
 	arm(data.latitude, data.longitude, data.season, data.quality_preset)
@@ -630,6 +625,7 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 ## shows each build, and says when the interim cap bites (`slowed`).
 func tick(v: View360, delta: float) -> void:
 	_view = v
+	_detail.tick(v, self, delta)
 	if not enabled or v._data == null or v._ground == null or v._rig == null \
 			or not v.is_visible_in_tree():
 		# Retired and dropped worlds still leave (hidden, in the tree).
@@ -700,7 +696,7 @@ func tick(v: View360, delta: float) -> void:
 		# settled too unless the edge is near.
 		if hurry and not (_ready.size() > 1 and _handoff.ready_for(_ready[1])
 				and _reveal.prepared(_ready[1])
-				and (near_edge or _handoff.staged_ms(_ready[1]) >= SETTLE_MS)):
+				and may_show(near_edge, _handoff.staged_ms(_ready[1]), _detail.holds(_ready[1], _handoff))):
 			return
 		if swap_wanted(pos):
 			_finish_ranging()
@@ -803,29 +799,9 @@ func _note_frame(delta: float) -> void:
 			_log("STREAM swap: %s" % _worst_line(["ready", "swap call", "swap+0", "swap+1", "swap+2", "swap+3"]))
 			_worst.clear()
 
-## Prints `line` and keeps it in LOG_PATH too: Godot keeps only its last
-## few session logs, so a flight's timings were gone by the time anyone
-## looked. The file starts over past LOG_MAX_BYTES.
-const LOG_PATH := "user://logs/stream.log"
-const LOG_MAX_BYTES := 1 << 20
-
+## Prints `line` and keeps it in the stream log too (StreamLog).
 static func _log(line: String) -> void:
-	print(line)
-	if DisplayServer.get_name() == "headless":
-		return  # tests and tools keep their own output
-	DirAccess.make_dir_recursive_absolute(LOG_PATH.get_base_dir())
-	var f := FileAccess.open(LOG_PATH, FileAccess.READ_WRITE) if FileAccess.file_exists(LOG_PATH) \
-		else FileAccess.open(LOG_PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	if f.get_length() > LOG_MAX_BYTES:
-		f.close()
-		f = FileAccess.open(LOG_PATH, FileAccess.WRITE)
-		if f == null:
-			return
-	f.seek_end()
-	f.store_line("%s %s" % [Time.get_datetime_string_from_system(), line])
-	f.close()
+	StreamLog.line(line)
 
 func _worst_line(phases: Array) -> String:
 	var parts: Array[String] = []
@@ -872,7 +848,7 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 	for p in ["fetch", "build", "ready"]:
 		_worst.erase(p)
 	_log("STREAM gen %d: start %.0f m ahead at %.1f m/s (expect %.1f s)%s" % [gen,
-		target.distance_to(pos), _vel.length(), expected, ", fetched ahead" if planned else (", reused" if reused else "")])
+		target.distance_to(pos), _vel.length(), expected, _scout.start_note(ll, planned, reused)])
 	_abort = BuildAbort.new()
 	_abort.background = true
 	# A fresh pipeline per generation: a reused one aliases runs (its
@@ -925,8 +901,7 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 		ground = await pipe.ground_for(data)
 	if is_instance_valid(pipe):
 		if gen == generation and state == State.FETCHING:
-			_retiring_pipes = _retiring_pipes.filter(func(p: GenerationPipeline) -> bool: return is_instance_valid(p))
-			_retiring_pipes.append(pipe)
+			_retire_pipe(pipe)
 			pipe.retire_when_settled()
 		else:
 			pipe.cancel()
@@ -988,3 +963,4 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	begin_ranging(built[1] as Node3D, v._quality_preset)
 	_ready = built
 	_ready_data = data
+	_detail.start(built[1] as Node3D, data, built[0], _abort, gen)

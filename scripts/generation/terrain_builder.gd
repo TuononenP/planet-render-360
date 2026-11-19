@@ -167,11 +167,14 @@ static func _stage_ms(abort: BuildAbort, s: BuildAbort.Step, since: int) -> void
 static func _adopt_flat(root: Node3D, subtree: Node3D) -> void:
 	for c in subtree.get_children():
 		subtree.remove_child(c)
-		# LodRing (T7.1) reads the layer a flat child came from.
-		if not c.has_meta("lod_layer"):
-			c.set_meta("lod_layer", str(subtree.name))
+		tag_layer(c, str(subtree.name))
 		root.add_child(c)
 	subtree.free()
+
+## LodRing (T7.1) reads the layer a flat child came from.
+static func tag_layer(c: Node, layer: String) -> void:
+	if not c.has_meta("lod_layer"):
+		c.set_meta("lod_layer", layer)
 
 ## Landmark candidates (LandmarkSites: registry extras, then OSM
 ## features) near the viewpoint: a registry `type` builds its hand-made

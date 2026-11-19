@@ -40,6 +40,10 @@ var step := 0
 var ms: Dictionary = {}
 ## Every stage's ms in WorldBuildGraph order (`ms` keeps a Step's slowest).
 var stage_ms: Array = []
+## A background build's detail layer still to build (WorldBuildGraph
+## .build_detail): what its core stages kept for it; empty when the
+## build made everything at once.
+var detail: Dictionary = {}
 ## Steps finished (the parallel build ends them out of order).
 var _done: Array[bool] = [false, false, false, false, false, false]
 var _mutex := Mutex.new()

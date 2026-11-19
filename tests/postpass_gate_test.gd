@@ -103,6 +103,39 @@ func _low_priority() -> void:
 		await process_frame
 	_check(_log == ["first", "urgent", "live", "live2", "w1", "w2"],
 		"live requests go ahead of a fetch-ahead's, in order: %s" % [_log])
+	# A fetch-ahead's detailed layer (urgent) goes ahead of the fetch-ahead's
+	# other layers, in its own order, and never ahead of a live request:
+	# the next stretch's map before any stretch's far city.
+	PostpassGate.reset()
+	_log.clear()
+	for n: String in ["wd1", "wd2"]:
+		var node := Node.new()
+		node.name = n
+		nodes[n] = node
+		warm.add_child(node)
+	for n: String in ["first", "w1", "w2"]:
+		enter.call(n)
+	enter.call("wd1", true)
+	enter.call("live")
+	enter.call("wd2", true)
+	enter.call("urgent", true)
+	for n: String in ["first", "urgent", "live", "wd1", "wd2", "w1", "w2"]:
+		PostpassGate.leave(nodes[n])
+		await process_frame
+	_check(_log == ["first", "urgent", "live", "wd1", "wd2", "w1", "w2"],
+		"a fetch-ahead's detailed layer leads its other layers, behind the live ones: %s" % [_log])
+	# In a free slot it still gives way to a live request already waiting.
+	PostpassGate.reset()
+	_log.clear()
+	enter.call("first")
+	enter.call("live")
+	PostpassGate.leave(nodes["first"])  # the slot frees; "live" is sent next frame
+	enter.call("wd1", true)
+	await process_frame
+	_check(_log == ["first", "live"], "a live request waiting takes the freed slot first: %s" % [_log])
+	PostpassGate.leave(nodes["live"])
+	await process_frame
+	_check(_log == ["first", "live", "wd1"], "then the fetch-ahead's detailed layer: %s" % [_log])
 	# While a live build holds them back, a fetch-ahead's request does not start
 	# even in a free slot; it goes once the live layers are in.
 	PostpassGate.reset()

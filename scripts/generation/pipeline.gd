@@ -119,6 +119,11 @@ const STREAM_OSM_WAIT_S := 30.0
 ## stretch's water, buildings and roads in hand: Overpass gets a short
 ## head start, then the stretch builds on the vector map.
 const STREAM_OMT_WAIT_S := 8.0
+## A fetch-ahead (warm_only) run's map-data wait: no camera waits on it,
+## and an answer given up on is never cached (OsmFetcher.give_up), so the
+## stretch it was fetched for asked for its map all over again.
+const WARM_OSM_WAIT_S := 60.0
+const WARM_FARCITY_MIN_S := 10.0
 ## A late streamed run (`hurry`) holds this long for the layers around
 ## the detailed one (the ring's far roads, bridge outlines, POIs, the far
 ## city, the sharper inner mosaic), then builds without them; the
@@ -472,7 +477,6 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	_osm_barriers = []
 	_fetch_started_msec = Time.get_ticks_msec()
 	timings = {}
-	_osm.gate_urgent = not warm_only
 	set_meta(PostpassGate.LOW_META, warm_only)
 	if not warm_only:
 		PostpassGate.hold_low()  # released once its layers are in (_await_far_city)
@@ -820,14 +824,24 @@ static func rank_landmarks(cands: Array) -> Array:
 		return da < db if ma == mb else ma)
 	return ranked
 
+## Whether the run's map data came from the network or a copy of this
+## spot on disk: not the vector map or a neighbour's copy (both noted as
+## partial), which leave nothing on disk for the stretch itself.
+func map_landed() -> bool:
+	return used_osm and not _osm.used_omt and not degraded.has("map")
+
+## Seconds a run waits on the network for its map data.
+static func osm_wait_s(bg: bool, warm: bool) -> float:
+	return (WARM_OSM_WAIT_S if warm else STREAM_OSM_WAIT_S) if bg else OsmFetcher.retry_budget_seconds()
+
 func _await_osm(data: LocationData) -> void:
 	# OsmFetcher retries across Overpass endpoints; this wait must
 	# outlast the whole chain or a rescued fetch is dropped.
 	var waited := 0.0
 	var held := 0.0  # with the detailed layer in hand, the rest still out
-	var budget := STREAM_OSM_WAIT_S if background else OsmFetcher.retry_budget_seconds()
+	var budget := osm_wait_s(background, warm_only)
 	while not _osm_done and waited < budget and not _cancelled:
-		if background and waited >= STREAM_OMT_WAIT_S and _osm.has_omt():
+		if background and not warm_only and waited >= STREAM_OMT_WAIT_S and _osm.has_omt():
 			break
 		await get_tree().process_frame
 		waited += get_process_delta_time()
@@ -910,8 +924,12 @@ func _await_climate(data: LocationData) -> void:
 ## the far city continues from imagery alone). Over budget, the fetch
 ## keeps running and caches for the next visit.
 func _await_far_city(data: LocationData) -> void:
-	# A streamed run counts the wait from its start, not from here.
+	# A streamed run counts the wait from its start, not from here (a
+	# fetch-ahead keeps WARM_FARCITY_MIN_S of it: its map may have used
+	# the whole wait already).
 	var waited := (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0 if background else 0.0
+	if warm_only:
+		waited = minf(waited, FARCITY_WAIT_S - WARM_FARCITY_MIN_S)
 	var held := 0.0
 	var has_fallback := background and not warm_only and not fallback_far_city.is_empty()
 	while not _farcity_done and waited < FARCITY_WAIT_S and not _cancelled:

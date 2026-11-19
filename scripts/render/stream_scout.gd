@@ -36,6 +36,10 @@ var known: Array[Vector2] = []
 var plan_ll := Vector2.INF
 ## Second step ahead along the same heading on high-memory devices (warm_max >= 2).
 var plan2_ll := Vector2.INF
+## Centres whose fetch-ahead ran to its end with its map data in hand
+## (lat/lon, newest last): only these have it on disk (`known` holds a
+## centre from the moment its fetch starts, given up or not).
+var fetched: Array[Vector2] = []
 var _warms: Array[GenerationPipeline] = []
 ## Ring centres still to fetch (lat/lon), next first.
 var _ring: Array[Vector2] = []
@@ -167,6 +171,11 @@ func _warm(v: View360, ll: Vector2, what: String) -> void:
 	warm.finished.connect(func(_d: LocationData) -> void:
 		WorldStreamer._log("STREAM warm: %s fetched in %.1f s" % [what,
 			(Time.get_ticks_msec() - t0) / 1000.0])
+		if warm.map_landed():
+			fetched.erase(ll)
+			fetched.append(ll)
+			while fetched.size() > KNOWN_MAX:
+				fetched.pop_front()
 		_end_warm(warm, false))
 	warm.cancelled.connect(func() -> void: _end_warm(warm, false))
 	warm.run(ll.x, ll.y, "", v._quality_preset)
@@ -177,6 +186,13 @@ func _end_warm(warm: GenerationPipeline, stop_it: bool) -> void:
 		if stop_it:
 			warm.cancel()
 		warm.queue_free()
+
+## What the streamer's start line says of a centre picked from here:
+## `planned` it was the plan ahead, else one known from before.
+func start_note(ll: Vector2, planned: bool, reused: bool) -> String:
+	if planned:
+		return ", fetched ahead" if ll in fetched else ", fetch ahead not landed"
+	return ", reused" if reused else ""
 
 ## Fetch-only pipelines at once, at most (the oldest stops for a newer
 ## plan, so a twisting flight cannot pile them up): the device's tier
@@ -197,3 +213,4 @@ func stop() -> void:
 func clear() -> void:
 	stop()
 	known.clear()
+	fetched.clear()

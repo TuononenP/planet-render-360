@@ -317,6 +317,7 @@ func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 	else:
 		if _ground == null:
 			_ground = GroundTruth.new(_data)
+		_streamer._detail.halt()  # a main-thread build, never beside a detail pass
 		_generated = make_world(_data, _ground)
 	# Range the near/mid rings for the current preset (a streamed world
 	# arrives already ranged: the streamer ranges it while it waits).
@@ -354,6 +355,7 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 			return cached
 	# Never beside the altitude far rebuild: they share static caches.
 	await _reach.yield_build(self)
+	await _streamer._detail.enter_build(self, abort)  # nor a stretch's detail pass
 	var thread := Thread.new()
 	_threads.append(thread)
 	thread.start(func() -> Array:
@@ -381,13 +383,10 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	# build, whose frames must stay smooth).
 	var last_us := Time.get_ticks_usec()
 	while thread.is_alive():
-		var t := Time.get_ticks_usec()
-		var budget := WorldCache.pump_budget_us(t - last_us, bg, bg and abort.urgent)
-		while thread.is_alive() and Time.get_ticks_usec() - t < budget:
-			RenderingServer.force_sync()
-		last_us = t
+		last_us = WorldCache.pump_thread(thread, last_us, bg, bg and abort.urgent)
 		await get_tree().process_frame
 	_threads.erase(thread)
+	_streamer._detail.exit_build()
 	var built: Array = thread.wait_to_finish()
 	var packed: PackedScene = built.pop_back()
 	if abort != null and abort.requested:

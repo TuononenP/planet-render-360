@@ -120,14 +120,17 @@ const TURF_GREY := 0.18
 static var _mats: Dictionary = {}
 
 ## Adds the cover MultiMeshes to `root` in chunks; returns the instance count.
+## `abort` stops it between rows and kinds; a stopped result is dropped.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
-		mask: VegetationMask) -> int:
+		mask: VegetationMask, abort: BuildAbort = null) -> int:
 	var p := RenderSettings.clamp_preset(data.quality_preset)
 	var radius := float(RADIUS_M[p]) * WorldScale.metres_to_units()
 	var chunk := CHUNK_M * WorldScale.metres_to_units()
-	var per := plan(data, ground, mask)
+	var per := plan(data, ground, mask, abort)
 	var total := 0
 	for kind: String in KINDS:
+		if abort != null and abort.requested:
+			return total
 		var list: Array = per.get(kind, [])
 		var cells := {}
 		for e: Array in list:
@@ -267,7 +270,8 @@ static func green_index(c: Color) -> float:
 	return (2.0 * c.g - c.r - c.b) / maxf(c.r + c.g + c.b, 0.001)
 
 ## Placements per kind: [position, scale, yaw, colour, height factor] lists.
-static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) -> Dictionary:
+static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask,
+		abort: BuildAbort = null) -> Dictionary:
 	var p := RenderSettings.clamp_preset(data.quality_preset)
 	var m := WorldScale.metres_to_units()
 	var radius := float(RADIUS_M[p]) * m
@@ -282,12 +286,12 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 		per[k] = []
 	var extra := float(WALK_EXTRA_M[p]) * m if desktop else 0.0
 	var reach := radius + extra
-	_scatter(per, data, ground, mask, reach, extra > 0.0, float(SPACING_M[p]) * m, photo_cover)
+	_scatter(per, data, ground, mask, reach, extra > 0.0, float(SPACING_M[p]) * m, photo_cover, abort)
 	return per
 
 ## One jittered grid of placements out to `reach`.
 static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, mask: VegetationMask, reach: float,
-		full_reach: bool, sp: float, photo_cover: bool) -> void:
+		full_reach: bool, sp: float, photo_cover: bool, abort: BuildAbort = null) -> void:
 	var centre := View360.spawn_xz(data)
 	var grass := _grass_colour(data)
 	var u2m := 1.0 / WorldScale.metres_to_units()
@@ -295,6 +299,8 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 	var steps := int(ceil(reach / sp))
 	var sampler := _photo_sampler(data) if photo_cover else null
 	for j in range(-steps, steps + 1):
+		if abort != null and abort.requested:
+			return
 		for i in range(-steps, steps + 1):
 			var h1 := _hash(float(i), float(j), 1.0)
 			var h2 := _hash(float(i), float(j), 2.0)

@@ -141,12 +141,48 @@ func _run() -> void:
 	var stopped: Node3D = await _build(data, ground, stop)
 	if stopped == null or stopped.get_child_count() != 0:
 		failures.append("a stopped parallel build should return an empty world")
+	# A background build (the streamer's) is layered: its core, then its
+	# detail, hold the nodes of a build made at once, the detail's last.
+	var bg := BuildAbort.new()
+	bg.background = true
+	var core: Node3D = await _build(data, ground, bg)
+	var hc := _hash(core)
+	if bg.detail.is_empty() or hc.size() >= hp.size():
+		failures.append("a background build should leave its detail for later (%d of %d children)"
+			% [hc.size(), hp.size()])
+	else:
+		var keep := bg.detail
+		var th := Thread.new()
+		th.start(func() -> Node3D: return WorldBuildGraph.build_detail(data, ground, keep, BuildAbort.new()))
+		while th.is_alive():
+			await process_frame
+		var detail: Node3D = th.wait_to_finish()
+		if detail == null or detail.get_child_count() == 0:
+			failures.append("the detail layer of the fixture should hold its fences")
+		else:
+			for c in detail.get_children():
+				detail.remove_child(c)  # tagged with its layer already (build_detail)
+				core.add_child(c)
+			detail.free()
+			var layered := _hash(core)
+			var whole := hp.duplicate()
+			layered.sort()
+			whole.sort()
+			if layered != whole:
+				failures.append("core + detail differs from a build made at once:\n  at once %s\n  layered %s"
+					% ["\n          ".join(whole), "\n          ".join(layered)])
+		# A stopped detail pass returns nothing.
+		var stop_detail := BuildAbort.new()
+		stop_detail.requested = true
+		if WorldBuildGraph.build_detail(data, ground, keep, stop_detail) != null:
+			failures.append("a stopped detail pass should return no subtree")
+	core.free()
 	for w in [serial, parallel, again, stopped]:
 		if w != null:
 			(w as Node3D).free()
 	WorldBuildGraph.force_serial = false
 	if failures.is_empty():
-		print("PARALLEL BUILD OK: %d top-level children identical to the serial build" % hs.size())
+		print("PARALLEL BUILD OK: %d top-level children identical to the serial build, and to a layered one" % hs.size())
 		quit(0)
 	else:
 		for f in failures:

@@ -38,6 +38,10 @@ var _staged_at := 0
 var dress := Callable()
 var dressed := false
 var _holder := Node.new()
+## Pieces joining a world built before them (StreamDetail: a stretch's
+## detail layer, made after its core): [world, node, dress], added like
+## staged pieces, a slice a frame, each dressed by its own callable.
+var _late: Array = []
 
 ## Whether `world` is fully staged: in the tree with every subtree back.
 func ready_for(world: Node3D) -> bool:
@@ -77,6 +81,9 @@ func pump(budget_us: int = BUDGET_US) -> bool:
 		moved = true
 		if _pending.is_empty():
 			_staged_at = Time.get_ticks_msec()
+	while not _late.is_empty() and (not moved or Time.get_ticks_usec() - t < budget_us):
+		_add_late(_late.pop_front())
+		moved = true
 	while not _retiring.is_empty() and (not moved or Time.get_ticks_usec() - t < budget_us):
 		var old := _retiring[0]
 		if not is_instance_valid(old):
@@ -103,6 +110,44 @@ func _add_back(piece: Array) -> void:
 	(piece[0] as Node).add_child(node)
 	node.owner = staged  # every node's owner was the world (WorldCache.pack)
 
+## Queues detached `node` to join `world` (in the tree: staged, parked
+## or live) as its child, dressed by `dress_late` (as `dress`, or none).
+func add_late(world: Node3D, node: Node, dress_late: Callable = Callable()) -> void:
+	_late.append([world, node, dress_late])
+
+## Whether pieces are still to join `world`.
+func late_pending(world: Node3D) -> bool:
+	return _late.any(func(piece: Array) -> bool: return is_same(piece[0], world))
+
+## The pieces still to join `world`.
+func late_nodes(world: Node3D) -> Array:
+	var nodes: Array = []
+	for piece: Array in _late:
+		if is_same(piece[0], world):
+			nodes.append(piece[1])
+	return nodes
+
+## Whether `world` is leaving (hidden, being freed a slice a frame).
+func retiring(world: Node3D) -> bool:
+	return world in _retiring
+
+## A late piece joins its world, or is freed when that world has gone.
+func _add_late(piece: Array) -> void:
+	var node: Node = piece[1]
+	if not is_instance_valid(piece[0]) or piece[0] in _retiring:
+		node.free()
+		return
+	var world: Node3D = piece[0]
+	var dress_late: Callable = piece[2]
+	if dress_late.is_valid():
+		_holder.add_child(node)
+		dress_late.call(_holder, true)
+		_holder.remove_child(node)
+	world.add_child(node)
+	node.owner = world
+	if world == staged:
+		_staged_at = Time.get_ticks_msec()  # settles again: its meshes are new to the renderer
+
 ## Milliseconds `world` has been fully staged (0 when it is not): the
 ## renderer finishes its first uploads meanwhile, which a swap right
 ## after staging pays in its first visible frames instead.
@@ -110,7 +155,7 @@ func staged_ms(world: Node3D) -> int:
 	return Time.get_ticks_msec() - _staged_at if ready_for(world) and _staged_at > 0 else 0
 
 func busy() -> bool:
-	return not _pending.is_empty() or not _retiring.is_empty()
+	return not _pending.is_empty() or not _retiring.is_empty() or not _late.is_empty()
 
 ## The swap: the staged world (finished now if it was not yet) becomes
 ## the view's world and shows; the old one hides and leaves over the
@@ -170,8 +215,13 @@ func adopt(world: Node3D) -> void:
 ## The view is going away: its world root frees everything still in the
 ## tree; only detached subtrees are freed here.
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and is_instance_valid(_holder):
-		_holder.free()
+	if what == NOTIFICATION_PREDELETE:
+		# No method of its own here: the script is already going.
+		for piece: Variant in _late:
+			if is_instance_valid(piece[1]):
+				(piece[1] as Node).free()
+		if is_instance_valid(_holder):
+			_holder.free()
 
 ## Pieces still off: each is freed itself (a child taken off its parent
 ## is no longer freed with it).
@@ -181,7 +231,15 @@ func _free_pending() -> void:
 			(piece[1] as Node).free()
 	_pending.clear()
 
+## Late pieces still off are freed themselves, like pending ones.
+func _free_late() -> void:
+	for piece in _late:
+		if is_instance_valid(piece[1]):
+			(piece[1] as Node).free()
+	_late.clear()
+
 func clear() -> void:
 	_free_pending()
+	_free_late()
 	staged = null
 	_retiring.clear()

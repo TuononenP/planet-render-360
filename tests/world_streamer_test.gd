@@ -25,7 +25,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_maths()
 	_state_machine()
-	_handoff()
+	await _handoff()
 	_scout()
 	_reveal()
 	await _badge()
@@ -241,6 +241,18 @@ func _state_machine() -> void:
 	_check(s._pace == 0.0 and not s._warmed, "a new place forgets the pace and warms up again")
 	_check(s.state == WorldStreamer.State.IDLE and s.generation > gen4,
 		"a new place drops a ready world and bumps the generation")
+	# A retired pipeline frees itself once settled: the next one to retire
+	# must find the list usable (a freed entry ended _on_finished before
+	# the build, so every stretch after a swap was lost).
+	var gone := GenerationPipeline.new()
+	s._retire_pipe(gone)
+	gone.free()
+	var next := GenerationPipeline.new()
+	s._retire_pipe(next)
+	_check(s._retiring_pipes.size() == 1 and s._retiring_pipes[0] == next,
+		"a pipeline freed while retiring is forgotten, the next one kept")
+	next.free()
+	s._retiring_pipes.clear()
 
 ## WorldHandoff: a world staged hidden comes back a subtree per pump,
 ## keeps its children's order and owners, and a dropped one leaves.
@@ -303,8 +315,111 @@ func _handoff() -> void:
 	h2.swap_in(view, true)
 	_check(view._generated == parked and parked.visible and is_instance_valid(live)
 		and not live.visible and not h2.busy(), "a kept old world only hides")
+	await _late(holder, view)
 	view.free()
 	holder.free()
+
+## A stretch's detail layer joins a world built before it (StreamDetail):
+## late pieces come a slice a pump, dressed and owned like staged ones,
+## after the staged pieces; a swap takes those in hand with it; a world
+## that has gone frees them.
+func _late(holder: Node3D, view: View360) -> void:
+	var h := WorldHandoff.new()
+	var world := Node3D.new()
+	for i in 2:
+		var part := Node3D.new()
+		part.name = "Core%d" % i
+		world.add_child(part)
+	h.stage(holder, world)
+	var dressed: Array = []
+	var dress := func(piece: Node, top: bool) -> void:
+		dressed.append([piece.get_child(0).name, top])
+	var cars := Node3D.new()
+	cars.name = "ParkedCars"
+	h.add_late(world, cars, dress)
+	_check(h.busy() and h.late_pending(world) and not h.ready_for(world),
+		"a late piece waits its turn behind the staged ones")
+	h.pump(0)
+	_check(world.get_child_count() == 1 and cars.get_parent() == null,
+		"the staged pieces come back first")
+	while h.busy():
+		h.pump(0)
+	_check(cars.get_parent() == world and cars.owner == world and world.get_child(2) == cars
+		and dressed == [[&"ParkedCars", true]] and not h.late_pending(world),
+		"a late piece joins its world dressed and owned, after the core: %s" % [dressed])
+	_check(h.staged_ms(world) < 400, "a staged world settles again after its late pieces")
+	# A swap does not wait for late pieces still off, nor add them all in
+	# its frame: they go on joining the shown world a slice a pump.
+	var boats := Node3D.new()
+	boats.name = "Marina"
+	h.add_late(world, boats)
+	var before: Node3D = view._generated
+	h.swap_in(view, true)
+	_check(world.visible and boats.get_parent() == null and h.late_pending(world),
+		"a swap leaves late pieces still off to join after it")
+	# Those fade in like pieces handed over after the swap (StreamDetail).
+	var hull := MeshInstance3D.new()
+	hull.mesh = BoxMesh.new()
+	boats.add_child(hull)
+	var detail := StreamDetail.new()
+	detail._joining.append(world)
+	_check(h.late_nodes(world) == [boats] and not detail._fade(view, world, [boats]),
+		"no late wave without a camera to spread from")
+	view._rig = CameraRig.new()
+	var streamer := WorldStreamer.new()
+	streamer._handoff = h
+	detail.tick(view, streamer, 0.0)
+	_check(hull.has_meta(RevealWave.PENDING) and detail._reveal.active() and detail._faded == world,
+		"late pieces still off at a swap are hidden for the late wave")
+	h.pump(0)
+	detail.tick(view, streamer, 10.0)
+	_check(not hull.has_meta(RevealWave.PENDING) and not detail._reveal.active() and detail._joining.is_empty(),
+		"and the wave brings them in once they have joined")
+	view._rig.free()
+	view._rig = null
+	_check(boats.get_parent() == world and boats.owner == world and not h.late_pending(world),
+		"and they join the shown world")
+	view._generated = before
+	# Pieces of a world that is leaving, or gone, are freed, never added.
+	var lamps := Node3D.new()
+	h.add_late(world, lamps)
+	h.retire(world)
+	_check(h.retiring(world), "a retired world is leaving")
+	while h.busy():
+		h.pump(0)
+	_check(not is_instance_valid(lamps) and not is_instance_valid(world),
+		"a leaving world's late pieces are freed with it")
+	# The swap waits for the detail unless the edge is near.
+	_check(WorldStreamer.may_show(true, 0, true), "near the edge a staged world shows at once, detail or not")
+	_check(not WorldStreamer.may_show(false, WorldStreamer.SETTLE_MS, true),
+		"with ground ahead the swap waits for the detail")
+	_check(WorldStreamer.may_show(false, WorldStreamer.SETTLE_MS, false)
+		and not WorldStreamer.may_show(false, WorldStreamer.SETTLE_MS - 1, false),
+		"and for the world to settle")
+	# A build that made everything at once leaves no pass behind.
+	var d := StreamDetail.new()
+	var w2 := Node3D.new()
+	d.start(w2, null, null, BuildAbort.new(), 1)
+	_check(not d.busy() and not d.holds(w2, h), "no detail kept, no pass")
+	var kept := BuildAbort.new()
+	kept.detail = {"mask": null}
+	d.start(w2, null, null, kept, 2)
+	_check(d.busy() and d.holds(w2, h) and kept.detail.is_empty() and not d.holds(holder, h),
+		"a kept detail is taken for its own world")
+	d.cancel(true)
+	_check(not d.busy(), "a view going away lets the pass go")
+	# A world gone before its turn is dropped, never built for.
+	kept.detail = {"mask": null}
+	d.start(w2, null, null, kept, 3)
+	w2.free()
+	_check(d.busy() and StreamDetail._gone(d._queue[0]["world"], h), "a freed world's pass is seen as gone")
+	d.cancel()
+	# A world build brackets itself: no pass starts in between.
+	await d.enter_build(view, null)
+	_check(d._builds == 1, "a build entered holds the passes back")
+	d.exit_build()
+	d.exit_build()
+	_check(d._builds == 0, "and lets them go when it leaves, never below none")
 
 ## StreamScout: the ring around a centre, nearest the heading first and
 ## never straight ahead; picking a known centre ahead, never the live one.
@@ -350,6 +465,17 @@ func _scout() -> void:
 	for i in StreamScout.KNOWN_MAX + 5:
 		sc.note(Vector2(61.0 + i * 0.001, 25.0))
 	_check(sc.known.size() == StreamScout.KNOWN_MAX, "known centres are capped")
+	# The start line says "fetched ahead" only of a plan whose fetch ended.
+	_check(sc.start_note(ne, true, false) == ", fetch ahead not landed"
+		and sc.start_note(ne, false, true) == ", reused" and sc.start_note(ne, false, false) == "",
+		"a plan still being fetched is not called fetched")
+	sc.fetched.append(ne)
+	_check(sc.start_note(ne, true, false) == ", fetched ahead", "a plan fetched to its end is")
+	# A fetch-ahead waits for its map (an answer given up on is not cached);
+	# only a live streamed run takes the vector map after the short wait.
+	_check(GenerationPipeline.osm_wait_s(true, true) > GenerationPipeline.osm_wait_s(true, false)
+		and GenerationPipeline.osm_wait_s(true, true) > GenerationPipeline.STREAM_OMT_WAIT_S * 4.0,
+		"a fetch-ahead run outwaits a live streamed run for its map data")
 	_check(WorldStreamer.exit_missed(Vector2(0, -600), Vector2(27, 0), Vector2(0, -1600))
 		and not WorldStreamer.exit_missed(Vector2(0, -600), Vector2(0, -27), Vector2(0, -1600)),
 		"an exit outside a target's square is missed, one inside is not")
@@ -447,6 +573,28 @@ func _reveal() -> void:
 	w.tick(Vector2(0, -500), 5.0, RenderSettings.Preset.HIGH)
 	_check(not w.active() and is_equal_approx(fresh.visibility_range_end, LodRing.trees_m(RenderSettings.Preset.HIGH))
 		and not fresh.has_meta(RevealWave.PENDING), "once passed, a piece has its own range back")
+	# Late detail joining a world already shown: every piece waits for the
+	# wave wherever it lies (there is no old square to have shown it).
+	var late_near := MeshInstance3D.new()
+	late_near.mesh = BoxMesh.new()
+	late_near.position = Vector3(0, 0, -600)
+	late_near.set_meta("lod_layer", "Vegetation")
+	var late_far := MeshInstance3D.new()
+	late_far.mesh = BoxMesh.new()
+	late_far.position = Vector3(0, 0, -1500)
+	late_far.set_meta("lod_layer", "Vegetation")
+	var w2 := RevealWave.new()
+	w2.prepare_nodes(world, [late_near, late_far])
+	w2.start(world, Vector2(0, -500), RenderSettings.Preset.HIGH)
+	_check(w2.active() and late_far.has_meta(RevealWave.PENDING) and late_near.has_meta(RevealWave.PENDING)
+		and late_far.visibility_range_end > 0.0 and late_far.visibility_range_end < 900.0,
+		"late pieces wait for their own wave, inside the old square too: %.0f" % late_far.visibility_range_end)
+	world.add_child(late_near)
+	world.add_child(late_far)
+	w2.tick(Vector2(0, -500), 5.0, RenderSettings.Preset.HIGH)
+	_check(not w2.active() and not late_far.has_meta(RevealWave.PENDING)
+		and is_equal_approx(late_far.visibility_range_end, LodRing.trees_m(RenderSettings.Preset.HIGH)),
+		"and get their own range once it has passed")
 	world.free()
 
 ## The way-ahead badge: hidden for a quick (cached) stretch, then the
@@ -604,8 +752,62 @@ func _movement_and_swap() -> void:
 	view._rig.position = keep_pos
 	s.note_spawn(after_xz)
 	await _swap_continuity(view, data2, after_xz)
+	await _detail_pass(view)
 	view.queue_free()
 	await process_frame
+
+## A stretch built as the streamer builds it (a background build) comes
+## without its detail layer; StreamDetail builds that after and hands it
+## to the world: at once while the world still waits detached, a slice a
+## frame (owned, like staged pieces) once it is the live one.
+func _detail_pass(view: View360) -> void:
+	var s := view._streamer
+	s.enabled = false  # the view's own tick only drives the pass and the handoff
+	var fence := {"class": "fence", "points": PackedVector2Array([Vector2(40, 80), Vector2(65, 80)]),
+		"fence_type": "chain_link", "height_m": 2.2}
+	for live: bool in [false, true]:
+		var ll := WorldScale.latlon_from_xz(0.0, -900.0, view._data.latitude, view._data.longitude)
+		var data := _flat(ll.x, ll.y, "Testville Detail")
+		data.season = view._data.season
+		data.barriers = [fence]
+		var abort := BuildAbort.new()
+		abort.background = true
+		var built: Array = await view.build_location(data, null, abort)
+		_check(built.size() == 2 and not abort.detail.is_empty(),
+			"a streamed build keeps its detail layer for later")
+		if built.size() < 2 or abort.detail.is_empty():
+			return
+		var world: Node3D = built[1]
+		if live:
+			view.apply_streamed_world(data, built)
+			_check(view._generated == world, "the stretch is live before its detail lands")
+		var core := world.get_child_count()
+		s._detail.start(world, data, built[0], abort, 90 + int(live))
+		_check(s._detail.busy() and s._detail.holds(world, s._handoff),
+			"the world's detail is on its way")
+		if live:
+			# Another build meanwhile (a place opening): the pass waits for it,
+			# or stops for it and is built again; either way it lands after.
+			await process_frame
+			var other: Array = await view.build_location(_flat(ll.x + 0.01, ll.y, "Testville Elsewhere"))
+			_check(s._detail._builds == 0, "a build that has ended lets the passes go on")
+			if other.size() > 1 and other[1] is Node3D:
+				(other[1] as Node3D).free()
+		var frames := 0
+		while s._detail.holds(world, s._handoff) and frames < 900:
+			await process_frame
+			frames += 1
+		_check(not s._detail.busy() and not s._detail.holds(world, s._handoff),
+			"the detail pass ends (%s world, %d frames)" % ["live" if live else "waiting", frames])
+		_check(world.get_child_count() > core, "its pieces joined the %s world: %d -> %d" % [
+			"live" if live else "waiting", core, world.get_child_count()])
+		var late := world.get_child(world.get_child_count() - 1)
+		_check(str(late.get_meta("lod_layer", "")) == "Vegetation",
+			"a late piece keeps the layer it would have had built at once")
+		if live:
+			_check(late.owner == world and late.is_inside_tree(), "and is owned by the live world")
+		else:
+			world.free()
 
 func _first_geo(node: Node) -> GeometryInstance3D:
 	if node is GeometryInstance3D:

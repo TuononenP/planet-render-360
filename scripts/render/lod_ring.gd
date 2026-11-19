@@ -152,6 +152,11 @@ static func apply_child(root: Node, index: int, preset: int) -> void:
 	var c := root.get_child(index)
 	_apply(c, preset, str(c.get_meta("lod_layer", c.name)))
 
+## Ranges one subtree that joins a world after its build (StreamDetail's
+## late pieces), by `layer`'s rules.
+static func apply_node(node: Node, preset: int, layer: String) -> void:
+	_apply(node, preset, layer)
+
 ## One node's range for its `layer` (RevealWave hands a faded-in piece
 ## back to its ring).
 static func range_one(gi: GeometryInstance3D, preset: int, layer: String) -> void:

@@ -346,6 +346,17 @@ static func pump_budget_us(frame_us: int, background := false, urgent := false) 
 		return clampi(int(frame_us * BG_FRAME_SHARE), BG_PUMP_US, BG_MAX_US)
 	return clampi(int(frame_us * PUMP_FRAME_SHARE), PUMP_US, PUMP_MAX_US)
 
+## Answers `thread`'s rendering-server calls for this frame's share (a
+## build's stages and merge wait on the main thread for every texture and
+## mesh read). `last_us`: when the previous frame's share began; returns
+## this one's.
+static func pump_thread(thread: Thread, last_us: int, background := false, urgent := false) -> int:
+	var t := Time.get_ticks_usec()
+	var budget := pump_budget_us(t - last_us, background, urgent)
+	while thread.is_alive() and Time.get_ticks_usec() - t < budget:
+		RenderingServer.force_sync()
+	return t
+
 static func _save_in_progress(path: String) -> bool:
 	var previous: Variant = _save_threads.get(path)
 	if previous is Thread and previous.is_alive():

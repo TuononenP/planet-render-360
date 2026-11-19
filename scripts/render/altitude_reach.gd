@@ -144,6 +144,10 @@ func abort_build() -> void:
 	if _abort != null:
 		_abort.requested = true
 
+## Whether a far build is on its thread now.
+func building() -> bool:
+	return _thread != null and _thread.is_alive()
+
 ## Aborts a far build in flight and waits for its thread to end, so a
 ## world build never runs beside it (they share static caches). The
 ## finished thread is collected by the next tick.

@@ -587,10 +587,14 @@ func _attach_vehicle_lights(holder: Node, t: Dictionary) -> void:
 		(world_parent if world_parent != null else holder).add_child(_lights_holder)
 		_lights_source = holder as Node3D
 		if world_parent != null:
-			var lh := _lights_holder
+			# By id, not by node: stop() frees the lights before an old world's
+			# holder leaves the tree, and a freed capture is an engine error.
+			var lh_id := _lights_holder.get_instance_id()
 			holder.tree_exited.connect(func() -> void:
-				if is_instance_valid(lh):
-					lh.queue_free()
+				var lh := instance_from_id(lh_id) as Node
+				if lh == null:
+					return
+				lh.queue_free()
 				if _lights_holder == lh:
 					_lights_holder = null
 			, Object.CONNECT_ONE_SHOT)

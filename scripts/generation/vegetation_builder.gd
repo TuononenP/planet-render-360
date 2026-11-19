@@ -31,53 +31,85 @@ const IMPOSTOR_FACTOR := 6
 
 static var last_stats: Dictionary = {}
 
+## Which part of the subtree a call builds. A streamed stretch builds
+## CORE first (the trees, far canopy, carpet and pits: what the world is
+## shown with) and DETAIL after (street props, ground cover, rocks), so
+## the detail never holds the swap (WorldBuildGraph.build_detail).
+enum Layer { ALL, CORE, DETAIL }
+
 ## Vegetation subtree: real trees + land-cover fill + street props.
 ## `abort` stops it between rows / items; a stopped result is dropped.
-static func build_vegetation(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null) -> Node3D:
+## `keep` carries the planted mask and the context from a CORE call to
+## the DETAIL call that follows it. The order of an ALL build's children
+## is the same whatever the layers.
+static func build_vegetation(data: LocationData, ground: GroundTruth = null, abort: BuildAbort = null,
+		layer: Layer = Layer.ALL, keep: Dictionary = {}) -> Node3D:
 	if ground == null:
 		ground = GroundTruth.new(data)
 	var t0 := Time.get_ticks_msec()
 	var root := Node3D.new()
 	root.name = "Vegetation"
-	var ctx := _context(data, ground)
-	var mask := VegetationMask.new(data, ground)
-	var plan := {"pos": [], "sp": [], "scale": [], "real": []}
-	_plant_osm_trees(plan, data, ground, mask, ctx, abort)
-	if abort != null and abort.requested:
-		return root
-	_fill_cover(plan, data, ground, mask, ctx, abort)
-	if abort != null and abort.requested:
-		return root
-	CanopyVegetation.add(plan, data, ground, mask, ctx, abort)
-	if abort != null and abort.requested:
-		return root
-	var fallback := data.trees.is_empty() and mask.green.is_empty() \
-		and not bool(ctx["canopy_present"])
-	if fallback:
-		_fallback_scatter(plan, data, ground, mask, ctx, abort)
+	var stats := {}
+	var timings := {}
+	var ctx: Dictionary
+	var mask: VegetationMask
+	var t := t0
+	if layer == Layer.DETAIL:
+		ctx = keep["ctx"]
+		mask = keep["mask"]
+	else:
+		ctx = _context(data, ground)
+		mask = VegetationMask.new(data, ground)
+		var plan := {"pos": [], "sp": [], "scale": [], "real": []}
+		_plant_osm_trees(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root
-	mask.mark_trees(plan["pos"])
-	var timings := {"plan": Time.get_ticks_msec() - t0}
-	var t := Time.get_ticks_msec()
-	var stats := _emit(root, plan, ctx)
-	timings["trees"] = Time.get_ticks_msec() - t
-	stats["fallback"] = fallback
+		_fill_cover(plan, data, ground, mask, ctx, abort)
+		if abort != null and abort.requested:
+			return root
+		CanopyVegetation.add(plan, data, ground, mask, ctx, abort)
+		if abort != null and abort.requested:
+			return root
+		var fallback := data.trees.is_empty() and mask.green.is_empty() \
+			and not bool(ctx["canopy_present"])
+		if fallback:
+			_fallback_scatter(plan, data, ground, mask, ctx, abort)
+			if abort != null and abort.requested:
+				return root
+		mask.mark_trees(plan["pos"])
+		timings["plan"] = Time.get_ticks_msec() - t0
+		t = Time.get_ticks_msec()
+		stats = _emit(root, plan, ctx)
+		timings["trees"] = Time.get_ticks_msec() - t
+		stats["fallback"] = fallback
+		keep["ctx"] = ctx
+		keep["mask"] = mask
+	if layer != Layer.CORE:
+		t = Time.get_ticks_msec()
+		var props_ctx := ctx.duplicate()
+		props_ctx["abort"] = abort
+		stats["props"] = StreetProps.build(root, data, ground, mask, props_ctx)
+		timings["props"] = Time.get_ticks_msec() - t
+		if abort != null and abort.requested:
+			return root
 	t = Time.get_ticks_msec()
-	stats["props"] = StreetProps.build(root, data, ground, mask, ctx)
-	timings["props"] = Time.get_ticks_msec() - t
-	t = Time.get_ticks_msec()
-	stats["cover"] = GroundCover.build(root, data, ground, mask)
-	stats["rocks"] = RockOutcrops.build(root, data, ground)
-	stats["far_canopy"] = FarCanopy.build(root, data, ground, SettlementMap.build(data))
+	if layer != Layer.CORE:
+		stats["cover"] = GroundCover.build(root, data, ground, mask, abort)
+		if abort != null and abort.requested:
+			return root
+		stats["rocks"] = RockOutcrops.build(root, data, ground)
+	if layer != Layer.DETAIL:
+		stats["far_canopy"] = FarCanopy.build(root, data, ground, SettlementMap.build(data))
 	timings["cover"] = Time.get_ticks_msec() - t
-	t = Time.get_ticks_msec()
-	stats["carpet"] = GrassCarpet.build(root, data) != null
-	stats["tree_pits"] = TreePits.build(root, data, ground, mask)
-	timings["carpet_pits"] = Time.get_ticks_msec() - t
+	if layer != Layer.DETAIL:
+		t = Time.get_ticks_msec()
+		stats["carpet"] = GrassCarpet.build(root, data) != null
+		stats["tree_pits"] = TreePits.build(root, data, ground, mask)
+		timings["carpet_pits"] = Time.get_ticks_msec() - t
 	stats["ms"] = Time.get_ticks_msec() - t0
-	print("VEGETATION timings ms ", timings)
-	last_stats = stats
+	print("VEGETATION%s timings ms " % ["", " core", " detail"][layer], timings)
+	if layer != Layer.DETAIL:
+		last_stats = stats
 	root.set_meta("stats", stats)
 	return root
 

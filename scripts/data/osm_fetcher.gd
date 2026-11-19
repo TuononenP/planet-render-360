@@ -458,9 +458,6 @@ var _pending_ring_cache := ""
 var _detailed_text := ""
 var _detailed_cached := false
 var _detailed_ready := false
-## Whether the detailed layer goes to the front of PostpassGate's line:
-## not for a fetch ahead (StreamScout), which waits behind a live build.
-var gate_urgent := true
 ## settle() ran: no layer still missing is asked of the network.
 var _settled := false
 var _ring_text := ""
@@ -707,7 +704,7 @@ func _start_postpass() -> void:
 	var gen := _parse_gen
 	PostpassGate.enter(self, _send_postpass.bind(gen), func(why: String) -> void:
 		if gen == _parse_gen:
-			_postpass_failed(why), gate_urgent)
+			_postpass_failed(why), true)  # the detailed layer leads its line (PostpassGate)
 
 func _send_postpass(gen: int) -> void:
 	if gen != _parse_gen:

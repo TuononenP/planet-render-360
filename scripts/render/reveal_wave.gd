@@ -51,6 +51,24 @@ func prepare(world: Node3D, old_centre: Vector2) -> void:
 	_cursor = 0
 	_pieces.clear()
 
+## Prepares a wave over `nodes` alone: detached pieces about to join
+## `world` as its children after it is shown (StreamDetail's late
+## detail), wherever they lie. start() then hides them before they enter
+## the tree and the wave brings them in, nearest first.
+func prepare_nodes(world: Node3D, nodes: Array) -> void:
+	finish(_preset)
+	_world = world
+	_old_centre = Vector2.INF  # no old square: every piece is new
+	_pieces.clear()
+	for n: Node in nodes:
+		_collect(n, str(n.get_meta("lod_layer", n.name)), Transform3D.IDENTITY)
+	_cursor = world.get_child_count()
+
+## Whether `world` is the one being prepared (walked or not): start()
+## walks whatever is left, children it gained since included.
+func preparing(world: Node3D) -> bool:
+	return world != null and _world == world and not _running
+
 ## Whether `world` is the one being prepared and every subtree is walked.
 func prepared(world: Node3D) -> bool:
 	return world != null and _world == world and _cursor >= world.get_child_count()
@@ -86,6 +104,8 @@ func _collect(node: Node, layer: String, parent_xf: Transform3D) -> void:
 ## reaching into it was on screen the frame before the swap, and hiding
 ## it would blink it out.
 func _new_ground(box: AABB) -> bool:
+	if _old_centre == Vector2.INF:
+		return true
 	var h := WorldStreamer.HALF_EXTENT_M
 	var lo := Vector2(box.position.x, box.position.z) - _old_centre
 	var hi := Vector2(box.end.x, box.end.z) - _old_centre
