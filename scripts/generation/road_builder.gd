@@ -129,6 +129,10 @@ static func _rank(cls: String) -> int:
 
 ## Surface finish from the `surface` tag, else the class.
 static func _finish(cls: String, surface: String) -> String:
+	# A concrete footway or square is pale slabs, not a road's tarmac:
+	# Gwanghwamun's forecourt read as a dark apron round the Woldae.
+	if surface == "concrete" and cls in ["footway", "path", "pedestrian", "steps", "corridor"]:
+		return "paving"
 	match surface:
 		"paving_stones", "sett", "cobblestone", "unhewn_cobblestone", "bricks", "concrete:plates", "stone":
 			return "sett"

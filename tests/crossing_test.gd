@@ -44,6 +44,12 @@ func _init() -> void:
 		var f := RoadSurface.crossing_finish(row[1], row[2], place)
 		if f != str(row[3]):
 			failures.append("finish for %s/%s/%s should be %s, got %s" % [row[0], row[1], row[2], row[3], f])
+	# Concrete is pale slabs underfoot, tarmac only on a road.
+	for row in [["pedestrian", "paving"], ["footway", "paving"], ["steps", "paving"], ["primary", "asphalt"],
+			["service", "asphalt"]]:
+		var cf := RoadBuilder._finish(str(row[0]), "concrete")
+		if cf != str(row[1]):
+			failures.append("concrete %s should take %s, got %s" % [row[0], row[1], cf])
 	var prev := -1.0
 	for layer in [0.5, 1.0, 2.9, 4.0, 6.0, 6.9, 7.67]:
 		var lift := RoadBuilder.lift_for_layer(layer)
