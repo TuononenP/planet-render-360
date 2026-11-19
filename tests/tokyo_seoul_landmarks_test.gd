@@ -17,6 +17,7 @@ const SEOUL := [
 	["king_sejong_statue", "statue of king sejong", 10.4],
 	["yi_sun_sin_statue", "statue of admiral yi sun-sin", 17.0],
 	["gyeongbokgung_walls", "gyeongbokgung palace walls", 4.0],
+	["gwanghwamun_woldae", "gwanghwamun woldae", 3.75],
 	["heungnyemun", "heungnyemun gate", 15.0],
 	["geunjeongjeon", "geunjeongjeon", 27.8],
 ]

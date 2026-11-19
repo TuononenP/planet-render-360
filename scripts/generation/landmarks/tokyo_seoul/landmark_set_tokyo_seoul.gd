@@ -15,6 +15,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"king_sejong_statue": LandmarkTsStatues.king_sejong(model)
 		"yi_sun_sin_statue": LandmarkTsStatues.yi_sun_sin(model)
 		"gyeongbokgung_walls": LandmarkTsPalaceWalls.build(model)
+		"gwanghwamun_woldae": LandmarkTsWoldae.build(model)
 		"heungnyemun": LandmarkTsGyeongbokgung.heungnyemun(model)
 		"geunjeongjeon": LandmarkTsGyeongbokgung.geunjeongjeon(model)
 		_:

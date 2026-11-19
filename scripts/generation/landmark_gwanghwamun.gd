@@ -11,8 +11,9 @@ extends RefCounted
 ## the columns as well as on them) under each eave, twin rafter layers,
 ## a skirt roof round the lower storey and the hipped-and-gabled upper
 ## roof (paljak) with concave tiled slopes, upswept corners, hip ridges
-## carrying the japsang guardian figures and ridge-end ornaments. The
-## pair of haetae guardians sits in front. Front faces south (+Z).
+## carrying the japsang guardian figures and ridge-end ornaments. Its
+## pair of haetae guardians stands on the Woldae before it
+## (LandmarkTsWoldae). Front faces south (+Z).
 
 const TOP_M := 19.0
 const BASE := Vector3(35.0, 5.6, 14.0)
@@ -31,9 +32,7 @@ static func build(model: Node3D) -> void:
 	var low := Vector2(24.0, 9.6)
 	lm.box("Granite", Vector3(0, BASE.y + 0.3, 0), Vector3(low.x + 2.0, 0.6, low.y + 2.0))
 	LandmarkKoreanRoof.two_storey(lm, y1, low, Vector2(20.0, 6.6), 3.4, 2.6, TOP_M)
-	# Haetae guardians on their plinths in front of the gate.
-	for s in [-1.0, 1.0]:
-		_haetae(lm, Vector3(s * 9.0, 0, BASE.z * 0.5 + 9.0))
+	# Its haetae guardians stand on the Woldae terrace before it (LandmarkTsWoldae).
 	lm.commit(model)
 
 ## Granite platform: coursed ashlar with real passages — piers between
