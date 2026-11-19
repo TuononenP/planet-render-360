@@ -807,7 +807,7 @@ static func _assign_crossings(out: Plan, data: LocationData, chains: Array, stub
 			var road: Dictionary = data.roads[i]
 			out.by_road[i] = {"finish": RoadSurface.crossing_finish(str(road.get("crossing_style", "auto")),
 				bool(road.get("crossing_signal", false)), data), "width_m": w,
-				"runs": RoadCrossingClip.pieces(RoadSurface._points(road), road_grid, aprons, m)}
+				"runs": RoadCrossingClip.pieces(RoadSurface._points(road), road_grid, aprons, m, w)}
 
 ## Stop lines for signalled crossings and lone signal nodes.
 static func _stop_lines(out: Plan, data: LocationData, chains: Array, stubs: Dictionary, car_grid: Dictionary,

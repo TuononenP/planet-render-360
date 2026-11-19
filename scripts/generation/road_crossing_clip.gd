@@ -18,6 +18,8 @@ const MIN_CLEAR := 0.5
 ## so is a piece this short beside a longer one where a way bends.
 const FRAGMENT_M := 2.5
 const BEND_SCRAP_M := 4.0
+## Bands at least this wide (m, RoadMarkings.SCRAMBLE_WIDTH_M) trim to their edges.
+const WIDE_M := 8.0
 
 ## The stretches of `pts` over a road of `grid` ([a, b, half width,
 ## service?] segments) or an apron, ending exactly at the kerb. With
@@ -25,18 +27,20 @@ const BEND_SCRAP_M := 4.0
 ## leaves service roads out of the test.
 static func on_road_runs(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary, m: float,
 		keep_on: bool = true, skip_service: bool = false) -> Array:
-	var size := RoadMarkings.CELL_M * m
-	var reach := RoadMarkings.ON_ROAD_REACH_M * m
 	return _runs(pts, m, func(p: Vector2) -> bool:
-		for seg: Array in RoadMarkings._grid_near(grid, p, reach, m):
-			if skip_service and seg.size() > 3 and bool(seg[3]):
-				continue
-			if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]):
-				return keep_on
-		for ring: PackedVector2Array in aprons.get(RoadMarkings._cell(p, size), []):
-			if Geometry2D.is_point_in_polygon(p, ring):
-				return keep_on
-		return not keep_on)
+		return _on_road(p, grid, aprons, m, skip_service) == keep_on)
+
+## True when `p` is over a road of `grid` or inside an apron.
+static func _on_road(p: Vector2, grid: Dictionary, aprons: Dictionary, m: float, skip_service: bool = false) -> bool:
+	for seg: Array in RoadMarkings._grid_near(grid, p, RoadMarkings.ON_ROAD_REACH_M * m, m):
+		if skip_service and seg.size() > 3 and bool(seg[3]):
+			continue
+		if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]):
+			return true
+	for ring: PackedVector2Array in aprons.get(RoadMarkings._cell(p, RoadMarkings.CELL_M * m), []):
+		if Geometry2D.is_point_in_polygon(p, ring):
+			return true
+	return false
 
 ## The runs of `pts` where `keep` holds, each end placed on the boundary.
 static func _runs(pts: PackedVector2Array, m: float, keep: Callable) -> Array:
@@ -95,7 +99,11 @@ static func straight_pieces(run: PackedVector2Array, tolerance: float) -> Array:
 
 ## The straight painted pieces of a crossing way: over the carriageways
 ## it crosses, or over a service road when it crosses nothing else.
-static func pieces(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary, m: float) -> Array:
+## A band `width_m` of at least WIDE_M keeps only the stretch where both
+## its edges are over the road too: one straight band laid wide across a
+## kerb that runs at a slant hangs its corner over the pavement.
+static func pieces(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary, m: float,
+		width_m: float = 0.0) -> Array:
 	var runs := on_road_runs(pts, grid, aprons, m, true, true)
 	if runs.is_empty():
 		runs = on_road_runs(pts, grid, aprons, m)
@@ -111,7 +119,19 @@ static func pieces(pts: PackedVector2Array, grid: Dictionary, aprons: Dictionary
 			var length := piece[0].distance_to(piece[1])
 			if length >= BEND_SCRAP_M * m or is_equal_approx(length, longest):
 				out.append(piece)
-	return out
+	if width_m < WIDE_M:
+		return out
+	var trimmed: Array = []
+	for piece: PackedVector2Array in out:
+		var side := (piece[1] - piece[0]).normalized().orthogonal() * width_m * 0.5 * m
+		# Only the ends move: a gap in the road grid inside the crossing
+		# (between carriageways) must not cut the band in two.
+		var wide_runs := _runs(piece, m, func(p: Vector2) -> bool:
+			return _on_road(p + side, grid, aprons, m) and _on_road(p - side, grid, aprons, m))
+		if not wide_runs.is_empty():
+			var last: PackedVector2Array = wide_runs[wide_runs.size() - 1]
+			trimmed.append(PackedVector2Array([(wide_runs[0] as PackedVector2Array)[0], last[last.size() - 1]]))
+	return trimmed
 
 ## Cuts every painted crossing piece of `by_road` ({road: {finish,
 ## width_m, runs}}) back to the ground no longer piece already paints,
