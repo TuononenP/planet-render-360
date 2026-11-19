@@ -94,8 +94,10 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 			if not clear or not MarinaBuilder._claim(taken, stern, dir, length / m, beam / m, m):
 				continue
 			var y := ground.water_level_at(position.x, position.y)
-			out.append([Vector3(position.x, y, position.y), atan2(-dir.y, dir.x), length / (10.0 * m),
-				"steam" if hash_v < 0.65 else "houseboat", Color.WHITE])
+			var is_houseboat := hash_v >= 0.80
+			var scale_len := minf(length, 20.0 * m) if is_houseboat else length
+			out.append([Vector3(position.x, y, position.y), atan2(-dir.y, dir.x), scale_len / (10.0 * m),
+				"houseboat" if is_houseboat else "steam", Color.WHITE])
 			if out.size() >= MAX_BOATS:
 				return out
 	return out
