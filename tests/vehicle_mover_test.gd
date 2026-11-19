@@ -122,6 +122,7 @@ func _run() -> void:
 	if VehicleMover.attach(Node3D.new(), data, ground) != null:
 		failures.append("no trams in the world, no mover")
 	_check_planned_motion(failures, world, data, ground)
+	_check_platform_motion(failures, data, ground)
 	_check_never_stops(failures)
 	_check_junctions(failures)
 	_finish(failures, world)
@@ -152,6 +153,56 @@ func _check_planned_motion(failures: Array[String], world: Node, data: LocationD
 				failures.append("train %d: planned %s differs (%s against %s)" % [i, field, a[field], b[field]])
 		if var_to_bytes(a["deck_mid"]) != var_to_bytes(b["deck_mid"]):
 			failures.append("train %d: planned deck_mid differs" % i)
+
+## A platform train (the tram plan's routes, stood at platforms) is adopted the
+## same with its motion planned ahead as without, and runs within its 220 m:
+## its stops lie in its run and include where it stands and the run's ends.
+func _check_platform_motion(failures: Array[String], data: LocationData, ground: GroundTruth) -> void:
+	var m2u := WorldScale.metres_to_units()
+	var plan := TransitVehicles.plan(data, ground, m2u)
+	var holder := Node3D.new()
+	for k in plan.size():
+		(plan[k] as Dictionary)["at"] = "platform"
+		for i in ((plan[k] as Dictionary)["sections"] as Array).size():
+			for part in ["near", "far", "shadow"]:
+				var n := Node3D.new()
+				n.name = "Train%d_%d_%s" % [k, i, part]
+				holder.add_child(n)
+	var own := VehicleMover.new()
+	own._m2u = m2u
+	own._adopt(holder, "Train", plan, data, ground, true)
+	var mouths := TramRoute.mouths(data, func(_rail: Dictionary) -> bool: return true)
+	var dirs := {}
+	for k in plan.size():
+		(plan[k] as Dictionary)["motion"] = VehicleMover.motion(plan[k], k, plan, data, ground, true, mouths, dirs, m2u)
+	var ahead := VehicleMover.new()
+	ahead._m2u = m2u
+	ahead._adopt(holder, "Train", plan, data, ground, true)
+	if own.count() == 0 or own.count() != ahead.count():
+		failures.append("platform trains: %d adopted, %d with motion planned ahead" % [own.count(), ahead.count()])
+	for i in mini(own.count(), ahead.count()):
+		var a: Dictionary = own._trains[i]
+		var b: Dictionary = ahead._trains[i]
+		for field in ["lo", "hi", "dir", "stops", "dwell", "signals", "salt", "s", "loop"]:
+			if var_to_bytes(a[field]) != var_to_bytes(b[field]):
+				failures.append("platform train %d: planned %s differs" % [i, field])
+		var stops: Array = a["stops"]
+		var lo := float(a["lo"])
+		var hi := float(a["hi"])
+		var stands := false
+		for stop: float in stops:
+			stands = stands or absf(stop - float(a["s"])) < 0.01
+		if not stops.has(lo) or not stops.has(hi) or not stands:
+			failures.append("platform train %d: stops should include its run's ends and where it stands" % i)
+		for stop: float in stops:
+			if stop < lo - 0.01 or stop > hi + 0.01:
+				failures.append("platform train %d: stop %.1f outside its run %.1f..%.1f" % [i, stop, lo, hi])
+				break
+		if absf(float(a["dir"])) != 1.0 or bool(a["loop"]) or not is_nan(float(a["deck_mid"])):
+			failures.append("platform train %d: a platform train turns round, with no deck timetable" % i)
+		if hi - lo > 2.0 * VehicleMover.TRAIN_RUN_M + 0.01:
+			failures.append("platform train %d: its run %.0f m is longer than %.0f m each way" % [i, hi - lo, VehicleMover.TRAIN_RUN_M])
+	holder.free()
 
 ## Twin tracks 3.6 m apart with mapped stops and a traffic light: for
 ## 20 minutes no tram stands on the line except at a stop, at the red

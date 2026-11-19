@@ -20,11 +20,21 @@ func _init() -> void:
 		var data := LocationData.new()
 		data.latitude = rng.randf_range(-60.0, 65.0)
 		data.longitude = rng.randf_range(-170.0, 170.0)
+		# The last cases: either pole's edge (the latitude clamp), then a place whose
+		# drapes are one that is no image, one that is mipmapped RGBA, or none.
+		if t == 20:
+			data.latitude = 84.99
+		elif t == 21:
+			data.latitude = -84.99
 		data.far_drapes = []
-		for k in 1 + (t % 2):
+		if t == 22:
+			data.far_drapes.append({"zoom": 15, "origin_px": Vector2.ZERO, "size_px": Vector2i(64, 64),
+				"texture": null, "image": null, "reach_m": 1000.0})
+		for k in (0 if t == 23 else 1 + (t % 2)):
 			var zoom := 14 + k + (t % 3)
 			var size := Vector2i(rng.randi_range(200, 420), rng.randi_range(200, 420))
-			var img := Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
+			var rgba := t % 4 == 3
+			var img := Image.create(size.x, size.y, rgba, Image.FORMAT_RGBA8 if rgba else Image.FORMAT_RGB8)
 			for y in size.y:
 				for x in size.x:
 					var v := rng.randf_range(0.05, 0.6)
@@ -42,7 +52,7 @@ func _init() -> void:
 			cells.append([centre, centre.length()])
 		cells.sort_custom(func(a: Array, b: Array) -> bool: return float(a[1]) < float(b[1]))
 		var dark := rng.randf_range(0.2, 0.5)
-		for budget in [37, 100000]:
+		for budget in [0, 37, 100000]:
 			var want := FarCanopy._probes_script(data, bytes, cells, dark, budget)
 			var got := FarCanopy._probes_native(data, bytes, cells, dark, budget)
 			kept_total += (want["x"] as PackedFloat64Array).size()
@@ -50,7 +60,7 @@ func _init() -> void:
 				if var_to_bytes(want[key]) != var_to_bytes(got[key]):
 					failures.append("case %d, budget %d: %s differs (%d against %d probes)" % [t, budget, key,
 						(want["x"] as PackedFloat64Array).size(), (got["x"] as PackedFloat64Array).size()])
-	if kept_total < 1000:
+	if kept_total < 1500:
 		failures.append("the cases barely exercise the kernel: %d probes kept" % kept_total)
 	if failures.is_empty():
 		print("CANOPY_KERNELS PASS")
