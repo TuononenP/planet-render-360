@@ -39,6 +39,14 @@ const NOT_COAST := "tags->>'natural' IS DISTINCT FROM 'coastline'"
 
 ## Seconds a small layer (the POIs) may take, like its Overpass request.
 const LAYER_TIMEOUT_S := 15.0
+## Prefix stamped onto Postpass detailed payloads so cached files distinguish
+## queries that already included POIs from legacy Postpass caches.
+const POI_STAMP := "{\"postpass_pois\":true,"
+
+static func stamp_pois(overpass_json: String) -> String:
+	if overpass_json.begins_with("{") and not overpass_json.begins_with(POI_STAMP):
+		return POI_STAMP + overpass_json.substr(1)
+	return overpass_json
 
 static func endpoint() -> String:
 	return str(RemoteConfig.value("postpass_endpoint", URL))
@@ -106,6 +114,10 @@ static func build_body(lat: float, lon: float, radius_m: int) -> String:
 		# open, so the whole near sea was dropped (ShoreCoast).
 		_part(_near(lat, lon, ceili(radius_m * sqrt(2.0))) + " AND osm_type = 'W' AND tags->>'natural' = 'coastline'",
 			lat, lon, OsmQuery.CAP_RING_COASTLINE),
+		# POIs in the same round-trip (avoids a second PostpassGate wait).
+		_part(_near(lat, lon, OsmQuery.POI_RADIUS_M) + " AND osm_type = 'N' AND tags ?| "
+			+ "ARRAY['shop','amenity','office','tourism','craft','advertising']",
+			lat, lon, OsmQuery.CAP_POIS),
 		# The country (Overpass is_in): tags only, at the place's own point.
 		"(SELECT osm_type, osm_id, tags, %s AS geom FROM postpass_polygon WHERE osm_type = 'R'" % _point(lat, lon)
 			+ " AND tags->>'admin_level' = '2' AND tags ? 'ISO3166-1'"

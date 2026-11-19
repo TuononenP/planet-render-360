@@ -251,7 +251,7 @@ static func _fill_cover(plan: Dictionary, data: LocationData, ground: GroundTrut
 	var stride := 2
 	for cz in range(0, mask.n, stride):
 		for cx in range(0, mask.n, stride):
-			var gid := mask.cover[cz * mask.n + cx] - 1
+			var gid := mask.cover_at_cell(cx, cz)
 			if gid < 0 or str(mask.green[gid]["class"]) != "forest":
 				continue
 			var x := (float(cx) + 0.5) * mask.cell - mask.half

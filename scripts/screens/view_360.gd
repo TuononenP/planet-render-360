@@ -348,9 +348,10 @@ static func _merge(world: Node3D, abort: BuildAbort) -> void:
 func build_location(data: LocationData, ground: GroundTruth = null,
 		abort: BuildAbort = null, wait_save := false) -> Array:
 	var bg := abort != null and abort.background  # the streamer's way ahead
-	var cached := await WorldCache.load_world(self, _threads, data, ground, bg)
-	if not cached.is_empty():
-		return cached
+	if not bg:
+		var cached := await WorldCache.load_world(self, _threads, data, ground, false)
+		if not cached.is_empty():
+			return cached
 	# Never beside the altitude far rebuild: they share static caches.
 	await _reach.yield_build(self)
 	var thread := Thread.new()

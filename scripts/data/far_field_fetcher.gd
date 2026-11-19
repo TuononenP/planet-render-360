@@ -290,6 +290,14 @@ func _done(job: Dictionary, img: Variant) -> void:
 ## the camera moved); only the textures are made here.
 func _finish() -> void:
 	var fetch_ms := Time.get_ticks_msec() - _t0
+	if not textures:
+		_water_bodies = {}
+		water_mask = {}
+		timings = {"fetch_ms": fetch_ms, "assemble_ms": 0,
+			"tiles": _queue.size(), "cached": _cached, "failed": _failed}
+		_busy = false
+		finished.emit([], [])
+		return
 	var t1 := Time.get_ticks_msec()
 	var gen := _fetch_gen
 	var out := {}

@@ -33,6 +33,7 @@ var _origin := Vector2.ZERO
 var _parts := 1
 var _part_px := 0
 var _bytes: Array = []  # per part, PackedByteArray or null
+var _fresh := PackedByteArray()  # 1 when downloaded this run, 0 when from cache
 var _remaining := 0
 var _failed := false
 var _gen := 0
@@ -77,6 +78,8 @@ func fetch(src: String, lat: float, lon: float, zoom: int, span: int) -> void:
 	_part_px = size / _parts
 	_bytes = []
 	_bytes.resize(_parts * _parts)
+	_fresh.resize(_parts * _parts)
+	_fresh.fill(0)
 	_remaining = _parts * _parts
 	_failed = false
 	source = {}
@@ -85,7 +88,7 @@ func fetch(src: String, lat: float, lon: float, zoom: int, span: int) -> void:
 		var path := cache_path(src, zoom, span, lat, lon, i)
 		if FileAccess.file_exists(path):
 			CacheStore.note_read(path)
-			_part_done(gen, i, FileAccess.get_file_as_bytes(path), false)
+			_part_done(gen, i, PackedByteArray([1]) if not textures else FileAccess.get_file_as_bytes(path), false)
 			continue
 		if offline:
 			_part_done(gen, i, PackedByteArray(), false)
@@ -115,20 +118,75 @@ func _part_done(gen: int, i: int, body: PackedByteArray, fresh: bool) -> void:
 		_failed = true
 	else:
 		_bytes[i] = body
-		if fresh:
-			var path := cache_path(_src, _zoom, _span, _lat, _lon, i)
-			var f := FileAccess.open(path, FileAccess.WRITE)
-			if f != null:
-				f.store_buffer(body)
-				f.close()
-				CacheStore.note_written(path)
+		_fresh[i] = 1 if fresh else 0
 	_remaining -= 1
 	if _remaining > 0:
 		return
 	if _failed:
 		failed.emit("Orthophoto unavailable")
 		return
+	if not textures:
+		_validate_warm(gen)
+		return
 	_stitch(gen)
+
+func _validate_warm(gen: int) -> void:
+	var has_fresh := false
+	for i in _fresh.size():
+		if _fresh[i] != 0:
+			has_fresh = true
+			break
+	if not has_fresh:
+		source = _make_source()
+		succeeded.emit(null, null, _origin, _zoom)
+		return
+	var parts := _parts
+	var bytes := _bytes.duplicate()
+	var fresh_flags := _fresh.duplicate()
+	var out := {}
+	_task = WorkerThreadPool.add_task(func() -> void:
+		for i in parts * parts:
+			if fresh_flags[i] == 0:
+				continue
+			var img := Image.new()
+			if img.load_jpg_from_buffer(bytes[i]) != OK or OrthoSource.is_blank(img):
+				out["error"] = "part %d unreadable or blank" % i
+				out["bad_part"] = i
+				_warm_validated.call_deferred(gen, out)
+				return
+		out["ok"] = true
+		_warm_validated.call_deferred(gen, out), false, "Validate orthophoto")
+
+func _warm_validated(gen: int, out: Dictionary) -> void:
+	_join()
+	if gen != _gen:
+		return
+	if not bool(out.get("ok", false)):
+		if out.has("bad_part"):
+			DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, int(out["bad_part"])))
+		failed.emit("Orthophoto: %s" % str(out.get("error", "unreadable")))
+		return
+	_write_fresh_parts()
+	source = _make_source()
+	succeeded.emit(null, null, _origin, _zoom)
+
+func _write_fresh_parts() -> void:
+	for i in _parts * _parts:
+		if i >= _fresh.size() or _fresh[i] == 0:
+			continue
+		var body: Variant = _bytes[i]
+		if not (body is PackedByteArray) or (body as PackedByteArray).is_empty():
+			continue
+		var path := cache_path(_src, _zoom, _span, _lat, _lon, i)
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f != null:
+			f.store_buffer(body)
+			f.close()
+			CacheStore.note_written(path)
+
+func _make_source() -> Dictionary:
+	return {"src": _src, "zoom": _zoom, "span": _span,
+		"metres_per_px": SatelliteFetcher.metres_per_px(_lat, _zoom)}
 
 func _stitch(gen: int) -> void:
 	var parts := _parts
@@ -142,6 +200,7 @@ func _stitch(gen: int) -> void:
 			var img := Image.new()
 			if img.load_jpg_from_buffer(bytes[i]) != OK or OrthoSource.is_blank(img):
 				out["error"] = "part %d unreadable or blank" % i
+				out["bad_part"] = i
 				_stitched.call_deferred(gen, out)
 				return
 			if img.get_format() != Image.FORMAT_RGB8:
@@ -161,15 +220,15 @@ func _stitched(gen: int, out: Dictionary) -> void:
 	if gen != _gen:
 		return
 	if out.has("error") or not out.has("mosaic"):
-		# A blank part is past the data: drop the cached copies too.
-		for i in _parts * _parts:
-			DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, i))
+		# Only drop the offending blank/damaged part, preserving valid sibling parts.
+		if out.has("bad_part"):
+			DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, int(out["bad_part"])))
 		failed.emit("Orthophoto: %s" % str(out.get("error", "no mosaic")))
 		return
+	_write_fresh_parts()
 	var mosaic: Image = out["mosaic"]
 	thumbnail = out["thumb"]
-	source = {"src": _src, "zoom": _zoom, "span": _span,
-		"metres_per_px": SatelliteFetcher.metres_per_px(_lat, _zoom)}
+	source = _make_source()
 	succeeded.emit(ImageTexture.create_from_image(mosaic) if textures else null, mosaic, _origin, _zoom)
 
 func _join() -> void:

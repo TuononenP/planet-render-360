@@ -90,8 +90,7 @@ static func _known_empty(lat: float, lon: float) -> bool:
 const CACHE_DIR := "user://cache"
 
 
-## Caps and Overpass timeout live in OsmQuery (single source); these
-## aliases keep the historical OsmFetcher.* names working.
+## Caps and Overpass timeout live in OsmQuery (single source).
 const OVERPASS_TIMEOUT_S = OsmQuery.OVERPASS_TIMEOUT_S
 const CAP_BUILDINGS = OsmQuery.CAP_BUILDINGS
 const CAP_PARTS = OsmQuery.CAP_PARTS
@@ -106,16 +105,9 @@ const CAP_RELATIONS = OsmQuery.CAP_RELATIONS
 const CAP_RING_HIGHWAYS = OsmQuery.CAP_RING_HIGHWAYS
 const CAP_RING_WATERWAYS = OsmQuery.CAP_RING_WATERWAYS
 const CAP_RING_COASTLINE = OsmQuery.CAP_RING_COASTLINE
-## Detailed-query radius in metres (contract §7 V12: RADIUS_M=420 is
-## gone). T7.0 metre cutover: the detailed extent is 2400 m across, so
-## the query reaches its 1200 m half-width on every preset (one shared
-## cache entry per place; presets differ by LOD, never by data — AC-12).
-## T2.3 measured 800 m Paris at ≈6 MB / 25–40 s; 1200 m is ≈2.25× the
-## area. If every endpoint fails, the cache and the OSM API step in
-## (see _detailed_fallback).
+## Detailed-query radius (m): half the 2400 m detailed extent on every preset.
 const DETAILED_RADIUS_M := 1200
-## Cache fallback reach (metres): quantised keys of the same place, then
-## neighbouring cached spots once the OSM API has failed too.
+## Cache fallback reach (m): same place, then neighbouring cached spots.
 const SAME_PLACE_M := 150.0
 const NEARBY_M := 500.0
 static func radius_for_preset(_preset: int) -> int:
@@ -649,7 +641,8 @@ func _try_finish() -> void:
 			if gen != _parse_gen:
 				return
 			_poi_pending = false
-		if _poi_text == "" and _poi_enabled and not offline_mode and not _settled:
+		var pp_pois := _from_postpass and _detailed_text.begins_with(PostpassFallback.POI_STAMP)
+		if _poi_text == "" and _poi_enabled and not offline_mode and not _settled and not pp_pois:
 			_poi_pending = true
 			_poi_postpass.run(PostpassFallback.build_poi_body(_pending_lat, _pending_lon))
 			return
@@ -775,7 +768,7 @@ func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
 	if int(converted["buildings"]) == 0 and not converted["shores"]:
 		_postpass_failed(NO_BUILDINGS)
 		return
-	_detailed_text = converted["json"]
+	_detailed_text = PostpassFallback.stamp_pois(str(converted["json"]))
 	_detailed_cached = false
 	_from_postpass = true
 	# Under its own key, not osm_path: an Overpass answer and a Postpass
@@ -943,19 +936,28 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 func _finish() -> void:
 	_join_parse()
 	var gen := _parse_gen
+	var lat := _pending_lat
+	var lon := _pending_lon
+	var ckey := OsmParseCache.make_key(lat, lon, PackedStringArray([
+		"%d:%d" % [_detailed_text.hash(), _detailed_text.length()],
+		"%d:%d" % [_ring_text.hash(), _ring_text.length()],
+		"%d:%d" % [_poi_text.hash(), _poi_text.length()],
+		"%d:%d" % [_transit_text.hash(), _transit_text.length()],
+		"%d:%d" % [_bridge_text.hash(), _bridge_text.length()]]))
+	var hit := OsmParseCache.take(ckey)
+	if not hit.is_empty():
+		_on_parsed.call_deferred(gen, hit)
+		return
 	var detailed := _detailed_text
 	var ring := _ring_text
 	var poi := _poi_text
-	# Small next to the city, so joined with the POIs rather than re-parsing
-	# the merged city once more.
 	if _transit_text != "":
 		poi = merge_payloads(poi, _transit_text)
 	if _bridge_text != "":
 		poi = merge_payloads(poi, _bridge_text)
-	var lat := _pending_lat
-	var lon := _pending_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
 		var parsed := parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon)
+		OsmParseCache.store(ckey, parsed)
 		_on_parsed.call_deferred(gen, parsed))
 
 func _join_parse() -> void:

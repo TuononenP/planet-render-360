@@ -47,12 +47,18 @@ static var view_cache_hits := 0
 static var view_cache_misses := 0
 static var _views := {}  # content key -> Array of 4 PackedByteArray
 static var _view_keys: Array = []
+## Stripped far-impostor specs by registry `type` ({views, center, wx, wz, y0, y1, name}):
+## lets distant landmarks (> STRIP_REAL_M) skip rebuilding and discarding their hero mesh.
+static var _type_bakes := {}
+static var _type_keys: Array = []
 static var _views_mutex := Mutex.new()
 
 static func clear_view_cache() -> void:
 	_views_mutex.lock()
 	_views.clear()
 	_view_keys.clear()
+	_type_bakes.clear()
+	_type_keys.clear()
 	view_cache_hits = 0
 	view_cache_misses = 0
 	_views_mutex.unlock()
@@ -85,6 +91,65 @@ static func _remember_views(key: String, views: Array) -> void:
 	_views[key] = views
 	_views_mutex.unlock()
 
+static func _remember_type_bake(type: String, spec: Dictionary) -> void:
+	if type.is_empty() or not view_cache_enabled:
+		return
+	_views_mutex.lock()
+	if not _type_bakes.has(type):
+		_type_keys.append(type)
+		while _type_keys.size() > VIEW_CACHE_MAX:
+			_type_bakes.erase(_type_keys.pop_front())
+	_type_bakes[type] = spec
+	_views_mutex.unlock()
+
+## Builds a stripped far-impostor landmark node directly from the cached bake
+## for `type` when `dist_m > STRIP_REAL_M`, avoiding building and immediately
+## freeing the full hero geometry on consecutive streamed stretches. Returns
+## null on a cache miss or when `dist_m <= STRIP_REAL_M`.
+static func build_cached_stripped(type: String, dist_m: float) -> Node3D:
+	if not view_cache_enabled or _fail_bake_test or type.is_empty() or dist_m <= STRIP_REAL_M:
+		return null
+	_views_mutex.lock()
+	var spec: Dictionary = _type_bakes.get(type, {})
+	if not spec.is_empty():
+		view_cache_hits += 1
+	_views_mutex.unlock()
+	if spec.is_empty():
+		return null
+	var views: Array = spec["views"]
+	var headless := DisplayServer.get_name() == "headless"
+	var texs: Array[ImageTexture] = []
+	for v_idx in 4:
+		var base_img := Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RGBA8, views[v_idx])
+		var gpu_img := base_img.duplicate() as Image
+		gpu_img.generate_mipmaps()
+		FoliageTextures.preserve_coverage(gpu_img, ALPHA_CUT)
+		var tex := ImageTexture.create_from_image(gpu_img)
+		tex.set_meta("view", v_idx)
+		if headless:
+			tex.set_meta("impostor_image", base_img)
+		texs.append(tex)
+	var center: Vector3 = spec["center"]
+	var octa := _build_octahedron(Vector2(center.x, center.z), float(spec["y0"]), float(spec["y1"]),
+		float(spec["wx"]), float(spec["wz"]), texs)
+	var far_r0 := band_r0_for(dist_m)
+	var root := Node3D.new()
+	root.name = str(spec.get("name", type))
+	var imp := MeshInstance3D.new()
+	imp.name = "Impostor"
+	imp.mesh = octa
+	imp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	imp.set_meta("lod_layer", "Landmarks")
+	imp.set_meta("lod_impostor", true)
+	imp.set_meta("impostor_only", true)
+	imp.set_meta("far_r0", far_r0)
+	root.add_child(imp)
+	root.set_meta("lod_impostor", true)
+	root.set_meta("impostor_only", true)
+	root.set_meta("lod_r0", R_IMPOSTOR_M)
+	root.set_meta("far_r0", far_r0)
+	return root
+
 ## Test hook to force a bake failure and verify real-mesh fallback.
 static var _fail_bake_test := false
 static var _notes_mutex := Mutex.new()
@@ -108,13 +173,17 @@ static func band_r0_for(dist_m: float) -> float:
 ## Applies an octahedral impostor to `root` when `dist_m > R_IMPOSTOR_M`.
 ## Returns `"stripped"` when real parts were replaced, `"paired"` when
 ## kept for threshold cross-fade, or `""` when below threshold or fallen back.
-static func apply_if_far(root: Node3D, dist_m: float, label: String = "") -> String:
+static func apply_if_far(root: Node3D, dist_m: float, label: String = "", cache_type := false) -> String:
 	if root == null or dist_m <= R_IMPOSTOR_M:
 		return ""
 	var baked := bake(root, rad_to_deg(root.rotation.y))
 	if not bool(baked.get("ok", false)):
 		record_fallback(label, str(baked.get("note", "impostor bake failed")))
 		return ""
+	if cache_type and label != "" and baked.has("spec") and not _has_seat_meta(root):
+		var spec: Dictionary = baked["spec"]
+		spec["name"] = str(root.name)
+		_remember_type_bake(label, spec)
 	var strip := dist_m > STRIP_REAL_M
 	var far_r0 := band_r0_for(dist_m)
 	var imp := MeshInstance3D.new()
@@ -126,36 +195,27 @@ static func apply_if_far(root: Node3D, dist_m: float, label: String = "") -> Str
 	imp.set_meta("impostor_only", strip)
 	imp.set_meta("far_r0", far_r0)
 	if strip:
-		for part in LandmarkBuilder.parts(root):
-			if part.get_parent() != null:
-				part.get_parent().remove_child(part)
-			part.free()
-		_strip_lights(root)
+		for c in root.get_children():
+			root.remove_child(c)
+			c.free()
 	else:
 		for part in LandmarkBuilder.parts(root):
 			part.set_meta("lod_layer", "Landmarks")
 			part.set_meta("lod_near_landmark", true)
-	var parent: Node3D = root.get_node_or_null("Model") as Node3D
-	if parent != null:
-		# `bake` measured vertices in `root` space (already scaled by Model.scale),
-		# so undo Model.scale on the child or attach directly under `root`.
-		parent = root
-	else:
-		parent = root
-	parent.add_child(imp)
+	root.add_child(imp)
 	root.set_meta("lod_impostor", true)
 	root.set_meta("impostor_only", strip)
 	root.set_meta("lod_r0", R_IMPOSTOR_M)
 	root.set_meta("far_r0", far_r0)
 	return "stripped" if strip else "paired"
 
-static func _strip_lights(n: Node) -> void:
+static func _has_seat_meta(n: Node) -> bool:
+	if n.has_meta(LandmarkTerrain.SEAT_META):
+		return true
 	for c in n.get_children():
-		if c is Light3D:
-			n.remove_child(c)
-			c.free()
-		else:
-			_strip_lights(c)
+		if _has_seat_meta(c):
+			return true
+	return false
 
 ## Re-binds baked CPU `Image` metadata onto `ImageTexture`s after a
 ## `PackedScene` load when the active renderer dropped GPU texels (headless).
@@ -272,6 +332,7 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 		"mesh": octa,
 		"height": size3.y,
 		"size": Vector2(size3.x, size3.z),
+		"spec": {"views": views, "center": center, "wx": wx, "wz": wz, "y0": y0, "y1": y1},
 	}
 
 static func _extract_surfaces(root: Node3D) -> Array:

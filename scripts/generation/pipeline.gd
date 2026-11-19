@@ -124,6 +124,16 @@ const STREAM_OMT_WAIT_S := 8.0
 ## city, the sharper inner mosaic), then builds without them; the
 ## fetch-ahead of the next stretch fills their caches.
 const HURRY_EXTRAS_S := 4.0
+## On a live streamed run, how long to wait for the sharper inner mosaic once
+## the main satellite mosaic is in hand (the ortho finishes caching in background).
+const STREAM_INNER_WAIT_S := 3.0
+## On a live streamed run that carries the previous centre's far city as a
+## fallback, how long to wait for a fresh far-city query once map + registers
+## have landed before reusing the remapped far city.
+const STREAM_FARCITY_FALLBACK_S := 1.5
+## Optional fallback far city from the live streamed world:
+## {"landuse": Array, "towers": Array, "offset": Vector2}.
+var fallback_far_city: Dictionary = {}
 ## Set by WorldStreamer while the camera is about to run out of ground.
 var hurry := false
 ## Seconds from the run's start to each step landing (stream.log).
@@ -377,6 +387,36 @@ func cancel() -> void:
 		_climate.cancel()
 	if _landcover != null:
 		_landcover.cancel()
+
+## Frees a finished streamed pipeline immediately unless an optional layer
+## (_inner orthophoto or _farcity) broke out early and is still downloading
+## into the disk cache; in that case drops heavy data and waits (bounded)
+## before freeing so the in-flight response reaches user://cache.
+func retire_when_settled(max_s: float = 25.0) -> void:
+	if _cancelled or ((_inner == null or _inner.done) and _farcity_done) or not is_inside_tree():
+		queue_free()
+		return
+	if _inner != null:
+		_inner.set_textures(false)
+	set_meta(PostpassGate.LOW_META, true)
+	_sat_texture = null
+	_sat_image = null
+	_landcover_image = null
+	_canopy_image = null
+	_hsy_cover_image = null
+	_osm_buildings = []
+	_osm_roads_v2 = []
+	_osm_land = []
+	_farfield_rings = []
+	_farfield_drapes = []
+	var waited := 0.0
+	while is_inside_tree() and not _cancelled and waited < max_s \
+			and not ((_inner == null or _inner.done) and _farcity_done):
+		await get_tree().create_timer(0.25).timeout
+		waited += 0.25
+	if is_instance_valid(self):
+		cancel()
+		queue_free()
 
 ## `focus`: the landmark the viewer came to see (LandmarkVisit site);
 ## the view aims at it (LocationData.focus). `view`: a saved camera or
@@ -736,8 +776,9 @@ func _await_satellite(data: LocationData) -> void:
 		if _inner.done and not timings.has("inner imagery"):
 			_mark("inner imagery")
 		inner_held = inner_held + get_process_delta_time() if _sat_done and not _inner.done else 0.0
-		if hurry and inner_held >= HURRY_EXTRAS_S:
-			print("Streamed build is late: ground photo without the sharper inner mosaic")
+		var inner_cap := HURRY_EXTRAS_S if hurry else (STREAM_INNER_WAIT_S if background and not warm_only else INF)
+		if inner_held >= inner_cap:
+			print("Streamed build: ground photo without waiting for the sharper inner mosaic (%.1f s)" % inner_held)
 			break
 	if _sat_texture == null and data.quality_preset > RenderSettings.Preset.FAST:
 		_note("imagery")
@@ -825,9 +866,10 @@ func _await_osm(data: LocationData) -> void:
 		data.piers = _osm.piers
 		data.shore_structures = _osm.shore_structures
 		data.bridge_areas = _osm.bridge_areas
-		HeritageZones.apply(data)
-		data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(HeritageZones.filter_candidates(data, _osm_landmarks)))
-		HeritageZones.drop_cleared(data)
+		if not warm_only:
+			HeritageZones.apply(data)
+			data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(HeritageZones.filter_candidates(data, _osm_landmarks)))
+			HeritageZones.drop_cleared(data)
 		_credits[2] = "Map data: © OpenStreetMap contributors" + (" · © OpenMapTiles" if _osm.used_omt else "")
 	else:
 		# No map data: the registry's other landmarks still stand.
@@ -871,15 +913,28 @@ func _await_far_city(data: LocationData) -> void:
 	# A streamed run counts the wait from its start, not from here.
 	var waited := (Time.get_ticks_msec() - _fetch_started_msec) / 1000.0 if background else 0.0
 	var held := 0.0
+	var has_fallback := background and not warm_only and not fallback_far_city.is_empty()
 	while not _farcity_done and waited < FARCITY_WAIT_S and not _cancelled:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 		held += get_process_delta_time()
 		if hurry and held >= HURRY_EXTRAS_S:
 			break  # a late streamed build: the far city from imagery alone
+		if has_fallback and held >= STREAM_FARCITY_FALLBACK_S:
+			break  # reuse the live centre's remapped far city without stalling on Postpass
 	if not warm_only:
 		PostpassGate.release_low()  # the live layers are in: a fetch-ahead may go
 	if not _farcity_done:
+		if has_fallback:
+			var remapped := FarCityFetcher.remap_far(
+				fallback_far_city.get("landuse", []),
+				fallback_far_city.get("towers", []),
+				fallback_far_city.get("offset", Vector2.ZERO))
+			data.far_landuse = remapped["landuse"]
+			data.far_towers = remapped["towers"]
+			data.buildings = FarCityFetcher.complete_buildings(data.buildings, data.far_towers)
+			print("FAR-CITY fetch: reused remapped live far city (%.1f s wait)" % held)
+			return
 		print("Far-city fetch over budget; far city from imagery only")
 		return
 	data.far_landuse = _farcity_landuse

@@ -30,7 +30,7 @@ const URL_TEMPLATE := "https://server.arcgisonline.com/ArcGIS/rest/services/Worl
 const USER_AGENT := Brand.USER_AGENT
 const CACHE_DIR := "user://cache"
 const TILE_PX := 256
-const POOL_SIZE := 8  # parallel tile downloads; Ultra fetches 169 tiles
+const POOL_SIZE := 12  # parallel tile downloads; Ultra fetches 169 tiles
 const TILE_TIMEOUT := 20.0
 ## Web-mercator metres per pixel at the equator for zoom 0.
 const M_PX_Z0 := 156543.03392
@@ -43,6 +43,7 @@ const M_PX_Z0 := 156543.03392
 static var SPAN := 3
 
 var _pool: Array[HTTPRequest] = []
+var _queue: Array = []  # [[Vector2i, gen, attempt]] waiting for a free HTTP slot
 var _images: Dictionary = {}  # Vector2i -> Image
 var _tiles: Array[Vector2i] = []
 var _remaining := 0
@@ -145,6 +146,7 @@ func _start_mosaic(zoom: int, span: int) -> void:
 	_span = span
 	_centre_tile = DemFetcher.tile_xy(_pending_lat, _pending_lon, zoom)
 	_tiles = mosaic_tiles(_pending_lat, _pending_lon, zoom, span)
+	_queue.clear()
 	_images.clear()
 	_remaining = _tiles.size()
 	_emitted = false
@@ -153,7 +155,11 @@ func _start_mosaic(zoom: int, span: int) -> void:
 	var cached: Array[Vector2i] = []
 	for t in _tiles:
 		if FileAccess.file_exists(_cache_path(t)):
-			cached.append(t)
+			if textures:
+				cached.append(t)
+			else:
+				CacheStore.note_read(_cache_path(t))
+				_tile_done(t, null, true)
 		else:
 			_load_tile(t, gen)
 	# A mosaic that settled inside the loop (offline, every tile missing)
@@ -219,11 +225,18 @@ func pending_tile_count() -> int:
 func _cache_path(t: Vector2i) -> String:
 	return CacheStore.sat_path(_zoom, t.x, t.y)
 
+static func _looks_like_jpeg(body: PackedByteArray) -> bool:
+	return body.size() >= 4 and body[0] == 0xFF and body[1] == 0xD8
+
 func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
 	if gen != _generation:
 		return
 	var path := _cache_path(t)
 	if FileAccess.file_exists(path):
+		if not textures:
+			CacheStore.note_read(path)
+			_tile_done(t, null, true)
+			return
 		var img := Image.new()
 		if img.load(path) == OK:
 			CacheStore.note_read(path)
@@ -234,22 +247,34 @@ func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
 		return
 	var http := _free_http()
 	if http == null:
-		# Pool busy: retry on the next process frame until a slot frees.
-		get_tree().create_timer(0.25).timeout.connect(func() -> void: _load_tile(t, gen, attempt))
+		# Pool busy: dispatch immediately when a slot frees instead of polling on a timer.
+		_queue.append([t, gen, attempt])
 		return
 	var done := func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 		http.set_meta("busy", false)
+		_pump_queue.call_deferred()
 		if result == HTTPRequest.RESULT_SUCCESS and code == 200 and not body.is_empty():
-			var f := FileAccess.open(path, FileAccess.WRITE)
-			if f != null:
-				f.store_buffer(body)
-				CacheStore.note_written(path)
-			if gen != _generation:
-				return
-			var img := Image.new()
-			if img.load_jpg_from_buffer(body) == OK:
-				_tile_done(t, img)
-				return
+			if not textures:
+				if _looks_like_jpeg(body):
+					var f := FileAccess.open(path, FileAccess.WRITE)
+					if f != null:
+						f.store_buffer(body)
+						f.close()
+						CacheStore.note_written(path)
+					if gen == _generation:
+						_tile_done(t, null, true)
+					return
+			else:
+				var img := Image.new()
+				if img.load_jpg_from_buffer(body) == OK:
+					var f := FileAccess.open(path, FileAccess.WRITE)
+					if f != null:
+						f.store_buffer(body)
+						f.close()
+						CacheStore.note_written(path)
+					if gen == _generation:
+						_tile_done(t, img)
+					return
 		# A tile the source does not have is not a blip: no retry.
 		var missing := result == HTTPRequest.RESULT_SUCCESS and code == 404
 		if missing:
@@ -266,7 +291,25 @@ func _load_tile(t: Vector2i, gen: int, attempt: int = 0) -> void:
 	if err != OK:
 		http.request_completed.disconnect(done)
 		http.set_meta("busy", false)
+		_pump_queue.call_deferred()
 		_tile_done(t, null)
+
+func _pump_queue() -> void:
+	while not _queue.is_empty():
+		var item: Array = _queue[0]
+		if int(item[1]) != _generation:
+			_queue.pop_front()
+			continue
+		if not _has_free_http():
+			return
+		_queue.pop_front()
+		_load_tile(item[0], int(item[1]), int(item[2]))
+
+func _has_free_http() -> bool:
+	for http in _pool:
+		if not http.get_meta("busy", false):
+			return true
+	return false
 
 func _free_http() -> HTTPRequest:
 	for http in _pool:
@@ -275,9 +318,11 @@ func _free_http() -> HTTPRequest:
 			return http
 	return null
 
-func _tile_done(t: Vector2i, img: Image) -> void:
+func _tile_done(t: Vector2i, img: Image, warm_ok := false) -> void:
 	if img != null:
 		_images[t] = img
+	elif warm_ok:
+		_images[t] = true
 	_remaining -= 1
 	tile_progress.emit(_tiles.size() - maxi(_remaining, 0), _tiles.size())
 	if _remaining <= 0 and not _emitted:
@@ -293,6 +338,15 @@ func _stitch() -> void:
 			_start_mosaic(next.x, next.y)
 			return
 		failed.emit("Satellite imagery unavailable")
+		return
+	if not textures:
+		var half := _span / 2
+		var origin := Vector2((_centre_tile.x - half) * TILE_PX, (_centre_tile.y - half) * TILE_PX)
+		satellite_source = {
+			"zoom": _requested_zoom, "span": _requested_span, "tile_count": _tiles.size(),
+			"metres_per_px": metres_per_px(_pending_lat, _zoom), "source_zoom": _zoom, "source_span": _span,
+		}
+		succeeded.emit(null, null, origin, _zoom)
 		return
 	# Blitting 225 tiles and building the mipmaps of a 3840 px mosaic took
 	# ~60 ms on the main thread; the worker does it and only the texture

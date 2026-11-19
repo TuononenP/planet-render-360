@@ -49,11 +49,69 @@ var timings: Dictionary = {}
 var _req: LayerRequest
 var _busy := false
 ## A streamed run (GenerationPipeline.background) asks around the nearest
-## point of a lattice COARSE_CELLS wider than StreamLattice's (~2.2 km)
-## instead of its own centre, so the stretches of one flight share a
-## query and its cache; the features are still placed around the centre.
-const COARSE_CELLS := 5
+## point of a lattice COARSE_CELLS wider than StreamLattice's (~2.7 km for a
+## 12 km far-city radius) so consecutive stretches share one query and cache;
+## features are still placed around the stretch's own centre.
+const COARSE_CELLS := 6
 var coarse := false
+
+## Shifts previously loaded far_landuse and far_towers from the live centre
+## into a new streamed centre's XZ frame (adding `offset` = old centre in new
+## frame). Used as an immediate fallback when the next coarse cell is still
+## waiting behind PostpassGate.
+static func remap_far(landuse: Array, towers: Array, offset: Vector2) -> Dictionary:
+	var lu_out: Array = []
+	for poly in landuse:
+		if not (poly is Dictionary):
+			continue
+		var d: Dictionary = (poly as Dictionary).duplicate()
+		d["points"] = _shift_ring(d.get("points", PackedVector2Array()), offset)
+		var holes: Array = []
+		for h in d.get("holes", []):
+			holes.append(_shift_ring(h, offset))
+		d["holes"] = holes
+		lu_out.append(d)
+	var tw_out: Array = []
+	for tw in towers:
+		if not (tw is Dictionary):
+			continue
+		var d: Dictionary = (tw as Dictionary).duplicate()
+		d["x"] = float(d.get("x", 0.0)) + offset.x
+		d["z"] = float(d.get("z", 0.0)) + offset.y
+		if d.has("footprint"):
+			d["footprint"] = _shift_ring(d["footprint"], offset)
+		if d.has("holes"):
+			var holes: Array = []
+			for h in d["holes"]:
+				holes.append(_shift_ring(h, offset))
+			d["holes"] = holes
+		if d.has("parts"):
+			var parts: Array = []
+			for p in d["parts"]:
+				if p is Dictionary:
+					var pd: Dictionary = (p as Dictionary).duplicate()
+					if pd.has("x"):
+						pd["x"] = float(pd["x"]) + offset.x
+					if pd.has("z"):
+						pd["z"] = float(pd["z"]) + offset.y
+					if pd.has("footprint"):
+						pd["footprint"] = _shift_ring(pd["footprint"], offset)
+					if pd.has("holes"):
+						var pholes: Array = []
+						for ph in pd["holes"]:
+							pholes.append(_shift_ring(ph, offset))
+						pd["holes"] = pholes
+					parts.append(pd)
+			d["parts"] = parts
+		tw_out.append(d)
+	return {"landuse": lu_out, "towers": tw_out}
+
+static func _shift_ring(pts: PackedVector2Array, offset: Vector2) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(pts.size())
+	for i in pts.size():
+		out[i] = pts[i] + offset
+	return out
 ## The centre asked about (and cached under), and the one parsed around.
 var _lat := 0.0
 var _lon := 0.0

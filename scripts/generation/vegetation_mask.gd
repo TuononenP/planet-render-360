@@ -44,16 +44,24 @@ var _built_blocks := PackedInt32Array()
 var _block := 16
 var _nb := 1
 
+## Test hook: force the GDScript path so parity tests can compare both.
+static var force_script := false
+var _native: Object = null
+
 func _init(data: LocationData, ground: GroundTruth) -> void:
 	var m2u := WorldScale.metres_to_units()
 	cell = CELL_M * m2u
 	_bucket = 24.0 * m2u
 	half = ground.extent_m * m2u if ground != null else WorldScale.detailed_extent_units() * 0.5
 	n = maxi(int(ceil(2.0 * half / cell)), 1)
-	bits.resize(n * n)
-	cover.resize(n * n)
 	_nb = int(ceil(float(n) / float(_block)))
-	_built_blocks.resize(_nb * _nb)
+	if not force_script and ClassDB.class_exists("VegetationMaskNative"):
+		_native = ClassDB.instantiate("VegetationMaskNative")
+		_native.setup(n, half, cell, _block, _nb, _bucket)
+	else:
+		bits.resize(n * n)
+		cover.resize(n * n)
+		_built_blocks.resize(_nb * _nb)
 	if ground != null:
 		surface = ground.surface(data)
 	var t0 := Time.get_ticks_msec()
@@ -99,12 +107,17 @@ func _init(data: LocationData, ground: GroundTruth) -> void:
 			pts = r
 		else:
 			continue
-		for i in pts.size() - 1:
-			# Mapped sidewalks/paths are not carriageway: street trees and
-			# lamps stand on them, only synthetic planting avoids them.
+		if _native != null:
 			var core := -1.0 if foot else width_m * 0.5 * m2u
 			var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
-			_add_segment(pts[i], pts[i + 1], core, edge, paved, sides)
+			_native.add_polyline(pts, core, edge, paved, sides)
+		else:
+			for i in pts.size() - 1:
+				# Mapped sidewalks/paths are not carriageway: street trees and
+				# lamps stand on them, only synthetic planting avoids them.
+				var core := -1.0 if foot else width_m * 0.5 * m2u
+				var edge := (width_m * 0.5 + (0.4 if foot else 1.2)) * m2u
+				_add_segment(pts[i], pts[i + 1], core, edge, paved, sides)
 	# Bespoke bridges replace their mapped decks. Keep the same registered
 	# corridor clear for trees, including where the removed deck was wider
 	# than an individual OSM carriageway or train track.
@@ -180,7 +193,14 @@ func index_of(x: float, z: float) -> int:
 ## True when any cell within `margin_m` of XZ carries one of `mask`.
 ## Outside the extent counts as blocked.
 func blocked(x: float, z: float, mask: int, margin_m: float = 0.0) -> bool:
-	var r := int(ceil(margin_m * WorldScale.metres_to_units() / cell))
+	var m2u := WorldScale.metres_to_units()
+	if _native != null:
+		if mask & PAINTED and surface != null:
+			var r_p := int(ceil(margin_m * m2u / cell))
+			if surface.hard_at(x, z, float(r_p) * cell, GroundSurface.NO_PLANTING):
+				return true
+		return _native.blocked(x, z, mask & ~PAINTED, margin_m, m2u)
+	var r := int(ceil(margin_m * m2u / cell))
 	var cx := int(floor((x + half) / cell))
 	var cz := int(floor((z + half) / cell))
 	if cx < 0 or cz < 0 or cx >= n or cz >= n:
@@ -209,6 +229,9 @@ func blocked(x: float, z: float, mask: int, margin_m: float = 0.0) -> bool:
 ## Marks the cell under each trunk (Vector3 XZ, units) with TREE, so
 ## later cover can tell where the mower cannot reach.
 func mark_trees(pos: Array) -> void:
+	if _native != null:
+		_native.mark_trees(pos)
+		return
 	for p: Vector3 in pos:
 		var i := index_of(p.x, p.z)
 		if i >= 0:
@@ -222,14 +245,26 @@ static func sward_of(cls: String) -> String:
 
 ## Green polygon id (index into `green`) at XZ, or -1.
 func cover_at(x: float, z: float) -> int:
+	if _native != null:
+		return _native.cover_at(x, z)
 	var i := index_of(x, z)
 	if i < 0:
 		return -1
 	return cover[i] - 1
 
+## Green polygon id at raster cell `(cx, cz)`, or -1.
+func cover_at_cell(cx: int, cz: int) -> int:
+	if _native != null:
+		return _native.cover_at_cell(cx, cz)
+	if cx < 0 or cz < 0 or cx >= n or cz >= n:
+		return -1
+	return cover[cz * n + cx] - 1
+
 ## Fraction of built cells in the block window around XZ (~24 m blocks,
 ## 3x3 neighbourhood ≈ 72 m): "is this a street / town park".
 func built_fraction(x: float, z: float) -> float:
+	if _native != null:
+		return _native.built_fraction(x, z)
 	var bx := clampi(int(floor((x + half) / cell)) / _block, 0, _nb - 1)
 	var bz := clampi(int(floor((z + half) / cell)) / _block, 0, _nb - 1)
 	var total := 0
@@ -248,6 +283,8 @@ func built_fraction(x: float, z: float) -> float:
 ## Even-odd scan conversion of rings (outer + holes). Sets `bit` and/or
 ## cover id per covered cell; returns the covered cell count.
 func _fill(rings: Array, bit: int, cov: int) -> int:
+	if _native != null:
+		return _native.fill_rings(rings, bit, cov, bit == BUILDING)
 	var outer: PackedVector2Array = rings[0]
 	if outer.size() < 3:
 		return 0
@@ -313,6 +350,9 @@ func _fill(rings: Array, bit: int, cov: int) -> int:
 ## stamping every cell of ~250 km of Paris ways cost ~1 s in GDScript,
 ## while candidate queries are only tens of thousands.
 func _add_segment(a: Vector2, b: Vector2, core: float, edge: float, paved: float = -1.0, sides: int = 0) -> void:
+	if _native != null:
+		_native.add_segment(a, b, core, edge, paved, sides)
+		return
 	var reach := maxf(edge, paved)
 	if (absf(a.x) > half + reach and absf(b.x) > half + reach and signf(a.x) == signf(b.x)) \
 			or (absf(a.y) > half + reach and absf(b.y) > half + reach and signf(a.y) == signf(b.y)):

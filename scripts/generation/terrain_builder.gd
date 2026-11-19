@@ -200,11 +200,22 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			var entry := LocationData.entry_for_type(c_type)
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 			var hero_y := _hero_y(data, ground, cx, cz, entry, half)
+			var cacheable := not bool(entry.get("deck_ends", false)) \
+				and c_type not in LandmarkTerrain.RELIEFS \
+				and LandmarkTerrain.outline(c_type).is_empty()
+			if cacheable:
+				var fast_imp := LandmarkImpostor.build_cached_stripped(c_type, dist_m)
+				if fast_imp != null:
+					fast_imp.position = Vector3(cx, hero_y, cz)
+					fast_imp.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
+					fast_imp.set_meta("lod_layer", "Landmarks")
+					root.add_child(fast_imp)
+					continue
 			var hero := _hero(c_type, entry, ground, Vector2(cx, cz), hero_y)
 			hero.position = Vector3(cx, hero_y, cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
 			LandmarkTerrain.stitch(hero, ground, c_type)
-			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type)
+			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type, cacheable)
 			if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
 				LandmarkLights.dress(hero, c_type)
 				LandmarkShader.upgrade(hero)

@@ -65,6 +65,8 @@ add_library(planet_render SHARED
 	src/road_grader.h
 	src/shore_classifier.cpp
 	src/shore_classifier.h
+	src/vegetation_mask_native.cpp
+	src/vegetation_mask_native.h
 	src/video_decoder.cpp
 	src/video_decoder.h
 	src/video_encoder.cpp

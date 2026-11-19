@@ -34,6 +34,8 @@ const KNOWN_REACH_M := 3000.0
 var known: Array[Vector2] = []
 ## The centre planned after the one building (lat/lon; INF = none).
 var plan_ll := Vector2.INF
+## Second step ahead along the same heading on high-memory devices (warm_max >= 2).
+var plan2_ll := Vector2.INF
 var _warms: Array[GenerationPipeline] = []
 ## Ring centres still to fetch (lat/lon), next first.
 var _ring: Array[Vector2] = []
@@ -99,8 +101,18 @@ func plan(v: View360, pos: Vector2, target: Vector2, step: float) -> void:
 		return
 	var next := target + dir * step
 	_ring.erase(plan_ll)  # the plan it replaces is no longer wanted
+	_ring.erase(plan2_ll)
 	plan_ll = StreamLattice.snap(
 		WorldScale.latlon_from_xz(next.x, next.y, v._data.latitude, v._data.longitude))
+	plan2_ll = Vector2.INF
+	if warm_max() >= 2:
+		var next2 := next + dir * step
+		var ll2 := StreamLattice.snap(
+			WorldScale.latlon_from_xz(next2.x, next2.y, v._data.latitude, v._data.longitude))
+		if ll2 != plan_ll and not ll2 in known:
+			plan2_ll = ll2
+			_ring.erase(plan2_ll)
+			_ring.push_front(plan2_ll)
 	_ring.erase(plan_ll)
 	_ring.push_front(plan_ll)
 
@@ -113,6 +125,8 @@ func survey(lat: float, lon: float, heading: Vector2) -> void:
 	_ring = []
 	if plan_ll != Vector2.INF and not plan_ll in known:
 		_ring.append(plan_ll)  # still to fetch: ahead of the ring
+	if plan2_ll != Vector2.INF and plan2_ll != plan_ll and not plan2_ll in known:
+		_ring.append(plan2_ll)
 	for ll in ring_around(lat, lon, heading) if heading.length() <= RING_MAX_MPS else []:
 		var s := StreamLattice.snap(ll)
 		if not s in _ring and not s in known:
@@ -140,7 +154,7 @@ func pump(v: View360, net_busy: bool) -> void:
 		return
 	while _warms.size() >= warm_max():
 		_end_warm(_warms[0], true)
-	_warm(v, ll, "a stretch ahead" if ll == plan_ll else "a stretch around")
+	_warm(v, ll, "a stretch ahead" if ll == plan_ll or ll == plan2_ll else "a stretch around")
 
 func _warm(v: View360, ll: Vector2, what: String) -> void:
 	note(ll)
@@ -177,6 +191,7 @@ func stop() -> void:
 		_end_warm(w, true)
 	_ring.clear()
 	plan_ll = Vector2.INF
+	plan2_ll = Vector2.INF
 
 ## A new place: nothing known carries over.
 func clear() -> void:

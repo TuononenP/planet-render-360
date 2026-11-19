@@ -349,6 +349,7 @@ func _off_both_squares(pos: Vector2) -> bool:
 # --- Live driving (View360 delegates here, so View360 stays lean) ---
 
 var _pipeline: GenerationPipeline
+var _retiring_pipes: Array[GenerationPipeline] = []
 var _abort: BuildAbort
 var _ready: Array = []
 ## The ready world is ranged subtree by subtree while it waits (see
@@ -478,6 +479,11 @@ func _cancel_pending() -> void:
 		_abort.requested = true
 	if _pipeline != null:
 		_pipeline.cancel()
+	for rp in _retiring_pipes.duplicate():
+		if is_instance_valid(rp):
+			rp.cancel()
+			rp.queue_free()
+	_retiring_pipes.clear()
 
 ## Cancels any pending generation and drops its world (a season change,
 ## a new place, teardown). The next begin() starts from a clean slate.
@@ -854,10 +860,13 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 				and not exit_missed(pos, _planned_vel(), sxz):
 			ll = s
 			target = sxz
-	_scout.plan_ll = Vector2.INF
 	_scout.note(ll)
 	var gen := begin(ll, target)
-	_scout.plan(v, pos, target, step_m(_pace, expected))
+	if here or target.is_equal_approx(pos):
+		_scout.plan_ll = Vector2.INF
+		_scout.plan2_ll = Vector2.INF
+	else:
+		_scout.plan(v, pos, target, step_m(_pace, expected))
 	_started_msec = Time.get_ticks_msec()
 	_fetched_msec = 0
 	for p in ["fetch", "build", "ready"]:
@@ -874,6 +883,12 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 		_pipeline.queue_free()
 	_pipeline = GenerationPipeline.new()
 	_pipeline.background = true
+	if v._data != null and (not v._data.far_landuse.is_empty() or not v._data.far_towers.is_empty()):
+		_pipeline.fallback_far_city = {
+			"landuse": v._data.far_landuse,
+			"towers": v._data.far_towers,
+			"offset": remap_xz(Vector2.ZERO, v._data.latitude, v._data.longitude, ll.x, ll.y),
+		}
 	v.add_child(_pipeline)
 	var pipe := _pipeline
 	var p := SaveProgress.new()
@@ -909,7 +924,13 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 	if gen == generation and state == State.FETCHING:
 		ground = await pipe.ground_for(data)
 	if is_instance_valid(pipe):
-		pipe.queue_free()
+		if gen == generation and state == State.FETCHING:
+			_retiring_pipes = _retiring_pipes.filter(func(p: GenerationPipeline) -> bool: return is_instance_valid(p))
+			_retiring_pipes.append(pipe)
+			pipe.retire_when_settled()
+		else:
+			pipe.cancel()
+			pipe.queue_free()
 	if not is_instance_valid(v) or gen != generation or state != State.FETCHING \
 			or v._data == null:
 		return
@@ -937,8 +958,11 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 			"Still exploring on distant ground; will try again as you go.", "caution")
 		return
 	# The vehicle plans, ahead and off the main thread (VehicleMover).
+	# WorldBuildGraph usually overlaps this with the build stages.
 	var plan_ground: GroundTruth = built[0] if built.size() > 0 else null
-	await FrameTask.run(VehicleMover.plan_ahead.bind(data, plan_ground), "Vehicle plans", v.get_tree())
+	if plan_ground != null and (not data.has_meta(VehicleMover.PLANS_GROUND) \
+			or data.get_meta(VehicleMover.PLANS_GROUND) != plan_ground):
+		await FrameTask.run(VehicleMover.plan_ahead.bind(data, plan_ground), "Vehicle plans", v.get_tree())
 	if not is_instance_valid(v) or gen != generation:
 		if built.size() > 1 and built[1] is Node3D:
 			(built[1] as Node3D).free()

@@ -102,14 +102,22 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 const PLANS_META := &"vehicle_plans"
 const PLANS_GROUND := &"vehicle_plans_ground"
 
-static func plan_ahead(data: LocationData, ground: GroundTruth) -> void:
+static func compute_plans(data: LocationData, ground: GroundTruth) -> Dictionary:
 	if data == null or ground == null or data.railways.is_empty() \
 			or not TransitVehicles.enabled(data.quality_preset):
-		return
+		return {}
 	var m2u := WorldScale.metres_to_units()
-	data.set_meta(PLANS_META, {"Tram": TransitVehicles.plan(data, ground, m2u),
-		"Train": StationTrains.plan(data, ground, m2u)})
+	return {"Tram": TransitVehicles.plan(data, ground, m2u),
+		"Train": StationTrains.plan(data, ground, m2u)}
+
+static func store_plans(data: LocationData, ground: GroundTruth, plans: Dictionary) -> void:
+	if data == null or ground == null or plans.is_empty():
+		return
+	data.set_meta(PLANS_META, plans)
 	data.set_meta(PLANS_GROUND, ground)
+
+static func plan_ahead(data: LocationData, ground: GroundTruth) -> void:
+	store_plans(data, ground, compute_plans(data, ground))
 
 ## How many trains this mover drives.
 func count() -> int:

@@ -50,6 +50,7 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 		StreetProps._fence_material()
 		StreetProps._chainlink_material()
 	var hide := TerrainBuilder.debug_hide_buildings
+	var vehicle_box := [{}]
 	var stages: Array[Stage] = [
 		_stage(BuildAbort.Step.FAR, func() -> Node3D:
 			return FarTerrainBuilder.build_far(data, ground, abort)),
@@ -66,6 +67,8 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			if data.landmark_type != "none":
 				lm.add_child(TerrainBuilder._landmark(data, ground))
 			TerrainBuilder._landmark_candidates(lm, data, ground)
+			if abort != null and abort.background and not abort.requested:
+				vehicle_box[0] = VehicleMover.compute_plans(data, ground)
 			return lm),
 		_stage(BuildAbort.Step.VEGETATION, func() -> Node3D:
 			return VegetationBuilder.build_vegetation(data, ground, abort)),
@@ -91,6 +94,8 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 	for task in tasks:
 		WorkerThreadPool.wait_for_task_completion(task)
 	BuildingBuilder._suppress_begin_build = false
+	if (abort == null or not abort.requested) and not (vehicle_box[0] as Dictionary).is_empty():
+		VehicleMover.store_plans(data, ground, vehicle_box[0])
 	if (abort != null and abort.requested) or PbrTextures.cap_reached:
 		for st in stages:
 			if st.node != null:
@@ -138,7 +143,7 @@ static func _lanes() -> Array:
 	if not lanes_override.is_empty():
 		return lanes_override
 	if OS.is_debug_build():
-		return [[3], [6], [0, 1, 2, 4, 5]]
+		return [[3], [6], [4], [0, 1, 2, 5]]
 	return [[0], [1], [2], [3], [4], [5], [6]]
 
 static func _stage(step: int, fn: Callable) -> Stage:

@@ -23,6 +23,7 @@
 #include "snapshot_kernels.h"
 #include "steps_kernels.h"
 #include "memory_stats.h"
+#include "vegetation_mask_native.h"
 #include "video_decoder.h"
 #include "video_encoder.h"
 
@@ -64,6 +65,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(RoadGrader);
 	GDREGISTER_CLASS(ShoreClassifier);
 	GDREGISTER_CLASS(MemoryStats);
+	GDREGISTER_CLASS(VegetationMaskNative);
 	GDREGISTER_CLASS(VideoDecoder);
 	GDREGISTER_CLASS(VideoEncoder);
 }
