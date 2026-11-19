@@ -54,6 +54,17 @@ static func _station_building(tags: Dictionary) -> bool:
 static func is_chimney(tags: Dictionary) -> bool:
 	return str(tags.get("man_made", "")) == "chimney" or str(tags.get("building", "")) == "chimney"
 
+## A statue mapped as a building (historic=statue, memorial=statue, or
+## tourism=artwork with artwork_type=statue): its `statue` form
+## ("equestrian", ...) or "figure"; "" for anything else. StatueBuilder
+## draws it as a pedestal and bronze, not a windowed box.
+static func statue_kind(tags: Dictionary) -> String:
+	if str(tags.get("historic", "")) != "statue" and str(tags.get("memorial", "")) != "statue" \
+			and not (str(tags.get("tourism", "")) == "artwork" and str(tags.get("artwork_type", "")) == "statue"):
+		return ""
+	var form := str(tags.get("statue", "")).strip_edges().to_lower()
+	return form if form != "" else "figure"
+
 ## "obelisk" / "column" for a historic monument or memorial (a building
 ## way such as Nelson's Column, or man_made=obelisk|column), "" otherwise.
 ## The parser turns the tall slender ones into free-standing landmarks.
@@ -419,6 +430,11 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 	}
 	if is_chimney(tags):
 		entry["chimney"] = true
+	var statue := statue_kind(tags)
+	if statue != "":
+		entry["statue"] = statue
+		if str(tags.get("direction", "")).is_valid_float():
+			entry["statue_dir"] = float(tags["direction"])
 	entry.merge(_roof_tags(tags))
 	entry.merge(fortification_tags(tags))
 	if str(entry["kind"]) in ["ship", "boat", "houseboat"]:
