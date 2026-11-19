@@ -21,24 +21,34 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	if walks.is_empty():
 		return 0
 	var barriers := _index(data.barriers, centre, m, true)
+	var domains: ShoreDomains = ground.shoreline.domains
 	var buf := TreeMeshLibrary.Buf.new()
 	var count := 0
 	for seg in ground.shoreline.segments:
+		# Only walled/quayed edges carry a promenade rail: a natural sloping
+		# shore has no retaining face and dips into the water.
+		if str(seg.get("kind", "")) != "hard":
+			continue
 		var a: Vector2 = seg["a"]
 		var b: Vector2 = seg["b"]
 		var mid := (a + b) * 0.5
 		if mid.distance_squared_to(centre) > pow(RADIUS_M * m, 2.0):
 			continue
-		var body: Dictionary = ground.shoreline.domains.bodies[int(seg["body"])]
+		var body: Dictionary = domains.bodies[int(seg["body"])]
 		if not bool(body.get("tidal", false)):
 			continue
-		if not eligible(seg, _near(walks, mid, m), _near(barriers, mid, m), m):
+		if minf(float(seg["top_a"]) - float(seg["water_a"]),
+				float(seg["top_b"]) - float(seg["water_b"])) < 0.25 * m:
+			continue
+		if not eligible(seg, _near(walks, mid, m), _near(barriers, mid, m), m, domains):
 			continue
 		# The bank's top is the canonical shoreline height; move a little
 		# inland so posts sit on the promenade instead of the water face.
 		var land: Vector2 = seg["land"]
 		var p0 := a + land * 0.35 * m
 		var p1 := b + land * 0.35 * m
+		if domains.at(p0) >= 0 or domains.at(p1) >= 0 or domains.at((p0 + p1) * 0.5) >= 0:
+			continue
 		StreetProps._fence_piece(buf, p0, p1, float(seg["top_a"]), float(seg["top_b"]), 1.1 * m, m)
 		count += 1
 	if not buf.idx.is_empty():
@@ -53,7 +63,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 
 ## A guardrail needs a parallel paved path on its landward side. A mapped
 ## barrier nearby suppresses the inferred rail, including at junctions.
-static func eligible(seg: Dictionary, walks: Array, barriers: Array, m: float) -> bool:
+static func eligible(seg: Dictionary, walks: Array, barriers: Array, m: float,
+		domains: ShoreDomains = null) -> bool:
 	var a: Vector2 = seg["a"]
 	var b: Vector2 = seg["b"]
 	var mid := (a + b) * 0.5
@@ -67,6 +78,8 @@ static func eligible(seg: Dictionary, walks: Array, barriers: Array, m: float) -
 			return false
 	for line in walks:
 		var q := Geometry2D.get_closest_point_to_segment(mid, line[0], line[1])
+		if domains != null and domains.at(q) >= 0:
+			continue
 		if q.distance_to(mid) <= (8.0 + float(line[2]) * 0.5) * m \
 				and (q - mid).dot(land) >= -0.5 * m \
 				and absf((line[1] - line[0]).normalized().dot(dir)) >= 0.75:

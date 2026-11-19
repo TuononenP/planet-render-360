@@ -120,6 +120,13 @@ func _run() -> void:
 			or ShoreRailings.eligible(shore, [[Vector2(5, -5), Vector2(5, 5), 2.0]], [], 1.0) \
 			or ShoreRailings.eligible(shore, [[Vector2(0, -5), Vector2(10, -5), 2.0]], [], 1.0):
 		failures.append("waterfront rail requires a parallel landward path and no mapped barrier")
+	# A walk point inside a water domain must not trigger a railing over water.
+	var wd := _data()
+	wd.land_polygons = [{"class": "water", "tidal": true, "points": PackedVector2Array([
+		Vector2(-20, 2), Vector2(30, 2), Vector2(30, 20), Vector2(-20, 20)]), "holes": []}]
+	var wet_domains := ShoreDomains.new(wd, Rect2(-50, -50, 100, 100))
+	if ShoreRailings.eligible(shore, walk, [], 1.0, wet_domains):
+		failures.append("waterfront rail must ignore walks whose closest point lies in water")
 	# Every mesh builds; a lit lens glows.
 	for key in ["bench_wood", "bench_stone", "bin_post", "bin_drum", "bin_black", "bollard_black",
 			"bollard_red", "bin_nyc", "subway_entrance", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole", "stop_hsl", "stop_sl"]:
