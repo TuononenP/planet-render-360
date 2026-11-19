@@ -101,11 +101,12 @@ func _on_sites(sites: Array) -> void:
 	queue_redraw()
 
 ## Rendered terrain height (render Y) at metre position (x, z): the built
-## ground inside the detailed extent, the far DEM outside it.
+## ground inside the detailed extent, the far DEM outside it (a place
+## without one, offline or procedural: the ground's edge).
 func _terrain_y(x: float, z: float) -> float:
 	if _ground == null:
 		return 0.0
-	if _ground.is_inside(x, z):
+	if _ground.is_inside(x, z) or _data.far_heights.size() != _data.far_grid_size * _data.far_grid_size:
 		return _ground.height_at_world(x, z)
 	if _surf.is_empty():
 		_surf = FarTerrainBuilder._surface(_data)

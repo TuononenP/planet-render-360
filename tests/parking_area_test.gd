@@ -1,21 +1,26 @@
 extends SceneTree
 
 func _init() -> void:
-	var ring := [{"lat": 0.0, "lon": 0.0}, {"lat": 0.0, "lon": 0.001},
-		{"lat": 0.001, "lon": 0.001}, {"lat": 0.001, "lon": 0.0},
-		{"lat": 0.0, "lon": 0.0}]
+	# A square of its own per element: areas on one outline count as one
+	# (OsmParser._drop_duplicate_paved_areas).
+	var rings: Array = []
+	for i in 10:
+		var lon := 0.002 * i
+		rings.append([{"lat": 0.0, "lon": lon}, {"lat": 0.0, "lon": lon + 0.001},
+			{"lat": 0.001, "lon": lon + 0.001}, {"lat": 0.001, "lon": lon},
+			{"lat": 0.0, "lon": lon}])
 	var elements := [
-		{"type": "way", "id": 1, "tags": {"amenity": "parking", "surface": "asphalt"}, "geometry": ring},
-		{"type": "way", "id": 2, "tags": {"amenity": "parking", "parking": "underground"}, "geometry": ring},
-		{"type": "way", "id": 3, "tags": {"amenity": "parking", "surface": "grass"}, "geometry": ring},
-		{"type": "way", "id": 4, "tags": {"amenity": "parking", "building": "yes"}, "geometry": ring},
+		{"type": "way", "id": 1, "tags": {"amenity": "parking", "surface": "asphalt"}, "geometry": rings[1]},
+		{"type": "way", "id": 2, "tags": {"amenity": "parking", "parking": "underground"}, "geometry": rings[2]},
+		{"type": "way", "id": 3, "tags": {"amenity": "parking", "surface": "grass"}, "geometry": rings[3]},
+		{"type": "way", "id": 4, "tags": {"amenity": "parking", "building": "yes"}, "geometry": rings[4]},
 		{"type": "relation", "id": 5, "tags": {"amenity": "parking", "type": "multipolygon"},
-			"members": [{"type": "way", "role": "outer", "geometry": ring}]},
+			"members": [{"type": "way", "role": "outer", "geometry": rings[5]}]},
 		# Senate Square's edge: a parking lane, cycle stands and a bus bay.
-		{"type": "way", "id": 6, "tags": {"amenity": "parking", "parking": "lane"}, "geometry": ring},
-		{"type": "way", "id": 7, "tags": {"amenity": "bicycle_parking"}, "geometry": ring},
-		{"type": "way", "id": 8, "tags": {"amenity": "unsigned_tourist_bus_halting"}, "geometry": ring},
-		{"type": "way", "id": 9, "tags": {"amenity": "bicycle_parking", "surface": "grass"}, "geometry": ring}]
+		{"type": "way", "id": 6, "tags": {"amenity": "parking", "parking": "lane"}, "geometry": rings[6]},
+		{"type": "way", "id": 7, "tags": {"amenity": "bicycle_parking"}, "geometry": rings[7]},
+		{"type": "way", "id": 8, "tags": {"amenity": "unsigned_tourist_bus_halting"}, "geometry": rings[8]},
+		{"type": "way", "id": 9, "tags": {"amenity": "bicycle_parking", "surface": "grass"}, "geometry": rings[9]}]
 	var parsed := OsmParser.parse_features(JSON.stringify({"elements": elements}), 0.0, 0.0)
 	var areas: Array = parsed["roads"]
 	var query := OsmQuery.build_query(0.0, 0.0)

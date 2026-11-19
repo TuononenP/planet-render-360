@@ -48,7 +48,9 @@ func _run() -> void:
 			continue
 		var model := LandmarkBuilder.build(type)
 		_check_model(failures, type, model, 0.0 if core else float(entry.get("height_m", 0.0)))
-		if entry.has("base_drop_m"):
+		# A base_at_m model stands on the ground at that one point; what it
+		# holds below (a pool basin, a sunk pitch) is cut into the ground.
+		if entry.has("base_drop_m") and not entry.has("base_at_m"):
 			var low := 0.0
 			for m in LandmarkBuilder.parts(model):
 				low = minf(low, (m.transform * m.mesh.get_aabb()).position.y)

@@ -30,8 +30,8 @@ func _init() -> void:
 			BareEarth._native = native
 			out[native] = [BareEarth._rank_filter(heights, size, r, true), BareEarth._rank_filter(heights, size, r, false),
 				BareEarth._dilate(bits, size, r), BareEarth._box_sum(heights, size, r, true),
-				BareEarth._box_sum(heights, size, r, false), UrbanSmooth._box(heights, size, maxi(r, 1), true),
-				UrbanSmooth._box(heights, size, maxi(r, 1), false), _relaxed(heights, holes, size),
+				BareEarth._box_sum(heights, size, r, false), UrbanSmooth.box(heights, size, maxi(r, 1), true),
+				UrbanSmooth.box(heights, size, maxi(r, 1), false), _relaxed(heights, holes, size),
 				_blurred(heights, size)]
 		for k in (out[true] as Array).size():
 			if var_to_bytes(out[true][k]) != var_to_bytes(out[false][k]):

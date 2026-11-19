@@ -10,6 +10,8 @@ extends SceneTree
 
 ## A bridge belongs to a capital when it lies this close to one of its country.
 const MAX_CAPITAL_KM := 12.0
+## Cities with bridge rows that are not capitals: {cc: [[lat, lon]]}.
+const OTHER_CITIES := {"FI": [[60.4518, 22.2666]]}  # Turku
 var failures: Array[String] = []
 
 func _init() -> void:
@@ -25,6 +27,9 @@ func _run() -> void:
 		var list: Array = capitals.get(str(row[0]), [])
 		list.append(Vector2(float(row[3]), float(row[4])))
 		capitals[str(row[0])] = list
+	for cc: String in OTHER_CITIES:
+		for at: Array in OTHER_CITIES[cc]:
+			(capitals[cc] as Array).append(Vector2(float(at[0]), float(at[1])))
 	var seen := {}
 	var built := 0
 	var rows := BridgeSpecs.all()

@@ -34,7 +34,7 @@ func _run() -> void:
 	root.add_child(city)
 	await process_frame
 	city.offline = true
-	city.fetch(60.4518, 22.2666)  # no network layers: done at once
+	city.fetch(0.0, 0.0)  # no layer covers it: done at once
 	var box := {}
 	var run := func(key: String) -> void:
 		box[key] = await city.land(_data(), 1.0)
