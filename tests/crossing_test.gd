@@ -104,6 +104,9 @@ func _init() -> void:
 	if plain_zebra != null and float(plain_zebra) != 0.0:
 		failures.append("the carriageway material must not carry zebra bars")
 	roads.free()
+	var square := _square_paths(d)
+	if square != "":
+		failures.append(square)
 	if failures.is_empty():
 		print("CROSSING OK: styles from tags, own finish at 4+ m, lift follows layer, above the carriageway")
 		quit(0)
@@ -113,3 +116,30 @@ func _init() -> void:
 		quit(1)
 
 const CROSSING_MIN := 4.0
+
+## A footway mapped across a pedestrian square shows the square's paving
+## inside it: its own ribbon (setts here) lies only outside the square.
+func _square_paths(d: LocationData) -> String:
+	var m := WorldScale.metres_to_units()
+	d.roads = [
+		{"class": "pedestrian", "area": true, "width_m": 6.0,
+			"points": PackedVector2Array([Vector2(-30, 10) * m, Vector2(-10, 10) * m, Vector2(-10, 40) * m, Vector2(-30, 40) * m])},
+		{"class": "footway", "width_m": 2.0, "surface": "paving_stones",
+			"points": PackedVector2Array([Vector2(-20, -5) * m, Vector2(-20, 55) * m])},
+	]
+	var roads := RoadBuilder.build_roads(d, GroundTruth.new(d))
+	var outside := 0
+	var inside := 0
+	for c in roads.get_children():
+		if not (c is MeshInstance3D) or str(c.name) != "Road_sett":
+			continue
+		for v: Vector3 in (c as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			var z := ((c as MeshInstance3D).transform * v).z / m
+			if z > 12.0 and z < 38.0:
+				inside += 1
+			else:
+				outside += 1
+	roads.free()
+	if inside > 0 or outside == 0:
+		return "a footway across a square must draw only outside it: %d vertices inside, %d outside" % [inside, outside]
+	return ""

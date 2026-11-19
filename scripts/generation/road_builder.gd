@@ -226,6 +226,12 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	surf.built = OverheadWires._centre_grid(data, LIT_BUILT_M * m2u)
 	surf.built_major = OverheadWires._centre_grid(data, LIT_MAJOR_M * m2u)
 	surf.ground_roads = StreetProps._road_grid(data, m2u, true)
+	for w: Variant in data.roads:
+		if w is Dictionary and bool((w as Dictionary).get("area", false)) and str((w as Dictionary).get("class", "")) == "pedestrian" \
+				and int((w as Dictionary).get("layer", 0)) == 0:
+			var ring: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+			if ring.size() >= 3:
+				surf.squares.append([ring, RingGeometry.aabb(ring), (w as Dictionary).get("holes", [])])
 	# A registry bridge's model carries its own deck over its span.
 	var spans := LandmarkSites.bridge_spans(data)
 	# Bridge structures are levelled once, before the chunks read them.
@@ -268,6 +274,18 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
+## Paths a pedestrian square paves over (not steps, crossings, bridges,
+## tunnels or a piece already clipped).
+const SQUARE_PATHS := ["footway", "path", "pedestrian"]
+
+static func _in_square_class(line: Variant) -> bool:
+	if not (line is Dictionary):
+		return false
+	var d: Dictionary = line
+	return str(d.get("class", "")) in SQUARE_PATHS and not bool(d.get("area", false)) \
+		and not bool(d.get("crossing", false)) and not bool(d.get("bridge", false)) \
+		and not bool(d.get("tunnel", false)) and not bool(d.get("square_clipped", false))
+
 ## One road element (at depth `step`, RoadSurface.depth_steps) into
 ## `batches`: draped ribbons on dry land, decks on its bridge spans.
 static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, surf: _Surface,
@@ -285,6 +303,18 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 			part["points"] = piece
 			_road(batches, part, step, m2u, surf, ground, junc, spans, abort, whole, wear_seed)
 		return
+	if marking.is_empty() and _in_square_class(line) and not surf.squares.is_empty():
+		# A footway mapped across a pedestrian square is its walking route:
+		# the square's own paving shows there, the ribbon only outside it.
+		var outside := RoadCrossingClip._runs(r["points"], m2u, func(p: Vector2) -> bool:
+			return not surf.in_square(p))
+		if outside.size() != 1 or (outside[0] as PackedVector2Array).size() != (r["points"] as PackedVector2Array).size():
+			for piece: PackedVector2Array in outside:
+				var part: Dictionary = (line as Dictionary).duplicate()
+				part["points"] = piece
+				part["square_clipped"] = true
+				_road(batches, part, step, m2u, surf, ground, junc, spans, abort, {}, wear_seed)
+			return
 	if not marking.is_empty():
 		r["finish"] = marking["finish"]
 		r["width_u"] = float(marking["width_m"]) * m2u
@@ -693,6 +723,22 @@ class _Surface extends RefCounted:
 	var wear_seeds := PackedFloat32Array()
 	## Roads on the ground (StreetProps._road_grid): no pier stands on one.
 	var ground_roads := {}
+	## Pedestrian squares on the ground ([ring, aabb, holes]): paths across
+	## one are drawn only outside it (RoadBuilder._road).
+	var squares: Array = []
+
+	func in_square(p: Vector2) -> bool:
+		for sq: Array in squares:
+			if not (sq[1] as Rect2).has_point(p) or not Geometry2D.is_point_in_polygon(p, sq[0]):
+				continue
+			var in_hole := false
+			for hole: Variant in sq[2]:
+				if hole is PackedVector2Array and Geometry2D.is_point_in_polygon(p, hole):
+					in_hole = true
+					break
+			if not in_hole:
+				return true
+		return false
 
 	static func _node(p: Vector2) -> Vector2i:
 		var m := WorldScale.metres_to_units()
