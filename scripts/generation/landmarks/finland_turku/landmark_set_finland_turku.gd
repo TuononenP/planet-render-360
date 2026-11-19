@@ -18,6 +18,8 @@ static func build(model: Node3D, type: String) -> bool:
 		"vanha_suurtori": LandmarkFtHistoric.vanha_suurtori(model)
 		"suomen_joutsen": LandmarkFtHistoric.suomen_joutsen(model)
 		"fori_ferry": LandmarkFtHistoric.fori_ferry(model)
+		"samppalinnan_maauimala": LandmarkFtSamppalinna.build(model)
+		"paavo_nurmen_stadion": LandmarkFtPaavoNurmi.build(model)
 		"turku_kauppatori": LandmarkFtKauppatori.build(model)
 		_:
 			return false

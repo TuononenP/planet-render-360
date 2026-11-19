@@ -10,7 +10,7 @@ const EXPECTED_TYPES := [
 	"turku_orthodox_church", "turku_art_museum", "vartiovuori_observatory",
 	"turku_market_hall", "turku_main_library", "turku_city_theatre",
 	"kakola_prison", "vanha_suurtori", "suomen_joutsen", "fori_ferry",
-	"turku_kauppatori",
+	"samppalinnan_maauimala", "paavo_nurmen_stadion", "turku_kauppatori",
 ]
 
 const EXPECTED_BRIDGES := [
@@ -52,7 +52,9 @@ func _init() -> void:
 	var ruissalo := BuildingEra.refine("turku", "house", {"x": 0.0, "z": 0.0, "levels": 2}, f_ruissalo, 0.5, 180.0)
 	_check(ruissalo == "turku_villa", "Ruissalo house resolves to turku_villa (got %s)" % ruissalo)
 	_check(TransitVehicles.BUS_PAINT.has("turku"), "Föli bus paint present for turku")
-	# 4. Turku Kauppatori model, walker breezeway, slope conform & Orthodox church tree keep-out.
+	# 4. Samppalinnan maauimala & Paavo Nurmen Stadion aliases, dimensions, SEAT_META, clearance & terrain cut.
+	_check_sports_venues()
+	# 5. Turku Kauppatori model, walker breezeway, slope conform & Orthodox church tree keep-out.
 	_check_kauppatori()
 	if failures.is_empty():
 		print("TURKU LANDMARKS OK: %d landmarks, %d bridges, districts & Föli livery" % [
@@ -62,6 +64,56 @@ func _init() -> void:
 		for msg in failures:
 			printerr("TURKU LANDMARKS FAIL: ", msg)
 		quit(1)
+
+func _check_sports_venues() -> void:
+	var alias_cases := {
+		"Samppalinnan maauimala": "samppalinnan_maauimala",
+		"Samppis": "samppalinnan_maauimala",
+		"Paavo Nurmen stadion": "paavo_nurmen_stadion",
+		"Paavo Nurmi Stadium": "paavo_nurmen_stadion",
+	}
+	for query in alias_cases:
+		var got := LocationData.landmark_for(60.444, 22.263, query)
+		_check(got == alias_cases[query], "Alias '%s' resolves to %s (got %s)" % [query, alias_cases[query], got])
+	_check(LocationData.landmark_for(60.4518, 22.2666, "Turku, Finland") == "turku_cathedral",
+		"Turku centre still resolves to turku_cathedral")
+
+	var s_root := LandmarkBuilder.build("samppalinnan_maauimala")
+	var s_box := _full_aabb(s_root)
+	_check(s_box.end.y >= 10.5 and s_box.end.y <= 13.0,
+		"Samppalinna diving tower top 10.5..13.0 m (got %.2f)" % s_box.end.y)
+	_check(maxf(s_box.size.x, s_box.size.z) >= 85.0,
+		"Samppalinna span >= 85 m (got %.2f x %.2f)" % [s_box.size.x, s_box.size.z])
+	_check(_has_seated_child(s_root, "ChildrensPool"), "Samppalinna has SEAT_META ChildrensPool")
+	s_root.free()
+
+	var p_root := LandmarkBuilder.build("paavo_nurmen_stadion")
+	var p_box := _full_aabb(p_root)
+	_check(p_box.end.y >= 19.0 and p_box.end.y <= 21.5,
+		"Paavo Nurmi canopy top 19.0..21.5 m (got %.2f)" % p_box.end.y)
+	_check(p_box.size.x >= 190.0 and p_box.size.z >= 120.0,
+		"Paavo Nurmi span >= 190x120 m (got %.2f x %.2f)" % [p_box.size.x, p_box.size.z])
+	for cname in ["WestRearPavilion", "NorthServiceBuilding", "EntranceKiosks"]:
+		_check(_has_seated_child(p_root, cname), "Paavo Nurmi has SEAT_META %s" % cname)
+	p_root.free()
+
+	# Clearance & Karikon huvila preservation at Paavo Nurmen Stadion.
+	var p_entry := LocationData.entry_for_type("paavo_nurmen_stadion")
+	var p_lat := float(p_entry["lat"])
+	var p_lon := float(p_entry["lon"])
+	var clear := LandmarkSites.clear_m(p_entry)
+	for osm_pt in [[60.442758, 22.260556, "way 24206308"], [60.442985, 22.260117, "way 777857700"]]:
+		var xz := WorldScale.xz_from_latlon(float(osm_pt[0]), float(osm_pt[1]), p_lat, p_lon)
+		_check(LandmarkSites.span_dist(xz, Vector2.ZERO, p_entry) < clear,
+			"Paavo Nurmi clears %s" % osm_pt[2])
+	var karikko := WorldScale.xz_from_latlon(60.443600, 22.261451, p_lat, p_lon)
+	_check(LandmarkSites.span_dist(karikko, Vector2.ZERO, p_entry) >= clear
+		and not LandmarkSites.in_model_rect(karikko, Vector2.ZERO, p_entry),
+		"Karikon huvila preserved outside Paavo Nurmi clearance")
+
+	# Terrain terrace cuts preserve datum at base_at_m while lowering basin/track bumps.
+	_check_terrace_cut("samppalinnan_maauimala", Vector2(-38.0, 0.0), Vector2(0.0, 0.0), -1.0)
+	_check_terrace_cut("paavo_nurmen_stadion", Vector2(0.0, 0.0), Vector2(30.0, 10.0), 0.0)
 
 func _check_kauppatori() -> void:
 	for q in ["Turun kauppatori", "Turku Market Square"]:
@@ -101,6 +153,45 @@ func _check_kauppatori() -> void:
 	var breezeway := ax * -3.3 + side * 58.2
 	_check(ViewWalk.blocked(solids, aura_core), "Aurakatu pavilion glass core blocks walkers")
 	_check(not ViewWalk.blocked(solids, breezeway), "Eerikinkatu 6.3 m central breezeway is walkable")
+
+func _check_terrace_cut(type: String, base_local: Vector2, probe_local: Vector2, want_rel: float) -> void:
+	var entry := LocationData.entry_for_type(type)
+	var d := LocationData.new()
+	d.latitude = float(entry["lat"])
+	d.longitude = float(entry["lon"])
+	d.landmark_type = type
+	d.has_landmark_site = true
+	d.landmark_lat = d.latitude
+	d.landmark_lon = d.longitude
+	var size := 241
+	var step := WorldScale.detailed_extent_units() / float(size - 1)
+	var surf := PackedFloat32Array()
+	surf.resize(size * size)
+	surf.fill(26.0)
+	# Put a 2 m mound at probe_local so we confirm the hold lowers bumps while leaving base_local untouched.
+	var axis := LandmarkSites.axis(entry)
+	var side := Vector2(-axis.y, axis.x)
+	var base_w := (axis * base_local.x + side * base_local.y) * WorldScale.metres_to_units()
+	var probe_w := (axis * probe_local.x + side * probe_local.y) * WorldScale.metres_to_units()
+	var half := float(size) * 0.5
+	for z in size:
+		for x in size:
+			var wp := Vector2((float(x) - half) * step, (float(z) - half) * step)
+			if wp.distance_to(probe_w) < 14.0:
+				surf[z * size + x] = 28.0
+	LandmarkStairCut.cut(surf, size, step, d)
+	var base_after := LandmarkStairCut._sample(surf, size, step, base_w)
+	var probe_after := LandmarkStairCut._sample(surf, size, step, probe_w)
+	_check(absf(base_after - 26.0) < 0.05, "%s cut keeps base_at_m datum untouched (got %.3f)" % [type, base_after])
+	_check(probe_after <= 26.0 + want_rel + 0.15,
+		"%s cut holds probe <= %.2f (got %.3f)" % [type, 26.0 + want_rel, probe_after])
+
+func _has_seated_child(root: Node3D, child_name: String) -> bool:
+	var model := root.get_node_or_null("Model")
+	if model == null:
+		return false
+	var c := model.get_node_or_null(child_name)
+	return c != null and bool(c.get_meta(LandmarkTerrain.SEAT_META, false))
 
 func _full_aabb(root: Node3D) -> AABB:
 	var lo := Vector3(INF, INF, INF)

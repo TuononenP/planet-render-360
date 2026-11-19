@@ -114,6 +114,43 @@ static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
 	_mutex.unlock()
 	return ret
 
+## Glossy outdoor pool water without LandmarkShader weathering or glass
+## greying, keeping vivid turquoise-cyan hue on desktop Ultra.
+static func pool_water(hex: String, roughness: float = 0.08) -> StandardMaterial3D:
+	_mutex.lock()
+	var key := "pool_water|%s|%.2f" % [hex, roughness]
+	if _cache.has(key):
+		var ret: StandardMaterial3D = _cache[key] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(hex)
+	if not _texs.has("pool_water_caustic"):
+		var n := 128
+		var img := Image.create(n, n, false, Image.FORMAT_RGB8)
+		for y in n:
+			var v := TAU * float(y) / float(n)
+			for x in n:
+				var u := TAU * float(x) / float(n)
+				var w := 0.5 + 0.5 * (sin(u * 2.0 + sin(v * 3.0)) * cos(v * 2.0 - cos(u * 3.0)))
+				var g := clampf(0.88 + 0.12 * w, 0.0, 1.0)
+				img.set_pixel(x, y, Color(g, g, g))
+		img.generate_mipmaps()
+		_texs["pool_water_caustic"] = ImageTexture.create_from_image(img)
+	m.albedo_texture = _texs["pool_water_caustic"] as Texture2D
+	m.roughness = roughness
+	m.metallic = 0.05
+	m.metallic_specular = 0.65
+	m.normal_enabled = true
+	m.normal_texture = tex("sand", "nor")
+	m.normal_scale = 0.14
+	m.uv1_scale = Vector3(0.28, 0.28, 0.28)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	_cache[key] = m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret
+
 ## Self-lit lamp / clock-face glow (emission so it reads at dusk).
 static func lit(hex: String, energy: float = 0.6) -> StandardMaterial3D:
 	_mutex.lock()

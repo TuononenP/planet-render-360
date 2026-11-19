@@ -67,6 +67,64 @@ static func cut(surface: PackedFloat32Array, size: int, step: float, data: Locat
 				var i := z * size + x
 				var target := minf(surface[i], root + hold_m(spec, l) * m2u)
 				surface[i] = lerpf(target, surface[i], smoothstep(0.0, FEATHER_M, maxf(d, 0.0)))
+	_cut_terraces(surface, size, step, data)
+
+## Basin and terrace ground holds for open-air sports venues whose pool
+## basins or running tracks sit directly on the terrain grid.
+static func terraces() -> Dictionary:
+	return {
+		"samppalinnan_maauimala": {"x0": -48.0, "x1": 44.0, "z0": -22.0, "z1": 25.0, "feather_m": 6.0},
+		"paavo_nurmen_stadion": {"x0": -92.0, "x1": 92.0, "z0": -72.0, "z1": 46.0, "feather_m": 8.0},
+	}
+
+static func _cut_terraces(surface: PackedFloat32Array, size: int, step: float, data: LocationData) -> void:
+	var half := float(size) * 0.5
+	var m2u := WorldScale.metres_to_units()
+	var table := terraces()
+	for site in LandmarkTerrain._sites(data, table.keys()):
+		var entry: Dictionary = site[1]
+		var type := str(entry["type"])
+		var spec: Dictionary = table[type]
+		var rect := Rect2(float(spec["x0"]), float(spec["z0"]),
+			float(spec["x1"]) - float(spec["x0"]), float(spec["z1"]) - float(spec["z0"]))
+		var feather := float(spec["feather_m"])
+		var at: Vector2 = site[0]
+		var axis := LandmarkSites.axis(entry)
+		var side := Vector2(-axis.y, axis.x)
+		var base: Array = entry.get("base_at_m", [0.0, 0.0])
+		var root := _sample(surface, size, step, at + (axis * float(base[0]) + side * float(base[1])) * m2u) \
+			+ (float(entry.get("base_drop_m", 0.0)) - SINK_M) * m2u
+		var reach := (rect.size * 0.5 + rect.get_center().abs()).length() + feather
+		var x0 := clampi(int(floor((at.x - reach * m2u) / step + half)), 0, size - 1)
+		var x1 := clampi(int(ceil((at.x + reach * m2u) / step + half)), 0, size - 1)
+		var z0 := clampi(int(floor((at.y - reach * m2u) / step + half)), 0, size - 1)
+		var z1 := clampi(int(ceil((at.y + reach * m2u) / step + half)), 0, size - 1)
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				var l := LandmarkTerrain.local_xz(Vector2((float(x) - half) * step, (float(z) - half) * step), site)
+				var d := maxf(maxf(rect.position.x - l.x, l.x - rect.end.x), maxf(rect.position.y - l.y, l.y - rect.end.y))
+				if d >= feather:
+					continue
+				var i := z * size + x
+				var target := minf(surface[i], root + terrace_hold_m(type, l) * m2u)
+				surface[i] = lerpf(target, surface[i], smoothstep(0.0, feather, maxf(d, 0.0)))
+
+## Model-local ground hold (metres over y = 0) inside a venue's terrace rect.
+## Evaluates to 0.0 at base_at_m so _hero_y reads the untouched ground datum.
+static func terrace_hold_m(type: String, l: Vector2) -> float:
+	if type == "samppalinnan_maauimala":
+		if l.x >= -25.5 and l.x <= 26.5 and l.y >= -9.6 and l.y <= 9.6:
+			return -1.2
+		if l.y > 14.0:
+			return lerpf(0.0, 2.0, clampf((l.y - 14.0) / 10.0, 0.0, 1.0))
+		if l.x > 31.0 and l.y >= -16.0:
+			return lerpf(0.0, 2.0, clampf((l.x - 31.0) / 12.0, 0.0, 1.0))
+		return 0.0
+	if type == "paavo_nurmen_stadion":
+		if l.y < -53.5 and absf(l.x) <= 59.0:
+			return lerpf(0.0, 5.2, clampf((-53.5 - l.y) / 17.5, 0.0, 1.0))
+		return 0.0
+	return 0.0
 
 ## The cut's model-local rect (x, z), metres.
 static func rect_m(spec: Dictionary) -> Rect2:
