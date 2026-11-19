@@ -10,7 +10,10 @@ extends RefCounted
 ## compressions or predictors). HelsinkiDem.decode reads the uncompressed
 ## GeoServer files.
 
-static func decode(bytes: PackedByteArray, threaded: bool = false) -> Dictionary:
+## Parses a float32 GeoTIFF header (from the whole file or a leading byte
+## range) into {width, height, bw, bh, compression, predictor, big, tiled,
+## offsets, counts, origin, cell}, or {} when unsupported.
+static func parse_header(bytes: PackedByteArray) -> Dictionary:
 	if bytes.size() < 16:
 		return {}
 	var big := bytes[0] == 0x4D and bytes[1] == 0x4D
@@ -40,11 +43,78 @@ static func decode(bytes: PackedByteArray, threaded: bool = false) -> Dictionary
 			or offsets.is_empty() or offsets.size() != counts.size() \
 			or not ((tags.has(33550) and tags.has(33922)) or tags.has(34264)):
 		return {}
+	var origin: Vector2
+	var cell: Vector2
+	if tags.has(34264):
+		var m: Array = tags[34264]
+		if m.size() < 8 or float(m[0]) <= 0.0 or float(m[5]) >= 0.0:
+			return {}
+		origin = Vector2(float(m[3]), float(m[7]))
+		cell = Vector2(float(m[0]), -float(m[5]))
+	else:
+		var scale: Array = tags[33550]
+		var tie: Array = tags[33922]
+		if scale.size() < 2 or tie.size() < 6 or float(scale[0]) <= 0.0 or float(scale[1]) <= 0.0:
+			return {}
+		origin = Vector2(float(tie[3]) - float(tie[0]) * float(scale[0]),
+			float(tie[4]) + float(tie[1]) * float(scale[1]))
+		cell = Vector2(float(scale[0]), float(scale[1]))
+	return {"width": w, "height": h, "bw": bw, "bh": bh, "compression": compression,
+		"predictor": predictor, "big": big, "tiled": tiled, "offsets": offsets, "counts": counts,
+		"origin": origin, "cell": cell}
+
+## Decodes one compressed/uncompressed float32 tile or strip (`rows` rows,
+## padded to `bw * bh` floats). Fast-paths little-endian predictor-1 tiles.
+static func decode_tile(src: PackedByteArray, bw: int, bh: int, rows: int,
+		compression: int, predictor: int, big: bool) -> PackedFloat32Array:
+	if rows <= 0 or src.is_empty():
+		return PackedFloat32Array()
+	var raw := src
+	match compression:
+		5:
+			raw = _lzw(raw, bw * rows * 4)
+		8, 32946:
+			raw = raw.decompress(bw * rows * 4, FileAccess.COMPRESSION_DEFLATE)
+	if raw.size() < bw * rows * 4:
+		return PackedFloat32Array()
+	raw.resize(bw * bh * 4)
+	var planes: bool = predictor == 3
+	if not planes and not big:
+		return raw.to_float32_array()
+	var out := PackedFloat32Array()
+	out.resize(bw * bh)
+	var b := PackedByteArray()
+	b.resize(4)
+	for r in rows:
+		var row_at := r * bw * 4
+		if planes:
+			for k in range(1, bw * 4):
+				raw[row_at + k] = (raw[row_at + k] + raw[row_at + k - 1]) & 0xFF
+		for c in bw:
+			for k in 4:
+				if planes:
+					b[3 - k] = raw[row_at + k * bw + c]
+				else:
+					b[3 - k] = raw[row_at + c * 4 + k]
+			out[r * bw + c] = b.decode_float(0)
+	return out
+
+static func decode(bytes: PackedByteArray, threaded: bool = false) -> Dictionary:
+	var hdr := parse_header(bytes)
+	if hdr.is_empty():
+		return {}
+	var w: int = hdr["width"]
+	var h: int = hdr["height"]
+	var bw: int = hdr["bw"]
+	var bh: int = hdr["bh"]
+	var offsets: Array = hdr["offsets"]
+	var counts: Array = hdr["counts"]
 	var across := ceili(float(w) / float(bw))
 	var blocks: Array = []
 	blocks.resize(offsets.size())
 	var args := {"bytes": bytes, "offsets": offsets, "counts": counts, "bw": bw, "bh": bh,
-		"compression": compression, "predictor": predictor, "big": big, "tiled": tiled, "h": h}
+		"compression": hdr["compression"], "predictor": hdr["predictor"], "big": hdr["big"],
+		"tiled": hdr["tiled"], "h": h}
 	var job := func(i: int) -> void:
 		blocks[i] = _block(args, i)
 	if threaded and offsets.size() > 4:
@@ -65,22 +135,7 @@ static func decode(bytes: PackedByteArray, threaded: bool = false) -> Dictionary
 		for r in mini(bh, h - y0):
 			for c in mini(bw, w - x0):
 				out[(y0 + r) * w + x0 + c] = vals[r * bw + c]
-	# GeoServer writes a ModelTransformation matrix; other writers a pixel
-	# scale and a tiepoint.
-	if tags.has(34264):
-		var m: Array = tags[34264]
-		if m.size() < 8 or float(m[0]) <= 0.0 or float(m[5]) >= 0.0:
-			return {}
-		return {"size": Vector2i(w, h), "values": out,
-			"origin": Vector2(float(m[3]), float(m[7])), "cell": Vector2(float(m[0]), -float(m[5]))}
-	var scale: Array = tags[33550]
-	var tie: Array = tags[33922]
-	if scale.size() < 2 or tie.size() < 6 or float(scale[0]) <= 0.0 or float(scale[1]) <= 0.0:
-		return {}
-	return {"size": Vector2i(w, h), "values": out,
-		"origin": Vector2(float(tie[3]) - float(tie[0]) * float(scale[0]),
-			float(tie[4]) + float(tie[1]) * float(scale[1])),
-		"cell": Vector2(float(scale[0]), float(scale[1]))}
+	return {"size": Vector2i(w, h), "values": out, "origin": hdr["origin"], "cell": hdr["cell"]}
 
 ## The bw × bh floats of block `i` (a strip or tile, edge blocks padded), or
 ## an empty array when its bytes are bad.
@@ -94,36 +149,8 @@ static func _block(a: Dictionary, i: int) -> PackedFloat32Array:
 		return PackedFloat32Array()
 	# The last strip of a strip file holds only the rows that remain.
 	var rows := bh if bool(a["tiled"]) else mini(bh, int(a["h"]) - i * bh)
-	var raw := bytes.slice(start, start + length)
-	match int(a["compression"]):
-		5:
-			raw = _lzw(raw, bw * rows * 4)
-		8, 32946:
-			raw = raw.decompress(bw * rows * 4, FileAccess.COMPRESSION_DEFLATE)
-	if rows <= 0 or raw.size() < bw * rows * 4:
-		return PackedFloat32Array()
-	raw.resize(bw * bh * 4)
-	var planes: bool = int(a["predictor"]) == 3
-	var big: bool = a["big"]
-	var out := PackedFloat32Array()
-	out.resize(bw * bh)
-	var b := PackedByteArray()
-	b.resize(4)
-	for r in rows:
-		var row_at := r * bw * 4
-		if planes:
-			for k in range(1, bw * 4):
-				raw[row_at + k] = (raw[row_at + k] + raw[row_at + k - 1]) & 0xFF
-		for c in bw:
-			for k in 4:
-				if planes:
-					b[3 - k] = raw[row_at + k * bw + c]
-				elif big:
-					b[3 - k] = raw[row_at + c * 4 + k]
-				else:
-					b[k] = raw[row_at + c * 4 + k]
-			out[r * bw + c] = b.decode_float(0)
-	return out
+	return decode_tile(bytes.slice(start, start + length), bw, bh, rows,
+		int(a["compression"]), int(a["predictor"]), bool(a["big"]))
 
 ## TIFF LZW (most significant bit first, codes widening one code early).
 static func _lzw(src: PackedByteArray, expected: int) -> PackedByteArray:

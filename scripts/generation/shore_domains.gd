@@ -144,6 +144,7 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 				body["level_end"] = body["level"]
 			continue
 		var samples: Array[float] = []
+		var edges: Array[float] = []
 		var inside := INF
 		var rings: Array = [body["points"]]
 		rings.append_array(body["holes"])
@@ -157,7 +158,9 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 				var count := maxi(1, ceili(d.length() / 20.0))
 				for j in count:
 					var p := cut[0].lerp(cut[1], (float(j) + 0.5) / float(count))
-					inside = minf(inside, float(dry.call(p.x, p.y)))
+					var edge_h := float(dry.call(p.x, p.y))
+					inside = minf(inside, edge_h)
+					edges.append(edge_h)
 					for sign in [-1.0, 1.0]:
 						var q: Vector2 = p + n * sign * 15.0
 						if bounds.has_point(q) and at(q) < 0:
@@ -172,10 +175,15 @@ func estimate(dry: Callable, datum: float, freeboard: float, sea_level: float = 
 				float(dry.call(axis[1].x - n.x, axis[1].y - n.y))) - freeboard
 			continue
 		body["_samples"] = samples
+		body["_edges"] = edges
 		body["_inside"] = inside
 		if samples.size() >= 3:
 			samples.sort()
-			body["level"] = samples[samples.size() / 10] - freeboard
+			var lvl := samples[samples.size() / 10] - freeboard
+			if edges.size() >= 3:
+				edges.sort()
+				lvl = minf(lvl, edges[edges.size() / 4])
+			body["level"] = lvl
 		else:
 			body["level"] = inside - freeboard if not is_inf(inside) else datum
 			if not is_inf(inside):
@@ -380,6 +388,7 @@ func _merge_levels(datum: float = 0.0, freeboard: float = 0.0) -> void:
 	var levels := {}
 	var tidal := {}
 	var pooled := {}
+	var pooled_edges := {}
 	var insides := {}
 	for id in bodies.size():
 		var body: Dictionary = bodies[id]
@@ -393,6 +402,10 @@ func _merge_levels(datum: float = 0.0, freeboard: float = 0.0) -> void:
 				if not pooled.has(group):
 					pooled[group] = []
 				(pooled[group] as Array).append_array(body["_samples"])
+				if body.has("_edges"):
+					if not pooled_edges.has(group):
+						pooled_edges[group] = []
+					(pooled_edges[group] as Array).append_array(body["_edges"])
 				insides[group] = minf(float(insides.get(group, INF)), float(body.get("_inside", INF)))
 			else:
 				levels[group] = maxf(float(levels.get(group, -INF)), float(body["level"]))
@@ -400,13 +413,19 @@ func _merge_levels(datum: float = 0.0, freeboard: float = 0.0) -> void:
 		var samples: Array = pooled[group]
 		if samples.size() >= 3:
 			samples.sort()
-			levels[group] = float(samples[samples.size() / 10]) - freeboard
+			var lvl := float(samples[samples.size() / 10]) - freeboard
+			var edges: Array = pooled_edges.get(group, [])
+			if edges.size() >= 3:
+				edges.sort()
+				lvl = minf(lvl, float(edges[edges.size() / 4]))
+			levels[group] = lvl
 		else:
 			var inside := float(insides.get(group, INF))
 			levels[group] = inside - freeboard if not is_inf(inside) else datum
 	for id in bodies.size():
 		var body: Dictionary = bodies[id]
 		body.erase("_samples")
+		body.erase("_edges")
 		body.erase("_inside")
 		if str(body["kind"]) == "channel":
 			continue

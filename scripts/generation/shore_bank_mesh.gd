@@ -18,7 +18,7 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 	var seen := {}
 	var m2u := WorldScale.metres_to_units()
 	var defenses := SuomenlinnaSite.rings(data.buildings) if data != null else []
-	var coping := QuayBuilder.stone_quays(data)
+	var coping := QuayBuilder.stone_quays(data) or QuayBuilder.granite_quays(data)
 	for segment in model.segments:
 		if abort != null and abort.requested:
 			return
@@ -58,9 +58,10 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 			_append_face(abut_verts, abut_normals, abut_indices, face, normal)
 		else:
 			_append_face(verts, normals, indices, face, normal)
-		# A coping along the top of a tall wall (Paris): the cornice line a Seine
-		# quay wall has, where the face otherwise ran flat into the street.
-		if coping and not capped and maxf(top_a - level_a, top_b - level_b) > 1.5:
+		# A coping along the top of a stone quay wall: the cornice/cap course
+		# a masonry quay has, where the face otherwise ran flat into the bank.
+		var coping_min := (1.5 if QuayBuilder.stone_quays(data) else 0.6) * m2u
+		if coping and not capped and maxf(top_a - level_a, top_b - level_b) > coping_min:
 			if into_abut:
 				_coping(abut_verts, abut_normals, abut_indices, a, b, top_a, top_b, normal)
 			else:

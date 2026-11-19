@@ -403,14 +403,16 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 	var piece := 3.0 * m2u
 	var roads := _road_grid(data, m2u)
 	var decks := BridgeStructures.barrier_rings(data, m2u)
-	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and not (ground.shoreline as ShorelineModel).quays.is_empty() else null
+	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and (ground.shoreline as ShorelineModel).ready else null
+	var has_quays := shore != null and not shore.quays.is_empty()
 	var models := LandmarkSites.model_rect_sites(data)
 	for br in data.barriers:
 		if not (br is Dictionary):
 			continue
 		if bool(br.get("fortress_wall", false)):
 			continue  # SuomenlinnaFortress owns this mapped defense.
-		var row: Array = BARRIERS.get(str((br as Dictionary).get("class", "")), [])
+		var cls := str((br as Dictionary).get("class", ""))
+		var row: Array = BARRIERS.get(cls, [])
 		if row.is_empty():
 			continue
 		var kind: String = row[0]
@@ -451,8 +453,15 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				# A low quay's upper wall and its parapet are ShoreBankMesh's:
 				# drawn on the drop it stands on, the mapped wall zigzagged
 				# between the walk and the street.
-				if shore != null and shore.near_quay_wall((p0 + p1) * 0.5, QUAY_WALL_REACH_M * m2u):
+				if has_quays and shore.near_quay_wall((p0 + p1) * 0.5, QUAY_WALL_REACH_M * m2u):
 					continue
+				# A mapped retaining_wall on a hard shoreline is already built
+				# flush with the bank by ShoreBankMesh; drawing a free-standing
+				# 1.2 m barrier on top of the water's edge leaves broken walls.
+				if cls == "retaining_wall" and shore != null:
+					var near_hard := shore.nearest((p0 + p1) * 0.5, 1)
+					if not near_hard.is_empty() and float(near_hard["distance"]) <= 3.0 * m2u:
+						continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
 				var y1 := ground.height_at_world(p1.x, p1.y)
 				total_m += p0.distance_to(p1) / m2u

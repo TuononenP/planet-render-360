@@ -116,6 +116,7 @@ func _sources() -> void:
 			[55.9533, -3.1883, "", "Edinburgh"], [46.9480, 7.4474, "swisstopo", "Bern"],
 			[47.3769, 8.5417, "swisstopo", "Zurich"], [46.2044, 6.1432, "swisstopo", "Geneva"],
 			[46.0037, 8.9511, "swisstopo", "Lugano"], [48.1351, 11.5820, "", "Munich"], [60.1699, 24.9384, "", "Helsinki"],
+			[60.4518, 22.2666, "mml", "Turku"], [61.4978, 23.7610, "mml", "Tampere"],
 			[40.7128, -74.0060, "", "New York"]]:
 		_check(GroundModel.source_for(row[0], row[1]) == row[2],
 			"%s is covered by '%s', expected '%s'" % [row[3], GroundModel.source_for(row[0], row[1]), row[2]])

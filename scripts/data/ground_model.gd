@@ -20,12 +20,15 @@ const SOURCES := {
 	"ign": "Elevation: © IGN, RGE ALTI (Licence Ouverte)",
 	"ahn": "Elevation: AHN DTM, Rijkswaterstaat (CC0)",
 	"swisstopo": "Elevation: © swisstopo, swissALTI3D (Open Government Data)",
+	"mml": "Elevation: © National Land Survey of Finland, Elevation model 2 m (CC BY 4.0)",
 }
 ## Ground half-width of the window requested around the viewpoint: the
 ## 2.4 km detailed extent with a margin, like HelsinkiDem.HALF_M.
 const HALF_M := 1450.0
 ## Cells across a window of the sources that answer one raster.
 const CELLS := 300
+## Cells across an MML 2 m window (~4.8 m/cell, matching HelsinkiDem.CELLS).
+const MML_CELLS := 600
 ## A raster missing more of its cells than this has no data here (outside
 ## the country, open sea). AHN leaves holes under every building and over
 ## water, so dense city centres are 40–50 % missing and still usable.
@@ -73,6 +76,10 @@ const _SWITZERLAND := [Vector2(5.95, 46.15), Vector2(6.1, 46.6), Vector2(6.9, 47
 	Vector2(7.55, 47.6), Vector2(8.4, 47.62), Vector2(9.5, 47.55), Vector2(9.6, 47.1),
 	Vector2(10.5, 46.9), Vector2(10.45, 46.5), Vector2(9.3, 46.3), Vector2(9.05, 45.82),
 	Vector2(8.4, 45.9), Vector2(7.0, 45.95)]
+const _FINLAND := [Vector2(19.5, 59.7), Vector2(21.2, 60.8), Vector2(21.0, 63.1),
+	Vector2(24.0, 65.8), Vector2(20.5, 69.1), Vector2(28.0, 70.1), Vector2(29.5, 69.0),
+	Vector2(30.1, 66.5), Vector2(30.5, 64.0), Vector2(31.6, 62.9), Vector2(28.0, 60.5),
+	Vector2(25.0, 59.9), Vector2(22.5, 59.7)]
 
 ## True in England: Terrarium's heights there are the Environment Agency's
 ## bare-earth lidar DTM (roads within about 1 m of it in London, Manchester
@@ -96,6 +103,8 @@ static func source_for(lat: float, lon: float) -> String:
 		return "ign"
 	if Geometry2D.is_point_in_polygon(p, PackedVector2Array(_NETHERLANDS)):
 		return "ahn"
+	if Geometry2D.is_point_in_polygon(p, PackedVector2Array(_FINLAND)) and not HelsinkiDem.covers(lat, lon):
+		return "mml"
 	return ""
 
 ## Web Mercator metres of lat/lon.

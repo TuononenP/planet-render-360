@@ -249,8 +249,10 @@ func _classify(abort: BuildAbort) -> void:
 					hard = true
 			var top_a := _bank_top(start, land) if hard else dry_height(start.x, start.y)
 			var top_b := _bank_top(end, land) if hard else dry_height(end.x, end.y)
+			var water_a := domains.level(body, start)
+			var water_b := domains.level(body, end)
 			var road_top := _abutment_top(treatment, mid)
-			if hard and not is_nan(road_top):
+			if hard and not is_nan(road_top) and road_top > maxf(water_a, water_b) + 0.3 * WorldScale.metres_to_units():
 				# A bridge abutment's top is the road's level at the bridge's end.
 				top_a = road_top
 				top_b = road_top
@@ -261,7 +263,7 @@ func _classify(abort: BuildAbort) -> void:
 			if is_nan(top_b):
 				top_b = dry_height(end.x, end.y)
 			treatment.merge({"a": start, "b": end, "land": land, "body": body,
-				"top_a": top_a, "top_b": top_b, "water_a": domains.level(body, start), "water_b": domains.level(body, end)})
+				"top_a": top_a, "top_b": top_b, "water_a": water_a, "water_b": water_b})
 			var segment_id := segments.size()
 			segments.append(treatment)
 			var lo := cell_at(start.min(end) - Vector2.ONE * 0.01)

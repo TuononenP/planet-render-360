@@ -33,7 +33,8 @@ const LIMESTONE := Color(0.56, 0.52, 0.44)
 const ASHLAR_COURSE_M := 0.6
 const ASHLAR_TILE_COURSES := 4
 
-static func _ashlar_material() -> StandardMaterial3D:
+static func _ashlar_material(base: Color = Color(0.80, 0.77, 0.69), course_m: float = ASHLAR_COURSE_M,
+		variation: float = 0.12) -> StandardMaterial3D:
 	var n := 256
 	var course := n / ASHLAR_TILE_COURSES
 	var block := course * 2
@@ -47,19 +48,18 @@ static func _ashlar_material() -> StandardMaterial3D:
 			# Weathered: blocks of several shades, the odd one sooty, a fine
 			# grain, and grime run down from each bed joint, so a long wall
 			# no longer reads as one clean printed grid.
-			var tone := 0.92 + 0.12 * h
-			if fposmod(h * 7.31, 1.0) < 0.12:
-				tone *= 0.93
+			var tone := (1.0 - variation * 0.65) + variation * h
+			if fposmod(h * 7.31, 1.0) < 0.14:
+				tone *= 0.91
 			var grain := fposmod(sin(float(x * 31 + y * 17) * 78.233) * 43758.5453, 1.0)
 			tone *= 0.97 + 0.06 * grain
 			var drip := fposmod(sin(float((x + shift) / 3) * 4.17 + float(c) * 1.3) * 43758.5453, 1.0)
 			if drip < 0.3:
-				tone *= 1.0 - 0.05 * (1.0 - float(y % course) / float(course))
+				tone *= 1.0 - 0.06 * (1.0 - float(y % course) / float(course))
 			var joint_h := (y % course) < 2
 			var joint_v := ((x + shift) % block) < 2
 			if joint_h or joint_v:
-				tone *= 0.62
-			var base := Color(0.80, 0.77, 0.69)
+				tone *= 0.58
 			img.set_pixel(x, y, Color(base.r * tone, base.g * tone, base.b * tone))
 	img.generate_mipmaps()
 	var m := StandardMaterial3D.new()
@@ -67,12 +67,17 @@ static func _ashlar_material() -> StandardMaterial3D:
 	m.roughness = 0.9
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3.ONE / (ASHLAR_COURSE_M * ASHLAR_TILE_COURSES * WorldScale.metres_to_units())
+	m.uv1_scale = Vector3.ONE / (course_m * ASHLAR_TILE_COURSES * WorldScale.metres_to_units())
 	return m
 
 ## True where the quays and bridges are pale limestone (Paris's core).
 static func stone_quays(data: LocationData) -> bool:
 	return data != null and ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country) == "haussmann"
+
+## True where quay walls are dressed granite ashlar blocks (Nordic and
+## European granite-kerb regions) rather than poured concrete.
+static func granite_quays(data: LocationData) -> bool:
+	return data != null and not stone_quays(data) and KerbBuilder.stone_for(data) == KerbBuilder.GRANITE
 
 ## Fine-grained stone calibrated in linear space to the regional kerb
 ## colour (granite in Europe, concrete in North America). Cache by
@@ -84,10 +89,16 @@ static func stone_material(data: LocationData = null) -> StandardMaterial3D:
 	# kerb: a tall wall of it read as a flat lilac-grey slab.
 	if stone_quays(data):
 		target = LIMESTONE
-	var key := target.to_html(false)
+	var granite := granite_quays(data)
+	var key := target.to_html(false) + ("_granite_ashlar" if granite else "")
 	if not _stone_mats.has(key):
 		if stone_quays(data):
 			_stone_mats[key] = _ashlar_material()
+			return _stone_mats[key]
+		if granite:
+			# Weathered Nordic/European dressed granite ashlar blocks (~0.45 m
+			# courses, warm-grey granite tone matching historic river quays).
+			_stone_mats[key] = _ashlar_material(Color(0.55, 0.53, 0.49), 0.45, 0.18)
 			return _stone_mats[key]
 		var row: Dictionary = MaterialLibrary.PBR_SETS["render"]
 		# Set means are already linear (a second decode read the stone

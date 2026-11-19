@@ -27,6 +27,9 @@ const IGN_LAYER := "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES"
 const STAC_URL := "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items"
 const AHN_URL := "https://service.pdok.nl/rws/ahn/wcs/v1_0"
 const AHN_COVERAGE := "dtm_05m"
+const MML_URL := "https://www.nic.funet.fi/index/geodata/mml/dem2m/2008_latest"
+const MML_HEADER_BYTES := 16384
+const MML_MAX_RANGE_BYTES := 2 * 1024 * 1024
 const EPSG_3857 := "http://www.opengis.net/def/crs/EPSG/0/3857"
 
 ## Whether the last fetch lost a request to the network, the server or the
@@ -48,6 +51,8 @@ func fetch(source: String, lat: float, lon: float, offline: bool = false) -> voi
 			raster = await _ahn(lat, lon, offline)
 		"swisstopo":
 			raster = await _swiss(lat, lon, offline)
+		"mml":
+			raster = await _mml(lat, lon, offline)
 	if not raster.is_empty() and GroundModel.missing_share(raster) > GroundModel.MAX_MISSING:
 		raster = {}
 	finished.emit(raster)
@@ -145,13 +150,13 @@ func _notification(what: int) -> void:
 			WorkerThreadPool.wait_for_task_completion(task)
 		_tasks.clear()
 
-static func _bil_raster(bytes: PackedByteArray, w: Dictionary) -> Dictionary:
+static func _bil_raster(bytes: PackedByteArray, w: Dictionary, cells: int = GroundModel.CELLS) -> Dictionary:
 	if w.is_empty():
 		return {}
 	var c: Vector2 = w["c"]
 	var h: float = w["half"]
-	return GroundModel.decode_bil(bytes, GroundModel.CELLS, Vector2(c.x - h, c.y + h),
-		2.0 * h / float(GroundModel.CELLS))
+	return GroundModel.decode_bil(bytes, cells, Vector2(c.x - h, c.y + h),
+		2.0 * h / float(cells))
 
 func _save_raster(path: String, raster: Dictionary) -> void:
 	var bytes := PackedByteArray()
@@ -196,6 +201,155 @@ func _swiss(lat: float, lon: float, offline: bool) -> Dictionary:
 		if mosaic.is_empty():
 			return {}
 		return GroundModel.reproject(mosaic, NationalGrids.lv95, win))
+	if not raster.is_empty() and GroundModel.missing_share(raster) <= GroundModel.MAX_MISSING:
+		_save_raster(cache, raster)
+	return raster
+
+## National Land Survey of Finland (MML) 2 m laser-scanned bare-earth DEM
+## hosted as tiled LZW GeoTIFFs by CSC Funet. Only the 256×256 tiles that
+## overlap the viewpoint window are fetched via HTTP Range requests,
+## decoded and mosaicked in ETRS-TM35FIN, then resampled to Mercator and
+## cached as a compact 600×600 BIL.
+func _mml(lat: float, lon: float, offline: bool) -> Dictionary:
+	var win := window(lat, lon)
+	var cells := GroundModel.MML_CELLS
+	var cache := cache_path("mml", lat, lon, "bil")
+	if FileAccess.file_exists(cache):
+		var bytes := FileAccess.get_file_as_bytes(cache)
+		if bytes.size() == cells * cells * 4:
+			CacheStore.note_read(cache)
+			return _bil_raster(bytes, win, cells)
+	if offline:
+		return {}
+	var llb := latlon_box(lat, lon)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for corner in [llb.position, Vector2(llb.end.x, llb.position.y), llb.end, Vector2(llb.position.x, llb.end.y)]:
+		var p := NationalGrids.tm35fin(corner.y, corner.x)
+		lo = lo.min(p)
+		hi = hi.max(p)
+	lo -= Vector2(64.0, 64.0)
+	hi += Vector2(64.0, 64.0)
+	var sheets := {}
+	var e := lo.x
+	while e <= hi.x + 5999.0:
+		var n := lo.y
+		while n <= hi.y + 5999.0:
+			var s := NationalGrids.tm35_sheet(minf(e, hi.x), minf(n, hi.y))
+			if not s.is_empty():
+				sheets[s] = true
+			n += 6000.0
+		e += 6000.0
+	if sheets.is_empty():
+		return {}
+	var hdr_jobs: Array = []
+	var sheet_urls: PackedStringArray = []
+	for s in sheets:
+		var url := "%s/%s" % [MML_URL, str(s)]
+		sheet_urls.append(url)
+		hdr_jobs.append({"url": url, "path": "", "range": "bytes=0-%d" % (MML_HEADER_BYTES - 1)})
+	var hdr_blobs := await _get_many(hdr_jobs, false, _is_tiff)
+	var range_jobs: Array = []
+	var plans: Array = []  # [{hdr, tiles: [{idx, tx, ty, job, rel_off, len}]}]
+	for si in sheet_urls.size():
+		var blob: PackedByteArray = hdr_blobs[si]
+		if blob.is_empty():
+			continue
+		var hdr := GroundTiff.parse_header(blob)
+		if hdr.is_empty() or not bool(hdr["tiled"]):
+			continue
+		var origin: Vector2 = hdr["origin"]
+		var cell: Vector2 = hdr["cell"]
+		var w: int = hdr["width"]
+		var h: int = hdr["height"]
+		var bw: int = hdr["bw"]
+		var bh: int = hdr["bh"]
+		var across := ceili(float(w) / float(bw))
+		var down := ceili(float(h) / float(bh))
+		var tx0 := clampi(floori((lo.x - origin.x) / (float(bw) * cell.x)), 0, across - 1)
+		var tx1 := clampi(floori((hi.x - origin.x) / (float(bw) * cell.x)), 0, across - 1)
+		var ty0 := clampi(floori((origin.y - hi.y) / (float(bh) * cell.y)), 0, down - 1)
+		var ty1 := clampi(floori((origin.y - lo.y) / (float(bh) * cell.y)), 0, down - 1)
+		var offsets: Array = hdr["offsets"]
+		var counts: Array = hdr["counts"]
+		var wanted: Array = []
+		for ty in range(ty0, ty1 + 1):
+			for tx in range(tx0, tx1 + 1):
+				var idx := ty * across + tx
+				var off := int(offsets[idx])
+				var cnt := int(counts[idx])
+				if off > 0 and cnt > 0:
+					wanted.append({"idx": idx, "tx": tx, "ty": ty, "off": off, "len": cnt})
+		if wanted.is_empty():
+			continue
+		wanted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["off"]) < int(b["off"]))
+		# Coalesce contiguous or near-contiguous tile byte ranges into a few requests.
+		var r_start := int(wanted[0]["off"])
+		var r_end := r_start + int(wanted[0]["len"])
+		var group: Array = []
+		var tiles_plan: Array = []
+		var flush := func(rs: int, re: int) -> void:
+			var job_id := range_jobs.size()
+			range_jobs.append({"url": sheet_urls[si], "path": "", "range": "bytes=%d-%d" % [rs, re - 1]})
+			for item: Dictionary in group:
+				tiles_plan.append({"tx": item["tx"], "ty": item["ty"], "job": job_id,
+					"rel_off": int(item["off"]) - rs, "len": int(item["len"])})
+			group.clear()
+		for item: Dictionary in wanted:
+			var s_off := int(item["off"])
+			var s_end := s_off + int(item["len"])
+			if not group.is_empty() and (s_off - r_end > 65536 or s_end - r_start > MML_MAX_RANGE_BYTES):
+				flush.call(r_start, r_end)
+				r_start = s_off
+				r_end = s_end
+			else:
+				r_end = maxi(r_end, s_end)
+			group.append(item)
+		if not group.is_empty():
+			flush.call(r_start, r_end)
+		plans.append({"hdr": hdr, "tiles": tiles_plan, "tx0": tx0, "tx1": tx1, "ty0": ty0, "ty1": ty1})
+	if plans.is_empty():
+		return {}
+	var range_blobs := await _get_many(range_jobs, false, func(b: PackedByteArray) -> bool: return not b.is_empty())
+	var raster: Dictionary = await _in_thread(func() -> Dictionary:
+		var rasters: Array = []
+		for plan: Dictionary in plans:
+			var hdr: Dictionary = plan["hdr"]
+			var bw: int = hdr["bw"]
+			var bh: int = hdr["bh"]
+			var tx0: int = plan["tx0"]
+			var ty0: int = plan["ty0"]
+			var w_px := (int(plan["tx1"]) - tx0 + 1) * bw
+			var h_px := (int(plan["ty1"]) - ty0 + 1) * bh
+			var sub := PackedFloat32Array()
+			sub.resize(w_px * h_px)
+			sub.fill(NAN)
+			var comp: int = hdr["compression"]
+			var pred: int = hdr["predictor"]
+			var big: bool = hdr["big"]
+			for t: Dictionary in plan["tiles"]:
+				var blob: PackedByteArray = range_blobs[int(t["job"])]
+				var rel: int = t["rel_off"]
+				var tlen: int = t["len"]
+				if rel < 0 or rel + tlen > blob.size():
+					continue
+				var vals := GroundTiff.decode_tile(blob.slice(rel, rel + tlen), bw, bh, bh, comp, pred, big)
+				if vals.size() != bw * bh:
+					continue
+				var x0 := (int(t["tx"]) - tx0) * bw
+				var y0 := (int(t["ty"]) - ty0) * bh
+				for r in bh:
+					for c in bw:
+						sub[(y0 + r) * w_px + x0 + c] = GroundModel.valid_height(vals[r * bw + c])
+			var orig: Vector2 = hdr["origin"]
+			var cell: Vector2 = hdr["cell"]
+			rasters.append({"size": Vector2i(w_px, h_px), "values": sub,
+				"origin": Vector2(orig.x + float(tx0 * bw) * cell.x, orig.y - float(ty0 * bh) * cell.y),
+				"cell": cell})
+		var mosaic := mosaic_rasters(rasters)
+		if mosaic.is_empty():
+			return {}
+		return GroundModel.reproject(mosaic, NationalGrids.tm35fin, win, cells))
 	if not raster.is_empty() and GroundModel.missing_share(raster) <= GroundModel.MAX_MISSING:
 		_save_raster(cache, raster)
 	return raster
@@ -383,7 +537,7 @@ func _get_many(jobs: Array, offline: bool, valid: Callable) -> Array:
 			if offline or CacheStore.is_absent(path):
 				continue
 			remaining[0] += 1
-			_download(str(jobs[k]["url"]), path, k, out, remaining, valid)
+			_download(str(jobs[k]["url"]), path, k, out, remaining, valid, str(jobs[k].get("range", "")))
 		var waited := 0.0
 		while remaining[0] > 0 and waited < TIMEOUT_S:
 			await get_tree().process_frame
@@ -394,13 +548,13 @@ func _get_many(jobs: Array, offline: bool, valid: Callable) -> Array:
 	return out
 
 func _download(url: String, path: String, k: int, out: Array, remaining: Array,
-		valid: Callable) -> void:
+		valid: Callable, byte_range: String = "") -> void:
 	var http := HTTPRequest.new()
 	http.timeout = TIMEOUT_S
 	add_child(http)
 	var done := func(result: int, code: int, _h: PackedStringArray,
 			body: PackedByteArray) -> void:
-		if result == HTTPRequest.RESULT_SUCCESS and code == 200 and valid.call(body):
+		if result == HTTPRequest.RESULT_SUCCESS and (code == 200 or (code == 206 and not byte_range.is_empty())) and valid.call(body):
 			out[k] = body
 			var f := FileAccess.open(path, FileAccess.WRITE) if not path.is_empty() else null
 			if f != null:
@@ -414,7 +568,10 @@ func _download(url: String, path: String, k: int, out: Array, remaining: Array,
 		remaining[0] -= 1
 		http.queue_free()
 	http.request_completed.connect(done, CONNECT_ONE_SHOT)
-	if http.request(url, ["User-Agent: " + Brand.USER_AGENT]) != OK:
+	var headers := PackedStringArray(["User-Agent: " + Brand.USER_AGENT])
+	if not byte_range.is_empty():
+		headers.append("Range: " + byte_range)
+	if http.request(url, headers) != OK:
 		outage = true
 		remaining[0] -= 1
 		http.queue_free()

@@ -217,11 +217,13 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 				hard = true;
 			}
 		}
+		const double water_a = level(p.body, p.start);
+		const double water_b = level(p.body, p.end);
 		double top_a = hard ? bank_top(p.start, p.land) : dry_height(p.start);
 		double top_b = hard ? bank_top(p.end, p.land) : dry_height(p.end);
 		if (hard) {
 			const double road_top = abutment_top(treatment, p.mid);
-			if (!std::isnan(road_top)) {
+			if (!std::isnan(road_top) && road_top > gd_max(water_a, water_b) + 0.3 * m2u) {
 				// A bridge abutment's top is the road's level at the bridge's end.
 				top_a = road_top;
 				top_b = road_top;
@@ -238,8 +240,8 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 		p.treatment = treatment;
 		p.top_a = top_a;
 		p.top_b = top_b;
-		p.water_a = level(p.body, p.start);
-		p.water_b = level(p.body, p.end);
+		p.water_a = water_a;
+		p.water_b = water_b;
 	});
 	if (abort != nullptr && (bool)abort->get("requested")) {
 		result["aborted"] = true;
