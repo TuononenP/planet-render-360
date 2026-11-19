@@ -293,6 +293,10 @@ void fragment() {
 	// patches the photo cannot carry at grazing angles.
 	float big = lum(t_dehaze(textureLod(photo, UV, lf_lod + 3.0).rgb * photo_gain));
 	float macro = clamp(lum(lf) / max(big, 1e-3), 0.72, 1.18);
+	// Paving keeps little of the photo's patches: there they are tree
+	// canopy, cars and shadows, which the street ribbons beside it don't
+	// carry, so the ground read as a darker pavement between them.
+	macro = mix(macro, 1.0, 0.75 * clamp(pave, 0.0, 1.0));
 	macro *= 0.92 + 0.16 * t_noise(g / 47.0);
 	vec3 base = mix(col, lf, trust);
 	// Rock colour: neutral stone carrying some of the photo's tint.

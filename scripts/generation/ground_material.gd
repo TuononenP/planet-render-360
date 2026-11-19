@@ -290,14 +290,18 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 		grass = Color(0.48, 0.62, 0.36)
 	if dry.a > 0.0:
 		grass = Color(dry.r, dry.g, dry.b).linear_to_srgb()
-	var pave := MaterialLibrary.ground_color("urban")
+	# Open paving is the stone the footways and squares lay beside it
+	# (RoadBuilder's paving and sett finishes): a gap between ribbons must
+	# not read as a darker, cooler pavement. The photo only tints it a
+	# little; its canopy, cars and shadows are not the paving's colour.
+	var pave := Color.html(RoadBuilder.FINISH_HEX["paving"])
 	var none := Color(0, 0, 0, 0)
 	var rows := {
 		"building": [Color(1, 0, 0, 0), pave, 0.0, 0.0, 0.95, 0.0, none],
 		"road": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["asphalt"]), 0.0, 0.25, 0.95, 0.45, none],
-		"urban": [Color(1, 0, 0, 0), Color(0.50, 0.495, 0.48), 0.12, 0.45, 0.95, 0.55, none],
-		# Grey granite setts: a little darker and rougher than flagstones.
-		"sett": [Color(1, 0, 0, 0), Color(0.45, 0.44, 0.43), 0.12, 0.45, 0.97, 0.55, none],
+		"urban": [Color(1, 0, 0, 0), pave, 0.04, 0.45, 0.95, 0.55, none],
+		# Granite setts: the sett finish, a little rougher than flagstones.
+		"sett": [Color(1, 0, 0, 0), Color.html(RoadBuilder.FINISH_HEX["sett"]), 0.04, 0.45, 0.97, 0.55, none],
 		"grass": [Color(0, 1, 0, 0), grass, 0.5, 1.0, 0.97, 0.55, none],
 		# Unmown meadow: the lawn layer with some forest-floor litter, a
 		# little drier and more photo-led than a mown lawn.

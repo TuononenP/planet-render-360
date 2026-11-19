@@ -32,6 +32,16 @@ func _init() -> void:
 	var pal := GroundMaterial.palette()
 	if pal.get_pixel(int(GroundMaterial.ID["road"]), 0).a != 0.0:
 		failures.append("road ground should not weight the soil layer")
+	# Open paving is the footways' stone: a gap between street ribbons
+	# must not read as a darker, cooler pavement.
+	for pair in [["urban", "paving"], ["sett", "sett"]]:
+		var got := pal.get_pixel(int(GroundMaterial.ID[pair[0]]), 1)
+		var want := Color.html(RoadBuilder.FINISH_HEX[pair[1]])
+		if absf(got.r - want.r) > 1.5 / 255.0 or absf(got.g - want.g) > 1.5 / 255.0 \
+				or absf(got.b - want.b) > 1.5 / 255.0:
+			failures.append("%s ground should be the %s finish %s, got %s" % [pair[0], pair[1], want.to_html(false), got.to_html(false)])
+		if got.a > 0.05:
+			failures.append("%s ground should take little of the photo's tint" % pair[0])
 	if failures.is_empty():
 		print("LANDCOVER GROUND OK: classes, OSM precedence, water and climate fallback")
 		quit(0)
