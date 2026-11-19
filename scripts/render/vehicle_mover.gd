@@ -114,8 +114,17 @@ static func compute_plans(data: LocationData, ground: GroundTruth) -> Dictionary
 		return {}
 	var m2u := WorldScale.metres_to_units()
 	var trams := TransitVehicles.plan(data, ground, m2u)
-	return {"Tram": trams, "TramZones": zones_of(trams),
-		"Train": StationTrains.plan(data, ground, m2u)}
+	var trains := StationTrains.plan(data, ground, m2u)
+	# Each train's run, stops, direction and signals, so attach() on the main
+	# thread only adopts them (they walked every route in 5 m steps there).
+	var mouths := TramRoute.mouths(data, func(_rail: Dictionary) -> bool: return true)
+	var dirs := {}
+	for k in trams.size():
+		(trams[k] as Dictionary)["motion"] = motion(trams[k], k, trams, data, ground, false, mouths, dirs, m2u)
+	for k in trains.size():
+		if str((trains[k] as Dictionary).get("at", "")) == "platform":
+			(trains[k] as Dictionary)["motion"] = motion(trains[k], k, trains, data, ground, true, mouths, dirs, m2u)
+	return {"Tram": trams, "TramZones": zones_of(trams), "Train": trains}
 
 ## Where the tracks of the trams of `plan` come close enough for two of
 ## them to touch (TramRails).
@@ -200,6 +209,49 @@ func stop() -> void:
 	_lights_holder = null
 	_lights_source = null
 
+## What a train's motion needs of the map, worked out from the plan and the
+## data alone (so compute_plans can do it on a worker, ahead of the swap):
+## "span" its run (_span), "salt", "stops" (sorted: a tram's mapped stops it
+## snaps to, a platform train's every STOP_EVERY_M), "dir", "deck_mid" and
+## "signals". `dirs` keeps each route's way (_track_dir) across the trains of
+## one plan.
+static func motion(train: Dictionary, k: int, plan: Array, data: LocationData, ground: GroundTruth,
+		platform_only: bool, mouths: PackedVector2Array, dirs: Dictionary, m2u: float) -> Dictionary:
+	var route: TramRoute = train["route"]
+	var s0 := float(train["s"])
+	var reach := float(train["length"]) * 0.5 + 1.0
+	var run := TRAIN_RUN_M if platform_only else INF
+	var span := span_of(route, s0, reach, run, mouths, ground, m2u)
+	var salt := TransitVehicles._hash(float(k), s0, 41.0 if platform_only else 17.0)
+	var stops := PackedFloat32Array()
+	if not platform_only:
+		for stop in data.tram_stops:
+			if not (stop is Dictionary):
+				continue
+			var at := route.nearest(Vector2(float(stop.get("x", 0.0)), float(stop.get("z", 0.0))))
+			if at.y < TransitVehicles.SNAP_M and at.x > span.x and at.x < span.y:
+				stops.append(at.x)
+	else:
+		var x := s0 + STOP_EVERY_M * (0.5 + salt)
+		while x < span.y:
+			stops.append(x)
+			x += STOP_EVERY_M * (0.8 + 0.4 * TransitVehicles._hash(x, salt, 5.0))
+		x = s0 - STOP_EVERY_M * (0.5 + salt)
+		while x > span.x:
+			stops.append(x)
+			x -= STOP_EVERY_M * (0.8 + 0.4 * TransitVehicles._hash(x, salt, 6.0))
+		stops.append(s0)
+		stops.append(span.x)
+		stops.append(span.y)
+	var sorted := Array(stops)
+	sorted.sort()
+	if not platform_only and not dirs.has(route):
+		dirs[route] = _track_dir(route, plan, data.country)
+	return {"span": span, "salt": salt, "stops": sorted,
+		"dir": (1.0 if salt < 0.5 else -1.0) if platform_only else float(dirs[route]),
+		"deck_mid": NAN if platform_only else _deck_mid(route),
+		"signals": PackedFloat32Array() if platform_only else _signals(route, span, data)}
+
 ## Takes the trains of `plan` whose nodes `holder` has (named `prefix`
 ## + train + "_" + section + "_near" / "_far" / "_shadow").
 func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, ground: GroundTruth,
@@ -224,48 +276,27 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 			continue
 		var route: TramRoute = train["route"]
 		var s0 := float(train["s"])
-		var reach := float(train["length"]) * 0.5 + 1.0
-		var run := TRAIN_RUN_M if platform_only else INF
-		var span := _span(route, s0, reach, run, mouths, ground)
-		var salt := TransitVehicles._hash(float(k), s0, 41.0 if platform_only else 17.0)
-		var stops := PackedFloat32Array()
-		if not platform_only:
-			for stop in data.tram_stops:
-				if not (stop is Dictionary):
-					continue
-				var at := route.nearest(Vector2(float(stop.get("x", 0.0)), float(stop.get("z", 0.0))))
-				if at.y < TransitVehicles.SNAP_M and at.x > span.x and at.x < span.y:
-					stops.append(at.x)
-		else:
-			var x := s0 + STOP_EVERY_M * (0.5 + salt)
-			while x < span.y:
-				stops.append(x)
-				x += STOP_EVERY_M * (0.8 + 0.4 * TransitVehicles._hash(x, salt, 5.0))
-			x = s0 - STOP_EVERY_M * (0.5 + salt)
-			while x > span.x:
-				stops.append(x)
-				x -= STOP_EVERY_M * (0.8 + 0.4 * TransitVehicles._hash(x, salt, 6.0))
-			stops.append(s0)
-			stops.append(span.x)
-			stops.append(span.y)
-		var sorted := Array(stops)
-		sorted.sort()
+		# Worked out ahead on a worker (compute_plans) when there is a plan for
+		# this world, else here.
+		var mo: Dictionary = train["motion"] if train.has("motion") \
+			else motion(train, k, plan, data, ground, platform_only, mouths, dirs, _m2u)
+		var span: Vector2 = mo["span"]
+		var salt: float = mo["salt"]
+		var sorted: Array = mo["stops"]
 		# A tram starts off at once unless it stands at a stop.
 		var at_stop := platform_only
 		for stop: float in sorted:
 			at_stop = at_stop or absf(stop - s0) < 3.0
-		if not platform_only and not dirs.has(route):
-			dirs[route] = _track_dir(route, plan, data.country)
 		_trains.append({
 			"route": route, "sections": sections, "nodes": nodes, "length": float(train["length"]),
 			"s": s0, "v": 0.0, "lo": span.x, "hi": span.y,
-			"dir": (1.0 if salt < 0.5 else -1.0) if platform_only else float(dirs[route]),
+			"dir": mo["dir"],
 			"stops": sorted, "dwell": (TRAIN_DWELL_S if platform_only else DWELL_S).x * salt if at_stop else 0.0,
 			"dwell_range": TRAIN_DWELL_S if platform_only else DWELL_S,
 			"cruise": TRAIN_CRUISE_MS if platform_only else CRUISE_MS,
 			"loop": not platform_only, "hidden": false,
-			"deck_mid": NAN if platform_only else _deck_mid(route),
-			"signals": PackedFloat32Array() if platform_only else _signals(route, span, data),
+			"deck_mid": mo["deck_mid"],
+			"signals": mo["signals"],
 			"salt": salt, "target": NAN, "blocked": 0.0, "moved": false, "age": 0.0, "mid": route.xz_at(s0), "n": 0,
 			"zones": [], "claims": {},
 			"headlight": null, "taillight": null})
@@ -355,8 +386,8 @@ func _red(route: TramRoute, s: float) -> bool:
 ## The run [low, high] (metres along `route`) a train standing at `s0`
 ## may use: up to `run` each way, and not past a tunnel mouth, the edge
 ## of the data, a bridge with no known deck or the route's own ends.
-func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: PackedVector2Array,
-		ground: GroundTruth) -> Vector2:
+static func span_of(route: TramRoute, s0: float, reach: float, run: float, mouths: PackedVector2Array,
+		ground: GroundTruth, m2u: float) -> Vector2:
 	var lo := s0
 	var hi := s0
 	for dir in [-1.0, 1.0]:
@@ -370,7 +401,7 @@ func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: Packed
 			var ok := (ground == null or ground.is_inside(p.x, p.y)) \
 				and not route.unsupported(next - reach, next + reach)
 			for m in mouths:
-				if m.distance_to(p) < (TransitVehicles.TUNNEL_CLEAR_M + reach) * _m2u:
+				if m.distance_to(p) < (TransitVehicles.TUNNEL_CLEAR_M + reach) * m2u:
 					ok = false
 					break
 			if not ok:
@@ -381,6 +412,10 @@ func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: Packed
 		else:
 			hi = s
 	return Vector2(lo, hi)
+
+func _span(route: TramRoute, s0: float, reach: float, run: float, mouths: PackedVector2Array,
+		ground: GroundTruth) -> Vector2:
+	return span_of(route, s0, reach, run, mouths, ground, _m2u)
 
 ## The next stop `t` runs to from where it stands, in its direction
 ## (turning it round at the end of its run); `s` itself when there is none.

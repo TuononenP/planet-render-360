@@ -121,9 +121,37 @@ func _run() -> void:
 	# A world without the nodes is left alone.
 	if VehicleMover.attach(Node3D.new(), data, ground) != null:
 		failures.append("no trams in the world, no mover")
+	_check_planned_motion(failures, world, data, ground)
 	_check_never_stops(failures)
 	_check_junctions(failures)
 	_finish(failures, world)
+
+## The motion facts compute_plans works out ahead (on a worker) give the same
+## trains as attach() working them out itself: runs, stops, ways, signals.
+func _check_planned_motion(failures: Array[String], world: Node, data: LocationData, ground: GroundTruth) -> void:
+	var own := VehicleMover.attach(world, data, ground)
+	var plans := VehicleMover.compute_plans(data, ground)
+	var motions := 0
+	for key in ["Tram", "Train"]:
+		for train: Dictionary in plans[key]:
+			motions += 1 if train.has("motion") else 0
+	if motions == 0:
+		failures.append("compute_plans should plan the trains' motion")
+	VehicleMover.store_plans(data, ground, plans)
+	var ahead := VehicleMover.attach(world, data, ground)
+	data.remove_meta(VehicleMover.PLANS_META)
+	data.remove_meta(VehicleMover.PLANS_GROUND)
+	if own == null or ahead == null or own.count() != ahead.count():
+		failures.append("a mover with planned motion drives the same trains")
+		return
+	for i in own.count():
+		var a: Dictionary = own._trains[i]
+		var b: Dictionary = ahead._trains[i]
+		for field in ["lo", "hi", "dir", "stops", "dwell", "signals", "salt", "s"]:
+			if var_to_bytes(a[field]) != var_to_bytes(b[field]):
+				failures.append("train %d: planned %s differs (%s against %s)" % [i, field, a[field], b[field]])
+		if var_to_bytes(a["deck_mid"]) != var_to_bytes(b["deck_mid"]):
+			failures.append("train %d: planned deck_mid differs" % i)
 
 ## Twin tracks 3.6 m apart with mapped stops and a traffic light: for
 ## 20 minutes no tram stands on the line except at a stop, at the red
