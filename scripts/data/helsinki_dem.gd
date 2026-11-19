@@ -103,8 +103,6 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			or int(_one(tags, 339)) != 3 or int(_one(tags, 259, 1)) != 1 \
 			or int(_one(tags, 277, 1)) != 1 or not (tags.has(34264) or (tags.has(33550) and tags.has(33922))):
 		return {}
-	var out := PackedFloat32Array()
-	out.resize(w * h)
 	var tiled := tags.has(324)
 	var offsets: Array = tags.get(324 if tiled else 273, [])
 	var tw := int(_one(tags, 322)) if tiled else w
@@ -113,28 +111,51 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 		return {}
 	var counts: Array = tags.get(325 if tiled else 279, [])
 	var across := ceili(float(w) / float(tw))
+	# Each strip or tile as floats (native: no per-cell reads), then the
+	# rows assembled from them.
+	var blocks: Array = []
 	for idx in offsets.size():
-		var x0 := (idx % across) * tw if tiled else 0
 		var y0 := (idx / across) * th if tiled else idx * th
 		var rows := mini(th, h - y0)
-		if rows <= 0:
-			continue
+		var cells := tw * (th if tiled else maxi(rows, 0))
 		var start := int(offsets[idx])
+		var block := PackedFloat32Array()
+		if rows <= 0:
+			blocks.append(block)
+			continue
 		if start == 0 or (idx < counts.size() and int(counts[idx]) == 0):
 			# A sparse file leaves an all-nodata block (open sea) out, offset
 			# and byte count 0: read, it would be the file's header as heights.
-			for r in rows:
-				for c in mini(tw, w - x0):
-					out[(y0 + r) * w + x0 + c] = NODATA
-			continue
-		if start + tw * (th if tiled else rows) * 4 > bytes.size():
-			return {}
-		sp.seek(start)
+			block.resize(cells)
+			block.fill(NODATA)
+		else:
+			if start + cells * 4 > bytes.size():
+				return {}
+			var raw := bytes.slice(start, start + cells * 4)
+			if big:
+				# Reversed bytes: every float byte-swapped, in reverse order.
+				raw.reverse()
+				block = raw.to_float32_array()
+				block.reverse()
+			else:
+				block = raw.to_float32_array()
+		blocks.append(block)
+	var out := PackedFloat32Array()
+	var bands := ceili(float(h) / float(th))
+	for band in bands:
+		var rows := mini(th, h - band * th)
 		for r in rows:
-			for c in tw:
-				var v := sp.get_float()
-				if x0 + c < w:
-					out[(y0 + r) * w + x0 + c] = v
+			for tx in (across if tiled else 1):
+				var idx := band * across + tx if tiled else band
+				if idx >= blocks.size():
+					return {}
+				var block: PackedFloat32Array = blocks[idx]
+				var take := mini(tw, w - tx * tw)
+				if block.size() < (r + 1) * tw:
+					return {}
+				out.append_array(block.slice(r * tw, r * tw + take))
+	if out.size() != w * h:
+		return {}
 	# GeoServer writes a ModelTransformation matrix; other writers a pixel
 	# scale and a tiepoint.
 	if tags.has(34264) and (tags[34264] as Array).size() >= 8:

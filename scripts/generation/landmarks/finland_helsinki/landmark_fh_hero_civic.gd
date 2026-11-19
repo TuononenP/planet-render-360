@@ -19,31 +19,42 @@ static func _materials(wall: String = "#D9C690") -> LandmarkMesh:
 	lm.use("Glass", LandmarkMaterials.glass())
 	return lm
 
-## Windowless timber vessel with the flaring upper lip and low entrance.
+## Windowless timber vessel on the mapped 19.8 by 13.1 m ellipse (OSM way
+## 185401488): spruce planks run round it, the wall flares smoothly to a
+## lip at 11.5 m, the flat roof is grey and the entrance is a glazed door.
 static func kamppi(model: Node3D) -> void:
 	var lm := _materials()
-	lm.use("Wood", LandmarkMaterials.pbr("wood", "#BC853E", 2.0))
-	lm.use("Seam", LandmarkMaterials.pbr("wood", "#9D7039", 2.0))
-	var profile := PackedVector2Array([Vector2(0.82, 0), Vector2(0.83, 1), Vector2(0.87, 3),
-		Vector2(0.93, 6), Vector2(0.985, 9), Vector2(1.0, 11.5)])
-	lm.lathe("Wood", Vector3.ZERO, profile, 64, 8.4, 6.2)
+	lm.use("Wood", LandmarkMaterials.pbr("wood", "#B98A4B", 0.9))
+	lm.use("Seam", LandmarkMaterials.pbr("wood", "#8E6633", 2.0))
+	lm.use("Roof", LandmarkMaterials.paint("#6A6D6F", 0.7))
+	lm.use("Door", LandmarkMaterials.paint("#2A2D30", 0.5))
+	var sx := 9.9
+	var sz := 6.55
+	var profile := PackedVector2Array()
+	for i in 13:
+		var t := float(i) / 12.0
+		profile.append(Vector2(_kamppi_radius(t), 11.5 * t))
+	lm.lathe("Wood", Vector3.ZERO, profile, 96, sx, sz, 0.0, true, false)
 	# Fine horizontal plank seams follow the same curved vessel profile.
 	for i in 57:
 		var y := 0.15 + float(i) * 0.20
-		var r := profile[0].x
-		for j in profile.size() - 1:
-			if y >= profile[j].y and y <= profile[j + 1].y:
-				r = lerpf(profile[j].x, profile[j + 1].x,
-					(y - profile[j].y) / (profile[j + 1].y - profile[j].y))
-				break
-		lm.lathe("Seam", Vector3(0, y, 0), PackedVector2Array([Vector2(r + 0.002, 0),
-			Vector2(r + 0.002, 0.016)]), 64, 8.4, 6.2, 0.0, false, false)
-	# Elliptical flat roof closes the vessel, hidden behind the wood rim.
-	var roof := PackedVector2Array([Vector2(1.0, 0), Vector2(0.0, 0)])
-	lm.lathe("Roof", Vector3(0, 11.44, 0), roof, 64, 8.35, 6.15, 0.0, false)
-	U.blk(lm, "Stone", 8.4, 0, -1.8, 8.0, 3.0, 8.0)
-	LandmarkDetail.window(lm, "Trim", "Glass", Vector3(8.4, 1.3, 2.24), Vector3.BACK, 3.2, 2.5, false, 0.08)
+		lm.lathe("Seam", Vector3(0, y, 0), PackedVector2Array([
+			Vector2(_kamppi_radius(y / 11.5) + 0.002, 0), Vector2(_kamppi_radius(y / 11.5) + 0.002, 0.016)]),
+			96, sx, sz, 0.0, false, false)
+	# Flat grey roof closes the vessel behind the wood rim.
+	lm.lathe("Roof", Vector3(0, 11.44, 0), PackedVector2Array([Vector2(1.0, 0), Vector2(0.0, 0)]),
+		96, sx - 0.05, sz - 0.05, 0.0, false)
+	# Glazed entrance in the east end, on a low stone threshold.
+	var wall_x := _kamppi_radius(0.1) * sx
+	U.blk(lm, "Door", wall_x - 0.15, 0.0, 0.0, 0.2, 2.7, 3.2)
+	U.blk(lm, "Glass", wall_x - 0.03, 0.15, 0.0, 0.1, 2.4, 2.8)
+	U.blk(lm, "Stone", wall_x + 0.7, 0.0, 0.0, 1.6, 0.12, 4.2)
 	lm.commit(model)
+
+## Wall radius (fraction of the roof rim) at fraction t of the height: a
+## narrow foot that swells smoothly to the flared lip.
+static func _kamppi_radius(t: float) -> float:
+	return 0.80 + 0.20 * pow(clampf(t, 0.0, 1.0), 1.6)
 
 ## Five low concrete light scoops; each has an offset circular skylight.
 static func amos(model: Node3D) -> void:

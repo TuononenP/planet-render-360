@@ -270,17 +270,21 @@ static func _edge_grid(polys: Array) -> Dictionary:
 	return grid
 
 static func _inside(p: Vector2, polys: Array, grid: Dictionary) -> bool:
+	return _inside_at(p, polys, grid) >= 0
+
+## Index of the polygon (outside its holes) containing `p`; -1 none.
+static func _inside_at(p: Vector2, polys: Array, grid: Dictionary) -> int:
 	for i in grid.get(_cell(p), []):
 		var poly: Dictionary = polys[i]
-		if WorldScale.point_in_polygon(p, poly["points"]):
+		if Geometry2D.is_point_in_polygon(p, poly["points"]):
 			var hole := false
 			for h in poly.get("holes", []):
-				if WorldScale.point_in_polygon(p, h):
+				if Geometry2D.is_point_in_polygon(p, h):
 					hole = true
 					break
 			if not hole:
-				return true
-	return false
+				return i
+	return -1
 
 ## Distance from `p` along `dir` to where the polygons' union ends
 ## (edges crossed between adjoining parts are passed); 0 past the reach.

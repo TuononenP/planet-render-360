@@ -7,8 +7,8 @@ extends RefCounted
 ## use class. `apply` matches each point to the OSM footprint it falls in
 ## and fills only what the map leaves out (BuildingReferences.fill):
 ## real storeys and years drive BuildingEra and the dated Helsinki eras,
-## facade codes FacadeMaterials. Helsinki only; Espoo has no open
-## register (docs/data-source-register.md).
+## facade codes FacadeMaterials. Helsinki only; Espoo and Vantaa take
+## HSY's regional register (HsyRegister) through the same `apply`.
 
 const URL := "https://kartta.hel.fi/ws/geoserver/avoindata/wfs"
 const LAYER := "avoindata:Rakennukset_alue_rekisteritiedot"

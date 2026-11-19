@@ -31,6 +31,11 @@ const SKIP_WALK := ["Portaat", "Lämmitettävät portaat"]
 const GRAVEL := ["Kivituhka", "Sora", "Murske"]
 ## Pavements laid in cobbles or setts: GroundMaterial's "sett" class.
 const SETTS := ["Nupukivi", "Noppakivi", "Graniittinoppakivi"]
+## Natural-stone carriageway (cobbles, setts, granite): a street laid
+## mostly with it takes the sett finish where OSM names no surface.
+const STONE := ["Nupukivi", "Noppakivi", "Graniittikivi", "Graniittinoppakivi", "Luonnonkivi"]
+## Share of a street's probes on the carriageway that must be stone.
+const STONE_SHARE := 0.6
 
 static func covers(lat: float, lon: float) -> bool:
 	return HelsinkiRegister.covers(lat, lon)
@@ -130,8 +135,44 @@ static func apply(data: LocationData, carriageway: Array, walkways: Array) -> Di
 		if not drive.is_empty() else 0
 	_keep_bands_without_pavement(data.roads, paved)
 	var squares := sett_squares(data.roads, paved)
+	var setts := surfaces(data.roads, drive) if not drive.is_empty() else 0
 	return {"drive": drive.size(), "parking": parking.size(), "widths": widths, "paved": paved.size(),
-		"squares": squares}
+		"setts": setts, "squares": squares}
+
+## Lays each car road with no mapped `surface` in setts (in place) where
+## most of its probes stand on surveyed natural-stone carriageway: the
+## old town's cobbled streets OSM leaves untagged. Returns how many.
+static func surfaces(roads: Array, drive: Array) -> int:
+	var grid := RoadWidths._poly_grid(drive)
+	var count := 0
+	for r in roads:
+		if not (r is Dictionary):
+			continue
+		var road: Dictionary = r
+		if str(road.get("surface", "")) != "" or bool(road.get("bridge", false)) \
+				or bool(road.get("tunnel", false)) or bool(road.get("area", false)) \
+				or not str(road.get("class", "")) in RoadWidths.CAR_CLASSES:
+			continue
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+		var on := 0
+		var stone := 0
+		for i in pts.size() - 1:
+			var len := pts[i].distance_to(pts[i + 1])
+			if len < 4.0:
+				continue
+			var k_n := maxi(1, int(len / RoadWidths.PROBE_M))
+			for k in k_n:
+				var hit := RoadWidths._inside_at(pts[i].lerp(pts[i + 1], (float(k) + 0.5) / float(k_n)), drive, grid)
+				if hit < 0:
+					continue
+				on += 1
+				if str(drive[hit]["material"]) in STONE:
+					stone += 1
+		if on >= 2 and float(stone) >= STONE_SHARE * float(on):
+			road["surface"] = "sett"
+			road["surface_source"] = "survey"
+			count += 1
+	return count
 
 ## Probe spacing over a mapped square (m) and the share of its probes on
 ## surveyed setts that lays the whole square in setts.

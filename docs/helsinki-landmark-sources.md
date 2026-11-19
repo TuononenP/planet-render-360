@@ -5,6 +5,7 @@ Models use true metres and merged textured surfaces. They approximate the buildi
 | Type | Model envelope / details | Evidence |
 | --- | --- | --- |
 | `kamppi_chapel` | 11.5 m timber vessel, flaring elliptical walls, plank seams, low stone entrance | Owner: https://kampinkappeli.fi/en/index/architectureanddesign.html (height and spruce exterior). Envelope width/depth approximate. |
+| `lasipalatsi` | OSM way [8035238](https://www.openstreetmap.org/way/8035238) (3 levels, flat roof, 1936), outline simplified to 0.5 m about 60.170231, 24.936695, yaw 0. | Pale rendered functionalist block with a glazed shopfront storey on steel mullions and two storeys of ribbon windows, flat roof behind a parapet. Outline and level count from OSM; 12.2 m eaves, storey heights, render colour and glazing pattern are estimates. |
 | `amos_rex` | Five asymmetric concrete light scoops with circular glazed oculi on Lasipalatsi square | Architect: https://jkmm.fi/work/amos-rex-museum/ . Heights and radii approximate. Registry point centres the outdoor square, not the historic museum's previous address. |
 | `havis_amanda` | 5 m total, pink granite basin, bronze figure, four sea lions, pedestal fish | City: https://tpr.hel.fi/TPRalusta/notification/info/3229/ . Anatomy is procedural and approximate. |
 | `kappeli` | Glazed verandas, green iron framework, polygonal pavilions, roof lantern | City: https://tpr.hel.fi/TPRalusta/notification/info/605/ ; conservation engineer: https://www.wsp.com/fi-fi/news/2022/ravintola-kappeli-peruskorjataan-historiaa-vaalien . Envelope approximate. |

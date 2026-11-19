@@ -337,19 +337,11 @@ def analyse(data, translation):
     return rows
 
 
-def summarise(rec, props, f, translation, east, north, up):
-    roof = rec["roof"]
-    plan = sum(a * math.cos(math.radians(p)) for a, p, *_ in roof)
-    if plan < 4.0:
-        return None
-    cx = sum(a * x for a, _, _, x, _, _ in roof) / sum(a for a, *_ in roof)
-    cy = sum(a * y for a, _, _, _, y, _ in roof) / sum(a for a, *_ in roof)
-    ground = rec["zmin"]
-    top = rec["zmax"]
-    height = props.get("height", [0.0] * (f + 1))[f]
-    height = float(height) if isinstance(height, (int, float)) and height > 0.5 else top - ground
-    storeys = props.get("storeysAboveGround", [0] * (f + 1))[f]
-    storeys = int(storeys) if isinstance(storeys, (int, float)) and 0 < storeys < 200 else 0
+def classify_roof(roof, top):
+    """(shape, pitch_deg, ridge_az_deg, roof_h_m) of a building's roof facets
+    [(area, pitch_deg, aspect_deg, x, y, z_min)] (aspect: compass bearing the
+    facet faces) whose highest point is `top`. Shared with
+    prepare_espoo_lod2.py so both cities' roofs reduce alike."""
     sloped = [r for r in roof if r[1] >= FLAT_DEG]
     total = sum(r[0] for r in roof)
     sloped_area = sum(r[0] for r in sloped)
@@ -386,6 +378,23 @@ def summarise(rec, props, f, translation, east, north, up):
             ridge_az = (axis + 90.0) % 180.0
         else:
             shape = "complex"
+    return shape, pitch, ridge_az, roof_h
+
+
+def summarise(rec, props, f, translation, east, north, up):
+    roof = rec["roof"]
+    plan = sum(a * math.cos(math.radians(p)) for a, p, *_ in roof)
+    if plan < 4.0:
+        return None
+    cx = sum(a * x for a, _, _, x, _, _ in roof) / sum(a for a, *_ in roof)
+    cy = sum(a * y for a, _, _, _, y, _ in roof) / sum(a for a, *_ in roof)
+    ground = rec["zmin"]
+    top = rec["zmax"]
+    height = props.get("height", [0.0] * (f + 1))[f]
+    height = float(height) if isinstance(height, (int, float)) and height > 0.5 else top - ground
+    storeys = props.get("storeysAboveGround", [0] * (f + 1))[f]
+    storeys = int(storeys) if isinstance(storeys, (int, float)) and 0 < storeys < 200 else 0
+    shape, pitch, ridge_az, roof_h = classify_roof(roof, top)
     # Centroid to GK25.
     ex = translation[0] + east[0] * cx + north[0] * cy
     ey = translation[1] + east[1] * cx + north[1] * cy

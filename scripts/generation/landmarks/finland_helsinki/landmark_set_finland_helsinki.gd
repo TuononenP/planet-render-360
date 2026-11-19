@@ -71,6 +71,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"dipoli": LandmarkFhDipoli.build(model)
 		"heureka_science_centre": LandmarkFhHelsinkiModern.heureka(model)
 		"helsinki_central_station": LandmarkFhHelsinkiCity.station(model)
+		"lasipalatsi": LandmarkFhLasipalatsi.lasipalatsi(model)
 		"hotel_torni": LandmarkFhHelsinkiCity.torni(model)
 		"old_market_hall_helsinki": LandmarkFhHelsinkiCity.markethall(model)
 		"national_library_of_finland": LandmarkFhHelsinkiCity.natlibrary(model)

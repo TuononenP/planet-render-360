@@ -13,9 +13,10 @@ var failures: Array[String] = []
 func _init() -> void:
 	_decode()
 	_widths()
+	_surfaces()
 	_class_map()
 	if failures.is_empty():
-		print("HELSINKI STREETS OK: decode, classes, widths, class map")
+		print("HELSINKI STREETS OK: decode, classes, widths, stone surfaces, class map")
 		quit(0)
 	else:
 		for f in failures:
@@ -57,6 +58,25 @@ func _decode() -> void:
 
 func _rect(x0: float, z0: float, x1: float, z1: float) -> Dictionary:
 	return {"points": PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0, z1)]), "holes": []}
+
+func _stone(x0: float, z0: float, x1: float, z1: float, material: String) -> Dictionary:
+	var r := _rect(x0, z0, x1, z1)
+	r["material"] = material
+	return r
+
+func _surfaces() -> void:
+	# Cobbles from x -100 to 60, asphalt beyond; a second street all asphalt.
+	var drive := [_stone(-100, -5, 60, 5, "Nupukivi"), _stone(60, -5, 100, 5, "Asfalttibetoni"),
+		_stone(-100, 45, 100, 55, "Asfalttibetoni")]
+	var cobbled := {"class": "residential", "points": PackedVector2Array([Vector2(-90, 0), Vector2(90, 0)])}
+	var tagged := {"class": "residential", "surface": "asphalt", "points": PackedVector2Array([Vector2(-90, 1), Vector2(90, 1)])}
+	var plain := {"class": "residential", "points": PackedVector2Array([Vector2(-90, 50), Vector2(90, 50)])}
+	var walk := {"class": "footway", "points": PackedVector2Array([Vector2(-90, 2), Vector2(90, 2)])}
+	var n := HelsinkiStreets.surfaces([cobbled, tagged, plain, walk], drive)
+	_check(n == 1 and str(cobbled.get("surface", "")) == "sett", "A mostly cobbled street takes setts (%d)" % n)
+	_check(str(tagged["surface"]) == "asphalt", "A mapped surface is kept")
+	_check(not plain.has("surface") and not walk.has("surface"), "Asphalt streets and footways are left")
+	_check(RoadBuilder._finish("residential", str(cobbled["surface"])) == "sett", "The sett surface lays the sett finish")
 
 func _widths() -> void:
 	# A street along x: two lane parts meeting at z = 0 (5 m + 4 m), a 2 m
