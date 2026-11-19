@@ -62,12 +62,19 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 		_:
 			var spec: Array = PAINTS.get(name, PAINTS["white"])
 			m = paint(str(spec[0]), maps, float(spec[1]), float(spec[2]))
-			if name in ["white", "cream", "steel", "tube", "antifoul", "dark", "black", "pool"]:
+			if name in ["steel", "tube", "antifoul", "dark", "black", "pool"]:
 				m = m.duplicate()
 				m.albedo_texture = null
 				m.albedo_color = Color(str(spec[0]))
 				m.normal_enabled = false
 				m.normal_texture = null
+			elif name in ["white", "cream", "grey_deck"]:
+				# Subtle marine panel seams + fine weathering grain so shadowed
+				# cabins and deck roofs never read as flat untextured blocks.
+				m = m.duplicate()
+				m.albedo_color = Color(str(spec[0]))
+				m.albedo_texture = _marine_panel()
+				m.uv1_scale = Vector3.ONE * 0.5
 			# A light coat: a glossier one mirrors the whole sky off flat
 			# cabin tops, which then read as blank white slabs from above.
 			if name in ["white", "cream"]:
@@ -79,6 +86,27 @@ static func get_mat(name: String, maps: bool = true) -> StandardMaterial3D:
 	_cache[key] = m
 	_mutex.unlock()
 	return m
+
+## Subtle painted marine paneling: fine grain + faint horizontal strake seams.
+static var _panel_tex: Texture2D = null
+
+static func _marine_panel() -> Texture2D:
+	if _panel_tex != null:
+		return _panel_tex
+	var img := Image.create(128, 128, true, Image.FORMAT_RGB8)
+	for y in 128:
+		var seam := (y % 32) == 0
+		for x in 128:
+			var h := fposmod(sin(float(x * 19 + y * 37) * 12.9898) * 43758.5453, 1.0)
+			var tone := 0.965 + 0.05 * h
+			if seam:
+				tone *= 0.88
+			elif (x % 64) == 0:
+				tone *= 0.94
+			img.set_pixel(x, y, Color(tone, tone, tone))
+	img.generate_mipmaps()
+	_panel_tex = ImageTexture.create_from_image(img)
+	return _panel_tex
 
 ## A metre-wide tile of eight narrow boards, with caulk and subtle grain.
 ## Architectural wood textures have boards much too broad for a boat deck.

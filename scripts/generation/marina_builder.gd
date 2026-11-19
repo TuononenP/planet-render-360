@@ -31,7 +31,7 @@ const MAX_BOATS := 700
 ## (VesselPrototypes.KINDS) always fits; finer cells only while they do.
 const MAX_DRAW_CALLS := 96
 ## Boats farther than this from the camera use the reduced "_far" meshes (m).
-const NEAR_M := 250.0
+const NEAR_M := 420.0
 ## Side of the square cells boats are batched in for the near/far switch
 ## (m); doubled, then dropped to one batch per kind, to fit MAX_DRAW_CALLS.
 const BATCH_M := 120.0

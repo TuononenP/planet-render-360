@@ -57,6 +57,7 @@ static func mesh(kind: String) -> ArrayMesh:
 	var base := base_kind(kind)
 	var detail := not kind.ends_with("_far")
 	var lm: LandmarkMesh
+	var proto_scale := 1.0
 	match base:
 		"motor":
 			lm = geometry("motor_yacht", LEN_M, 0.0, 0.0, VesselMaterials.get_mat("hull_instance"), detail, true, 0.95, "sport")
@@ -71,9 +72,21 @@ static func mesh(kind: String) -> ArrayMesh:
 		"catamaran":
 			lm = geometry("catamaran", LEN_M, 0.0, 0.0, VesselMaterials.get_mat("hull_instance"), detail, true)
 		"houseboat":
-			lm = geometry("houseboat", LEN_M, 3.0, 3.0, VesselMaterials.paint("#4a5a63"), detail, true)
+			# Near prototype built at realistic 18 m river-barge proportions,
+			# then normalised to LEN_M; far stays compact at LEN_M.
+			if detail:
+				proto_scale = LEN_M / 18.0
+				lm = geometry("houseboat", 18.0, 5.4, 5.2, VesselMaterials.paint("#4a5a63"), true, true)
+			else:
+				lm = geometry("houseboat", LEN_M, 3.0, 3.0, VesselMaterials.paint("#4a5a63"), false, true)
 		_:
-			lm = geometry("passenger", LEN_M, 2.6, 3.4, VesselMaterials.paint("#2d3b4a"), detail, true)
+			# Near prototype built at 24 m coastal steamer proportions (2 decks +
+			# lifeboats + davits), then normalised to LEN_M; far stays compact at LEN_M.
+			if detail:
+				proto_scale = LEN_M / 24.0
+				lm = geometry("passenger", 24.0, 6.2, 8.2, VesselMaterials.paint("#2d3b4a"), true, true)
+			else:
+				lm = geometry("passenger", LEN_M, 2.6, 3.4, VesselMaterials.paint("#2d3b4a"), false, true)
 	var holder := Node3D.new()
 	var out := ArrayMesh.new()
 	var shift := LEN_M * 0.5 if base in STERN_ORIGIN else 0.0
@@ -84,14 +97,18 @@ static func mesh(kind: String) -> ArrayMesh:
 		if str(part.name).begins_with("Nav") or part.name == "Lamp":
 			continue
 		var arrays := part.mesh.surface_get_arrays(0)
-		if shift != 0.0:
+		if proto_scale != 1.0 or shift != 0.0:
 			var v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			for i in v.size():
-				v[i] += Vector3(shift, 0, 0)
+				v[i] = v[i] * proto_scale + Vector3(shift, 0, 0)
 			arrays[Mesh.ARRAY_VERTEX] = v
 		var material := part.mesh.surface_get_material(0)
-		if base == "steam" and part.name == "Glass":
+		if base in ["steam", "houseboat"] and (part.name == "Glass" or str(part.name).begins_with("Cabin")):
 			material = ShipLights.cabin_glass(0)  # one lit glass surface
+		elif base == "steam" and detail and part.name == "Orange":
+			material = VesselMaterials.get_mat("white")  # classic white lifeboats, no extra draw call
+		elif base in ["steam", "houseboat"] and detail and part.name == "Steel":
+			material = VesselMaterials.get_mat("dark")
 		if not detail:
 			# Distant fittings share a compact palette. Decks and cabin roofs stay
 			# matte non-slip grey so distant fleets never glare white from above.
