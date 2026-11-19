@@ -49,7 +49,7 @@ const COUNTRY_FLEET := {
 ## Region fleets where the map data names no country.
 const REGION_FLEET := {
 	"new_york": "north_america", "chicago": "north_america", "san_francisco": "north_america",
-	"banff": "north_america", "tokyo": "japan", "helsinki": "nordic", "espoo": "nordic",
+	"banff": "north_america", "tokyo": "japan", "helsinki": "nordic", "espoo": "nordic", "turku": "nordic",
 	"stockholm": "nordic", "oslo": "nordic", "copenhagen": "nordic", "lisbon": "south_europe",
 	"madrid": "south_europe", "barcelona": "south_europe", "rome": "south_europe", "milan": "south_europe",
 	"florence": "south_europe", "athens": "south_europe", "london": "europe", "paris": "europe",

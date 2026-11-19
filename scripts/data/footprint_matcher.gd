@@ -13,17 +13,19 @@ const SNAP_M := 3.5
 const CELL_M := 50.0
 
 ## {building index: [rows]} for `rows` ({e, n} or [_, e, n, ...]) over
-## `buildings` (local metre footprints round c_lat, c_lon).
-static func match(buildings: Array, c_lat: float, c_lon: float, rows: Array) -> Dictionary:
+## `buildings` (local metre footprints round c_lat, c_lon). Uses GK23
+## (EPSG:3877) when `gk23` is true, else GK25 (EPSG:3879).
+static func match(buildings: Array, c_lat: float, c_lon: float, rows: Array, gk23: bool = false) -> Dictionary:
 	var hits := {}
 	if rows.is_empty() or buildings.is_empty():
 		return hits
 	var grid := _grid(buildings)
-	var f := Gk25.frame(c_lat, c_lon)
+	var f := Gk23.frame(c_lat, c_lon) if gk23 else Gk25.frame(c_lat, c_lon)
 	for r in rows:
 		var e: float = float(r["e"]) if r is Dictionary else float(r[1])
 		var n: float = float(r["n"]) if r is Dictionary else float(r[2])
-		var i := _owner(buildings, grid, Gk25.frame_xz(f, e, n))
+		var p := Gk23.frame_xz(f, e, n) if gk23 else Gk25.frame_xz(f, e, n)
+		var i := _owner(buildings, grid, p)
 		if i < 0:
 			continue
 		if not hits.has(i):
@@ -72,10 +74,10 @@ static func _owner(buildings: Array, grid: Dictionary, p: Vector2) -> int:
 	for i in grid.get(key, []):
 		var b: Dictionary = buildings[i]
 		var fp: PackedVector2Array = b["footprint"]
-		if WorldScale.point_in_polygon(p, fp):
+		if Geometry2D.is_point_in_polygon(p, fp):
 			var in_hole := false
 			for h in b.get("holes", []):
-				if WorldScale.point_in_polygon(p, h):
+				if Geometry2D.is_point_in_polygon(p, h):
 					in_hole = true
 					break
 			if not in_hole:

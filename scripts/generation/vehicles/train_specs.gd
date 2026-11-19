@@ -124,7 +124,7 @@ static func pick(region: String, country: String, rail: Dictionary, h: float) ->
 		return {"kind": "emu_uk", "livery": LONDON_LIVERIES[i], "cars": 4, "panto": false}
 	if region == "berlin" and str(rail.get("class", "")) == "light_rail":
 		return {"kind": "emu", "livery": "berlin_sbahn", "cars": 4, "panto": false}
-	if country.to_upper() == "FI":
+	if region == "turku" or country.to_upper() == "FI":
 		return {"kind": "intercity" if h < 0.5 else "emu", "livery": "finland_long", "cars": cars, "panto": wired}
 	if country.to_upper() == "GB":
 		return {"kind": "emu_uk", "livery": LONDON_LIVERIES[mini(int(h * LONDON_LIVERIES.size()), LONDON_LIVERIES.size() - 1)],

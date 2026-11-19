@@ -348,4 +348,41 @@ static func rows() -> Array:
 				"34.28 m); OSM Dienvidu tilts ways 126047905/37732348 (801 m, bearing 43.4/223.4, mid " +
 				"56.91575,24.15728) so centre and bearing re-measured; order of the 77 m and 49.5 m side " +
 				"spans at each end assumed, deck height estimated from 8.5 m clearance + girder depth"},
+		{"id": "br_turku_tuomiokirkkosilta", "cc": "FI", "name": "Tuomiokirkkosilta", "wiki": "Tuomiokirkkosilta",
+			"aliases": ["cathedral bridge turku", "domkyrkobron"], "lat": 60.452268, "lon": 22.274896,
+			"bearing": 143.7, "st": "girder", "spans": [16.0, 18.0, 16.0], "width": 24.0, "clear": 4.2,
+			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Tuomiokirkkosilta, widened 1956 reinforced-concrete three-span bridge over Aurajoki, " +
+				"about 50 m long, ~24 m wide), OSM ways 4306348/27734777 (47.4-50.0 m, bearing 143.6/323.8, " +
+				"mid 60.452268,22.274896)"},
+		{"id": "br_turku_kirjastosilta", "cc": "FI", "name": "Kirjastosilta", "wiki": "Kirjastosilta",
+			"aliases": ["library bridge turku", "biblioteksbron"], "lat": 60.449458, "lon": 22.272091,
+			"bearing": 123.2, "st": "arch_deck", "spans": [56.0], "width": 5.0, "clear": 4.0, "rise": 3.5,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Kirjastosilta, 2013 white steel pedestrian bridge over Aurajoki, single ~56 m span, " +
+				"5 m wide), OSM way 103351226 (59.8 m, width 5 m, bearing 303.2, mid 60.449458,22.272091)"},
+		{"id": "br_turku_auransilta", "cc": "FI", "name": "Auransilta", "wiki": "Auransilta",
+			"aliases": ["aurasilta", "aura bridge", "aurabron"], "lat": 60.448548, "lon": 22.269742,
+			"bearing": 144.5, "st": "arch_deck", "spans": [45.0], "width": 17.5, "clear": 4.5, "rise": 4.2,
+			"material": "stone", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Auransilta, 1907 single-span steel/granite arch bridge across Aurajoki, ~45 m span, " +
+				"17.5 m wide), OSM ways 90088650/90088646/90088671 (45.2 m, bearing 144.5, mid 60.448548,22.269742)"},
+		{"id": "br_turku_teatterisilta", "cc": "FI", "name": "Teatterisilta", "wiki": "Teatterisilta",
+			"aliases": ["theatre bridge turku", "teaterbron"], "lat": 60.447032, "lon": 22.264301,
+			"bearing": 150.7, "st": "girder", "spans": [65.0], "width": 6.0, "clear": 4.5,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Teatterisilta, 1997 single-span steel pedestrian bridge by Turku City Theatre, ~65 m), " +
+				"OSM way 105064411 (66.3 m, bearing 330.7, mid 60.447032,22.264301)"},
+		{"id": "br_turku_myllysilta", "cc": "FI", "name": "Myllysilta", "wiki": "Myllysilta",
+			"aliases": ["mill bridge turku", "kvarnbron"], "lat": 60.445174, "lon": 22.257903,
+			"bearing": 145.4, "st": "girder", "spans": [22.0, 50.0, 22.0], "width": 20.0, "clear": 5.2,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Myllysilta, 2011 replacement steel box-girder bridge over Aurajoki, ~94 m total, " +
+				"~20 m wide), OSM ways 531029806/1579901611/206891995 (94.0-94.4 m, bearing 325.4, mid 60.445174,22.257903)"},
+		{"id": "br_turku_martinsilta", "cc": "FI", "name": "Martinsilta", "wiki": "Martinsilta",
+			"aliases": ["st. martin's bridge turku", "martinsbron"], "lat": 60.444341, "lon": 22.255718,
+			"bearing": 145.2, "st": "girder", "spans": [24.0, 56.0, 24.0], "width": 18.0, "clear": 5.5,
+			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Martinsilta, 1940 reinforced-concrete girder bridge over Aurajoki, ~104.5 m), " +
+				"OSM way 4306342 (104.6 m, bearing 145.2, mid 60.444341,22.255718)"},
 	]

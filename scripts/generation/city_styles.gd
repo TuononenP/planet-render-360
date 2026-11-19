@@ -48,6 +48,7 @@ const ZONES := [
 	["espoo", "espoo", 60.1755, 24.8310, 1.0],          # Keilaniemi, before Helsinki's rim
 	["helsinki", "helsinki", 60.1900, 24.9950, 9.0],
 	["espoo", "espoo", 60.1900, 24.7700, 9.0],
+	["turku", "turku", 60.4518, 22.2666, 9.5],          # Turku, Aurajoki, Ruissalo, Hirvensalo
 	["edinburgh", "edinburgh", 55.9533, -3.1883, 5.0],
 	["dublin", "dublin", 53.3498, -6.2603, 5.0],
 	["brussels", "brussels", 50.8503, 4.3517, 5.0],
@@ -114,6 +115,7 @@ const CORES := {
 	"oslo": [[59.9133, 10.7389]],                          # Karl Johans gate
 	"espoo": [[60.1760, 24.8050], [60.2190, 24.8130], [60.1590, 24.7380], [60.2050, 24.6550]],
 	"helsinki": [[60.1694, 24.9522]],                      # Senate Square
+	"turku": [[60.4518, 22.2666]],                         # Kauppatori / Aurajoki
 	"edinburgh": [[55.9500, -3.1880]],                     # the Royal Mile
 	"dublin": [[53.3473, -6.2591]],                        # O'Connell Bridge
 	"brussels": [[50.8467, 4.3525]],                       # Grand-Place
@@ -327,6 +329,21 @@ const DISTRICTS := [
 	["espoo", "espoo_modern", 60.1700, 24.7650, 0.6, 8.0],  # Niittykumpu metro centre
 	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
+	["turku", "turku_empire", 60.4508, 22.2758, 0.35, 10.0],  # Vanha Suurtori & Cathedral quarter
+	["turku", "turku_wood", 60.4480, 22.2480, 0.55, 10.0],    # Port Arthur (Portsa)
+	["turku", "turku_wood", 60.4472, 22.2775, 0.22, 12.0],    # Luostarinmäki
+	["turku", "turku_wood", 60.4408, 22.2630, 0.55, 8.0],     # Martti
+	["turku", "turku_wood", 60.4365, 22.2740, 0.50, 8.0],     # Mäntymäki
+	["turku", "turku_wood", 60.4590, 22.2990, 0.65, 8.0],     # Nummenmäki
+	["turku", "turku_midrise", 60.4495, 22.2950, 0.70, 8.0],  # Kupittaa
+	["turku", "turku_midrise", 60.4345, 22.2410, 0.50, 8.0],  # Telakkaranta & Korppolaismäki waterfront
+	["turku", "turku_midrise", 60.4428, 22.2465, 0.35, 8.0],  # Kakolanmäki new quarter
+	["turku", "turku_villa", 60.4290, 22.1500, 3.2, 8.0],     # Ruissalo
+	["turku", "turku_villa", 60.4150, 22.2300, 2.0, 6.0],     # Hirvensalo
+	["turku", "turku_element", 60.4420, 22.3620, 1.0, 8.0],   # Varissuo
+	["turku", "turku_element", 60.4880, 22.2620, 1.0, 8.0],   # Runosmäki
+	["turku", "turku_element", 60.4310, 22.3420, 0.8, 8.0],   # Lauste
+	["turku", "turku_suburb", 60.4670, 22.3130, 0.8, 8.0],    # Halinen
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
 	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands

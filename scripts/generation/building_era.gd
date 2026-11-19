@@ -452,6 +452,23 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 12 or district == "espoo_modern":
 				return "espoo_modern"
 			return "tapiola"
+		"turku":
+			var district := str(c["district"])
+			if district == "turku_empire" or (dist < 1.0 and _empire(kind, c)):
+				return "turku_empire"
+			if kind == "house" and district == "turku_villa":
+				return "turku_villa"
+			if kind == "house":
+				return "turku_wood" if district == "turku_wood" or bool(c["heritage"]) or dist < 2.2 else "turku_suburb"
+			if district in ["turku_wood", "turku_functional", "turku_suburb", "turku_element", "turku_midrise"]:
+				return district
+			if roof == "flat" and lv >= 5 and area >= 500.0 and dist > 2.2:
+				return "turku_element"
+			if roof == "flat" and lv >= 5 and dist <= 2.2:
+				return "turku_functional"
+			if dist > 3.2:
+				return "turku_suburb"
+			return "turku"
 		"stockholm":
 			var district := str(c["district"])
 			if kind == "house":

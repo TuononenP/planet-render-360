@@ -1,0 +1,66 @@
+class_name LandmarkRegistryFinlandTurku
+extends RefCounted
+
+## Registry entries for the Turku landmark batch, in the format of
+## LocationData.landmarks(). Types are built by LandmarkSetFinlandTurku.
+## Coordinates and yaw_deg follow OpenStreetMap footprints (see
+## docs/turku-landmark-sources.md); +X east, +Z south, model turns by
+## -yaw_deg so +X bears (90 + yaw_deg)°.
+
+static func entries() -> Array:
+	return [
+		{"type": "mikaelinkirkko", "name": "St. Michael's Church, Turku", "lat": 60.448717, "lon": 22.247918,
+			"radius_m": 4000.0, "wiki_title": "St. Michael's Church, Turku", "height_m": 77.0,
+			"kind": "Church", "clear_m": 34.0, "yaw_deg": -34.4, "icon": true,
+			"aliases": ["mikaelinkirkko", "st michael's church turku", "st. michael's church turku",
+				"mikaelskyrkan", "turku michael church"]},
+		{"type": "martinkirkko", "name": "St. Martin's Church, Turku", "lat": 60.440857, "lon": 22.254405,
+			"radius_m": 3500.0, "wiki_title": "St. Martin's Church, Turku", "height_m": 52.0,
+			"kind": "Church", "clear_m": 32.0, "yaw_deg": -33.7,
+			"aliases": ["martinkirkko", "st martin's church turku", "st. martin's church turku",
+				"martinskyrkan"]},
+		{"type": "turku_orthodox_church", "name": "Turku Orthodox Church", "lat": 60.452285, "lon": 22.266010,
+			"radius_m": 2500.0, "wiki_title": "Turku Orthodox Church", "height_m": 27.0,
+			"kind": "Church", "clear_m": 22.0, "yaw_deg": -34.8,
+			"aliases": ["turku orthodox church", "turun ortodoksinen kirkko",
+				"pyhän marttyyrikeisarinna aleksandran kirkko", "åbo ortodoxa kyrka"]},
+		{"type": "turku_art_museum", "name": "Turku Art Museum", "lat": 60.454107, "lon": 22.261774,
+			"radius_m": 3000.0, "wiki_title": "Turku Art Museum", "height_m": 22.0,
+			"kind": "Museum", "clear_m": 28.0, "yaw_deg": -34.7,
+			"aliases": ["turku art museum", "turun taidemuseo", "åbo konstmuseum"]},
+		{"type": "vartiovuori_observatory", "name": "Vartiovuori Observatory", "lat": 60.448699, "lon": 22.276653,
+			"radius_m": 3000.0, "wiki_title": "Vartiovuori Observatory", "height_m": 18.0,
+			"kind": "Observatory", "clear_m": 22.0, "yaw_deg": 0.5,
+			"aliases": ["vartiovuori observatory", "vartiovuoren tähtitorni", "vartiovuoren tahtitorni",
+				"vårdbergets observatorium"]},
+		{"type": "turku_market_hall", "name": "Turku Market Hall", "lat": 60.449761, "lon": 22.266060,
+			"radius_m": 2000.0, "wiki_title": "Turku Market Hall", "height_m": 13.0,
+			"kind": "Market hall", "clear_m": 62.0, "yaw_deg": 54.9,
+			"aliases": ["turku market hall", "turun kauppahalli", "kauppahalli turku", "åbo saluhall"]},
+		{"type": "turku_main_library", "name": "Turku Main Library", "lat": 60.450810, "lon": 22.272273,
+			"radius_m": 2500.0, "wiki_title": "Turku City Library", "height_m": 18.0,
+			"kind": "Library", "clear_m": 30.0, "yaw_deg": -35.5,
+			"aliases": ["turku main library", "turku city library", "turun pääkirjasto",
+				"turun kaupunginkirjasto", "vanha kirjasto", "åbo huvudbibliotek"]},
+		{"type": "turku_city_theatre", "name": "Turku City Theatre", "lat": 60.445939, "lon": 22.264207,
+			"radius_m": 2500.0, "wiki_title": "Turku City Theatre", "height_m": 22.0,
+			"kind": "Theatre", "clear_m": 54.0, "yaw_deg": -31.2,
+			"aliases": ["turku city theatre", "turun kaupunginteatteri", "åbo stadsteater"]},
+		{"type": "kakola_prison", "name": "Kakola", "lat": 60.444429, "lon": 22.247103,
+			"radius_m": 3500.0, "wiki_title": "Kakola", "height_m": 24.0,
+			"kind": "Landmark", "clear_m": 44.0, "yaw_deg": -32.0,
+			"aliases": ["kakola", "kakola prison", "kakolan vankila", "hotel kakola"]},
+		{"type": "vanha_suurtori", "name": "Brinkkala Mansion", "lat": 60.450508, "lon": 22.275468,
+			"radius_m": 2000.0, "wiki_title": "Brinkkala Mansion", "height_m": 15.0,
+			"kind": "Historic", "clear_m": 26.0, "yaw_deg": -59.0,
+			"aliases": ["brinkkala", "brinkkala mansion", "brinkkalan talo", "vanha suurtori",
+				"old great square turku"]},
+		{"type": "suomen_joutsen", "name": "Suomen Joutsen", "lat": 60.436330, "lon": 22.237154,
+			"radius_m": 3000.0, "wiki_title": "Suomen Joutsen", "height_m": 44.0,
+			"kind": "Museum ship", "clear_m": 48.0, "yaw_deg": -33.9, "base": "water", "icon": true,
+			"aliases": ["suomen joutsen", "swan of finland", "forum marinum"]},
+		{"type": "fori_ferry", "name": "Föri", "lat": 60.441137, "lon": 22.247901,
+			"radius_m": 2000.0, "wiki_title": "Föri", "height_m": 5.5,
+			"kind": "Ferry", "clear_m": 12.0, "yaw_deg": -35.5, "base": "water",
+			"aliases": ["föri", "fori", "föri ferry", "fori ferry", "turku ferry"]},
+	]

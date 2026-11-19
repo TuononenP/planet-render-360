@@ -16,12 +16,24 @@ func _init() -> void:
 	var rows := HelsinkiLod2.read_cell(CELL)
 	_check(rows.size() > 100, "The bundled cell must read and pass its hash (%d rows)" % rows.size())
 	_check(HelsinkiLod2.covers(60.1699, 24.9384), "Central Helsinki has bundled cells")
-	_check(not HelsinkiLod2.covers(60.4518, 22.2666), "Turku has none")
+	_check(not HelsinkiLod2.covers(61.4978, 23.7610), "Tampere has none")
+	_check(HelsinkiLod2.covers(60.4518, 22.2666), "Turku centre has bundled cells")
+	var turku := HelsinkiLod2.rows_for(60.4518, 22.2666)
+	_check(turku.size() > 1000, "Turku centre reads Turku's rows (%d)" % turku.size())
+	_check(HelsinkiLod2.credits_for(60.4518, 22.2666).size() == 1
+		and str(HelsinkiLod2.credits_for(60.4518, 22.2666)[0]).contains("Turku"), "Turku cells credit Turku")
+	_check(HelsinkiLod2.covers(60.2050, 24.6550), "Espoo centre has bundled cells")
+	var espoo := HelsinkiLod2.rows_for(60.1755, 24.8050)
+	_check(espoo.size() > 500, "Tapiola reads Espoo's rows (%d)" % espoo.size())
+	_check(HelsinkiLod2.credits_for(60.2050, 24.6550).size() == 1
+		and str(HelsinkiLod2.credits_for(60.2050, 24.6550)[0]).contains("Espoo"), "Espoo cells credit Espoo")
+	_check(HelsinkiLod2.credits_for(60.1699, 24.9384) == [HelsinkiLod2.CREDIT], "Central Helsinki credits Helsinki alone")
 	_check(HelsinkiLod2.cell_keys(60.1699, 24.9384).has(CELL), "The window round Kamppi includes the cell")
 	if rows.size() > 3:
 		_apply(rows)
+	_directions()
 	if failures.is_empty():
-		print("HELSINKI LOD2 OK: cells, matching, heights, roofs, idempotence")
+		print("HELSINKI LOD2 OK: cells, matching, heights, roofs, directions, idempotence")
 		quit(0)
 	else:
 		for f in failures:
@@ -40,6 +52,19 @@ func _building(p: Vector2, extra: Dictionary = {}) -> Dictionary:
 		"levels": 0.0, "roof_shape": "", "roof_angle": 0.0, "parts": [], "kind": "yes"}
 	b.merge(extra, true)
 	return b
+
+func _directions() -> void:
+	# 20 m east-west by 8 m: the long side runs east (local x).
+	var ring := PackedVector2Array([Vector2(-10, -4), Vector2(10, -4), Vector2(10, 4), Vector2(-10, 4)])
+	var b := {"footprint": ring, "roof_dir": -1.0, "roof_orient": ""}
+	_check(HelsinkiLod2.roof_dir(b, "gabled", 90.0) < 0.0, "A ridge along the long side keeps the native axis")
+	_check(is_equal_approx(HelsinkiLod2.roof_dir(b, "gabled", 0.0), 90.0), "A north-south ridge turns the roof to face east")
+	_check(HelsinkiLod2.roof_dir(b, "gabled", 80.0) < 0.0, "A ridge 10 degrees off stays on the footprint's axis")
+	_check(HelsinkiLod2.roof_dir(b, "skillion", 0.0) < 0.0, "A skillion falling north (the default) is left")
+	_check(is_equal_approx(HelsinkiLod2.roof_dir(b, "skillion", 180.0), 180.0), "A skillion falling south takes its bearing")
+	_check(HelsinkiLod2.roof_dir(b, "flat", 0.0) < 0.0, "A flat roof has no direction")
+	var mapped := {"footprint": ring, "roof_dir": 45.0, "roof_orient": ""}
+	_check(HelsinkiLod2.roof_dir(mapped, "gabled", 0.0) < 0.0, "A mapped roof:direction wins")
 
 func _apply(rows: Array) -> void:
 	# Real rows with a roof shape the app uses, a sloped one first.

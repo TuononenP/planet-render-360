@@ -4,7 +4,8 @@ extends Node
 ## City open-data layers beside the OSM fetch, for places that publish
 ## them (Helsinki: the building register, HelsinkiRegister; the tree
 ## register, HelsinkiTrees; the surveyed street areas, HelsinkiStreets;
-## and the bundled LoD2 roofs, HelsinkiLod2). Each answer is cached raw under
+## and the bundled LoD2 roofs, HelsinkiLod2; Espoo and Vantaa: HSY's
+## regional building register, HsyRegister). Each answer is cached raw under
 ## user://cache per place, decoded on the worker pool, and `land` merges
 ## both into the map data before GroundTruth reads it. Any failure leaves
 ## the place on its map data, as before. No key, no account.
@@ -26,9 +27,11 @@ static var _decoded := {}
 const DECODED_KEEP := 8
 ## Test hook: when set, a merge waits on it before it starts.
 var _merge_gate: Semaphore = null
-const LAYER_NAMES := ["register", "trees", "carriageway", "walkways"]
+const LAYER_NAMES := ["register", "trees", "carriageway", "walkways", "hsy_register",
+	"turku_trees", "turku_streets"]
 const PREFIX := {"register": "hkireg_v1", "trees": "hkitree_v1",
-	"carriageway": "hkistreet_car_v1", "walkways": "hkistreet_walk_v1"}
+	"carriageway": "hkistreet_car_v1", "walkways": "hkistreet_walk_v1", "hsy_register": "hsyreg_v1",
+	"turku_trees": "tkutree_v1", "turku_streets": "tkustreet_v1"}
 
 func _ready() -> void:
 	for name in LAYER_NAMES:
@@ -41,30 +44,53 @@ func _ready() -> void:
 			_on_completed(name, result, code, body))
 
 static func cache_path(name: String, lat: float, lon: float) -> String:
-	return "%s/%s_%d_%d.json" % [CacheStore.base_dir(), PREFIX[name], CacheStore.quant(lat), CacheStore.quant(lon)]
+	var ext := "xml" if name.begins_with("turku_") else "json"
+	return "%s/%s_%d_%d.%s" % [CacheStore.base_dir(), PREFIX[name], CacheStore.quant(lat), CacheStore.quant(lon), ext]
+
+## Whether layer `name` has data round (lat, lon).
+static func covers(name: String, lat: float, lon: float) -> bool:
+	if name == "hsy_register":
+		return HsyRegister.covers(lat, lon)
+	if name == "turku_trees":
+		return TurkuTrees.covers(lat, lon)
+	if name == "turku_streets":
+		return TurkuStreets.covers(lat, lon)
+	return HelsinkiRegister.covers(lat, lon)
 
 static func request_url(name: String, lat: float, lon: float) -> String:
 	match name:
+		"hsy_register":
+			return HsyRegister.request_url(lat, lon)
 		"register":
 			return HelsinkiRegister.request_url(lat, lon)
 		"trees":
 			return HelsinkiTrees.request_url(lat, lon)
+		"turku_trees":
+			return TurkuTrees.request_url(lat, lon)
+		"turku_streets":
+			return TurkuStreets.request_url(lat, lon)
 	return HelsinkiStreets.request_url(name, lat, lon)
 
 static func decode(name: String, text: String) -> Variant:
 	match name:
+		"hsy_register":
+			return HsyRegister.decode(text)
 		"register":
 			return HelsinkiRegister.decode(text)
 		"trees":
 			return HelsinkiTrees.decode(text)
+		"turku_trees":
+			return TurkuTrees.decode(text)
+		"turku_streets":
+			return TurkuStreets.decode(text)
 	return HelsinkiStreets.decode(text)
 
 ## Starts every layer that covers (lat, lon); the rest finish at once.
 func fetch(lat: float, lon: float) -> void:
 	cancel()
-	var covered := HelsinkiRegister.covers(lat, lon)
 	for name in _layers:
 		var layer: Dictionary = _layers[name]
+		var covered := covers(name, lat, lon)
 		layer["rows"] = []
 		layer["done"] = not covered
 		if not covered:
@@ -179,6 +205,9 @@ func land(data: LocationData, budget_s: float = LAND_WAIT_S, merge_layers: bool 
 	var trees: Array = _layers["trees"]["rows"] if _layers["trees"]["done"] else []
 	var car: Array = _layers["carriageway"]["rows"] if _layers["carriageway"]["done"] else []
 	var walk: Array = _layers["walkways"]["rows"] if _layers["walkways"]["done"] else []
+	var hsy: Array = _layers["hsy_register"]["rows"] if _layers["hsy_register"]["done"] else []
+	var tku_trees: Array = _layers["turku_trees"]["rows"] if _layers["turku_trees"]["done"] else []
+	var tku_streets: Array = _layers["turku_streets"]["rows"] if _layers["turku_streets"]["done"] else []
 	var extra_trees := CityDetail.extra_trees(data)
 	# Thousands of footprints, points, polygons and probes: off the main
 	# thread. Nothing else reads this data's buildings, trees or roads
@@ -191,7 +220,7 @@ func land(data: LocationData, budget_s: float = LAND_WAIT_S, merge_layers: bool 
 	var task := WorkerThreadPool.add_task(func() -> void:
 		if gate != null:
 			gate.wait()
-		out.merge(merge(data, reg, trees, car, walk, extra_trees)), false, "CityOpenData")
+		out.merge(merge(data, reg, trees, car, walk, extra_trees, hsy, tku_trees, tku_streets)), false, "CityOpenData")
 	_land_task = task
 	# cancel() (or a newer run) joins and forgets the task: stop then.
 	while _land_task == task and not WorkerThreadPool.is_task_completed(task) and is_inside_tree():
@@ -209,7 +238,7 @@ func land(data: LocationData, budget_s: float = LAND_WAIT_S, merge_layers: bool 
 ## roofs, then the register, the tree register and the street areas.
 ## Returns {log: [lines], credits: [strings]}.
 static func merge(data: LocationData, reg: Array, trees: Array, car: Array, walk: Array,
-		extra_trees: bool) -> Dictionary:
+		extra_trees: bool, hsy: Array = [], tku_trees: Array = [], tku_streets: Array = []) -> Dictionary:
 	var log: Array = []
 	var credits: Array = []
 	# Measured heights and roofs first: the register only fills a height
@@ -219,19 +248,34 @@ static func merge(data: LocationData, reg: Array, trees: Array, car: Array, walk
 		var st := HelsinkiLod2.apply(data.buildings, data.latitude, data.longitude, lod2)
 		log.append("LOD2: %d rows / %d matched / %d filled" % [st["rows"], st["matched"], st["filled"]])
 		if int(st["matched"]) > 0:
-			credits.append(HelsinkiLod2.CREDIT)
+			credits.append_array(HelsinkiLod2.credits_for(data.latitude, data.longitude))
 	if not reg.is_empty() and not data.buildings.is_empty():
 		var st := HelsinkiRegister.apply(data.buildings, data.latitude, data.longitude, reg)
 		log.append("REGISTER: %d rows / %d matched / %d filled" % [st["rows"], st["matched"], st["filled"]])
 		credits.append(HelsinkiRegister.CREDIT)
+	if not hsy.is_empty() and not data.buildings.is_empty():
+		var st := HelsinkiRegister.apply(data.buildings, data.latitude, data.longitude, hsy)
+		log.append("HSY REGISTER: %d rows / %d matched / %d filled" % [st["rows"], st["matched"], st["filled"]])
+		if int(st["matched"]) > 0:
+			credits.append(HsyRegister.CREDIT)
 	if not trees.is_empty():
 		var st := {}
 		data.trees = HelsinkiTrees.merge(data.trees, data.latitude, data.longitude, trees, extra_trees, st)
 		log.append("TREE REGISTER: %d rows / %d matched / %d added" % [st["rows"], st["matched"], st["added"]])
 		credits.append(HelsinkiTrees.CREDIT)
+	if not tku_trees.is_empty():
+		var st := {}
+		data.trees = TurkuTrees.merge(data.trees, data.latitude, data.longitude, tku_trees, extra_trees, st)
+		log.append("TURKU TREES: %d rows / %d matched / %d added" % [st["rows"], st["matched"], st["added"]])
+		credits.append(TurkuTrees.CREDIT)
 	if not car.is_empty() or not walk.is_empty():
 		var st := HelsinkiStreets.apply(data, car, walk)
 		log.append("STREETS: %s" % str(st))
 		if int(st["widths"]) > 0 or int(st["paved"]) > 0:
 			credits.append(HelsinkiStreets.CREDIT)
+	if not tku_streets.is_empty():
+		var st := TurkuStreets.apply(data, tku_streets)
+		log.append("TURKU STREETS: %s" % str(st))
+		if int(st["widths"]) > 0 or int(st["paved"]) > 0:
+			credits.append(TurkuStreets.CREDIT)
 	return {"log": log, "credits": credits}

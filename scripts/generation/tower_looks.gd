@@ -8,7 +8,7 @@ extends RefCounted
 
 const GULF := ["gulf", "arab", "dubai", "doha", "riyadh", "abu_dhabi", "mideast", "kuwait"]
 const ASIA := ["east_asia", "japan", "tokyo", "shanghai", "seoul", "hong_kong", "singapore", "se_asia", "beijing", "bangkok", "kuala"]
-const EUROPE := ["europe", "london", "paris", "nordic", "frankfurt", "haussmann", "mediterranean", "alpine", "berlin", "madrid", "stockholm", "helsinki"]
+const EUROPE := ["europe", "london", "paris", "nordic", "frankfurt", "haussmann", "mediterranean", "alpine", "berlin", "madrid", "stockholm", "helsinki", "turku"]
 
 ## [glazing id, cumulative share] by region family.
 const PALETTES := {

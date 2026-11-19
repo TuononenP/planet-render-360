@@ -17,7 +17,7 @@ const CITIES := {
 	"warsaw": [52.2297, 21.0122, "warsaw"], "interlaken": [46.6863, 7.8632, "interlaken"],
 	"banff": [51.1789, -115.5708, "banff"], "big_sur": [36.2704, -121.8081, "mountain_lodge"],
 	"whistler": [50.1163, -122.9574, "mountain_lodge"], "zurich": [47.3769, 8.5417, "alpine"], "innsbruck": [47.2692, 11.4041, "alpine"],
-	"espoo": [60.1760, 24.8050, "espoo"], "helsinki": [60.1699, 24.9384, "helsinki"], "turku": [60.4518, 22.2666, "nordic"],
+	"espoo": [60.1760, 24.8050, "espoo"], "helsinki": [60.1699, 24.9384, "helsinki"], "turku": [60.4518, 22.2666, "turku"],
 	"stockholm": [59.3293, 18.0686, "stockholm"], "venice": [45.4375, 12.3358, "venice"], "oslo": [59.9139, 10.7522, "oslo"],
 	"reykjavik": [64.1466, -21.9426, "reykjavik"], "madrid": [40.4168, -3.7038, "madrid"],
 	"barcelona": [41.3874, 2.1686, "barcelona"], "lisbon": [38.7223, -9.1393, "lisbon"],
