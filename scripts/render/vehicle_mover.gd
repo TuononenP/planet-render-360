@@ -59,12 +59,19 @@ const NEAR_M := 400.0
 const FAR_STEP_S := 0.5
 ## Longest step simulated at once.
 const MAX_STEP_S := 0.1
+## Nearest moving trams/trains that carry live headlight + taillight pools at night.
+const MAX_HEADLIGHT_TRAINS := 8
+const HEADLIGHT_ENERGY := 3.2
+const TAILLIGHT_ENERGY := 0.9
 
 var _trains: Array = []
 var _m2u := 1.0
 var _clock := 0.0
 ## The deck trams' shared cycle (s): the longest of their runs at cruise.
 var _deck_cycle := 0.0
+var _night_lights := false
+var _lights_holder: Node3D
+var _lights_source: Node3D
 
 ## A mover for the trams and platform trains under `world`, planned from
 ## `data` as the world was built; null when there are none to move.
@@ -73,6 +80,7 @@ static func attach(world: Node, data: LocationData, ground: GroundTruth) -> Vehi
 		return null
 	var mover := VehicleMover.new()
 	mover._m2u = WorldScale.metres_to_units()
+	mover._night_lights = RenderQuality.ultra_desktop(data.quality_preset)
 	var planned: Dictionary = data.get_meta(PLANS_META, {}) if data.has_meta(PLANS_GROUND) \
 		and data.get_meta(PLANS_GROUND) == ground \
 		else {}
@@ -152,15 +160,21 @@ func tick(delta: float, eye: Vector2) -> void:
 		_clock += dt
 		for t: Dictionary in _trains:
 			_step(t, dt)
+	var night := StreetGlow.night
 	for t: Dictionary in _trains:
 		var near := (t["mid"] as Vector2).distance_to(eye) < NEAR_M * _m2u
 		t["age"] = float(t["age"]) + delta
 		if bool(t["moved"]) and (near or float(t["age"]) >= FAR_STEP_S):
 			_pose(t)
 			t["age"] = 0.0
+		_sync_vehicle_lights(t, night)
 
 func stop() -> void:
 	_trains.clear()
+	if _lights_holder != null and is_instance_valid(_lights_holder):
+		_lights_holder.queue_free()
+	_lights_holder = null
+	_lights_source = null
 
 ## Takes the trains of `plan` whose nodes `holder` has (named `prefix`
 ## + train + "_" + section + "_near" / "_far" / "_shadow").
@@ -225,7 +239,10 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 			"loop": not platform_only, "hidden": false,
 			"deck_mid": NAN if platform_only else _deck_mid(route),
 			"signals": PackedFloat32Array() if platform_only else _signals(route, span, data),
-			"salt": salt, "target": NAN, "blocked": 0.0, "moved": false, "age": 0.0, "mid": route.xz_at(s0), "n": 0})
+			"salt": salt, "target": NAN, "blocked": 0.0, "moved": false, "age": 0.0, "mid": route.xz_at(s0), "n": 0,
+			"headlight": null, "taillight": null})
+		if _night_lights and _trains.size() <= MAX_HEADLIGHT_TRAINS:
+			_attach_vehicle_lights(holder, _trains[_trains.size() - 1])
 
 ## The way trams run along `route` (1 with its points, -1 against them):
 ## the driving side of `country` against its twin track (the nearest
@@ -495,3 +512,93 @@ func _pose(t: Dictionary) -> void:
 		for node: Node3D in rows[i]:
 			node.transform = pose
 			node.visible = not bool(t["hidden"])
+	_pose_vehicle_lights(t, placed, sections)
+
+func _attach_vehicle_lights(holder: Node, t: Dictionary) -> void:
+	if _lights_holder == null or not is_instance_valid(_lights_holder):
+		_lights_holder = Node3D.new()
+		_lights_holder.name = "VehicleLights"
+		# Attach outside the cached world subtree (onto world_root when
+		# present) so cached vs live world node counts match exactly.
+		var world_parent := holder.get_parent().get_parent() if holder.get_parent() != null else null
+		(world_parent if world_parent != null else holder).add_child(_lights_holder)
+		_lights_source = holder as Node3D
+		if world_parent != null:
+			var lh := _lights_holder
+			holder.tree_exited.connect(func() -> void:
+				if is_instance_valid(lh):
+					lh.queue_free()
+				if _lights_holder == lh:
+					_lights_holder = null
+			, Object.CONNECT_ONE_SHOT)
+	var lights := _lights_holder
+	var head := SpotLight3D.new()
+	head.light_color = Color(1.0, 0.94, 0.82)
+	head.light_energy = 0.0
+	head.light_volumetric_fog_energy = 1.8
+	head.spot_range = 26.0 * _m2u
+	head.spot_angle = 40.0
+	head.spot_attenuation = 1.1
+	head.shadow_enabled = false
+	head.distance_fade_enabled = true
+	head.distance_fade_begin = 160.0 * _m2u
+	head.distance_fade_length = 50.0 * _m2u
+	head.visible = false
+	lights.add_child(head)
+	var tail := OmniLight3D.new()
+	tail.light_color = Color(1.0, 0.14, 0.10)
+	tail.light_energy = 0.0
+	tail.omni_range = 5.0 * _m2u
+	tail.omni_attenuation = 1.4
+	tail.shadow_enabled = false
+	tail.distance_fade_enabled = true
+	tail.distance_fade_begin = 160.0 * _m2u
+	tail.distance_fade_length = 50.0 * _m2u
+	tail.visible = false
+	lights.add_child(tail)
+	t["headlight"] = head
+	t["taillight"] = tail
+	var placed := (t["route"] as TramRoute).place_train(float(t["s"]), t["sections"] as Array)
+	_pose_vehicle_lights(t, placed, t["sections"] as Array)
+	_sync_vehicle_lights(t, StreetGlow.night)
+
+func _pose_vehicle_lights(t: Dictionary, placed: Array, sections: Array) -> void:
+	var head := t["headlight"] as SpotLight3D
+	var tail := t["taillight"] as OmniLight3D
+	if head == null or tail == null or placed.is_empty():
+		return
+	if _lights_holder != null and is_instance_valid(_lights_holder) \
+			and _lights_source != null and is_instance_valid(_lights_source) \
+			and _lights_holder.is_inside_tree() and _lights_source.is_inside_tree() \
+			and _lights_holder.get_parent() != _lights_source:
+		_lights_holder.global_transform = _lights_source.global_transform
+	var forward := float(t["dir"]) >= 0.0
+	var lead_i := 0 if forward else sections.size() - 1
+	var rear_i := sections.size() - 1 if forward else 0
+	var lead_pose: Transform3D = placed[lead_i]
+	var rear_pose: Transform3D = placed[rear_i]
+	var lead_half := float((sections[lead_i] as Dictionary)["len"]) * 0.5 * _m2u
+	var rear_half := float((sections[rear_i] as Dictionary)["len"]) * 0.5 * _m2u
+	var lead_fwd := (lead_pose.basis.x if forward else -lead_pose.basis.x).normalized()
+	var rear_back := (-rear_pose.basis.x if forward else rear_pose.basis.x).normalized()
+	var up := lead_pose.basis.y.normalized()
+	var head_pos := lead_pose.origin + lead_fwd * (lead_half + 0.15 * _m2u) + up * 1.15 * _m2u
+	# SpotLight3D shines along -Z; aim along lead_fwd pitched slightly down onto the track.
+	var aim := (lead_fwd - up * 0.18).normalized()
+	var right := aim.cross(up).normalized()
+	if right.length_squared() < 0.01:
+		right = Vector3.RIGHT
+	head.transform = Transform3D(Basis(right, right.cross(aim).normalized(), -aim), head_pos)
+	tail.position = rear_pose.origin + rear_back * (rear_half + 0.2 * _m2u) + rear_pose.basis.y.normalized() * 1.15 * _m2u
+
+func _sync_vehicle_lights(t: Dictionary, night: float) -> void:
+	var head := t["headlight"] as SpotLight3D
+	var tail := t["taillight"] as OmniLight3D
+	if head == null or tail == null:
+		return
+	var on := night > 0.02 and not bool(t["hidden"])
+	head.visible = on
+	tail.visible = on
+	if on:
+		head.light_energy = HEADLIGHT_ENERGY * night
+		tail.light_energy = TAILLIGHT_ENERGY * night

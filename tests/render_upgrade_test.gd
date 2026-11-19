@@ -35,8 +35,8 @@ func _run() -> void:
 	if env.glow_bloom > 0.0 or env.glow_hdr_threshold < 1.0:
 		failures.append("glow should come from HDR highlights only (bloom %.2f, threshold %.2f)"
 			% [env.glow_bloom, env.glow_hdr_threshold])
-	if env.ambient_light_sky_contribution < 1.0 or env.tonemap_mode != Environment.TONE_MAPPER_ACES:
-		failures.append("ambient should be the sky, tonemap ACES")
+	if env.ambient_light_sky_contribution < 1.0 or env.tonemap_mode != Environment.TONE_MAPPER_AGX:
+		failures.append("ambient should be the sky, tonemap AgX")
 	# Facade layers.
 	var look := {"frame": Color(0.8, 0.8, 0.78), "window": "casement", "variant": 1}
 	var texs := FacadeComposer.compose_tile("limestone", "punched", 1, look,

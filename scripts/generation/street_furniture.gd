@@ -123,8 +123,55 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mmi.multimesh = mm
 		mmi.name = "Furniture_%s" % key
 		holder.add_child(mmi)
+	_add_contact_shadows(holder, placed, m2u)
 	root.add_child(holder)
 	return count
+
+## Soft ground contact-shadow footprints (x along facing, z across, m) per
+## street-furniture kind; poles/signs are too narrow for a ground blot.
+const SHADOW_FOOTPRINT := {
+	"bench_wood": Vector2(0.85, 2.0), "bench_stone": Vector2(0.85, 2.0),
+	"bus_stop": Vector2(1.8, 3.6),
+	"bin_post": Vector2(0.55, 0.55), "bin_drum": Vector2(0.75, 0.75),
+	"bin_nyc": Vector2(0.75, 0.75), "bin_black": Vector2(0.65, 0.65),
+	"bollard_black": Vector2(0.42, 0.42), "bollard_red": Vector2(0.42, 0.42),
+}
+
+static var _shadow_quad: PlaneMesh
+
+static func _contact_quad() -> PlaneMesh:
+	if _shadow_quad == null:
+		var p := PlaneMesh.new()
+		p.size = Vector2.ONE
+		p.center_offset = Vector3(0.0, 0.025, 0.0)
+		p.material = CarPaint.shadow_material()
+		_shadow_quad = p
+	return _shadow_quad
+
+static func _add_contact_shadows(holder: Node3D, placed: Dictionary, m2u: float) -> void:
+	var xfs: Array[Transform3D] = []
+	for key in placed:
+		if not SHADOW_FOOTPRINT.has(key):
+			continue
+		var sz: Vector2 = SHADOW_FOOTPRINT[key]
+		var s := Basis.from_scale(Vector3(sz.x, 1.0, sz.y))
+		for t: Transform3D in (placed[key] as Array):
+			xfs.append(Transform3D(t.basis * s, t.origin))
+	if xfs.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _contact_quad()
+	mm.instance_count = xfs.size()
+	for i in xfs.size():
+		mm.set_instance_transform(i, xfs[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "FurnitureShadows"
+	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.set_meta("lod_own", true)
+	mmi.visibility_range_end = 160.0 * m2u
+	holder.add_child(mmi)
 
 ## `p`, or the nearest point along its street (a signal faces along it,
 ## anything else faces across it) out of every carriageway; INF when

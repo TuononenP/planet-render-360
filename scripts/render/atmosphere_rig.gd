@@ -82,6 +82,7 @@ static func sun_transmittance(elev_deg: float, haze: float = 1.0) -> Color:
 var sun: DirectionalLight3D
 var world_environment: WorldEnvironment
 var environment: Environment
+var camera_attributes: CameraAttributesPractical
 var sky_material: ShaderMaterial
 ## Render units per metre of the generated world (WorldScale; identity
 ## since the T7.0 metre cutover); haze density is defined per metre.
@@ -133,6 +134,10 @@ var lightning: LightningRig
 ## Coastal fog lying on the sea (fog weather at a place with a coastline).
 var marine: MarineLayer
 var _coastal := false
+## Valley floor elevation (render Y) for height-based morning/damp mist.
+var _valley_floor_y := 0.0
+var _valley_has_floor := false
+var _valley_arid := false
 ## Unified volumetric-haze driver (0..1, fed by HazeRig on Ultra): scales
 ## fog light energy, directional sun scatter, glow highlight threshold/
 ## intensity and froxel density together without re-capturing probes.
@@ -301,6 +306,8 @@ func set_quality(preset: int) -> void:
 	sky_material.set_shader_parameter("octaves", RenderSettings.cloud_octaves_for(_preset))
 	sky_material.set_shader_parameter("cloud_quality", _preset)
 	RenderQuality.apply_environment(environment, _preset)
+	if camera_attributes != null:
+		RenderQuality.apply_camera_attributes(camera_attributes, _preset)
 	RenderQuality.apply_light(sun, _preset)
 	sun.shadow_opacity = float(weather_look["shadow_opacity"])
 	_update_lightning()
@@ -321,6 +328,14 @@ func is_foggy() -> bool:
 func set_coast(sea_y: float, coastal: bool) -> void:
 	_coastal = coastal
 	marine.set_sea(sea_y, units_per_metre)
+	_apply()
+
+## Sets the local valley/water floor elevation (render Y) for subtle
+## height-based mist at low sun and in damp weather; arid places stay clear.
+func set_valley_floor(floor_y: float, arid: bool = false) -> void:
+	_valley_floor_y = floor_y
+	_valley_has_floor = true
+	_valley_arid = arid
 	_apply()
 
 func _marine_on() -> bool:
@@ -363,9 +378,11 @@ func _build_environment() -> void:
 	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	sky.radiance_size = Sky.RADIANCE_SIZE_128
 	environment.sky = sky
-	# Ambient sky light, ACES grade, glow and haze model (every tier).
+	# Ambient sky light, AgX grade, glow and haze model (every tier).
 	PostGrade.apply(environment)
 	world_environment.environment = environment
+	camera_attributes = CameraAttributesPractical.new()
+	world_environment.camera_attributes = camera_attributes
 	add_child(world_environment)
 
 # --- State -> light / sky / fog ---
@@ -608,6 +625,17 @@ func _apply() -> void:
 	# A marine layer carries the fog itself; the air above it stays hazy.
 	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)
 	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
+	# Subtle height-based valley mist: gathers over inland valleys and basins
+	# near dawn, golden hour and damp weather while leaving peaks crisp.
+	# Kept off coastal harbours (MarineLayer handles sea fog) and arid sites.
+	if _valley_has_floor and not _valley_arid and not _coastal and not _marine_on() and not is_foggy():
+		var damp := 0.35 if str(look["precip"]) != "none" else 0.0
+		var season_mist := 0.35 if season == LocationData.Season.AUTUMN else (0.2 if season == LocationData.Season.SPRING else 0.0)
+		var mist := (0.00003 + 0.00012 * low_sun + 0.00009 * maxf(damp, season_mist)) * (1.0 - 0.65 * night_amount)
+		environment.fog_height = _valley_floor_y + 12.0 * units_per_metre
+		environment.fog_height_density = mist / maxf(units_per_metre, 1e-4)
+	else:
+		environment.fog_height_density = 0.0
 	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
 	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
 	_base_sun_scatter = 0.0 if night else 0.14 * low_sun * (1.0 - overcast)

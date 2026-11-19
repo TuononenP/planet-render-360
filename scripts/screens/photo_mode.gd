@@ -17,6 +17,22 @@ const VIDEO_DIR_FALLBACK := "user://videos"
 static var dir_override := ""
 const PREFIX := "planet-render-360"
 const DRAW_WAIT_MS := 2000
+## Subtle far-field optical softness used only during 2D photo capture on
+## Forward+ Ultra; exploration keeps full sharpness.
+const DOF_DISTANCE_M := 220.0
+const DOF_TRANSITION_M := 360.0
+const DOF_AMOUNT := 0.035
+
+## Enables or restores subtle optical depth-of-field on `attrs` for a photo
+## capture, leaving auto-exposure and exploration untouched.
+static func apply_dof(attrs: CameraAttributesPractical, on: bool,
+		focus_m: float = DOF_DISTANCE_M) -> void:
+	if attrs == null:
+		return
+	attrs.dof_blur_far_enabled = on
+	attrs.dof_blur_far_distance = maxf(focus_m, 20.0)
+	attrs.dof_blur_far_transition = DOF_TRANSITION_M
+	attrs.dof_blur_amount = DOF_AMOUNT if on else 0.0
 
 ## "paris-france" from "Paris, France": lowercase letters and digits
 ## joined by single dashes (accented and non-Latin letters are kept).

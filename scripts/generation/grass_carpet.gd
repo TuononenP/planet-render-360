@@ -144,12 +144,14 @@ void vertex() {
 		float s = mix(0.25, 1.0, fade);
 		float bury = 1.0 - 0.95 * snow_bury(vec3(root.x, y, root.y));
 		vec3 p = vec3(root.x + (xz.x + side.x) * s, y + local.y * hgt * s * bury, root.y + (xz.y + side.y) * s);
-		// Wind: tips sway, a slow gust front travels; short turf barely moves.
-		float gust = sin(p.x * 0.07 + p.z * 0.05 - TIME * 1.3) * 0.5 + 0.5;
-		float ph = TIME * 2.3 + p.x * 0.9 + p.z * 0.7;
-		float amp = sway * hgt * t * t * (0.4 + gust) * 2.0;
-		p.x += sin(ph) * amp;
-		p.z += cos(ph * 0.83) * amp * 0.6;
+		// Wind: tips sway along WaterShader.WIND's travelling gust front.
+		vec2 wd = vec2(0.86, 0.51);
+		float front = dot(p.xz, wd) * 0.075;
+		float gust = 0.5 + 0.5 * sin(TIME * 1.15 - front) + 0.25 * sin(TIME * 2.1 - front * 1.6 + 0.8);
+		float storm = 1.0 + 0.8 * clamp(climate_rain, 0.0, 1.0);
+		float ph = TIME * 2.5 + p.x * 0.9 + p.z * 0.7;
+		float amp = sway * hgt * t * t * (0.4 + gust) * 1.9 * storm;
+		p.xz += wd * (amp * (0.65 + 0.35 * sin(ph))) + vec2(-wd.y, wd.x) * (cos(ph * 0.83) * amp * 0.35);
 		VERTEX = p;
 		wpos = p;
 		vec3 n = normalize(vec3(-side.y, 0.0, side.x) + 1e-5);
@@ -185,10 +187,11 @@ void fragment() {
 	vec3 nn = dot(NORMAL, up) < 0.0 ? -NORMAL : NORMAL;
 	NORMAL = normalize(mix(nn, up, 0.5));
 	float sc = snow_cover(wpos, 1.0);
-	ALBEDO = mix(c, snow_col, sc * 0.8);
+	float wet = climate_wetness * (1.0 - sc);
+	ALBEDO = mix(c * mix(1.0, 0.82, wet), snow_col, sc * 0.8);
 	BACKLIGHT = c * vec3(0.4, 0.36, 0.2);
-	ROUGHNESS = mix(0.9, 0.6, tipv);
-	SPECULAR = mix(0.18, 0.45, tipv);
+	ROUGHNESS = mix(mix(0.9, 0.6, tipv), 0.28, wet);
+	SPECULAR = mix(mix(0.18, 0.45, tipv), 0.62, wet);
 	AO = mix(0.55, 1.0, tipv);
 	AO_LIGHT_AFFECT = 0.25;
 }

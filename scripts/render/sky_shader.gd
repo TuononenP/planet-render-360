@@ -122,6 +122,18 @@ float fbm2(vec2 p) {
 	return (0.5 * vnoise(p) + 0.25 * vnoise(r * p * 2.03 + vec2(17.1, 5.3))) / 0.75;
 }
 
+// Henyey-Greenstein phase function (normalised to ~1 at isotropic scatter).
+float hg_phase(float mu, float g) {
+	float g2 = g * g;
+	return (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * mu, 0.02), 1.5);
+}
+
+// One dome-projected cloud slice at relative altitude `h_scale` (1.0 = main deck).
+vec2 cloud_proj(vec3 d, float y, vec2 wd, vec2 wn, float h_scale) {
+	vec2 u = d.xz / (y + 0.10 * h_scale) * (1.3 / h_scale);
+	return wd * (dot(u, wd) / cloud_stretch) + wn * dot(u, wn) + wind * drift;
+}
+
 void sky() {
 	vec3 d = EYEDIR;
 	float y = d.y;
@@ -192,47 +204,69 @@ void sky() {
 		}
 		// Dome projection keeps the horizon finite and compresses the
 		// deck into a band toward the horizon, like a real cloud layer.
-		vec2 uv = d.xz / (y + 0.10) * 1.3;
-		// Stratiform seasons: the noise is stretched along the wind.
-		uv = wd * (dot(uv, wd) / cloud_stretch) + wn * dot(uv, wn) + wind * drift;
-		// Low-frequency domain warp breaks the FBM into billowed
-		// heaps instead of uniform streaks (two extra lookups).
-		uv += 0.45 * vec2(vnoise(uv * 0.35), vnoise(uv * 0.35 + vec2(7.3, 2.1))) - 0.225;
+		vec2 uv0 = cloud_proj(d, y, wd, wn, 1.0);
+		vec2 warp = 0.45 * vec2(vnoise(uv0 * 0.35), vnoise(uv0 * 0.35 + vec2(7.3, 2.1))) - 0.225;
+		vec2 uv = uv0 + warp;
 		int n = AT_CUBEMAP_PASS ? 2 : octaves;
 		float low;
 		float den = fbm(uv, n, low);
 		// Value-noise FBM clusters around 0.5, so cover maps onto a
 		// narrow threshold range to give the matching sky fraction.
 		float thr = 0.5 + (0.5 - cloud_cover) * 0.36;
+		float c = 0.0;
+		float lit = 0.5;
+		float thick = 0.0;
 		if (hq) {
-			// Billowed edges: fine noise erodes the thin margins only,
-			// so heaps get cauliflower rims instead of blurred blobs.
+			// 3-slice parallax cumulus (base, core, sunlit upper crown):
+			// upper towers overhang the shadowed base with real altitude
+			// separation, zero geometry faceting (AC-11).
 			float ero = vnoise(uv * 7.0 + wind * drift * 0.6) * 0.65 + vnoise(uv * 17.0) * 0.35;
-			den -= (ero - 0.5) * 0.07 * (1.0 - smoothstep(thr, thr + 0.2, den));
+			float den_mid = den - (ero - 0.5) * 0.07 * (1.0 - smoothstep(thr, thr + 0.2, den));
+			vec2 uv_base = cloud_proj(d, y, wd, wn, 0.86) + warp;
+			vec2 uv_top = cloud_proj(d, y, wd, wn, 1.22) + warp;
+			float l_base;
+			float l_top;
+			int n_slice = max(n - 2, 3);
+			float den_base = fbm(uv_base, n_slice, l_base) - (ero - 0.5) * 0.05;
+			float den_top = fbm(uv_top, n_slice, l_top) - (ero - 0.5) * 0.08;
+			float c_base = smoothstep(thr - 0.015, thr + cloud_soft * 0.9, den_base);
+			float c_mid = smoothstep(thr - 0.02, thr + cloud_soft, den_mid);
+			float c_top = smoothstep(thr + 0.025, thr + cloud_soft * 1.15 + 0.04, den_top);
+			// Front-to-back transmittance from base -> mid -> crown.
+			float t_acc = 1.0;
+			float w_base = c_base * 0.72;
+			float w_mid = c_mid * 0.82 * (1.0 - w_base);
+			float w_top = c_top * 0.90 * (1.0 - w_base) * (1.0 - c_mid * 0.65);
+			t_acc = (1.0 - w_base) * (1.0 - c_mid * 0.75) * (1.0 - c_top * 0.65);
+			c = clamp(1.0 - t_acc, 0.0, 1.0);
+			c = max(c, overcast * (0.80 + 0.20 * den_mid));
+			// Sunward light march + Beer-Powder + altitude stratification.
+			vec2 sxz = normalize(sun_dir.xz + vec2(1e-4)) * 0.09;
+			float toward = fbm2(uv + sxz);
+			float od = max(toward - thr, 0.0)
+				+ max(fbm2(uv + sxz * 2.2) - thr, 0.0)
+				+ max(fbm2(uv + sxz * 3.6) - thr, 0.0);
+			float beer = exp(-od * 6.8);
+			float powder = 1.0 - exp(-max(den_mid - thr, 0.0) * 18.0);
+			float grad_lit = clamp(0.5 + (low - toward) * 5.0, 0.0, 1.0);
+			float slice_sum = max(w_base + w_mid + w_top, 1e-4);
+			float alt_lit = (w_base * 0.28 + w_mid * 0.68 + w_top * 1.08) / slice_sum;
+			lit = clamp(mix(grad_lit, beer * mix(1.0, powder, 0.42), 0.58) * mix(0.75, 1.18, alt_lit), 0.0, 1.0);
+			thick = smoothstep(thr, thr + 0.28, mix(den_mid, max(den_base, den_mid), 0.45));
+		} else {
+			c = smoothstep(thr - 0.02, thr + cloud_soft, den);
+			c = max(c, overcast * (0.80 + 0.20 * den));
+			vec2 sxz = normalize(sun_dir.xz + vec2(1e-4)) * 0.09;
+			float toward = fbm2(uv + sxz);
+			lit = clamp(0.5 + (low - toward) * 5.0, 0.0, 1.0);
+			thick = smoothstep(thr, thr + 0.3, den);
 		}
-		float c = smoothstep(thr - 0.02, thr + cloud_soft, den);
-		// Overcast: the gaps close into a continuous grey deck.
-		c = max(c, overcast * (0.80 + 0.20 * den));
-		// Light marched toward the sun through the deck: Beer's law on
-		// the density met on the way, plus the cheap low-vs-sunward
-		// gradient. Thick cores go dark, sunward flanks bright.
-		vec2 sxz = normalize(sun_dir.xz + vec2(1e-4)) * 0.09;
-		float toward = fbm2(uv + sxz);
-		float lit = clamp(0.5 + (low - toward) * 5.0, 0.0, 1.0);
-		if (hq) {
-			float od = max(toward - thr, 0.0);
-			od += max(fbm2(uv + sxz * 2.2) - thr, 0.0);
-			od += max(fbm2(uv + sxz * 3.6) - thr, 0.0);
-			float beer = exp(-od * 7.0);
-			// Powder: thin cloud lit from behind still looks dark at its edge.
-			float powder = 1.0 - exp(-max(den - thr, 0.0) * 18.0);
-			lit = clamp(mix(lit, beer * mix(1.0, powder, 0.4), 0.6), 0.0, 1.0);
-		}
-		float thick = smoothstep(thr, thr + 0.3, den);
-		vec3 cc = mix(cloud_shade, cloud_lit, lit * (1.0 - 0.55 * thick));
-		// Silver lining: thin cloud rims close to the sun catch a bright edge
-		// without pushing a wide patch of sky past the HDR glow threshold.
-		cc += LIGHT0_COLOR * pow(m, 18.0) * (1.0 - thick) * 0.28 * (1.0 - overcast);
+		vec3 cc = mix(cloud_shade, cloud_lit, lit * (1.0 - 0.52 * thick));
+		// Dual-lobe Henyey-Greenstein forward silver lining + subtle back-scatter
+		// (kept under the HDR bloom threshold so the sky never washes out).
+		float phase = hq ? clamp(mix(hg_phase(mu, -0.25) * 0.35, hg_phase(mu, 0.72) * 0.10, 0.72), 0.0, 1.4)
+			: pow(m, 18.0);
+		cc += LIGHT0_COLOR * phase * (1.0 - thick * 0.85) * (hq ? 0.24 : 0.28) * (1.0 - overcast);
 		if (flash > 0.001) {
 			// Lightning lights the deck from inside: thick cores glow,
 			// brightest around the strike, the whole deck faintly.

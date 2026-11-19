@@ -46,10 +46,14 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 		var p: Vector2 = site["centre"]
 		var axis: Vector2 = site["axis"]
 		print("HARBOUR-FERRY berth=(%.1f, %.1f) axis=(%.2f, %.2f)" % [p.x, p.y, axis.x, axis.y])
+		var m2u := WorldScale.metres_to_units()
+		var wpos := Vector3(p.x, ground.water_level_at(p.x, p.y), p.y)
+		var yaw := atan2(-axis.y, axis.x)
 		for part in lm.commit(root, "HarbourFerry_"):
-			part.position = Vector3(p.x, ground.water_level_at(p.x, p.y), p.y)
-			part.rotation.y = atan2(-axis.y, axis.x)
+			part.position = wpos
+			part.rotation.y = yaw
 			part.set_meta("procedural_ferry", true)
+		WaterWakes.add_wake(root, wpos, yaw, LENGTH_M * m2u, BEAM_M * m2u)
 		return 1
 	return 0
 

@@ -3,28 +3,22 @@ extends RefCounted
 
 ## Tonemap, grade, glow, ambient and haze defaults of the 360 view's
 ## Environment, applied once by AtmosphereRig. Every tier shares them
-## (AC-12): ACES, one grade, the same glow, ambient and fog model.
+## (AC-12): AgX, one grade, the same glow, ambient and fog model.
 ##
-## - Glow only from true highlights (HDR threshold 1.0, no bloom): sun
+## - AgX rolls bright sunlit stone, snow, golden-hour skies and warm
+##   street lamps softly toward white without ACES's hue shifts or
+##   over-saturated blue shadows.
+## - Glow only from true highlights (HDR threshold > 1.0, no bloom): sun
 ##   glints on water and glass, the sun disc, lit windows at night. A
 ##   bloom term spreads every pixel over the frame and reads as milk.
 ## - Ambient light is the sky itself, so shade turns blue under a blue
 ##   sky, grey under overcast and dark at night; no fixed fill colour.
-## - Contrast over ACES, which rolls off highlights and greys the
-##   mid-tones on its own.
+## - Gentle contrast over AgX's smooth mid-tone shoulder.
 
-## ACES with a white point of 6: highlights (sun-lit stone, sky near the
-## sun, glints) roll off like film instead of clipping at 1.0, which
-## washed the frame toward white; exposure lifts the mid-tones back. At
-## 1.45 sun-lit limestone and plazas still burned to white, and the extra
-## saturation pushed sky-lit shade to a strong blue: lower and neutral.
-## 1.25, not 1.3: at golden hour a slope facing the low sun gets ~3.4x
-## the light of flat ground, and anything over ~0.3 albedo there (pale
-## soil, rock, render) compressed to colourless white.
-const EXPOSURE := 1.16
+const EXPOSURE := 1.05
 const WHITE := 6.0
-const CONTRAST := 1.1
-const SATURATION := 1.0
+const CONTRAST := 1.12
+const SATURATION := 1.05
 const AMBIENT_ENERGY := 0.55
 const GLOW_THRESHOLD := 1.35
 const GLOW_INTENSITY := 0.18
@@ -39,7 +33,7 @@ static func apply(env: Environment) -> void:
 	env.ambient_light_energy = AMBIENT_ENERGY
 	env.ambient_light_sky_contribution = 1.0
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = EXPOSURE
 	env.tonemap_white = WHITE
 	env.adjustment_enabled = true

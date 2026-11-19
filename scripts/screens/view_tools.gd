@@ -156,11 +156,28 @@ static func copy_link(v: View360) -> void:
 static func photo(v: View360) -> void:
 	if v._data == null or v._photo_busy:
 		return
+	var dof := DisplayServer.get_name() != "headless" and v._atmos != null \
+		and v._atmos.camera_attributes != null and RenderQuality.ultra_desktop(v._quality_preset)
+	v._photo_busy = true
+	if dof:
+		PhotoMode.apply_dof(v._atmos.camera_attributes, true)
+		await v.get_tree().process_frame
+		if is_instance_valid(v):
+			await RenderingServer.frame_post_draw
+	if not is_instance_valid(v):
+		return
+	if v._data == null:
+		if dof and v._atmos != null and v._atmos.camera_attributes != null:
+			PhotoMode.apply_dof(v._atmos.camera_attributes, false)
+		v._photo_busy = false
+		return
 	var img := v.snapshot()
+	if dof and v._atmos != null and v._atmos.camera_attributes != null:
+		PhotoMode.apply_dof(v._atmos.camera_attributes, false)
 	if img == null:
+		v._photo_busy = false
 		say(v, "Couldn't take the photo", "The scene isn't drawn yet. Try again in a moment.", "error")
 		return
-	v._photo_busy = true
 	flash(v)
 	var data := v._data
 	var local := ViewConditions.place_now(v)
@@ -217,7 +234,13 @@ static func panorama(v: View360) -> void:
 	# hold still, so every face sees the same sun, shadows and geometry.
 	var mode := v.process_mode
 	v.process_mode = Node.PROCESS_MODE_DISABLED
+	var attrs := v._atmos.camera_attributes as CameraAttributesPractical if v._atmos != null else null
+	var was_ae := attrs != null and attrs.auto_exposure_enabled
+	if was_ae:
+		attrs.auto_exposure_enabled = false
 	var img := await PanoramaCapture.capture(v._viewport, cam, v._quality_preset, PanoramaCapture.face_px(), lines)
+	if was_ae and is_instance_valid(attrs):
+		attrs.auto_exposure_enabled = true
 	if not is_instance_valid(v):
 		return
 	v.process_mode = mode

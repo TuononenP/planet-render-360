@@ -58,7 +58,41 @@ void fragment() {
 }
 """
 
+## Wet-roof sheen overlay when raining and not snow-covered: darkens and
+## glosses up-facing roof planes via material_overlay without touching
+## shared roof materials (WorldCache-safe).
+const WET_SHADER := """
+shader_type spatial;
+render_mode blend_mix, depth_draw_never, cull_back, specular_schlick_ggx;
+// @SNOW
+global uniform vec2 world_origin_m;
+varying vec3 wpos;
+varying float wny;
+void vertex() {
+	vec3 wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	wny = wn.y;
+	VERTEX += NORMAL * 0.015;
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+void fragment() {
+	float up = smoothstep(0.22, 0.55, wny);
+	float wet = climate_wetness * (1.0 - snow_line(wpos)) * up;
+	if (wet < 0.01) {
+		discard;
+	}
+	vec2 hp = wpos.xz + world_origin_m;
+	float patch_n = snow_noise(hp / 4.2) * 0.65 + snow_noise(hp / 1.3) * 0.35;
+	float film = wet * mix(0.65, 1.0, patch_n);
+	ALBEDO = vec3(0.025, 0.028, 0.032);
+	ALPHA = film * 0.32;
+	ROUGHNESS = mix(0.28, 0.11, film);
+	SPECULAR = 0.72;
+	METALLIC = 0.0;
+}
+"""
+
 static var _overlay: ShaderMaterial
+static var _wet_overlay: ShaderMaterial
 
 static func overlay() -> ShaderMaterial:
 	if _overlay == null:
@@ -68,10 +102,20 @@ static func overlay() -> ShaderMaterial:
 		_overlay.shader = sh
 	return _overlay
 
-## Attaches (on) or detaches (off) the overlay on every building mesh
-## of `world` that carries a roof material. Returns the meshes touched.
-static func apply(world: Node, on: bool) -> int:
+static func wet_overlay() -> ShaderMaterial:
+	if _wet_overlay == null:
+		var sh := Shader.new()
+		sh.code = WET_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		_wet_overlay = ShaderMaterial.new()
+		_wet_overlay.shader = sh
+	return _wet_overlay
+
+## Attaches (on) or detaches (off) the snow or wet overlay on every
+## building mesh of `world` that carries a roof material. Snow wins when
+## both are active; `wet` attaches the wet-sheen overlay when snow is off.
+static func apply(world: Node, on: bool, wet: bool = false) -> int:
 	var touched := 0
+	var mat: Material = overlay() if on else (wet_overlay() if wet else null)
 	for c in world.get_children():
 		if not (c is MeshInstance3D):
 			continue
@@ -83,6 +127,6 @@ static func apply(world: Node, on: bool) -> int:
 		for s in (mi.mesh.get_surface_count() if mi.mesh != null else 0):
 			mats.append(mi.mesh.surface_get_material(s))
 		if mats.any(func(m: Variant) -> bool: return m is Material and (m as Material).has_meta("roof")):
-			mi.material_overlay = overlay() if on else null
+			mi.material_overlay = mat
 			touched += 1
 	return touched

@@ -68,6 +68,7 @@ uniform vec3 sea_deep = vec3(0.004, 0.034, 0.088);
 uniform float harbour = 0.0;
 
 // @SNOW
+// @CLOUD_SHADOW
 varying vec3 wpos;
 varying float openv;
 varying float seav;
@@ -242,8 +243,38 @@ void fragment() {
 		shallow_c = sea_shallow;
 	}
 	vec3 col = mix(shallow_c, deep_c, open_w);
-	// Shore foam: a broken, breathing band along the rim; surf on the sea.
+	// Drifting cloud shadow across water (matches SkyShader + FarSurface).
+	float csh = cloud_shadow_at(wpos / units_per_metre);
+	float sun_up = smoothstep(0.04, 0.28, cloud_sun_dir.y);
+	float direct_sun = sun_up * clamp(climate_snow_glint, 0.0, 1.0);
+	// Beer-Lambert shallow-water bed translucency, wave-refracted substrate
+	// and sunlit underwater caustics in the first ~6 m off the shore while
+	// keeping depth_draw_opaque so Forward+ SSR reflections stay intact.
 	float shore = clamp(shorev, 0.0, 1.0) * shore_m;
+	float bed_vis = (1.0 - smoothstep(0.4, 6.5, shore)) * (1.0 - smoothstep(90.0, 380.0, dist_m))
+		* (1.0 - ice_cover) * (1.0 - 0.65 * max(harbour, brackish));
+	if (water_quality >= 2 && bed_vis > 0.005) {
+		float bed_d = mix(0.08, 3.2, smoothstep(0.0, 6.5, shore) * (0.4 + 0.6 * open_w));
+		vec2 bed_p = pf + s * bed_d * 0.65;
+		float pebble = w_noise(bed_p * 3.4) * 0.55 + w_noise(bed_p * 11.0 + 3.1) * 0.45;
+		vec3 sand_bed = seav > 0.5 ? vec3(0.24, 0.22, 0.17) : vec3(0.16, 0.15, 0.12);
+		vec3 bed_c = sand_bed * mix(0.75, 1.22, pebble);
+		// Animated sunlit caustics on shallow beds.
+		float caust_w = direct_sun * (1.0 - csh) * (1.0 - 0.75 * climate_rain) * water_wave_weight(pixel_m, 0.4);
+		if (caust_w > 0.01) {
+			vec2 cp = bed_p * 1.45 - cloud_sun_dir.xz * bed_d * 0.5;
+			float c1 = 1.0 - abs(2.0 * w_noise(cp + vec2(t * 0.32, -t * 0.24)) - 1.0);
+			float c2 = 1.0 - abs(2.0 * w_noise(cp * 1.37 - vec2(t * 0.27, t * 0.35) + 4.7) - 1.0);
+			float caust = pow(clamp(c1 * c2, 0.0, 1.0), 3.0) * 1.6;
+			bed_c += vec3(0.32, 0.36, 0.30) * caust * caust_w;
+		}
+		// Turbid harbours and brackish waters absorb faster than clear coasts.
+		float turb = mix(1.0, 2.4, max(harbour, brackish * 0.7));
+		vec3 absorb = vec3(1.15, 0.42, 0.32) * turb;
+		vec3 trans = exp(-bed_d * absorb);
+		col = mix(col, bed_c * trans + shallow_c * (vec3(1.0) - trans), clamp(bed_vis * 0.72, 0.0, 0.72));
+	}
+	// Shore foam: a broken, breathing band along the rim; surf on the sea.
 	float surf = seav > 0.5 ? mix(1.0, 0.12, harbour) : 0.35;
 	float band = (1.0 - smoothstep(0.0, mix(2.5, 9.0, surf), shore));
 	float pulse = 0.5 + 0.5 * sin(t * 0.8 - shore * 0.35 + w_noise(pm * 0.05) * 6.0);
@@ -275,9 +306,26 @@ void fragment() {
 	}
 	foam = clamp(foam, 0.0, 1.0);
 	// Light through the thin tops of the waves: a faint green on slopes.
-	col += vec3(0.010, 0.034, 0.028) * smoothstep(0.02, 0.14, length(s)) * (1.0 - ice_cover);
-	col = mix(col, foam_color.rgb, foam);
+	col += vec3(0.010, 0.034, 0.028) * smoothstep(0.02, 0.14, length(s)) * (1.0 - ice_cover) * (1.0 - 0.6 * csh);
+	col *= 1.0 - 0.24 * csh * sun_up;
+	col = mix(col, foam_color.rgb * (1.0 - 0.20 * csh * sun_up), foam);
 	ALBEDO = mix(col, ice_c, ice_cover);
+	// Controlled micro-facet sun glitter along the reflection path (clamped
+	// below PostGrade.GLOW_LUMINANCE_CAP so glints sparkle without blooming).
+	vec3 glitter_e = vec3(0.0);
+	if (water_quality >= 2 && direct_sun > 0.01 && ice_cover < 0.5) {
+		vec3 view_w = normalize(CAMERA_POSITION_WORLD - wpos);
+		vec3 half_w = normalize(view_w + normalize(cloud_sun_dir));
+		vec2 gn = noise_grad(pf * 3.1 + wd * t * 0.45) * 0.14 * water_wave_weight(pixel_m, 0.35);
+		vec3 n_glit = normalize(vec3(-(s.x + gn.x), 1.0, -(s.y + gn.y)));
+		float ndh = max(dot(n_glit, half_w), 0.0);
+		float spk = pow(ndh, 280.0) * (1.0 - foam) * (1.0 - ice_cover) * (1.0 - csh)
+			* (1.0 - 0.85 * climate_rain) * direct_sun;
+		// Warm at low sun, neutral white at high sun.
+		vec3 glint_col = mix(vec3(1.0, 0.78, 0.48), vec3(1.0, 0.96, 0.90), smoothstep(0.12, 0.5, cloud_sun_dir.y));
+		glitter_e = glint_col * min(spk * 0.95, 0.85);
+	}
+	EMISSION = glitter_e;
 	float rough = mix(near_rough, far_rough, smoothstep(60.0, 1500.0, dist_m));
 	rough = mix(rough, 0.45, foam);
 	rough = mix(rough, 0.12, sqrt(climate_rain) * (1.0 - smoothstep(150.0, 900.0, dist_m)));

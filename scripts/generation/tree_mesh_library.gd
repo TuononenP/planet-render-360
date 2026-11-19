@@ -35,10 +35,14 @@ void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	if (sway > 0.0) {
 		vec3 wp = MODEL_MATRIX[3].xyz;
-		float ph = wp.x * 0.37 + wp.z * 0.23;
-		float k = max(VERTEX.y, 0.0) * sway;
-		VERTEX.x += sin(TIME * 1.1 + ph) * k;
-		VERTEX.z += cos(TIME * 0.9 + ph * 1.3) * k * 0.6;
+		// Travelling wind gust front aligned with WaterShader.WIND + fine leaf flutter.
+		vec2 wd = vec2(0.86, 0.51);
+		float front = dot(wp.xz, wd) * 0.055;
+		float gust = 0.55 + 0.45 * sin(TIME * 0.65 - front) + 0.25 * sin(TIME * 1.45 - front * 1.7 + 1.1);
+		float storm = 1.0 + 0.85 * clamp(climate_rain, 0.0, 1.0);
+		float k = max(VERTEX.y, 0.0) * sway * gust * storm;
+		float flutter = sin(TIME * 4.4 + wpos.x * 1.9 + wpos.z * 2.3 + wpos.y * 1.3) * 0.14 * min(length(VERTEX.xz), 3.0) * sway * storm;
+		VERTEX.xz += wd * (k * 0.9 + flutter) + vec2(-wd.y, wd.x) * (cos(TIME * 0.95 + front * 1.3) * k * 0.45);
 	}
 	v_n = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
@@ -68,14 +72,24 @@ void fragment() {
 		vec3 face_n = normalize(cross(dFdx(VERTEX), dFdy(VERTEX)));
 		edge = smoothstep(0.22, 0.6, abs(dot(face_n, VIEW)));
 	}
+	// Subtle leaf-spray normal breakup near the eye so crowns read as
+	// dappled sprays rather than smooth matte spheres.
+	float near_crown = 1.0 - smoothstep(25.0, 75.0, length(wpos - CAMERA_POSITION_WORLD));
+	if (near_crown > 0.01) {
+		vec2 lq = UV * 6.5 + wpos.xz * 0.35;
+		vec3 spray = vec3(snow_noise(lq) - 0.5, snow_noise(lq + 7.3) - 0.5, snow_noise(lq + 13.1) - 0.5);
+		n = normalize(n + spray * 0.28 * near_crown);
+	}
+	float wet = climate_wetness * (1.0 - snow_load);
+	c *= mix(1.0, 0.84, wet);
 	ALBEDO = c;
 	ALPHA = t.a;
 	ALPHA_SCISSOR_THRESHOLD = mix(0.95, alpha_cut, edge);
 	ALPHA_ANTIALIASING_EDGE = 0.25;
 	ALPHA_TEXTURE_COORDINATE = UV * vec2(textureSize(leaf_tex, 0));
 	NORMAL = n;
-	ROUGHNESS = 0.82;
-	SPECULAR = 0.22 * mix(0.4, 1.0, edge);
+	ROUGHNESS = mix(0.82, 0.36, wet);
+	SPECULAR = mix(0.22, 0.44, wet) * mix(0.4, 1.0, edge);
 	// Snow on the sprays glows when the sun is behind it.
 	BACKLIGHT = mix(translucency * COLOR.rgb, vec3(0.35), snow_load);
 }
@@ -130,14 +144,15 @@ void fragment() {
 			edge = smoothstep(0.2, 0.5, abs(dot(normalize(fw.xz), vw.xz / lh)));
 		}
 	}
-	ALBEDO = c;
+	float wet_imp = climate_wetness * (1.0 - clamp(snow, 0.0, 1.0) * snow_line(wpos));
+	ALBEDO = c * mix(1.0, 0.86, wet_imp);
 	ALPHA = t.a;
 	ALPHA_SCISSOR_THRESHOLD = mix(0.97, 0.5, edge);
 	ALPHA_ANTIALIASING_EDGE = 0.25;
 	ALPHA_TEXTURE_COORDINATE = UV * vec2(textureSize(imp_tex, 0));
 	NORMAL = n;
-	ROUGHNESS = 0.85;
-	SPECULAR = 0.2 * mix(0.4, 1.0, edge);
+	ROUGHNESS = mix(0.85, 0.48, wet_imp);
+	SPECULAR = mix(0.2, 0.34, wet_imp) * mix(0.4, 1.0, edge);
 	BACKLIGHT = vec3(0.12, 0.15, 0.05) * fol;
 }
 """

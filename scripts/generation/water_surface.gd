@@ -80,7 +80,8 @@ static func material(preset: int = RenderSettings.Preset.HIGH) -> ShaderMaterial
 	preset = RenderSettings.clamp_preset(preset)
 	if not _mats.has(preset):
 		var sh := Shader.new()
-		sh.code = WaterShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		sh.code = WaterShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
 		var m := ShaderMaterial.new()
 		m.shader = sh
 		m.set_shader_parameter("water_quality", preset)

@@ -34,6 +34,13 @@ const VOLUME_PER_M := 0.00028
 const VOLUME_FOG_PER_M := 0.003
 const VOLUME_LENGTH_M := 250.0
 
+## Narrow eye-adaptation sensitivity band (ISO around 100, ≈ ±0.18 EV):
+## lets shaded alleys and sunlit plazas breathe without shifting the grade.
+const AUTO_EXP_MIN_ISO := 88.0
+const AUTO_EXP_MAX_ISO := 114.0
+const AUTO_EXP_SCALE := 0.24
+const AUTO_EXP_SPEED := 0.6
+
 static func is_forward_plus() -> bool:
 	return RenderingServer.get_current_rendering_method() == "forward_plus"
 
@@ -56,6 +63,7 @@ static func features_for(preset: int, forward_plus: bool) -> Dictionary:
 		"sdfgi": forward_plus and ultra,
 		"volumetric_fog": forward_plus and ultra,
 		"taa": forward_plus and ultra,
+		"auto_exposure": forward_plus and ultra,
 		"msaa": [Viewport.MSAA_DISABLED, Viewport.MSAA_DISABLED, Viewport.MSAA_2X,
 			Viewport.MSAA_2X if forward_plus else Viewport.MSAA_4X][p],
 		"screen_aa": Viewport.SCREEN_SPACE_AA_SMAA if p == RenderSettings.Preset.BALANCED
@@ -144,6 +152,16 @@ static func apply_viewport(vp: Viewport, preset: int, forward_plus: bool = is_fo
 	vp.use_taa = f["taa"]
 	vp.anisotropic_filtering_level = f["anisotropy"]
 	vp.use_debanding = f["debanding"]
+
+## Clamped eye adaptation on desktop Ultra (CameraAttributesPractical).
+static func apply_camera_attributes(ca: CameraAttributesPractical, preset: int,
+		forward_plus: bool = is_forward_plus()) -> void:
+	var f := features_for(preset, forward_plus)
+	ca.auto_exposure_enabled = bool(f["auto_exposure"])
+	ca.auto_exposure_scale = AUTO_EXP_SCALE
+	ca.auto_exposure_speed = AUTO_EXP_SPEED
+	ca.auto_exposure_min_sensitivity = AUTO_EXP_MIN_ISO
+	ca.auto_exposure_max_sensitivity = AUTO_EXP_MAX_ISO
 
 ## Volumetric medium in the haze colour, per light state: denser in fog
 ## and drizzle; the albedo follows the haze so it adds shafts, not tint.

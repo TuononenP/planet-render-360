@@ -69,6 +69,7 @@ uniform float paving_on = 0.0;
 // @SNOW
 // @GLOW
 // @PAVING
+// @CLOUD_SHADOW
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -170,7 +171,10 @@ void fragment() {
 	// value_clamp): the same cap here, so a paved slab set in a snowy
 	// pavement shows no outline.
 	lying *= min(1.0, 0.85 / max(dot(lying, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
-	ALBEDO = mix(bare, lying, cover);
+	vec3 paved_alb = mix(bare, lying, cover);
+	// Drifting cloud shadows across sunlit squares and pavements.
+	paved_alb *= 1.0 - 0.26 * cloud_shadow_at(wpos) * smoothstep(0.05, 0.25, cloud_sun_dir.y);
+	ALBEDO = paved_alb;
 	// Snow's relief goes on in world space, the way the ground's does:
 	// through the ribbons' UV tangent frame the world-sampled snow layer
 	// tilted the whole slab away from a low sun, a shade darker than the
@@ -251,6 +255,7 @@ uniform float junction_m = 30.0;
 uniform float detail_m = 220.0;
 // @SNOW
 // @GLOW
+// @CLOUD_SHADOW
 varying vec3 wpos;
 varying vec4 attr;
 varying float width_m;
@@ -528,6 +533,8 @@ void fragment() {
 		snm = mix(snm, vec3(0.5 + facet.x * 0.5, 0.5 + facet.z * 0.5, 1.0), glint);
 		rough = mix(rough, 0.03, glint);
 	}
+	// Drifting cloud shadows across sunlit carriageways.
+	col *= 1.0 - 0.26 * cloud_shadow_at(wpos) * smoothstep(0.05, 0.25, cloud_sun_dir.y);
 	ALBEDO = col;
 	ROUGHNESS = clamp(rough, 0.02, 1.0);
 	NORMAL_MAP = mix(nm, snm, sc);
@@ -567,7 +574,8 @@ static func material(target: Color) -> ShaderMaterial:
 		return _mat
 	var sh := Shader.new()
 	sh.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL).replace("// @DEPTH", DEPTH_GLSL) \
-		.replace("// @LINE_MATH", LINE_GLSL).replace("// @GLOW", StreetGlow.GLSL)
+		.replace("// @LINE_MATH", LINE_GLSL).replace("// @GLOW", StreetGlow.GLSL) \
+		.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	var mean: Color = (MaterialLibrary.PBR_SETS["asphalt"] as Dictionary)["mean"]
@@ -623,7 +631,8 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 		_paved_shader = Shader.new()
 		_paved_shader.code = PAVED_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 			.replace("// @DEPTH", DEPTH_GLSL).replace("// @GLOW", StreetGlow.GLSL) \
-			.replace("// @PAVING", PavingGlsl.CODE)
+			.replace("// @PAVING", PavingGlsl.CODE) \
+			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	var t := MaterialLibrary._calib_tint(row["mean"], target)
 	var m := ShaderMaterial.new()

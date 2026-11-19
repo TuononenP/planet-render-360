@@ -14,6 +14,46 @@ extends RefCounted
 ## - det_side: a layer projected on the two vertical planes (biplanar)
 ##   for cliffs, where a plan projection stretches into streaks;
 ## - t_dehaze: the satellite photo without its own baked haze.
+## Standalone drifting cloud-shadow sampler spliced at "// @CLOUD_SHADOW"
+## by shaders that do not include TerrainGlsl (roads, water, facades).
+## Matches t_cloud_shadow() and SkyShader's cloud dome projection.
+const CLOUD_SHADOW_GLSL := """
+global uniform float cloud_shadow_cover;
+global uniform float cloud_shadow_drift;
+global uniform float cloud_shadow_stretch;
+global uniform vec3 cloud_sun_dir;
+global uniform vec2 world_origin_m;
+
+float cs_hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float cs_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(cs_hash(i), cs_hash(i + vec2(1.0, 0.0)), f.x),
+		mix(cs_hash(i + vec2(0.0, 1.0)), cs_hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+float cloud_shadow_at(vec3 p) {
+	if (cloud_shadow_cover <= 0.02 || cloud_sun_dir.y <= 0.03) {
+		return 0.0;
+	}
+	float h = 2200.0;
+	vec2 q = p.xz + world_origin_m + cloud_sun_dir.xz / cloud_sun_dir.y * max(h - p.y, 0.0);
+	vec2 uv = q / h * 1.3;
+	vec2 wd = vec2(0.8, 0.6);
+	vec2 wn = vec2(-wd.y, wd.x);
+	uv = wd * (dot(uv, wd) / max(cloud_shadow_stretch, 0.1)) + wn * dot(uv, wn) + wd * cloud_shadow_drift;
+	uv += 0.45 * vec2(cs_noise(uv * 0.35), cs_noise(uv * 0.35 + vec2(7.3, 2.1))) - 0.225;
+	float den = cs_noise(uv) * 0.5 + cs_noise(uv * 2.03 + vec2(17.1, 5.3)) * 0.3
+		+ cs_noise(uv * 4.1 + vec2(3.7, 9.2)) * 0.2;
+	float thr = 0.5 + (0.5 - cloud_shadow_cover) * 0.36;
+	return smoothstep(thr - 0.03, thr + 0.12, den);
+}
+"""
+
 const CODE := """
 uniform sampler2DArray det_alb : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2DArray det_nor : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -65,12 +105,13 @@ global uniform float cloud_shadow_cover;
 global uniform float cloud_shadow_drift;
 global uniform float cloud_shadow_stretch;
 global uniform vec3 cloud_sun_dir;
+global uniform vec2 world_origin_m;
 float t_cloud_shadow(vec3 p) {
 	if (cloud_shadow_cover <= 0.02 || cloud_sun_dir.y <= 0.03) {
 		return 0.0;
 	}
 	float h = 2200.0;
-	vec2 q = p.xz + cloud_sun_dir.xz / cloud_sun_dir.y * max(h - p.y, 0.0);
+	vec2 q = p.xz + world_origin_m + cloud_sun_dir.xz / cloud_sun_dir.y * max(h - p.y, 0.0);
 	vec2 uv = q / h * 1.3;
 	vec2 wd = vec2(0.8, 0.6);
 	vec2 wn = vec2(-wd.y, wd.x);

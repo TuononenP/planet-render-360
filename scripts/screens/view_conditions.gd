@@ -150,6 +150,7 @@ static func apply_surface_state(v: View360, dress_world := true) -> void:
 			and ClimateModel.snowy_at_viewpoint(v._data, v._data.season))
 		if v._ground != null:
 			v._atmos.lightning.ground_height = v._ground.height_at_world
+			v._atmos.set_valley_floor(v._ground.render_y(v._ground.water_level_m), ClimateModel.arid(v._data))
 	if dress_world and v._generated != null and is_instance_valid(v._generated):
 		dress(v._generated, true, v, v._data)
 	# The city glow above has just moved the sky these take their light from.
@@ -164,12 +165,18 @@ static func dress(world: Node, top: bool, v: View360, data: LocationData) -> voi
 	var code := v._atmos.weather_code if v._atmos != null else -1
 	StreetGlow.apply_world(world, data, top)
 	if top:
-		_wet_roads(world, 1.0 if code in ClimateModel.RAINING else 0.0)
+		var raining := code in ClimateModel.RAINING
+		_wet_roads(world, 1.0 if raining else 0.0)
 		var snow_on := float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0
-		RoofSnow.apply(world, snow_on)
+		RoofSnow.apply(world, snow_on, raining)
 		Icicles.apply(world, snow_on, data)
 	if v._atmos != null:
-		CityLights.apply(world, CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount))
+		var night_amt := CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount)
+		CityLights.apply(world, night_amt)
+		if top:
+			var eye := v._rig.position if v._rig != null else Vector3.ZERO
+			StreetLights.update_shadows(world, eye, night_amt, v._quality_preset)
+			AmbientLife.sync(world, data, v._ground, v._atmos, v._quality_preset)
 
 ## Wet asphalt: lower roughness (a multiplier over the PBR map) and a
 ## darker albedo. Dry values are kept on the shared material, so the
@@ -407,5 +414,37 @@ static func _apply_time(v: View360, hour_f: float) -> void:
 ## Lit windows follow the sky's darkness (CityLights).
 static func _city_lights(v: View360) -> void:
 	if v._atmos != null and v._generated != null and is_instance_valid(v._generated):
-		CityLights.apply(v._generated, CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount))
+		var night_amt := CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount)
+		CityLights.apply(v._generated, night_amt)
+		var eye := v._rig.position if v._rig != null else Vector3.ZERO
+		StreetLights.update_shadows(v._generated, eye, night_amt, v._quality_preset)
+		if night_amt <= 0.15:
+			_shadow_world = 0
+		else:
+			_shadow_world = v._generated.get_instance_id()
+			_shadow_eye = eye
+		AmbientLife.sync(v._generated, v._data, v._ground, v._atmos, v._quality_preset)
+
+## Re-syncs preset-sensitive atmospheric FX (hero street-lamp shadows and ambient life).
+static func sync_quality_fx(v: View360) -> void:
+	_city_lights(v)
+
+## Keeps the 12 nearest hero street-lamp shadows following the moving camera
+## at night (throttled to > 6 m steps so stationary frames pay zero cost).
+static var _shadow_eye := Vector3(INF, INF, INF)
+static var _shadow_world := 0
+
+static func tick_night_fx(v: View360) -> void:
+	if v._atmos == null or v._rig == null or v._generated == null or not is_instance_valid(v._generated):
+		return
+	var night_amt := CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount)
+	if night_amt <= 0.15:
+		_shadow_world = 0
+		return
+	var wid := v._generated.get_instance_id()
+	if wid == _shadow_world and v._rig.position.distance_squared_to(_shadow_eye) < 36.0:
+		return
+	_shadow_world = wid
+	_shadow_eye = v._rig.position
+	StreetLights.update_shadows(v._generated, _shadow_eye, night_amt, v._quality_preset)
 

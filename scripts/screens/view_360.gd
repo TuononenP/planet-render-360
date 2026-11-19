@@ -301,6 +301,7 @@ func set_quality_preset(preset_value: int) -> void:
 	if _generated != null and is_instance_valid(_generated):
 		LodRing.city_boost = _data != null and CityDetail.city_at(_data.latitude, _data.longitude) != ""
 		LodRing.apply(_generated, _quality_preset)
+	ViewConditions.sync_quality_fx(self)
 
 ## Replace the generated world in place. The old world is tracked by
 ## reference: same-named siblings get auto-renamed by the engine, so
@@ -939,6 +940,7 @@ func _process(delta: float) -> void:
 	_reach.tick(self, delta)
 	if _mover != null and _rig != null and is_visible_in_tree():
 		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))
+	ViewConditions.tick_night_fx(self)
 	if _lapse.playing and is_visible_in_tree():
 		ViewConditions.lapse_tick(self, delta)
 	if _drone.on:

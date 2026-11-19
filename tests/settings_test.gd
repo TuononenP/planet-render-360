@@ -294,13 +294,13 @@ func _run() -> void:
 		failures.append("Ultra should have a physical sun penumbra and a larger shadow map than High")
 	if int(RenderQuality.features_for(RenderSettings.Preset.ULTRA, false)["shadow_atlas"]) > 4096:
 		failures.append("Mobile shadow map should stay within 4096")
-	# AC-12: the rig keeps ACES and the haze on every tier; Ultra's
+	# AC-12: the rig keeps AgX and the haze on every tier; Ultra's
 	# volume takes the haze colour.
 	var rig := AtmosphereRig.new(RenderSettings.Preset.ULTRA)
 	for p in 4:
 		rig.set_quality(p)
-		if rig.environment.tonemap_mode != Environment.TONE_MAPPER_ACES or not rig.environment.fog_enabled:
-			failures.append("preset %d should keep ACES and the exponential haze" % p)
+		if rig.environment.tonemap_mode != Environment.TONE_MAPPER_AGX or not rig.environment.fog_enabled:
+			failures.append("preset %d should keep AgX and the exponential haze" % p)
 	if not rig.environment.volumetric_fog_albedo.is_equal_approx(rig.haze_color):
 		failures.append("volumetric fog should take the haze colour")
 	rig.free()

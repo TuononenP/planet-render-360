@@ -495,6 +495,9 @@ void fragment() {
 	if (puddle > 0.01) {
 		ripple = rain_ripples(g, TIME, pixel_m) * 0.25;
 	}
+	// Drifting cloud shadows across sunlit near and mid ground.
+	float csh = t_cloud_shadow(pm) * smoothstep(0.0, 0.35, dot(nw, cloud_sun_dir));
+	alb *= 1.0 - 0.28 * csh;
 	ALBEDO = value_clamp(alb);
 	// Lighting normal: relief-bent world normal into view space.
 	vec3 tw = normalize(vec3(1.0, 0.0, 0.0) - nw * nw.x);

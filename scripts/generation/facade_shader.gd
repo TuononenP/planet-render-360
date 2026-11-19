@@ -73,11 +73,10 @@ uniform float photo_keep = 1.0;
 uniform bool photo_turn = false;
 
 varying vec3 wpos;
+varying vec3 wnrm;
 varying flat float bld;
-// Where this world's origin lies on the streamer's continuous map (m,
-// WorldStreamer): weathering hashes on it, so it holds through a swap.
-global uniform vec2 world_origin_m;
 // @SNOW
+// @CLOUD_SHADOW
 
 // Near panes. Head-on reflectance of double glazing (four surfaces); the
 // high metallic over a dark albedo gives it with almost no diffuse.
@@ -145,6 +144,7 @@ vec3 lamp_colour(float k, float t) {
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec3 wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	wnrm = wn;
 	// The per-building wall tint (vertex colour) and the wall's facing
 	// tell buildings and their sides apart. Chromaticity only, coarsely
 	// quantized and flat: the foot shade darkens a wall's lower vertices
@@ -241,23 +241,44 @@ void fragment() {
 	float s_at = (wm.x + wm.z) * 0.9;
 	float streak = mix(vnoise(vec2(s_at, wm.y * 0.06)), 0.5, smoothstep(0.25, 0.75, fwidth(s_at)));
 	vec3 wall = base * mix(0.90, 1.06, g) * (1.0 - 0.07 * smoothstep(0.55, 0.95, streak));
+	// Architectural sill / drip occlusion under glass panes (gives depth in
+	// flat overcast light) and live rain wetness on porous walls.
+	float pane_px = max(length(gx * cells), length(gy * cells));
+	float sill_near = 1.0 - smoothstep(0.03, 0.1, pane_px);
+	float sill_band = 0.0;
+	float wall_ao = 1.0;
+	if (has_normal && framed && sill_near > 0.0) {
+		float d_uv = 0.10 / max(cell_size.y * cells.y, 1e-3);
+		float glass_above = smoothstep(0.32, 0.22, textureGrad(rough_tex, uv - vec2(0.0, d_uv), gx, gy).r);
+		sill_band = (1.0 - pane) * glass_above * sill_near;
+		float d_drip = 0.34 / max(cell_size.y * cells.y, 1e-3);
+		float glass_hi = smoothstep(0.32, 0.22, textureGrad(rough_tex, uv - vec2(0.0, d_drip), gx, gy).r);
+		float drip = (1.0 - pane) * glass_hi * sill_near * (0.45 + 0.55 * streak);
+		wall_ao = 1.0 - 0.22 * sill_band - 0.10 * drip;
+		wall *= 1.0 - 0.08 * drip;
+	}
 	// Winter on the wall (ClimateModel): snow on the sills under the
 	// panes, and slush and salt the street throws up its foot.
 	float wsnow = snow_line(wpos);
 	if (wsnow > 0.0) {
-		float pane_px = max(length(gx * cells), length(gy * cells));
-		if (has_normal && framed) {
-			// A sill is wall a hand's breadth under glass (uv runs down).
-			float d_uv = 0.09 / max(cell_size.y * cells.y, 1e-3);
-			float glass_above = smoothstep(0.32, 0.22, textureGrad(rough_tex, uv - vec2(0.0, d_uv), gx, gy).r);
-			float sill = (1.0 - pane) * glass_above * (1.0 - smoothstep(0.03, 0.1, pane_px));
-			sill *= smoothstep(0.25, 0.6, vnoise(vec2((wm.x + wm.z) * 2.3, wm.y * 0.5)) + 0.3);
+		if (sill_band > 0.0) {
+			float sill = sill_band * smoothstep(0.25, 0.6, vnoise(vec2((wm.x + wm.z) * 2.3, wm.y * 0.5)) + 0.3);
 			wall = mix(wall, snow_albedo(wm.xz + wm.y, 0.01, 0.08), sill * wsnow);
 		}
 		vec2 sp = snow_splash(wpos);
 		sp.y *= 1.0 - pane;
 		wall = apply_splash(wall, sp);
 	}
+	float wet = climate_wetness * (1.0 - wsnow);
+	if (wet > 0.001) {
+		float damp = mix(1.0, 0.80, wet * (1.0 - metallic_wall));
+		// Rain darkens porous masonry and adds a slight glossy film.
+		wall *= damp * (1.0 - 0.07 * wet * smoothstep(0.5, 0.9, streak));
+		rough = mix(rough, max(rough * 0.62, 0.26), wet);
+	}
+	// Drifting cloud shadows across sunlit facade faces.
+	float csh = cloud_shadow_at(wpos / units_per_m) * smoothstep(0.0, 0.4, dot(normalize(wnrm), cloud_sun_dir));
+	wall *= 1.0 - 0.30 * csh;
 
 	vec2 cg = uv * cells;
 	vec2 cell = floor(cg);
@@ -347,18 +368,36 @@ void fragment() {
 	// Distant panes (no glass treatment) are rougher still: a mirror a few
 	// pixels wide sparkles as screen-space reflections find and lose it.
 	float pane_rough = mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean));
+	pane_rough = mix(pane_rough, 0.11, wet * 0.5);
 	ROUGHNESS = mix(rough, mix(0.3, pane_rough, near_glass), pane);
 	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
-	SPECULAR = mix(0.5, 0.65, pane);
-	EMISSION = glass_e * pane;
+	SPECULAR = mix(mix(0.5, 0.6, wet), 0.65, pane);
+	AO = mix(wall_ao, 1.0, pane);
+	// Warm night light spilling gently onto sills beneath lit panes.
+	vec3 spill_e = vec3(0.0);
+	if (night > 0.02 && sill_band > 0.01) {
+		float spill_duv = 0.14 / max(cell_size.y * cells.y, 1e-3);
+		vec2 up_cell = floor((uv - vec2(0.0, spill_duv)) * cells);
+		vec2 up_lc = curtain_wall ? vec2(floor(up_cell.x / 5.0), up_cell.y) : up_cell;
+		float up_lit = mix(step(h13(vec3(up_lc + 0.37, bld + 11.0)) , occ) * night, occ * night, sub);
+		vec3 up_lamp = mix(lamp_colour(h13(vec3(up_lc, bld + 3.7)), TIME), vec3(1.0, 0.80, 0.58), sub);
+		spill_e = wall * up_lamp * up_lit * sill_band * night_energy * 0.28;
+	}
+	EMISSION = glass_e * pane + spill_e * (1.0 - pane);
 	vec3 nm = has_normal ? textureGrad(normal_tex, uv, gx, gy).rgb : vec3(0.5, 0.5, 1.0);
 	// Godot rebuilds z from xy: keep the sum inside the unit disc (outside
 	// it z is NaN and the pixel renders black).
 	vec2 nxy = nm.xy * 2.0 - 1.0 + photo_n;
 	nxy *= min(1.0, 0.92 / max(length(nxy), 1e-4));
 	nm.xy = nxy * 0.5 + 0.5;
-	// About 0.3 degrees of tilt per pane.
+	// About 0.3 degrees of tilt per pane, plus raindrop streaks in rain.
 	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012 * (1.0 - pane_mean);
+	if (climate_rain > 0.01 && near_glass > 0.05 && pane > 0.1) {
+		float col_x = (wm.x + wm.z) * 14.0;
+		float trail = vnoise(vec2(col_x, wm.y * 2.2 + TIME * 1.4));
+		float drop = smoothstep(0.68, 0.95, trail) * climate_rain * near_glass;
+		tilt += vec2((vnoise(vec2(col_x * 2.1, wm.y * 5.0 + TIME * 1.8)) - 0.5) * 0.06, -0.04) * drop;
+	}
 	NORMAL_MAP = mix(nm, vec3(0.5 + tilt, 1.0), pane);
 }
 """
@@ -370,7 +409,8 @@ static var _photo_mutex := Mutex.new()
 static func shader() -> Shader:
 	if _shader == null:
 		var sh := Shader.new()
-		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
 		_shader = sh
 	return _shader
 

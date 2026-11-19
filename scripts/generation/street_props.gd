@@ -72,6 +72,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var boats := MarinaBuilder.build(root, data, ground, mask)
 	t = _lap(timings, "marina", t)
 	boats += HarbourFerries.build(root, data, ground, mask)
+	WaterWakes.build_mapped_collars(root, data, ground)
 	t = _lap(timings, "ferries", t)
 	var quay_bollards := QuayDetails.build(root, data, ground, mask)
 	t = _lap(timings, "quay", t)
