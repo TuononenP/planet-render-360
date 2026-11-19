@@ -270,8 +270,14 @@ static func paved_area_class(tags: Dictionary, is_area: bool = false) -> String:
 		return "pedestrian"
 	if str(tags.get("place", "")) == "square" and not tags.has("building"):
 		return "pedestrian"
-	if _standing_area(tags) and not tags.has("building") \
-			and str(tags.get("surface", "")) not in ["grass", "ground", "dirt", "earth", "sand", "mud"]:
+	var unpaved := str(tags.get("surface", "")) in ["grass", "ground", "dirt", "earth", "sand", "mud"]
+	if str(tags.get("amenity", "")) == "marketplace" and not tags.has("building") and not unpaved:
+		return "pedestrian"
+	if str(tags.get("leisure", "")) == "outdoor_seating" and not tags.has("building") \
+			and str(tags.get("location", "")) != "roof" \
+			and _tag_int(tags.get("level", 0), -10, 10) == 0 and not unpaved:
+		return "footway"
+	if _standing_area(tags) and not tags.has("building") and not unpaved:
 		return "parking"
 	return ""
 
@@ -299,6 +305,15 @@ static func _area_entry(tags: Dictionary, cls: String, outer: PackedVector2Array
 		"width_m": road_class_width(cls), "lanes": 0,
 		"surface": str(tags.get("surface", "")), "bridge": false, "tunnel": false,
 		"layer": _tag_int(tags.get("layer", 0), -10, 10)}
+	var nm := str(tags.get("name", ""))
+	if nm != "":
+		entry["name"] = nm
+	if str(tags.get("amenity", "")) == "marketplace":
+		entry["marketplace"] = true
+	if str(tags.get("leisure", "")) == "outdoor_seating":
+		entry["outdoor_seating"] = true
+	if _tag_truthy(tags.get("covered", "")):
+		entry["covered"] = true
 	if cls == "steps":
 		entry.merge(steps_fields(tags))
 	return entry
@@ -802,4 +817,5 @@ static func bay(tags: Dictionary) -> bool:
 ## Shallow ornamental/swimming basins use calm-water shading.
 static func still_pool(tags: Dictionary) -> bool:
 	return str(tags.get("artificial", "")) == "yes" or str(tags.get("leisure", "")) == "swimming_pool" \
-		or str(tags.get("water", "")) == "basin"
+		or str(tags.get("water", "")) in ["basin", "fountain"] \
+		or str(tags.get("amenity", "")) == "fountain"

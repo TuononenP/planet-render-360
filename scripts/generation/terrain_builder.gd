@@ -201,6 +201,7 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 			var hero_y := _hero_y(data, ground, cx, cz, entry, half)
 			var cacheable := not bool(entry.get("deck_ends", false)) \
+				and c_type != "turku_kauppatori" \
 				and c_type not in LandmarkTerrain.RELIEFS \
 				and LandmarkTerrain.outline(c_type).is_empty()
 			if cacheable:

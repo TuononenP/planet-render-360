@@ -330,7 +330,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		return
 	if line is Dictionary and bool((line as Dictionary).get("area", false)):
 		_area(_batch(batches, str(r["finish"])), pts, (line as Dictionary).get("holes", []),
-			surf, AREA_LIFT_M * m2u, m2u)
+			surf, AREA_LIFT_M * m2u, m2u, AREA_LAYER, _square_axis_rg(pts, str(r.get("class", "")), m2u))
 		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
@@ -379,12 +379,31 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 			_ribbon(_batch(batches, finish), band_rows(piece, m2u) if finish.begins_with("crossing") \
 				else _straighten(piece, surf.step), float(r["width_u"]), surf, lift, attr, junc, layer)
 
+## Dominant edge axis of a civic pedestrian square (>= 350 m²), packed
+## into COLOR.rg (`0.5 + 0.45 * u`) for RoadSurface's granite bay grid.
+static func _square_axis_rg(ring: PackedVector2Array, cls: String, m2u: float) -> Vector2:
+	if cls != "pedestrian" or ring.size() < 3 or absf(RingGeometry.signed_area(ring)) < 350.0 * m2u * m2u:
+		return Vector2.ZERO
+	var best_len := 1.0 * m2u
+	var u := Vector2.ZERO
+	for i in ring.size():
+		var e := ring[(i + 1) % ring.size()] - ring[i]
+		var el := e.length()
+		if el > best_len:
+			best_len = el
+			u = e / el
+	if u == Vector2.ZERO:
+		return Vector2.ZERO
+	if u.x < 0.0 or (is_equal_approx(u.x, 0.0) and u.y < 0.0):
+		u = -u
+	return Vector2(0.5 + 0.45 * u.x, 0.5 + 0.45 * u.y)
+
 ## Paved area (a square) filled flat on the drawn terrain: the outer
 ## ring ear-clipped, triangles over its holes, open water or past the
 ## drawn mesh dropped, the rest cut and laid like ribbon pieces under
 ## every ribbon (AREA_LAYER). An outline ribbon only drew its edge.
 static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surface,
-		lift: float, m2u: float, layer: float = AREA_LAYER) -> void:
+		lift: float, m2u: float, layer: float = AREA_LAYER, axis_rg: Vector2 = Vector2.ZERO) -> void:
 	if ring.size() < 3:
 		return
 	# A junction's apron comes out of a paved area (a square whose corner
@@ -426,7 +445,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 	if eligible.is_empty():
 		return
 	b.pad()
-	var attr := Color(0.0, 0.0, RoadSurface.wear_attr(false, 0.0, _lit_ring(ring, surf, m2u)), 1.0)
+	var attr := Color(axis_rg.x, axis_rg.y, RoadSurface.wear_attr(false, 0.0, _lit_ring(ring, surf, m2u)), 1.0)
 	var w2 := Vector2(0.0, layer)
 	var weld := {}
 	if surf.native != null and surf.native.has_method("area") \

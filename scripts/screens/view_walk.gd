@@ -282,14 +282,28 @@ static func _landmark_solids(data: LocationData) -> Array:
 	var out: Array = []
 	for entry in LocationData.landmarks():
 		var type := str(entry.get("type", ""))
-		if type != "gwanghwamun" and type != "gyeongbokgung_walls":
+		if type not in ["gwanghwamun", "gyeongbokgung_walls", "turku_kauppatori"]:
 			continue
 		var pos := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
 			data.latitude, data.longitude)
 		if pos.length() > 1300.0:
 			continue
 		var yaw := float(entry.get("yaw_deg", 0.0))
-		if type == "gwanghwamun":
+		if type == "turku_kauppatori":
+			var active := data.landmark_type == "turku_kauppatori"
+			if not active:
+				for cand in data.landmark_candidates:
+					if cand is Dictionary and str((cand as Dictionary).get("type", "")) == "turku_kauppatori":
+						active = true
+						break
+			if not active:
+				continue
+			var a := LandmarkSites.axis(entry)
+			var cross := Vector2(-a.y, a.x)
+			for r: Array in LandmarkFtKauppatori.SOLID_RECTS:
+				var c := pos + a * float(r[0]) + cross * float(r[1])
+				out.append(rect_solid(c, a, float(r[2]), float(r[3]), str(r[4])))
+		elif type == "gwanghwamun":
 			var hx := LandmarkGwanghwamun.BASE.x * 0.5
 			var depth := LandmarkGwanghwamun.BASE.z
 			var x0 := -hx

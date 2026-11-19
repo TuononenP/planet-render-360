@@ -20,6 +20,7 @@ Models use true metres and merged textured surfaces (`LandmarkMesh` / `LandmarkM
 | `vanha_suurtori` | 23370371 | 60.450508, 22.275468 | -59.0 | 15.0 | Brinkkala Mansion (1829) pale-yellow Empire facade & Christmas Peace balcony. |
 | `suomen_joutsen` | 178299341 | 60.436330, 22.237154 | -33.9 | 44.0 | 1902 white 3-masted full-rigged museum ship moored at Forum Marinum (`base=water`). |
 | `fori_ferry` | 57933176 | 60.441137, 22.247901 | -35.5 | 5.5 | 1904 orange-and-white double-ended Aurajoki cable ferry (`base=water`). |
+| `turku_kauppatori` | 621404185 / rel 14681388 / 1086675771 / 1086675770 / 1086675768 / 1136104931 / 1103029144–51 / 1112106012 | 60.451692, 22.266896 | -35.3 | 11.0 | 2022 *Saariston sydän* square & Schauman Arkkitehdit glulam-and-glass pavilions (Aurakatu, Kauppiaskatu, twin-wing Eerikinkatu with 6.3 m breezeway), *Kanttarelli* timber/glass stage, *Saaristohyppely* water basin & skerries, 8 bench-planters, 5 candelabra masts, Taivassalo red-granite grid bands & market stalls / *torikahvilat*. |
 
 ## Aurajoki Bridges (`BridgeSpecsNorthEurope`, `conf: 2`)
 

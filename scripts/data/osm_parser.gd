@@ -96,9 +96,26 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			for category in ["shop", "amenity", "office", "tourism", "craft", "advertising"]:
 				if el_tags.has(category):
 					var pt := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
-					pois.append({"x": pt.x, "z": pt.y, "category": category,
-						"kind": str(el_tags[category]), "name": str(el_tags.get("name", "")),
-						"brand": str(el_tags.get("brand", ""))})
+					var kind := str(el_tags[category])
+					var poi := {"x": pt.x, "z": pt.y, "category": category,
+						"kind": kind, "name": str(el_tags.get("name", "")),
+						"brand": str(el_tags.get("brand", ""))}
+					var indoor_or_sub := OsmTags._tag_truthy(el_tags.get("indoor", "")) \
+						or OsmTags.underground(el_tags) \
+						or OsmTags._tag_int(el_tags.get("level", 0), -10, 10) != 0
+					if category == "amenity" and kind in ["cafe", "restaurant", "bar", "fast_food", "pub", "biergarten", "ice_cream"] \
+							and str(el_tags.get("outdoor_seating", "")).strip_edges().to_lower() in ["yes", "pedestrian_zone", "terrace", "sidewalk"] \
+							and not indoor_or_sub:
+						poi["outdoor_seating"] = true
+					if category == "amenity" and kind in ["marketplace", "fountain"] \
+							and (indoor_or_sub or str(el_tags.get("access", "")) == "private"):
+						poi["indoor"] = true
+					if category == "amenity" and kind == "fountain" \
+							and (str(el_tags.get("fountain", "")) in ["wall_mounted", "drinking"] \
+								or str(el_tags.get("support", "")) == "wall_mounted" \
+								or str(el_tags.get("man_made", "")) == "water_tap"):
+						poi["wall_mounted"] = true
+					pois.append(poi)
 					break
 			var node_arch := OsmTags.archetype_for(el_tags)
 			if node_arch != "":
@@ -156,14 +173,26 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			elif str(el_tags.get("type", "")) == "multipolygon" \
 					and el.has("members"):
 				var members: Array = el.get("members", [])
+				var any_rel_land := false
 				for entry in OsmGeometry._relation_land(el_tags, members, c_lat, c_lon):
+					any_rel_land = true
 					if str(entry["class"]) == "water":
 						entry["tidal"] = OsmTags.tidal(el_tags)
 						entry["bay"] = OsmTags.bay(el_tags)
 						entry["still_pool"] = OsmTags.still_pool(el_tags)
 					if str(entry["class"]) == "forest":
 						(entry as Dictionary).merge(OsmTags.tree_tags(el_tags))
+					_tag_plaza_land(entry, el_tags)
 					land.append(entry)
+				if not any_rel_land and not OsmTags.underground(el_tags) \
+						and not OsmTags._tag_truthy(el_tags.get("indoor", "")):
+					var fallback_cls := "fountain" if str(el_tags.get("amenity", "")) == "fountain" \
+						else ("planter" if str(el_tags.get("man_made", "")) == "planter" else "")
+					if fallback_cls != "":
+						for r in OsmGeometry._relation_rings(members, c_lat, c_lon):
+							var entry := {"class": fallback_cls, "points": r["outer"], "holes": r["holes"]}
+							_tag_plaza_land(entry, el_tags)
+							land.append(entry)
 				var rel_arch := OsmTags.archetype_for(el_tags)
 				if rel_arch != "":
 					var outs := OsmGeometry._join_rings(
@@ -260,7 +289,9 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			piers.append({"points": poly, "floating": str(el_tags.get("floating", "")) == "yes",
 				"width_m": OsmTags._tag_metres(el_tags.get("width", ""), 0.5, 40.0)})
 		elif el_tags.has("barrier") and not (OsmGeometry._is_closed(poly) \
-				and str(el_tags.get("natural", "")) in ["scrub", "grassland", "heath"]):
+				and (str(el_tags.get("natural", "")) in ["scrub", "grassland", "heath"] \
+					or str(el_tags.get("amenity", "")) == "fountain" \
+					or str(el_tags.get("man_made", "")) == "planter")):
 			# A closed planting bed also tagged barrier=fence (Tapiola's
 			# coloured grass beds) is ground cover, not a fence: it falls
 			# through to the land branch below.
@@ -298,6 +329,16 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					entry["sward"] = OsmTags.sward(el_tags)
 				if cls == "urban" and OsmTags.harbour_use(el_tags) != "":
 					entry["harbour_use"] = OsmTags.harbour_use(el_tags)
+				_tag_plaza_land(entry, el_tags)
+				land.append(entry)
+			elif OsmGeometry._is_closed(poly) and poly.size() >= 4 \
+					and not OsmTags.underground(el_tags) \
+					and not OsmTags._tag_truthy(el_tags.get("indoor", "")) \
+					and (str(el_tags.get("amenity", "")) == "fountain" \
+						or str(el_tags.get("man_made", "")) == "planter"):
+				var pcls := "fountain" if str(el_tags.get("amenity", "")) == "fountain" else "planter"
+				var entry := {"class": pcls, "points": poly, "holes": []}
+				_tag_plaza_land(entry, el_tags)
 				land.append(entry)
 			elif str(el_tags.get("natural", "")) == "tree_row":
 				# A mapped row of trees: one tree every TREE_ROW_M along it.
@@ -306,6 +347,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					tree.merge(OsmTags.tree_tags(el_tags))
 					trees.append(tree)
 		_stamp_sources([buildings, roads, land], source_starts, source_id)
+	_drop_duplicate_paved_areas(roads)
 	RoadWidths.from_sidewalks(roads, trees)
 	RoadReferences.apply(roads)
 	_drop_duplicate_buildings(buildings)
@@ -517,6 +559,68 @@ static func _building_detail(b: Dictionary) -> int:
 	return (4 if not (b.get("holes", []) as Array).is_empty() else 0) \
 		+ (2 if str(b.get("height_source", "default")) != "default" else 0) \
 		+ (1 if str(b.get("name", "")) != "" else 0)
+
+## Stamps plaza metadata (`fountain`, `planter`, `bench`) on land entries.
+static func _tag_plaza_land(entry: Dictionary, tags: Dictionary) -> void:
+	if str(tags.get("amenity", "")) == "fountain" or str(tags.get("water", "")) == "fountain":
+		entry["fountain"] = true
+	if str(tags.get("man_made", "")) == "planter":
+		entry["planter"] = true
+		if OsmTags._tag_truthy(tags.get("bench", "")):
+			entry["bench"] = true
+
+## Coincident paved-area polygons (e.g. a `place=square` way and a
+## `highway=pedestrian` multipolygon with inner holes on the same outer
+## ring) z-fought when both laid an Area patch; keep the richer copy.
+static func _drop_duplicate_paved_areas(roads: Array) -> void:
+	var at := {}
+	var drop := {}
+	for i in roads.size():
+		if not (roads[i] is Dictionary):
+			continue
+		var r: Dictionary = roads[i]
+		if not bool(r.get("area", false)):
+			continue
+		var pts: Variant = r.get("points", null)
+		if not (pts is PackedVector2Array) or (pts as PackedVector2Array).size() < 3:
+			continue
+		var sig := "%s|%d" % [ring_signature(pts), int(r.get("layer", 0))]
+		if not at.has(sig):
+			at[sig] = i
+			continue
+		var j: int = at[sig]
+		var keep: Dictionary = roads[j]
+		var lose := r
+		if _area_detail(r) > _area_detail(roads[j]):
+			keep = r
+			lose = roads[j]
+			drop[j] = true
+			at[sig] = i
+		else:
+			drop[i] = true
+		if (keep.get("holes", []) as Array).is_empty() and not (lose.get("holes", []) as Array).is_empty():
+			keep["holes"] = lose["holes"]
+		if str(keep.get("surface", "")) == "" and str(lose.get("surface", "")) != "":
+			keep["surface"] = lose["surface"]
+		if str(keep.get("name", "")) == "" and str(lose.get("name", "")) != "":
+			keep["name"] = lose["name"]
+		for flag in ["marketplace", "outdoor_seating", "covered"]:
+			if bool(lose.get(flag, false)):
+				keep[flag] = true
+	if drop.is_empty():
+		return
+	var kept: Array = []
+	for i in roads.size():
+		if not drop.has(i):
+			kept.append(roads[i])
+	roads.assign(kept)
+
+static func _area_detail(r: Dictionary) -> int:
+	return 4 * (r.get("holes", []) as Array).size() \
+		+ (2 if str(r.get("class", "")) == "pedestrian" else 0) \
+		+ (2 if str(r.get("surface", "")) != "" else 0) \
+		+ (2 if bool(r.get("marketplace", false)) else 0) \
+		+ (1 if str(r.get("name", "")) != "" else 0)
 
 ## The same building:part mapped twice (same rings, same tags) drew two
 ## coincident masses; only the first is kept. Parts that differ in any

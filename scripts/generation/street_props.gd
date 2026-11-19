@@ -69,6 +69,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "shore_railings", t)
 	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
 	t = _lap(timings, "furniture", t)
+	var plazas := PlazaLife.build(root, data, ground, mask, ctx)
+	t = _lap(timings, "plazas", t)
 	var boats := MarinaBuilder.build(root, data, ground, mask)
 	t = _lap(timings, "marina", t)
 	boats += HarbourFerries.build(root, data, ground, mask)
@@ -89,7 +91,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var snowbanks := Snowbanks.build(root, data, ground)
 	t = _lap(timings, "snowbanks", t)
 	print("PROPS timings ms ", timings)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks}
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks}
 
 ## Records the ms since `t` under `key`; returns the time now.
 static func _lap(timings: Dictionary, key: String, t: int) -> int:

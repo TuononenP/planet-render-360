@@ -64,6 +64,9 @@ static func floor_y(data: LocationData, ground: GroundTruth, p: Vector2) -> floa
 ## corrected datum can expose a short gap where the DEM is lower.
 static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
 	_seat(root, ground)
+	if type == "turku_kauppatori":
+		LandmarkFtKauppatori.conform(root, ground)
+		return
 	if not outline(type).is_empty():
 		_plinth(root, ground, type)
 		return

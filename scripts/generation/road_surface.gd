@@ -123,6 +123,29 @@ void fragment() {
 		col *= paving_look(wpos.xz, sett_on, pv_rgh);
 		rough = mix(pv_rgh, 0.3, wet);
 	}
+	if (paving_on > 0.5 && width_m < 0.2 && (attr.r + attr.g) > 0.25) {
+		vec2 sq_u = normalize(vec2(attr.r - 0.5, attr.g - 0.5));
+		vec2 sq_p = vec2(dot(wpos.xz, sq_u), dot(wpos.xz, vec2(-sq_u.y, sq_u.x)));
+		vec2 sq_fw = fwidth(sq_p);
+		float sq_fade = 1.0 - smoothstep(0.06, 0.28, max(sq_fw.x, sq_fw.y) / 0.46);
+		if (sq_fade > 0.001) {
+			vec2 d_bay = abs(mod(sq_p + 5.5, 11.0) - 5.5);
+			vec2 hw = vec2(0.23);
+			vec2 aa = max(sq_fw, vec2(0.004));
+			vec2 course = 1.0 - smoothstep(hw - aa * 0.5, hw + aa * 0.5, d_bay);
+			float band_mask = max(course.x, course.y) * sq_fade;
+			float seam = max(
+				1.0 - smoothstep(0.0, aa.x + 0.014, abs(d_bay.x - hw.x)),
+				1.0 - smoothstep(0.0, aa.y + 0.014, abs(d_bay.y - hw.y))
+			) * (1.0 - smoothstep(0.02, 0.09, max(sq_fw.x, sq_fw.y)));
+			vec2 bay_id = floor((sq_p + 5.5) / 11.0);
+			float checker = (mod(bay_id.x + bay_id.y, 2.0) - 0.5) * 0.055 * (1.0 - band_mask) * sq_fade;
+			col *= 1.0 + checker;
+			col = mix(col, col * vec3(1.11, 1.08, 1.04), band_mask * 0.85);
+			col *= 1.0 - 0.16 * seam;
+			rough = mix(rough, max(rough - 0.10, 0.24), band_mask * 0.7);
+		}
+	}
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
 	vec2 p = wpos.xz;
 	// Paved streets, squares and walks are trampled: feet and wheels
