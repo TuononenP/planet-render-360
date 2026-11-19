@@ -38,10 +38,22 @@ struct Drape {
 Dictionary CanopyKernels::probes(const PackedVector2Array &cells, const PackedFloat64Array &dists,
 		const PackedFloat64Array &steps, const Array &drapes, double lat, double lon, double dark,
 		double min_green, double cell_m, int64_t budget) {
+	// Inputs that do not line up would be read past their end: no probes.
+	if (steps.size() < 2 || dists.size() != cells.size() || steps[1] <= 0.0) {
+		Dictionary none;
+		none["x"] = PackedFloat64Array();
+		none["z"] = PackedFloat64Array();
+		none["rgb"] = PackedFloat32Array();
+		none["widen"] = PackedFloat64Array();
+		return none;
+	}
 	std::vector<Drape> ds;
 	for (int64_t k = 0; k < drapes.size(); ++k) {
 		const Dictionary d = drapes[k];
-		ds.push_back({ d["bytes"], (int64_t)d["w"], (int64_t)d["h"], (int)(int64_t)d["zoom"], d["origin"], d["size"] });
+		Drape drape = { d["bytes"], (int64_t)d["w"], (int64_t)d["h"], (int)(int64_t)d["zoom"], d["origin"], d["size"] };
+		// A drape whose bytes are not RGB8 for its size is skipped, as an empty one is.
+		if (drape.w <= 0 || drape.h <= 0 || drape.bytes.size() < drape.w * drape.h * 3) continue;
+		ds.push_back(drape);
 	}
 	const double cos_lat = std::cos(lat * (Math::PI / 180.0));
 	PackedFloat64Array xs, zs, widens;

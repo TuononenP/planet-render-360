@@ -256,7 +256,8 @@ static func motion(train: Dictionary, k: int, plan: Array, data: LocationData, g
 ## + train + "_" + section + "_near" / "_far" / "_shadow").
 func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, ground: GroundTruth,
 		platform_only: bool) -> void:
-	var mouths := TramRoute.mouths(data, func(_rail: Dictionary) -> bool: return true)
+	var mouths := PackedVector2Array()
+	var mouths_read := false
 	var dirs := {}
 	for k in plan.size():
 		var train: Dictionary = plan[k]
@@ -278,6 +279,9 @@ func _adopt(holder: Node, prefix: String, plan: Array, data: LocationData, groun
 		var s0 := float(train["s"])
 		# Worked out ahead on a worker (compute_plans) when there is a plan for
 		# this world, else here.
+		if not train.has("motion") and not mouths_read:
+			mouths = TramRoute.mouths(data, func(_rail: Dictionary) -> bool: return true)
+			mouths_read = true
 		var mo: Dictionary = train["motion"] if train.has("motion") \
 			else motion(train, k, plan, data, ground, platform_only, mouths, dirs, _m2u)
 		var span: Vector2 = mo["span"]

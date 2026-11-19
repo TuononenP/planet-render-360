@@ -135,6 +135,13 @@ Array to_array(const Face &f) {
 	return out;
 }
 
+Array empty_result() {
+	Array out;
+	out.push_back(to_array(Face()));
+	out.push_back(to_array(Face()));
+	return out;
+}
+
 } // namespace
 
 PackedVector2Array PlinthKernels::edge_points(const PackedVector2Array &ring) {
@@ -150,6 +157,15 @@ PackedVector2Array PlinthKernels::edge_points(const PackedVector2Array &ring) {
 
 Array PlinthKernels::plinth(const Array &rings, const Array &grounds, const PackedByteArray &ccw,
 		const PackedFloat64Array &params, bool tangents) {
+	// Tables of the wrong size would be read past their end: give no plinth.
+	if (params.size() < 7 || grounds.size() != rings.size() || ccw.size() < rings.size()) {
+		return empty_result();
+	}
+	for (int64_t r = 0; r < rings.size(); ++r) {
+		const PackedVector2Array ring = rings[r];
+		const PackedFloat64Array g = grounds[r];
+		if (g.size() != ring.size() * 2) return empty_result();
+	}
 	const double m = params[0], floor_y = params[1];
 	const double sink_m = params[2], gap_m = params[3], coping_min_m = params[4];
 	const double coping_depth_m = params[5], coping_proud_m = params[6];
