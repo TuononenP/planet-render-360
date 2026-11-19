@@ -22,8 +22,9 @@ const MERGE_M := 40.0
 ## waits this far short of one it may not enter.
 const COMMIT_M := 3.0
 const WAIT_M := 1.0
-## A claim on a zone more than this far ahead (m) lapses (the tram turned).
-const LOOK_M := 60.0
+## Zones up to this far ahead (m) are looked at (a group of them reaches
+## its last zone's end plus a tram's length); a claim beyond lapses.
+const LOOK_M := 120.0
 
 ## The zones between `routes` (distinct TramRoutes): each [route a,
 ## Vector2(from, to) along a, route b, Vector2(from, to) along b], arc
@@ -113,11 +114,18 @@ static func of(route: TramRoute, all: Array) -> Array:
 ## is in or about to reach, and stops short of one another route's train
 ## holds; INF when nothing holds it back. `brake` is the service brake
 ## (m/s²). Zones closer together than the train is long are claimed
-## together, so it never stands in one waiting for the next.
-static func limit(t: Dictionary, trains: Array, dt: float, brake: float) -> float:
+## together, so it never stands in one waiting for the next. `held_to`
+## is the speed limit something else (a light, a stop, the tram ahead)
+## sets: it claims no zone it would stop short of for that, and standing
+## for it lets go of the zones ahead (release()).
+static func limit(t: Dictionary, trains: Array, dt: float, brake: float, held_to: float = INF) -> float:
 	if (t["zones"] as Array).is_empty():
 		return INF
 	var v := float(t["v"])
+	if held_to < 0.3 and v < 0.1:
+		release(t)
+		return INF
+	var commit := v * v / (2.0 * brake) + v * dt + COMMIT_M
 	var claims: Dictionary = t["claims"]
 	var ahead := _ahead(t, float(t["s"]), float(t["dir"]), claims)
 	var i := 0
@@ -130,8 +138,15 @@ static func limit(t: Dictionary, trains: Array, dt: float, brake: float) -> floa
 			var near := float(ahead[i][0])
 			for k in range(i, j + 1):
 				if not claims.has(int(ahead[k][2][0])) and _taken(t, ahead[k][2], trains):
-					return sqrt(2.0 * brake * maxf(near - WAIT_M, 0.0))
-			if near > v * v / (2.0 * brake) + v * dt + COMMIT_M:
+					# Waiting, it lets go of the zones it can still stop short of;
+					# committed to the first, it stops short of the taken one.
+					for m in range(i, j + 1):
+						if float(ahead[m][0]) > commit:
+							claims.erase(int(ahead[m][2][0]))
+					var stop_at := near if not claims.has(int(ahead[i][2][0])) else float(ahead[k][0])
+					return sqrt(2.0 * brake * maxf(stop_at - WAIT_M, 0.0))
+			# Not past the light or stop that holds it, nor near enough yet.
+			if near > commit or (held_to < INF and held_to * held_to / (2.0 * brake) < near):
 				return INF
 			for k in range(i, j + 1):
 				claims[int(ahead[k][2][0])] = true
@@ -142,12 +157,13 @@ static func limit(t: Dictionary, trains: Array, dt: float, brake: float) -> floa
 ## clear of every zone it would stand in or be too close to stop for (and
 ## those claimed together with them); when it is, it claims them, dropping
 ## its claims from the last run.
-static func can_enter(t: Dictionary, trains: Array, start: float, dir: float, v: float, brake: float) -> bool:
+static func can_enter(t: Dictionary, trains: Array, start: float, dir: float, v: float, brake: float,
+		dt: float) -> bool:
 	var claims := {}
 	if not (t["zones"] as Array).is_empty():
 		var ahead := _ahead(t, start, dir, claims)
 		var i := 0
-		while i < ahead.size() and float(ahead[i][0]) <= v * v / (2.0 * brake) + COMMIT_M:
+		while i < ahead.size() and float(ahead[i][0]) <= v * v / (2.0 * brake) + v * dt + COMMIT_M:
 			var j := _group(ahead, i, float(t["length"]))
 			for k in range(i, j + 1):
 				if _taken(t, ahead[k][2], trains):
@@ -156,6 +172,19 @@ static func can_enter(t: Dictionary, trains: Array, start: float, dir: float, v:
 			i = j + 1
 	t["claims"] = claims
 	return true
+
+## Drops train `t`'s claims on zones it does not stand in (it stands for
+## something else: a stop, a light).
+## Those claimed with a zone it stands in stay claimed (it may not stand
+## in one waiting for the next).
+static func release(t: Dictionary) -> void:
+	var claims: Dictionary = t["claims"]
+	var ahead := _ahead(t, float(t["s"]), float(t["dir"]), claims)
+	var keep := -1
+	if not ahead.is_empty() and float(ahead[0][0]) <= 0.0:
+		keep = _group(ahead, 0, float(t["length"]))
+	for k in range(keep + 1, ahead.size()):
+		claims.erase(int(ahead[k][2][0]))
 
 ## The zones of train `t` ahead of it standing at `s` heading `dir`, as
 ## [metres from its front to the zone, to the zone's far end, zone],
@@ -194,16 +223,30 @@ static func _group(ahead: Array, i: int, length: float) -> int:
 	return j
 
 ## Whether a train of the other route of zone `z` (as of() gives it to
-## `t`) has claimed it or stands in it.
+## `t`) has claimed it or stands in it. A deck tram keeps a timetable
+## and claims nothing: it holds every zone ahead of it within twice
+## LOOK_M, also while it is out of sight waiting to come back in.
 static func _taken(t: Dictionary, z: Array, trains: Array) -> bool:
 	var id := int(z[0])
 	var other: TramRoute = z[2]
 	var theirs: Vector2 = z[3]
 	for o: Dictionary in trains:
-		if o == t or o["route"] != other or bool(o["hidden"]):
+		var deck := not is_nan(float(o["deck_mid"]))
+		if o == t or o["route"] != other or (bool(o["hidden"]) and not deck):
 			continue
 		var s := float(o["s"])
 		var half := float(o["length"]) * 0.5
+		var dir := float(o["dir"])
+		if bool(o["hidden"]):
+			# A deck tram out of sight: past its run's far end it is gone;
+			# before its start it is coming, over every zone ahead.
+			if s != (float(o["lo"]) if dir > 0.0 else float(o["hi"])):
+				continue
+			s -= dir * (half + 1.0)
 		if (o["claims"] as Dictionary).has(id) or (s + half > theirs.x and s - half < theirs.y):
 			return true
+		if deck:
+			var ahead := theirs.x - (s + half) if dir > 0.0 else (s - half) - theirs.y
+			if ahead >= 0.0 and ahead <= 2.0 * LOOK_M:
+				return true
 	return false

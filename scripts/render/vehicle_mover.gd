@@ -294,8 +294,9 @@ static func _track_dir(route: TramRoute, plan: Array, country: String) -> float:
 			var box := Rect2(other.points[0], Vector2.ZERO)
 			for q in other.points:
 				box = box.expand(q)
-			boxes.append(box.grow(TWIN_M * route._m2u))
+			boxes.append(box.grow(TWIN_M * WorldScale.metres_to_units()))
 	var vote := 0
+	var mid_vote := 0
 	for k in DIR_SAMPLES:
 		var at := route.length_m * (float(k) + 0.5) / float(DIR_SAMPLES)
 		var p := route.xz_at(at)
@@ -315,6 +316,10 @@ static func _track_dir(route: TramRoute, plan: Array, country: String) -> float:
 				side = (other.xz_at(near.x) - p).dot(Vector2(-f.y, f.x))
 		if best < INF:
 			vote += 1 if side > 0.0 else -1
+			if k == DIR_SAMPLES >> 1:
+				mid_vote = 1 if side > 0.0 else -1
+	# A tie goes the way the twin lies at the middle.
+	vote = vote if vote != 0 else mid_vote
 	if vote == 0:
 		var p := route.xz_at(route.length_m * 0.5)
 		return 1.0 if TransitVehicles._hash(p.x, p.y, 23.0) < 0.5 else -1.0
@@ -432,7 +437,7 @@ func _step(t: Dictionary, dt: float) -> void:
 	if loop:
 		limit = minf(limit, _light_limit(t, s, v, dir))
 		# Another route's tram where the tracks meet: wait for it to pass.
-		limit = minf(limit, TramRails.limit(t, _trains, dt, BRAKE_MS2))
+		limit = minf(limit, TramRails.limit(t, _trains, dt, BRAKE_MS2, limit))
 	var target_v := minf(float(t["cruise"]), limit)
 	if v < target_v:
 		v = minf(v + ACCEL_MS2 * dt, target_v)
@@ -463,6 +468,7 @@ func _step(t: Dictionary, dt: float) -> void:
 		t["s"] = float(t["target"])
 		t["v"] = 0.0
 		t["moved"] = true
+		TramRails.release(t)
 		var n := int(t["n"]) + 1
 		t["n"] = n
 		var dwell: Vector2 = t["dwell_range"]
@@ -511,7 +517,7 @@ func _enter(t: Dictionary) -> void:
 			var room := (float(o["s"]) - start) * dir - (float(o["length"]) + float(t["length"])) * 0.5 - FOLLOW_M
 			if room < float(t["cruise"]) * float(t["cruise"]) / (2.0 * BRAKE_MS2):
 				return
-	if not TramRails.can_enter(t, _trains, start, dir, float(t["cruise"]), BRAKE_MS2):
+	if not TramRails.can_enter(t, _trains, start, dir, float(t["cruise"]), BRAKE_MS2, MAX_STEP_S):
 		return
 	t["hidden"] = false
 	t["s"] = start

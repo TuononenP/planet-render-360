@@ -444,7 +444,7 @@ static func _platform_spots(spots: Array, data: LocationData, ground: GroundTrut
 		return
 	var carries := func(rail: Dictionary) -> bool:
 		return TrainSpecs.carries(rail)
-	var routes := TramRoute.chains(data, ground, m2u, carries)
+	var routes := TramRoute.chains(data, ground, m2u, carries, false)
 	for platform in data.rail_platforms:
 		if not (platform is Dictionary):
 			continue

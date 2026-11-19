@@ -52,9 +52,10 @@ var _m2u := 1.0
 var _ground: GroundTruth
 
 ## Routes over `data`'s track that `carries` accepts (Callable(rail) ->
-## bool; default: every tram way), longest first.
+## bool; default: every tram way), longest first; with `one_per_rail` a
+## rail mapped twice carries one route (_distinct).
 static func chains(data: LocationData, ground: GroundTruth, m2u: float,
-		carries: Callable = Callable()) -> Array[TramRoute]:
+		carries: Callable = Callable(), one_per_rail: bool = true) -> Array[TramRoute]:
 	var lines: Array = []
 	for r in data.railways:
 		if not (r is Dictionary) or bool((r as Dictionary).get("tunnel", false)):
@@ -68,7 +69,8 @@ static func chains(data: LocationData, ground: GroundTruth, m2u: float,
 		var pts: PackedVector2Array = rail.get("points", PackedVector2Array())
 		if pts.size() >= 2:
 			lines.append(rail)
-	lines = _distinct(lines, m2u)
+	if one_per_rail:
+		lines = _distinct(lines, m2u)
 	var tol := JOIN_M * m2u
 	# Way ends by cell, [way index, at its tail end].
 	var ends := {}
@@ -281,7 +283,8 @@ static func _uncovered(pts: PackedVector2Array, bridge: bool, grid: Dictionary, 
 			if (e == 0 and span.x == 0.0) or (e > 0 and span.y == at):
 				continue
 			for tip in tips:
-				if tip.distance_to(piece[e]) < 2.0 * tol:
+				# Not onto the twin track's end: the tip lies on this way's line.
+				if tip.distance_to(piece[e]) < 2.0 * tol and _off_line(tip, pts) < tol:
 					piece[e] = tip
 					break
 		out.append(piece)
@@ -302,6 +305,13 @@ static func _cut(pts: PackedVector2Array, u0: float, u1: float) -> PackedVector2
 					out.append(p)
 		at = next
 	return out
+
+## Distance from `p` to the line `pts` (world units).
+static func _off_line(p: Vector2, pts: PackedVector2Array) -> float:
+	var best := INF
+	for k in pts.size() - 1:
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, pts[k], pts[k + 1])))
+	return best
 
 static func _polyline_length(pts: PackedVector2Array) -> float:
 	var total := 0.0
