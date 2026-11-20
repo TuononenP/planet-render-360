@@ -17,7 +17,10 @@ class ShoreClassifier : public RefCounted {
 	GDCLASS(ShoreClassifier, RefCounted)
 
 	PackedFloat32Array dry, land_grid;
-	PackedByteArray quayed;
+	// Plain bytes, not a PackedByteArray: the worker threads index it, and
+	// the packed array's operator[] on a non-const object detaches a shared
+	// buffer (a copy-on-write that races, corrupting the heap).
+	std::vector<uint8_t> quayed;
 	int size = 0;
 	double step = 1.0, origin = 0.0, m2u = 1.0;
 	Rect2 bounds, domain_bounds;

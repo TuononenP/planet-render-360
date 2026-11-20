@@ -35,7 +35,7 @@ void ShoreClassifier::setup(const PackedFloat32Array &p_dry, int p_size, double 
 		const PackedFloat64Array &p_levels, const Ref<ShoreEvidenceIndex> &p_evidence, const Dictionary &p_abutment_ends,
 		double p_m2u, const PackedFloat32Array &p_land, const PackedByteArray &p_quayed) {
 	dry = p_dry;
-	quayed = p_quayed;
+	quayed.assign(p_quayed.ptr(), p_quayed.ptr() + p_quayed.size());
 	land_grid = p_land;
 	size = p_size;
 	step = p_step;
@@ -207,7 +207,7 @@ Dictionary ShoreClassifier::classify(const Array &edges, Object *abort) {
 		Dictionary treatment = evidence_of[p.first].duplicate();
 		bool hard = String(treatment["kind"]) == "hard";
 		// ShorelineModel._classify: a steep natural bank on a quayed river is a wall.
-		if (!hard && p.body >= 0 && p.body < quayed.size() && quayed[p.body]) {
+		if (!hard && p.body >= 0 && (size_t)p.body < quayed.size() && quayed[(size_t)p.body]) {
 			const double rise = bank_top(p.mid, p.land);
 			if (!std::isnan(rise) && rise - level(p.body, p.mid) > 4.0 * m2u) {
 				treatment = Dictionary();

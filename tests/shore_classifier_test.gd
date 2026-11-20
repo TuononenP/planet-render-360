@@ -7,6 +7,8 @@ extends SceneTree
 ## through paved, built frontage, a road bridge on abutments and sloping
 ## banks. Skips, passing, when the library is not built.
 
+const REPEATS := 40
+
 func _init() -> void:
 	if not ClassDB.class_exists("ShoreClassifier"):
 		print("SHORE_CLASSIFIER SKIP: ShoreClassifier is not loaded (tools/build_native.sh)")
@@ -23,6 +25,14 @@ func _init() -> void:
 			out[native] = [model.segments, model._segment_cells, model.diagnostics, model._edges,
 				model.transition_edges, model.patches.keys()]
 		ShorelineModel.native_classify = true
+		# The kernel classifies on every core: a data race inside it (a shared
+		# buffer written from two threads) shows as a rare, wrong segment, so
+		# the same build repeats and must match the script's every time.
+		for run in REPEATS:
+			var again = GroundTruth.new(fixtures[name]).shoreline
+			if var_to_bytes([again.segments, again._segment_cells, again.diagnostics]) != var_to_bytes(out[false].slice(0, 3)):
+				failures.append("%s: native run %d differs from the script's" % [name, run])
+				break
 		var segments: Array = out[false][0]
 		if segments.is_empty():
 			failures.append("%s: no segments to compare" % name)
