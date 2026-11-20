@@ -46,15 +46,27 @@ python3 tools/osmb.py decode assets/osm_snapshots/helsinki_detailed.osmb > helsi
 | Helsinki | 60.1680, 24.9530 | POI / q1 | 2026-11-02 21:21:26 | 128,922 |
 | Stockholm | 59.3207, 18.0604 | detailed / q12 | 2026-11-02 21:21:26 | 1,794,330 |
 | Stockholm | 59.3207, 18.0604 | ring 1600 m / q1 | 2026-11-02 21:21:26 | 71,040 |
-| Stockholm | 59.3207, 18.0604 | ring 2500 m / q1 | 2026-11-02 21:21:26 | 119,405 |
+| Stockholm | 59.3207, 18.0604 | ring 2500 m / q1, highways uncapped | 2026-11-19 19:54:43 | 172,741 |
 | Stockholm | 59.3207, 18.0604 | POI / q1 | 2026-11-02 21:21:26 | 72,530 |
 
 The November 2 Helsinki and Stockholm responses came from the Europe
 Overpass instance at `https://ovp.dresel.systems/api/interpreter` on
 2026-11-04. They have no runtime error and match the current queries, but
-retain the queries' per-layer output caps: both Helsinki rings and the
-Stockholm 2500 m ring reached the highway cap, and Helsinki's 2500 m ring
-also reached the waterway cap. Those layers may omit mapped features.
+retain the queries' per-layer output caps: both Helsinki rings reached the
+highway cap, and Helsinki's 2500 m ring also reached the waterway cap. Those
+layers may omit mapped features.
+
+The Stockholm 2500 m ring was re-cut on 2026-11-19 from
+`https://overpass.openstreetmap.fr/api/interpreter`. The old file had hit
+the 800-highway cap (Overpass prints in id order, so it thinned the whole
+ring and kept 800 of 1,375 major roads). The new file uses the q1 ring
+statements unchanged, except the highway `out geom` cap is raised from 800
+to 5,000 for this one snapshot. It holds all 1,375 motorway to tertiary ways
+within 2,500 m (927 tertiary, 389 secondary, 15 primary, 44 trunk), with 23
+waterways (cap 150) and 45 coastline ways (cap 100), so every layer is
+complete inside the ring. The parser applies no cap to bundled text, and the
+live query keeps `CAP_RING_HIGHWAYS` (800), so `RING_VERSION` stays 1 and no
+other preset changes. The `.osmb` file grew from 38,963 to 52,382 bytes.
 
 The New York far-city, ring and POI layers and San Francisco ring and POI
 layers were generated from BBBike's 2026-10-31 [New York](https://download.bbbike.org/osm/bbbike/NewYork/)
