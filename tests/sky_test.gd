@@ -149,22 +149,25 @@ func _init() -> void:
 		var street := sp.position.x * 0.1
 		var bottom := sp.position.y - sp.size.y * 0.5
 		var capture := sp.position.y + sp.origin_offset.y
-		if absf(bottom - (street - AtmosphereRig.STREET_BELOW_M * um)) > 0.01 * um \
+		if not sp.visible or absf(bottom - (street - AtmosphereRig.STREET_BELOW_M * um)) > 0.01 * um \
 				or absf(capture - (street + 30.0 * um)) > 0.01 * um:
-			failures.append("a street box should stand on its street and capture at eye height: %s" % sp.position)
+			failures.append("a street box should be visible, stand on its street and capture at eye height: %s" % sp.position)
 			break
 	if not is_equal_approx(rig._street_probes[1].position.x, 150.0 * um):
 		failures.append("street probes should follow the eye")
-	# A drone far up: the capture stays inside its box.
+	# A drone far up: street probes hide so box projection cannot bend
+	# water reflections downward, while keeping their capture inside the box.
 	rig.set_probe_origin(Vector3(10.0, 400.0, 0.0) * um)
 	var top_sp := rig._street_probes[0]
-	if absf(top_sp.origin_offset.y) > top_sp.size.y * 0.5:
-		failures.append("a high eye should keep each street capture inside its box")
+	if top_sp.visible or absf(top_sp.origin_offset.y) > top_sp.size.y * 0.5:
+		failures.append("a high eye should hide street probes and keep each capture inside its box")
 	# The view probe: a high eye captures where it is; a walker's eye
 	# captures VIEW_CAPTURE_AGL_M over its ground, above trees and walls.
 	if not rig.probe.origin_offset.is_zero_approx():
 		failures.append("a high eye should capture the view probe where it is: %s" % rig.probe.origin_offset)
 	rig.set_probe_origin(Vector3(10.0, 1.0 + 1.7, 0.0) * um)
+	if not rig._street_probes[0].visible:
+		failures.append("street probes should reappear when the eye returns to street level")
 	var view_capture := rig.probe.position.y + rig.probe.origin_offset.y
 	if absf(view_capture - (1.0 + AtmosphereRig.VIEW_CAPTURE_AGL_M) * um) > 0.01 * um:
 		failures.append("a walker's view probe should capture %.0f m over the ground, at %f" % [

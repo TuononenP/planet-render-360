@@ -195,7 +195,8 @@ func _process(delta: float) -> void:
 			# Godot spreads over six frames (one cube face each).
 			probe.intensity = 1.0 if probe.intensity < 1.0 else 0.9999
 			for sp in _street_probes:
-				sp.intensity = probe.intensity
+				if sp.visible:
+					sp.intensity = probe.intensity
 	# Lightning writes the sky only while a flash is lit (it dirties the
 	# radiance map); flashes never re-capture the reflection probe.
 	if lightning.active or _flash_on:
@@ -442,6 +443,13 @@ const STREET_PROBE_SIZE_M := Vector3(160.0, 90.0, 160.0)
 const STREET_BELOW_M := 4.0
 ## Eye height over the street assumed when no ground is known.
 const STREET_EYE_M := 30.0
+## Above this height over the ground (drone / aerial views), the eye is
+## over the rooftops looking across open water and city rather than down
+## a street canyon: hide the box-projected street probes so the sky-scale
+## view probe holds everywhere. Otherwise their high capture origin bends
+## upward water reflections onto the box side walls below it, sampling
+## the dark sea and ground below the horizon as dark smears on the water.
+const STREET_PROBE_MAX_AGL_M := 50.0
 var _street_probes: Array[ReflectionProbe] = []
 ## Ground height (render Y) at (x, z), set by the view once its ground is
 ## known: each street box stands on the street under it.
@@ -478,8 +486,10 @@ func _place_street_probes() -> void:
 	var m := units_per_metre
 	var eye := probe.position
 	var eye_ground := _ground_y(eye.x, eye.z, eye.y - STREET_EYE_M * m)
+	var aerial := eye.y - eye_ground > STREET_PROBE_MAX_AGL_M * m
 	for i in _street_probes.size():
 		var sp := _street_probes[i]
+		sp.visible = not aerial
 		var at := eye + STREET_PROBE_OFFSETS[i] * m
 		var street := _ground_y(at.x, at.z, eye_ground)
 		var bottom := street - STREET_BELOW_M * m
