@@ -329,21 +329,29 @@ const DISTRICTS := [
 	["espoo", "espoo_modern", 60.1700, 24.7650, 0.6, 8.0],  # Niittykumpu metro centre
 	["espoo", "espoo_modern", 60.1755, 24.8310, 0.75, 8.0],  # Keilaniemi
 	["espoo", "kauniainen", 60.2100, 24.7280, 1.5, 8.0],  # Kauniainen
-	["turku", "turku_empire", 60.4508, 22.2758, 0.35, 10.0],  # Vanha Suurtori & Cathedral quarter
-	["turku", "turku_wood", 60.4480, 22.2480, 0.55, 10.0],    # Port Arthur (Portsa)
-	["turku", "turku_wood", 60.4472, 22.2775, 0.22, 12.0],    # Luostarinmäki
-	["turku", "turku_wood", 60.4408, 22.2630, 0.55, 8.0],     # Martti
-	["turku", "turku_wood", 60.4365, 22.2740, 0.50, 8.0],     # Mäntymäki
-	["turku", "turku_wood", 60.4590, 22.2990, 0.65, 8.0],     # Nummenmäki
-	["turku", "turku_midrise", 60.4495, 22.2950, 0.70, 8.0],  # Kupittaa
-	["turku", "turku_midrise", 60.4345, 22.2410, 0.50, 8.0],  # Telakkaranta & Korppolaismäki waterfront
-	["turku", "turku_midrise", 60.4428, 22.2465, 0.35, 8.0],  # Kakolanmäki new quarter
-	["turku", "turku_villa", 60.4290, 22.1500, 3.2, 8.0],     # Ruissalo
-	["turku", "turku_villa", 60.4150, 22.2300, 2.0, 6.0],     # Hirvensalo
-	["turku", "turku_element", 60.4420, 22.3620, 1.0, 8.0],   # Varissuo
-	["turku", "turku_element", 60.4880, 22.2620, 1.0, 8.0],   # Runosmäki
-	["turku", "turku_element", 60.4310, 22.3420, 0.8, 8.0],   # Lauste
-	["turku", "turku_suburb", 60.4670, 22.3130, 0.8, 8.0],    # Halinen
+	["turku", "turku_empire", 60.4508, 22.2758, 0.35, 10.0],     # Vanha Suurtori & Cathedral quarter
+	["turku", "turku_commercial", 60.4515, 22.2666, 0.42, 9.0],  # VI-VII Commercial Core (Kauppatori / Yliopistonkatu)
+	["turku", "turku_jugend", 60.4545, 22.2595, 0.38, 9.0],      # Puolalanmäki & Humalistonkatu Jugend
+	["turku", "turku_jugend", 60.4478, 22.2715, 0.35, 9.0],      # Kaskenmäki & Vartiovuori Jugend
+	["turku", "turku_campus", 60.4540, 22.2855, 0.45, 9.0],      # Yliopistonmäki university campus
+	["turku", "turku_campus", 60.4525, 22.2935, 0.45, 10.0],     # TYKS Hospital Area (Kantasairaala / Majakka / T)
+	["turku", "turku_campus", 60.4495, 22.2950, 0.55, 8.0],      # Kupittaa Science Park
+	["turku", "turku_wood", 60.4480, 22.2480, 0.55, 10.0],       # Port Arthur (Portsa)
+	["turku", "turku_wood", 60.4472, 22.2775, 0.22, 12.0],       # Luostarinmäki
+	["turku", "turku_wood", 60.4408, 22.2630, 0.55, 8.0],        # Martti
+	["turku", "turku_wood", 60.4365, 22.2740, 0.50, 8.0],        # Mäntymäki
+	["turku", "turku_wood", 60.4590, 22.2990, 0.65, 8.0],        # Nummenmäki
+	["turku", "turku_midrise", 60.4460, 22.2880, 0.55, 8.0],     # Kupittaa / Itäharju midrise
+	["turku", "turku_midrise", 60.4345, 22.2410, 0.50, 8.0],     # Telakkaranta & Korppolaismäki waterfront
+	["turku", "turku_midrise", 60.4428, 22.2465, 0.35, 8.0],     # Kakolanmäki new quarter
+	["turku", "turku_villa", 60.4290, 22.1500, 3.2, 8.0],        # Ruissalo
+	["turku", "turku_villa", 60.4150, 22.2300, 2.0, 6.0],        # Hirvensalo
+	["turku", "turku_element", 60.4420, 22.3620, 1.0, 8.0],      # Varissuo
+	["turku", "turku_element", 60.4880, 22.2620, 1.0, 8.0],      # Runosmäki
+	["turku", "turku_element", 60.4310, 22.3420, 0.8, 8.0],      # Lauste
+	["turku", "turku_element", 60.4230, 22.2560, 0.7, 8.0],      # Uittamo
+	["turku", "turku_element", 60.4490, 22.1720, 0.9, 8.0],      # Pansio
+	["turku", "turku_suburb", 60.4670, 22.3130, 0.8, 8.0],       # Halinen
 	["edinburgh", "edinburgh_old", 55.9500, -3.1880, 0.4, 20.0],  # Royal Mile
 	["edinburgh", "edinburgh_georgian", 55.9550, -3.1990, 0.7, 12.0],  # New Town
 	["dublin", "dublin_modern", 53.3470, -6.2380, 0.8, 15.0],    # Docklands

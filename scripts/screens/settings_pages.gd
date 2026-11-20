@@ -18,6 +18,7 @@ const SOURCES := [
 	["Street areas, Helsinki", "© City of Helsinki, register of public areas · CC BY 4.0", "https://hri.fi/data/en/dataset/helsingin-kaupungin-yleisten-alueiden-rekisteri"],
 	["Imagery", "Esri, Vantor, Earthstar Geographics", "https://www.esri.com/en-us/legal/terms/web-site-service"],
 	["Imagery, Helsinki region", "© HSY, orthophoto 2023 · CC BY 4.0", "https://hri.fi/data/en/dataset/paakaupunkiseudun-ortoilmakuvat"],
+	["Imagery, Turku", "© City of Turku, orthophoto 2025 · CC BY 4.0", "https://www.turku.fi/avoindata"],
 	["Land cover", "© ESA WorldCover project 2021 · contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium · CC BY 4.0", "https://esa-worldcover.org/"],
 	["Canopy height", "© Meta and World Resources Institute · source imagery © 2016 Vantor · CC BY 4.0", "https://registry.opendata.aws/dataforgood-fb-forestsv2/"],
 	["Land cover, Helsinki region", "© HSY, land cover 2024 (surfaces and tree canopy) · CC BY 4.0", "https://hri.fi/data/en/dataset/paakaupunkiseudun-maanpeiteaineisto"],

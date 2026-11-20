@@ -141,12 +141,20 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 	var primary := pts.size()
 	var half: float = RADIUS_M * 0.5
 	pts.append_array([Vector2(half, half), Vector2(-half, half), Vector2(half, -half), Vector2(-half, -half)])
+	var bare_earth := not data.ground_model.is_empty() \
+		and GroundModel.SOURCES.has(str(data.dem_source.get("ground_model", "")))
+	var ref_label := "bare-earth " + str(data.dem_source.get("ground_model", "")) if bare_earth else "z14"
 	for i in pts.size():
 		if i >= primary and n >= 6:
 			break
 		var p := pts[i]
 		var ll := WorldScale.latlon_from_xz(p.x, p.y, data.latitude, data.longitude)
-		var ref := _dem_z14(ll.x, ll.y)
+		var ref := NAN
+		if bare_earth:
+			var m := GroundModel.merc(ll.x, ll.y)
+			ref = GroundModel.sample(data.ground_model, m.x, m.y)
+		else:
+			ref = _dem_z14(ll.x, ll.y)
 		if is_nan(ref):
 			return {"lines": ["- (a) DEM → BLOCKED(z14 tile not cached at %.5f, %.5f)" % [ll.x, ll.y]],
 				"verdicts": ["a:BLOCKED"]}
@@ -155,10 +163,11 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 			# Mapped water: the bed is carved below the surface on purpose.
 			per.append("(%.0f,%.0f) water, carved %.1f m — excluded" % [p.x, p.y, got - ref])
 			continue
-		var stripped := unstripped.asl_y(unstripped.height_at_world(p.x, p.y)) - got
-		if stripped >= 0.5:
-			per.append("(%.0f,%.0f) %+.2f, roofs stripped %.1f m — excluded" % [p.x, p.y, got - ref, stripped])
-			continue
+		if not bare_earth:
+			var stripped := unstripped.asl_y(unstripped.height_at_world(p.x, p.y)) - got
+			if stripped >= 0.5:
+				per.append("(%.0f,%.0f) %+.2f, roofs stripped %.1f m — excluded" % [p.x, p.y, got - ref, stripped])
+				continue
 		var e := absf(got - ref)
 		per.append("(%.0f,%.0f) %+.2f" % [p.x, p.y, got - ref])
 		max_e = maxf(max_e, e)
@@ -167,7 +176,7 @@ func _check_a(loc: Dictionary, data: LocationData, ground: GroundTruth) -> Dicti
 	var bar := float(loc["dem_bar"])
 	var v := "PASS" if n >= 6 and max_e <= bar else ("BLOCKED" if n < 6 else "FAIL")
 	return {"lines": ["- (a) DEM: max %.2f m / mean %.2f m over %d land points (bar ≤ %.0f m) → %s" % [max_e, sum_e / maxf(n, 1), n, bar, v],
-		"  - points (x,z m: rendered − z14): " + "; ".join(per)],
+		"  - points (x,z m: rendered − %s): " % ref_label + "; ".join(per)],
 		"verdicts": ["a:" + v]}
 
 ## Independent z14 Terrarium sample (bilinear) from the v2 tile cache.

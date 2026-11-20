@@ -7,7 +7,7 @@ extends RefCounted
 
 static func build(model: Node3D, type: String) -> bool:
 	match type:
-		"turku_castle": LandmarkFrTurku.turku_castle(model)
+		"turku_castle": FtTurkuCastle.build(model)
 		"naantali_convent_church": LandmarkFrTurku.naantali(model)
 		"rauma_holy_cross_church": LandmarkFrTurku.rauma(model)
 		"tampere_cathedral": LandmarkFrTampere.cathedral(model)

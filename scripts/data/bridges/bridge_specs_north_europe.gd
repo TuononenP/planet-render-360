@@ -385,4 +385,42 @@ static func rows() -> Array:
 			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
 			"src": "fi Wikipedia (Martinsilta, 1940 reinforced-concrete girder bridge over Aurajoki, ~104.5 m), " +
 				"OSM way 4306342 (104.6 m, bearing 145.2, mid 60.444341,22.255718)"},
+		{"id": "br_turku_tuomaansilta", "cc": "FI", "name": "Tuomaansilta", "wiki": "Tuomaansilta",
+			"aliases": ["tuomaan silta", "thomas bridge turku", "tomasbron"], "lat": 60.458810, "lon": 22.277528,
+			"bearing": 80.8, "st": "girder", "spans": [28.0, 55.2, 28.0], "width": 22.0, "clear": 5.8,
+			"material": "concrete", "concrete_hex": "#B8B6AE", "columns": 3, "base": "water", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Tuomaansilta, 1999 concrete/steel road bridge over Aurajoki, 22 m wide, ~110 m deck), " +
+				"OSM ways 4238871/4238874 + cycleways 26490790/482768026 (111.2 m, bearing 80.8, mid 60.458810,22.277528)"},
+		{"id": "br_turku_halistensilta", "cc": "FI", "name": "Halistensilta", "wiki": "Halistensilta",
+			"aliases": ["halisten silta", "halisbron"], "lat": 60.464742, "lon": 22.304102,
+			"bearing": 10.5, "st": "girder", "spans": [30.0, 37.3, 37.4, 30.0], "width": 12.5, "clear": 7.5,
+			"material": "concrete", "concrete_hex": "#B4B2AA", "columns": 2, "base": "water", "tier": 3, "conf": 2,
+			"src": "fi Wikipedia (Halistensilta crossing Aurajoki at Halistenkoski rapids), " +
+				"OSM way 4451067 (134.7 m, 2 lanes, bearing 10.5, mid 60.464742,22.304102)"},
+		{"id": "br_turku_aurajoen_rautatiesilta", "cc": "FI", "name": "Aurajoen rautatiesilta",
+			"wiki": "Aurajoen rautatiesilta", "aliases": ["aura river railway bridge", "rantarata bridge turku"],
+			"lat": 60.460771, "lon": 22.279379, "bearing": 105.5, "st": "truss",
+			"spans": [42.0, 54.0, 53.2, 42.0], "arch_spans": [1, 2], "width": 8.5, "clear": 7.5, "rise": 7.5,
+			"material": "steel", "steel_hex": "#6E757A", "base": "water", "tier": 3, "conf": 2,
+			"src": "Rantarata steel truss railway bridge over Aurajoki upstream of Tuomaansilta, " +
+				"OSM way 1327879940 (191.2 m, bearing 105.5/285.5, mid 60.460771,22.279379)"},
+		{"id": "br_turku_hirvensalonsilta", "cc": "FI", "name": "Hirvensalonsilta", "wiki": "Hirvensalonsilta",
+			"aliases": ["hirvensalo bridge", "hirvensalobron"], "lat": 60.422780, "lon": 22.236390,
+			"bearing": 172.0, "st": "girder", "spans": [45.0, 58.0, 64.0, 58.0, 45.0], "width": 21.0, "clear": 10.0,
+			"material": "concrete", "concrete_hex": "#C4C2BA", "columns": 3, "base": "sea", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Hirvensalonsilta, 1993 4-lane road bridge over Pitkäsalmi strait, 6300 m2 deck, " +
+				"8 m vertical clearance, 60°25'22\"N 22°14'11\"E)"},
+		{"id": "br_turku_aninkaistensilta", "cc": "FI", "name": "Aninkaistensilta", "wiki": "Aninkaistensilta",
+			"aliases": ["aningaisbron", "aninkainen bridge"], "lat": 60.458812, "lon": 22.267903,
+			"bearing": 146.4, "st": "girder", "spans": [28.0, 37.5, 37.6, 28.0], "width": 35.0, "clear": 6.5,
+			"material": "concrete", "concrete_hex": "#BDBBB2", "columns": 4, "base": "ground", "tier": 2, "conf": 2,
+			"src": "fi Wikipedia (Aninkaistensilta over Turku railyard, 130 m long, 35 m wide), " +
+				"OSM ways 4265033/4265032 + cycleways 35012132/27955401 (131.1 m, bearing 146.4, mid 60.458812,22.267903)"},
+		{"id": "br_turku_ukko_pekan_silta", "cc": "FI", "name": "Ukko-Pekan silta", "wiki": "Ukko-Pekan silta",
+			"aliases": ["ukko-pekka bridge", "ukko-pekka-bron", "naantalinsalmen silta"],
+			"lat": 60.462220, "lon": 22.020830, "bearing": 258.0, "st": "arch_deck",
+			"spans": [33.0, 45.0, 55.0, 45.0, 33.0], "width": 8.0, "clear": 13.0, "rise": 8.5,
+			"material": "concrete", "concrete_hex": "#C8C4BA", "base": "sea", "tier": 3, "conf": 2, "view": 4500.0,
+			"src": "fi Wikipedia (Ukko-Pekan silta, 1934 concrete arch bridge over Naantalinsalmi via Raumakari, " +
+				"211 m total, 45 m arch spans, 11 m vertical clearance, 60°27'44\"N 22°01'15\"E)"},
 	]

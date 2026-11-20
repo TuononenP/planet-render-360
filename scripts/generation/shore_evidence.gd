@@ -101,8 +101,8 @@ func _init(data: LocationData = null) -> void:
 			continue
 		var cls := str(road.get("class", ""))
 		var surface := str(road.get("surface", ""))
-		# Stairs down a quay's wall to its walk do not open the wall.
-		if cls in ["steps", "platform"] and not _at_quay(road.get("points", PackedVector2Array())):
+		# Steps never open a shore wall; platforms at a low quay's wall do not either.
+		if cls == "platform" and not _at_quay(road.get("points", PackedVector2Array())):
 			_add({"kind": "break", "points": road.get("points", PackedVector2Array()), "area": bool(road.get("area", false))})
 		if surface in ["asphalt", "paved", "paving_stones", "sett", "cobblestone", "unhewn_cobblestone", "bricks", "concrete", "concrete:plates", "stone"] \
 				or (surface == "" and cls in ["pedestrian", "living_street"]):

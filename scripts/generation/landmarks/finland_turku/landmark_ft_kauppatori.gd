@@ -78,6 +78,16 @@ static func build(model: Node3D) -> void:
 	_build_masts(lm)
 	_build_market_life(lm)
 	lm.commit(model, "", true)
+	# Night lighting: warm plaza floods on the glulam pavilions, Kanttarelli stage & skerry basin.
+	var warm := Color(1.0, 0.92, 0.78)
+	var aqua := Color(0.72, 0.92, 1.0)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-42.0, 1.5, -15.0), Vector3(-56.0, 5.5, -15.0), 38.0, 0.90, 40.0, warm],
+		[Vector3(38.0, 1.5, -14.0), Vector3(52.0, 6.0, -14.0), 38.0, 0.90, 40.0, warm],
+		[Vector3(-4.0, 1.5, 42.0), Vector3(-4.0, 5.5, 58.0), 42.0, 0.90, 45.0, warm],
+		[Vector3(33.75, 1.2, -32.0), Vector3(33.75, 4.8, -40.0), 36.0, 0.95, 35.0, warm],
+		[Vector3(-2.5, 1.2, -34.0), Vector3(-2.5, 0.8, -44.5), 42.0, 0.75, 35.0, aqua],
+	])
 
 ## Conforms Kauppatori vertices to GroundTruth slope while keeping each
 ## structure locally level on its anchor.

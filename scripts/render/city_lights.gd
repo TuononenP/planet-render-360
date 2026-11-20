@@ -10,9 +10,11 @@ extends RefCounted
 ## threshold, so windows halo softly).
 const NIGHT_ENERGY := 2.6
 const META := "city_lit"
-## Scene clock (AtmosphereRig.set_time): the Ultra facade shader lights
-## rooms by the hour (FacadeShader).
+## Scene clock (AtmosphereRig.set_time / set_season): the Ultra facade shader
+## and scheduled landmarks (e.g. Föri ferry) read hour, month, and night_amount.
 static var hour := 20.0
+static var month := 7
+static var night_amount := 0.0
 
 ## Gives `m` its lit-pane map (off until apply()).
 static func mark(m: StandardMaterial3D, emit: Variant) -> void:
@@ -38,6 +40,7 @@ static func amount_for(night_amount: float, twilight: float) -> float:
 
 ## Sets every marked material under `world` to `amount` of night light.
 static func apply(world: Node, amount: float) -> void:
+	night_amount = clampf(amount, 0.0, 1.0)
 	if world == null:
 		return
 	StreetGlow.set_night(amount)

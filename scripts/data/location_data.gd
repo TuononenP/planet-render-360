@@ -445,6 +445,7 @@ static func _core_landmarks() -> Array:
 	return [
 		{"type": "turku_cathedral", "name": "Turku Cathedral", "lat": 60.45245, "lon": 22.278549, "radius_m": 3000.0,
 			"wiki_title": "Turku Cathedral", "height_m": 101.0, "yaw_deg": 2.2, "clear_m": 52.0,
+			"ultra_registry_limit": 26,
 			"aliases": ["turun tuomiokirkko", "turku cathedral", "åbo domkyrka"]},
 		# The origin is the mapped church's centre, turned with the mapped
 		# front (stair, wings and the pavilions' fronts); the model builds

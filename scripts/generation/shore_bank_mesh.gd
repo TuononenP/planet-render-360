@@ -8,12 +8,14 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 		return
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	# A bridge's abutment (ShoreEvidence._abutments) is concrete, as the
 	# bridge's own walls are: in the quay's plain render it read as an
 	# untextured grey slab under the deck.
 	var abut_verts := PackedVector3Array()
 	var abut_normals := PackedVector3Array()
+	var abut_colors := PackedColorArray()
 	var abut_indices := PackedInt32Array()
 	var seen := {}
 	var m2u := WorldScale.metres_to_units()
@@ -54,39 +56,35 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 		var face := PackedVector3Array([Vector3(a.x, level_a - 0.6, a.y), Vector3(b.x, level_b - 0.6, b.y),
 			Vector3(b.x, top_b, b.y), Vector3(a.x, top_a, a.y)])
 		var into_abut := _abutment(segment)
+		var coping_min := (1.5 if QuayBuilder.stone_quays(data) else 0.6) * m2u
+		var has_coping := coping and not capped and maxf(top_a - level_a, top_b - level_b) > coping_min
 		if into_abut:
-			_append_face(abut_verts, abut_normals, abut_indices, face, normal)
+			_append_face(abut_verts, abut_normals, abut_indices, face, normal, abut_colors,
+				WATERLINE_DAMP, Color.WHITE)
 		else:
-			_append_face(verts, normals, indices, face, normal)
+			_append_face(verts, normals, indices, face, normal, colors,
+				WATERLINE_DAMP, Color(0.92, 0.92, 0.91) if has_coping else Color.WHITE)
 		# A coping along the top of a stone quay wall: the cornice/cap course
 		# a masonry quay has, where the face otherwise ran flat into the bank.
-		var coping_min := (1.5 if QuayBuilder.stone_quays(data) else 0.6) * m2u
-		if coping and not capped and maxf(top_a - level_a, top_b - level_b) > coping_min:
+		if has_coping:
 			if into_abut:
-				_coping(abut_verts, abut_normals, abut_indices, a, b, top_a, top_b, normal)
+				_coping(abut_verts, abut_normals, abut_indices, a, b, top_a, top_b, normal, abut_colors)
 			else:
-				_coping(verts, normals, indices, a, b, top_a, top_b, normal)
+				_coping(verts, normals, indices, a, b, top_a, top_b, normal, colors)
 	var caps := transition_caps(model, abort)
 	if abort != null and abort.requested:
 		return
-	_parapets(model, verts, normals, indices)
+	_parapets(model, verts, normals, indices, colors)
 	for cap in caps:
 		var face: PackedVector3Array = cap["face"]
 		var normal: Vector3 = cap["normal"]
-		var k := verts.size()
-		verts.append_array(face)
-		for i in 4:
-			normals.append(normal)
-		if (face[1] - face[0]).cross(face[2] - face[0]).dot(normal) < 0.0:
-			indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
-		else:
-			indices.append_array([k, k + 2, k + 1, k, k + 3, k + 2])
+		_append_face(verts, normals, indices, face, normal, colors, Color.WHITE, Color.WHITE)
 	if not abut_indices.is_empty():
-		var abut := TerrainBuilder._add(root, _mesh(abut_verts, abut_normals, abut_indices), abutment_material(data))
+		var abut := TerrainBuilder._add(root, _mesh(abut_verts, abut_normals, abut_indices, abut_colors), abutment_material(data))
 		abut.name = "ShoreAbutments"
 	if indices.is_empty():
 		return
-	var node := TerrainBuilder._add(root, _mesh(verts, normals, indices), QuayBuilder.stone_material(data))
+	var node := TerrainBuilder._add(root, _mesh(verts, normals, indices, colors), QuayBuilder.stone_material(data))
 	node.name = "ShoreWalls"
 	node.set_meta("shore_transitions", caps.size())
 
@@ -114,12 +112,24 @@ static func _abutment(segment: Dictionary) -> bool:
 			return true
 	return false
 
+## Damp darkened waterline base and dressed granite coping capstone tints (sRGB).
+const WATERLINE_DAMP := Color(0.42, 0.43, 0.40)
+const COPING_TOP := Color(1.15, 1.14, 1.11)
+const COPING_FRONT := Color(1.09, 1.08, 1.06)
+const COPING_UNDER := Color(0.62, 0.62, 0.60)
+
 static func _append_face(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array,
-		face: PackedVector3Array, normal: Vector3) -> void:
+		face: PackedVector3Array, normal: Vector3, colors: PackedColorArray = PackedColorArray(),
+		c_bottom: Color = Color.WHITE, c_top: Color = Color.WHITE) -> void:
 	var k := verts.size()
 	verts.append_array(face)
 	for i in 4:
 		normals.append(normal)
+	if colors != null:
+		colors.append(c_bottom)
+		colors.append(c_bottom)
+		colors.append(c_top)
+		colors.append(c_top)
 	if (face[1] - face[0]).cross(face[2] - face[0]).dot(normal) < 0.0:
 		indices.append_array([k, k + 1, k + 2, k, k + 2, k + 3])
 	else:
@@ -131,24 +141,28 @@ const COPING_DEPTH_M := 0.22
 const COPING_OUT_M := 0.12
 
 static func _coping(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array,
-		a: Vector2, b: Vector2, top_a: float, top_b: float, normal: Vector3) -> void:
+		a: Vector2, b: Vector2, top_a: float, top_b: float, normal: Vector3,
+		colors: PackedColorArray = PackedColorArray()) -> void:
 	var m2u := WorldScale.metres_to_units()
 	var out := Vector2(normal.x, normal.z) * COPING_OUT_M * m2u
 	var drop := COPING_DEPTH_M * m2u
 	var ao := a + out
 	var bo := b + out
 	_append_face(verts, normals, indices, PackedVector3Array([Vector3(ao.x, top_a - drop, ao.y), Vector3(bo.x, top_b - drop, bo.y),
-		Vector3(bo.x, top_b, bo.y), Vector3(ao.x, top_a, ao.y)]), normal)
+		Vector3(bo.x, top_b, bo.y), Vector3(ao.x, top_a, ao.y)]), normal, colors, COPING_FRONT, COPING_FRONT)
 	_append_face(verts, normals, indices, PackedVector3Array([Vector3(a.x, top_a - drop, a.y), Vector3(b.x, top_b - drop, b.y),
-		Vector3(bo.x, top_b - drop, bo.y), Vector3(ao.x, top_a - drop, ao.y)]), Vector3.DOWN)
+		Vector3(bo.x, top_b - drop, bo.y), Vector3(ao.x, top_a - drop, ao.y)]), Vector3.DOWN, colors, COPING_UNDER, COPING_UNDER)
 	_append_face(verts, normals, indices, PackedVector3Array([Vector3(a.x, top_a, a.y), Vector3(b.x, top_b, b.y),
-		Vector3(bo.x, top_b, bo.y), Vector3(ao.x, top_a, ao.y)]), Vector3.UP)
+		Vector3(bo.x, top_b, bo.y), Vector3(ao.x, top_a, ao.y)]), Vector3.UP, colors, COPING_TOP, COPING_TOP)
 
-static func _mesh(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array) -> ArrayMesh:
+static func _mesh(verts: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array,
+		colors: PackedColorArray = PackedColorArray()) -> ArrayMesh:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	if colors.size() == verts.size():
+		arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -157,7 +171,7 @@ static func _mesh(verts: PackedVector3Array, normals: PackedVector3Array, indice
 ## A low quay's upper wall carries a parapet PARAPET_H_M tall and
 ## PARAPET_T_M thick on the street's edge (QuayBuilder's, metres).
 static func _parapets(model: ShorelineModel, verts: PackedVector3Array, normals: PackedVector3Array,
-		indices: PackedInt32Array) -> void:
+		indices: PackedInt32Array, colors: PackedColorArray = PackedColorArray()) -> void:
 	var m2u := WorldScale.metres_to_units()
 	var tall := QuayBuilder.PARAPET_H_M * m2u
 	for q: Dictionary in model.quays:
@@ -175,11 +189,11 @@ static func _parapets(model: ShorelineModel, verts: PackedVector3Array, normals:
 			var a2 := a + back
 			var b2 := b + back
 			_append_face(verts, normals, indices, PackedVector3Array([Vector3(a.x, ya, a.y), Vector3(b.x, yb, b.y),
-				Vector3(b.x, yb + tall, b.y), Vector3(a.x, ya + tall, a.y)]), out)
+				Vector3(b.x, yb + tall, b.y), Vector3(a.x, ya + tall, a.y)]), out, colors)
 			_append_face(verts, normals, indices, PackedVector3Array([Vector3(a.x, ya + tall, a.y), Vector3(b.x, yb + tall, b.y),
-				Vector3(b2.x, yb + tall, b2.y), Vector3(a2.x, ya + tall, a2.y)]), Vector3.UP)
+				Vector3(b2.x, yb + tall, b2.y), Vector3(a2.x, ya + tall, a2.y)]), Vector3.UP, colors, COPING_TOP, COPING_TOP)
 			_append_face(verts, normals, indices, PackedVector3Array([Vector3(a2.x, ya, a2.y), Vector3(b2.x, yb, b2.y),
-				Vector3(b2.x, yb + tall, b2.y), Vector3(a2.x, ya + tall, a2.y)]), -out)
+				Vector3(b2.x, yb + tall, b2.y), Vector3(a2.x, ya + tall, a2.y)]), -out, colors)
 
 ## A quay can end beside a sloping natural bank. Close the height
 ## discontinuity with masonry returning landward, using the exact two

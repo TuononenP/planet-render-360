@@ -7,9 +7,9 @@ extends RefCounted
 ## assets/city_models/helsinki_lod2/ (zstd JSON, size + SHA-256 pinned in
 ## its manifest, as BundledOsm pins its snapshots), and Espoo's (city
 ## model, CC BY 4.0) by tools/prepare_espoo_lod2.py under espoo_lod2/,
-## its cell keys prefixed "espoo:". Each row is one
-## building: [vtj_prt, e, n, area_m2, height_m, roof_h_m, pitch_deg,
-## ridge_az_deg, shape, storeys].
+## Each row is one building: [vtj_prt, e, n, area_m2, height_m, roof_h_m,
+## pitch_deg, ridge_az_deg, shape, storeys] plus optional [start_year,
+## use_code] (Turku's CityGML bundle).
 ##
 ## `apply` joins rows to OSM footprints (FootprintMatcher) before the
 ## register runs: a measured height replaces an estimated one (default,
@@ -202,7 +202,16 @@ static func _enrich(b: Dictionary, rows: Array) -> Array:
 			values["roof_angle"] = snappedf(pitch, 0.5)
 	if int(main[9]) > 0:
 		values["levels"] = float(int(main[9]))
+	if main.size() >= 11:
+		var year := int(main[10])
+		if year >= 1700 and year <= 2100:
+			values["start_year"] = year
 	fields.append_array(BuildingReferences.fill(b, values))
+	if main.size() >= 12:
+		var kind := RegisterCodes.kind_for(str(main[11]), "")
+		if kind != "" and str(b.get("kind", "yes")) in ["yes", "residential", "building"]:
+			b["kind"] = kind
+			fields.append("kind")
 	var dir := roof_dir(b, str(b.get("roof_shape", "")), float(main[7])) if rows.size() == 1 else -1.0
 	if dir >= 0.0:
 		b["roof_dir"] = dir

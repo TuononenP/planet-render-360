@@ -52,6 +52,11 @@ func _bbox() -> void:
 	var url := OrthoSource.part_url("hsy_2023", Vector2(0, 0), 1920, 19)
 	_check(not HostPolicy.is_blocked(url) and url.contains("crs=EPSG:3857") and url.contains("width=1920"),
 		"Part URLs must be WMS 1.3.0 EPSG:3857 at the part size, on an allowed host")
+	var tku_url := OrthoSource.part_url("turku_2025", Vector2(0, 0), 1024, 19)
+	_check(not HostPolicy.is_blocked(tku_url) and tku_url.contains("turku.asiointi.fi/TeklaOGCWeb/WMS.ashx")
+		and tku_url.contains("layers=Ilmakuva%202025") and tku_url.contains("format=image/png")
+		and tku_url.contains("crs=EPSG:3857") and tku_url.contains("width=1024"),
+		"Turku orthophoto URL must target TeklaOGCWeb WMS EPSG:3857 with encoded layer and PNG format")
 	_check(OrthoSource.parts_for(3840) == 2 and OrthoSource.parts_for(1792) == 1 and OrthoSource.parts_for(2816) == 2,
 		"Mosaics split into parts of at most MAX_PART_PX")
 	_check(OrthoFetcher.cache_path("hsy_2023", 19, 15, 60.168, 24.953, 3).ends_with("_p3.jpg"),
@@ -60,6 +65,7 @@ func _bbox() -> void:
 func _coverage() -> void:
 	_check(OrthoSource.source_for(60.1680, 24.9530, 19, 15) == "hsy_2023", "Central Helsinki is covered")
 	_check(OrthoSource.source_for(60.1760, 24.8050, 18, 11) == "hsy_2023", "Tapiola is covered")
+	_check(OrthoSource.source_for(60.4518, 22.2666, 19, 4) == "turku_2025", "Central Turku is covered")
 	_check(OrthoSource.source_for(59.4370, 24.7536, 18, 7) == "", "Tallinn is not")
 	_check(OrthoSource.source_for(60.6040, 24.9, 18, 11) == "", "A mosaic crossing the layer edge is not")
 
@@ -72,6 +78,12 @@ func _images() -> void:
 		for x in 64:
 			busy.set_pixel(x, y, Color(float(x) / 63.0, float(y) / 63.0, 0.5))
 	_check(not OrthoSource.is_blank(busy), "A textured part is imagery")
+	var dec_png := Image.new()
+	var dec_jpg := Image.new()
+	_check(OrthoFetcher._decode_part(dec_png, busy.save_png_to_buffer()) == OK and dec_png.get_width() == 64,
+		"OrthoFetcher decodes PNG orthophoto responses")
+	_check(OrthoFetcher._decode_part(dec_jpg, busy.save_jpg_to_buffer()) == OK and dec_jpg.get_width() == 64,
+		"OrthoFetcher decodes JPEG orthophoto responses")
 	# Matching an image to itself is the identity; a darker copy is lifted.
 	var same := OrthoSource.colour_match(busy, busy)
 	_check((same["gain"] as Vector3).is_equal_approx(Vector3.ONE) and (same["bias"] as Vector3).length() < 1e-4,

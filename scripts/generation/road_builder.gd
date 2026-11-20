@@ -251,8 +251,19 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	var n := data.roads.size()
 	var parts: Array = []
 	parts.resize(CHUNKS)
-	# Flights of steps the ground was held to are drawn as stairs, not ribbons.
+	# Flights of steps the ground was held to are drawn as stairs, not ribbons;
+	# riverbank/quay-edge steps are omitted altogether.
 	var stairs := StairBuilder.skipped_roads(ground)
+	if ground.shoreline != null and not ground.shoreline.empty():
+		for i in n:
+			if stairs.has(i):
+				continue
+			var r_item: Variant = data.roads[i]
+			if r_item is Dictionary and str((r_item as Dictionary).get("class", "")) == "steps" \
+					and not bool((r_item as Dictionary).get("bridge", false)) \
+					and StepsGround.near_shore((r_item as Dictionary).get("points", PackedVector2Array()),
+						ground.shoreline, m2u, bool((r_item as Dictionary).get("area", false))):
+				stairs[i] = true
 	var job := func(c: int) -> void:
 		var own := {}
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):

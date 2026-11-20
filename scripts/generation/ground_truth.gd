@@ -274,7 +274,7 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 		shoreline.hold_terrace(_surface)
 	# Flights of steps hold the ground to their levels last of all: over
 	# the terrace levelling, the squares' planes and the DEM's blur.
-	steps = StepsGround.apply(_surface, _level, size, _step_units, data, WorldScale.metres_to_units())
+	steps = StepsGround.apply(_surface, _level, size, _step_units, data, WorldScale.metres_to_units(), shoreline)
 	# Y-scale conversion (see header): carving above is in source
 	# metres; the stored surface and water datum are render units.
 	if not is_equal_approx(data.water_level, -3.0):

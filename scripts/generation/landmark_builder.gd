@@ -56,7 +56,7 @@ static func build(type: String) -> Node3D:
 		"pyramid": LandmarkMonuments.giza(model)
 		"statue_liberty": LandmarkMonuments.liberty(model)
 		"sydney_opera": LandmarkOpera.build(model)
-		"turku_cathedral": LandmarkCathedrals.turku(model)
+		"turku_cathedral": FtTurkuCathedral.build(model)
 		"helsinki_cathedral": LandmarkCathedrals.helsinki(model)
 		"burj_khalifa": LandmarkBurj.build(model)
 		"one_wtc": LandmarkNycTowers.one_wtc(model)
@@ -90,7 +90,13 @@ static func build(type: String) -> Node3D:
 static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_m: float = 0.0) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
-	BridgeParam.build(model_root(root), BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m))
+	var model := model_root(root)
+	match type:
+		"br_turku_auransilta": FtBridgeAuransilta.build(model)
+		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model)
+		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model)
+		_:
+			BridgeParam.build(model, BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m))
 	return root
 
 ## On-the-fly archetype for any OSM-tagged feature (OsmFetcher.

@@ -235,6 +235,7 @@ func _run() -> void:
 	_bridge_and_far_fixture()
 	_area_packing_fixture()
 	_low_quay_fixture()
+	_steps_evidence_fixture()
 	if failures.is_empty():
 		print("SHORELINE OK: exact coverage, natural and hard banks, low quays, evidence, queries, cache, hole fallback")
 		quit(0)
@@ -632,3 +633,30 @@ func _area_packing_fixture() -> void:
 			same = false
 			break
 	_check(same, "native paved-area clipping must preserve positions and texture coordinates")
+
+func _steps_evidence_fixture() -> void:
+	var data := _data()
+	data.shore_structures = [{"points": PackedVector2Array([Vector2(0, -200), Vector2(0, 200)]),
+		"kind": "quay", "id": "way:quay"}]
+	var step_pts := PackedVector2Array([Vector2(-8, -20), Vector2(0, -20)])
+	var platform_pts := PackedVector2Array([Vector2(-8, 20), Vector2(0, 20)])
+	data.roads = [
+		{"class": "steps", "points": step_pts},
+		{"class": "platform", "points": platform_pts}]
+	for force_script in [false, true]:
+		ShoreGeometry.force_script = force_script
+		var tag := " (script=%s)" % force_script
+		var evidence := ShoreEvidence.new(data)
+		var breaks: Array = []
+		for f in evidence.features:
+			if str(f.get("kind", "")) == "break":
+				breaks.append(f)
+		_check(breaks.size() == 1 and breaks[0]["points"] == platform_pts,
+			"ShoreEvidence should emit a break for platform only, not steps, got %d%s" % [breaks.size(), tag])
+		var at_steps := evidence.classify(Vector2(0, -22), Vector2(0, -18), Vector2(-1, 0))
+		_check(str(at_steps.get("kind", "")) == "hard" and str(at_steps.get("reason", "")) == "mapped_structure",
+			"steps must not emit a break cutout in a quay wall, got %s%s" % [at_steps, tag])
+		var at_platform := evidence.classify(Vector2(0, 18), Vector2(0, 22), Vector2(-1, 0))
+		_check(str(at_platform.get("kind", "")) == "natural" and str(at_platform.get("reason", "")) == "mapped_access",
+			"platform must still emit a break cutout in a quay wall, got %s%s" % [at_platform, tag])
+	ShoreGeometry.force_script = false

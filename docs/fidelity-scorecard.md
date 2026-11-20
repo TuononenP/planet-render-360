@@ -258,7 +258,7 @@ PRD §2 gains no new rows until a reference with a verifiable source/licence is 
 | Interlaken (46.6863, 7.8632) | none | — | `no-reference — geometry-only scoring` |
 | Zermatt (46.0207, 7.7491) | none | — | `no-reference — geometry-only scoring` |
 | Big Sur (36.2704, −121.8081) | none | — | `no-reference — geometry-only scoring` |
-| Turku (60.4518, 22.2666) | none | — | `no-reference — geometry-only scoring` |
+| Turku (60.4518, 22.2666) | `visual-plan/refs/turku/` (13 open-space views + `README.md`) | Wikimedia Commons CC BY / CC BY-SA / PD (T-0.2, 2026-11-20) | Full (f) human rating vs. reference |
 
 Geometry-only locations are gated by checks (a–e) only; (f) is recorded as
 `no-reference — geometry-only scoring` with the rater naming the closest available
@@ -746,3 +746,28 @@ generation, but missed far-city geometry and POIs. The subway globes now
 meet their support posts; a true descending stairwell remains open. A
 licensed 06:39 golden-hour skyline photo at nearby Fulton Ferry Landing is
 documented as context; it does not establish the requested Pier 1 reference.
+
+### Turku round tku-r3 (2026-11-20)
+
+Frames in `visual-plan/reviews/tku-r3-2026-11-20/` (Ultra, opening Aurajoki quay view at golden hour,
+noon, and night plus 5 open-space `--looks`: Kauppatori, Aurajoki quay, Qwensel/City Hall, TYKS
+Hospital Area, and Föri/Kakola). Agent pre-rating only; the "photographic" call is the user's.
+78 bespoke Turku landmarks, 12 bridges, 180 `TurkuNotable` rows, 26,540 enriched `turku_lod2`
+buildings, 23 districts, Aurajoki restaurant ships, Viking/Silja ferries, animated Föri ferry, and
+City of Turku 2025 z19 orthophoto (`docs/turku-landmark-sources.md`, 13 city refs in
+`visual-plan/refs/turku/`, 34 landmark ref sets, 38 side-by-side compare sheets). The earlier DEM
+check (a) failure is closed against bare-earth `GroundModel` `"mml"` (`fidelity_scorecard_test.gd`
+PASS).
+
+- **Reads as Turku:** Kauppatori with Taivassalo red-granite paving and rebuilt Sokos Wiklund
+  (travertine podium, Prisma banner, Walo glass crown), red *punamulta* Qwensel House beside
+  yellow-ochre Turku City Hall, moored *jokilaivat* restaurant ships along Aurajoki, TYKS T-sairaala
+  linked by its glazed skybridge to Majakkasairaala, and the animated orange-and-white Föri crossing
+  below Kakolanmäki.
+- **Remaining tells:** minor near-foreground linden trunk in `turku_look1` and vessel edge in
+  `turku_look2`; human photographic gate (AC-18) pending user sign-off.
+- **Performance (Turku Ultra, Preset 3, `WorldCache.BUILD_VERSION = 311`):** cold Ultra build **13 s**
+  (`8.505 s` parallel generation; 2,625 real + 9,701 far buildings, 38 landmarks in frame) against the
+  ≤ 150 s Ultra budget; cached reopen **64–96 ms**; memory **7.4 GB** at build completion / **10.1 GB**
+  active render (63.6 GB headroom on T3). All Turku headless suites and windowed `world_cache_test` /
+  `screenshot_test` pass.

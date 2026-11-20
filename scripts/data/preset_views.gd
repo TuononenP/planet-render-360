@@ -139,6 +139,11 @@ const ROWS := [
 	{"id": "espoo", "label": "Espoo", "name": "Espoo, Finland",
 		"lat": 60.1760, "lon": 24.8050, "eye_lat": 60.1780, "eye_lon": 24.8076,
 		"eye_m": 5.0, "bearing": 230.0, "pitch": 2.0, "clear": false},
+	# Läntinen Rantakatu open granite quay upstream of Kirjastosilta, looking
+	# across Aurajoki past Tuomiokirkkosilta toward Turku Cathedral spire (~52°).
+	{"id": "turku", "label": "Turku", "name": "Turku, Finland",
+		"lat": 60.4518, "lon": 22.2666, "eye_lat": 60.45030, "eye_lon": 22.27295,
+		"eye_m": 6.0, "bearing": 46.0, "pitch": 4.0, "clear": false},
 ]
 
 ## Index of the starting place in ROWS (and in LocationData.quick_picks()).

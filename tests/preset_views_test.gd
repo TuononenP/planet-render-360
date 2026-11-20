@@ -79,7 +79,9 @@ func _pins() -> void:
 				found = is_equal_approx(float(place["lat"]), lat) and is_equal_approx(float(place["lon"]), lon)
 		_check(found, "%s search resolves to the curated origin" % id)
 	_check(PresetViews.for_pin(35.6762, 139.6503).is_empty(), "the old Setagaya pin is not a preset")
-	_check(PresetViews.origin_for_name("Turku, Finland") == Vector2.INF, "non-preset names keep their own coordinates")
+	_check(PresetViews.origin_for_name("Barcelona, Spain") == Vector2.INF, "non-preset names keep their own coordinates")
+	var tku := PresetViews.for_pin(60.4518, 22.2666)
+	_check(str(tku.get("id", "")) == "turku", "Turku pin resolves its curated riverfront view")
 
 func _data_at(lat: float, lon: float) -> LocationData:
 	var data := LocationData.new()

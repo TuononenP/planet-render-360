@@ -9,7 +9,7 @@ tool reads the model box by box over a GK23 area, reduces each building's
 RoofSurface polygons with prepare_helsinki_lod2.classify_roof:
 
   [vtj_prt, e, n, area_m2, height_m, roof_h_m, pitch_deg, ridge_az_deg,
-   shape, storeys]
+   shape, storeys, start_year, use_code]
 
 and writes 1 km cells to assets/city_models/turku_lod2/<E>_<N>.lod2 (zstd JSON)
 with manifest.json, read by HelsinkiLod2 beside Helsinki's and Espoo's bundles.
@@ -54,13 +54,41 @@ NS = {
     "gen": "http://www.opengis.net/citygml/generics/2.0",
 }
 
+# Turku's CityGML 2.0 bldg:function uses 4-digit ALKIS/CityGML codes alongside
+# pass-through 3-digit Finnish VTJ 1994 codes. Normalise the 4-digit codes to
+# VTJ 1994 strings so RegisterCodes.kind_for() resolves them uniformly.
+CITYGML_TO_VTJ = {
+    "1000": "011",  # residential / house
+    "1010": "032",  # apartments / tenement
+    "1020": "151",  # office
+    "1050": "111",  # retail / department store
+    "1070": "141",  # commercial / restaurant
+    "1100": "041",  # holiday cabin
+    "1240": "121",  # hotel
+    "1310": "711",  # warehouse (or 611 industrial when bldg:class in 691/692/699)
+    "1360": "931",  # shed / outbuilding
+    "1700": "711",  # storage / warehouse
+    "1760": "899",  # farm / agricultural
+    "1940": "899",  # farm / boathouse
+    "2070": "511",  # school
+    "2120": "311",  # civic / library / cultural
+    "2210": "341",  # church
+    "2300": "221",  # civic / social / daycare
+    "2340": "211",  # hospital
+    "2410": "721",  # fire_station
+    "2440": "722",  # civic (prison / institutional)
+    "2550": "351",  # sports_hall
+}
 
-def fetch(e, n):
+
+def fetch(e, n, offline=False):
     """The box's GML (bytes), cached gzipped; None when unavailable."""
     path = os.path.join(CACHE_DIR, "%d_%d.xml.gz" % (e, n))
     if os.path.exists(path):
         with gzip.open(path, "rb") as f:
             return f.read()
+    if offline:
+        return None
     url = "%s?service=WFS&version=1.1.0&request=GetFeature&typeName=bldg:Building_LOD2&bbox=%d,%d,%d,%d" % (
         WFS, e, n, e + BOX_M, n + BOX_M)
     data = None
@@ -128,6 +156,45 @@ def attribute(b, name):
     return ""
 
 
+def parse_year(b):
+    """Completion year (1700..2100) from yearOfConstruction or valmistunut, else 0."""
+    yc = b.find("bldg:yearOfConstruction", NS)
+    raw = (yc.text or "").strip() if yc is not None else ""
+    if not raw:
+        raw = attribute(b, "valmistunut")
+    if not raw:
+        return 0
+    # Accept "1927", "1927-01-01", or Finnish "01.01.1927".
+    for candidate in (raw[:4], raw[-4:]):
+        if len(candidate) == 4 and candidate.isdigit():
+            y = int(candidate)
+            if 1700 <= y <= 2100:
+                return y
+    return 0
+
+
+def parse_use_code(b):
+    """Normalised VTJ 1994 3-digit use code from bldg:function / käyttötarkoitus, else ''."""
+    fn = b.find("bldg:function", NS)
+    raw = (fn.text or "").strip() if fn is not None else ""
+    if not raw or raw == "0":
+        kt = attribute(b, "käyttötarkoitus")
+        if kt and kt.lower() != "ei arvoa" and kt != "0":
+            raw = kt
+        else:
+            return ""
+    if raw in CITYGML_TO_VTJ:
+        if raw == "1310":
+            cl = b.find("bldg:class", NS)
+            cls = (cl.text or "").strip() if cl is not None else ""
+            if cls in ("691", "692", "699"):
+                return "611"
+        return CITYGML_TO_VTJ[raw]
+    if len(raw) == 3 and raw.isdigit() and raw != "999":
+        return raw
+    return ""
+
+
 def analyse(data):
     """{gml id: row} of the buildings in one box's GML."""
     out = {}
@@ -178,8 +245,11 @@ def analyse(data):
                 v = int(kl)
                 storeys = v if 0 < v < 200 else 0
         shape, pitch, ridge_az, roof_h = classify_roof(roof, top)
+        start_year = parse_year(b)
+        use_code = parse_use_code(b)
         out[gid] = [attribute(b, "pysyvarakennustunnus"), round(e, 1), round(n, 1), round(plan, 1),
-                    round(height, 2), round(roof_h, 2), round(pitch, 1), round(ridge_az, 1), shape, storeys]
+                    round(height, 2), round(roof_h, 2), round(pitch, 1), round(ridge_az, 1), shape, storeys,
+                    start_year, use_code]
     return out
 
 
@@ -214,7 +284,7 @@ def write_cells(rows, box):
                    "licence": "CC BY 4.0, © City of Turku, 3D city model",
                    "crs": "EPSG:3877",
                    "columns": ["vtj_prt", "e", "n", "area_m2", "height_m", "roof_h_m", "pitch_deg",
-                               "ridge_az_deg", "shape", "storeys"],
+                               "ridge_az_deg", "shape", "storeys", "start_year", "use_code"],
                    "cell_m": CELL_M, "cells": dict(sorted(manifest.items()))}, f, indent=1)
     return cells
 
@@ -224,6 +294,8 @@ def main():
     ap.add_argument("--box", default=",".join(str(v) for v in DEFAULT_BOX),
                     help="GK23 E0,N0,E1,N1 in metres (whole km)")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--offline", action="store_true",
+                    help="Read only cached boxes in build/turku_lod2_boxes/; never make network calls")
     args = ap.parse_args()
     box = tuple(int(v) for v in args.box.split(","))
     if len(box) != 4 or box[0] >= box[2] or box[1] >= box[3] or any(v % CELL_M for v in box):
@@ -234,7 +306,7 @@ def main():
     done = 0
 
     def work(item):
-        data = fetch(*item)
+        data = fetch(*item, offline=args.offline)
         return analyse(data) if data else {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:

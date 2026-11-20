@@ -13,6 +13,8 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	match str(p.get("variant", "classic")):
 		"houseboat":
 			_houseboat(lm, p)
+		"restaurant_boat":
+			_restaurant_boat(lm, p)
 		"tall_ship":
 			_tall_ship(lm, p)
 		_:
@@ -198,6 +200,73 @@ static func _houseboat(lm: LandmarkMesh, p: Dictionary) -> void:
 		lm.box("White", Vector3(cx, y + wall * 0.5, 0), Vector3(l, wall, w), Basis(), 0.03)
 		VesselKit.windows(lm, cx - l * 0.5 + 0.4, cx + l * 0.5 - 0.4, w * 0.5, y + wall * 0.3, y + wall * 0.8, 0.0, glass_key)
 		lm.gable("Roof", Vector3(cx, y + wall, 0), w, l, beam * 0.14, Basis(Vector3.UP, PI * 0.5), 0.22)
+
+## Converted Baltic coaster / river restaurant ship (Turku jokilaivat:
+## Svarte Rudolf, Papa Joe, Donna, Cindy, Katarina, Esposito): dark iron hull,
+## warm-lit lower saloon, timber sun-deck with full terrace canopy, café tables,
+## aft wheelhouse, and warm glowing string-lights along the canopy eaves.
+static func _restaurant_boat(lm: LandmarkMesh, p: Dictionary) -> void:
+	var length: float = p["length"]
+	var beam: float = p["beam"]
+	var h: float = p["height"]
+	var detail: bool = p.get("detail", true)
+	var maps: bool = p.get("maps", true)
+	var fb := clampf(h * 0.22, 0.85, 1.45)
+	var spec := {"length": length, "beam": beam, "freeboard": fb, "draft": minf(beam * 0.16, 1.1),
+		"entry": 0.20, "bow_pow": 2.2, "stern_w": 0.78, "flare": 0.06, "deadrise": 0.0,
+		"stern_round": 0.85, "bow_rise": fb * 0.32, "stern_rise": fb * 0.14,
+		"stem_rake": length * 0.03, "keel_lift": 0.45, "lod": 0 if detail else 1}
+	spec["ultra"] = bool(p.get("ultra", false))
+	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
+	ShipLights.register(lm, maps)
+	lm.use("Roof", VesselMaterials.get_mat("grey_deck", maps))
+	lm.use("Awning", VesselMaterials.paint("#d8cdb8", maps, 0.86, 0.0))
+	HullLoft.loft(lm, spec, {"hull": "Hull", "boot": "Dark", "bottom": "Bottom", "deck": "Deck"})
+	var y := fb + 0.03
+	var wall := clampf(h * 0.38, 1.9, 2.5)
+	var l := length * 0.58
+	var w := beam * 0.78
+	var cx := -length * 0.04
+	var glass_key := ShipLights.cabin_key(0)
+	if detail:
+		VesselForms.cabin(lm, cx, l, w, y, wall, 1.25, "White", 0.0, glass_key, "Deck")
+		VesselForms.fittings(lm, spec)
+		VesselKit.guard(lm, spec, -length * 0.46, length * 0.45, 0.95, 1.4, 0.04)
+		# Upper open-air restaurant sun-deck canopy with slender posts & café tables.
+		var deck_y := y + wall + 0.05
+		var can_x0 := cx - l * 0.44
+		var can_x1 := cx + l * 0.48
+		var can_l := can_x1 - can_x0
+		var can_cx := (can_x0 + can_x1) * 0.5
+		var can_w := w * 0.94
+		var can_y := deck_y + 2.25
+		lm.box("Awning", Vector3(can_cx, can_y, 0.0), Vector3(can_l, 0.10, can_w), Basis(), 0.0)
+		# Warm glowing festoon / string-light strips under both canopy eaves (uses lit cabin glass).
+		for sz: float in [-1.0, 1.0]:
+			lm.box(glass_key, Vector3(can_cx, can_y - 0.12, sz * (can_w * 0.47)),
+				Vector3(can_l * 0.94, 0.10, 0.08), Basis(), 0.0)
+			# Upper deck railings & canopy posts.
+			lm.beam("Dark", Vector3(can_x0, deck_y + 0.95, sz * (w * 0.48)),
+				Vector3(can_x1, deck_y + 0.95, sz * (w * 0.48)), 0.05)
+			for i in 4:
+				var px := lerpf(can_x0 + 0.15, can_x1 - 0.15, float(i) / 3.0)
+				lm.beam("Dark", Vector3(px, deck_y, sz * (can_w * 0.46)),
+					Vector3(px, can_y, sz * (can_w * 0.46)), 0.055)
+		# Café tables along both sides of the upper terrace and forward deck.
+		for i in 4:
+			var tx := lerpf(can_x0 + 1.1, can_x1 - 1.1, float(i) / 3.0)
+			for sz: float in [-1.0, 1.0]:
+				lm.box("Deck", Vector3(tx, deck_y + 0.74, sz * (w * 0.28)), Vector3(0.95, 0.07, 0.72), Basis(), 0.0)
+				lm.box("Dark", Vector3(tx, deck_y + 0.37, sz * (w * 0.28)), Vector3(0.10, 0.74, 0.10), Basis(), 0.0)
+		# Compact aft wheelhouse / bar galley + short mast.
+		var wh_x := cx - l * 0.36
+		VesselForms.cabin(lm, wh_x, minf(l * 0.22, 2.6), w * 0.56, deck_y, 1.75, 0.85, "White", 0.10, glass_key, "Dark")
+		var fore_x := length * 0.34
+		VesselKit.mast(lm, "Dark", Vector3(fore_x, HullLoft.sheer(spec, fore_x), 0.0), h * 0.65, 0.08, false)
+	else:
+		lm.box("White", Vector3(cx, y + wall * 0.5, 0.0), Vector3(l, wall, w), Basis(), 0.03)
+		VesselKit.windows(lm, cx - l * 0.5 + 0.4, cx + l * 0.5 - 0.4, w * 0.5, y + wall * 0.28, y + wall * 0.82, 0.0, glass_key)
+		lm.box("Awning", Vector3(cx, y + wall + 1.45, 0.0), Vector3(l * 0.9, 0.14, w * 0.92), Basis(), 0.0)
 
 static func _tall_ship(lm: LandmarkMesh, p: Dictionary) -> void:
 	var length: float = p["length"]

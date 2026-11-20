@@ -264,3 +264,30 @@ func _run() -> void:
 		var inside: bool = at == statue
 		_check(kept.is_empty() == inside, "steps at %s: kept %d, inside a model rect %s" % [at, kept.size(), inside])
 		_check((fresh == dem) == inside, "ground at %s %s" % [at, "untouched inside the rect" if inside else "held outside it"])
+
+	# Steps entering water or within SHORE_MARGIN_M of a shoreline edge are
+	# omitted; inland steps well away from shore are unaffected.
+	var shore_data := LocationData.new()
+	shore_data.grid_size = 32
+	shore_data.heights.resize(32 * 32)
+	shore_data.heights.fill(3.0)
+	shore_data.water_level = -3.0
+	shore_data.land_polygons = [{"class": "water", "tidal": true, "points": PackedVector2Array([
+		Vector2(0, -200) * m, Vector2(200, -200) * m, Vector2(200, 200) * m, Vector2(0, 200) * m]), "holes": []}]
+	var shore_ground := GroundTruth.new(shore_data)
+	var shoreline: ShorelineModel = shore_ground.shoreline
+	_check(StepsGround.near_shore(PackedVector2Array([Vector2(-5, 0) * m, Vector2(2, 0) * m]), shoreline, m),
+		"steps entering water should be near_shore")
+	_check(StepsGround.near_shore(PackedVector2Array([Vector2(-8, 0) * m, Vector2(-2.0, 0) * m]), shoreline, m),
+		"steps stopping within SHORE_MARGIN_M (2.0 m) of shoreline edge should be near_shore")
+	_check(StepsGround.near_shore(PackedVector2Array([Vector2(-2.5, -10) * m, Vector2(-2.5, 10) * m]), shoreline, m),
+		"steps parallel within SHORE_MARGIN_M (2.5 m) of shoreline edge should be near_shore")
+	_check(not StepsGround.near_shore(PackedVector2Array([Vector2(-5, 0) * m, Vector2(-3.5, 0) * m]), shoreline, m),
+		"steps outside SHORE_MARGIN_M (3.5 m) of shoreline edge should not be near_shore")
+	_check(not StepsGround.near_shore(PackedVector2Array([Vector2(-30, 0) * m, Vector2(-20, 0) * m]), shoreline, m),
+		"inland steps well away from shore should not be near_shore")
+	var shore_flights := StepsGround.apply(dem.duplicate(), _dry(), SIZE, step,
+		_data([_steps([Vector2(-1, 0), Vector2(9, 0)], 33),
+			_steps([Vector2(-30, 0), Vector2(-20, 0)], 12)]), m, shoreline)
+	_check(shore_flights.size() == 1 and int((shore_flights[0] as Dictionary)["road"]) == 1,
+		"StepsGround.apply with shoreline should skip near-shore steps and keep inland steps, got %d" % shore_flights.size())

@@ -39,10 +39,12 @@ const BUS_CLEAR_M := 14.0
 ## Bus centreline inside the kerb (m).
 const BUS_KERB_IN_M := 1.6
 const BUS_CLASSES: Array[String] = ["primary", "secondary", "tertiary", "residential", "unclassified", "trunk"]
+## Turku's Föli bus saffron yellow (#F5A800, as linear albedo).
+const FOLI_YELLOW := Color(0.91, 0.39, 0.0)
 ## The city's bus colour; elsewhere one of BUS_PALETTE by country.
 const BUS_PAINT := {
 	"london": Color(0.5, 0.03, 0.03), "helsinki": Color(0.05, 0.18, 0.45), "espoo": Color(0.05, 0.18, 0.45),
-	"turku": Color(0.95, 0.76, 0.06),
+	"turku": FOLI_YELLOW,
 	"stockholm": Color(0.5, 0.04, 0.04), "lisbon": Color(0.85, 0.62, 0.04), "berlin": Color(0.85, 0.66, 0.05),
 	"new_york": Color(0.78, 0.8, 0.84), "san_francisco": Color(0.72, 0.72, 0.7), "paris": Color(0.35, 0.62, 0.52),
 }

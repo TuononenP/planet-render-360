@@ -8,7 +8,7 @@ extends RefCounted
 ## origin amidships), each with a "_far" variant that drops the fittings
 ## (rails, mullions, rigging) for boats beyond MarinaBuilder.NEAR_M. +X bow.
 
-const KINDS := ["motor", "yacht", "sail", "day", "rib", "steam", "houseboat", "catamaran"]
+const KINDS := ["motor", "yacht", "sail", "day", "rib", "steam", "houseboat", "restaurant_boat", "catamaran"]
 const LEN_M := 10.0
 const STERN_ORIGIN := ["motor", "yacht", "sail", "day", "rib", "catamaran"]
 static var _meshes := {}
@@ -18,7 +18,8 @@ static func base_kind(kind: String) -> String:
 
 ## The LandmarkMesh for a model at true size. `model` is one of liner
 ## (variant "ferry" is a cruise ferry), cruise_ferry, cargo (variant
-## container, bulk, tanker or general), passenger,
+## container, bulk, tanker or general; for cruise_ferry a livery hex),
+## passenger,
 ## houseboat, tall_ship, motor_yacht, runabout, sail_yacht.
 static func geometry(model: String, length: float, beam: float, h: float, hull: Material,
 		detail: bool, maps: bool, seed_value: float = 0.0, variant: String = "") -> LandmarkMesh:
@@ -36,7 +37,7 @@ static func geometry(model: String, length: float, beam: float, h: float, hull: 
 		"cargo":
 			p["variant"] = variant
 			CargoShipModel.build(lm, p)
-		"houseboat", "tall_ship":
+		"houseboat", "restaurant_boat", "tall_ship":
 			p["variant"] = model
 			PassengerVesselModel.build(lm, p)
 		"motor_yacht", "runabout":
@@ -79,6 +80,14 @@ static func mesh(kind: String) -> ArrayMesh:
 				lm = geometry("houseboat", 18.0, 5.4, 5.2, VesselMaterials.paint("#4a5a63"), true, true)
 			else:
 				lm = geometry("houseboat", LEN_M, 3.0, 3.0, VesselMaterials.paint("#4a5a63"), false, true)
+		"restaurant_boat":
+			# Near prototype built at 22 m Turku jokilaiva restaurant-ship proportions
+			# (deck canopy, café tables, warm eaves lights), normalised to LEN_M.
+			if detail:
+				proto_scale = LEN_M / 22.0
+				lm = geometry("restaurant_boat", 22.0, 6.0, 5.8, VesselMaterials.paint("#2e363c"), true, true)
+			else:
+				lm = geometry("restaurant_boat", LEN_M, 2.8, 2.8, VesselMaterials.paint("#2e363c"), false, true)
 		_:
 			# Near prototype built at 24 m coastal steamer proportions (2 decks +
 			# lifeboats + davits), then normalised to LEN_M; far stays compact at LEN_M.
@@ -103,18 +112,18 @@ static func mesh(kind: String) -> ArrayMesh:
 				v[i] = v[i] * proto_scale + Vector3(shift, 0, 0)
 			arrays[Mesh.ARRAY_VERTEX] = v
 		var material := part.mesh.surface_get_material(0)
-		if base in ["steam", "houseboat"] and (part.name == "Glass" or str(part.name).begins_with("Cabin")):
+		if base in ["steam", "houseboat", "restaurant_boat"] and (part.name == "Glass" or str(part.name).begins_with("Cabin")):
 			material = ShipLights.cabin_glass(0)  # one lit glass surface
 		elif base == "steam" and detail and part.name == "Orange":
 			material = VesselMaterials.get_mat("white")  # classic white lifeboats, no extra draw call
-		elif base in ["steam", "houseboat"] and detail and part.name == "Steel":
+		elif base in ["steam", "houseboat", "restaurant_boat"] and detail and part.name == "Steel":
 			material = VesselMaterials.get_mat("dark")
 		if not detail:
 			# Distant fittings share a compact palette. Decks and cabin roofs stay
 			# matte non-slip grey so distant fleets never glare white from above.
 			if part.name in ["Deck", "DeckSteel", "Roof"]:
 				material = VesselMaterials.get_mat("grey_deck")
-			elif part.name in ["White", "Sail", "Canvas"]:
+			elif part.name in ["White", "Sail", "Canvas", "Awning"]:
 				material = VesselMaterials.get_mat("white")
 			elif part.name not in ["Hull", "Glass"] and not str(part.name).begins_with("Cabin"):
 				material = ShipLights.cabin_glass(0) if base == "steam" else VesselMaterials.get_mat("glass")

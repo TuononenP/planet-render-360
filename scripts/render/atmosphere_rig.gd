@@ -223,6 +223,7 @@ func set_time(hour_f: float, lat: float = latitude, on_date: Dictionary = {}) ->
 	CityLights.hour = hour
 	latitude = lat
 	date = on_date
+	CityLights.month = int(solar_date().get("month", 7))
 	_apply()
 
 ## Place for the solar position. Without a known UTC offset the clock
@@ -295,6 +296,7 @@ func set_snow_ground(on: bool) -> void:
 
 func set_season(value: int) -> void:
 	season = LocationData.clamp_season(value)
+	CityLights.month = int(solar_date().get("month", 7))
 	_apply()
 
 ## Shadow reach/softness, cloud octaves and the tier's renderer

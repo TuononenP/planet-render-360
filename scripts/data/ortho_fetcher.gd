@@ -104,6 +104,13 @@ func fetch(src: String, lat: float, lon: float, zoom: int, span: int) -> void:
 			http.request_completed.disconnect(done)
 			_part_done(gen, i, PackedByteArray(), false)
 
+## Decodes a WMS image part (PNG when the server sends a PNG header, else JPEG).
+static func _decode_part(img: Image, body: PackedByteArray) -> Error:
+	if body.size() >= 4 and body[0] == 0x89 and body[1] == 0x50 and body[2] == 0x4E and body[3] == 0x47:
+		return img.load_png_from_buffer(body)
+	var err := img.load_jpg_from_buffer(body)
+	return err if err == OK else img.load_png_from_buffer(body)
+
 ## A GeoServer error comes back 200 as XML: only an image body counts.
 static func _is_image(headers: PackedStringArray) -> bool:
 	for h in headers:
@@ -149,7 +156,7 @@ func _validate_warm(gen: int) -> void:
 			if fresh_flags[i] == 0:
 				continue
 			var img := Image.new()
-			if img.load_jpg_from_buffer(bytes[i]) != OK or OrthoSource.is_blank(img):
+			if _decode_part(img, bytes[i]) != OK or OrthoSource.is_blank(img):
 				out["error"] = "part %d unreadable or blank" % i
 				out["bad_part"] = i
 				_warm_validated.call_deferred(gen, out)
@@ -198,7 +205,7 @@ func _stitch(gen: int) -> void:
 		var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
 		for i in parts * parts:
 			var img := Image.new()
-			if img.load_jpg_from_buffer(bytes[i]) != OK or OrthoSource.is_blank(img):
+			if _decode_part(img, bytes[i]) != OK or OrthoSource.is_blank(img):
 				out["error"] = "part %d unreadable or blank" % i
 				out["bad_part"] = i
 				_stitched.call_deferred(gen, out)

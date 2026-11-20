@@ -6,20 +6,44 @@ extends SceneTree
 var failures: Array[String] = []
 
 const EXPECTED_TYPES := [
+	# Original 17 Turku landmarks
 	"turku_cathedral", "turku_castle", "mikaelinkirkko", "martinkirkko",
 	"turku_orthodox_church", "turku_art_museum", "vartiovuori_observatory",
 	"turku_market_hall", "turku_main_library", "turku_city_theatre",
 	"kakola_prison", "vanha_suurtori", "suomen_joutsen", "fori_ferry",
 	"samppalinnan_maauimala", "paavo_nurmen_stadion", "turku_kauppatori",
+	# Phase T-3A: Kauppatori, Yliopistonkatu & Commercial Core (14)
+	"hamburger_bors_turku", "wiklund_turku", "hansakortteli", "abo_svenska_teater",
+	"kop_kolmio_turku", "turun_sanomat_building", "kivikukkaro", "turku_synagogue",
+	"puutori_ensemble", "betel_church_turku", "prima_albatross_aurakatu",
+	"pantern_hjelt_kaskenkatu", "humalistonkatu_jugend", "turku_fire_station",
+	# Phase T-3B: Aurajoki Waterfront & Maritime (16)
+	"turku_city_hall", "qwensel_house", "verdandi_house", "chappe_art_house",
+	"aboa_vetus_rettig", "pinella_porthan", "sibelius_museum", "abo_akademi_main",
+	"abo_akademi_book_tower", "wam_museum", "turku_state_office", "fuuga_music_hall",
+	"samppalinna_windmill", "forum_marinum", "sigyn_bore_ships", "crichton_vulcan_crane",
+	# Phase T-3C: TYKS Hospital Area, Universities, Kupittaa & Cultural Hills (16)
+	"tyks_majakka", "tyks_t_hospital", "tyks_a_u_hospitals", "tyks_medisiina_dentalia",
+	"tyks_kantasairaala_pavilions", "utu_main_campus", "utu_agora_quantum",
+	"turku_school_economics", "turku_concert_hall", "kupittaa_biocity_electro",
+	"intelligate_ict_kupittaa", "veritas_stadion", "kupittaan_puisto_pavilions",
+	"resurrection_chapel", "st_catherine_church_turku", "maaria_church_turku",
+	# Phase T-3D & T-5.5: Stations, Logomo, Port, Skyline Towers, Arenas & Funicular (15)
+	"kakola_funicular", "logomo_and_bridge", "turku_central_station", "turku_bus_station",
+	"kupittaa_station", "port_of_turku_terminals", "if_torni_turku", "ikituuri_turku",
+	"airiston_tahti", "paaskyvuori_tower", "luolavuori_water_tower", "iso_heikkila_water_tower",
+	"gatorade_center_turku", "telakkaranta_linnanfaltti", "ruissalo_villas_spa",
 ]
 
 const EXPECTED_BRIDGES := [
 	"br_turku_tuomiokirkkosilta", "br_turku_kirjastosilta", "br_turku_auransilta",
 	"br_turku_teatterisilta", "br_turku_myllysilta", "br_turku_martinsilta",
+	"br_turku_tuomaansilta", "br_turku_halistensilta", "br_turku_aurajoen_rautatiesilta",
+	"br_turku_hirvensalonsilta", "br_turku_aninkaistensilta", "br_turku_ukko_pekan_silta",
 ]
 
 func _init() -> void:
-	# 1. All 14 Turku landmarks exist, have non-empty meshes, and sit inside Turku.
+	# 1. All 78 Turku landmarks exist, have non-empty meshes, and sit inside Turku.
 	for t in EXPECTED_TYPES:
 		var e := LocationData.entry_for_type(t)
 		_check(not e.is_empty(), "Registry entry present for %s" % t)
@@ -27,13 +51,13 @@ func _init() -> void:
 			continue
 		var lat := float(e.get("lat", 0.0))
 		var lon := float(e.get("lon", 0.0))
-		_check(lat > 60.42 and lat < 60.47 and lon > 22.20 and lon < 22.30,
+		_check(lat > 60.41 and lat < 60.49 and lon > 22.15 and lon < 22.35,
 			"%s coordinates inside Turku: %s, %s" % [t, lat, lon])
 		var root := LandmarkBuilder.build(t)
 		var meshes := _count_meshes(root)
 		_check(meshes > 0, "%s built %d meshes" % [t, meshes])
 		root.free()
-	# 2. All 6 Aurajoki bridges exist with conf >= 2 and build cleanly.
+	# 2. All 12 Turku bridges exist with conf >= 2 and build cleanly.
 	for bid in EXPECTED_BRIDGES:
 		var row := BridgeSpecs.row_for(bid)
 		_check(not row.is_empty(), "BridgeSpec present for %s" % bid)
@@ -56,6 +80,8 @@ func _init() -> void:
 	_check_sports_venues()
 	# 5. Turku Kauppatori model, walker breezeway, slope conform & Orthodox church tree keep-out.
 	_check_kauppatori()
+	# 6. Föri animated vessel shuttling between stationary riverbank landing stages.
+	_check_fori()
 	if failures.is_empty():
 		print("TURKU LANDMARKS OK: %d landmarks, %d bridges, districts & Föli livery" % [
 			EXPECTED_TYPES.size(), EXPECTED_BRIDGES.size()])
@@ -212,6 +238,43 @@ func _count_meshes(node: Node) -> int:
 	for c in node.get_children():
 		n += _count_meshes(c)
 	return n
+
+func _check_fori() -> void:
+	var root := LandmarkBuilder.build("fori_ferry")
+	var model := root.get_node_or_null("Model") as Node3D
+	var vessel := model.get_node_or_null("ForiVessel") as ForiShuttle if model != null else null
+	var landings := model.get_node_or_null("ForiLandings") as Node3D if model != null else null
+	_check(vessel != null and _count_meshes(vessel) > 0, "Föri has animated ForiVessel child with meshes")
+	_check(landings != null and _count_meshes(landings) > 0, "Föri has stationary ForiLandings child with meshes")
+	if vessel != null:
+		_check(absf(vessel.sample_x(0.0)) < 0.01, "Föri starts centred at mid-river on frame 0")
+		_check(absf(vessel.sample_x(vessel.cross_sec * 0.5) - vessel.travel_half_m) < 0.05,
+			"Föri docks at east landing stage after half crossing")
+		_check(absf(vessel.sample_x(vessel.cross_sec * 1.5 + vessel.pause_sec) + vessel.travel_half_m) < 0.05,
+			"Föri docks at west landing stage on return leg")
+		# Real operating schedule: Summer (May–Sep) 06:15–23:00, Winter (Oct–Apr) 06:15–21:00.
+		_check(ForiShuttle.is_operating(22.5, 7), "Föri active summer 22:30")
+		_check(not ForiShuttle.is_operating(23.25, 7), "Föri off summer 23:15")
+		_check(ForiShuttle.is_operating(20.5, 1), "Föri active winter 20:30")
+		_check(not ForiShuttle.is_operating(21.25, 1), "Föri off winter 21:15")
+		_check(not ForiShuttle.is_operating(6.0, 7) and not ForiShuttle.is_operating(6.0, 1), "Föri off at 06:00")
+		# Night lights ON when operating at night, OFF & moored when outside schedule.
+		var lamp_node := vessel.get_node_or_null("ForiLamp") as MeshInstance3D
+		var deck_light := vessel.get_node_or_null("ForiDeckLight") as OmniLight3D
+		vessel.apply_state(0.0, 22.5, 7, 1.0)
+		var mat_on := lamp_node.get_surface_override_material(0) as StandardMaterial3D if lamp_node != null else null
+		_check(absf(vessel.position.x) < 0.05 and mat_on != null and mat_on.emission_energy_multiplier > 1.0
+			and deck_light != null and deck_light.visible and deck_light.light_energy > 0.5,
+			"Föri summer 22:30 night: moving mid-river with cabin/mast/deck lights ON")
+		vessel.apply_state(0.0, 23.25, 7, 1.0)
+		_check(absf(vessel.position.x + vessel.travel_half_m) < 0.05 and mat_on != null
+			and mat_on.emission_energy_multiplier == 0.0 and deck_light != null and not deck_light.visible,
+			"Föri summer 23:15 night: moored at dock with ALL vessel lights OFF")
+		vessel.apply_state(0.0, 21.25, 1, 1.0)
+		_check(absf(vessel.position.x + vessel.travel_half_m) < 0.05 and mat_on != null
+			and mat_on.emission_energy_multiplier == 0.0 and deck_light != null and not deck_light.visible,
+			"Föri winter 21:15 night: moored at dock with ALL vessel lights OFF")
+	root.free()
 
 func _check(ok: bool, msg: String) -> void:
 	if not ok:

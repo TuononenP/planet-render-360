@@ -11,9 +11,18 @@ const SOURCES := {
 	"hsy_2023": {
 		"url": "https://kartta.hsy.fi/geoserver/wms",
 		"layer": "taustakartat_ja_aluejaot:Ortoilmakuva_2023",
+		"format": "image/jpeg",
 		# Layer extent (lat_min, lat_max, lon_min, lon_max).
 		"bbox": [59.905, 60.605, 24.253, 25.373],
 		"credit": "Aerial imagery: © HSY, orthophoto 2023 (CC BY 4.0)",
+	},
+	"turku_2025": {
+		"url": "https://turku.asiointi.fi/TeklaOGCWeb/WMS.ashx",
+		"layer": "Ilmakuva 2025",
+		"format": "image/png",
+		# Layer extent (lat_min, lat_max, lon_min, lon_max) covering Turku.
+		"bbox": [60.36, 60.54, 22.08, 22.42],
+		"credit": "Aerial imagery: © City of Turku, orthophoto 2025 (CC BY 4.0)",
 	},
 }
 const DEFAULT := "hsy_2023"
@@ -28,16 +37,17 @@ const BLANK_STD := 2.0 / 255.0
 
 ## The source for a mosaic at (lat, lon) of span tiles at zoom, "" none.
 static func source_for(lat: float, lon: float, zoom: int, span: int) -> String:
-	var src: Dictionary = SOURCES[DEFAULT]
-	var bb: Array = src["bbox"]
 	# The mosaic's half width in degrees, so the whole of it is covered.
 	var half_m := SatelliteFetcher.metres_per_px(lat, zoom) * float(span * TILE_PX) * 0.5
 	var dlat := half_m / 110540.0
 	var dlon := half_m / (111320.0 * cos(deg_to_rad(lat)))
-	if lat - dlat < float(bb[0]) or lat + dlat > float(bb[1]) \
-			or lon - dlon < float(bb[2]) or lon + dlon > float(bb[3]):
-		return ""
-	return DEFAULT
+	for key in SOURCES:
+		var src: Dictionary = SOURCES[key]
+		var bb: Array = src["bbox"]
+		if lat - dlat >= float(bb[0]) and lat + dlat <= float(bb[1]) \
+				and lon - dlon >= float(bb[2]) and lon + dlon <= float(bb[3]):
+			return str(key)
+	return ""
 
 ## Parts per side for a mosaic of `size_px` (each ≤ MAX_PART_PX).
 static func parts_for(size_px: int) -> int:
@@ -57,8 +67,10 @@ static func bbox_3857(origin_px: Vector2, size_px: Vector2, zoom: int) -> Packed
 static func part_url(src: String, origin_px: Vector2, part_px: int, zoom: int) -> String:
 	var s: Dictionary = SOURCES[src]
 	var bb := bbox_3857(origin_px, Vector2(part_px, part_px), zoom)
-	return "%s?service=WMS&version=1.3.0&request=GetMap&layers=%s&styles=&crs=EPSG:3857&format=image/jpeg&width=%d&height=%d&bbox=%.3f,%.3f,%.3f,%.3f" % [
-		s["url"], s["layer"], part_px, part_px, bb[0], bb[1], bb[2], bb[3]]
+	var layer := str(s["layer"]).replace(" ", "%20")
+	var fmt := str(s.get("format", "image/jpeg"))
+	return "%s?service=WMS&version=1.3.0&request=GetMap&layers=%s&styles=&crs=EPSG:3857&format=%s&width=%d&height=%d&bbox=%.3f,%.3f,%.3f,%.3f" % [
+		s["url"], layer, fmt, part_px, part_px, bb[0], bb[1], bb[2], bb[3]]
 
 static func credit(src: String) -> String:
 	return str((SOURCES.get(src, {}) as Dictionary).get("credit", ""))

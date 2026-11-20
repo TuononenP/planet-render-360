@@ -12,6 +12,7 @@ func _init() -> void:
 			["cargo", 300.0, 45.0, 52.0, 120000, 3000, "container"], ["cargo", 190.0, 30.0, 32.0, 60000, 2000, "bulk"],
 			["cargo", 250.0, 44.0, 40.0, 60000, 2000, "tanker"], ["cargo", 110.0, 17.0, 26.0, 50000, 2000, "general"], ["passenger", 50.0, 8.0, 12.0, 32000, 637, ""],
 			["tall_ship", 60.0, 9.5, 32.0, 24000, 639, ""], ["houseboat", 14.0, 4.2, 4.5, 8000, 275, ""],
+			["restaurant_boat", 22.0, 6.0, 5.8, 10000, 320, ""],
 			["motor_yacht", 24.0, 0.0, 0.0, 12000, 391, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, 10000, 333, "sport"],
 			["sail_yacht", 12.0, 0.0, 0.0, 12000, 481, ""], ["runabout", 7.0, 0.0, 0.0, 8000, 405, "runabout"],
 			["runabout", 7.0, 0.0, 0.0, 8000, 433, "console"], ["runabout", 7.0, 0.0, 0.0, 8000, 721, "rib"], ["catamaran", 12.0, 0.0, 0.0, 16000, 1500, ""]]:
@@ -29,7 +30,7 @@ func _init() -> void:
 		_check(absf(box.size.x - float(c[1])) / float(c[1]) < 0.02 or box.size.x >= float(c[1]) * 0.98, "%s length %.1f vs %.1f" % [c[0], box.size.x, c[1]])
 		root.free()
 	var surfaces := 1 # pontoon
-	var far_baselines := {"motor": 333, "yacht": 391, "sail": 481, "day": 405, "rib": 721, "steam": 557, "houseboat": 275, "catamaran": 1500}
+	var far_baselines := {"motor": 333, "yacht": 391, "sail": 481, "day": 405, "rib": 721, "steam": 557, "houseboat": 275, "restaurant_boat": 320, "catamaran": 1500}
 	for kind in VesselPrototypes.KINDS:
 		var near_mesh := VesselPrototypes.mesh(kind)
 		var far_mesh := VesselPrototypes.mesh(kind + "_far")

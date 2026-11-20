@@ -82,6 +82,9 @@ const AREA_MIN_SLOPE := 0.03
 const AREA_SAMPLE_M := 2.0
 const AREA_SAMPLES_MAX := 400
 const CELL_M := 4.0
+## Steps this close to a water body's edge are riverbank/quay stairs and are
+## omitted so riverbanks keep a continuous wall instead of misaligned steps.
+const SHORE_MARGIN_M := 3.0
 
 ## The loops that run over a whole place (the steps among the roads, the ways
 ## touching a stair's ends, the park levelling) run natively (StepsKernels,
@@ -170,10 +173,10 @@ class _Net extends RefCounted:
 ## source metres: {road (index in data.roads), points (top to bottom),
 ## y_top, y_bot, n (risers), width, handrail, area, ring}.
 static func apply(surface: PackedFloat32Array, level: PackedFloat32Array, size: int,
-		step: float, data: LocationData, m2u: float) -> Array:
+		step: float, data: LocationData, m2u: float, shoreline: ShorelineModel = null) -> Array:
 	if size < 2 or surface.size() != size * size:
 		return []
-	var edges := _edges(data, surface, size, step, m2u)
+	var edges := _edges(data, surface, size, step, m2u, shoreline)
 	if edges.is_empty():
 		return []
 	var net := _Net.new(m2u)
@@ -218,9 +221,10 @@ static func apply(surface: PackedFloat32Array, level: PackedFloat32Array, size: 
 	return out
 
 ## Every flight of steps in `data` the ground may take: a way or an area,
-## on the ground (not a bridge, not below it), clear of landmark stairs.
+## on the ground (not a bridge, not below it), clear of landmark stairs and
+## riverbank/quay edges.
 static func _edges(data: LocationData, surface: PackedFloat32Array, size: int, step: float,
-		m2u: float) -> Array:
+		m2u: float, shoreline: ShorelineModel = null) -> Array:
 	var edges: Array = []
 	var models := LandmarkSites.model_rect_sites(data)
 	var table := LandmarkStairCut.stairs()
@@ -230,12 +234,15 @@ static func _edges(data: LocationData, surface: PackedFloat32Array, size: int, s
 		if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) or int(road.get("layer", 0)) < 0:
 			continue
 		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
-		if pts.size() < (3 if bool(road.get("area", false)) else 2):
+		var is_area := bool(road.get("area", false))
+		if pts.size() < (3 if is_area else 2):
 			continue
 		if _in_landmark(pts, models, cuts, table):
 			continue
+		if near_shore(pts, shoreline, m2u, is_area):
+			continue
 		var e: _Edge = null
-		if bool(road.get("area", false)):
+		if is_area:
 			e = _area_edge(road, surface, size, step, m2u)
 		elif _length(pts) >= MIN_RUN_M * m2u:
 			e = _Edge.new()
@@ -276,6 +283,41 @@ static func _in_landmark(pts: PackedVector2Array, models: Array, cuts: Array, ta
 			var rect := LandmarkStairCut.rect_m(table[str(site[1]["type"])]).grow(LandmarkStairCut.FEATHER_M)
 			if rect.has_point(LandmarkTerrain.local_xz(p, site)):
 				return true
+	return false
+
+## True when polyline/ring `pts` enters a water body or comes within
+## SHORE_MARGIN_M of a shoreline edge in `shoreline`.
+static func near_shore(pts: PackedVector2Array, shoreline: ShorelineModel, m2u: float,
+		closed: bool = false) -> bool:
+	if shoreline == null or shoreline.empty() or pts.is_empty():
+		return false
+	for p in pts:
+		if shoreline.domains.at(p) >= 0:
+			return true
+	var reach := SHORE_MARGIN_M * m2u
+	var box := RingGeometry.aabb(pts).grow(reach + 0.05)
+	var lo := shoreline.cell_at(box.position)
+	var hi := shoreline.cell_at(box.end)
+	var seg_count := pts.size() if closed else pts.size() - 1
+	var seen := {}
+	for cx in range(lo.x, hi.x + 1):
+		for cz in range(lo.y, hi.y + 1):
+			for eid: int in shoreline.edge_cells.get(Vector2i(cx, cz), []):
+				if seen.has(eid):
+					continue
+				seen[eid] = true
+				var edge: Dictionary = shoreline._edges[eid]
+				var ea: Vector2 = edge["a"]
+				var eb: Vector2 = edge["b"]
+				if seg_count <= 0:
+					if Geometry2D.get_closest_point_to_segment(pts[0], ea, eb).distance_to(pts[0]) <= reach:
+						return true
+				else:
+					for i in seg_count:
+						var hits := Geometry2D.get_closest_points_between_segments(
+							pts[i], pts[(i + 1) % pts.size()], ea, eb)
+						if hits[0].distance_to(hits[1]) <= reach:
+							return true
 	return false
 
 ## A steps area as a flight along its steepest line: the DEM plane over

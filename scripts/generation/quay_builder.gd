@@ -26,45 +26,110 @@ static var _stone_mats := {}
 
 ## Pale limestone of the Seine quays (linear target for the render set).
 const LIMESTONE := Color(0.56, 0.52, 0.44)
+## Warm pinkish-brown-grey Finnish granite (Aurajoki / Helsinki graniittimuuri).
+const FINNISH_ASHLAR := Color(0.54, 0.50, 0.47)
 
-## Seine ashlar: courses COURSE_M high, blocks 2 x COURSE_M long, joints
-## staggered half a block course to course, each block a little lighter or
-## darker; mapped in world space (a tile is TILE_COURSES courses high).
+## Ashlar masonry: courses COURSE_M high, staggered rough-hewn blocks with
+## recessed joints, beveled edges, normal + roughness maps, and block-to-block
+## tone/hue variation; mapped in world space (a tile is TILE_COURSES courses high).
 const ASHLAR_COURSE_M := 0.6
 const ASHLAR_TILE_COURSES := 4
 
+static func _hash2(ix: int, iy: int, seed_v: float) -> float:
+	return fposmod(sin(float(ix) * 127.1 + float(iy) * 311.7 + seed_v * 74.7) * 43758.5453, 1.0)
+
+static func _tile_noise(x: float, y: float, period: int, seed_v: float) -> float:
+	var fx := floorf(x)
+	var fy := floorf(y)
+	var tx := x - fx
+	var ty := y - fy
+	tx = tx * tx * (3.0 - 2.0 * tx)
+	ty = ty * ty * (3.0 - 2.0 * ty)
+	var x0 := posmod(int(fx), period)
+	var y0 := posmod(int(fy), period)
+	var x1 := (x0 + 1) % period
+	var y1 := (y0 + 1) % period
+	var a := lerpf(_hash2(x0, y0, seed_v), _hash2(x1, y0, seed_v), tx)
+	var b := lerpf(_hash2(x0, y1, seed_v), _hash2(x1, y1, seed_v), tx)
+	return lerpf(a, b, ty)
+
 static func _ashlar_material(base: Color = Color(0.80, 0.77, 0.69), course_m: float = ASHLAR_COURSE_M,
-		variation: float = 0.12) -> StandardMaterial3D:
+		variation: float = 0.14, hue_var: float = 0.02, lime_streaks: bool = false) -> StandardMaterial3D:
 	var n := 256
 	var course := n / ASHLAR_TILE_COURSES
-	var block := course * 2
+	var shifts := [0, 64, 34, 98]
+	var splits := [120, 134, 114, 128]
 	var img := Image.create(n, n, false, Image.FORMAT_RGB8)
+	var bump := Image.create(n, n, false, Image.FORMAT_RGB8)
+	var rough := Image.create(n, n, false, Image.FORMAT_RGB8)
 	for y in n:
 		var c := y / course
-		var shift := (block / 2) if c % 2 == 1 else 0
+		var shift: int = shifts[c % shifts.size()]
+		var split_x: int = splits[c % splits.size()]
 		for x in n:
-			var bx := (x + shift) % n / block
-			var h := fposmod(sin(float(c * 7 + bx * 13) * 12.9898) * 43758.5453, 1.0)
-			# Weathered: blocks of several shades, the odd one sooty, a fine
-			# grain, and grime run down from each bed joint, so a long wall
-			# no longer reads as one clean printed grid.
-			var tone := (1.0 - variation * 0.65) + variation * h
-			if fposmod(h * 7.31, 1.0) < 0.14:
-				tone *= 0.91
-			var grain := fposmod(sin(float(x * 31 + y * 17) * 78.233) * 43758.5453, 1.0)
-			tone *= 0.97 + 0.06 * grain
-			var drip := fposmod(sin(float((x + shift) / 3) * 4.17 + float(c) * 1.3) * 43758.5453, 1.0)
-			if drip < 0.3:
-				tone *= 1.0 - 0.06 * (1.0 - float(y % course) / float(course))
-			var joint_h := (y % course) < 2
-			var joint_v := ((x + shift) % block) < 2
-			if joint_h or joint_v:
-				tone *= 0.58
-			img.set_pixel(x, y, Color(base.r * tone, base.g * tone, base.b * tone))
+			var wy := (_tile_noise(float(x) * 0.125, float(c) * 2.3, 32, 1.3) - 0.5) * 2.4
+			var ly := fposmod(float(y) + wy, float(course))
+			var dist_h := minf(ly, float(course) - ly)
+			var wx := (_tile_noise(float(c) * 1.9, float(y) * 0.125, 32, 4.1) - 0.5) * 2.2
+			var lx := fposmod(float(x + shift) + wx, float(n))
+			var bx := 0 if lx < float(split_x) else 1
+			var blk_len := float(split_x) if bx == 0 else float(n - split_x)
+			var in_blk := lx if bx == 0 else lx - float(split_x)
+			var dist_v := minf(in_blk, blk_len - in_blk)
+			var edge := minf(dist_h, dist_v)
+			var bh := _hash2(bx + c * 3, c * 7 + 1, 2.7)
+			var bh2 := _hash2(bx * 5 + 2, c * 11 + 3, 9.1)
+			var tone := (1.0 - variation * 0.50) + variation * bh
+			if bh2 < 0.18:
+				tone *= 0.87
+			elif bh2 > 0.84:
+				tone *= 1.08
+			var coarse := _tile_noise(float(x) * 0.0625, float(y) * 0.0625, 16, 6.2)
+			var fine := _tile_noise(float(x) * 0.25, float(y) * 0.25, 64, 11.4)
+			var speckle := _hash2(x, y, 17.3)
+			tone *= 0.90 + 0.14 * coarse + 0.06 * fine + 0.04 * (speckle - 0.5)
+			# Weathering & mineral streaks running down from bed joints.
+			var drip := _tile_noise(float(x + shift) * 0.125, float(c) * 1.7, 32, 8.5)
+			if ly < 22.0:
+				var fade := 1.0 - ly / 22.0
+				if drip < 0.30:
+					tone *= 1.0 - 0.11 * fade
+				elif lime_streaks and drip > 0.84:
+					tone *= 1.0 + 0.14 * fade
+			var block_rough := 0.80 + 0.08 * bh
+			var h_val := 0.78 + (coarse - 0.5) * 0.20 + (fine - 0.5) * 0.08
+			var r_val := clampf(block_rough + (fine - 0.5) * 0.10, 0.72, 0.96)
+			if edge < 2.6:
+				h_val = 0.06
+				tone *= 0.34
+				r_val = 0.96
+			elif edge < 7.5:
+				var t := (edge - 2.6) / 4.9
+				t = t * t * (3.0 - 2.0 * t)
+				h_val = lerpf(0.06, h_val, t)
+				tone *= lerpf(0.56, 1.0, t)
+				r_val = lerpf(0.95, r_val, t)
+			var r_s := 1.0 + hue_var * (bh2 - 0.45)
+			var g_s := 1.0 + hue_var * 0.25 * (bh2 - 0.50)
+			var b_s := 1.0 - hue_var * 0.85 * (bh2 - 0.45)
+			img.set_pixel(x, y, Color(clampf(base.r * tone * r_s, 0.0, 1.0),
+				clampf(base.g * tone * g_s, 0.0, 1.0), clampf(base.b * tone * b_s, 0.0, 1.0)))
+			var hv := clampf(h_val, 0.0, 1.0)
+			bump.set_pixel(x, y, Color(hv, hv, hv))
+			rough.set_pixel(x, y, Color(r_val, r_val, r_val))
+	bump.bump_map_to_normal_map(4.5)
 	img.generate_mipmaps()
+	bump.generate_mipmaps()
+	rough.generate_mipmaps()
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = ImageTexture.create_from_image(img)
-	m.roughness = 0.9
+	m.normal_enabled = true
+	m.normal_texture = ImageTexture.create_from_image(bump)
+	m.normal_scale = 1.15
+	m.roughness_texture = ImageTexture.create_from_image(rough)
+	m.roughness = 1.0
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
 	m.uv1_scale = Vector3.ONE / (course_m * ASHLAR_TILE_COURSES * WorldScale.metres_to_units())
@@ -75,7 +140,7 @@ static func stone_quays(data: LocationData) -> bool:
 	return data != null and ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country) == "haussmann"
 
 ## True where quay walls are dressed granite ashlar blocks (Nordic and
-## European granite-kerb regions) rather than poured concrete.
+## European granite-kerb regions, including Finland) rather than poured concrete.
 static func granite_quays(data: LocationData) -> bool:
 	return data != null and not stone_quays(data) and KerbBuilder.stone_for(data) == KerbBuilder.GRANITE
 
@@ -90,15 +155,21 @@ static func stone_material(data: LocationData = null) -> StandardMaterial3D:
 	if stone_quays(data):
 		target = LIMESTONE
 	var granite := granite_quays(data)
-	var key := target.to_html(false) + ("_granite_ashlar" if granite else "")
+	var finnish := granite and (data.country == "FI" or CityStyles.region_at(data.latitude, data.longitude) in ["helsinki", "espoo", "turku"])
+	var key := target.to_html(false) + ("_granite_ashlar" if granite else "") \
+		+ ("_finnish" if finnish else "")
 	if not _stone_mats.has(key):
 		if stone_quays(data):
 			_stone_mats[key] = _ashlar_material()
 			return _stone_mats[key]
 		if granite:
-			# Weathered Nordic/European dressed granite ashlar blocks (~0.45 m
-			# courses, warm-grey granite tone matching historic river quays).
-			_stone_mats[key] = _ashlar_material(Color(0.55, 0.53, 0.49), 0.45, 0.18)
+			# Weathered Nordic/European dressed granite ashlar blocks:
+			# Finnish river/harbour quays (graniittimuuri) use rough-hewn
+			# warm pinkish-brown-grey rapakivi granite in ~0.42 m courses.
+			if finnish:
+				_stone_mats[key] = _ashlar_material(FINNISH_ASHLAR, 0.42, 0.24, 0.08, true)
+			else:
+				_stone_mats[key] = _ashlar_material(Color(0.55, 0.53, 0.49), 0.45, 0.20, 0.04, false)
 			return _stone_mats[key]
 		var row: Dictionary = MaterialLibrary.PBR_SETS["render"]
 		# Set means are already linear (a second decode read the stone
