@@ -25,7 +25,10 @@ extends RefCounted
 ## * "bogies": bogie centres along the section; a section without one at
 ##   an end rests on its neighbour's, under the joint.
 
-const KINDS: Array[String] = ["modern3", "modern5", "modern2", "lrv", "heritage", "cable", "pcc"]
+const KINDS: Array[String] = ["modern3", "modern5", "modern2", "lrv", "heritage", "cable", "pcc", "artic", "nr2"]
+## Share of Helsinki's fleet that is the older Nr II+ car; the rest are
+## Artics (the Variotrams are withdrawn).
+const HELSINKI_NR2 := 0.3
 
 const DARK := Color(0.04, 0.04, 0.045)
 const WHITE := Color(0.92, 0.92, 0.9)
@@ -36,7 +39,7 @@ const WOOD := Color(0.42, 0.27, 0.15)
 ## the equipment colour on the roof.
 const LIVERIES := {
 	"helsinki": {"lower": Color(0.0, 0.45, 0.27), "band": Color(0.0, 0.45, 0.27), "upper": Color(0.93, 0.9, 0.78),
-		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.0},
+		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.0, "boards": true},
 	"lisbon_modern": {"lower": Color(0.96, 0.75, 0.05), "band": WHITE, "upper": Color(0.96, 0.75, 0.05),
 		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.435},
 	"lisbon": {"lower": Color(0.95, 0.74, 0.06), "band": Color(0.95, 0.74, 0.06), "upper": Color(0.94, 0.93, 0.88),
@@ -51,6 +54,13 @@ const LIVERIES := {
 		"pillar": Color(0.93, 0.88, 0.72), "roof": Color(0.62, 0.6, 0.5), "inner": WOOD, "gauge": 1.435},
 	"pcc_red": {"lower": Color(0.68, 0.09, 0.09), "band": Color(0.93, 0.88, 0.72), "upper": Color(0.93, 0.88, 0.72),
 		"pillar": Color(0.93, 0.88, 0.72), "roof": Color(0.45, 0.45, 0.44), "inner": WOOD, "gauge": 1.435},
+	# Tvärbanan, Lidingöbanan and Nockebybanan (SL): blue body, white band.
+	"stockholm": {"lower": Color(0.0, 0.31, 0.64), "band": WHITE, "upper": Color(0.0, 0.31, 0.64),
+		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.435},
+	# Djurgårdslinjen's vintage cars: yellow below, cream above.
+	"stockholm_heritage": {"lower": Color(0.86, 0.64, 0.1), "band": Color(0.86, 0.64, 0.1),
+		"upper": Color(0.93, 0.88, 0.72), "pillar": Color(0.93, 0.88, 0.72), "roof": Color(0.45, 0.45, 0.44),
+		"inner": WOOD, "gauge": 1.435},
 	"pcc_blue": {"lower": Color(0.08, 0.22, 0.52), "band": Color(0.85, 0.64, 0.14), "upper": WHITE,
 		"pillar": WHITE, "roof": Color(0.45, 0.45, 0.44), "inner": WOOD, "gauge": 1.435},
 	"pcc_orange": {"lower": Color(0.9, 0.44, 0.07), "band": Color(0.3, 0.1, 0.07), "upper": Color(0.93, 0.88, 0.72),
@@ -83,6 +93,12 @@ const PROF_CABLE := [[0.75, 0.0, "under"], [0.75, 0.92, "skirt"], [0.82, 0.97, "
 const NOSE_MODERN := {"len": 1.3, "rake": 0.5, "pow": 3.0, "lamps": "pair", "board": true}
 const NOSE_OLDER := {"len": 0.55, "rake": 0.2, "pow": 4.0, "lamps": "pair", "board": true}
 const NOSE_LRV := {"len": 0.8, "rake": 0.3, "pow": 3.5, "lamps": "pair", "board": true}
+## The Artic's blunt front: a near-upright screen under a deep board.
+const NOSE_ARTIC := {"len": 0.7, "rake": 0.18, "pow": 3.8, "lamps": "pair", "board": true}
+## The Artic's section: a 100 % low floor, tall windows, a flat roof.
+const PROF_ARTIC := [[0.3, 0.0, "under"], [0.3, 0.9, "skirt"], [0.42, 0.97, "lower"], [0.55, 0.99, "lamp"],
+	[0.7, 1.0, "lower"], [0.86, 1.0, "band"], [0.98, 1.0, "win"], [2.24, 0.98, "upper"],
+	[2.78, 0.96, "roof"], [3.3, 0.9, "roof"], [3.4, 0.5, "roof"], [3.42, 0.0, ""]]
 const NOSE_DASH := {"len": 0.4, "rake": 0.0, "pow": 3.0, "lamps": "single", "post": true, "mullion": true}
 
 const KIND := {
@@ -94,6 +110,22 @@ const KIND := {
 				"pitch": 1.5, "bogies": [2.3, -4.95], "boxes": [[-1.0, 3.6]]},
 			"mid": {"len": 7.8, "prof": PROF_LOW, "front": {}, "rear": {}, "doors": [0.0],
 				"pitch": 1.5, "bogies": [], "boxes": [[-2.4, 1.6]], "panto": 1.0}}},
+	# Helsinki's Artic (Transtech, 100 % low floor, about 27 m, three
+	# modules on Jacobs bogies): a blunt, near-upright front.
+	"artic": {"w": 2.4, "gap": 0.5, "wheel_r": 0.3, "train": [["cab", false], ["mid", false], ["cab", true]],
+		"sections": {
+			"cab": {"len": 9.4, "prof": PROF_ARTIC, "front": NOSE_ARTIC, "rear": {}, "doors": [-2.6, 1.5],
+				"pitch": 1.5, "bogies": [2.3, -4.95], "boxes": [[-1.0, 3.6]]},
+			"mid": {"len": 7.8, "prof": PROF_ARTIC, "front": {}, "rear": {}, "doors": [0.0],
+				"pitch": 1.5, "bogies": [], "boxes": [[-2.4, 1.6]], "panto": 1.0}}},
+	# The older Nr II+ car (about 24 m, a higher floor at the ends): boxier,
+	# with the older, flatter front.
+	"nr2": {"w": 2.4, "gap": 0.4, "wheel_r": 0.33, "train": [["cab", false], ["mid", false], ["cab", true]],
+		"sections": {
+			"cab": {"len": 8.6, "prof": PROF_HIGH, "front": NOSE_OLDER, "rear": {}, "doors": [-2.3, 1.4],
+				"pitch": 1.3, "bogies": [2.1, -4.55], "boxes": [[-1.0, 3.2]]},
+			"mid": {"len": 6.8, "prof": PROF_LOW, "front": {}, "rear": {}, "doors": [0.0],
+				"pitch": 1.4, "bogies": [], "boxes": [[-2.0, 1.6]], "panto": 0.8}}},
 	"modern5": {"w": 2.65, "gap": 0.5, "wheel_r": 0.3,
 		"train": [["cab", false], ["susp", false], ["mid", false], ["susp", false], ["cab", true]],
 		"sections": {
@@ -146,22 +178,34 @@ const KIND := {
 				"doors": [4.6, -1.2], "pitch": 0.82, "bogies": [3.45, -3.45], "pole": 1.2}}},
 }
 
-## Whether trams run on `rail`: mapped tram track, in San Francisco the
-## light rail too (its street-running metro), and round Helsinki the
-## metre-gauge light rail (Kruunusillat, Raide-Jokeri), which trams run.
+## Djurgårdslinjen's corridor, Hamngatan and Norrmalmstorg out Strandvägen to
+## Waldemarsudde as [min lat, max lat, min lon, max lon]: the only tram
+## track in it is that line.
+const DJURGARDEN_BOX := [59.3225, 59.3345, 18.0670, 18.1250]
+
+## Whether (lat, lon) `ll` lies on Djurgårdslinjen's corridor.
+static func on_djurgarden_line(ll: Vector2) -> bool:
+	return ll.x >= DJURGARDEN_BOX[0] and ll.x <= DJURGARDEN_BOX[1] \
+		and ll.y >= DJURGARDEN_BOX[2] and ll.y <= DJURGARDEN_BOX[3]
+
+## Whether trams run on `rail`: mapped tram track, in San Francisco and
+## Stockholm the light rail too (San Francisco's street-running metro;
+## Tvärbanan and Lidingöbanan), and round Helsinki the metre-gauge light
+## rail (Kruunusillat, Raide-Jokeri), which trams run.
 static func carries(region: String, rail: Dictionary) -> bool:
 	var cls := str(rail.get("class", ""))
 	if cls == "tram":
 		return true
 	if cls != "light_rail":
 		return false
-	return region == "san_francisco" \
+	return region in ["san_francisco", "stockholm"] \
 		or (region in ["helsinki", "espoo"] and float(rail.get("gauge_m", 1.435)) < 1.2)
 
 ## The tram that runs on `rail` in CityStyles region `region` of
 ## country `country` (ISO alpha-2): {"kind", "livery"}, or {} when none
-## does. `h` (0..1) mixes a city's fleet.
-static func pick(region: String, country: String, rail: Dictionary, h: float) -> Dictionary:
+## does. `h` (0..1) mixes a city's fleet; `ll` (latitude, longitude of
+## the spot) tells Stockholm's Djurgårdslinjen from its blue light rail.
+static func pick(region: String, country: String, rail: Dictionary, h: float, ll: Vector2 = Vector2.INF) -> Dictionary:
 	if not carries(region, rail):
 		return {}
 	var gauge := float(rail.get("gauge_m", 1.435))
@@ -173,7 +217,11 @@ static func pick(region: String, country: String, rail: Dictionary, h: float) ->
 				return {"kind": "pcc", "livery": PCC_LIVERIES[mini(int(h * PCC_LIVERIES.size()), PCC_LIVERIES.size() - 1)]}
 			return {"kind": "lrv", "livery": "sf_lrv"}
 		"helsinki", "espoo":
-			return {"kind": "modern2" if h < 0.3 else "modern3", "livery": "helsinki"}
+			return {"kind": "nr2" if h < HELSINKI_NR2 else "artic", "livery": "helsinki"}
+		"stockholm":
+			if on_djurgarden_line(ll) and str(rail.get("class", "")) == "tram":
+				return {"kind": "heritage", "livery": "stockholm_heritage"}
+			return {"kind": "modern5", "livery": "stockholm"}
 		"lisbon":
 			if gauge <= 0.95:
 				return {"kind": "heritage", "livery": "lisbon"}

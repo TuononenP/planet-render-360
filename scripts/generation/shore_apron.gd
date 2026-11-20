@@ -4,6 +4,80 @@ extends RefCounted
 ## Shoreline geometry for WaterBuilder: coastlines, shore aprons
 ## sloping into the water, and bridge ways over water. Level and
 ## clipping helpers stay in WaterBuilder.
+
+## Rock colour override for this build (FinnishGranite, or Stockholm's
+## bedrock); alpha 0 = none.
+static var _rock := Color(0, 0, 0, 0)
+## Colour of a bank with no mapped cover (the pale sand outside Stockholm).
+static var _unknown := WaterBuilder._UNKNOWN_SHORE
+
+## Stockholm's banks are grey-pink granite bedrock and dark dressed-stone
+## quay, not the pale sand fallback. Anywhere else the colours are unchanged.
+const STOCKHOLM_ROCK := Color(0.45, 0.41, 0.39)
+const STOCKHOLM_BANK := Color(0.38, 0.36, 0.34)
+
+## Ground-paint overrides for Stockholm: the paving and setts of its quays and
+## squares are grey granite, not the warm pale stone the other cities share.
+const STOCKHOLM_PAVING := Color(0.40, 0.385, 0.36)
+const STOCKHOLM_SETT := Color(0.38, 0.365, 0.345)
+
+static func palette_overrides(data: LocationData) -> Dictionary:
+	if not stockholm(data):
+		return {}
+	return {"urban": STOCKHOLM_PAVING, "sett": STOCKHOLM_SETT, "rock": STOCKHOLM_ROCK}
+
+## Corners of Stockholm's mapped water rings are rounded: the OSM outlines are
+## sharp polygons (the Riddarholmen island, the Slussen basins) that read as
+## angular slabs. A corner turning more than ROUND_TURN is cut back by up to
+## ROUND_M each side, twice, which bevels then rounds it. Idempotent (the
+## polygon carries a "rounded" flag); vertices near the extent edge stay put.
+const ROUND_M := 3.0
+const ROUND_TURN := 0.6
+
+static func round_water(data: LocationData) -> void:
+	if not stockholm(data):
+		return
+	var m := WorldScale.metres_to_units()
+	var edge := WorldScale.detailed_extent_units() * 0.5 - 6.0 * m
+	for poly in data.land_polygons:
+		if not (poly is Dictionary) or str(poly.get("class", "")) != "water" or bool(poly.get("rounded", false)):
+			continue
+		poly["points"] = round_ring(poly.get("points", PackedVector2Array()), ROUND_M * m, edge)
+		var holes: Array = []
+		for h in poly.get("holes", []):
+			holes.append(round_ring(h, ROUND_M * m, edge) if h is PackedVector2Array else h)
+		poly["holes"] = holes
+		poly["rounded"] = true
+
+static func round_ring(pts: PackedVector2Array, r: float, edge: float) -> PackedVector2Array:
+	var closed := pts.size() > 3 and pts[0].is_equal_approx(pts[pts.size() - 1])
+	var ring := pts.slice(0, pts.size() - 1) if closed else pts
+	for _pass in 2:
+		var n := ring.size()
+		if n < 4:
+			break
+		var out := PackedVector2Array()
+		for i in n:
+			var p := ring[i]
+			var d0 := ring[(i + n - 1) % n] - p
+			var d1 := ring[(i + 1) % n] - p
+			var l0 := d0.length()
+			var l1 := d1.length()
+			if l0 < 1e-6 or l1 < 1e-6 or absf(p.x) > edge or absf(p.y) > edge \
+					or absf((-d0).angle_to(d1)) < ROUND_TURN:
+				out.append(p)
+				continue
+			out.append(p + d0 / l0 * minf(r, l0 * 0.33))
+			out.append(p + d1 / l1 * minf(r, l1 * 0.33))
+		ring = out
+	if closed:
+		ring.append(ring[0])
+	return ring
+
+## True when the view sits in Stockholm's zones (CityStyles).
+static func stockholm(data: LocationData) -> bool:
+	return data != null and CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) == "stockholm"
+
 static func _coastlines(data: LocationData) -> Array:
 	var out: Array = []
 	for w in data.waterways:
@@ -29,6 +103,11 @@ static func _coastlines(data: LocationData) -> Array:
 ## `abort` stops it between rows / items; a stopped result is dropped.
 static func _shore_aprons(root: Node3D, data: LocationData,
 		ground: GroundTruth, channels: Array, abort: BuildAbort = null) -> void:
+	_rock = FinnishGranite.ROCK if FinnishGranite.applies(data) else Color(0, 0, 0, 0)
+	_unknown = WaterBuilder._UNKNOWN_SHORE
+	if stockholm(data):
+		_rock = STOCKHOLM_ROCK
+		_unknown = STOCKHOLM_BANK
 	if ground.shoreline != null and ground.shoreline.ready:
 		# ShoreSurface paints the wet strip on canonical dry triangles.
 		# An extra ribbon could cross a concave shore or float above it.
@@ -110,9 +189,9 @@ static func _apron_append(verts: Array, normals: Array, colors: Array,
 	var rise := absf(ground.height_at_world(outer.x, outer.y) - ground.height_at_world(inner.x, inner.y))
 	if cls == "rock" or (cls == "" and rise > maxf(1.5 * m, outer.distance_to(inner) * 0.35)):
 		cls = "rock"
-	var c := WaterBuilder._UNKNOWN_SHORE
+	var c := _unknown
 	if MaterialLibrary.has_ground_class(cls):
-		c = MaterialLibrary.ground_color(cls)
+		c = _rock if cls == "rock" and _rock.a > 0.0 else MaterialLibrary.ground_color(cls)
 	var wet := Color(c.r * WaterBuilder._WET_DARKEN, c.g * WaterBuilder._WET_DARKEN,
 		c.b * WaterBuilder._WET_DARKEN)
 	var k := verts.size()

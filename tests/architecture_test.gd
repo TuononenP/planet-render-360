@@ -456,7 +456,7 @@ func _build_checks(failures: Array[String]) -> void:
 		failures.append("Helsinki/Cairo/Paris apartments must use 3 different facade textures, got %d" % distinct.size())
 
 	# Real-bay UVs: a 15 m edge on a 3.0 m bay is 5 bays = 1.25 tiles; v = storeys.
-	var d2 := _flat_data(60.17, 24.94)
+	var d2 := _flat_data(60.1620, 24.9350)  # Punavuori: the city-wide row, outside the commercial circles
 	d2.buildings = [_bld("apartments", 0.0, 0.0, 15.0, 15.0, 4, 0.0, {"start_year": 1940})]
 	var n2 := BuildingBuilder.build_buildings(d2, GroundTruth.new(d2))
 	var uv_ok := false
@@ -822,7 +822,7 @@ func _era_checks(failures: Array[String]) -> void:
 		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3435, 18.0370), "stockholm_grace"],
 		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3305, 18.0045), "stockholm_funkis"],
 		["stockholm", {"kind": "apartments", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3030, 18.0950), "stockholm_eco"],
-		["stockholm", {"kind": "apartments", "start_year": 1972, "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_miljon"],
+		["stockholm", {"kind": "apartments", "start_year": 1972, "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_postwar"],
 		["stockholm", {"kind": "apartments", "architecture": "swedish_grace", "x": 0.0, "z": 0.0}, CityStyles.local_frame("stockholm", 59.3251, 18.0711), "stockholm_grace"],
 		["chicago", {"kind": "apartments", "levels": 40}, {}, "chicago_tower"],
 		["nordic", {"kind": "apartments", "start_year": 1930}, {}, "nordic"],

@@ -173,7 +173,7 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 ## slope, under a dressed coping where it stands tall enough to show one
 ## (PlinthStyle). Uphill and level edges are buried and get none.
 static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
-		footing: Dictionary, ground: GroundTruth) -> void:
+		footing: Dictionary, ground: GroundTruth, calm: bool = false) -> void:
 	if float(footing.get("plinth", 0.0)) <= 0.0:
 		return
 	var rings: Array = [ring]
@@ -184,8 +184,8 @@ static func plinth(root: Node3D, ring: PackedVector2Array, holes: Array,
 		ccw.append(1 if RingGeometry.signed_area(edge_ring) > 0.0 else 0)
 		grounds.append(_ground_table(ground, edge_ring))
 	var arrays := plinth_arrays(rings, grounds, ccw, float(footing["floor"]))
-	BuildingWalls._emit(root, arrays[0], PlinthStyle.body_material())
-	BuildingWalls._emit(root, arrays[1], PlinthStyle.coping_material())
+	BuildingWalls._emit(root, arrays[0], PlinthStyle.body_material(calm))
+	BuildingWalls._emit(root, arrays[1], PlinthStyle.coping_material(calm))
 
 ## The plinth's [face, coping] BuildingWalls arrays for `rings` (the
 ## footprint, then its holes), their `grounds` tables (_ground_table) and

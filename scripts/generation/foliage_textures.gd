@@ -21,7 +21,7 @@ const DIR := "res://assets/textures/foliage/"
 const LEAF_KINDS: Array[String] = ["broad", "birch", "olive", "needle",
 	"pine", "palm", "cypress", "twigs"]
 const BARK_KINDS: Array[String] = ["plane", "furrowed", "pine", "birch",
-	"spruce", "palm"]
+	"spruce", "palm", "plane_grey", "birch_grey", "furrowed_grey"]
 const LEAF_SIZE := 1024
 const BARK_SIZE := Vector2i(512, 1024)
 
@@ -391,10 +391,10 @@ static func paint_bark(kind: String, res: float = 1.0) -> Array:
 	n2.noise_type = FastNoiseLite.TYPE_CELLULAR
 	n2.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_SUB
 	match kind:
-		"furrowed", "spruce":
+		"furrowed", "furrowed_grey", "spruce":
 			n1.frequency = 0.004 / res
-			n2.frequency = (0.03 if kind == "furrowed" else 0.06) / res
-		"plane":
+			n2.frequency = (0.06 if kind == "spruce" else 0.03) / res
+		"plane", "plane_grey":
 			n1.frequency = 0.012 / res
 			n2.frequency = 0.012 / res
 		"pine":
@@ -418,11 +418,13 @@ static func paint_bark(kind: String, res: float = 1.0) -> Array:
 			var u := float(x) / float(w)
 			var v := float(y) / float(h)
 			match kind:
-				"furrowed":
+				"furrowed", "furrowed_grey":
 					# Vertical ridges broken into plates; deep dark furrows.
 					var ridge := absf(sin((u * 9.0 + f * 1.6) * TAU * 0.5))
 					ht = clampf(ridge * 1.2 - 0.15 + cell * 0.35, 0.0, 1.0)
 					col = Color(0.30, 0.26, 0.22).lerp(Color(0.52, 0.48, 0.42), ht)
+					if kind == "furrowed_grey":
+						col = Color(0.13, 0.12, 0.11).lerp(Color(0.27, 0.255, 0.235), ht)
 				"spruce":
 					ht = clampf(cell * 1.4 + f * 0.3, 0.0, 1.0)
 					col = Color(0.26, 0.20, 0.16).lerp(Color(0.50, 0.40, 0.33), ht)
@@ -440,8 +442,20 @@ static func paint_bark(kind: String, res: float = 1.0) -> Array:
 					else:
 						col = Color(0.48, 0.47, 0.40)
 					ht = pick
-				"birch":
+				"plane_grey":
+					# Grey-brown flaking bark with olive-grey and a little pale patch.
+					var pick := f + cell * 0.25
+					if pick > 0.7:
+						col = Color(0.40, 0.38, 0.33)
+					elif pick > 0.45:
+						col = Color(0.28, 0.265, 0.24)
+					else:
+						col = Color(0.20, 0.19, 0.17)
+					ht = pick
+				"birch", "birch_grey":
 					col = Color(0.86, 0.85, 0.81).lerp(Color(0.70, 0.69, 0.66), f)
+					if kind == "birch_grey":
+						col = col * 0.48
 					ht = 0.8
 					# Horizontal lenticels + dark scars.
 					var band := absf(sin(v * 260.0 + f * 9.0))
@@ -462,5 +476,5 @@ static func paint_bark(kind: String, res: float = 1.0) -> Array:
 			col.a = 1.0
 			alb.set_pixel(x, y, col)
 			bump.set_pixel(x, y, Color(ht, ht, ht, 1.0))
-	bump.bump_map_to_normal_map(6.0 if kind != "birch" else 2.0)
+	bump.bump_map_to_normal_map(2.0 if kind.begins_with("birch") else 6.0)
 	return [alb, bump]

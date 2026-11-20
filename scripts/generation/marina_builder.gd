@@ -29,7 +29,7 @@ const RADIUS_M := 800.0
 const MAX_BOATS := 700
 ## Near + far surfaces of every boat batch + pontoon. One batch per kind
 ## (VesselPrototypes.KINDS) always fits; finer cells only while they do.
-const MAX_DRAW_CALLS := 96
+const MAX_DRAW_CALLS := 108
 ## Boats farther than this from the camera use the reduced "_far" meshes (m).
 const NEAR_M := 420.0
 ## Side of the square cells boats are batched in for the near/far switch
@@ -52,8 +52,24 @@ const HULL_COLOURS := [Color(0.88, 0.88, 0.86), Color(0.88, 0.88, 0.86), Color(0
 	Color(0.88, 0.88, 0.86), Color(0.88, 0.88, 0.86), Color(0.88, 0.88, 0.86),
 	Color(0.80, 0.76, 0.62), Color(0.03, 0.04, 0.09), Color(0.06, 0.06, 0.07), Color(0.30, 0.31, 0.32)]
 const SAIL_SHARE := 0.35
+## Share of the default length draw that makes a flybridge yacht (14 m and
+## over) among motor boats: what a country's `yacht_share` thins to.
+const NATURAL_YACHT_SHARE := 0.39
 ## The boat meshes are 10 m long; an instance scales them uniformly.
 const MESH_LEN_M := 10.0
+
+## The small-boat fleet for `data`'s country: {"hulls": Array[Color],
+## "sail_share", "yacht_share"}, from HarbourVesselData.FLEET_PROFILES, else
+## this class's own defaults.
+static func fleet_of(data: LocationData) -> Dictionary:
+	var row: Dictionary = HarbourVesselData.FLEET_PROFILES.get(data.country.to_upper(), {})
+	if row.is_empty() and FinnishGranite.applies(data):
+		row = HarbourVesselData.FLEET_PROFILES["FI"]
+	var hulls: Array = HULL_COLOURS
+	if row.has("hulls"):
+		hulls = (row["hulls"] as Array).map(func(h: Variant) -> Color: return Color.html(str(h)))
+	return {"hulls": hulls, "sail_share": float(row.get("sail_share", SAIL_SHARE)),
+		"yacht_share": float(row.get("yacht_share", NATURAL_YACHT_SHARE))}
 
 ## Boats [position, yaw, scale, kind, colour], deck ribbons (each an
 ## Array of [x, z, water y]) for `data`'s piers, nearest boats first, and
@@ -66,6 +82,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var centre := View360.spawn_xz(data)
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var cats := mediterranean(data)
+	var fleet := fleet_of(data)
 	var piers: Array = []
 	for p in data.piers:
 		var pts: PackedVector2Array = (p as Dictionary).get("points", PackedVector2Array())
@@ -90,6 +107,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			var vf := ShipBuilder.frame(b)
 			_claim(taken, (vf["centre"] as Vector2) - (vf["axis"] as Vector2) * float(vf["length"]) * 0.5,
 				vf["axis"], float(vf["length"]) / m2u + 4.0, float(vf["beam"]) / m2u + 3.0, m2u)
+	# Helsinki's icebreakers, market and commuter boats keep small craft off their hulls.
+	HarbourTraffic.claim(taken, data, ground, mask, m2u)
 	var bridge_list := QuayMoorings.bridges(data, m2u)
 	QuayMoorings.begin_plan(data, m2u)
 	var liners := QuayMoorings.liners(data, ground, taken, m2u, mask)
@@ -117,8 +136,12 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			for side: float in [-1.0, 1.0]:
 				var h := _hash(pos.x, pos.y, float(k * 7 + slot) + (0.5 if side > 0.0 else 0.0))
 				var len_m := 5.0 + 24.0 * h * h
-				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < SAIL_SHARE
+				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < float(fleet["sail_share"])
 				var pick := _hash(pos.x + 1.7, pos.y, float(slot))
+				# A fleet with fewer big yachts shrinks the surplus to sport cruisers.
+				if not sail and len_m >= 14.0 and float(fleet["yacht_share"]) < NATURAL_YACHT_SHARE \
+						and _hash(pos.y + 2.9, pos.x, float(k * 5 + slot)) * NATURAL_YACHT_SHARE >= float(fleet["yacht_share"]):
+					len_m = 9.0 + (len_m - 14.0) * 0.3
 				var kind := _kind(len_m, sail, pick)
 				if cats and sail and len_m >= 10.0 and len_m <= 22.0 and pick < 0.35:
 					kind = "catamaran"
@@ -137,7 +160,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
 				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m + (CELL_M * 2.0 if kind == "catamaran" else 0.0), m2u):
 					continue
-				var col: Color = HULL_COLOURS[int(_hash(pos.x + 3.1, pos.y, float(slot)) * HULL_COLOURS.size()) % HULL_COLOURS.size()]
+				var hulls: Array = fleet["hulls"]
+				var col: Color = hulls[int(_hash(pos.x + 3.1, pos.y, float(slot)) * hulls.size()) % hulls.size()]
 				boats.append([Vector3(stern.x, y, stern.y), atan2(-out.y, out.x),
 					len_m / MESH_LEN_M * m2u, kind, col])
 			slot += 1

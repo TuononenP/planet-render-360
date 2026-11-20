@@ -1,0 +1,582 @@
+godot --path .
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M5 Ultra (Apple9)
+
+MEM footprint 1,375 MB, engine 400 MB, video 217 MB, objects 9547, limit 73,728 MB, headroom 72,352 MB, tier T3
+MEM footprint 1,565 MB, engine 456 MB, video 257 MB, objects 10023, limit 73,728 MB, headroom 72,162 MB, tier T3
+MEM footprint 1,675 MB, engine 479 MB, video 257 MB, objects 10042, limit 73,728 MB, headroom 72,052 MB, tier T3
+MEM footprint 1,709 MB, engine 487 MB, video 257 MB, objects 10028, limit 73,728 MB, headroom 72,018 MB, tier T3
+MEM footprint 1,817 MB, engine 532 MB, video 302 MB, objects 10137, limit 73,728 MB, headroom 71,910 MB, tier T3
+CLIMATE: { "precip_dry_mm": 104.4, "precip_mm": 676.6, "precip_warm_mm": 208.7, "snow_days": 168.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.14999999999998, "t_warm_c": 15.45 } { "ms": 0, "cached": true }
+MEM footprint 2,377 MB, engine 1,078 MB, video 441 MB, objects 10580, limit 73,728 MB, headroom 71,350 MB, tier T3
+Far water mask: 16 tiles z10 in 13 ms
+FAR-FIELD fetch: { "fetch_ms": 9, "assemble_ms": 366, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+MEM footprint 4,145 MB, engine 1,091 MB, video 1,560 MB, objects 11457, limit 73,728 MB, headroom 69,582 MB, tier T3
+MEM footprint 3,658 MB, engine 1,049 MB, video 1,560 MB, objects 11416, limit 73,728 MB, headroom 70,069 MB, tier T3
+MEM footprint 3,760 MB, engine 1,312 MB, video 1,560 MB, objects 11418, limit 73,728 MB, headroom 69,967 MB, tier T3
+LOD2: 4312 rows / 1270 matched / 1105 filled
+REGISTER: 2227 rows / 1158 matched / 993 filled
+TREE REGISTER: 6517 rows / 1948 matched / 2915 added
+STREETS: { "drive": 916, "parking": 93, "widths": 1081, "paved": 2394, "setts": 0, "squares": 3 }
+COAST DEM registration: bias=17.07 m
+LANDCOVER fetch: { "landcover": { "ms": 1443, "available": true }, "hsy_cover": { "ms": 1943, "available": true }, "canopy": { "ms": 10400, "available": true } }
+MEM footprint 3,822 MB, engine 1,107 MB, video 1,560 MB, objects 12565, limit 73,728 MB, headroom 69,905 MB, tier T3
+SHORE TIMINGS classify=40 patches=60
+SHORELINE bodies=40 edges=10513 patches=5882 hard=1469 diagnostics=0
+MEM footprint 3,864 MB, engine 1,142 MB, video 1,560 MB, objects 12606, limit 73,728 MB, headroom 69,863 MB, tier T3
+MEM footprint 3,980 MB, engine 1,375 MB, video 1,560 MB, objects 12604, limit 73,728 MB, headroom 69,747 MB, tier T3
+FAR-CITY fetch: { "ms": 16056, "bytes": 9293384, "cached": false, "partial": false, "landuse": 6065, "towers": 257 }
+MEM footprint 4,038 MB, engine 1,201 MB, video 1,560 MB, objects 12639, limit 73,728 MB, headroom 69,689 MB, tier T3
+SETTLEMENT timings ms imagery=29 landuse=273 native=true
+MEM footprint 4,350 MB, engine 1,253 MB, video 1,798 MB, objects 13135, limit 73,728 MB, headroom 69,377 MB, tier T3
+FAR-TERRAIN built in 2033 ms (rings=3 drapes=3 bands=2)
+MEM footprint 4,704 MB, engine 1,296 MB, video 2,077 MB, objects 14815, limit 73,728 MB, headroom 69,023 MB, tier T3
+MEM footprint 4,903 MB, engine 1,379 MB, video 2,188 MB, objects 17058, limit 73,728 MB, headroom 68,824 MB, tier T3
+MEM footprint 5,069 MB, engine 1,449 MB, video 2,261 MB, objects 19261, limit 73,728 MB, headroom 68,658 MB, tier T3
+SHORE TERRAIN vertices_ms=2479
+SHORE TERRAIN arrays_ms=2880 vertices=120131
+NEAR-CLASS 4096 texels in 176 ms
+SHORE TERRAIN total_ms=3162
+MEM footprint 5,434 MB, engine 1,613 MB, video 2,421 MB, objects 22973, limit 73,728 MB, headroom 68,293 MB, tier T3
+MEM footprint 6,026 MB, engine 1,635 MB, video 2,818 MB, objects 26408, limit 73,728 MB, headroom 67,701 MB, tier T3
+MEM footprint 6,415 MB, engine 1,683 MB, video 3,025 MB, objects 37239, limit 73,728 MB, headroom 67,312 MB, tier T3
+FAR-CITY built in 181 ms (blocks=11225 towers=226 tris=165322 meshes=214 source=drape+osm)
+LANDMARKS timings ms (26 built; impostor views cached 0, rasterised 0) br_helsinki_pitkasilta=221, national_library_of_finland=214, uspenski_cathedral=133, presidential_palace_helsinki=131, stockmann_helsinki=122, helsinki_university_main=98, helsinki_central_station=91, ateneum=81
+BUILDINGS timings ms { "shared_walls_setup": 556, "roof_setup": 135, "mapped": 6692, "batching": 11, "settlement": 0, "infill": 25, "far_city": 182, "finishing": 414, "facade_compose": 995 }
+BUILDINGS census { "real": 1536, "impostors": 0, "infill": 0, "far_blocks": 11225, "far_towers": 226, "far_tris": 165322 } (settlement=drape+osm)
+BUILDINGS 50 outlines under 90% covered by their parts, 50365 m² unbuilt
+PROPS timings ms { "pole_plan": 0, "lamps": 75, "barriers": 1840, "shore_railings": 41, "furniture": 78, "marina": 1212, "ferries": 8, "quay": 148, "cars": 1761, "trams": 450, "trains": 209, "wires": 106, "utility_poles": 0, "snowbanks": 0 }
+MEM footprint 6,714 MB, engine 1,700 MB, video 3,215 MB, objects 39190, limit 73,728 MB, headroom 67,013 MB, tier T3
+MEM footprint 6,771 MB, engine 1,712 MB, video 3,266 MB, objects 39419, limit 73,728 MB, headroom 66,956 MB, tier T3
+FAR-CANOPY 80000 crowns in 12 meshes in 1086 ms
+VEGETATION timings ms { "plan": 1669, "trees": 626, "props": 5928, "cover": 1655, "carpet_pits": 11 }
+BUILD timings {Distant terrain=2048, Ground & water=3162, Buildings=8026, Roads & landmarks=6953, Vegetation=9890} total=9900 parallel
+MEM footprint 7,139 MB, engine 1,377 MB, video 3,300 MB, objects 21291, limit 73,728 MB, headroom 66,588 MB, tier T3
+MEM cache save world_60170_24949_p3_s1_8bd3729f.scn start: footprint 7,139 MB, engine 1,376 MB, video 3,300 MB, objects 21291, limit 73,728 MB, headroom 66,588 MB, tier T3
+MEM cache save world_60170_24949_p3_s1_8bd3729f.scn packed: footprint 7,139 MB, engine 1,376 MB, video 3,300 MB, objects 21291, limit 73,728 MB, headroom 66,588 MB, tier T3
+STREAM gen 2: start 1072 m ahead at 0.0 m/s (expect 16.0 s)
+Far water mask: 16 tiles z10 in 14 ms
+MEM footprint 10,117 MB, engine 2,308 MB, video 4,910 MB, objects 23291, limit 73,728 MB, headroom 63,610 MB, tier T3
+MEM footprint 10,279 MB, engine 2,407 MB, video 4,921 MB, objects 23656, limit 73,728 MB, headroom 63,448 MB, tier T3
+CLIMATE: { "t_warm_c": 15.65, "t_cold_c": -4.04999999999995, "snow_days": 165.0, "precip_mm": 661.7, "precip_dry_mm": 102.2, "precip_warm_mm": 204.4, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 2956, "cached": false, "vars": 6 }
+CLIMATE: { "t_warm_c": 15.65, "t_cold_c": -4.04999999999995, "snow_days": 166.0, "precip_mm": 669.5, "precip_warm_mm": 206.7, "precip_dry_mm": 103.3, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 3059, "cached": false, "vars": 6 }
+MEM footprint 10,374 MB, engine 2,512 MB, video 4,921 MB, objects 23493, limit 73,728 MB, headroom 63,353 MB, tier T3
+Streamed build: ground photo without waiting for the sharper inner mosaic (3.0 s)
+MEM footprint 10,410 MB, engine 2,552 MB, video 4,921 MB, objects 23618, limit 73,728 MB, headroom 63,317 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 200, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+FAR-FIELD fetch: { "fetch_ms": 2, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+MEM footprint 10,450 MB, engine 2,636 MB, video 4,921 MB, objects 23742, limit 73,728 MB, headroom 63,277 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 536, "available": true }, "hsy_cover": { "ms": 3270, "available": true }, "canopy": { "ms": 7779, "available": true } }
+MEM footprint 10,600 MB, engine 2,750 MB, video 4,921 MB, objects 23723, limit 73,728 MB, headroom 63,127 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 1735, "available": true }, "hsy_cover": { "ms": 3015, "available": true }, "canopy": { "ms": 8480, "available": true } }
+MEM footprint 10,672 MB, engine 2,818 MB, video 4,921 MB, objects 23705, limit 73,728 MB, headroom 63,055 MB, tier T3
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 10,879 MB, engine 3,007 MB, video 4,921 MB, objects 23708, limit 73,728 MB, headroom 62,848 MB, tier T3
+MEM footprint 11,165 MB, engine 2,987 MB, video 4,996 MB, objects 23712, limit 73,728 MB, headroom 62,562 MB, tier T3
+LOD2: 3435 rows / 1956 matched / 1782 filled
+REGISTER: 1334 rows / 1313 matched / 1237 filled
+TREE REGISTER: 4151 rows / 0 matched / 2670 added
+STREETS: { "drive": 338, "parking": 66, "widths": 260, "paved": 998, "setts": 0, "squares": 7 }
+COAST DEM registration: bias=16.91 m
+SHORE TIMINGS classify=26 patches=46
+SHORELINE bodies=34 edges=6468 patches=4749 hard=441 diagnostics=21
+FAR-CITY fetch: reused remapped live far city (1.6 s wait)
+MEM footprint 12,449 MB, engine 4,805 MB, video 4,988 MB, objects 26642, limit 73,728 MB, headroom 61,278 MB, tier T3
+SETTLEMENT timings ms imagery=30 landuse=264 native=true
+MEM footprint 12,634 MB, engine 4,888 MB, video 5,167 MB, objects 29112, limit 73,728 MB, headroom 61,093 MB, tier T3
+WORLD CACHE saved world_60170_24949_p3_s1_8bd3729f.scn in 28184 ms
+MEM cache save world_60170_24949_p3_s1_8bd3729f.scn done: footprint 12,146 MB, engine 1,965 MB, video 5,261 MB, objects 30200, limit 73,728 MB, headroom 61,581 MB, tier T3
+MEM footprint 12,146 MB, engine 1,958 MB, video 5,265 MB, objects 30312, limit 73,728 MB, headroom 61,581 MB, tier T3
+FAR-TERRAIN built in 3492 ms (rings=3 drapes=3 bands=2)
+MEM footprint 12,240 MB, engine 2,036 MB, video 5,325 MB, objects 33977, limit 73,728 MB, headroom 61,487 MB, tier T3
+PROPS timings ms { "pole_plan": 0, "lamps": 23, "barriers": 0, "shore_railings": 46, "furniture": 38, "marina": 47, "ferries": 10, "quay": 27, "cars": 124, "trams": 17, "trains": 1, "wires": 344, "utility_poles": 0, "snowbanks": 0 }
+WARNING: BuildingBuilder: 1 of 946 real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle).
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _real_buildings (res://scripts/generation/building_builder.gd:343)
+         [1] build_buildings (res://scripts/generation/building_builder.gd:71)
+         [2] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:62)
+         [3] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:86)
+MEM footprint 12,274 MB, engine 2,095 MB, video 5,343 MB, objects 38732, limit 73,728 MB, headroom 61,453 MB, tier T3
+FAR-CITY built in 364 ms (blocks=11058 towers=228 tris=163670 meshes=210 source=drape+osm)
+BUILDINGS timings ms { "shared_walls_setup": 856, "roof_setup": 77, "mapped": 3915, "batching": 4, "settlement": 0, "infill": 84, "far_city": 365, "finishing": 92, "facade_compose": 464 }
+BUILDINGS census { "real": 946, "impostors": 0, "infill": 0, "far_blocks": 11058, "far_towers": 228, "far_tris": 163670 } (settlement=drape+osm)
+BUILDINGS 1 masses failed to build
+SHORE TERRAIN vertices_ms=1978
+SHORE TERRAIN arrays_ms=2274 vertices=104898
+NEAR-CLASS 4096 texels in 140 ms
+SHORE TERRAIN total_ms=2489
+MEM footprint 11,363 MB, engine 2,269 MB, video 5,399 MB, objects 39835, limit 73,728 MB, headroom 62,364 MB, tier T3
+FAR-CANOPY 80000 crowns in 12 meshes in 1502 ms
+VEGETATION timings ms { "plan": 3515, "trees": 23, "props": 678, "cover": 3064, "carpet_pits": 5 }
+LANDMARKS timings ms (24 built; impostor views cached 0, rasterised 0) national_library_of_finland=202, stockmann_helsinki=97, presidential_palace_helsinki=97, uspenski_cathedral=95, helsinki_university_main=67, ateneum=66, government_palace_helsinki=47, helsinki_central_station=44
+BUILD timings {Distant terrain=3506, Ground & water=2489, Buildings=5418, Roads & landmarks=6576, Vegetation=7287} total=7569 parallel
+STREAM gen 2: fetch 14.4 s (Weather 3.3 s, Elevation 6.4 s, Imagery 8.0 s, Buildings & landmarks 14.4 s), build 7.7 s, total 22.0 s (expect next 19.6 s); worst frame fetch 148.1 ms, build 147.4 ms; fetch s { "satellite": 0.7, "landcover": 8.0, "map": 12.4, "registers": 12.6, "far city": 14.4, "stages": 14.4, "prewarm": 14.4, "ground": 14.4, "ground ms": { "coastal": 10, "hki dem": 151, "model": 151, "truth": 551 } }; BUILD timings {Distant terrain=3506, Ground & water=2489, Buildings=5418, Roads & landmarks=6576, Vegetation=7287, Finishing=89} [3506, 2489, 261, 5418, 6576, 1306, 7287]; postpass 6 requests, slot held 35.2 s, longest wait 21.1 s
+MEM footprint 11,177 MB, engine 1,795 MB, video 5,366 MB, objects 30215, limit 73,728 MB, headroom 62,550 MB, tier T3
+STREAM drop gen 2: camera turned back
+MEM footprint 10,908 MB, engine 1,748 MB, video 5,129 MB, objects 25989, limit 73,728 MB, headroom 62,819 MB, tier T3
+MEM footprint 10,970 MB, engine 1,842 MB, video 5,129 MB, objects 25986, limit 73,728 MB, headroom 62,757 MB, tier T3
+FAR-CITY fetch: { "ms": 27858, "bytes": 9235278, "cached": false, "partial": false, "landuse": 6034, "towers": 248 }
+STREAM warm: a stretch ahead fetched in 27.9 s
+CLIMATE: { "t_warm_c": 15.7500000000001, "t_cold_c": -4.14999999999998, "precip_dry_mm": 102.2, "precip_mm": 660.9, "snow_days": 165.0, "precip_warm_mm": 204.5, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1002, "cached": false, "vars": 6 }
+FAR-FIELD fetch: { "fetch_ms": 3, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+LANDCOVER fetch: { "landcover": { "ms": 393, "available": true }, "hsy_cover": { "ms": 1068, "available": true }, "canopy": { "ms": 4218, "available": true } }
+MEM footprint 11,011 MB, engine 1,752 MB, video 5,129 MB, objects 25993, limit 73,728 MB, headroom 62,716 MB, tier T3
+MEM footprint 11,070 MB, engine 1,952 MB, video 5,129 MB, objects 25992, limit 73,728 MB, headroom 62,657 MB, tier T3
+FAR-CITY fetch: { "ms": 10724, "bytes": 8484841, "cached": false, "partial": false, "landuse": 5444, "towers": 201 }
+STREAM warm: a stretch ahead fetched in 10.7 s
+MEM footprint 11,014 MB, engine 1,731 MB, video 5,129 MB, objects 25399, limit 73,728 MB, headroom 62,713 MB, tier T3
+MEM footprint 9,721 MB, engine 1,731 MB, video 5,129 MB, objects 25392, limit 73,728 MB, headroom 64,006 MB, tier T3
+MEM footprint 9,708 MB, engine 1,731 MB, video 5,129 MB, objects 25391, limit 73,728 MB, headroom 64,019 MB, tier T3
+STREAM gen 4: start 921 m ahead at 12.8 m/s (expect 19.6 s), reused
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 2, "available": true }, "hsy_cover": { "ms": 7, "available": true } }
+MEM footprint 9,887 MB, engine 2,087 MB, video 5,205 MB, objects 26989, limit 73,728 MB, headroom 63,840 MB, tier T3
+CLIMATE: { "precip_dry_mm": 103.3, "precip_mm": 669.5, "precip_warm_mm": 206.7, "snow_days": 166.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.04999999999995, "t_warm_c": 15.65 } { "ms": 0, "cached": true }
+Far water mask: 16 tiles z10 in 17 ms
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 235, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+CLIMATE: { "t_warm_c": 15.65, "t_cold_c": -4.14999999999998, "precip_warm_mm": 207.9, "snow_days": 166.0, "precip_mm": 672.1, "precip_dry_mm": 103.9, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1034, "cached": false, "vars": 6 }
+MEM footprint 10,363 MB, engine 2,329 MB, video 5,298 MB, objects 26858, limit 73,728 MB, headroom 63,364 MB, tier T3
+MEM footprint 9,258 MB, engine 1,974 MB, video 5,298 MB, objects 26858, limit 73,728 MB, headroom 64,469 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+LANDCOVER fetch: { "landcover": { "ms": 505, "available": true }, "hsy_cover": { "ms": 814, "available": true }, "canopy": { "ms": 2909, "available": true } }
+MEM footprint 9,293 MB, engine 1,960 MB, video 5,298 MB, objects 26861, limit 73,728 MB, headroom 64,434 MB, tier T3
+MEM footprint 9,502 MB, engine 1,939 MB, video 5,298 MB, objects 26834, limit 73,728 MB, headroom 64,225 MB, tier T3
+NEAR-CLASS window moved to (200, 13)
+LOD2: 3435 rows / 674 matched / 594 filled
+REGISTER: 1334 rows / 572 matched / 484 filled
+TREE REGISTER: 4151 rows / 829 matched / 1841 added
+STREETS: { "drive": 338, "parking": 66, "widths": 465, "paved": 998, "setts": 0, "squares": 2 }
+FAR-CITY fetch: { "ms": 1848, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+COAST DEM registration: bias=17.03 m
+MEM footprint 9,555 MB, engine 2,001 MB, video 5,298 MB, objects 27953, limit 73,728 MB, headroom 64,172 MB, tier T3
+SHORE TIMINGS classify=93 patches=118
+SHORELINE bodies=101 edges=21520 patches=8568 hard=4417 diagnostics=0
+SETTLEMENT timings ms imagery=29 landuse=277 native=true
+MEM footprint 9,628 MB, engine 2,058 MB, video 5,343 MB, objects 27340, limit 73,728 MB, headroom 64,099 MB, tier T3
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 9,877 MB, engine 2,260 MB, video 5,502 MB, objects 29706, limit 73,728 MB, headroom 63,850 MB, tier T3
+MEM footprint 9,966 MB, engine 2,247 MB, video 5,572 MB, objects 31388, limit 73,728 MB, headroom 63,761 MB, tier T3
+FAR-CITY fetch: { "ms": 1853, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+STREAM warm: a stretch ahead fetched in 10.2 s
+FAR-TERRAIN built in 2981 ms (rings=3 drapes=3 bands=2)
+MEM footprint 10,070 MB, engine 2,250 MB, video 5,669 MB, objects 34319, limit 73,728 MB, headroom 63,657 MB, tier T3
+SHORE TERRAIN vertices_ms=1602
+MEM footprint 10,159 MB, engine 2,351 MB, video 5,740 MB, objects 38219, limit 73,728 MB, headroom 63,568 MB, tier T3
+SHORE TERRAIN arrays_ms=2101 vertices=149632
+PROPS timings ms { "pole_plan": 0, "lamps": 27, "barriers": 1140, "shore_railings": 46, "furniture": 7, "marina": 618, "ferries": 3, "quay": 185, "cars": 121, "trams": 17, "trains": 0, "wires": 151, "utility_poles": 0, "snowbanks": 0 }
+NEAR-CLASS 4096 texels in 124 ms
+SHORE TERRAIN total_ms=2304
+FAR-CITY built in 223 ms (blocks=11132 towers=228 tris=164442 meshes=208 source=drape+osm)
+BUILDINGS timings ms { "shared_walls_setup": 282, "roof_setup": 79, "mapped": 4689, "batching": 5, "settlement": 0, "infill": 12, "far_city": 223, "finishing": 97, "facade_compose": 459 }
+BUILDINGS census { "real": 837, "impostors": 0, "infill": 0, "far_blocks": 11132, "far_towers": 228, "far_tris": 164442 } (settlement=drape+osm)
+BUILDINGS 21 outlines under 90% covered by their parts, 16999 m² unbuilt
+MEM footprint 10,059 MB, engine 2,277 MB, video 5,588 MB, objects 41270, limit 73,728 MB, headroom 63,668 MB, tier T3
+MEM footprint 10,284 MB, engine 2,296 MB, video 5,629 MB, objects 42011, limit 73,728 MB, headroom 63,443 MB, tier T3
+LANDMARKS timings ms (26 built; impostor views cached 0, rasterised 0) national_library_of_finland=149, presidential_palace_helsinki=130, stockmann_helsinki=107, uspenski_cathedral=88, ateneum=80, helsinki_university_main=61, helsinki_central_station=56, government_palace_helsinki=49
+FAR-CANOPY 80000 crowns in 12 meshes in 1208 ms
+VEGETATION timings ms { "plan": 2858, "trees": 40, "props": 2315, "cover": 2077, "carpet_pits": 2 }
+BUILD timings {Distant terrain=2991, Ground & water=2305, Buildings=5393, Roads & landmarks=5755, Vegetation=7293} total=7298 parallel
+STREAM gen 4: fetch 7.5 s (Weather 0.1 s, Imagery 0.2 s, Elevation 0.4 s, Buildings & landmarks 6.7 s), build 7.5 s, total 15.0 s (expect next 18.5 s); worst frame fetch 83.3 ms, build 88.8 ms; fetch s { "satellite": 0.2, "inner imagery": 0.2, "landcover": 0.2, "map": 6.5, "registers": 6.7, "far city": 6.7, "stages": 6.7, "prewarm": 6.7, "ground": 7.5, "ground ms": { "coastal": 161, "hki dem": 323, "model": 323, "truth": 857 } }; BUILD timings {Distant terrain=2991, Ground & water=2305, Buildings=5393, Roads & landmarks=5755, Vegetation=7293, Finishing=195} [2991, 2305, 451, 5393, 5755, 1288, 7293]; postpass 6 requests, slot held 23.0 s, longest wait 6.6 s
+MEM footprint 10,503 MB, engine 2,022 MB, video 5,677 MB, objects 32919, limit 73,728 MB, headroom 63,224 MB, tier T3
+STREAM drop gen 4: camera turned back
+MEM footprint 10,141 MB, engine 1,955 MB, video 5,350 MB, objects 26711, limit 73,728 MB, headroom 63,586 MB, tier T3
+STREAM gen 6: start 868 m ahead at 25.7 m/s (expect 18.5 s)
+Far water mask: 16 tiles z10 in 15 ms
+MEM footprint 10,308 MB, engine 2,465 MB, video 5,443 MB, objects 28500, limit 73,728 MB, headroom 63,419 MB, tier T3
+CLIMATE: { "t_warm_c": 15.65, "snow_days": 166.0, "t_cold_c": -4.04999999999995, "precip_dry_mm": 103.3, "precip_warm_mm": 206.7, "precip_mm": 669.5, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1284, "cached": false, "vars": 6 }
+CLIMATE: { "t_cold_c": -4.04999999999995, "t_warm_c": 15.65, "snow_days": 165.0, "precip_dry_mm": 102.2, "precip_mm": 661.7, "precip_warm_mm": 204.4, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1263, "cached": false, "vars": 6 }
+MEM footprint 10,480 MB, engine 2,585 MB, video 5,443 MB, objects 28190, limit 73,728 MB, headroom 63,247 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 6, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 156, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+Streamed build: ground photo without waiting for the sharper inner mosaic (3.0 s)
+MEM footprint 10,549 MB, engine 2,149 MB, video 5,443 MB, objects 28161, limit 73,728 MB, headroom 63,178 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 796, "available": true }, "hsy_cover": { "ms": 1350, "available": true }, "canopy": { "ms": 5899, "available": true } }
+LANDCOVER fetch: { "landcover": { "ms": 776, "available": true }, "hsy_cover": { "ms": 1245, "available": true }, "canopy": { "ms": 5868, "available": true } }
+LOD2: 3435 rows / 653 matched / 573 filled
+REGISTER: 1296 rows / 574 matched / 480 filled
+TREE REGISTER: 4569 rows / 510 matched / 2180 added
+STREETS: { "drive": 240, "parking": 47, "widths": 425, "paved": 832, "setts": 0, "squares": 2 }
+FAR-CITY fetch: { "ms": 1955, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+COAST DEM registration: bias=17.03 m
+SHORE TIMINGS classify=73 patches=120
+SHORELINE bodies=90 edges=14252 patches=7728 hard=1614 diagnostics=2
+MEM footprint 10,605 MB, engine 2,258 MB, video 5,440 MB, objects 28759, limit 73,728 MB, headroom 63,122 MB, tier T3
+SETTLEMENT timings ms imagery=32 landuse=279 native=true
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 10,790 MB, engine 2,381 MB, video 5,589 MB, objects 30363, limit 73,728 MB, headroom 62,937 MB, tier T3
+MEM footprint 10,912 MB, engine 2,502 MB, video 5,673 MB, objects 31795, limit 73,728 MB, headroom 62,815 MB, tier T3
+FAR-CITY fetch: { "ms": 1969, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+STREAM warm: a stretch ahead fetched in 9.9 s
+FAR-TERRAIN built in 2862 ms (rings=3 drapes=3 bands=2)
+MEM footprint 11,021 MB, engine 2,583 MB, video 5,772 MB, objects 33366, limit 73,728 MB, headroom 62,706 MB, tier T3
+CLIMATE: { "t_cold_c": -4.04999999999995, "snow_days": 165.0, "t_warm_c": 15.65, "precip_warm_mm": 200.8, "precip_dry_mm": 100.4, "precip_mm": 650.6, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1049, "cached": false, "vars": 6 }
+MEM footprint 11,082 MB, engine 2,481 MB, video 5,848 MB, objects 35438, limit 73,728 MB, headroom 62,645 MB, tier T3
+MEM footprint 11,181 MB, engine 2,498 MB, video 5,917 MB, objects 38989, limit 73,728 MB, headroom 62,546 MB, tier T3
+SHORE TERRAIN vertices_ms=2433
+PROPS timings ms { "pole_plan": 0, "lamps": 37, "barriers": 1379, "shore_railings": 48, "furniture": 16, "marina": 897, "ferries": 3, "quay": 195, "cars": 185, "trams": 50, "trains": 0, "wires": 192, "utility_poles": 0, "snowbanks": 0 }
+FAR-CITY built in 332 ms (blocks=10827 towers=230 tris=160866 meshes=211 source=drape+osm)
+FAR-FIELD fetch: { "fetch_ms": 6, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+FAR-CITY fetch: { "ms": 1381, "bytes": 8484841, "cached": true, "partial": false, "landuse": 5444, "towers": 201 }
+BUILDINGS timings ms { "shared_walls_setup": 278, "roof_setup": 74, "mapped": 5151, "batching": 8, "settlement": 0, "infill": 42, "far_city": 332, "finishing": 46, "facade_compose": 500 }
+BUILDINGS census { "real": 768, "impostors": 0, "infill": 0, "far_blocks": 10827, "far_towers": 230, "far_tris": 160866 } (settlement=drape+osm)
+BUILDINGS 18 outlines under 90% covered by their parts, 16134 m² unbuilt
+SHORE TERRAIN arrays_ms=3077 vertices=142483
+NEAR-CLASS 4096 texels in 101 ms
+MEM footprint 10,980 MB, engine 2,521 MB, video 5,702 MB, objects 42883, limit 73,728 MB, headroom 62,747 MB, tier T3
+SHORE TERRAIN total_ms=3256
+LANDCOVER fetch: { "landcover": { "ms": 429, "available": true }, "hsy_cover": { "ms": 886, "available": true }, "canopy": { "ms": 3801, "available": true } }
+MEM footprint 11,172 MB, engine 2,527 MB, video 5,737 MB, objects 43515, limit 73,728 MB, headroom 62,555 MB, tier T3
+Orthophoto: part 0 unreadable or blank; inner imagery falls back
+LANDMARKS timings ms (26 built; impostor views cached 0, rasterised 0) national_library_of_finland=178, presidential_palace_helsinki=111, stockmann_helsinki=108, uspenski_cathedral=98, ateneum=70, helsinki_central_station=58, government_palace_helsinki=56, helsinki_university_main=51
+FAR-CANOPY 80000 crowns in 12 meshes in 1258 ms
+VEGETATION timings ms { "plan": 2821, "trees": 50, "props": 3002, "cover": 1935, "carpet_pits": 2 }
+BUILD timings {Distant terrain=2876, Ground & water=3257, Buildings=5951, Roads & landmarks=5734, Vegetation=7811} total=7816 parallel
+STREAM warm: a stretch ahead fetched in 5.3 s
+STREAM gen 6: fetch 7.3 s (Weather 1.3 s, Elevation 3.0 s, Imagery 5.9 s, Buildings & landmarks 6.5 s), build 8.0 s, total 15.3 s (expect next 17.7 s); worst frame fetch 93.9 ms, build 60.1 ms; fetch s { "satellite": 0.2, "landcover": 5.9, "map": 6.4, "registers": 6.5, "far city": 6.5, "stages": 6.5, "prewarm": 6.5, "ground": 7.3, "ground ms": { "coastal": 179, "hki dem": 322, "model": 322, "truth": 785 } }; BUILD timings {Distant terrain=2876, Ground & water=3257, Buildings=5951, Roads & landmarks=5734, Vegetation=7811, Finishing=140} [2876, 3257, 316, 5951, 5734, 1288, 7811]; postpass 5 requests, slot held 9.5 s, longest wait 6.5 s
+MEM footprint 10,942 MB, engine 2,218 MB, video 5,791 MB, objects 34392, limit 73,728 MB, headroom 62,785 MB, tier T3
+MEM footprint 10,990 MB, engine 2,218 MB, video 5,791 MB, objects 34391, limit 73,728 MB, headroom 62,737 MB, tier T3
+MEM footprint 10,273 MB, engine 2,218 MB, video 5,796 MB, objects 34390, limit 73,728 MB, headroom 63,454 MB, tier T3
+NEAR-CLASS window moved to (401, 141)
+STREAM gen 7: start 1350 m ahead at 82.3 m/s (expect 17.7 s), fetched ahead
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 1, "available": true }, "hsy_cover": { "ms": 4, "available": true } }
+NEAR-CLASS window moved to (-464, 9)
+MEM footprint 10,689 MB, engine 2,653 MB, video 5,807 MB, objects 35827, limit 73,728 MB, headroom 63,038 MB, tier T3
+STREAM swap: worst frame swap call 6.6 ms, swap+0 27.2 ms, swap+1 55.5 ms, swap+2 76.4 ms, swap+3 128.9 ms
+CLIMATE: { "precip_dry_mm": 102.2, "precip_mm": 661.7, "precip_warm_mm": 204.4, "snow_days": 165.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.04999999999995, "t_warm_c": 15.65 } { "ms": 1, "cached": true }
+Far water mask: 16 tiles z10 in 20 ms
+FAR-FIELD fetch: { "fetch_ms": 4, "assemble_ms": 251, "tiles": 78, "cached": 78, "failed": 0 } rings=3 drapes=3 water=true
+CLIMATE: { "precip_dry_mm": 101.3, "precip_mm": 655.7, "precip_warm_mm": 202.6, "snow_days": 165.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.04999999999995, "t_warm_c": 15.65 } { "ms": 1, "cached": true }
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+MEM footprint 10,819 MB, engine 2,732 MB, video 5,975 MB, objects 35900, limit 73,728 MB, headroom 62,908 MB, tier T3
+FAR-CITY fetch: { "ms": 1340, "bytes": 8484841, "cached": true, "partial": false, "landuse": 5444, "towers": 201 }
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 2, "available": true }, "hsy_cover": { "ms": 2034, "available": true } }
+NEAR-CLASS window moved to (-263, 48)
+MEM footprint 10,853 MB, engine 2,385 MB, video 5,975 MB, objects 35854, limit 73,728 MB, headroom 62,874 MB, tier T3
+Orthophoto: part 2 unreadable or blank; inner imagery falls back
+LOD2: 2645 rows / 237 matched / 216 filled
+REGISTER: 412 rows / 185 matched / 154 filled
+TREE REGISTER: 1606 rows / 149 matched / 772 added
+STREETS: { "drive": 52, "parking": 6, "widths": 80, "paved": 207, "setts": 0, "squares": 0 }
+FAR-CITY fetch: { "ms": 1474, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+COAST DEM registration: bias=17.01 m
+STREAM warm: a stretch ahead fetched in 6.9 s
+SHORE TIMINGS classify=35 patches=83
+SHORELINE bodies=74 edges=7740 patches=6416 hard=587 diagnostics=2
+ERROR: Error calling method from 'filter': 'GDScript::<anonymous lambda>': Cannot convert argument 1 from Object to Object.
+   at: filter (core/variant/array.cpp:619)
+   GDScript backtrace (most recent call first):
+       [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+       [1] ground_for (res://scripts/generation/pipeline.gd:330)
+SCRIPT ERROR: Trying to assign an array of type "Array" to a variable of type "Array[GenerationPipeline]".
+          at: WorldStreamer._on_finished (res://scripts/render/world_streamer.gd:928)
+          GDScript backtrace (most recent call first):
+              [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+              [1] ground_for (res://scripts/generation/pipeline.gd:330)
+MEM footprint 10,886 MB, engine 2,363 MB, video 5,975 MB, objects 35258, limit 73,728 MB, headroom 62,841 MB, tier T3
+NEAR-CLASS window moved to (-62, 125)
+NEAR-CLASS window moved to (140, 148)
+NEAR-CLASS window moved to (340, 33)
+MEM footprint 10,920 MB, engine 2,364 MB, video 5,975 MB, objects 35269, limit 73,728 MB, headroom 62,807 MB, tier T3
+MEM footprint 10,990 MB, engine 2,366 MB, video 5,975 MB, objects 35264, limit 73,728 MB, headroom 62,737 MB, tier T3
+STREAM drop gen 7: camera turned away mid-build
+STREAM gen 9: start 1163 m ahead at 52.5 m/s (expect 17.7 s)
+Far water mask: 16 tiles z10 in 17 ms
+MEM footprint 11,064 MB, engine 2,808 MB, video 6,051 MB, objects 37064, limit 73,728 MB, headroom 62,663 MB, tier T3
+MEM footprint 11,183 MB, engine 2,639 MB, video 6,066 MB, objects 37267, limit 73,728 MB, headroom 62,544 MB, tier T3
+CLIMATE: { "t_warm_c": 15.65, "precip_dry_mm": 105.0, "t_cold_c": -4.14999999999998, "precip_mm": 679.8, "precip_warm_mm": 210.0, "snow_days": 169.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1819, "cached": false, "vars": 6 }
+CLIMATE: { "t_warm_c": 15.55, "t_cold_c": -4.24999999999994, "precip_mm": 700.9, "precip_dry_mm": 108.3, "precip_warm_mm": 216.8, "snow_days": 170.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1830, "cached": false, "vars": 6 }
+MEM footprint 11,237 MB, engine 2,653 MB, video 6,066 MB, objects 36793, limit 73,728 MB, headroom 62,490 MB, tier T3
+NEAR-CLASS window moved to (137, 29)
+Streamed build: ground photo without waiting for the sharper inner mosaic (4.0 s)
+MEM footprint 11,068 MB, engine 2,656 MB, video 5,876 MB, objects 36773, limit 73,728 MB, headroom 62,659 MB, tier T3
+NEAR-CLASS window moved to (-66, 31)
+FAR-FIELD fetch: { "fetch_ms": 4, "assemble_ms": 282, "tiles": 67, "cached": 67, "failed": 0 } rings=3 drapes=3 water=true
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 0, "tiles": 75, "cached": 75, "failed": 0 } rings=0 drapes=0 water=false
+LANDCOVER fetch: { "landcover": { "ms": 1158, "available": true }, "hsy_cover": { "ms": 2302, "available": true }, "canopy": { "ms": 6573, "available": true } }
+LANDCOVER fetch: { "landcover": { "ms": 1140, "available": true }, "hsy_cover": { "ms": 2682, "available": true }, "canopy": { "ms": 7251, "available": true } }
+NEAR-CLASS window moved to (-267, 19)
+OsmFetcher: map data over the streamed wait (8 s); using cached osm_v2_60175_24961_pp1200_q12.json
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 11,138 MB, engine 2,861 MB, video 5,876 MB, objects 36709, limit 73,728 MB, headroom 62,589 MB, tier T3
+MEM footprint 11,286 MB, engine 3,014 MB, video 5,876 MB, objects 36709, limit 73,728 MB, headroom 62,441 MB, tier T3
+NEAR-CLASS window moved to (-468, -11)
+LOD2: 3771 rows / 859 matched / 765 filled
+REGISTER: 1706 rows / 758 matched / 647 filled
+TREE REGISTER: 5849 rows / 1436 matched / 2885 added
+STREETS: { "drive": 476, "parking": 84, "widths": 611, "paved": 1635, "setts": 0, "squares": 1 }
+FAR-CITY fetch: { "ms": 1359, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+COAST DEM registration: bias=17.04 m
+MEM footprint 11,339 MB, engine 2,971 MB, video 5,858 MB, objects 37867, limit 73,728 MB, headroom 62,388 MB, tier T3
+SHORE TIMINGS classify=59 patches=97
+SHORELINE bodies=80 edges=11784 patches=6822 hard=2578 diagnostics=2
+SETTLEMENT timings ms imagery=39 landuse=326 native=true
+MEM footprint 11,290 MB, engine 2,739 MB, video 5,781 MB, objects 36903, limit 73,728 MB, headroom 62,437 MB, tier T3
+NEAR-CLASS window moved to (-670, -85)
+MEM footprint 11,527 MB, engine 2,809 MB, video 5,984 MB, objects 39075, limit 73,728 MB, headroom 62,200 MB, tier T3
+MEM footprint 11,628 MB, engine 2,839 MB, video 6,071 MB, objects 41051, limit 73,728 MB, headroom 62,099 MB, tier T3
+FAR-TERRAIN built in 2822 ms (rings=3 drapes=3 bands=2)
+MEM footprint 11,689 MB, engine 2,922 MB, video 6,133 MB, objects 43275, limit 73,728 MB, headroom 62,038 MB, tier T3
+NEAR-CLASS window moved to (-875, -133)
+MEM footprint 11,738 MB, engine 3,006 MB, video 6,177 MB, objects 44986, limit 73,728 MB, headroom 61,989 MB, tier T3
+SHORE TERRAIN vertices_ms=2499
+MEM footprint 11,815 MB, engine 3,150 MB, video 6,235 MB, objects 47601, limit 73,728 MB, headroom 61,912 MB, tier T3
+SHORE TERRAIN arrays_ms=3116 vertices=135840
+NEAR-CLASS 4096 texels in 181 ms
+SHORE TERRAIN total_ms=3377
+NEAR-CLASS window moved to (-1077, -174)
+PROPS timings ms { "pole_plan": 0, "lamps": 44, "barriers": 1846, "shore_railings": 31, "furniture": 19, "marina": 557, "ferries": 3, "quay": 333, "cars": 211, "trams": 74, "trains": 180, "wires": 259, "utility_poles": 0, "snowbanks": 0 }
+MEM footprint 12,013 MB, engine 3,251 MB, video 6,338 MB, objects 52631, limit 73,728 MB, headroom 61,714 MB, tier T3
+MEM footprint 12,085 MB, engine 3,288 MB, video 6,296 MB, objects 56879, limit 73,728 MB, headroom 61,642 MB, tier T3
+FAR-CITY built in 356 ms (blocks=11664 towers=215 tris=170615 meshes=215 source=drape+osm)
+BUILDINGS timings ms { "shared_walls_setup": 444, "roof_setup": 119, "mapped": 6585, "batching": 9, "settlement": 0, "infill": 47, "far_city": 357, "finishing": 127, "facade_compose": 489 }
+BUILDINGS census { "real": 1088, "impostors": 0, "infill": 0, "far_blocks": 11664, "far_towers": 215, "far_tris": 170615 } (settlement=drape+osm)
+BUILDINGS 41 outlines under 90% covered by their parts, 37229 m² unbuilt
+MEM footprint 12,215 MB, engine 3,229 MB, video 6,350 MB, objects 58140, limit 73,728 MB, headroom 61,512 MB, tier T3
+LANDMARKS timings ms (25 built; impostor views cached 0, rasterised 0) kallio_library=264, national_library_of_finland=173, presidential_palace_helsinki=133, uspenski_cathedral=117, ateneum=79, government_palace_helsinki=73, finlandia_hall=62, helsinki_university_main=60
+FAR-CANOPY 80000 crowns in 12 meshes in 1252 ms
+VEGETATION timings ms { "plan": 2871, "trees": 44, "props": 3558, "cover": 2778, "carpet_pits": 3 }
+BUILD timings {Distant terrain=2835, Ground & water=3377, Buildings=7717, Roads & landmarks=7849, Vegetation=9255} total=9264 parallel
+STREAM gen 9: fetch 11.2 s (Weather 1.9 s, Elevation 6.0 s, Imagery 6.6 s, Buildings & landmarks 10.2 s), build 9.5 s, total 20.7 s (expect next 19.5 s); worst frame fetch 136.4 ms, build 101.5 ms; fetch s { "satellite": 0.2, "landcover": 6.6, "map": 9.8, "registers": 10.2, "far city": 10.2, "stages": 10.2, "prewarm": 10.2, "ground": 11.2, "ground ms": { "coastal": 185, "hki dem": 410, "model": 410, "truth": 1032 } }; BUILD timings {Distant terrain=2835, Ground & water=3377, Buildings=7717, Roads & landmarks=7849, Vegetation=9255, Finishing=214} [2835, 3377, 611, 7717, 7849, 2127, 9255]; postpass 4 requests, slot held 14.1 s, longest wait 10.1 s
+MEM footprint 12,328 MB, engine 2,809 MB, video 6,402 MB, objects 45668, limit 73,728 MB, headroom 61,399 MB, tier T3
+MEM footprint 12,427 MB, engine 3,021 MB, video 6,402 MB, objects 45667, limit 73,728 MB, headroom 61,300 MB, tier T3
+FAR-CITY fetch: { "ms": 23891, "bytes": 9308949, "cached": false, "partial": false, "landuse": 6070, "towers": 279 }
+STREAM warm: a stretch ahead fetched in 23.9 s
+MEM footprint 12,382 MB, engine 2,982 MB, video 6,402 MB, objects 45919, limit 73,728 MB, headroom 61,345 MB, tier T3
+CLIMATE: { "t_cold_c": -4.24999999999994, "precip_dry_mm": 108.6, "snow_days": 169.0, "precip_warm_mm": 216.9, "precip_mm": 701.7, "t_warm_c": 15.65, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1412, "cached": false, "vars": 6 }
+STREAM gen 10: start 1504 m ahead at 9.1 m/s (expect 19.5 s)
+MEM footprint 12,445 MB, engine 2,858 MB, video 6,402 MB, objects 47320, limit 73,728 MB, headroom 61,282 MB, tier T3
+STREAM swap: worst frame swap call 6.5 ms, swap+0 49.0 ms, swap+1 44.3 ms, swap+2 28.3 ms, swap+3 41.4 ms
+NEAR-CLASS window moved to (-821, 565)
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 0, "tiles": 71, "cached": 71, "failed": 0 } rings=0 drapes=0 water=false
+MEM footprint 12,497 MB, engine 3,035 MB, video 6,402 MB, objects 47740, limit 73,728 MB, headroom 61,230 MB, tier T3
+Far water mask: 16 tiles z10 in 16 ms
+CLIMATE: { "t_warm_c": 15.55, "t_cold_c": -4.14999999999998, "precip_mm": 673.3, "precip_dry_mm": 104.0, "precip_warm_mm": 207.5, "snow_days": 169.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1172, "cached": false, "vars": 6 }
+CLIMATE: { "t_warm_c": 15.65, "t_cold_c": -4.14999999999998, "precip_dry_mm": 101.8, "snow_days": 165.0, "precip_mm": 659.4, "precip_warm_mm": 203.1, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1537, "cached": false, "vars": 6 }
+MEM footprint 12,618 MB, engine 3,120 MB, video 6,495 MB, objects 47202, limit 73,728 MB, headroom 61,109 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 3, "assemble_ms": 0, "tiles": 78, "cached": 78, "failed": 0 } rings=0 drapes=0 water=false
+FAR-FIELD fetch: { "fetch_ms": 4, "assemble_ms": 1050, "tiles": 78, "cached": 78, "failed": 0 } rings=3 drapes=3 water=true
+LANDCOVER fetch: { "landcover": { "ms": 454, "available": true }, "hsy_cover": { "ms": 1797, "available": true }, "canopy": { "ms": 7770, "available": true } }
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+Streamed build: ground photo without waiting for the sharper inner mosaic (3.0 s)
+MEM footprint 12,717 MB, engine 3,211 MB, video 6,495 MB, objects 47142, limit 73,728 MB, headroom 61,010 MB, tier T3
+MEM footprint 12,752 MB, engine 3,349 MB, video 6,495 MB, objects 47165, limit 73,728 MB, headroom 60,975 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 1558, "available": true }, "hsy_cover": { "ms": 1726, "available": true }, "canopy": { "ms": 6525, "available": true } }
+FAR-CITY fetch: { "ms": 866, "bytes": 9308949, "cached": true, "partial": false, "landuse": 6070, "towers": 279 }
+STREAM warm: a stretch ahead fetched in 10.5 s
+LANDCOVER fetch: { "landcover": { "ms": 1544, "available": true }, "hsy_cover": { "ms": 2113, "available": true }, "canopy": { "ms": 7740, "available": true } }
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 12,903 MB, engine 3,375 MB, video 6,495 MB, objects 46540, limit 73,728 MB, headroom 60,824 MB, tier T3
+MEM footprint 13,037 MB, engine 3,373 MB, video 6,495 MB, objects 46547, limit 73,728 MB, headroom 60,690 MB, tier T3
+LOD2: 4364 rows / 3257 matched / 2993 filled
+REGISTER: 1545 rows / 1464 matched / 1413 filled
+TREE REGISTER: 7287 rows / 0 matched / 5608 added
+STREETS: { "drive": 339, "parking": 64, "widths": 497, "paved": 1699, "setts": 0, "squares": 2 }
+COAST DEM registration: bias=17.03 m
+MEM footprint 13,075 MB, engine 3,187 MB, video 6,570 MB, objects 51237, limit 73,728 MB, headroom 60,652 MB, tier T3
+SHORE TIMINGS classify=46 patches=81
+SHORELINE bodies=82 edges=8278 patches=5282 hard=99 diagnostics=1
+MEM footprint 13,170 MB, engine 3,204 MB, video 6,570 MB, objects 51235, limit 73,728 MB, headroom 60,557 MB, tier T3
+FAR-CITY fetch: reused remapped live far city (1.5 s wait)
+ERROR: Error calling method from 'filter': 'GDScript::<anonymous lambda>': Cannot convert argument 1 from Object to Object.
+   at: filter (core/variant/array.cpp:619)
+   GDScript backtrace (most recent call first):
+       [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+       [1] <anonymous lambda> (res://scripts/render/world_streamer.gd:910)
+       [2] run (res://scripts/generation/pipeline.gd:587)
+SCRIPT ERROR: Trying to assign an array of type "Array" to a variable of type "Array[GenerationPipeline]".
+          at: WorldStreamer._on_finished (res://scripts/render/world_streamer.gd:928)
+          GDScript backtrace (most recent call first):
+              [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+              [1] <anonymous lambda> (res://scripts/render/world_streamer.gd:910)
+              [2] run (res://scripts/generation/pipeline.gd:587)
+MEM footprint 13,238 MB, engine 3,354 MB, video 6,570 MB, objects 46522, limit 73,728 MB, headroom 60,489 MB, tier T3
+NEAR-CLASS window moved to (-996, 766)
+STREAM drop gen 10: camera turned away mid-build
+STREAM gen 12: start 1700 m ahead at 80.7 m/s (expect 19.5 s)
+Far water mask: 25 tiles z10 in 18 ms
+MEM footprint 13,388 MB, engine 3,416 MB, video 6,742 MB, objects 48368, limit 73,728 MB, headroom 60,339 MB, tier T3
+MEM footprint 13,497 MB, engine 3,355 MB, video 6,759 MB, objects 48531, limit 73,728 MB, headroom 60,230 MB, tier T3
+CLIMATE: { "t_warm_c": 15.45, "t_cold_c": -4.04999999999995, "precip_mm": 654.5, "precip_dry_mm": 100.8, "precip_warm_mm": 201.4, "snow_days": 162.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1522, "cached": false, "vars": 6 }
+CLIMATE: { "t_warm_c": 15.35, "precip_dry_mm": 98.4, "precip_warm_mm": 196.1, "t_cold_c": -4.04999999999995, "precip_mm": 639.9, "snow_days": 162.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1703, "cached": false, "vars": 6 }
+NEAR-CLASS window moved to (-981, 971)
+MEM footprint 13,537 MB, engine 3,356 MB, video 6,759 MB, objects 48020, limit 73,728 MB, headroom 60,190 MB, tier T3
+Streamed build: ground photo without waiting for the sharper inner mosaic (4.0 s)
+NEAR-CLASS window moved to (-1011, 1173)
+FAR-FIELD fetch: { "fetch_ms": 10, "assemble_ms": 293, "tiles": 73, "cached": 73, "failed": 0 } rings=3 drapes=3 water=true
+FAR-FIELD fetch: { "fetch_ms": 6, "assemble_ms": 0, "tiles": 75, "cached": 75, "failed": 0 } rings=0 drapes=0 water=false
+LANDCOVER fetch: { "landcover": { "ms": 515, "available": true }, "hsy_cover": { "ms": 2458, "available": true }, "canopy": { "ms": 6931, "available": true } }
+MEM footprint 13,570 MB, engine 3,366 MB, video 6,759 MB, objects 47992, limit 73,728 MB, headroom 60,157 MB, tier T3
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 13,653 MB, engine 3,566 MB, video 6,759 MB, objects 47997, limit 73,728 MB, headroom 60,074 MB, tier T3
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+FAR-CITY fetch: { "ms": 25933, "bytes": 8595132, "cached": false, "partial": false, "landuse": 6081, "towers": 273 }
+STREAM warm: a stretch ahead fetched in 26.0 s
+MEM footprint 13,707 MB, engine 3,435 MB, video 6,759 MB, objects 47394, limit 73,728 MB, headroom 60,020 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 550, "available": true }, "hsy_cover": { "ms": 1689, "available": true }, "canopy": { "ms": 9749, "available": true } }
+LOD2: 2365 rows / 1792 matched / 1614 filled
+REGISTER: 1257 rows / 1237 matched / 1161 filled
+TREE REGISTER: 3690 rows / 0 matched / 3016 added
+STREETS: { "drive": 240, "parking": 35, "widths": 196, "paved": 1070, "setts": 1, "squares": 3 }
+COAST DEM registration: bias=16.91 m
+SHORE TIMINGS classify=34 patches=50
+SHORELINE bodies=5 edges=8093 patches=5093 hard=191 diagnostics=0
+MEM footprint 13,832 MB, engine 3,277 MB, video 6,854 MB, objects 49854, limit 73,728 MB, headroom 59,895 MB, tier T3
+FAR-CITY fetch: reused remapped live far city (1.5 s wait)
+SETTLEMENT timings ms imagery=29 landuse=239 native=true
+MEM footprint 13,998 MB, engine 3,336 MB, video 6,967 MB, objects 49629, limit 73,728 MB, headroom 59,729 MB, tier T3
+MEM footprint 14,229 MB, engine 3,535 MB, video 7,121 MB, objects 51049, limit 73,728 MB, headroom 59,498 MB, tier T3
+MEM footprint 14,073 MB, engine 3,336 MB, video 7,180 MB, objects 53108, limit 73,728 MB, headroom 59,654 MB, tier T3
+FAR-TERRAIN built in 2904 ms (rings=3 drapes=3 bands=2)
+PROPS timings ms { "pole_plan": 0, "lamps": 34, "barriers": 0, "shore_railings": 67, "furniture": 45, "marina": 66, "ferries": 8, "quay": 37, "cars": 130, "trams": 10, "trains": 0, "wires": 382, "utility_poles": 0, "snowbanks": 0 }
+MEM footprint 14,201 MB, engine 3,438 MB, video 7,285 MB, objects 56468, limit 73,728 MB, headroom 59,526 MB, tier T3
+SHORE TERRAIN vertices_ms=1666
+MEM footprint 14,282 MB, engine 3,618 MB, video 7,357 MB, objects 60487, limit 73,728 MB, headroom 59,445 MB, tier T3
+SHORE TERRAIN arrays_ms=2177 vertices=112376
+NEAR-CLASS 4096 texels in 152 ms
+SHORE TERRAIN total_ms=2406
+WARNING: BuildingBuilder: 2 of 1122 real buildings used the AABB fallback (missing/corrupt footprint, extruded as a rectangle).
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _real_buildings (res://scripts/generation/building_builder.gd:343)
+         [1] build_buildings (res://scripts/generation/building_builder.gd:71)
+         [2] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:62)
+         [3] <anonymous lambda> (res://scripts/generation/world_build_graph.gd:86)
+FAR-CITY built in 259 ms (blocks=8599 towers=180 tris=128458 meshes=192 source=drape+osm)
+BUILDINGS timings ms { "shared_walls_setup": 912, "roof_setup": 125, "mapped": 4464, "batching": 15, "settlement": 0, "infill": 64, "far_city": 261, "finishing": 45, "facade_compose": 536 }
+BUILDINGS census { "real": 1122, "impostors": 0, "infill": 0, "far_blocks": 8599, "far_towers": 180, "far_tris": 128458 } (settlement=drape+osm)
+BUILDINGS 2 masses failed to build
+MEM footprint 14,385 MB, engine 3,700 MB, video 7,418 MB, objects 66363, limit 73,728 MB, headroom 59,342 MB, tier T3
+FAR-CITY fetch: { "ms": 18584, "bytes": 6785840, "cached": false, "partial": false, "landuse": 4341, "towers": 178 }
+STREAM warm: a stretch ahead fetched in 18.6 s
+FAR-CANOPY 77227 crowns in 16 meshes in 1592 ms
+VEGETATION timings ms { "plan": 2746, "trees": 31, "props": 779, "cover": 3436, "carpet_pits": 1 }
+LANDMARKS timings ms (23 built; impostor views cached 0, rasterised 3) finnish_national_opera=510, majakka=286, loisto=241, national_library_of_finland=142, presidential_palace_helsinki=86, uspenski_cathedral=84, stockmann_helsinki=82, ateneum=62
+BUILD timings {Distant terrain=2916, Ground & water=2406, Buildings=5895, Roads & landmarks=5512, Vegetation=6994} total=7908 parallel
+MEM footprint 14,337 MB, engine 3,602 MB, video 7,423 MB, objects 66238, limit 73,728 MB, headroom 59,390 MB, tier T3
+STREAM gen 12: fetch 12.5 s (Weather 1.6 s, Elevation 5.5 s, Imagery 7.0 s, Buildings & landmarks 12.5 s), build 8.0 s, total 20.5 s (expect next 20.1 s); worst frame fetch 147.3 ms, build 73.7 ms; fetch s { "satellite": 0.4, "landcover": 7.0, "map": 9.8, "registers": 10.1, "far city": 12.5, "stages": 12.5, "prewarm": 12.5, "ground": 12.5, "ground ms": { "coastal": 11, "hki dem": 163, "model": 163, "truth": 572 } }; BUILD timings {Distant terrain=2916, Ground & water=2406, Buildings=5895, Roads & landmarks=5512, Vegetation=6994, Finishing=128} [2916, 2406, 333, 5895, 5512, 2243, 6994]; postpass 7 requests, slot held 51.3 s, longest wait 14.4 s
+MEM footprint 13,796 MB, engine 3,264 MB, video 7,445 MB, objects 55540, limit 73,728 MB, headroom 59,931 MB, tier T3
+CLIMATE: { "t_cold_c": -4.04999999999995, "snow_days": 163.0, "precip_warm_mm": 194.3, "t_warm_c": 15.15, "precip_mm": 636.0, "precip_dry_mm": 97.6, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1109, "cached": false, "vars": 6 }
+STREAM gen 13: start 2725 m ahead at 10.1 m/s (expect 20.1 s), fetched ahead
+LANDCOVER fetch: { "landcover": { "ms": 0, "available": true }, "canopy": { "ms": 0, "available": true }, "hsy_cover": { "ms": 2, "available": true } }
+STREAM swap: worst frame swap call 6.2 ms, swap+0 21.9 ms, swap+1 55.9 ms, swap+2 40.4 ms, swap+3 135.3 ms
+NEAR-CLASS window moved to (-380, -1162)
+LANDCOVER fetch: { "landcover": { "ms": 126, "available": true }, "hsy_cover": { "ms": 717, "available": true }, "canopy": { "ms": 3961, "available": true } }
+CLIMATE: { "precip_dry_mm": 98.4, "precip_mm": 639.9, "precip_warm_mm": 196.1, "snow_days": 162.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)", "t_cold_c": -4.04999999999995, "t_warm_c": 15.35 } { "ms": 0, "cached": true }
+MEM footprint 13,941 MB, engine 3,486 MB, video 7,596 MB, objects 56649, limit 73,728 MB, headroom 59,786 MB, tier T3
+Far water mask: 25 tiles z10 in 14 ms
+FAR-FIELD fetch: { "fetch_ms": 4, "assemble_ms": 224, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+ERROR: Lambda capture at index 0 was freed. Passed "null" instead.
+   at: call (modules/gdscript/gdscript_lambda_callable.cpp:242)
+   GDScript backtrace (most recent call first):
+       [0] pump (res://scripts/render/world_handoff.gd:90)
+       [1] tick (res://scripts/render/world_streamer.gd:654)
+       [2] _process (res://scripts/screens/view_360.gd:937)
+MEM footprint 13,418 MB, engine 3,301 MB, video 7,027 MB, objects 48318, limit 73,728 MB, headroom 60,309 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 10, "assemble_ms": 0, "tiles": 67, "cached": 67, "failed": 0 } rings=0 drapes=0 water=false
+CLIMATE: { "t_cold_c": -4.04999999999995, "t_warm_c": 15.2500000000001, "snow_days": 163.0, "precip_dry_mm": 97.9, "precip_mm": 637.8, "precip_warm_mm": 195.2, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1570, "cached": false, "vars": 6 }
+ERROR: Lambda capture at index 0 was freed. Passed "null" instead.
+   at: call (modules/gdscript/gdscript_lambda_callable.cpp:242)
+   GDScript backtrace (most recent call first):
+       [0] pump (res://scripts/render/world_handoff.gd:90)
+       [1] tick (res://scripts/render/world_streamer.gd:654)
+       [2] _process (res://scripts/screens/view_360.gd:937)
+ERROR: Lambda capture at index 0 was freed. Passed "null" instead.
+   at: call (modules/gdscript/gdscript_lambda_callable.cpp:242)
+   GDScript backtrace (most recent call first):
+       [0] pump (res://scripts/render/world_handoff.gd:90)
+       [1] tick (res://scripts/render/world_streamer.gd:654)
+       [2] _process (res://scripts/screens/view_360.gd:937)
+MEM footprint 12,400 MB, engine 3,159 MB, video 5,976 MB, objects 33347, limit 73,728 MB, headroom 61,327 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 441, "available": true }, "hsy_cover": { "ms": 1200, "available": true }, "canopy": { "ms": 2530, "available": true } }
+FAR-FIELD fetch: { "fetch_ms": 3, "assemble_ms": 0, "tiles": 67, "cached": 67, "failed": 0 } rings=0 drapes=0 water=false
+FAR-CITY fetch: { "ms": 6944, "bytes": 4974988, "cached": false, "partial": false, "landuse": 2682, "towers": 136 }
+STREAM warm: a stretch ahead fetched in 7.0 s
+MEM footprint 12,262 MB, engine 3,126 MB, video 5,812 MB, objects 31570, limit 73,728 MB, headroom 61,465 MB, tier T3
+LOD2: 1044 rows / 2 matched / 2 filled
+REGISTER: 28 rows / 0 matched / 0 filled
+TREE REGISTER: 52 rows / 0 matched / 0 added
+FAR-CITY fetch: { "ms": 775, "bytes": 6785840, "cached": true, "partial": false, "landuse": 4341, "towers": 178 }
+COAST DEM registration: bias=16.99 m
+SHORE TIMINGS classify=14 patches=14
+SHORELINE bodies=1 edges=2200 patches=1250 hard=0 diagnostics=0
+ERROR: Error calling method from 'filter': 'GDScript::<anonymous lambda>': Cannot convert argument 1 from Object to Object.
+   at: filter (core/variant/array.cpp:619)
+   GDScript backtrace (most recent call first):
+       [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+       [1] ground_for (res://scripts/generation/pipeline.gd:330)
+SCRIPT ERROR: Trying to assign an array of type "Array" to a variable of type "Array[GenerationPipeline]".
+          at: WorldStreamer._on_finished (res://scripts/render/world_streamer.gd:928)
+          GDScript backtrace (most recent call first):
+              [0] _on_finished (res://scripts/render/world_streamer.gd:928)
+              [1] ground_for (res://scripts/generation/pipeline.gd:330)
+MEM footprint 12,297 MB, engine 3,123 MB, video 5,812 MB, objects 31551, limit 73,728 MB, headroom 61,430 MB, tier T3
+STREAM drop gen 13: camera turned away mid-build
+STREAM gen 15: start 1042 m ahead at 10.3 m/s (expect 20.1 s)
+Far water mask: 16 tiles z10 in 15 ms
+MEM footprint 12,538 MB, engine 3,782 MB, video 5,904 MB, objects 33432, limit 73,728 MB, headroom 61,189 MB, tier T3
+CLIMATE: { "t_cold_c": -4.14999999999998, "precip_dry_mm": 104.5, "t_warm_c": 15.55, "precip_mm": 677.7, "precip_warm_mm": 208.7, "snow_days": 168.0, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1142, "cached": false, "vars": 6 }
+CLIMATE: { "snow_days": 169.0, "t_cold_c": -4.14999999999998, "t_warm_c": 15.65, "precip_warm_mm": 210.0, "precip_dry_mm": 105.0, "precip_mm": 679.8, "source": "CHELSA V2.1 1981–2010 (Karger et al., CC BY 4.0)" } { "ms": 1257, "cached": false, "vars": 6 }
+MEM footprint 12,631 MB, engine 3,939 MB, video 5,904 MB, objects 33026, limit 73,728 MB, headroom 61,096 MB, tier T3
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 163, "tiles": 75, "cached": 75, "failed": 0 } rings=3 drapes=3 water=true
+FAR-CITY fetch: { "ms": 10464, "bytes": 4974988, "cached": false, "partial": false, "landuse": 2682, "towers": 136 }
+STREAM warm: a stretch ahead fetched in 10.5 s
+FAR-FIELD fetch: { "fetch_ms": 5, "assemble_ms": 0, "tiles": 67, "cached": 67, "failed": 0 } rings=0 drapes=0 water=false
+MEM footprint 12,676 MB, engine 3,418 MB, video 5,904 MB, objects 32414, limit 73,728 MB, headroom 61,051 MB, tier T3
+Streamed build: ground photo without waiting for the sharper inner mosaic (3.0 s)
+NEAR-CLASS window moved to (-327, -961)
+OsmFetcher: map data over the streamed wait (8 s); using the vector map's features
+MEM footprint 12,774 MB, engine 3,605 MB, video 5,904 MB, objects 32428, limit 73,728 MB, headroom 60,953 MB, tier T3
+LANDCOVER fetch: { "hsy_cover": { "ms": 1052, "available": true }, "landcover": { "ms": 1204, "available": true }, "canopy": { "ms": 9335, "available": true } }
+MEM footprint 12,951 MB, engine 3,671 MB, video 5,980 MB, objects 32432, limit 73,728 MB, headroom 60,776 MB, tier T3
+MEM footprint 13,057 MB, engine 3,951 MB, video 5,979 MB, objects 32403, limit 73,728 MB, headroom 60,670 MB, tier T3
+LANDCOVER fetch: { "landcover": { "ms": 659, "available": true }, "hsy_cover": { "ms": 939, "available": true }, "canopy": { "ms": 11058, "available": true } }
+FAR-CITY fetch: { "ms": 2207, "bytes": 9308949, "cached": true, "partial": false, "landuse": 6070, "towers": 279 }
+STREAM warm: a stretch ahead fetched in 11.2 s
+MEM footprint 12,981 MB, engine 3,459 MB, video 5,979 MB, objects 31825, limit 73,728 MB, headroom 60,746 MB, tier T3
+LOD2: 4312 rows / 983 matched / 858 filled
+REGISTER: 2019 rows / 884 matched / 748 filled
+TREE REGISTER: 6315 rows / 1927 matched / 2720 added
+STREETS: { "drive": 839, "parking": 109, "widths": 972, "paved": 2219, "setts": 0, "squares": 3 }
+FAR-CITY fetch: { "ms": 2181, "bytes": 9235278, "cached": true, "partial": false, "landuse": 6034, "towers": 248 }
+COAST DEM registration: bias=17.05 m
+SHORE TIMINGS classify=44 patches=70
+SHORELINE bodies=43 edges=11232 patches=6435 hard=1623 diagnostics=0
+MEM footprint 12,890 MB, engine 3,453 MB, video 5,899 MB, objects 31945, limit 73,728 MB, headroom 60,837 MB, tier T3
+SETTLEMENT timings ms imagery=31 landuse=268 native=true
+MEM footprint 13,047 MB, engine 3,523 MB, video 6,034 MB, objects 33440, limit 73,728 MB, headroom 60,680 MB, tier T3
+MEM footprint 13,129 MB, engine 3,551 MB, video 6,191 MB, objects 36128, limit 73,728 MB, headroom 60,598 MB, tier T3
+FAR-TERRAIN built in 2863 ms (rings=3 drapes=3 bands=2)
+MEM footprint 13,165 MB, engine 3,616 MB, video 6,228 MB, objects 37915, limit 73,728 MB, headroom 60,562 MB, tier T3
+MEM footprint 13,214 MB, engine 3,697 MB, video 6,276 MB, objects 39860, limit 73,728 MB, headroom 60,513 MB, tier T3
+MEM footprint 13,274 MB, engine 3,815 MB, video 6,333 MB, objects 42289, limit 73,728 MB, headroom 60,453 MB, tier T3
+SHORE TERRAIN vertices_ms=2930
+MEM footprint 13,349 MB, engine 3,966 MB, video 6,388 MB, objects 45476, limit 73,728 MB, headroom 60,378 MB, tier T3
+SHORE TERRAIN arrays_ms=3537 vertices=123913
+NEAR-CLASS 4096 texels in 177 ms
+SHORE TERRAIN total_ms=3795
+PROPS timings ms { "pole_plan": 0, "lamps": 66, "barriers": 1802, "shore_railings": 28, "furniture": 27, "marina": 502, "ferries": 2, "quay": 211, "cars": 479, "trams": 256, "trains": 150, "wires": 269, "utility_poles": 0, "snowbanks": 0 }
+MEM footprint 13,497 MB, engine 3,936 MB, video 6,519 MB, objects 51310, limit 73,728 MB, headroom 60,230 MB, tier T3
+MEM footprint 13,640 MB, engine 4,039 MB, video 6,580 MB, objects 53658, limit 73,728 MB, headroom 60,087 MB, tier T3
+MEM footprint 13,770 MB, engine 4,077 MB, video 6,645 MB, objects 59672, limit 73,728 MB, headroom 59,957 MB, tier T3
+FAR-CITY built in 232 ms (blocks=11368 towers=220 tris=166465 meshes=221 source=drape+osm)
+BUILDINGS timings ms { "shared_walls_setup": 484, "roof_setup": 118, "mapped": 8602, "batching": 7, "settlement": 0, "infill": 31, "far_city": 232, "finishing": 72, "facade_compose": 495 }
+BUILDINGS census { "real": 1260, "impostors": 0, "infill": 0, "far_blocks": 11368, "far_towers": 220, "far_tris": 166465 } (settlement=drape+osm)
+BUILDINGS 48 outlines under 90% covered by their parts, 50752 m² unbuilt
+LANDMARKS timings ms (26 built; impostor views cached 0, rasterised 3) national_library_of_finland=288, presidential_palace_helsinki=221, stockmann_helsinki=150, government_palace_helsinki=143, helsinki_university_main=138, uspenski_cathedral=130, ateneum=93, helsinki_central_station=86
+MEM footprint 13,720 MB, engine 4,087 MB, video 6,624 MB, objects 60629, limit 73,728 MB, headroom 60,007 MB, tier T3
+FAR-CANOPY 80000 crowns in 12 meshes in 2019 ms
+VEGETATION timings ms { "plan": 3135, "trees": 64, "props": 3792, "cover": 4069, "carpet_pits": 4 }
+BUILD timings {Distant terrain=2874, Ground & water=3795, Buildings=9563, Roads & landmarks=8925, Vegetation=11065} total=11080 parallel
+MEM footprint 14,288 MB, engine 4,077 MB, video 6,638 MB, objects 42762, limit 73,728 MB, headroom 59,439 MB, tier T3
+STREAM drop gen 15: cancelled
+ERROR: 51 RID allocations of type 'N10RendererRD14TextureStorage7TextureE' were leaked at exit.
+WARNING: 88 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 11671 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 8 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)

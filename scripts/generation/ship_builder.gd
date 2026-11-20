@@ -136,9 +136,25 @@ static func build(root: Node3D, b: Dictionary, data: LocationData, ground: Groun
 			colour = "#f0eee8"
 		elif model == "cargo":
 			colour = str(LargeShips.CARGO_HULLS[int(seed_value * 50.0) % LargeShips.CARGO_HULLS.size()])
-	var lm := VesselPrototypes.geometry(model, length, float(f["beam"]), height(b, length),
-		VesselMaterials.paint(colour, maps, 0.42, 0.05), maps, maps, seed_value, variant_for(b))
-	var yaw := atan2(-(f["axis"] as Vector2).y, (f["axis"] as Vector2).x)
+	var lm: LandmarkMesh
+	var turned := false
+	if MalarShips.applies(data, model):
+		# Stockholm's hotel ships and steamers: a livery each, off the quay edge.
+		var mapped := colour if MaterialLibrary.parse_colour_tag(str(b.get("colour", ""))).a > 0.0 else ""
+		var look := MalarShips.look(length, seed_value, mapped, at, MalarShips.model_at(data, at))
+		# Some hulls lie bow the other way; the quay side flips with them.
+		turned = fposmod(seed_value * 17.3, 1.0) < 0.4
+		model = str(look["model"])
+		var side := MalarShips.water_side(ground, at, f["axis"], float(f["beam"]))
+		if side != 0.0 and at.distance_to(View360.spawn_xz(data)) <= MalarShips.MOOR_NEAR_M:
+			look["quay_sign"] = -side * (-1.0 if turned else 1.0)
+			look["quay_gap"] = float(f["beam"]) * 0.5 + MalarShips.QUAY_EDGE_M
+		lm = QuayFleet.vessel(model, length, float(f["beam"]), float(look["height"]), look, maps, maps)
+		at += Vector2(-(f["axis"] as Vector2).y, (f["axis"] as Vector2).x) * side * MalarShips.OFFSHORE_M
+	else:
+		lm = VesselPrototypes.geometry(model, length, float(f["beam"]), height(b, length),
+			VesselMaterials.paint(colour, maps, 0.42, 0.05), maps, maps, seed_value, variant_for(b))
+	var yaw := atan2(-(f["axis"] as Vector2).y, (f["axis"] as Vector2).x) + (PI if turned else 0.0)
 	for part in lm.commit(root, "MappedShip_"):
 		part.position = Vector3(at.x, y, at.y)
 		part.rotation.y = yaw

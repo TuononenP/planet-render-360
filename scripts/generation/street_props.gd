@@ -22,6 +22,9 @@ extends RefCounted
 ##   (desktop Ultra).
 
 const LAMP_SPACING_M := 25.0
+## A lit park path's lanterns stand closer (Esplanadi's alleys carry one
+## every 15 m or so on alternating sides).
+const PARK_LAMP_SPACING_M := 16.0
 ## A signal this near makes a utility-pole street a main-road lamp's.
 const SIGNAL_LAMP_M := 40.0
 const PROP_R := [0.0, 120.0, 220.0, 600.0]
@@ -155,9 +158,11 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 			continue
 		if family == "span" and RenderQuality.ultra_desktop(data.quality_preset) and cls != "pedestrian" and not park_path:
 			continue
-		var style := lamp_style(family, region, cls)
+		# Finland's park paths take the cast-iron lantern, not the span-wire post (Stockholm's keep it).
+		var lantern := park_path and FinnishGranite.applies(data)
+		var style := "lantern" if lantern else lamp_style(family, region, cls)
 		var off := (width_m * 0.5 + 1.1) * m2u
-		var step := LAMP_SPACING_M * m2u
+		var step := (PARK_LAMP_SPACING_M if lantern else LAMP_SPACING_M) * m2u
 		var carry := step * 0.5
 		var side := 1.0
 		for i in pts.size() - 1:

@@ -7,7 +7,10 @@ extends RefCounted
 ## x, z pairs about the registry origin, +X east, +Z south, yaw 0): a pale
 ## rendered functionalist block with a glazed shopfront storey on slim steel
 ## mullions and two storeys of continuous ribbon windows. Heights are
-## estimates: docs/helsinki-landmark-sources.md.
+## estimates: docs/helsinki-landmark-sources.md. From the Commons photos
+## (visual-plan/refs/landmarks/lasipalatsi/): bright white render, white window
+## frames, tinted shopfront glazing; the slender clock tower (OSM way
+## 28775756) is not modelled because the registry height is 12.8 m.
 
 const F = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_mall_footprints.gd")
 const W = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_west_footprints.gd")
@@ -21,10 +24,10 @@ const SHOP := 4.6
 
 static func lasipalatsi(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Wall", LandmarkMaterials.pbr("render", "#DAD8C6", 3.0))
+	lm.use("Wall", LandmarkMaterials.pbr("render", "#E2E0D4", 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("render", "#ECEADC", 2.0))
-	lm.use("Glass", LandmarkMaterials.glass("#2E4A44"))
-	lm.use("Metal", LandmarkMaterials.paint("#3A403F", 0.5))
+	lm.use("Glass", LandmarkMaterials.paint("#6F8F95", 0.25, 0.4))
+	lm.use("Metal", LandmarkMaterials.paint("#EDEBE0", 0.5))
 	lm.use("Roof", LandmarkMaterials.paint("#5A5E5E", 0.8))
 	var poly := PackedVector2Array()
 	for i in range(0, OUTLINE.size() - 1, 2):

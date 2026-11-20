@@ -26,6 +26,9 @@ static var _stone_mats := {}
 
 ## Pale limestone of the Seine quays (linear target for the render set).
 const LIMESTONE := Color(0.56, 0.52, 0.44)
+# Cool blue-grey: the golden-hour sun warms it to the real granite's tone; a warm
+# base read as orange blocks.
+const STOCKHOLM_ASHLAR := Color(0.33, 0.35, 0.37)
 ## Warm pinkish-brown-grey Finnish granite (Aurajoki / Helsinki graniittimuuri).
 const FINNISH_ASHLAR := Color(0.54, 0.50, 0.47)
 
@@ -142,7 +145,10 @@ static func stone_quays(data: LocationData) -> bool:
 ## True where quay walls are dressed granite ashlar blocks (Nordic and
 ## European granite-kerb regions, including Finland) rather than poured concrete.
 static func granite_quays(data: LocationData) -> bool:
-	return data != null and not stone_quays(data) and KerbBuilder.stone_for(data) == KerbBuilder.GRANITE
+	if data == null or stone_quays(data):
+		return false
+	var stone := KerbBuilder.stone_for(data)
+	return stone == KerbBuilder.GRANITE or stone == FinnishGranite.KERB
 
 ## Fine-grained stone calibrated in linear space to the regional kerb
 ## colour (granite in Europe, concrete in North America). Cache by
@@ -155,9 +161,10 @@ static func stone_material(data: LocationData = null) -> StandardMaterial3D:
 	if stone_quays(data):
 		target = LIMESTONE
 	var granite := granite_quays(data)
-	var finnish := granite and (data.country == "FI" or CityStyles.region_at(data.latitude, data.longitude) in ["helsinki", "espoo", "turku"])
+	var stockholm := granite and ShoreApron.stockholm(data)
+	var finnish := granite and FinnishGranite.applies(data)
 	var key := target.to_html(false) + ("_granite_ashlar" if granite else "") \
-		+ ("_finnish" if finnish else "")
+		+ ("_stockholm" if stockholm else "") + ("_finnish" if finnish else "")
 	if not _stone_mats.has(key):
 		if stone_quays(data):
 			_stone_mats[key] = _ashlar_material()
@@ -165,9 +172,12 @@ static func stone_material(data: LocationData = null) -> StandardMaterial3D:
 		if granite:
 			# Weathered Nordic/European dressed granite ashlar blocks:
 			# Finnish river/harbour quays (graniittimuuri) use rough-hewn
-			# warm pinkish-brown-grey rapakivi granite in ~0.42 m courses.
+			# warm pinkish-brown-grey rapakivi granite in ~0.42 m courses;
+			# Stockholm's quays are darker, cooler grey granite.
 			if finnish:
 				_stone_mats[key] = _ashlar_material(FINNISH_ASHLAR, 0.42, 0.24, 0.08, true)
+			elif stockholm:
+				_stone_mats[key] = _ashlar_material(STOCKHOLM_ASHLAR, 0.45, 0.20, 0.03, false)
 			else:
 				_stone_mats[key] = _ashlar_material(Color(0.55, 0.53, 0.49), 0.45, 0.20, 0.04, false)
 			return _stone_mats[key]

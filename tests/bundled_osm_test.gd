@@ -79,6 +79,7 @@ func _run() -> void:
 	check(BundledOsm.read("missing") == "", "missing snapshot must be ignored")
 	_header_checks()
 	_preset_checks()
+	_stockholm_ring_checks()
 	await _fetch_checks()
 	print("bundled_osm_test: %d failure(s)" % failures)
 	quit(1 if failures else 0)
@@ -114,6 +115,36 @@ func _preset_checks() -> void:
 			["CAP", HorizonFetcher.CAP]]:
 		check(tool.contains("\n%s = %d " % pair), "prepare_horizon_layer.py %s should be %d" % pair)
 	check(tool.contains('\nURL = "%s"' % PostpassFallback.URL), "prepare_horizon_layer.py URL should be PostpassFallback.URL")
+
+## Stockholm's 2500 m road ring was re-cut with the 800-way highway cap
+## lifted (assets/osm_snapshots/README.md): it holds ~1,375 highway ways,
+## and its manifest size and SHA-256 describe the file on disk.
+func _stockholm_ring_checks() -> void:
+	var key := BundledOsm.entry_for(59.3207, 18.0604, "ring2500", 1)
+	check(key == "stockholm_ring2500", "Stockholm ring2500 should be in the manifest, got %s" % key)
+	var row: Array = BundledOsm._entries()[key]
+	var file := FileAccess.open(BundledOsm.DIRECTORY + key + ".osmb", FileAccess.READ)
+	check(file != null, "stockholm_ring2500.osmb should ship")
+	if file == null:
+		return
+	var payload := file.get_buffer(file.get_length()).decompress(int(row[5]), FileAccess.COMPRESSION_ZSTD)
+	check(payload.size() == int(row[5]), "stockholm_ring2500 should decompress to its manifest size")
+	var hash := HashingContext.new()
+	hash.start(HashingContext.HASH_SHA256)
+	hash.update(payload)
+	check(hash.finish().hex_encode() == str(row[6]), "stockholm_ring2500 SHA-256 should match bundled_osm.gd")
+	var text := BundledOsm.read(key)
+	check(text != "", "stockholm_ring2500 should decode through the app's reader")
+	var parsed: Variant = JSON.parse_string(text)
+	check(parsed is Dictionary, "stockholm_ring2500 should decode to Overpass JSON")
+	if not parsed is Dictionary:
+		return
+	var highways := 0
+	for element: Variant in (parsed as Dictionary).get("elements", []):
+		if element is Dictionary and str(element.get("type", "")) == "way" \
+				and (element.get("tags", {}) as Dictionary).has("highway"):
+			highways += 1
+	check(highways > 800, "stockholm_ring2500 should hold more than 800 highway ways, got %d" % highways)
 
 func _header_checks() -> void:
 	var key := BundledOsm.entry_for(40.7060, -74.0040, "detailed", OsmQuery.QUERY_VERSION)

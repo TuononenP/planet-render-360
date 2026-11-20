@@ -123,6 +123,32 @@ func _init() -> void:
 	var steep := (MarinaBuilder.plan(ramp, GroundTruth.new(ramp), m)["boats"] as Array).size()
 	if steep != 0:
 		failures.append("berths across a steep ramp should stay empty, got %d boats" % steep)
+	# Finland's fleet (HarbourVesselData.FLEET_PROFILES): the same berths, but
+	# varnished wooden hulls, more sailboats and fewer big white yachts. Other
+	# countries keep the default fleet.
+	if MarinaBuilder.fleet_of(d)["hulls"] != MarinaBuilder.HULL_COLOURS:
+		failures.append("a place without a profile should keep the default hull colours")
+	d.country = "FI"
+	var fi_boats := MarinaBuilder.plan(d, ground, m)["boats"] as Array
+	d.country = ""
+	if fi_boats.size() < 12:
+		failures.append("the Finnish fleet should berth boats too, got %d" % fi_boats.size())
+	var share := func(list: Array, test: Callable) -> float:
+		var hits := 0
+		for b: Array in list:
+			if test.call(b):
+				hits += 1
+		return float(hits) / maxf(float(list.size()), 1.0)
+	var is_wood := func(b: Array) -> bool: return (b[4] as Color).r > (b[4] as Color).b + 0.25
+	var is_sail := func(b: Array) -> bool: return str(b[3]) == "sail"
+	var is_yacht := func(b: Array) -> bool: return str(b[3]) == "yacht"
+	if float(share.call(fi_boats, is_wood)) < 0.15 or float(share.call(boats, is_wood)) > 0.02:
+		failures.append("Finnish hulls should include wooden browns, the default none: %.2f / %.2f" % [
+			share.call(fi_boats, is_wood), share.call(boats, is_wood)])
+	if float(share.call(fi_boats, is_sail)) <= float(share.call(boats, is_sail)):
+		failures.append("the Finnish fleet should carry more sailboats than the default")
+	if float(share.call(fi_boats, is_yacht)) >= float(share.call(boats, is_yacht)):
+		failures.append("the Finnish fleet should carry fewer flybridge yachts than the default")
 	var root := Node3D.new()
 	var n := MarinaBuilder.build(root, d, ground)
 	if RenderQuality.ultra_desktop(d.quality_preset) and (n != boats.size() or not root.has_node("Marina/Pontoons")):

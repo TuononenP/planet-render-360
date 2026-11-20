@@ -3,8 +3,9 @@ extends RefCounted
 
 ## Per-city detail profile: places with city open data behind them
 ## (Helsinki, Espoo: orthophoto, building and tree registers, canopy
-## bands, a 1 m elevation model) get wider detail rings and denser
-## budgets on High and Ultra. Fast and Balanced keep the shared values,
+## bands, a 1 m elevation model; Turku; Stockholm, which gets the raised
+## caps and rings only, its data sources being gated by their own coverage)
+## get wider detail rings and denser budgets on High and Ultra. Fast and Balanced keep the shared values,
 ## so low-end devices see no change.
 ##
 ## Every knob is a level-of-detail range or cost, never a choice of which
@@ -12,11 +13,11 @@ extends RefCounted
 ## the layout stays the same across presets (AC-12).
 
 ## Bumped whenever a knob's value changes (WorldCache.key).
-const VERSION := 2
+const VERSION := 3
 
-const CITIES := ["helsinki", "espoo", "turku"]
+const CITIES := ["helsinki", "espoo", "turku", "stockholm"]
 
-## The detail city at (lat, lon): "helsinki", "espoo" or "".
+## The detail city at (lat, lon): "helsinki", "espoo", "turku", "stockholm" or "".
 static func city_at(lat: float, lon: float) -> String:
 	var z := CityStyles.zone_at(lat, lon)
 	if z.is_empty():

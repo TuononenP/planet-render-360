@@ -3,7 +3,8 @@ extends Node
 
 ## Downloads and decodes the GroundModel raster for a viewpoint: GSI's
 ## DEM5A PNG tiles (DEM10B where 5 m is missing) in Japan, IGN's RGE ALTI
-## and the AHN DTM as one window each. Answers are cached under
+## and the AHN DTM as one window each, Lantmäteriet's 1 m model through
+## Mapterhorn's Terrarium tiles in Sweden. Answers are cached under
 ## user://cache (CacheStore.base_dir) so a revisit works offline. No key,
 ## no account; see docs/data-source-register.md.
 
@@ -31,6 +32,13 @@ const MML_URL := "https://www.nic.funet.fi/index/geodata/mml/dem2m/2008_latest"
 const MML_HEADER_BYTES := 16384
 const MML_MAX_RANGE_BYTES := 2 * 1024 * 1024
 const EPSG_3857 := "http://www.opengis.net/def/crs/EPSG/0/3857"
+## Mapterhorn's keyless Terrarium tiles (512 px lossless WebP). In Sweden
+## they carry Lantmäteriet's Markhöjdmodell (1 m laser bare earth; the
+## agency's own download needs a Geotorget account). z13 is ~4.9 m a
+## pixel at Stockholm, the MML_CELLS window's cell: 4–9 tiles a world.
+const MAPTERHORN_URL := "https://tiles.mapterhorn.com"
+const MAPTERHORN_ZOOM := 13
+const MAPTERHORN_PX := 512
 
 ## Whether the last fetch lost a request to the network, the server or the
 ## clock (not to coverage: a 404 or a window outside the country's data):
@@ -53,6 +61,8 @@ func fetch(source: String, lat: float, lon: float, offline: bool = false) -> voi
 			raster = await _swiss(lat, lon, offline)
 		"mml":
 			raster = await _mml(lat, lon, offline)
+		"lm":
+			raster = await _mapterhorn(lat, lon, offline)
 	if not raster.is_empty() and GroundModel.missing_share(raster) > GroundModel.MAX_MISSING:
 		raster = {}
 	finished.emit(raster)
@@ -354,6 +364,76 @@ func _mml(lat: float, lon: float, offline: bool) -> Dictionary:
 		_save_raster(cache, raster)
 	return raster
 
+## Lantmäteriet's bare earth from the Mapterhorn tiles over the window,
+## decoded and mosaicked in Web Mercator, resampled to MML_CELLS and cached
+## in that form (the tiles themselves are not kept).
+func _mapterhorn(lat: float, lon: float, offline: bool) -> Dictionary:
+	var win := window(lat, lon)
+	var cells := GroundModel.MML_CELLS
+	var cache := cache_path("lm", lat, lon, "bil")
+	if FileAccess.file_exists(cache):
+		var bytes := FileAccess.get_file_as_bytes(cache)
+		if bytes.size() == cells * cells * 4:
+			CacheStore.note_read(cache)
+			return _bil_raster(bytes, win, cells)
+	if offline:
+		return {}
+	var range_ := tile_range(win, MAPTERHORN_ZOOM)
+	var jobs: Array = []
+	for ty in range(range_.position.y, range_.end.y):
+		for tx in range(range_.position.x, range_.end.x):
+			jobs.append({"url": "%s/%d/%d/%d.webp" % [MAPTERHORN_URL, MAPTERHORN_ZOOM, tx, ty], "path": ""})
+	var tiles := await _get_many(jobs, false, _is_webp)
+	var raster: Dictionary = await _in_thread(func() -> Dictionary:
+		var mosaic := terrarium_mosaic(tiles, range_, MAPTERHORN_ZOOM, MAPTERHORN_PX)
+		if mosaic.is_empty():
+			return {}
+		return GroundModel.reproject(mosaic, GroundModel.merc, win, cells))
+	if not raster.is_empty() and GroundModel.missing_share(raster) <= GroundModel.MAX_MISSING:
+		_save_raster(cache, raster)
+	return raster
+
+## The slippy tiles at `zoom` covering a Mercator window: position is the
+## first (x, y), size the count across and down.
+static func tile_range(win: Dictionary, zoom: int) -> Rect2i:
+	var c: Vector2 = win["c"]
+	var h: float = win["half"]
+	var span := 2.0 * PI * GroundModel.MERC_R / float(1 << zoom)
+	var edge := PI * GroundModel.MERC_R
+	var x0 := floori((c.x - h + edge) / span)
+	var y0 := floori((edge - (c.y + h)) / span)
+	return Rect2i(x0, y0, floori((c.x + h + edge) / span) - x0 + 1,
+		floori((edge - (c.y - h)) / span) - y0 + 1)
+
+## One Mercator raster from Terrarium tiles listed row by row over `range_`
+## (NAN where a tile is missing or unreadable); {} when none decodes.
+static func terrarium_mosaic(tiles: Array, range_: Rect2i, zoom: int, px: int) -> Dictionary:
+	var nx := range_.size.x
+	var width := nx * px
+	var values := PackedFloat32Array()
+	values.resize(width * range_.size.y * px)
+	values.fill(NAN)
+	var have := 0
+	for k in tiles.size():
+		var heights := GroundModel.decode_terrarium(tiles[k], px)
+		if heights.is_empty():
+			continue
+		have += 1
+		var col := k % nx
+		@warning_ignore("integer_division")
+		var row := k / nx
+		for r in px:
+			var dst := (row * px + r) * width + col * px
+			for q in px:
+				values[dst + q] = heights[r * px + q]
+	if have == 0:
+		return {}
+	var span := 2.0 * PI * GroundModel.MERC_R / float(1 << zoom)
+	var edge := PI * GroundModel.MERC_R
+	return {"size": Vector2i(width, range_.size.y * px), "values": values,
+		"origin": Vector2(-edge + float(range_.position.x) * span, edge - float(range_.position.y) * span),
+		"cell": Vector2(span / float(px), span / float(px))}
+
 ## The 2 m GeoTIFF links of a STAC listing, the newest survey of each tile.
 static func swiss_tile_hrefs(listing: PackedByteArray) -> PackedStringArray:
 	var json: Variant = JSON.parse_string(listing.get_string_from_utf8())
@@ -509,6 +589,10 @@ static func _is_tiff(b: PackedByteArray) -> bool:
 
 static func _is_json(b: PackedByteArray) -> bool:
 	return b.size() > 2 and b[0] == 0x7B
+
+static func _is_webp(b: PackedByteArray) -> bool:
+	return b.size() > 12 and b.slice(0, 4).get_string_from_ascii() == "RIFF" \
+		and b.slice(8, 12).get_string_from_ascii() == "WEBP"
 
 static func _is_png(b: PackedByteArray) -> bool:
 	return b.size() > 8 and b[0] == 0x89 and b[1] == 0x50 and b[2] == 0x4E and b[3] == 0x47

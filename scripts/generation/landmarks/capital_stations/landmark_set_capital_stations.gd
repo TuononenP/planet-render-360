@@ -23,7 +23,6 @@ static func build(model: Node3D, type: String) -> bool:
 		"budapest_keleti": LandmarkCsCentral.keleti(model)
 		"warszawa_centralna": LandmarkCsCentral.warszawa_centralna(model)
 		"kobenhavn_h": LandmarkCsCentral.kobenhavn_h(model)
-		"stockholm_central_station": LandmarkCsCentral.stockholm_central(model)
 		"oslo_central_station": LandmarkCsCentral.oslo_s(model)
 		"tallinn_balti_jaam": LandmarkCsEast.balti_jaam(model)
 		"riga_central_station": LandmarkCsEast.riga_central(model)

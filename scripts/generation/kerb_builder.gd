@@ -9,8 +9,9 @@ extends RefCounted
 ## the ground mesh does not raise). It sits over the painted band
 ## (INSET_M inside the ribbon edge) and stops CUT_M short of every
 ## junction node, so it never crosses a side street. Draped on the road's
-## surface height. Granite grey in Europe and most places, poured
-## concrete in North America (also RoadSurface's band colour).
+## surface height. Granite grey in Europe and most places (paler pink-grey
+## in Finland, FinnishGranite), poured concrete in North America (also
+## RoadSurface's band colour).
 
 const RADIUS_M := 400.0
 const HEIGHT_M := 0.13
@@ -25,6 +26,8 @@ const GRANITE := Color(0.30, 0.30, 0.29)
 const CONCRETE := Color(0.46, 0.45, 0.42)
 
 static func stone_for(data: LocationData) -> Color:
+	if FinnishGranite.applies(data):
+		return FinnishGranite.KERB
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
 	return CONCRETE if StreetFurniture.furniture_family(region, data.country) == "na" else GRANITE
 

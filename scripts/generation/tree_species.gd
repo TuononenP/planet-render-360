@@ -134,16 +134,49 @@ const TINTS := {
 
 ## Bark colour behind impostor bark pixels (impostors store luminance).
 const BARK_TINT := {
+	"plane_grey": Color(0.30, 0.28, 0.25), "birch_grey": Color(0.40, 0.385, 0.36),
+	"furrowed_grey": Color(0.22, 0.205, 0.185),
 	"plane": Color(0.62, 0.60, 0.48), "furrowed": Color(0.40, 0.35, 0.30),
 	"pine": Color(0.55, 0.36, 0.24), "birch": Color(0.80, 0.79, 0.75),
 	"spruce": Color(0.38, 0.30, 0.25), "palm": Color(0.48, 0.42, 0.33),
 }
 
+## Stockholm's avenues show greyer, darker bark than the shared kinds: the cream camouflage of the planes,
+## the white of the birches and the furrowed tan all read as pale poles in the low sun. A species name
+## plus GREY_SUFFIX is that species with the darker bark kind (spec).
+const GREY_SUFFIX := "_grey"
+const GREY_BARK := {"plane": "plane_grey", "birch": "birch_grey", "furrowed": "furrowed_grey"}
+
+## Stockholm's species for a mix pick: the same tree with the darker bark where it has a pale one.
+static func stockholm_species(sp: String) -> String:
+	if sp.ends_with(GREY_SUFFIX) or not GREY_BARK.has(str(spec(sp).get("bark", ""))):
+		return sp
+	return sp + GREY_SUFFIX
+
 static func names() -> Array:
 	return SPECIES.keys()
 
 static func spec(name: String) -> Dictionary:
-	return SPECIES.get(name, SPECIES["lime"])
+	if SPECIES.has(name):
+		return SPECIES[name]
+	var base := name.trim_suffix(GREY_SUFFIX)
+	if base != name and GREY_BARK.has(str(SPECIES.get(base, {}).get("bark", ""))):
+		return _grey_spec(base)
+	return SPECIES["lime"]
+
+static var _grey: Dictionary = {}
+static var _grey_mutex := Mutex.new()
+
+## `base` with Stockholm's darker bark (a copy; the shared species is untouched).
+static func _grey_spec(base: String) -> Dictionary:
+	_grey_mutex.lock()
+	if not _grey.has(base):
+		var d: Dictionary = (SPECIES[base] as Dictionary).duplicate()
+		d["bark"] = GREY_BARK[str(d["bark"])]
+		_grey[base] = d
+	var out: Dictionary = _grey[base]
+	_grey_mutex.unlock()
+	return out
 
 static func is_evergreen(name: String) -> bool:
 	return bool(spec(name).get("evergreen", false))
@@ -201,6 +234,16 @@ static func mix(biome: String, setting: String) -> Array:
 			# maples, lindens and honey locusts, a few pines.
 			return [["zelkova", 0.24], ["oak", 0.24], ["plane", 0.16], ["maple", 0.14], ["lime", 0.1],
 				["honey_locust", 0.06], ["scots_pine", 0.04], ["birch", 0.02]]
+		"stockholm_park":
+			# Royal Djurgården: the old oaks of the hunting park, lime,
+			# birch, maple, and spruce and pine on the rocky ground.
+			if setting == "street":
+				return [["lime", 0.35], ["oak", 0.3], ["maple", 0.15], ["birch", 0.1], ["rowan", 0.1]]
+			return [["oak", 0.4], ["lime", 0.12], ["birch", 0.16], ["maple", 0.08], ["spruce", 0.12],
+				["scots_pine", 0.12]]
+		"lime_avenue":
+			# The lime-lined walks of Kungsträdgården and Humlegården.
+			return [["lime", 0.78], ["zelkova", 0.12], ["maple", 0.06], ["birch", 0.04]]
 		"khmer":
 			return [["dipterocarp", 0.35], ["sugar_palm", 0.22], ["tropical", 0.2], ["silk_cotton", 0.15],
 				["palm", 0.08]]

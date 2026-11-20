@@ -40,3 +40,52 @@ static func build(lm: LandmarkMesh, row: Dictionary) -> void:
 	# String course under the parapet on both faces.
 	for s in [-1.0, 1.0]:
 		lm.box("Stone", Vector3(0, clear - 0.35, s * (hz + 0.1)), Vector3(2.0 * h, 0.5, 0.3), Basis(), 0.0)
+	if int(row.get("pocks", 0)) > 0:
+		_pocks(lm, row, xs, pier_w, spring, rise_k)
+
+## Shrapnel and bullet scars (`pocks` a face): small dark patches on the
+## spandrels between the openings and on the parapet's outer face, in a
+## fixed pseudo-random scatter so a rebuild looks the same. Drawn with the
+## otherwise unused "Concrete" key, dark.
+static func _pocks(lm: LandmarkMesh, row: Dictionary, xs: PackedFloat32Array, pier_w: float,
+		spring: float, rise_k: float) -> void:
+	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#3F3A36", 2.0))
+	var clear := float(row["clear"])
+	var hz := float(row["width"]) * 0.5 - 0.05
+	var h := BridgeParam.half_length(row)
+	var seed_v := 20260
+	for face in [-1.0, 1.0]:
+		var placed := 0
+		var tries := 0
+		while placed < int(row["pocks"]) and tries < 2000:
+			tries += 1
+			seed_v = (seed_v * 1103515245 + 12345) & 0x7FFFFFFF
+			var u := float((seed_v >> 8) & 0xFFFF) / 65535.0
+			seed_v = (seed_v * 1103515245 + 12345) & 0x7FFFFFFF
+			var v := float((seed_v >> 8) & 0xFFFF) / 65535.0
+			seed_v = (seed_v * 1103515245 + 12345) & 0x7FFFFFFF
+			var k := float((seed_v >> 8) & 0xFFFF) / 65535.0
+			var x := lerpf(-h + 1.0, h - 1.0, u)
+			var on_parapet := k < 0.35
+			var y := lerpf(clear + 0.1, clear + BridgeSpec.PARAPET_M - 0.1, v) if on_parapet \
+				else lerpf(0.9, clear - 0.7, v)
+			if not on_parapet and not _in_wall(xs, x, y, pier_w, spring, rise_k, clear):
+				continue
+			var z: float = face * (hz + 0.07) if on_parapet else face * (hz + 0.02)
+			var w := 0.12 + 0.3 * k
+			lm.box("Concrete", Vector3(x, y, z), Vector3(w, w * lerpf(0.45, 1.2, u * v), 0.06), Basis(), 0.0)
+			placed += 1
+
+## True when (x, y) on a face is solid wall: not under an arch opening.
+static func _in_wall(xs: PackedFloat32Array, x: float, y: float, pier_w: float, spring: float,
+		rise_k: float, clear: float) -> bool:
+	for i in xs.size() - 1:
+		if x < xs[i] or x > xs[i + 1]:
+			continue
+		var r := (xs[i + 1] - xs[i] - pier_w) * 0.5
+		var ry := minf(r * rise_k, clear - 1.2 - spring)
+		var u := (x - (xs[i] + xs[i + 1]) * 0.5) / r
+		if absf(u) >= 1.0:
+			return true
+		return y > spring + ry * sqrt(1.0 - u * u) + 0.35
+	return true

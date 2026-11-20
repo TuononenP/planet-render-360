@@ -59,6 +59,9 @@ void fragment() {
 	if (alpha_fade < 0.02) {
 		discard;
 	}
+	// The mesh winds downward, so seen from above the back face turns the
+	// normal down and the bird goes black against water. Light both faces as top.
+	NORMAL = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
 	ALBEDO = bird_tint * COLOR.rgb;
 	ALPHA = alpha_fade;
 	ROUGHNESS = 0.9;

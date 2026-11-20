@@ -4,7 +4,7 @@ extends RefCounted
 ## Capital termini of central and northern Europe in the station frame
 ## (+X along the main facade or the through tracks, +Z the forecourt):
 ## Berlin Hauptbahnhof, Wien Hauptbahnhof, Praha hlavní nádraží, Budapest
-## Keleti, Warszawa Centralna, København H, Stockholm Central and Oslo S.
+## Keleti, Warszawa Centralna, København H and Oslo S (Stockholm Central: sweden_stockholm/stations).
 
 const K = preload("res://scripts/generation/landmarks/capital_stations/landmark_station_kit.gd")
 
@@ -275,23 +275,6 @@ static func kobenhavn_h(model: Node3D) -> void:
 	K.arch_window(lm, "Trim", "Glass", Vector3(0, 4.0, 14.05), Vector3.BACK, 9.0, 15.0, 3, 0.7)
 	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, 16.5, 70.0, 5.0, 0.0, 4.5, "flat", 0.0, 3.5, 4.5, true)
 	K.clock_tower(lm, "Walls", "Trim", "Spire", "Dial", "Glass", Vector3(-41.0, 0, 9.0), 7.0, 30.0, "spire", 16.0)
-	lm.commit(model)
-
-## Adolf W. Edelsvärd's Stockholm Central (1871) on Vasagatan: the long
-## rendered range of three storeys with its central pavilion and corner
-## pavilions under mansard roofs, the tracks along its back.
-static func stockholm_central(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#D9C79F", "#E6DAC2", "slate", "#3E464D")
-	for s in [-1.0, 1.0]:
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 52.0, 0.0, 64.0, 22.0, 0.0, 16.0, "hip", 5.0, 4.2, 5.0, true)
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 92.0, 1.0, 16.0, 25.0, 0.0, 18.0, "mansard", 6.0, 3.6, 5.5, true)
-	K.block(lm, "Walls", "Trim", "Glass", "Roof", 0.0, 1.5, 40.0, 27.0, 0.0, 20.0, "mansard", 6.5, 3.8, 6.0, true)
-	K.clock(lm, "Dial", "Trim", Vector3(0, 17.0, 15.2), Vector3.BACK, 1.4)
-	K.canopy(lm, "Steel", "Steel", Vector3(-16, 0, 15.0), Vector3(16, 0, 15.0), Vector3.BACK, 4.0, 4.5, 5)
-	for i in 4:
-		K.shed(lm, "Roof", "Steel", "Glass", Vector3(-100, 0, -24.0 - 13.0 * float(i)), Vector3.RIGHT, 11.0, 200.0, 5.0,
-			1.5, 12.0, 0.3, 0)
 	lm.commit(model)
 
 ## Oslo S: the 1882 Østbanehallen on Jernbanetorget, pale buff render

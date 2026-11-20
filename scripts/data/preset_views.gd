@@ -85,11 +85,14 @@ const ROWS := [
 	{"id": "central_park", "label": "Central Park", "name": "Central Park, New York, United States",
 		"lat": 40.7760, "lon": -73.9700, "eye_lat": 40.77395, "eye_lon": -73.97078,
 		"eye_m": 4.0, "bearing": 345.0, "pitch": -6.0, "hour": 9.0},
-	# Monteliusvägen clifftop, ~32 m ASL: City Hall (335°), Riddarholmen
-	# (28°), Gamla stan (46°) across Riddarfjärden. The smoothed DEM puts
-	# the path at the waterfront road, so asl_m holds the eye on the cliff.
+	# Monteliusvägen clifftop: City Hall (335°), Riddarholmen (28°), Gamla
+	# stan (46°) across Riddarfjärden. Lantmäteriet's bare earth (GroundModel
+	# "lm") puts the walk 37–39 m ASL, the cliff dropping to Söder
+	# Mälarstrand in ~10 m (tests/stockholm_cliff_test.gd). asl_m only holds
+	# the eye up there when that model is unavailable and Terrarium's ramp
+	# stands in.
 	{"id": "stockholm", "label": "Stockholm", "name": "Stockholm, Sweden",
-		"lat": 59.3207, "lon": 18.0604, "eye_m": 6.0, "asl_m": 32.0, "bearing": 10.0, "pitch": -9.0},
+		"lat": 59.3207, "lon": 18.0604, "eye_m": 4.0, "asl_m": 40.0, "bearing": 10.0, "pitch": -9.0},
 	# Place du Palais on Le Rocher, over Port Hercule to Monte-Carlo and
 	# the Casino (34°).
 	{"id": "monaco", "label": "Monaco", "name": "Monaco",

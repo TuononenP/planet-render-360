@@ -128,8 +128,8 @@ func _run() -> void:
 	if ShoreRailings.eligible(shore, walk, [], 1.0, wet_domains):
 		failures.append("waterfront rail must ignore walks whose closest point lies in water")
 	# Every mesh builds; a lit lens glows.
-	for key in ["bench_wood", "bench_stone", "bin_post", "bin_drum", "bin_black", "bollard_black",
-			"bollard_red", "bin_nyc", "subway_entrance", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole", "stop_hsl", "stop_sl"]:
+	for key in ["bench_wood", "bench_park", "bench_stone", "bin_post", "bin_drum", "bin_black", "bollard_black",
+			"bollard_red", "bin_nyc", "subway_entrance", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole", "stop_hsl", "stop_sl", "stop_tram"]:
 		var mesh := StreetFurniture.mesh(key)
 		if mesh.get_surface_count() == 0:
 			failures.append("%s should build a mesh" % key)
@@ -181,6 +181,10 @@ func _run() -> void:
 	croads = StreetFurniture.RoadIndex.new(crossing, m, 400.0 * m)
 	if not StreetFurniture.spots({"x": 60.0 * m, "z": 104.0 * m, "kind": "bench"}, croads, "europe", m).is_empty():
 		failures.append("a bench on a bridge should not stand on the ground under it")
+	var tram := StreetFurniture.spots({"x": 100.0 * m, "z": 1.0 * m, "kind": "tram_stop"}, roads, "nordic", m)
+	if tram.size() != 1 or str(tram[0][2]) != "stop_tram" or (tram[0][0] as Vector2).y < 5.5 * m:
+		failures.append("a Finnish tram stop should get a pole on its own kerb: %s" % [tram])
+	_park_benches(failures, m)
 	failures.erase(failures[0])
 	if failures.is_empty():
 		print("STREET FURNITURE OK: OSM kinds, kerb placement, regional kit, sparse fill, meshes")
@@ -189,3 +193,40 @@ func _run() -> void:
 		for f in failures:
 			printerr("STREET FURNITURE FAIL: ", f)
 		quit(1)
+
+## Finnish park benches: along a gravel footway in a park, alternate sides,
+## facing the path, clear of a mapped bench; none on a footway outside green
+## cover or on a paved one; Finland's own mapped benches use the park bench.
+func _park_benches(failures: Array[String], m: float) -> void:
+	if StreetFurniture.mesh_key("bench", "nordic") != "bench_park" or StreetFurniture.mesh_key("bench", "europe") != "bench_wood":
+		failures.append("Finland's benches should be the red-brown park bench, others unchanged")
+	var d := _data()
+	d.country = "FI"
+	d.roads = [
+		{"class": "footway", "surface": "compacted", "width_m": 2.0, "lit": true,
+			"points": PackedVector2Array([Vector2(-80, 0), Vector2(80, 0)])},
+		{"class": "footway", "surface": "paving_stones", "width_m": 2.0,
+			"points": PackedVector2Array([Vector2(-80, 20), Vector2(80, 20)])},
+		{"class": "footway", "surface": "compacted", "width_m": 2.0,
+			"points": PackedVector2Array([Vector2(-80, 90), Vector2(80, 90)])},
+	]
+	d.land_polygons = [{"class": "grass", "holes": [], "points": PackedVector2Array([
+		Vector2(-90, -30), Vector2(90, -30), Vector2(90, 40), Vector2(-90, 40)])}]
+	var mask := VegetationMask.new(d, GroundTruth.new(d))
+	var mapped := [{"x": 0.0, "z": 1.5, "kind": "bench"}]
+	var spots := StreetFurniture.park_spots(d, mask, mapped, Vector2.ZERO, m)
+	if spots.size() < 6 or spots.size() > 10:
+		failures.append("a 160 m park walk should get about 8 benches, got %d" % spots.size())
+	var sides := {}
+	for sp: Array in spots:
+		var at: Vector2 = sp[0]
+		if absf(at.y) < 1.2 * m or absf(at.y) > 2.0 * m or str(sp[2]) != "bench_park":
+			failures.append("a park bench stands just off the path: %s" % [sp])
+		if at.distance_to(Vector2(0, 1.5)) < StreetFurniture.PARK_BENCH_CLEAR_M * m:
+			failures.append("no park bench within %.0f m of a mapped one: %s" % [StreetFurniture.PARK_BENCH_CLEAR_M, at])
+		if (sp[1] as Vector2).y * at.y >= 0.0:
+			failures.append("a park bench faces the path: %s" % [sp])
+		sides[signf(at.y)] = true
+	if sides.size() != 2:
+		failures.append("park benches alternate sides of the path")
+

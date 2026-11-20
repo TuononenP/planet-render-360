@@ -6,6 +6,15 @@ extends RefCounted
 ## Small craft are steamers, houseboats and the odd large yacht; long,
 ## straight, deep sea quays (tidal water, a clear fairway) also get up to
 ## MAX_LINERS cruise liners.
+## * Known quay rows (QUAY_ROWS) keep their real character: a steamboat
+##   row stays steamers, a houseboat quay is mostly houseboats, and a
+##   row reaches farther than MarinaBuilder.RADIUS_M (it is a known sight
+##   seen across the water), with its own cap of ROW_MAX_BOATS.
+## * Big ferry ports (FERRY_PORTS) count as ferry terminals where the POI
+##   layer (capped round the eye) misses them, and give their ferries the
+##   line's livery. A ro-pax ferry stands 40-60 m tall, a skyline object
+##   like a tower landmark, so a port's ferries show out to its reach_m
+##   (the landmark registry's radius_m rule) rather than LINER_RADIUS_M.
 const MAX_BOATS := 24
 const GAP_M := 8.0
 const MAX_LINERS := 2
@@ -19,6 +28,48 @@ const LINER_DEPTH_M := 2.0
 const LINER_EYE_CLEAR_M := 40.0
 const LINER_TURN_RAD := 0.12
 const LINER_DEVIATION_M := 6.0
+## Ferry ports by lat/lon: "reach_m" how far from the eye their ferries
+## show; "hull" and "livery" (CruiseFerryModel sweep and funnel) colours.
+## Plain colour blocks, no company marks.
+const FERRY_PORTS := [
+	# Stadsgården (Viking Line to Helsinki, Mariehamn): red hull, white upper works.
+	{"id": "stadsgarden", "lat": 59.3170, "lon": 18.0910, "reach_m": 4500.0, "hull": "#c21f2c", "livery": "#c21f2c"},
+	# Värtahamnen (Tallink Silja to Helsinki, Riga): white hull, navy sweep.
+	{"id": "vartahamnen", "lat": 59.3500, "lon": 18.1110, "reach_m": 4500.0, "hull": "#f0eee8", "livery": "#1b2f5c"},
+	# Linnansatama, Port of Turku (Viking Line to Stockholm/Mariehamn): red Viking livery.
+	{"id": "turku_viking", "lat": 60.4352, "lon": 22.2195, "reach_m": 4500.0, "hull": "#f4f3ee", "livery": "#c8102e",
+		"line": "turku_viking"},
+	# Linnansatama, Port of Turku (Tallink Silja to Stockholm): white hull, navy Silja livery.
+	{"id": "turku_silja", "lat": 60.4338, "lon": 22.2235, "reach_m": 4500.0, "hull": "#f4f3ee", "livery": "#16295a",
+		"line": "turku_silja"},
+]
+## A ferry port's ships are those berthed within this of it (m).
+const PORT_M := 500.0
+## Named quay rows: "points" [lat, lon] along the quay, "houseboat" the
+## share of houseboats, "corridor_m" how near the row a berth must be,
+## "reach_m" how far from the eye the row is dressed.
+const QUAY_ROWS := [
+	# Strandvägen's veteran steamboat row (Nybroplan to Djurgårdsbron).
+	{"id": "strandvagen", "houseboat": 0.0, "corridor_m": 60.0, "reach_m": 2600.0,
+		"points": [[59.3322, 18.0775], [59.3317, 18.0860], [59.3313, 18.0940], [59.3309, 18.1000]]},
+	# Söder Mälarstrand: houseboats and boat homes from Slussen west, and the
+	# hotel ships and old steamers of QuayFleet. The points follow the street
+	# (OSM), the quay edge lies 10-30 m north of it.
+	{"id": "soder_malarstrand", "houseboat": 0.7, "corridor_m": 75.0, "reach_m": 2600.0,
+		"points": [[59.31971, 18.03378], [59.32051, 18.04320], [59.32100, 18.04946], [59.32113, 18.05591],
+			[59.32114, 18.05926], [59.32118, 18.06103], [59.32106, 18.06566], [59.32086, 18.06810]]},
+	# Aurajoki east bank (Itäinen Rantakatu: Auransilta -> Teatterisilta -> Martinsilta),
+	# Turku's signature moored restaurant ships (jokilaivat: Donna, Cindy, Katarina, Esposito).
+	{"id": "aurajoki_east", "houseboat": 0.75, "kind": "restaurant_boat", "corridor_m": 35.0, "reach_m": 2600.0,
+		"points": [[60.44854, 22.27035], [60.44768, 22.26763], [60.44694, 22.26510],
+			[60.44556, 22.26029], [60.44419, 22.25624]]},
+	# Aurajoki west bank (Läntinen Rantakatu: Kristiinankatu -> Martinsilta -> Tervatori),
+	# moored restaurant ships (Svarte Rudolf, Papa Joe, Lulu).
+	{"id": "aurajoki_west", "houseboat": 0.75, "kind": "restaurant_boat", "corridor_m": 35.0, "reach_m": 2600.0,
+		"points": [[60.44799, 22.26680], [60.44767, 22.26555], [60.44613, 22.25984],
+			[60.44506, 22.25596], [60.44476, 22.25492], [60.44381, 22.25241], [60.44280, 22.25027]]},
+]
+const ROW_MAX_BOATS := 16
 
 ## One harbour plan's shared lookups: [data, its ferry terminals, its
 ## joined quay lines (null until asked for), m]. The terminal test runs
@@ -35,8 +86,9 @@ static func begin_plan(data: LocationData, m: float) -> void:
 static func end_plan() -> void:
 	_scope = []
 
-static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
-		m: float, mask: VegetationMask = null) -> Array:
+## The quay and bank lines small craft and row vessels berth along:
+## {"points", "mapped"}.
+static func berth_lines(data: LocationData, ground: GroundTruth) -> Array:
 	var lines: Array = []
 	for structure in data.shore_structures:
 		if str(structure.get("kind", "")) in ["quay", "retaining_wall"]:
@@ -51,9 +103,17 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 				if not points.is_empty() and points[0] != points[-1]:
 					points.append(points[0])
 				lines.append({"points": points, "mapped": false})
+	return lines
+
+static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
+		m: float, mask: VegetationMask = null) -> Array:
+	var lines := berth_lines(data, ground)
 	var centre := View360.spawn_xz(data)
 	var stairs := _stairs(data)
 	var bridge_list := bridges(data, m)
+	var rows := quay_rows(data, m)
+	var row_counts := {}
+	var generic := 0
 	var out: Array = []
 	for line in lines:
 		var pts: PackedVector2Array = line["points"]
@@ -67,7 +127,12 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 			var hash_v := MarinaBuilder._hash(at.x, at.y, 37.0)
 			var length := (18.0 + hash_v * 14.0) * m
 			t += length + GAP_M * m
-			if at.distance_to(centre) > MarinaBuilder.RADIUS_M * m:
+			var row := _row_at(rows, at, m)
+			var reach := float(row.get("reach_m", MarinaBuilder.RADIUS_M))
+			if at.distance_to(centre) > reach * m:
+				continue
+			if (row.is_empty() and generic >= MAX_BOATS) \
+					or int(row_counts.get(row.get("id", ""), 0)) >= ROW_MAX_BOATS:
 				continue
 			if not bool(line["mapped"]) and not _hard_span(ground, at, dir, length):
 				continue
@@ -95,12 +160,63 @@ static func plan(data: LocationData, ground: GroundTruth, taken: Dictionary,
 				continue
 			var y := ground.water_level_at(position.x, position.y)
 			var is_houseboat := hash_v >= 0.80
+			if not row.is_empty():
+				is_houseboat = MarinaBuilder._hash(at.x, at.y, 53.0) < float(row["houseboat"])
+				# A row with its own fleet (QuayFleet) keeps houseboats only here.
+				if QuayFleet.FLEETS.has(row["id"]) and not is_houseboat:
+					continue
+				row_counts[row["id"]] = int(row_counts.get(row["id"], 0)) + 1
+			else:
+				generic += 1
 			var scale_len := minf(length, 20.0 * m) if is_houseboat else length
+			var boat_kind := str(row.get("kind", "houseboat")) if is_houseboat else "steam"
 			out.append([Vector3(position.x, y, position.y), atan2(-dir.y, dir.x), scale_len / (10.0 * m),
-				"houseboat" if is_houseboat else "steam", Color.WHITE])
-			if out.size() >= MAX_BOATS:
-				return out
+				boat_kind, Color.WHITE])
 	return out
+
+## QUAY_ROWS in `data`'s frame: each row with "pts" (world XZ).
+static func quay_rows(data: LocationData, m: float) -> Array:
+	var out: Array = []
+	for row: Dictionary in QUAY_ROWS:
+		var pts := PackedVector2Array()
+		for ll: Array in row["points"]:
+			pts.append(WorldScale.xz_from_latlon(float(ll[0]), float(ll[1]), data.latitude, data.longitude) * m)
+		var near := false
+		for q in pts:
+			near = near or q.length() < (WorldScale.DETAILED_EXTENT_M + float(row["reach_m"])) * m
+		if near:
+			var placed := row.duplicate()
+			placed["pts"] = pts
+			out.append(placed)
+	return out
+
+## The row whose corridor holds `at`, or {}.
+static func _row_at(rows: Array, at: Vector2, m: float) -> Dictionary:
+	for row: Dictionary in rows:
+		var pts: PackedVector2Array = row["pts"]
+		for i in pts.size() - 1:
+			if Geometry2D.get_closest_point_to_segment(at, pts[i], pts[i + 1]).distance_to(at) \
+					<= float(row["corridor_m"]) * m:
+				return row
+	return {}
+
+## FERRY_PORTS inside `data`'s detailed extent, each with "at" (world XZ).
+static func ports(data: LocationData, m: float) -> Array:
+	var out: Array = []
+	for port: Dictionary in FERRY_PORTS:
+		var at := WorldScale.xz_from_latlon(float(port["lat"]), float(port["lon"]), data.latitude, data.longitude) * m
+		if absf(at.x) <= WorldScale.DETAILED_EXTENT_M * m and absf(at.y) <= WorldScale.DETAILED_EXTENT_M * m:
+			var placed := port.duplicate()
+			placed["at"] = at
+			out.append(placed)
+	return out
+
+## The listed port within PORT_M of `at`, or {}.
+static func port_at(data: LocationData, at: Vector2, m: float) -> Dictionary:
+	for port: Dictionary in ports(data, m):
+		if (port["at"] as Vector2).distance_to(at) <= PORT_M * m:
+			return port
+	return {}
 
 ## The mapped steps ways' lines (stairs down a quay wall).
 static func _stairs(data: LocationData) -> Array:
@@ -142,8 +258,15 @@ static func _wet(ground: GroundTruth, p: Vector2, mask: VegetationMask) -> bool:
 
 ## Large vessels [centre, yaw, length m, beam m, height m, seed, kind] along
 ## mapped quays or terminal banks on tidal water with a clear fairway; each
-## claims its berth in `taken` so small craft keep clear.
+## claims its berth in `taken` so small craft keep clear. A row's own fleet
+## (QuayFleet) follows the liners.
 static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m: float,
+		mask: VegetationMask = null) -> Array:
+	var out := _large_ships(data, ground, taken, m, mask)
+	out.append_array(QuayFleet.plan(data, ground, taken, m, mask))
+	return out
+
+static func _large_ships(data: LocationData, ground: GroundTruth, taken: Dictionary, m: float,
 		mask: VegetationMask = null) -> Array:
 	var out: Array = []
 	if ground.shoreline == null or not ground.shoreline.ready:
@@ -171,7 +294,11 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 		var length := minf(200.0 if ferry else 230.0, run_m - 30.0)
 		if length < LINER_MIN_M:
 			continue
-		var beam := length * 0.125
+		# Riddarfjärden's quays berth a Mälaren steamer or hotel ship, not a liner.
+		var hotel := not ferry and QuayFleet.hotel_water(data, (a + b) * 0.5, m)
+		if hotel:
+			length = QuayFleet.HOTEL_LENGTH_M
+		var beam := length * (QuayFleet.HOTEL_BEAM_SHARE if hotel else 0.125)
 		for frac in [0.5, 0.2, 0.8]:
 			var along := (length * 0.5 + 15.0 + (run_m - length - 30.0) * float(frac)) * m
 			var at := a + dir * along
@@ -181,7 +308,9 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			if berth.is_empty():
 				continue
 			var c: Vector2 = berth["centre"]
-			if c.distance_to(eye) > LINER_RADIUS_M * m or _near_eye(c, dir, length, beam, eye, m) \
+			var port := port_at(data, c, m) if ferry else {}
+			var radius := float(port.get("reach_m", LINER_RADIUS_M))
+			if c.distance_to(eye) > radius * m or _near_eye(c, dir, length, beam, eye, m) \
 					or not _spaced(out, c, m) or _mapped_ship_near(data, c, length, m):
 				continue
 			var bow_dir := dir
@@ -190,10 +319,25 @@ static func liners(data: LocationData, ground: GroundTruth, taken: Dictionary, m
 			if near_bridge(bridge_list, stern, bow, (beam * 0.5 + 6.0) * m) \
 					or not MarinaBuilder._claim(taken, stern, dir, length, beam, m):
 				continue
+			var info := berth_info(ground, a, b, at, berth, beam, m)
+			if not port.is_empty():
+				info["hull"] = str(port["hull"])
+				info["livery"] = str(port["livery"])
+				if port.has("line"):
+					info["line"] = str(port["line"])
+			elif ferry:
+				var line := FerryLivery.line_at(data, c, m)
+				if not line.is_empty():
+					info["hull"] = str(line["hull"])
+					info["line"] = str(line["id"])
+			var seed_value := fposmod(c.x * 0.0131 + c.y * 0.0077, 1.0)
+			if hotel:
+				out.append(QuayFleet.hotel_ship(Vector3(c.x, ground.water_level_at(c.x, c.y), c.y),
+					atan2(-bow_dir.y, bow_dir.x), length, beam, seed_value))
+				break
 			out.append([Vector3(c.x, ground.water_level_at(c.x, c.y), c.y), atan2(-bow_dir.y, bow_dir.x),
 				length, beam, clampf(length * 0.21 if ferry else length * 0.2, 22.0, 65.0),
-				fposmod(c.x * 0.0131 + c.y * 0.0077, 1.0), "ferry" if ferry else "liner",
-				berth_info(ground, a, b, at, berth, beam, m)])
+				seed_value, "ferry" if ferry else "liner", info])
 			break
 		if out.size() >= MAX_LINERS:
 			return out
@@ -308,6 +452,8 @@ static func _terminals(data: LocationData) -> PackedVector2Array:
 		if p is Dictionary and str(p.get("kind", "")) == "ferry_terminal" \
 				and not str(p.get("name", "")).to_lower().contains("staten island ferry"):
 			out.append(Vector2(float(p.get("x", 0.0)), float(p.get("z", 0.0))))
+	for port: Dictionary in ports(data, WorldScale.metres_to_units()):
+		out.append(port["at"])
 	return out
 
 static func _near_terminal(data: LocationData, at: Vector2, m: float) -> bool:

@@ -48,6 +48,8 @@ uniform float uv_scale = 0.25;
 uniform int kind = 0;
 uniform bool anti_tile = false;
 uniform float grime = 1.0;
+// (specular cap, roughness floor): StockholmGlare caps the sheen of Stockholm's stone; (1, 0) elsewhere.
+uniform vec2 glare = vec2(1.0, 0.0);
 // Linear colour of the runs down a metal (rust, verdigris, soot).
 uniform vec3 runs = vec3(0.1);
 // A part's height above the model's ground when its node is lifted.
@@ -195,7 +197,8 @@ void fragment() {
 	float r = has_rough_tex ? texture(rough_tex, uv).r : roughness;
 	r *= mix(0.88, 1.12, m2);
 	r += 0.1 * clamp(dirt, 0.0, 1.0) * grime + 0.15 * joint + (block - 0.5) * 0.06;
-	ROUGHNESS = clamp(r, 0.05, 1.0);
+	ROUGHNESS = clamp(max(r, glare.y), 0.05, 1.0);
+	SPECULAR = min(0.5, glare.x);
 	METALLIC = metallic * (1.0 - 0.5 * clamp(dirt, 0.0, 1.0) * grime);
 
 	vec3 nm = texture(normal_tex, uv).rgb;

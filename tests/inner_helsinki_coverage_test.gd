@@ -5,9 +5,9 @@ extends SceneTree
 ## searchable by name, with clearance that covers every footprint but does
 ## not swallow a neighbouring landmark, and the districts' fabric.
 const TYPES := {
-	"enso_gutzeit_hq": 24.0, "merikasarmi": 18.0, "katajanokka_terminal": 14.0,
-	"kallio_library": 19.0, "kallio_virastotalo": 40.0, "linnanmaki": 75.0,
-	"clarion_hotel": 78.0, "west_terminal_2": 18.0, "cable_factory": 28.0, "salmisaari_power_plant": 150.0,
+	"enso_gutzeit_hq": 24.0, "merikasarmi": 18.0, "katajanokka_terminal": 15.8,
+	"kallio_library": 19.0, "kallio_virastotalo": 38.5, "linnanmaki": 75.0,
+	"clarion_hotel": 78.0, "west_terminal_2": 23.4, "cable_factory": 28.0, "salmisaari_power_plant": 150.0,
 }
 
 func _init() -> void:
@@ -95,6 +95,11 @@ func _check_outline(failures: Array[String], type: String, entry: Dictionary, po
 	if missed > 0:
 		failures.append("%s: %d points inside the outline escape clearance" % [type, missed])
 
+## Models that carry attractions mapped as nodes outside the footprint
+## outlines (Linnanmäki's Rinkeli wheel and Taiga coaster) or an overhanging
+## roof (West Terminal 2) may pass the 6 m margin by this much.
+const SPILL_M := {"linnanmaki": 130.0, "west_terminal_2": 12.0}
+
 ## The model stays within 6 m of its outlines' extent.
 func _check_spill(failures: Array[String], type: String, polys: Array[PackedVector2Array], bounds: AABB) -> void:
 	var lo := Vector2(INF, INF)
@@ -103,8 +108,9 @@ func _check_spill(failures: Array[String], type: String, polys: Array[PackedVect
 		for p in poly:
 			lo = lo.min(p)
 			hi = hi.max(p)
-	if bounds.position.x < lo.x - 6.0 or bounds.end.x > hi.x + 6.0 \
-			or bounds.position.z < lo.y - 6.0 or bounds.end.z > hi.y + 6.0:
+	var margin: float = 6.0 + float(SPILL_M.get(type, 0.0))
+	if bounds.position.x < lo.x - margin or bounds.end.x > hi.x + margin \
+			or bounds.position.z < lo.y - margin or bounds.end.z > hi.y + margin:
 		failures.append("%s model %s spills past its outline %s..%s" % [type, bounds, lo, hi])
 
 ## No landmark's clearance reaches another registry landmark's centre.

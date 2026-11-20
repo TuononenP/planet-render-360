@@ -9,8 +9,8 @@ const NEW_TYPES := {
 	"redi_shopping_centre": 20.0, "mall_of_tripla": 30.0,
 	"itis_shopping_centre": 25.0, "iso_omena": 24.0,
 	"sello_shopping_centre": 22.0, "jumbo_shopping_centre": 18.0,
-	"suomenlinna_kings_gate": 12.0, "suomenlinna_dry_dock": 8.0,
-	"suomenlinna_jetty_barracks": 14.0,
+	"suomenlinna_kings_gate": 11.3, "suomenlinna_dry_dock": 22.0,
+	"suomenlinna_jetty_barracks": 15.7,
 }
 
 func _init() -> void:
@@ -53,6 +53,15 @@ func _init() -> void:
 			_check_outline(failures, type, entry, outline, bounds)
 		elif entry.has("clear_offsets_m"):
 			failures.append(type + " has clear_offsets_m but no outline to check them against")
+		elif entry.has("clear_rect_m"):
+			# A long model is covered by a rectangle (centre x, z, half x, half z)
+			# in its own frame, grown by clear_m.
+			var rect: Array = entry["clear_rect_m"]
+			# Rims, cranes and eaves may stand a few metres past the cleared rectangle.
+			var grow := float(entry.get("clear_m", 0.0)) + 9.0
+			if bounds.position.x < float(rect[0]) - float(rect[2]) - grow or bounds.end.x > float(rect[0]) + float(rect[2]) + grow \
+					or bounds.position.z < float(rect[1]) - float(rect[3]) - grow or bounds.end.z > float(rect[1]) + float(rect[3]) + grow:
+				failures.append("%s model %s outside its clear_rect_m %s" % [type, bounds, rect])
 		elif radius > float(entry.get("clear_m", 0.0)) + 1.0:
 			failures.append("%s radius %.1f exceeds clear_m %s" % [type, radius, entry.get("clear_m")])
 		if type == "redi_shopping_centre" and LandmarkBuilder.parts(root).size() < 6:

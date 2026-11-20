@@ -133,6 +133,8 @@ func _rebuild_index() -> void:
 func _init(data: LocationData, abort: BuildAbort = null) -> void:
 	if data == null:
 		return
+	ShoreApron.round_water(data)
+	StockholmShore.prepare(data)
 	var size := data.grid_size
 	_size = size
 	var extent_units := WorldScale.detailed_extent_units()
@@ -242,6 +244,7 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 			_surface = buf
 			buf = swap
 	SuomenlinnaSite.grade_gate(_surface, size, _step_units, data.buildings, data.latitude, data.longitude)
+	StockholmShore.flatten_plinths(_surface, size, _step_units, data)
 	# Water polygons carve below their own bank-levelled surface, or
 	# the channel terrain covers the water entirely (v1 _heights, which
 	# carved to the global datum instead).

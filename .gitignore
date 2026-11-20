@@ -76,6 +76,7 @@ generated_images/.tbh-generated-images.lock
 visual-plan/reviews/
 visual-plan/refs/**/*.jpg
 visual-plan/captures/
+visual-plan/**/*.md
 # Native build kernels: built by tools/build_native.sh
 native/build/
 native/bin/

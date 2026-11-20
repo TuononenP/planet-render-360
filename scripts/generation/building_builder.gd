@@ -304,7 +304,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 			pos.y = float(footing["floor"]) - (0.0 if bool(footing["raised"]) \
 				else BuildingFoundation.SINK_M * WorldScale.metres_to_units())
 			BuildingFoundation.build(root, fallback_ring, [], footing, b, ground)
-			BuildingFoundation.plinth(root, fallback_ring, [], footing, ground)
+			BuildingFoundation.plinth(root, fallback_ring, [], footing, ground,
+				ArchitectureStyle.city_of(str(ctx.get("region", ""))) == "stockholm")
 			var look := _look_for(b, ctx)
 			var res := _resolve_total(b, b, ctx, {}, look)
 			var legacy: bool = not (b as Dictionary).has("height_source")
@@ -490,7 +491,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		top = floor_y + height_world - shift
 	else:
 		BuildingFoundation.build(root, ring, holes, footing, b, ground)
-		BuildingFoundation.plinth(root, ring, holes, footing, ground)
+		BuildingFoundation.plinth(root, ring, holes, footing, ground, ArchitectureStyle.city_of(str(ctx.get("region", ""))) == "stockholm")
 	# Party walls: hidden stretches skipped, firewalls above lower
 	# neighbours, gables (not slopes) and no cornice on shared edges.
 	var cover: Array = []
@@ -572,6 +573,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 				# rather than multiplying them by every building's wall variant.
 				var shop_look := {"wall_set": "concrete", "ground": "shop", "bay_m": 3.2,
 					"floor_h": 3.3, "ground_colour": PoiFacadeIndex.colour(shops[edge])}
+				if str(look.get("city", "")) == "helsinki":
+					shop_look["city"] = "helsinki"  # takes Helsinki's warm bounce (FacadeTextures.HELSINKI_BOUNCE)
 				var shop_mat := FacadeMaterials.ground_for_building({}, fidelity, false, shop_look)
 				if shop_mat != null:
 					shop_materials[edge] = shop_mat

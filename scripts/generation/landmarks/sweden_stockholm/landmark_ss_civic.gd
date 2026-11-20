@@ -5,8 +5,7 @@ extends RefCounted
 ## ground level at the footprint centre, front toward +Z (the registry
 ## yaw_deg turns it onto its real compass facing). Footprints are traced
 ## from the OpenStreetMap outlines and building parts in the model frame.
-## This class holds the Nordic Museum and the Stockholm Public Library;
-## the Concert Hall and the Riksdag live in LandmarkSsCivic2.
+## This class holds the Nordic Museum; the Riksdag lives in LandmarkSsCivic2.
 
 ## Nordic Museum (Nordiska museet, Isak Gustaf Clason, 1888-1907) on
 ## Djurgården: the Danish-Renaissance palace of Roslagen sandstone with
@@ -33,12 +32,13 @@ const NM_Z1 := 17.5
 
 static func nordic(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("stone", "#BAB09B", 3.0))
-	lm.use("Dressing", LandmarkMaterials.pbr("limestone", "#D8D0BF", 3.0))
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#86817A", 2.5))
-	lm.use("Slate", LandmarkMaterials.pbr("slate", "#464B51", 2.0))
+	lm.use("Stone", LandmarkMaterials.pbr("stone", "#B79A82", 3.0))
+	lm.use("Dressing", LandmarkMaterials.pbr("limestone", "#D3C2A9", 3.0))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#6C6864", 2.5))
+	lm.use("Slate", LandmarkMaterials.pbr("slate", "#59616A", 2.0))
 	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#6E9C88", 2.0, 0.55, 0.3))
 	lm.use("Windows", LandmarkMaterials.glass("#1F262A"))
+	lm.use("Skylight", LandmarkMaterials.paint("#9DAAB3", 0.3, 0.3))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	var cx := (NM_X0 + NM_X1) * 0.5
 	var cz := (NM_Z0 + NM_Z1) * 0.5
@@ -75,7 +75,8 @@ static func nordic(model: Node3D) -> void:
 
 ## The steep slate roof: crow-stepped end gables, wall dormers with their
 ## own little roofs on both long sides, small dormers and the glazed roof
-## lights over the great hall, a copper ridge roll.
+## lights (two long bands along the ridge) over the great hall, a copper
+## ridge roll.
 static func _nm_roof(lm: LandmarkMesh, cx: float, cz: float, lx: float, dz: float) -> void:
 	var rise := NM_RIDGE - NM_EAVE
 	LandmarkFhUtil.ridge_x(lm, "Slate", "Stone", Vector3(cx, NM_EAVE, cz), lx, dz, rise, 0.5)
@@ -106,16 +107,20 @@ static func _nm_roof(lm: LandmarkMesh, cx: float, cz: float, lx: float, dz: floa
 			lm.box("Slate", dc + Vector3(0, 1.0, 0), Vector3(1.8, 2.0, 2.2), fb)
 			lm.box("Windows", dc + fb * Vector3(0, 1.0, 1.12), Vector3(1.0, 1.2, 0.05), fb, 0.0)
 			lm.gable("Copper", dc + Vector3(0, 2.0, 0), 1.9, 2.2, 0.9, fb, 0.1, "Slate")
-		# Glazed roof lights high on both slopes over the hall.
-		for x in [-44.0, -27.0, 27.0, 44.0]:
-			var p0 := Vector3(float(x) - 5.0, NM_EAVE + rise * 0.55, cz + s * half * 0.45)
-			var p1 := Vector3(float(x) + 5.0, NM_EAVE + rise * 0.55, cz + s * half * 0.45)
-			var q1 := Vector3(float(x) + 5.0, NM_EAVE + rise * 0.85, cz + s * half * 0.15)
-			var q0 := Vector3(float(x) - 5.0, NM_EAVE + rise * 0.85, cz + s * half * 0.15)
+		# Two long glazed roof lights over the great hall, either side of
+		# the tower, running along the ridge on both slopes.
+		for run in [[-54.0, -9.0], [9.0, 54.0]]:
+			var x0: float = run[0]
+			var x1: float = run[1]
+			var p0 := Vector3(x0, NM_EAVE + rise * 0.5, cz + s * half * 0.5)
+			var p1 := Vector3(x1, NM_EAVE + rise * 0.5, cz + s * half * 0.5)
+			var q1 := Vector3(x1, NM_EAVE + rise * 0.94, cz + s * half * 0.06)
+			var q0 := Vector3(x0, NM_EAVE + rise * 0.94, cz + s * half * 0.06)
 			var n := Vector3(0, half, s * rise).normalized()
-			lm.quad("Windows", p0 + n * 0.08, p1 + n * 0.08, q1 + n * 0.08, q0 + n * 0.08, n)
-			for k in 6:
-				var bx := float(x) - 5.0 + 2.0 * float(k)
+			lm.quad("Skylight", p0 + n * 0.08, p1 + n * 0.08, q1 + n * 0.08, q0 + n * 0.08, n)
+			var nb := int((x1 - x0) / 2.5)
+			for k in nb + 1:
+				var bx := lerpf(x0, x1, float(k) / float(nb))
 				lm.beam("Copper", Vector3(bx, p0.y, p0.z) + n * 0.12, Vector3(bx, q0.y, q0.z) + n * 0.12, 0.12, 0.1)
 
 ## The ends: short wings between the corner turrets, the octagonal
@@ -272,137 +277,7 @@ static func _nm_tower(lm: LandmarkMesh, t: Vector3) -> void:
 	lm.lathe("Gilt", t + Vector3(0, NM_TOP - 4.6, 0), LandmarkFhUtil.ball(0.32), 8)
 	lm.frustum("Gilt", t + Vector3(0, NM_TOP - 0.8, 0), 0.06, 0.0, 0.8, 4)
 
-## Stockholm Public Library (Stadsbiblioteket, Gunnar Asplund, 1924-1928)
-## on Sveavägen: the ochre-rendered cubic block of three storeys of small
-## deep-set windows on a granite plinth, the plain 30 m cylinder of the
-## lending-hall rotunda rising from its middle with a ring of tall
-## clerestory windows under the parapet, the tall tapering
-## Egyptian-style portal in the front with its dark doors and gilt
-## reliefs, the steps, and the low shop wings along Sveavägen.
-## Sources: biblioteket.stockholm.se (rotunda 26 m across inside, 24 m
-## to the ceiling); OSM way 31990167 (block 48.5 x 49.9 m), building part
-## 101343771 (rotunda 30 m outside) and the shop wings 39087434/39087435.
-const LIB_TOP := 31.0
-const LIB_BLOCK_H := 14.5
-const LIB_HX := 24.2
-const LIB_HZ := 25.0
-
-static func library(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Render", LandmarkMaterials.pbr("render", "#C98B50", 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("render", "#B47A45", 3.0))
-	lm.use("Plinth", LandmarkMaterials.pbr("stone", "#8A857E", 2.5))
-	lm.use("Windows", LandmarkMaterials.glass("#20272B"))
-	lm.use("Door", LandmarkMaterials.pbr("concrete", "#2A2622", 2.0, 0.5, 0.2))
-	lm.use("Gilt", LandmarkMaterials.gold())
-	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#5E7F72", 2.0, 0.55, 0.3))
-	lm.use("Roof", LandmarkMaterials.pbr("concrete", "#4B4A47", 2.0, 0.85))
-	# The cubic block on its granite plinth, cornice band and parapet.
-	LandmarkFhUtil.blk(lm, "Render", 0.0, 0.0, 0.0, LIB_HX * 2.0, LIB_BLOCK_H, LIB_HZ * 2.0)
-	LandmarkFhUtil.blk(lm, "Plinth", 0.0, 0.0, 0.0, LIB_HX * 2.0 + 0.6, 1.4, LIB_HZ * 2.0 + 0.6)
-	LandmarkFhParts.box_band(lm, "Trim", 0.0, 0.0, LIB_HX * 2.0, LIB_HZ * 2.0, LIB_BLOCK_H - 0.7, 0.45, 0.5)
-	LandmarkFhUtil.blk(lm, "Roof", 0.0, LIB_BLOCK_H, 0.0, LIB_HX * 2.0 - 0.2, 0.15, LIB_HZ * 2.0 - 0.2)
-	LandmarkFhParts.box_band(lm, "Copper", 0.0, 0.0, LIB_HX * 2.0, LIB_HZ * 2.0, LIB_BLOCK_H - 0.15, 0.35, 0.15)
-	var faces := LandmarkFhParts.faces(0.0, 0.0, LIB_HX * 2.0, LIB_HZ * 2.0)
-	for f in faces:
-		var a: Vector3 = f[0]
-		var b: Vector3 = f[1]
-		var o: Vector3 = f[2]
-		if o.z > 0.5:
-			# Front: the portal bay is left whole.
-			LandmarkFhParts.pierce(lm, "Render", "Windows", a, Vector3(-5.4, 0, a.z), o, 1.4, LIB_BLOCK_H - 2.2, 6, 3,
-				Vector2(1.3, 2.1), 1.5, 4.0, 0.45)
-			LandmarkFhParts.pierce(lm, "Render", "Windows", Vector3(5.4, 0, a.z), b, o, 1.4, LIB_BLOCK_H - 2.2, 6, 3,
-				Vector2(1.3, 2.1), 1.5, 4.0, 0.45)
-		else:
-			LandmarkFhParts.pierce(lm, "Render", "Windows", a, b, o, 1.4, LIB_BLOCK_H - 2.2, 15, 3,
-				Vector2(1.3, 2.1), 1.5, 4.0, 0.45)
-	_lib_portal(lm, LIB_HZ)
-	_lib_rotunda(lm, Vector3(-0.2, 0, 2.0), 15.0)
-	_lib_shops(lm)
-	lm.commit(model)
-
-## The tall tapering portal: granite jambs leaning in, a deep dark door
-## recess with gilt relief panels, the plain lintel and its cavetto head;
-## steps up to it.
-static func _lib_portal(lm: LandmarkMesh, zf: float) -> void:
-	var h := 10.2
-	var w0 := 6.6
-	var w1 := 5.4
-	var n := Vector3(0, 0, 1)
-	var z := zf + 0.02
-	# The recess, then the leaning jambs.
-	lm.quad("Door", Vector3(-w0 * 0.5 + 0.6, 0.0, z), Vector3(w0 * 0.5 - 0.6, 0.0, z),
-		Vector3(w1 * 0.5 - 0.6, h, z), Vector3(-w1 * 0.5 + 0.6, h, z), n)
-	# (The leaning jambs start a little up so their square-cut feet stay
-	# above the ground; a plinth block sits under each.)
-	for s in [-1.0, 1.0]:
-		lm.beam("Plinth", Vector3(s * (w0 * 0.5 - 0.3), 0.05, zf + 0.35), Vector3(s * (w1 * 0.5 - 0.3), h, zf + 0.35),
-			0.8, 0.7, Vector3(1, 0, 0), true)
-		lm.box("Plinth", Vector3(s * (w0 * 0.5 - 0.3), 0.3, zf + 0.35), Vector3(1.0, 0.6, 0.9))
-	lm.box("Plinth", Vector3(0, h + 0.5, zf + 0.4), Vector3(w1 + 0.8, 1.0, 0.8))
-	lm.box("Trim", Vector3(0, h + 1.3, zf + 0.55), Vector3(w1 + 1.6, 0.6, 1.1))
-	# Gilt relief panels on the door leaves.
-	for row in 4:
-		for s in [-1.0, 1.0]:
-			var y := 1.2 + 2.1 * float(row)
-			var x: float = s * lerpf(w0, w1, y / h) * 0.18
-			lm.box("Gilt", Vector3(x, y + 0.7, zf + 0.06), Vector3(1.1, 1.4, 0.06), Basis(), 0.0)
-	LandmarkFhUtil.steps(lm, "Plinth", Vector3(0, 0, zf + 0.3), n, 9.0, 0.4, 0.15, 3)
-
-## The rotunda: a plain rendered drum with base and top bands, the ring
-## of tall clerestory windows, a thin copper coping and the flat roof.
-static func _lib_rotunda(lm: LandmarkMesh, c: Vector3, r: float) -> void:
-	lm.frustum("Render", c + Vector3(0, LIB_BLOCK_H - 0.5, 0), r, r, LIB_TOP - LIB_BLOCK_H - 0.1, 48)
-	lm.frustum("Trim", c + Vector3(0, LIB_BLOCK_H + 0.3, 0), r + 0.25, r + 0.25, 0.6, 48)
-	lm.frustum("Trim", c + Vector3(0, LIB_TOP - 1.6, 0), r + 0.3, r + 0.3, 0.7, 48)
-	lm.frustum("Copper", c + Vector3(0, LIB_TOP - 0.6, 0), r + 0.35, r + 0.3, 0.45, 48)
-	lm.frustum("Roof", c + Vector3(0, LIB_TOP - 0.15, 0), r + 0.25, r + 0.25, 0.15, 48)
-	var n := 32
-	for k in n:
-		var a := TAU * (float(k) + 0.5) / float(n)
-		var d := Vector3(cos(a), 0, sin(a))
-		var basis := Basis(Vector3.UP, -a + PI * 0.5)
-		lm.box("Windows", c + d * (r + 0.02) + Vector3(0, 25.2, 0), Vector3(1.1, 6.4, 0.06), basis, 0.0)
-		lm.box("Trim", c + d * (r + 0.12) + Vector3(0, 21.9, 0), Vector3(1.5, 0.22, 0.25), basis, 0.0)
-		for s in [-1.0, 1.0]:
-			lm.box("Render", c + d * (r + 0.08) + basis.x * (0.66 * float(s)) + Vector3(0, 25.2, 0),
-				Vector3(0.2, 6.6, 0.18), basis, 0.0)
-
-## The low shop wings along Sveavägen: shop fronts with granite frames
-## and flat roofs with a coping.
-static func _lib_shops(lm: LandmarkMesh) -> void:
-	var wings := [PackedVector2Array([Vector2(4.9, 31.9), Vector2(34.0, 31.9), Vector2(35.5, 54.0), Vector2(5.3, 54.7)]),
-		PackedVector2Array([Vector2(-42.4, 31.8), Vector2(-5.5, 31.9), Vector2(-5.6, 54.8), Vector2(-42.2, 56.2)])]
-	var h := 5.0
-	for poly in wings:
-		var pg: PackedVector2Array = poly
-		lm.poly_prism("Render", pg, 0.0, h)
-		var cen := LandmarkFhParts.centre(pg)
-		var inner := PackedVector2Array()
-		for p in pg:
-			inner.append(cen + (p - cen) * 0.97)
-		lm.poly_prism("Roof", inner, h, h + 0.15)
-		for i in pg.size():
-			var j := (i + 1) % pg.size()
-			var a := Vector3(pg[i].x, 0, pg[i].y)
-			var b := Vector3(pg[j].x, 0, pg[j].y)
-			var o := LandmarkFhParts.edge_out(pg, i)
-			var basis := Basis(Vector3.UP.cross(o).normalized(), Vector3.UP, o)
-			var m := (a + b) * 0.5
-			lm.box("Trim", m + Vector3(0, h - 0.25, 0) + o * 0.1, Vector3(a.distance_to(b) + 0.2, 0.5, 0.3), basis)
-			lm.box("Plinth", m + Vector3(0, 0.3, 0) + o * 0.1, Vector3(a.distance_to(b) + 0.2, 0.6, 0.3), basis)
-			if o.z > 0.5 or absf(o.x) > 0.5:
-				var nb := int(a.distance_to(b) / 4.0)
-				for k in nb:
-					var p := a.lerp(b, (float(k) + 0.5) / float(nb)) + o * 0.04
-					lm.box("Windows", p + Vector3(0, 2.3, 0), Vector3(3.0, 2.8, 0.06), basis, 0.0)
-					lm.box("Plinth", p + Vector3(0, 0.75, 0) + o * 0.06, Vector3(3.3, 0.3, 0.2), basis, 0.0)
-
-## Concert Hall: built in LandmarkSsCivic2.
-static func concert_hall(model: Node3D) -> void:
-	LandmarkSsCivic2.concert_hall(model)
-
-## Riksdag Building: built in LandmarkSsCivic2.
+## Riksdag Building: built in LandmarkSsCivic2 (the Public Library is
+## StoHeroLibrary and the Concert Hall StoHeroConcert, in hero/).
 static func riksdag(model: Node3D) -> void:
 	LandmarkSsCivic2.riksdag(model)

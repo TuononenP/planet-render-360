@@ -66,6 +66,8 @@ uniform float sett_on = 0.0;
 // 1 for the paved finishes (slabs, setts): PavingGlsl's stone, the same the
 // ground lays, over the pavement set. Gravel and track beds have none.
 uniform float paving_on = 0.0;
+// (specular cap, roughness floor) of dry stone: Stockholm's golden-hour sheen, off (1, 0) elsewhere.
+uniform vec2 glare = vec2(1.0, 0.0);
 // @SNOW
 // @GLOW
 // @PAVING
@@ -211,6 +213,9 @@ void fragment() {
 	float glint = facet.w * cover * (1.0 - in_track);
 	ROUGHNESS = mix(mix(mix(rough, 0.3, sc), SNOW_ROUGH, cover), 0.03, glint);
 	SPECULAR = mix(mix(0.5, SNOW_SPEC, cover), 1.0, glint);
+	float dry = (1.0 - cover) * (1.0 - climate_wetness);
+	SPECULAR = mix(SPECULAR, min(SPECULAR, glare.x), dry);
+	ROUGHNESS = mix(ROUGHNESS, max(ROUGHNESS, glare.y), dry);
 	METALLIC = metallic;
 	float near_px = 1.0 - smoothstep(0.03, 0.3, px);
 	vec2 layer = (texture(snow_nor, p / 5.0).rg - vec2(0.5)) * 0.6 * (1.0 - smoothstep(8.0, 30.0, length(VERTEX)));
@@ -276,6 +281,8 @@ uniform vec3 kerb_col = vec3(0.36, 0.35, 0.33);
 uniform float junction_m = 30.0;
 // Range (m) at which fine cracking has faded out, by preset (DETAIL_M).
 uniform float detail_m = 220.0;
+// (specular cap, roughness floor) of dry asphalt: Stockholm's golden-hour sheen, off (1, 0) elsewhere.
+uniform vec2 glare = vec2(1.0, 0.0);
 // @SNOW
 // @GLOW
 // @CLOUD_SHADOW
@@ -563,6 +570,9 @@ void fragment() {
 	NORMAL_MAP = mix(nm, snm, sc);
 	NORMAL_MAP_DEPTH = 1.0;
 	SPECULAR = mix(mix(0.4, mix(SNOW_SPEC, 0.5, worn), sc), 1.0, glint);
+	float dry = (1.0 - sc) * (1.0 - wet);
+	SPECULAR = mix(SPECULAR, min(SPECULAR, glare.x), dry);
+	ROUGHNESS = mix(ROUGHNESS, max(ROUGHNESS, glare.y), dry);
 	RIM = SNOW_RIM * sc * (1.0 - in_track);
 	RIM_TINT = SNOW_RIM_TINT;
 	// Night: the lampposts' pools of light (StreetGlow), on lit streets.
@@ -583,6 +593,10 @@ const YELLOW_CENTRE := ["US", "CA", "MX", "GT", "BZ", "HN", "SV", "NI", "CR", "P
 const YELLOW := Color(0.62, 0.40, 0.05)
 
 static var _mat: ShaderMaterial
+## Dry-surface (specular cap, roughness floor) of the place: Stockholm's quays and streets blew out
+## to white under the low golden sun. (1, 0) leaves the shaders as they were.
+const STOCKHOLM_GLARE := Vector2(0.14, 0.78)
+static var _glare := Vector2(1.0, 0.0)
 ## Painted kerb band: granite or concrete by region (KerbBuilder.stone_for).
 static var _kerb := Color(0.36, 0.35, 0.33)
 ## Crack range (m) per preset: Fast, Balanced, High, Ultra.
@@ -610,6 +624,7 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.set_shader_parameter("junction_m", JUNCTION_M)
 	_mat.set_shader_parameter("kerb_col", Vector3(_kerb.r, _kerb.g, _kerb.b))
 	_mat.set_shader_parameter("detail_m", _detail_m)
+	_mat.set_shader_parameter("glare", _glare)
 	return _mat
 
 ## RoadBuilder finish of a crossing's style; "auto" takes the country's
@@ -641,9 +656,11 @@ static func set_place(data: LocationData) -> void:
 	RoadPaint.set_place(data)
 	_kerb = KerbBuilder.stone_for(data)
 	_detail_m = float(DETAIL_M[RenderSettings.clamp_preset(data.quality_preset)])
+	_glare = STOCKHOLM_GLARE if ShoreApron.stockholm(data) else Vector2(1.0, 0.0)
 	if _mat != null:
 		_mat.set_shader_parameter("kerb_col", Vector3(_kerb.r, _kerb.g, _kerb.b))
 		_mat.set_shader_parameter("detail_m", _detail_m)
+		_mat.set_shader_parameter("glare", _glare)
 
 ## A paved finish's material: PBR set `set_name` calibrated to `target`
 ## (linear albedo), one per call (RoadBuilder caches per finish). `sett`
@@ -672,6 +689,7 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 	m.set_shader_parameter("lamp_pools", 1.0 if lamp_pools else 0.0)
 	m.set_shader_parameter("sett_on", 1.0 if sett else 0.0)
 	m.set_shader_parameter("paving_on", 1.0 if paving else 0.0)
+	m.set_shader_parameter("glare", _glare)
 	return m
 
 static func _tex(map_name: String) -> Texture2D:

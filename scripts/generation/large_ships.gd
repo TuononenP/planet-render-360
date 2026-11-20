@@ -18,6 +18,8 @@ static func prefix(kind: String) -> String:
 		return "CruiseFerry_"
 	if kind.begins_with("cargo"):
 		return "Cargo_"
+	if kind.begins_with("fleet:"):
+		return "Fleet_"
 	return "Liner_"
 
 static func commit(holder: Node3D, ships: Array, eye: Vector2, m2u: float, maps: bool = true) -> int:
@@ -40,12 +42,20 @@ static func commit(holder: Node3D, ships: Array, eye: Vector2, m2u: float, maps:
 ## The ship of `kind` at true size (+X bow, waterline y = 0).
 static func geometry(kind: String, length: float, beam: float, h: float, seed_value: float,
 		detail: bool, maps: bool, berth: Dictionary = {}) -> LandmarkMesh:
+	# A quay row's own vessels (QuayFleet): a model and livery each.
+	if kind.begins_with("fleet:"):
+		return QuayFleet.vessel(kind.trim_prefix("fleet:"), length, beam, h, berth, detail, maps)
 	var hex := CruiseLinerModel.hull_hex(seed_value * 4.0)
 	var model := "liner"
 	var variant := ""
 	if kind == "ferry":
-		hex = "#f0eee8"
+		# A listed port's line livery (QuayMoorings.FERRY_PORTS) rides on the berth.
+		hex = str(berth.get("hull", "#f0eee8"))
 		model = "cruise_ferry"
+		variant = str(berth.get("livery", ""))
+		# A shipping line's terminal (HarbourVesselData.CRUISE_LIVERIES).
+		if berth.has("line"):
+			variant = "line:" + str(berth["line"])
 	elif kind.begins_with("cargo"):
 		hex = CARGO_HULLS[int(seed_value * 50.0) % CARGO_HULLS.size()]
 		model = "cargo"

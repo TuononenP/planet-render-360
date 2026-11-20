@@ -60,7 +60,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 	else:
 		ctx = _context(data, ground)
 		mask = VegetationMask.new(data, ground)
-		var plan := {"pos": [], "sp": [], "scale": [], "real": []}
+		var plan := {"pos": [], "sp": [], "scale": [], "real": [], "grey_bark": ShoreApron.stockholm(data)}
 		_plant_osm_trees(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root
@@ -97,7 +97,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 		stats["cover"] = GroundCover.build(root, data, ground, mask, abort)
 		if abort != null and abort.requested:
 			return root
-		stats["rocks"] = RockOutcrops.build(root, data, ground)
+		stats["rocks"] = RockOutcrops.build(root, data, ground, mask)
 	if layer != Layer.DETAIL:
 		stats["far_canopy"] = FarCanopy.build(root, data, ground, SettlementMap.build(data))
 	timings["cover"] = Time.get_ticks_msec() - t
@@ -149,7 +149,7 @@ static func _sightline(data: LocationData) -> Array:
 			or not HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M):
 		return []
 	var site := TerrainBuilder.landmark_world_pos(data)
-	if HeritageZones.rule_at_xz(data, site.x, site.y).is_empty():
+	if HeritageZones.is_trees_only(HeritageZones.rule_at_xz(data, site.x, site.y)):
 		return []
 	var m := WorldScale.metres_to_units()
 	return [View360.spawn_xz(data), site, SIGHTLINE_EYE_M * m, SIGHTLINE_SITE_M * m]
@@ -204,7 +204,7 @@ static func _add(plan: Dictionary, x: float, z: float, ground: GroundTruth, sp: 
 	# Plan columns are plain Arrays (Packed arrays in a Dictionary are
 	# copied on read, so appends would be lost).
 	(plan["pos"] as Array).append(Vector3(x, ground.height_at_world(x, z), z))
-	(plan["sp"] as Array).append(sp)
+	(plan["sp"] as Array).append(TreeSpecies.stockholm_species(sp) if bool(plan.get("grey_bark", false)) else sp)
 	(plan["scale"] as Array).append(Vector2(size, spread))
 	(plan["real"] as Array).append(1 if real else 0)
 

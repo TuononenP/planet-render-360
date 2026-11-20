@@ -50,6 +50,10 @@ static func mesh(kind: String, id: String, livery: String, tail: bool = false, f
 	_running_gear(lm, k, sec, liv, far)
 	if not far:
 		_roof_gear(lm, sec)
+		# Route boards (TramBoards): TransitVehicles points them at the route.
+		if bool(liv.get("boards", false)):
+			lm.use(TramBoards.SURFACE, TramBoards.material([]))
+			TramBoards.add(lm, sec, float(k["w"]) * 0.5, _role_y(sec["prof"], "win"))
 	var out := lm.to_array_mesh(false)
 	if far:
 		out = _folded(out)

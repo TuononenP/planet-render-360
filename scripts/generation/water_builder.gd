@@ -80,6 +80,8 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		# upward offset that flooded low waterfront buildings.
 		ShoreWater.build(root, ground.shoreline, mat, abort)
 		ShoreBankMesh.build(root, ground.shoreline, abort, data)
+		StockholmQuay.build(root, ground.shoreline, data, abort)
+		StockholmLocks.build(root, ground.shoreline, data)
 		_shore_aprons(root, data, ground, channels, abort)
 		return root
 	# Clip each water polygon once and reuse: _poly_levels and

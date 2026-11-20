@@ -37,7 +37,11 @@ uniform float specular_value = 0.5;
 uniform bool curtain_wall = false;
 uniform vec2 cells = vec2(4.0, 1.0);
 uniform float night_energy = 0.0;
+// Warm ground-bounce on walls out of the sun, as in FacadeShader (0 = none).
+uniform float warm_bounce = 0.0;
 varying vec3 wpos;
+varying vec3 wnrm;
+global uniform vec3 cloud_sun_dir;
 // Where this world's origin lies on the streamer's continuous map (m,
 // WorldStreamer): the lit-window cells hold through a swap.
 global uniform vec2 world_origin_m;
@@ -49,6 +53,7 @@ float h13(vec3 p) {
 }
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 void fragment() {
 	vec3 base = texture(albedo_tex, UV).rgb * tint.rgb * COLOR.rgb;
@@ -66,6 +71,12 @@ void fragment() {
 	ROUGHNESS = rough;
 	METALLIC = metallic_value;
 	SPECULAR = specular_value;
+	if (warm_bounce > 0.0) {
+		vec3 n = normalize(wnrm);
+		float shade = 1.0 - smoothstep(-0.05, 0.35, dot(n, cloud_sun_dir));
+		float sun_up = smoothstep(0.03, 0.30, cloud_sun_dir.y);
+		EMISSION = (base + 0.12) * vec3(1.0, 0.80, 0.58) * (warm_bounce * (1.0 - clamp(n.y, 0.0, 1.0)) * shade * sun_up);
+	}
 	if (has_emit && night_energy > 0.001) {
 		// Shared walls have few tints, so the seed also takes the ground cell.
 		vec2 at = wpos.xz + world_origin_m;
@@ -80,7 +91,7 @@ void fragment() {
 		// Windows under about two pixels keep the map's own glow: picked one
 		// by one they alias to speckle on the skyline.
 		k = mix(k, 1.0, smoothstep(0.25, 0.7, bay_px));
-		EMISSION = texture(emit_tex, UV).rgb * night_energy * k;
+		EMISSION += texture(emit_tex, UV).rgb * night_energy * k;
 	}
 }
 """
@@ -169,6 +180,8 @@ static func from_standard(m: StandardMaterial3D) -> ShaderMaterial:
 	s.set_shader_parameter("curtain_wall", set_name == "glass")
 	s.set_shader_parameter("cells", grid_for(m))
 	s.set_shader_parameter("night_energy", 0.0)
+	if m.has_meta("warm_bounce"):
+		s.set_shader_parameter("warm_bounce", float(m.get_meta("warm_bounce")))
 	for k in m.get_meta_list():
 		if k != "facade_set":
 			s.set_meta(k, m.get_meta(k))

@@ -88,6 +88,17 @@ static func _calib(set_name: String, target: Color) -> Color:
 	return MaterialLibrary._calib_tint(
 		(MaterialLibrary.PBR_SETS[set_name] as Dictionary)["mean"], target)
 
+## Helsinki's stone and render fronts. The bundled sandstone photo is orange-brown (blue mean 0.049), so the
+## shared 2.8x calibration cap left every grey, buff or sand stone front missing its blue: olive-tan in sun and
+## dark moss-green in shade. Calibrated per channel up to 8x, the front takes the colour the palette names.
+static func _helsinki(style: Dictionary) -> bool:
+	return str(style.get("city", "")) == "helsinki"
+
+static func _stone_calib(target: Color) -> Color:
+	var mean: Color = MaterialLibrary.PBR_SETS["stone"]["mean"]
+	return Color(clampf(target.r / mean.r, 0.3, 8.0), clampf(target.g / mean.g, 0.3, 8.0),
+		clampf(target.b / mean.b, 0.3, 8.0))
+
 # --- Paris limestone (PRD §4.2) ---
 
 ## Six limestone tints (PRD §4.2: hue ≤±4%, value ±8%) around the
@@ -132,7 +143,8 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 		# curtain wall from masonry (including glass residential towers).
 		var mapped_set := str(MaterialLibrary.MATERIAL_TAGS.get(str(b.get("material", "")).strip_edges().to_lower(), ""))
 		if mapped_set == "glass" or (mapped_set == "" and str(style.get("wall_set", "")) == "glass"):
-			return FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1)
+			return FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1,
+				{"city": "stockholm"} if str(style.get("city", "")) == "stockholm" else {})
 		# A mapped finish and a resolved prewar tower must not turn into
 		# the region's generic apartment brick at the fidelity boundary.
 		if mapped_set != "" or str(style.get("era", "")).begins_with("nyc_"):
@@ -166,12 +178,17 @@ static func facade_for_building(b: Dictionary, region: String, storeys: int,
 	elif not style.is_empty():
 		look_key = "%.1f|%d" % [float(style["bay_m"]), variant]
 	var tint_key := tint.to_html()
-	if str(b.get("material", "")).strip_edges().to_lower() == "marble":
+	if (set_name == "stone" and _helsinki(style)) \
+			or str(b.get("material", "")).strip_edges().to_lower() == "marble":
 		# HTML colours clamp HDR calibration channels to 1.0, making
 		# differently coloured pale marbles share the first material.
 		tint_key = "marble:%.3f,%.3f,%.3f" % [tint.r, tint.g, tint.b]
 	var key := "%s|%s|%d|%d|%s|%s" % [set_name, pattern, tex_rows, detail,
 		tint_key, look_key]
+	if set_name == "glass" and str(style.get("city", "")) == "stockholm":
+		key += "|sto"
+	if _helsinki(style):
+		key += "|hel"
 	if _facade_cache.has(key):
 		return _facade_cache[key] as Material
 	var family := set_name + "|" + pattern
@@ -312,16 +329,29 @@ static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 			var mean: Color = MaterialLibrary.PBR_SETS[set_name]["mean"]
 			return Color(clampf(target.r / mean.r, 0.02, 8.0),
 				clampf(target.g / mean.g, 0.02, 8.0), clampf(target.b / mean.b, 0.02, 8.0))
+		if set_name == "stone" and _helsinki(style):
+			return _stone_calib(hsv)
 		return _keep_chroma(set_name, _calib(set_name, hsv))
 	if set_name == "glass":
 		return Color(0.38, 0.42, 0.45) if str(style.get("era", "")) == "nyc_international" \
 			and not style.has("curtain") else Color.WHITE
+	if set_name == "wood" and str(style.get("city", "")) == "stockholm" and painted.a > 0.0:
+		return _stockholm_wood(painted)
+	if set_name == "stone" and painted.a > 0.0 and _helsinki(style):
+		return _stone_calib(painted)
 	if painted.a > 0.0 and MaterialLibrary.PBR_SETS.has(set_name):
 		return _keep_chroma(set_name, _calib(set_name, painted))
 	if set_name == "limestone":
 		return _limestone_tint(seed_v)
 	var variants := [Color(0.96, 0.96, 0.96), Color.WHITE, Color(1.04, 1.03, 1.02)]
 	return variants[absi(hash(str(seed_v))) % variants.size()]
+
+## Stockholm's painted boarding: ochre and yellow are far brighter than the dark plank photo, and the
+## shared 2.8x calibration cap left them a dark olive-khaki. Calibrated up to 7x, as paint over bare boards.
+static func _stockholm_wood(target: Color) -> Color:
+	var mean: Color = MaterialLibrary.PBR_SETS["wood"]["mean"]
+	return Color(clampf(target.r / mean.r, 0.3, 7.0), clampf(target.g / mean.g, 0.3, 7.0),
+		clampf(target.b / mean.b, 0.3, 7.0))
 
 ## Brick and terracotta photos are already strongly coloured: a
 ## per-channel calibration toward a red target multiplies that chroma and
@@ -346,6 +376,8 @@ static func _look_key(look: Dictionary) -> String:
 		str(look.get("window", "casement")),
 		snappedf(float(look.get("rails", 0.0)), 0.1),
 		float(look.get("bay_m", 3.2))]
+	if str(look.get("city", "")) in FacadeComposer.SMOOTH_PLASTER_CITIES:
+		key += "|" + str(look["city"]).left(3)
 	return key + "|" + str(look["curtain"]) if look.has("curtain") else key
 
 ## Ground-storey material for a building whose look has a ground
@@ -371,7 +403,8 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 	if kind == "render":
 		tint = _calib("render", ArchitectureStyle._lin("#f1ece0"))
 	elif kind == "stone":
-		tint = _calib("stone", ArchitectureStyle._lin("#b8ab92"))
+		tint = _stone_calib(ArchitectureStyle._lin("#b8ab92")) if _helsinki(style) \
+			else _calib("stone", ArchitectureStyle._lin("#b8ab92"))
 	else:
 		tint = _wall_tint(b, style, set_name, float(style.get("variant", 0)))
 	var detail := 2 if fidelity >= 3 else 1
@@ -395,6 +428,8 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 				style, fascia, Callable(MaterialLibrary, "_set_image")))
 		_facade_texs[tkey] = texs
 	var m := _material_from(texs, set_name, detail, tint)
+	if _helsinki(style):
+		m.set_meta("warm_bounce", FacadeTextures.HELSINKI_BOUNCE)
 	m.set_meta("fc_uv", Vector3(maxf(float(style.get("bay_m", 3.2)), 1.0),
 		float(FacadeComposer.BAYS), 1.0))
 	FacadeTextures.set_recess(m, texs.get("depth"), maxf(float(style.get("bay_m", 3.2)), 1.0)

@@ -27,7 +27,7 @@ func _run() -> void:
 	var countries := {"paris": "FR", "alps": "CH", "banff": "CA", "big_sur": "US",
 		"tokyo": "JP", "new_york": "US", "new_york_midtown": "US", "central_park": "US", "stockholm": "SE", "monaco": "MC",
 		"dubai": "AE", "london": "GB", "rome": "IT", "venice": "IT",
-		"seoul": "KR", "san_francisco": "US", "helsinki": "FI", "espoo": "FI"}
+		"seoul": "KR", "san_francisco": "US", "helsinki": "FI", "espoo": "FI", "turku": "FI"}
 	var places := _places()
 	for row in places:
 		var pos := Vector2(float(row["lat"]), float(row["lon"]))

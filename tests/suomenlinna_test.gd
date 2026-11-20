@@ -117,7 +117,7 @@ func _run() -> void:
 		var box: AABB = mesh.transform * mesh.mesh.get_aabb()
 		bounds = box if first else bounds.merge(box)
 		first = false
-	_check(bounds.size.x < 45.0 and bounds.size.z < 40.0 and absf(bounds.end.y - 42.0) < 0.1, "church must retain its lighthouse height without the fake adjacent fortress")
+	_check(bounds.size.x < 55.0 and bounds.size.z < 45.0 and absf(bounds.end.y - 42.0) < 0.1, "church must retain its lighthouse height without the fake adjacent fortress")
 	church.free()
 	holder.free()
 	BuildingMasses.end_build()

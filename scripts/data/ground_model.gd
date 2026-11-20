@@ -21,6 +21,7 @@ const SOURCES := {
 	"ahn": "Elevation: AHN DTM, Rijkswaterstaat (CC0)",
 	"swisstopo": "Elevation: © swisstopo, swissALTI3D (Open Government Data)",
 	"mml": "Elevation: © National Land Survey of Finland, Elevation model 2 m (CC BY 4.0)",
+	"lm": "Elevation: Lantmäteriet, Markhöjdmodell 1 m (CC0), via Mapterhorn",
 }
 ## Ground half-width of the window requested around the viewpoint: the
 ## 2.4 km detailed extent with a margin, like HelsinkiDem.HALF_M.
@@ -28,6 +29,7 @@ const HALF_M := 1450.0
 ## Cells across a window of the sources that answer one raster.
 const CELLS := 300
 ## Cells across an MML 2 m window (~4.8 m/cell, matching HelsinkiDem.CELLS).
+## Lantmäteriet's windows use the same size.
 const MML_CELLS := 600
 ## A raster missing more of its cells than this has no data here (outside
 ## the country, open sea). AHN leaves holes under every building and over
@@ -81,6 +83,23 @@ const _FINLAND := [Vector2(19.5, 59.7), Vector2(21.2, 60.8), Vector2(21.0, 63.1)
 	Vector2(30.1, 66.5), Vector2(30.5, 64.0), Vector2(31.6, 62.9), Vector2(28.0, 60.5),
 	Vector2(25.0, 59.9), Vector2(22.5, 59.7)]
 
+# Sweden, coarse: the Öresund and Torne river borders run between the
+# twin towns, the Norwegian border a little inside Sweden. Mapterhorn
+# answers everywhere (Copernicus outside Sweden), so this outline alone
+# decides where its tiles count as Lantmäteriet's bare earth.
+const _SWEDEN := [Vector2(12.80, 55.33), Vector2(14.30, 55.36), Vector2(14.50, 55.70),
+	Vector2(16.70, 56.10), Vector2(17.30, 57.40), Vector2(18.00, 56.85), Vector2(19.40, 57.30),
+	Vector2(19.40, 58.05), Vector2(18.90, 58.60), Vector2(19.30, 59.50), Vector2(18.95, 60.25),
+	Vector2(17.90, 60.75), Vector2(17.60, 61.60), Vector2(18.90, 62.90), Vector2(20.60, 63.55),
+	Vector2(21.70, 64.40), Vector2(22.50, 65.50), Vector2(24.05, 65.75), Vector2(23.60, 66.50),
+	Vector2(23.90, 67.00), Vector2(23.40, 67.90), Vector2(21.00, 68.95), Vector2(20.10, 68.45),
+	Vector2(18.20, 68.45), Vector2(16.60, 67.60), Vector2(15.60, 66.30), Vector2(14.60, 65.40),
+	Vector2(13.90, 64.60), Vector2(12.40, 63.95), Vector2(12.25, 62.30), Vector2(12.70, 61.60),
+	Vector2(12.40, 61.00), Vector2(12.30, 60.55), Vector2(11.90, 59.90), Vector2(11.55, 59.40),
+	Vector2(11.20, 59.10), Vector2(10.95, 58.85), Vector2(11.05, 58.20), Vector2(11.60, 57.60),
+	Vector2(12.10, 56.95), Vector2(12.55, 56.45), Vector2(12.40, 56.25), Vector2(12.66, 56.10),
+	Vector2(12.75, 55.80), Vector2(12.85, 55.55)]
+
 ## True in England: Terrarium's heights there are the Environment Agency's
 ## bare-earth lidar DTM (roads within about 1 m of it in London, Manchester
 ## and Birmingham), so no building filter or replacement is wanted.
@@ -105,6 +124,8 @@ static func source_for(lat: float, lon: float) -> String:
 		return "ahn"
 	if Geometry2D.is_point_in_polygon(p, PackedVector2Array(_FINLAND)) and not HelsinkiDem.covers(lat, lon):
 		return "mml"
+	if Geometry2D.is_point_in_polygon(p, PackedVector2Array(_SWEDEN)):
+		return "lm"
 	return ""
 
 ## Web Mercator metres of lat/lon.
@@ -197,6 +218,24 @@ static func decode_gsi_png(bytes: PackedByteArray) -> PackedFloat32Array:
 			out[i] = NAN
 		else:
 			out[i] = valid_height(float(v if v < 0x800000 else v - 0x1000000) * 0.01)
+	return out
+
+## Heights of one Terrarium-encoded tile (Mapterhorn: lossless WebP,
+## 512 × 512): R·256 + G + B/256 − 32768 m. Empty when the bytes are not
+## a square WebP or PNG of `size` pixels.
+static func decode_terrarium(bytes: PackedByteArray, size: int) -> PackedFloat32Array:
+	var img := Image.new()
+	var webp := bytes.size() > 12 and bytes.slice(8, 12).get_string_from_ascii() == "WEBP"
+	var err := img.load_webp_from_buffer(bytes) if webp else img.load_png_from_buffer(bytes)
+	if err != OK or img.get_width() != size or img.get_height() != size:
+		return PackedFloat32Array()
+	img.convert(Image.FORMAT_RGB8)
+	var px := img.get_data()
+	var out := PackedFloat32Array()
+	out.resize(size * size)
+	for i in size * size:
+		out[i] = valid_height(float(px[i * 3]) * 256.0 + float(px[i * 3 + 1])
+			+ float(px[i * 3 + 2]) / 256.0 - 32768.0)
 	return out
 
 ## `h`, or NAN when it is a source's no-data marker.

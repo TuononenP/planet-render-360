@@ -25,6 +25,12 @@ extends RefCounted
 ## court), Wikipedia "Stockholm Palace" (115 x 120 m block, court, wing
 ## sizes, facade programme), kungligaslotten.se "Why is the palace so
 ## big?" (northern front approx. 35 m + 1.5 m balustrade, 212 m long).
+## Colours from the photos (visual-plan/refs/landmarks/royal_palace_stockholm/):
+## rose-brown render on the plain walls, pale sandstone on the risalits,
+## rustication and dressings, low roofs in a grey-green patinated metal.
+## The registry point is the model frame (the main block's centre); the
+## model's own area centroid lies 4.9 m from the OSM outline's, so no
+## registry shift is needed.
 ## Storkyrkan, Katarina and Hedvig Eleonora churches live in
 ## LandmarkSsRoyal2.
 
@@ -54,9 +60,9 @@ const WING_BANDS := [[3.5, 0.5, 0.5], [14.0, 0.7, 0.6], [21.4, 0.4, 0.4]]
 
 static func palace(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Render", LandmarkMaterials.pbr("render", "#B49B7B", 3.0))
-	lm.use("Stone", LandmarkMaterials.pbr("stone", "#C9BA9B", 3.0))
-	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#6E9C88", 2.0, 0.55, 0.3))
+	lm.use("Render", LandmarkMaterials.pbr("render", "#B8896C", 3.0))
+	lm.use("Stone", LandmarkMaterials.pbr("stone", "#BAA88A", 3.0))
+	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#6B7F74", 2.0, 0.55, 0.3))
 	lm.use("Glass", LandmarkMaterials.glass("#22292D"))
 	lm.use("Bronze", LandmarkMaterials.paint("#4B4436", 0.45, 0.7))
 	lm.use("Dark", LandmarkMaterials.pbr("stone", "#3A332B", 3.0))
@@ -148,8 +154,8 @@ static func _front(lm: LandmarkMesh, a: Vector3, r: Vector3, o: Vector3, length:
 			win, sill, y1 - y0, 0.4)
 		for sg in segs:
 			if float(sg[2]) > 0.0:
-				LandmarkDetail.pierced_face(lm, wall, "Glass", a + r * float(sg[0]) + Vector3.UP * y0 + o * 0.4,
-					r, o, float(sg[1]) - float(sg[0]), y1 - y0, int(sg[3]), 1, win, sill, y1 - y0, RIS_M)
+				LandmarkDetail.pierced_face(lm, "Stone" if giant else wall, "Glass",
+					a + r * float(sg[0]) + Vector3.UP * y0 + o * 0.4, r, o, float(sg[1]) - float(sg[0]), y1 - y0, int(sg[3]), 1, win, sill, y1 - y0, RIS_M)
 		var wy0 := y0 + sill
 		var wy1 := wy0 + win.y
 		for i in bays:

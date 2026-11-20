@@ -10,7 +10,7 @@ extends SceneTree
 ## off bridges and apart; and the quality gate holds.
 
 const LIVERY := {"modern3": "helsinki", "modern5": "generic2", "modern2": "helsinki", "lrv": "sf_lrv",
-	"heritage": "lisbon", "cable": "sf_cable", "pcc": "pcc_green"}
+	"heritage": "lisbon", "cable": "sf_cable", "pcc": "pcc_green", "artic": "helsinki", "nr2": "helsinki"}
 
 func _init() -> void:
 	_run()
@@ -121,7 +121,7 @@ func _models(failures: Array[String]) -> void:
 				var joint_b := float(sec["at"]) + (sec["sup"] as Vector2).y
 				if absf(joint_a - joint_b) > 0.001:
 					failures.append("%s sections %d and %d should share their joint: %s vs %s" % [kind, i - 1, i, joint_a, joint_b])
-	for row in [["modern3", 26.0, 29.0], ["modern5", 30.0, 34.0], ["modern2", 19.0, 21.5], ["lrv", 22.0, 24.0],
+	for row in [["modern3", 26.0, 29.0], ["artic", 26.0, 29.0], ["nr2", 23.0, 26.0], ["modern5", 30.0, 34.0], ["modern2", 19.0, 21.5], ["lrv", 22.0, 24.0],
 			["heritage", 8.3, 8.5], ["cable", 8.0, 8.6], ["pcc", 14.0, 14.5]]:
 		var got := TramSpecs.length_m(row[0])
 		if got < float(row[1]) or got > float(row[2]):
@@ -137,8 +137,8 @@ func _selection(failures: Array[String]) -> void:
 	var light := OsmTags._rail_entry({"railway": "light_rail", "gauge": "1435"}, PackedVector2Array([Vector2.ZERO, Vector2(10, 0)]))
 	var heavy := OsmTags._rail_entry({"railway": "rail"}, PackedVector2Array([Vector2.ZERO, Vector2(10, 0)]))
 	var rows := [
-		["helsinki", "FI", street, 0.9, "modern3", "helsinki"],
-		["helsinki", "FI", street, 0.1, "modern2", "helsinki"],
+		["helsinki", "FI", street, 0.9, "artic", "helsinki"],
+		["helsinki", "FI", street, 0.1, "nr2", "helsinki"],
 		["lisbon", "PT", narrow, 0.5, "heritage", "lisbon"],
 		["lisbon", "PT", standard, 0.5, "modern3", "lisbon_modern"],
 		["", "PT", standard, 0.5, "heritage", "porto"],
@@ -230,7 +230,7 @@ func _route(failures: Array[String]) -> void:
 	var on_bend := 200.0 + PI * 0.25 * 40.0
 	if (route.xz_at(0.0) as Vector2) != Vector2(0, 0):
 		on_bend = route.length_m - on_bend
-	for kind: String in ["modern5", "modern3", "modern2"]:
+	for kind: String in ["modern5", "modern3", "modern2", "artic", "nr2"]:
 		var train := TramSpecs.train(kind)
 		var poses := route.place_train(on_bend, train)
 		for i in train.size():
@@ -306,7 +306,7 @@ func _placement(failures: Array[String]) -> void:
 			failures.append("tram %d must stand the same on every build" % i)
 		var a: Vector2 = t["a"]
 		var b: Vector2 = t["b"]
-		if not str(t["kind"]) in ["modern3", "modern2"] or str(t["livery"]) != "helsinki":
+		if not str(t["kind"]) in ["artic", "nr2"] or str(t["livery"]) != "helsinki":
 			failures.append("Helsinki should stand its own trams: %s" % t["kind"])
 		if absf(a.distance_to(b) - float(t["length"])) > 0.05:
 			failures.append("a tram's footprint should span its length: %s" % a.distance_to(b))

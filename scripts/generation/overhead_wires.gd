@@ -257,6 +257,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 	var chunks := {}
 	var poles := {}
 	var m := WorldScale.metres_to_units()
+	# Stockholm's wires and poles are drawn heavier, wire darker with a faint sheen, to read at distance.
+	var sto := CityStyles.region_at(data.latitude, data.longitude) == "stockholm"
+	var wire_k := 1.8 if sto else 1.0
+	var pole_k := 1.4 if sto else 1.0
 	# Each span luminaire also gets a real light (StreetLights), sharing
 	# the lampposts' budget.
 	var heads: Array = []
@@ -268,18 +272,18 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 		var buffers: Array = chunks[key]
 		if span["contact"]:
 			var b: Vector2 = span["b"]
-			_tube(buffers[0], Vector3(a.x, span["ya"], a.y), Vector3(b.x, span["yb"], b.y), 0.012 * m)
+			_tube(buffers[0], Vector3(a.x, span["ya"], a.y), Vector3(b.x, span["yb"], b.y), 0.012 * wire_k * m)
 		var supports: Array = span["supports"]
 		var left: Vector3 = supports[0][0]
 		var right: Vector3 = supports[1][0]
 		var mid := (left + right) * 0.5 - Vector3.UP * 0.55 * m
-		_tube(buffers[0], left, mid, 0.009 * m)
-		_tube(buffers[0], mid, right, 0.009 * m)
+		_tube(buffers[0], left, mid, 0.009 * wire_k * m)
+		_tube(buffers[0], mid, right, 0.009 * wire_k * m)
 		for support in supports:
 			var p: Vector3 = support[0]
 			var snap := Vector2i(roundi(p.x / (3.0 * m)), roundi(p.z / (3.0 * m)))
 			if not support[1] and not poles.has(snap):
-				_tube(buffers[1], Vector3(p.x, support[2], p.z), p, 0.065 * m)
+				_tube(buffers[1], Vector3(p.x, support[2], p.z), p, 0.065 * pole_k * m)
 				poles[snap] = true
 		if span["lamp"]:
 			StreetProps._box(buffers[1], mid - Vector3.UP * 0.18 * m, Vector3(0.65, 0.18, 0.3) * m)
@@ -298,6 +302,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dict
 			var mat := StandardMaterial3D.new()
 			mat.albedo_color = Color(0.045, 0.05, 0.045) if j == 0 else Color(0.26, 0.28, 0.26)
 			mat.roughness = 0.65
+			if sto and j == 0:
+				mat.albedo_color = Color(0.02, 0.022, 0.02)
+				mat.metallic = 0.55
+				mat.roughness = 0.38
 			if j == 2:
 				mat.albedo_color = Color(0.9, 0.88, 0.75)
 				mat.emission_enabled = true

@@ -20,6 +20,13 @@ static func _tower(lm: LandmarkMesh, row: Dictionary, x: float, leg_z: float) ->
 	var clear := float(row["clear"])
 	var main := BridgeSpec.widest_span(row)
 	var leg := clampf(main * 0.008 + 1.0, 1.4, 4.5)
+	if str(row.get("pylon", "portal")) == "twin":
+		# Two separate inclined blades, narrow across the deck and wide in
+		# the plane of the stays, with no cross beam.
+		for s in [-1.0, 1.0]:
+			lm.beam("Steel", Vector3(x, leg * 1.2, s * leg_z), Vector3(x + float(row.get("lean", 0.0)), top - 0.3, s * leg_z),
+				leg * 0.6, leg * 1.6, Vector3(0, 0, 1))
+		return
 	if str(row.get("pylon", "portal")) == "single":
 		var lean := float(row.get("lean", 0.0))
 		if absf(lean) > 0.5:
@@ -87,8 +94,9 @@ static func _stayed(lm: LandmarkMesh, row: Dictionary, low: bool) -> void:
 	BridgeParam.box_girder(lm, "Steel", -h, h, clear, width, depth)
 	BridgeParam.rails(lm, "Steel", -h, h, clear, width)
 	var single := str(row.get("pylon", "portal")) == "single"
-	var lean := float(row.get("lean", 0.0)) if single else 0.0
-	var leg_z := width * 0.5 + 1.2
+	var twin := str(row.get("pylon", "portal")) == "twin"
+	var lean := float(row.get("lean", 0.0)) if single or twin else 0.0
+	var leg_z := width * 0.3 if twin else width * 0.5 + 1.2
 	var w := clampf(main * 0.0005, 0.18, 0.45)
 	if low:
 		w = clampf(main * 0.0012, 0.25, 0.6)
@@ -104,8 +112,11 @@ static func _stayed(lm: LandmarkMesh, row: Dictionary, low: bool) -> void:
 			var between := next >= 0 and next < towers.size()
 			var other := xs[towers[next]] if between else (h if dir > 0.0 else -h)
 			var reach := absf(other - x) * (0.5 if between else 1.0)
-			reach = minf(reach, main * 0.5) * 0.94
+			# Between two towers a stay fan stops half way; toward a deck end it
+			# runs the whole span, as a one-tower bridge's long span does.
+			reach = (minf(reach, main * 0.5) if between else reach) * 0.94
 			var n := clampi(int(reach / (22.0 if low else 14.0)), 3 if low else 5, 8 if low else 14)
+			n = int(row.get("stays", n))
 			var d0 := reach * (0.2 if low else 0.12)
 			var dd := (reach - d0) / maxf(n - 1, 1)
 			for s in [-1.0, 1.0]:

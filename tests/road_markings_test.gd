@@ -460,14 +460,15 @@ func _run() -> void:
 	d.country = "FI"
 	var path := PackedVector2Array([Vector2(-70, 50), Vector2(70, 50)])
 	d.roads = [OsmTags._road_entry({"highway": "footway", "lit": "yes"}, path)]
-	_check(_lamps(d).get("post_top", 0) == 0, "a lit footway off green cover has no lamps")
+	_check(_lamps(d).get("post_top", 0) + _lamps(d).get("lantern", 0) == 0, "a lit footway off green cover has no lamps")
 	d.roads.append(OsmTags._road_entry({"highway": "footway", "footway": "sidewalk", "lit": "yes"}, path))
 	d.roads.append(OsmTags._area_entry({"highway": "pedestrian", "area": "yes"}, "pedestrian",
 		PackedVector2Array([Vector2(-60, 30), Vector2(60, 30), Vector2(60, 70), Vector2(-60, 70)]), []))
-	_check(_lamps(d).get("post_top", 0) == 0, "no lamps along sidewalks or a square's outline")
+	_check(_lamps(d).get("post_top", 0) + _lamps(d).get("lantern", 0) == 0, "no lamps along sidewalks or a square's outline")
 	d.land_polygons.append({"class": "grass", "points": PackedVector2Array([Vector2(-80, 40),
 		Vector2(80, 40), Vector2(80, 60), Vector2(-80, 60)]), "holes": []})
-	_check(_lamps(d).get("post_top", 0) > 0, "a lit park path has lamps")
+	var park := _lamps(d)
+	_check(park.get("lantern", 0) >= 6 and park.get("post_top", 0) == 0, "a lit park path has cast-iron lanterns every ~16 m: %s" % [park])
 	# Everything lays into real meshes.
 	d = _place("JP")
 	d.roads = _four_way()

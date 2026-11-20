@@ -14,7 +14,7 @@ static func entries() -> Array:
 			"radius_m": 5000.0, "wiki_title": "Manhattan Bridge", "height_m": 110.0, "clear_m": 24.0,
 			"yaw_deg": 65.0, "span_m": 2140.0, "base": "sea", "kind": "Bridge",
 			"aliases": ["manhattan bridge"]},
-		{"type": "vasterbron", "skyline_priority": 1, "name": "Västerbron", "lat": 59.3244, "lon": 18.0272,
+		{"type": "vasterbron", "skyline_priority": 1, "name": "Västerbron", "lat": 59.32452, "lon": 18.02707,
 			"radius_m": 5000.0, "wiki_title": "Västerbron", "height_m": 51.2, "clear_m": 15.0,
 			"yaw_deg": -116.0, "span_m": 602.0, "base": "water", "kind": "Bridge",
 			"aliases": ["västerbron", "vasterbron", "vaster bridge stockholm"]},

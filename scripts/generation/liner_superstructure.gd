@@ -107,7 +107,8 @@ static func build(lm: LandmarkMesh, p: Dictionary, spec: Dictionary, cfg: Dictio
 	var f_top := top_y + maxf(minf(dh * 2.4, h * 0.97 - top_y), 2.0)
 	var f_base := _deck_under(tops, afts, fronts, funnel_x - fr * 2.4, funnel_x + fr * 2.4, y0)
 	var f_h := f_top - f_base
-	VesselKit.funnel(lm, Vector3(funnel_x, f_base - 0.1, 0), f_h + 0.1, fr, 2.3, "Funnel", "Black", detail)
+	VesselKit.funnel(lm, Vector3(funnel_x, f_base - 0.1, 0), f_h + 0.1, fr, 2.3, "Funnel",
+		str(cfg.get("funnel_top", "Black")), detail)
 	if detail:
 		for k in 3:
 			lm.lathe("Black", Vector3(funnel_x + fr * (float(k) - 1.0) * 0.9, f_top - 0.3, 0),
@@ -134,7 +135,8 @@ static func build(lm: LandmarkMesh, p: Dictionary, spec: Dictionary, cfg: Dictio
 		ShipLights.deck_lamps(lm, -length * 0.3, length * 0.22, y0 + d0 - 0.35, widths[0] * 0.5 + 0.3, 9.0)
 		ShipLights.deck_lamps(lm, afts[n - 1] + 3.0, fronts[n - 1] - 3.0, top_y + 1.6, sun_w * 0.5 - 0.15, 11.0, 0.1)
 	return {"n": n, "dh": dh, "deck_tops": tops, "fronts": fronts, "afts": afts, "widths": widths,
-		"bridge": bi, "top_y": top_y, "mast_x": mast_x, "funnel_x": funnel_x}
+		"bridge": bi, "top_y": top_y, "mast_x": mast_x, "funnel_x": funnel_x,
+		"funnel_base": f_base, "funnel_top": f_top, "funnel_r": fr}
 
 ## Floor height of deck `i`: deck 0 is `d0` high, the others `dh`.
 static func _base(i: int, y0: float, d0: float, dh: float) -> float:

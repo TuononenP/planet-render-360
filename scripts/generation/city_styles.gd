@@ -28,6 +28,9 @@ const ZONES := [
 	["stockholm", "stockholm", 59.3293, 18.0686, 6.0],
 	["stockholm", "stockholm", 59.2760, 17.9060, 1.0], # Skärholmen
 	["stockholm", "stockholm", 59.3920, 17.9170, 1.8], # Tensta / Rinkeby
+	["stockholm", "stockholm", 59.4120, 17.9200, 1.2], # Husby / Akalla
+	["stockholm", "stockholm", 59.2950, 17.9330, 0.9], # Bredäng
+	["stockholm", "stockholm", 59.2600, 18.0200, 1.0], # Hagsätra / Rågsved
 	["new_york", "new_york", 40.7831, -73.9712, 11.0],  # Manhattan
 	["new_york", "new_york", 40.6800, -73.9600, 7.0],   # inner Brooklyn
 	["new_york", "new_york", 40.7500, -73.8950, 5.5],   # inner Queens
@@ -159,8 +162,12 @@ const CORES := {
 ## radius_km, weight multiplier]. Soft — they only scale the era's
 ## weight in BuildingEra's last-resort seeded pick, never override a
 ## real cue (a tagged 1970 tower in the Marais stays modern). San
-## Francisco's structural rules also read the most local circle a
-## building stands in (its fabric changes block by block).
+## Francisco's and Stockholm's structural rules also read the most local
+## circle a building stands in (their fabric changes block by block):
+## Stockholm's circles are Gamla stan, the stone city of Kungsholmen and
+## Södermalm, Klara's post-war core, the cottage and villa districts, the
+## Million Programme estates and the new quarters. A city in
+## FAR_DISTRICT_CITIES also draws them into the far fabric.
 const DISTRICTS := [
 	["paris", "paris_faubourg", 48.8590, 2.3620, 0.9, 5.0],      # Le Marais
 	["paris", "paris_faubourg", 48.8867, 2.3431, 0.6, 5.0],      # Montmartre
@@ -280,6 +287,7 @@ const DISTRICTS := [
 	["stockholm", "stockholm_medieval", 59.3251, 18.0711, 0.43, 20.0], # Gamla stan
 	["stockholm", "stockholm_medieval", 59.3250, 18.0640, 0.22, 20.0], # Riddarholmen
 	["stockholm", "stockholm_wood", 59.3195, 18.0595, 0.20, 12.0], # Mariaberget
+	["stockholm", "stockholm_wood", 59.3172, 18.0836, 0.11, 12.0], # Fjällgatan
 	["stockholm", "stockholm_wood", 59.3125, 18.0925, 0.25, 12.0], # Vita Bergen
 	["stockholm", "stockholm_stone", 59.3360, 18.0900, 0.85, 10.0], # Östermalm / Strandvägen
 	["stockholm", "stockholm_grace", 59.3435, 18.0370, 0.65, 10.0], # Vasastan
@@ -290,6 +298,22 @@ const DISTRICTS := [
 	["stockholm", "stockholm_miljon", 59.3890, 17.9290, 0.8, 15.0], # Rinkeby
 	["stockholm", "stockholm_eco", 59.3030, 18.0950, 0.8, 15.0], # Hammarby Sjöstad
 	["stockholm", "stockholm_eco", 59.3580, 18.1060, 0.7, 15.0], # Norra Djurgårdsstaden
+	["stockholm", "stockholm_postwar", 59.3335, 18.0625, 0.40, 15.0], # Klara, Hötorgscity, Sergels torg
+	["stockholm", "stockholm_stenstad", 59.3330, 18.0450, 0.65, 10.0], # Kungsholmen east
+	["stockholm", "stockholm_stenstad", 59.3360, 18.0230, 0.60, 10.0], # Kungsholmen west, Fridhemsplan
+	["stockholm", "stockholm_stenstad", 59.3150, 18.0700, 0.90, 10.0], # Södermalm: Mariatorget, Medborgarplatsen
+	["stockholm", "stockholm_stenstad", 59.3140, 18.0880, 0.55, 10.0], # Södermalm: Sofia
+	["stockholm", "stockholm_stenstad", 59.3125, 18.0450, 0.55, 10.0], # Södermalm: Högalid, Hornstull
+	["stockholm", "stockholm_wood", 59.3222, 18.1025, 0.18, 12.0], # Djurgårdsstaden
+	["stockholm", "stockholm_villa", 59.3245, 18.1050, 0.75, 12.0], # Djurgården west: Skansen, villas
+	["stockholm", "stockholm_villa", 59.3240, 18.1400, 1.20, 12.0], # Djurgården east, Blockhusudden
+	["stockholm", "stockholm_funkis", 59.3460, 18.0980, 0.55, 12.0], # Gärdet lamellas
+	["stockholm", "stockholm_miljon", 59.4100, 17.9270, 0.7, 15.0], # Husby
+	["stockholm", "stockholm_miljon", 59.4145, 17.9130, 0.6, 15.0], # Akalla
+	["stockholm", "stockholm_miljon", 59.3965, 17.8880, 0.4, 15.0], # Hjulsta
+	["stockholm", "stockholm_miljon", 59.2950, 17.9330, 0.6, 15.0], # Bredäng
+	["stockholm", "stockholm_miljon", 59.2630, 18.0130, 0.5, 15.0], # Hagsätra
+	["stockholm", "stockholm_miljon", 59.2565, 18.0270, 0.5, 15.0], # Rågsved
 	["copenhagen", "copenhagen_old", 55.6800, 12.5900, 0.35, 20.0],  # Nyhavn
 	["copenhagen", "copenhagen_modern", 55.6300, 12.5800, 1.2, 20.0],  # Ørestad
 	["oslo", "oslo_wood", 59.9200, 10.7470, 0.2, 30.0],          # Damstredet
@@ -322,6 +346,18 @@ const DISTRICTS := [
 	["helsinki", "helsinki_midrise", 60.1625, 24.9110, 0.5, 8.0],  # Ruoholahti, 1990s brick
 	["helsinki", "helsinki_functional", 60.1600, 24.8750, 1.5, 8.0],  # Lauttasaari
 	["helsinki", "helsinki_midrise", 60.1530, 24.8590, 0.55, 8.0],  # Vattuniemi
+	["helsinki", "helsinki_commercial", 60.1705, 24.9440, 0.35, 8.0],  # Kluuvi, Aleksanterinkatu to the Station
+	["helsinki", "helsinki_commercial", 60.1690, 24.9355, 0.3, 8.0],  # Kamppi, Forum to Simonkatu
+	["helsinki", "helsinki_historicism", 60.1655, 24.9475, 0.35, 8.0],  # Kaartinkaupunki, Esplanadi south
+	["helsinki", "helsinki_brick", 60.1790, 24.9515, 0.35, 8.0],  # Hakaniemi
+	["helsinki", "helsinki_brick", 60.1880, 24.9635, 0.35, 8.0],  # Sörnäinen, Suvilahti
+	["helsinki", "helsinki_functional", 60.1918, 24.9440, 0.3, 8.0],  # Alppila
+	["helsinki", "helsinki_element", 60.1995, 24.9320, 0.75, 8.0],  # Pasila, 1970s–80s offices
+	["helsinki", "helsinki_functional", 60.1895, 24.9010, 0.6, 8.0],  # Meilahti
+	["helsinki", "helsinki_functional", 60.1960, 24.9690, 0.35, 8.0],  # Hermanni, Hermanninmäki
+	["helsinki", "helsinki_midrise", 60.2070, 24.9800, 0.5, 8.0],  # Arabianranta
+	["helsinki", "helsinki_midrise", 60.1650, 25.0055, 0.7, 8.0],  # Kruunuvuorenranta
+	["helsinki", "helsinki_midrise", 60.1545, 24.9255, 0.35, 8.0],  # Hernesaari
 	["espoo", "tapiola", 60.1760, 24.8050, 1.0, 8.0],  # Tapiola
 	["espoo", "otaniemi", 60.1850, 24.8280, 0.85, 8.0],  # Otaniemi
 	["espoo", "espoo_modern", 60.2190, 24.8130, 1.2, 8.0],  # Leppävaara
@@ -470,6 +506,29 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 			continue
 		districts.append([str(row[1]), at, float(row[4]) * 1000.0, float(row[5])])
 	return {"city": city, "cores": cores, "districts": districts}
+
+## Cities whose district circles also shape the far fabric
+## (FarCityBuilder), so the city past the detailed extent keeps them.
+const FAR_DISTRICT_CITIES := ["stockholm"]
+
+## The far fabric's district circles for a viewpoint's region, in its
+## local metre frame: [[era, Vector2 centre, radius_m], ...], the most
+## local (smallest) first; [] unless the city is in FAR_DISTRICT_CITIES.
+static func far_districts(region: String, lat: float, lon: float, reach_m: float) -> Array:
+	var city := city_of_region(region)
+	if city == "" or not FAR_DISTRICT_CITIES.has(city):
+		return []
+	var out: Array = []
+	for d in DISTRICTS:
+		var row: Array = d
+		if str(row[0]) != city:
+			continue
+		var at := WorldScale.xz_from_latlon(float(row[2]), float(row[3]), lat, lon)
+		if at.length() - float(row[4]) * 1000.0 > reach_m:
+			continue
+		out.append([str(row[1]), at, float(row[4]) * 1000.0])
+	out.sort_custom(func(a: Array, b: Array) -> bool: return float(a[2]) < float(b[2]))
+	return out
 
 ## Great-circle-ish distance in km (equirectangular; fine at city scale).
 static func _km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:

@@ -7,7 +7,8 @@ extends RefCounted
 ## follows the above-ground OSM track ways 1312875271/2/3/4/6 and
 ## 1312887388. OSM layers are crossing order, not measured altitudes:
 ## the vertical profile and support positions below are approximations.
-## The 2023-closed Jetline is intentionally absent.
+## The 2023-closed Jetline is intentionally absent here; the grona_lund_park
+## model (djurgarden/sto_grona_coasters.gd) carries it with the Twister.
 
 const FRITT := Vector2(38.33, -29.69)
 const IKAROS := Vector2(-54.85, -25.30)

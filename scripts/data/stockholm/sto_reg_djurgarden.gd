@@ -1,0 +1,45 @@
+extends RefCounted
+
+## Stockholm Tier B landmarks on Djurgården: Skansen, Waldemarsudde, Rosendal, ABBA, Liljevalchs,
+## Cirkus, Sjöhistoriska, Tekniska museet and the Gröna Lund park (plan S-3).
+## Built by sweden_stockholm/djurgarden/sto_set_djurgarden.gd.
+
+static func entries() -> Array:
+	return [
+		{"type": "skansen_bredablick", "name": "Bredablick", "lat": 59.327309, "lon": 18.108107,
+			"radius_m": 4000.0, "wiki_title": "Skansen", "height_m": 30.0, "clear_m": 12.0,
+			"yaw_deg": 13.0, "kind": "Tower", "aliases": ["skansen bredablick", "bredablick", "bredablick tower"]},
+		{"type": "skansen_hazelius_gate", "name": "Hazeliusporten", "lat": 59.327405, "lon": 18.099376,
+			"radius_m": 4000.0, "wiki_title": "Skansen", "height_m": 15.5, "clear_m": 20.0,
+			"yaw_deg": 90.0, "kind": "Gate", "aliases": ["hazeliusporten", "skansen main entrance", "skansen entrance"]},
+		{"type": "waldemarsudde", "name": "Waldemarsudde", "lat": 59.320020, "lon": 18.113775,
+			"radius_m": 4000.0, "wiki_title": "Waldemarsudde", "height_m": 20.0, "clear_m": 28.0,
+			"yaw_deg": 1.5, "kind": "Museum", "clear_offsets_m": [[58.0, -18.3]],
+			"aliases": ["waldemarsudde", "prins eugens waldemarsudde", "prince eugens waldemarsudde"]},
+		{"type": "rosendal", "name": "Rosendal Palace", "lat": 59.328914, "lon": 18.117335,
+			"radius_m": 4000.0, "wiki_title": "Rosendal Palace", "height_m": 11.8, "clear_m": 22.0,
+			"yaw_deg": 13.0, "kind": "Palace", "aliases": ["rosendals slott", "rosendal palace"]},
+		{"type": "abba_museum", "name": "ABBA The Museum", "lat": 59.324912, "lon": 18.096552,
+			"radius_m": 4000.0, "wiki_title": "ABBA The Museum", "height_m": 12.8, "clear_m": 28.0,
+			"yaw_deg": 66.8, "kind": "Museum", "aliases": ["abba the museum", "abba museum", "abbamuseet"]},
+		{"type": "liljevalchs", "name": "Liljevalchs konsthall", "lat": 59.325529, "lon": 18.096084,
+			"radius_m": 4000.0, "wiki_title": "Liljevalchs konsthall", "height_m": 19.2, "clear_m": 36.0,
+			"yaw_deg": 66.8, "kind": "Museum", "aliases": ["liljevalchs konsthall", "liljevalchs", "liljevalchs art gallery"]},
+		{"type": "cirkus", "name": "Cirkus", "lat": 59.324895, "lon": 18.099921,
+			"radius_m": 4000.0, "wiki_title": "Cirkus, Stockholm", "height_m": 16.8, "clear_m": 47.0,
+			"yaw_deg": -68.0, "kind": "Theatre", "aliases": ["cirkus", "cirkus stockholm", "cirkus djurgården"]},
+		{"type": "sjohistoriska", "name": "Sjöhistoriska museet", "lat": 59.332509, "lon": 18.115807,
+			"radius_m": 4000.0, "wiki_title": "Swedish National Maritime Museum", "height_m": 19.5,
+			"clear_m": 8.0, "yaw_deg": 79.0, "clear_rect_m": [0.0, 2.0, 62.0, 26.0],
+			"kind": "Museum", "aliases": ["sjöhistoriska museet", "sjohistoriska", "swedish national maritime museum",
+				"national maritime museum stockholm"]},
+		{"type": "tekniska_museet", "name": "Tekniska museet", "lat": 59.332522, "lon": 18.118572,
+			"radius_m": 4000.0, "wiki_title": "Tekniska museet", "height_m": 16.8,
+			"clear_m": 8.0, "yaw_deg": -82.0, "clear_rect_m": [0.0, 0.0, 46.0, 27.0],
+			"kind": "Museum", "aliases": ["tekniska museet", "national museum of science and technology",
+				"swedish national museum of science and technology"]},
+		{"type": "grona_lund_park", "name": "Gröna Lund", "lat": 59.324298, "lon": 18.096703,
+			"radius_m": 4000.0, "wiki_title": "Gröna Lund", "height_m": 24.1, "clear_m": 10.0,
+			"clear_offsets_m": [[23.9, -15.6], [12.8, 31.8], [1.2, 17.0], [-73.9, 139.5], [-75.9, 154.5]],
+			"kind": "Amusement park", "aliases": ["gröna lund", "grona lund", "gröna lund park", "grona lund park", "gröna lund tivoli"]},
+	]

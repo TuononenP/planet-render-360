@@ -7,28 +7,37 @@ extends RefCounted
 ##   Storkyrkan (way 8049504, yaw -15: the nave runs to 75 degrees) -
 ##     the five-aisled brick hall church given its uniform Baroque
 ##     exterior by J. E. Carlberg in 1736-1743: 65.5 x 37.2 m under one
-##     great copper roof, pilaster-buttressed sides with tall round-headed
-##     windows, the dressed east gable to Slottsbacken, and the west
+##     great roof in two tiers (dark aisle slopes under the patinated
+##     green nave roof), orange-ochre walls with sandstone-grey
+##     pilaster-buttresses and tall round-headed windows, the east end
+##     with its round-arched attic gable to Slottsbacken, and the west
 ##     tower (main portal in its base) with corner quoins, four clocks,
 ##     the belfry stage and a pediment on each face, its chamfered
-##     terrace and the lantern of timber clad in copper - painted deep
-##     red again in 2022 - in two open stages under bell caps, with the
-##     gilt orb and crown, 63 m to the tip.
+##     terrace and the lantern of timber clad in patinated green copper
+##     (green in all the reference photos; svenskakyrkan.se mentions a
+##     red repaint from 2022 that the photos do not show) in two open
+##     stages under bell caps, with the gilt orb and crown, 63 m to the
+##     tip.
 ##   Katarina Church (way 37079169, yaw -15) - Jean de la Vallée's Greek
 ##     cross (1656-1695), 50 x 50 m: arms 21.4 m wide under gabled
 ##     roofs with dressed end gables, four small corner towers in the
 ##     re-entrant angles, and Adelcrantz's octagonal crossing tower with
 ##     its bell-shaped copper dome and lantern, 72 m above the ground;
-##     yellow with grey pilasters (the 1784 scheme), rebuilt after the
-##     fire of 17 May 1990 and reopened in 1995 with 5000 m2 of new
-##     copper, now darkened.
+##     strong yellow with white pilasters and trim (the 1784 scheme),
+##     the arm ends plain pediments with an oculus, the corner towers
+##     and the lantern in white under slender dark needle spires,
+##     rebuilt after the fire of 17 May 1990 and reopened in 1995 with
+##     5000 m2 of new copper, now darkened to near-black. The cross tops
+##     the model at 72 m (OSM 64.5 m is the dome's top without it).
 ##   Hedvig Eleonora Church (way 27741605, yaw 22.5: the axis runs to
 ##     112.5 degrees) - the octagonal centralised church (de la Vallée,
 ##     completed by G. J. Adelcrantz, 1737), 40.6 m across the flats,
 ##     with pediments on its four axial faces, the two low burial vaults
 ##     at the west front (towers begun 1755, never finished), the copper
-##     roof rising to the tall drum, and Scholander's ribbed copper dome
-##     of 1866-1868 with dormers and the lantern, 59 m to the cross.
+##     roof (grey-green) rising to the tall drum, and Scholander's ribbed
+##     dark-bronze copper dome of 1866-1868 with dormers and the lantern,
+##     59 m to the cross; orange-ochre walls with channelled bands,
+##     round windows, grey door surrounds and a red granite base.
 ## Sources: the OpenStreetMap ways above (outlines, height tags: 63 m,
 ## 59 m), Wikipedia "Storkyrkan" (63 x 37.2 m, west tower and portal,
 ## east front), svenskakyrkan.se (Storkyrkan lantern of copper-clad
@@ -43,10 +52,11 @@ const HEDVIG_TOP_M := 59.0
 ## Octagon circumradius per unit apothem: 1 / cos(PI / 8).
 const K8 := 1.0823922
 
-static func _keys(lm: LandmarkMesh, wall: String, trim: String, copper: String) -> void:
+static func _keys(lm: LandmarkMesh, wall: String, trim: String, copper: String, stone: String = "#A29A8D") -> void:
 	lm.use("Wall", LandmarkMaterials.pbr("render", wall, 3.0))
 	lm.use("Trim", LandmarkMaterials.pbr("render", trim, 3.0))
-	lm.use("Stone", LandmarkMaterials.pbr("stone", "#A29A8D", 3.0))
+	lm.use("Stone", LandmarkMaterials.pbr("stone", stone, 3.0))
+	lm.use("Slate", LandmarkMaterials.pbr("concrete", "#3E403F", 2.0, 0.7, 0.2))
 	lm.use("Copper", LandmarkMaterials.pbr("concrete", copper, 2.0, 0.55, 0.3))
 	lm.use("Glass", LandmarkMaterials.glass("#1E2427"))
 	lm.use("Dark", LandmarkMaterials.pbr("stone", "#2E2A26", 3.0))
@@ -200,9 +210,9 @@ static func _cross(lm: LandmarkMesh, base: Vector3, h: float) -> void:
 
 static func storkyrkan(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	_keys(lm, "#E0C0A6", "#EEE5D6", "#6E9C88")
-	lm.use("Tower", LandmarkMaterials.pbr("render", "#E8C5B1", 3.0))
-	lm.use("Lantern", LandmarkMaterials.paint("#7C2D25", 0.5, 0.35))
+	_keys(lm, "#D88A3E", "#BCAE97", "#6E9C88", "#8A6558")
+	lm.use("Tower", LandmarkMaterials.pbr("render", "#D6965F", 3.0))
+	lm.use("Lantern", LandmarkMaterials.pbr("concrete", "#5F9380", 2.0, 0.55, 0.3))
 	var x0 := -32.5
 	var x1 := 33.0
 	var hz := 18.6
@@ -223,26 +233,9 @@ static func storkyrkan(model: Node3D) -> void:
 		var bay := length / 8.0
 		for b in ([3] if s < 0.0 else [2, 5]):
 			_door(lm, a, r, o, bay * (float(b) + 0.5), 1.8, 3.2, 0.6)
-	# The great copper roof over all five aisles: ridge roll, seams.
-	var along := Basis(Vector3.UP, PI * 0.5)
-	var rise := 11.0
-	lm.gable("Copper", Vector3((x0 + x1) * 0.5, eave, 0), 2.0 * hz, length, rise, along, 0.6, "Wall")
-	lm.box("Copper", Vector3((x0 + x1) * 0.5, eave + rise + 0.15, 0), Vector3(length + 0.6, 0.4, 0.5), Basis(), 0.0)
-	var seams := int(length / 1.6)
-	for k in seams + 1:
-		var x := x0 + length * float(k) / float(seams)
-		for sz in [-1.0, 1.0]:
-			lm.beam("Copper", Vector3(x, eave - 0.07, float(sz) * (hz + 0.6)), Vector3(x, eave + rise + 0.08, 0), 0.08,
-				0.1)
-	# Dormers in two rows down both slopes.
-	for k in 5:
-		var x := x0 + 12.0 + 10.0 * float(k)
-		for sz in [-1.0, 1.0]:
-			var dc := Vector3(x, eave + rise * 0.4, float(sz) * hz * 0.6)
-			var fb := Basis(Vector3.UP, 0.0 if sz > 0.0 else PI)
-			lm.box("Copper", dc + Vector3.UP * 0.8, Vector3(1.6, 1.6, 2.4), fb)
-			lm.box("Glass", dc + fb * Vector3(0, 0.8, 1.22), Vector3(0.9, 0.9, 0.05), fb, 0.0)
-			lm.gable("Copper", dc + Vector3.UP * 1.6, 1.6, 2.4, 0.7, fb, 0.1, "Copper")
+	# The roof in two tiers: dark aisle slopes, the green nave roof above.
+	var rise := 5.5
+	StoChurchBaroque.stepped_roof(lm, "Slate", "Copper", "Wall", x0, x1, hz, eave, 11.8, 5.5, rise)
 	# East front to Slottsbacken: three tall windows, pilasters, gable.
 	var ea := Vector3(x1, 0, hz)
 	var er := Vector3.FORWARD
@@ -251,7 +244,7 @@ static func storkyrkan(model: Node3D) -> void:
 	_pilasters(lm, "Trim", ea, er, eo, 2.0 * hz, 3, 1.2, eave - 1.0, 1.6)
 	LandmarkDetail.cornice(lm, "Trim", ea + Vector3.UP * (eave - 1.0) + eo * 0.4,
 		ea + er * 2.0 * hz + Vector3.UP * (eave - 1.0) + eo * 0.4, eo, 1.0, false)
-	_gable_end(lm, Vector3(x1, eave, 0), eo, hz, rise)
+	StoChurchBaroque.arched_gable(lm, "Wall", "Trim", "Glass", "Gilt", Vector3(x1, eave, 0), eo, 8.5, 4.0)
 	lm.box("Stone", Vector3(x1 + 0.45, 3.0, 0), Vector3(0.1, 1.6, 2.6), Basis(), 0.0)
 	# West front either side of the tower.
 	for side in [[-hz, -9.0], [6.8, hz]]:
@@ -260,12 +253,13 @@ static func storkyrkan(model: Node3D) -> void:
 		var wa := Vector3(x0, 0, za)
 		_arched_row(lm, "Wall", wa + Vector3.UP * 1.2, Vector3.BACK, Vector3.LEFT, zb - za, eave - 2.2, 1, 4.0, 3.0, 7.0)
 		_pilasters(lm, "Trim", wa, Vector3.BACK, Vector3.LEFT, zb - za, 1, 1.2, eave - 1.0, 1.5)
-	_gable_end(lm, Vector3(x0, eave, 0), Vector3.LEFT, hz, rise)
+	StoChurchBaroque.arched_gable(lm, "Wall", "Trim", "Glass", "Gilt", Vector3(x0, eave, 0), Vector3.LEFT, 8.5, 4.0)
 	# Palmstedt's stair tower on the south side of the tower.
 	lm.box("Wall", Vector3(-30.0, 7.0, 9.0), Vector3(5.4, 14.0, 4.6), Basis(), 0.0)
 	lm.spire("Copper", Vector3(-30.0, 14.0, 9.0), 3.0, 2.2, 0.0)
 	_sk_tower(lm, Vector3(-26.8, 0, -1.1), 7.8)
 	lm.commit(model)
+	StoChurchKit.flood(model, Vector3(-26.8, 0, -1.1), 60.0, 16.0)
 
 ## Storkyrkan's west tower on centre `tc`, half width `tw`: stone
 ## plinth, quoined shaft in three stages to 34 m with the main portal,
@@ -329,10 +323,10 @@ static func _sk_tower(lm: LandmarkMesh, tc: Vector3, tw: float) -> void:
 		var a1 := a0 + PI * 0.25
 		var p0 := tb + Vector3(cos(a0), 0, sin(a0)) * (tw * K8 - 0.6) + Vector3.UP * 0.6
 		var p1 := tb + Vector3(cos(a1), 0, sin(a1)) * (tw * K8 - 0.6) + Vector3.UP * 0.6
-		lm.beam("Lantern", p0 + Vector3.UP * 1.0, p1 + Vector3.UP * 1.0, 0.12, 0.12)
+		lm.beam("Dark", p0 + Vector3.UP * 1.0, p1 + Vector3.UP * 1.0, 0.12, 0.12)
 		for m in 7:
 			var p := p0.lerp(p1, (float(m) + 0.5) / 7.0)
-			lm.box("Lantern", p + Vector3.UP * 0.5, Vector3(0.08, 1.0, 0.08), Basis(), 0.0)
+			lm.box("Dark", p + Vector3.UP * 0.5, Vector3(0.08, 1.0, 0.08), Basis(), 0.0)
 	# The red lantern.
 	var ly := ttop + 0.6
 	var lb := tc + Vector3.UP * ly
@@ -362,7 +356,7 @@ static func _sk_tower(lm: LandmarkMesh, tc: Vector3, tw: float) -> void:
 
 static func katarina(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	_keys(lm, "#E8CB90", "#A9A69E", "#575B53")
+	_keys(lm, "#E8B53C", "#EDEAE0", "#4A4743")
 	var arm := 10.7
 	var reach := 25.0
 	var core := 17.0
@@ -404,12 +398,13 @@ static func katarina(model: Node3D) -> void:
 			for s in [-1.0, 1.0]:
 				lm.beam("Copper", rb * Vector3(float(s) * (arm + 0.5), eave - 0.1, u), rb * Vector3(0, eave + rise + 0.05, u),
 					0.08, 0.1)
-		_gable_end(lm, o * reach + Vector3.UP * eave, o, arm, rise)
+		StoChurchBaroque.plain_pediment(lm, "Trim", "Glass", o * reach + Vector3.UP * eave, o, arm, rise)
 		# Corner tower in the angle between this arm and the next.
 		var cc := (o + r) * (arm + core) * 0.5
 		_k_corner_tower(lm, cc, (core - arm) * 0.5, eave)
 	_k_crossing(lm, eave)
 	lm.commit(model)
+	StoChurchKit.flood(model, Vector3.ZERO, 60.0, 26.0)
 
 ## A small corner tower of half width `hw` at `cc`: square shaft with
 ## bands and small windows to 22 m, octagonal lantern, cupola, finial.
@@ -429,11 +424,9 @@ static func _k_corner_tower(lm: LandmarkMesh, cc: Vector3, hw: float, eave: floa
 		_fb(lm, "Glass", a, r, o, hw, 9.0, 0.03, Vector3(1.0, 1.8, 0.05))
 		_fb(lm, "Glass", a, r, o, hw, 18.4, 0.03, Vector3(1.1, 2.2, 0.05))
 	var b := cc + Vector3.UP * top
-	lm.frustum("Copper", b, hw * 1.45, hw * 0.95, 1.2, 4, PI * 0.25)
-	_lantern(lm, "Copper", b + Vector3.UP * 1.2, 1.5, 2.6)
-	lm.lathe("Copper", b + Vector3.UP * 3.8, PackedVector2Array([Vector2(1.9, 0), Vector2(1.7, 0.9), Vector2(1.0, 1.9),
-		Vector2(0.3, 2.6), Vector2(0.18, 3.6)]), 8, 1.0, 1.0, PI / 8.0, false)
-	lm.lathe("Gilt", b + Vector3.UP * 7.4, LandmarkFhUtil.ball(0.3), 8)
+	lm.frustum("Trim", b, hw * 1.45, hw * 0.95, 1.2, 4, PI * 0.25)
+	_lantern(lm, "Trim", b + Vector3.UP * 1.2, 1.5, 2.6)
+	StoChurchBaroque.needle(lm, "Copper", "Gilt", b + Vector3.UP * 3.8, 1.9, 8.0)
 
 ## Adelcrantz's crossing tower: octagonal drum with round-headed windows
 ## in two tiers, corner pilasters and the crowning cornice, the bell-
@@ -453,6 +446,11 @@ static func _k_crossing(lm: LandmarkMesh, eave: float) -> void:
 		_arched_row(lm, "Wall", a + Vector3.UP * 25.0, r, o, side, top - 26.2, 1, 2.0, 2.4, 6.0)
 		lm.disc("Glass", a + r * side * 0.5 + Vector3.UP * 37.0 + o * 0.42, o, 0.75, 12)
 		_pilasters(lm, "Trim", a, r, o, side, 1, 24.0, top - 1.0, 1.0)
+		if k % 2 == 0:
+			var cc := a + r * side * 0.5 + Vector3.UP * (top - 4.2) + o * 0.5
+			lm.disc("Trim", cc, o, 1.9, 20)
+			lm.disc("Dark", cc + o * 0.03, o, 1.6, 20)
+			lm.beam("Gilt", cc + o * 0.08, cc + o * 0.08 + Vector3.UP * 1.2, 0.12, 0.05, r)
 		_fb(lm, "Trim", a, r, o, side * 0.5, 24.6, 0.3, Vector3(side + 0.6, 0.6, 0.5))
 		LandmarkDetail.cornice(lm, "Trim", a + Vector3.UP * (top - 1.0) + o * 0.4,
 			a + r * side + Vector3.UP * (top - 1.0) + o * 0.4,
@@ -473,19 +471,21 @@ static func _k_crossing(lm: LandmarkMesh, eave: float) -> void:
 		lm.box("Copper", dc, Vector3(1.6, 1.8, 1.4), fb)
 		lm.disc("Glass", dc + o * 0.72, o, 0.55, 12)
 	var lb := db + Vector3.UP * 13.6
-	_lantern(lm, "Copper", lb, 2.6, 7.0)
-	lm.lathe("Copper", lb + Vector3.UP * 7.0, PackedVector2Array([Vector2(3.1, 0), Vector2(2.9, 1.0), Vector2(1.9, 2.4),
-		Vector2(0.7, 3.4), Vector2(0.45, 3.9)]), 8, 1.0, 1.0, PI / 8.0, false)
-	var sy := top + 13.6 + 7.0 + 3.9
-	lm.frustum("Copper", c + Vector3.UP * sy, 0.45, 0.08, 4.2, 8, PI / 8.0)
-	lm.lathe("Gilt", c + Vector3.UP * (sy + 4.0), LandmarkFhUtil.ball(0.42), 10)
-	_cross(lm, c + Vector3.UP * (sy + 4.8), KATARINA_TOP_M - sy - 4.8)
+	_lantern(lm, "Trim", lb, 2.6, 7.0)
+	lm.frustum("Trim", lb + Vector3.UP * 7.0, 3.3 * K8, 3.0 * K8, 0.5, 8, PI / 8.0)
+	var sy := top + 13.6 + 7.5 + 6.0
+	StoChurchBaroque.needle(lm, "Copper", "Gilt", lb + Vector3.UP * 7.5, 2.8, 6.0)
+	_cross(lm, c + Vector3.UP * (sy + 0.6), KATARINA_TOP_M - sy - 0.6)
 
 # --- Hedvig Eleonora Church -------------------------------------------
 
 static func hedvig_eleonora(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	_keys(lm, "#E2BE78", "#EFEBE1", "#6E9C88")
+	_keys(lm, "#DA9A4C", "#BDB3A2", "#5D7568", "#8A5C4E")
+	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#3F3B34", 2.0, 0.55, 0.3))
+	lm.use("Patina", LandmarkMaterials.pbr("concrete", "#5F9380", 2.0, 0.55, 0.3))
+	lm.use("Joint", LandmarkMaterials.pbr("render", "#B97C3A", 3.0))
+	lm.use("Grey", LandmarkMaterials.pbr("stone", "#8F8A80", 3.0))
 	var c := Vector3(2.25, 0, 0)
 	var ap := 20.3
 	var eave := 17.0
@@ -512,6 +512,14 @@ static func hedvig_eleonora(model: Node3D) -> void:
 				_door(lm, a, r, o, side * 0.5, 1.8, 3.0)
 		else:
 			_arched_row(lm, "Wall", a + Vector3.UP * 1.2, r, o, side, eave - 2.2, 2, 4.6, 2.4, 6.4)
+		# Channelled ashlar bands under and over the window range, and the
+		# round window each face carries high up.
+		StoChurchBaroque.channels(lm, "Joint", a, r, o, side, 1.8, 5.2, 1.4, 5.4 if axial else 0.0)
+		StoChurchBaroque.channels(lm, "Joint", a, r, o, side, 14.6, eave - 1.6, 1.4)
+		var oc := a + r * side * 0.5 + Vector3.UP * 14.6 + o * 0.42
+		if not west:
+			lm.disc("Glass", oc, o, 0.9, 14)
+			LandmarkDetail.arch(lm, "Trim", oc + Vector3.UP * 0.0, o, 1.8, 0.25, 0.2, 12)
 		# Paired pilasters at the angles, plain between.
 		for s in [0.55, 1.55, side - 1.55, side - 0.55]:
 			_fb(lm, "Trim", a, r, o, float(s), eave * 0.5, 0.55, Vector3(0.8, eave - 1.2, 0.3))
@@ -537,7 +545,7 @@ static func hedvig_eleonora(model: Node3D) -> void:
 	# The two low burial vaults at the west front.
 	for s in [-1.0, 1.0]:
 		var vc := Vector3(-21.05, 0, float(s) * 11.65)
-		lm.box("Wall", vc + Vector3.UP * 4.75, Vector3(8.1, 9.5, 8.5), Basis(), 0.0)
+		lm.box("Grey", vc + Vector3.UP * 4.75, Vector3(8.1, 9.5, 8.5), Basis(), 0.0)
 		lm.box("Stone", vc + Vector3.UP * 0.6, Vector3(8.5, 1.2, 8.9))
 		lm.box("Trim", vc + Vector3.UP * 9.3, Vector3(8.6, 0.6, 9.0))
 		for f in [Vector3.LEFT, Vector3(0, 0, float(s))]:
@@ -546,13 +554,14 @@ static func hedvig_eleonora(model: Node3D) -> void:
 			var half := 4.25 if absf(o.x) > 0.0 else 4.05
 			var depth := 4.05 if absf(o.x) > 0.0 else 4.25
 			var a := vc + o * depth - r * half
-			_arched_row(lm, "Wall", a + Vector3.UP * 1.2, r, o, 2.0 * half, 7.4, 1, 2.6, 1.8, 2.8)
+			_arched_row(lm, "Grey", a + Vector3.UP * 1.2, r, o, 2.0 * half, 7.4, 1, 2.6, 1.8, 2.8)
 			for x in [0.4, 2.0 * half - 0.4]:
 				_fb(lm, "Trim", a, r, o, float(x), 4.75, 0.1, Vector3(0.8, 8.3, 0.2))
-		lm.spire("Copper", vc + Vector3.UP * 9.6, 4.3, 2.6, 1.2)
+		lm.spire("Patina", vc + Vector3.UP * 9.6, 4.3, 2.6, 1.2)
 		lm.lathe("Trim", vc + Vector3.UP * 12.2, _urn(1.2), 8)
 	_he_dome(lm, c)
 	lm.commit(model)
+	StoChurchKit.flood(model, c, 50.0, 28.0)
 
 ## Hedvig Eleonora's drum and dome: the octagonal drum with a round-
 ## headed window per face between paired pilasters, cornice and
@@ -578,24 +587,24 @@ static func _he_dome(lm: LandmarkMesh, c: Vector3) -> void:
 	var db := c + Vector3.UP * top
 	var prof := PackedVector2Array([Vector2(11.4, 0), Vector2(11.1, 3.0), Vector2(10.0, 6.4), Vector2(8.0, 9.6),
 		Vector2(5.2, 12.3), Vector2(3.0, 13.8)])
-	lm.lathe("Copper", db, prof, 8, 1.0, 1.0, PI / 8.0, false)
+	lm.lathe("Dome", db, prof, 8, 1.0, 1.0, PI / 8.0, false)
 	for k in 8:
 		var a := PI / 8.0 + PI * 0.25 * float(k)
 		for j in prof.size() - 1:
-			lm.beam("Copper", db + Vector3(cos(a) * (prof[j].x + 0.12), prof[j].y, sin(a) * (prof[j].x + 0.12)),
+			lm.beam("Dome", db + Vector3(cos(a) * (prof[j].x + 0.12), prof[j].y, sin(a) * (prof[j].x + 0.12)),
 				db + Vector3(cos(a) * (prof[j + 1].x + 0.12), prof[j + 1].y, sin(a) * (prof[j + 1].x + 0.12)), 0.5, 0.3)
 		var fa := a + PI / 8.0
 		var o := Vector3(cos(fa), 0, sin(fa))
 		var fb := Basis(Vector3.UP, -fa + PI * 0.5)
 		var dc := db + o * 9.2 + Vector3.UP * 4.2
-		lm.box("Copper", dc + Vector3.UP * 0.9, Vector3(1.6, 1.8, 1.6), fb)
-		lm.gable("Copper", dc + Vector3.UP * 1.8, 1.6, 1.6, 0.8, fb, 0.1, "Copper")
+		lm.box("Dome", dc + Vector3.UP * 0.9, Vector3(1.6, 1.8, 1.6), fb)
+		lm.gable("Dome", dc + Vector3.UP * 1.8, 1.6, 1.6, 0.8, fb, 0.1, "Dome")
 		lm.box("Glass", dc + o * 0.82 + Vector3.UP * 0.9, Vector3(0.9, 1.2, 0.04), fb, 0.0)
 	var lb := db + Vector3.UP * 13.8
-	_lantern(lm, "Copper", lb, 2.5, 6.0)
-	lm.lathe("Copper", lb + Vector3.UP * 6.0, PackedVector2Array([Vector2(3.0, 0), Vector2(2.6, 1.0), Vector2(1.2, 2.0),
+	_lantern(lm, "Dome", lb, 2.5, 6.0)
+	lm.lathe("Dome", lb + Vector3.UP * 6.0, PackedVector2Array([Vector2(3.0, 0), Vector2(2.6, 1.0), Vector2(1.2, 2.0),
 		Vector2(0.35, 2.4)]), 8, 1.0, 1.0, PI / 8.0, false)
 	var sy := top + 13.8 + 6.0 + 2.4
-	lm.frustum("Copper", c + Vector3.UP * sy, 0.35, 0.08, 1.4, 8, PI / 8.0)
+	lm.frustum("Dome", c + Vector3.UP * sy, 0.35, 0.08, 1.4, 8, PI / 8.0)
 	lm.lathe("Gilt", c + Vector3.UP * (sy + 1.3), LandmarkFhUtil.ball(0.38), 10)
 	_cross(lm, c + Vector3.UP * (sy + 2.0), HEDVIG_TOP_M - sy - 2.0)

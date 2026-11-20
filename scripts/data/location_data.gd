@@ -431,7 +431,7 @@ static func landmarks() -> Array:
 ## City Hall), never ahead of it.
 static func _regional_extras() -> Array:
 	return [
-		{"type": "riddarholmen", "name": "Riddarholmen Church", "lat": 59.32468, "lon": 18.06454, "radius_m": 3000.0,
+		{"type": "riddarholmen", "name": "Riddarholmen Church", "lat": 59.324668, "lon": 18.064595, "radius_m": 3000.0,
 			"wiki_title": "Riddarholmen Church", "height_m": 90.0, "clear_m": 50.0, "yaw_deg": -13.2, "kind": "Church",
 			"aliases": ["riddarholmen church", "riddarholmskyrkan"]},
 	]
@@ -452,6 +452,7 @@ static func _core_landmarks() -> Array:
 		# the wings, pavilions and the Alexander II statue (model_rects_m).
 		{"type": "helsinki_cathedral", "name": "Helsinki Cathedral", "lat": 60.170382, "lon": 24.952182, "radius_m": 5000.0,
 			"wiki_title": "Helsinki Cathedral", "height_m": 62.0, "yaw_deg": -2.6, "base_at_m": [-30.0, 84.0],
+			"ultra_registry_limit": 26,
 			"model_rects_m": [[0.0, 36.0, 67.0, 22.0], [0.6, 97.0, 11.0, 10.0]],
 			"aliases": ["helsingin tuomiokirkko", "helsinki cathedral", "helsingfors domkyrka"]},
 		{"type": "eiffel", "name": "Eiffel Tower", "lat": 48.8584, "lon": 2.2945, "radius_m": 6500.0,
@@ -504,9 +505,15 @@ static func _core_landmarks() -> Array:
 		{"type": "banff_springs", "name": "Banff Springs Hotel", "lat": 51.1643, "lon": -115.5618, "radius_m": 3000.0,
 			"wiki_title": "Banff Springs Hotel", "height_m": 59.5, "clear_m": 120.0, "yaw_deg": 225.0,
 			"kind": "Hotel", "aliases": ["banff springs"]},
-		{"type": "stockholm_city_hall", "name": "Stockholm City Hall", "lat": 59.3275, "lon": 18.0543, "radius_m": 4000.0,
-			"wiki_title": "Stockholm City Hall", "height_m": 106.0, "clear_m": 75.0, "kind": "City hall",
-			"ultra_registry_limit": 26,
+		{"type": "stockholm_city_hall", "name": "Stockholm City Hall", "lat": 59.32748, "lon": 18.05485, "radius_m": 4000.0,
+			"wiki_title": "Stockholm City Hall", "height_m": 106.0, "clear_m": 75.0, "yaw_deg": -7.5,
+			"clear_rect_m": [0.0, 0.0, 72.0, 42.0], "kind": "City hall",
+			# A hero city with about 70 hand-built landmarks: Ultra builds
+			# the 48 that matter most for the view (skyline items first,
+			# then nearest) and leaves room for 8 bridges. The other
+			# Stockholm primaries carry the same budget
+			# (LandmarkRegistrySwedenStockholm).
+			"ultra_registry_limit": 48, "ultra_total_limit": 56,
 			"aliases": ["stockholm city hall", "stadshuset"]},
 		# Bridges: built along their axis (span_m long, yaw_deg turning the
 		# model's +X onto it) at sea level (base: sea). yaw_deg is the true

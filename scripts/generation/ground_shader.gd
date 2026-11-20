@@ -49,6 +49,10 @@ uniform vec4 relief_rect = vec4(0.0);
 uniform float ground_max_low = 0.38;
 uniform float lum_floor = 0.055;
 uniform float urban_unknown = 1.0;
+// Cliff rock onset: x = lighting normal.y where rock starts, y = where it is
+// full, z = how much of the steep rock grass and scrub hold off (0.7 default),
+// w = how much of the photo's tint the rock colour carries (0.5 default).
+uniform vec4 cliff_set = vec4(0.76, 0.52, 0.7, 0.5);
 uniform float unknown_trust = 0.3;
 uniform vec3 unknown_bare : source_color = vec3(0.54, 0.51, 0.45);
 uniform vec3 unknown_veg : source_color = vec3(0.35, 0.48, 0.24);
@@ -63,6 +67,8 @@ uniform float micro_detail = 0.0;
 // Mowing direction of this place's lawns (radians from +x): stripes run
 // along it and alternate light and dark with the view.
 uniform float stripe_angle = 0.6;
+// (specular cap, roughness floor) of dry ground: Stockholm's golden-hour sheen, off (1, 0) elsewhere.
+uniform vec2 glare = vec2(1.0, 0.0);
 
 // @SNOW
 // @TERRAIN
@@ -256,6 +262,9 @@ void fragment() {
 			nw = normalize(nw - vec3(sl.x, 0.0, sl.y) * rf);
 		}
 	}
+	// Stockholm's glare cap (glare.x < 1) also calms the rock: its crag relief and grain read as sun-lit
+	// glitter on the low sun's side of a granite face.
+	float calm_rock = glare.x < 0.99 ? 1.0 : 0.0;
 	float steep0 = smoothstep(0.86, 0.6, nw.y);
 	// Forested and grassy slopes keep their own shading: only bare ground
 	// takes the rock relief (it frosted wooded mountainsides).
@@ -263,11 +272,11 @@ void fragment() {
 	float relief_fade = 1.0 - smoothstep(600.0, 2400.0, dist_m);
 	if (rocky * relief_fade > 0.01) {
 		vec2 gr = t_relief(g, 26.0, ground_quality >= 2 ? 4 : 2);
-		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 9.0 * rocky * relief_fade);
+		nw = normalize(nw - vec3(gr.x, 0.0, gr.y) * 9.0 * (1.0 - 0.6 * calm_rock) * rocky * relief_fade);
 	}
 	// Very steep ground (past ~45°) is cliff rock and scree whatever the
 	// cover says; grass and scrub hold on gentler slopes.
-	float steep = smoothstep(0.76, 0.52, nw.y) * (1.0 - 0.7 * veg);
+	float steep = smoothstep(cliff_set.x, cliff_set.y, nw.y) * (1.0 - cliff_set.z * veg);
 	W0 *= 1.0 - steep * 0.9;
 	W1 = W1 * (1.0 - steep * 0.9) + vec4(0.75, 0.0, 0.25, 0.0) * steep * 0.9;
 	float wsum = W0.x + W0.y + W0.z + W0.w + W1.x + W1.y + W1.z + W1.w;
@@ -286,7 +295,7 @@ void fragment() {
 	vec3 base = mix(col, lf, trust);
 	// Rock colour: neutral stone carrying some of the photo's tint.
 	float l_lf = max(lum(lf), 1e-3);
-	vec3 rock_c = mix(vec3(0.34, 0.32, 0.29), lf * (0.33 / l_lf), 0.5);
+	vec3 rock_c = mix(vec3(0.34, 0.32, 0.29), lf * (0.33 / l_lf), cliff_set.w);
 	base = mix(base, rock_c, steep * 0.85);
 	// Exposed granite: feldspar pink-grey with cool, pale lichen patches.
 	float granite = clamp(W0.z + W1.x * 0.45, 0.0, 1.0) * (1.0 - veg);
@@ -379,6 +388,8 @@ void fragment() {
 	}
 	det = clamp(det / max(wt, 1e-3), vec3(0.3), vec3(2.0));
 	nm /= max(wt, 1e-3);
+	det = mix(det, vec3(1.0), 0.5 * calm_rock * clamp(steep + rocky, 0.0, 1.0));
+	nm.rgb = mix(nm.rgb, vec3(0.5, 0.5, 1.0), 0.45 * calm_rock * clamp(steep + rocky, 0.0, 1.0));
 	// Close to the eye one repeat of a layer is too coarse: the main layer
 	// again at about a quarter the size gives the surface its fine grain.
 	if (micro_detail > 0.5 && dist_m < 90.0 && main_layer >= 0) {
@@ -519,6 +530,9 @@ void fragment() {
 	r = mix(r, SNOW_ROUGH, sc * (1.0 - wf));
 	ROUGHNESS = mix(puddle_roughness(r, wet, mask), 0.03, glint);
 	SPECULAR = mix(mix(mix(0.28, 0.5, wet), SNOW_SPEC, sc), 1.0, glint);
+	float dry = (1.0 - sc) * (1.0 - wet) * (1.0 - glint);
+	SPECULAR = mix(SPECULAR, min(SPECULAR, glare.x), dry);
+	ROUGHNESS = mix(ROUGHNESS, max(ROUGHNESS, glare.y), dry);
 	RIM = SNOW_RIM * sc;
 	RIM_TINT = SNOW_RIM_TINT;
 	// Night: past the drawn streets the city's lit streets read as a glow

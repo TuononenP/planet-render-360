@@ -20,6 +20,8 @@ uniform bool use_tex = false;
 uniform bool use_vertex = false;
 uniform float base_roughness = 0.7;
 uniform float base_metallic = 0.0;
+// (specular cap, roughness floor): Stockholm's dressed granite (RoadSurface.STOCKHOLM_GLARE); (1, 0) elsewhere.
+uniform vec2 glare = vec2(1.0, 0.0);
 // 0 fresh snow .. 1 grey, ploughed or trodden (StreetSnow.material).
 uniform float age = 0.0;
 varying vec3 wpos;
@@ -44,7 +46,7 @@ void fragment() {
 	ALBEDO = mix(col, snow_grit(snow_albedo(wpos.xz, px, age), wpos.xz, px, age), snow);
 	float roughness = base_roughness;
 	if (use_rough) { roughness *= texture(rough_tex, uv).r; }
-	ROUGHNESS = mix(roughness, SNOW_ROUGH, snow);
+	ROUGHNESS = mix(max(roughness, glare.y), SNOW_ROUGH, snow);
 	if (use_normal) {
 		NORMAL_MAP = mix(texture(normal_tex, uv).rgb, vec3(0.5, 0.5, 1.0), snow);
 		NORMAL_MAP_DEPTH = normal_scale;
@@ -57,14 +59,14 @@ void fragment() {
 		NORMAL = normalize(mix(NORMAL, (VIEW_MATRIX * vec4(sn, 0.0)).xyz, snow));
 	}
 	METALLIC = base_metallic * (1.0 - snow);
-	SPECULAR = mix(0.5, SNOW_SPEC, snow);
+	SPECULAR = mix(min(0.5, glare.x), SNOW_SPEC, snow);
 	RIM = SNOW_RIM * snow;
 	RIM_TINT = SNOW_RIM_TINT;
 }
 """
 static var _shader: Shader
 
-static func material(source: StandardMaterial3D, age: float = 0.0) -> ShaderMaterial:
+static func material(source: StandardMaterial3D, age: float = 0.0, glare := Vector2(1.0, 0.0)) -> ShaderMaterial:
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL)
@@ -86,4 +88,5 @@ static func material(source: StandardMaterial3D, age: float = 0.0) -> ShaderMate
 	mat.set_shader_parameter("base_roughness", source.roughness)
 	mat.set_shader_parameter("base_metallic", source.metallic)
 	mat.set_shader_parameter("age", age)
+	mat.set_shader_parameter("glare", glare)
 	return mat

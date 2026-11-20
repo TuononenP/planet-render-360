@@ -70,7 +70,15 @@ uniform bool has_photo = false;
 uniform float photo_reps = 1.0;
 uniform float photo_lod = 3.0;
 uniform float photo_keep = 1.0;
+// How much of the photo's own relief the normal keeps (1 unless the wall is smoothed).
+uniform float photo_relief = 1.0;
+// Panes' (metallic cap, specular cap, roughness floor): Stockholm's glass blew out to white under the
+// low golden sun. (1, 1, 0) leaves them as they were.
+uniform vec3 glass_cap = vec3(1.0, 1.0, 0.0);
 uniform bool photo_turn = false;
+// Ground-bounce light on walls out of the sun (0 = none): the sunlit paving throws warm light onto shaded
+// fronts, which the blue sky ambient cannot give. Helsinki's fronts (FacadeTextures.HELSINKI_BOUNCE).
+uniform float warm_bounce = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -139,6 +147,17 @@ vec3 lamp_colour(float k, float t) {
 	vec3 neutral = vec3(1.0, 0.82, 0.60); // 3500 K
 	vec3 cool = vec3(0.96, 0.92, 0.84);   // 4500 K
 	return k < 0.55 ? mix(warm, neutral, k / 0.55) : mix(neutral, cool, (k - 0.55) / 0.41);
+}
+
+// Warm light off the sunlit ground onto a wall: weighted by how far the wall faces sideways, gone where
+// the sun reaches the wall itself (its own sun already outshines it) and when the sun is down. The 0.12
+// keeps a near-black albedo from staying black: paving throws light on any wall, dark stone too.
+vec3 ground_bounce(vec3 wall, vec3 wn, float k) {
+	vec3 n = normalize(wn);
+	float side = 1.0 - clamp(n.y, 0.0, 1.0);
+	float shade = 1.0 - smoothstep(-0.05, 0.35, dot(n, cloud_sun_dir));
+	float sun_up = smoothstep(0.03, 0.30, cloud_sun_dir.y);
+	return (wall + 0.12) * vec3(1.0, 0.80, 0.58) * (k * side * shade * sun_up);
 }
 
 void vertex() {
@@ -221,7 +240,7 @@ void fragment() {
 		vec3 hi = textureGrad(photo_diff, puv, pgx, pgy).rgb;
 		vec3 lo = textureLod(photo_diff, puv, photo_lod).rgb;
 		base *= mix(vec3(1.0), clamp(hi / max(lo, vec3(0.02)), vec3(0.4), vec3(2.2)), photo_keep);
-		photo_n = textureGrad(photo_nor, puv, pgx, pgy).rg - textureLod(photo_nor, puv, photo_lod).rg;
+		photo_n = (textureGrad(photo_nor, puv, pgx, pgy).rg - textureLod(photo_nor, puv, photo_lod).rg) * photo_relief;
 		if (photo_turn) {
 			photo_n = vec2(photo_n.y, -photo_n.x);
 		}
@@ -372,6 +391,9 @@ void fragment() {
 	ROUGHNESS = mix(rough, mix(0.3, pane_rough, near_glass), pane);
 	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
 	SPECULAR = mix(mix(0.5, 0.6, wet), 0.65, pane);
+	ROUGHNESS = max(ROUGHNESS, glass_cap.z * pane);
+	METALLIC = min(METALLIC, mix(1.0, glass_cap.x, pane));
+	SPECULAR = min(SPECULAR, mix(1.0, glass_cap.y, pane));
 	AO = mix(wall_ao, 1.0, pane);
 	// Warm night light spilling gently onto sills beneath lit panes.
 	vec3 spill_e = vec3(0.0);
@@ -384,6 +406,9 @@ void fragment() {
 		spill_e = wall * up_lamp * up_lit * sill_band * night_energy * 0.28;
 	}
 	EMISSION = glass_e * pane + spill_e * (1.0 - pane);
+	if (warm_bounce > 0.0) {
+		EMISSION += (1.0 - pane) * ground_bounce(wall, wnrm, warm_bounce);
+	}
 	vec3 nm = has_normal ? textureGrad(normal_tex, uv, gx, gy).rgb : vec3(0.5, 0.5, 1.0);
 	// Godot rebuilds z from xy: keep the sum inside the unit disc (outside
 	// it z is NaN and the pixel renders black).
@@ -509,8 +534,14 @@ static func from_standard(m: StandardMaterial3D) -> ShaderMaterial:
 		s.set_shader_parameter("photo_reps", reps)
 		s.set_shader_parameter("photo_lod", maxf(log(float(diff.get_width()) * reps
 			/ float(FacadeComposer.CELL)) / log(2.0), 0.0))
-		s.set_shader_parameter("photo_keep", float(FacadeComposer.KEEP_CONTRAST.get(set_name, 1.0)))
+		s.set_shader_parameter("photo_keep", float(FacadeComposer.KEEP_CONTRAST.get(set_name, 1.0))
+			* (FacadeComposer.STOCKHOLM_KEEP if m.has_meta("smooth_photo") else 1.0))
+		s.set_shader_parameter("photo_relief", FacadeComposer.STOCKHOLM_KEEP if m.has_meta("smooth_photo") else 1.0)
 		s.set_shader_parameter("photo_turn", set_name == "wood" and str(m.get_meta("facade_pattern", "")) == "clapboard")
+	if m.has_meta("glass_cap"):
+		s.set_shader_parameter("glass_cap", m.get_meta("glass_cap"))
+	if m.has_meta("warm_bounce"):
+		s.set_shader_parameter("warm_bounce", float(m.get_meta("warm_bounce")))
 	for k in m.get_meta_list():
 		if k != "facade_set":
 			s.set_meta(k, m.get_meta(k))

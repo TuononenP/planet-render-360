@@ -78,6 +78,12 @@ const CROSSING_LAYER := 6.9
 const BAND_LIFT_M := 0.1
 const BAND_ROW_M := 1.0
 static var _mats: Dictionary = {}
+## The sett and paving finishes' colours this build: Finnish granite where it applies.
+static var _sett_hex: String = FINISH_HEX["sett"]
+static var _paving_hex: String = FINISH_HEX["paving"]
+static var _gravel_hex: String = FINISH_HEX["gravel"]
+## The PBR set the gravel finish is laid with: Finland's is real gravel grain.
+static var _gravel_set: String = "pavement"
 ## The bridges' concrete where the place's bridges are stone (else null).
 static var _stone_deck: Material = null
 
@@ -154,13 +160,16 @@ static func _finish(cls: String, surface: String) -> String:
 			return "gravel"
 	return "asphalt"
 
-## In historic districts, an unmapped surface defaults to local setts;
+## In historic districts, an unmapped surface defaults to local setts, and
+## an unsurfaced footway through a Finnish park (`parks`) to gravel;
 ## mapped surfaces, crossings and bridges always retain their own finish.
-static func _district_finish(road: Dictionary, districts: Array, m2u: float) -> String:
+static func _district_finish(road: Dictionary, districts: Array, m2u: float, parks: Array = []) -> String:
 	var cls := str(road.get("class", "unclassified"))
 	var finish := "crossing" if bool(road.get("crossing", false)) else _finish(cls, str(road.get("surface", "")).to_lower())
 	if str(road.get("surface", "")) != "" or bool(road.get("crossing", false)) or bool(road.get("bridge", false)):
 		return finish
+	if FinnishGranite.park_way(road, parks):
+		return "gravel"
 	var pts: PackedVector2Array = road.get("points", PackedVector2Array())
 	if pts.is_empty():
 		return finish
@@ -178,8 +187,8 @@ static func finish_of(line: Variant, surf: _Surface, m2u: float) -> String:
 	var r := _parse(line, m2u)
 	if r.is_empty():
 		return "asphalt"
-	if line is Dictionary and not surf.districts.is_empty():
-		return _district_finish(line, surf.districts, m2u)
+	if line is Dictionary and not (surf.districts.is_empty() and surf.parks.is_empty()):
+		return _district_finish(line, surf.districts, m2u, surf.parks)
 	return str(r["finish"])
 
 static func _material(finish: String) -> Material:
@@ -189,7 +198,8 @@ static func _material(finish: String) -> Material:
 	match finish:
 		"paving", "sett", "gravel":
 			# Setts and gravel carry traffic; footway paving does not.
-			m = RoadSurface.paved_material("pavement", Color.html(FINISH_HEX[finish]).srgb_to_linear(),
+			m = RoadSurface.paved_material(_gravel_set if finish == "gravel" else "pavement",
+				Color.html(_sett_hex if finish == "sett" else (_paving_hex if finish == "paving" else _gravel_hex)).srgb_to_linear(),
 				0.0 if finish == "paving" else (1.0 if finish == "sett" else 0.6), true, finish == "sett",
 				finish != "gravel")
 		"deck":
@@ -219,6 +229,15 @@ const LANDING_WET_M := 8.0
 
 static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
 	_mats.clear()
+	var granite := FinnishGranite.applies(data)
+	_sett_hex = FinnishGranite.SETT_HEX if granite else FINISH_HEX["sett"]
+	_paving_hex = FinnishGranite.PAVING_HEX if granite else FINISH_HEX["paving"]
+	_gravel_hex = FinnishGranite.GRAVEL_HEX if granite else FINISH_HEX["gravel"]
+	_gravel_set = "gravel" if granite else "pavement"
+	if ShoreApron.stockholm(data):
+		# Stockholm's quays, squares and walks are grey granite.
+		_sett_hex = ShoreApron.STOCKHOLM_SETT.to_html(false)
+		_paving_hex = ShoreApron.STOCKHOLM_PAVING.to_html(false)
 	_stone_deck = QuayBuilder.stone_material(data) if QuayBuilder.stone_quays(data) else null
 	BridgeArches.stone_arches = QuayBuilder.stone_quays(data)
 	var m2u := WorldScale.metres_to_units()
@@ -352,8 +371,8 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
-	if line is Dictionary and not surf.districts.is_empty() and marking.is_empty():
-		finish = _district_finish(line, surf.districts, m2u)
+	if line is Dictionary and not (surf.districts.is_empty() and surf.parks.is_empty()) and marking.is_empty():
+		finish = _district_finish(line, surf.districts, m2u, surf.parks)
 	var lines: Array = [dense]
 	if bool(r["bridge"]):
 		lines = []
@@ -738,6 +757,8 @@ class _Surface extends RefCounted:
 	## The same in LIT_MAJOR_M cells, for major roads and squares.
 	var built_major: Dictionary = {}
 	var districts: Array = []
+	## Green polygons of a Finnish place (GroundMaterial._grass_polys), else none.
+	var parks: Array = []
 	var size := 0
 	var step := 1.0
 	## The preset's terrain mesh (TerrainBuilder._terrain_mesh): coarser
@@ -834,6 +855,8 @@ class _Surface extends RefCounted:
 
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
+		if FinnishGranite.applies(data):
+			parks = GroundMaterial._grass_polys(data)
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))
 		mesh_size = mini(CityDetail.terrain_mesh_posts(data), size)

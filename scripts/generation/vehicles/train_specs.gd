@@ -14,13 +14,15 @@ extends RefCounted
 ## "cab" (the colour of a cab end, a warning yellow in Britain).
 ## A section id ending in "p" is the same car with a pantograph.
 
-const KINDS: Array[String] = ["emu", "emu_uk", "intercity"]
+const KINDS: Array[String] = ["emu", "emu_uk", "intercity", "metro"]
 const MIN_CARS := 2
 const MAX_CARS := 4
 
 const WHITE := Color(0.9, 0.9, 0.88)
 const ROOF := Color(0.36, 0.37, 0.38)
 const YELLOW := Color(0.93, 0.74, 0.04)
+const METRO_ORANGE := Color(0.93, 0.38, 0.09)
+const METRO_BLUE := Color(0.0, 0.31, 0.64)
 
 ## Livery colours by role (TramSpecs.LIVERIES) and the gauge the fleet
 ## runs on (Finland's is 1524 mm).
@@ -46,6 +48,14 @@ const LIVERIES := {
 	# Berlin's S-Bahn: deep red below the windows, ochre above.
 	"berlin_sbahn": {"lower": Color(0.55, 0.08, 0.07), "band": Color(0.55, 0.08, 0.07), "upper": Color(0.86, 0.62, 0.16),
 		"door": Color(0.55, 0.08, 0.07), "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
+	# Helsinki's metro (M100, M200, M300 sets): orange body, a dark band
+	# round the windows, a pale roof.
+	"helsinki_metro": {"lower": METRO_ORANGE, "band": Color(0.1, 0.1, 0.11), "upper": METRO_ORANGE,
+		"door": METRO_ORANGE, "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78), "inner": WHITE, "gauge": 1.524},
+	# Stockholm's tunnelbana (C20 sets): SL blue body, a silver band
+	# round the windows, a pale roof, standard gauge.
+	"stockholm_metro": {"lower": METRO_BLUE, "band": Color(0.78, 0.8, 0.82), "upper": METRO_BLUE,
+		"door": METRO_BLUE, "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78), "inner": WHITE, "gauge": 1.435},
 }
 const LONDON_LIVERIES: Array[String] = ["london_blue", "london_grey", "london_white"]
 ## Share of Helsinki's trains that are the long-distance unit.
@@ -58,8 +68,13 @@ const PROF_LONG := [[0.95, 0.0, "under"], [0.95, 0.9, "skirt"], [1.08, 0.97, "lo
 	[1.5, 1.0, "lower"], [1.8, 1.0, "band"], [2.05, 1.0, "win"], [2.9, 0.985, "upper"],
 	[3.5, 0.94, "roof"], [3.9, 0.8, "roof"], [4.08, 0.45, "roof"], [4.14, 0.0, ""]]
 
+## The metro car: a high floor at platform height, a tall, wide body.
+const PROF_METRO := [[1.0, 0.0, "under"], [1.0, 0.92, "skirt"], [1.12, 0.98, "lower"], [1.4, 1.0, "lamp"],
+	[1.62, 1.0, "lower"], [1.82, 1.0, "band"], [1.98, 1.0, "win"], [2.92, 0.99, "band"], [3.1, 0.985, "upper"],
+	[3.42, 0.95, "roof"], [3.62, 0.82, "roof"], [3.7, 0.45, "roof"], [3.72, 0.0, ""]]
 const NOSE_EMU := {"len": 1.5, "rake": 0.62, "pow": 2.6, "lamps": "pair", "board": true}
 const NOSE_UK := {"len": 0.7, "rake": 0.2, "pow": 3.2, "lamps": "pair", "board": true}
+const NOSE_METRO := {"len": 0.75, "rake": 0.3, "pow": 3.4, "lamps": "pair", "board": true}
 const NOSE_LONG := {"len": 2.8, "rake": 1.15, "pow": 2.2, "lamps": "pair"}
 
 const KIND := {
@@ -90,7 +105,37 @@ const KIND := {
 			"mid": {"len": 24.6, "prof": PROF_LONG, "front": {}, "rear": {}, "doors": [-10.6, 10.6],
 				"pitch": 1.7, "axle": 1.35, "bogies": [8.7, -8.7], "boxes": [[0.0, 6.0]],
 				"under": [[-2.6, 4.6], [3.0, 4.0]], "panto": -7.6}}},
+	# Helsinki's metro: 3.2 m wide cars, three doorways a side, third rail;
+	# a train is four cars (two M100 / M200 pairs or one M300 set).
+	"metro": {"w": 3.2, "gap": 0.6, "wheel_r": 0.43, "gangway": Vector2(1.6, 2.1),
+		"sections": {
+			"cab": {"len": 22.0, "prof": PROF_METRO, "front": NOSE_METRO, "rear": {}, "doors": [-6.9, -0.3, 6.3],
+				"pitch": 1.6, "axle": 1.25, "bogies": [7.3, -7.6], "boxes": [[-1.0, 3.0]],
+				"under": [[-3.6, 4.4], [3.4, 2.6]], "panto": -6.4},
+			"mid": {"len": 22.0, "prof": PROF_METRO, "front": {}, "rear": {}, "doors": [-6.6, 0.0, 6.6],
+				"pitch": 1.6, "axle": 1.25, "bogies": [7.6, -7.6], "boxes": [[0.0, 3.0]],
+				"under": [[-3.4, 3.6], [3.4, 3.6]], "panto": -5.6}}},
 }
+
+## The regions whose metro runs on surface track (Helsinki's, east of
+## Sörnäinen, Länsimetro is all underground; Stockholm's above-ground
+## tunnelbana, over Västerbron and out in the suburbs) and the livery
+## of each.
+const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm"]
+const METRO_LIVERY := {"stockholm": "stockholm_metro"}
+
+## Whether a metro runs on `rail` in CityStyles region `region`: open
+## (or roofed) mapped subway track at or above ground in Helsinki and
+## Stockholm.
+static func metro(region: String, rail: Dictionary) -> bool:
+	if not region in METRO_REGIONS or str(rail.get("class", "")) != "subway":
+		return false
+	return (not bool(rail.get("tunnel", false)) or bool(rail.get("covered", false))) and int(rail.get("layer", 0)) >= 0
+
+## Whether trains stand on `rail` in region `region`: carries(), or a
+## city's surface metro track (metro()).
+static func carries_in(region: String, rail: Dictionary) -> bool:
+	return carries(rail) or metro(region, rail)
 
 ## Whether passenger trains run on `rail`: mapped heavy rail.
 static func carries(rail: Dictionary) -> bool:
@@ -110,6 +155,8 @@ static func overhead(rail: Dictionary) -> bool:
 ## "panto"}, or {} when none does. `h` (0..1) mixes a city's fleet and
 ## its train lengths.
 static func pick(region: String, country: String, rail: Dictionary, h: float) -> Dictionary:
+	if metro(region, rail):
+		return {"kind": "metro", "livery": METRO_LIVERY.get(region, "helsinki_metro"), "cars": 4, "panto": false}
 	if not carries(rail):
 		return {}
 	var wired := overhead(rail)

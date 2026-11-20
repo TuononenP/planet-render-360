@@ -75,6 +75,11 @@ static func terraces() -> Dictionary:
 	return {
 		"samppalinnan_maauimala": {"x0": -48.0, "x1": 44.0, "z0": -22.0, "z1": 25.0, "feather_m": 6.0},
 		"paavo_nurmen_stadion": {"x0": -92.0, "x1": 92.0, "z0": -72.0, "z1": 46.0, "feather_m": 8.0},
+		# Sergels torg: the elevation model has the sunken plaza 1-4 m under the
+		# slab's street and bumps it up in places; the whole site is held level
+		# at the ground of the model's origin ("flat": raised as well as cut).
+		"kulturhuset_sergels_torg": {"x0": -84.0, "x1": 84.0, "z0": -72.0, "z1": 14.0, "feather_m": 8.0,
+			"flat": true},
 	}
 
 static func _cut_terraces(surface: PackedFloat32Array, size: int, step: float, data: LocationData) -> void:
@@ -106,7 +111,8 @@ static func _cut_terraces(surface: PackedFloat32Array, size: int, step: float, d
 				if d >= feather:
 					continue
 				var i := z * size + x
-				var target := minf(surface[i], root + terrace_hold_m(type, l) * m2u)
+				var hold := root + terrace_hold_m(type, l) * m2u
+				var target := hold if bool(spec.get("flat", false)) else minf(surface[i], hold)
 				surface[i] = lerpf(target, surface[i], smoothstep(0.0, feather, maxf(d, 0.0)))
 
 ## Model-local ground hold (metres over y = 0) inside a venue's terrace rect.

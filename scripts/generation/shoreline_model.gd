@@ -57,6 +57,8 @@ func _init(data: LocationData = null, ground = null, sea_level: float = NAN, abo
 	domains.lower_under_bridges(data.roads, Callable(self, "dry_height"))
 	_evidence = ShoreEvidence.new(data)
 	domains.lower_for_quays(_evidence.quays, Callable(self, "dry_height"))
+	if ShoreApron.stockholm(data):
+		StockholmShore.level_locks(domains, data)
 	# The street along the quays' upper walls, levelled (ShoreTerrace)
 	# before the water is carved and the roads graded.
 	var levelled := ShoreTerrace.posts(self, _evidence)

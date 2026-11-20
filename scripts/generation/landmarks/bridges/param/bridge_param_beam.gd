@@ -16,6 +16,8 @@ extends RefCounted
 ## clearance: deeper, a long-span girder walled the river off at its ends.
 static func girder_depth(row: Dictionary) -> float:
 	var clear := float(row["clear"])
+	if row.has("depth"):
+		return minf(float(row["depth"]), clear - 0.3)
 	var depth := minf(clampf(BridgeSpec.widest_span(row) / 18.0, 1.2, 6.0), clear - 0.3)
 	return minf(depth, maxf(1.2, clear * 0.5)) if row.has("camber") else depth
 
@@ -24,8 +26,27 @@ static func piers(lm: LandmarkMesh, row: Dictionary, soffit: float) -> void:
 	var xs := BridgeParam.supports(row)
 	var width := float(row["width"])
 	for i in range(1, xs.size() - 1):
+		if int(row.get("columns", 0)) > 0:
+			_columns(lm, row, xs[i], soffit)
+			continue
 		BridgeParam.pier(lm, "Concrete", xs[i], soffit, 1.4 + BridgeSpec.widest_span(row) * 0.01, width * 0.3)
 	BridgeParam.abutments(lm, row, soffit)
+
+## A row of round columns across the deck (`columns` of them, as under
+## Helsinki's Kulosaari and Lauttasaari bridges) up to the soffit, each pier
+## line on a stone footing `plinth` m over the water when the row has one.
+static func _columns(lm: LandmarkMesh, row: Dictionary, x: float, soffit: float) -> void:
+	if soffit < 0.8:
+		return
+	var n := int(row["columns"])
+	var width := float(row["width"])
+	var d := clampf(BridgeSpec.widest_span(row) * 0.03, 1.0, 2.2)
+	var plinth := float(row.get("plinth", 0.0))
+	for k in n:
+		var z := lerpf(-width * 0.4, width * 0.4, float(k) / maxf(n - 1, 1))
+		lm.lathe("Concrete", Vector3(x, 0.0, z), PackedVector2Array([Vector2(d * 0.5, 0.0), Vector2(d * 0.5, soffit)]), 8)
+	if plinth > 0.0:
+		lm.box("Stone", Vector3(x, plinth * 0.5, 0), Vector3(d * 3.0, plinth, width * 0.86), Basis(), 0.0)
 
 static func girder(lm: LandmarkMesh, row: Dictionary) -> void:
 	var h := BridgeParam.half_length(row)

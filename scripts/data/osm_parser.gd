@@ -354,6 +354,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	_drop_duplicate_parts(part_ways)
 	_nest_parts(buildings, part_ways)
 	BuildingReferences.apply(buildings)
+	HelsinkiNotable.apply(buildings)
 	TurkuNotable.apply(buildings)
 	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
 	_monument_landmarks(buildings, landmarks)

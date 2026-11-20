@@ -15,6 +15,7 @@ extends SceneTree
 ##          <id>_look<N>.jpg each: the eye stands height_m over the ground; zoom 0.7-2.8;
 ##          an eye inside or within 3 m of a building at least as tall as it moves to open ground)
 ##        [--look_time=late]  (take the looks two hours after sunset, not at golden hour)
+##        [--look_ahead=800]  (metres ahead of a look's eye its own world is centred; use ~100 at street level)
 ##        [--keep_centre]  (shoot every look in the place's own world; by default a look
 ##          whose view would run off the detailed square gets a world centred ahead of it)
 ##        [--size=WxH]  (frame size; default 1280x800)  [--png]  (lossless PNG, not JPEG)
@@ -178,7 +179,7 @@ var _weather_code := 0
 ## Season every place is shot in (--season=spring|summer|autumn|winter or
 ## 0..3); -1 keeps the place's own.
 var _season := -1
-## Candidate eyes (--looks=): [lat, lon, height_m over ground, bearing°, pitch°].
+## Candidate eyes (--looks=): [lat, lon, height_m over ground (or the water surface), bearing°, pitch°].
 var _looks: Array = []
 ## Least height (m) of a landmark's opening eye over the ground (--eye_min).
 var _eye_min := 0.0
@@ -316,6 +317,7 @@ func _run() -> void:
 	_weather_code = int(a.get("weather", 0))
 	_look_time = str(a.get("look_time", ""))
 	_keep_centre = OS.get_cmdline_user_args().has("--keep_centre")
+	_look_ahead_m = float(a.get("look_ahead", LOOK_AHEAD_M))
 	for spec in str(a.get("looks", "")).split(";", false):
 		var f := spec.split(",")
 		if f.size() >= 5:
@@ -551,6 +553,9 @@ func _look_light(view: View360, place: Dictionary) -> void:
 ## How far ahead of a look's eye (m) its own world is centred: the eye
 ## keeps detailed ground behind it, and most of the square lies in view.
 const LOOK_AHEAD_M := 800.0
+## --look_ahead=metres replaces it: a street-level look wants the world close
+## around it, since props (wires, lamps, furniture, cars) stop 320-600 m from the centre.
+var _look_ahead_m := LOOK_AHEAD_M
 ## A look whose wanted centre is this close to the live one keeps it.
 const LOOK_RECENTRE_M := 300.0
 
@@ -562,7 +567,7 @@ func _look_centre(view: View360, l: Array) -> Vector2:
 	var b := deg_to_rad(float(l[3]))
 	var eye := WorldScale.xz_from_latlon(float(l[0]), float(l[1]), view._data.latitude, view._data.longitude)
 	# Bearing 0 looks north (-Z), 90 east (+X), as CameraRig.set_look(-bearing).
-	var want := eye + Vector2(sin(b), -cos(b)) * LOOK_AHEAD_M * WorldScale.metres_to_units()
+	var want := eye + Vector2(sin(b), -cos(b)) * _look_ahead_m * WorldScale.metres_to_units()
 	if want.length() <= LOOK_RECENTRE_M * WorldScale.metres_to_units():
 		return Vector2.INF
 	return WorldScale.latlon_from_xz(want.x, want.y, view._data.latitude, view._data.longitude)
@@ -577,7 +582,12 @@ func _place_eye(view: View360, id: String, shot: String, l: Array) -> void:
 	if free_at != at:
 		print("CAPTURE MOVED %s %s: eye inside or against a building, moved %.1f m" % [id, shot, free_at.distance_to(at) / WorldScale.metres_to_units()])
 		at = free_at
-	var y := view._ground.height_at_world(at.x, at.y) + float(l[2]) * WorldScale.metres_to_units()
+	# Over water the ground is the bed: an eye `height` over it sat at (or
+	# under) the surface and drew the water from below, its shadowed
+	# underside a black slab. Measure from the surface, as the camera does
+	# (LandmarkTerrain.floor_y).
+	var floor_y := maxf(view._ground.height_at_world(at.x, at.y), view._ground.water_level_at(at.x, at.y))
+	var y := floor_y + float(l[2]) * WorldScale.metres_to_units()
 	rig.position = Vector3(at.x, y, at.y)
 	rig.set_zoom(float(l[5]) if l.size() >= 6 else 1.0)
 	rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))

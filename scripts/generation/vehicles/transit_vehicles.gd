@@ -5,7 +5,8 @@ extends RefCounted
 ## phones on Ultra): a tram city with bare rails reads as a model.
 ## * Which: TramSpecs.pick by city and track (Helsinki's green cars,
 ##   Lisbon's and Porto's two-axle cars, San Francisco's cable cars,
-##   streamliners and light rail, a white articulated car elsewhere).
+##   streamliners and light rail, Stockholm's blue light rail and
+##   Djurgårdslinjen's vintage car, a white articulated car elsewhere).
 ## * Where: at a mapped tram stop, snapped to the nearest track within
 ##   SNAP_M, OCCUPIED of them taken; and one at a hashed spot in every
 ##   BLOCK_M of route without a stop (bundled and older payloads carry
@@ -39,11 +40,13 @@ const BUS_CLEAR_M := 14.0
 ## Bus centreline inside the kerb (m).
 const BUS_KERB_IN_M := 1.6
 const BUS_CLASSES: Array[String] = ["primary", "secondary", "tertiary", "residential", "unclassified", "trunk"]
+## HSL's bus blue (#0072C6, as linear albedo like the other BUS_PAINT rows).
+const HSL_BLUE := Color(0.0, 0.17, 0.57)
 ## Turku's Föli bus saffron yellow (#F5A800, as linear albedo).
 const FOLI_YELLOW := Color(0.91, 0.39, 0.0)
 ## The city's bus colour; elsewhere one of BUS_PALETTE by country.
 const BUS_PAINT := {
-	"london": Color(0.5, 0.03, 0.03), "helsinki": Color(0.05, 0.18, 0.45), "espoo": Color(0.05, 0.18, 0.45),
+	"london": Color(0.5, 0.03, 0.03), "helsinki": HSL_BLUE, "espoo": HSL_BLUE,
 	"turku": FOLI_YELLOW,
 	"stockholm": Color(0.5, 0.04, 0.04), "lisbon": Color(0.85, 0.62, 0.04), "berlin": Color(0.85, 0.66, 0.05),
 	"new_york": Color(0.78, 0.8, 0.84), "san_francisco": Color(0.72, 0.72, 0.7), "paris": Color(0.35, 0.62, 0.52),
@@ -116,7 +119,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 			var s := float(spot[1])
 			if decked.has(route) or not route.bridged(s, s) or route.unsupported(s, s):
 				continue
-		var train := _train(spot[0], float(spot[1]), region, data.country, mouths, ground, m2u)
+		var train := _train(spot[0], float(spot[1]), region, data.country, mouths, ground, m2u,
+				Vector2(data.latitude, data.longitude))
 		if train.is_empty():
 			continue
 		var clear := true
@@ -137,9 +141,12 @@ static func _block_m(route: TramRoute) -> float:
 ## The train standing with its middle near `s` on `route`, or {} when
 ## that spot cannot take it.
 static func _train(route: TramRoute, s_in: float, region: String, country: String,
-		mouths: PackedVector2Array, ground: GroundTruth, m2u: float) -> Dictionary:
+		mouths: PackedVector2Array, ground: GroundTruth, m2u: float, origin: Vector2 = Vector2.INF) -> Dictionary:
 	var at := route.xz_at(s_in)
-	var pick := TramSpecs.pick(region, country, route.way_at(s_in), _hash(at.x, at.y, 11.3))
+	# Stockholm's Djurgårdslinjen is told by where the track runs.
+	var ll := WorldScale.latlon_from_xz(at.x, at.y, origin.x, origin.y) \
+		if region == "stockholm" and origin.x != INF else Vector2.INF
+	var pick := TramSpecs.pick(region, country, route.way_at(s_in), _hash(at.x, at.y, 11.3), ll)
 	if pick.is_empty():
 		return {}
 	var kind := str(pick["kind"])

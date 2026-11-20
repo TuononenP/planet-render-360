@@ -90,6 +90,15 @@ func _swap() -> void:
 	if L.from_standard(_facade("render")).get_shader_parameter("has_emit") != false:
 		failures.append("no emit map, no night glow")
 
+	# Warm ground bounce: only a material marked for it (Helsinki's) takes the uniform.
+	var warm := _facade("render")
+	warm.set_meta("warm_bounce", FacadeTextures.HELSINKI_BOUNCE)
+	if not is_equal_approx(float(L.from_standard(warm).get_shader_parameter("warm_bounce")), FacadeTextures.HELSINKI_BOUNCE) \
+			or L.from_standard(_facade("render")).get_shader_parameter("warm_bounce") != null:
+		failures.append("warm_bounce must reach the lite shader for a marked material only")
+	if not L.CODE.contains("uniform float warm_bounce") or not L.CODE.contains("EMISSION += texture(emit_tex"):
+		failures.append("the lite shader's bounce must not replace the night emission")
+
 func _grids() -> void:
 	if FacadeLiteShader.grid_for(_facade("render")) != Vector2(4.0, 1.0):
 		failures.append("a tiled look holds its bays by one storey")

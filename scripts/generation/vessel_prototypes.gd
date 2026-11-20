@@ -33,6 +33,10 @@ static func geometry(model: String, length: float, beam: float, h: float, hull: 
 			else:
 				CruiseLinerModel.build(lm, p)
 		"cruise_ferry":
+			if variant.begins_with("#"):
+				p["livery"] = variant
+			elif variant.begins_with("line:"):
+				p["line"] = FerryLivery.row(variant.trim_prefix("line:"))
 			CruiseFerryModel.build(lm, p)
 		"cargo":
 			p["variant"] = variant

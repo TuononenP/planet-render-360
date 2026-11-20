@@ -99,6 +99,15 @@ func _run() -> void:
 		failures.append("a glass override should become a curtain-wall shader material")
 	if FacadeShader.upgrade(root) != 0:
 		failures.append("a second pass has nothing left to swap")
+	# Warm ground bounce is Helsinki's alone: marked at the source, passed to the shader as a uniform.
+	var hel_look := {"city": "helsinki", "bay_m": 3.2, "floor_h": 3.3}
+	var hel := FacadeTextures._facade_material_for("render", 6, 1, Color.WHITE, "punched", hel_look)
+	var sto := FacadeTextures._facade_material_for("render", 6, 1, Color.WHITE, "punched", {"city": "stockholm"})
+	if not hel.has_meta("warm_bounce") or sto.has_meta("warm_bounce") or wall.has_meta("warm_bounce"):
+		failures.append("only Helsinki facades carry the warm ground bounce")
+	elif not is_equal_approx(float(FacadeShader.from_standard(hel).get_shader_parameter("warm_bounce")),
+			FacadeTextures.HELSINKI_BOUNCE) or FacadeShader.from_standard(sto).get_shader_parameter("warm_bounce") != null:
+		failures.append("warm_bounce must reach the shader for Helsinki only")
 	root.free()
 	failures.erase(failures[0])
 	if failures.is_empty():

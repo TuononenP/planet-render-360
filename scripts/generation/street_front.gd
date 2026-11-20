@@ -69,7 +69,7 @@ static func add(kit: ReliefKit, spans: Array, rows: Array, d: Dictionary, stone:
 			stooped = true
 		# A lifted part stands on another part: no plinth at its foot.
 		if bool(relief.get("granite_plinth", false)) and not raised:
-			FinlandRelief.plinth(kit, sp, rows, seed_v)
+			FinlandRelief.plinth(kit, sp, rows, seed_v, str(look.get("city", "")) == "stockholm")
 		if i == longest and ArchitectureStyle._h(seed_v, 95) < float(relief.get("turret", 0.0)) \
 				and FinlandRelief.turret_fits(d):
 			FinlandRelief.turret(kit, sp, d, stone)

@@ -23,7 +23,7 @@ const FADE_LENGTH_M := 60.0
 const HERO_SHADOW_MAX := 12
 const HERO_SHADOW_RADIUS_M := 55.0
 const VOLUMETRIC_FOG_ENERGY := 2.4
-const HALO_SIZE_M := 2.6
+const HALO_SIZE_M := 1.5
 
 ## Soft misty inverse-square glow halo around each lamp head at night;
 ## scales with street_lamp_glow and blooms softly in rain.
@@ -32,7 +32,7 @@ shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, world_vertex_coords;
 global uniform float street_lamp_glow;
 global uniform float climate_rain;
-uniform float halo_size = 2.6;
+uniform float halo_size = 1.5;
 varying vec3 lamp_col;
 varying float dist_fade;
 
@@ -42,7 +42,7 @@ void vertex() {
 	float d = length(CAMERA_POSITION_WORLD - centre);
 	// Fade out very close (avoids blinding wash) and past FADE_BEGIN_M + FADE_LENGTH_M.
 	dist_fade = smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(140.0, 240.0, d));
-	float scale = halo_size * mix(1.0, 1.55, clamp(climate_rain, 0.0, 1.0)) * mix(1.0, 1.8, smoothstep(40.0, 180.0, d));
+	float scale = halo_size * mix(1.0, 1.55, clamp(climate_rain, 0.0, 1.0)) * mix(1.0, 1.35, smoothstep(40.0, 180.0, d));
 	vec3 cam_right = INV_VIEW_MATRIX[0].xyz;
 	vec3 cam_up = INV_VIEW_MATRIX[1].xyz;
 	vec2 corner = vec2(UV.x - 0.5, 0.5 - UV.y);
@@ -59,9 +59,11 @@ void fragment() {
 	if (r2 >= 1.0) {
 		discard;
 	}
-	float core = exp(-r2 * 14.0) * 0.55;
-	float mist = pow(1.0 - r2, 3.0) * mix(0.16, 0.34, clamp(climate_rain, 0.0, 1.0));
-	ALBEDO = lamp_col * (core + mist) * glow;
+	// A faint gaussian bloom that fades to nothing well inside the quad, so
+	// no disc edge or flat plate shows; the lamp head itself carries the core.
+	float falloff = exp(-r2 * 7.0) * (1.0 - r2);
+	float rain = clamp(climate_rain, 0.0, 1.0);
+	ALBEDO = lamp_col * falloff * mix(0.17, 0.30, rain) * glow;
 }
 """
 

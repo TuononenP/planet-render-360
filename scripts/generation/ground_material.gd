@@ -114,8 +114,15 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 		cmap = class_map(data)
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
-		ClimateModel.grass_tint(data, data.season))))
+		ClimateModel.grass_tint(data, data.season),
+		ShoreApron.palette_overrides(data) if ShoreApron.stockholm(data) else FinnishGranite.palette_overrides(data))))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
+	if ShoreApron.stockholm(data):
+		# Södermalm's cliffs are bare granite: rock from gentler slopes, and grass holds
+		# little of it (Mariaberget read as a smooth lawn and a paved slab).
+		m.set_shader_parameter("cliff_set", Vector4(0.88, 0.66, 0.3, 0.2))
+		# Dry ground and paving blew out to white under the low golden sun.
+		m.set_shader_parameter("glare", RoadSurface.STOCKHOLM_GLARE)
 	_bind_near(m, data, m2u)
 	m.set_shader_parameter("extent_u", WorldScale.detailed_extent_units())
 	m.set_shader_parameter("u2m", 1.0 / m2u)
@@ -281,7 +288,10 @@ static func ground_ceiling(photo: Texture2D, rect: Rect2, gain: float,
 ## row 3 more detail weights (cliff, forest floor, gravel, sand).
 ## `dry` (linear, alpha 1) replaces the grass colour in dry-summer and
 ## arid climates (ClimateModel.grass_tint); alpha 0 keeps the season's.
-static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color(0, 0, 0, 0)) -> Image:
+## `colours` (class name -> sRGB Color) replaces that class's base colour
+## (FinnishGranite: Finland's pink-grey rock and setts).
+static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color(0, 0, 0, 0),
+		colours: Dictionary = {}) -> Image:
 	var img := Image.create(32, 4, false, Image.FORMAT_RGBA8)
 	# Unused ids must never read as colour: v1 filled (1,0,0,0), which
 	# row 1 decodes as pure red albedo (the Big Sur all-red ground).
@@ -329,7 +339,7 @@ static func palette(season: int = LocationData.Season.SUMMER, dry: Color = Color
 		var r: Array = rows[cls]
 		var x: int = ID[cls]
 		img.set_pixel(x, 0, r[0])
-		var c: Color = r[1]
+		var c: Color = colours.get(cls, r[1])
 		img.set_pixel(x, 1, Color(c.r, c.g, c.b, float(r[2])))
 		img.set_pixel(x, 2, Color(float(r[3]), float(r[4]), float(r[5]),
 			float(PAVED.get(cls, 0.0))))
@@ -477,6 +487,8 @@ static func _paint_features(data: LocationData, paint: Callable, road_inset_m: f
 		var rings: Array = [area["points"]]
 		rings.append_array(area.get("holes", []))
 		paint.call(rings, int(ID.get(str(area["class"]), ID["urban"])))
+	var granite := FinnishGranite.applies(data)
+	var finnish_parks: Array = _grass_polys(data) if granite else []
 	for line in data.roads:
 		var pts := PackedVector2Array()
 		var width := 1.7
@@ -491,6 +503,10 @@ static func _paint_features(data: LocationData, paint: Callable, road_inset_m: f
 			var rc := str(road.get("class", ""))
 			if rc in PAVED_PATHS:
 				id = ID["urban"]
+				# Finland's park paths are gravel (FinnishGranite.GRAVEL_HEX).
+				if granite and (RoadBuilder._finish(rc, str(road.get("surface", "")).to_lower()) == "gravel" \
+						or FinnishGranite.park_way(road, finnish_parks)):
+					id = ID["path"]
 			elif rc in DIRT_PATHS:
 				id = ID["path"]
 		elif line is PackedVector2Array:

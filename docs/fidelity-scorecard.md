@@ -532,6 +532,10 @@ Round sto-r4, 2026-11-03 (Stockholm hero work in progress):
 - Capture: `visual-plan/reviews/sto-r4-2026-11-03/`, Ultra summer golden hour. Agent pre-rating: recognisable; human gate pending.
 - Island buildings and waterfront remain simplified, and the road and grass dominate the foreground. The 206 s time to view exceeds the 150 s target under concurrent load; an isolated timing remains necessary.
 
+Round sto-r6, 2026-11-20 (Stockholm hero loop S-6):
+- Captures: `visual-plan/reviews/sto-r6-2026-11-20/` (golden, noon, night, 15 looks) with `sto-r6-redo-`, `sto-r6-winter-` and `sto-r6-cold-` folders beside it, Ultra. Agent pre-rating: recognisable; human gate pending.
+- The Monteliusvägen eye now stands on the cliff top (38 m over Riddarfjärden, hero-plan B-3 closed). Remaining tells: pale flat Riddarholmen and Slussen banks, a tilted paved slab and smooth grass instead of granite on the cliffs, a repeated moored-ship model, dark olive render walls, no moving water traffic. Cold-cache time to view 23 s against the 150 s target, on a machine with other Godot processes running.
+
 Round nyc-r4, 2026-11-03 (New York hero work in progress):
 - Capture: `visual-plan/reviews/nyc-r4-2026-11-03/`, Ultra, clear summer, 08:00 local. Agent pre-rating: recognisable; human gate pending.
 - Grey-green water and the bridge read clearly, but the skyline remains simplified, nearby foliage has pale angular patches, and the promenade has repeated benches. The truncated OSM response omitted mapped furniture, so this round does not validate it. See the review README for timings and reference limitations.
@@ -746,6 +750,27 @@ generation, but missed far-city geometry and POIs. The subway globes now
 meet their support posts; a true descending stairwell remains open. A
 licensed 06:39 golden-hour skyline photo at nearby Fulton Ferry Landing is
 documented as context; it does not establish the requested Pier 1 reference.
+
+### Helsinki round hel-r6 (2026-11-20)
+
+Frames in `visual-plan/reviews/hel-r6-final-2026-11-20/` (Ultra, twelve open-space eyes plus the
+opening look at golden hour, noon and night). Agent pre-rating only; the "photographic" call is the
+user's. Landmark models rebuilt in the same pass (about 120 types, refs in
+`visual-plan/refs/landmarks/`, per-group sections in `docs/helsinki-landmark-sources.md`).
+
+- **Reads as Helsinki:** the Senate Square view (cathedral on its steps, Government Palace and
+  University ochre fronts), the harbour from the water (Uspenski beside the Enso-Gutzeit block,
+  moored boats), Rautatientori (station tower and arch in granite) and the night view.
+- **Biggest remaining tell:** black masses in the drone view (top right, probably the
+  Kalasatama glass towers, and a ship hull at left), then window grids that stay flat black
+  rectangles, then bright, near-white plaza paving on the Market Square side.
+- **Performance (Helsinki, `tools/perf_baseline.gd`, one run per preset, 60 s fly, cold cache;
+  against 2026-11-15):** cold 10.7 / 16.0 / 19.6 s on Fast / High / Ultra (was 10.9 / 25.6 / 26.7);
+  cached 1.4 / 1.5 / 2.0 s (was 3.8 / 4.2 / 4.5); fly p95 9.3 / 9.5 / 26.2 ms (was 9.4 / 21.3 /
+  23.4), fly max 62 / 83 / 64 ms (was 235 / 265 / 204); mesh nodes 1417 / 2211 / 3500 (was 1279 /
+  2071 / 3183); peak 5.2 / 8.0 / 12.2 GB (was 4.8 / 7.6 / 12.5). Ultra save 40.0 s against 29.8 s
+  is the one number that got worse. The fly runs differ in length (60 s against 90 s), so p95 is
+  indicative only.
 
 ### Turku round tku-r3 (2026-11-20)
 

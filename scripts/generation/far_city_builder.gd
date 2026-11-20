@@ -78,6 +78,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		b.batch.chroma = b._paint().x
 		b.batch.tone = b._paint().y
 		b._fabric()
+	elif smap != null and not smap.is_empty() and not b._far_dists.is_empty():
+		# The kernel skipped the district cells; the script builds them.
+		b.batch.chroma = b._paint().x
+		b.batch.tone = b._paint().y
+		b._fabric(true)
 	var batch := b.batch
 	stats = {"far_blocks": b.blocks, "far_towers": b.towers,
 		"far_tris": batch.triangles}
@@ -111,6 +116,13 @@ const FAR_MASSING_FIDELITY := 3
 var _tower_cells := {}
 var _height_ctx := {}
 var _fidelity := 2
+## The city's district circles past the detailed extent
+## (CityStyles.far_districts), each with its rows' profiles and distant
+## materials: {"at", "r2", "apt", "house", "com", "dfs", "drs"}.
+var _far_dists: Array = []
+## The facade / roof set the current fabric mass draws from (_fabric).
+var _cell_dfs: Array = []
+var _cell_drs: Array = []
 var _detailed_ids := {}
 
 func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
@@ -130,7 +142,20 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 	_fidelity = fidelity
 	_dfs = FacadeMaterials.distant_facades(fidelity, _region)
 	_drs = FacadeMaterials.distant_roofs(_region, fidelity)
-	_glass = FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1)
+	_cell_dfs = _dfs
+	_cell_drs = _drs
+	# The city's districts carry on past the extent: a Klara or Million
+	# Programme patch on the far skyline keeps its own storeys, roofs and walls.
+	for fd in CityStyles.far_districts(_region, d.latitude, d.longitude, SettlementMap.RADIUS_M):
+		var era := str(fd[0])
+		_far_dists.append({"at": fd[1], "r2": float(fd[2]) * float(fd[2]),
+			"apt": ArchitectureStyle.profile(era, "apartments"),
+			"house": ArchitectureStyle.profile(era, "house"),
+			"com": ArchitectureStyle.profile(era, "commercial"),
+			"dfs": FacadeMaterials.distant_facades(fidelity, era),
+			"drs": FacadeMaterials.distant_roofs(era, fidelity)})
+	_glass = FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1,
+		{"city": "stockholm"} if ShoreApron.stockholm(d) else {})
 	if d.landmark_type != "none":
 		_landmarks.append(TerrainBuilder.landmark_world_pos(d))
 		_tower_clear.append(Vector3(_landmarks[0].x, _landmarks[0].y, LANDMARK_CLEAR_M))
@@ -354,13 +379,38 @@ static func grid_cell0(m: SettlementMap, origin: Vector2) -> Vector2i:
 	return Vector2i(roundi((origin.x - m.shift.x) / SettlementMap.CELL_M) - m.half,
 		roundi((origin.y - m.shift.y) / SettlementMap.CELL_M) - m.half)
 
-func _fabric() -> void:
+## Settlement cell index -> the far district (an entry of _far_dists) its
+## centre stands in, the most local winning; filled once per build.
+var _dist_cells := {}
+
+func _district_cells() -> Dictionary:
+	if not _dist_cells.is_empty() or _far_dists.is_empty():
+		return _dist_cells
+	var cell := SettlementMap.CELL_M
+	for fd: Dictionary in _far_dists:
+		var at: Vector2 = fd["at"]
+		var r := sqrt(float(fd["r2"]))
+		var lo := Vector2i(floori((at.x - r + smap.shift.x) / cell) + smap.half,
+			floori((at.y - r + smap.shift.y) / cell) + smap.half)
+		var hi := Vector2i(floori((at.x + r + smap.shift.x) / cell) + smap.half,
+			floori((at.y + r + smap.shift.y) / cell) + smap.half)
+		for j in range(maxi(lo.y, 0), mini(hi.y, smap.n - 1) + 1):
+			for i in range(maxi(lo.x, 0), mini(hi.x, smap.n - 1) + 1):
+				var k := smap.index(i, j)
+				if not _dist_cells.has(k) and smap.centre(i, j).distance_squared_to(at) <= float(fd["r2"]):
+					_dist_cells[k] = fd
+	return _dist_cells
+
+## `districts_only`: build just the cells inside a far district (the native
+## kernel has built the rest).
+func _fabric(districts_only: bool = false) -> void:
 	var apt := ArchitectureStyle.profile(_region, "apartments")
 	var house := ArchitectureStyle.profile(_region, "house")
 	var ind := ArchitectureStyle.profile(_region, "industrial")
 	var com := ArchitectureStyle.profile(_region, "commercial")
 	var r2_out := SettlementMap.RADIUS_M * SettlementMap.RADIUS_M
 	var cell0 := grid_cell0(smap, data.origin_m)
+	var dist_cells := _district_cells()
 	for j in smap.n:
 		for i in smap.n:
 			var k := smap.index(i, j)
@@ -374,19 +424,24 @@ func _fabric() -> void:
 			if absf(cc.x) < R_IN and absf(cc.y) < R_IN or d2 > r2_out \
 					or _tower_cells.has(Vector2i(i, j)):
 				continue
+			var fd: Dictionary = dist_cells.get(k, {})
+			if districts_only and fd.is_empty():
+				continue
 			var d := sqrt(d2)
 			var cls := smap.cls[k]
-			var prof := apt
+			var prof: Dictionary = fd.get("apt", apt)
 			var kind := "apartments"
 			if cls == SettlementMap.Cls.INDUSTRIAL:
 				prof = ind
 				kind = "industrial"
 			elif cls == SettlementMap.Cls.COMMERCIAL:
-				prof = com
+				prof = fd.get("com", com)
 				kind = "commercial"
 			elif s < 0.42:
-				prof = house
+				prof = fd.get("house", house)
 				kind = "house"
+			_cell_dfs = _dfs if fd.is_empty() or kind == "industrial" else fd["dfs"]
+			_cell_drs = _drs if fd.is_empty() or kind == "industrial" else fd["drs"]
 			# District grid orientation: shared by ~600 m patches of the
 			# continuous map's cells (cell0: this grid's first, there).
 			var yaw := _hash(floorf(float(i + cell0.x) / 6.0), floorf(float(j + cell0.y) / 6.0), 3.0) * PI * 0.5
@@ -457,7 +512,7 @@ func _native_fabric() -> bool:
 		"far_ok": _far_ok, "sea": _sea, "h_edge": _h_edge,
 		"n": smap.n, "half": smap.half, "score": smap.score, "cls": smap.cls,
 		"shift": smap.shift, "origin": data.origin_m, "cell0": grid_cell0(smap, data.origin_m),
-		"blocked": smap.blocked, "tower_cells": towers,
+		"blocked": _native_blocked(), "tower_cells": towers,
 		"apt": ArchitectureStyle.profile(_region, "apartments"),
 		"house": ArchitectureStyle.profile(_region, "house"),
 		"ind": ArchitectureStyle.profile(_region, "industrial"),
@@ -472,6 +527,17 @@ func _native_fabric() -> bool:
 		batch.add_group(g[0], mats[g[1]], g[2], g[3], g[4], g[5], g[6])
 	blocks += int(out["blocks"])
 	return true
+
+## The settlement map's blocked cells, plus every far-district cell: those
+## take their district's rows, which the kernel's one profile per kind
+## cannot, so _fabric(true) builds them instead.
+func _native_blocked() -> PackedByteArray:
+	if _far_dists.is_empty():
+		return smap.blocked
+	var out := smap.blocked.duplicate()
+	for k: int in _district_cells():
+		out[k] = 1
+	return out
 
 ## The far blocks' paint weight and the place's tone (x, y): the region's
 ## apartment fabric takes paint families as a near building of that wall set
@@ -540,8 +606,8 @@ func _mass(c: Vector2, size: Vector2, yaw: float, prof: Dictionary, d: float,
 	# Past SPLIT_M tints are indistinguishable through the haze: two
 	# facades + one roof per band keep the draw calls down.
 	var far := d >= SPLIT_M
-	var facade: Material = _dfs[int(seed_v * 97.0) % (mini(2, _dfs.size()) if far else _dfs.size())]
-	var roof: Material = _drs[0 if far else int(seed_v * 53.0) % _drs.size()]
+	var facade: Material = _cell_dfs[int(seed_v * 97.0) % (mini(2, _cell_dfs.size()) if far else _cell_dfs.size())]
+	var roof: Material = _cell_drs[0 if far else int(seed_v * 53.0) % _cell_drs.size()]
 	BuildingBuilder._batch = batch
 	BuildingBuilder._batch_key = _key(c.x, c.y)
 	BuildingBuilder._walls(null, ring, base, top, facade, float(storeys))

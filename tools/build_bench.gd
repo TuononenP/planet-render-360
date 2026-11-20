@@ -26,6 +26,7 @@ const PLACES := [
 	{"key": "bigsur", "lat": 36.2704, "lon": -121.8081},
 	{"key": "niittykumpu", "lat": 60.1700, "lon": 24.7790},
 	{"key": "helsinki", "lat": 60.1699, "lon": 24.9384},
+	{"key": "stockholm", "lat": 59.3207, "lon": 18.0604},
 ]
 
 var _tex_memo := {}

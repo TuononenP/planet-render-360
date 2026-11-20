@@ -6,7 +6,8 @@ extends RefCounted
 ## painted port band, stern windows on the raked transom, a bowsprit and
 ## jib-boom with furled headsails, and three masts built in sections
 ## (lower mast, top, topmast, crosstrees, topgallant). Fore and main carry
-## round tapered yards with furled sails and footropes; the mizzen a gaff
+## round tapered yards, the courses and topsails set (belled square sails),
+## the topgallants furled; a jib on the forestay; the mizzen a gaff
 ## and spanker boom. Shrouds lead to channels outside the hull, stays run
 ## fore and aft. On deck: a rounded deckhouse with a skylight, a galley
 ## house, hatches and a spoked wheel. Only existing vessel surfaces are
@@ -15,20 +16,24 @@ extends RefCounted
 
 const MASTS := [0.28, -0.02, -0.3]
 
-static func build(lm: LandmarkMesh, spec: Dictionary, p: Dictionary, deck_y: float, h: float) -> void:
+## Returns the bowsprit's [cap, tip]. `p.masts` = false leaves the masts and
+## stays to the caller (an authored ship with its own rig).
+static func build(lm: LandmarkMesh, spec: Dictionary, p: Dictionary, deck_y: float, h: float) -> Array:
 	var ultra := bool(p.get("ultra", false))
 	_bulwarks(lm, spec)
 	_band(lm, spec)
 	_stern(lm, spec)
 	var jib := _bowsprit(lm, spec)
 	_deck(lm, spec, deck_y)
-	var heads: Array = []
-	for i in MASTS.size():
-		heads.append(_mast(lm, spec, i, deck_y, h, ultra))
-	_stays(lm, heads, jib, deck_y)
+	if bool(p.get("masts", true)):
+		var heads: Array = []
+		for i in MASTS.size():
+			heads.append(_mast(lm, spec, i, deck_y, h, ultra))
+		_stays(lm, heads, jib, deck_y)
 	VesselForms.fittings(lm, spec)
 	if ultra:
 		VesselEquipment.deck(lm, spec)
+	return jib
 
 ## A point on the hull side `drop` m under the sheer at station `t`
 ## (port side, |z|). Follows the lofted section, rake included.
@@ -209,17 +214,24 @@ static func _mast(lm: LandmarkMesh, spec: Dictionary, i: int, deck_y: float, h: 
 		for k in levels.size():
 			var yy := deck_y + mh * float(levels[k][0])
 			var ax := (mx if k == 0 else tx) + r * 1.2
-			_yard(lm, Vector3(ax, yy, 0), beam * float(levels[k][1]) * scale, beam, Vector3(mx if k == 0 else tx, yy + mh * 0.12, 0))
+			# The courses and topsails are set, the topgallants furled.
+			var drop := mh * (0.3 if k == 0 else (0.19 if k == 1 else 0.0))
+			_yard(lm, Vector3(ax, yy, 0), beam * float(levels[k][1]) * scale, beam, Vector3(mx if k == 0 else tx, yy + mh * 0.12, 0), drop)
 	else:
 		_spanker(lm, spec, mx, r, deck_y, mh)
 	return {"top": Vector3(mx, y_top, 0), "head": Vector3(tx, y_cross, 0), "x": mx}
 
 ## A tapered round yard with its sail furled on top, a footrope and lifts.
-static func _yard(lm: LandmarkMesh, at: Vector3, span: float, beam: float, lift_to: Vector3) -> void:
+static func _yard(lm: LandmarkMesh, at: Vector3, span: float, beam: float, lift_to: Vector3, drop: float = 0.0) -> void:
 	var ry := maxf(beam * 0.014, 0.07)
 	var half := span * 0.5
 	HullLoft.tube(lm, "Dark", [at - Vector3(0, 0, half), at + Vector3(0, 0, half)], ry * 0.6, 6)
 	HullLoft.tube(lm, "Dark", [at - Vector3(0, 0, half * 0.5), at + Vector3(0, 0, half * 0.5)], ry, 8)
+	if drop > 0.0:
+		_square_sail(lm, at, span, drop)
+		for s in [-1.0, 1.0]:
+			HullLoft.tube(lm, "Dark", [at + Vector3(0, 0, half * 0.97 * s), lift_to], 0.015, 4)
+		return
 	var rs := maxf(beam * 0.017, 0.09)
 	var bundle: Array = []
 	for k in 9:
@@ -233,6 +245,23 @@ static func _yard(lm: LandmarkMesh, at: Vector3, span: float, beam: float, lift_
 	VesselEquipment.line(lm, at + Vector3(-0.1, -0.15, -half * 0.94), at + Vector3(-0.1, -0.15, half * 0.94), clampf(span * 0.05, 0.3, 0.8), 0.015)
 	for s in [-1.0, 1.0]:
 		HullLoft.tube(lm, "Dark", [at + Vector3(0, 0, half * 0.97 * s), lift_to], 0.015, 4)
+
+## A set square sail hanging `drop` m from the yard at `at`, wider at the foot
+## and belled forward (+X) in the middle: five rows by eight columns, one
+## surface (the double-sided canvas), about 80 triangles a sail.
+static func _square_sail(lm: LandmarkMesh, at: Vector3, span: float, drop: float) -> void:
+	var rows: Array = []
+	var bell := minf(span * 0.1, 1.1)
+	for j in 5:
+		var v := float(j) / 4.0
+		var row := PackedVector3Array()
+		var w := span * 0.5 * lerpf(0.92, 1.0, v)
+		for i in 9:
+			var u := float(i) / 8.0
+			row.append(Vector3(at.x + bell * sin(PI * u) * sin(PI * clampf(v * 0.85 + 0.1, 0.0, 1.0)),
+				at.y - 0.1 - drop * v + 0.25 * sin(PI * u) * v, lerpf(-w, w, u)))
+		rows.append(row)
+	lm.grid("Sail", rows, Vector3.RIGHT)
 
 ## The mizzen's gaff and spanker boom, the sail furled on the boom.
 static func _spanker(lm: LandmarkMesh, spec: Dictionary, mx: float, r: float, deck_y: float, mh: float) -> void:
@@ -285,6 +314,14 @@ static func _stays(lm: LandmarkMesh, heads: Array, jib: Array, deck_y: float) ->
 	var tip: Vector3 = jib[1]
 	_stay(lm, fore["top"], cap)
 	_stay(lm, fore["head"], tip)
+	# A jib set on the forestay: tack at the jib-boom end, head up the stay, clew on deck.
+	var head: Vector3 = fore["head"]
+	var luff := tip.lerp(head, 0.55)
+	var clew := Vector3(float(fore["x"]) + 1.0, deck_y + 1.6, 0)
+	lm.tri("Sail", tip + Vector3(0, 0.1, 0), luff, clew, Vector3.BACK, Vector3.BACK, Vector3.BACK,
+		Vector2(0, 0), Vector2(1, 0), Vector2(0.5, 1))
+	lm.tri("Sail", tip + Vector3(0, 0.1, 0), clew, luff, Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD,
+		Vector2(0, 0), Vector2(0.5, 1), Vector2(1, 0))
 	for i in range(1, heads.size()):
 		var m: Dictionary = heads[i]
 		var ahead: Dictionary = heads[i - 1]

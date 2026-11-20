@@ -14,7 +14,8 @@ extends RefCounted
 ##   3. structural rules per city: levels (or tagged height / 3.2 m),
 ##      `roof:shape`, footprint area, `heritage`, distance from the
 ##      city core (ctx.cores, metres in the build's local frame) and,
-##      for San Francisco, the most local district circle it stands in;
+##      for San Francisco, Stockholm and the other cities with district
+##      fabrics, the most local district circle it stands in;
 ##   4. seeded pick over ERAS weights, x0.12 outside an era's distance
 ##      band, x district multiplier inside a CityStyles district.
 ## Outside a city zone a country region's periods (ArchitectureCountryEras)
@@ -101,13 +102,18 @@ const CITY_ERAS := {
 			"baroque", "neoclassicism", "vernacular", "palazzo"], 8.0, 0.0, 99.0],
 		["venice_modern", ACC, 1946, 2100, MODERN, 0.3, 0.0, 99.0],
 	],
+	# Wood and Million Programme panel are district-bound (_stockholm_cands);
+	# the other rows are the city's date and architecture bands.
 	"stockholm": [
 		["stockholm_medieval", ALL, 1200, 1799, ["medieval", "gothic", "baroque", "renaissance"], 2.0, 0.0, 3.0, [3, 5]],
 		["stockholm_wood", ["house", "apartments"], 1700, 1919, ["wooden", "vernacular"], 0.5, 0.0, 99.0, [1, 2]],
-		["stockholm_stone", ACC, 1800, 1919, ["national_romantic", "art_nouveau", "jugendstil"], 4.0, 0.0, 5.0, [4, 6]],
+		["stockholm_villa", HAC, 1850, 2100, ["villa", "cottage"], 1.0, 0.0, 99.0, [1, 3]],
+		["stockholm_stenstad", ACC, 1800, 1919, ["historicism", "eclectic", "neo_renaissance", "neo_baroque"], 4.0, 0.0, 6.0, [4, 7]],
+		["stockholm_stone", ACC, 1880, 1919, ["national_romantic", "art_nouveau", "jugendstil"], 2.0, 0.0, 5.0, [4, 6]],
 		["stockholm_grace", ACC, 1920, 1932, ["swedish_grace", "nordic_classicism", "classicism", "neoclassicism"], 2.0, 0.0, 8.0, [4, 6]],
 		["stockholm_funkis", ACC, 1933, 1964, ["functionalism", "functionalist", "funkis"], 2.0, 0.0, 99.0, [3, 6]],
-		["stockholm_miljon", ACC, 1965, 1989, ["million_programme", "prefab", "brutalist"], 2.0, 0.0, 99.0, [4, 9]],
+		["stockholm_postwar", ACC, 1950, 1989, ["international_style", "late_modernism"], 1.0, 0.0, 99.0, [7, 12]],
+		["stockholm_miljon", ACC, 1965, 1975, ["million_programme", "miljonprogrammet", "prefab", "brutalist"], 2.0, 4.0, 99.0, [4, 9]],
 		["stockholm_eco", ACC, 1990, 2100, MODERN, 2.0, 0.0, 99.0, [5, 12]],
 	],
 	"new_york": [
@@ -213,7 +219,9 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		# A recent date alone does not turn an unheighted shop or sauna
 		# into a skyscraper; retain the contemporary mid-rise fabric.
 		cands = cands.filter(func(e: Array) -> bool: return str(e[0]) != "helsinki_modern")
-	if city == "turku":
+	if city == "helsinki" or city == "turku":
+		# Commercial-core, Neo-Renaissance, Jugend, campus and brick-and-render
+		# fabrics belong to their own circles; elsewhere a date keeps city-wide rows.
 		var here := str(c["district"])
 		cands = cands.filter(func(e: Array) -> bool:
 			return not ArchitectureCitiesFinland.DISTRICT_ONLY.has(str(e[0])) or str(e[0]) == here)
@@ -222,6 +230,8 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		for e in cands:
 			if ((e as Array)[4] as Array).has(arch):
 				return str((e as Array)[0])
+	if city == "stockholm":
+		cands = _stockholm_cands(cands, c)
 	# A Seoul palace hall comes from the walls' circles or a heritage
 	# hall (ArchitectureCitiesEastAsia.seoul_rule), never by elimination:
 	# a church, whose kind only the palace row lists, keeps the city fabric.
@@ -438,7 +448,7 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 10:
 				return "helsinki_modern"
 			if district in ["helsinki_wood", "helsinki_classicism", "helsinki_functional", "helsinki_suburb",
-					"helsinki_element", "helsinki_midrise"]:
+					"helsinki_element", "helsinki_midrise"] or ArchitectureCitiesFinland.DISTRICT_ONLY.has(district):
 				return district
 			if district == "helsinki" and lv >= 4 and lv <= 7:
 				return "helsinki"
@@ -490,15 +500,28 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			return "turku"
 		"stockholm":
 			var district := str(c["district"])
+			var year := int(c["year"])
+			# Falu-red timber only in the cottage districts; detached houses
+			# elsewhere are painted villas.
 			if kind == "house":
-				return "stockholm_wood"
-			if district in ["stockholm_medieval", "stockholm_stone", "stockholm_grace", "stockholm_funkis", "stockholm_miljon", "stockholm_eco"]:
-				return district
+				return district if district in ["stockholm_wood", "stockholm_medieval"] else "stockholm_villa"
 			if district == "stockholm_wood" and lv <= 2:
 				return district
-			if old:
-				return "stockholm_stone"
-			return "stockholm_miljon" if lv >= 9 else "stockholm_stone"
+			if district == "stockholm_villa":
+				return district if lv <= 4 else "stockholm_stenstad"
+			# Klara's surviving older blocks keep their stone fabric.
+			if district == "stockholm_postwar":
+				return "stockholm_stenstad" if old or (year > 0 and year < 1950) else district
+			if district in ["stockholm_medieval", "stockholm_stone", "stockholm_stenstad", "stockholm_grace",
+					"stockholm_funkis", "stockholm_miljon", "stockholm_eco"]:
+				return district
+			if lv >= 9:
+				return "stockholm_miljon" if dist > MILJON_KM else "stockholm_postwar"
+			if roof == "flat" and lv >= 4 and not old:
+				return "stockholm_funkis" if dist > 2.5 else "stockholm_postwar"
+			if dist > 3.5 and not old:
+				return "stockholm_funkis"
+			return "stockholm_stenstad"
 		"new_york":
 			var district := str(c["district"])
 			var year := int(c["year"])
@@ -619,10 +642,33 @@ static func _banded(city: String, kind: String, c: Dictionary) -> String:
 			return str(row[0])
 	return ""
 
+## Million Programme estates stand in the outer suburbs: past this many km
+## from Gamla stan an undistricted building may be one.
+const MILJON_KM := 7.0
+
+## Stockholm's district-bound fabrics: a date alone must not turn a house
+## into falu-red timber or a 1965-75 building into Million Programme panel
+## outside the cottage districts and the real estates (CityStyles.DISTRICTS).
+static func _stockholm_cands(cands: Array, c: Dictionary) -> Array:
+	var district := str(c["district"])
+	var outer := float(c["dist"]) > MILJON_KM
+	return cands.filter(func(e: Array) -> bool:
+		match str(e[0]):
+			"stockholm_wood":
+				return district == "stockholm_wood"
+			"stockholm_miljon":
+				return district == "stockholm_miljon" or outer
+		return true)
+
 static func _empire(kind: String, c: Dictionary) -> bool:
 	var year := int(c["year"])
 	var district := str(c["district"])
 	var core := float(c["dist"]) >= 0.0 and float(c["dist"]) <= 1.2
 	if kind == "house" and not bool(c["heritage"]):
 		return false
+	# In the commercial core and Kaartinkaupunki a listed building is far
+	# more often a stone bank or a Neo-Renaissance block than Engel ochre:
+	# only a pre-1880 date makes it Empire there.
+	if ArchitectureCitiesFinland.DISTRICT_ONLY.has(district):
+		return year > 0 and year < 1880
 	return district == "helsinki_empire" or (core and (bool(c["heritage"]) or (year > 0 and year < 1880)))

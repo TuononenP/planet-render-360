@@ -19,8 +19,24 @@ extends RefCounted
 ##   view      radius within which the bridge is built, metres (default 2500)
 ##   towers    (cable bridges) indices into the supports (0 = first end) that
 ##             carry a tower, else every interior support; pylon "single" is
-##             one mast on the centre line instead of two legs; lean = metres
-##             the single pylon's top is displaced along +X from its foot
+##             one mast on the centre line instead of two legs, "twin" two
+##             separate inclined masts on the deck (no cross beams, as
+##             Helsinki's Crusell Bridge); lean = metres the single or twin
+##             pylon's top is displaced along +X from its foot
+##   steel_hex, stone_hex, concrete_hex  sRGB colours of the structure
+##             ("Steel": girders, pylons, cables, rails), of masonry and
+##             footings ("Stone") and of piers ("Concrete"), where a photo
+##             asks for a different shade than the material's default
+##   depth     (girder, bascule) girder depth in metres, slab included, where a
+##             photo shows a slimmer or deeper one than a span fraction gives
+##   columns   (girder, truss, arches) round columns across the deck under
+##             each interior support instead of one slab pier; plinth = metres
+##             a stone footing under each such line stands over the water
+##   orn       metres the tallest ornament (statue column, lamp standard) stands
+##             over the deck, where a bespoke Stockholm model has one: the
+##             model's top is then clear + orn instead of clear + PARAPET_M
+##   pocks     (masonry) shrapnel and bullet scars per face, drawn as dark
+##             patches on the spandrels and parapet (Helsinki's Pitkasilta)
 ##   moving    (swing, lift) index of the moving span
 ##   arch_spans  (arch, truss) the spans that carry the arch / truss, others
 ##             are plain girders; lower = metres a second deck hangs under the road
@@ -69,6 +85,8 @@ static func widest_span(row: Dictionary) -> float:
 static func model_top(row: Dictionary) -> float:
 	var st := str(row.get("st", ""))
 	var clear := float(row.get("clear", 0.0))
+	if row.has("orn"):
+		return clear + float(row["orn"])
 	if st in TOWERED or (st == "bascule" and row.has("tower")):
 		return float(row.get("tower", clear + PARAPET_M))
 	if st in OVER_DECK or (st == "swing" and float(row.get("rise", 0.0)) > 0.0):
@@ -195,6 +213,11 @@ static func validate(row: Dictionary, catalog_cc: Dictionary = {}) -> PackedStri
 		out.append("%s needs a rise over the deck" % id)
 	if st == "arch_deck" and float(row.get("rise", 0.0)) < 1.0:
 		out.append("%s needs an arch rise" % id)
+	for key in ["steel_hex", "stone_hex", "concrete_hex"]:
+		if row.has(key) and not str(row[key]).is_valid_html_color():
+			out.append("%s %s is not a colour" % [id, key])
+	if row.has("pocks") and (int(row["pocks"]) < 0 or int(row["pocks"]) > 400):
+		out.append("%s pocks should be 0..400 a face" % id)
 	if not catalog_cc.is_empty() and not catalog_cc.has(str(row["cc"])):
 		out.append("%s has unknown country %s" % [id, row["cc"]])
 	return out

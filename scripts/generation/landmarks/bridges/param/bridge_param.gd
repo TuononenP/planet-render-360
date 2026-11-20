@@ -46,10 +46,11 @@ static func _materials(lm: LandmarkMesh, row: Dictionary) -> void:
 		"iron": steel = "#44504A"
 		"concrete": steel = "#BDB8AE"
 		"stone": steel = "#A79E8C"
+	steel = str(row.get("steel_hex", steel))
 	lm.use("Steel", LandmarkMaterials.paint(steel, 0.58, 0.35))
 	lm.use("Deck", LandmarkMaterials.pbr("asphalt", "#3B3B3B", 4.0))
-	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#B9B3A8", 4.0))
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#B9B09C", 3.0))
+	lm.use("Concrete", LandmarkMaterials.pbr("concrete", str(row.get("concrete_hex", "#B9B3A8")), 4.0))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", str(row.get("stone_hex", "#B9B09C")), 3.0))
 	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#9A958A", 3.0))
 	lm.use("Line", LandmarkMaterials.paint("#E8E6DE", 0.8, 0.0))
 

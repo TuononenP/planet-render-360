@@ -22,9 +22,13 @@ static func distant_facades(fidelity: int, region: String = "") -> Array:
 			var col: Color = c
 			var tint := Color.WHITE
 			if col.a > 0.0:
-				tint = FacadeMaterials._calib(set_name, col)
-			out.append(_facade_material_for(set_name, 6, detail, tint,
-				str(look["pattern"]), look))
+				tint = FacadeMaterials._stone_calib(col) \
+					if set_name == "stone" and ArchitectureStyle.city_of(region) == "helsinki" \
+					else FacadeMaterials._calib(set_name, col)
+			var dm := _facade_material_for(set_name, 6, detail, tint, str(look["pattern"]), look)
+			if ArchitectureStyle.city_of(region) == "helsinki":
+				dm.set_meta("warm_bounce", HELSINKI_BOUNCE)
+			out.append(dm)
 	FacadeMaterials._distant_mats[key] = out
 	return out
 
@@ -114,11 +118,17 @@ static func skylight_material(detail: int = 1) -> StandardMaterial3D:
 static func curtain_distant(detail: int = 1, look: Dictionary = {}) -> StandardMaterial3D:
 	detail = clampi(detail, 0, 1)
 	var id := str(look.get("curtain", ""))
-	var key := "curtain|%d|%s" % [detail, id]
+	var city := "stockholm" if str(look.get("city", "")) == "stockholm" else ""
+	var key := "curtain|%d|%s|%s" % [detail, id, city]
 	if FacadeMaterials._glass_mats.has(key):
 		return FacadeMaterials._glass_mats[key] as StandardMaterial3D
 	var m := _facade_material_for("glass", 0, detail, Color.WHITE, "curtain",
-		{"bay_m": 3.0, "floor_h": 3.8, "curtain": id})
+		{"bay_m": 3.0, "floor_h": 3.8, "curtain": id, "city": city})
+	if city != "":
+		# Far glass in Stockholm: a mirror-smooth pane map (roughness 0.1) threw the low sun back as a white
+		# block. Distant panes are a few pixels wide, so one dull roughness stands in for the map.
+		m.roughness_texture = null
+		m.roughness = STOCKHOLM_FAR_GLASS_ROUGH
 	FacadeMaterials._glass_mats[key] = m
 	return m
 
@@ -252,6 +262,16 @@ static func end_build() -> void:
 			_store.erase(k)
 	_store_used.clear()
 
+## Stockholm's curtain glass (metallic cap, specular cap, roughness floor): the shared 0.6 / 0.7
+## mirror turned a sunlit block white at golden hour.
+const STOCKHOLM_GLASS := Vector3(0.1, 0.12, 0.55)
+const STOCKHOLM_FAR_GLASS_ROUGH := 0.5
+
+## Helsinki's fronts out of the sun take a share of their own albedo as warm light off the sunlit paving
+## (the `warm_bounce` shader uniform): the blue shade ambient alone left ochre plaster grey-khaki and
+## granite near black.
+const HELSINKI_BOUNCE := 0.16
+
 static func _material_from(texs: Dictionary, set_name: String, detail: int,
 		tint: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -292,10 +312,18 @@ static func _facade_material_for(set_name: String, rows: int, detail: int,
 		look: Dictionary = {}) -> StandardMaterial3D:
 	var texs := facade_texs(set_name, rows, detail, pattern, look)
 	var m := _material_from(texs, set_name, detail, tint)
+	if set_name == "glass" and str(look.get("city", "")) == "stockholm":
+		m.metallic = STOCKHOLM_GLASS.x
+		m.metallic_specular = STOCKHOLM_GLASS.y
+		m.set_meta("glass_cap", STOCKHOLM_GLASS)
 	var tiled := FacadeComposer.is_tiled(pattern)
 	var bay_m := maxf(float(look.get("bay_m", 3.2)), 1.0)
 	var floor_m := float(look.get("floor_h", 3.3))
 	m.set_meta("facade_rows", rows)
+	if FacadeComposer.smooth_plaster(set_name, look):
+		m.set_meta("smooth_photo", true)
+	if str(look.get("city", "")) == "helsinki":
+		m.set_meta("warm_bounce", HELSINKI_BOUNCE)
 	m.set_meta("facade_floor_m", floor_m)
 	m.set_meta("facade_pattern", pattern)
 	if not look.is_empty():

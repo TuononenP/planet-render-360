@@ -3,99 +3,52 @@ extends RefCounted
 
 ## Registry entries for the sweden_stockholm landmark batch, in the
 ## format of LocationData.landmarks(). Types are built by LandmarkSetSwedenStockholm.
+## Each group lives in its own file under scripts/data/stockholm/ with a
+## matching build set under generation/landmarks/sweden_stockholm/.
+## Selection rule (LandmarkSites.select): only items that stand on the
+## skyline (spires, domes, towers, slabs) carry `skyline_priority`; low
+## palaces, museums and squares are chosen nearest the eye first.
 
+const GROUPS := [
+	preload("res://scripts/data/stockholm/sto_reg_hero.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_island.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_towers.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_churches.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_palaces.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_gamla.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_norrmalm.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_inner.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_djurgarden.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_outer.gd"),
+	preload("res://scripts/data/stockholm/sto_reg_bridges.gd"),
+]
+
+## The landmarks that predate the realism pass: they may open as a place's
+## primary landmark and answer their name from anywhere, as before.
+const ORIGINALS := ["hotorgsskraporna", "katarinahissen", "grona_lund_eclipse", "kastellet_stockholm",
+	"royal_opera_stockholm", "grand_hotel_stockholm", "soder_torn", "riddarhuset_stockholm", "wrangel_palace",
+	"bonde_palace", "nationalmuseum_stockholm", "klara_church", "sofia_church_stockholm", "tyska_kyrkan",
+	"royal_palace_stockholm", "storkyrkan", "katarina_church", "hedvig_eleonora_church", "ericsson_globe",
+	"kaknas_tower", "vasa_museum", "nordic_museum", "stockholm_public_library", "stockholm_concert_hall",
+	"riksdag_building"]
+## Ultra budget of every Stockholm primary candidate (see LandmarkSites.select):
+## the registry extras and the total with room for eight bridges.
+const ULTRA_REGISTRY_LIMIT := 48
+const ULTRA_TOTAL_LIMIT := 56
+
+## Every Stockholm entry. The ones added since are `secondary`: a search for
+## "Fotografiska" or "3Arena" made far from Stockholm must not open
+## Stockholm's model, so their aliases only answer within `radius_m` of the
+## site and they never open as a place's primary. The originals carry the
+## city's Ultra budget, as they can be the primary.
 static func entries() -> Array:
-	return [
-		{"type": "hotorg_1", "skyline_priority": 1, "name": "Hötorgsskrapa 1", "lat": 59.334646, "lon": 18.063646,
-			"radius_m": 4000.0, "wiki_title": "Hötorget buildings", "height_m": 61.0, "clear_m": 17.0,
-			"yaw_deg": -25.2, "kind": "Office", "aliases": ["hötorgsskrapa 1", "hötorgsskraporna"]},
-		{"type": "hotorg_2", "skyline_priority": 1, "name": "Hötorgsskrapa 2", "lat": 59.334280, "lon": 18.063863,
-			"radius_m": 4000.0, "wiki_title": "Hötorget buildings", "height_m": 61.0, "clear_m": 17.0,
-			"yaw_deg": -25.2, "kind": "Office", "aliases": ["hötorgsskrapa 2"]},
-		{"type": "hotorg_3", "skyline_priority": 1, "name": "Hötorgsskrapa 3", "lat": 59.333896, "lon": 18.064068,
-			"radius_m": 4000.0, "wiki_title": "Hötorget buildings", "height_m": 61.0, "clear_m": 17.0,
-			"yaw_deg": -25.2, "kind": "Office", "aliases": ["hötorgsskrapa 3"]},
-		{"type": "hotorg_4", "skyline_priority": 1, "name": "Hötorgsskrapa 4", "lat": 59.333536, "lon": 18.064321,
-			"radius_m": 4000.0, "wiki_title": "Hötorget buildings", "height_m": 61.0, "clear_m": 17.0,
-			"yaw_deg": -25.2, "kind": "Office", "aliases": ["hötorgsskrapa 4"]},
-		{"type": "hotorg_5", "skyline_priority": 1, "name": "Hötorgsskrapa 5", "lat": 59.333149, "lon": 18.064526,
-			"radius_m": 4000.0, "wiki_title": "Hötorget buildings", "height_m": 61.0, "clear_m": 17.0,
-			"yaw_deg": -25.2, "kind": "Office", "aliases": ["hötorgsskrapa 5"]},
-		{"type": "katarinahissen", "skyline_priority": 1, "name": "Katarinahissen", "lat": 59.319919, "lon": 18.073170,
-			"radius_m": 4000.0, "wiki_title": "Katarina Elevator", "height_m": 42.5, "clear_m": 12.0,
-			"yaw_deg": 90.0, "kind": "Elevator", "aliases": ["katarinahissen", "katarina elevator"]},
-		{"type": "grona_lund_eclipse", "skyline_priority": 1, "name": "Eclipse, Gröna Lund", "lat": 59.3230, "lon": 18.0963,
-			"radius_m": 4000.0, "wiki_title": "Gröna Lund", "height_m": 121.0, "clear_m": 10.0,
-			"clear_offsets_m": [[38.33, -29.69], [-54.85, -25.30]],
-			"kind": "Amusement ride", "aliases": ["eclipse, gröna lund", "gröna lund", "grona lund"]},
-		{"type": "kastellet_stockholm", "skyline_priority": 1, "name": "Kastellet, Stockholm", "lat": 59.322625, "lon": 18.090165,
-			"radius_m": 4000.0, "wiki_title": "Kastellet, Stockholm", "height_m": 20.0, "clear_m": 16.0,
-			"kind": "Castle", "aliases": ["kastellet, stockholm", "kastellet stockholm", "kastellholmen kastellet"]},
-		{"type": "royal_opera_stockholm", "skyline_priority": 1, "name": "Royal Swedish Opera", "lat": 59.329699, "lon": 18.070551,
-			"radius_m": 4000.0, "wiki_title": "Royal Swedish Opera", "height_m": 41.5, "clear_m": 45.0,
-			"yaw_deg": -25.2, "kind": "Theatre", "aliases": ["royal swedish opera", "kungliga operan"]},
-		{"type": "grand_hotel_stockholm", "skyline_priority": 1, "name": "Grand Hôtel Stockholm", "lat": 59.32961, "lon": 18.07549,
-			"radius_m": 4000.0, "wiki_title": "Grand Hôtel (Stockholm)", "height_m": 30.0, "clear_m": 40.0,
-			"yaw_deg": -38.0, "kind": "Hotel", "aliases": ["grand hôtel stockholm", "grand hotel stockholm"]},
-		{"type": "soder_torn", "skyline_priority": 1, "name": "Söder Torn", "lat": 59.315003, "lon": 18.069673,
-			"radius_m": 4000.0, "wiki_title": "Söder Torn", "height_m": 86.0, "clear_m": 16.0,
-			"kind": "Tower", "aliases": ["söder torn", "soder torn"]},
-		{"type": "riddarhuset_stockholm", "skyline_priority": 1, "name": "Riddarhuset", "lat": 59.32595, "lon": 18.06579,
-			"radius_m": 4000.0, "wiki_title": "House of Nobility (Sweden)", "height_m": 25.5, "clear_m": 32.0,
-			"yaw_deg": -39.3, "kind": "Palace", "aliases": ["riddarhuset", "house of nobility stockholm"]},
-		{"type": "wrangel_palace", "skyline_priority": 1, "name": "Wrangel Palace", "lat": 59.32512, "lon": 18.06282,
-			"radius_m": 4000.0, "wiki_title": "Wrangel Palace", "height_m": 32.5, "clear_m": 32.0,
-			"yaw_deg": -12.5, "kind": "Palace", "aliases": ["wrangel palace", "wrangelska palatset"]},
-		{"type": "bonde_palace", "skyline_priority": 1, "name": "Bonde Palace", "lat": 59.32625, "lon": 18.06646,
-			"radius_m": 4000.0, "wiki_title": "Bonde Palace", "height_m": 23.5, "clear_m": 30.0,
-			"yaw_deg": -39.1, "kind": "Palace", "aliases": ["bonde palace", "bondeska palatset"]},
-		{"type": "nationalmuseum_stockholm", "skyline_priority": 1, "name": "Nationalmuseum", "lat": 59.32853, "lon": 18.07829,
-			"radius_m": 4000.0, "wiki_title": "Nationalmuseum", "height_m": 33.5, "clear_m": 42.0,
-			"yaw_deg": -38.0, "kind": "Museum", "aliases": ["nationalmuseum stockholm", "nationalmuseum"]},
-		{"type": "klara_church", "skyline_priority": 1, "name": "Klara Church", "lat": 59.33121, "lon": 18.06141,
-			"radius_m": 4000.0, "wiki_title": "Klara Church", "height_m": 116.0, "clear_m": 35.0,
-			"yaw_deg": 8.7, "kind": "Church", "aliases": ["klara church", "klara kyrka", "sankta clara kyrka"]},
-		{"type": "sofia_church_stockholm", "skyline_priority": 1, "name": "Sofia Church", "lat": 59.31230, "lon": 18.08834,
-			"radius_m": 4000.0, "wiki_title": "Sofia Church", "height_m": 78.0, "clear_m": 30.0,
-			"yaw_deg": -14.3, "kind": "Church", "aliases": ["sofia church", "sofia kyrka", "sofia church stockholm", "sofia kyrka stockholm"]},
-		{"type": "tyska_kyrkan", "skyline_priority": 1, "name": "German Church", "lat": 59.32417, "lon": 18.07167,
-			"radius_m": 4000.0, "wiki_title": "German Church, Stockholm", "height_m": 96.0, "clear_m": 30.0, "yaw_deg": -43.0,
-			"kind": "Church", "aliases": ["tyska kyrkan", "german church", "german church stockholm", "sankta gertruds kyrka"]},
-		{"type": "royal_palace_stockholm", "name": "Stockholm Palace", "lat": 59.32680, "lon": 18.07169,
-			"radius_m": 4000.0, "wiki_title": "Stockholm Palace", "height_m": 36.5, "clear_m": 110.0, "yaw_deg": -31.5,
-			"kind": "Palace", "aliases": ["stockholm palace", "royal palace stockholm", "kungliga slottet",
-				"stockholms slott"]},
-		{"type": "storkyrkan", "name": "Storkyrkan", "lat": 59.32577, "lon": 18.07040,
-			"radius_m": 4000.0, "wiki_title": "Storkyrkan", "height_m": 63.0, "clear_m": 45.0, "yaw_deg": -15.0,
-			"kind": "Cathedral", "aliases": ["storkyrkan", "stockholm cathedral", "sankt nikolai kyrka",
-				"stockholms domkyrka"]},
-		{"type": "katarina_church", "name": "Katarina Church", "lat": 59.31706, "lon": 18.07813,
-			"radius_m": 4000.0, "wiki_title": "Katarina Church", "height_m": 72.0, "clear_m": 40.0, "yaw_deg": -15.0,
-			"kind": "Church", "aliases": ["katarina church", "katarina kyrka", "katarinakyrkan"]},
-		{"type": "hedvig_eleonora_church", "name": "Hedvig Eleonora Church", "lat": 59.33522, "lon": 18.08056,
-			"radius_m": 4000.0, "wiki_title": "Hedvig Eleonora Church", "height_m": 59.0, "clear_m": 35.0, "yaw_deg": 22.5,
-			"kind": "Church", "aliases": ["hedvig eleonora church", "hedvig eleonora kyrka", "hedvig eleonora kyrkan"]},
-		{"type": "ericsson_globe", "name": "Avicii Arena", "lat": 59.29361, "lon": 18.08321,
-			"radius_m": 5500.0, "wiki_title": "Avicii Arena", "height_m": 85.0, "clear_m": 70.0,
-			"kind": "Arena", "aliases": ["avicii arena", "ericsson globe", "globen", "stockholm globe arena"]},
-		{"type": "kaknas_tower", "name": "Kaknäs Tower", "lat": 59.33504, "lon": 18.12675,
-			"radius_m": 5500.0, "wiki_title": "Kaknäs Tower", "height_m": 170.0, "clear_m": 40.0,
-			"kind": "Tower", "aliases": ["kaknas tower", "kaknästornet", "kaknäs tower"]},
-		{"type": "vasa_museum", "name": "Vasa Museum", "lat": 59.32798, "lon": 18.09134,
-			"radius_m": 4000.0, "wiki_title": "Vasa Museum", "height_m": 52.5, "clear_m": 75.0,
-			"kind": "Museum", "aliases": ["vasa museum", "vasamuseet", "vasa museet"]},
-		{"type": "nordic_museum", "name": "Nordic Museum", "lat": 59.32915, "lon": 18.09385,
-			"radius_m": 4000.0, "wiki_title": "Nordic Museum", "height_m": 81.0, "clear_m": 85.0, "yaw_deg": -121.0,
-			"kind": "Museum", "aliases": ["nordic museum", "nordiska museet", "nordiska museum stockholm"]},
-		{"type": "stockholm_public_library", "name": "Stockholm Public Library", "lat": 59.34335, "lon": 18.05475,
-			"radius_m": 4000.0, "wiki_title": "Stockholm Public Library", "height_m": 31.0, "clear_m": 55.0,
-			"yaw_deg": -112.0, "kind": "Library", "aliases": ["stockholm public library", "stockholms stadsbibliotek",
-				"stadsbiblioteket stockholm", "stockholm city library"]},
-		{"type": "stockholm_concert_hall", "name": "Stockholm Concert Hall", "lat": 59.33509, "lon": 18.06315,
-			"radius_m": 4000.0, "wiki_title": "Stockholm Concert Hall", "height_m": 22.2, "clear_m": 48.0,
-			"yaw_deg": 63.0, "kind": "Concert hall", "aliases": ["stockholm concert hall", "konserthuset stockholm",
-				"stockholms konserthus"]},
-		{"type": "riksdag_building", "name": "Riksdag Building", "lat": 59.32755, "lon": 18.06787,
-			"radius_m": 4000.0, "wiki_title": "Riksdag building", "height_m": 35.0, "clear_m": 70.0,
-			"yaw_deg": -117.5, "kind": "Parliament", "aliases": ["riksdag building", "riksdagshuset", "swedish parliament building"]},
-	]
+	var out: Array = []
+	for group in GROUPS:
+		out.append_array(group.entries())
+	for entry in out:
+		if str(entry["type"]) in ORIGINALS:
+			entry["ultra_registry_limit"] = ULTRA_REGISTRY_LIMIT
+			entry["ultra_total_limit"] = ULTRA_TOTAL_LIMIT
+		else:
+			entry["secondary"] = true
+	return out

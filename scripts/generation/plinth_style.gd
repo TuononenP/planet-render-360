@@ -23,6 +23,8 @@ const COPING_MIN_M := 0.6
 
 static var _body: Material
 static var _coping: Material
+static var _body_calm: Material
+static var _coping_calm: Material
 
 ## Building-pipeline materials: the same calibrated LandmarkMaterials
 ## the landmark plinth uses (MaterialLibrary's own stone set reads tan
@@ -32,15 +34,30 @@ static var _coping: Material
 ## Through StreetSnow, so in winter the coping holds snow and the street's
 ## slush and salt climb the body (ClimateModel.snow_splash); unchanged
 ## otherwise.
-static func body_material() -> Material:
+## `calm` is Stockholm's: the low golden sun lit every course and coping edge white, so its stone takes the
+## glare cap (RoadSurface.STOCKHOLM_GLARE) and half the relief, as a material of its own.
+static func body_material(calm: bool = false) -> Material:
+	if calm:
+		if _body_calm == null:
+			_body_calm = _calm(LandmarkMaterials.pbr(BODY_SET, BODY_HEX, 0.75), 0.3)
+		return _body_calm
 	if _body == null:
 		_body = StreetSnow.material(LandmarkMaterials.pbr(BODY_SET, BODY_HEX, 0.75), 0.3)
 	return _body
 
-static func coping_material() -> Material:
+static func coping_material(calm: bool = false) -> Material:
+	if calm:
+		if _coping_calm == null:
+			_coping_calm = _calm(LandmarkMaterials.pbr(COPING_SET, COPING_HEX, 0.5), 0.2)
+		return _coping_calm
 	if _coping == null:
 		_coping = StreetSnow.material(LandmarkMaterials.pbr(COPING_SET, COPING_HEX, 0.5), 0.2)
 	return _coping
+
+static func _calm(src: StandardMaterial3D, age: float) -> Material:
+	var c := src.duplicate() as StandardMaterial3D
+	c.normal_scale *= 0.5
+	return StreetSnow.material(c, age, RoadSurface.STOCKHOLM_GLARE)
 
 ## Mitred outward direction at each vertex of `ring` (scaled so a face set
 ## `d` out along each edge's normal meets its neighbour at the corner).

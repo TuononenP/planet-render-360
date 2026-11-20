@@ -43,6 +43,9 @@ static func model_root(root: Node3D) -> Node3D:
 	root.add_child(model)
 	return model
 
+const StoSetBridges = preload("res://scripts/generation/landmarks/sweden_stockholm/bridges/sto_set_bridges.gd")
+const HelsinkiCathedral =preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_cathedral.gd")
+
 static func build(type: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
@@ -57,7 +60,7 @@ static func build(type: String) -> Node3D:
 		"statue_liberty": LandmarkMonuments.liberty(model)
 		"sydney_opera": LandmarkOpera.build(model)
 		"turku_cathedral": FtTurkuCathedral.build(model)
-		"helsinki_cathedral": LandmarkCathedrals.helsinki(model)
+		"helsinki_cathedral": HelsinkiCathedral.build(model)
 		"burj_khalifa": LandmarkBurj.build(model)
 		"one_wtc": LandmarkNycTowers.one_wtc(model)
 		"empire_state": LandmarkNycTowers.empire_state(model)
@@ -96,7 +99,9 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model)
 		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model)
 		_:
-			BridgeParam.build(model, BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m))
+			var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
+			if not StoSetBridges.build_row(model, type, row):
+				BridgeParam.build(model, row)
 	return root
 
 ## On-the-fly archetype for any OSM-tagged feature (OsmFetcher.

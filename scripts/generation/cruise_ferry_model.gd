@@ -32,7 +32,10 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	var detail: bool = p.get("detail", true)
 	var maps: bool = p.get("maps", true)
 	var ultra := detail and bool(p.get("ultra", false))
-	var livery := Color(str(p.get("livery", livery_hex(float(p.get("seed", 0.0))))))
+	# A shipping line's livery (FerryLivery) replaces the seeded colour.
+	var line: Dictionary = p.get("line", {})
+	var livery := Color(str(line["band"] if not line.is_empty()
+		else p.get("livery", livery_hex(float(p.get("seed", 0.0))))))
 	var s := spec(length, beam, detail, ultra)
 	var fb: float = s["freeboard"]
 	VesselMaterials.register(lm, maps, p["hull"], VesselMaterials.get_mat("antifoul", maps))
@@ -41,13 +44,19 @@ static func build(lm: LandmarkMesh, p: Dictionary) -> void:
 	lm.use("Orange", ShipPaint.enamel(Color("#e0651c"), maps))
 	lm.use("Livery", ShipPaint.enamel(livery, maps))
 	lm.use("Funnel", ShipPaint.enamel(livery, maps))
+	if not line.is_empty():
+		FerryLivery.register(lm, line, maps)
 	lm.use("DeckSteel", VesselMaterials.get_mat("grey_deck", maps))
 	lm.use("Black", VesselMaterials.get_mat("black", maps))
 	HullLoft.loft(lm, s, {"hull": "Hull", "boot": "Boot", "bottom": "Bottom", "deck": "DeckSteel"})
-	LinerSuperstructure.build(lm, p, s, {"y0": fb + 0.02, "top": maxf(h * 0.84, fb + 9.0),
+	var top := LinerSuperstructure.build(lm, p, s, {"y0": fb + 0.02, "top": maxf(h * 0.84, fb + 9.0),
 		"front": length * 0.3, "aft": -length * 0.38, "terraces": true, "boats": true,
-		"balconies": false, "pool": false, "slide": false, "funnel_x": -length * 0.27})
-	ShipHullKit.livery(lm, s, "Livery", -length * 0.48, length * 0.44, fb * 0.3, fb * 0.78, clampf(fb * 0.2, 1.2, 3.0))
+		"balconies": false, "pool": false, "slide": false, "funnel_x": -length * 0.27,
+		"funnel_top": "Black" if line.is_empty() else "FunnelTop"})
+	if line.is_empty():
+		ShipHullKit.livery(lm, s, "Livery", -length * 0.48, length * 0.44, fb * 0.3, fb * 0.78, clampf(fb * 0.2, 1.2, 3.0))
+	else:
+		FerryLivery.dress(lm, s, line, top, detail)
 	if not detail:
 		return
 	ShipHullKit.bulb(lm, s, "Bottom", length * 0.02)

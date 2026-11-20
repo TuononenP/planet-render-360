@@ -1,0 +1,83 @@
+extends RefCounted
+
+## Stockholm Tier B landmarks outside the old town (library, Adolf Fredrik, Stadion,
+## Berwaldhallen, Skatteskrapan, Norra Tornen, Tele2 Arena, the ferry terminals and the royal
+## statues) and the Tier C outliers within the 9 km landmark limit (plan S-3).
+## Built by sweden_stockholm/outer/sto_set_outer.gd.
+
+static func entries() -> Array:
+	return [
+		# Tier C: outlying landmarks inside the 9 km landmark limit of the
+		# preset (docs/stockholm-landmark-sources.md, "Tier C"). radius_m is
+		# the distance to the Monteliusvägen preset plus a margin, so they
+		# are candidates there; Ultra's nearest-first budget keeps only the
+		# skyline_priority ones (the arena's 94 m hotel tower and the
+		# Carolina Tower beside Nya Karolinska).
+		{"type": "strawberry_arena", "skyline_priority": 1, "name": "Strawberry Arena", "lat": 59.372321,
+			"lon": 18.001778, "radius_m": 7000.0, "wiki_title": "Strawberry Arena", "height_m": 94.4,
+			"clear_m": 120.0, "yaw_deg": 69.0, "kind": "Stadium",
+			"aliases": ["strawberry arena", "friends arena", "quality hotel friends", "strawberry arena solna"]},
+		{"type": "naturhistoriska_riksmuseet", "name": "Swedish Museum of Natural History", "lat": 59.368880,
+			"lon": 18.053769, "radius_m": 5800.0, "wiki_title": "Swedish Museum of Natural History",
+			"height_m": 50.5, "clear_m": 12.0, "clear_rect_m": [-2.0, -18.0, 70.0, 102.0], "yaw_deg": -15.0,
+			"kind": "Museum", "aliases": ["naturhistoriska riksmuseet", "swedish museum of natural history",
+				"naturhistoriska museet stockholm", "cosmonova"]},
+		{"type": "kth_main", "name": "KTH Royal Institute of Technology", "lat": 59.347363, "lon": 18.071761,
+			"radius_m": 3500.0, "wiki_title": "KTH Royal Institute of Technology", "height_m": 25.0,
+			"clear_m": 20.0, "clear_rect_m": [18.0, -67.0, 80.0, 80.0], "yaw_deg": 62.0, "kind": "University",
+			"aliases": ["kth main building", "kth royal institute of technology", "kungliga tekniska högskolan",
+				"kth entré", "kth valhallavägen"]},
+		{"type": "stockholm_university", "name": "Stockholm University", "lat": 59.362904, "lon": 18.060472,
+			"radius_m": 5200.0, "wiki_title": "Stockholm University", "height_m": 31.4, "clear_m": 12.0,
+			"clear_rect_m": [4.0, 7.5, 124.0, 44.0], "yaw_deg": 3.0, "kind": "University",
+			"aliases": ["stockholm university", "stockholms universitet", "södra huset", "frescati campus"]},
+		{"type": "nya_karolinska", "skyline_priority": 1, "name": "Nya Karolinska Solna", "lat": 59.349000,
+			"lon": 18.032200, "radius_m": 4000.0, "wiki_title": "New Karolinska Solna University Hospital",
+			"height_m": 60.4, "clear_m": 120.0, "yaw_deg": -29.0, "kind": "Hospital",
+			"aliases": ["nya karolinska solna", "new karolinska solna", "karolinska university hospital",
+				"carolina tower", "elite hotel carolina tower"]},
+		{"type": "kungliga_biblioteket", "name": "National Library of Sweden", "lat": 59.338218, "lon": 18.072156,
+			"radius_m": 4000.0, "wiki_title": "National Library of Sweden", "height_m": 19.5, "clear_m": 12.0,
+			"clear_rect_m": [0.0, -14.5, 56.0, 31.0], "yaw_deg": 21.8, "kind": "Library",
+			"aliases": ["kungliga biblioteket", "national library of sweden", "royal library stockholm",
+				"kb stockholm", "kungliga biblioteket humlegården"]},
+		{"type": "adolf_fredriks_kyrka", "name": "Adolf Fredrik Church", "lat": 59.337908, "lon": 18.060110,
+			"radius_m": 4000.0, "wiki_title": "Adolf Fredrik Church", "height_m": 43.5, "clear_m": 31.0,
+			"yaw_deg": -26.6, "kind": "Church",
+			"aliases": ["adolf fredriks kyrka", "adolf fredrik church", "adolf fredriks church",
+				"adolf frederick church stockholm"]},
+		{"type": "stockholm_stadion", "name": "Stockholm Olympic Stadium", "lat": 59.345414, "lon": 18.079098,
+			"radius_m": 4000.0, "wiki_title": "Stockholm Olympic Stadium", "height_m": 40.0, "clear_m": 14.0,
+			"clear_rect_m": [-3.0, 0.0, 117.0, 66.0], "yaw_deg": -55.4, "kind": "Stadium",
+			"aliases": ["stockholms stadion", "stockholm olympic stadium", "stockholm stadion",
+				"stockholm olympiastadion", "olympic stadium stockholm"]},
+		{"type": "berwaldhallen", "name": "Berwaldhallen", "lat": 59.333327, "lon": 18.100456,
+			"radius_m": 4000.0, "wiki_title": "Berwaldhallen", "height_m": 13.0, "clear_m": 12.0,
+			"clear_rect_m": [0.8, -1.75, 40.0, 28.0], "yaw_deg": -67.8, "kind": "Concert hall",
+			"aliases": ["berwaldhallen", "berwald hall", "radiohuset", "berwald concert hall"]},
+		{"type": "skatteskrapan", "skyline_priority": 1, "name": "Skatteskrapan", "lat": 59.312024, "lon": 18.073541,
+			"radius_m": 6000.0, "wiki_title": "Skatteskrapan", "height_m": 85.5, "clear_m": 28.0,
+			"yaw_deg": 0.0, "kind": "Skyscraper", "aliases": ["skatteskrapan", "skatteverket tower", "skatteskrapan stockholm"]},
+		{"type": "norra_tornen", "skyline_priority": 1, "name": "Norra Tornen", "lat": 59.346107, "lon": 18.034133,
+			"radius_m": 6000.0, "wiki_title": "Norra Tornen", "height_m": 125.0, "clear_m": 27.0,
+			"yaw_deg": 0.0, "kind": "Skyscraper", "clear_offsets_m": [[-63.5, 48.9]],
+			"aliases": ["norra tornen", "norra tornen kungsholmen", "north towers stockholm"]},
+		{"type": "tele2_arena", "name": "Tele2 Arena", "lat": 59.291115, "lon": 18.084528,
+			"radius_m": 6000.0, "wiki_title": "Tele2 Arena", "height_m": 52.0, "clear_m": 125.0,
+			"yaw_deg": 0.0, "kind": "Stadium", "aliases": ["tele2 arena", "3arena", "3arena stockholm", "stockholmsarenan"]},
+		{"type": "viking_line_terminal", "name": "Viking Line Terminal", "lat": 59.31613, "lon": 18.096971,
+			"radius_m": 4000.0, "wiki_title": "Viking Line", "height_m": 13.3, "clear_m": 45.0,
+			"clear_offsets_m": [[30.0, 8.0]], "yaw_deg": 0.0, "kind": "Terminal",
+			"aliases": ["viking line terminal", "viking line terminal stockholm", "stadsgården terminal", "viking line stadsgården"]},
+		{"type": "varta_terminal", "name": "Värtaterminalen", "lat": 59.351362, "lon": 18.111845,
+			"radius_m": 4000.0, "wiki_title": "Värtahamnen", "height_m": 13.4, "clear_m": 40.0,
+			"clear_offsets_m": [[-85.0, 0.0], [85.0, 5.0]], "yaw_deg": 0.0, "kind": "Terminal",
+			"aliases": ["värtaterminalen", "vartaterminalen", "värtahamnen terminal", "varta terminal"]},
+		{"type": "karl_xii_statue", "name": "Karl XII Statue", "lat": 59.3300115, "lon": 18.0722205,
+			"radius_m": 4000.0, "wiki_title": "Karl XII:s staty, Stockholm", "height_m": 8.5, "clear_m": 5.0,
+			"yaw_deg": 0.0, "kind": "Statue", "aliases": ["karl xii statue", "karl xii:s staty", "karl xii:s torg statue"]},
+		{"type": "gustav_ii_adolf_statue", "name": "Gustav II Adolf Statue", "lat": 59.329362, "lon": 18.06868,
+			"radius_m": 4000.0, "wiki_title": "Gustav II Adolfs staty", "height_m": 9.0, "clear_m": 10.0,
+			"yaw_deg": 0.0, "kind": "Statue",
+			"aliases": ["gustav ii adolf statue", "gustav ii adolfs staty", "gustav adolfs torg statue"]},
+	]

@@ -53,18 +53,22 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			< LocationData.distance_m(data.latitude, data.longitude, float(b["lat"]), float(b["lon"])))
 	var preset := clampi(data.quality_preset, 0, MAX_BY_PRESET.size() - 1)
 	var registry_limit := MAX_REGISTRY_EXTRAS_BY_PRESET[preset]
+	var total_limit := MAX_BY_PRESET[preset]
 	# A dense primary skyline can use more Ultra slots, but never more
-	# than the preset's total candidate budget.
+	# than the preset's total candidate budget. A hero city with dozens of
+	# hand-built landmarks (Stockholm) raises that budget itself with the
+	# primary's `ultra_total_limit`.
 	if preset == MAX_BY_PRESET.size() - 1:
 		var primary := LocationData.entry_for_type(data.landmark_type)
-		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, MAX_BY_PRESET[preset])
+		total_limit = maxi(total_limit, int(primary.get("ultra_total_limit", total_limit)))
+		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, total_limit)
 	var skyline := _skyline(data, extras.filter(func(e: Dictionary) -> bool: return bool(e.get("skyline", false))),
 		MAX_SKYLINE_BY_PRESET[preset])
 	var icons: Array = extras.filter(func(e: Dictionary) -> bool:
 		return not _is_capital_bridge(e) and not bool(e.get("skyline", false))).slice(0, registry_limit)
 	# Bridges fill only the room the icons leave under the preset's candidate cap.
 	var bridges := _nearest_bridges(data, extras,
-		mini(MAX_BRIDGES_BY_PRESET[preset], maxi(MAX_BY_PRESET[preset] - icons.size(), 0)))
+		mini(MAX_BRIDGES_BY_PRESET[preset], maxi(total_limit - icons.size(), 0)))
 	for e in icons + bridges + skyline:
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
@@ -81,7 +85,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
 		clear.append([p, entry])
-	var cap: int = MAX_BY_PRESET[preset] + skyline.size()
+	var cap: int = total_limit + skyline.size()
 	for c in ranked_osm:
 		if out.size() >= cap:
 			break

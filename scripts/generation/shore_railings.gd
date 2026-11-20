@@ -35,7 +35,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		if mid.distance_squared_to(centre) > pow(RADIUS_M * m, 2.0):
 			continue
 		var body: Dictionary = domains.bodies[int(seg["body"])]
-		if not bool(body.get("tidal", false)):
+		if not railed_body(body, data):
 			continue
 		if minf(float(seg["top_a"]) - float(seg["water_a"]),
 				float(seg["top_b"]) - float(seg["water_b"])) < 0.25 * m:
@@ -60,6 +60,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		mi.material_override = StreetProps._fence_material()
 		root.add_child(mi)
 	return count
+
+## Which water carries a rail: tidal bodies, and in Stockholm every body
+## (Mälaren and the Baltic quays are not tidal but are walked edges).
+static func railed_body(body: Dictionary, data: LocationData) -> bool:
+	return bool(body.get("tidal", false)) or ShoreApron.stockholm(data)
 
 ## A guardrail needs a parallel paved path on its landward side. A mapped
 ## barrier nearby suppresses the inferred rail, including at junctions.

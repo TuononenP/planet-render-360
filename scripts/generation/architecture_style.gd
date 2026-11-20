@@ -69,9 +69,20 @@ static func tiers_for(preset: int, forward_plus: bool = RenderQuality.is_forward
 static func chroma_of(wall_set: String) -> float:
 	return float(CHROMA.get(wall_set, 0.0))
 
+## Stockholm's tone: between the ochre and blush families (WallVariety.FAMILIES).
+const STOCKHOLM_TONE := 0.25
+## Helsinki's tone: cream and ochre, the render of the references (sage and mist read as moss in shade).
+const HELSINKI_TONE := 0.12
+
 ## The place's tone 0..1: which paint families a city leans to
 ## (WallVariety.tint_for), steady within about 14 km.
 static func tone_for(lat: float, lon: float) -> float:
+	# Stockholm leans to ochre and blush; sage and mist plaster turned olive in shade.
+	var city := CityStyles.city_of_region(CityStyles.region_at(lat, lon))
+	if city == "stockholm":
+		return STOCKHOLM_TONE
+	if city == "helsinki":
+		return HELSINKI_TONE
 	return TerrainBuilder._hash(snappedf(lat, 0.125) * 7.31 + 1.7, snappedf(lon, 0.125) * 3.77 + 4.1)
 
 static var _profile_cache: Dictionary = {}
@@ -269,6 +280,8 @@ static func resolve(b: Dictionary, region: String, density: String,
 		if tints > looks:
 			mt = (floorf(_h(seed_v, 32) * tints) + 0.5) / tints * 0.913 + 0.041
 	var wall: Array = _pick_wall(p["w"] as Array, seed_v, ms, zoned)
+	if city in MAPPED_FINISH_CITIES:
+		wall = _mapped_wall(b, p["w"] as Array, wall, mt)
 	var roof: Array = _pick(p["rf"] as Array, ms, 4)
 	var shape := _pick_weighted(p["r"] as Array, seed_v, 3)
 	var pattern := _pattern_of(p, ms, 13)
@@ -299,10 +312,13 @@ static func resolve(b: Dictionary, region: String, density: String,
 	# Each roof is a little steeper or flatter than its neighbour's (+-10%).
 	var pitch := float(p["pitch"]) * (0.9 + 0.2 * _h(seed_v, 41))
 	var rise := 0.0 if shape == "flat" else clampf(2.4 * pitch, 1.2, 4.0)
+	var vt := float(p.get("vt", chroma_of(str(wall[0]))))
+	if city in MAPPED_FINISH_CITIES and MaterialLibrary.parse_colour_tag(str(b.get("colour", ""))).a > 0.0:
+		vt = 0.0  # a mapped colour is the building's own paint: no family on top
 	return {
 		"region": region, "kind": kind, "city": city, "era": era,
 		"wall_set": str(wall[0]), "wall_colour": _tint(wall[1] as Array, mt, 2),
-		"vt": float(p.get("vt", chroma_of(str(wall[0])))),
+		"vt": vt,
 		"pattern": pattern, "bay_m": float(p["bay"]), "bay_scale": bay_scale,
 		"frame": _lin(str(p["fr"])), "shutter": _lin(_hex(p["sh"], ms, 17)),
 		"shutter_p": float(p["sp"]),
@@ -343,6 +359,32 @@ static func _pick_wall(walls: Array, seed_v: float, ms: float, in_city: bool) ->
 		return walls[0] as Array
 	var rest := walls.size() - 1
 	return walls[1 + mini(int((r - MAIN_SHARE) / (1.0 - MAIN_SHARE) * float(rest)), rest - 1)] as Array
+
+## Cities whose register names each building's facade (HelsinkiRegister,
+## HsyRegister): a mapped finish takes the row's palette for that finish,
+## not the colour the district rolled for another one (Jugend green-grey
+## on a concrete office, pastel render on brick).
+const MAPPED_FINISH_CITIES := ["helsinki", "espoo", "turku"]
+## A mapped finish's colours when the era row has none for it.
+const FINISH_PALETTES := {
+	"brick": ["#9a4a35", "#8e4636", "#a86048", "#7a4434"],
+	"stone": ["#8e8b85", "#9a948a", "#a8a090"],
+	"concrete": ["#c4bdb1", "#d4cec2", "#b6b3a9"],
+	"render": ["#e6d8be", "#d6b6a2", "#d8d5b7", "#e8d6a4", "#ccd2c5"],
+	"wood": ["#c8503a", "#e8d070", "#f2ede0", "#8a3a2a", "#e8c070", "#a8c0b8"],
+}
+
+## The wall for building `b` whose `material` names a finish: one of the
+## row's entries of that finish (picked with the look seed), else the finish
+## with FINISH_PALETTES; `wall` itself when nothing is mapped or it agrees.
+static func _mapped_wall(b: Dictionary, walls: Array, wall: Array, seed_v: float) -> Array:
+	var mapped := str(MaterialLibrary.MATERIAL_TAGS.get(str(b.get("material", "")).strip_edges().to_lower(), ""))
+	if mapped == "" or mapped == str(wall[0]):
+		return wall
+	var same := walls.filter(func(w: Array) -> bool: return str(w[0]) == mapped)
+	if not same.is_empty():
+		return _pick(same, seed_v, 34) as Array
+	return [mapped, FINISH_PALETTES.get(mapped, [])]
 
 ## A roof finish's palette: its own, or FLAT_ROOFS for a bare membrane.
 static func _roof_palette(roof: Array) -> Array:

@@ -146,8 +146,9 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 ## The heavy-rail ways of `data`, tunnels and roofed track included.
 static func _rails(data: LocationData) -> Array:
 	var out: Array = []
+	var region := CityStyles.region_at(data.latitude, data.longitude)
 	for r in data.railways:
-		if r is Dictionary and TrainSpecs.carries(r) \
+		if r is Dictionary and TrainSpecs.carries_in(region, r) \
 				and ((r as Dictionary).get("points", PackedVector2Array()) as PackedVector2Array).size() >= 2:
 			out.append(r)
 	return out
@@ -442,8 +443,9 @@ static func _platform_spots(spots: Array, data: LocationData, ground: GroundTrut
 		eye: Vector2) -> void:
 	if data.rail_platforms.is_empty():
 		return
+	var region := CityStyles.region_at(data.latitude, data.longitude)
 	var carries := func(rail: Dictionary) -> bool:
-		return TrainSpecs.carries(rail)
+		return TrainSpecs.carries_in(region, rail)
 	var routes := TramRoute.chains(data, ground, m2u, carries, false)
 	for platform in data.rail_platforms:
 		if not (platform is Dictionary):

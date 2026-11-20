@@ -6,7 +6,9 @@ extends RefCounted
 ## Angkor park stay one or two storeys and never turn into apartment
 ## blocks, and footprints of the stone monuments the landmark models
 ## draw (a `historic` gate or ruin) give way to those models.
-## Central Park keeps only its own tree mix (TreeSpecies "nyc_park").
+## Central Park keeps only its own tree mix (TreeSpecies "nyc_park");
+## Djurgården its oaks ("stockholm_park"), Kungsträdgården and
+## Humlegården their lime avenues ("lime_avenue").
 ## Zones are lat/lon boxes, outermost first; a point inside several takes
 ## the outer rules overlaid by the inner ones. Rule keys:
 ##   max_storeys      cap on an inferred (untagged) height, in storeys
@@ -25,6 +27,8 @@ extends RefCounted
 ##   ground           "wild": park grass reads as unmown meadow
 ##   no_marina        no yachts moored along mapped piers (MarinaBuilder)
 ##   no_new_era       the region's newest period row is never picked
+##   trees_only       the zone sets a tree mix and nothing else: no
+##                    footprints change or drop and no glade is cut
 
 ## Rules round a temple outside the park, in its village.
 const OUTER_TEMPLE := {"max_storeys": 2, "no_kinds": ["apartments", "commercial", "office", "farm"],
@@ -53,6 +57,12 @@ const ZONES := [
 	# region's newest 6-14 storey white blocks.
 	{"id": "central_park", "lat": [40.7644, 40.8005], "lon": [-73.9820, -73.9490],
 		"rules": {"tree_mix": "nyc_park"}},
+	{"id": "djurgarden", "lat": [59.318, 59.345], "lon": [18.090, 18.160],
+		"rules": {"tree_mix": "stockholm_park", "trees_only": true}},
+	{"id": "kungstradgarden", "lat": [59.3298, 59.3340], "lon": [18.0685, 18.0745],
+		"rules": {"tree_mix": "lime_avenue", "trees_only": true}},
+	{"id": "humlegarden", "lat": [59.3355, 59.3395], "lon": [18.0700, 18.0780],
+		"rules": {"tree_mix": "lime_avenue", "trees_only": true}},
 	{"id": "siem_reap_town", "lat": [13.330, 13.395], "lon": [103.820, 103.900],
 		"rules": {"max_storeys": 5, "no_new_era": true, "tree_mix": "khmer"}},
 ]
@@ -67,6 +77,10 @@ static func rule_at(lat: float, lon: float) -> Dictionary:
 		if lat >= float(la[0]) and lat <= float(la[1]) and lon >= float(lo[0]) and lon <= float(lo[1]):
 			out.merge(z["rules"] as Dictionary, true)
 	return out
+
+## Whether `rules` are empty or only set a tree mix (trees_only).
+static func is_trees_only(rules: Dictionary) -> bool:
+	return rules.is_empty() or bool(rules.get("trees_only", false))
 
 ## Merged rules at local metre (x, z) of `data` (viewpoint at the origin).
 static func rule_at_xz(data: LocationData, x: float, z: float) -> Dictionary:
@@ -123,6 +137,8 @@ static func apply_buildings(data: LocationData) -> void:
 
 ## One building under `rules`; false when it is dropped.
 static func apply_building(b: Dictionary, rules: Dictionary) -> bool:
+	if bool(rules.get("trees_only", false)):
+		return true
 	var historic := str(b.get("historic", ""))
 	var drop: Variant = rules.get("drop_historic", false)
 	if historic != "" and ((drop is bool and drop) or (drop is Array and (drop as Array).has(historic))):
@@ -172,7 +188,7 @@ static func drop_cleared(data: LocationData) -> void:
 		if not (b is Dictionary):
 			return true
 		var bd := b as Dictionary
-		if rule_at_xz(data, float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).is_empty():
+		if is_trees_only(rule_at_xz(data, float(bd.get("x", 0.0)), float(bd.get("z", 0.0)))):
 			return true
 		return BuildingBuilder._accepted(data, bd, site, INF))
 

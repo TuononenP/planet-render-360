@@ -13,6 +13,10 @@ extends RefCounted
 ##   sparse fill, a bin every BIN_STEP_M along lit urban streets (none in
 ##   Japan, which has almost no street bins) and signals where two main
 ##   roads meet.
+## * Finland: a green tram-stop pole at each mapped tram stop (kerb-snapped
+##   like a bus stop), and a bench every PARK_BENCH_STEP_M along the gravel footways of
+##   its parks (Esplanadi's rows), alternate sides, facing the path, none
+##   within PARK_BENCH_CLEAR_M of a mapped one.
 ## * Regional kit (furniture_family): North American mast-arm signals
 ##   and drum bins, Japanese/Korean horizontal signal heads, British
 ##   black bins, Dutch red-brown bollards, European post bins elsewhere.
@@ -33,6 +37,11 @@ const SLIDE_M := 14
 ## A bridge kerb counts this much further (m) than a street's, so a node
 ## where a bridge meets its street snaps to the street.
 const BRIDGE_BIAS_M := 1.0
+## Park benches (Finnish places): spacing along a park footway, the clear
+## distance from a mapped bench, and the cap on how many are added.
+const PARK_BENCH_STEP_M := 20.0
+const PARK_BENCH_CLEAR_M := 8.0
+const PARK_BENCH_MAX := 160
 const LENS := {"r": Color(1.0, 0.08, 0.03), "g": Color(0.1, 1.0, 0.45)}
 
 static var _meshes: Dictionary = {}
@@ -60,14 +69,21 @@ static func furniture_family(region: String, country: String, city: String = "")
 static func mesh_key(kind: String, family: String) -> String:
 	match kind:
 		"bench":
-			return "bench_stone" if family == "japan" else "bench_wood"
+			return "bench_stone" if family == "japan" else ("bench_park" if family == "nordic" else "bench_wood")
 		"bin":
 			return {"na": "bin_drum", "nyc": "bin_nyc", "uk": "bin_black"}.get(family, "bin_post")
 		"bollard":
 			return "bollard_red" if family == "nl" else "bollard_black"
 		"signals":
 			return {"na": "signals_na", "nyc": "signals_na", "japan": "signals_jp"}.get(family, "signals_post")
+		"subway_entrance":
+			return "t_sign" if family == "nordic_se" else kind
 	return kind
+
+## Whether mapped subway entrances are drawn in `family`: New York's
+## stairwells and Stockholm's blue T sign.
+static func shows_entrances(family: String) -> bool:
+	return family in ["nyc", "nordic_se"]
 
 ## Adds the furniture under one "StreetFurniture" node of `root` on
 ## desktop Ultra. Returns the number of items placed.
@@ -82,31 +98,39 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var items: Array = data.street_furniture
 	if items.is_empty():
 		items = fill(data, roads, family, m2u)
+	if family == "nordic":
+		items = items.duplicate()
+		for stop in data.tram_stops:
+			items.append({"x": float(stop.get("x", 0.0)), "z": float(stop.get("z", 0.0)), "kind": "tram_stop"})
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var near: Array = []
 	for it in items:
 		var p := Vector2(float(it["x"]), float(it["z"]))
-		if str(it.get("kind", "")) == "subway_entrance" and family != "nyc":
+		if str(it.get("kind", "")) == "subway_entrance" and not shows_entrances(family):
 			continue
 		if (p - centre).length_squared() <= r2:
 			near.append([(p - centre).length_squared(), it])
 	near.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
 	var placed := {}  # mesh key -> Array[Transform3D]
 	var count := 0
+	var all_spots: Array = []
 	for e in near:
+		all_spots.append_array(spots(e[1], roads, family, m2u))
+	if family == "nordic":
+		all_spots.append_array(park_spots(data, mask, items, centre, m2u))
+	for spot in all_spots:
 		if count >= MAX_ITEMS:
 			break
-		for spot in spots(e[1], roads, family, m2u):
-			var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u)
-			if p.x == INF or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
-					or ground.water_at(p.x, p.y) > 0.0:
-				continue
-			var basis := Basis(Vector3.UP, _yaw(spot[1])).scaled(Vector3.ONE * m2u)
-			if not placed.has(spot[2]):
-				placed[spot[2]] = []
-			(placed[spot[2]] as Array).append(Transform3D(basis,
-				Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
-			count += 1
+		var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u)
+		if p.x == INF or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
+				or ground.water_at(p.x, p.y) > 0.0:
+			continue
+		var basis := Basis(Vector3.UP, _yaw(spot[1])).scaled(Vector3.ONE * m2u)
+		if not placed.has(spot[2]):
+			placed[spot[2]] = []
+		(placed[spot[2]] as Array).append(Transform3D(basis,
+			Vector3(p.x, ground.height_at_world(p.x, p.y), p.y)))
+		count += 1
 	if placed.is_empty():
 		return 0
 	var holder := Node3D.new()
@@ -130,7 +154,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 ## Soft ground contact-shadow footprints (x along facing, z across, m) per
 ## street-furniture kind; poles/signs are too narrow for a ground blot.
 const SHADOW_FOOTPRINT := {
-	"bench_wood": Vector2(0.85, 2.0), "bench_stone": Vector2(0.85, 2.0),
+	"bench_wood": Vector2(0.85, 2.0), "bench_park": Vector2(0.85, 2.0), "bench_stone": Vector2(0.85, 2.0),
 	"bus_stop": Vector2(1.8, 3.6),
 	"bin_post": Vector2(0.55, 0.55), "bin_drum": Vector2(0.75, 0.75),
 	"bin_nyc": Vector2(0.75, 0.75), "bin_black": Vector2(0.65, 0.65),
@@ -197,7 +221,7 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 	var key := mesh_key(kind, family)
 	var r := roads.nearest(p, SNAP_M * m2u)
 	if r.is_empty():
-		return [] if kind in ["signals", "bus_stop"] else [[p, Vector2.RIGHT, key]]
+		return [] if kind in ["signals", "bus_stop", "tram_stop"] else [[p, Vector2.RIGHT, key]]
 	# An item on a bridge belongs on its deck, not on the ground under it.
 	if bool(r.get("bridge", false)):
 		return []
@@ -214,6 +238,8 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 			# One state per junction: both poles show the same aspect.
 			var lit := "r" if _hash(p) < 0.5 else "g"
 			return [[c + nrm * kerb, -dir, key + "_" + lit], [c - nrm * kerb, dir, key + "_" + lit]]
+		"tram_stop":
+			return [[c + nrm * side * kerb, -nrm * side, "stop_tram"]]
 		"bus_stop":
 			var stop := "shelter" if bool(it.get("shelter", false)) else ("stop_hsl" if family == "nordic" else ("stop_sl" if family == "nordic_se" else "stop_pole"))
 			return [[c + nrm * side * (kerb + (0.9 if stop == "shelter" else 0.0) * m2u), -nrm * side, stop]]
@@ -221,6 +247,64 @@ static func spots(it: Dictionary, roads: RoadIndex, family: String, m2u: float) 
 	if (p - c).length() < kerb:
 		at = c + nrm * side * kerb
 	return [[at, -nrm * side, key]]
+
+## Park benches of a Finnish place as [position, facing, mesh key] spots: along
+## each footway or path that is gravel (surface tag, else untagged) and lies in
+## green cover, one every PARK_BENCH_STEP_M on alternating sides just off the
+## path, facing it; none within PARK_BENCH_CLEAR_M of a bench in `mapped` (the
+## OSM nodes), nor in a carriageway or on a footprint. Nearest the eye first.
+static func park_spots(data: LocationData, mask: VegetationMask, mapped: Array, centre: Vector2,
+		m2u: float) -> Array:
+	var out: Array = []
+	var taken: Array[Vector2] = []
+	for it in mapped:
+		if str((it as Dictionary).get("kind", "")) == "bench":
+			taken.append(Vector2(float(it["x"]), float(it["z"])))
+	var step := PARK_BENCH_STEP_M * m2u
+	var clear2 := pow(PARK_BENCH_CLEAR_M * m2u, 2.0)
+	var r2 := pow(RADIUS_M * m2u, 2.0)
+	var side := 1.0
+	for rd in data.roads:
+		if not (rd is Dictionary) or str((rd as Dictionary).get("class", "")) not in ["footway", "path"]:
+			continue
+		var d: Dictionary = rd
+		if bool(d.get("tunnel", false)) or bool(d.get("bridge", false)) or bool(d.get("area", false)) \
+				or bool(d.get("crossing", false)) or bool(d.get("kerb_line", false)):
+			continue
+		# A tagged surface must be gravel (compacted, fine_gravel...); untagged is a park's.
+		if str(d.get("surface", "")) != "" and RoadBuilder._finish(str(d["class"]), str(d["surface"]).to_lower()) != "gravel":
+			continue
+		var pts: PackedVector2Array = d.get("points", PackedVector2Array())
+		var off := (float(d.get("width_m", 2.0)) * 0.5 + KERB_OUT_M) * m2u
+		var t := step * 0.5
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var seg := a.distance_to(pts[i + 1])
+			if seg < 0.001:
+				continue
+			var dir := (pts[i + 1] - a) / seg
+			var nrm := Vector2(-dir.y, dir.x)
+			while t < seg:
+				var c := a + dir * t
+				t += step
+				side = -side
+				var p := c + nrm * off * side
+				if (p - centre).length_squared() > r2 or mask.cover_at(p.x, p.y) < 0 \
+						or mask.cover_at(c.x, c.y) < 0:
+					continue
+				var near_one := false
+				for q in taken:
+					if q.distance_squared_to(p) < clear2:
+						near_one = true
+						break
+				if near_one:
+					continue
+				taken.append(p)
+				out.append([p, -nrm * side, "bench_park"])
+			t -= seg
+	out.sort_custom(func(x: Array, y: Array) -> bool:
+		return (x[0] as Vector2).distance_squared_to(centre) < (y[0] as Vector2).distance_squared_to(centre))
+	return out.slice(0, PARK_BENCH_MAX)
 
 ## Sparse fill for a place with no furniture mapped.
 static func fill(data: LocationData, roads: RoadIndex, family: String, m2u: float) -> Array:
@@ -300,6 +384,18 @@ static func mesh(key: String) -> ArrayMesh:
 			for z in [-0.75, 0.75]:
 				StreetProps._box(buf.call("iron"), Vector3(0, 0.22, z), Vector3(0.4, 0.44, 0.05))
 				StreetProps._box(buf.call("iron"), Vector3(-0.22, 0.62, z), Vector3(0.04, 0.4, 0.05))
+		"bench_park":
+			# Helsinki's park bench: red-brown slats on black cast-iron ends,
+			# a raked back and armrests.
+			for x in [-0.16, -0.05, 0.06, 0.17]:
+				StreetProps._box(buf.call("wood_red"), Vector3(x, 0.45, 0), Vector3(0.09, 0.04, 1.8))
+			for y in [0.64, 0.76, 0.88]:
+				StreetProps._box(buf.call("wood_red"), Vector3(-0.24 - (y - 0.64) * 0.25, y, 0), Vector3(0.03, 0.09, 1.8))
+			for z in [-0.82, 0.82]:
+				StreetProps._box(buf.call("iron"), Vector3(0.1, 0.22, z), Vector3(0.04, 0.44, 0.06))
+				StreetProps._box(buf.call("iron"), Vector3(-0.2, 0.22, z), Vector3(0.04, 0.44, 0.06))
+				StreetProps._box(buf.call("iron"), Vector3(-0.3, 0.75, z), Vector3(0.05, 0.6, 0.05))
+				StreetProps._box(buf.call("iron"), Vector3(0.0, 0.66, z), Vector3(0.36, 0.04, 0.06))
 		"bench_stone":
 			StreetProps._box(buf.call("concrete"), Vector3(0, 0.22, 0), Vector3(0.45, 0.44, 1.8))
 		"bin_post":
@@ -368,18 +464,31 @@ static func mesh(key: String) -> ArrayMesh:
 			for z in [-1.5, 1.5]:
 				StreetProps._box(buf.call("glass"), Vector3(0, 1.3, z), Vector3(1.3, 2.1, 0.02))
 			StreetProps._box(buf.call("galv"), Vector3(-0.45, 0.45, 0), Vector3(0.35, 0.05, 2.0))
-		"stop_pole", "stop_hsl", "stop_sl":
+		"stop_pole", "stop_hsl", "stop_sl", "stop_tram":
 			TreeMeshLibrary._tube(buf.call("galv"), [Vector3(0, 0, 0), Vector3(0, 2.7, 0)], [0.04, 0.035], 6, 1.0, 1.0)
-			StreetProps._box(buf.call("blue" if key in ["stop_hsl", "stop_sl"] else "sign"), Vector3(0.05, 2.45, 0), Vector3(0.04, 0.55, 0.45))
+			StreetProps._box(buf.call("blue" if key in ["stop_hsl", "stop_sl"] else ("tram_green" if key == "stop_tram" else "sign")),
+				Vector3(0.05, 2.45, 0), Vector3(0.04, 0.55, 0.45))
 			if key == "stop_sl":
 				StreetProps._box(buf.call("sign"), Vector3(0.078, 2.47, 0), Vector3(0.015, 0.16, 0.28))
+			if key == "stop_tram":
+				# HSL's tram sign: a green panel with a white tram front.
+				StreetProps._box(buf.call("sign"), Vector3(0.078, 2.45, 0), Vector3(0.015, 0.3, 0.26))
+				StreetProps._box(buf.call("tram_green"), Vector3(0.09, 2.5, 0), Vector3(0.015, 0.1, 0.18))
 			if key == "stop_hsl":
 				StreetProps._box(buf.call("gold"), Vector3(0.078, 2.47, 0), Vector3(0.015, 0.27, 0.3))
 				StreetProps._box(buf.call("blue"), Vector3(0.09, 2.47, 0), Vector3(0.015, 0.1, 0.2))
+		"t_sign":
+			# SL's tunnelbana sign: a blue square on a pole with a white T
+			# (bar and stem) on both faces.
+			TreeMeshLibrary._tube(buf.call("galv"), [Vector3(0, 0, 0), Vector3(0, 3.0, 0)], [0.045, 0.04], 6, 1.0, 1.0)
+			StreetProps._box(buf.call("blue"), Vector3(0, 2.7, 0), Vector3(0.05, 0.6, 0.6))
+			for x in [-0.03, 0.03]:
+				StreetProps._box(buf.call("sign"), Vector3(x, 2.84, 0), Vector3(0.015, 0.1, 0.4))
+				StreetProps._box(buf.call("sign"), Vector3(x, 2.6, 0), Vector3(0.015, 0.34, 0.1))
 	var m := ArrayMesh.new()
 	for mat in surf:
 		var arrays := (surf[mat] as TreeMeshLibrary.Buf).arrays()
-		if key in ["stop_hsl", "stop_sl"]:
+		if key in ["stop_hsl", "stop_sl", "stop_tram"]:
 			arrays[Mesh.ARRAY_INDEX] = ParkedCars.front_faces(arrays[Mesh.ARRAY_INDEX])
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		m.surface_set_material(m.get_surface_count() - 1, _material(str(mat)))
@@ -401,15 +510,15 @@ static func _head(buf: Callable, c: Vector3, horizontal: bool, lit: String) -> v
 static func _material(name: String) -> Material:
 	var m := StandardMaterial3D.new()
 	var col: Color = {
-		"wood": Color(0.30, 0.20, 0.12), "iron": Color(0.04, 0.045, 0.045),
+		"wood": Color(0.30, 0.20, 0.12), "wood_red": Color(0.50, 0.17, 0.07), "iron": Color(0.04, 0.045, 0.045),
 		"concrete": Color(0.48, 0.47, 0.44), "green": Color(0.05, 0.12, 0.07),
 		"gold": Color(0.55, 0.42, 0.12), "oxide": Color(0.22, 0.07, 0.04),
 		"galv": Color(0.46, 0.47, 0.46), "glass": Color(0.6, 0.7, 0.72, 0.25),
-		"blue": Color(0.015, 0.19, 0.5), "sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
+		"blue": Color(0.015, 0.19, 0.5), "tram_green": Color(0.0, 0.34, 0.2), "sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
 	}.get(name, Color(0.03, 0.03, 0.03))
 	m.albedo_color = col
 	m.vertex_color_use_as_albedo = true
-	m.roughness = 0.75 if name in ["wood", "concrete"] else 0.4
+	m.roughness = 0.75 if name in ["wood", "wood_red", "concrete"] else 0.4
 	m.metallic = 0.5 if name in ["iron", "galv", "gold", "oxide", "green"] else 0.0
 	if name == "glass":
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -425,7 +534,7 @@ static func _material(name: String) -> Material:
 		m.emission_enabled = true
 		m.emission = m.albedo_color
 		m.emission_energy_multiplier = 0.25
-	return StreetSnow.material(m) if name in ["wood", "iron", "concrete", "green", "galv"] else m
+	return StreetSnow.material(m) if name in ["wood", "wood_red", "iron", "concrete", "green", "galv"] else m
 
 ## Road segments near the eye on a coarse grid, for nearest-kerb lookups.
 class RoadIndex:

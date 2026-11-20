@@ -7,14 +7,19 @@ extends RefCounted
 ## - Avicii Arena (the Ericsson Globe, Berg Arkitektkontor 1989): the
 ##   world's largest spherical building, 110 m across and 85 m high
 ##   (Wikipedia; OSM way 25431325 height 85), its white skin of panel
-##   rings and meridians, the 20 m podium of concourses (OSM way
-##   109511512) with the glazed entrances, and the SkyView: two glass
-##   gondolas on parallel tracks up the south side.
+##   rings and meridians pierced by round portholes (blocks of rows on
+##   the lower belt, a ring round the crown), the 20 m podium of concourses
+##   (OSM way 109511512) with the glazed entrances and, on Globentorget,
+##   the white-framed yellow office front, and the SkyView: two glass
+##   gondolas on parallel tracks up the south side. Lit by cool floods.
 ## - Kaknäs Tower (Borgström & Lindroos 1967): the slip-formed concrete
 ##   shaft whose plan is a 15.1 m square crossed by an equal square turned
 ##   45° (OSM way 593144774), the head of restaurant and observation floors
 ##   turned 45° to the shaft, gold-filmed glazing, 155 m roof and the mast
-##   to 170 m (sv.wikipedia, Structurae).
+##   to 170 m (sv.wikipedia, Structurae). Photos: four stacked antenna
+##   balconies with dishes under the head, a concrete crown of ribbon
+##   windows, and a slim red-and-white lattice mast (a quarter of the
+##   head's height again, as in the reference).
 ## - Vasa Museum (Månsson & Dahlbäck 1990) over the 1878 Galärvarvet dry
 ##   dock: the nineteen OSM 3D parts of way 27288534 (skillion roofs 12 to
 ##   41 m) clad in Falu red, ochre and tar-black boarding under dark copper
@@ -53,6 +58,8 @@ static func globe(model: Node3D) -> void:
 	lm.use("Steel", LandmarkMaterials.paint("#4E545A", 0.45, 0.6))
 	lm.use("Cabin", LandmarkMaterials.glass("#4A6276"))
 	lm.use("Lamp", LandmarkMaterials.lit("#FFF1D6", 0.8))
+	lm.use("Frame", LandmarkMaterials.pbr("concrete", "#D8D4CB", 3.0))
+	lm.use("Yellow", LandmarkMaterials.pbr("render", "#D9A92E", 3.0, 0.5, 0.05))
 	var c := Vector3(0, GLOBE_CY, 0)
 	var phi0 := asin(-GLOBE_CY / GLOBE_R)
 	var prof := PackedVector2Array()
@@ -72,9 +79,37 @@ static func globe(model: Node3D) -> void:
 		var top := 82.0 if m % 2 == 0 else 66.0
 		_meridian(lm, "Seam", c, GLOBE_R + 0.1, TAU * float(m) / 48.0, deg_to_rad(-20.0), deg_to_rad(top), 0.14)
 	lm.box("Lamp", c + Vector3(0, GLOBE_R + 0.2, 0), Vector3(0.5, 0.4, 0.5))
+	_portholes(lm, c)
 	_globe_podium(lm)
+	_globe_front(lm)
 	_skyview(lm, c)
 	lm.commit(model)
+	# Cool floods up the skin from the podium deck (the arena is washed in
+	# blue-white at night).
+	var wash := Color(0.66, 0.72, 1.0)
+	var floods := []
+	for fi in 5:
+		var a := TAU * (float(fi) + 0.3) / 5.0
+		floods.append([Vector3(sin(a) * 63.0, 8.0, cos(a) * 63.0), Vector3(0, 52.0, 0), 50.0, 1.1, 130.0, wash])
+	model.set_meta(LandmarkLights.FLOOD_META, floods)
+
+## Round portholes in the skin: blocks of seven rows by six columns on
+## the lower belt (gaps between the blocks), and a ring of smaller ones
+## round the crown. Dark glass discs standing just proud of the panels.
+static func _portholes(lm: LandmarkMesh, c: Vector3) -> void:
+	var r := GLOBE_R + 0.16
+	for m in 48:
+		if m % 12 >= 6:
+			continue
+		var az := TAU * (float(m) + 0.5) / 48.0
+		for row in 7:
+			var phi := deg_to_rad(8.0 + 8.0 * float(row))
+			var p := _sph(c, r, az, phi)
+			lm.disc("Glass", p, (p - c).normalized(), 1.1, 10)
+	for m in 48:
+		var az := TAU * (float(m) + 0.5) / 48.0
+		var p := _sph(c, r, az, deg_to_rad(72.0))
+		lm.disc("Glass", p, (p - c).normalized(), 0.8, 8)
 
 ## A thin latitude band on the sphere (centre c, radius r) at latitude
 ## phi, `w` metres wide, as a ring of quads standing just proud.
@@ -132,9 +167,9 @@ static func _globe_podium(lm: LandmarkMesh) -> void:
 	lm.lathe("Glass", Vector3(0, PODIUM_H + 1.2, 0), PackedVector2Array([Vector2(TIER_R - 0.4, 0),
 		Vector2(TIER_R - 0.4, 2.4)]), 48, 1.0, 1.0, 0.0, true, false)
 	lm.frustum("Podium", Vector3(0, PODIUM_H + 3.6, 0), TIER_R, TIER_R, TIER_H - PODIUM_H - 3.6, 48)
-	# North block (Globentorget) and east block, 12 m, glass between
-	# concrete floor bands.
-	for b in [[6.0, -55.0, 116.0, 26.0], [58.5, -35.0, 11.0, 32.0]]:
+	# East block, 12 m, glass between concrete floor bands (the north
+	# block on Globentorget is _globe_front).
+	for b in [[58.5, -35.0, 11.0, 32.0]]:
 		var bx: float = b[0]
 		var bz: float = b[1]
 		var bw: float = b[2]
@@ -163,6 +198,34 @@ static func _globe_podium(lm: LandmarkMesh) -> void:
 		var q := Vector3(sin(a), 0, cos(a)) * (PODIUM_R - 2.0) + Vector3(0, PODIUM_H, 0)
 		lm.frustum("Steel", q, 0.08, 0.06, 4.0, 6)
 		lm.box("Lamp", q + Vector3(0, 4.1, 0), Vector3(0.35, 0.25, 0.35))
+
+## The Globentorget front (OSM podium way, 20 m): a 116 m block of five
+## storeys over a glazed foyer, white concrete frame in bays with yellow
+## infill panels and paired windows, the lit AVICII ARENA sign over the
+## doors.
+static func _globe_front(lm: LandmarkMesh) -> void:
+	var bx := 6.0
+	var bz := -55.0
+	var bw := 116.0
+	var bd := 26.0
+	var h := 20.0
+	FhU.blk(lm, "Yellow", bx, 0.0, bz, bw - 0.4, h, bd - 0.4)
+	var a := Vector3(bx - bw * 0.5, 0, bz - bd * 0.5)
+	var b := Vector3(bx + bw * 0.5, 0, bz - bd * 0.5)
+	var out := Vector3(0, 0, -1)
+	FhP.pierce(lm, "Yellow", "Glass", a, b, out, 5.0, h - 5.6, 24, 4, Vector2(1.2, 1.5), 1.0, 3.6, 0.3)
+	# Glazed foyer on the ground floor behind the frame, entrance sign.
+	FhU.blk(lm, "Glass", bx, 0.0, bz - bd * 0.5 + 0.3, bw - 4.0, 5.0, 0.3)
+	FhP.strips(lm, "Frame", a, b, out, 0.0, h, 9, 2.4, 1.4)
+	for y in [4.8, 11.4, h - 1.0]:
+		FhP.band(lm, "Frame", a, b, out, float(y), 1.0, 1.4)
+	lm.box("Lamp", Vector3(bx + 2.0, 6.3, bz - bd * 0.5 - 0.5), Vector3(26.0, 1.3, 0.2))
+	# The three other faces share the frame: bands at the ends.
+	for s: float in [-1.0, 1.0]:
+		var x := bx + s * bw * 0.5
+		for y in [4.8, 11.4, h - 1.0]:
+			FhU.blk(lm, "Frame", x, float(y), bz, 1.4, 1.0, bd)
+	FhU.blk(lm, "Frame", bx, h, bz, bw + 0.6, 0.6, bd + 0.6)
 
 ## SkyView on the south face: two tracks of twin steel rails on stand-off
 ## brackets with cross ties, the glazed boarding station on the upper
@@ -229,7 +292,7 @@ static func kaknas(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#ABA79E", 3.0))
 	lm.use("Relief", LandmarkMaterials.pbr("concrete", "#9C988F", 3.0))
-	lm.use("GoldGlass", LandmarkMaterials.pbr("concrete", "#8C7746", 2.0, 0.14, 0.8))
+	lm.use("GoldLamp", _kak_gold())
 	lm.use("Glass", LandmarkMaterials.glass("#2A3238"))
 	lm.use("Steel", LandmarkMaterials.paint("#D9DBDA", 0.5, 0.5))
 	lm.use("Red", LandmarkMaterials.paint("#B23A2E", 0.55, 0.3))
@@ -266,6 +329,16 @@ static func kaknas(model: Node3D) -> void:
 	_kak_head(lm)
 	lm.commit(model)
 
+## The head's gold-filmed glazing: a metallic film by day, the restaurant
+## and café floors warm-lit at night (LandmarkLights).
+static func _kak_gold() -> StandardMaterial3D:
+	var m := LandmarkMaterials.pbr("concrete", "#8C7746", 2.0, 0.14, 0.8).duplicate() as StandardMaterial3D
+	m.emission_enabled = true
+	m.emission = Color("#FFC870")
+	m.emission_energy_multiplier = 0.0
+	m.set_meta(LandmarkLights.NIGHT_GLOW_META, 0.7)
+	return m
+
 ## The shaft plan: a 2*KAK_S square crossed by a 45° square of half
 ## diagonal KAK_D, scaled by `k`, as one 16-point outline.
 static func _kak_star(k: float) -> PackedVector2Array:
@@ -294,7 +367,7 @@ static func _kak_head(lm: LandmarkMesh) -> void:
 	_diamond(lm, "Concrete", KAK_D, KAK_SHAFT_H, 122.0, KAK_D + 1.6)
 	_diamond(lm, "Concrete", KAK_D + 1.6, 122.0, 124.0, r)
 	# Two glazed floors (124-135) between slab edges.
-	_diamond(lm, "GoldGlass", r - 0.5, 124.0, 135.0)
+	_diamond(lm, "GoldLamp", r - 0.5, 124.0, 135.0)
 	for sl in [[124.0, 0.8], [129.4, 0.7], [134.6, 0.9]]:
 		_diamond(lm, "Concrete", r, float(sl[0]), float(sl[0]) + float(sl[1]))
 	for fl in [[124.8, 129.4], [130.1, 134.6]]:
@@ -319,10 +392,22 @@ static func _kak_head(lm: LandmarkMesh) -> void:
 		for k in posts + 1:
 			var p := a.lerp(b, float(k) / float(posts))
 			lm.box("Steel", p + Vector3(0, 1.15, 0), Vector3(0.1, 2.3, 0.1), Basis(), 0.0)
-	# Antenna crown: concrete core with louvre bands, two balconies.
+	# Antenna balconies on the shaft under the head: four square rings
+	# 8 m apart with their rails and a few dishes (the photo's stack).
+	for yb in [81.0, 89.0, 97.0, 105.0]:
+		lm.box("Concrete", Vector3(0, float(yb), 0), Vector3(22.4, 0.7, 22.4))
+		lm.box("Concrete", Vector3(0, float(yb) + 0.9, 0), Vector3(22.8, 0.5, 22.8))
+		for q in 4:
+			var a := PI * 0.5 * float(q)
+			var d := Vector3(cos(a), 0, sin(a))
+			var basis := Basis(Vector3.UP, -a)
+			lm.box("Steel", d * 11.3 + Vector3(0, float(yb) + 1.9, 0), Vector3(0.1, 1.2, 22.6), basis, 0.0)
+			if int(yb) % 16 == 1:
+				lm.disc("Steel", d * 11.5 + Vector3(0, float(yb) + 2.6, 0), d, 1.5, 14)
+	# Antenna crown: concrete core with ribbon windows, two balconies.
 	_diamond(lm, "Concrete", 11.6, 135.5, KAK_ROOF_H - 1.0)
 	for yl in [137.0, 141.5, 146.0, 150.5]:
-		_diamond(lm, "Glass", 11.68, float(yl), float(yl) + 2.0)
+		_diamond(lm, "Glass", 11.68, float(yl) + 0.5, float(yl) + 1.4)
 		var c4 := _diamond_pts(11.68, 0.0)
 		for i in 4:
 			var a: Vector3 = c4[i]
@@ -335,20 +420,39 @@ static func _kak_head(lm: LandmarkMesh) -> void:
 			lm.beam("Steel", b4[i] + Vector3(0, 1.0, 0), b4[(i + 1) % 4] + Vector3(0, 1.0, 0), 0.08, 0.08)
 	_diamond(lm, "Concrete", 12.2, KAK_ROOF_H - 1.0, KAK_ROOF_H)
 	_diamond(lm, "Concrete", 6.0, KAK_ROOF_H, KAK_ROOF_H + 1.2)
-	# The mast: a steel tube in two diameters with red marking bands,
-	# antenna rungs and a beacon at the top.
+	# The mast: a slim lattice of four legs in red and white bays, bracing
+	# in every bay, antenna rungs at the foot and a beacon at the top.
 	var m0 := KAK_ROOF_H + 1.2
-	lm.frustum("Steel", Vector3(0, m0, 0), 1.1, 0.95, 7.0, 16)
-	lm.frustum("Steel", Vector3(0, m0 + 7.0, 0), 0.5, 0.32, KAK_TOP_H - m0 - 7.5, 12)
-	for yr in [m0 + 5.6, m0 + 10.0, KAK_TOP_H - 2.2]:
-		var rad := 1.0 if yr < m0 + 7.0 else 0.44
-		lm.frustum("Red", Vector3(0, float(yr), 0), rad + 0.03, rad + 0.03, 1.1, 16)
+	lm.frustum("Steel", Vector3(0, m0, 0), 1.7, 1.4, 1.6, 12)
+	var bays := 8
+	var hw0 := 1.3
+	var hw1 := 0.4
+	var yb0 := m0 + 1.6
+	var span := KAK_TOP_H - 0.5 - yb0
+	for k in bays:
+		var f0 := float(k) / float(bays)
+		var f1 := float(k + 1) / float(bays)
+		var y0 := yb0 + span * f0
+		var y1 := yb0 + span * f1
+		var h0 := lerpf(hw0, hw1, f0)
+		var h1 := lerpf(hw0, hw1, f1)
+		var leg := "Red" if (k / 2) % 2 == 0 else "Steel"
+		for q in 4:
+			var a := PI * 0.5 * float(q) + PI * 0.25
+			var b := PI * 0.5 * float(q + 1) + PI * 0.25
+			var ca := Vector2(cos(a), sin(a)) * sqrt(2.0)
+			var cb := Vector2(cos(b), sin(b)) * sqrt(2.0)
+			lm.beam(leg, Vector3(ca.x * h0, y0, ca.y * h0), Vector3(ca.x * h1, y1, ca.y * h1), 0.2, 0.2)
+			lm.beam("Steel", Vector3(ca.x * h1, y1, ca.y * h1), Vector3(cb.x * h1, y1, cb.y * h1), 0.1, 0.1)
+			var da := Vector3(ca.x * h0, y0, ca.y * h0)
+			var db := Vector3(cb.x * h1, y1, cb.y * h1)
+			lm.beam("Steel", da if q % 2 == 0 else Vector3(cb.x * h0, y0, cb.y * h0), db if q % 2 == 0 else Vector3(ca.x * h1, y1, ca.y * h1), 0.08, 0.08)
 	for k in 6:
-		var yk := m0 + 0.8 + float(k) * 1.0
+		var yk := m0 + 0.2 + float(k) * 0.9
 		for q in 4:
 			var a := PI * 0.5 * float(q) + (PI * 0.25 if k % 2 == 1 else 0.0)
 			var d := Vector3(cos(a), 0, sin(a))
-			lm.box("Steel", Vector3(0, yk, 0) + d * 1.25, Vector3(0.3, 0.7, 0.3), Basis(Vector3.UP, -a), 0.0)
+			lm.box("Steel", Vector3(0, yk, 0) + d * 2.0, Vector3(0.3, 0.7, 0.3), Basis(Vector3.UP, -a), 0.0)
 	lm.box("Lamp", Vector3(0, KAK_TOP_H - 0.25, 0), Vector3(0.5, 0.5, 0.5))
 
 # --- Vasa Museum -------------------------------------------------------
@@ -410,15 +514,16 @@ static func _v(a: Array) -> PackedVector2Array:
 ## gate where Vasa came in, and the three masts on the ship hall.
 static func vasa(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#5A5149", 2.0, 0.5, 0.45))
-	lm.use("Seam", LandmarkMaterials.pbr("concrete", "#6B6157", 2.0, 0.42, 0.55))
+	lm.use("Copper", LandmarkMaterials.pbr("concrete", "#4D5A60", 2.0, 0.5, 0.45))
+	lm.use("Seam", LandmarkMaterials.pbr("concrete", "#66757A", 2.0, 0.42, 0.55))
+	lm.use("Hall", LandmarkMaterials.pbr("wood", "#63453D", 2.5))
 	lm.use("FaluRed", LandmarkMaterials.pbr("wood", "#7B2F24", 2.5))
 	lm.use("Ochre", LandmarkMaterials.pbr("wood", "#C08B3C", 2.5))
 	lm.use("Tar", LandmarkMaterials.pbr("wood", "#2B2825", 2.5))
 	lm.use("Plinth", LandmarkMaterials.pbr("concrete", "#8A857D", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#28323A"))
-	lm.use("Mast", LandmarkMaterials.pbr("wood", "#4E3B2A", 2.0))
-	lm.use("Rig", LandmarkMaterials.paint("#2A2622", 0.7, 0.1))
+	lm.use("Mast", LandmarkMaterials.pbr("wood", "#9B3028", 2.0))
+	lm.use("Rig", LandmarkMaterials.paint("#8E908E", 0.7, 0.1))
 	var parts := _vasa_parts()
 	var polys: Array[PackedVector2Array] = []
 	for p in parts:
@@ -475,6 +580,7 @@ static func _vasa_part(lm: LandmarkMesh, part: Array, polys: Array[PackedVector2
 	var down := _down(part)
 	var rise: float = part[1]
 	var wood := wall != "Copper"
+	var skin := "Hall" if wall == "Copper" else wall
 	var nv := poly.size()
 	for i in nv:
 		var a := poly[i]
@@ -485,8 +591,8 @@ static func _vasa_part(lm: LandmarkMesh, part: Array, polys: Array[PackedVector2
 		var pa := Vector3(a.x, 0, a.y)
 		var pb := Vector3(b.x, 0, b.y)
 		var ln := a.distance_to(b)
-		lm.tri(wall, pa, pb, Vector3(b.x, yb, b.y), o, o, o, Vector2(0, 0), Vector2(ln, 0), Vector2(ln, -yb))
-		lm.tri(wall, pa, Vector3(b.x, yb, b.y), Vector3(a.x, ya, a.y), o, o, o, Vector2(0, 0), Vector2(ln, -yb),
+		lm.tri(skin, pa, pb, Vector3(b.x, yb, b.y), o, o, o, Vector2(0, 0), Vector2(ln, 0), Vector2(ln, -yb))
+		lm.tri(skin, pa, Vector3(b.x, yb, b.y), Vector3(a.x, ya, a.y), o, o, o, Vector2(0, 0), Vector2(ln, -yb),
 			Vector2(0, -ya))
 		# Copper flashing along the roof edge.
 		lm.beam("Seam", Vector3(a.x, ya, a.y) + o * 0.15, Vector3(b.x, yb, b.y) + o * 0.15, 0.45, 0.3, o)

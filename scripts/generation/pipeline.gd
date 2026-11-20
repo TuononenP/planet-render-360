@@ -872,6 +872,7 @@ func _await_osm(data: LocationData) -> void:
 		data.barriers = _osm_barriers
 		data.country = _osm.country
 		data.railways = _osm.railways
+		StockholmTram.complete(data)
 		data.street_furniture = _osm.furniture
 		data.tram_stops = _osm.tram_stops
 		data.bus_stops = _osm.bus_stops

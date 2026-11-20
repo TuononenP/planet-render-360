@@ -270,6 +270,10 @@ static func bark_material(kind: String) -> StandardMaterial3D:
 	m.normal_scale = 1.2
 	m.vertex_color_use_as_albedo = true
 	m.roughness = 0.92
+	if kind.ends_with("_grey"):
+		# Stockholm's trunks: against the low sun the grazing sheen turned them cream.
+		m.roughness = 1.0
+		m.metallic_specular = 0.1
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	_mats[key] = m
 	return m

@@ -11,7 +11,7 @@ extends SceneTree
 ## viaduct's train stands on its deck; a mapped platform takes a train
 ## beside it; placement is deterministic and gated by quality.
 
-const LIVERY := {"emu": "helsinki_commuter", "emu_uk": "london_grey", "intercity": "finland_long"}
+const LIVERY := {"emu": "helsinki_commuter", "emu_uk": "london_grey", "intercity": "finland_long", "metro": "helsinki_metro"}
 
 func _init() -> void:
 	_run()
@@ -53,13 +53,20 @@ func _run() -> void:
 			printerr("TRAIN FAIL: ", failure)
 		quit(1)
 
+## Body envelopes: width and roof height (m) and doorways a side. A metro
+## car is wider and lower than a main-line one and has three doorways.
+const WIDTH_M := {"metro": Vector2(3.0, 3.3)}
+const ROOF_M := {"metro": Vector2(3.6, 3.9)}
+const DOORWAYS := {"metro": 3}
+
 func _models(failures: Array[String]) -> void:
 	for kind: String in TrainSpecs.KINDS:
 		var livery: String = LIVERY[kind]
 		var liv := TrainSpecs.livery(livery)
 		var width := TrainSpecs.width_m(kind)
-		if width < 2.8 or width > 3.0:
-			failures.append("%s should be 2.8-3.0 m wide: %s" % [kind, width])
+		var w_range: Vector2 = WIDTH_M.get(kind, Vector2(2.8, 3.0))
+		if width < w_range.x or width > w_range.y:
+			failures.append("%s should be %s-%s m wide: %s" % [kind, w_range.x, w_range.y, width])
 		for cars: int in [2, 3, 4]:
 			if TrainSpecs.train(kind, cars, false).size() != cars:
 				failures.append("%s should run %d cars" % [kind, cars])
@@ -77,10 +84,12 @@ func _models(failures: Array[String]) -> void:
 				var spec := TrainSpecs.section(kind, id)
 				var prof: Array = spec["prof"]
 				var top := float(prof[prof.size() - 1][0])
-				if float(sec["len"]) < 19.0 or float(sec["len"]) > 25.5 or top < 3.8 or top > 4.2:
-					failures.append("%s %s should be 19-25 m long and 3.8-4.2 m over the roof: %s, %s" % [kind, id, sec["len"], top])
-				if (spec["bogies"] as Array).size() != 2 or (spec["doors"] as Array).size() != 2 or (spec["under"] as Array).is_empty():
-					failures.append("%s %s needs two bogies, two doorways a side and underfloor cases" % [kind, id])
+				var roof: Vector2 = ROOF_M.get(kind, Vector2(3.8, 4.2))
+				if float(sec["len"]) < 19.0 or float(sec["len"]) > 25.5 or top < roof.x or top > roof.y:
+					failures.append("%s %s should be 19-25 m long and %s-%s m over the roof: %s, %s" % [kind, id, roof.x, roof.y, sec["len"], top])
+				var doorways: int = DOORWAYS.get(kind, 2)
+				if (spec["bogies"] as Array).size() != 2 or (spec["doors"] as Array).size() != doorways or (spec["under"] as Array).is_empty():
+					failures.append("%s %s needs two bogies, %d doorways a side and underfloor cases" % [kind, id, doorways])
 				if spec.has("panto"):
 					wired += 1
 				if absf(float(sec["at"]) - (x - float(sec["len"]) * 0.5)) > 0.001:

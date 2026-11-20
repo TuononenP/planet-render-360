@@ -164,6 +164,16 @@ const SKYGLOW_E := 0.025
 const MOON_COLOR := Color(0.62, 0.72, 0.95)
 ## Exposure lift in full night: the eye adapts, the scene stays legible.
 const NIGHT_EXPOSURE_LIFT := 0.12
+## A snowbound winter day (H-7, the January Helsinki reference): snow
+## light washes the colour out of facades and lifts the frame, so the
+## grade's saturation drops to this share and the exposure rises by
+## SNOW_EXPOSURE_LIFT (by day; the night keeps its own lift).
+const SNOW_SATURATION := 0.84
+const SNOW_EXPOSURE_LIFT := 0.06
+
+## Whether the winter snow grade applies: winter with snow lying.
+func snow_graded() -> bool:
+	return snow_ground and season == LocationData.Season.WINTER
 
 func _init(preset: int = RenderSettings.Preset.HIGH) -> void:
 	name = "AtmosphereRig"
@@ -644,8 +654,11 @@ func _apply() -> void:
 	# Diffuse sky light takes over under cloud; the eye adapts to storms
 	# and to the night.
 	environment.ambient_light_energy = PostGrade.AMBIENT_ENERGY * float(look["ambient_gain"])
+	var snowbound := 1.0 if snow_graded() else 0.0
 	environment.tonemap_exposure = PostGrade.EXPOSURE \
-		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount)
+		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount
+			+ SNOW_EXPOSURE_LIFT * snowbound * (1.0 - night_amount))
+	environment.adjustment_saturation = PostGrade.SATURATION * lerpf(1.0, SNOW_SATURATION, snowbound)
 	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
 	_base_vol_density = environment.volumetric_fog_density
 	_apply_haziness()

@@ -10,6 +10,7 @@ const IN := {
 	"kallio": [60.1850, 24.9500, "helsinki"], "toolo": [60.1800, 24.9200, "helsinki"],
 	"vuosaari": [60.2090, 25.1440, "helsinki"], "keilaniemi": [60.1755, 24.8310, "espoo"],
 	"tapiola": [60.1760, 24.8050, "espoo"], "turku": [60.4518, 22.2666, "turku"],
+	"stockholm": [59.3293, 18.0686, "stockholm"], "monteliusvagen": [59.3207, 18.0604, "stockholm"],
 }
 const OUT := {"tampere": [61.4978, 23.7610], "tallinn": [59.4370, 24.7536], "paris": [48.8566, 2.3522]}
 

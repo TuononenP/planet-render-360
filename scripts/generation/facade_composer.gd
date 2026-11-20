@@ -38,6 +38,15 @@ const PHOTO_REPS := {"brick": 2, "wood": 2}
 ## Share of a photo's contrast kept once it is shrunk to a bay cell:
 ## concrete's streaks and blotches read as dirty noise at ~4 cm/px.
 const KEEP_CONTRAST := {"concrete": 0.4, "stone": 0.7, "render": 0.7}
+## Stockholm's plaster is smooth: the stucco photo's grain keeps this share of the contrast it has after
+## KEEP_CONTRAST, so a shaded wall does not read as stippled pebble-dash.
+const STOCKHOLM_KEEP := 0.3
+## Cities whose render is smooth plaster (the share above applies): Stockholm's, and Helsinki's, whose
+## stippled stucco photo turned a shaded ochre front into speckled olive.
+const SMOOTH_PLASTER_CITIES: Array[String] = ["stockholm", "helsinki"]
+
+static func smooth_plaster(set_name: String, look: Dictionary) -> bool:
+	return set_name == "render" and str(look.get("city", "")) in SMOOTH_PLASTER_CITIES
 ## Clapboard is painted siding: the bundled raw planks' grain and knots,
 ## tinted a pastel, read as grime, so siding keeps little of it.
 const SIDING_CONTRAST := 0.25
@@ -74,9 +83,14 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 		# The bundled planks run vertically; siding runs horizontally.
 		var turn := set_name == "wood" and pattern == "clapboard"
 		alb = _wall_layer(loader, set_name, "diff", reps, turn)
+		var smooth := smooth_plaster(set_name, look)
+		if smooth:
+			_soften(alb, STOCKHOLM_KEEP)
 		if detail >= 1:
 			nor = _wall_layer(loader, set_name, "nor", reps, turn)
 			rgh = _wall_layer(loader, set_name, "rough", reps, turn)
+			if smooth:
+				_soften(nor, STOCKHOLM_KEEP)
 	if detail >= 1 and nor == null:
 		nor = Image.create(W, CELL, false, Image.FORMAT_RGBA8)
 		nor.fill(Color(0.5, 0.5, 1.0))

@@ -42,6 +42,48 @@ func _init() -> void:
 			failures.append("%s ground should be the %s finish %s, got %s" % [pair[0], pair[1], want.to_html(false), got.to_html(false)])
 		if got.a > 0.05:
 			failures.append("%s ground should take little of the photo's tint" % pair[0])
+	# Finland's granite overrides rock and setts; elsewhere the palette stays.
+	var fi := LocationData.new()
+	fi.country = "FI"
+	var fi_pal := GroundMaterial.palette(LocationData.Season.SUMMER, Color(0, 0, 0, 0),
+		FinnishGranite.palette_overrides(fi))
+	var fi_rock := fi_pal.get_pixel(int(GroundMaterial.ID["rock"]), 1)
+	if absf(fi_rock.r - FinnishGranite.ROCK.r) > 1.5 / 255.0 or fi_rock.r <= fi_rock.b + 0.05:
+		failures.append("Finnish rock should be pink-grey, got %s" % fi_rock.to_html(false))
+	if pal.get_pixel(int(GroundMaterial.ID["rock"]), 1).to_html(false) == fi_rock.to_html(false):
+		failures.append("the default rock colour should differ from Finland's")
+	var fi_urban := fi_pal.get_pixel(int(GroundMaterial.ID["urban"]), 1)
+	if fi_urban.to_html(false) != FinnishGranite.PAVING_HEX.trim_prefix("#"):
+		failures.append("Finnish open paving should be the granite slab, got %s" % fi_urban.to_html(false))
+	var fi_path := fi_pal.get_pixel(int(GroundMaterial.ID["path"]), 1)
+	if fi_path.to_html(false) != FinnishGranite.GRAVEL_HEX.trim_prefix("#") or fi_path.r <= fi_path.b + 0.1:
+		failures.append("Finnish park gravel should be red-brown, got %s" % fi_path.to_html(false))
+	# A footway through a park is gravel there; tagged, crossing or outside it is not.
+	var park := [[PackedVector2Array([Vector2(0, 0), Vector2(10, 0), Vector2(10, 10), Vector2(0, 10)]), Vector2(0, 0), Vector2(10, 10)]]
+	var walk := {"class": "footway", "points": PackedVector2Array([Vector2(2, 5), Vector2(8, 5)])}
+	if not FinnishGranite.park_way(walk, park):
+		failures.append("an unsurfaced footway in a park should be gravel")
+	for variant in [{"surface": "paving_stones"}, {"crossing": true}, {"class": "cycleway"},
+			{"points": PackedVector2Array([Vector2(20, 5), Vector2(28, 5)])}]:
+		var other := walk.duplicate()
+		other.merge(variant, true)
+		if FinnishGranite.park_way(other, park):
+			failures.append("%s should not be a park gravel way" % [variant])
+	# The ground paint under such a way is the gravel class in Finland, paving elsewhere.
+	for country in ["FI", ""]:
+		var way_data := LocationData.new()
+		way_data.country = country
+		way_data.roads = [{"class": "footway", "surface": "compacted", "width_m": 8.0,
+			"points": PackedVector2Array([Vector2(-100, 0), Vector2(100, 0)])}]
+		var cmap := GroundMaterial.class_map(way_data)
+		var ids := {}
+		for dy in range(-4, 5):
+			ids[roundi(cmap.get_pixel(GroundMaterial.CLASS_TEXELS / 2, GroundMaterial.CLASS_TEXELS / 2 + dy).r * 255.0)] = true
+		var want := int(GroundMaterial.ID["path"] if country == "FI" else GroundMaterial.ID["urban"])
+		if not ids.has(want):
+			failures.append("a compacted footway should paint class %d (%s), got %s" % [want, country, ids.keys()])
+	if not FinnishGranite.palette_overrides(LocationData.new()).is_empty():
+		failures.append("a place outside Finland keeps the shared palette")
 	if failures.is_empty():
 		print("LANDCOVER GROUND OK: classes, OSM precedence, water and climate fallback")
 		quit(0)

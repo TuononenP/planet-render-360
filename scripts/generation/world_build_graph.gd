@@ -139,6 +139,7 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			n.free()
 		else:
 			TerrainBuilder._adopt_flat(root, n)
+	StockholmGlare.apply(root, data)
 	if abort != null:
 		var ms := {}
 		for st in stages:
@@ -169,6 +170,7 @@ static func build_detail(data: LocationData, ground: GroundTruth, keep: Dictiona
 		return null
 	for c in node.get_children():
 		TerrainBuilder.tag_layer(c, str(node.name))
+	StockholmGlare.apply(node, data)
 	return node
 
 ## Stage indices grouped into tasks; a task runs its stages in order.

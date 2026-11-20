@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Small facade pieces for northern masonry: rusticated granite bases
 ## and corner turrets. Shares the building's ReliefKit and detail radius.
-static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -> void:
+static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float, calm: bool = false) -> void:
 	if rows.is_empty():
 		return
 	var m := WorldScale.metres_to_units()
@@ -12,7 +12,7 @@ static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float) -
 	var ax := Vector3(dir.x, 0, dir.y)
 	var az := Vector3(n.x, 0, n.y)
 	var h := minf(float(rows[0]["y1"]) - float(rows[0]["y0"]), 1.2 * m)
-	var stone := _base_stone("#958c86" if ArchitectureStyle._h(seed_v, 93) < 0.5 else "#928f89")
+	var stone := _base_stone("#958c86" if ArchitectureStyle._h(seed_v, 93) < 0.5 else "#928f89", calm)
 	var len := float(sp["len_m"]) * m
 	var count := maxi(1, ceili(len / (0.95 * m)))
 	for row in 3:
@@ -30,11 +30,18 @@ static var _base_mutex := Mutex.new()
 ## The granite base's stone, one shared material per tint (merged cells
 ## batch by material). Through StreetSnow: in winter its top course holds
 ## snow and the street's slush and salt climb it (ClimateModel.snow_splash).
-static func _base_stone(hex: String) -> Material:
+## `calm` is Stockholm's: the low golden sun lit every course edge white, so its stone takes the glare
+## cap (RoadSurface.STOCKHOLM_GLARE) and half the relief, and is cached apart.
+static func _base_stone(hex: String, calm: bool = false) -> Material:
+	var key := hex + ("|calm" if calm else "")
 	_base_mutex.lock()
-	if not _base_stones.has(hex):
-		_base_stones[hex] = StreetSnow.material(ReliefKit.stone("stone", Color.html(hex).srgb_to_linear()) as StandardMaterial3D, 0.3)
-	var mat: Material = _base_stones[hex]
+	if not _base_stones.has(key):
+		var src := ReliefKit.stone("stone", Color.html(hex).srgb_to_linear()) as StandardMaterial3D
+		if calm:
+			src = src.duplicate() as StandardMaterial3D
+			src.normal_scale *= 0.5
+		_base_stones[key] = StreetSnow.material(src, 0.3, RoadSurface.STOCKHOLM_GLARE if calm else Vector2(1.0, 0.0))
+	var mat: Material = _base_stones[key]
 	_base_mutex.unlock()
 	return mat
 

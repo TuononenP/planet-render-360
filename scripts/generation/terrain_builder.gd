@@ -152,6 +152,7 @@ static func _build_serial(data: LocationData, ground: GroundTruth,
 	BuildAbort.mark(abort, BuildAbort.Step.VEGETATION)
 	_adopt_flat(root, VegetationBuilder.build_vegetation(data, ground, abort))
 	_stage_ms(abort, BuildAbort.Step.VEGETATION, t)
+	StockholmGlare.apply(root, data)
 	if abort != null:
 		print("%s total=%d serial" % [abort.timings_line(), Time.get_ticks_msec() - t0])
 	return root
