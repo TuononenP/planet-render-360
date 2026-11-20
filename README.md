@@ -116,7 +116,7 @@ Release builds run from GitHub Actions on demand: **Actions → Build → Run wo
 
 - `platform`: `both`, `macos` or `ios`
 - `macos_signing`: `adhoc` (no secrets needed) or `notarized` (Developer ID signed, notarized, stapled)
-- `version`: the marketing version, e.g. `0.1.0`; the build number is the workflow run number
+- `version`: the marketing version, e.g. `1.0.0`; the build number is the workflow run number
 - `testflight`: upload the iOS build to TestFlight, or attach the `.ipa` to the run instead
 
 Android builds run from **Actions → Android → Run workflow**

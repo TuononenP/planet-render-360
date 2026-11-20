@@ -835,3 +835,39 @@ the same places before and after. Left as is.
 Frames: `visual-plan/reviews/hel-smear-before-2026-11-20/` and `hel-smear-after-2026-11-20/` (look0 = eye 60.164,24.960
 and look1 = eye 60.165,25.000, `--preset=3 --look_ahead=100`, default 1280x800): black specks before, white gulls after.
 - `hel-r8-final-2026-11-20` look10 and look11 were re-shot after the gull-normal fix (`hel-r8-air-2026-11-20`) and copied in; the dark smears on the water are gone and the gulls read as white. `sheet_city_{1,2}.jpg` were rebuilt from the final set.
+
+## Black streaks on walls (2026-11-20)
+
+`visual-plan/reviews/hel-warm-2026-11-20/helsinki_look2.jpg` (eye 60.17380,24.93800, 2 m high, bearing 0) showed jagged black
+streaks and blotches over the Oodi timber wall, and black on the lower half of the cars and the windows of the brick block
+beyond. The same eye in `hel-r8-final-2026-11-20/helsinki_look4.jpg` has them too; a run on a cached world has none.
+
+What they are: not the wall's material. With the street eye rebuilt fresh (`PR360_DISABLE_WORLD_CACHE=1`, a far look between
+so the world is built again) about 12 of 28 frames were streaked and some were wholly black (wall mean 15 of 255 against 62
+clean; `max(r,g,b) < 22` over the left 45 % of the frame, 67 k px clean, 175-275 k streaked, 495 k black). In a streaked frame
+every one of these left the black unchanged: SDFGI, SSAO, SSIL, SSR, volumetric fog, TAA, the sun's shadow, the sun itself,
+constant ambient, the sky reflection, and the wall's own material (`LandmarkShader` rain streaks, its albedo, its normal map,
+or the plain `StandardMaterial3D` the shader replaces). A flat standard material or a constant roughness hid the wall's
+streaks only because the black rides on the glossy pixels: a wall's roughness map, car paint and window glass are the smooth
+surfaces, so the pattern follows the wood grain. Hiding the 60 km view probe (`ViewReflections`), or both it and the five
+box-projected street probes, brought the wall back to a normal frame; hiding the street probes alone did not. A fresh capture
+(UPDATE_ALWAYS for three frames, then UPDATE_ONCE again) with the camera at the eye cleared every bad frame (6 of 6) and the
+result held after the mode went back to UPDATE_ONCE.
+
+Cause: `tools/capture_presets.gd` `_place_eye` moves the camera rig to a look without telling the atmosphere rig, so the
+view probe and the street probes stayed at the world's centre (100 m from the eye with `--look_ahead=100`, 30 m up) holding
+the capture made as the new world appeared. That capture is taken while the world is still arriving and is bad in about
+half the runs; whatever stands in it is what the glossy surfaces near the eye reflect. A walk, a flight and a stream swap
+call `AtmosphereRig.set_probe_origin` whenever they move the rig (`view_walk.gd`, `view_drone.gd`, `stream_swap.gd`), so the
+probes follow the eye and re-capture there; the capture tool was the one mover that did not. Why a capture made from the
+centre is bad on some runs and good on others was not isolated (nudging `intensity`, as `_process` does after the debounce,
+did not replace a bad capture either).
+
+Fix: `_place_eye` calls `view._atmos.set_probe_origin(rig.position)` after it sets the rig position
+(`tools/capture_presets.gd`). No game code changed, so no other city's look changes in play; capture frames of any `--looks`
+eye, card or thumb now have reflections taken at the eye.
+
+Check: the eye above, six fresh worlds in one run (`PR360_DISABLE_WORLD_CACHE=1`, a far look between each), near-black pixels
+(`max(r,g,b) < 22`, left 45 % of the frame): before 67 k, 496 k, 497 k, 67 k, 497 k, 67 k (three of six wholly black; this run also had a three-frame UPDATE_ALWAYS re-capture after the debounce, which changed nothing); after
+68.1 k, 68.9 k, 68.6 k, 68.1 k, 68.1 k, 68.5 k (the dark louvre band only). Frames:
+`visual-plan/reviews/stk-f1-2026-11-20/` (before) and `stk-f2-2026-11-20/` (after), `helsinki_look{0,2,4,6,8,10}.jpg`.

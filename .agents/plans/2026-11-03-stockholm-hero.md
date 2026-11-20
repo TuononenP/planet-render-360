@@ -116,10 +116,12 @@ Done 2026-11-08: `architecture_test` passes (66 regions); skyline reads as Stock
 - [x] Riddarholmen: find why it reads as green patches (land class, quay apron or missing buildings) and fix that
       generically. — Patches are gone in sto-r4 (buildings and the church spire read); the mapped paving evidence
       change fixed the shoreline class. The island bank is still pale and angular (see B-8).
-- [ ] Foreground lamellas: restore the Mariaberget cliff lip (DEM smoothing at `asl_m` sites), or step the eye to the
+- [x] Foreground lamellas: restore the Mariaberget cliff lip (DEM smoothing at `asl_m` sites), or step the eye to the
       cliff edge with `--looks`. Update the `PresetViews` row comment with the OSM check. — Open. The lamellas no
       longer dominate, but the foreground is now the mapped road and grass instead of a cliff edge. On-path trial eyes
-      (sto-r2, sto-r3) lose City Hall or leave the mapped footway. Needs a terrain/eye check; preset unchanged.
+      (sto-r2, sto-r3) lose City Hall or leave the mapped footway. Needs a terrain/eye check; preset unchanged. —
+      Closed 2026-11-20 (S-5.1, S-6): Lantmäteriet bare earth puts the eye on the cliff top, 38 m over Riddarfjärden
+      (`stockholm_cliff_test`); `visual-plan/reviews/sto-r6-2026-11-20/` shows the opening look from there.
 
 ### B-4: Water, quays, boats (needs G-4, G-6) — @codex/stockholm-waterfront 2026-11-03
 - [x] Baltic water colour from the G-4 table. — `WaterSurface.baltic` (`water_surface.gd:384`).

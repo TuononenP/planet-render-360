@@ -589,6 +589,11 @@ func _place_eye(view: View360, id: String, shot: String, l: Array) -> void:
 	var floor_y := maxf(view._ground.height_at_world(at.x, at.y), view._ground.water_level_at(at.x, at.y))
 	var y := floor_y + float(l[2]) * WorldScale.metres_to_units()
 	rig.position = Vector3(at.x, y, at.y)
+	# The reflection probes follow the eye as they do in a walk or a flight
+	# (set_probe_origin): left at the world's centre, their stale captures
+	# painted the walls and cars near the eye black or streaked, run to run
+	# (the Oodi wall).
+	view._atmos.set_probe_origin(rig.position)
 	rig.set_zoom(float(l[5]) if l.size() >= 6 else 1.0)
 	rig.set_look(-deg_to_rad(float(l[3])), deg_to_rad(float(l[4])))
 

@@ -13,7 +13,7 @@ on:
       version:
         description: Version (version/name)
         type: string
-        default: "0.1.0"
+        default: "1.0.0"
       build_type:
         description: Build type
         type: choice

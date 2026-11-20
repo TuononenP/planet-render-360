@@ -19,7 +19,7 @@ on:
       version:
         description: Version (CFBundleShortVersionString)
         type: string
-        default: "0.1.0"
+        default: "1.0.0"
       testflight:
         description: Upload the iOS build to TestFlight (off = .ipa artifact only)
         type: boolean
