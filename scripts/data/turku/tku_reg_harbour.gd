@@ -7,7 +7,7 @@ static func entries() -> Array:
 	return [
 		{"type": "suomen_joutsen", "name": "Suomen Joutsen", "lat": 60.436330, "lon": 22.237154,
 			"radius_m": 3000.0, "wiki_title": "Suomen Joutsen", "height_m": 44.0,
-			"kind": "Museum ship", "clear_m": 48.0, "yaw_deg": -33.9, "base": "water", "icon": true,
+			"kind": "Museum ship", "clear_m": 48.0, "yaw_deg": 146.1, "base": "water", "icon": true,
 			"aliases": ["suomen joutsen", "swan of finland"]},
 		{"type": "port_of_turku_terminals", "name": "Port of Turku Terminals", "lat": 60.434800, "lon": 22.221500,
 			"radius_m": 4500.0, "wiki_title": "Port of Turku", "height_m": 15.6,
