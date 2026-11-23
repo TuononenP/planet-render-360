@@ -58,7 +58,7 @@ Decoded from `assets/osm_snapshots/london_*.osmb` (base `2026-11-02`):
 | `whitehall_court` | Whitehall Court | `51.5056, -0.1243` | 42.0 m | -12.0° | OSM `relation 5485985` (Archer & Green, 1884) |
 | `trafalgar_square` | Trafalgar Square (Nelson's Column & National Gallery) | `51.5080, -0.1281` | 51.6 m | -10.0° | OSM `ways 150920358, 30734422` (Railton 1843; Wilkins 1838; Gibbs 1726) |
 | `admiralty_arch` | Admiralty Arch | `51.5068, -0.1287` | 28.0 m | -32.0° | OSM `relation 17074208` (Aston Webb, 1912) |
-| `royal_festival_hall` | Royal Festival Hall | `51.5058, -0.1167` | 28.0 m | -26.0° | OSM `way 5987419` (Robert Matthew & Leslie Martin, 1951) |
+| `royal_festival_hall` | Royal Festival Hall | `51.5058, -0.1167` | 28.0 m | 124.0° | OSM `way 5987419` (Robert Matthew & Leslie Martin, 1951) |
 | `national_theatre` | Royal National Theatre | `51.5071, -0.1142` | 35.0 m | -22.0° | OSM `relation 2023676` (Denys Lasdun, 1976) |
 | `somerset_house` | Somerset House | `51.5110, -0.1173` | 28.0 m | -22.0° | OSM `way 372841786` (William Chambers, 1796) |
 | `oxo_tower` | OXO Tower Wharf | `51.5084, -0.1085` | 67.0 m | -8.0° | OSM `ways 25298098, 1449888762` (Albert Moore, 1929) |
