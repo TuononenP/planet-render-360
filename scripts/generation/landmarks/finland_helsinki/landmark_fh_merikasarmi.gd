@@ -80,6 +80,18 @@ static func build(model: Node3D) -> void:
 	var m := u * 0.0 + n * 3.0
 	lm.beam("Soot", Vector3(m.x, EAVE + 2.0, m.y), Vector3(m.x, TOP, m.y), 0.1)
 	lm.commit(model, "Merikasarmi_")
+	var warm := Color(1.0, 0.88, 0.66)
+	var spot := func(lu: float, ln: float, ly: float, au: float, an: float, ay: float, ang: float, energy: float) -> Array:
+		var lp := u * lu + n * ln
+		var ap := u * au + n * an
+		return [Vector3(lp.x, ly, lp.y), Vector3(ap.x, ay, ap.y), ang, energy, 60.0, warm]
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		spot.call(-55.0, -38.0, 1.5, -55.0, -23.0, 9.5, 44.0, 0.95),
+		spot.call(54.0, -38.0, 1.5, 54.0, -22.0, 9.5, 44.0, 0.95),
+		spot.call(0.0, -24.0, 1.5, 0.0, -6.0, 10.0, 46.0, 0.9),
+		spot.call(-18.0, 28.0, 1.5, -18.0, 12.0, 9.0, 50.0, 0.8),
+		spot.call(18.0, 28.0, 1.5, 18.0, 12.0, 9.0, 50.0, 0.8),
+	])
 
 ## The round-headed attic windows of the long wing, either side of the
 ## giant order, on its southern (-n) face.

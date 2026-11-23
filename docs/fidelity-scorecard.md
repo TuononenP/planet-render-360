@@ -536,6 +536,11 @@ Round sto-r6, 2026-11-20 (Stockholm hero loop S-6):
 - Captures: `visual-plan/reviews/sto-r6-2026-11-20/` (golden, noon, night, 15 looks) with `sto-r6-redo-`, `sto-r6-winter-` and `sto-r6-cold-` folders beside it, Ultra. Agent pre-rating: recognisable; human gate pending.
 - The Monteliusvägen eye now stands on the cliff top (38 m over Riddarfjärden, hero-plan B-3 closed). Remaining tells: pale flat Riddarholmen and Slussen banks, a tilted paved slab and smooth grass instead of granite on the cliffs, a repeated moored-ship model, dark olive render walls, no moving water traffic. Cold-cache time to view 23 s against the 150 s target, on a machine with other Godot processes running.
 
+Rounds sto-r7…sto-r19-final, 2026-11-20 & 2026-11-23 (Stockholm hero acceptance + bridge regression fix):
+- Captures: `visual-plan/reviews/sto-r10-final-2026-11-20/`, `sto-r14-final-2026-11-20/`, `sto-r16-final-2026-11-20/`, `sto-r18-final-2026-11-20/`, and `sto-r19-final-2026-11-20/` (Ultra golden, noon, night, 7 open-space looks) plus 77-landmark reference comparison pages in `visual-plan/captures/sto_final/compare/`.
+- **Human gate (AC-18): accepted as `photographic` by the user on 2026-11-20 at `WorldCache.BUILD_VERSION = 318`** (`PLAN_Stockholm_super_realistic.md:194`). Closed across Rounds 7–12: Riddarholmen ashlar quay wall & flattened plinth, Slussen battered ashlar lock panes/gates/sills & island caps, Mariaberget switchback granite stair, six distinct Mälaren moored hull models with rigging/sails & fenders, travelling Riddarfjärden/Saltsjön route boats, twin-track Djurgårdslinjen tram with catenary, warmed Stockholm plaster palette & stone glare cap, translucent Sergels torg/Kulturhuset sky-band glass, smooth-bronze Gustav II Adolf equestrian statue, ornate Strömbron balustrades/candelabra,gaussian night street-lamp bloom, and thread-safe native `ShoreClassifier` (`std::vector<uint8_t>`).
+- Follow-up verification (2026-11-23, `BUILD_VERSION = 321`): `sto_bridge_stromsbron.gd` pier bands clamped to `y >= 0.0` and fitted mesh trimmed below 18,000 triangles (`bridge_specs_test`, `stockholm_bridges_test`, `stockholm_hero_landmarks_test`, `world_cache_test`, `screenshot_test` all PASS).
+
 Round nyc-r4, 2026-11-03 (New York hero work in progress):
 - Capture: `visual-plan/reviews/nyc-r4-2026-11-03/`, Ultra, clear summer, 08:00 local. Agent pre-rating: recognisable; human gate pending.
 - Grey-green water and the bridge read clearly, but the skyline remains simplified, nearby foliage has pale angular patches, and the promenade has repeated benches. The truncated OSM response omitted mapped furniture, so this round does not validate it. See the review README for timings and reference limitations.
@@ -796,3 +801,50 @@ PASS).
   ≤ 150 s Ultra budget; cached reopen **64–96 ms**; memory **7.4 GB** at build completion / **10.1 GB**
   active render (63.6 GB headroom on T3). All Turku headless suites and windowed `world_cache_test` /
   `screenshot_test` pass.
+
+### Helsinki round hel-r10 (2026-11-23)
+
+Frames in `visual-plan/reviews/hel-r10-2026-11-23/` (`--preset=3 --look_ahead=100`, golden hour, noon,
+night, and 12 validated open-space `--looks`) and `visual-plan/reviews/hel-r10-winter-2026-11-23/`
+(`--season=winter --weather=73`), plus day/night studio & reference comparison pages for 22 upgraded
+or newly added landmarks in `visual-plan/captures/{hel_r2_upgrades,hel_r2_night}/` (`BUILD_VERSION = 321`).
+Agent pre-rating: **recognisable** (approaching photographic on central views); **the human
+"photographic" gate (AC-18) remains open for user sign-off**.
+
+- **Upgrades since `hel-r6`:** street reflection probes hidden above 50 m AGL and re-captured at
+  each `--looks` eye (`stk-f2`), white-lit gull normals from above (`hel-smear-after`), 3 new Market
+  Square / Esplanadi landmarks (`swedish_embassy_helsinki`, `supreme_court_helsinki`, `runeberg_statue`),
+  18 rebuilt/upgraded models (`kiasma`, `bank_of_finland`, `amos_rex`, `kamppi_chapel`, `lasipalatsi`
+  24 m clock tower + Bio Rex neon, `old_market_hall_helsinki`, `market_square_helsinki`, `havis_amanda`,
+  `uspenski_cathedral`, `kappeli` + Espa Stage, `helsinki_ice_hall`, `linnanmaki`, `suomenlinna_dry_dock`,
+  `lonna_island`, `kustaanmiekka_bastions`, `hotel_kalastajatorppa`, `kallio_library`,
+  `lauttasaari_manor`), night `FLOOD_META` across 19 previously unlit landmarks, 25 verified
+  `HelsinkiNotable` central OSM buildings, `"helsinki"` in `FAR_DISTRICT_CITIES`, and 16 regional/inner
+  landmark Commons CC/PD reference sets populated/topped up.
+- **Biggest remaining tell:** procedural window grids on uncurated background blocks outside the
+  25 `HelsinkiNotable` facades and bright winter snow/paving contrast on broad open squares; human
+  photographic gate (AC-18) pending user review.
+
+### Turku round tku-r4 & tku-perf-final (2026-11-23)
+
+Frames in `visual-plan/reviews/tku-r4-2026-11-23/` (`--preset=3`, golden hour, noon, night, and all
+13 open-space `--looks` matching `visual-plan/refs/turku/`) and
+`visual-plan/reviews/tku-r4-winter-2026-11-23/` (`--season=winter --weather=73`), studio & 14-page
+compare sheets for all 79 Turku landmarks in `visual-plan/captures/{tku_t3_complete,tku_t3_night}/`,
+and multi-preset performance baseline in `visual-plan/reviews/tku-perf-final-2026-11-23/`
+(`BUILD_VERSION = 321`). Agent pre-rating: **recognisable**; **the human "photographic" gate (AC-18)
+remains open for user sign-off**.
+
+- **Upgrades since `tku-r3`:** `meyer_gantry_cranes` (twin 105 m & 97.5 m Perno Goliath cranes on
+  Turku's western skyline, 79 bespoke landmarks total), `Auransilta` / `Kirjastosilta` / `Teatterisilta`
+  fitted to `BridgeSpec` + `BridgeCamber.apply` with `y >= 0.0` footings and Array-typed `FLOOD_META`
+  (plus `FtKakolaFunicular`), `"turku"` in `FAR_DISTRICT_CITIES` for 12 km horizon district continuity,
+  and 44 newly populated Wikimedia Commons CC/PD landmark reference sets (`78/79` documented sets on
+  disk; `chappe_art_house` lacks a free-licensed exterior photo under Finnish FOP).
+- **Remaining tells:** near-foreground riverside linden trunks in `turku_look5`–`look7` along the
+  narrow Aurajoki promenade; human photographic gate (AC-18) pending user sign-off.
+- **Performance (`tools/perf_baseline.gd`, 20 s fly, isolated empty cache per preset):**
+  - **Fast (`p0`):** cold **19.7 s** (≤ 20 s budget), cached **7.3 s**, save **0.13 s**, fly p95 **9.0 ms** / max **145.4 ms**, 1,853 mesh nodes, peak **2,037 MB**.
+  - **High (`p2`):** cold **23.8 s** (≤ 45–75 s budget), cached **7.3 s**, save **0.15 s**, fly p95 **9.2 ms** / max **129.6 ms**, 2,511 mesh nodes, peak **3,265 MB**.
+  - **Ultra (`p3`):** cold **23.6 s** (≤ 150 s cap), cached **7.2 s** (≤ 8 s budget), save **0.20 s**, fly p95 **15.9 ms** / max **186.3 ms**, 3,717 mesh nodes, peak **5,395 MB**.
+  All headless Nordic suites and windowed `world_cache_test` / `screenshot_test` pass.

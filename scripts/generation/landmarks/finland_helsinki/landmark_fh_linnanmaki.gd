@@ -47,6 +47,7 @@ static func build(model: Node3D) -> void:
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#A9A59D", 3.0))
 	lm.use("Blue", LandmarkMaterials.paint("#2F7FE0", 0.4, 0.5))
 	lm.use("Black", LandmarkMaterials.paint("#22262A", 0.5, 0.6))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE09A", 1.2))
 	_coaster(lm)
 	_taiga(lm)
 	_wheel(lm)
@@ -55,22 +56,36 @@ static func build(model: Node3D) -> void:
 	lm.poly_prism("Concrete", I.circle(k, 3.0), 0.0, 0.6)
 	lm.frustum("Steel", Vector3(k.x, 0.6, k.y), 1.9, 1.6, LINNANMAKI_M - 3.6, 16)
 	lm.frustum("Red", Vector3(k.x, LINNANMAKI_M - 3.0, k.y), 2.4, 2.4, 3.0, 16)
+	lm.frustum("Lamp", Vector3(k.x, LINNANMAKI_M - 3.4, k.y), 2.5, 2.5, 0.4, 16)
 	lm.frustum("Red", Vector3(k.x, 1.4, k.y), 4.0, 4.0, 1.6, 20)
+	lm.frustum("Lamp", Vector3(k.x, 2.9, k.y), 4.1, 4.1, 0.25, 20)
 	# Raketti: a slim tower under a rocket's nose cone.
 	var r := I.RAKETTI
 	lm.poly_prism("Concrete", I.circle(r, 2.6), 0.0, 0.6)
 	lm.frustum("Steel", Vector3(r.x, 0.6, r.y), 1.6, 1.4, 53.4, 14)
 	lm.frustum("Red", Vector3(r.x, 54.0, r.y), 2.2, 0.0, 6.0, 14)
+	lm.frustum("Lamp", Vector3(r.x, 53.6, r.y), 2.1, 2.1, 0.4, 14)
 	lm.frustum("Red", Vector3(r.x, 1.4, r.y), 3.4, 3.4, 1.4, 18)
+	lm.frustum("Lamp", Vector3(r.x, 2.75, r.y), 3.45, 3.45, 0.22, 18)
 	# Panoraama: the observation gondola ring on its column.
 	var p := I.PANORAAMA
 	lm.poly_prism("Concrete", I.circle(p, 2.4), 0.0, 0.6)
 	lm.frustum("Steel", Vector3(p.x, 0.6, p.y), 1.4, 1.2, 49.4, 14)
 	lm.frustum("Steel", Vector3(p.x, 50.0, p.y), 1.8, 1.8, 3.0, 14)
+	lm.frustum("Lamp", Vector3(p.x, 52.8, p.y), 1.95, 1.95, 0.35, 14)
 	lm.frustum("Red", Vector3(p.x, 18.0, p.y), 5.0, 5.0, 0.6, 24)
 	lm.frustum("Glass", Vector3(p.x, 18.6, p.y), 4.9, 4.9, 2.0, 24)
+	lm.frustum("Lamp", Vector3(p.x, 20.35, p.y), 4.95, 4.95, 0.25, 24)
 	lm.frustum("Red", Vector3(p.x, 20.6, p.y), 5.0, 5.0, 0.5, 24)
 	lm.commit(model, "Linnanmaki_")
+	var warm := Color(1.0, 0.86, 0.64)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 2.0, -76.0), Vector3(-12.0, 18.0, -40.0), 48.0, 0.9, 75.0, warm],
+		[Vector3(46.0, 2.0, 20.0), Vector3(16.0, 14.0, 12.0), 50.0, 0.85, 70.0, warm],
+		[Vector3(-120.0, 2.0, 8.0), Vector3(-120.0, 32.0, 28.0), 44.0, 1.0, 85.0, Color(0.84, 0.92, 1.0)],
+		[Vector3(-134.4, 2.0, 108.0), Vector3(-134.4, 18.0, 80.3), 46.0, 0.9, 65.0, warm],
+		[Vector3(-30.0, 2.0, 96.0), Vector3(-5.4, 48.0, 90.2), 26.0, 0.9, 95.0, warm],
+	])
 
 ## Bents of timber posts every few metres along the centreline, X-braced
 ## side walls up to the track, cross ties, and two track decks on top.
@@ -107,6 +122,9 @@ static func _coaster(lm: LandmarkMesh) -> void:
 				var a := prev_l.lerp(prev_r, 0.5 + k) + Vector3.UP * (prev_h + 0.3)
 				var b := l.lerp(r, 0.5 + k) + Vector3.UP * (h + 0.3)
 				lm.beam("Timber", a, b, 2.0, 0.35)
+			if s % 3 == 0 and h > 10.0:
+				lm.box("Lamp", l + Vector3(0, h + 0.65, 0), Vector3(0.32, 0.32, 0.32), Basis(), 0.0)
+				lm.box("Lamp", r + Vector3(0, h + 0.65, 0), Vector3(0.32, 0.32, 0.32), Basis(), 0.0)
 		prev_l = l
 		prev_r = r
 		prev_h = h
@@ -133,11 +151,13 @@ static func _coaster_height(t: float) -> float:
 			return lerpf(float(a[1]), float(b[1]), k)
 	return float(COASTER_PROFILE[-1][1])
 
-## Taiga: a closed blue track through waypoints (x, z, rail height) with
-## black tubular supports every few metres and a white lift chain stretch.
-const TAIGA := [Vector3(-165.0, 30.0, 4.0), Vector3(-148.0, 28.0, 5.0), Vector3(-126.0, 27.0, 16.0),
-	Vector3(-108.0, 29.0, 29.0), Vector3(-97.0, 38.0, 20.0), Vector3(-97.0, 50.0, 8.0), Vector3(-110.0, 59.0, 12.0),
-	Vector3(-128.0, 64.0, 21.0), Vector3(-150.0, 60.0, 14.0), Vector3(-166.0, 50.0, 7.0), Vector3(-171.0, 38.0, 4.0)]
+## Taiga: Intamin Blitz launch coaster with launch straight, 52 m top-hat,
+## airtime hills, second launch and A-frame tubular supports.
+const TAIGA := [
+	Vector3(-170.0, 32.0, 4.5), Vector3(-148.0, 26.0, 5.5), Vector3(-130.0, 23.0, 22.0),
+	Vector3(-118.0, 26.0, 52.0), Vector3(-106.0, 32.0, 28.0), Vector3(-96.0, 44.0, 12.0),
+	Vector3(-104.0, 58.0, 34.0), Vector3(-124.0, 64.0, 16.0), Vector3(-146.0, 62.0, 24.0),
+	Vector3(-164.0, 52.0, 11.0), Vector3(-172.0, 40.0, 4.5)]
 
 static func _spline(pts: Array, t: float) -> Vector3:
 	var n := pts.size()
@@ -152,28 +172,38 @@ static func _spline(pts: Array, t: float) -> Vector3:
 		+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u * u * u)
 
 static func _taiga(lm: LandmarkMesh) -> void:
-	var steps := 220
+	var steps := 240
 	var prev: Vector3 = _spline(TAIGA, 0.0)
 	var prev_side := Vector3.ZERO
 	for k in range(1, steps + 1):
 		var cur: Vector3 = _spline(TAIGA, float(k) / float(steps))
 		var dir := (cur - prev)
-		var side := Vector3(dir.z, 0.0, -dir.x).normalized() * 0.75
+		var horiz := Vector3(dir.z, 0.0, -dir.x)
+		var side := (horiz.normalized() if horiz.length() > 0.01 else Vector3.RIGHT) * 0.72
 		if k == 1:
 			prev_side = side
-		var a_l := Vector3(prev.x, prev.y, prev.z) + prev_side
-		var a_r := Vector3(prev.x, prev.y, prev.z) - prev_side
-		var b_l := Vector3(cur.x, cur.y, cur.z) + side
-		var b_r := Vector3(cur.x, cur.y, cur.z) - side
-		lm.beam("Blue", a_l, b_l, 0.28)
-		lm.beam("Blue", a_r, b_r, 0.28)
-		lm.beam("Blue", Vector3(prev.x, prev.y - 0.5, prev.z), Vector3(cur.x, cur.y - 0.5, cur.z), 0.35)
-		if k % 3 == 0:
-			lm.beam("Blue", Vector3(cur.x, cur.y, cur.z) + side, Vector3(cur.x, cur.y - 0.5, cur.z), 0.18)
-			lm.beam("Blue", Vector3(cur.x, cur.y, cur.z) - side, Vector3(cur.x, cur.y - 0.5, cur.z), 0.18)
-		if k % 16 == 0 and cur.y > 6.0:
-			lm.beam("Black", Vector3(cur.x, 0.2, cur.z), Vector3(cur.x, cur.y - 0.6, cur.z), 0.45)
-			lm.beam("Black", Vector3(cur.x + 2.0, 0.2, cur.z + 1.5), Vector3(cur.x, cur.y - 0.6, cur.z), 0.3)
+		var a_l := prev + prev_side
+		var a_r := prev - prev_side
+		var b_l := cur + side
+		var b_r := cur - side
+		lm.beam("Blue", a_l, b_l, 0.24)
+		lm.beam("Blue", a_r, b_r, 0.24)
+		lm.beam("Blue", prev - Vector3(0, 0.65, 0), cur - Vector3(0, 0.65, 0), 0.42)
+		if k % 2 == 0:
+			lm.beam("Blue", cur + side, cur - Vector3(0, 0.65, 0), 0.16)
+			lm.beam("Blue", cur - side, cur - Vector3(0, 0.65, 0), 0.16)
+		# Tubular A-frame supports anchored to concrete footings.
+		if k % 12 == 0 and cur.y > 5.5:
+			var collar := cur - Vector3(0, 0.85, 0)
+			var spread := side.normalized() * (2.2 + cur.y * 0.13)
+			var f_l := Vector3(collar.x + spread.x, 0.2, collar.z + spread.z)
+			var f_r := Vector3(collar.x - spread.x, 0.2, collar.z - spread.z)
+			lm.beam("Black", f_l, collar, 0.44)
+			lm.beam("Black", f_r, collar, 0.44)
+			lm.box("Concrete", Vector3(f_l.x, 0.25, f_l.z), Vector3(1.1, 0.5, 1.1))
+			lm.box("Concrete", Vector3(f_r.x, 0.25, f_r.z), Vector3(1.1, 0.5, 1.1))
+			if cur.y > 16.0:
+				lm.beam("Black", f_l.lerp(collar, 0.55), f_r.lerp(collar, 0.55), 0.28)
 		prev = cur
 		prev_side = side
 
@@ -192,9 +222,12 @@ static func _wheel(lm: LandmarkMesh) -> void:
 		if k % 2 == 0:
 			for z in [-1.2, 1.2]:
 				lm.beam("Steel", c + Vector3(0, 0, z), p0 + Vector3(0, 0, z), 0.12)
+				lm.box("Lamp", p0 + Vector3(0, 0, z * 1.15), Vector3(0.4, 0.4, 0.25), Basis(), 0.0)
 			var g := c + Vector3(cos(a0) * (r + 0.4), sin(a0) * (r + 0.4) - 1.0, 0.0)
 			lm.box("Red", g, Vector3(1.8, 1.2, 1.6))
 	lm.box("Steel", c, Vector3(1.6, 1.6, 3.2))
+	for z in [-1.7, 1.7]:
+		lm.disc("Lamp", c + Vector3(0, 0, z), Vector3(0, 0, signf(z)), 1.4, 12)
 	for sx in [-1.0, 1.0]:
 		lm.beam("Black", Vector3(c.x + sx * 6.0, 0.2, c.z - 2.4), c, 0.5)
 		lm.beam("Black", Vector3(c.x + sx * 6.0, 0.2, c.z + 2.4), c, 0.5)

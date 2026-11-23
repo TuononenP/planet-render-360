@@ -67,4 +67,43 @@ static func build(model: Node3D) -> void:
 			lm.poly_prism("Wall", inner, 13.8, TOP_M)
 	# The dark brick stair and flue tower at the north end of the west wing.
 	lm.box("Chimney", Vector3(-95.0, 8.4, -25.0), Vector3(4.0, 16.8, 4.0))
+	_rotunda(lm)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.70)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-24.0, 1.5, 24.0), Vector3(-13.0, 5.5, 10.0), 48.0, 0.95, 45.0, warm],
+		[Vector3(-90.0, 1.5, 42.0), Vector3(-84.0, 7.5, 14.0), 50.0, 0.85, 60.0, warm],
+		[Vector3(-56.0, 1.5, -24.0), Vector3(-76.0, 7.5, -24.0), 50.0, 0.85, 60.0, warm],
+		[Vector3(44.0, 1.5, 20.0), Vector3(22.0, 7.5, 20.0), 50.0, 0.85, 60.0, warm],
+		[Vector3(14.0, 1.5, -76.0), Vector3(0.0, 7.5, -56.0), 50.0, 0.8, 60.0, warm],
+	])
+
+## Jarl Eklund's 1936 white functionalist Kalastajatorppa restaurant rotunda
+## ("Pyöreä sali") nestled seaward of the EAST wing inside [-2.0, 4.0] clearance.
+static func _rotunda(lm: LandmarkMesh) -> void:
+	var c := Vector2(-13.0, 10.0)
+	var r := 9.8
+	var seg := 24
+	# Connecting white functionalist neck joining the EAST wing.
+	lm.box("Wall", Vector3(-11.0, 4.4, 4.5), Vector3(11.0, 8.8, 9.0), Basis(Vector3.UP, -0.45))
+	lm.box("Roof", Vector3(-11.0, 8.9, 4.5), Vector3(10.6, 0.2, 8.6), Basis(Vector3.UP, -0.45))
+	# Two-storey cylindrical restaurant drum with continuous panoramic glazing.
+	var base := Vector3(c.x, 0.0, c.y)
+	lm.frustum("Slab", base, r + 0.3, r + 0.3, 0.6, seg)
+	lm.frustum("Wall", base + Vector3(0, 0.6, 0), r, r, 1.0, seg)
+	lm.frustum("Glass", base + Vector3(0, 1.6, 0), r - 0.1, r - 0.1, 2.7, seg)
+	lm.frustum("Lamp", base + Vector3(0, 1.8, 0), r - 0.18, r - 0.18, 2.2, seg)
+	lm.frustum("Slab", base + Vector3(0, 4.3, 0), r + 0.55, r + 0.55, 0.45, seg)
+	lm.frustum("Wall", base + Vector3(0, 4.75, 0), r, r, 0.85, seg)
+	lm.frustum("Glass", base + Vector3(0, 5.6, 0), r - 0.1, r - 0.1, 2.5, seg)
+	lm.frustum("Lamp", base + Vector3(0, 5.8, 0), r - 0.18, r - 0.18, 2.0, seg)
+	lm.frustum("Slab", base + Vector3(0, 8.1, 0), r + 0.8, r + 0.8, 0.5, seg)
+	lm.frustum("Roof", base + Vector3(0, 8.6, 0), r - 0.2, r - 0.2, 0.25, seg)
+	# Vertical white mullions around the rotunda glazing and rooftop clerestory.
+	for k in seg:
+		var a := TAU * float(k) / float(seg)
+		var d := Vector3(cos(a), 0, sin(a))
+		lm.box("Wall", base + d * (r + 0.02) + Vector3(0, 4.8, 0), Vector3(0.18, 6.8, 0.18), Basis(Vector3.UP, -a), 0.0)
+	lm.frustum("Wall", base + Vector3(0, 8.85, 0), r * 0.52, r * 0.52, 1.35, 18)
+	lm.frustum("Glass", base + Vector3(0, 9.1, 0), r * 0.53, r * 0.53, 0.8, 18)
+	lm.frustum("Roof", base + Vector3(0, 10.2, 0), r * 0.55, r * 0.55, 0.2, 18)

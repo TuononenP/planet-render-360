@@ -146,7 +146,7 @@ static func _build_funicular_cabin(lm: LandmarkMesh) -> void:
 
 static func _set_night_floods(model: Node3D) -> void:
 	model.set_meta(LandmarkLights.FLOOD_META, [
-		{"at": Vector3(-RUN_HALF - 2.6, 3.2, 0.0), "range": 18.0, "energy": 2.2, "colour": Color("#FFE8BE")},
-		{"at": Vector3(CABIN_X, _track_y(CABIN_X) + 3.0, 0.0), "range": 16.0, "energy": 2.0, "colour": Color("#FFE8BE")},
-		{"at": Vector3(RUN_HALF + 2.8, RISE_M + 3.5, 0.0), "range": 18.0, "energy": 2.2, "colour": Color("#FFE8BE")},
+		[Vector3(-RUN_HALF - 2.6, 5.5, 6.0), Vector3(-RUN_HALF - 2.6, 1.5, 0.0), 60.0, 0.8, 18.0, Color("#FFE8BE")],
+		[Vector3(CABIN_X, _track_y(CABIN_X) + 5.5, -6.0), Vector3(CABIN_X, _track_y(CABIN_X) + 1.5, 0.0), 58.0, 0.75, 16.0, Color("#FFE8BE")],
+		[Vector3(RUN_HALF + 2.8, RISE_M + 6.0, 6.0), Vector3(RUN_HALF + 2.8, RISE_M + 1.5, 0.0), 60.0, 0.8, 18.0, Color("#FFE8BE")],
 	])

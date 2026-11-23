@@ -491,19 +491,19 @@ static func rows() -> Array:
 				"mid 60.452268,22.274896)"},
 		{"id": "br_turku_kirjastosilta", "cc": "FI", "name": "Kirjastosilta", "wiki": "Kirjastosilta",
 			"aliases": ["library bridge turku", "biblioteksbron"], "lat": 60.449458, "lon": 22.272091,
-			"bearing": 123.2, "st": "arch_deck", "spans": [56.0], "width": 5.0, "clear": 4.0, "rise": 3.5,
+			"bearing": 123.2, "st": "arch_deck", "spans": [59.8], "width": 5.0, "clear": 4.0, "rise": 3.5, "orn": 3.8,
 			"material": "steel", "base": "water", "tier": 2, "conf": 2,
 			"src": "fi Wikipedia (Kirjastosilta, 2013 white steel pedestrian bridge over Aurajoki, single ~56 m span, " +
 				"5 m wide), OSM way 103351226 (59.8 m, width 5 m, bearing 303.2, mid 60.449458,22.272091)"},
 		{"id": "br_turku_auransilta", "cc": "FI", "name": "Auransilta", "wiki": "Auransilta",
 			"aliases": ["aurasilta", "aura bridge", "aurabron"], "lat": 60.448548, "lon": 22.269742,
-			"bearing": 144.5, "st": "arch_deck", "spans": [45.0], "width": 17.5, "clear": 4.5, "rise": 4.2,
+			"bearing": 144.5, "st": "arch_deck", "spans": [45.2], "width": 17.5, "clear": 4.5, "rise": 4.2, "orn": 6.1,
 			"material": "stone", "base": "water", "tier": 2, "conf": 2,
 			"src": "fi Wikipedia (Auransilta, 1907 single-span steel/granite arch bridge across Aurajoki, ~45 m span, " +
 				"17.5 m wide), OSM ways 90088650/90088646/90088671 (45.2 m, bearing 144.5, mid 60.448548,22.269742)"},
 		{"id": "br_turku_teatterisilta", "cc": "FI", "name": "Teatterisilta", "wiki": "Teatterisilta",
 			"aliases": ["theatre bridge turku", "teaterbron"], "lat": 60.447032, "lon": 22.264301,
-			"bearing": 150.7, "st": "girder", "spans": [65.0], "width": 6.0, "clear": 4.5,
+			"bearing": 150.7, "st": "girder", "spans": [66.2], "width": 6.4, "clear": 4.5, "orn": 9.3,
 			"material": "steel", "base": "water", "tier": 2, "conf": 2,
 			"src": "fi Wikipedia (Teatterisilta, 1997 single-span steel pedestrian bridge by Turku City Theatre, ~65 m), " +
 				"OSM way 105064411 (66.3 m, bearing 330.7, mid 60.447032,22.264301)"},

@@ -21,7 +21,7 @@ static func entries() -> Array:
 			"yaw_deg": 15.0, "kind": "Science centre", "aliases": ["heureka science centre", "tiedekeskus heureka",
 				"heureka vantaa", "finnish science centre heureka"]},
 		{"type": "lasipalatsi", "name": "Lasipalatsi", "lat": 60.170231, "lon": 24.936695,
-			"radius_m": 5000.0, "wiki_title": "Lasipalatsi", "height_m": 12.8, "clear_m": 20.0,
+			"radius_m": 5000.0, "wiki_title": "Lasipalatsi", "height_m": 24.0, "clear_m": 20.0,
 			"clear_rect_m": [-6.0, -3.0, 58.0, 62.0], "kind": "Commercial building",
 			"aliases": ["lasipalatsi", "glass palace", "glaspalatset"]},
 		{"type": "suomenlinna_fortress", "name": "Suomenlinna Fortress", "lat": 60.14786, "lon": 24.98637,

@@ -111,6 +111,9 @@ const MODELS: Array = [
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_klippan.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_uunisaari.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_kustaanmiekka.gd"),
+	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_swedish_embassy.gd"),
+	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_supreme_court.gd"),
+	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_runeberg_statue.gd"),
 	# @models-end
 ]
 

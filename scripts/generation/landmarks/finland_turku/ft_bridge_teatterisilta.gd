@@ -18,20 +18,26 @@ extends RefCounted
 
 const SPAN_HALF := 33.1
 const HALF_W := 3.2
-const END_Y := 4.25
-const CAMBER := 0.70
-const MAST_H := 8.85
-const FOOT_Y := -2.5
+const DECK_Y := 4.5
+const MAST_H := 9.3
+const FOOT_Y := 0.0
 
-static func build(model: Node3D) -> void:
+static func build(model: Node3D, row: Dictionary = {}) -> void:
+	if row.is_empty():
+		row = BridgeSpecs.row_for("br_turku_teatterisilta")
+	var h := BridgeParam.half_length(row)
+	var half_w := float(row.get("width", HALF_W * 2.0)) * 0.5
+	var c := float(row.get("clear", DECK_Y))
+	var orn := float(row.get("orn", MAST_H))
 	var lm := LandmarkMesh.new()
 	_materials(lm)
-	_build_abutments(lm)
-	_build_girder_and_wood_deck(lm)
-	_build_railings_and_benches(lm)
-	_build_lighting_masts(lm)
+	_build_abutments(lm, h, c, half_w)
+	_build_girder_and_wood_deck(lm, h, c, half_w)
+	_build_railings_and_benches(lm, h, c, half_w)
+	_build_lighting_masts(lm, c, half_w, orn)
+	BridgeCamber.apply(lm, h, c, float(row.get("camber", 0.0)), float(row.get("tilt", 0.0)))
 	lm.commit(model)
-	_set_night_floods(model)
+	_set_night_floods(model, c)
 
 static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Steel", LandmarkMaterials.paint("#F1F1EC", 0.38, 0.24))
@@ -41,89 +47,81 @@ static func _materials(lm: LandmarkMesh) -> void:
 	lm.use("Bench", LandmarkMaterials.pbr("wood", "#7C5A3B", 1.8, 0.74))
 	lm.use("Lamp", LandmarkMaterials.lit("#FFEBC2", 2.2))
 
-static func _deck_y(x: float) -> float:
-	var u := clampf(x / SPAN_HALF, -1.0, 1.0)
-	return END_Y + CAMBER * (1.0 - u * u)
-
-static func _build_abutments(lm: LandmarkMesh) -> void:
+static func _build_abutments(lm: LandmarkMesh, h: float, c: float, half_w: float) -> void:
+	var ab_h := maxf(c - 0.15 - FOOT_Y, 0.2)
+	var seat_h := minf(1.20, maxf(c - 0.35, 0.2))
 	for sx: float in [-1.0, 1.0]:
-		var ax := sx * (SPAN_HALF - 1.5)
-		lm.box("Concrete", Vector3(ax, (FOOT_Y + END_Y - 0.15) * 0.5, 0.0),
-			Vector3(3.4, END_Y - 0.15 - FOOT_Y, HALF_W * 2.0 + 1.6))
-		lm.box("Steel", Vector3(ax - sx * 0.9, END_Y - 0.75, 0.0),
-			Vector3(2.2, 1.20, HALF_W * 2.0 - 0.8))
+		var ax := sx * (h - 1.5)
+		lm.box("Concrete", Vector3(ax, FOOT_Y + ab_h * 0.5, 0.0),
+			Vector3(3.4, ab_h, half_w * 2.0 + 1.6), Basis(), 0.0)
+		lm.box("Steel", Vector3(ax - sx * 0.9, c - 0.15 - seat_h * 0.5, 0.0),
+			Vector3(2.2, seat_h, half_w * 2.0 - 0.8), Basis(), 0.0)
 
-static func _build_girder_and_wood_deck(lm: LandmarkMesh) -> void:
-	var segs := 28
+static func _build_girder_and_wood_deck(lm: LandmarkMesh, h: float, c: float, half_w: float) -> void:
+	var segs := 16
+	var max_haunch := minf(1.55, maxf(c * 0.65, 0.5))
+	var min_haunch := minf(0.75, max_haunch * 0.5)
 	for i in segs:
-		var x0 := lerpf(-SPAN_HALF, SPAN_HALF, float(i) / float(segs))
-		var x1 := lerpf(-SPAN_HALF, SPAN_HALF, float(i + 1) / float(segs))
+		var x0 := lerpf(-h, h, float(i) / float(segs))
+		var x1 := lerpf(-h, h, float(i + 1) / float(segs))
 		var xm := (x0 + x1) * 0.5
-		var y0 := _deck_y(x0)
-		var y1 := _deck_y(x1)
-		var ym := (y0 + y1) * 0.5
-		var l := Vector2(x1 - x0, y1 - y0).length() + 0.06
-		var rot := Basis(Vector3.BACK, atan2(y1 - y0, x1 - x0))
+		var l := (x1 - x0) + 0.04
 		# Warm wood-plank pedestrian plaza deck.
-		lm.box("Timber", Vector3(xm, ym - 0.06, 0.0), Vector3(l, 0.14, HALF_W * 2.0 - 0.30), rot)
+		lm.box("Timber", Vector3(xm, c - 0.06, 0.0), Vector3(l, 0.14, half_w * 2.0 - 0.30), Basis(), 0.0)
 		# Haunched white steel box girder below deck.
-		var haunch := lerpf(0.75, 1.55, pow(absf(xm) / SPAN_HALF, 2.0))
-		lm.box("Steel", Vector3(xm, ym - 0.14 - haunch * 0.5, 0.0), Vector3(l, haunch, HALF_W * 2.0 - 1.1), rot)
+		var haunch := lerpf(min_haunch, max_haunch, pow(absf(xm) / h, 2.0))
+		lm.box("Steel", Vector3(xm, c - 0.14 - haunch * 0.5, 0.0), Vector3(l, haunch, half_w * 2.0 - 1.1), Basis(), 0.0)
 		# White steel fascia edges.
 		for sz: float in [-1.0, 1.0]:
-			lm.box("Steel", Vector3(xm, ym - 0.18, sz * (HALF_W - 0.12)), Vector3(l, 0.40, 0.24), rot)
+			lm.box("Steel", Vector3(xm, c - 0.18, sz * (half_w - 0.12)), Vector3(l, 0.40, 0.24), Basis(), 0.0)
 
-static func _build_railings_and_benches(lm: LandmarkMesh) -> void:
-	var segs := 24
+static func _build_railings_and_benches(lm: LandmarkMesh, h: float, c: float, half_w: float) -> void:
+	var segs := 16
 	for sz: float in [-1.0, 1.0]:
-		var zr := sz * (HALF_W - 0.12)
+		var zr := sz * (half_w - 0.12)
 		for i in segs:
-			var x0 := lerpf(-SPAN_HALF + 0.4, SPAN_HALF - 0.4, float(i) / float(segs))
-			var x1 := lerpf(-SPAN_HALF + 0.4, SPAN_HALF - 0.4, float(i + 1) / float(segs))
-			var y0 := _deck_y(x0)
-			var y1 := _deck_y(x1)
-			lm.beam("Steel", Vector3(x0, y0 + 1.12, zr), Vector3(x1, y1 + 1.12, zr), 0.08, 0.08)
-			lm.beam("Steel", Vector3(x0, y0 + 0.58, zr), Vector3(x1, y1 + 0.58, zr), 0.05, 0.05)
-			lm.beam("Steel", Vector3(x0, y0 + 0.26, zr), Vector3(x1, y1 + 0.26, zr), 0.05, 0.05)
-			lm.beam("Steel", Vector3(x0, y0, zr), Vector3(x0, y0 + 1.12, zr), 0.065, 0.065)
+			var x0 := lerpf(-h + 0.4, h - 0.4, float(i) / float(segs))
+			var x1 := lerpf(-h + 0.4, h - 0.4, float(i + 1) / float(segs))
+			lm.beam("Steel", Vector3(x0, c + 1.12, zr), Vector3(x1, c + 1.12, zr), 0.08, 0.08)
+			lm.beam("Steel", Vector3(x0, c + 0.58, zr), Vector3(x1, c + 0.58, zr), 0.05, 0.05)
+			lm.beam("Steel", Vector3(x0, c + 0.26, zr), Vector3(x1, c + 0.26, zr), 0.05, 0.05)
+			lm.beam("Steel", Vector3(x0, c, zr), Vector3(x0, c + 1.12, zr), 0.065, 0.065)
 		# Wooden pedestrian benches along the mid-span plaza section.
 		for bx: float in [-10.0, 0.0, 10.0]:
-			var by := _deck_y(bx)
-			var bz := sz * (HALF_W - 0.68)
-			lm.box("Bench", Vector3(bx, by + 0.46, bz), Vector3(3.2, 0.08, 0.52))
-			lm.box("Bench", Vector3(bx, by + 0.78, bz + sz * 0.22), Vector3(3.2, 0.34, 0.08))
+			var bz := sz * (half_w - 0.68)
+			lm.box("Bench", Vector3(bx, c + 0.46, bz), Vector3(3.2, 0.08, 0.52), Basis(), 0.0)
+			lm.box("Bench", Vector3(bx, c + 0.78, bz + sz * 0.22), Vector3(3.2, 0.34, 0.08), Basis(), 0.0)
 			for lx: float in [-1.2, 0.0, 1.2]:
-				lm.box("Dark", Vector3(bx + lx, by + 0.23, bz), Vector3(0.08, 0.46, 0.44))
+				lm.box("Dark", Vector3(bx + lx, c + 0.23, bz), Vector3(0.08, 0.46, 0.44), Basis(), 0.0)
 
-static func _build_lighting_masts(lm: LandmarkMesh) -> void:
+static func _build_lighting_masts(lm: LandmarkMesh, c: float, half_w: float, orn: float) -> void:
 	# Three pairs of tall tapered white architectural lighting masts with stays
-	# and twin warm luminaire heads (top y = 4.95 + 8.85 = 13.80 m at mid-span).
+	# and twin warm luminaire heads (top y = c + orn at mid-span).
 	var mast_prof := PackedVector2Array([
-		Vector2(0.18, 0.0), Vector2(0.14, 3.0), Vector2(0.09, MAST_H - 0.3), Vector2(0.05, MAST_H)
+		Vector2(0.18, -0.25), Vector2(0.14, 2.75), Vector2(0.09, orn - 0.3), Vector2(0.05, orn)
 	])
 	for mx: float in [-18.0, 0.0, 18.0]:
-		var dy := _deck_y(mx)
-		var top_y := dy + MAST_H
+		var top_y := c + orn
 		for sz: float in [-1.0, 1.0]:
-			var zm := sz * (HALF_W + 0.08)
-			lm.lathe("Steel", Vector3(mx, dy - 0.25, zm), mast_prof, 8)
+			var zm := sz * (half_w + 0.08)
+			lm.lathe("Steel", Vector3(mx, c, zm), mast_prof, 8)
 			# Subtle outrigger luminaire arm pointing inward over the wood deck.
 			var arm_end := Vector3(mx, top_y - 0.45, zm - sz * 1.15)
 			lm.beam("Steel", Vector3(mx, top_y - 0.75, zm), arm_end, 0.06, 0.06)
-			lm.box("Dark", arm_end + Vector3(0.0, 0.06, 0.0), Vector3(0.55, 0.12, 0.32))
-			lm.box("Lamp", arm_end + Vector3(0.0, -0.02, 0.0), Vector3(0.46, 0.08, 0.24))
+			lm.box("Dark", arm_end + Vector3(0.0, 0.06, 0.0), Vector3(0.55, 0.12, 0.32), Basis(), 0.0)
+			lm.box("Lamp", arm_end + Vector3(0.0, -0.02, 0.0), Vector3(0.46, 0.08, 0.24), Basis(), 0.0)
 			# Tension stay rods bracing each mast longitudinally along the bridge.
 			for dx: float in [-5.5, 5.5]:
 				var ax := mx + dx
 				lm.beam("Dark", Vector3(mx, top_y - 1.4, zm),
-					Vector3(ax, _deck_y(ax) + 0.15, zm), 0.035, 0.035)
+					Vector3(ax, c + 0.15, zm), 0.035, 0.035)
 		# Slim overhead tie cable linking each mast pair across the deck.
-		lm.beam("Dark", Vector3(mx, top_y - 0.9, -HALF_W - 0.08),
-			Vector3(mx, top_y - 0.9, HALF_W + 0.08), 0.03, 0.03)
+		lm.beam("Dark", Vector3(mx, top_y - 0.9, -half_w - 0.08),
+			Vector3(mx, top_y - 0.9, half_w + 0.08), 0.03, 0.03)
 
-static func _set_night_floods(model: Node3D) -> void:
+static func _set_night_floods(model: Node3D, c: float) -> void:
 	model.set_meta(LandmarkLights.FLOOD_META, [
-		{"at": Vector3(-18.0, 12.2, 0.0), "range": 26.0, "energy": 2.4, "colour": Color("#FFE8BE")},
-		{"at": Vector3(0.0, 12.8, 0.0), "range": 28.0, "energy": 2.6, "colour": Color("#FFE8BE")},
-		{"at": Vector3(18.0, 12.2, 0.0), "range": 26.0, "energy": 2.4, "colour": Color("#FFE8BE")},
+		[Vector3(-18.0, c + 8.5, 4.0), Vector3(-18.0, c, 0.0), 65.0, 0.8, 26.0, Color("#FFE8BE")],
+		[Vector3(0.0, c + 9.0, -4.0), Vector3(0.0, c, 0.0), 70.0, 0.9, 28.0, Color("#FFE8BE")],
+		[Vector3(18.0, c + 8.5, 4.0), Vector3(18.0, c, 0.0), 65.0, 0.8, 26.0, Color("#FFE8BE")],
 	])

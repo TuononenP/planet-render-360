@@ -180,3 +180,11 @@ static func build(model: Node3D) -> void:
 		var y := _oodi_sill(p.x) + BAND + 0.45 * (0.7 + 0.3 * sin(0.09 * p.x)) + 0.15
 		lm.box("Sky", Vector3(p.x, y, p.y), Vector3(4.2, 0.4, 2.2), Basis(Vector3.UP, 0.12), 0.0)
 	lm.commit(model)
+	var warm := Color(1.0, 0.90, 0.72)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-15.0, 1.5, 44.0), Vector3(-15.0, 11.0, 16.0), 52.0, 0.9, 60.0, warm],
+		[Vector3(28.0, 1.5, 46.0), Vector3(28.0, 11.0, 22.0), 52.0, 0.95, 60.0, warm],
+		[Vector3(68.0, 1.5, 44.0), Vector3(68.0, 11.0, 20.0), 52.0, 0.9, 60.0, warm],
+		[Vector3(0.0, 1.5, -36.0), Vector3(0.0, 12.0, -19.0), 52.0, 0.8, 55.0, warm],
+		[Vector3(56.0, 1.5, -36.0), Vector3(56.0, 12.0, -19.0), 52.0, 0.8, 55.0, warm],
+	])

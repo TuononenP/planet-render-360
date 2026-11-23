@@ -155,9 +155,7 @@ Run as one background agent batch in a scratch copy, deleted afterwards (memory 
 - [x] Capture rounds `sto-rN` against the refs (summer, plus a winter round against the snow photo). — sto-r1 to
       sto-r4 (winter for r1 and r3).
 - [x] Review README and scorecard §9 line per round. — READMEs per round; scorecard rounds r1 to r4.
-- [ ] Target: photographic on Ultra. — Open. Agent pre-rating is still recognisable, and the human gate is pending.
-      Remaining gaps: the pale angular island bank, the road and grass foreground (B-3), and an isolated cold time
-      to view (206 s under load vs the 150 s target; the build graph itself took 58 s).
+- [x] Target: photographic on Ultra. — Accepted by user on 2026-11-20 at `BUILD_VERSION` 318 after `PLAN_Stockholm_super_realistic.md` Rounds 7–12 (`sto-r19-final-2026-11-20`, cold Ultra time-to-view 23 s ≤ 150 s); `sto_bridge_stromsbron` below-water band and 18k fitted-triangle cap regression closed and verified at `BUILD_VERSION` 321 (`bridge_specs_test` PASS).
 
 ## Critical files
 

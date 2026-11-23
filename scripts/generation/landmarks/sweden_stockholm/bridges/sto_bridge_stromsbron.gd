@@ -23,7 +23,7 @@ const LAMP_H := 8.5
 const BAND_H := 0.6
 const BAND_PROUD := 0.05
 const ARM_M := 1.9
-const BAR_PITCH_M := 1.0
+const BAR_PITCH_M := 2.2
 ## Carriageway edge, metres from the axis: inside the 2.8 m footway.
 const ROAD_EDGE_M := 6.55
 
@@ -40,12 +40,18 @@ static func build(model: Node3D, row: Dictionary) -> void:
 	var c := float(row["clear"])
 	var width := float(row["width"])
 	var h := BridgeParam.half_length(row)
+	var segs := 9
 	for s in [-1.0, 1.0]:
 		var z: float = float(s) * (width * 0.5 - 0.2)
-		# Fascia beam, kerb and edge line.
-		lm.box("Fascia", Vector3(0, c - 0.55, float(s) * (width * 0.5 - 0.3)), Vector3(h * 2.0, 1.1, 0.6), Basis(), 0.0)
-		lm.box("Granite", Vector3(0, c + 0.07, float(s) * (ROAD_EDGE_M + 0.1)), Vector3(h * 2.0, 0.14, 0.24), Basis(), 0.0)
-		lm.box("Edge", Vector3(0, c + 0.03, float(s) * (ROAD_EDGE_M - 0.35)), Vector3(h * 2.0, 0.04, 0.14), Basis(), 0.0)
+		# Fascia beam, kerb and edge line (segmented so BridgeCamber stays within budget).
+		for k in segs:
+			var xa := lerpf(-h, h, float(k) / float(segs))
+			var xb := lerpf(-h, h, float(k + 1) / float(segs))
+			var xm := (xa + xb) * 0.5
+			var seg_l := xb - xa
+			lm.box("Fascia", Vector3(xm, c - 0.55, float(s) * (width * 0.5 - 0.3)), Vector3(seg_l, 1.1, 0.6), Basis(), 0.0)
+			lm.box("Granite", Vector3(xm, c + 0.07, float(s) * (ROAD_EDGE_M + 0.1)), Vector3(seg_l, 0.14, 0.24), Basis(), 0.0)
+			lm.box("Edge", Vector3(xm, c + 0.03, float(s) * (ROAD_EDGE_M - 0.35)), Vector3(seg_l, 0.04, 0.14), Basis(), 0.0)
 		_balustrade(lm, -h + 1.0, h - 1.0, c, z)
 		for e in [-1.0, 1.0]:
 			_parapet_pier(lm, float(e) * (h - 0.6), c, z)
@@ -62,14 +68,20 @@ static func build(model: Node3D, row: Dictionary) -> void:
 
 ## Bar balustrade from x0 to x1 along z: flat top rail, mid rail, bars.
 static func _balustrade(lm: LandmarkMesh, x0: float, x1: float, y: float, z: float) -> void:
-	lm.box("Rail", Vector3((x0 + x1) * 0.5, y + 1.17, z), Vector3(x1 - x0, 0.06, 0.16), Basis(), 0.0)
-	lm.box("Rail", Vector3((x0 + x1) * 0.5, y + 0.62, z), Vector3(x1 - x0, 0.05, 0.05), Basis(), 0.0)
-	lm.box("Rail", Vector3((x0 + x1) * 0.5, y + 0.14, z), Vector3(x1 - x0, 0.05, 0.05), Basis(), 0.0)
+	var segs := 9
+	for k in segs:
+		var xa := lerpf(x0, x1, float(k) / float(segs))
+		var xb := lerpf(x0, x1, float(k + 1) / float(segs))
+		var xm := (xa + xb) * 0.5
+		var seg_l := xb - xa
+		lm.box("Rail", Vector3(xm, y + 1.17, z), Vector3(seg_l, 0.06, 0.16), Basis(), 0.0)
+		lm.box("Rail", Vector3(xm, y + 0.62, z), Vector3(seg_l, 0.05, 0.05), Basis(), 0.0)
+		lm.box("Rail", Vector3(xm, y + 0.14, z), Vector3(seg_l, 0.05, 0.05), Basis(), 0.0)
 	var centres := PackedVector3Array()
 	var sizes := PackedVector3Array()
 	var n := int((x1 - x0) / BAR_PITCH_M)
 	for i in n + 1:
-		var post := i % 4 == 0
+		var post := i % 3 == 0
 		centres.append(Vector3(x0 + (x1 - x0) * float(i) / float(n), y + 0.58, z))
 		sizes.append(Vector3(0.1, 1.16, 0.1) if post else Vector3(0.03, 1.1, 0.03))
 	lm.boxes("Rail", centres, sizes, Basis(), 0.0)
@@ -83,14 +95,14 @@ static func _parapet_pier(lm: LandmarkMesh, x: float, y: float, z: float) -> voi
 ## White standard at `base` with its arm reaching toward `inward` (+-Z) and a
 ## dome luminaire at the end.
 static func _lamp(lm: LandmarkMesh, base: Vector3, inward: float, pole_h: float) -> void:
-	lm.lathe("Pole", base, PackedVector2Array([Vector2(0.16, 0.0), Vector2(0.12, 0.5), Vector2(0.08, pole_h)]), 10)
+	lm.lathe("Pole", base, PackedVector2Array([Vector2(0.16, 0.0), Vector2(0.12, 0.5), Vector2(0.08, pole_h)]), 8)
 	lm.box("Pole", base + Vector3(0, 0.5, 0), Vector3(0.34, 1.0, 0.34), Basis(), 0.0)
 	var top := base + Vector3(0, pole_h - 0.1, 0)
 	var tip := top + Vector3(0, 0.25, inward * ARM_M)
 	lm.beam("Pole", top, tip, 0.07, 0.07)
 	lm.lathe("Pole", tip - Vector3(0, 0.3, 0), PackedVector2Array([Vector2(0.34, 0.0),
-		Vector2(0.3, 0.1), Vector2(0.14, 0.26), Vector2(0.0, 0.3)]), 12)
-	lm.disc("Lamp", tip - Vector3(0, 0.31, 0), Vector3.DOWN, 0.27, 12)
+		Vector2(0.3, 0.1), Vector2(0.14, 0.26), Vector2(0.0, 0.3)]), 8)
+	lm.disc("Lamp", tip - Vector3(0, 0.31, 0), Vector3.DOWN, 0.27, 8)
 
 ## The pale band at the waterline of each pier plinth, following BridgeParam's
 ## taper (half-width 1.4 + span/100 along the bridge, 0.3 of the width across,
@@ -103,5 +115,5 @@ static func _bands(lm: LandmarkMesh, row: Dictionary, soffit: float) -> void:
 	var t := minf(BAND_H / soffit, 1.0)
 	var xs := BridgeParam.supports(row)
 	for i in range(1, xs.size() - 1):
-		LandmarkBrKit.tapered_box(lm, "Band", Vector3(xs[i], -0.05, 0), along + BAND_PROUD, across + BAND_PROUD,
-			along * lerpf(1.0, 0.75, t) + BAND_PROUD, across * lerpf(1.0, 0.85, t) + BAND_PROUD, BAND_H + 0.05)
+		LandmarkBrKit.tapered_box(lm, "Band", Vector3(xs[i], 0.0, 0), along + BAND_PROUD, across + BAND_PROUD,
+			along * lerpf(1.0, 0.75, t) + BAND_PROUD, across * lerpf(1.0, 0.85, t) + BAND_PROUD, BAND_H)

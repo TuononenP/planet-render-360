@@ -118,3 +118,11 @@ static func build(model: Node3D) -> void:
 		FhU.blk(lm, "Glass", q.x, h + 0.5, q.z, 3.65, 1.2, 3.65)
 		FhU.hip(lm, "Roof", q + Vector3(0, h + 2.2, 0), 4.0, 4.0, 1.4)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.66)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-25.0, 2.0, 44.0), Vector3(-14.0, 11.0, 15.0), 44.0, 0.95, 55.0, warm],
+		[Vector3(2.0, 2.0, 44.0), Vector3(-9.0, 11.0, 15.0), 44.0, 0.95, 55.0, warm],
+		[Vector3(-12.0, 2.0, -52.0), Vector3(-12.0, 10.0, -37.0), 50.0, 0.8, 55.0, warm],
+		[Vector3(-52.0, 2.0, 0.0), Vector3(-36.0, 10.0, 0.0), 50.0, 0.8, 55.0, warm],
+		[Vector3(28.0, 2.0, 0.0), Vector3(13.0, 10.0, 0.0), 50.0, 0.8, 55.0, warm],
+	])

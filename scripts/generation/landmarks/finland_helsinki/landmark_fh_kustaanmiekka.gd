@@ -40,17 +40,48 @@ static func build(model: Node3D) -> void:
 	lm.use("Iron", LandmarkMaterials.paint("#26292B", 0.5, 0.6))
 	var star := _trace()
 	var inner := _inset(star, 2.2)
+	lm.poly_prism("Granite", _inset(star, -0.45), 0.0, 1.4, false)
 	lm.poly_prism("Granite", star, 0.0, WALL)
+	lm.poly_prism("Coping", _inset(star, -0.25), WALL - 0.65, WALL - 0.4, false)
 	lm.poly_prism("Coping", _inset(star, 0.1), WALL, WALL + 0.3, false)
-	# Rampart: a stepped earth mound within the coping.
-	lm.poly_prism("Grass", inner, WALL + 0.3, WALL + 0.9)
-	lm.poly_prism("Grass", _inset(star, 9.0), WALL + 0.9, WALL + 2.2)
+	# Turf parapet merlons with splayed gun embrasures along seaward faces, plus inner mound.
+	_embrasures(lm, star)
+	lm.poly_prism("Grass", _inset(star, 8.5), WALL + 0.9, WALL + 2.2)
 	lm.poly_prism("Grass", _inset(star, 17.0), WALL + 2.2, WALL + 3.4)
 	_path(lm, star)
 	_lichen(lm, star)
 	_casemates(lm, star)
 	_guns(lm, star)
 	lm.commit(model)
+	var warm := Color(1.0, 0.85, 0.62)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(0.0, 1.5, 58.0), Vector3(0.0, 5.5, 36.0), 54.0, 0.95, 55.0, warm],
+		[Vector3(-56.0, 1.5, 36.0), Vector3(-36.0, 5.5, 22.0), 52.0, 0.9, 55.0, warm],
+		[Vector3(56.0, 1.5, 36.0), Vector3(36.0, 5.5, 22.0), 52.0, 0.9, 55.0, warm],
+		[Vector3(-34.0, 1.5, -24.0), Vector3(-22.0, 4.5, -10.0), 48.0, 0.8, 45.0, warm],
+		[Vector3(34.0, 1.5, -24.0), Vector3(22.0, 4.5, -10.0), 48.0, 0.8, 45.0, warm],
+	])
+
+## Turf parapet ring behind the coping with embrasure gaps at each salient gun.
+static func _embrasures(lm: LandmarkMesh, star: PackedVector2Array) -> void:
+	var outer := _inset(star, 1.6)
+	var inner := _inset(star, 6.0)
+	lm.poly_prism("Grass", inner, WALL + 0.3, WALL + 0.95)
+	for i in outer.size():
+		var a := outer[i]
+		var b := outer[(i + 1) % outer.size()]
+		var ia := inner[i]
+		var ib := inner[(i + 1) % inner.size()]
+		var gun_at_a := (i % 2 == 0 and star[i].y >= 0.0)
+		var gun_at_b := (((i + 1) % outer.size()) % 2 == 0 and star[(i + 1) % star.size()].y >= 0.0)
+		var t0 := 0.14 if gun_at_a else 0.0
+		var t1 := 0.86 if gun_at_b else 1.0
+		var merlon := PackedVector2Array([a.lerp(b, t0), a.lerp(b, t1), ib.lerp(ia, 1.0 - t1), ib.lerp(ia, 1.0 - t0)])
+		lm.poly_prism("Grass", merlon, WALL + 0.3, WALL + 1.95)
+		if gun_at_a:
+			var cheek_b := Basis(Vector3.UP, atan2((b - a).x, (b - a).y))
+			var cp := a.lerp(ia, 0.5) + (b - a).normalized() * 1.4
+			lm.box("Wood", Vector3(cp.x, WALL + 1.15, cp.y), Vector3(0.2, 1.4, 3.4), cheek_b, 0.0)
 
 ## The star trace: five salients and re-entrants round the battery,
 ## 35 m radius, seaward side to +Z.
@@ -103,8 +134,8 @@ static func _lichen(lm: LandmarkMesh, star: PackedVector2Array) -> void:
 			var p := a.lerp(b, (float(k) + 0.5) * 6.0 / d.length()) + n * 0.05
 			lm.box("Iron", Vector3(p.x, WALL - 1.6, p.y), Vector3(0.12, 0.6, 0.1), basis)
 
-## Casemate doors: brick surrounds with arched plank doors set into the
-## longer granite faces, the vaults behind them under the turf.
+## Casemate portals: brick-vaulted surrounds with stone keystones, arched plank
+## doors and turf-covered barrel vaults rising behind the parapet.
 static func _casemates(lm: LandmarkMesh, star: PackedVector2Array) -> void:
 	for i in star.size():
 		var a := star[i]
@@ -115,14 +146,32 @@ static func _casemates(lm: LandmarkMesh, star: PackedVector2Array) -> void:
 		var n := Vector2(d.y, -d.x).normalized()
 		if n.dot((a + b) * 0.5) < 0.0:
 			n = -n
-		var basis := Basis(Vector3.UP, atan2(d.x, d.y))
-		var out := Vector3(n.x, 0, n.y)
+		var right := Vector3(-n.y, 0.0, n.x)
+		var out := Vector3(n.x, 0.0, n.y)
+		var basis := Basis(right, Vector3.UP, out)
 		for t in [0.3, 0.7]:
 			var p := a.lerp(b, t)
-			lm.box("Brick", Vector3(p.x, 2.1, p.y) + out * 0.12, Vector3(0.5, 4.2, 4.4), basis)
-			U.opening(lm, "Wood", Vector3(p.x, 0.0, p.y) + out * 0.42, out, 1.9, 3.0, true)
+			var cen := Vector3(p.x, 0.0, p.y)
+			# Brick surround and granite jamb quoins.
+			lm.box("Brick", cen + Vector3(0, 2.15, 0) + out * 0.14, Vector3(4.6, 4.3, 0.45), basis)
+			for s in [-1.0, 1.0]:
+				for qk in 3:
+					lm.box("Coping", cen + right * (s * 1.35) + Vector3(0, 0.45 + float(qk) * 0.85, 0) + out * 0.34,
+						Vector3(0.45, 0.45, 0.25), basis, 0.0)
+			# Recessed arched oak plank door and semicircular brick voussoir arch.
+			U.opening(lm, "Wood", cen + out * 0.38, out, 2.0, 3.1, true)
+			var arch_c := cen + Vector3(0, 2.1, 0) + out * 0.36
+			var prev := arch_c + right * 1.15
+			for k in range(1, 9):
+				var ang := PI * float(k) / 8.0
+				var pt := arch_c + right * (1.15 * cos(ang)) + Vector3(0, 1.15 * sin(ang), 0)
+				lm.beam("Brick", prev, pt, 0.35, 0.28, out)
+				prev = pt
+			lm.box("Coping", arch_c + Vector3(0, 1.2, 0) + out * 0.06, Vector3(0.4, 0.5, 0.3), basis, 0.0)
+			# Turf-covered casemate vault hood behind the portal.
+			lm.frustum("Grass", cen - out * 3.2 + Vector3(0, WALL + 0.5, 0), 2.4, 1.6, 1.4, 8)
 
-## Guns on wooden carriages behind the parapet.
+## Coastal artillery barrels on stepped wooden carriages behind each embrasure.
 static func _guns(lm: LandmarkMesh, star: PackedVector2Array) -> void:
 	for i in star.size():
 		if i % 2 != 0:
@@ -131,14 +180,23 @@ static func _guns(lm: LandmarkMesh, star: PackedVector2Array) -> void:
 		if tip.y < 0.0:
 			continue
 		var dir := Vector2(tip.x, tip.y).normalized()
-		var base2 := tip - dir * 5.0
+		var base2 := tip - dir * 4.4
 		var ang := atan2(dir.x, dir.y)
 		var b := Basis(Vector3.UP, ang)
 		var y := WALL + 0.95
-		lm.box("Wood", Vector3(base2.x, y + 0.35, base2.y), Vector3(1.5, 0.6, 2.4), b)
-		for s in [-1.0, 1.0]:
-			lm.frustum("Wood", Vector3(base2.x + cos(ang) * s * 0.85, y, base2.y - sin(ang) * s * 0.85), 0.5, 0.5, 0.18, 8)
-		var p0 := Vector3(base2.x, y + 1.0, base2.y)
-		var p1 := p0 + b * Vector3(0, 0.25, 3.3)
-		lm.beam("Iron", p0, p1, 0.5, 0.5)
-		lm.frustum("Iron", Vector3(p1.x, p1.y - 0.25, p1.z), 0.3, 0.3, 0.5, 8)
+		# Stepped wooden carriage cheeks and four truck wheels.
+		lm.box("Wood", Vector3(base2.x, y + 0.35, base2.y), Vector3(1.4, 0.55, 2.4), b)
+		lm.box("Wood", Vector3(base2.x, y + 0.72, base2.y) + b * Vector3(0, 0, 0.2), Vector3(1.05, 0.32, 1.7), b)
+		for sz in [-0.75, 0.75]:
+			for sx in [-0.82, 0.82]:
+				var wp := Vector3(base2.x, y, base2.y) + b * Vector3(sx, 0.26, sz)
+				lm.box("Wood", wp, Vector3(0.22, 0.52, 0.52), b, 0.0)
+				lm.box("Iron", wp, Vector3(0.25, 0.2, 0.2), b, 0.0)
+		# Tapered cast-iron artillery barrel with cascabel, reinforcing bands and muzzle swell.
+		var p0 := Vector3(base2.x, y + 0.98, base2.y) - b * Vector3(0, 0, 0.35)
+		var p_mid := p0 + b * Vector3(0, 0.14, 1.8)
+		var p1 := p0 + b * Vector3(0, 0.26, 3.6)
+		lm.beam("Iron", p0, p_mid, 0.56, 0.56)
+		lm.beam("Iron", p_mid, p1, 0.42, 0.42)
+		lm.frustum("Iron", p0 - Vector3(0, 0.15, 0) - b * Vector3(0, 0, 0.22), 0.18, 0.18, 0.3, 8)
+		lm.frustum("Iron", p1 - Vector3(0, 0.24, 0), 0.32, 0.28, 0.48, 8)

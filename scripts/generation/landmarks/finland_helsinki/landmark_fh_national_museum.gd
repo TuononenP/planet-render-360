@@ -128,6 +128,14 @@ static func build(model: Node3D) -> void:
 	lm.frustum("Verdigris", Vector3(tx, SHAFT + 14.9, tz), 4.4, 0.0, 9.2, 4, PI * 0.25)
 	lm.frustum("Verdigris", Vector3(tx, SHAFT + 24.1, tz), 0.1, 0.04, 0.6, 6)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.66)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-6.0, 1.5, 38.0), Vector3(-5.6, 9.0, 21.0), 46.0, 0.9, 50.0, warm],
+		[Vector3(-36.0, 1.5, 32.0), Vector3(-11.5, 44.0, 7.2), 20.0, 1.0, 85.0, warm],
+		[Vector3(14.0, 1.5, 34.0), Vector3(-11.5, 46.0, 7.2), 20.0, 1.0, 85.0, warm],
+		[Vector3(58.0, 1.5, 0.0), Vector3(40.0, 10.0, -2.0), 48.0, 0.85, 50.0, warm],
+		[Vector3(-24.0, 1.5, -58.0), Vector3(-14.0, 13.0, -40.0), 48.0, 0.8, 50.0, warm],
+	])
 
 ## Emil Wikström's granite bear, `l` long, lying on a pedestal at `base`.
 static func _bear(lm: LandmarkMesh, key: String, base: Vector3, l: float) -> void:

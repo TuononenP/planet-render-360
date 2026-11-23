@@ -72,6 +72,13 @@ static func build(model: Node3D) -> void:
 	_wall(lm, WALL_B)
 	_annex(lm)
 	lm.commit(model)
+	var warm := Color(1.0, 0.86, 0.64)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-2.0, 1.5, -38.0), Vector3(-2.0, 9.0, -14.0), 50.0, 0.85, 50.0, warm],
+		[Vector3(2.0, 1.5, 42.0), Vector3(2.0, 9.0, 16.0), 50.0, 0.85, 50.0, warm],
+		[Vector3(-40.0, 1.5, 2.0), Vector3(-15.0, 9.0, 2.0), 50.0, 0.85, 50.0, warm],
+		[Vector3(40.0, 1.5, -2.0), Vector3(15.0, 9.0, -2.0), 50.0, 0.85, 50.0, warm],
+	])
 
 ## Hipped sheet-metal roofs over the two bars of the cross (each 15 m
 ## wide): one from the north-west end to the south-east one, one across it.

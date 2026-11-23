@@ -110,3 +110,12 @@ static func build(model: Node3D) -> void:
 		for k in 4:
 			lm.frustum("Marble", e + eb * Vector3(-5.0 + 3.33 * float(k), 0, 5.6), 0.16, 0.16, 3.4, 10)
 	lm.commit(model)
+	var warm := Color(1.0, 0.92, 0.78)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-65.0, 1.5, -46.0), Vector3(-65.0, 10.0, -24.0), 50.0, 0.85, 55.0, warm],
+		[Vector3(10.0, 1.5, -48.0), Vector3(10.0, 24.0, -25.0), 32.0, 1.0, 65.0, warm],
+		[Vector3(70.0, 1.5, -46.0), Vector3(70.0, 11.0, -24.0), 50.0, 0.85, 55.0, warm],
+		[Vector3(-55.0, 1.5, 52.0), Vector3(-45.0, 10.0, 32.0), 50.0, 0.85, 55.0, warm],
+		[Vector3(-15.0, 1.5, 42.0), Vector3(-15.0, 10.0, 22.0), 48.0, 0.85, 55.0, warm],
+		[Vector3(55.0, 1.5, 15.0), Vector3(55.0, 10.0, -4.0), 48.0, 0.8, 50.0, warm],
+	])

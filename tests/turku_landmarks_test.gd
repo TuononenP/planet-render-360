@@ -33,6 +33,7 @@ const EXPECTED_TYPES := [
 	"kupittaa_station", "port_of_turku_terminals", "if_torni_turku", "ikituuri_turku",
 	"airiston_tahti", "paaskyvuori_tower", "luolavuori_water_tower", "iso_heikkila_water_tower",
 	"gatorade_center_turku", "telakkaranta_linnanfaltti", "ruissalo_villas_spa",
+	"meyer_gantry_cranes",
 ]
 
 const EXPECTED_BRIDGES := [
@@ -51,11 +52,12 @@ func _init() -> void:
 			continue
 		var lat := float(e.get("lat", 0.0))
 		var lon := float(e.get("lon", 0.0))
-		_check(lat > 60.41 and lat < 60.49 and lon > 22.15 and lon < 22.35,
+		_check(lat > 60.41 and lat < 60.49 and lon > 22.11 and lon < 22.35,
 			"%s coordinates inside Turku: %s, %s" % [t, lat, lon])
 		var root := LandmarkBuilder.build(t)
 		var meshes := _count_meshes(root)
 		_check(meshes > 0, "%s built %d meshes" % [t, meshes])
+		LandmarkLights.dress(root, t)
 		root.free()
 	# 2. All 12 Turku bridges exist with conf >= 2 and build cleanly.
 	for bid in EXPECTED_BRIDGES:
@@ -65,6 +67,7 @@ func _init() -> void:
 			_check(int(row.get("conf", 0)) >= BridgeSpec.MIN_BUILT_CONF, "%s conf >= 2" % bid)
 			var b := LandmarkBuilder.build_bridge(bid, float(row.get("clear", 4.5)))
 			_check(_count_meshes(b) > 0, "%s bridge built geometry" % bid)
+			LandmarkLights.dress(b, bid)
 			b.free()
 	# 3. Turku architecture districts & Föli bus livery.
 	var z := CityStyles.zone_at(60.4518, 22.2666)

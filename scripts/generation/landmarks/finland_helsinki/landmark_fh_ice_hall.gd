@@ -43,15 +43,9 @@ static func build(model: Node3D) -> void:
 	lm.poly_prism("Glass", poly, 1.1, WALL, false)
 	for i in poly.size():
 		_curtain(lm, poly, i)
-	# Fascia band and the shallow vault: a hipped skirt up to a flat crown
-	# with the roof's own deep edge.
-	lm.poly_prism("Roof", F.offset(poly, 0.8), WALL, WALL + 2.6, false)
-	var cen := FhP.centre(poly)
-	FhP.slope_roof(lm, "Roof", F.offset(poly, 0.8), cen, 0.82, WALL + 2.6, TOP - 1.6)
-	var crown := PackedVector2Array()
-	for p in poly:
-		crown.append(cen + (p - cen) * 0.74)
-	lm.poly_prism("Roof", crown, TOP - 1.7, TOP, true)
+	# Dark graphite fascia band and shallow barrel-vault arch roof with structural ribs.
+	lm.poly_prism("Roof", F.offset(poly, 0.8), WALL, WALL + 2.4, false)
+	_barrel_vault(lm, F.offset(poly, 0.8), WALL + 2.4, TOP - 0.3)
 	# Fascia vents (round, lit).
 	for i in poly.size():
 		var a := poly[i]
@@ -62,10 +56,89 @@ static func build(model: Node3D) -> void:
 		var n := int(a.distance_to(b) / 7.0)
 		for k in n:
 			var p := a.lerp(b, (float(k) + 0.5) / float(n)) + Vector2(o.x, o.z) * 0.85
-			lm.disc("Lamp", Vector3(p.x, WALL + 1.4, p.y), o, 0.4, 10)
+			lm.disc("Lamp", Vector3(p.x, WALL + 1.2, p.y), o, 0.4, 10)
 	# Corner pier of the entrance block.
 	lm.box("Concrete", Vector3(48.0, 6.0, 8.0), Vector3(5.0, 12.0, 8.0))
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.68)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-68.0, 1.5, 6.0), Vector3(-44.0, 11.0, 6.0), 50.0, 0.9, 70.0, warm],
+		[Vector3(68.0, 1.5, 6.0), Vector3(42.0, 11.0, 6.0), 50.0, 0.9, 70.0, warm],
+		[Vector3(-2.0, 1.5, 76.0), Vector3(-2.0, 13.0, 52.0), 52.0, 0.95, 75.0, warm],
+		[Vector3(-2.0, 1.5, -62.0), Vector3(-2.0, 13.0, -38.0), 52.0, 0.85, 75.0, warm],
+	])
+
+## Shallow parabolic barrel-vault roof over `roof_poly` peaking at `y_crown`,
+## closed along the perimeter from `y_spring` and crossed by structural arch ribs.
+static func _barrel_vault(lm: LandmarkMesh, roof_poly: PackedVector2Array, y_spring: float, y_crown: float) -> void:
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	for p in roof_poly:
+		lo = lo.min(p)
+		hi = hi.max(p)
+	var mid_x := (lo.x + hi.x) * 0.5
+	var half_x := maxf((hi.x - lo.x) * 0.5, 1.0)
+	var vault_y := func(x: float) -> float:
+		var t := clampf((x - mid_x) / half_x, -1.0, 1.0)
+		return lerpf(y_spring, y_crown, 1.0 - t * t)
+	var vault_n := func(x: float) -> Vector3:
+		var t := clampf((x - mid_x) / half_x, -1.0, 1.0)
+		var dydx := -2.0 * (y_crown - y_spring) * t / half_x
+		return Vector3(-dydx, 1.0, 0.0).normalized()
+	var nx := 18
+	var nz := 14
+	for ix in nx:
+		var x0 := lerpf(lo.x, hi.x, float(ix) / float(nx))
+		var x1 := lerpf(lo.x, hi.x, float(ix + 1) / float(nx))
+		for iz in nz:
+			var z0 := lerpf(lo.y, hi.y, float(iz) / float(nz))
+			var z1 := lerpf(lo.y, hi.y, float(iz + 1) / float(nz))
+			var cell := PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0, z1)])
+			for piece in Geometry2D.intersect_polygons(roof_poly, cell):
+				var idx := Geometry2D.triangulate_polygon(piece)
+				for t in range(0, idx.size(), 3):
+					var pa := piece[idx[t]]
+					var pb := piece[idx[t + 1]]
+					var pc := piece[idx[t + 2]]
+					var va := Vector3(pa.x, vault_y.call(pa.x), pa.y)
+					var vb := Vector3(pb.x, vault_y.call(pb.x), pb.y)
+					var vc := Vector3(pc.x, vault_y.call(pc.x), pc.y)
+					lm.tri("Roof", va, vb, vc, vault_n.call(pa.x), vault_n.call(pb.x), vault_n.call(pc.x),
+						Vector2(pa.x, pa.y), Vector2(pb.x, pb.y), Vector2(pc.x, pc.y))
+	# Vertical tympanum closure from fascia top up to the curved barrel vault.
+	for i in roof_poly.size():
+		var a := roof_poly[i]
+		var b := roof_poly[(i + 1) % roof_poly.size()]
+		var o := FhP.edge_out(roof_poly, i)
+		var segs := maxi(1, int(ceil(a.distance_to(b) / 3.0)))
+		for k in segs:
+			var p0 := a.lerp(b, float(k) / float(segs))
+			var p1 := a.lerp(b, float(k + 1) / float(segs))
+			lm.quad("Roof", Vector3(p0.x, y_spring, p0.y), Vector3(p1.x, y_spring, p1.y),
+				Vector3(p1.x, vault_y.call(p1.x), p1.y), Vector3(p0.x, vault_y.call(p0.x), p0.y), o)
+	# Structural steel arch ribs spanning across the barrel vault.
+	var rib_count := 7
+	for r in rib_count:
+		var z := lerpf(lo.y + 10.0, hi.y - 10.0, float(r) / float(rib_count - 1))
+		var xs: Array[float] = []
+		for i in roof_poly.size():
+			var a := roof_poly[i]
+			var b := roof_poly[(i + 1) % roof_poly.size()]
+			if (a.y <= z and b.y > z) or (b.y <= z and a.y > z):
+				var u := (z - a.y) / (b.y - a.y)
+				xs.append(lerpf(a.x, b.x, u))
+		if xs.size() < 2:
+			continue
+		xs.sort()
+		var rx0 := xs[0] + 0.5
+		var rx1 := xs[xs.size() - 1] - 0.5
+		var segs := 16
+		var prev := Vector3(rx0, vault_y.call(rx0) + 0.05, z)
+		for k in range(1, segs + 1):
+			var x := lerpf(rx0, rx1, float(k) / float(segs))
+			var cur := Vector3(x, vault_y.call(x) + 0.05, z)
+			lm.beam("Frame", prev, cur, 0.55, 0.6, Vector3(0, 0, 1))
+			prev = cur
 
 ## One wall edge of the curtain: mullions every 2.4 m, transoms every 2.6 m.
 static func _curtain(lm: LandmarkMesh, poly: PackedVector2Array, i: int) -> void:

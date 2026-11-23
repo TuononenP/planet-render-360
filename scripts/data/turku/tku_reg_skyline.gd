@@ -71,4 +71,10 @@ static func entries() -> Array:
 			"radius_m": 5000.0, "wiki_title": "Crichton-Vulcan", "height_m": 38.0,
 			"kind": "Crane", "clear_m": 14.0, "yaw_deg": -34.0,
 			"aliases": ["crichton-vulcan harbour crane", "nosturi 37", "aurajoki harbour crane"]},
+		{"type": "meyer_gantry_cranes", "skyline": true, "name": "Meyer Turku Gantry Cranes",
+			"lat": 60.457800, "lon": 22.124800,
+			"radius_m": 9500.0, "wiki_title": "Meyer Turku", "height_m": 105.0,
+			"secondary": true, "kind": "Crane", "clear_m": 16.0, "yaw_deg": 38.1,
+			"aliases": ["meyer turku gantry cranes", "meyer turku", "perno shipyard",
+				"pernon telakka", "goliath cranes turku"]},
 	]

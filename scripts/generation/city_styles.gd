@@ -509,7 +509,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm"]
+const FAR_DISTRICT_CITIES := ["stockholm", "turku", "helsinki"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most

@@ -87,3 +87,11 @@ static func build(model: Node3D) -> void:
 		lm.beam("Bronze", ph + pb * Vector3(-0.5 + 0.12 * float(k), 3.2, 0.1),
 			ph + pb * Vector3(-0.6 + 0.15 * float(k), 3.85, 0.0), 0.08, 0.06)
 	lm.commit(model)
+	var silver := Color(0.95, 0.96, 1.0)
+	var warm := Color(1.0, 0.90, 0.74)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 1.2, 10.0), Vector3(-1.0, 5.0, 0.0), 42.0, 0.9, 28.0, silver],
+		[Vector3(12.0, 1.2, 11.0), Vector3(2.0, 5.0, 1.0), 44.0, 0.95, 28.0, warm],
+		[Vector3(-11.0, 1.2, -10.0), Vector3(-1.0, 5.0, 0.0), 42.0, 0.85, 28.0, silver],
+		[Vector3(11.0, 1.2, -10.0), Vector3(2.0, 5.0, 0.0), 42.0, 0.85, 28.0, warm],
+	])

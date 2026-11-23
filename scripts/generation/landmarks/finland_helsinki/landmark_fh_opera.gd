@@ -108,3 +108,11 @@ static func build(model: Node3D) -> void:
 		lm.frustum("Band", Vector3(-35.0 + 77.0 * float(i) / 9.0, 0.0, 36.0), 0.18, 0.18, 9.5, 10)
 	FhU.steps(lm, "Band", Vector3(3.0, 0.0, 36.6), Vector3(0, 0, 1), 40.0, 0.7, 0.2, 5)
 	lm.commit(model)
+	var warm := Color(1.0, 0.90, 0.74)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-22.0, 1.5, 54.0), Vector3(-12.0, 9.0, 34.0), 50.0, 0.9, 60.0, warm],
+		[Vector3(28.0, 1.5, 54.0), Vector3(18.0, 9.0, 34.0), 50.0, 0.9, 60.0, warm],
+		[Vector3(-24.0, 1.5, -56.0), Vector3(7.9, 25.0, -12.0), 26.0, 0.95, 80.0, warm],
+		[Vector3(40.0, 1.5, -54.0), Vector3(7.9, 25.0, -12.0), 26.0, 0.95, 80.0, warm],
+		[Vector3(-76.0, 1.5, -12.0), Vector3(-56.0, 10.0, -12.0), 48.0, 0.8, 55.0, warm],
+	])

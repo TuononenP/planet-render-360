@@ -54,6 +54,13 @@ static func build(model: Node3D) -> void:
 		var p := c[0].lerp(c[1], (float(k) + 0.5) / 5.0)
 		lm.beam("Concrete", Vector3(p.x, EAVE, p.y), Vector3(p.x, EAVE + 3.2, p.y), 0.12)
 	lm.commit(model, "Katajanokka_terminal_")
+	var warm := Color(1.0, 0.90, 0.74)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-4.0, 1.5, 42.0), Vector3(-4.0, 8.0, 22.0), 52.0, 0.85, 55.0, warm],
+		[Vector3(4.0, 1.5, -40.0), Vector3(4.0, 8.0, -18.0), 52.0, 0.85, 55.0, warm],
+		[Vector3(50.0, 1.5, 4.0), Vector3(32.0, 8.0, 4.0), 50.0, 0.85, 50.0, warm],
+		[Vector3(-48.0, 1.5, 4.0), Vector3(-30.0, 8.0, 4.0), 50.0, 0.85, 50.0, warm],
+	])
 
 ## Round concrete columns with flared heads round the ground floor, every
 ## 4.8 m along each outline edge.

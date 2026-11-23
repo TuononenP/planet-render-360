@@ -11,7 +11,7 @@ extends SceneTree
 ## A bridge belongs to a capital when it lies this close to one of its country.
 const MAX_CAPITAL_KM := 12.0
 ## Cities with bridge rows that are not capitals: {cc: [[lat, lon]]}.
-const OTHER_CITIES := {"FI": [[60.4518, 22.2666]]}  # Turku
+const OTHER_CITIES := {"FI": [[60.4518, 22.2666], [60.4350, 22.1500]]}  # Turku centre and Ruissalo/west
 var failures: Array[String] = []
 
 func _init() -> void:

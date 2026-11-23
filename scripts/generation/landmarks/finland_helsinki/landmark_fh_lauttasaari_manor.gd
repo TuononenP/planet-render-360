@@ -45,4 +45,37 @@ static func build(model: Node3D) -> void:
 		var c := centre + ridge * (3.2 * s)
 		U.blk(lm, "Render", c.x, eave + 2.0, c.y, 0.9, 3.45, 0.9)
 		U.blk(lm, "Trim", c.x, eave + 5.45, c.y, 1.1, 0.25, 1.1)
+	_porch(lm, poly, eave)
 	lm.commit(model, "Lauttasaari_manor_")
+	var warm := Color(1.0, 0.88, 0.68)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(21.0, 1.2, 11.5), Vector3(8.75, 5.0, 0.75), 48.0, 1.0, 35.0, warm],
+		[Vector3(-16.0, 1.2, -16.0), Vector3(-2.0, 5.0, -7.0), 48.0, 0.85, 35.0, warm],
+		[Vector3(16.0, 1.2, -22.0), Vector3(8.0, 5.0, -11.0), 46.0, 0.8, 35.0, warm],
+		[Vector3(-12.0, 1.2, 18.0), Vector3(-3.0, 5.0, 6.0), 46.0, 0.8, 35.0, warm],
+	])
+
+## 1837 Empire pedimented columned front porch on the south-east main facade.
+static func _porch(lm: LandmarkMesh, poly: PackedVector2Array, eave: float) -> void:
+	var a := Vector2(15.9, -7.4)
+	var b := Vector2(1.6, 8.9)
+	var mid := (a + b) * 0.5
+	var along2 := (b - a).normalized()
+	var out2 := W.outward(poly, a, b)
+	var out := Vector3(out2.x, 0.0, out2.y)
+	var right := Vector3(along2.x, 0.0, along2.y)
+	var basis := Basis(right, Vector3.UP, out)
+	var depth := 2.7
+	var width := 7.6
+	var pc := Vector3(mid.x, 0.0, mid.y) + out * (depth * 0.5)
+	lm.box("Granite", pc + Vector3(0, 0.42, 0), Vector3(width + 0.6, 0.84, depth + 0.3), basis)
+	U.steps(lm, "Granite", Vector3(mid.x, 0.0, mid.y) + out * depth, out, 4.6, 0.38, 0.2, 4)
+	# Four white Empire columns supporting the entablature and triangular pediment.
+	var col_line := Vector3(mid.x, 0.84, mid.y) + out * (depth - 0.55)
+	U.columns(lm, "Trim", col_line - right * (width * 0.42), col_line + right * (width * 0.42), 4, eave - 1.74, 0.32, 12)
+	lm.box("Trim", pc + Vector3(0, eave - 0.45, 0), Vector3(width + 0.5, 0.9, depth + 0.3), basis)
+	lm.gable("Roof", pc + Vector3(0, eave, 0), width + 0.6, depth + 0.4, 2.1, basis, 0.2, "Trim")
+	# Glazed Empire entrance double doors behind the portico.
+	var dc := Vector3(mid.x, 2.2, mid.y) + out * 0.06
+	lm.box("Trim", dc, Vector3(2.4, 3.0, 0.16), basis, 0.0)
+	lm.box("Glass", dc + out * 0.06, Vector3(1.8, 2.6, 0.08), basis, 0.0)

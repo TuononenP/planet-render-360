@@ -8,10 +8,10 @@ extends SceneTree
 const TYPES := {
 	"finago_tower": 83.6, "kone_building": 72.6, "keilalampi": 22.4,
 	"espoo_cultural_centre": 21.0, "mantytorni": 31.0, "tapiola_hip_flask_houses": 30.0,
-	"lauttasaari_church": 61.0, "lauttasaari_manor": 12.5,
+	"lauttasaari_church": 61.0, "lauttasaari_manor": 13.5,
 	"niittyhuippu": 90.0, "niittytori_tower": 38.0, "niitty_shopping_centre": 14.0,
 	"niittytaival_tower": 50.5, "olari_church": 13.0,
-	"aalto_house": 8.0, "studio_aalto": 7.4, "didrichsen_art_museum": 8.4, "villa_gyllenberg": 10.0,
+	"aalto_house": 8.0, "studio_aalto": 9.2, "didrichsen_art_museum": 8.4, "villa_gyllenberg": 10.0,
 	"vare": 21.5, "harald_herlin_learning_centre": 11.5, "aalto_university_metro_station": 7.5,
 	"otaniemi_water_tower": 58.0, "otahalli": 16.5, "otaniemi_power_plant": 75.0,
 }

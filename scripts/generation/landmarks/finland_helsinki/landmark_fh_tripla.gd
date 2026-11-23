@@ -71,6 +71,15 @@ static func build(model: Node3D) -> void:
 			else:
 				U.blk(lm, "Glass", c.x, h - 1.25, c.y, 22.0, 0.5, 5.0)
 	lm.commit(model)
+	var warm := Color(1.0, 0.90, 0.76)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(20.0, 1.5, 118.0), Vector3(15.0, 16.0, 85.0), 56.0, 0.95, 90.0, warm],
+		[Vector3(-70.0, 1.5, 95.0), Vector3(-60.0, 16.0, 65.0), 56.0, 0.9, 85.0, warm],
+		[Vector3(-10.0, 1.5, -85.0), Vector3(-10.0, 16.0, -55.0), 56.0, 0.85, 85.0, warm],
+		[Vector3(160.0, 1.5, -125.0), Vector3(160.0, 16.0, -95.0), 56.0, 0.85, 85.0, warm],
+		[Vector3(-135.0, 1.5, 15.0), Vector3(-105.0, 16.0, 15.0), 54.0, 0.85, 80.0, warm],
+		[Vector3(245.0, 1.5, -55.0), Vector3(220.0, 16.0, -55.0), 54.0, 0.85, 80.0, warm],
+	])
 
 ## Entrance canopy and accent pylon at the middle of the longest edge,
 ## facing out of the building.

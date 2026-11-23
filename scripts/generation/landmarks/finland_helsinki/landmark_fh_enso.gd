@@ -57,6 +57,13 @@ static func build(model: Node3D) -> void:
 	W.ribs(lm, "Metal", top_floor, grid_top + 0.5, ENSO_M - 0.4, 1.6, 0.08, 0.1)
 	lm.poly_prism("Marble", F.offset(poly, -0.3), ENSO_M - 0.4, ENSO_M)
 	lm.commit(model, "Enso_")
+	var marble_warm := Color(1.0, 0.92, 0.78)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-18.0, 1.5, 29.0), Vector3(-7.0, 13.0, 13.0), 50.0, 0.9, 55.0, marble_warm],
+		[Vector3(38.0, 1.5, 23.0), Vector3(23.0, 13.0, 14.0), 48.0, 0.85, 50.0, marble_warm],
+		[Vector3(18.0, 1.5, -28.0), Vector3(10.0, 13.0, -10.0), 50.0, 0.85, 55.0, marble_warm],
+		[Vector3(-35.0, 1.5, -24.0), Vector3(-20.0, 13.0, -15.0), 48.0, 0.85, 50.0, marble_warm],
+	])
 
 ## A full marble wall over the facade edge whose outward normal is
 ## closest to `dir` (the blank south-east end).

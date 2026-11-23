@@ -122,6 +122,13 @@ static func build(model: Node3D) -> void:
 	U.blk(lm, "Trim", -52.0, 19.1, -30.0, 21.0, 0.4, 12.0)
 	U.blk(lm, "Roof", 60.0, 18.5, -20.0, 22.0, 1.5, 16.0)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.72)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-50.0, 1.5, 112.0), Vector3(-40.0, 9.0, 72.0), 56.0, 0.9, 85.0, warm],
+		[Vector3(65.0, 1.5, 65.0), Vector3(45.0, 9.0, 35.0), 56.0, 0.9, 85.0, warm],
+		[Vector3(-40.0, 1.5, -125.0), Vector3(-40.0, 9.0, -90.0), 56.0, 0.85, 85.0, warm],
+		[Vector3(124.0, 1.5, -35.0), Vector3(92.0, 9.0, -35.0), 56.0, 0.85, 85.0, warm],
+	])
 
 ## True when a deck item (centre `c`, size `size`) lies on the lawn and
 ## clear of every tower shaft by 3 m.

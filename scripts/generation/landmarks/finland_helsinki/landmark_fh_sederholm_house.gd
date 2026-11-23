@@ -46,6 +46,12 @@ static func build(model: Node3D) -> void:
 	_sides(lm)
 	_roof(lm)
 	lm.commit(model)
+	var warm := Color(1.0, 0.86, 0.64)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-7.0, 1.5, 17.0), Vector3(-3.0, 5.5, 5.9), 44.0, 0.9, 32.0, warm],
+		[Vector3(7.0, 1.5, 17.0), Vector3(3.0, 5.5, 5.9), 44.0, 0.9, 32.0, warm],
+		[Vector3(20.0, 1.5, -10.0), Vector3(8.0, 5.0, -2.0), 44.0, 0.75, 34.0, warm],
+	])
 
 static func _front(lm: LandmarkMesh) -> void:
 	var out := Vector3(0, 0, 1)

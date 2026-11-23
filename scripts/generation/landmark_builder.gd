@@ -94,12 +94,12 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
 	var model := model_root(root)
+	var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
 	match type:
-		"br_turku_auransilta": FtBridgeAuransilta.build(model)
-		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model)
-		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model)
+		"br_turku_auransilta": FtBridgeAuransilta.build(model, row)
+		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model, row)
+		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model, row)
 		_:
-			var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
 			if not StoSetBridges.build_row(model, type, row):
 				BridgeParam.build(model, row)
 	return root

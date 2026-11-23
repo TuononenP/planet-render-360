@@ -133,3 +133,11 @@ static func build(model: Node3D) -> void:
 	lm.lathe("Copper", Vector3(tc.x, 60.0, tc.z), FhU.dome_prof(3.9, 3.0, 10), 16)
 	FhP.latin_cross(lm, "Dark", Vector3(tc.x, 63.0, tc.z), 4.8, Vector3(0, 0, 1))
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.68)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(0.0, 1.5, 48.0), Vector3(0.0, 18.0, 26.0), 44.0, 0.95, 55.0, warm],
+		[Vector3(-28.0, 1.5, 52.0), Vector3(-0.1, 48.0, 19.7), 18.0, 1.0, 95.0, warm],
+		[Vector3(28.0, 1.5, 52.0), Vector3(-0.1, 48.0, 19.7), 18.0, 1.0, 95.0, warm],
+		[Vector3(40.0, 1.5, 0.0), Vector3(14.0, 14.0, 0.0), 48.0, 0.8, 55.0, warm],
+		[Vector3(-40.0, 1.5, 0.0), Vector3(-14.0, 14.0, 0.0), 48.0, 0.8, 55.0, warm],
+	])

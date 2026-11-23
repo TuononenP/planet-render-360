@@ -49,3 +49,9 @@ static func build(model: Node3D) -> void:
 	var c := u * 4.0 + n * -2.0
 	U.blk(lm, "White", c.x, top - 0.5, c.y, 0.9, AALTO_HOUSE_M - top + 0.5, 1.0)
 	lm.commit(model, "Aalto_house_")
+	var warm := Color(1.0, 0.88, 0.68)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(16.0, 1.0, 14.0), Vector3(4.0, 4.5, 2.0), 46.0, 0.65, 28.0, warm],
+		[Vector3(-16.0, 1.0, 14.0), Vector3(-4.0, 4.5, 2.0), 46.0, 0.65, 28.0, warm],
+		[Vector3(0.0, 1.0, -18.0), Vector3(0.0, 4.5, -6.0), 46.0, 0.6, 28.0, warm],
+	])

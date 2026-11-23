@@ -77,3 +77,10 @@ static func build(model: Node3D) -> void:
 			2.9, 0.3, 0.3)
 	lm.box("Frame", Vector3(9.0, 4.4, 40.0), Vector3(22.0, 0.35, 4.4))
 	lm.commit(model)
+	var warm := Color(1.0, 0.90, 0.72)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 1.5, 54.0), Vector3(-6.0, 10.0, 35.0), 48.0, 0.9, 55.0, warm],
+		[Vector3(26.0, 1.5, 54.0), Vector3(20.0, 10.0, 35.0), 48.0, 0.9, 55.0, warm],
+		[Vector3(65.0, 1.5, -12.0), Vector3(45.0, 12.0, -12.0), 48.0, 0.85, 55.0, warm],
+		[Vector3(-15.0, 1.5, -56.0), Vector3(0.0, 13.0, -36.0), 50.0, 0.85, 55.0, warm],
+	])

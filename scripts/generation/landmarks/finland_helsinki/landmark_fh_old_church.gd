@@ -95,6 +95,14 @@ static func build(model: Node3D) -> void:
 	lm.lathe("Gold", lc + Vector3(0, dh + 6.1, 0), U.ball(0.25), 8)
 	U.cross(lm, "Gold", lc + Vector3(0, dh + 6.55, 0), 1.8)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.68)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(0.0, 1.5, 25.0), Vector3(0.0, 9.0, 11.7), 48.0, 0.95, 45.0, warm],
+		[Vector3(0.0, 1.5, -26.0), Vector3(0.0, 8.0, -11.7), 48.0, 0.85, 45.0, warm],
+		[Vector3(36.0, 1.5, -1.6), Vector3(23.2, 8.0, -1.6), 44.0, 0.8, 40.0, warm],
+		[Vector3(-36.0, 1.5, -1.6), Vector3(-23.2, 8.0, -1.6), 44.0, 0.8, 40.0, warm],
+		[Vector3(16.0, 11.0, 16.0), Vector3(0.0, 19.0, -1.8), 32.0, 0.9, 45.0, warm],
+	])
 
 ## One walled volume between the given x and z bounds: granite plinth, board
 ## walls to the eave and a white cornice.

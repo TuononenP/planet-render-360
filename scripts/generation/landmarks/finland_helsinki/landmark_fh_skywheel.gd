@@ -24,7 +24,7 @@ extends RefCounted
 
 const U = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_util.gd")
 
-const ENTRY := {"type": "skywheel_helsinki", "name": "SkyWheel Helsinki", "lat": 60.1667282, "lon": 24.9594489,
+const ENTRY := {"type": "skywheel_helsinki", "skyline_priority": 1, "name": "SkyWheel Helsinki", "lat": 60.1667282, "lon": 24.9594489,
 	"radius_m": 5000.0, "wiki_title": "SkyWheel Helsinki", "height_m": 40.0, "clear_m": 22.0,
 	"yaw_deg": -90.4, "kind": "Observation wheel", "aliases": ["skywheel helsinki", "helsinki skywheel", "finnair skywheel"]}
 

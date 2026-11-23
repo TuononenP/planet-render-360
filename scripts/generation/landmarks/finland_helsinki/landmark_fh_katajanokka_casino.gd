@@ -66,6 +66,13 @@ static func build(model: Node3D) -> void:
 	_bays(lm)
 	_round_bay(lm)
 	lm.commit(model)
+	var warm := Color(1.0, 0.88, 0.66)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-4.0, 1.5, 24.0), Vector3(-2.0, 6.0, 7.5), 50.0, 0.9, 45.0, warm],
+		[Vector3(0.0, 1.5, -24.0), Vector3(0.0, 6.0, -7.4), 50.0, 0.85, 45.0, warm],
+		[Vector3(32.0, 1.5, -5.0), Vector3(18.0, 6.0, -4.6), 46.0, 0.9, 40.0, warm],
+		[Vector3(-12.0, 9.0, 14.0), Vector3(3.5, 11.5, -1.0), 34.0, 0.95, 45.0, warm],
+	])
 
 ## Pilasters with capitals, the dentil band and framed windows on both
 ## long faces.

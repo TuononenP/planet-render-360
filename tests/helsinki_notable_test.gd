@@ -12,10 +12,11 @@ var failures: Array[String] = []
 func _init() -> void:
 	_rows()
 	_apply()
+	_matches_bundled_osm()
 	_parse_runs_it()
 	_reaches_the_facade()
 	if failures.is_empty():
-		print("HELSINKI NOTABLE OK: %d rows, fill-only, provenance, parse hook, wall set" % HelsinkiNotable.ROWS.size())
+		print("HELSINKI NOTABLE OK: %d rows, bundled OSM, fill-only, provenance, parse hook, wall set" % HelsinkiNotable.ROWS.size())
 		quit(0)
 	else:
 		for f in failures:
@@ -27,12 +28,12 @@ func _check(ok: bool, message: String) -> void:
 		failures.append(message)
 
 func _rows() -> void:
-	_check(HelsinkiNotable.ROWS.size() >= 3, "the table must hold the curated rows")
+	_check(HelsinkiNotable.ROWS.size() >= 18, "the table must hold >= 18 curated rows (got %d)" % HelsinkiNotable.ROWS.size())
 	for id in HelsinkiNotable.ROWS:
 		var row: Dictionary = HelsinkiNotable.ROWS[id]
 		_check(str(id).begins_with("way:") or str(id).begins_with("relation:"), "%s is not an OSM identity" % id)
 		_check(str(row.get("name", "")) != "", "%s needs a name" % id)
-		_check(str(row.get("source", "")).begins_with("http"), "%s needs a source URL" % id)
+		_check(str(row.get("source", "")).begins_with("https://"), "%s needs an https source URL" % id)
 		var values: Dictionary = row.get("values", {})
 		_check(not values.is_empty(), "%s has no values" % id)
 		var mat := str(values.get("material", ""))
@@ -60,6 +61,27 @@ func _apply() -> void:
 	var alias := {"osm_id": "way:2", "alias_ids": [id], "material": ""}
 	HelsinkiNotable.apply([alias])
 	_check(alias.has("enriched"), "a row also matches through an alias id")
+
+func _matches_bundled_osm() -> void:
+	var found := {}
+	var enriched_in_parse := 0
+	for key in ["helsinki_detailed", "helsinki_ring1600"]:
+		var text := BundledOsm.read(key)
+		var feats := OsmParser.parse_features(text, 60.1680, 24.9530)
+		for b in feats["buildings"]:
+			var bd := b as Dictionary
+			for oid in OsmParser.ids_of(bd):
+				if HelsinkiNotable.ROWS.has(oid):
+					if not found.has(oid):
+						found[oid] = true
+						if (bd.get("enriched", {}) as Dictionary).has(HelsinkiNotable.PROVENANCE):
+							enriched_in_parse += 1
+	var missing: Array[String] = []
+	for id in HelsinkiNotable.ROWS:
+		if not found.has(id):
+			missing.append(str(id))
+	_check(missing.is_empty(), "%d HelsinkiNotable IDs missing from bundled OSM: %s" % [missing.size(), ", ".join(missing.slice(0, 10))])
+	_check(enriched_in_parse >= 18, "OsmParser applies HelsinkiNotable to bundled Helsinki buildings (got %d)" % enriched_in_parse)
 
 func _parse_runs_it() -> void:
 	# The hook sits in the OSM parse: a way carrying a row's id, with no

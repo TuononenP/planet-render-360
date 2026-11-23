@@ -69,6 +69,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"forum_marinum": FtForumMarinum.build(model)
 		"sigyn_bore_ships": FtSigynBoreShips.build(model)
 		"crichton_vulcan_crane": FtCrichtonVulcanCrane.build(model)
+		"meyer_gantry_cranes": FtMeyerGantryCranes.build(model)
 		"turku_synagogue": FtTurkuSynagogue.build(model)
 		"puutori_ensemble": FtPuutoriEnsemble.build(model)
 		"betel_church_turku": FtBetelChurch.build(model)
@@ -82,6 +83,9 @@ static func build(model: Node3D, type: String) -> bool:
 		"maaria_church_turku": FtMaariaChurch.build(model)
 		"telakkaranta_linnanfaltti": FtTelakkarantaLinnanfaltti.build(model)
 		"ruissalo_villas_spa": FtRuissaloVillasSpa.build(model)
+		"br_turku_auransilta": FtBridgeAuransilta.build(model)
+		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model)
+		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model)
 		_:
 			return false
 	return true
